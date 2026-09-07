@@ -38,6 +38,18 @@ export const LOCAL_MODEL_MISSING_MESSAGE =
   'Het lokale model staat niet (meer) op dit toestel — mogelijk heeft je browser het verwijderd om ruimte te maken. Download het opnieuw via Mijn → Privacy. Je regels en eerdere keuzes staan wel klaar.'
 
 /**
+ * Melding wanneer er op dit toestel nog nooit een model heeft gestaan.
+ *
+ * Bewust een ándere tekst dan `LOCAL_MODEL_MISSING_MESSAGE`. Die zegt "niet
+ * (meer)" en oppert dat de browser het verwijderd heeft — een verlies-narratief.
+ * Wie het model nooit gedownload had, leest daar dat hij iets kwijt is wat hij
+ * nooit had, en gaat zoeken naar een oorzaak die niet bestaat (UR3-17 #13).
+ * Hier is er niets misgegaan: dit is gewoon de eerste stap.
+ */
+export const LOCAL_MODEL_NOT_DOWNLOADED_MESSAGE =
+  'Er staat nog geen lokaal model op dit toestel. Download het eenmalig via Mijn → Privacy; daarna werkt dit ook zonder internet. Je regels en eerdere keuzes staan al klaar.'
+
+/**
  * Melding wanneer er nú een download loopt (transiente 'downloaden'-staat) —
  * het eviction-narratief zou hier feitelijk onjuist zijn (review 19 jul).
  */
@@ -70,7 +82,17 @@ function firstSentence(text: string): string {
  */
 export function resolveLocalReadiness(
   cap: LocalAiCapability,
-  model: { state: LocalModelState },
+  model: {
+    state: LocalModelState
+    /**
+     * Heeft dit toestel het model ooit compleet gehad
+     * (`hasEverDownloadedLocalModel()`)? Alleen dán is een leeg cachepad
+     * daadwerkelijk verlies. Ontbreekt het veld, dan gaan we uit van "nog nooit"
+     * — de onschuldige lezing: een gebruiker ten onrechte vertellen dat hij iets
+     * kwijt is, is de duurdere fout van de twee.
+     */
+    everDownloaded?: boolean
+  },
 ): LocalReadiness {
   if (cap.ok && model.state === 'klaar') {
     return { ready: true, kind: 'ok', message: null }
@@ -82,12 +104,18 @@ export function resolveLocalReadiness(
     return { ready: false, kind: 'capability', message: `${lead} ${LOCAL_READINESS_FLAP_HINT}` }
   }
 
-  // cap.ok, maar het model staat niet klaar. Een lopende download krijgt zijn
-  // eigen, feitelijk juiste melding; 'niet-gedownload'/'fout' → het
-  // eviction-/ontbreekt-narratief met de download-actie.
-  return {
-    ready: false,
-    kind: 'model-missing',
-    message: model.state === 'downloaden' ? LOCAL_MODEL_DOWNLOADING_MESSAGE : LOCAL_MODEL_MISSING_MESSAGE,
+  // cap.ok, maar het model staat niet klaar. Drie feitelijk verschillende
+  // toestanden, drie meldingen — de download-actie is dezelfde, de uitleg niet:
+  //  - 'downloaden'      → hij is er al mee bezig, niets is misgegaan.
+  //  - leeg cachepad ('niet-gedownload') zónder eerdere download → hij is er
+  //    nog nooit aan begonnen; er is niets verloren gegaan.
+  //  - al het overige ('fout', of een leeg cachepad ná een geslaagde download)
+  //    → er stónd iets en dat is weg: het eviction-narratief.
+  if (model.state === 'downloaden') {
+    return { ready: false, kind: 'model-missing', message: LOCAL_MODEL_DOWNLOADING_MESSAGE }
   }
+  if (model.state === 'niet-gedownload' && !model.everDownloaded) {
+    return { ready: false, kind: 'model-missing', message: LOCAL_MODEL_NOT_DOWNLOADED_MESSAGE }
+  }
+  return { ready: false, kind: 'model-missing', message: LOCAL_MODEL_MISSING_MESSAGE }
 }

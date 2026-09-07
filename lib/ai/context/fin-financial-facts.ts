@@ -44,6 +44,7 @@ import {
   isHomeExcludedFromFire,
 } from '@/lib/housing-strategy'
 import { dailyExpenseRate } from '@/lib/format'
+import { NL_AOW_AGE } from '@/lib/constants'
 
 /**
  * De canonieke kern-cijfers die beide Fins nodig hebben. Alle EUR-/%-waarden zijn
@@ -87,6 +88,18 @@ export interface FinFacts {
   maandinkomen: number
   /** Maanduitgaven in EUR. */
   maanduitgaven: number
+  /**
+   * Cohort-correcte AOW-leeftijd, FRACTIONEEL (67.75 = 67 jaar en 9 maanden) —
+   * verbatim `coreData.aowAge`, dus `lookupAowAge` op de `aow_leeftijd`-tabel via
+   * de gedeelde referentie-cache. Consumenten schrijven 'm met `formatAowAge`.
+   *
+   * UR3-24: dit feit ontbrak volledig in de Fin-context. Het model kreeg de
+   * AOW-leeftijd alleen te zien wanneer het stopanker toevallig AOW was en gokte
+   * anders uit trainingskennis — drie keer dezelfde vraag op hetzelfde testaccount
+   * gaf 68j3m / 69j3m / 67j. Consume, don't recompute geldt ook voor het model:
+   * krijgt het de canonieke waarde niet, dan verzint het er een.
+   */
+  aowLeeftijd: number
 }
 
 /** Alleen `housing_strategy_config` is nodig; beide callers laden méér, maar delen dit veld. */
@@ -98,6 +111,11 @@ export type FinFactsProfile = { housing_strategy_config?: unknown } | null
  */
 export function buildWillFinancialFacts(coreData: CorePageData, profile: FinFactsProfile): FinFacts {
   const { rawFinancials } = coreData
+  // `loadCoreData` zet `aowAge` altijd (lookupAowAge valt zelf al terug op NL_AOW_AGE
+  // zodra de geboortedatum of de tabel ontbreekt), dus deze vangnet-tak vuurt alleen
+  // op onvolledige mocks. Nooit een eigen leeftijd-afleiding — alleen de canonieke
+  // constante als de bundel niets levert.
+  const aowLeeftijd = Number.isFinite(coreData.aowAge) ? coreData.aowAge : NL_AOW_AGE
   const totalAssets = rawFinancials.totalAssets
   const totalDebts = rawFinancials.totalDebts
   const effectiveSwr = coreData.fireParams.effectiveSwr
@@ -119,6 +137,9 @@ export function buildWillFinancialFacts(coreData: CorePageData, profile: FinFact
       dagtarief: 0,
       maandinkomen: rawFinancials.monthlyIncome,
       maanduitgaven: rawFinancials.monthlyExpenses,
+      // De AOW-leeftijd hangt aan de geboortedatum, niet aan de financiële data —
+      // ook een leeg account moet het canonieke getal krijgen i.p.v. een gok.
+      aowLeeftijd,
     }
   }
 
@@ -229,5 +250,6 @@ export function buildWillFinancialFacts(coreData: CorePageData, profile: FinFact
     dagtarief: coreData.dailyExpenseRate ?? dailyExpenseRate(rawFinancials.monthlyExpenses),
     maandinkomen: rawFinancials.monthlyIncome,
     maanduitgaven: rawFinancials.monthlyExpenses,
+    aowLeeftijd,
   }
 }

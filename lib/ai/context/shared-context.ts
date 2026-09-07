@@ -10,6 +10,8 @@ import { deriveCountdown } from '@/lib/horizon/fire-scalar'
 import { isKernelReachedNowDisplay } from '@/lib/horizon-kernel/bridge'
 import { deflate, factorAtAge } from '@/lib/euro-display'
 import { buildWillFinancialFacts } from './fin-financial-facts'
+import { formatAowAge } from '@/lib/aow-leeftijd'
+import { buildDataFreshnessLine } from './data-freshness'
 import { section, formatCurrency, formatFreedomTime, formatPercentage } from './formatter'
 
 const TEMPORAL_LABELS: Record<number, string> = {
@@ -257,6 +259,12 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
     : null
 
   const lines = [
+    // HET VOORBEHOUD STAAT VÓÓR DE CIJFERS (UR3-22). Rusten de transactie-
+    // afgeleide getallen hieronder op maandenoude data, dan hoort het model dat
+    // te weten vóór het ze leest — niet als voetnoot erna. Zelfde canonieke
+    // oordeel als de "Gegevens verouderd"-banner op /overzicht; null bij verse
+    // data, dus in het normale geval kost deze regel geen token.
+    buildDataFreshnessLine(coreData.latestTransactionMonth),
     `Netto vermogen: ${formatCurrency(facts.nettoVermogen)}`,
     `Vrijgekochte tijd: ${formatFreedomTime(facts.freedomYears, facts.freedomMonths)}`,
     `Vrijheids-%: ${formatPercentage(freedomPercentage)}`,
@@ -291,6 +299,12 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
     // vulde dat gat met eigen kennis (7% / ~3%) i.p.v. de profielwaarden (UR3-06
     // geval 4, eigenaarskeuze optie A: de velden alsnog leveren).
     `Aannames (uit je profiel, /toekomst/voorkeuren): bruto rendement ${formatPercentage(coreData.fireParams.grossReturn * 100)} | inflatie ${formatPercentage(coreData.fireParams.inflationRate * 100)} | veilig opnamepercentage (SWR) ${formatPercentage(coreData.fireParams.effectiveSwr * 100)}. Noem deze percentages letterlijk; gebruik NOOIT een standaardaanname (geen 7%, geen 4%-regel).`,
+    // DE AOW-leeftijd — cohort-correct uit de `aow_leeftijd`-tabel (`lookupAowAge`),
+    // geschreven met de canonieke `formatAowAge`, dus letterlijk hetzelfde als op het
+    // scherm. Stond hier tot UR3-24 NIET in: het model kreeg de leeftijd alleen mee
+    // wanneer het stopanker toevallig AOW was en gokte anders uit trainingskennis —
+    // drie keer dezelfde vraag op hetzelfde testaccount gaf 68j3m / 69j3m / 67j.
+    `AOW-leeftijd: ${formatAowAge(facts.aowLeeftijd)}${coreData.currentAge != null ? ` (je bent nu ${coreData.currentAge})` : ''} — jouw persoonlijke AOW-leeftijd uit de officiële SVB-cohorttabel. Noem dit getal letterlijk; leid het NOOIT zelf af uit een geboortejaar.`,
     `Budgettering: ${coreData.budgetingActive !== false ? 'actief' : 'NIET actief — gebruiker budgetteert niet. Doe GEEN budget-gerelateerde voorstellen.'}`,
     // Het stop-anker (ADR 0129) — alleen onder een vast anker; zie hierboven.
     ankerRegel,

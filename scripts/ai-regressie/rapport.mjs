@@ -40,7 +40,12 @@ uit.push('|---|---|---|---|')
 uit.push(`| Max 150 woorden | mediaan ${NULMETING.woordenMediaan}, ${pct(NULMETING.bovenNorm150, NULMETING.n)} erboven | mediaan ${s.woordenMediaan}, ${pct(s.bovenNorm150, s.beantwoord)} erboven | 150 |`)
 uit.push(`| Geen emoji | ${pct(NULMETING.metEmoji, NULMETING.n)} | ${pct(s.metEmoji, s.beantwoord)} | 0 |`)
 uit.push(`| Geen product-aanbeveling | ${NULMETING.productMetActie} geval | ${s.productMetActie} | 0 |`)
-uit.push(`| Jargon per antwoord | mediaan ${NULMETING.jargonMediaan} | mediaan ${s.jargonMediaan} | 2 |`)
+uit.push(`| Jargon per antwoord (alles) | mediaan ${NULMETING.jargonMediaan} | mediaan ${s.jargonMediaan} | informatief |`)
+// UR3-11 spoor C: alleen EXTERN vakjargon wordt afgerekend. Huisjargon (FIRE,
+// spaarquote, vrijheidsdagen) is door base.ts verplichte taal; die meetellen zou
+// de app vragen haar eigen framing op te geven.
+uit.push(`| → waarvan huisjargon (toegestaan) | — | mediaan ${s.jargonHuisMediaan ?? '—'} | n.v.t. |`)
+uit.push(`| → waarvan extern vakjargon | — | mediaan ${s.jargonExternMediaan ?? '—'} | 2 |`)
 uit.push('')
 uit.push(`De nulmeting is met de hand gescoord op ${NULMETING.n} antwoorden (${NULMETING.bron}); de meting hierboven automatisch. Vergelijkbaar in richting, niet in decimalen.`)
 uit.push('')
@@ -79,12 +84,12 @@ uit.push('')
 // ── Per categorie ───────────────────────────────────────────────────────────
 uit.push('## Per categorie')
 uit.push('')
-uit.push('| Categorie | N | Woorden mediaan | > 150 w | Emoji | Hard verbod | Twijfel | Jargon mediaan |')
-uit.push('|---|---|---|---|---|---|---|---|')
+uit.push('| Categorie | N | Woorden mediaan | > 150 w | Emoji | Hard verbod | Twijfel | Jargon mediaan | Extern jargon mediaan |')
+uit.push('|---|---|---|---|---|---|---|---|---|')
 const cats = [...new Set(gelukt.map(r => r.vraag.cat))].sort()
 for (const c of cats) {
   const g = gelukt.filter(r => r.vraag.cat === c)
-  uit.push(`| ${c} | ${g.length} | ${mediaan(g.map(r => r.score.woorden))} | ${g.filter(r => r.score.woorden > 150).length} | ${g.filter(r => r.score.emoji).length} | ${g.filter(r => r.score.verbodHard.length).length} | ${g.filter(r => r.score.verbodZacht.length).length} | ${mediaan(g.map(r => r.score.jargonAantal))} |`)
+  uit.push(`| ${c} | ${g.length} | ${mediaan(g.map(r => r.score.woorden))} | ${g.filter(r => r.score.woorden > 150).length} | ${g.filter(r => r.score.emoji).length} | ${g.filter(r => r.score.verbodHard.length).length} | ${g.filter(r => r.score.verbodZacht.length).length} | ${mediaan(g.map(r => r.score.jargonAantal))} | ${mediaan(g.map(r => r.score.jargonExternAantal ?? 0))} |`)
 }
 uit.push('')
 

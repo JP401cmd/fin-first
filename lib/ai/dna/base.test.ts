@@ -63,13 +63,44 @@ describe('BASE_SYSTEM_PROMPT — Wft-adviesgrens (UR3-03)', () => {
  * ontbrak volledig (missing-rule bug) en is hier de kernfix.
  */
 describe('BASE_SYSTEM_PROMPT — toon: lengte, emoji, jargon (UR3-11)', () => {
-  it('houdt de bestaande lengte- en emoji-regels intact', () => {
-    expect(BASE_SYSTEM_PROMPT).toMatch(/max 150 woorden/i)
+  it('houdt de lengte- en emoji-regels intact', () => {
+    expect(BASE_SYSTEM_PROMPT).toMatch(/150 woorden/i)
     expect(BASE_SYSTEM_PROMPT).toMatch(/NOOIT emoji/i)
   })
 
-  it('verankert de lengteregel ook bij het delen van een tip of aandachtspunt', () => {
-    expect(BASE_SYSTEM_PROMPT).toMatch(/tip of aandachtspunt deelt/i)
+  it('benoemt bij de lengteregel WAT er wegvalt, niet alleen dat het korter moet', () => {
+    // Mechanisme uit de meting van 6 sep: een verbod houdt stand als het de
+    // vervanging benoemt. De kale variant ("max 150 woorden, ook bij een tip")
+    // maakte de mediaan juist slechter (168 -> 186).
+    expect(BASE_SYSTEM_PROMPT).toMatch(/laat detail weg, niet de kern/i)
+    expect(BASE_SYSTEM_PROMPT).toMatch(/één tip in plaats van drie/i)
+  })
+
+  it('benoemt per emoji-slot de vervanging (afsluiter, sectiemarkeerder, status)', () => {
+    // De 23 gemeten emoji stonden in exact drie slots met een onvervulde behoefte.
+    expect(BASE_SYSTEM_PROMPT).toMatch(/ook niet als afsluiter na een uitroep/i)
+    expect(BASE_SYSTEM_PROMPT).toMatch(/enthousiasme leg je in de woorden zelf/i)
+    expect(BASE_SYSTEM_PROMPT).toMatch(/\*\*Let op:\*\*/)
+    expect(BASE_SYSTEM_PROMPT).toMatch(/status benoem je in woorden/i)
+  })
+
+  it('houdt het ∞-merkteken uitgezonderd van het emoji-verbod', () => {
+    // base.ts § FRAMING licenseert ∞ expliciet; het uitvoerfilter spaart 'm ook.
+    expect(BASE_SYSTEM_PROMPT).toMatch(/Alleen het ∞-symbool blijft toegestaan/i)
+  })
+
+  it('vraagt niet langer om een samenvatting én dezelfde inhoud nog eens uitgewerkt', () => {
+    expect(BASE_SYSTEM_PROMPT).not.toMatch(/Begin met een directe samenvatting, dan detail/i)
+    expect(BASE_SYSTEM_PROMPT).toMatch(/Begin met het antwoord zelf/i)
+  })
+
+  it('begrenst de opsomming bij een keuzevraag zonder de Wft-verwijzing te raken', () => {
+    // De grootste lengte-hefboom (39 antwoorden, mediaan 220-232) zat in de eis
+    // om vier overwegingen + vragen + verwijzing te geven. Alleen de opsomming
+    // is begrensd; verwijzing en adviesverbod blijven woordelijk staan.
+    expect(BASE_SYSTEM_PROMPT).toMatch(/niet alle vier opsommen/i)
+    expect(BASE_SYSTEM_PROMPT).toMatch(/hooguit één verduidelijkende vraag/i)
+    expect(BASE_SYSTEM_PROMPT).toMatch(/erkend financieel adviseur \(AFM-geregistreerd\)/i)
   })
 
   it('instrueert een vakterm uit te leggen in dezelfde zin, of te vermijden', () => {

@@ -122,16 +122,36 @@ export const HANDELINGSWERKWOORDEN = /\b(koop|kopen|verkoop|verkopen|beleg|beleg
 // De zwaarste woorden uit onderzoek/jargon-ranglijst.md (6 sep 2026), gerangschikt
 // op frequentie × vroegheid × onvermijdelijkheid. Fin gebruikte er 4 tot 14 per
 // antwoord in de nulmeting.
-export const JARGON = [
+//
+// GESPLITST (UR3-11 spoor C, besluit eigenaar 6 sep 2026). De ongesplitste
+// teller vroeg de app impliciet om haar eigen taal op te geven: de meest
+// gebruikte termen in de meting van 6 sep waren TriFinity's eigen woorden — FIRE
+// 59x, spaarquote 38x, vrijheidsdagen 34x, netto vermogen 20x, vrijheidstijd
+// 19x — en die zijn door `lib/ai/dna/base.ts` § KERNFILOSOFIE juist VERPLICHT
+// gesteld ("vrijheidstijd is DE taal van TriFinity"). Een norm van 2 totaal is
+// daarmee onbereikbaar zonder de framing te slopen. Genormeerd wordt daarom
+// alleen het EXTERNE vakjargon; huisjargon wordt apart geteld zodat een
+// stijging ervan wél zichtbaar blijft.
+
+/** TriFinity's eigen taal + schermlabels — toegestaan, apart geteld, niet genormeerd. */
+export const HUISJARGON = [
   'FIRE', 'spaarquote', 'vrijheidstijd', 'vrijheidsdagen', 'vrijheidsleeftijd',
-  'netto vermogen', 'Wft', 'bandbreedte', 'Box 3', 'Box 1', 'Box 2',
-  'financiële onafhankelijkheid', 'cashflow', 'noodfonds', 'noodbuffer',
-  'AOW-leeftijd', 'rekenhulp', 'scenario', 'what-if', 'bruto', 'netto',
-  'horizon', 'hefboom', 'hefbomen', 'heffingsvrije voet', 'heffingsvrij vermogen',
-  'belastingdruk', 'briefing', 'vaste lasten', 'forfait', 'forfaitair',
-  'jaarruimte', 'tegenbewijs', 'SWR', 'onttrekkingspercentage', 'annuïtair',
-  'lineair', 'rendementsgrondslag', 'aanmerkelijk belang', 'lijfrente', 'drawdown',
+  'netto vermogen', 'financiële onafhankelijkheid', 'noodfonds', 'noodbuffer',
+  'rekenhulp', 'briefing', 'hefboom', 'hefbomen', 'horizon', 'scenario',
+  'what-if', 'vaste lasten', 'bandbreedte',
 ]
+
+/** Vakjargon van buiten (fiscaal/financieel-sector) — dit is wat genormeerd wordt. */
+export const EXTERN_JARGON = [
+  'Wft', 'Box 3', 'Box 1', 'Box 2', 'cashflow', 'AOW-leeftijd', 'bruto', 'netto',
+  'heffingsvrije voet', 'heffingsvrij vermogen', 'belastingdruk', 'forfait',
+  'forfaitair', 'jaarruimte', 'tegenbewijs', 'SWR', 'onttrekkingspercentage',
+  'annuïtair', 'lineair', 'rendementsgrondslag', 'aanmerkelijk belang',
+  'lijfrente', 'drawdown',
+]
+
+/** De volledige lijst — blijft bestaan zodat oudere uitvoer vergelijkbaar blijft. */
+export const JARGON = [...HUISJARGON, ...EXTERN_JARGON]
 
 // ── Canonieke fiscale waarden ───────────────────────────────────────────────
 // Uit lib/box3-data.ts en lib/constants.ts. Alleen waarden waarvoor de repo zélf de
@@ -271,6 +291,15 @@ export const DREMPELS = {
   woordenMax:       { nulmeting: 510,     norm: 250, bron: 'ontwerp spoor 8' },
   grensOvertreding: { nulmeting: 3 / 14,  norm: 0,   bron: 'REGELS.grens' },
   emoji:            { nulmeting: 2 / 14,  norm: 0,   bron: 'REGELS.emoji' },
-  jargonMediaan:    { nulmeting: 7,       norm: 2,   bron: 'ontwerp spoor 8' },
+  // Ongesplitste teller — blijft staan voor de vergelijking met de nulmeting,
+  // maar is GEEN afrekennorm meer: hij telt ook TriFinity's eigen taal mee, die
+  // base.ts § KERNFILOSOFIE verplicht stelt (UR3-11 spoor C).
+  jargonMediaan:    { nulmeting: 7,       norm: 2,   bron: 'ontwerp spoor 8 (ongesplitst — informatief)' },
+  // De norm die wél afrekent. `nulmeting: null` omdat de handmatige nulmeting van
+  // 5 sep niet gesplitst te herleiden is. Wel gemeten: een gratis herscoring van
+  // de meting van 6 sep (129 antwoorden) geeft mediaan 1 extern vakjargon tegen 2
+  // huisjargon — de norm van 2 was dus al gehaald zodra je TriFinity's eigen,
+  // verplichte taal niet meetelt. Precies de reden voor de splitsing.
+  jargonExternMediaan: { nulmeting: null, norm: 2,   bron: 'UR3-11 spoor C (extern vakjargon)' },
   fiscaleFout:      { nulmeting: 5,       norm: 0,   bron: 'ontwerp spoor 8' },
 }

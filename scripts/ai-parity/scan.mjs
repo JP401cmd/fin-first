@@ -23,10 +23,14 @@
  * zonder dat de lokale DNA opnieuw is gecondenseerd/gebaselined (dat re-condense-
  * en-review-pad is de `lokale-prompt-parity`-skill, niet dit script).
  *
- * `--check` is de CI-poort: is het GECOMMITTE parity.json nog vers t.o.v. een
- * verse herberekening? Zo niet (bron gewijzigd → andere live-hash/`inSync`), dan
- * exit 1. Symmetrisch met arch:check; de scan-tijd (`generatedAt`) telt bewust
- * NIET mee in de vergelijking (anders zou elke run "stale" lijken).
+ * `--check` is de CI-poort, en is GELAAGD (zoals merkstem:check, ADR 0112):
+ *   STALENESS (exit 1) — is het GECOMMITTE parity.json nog vers t.o.v. een verse
+ *     herberekening? Zo niet (bron gewijzigd → andere live-hash/`inSync`), exit 1.
+ *     Symmetrisch met arch:check; de scan-tijd (`generatedAt`) telt bewust NIET
+ *     mee in de vergelijking (anders zou elke run "stale" lijken).
+ *   DRIFT (waarschuwing → exit 1 na DRIFT_GRACE_DAYS) — een verse drift
+ *     waarschuwt; een drift die langer dan één release blijft staan blokkeert.
+ *     Zie DRIFT_GRACE_DAYS voor het waarom en de maatstaf.
  *
  * HASH-METHODE (moet exact gelijk zijn aan de baseline-generator van P1):
  * crypto.createHash('sha256').update(<RAW utf8 bestandsinhoud>).digest('hex') —
@@ -104,6 +108,100 @@ export function classifyBaseline({ stored, headContent }) {
   if (stored === sha256(lf)) return 'in-sync'
   if (stored === sha256(lf.replace(/\n/g, '\r\n'))) return 'crlf-artefact'
   return 'drift'
+}
+
+// ── drift-ondergrens (eigenaarsbesluit 7 sep 2026 — variant B) ───────────────
+/**
+ * `parity:check` is een STALENESS-poort: hij vergelijkt het gecommitte rapport
+ * met een verse herberekening. `inSync` zit ín die signatuur, dus zolang beide
+ * `false` zeggen is de poort groen — het rapport is vers, de drift blijft staan.
+ * Zo stond op 7 sep 2026 een gecommitte parity.json met `inSync: false` terwijl
+ * de pre-push-hook slaagde: er was app-breed geen enkele poort die op ECHTE
+ * prompt-drift faalt.
+ *
+ * De eigenaar koos variant B mét harde ondergrens: drift WAARSCHUWT zolang ze
+ * vers is en BLOKKEERT zodra ze langer dan één release blijft staan. Vanaf regel
+ * één hard falen zou de push gijzelen tot de hercondensatie door de eigenaar-gate
+ * is — de `lokale-prompt-parity`-skill shipt bewust niet automatisch en dat kan
+ * dagen duren. Alleen waarschuwen leunt op precies de discipline die hier vijf
+ * keer faalde. Dezelfde gelaagde lijn als `merkstem:check` (ADR 0112).
+ *
+ * MAATSTAF = kalenderdagen sinds de drift voor het eerst in het GECOMMITTE
+ * rapport verscheen (`driftSince`). Een commit- of versietelling is hier geen
+ * bruikbare proxy: `package.json#version` bewoog drie keer in de hele historie,
+ * en een release is nu eens 5 en dan weer 46 commits. TriFinity shipt gemiddeld
+ * elke één à twee dagen; veertien dagen is dus ruim één release — genoeg voor de
+ * eigenaar-gate, te kort om drift een maand te laten liggen.
+ */
+const DRIFT_GRACE_DAYS = 14
+
+/**
+ * Stempelt `driftSince` op elke bron die uit sync staat, en draagt een bestaande
+ * stempel uit het gecommitte rapport ONGEWIJZIGD over. Zonder dat overdragen zet
+ * elke scan de klok terug en blijft drift eeuwig binnen de coulance — dan is de
+ * ondergrens geen poort maar decoratie. Komt een bron weer in sync, dan valt de
+ * stempel weg (drift die opnieuw ontstaat begint een nieuwe termijn).
+ *
+ * Muteert de verse artefacten ter plekke en geeft ze terug.
+ *
+ * @param {any[]} artefacts   verse artefacten (worden ter plekke aangevuld)
+ * @param {any} committed     het gecommitte parity-rapport (of null)
+ * @param {string} nowIso     stempel voor nieuw geconstateerde drift
+ * @returns {any[]}
+ */
+export function carryDriftSince(artefacts, committed, nowIso) {
+  const eerder = new Map()
+  for (const a of Array.isArray(committed?.artefacts) ? committed.artefacts : []) {
+    for (const s of Array.isArray(a?.sources) ? a.sources : []) {
+      if (s?.inSync === false && typeof s?.driftSince === 'string' && s.driftSince) {
+        eerder.set(`${a?.id ?? ''}|${s?.file ?? ''}`, s.driftSince)
+      }
+    }
+  }
+  for (const a of Array.isArray(artefacts) ? artefacts : []) {
+    for (const s of Array.isArray(a?.sources) ? a.sources : []) {
+      if (s.inSync) delete s.driftSince
+      else s.driftSince = eerder.get(`${a?.id ?? ''}|${s?.file ?? ''}`) || nowIso
+    }
+  }
+  return artefacts
+}
+
+/**
+ * Deelt de gedrifte bronnen van een rapport in twee bakken: binnen de coulance
+ * (waarschuwing) en erbuiten (blokkeert). Puur, zodat de ondergrens testbaar is
+ * zonder werkboom en zonder de klok van de CI-machine.
+ *
+ * Een bron zónder leesbare stempel telt als 0 dagen: nooit vastgelegde drift
+ * waarschuwt, blokkeert niet — de eerstvolgende scan stempelt hem alsnog. Zo kan
+ * een ontbrekend veld nooit een push blokkeren die er niets aan kan doen.
+ *
+ * @param {{ report?: any, now?: Date | string, graceDays?: number }} [opts]
+ * @returns {{ warn: any[], block: any[], graceDays: number }}
+ */
+export function driftGraceVerdict({ report, now = new Date(), graceDays = DRIFT_GRACE_DAYS } = {}) {
+  const nu = now instanceof Date ? now.getTime() : Date.parse(String(now))
+  const warn = []
+  const block = []
+  for (const a of Array.isArray(report?.artefacts) ? report.artefacts : []) {
+    for (const s of Array.isArray(a?.sources) ? a.sources : []) {
+      if (s?.inSync !== false) continue
+      const stempel = typeof s?.driftSince === 'string' ? s.driftSince : ''
+      const sinds = Date.parse(stempel)
+      const dagen =
+        Number.isNaN(sinds) || Number.isNaN(nu) ? 0 : Math.floor((nu - sinds) / 86_400_000)
+      const entry = {
+        artefact: typeof a?.id === 'string' ? a.id : '',
+        label: typeof a?.label === 'string' ? a.label : (a?.id ?? ''),
+        file: typeof s?.file === 'string' ? s.file : '',
+        driftSince: stempel,
+        dagen,
+      }
+      if (dagen > graceDays) block.push(entry)
+      else warn.push(entry)
+    }
+  }
+  return { warn, block, graceDays }
 }
 
 /**
@@ -244,10 +342,25 @@ function buildArtefact(a) {
   }
 }
 
+/** Het GECOMMITTE rapport, defensief gelezen (ontbrekend/kapot → null). */
+function readCommitted() {
+  if (!existsSync(DATA_FILE)) return null
+  try {
+    return JSON.parse(read(DATA_FILE) || 'null')
+  } catch {
+    return null
+  }
+}
+
 function buildParity() {
   const now = new Date()
   const manifest = readManifest() || {}
   const artefacts = readArtefacts(manifest).map(buildArtefact)
+
+  // Draag de drift-stempels van het gecommitte rapport over vóór het rapport
+  // wordt samengesteld: `driftSince` moet de EERSTE constatering bewaren, niet
+  // die van de laatste scan (zie carryDriftSince).
+  carryDriftSince(artefacts, readCommitted(), now.toISOString())
 
   // Overall in-sync: elk artefact moet kloppen én er moet er minstens één zijn
   // (een leeg manifest is geen "alles in sync").
@@ -284,6 +397,10 @@ function signature(data) {
   const d = data && typeof data === 'object' ? data : {}
   const sources = Array.isArray(d.sources) ? d.sources : []
   const artefacts = Array.isArray(d.artefacts) ? d.artefacts : []
+  // `driftSince` staat hier BEWUST niet in: het is een datumstempel, geen
+  // structureel feit. Zou hij meetellen, dan verklaarde de eerste stempel het
+  // gecommitte rapport meteen stale en zou elke scan een diff opleveren. De
+  // ondergrens leest de stempel rechtstreeks uit het gecommitte rapport.
   const sig = (list) =>
     list.map((s) => ({
       file: typeof s?.file === 'string' ? s.file : '',
@@ -323,7 +440,8 @@ function printSummary(data) {
       `\n  ${a.inSync ? '✓' : '✗'} ${a.label} — ${a.estimatedTokens}/${a.subBudget} tokens (${a.tokenSource})${over}`,
     )
     for (const s of a.sources) {
-      console.log(`      ${s.inSync ? '✓' : '✗'} ${s.file}`)
+      const sinds = !s.inSync && s.driftSince ? `  — drift sinds ${s.driftSince.slice(0, 10)}` : ''
+      console.log(`      ${s.inSync ? '✓' : '✗'} ${s.file}${sinds}`)
     }
   }
   console.log(`\n  ✓ ${rel(DATA_FILE)}\n`)
@@ -349,15 +467,52 @@ function checkFresh() {
     )
     process.exit(1)
   }
-  let committed
-  try {
-    committed = JSON.parse(read(DATA_FILE) || 'null')
-  } catch {
-    committed = null
-  }
+  const committed = readCommitted()
   const fresh = buildParity()
+
+  // ── laag 1 (waarschuwing): drift die er is, maar nog binnen de coulance ────
+  // Bewust vóór de staleness-uitgang: is het rapport óók stale, dan wil je de
+  // drift nog steeds op je scherm zien in plaats van pas na de volgende scan.
+  const { warn: coulance, block: verlopen, graceDays } = driftGraceVerdict({ report: committed })
+  if (coulance.length > 0) {
+    console.warn(
+      `\nparity:check — WAARSCHUWING: ${coulance.length} bron(nen) in drift; de lokale DNA is niet opnieuw gecondenseerd.`,
+    )
+    for (const d of coulance) {
+      console.warn(
+        `  • ${d.label} · ${d.file} — ${d.dagen} dag(en) in drift (blokkeert na ${graceDays})`,
+      )
+    }
+    console.warn(
+      '  Loop de hercondensatie-afweging langs de `lokale-prompt-parity`-skill (eigenaar-gate)\n' +
+        '  en draai daarna `npm run parity:rebaseline -- --accept-drift`.',
+    )
+  }
+
   if (signature(committed) === signature(fresh)) {
-    console.log('\nparity:check — parity-rapport is vers (structureel gelijk). ✓\n')
+    // ── laag 2 (hard): drift die een release heeft overleefd ─────────────────
+    if (verlopen.length > 0) {
+      console.error(
+        `\nparity:check — GEBLOKKEERD: ${verlopen.length} bron(nen) staan langer dan ${graceDays} dagen in drift.\n`,
+      )
+      for (const d of verlopen) {
+        console.error(
+          `  • ${d.label} · ${d.file} — drift sinds ${d.driftSince.slice(0, 10)} (${d.dagen} dagen)`,
+        )
+      }
+      console.error(
+        '\n  De lokale DNA is een afgeleide van de cloud-bron-DNA; blijft die afwijken, dan\n' +
+          '  antwoordt Fin on-device anders dan in de cloud. Hercondenseer via de\n' +
+          '  `lokale-prompt-parity`-skill (met eigenaar-gate) en draai daarna\n' +
+          '  `npm run parity:rebaseline -- --accept-drift`.\n',
+      )
+      process.exit(1)
+    }
+    console.log(
+      `\nparity:check — parity-rapport is vers (structureel gelijk). ✓${
+        coulance.length ? '  (drift: waarschuwing, zie boven)' : ''
+      }\n`,
+    )
     return
   }
   console.error('\nparity:check — docs/ai-parity/parity.json is STALE.\n')

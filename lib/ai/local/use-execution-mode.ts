@@ -37,6 +37,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { checkLocalAiCapability } from './webgpu-capability'
 import { getLocalModelState } from './model-manager'
+import { hasEverDownloadedLocalModel } from './model-download-marker'
 import { resolveLocalReadiness } from './local-readiness'
 import { readProofVerdict } from './proof-verdict'
 import { useExecutionPrefsVersion } from '@/lib/ai/execution-prefs-signal'
@@ -286,7 +287,10 @@ export function useExecutionMode(group: AiExecutionGroup, active = true): Execut
       const [cap, model] = await Promise.all([checkLocalAiCapability(), getLocalModelState()])
       if (cancelled) return
 
-      const readiness = resolveLocalReadiness(cap, { state: model.state })
+      const readiness = resolveLocalReadiness(cap, {
+        state: model.state,
+        everDownloaded: hasEverDownloadedLocalModel(),
+      })
       if (!readiness.ready) {
         setState({
           status: 'blocked',

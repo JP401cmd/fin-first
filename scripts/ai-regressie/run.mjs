@@ -31,7 +31,7 @@ import { createClient } from '@supabase/supabase-js'
 import {
   VRAGEN, VRAGEN_EXTRA, REGELS, DREMPELS,
   VERBOD_HARD, VERBOD_ZACHT, GRENS_MARKERS,
-  PRODUCTNAMEN, IMPERATIEF, JARGON,
+  PRODUCTNAMEN, IMPERATIEF, JARGON, HUISJARGON, EXTERN_JARGON,
 } from './vragen.mjs'
 
 const HIER = dirname(fileURLToPath(import.meta.url))
@@ -191,7 +191,14 @@ function scoor(vraag, antwoord) {
   const productMetActie = genoemdeProducten.filter(p =>
     zinnen.some(z => new RegExp(`\\b${p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(z) && IMPERATIEF.test(z)))
 
-  const jargon = JARGON.filter(w => new RegExp(`\\b${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i').test(t))
+  // Jargon in twee tellers (UR3-11 spoor C): huisjargon is TriFinity's eigen,
+  // door base.ts verplichte taal en wordt apart geteld; extern vakjargon is wat
+  // de norm afrekent. `jargon`/`jargonAantal` blijven de unie, zodat de
+  // vergelijking met de nulmeting van 5 sep intact blijft.
+  const telJargon = (lijst) => lijst.filter(w => new RegExp(`\\b${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i').test(t))
+  const jargonHuis = telJargon(HUISJARGON)
+  const jargonExtern = telJargon(EXTERN_JARGON)
+  const jargon = [...jargonHuis, ...jargonExtern]
 
   // Adviesgrens vooraan: alleen bij adviesvragen.
   let grensVooraan = null
@@ -236,6 +243,10 @@ function scoor(vraag, antwoord) {
     productMetActie,
     jargon,
     jargonAantal: jargon.length,
+    jargonHuis,
+    jargonHuisAantal: jargonHuis.length,
+    jargonExtern,
+    jargonExternAantal: jargonExtern.length,
     grensVooraan,
     nulCijfers,
     verwachteWaardeGevonden: verwachteWaarden,
@@ -333,6 +344,8 @@ function vatSamen(resultaten, gedraaid) {
     metZachtVerbod: gelukt.filter(r => r.score.verbodZacht.length).length,
     productMetActie: gelukt.filter(r => r.score.productMetActie.length).length,
     jargonMediaan: mediaan(gelukt.map(r => r.score.jargonAantal)),
+    jargonHuisMediaan: mediaan(gelukt.map(r => r.score.jargonHuisAantal ?? 0)),
+    jargonExternMediaan: mediaan(gelukt.map(r => r.score.jargonExternAantal ?? 0)),
     grensvragen: gelukt.filter(r => r.vraag.grensvraag).length,
     grensVooraanGehaald: gelukt.filter(r => r.score.grensVooraan === true).length,
     nulCijfersGetoetst: gelukt.filter(r => r.score.nulCijfers).length,

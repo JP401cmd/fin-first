@@ -4,6 +4,7 @@ import {
   LOCAL_READINESS_FLAP_HINT,
   LOCAL_MODEL_MISSING_MESSAGE,
   LOCAL_MODEL_DOWNLOADING_MESSAGE,
+  LOCAL_MODEL_NOT_DOWNLOADED_MESSAGE,
 } from './local-readiness'
 import type { LocalAiCapability } from './webgpu-capability'
 
@@ -48,10 +49,41 @@ describe('resolveLocalReadiness', () => {
     expect(r.kind).toBe('capability')
   })
 
-  it('model-missing-tak: capability oké maar model niet klaar → eviction-melding', () => {
-    const r = resolveLocalReadiness(cap({ ok: true }), { state: 'niet-gedownload' })
+  // UR3-17 #18/#13: "nooit gedownload" en "gedownload en daarna kwijtgeraakt"
+  // leveren allebei state 'niet-gedownload' op (de Cache Storage is in beide
+  // gevallen leeg). Alleen `everDownloaded` onderscheidt ze, en alleen het
+  // tweede geval verdient het verlies-narratief.
+  it('model-missing-tak: leeg cachepad ná een eerdere download → eviction-melding', () => {
+    const r = resolveLocalReadiness(cap({ ok: true }), {
+      state: 'niet-gedownload',
+      everDownloaded: true,
+    })
     expect(r.ready).toBe(false)
     expect(r.kind).toBe('model-missing')
+    expect(r.message).toBe(LOCAL_MODEL_MISSING_MESSAGE)
+  })
+
+  it('model-missing-tak: nog nooit gedownload → géén verlies-narratief', () => {
+    const r = resolveLocalReadiness(cap({ ok: true }), {
+      state: 'niet-gedownload',
+      everDownloaded: false,
+    })
+    expect(r.ready).toBe(false)
+    expect(r.kind).toBe('model-missing')
+    expect(r.message).toBe(LOCAL_MODEL_NOT_DOWNLOADED_MESSAGE)
+    // De twee zinnen waar de melding over ging: hij mag niet suggereren dat er
+    // iets verdwenen is, en niet dat de browser iets heeft opgeruimd.
+    expect(r.message).not.toContain('niet (meer)')
+    expect(r.message).not.toContain('verwijderd om ruimte te maken')
+  })
+
+  it('model-missing-tak: zonder everDownloaded is de onschuldige lezing de default', () => {
+    const r = resolveLocalReadiness(cap({ ok: true }), { state: 'niet-gedownload' })
+    expect(r.message).toBe(LOCAL_MODEL_NOT_DOWNLOADED_MESSAGE)
+  })
+
+  it("state 'fout' houdt het verlies-narratief, óók zonder everDownloaded", () => {
+    const r = resolveLocalReadiness(cap({ ok: true }), { state: 'fout' })
     expect(r.message).toBe(LOCAL_MODEL_MISSING_MESSAGE)
   })
 

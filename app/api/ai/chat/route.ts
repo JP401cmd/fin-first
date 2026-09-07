@@ -7,7 +7,7 @@ import { buildContext } from '@/lib/ai/context/builder'
 import { getTools } from '@/lib/ai/tools'
 import { WHATIF_PROMPT } from '@/lib/ai/dna/wil'
 import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
-import { maskPIIInOutput } from '@/lib/ai/pii-output-filter'
+import { createChatOutputFilter } from '@/lib/ai/chat-output-filter'
 import { checkTierGate } from '@/lib/require-tier'
 import { assertCloudAllowed } from '@/lib/ai/privacy-gate'
 import { checkCreditBudget, creditLimitMessage } from '@/lib/ai/credit-gate'
@@ -239,10 +239,6 @@ export async function POST(req: Request) {
       onFinish: () => recordAiUsage(supabase, user.id, 'chat'),
     })
 
-    /* PII output filter — mask any IBANs/BSNs that slip through in AI output.
-     * We wrap the UIMessageStream with a TransformStream that applies maskPIIInOutput
-     * to each chunk's string content. The UIMessageStream encodes chunks as strings
-     * at the wire level, so we intercept at that layer. */
     // `onError` bepaalt wat er bij een providerfout MIDDEN in de stream naar de
     // client gaat. Zonder deze hook stuurt de AI SDK zijn Engelse default
     // ("An error occurred.") — Engels in een NL-app én niet classificeerbaar.
@@ -258,16 +254,13 @@ export async function POST(req: Request) {
         return JSON.stringify({ error: copy.text, code: copy.code })
       },
     })
-    const piiFilter = new TransformStream({
-      transform(chunk: unknown, controller: TransformStreamDefaultController) {
-        if (typeof chunk === 'string') {
-          controller.enqueue(maskPIIInOutput(chunk))
-        } else {
-          controller.enqueue(chunk)
-        }
-      },
-    })
-    const filteredStream = rawStream.pipeThrough(piiFilter)
+    /* Uitvoerfilter op de stream: emoji strippen én IBAN/BSN maskeren.
+     * De transform staat in `lib/ai/chat-output-filter.ts` — inline in deze route
+     * was hij niet te testen zonder auth/model/provider te mocken, en juist
+     * daardoor kon de PII-tak stil uitvallen: hij testte op `typeof chunk ===
+     * 'string'`, terwijl `toUIMessageStream()` UIMessageChunk-OBJECTEN levert.
+     * De maskering vuurde daardoor nooit. */
+    const filteredStream = rawStream.pipeThrough(createChatOutputFilter())
 
     return createUIMessageStreamResponse({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

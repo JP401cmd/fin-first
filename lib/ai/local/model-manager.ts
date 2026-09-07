@@ -9,6 +9,7 @@
 
 import type { ProofOptions, ProofOutcome } from './output-proof'
 import { storeSelectedLocalModelId } from './selected-model'
+import { markLocalModelDownloaded } from './model-download-marker'
 import type { LocalModelId } from './model-catalog'
 
 export type LocalModelState = 'niet-gedownload' | 'downloaden' | 'klaar' | 'fout'
@@ -74,6 +75,10 @@ export async function downloadLocalModel(onProgress: (p: LocalModelProgress) => 
     } catch {
       /* persist is best-effort; falen mag de download niet ongeldig maken */
     }
+
+    // Vanaf hier weten we dat dit toestel het model ooit compleet had. Raakt
+    // het later kwijt (eviction), dan is het verlies-narratief pas terecht.
+    markLocalModelDownloaded()
 
     transientState = null // vanaf nu leidt de cache de staat af ('klaar')
   } catch (err) {

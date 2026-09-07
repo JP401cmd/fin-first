@@ -361,6 +361,17 @@ describe('LOCAL_CHAT_DNA — fin-actie-fence-instructie', () => {
     expect(LOCAL_CHAT_DNA).toMatch(/dezelfde zin/i)
   })
 
+  it('benoemt bij lengte en emoji de VERVANGING, niet alleen het verbod (parity met base.ts, UR3-11)', () => {
+    // Zelfde mechanisme als in de cloud-DNA: een kaal verbod hield in de meting
+    // van 6 sep niet stand, een verbod dat de vervanging benoemt wel. Het lokale
+    // model is kleiner, dus dit weegt hier zwaarder, niet lichter.
+    expect(LOCAL_CHAT_DNA).toMatch(/laat dan detail weg en niet de kern/i)
+    expect(LOCAL_CHAT_DNA).toMatch(/ook niet als afsluiter na een uitroep/i)
+    expect(LOCAL_CHAT_DNA).toMatch(/enthousiasme leg je in de woorden zelf/i)
+    expect(LOCAL_CHAT_DNA).toMatch(/status benoem je in woorden/i)
+    expect(LOCAL_CHAT_DNA).toMatch(/Alleen het ∞-symbool blijft toegestaan/i)
+  })
+
   it('blijft binnen het sub-budget van 2000 tokens (chars/4-heuristiek)', () => {
     // Zelfde heuristiek als knowledge-context#estimateTokens en de parity-scanner.
     expect(Math.ceil(LOCAL_CHAT_DNA.length / 4)).toBeLessThanOrEqual(2000)
