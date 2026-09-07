@@ -58,11 +58,32 @@ function makeData(overrides: Partial<DashboardData> = {}): DashboardData {
   } as unknown as DashboardData
 }
 
-describe('AssetsWidget — vrijheidstijd-grondslag (bevinding 3)', () => {
-  it('framet vrijheidstijd expliciet als bruto bezit ("vrijheid in bezit")', () => {
+// UR3-19 (6 sep 2026) — DEZE TEST IS OMGEDRAAID, met opzet.
+//
+// Hij pinde het besluit van een eerdere auditronde: de vrijheidstijd op het
+// BRUTO bezittingentotaal mocht blijven staan mits hij zich als bruto LABELDE
+// ("≈ X vrijheid in bezit"). Het eigenaarsbesluit bij UR3-19 draait dat terug —
+// een label repareert een bruto teller niet (besluit K3 van UR3-04), en
+// "vermogen ÷ dagtarief" is bovendien de verboden derde vrijheidstijd-grootheid
+// (ADR 0126 D1: dagtarief = marginaal, runway = totaal). De assertie bewijst nu
+// het omgekeerde: géén tijdvertaling op het bruto totaal, bedrag blijft staan.
+describe('AssetsWidget — geen vrijheidstijd op het bruto bezit (UR3-19)', () => {
+  it.each(['quarter', 'half', 'full'] as const)(
+    'toont op %s-formaat geen tijdvertaling van het bruto bezittingentotaal',
+    (size) => {
+      const { container } = render(<AssetsWidget size={size} data={makeData()} />)
+      const text = container.textContent ?? ''
+      expect(text).not.toContain('vrijheid in bezit')
+      expect(text).not.toContain('vrijheid')
+    },
+  )
+
+  it('laat het bedrag zelf ongemoeid — alleen de tijdvertaling vervalt', () => {
     const { container } = render(<AssetsWidget size="full" data={makeData()} />)
     const text = container.textContent ?? ''
-    expect(text).toContain('vrijheid in bezit')
+    expect(text).toContain('Totaal actief vermogen')
+    // Het bruto totaal uit de fixture (€ 100.000) staat er nog.
+    expect(text).toContain('100.000')
   })
 })
 

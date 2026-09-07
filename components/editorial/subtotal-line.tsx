@@ -5,8 +5,9 @@
  * "excl. eigen woning"-subtotaal bij de dubbele grondslag op /core/assets
  * (bezittingen) en /core/debts (schulden). Eén gedeeld recept zodat plaatsing,
  * typografie én masking op beide pagina's identiek zijn — alleen `label` en de
- * `trailing`-inhoud verschillen (bezittingen: vrijheidstijd-equivalent;
- * schulden: beschrijvende noot).
+ * `trailing`-inhoud verschillen (schulden en de netto-vermogen-grafiek: een
+ * beschrijvende noot). Op /overzicht/bezittingen draagt de regel sinds UR3-19
+ * bewust GÉÉN `trailing`: daar stond een vrijheidstijd op een bruto teller.
  *
  * Kern-accent op het bedrag; de kleur loopt via de className, NIET via de
  * MaskedAmount-`tone` — anders zetten `TONE_CLASS['kern']` en `text-kern-700`

@@ -352,6 +352,42 @@ export const CREDIBLE_MONTHLY_BASIS_MIN = 100
 export const CREDIBLE_DAILY_EXPENSE_MIN =
   (CREDIBLE_MONTHLY_BASIS_MIN * FREEDOM_MONTHS_PER_YEAR) / FREEDOM_DAYS_PER_YEAR
 
+// ── Welke TELLER mag door dit dagtarief? (besluit K3 + ADR 0126 D1) ───
+//
+// De twee blokken hierboven bewaken de NOEMER: de kalenderbasis en een
+// geloofwaardige €/dag. Ze zeggen niets over het BEDRAG dat je erdoor deelt, en
+// precies daar zijn twee fouten ontstaan die er in code identiek uitzien.
+//
+// K3 — EEN BRUTO BEDRAG KRIJGT GEEN TIJDVERTALING. Een bezittingentotaal is
+// bruto: de eigen woning telt voor de volle marktwaarde mee en er gaat geen
+// schuld af. "€ 1.586.288 = 41 jaar vrijheid" belooft dan tijd op geld waarvan
+// een deel van de bank is (netto ~29 jaar op hetzelfde account). Ook mét
+// markering blijft dat misleidend — een label repareert een bruto teller niet.
+// De regel is geboren bij de rondleiding (UR3-04/K3, lib/rondleiding/steps.ts:
+// `formatWithFreedom` staat daarom niet op `totals.bezittingen`) en met UR3-19
+// doorgevoerd op /overzicht/bezittingen en de Bezittingen-tegel. Hij staat hier
+// omdat dít het huis van de conversie is, en niet in een comment in één
+// consument, waar niemand hem zoekt.
+//
+// ADR 0126 D1 — ER ZIJN PRECIES TWEE VRIJHEIDSTIJD-GROOTHEDEN, EN EEN DERDE IS
+// VERBODEN:
+//   · MARGINAAL — het dagtarief hieronder: "wat koopt één euro aan tijd". Voor
+//     badges, deltas, tips, budgetdetail, één transactie, één onbezwaarde pot.
+//   · TOTAAL — de runway (lib/horizon/runway.ts + de zin in
+//     lib/horizon/anker-copy.ts): "hoe lang kom ik mee als ik nu stop", één
+//     kernel-run mét rendement, AOW, Box 3 en woonstrategie.
+// "Vermogen ÷ dagtarief" stelt een TOTALE vraag met het MARGINALE instrument.
+// Die platte deling (`computeFreedomTotal`) is bij ADR 0126 PR C verwijderd;
+// wat erna nog opdook was steeds een handgerolde heropvoering ervan.
+//
+// Praktisch: `calculateFreedomTime`/`formatWithFreedom` zijn bedoeld voor een
+// STROOM of een AFGEBAKEND, onbezwaard bedrag — een uitgave, een besparing, een
+// delta, een fee, een schuld die je terugkoopt, een liquide pot. Niet voor een
+// vermogensTOTAAL. Bewaakt door regel 5 van scripts/check-freedom-time-basis.mjs
+// (npm run check:freedom-basis, pre-push) op een expliciete namenlijst; die gate
+// is een vangrail, geen dekkingsbewijs — een totaal via een neutraal genoemde
+// tussenvariabele ziet hij niet.
+
 /**
  * Maandgrondslag (€/mnd) zoals een becijferde claim hem mag gebruiken, of 0
  * wanneer hij onder de geloofwaardigheidsvloer ligt. 0 is bewust dezelfde

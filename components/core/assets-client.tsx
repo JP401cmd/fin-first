@@ -230,9 +230,24 @@ type AssetsPageProps = {
    *  `/overzicht/bezittingen` rendert de page-shell zélf de `i` (+ statuspunt
    *  + insight-toggle); dan `false` om een dubbele info-knop te voorkomen. */
   showPageInfo?: boolean
+  /**
+   * De runway-zin voor de deck (UR3-19, optie C) — kant-en-klaar server-side
+   * gebouwd uit `computeHorizonRunway` + `ankerZin` (lib/horizon/anker-copy.ts)
+   * en hier alleen gerenderd. Dit is het ENIGE geldige tijdgetal op deze pagina
+   * dat over het gehéél gaat: een TOTALE grootheid (hoe ver reikt je liquide
+   * vermogen) beantwoord met het totale instrument, in plaats van de verwijderde
+   * "bruto vermogen ÷ dagtarief" die een totale vraag met het marginale
+   * instrument beantwoordde (ADR 0126 D1).
+   *
+   * Bewust een STRING en geen reach/stop-paar: de zin heeft één huis
+   * (`ankerZin`) en deze component mag hem niet opnieuw formuleren. `null` /
+   * weggelaten (legacy `/core/assets`, geen basisrun, geen geboortedatum) ⇒
+   * geen zin — nooit een verzonnen terugval.
+   */
+  runwayZin?: string | null
 }
 
-export default function AssetsPage({ initialAssetId, initialData, toolbarFilter, inspirationCards, assetTypeFilter, showPageInfo = true }: AssetsPageProps = {}) {
+export default function AssetsPage({ initialAssetId, initialData, toolbarFilter, inspirationCards, assetTypeFilter, showPageInfo = true, runwayZin }: AssetsPageProps = {}) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
@@ -880,9 +895,18 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
     {
       kicker: 'Totale waarde',
       amount: fc(totalValue),
-      sub: dailyExpenses > 0 && totalValue > 0
-        ? `${formatFreedomTimeString(calculateFreedomTime(totalValue, dailyExpenses), 'long')} vrijheid`
-        : `${activeAssets.length} bezitting${activeAssets.length === 1 ? '' : 'en'}`,
+      // GEEN tijdvertaling op `totalValue` (UR3-19, besluit optie A). Zie de
+      // grondslag-notitie boven `perspectiveAssetValue`: dit is het BRUTO
+      // bezittingentotaal — de eigen woning telt voor de volle marktwaarde mee
+      // en er gaat geen enkele schuld af (deze pagina kent alleen hypotheken,
+      // en die alleen voor de overwaarde-regel in het detailvenster). Twee
+      // fouten tegelijk als je er toch door deelt: (1) de grondslag —
+      // "41 jaar vrijheid" op geld waarvan een deel van de bank is; (2) de
+      // GROOTHEID — "vermogen ÷ dagtarief" stelt een TOTALE vraag met het
+      // MARGINALE instrument, en ADR 0126 D1 verbiedt die derde grootheid naast
+      // dagtarief (marginaal) en runway (totaal). De runway-zin in de deck
+      // hierboven is het geldige tijdantwoord op dit scherm.
+      sub: `${activeAssets.length} bezitting${activeAssets.length === 1 ? '' : 'en'}`,
       variant: 'winner',
     },
     {
@@ -917,9 +941,10 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
     {
       kicker: `Waarde over ${projectionYears} jaar`,
       amount: fc(futureValue),
-      sub: dailyExpenses > 0 && futureValue > 0
-        ? `${formatFreedomTimeString(calculateFreedomTime(futureValue, dailyExpenses), 'long')} vrijheid`
-        : `+${fc(projectedGrowth)} verwacht`,
+      // Idem (UR3-19): `futureValue` is hetzelfde bruto totaal, alleen
+      // geprojecteerd — dus dezelfde twee fouten, en bovendien het tarief van
+      // nu toegepast op een bedrag van over N jaar.
+      sub: `+${fc(projectedGrowth)} verwacht`,
       variant: 'positive',
     },
   ]
@@ -956,6 +981,24 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
                 woning op 50% inclusie telde hier gewoon vol mee. Netto vermogen
                 weegt wél (lib/asset-data.ts), vandaar de verwijzing. */}
             {activeAssets.length > 0 && ` ${activeAssets.length} bezitting${activeAssets.length === 1 ? '' : 'en'} bij elkaar, elk voor zijn volle waarde — je netto vermogen weegt ze naar inclusiepercentage en valt daardoor anders uit.`}
+            {/* De vertaling naar tijd op ditzelfde scherm (UR3-19, optie C).
+                Bewust HIER en niet onder een bedrag: de runway volgt niet uit
+                het bruto totaal erboven — hij rekent op je LIQUIDE vermogen,
+                mét rendement, AOW, Box 3 en woonstrategie. Onder een KPI gezet
+                zou hij opnieuw suggereren dat het ene uit het andere volgt. */}
+            {runwayZin && (
+              <>
+                {' '}
+                <span className="text-[var(--ink-2)]">{runwayZin}</span>{' '}
+                <Link
+                  href="/toekomst"
+                  className="underline decoration-dotted underline-offset-4 hover:text-[var(--ink)]"
+                >
+                  Bekijk je toekomst
+                </Link>
+                .
+              </>
+            )}
           </>
         }
       >
@@ -1039,19 +1082,16 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
       />
 
       {/* Dubbele grondslag — subtieler subtotaal "excl. eigen woning" onder het
-          bruto totaal. Zelfde typografie-familie (mono/tabular-nums), kern-accent,
-          mét vrijheidstijd-equivalent. Alleen bij eigen woning + strategie ≠
-          include_full (shouldShowDualHousingBasis). */}
+          bruto totaal. Zelfde typografie-familie (mono/tabular-nums), kern-accent.
+          Alleen bij eigen woning + strategie ≠ include_full
+          (shouldShowDualHousingBasis).
+
+          GEEN `trailing` met vrijheidstijd meer (UR3-19, optie A): het huis
+          eruit halen maakt de teller niet netto — de schulden staan er nog
+          steeds vol in — en de grootheid-fout (ADR 0126 D1) blijft sowieso
+          staan. Deze regel toont dus alleen het bedrag. */}
       {showExclHomeSubtotal && (
-        <SubtotalLine
-          label="excl. eigen woning"
-          amount={totalValueExclHome}
-          trailing={
-            dailyExpenses > 0 && totalValueExclHome > 0
-              ? `${formatFreedomTimeString(calculateFreedomTime(totalValueExclHome, dailyExpenses), 'long')} vrijheid`
-              : undefined
-          }
-        />
+        <SubtotalLine label="excl. eigen woning" amount={totalValueExclHome} />
       )}
 
       {/* Toolbar — filter links (indien meegegeven), Herwaarderen + primaire
@@ -1125,7 +1165,7 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
                 <GlossaryTerm term="diversificatie">Diversificatie</GlossaryTerm> over meerdere typen verlaagt risico.
               </p>
               <div className="mt-4 flex items-center gap-6">
-                <AllocationPie byType={byType} total={totalValue} dailyExpenses={dailyExpenses} />
+                <AllocationPie byType={byType} total={totalValue} />
                 <div className="flex-1 space-y-2">
                   {(Object.keys(ASSET_TYPE_LABELS) as AssetType[]).map((type) => {
                     const data = byType[type]
@@ -1182,11 +1222,9 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
                   {totalMonthlyContrib > 0
                     ? `Met je huidige inleg van ${fc(totalMonthlyContrib)}/maand groeit je portfolio naar ${fc(futureValue)} in ${projectionYears} jaar`
                     : `Zonder extra inleg groeit je portfolio naar ${fc(futureValue)} in ${projectionYears} jaar`}
-                  {dailyExpenses > 0 && futureValue > 0 && (
-                    <span className="text-positive font-medium">
-                      {' — '}dat is {formatFreedomTimeString(calculateFreedomTime(futureValue, dailyExpenses), 'long')} vrijheid
-                    </span>
-                  )}
+                  {/* Hier stond "— dat is X vrijheid" op `futureValue`. Vervallen
+                      met UR3-19 (optie A): bruto teller, en bovendien de
+                      verboden derde vrijheidstijd-grootheid (ADR 0126 D1). */}
                 </p>
               )}
             </section>
@@ -1582,6 +1620,18 @@ export function AssetDetailModal({
 
   const availableDebts = allDebts.filter(d => !d.linked_asset_id)
 
+  /**
+   * Hangt er een schuld aan dít bezit? (UR3-19) Bepaalt of de waarde nog een
+   * vrijheidstijd mag dragen: bij een gekoppelde hypotheek of DGA-lening is
+   * `asset.current_value` een BRUTO teller — een deel van die euro's is van de
+   * bank — en toont de app de overwaarde verderop op ditzelfde scherm.
+   * `mortgage` komt als prop mee (eigen woning); `linkedDebts` wordt voor een
+   * deelneming geladen. Beide zijn conservatief: zolang de deelnemings-fetch
+   * loopt is `linkedDebts` leeg en toont de regel — dezelfde ordegrootte
+   * onnauwkeurigheid als de overwaarde-regel zelf.
+   */
+  const heeftGekoppeldeSchuld = mortgage != null || linkedDebts.length > 0
+
   // Body-renderer — gedeeld tussen standalone (BottomSheet) en embedded
   // (pane-content) modi. Houdt dezelfde DOM-structuur, alleen de buitenste
   // wrapper verschilt zodat de pane-driewegregel respecteerd blijft.
@@ -1632,7 +1682,13 @@ export function AssetDetailModal({
               {fc(value)}
             </span>
           </p>
-          {dailyExpenses > 0 && value > 0 && (
+          {/* UR3-19 (optie A), enige genuanceerde geval van de zes: een
+              ONBEZWAARD bezit is geen bruto teller — daar is `value` wél wat de
+              gebruiker heeft. Hangt er een schuld aan (gekoppelde hypotheek bij
+              een eigen woning, DGA-lening bij een deelneming), dan is `value` de
+              marktwaarde vóór aflossing en vervalt de tijdvertaling: de
+              overwaarde staat een stuk lager op ditzelfde scherm. */}
+          {dailyExpenses > 0 && value > 0 && !heeftGekoppeldeSchuld && (
             <p
               className="mt-1.5 italic text-[12px] text-[var(--ink-3)]"
               style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
@@ -2923,17 +2979,15 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
 
 // ── Allocation pie chart (SVG donut) ─────────────────────────
 
-// memo(): props (byType via useMemo, total/dailyExpenses primitieven) zijn al
-// stabiel, dus deze SVG-donut hoeft niet mee te herrenderen bij ongerelateerde
-// state-wijzigingen van de host-pagina.
+// memo(): props (byType via useMemo, total primitief) zijn al stabiel, dus deze
+// SVG-donut hoeft niet mee te herrenderen bij ongerelateerde state-wijzigingen
+// van de host-pagina.
 const AllocationPie = memo(function AllocationPie({
   byType,
   total,
-  dailyExpenses,
 }: {
   byType: Record<AssetType, { assets: Asset[]; total: number }>
   total: number
-  dailyExpenses: number
 }) {
   const fc = useFc()
   const { ref, hasEntered } = useInViewAnimation({ duration: 700 })
@@ -2977,23 +3031,16 @@ const AllocationPie = memo(function AllocationPie({
           />
         )
       })}
-      <text x={cx} y={dailyExpenses > 0 && total > 0 ? cy - 10 : cy - 4} textAnchor="middle" fontSize="11" fontWeight="700" fill="#18181b">
+      {/* Het middenlabel toont het bedrag + het woord "totaal". Hier stond een
+          vrijheidstijd op `total` — en `total` is `totalValue`, het BRUTO
+          bezittingentotaal (r. ~1128). Vervallen met UR3-19 (optie A); daarmee
+          heeft deze donut geen dagtarief meer nodig. */}
+      <text x={cx} y={cy - 4} textAnchor="middle" fontSize="11" fontWeight="700" fill="#18181b">
         {fc(total)}
       </text>
-      {dailyExpenses > 0 && total > 0 ? (
-        <>
-          <text x={cx} y={cy + 4} textAnchor="middle" fontSize="7" fill="#d97706" data-testid="donut-freedom">
-            {formatFreedomTimeString(calculateFreedomTime(total, dailyExpenses), 'short', false)}
-          </text>
-          <text x={cx} y={cy + 14} textAnchor="middle" fontSize="7" fill="#a1a1aa">
-            vrijheid
-          </text>
-        </>
-      ) : (
-        <text x={cx} y={cy + 10} textAnchor="middle" fontSize="8" fill="#a1a1aa">
-          totaal
-        </text>
-      )}
+      <text x={cx} y={cy + 10} textAnchor="middle" fontSize="8" fill="#a1a1aa">
+        totaal
+      </text>
     </svg>
     </div>
   )

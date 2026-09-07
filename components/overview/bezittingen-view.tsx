@@ -27,9 +27,12 @@ import type { AssetsPageData } from '@/lib/assets-data-loader'
 interface BezittingenViewProps {
   initialData?: AssetsPageData
   inspirationCards: ReactNode
+  /** Kant-en-klare runway-zin voor de deck (UR3-19, optie C) — server-side
+   *  gebouwd in de page, hier alleen doorgegeven. */
+  runwayZin?: string | null
 }
 
-export function BezittingenView({ initialData, inspirationCards }: BezittingenViewProps) {
+export function BezittingenView({ initialData, inspirationCards, runwayZin }: BezittingenViewProps) {
   const [filter, setFilter] = useState<AssetType | null>(null)
 
   return (
@@ -39,6 +42,7 @@ export function BezittingenView({ initialData, inspirationCards }: BezittingenVi
         <BezittingenFilter value={filter} onChange={setFilter} assetCount={assetCount} />
       )}
       inspirationCards={inspirationCards}
+      runwayZin={runwayZin}
       assetTypeFilter={filter}
       // De page-shell (`overzicht/bezittingen/page.tsx`) rendert de i +
       // statuspunt + insight-toggle; onderdruk de ingebouwde i hier.

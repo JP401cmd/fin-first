@@ -136,6 +136,89 @@ const INLINE_CONVERSION_ALLOWED = new Map([
 ])
 
 /**
+ * REGEL 5 (UR3-19) — de TELLER, niet de noemer.
+ *
+ * Regel 1 t/m 4 bewaken uitsluitend de NOEMER van de €→vrijheidstijd-conversie:
+ * dat het dagtarief uit één bron komt. Ze zeggen niets over het BEDRAG dat je
+ * erdoor deelt. Op /overzicht/bezittingen stond daardoor jarenlang een perfect
+ * canonieke noemer onder een bruto teller: `totalValue` = Σ bezittingen, de
+ * eigen woning voor de volle marktwaarde, geen enkele schuld eraf. Op het
+ * gemelde account gaf dat "41 jaar 4 maanden vrijheid" op €1.586.288 waarvan
+ * €453.620 van de bank was (~29 jaar netto). De Bezittingen-tegel op /overzicht
+ * deed hetzelfde met `totalAssets`.
+ *
+ * Twee redenen dat dit een GATE verdient en geen losse fix:
+ *  1. GRONDSLAG — een bruto bezittingentotaal is geen besteedbaar vermogen.
+ *     Besluit K3 (UR3-04) legt dit vast: een bruto bedrag krijgt géén
+ *     tijdvertaling, ook niet mét markering. Een label repareert een bruto
+ *     teller niet.
+ *  2. GROOTHEID — "vermogen ÷ dagtarief" stelt een TOTALE vraag met het
+ *     MARGINALE instrument. ADR 0126 D1 kent er twee (dagtarief = marginaal,
+ *     runway = totaal) en verbiedt een derde. Die platte deling
+ *     (`computeFreedomTotal`) is in PR C verwijderd — behalve waar hij
+ *     handgerold in componenten stond, precies wat deze regel nu vangt.
+ *
+ * WAT WE VANGEN: een EXPLICIETE lijst identifiers die een bruto vermogens-
+ * totaal dragen, als eerste argument van `calculateFreedomTime`/
+ * `formatWithFreedom`. Bewust een lijst en géén prefix-heuristiek zoals
+ * `total*` of `bruto*`:
+ *   · `total*` zou `totalDebts` (schuld → "vrijheid die je terugkoopt"),
+ *     `totalRecurringAmount`, `totalAnnualFee`, `totalIncome`/`totalExpenses`
+ *     en `totalImpact` meepakken — allemaal STROMEN of KOSTEN, waar de
+ *     marginale vraag juist de goede is;
+ *   · `bruto*` zou `bruto`/`totalBruto` in de pensioen-strategie-editor
+ *     meepakken — een bruto pensioen-INKOMEN per jaar, opnieuw een stroom.
+ * Een regel die die gevallen flagt wordt binnen een maand met een allowlist
+ * omzeild en bewijst dan niets meer. Groeit het aantal namen: voeg de naam toe,
+ * niet een wildcard.
+ *
+ * NIET-ALLOWLISTBAAR, net als regel 2 t/m 4. Een bruto teller is geen bewuste
+ * andere grondslag maar een verkeerde grootheid; de uitweg is de weergave laten
+ * vervallen (K3) of de canonieke totaal-grootheid tonen (de runway uit
+ * lib/horizon/runway.ts + de zin uit lib/horizon/anker-copy.ts). De
+ * RESIDUE-lijst hieronder mag daarom alleen KRIMPEN — een entry die geen
+ * overtreding meer is maakt de gate hard rood, zelfde patroon als
+ * COLUMN_RULE_RESIDUE in check-client-data-reads.mjs.
+ *
+ * BLINDE VLEK (vangrail, geen dekkingsbewijs): een bruto totaal dat eerst in een
+ * neutraal genoemde tussenvariabele landt (`const bedrag = totalValue`) glipt
+ * erdoor, net als een doorgeefketen via props. De bron-grendel
+ * components/core/assets-client.bruto-vrijheidstijd.test.ts dekt die vorm voor
+ * het oppervlak waar hij daadwerkelijk optrad.
+ */
+const GROSS_WEALTH_TELLERS = [
+  'totalValue',
+  'totalValueExclHome',
+  'totalAssets',
+  'futureValue',
+  'grossAssets',
+  'grossNetWorth',
+  'brutoVermogen',
+  'brutoBezit',
+  'brutoAssets',
+]
+/**
+ * Toegestane prefixen vóór zo'n naam: de BUNDEL-objecten waaruit een oppervlak
+ * zijn totalen leest (`data.totalAssets` is exact dezelfde fout als een kale
+ * `totalAssets`). Bewust een lijst en niet `[A-Za-z0-9_$]+\.`: die brede vorm
+ * pakte `holding.totalValue` in holding-fav-widget.tsx mee — de marktwaarde van
+ * ÉÉN liquide positie zonder gekoppelde schuld, waar "hoeveel dagen dekt dit"
+ * juist de goede, marginale vraag is. De naam alleen zegt niets; het gaat om
+ * het OBJECT waar hij op zit.
+ */
+const GROSS_TELLER_OWNERS = ['data', 'initialData', 'dashboardData', 'bundle', 'overrides']
+const GROSS_TELLER = new RegExp(
+  String.raw`(?<![A-Za-z0-9_$.])(?:calculateFreedomTime|formatWithFreedom)\s*\(\s*(?:(?:${GROSS_TELLER_OWNERS.join('|')})\.)?(${GROSS_WEALTH_TELLERS.join('|')})(?![A-Za-z0-9_$])`,
+)
+/**
+ * Bekende, nog niet opgeloste overtredingen. LEEG sinds UR3-19 — de zes
+ * aanroepen in components/core/assets-client.tsx en de aanroep in
+ * components/widgets/assets-widget.tsx zijn vervallen. Toevoegen mag alleen met
+ * een datum en een kaart; verwijderen mag altijd.
+ */
+const GROSS_TELLER_RESIDUE = new Map([])
+
+/**
  * Verwijder string-literals uit een regel vóór de match-test. De naam
  * `dailyExpenseRate(3000)` komt namelijk óók voor in PROZA — UAT-verwachtingen
  * ("vrijheidsdagen = calculateFreedomTime(…, dailyExpenseRate(2200))") en de
@@ -372,6 +455,41 @@ for (const file of files) {
     })
   }
 
+  // ── Regel 5: bruto vermogenstotaal als TELLER (UR3-19) ─────────────────
+  // Niet-allowlistbaar. Wel een RESIDUE-lijst die alleen mag krimpen: een entry
+  // die geen overtreding meer is maakt de gate hard rood, zodat een opgeloste
+  // vindplaats niet stil als "bekend" blijft staan.
+  {
+    const residueReason = GROSS_TELLER_RESIDUE.get(rel)
+    let hitsHere = 0
+    if (GROSS_TELLER.test(src)) {
+      src.split(/\r?\n/).forEach((rawLine, i) => {
+        if (COMMENT_LINE.test(rawLine)) return
+        const m = GROSS_TELLER.exec(stripStrings(rawLine))
+        if (!m) return
+        hitsHere++
+        if (residueReason) {
+          allowed.push({ rel, line: i + 1, text: rawLine.trim(), why: 'RESIDUE (moet krimpen): ' + residueReason })
+          return
+        }
+        violations.push({
+          rel,
+          line: i + 1,
+          text: rawLine.trim(),
+          rule: `bruto vermogenstotaal (\`${m[1]}\`) als teller van de vrijheidstijd-conversie`,
+        })
+      })
+    }
+    if (residueReason && hitsHere === 0) {
+      violations.push({
+        rel,
+        line: 0,
+        text: `(geen overtreding meer gevonden — verwijder deze entry uit GROSS_TELLER_RESIDUE)`,
+        rule: 'stale RESIDUE-entry; de lijst mag alleen krimpen',
+      })
+    }
+  }
+
   if (!CALL.test(src)) continue
   const lines = src.split(/\r?\n/)
   lines.forEach((rawLine, i) => {
@@ -441,7 +559,15 @@ if (violations.length > 0) {
       '\nSTAAT ER [inline (maand × 12) / 365] bij? De formule klopt, maar hij hoort\n' +
       'maar op ÉÉN plek te staan (lib/format.ts). Server-side: `getRecentDailyExpenseRate(supabase)`;\n' +
       'in een bundel-consument: het veld `dailyExpenseRate`; bij een gedocumenteerde\n' +
-      'andere grondslag: `dailyExpenseRate(maandbedrag)` — en dan geldt regel 1.\n',
+      'andere grondslag: `dailyExpenseRate(maandbedrag)` — en dan geldt regel 1.\n' +
+      '\nSTAAT ER [bruto vermogenstotaal … als teller] bij? Dan is de NOEMER niet het\n' +
+      'probleem maar de TELLER. Een bruto bezittingentotaal (woning vol mee, geen\n' +
+      'schuld eraf) is geen besteedbaar vermogen — besluit K3: een bruto bedrag\n' +
+      'krijgt géén tijdvertaling, ook niet mét markering. En "vermogen ÷ dagtarief"\n' +
+      'stelt bovendien een TOTALE vraag met het MARGINALE instrument; ADR 0126 D1\n' +
+      'verbiedt die derde grootheid. Laat de weergave vervallen, of toon de\n' +
+      'canonieke TOTAAL-grootheid: de runway (lib/horizon/runway.ts) met de zin uit\n' +
+      'lib/horizon/anker-copy.ts. De allowlist is hier géén uitweg.\n',
   )
   process.exit(1)
 }

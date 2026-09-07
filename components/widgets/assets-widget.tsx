@@ -4,7 +4,7 @@ import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import { WidgetEmpty } from './widget-empty'
 import type { WidgetSize } from '@/lib/widget-catalog'
-import { formatMaskedCurrency, calculateFreedomTime, formatFreedomTimeString, dailyExpenseRate } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { ASSET_TYPE_COLORS, ASSET_TYPE_LABELS, type AssetType } from '@/lib/asset-data'
@@ -44,7 +44,6 @@ export const AssetsWidget = memo(function AssetsWidget({ size, data, href }: Pro
   // de segmenten zouden niet naar het getoonde totaal optellen).
   const overrides = isHouseholdView ? data.householdOverrides! : isPartnerView ? data.partnerOverrides! : null
   const totalAssets = overrides ? overrides.totalAssets : data.totalAssets
-  const monthlyExpenses = overrides ? overrides.monthlyExpenses : data.monthlyExpenses
   const { monthlyContributions, assetsByType, assetReturn } = data
 
   const kickerLabel = isHouseholdView
@@ -71,17 +70,27 @@ export const AssetsWidget = memo(function AssetsWidget({ size, data, href }: Pro
     )
   }
 
-  // Canoniek 12-mnd rolling dagtarief uit de bundel (KRUIS-20); override-perspectief
-  // houdt zijn eigen (perspectief-eigen) uitgavenniveau. Fallback voor mocks.
-  const dailyExp = overrides
-    ? dailyExpenseRate(monthlyExpenses)
-    : data.dailyExpenseRate ?? dailyExpenseRate(monthlyExpenses)
-  const ft = dailyExp > 0 && totalAssets > 0 ? calculateFreedomTime(totalAssets, dailyExp) : null
-  const ftStr = ft ? formatFreedomTimeString(ft, 'short') : null
-  // Grondslag-duiding (bevinding 3): deze vrijheidstijd staat op het BRUTO bezit, terwijl
-  // de zuster-widget Netto Vermogen 'm op het GETEKENDE netto vermogen (bezit − schulden)
-  // rekent. "vrijheid in bezit" maakt expliciet dat dit het bruto-bezit-cijfer is, zodat
-  // twee verschillende "vrijheid"-getallen op één dashboard niet als tegenstrijdig lezen.
+  // GEEN vrijheidstijd op `totalAssets` (UR3-19, eigenaarsbesluit 6 sep 2026).
+  //
+  // Hier stond `calculateFreedomTime(totalAssets, dailyExp)`, gerenderd als
+  // "≈ X vrijheid in bezit" op alle vier de maten. Een eerdere auditronde koos
+  // bewust voor LABELEN in plaats van weghalen ("vrijheid in bezit" maakt
+  // expliciet dat dit het bruto-bezit-cijfer is); dat besluit is met UR3-19
+  // teruggedraaid, om twee redenen:
+  //   1. GRONDSLAG — `totalAssets` is bruto: de eigen woning telt voor de volle
+  //      marktwaarde mee en er gaat geen enkele schuld af. Een label repareert
+  //      een bruto teller niet; een deel van die euro's is van de bank. Dat is
+  //      letterlijk besluit K3 van UR3-04 (lib/rondleiding/steps.ts), dat
+  //      `formatWithFreedom` om precies deze reden van `totals.bezittingen`
+  //      weghaalt.
+  //   2. GROOTHEID — "vermogen ÷ dagtarief" beantwoordt een TOTALE vraag met
+  //      het MARGINALE instrument. ADR 0126 D1 kent er twee (dagtarief =
+  //      marginaal, runway = totaal) en verbiedt een derde; de platte deling
+  //      `computeFreedomTotal` is in PR C verwijderd en leefde hier handgerold
+  //      voort.
+  // De tegenhanger op /overzicht/bezittingen (zes aanroepen) verviel in dezelfde
+  // wijziging; die pagina draagt in plaats daarvan één runway-zin in de deck.
+  // Het BEDRAG blijft staan — alleen de tijdvertaling erop vervalt.
 
   // ── Huishoud-/partnerperspectief (Optie A): alleen het scalaire totaal + badge ──
   // Eén compacte, eerlijke layout voor quarter/half/full — geen persoonlijke breakdown.
@@ -101,11 +110,6 @@ export const AssetsWidget = memo(function AssetsWidget({ size, data, href }: Pro
         <p className="text-[var(--ink)]">
           <MaskedAmount value={totalAssets} tone="kern" className={amountClass} />
         </p>
-        {ftStr && (
-          <p className="mt-0.5 font-serif italic text-[11px] text-[var(--ink-3)]">
-            ≈ {ftStr} vrijheid in bezit
-          </p>
-        )}
         <p className="mt-1.5 text-[11px] text-[var(--ink-3)]">
           Totaal actief vermogen
         </p>
@@ -126,18 +130,13 @@ export const AssetsWidget = memo(function AssetsWidget({ size, data, href }: Pro
         .join(', ')}`
     : undefined
 
-  // ── Quarter-size: compact total + freedom time + stacked bar ──
+  // ── Quarter-size: compact total + stacked bar ──
   if (size === 'quarter') {
     return (
       <WidgetShell module="kern" size={size} kicker={kickerLabel} href={href}>
         <p className="text-[var(--ink)]">
           <MaskedAmount value={totalAssets} tone="kern" className="text-lg font-semibold" />
         </p>
-        {ftStr && (
-          <p className="mt-0.5 font-serif italic text-[11px] text-[var(--ink-3)]">
-            {ftStr} vrijheid in bezit
-          </p>
-        )}
         {/* Compact stacked bar */}
         {assetsByType.length > 0 && totalAssets > 0 && (
           <div
@@ -184,11 +183,6 @@ export const AssetsWidget = memo(function AssetsWidget({ size, data, href }: Pro
             <p className="text-[var(--ink)]">
               <MaskedAmount value={totalAssets} tone="kern" className="text-xl font-semibold" />
             </p>
-            {ftStr && (
-              <p className="mt-0.5 font-serif italic text-[11px] text-[var(--ink-3)]">
-                ≈ {ftStr} vrijheid in bezit
-              </p>
-            )}
             <p className="mt-1.5 text-[11px] text-[var(--ink-3)]">
               Totaal actief vermogen
             </p>
@@ -244,12 +238,6 @@ export const AssetsWidget = memo(function AssetsWidget({ size, data, href }: Pro
       <p className="text-[var(--ink)]">
         <MaskedAmount value={totalAssets} tone="kern" className="text-2xl font-semibold" />
       </p>
-      {ftStr && (
-        <p className="mt-0.5 font-serif italic text-[12px] text-[var(--ink-3)]">
-          ≈ {ftStr} vrijheid in bezit
-        </p>
-      )}
-
       {/* Stacked bar */}
       {assetsByType.length > 0 && totalAssets > 0 && (
         <div
