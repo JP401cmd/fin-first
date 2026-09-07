@@ -69,6 +69,12 @@ import {
 } from '@/lib/color-palette'
 import type { ModuleColorConfig, BudgetColorConfig, PhaseColorConfig } from '@/lib/color-palette'
 import type { FontTheme } from '@/components/app/module-color-provider'
+import {
+  RECOMMENDATION_OPEN_COLUMNS,
+  RECOMMENDATION_OPEN_STATUSES,
+  countOpenRecommendations,
+  type RecommendationOpenState,
+} from '@/lib/recommendation-status'
 
 // ── Tabtitel binnen de app-shell ────────────────────────────────────
 // Zonder deze export erven alle (app)-pagina's de root-title uit
@@ -219,8 +225,26 @@ export default async function AppLayout({
     // Sidebar-dot "Tips & acties": openstaande/uitgestelde aanbevelingen.
     // RLS-gescoped op de gebruiker (geen .eq('user_id') — spiegelt de
     // actionsCountRes-query hierboven en de recommendations-query in
-    // fin-data-loader.ts). Head-only + count: 'exact' = geen rows-payload.
-    supabase.from('recommendations').select('id', { count: 'exact', head: true }).in('status', ['pending', 'postponed']),
+    // fin-data-loader.ts).
+    //
+    // GEEN head-only count meer, en dat is de hele wijziging (UR3-27, D1) —
+    // exact hetzelfde motief als bij de holdings-staleness hieronder: de telling
+    // stelde hier zijn EIGEN vraag (`status IN ('pending','postponed')`) terwijl
+    // de tips-pagina en de briefing een andere stelden (`pending` OF `postponed`
+    // MET `postponed_until <= vandaag`, via `recsForList` in fin-data-loader.ts).
+    // Wie bij zijn laatste tip op "Later" drukte, zag de zijbalk-stip veertien
+    // dagen doorbranden boven een pagina die "Geen tips wachten op je" meldde —
+    // allebei volgens hun eigen definitie correct, en samen onbruikbaar.
+    //
+    // Nu halen we de twee velden op waarop het oordeel rust en laten we
+    // `lib/recommendation-status.ts` beslissen: dezelfde functie die
+    // fin-data-loader gebruikt. De payload blijft klein (twee smalle kolommen,
+    // alleen de twee kandidaat-statussen) en er is nog steeds één ronde naar de
+    // database.
+    supabase
+      .from('recommendations')
+      .select(RECOMMENDATION_OPEN_COLUMNS)
+      .in('status', [...RECOMMENDATION_OPEN_STATUSES]),
     // (De Box 1-maandinkomen-query is verhuisd naar `loadLeverScores`, de
     // gedeelde SSoT die zowel deze sidebar-dot als de status-duiding-banner
     // voedt — geen aparte query meer in de shell.)
@@ -369,6 +393,12 @@ export default async function AppLayout({
     activeModules,
   )
   const sidebarActionCount = actionsCountRes.count ?? 0
+  // Het oordeel "wacht deze tip vandaag op je?" komt uit de gedeelde bron, niet
+  // uit een tweede filter hier (UR3-27, D1).
+  const sidebarOpenRecCount = countOpenRecommendations(
+    (recsCountRes.data ?? []) as unknown as RecommendationOpenState[],
+    new Date().toISOString().split('T')[0],
+  )
 
   // ── Vier-hefbomen-kompas scores + Box 1/3-statussen + netto vermogen + budget-
   //    health (SSoT) ──
@@ -393,7 +423,7 @@ export default async function AppLayout({
   } = await loadLeverScores(supabase, sidebarPerspective)
 
   const sidebarSignals: SidebarSignals = {
-    tipsActions: sidebarActionCount > 0 || (recsCountRes.count ?? 0) > 0,
+    tipsActions: sidebarActionCount > 0 || sidebarOpenRecCount > 0,
     budgetOver: budgetsOver > 0,
     aandelenStale: sidebarAandelenStale,
     cryptoStale: sidebarCryptoStale,
@@ -500,6 +530,10 @@ export default async function AppLayout({
     kern:    mc?.kern    || DEFAULT_MODULE_COLORS.kern,
     wil:     mc?.wil     || DEFAULT_MODULE_COLORS.wil,
     horizon: mc?.horizon || DEFAULT_MODULE_COLORS.horizon,
+    // Nieuw accent (UR3-32): profielrijen van vóór deze release dragen geen
+    // `fin`-sleutel en vallen hier terug op de default — `module_colors` is
+    // jsonb met per-sleutel fallback, dus een migratie is niet nodig.
+    fin:     mc?.fin     || DEFAULT_MODULE_COLORS.fin,
   }
 
   const bc = profile?.budget_colors as Record<string, string> | null

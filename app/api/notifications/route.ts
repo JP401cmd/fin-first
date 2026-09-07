@@ -68,7 +68,44 @@ export type Notification = {
   actionUrl?: string
   aiContext?: string
   metadata?: Record<string, unknown>
+  /**
+   * Waar deze melding over gáát, los van de route waar je op landt (UR3-27, D2).
+   *
+   * Aanleiding: `Notification` droeg geen entiteit-id. De id zat alleen
+   * versleuteld in de samengestelde `id`-string, en de klikhandler duwde
+   * `actionUrl` letterlijk door. Vier families landden daardoor op hub-niveau
+   * terwijl de id op het moment van genereren wél in de hand was — je kreeg het
+   * rekeningenoverzicht te zien in plaats van de transactie waar de melding over
+   * ging.
+   *
+   * Deze twee velden maken die relatie expliciet en machinaal toetsbaar: de
+   * grendel in `app/api/notifications/action-url.test.ts` dwingt af dat een
+   * melding mét `entityId` die id ook daadwerkelijk in haar `actionUrl` draagt.
+   * Zonder dat is "wijst deze melding naar het detail?" alleen met de hand vast
+   * te stellen — precies hoe het drie weken kon wegdrijven.
+   *
+   * Beide velden zijn OPTIONEEL en blijven dat: de meldingen-historie
+   * (`app_settings.notifications_history_<uid>`, 30 dagen) bevat rijen van vóór
+   * dit contract. De klikhandler blijft op `actionUrl` werken, zodat oude rijen
+   * gewoon blijven doen wat ze deden. Geen backfill.
+   */
+  entityType?: NotificationEntityType
+  entityId?: string
 }
+
+/**
+ * De soorten dingen waar een melding over kan gaan. Bewust een gesloten unie:
+ * een nieuwe waarde toevoegen dwingt je langs de vraag welke detailroute erbij
+ * hoort.
+ */
+export type NotificationEntityType =
+  | 'budget'
+  | 'transaction'
+  | 'milestone'
+  | 'bank_connection_account'
+  | 'investment_holding'
+  | 'crypto_holding'
+  | 'spend_limit'
 
 // ── Langzame-checks cache ────────────────────────────────────────────
 // Egress-reductie (jun 2026): de poll draait per gebruiker elke 10 min en
@@ -373,7 +410,13 @@ export async function GET(request: NextRequest) {
           color,
           createdAt: now,
           read: readIds.includes(id),
-          actionUrl: `/core/budgets?budget=${budget.id}`,
+          // Het budgetdetail, niet de budgetten-hub met een querystring die daar
+          // niet gelezen wordt (UR3-27, D2). `/core/budgets` is een 307 naar
+          // `/overzicht/budget`; `/core/budgets/[id]` is een echte detailroute
+          // en blijft bewust op zijn eigen pad bestaan.
+          actionUrl: `/core/budgets/${budget.id}`,
+          entityType: 'budget',
+          entityId: budget.id,
           aiContext: limitStatus === 'bereikt'
             ? `Mijn budget voor ${budget.name} zit precies op de limiet: €${Math.round(spent)} van €${Math.round(limit)}. Is dat erg, en klopt deze limiet nog?`
             : `Mijn budget voor ${budget.name} staat op ${pctRounded}%. Wat kan ik doen om binnen budget te blijven?`,
@@ -744,7 +787,12 @@ export async function GET(request: NextRequest) {
           color: 'violet',
           createdAt: milestoneRow.achieved_at,
           read: readIds.includes(id),
-          actionUrl: '/overzicht',
+          // De mijlpalenpagina, niet het dashboard (UR3-27, D2). Een melding
+          // "je hebt mijlpaal X gehaald" die op /overzicht landt, laat de
+          // gebruiker zelf zoeken waar die mijlpaal staat.
+          actionUrl: '/mijn/mijlpalen',
+          entityType: 'milestone',
+          entityId: milestoneRow.milestone_key,
         })
       }
     } catch (err) {
@@ -896,7 +944,23 @@ export async function GET(request: NextRequest) {
                 color: isIncome ? 'emerald' : 'teal',
                 createdAt: tx.date ? new Date(tx.date).toISOString() : now,
                 read: readIds.includes(id),
-                actionUrl: '/core/cash',
+                // De transactielijst op de máánd van de transactie, niet het
+                // rekeningenoverzicht (UR3-27, D2). `/core/cash` is een 307 naar
+                // `/overzicht/bezittingen/cash` — een lijst met rekeningen, niet
+                // met transacties; dit was de meest waarschijnlijk gemelde
+                // instantie van "melding landt op een hub".
+                //
+                // `?maand=` wordt gelezen door `transacties-analyse.tsx`
+                // (`/^\d{4}-\d{2}$/`). Dat brengt je op de juiste maand, nog niet
+                // op de rij zelf: een transactie-deeplink (`?tx=`) bestaat nog
+                // niet. `entityId` draagt de id alvast, zodat die stap later
+                // alleen de URL hoeft te verlengen — en zodat de grendel in
+                // action-url.test.ts kan zien dat deze familie nog niet klaar is.
+                actionUrl: tx.date
+                  ? `/overzicht/budget/transacties?maand=${String(tx.date).slice(0, 7)}`
+                  : '/overzicht/budget/transacties',
+                entityType: 'transaction',
+                entityId: tx.id,
                 aiContext: isIncome
                   ? `Mijn partner heeft €${amount.toFixed(2)} inkomen ontvangen${budgetName ? ` in categorie ${budgetName}` : ''}${freedomLabel ? `, dat is ${freedomLabel} aan vrijheidstijd` : ''}. Hoe draagt dit bij aan onze financiele vrijheid?`
                   : `Mijn partner heeft €${amount.toFixed(2)} uitgegeven${budgetName ? ` in categorie ${budgetName}` : ''}${freedomLabel ? `, dat is ${freedomLabel} aan vrijheidstijd` : ''}. Wat is de impact op ons huishoudbudget?`,
@@ -1044,7 +1108,9 @@ export async function GET(request: NextRequest) {
           color: 'purple',
           createdAt: now,
           read: readIds.includes(id),
-          actionUrl: '/core/debts',
+          // Canonieke schuldenroute (lib/nav-config.ts). `/core/debts` bestaat
+          // nog als oud pad, maar staat in geen enkele navigatie meer.
+          actionUrl: '/overzicht/schulden',
           aiContext: `Ik heb ${debtFormatted} aan schulden. Wat is de impact op mijn financiële vrijheid en hoe kan ik dit het beste aanpakken?`,
         })
       }
@@ -1083,7 +1149,8 @@ export async function GET(request: NextRequest) {
             color: 'red',
             createdAt: now,
             read: readIds.includes(id),
-            actionUrl: '/horizon',
+            // `/horizon` is een 307 naar `/toekomst`; geef meteen de bestemming uit.
+            actionUrl: '/toekomst',
             aiContext: 'Mijn FIRE-doel is niet haalbaar bij mijn huidige inkomsten en uitgaven. Wat kan ik doen?',
           })
         }
@@ -1208,7 +1275,20 @@ export async function GET(request: NextRequest) {
               color: alert.type === 'price_below' ? 'red' : alert.type === 'price_above' ? 'green' : 'blue',
               createdAt: now,
               read: readIds.includes(id),
-              actionUrl: holdingId ? `/core/assets/holdings/${holdingId}` : '/core/assets/holdings',
+              // Een crypto-alert hoort naar de crypto-detailroute (UR3-27, D2).
+              // Hiervoor liep álles langs `/core/assets/holdings/[id]` — de
+              // detailroute van een BELEGGING. Een crypto-id landde daar dus op
+              // een pagina die 'm niet kent, en de fallback gooide de id die de
+              // alert wél had gewoon weg.
+              actionUrl: alert.investment_holding_id
+                ? `/core/assets/holdings/${alert.investment_holding_id}`
+                : alert.crypto_holding_id
+                  ? `/core/assets/crypto/${alert.crypto_holding_id}`
+                  : '/overzicht/bezittingen/investment',
+              entityType: alert.crypto_holding_id && !alert.investment_holding_id
+                ? 'crypto_holding'
+                : 'investment_holding',
+              entityId: holdingId ?? undefined,
             })
           }
         }

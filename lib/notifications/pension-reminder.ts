@@ -80,5 +80,7 @@ export const PENSION_REMINDER_TEMPLATE = {
     'Begin van het jaar is een goed moment om je pensioendata bij te werken. Open Mijnpensioenoverzicht (DigiD vereist) en update je waarde handmatig.',
   icon: 'PiggyBank',
   color: 'amber',
-  actionUrl: '/identity/koppelingen',
+  // `/identity/koppelingen` is een 307 naar `/mijn/koppelingen` (UR3-27, D2) —
+  // geef de bestemming meteen uit, dan overleeft een deeplink de omleiding.
+  actionUrl: '/mijn/koppelingen',
 }

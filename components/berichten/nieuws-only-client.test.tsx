@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import type { NewsItem } from '@/lib/news-item'
 import type { LocalNewsProgress } from '@/lib/ai/local/local-news-resolver'
 import type { ExecutionModeState } from '@/lib/ai/local/use-execution-mode'
@@ -411,5 +411,92 @@ describe('NieuwsOnlyClient — uitvoertoestanden', () => {
       itemCount: 0,
     })
     expect(await screen.findByText('Geen nieuws met impact op jouw situatie')).toBeInTheDocument()
+  })
+})
+
+// ── 5. Een generatie die nooit afrondt (UR3-17 #12) ────────────────────────
+
+/**
+ * `/api/news?refresh=1` mag antwoorden met `status: 'generating'`; de client
+ * houdt `refreshing` dan bewust aan en laat de polling het afmaken. Kwam er
+ * nooit iets, dan bleef dat vlaggetje eeuwig staan — en de Ververs-knop rendert
+ * alleen bij `!viewBusy`. De knop verdween dus, er kwam geen bericht, en er was
+ * geen weg terug behalve de pagina herladen. Dat is precies wat de tester zag.
+ *
+ * Sinds deze fix loopt er een deadline op de generatie.
+ */
+describe('NieuwsOnlyClient — generatie die nooit afrondt', () => {
+  const cloud = () =>
+    executionState({ status: 'cloud', intended: 'cloud', canUseCloud: true })
+
+  /**
+   * Tijd vooruit in poll-stappen, elk in een eigen `act`. Eén grote sprong
+   * werkt hier niet: React verwerkt de state-update uit een poll pas in een
+   * volgende taak, dus zonder tussentijdse flush loopt de timerklok wel door
+   * maar de component niet mee — en dan lijkt de polling stil te liggen.
+   */
+  async function tick(ms: number) {
+    const stap = 4_000
+    for (let verstreken = 0; verstreken < ms; verstreken += stap) {
+      // eslint-disable-next-line no-await-in-loop
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(stap)
+      })
+    }
+  }
+
+  /** Laat /api/news eeuwig "nog bezig" zeggen. */
+  function alwaysGenerating() {
+    fetchMock.mockImplementation(async (url: string) => {
+      const json = (body: unknown) =>
+        ({ ok: true, status: 200, json: async () => body }) as unknown as Response
+      if (String(url).startsWith('/api/news/read')) return json({ readIds: [] })
+      if (String(url).startsWith('/api/news')) {
+        return json({ status: 'generating', editionNr: 7, jaargang: 2 })
+      }
+      return json({})
+    })
+  }
+
+  beforeEach(() => {
+    mocks.useExecutionMode.mockReturnValue(cloud())
+    alwaysGenerating()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('geeft na de deadline een zichtbare melding in plaats van stilte', async () => {
+    vi.useFakeTimers()
+    render(<NieuwsOnlyClient userId="u1" />)
+
+    // Ruim voorbij de drie minuten — de poll draait per 4 s.
+    await tick(200_000)
+
+    expect(screen.getByText(/duurde langer dan 3 minuten/i)).toBeTruthy()
+  })
+
+  it('houdt de generatie binnen de deadline gewoon lopend (geen valse afbreking)', async () => {
+    vi.useFakeTimers()
+    render(<NieuwsOnlyClient userId="u1" />)
+
+    // Ruim binnen het venster: nog niets te melden.
+    await tick(60_000)
+
+    expect(screen.queryByText(/duurde langer dan/i)).toBeNull()
+    // En hij is wél aan het pollen — anders bewijst de test hierboven niets.
+    expect(urls().filter((u) => u === '/api/news').length).toBeGreaterThan(1)
+  })
+
+  it('stopt met pollen zodra hij het opgeeft', async () => {
+    vi.useFakeTimers()
+    render(<NieuwsOnlyClient userId="u1" />)
+
+    await tick(200_000)
+    const naTimeout = urls().filter((u) => u === '/api/news').length
+
+    await tick(60_000)
+    expect(urls().filter((u) => u === '/api/news').length).toBe(naTimeout)
   })
 })

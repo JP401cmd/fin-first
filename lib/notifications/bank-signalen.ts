@@ -97,6 +97,11 @@ export interface BankSignalNotification {
   color: string
   actionUrl: string
   aiContext: string
+  /** Zie `NotificationEntityType` in app/api/notifications/route.ts (UR3-27, D2).
+   *  Letterlijk overgenomen i.p.v. geïmporteerd: dit bestand is een pure
+   *  producent en mag niet aan de route-module hangen. */
+  entityType?: 'bank_connection_account'
+  entityId?: string
 }
 
 /** Nederlandse dag-aanduiding voor een deadline die nog niet verstreken is. */
@@ -145,7 +150,13 @@ export function buildBankSignalNotification(
         'Vernieuw de koppeling, dan blijven je transacties vanzelf binnenkomen.',
       icon: 'ShieldAlert',
       color: 'amber',
-      actionUrl: '/core/cash',
+      // Naar de koppelingenpagina, niet naar het rekeningenoverzicht (UR3-27,
+      // D2). De actie die dit bericht vraagt — de koppeling vernieuwen — kán
+      // alleen daar; `/core/cash` (307 → `/overzicht/bezittingen/cash`) toont
+      // saldi en laat de gebruiker zelf zoeken.
+      actionUrl: '/mijn/koppelingen',
+      entityType: 'bank_connection_account',
+      entityId: input.connectionAccountId,
       aiContext:
         `Mijn bankkoppeling met ${bank} verloopt ${moment}. ` +
         'Wat gebeurt er als ik niets doe, en hoe vernieuw ik hem?',
@@ -176,7 +187,11 @@ export function buildBankSignalNotification(
     description: `Laatste sync: ${lastSynced.toLocaleDateString('nl-NL')}. Vernieuw je bankgegevens voor actueel inzicht.`,
     icon: 'RefreshCw',
     color: 'red',
-    actionUrl: '/core/cash',
+    // Zie de verloop-tak hierboven: vernieuwen/synchroniseren gebeurt op
+    // /mijn/koppelingen (UR3-27, D2).
+    actionUrl: '/mijn/koppelingen',
+    entityType: 'bank_connection_account',
+    entityId: input.connectionAccountId,
     aiContext: `Mijn bankrekening ${input.label} is al ${daysSince} dagen niet gesynchroniseerd. Wat moet ik doen?`,
   }
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { Newspaper, Loader2, RefreshCw, AlertCircle, Cpu } from 'lucide-react'
 import { AiPrivacyIndicator } from '@/components/app/ai-privacy-indicator'
@@ -250,6 +250,29 @@ function LocalUnavailableNotice({ message, onRetry }: { message: string; onRetry
 // De gate loopt via `canUseCloud`/`canUseLocal`, niet via een eigen
 // `status === 'lokaal'`-vergelijking — dat is de fail-closed-garantie.
 
+/**
+ * Hoe lang we een server-generatie de tijd geven vóór we hem opgeven.
+ *
+ * Zonder grens bleef `refreshing` op `true` staan zodra `/api/news?refresh=1`
+ * met `status: 'generating'` antwoordde ("polling will handle it"). Leverde die
+ * polling nooit iets op, dan bleef de Ververs-knop permanent verborgen (hij
+ * rendert alleen bij `!viewBusy`) — en bij een lege editie stond er zelfs geen
+ * spinner: de knop verdween en er gebeurde niets meer. Dat is precies wat de
+ * tester zag (UR3-17 #12).
+ *
+ * Drie minuten: ruim boven een normale cloud-generatie (tientallen seconden),
+ * kort genoeg om niet als "kapot" te voelen.
+ */
+const GENERATION_TIMEOUT_MS = 3 * 60_000
+
+/**
+ * Bewust uit de constante afgeleid en niet uitgeschreven: anders drijft de tekst
+ * weg zodra iemand de drempel bijstelt. De omliggende copy (de foutstrip onder
+ * de artikelen, resp. de foutkaart) draagt het "wat nu" — deze zin alleen de
+ * reden.
+ */
+const GENERATION_TIMEOUT_MESSAGE = `Het duurde langer dan ${GENERATION_TIMEOUT_MS / 60_000} minuten.`
+
 export function NieuwsOnlyClient({ userId }: { userId: string }) {
   // Weergavemodus — stuurt alleen de masthead-reductie (NWS-1) aan.
   const simple = useDisplayMode().mode === 'simple'
@@ -267,6 +290,12 @@ export function NieuwsOnlyClient({ userId }: { userId: string }) {
   const [generating, setGenerating] = useState(false)
   const [generatedAt, setGeneratedAt] = useState<string | undefined>()
   const [sourceCount, setSourceCount] = useState<number | undefined>()
+  /**
+   * Wanneer we de lopende generatie opgeven. Een ref en geen state: de waarde
+   * mag geen render uitlokken, en de poll-effect mag er niet op herstarten —
+   * anders schuift het venster bij elke tussenstand weer op.
+   */
+  const generationDeadlineRef = useRef<number | null>(null)
 
   // ── Waar draait deze editie? ──
   const execution = useExecutionMode('nieuws')
@@ -325,6 +354,7 @@ export function NieuwsOnlyClient({ userId }: { userId: string }) {
       const data = await res.json()
 
       if (data.status === 'generating') {
+        generationDeadlineRef.current = Date.now() + GENERATION_TIMEOUT_MS
         setGenerating(true)
         setNewsLoading(false)
         if (data.editionNr) setEditionNr(data.editionNr)
@@ -372,14 +402,18 @@ export function NieuwsOnlyClient({ userId }: { userId: string }) {
       const data = await res.json()
 
       if (data.status === 'generating') {
+        // `refreshing` blijft bewust staan — de polling neemt het over. Maar
+        // niet ongelimiteerd: vanaf hier loopt de klok (zie
+        // GENERATION_TIMEOUT_MS), zodat de knop terugkomt als er niets komt.
+        generationDeadlineRef.current = Date.now() + GENERATION_TIMEOUT_MS
         setGenerating(true)
         if (data.editionNr) setEditionNr(data.editionNr)
         if (data.jaargang) setJaargang(data.jaargang)
-        // Don't clear refreshing — polling will handle it
         return
       }
 
       const items: NewsItem[] = data.items ?? data
+      generationDeadlineRef.current = null
       setNewsItems(items)
       setLocalNewsCache(userId, items, data.generatedAt, data.sourceCount, data.editionNr, data.jaargang)
       setNewsFetched(true)
@@ -390,6 +424,7 @@ export function NieuwsOnlyClient({ userId }: { userId: string }) {
       if (data.sourceCount !== undefined) setSourceCount(data.sourceCount)
       if (data.refreshesRemaining !== undefined) setRefreshesRemaining(data.refreshesRemaining)
     } catch (err) {
+      generationDeadlineRef.current = null
       setNewsError(err instanceof Error ? err.message : 'Nieuws kon niet worden geladen')
       setRefreshing(false)
     }
@@ -408,6 +443,16 @@ export function NieuwsOnlyClient({ userId }: { userId: string }) {
     if (!execution.canUseCloud) return
     if (!generating) return
     const poll = async () => {
+      // Opgeven vóór we opnieuw vragen: een generatie die de deadline passeert
+      // geeft de knop terug mét uitleg, in plaats van eeuwig door te draaien.
+      const deadline = generationDeadlineRef.current
+      if (deadline !== null && Date.now() > deadline) {
+        generationDeadlineRef.current = null
+        setGenerating(false)
+        setRefreshing(false)
+        setNewsError(GENERATION_TIMEOUT_MESSAGE)
+        return
+      }
       try {
         const res = await fetch('/api/news')
         if (!res.ok) {
@@ -429,6 +474,7 @@ export function NieuwsOnlyClient({ userId }: { userId: string }) {
 
         // Generation complete — final items arrived
         const items: NewsItem[] = data.items ?? data
+        generationDeadlineRef.current = null
         setNewsItems(items)
         setLocalNewsCache(userId, items, data.generatedAt, data.sourceCount, data.editionNr, data.jaargang)
         setNewsFetched(true)
@@ -440,6 +486,7 @@ export function NieuwsOnlyClient({ userId }: { userId: string }) {
         if (data.sourceCount !== undefined) setSourceCount(data.sourceCount)
         if (data.refreshesRemaining !== undefined) setRefreshesRemaining(data.refreshesRemaining)
       } catch (err) {
+        generationDeadlineRef.current = null
         setNewsError(err instanceof Error ? err.message : 'Nieuws kon niet worden geladen')
         setGenerating(false)
         setRefreshing(false)
@@ -637,10 +684,14 @@ export function NieuwsOnlyClient({ userId }: { userId: string }) {
                      wanneer /api/news faalt. Liever een skeleton dan een
                      onwaar bericht. */
                   <NewsSkeletonLoader />
-                ) : viewError && !(isLocal && viewItems.length > 0) ? (
-                  /* Lokaal met al gemaakte berichten valt hier bewust NIET in:
-                     een mislukte verversing mag de editie die er staat niet
-                     wegnemen — die fout komt als strip ónder de artikelen. */
+                ) : viewError && viewItems.length === 0 ? (
+                  /* Een editie die er al staat valt hier bewust NIET in: een
+                     mislukte verversing mag de leesstof niet wegnemen — die fout
+                     komt als strip ónder de artikelen.
+                     Gold eerst alleen voor het lokale pad, omdat alleen dáár een
+                     fout mét artikelen kon voorkomen. Sinds de cloud-generatie
+                     een deadline heeft (GENERATION_TIMEOUT_MS, UR3-17 #12) kan
+                     dat ook op het cloudpad, en geldt dezelfde regel. */
                   <div className="flex flex-col items-center gap-4 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] px-6 py-12 text-center shadow-[var(--s0)]">
                     <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--subtle)]">
                       <AlertCircle className="h-6 w-6 text-[var(--ink-3)]" />
@@ -706,9 +757,9 @@ export function NieuwsOnlyClient({ userId }: { userId: string }) {
                         ))}
                       </div>
                     )}
-                    {isLocal && viewError && (
+                    {viewError && (
                       /* De editie die er staat blijft leesbaar; alleen het
-                         samenstellen is misgegaan. */
+                         samenstellen is misgegaan. Beide paden, zelfde regel. */
                       <div
                         role="alert"
                         className="mt-5 flex flex-col items-center gap-3 border-t border-[var(--border-ed)] pt-4 text-center"
@@ -716,7 +767,9 @@ export function NieuwsOnlyClient({ userId }: { userId: string }) {
                         {/* Twee losse zinnen: de servertekst hoeft niet op een punt
                             te eindigen, dus nooit met een dubbele punt aanplakken. */}
                         <p className="font-source-serif text-[13px] italic leading-relaxed text-[var(--ink-3)]">
-                          Het samenstellen op je toestel is gestopt. {viewError} De berichten hierboven zijn wel bewaard.
+                          {isLocal
+                            ? `Het samenstellen op je toestel is gestopt. ${viewError} De berichten hierboven zijn wel bewaard.`
+                            : `Het samenstellen van de nieuwe editie is gestopt. ${viewError} De editie hierboven blijft gewoon leesbaar.`}
                         </p>
                         <button
                           type="button"

@@ -29,6 +29,23 @@ vi.mock('./lokale-tips-generator', () => ({
   LokaleTipsGenerator: () => <div data-testid="lokale-tips-generator" />,
 }))
 
+// Om dezelfde reden stubben we de uitvoervoorkeur ook voor TipsLijst zélf: die
+// leest 'm sinds UR3-17 #18 om te weten of een LEGE lijst rust of een
+// AI-storing is. Zonder stub vuurt die fetch zodra de laatste tip optimistisch
+// verdwijnt, en telt hij mee in de `fetchMock`-assertions van de beslis-flow —
+// een vals faalbeeld dat naar de POST-logica wijst terwijl er niets mis is.
+// Eigen dekking: components/overview/tips-lijst.ai-storing.test.tsx.
+vi.mock('@/lib/ai/local/use-execution-mode', () => ({
+  useExecutionMode: () => ({
+    status: 'cloud',
+    message: null,
+    intended: 'cloud',
+    canUseCloud: true,
+    canUseLocal: false,
+    refresh: vi.fn(),
+  }),
+}))
+
 const fetchMock = vi.fn()
 vi.stubGlobal('fetch', fetchMock)
 
@@ -71,7 +88,10 @@ const baseRec = (overrides: Partial<Recommendation>): Recommendation =>
 describe('TipsLijst', () => {
   it('shows empty state CTA that opens the Fin-chat in-place (geen navigatie)', () => {
     render(<TipsLijst recommendations={[]} />)
-    expect(screen.getByText(/Geen tips wachten/i)).toBeInTheDocument()
+    // De kop spreekt namens de tips-sectie, niet namens de pagina (UR3-27, D1):
+    // eronder kan het ActionBoard wél gevuld zijn, en dan las "Geen tips wachten
+    // op je" als tegenspraak met de zijbalk-stip.
+    expect(screen.getByText(/Geen tips op dit moment/i)).toBeInTheDocument()
     // Mag GEEN navigerende link naar /berichten meer zijn — dat verliet de
     // pagina onnodig en daar staan de tips niet.
     expect(screen.queryByRole('link', { name: /Vraag Fin/i })).not.toBeInTheDocument()

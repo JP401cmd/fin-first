@@ -17,6 +17,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { AICategorizeSheet } from './ai-categorize-sheet'
 import type { Budget } from '@/lib/budget-data'
 import { resolveAllExecutionModes } from '@/lib/ai/execution-groups'
+import { markLocalModelDownloaded } from '@/lib/ai/local/model-download-marker'
 
 // ── Supabase mock ──────────────────────────────────────────────
 //
@@ -308,6 +309,10 @@ beforeEach(() => {
   execTransactiesOverride = null
   localCapabilityOk = true
   localModelReady = true
+  // De "ooit gedownload"-markering leeft in localStorage en overleeft cleanup();
+  // laat 'm dus nooit van de ene test naar de volgende lekken, anders krijgt een
+  // vers toestel het verlies-narratief van zijn voorganger.
+  localStorage.clear()
   localResolverSpy.mockClear()
   createLocalResolverSpy.mockClear()
   // Default: AI-context met een eigen-rekening-budget, geen IBAN/naam/spiegelparen.
@@ -1268,7 +1273,11 @@ describe('AICategorizeSheet — privé-modus resolver-keuze', () => {
   it('privacy_mode AAN + model weg (eviction): blokkeert met de download-opnieuw-melding, geen cloud-fallback', async () => {
     execPrivacyMode = true
     localCapabilityOk = true
-    localModelReady = false // cache-eviction / nooit voltooide download → model-missing-tak
+    localModelReady = false // leeg cachepad → model-missing-tak
+    // Dit toestel HAD het model: pas dan is het verlies-narratief terecht. Zonder
+    // deze markering leest hetzelfde lege cachepad als "nog nooit gedownload"
+    // (UR3-17 #13) — twee toestanden die de modelstaat zelf niet kan scheiden.
+    markLocalModelDownloaded()
     autoCatContext = { ...autoCatContext, budgets: [boodschappenBudget] }
     const txs = [makeTx('x2', { description: 'Betaling', counterparty_name: 'Onbekende Zaak' })]
 
@@ -1289,6 +1298,35 @@ describe('AICategorizeSheet — privé-modus resolver-keuze', () => {
     })
     expect(screen.getByText(/Download het opnieuw via Mijn → Privacy/i)).toBeInTheDocument()
     // Fail-closed blijft gelden: geen lokale resolver, géén cloud-fallback.
+    expect(createLocalResolverSpy).not.toHaveBeenCalled()
+    expect(aiCategorizeFetches().length).toBe(0)
+  })
+
+  it('privacy_mode AAN + model nooit gedownload: geen verlies-narratief, wél dezelfde fail-closed', async () => {
+    execPrivacyMode = true
+    localCapabilityOk = true
+    localModelReady = false
+    // Bewust GEEN markLocalModelDownloaded(): dit toestel is er nooit aan begonnen.
+    autoCatContext = { ...autoCatContext, budgets: [boodschappenBudget] }
+    const txs = [makeTx('x3', { description: 'Betaling', counterparty_name: 'Onbekende Zaak' })]
+
+    render(
+      <AICategorizeSheet
+        transactions={txs}
+        budgets={[boodschappenBudget]}
+        budgetGroups={[{ parent: boodschappenBudget, children: [boodschappenBudget] }]}
+        onClose={() => {}}
+        onSaved={() => {}}
+      />,
+    )
+
+    await clickVraagFin()
+
+    await waitFor(() => {
+      expect(screen.getByText(/Er staat nog geen lokaal model op dit toestel/i)).toBeInTheDocument()
+    })
+    // De zin die de gebruiker naar een niet-bestaand verlies stuurde.
+    expect(screen.queryByText(/verwijderd om ruimte te maken/i)).toBeNull()
     expect(createLocalResolverSpy).not.toHaveBeenCalled()
     expect(aiCategorizeFetches().length).toBe(0)
   })

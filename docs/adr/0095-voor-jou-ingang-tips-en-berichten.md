@@ -41,3 +41,42 @@ Geïmplementeerd op 9 augustus 2026:
 - `lib/nav-config.test.ts` — twee asserties die bijten: het item moet in `globalNav` staan, en `/overzicht/tips` mag niet dubbel in `EXTRA_ROUTE_TITLES` staan.
 
 De desktop-sidebar (`OVERIGE_BASE`) is bewust ongemoeid gelaten.
+
+## Herbevestigd — 7 september 2026 (UR3-27)
+
+Persona Bas kon het verschil tussen briefing, Tips & acties en Berichten niet
+uitleggen. Kaart UR3-27 heropende dit besluit expliciet. Uitkomst: **dit ADR
+blijft staan**, maar op nieuwe gronden — niet op de oude.
+
+**Wat er sinds augustus veranderde.** De meldingstroom groeide van enkele naar
+tien typen. De blokkade uit §3 hierboven ("wat telt N?") is daarmee zwaarder
+geworden, niet lichter: één gedeelde teller zou nog steeds dalen zodra iemand
+*leest* zonder dat er iets *gedaan* is, over tien producenten in plaats van
+enkele.
+
+**Wat het onderzoek toevoegde.** Het zijn geen vier ingangen maar acht
+(briefing, tips, berichten op drie oppervlakken, krant, volgende-stap-widget,
+status-duiding, check-in-banner, Fin). Belangrijker: drie van de vier zijn
+**al samengevoegd**, alleen niet zichtbaar. De briefing consumeert de tips
+(`lib/briefing/engine.ts`), het topitem uit de Krant-cache
+(`lib/briefing/news-market.ts`) én de aandachtspunten-bus
+(`lib/aandachtspunten-loader.ts`, mét actie-suppressie). De briefing *is* de ene
+plek; hij zei het alleen niet.
+
+**Besluit (eigenaar, 6 september 2026): variant B — samenvoegen op de bron-as,
+niet op de route-as.** De routes blijven gescheiden; het werk zit in de bronnen
+die nog niet aan de aandachtspunten-bus hangen (`/api/notifications`, `/nieuws`)
+en in het uitspreken van de rolverdeling op het scherm. Variant A (één "Voor
+jou"-ingang) valt op dezelfde tellerdefinitie als in 2026-08. Variant C (alles in
+de briefing) valt op het *moment*-argument: de briefing is per ISO-week bevroren
+(`lib/briefing/snapshot.ts`) en kan geen gebeurtenis-gedreven meldingen dragen —
+een bankkoppeling die vandaag verloopt mag niet tot maandag wachten.
+
+**Heropeningsgrond.** Landt UR3-31 (geheugen van het vorige bezoek), dan verdient
+variant A een nieuwe weging: "sinds je vorige bezoek" ís een uitlegbare N, waar
+"openstaand" dat niet was. Dat is precies het getal dat dit ADR in 2026-08 miste.
+
+**Uitgevoerd in dezelfde ronde (fase 1 van variant B):** de twee defecten die de
+ingangen elkaar lieten tegenspreken — het filterverschil op de tips-stip en de
+meldingen die op een hub landden. Zie `lib/recommendation-status.ts` en
+`app/api/notifications/action-url.test.ts`.

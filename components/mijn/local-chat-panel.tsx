@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Cpu, Send, RotateCcw, AlertTriangle, Loader2, ShieldCheck } from 'lucide-react'
 import { checkLocalAiCapability } from '@/lib/ai/local/webgpu-capability'
 import { getLocalModelState } from '@/lib/ai/local/model-manager'
+import { hasEverDownloadedLocalModel } from '@/lib/ai/local/model-download-marker'
 import { resolveLocalReadiness, type LocalReadiness } from '@/lib/ai/local/local-readiness'
 import type { LocalChatSession } from '@/lib/ai/local/litert-runtime'
 import type { LocalKnowledgeItem } from '@/lib/ai/local/knowledge-context'
@@ -71,7 +72,14 @@ export function LocalChatPanel({ overview }: { overview: LocalChatOverview }) {
     ;(async () => {
       try {
         const [cap, model] = await Promise.all([checkLocalAiCapability(), getLocalModelState()])
-        if (active) setReadiness(resolveLocalReadiness(cap, { state: model.state }))
+        if (active) {
+          setReadiness(
+            resolveLocalReadiness(cap, {
+              state: model.state,
+              everDownloaded: hasEverDownloadedLocalModel(),
+            }),
+          )
+        }
       } catch {
         if (active) {
           setReadiness({

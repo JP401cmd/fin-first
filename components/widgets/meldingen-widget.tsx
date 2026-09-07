@@ -1,6 +1,6 @@
 'use client'
 
-import { memo } from 'react'
+import { memo, useMemo } from 'react'
 import { WidgetShell } from './widget-shell'
 import { WidgetEmpty } from './widget-empty'
 import type { WidgetSize } from '@/lib/widget-catalog'
@@ -37,12 +37,34 @@ function dotClass(n: Notification): string {
 
 export const MeldingenWidget = memo(function MeldingenWidget({ size, href }: Props) {
   // Canonieke bron van waarheid: dezelfde NotificationProvider die de bel-badge
-  // én /berichten voedt (prefs-gefilterd, echte createdAt, echte actionUrl,
-  // gelezen/ongelezen-status). Zo tonen widget, bel en berichtencentrum bij
-  // dezelfde staat hetzelfde — geen tweede, afwijkende meldingen-motor meer.
-  const { notifications, unreadCount } = useNotifications()
-  const count = notifications.length
-  const urgentUnread = notifications.filter(isUrgentUnread).length
+  // én /berichten voedt (prefs-gefilterd, echte actionUrl, gelezen/ongelezen-
+  // status). Zo tonen widget, bel en berichtencentrum bij dezelfde staat
+  // hetzelfde — geen tweede, afwijkende meldingen-motor meer.
+  //
+  // WELK veld waaruit (UR3-31): `notifications` is per poll VERS gegenereerd en
+  // draagt voor bijna elk type `createdAt: now`. Alleen `history` bewaart het
+  // oorspronkelijke tijdstip (de merge in /api/notifications behoudt daar
+  // `createdAt` bij een bekende, deterministische melding-ID). Wie het tijdstip
+  // uit `notifications` leest, toont bij élke poll "zojuist" en sorteert op een
+  // waarde die voor alle items gelijk is. Vandaar: de LIJST (welke meldingen nu
+  // spelen) komt uit `notifications`, het TIJDSTIP komt uit `history` — precies
+  // zoals /berichten en het bel-paneel dat doen.
+  const { notifications, history, unreadCount } = useNotifications()
+
+  // Stabiel tijdstempel per melding: match op ID in `history`, val terug op de
+  // verse waarde wanneer een actieve melding daar (nog) niet in staat — de
+  // route geeft `history` alleen binnen het `days`-venster terug, dus die
+  // terugval is een reëel geval en geen theoretisch randgeval.
+  const items = useMemo<Notification[]>(() => {
+    const stableCreatedAt = new Map(history.map(h => [h.id, h.createdAt]))
+    return notifications.map(n => {
+      const stable = stableCreatedAt.get(n.id)
+      return stable && stable !== n.createdAt ? { ...n, createdAt: stable } : n
+    })
+  }, [notifications, history])
+
+  const count = items.length
+  const urgentUnread = items.filter(isUrgentUnread).length
   // "Nieuw" = echte ongelezen-teller (spiegelt de bel); valt terug op het aantal
   // actieve meldingen wanneer alles gelezen is.
   const headline = unreadCount > 0
@@ -86,7 +108,7 @@ export const MeldingenWidget = memo(function MeldingenWidget({ size, href }: Pro
   }
 
   // Ongelezen eerst, daarna nieuwste bovenaan — zelfde prioritering als de bel.
-  const ordered = [...notifications].sort((a, b) => {
+  const ordered = [...items].sort((a, b) => {
     if (a.read !== b.read) return a.read ? 1 : -1
     return b.createdAt.localeCompare(a.createdAt)
   })

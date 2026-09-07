@@ -26,6 +26,7 @@ import { HEFBOOM_CONFIG, type Hefboom } from '@/lib/hefboom-config'
 import {
   hefboomVerdict,
   HEFBOOM_VERDICT_NEUTRAL,
+  HEFBOOM_VERDICT_NEUTRAL_MET_CIJFER,
 } from '@/lib/hefboom-status-copy'
 import { LeverageCard } from '@/components/overview/leverage-card'
 import {
@@ -282,7 +283,15 @@ export function HefbomenNav({
         //  - Eenvoudig toont "Nog geen gegevens", zodat élke tegel daar een
         //    woord draagt en het stoplicht nooit het enige signaal is.
         const verdict = hefboomVerdict(key, status)
-        const subText = simple ? (verdict ?? HEFBOOM_VERDICT_NEUTRAL) : verdict
+        // Bij `neutral` hangt de neutrale zin af van wat er nog méér in de tegel
+        // staat: mét een getal is het "Nog geen oordeel" (de gegevens zijn er,
+        // de lever-score nog niet), zonder getal "Nog geen gegevens". Zonder dat
+        // onderscheid stond op de cashflow-tegel "Nog geen gegevens" pal naast
+        // de spaarquote — UR3-17 #8.
+        const subText = simple
+          ? (verdict ??
+            (showTotal ? HEFBOOM_VERDICT_NEUTRAL_MET_CIJFER : HEFBOOM_VERDICT_NEUTRAL))
+          : verdict
         const expanded = expandedKey === key
 
         const hasDrilldown = Boolean(pillar) || status !== 'neutral'

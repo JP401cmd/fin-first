@@ -77,5 +77,7 @@ export const WOZ_REMINDER_TEMPLATE = {
     'Je gemeente publiceert deze maanden nieuwe WOZ-beschikkingen. Open het officiële waardeloket en werk je eigen-huis waarde bij.',
   icon: 'Building2',
   color: 'amber',
-  actionUrl: '/identity/koppelingen',
+  // `/identity/koppelingen` is een 307 naar `/mijn/koppelingen` (UR3-27, D2) —
+  // geef de bestemming meteen uit, dan overleeft een deeplink de omleiding.
+  actionUrl: '/mijn/koppelingen',
 }

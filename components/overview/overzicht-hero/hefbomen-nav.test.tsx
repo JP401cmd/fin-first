@@ -716,3 +716,56 @@ describe('HefbomenNav — data-tour-ankers voor de rondleiding', () => {
     ])
   })
 })
+
+/**
+ * UR3-17 #8 — de cashflow-tegel zette "Nog geen gegevens" pal naast een
+ * spaarquote. Twee uitspraken die elkaar tegenspreken: het cijfer bewijst dat
+ * de gegevens er zijn; wat ontbreekt is het OORDEEL (de lever-score).
+ *
+ * Alleen de Eenvoudige weergave draagt bij `neutral` een woord — in Volledig
+ * blijft de regel leeg en is er dus niets tegen te spreken.
+ */
+describe('HefbomenNav — neutrale tegel naast een getal (#8)', () => {
+  afterEach(() => {
+    window.localStorage.removeItem(PRIVACY_MASKED_STORAGE_KEY)
+  })
+
+  it('neutraal MET cijfer → "Nog geen oordeel", niet "Nog geen gegevens"', () => {
+    const { container } = render(
+      <HefbomenNav
+        health={mockHealth({ pillars: [] })}
+        totals={{ cashflow: 46 } as HefbomenTotals}
+        simple
+      />,
+    )
+    // Alleen de cashflow-tegel draagt hier een getal; de andere drie horen
+    // "Nog geen gegevens" te blijven zeggen. Scope dus op die ene tegel —
+    // een paginabrede toets zou de drie terechte gevallen meetellen.
+    const cashflowTegel = container.querySelector('a[href="/overzicht/budget"]')!
+      .parentElement!
+    const tekst = cashflowTegel.textContent ?? ''
+    expect(tekst).toContain('46%')
+    expect(tekst).toContain('Nog geen oordeel')
+    expect(tekst).not.toContain('Nog geen gegevens')
+  })
+
+  it('neutraal ZONDER cijfer → "Nog geen gegevens" blijft staan', () => {
+    render(<HefbomenNav health={mockHealth({ pillars: [] })} simple />)
+    expect(screen.getAllByText('Nog geen gegevens').length).toBe(4)
+    expect(screen.queryByText('Nog geen oordeel')).toBeNull()
+  })
+
+  it('een tegel MET oordeel houdt zijn eigen zin — de neutrale tekst geldt alleen bij neutral', () => {
+    render(
+      <HefbomenNav
+        health={mockHealth()}
+        leverScores={mockLeverScores()}
+        totals={{ cashflow: 46 } as HefbomenTotals}
+        simple
+      />,
+    )
+    // cashflow staat op 'red' → een echt oordeel, geen neutrale terugval.
+    expect(screen.getByText('Tekort op rekening')).toBeTruthy()
+    expect(screen.queryByText('Nog geen oordeel')).toBeNull()
+  })
+})

@@ -23,6 +23,7 @@ import { syncActiveGoalValues } from '@/lib/goal-current-value'
 import { isVrijheidsgetalGoal } from '@/lib/goals/vrijheidsgetal-goal'
 import { loadVrijheidsgetalSnapshot } from '@/lib/goals/vrijheidsgetal-source'
 import { buildGoalMetricSources, loadGoalLinks } from '@/lib/goals/metric-sources'
+import { isRecommendationOpen } from '@/lib/recommendation-status'
 import {
   linkedGoalIdSet,
   selectAutoCompletedNotices,
@@ -313,11 +314,11 @@ export async function loadFinData(
     decided_at: r.decided_at ?? null,
     created_at: r.created_at,
   }))
-  // Filter for recommendation list: pending, or postponed with postponed_until <= today
-  const recsForList = allRecsRaw.filter(r =>
-    r.status === 'pending' ||
-    (r.status === 'postponed' && r.postponed_until != null && r.postponed_until <= today)
-  ) as Recommendation[]
+  // Filter for recommendation list: pending, or postponed with postponed_until <= today.
+  // Het oordeel zelf woont in `lib/recommendation-status.ts` — dezelfde bron die de
+  // zijbalk-stip in `app/(app)/layout.tsx` gebruikt (UR3-27, D1). Schrijf het hier
+  // niet opnieuw uit: dan lopen pagina en stip weer uiteen.
+  const recsForList = allRecsRaw.filter(r => isRecommendationOpen(r, today)) as Recommendation[]
 
   // ── Goals: derive active list + counts from single query ──
   const allGoals = (goalsResult.data ?? []) as GoalWithBudget[]

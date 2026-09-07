@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Sparkles, Check, Clock, ThumbsDown, MessageCircle, ArrowRight, ExternalLink } from 'lucide-react'
+import { Sparkles, Check, Clock, ThumbsDown, MessageCircle, ArrowRight, ExternalLink, ShieldOff } from 'lucide-react'
 import Link from 'next/link'
 import type { Recommendation } from '@/lib/recommendation-data'
 import { deepLinkForRecommendation } from '@/lib/recommendation-deep-link'
@@ -11,6 +11,8 @@ import { ANALYSE_FINANCIEN_PROMPT } from '@/components/app/chat/chat-prompt-deep
 import { useOptionalToast } from '@/components/app/toast-provider'
 import { LokaleTipsGenerator } from './lokale-tips-generator'
 import { TIP_DECISION_LABELS, type TipDecisionKind } from '@/lib/tip-decision-labels'
+import { isRecommendationOpen } from '@/lib/recommendation-status'
+import { useExecutionMode } from '@/lib/ai/local/use-execution-mode'
 
 /**
  * TipsLijst — toptips bovenaan /overzicht/tips. Toont pending +
@@ -53,9 +55,14 @@ const DECISION_TOAST_TITLE: Record<DecisionKind, string> = {
 }
 
 function sortTips(recs: Recommendation[]): Recommendation[] {
-  const now = new Date()
+  // "Ready" is hier een sorteervraag, geen zichtbaarheidsvraag: een tip die
+  // terug is van uitstel staat bovenaan zijn prio-bucket. De vergelijking met
+  // `postponed_until` komt niettemin uit de gedeelde bron (UR3-27, D1) — hier
+  // stond een vierde eigen formulering, met tijdstempel-semantiek waar de
+  // server datum-semantiek gebruikt.
+  const today = new Date().toISOString().split('T')[0]
   const isReady = (r: Recommendation) =>
-    r.status === 'postponed' && !!r.postponed_until && new Date(r.postponed_until) <= now
+    r.status === 'postponed' && isRecommendationOpen(r, today)
   return [...recs].sort((a, b) => {
     // Postponed-ready bovenaan binnen dezelfde prio-bucket
     const readyDelta = (isReady(b) ? 1 : 0) - (isReady(a) ? 1 : 0)
@@ -79,19 +86,33 @@ export function TipsLijst({ recommendations, onChanged, onAccepted }: TipsLijstP
 
   // Filter alleen pending + postponed-ready; expired/rejected/accepted horen
   // hier niet thuis. Postponed-niet-ready slaan we ook over (wachttijd loopt).
+  //
+  // Het oordeel komt uit `lib/recommendation-status.ts` — dezelfde bron die de
+  // server-loader en de zijbalk-stip gebruiken (UR3-27, D1). Hier stond een
+  // dérde formulering (tijdstempel-vergelijking i.p.v. datumvergelijking); die
+  // was toleranter dan de server-filter en kon dus nooit iets extra's tonen,
+  // maar het was wel de derde plek waar dit opnieuw kon wegdrijven.
   const visible = useMemo(() => {
-    const now = Date.now()
+    const today = new Date().toISOString().split('T')[0]
     return sortTips(
-      recommendations.filter((r) => {
-        if (dismissed.has(r.id)) return false
-        if (r.status === 'pending') return true
-        if (r.status === 'postponed' && r.postponed_until) {
-          return new Date(r.postponed_until).getTime() <= now
-        }
-        return false
-      }),
+      recommendations.filter(
+        (r) => !dismissed.has(r.id) && isRecommendationOpen(r, today),
+      ),
     )
   }, [recommendations, dismissed])
+
+  // Waaróm is de lijst leeg? "Geen tips" is een rustige toestand zolang Fin ze
+  // kán maken; staat AI uit, is het abonnement verlopen of kan dit toestel het
+  // lokale model niet aan, dan is dezelfde lege lijst een STORING — en dan is
+  // "Vraag Fin om tips" een knop naar een gesprek dat niet gevoerd kan worden.
+  // De tester zag precies dat: een lege pagina zonder één woord over de
+  // AI-storing eronder (UR3-17 #18).
+  //
+  // `active` = alleen bij een lege lijst: de hook doet dan een verse fetch van
+  // /api/ai-execution-prefs, en die hoort niet te draaien op een pagina die
+  // gewoon tips toont.
+  const tipsMode = useExecutionMode('tips', visible.length === 0)
+  const tipsGeblokkeerd = tipsMode.status === 'blocked'
 
   const restoreTip = useCallback((id: string) => {
     setDismissed((prev) => {
@@ -200,11 +221,44 @@ export function TipsLijst({ recommendations, onChanged, onAccepted }: TipsLijstP
   )
 
   if (visible.length === 0) {
+    // Leeg ÉN geblokkeerd: zeg wát er aan de hand is, en bied geen knop naar een
+    // gesprek dat niet gevoerd kan worden. `LokaleTipsGenerator` blijft hier
+    // bewust weg — die toont bij 'blocked' zijn eigen kaart met dezelfde reden,
+    // en één melding per storing is genoeg.
+    if (tipsGeblokkeerd) {
+      return (
+        <section
+          aria-label="Tips"
+          className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-6 text-center"
+        >
+          <ShieldOff className="mx-auto h-6 w-6 text-[var(--ink-4)]" aria-hidden="true" />
+          <h2 className="mt-2 font-serif text-lg text-[var(--ink)]">
+            Er kunnen nu geen tips gemaakt worden
+          </h2>
+          <p className="mt-1 text-sm text-[var(--ink-3)]">
+            {tipsMode.message ??
+              'Fin kan op dit moment geen tips maken. Zodra dat weer kan, verschijnen ze hier.'}
+          </p>
+          <Link
+            href="/mijn/privacy"
+            className="mt-3 inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3.5 py-2 text-sm font-medium text-[var(--ink)] transition-colors hover:bg-[var(--subtle)]"
+          >
+            Naar Mijn &rsaquo; Privacy
+          </Link>
+        </section>
+      )
+    }
+
     return (
       <div className="space-y-2.5">
         <section aria-label="Tips" className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-6 text-center">
           <Sparkles className="mx-auto h-6 w-6 text-wil-400" aria-hidden="true" />
-          <h2 className="mt-2 font-serif text-lg text-[var(--ink)]">Geen tips wachten op je</h2>
+          {/* De kop spreekt namens deze sectie, niet namens de pagina (UR3-27,
+              D1). "Geen tips wachten op je" las als een belofte over het hele
+              scherm, terwijl het ActionBoard eronder wél gevuld kan zijn — en
+              terwijl de zijbalk-stip ("Er zijn tips of acties") dan terecht
+              brandde. Twee ware uitspraken die samen als tegenspraak lazen. */}
+          <h2 className="mt-2 font-serif text-lg text-[var(--ink)]">Geen tips op dit moment</h2>
           <p className="mt-1 text-sm text-[var(--ink-3)]">
             Vraag Fin om een doorlichting voor een verse tip.
           </p>
