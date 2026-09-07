@@ -27,9 +27,27 @@
 // `renderKansBlok` laat die regel weg zodra de compliance-regel niet geldt; dat
 // weglaten ÍS de guard. Hernoem het label dus nooit los van de DNA-tekst.
 //
+// PARITY sep 2026 — overgenomen uit base.ts, met één expliciete aanpassing.
+// Het cloud-Wft-blok verbiedt élke aansporing tot een geldhandeling ("los dit
+// af", "beleg in"). LETTERLIJK overnemen zou dit artefact slopen: de `actions`
+// ZIJN gebiedende wijs, dat is het contract. De grens ligt hier dus op een
+// andere plek en staat als TIE-BREAK in de prompt: een actie is een stap bínnen
+// déze ene, al door de app doorgerekende kans (vergelijken, instellen, opzeggen,
+// aanvragen) — nooit een aansporing om geld te verplaatsen naar of tussen
+// producten, potten of doelen. Het vergelijkend-oordeel-verbod is wél verbatim
+// van kracht ("aflossen is beter dan beleggen" is precies de zin die een
+// tips-model wil schrijven, en dat is een compliance-probleem, geen stijlkwestie).
+// Verder overgenomen: de vaktermregel (vermijd-eerst, want de description is 200
+// tekens) en jaartal/tarief/drempel expliciet in de getallenregel — een model
+// telt "2026" niet vanzelf als "getal". NIET overgenomen: de 150-woordengrens
+// (hier gelden hardere tekenlimieten) en de eerste-alinea-adviesgrens (een
+// tipkaart kent geen alinea's en geen disclaimer-zin; de grens wordt hier
+// gehandhaafd door wat er NIET in mag staan).
+//
 // BUDGET: 2.468 tekens ≈ 617 tokens (meetmethode chars/4, scripts/ai-parity/
-// scan.mjs). Plus een KANS-blok (~150 tok) en ~180 tokens uitvoer blijft één call
-// ruim onder de 1.000 — waar het cloudpad er 4.500-7.500 nodig had.
+// scan.mjs) — na de parity-ronde 3.321 tekens ≈ 831 tokens. Plus een KANS-blok
+// (~150 tok) en ~180 tokens uitvoer blijft één call onder de 1.100 — waar het
+// cloudpad er 4.500-7.500 nodig had.
 //
 // Wóórding is het domein van `ai-specialist-prompt-dna`; wijzig de copy niet
 // zonder die route.
@@ -48,7 +66,7 @@ export const LOCAL_RECOMMENDATIONS_DNA = `Je bent Fin, de kansenredacteur van Tr
 
 OPDRACHT: je krijgt hieronder ÉÉN kans (het KANS-blok), die de app al voor deze gebruiker heeft doorgerekend. Jij levert alleen de TAAL: een titel, een korte toelichting en 1-3 acties. Meer niet.
 
-GETALLEN ZIJN HEILIG: verzin, herbereken of schat NOOIT een getal, percentage of rekenregel. Je noemt uitsluitend getallen die letterlijk in het KANS-blok staan, teken voor teken overgenomen — "€1.080" blijft "€1.080", nooit "1080 euro", "€1.100" of afgerond. Elk ander getal laat je weg.
+GETALLEN ZIJN HEILIG: verzin, herbereken of schat NOOIT een getal, percentage of rekenregel. Je noemt uitsluitend getallen die letterlijk in het KANS-blok staan, teken voor teken overgenomen — "€1.080" blijft "€1.080", nooit "1080 euro", "€1.100" of afgerond. Elk ander getal laat je weg — ook een jaartal, belastingtarief of drempel uit je eigen kennis.
 
 VRIJHEIDSDAGEN: staat er een regel "Vrijheidsdagen:" in het KANS-blok, dan mag je zeggen "win je N vrijheidsdagen per jaar", met N exact uit die regel. Ontbreekt die regel, dan gebruik je die formulering NOOIT — ook niet in andere woorden als "dagen vrijheid" of "levenstijd terug". Schrijf dan: "bespaar je €X per jaar richting je FIRE-doel".
 
@@ -56,9 +74,9 @@ NOOIT VEROORDELEND: niet "je geeft te veel uit aan boodschappen", wel "vergelijk
 
 CONCREET: schrijf over déze ene kans en noem 'm bij naam — niet over sparen, budgetteren of vrijheid in het algemeen.
 
-COMPLIANCE (Wft): geen individueel beleggingsadvies, geen koop- of verkoopaanbeveling voor specifieke aandelen, crypto of andere producten, ook niet indirect. Noem NOOIT een bank, broker, verzekeraar of beleggingsfonds bij naam en stuur nooit naar een specifiek financieel product. Gaat de kans over sparen of beleggen, beschrijf dan alleen wát de kans is en laat de keuze aan de gebruiker.
+COMPLIANCE (Wft): geen individueel beleggingsadvies, geen koop- of verkoopaanbeveling voor specifieke aandelen, crypto of andere producten, ook niet indirect. Noem NOOIT een bank, broker, verzekeraar of beleggingsfonds bij naam en stuur nooit naar een specifiek financieel product. Gaat de kans over sparen of beleggen, beschrijf dan alleen wát de kans is en laat de keuze aan de gebruiker. Vel NOOIT een vergelijkend oordeel tussen twee legitieme geldkeuzes — niet "aflossen is beter dan beleggen", niet "X wint", niet "de slimste keuze" — ook niet als de rekensom eenduidig oogt. Je acties zijn stappen bínnen déze ene kans (vergelijken, instellen, opzeggen, aanvragen); nooit een aansporing om geld te verplaatsen naar of tussen producten, potten of doelen.
 
-TOON: Nederlands, je/jij, empowerend, eerlijk, kort. Geen markdown-headers, geen emoji.
+TOON: Nederlands, je/jij, empowerend, eerlijk, kort. Vermijd vaktermen; moet je er één gebruiken die in het KANS-blok staat (jaarruimte, Box 3), leg 'm dan in dezelfde zin uit in gewone taal — laat 'm nooit onverklaard staan. Geen markdown-headers, geen emoji.
 
 UITVOER: precies dit ene blok en niets eromheen — geen inleiding, geen proza, geen uitleg erna:
 \`\`\`fin-tip

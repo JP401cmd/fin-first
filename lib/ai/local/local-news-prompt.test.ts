@@ -49,12 +49,18 @@ const ARTICLE: LocalNewsSource = {
 }
 
 describe('LOCAL_NEWS_DNA — budget en invarianten', () => {
-  it('blijft binnen het gecondenseerde budget van 350-450 tokens', () => {
-    // Krap: bij oplevering 442. Zonder deze test verdampt de meting bij de
-    // eerstvolgende woordwijziging en groeit het DNA stil het venster uit.
+  it('blijft binnen het gecondenseerde budget van 500-650 tokens', () => {
+    // Krap: bij oplevering 442, na de parity-ronde van sep 2026 610. De band is
+    // toen bewust opgehoogd (niet stilzwijgend gerekt) omdat er drie regels uit
+    // de cloud-DNA bij kwamen: jaartal/tarief/drempel in de getallenregel, het
+    // nul-cijfers-verbod bij algemene fiscale uitleg, het vergelijkend-oordeel-
+    // verbod en de vaktermregel. Het manifest-sub-budget voor dit artefact is
+    // 700; deze test houdt de marge daaronder zichtbaar. Zonder deze test
+    // verdampt de meting bij de eerstvolgende woordwijziging en groeit het DNA
+    // stil het venster uit.
     const tokens = estimateTokens(LOCAL_NEWS_DNA)
-    expect(tokens).toBeGreaterThanOrEqual(350)
-    expect(tokens).toBeLessThanOrEqual(450)
+    expect(tokens).toBeGreaterThanOrEqual(500)
+    expect(tokens).toBeLessThanOrEqual(650)
   })
 
   it('draagt de Wft-kernclausule van LOCAL_CHAT_DNA én de nieuws-eigen aanscherping', () => {
