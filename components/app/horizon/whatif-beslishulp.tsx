@@ -24,9 +24,23 @@ import type { LifeEventImpactKind } from '@/lib/calculator/to-life-event'
  * WhatIf-beslishulp — "Wat doe je met €X per maand extra?"
  *
  * Vergelijkt drie bestemmingen voor extra maandgeld en vertaalt elk naar
- * vrijheidstijd-impact (FIRE-leeftijd-delta). De winnaar (vroegst vrij) krijgt
- * de editorial highlight-marker. Elke optie kan als levensgebeurtenis op de
- * tijdas worden gezet via de bestaande CalculatorToLifeEventSheet.
+ * vrijheidstijd-impact (FIRE-leeftijd-delta). De uitkomst met de vroegste
+ * vrijheidsdatum krijgt de editorial highlight-marker. Elke optie kan als
+ * levensgebeurtenis op de tijdas worden gezet via de bestaande
+ * CalculatorToLifeEventSheet.
+ *
+ * ── Wft-grens (harde kaders voor de copy in dit bestand) ────────────────────
+ * Dit oppervlak zet drie legitieme geldkeuzes naast elkaar op de EIGEN cijfers van
+ * de gebruiker — precies waar inzicht in vergunningsplichtig advies kan omslaan.
+ * Daarom, vergrendeld in `whatif-beslishulp.wft.test.ts` (die de bron letterlijk
+ * leest, doc-comments incluis — dáár stond de formulering die in de copy belandde):
+ *  - geen absolute zekerheids- of rendementsclaim; zie de verboden-lijst in
+ *    `.claude/skills/compliance-check/SKILL.md` §De claimlijst. De schuldrente heet
+ *    "vast": een tarief uit een contract, geen belofte over een uitkomst;
+ *  - geen vergelijkend oordeel tussen de bestemmingen — regel uit `lib/ai/dna/base.ts`
+ *    §BEPERKINGEN: benoem het verschil beschrijvend en laat de keuze aan de gebruiker;
+ *  - de marker benoemt de MEETUITKOMST (vroegste vrijheidsdatum), niet een voorkeur;
+ *  - de app-brede disclaimer "Indicatie, geen advies — …" staat onder het blok.
  *
  * ── Modelkeuzes (motor-eerlijk) ─────────────────────────────────────────────
  * De horizon-kernel routeert élke terugkerende `income`-cashflow als surplus naar
@@ -37,8 +51,8 @@ import type { LifeEventImpactKind } from '@/lib/calculator/to-life-event'
  *    identiek aan de bestaande extra-inleg-slider. Compound op verwacht
  *    rendement via de echte motor. Geen benadering.
  *
- * 2. AFLOSSEN  — gegarandeerd, eigen tarief: aflossen levert het VASTE
- *    rentetarief van je schuld op (r_debt = saldo-gewogen) en is BOX-3-VRIJ (een
+ * 2. AFLOSSEN  — eigen tarief: aflossen rekent met het VASTE rentetarief van je
+ *    schuld (r_debt = saldo-gewogen) en is BOX-3-VRIJ (een
  *    schuld terugbetalen wordt niet belast). We raken de gedeelde motor niet aan
  *    voor een tweede definitie; in plaats daarvan groeit een aparte "aflossen-pot"
  *    van €X/mnd op r_debt (onbelast) bovenop het netto-vermogenspad dat de motor
@@ -47,7 +61,7 @@ import type { LifeEventImpactKind } from '@/lib/calculator/to-life-event'
  *    `whatif-beslishulp.model.ts` (`aflossenFireAge`). Bij €0 extra identiek aan
  *    de motor-baseline (`fireAgeFromSim(base)`) → beide kaarten delen dezelfde
  *    grondslag; het enige verschil met beleggen is de groeivoet + Box 3. Distinct
- *    van beleggen: lager-maar-gegarandeerd-en-onbelast → kleinere FIRE-versnelling
+ *    van beleggen: vast-en-onbelast → kleinere FIRE-versnelling
  *    wanneer r_debt onder het (Box-3-belaste) beleggingspad blijft, en groter
  *    wanneer r_debt hoog genoeg is om dat pad te verslaan.
  *
@@ -74,8 +88,12 @@ interface OptionResult {
   fireAgeWith: number | null
   /** Verschil t.o.v. het huidige scenario in maanden (negatief = eerder vrij). */
   deltaMonths: number | null
-  /** Of dit de winnaar is (vroegst vrij van de drie). */
-  isWinner: boolean
+  /**
+   * Of deze doorrekening de vroegste vrijheidsdatum van de drie oplevert.
+   * Bewust een MEETUITKOMST, geen voorkeur: de marker zegt wat er gerekend is,
+   * niet wat de gebruiker zou moeten doen (Wft-grens, zie de doc-block).
+   */
+  isEarliest: boolean
   /** Optionele voetnoot over de modelbasis. */
   footnote?: string
 }
@@ -219,7 +237,7 @@ export function WhatIfBeslishulp({
     // 3. Noodfonds — bewust bijna-vlak (geen FIRE-versnelling)
     const noodfondsAge = baselineFireAge
 
-    const raw: Omit<OptionResult, 'isWinner'>[] = [
+    const raw: Omit<OptionResult, 'isEarliest'>[] = [
       {
         id: 'beleggen',
         label: 'Beleggen',
@@ -231,19 +249,19 @@ export function WhatIfBeslishulp({
     ]
 
     // 2. Aflossen — alleen tonen als er schuld is om af te lossen. Compoundt op
-    // het GEGARANDEERDE saldo-gewogen schuldrente-tarief (r_debt) bovenop het
-    // basispad → distinct van beleggen (lager-maar-zeker wanneer r_debt onder
-    // het marktrendement ligt; hoger wanneer r_debt erboven ligt).
+    // het VASTE saldo-gewogen schuldrente-tarief (r_debt) bovenop het basispad →
+    // distinct van beleggen (lager wanneer r_debt onder het aangenomen
+    // marktrendement ligt; hoger wanneer r_debt erboven ligt).
     if (hasDebt && debtRate !== null) {
       const aflossenAge = aflossenFireAge(baselineSim, currentAge, amount, debtRate)
       raw.push({
         id: 'aflossen',
         label: 'Aflossen',
-        description: 'Schuld terugkopen — gegarandeerd rendement op je rente.',
+        description: 'Schuld terugkopen — je bespaart de rente die je nu betaalt.',
         icon: <Landmark className="h-5 w-5" aria-hidden />,
         fireAgeWith: aflossenAge,
         deltaMonths: deltaFrom(aflossenAge),
-        footnote: `Aflossen levert je gegarandeerd je schuldrente op (~${formatDecimal(debtRate * 100, 1)}%), niet het onzekere marktrendement. Doorgaans dus een kleinere — maar zekere — vrijheidswinst dan beleggen.`,
+        footnote: `Deze doorrekening gebruikt je eigen schuldrente (~${formatDecimal(debtRate * 100, 1)}%) als groeivoet, niet het aangenomen marktrendement. Die rente betaal je nu; het marktrendement is een aanname over de toekomst.`,
       })
     }
 
@@ -257,18 +275,18 @@ export function WhatIfBeslishulp({
       footnote: 'Een noodfonds blijft cash (~0% rendement, reëel uitgehold door inflatie). Het vervroegt je vrijheidsdatum niet — het beschermt die wél tegen tegenslagen.',
     })
 
-    // Winnaar = vroegst vrij (laagste fractionele FIRE-leeftijd). Onbereikbaar
-    // telt niet mee; bij gelijkspel wint de eerste (beleggen).
-    let winnerId: OptionId | null = null
-    let bestAge = Infinity
+    // Marker = de vroegste vrijheidsdatum (laagste fractionele FIRE-leeftijd).
+    // Onbereikbaar telt niet mee; bij gelijkspel houdt de eerste (beleggen) 'm.
+    let earliestId: OptionId | null = null
+    let earliestAge = Infinity
     for (const o of raw) {
-      if (o.fireAgeWith !== null && o.fireAgeWith < bestAge - 1e-6) {
-        bestAge = o.fireAgeWith
-        winnerId = o.id
+      if (o.fireAgeWith !== null && o.fireAgeWith < earliestAge - 1e-6) {
+        earliestAge = o.fireAgeWith
+        earliestId = o.id
       }
     }
 
-    return raw.map(o => ({ ...o, isWinner: o.id === winnerId }))
+    return raw.map(o => ({ ...o, isEarliest: o.id === earliestId }))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [baseInput, baselineSim, amount, scenarioCashflows, scenarioEvents, baselineFireAge, hasDebt, debtRate, currentAge, runProjection])
 
@@ -352,9 +370,15 @@ export function WhatIfBeslishulp({
             ))}
           </div>
 
+          {/* Wft-grens: de drie kaarten zetten legitieme geldkeuzes naast elkaar op
+              eigen cijfers. De sluitregel houdt dat expliciet een rekenuitkomst en
+              legt de keuze terug bij de gebruiker (app-conventie "Indicatie, geen
+              advies — …"). Vergrendeld in whatif-beslishulp.wft.test.ts. */}
           <p className="mt-3 font-sans text-[10px] leading-snug text-[var(--ink-4)]">
-            Vergeleken vanaf je huidige scenario. &quot;Kies deze&quot; zet de keuze als
-            levensgebeurtenis op je tijdas, zodat de projectie er blijvend mee rekent.
+            Indicatie, geen advies — drie doorrekeningen vanaf je huidige scenario, elk
+            met zijn eigen aannames. Wat bij jou past, kies je zelf. &quot;Kies deze&quot;
+            zet de keuze als levensgebeurtenis op je tijdas, zodat de projectie er
+            blijvend mee rekent.
           </p>
         </div>
       )}
@@ -383,7 +407,7 @@ function OptionCard({
   option: OptionResult
   onCommit: () => void
 }) {
-  const { label, description, icon, fireAgeWith, deltaMonths, isWinner, footnote } = option
+  const { label, description, icon, fireAgeWith, deltaMonths, isEarliest, footnote } = option
 
   // Vrijheidstijd-framing: negatieve delta = eerder vrij (positief gevoel).
   const earlier = deltaMonths !== null && deltaMonths < 0
@@ -399,33 +423,35 @@ function OptionCard({
   return (
     <div
       className={`flex flex-col gap-2 rounded-lg border p-3 transition-colors ${
-        isWinner
+        isEarliest
           ? 'border-horizon-500 bg-horizon-50/60'
           : 'border-[var(--border-ed)] bg-[var(--paper)]'
       }`}
     >
       <div className="flex items-start justify-between gap-2">
-        <span className={isWinner ? 'text-horizon-600' : 'text-[var(--ink-3)]'}>
+        <span className={isEarliest ? 'text-horizon-600' : 'text-[var(--ink-3)]'}>
           {icon}
         </span>
-        {isWinner && (
+        {/* Beschrijvende meetuitkomst, geen prijs: het label benoemt wát er gemeten
+            is (de vroegste vrijheidsdatum), niet welke keuze te verkiezen zou zijn. */}
+        {isEarliest && (
           <span className="rounded-full bg-horizon-500 px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.08em] text-white">
-            Snelst
+            Vroegst vrij
           </span>
         )}
       </div>
 
-      <h4 className={`font-sans text-sm font-semibold ${isWinner ? 'text-horizon-700' : 'text-[var(--ink)]'}`}>
+      <h4 className={`font-sans text-sm font-semibold ${isEarliest ? 'text-horizon-700' : 'text-[var(--ink)]'}`}>
         {label}
       </h4>
 
-      {/* Vrijheidsleeftijd — editorial figure, winnaar krijgt highlight-marker */}
+      {/* Vrijheidsleeftijd — editorial figure; de vroegste datum krijgt de marker */}
       <div>
         <div
           className="text-[20px] font-black leading-none tracking-[-0.02em] tabular-nums"
           style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
         >
-          {isWinner ? (
+          {isEarliest ? (
             <span
               className="inline px-1"
               style={{ backgroundImage: 'linear-gradient(transparent 60%, var(--module-active-200) 60%)' }}
