@@ -88,6 +88,7 @@ describe('SimChartModal — bruto rendement volgt profielprop (geen hardcoded 7%
         retirementExpenseMethod={null}
         yearlyExpenses={30_000}
         grossReturn={0.06}
+        canonicalDailyRate={105}
       />,
     )
     openMotorkap()
@@ -106,6 +107,7 @@ describe('SimChartModal — bruto rendement volgt profielprop (geen hardcoded 7%
         retirementExpenseMethod={null}
         yearlyExpenses={30_000}
         grossReturn={0.05}
+        canonicalDailyRate={105}
       />,
     )
     openMotorkap()
@@ -124,6 +126,7 @@ describe('SimChartWidget — geeft grossReturn door aan de interne modal', () =>
         retirementExpenseMethod={null}
         yearlyExpenses={30_000}
         grossReturn={0.06}
+        canonicalDailyRate={105}
       />,
     )
     // Open de detail-modal via de klikbare card.

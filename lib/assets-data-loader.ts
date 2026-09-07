@@ -9,6 +9,7 @@ import { loadKpiContextRefs, type KpiContextRefs } from './kpi-context'
 import { loadConnectionsByAssetIds, type AssetConnectionSummary } from './connections-data'
 import { loadPerspectiveDataServer } from './household/perspective-loader-server'
 import { getRecentDailyExpenseRate } from './expense-rate'
+import type { FreedomRateSource } from './format'
 import { parseHousingStrategy, type HousingStrategyConfig } from './housing-strategy'
 import { buildUnlinkedCashAssets } from './unlinked-cash-assets'
 // Kostprijs-per-bezit woont sinds kaart H7 in een eigen module (lib/holdings-cost.ts),
@@ -33,6 +34,19 @@ export interface AssetsPageData {
   assets: Array<Record<string, unknown>>
   mortgages: Array<{ id: string; name: string; current_balance: number; linked_asset_id: string | null }>
   dailyExpenses: number
+  /**
+   * Herkomst van `dailyExpenses` — `recentDailyExpenseRateFromRows(...).source`.
+   * Additief meegereisd sinds UR3-08: zonder de bron kan de wisselkoers-voetnoot
+   * naast de vrijheidstijden op deze pagina niet zeggen ÓF het tarief een meting
+   * is ("je uitgaven over de afgelopen 12 maanden") dan wel een schatting uit het
+   * profiel of op leeftijd. `'none'` = onbekende grondslag (ADR 0131) → geen
+   * voetnoot, want die zou een meting suggereren die er niet is.
+   *
+   * Optioneel gehouden zodat bestaande fixtures/testbundels niet hoeven te
+   * wijzigen; de client valt dan terug op `'transactions'` bij een tarief > 0 —
+   * dezelfde terugval als hub-kansen en het cashflow-blok.
+   */
+  dailyExpensesSource?: FreedomRateSource
   linkedBankAccounts: Array<{ id: string; linked_asset_id: string; balance: number }>
   budgetingActive: boolean
   valuations: Record<string, Array<Record<string, unknown>>>
@@ -207,6 +221,7 @@ export const loadAssetsData = cache(async (
     assets,
     mortgages,
     dailyExpenses,
+    dailyExpensesSource: expenseRate.source,
     linkedBankAccounts,
     budgetingActive,
     valuations,

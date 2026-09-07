@@ -173,18 +173,15 @@ const ALLOWED_FILES = new Map([
       'tarief van vandaag. De zin benoemt die grondslag zichtbaar. Conversie ' +
       'zelf via de canonieke helpers (dailyExpenseRate + credibleDailyExpense).',
   ],
-  [
-    'components/app/horizon/sim-chart-widget.tsx',
-    'ONTTREKKINGSFASE-grondslag: rekent op yearlyMustExpenses (uitgaven ná pensioen, ' +
-      'de FIRE-doel-invoer uit lib/budget-utils.ts), niet op de huidige levensstijl. ' +
-      'Dit is de kassabon ONDER de simulatie; het huidige-levensstijl-tarief zou de ' +
-      'onderbouwing niet meer laten kloppen met de motor eronder.',
-  ],
-  [
-    'components/app/horizon/grafiek-uitleg/grafiek-uitleg-walkthrough.tsx',
-    'Zelfde onttrekkingsfase-grondslag als sim-chart-widget (krijgt dezelfde ' +
-      'yearlyExpenses-prop en wordt er letterlijk door gerenderd).',
-  ],
+  // VERVALLEN (UR3-08 fase 2, 6 sep 2026): sim-chart-widget.tsx en
+  // grafiek-uitleg/grafiek-uitleg-walkthrough.tsx stonden hier met de reden
+  // "ONTTREKKINGSFASE-grondslag" — ze leidden hun €→tijd-koers af uit
+  // yearlyMustExpenses. Eigenaarsbesluit C bij UR3-08 keert dat om: dat gaf op
+  // /toekomst voor hetzelfde bedrag een andere vrijheidstijd dan de pagina
+  // eromheen (vervolg KRUIS-20), en in wat-als bewoog de koers bovendien mee met
+  // een scenario dat de werkelijke levenskosten van vandaag niet verandert. Beide
+  // consumeren nu `canonicalDailyRate` uit de bundel; de uitzondering is daarmee
+  // opgeheven en de entries zijn verwijderd i.p.v. blijven staan.
   [
     'components/core/holdings/portfolio-value-chart.tsx',
     'ESSENTIELE-uitgaven-grondslag (yearlyEssentialExpenses): bewust de must-basis ' +

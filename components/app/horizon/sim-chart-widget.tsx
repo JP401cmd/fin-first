@@ -16,7 +16,7 @@ import { KassabonShell } from '@/components/app/kassabon-shell'
 import { SimChart } from '@/components/app/horizon/sim-chart'
 import { ZoomableChartContainer } from '@/components/app/horizon/zoomable-chart-container'
 import { GrafiekUitlegWalkthrough } from '@/components/app/horizon/grafiek-uitleg/grafiek-uitleg-walkthrough'
-import { formatCurrency, formatWithFreedom, dailyExpenseRate } from '@/lib/format'
+import { formatCurrency, formatWithFreedom } from '@/lib/format'
 import { useEuroView } from '@/lib/hooks/use-euro-view'
 import { formatFireAge } from '@/lib/horizon-data'
 import type { SimResult, SimCashflow } from '@/lib/fire-simulation'
@@ -115,6 +115,19 @@ export interface SimChartModalProps {
    * projectie is doorgerekend; nooit een hardcoded constante (voorkomt display-drift).
    */
   grossReturn: number
+  /**
+   * Het CANONIEKE dagtarief (€/dag) uit de bundel — `HorizonPageData.dailyExpenseRate`,
+   * 12-mnd rolling consumptie via lib/expense-rate.ts. Verplicht en doorgegeven,
+   * nooit hier afgeleid.
+   *
+   * Hier stond `dailyExpenseRate(yearlyExpenses / 12)`. `yearlyExpenses` is de
+   * PROJECTIE-uitgave (`yearlyMustExpenses`, de FIRE-grondslag) en blijft dat ook —
+   * hij hoort als BEDRAG in de kassabon hieronder. Als weergave-KOERS gaf hij
+   * hetzelfde bedrag hier echter een andere vrijheidstijd dan de pagina eromheen
+   * (vervolg KRUIS-20). Eigenaarsbesluit C bij UR3-08: eerst gelijktrekken, daarna
+   * pas de wisselkoers-voetnoot uitrollen.
+   */
+  canonicalDailyRate: number
   /** Optioneel: de rijkere grootboek-rijen voor extra detail (graceful degradation). */
   unifiedRows?: UnifiedProjectionRow[]
 }
@@ -128,6 +141,7 @@ export const SimChartModal = memo(function SimChartModal({
   retirementExpenseMethod,
   yearlyExpenses,
   grossReturn,
+  canonicalDailyRate,
   unifiedRows,
 }: SimChartModalProps) {
   // Derive strategy from simResult
@@ -165,8 +179,9 @@ export const SimChartModal = memo(function SimChartModal({
   const annualSavingsFromRows = rows.find(r => r.phase === 'accumulation')?.savings ?? 0
   const accumulationRows = rows.filter(r => r.phase === 'accumulation')
   const retirementRows = rows.filter(r => r.phase === 'retirement')
-  // Canonieke €→tijd-dagbasis (×12/365) uit lib/format.ts — geen eigen som.
-  const dailyRate = dailyExpenseRate(yearlyExpenses / 12)
+  // Consume, don't recompute: de €→tijd-koers komt uit de bundel. Zie de
+  // prop-documentatie hierboven voor waarom hier geen eigen som meer staat.
+  const dailyRate = canonicalDailyRate
 
   return (
     <ShellOverlay open={open} onClose={onClose} kind="sheet" size="full" title="Simulatie Prognose">
@@ -177,7 +192,7 @@ export const SimChartModal = memo(function SimChartModal({
           simResult={simResult}
           cashflows={cashflows}
           currentAge={currentAge}
-          yearlyExpenses={yearlyExpenses}
+          canonicalDailyRate={canonicalDailyRate}
           unifiedRows={unifiedRows}
         />
 
@@ -294,7 +309,14 @@ export const SimChartModal = memo(function SimChartModal({
             <KassabonRow label="Huidig netto vermogen" amount={startPortfolio} dailyRate={dailyRate} />
             <KassabonRow label="Jaarlijkse uitgaven (pensioen)" amount={yearlyExpenses} dailyRate={dailyRate} freedomSuffix="/jaar" />
             <div className="flex justify-between py-0.5">
-              <span className="font-sans text-sm text-[var(--ink-2)]">Dagelijkse uitgaven</span>
+              {/* Grondslag in het label. Dit is de PROJECTIE-uitgave per dag
+                  (jaaruitgaven ná pensioen ÷ 365) — een invoerparameter van de
+                  motor, niet de wisselkoers waarmee de vrijheidstijd-subregels
+                  hierboven rekenen (die staat sinds UR3-08 besluit C op het
+                  canonieke 12-mnd consumptietarief van vandaag). Twee
+                  verschillende €/dag naast elkaar zonder woord erbij leest als
+                  een tegenspraak; mét het woord is het een feit. */}
+              <span className="font-sans text-sm text-[var(--ink-2)]">Dagelijkse uitgaven (pensioen)</span>
               <span className="font-mono tabular-nums text-[var(--ink)]">{fmt(yearlyExpenses / 365)}/dag</span>
             </div>
             <KassabonRow label="Jaarlijkse inleg (assets)" amount={annualSavingsFromRows} dailyRate={dailyRate} freedomSuffix="/jaar" />
@@ -603,6 +625,8 @@ export interface SimChartWidgetProps {
   yearlyExpenses: number
   /** Bruto profielrendement — doorgegeven aan de interne SimChartModal (zie SimChartModalProps). */
   grossReturn: number
+  /** Canoniek dagtarief uit de bundel — doorgegeven aan de interne SimChartModal. */
+  canonicalDailyRate: number
   className?: string
 }
 
@@ -613,6 +637,7 @@ export const SimChartWidget = memo(function SimChartWidget({
   retirementExpenseMethod,
   yearlyExpenses,
   grossReturn,
+  canonicalDailyRate,
   className,
 }: SimChartWidgetProps) {
   const [modalOpen, setModalOpen] = useState(false)
@@ -778,6 +803,7 @@ export const SimChartWidget = memo(function SimChartWidget({
         retirementExpenseMethod={retirementExpenseMethod}
         yearlyExpenses={yearlyExpenses}
         grossReturn={grossReturn}
+        canonicalDailyRate={canonicalDailyRate}
       />
     </>
   )

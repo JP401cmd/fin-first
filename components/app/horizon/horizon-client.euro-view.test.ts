@@ -288,7 +288,17 @@ describe('horizon-client.tsx — euro-weergave-render-grens (T4)', () => {
     const src = readFileSync(SOURCE_PATH, 'utf8')
     // D15: het dagtarief is per definitie een grootheid van vandaag. Deflateert
     // het mee, dan wordt de deflatie twee keer toegepast op de vrijheidstijd.
-    expect(src).toMatch(/dailyExpenseRate=\{\(effectiveInput\?\.yearlyMustExpenses \?\? 0\) \/ 365\}/)
+    //
+    // De koers zélf verhuisde bij UR3-08 (eigenaarsbesluit C) van een eigen som
+    // over de projectie-uitgave — `(effectiveInput?.yearlyMustExpenses ?? 0) / 365`
+    // — naar `canonicalDailyRate` (= HorizonPageData.dailyExpenseRate, 12-mnd
+    // rolling consumptie), zodat de grafiek-tooltip dezelfde vrijheidstijd toont
+    // als de rest van deze pagina. Dat verandert niets aan D15: ook de canonieke
+    // koers is een grootheid van vandaag en gaat ONGEDEFLATEERD de grafiek in.
+    expect(src).toMatch(/dailyExpenseRate=\{canonicalDailyRate\}/)
+    // De vangrail zelf: nergens een gedeflateerde variant van de koers.
+    expect(src).not.toMatch(/dailyExpenseRate=\{deflate\(/)
+    expect(src).not.toMatch(/dailyExpenseRate=\{view[A-Za-z]*DailyRate/)
   })
 
   it('deflateert de vermogensopbouw-staven (WealthCompositionChart) als view*-feed', () => {

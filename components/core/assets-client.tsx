@@ -30,6 +30,7 @@ import { DGA_LENING_DREMPEL } from '@/lib/box2-data'
 import { BudgetIcon, formatCurrency } from '@/components/app/budget-shared'
 import { calculateFreedomTime, formatFreedomTimeString, formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+import { VrijheidstijdVoetnoot } from '@/components/app/vrijheidstijd-voetnoot'
 import { AmountInput } from '@/components/app/amount-input'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { parseAmountInput } from '@/lib/amount-input'
@@ -323,6 +324,10 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
   // deze pagina een ander €/dag (en dus andere "jaren vrijheid") dan de
   // balans/vermogen-rapporten en de dashboard-widgets voor hetzelfde bedrag.
   const dailyExpenses = initialData?.dailyExpenses ?? 0
+  // Herkomst van dat tarief — reist mee vanaf dezelfde `getRecentDailyExpenseRate`
+  // in de loader. Alleen nodig om de voetnoot te laten zeggen ÓF het een meting of
+  // een schatting is; het GETAL blijft `dailyExpenses`.
+  const dailyExpensesSource = initialData?.dailyExpensesSource
   // Kostprijs per bezit uit de holdings-motor (`sumHoldingTotals`), via de
   // server-loader — client-direct lezen van holdings voor weergavedata mag niet
   // (ADR 0058). De map is NIET perspectief-afhankelijk: RLS op beide
@@ -985,6 +990,26 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
           portfolioReturn.cost > 0 ? [figures[0], figures[2]] : [figures[0], figures[1]]
         }
         figures={figures}
+      />
+
+      {/* De wisselkoers naast het eerste tijdgetal van deze pagina (UR3-08).
+          Henk las hier "1j 4m" bij zijn eerste bezitting en begreep pas twee
+          schermen later wat dat betekende: nergens stond dat vrijheidstijd niets
+          meer is dan bedrag ÷ dagtarief.
+
+          ÉÉN regel onder de héle strip, niet onder elke cel (eigenaarsbesluit A).
+          Alle vrijheidstijden op deze pagina — de twee strip-cellen, het
+          subtotaal excl. eigen woning hieronder, de taartpunt en elke kaart —
+          delen exact ditzelfde `dailyExpenses`; de koers per plek herhalen zou
+          een rustige pagina in een dozijn voetnoten veranderen.
+
+          Verdwijnt vanzelf in privacymodus, bij een tarief van 0 en bij een
+          onbekende grondslag — dat zit in het component (ADR 0091 / 0131). Voegt
+          zelf nooit een tijdgetal toe (eigenaarsbesluit 2, 12 jul 2026). */}
+      <VrijheidstijdVoetnoot
+        dailyRate={dailyExpenses}
+        source={dailyExpensesSource}
+        className="mt-2"
       />
 
       {/* Rekenmodal-trigger — in BÉIDE weergaven (S11). Hij stond alleen in

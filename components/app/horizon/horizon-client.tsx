@@ -6363,7 +6363,14 @@ export default function HorizonPage({
                             // Deflateert het bedrag wél, dan volgt de vrijheidstijd
                             // automatisch mee; ook de noemer aanpakken zou de deflatie
                             // twee keer toepassen.
-                            dailyExpenseRate={(effectiveInput?.yearlyMustExpenses ?? 0) / 365}
+                            //
+                            // Consume, don't recompute: hier stond
+                            // `(effectiveInput?.yearlyMustExpenses ?? 0) / 365` — de
+                            // PROJECTIE-uitgave als weergave-koers. De grafiek-tooltip gaf
+                            // daardoor een andere vrijheidstijd dan élk ander tijdgetal op
+                            // deze pagina, die al op `canonicalDailyRate` staan
+                            // (eigenaarsbesluit C bij UR3-08, vervolg KRUIS-20).
+                            dailyExpenseRate={canonicalDailyRate}
                             householdOverlays={viewHouseholdOverlays ?? undefined}
                             visibleMinAge={visibleMin}
                             visibleMaxAge={visibleMax}
@@ -6656,6 +6663,7 @@ export default function HorizonPage({
           retirementExpenseMethod={null}
           yearlyExpenses={effectiveInput?.yearlyMustExpenses ?? 0}
           grossReturn={fireParams.grossReturn}
+          canonicalDailyRate={canonicalDailyRate}
           unifiedRows={unifiedRows ?? undefined}
         />
       )}
@@ -9984,7 +9992,7 @@ export default function HorizonPage({
             <p className="mt-3 text-center font-sans text-[10px] text-[var(--ink-4)]">
               {simResult?.implicitWithdrawalRate != null
                 ? 'Levenslange simulatie (opbouw + verbruik, incl. Box 3 en inflatie)'
-                : 'Ingesteld via Identiteit → Instellingen'}
+                : 'Ingesteld via Toekomst → Voorkeuren'}
             </p>
           </KassabonShell>
         </div>

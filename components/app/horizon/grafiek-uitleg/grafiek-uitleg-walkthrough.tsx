@@ -25,7 +25,6 @@ import { deriveChapterData, leadSentenceForWithdrawal } from './chapter-data'
 import {
   formatCurrency,
   formatWithFreedom,
-  dailyExpenseRate,
 } from '@/lib/format'
 import { formatFireAge } from '@/lib/horizon-data'
 import { ASSET_TYPE_LABELS, type AssetType } from '@/lib/asset-data'
@@ -38,7 +37,20 @@ export interface GrafiekUitlegWalkthroughProps {
   simResult: SimResult
   cashflows: SimCashflow[]
   currentAge: number | null
-  yearlyExpenses: number
+  /**
+   * Het CANONIEKE dagtarief (€/dag) uit de bundel — `HorizonPageData.dailyExpenseRate`,
+   * 12-mnd rolling consumptie via lib/expense-rate.ts. Verplicht en doorgegeven,
+   * nooit hier afgeleid.
+   *
+   * Hier stond `dailyExpenseRate(yearlyExpenses / 12)`: de PROJECTIE-uitgave
+   * (`yearlyMustExpenses`, de FIRE-grondslag) als weergave-koers. Datzelfde bedrag
+   * gaf daardoor in deze uitleg een andere vrijheidstijd dan op de pagina eromheen
+   * — hetzelfde KRUIS-20-patroon dat horizon-client al gedicht had met
+   * `canonicalDailyRate`. Eigenaarsbesluit C bij UR3-08: eerst gelijktrekken,
+   * daarna pas de wisselkoers-voetnoot uitrollen, anders zou die voetnoot
+   * ("je uitgaven over de afgelopen 12 maanden") hier liegen.
+   */
+  canonicalDailyRate: number
   /** Optioneel: rijkere grootboek-rijen voor extra detail (graceful degradation). */
   unifiedRows?: UnifiedProjectionRow[]
 }
@@ -172,13 +184,14 @@ export const GrafiekUitlegWalkthrough = memo(function GrafiekUitlegWalkthrough({
   simResult,
   cashflows,
   currentAge,
-  yearlyExpenses,
+  canonicalDailyRate,
   unifiedRows,
 }: GrafiekUitlegWalkthroughProps) {
   const data = deriveChapterData(simResult, cashflows, unifiedRows)
   const resolvedCurrentAge = currentAge ?? 30
-  // Canonieke €→tijd-dagbasis (×12/365) uit lib/format.ts — geen eigen som.
-  const dailyRate = dailyExpenseRate(yearlyExpenses / 12)
+  // Consume, don't recompute: de €→tijd-koers komt uit de bundel. Zie de
+  // prop-documentatie hierboven voor waarom hier geen eigen som meer staat.
+  const dailyRate = canonicalDailyRate
 
   // ── Hoofdstuk 1 — Opbouw ──────────────────────────────────────────────────
   const opbouwFigures: JouwGetal[] = [
