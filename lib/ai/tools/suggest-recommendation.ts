@@ -6,7 +6,8 @@ import type { SupabaseClient } from '@supabase/supabase-js'
  * suggestRecommendation — Fin-tool die ÉÉN voorstel aan de gebruiker
  * toont, persistent opgeslagen in de `recommendations`-tabel als
  * status='pending'. De chat rendert een kaart met drie expliciete
- * knoppen (Accepteer / Uitstel / Wijs af). Niks doen = chat sluit met
+ * knoppen (Doe nu / Later / Negeren — dezelfde woorden als de TipsLijst
+ * op /overzicht/tips). Niks doen = chat sluit met
  * een onbeantwoorde recommendation → trigger expire (zie chat-panel).
  *
  * Plan §6.6: voorstellen leven enkel nog in de chat, één tegelijk. De
@@ -84,7 +85,7 @@ export function createSuggestRecommendationTool(supabase: SupabaseClient, userId
   return tool({
     description:
       'Stel ÉÉN concrete optimalisatie voor aan de gebruiker en sla op als pending recommendation. ' +
-      'De gebruiker kan in de chat Accepteren (creëert acties), Uitstellen (later terug) of Afwijzen. ' +
+      'De gebruiker kiest in de chat "Doe nu" (creëert acties), "Later" (komt terug) of "Negeren". ' +
       'Gebruik MAX één keer per gesprekstap; voor losse actie-suggesties zonder voorstel-context gebruik suggestAction.',
     inputSchema: z
       .object({

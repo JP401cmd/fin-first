@@ -80,10 +80,10 @@ const criteria: AcceptanceCriterion[] = [
   {
     workflow: 'WF-WILL-02',
     scenarioId: 'UAT-WILL-02',
-    titel: 'Een tip van Fin beslissen: accepteren, uitstellen, afwijzen',
+    titel: 'Een tip van Fin beslissen: Doe nu / Later / Negeren',
     kriticiteit: 'KERN',
-    given: 'Een "Tip van Fin"-kaart in de chat; "nu" = 5 juli 2026.',
-    when: 'De gebruiker kiest "Uitstel".',
+    given: 'Een "Tip van Fin"-kaart in de chat; "nu" = 5 juli 2026. De drie knoppen dragen dezelfde woorden als de TipsLijst op /overzicht/tips (WF-OVZ-19).',
+    when: 'De gebruiker kiest "Later".',
     then: '`postponed_until` = nu + 14 dagen = 19 juli 2026 (POSTPONE_DAYS = 14, identiek in chat-panel.tsx en tips-lijst.tsx); de tip mag pas vanaf die datum via de badge terugkomen (WF-WILL-06). De tip-inhoud zelf ("+X dagen vrijheid/jaar") is AI-tool-output en niet hand-narekenbaar.',
     assertion: {
       kind: 'exact',

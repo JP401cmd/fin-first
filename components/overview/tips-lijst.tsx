@@ -10,6 +10,7 @@ import { useChatContextOptional } from '@/components/app/chat/chat-provider'
 import { ANALYSE_FINANCIEN_PROMPT } from '@/components/app/chat/chat-prompt-deeplink'
 import { useOptionalToast } from '@/components/app/toast-provider'
 import { LokaleTipsGenerator } from './lokale-tips-generator'
+import { TIP_DECISION_LABELS, type TipDecisionKind } from '@/lib/tip-decision-labels'
 
 /**
  * TipsLijst — toptips bovenaan /overzicht/tips. Toont pending +
@@ -34,7 +35,7 @@ interface TipsLijstProps {
   onAccepted?: () => void
 }
 
-type DecisionKind = 'accept' | 'postpone' | 'reject'
+type DecisionKind = TipDecisionKind
 
 const POSTPONE_DAYS = 14
 
@@ -315,7 +316,7 @@ function TipCard({
           className="inline-flex items-center gap-1 rounded-full bg-wil-500 px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-wil-600"
         >
           <Check className="h-3 w-3" aria-hidden="true" />
-          Doe nu
+          {TIP_DECISION_LABELS.accept}
         </button>
         <button
           type="button"
@@ -323,7 +324,7 @@ function TipCard({
           className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800 transition-colors hover:bg-amber-100"
         >
           <Clock className="h-3 w-3" aria-hidden="true" />
-          Later
+          {TIP_DECISION_LABELS.postpone}
         </button>
         <button
           type="button"
@@ -331,7 +332,7 @@ function TipCard({
           className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-[var(--paper)] px-3 py-1 text-xs font-semibold text-zinc-700 transition-colors hover:bg-zinc-50"
         >
           <ThumbsDown className="h-3 w-3" aria-hidden="true" />
-          Negeren
+          {TIP_DECISION_LABELS.reject}
         </button>
       </div>
 

@@ -45,7 +45,7 @@ Je hebt TWEE tools om werk aan te bieden; gebruik ze gericht:
 A) **suggestRecommendation** — een geïntegreerde TIP (slaat op als recommendation in de DB):
    - Gebruik dit wanneer je een optimalisatie-kans identificeert die de moeite van een expliciete beslissing waard is
    - Stel MAXIMAAL DRIE tips per gespreksbeurt voor — geef de gebruiker keuze zonder overspoeling
-   - De tip verschijnt als kaart met 3 knoppen: Accepteer → de bijbehorende acties worden automatisch aangemaakt; Uitstel → komt na 14 dagen terug; Wijs af → wordt niet meer aangeboden
+   - De tip verschijnt als kaart met 3 knoppen: Doe nu → de bijbehorende acties worden automatisch aangemaakt; Later → komt na 14 dagen terug; Negeren → wordt niet meer aangeboden
    - Pending tips BLIJVEN bestaan na het sluiten van de chat — ze verschijnen op /overzicht/tips (TipsLijst) waar de gebruiker alsnog kan beslissen. Geen druk om in deze sessie te beslissen
    - Verplichte velden: title, description (2-3 zinnen), recommendation_type, freedom_days_per_year, suggested_actions (1-3 concrete uitvoer-stappen)
 

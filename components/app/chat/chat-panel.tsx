@@ -27,6 +27,7 @@ import { MeldingView } from './melding/melding-view'
 import { GidsView } from './gids/gids-view'
 import { countOpenGuideSteps, useWelcomeGuide } from './gids/welcome-guide-provider'
 import type { SuggestRecommendationResult } from '@/lib/ai/tools/suggest-recommendation'
+import { TIP_DECISION_LABELS, TIP_DECISION_DONE_LABELS } from '@/lib/tip-decision-labels'
 import { ChatVisualizationCard } from './chat-visualization-card'
 import '@/components/app/fin/fin-home.css' // wh-melding-in keyframe (corner-grow entree, gedeeld met FinHome)
 import type { VisualizationOutput } from '@/lib/ai/tools/show-visualization'
@@ -332,18 +333,20 @@ function RecommendationSuggestionCard({
           <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-medium text-[var(--ink-2)]">
             {decision === 'accepted' && (
               <>
-                <Check className="h-3 w-3 text-emerald-600" aria-hidden="true" /> Geaccepteerd —
-                staat op je acties
+                <Check className="h-3 w-3 text-emerald-600" aria-hidden="true" />{' '}
+                {TIP_DECISION_DONE_LABELS.accept} — staat op je acties
               </>
             )}
             {decision === 'postponed' && (
               <>
-                <Clock className="h-3 w-3 text-amber-600" aria-hidden="true" /> Uitgesteld
+                <Clock className="h-3 w-3 text-amber-600" aria-hidden="true" />{' '}
+                {TIP_DECISION_DONE_LABELS.postpone}
               </>
             )}
             {decision === 'rejected' && (
               <>
-                <ThumbsDown className="h-3 w-3 text-zinc-600" aria-hidden="true" /> Afgewezen
+                <ThumbsDown className="h-3 w-3 text-zinc-600" aria-hidden="true" />{' '}
+                {TIP_DECISION_DONE_LABELS.reject}
               </>
             )}
           </div>
@@ -361,7 +364,7 @@ function RecommendationSuggestionCard({
               ) : (
                 <Check className="h-3 w-3" aria-hidden="true" />
               )}
-              Accepteer
+              {TIP_DECISION_LABELS.accept}
             </button>
             <button
               type="button"
@@ -374,7 +377,7 @@ function RecommendationSuggestionCard({
               ) : (
                 <Clock className="h-3 w-3" aria-hidden="true" />
               )}
-              Uitstel
+              {TIP_DECISION_LABELS.postpone}
             </button>
             <button
               type="button"
@@ -387,7 +390,7 @@ function RecommendationSuggestionCard({
               ) : (
                 <ThumbsDown className="h-3 w-3" aria-hidden="true" />
               )}
-              Wijs af
+              {TIP_DECISION_LABELS.reject}
             </button>
           </div>
           {error && (
