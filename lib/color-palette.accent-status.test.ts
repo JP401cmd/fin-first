@@ -4,6 +4,7 @@ import {
   hexToOklch,
   ACCENT_CHROMA_MAX,
   STATUS_HUES,
+  STATUS_HUE_WINDOW,
   DEFAULT_MODULE_COLORS,
   DEFAULT_PHASE_COLORS,
   DEFAULT_BUDGET_COLORS,
@@ -54,12 +55,50 @@ describe('accentClashesWithStatus — de accent-defaults', () => {
     }
   })
 
-  it('alle vier de accent-defaults zitten in de accent-band', () => {
+  /**
+   * Was tot 8 sep "alle vier onder ACCENT_CHROMA_MAX". Dat klopt niet meer en
+   * was ook nooit de eigenlijke regel: de band geldt alléén voor een accent
+   * dat bínnen `STATUS_HUE_WINDOW` van een statushue ligt. Wil (20,2° van
+   * amber), horizon (81,7°) en fin (77,1°) liggen erbuiten en mogen daarom vol
+   * verzadigen; kern (3,1° van "op koers") niet.
+   */
+  it('elk accent-default respecteert de band die vóór hém geldt', () => {
     for (const [key, hex] of Object.entries(DEFAULT_MODULE_COLORS)) {
-      const { C } = hexToOklch(hex)
-      expect(C, `${key} (${hex}) onder de band`).toBeGreaterThan(0.02)
-      expect(C, `${key} (${hex}) boven de band`).toBeLessThan(ACCENT_CHROMA_MAX)
+      const { C, h } = hexToOklch(hex)
+      expect(C, `${key} (${hex}) is geen grijstint`).toBeGreaterThan(0.02)
+      const dichtbijStatus = Object.values(STATUS_HUES).some(
+        (statusHue) => Math.min(
+          Math.abs(((h - statusHue) % 360 + 360) % 360),
+          360 - Math.abs(((h - statusHue) % 360 + 360) % 360),
+        ) <= STATUS_HUE_WINDOW,
+      )
+      if (dichtbijStatus) {
+        expect(C, `${key} (${hex}) ligt bij een statushue en moet in de band`)
+          .toBeLessThan(ACCENT_CHROMA_MAX)
+      }
+      expect(accentClashesWithStatus(hex), `${key} (${hex})`).toBe('ok')
     }
+  })
+
+  /**
+   * Terracotta zit klem tussen twee statushues: tussen rood (25,3°) en amber
+   * (70,1°) is de corridor waar een accent buiten béíde vensters valt maar
+   * 4,8° breed, en wil staat er middenin.
+   *
+   * Op 8 sep is geprobeerd hem vol te verzadigen op zijn eigen hue (49,9° —
+   * op papier 20,2° van amber, dus net vrij). De gegenereerde `#a54c00` bleek
+   * door 8-bit-afronding op hue 50,25° te landen: 19,85° van amber, binnen het
+   * venster, dus 'warn'. De marge was kleiner dan de precisie van een hexcode.
+   *
+   * Deze test pint waaróm wil in de band blijft, zodat een volgende poging niet
+   * opnieuw op dezelfde afrondingsval loopt.
+   */
+  it('wil blijft in de band: zijn hue-marge tot amber is kleiner dan hex-precisie', () => {
+    const { C, h } = hexToOklch(DEFAULT_MODULE_COLORS.wil)
+    expect(C, 'wil hoort onder de band').toBeLessThan(ACCENT_CHROMA_MAX)
+    const marge = Math.abs(h - STATUS_HUES.aandacht) - STATUS_HUE_WINDOW
+    expect(marge, 'de marge tot het amber-venster is < 1° — te dun om op te bouwen')
+      .toBeLessThan(1)
   })
 
   /**

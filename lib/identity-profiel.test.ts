@@ -252,14 +252,14 @@ describe('Profiel — HouseholdSection presence', () => {
 // ── Step 8: Color preferences ──────────────────────────────────────────
 
 describe('Profiel — Color preferences (module, budget, phase)', () => {
-  // UR3-32: vier accenten, met defaults uit de hefboomfamilies gebracht in de
-  // accent-band (Bezittingen = kern, Schulden = wil, Budget = horizon) plus
-  // Fins eigen accent.
+  // UR3-32: vier accenten, met defaults uit de hefboomfamilies (Bezittingen =
+  // kern, Schulden = wil, Budget = horizon) plus Fins eigen accent.
+  // 8 sep: opgetrokken van C ~ 0,065 naar C ~ 0,094 — feller, hue ongewijzigd.
   it('DEFAULT_MODULE_COLORS has kern, wil, horizon, fin', () => {
-    expect(DEFAULT_MODULE_COLORS.kern).toBe('#427560')
-    expect(DEFAULT_MODULE_COLORS.wil).toBe('#885e47')
-    expect(DEFAULT_MODULE_COLORS.horizon).toBe('#476d8c')
-    expect(DEFAULT_MODULE_COLORS.fin).toBe('#3d3048')
+    expect(DEFAULT_MODULE_COLORS.kern).toBe('#247a5c')
+    expect(DEFAULT_MODULE_COLORS.wil).toBe('#945835')
+    expect(DEFAULT_MODULE_COLORS.horizon).toBe('#006ead')
+    expect(DEFAULT_MODULE_COLORS.fin).toBe('#4e0575')
   })
 
   it('DEFAULT_BUDGET_COLORS has 5 budget types', () => {

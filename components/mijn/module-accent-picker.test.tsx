@@ -2,7 +2,12 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { render, screen, fireEvent, within } from '@testing-library/react'
 import { ModuleAccentPicker } from './module-accent-picker'
 import { ModuleColorProvider } from '@/components/app/module-color-provider'
-import { DEFAULT_MODULE_COLORS, accentClashesWithStatus } from '@/lib/color-palette'
+import {
+  DEFAULT_MODULE_COLORS,
+  accentClashesWithStatus,
+  hexToOklch,
+  ACCENT_CHROMA_MAX,
+} from '@/lib/color-palette'
 
 beforeEach(() => {
   window.localStorage.clear()
@@ -136,7 +141,14 @@ describe('ModuleAccentPicker — switching', () => {
  * eigen kleur mag dat wel, maar dan waarschuwt de kaart.
  */
 describe('ModuleAccentPicker — identiteit botst niet met de status', () => {
-  it('elke preset op elke kaart zit in de accent-band', () => {
+  /**
+   * Naam bewust gewijzigd op 8 sep: dit toetst NIET dat elke preset onder
+   * ACCENT_CHROMA_MAX zit — sinds de accenten feller werden is dat niet meer
+   * waar, en het was ook nooit wat deze assertie deed. `accentClashesWithStatus`
+   * weegt hue én chroma, dus een tint ver van elke statushue mag ruim boven de
+   * band uitkomen en blijft 'ok'. Dít is de regel die telt.
+   */
+  it('geen enkele preset op geen enkele kaart botst met de stoplicht-status', () => {
     renderPicker()
     for (const label of ['Bezittingen', 'Schulden', 'Budget', 'Fin']) {
       const card = cardFor(label)
@@ -151,6 +163,24 @@ describe('ModuleAccentPicker — identiteit botst niet met de status', () => {
           `preset "${btn.getAttribute('title')}" op kaart ${label} (${hex})`,
         ).toBe('ok')
       }
+    }
+  })
+
+  /**
+   * De sub-case die de toets hierboven NIET afdwingt: voor een preset bínnen
+   * het hue-venster van een status is chroma de enige rem. Zonder deze
+   * assertie zou Bordeaux of Oker stilletjes vol verzadigd kunnen worden tot
+   * net onder de grens waarop de andere test aanslaat.
+   */
+  it('presets dicht bij een statushue blijven onder de chroma-band', () => {
+    renderPicker()
+    const card = cardFor('Bezittingen')
+    for (const naam of ['Bordeaux', 'Oker']) {
+      const btn = within(card).getByTitle(naam)
+      const span = btn.querySelector('span') as HTMLElement
+      const hex = rgbToHex(span.style.backgroundColor)
+      const { C } = hexToOklch(hex)
+      expect(C, `${naam} (${hex})`).toBeLessThan(ACCENT_CHROMA_MAX)
     }
   })
 

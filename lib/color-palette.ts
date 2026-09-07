@@ -28,19 +28,48 @@ export type ModuleColorConfig = {
 
 /**
  * Defaults overgenomen uit de hefboomfamilies (Bezittingen = groen,
- * Schulden = terracotta/amber, Budget = staalsblauw), maar met de verzadiging
- * in de ACCENT-band gebracht (C ≈ 0,065). De hefbomen droegen tot nu toe
- * Tailwind-standaardkleuren die letterlijk op het stoplicht botsten
+ * Schulden = terracotta/amber, Budget = staalsblauw). De hefbomen droegen tot
+ * UR3-32 Tailwind-standaardkleuren die letterlijk op het stoplicht botsten
  * (emerald-700 op 3,1° van "op koers"-groen, amber-700 exact box1). Het
  * werkelijke onderscheid tussen identiteit en status zit in chroma, niet in
- * hue: accenten 0,045–0,082 · stoplicht 0,149–0,208. Zie
- * `accentClashesWithStatus` hieronder.
+ * hue — zie `accentClashesWithStatus` hieronder.
+ *
+ * UR3-32 zette ze daarom op C ≈ 0,065. Dat bleek in gebruik té gedempt; op
+ * verzoek van de eigenaar (8 sep) opgetrokken tot elk accent zijn plafond
+ * raakt: **kern 0,094 · wil 0,093 · horizon 0,129 · fin 0,165**. Hue én
+ * lightness zijn per accent ONGEWIJZIGD — alleen verzadiging omhoog.
+ *
+ * Waarom die vier zo ver uiteenlopen — drie verschillende plafonds:
+ *
+ * 1. **Horizon en fin liggen ver van elke statushue** (81,7° resp. 77,1°) en
+ *    staan op hun sRGB-gamutgrens. Verder kan simpelweg niet.
+ *
+ * 2. **Kern ligt 3,1° van "op koers"-groen** en wordt door `ACCENT_CHROMA_MAX`
+ *    op 0,094 gehouden; z'n gamut zou 0,110 toelaten. Die 0,016 ophalen door de
+ *    grens te verhogen is geprobeerd en verworpen — zie de toelichting daar.
+ *
+ * 3. **Wil zit klem tussen twee statushues.** Tussen rood (25,3°) en amber
+ *    (70,1°) ligt maar een corridor van 4,8° waar een accent buiten beide
+ *    vensters valt, en terracotta staat er middenin (49,9°). Een poging hem vol
+ *    te verzadigen leverde `#a54c00` op — waarvan de hue door 8-bit-afronding
+ *    op 50,25° landt, 19,85° van amber, dus nét binnen het venster: 'warn'. De
+ *    marge is kleiner dan de precisie van een hexcode. Terracotta hoort dus in
+ *    de band, en dat is geen instelling maar een eigenschap van die kleurhoek.
+ *
+ * **Lightness is bewust niet verhoogd.** De eerste poging tilde L van 0,52 naar
+ * 0,56 ("lichter leest als kleur"); dat kostte contrast met papier — kern zakte
+ * van 5,06 naar 4,20, onder de 4,5 die WCAG AA voor normale tekst vraagt.
+ * Verzadiging levert de felheid, lichtheid leverde alleen contrastverlies.
+ * Huidige waarden: 4,97 / 5,38 / 5,20 / 12,45 — alle boven AA.
+ *
+ * Let bij het beoordelen op de bell-curve: shade 600 piekt ~11% boven de 500,
+ * dus dáár naderen identiteit en status elkaar het dichtst.
  */
 export const DEFAULT_MODULE_COLORS: ModuleColorConfig = {
-  kern: '#427560',
-  wil: '#885e47',
-  horizon: '#476d8c',
-  fin: '#3d3048',
+  kern: '#247a5c',
+  wil: '#945835',
+  horizon: '#006ead',
+  fin: '#4e0575',
 }
 
 export const SHADES = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950] as const
@@ -187,14 +216,30 @@ export const STATUS_HUES = {
 } as const
 
 /**
- * Bovengrens van de accent-band. Gemeten: de vier accent-defaults zitten op
- * C = 0,045–0,082; het stoplicht op C = 0,149–0,208. Een identiteitskleur mag
- * dus dicht bij een statushue liggen zolang hij ontzadigd blijft — zo botste
- * het oude horizon-goud (h=76,6°, 6,5° van amber-warn) nooit met "aandacht".
+ * Bovengrens van de accent-band. Een identiteitskleur mag dicht bij een
+ * statushue liggen zolang hij onder deze grens blijft — zo botst het gedempte
+ * goud (6,5° van amber-warn) nooit met "aandacht".
  *
- * De grens ligt op 0,10: middenin het lege gat tussen beide banden, en net
- * onder het oude hefboom-emerald (`#047857`, C = 0,1049, 3,1° van "op
- * koers"-groen) — precies de botsing die deze toets moet vangen.
+ * De grens ligt op 0,10: middenin het lege gat tussen beide banden (stoplicht
+ * op C = 0,149 / 0,165 / 0,208), en net onder het oude hefboom-emerald
+ * (`#047857`, C = 0,1049, 3,1° van "op koers"-groen) — precies de botsing die
+ * deze toets moet vangen.
+ *
+ * **Op 8 sep geprobeerd te verhogen naar 0,13 en teruggedraaid.** Aanleiding
+ * was een terechte wens: kern en Oker liggen dicht bij een statushue en worden
+ * door deze grens onder hun sRGB-maximum gehouden. Wat de proef liet zien is
+ * dat de grens breder werkt dan de accenten:
+ *   - `DEFAULT_BUDGET_COLORS.debt` (bewust bordeauxrood) stopte met waarschuwen;
+ *   - `phase_recovery` (bewust in de rode band) idem;
+ *   - `#047857` werd weer 'ok' — de kleur waarvoor UR3-32 bestaat.
+ * Vier tests vingen dat. Voor 0,016 extra chroma op één accent is dat een
+ * slechte ruil.
+ *
+ * Wil je hier ooit tóch ruimte: de toets weegt hue en chroma, maar NIET
+ * lightness — en juist daar zit veel van het feitelijke onderscheid (accenten
+ * L ≈ 0,52, stoplicht L ≈ 0,63–0,70). Een lightness-bewuste toets geeft die
+ * ruimte zonder de budget- en fasekleuren te ontwapenen. Dat is een
+ * ontwerpwijziging, geen constante die je even ophoogt.
  */
 export const ACCENT_CHROMA_MAX = 0.10
 
