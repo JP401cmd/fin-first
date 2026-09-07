@@ -50,14 +50,18 @@ import { goalReachedFromProgress, type GoalProgress as CanonicalGoalProgress } f
  * `loadFinData` (`FinPageData.goalProgresses`) hem teruggeeft.
  *
  * Bewust een SUBSET van het canonieke `computeGoalProgress`-contract, afgeleid
- * i.p.v. lokaal overgetikt: de kaart telt alleen aandacht-vragende doelen en
- * leunt daarvoor op `onTrack`. Een vers doel (bevinding M31) is bij de bron al
- * `onTrack: true` zolang er niets te meten valt, dus hier is geen tweede guard
- * nodig — en dus ook `measured` niet.
+ * i.p.v. lokaal overgetikt.
+ *
+ * `paceSkipped` MOET hier in. De kaart telt niet alleen aandacht-vragende doelen
+ * maar toont ook het positieve tegendeel ("Allemaal op koers", `N/N op koers`),
+ * en dáárvoor is `onTrack` alléén te weinig: bij de bron blijft `onTrack: true`
+ * zolang er niets te meten valt, dus een ONGEMETEN doel werd hier geteld als een
+ * doel dat zijn tempo haalt. Een versmalling die `paceSkipped` weglaat maakt dat
+ * compile-onzichtbaar (R5).
  */
 export type GoalProgress = Pick<
   CanonicalGoalProgress,
-  'current' | 'target' | 'pct' | 'onTrack' | 'eta'
+  'current' | 'target' | 'pct' | 'onTrack' | 'eta' | 'paceSkipped'
 >
 
 /**
@@ -159,9 +163,14 @@ function withGlossary(term: string | undefined, label: string): ReactNode {
 export function deriveDoelenStatus(
   goals: GoalWithBudget[],
   goalProgresses: GoalProgress[],
-): { status: LeverageStatus; activeCount: number; attentionCount: number } {
+): { status: LeverageStatus; activeCount: number; attentionCount: number; judgedCount: number } {
   let activeCount = 0
   let attentionCount = 0
+  // Doelen waarover wél een tempo-oordeel te vellen valt. `activeCount` telt
+  // álle meetellende doelen, ook de ongemeten; "op koers" mag alleen over dit
+  // kleinere aantal gaan, anders presenteert de kaart de afwezigheid van een
+  // oordeel als een positief oordeel (R5).
+  let judgedCount = 0
   let worst: LeverageStatus = 'good'
 
   goals.forEach((goal, i) => {
@@ -185,6 +194,12 @@ export function deriveDoelenStatus(
     // of nog geen meting (pct ≤ 0) → buiten attention/status houden.
     if (isParameter && (goal.goal_type === 'fire_age' || p.pct <= 0)) return
 
+    // Geen streefdatum, geen meetperiode, of een live-getrackt stand-doel: er is
+    // niets te beoordelen. Het doel telt mee in `activeCount` (het bestáát), maar
+    // valt buiten zowel "vraagt aandacht" als "op koers".
+    if (p.paceSkipped) return
+    judgedCount += 1
+
     if (!p.onTrack) {
       attentionCount += 1
       if (p.pct < 50) {
@@ -195,8 +210,12 @@ export function deriveDoelenStatus(
     }
   })
 
-  if (activeCount === 0) return { status: 'neutral', activeCount: 0, attentionCount: 0 }
-  return { status: worst, activeCount, attentionCount }
+  if (activeCount === 0) return { status: 'neutral', activeCount: 0, attentionCount: 0, judgedCount: 0 }
+  // Zijn er wel doelen maar valt er over geen enkele iets te zeggen, dan is de
+  // status neutraal — niet groen. Groen zou hier "alles loopt goed" beweren op
+  // grond van nul metingen.
+  if (judgedCount === 0) return { status: 'neutral', activeCount, attentionCount: 0, judgedCount: 0 }
+  return { status: worst, activeCount, attentionCount, judgedCount }
 }
 
 /**
@@ -273,13 +292,19 @@ export function buildNavCards({
 }): NavCard[] {
   // Doelen — enige kaart met een betekenisvolle kleur-status.
   const doelen = deriveDoelenStatus(goals, goalProgresses)
-  const onTrackCount = doelen.activeCount - doelen.attentionCount
+  // "Op koers" telt alleen over de BEOORDEELDE doelen. Een doel zonder
+  // streefdatum (of zonder meetperiode) heeft geen tempo-oordeel; dat als "op
+  // koers" presenteren is precies de bug die op de doelenpagina is weggehaald
+  // — hij mag hier niet terugkomen (R5).
+  const onTrackCount = doelen.judgedCount - doelen.attentionCount
   const doelenSubText =
     doelen.activeCount === 0
       ? 'Stel je eerste doel in'
       : doelen.attentionCount > 0
         ? `${doelen.attentionCount} vraagt aandacht`
-        : 'Allemaal op koers'
+        : doelen.judgedCount === 0
+          ? 'Nog niets te meten'
+          : 'Allemaal op koers'
 
   // Gebeurtenissen — neutrale dot, substext = eerstvolgende geplande event.
   const eventCount = events.length
@@ -306,13 +331,17 @@ export function buildNavCards({
       detail: {
         detailLabel: 'Op koers',
         value:
-          doelen.activeCount === 0 ? '—' : `${onTrackCount}/${doelen.activeCount}`,
+          doelen.activeCount === 0 || doelen.judgedCount === 0
+            ? '—'
+            : `${onTrackCount}/${doelen.judgedCount}`,
         tip:
           doelen.activeCount === 0
             ? 'Nog geen actieve doelen — bepaal waar je vrijheid voor opbouwt.'
-            : doelen.attentionCount > 0
-              ? `${doelen.attentionCount} ${doelen.attentionCount === 1 ? 'doel loopt' : 'doelen lopen'} achter op schema.`
-              : 'Al je actieve doelen liggen op koers.',
+            : doelen.judgedCount === 0
+              ? 'Je doelen hebben nog geen streefdatum, dus er valt nog geen tempo te meten.'
+              : doelen.attentionCount > 0
+                ? `${doelen.attentionCount} ${doelen.attentionCount === 1 ? 'doel loopt' : 'doelen lopen'} achter op schema.`
+                : 'Al je beoordeelde doelen liggen op koers.',
         actionLabel: 'Beheer doelen',
       },
     },

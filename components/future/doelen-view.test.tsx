@@ -880,4 +880,32 @@ describe('DoelenView — fire_age-doel onder een vast anker', () => {
     expect(screen.queryByTestId('fire-age-doel-nvt')).toBeNull()
     expect(screen.getByText(/nog geen meting — bekijk live in het lab/)).toBeTruthy()
   })
+
+  // ── R5: de balkKLEUR is net zo goed een oordeel als het label ──────────
+  it('kleurt de voortgangsbalk neutraal wanneer er geen tempo-oordeel is', () => {
+    const { container } = render(
+      <DoelenView
+        goals={[mockGoal({ target_value: 10000, current_value: 0 })]}
+        goalProgresses={[
+          { current: 0, target: 10000, pct: 0, onTrack: true, measured: true, requiredMonthly: null, eta: null, paceSkipped: true },
+        ]}
+      />,
+    )
+    // Groen zou hier "je haalt je tempo" beweren terwijl er niets gemeten is —
+    // dan staat het oordeel dat uit de tekst is gehaald alsnog in de kleur.
+    expect(container.querySelector('.bg-positive')).toBeNull()
+    expect(container.querySelector('[class*="ink-4"]')).toBeTruthy()
+  })
+
+  it('houdt de balk groen wanneer er WEL een positief tempo-oordeel is', () => {
+    const { container } = render(
+      <DoelenView
+        goals={[mockGoal({ target_value: 10000, current_value: 6000 })]}
+        goalProgresses={[
+          { current: 6000, target: 10000, pct: 60, onTrack: true, measured: true, requiredMonthly: 100, eta: 'jun 2027', paceSkipped: false },
+        ]}
+      />,
+    )
+    expect(container.querySelector('.bg-positive')).toBeTruthy()
+  })
 })

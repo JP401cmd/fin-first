@@ -599,18 +599,33 @@ export function computeGoalProgress(goal: GoalProgressInput, options?: GoalProgr
   // bron scheelt dezelfde klem in elke consument (en die waren het oneens).
   const pct = Math.max(0, Math.min(Math.round((current / target) * 100), 100))
 
-  // Zonder streefdatum is er geen planning om tegen af te zetten: het doel is
-  // per definitie "op koers" (bestaand gedrag) en er is geen maandinleg te
-  // berekenen. Dat is een geldig oordeel, dus `measured` blijft true.
+  // Zonder streefdatum is er geen planning om tegen af te zetten: er is geen
+  // maandinleg te berekenen en dus geen tempo te beoordelen.
+  //
+  // R5 (eigenaarsbesluit 7 sep 2026) — dit stond hier eerder als "het doel is
+  // per definitie op koers (bestaand gedrag)". Dat besluit is teruggedraaid: de
+  // AFWEZIGHEID van een oordeel werd op het scherm een POSITIEF oordeel, groen
+  // en al, ook bij 0% voortgang. `paceSkipped` start daarom op `true` en wordt
+  // alleen in de tak hieronder op `false` gezet, zodra er wél een streefdatum is
+  // om tegen te meten.
+  //
+  // `onTrack` blijft bewust `true`. De off-track-filters (de briefing-heads-up,
+  // de off-track-doelenlijst, de sorteringen op /overzicht en /toekomst) lezen
+  // `!onTrack` als "hier is een probleem" — en een ongemeten doel ís geen
+  // probleem. `paceSkipped` is het kanaal dat de oordeel-TONENDE oppervlakken
+  // stil houdt; `onTrack` blijft het kanaal voor "er is iets mis".
   let onTrack = true
   let measured = true
-  let paceSkipped = false
+  let paceSkipped = true
   let requiredMonthly: number | null = null
   // Een canonieke projectie wint van de opgeslagen streefdatum: dát is het
   // antwoord op "wanneer haal ik dit", terwijl `target_date` de ambitie is.
   let eta: string | null = etaOverride
 
   if (goal.target_date) {
+    // Er is een termijn: vanaf hier telt het tempo-oordeel wél, tenzij een van
+    // de takken hieronder 'm alsnog overslaat (live-getrackt stand-doel, UR2-17).
+    paceSkipped = false
     const targetDate = new Date(goal.target_date)
     const now = new Date()
     const daysLeft = Math.max(0, (targetDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
@@ -649,6 +664,12 @@ export function computeGoalProgress(goal: GoalProgressInput, options?: GoalProgr
           const actualMonthly = current / monthsElapsed
           onTrack = actualMonthly >= requiredMonthly * (1 - GOAL_PACE_TOLERANCE)
         }
+      } else {
+        // Geen bruikbare `created_at` (lichte projecties zoals TopGoal): er is
+        // geen meetperiode, dus geen tempo-oordeel. Dezelfde klasse als "geen
+        // streefdatum" hierboven — zonder deze tak bleef `paceSkipped` op false
+        // staan en toonde het scherm alsnog een groen "Op koers" (R5).
+        paceSkipped = true
       }
     } else if (current < target) {
       // Streefdatum verstreken en het doel niet gehaald. Er is geen maandinleg

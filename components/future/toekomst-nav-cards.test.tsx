@@ -59,6 +59,10 @@ function mockProgress(overrides: Partial<GoalProgress> = {}): GoalProgress {
     pct: 40,
     onTrack: false,
     eta: null,
+    // Default: er ís een tempo-oordeel. Tests die de ongemeten staat willen,
+    // zetten `paceSkipped: true` expliciet — zo blijft zichtbaar wélke test
+    // over welke situatie gaat (R5).
+    paceSkipped: false,
     ...overrides,
   }
 }
@@ -554,7 +558,44 @@ describe('deriveDoelenStatus', () => {
     )
     expect(r.activeCount).toBe(1) // telt wél mee in "N doelen"
     expect(r.attentionCount).toBe(0)
-    expect(r.status).toBe('good') // géén rode/oranje dot
+    // De eis van deze test — géén rode/oranje dot — staat. Alleen de neutrale
+    // kant is aangescherpt (R5): dit doel wordt bewust NIET beoordeeld (de
+    // parameter-escape hierboven slaat het over), en een groene dot zou dan
+    // "alles loopt goed" beweren op grond van nul metingen. Zonder beoordeeld
+    // doel is de status daarom 'neutral' i.p.v. 'good'.
+    expect(r.status).toBe('neutral')
+    expect(r.judgedCount).toBe(0)
+  })
+
+  // ── R5: een ongemeten doel is niet "op koers" ────────────────────────────
+  // De doelenpagina toont voor zo'n doel "Loopt mee" met een neutrale balk.
+  // Zonder deze guard zei de nav-kaart één niveau hoger tegelijk groen
+  // "Allemaal op koers" over hetzelfde doel — het oordeel was niet weg, alleen
+  // verhuisd. `paceSkipped` was hier weggetypeerd uit het `Pick<>`, waardoor
+  // dat compile-onzichtbaar bleef.
+  it('houdt een doel zonder tempo-oordeel buiten zowel aandacht als "op koers"', () => {
+    const r = deriveDoelenStatus(
+      [mockGoal({ id: 'geen-datum' })],
+      [mockProgress({ pct: 0, onTrack: true, paceSkipped: true })],
+    )
+    expect(r.activeCount).toBe(1) // het doel bestaat
+    expect(r.judgedCount).toBe(0) // maar er is niets beoordeeld
+    expect(r.attentionCount).toBe(0)
+    expect(r.status).toBe('neutral') // géén groene dot
+  })
+
+  it('telt naast een ongemeten doel wél het doel dat wél beoordeeld is', () => {
+    const r = deriveDoelenStatus(
+      [mockGoal({ id: 'geen-datum' }), mockGoal({ id: 'met-datum' })],
+      [
+        mockProgress({ pct: 0, onTrack: true, paceSkipped: true }),
+        mockProgress({ pct: 30, onTrack: false }),
+      ],
+    )
+    expect(r.activeCount).toBe(2)
+    expect(r.judgedCount).toBe(1)
+    expect(r.attentionCount).toBe(1)
+    expect(r.status).toBe('bad')
   })
 
   it('houdt een ongemeten (pct 0) parameter-doel buiten status (geen "bad")', () => {

@@ -41,9 +41,12 @@ function makeGoal(overrides: Partial<Goal>): Goal {
 // ── 1. Regressie: bestaande 'up'-types byte-identiek ───────────────────────
 
 describe('computeGoalProgress — bestaande up-types (regressie)', () => {
-  it('savings: 3000/5000 = 60%, zonder datum onTrack=true, eta=null', () => {
+  it('savings: 3000/5000 = 60%, zonder datum geen tempo-oordeel, eta=null', () => {
     const p = computeGoalProgress(makeGoal({ goal_type: 'savings', current_value: 3000, target_value: 5000 }))
-    expect(p).toEqual({ current: 3000, target: 5000, pct: 60, onTrack: true, measured: true, requiredMonthly: null, eta: null, paceSkipped: false })
+    // `paceSkipped: true` zonder streefdatum is de norm sinds R5: er is geen
+    // termijn om tegen te meten, dus geen oordeel. `onTrack` blijft true zodat
+    // de off-track-filters dit doel niet als probleem oppikken.
+    expect(p).toEqual({ current: 3000, target: 5000, pct: 60, onTrack: true, measured: true, requiredMonthly: null, eta: null, paceSkipped: true })
   })
 
   it('savings: current > target → pct geclampt op 100', () => {
@@ -318,13 +321,18 @@ describe('computeGoalProgress — live-getrackt stand-doel slaat de tempo-toets 
     expect(achter.onTrack).toBe(false)
   })
 
-  it('stand-doel ZONDER streefdatum: niets overgeslagen (er was al geen toets)', () => {
+  it('stand-doel ZONDER streefdatum: ook geen oordeel — maar nu via paceSkipped', () => {
     const p = computeGoalProgress(makeGoal({
       current_value: 960_000,
       target_value: 1_650_000,
       metadata: { standaardDoel: 'vrijheidsgetal' },
     }))
-    expect(p.paceSkipped).toBe(false)
+    // Deze test las eerder `paceSkipped: false` met de redenering "er was al
+    // geen toets, dus er is niets overgeslagen". Sinds R5 is dat omgedraaid:
+    // juist omdát er niets te toetsen valt, hoort het scherm géén oordeel te
+    // tonen — en `paceSkipped` is het kanaal dat dat afdwingt. Zonder streefdatum
+    // kwam het anders alsnog als groen "Op koers" op het scherm.
+    expect(p.paceSkipped).toBe(true)
     expect(p.onTrack).toBe(true)
   })
 })
@@ -533,5 +541,55 @@ describe('goalValueLabels — nieuwe types', () => {
     expect(goalValueLabels('fire_age')).toEqual({
       target: 'Doel-vrijheidsleeftijd', current: 'Huidige vrijheidsleeftijd',
     })
+  })
+})
+
+// ── Doel zonder streefdatum: geen oordeel, geen "Op koers" (R5) ─────────────
+
+describe('computeGoalProgress — doel zonder streefdatum krijgt geen tempo-oordeel (R5)', () => {
+  const DAG = 86400_000
+
+  /**
+   * Zonder `target_date` is er geen planning om tegen af te zetten. De motor
+   * hield `onTrack` dan op `true` en `paceSkipped` op `false`, waardoor het
+   * scherm er een groen "Op koers" van maakte — óók bij 0% voortgang. Dat is
+   * geen oordeel maar de afwezigheid ervan, en het hoort als zodanig te tonen.
+   *
+   * `onTrack` blijft bewust `true`: de off-track-filters (briefing-heads-up,
+   * off-track-doelenlijst, sorteringen) lezen `!onTrack` als "hier is een
+   * probleem", en een ongemeten doel ís geen probleem. `paceSkipped` is het
+   * kanaal dat de oordeel-TONENDE oppervlakken stil houdt.
+   */
+  const zonderDatum = {
+    current_value: 0,
+    target_value: 10_000,
+    target_date: null,
+    created_at: new Date(Date.now() - 200 * DAG).toISOString(),
+  }
+
+  it('slaat het tempo-oordeel over in plaats van "op koers" te claimen', () => {
+    const p = computeGoalProgress(makeGoal(zonderDatum))
+    expect(p.paceSkipped).toBe(true)
+  })
+
+  it('houdt onTrack op true, zodat de off-track-filters het doel niet als probleem flaggen', () => {
+    const p = computeGoalProgress(makeGoal(zonderDatum))
+    expect(p.onTrack).toBe(true)
+  })
+
+  it('berekent geen maandinleg zonder streefdatum — er is geen termijn', () => {
+    const p = computeGoalProgress(makeGoal(zonderDatum))
+    expect(p.requiredMonthly).toBeNull()
+  })
+
+  it('raakt een doel MET streefdatum niet — dat houdt zijn echte tempo-oordeel', () => {
+    const p = computeGoalProgress(makeGoal({
+      current_value: 0,
+      target_value: 10_000,
+      created_at: new Date(Date.now() - 200 * DAG).toISOString(),
+      target_date: new Date(Date.now() + 200 * DAG).toISOString(),
+    }))
+    expect(p.paceSkipped).toBe(false)
+    expect(p.onTrack).toBe(false)
   })
 })

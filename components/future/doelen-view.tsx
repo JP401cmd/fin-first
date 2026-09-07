@@ -276,15 +276,24 @@ function ParameterGoalCard({ goal, progress }: GoalDisplay) {
             aria-valuemax={100}
             aria-label={`Voortgang ${goal.name}: ${pct}%`}
           >
+            {/*
+              De balkKLEUR is net zo goed een oordeel als het label hierboven:
+              groen zegt "je haalt je tempo". Bij `paceSkipped` is er geen tempo
+              gemeten, dus krijgt de balk dezelfde neutrale toon als "Loopt mee"
+              en "Net begonnen" — anders staat het oordeel dat we net uit de
+              tekst haalden alsnog in de kleur (R5).
+            */}
             <div
               className={`h-full ${
                 pct >= 100
                   ? 'bg-positive'
-                  : progress.onTrack
-                    ? 'bg-positive'
-                    : pct >= 50
-                      ? 'bg-amber-500'
-                      : 'bg-negative'
+                  : progress.paceSkipped
+                    ? 'bg-[var(--ink-4)]'
+                    : progress.onTrack
+                      ? 'bg-positive'
+                      : pct >= 50
+                        ? 'bg-amber-500'
+                        : 'bg-negative'
               } transition-all duration-700`}
               style={{ width: `${pct}%` }}
             />
@@ -394,11 +403,13 @@ function ManualGoalCard({
           className={`h-full ${
             behaald
               ? 'bg-positive'
-              : progress.onTrack
-                ? 'bg-positive'
-                : pct >= 50
-                  ? 'bg-amber-500'
-                  : 'bg-negative'
+              : progress.paceSkipped
+                ? 'bg-[var(--ink-4)]'
+                : progress.onTrack
+                  ? 'bg-positive'
+                  : pct >= 50
+                    ? 'bg-amber-500'
+                    : 'bg-negative'
           } transition-all duration-700`}
           style={{ width: `${pct}%` }}
         />
