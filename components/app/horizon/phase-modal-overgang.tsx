@@ -31,7 +31,9 @@ import type { SimCashflow } from '@/lib/fire-simulation'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
 import { BOX3_DRAG } from '@/lib/constants'
 import { getPageInfo } from '@/lib/page-info-content'
-import { formatCurrency } from '@/lib/format'
+import { VrijheidstijdVoetnoot } from '@/components/app/vrijheidstijd-voetnoot'
+import { freedomDaysAtAge } from '@/lib/horizon/vrijheidsdagen'
+import { formatCurrency, type FreedomRateSource } from '@/lib/format'
 import { useEuroView } from '@/lib/hooks/use-euro-view'
 import { ReceiptRow } from '@/components/app/horizon/phase-analysis/receipt-row'
 import { MaskedAmount } from '@/components/app/masked-amount'
@@ -52,10 +54,36 @@ interface PhaseModalOvergangProps {
   yearlyWithdrawal: number
   /** Annual AOW income (only relevant for shortfall scenario) */
   yearlyAowIncome: number
-  /** Annual expenses */
+  /**
+   * Jaaruitgaven — een BEDRAG voor de kassabon/aannames. Bewust GEEN wisselkoers:
+   * dit is de *effective* grondslag (`monthlyExpenses × 12`, ADR 0073) en was als
+   * noemer een derde €→tijd-koers op dezelfde pagina (UR3-08).
+   */
   yearlyExpenses: number
-  /** Portfolio value at start of transition */
+  /**
+   * Vermogen aan het begin van de overgang. Voedt de klasse-C-kassabon en de
+   * analyses — niet de vrijheidsdagen-vertaling; gebruik daarvoor
+   * `nettoLiquideAtStart`.
+   *
+   * De grondslag hangt af van de bron en is dus NIET gegarandeerd I: de
+   * `transitionRows[0].startNetWorth`-tak (Prognose!I, incl. niet-liquide bezit)
+   * is dood — de kernel emit geen 'transition'-rijen (bridge.ts:44) — dus in de
+   * praktijk komt hier altijd de terugval `simResult.firePortfolioAtFire`, en dat
+   * is Prognose!J@FIRE (bridge.ts:913). Reken deze prop daarom nergens als "I"
+   * af zonder dat zelf na te gaan.
+   */
   portfolioAtTransitionStart: number
+  /**
+   * Netto LIQUIDE vermogen (Prognose!J, `startNettoLiquide`) aan het begin van de
+   * overgang, NOMINAAL op `startAge`. De enige grondslag waarop "op te leven
+   * vrijheidsdagen" eerlijk is — een eigen woning leef je niet op. Ontbreekt hij,
+   * dan vervalt de regel (geen stille terugval op de I-grondslag).
+   */
+  nettoLiquideAtStart?: number
+  /** Canoniek dagtarief (€/dag) uit de bundel — `HorizonPageData.dailyExpenseRate`. */
+  canonicalDailyRate: number
+  /** Herkomst van dat tarief; `'none'` ⇒ geen vrijheidsdagen-regel (ADR 0131). */
+  dailyRateSource: FreedomRateSource
   /** Unified projection rows for transition phase detail */
   rows: UnifiedProjectionRow[]
   /** Inflation rate for PhaseDetailTable */
@@ -96,6 +124,9 @@ export const PhaseModalOvergang = memo(function PhaseModalOvergang({
   yearlyAowIncome,
   yearlyExpenses,
   portfolioAtTransitionStart,
+  nettoLiquideAtStart,
+  canonicalDailyRate,
+  dailyRateSource,
   rows,
   inflationRate,
   debts,
@@ -464,17 +495,51 @@ export const PhaseModalOvergang = memo(function PhaseModalOvergang({
 
         {/* 11. Redactionele noot — data-driven freedom days */}
         {(() => {
-          const dailyExpenseRate = yearlyExpenses > 0 ? yearlyExpenses / 365 : 0
-          const freedomDays = dailyExpenseRate > 0
-            ? Math.round(portfolioAtTransitionStart / dailyExpenseRate)
-            : null
+          /**
+           * UR3-08 vervolg \u2014 hier stonden DRIE fouten in \u00e9\u00e9n deling:
+           *
+           *  (a) VINTAGE \u2014 de fout die \u00e9cht op het scherm stond.
+           *      `portfolioAtTransitionStart` is een kernelwaarde op een
+           *      TOEKOMSTIGE leeftijd en dus nominaal; hij werd gedeeld door een
+           *      dagtarief van nu. Precies de 1,3-1,8x overschatting uit ADR 0093
+           *      \u00a711. Nu exact \u00e9\u00e9n keer door `factorAtAge(rows, startAge)` \u2014
+           *      binnen de helper.
+           *  (b) GRONDSLAG \u2014 latent, niet zichtbaar geweest. De code las
+           *      `transitionRows[0].startNetWorth` (Prognose!I, incl. eigen
+           *      woning), maar die tak is dood: de kernel emit geen
+           *      'transition'-rijen (bridge.ts:44), dus in de praktijk kwam er
+           *      altijd `simResult.firePortfolioAtFire` = Prognose!J (bridge.ts:913).
+           *      De I-lezing was dus een bug-in-wachtstand, geen vertoond defect.
+           *      Nu expliciet `startNettoLiquide` (J), dezelfde grondslag als
+           *      `requiredFirePortfolio` \u2014 zie de grondslag-waarschuwing bij
+           *      `UnifiedProjectionRow.startNettoLiquide`.
+           *  (c) NOEMER. `yearlyExpenses / 365` is hier `monthlyExpenses \u00d7 12 / 365`:
+           *      een DERDE koers, naast die van de opbouwmodal en de canonieke.
+           *      Nu het canonieke dagtarief uit de bundel.
+           *
+           * Het getal wordt hierdoor fors lager. Dat IS de correctie.
+           *
+           * De kassabon eromheen blijft ongemoeid: die is klasse C en houdt
+           * bewust zijn nominale bedragen op de I-grondslag.
+           */
+          const freedomDays = freedomDaysAtAge({
+            rows,
+            age: startAge,
+            nominalAmount: nettoLiquideAtStart ?? 0,
+            canonicalDailyRate,
+            source: dailyRateSource,
+          })
+          if (freedomDays == null) return null
           return (
-            <div className="rounded-[var(--r)] border border-dashed border-[var(--border-ed)] bg-[var(--subtle)]/30 px-4 py-3">
+            <div
+              data-testid="vrijheidsdagen-noot"
+              className="rounded-[var(--r)] border border-dashed border-[var(--border-ed)] bg-[var(--subtle)]/30 px-4 py-3"
+            >
               <p className="font-serif text-xs italic leading-relaxed text-[var(--ink-3)] sm:text-sm">
-                {freedomDays != null
-                  ? `${durationYears} jaar overgang \u2014 je leeft van ${freedomDays.toLocaleString('nl-NL')} eerder opgebouwde vrijheidsdagen`
-                  : `${durationYears} jaar overgang = ${durationYears} jaar eerder verdiende vrijheid die je nu overbrugt`}
+                {`${durationYears} jaar overgang \u2014 je leeft van ${freedomDays.toLocaleString('nl-NL')} eerder opgebouwde vrijheidsdagen`}
               </p>
+              {/* De koers klopt nu, dus mag de wisselkoers-voetnoot eronder (UR3-08). */}
+              <VrijheidstijdVoetnoot dailyRate={canonicalDailyRate} source={dailyRateSource} className="mt-1" />
             </div>
           )
         })()}

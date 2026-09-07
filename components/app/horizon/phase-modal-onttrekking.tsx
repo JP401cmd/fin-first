@@ -36,6 +36,9 @@ import type { Asset } from '@/lib/asset-data'
 import type { LifeEvent } from '@/lib/horizon-data'
 import type { SimCashflow } from '@/lib/fire-simulation'
 import { MaskedAmount } from '@/components/app/masked-amount'
+import { VrijheidstijdVoetnoot } from '@/components/app/vrijheidstijd-voetnoot'
+import { freedomDaysAtAge } from '@/lib/horizon/vrijheidsdagen'
+import type { FreedomRateSource } from '@/lib/format'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -44,7 +47,22 @@ interface PhaseModalOnttrekkingProps {
   onClose: () => void
   startAge: number
   endAge: number
+  /**
+   * Netto vermogen (Prognose!I) bij de start van de onttrekking — I-grondslag,
+   * INCLUSIEF niet-liquide bezit. Voedt de klasse-C-kassabon en de analyses;
+   * niet geschikt voor een vrijheidsdagen-vertaling.
+   */
   startPortfolio: number
+  /**
+   * Netto LIQUIDE vermogen (Prognose!J, `startNettoLiquide`) bij de start,
+   * NOMINAAL op `startAge`. De enige eerlijke grondslag voor "vrijheidsdagen":
+   * een eigen woning leef je niet op. Ontbreekt hij, dan vervalt de regel.
+   */
+  nettoLiquideAtStart?: number
+  /** Canoniek dagtarief (€/dag) uit de bundel — `HorizonPageData.dailyExpenseRate`. */
+  canonicalDailyRate: number
+  /** Herkomst van dat tarief; `'none'` ⇒ geen vrijheidsdagen-regel (ADR 0131). */
+  dailyRateSource: FreedomRateSource
   strategy: FireEndStrategy
   targetEndPortfolio: number
   yearlyWithdrawal: number
@@ -85,6 +103,9 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
   startAge,
   endAge,
   startPortfolio,
+  nettoLiquideAtStart,
+  canonicalDailyRate,
+  dailyRateSource,
   strategy,
   targetEndPortfolio,
   yearlyWithdrawal,
@@ -540,18 +561,47 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
 
         {/* 13. Redactionele noot — data-driven freedom days */}
         {(() => {
-          const dailyExpenseRate = (yearlyExpenses ?? yearlyWithdrawal) > 0 ? (yearlyExpenses ?? yearlyWithdrawal) / 365 : 0
-          // Average freedom days per year = (yearly withdrawal + yearly AOW income) / daily expense rate
-          const avgFreedomDaysPerYear = dailyExpenseRate > 0
-            ? Math.round((yearlyWithdrawal + yearlyAowIncome) / dailyExpenseRate)
-            : null
+          /**
+           * UR3-08 vervolg \u2014 VERVALLEN EIS, vervangen (eigenaarsbesluit 7 sep 2026).
+           *
+           * Hier stond "gemiddeld N vrijheidsdagen per jaar" =
+           * `(yearlyWithdrawal + yearlyAowIncome) / (yearlyExpenses / 365)`. Die
+           * regel was met g\u00e9\u00e9n enkele koers te repareren:
+           *
+           *  \u00b7 TAUTOLOGIE. De teller is per kernelconstructie precies het inkomen
+           *    dat de uitgaven in de noemer dekt. De uitkomst is dus \u2248 365 by
+           *    design en draagt geen informatie \u2014 in de praktijk stond er
+           *    zichtbaar een getal b\u00f3ven 365 ("vrijheidsdagen per jaar" > een jaar).
+           *  \u00b7 KLASSE C. `yearlyWithdrawal` is een gemiddelde `row.withdrawal` over
+           *    de hele onttrekkingsfase (ADR 0093 \u00a71): geen canonieke deflator,
+           *    dus niet eerlijk vertaalbaar.
+           *  \u00b7 VERBODEN TWEEDE AFLEIDING. `yearlyAowIncome` = `NL_AOW_MONTHLY \u00d7 12`,
+           *    een handmatige AOW-afleiding n\u00e1\u00e1st de canonieke, ge\u00efndexeerde
+           *    `row.aowNetto` \u2014 expliciet verboden in lib/unified-projection.ts.
+           *
+           * Vervangen door de klasse-S-spiegel van de overgangregel: de BEGINSTAND
+           * op \u00e9\u00e9n leeftijd (`wRows[0].startNettoLiquide`, J-grondslag), exact \u00e9\u00e9n
+           * keer gedeflateerd naar euro's van vandaag, gedeeld door het canonieke
+           * dagtarief.
+           */
+          const freedomDaysAtStart = freedomDaysAtAge({
+            rows,
+            age: startAge,
+            nominalAmount: nettoLiquideAtStart ?? 0,
+            canonicalDailyRate,
+            source: dailyRateSource,
+          })
+          if (freedomDaysAtStart == null) return null
           return (
-            <div className="mt-5 rounded-[var(--r)] border border-dashed border-[var(--border-ed)] bg-[var(--subtle)]/30 px-4 py-3">
+            <div
+              data-testid="vrijheidsdagen-noot"
+              className="mt-5 rounded-[var(--r)] border border-dashed border-[var(--border-ed)] bg-[var(--subtle)]/30 px-4 py-3"
+            >
               <p className="font-serif text-xs italic leading-relaxed text-[var(--ink-3)] sm:text-sm">
-                {avgFreedomDaysPerYear != null
-                  ? `${durationYears} jaar vrijheid geleefd \u2014 gemiddeld ${avgFreedomDaysPerYear.toLocaleString('nl-NL')} vrijheidsdagen per jaar`
-                  : `${durationYears} jaar opgebouwde vrijheid, nu geleefd`}
+                {`${durationYears} jaar vrijheid geleefd \u2014 je begint deze fase met ${freedomDaysAtStart.toLocaleString('nl-NL')} vrijheidsdagen`}
               </p>
+              {/* De koers klopt nu, dus mag de wisselkoers-voetnoot eronder (UR3-08). */}
+              <VrijheidstijdVoetnoot dailyRate={canonicalDailyRate} source={dailyRateSource} className="mt-1" />
             </div>
           )
         })()}

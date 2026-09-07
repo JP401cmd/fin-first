@@ -26,7 +26,9 @@ import { PhaseDiscussButton } from '@/components/app/horizon/phase-analysis/phas
 import { RegimeKaart } from '@/components/app/horizon/phase-analysis/regime-kaart'
 import { ReceiptRow } from '@/components/app/horizon/phase-analysis/receipt-row'
 import { getPageInfo } from '@/lib/page-info-content'
-import { formatCurrency } from '@/lib/format'
+import { VrijheidstijdVoetnoot } from '@/components/app/vrijheidstijd-voetnoot'
+import { freedomDaysToday } from '@/lib/horizon/vrijheidsdagen'
+import { formatCurrency, type FreedomRateSource } from '@/lib/format'
 import { useEuroView } from '@/lib/hooks/use-euro-view'
 import { DEFAULT_VOLATILITY } from '@/lib/constants'
 import type { UnifiedProjectionRow, AssetBucketDetail } from '@/lib/unified-projection'
@@ -46,7 +48,20 @@ interface PhaseModalOpbouwProps {
   currentNetWorth: number
   expectedPortfolioAtFire: number
   yearlySavings: number
-  yearlyExpenses: number  // for freedom-day calculation
+  /**
+   * Pensioen-uitgavenniveau (`effectiveInput.yearlyMustExpenses`) — een BEDRAG
+   * voor de kassabon. Bewust GEEN wisselkoers meer: de €→vrijheidstijd-vertaling
+   * loopt sinds UR3-08 uitsluitend via `canonicalDailyRate`.
+   */
+  yearlyExpenses: number
+  /**
+   * Het canonieke dagtarief (€/dag) uit de bundel — `HorizonPageData.dailyExpenseRate`,
+   * 12-mnd rolling consumptie. Verplicht, zodat een vergeten wiring een
+   * compile-fout is en geen stilzwijgend tweede tarief (vervolg KRUIS-20).
+   */
+  canonicalDailyRate: number
+  /** Herkomst van dat tarief; `'none'` ⇒ geen vrijheidsdagen-regel (ADR 0131). */
+  dailyRateSource: FreedomRateSource
   expectedReturn: number  // e.g. 0.07 for 7%
   inflationRate: number   // e.g. 0.02 for 2%
   /** Unified projection rows (with per-asset-type detail) */
@@ -109,6 +124,8 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
   expectedPortfolioAtFire,
   yearlySavings,
   yearlyExpenses,
+  canonicalDailyRate,
+  dailyRateSource,
   expectedReturn,
   inflationRate,
   rows,
@@ -201,14 +218,30 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
 
   // ── Redactionele noot: vrijheidsdagen per maand ────────────────────────
   const yearsAccumulation = Math.max(fireAge - currentAge, 1)
-  // Freedom days built per month = monthly savings / daily expenses
-  // Derive monthly savings from total inleg if yearlySavings prop is 0
-  const effectiveMonthlySavings = yearlySavings > 0
-    ? yearlySavings / 12
-    : (totalInleg / yearsAccumulation / 12)
-  const dailyExpenseRate = yearlyExpenses > 0 ? yearlyExpenses / 365 : 0
-  const freedomDaysBuiltPerMonth = dailyExpenseRate > 0 && effectiveMonthlySavings > 0
-    ? Math.round(effectiveMonthlySavings / dailyExpenseRate)
+  /**
+   * UR3-08 vervolg — twee correcties in één regel:
+   *
+   *  1. NOEMER. Hier stond `yearlyExpenses / 365`, met `yearlyExpenses` =
+   *     `effectiveInput.yearlyMustExpenses`: het uitgavenniveau NA je stoppen.
+   *     Je spaarbedrag van vandaag werd dus omgerekend tegen je pensioenuitgaven
+   *     — een tweede wisselkoers op een pagina die met KRUIS-20 juist op één
+   *     koers was gezet. Nu het canonieke dagtarief uit de bundel.
+   *     `yearlyExpenses` blijft als BEDRAG in de kassabon staan; het is alleen
+   *     geen koers meer.
+   *
+   *  2. TERUGVAL VERVALLEN. `totalInleg / yearsAccumulation / 12` is een
+   *     gemiddelde over de héle opbouwfase — klasse C (ADR 0093 §1), zonder
+   *     canonieke deflator en dus niet eerlijk vertaalbaar. Geen besparing =
+   *     geen regel, in plaats van een verzonnen gemiddelde.
+   *
+   * De teller is een bedrag van VANDAAG (factor 1), vandaar `freedomDaysToday`.
+   */
+  const freedomDaysBuiltPerMonth = yearlySavings > 0
+    ? freedomDaysToday({
+        nominalAmount: yearlySavings / 12,
+        canonicalDailyRate,
+        source: dailyRateSource,
+      })
     : null
 
   // ── Hele-fase-samenvatting voor "Bespreek met Fin" (raw formatCurrency) ──
@@ -523,11 +556,16 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
         </div>
 
         {/* 12. Redactionele noot — freedom days editorial */}
-        {freedomDaysBuiltPerMonth != null && freedomDaysBuiltPerMonth > 0 && (
-          <div className="rounded-[var(--r)] border border-dashed border-[var(--border-ed)] bg-[var(--subtle)]/30 px-4 py-3">
+        {freedomDaysBuiltPerMonth != null && (
+          <div
+            data-testid="vrijheidsdagen-noot"
+            className="rounded-[var(--r)] border border-dashed border-[var(--border-ed)] bg-[var(--subtle)]/30 px-4 py-3"
+          >
             <p className="font-serif text-xs italic leading-relaxed text-[var(--ink-3)] sm:text-sm">
-              Elke maand bouw je {freedomDaysBuiltPerMonth} vrijheidsdagen op
+              Elke maand bouw je {freedomDaysBuiltPerMonth.toLocaleString('nl-NL')} vrijheidsdagen op
             </p>
+            {/* De koers klopt nu, dus mag de wisselkoers-voetnoot eronder (UR3-08). */}
+            <VrijheidstijdVoetnoot dailyRate={canonicalDailyRate} source={dailyRateSource} className="mt-1" />
           </div>
         )}
       </div>

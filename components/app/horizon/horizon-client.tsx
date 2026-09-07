@@ -99,6 +99,7 @@ import {
 import { applyHousingToComposition } from '@/lib/horizon/wealth-composition-housing'
 import { detectDeficitLoanFromRows } from '@/lib/horizon/deficit-loan-display'
 import { buildDeficitLoanCopy } from '@/lib/horizon/deficit-loan-copy'
+import { nettoLiquideAtAge } from '@/lib/horizon/vrijheidsdagen'
 import { useDeficitNotice } from '@/components/app/horizon/deficit-notice-provider'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { FreedomTimeBadge } from '@/components/app/freedom-time-label'
@@ -2677,8 +2678,27 @@ export default function HorizonPage({
     const portfolioAtStart = transRows.length > 0
       ? transRows[0].startNetWorth
       : simResult.firePortfolioAtFire
+    // UR3-08: de J-grondslag (netto LIQUIDE, excl. eigen woning) apart naast de
+    // I-grondslag hierboven. Alleen J is eerlijk te vertalen naar op te leven
+    // vrijheidsdagen; de kassabon houdt bewust I.
+    //
+    // LET OP — `transRows` is op productie ALTIJD leeg: de kernel kent geen
+    // overbrugging en zet `phase` uitsluitend op 'accumulation' of 'withdrawal'
+    // (bridge.ts:44 en :728). De filter hierboven is legacy en houdt alleen stand
+    // omdat `portfolioAtStart` een terugval draagt. Zonder eigen terugval zou deze
+    // waarde dus overal `undefined` zijn en de vrijheidsdagen-regel op élk echt
+    // account verdwijnen in plaats van kloppen.
+    //
+    // De terugval is J→J, niet J→I: dezelfde grootheid op dezelfde leeftijd, uit
+    // de volle rijenset. Terugvallen op de I-grondslag blijft verboden — dan telt
+    // de eigen woning mee als op te leven vrijheidsdagen. Ontbreekt ook die rij,
+    // dan vervalt de regel liever dan dat hij liegt.
+    const nettoLiquideAtStart =
+      transRows.length > 0
+        ? transRows[0].startNettoLiquide
+        : nettoLiquideAtAge(unifiedRows, start)
     const withdrawal = scenario === 'gap' ? yearlyExp : Math.max(yearlyExp - yearlyAow, 0)
-    return { scenario, start, end, fireAge: oFireAge, aowAge: oAowAge, yearlyExp, yearlyAow, portfolioAtStart, withdrawal }
+    return { scenario, start, end, fireAge: oFireAge, aowAge: oAowAge, yearlyExp, yearlyAow, portfolioAtStart, nettoLiquideAtStart, withdrawal }
   })()
 
   // ── Onttrekking (withdrawal phase) berekening ──────────────────────────────
@@ -2686,7 +2706,8 @@ export default function HorizonPage({
     if (!simResult || !simResult.fireReachable || simResult.fireAge == null) return null
     const wRows = (unifiedRows ?? []).filter(r => r.phase === 'withdrawal')
     if (wRows.length === 0) return null
-    const yearlyExp = (effectiveInput?.monthlyExpenses ?? 0) * 12
+    // (UR3-08 bijvangst) Hier stond een `yearlyExp` die nooit werd geretourneerd
+    // — dode code, verwijderd.
     const baseAow = isHouseholdView ? NL_AOW_MONTHLY_SAMENWONEND : NL_AOW_MONTHLY
     const yearlyAow = baseAow * 12
     const avgWithdrawal = wRows.reduce((s, r) => s + r.withdrawal, 0) / wRows.length
@@ -2694,6 +2715,8 @@ export default function HorizonPage({
       start: wRows[0].age,
       end: simResult.displayEndAge,
       startPortfolio: wRows[0].startNetWorth,
+      // UR3-08: J-grondslag naast I — zie de toelichting bij `overgangData`.
+      nettoLiquideAtStart: wRows[0].startNettoLiquide,
       strategy: simResult.strategy,
       targetEndPortfolio: simResult.targetEndPortfolio,
       yearlyWithdrawal: avgWithdrawal,
@@ -9415,6 +9438,8 @@ export default function HorizonPage({
           expectedPortfolioAtFire={simResult.firePortfolioAtFire}
           yearlySavings={(fire?.monthlySavings ?? 0) * 12}
           yearlyExpenses={effectiveInput?.yearlyMustExpenses ?? 0}
+          canonicalDailyRate={canonicalDailyRate}
+          dailyRateSource={initialData.dailyExpenseRateDetail.source}
           expectedReturn={fireParams.grossReturn}
           inflationRate={fireParams.inflationRate}
           rows={unifiedRows ?? []}
@@ -9447,6 +9472,9 @@ export default function HorizonPage({
           yearlyAowIncome={overgangData.yearlyAow}
           yearlyExpenses={overgangData.yearlyExp}
           portfolioAtTransitionStart={overgangData.portfolioAtStart}
+          nettoLiquideAtStart={overgangData.nettoLiquideAtStart}
+          canonicalDailyRate={canonicalDailyRate}
+          dailyRateSource={initialData.dailyExpenseRateDetail.source}
           rows={unifiedRows ?? []}
           inflationRate={fireParams.inflationRate}
           debts={debts}
@@ -9469,6 +9497,9 @@ export default function HorizonPage({
           startAge={onttrekkingData.start}
           endAge={onttrekkingData.end}
           startPortfolio={onttrekkingData.startPortfolio}
+          nettoLiquideAtStart={onttrekkingData.nettoLiquideAtStart}
+          canonicalDailyRate={canonicalDailyRate}
+          dailyRateSource={initialData.dailyExpenseRateDetail.source}
           strategy={onttrekkingData.strategy}
           targetEndPortfolio={onttrekkingData.targetEndPortfolio}
           yearlyWithdrawal={onttrekkingData.yearlyWithdrawal}
