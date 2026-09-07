@@ -15,6 +15,20 @@ import './fin-dots.css'
  * - Random eye blinking (top two dots) at 2-6s intervals with ~20% double-blink
  * - Random mouth movement (bottom dot) at 3-8s intervals with ~30% multi-pulse
  * - Respects prefers-reduced-motion
+ *
+ * ── Welk accent kleurt welke stip (UR3-32, vast) ──
+ * Fins gezicht is bewust DRIEkleurig: het draagt de drie hefbomen in
+ * miniatuur. Fins eigen accent (`--color-fin-*`) kleurt alleen de omtrek —
+ * de bubbel, de chat en zijn uitingen op /berichten en /nieuws — niet de
+ * stippen. De toewijzing ligt vast en is zichtbaar gemaakt op
+ * /mijn/uiterlijk:
+ *
+ *   linkeroog     (dot-1) → Bezittingen → var(--color-kern-500)
+ *   rechteroog    (dot-2) → Schulden    → var(--color-wil-500)
+ *   onderste stip (dot-3) → Budget      → var(--color-horizon-500)
+ *
+ * De luisterring volgt de onderste stip (Budget). Geborgd in
+ * fin-dots.accent-slots.test.ts — verander je hier een var, dan valt die om.
  */
 
 export interface FinDotsProps {
@@ -217,7 +231,7 @@ export function FinDots({ size = 48, state = 'idle' }: FinDotsProps) {
         />
       )}
 
-      {/* Kern trail (dot-1 shadow — renders behind main dot) */}
+      {/* Bezittingen-trail (dot-1 shadow — renders behind main dot) */}
       <circle
         cx={cx}
         cy={cy}
@@ -231,7 +245,7 @@ export function FinDots({ size = 48, state = 'idle' }: FinDotsProps) {
           transition: mounted && animState === 'idle' ? 'transform 120ms ease' : undefined,
         }}
       />
-      {/* Kern dot (dot-1 / left eye) */}
+      {/* Bezittingen-stip (dot-1 / linkeroog) — vast op het kern-accent */}
       <circle
         cx={cx}
         cy={cy}
@@ -246,7 +260,7 @@ export function FinDots({ size = 48, state = 'idle' }: FinDotsProps) {
         }}
       />
 
-      {/* Wil trail (dot-2 shadow — renders behind main dot) */}
+      {/* Schulden-trail (dot-2 shadow — renders behind main dot) */}
       <circle
         cx={cx}
         cy={cy}
@@ -260,7 +274,7 @@ export function FinDots({ size = 48, state = 'idle' }: FinDotsProps) {
           transition: mounted && animState === 'idle' ? 'transform 120ms ease' : undefined,
         }}
       />
-      {/* Wil dot (dot-2 / right eye) */}
+      {/* Schulden-stip (dot-2 / rechteroog) — vast op het wil-accent */}
       <circle
         cx={cx}
         cy={cy}
@@ -275,7 +289,7 @@ export function FinDots({ size = 48, state = 'idle' }: FinDotsProps) {
         }}
       />
 
-      {/* Horizon trail (dot-3 shadow — renders behind main dot) */}
+      {/* Budget-trail (dot-3 shadow — renders behind main dot) */}
       <circle
         cx={cx}
         cy={cy}
@@ -290,7 +304,7 @@ export function FinDots({ size = 48, state = 'idle' }: FinDotsProps) {
             mounted && animState === 'idle' ? 'transform 140ms ease' : undefined,
         }}
       />
-      {/* Horizon dot (dot-3 / mouth) */}
+      {/* Budget-stip (dot-3 / mond, de onderste stip) — vast op het horizon-accent */}
       <circle
         cx={cx}
         cy={cy}

@@ -196,8 +196,9 @@ describe('BriefingPanel — hefboom-tag (plan T-3)', () => {
         entries={[makeEntry('tip', 'Verlaag vaste lasten', { hefboom: 'cashflow' })]}
       />,
     )
-    // HEFBOOM_CONFIG.cashflow tint = 'text-sky-700 bg-sky-50'
-    expect(container.querySelector('.bg-sky-50')).toBeTruthy()
+    // HEFBOOM_CONFIG.cashflow tint = 'text-horizon-700 bg-horizon-50' (UR3-32:
+    // module-accenttokens i.p.v. Tailwind-standaardkleuren voor identiteit).
+    expect(container.querySelector('.bg-horizon-50')).toBeTruthy()
     // aria-label staat op de span
     expect(container.querySelector('[aria-label*="Budget"]')).toBeTruthy()
   })
@@ -210,7 +211,7 @@ describe('BriefingPanel — hefboom-tag (plan T-3)', () => {
     expect(container.querySelector('[aria-label*="Bezittingen"]')).toBeNull()
   })
 
-  it('toont juiste tint per hefboom (bezittingen=emerald, schulden=amber, belasting=violet)', () => {
+  it('toont juiste tint per hefboom (bezittingen=kern, schulden=wil, belasting=neutraal ink)', () => {
     const { container } = render(
       <BriefingPanel
         entries={[
@@ -220,9 +221,10 @@ describe('BriefingPanel — hefboom-tag (plan T-3)', () => {
         ]}
       />,
     )
-    expect(container.querySelector('.bg-emerald-50')).toBeTruthy()
-    expect(container.querySelector('.bg-amber-50')).toBeTruthy()
-    expect(container.querySelector('.bg-violet-50')).toBeTruthy()
+    expect(container.querySelector('.bg-kern-50')).toBeTruthy()
+    expect(container.querySelector('.bg-wil-50')).toBeTruthy()
+    // Belasting heeft bewust geen eigen accent: neutraal ink-vlak.
+    expect(container.querySelector('[class*="bg-[var(--subtle)]"]')).toBeTruthy()
   })
 })
 

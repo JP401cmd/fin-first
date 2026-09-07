@@ -182,16 +182,16 @@ export function MeldingView({ onClose, onBezigChange }: MeldingViewProps) {
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
             <p className="flex items-center font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--ink-4)]">
               <span
-                className="mr-2.5 inline-block h-px w-7 bg-wil-500 align-middle"
+                className="mr-2.5 inline-block h-px w-7 bg-fin-500 align-middle"
                 aria-hidden="true"
               />
               Melding
             </p>
             <h2 className="mt-2 font-display text-[20px] leading-tight text-[var(--ink)]">
               Wat wil je{' '}
-              <em className="font-serif font-normal italic text-wil-700">melden</em>?
+              <em className="font-serif font-normal italic text-fin-700">melden</em>?
             </h2>
-            <p className="mt-2 border-l-2 border-wil-500 pl-3 font-serif text-[13px] italic leading-relaxed text-[var(--ink-2)]">
+            <p className="mt-2 border-l-2 border-fin-500 pl-3 font-serif text-[13px] italic leading-relaxed text-[var(--ink-2)]">
               Je zit in de testperiode. Wat je hier meldt komt rechtstreeks op onze werklijst.
             </p>
 
@@ -207,7 +207,7 @@ export function MeldingView({ onClose, onBezigChange }: MeldingViewProps) {
             <button
               type="button"
               onClick={onClose}
-              className="inline-flex items-center gap-1.5 text-xs text-[var(--ink-3)] transition-colors hover:text-[var(--ink-2)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-wil-500"
+              className="inline-flex items-center gap-1.5 text-xs text-[var(--ink-3)] transition-colors hover:text-[var(--ink-2)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fin-500"
             >
               <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
               Terug naar de chat
@@ -232,14 +232,14 @@ export function MeldingView({ onClose, onBezigChange }: MeldingViewProps) {
       {stap === 'succes' && (
         <>
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-6">
-            <span className="flex h-10 w-10 items-center justify-center border border-wil-200 bg-wil-50 text-wil-700">
+            <span className="flex h-10 w-10 items-center justify-center border border-fin-200 bg-fin-50 text-fin-700">
               <Check className="h-5 w-5" aria-hidden="true" />
             </span>
             <h2 className="mt-3 font-display text-[20px] leading-tight text-[var(--ink)]">
               Bedankt, we hebben je melding{' '}
-              <em className="font-serif font-normal italic text-wil-700">ontvangen</em>
+              <em className="font-serif font-normal italic text-fin-700">ontvangen</em>
             </h2>
-            <p className="mt-2 border-l-2 border-wil-500 pl-3 font-serif text-[13px] italic leading-relaxed text-[var(--ink-2)]">
+            <p className="mt-2 border-l-2 border-fin-500 pl-3 font-serif text-[13px] italic leading-relaxed text-[var(--ink-2)]">
               Je melding staat nu op onze werklijst.
             </p>
 
@@ -250,14 +250,14 @@ export function MeldingView({ onClose, onBezigChange }: MeldingViewProps) {
               <ul className="mt-2 space-y-1.5 text-[13px] leading-relaxed text-[var(--ink-2)]">
                 <li className="flex items-start gap-2">
                   <span
-                    className="mt-[7px] block h-1 w-1 shrink-0 bg-wil-500"
+                    className="mt-[7px] block h-1 w-1 shrink-0 bg-fin-500"
                     aria-hidden="true"
                   />
                   We lezen elke melding zelf en bepalen wat er als eerste opgepakt wordt.
                 </li>
                 <li className="flex items-start gap-2">
                   <span
-                    className="mt-[7px] block h-1 w-1 shrink-0 bg-wil-500"
+                    className="mt-[7px] block h-1 w-1 shrink-0 bg-fin-500"
                     aria-hidden="true"
                   />
                   Bugs gaan naar de reparatielijst, vragen krijgen een antwoord en wensen wegen
@@ -265,7 +265,7 @@ export function MeldingView({ onClose, onBezigChange }: MeldingViewProps) {
                 </li>
                 <li className="flex items-start gap-2">
                   <span
-                    className="mt-[7px] block h-1 w-1 shrink-0 bg-wil-500"
+                    className="mt-[7px] block h-1 w-1 shrink-0 bg-fin-500"
                     aria-hidden="true"
                   />
                   Je hoeft verder niets te doen. Kom je nog iets tegen? Meld het gerust
@@ -283,14 +283,14 @@ export function MeldingView({ onClose, onBezigChange }: MeldingViewProps) {
               <button
                 type="button"
                 onClick={terugNaarTypekeuze}
-                className="flex-1 bg-wil-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-wil-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-wil-500 active:scale-[0.99]"
+                className="flex-1 bg-fin-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-fin-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fin-500 active:scale-[0.99]"
               >
                 Nog een melding
               </button>
               <button
                 type="button"
                 onClick={onClose}
-                className="border border-[var(--border-ed)] px-3 py-2.5 text-xs text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-wil-500"
+                className="border border-[var(--border-ed)] px-3 py-2.5 text-xs text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fin-500"
               >
                 Terug naar de chat
               </button>

@@ -75,7 +75,7 @@ export function GidsView() {
           <button
             type="button"
             onClick={reactivate}
-            className="mt-4 inline-flex min-h-[44px] items-center gap-1.5 bg-wil-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-wil-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-wil-500 active:scale-[0.99]"
+            className="mt-4 inline-flex min-h-[44px] items-center gap-1.5 bg-fin-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-fin-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fin-500 active:scale-[0.99]"
           >
             Gids opnieuw tonen
           </button>
@@ -160,7 +160,7 @@ export function GidsView() {
             type="button"
             onClick={goPrev}
             disabled={idx === 0}
-            className="inline-flex min-h-[44px] items-center gap-1.5 px-2.5 py-2 text-[13px] font-medium text-[var(--ink-3)] transition-colors hover:text-[var(--ink-2)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-wil-500 disabled:invisible"
+            className="inline-flex min-h-[44px] items-center gap-1.5 px-2.5 py-2 text-[13px] font-medium text-[var(--ink-3)] transition-colors hover:text-[var(--ink-2)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fin-500 disabled:invisible"
           >
             <ArrowLeft className="h-4 w-4" aria-hidden />
             Vorige
@@ -207,7 +207,7 @@ export function GidsView() {
             // Tekstueel klein (secundaire uitgang), maar met een volwaardig
             // raakvlak: de tekstregel zelf is ~16px hoog en dat is onder de
             // 44px-raakdrempel van de ui-ux-toets.
-            className="inline-flex min-h-[44px] items-center text-[11px] font-semibold leading-snug text-[var(--ink-3)] underline-offset-2 hover:text-[var(--ink-2)] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-wil-500"
+            className="inline-flex min-h-[44px] items-center text-[11px] font-semibold leading-snug text-[var(--ink-3)] underline-offset-2 hover:text-[var(--ink-2)] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fin-500"
           >
             Ik ben klaar met de gids
           </button>
@@ -305,7 +305,7 @@ function RondleidingKnop() {
       <button
         type="button"
         onClick={start}
-        className="mt-2.5 inline-flex min-h-[44px] items-center gap-1.5 border border-[var(--border-md)] px-3.5 py-2 text-[13px] font-medium text-[var(--ink-2)] transition-colors hover:border-[var(--ink-3)] hover:text-[var(--ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-wil-500"
+        className="mt-2.5 inline-flex min-h-[44px] items-center gap-1.5 border border-[var(--border-md)] px-3.5 py-2 text-[13px] font-medium text-[var(--ink-2)] transition-colors hover:border-[var(--ink-3)] hover:text-[var(--ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fin-500"
       >
         <Compass className="h-4 w-4" aria-hidden />
         {label}
@@ -323,7 +323,7 @@ function RondleidingKnop() {
 function GidsKicker({ children }: { children: React.ReactNode }) {
   return (
     <p className="flex items-center font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--ink-4)]">
-      <span className="mr-2.5 inline-block h-px w-7 bg-wil-500 align-middle" aria-hidden="true" />
+      <span className="mr-2.5 inline-block h-px w-7 bg-fin-500 align-middle" aria-hidden="true" />
       {children}
     </p>
   )
@@ -356,7 +356,7 @@ function ScreenDots({
             key={i}
             className={`h-1.5 rounded-full transition-all ${
               active
-                ? 'w-6 bg-wil-600'
+                ? 'w-6 bg-fin-600'
                 : revealed
                   ? 'w-1.5 bg-[var(--border-md)]'
                   : 'w-1.5 bg-[var(--border-ed)]'
@@ -381,7 +381,7 @@ function PrimaryButton({
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex min-h-[44px] items-center gap-1.5 bg-wil-600 px-3.5 py-2 text-[13px] font-medium text-white transition-colors hover:bg-wil-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-wil-500 active:scale-[0.99]"
+      className="inline-flex min-h-[44px] items-center gap-1.5 bg-fin-600 px-3.5 py-2 text-[13px] font-medium text-white transition-colors hover:bg-fin-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fin-500 active:scale-[0.99]"
     >
       {children}
     </button>

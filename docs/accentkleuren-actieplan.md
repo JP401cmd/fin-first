@@ -179,3 +179,60 @@ hook-route is dood).
   hunk-selectief splitsen.
 - Fallback-stijl charts is gemengd (mét `, #c4a06b` in horizon-bestanden,
   zónder in mini-networth) — cosmetisch, beide correct.
+
+---
+
+## Vervolg — UR3-32: vier accenten, hefboom-defaults, eigen kleur voor Fin (7 sep 2026)
+
+Het plan hierboven verdeelde *drie* accenten beter. UR3-32 verandert het aantal
+en de indeling. Besluit van de eigenaar (6-7 sep 2026, in de Notion-kaart):
+drie accenten met defaults uit de hefboomfamilies **Bezittingen / Schulden /
+Budget** — Belasting valt af, want die heeft al de box-triade en de hub
+neutraliseert het route-accent daar bewust naar ink — plus een **vierde,
+eigen accent voor Fin**. Alle vier blijven volledig instelbaar; de wijziging
+zit in de defaults en de indeling, niet in de instelbaarheid.
+
+### Wat er is gebouwd
+
+- **Vierde sleutel `fin`** in `ModuleColorConfig` / `DEFAULT_MODULE_COLORS`,
+  `--color-fin-50..950` in `app/globals.css` (`:root` + `@theme inline`), SSR
+  in `app/(app)/layout.tsx`. Geen migratie nodig: `profiles.module_colors` is
+  jsonb met per-sleutel fallback, dus bestaande rijen zonder `fin` krijgen de
+  default. `MODULE_KEYS` in `app/api/appearance/route.ts` volgt automatisch.
+- **Nieuwe defaults, in de accent-band.** De oude hefboomtinten waren
+  Tailwind-standaardkleuren die op het stoplicht botsten (Bezittingen
+  `emerald-700` op 3,1° van "op koers"-groen; Schulden `#b45309` = exact
+  `--color-box1-700`). De kleurfamilies zijn behouden maar ontzadigd tot
+  C ≈ 0,065: `kern #427560` (groen), `wil #885e47` (terracotta),
+  `horizon #476d8c` (staalsblauw). `fin #3d3048` (plum) — dat is de kleur die
+  Fins bubbel vandaag al had, dus voor Fin verandert er visueel niets.
+- **`HEFBOOM_CONFIG.tint`** van vier Tailwind-standaardkleuren naar
+  accenttokens (`text-kern-700 bg-kern-50` etc.); Belasting wordt neutraal ink.
+  Dat was de enige echte overtreding van de kleurconventie in `CLAUDE.md`.
+- **`accentClashesWithStatus(hex)`** in `lib/color-palette.ts`: waarschuwt
+  (blokkeert niet) wanneer een gekozen kleur binnen 20° van een statushue ligt
+  ÉN boven de accent-band uitkomt. Hue alléén zou het gedempte goud onterecht
+  afkeuren, chroma alléén een verzadigd indigo — de AND is de vondst.
+  Aangesloten op `ColorPickerCard` via de nieuwe prop `statusHint`.
+- **Fin.** Avatar blijft driekleurig; de toewijzing ligt vast en is zichtbaar
+  op `/mijn/uiterlijk`: linkeroog Bezittingen, rechteroog Schulden, onderste
+  stip Budget. Fins eigen accent kleurt de omtrek: de bubbel, de chat en zijn
+  uitingen op `/berichten` en `/nieuws` (die leenden tot nu toe het wil-accent).
+
+### Open vervolg (niet in deze ronde)
+
+- **Boxkleuren instelbaar.** De aanvulling op het besluit wil ook
+  `--color-box1/2/3-*` instelbaar maken. Die staan nu als vaste hexen in
+  `globals.css` en zitten in geen enkele config — dat is een eigen ronde
+  (config-type + vars-generator + picker + `PUT /api/appearance` + SSR).
+- **Fasekleuren-picker.** `PhaseColorConfig` en `generatePhaseColorVars`
+  bestaan al en worden al SSR-gehydrateerd uit `profiles.phase_colors`, maar er
+  is geen picker op `/mijn/uiterlijk` en `PUT /api/appearance` kent geen
+  `phase_colors`-sleutel — dus de keuze is vandaag niet te maken of te bewaren.
+- **Vocabulaire-rename (B2)** — `kern/wil/horizon` app-breed hernoemen. Bewust
+  NIET in R12; aparte refactor-kaart met ADR.
+- **Designtaal-skill** (`.claude/skills/ui-ux/**`): de regel over
+  module-accenten noemt nog drie accenten. Zelfmodificatie van `.claude/`
+  vraagt een expliciet akkoord van de eigenaar — nog te doen.
+- **ADR** over de instelbare accenten (`docs/adr/NNNN-instelbare-accenten.md`)
+  is nog niet geschreven.

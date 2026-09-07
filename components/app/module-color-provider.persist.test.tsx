@@ -94,6 +94,7 @@ describe('ModuleColorProvider — persist-gedrag bij DB-lading', () => {
         kern: '#ff0000',
         wil: '#00ff00',
         horizon: '#0000ff',
+        fin: '#ff00ff',
       }
       const dbBudgetColors: BudgetColorConfig = {
         income:  '#aabbcc',
@@ -141,12 +142,14 @@ describe('ModuleColorProvider — clobber-bewijs bij race', () => {
         kern:    '#111111',
         wil:     '#222222',
         horizon: '#333333',
+        fin:     '#444444',
       }
       // Kleur B: de STALE DB-waarden die het laadpad daarna hydrateert
       const staleDbB: ModuleColorConfig = {
         kern:    '#aaaaaa',
         wil:     '#bbbbbb',
         horizon: '#cccccc',
+        fin:     '#dddddd',
       }
 
       let capturedSetConfig!: (c: ModuleColorConfig) => void
@@ -209,6 +212,7 @@ describe('ModuleColorProvider — flush-hardening bij pagehide', () => {
         kern:    '#abcabc',
         wil:     '#defdef',
         horizon: '#123123',
+        fin:     '#456456',
       }
 
       let capturedSetConfig!: (c: ModuleColorConfig) => void
@@ -279,6 +283,7 @@ describe('ModuleColorProvider — flush-hardening bij visibilitychange hidden', 
         kern:    '#fedcba',
         wil:     '#abcdef',
         horizon: '#112233',
+        fin:     '#445566',
       }
 
       let capturedSetConfig!: (c: ModuleColorConfig) => void

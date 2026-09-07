@@ -125,7 +125,7 @@ function formatBytes(bytes: number): string {
 // module-activation-modal): sentence case, want deze labels zijn vragen.
 const LABEL_CLASS = 'block text-xs font-medium text-[var(--ink-2)]'
 const VELD_CLASS =
-  'mt-1.5 w-full border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2 text-sm text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--ink-4)] focus:border-wil-400 focus:ring-1 focus:ring-wil-200 disabled:opacity-60'
+  'mt-1.5 w-full border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2 text-sm text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--ink-4)] focus:border-fin-400 focus:ring-1 focus:ring-fin-200 disabled:opacity-60'
 
 export function MeldingForm({
   type,
@@ -271,12 +271,12 @@ export function MeldingForm({
       {/* Scrollbare inhoud — de knoppen blijven eronder staan (sticky footer). */}
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
         <p className="flex items-center font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--ink-4)]">
-          <span className="mr-2.5 inline-block h-px w-7 bg-wil-500 align-middle" aria-hidden="true" />
+          <span className="mr-2.5 inline-block h-px w-7 bg-fin-500 align-middle" aria-hidden="true" />
           Melding
         </p>
         <h2 className="mt-2 font-display text-[20px] leading-tight text-[var(--ink)]">
           {config.kopEerste}{' '}
-          <em className="font-serif font-normal italic text-wil-700">{config.kopAccent}</em>
+          <em className="font-serif font-normal italic text-fin-700">{config.kopAccent}</em>
         </h2>
 
         <div className="mt-4 space-y-4">
@@ -404,7 +404,7 @@ export function MeldingForm({
                     onClick={verwijderAfbeelding}
                     disabled={bezig}
                     aria-label="Schermafbeelding verwijderen"
-                    className="touch-target flex shrink-0 items-center justify-center text-[var(--ink-4)] transition-colors hover:text-[var(--ink-2)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-wil-500"
+                    className="touch-target flex shrink-0 items-center justify-center text-[var(--ink-4)] transition-colors hover:text-[var(--ink-2)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fin-500"
                   >
                     <X className="h-4 w-4" aria-hidden="true" />
                   </button>
@@ -414,11 +414,11 @@ export function MeldingForm({
                   type="button"
                   onClick={() => bestandInputRef.current?.click()}
                   disabled={bezig}
-                  className="mt-1.5 flex w-full items-center gap-3 border border-dashed border-[var(--border-md)] bg-[var(--subtle)] px-3 py-3 text-left transition-colors hover:border-wil-300 hover:bg-wil-50/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-wil-500 disabled:opacity-60"
+                  className="mt-1.5 flex w-full items-center gap-3 border border-dashed border-[var(--border-md)] bg-[var(--subtle)] px-3 py-3 text-left transition-colors hover:border-fin-300 hover:bg-fin-50/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fin-500 disabled:opacity-60"
                 >
                   <ImagePlus className="h-5 w-5 shrink-0 text-[var(--ink-4)]" aria-hidden="true" />
                   <span className="text-xs leading-snug text-[var(--ink-3)]">
-                    <span className="text-wil-700 underline underline-offset-2">Kies een bestand</span>{' '}
+                    <span className="text-fin-700 underline underline-offset-2">Kies een bestand</span>{' '}
                     of plak er een met Ctrl+V (⌘+V).
                     <span className="mt-0.5 block text-[var(--ink-4)]">
                       PNG, JPEG of WebP tot 4 MB.
@@ -471,7 +471,7 @@ export function MeldingForm({
                       onChange={() => setConsent(waarde)}
                       disabled={bezig}
                     />
-                    <span className="block border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-1.5 font-mono text-[11px] uppercase tracking-[0.10em] text-[var(--ink-3)] transition-colors hover:border-wil-300 peer-checked:border-wil-500 peer-checked:bg-wil-50 peer-checked:text-wil-700 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-wil-500">
+                    <span className="block border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-1.5 font-mono text-[11px] uppercase tracking-[0.10em] text-[var(--ink-3)] transition-colors hover:border-fin-300 peer-checked:border-fin-500 peer-checked:bg-fin-50 peer-checked:text-fin-700 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-fin-500">
                       {label}
                     </span>
                   </label>
@@ -511,7 +511,7 @@ export function MeldingForm({
             type="button"
             onClick={onTerug}
             disabled={bezig}
-            className="inline-flex items-center gap-1.5 border border-[var(--border-ed)] px-3 py-2.5 text-xs text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-wil-500 disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 border border-[var(--border-ed)] px-3 py-2.5 text-xs text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fin-500 disabled:opacity-50"
           >
             <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
             Terug
@@ -519,7 +519,7 @@ export function MeldingForm({
           <button
             type="submit"
             disabled={bezig}
-            className="inline-flex flex-1 items-center justify-center gap-2 bg-wil-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-wil-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-wil-500 active:scale-[0.99] disabled:bg-zinc-300 disabled:text-[var(--ink-3)]"
+            className="inline-flex flex-1 items-center justify-center gap-2 bg-fin-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-fin-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fin-500 active:scale-[0.99] disabled:bg-zinc-300 disabled:text-[var(--ink-3)]"
           >
             {bezig ? (
               <>

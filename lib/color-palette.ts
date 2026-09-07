@@ -7,16 +7,40 @@
  * No external dependencies. ~100 lines of pure TypeScript.
  */
 
+/**
+ * De vier instelbare identiteits-accenten. De DB-sleutels blijven bewust
+ * `kern` / `wil` / `horizon` — die namen dragen óók de AI-DNA, de
+ * contextbouwers, `WidgetModule` en `NavModule`, dus een kleur-scoped rename
+ * zou het vocabulaire splitsen in plaats van herstellen (besluit UR3-32,
+ * 6 sep 2026). Wat de gebruiker ziet is wél opnieuw ingedeeld:
+ *
+ *  - `kern`    → Bezittingen (kleurt ook de route /overzicht en Fins linkeroog)
+ *  - `wil`     → Schulden    (kleurt ook de route /mijn en Fins rechteroog)
+ *  - `horizon` → Budget      (kleurt ook de route /toekomst en Fins onderste stip)
+ *  - `fin`     → Fin zelf    (bubbel, chat-header, verzendknop, /berichten, /nieuws)
+ */
 export type ModuleColorConfig = {
-  kern: string   // hex, e.g. "#f59e0b"
-  wil: string    // hex, e.g. "#14b8a6"
-  horizon: string // hex, e.g. "#a855f7"
+  kern: string    // hex — Bezittingen
+  wil: string     // hex — Schulden
+  horizon: string // hex — Budget
+  fin: string     // hex — Fin
 }
 
+/**
+ * Defaults overgenomen uit de hefboomfamilies (Bezittingen = groen,
+ * Schulden = terracotta/amber, Budget = staalsblauw), maar met de verzadiging
+ * in de ACCENT-band gebracht (C ≈ 0,065). De hefbomen droegen tot nu toe
+ * Tailwind-standaardkleuren die letterlijk op het stoplicht botsten
+ * (emerald-700 op 3,1° van "op koers"-groen, amber-700 exact box1). Het
+ * werkelijke onderscheid tussen identiteit en status zit in chroma, niet in
+ * hue: accenten 0,045–0,082 · stoplicht 0,149–0,208. Zie
+ * `accentClashesWithStatus` hieronder.
+ */
 export const DEFAULT_MODULE_COLORS: ModuleColorConfig = {
-  kern: '#6b4339',
-  wil: '#3d3048',
-  horizon: '#c4a06b',
+  kern: '#427560',
+  wil: '#885e47',
+  horizon: '#476d8c',
+  fin: '#3d3048',
 }
 
 export const SHADES = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950] as const
@@ -148,6 +172,61 @@ export function contrastRatio(hexA: string, hexB: string): number {
   return (lighter + 0.05) / (darker + 0.05)
 }
 
+// ── Identiteit vs. status: de chroma-band ───────────────────────────────
+
+/**
+ * De drie stoplichtkleuren zoals `lib/leverage-status.ts` ze draagt
+ * (emerald-500 / amber-500 / red-500), uitgedrukt in OKLCH-hue. Die kleuren
+ * dragen BETEKENIS (op koers / aandacht / actie) en zijn daarom bewust niet
+ * instelbaar — net als positief/negatief en risico-rood.
+ */
+export const STATUS_HUES = {
+  goed: 162.5,     // #10b981
+  aandacht: 70.1,  // #f59e0b
+  actie: 25.3,     // #ef4444
+} as const
+
+/**
+ * Bovengrens van de accent-band. Gemeten: de vier accent-defaults zitten op
+ * C = 0,045–0,082; het stoplicht op C = 0,149–0,208. Een identiteitskleur mag
+ * dus dicht bij een statushue liggen zolang hij ontzadigd blijft — zo botste
+ * het oude horizon-goud (h=76,6°, 6,5° van amber-warn) nooit met "aandacht".
+ *
+ * De grens ligt op 0,10: middenin het lege gat tussen beide banden, en net
+ * onder het oude hefboom-emerald (`#047857`, C = 0,1049, 3,1° van "op
+ * koers"-groen) — precies de botsing die deze toets moet vangen.
+ */
+export const ACCENT_CHROMA_MAX = 0.10
+
+/** Hoe dicht een hue bij een statushue mag komen vóór we meekijken (graden). */
+export const STATUS_HUE_WINDOW = 20
+
+/** Kleinste hoek tussen twee hues op de kleurencirkel (0..180). */
+function hueDistance(a: number, b: number): number {
+  const d = Math.abs(((a - b) % 360 + 360) % 360)
+  return d > 180 ? 360 - d : d
+}
+
+/**
+ * Botst een gekozen accentkleur met de stoplicht-semantiek?
+ *
+ * `'warn'` wanneer de hue binnen `STATUS_HUE_WINDOW` van een statushue ligt
+ * ÉN de verzadiging boven de accent-band uitkomt. Beide voorwaarden moeten
+ * gelden: hue alléén zou het gedempte goud/olijf onterecht afkeuren, chroma
+ * alléén zou een verzadigd indigo onterecht afkeuren.
+ *
+ * Waarschuwen, nooit blokkeren — zelfde lijn als de bestaande WCAG-hint.
+ * Pure functie; getest in `lib/color-palette.accent-status.test.ts`.
+ */
+export function accentClashesWithStatus(hex: string): 'ok' | 'warn' {
+  const { C, h } = hexToOklch(hex)
+  if (C < ACCENT_CHROMA_MAX) return 'ok'
+  const near = Object.values(STATUS_HUES).some(
+    (statusHue) => hueDistance(h, statusHue) <= STATUS_HUE_WINDOW,
+  )
+  return near ? 'warn' : 'ok'
+}
+
 // ── Palette generation ──────────────────────────────────────────────────
 
 export type Palette = Record<Shade, { oklch: string; hex: string }>
@@ -198,12 +277,12 @@ export function generatePalette(hex: string): Palette {
 
 // ── CSS variable generation ─────────────────────────────────────────────
 
-export type ModuleName = 'kern' | 'wil' | 'horizon'
-const MODULE_NAMES: ModuleName[] = ['kern', 'wil', 'horizon']
+export type ModuleName = 'kern' | 'wil' | 'horizon' | 'fin'
+const MODULE_NAMES: ModuleName[] = ['kern', 'wil', 'horizon', 'fin']
 
 /**
  * Generates a flat object of CSS custom property name → oklch value
- * for all 3 modules (33 variables total).
+ * for all 4 accents (44 variables total).
  *
  * Example: { '--color-kern-50': 'oklch(0.977 0.012 84.4)', ... }
  */
@@ -317,7 +396,7 @@ export function generatePhaseColorVars(
 }
 
 /**
- * Generates all CSS color variables: module (33) + budget (55) + phase (44) = 132 total.
+ * Generates all CSS color variables: accenten (44) + budget (55) + fase (44) = 143 total.
  */
 export function generateAllColorVars(config: {
   modules: ModuleColorConfig

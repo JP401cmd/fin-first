@@ -3,12 +3,15 @@ import { ModuleNav } from '@/components/app/module-nav'
 import { mijnNav } from '@/lib/navigation'
 
 /**
- * Fin & acties-route layout voor `/mijn`. Naast de bestaande ModuleNav +
- * Breadcrumb (teal) zet deze wrapper de `--module-active-*` CSS-variabelen op
- * de Wil-shades, zodat editorial primitives (kicker-streep, headline-emphasis,
- * highlight-marker) onder `/mijn` het Wil-accent dragen dat de gebruiker koos
- * op `/mijn/uiterlijk`. De picker noemt deze kleur "Fin & acties" en de
- * /mijn-tabs zijn al wil — vandaar het wil-accent (zie accentkleuren-actieplan).
+ * Route layout voor `/mijn`. Naast de bestaande ModuleNav + Breadcrumb zet
+ * deze wrapper de `--module-active-*` CSS-variabelen op de wil-shades, zodat
+ * editorial primitives (kicker-streep, headline-emphasis, highlight-marker)
+ * onder `/mijn` het accent dragen dat de gebruiker koos op `/mijn/uiterlijk`.
+ *
+ * Sinds UR3-32 heet dat accent in de picker **Schulden** (de sleutel `wil`
+ * blijft; alleen de indeling en de default veranderden). `/berichten` en
+ * `/nieuws` zijn hier losgekoppeld: die dragen Fins eigen accent
+ * (`--color-fin-*`), want het zijn Fins uitingen.
  * Cross-module-defaults staan in `app/globals.css` (neutrale ink-shades).
  */
 export default function MijnLayout({ children }: { children: React.ReactNode }) {

@@ -71,7 +71,7 @@ function WftDisclaimer({ onAccept }: { onAccept: () => void }) {
         <button
           type="button"
           onClick={onAccept}
-          className="mt-5 w-full rounded-[var(--r-lg)] bg-wil-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-wil-700 active:scale-[0.98]"
+          className="mt-5 w-full rounded-[var(--r-lg)] bg-fin-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-fin-700 active:scale-[0.98]"
         >
           Ik begrijp het
         </button>
@@ -93,9 +93,9 @@ function WftDisclaimer({ onAccept }: { onAccept: () => void }) {
  */
 function LocalModeBanner() {
   return (
-    <div className="border-b border-[var(--border-ed)] bg-wil-50/60 px-4 py-2.5">
+    <div className="border-b border-[var(--border-ed)] bg-fin-50/60 px-4 py-2.5">
       <div className="flex items-start gap-2">
-        <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-wil-600" aria-hidden="true" />
+        <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-fin-600" aria-hidden="true" />
         <div className="text-[11px] leading-relaxed text-[var(--ink-2)]">
           <p>
             Fin denkt lokaal na — dit draait volledig op je toestel en duurt wat
@@ -183,11 +183,11 @@ const FIN_CONFIG: DomainConfig = {
   greeting: 'Hoi, ik ben Fin',
   greetingDescription: 'Ik help je met al je financiele vragen — van budgetten tot FIRE-projecties.',
   fabAvatar: (size: number) => <FinDots size={size} />,
-  headerColor: 'text-wil-600',
-  bubbleBg: 'bg-wil-50',
-  accentColor: 'text-wil-600',
-  sendBg: 'bg-wil-600',
-  sendHoverBg: 'hover:bg-wil-700',
+  headerColor: 'text-fin-600',
+  bubbleBg: 'bg-fin-50',
+  accentColor: 'text-fin-600',
+  sendBg: 'bg-fin-600',
+  sendHoverBg: 'hover:bg-fin-700',
 }
 
 /* ── Types ─────────────────────────────────────────────────────────── */
@@ -223,13 +223,13 @@ function ActionSuggestionCard({
       className={`mt-2 first:mt-0 w-full rounded-[var(--r-lg)] border text-left transition-all ${
         added
           ? 'border-emerald-200 bg-emerald-50'
-          : 'border-wil-200 bg-[var(--paper)] hover:border-wil-400 hover:shadow-[var(--s0)] active:scale-[0.98]'
+          : 'border-fin-200 bg-[var(--paper)] hover:border-fin-400 hover:shadow-[var(--s0)] active:scale-[0.98]'
       }`}
     >
       <div className="px-3 py-2.5">
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-1.5">
-            <Zap className={`h-3.5 w-3.5 shrink-0 ${added ? 'text-emerald-500' : 'text-wil-500'}`} />
+            <Zap className={`h-3.5 w-3.5 shrink-0 ${added ? 'text-emerald-500' : 'text-fin-500'}`} />
             <span className="text-xs font-semibold text-zinc-800">{data.title}</span>
           </div>
           {added ? (
@@ -237,9 +237,9 @@ function ActionSuggestionCard({
               <Check className="h-3 w-3" /> Toegevoegd
             </span>
           ) : loading ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin text-wil-500" />
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-fin-500" />
           ) : (
-            <span className="rounded-full bg-wil-100 px-1.5 py-0.5 text-xs font-medium text-wil-700">
+            <span className="rounded-full bg-fin-100 px-1.5 py-0.5 text-xs font-medium text-fin-700">
               + Toevoegen
             </span>
           )}
@@ -248,7 +248,7 @@ function ActionSuggestionCard({
           <p className="mt-1 text-xs leading-snug text-[var(--ink-3)]">{data.description}</p>
         )}
         <div className="mt-1.5 flex items-center gap-3 text-xs text-[var(--ink-3)]">
-          <span className="font-medium text-wil-600">
+          <span className="font-medium text-fin-600">
             +{data.freedom_days_impact} {data.freedom_days_impact === 1 ? 'dag' : 'dagen'} vrijheid
           </span>
           {data.euro_impact_monthly != null && data.euro_impact_monthly > 0 && (
@@ -290,17 +290,17 @@ function RecommendationSuggestionCard({
             : decision === 'postponed'
               ? 'border-amber-200 bg-amber-50/60'
               : 'border-zinc-200 bg-zinc-50/60'
-          : 'border-wil-200 bg-[var(--paper)]'
+          : 'border-fin-200 bg-[var(--paper)]'
       }`}
     >
       <div className="px-3 py-2.5">
         <div className="flex items-start gap-2">
           <Sparkles
-            className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${resolved ? 'text-[var(--ink-3)]' : 'text-wil-500'}`}
+            className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${resolved ? 'text-[var(--ink-3)]' : 'text-fin-500'}`}
             aria-hidden="true"
           />
           <div className="min-w-0 flex-1">
-            <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-wil-700">
+            <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-fin-700">
               Tip van Fin
             </div>
             <h4 className="mt-0.5 text-sm font-semibold text-[var(--ink)] leading-snug">
@@ -308,7 +308,7 @@ function RecommendationSuggestionCard({
             </h4>
             <p className="mt-1 text-xs text-[var(--ink-2)] leading-snug">{data.description}</p>
             <div className="mt-1.5 flex items-center gap-3 text-xs text-[var(--ink-3)]">
-              <span className="font-medium text-wil-600">
+              <span className="font-medium text-fin-600">
                 +{data.freedom_days_per_year}{' '}
                 {data.freedom_days_per_year === 1 ? 'dag' : 'dagen'} vrijheid/jaar
               </span>
@@ -320,7 +320,7 @@ function RecommendationSuggestionCard({
               <ul className="mt-2 space-y-0.5 text-[11px] text-[var(--ink-3)]">
                 {data.suggested_actions.map((a, i) => (
                   <li key={i} className="flex items-start gap-1.5">
-                    <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-wil-400" aria-hidden="true" />
+                    <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-fin-400" aria-hidden="true" />
                     <span>{a.title}</span>
                   </li>
                 ))}
@@ -357,7 +357,7 @@ function RecommendationSuggestionCard({
               type="button"
               onClick={() => onDecision('accept')}
               disabled={loading !== null}
-              className="inline-flex items-center gap-1 rounded-full bg-wil-500 px-2.5 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-wil-600 disabled:opacity-50"
+              className="inline-flex items-center gap-1 rounded-full bg-fin-500 px-2.5 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-fin-600 disabled:opacity-50"
             >
               {loading === 'accept' ? (
                 <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
@@ -471,7 +471,7 @@ function QuickActionChips({
           type="button"
           onClick={() => onPick(c.prompt)}
           disabled={disabled}
-          className="inline-flex items-center gap-1 rounded-full border border-wil-200 bg-wil-50 px-3 py-1 text-xs font-medium text-wil-700 transition-colors hover:bg-wil-100 disabled:opacity-50"
+          className="inline-flex items-center gap-1 rounded-full border border-fin-200 bg-fin-50 px-3 py-1 text-xs font-medium text-fin-700 transition-colors hover:bg-fin-100 disabled:opacity-50"
         >
           {c.label}
         </button>
@@ -1079,9 +1079,9 @@ export function ChatPanel() {
 
         if (isLoading) {
           elements.push(
-            <div key={`action-loading-${action.toolCallId}`} className="mt-2 first:mt-0 w-full rounded-[var(--r-lg)] border border-wil-100 bg-[var(--paper)] px-3 py-2.5">
+            <div key={`action-loading-${action.toolCallId}`} className="mt-2 first:mt-0 w-full rounded-[var(--r-lg)] border border-fin-100 bg-[var(--paper)] px-3 py-2.5">
               <div className="flex items-center gap-2">
-                <Loader2 className="h-3.5 w-3.5 animate-spin text-wil-400" />
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-fin-400" />
                 <span className="text-xs text-[var(--ink-3)]">Actie wordt voorbereid...</span>
               </div>
             </div>
@@ -1134,9 +1134,9 @@ export function ChatPanel() {
 
         if (isLoading) {
           elements.push(
-            <div key={`rec-loading-${rec.toolCallId}`} className="mt-2 w-full rounded-[var(--r-lg)] border border-wil-100 bg-[var(--paper)] px-3 py-2.5">
+            <div key={`rec-loading-${rec.toolCallId}`} className="mt-2 w-full rounded-[var(--r-lg)] border border-fin-100 bg-[var(--paper)] px-3 py-2.5">
               <div className="flex items-center gap-2">
-                <Loader2 className="h-3.5 w-3.5 animate-spin text-wil-400" />
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-fin-400" />
                 <span className="text-xs text-[var(--ink-3)]">Tip wordt voorbereid...</span>
               </div>
             </div>
@@ -1407,7 +1407,7 @@ export function ChatPanel() {
                 aria-pressed={mode === 'gids'}
                 title={gidsKnopLabel}
                 className={`touch-target flex items-center justify-center rounded-lg hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent ${
-                  mode === 'gids' ? 'text-wil-700' : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
+                  mode === 'gids' ? 'text-fin-700' : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
                 }`}
               >
                 <ListChecks className="h-4 w-4" />
@@ -1424,7 +1424,7 @@ export function ChatPanel() {
               aria-pressed={mode === 'melding'}
               title={meldingKnopLabel}
               className={`touch-target flex items-center justify-center rounded-lg hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent ${
-                mode === 'melding' ? 'text-wil-700' : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
+                mode === 'melding' ? 'text-fin-700' : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
               }`}
             >
               <Megaphone className="h-4 w-4" />

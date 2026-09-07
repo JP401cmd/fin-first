@@ -252,10 +252,14 @@ describe('Profiel — HouseholdSection presence', () => {
 // ── Step 8: Color preferences ──────────────────────────────────────────
 
 describe('Profiel — Color preferences (module, budget, phase)', () => {
-  it('DEFAULT_MODULE_COLORS has kern, wil, horizon', () => {
-    expect(DEFAULT_MODULE_COLORS.kern).toBe('#6b4339')
-    expect(DEFAULT_MODULE_COLORS.wil).toBe('#3d3048')
-    expect(DEFAULT_MODULE_COLORS.horizon).toBe('#c4a06b')
+  // UR3-32: vier accenten, met defaults uit de hefboomfamilies gebracht in de
+  // accent-band (Bezittingen = kern, Schulden = wil, Budget = horizon) plus
+  // Fins eigen accent.
+  it('DEFAULT_MODULE_COLORS has kern, wil, horizon, fin', () => {
+    expect(DEFAULT_MODULE_COLORS.kern).toBe('#427560')
+    expect(DEFAULT_MODULE_COLORS.wil).toBe('#885e47')
+    expect(DEFAULT_MODULE_COLORS.horizon).toBe('#476d8c')
+    expect(DEFAULT_MODULE_COLORS.fin).toBe('#3d3048')
   })
 
   it('DEFAULT_BUDGET_COLORS has 5 budget types', () => {
@@ -279,10 +283,14 @@ describe('Profiel — Color preferences (module, budget, phase)', () => {
       kern: dbColors.kern || DEFAULT_MODULE_COLORS.kern,
       wil: dbColors.wil || DEFAULT_MODULE_COLORS.wil,
       horizon: dbColors.horizon || DEFAULT_MODULE_COLORS.horizon,
+      // Profielrijen van vóór UR3-32 dragen geen `fin`-sleutel — die valt hier
+      // terug op de default, precies zoals de layout het doet.
+      fin: dbColors.fin || DEFAULT_MODULE_COLORS.fin,
     }
     expect(resolved.kern).toBe('#ff0000')
     expect(resolved.wil).toBe(DEFAULT_MODULE_COLORS.wil)
     expect(resolved.horizon).toBe(DEFAULT_MODULE_COLORS.horizon)
+    expect(resolved.fin).toBe(DEFAULT_MODULE_COLORS.fin)
   })
 
   it('loading budget_colors falls back to defaults for missing keys', () => {

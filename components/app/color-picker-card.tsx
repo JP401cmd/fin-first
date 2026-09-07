@@ -2,7 +2,7 @@
 
 import { useRef } from 'react'
 import { RotateCcw, AlertTriangle } from 'lucide-react'
-import { generatePalette, SHADES, contrastRatio } from '@/lib/color-palette'
+import { generatePalette, SHADES, contrastRatio, accentClashesWithStatus } from '@/lib/color-palette'
 import { TapTarget } from '@/components/editorial/tap-target'
 
 export interface ColorPreset {
@@ -26,6 +26,14 @@ interface ColorPickerCardProps {
    * carry white button-text / kickers.
    */
   contrastHint?: boolean
+  /**
+   * When true, warns (does not block) if the chosen color lands in the
+   * saturated status band (op koers / aandacht / actie). Identity and status
+   * must stay distinguishable — the real separation is chroma, not hue, so
+   * this only fires when a status-adjacent hue is ALSO saturated. See
+   * `accentClashesWithStatus` in lib/color-palette.ts.
+   */
+  statusHint?: boolean
 }
 
 /**
@@ -45,12 +53,15 @@ export function ColorPickerCard({
   onChange,
   activeBadge,
   contrastHint = false,
+  statusHint = false,
 }: ColorPickerCardProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const palette = generatePalette(value)
   const isDefault = value.toLowerCase() === defaultValue.toLowerCase()
   const lowContrast =
     contrastHint && contrastRatio('#ffffff', palette[700].hex) < 4.5
+  const clashesWithStatus =
+    statusHint && accentClashesWithStatus(value) === 'warn'
 
   return (
     <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-3 transition-all hover:border-[var(--border-md)]">
@@ -113,6 +124,17 @@ export function ColorPickerCard({
         <p className="mb-2 flex items-start gap-1 text-[10px] italic text-[var(--ink-3)]">
           <AlertTriangle className="mt-0.5 h-2.5 w-2.5 shrink-0" aria-hidden="true" />
           <span>Lichte kleur — tekst op deze tint kan slecht leesbaar worden.</span>
+        </p>
+      )}
+
+      {/* Status-waarschuwing — identiteit vs. stoplicht. Alleen waarschuwen. */}
+      {clashesWithStatus && (
+        <p className="mb-2 flex items-start gap-1 text-[10px] italic text-[var(--ink-3)]">
+          <AlertTriangle className="mt-0.5 h-2.5 w-2.5 shrink-0" aria-hidden="true" />
+          <span>
+            Deze kleur lijkt op een statuskleur (op koers, aandacht of actie).
+            Kies iets rustigers, dan blijft status in één oogopslag leesbaar.
+          </span>
         </p>
       )}
 

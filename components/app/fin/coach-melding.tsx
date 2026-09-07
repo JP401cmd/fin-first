@@ -16,7 +16,7 @@ export type CoachMeldingProps = {
 }
 
 const CTA_CLASS =
-  'mt-1 inline-flex items-center gap-1.5 font-mono text-xs text-wil-700 underline underline-offset-4 hover:text-wil-600'
+  'mt-1 inline-flex items-center gap-1.5 font-mono text-xs text-fin-700 underline underline-offset-4 hover:text-fin-600'
 
 /**
  * Editorial typemachine-strook (richting A). Géén eigen avatar — FinHome legt
@@ -39,7 +39,7 @@ export function CoachMelding({
       {/* pr-24 = 96px: houdt de kop vrij van de 44px-tapzone (48-92px) én de
           avatar (0-46px), zodat labeltekst nooit ónder de sluitknop loopt. */}
       <div className="flex min-h-[2.75rem] items-center border-b border-[var(--border-ed)] pl-3.5 pr-24">
-        <span className="min-w-0 truncate font-mono text-[10px] uppercase tracking-[0.2em] text-wil-700">
+        <span className="min-w-0 truncate font-mono text-[10px] uppercase tracking-[0.2em] text-fin-700">
           {headerLabel}
         </span>
       </div>

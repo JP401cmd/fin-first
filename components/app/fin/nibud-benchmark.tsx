@@ -43,7 +43,7 @@ export function NibudBenchmarkSection() {
     return (
       <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-5">
         <div className="flex items-center gap-3">
-          <div className="h-4 w-4 animate-spin rounded-full border-2 border-wil-500 border-t-transparent" />
+          <div className="h-4 w-4 animate-spin rounded-full border-2 border-fin-500 border-t-transparent" />
           <span className="text-sm text-[var(--ink-3)]">NIBUD benchmark laden...</span>
         </div>
       </div>
@@ -61,12 +61,12 @@ export function NibudBenchmarkSection() {
     <>
       <button
         onClick={() => setModalOpen(true)}
-        className="group w-full rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-5 text-left transition-colors hover:border-wil-200 hover:bg-wil-50/30"
+        className="group w-full rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-5 text-left transition-colors hover:border-fin-200 hover:bg-fin-50/30"
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-wil-50">
-              <BarChart3 className="h-4 w-4 text-wil-600" />
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-fin-50">
+              <BarChart3 className="h-4 w-4 text-fin-600" />
             </div>
             <div>
               <h3 className="text-sm font-semibold text-[var(--ink)]">Budget Gezondheidscheck</h3>
@@ -77,7 +77,7 @@ export function NibudBenchmarkSection() {
           </div>
           <div className="flex items-center gap-2">
             {data.total_freedom_days_potential > 0 && (
-              <span className="rounded-full bg-wil-50 px-2.5 py-1 text-xs font-bold text-wil-700">
+              <span className="rounded-full bg-fin-50 px-2.5 py-1 text-xs font-bold text-fin-700">
                 +{data.total_freedom_days_potential} dagen/jaar
               </span>
             )}
@@ -86,12 +86,12 @@ export function NibudBenchmarkSection() {
               tabIndex={0}
               onClick={e => { e.stopPropagation(); handleRefresh() }}
               onKeyDown={e => { if (e.key === 'Enter') { e.stopPropagation(); handleRefresh() } }}
-              className="rounded-md p-1 text-[var(--ink-4)] transition-colors hover:bg-wil-50 hover:text-wil-500"
+              className="rounded-md p-1 text-[var(--ink-4)] transition-colors hover:bg-fin-50 hover:text-fin-500"
               title="Verversen"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
             </span>
-            <ArrowRight className="h-4 w-4 text-[var(--ink-4)] transition-colors group-hover:text-wil-500" />
+            <ArrowRight className="h-4 w-4 text-[var(--ink-4)] transition-colors group-hover:text-fin-500" />
           </div>
         </div>
 
@@ -108,9 +108,9 @@ export function NibudBenchmarkSection() {
             <span><span className="font-medium text-amber-600">{aboveNorm.length}</span> boven norm</span>
           )}
           {onTrackCount > 0 && (
-            <span><span className="font-medium text-wil-600">{onTrackCount}</span> op koers</span>
+            <span><span className="font-medium text-fin-600">{onTrackCount}</span> op koers</span>
           )}
-          <span className="ml-auto text-[var(--ink-4)] group-hover:text-wil-400">Bekijk details</span>
+          <span className="ml-auto text-[var(--ink-4)] group-hover:text-fin-400">Bekijk details</span>
         </div>
       </button>
 
@@ -181,7 +181,7 @@ function NibudDetailModal({
           <button
             onClick={onRefresh}
             disabled={refreshing}
-            className="rounded-lg p-1.5 text-[var(--ink-3)] transition-colors hover:bg-wil-50 hover:text-wil-600 disabled:opacity-50"
+            className="rounded-lg p-1.5 text-[var(--ink-3)] transition-colors hover:bg-fin-50 hover:text-fin-600 disabled:opacity-50"
             title="Verversen"
           >
             <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
@@ -190,12 +190,12 @@ function NibudDetailModal({
 
         {/* Total potential banner */}
         {data.total_freedom_days_potential > 0 && (
-          <div className="rounded-[var(--r-lg)] bg-wil-50 p-4">
+          <div className="rounded-[var(--r-lg)] bg-fin-50 p-4">
             <div className="flex items-center justify-between">
-              <p className="text-sm text-wil-800">
+              <p className="text-sm text-fin-800">
                 Totaal potentieel bij NIBUD-niveau:
               </p>
-              <span className="text-xl font-bold text-wil-700">+{data.total_freedom_days_potential} dagen/jaar</span>
+              <span className="text-xl font-bold text-fin-700">+{data.total_freedom_days_potential} dagen/jaar</span>
             </div>
           </div>
         )}
@@ -223,7 +223,7 @@ function NibudDetailModal({
             >
               {showBelow ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
               <span>
-                <span className="font-medium text-wil-600">{atOrBelow.length}</span>{' '}
+                <span className="font-medium text-fin-600">{atOrBelow.length}</span>{' '}
                 {atOrBelow.length === 1 ? 'categorie' : 'categorien'} op of onder NIBUD-niveau
               </span>
             </button>
@@ -265,8 +265,8 @@ function DetailRow({
   const userPct = (b.user_spending / maxAmount) * 100
   const refPct = (referenceAmount / maxAmount) * 100
 
-  let barColor = 'bg-wil-500'
-  let textColor = 'text-wil-600'
+  let barColor = 'bg-fin-500'
+  let textColor = 'text-fin-600'
   if (b.delta > 0) {
     const ratio = referenceAmount > 0 ? b.user_spending / referenceAmount : 2
     if (ratio > 1.3) {
@@ -296,7 +296,7 @@ function DetailRow({
             </span>
           )}
           {b.freedom_days_potential > 0 && (
-            <span className="rounded-full bg-wil-50 px-2 py-0.5 text-[10px] font-bold text-wil-700">
+            <span className="rounded-full bg-fin-50 px-2 py-0.5 text-[10px] font-bold text-fin-700">
               +{b.freedom_days_potential} dagen/jaar
             </span>
           )}
@@ -326,7 +326,7 @@ function DetailRow({
         <div className="mt-3">
           <a
             href={`/core/budgets?budget=${b.mapped_budget_id}`}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-ed)] px-2.5 py-1 text-xs font-medium text-[var(--ink-2)] transition-colors hover:border-wil-200 hover:bg-wil-50 hover:text-wil-700"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-ed)] px-2.5 py-1 text-xs font-medium text-[var(--ink-2)] transition-colors hover:border-fin-200 hover:bg-fin-50 hover:text-fin-700"
           >
             <ArrowRight className="h-3 w-3" />
             Bekijk budget

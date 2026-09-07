@@ -54,52 +54,75 @@
   --s2: 0 4px 24px rgba(26,25,22,.09), 0 1px 4px rgba(26,25,22,.05);
 
   /* Legacy module colors (kept for backward compat) */
-  --color-kern: #6b4339;
-  --color-kern-light: #f0e8e5;
-  --color-wil: #3d3048;
-  --color-wil-light: #ebe7ef;
-  --color-horizon: #c4a06b;
-  --color-horizon-light: #f7f0e4;
+  --color-kern: #427560;
+  --color-kern-light: #e6e9e7;
+  --color-wil: #885e47;
+  --color-wil-light: #eae7e6;
+  --color-horizon: #476d8c;
+  --color-horizon-light: #e6e8ea;
+  --color-fin: #3d3048;
+  --color-fin-light: #d6d5d7;
 
-  /* ── Module color palettes (overridden by user preferences) ── */
-  /* Kern: Bruin #6b4339 — aarde, stabiliteit, waarheid */
-  --color-kern-50: oklch(0.902 0.0036 34.7);
-  --color-kern-100: oklch(0.855 0.0088 34.7);
-  --color-kern-200: oklch(0.771 0.0175 34.7);
-  --color-kern-300: oklch(0.666 0.0311 34.7);
-  --color-kern-400: oklch(0.538 0.0467 34.7);
-  --color-kern-500: oklch(0.427 0.0584 34.7);
-  --color-kern-600: oklch(0.386 0.0649 34.7);
-  --color-kern-700: oklch(0.345 0.0571 34.7);
-  --color-kern-800: oklch(0.315 0.0474 34.7);
-  --color-kern-900: oklch(0.301 0.0383 34.7);
-  --color-kern-950: oklch(0.202 0.026 34.7);
+  /* ── Accent-paletten (overridden by user preferences) ──
+     Vier instelbare identiteits-accenten. De sleutels blijven kern/wil/horizon
+     (die namen dragen ook de AI-DNA, WidgetModule en NavModule — geen
+     kleur-scoped rename, besluit UR3-32); wat de gebruiker kiest is opnieuw
+     ingedeeld naar de hefboomfamilies. Alle vier zitten in de ACCENT-band
+     (C = 0,045-0,082) — bewust ontzadigd, zodat identiteit nooit met de
+     verzadigde stoplicht-status (C = 0,149-0,208) te verwarren is. */
+  /* Kern = Bezittingen: gedempt groen #427560 (emerald-familie, accentband) */
+  --color-kern-50: oklch(0.93 0.004 165.6);
+  --color-kern-100: oklch(0.89 0.0097 165.6);
+  --color-kern-200: oklch(0.82 0.0195 165.6);
+  --color-kern-300: oklch(0.73 0.0347 165.6);
+  --color-kern-400: oklch(0.617 0.052 165.6);
+  --color-kern-500: oklch(0.52 0.065 165.6);
+  --color-kern-600: oklch(0.465 0.0722 165.6);
+  --color-kern-700: oklch(0.409 0.0636 165.6);
+  --color-kern-800: oklch(0.364 0.0527 165.6);
+  --color-kern-900: oklch(0.336 0.0426 165.6);
+  --color-kern-950: oklch(0.23 0.0289 165.6);
 
-  /* Wil: Paars #3d3048 — daadkracht, intentie */
-  --color-wil-50: oklch(0.875 0.0027 308.8);
-  --color-wil-100: oklch(0.82 0.0067 308.8);
-  --color-wil-200: oklch(0.721 0.0134 308.8);
-  --color-wil-300: oklch(0.602 0.0238 308.8);
-  --color-wil-400: oklch(0.46 0.0357 308.8);
-  --color-wil-500: oklch(0.334 0.0446 308.8);
-  --color-wil-600: oklch(0.308 0.0496 308.8);
-  --color-wil-700: oklch(0.281 0.0436 308.8);
-  --color-wil-800: oklch(0.265 0.0362 308.8);
-  --color-wil-900: oklch(0.266 0.0293 308.8);
-  --color-wil-950: oklch(0.175 0.0198 308.8);
+  /* Wil = Schulden: gedempt terracotta #885e47 (amber-familie, accentband) */
+  --color-wil-50: oklch(0.931 0.004 49.5);
+  --color-wil-100: oklch(0.891 0.0098 49.5);
+  --color-wil-200: oklch(0.821 0.0195 49.5);
+  --color-wil-300: oklch(0.731 0.0347 49.5);
+  --color-wil-400: oklch(0.618 0.0521 49.5);
+  --color-wil-500: oklch(0.521 0.0651 49.5);
+  --color-wil-600: oklch(0.466 0.0723 49.5);
+  --color-wil-700: oklch(0.41 0.0637 49.5);
+  --color-wil-800: oklch(0.365 0.0528 49.5);
+  --color-wil-900: oklch(0.337 0.0427 49.5);
+  --color-wil-950: oklch(0.231 0.0289 49.5);
 
-  /* Horizon: Zandgoud #c4a06b — toekomst, licht */
-  --color-horizon-50: oklch(0.992 0.005 76.6);
-  --color-horizon-100: oklch(0.968 0.0123 76.6);
-  --color-horizon-200: oklch(0.93 0.0246 76.6);
-  --color-horizon-300: oklch(0.872 0.0437 76.6);
-  --color-horizon-400: oklch(0.791 0.0655 76.6);
-  --color-horizon-500: oklch(0.726 0.0819 76.6);
-  --color-horizon-600: oklch(0.639 0.091 76.6);
-  --color-horizon-700: oklch(0.551 0.08 76.6);
-  --color-horizon-800: oklch(0.474 0.0664 76.6);
-  --color-horizon-900: oklch(0.414 0.0537 76.6);
-  --color-horizon-950: oklch(0.292 0.0364 76.6);
+  /* Horizon = Budget: gedempt staalsblauw #476d8c (sky-familie, accentband) */
+  --color-horizon-50: oklch(0.93 0.004 244.1);
+  --color-horizon-100: oklch(0.89 0.0098 244.1);
+  --color-horizon-200: oklch(0.82 0.0197 244.1);
+  --color-horizon-300: oklch(0.73 0.0349 244.1);
+  --color-horizon-400: oklch(0.617 0.0524 244.1);
+  --color-horizon-500: oklch(0.519 0.0655 244.1);
+  --color-horizon-600: oklch(0.465 0.0728 244.1);
+  --color-horizon-700: oklch(0.409 0.0641 244.1);
+  --color-horizon-800: oklch(0.364 0.0531 244.1);
+  --color-horizon-900: oklch(0.336 0.0429 244.1);
+  --color-horizon-950: oklch(0.23 0.0291 244.1);
+
+  /* Fin: plum #3d3048 — Fins eigen accent (bubbel, chat-header, verzendknop,
+     /berichten en /nieuws). Fins avatar blijft driekleurig: linkeroog kern
+     (Bezittingen), rechteroog wil (Schulden), onderste stip horizon (Budget). */
+  --color-fin-50: oklch(0.875 0.0027 308.8);
+  --color-fin-100: oklch(0.82 0.0067 308.8);
+  --color-fin-200: oklch(0.721 0.0134 308.8);
+  --color-fin-300: oklch(0.602 0.0238 308.8);
+  --color-fin-400: oklch(0.46 0.0357 308.8);
+  --color-fin-500: oklch(0.334 0.0446 308.8);
+  --color-fin-600: oklch(0.308 0.0496 308.8);
+  --color-fin-700: oklch(0.281 0.0436 308.8);
+  --color-fin-800: oklch(0.265 0.0362 308.8);
+  --color-fin-900: oklch(0.266 0.0293 308.8);
+  --color-fin-950: oklch(0.175 0.0198 308.8);
 
   /* ── Legacy module-alias-tokens ──
      Historische shorthands die in ~25 componenten/charts worden gebruikt maar
@@ -191,9 +214,10 @@
 
   /* ── Module-active CSS-variabelen (default = ink-shades, override per route layout) ──
      Route-layouts overschrijven deze met hun module-shades volgens de huidige IA:
-       /overzicht                → kern   (amber)
-       /toekomst                 → horizon (paars)
-       /berichten /nieuws /mijn   → wil    (teal) — Fin & acties-domein
+       /overzicht                → kern    (Bezittingen — gedempt groen)
+       /toekomst                 → horizon (Budget — gedempt staalsblauw)
+       /mijn                     → wil     (Schulden — gedempt terracotta)
+       /berichten /nieuws        → fin     (Fins eigen accent — plum)
      Legacy backing-routes (/core, /will, /horizon) houden hun eigen module-accent.
      Overige cross-module-routes (/rapportages, /beheer, …) vallen terug op deze defaults.
      Uitzondering: --module-active-200 wordt gebruikt voor highlight-marker.
@@ -561,6 +585,18 @@
   --color-horizon-800: var(--color-horizon-800);
   --color-horizon-900: var(--color-horizon-900);
   --color-horizon-950: var(--color-horizon-950);
+
+  --color-fin-50: var(--color-fin-50);
+  --color-fin-100: var(--color-fin-100);
+  --color-fin-200: var(--color-fin-200);
+  --color-fin-300: var(--color-fin-300);
+  --color-fin-400: var(--color-fin-400);
+  --color-fin-500: var(--color-fin-500);
+  --color-fin-600: var(--color-fin-600);
+  --color-fin-700: var(--color-fin-700);
+  --color-fin-800: var(--color-fin-800);
+  --color-fin-900: var(--color-fin-900);
+  --color-fin-950: var(--color-fin-950);
 
   /* ── Budget color tokens ── */
   --color-income-50: var(--color-income-50);

@@ -58,7 +58,7 @@ function ComparisonCard({ data }: { data: Extract<VisualizationOutput, { kind: '
       {/* Conclusion */}
       {data.conclusion && (
         <div className="flex items-start gap-2 border-t border-[var(--border-ed)] px-3 py-2">
-          <ArrowRight className="mt-0.5 h-3 w-3 shrink-0 text-wil-500" />
+          <ArrowRight className="mt-0.5 h-3 w-3 shrink-0 text-fin-500" />
           <p className="text-[11px] leading-snug text-[var(--ink-2)]">
             {data.conclusion}
           </p>

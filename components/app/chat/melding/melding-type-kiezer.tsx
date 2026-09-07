@@ -47,9 +47,9 @@ export function MeldingTypeKiezer({ onKies }: { onKies: (type: MeldingType) => v
           key={type}
           type="button"
           onClick={() => onKies(type)}
-          className="group flex w-full items-center gap-3 border border-[var(--border-ed)] bg-[var(--paper)] px-3.5 py-3 text-left transition-all duration-150 hover:-translate-y-px hover:border-wil-300 hover:bg-wil-50/40 hover:shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-wil-500"
+          className="group flex w-full items-center gap-3 border border-[var(--border-ed)] bg-[var(--paper)] px-3.5 py-3 text-left transition-all duration-150 hover:-translate-y-px hover:border-fin-300 hover:bg-fin-50/40 hover:shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fin-500"
         >
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center border border-wil-200 bg-wil-50 text-wil-700">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center border border-fin-200 bg-fin-50 text-fin-700">
             <Icon className="h-4 w-4" aria-hidden="true" />
           </span>
           <span className="min-w-0 flex-1">
@@ -61,7 +61,7 @@ export function MeldingTypeKiezer({ onKies }: { onKies: (type: MeldingType) => v
             </span>
           </span>
           <ChevronRight
-            className="h-4 w-4 shrink-0 text-[var(--ink-4)] transition-colors group-hover:text-wil-600"
+            className="h-4 w-4 shrink-0 text-[var(--ink-4)] transition-colors group-hover:text-fin-600"
             aria-hidden="true"
           />
         </button>

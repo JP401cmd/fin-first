@@ -97,14 +97,25 @@ Volledig **gescand** — niets handmatig. `scanTableRelations` in `generate.mjs`
 ### Claude-team (curatie-gate)
 Subagents (`.claude/agents/*`) en skill-pijplijnen (`.claude/skills/*`) volgen hetzelfde principe: feiten gescand door `scanClaudeTeam()` in `generate.mjs` → `architecture.json.claudeTeam` (regenereer met `npm run arch:diagram`); betekenis gecureerd in `lib/architecture/development-model.ts` (`TEAM_GROUPS`/`AGENT_CURATION`/`SKILL_CURATION`). **Voeg je een agent of skill toe (of hernoem/verwijder je er één), deel 'm daar in** — `development-model.test.ts` wordt anders rood, en daarmee de CI (ADR 0066). Er is bewust **géén in-app venster** meer (besluit 02, aug 2026): de leesvorm is de **teamplaat op de org-site** (`trifinity-org/site/team.html`, bouwen met `node site/build.mjs`). Die plaat leest `docs/architecture/architecture.json` én parseert `lib/architecture/development-model.ts` letterlijk — beide bestanden blijven dus bestaan; alleen de route `/beheer/development` is weg. Dit is interne meta/naslag en hoort bewust NIET in de ArchiMate-topologie, HLD of Berekeningen.
 
-## Kleurconventie — module-accenten (verplicht bij UI-werk)
+## Kleurconventie — instelbare accenten (verplicht bij UI-werk)
 
-De gebruiker kiest op `/mijn/uiterlijk` drie accentkleuren: **kern** (=Overzicht), **wil** (=Will & acties), **horizon** (=Toekomst). Die werken door via CSS-vars (`--color-kern-50..950` etc., gezet door `ModuleColorProvider` + server-side in `app/(app)/layout.tsx`) en Tailwind v4 `@theme`-tokens. Regels:
+De gebruiker kiest op `/mijn/uiterlijk` **vier accentkleuren**. De DB-/CSS-sleutels blijven bewust `kern`/`wil`/`horizon` (die namen dragen óók de AI-DNA, de contextbouwers, `WidgetModule` en `NavModule` — een kleur-scoped rename zou het vocabulaire splitsen, besluit UR3-32); wat de gebruiker ziet is ingedeeld naar de hefbomen:
 
-- **Module-identiteit** (een element "hoort bij" Overzicht/Will/Toekomst) altijd via `kern-*`/`wil-*`/`horizon-*`-classes, `var(--color-<module>-*)` of route-breed via `--module-active-*` (override per route-layout: `/overzicht`=kern, `/toekomst`=horizon, `/berichten`+`/nieuws`+`/mijn`=wil). **Nooit** Tailwind-standaardkleuren (`emerald-*`, `violet-*`, `sky-*`, …) of losse hexen voor module-identiteit.
+| sleutel | wat de gebruiker kiest | kleurt |
+|---|---|---|
+| `kern` | **Bezittingen** | hefboom Bezittingen · route `/overzicht` · Fins **linkeroog** |
+| `wil` | **Schulden** | hefboom Schulden · route `/mijn` · Fins **rechteroog** |
+| `horizon` | **Budget** | hefboom Budget · route `/toekomst` · Fins **onderste stip** |
+| `fin` | **Fin** | Fins bubbel, chat-header en verzendknop · routes `/berichten` + `/nieuws` |
+
+Alle vier werken door via CSS-vars (`--color-kern-50..950`, `--color-fin-50..950` etc., gezet door `ModuleColorProvider` + server-side in `app/(app)/layout.tsx`) en Tailwind v4 `@theme`-tokens. Regels:
+
+- **Module-identiteit** altijd via `kern-*`/`wil-*`/`horizon-*`/`fin-*`-classes, `var(--color-<module>-*)` of route-breed via `--module-active-*` (override per route-layout: `/overzicht`=kern, `/toekomst`=horizon, `/mijn`=wil, `/berichten`+`/nieuws`=fin). **Nooit** Tailwind-standaardkleuren (`emerald-*`, `violet-*`, `sky-*`, …) of losse hexen voor module-identiteit — dat gold ook voor `HEFBOOM_CONFIG.tint`, dat tot UR3-32 de enige overtreding was en nu op accenttokens draait (bewaakt door `lib/hefboom-config.tint.test.ts`).
 - **Charts/canvas** die een echte hex nodig hebben: `useModuleHex()` uit `components/app/module-color-provider.tsx` — niet hardcoden.
-- **Semantiek blijft semantisch**: positief/negatief (`text-positive`/`text-negative`), stoplicht-status (op koers/aandacht/actie) en risico-rood volgen de accentkeuze NIET. Belasting-boxkleuren (`--color-box1/2/3-*`) en categorie-herkenningskleuren zijn eigen systemen.
-- Fase-kleuren (`--color-phase-*`) zijn bewust **niet** gebruikersinstelbaar (sovereignty = motivatie) maar wel als vars beschikbaar.
+- **Wél instelbaar naast de vier accenten**: de budget-type-tints (`--color-income/expense/savings/debt/other-*`) en de soevereiniteitsfase-kleuren (`--color-phase-*`). Fase-kleuren zijn sinds het besluit van 6 sep 2026 **wél** gebruikersinstelbaar; dat staat los van ADR 0001 (soevereiniteit blijft motivatie en geen gating — of de kleur naar smaak te zetten is, is een andere vraag). *Open vervolg:* de belasting-boxkleuren (`--color-box1/2/3-*`) moeten óók instelbaar worden, en fase- en boxkleuren hebben nog geen picker op `/mijn/uiterlijk` en geen sleutel in `PUT /api/appearance`.
+- **Semantiek blijft semantisch en is NOOIT instelbaar**: positief/negatief (`text-positive`/`text-negative`), stoplicht-status (op koers/aandacht/actie, `LEVERAGE_STATUS_DOT`) en risico-rood volgen de accentkeuze niet. Categorie-herkenningskleuren zijn een eigen systeem.
+- **Identiteit en status blijven te scheiden via CHROMA, niet via hue.** Gemeten: accenten zitten op C = 0,045–0,082, het stoplicht op C = 0,149–0,208. Een gedempt goud op 6,5° van amber-warn botst dus níet, terwijl een verzadigd emerald op 3,1° van "op koers"-groen wél botst. `accentClashesWithStatus(hex)` in `lib/color-palette.ts` toetst dat (hue binnen 20° van een statushue **én** C ≥ `ACCENT_CHROMA_MAX`) en **waarschuwt, blokkeert nooit** — zelfde lijn als de WCAG-hint. Elke nieuwe voorkeuze-swatch moet `'ok'` geven; geborgd in `lib/color-palette.accent-status.test.ts` en `components/mijn/module-accent-picker.test.tsx`.
+- **Fins avatar blijft driekleurig** en die drie kleuren zijn de drie hefboom-accenten (`components/app/fin-dots.tsx`, geborgd in `fin-dots.accent-slots.test.ts`). Fins eigen accent kleurt alléén zijn omtrek. Verander die toewijzing niet zonder besluit.
 
 Achtergrond + actieplan: `docs/accentkleuren-actieplan.md`.
 
