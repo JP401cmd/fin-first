@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-07T12:49:16.173Z",
+  "generatedAt": "2026-09-07T21:37:26.517Z",
   "generatedDate": "2026-09-07",
   "repo": {
     "name": "fin",
@@ -187,13 +187,13 @@
     }
   },
   "stats": {
-    "routes": 140,
-    "routesProduction": 97,
+    "routes": 134,
+    "routesProduction": 91,
     "api": 309,
     "tables": 94,
     "migrations": 231,
     "integrations": 25,
-    "components": 1062,
+    "components": 1073,
     "providers": 17,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -491,12 +491,6 @@
       "isTest": false
     },
     {
-      "url": "/core",
-      "file": "app/(app)/core/page.tsx",
-      "group": "kern",
-      "isTest": false
-    },
-    {
       "url": "/core/assets",
       "file": "app/(app)/core/assets/page.tsx",
       "group": "kern",
@@ -547,18 +541,6 @@
     {
       "url": "/core/assets/revalue",
       "file": "app/(app)/core/assets/revalue/page.tsx",
-      "group": "kern",
-      "isTest": false
-    },
-    {
-      "url": "/core/belasting",
-      "file": "app/(app)/core/belasting/page.tsx",
-      "group": "kern",
-      "isTest": false
-    },
-    {
-      "url": "/core/budgets",
-      "file": "app/(app)/core/budgets/page.tsx",
       "group": "kern",
       "isTest": false
     },
@@ -659,20 +641,8 @@
       "isTest": false
     },
     {
-      "url": "/horizon",
-      "file": "app/(app)/horizon/page.tsx",
-      "group": "horizon",
-      "isTest": false
-    },
-    {
       "url": "/horizon/inflatie-koopkracht",
       "file": "app/(app)/horizon/inflatie-koopkracht/page.tsx",
-      "group": "horizon",
-      "isTest": false
-    },
-    {
-      "url": "/horizon/samengestelde-interest",
-      "file": "app/(app)/horizon/samengestelde-interest/page.tsx",
       "group": "horizon",
       "isTest": false
     },
@@ -1003,12 +973,6 @@
     {
       "url": "/toekomst/rekenhulp",
       "file": "app/(app)/toekomst/rekenhulp/page.tsx",
-      "group": "horizon",
-      "isTest": false
-    },
-    {
-      "url": "/toekomst/samengestelde-interest",
-      "file": "app/(app)/toekomst/samengestelde-interest/page.tsx",
       "group": "horizon",
       "isTest": false
     },
@@ -1576,12 +1540,6 @@
     ],
     "kern": [
       {
-        "url": "/core",
-        "file": "app/(app)/core/page.tsx",
-        "group": "kern",
-        "isTest": false
-      },
-      {
         "url": "/core/assets",
         "file": "app/(app)/core/assets/page.tsx",
         "group": "kern",
@@ -1632,18 +1590,6 @@
       {
         "url": "/core/assets/revalue",
         "file": "app/(app)/core/assets/revalue/page.tsx",
-        "group": "kern",
-        "isTest": false
-      },
-      {
-        "url": "/core/belasting",
-        "file": "app/(app)/core/belasting/page.tsx",
-        "group": "kern",
-        "isTest": false
-      },
-      {
-        "url": "/core/budgets",
-        "file": "app/(app)/core/budgets/page.tsx",
         "group": "kern",
         "isTest": false
       },
@@ -1716,20 +1662,8 @@
     ],
     "horizon": [
       {
-        "url": "/horizon",
-        "file": "app/(app)/horizon/page.tsx",
-        "group": "horizon",
-        "isTest": false
-      },
-      {
         "url": "/horizon/inflatie-koopkracht",
         "file": "app/(app)/horizon/inflatie-koopkracht/page.tsx",
-        "group": "horizon",
-        "isTest": false
-      },
-      {
-        "url": "/horizon/samengestelde-interest",
-        "file": "app/(app)/horizon/samengestelde-interest/page.tsx",
         "group": "horizon",
         "isTest": false
       },
@@ -1772,12 +1706,6 @@
       {
         "url": "/toekomst/rekenhulp",
         "file": "app/(app)/toekomst/rekenhulp/page.tsx",
-        "group": "horizon",
-        "isTest": false
-      },
-      {
-        "url": "/toekomst/samengestelde-interest",
-        "file": "app/(app)/toekomst/samengestelde-interest/page.tsx",
         "group": "horizon",
         "isTest": false
       },
@@ -8790,11 +8718,11 @@
     }
   ],
   "components": {
-    "total": 1062,
+    "total": 1073,
     "groups": [
       {
         "group": "app",
-        "count": 419,
+        "count": 420,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -8897,7 +8825,6 @@
           "coach-melding.test",
           "collapsible-section",
           "color-picker-card",
-          "compound-interest-chart",
           "concept-snijpunt",
           "concept-terugrekening",
           "confirm-destructive",
@@ -9089,6 +9016,7 @@
           "phase-modal-onttrekking",
           "phase-modal-opbouw",
           "phase-modal-overgang",
+          "phase-modal-vrijheidsdagen.test",
           "pill-row",
           "pill-row.test",
           "platform-banner",
@@ -9127,8 +9055,10 @@
           "shell-overlay.request-close.test",
           "shell-overlay.suspended.test",
           "sidebar",
+          "sidebar.a11y.test",
           "sidebar.eenvoudig.test",
           "sidebar.naamgeving.test",
+          "sidebar.versheidsstip.test",
           "sim-chart",
           "sim-chart-widget",
           "sim-chart-widget.canonieke-koers.test",
@@ -9143,10 +9073,9 @@
           "sorr-analyse",
           "spaarquote-gevoeligheid",
           "spending-confidence-indicator",
+          "stale-data-guard",
           "stale-notice-provider",
           "stale-notice-provider.test",
-          "stale-transactions-banner",
-          "stale-transactions-banner.test",
           "stale-transactions-notice",
           "step-choice",
           "step-details",
@@ -9219,7 +9148,7 @@
       },
       {
         "group": "overview",
-        "count": 194,
+        "count": 205,
         "items": [
           "aandachtspunt-actie-button",
           "atomic-cards",
@@ -9234,6 +9163,8 @@
           "box1-eigen-woning",
           "box1-gross-income-editor",
           "box1-heffingskortingen",
+          "box1-kost-zin",
+          "box1-kost-zin.test",
           "box1-marginale-curve-card",
           "box1-waterfall",
           "box2-detail",
@@ -9243,9 +9174,12 @@
           "box2-gecombineerde-druk",
           "box2-gecombineerde-druk.test",
           "box2-leengrens",
+          "box2-schijf-zin",
+          "box2-schijf-zin.test",
           "box3-detail",
           "box3-detail.test",
           "box3-heffingsvrij",
+          "box3-heffingsvrij.eenvoudig.test",
           "box3-mix",
           "box3-opbouw",
           "box3-partner-slider",
@@ -9299,6 +9233,7 @@
           "geldstroom-gauge",
           "geldstroom-gauge.test",
           "geldstroom-kassabonnen",
+          "geldstroom-kassabonnen.saldo-spaarquote.test",
           "geldstroom-kassabonnen.test",
           "gepaarde-staven",
           "grootste-uitgaven",
@@ -9388,9 +9323,12 @@
           "te-bespreken-section.test",
           "tips-acties-page",
           "tips-lijst",
+          "tips-lijst.ai-storing.test",
           "tips-lijst.test",
           "tips-teaser",
           "top-tegenpartijen",
+          "totale-druk-kassabon",
+          "totale-druk-kassabon.test",
           "transactie-detail-sheet",
           "transactie-tijdlijn",
           "transactie-tijdlijn.test",
@@ -9408,6 +9346,8 @@
           "vaste-lasten-loader",
           "vaste-lasten-loader.test",
           "verdeling-staaf",
+          "vermogen-kassabon",
+          "vermogen-kassabon.test",
           "voortgang-doelen-card",
           "voortgang-doelen-card.test",
           "vrijheid-strip",
@@ -9419,7 +9359,7 @@
       },
       {
         "group": "widgets",
-        "count": 97,
+        "count": 98,
         "items": [
           "abonnementen-widget",
           "acties-widget",
@@ -9473,6 +9413,7 @@
           "levensgebeurtenissen-widget",
           "maandoverzicht-widget",
           "meldingen-widget",
+          "meldingen-widget.tijdstempel.test",
           "monte-carlo-widget",
           "monte-carlo-widget.test",
           "netto-vermogen-widget",
@@ -9522,7 +9463,7 @@
       },
       {
         "group": "core",
-        "count": 81,
+        "count": 79,
         "items": [
           "account-source-icon",
           "account-source-icon.test",
@@ -9549,9 +9490,7 @@
           "category-tabs",
           "category-tabs.test",
           "connection-indicator",
-          "core-hero",
           "core-kengetallen",
-          "core-landing",
           "crypto-allocation-chart",
           "crypto-distribution-panel",
           "crypto-heatmap",
@@ -17336,19 +17275,19 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 75
+        "commits": 78
       },
       {
         "path": "lib/ai",
-        "commits": 50
+        "commits": 53
       },
       {
         "path": "app/(app)/toekomst",
-        "commits": 34
+        "commits": 35
       },
       {
         "path": "app/api/ai",
-        "commits": 18
+        "commits": 19
       },
       {
         "path": "app/api/household",
@@ -17378,28 +17317,28 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 10187,
-        "commits": 79
+        "loc": 10217,
+        "commits": 83
       },
       {
         "file": "components/app/budgets-client.tsx",
-        "loc": 5614,
-        "commits": 34
+        "loc": 5630,
+        "commits": 35
       },
       {
         "file": "components/core/assets-client.tsx",
-        "loc": 4966,
-        "commits": 36
+        "loc": 5013,
+        "commits": 38
       },
       {
         "file": "components/app/cash-account-view.tsx",
         "loc": 3698,
-        "commits": 24
+        "commits": 23
       },
       {
         "file": "lib/dashboard-data-loader.ts",
-        "loc": 3089,
-        "commits": 62
+        "loc": 3093,
+        "commits": 63
       },
       {
         "file": "lib/release-notes.ts",
@@ -17409,12 +17348,12 @@
       {
         "file": "app/(app)/core/cash/import/page.tsx",
         "loc": 2436,
-        "commits": 20
+        "commits": 19
       },
       {
         "file": "app/(app)/core/checkin/page.tsx",
-        "loc": 2387,
-        "commits": 13
+        "loc": 2402,
+        "commits": 14
       }
     ]
   },
@@ -18560,27 +18499,25 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-09-06",
+    "previousDate": "2026-09-07",
     "hasChanges": true,
     "sections": [
       {
         "label": "Schermen",
-        "added": [
-          "/overzicht/budget/instellingen"
-        ],
-        "removed": []
-      },
-      {
-        "label": "Integratie-clients",
-        "added": [
-          "lib/parsers/degiro-corporate-actions.ts"
-        ],
-        "removed": []
+        "added": [],
+        "removed": [
+          "/core",
+          "/core/belasting",
+          "/core/budgets",
+          "/horizon",
+          "/horizon/samengestelde-interest",
+          "/toekomst/samengestelde-interest"
+        ]
       },
       {
         "label": "Componenten (aantal)",
         "added": [
-          "+2"
+          "+11"
         ],
         "removed": []
       }
@@ -18954,9 +18891,9 @@
     {
       "date": "2026-09-07",
       "api": 309,
-      "components": 1062,
+      "components": 1073,
       "tables": 94,
-      "routesProduction": 97
+      "routesProduction": 91
     }
   ]
 }

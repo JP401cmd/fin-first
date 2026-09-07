@@ -949,3 +949,8 @@
 - **Schermen** toegevoegd: /overzicht/budget/instellingen
 - **Integratie-clients** toegevoegd: lib/parsers/degiro-corporate-actions.ts
 - **Componenten (aantal)** toegevoegd: +2
+
+## 2026-09-07
+
+- **Schermen** verwijderd: /core, /core/belasting, /core/budgets, /horizon, /horizon/samengestelde-interest, /toekomst/samengestelde-interest
+- **Componenten (aantal)** toegevoegd: +11
