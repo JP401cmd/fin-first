@@ -37,3 +37,21 @@ describe('Masthead — hideEdition (NWS-1)', () => {
     expect(screen.getByText('3 ongelezen')).toBeInTheDocument()
   })
 })
+
+/**
+ * ADR 0110 — binnen de app-shell draagt `mobile-stack-shell.tsx` de enige
+ * <h1> (de sr-only paginanaam). Deze masthead rendert op /berichten, /nieuws
+ * en het nieuwsarchief, allemaal ín die shell; hij droeg daar een tweede
+ * <h1> ("TriFinity ."), dezelfde klasse als UR3-17 #26 op de check-in.
+ * De gate `npm run check:headings` vangt een terugval ook, maar die kijkt naar
+ * de bronregel — deze toets kijkt naar wat er werkelijk gerenderd wordt.
+ */
+describe('Masthead — koppenconventie (ADR 0110)', () => {
+  afterEach(cleanup)
+
+  it('rendert de wordmark als h2, niet als h1', () => {
+    render(<Masthead editionNr={12} jaargang={2} />)
+    expect(screen.queryByRole('heading', { level: 1 })).toBeNull()
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('TriFinity')
+  })
+})

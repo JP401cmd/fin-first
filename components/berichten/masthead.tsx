@@ -97,13 +97,19 @@ export function Masthead({ editionNr, jaargang, dateline, metaLeft, articleCount
           Persoonlijk financieel overzicht
         </span>
       </div>
-      <h1
+      {/* Pagina-aanhef is een <h2>, GÉÉN <h1> (ADR 0110): binnen de app-shell
+          draagt `mobile-stack-shell.tsx` de enige h1 (de sr-only paginanaam).
+          Deze masthead rendert op /berichten, /nieuws en het nieuwsarchief —
+          allemaal ín de shell — dus stonden daar twee h1's op één route,
+          dezelfde klasse als #26 op de check-in. Alleen het niveau wijzigt;
+          de krant-typografie blijft ongemoeid. */}
+      <h2
         className="mt-2 text-center text-3xl font-black italic tracking-[-0.025em] sm:text-4xl md:text-[2.75rem]"
         style={{ fontFamily: 'var(--font-playfair, serif)' }}
       >
         TriFinity{' '}
         <span style={{ color: 'var(--color-horizon-500)' }}>.</span>
-      </h1>
+      </h2>
       <p
         className="mt-1.5 text-center italic text-sm text-[var(--ink-2)]"
         style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}

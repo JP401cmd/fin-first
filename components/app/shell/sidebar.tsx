@@ -35,6 +35,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { EuroViewBadge } from '@/components/app/shell/euro-view-badge'
+import { TAP_TARGET_ROW_MIN } from '@/components/editorial/tap-target'
 import { useIsLgUp } from '@/lib/hooks/use-media-query'
 import { useModuleAccess } from '@/components/app/feature-access-provider'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
@@ -187,7 +188,9 @@ const MODULES: ModuleEntry[] = [
         children: [
           { label: 'Transacties', href: '/overzicht/budget/transacties' },
           { label: 'Vaste lasten', href: '/overzicht/budget/vaste-lasten' },
-          { label: 'Forecast', href: '/overzicht/budget/forecast' },
+          // "Vooruitblik" — leenwoord hernoemd aan de bron (UR3-13 F2, optie C);
+          // spiegelt lib/nav-config.ts. De URL blijft /…/forecast.
+          { label: 'Vooruitblik', href: '/overzicht/budget/forecast' },
         ],
       },
       {
@@ -245,23 +248,69 @@ const MODULES: ModuleEntry[] = [
   },
 ]
 
+/**
+ * Welke bron de freshness-dot van een "overige"-rij voedt. Dit is een STABIELE
+ * SLEUTEL op de entry zelf — bewust géén vergelijking op `entry.label`.
+ *
+ * Waarom: de dot van de Krant-rij was drie weken dood. De rij heette op 28 aug
+ * (6c49f5cbc) "Nieuws" → "Krant", maar de dot-dispatch matchte nog op de
+ * letterlijke tekst 'Nieuws'. `useNewsUnread` bleef draaien, het resultaat werd
+ * weggegooid en het aria-label bleef leeg — stil, want een niet-matchende
+ * if-tak faalt nergens. Copy is geen sleutel: elke hernoeming (er staat er nog
+ * één aan te komen) breekt zo'n koppeling opnieuw, en altijd geruisloos.
+ *
+ * De sleutel reist daarom mét de entry mee. Voeg je een rij toe, dan dwingt het
+ * type een keuze af, en de switch in `OverigeRow` is exhaustief (never-check).
+ */
+type OverigeSignal = 'tips' | 'berichten' | 'nieuws' | 'geen'
+
 type OverigeEntry = {
+  /** Stabiele sleutel voor de dot-dispatch — nooit het zichtbare label. */
+  signal: OverigeSignal
   label: string
   Icon: LucideIcon
   href: string
+  /** Aria-/title-tekst van de dot, actief en inactief. */
+  freshness: FreshnessLabels
 }
 
 const OVERIGE_BASE: OverigeEntry[] = [
   // Tips & acties — de Fin-stroom (briefing-vervolg) als vaste ingang.
   // Zap = de actie-helft van "tips & acties" (zie guide-naslagwerk).
-  { label: 'Tips & acties', Icon: Zap, href: '/overzicht/tips' },
-  { label: 'Berichten', Icon: Inbox, href: '/berichten' },
+  {
+    signal: 'tips',
+    label: 'Tips & acties',
+    Icon: Zap,
+    href: '/overzicht/tips',
+    freshness: { on: 'Er zijn tips of acties', off: 'Geen openstaande acties' },
+  },
+  {
+    signal: 'berichten',
+    label: 'Berichten',
+    Icon: Inbox,
+    href: '/berichten',
+    freshness: { on: 'Ongelezen berichten', off: 'Geen nieuwe berichten' },
+  },
   // "Krant", niet "Nieuws". `lib/nav-config.ts` (globalNav) is de canonieke IA
   // en de pagina zelf zet `<NavStackMeta title="Krant">`; deze zijbalk hield
   // een eigen label aan en dreef daarmee weg (bevinding M14). Eén naam per
-  // concept — de zijbalk volgt de nav-config, niet andersom.
-  { label: 'Krant', Icon: Newspaper, href: '/nieuws' },
-  { label: 'Rapportages', Icon: BarChart3, href: '/rapportages' },
+  // concept — de zijbalk volgt de nav-config, niet andersom. Ook de dot-teksten
+  // zeggen "krant": een screenreader hoort anders een naam die nergens staat.
+  {
+    signal: 'nieuws',
+    label: 'Krant',
+    Icon: Newspaper,
+    href: '/nieuws',
+    freshness: { on: 'Ongelezen krant', off: 'Krant gelezen' },
+  },
+  // Rapportages heeft geen signaal: altijd grijs (zelf te genereren).
+  {
+    signal: 'geen',
+    label: 'Rapportages',
+    Icon: BarChart3,
+    href: '/rapportages',
+    freshness: { on: 'Rapportages op aanvraag', off: 'Rapportages op aanvraag' },
+  },
 ]
 
 type FooterLink = {
@@ -961,7 +1010,11 @@ function SubTagStrip({
           <div key={tag.href} className="flex flex-col">
             <Link
               href={tag.href}
-              className={`flex items-center gap-2 py-0.5 ${linkHoverClass} transition-colors duration-150`}
+              // UR3-20/B: py-0.5 gaf ~20px rijen, onder de WCAG 2.5.8-AA-vloer
+              // van 24px. TAP_TARGET_ROW_MIN tilt de rij zelf op (geen
+              // ::after-oprekking — die zou in deze verticale stack de
+              // raakgebieden van buren laten overlappen).
+              className={`flex items-center gap-2 py-1 ${TAP_TARGET_ROW_MIN} ${linkHoverClass} transition-colors duration-150`}
               title={
                 entry
                   ? `${tag.label}: ${leverStatusLabel(entry.status)} — ${entry.detail}`
@@ -1071,7 +1124,8 @@ function SubTagChildLink({
     <Link
       href={child.href}
       aria-current={active ? 'page' : undefined}
-      className={`flex items-center gap-2 py-0.5 transition-colors duration-150 ${
+      // UR3-20/B — zie SubTagStrip: rij zelf naar de 24px-vloer.
+      className={`flex items-center gap-2 py-1 ${TAP_TARGET_ROW_MIN} transition-colors duration-150 ${
         active ? 'text-[var(--ink)] font-medium' : `text-[var(--ink-3)] ${linkHoverClass}`
       }`}
     >
@@ -1139,7 +1193,8 @@ function AppTagStrip({
               key={app.href}
               href={app.href}
               aria-current={active ? 'page' : undefined}
-              className={`flex items-center gap-2 py-0.5 transition-colors duration-150 ${
+              // UR3-20/B — zie SubTagStrip: rij zelf naar de 24px-vloer.
+              className={`flex items-center gap-2 py-1 ${TAP_TARGET_ROW_MIN} transition-colors duration-150 ${
                 active ? 'text-[var(--ink)] font-medium' : linkHoverClass
               }`}
             >
@@ -1181,7 +1236,7 @@ function OverigeSection({
       <div className="flex flex-col">
         {OVERIGE_BASE.map((entry) => (
           <OverigeRow
-            key={entry.label}
+            key={entry.signal}
             entry={entry}
             collapsed={collapsed}
             sidebarSignals={sidebarSignals}
@@ -1226,32 +1281,33 @@ function OverigeRow({
   const { unreadCount } = useNotifications()
 
   // Bepaal per rij: numerieke badge (alleen Berichten) + freshness-dot.
-  const isBerichten = entry.label === 'Berichten'
+  // Dispatch loopt op `entry.signal` (stabiele sleutel), niet op het label.
+  const isBerichten = entry.signal === 'berichten'
   const badge = isBerichten && unreadCount > 0 ? `· ${unreadCount}` : null
 
-  // Freshness-dot per surface. Tips & acties + Berichten + Nieuws zijn live;
-  // Rapportages is altijd grijs (zelf te genereren — geen signaal).
-  let dotActive = false
-  let dotLabelOn = ''
-  let dotLabelOff = ''
-  if (entry.label === 'Tips & acties') {
-    dotActive = sidebarSignals?.tipsActions ?? false
-    dotLabelOn = 'Er zijn tips of acties'
-    dotLabelOff = 'Geen openstaande acties'
-  } else if (isBerichten) {
-    dotActive = unreadCount > 0
-    dotLabelOn = 'Ongelezen berichten'
-    dotLabelOff = 'Geen nieuwe berichten'
-  } else if (entry.label === 'Nieuws') {
-    dotActive = newsUnread
-    dotLabelOn = 'Ongelezen nieuws'
-    dotLabelOff = 'Nieuws gelezen'
-  } else if (entry.label === 'Rapportages') {
-    dotActive = false
-    dotLabelOn = 'Rapportages op aanvraag'
-    dotLabelOff = 'Rapportages op aanvraag'
+  // Freshness-dot per surface. Tips & acties + Berichten + Krant zijn live;
+  // Rapportages is altijd grijs (zelf te genereren — geen signaal). De switch is
+  // exhaustief: een nieuw signaal zonder bron is een compile-fout, geen dode dot.
+  let dotActive: boolean
+  switch (entry.signal) {
+    case 'tips':
+      dotActive = sidebarSignals?.tipsActions ?? false
+      break
+    case 'berichten':
+      dotActive = unreadCount > 0
+      break
+    case 'nieuws':
+      dotActive = newsUnread
+      break
+    case 'geen':
+      dotActive = false
+      break
+    default: {
+      const onbekend: never = entry.signal
+      throw new Error(`Onbekend overige-signaal: ${String(onbekend)}`)
+    }
   }
-  const dotLabel = dotActive ? dotLabelOn : dotLabelOff
+  const dotLabel = dotActive ? entry.freshness.on : entry.freshness.off
 
   if (collapsed) {
     // Collapsed: alleen icoon + (voor Berichten) numerieke badge. Freshness-
@@ -1377,12 +1433,26 @@ function FooterSection({
   return (
     <>
       <div className="border-t border-[var(--border-ed)] px-2 py-3">
+        {/*
+          GEEN aria-label hier (UR3-20/A): een aria-label VERVANGT de berekende
+          naam, dus "Account-menu" wiste de zichtbare `{userName}` uit de
+          toegankelijke naam — WCAG 2.5.3 (Label in Name) faalde daardoor op
+          vrijwel elke desktop-route, en spraakbediening kon de link niet vinden
+          op wat er staat. Het label was bovendien feitelijk onjuist: dit is een
+          navigatielink naar /mijn, geen menu-trigger. De initialen zijn puur
+          decoratief (de naam staat er leesbaar naast) en gaan daarom
+          aria-hidden, zodat de berekende naam exact de zichtbare naam is.
+          De collapsed-variant hierboven houdt zijn aria-label wél: daar is
+          geen zichtbare naamtekst, dus geen tegenspraak.
+        */}
         <Link
           href="/mijn"
           className="flex items-center gap-2.5 w-full px-2 h-10 hover:bg-[var(--subtle)]/50 transition-colors duration-150"
-          aria-label="Account-menu"
         >
-          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--ink)] text-[10px] font-bold text-[var(--paper)]">
+          <span
+            aria-hidden
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--ink)] text-[10px] font-bold text-[var(--paper)]"
+          >
             {userInitials}
           </span>
           <span className="flex-1 text-left text-[13px] font-medium text-[var(--ink-2)] truncate">

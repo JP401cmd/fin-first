@@ -100,11 +100,9 @@ const RESIDUE_ENTRIES = [
   'app/(app)/core/assets/holdings/[id]/not-found.tsx',
   'app/(app)/core/assets/holdings/[id]/page.tsx',
   'app/(app)/core/assets/investment/[holdingId]/page.tsx',
-  'app/(app)/core/belasting/page.tsx',
   'app/(app)/core/cash/connect/page.tsx',
   'app/(app)/core/cash/connect/success/page.tsx',
   'app/(app)/core/debts/[type]/page.tsx',
-  'app/(app)/core/page.tsx',
   'app/(app)/rapportages/[id]/components/report-masthead.tsx',
   'app/(app)/rapportages/balans/page.tsx',
   'app/(app)/rapportages/benchmark/page.tsx',
@@ -115,8 +113,6 @@ const RESIDUE_ENTRIES = [
   'components/app/cash-account-view.tsx',
   'components/app/horizon/horizon-client.tsx',
   'components/app/horizon/whatif-header.tsx',
-  'components/berichten/masthead.tsx',
-  'components/core/core-landing.tsx',
   'components/mijn/local-chat-panel.tsx',
 ]
 

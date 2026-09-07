@@ -38,6 +38,25 @@ interface CategoryTabsProps {
    * In "Volledig" verandert er niets; zonder deze prop ook niet.
    */
   simpleBaseTabKey?: string
+  /**
+   * ARIA-patroon van de strip (UR3-20/D1). Default `'tabs'` — de klassieke
+   * WAI-ARIA tabs-widget met `aria-controls` naar een `role="tabpanel"`.
+   *
+   * Kies `'radiogroup'` wanneer de strip géén paneel wisselt maar een FILTER
+   * is op content die eronder blijft staan (de periode-keuze op de
+   * transactiepagina). Die gebruikte de tabs-variant zonder ooit een
+   * tabpanel te renderen, waardoor elke `aria-controls` naar een spookpaneel
+   * wees (axe `aria-valid-attr-value`). Een radiogroup belooft geen paneel:
+   * de knoppen worden `role="radio"` + `aria-checked`, zónder `aria-controls`.
+   * Het uiterlijk en de pijltjes-navigatie blijven identiek — roving tabindex
+   * met pijltoetsen is óók het WAI-ARIA-patroon voor een radiogroup.
+   */
+  pattern?: 'tabs' | 'radiogroup'
+  /**
+   * Toegankelijke naam van de strip. Verplicht bij `pattern="radiogroup"`:
+   * een radiogroup zonder naam kondigt zich als een naamloze groep aan.
+   */
+  label?: string
 }
 
 // ── Component ────────────────────────────────────────────────
@@ -64,7 +83,10 @@ export function CategoryTabs({
   onChange,
   className = '',
   simpleBaseTabKey,
+  pattern = 'tabs',
+  label,
 }: CategoryTabsProps) {
+  const isRadioGroup = pattern === 'radiogroup'
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([])
   // Single source of truth voor de modus (geen prop-drilling van de rauwe
   // waarde) — zie use-display-mode.tsx / ADR 0026.
@@ -125,8 +147,9 @@ export function CategoryTabs({
 
   return (
     <div
-      role="tablist"
+      role={isRadioGroup ? 'radiogroup' : 'tablist'}
       aria-orientation="horizontal"
+      aria-label={label}
       className={[
         'flex items-end gap-2 border-b border-[var(--border-ed)]',
         className,
@@ -143,10 +166,13 @@ export function CategoryTabs({
               tabRefs.current[index] = node
             }}
             type="button"
-            role="tab"
+            role={isRadioGroup ? 'radio' : 'tab'}
             id={`category-tab-${tab.key}`}
-            aria-selected={isActive}
-            aria-controls={`category-tabpanel-${tab.key}`}
+            aria-selected={isRadioGroup ? undefined : isActive}
+            aria-checked={isRadioGroup ? isActive : undefined}
+            // Alleen de tabs-variant belooft een paneel; een radiogroup filtert
+            // content die er sowieso staat en mag dus niets "controlen".
+            aria-controls={isRadioGroup ? undefined : `category-tabpanel-${tab.key}`}
             tabIndex={isActive ? 0 : -1}
             onClick={() => onChange(tab.key)}
             onKeyDown={(event) => handleKeyDown(event, index)}

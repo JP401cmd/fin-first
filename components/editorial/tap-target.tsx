@@ -70,6 +70,24 @@ export const TAP_TARGET_EXTEND =
 export const TAP_TARGET_EXTEND_BLOCK =
   "relative after:absolute after:left-1/2 after:top-1/2 after:h-full after:w-full after:min-h-[44px] after:-translate-x-1/2 after:-translate-y-1/2 after:content-['']"
 
+/**
+ * De WCAG 2.5.8-AA-ondergrens (24×24) voor een rij in een DICHTE VERTICALE
+ * lijst — de uitgeklapte sidebar-subnavigatie en de kompas-rijen (UR3-20/B).
+ *
+ * Waarom hier geen `extend`/`extend-block`: die modi rekken het raakgebied op
+ * met een `::after` die BUITEN de doos steekt. In een horizontale balk is dat
+ * onschuldig, maar in een verticale stack met ~20px rijpitch overlappen de
+ * opgerekte gebieden van buren elkaar en wint de later geschilderde buur —
+ * dan opent een klik op rij N ineens rij N+1. Voor een verticale lijst is de
+ * enige veilige oplossing dat de rij ZELF hoog genoeg wordt (de `reserve`-
+ * gedachte), alleen op de 24px-vloer i.p.v. 44px: de sidebar is een dichte,
+ * altijd zichtbare navigatiekolom waar 44px per rij de lijst onbruikbaar lang
+ * maakt. 24px is exact wat WCAG 2.5.8 AA (en het acceptatiecriterium) vraagt.
+ *
+ * Combineer met `flex items-center` zodat de tekst gecentreerd blijft.
+ */
+export const TAP_TARGET_ROW_MIN = 'min-h-[24px]'
+
 /** De class-string voor een hit-modus — voor markup die geen `<TapTarget>` kan zijn. */
 export function tapTargetClass(hit: TapTargetHit = 'reserve'): string {
   if (hit === 'extend') return TAP_TARGET_EXTEND

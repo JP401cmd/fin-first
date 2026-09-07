@@ -37,13 +37,13 @@ function renderSelector(mode: DisplayMode, period: PeriodKind = '30d') {
 describe('PeriodeSelector — periodetabs per weergavemodus', () => {
   it('toont in Volledig alle vier de periodes', () => {
     renderSelector('full')
-    const tabs = screen.getAllByRole('tab')
+    const tabs = screen.getAllByRole('radio')
     expect(tabs.map((t) => t.textContent)).toEqual(['30 dagen', 'Maand', 'Kwartaal', 'Jaar'])
   })
 
   it('toont in Eenvoudig "30 dagen", "Maand" en "Jaar" — alleen kwartaal ontbreekt', () => {
     renderSelector('simple')
-    const tabs = screen.getAllByRole('tab')
+    const tabs = screen.getAllByRole('radio')
     expect(tabs).toHaveLength(3)
     expect(tabs.map((t) => t.textContent)).toEqual(['30 dagen', 'Maand', 'Jaar'])
   })
@@ -54,8 +54,8 @@ describe('PeriodeSelector — periodetabs per weergavemodus', () => {
     // ook als actieve tab kunnen staan (geen stille terugval naar 30 dagen).
     renderSelector('simple', 'month')
     const active = screen
-      .getAllByRole('tab')
-      .filter((t) => t.getAttribute('aria-selected') === 'true')
+      .getAllByRole('radio')
+      .filter((t) => t.getAttribute('aria-checked') === 'true')
     expect(active).toHaveLength(1)
     expect(active[0].textContent).toBe('Maand')
   })
@@ -83,8 +83,37 @@ describe('resolvePeriodForMode — terugval zonder lege staat', () => {
     // De strip mag nooit zonder actieve tab staan: elke terugval landt op een
     // key die de gefilterde tab-lijst daadwerkelijk rendert.
     renderSelector('simple', resolvePeriodForMode('quarter', 'simple'))
-    const active = screen.getAllByRole('tab').filter((t) => t.getAttribute('aria-selected') === 'true')
+    const active = screen.getAllByRole('radio').filter((t) => t.getAttribute('aria-checked') === 'true')
     expect(active).toHaveLength(1)
     expect(active[0].textContent).toBe('30 dagen')
+  })
+})
+
+/**
+ * UR3-20/D1 — de periode-strip beloofde een paneel dat niet bestond.
+ *
+ * `CategoryTabs` is een correcte WAI-ARIA tabs-widget: elke `role="tab"` wijst
+ * met `aria-controls` naar `category-tabpanel-<key>`. De periode-keuze
+ * hergebruikte die widget zonder ooit zo'n paneel te renderen — de rij eronder
+ * is een kale div/p. Elke verwijzing wees dus naar een spookpaneel (axe
+ * `aria-valid-attr-value`, de zwaarst gewogen audit van de meting). Een periode
+ * is een filter op content die er sowieso staat, geen paneelwissel: vandaar de
+ * radiogroup-variant.
+ */
+describe('PeriodeSelector — filter, geen paneelwissel (UR3-20/D1)', () => {
+  it('presenteert de strip als radiogroup met een eigen naam', () => {
+    renderSelector('full')
+    expect(screen.getByRole('radiogroup', { name: 'Periode' })).toBeTruthy()
+    expect(screen.queryAllByRole('tab')).toHaveLength(0)
+  })
+
+  it('verwijst niet meer naar een tabpanel dat nergens bestaat', () => {
+    const { container } = renderSelector('full')
+    const opties = screen.getAllByRole('radio')
+    expect(opties.length).toBeGreaterThan(0)
+    for (const optie of opties) {
+      expect(optie.getAttribute('aria-controls')).toBeNull()
+    }
+    expect(container.querySelector('[role="tabpanel"]')).toBeNull()
   })
 })

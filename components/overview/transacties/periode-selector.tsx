@@ -26,8 +26,10 @@ import type { PeriodKind } from '@/lib/transaction-insights'
  * (`resolvePeriodWindow`) blijft in beide modi identiek.
  *
  * Design (Editorial Finance):
- * - Hergebruikt `CategoryTabs` (krant-kicker-stijl tab-strip) voor de
- *   periode-keuze, zodat de tabs identiek aan de rest van de app ogen.
+ * - Hergebruikt `CategoryTabs` (krant-kicker-stijl strip) voor de
+ *   periode-keuze, zodat de strip identiek aan de rest van de app oogt — maar
+ *   in de `radiogroup`-variant: een periode is een filter op de content
+ *   eronder, geen wissel naar een `role="tabpanel"` (UR3-20/D1).
  * - Onder de tabs een `‹ {label} ›`-navigatierij. Voor het rollende
  *   '30d'-venster heeft kalender-navigatie geen betekenis → de rij wordt
  *   verborgen en enkel het label getoond.
@@ -99,9 +101,18 @@ export function PeriodeSelector({
 
   return (
     <div className="space-y-2.5">
+      {/*
+        UR3-20/D1: dit is een FILTER, geen paneelwissel. In de tabs-variant
+        wees elke `aria-controls` naar `category-tabpanel-<key>`, en dat paneel
+        bestond op deze pagina nooit — de rij eronder is een kale div/p. De
+        radiogroup-variant houdt het uiterlijk en de pijltjes-navigatie exact
+        gelijk, maar belooft geen paneel meer.
+      */}
       <CategoryTabs
         tabs={tabs}
         activeKey={period}
+        pattern="radiogroup"
+        label="Periode"
         onChange={(key) => onPeriodChange(key as PeriodKind)}
       />
 

@@ -26,6 +26,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
   type ReactNode,
@@ -265,6 +266,45 @@ let runtimeState: StoreState = {
 const SERVER_SNAPSHOT: StoreState = {
   stacks: EMPTY_STACK_MAP,
   transition: IDLE_TRANSITION,
+}
+
+/**
+ * ── In-app history-diepte (UR3-17 #27c) ─────────────────────────────────────
+ * Hoeveel history-stappen déze documentlading zélf heeft gemaakt binnen de
+ * app. Module-scoped `let` (net als `runtimeState`): nul bij elke volledige
+ * paginalading, blijft staan over client-side navigatie heen.
+ *
+ * Bestaat omdat `window.history.length` de VERKEERDE maat is voor "kan ik
+ * terug binnen de app?" — die telt de hele browsersessie mee, inclusief de
+ * inlogpagina en de redirect erna. Wie rechtstreeks op een sub-pagina
+ * binnenkomt (deeplink, refresh, login-redirect) heeft dus al
+ * `history.length > 1`, terwijl de vorige history-entry níét de stack-parent
+ * is. `router.back()` liep dan de app uit of viel via de redirect terug op
+ * dezelfde pagina — het symptoom "'Terug naar overzicht' blijft op
+ * bezittingen".
+ */
+let inAppHistoryDepth = 0
+
+/** Alleen voor tests: zet de in-app history-diepte terug op nul. */
+export function __resetInAppHistoryDepth(): void {
+  inAppHistoryDepth = 0
+}
+
+export type BackTarget = 'none' | 'history-back' | 'push-previous'
+
+/**
+ * Beslist wat de ←-knop (`pop()`) moet doen. Puur en geëxporteerd zodat de
+ * regel toetsbaar is zonder de hele shell te renderen.
+ *
+ * - `stackDepth <= 1` → er is geen parent in de stack: niets doen.
+ * - `inAppHistoryDepth > 0` → deze lading heeft zélf een history-stap gezet,
+ *   dus de vorige browser-entry ís de stack-parent → `router.back()` (behoudt
+ *   scrollpositie en laat de history niet groeien).
+ * - anders → directe landing: expliciet naar `previous.pathname` pushen.
+ */
+export function resolveBackTarget(stackDepth: number, historyDepth: number): BackTarget {
+  if (stackDepth <= 1) return 'none'
+  return historyDepth > 0 ? 'history-back' : 'push-previous'
 }
 
 function getServerSnapshot(): StoreState {
@@ -547,6 +587,10 @@ export function NavStackProvider({
   const router = useRouter()
   const activeTab: TabId = overrideActiveTab ?? deriveTabFromPath(pathname)
 
+  // Eerste pathname-synchronisatie van deze documentlading — voedt de
+  // in-app history-diepte in de pathname-watcher (#27c).
+  const didInitialSyncRef = useRef(false)
+
   // Hydrate runtime-state bij eerste client-render. Veilig om elke render
   // aan te roepen — de hasHydrated-guard zorgt dat het maar één keer effect
   // heeft. Geen useEffect-roundtrip nodig.
@@ -628,18 +672,22 @@ export function NavStackProvider({
   // 'popping'-animatie. Hierdoor is browser-back ↔ ←-knop ↔ swipe-back
   // gedrags-identiek: alle drie triggeren één code-pad.
   //
-  // Edge-case — directe deeplink zonder history: bij `history.length <= 1`
-  // (gebruiker komt rechtstreeks binnen op een sub-pagina, geen previous
-  // entry in browser-history) valt `router.back()` terug op leave-the-site
-  // gedrag, wat we niet willen. In dat geval doen we een expliciete
-  // `router.push(previous.pathname)`. Pathname-watcher detecteert het als
-  // pop (matcht eerdere stack-entry) en speelt alsnog de juiste animatie.
+  // Edge-case — directe deeplink zonder in-app history: komt de gebruiker
+  // rechtstreeks binnen op een sub-pagina (deeplink, refresh, login-redirect),
+  // dan is de vorige browser-entry NIET de stack-parent en loopt `router.back()`
+  // de app uit. In dat geval doen we een expliciete `router.push(previous.pathname)`.
+  // Pathname-watcher detecteert het als pop (matcht eerdere stack-entry) en
+  // speelt alsnog de juiste animatie.
+  //
+  // De maat hiervoor is `inAppHistoryDepth`, NIET `window.history.length`:
+  // die laatste telt de hele browsersessie (inclusief de inlogpagina) en stond
+  // dus vrijwel altijd > 1, ook bij een directe landing. Zie #27c.
   const pop = useCallback(() => {
     const tabStack = runtimeState.stacks[activeTab]
-    if (tabStack.length <= 1) return // Niet onder root popen.
     const previous = tabStack[tabStack.length - 2]
-    if (!previous) return
-    if (typeof window !== 'undefined' && window.history.length > 1) {
+    const target = resolveBackTarget(tabStack.length, inAppHistoryDepth)
+    if (target === 'none' || !previous) return
+    if (target === 'history-back') {
       router.back()
     } else {
       router.push(previous.pathname)
@@ -682,6 +730,24 @@ export function NavStackProvider({
     const top = tabStack[tabStack.length - 1]
 
     if (top && top.pathname === pathname) return
+
+    // ── In-app history-diepte bijhouden (#27c) ───────────────────
+    // Elke run die voorbij de sync-guard hierboven komt is een échte
+    // navigatie. De EERSTE daarvan is de initiële synchronisatie van de stack
+    // op de landings-URL (deeplink/refresh/login-redirect) — die heeft géén
+    // history-stap binnen de app gekost en telt dus niet mee. Zonder die
+    // uitzondering zou een directe landing op een sub-pagina meteen op diepte
+    // 1 staan en zou `pop()` alsnog de app uit terugstappen.
+    const isInitialSync = !didInitialSyncRef.current
+    didInitialSyncRef.current = true
+    if (!isInitialSync) {
+      const goesBackward = tabStack.some(
+        (e, i) => e.pathname === pathname && i < tabStack.length - 1
+      )
+      inAppHistoryDepth = goesBackward
+        ? Math.max(0, inAppHistoryDepth - 1)
+        : inAppHistoryDepth + 1
+    }
 
     const reduced = prefersReducedMotion()
     const isRoot = isTabRoot(pathname, activeTab)

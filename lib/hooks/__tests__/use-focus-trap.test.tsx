@@ -7,6 +7,7 @@
  *  3. Shift+Tab from first focusable wraps to last.
  *  4. When active flips false, focus returns to the previously-focused trigger.
  *  5. No-op when container has zero focusable descendants.
+ *  6. When the trap UNMOUNTS while still active, focus returns too (UR3-17 #27a).
  */
 import { describe, it, expect } from 'vitest'
 import { act, render } from '@testing-library/react'
@@ -95,6 +96,50 @@ describe('useFocusTrap', () => {
 
     expect(document.activeElement).toBe(trigger)
     trigger.remove()
+  })
+
+  /**
+   * UR3-17 #27a — een dialog die sluit door te UNMOUNTEN (welcome-popup,
+   * sleepmodus-overlay: `active: true` hardcoded) draaide de oude
+   * `active === false`-tak nooit. De focus bleef daardoor op het zojuist
+   * verwijderde element staan en de browser viel terug op <body>: een
+   * schermlezergebruiker verloor zijn plek in de pagina. Herstel hoort in de
+   * effect-cleanup, want die loopt bij ÉN deactivatie ÉN unmount.
+   */
+  it('returns focus to the original trigger when the trap unmounts while active', async () => {
+    const trigger = document.createElement('button')
+    document.body.appendChild(trigger)
+    trigger.focus()
+
+    const { unmount, getByTestId } = render(<Harness active />)
+    await flushRaf()
+    expect(document.activeElement).toBe(getByTestId('first'))
+
+    await act(async () => {
+      unmount()
+    })
+
+    expect(document.activeElement).toBe(trigger)
+    trigger.remove()
+  })
+
+  it('leaves focus alone when the trigger itself is gone after unmount', async () => {
+    const trigger = document.createElement('button')
+    document.body.appendChild(trigger)
+    trigger.focus()
+
+    const { unmount } = render(<Harness active />)
+    await flushRaf()
+
+    // Trigger verdwijnt óók (hele pagina genavigeerd) — dan is er niets
+    // zinnigs om naar terug te keren en mag de hook niet op een losgekoppeld
+    // element focussen.
+    trigger.remove()
+    await act(async () => {
+      unmount()
+    })
+
+    expect(document.activeElement).toBe(document.body)
   })
 
   it('no-ops when container has no focusable descendants', async () => {

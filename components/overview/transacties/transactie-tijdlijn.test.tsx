@@ -239,3 +239,33 @@ describe('TransactieTijdlijn — dagkop leest het canonieke dagtarief (M22)', ()
     expect(screen.getAllByText(/90,00/).length).toBeGreaterThan(0)
   })
 })
+
+/**
+ * UR3-20/D2 — de dag-stack droeg `role="list"` met kinderen die daar niet in
+ * mogen: dag-groep-divs (kop + geneste lijst) en, als laatste kind, de
+ * "Toon meer"-knop. Axe (`aria-required-children`) rekent dat zwaar aan, en de
+ * rol voegde niets toe: de transactieregels zelf zitten al in een native <ul>
+ * per dag. Die geneste lijsten blijven — deze suite pint beide kanten.
+ */
+describe('TransactieTijdlijn — geldige lijststructuur (UR3-20/D2)', () => {
+  it('zet geen expliciete lijstrol op de dag-stack', () => {
+    const { container } = render(
+      <TransactieTijdlijn transactions={[base]} accounts={[]} selectedAccountId={null} onSelectAccount={() => {}} />,
+    )
+    expect(container.querySelector('[role="list"]')).toBeNull()
+  })
+
+  it('houdt de transactieregels wél in een echte lijst per dag', () => {
+    const { container } = render(
+      <TransactieTijdlijn transactions={[base]} accounts={[]} selectedAccountId={null} onSelectAccount={() => {}} />,
+    )
+    const lijsten = container.querySelectorAll('ul')
+    expect(lijsten.length).toBeGreaterThan(0)
+    // Elke lijst bevat uitsluitend <li>-kinderen — de fout die D2 was.
+    for (const lijst of Array.from(lijsten)) {
+      for (const kind of Array.from(lijst.children)) {
+        expect(kind.tagName).toBe('LI')
+      }
+    }
+  })
+})

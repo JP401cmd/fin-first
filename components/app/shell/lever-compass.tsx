@@ -26,7 +26,7 @@ import {
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
-import { tapTargetClass } from '@/components/editorial/tap-target'
+import { tapTargetClass, TAP_TARGET_ROW_MIN } from '@/components/editorial/tap-target'
 
 // Re-export types and computation from shared (non-client) module so that
 // existing imports from this file continue to work — but the actual logic
@@ -309,7 +309,9 @@ export function LeverCompassExpanded({ scores }: { scores: LeverScores }) {
         const hasProgress = key === 'debts' && entry.progress != null
         const row = (
           <div
-            className={`flex items-center gap-2 py-0.5 ${href ? 'cursor-pointer hover:bg-[var(--subtle)] -mx-2 px-2 rounded transition-colors' : 'cursor-default'}`}
+            // UR3-20/B: kompas-rijen zijn dezelfde dichte sidebar-lijst als de
+            // subnavigatie — rij zelf naar de WCAG 2.5.8-vloer van 24px.
+            className={`flex items-center gap-2 py-1 ${TAP_TARGET_ROW_MIN} ${href ? 'cursor-pointer hover:bg-[var(--subtle)] -mx-2 px-2 rounded transition-colors' : 'cursor-default'}`}
           >
             <Icon className="w-3.5 h-3.5 text-[var(--ink-3)]" aria-hidden />
             <span className="flex-1 text-xs text-[var(--ink-2)] leading-tight">{label}</span>

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { deriveTabFromPath, isTabRoot } from './nav-stack-provider'
+import { deriveTabFromPath, isTabRoot, resolveBackTarget } from './nav-stack-provider'
 
 /**
  * Regressie: de mobiele TopBar toont de utility-cluster (vier-hefbomen-kompas
@@ -65,5 +65,46 @@ describe('isTabRoot — rich-TopBar gating', () => {
     expect(isTabRoot('/overzicht/bezittingen', 'kern')).toBe(false)
     expect(isTabRoot('/toekomst/doelen', 'horizon')).toBe(false)
     expect(isTabRoot('/mijn/profiel', 'identity')).toBe(false)
+  })
+})
+
+/**
+ * UR3-17 #27c — "Terug naar overzicht" bleef op bezittingen staan.
+ *
+ * `pop()` besloot met `window.history.length > 1` of het `router.back()` mocht
+ * doen. Die teller telt de HELE browsersessie mee: wie via de inlogpagina op
+ * `/overzicht/bezittingen` binnenkomt (of de pagina ververst, of een deeplink
+ * opent) heeft al `history.length >= 2`, terwijl de vorige history-entry níét
+ * de stack-parent is. `router.back()` liep dan de app uit of viel via de
+ * redirect terug op dezelfde pagina — de gebruiker zag geen verandering.
+ *
+ * De juiste maat is de in-app history-diepte: hoeveel stappen déze
+ * documentlading zélf binnen de app heeft gezet. Nul bij een directe landing.
+ */
+describe('resolveBackTarget — ←-knop (#27c)', () => {
+  it('doet niets op een stack zonder parent', () => {
+    expect(resolveBackTarget(1, 0)).toBe('none')
+    expect(resolveBackTarget(1, 5)).toBe('none')
+    expect(resolveBackTarget(0, 3)).toBe('none')
+  })
+
+  it('pusht expliciet naar de parent bij een directe landing (diepte 0)', () => {
+    // Dít is het defect: stack-diepte 2 (root + deeplink-pagina), maar deze
+    // lading heeft zelf nog geen enkele in-app stap gezet.
+    expect(resolveBackTarget(2, 0)).toBe('push-previous')
+    expect(resolveBackTarget(4, 0)).toBe('push-previous')
+  })
+
+  it('gebruikt router.back() zodra de app zelf een stap heeft gezet', () => {
+    expect(resolveBackTarget(2, 1)).toBe('history-back')
+    expect(resolveBackTarget(3, 2)).toBe('history-back')
+  })
+
+  it('kijkt niet naar window.history.length', () => {
+    // Regressie-anker: de oude regel zou hier 'history-back' geven omdat de
+    // browsersessie een inlogpagina bevat. De nieuwe regel kent die teller niet.
+    const browserHistoryLength = 3
+    expect(resolveBackTarget(2, 0)).not.toBe('history-back')
+    expect(browserHistoryLength).toBeGreaterThan(1)
   })
 })

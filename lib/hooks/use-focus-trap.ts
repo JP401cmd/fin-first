@@ -22,27 +22,41 @@ export function useFocusTrap({
 
   useEffect(() => {
     if (typeof document === 'undefined') return
+    if (!active) return
 
-    if (active) {
-      triggerRef.current = document.activeElement
-      const timer = requestAnimationFrame(() => {
-        if (initialFocusRef?.current) {
-          initialFocusRef.current.focus()
-          return
-        }
-        if (!containerRef.current) return
-        const focusable = containerRef.current.querySelector<HTMLElement>(
-          FOCUSABLE_SELECTOR
-        )
-        focusable?.focus()
-      })
-      return () => cancelAnimationFrame(timer)
-    } else {
+    triggerRef.current = document.activeElement
+    const timer = requestAnimationFrame(() => {
+      if (initialFocusRef?.current) {
+        initialFocusRef.current.focus()
+        return
+      }
+      if (!containerRef.current) return
+      const focusable = containerRef.current.querySelector<HTMLElement>(
+        FOCUSABLE_SELECTOR
+      )
+      focusable?.focus()
+    })
+
+    // Focus-herstel hoort in de CLEANUP, niet in een `active === false`-tak.
+    // Een dialog die sluit door te UNMOUNTEN draait die tak namelijk nooit:
+    // `welcome-popup.tsx` en `sleepmodus-overlay.tsx` geven `active: true`
+    // hardcoded mee en verdwijnen door een conditionele render. De focus bleef
+    // dan op het zojuist verwijderde element staan, de browser viel terug op
+    // <body>, en een schermlezergebruiker verloor zijn plek in de pagina —
+    // precies het a11y-gat dat UR3-17 #27a beschrijft.
+    //
+    // Voor consumenten die `active` wél omschakelen (bottom-sheet, slide-in-
+    // pane, command-palette, rondleiding) verandert er niets: die cleanup liep
+    // al bij true→false, alleen deed hij toen enkel `cancelAnimationFrame`.
+    return () => {
+      cancelAnimationFrame(timer)
       const target = returnFocusRef?.current ?? triggerRef.current
-      if (target && target instanceof HTMLElement) {
+      triggerRef.current = null
+      // `isConnected` — is het triggerelement zelf ook al uit de DOM (hele
+      // pagina genavigeerd), dan is er niets zinnigs om naar terug te keren.
+      if (target instanceof HTMLElement && target.isConnected) {
         target.focus()
       }
-      triggerRef.current = null
     }
   }, [active, containerRef, initialFocusRef, returnFocusRef])
 

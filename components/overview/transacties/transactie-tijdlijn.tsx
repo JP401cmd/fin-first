@@ -256,7 +256,12 @@ export function TransactieTijdlijn({ transactions, accounts, selectedAccountId, 
       ) : filtered.length === 0 ? (
         <NoResultsEmpty onClear={clearAll} />
       ) : (
-        <div role="list" className="space-y-4">
+        // UR3-20/D2: hier stond `role="list"`, maar de directe kinderen zijn
+        // dag-groepen (kop + lijst) en een "Toon meer"-knop — geen van beide
+        // is een toegestaan kind van een lijst (axe `aria-required-children`).
+        // De echte transactieregels zitten al in een native <ul> per dag; een
+        // expliciete lijstrol op de omhullende stack voegde niets toe.
+        <div className="space-y-4">
           {cappedGroups.map((g) => {
             // Eén grondslag voor béide cijfers in de kop (M20): het euro-bedrag en de
             // vrijheidsdagen lezen allebei dit netto dagbedrag. Vroeger stond hier het
