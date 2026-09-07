@@ -374,7 +374,7 @@ export async function POST() {
     monthlyExpenses,
     { income: snapshotBudgetBasis.income.monthlyTotal, expenses: snapshotBudgetBasis.expenses.monthlyTotal },
   )
-  const { effectiveSavingsRatePct: savingsRate6m } = resolveSavingsSource({
+  const { effectiveSavingsRatePct } = resolveSavingsSource({
     incomeSource: profileResult.data?.income_source,
     expensesSource: profileResult.data?.expenses_source,
     netMonthlyIncome: Number(profileResult.data?.net_monthly_income ?? 0),
@@ -403,7 +403,7 @@ export async function POST() {
   const healthScore = computeHealthScoreFromInputs(
     buildHealthScoreInput(
       {
-        savingsRate6m,
+        effectiveSavingsRatePct,
         totalAssets: weightedAssets + unlinkedCash,
         totalDebts,
         freedomPct: freedomPercentage,
@@ -450,9 +450,9 @@ export async function POST() {
     // Onder een vast anker bewust null (ADR 0129 F3a) — zie `snapshotFireAge`.
     fire_age: snapshotFireAge,
     sovereignty_level: sovereigntyLevel,
-    // Canonieke spaarquote (savingsRate6m), NIET fireProjection.savingsRate:
+    // Canonieke spaarquote (effectiveSavingsRatePct), NIET fireProjection.savingsRate:
     // deze kolom voedt de spaarquote-widget-ontwikkeling (savingsHistory).
-    savings_rate: Math.round(savingsRate6m * 10) / 10,
+    savings_rate: Math.round(effectiveSavingsRatePct * 10) / 10,
     // Note: resilience_score column is retained for historical data continuity.
     // It now stores the v2 4-pijler/7-indicator gezondheidsscore (ADR 0010).
     resilience_score: healthScore.total,
@@ -527,7 +527,7 @@ export async function POST() {
       stop_anchor: firePlan.anchor.kind,
       coverage_pct: coveragePct,
       sovereignty_level: sovereigntyLevel,
-      savings_rate: Math.round(savingsRate6m * 10) / 10,
+      savings_rate: Math.round(effectiveSavingsRatePct * 10) / 10,
       resilience_score: healthScore.total,
       fire_target: fireTarget,
       yearly_must_expenses: yearlyMustExpenses,
@@ -544,7 +544,7 @@ export async function POST() {
       fire_age: anchorFixed ? null : fireProjection.fireAge,
       stop_anchor: firePlan.anchor.kind,
       sovereignty_level: sovereigntyLevel,
-      savings_rate: Math.round(savingsRate6m * 10) / 10,
+      savings_rate: Math.round(effectiveSavingsRatePct * 10) / 10,
       resilience_score: healthScore.total,
       health_pillars: healthScore.pillars.map(p => ({ id: p.id, name: p.name, score: p.score, weight: p.weight })),
     },

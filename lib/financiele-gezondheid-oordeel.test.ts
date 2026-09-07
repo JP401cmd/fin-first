@@ -99,7 +99,7 @@ describe('gezondheidsscore — noodfonds-pijler scoort tegen de salaris-norm', (
   const input = (netMonthlySalary: number) =>
     buildHealthScoreInput(
       {
-        savingsRate6m: 30,
+        effectiveSavingsRatePct: 30,
         totalAssets: 556_201,
         totalDebts: 290_800,
         freedomPct: 12,
@@ -135,7 +135,7 @@ describe('gezondheidsscore — noodfonds-pijler scoort tegen de salaris-norm', (
     // 0,9 maandsalaris → ruim onder de norm van 3.
     const i = buildHealthScoreInput(
       {
-        savingsRate6m: 30,
+        effectiveSavingsRatePct: 30,
         totalAssets: 9_000,
         totalDebts: 0,
         freedomPct: 5,

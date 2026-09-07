@@ -82,7 +82,7 @@ export function computeReferencePeer(
 
   // Canonieke gezondheidsscore op dezelfde peer-invoer.
   const hsInput: HealthScoreInput = {
-    savingsRate6m: ref.savingsRatePct,
+    effectiveSavingsRatePct: ref.savingsRatePct,
     totalAssets: ref.netWorthMedian,
     totalDebts: 0,
     emergencyFundMonths: PEER_EMERGENCY_FUND_MONTHS,

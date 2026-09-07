@@ -9,9 +9,13 @@ import { localMonthBounds, localMonthStart } from '@/lib/month-range'
 import { budgetIdsOfType } from '@/lib/cashflow-kpis'
 import { buildBudgetTypeMap } from '@/lib/budget-utils'
 import { getRecentDailyExpenseRate } from '@/lib/expense-rate'
+import { resolveAmountWithBasis } from '@/lib/effective-financials'
+import { loadBudgetBasis, selectBudgetsForBasis } from '@/lib/household/budget-share'
+import type { BudgetBasisRow } from '@/lib/budget-basis'
 import {
   computeDebtAflossingMonthly,
   computeSavingsRate6m,
+  resolveSavingsSource,
   savingsRateDataMonths,
   savingsRateWindow,
 } from '@/lib/savings-source'
@@ -51,7 +55,7 @@ export async function GET() {
     goalsRes, budgetsRes, actionsRes, snapshotsRes,
     income6mRes, expense6mRes, profileRes, bankRes,
     curCatRes, prevCatRes, recurringRes, perspective,
-    prevFireAge, expenseRate,
+    prevFireAge, expenseRate, basisBudgetsRes,
   ] = await Promise.all([
     supabase.from('assets').select('name, current_value, net_worth_inclusion_pct').eq('user_id', claims.sub).eq('is_active', true),
     supabase.from('debts').select('current_balance, name, debt_type, interest_rate, monthly_payment, repayment_type, end_date, start_date, net_worth_inclusion_pct, include_aflossing_in_savings, custom_aflossing_amount, is_active').eq('user_id', claims.sub),
@@ -69,7 +73,11 @@ export async function GET() {
     supabase.from('net_worth_snapshots').select('value, snapshot_date').eq('user_id', claims.sub).order('snapshot_date', { ascending: false }).limit(6),
     supabase.from('transactions').select('amount, transaction_type, date').eq('user_id', claims.sub).eq('is_income', true).gte('date', window6m.fromDate).lt('date', window6m.toDate),
     supabase.from('transactions').select('amount, transaction_type, date, budget_id').eq('user_id', claims.sub).eq('is_income', false).gte('date', window6m.fromDate).lt('date', window6m.toDate),
-    supabase.from('profiles').select('date_of_birth, expected_return, inflation_rate').eq('id', claims.sub).maybeSingle(),
+    // De grondslag-kolommen staan hier bewust bij de FIRE-parameters: de
+    // spaarquote van deze check-in moet dezelfde grondslagresolutie doorlopen
+    // als /overzicht (ADR 0103/0121), en die leest income_source /
+    // expenses_source / de twee profielbedragen / cashflow_basis_prefs.
+    supabase.from('profiles').select('date_of_birth, expected_return, inflation_rate, income_source, net_monthly_income, expenses_source, estimated_monthly_expenses, cashflow_basis_prefs').eq('id', claims.sub).maybeSingle(),
     // Bewust zónder user-filter: de bank_accounts-policy is huishoud-verbreed
     // en RLS scoopt hier al (lib/unlinked-cash.ts).
     selectUnlinkedBankAccounts(supabase),
@@ -84,6 +92,13 @@ export async function GET() {
     // afweek van hetzelfde bedrag op elk ander scherm ("consume, don't
     // recompute"). Geen user-filter nodig: transactions-RLS is own-only.
     getRecentDailyExpenseRate(supabase, now),
+    // Budgetrijen voor de GRONDSLAG — bewust een tweede budgetquery naast die
+    // hierboven en niet dezelfde: `selectBudgetsForBasis` mag géén
+    // `.eq('user_id', …)` dragen (de SELECT-policy op budgets is
+    // huishoud-verbreed), terwijl de query hierboven juist eigen-gescoopt moet
+    // blijven omdat hij de categorie-limieten en de spaarbudget-ID's voedt.
+    // Zelfde splitsing als in de snapshot-routes.
+    selectBudgetsForBasis(supabase),
   ])
 
   // ── Kernmetrics ──────────────────────────────────────────────────────
@@ -145,24 +160,91 @@ export async function GET() {
   const expenses6mAvg = expenses6m / dataMonths6
   const debtAflossing6m = computeDebtAflossingMonthly(activeDebts) * SAVINGS_RATE_WINDOW_MONTHS
 
-  // Spaarquote via de CANONIEKE `computeSavingsRate6m` i.p.v. de kale
-  // `savingsRateFromAggregates`. Die trekt éérst de spaarbudget-stortingen van
-  // de uitgaven af (sparen is geen uitgave) en extrapoleert bij <6 maanden
-  // data. Zonder die correctie toonde de check-in onder exact hetzelfde label
-  // ("6-maands spaarquote") een lager getal dan /overzicht.
+  // ── Spaarquote: de EFFECTIEVE, grondslag-geresolveerde quote (R2) ─────────
+  //
+  // TWEE CORRECTIES, OP TWEE VERSCHILLENDE ASSEN — verwar ze niet:
+  //
+  //  1. (eerder) de MÉTING zelf loopt via de canonieke `computeSavingsRate6m`
+  //     i.p.v. de kale `savingsRateFromAggregates`: die trekt eerst de
+  //     spaarbudget-stortingen van de uitgaven af (sparen is geen uitgave) en
+  //     extrapoleert bij <6 maanden data.
+  //  2. (R2, eigenaarsbesluit 5 — 7 sep 2026) de GRONDSLAGRESOLUTIE. Die
+  //     ontbrak nog volledig. `computeSavingsRate6m` is de rauwe
+  //     transactiemeting; de tegel op /overzicht en de Fin-zijbalk tonen
+  //     `resolveSavingsSource(...).effectiveSavingsRatePct` (ADR 0121), waar
+  //     `income_source`/`expenses_source` = 'manual' of 'budget' de
+  //     gebruikerskeuze laat winnen. Onder zo'n grondslag toonde de check-in
+  //     een ánder percentage dan /overzicht — onder een IDENTIEK label
+  //     ("6-maands spaarquote"). Gemeten op de fixture van
+  //     lib/spaarquote-eenduidige-grondslag.test.tsx: /overzicht 30 %,
+  //     check-in 10 %, en daarmee de omgekeerde vraag ("welke kleine stap zou
+  //     die kunnen verhogen?" tegen iemand die 30 % spaart).
+  //
+  // GEEN TWEEDE FORMULE: `resolveSavingsSource` blijft de enige plek waar de
+  // grondslagkeuze in een percentage wordt omgezet; hier wordt uitsluitend
+  // dezelfde INVOER samengesteld als in de snapshot-routes (jaarinkomen =
+  // 6-maands gemiddelde × 12, uitgaven op diezelfde 6-maands meetbasis).
   const allBudgets = budgetsRes.data || []
   const savingsBudgetIds = budgetIdsOfType(buildBudgetTypeMap(allBudgets), 'savings')
   const savingsBudgetSpent6m = expense6mRows.reduce(
     (s, t) => (t.budget_id && savingsBudgetIds.has(t.budget_id) ? s + Math.abs(t.amount || 0) : s),
     0,
   )
-  const savingsRate6m = computeSavingsRate6m({
+  const measuredSavingsRate6m = computeSavingsRate6m({
     income6m,
     expenses6m,
     savingsBudgetSpent6m,
     debtAflossing6m,
     dataMonths: dataMonths6,
   }).savingsRate6m
+
+  const profileRow = (profileRes.data ?? {}) as Record<string, unknown>
+  const checkinBudgetBasis = await loadBudgetBasis(
+    supabase,
+    profileRow,
+    (basisBudgetsRes.data ?? []) as unknown as BudgetBasisRow[],
+  )
+  const checkinAnnualIncome = resolveAmountWithBasis(
+    profileRow.income_source as string | null | undefined,
+    Number(profileRow.net_monthly_income ?? 0) * 12,
+    income6mAvg * 12,
+    checkinBudgetBasis.income.annualTotal,
+  )
+  const checkinExpenses = resolveAmountWithBasis(
+    profileRow.expenses_source as string | null | undefined,
+    Number(profileRow.estimated_monthly_expenses ?? 0),
+    expenses6mAvg,
+    checkinBudgetBasis.expenses.monthlyTotal,
+  )
+  const { effectiveSavingsRatePct } = resolveSavingsSource({
+    incomeSource: profileRow.income_source as string | null | undefined,
+    expensesSource: profileRow.expenses_source as string | null | undefined,
+    netMonthlyIncome: Number(profileRow.net_monthly_income ?? 0),
+    // Terugval wanneer de gekozen grondslag geen bruikbaar jaarinkomen oplevert
+    // (bv. income_source='manual' met een leeggemaakt bedrag) — daarom bewust de
+    // transactie-afleiding en niet `checkinAnnualIncome.amount` zelf.
+    estimatedAnnualIncome: income6mAvg * 12,
+    estimatedMonthlyExpenses: Number(profileRow.estimated_monthly_expenses ?? 0),
+    // Op een zuivere transactie/transactie-grondslag geeft `resolveSavingsSource`
+    // deze meting ongewijzigd terug — de check-in toont dan hetzelfde getal als
+    // vóór R2.
+    //
+    // Dat is NIET hetzelfde als pariteit met /overzicht. Die pagina bouwt de
+    // meting met `resolveSavingsRate6m` (lib/cashflow-kpis.ts): mét profiel- en
+    // netto-vermogen-delta-terugval bij een leeg venster, en uit het
+    // maandaggregaat in plaats van rauwe rijen. Deze route heeft die terugvallen
+    // niet en leest rijen zonder `.limit()`, dus bij een leeg venster of >1000
+    // rijen kunnen de twee uiteenlopen. Grotendeels bestaand gedrag, maar het is
+    // een echte restdivergentie — apart vastgelegd, niet hier stilzwijgend
+    // weggeschreven.
+    savingsRate6m: measuredSavingsRate6m,
+    basis: {
+      income: checkinAnnualIncome.basis,
+      expenses: checkinExpenses.basis,
+      annualIncome: checkinAnnualIncome.amount,
+      monthlyExpenses: checkinExpenses.amount,
+    },
+  })
 
   // Canoniek dagtarief uit lib/expense-rate.ts (12-maands rolling) — zie de
   // toelichting bij de query hierboven.
@@ -229,7 +311,11 @@ export async function GET() {
     monthIndex: currentYear * 12 + currentMonth,
     netWorth, totalAssets, netWorthTrend, prevNetWorth,
     monthlyIncome, monthlyExpenses, prevMonthIncome, prevMonthExpenses,
-    monthlySavings, prevMonthlySavings, savingsRate6m, dailyExpenses,
+    monthlySavings, prevMonthlySavings,
+    effectiveSavingsRatePct,
+    savingsIncomeBasis: checkinAnnualIncome.basis,
+    savingsExpensesBasis: checkinExpenses.basis,
+    dailyExpenses,
     monthBeforePrevExpenses, monthBeforePrevSavings,
     goals: (goalsRes.data || []).map(g => ({
       name: g.name, current: g.current_value, target: g.target_value,

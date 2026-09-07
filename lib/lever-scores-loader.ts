@@ -516,8 +516,9 @@ export const loadLeverScores = cache(async function loadLeverScores(
   // WAT HIER MIS WAS (B-030): deze loader gaf de MÉTING hierboven door aan
   // `computeLeverScores`, die er zowel de kompas-detailregel ("Spaarquote 12%")
   // als de STATUS-kleur van de Budget-hefboom mee maakte. De hefboomKAART op
-  // /overzicht leest ondertussen `healthScoreInput.savingsRate6m` — en dát veld
-  // draagt (ondanks zijn naam) de EFFECTIEVE quote uit de horizon-loader. Eén
+  // /overzicht leest ondertussen `healthScoreInput.effectiveSavingsRatePct` —
+  // toen nog `savingsRate6m` geheten, terwijl het veld de EFFECTIEVE quote uit
+  // de horizon-loader droeg (naam rechtgezet in R2, 7 sep 2026). Eén
   // hefboom, één scherm, twee percentages: kaart 25 %, kompas 12 %. Erger nog:
   // het stipje op die kaart was van de rauwe meting afgeleid terwijl het getal
   // ernaast effectief was. ADR 0121 kent drie uitzonderingen waar de meting mág

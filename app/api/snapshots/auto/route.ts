@@ -308,7 +308,7 @@ export async function GET(request: Request) {
     monthlyExpenses,
     { income: snapshotBudgetBasis.income.monthlyTotal, expenses: snapshotBudgetBasis.expenses.monthlyTotal },
   )
-  const { effectiveSavingsRatePct: savingsRate6m } = resolveSavingsSource({
+  const { effectiveSavingsRatePct } = resolveSavingsSource({
     incomeSource: profileResult.data?.income_source,
     expensesSource: profileResult.data?.expenses_source,
     netMonthlyIncome: Number(profileResult.data?.net_monthly_income ?? 0),
@@ -335,7 +335,7 @@ export async function GET(request: Request) {
   const healthScore = computeHealthScoreFromInputs(
     buildHealthScoreInput(
       {
-        savingsRate6m,
+        effectiveSavingsRatePct,
         totalAssets: weightedAssets + unlinkedCash,
         totalDebts,
         freedomPct: freedomPercentage,
@@ -385,9 +385,9 @@ export async function GET(request: Request) {
     freedom_percentage: Math.round(freedomPercentage * 10) / 10,
     fire_age: snapshotFireAge,
     sovereignty_level: sovereigntyLevel,
-    // Canonieke spaarquote (savingsRate6m), NIET fireProjection.savingsRate:
+    // Canonieke spaarquote (effectiveSavingsRatePct), NIET fireProjection.savingsRate:
     // deze kolom voedt de spaarquote-widget-ontwikkeling (savingsHistory).
-    savings_rate: Math.round(savingsRate6m * 10) / 10,
+    savings_rate: Math.round(effectiveSavingsRatePct * 10) / 10,
     resilience_score: healthScore.total,
     // Methode-versie van de opgeslagen score (ADR 0010 / FR-7). DEFAULT 1 op de
     // kolom; v2-snapshots schrijven expliciet 2 voor de trend-methodemarkering.
@@ -509,7 +509,7 @@ export async function GET(request: Request) {
       fire_age: snapshotFireAge,
       stop_anchor: firePlan.anchor.kind,
       sovereignty_level: sovereigntyLevel,
-      savings_rate: Math.round(savingsRate6m * 10) / 10,
+      savings_rate: Math.round(effectiveSavingsRatePct * 10) / 10,
       resilience_score: healthScore.total,
     },
     metrics: {

@@ -234,7 +234,7 @@ describe('backfill-migratie — marker blijft in sync met de resolver', () => {
 
 describe('score-curve anti-gaming via computeHealthScoreFromInputs', () => {
   const base = {
-    savingsRate6m: 20,
+    effectiveSavingsRatePct: 20,
     totalAssets: 100_000,
     totalDebts: 0,
     freedomPct: 25,
@@ -323,7 +323,7 @@ describe('D1-pariteit — loader-bundel == health-pijler (inclusion-gewogen)', (
     // (b) health-pad: buildHealthScoreInput → emergencyFundMonths
     const input = buildHealthScoreInput(
       {
-        savingsRate6m: 20,
+        effectiveSavingsRatePct: 20,
         totalAssets: 116_000,
         totalDebts: 0,
         freedomPct: 20,
@@ -373,7 +373,7 @@ describe('D1-pariteit — loader-bundel == health-pijler (inclusion-gewogen)', (
 
     const input = buildHealthScoreInput(
       {
-        savingsRate6m: 20,
+        effectiveSavingsRatePct: 20,
         totalAssets: 116_000,
         totalDebts: 0,
         freedomPct: 20,

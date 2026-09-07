@@ -127,8 +127,8 @@ export function computeLeverScores(input: {
    * De EFFECTIEVE spaarquote (%) — `resolveSavingsSource(...).effectiveSavingsRatePct`
    * (ADR 0121): de grondslag-geresolveerde quote, waar een handmatige of
    * budget-grondslag wint van de 6-maands transactiemeting. Hetzelfde getal als
-   * de hefboomKAART op /overzicht toont (via `healthScoreInput.savingsRate6m`,
-   * een legacy-misnomer voor diezelfde effectieve quote) en als het
+   * de hefboomKAART op /overzicht toont (via
+   * `healthScoreInput.effectiveSavingsRatePct`) en als het
    * instellingenblok onderaan /overzicht/budget noemt — met één benoemde
    * uitzondering, zie hieronder.
    *

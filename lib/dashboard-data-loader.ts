@@ -1773,7 +1773,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       // Oordeelt op de EFFECTIEVE spaarquote (handmatige invoer wint), niet op
       // de rauwe 6-maands transactiequote — anders scoort de app op een getal
       // dat de gebruiker nergens ziet staan.
-      savingsRate6m: effectiveSavingsRate,
+      effectiveSavingsRatePct: effectiveSavingsRate,
       totalAssets,
       totalDebts,
       freedomPct,

@@ -1419,7 +1419,7 @@ export const loadCoreData = cache(async function loadCoreData(
   })
   const healthScoreInput: HealthScoreInput = buildHealthScoreInput(
     {
-      savingsRate6m: coreEffectiveSavingsRate,
+      effectiveSavingsRatePct: coreEffectiveSavingsRate,
       totalAssets: effectiveTotalAssets,
       totalDebts: effectiveTotalDebts,
       freedomPct: coreFreedomPct,

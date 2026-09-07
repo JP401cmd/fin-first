@@ -938,7 +938,7 @@ function buildHealth(ctx: EngineContext, fireAgeFractional: number | null): Chec
 
   const input = buildHealthScoreInput(
     {
-      savingsRate6m: ctx.savingsRatePct,
+      effectiveSavingsRatePct: ctx.savingsRatePct,
       totalAssets: ctx.totalAssets,
       totalDebts: ctx.totalDebts,
       freedomPct,

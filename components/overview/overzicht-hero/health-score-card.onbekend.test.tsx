@@ -9,7 +9,7 @@ import { GRONDSLAG_ONBEKEND_KOP } from '@/lib/grondslag-guard'
 
 /** Sanne: "Later invullen" bij inkomen én uitgaven, wél spaargeld. */
 const sanne: HealthScoreInput = {
-  savingsRate6m: 0,
+  effectiveSavingsRatePct: 0,
   totalAssets: 14_000,
   totalDebts: 9_000,
   emergencyFundMonths: 0,
@@ -46,7 +46,7 @@ describe('HealthScoreCard — onbekend inkomen (ADR 0131)', () => {
   // AC4: met bekend inkomen is het gedrag ongewijzigd.
   it('toont bij bekende grondslagen gewoon het cijfer (regressie)', () => {
     const health = computeHealthScoreFromInputs(
-      { ...sanne, savingsRate6m: 20, netMonthlyIncome: 3_000, incomeBasis: 'manual', expensesBasis: 'manual' },
+      { ...sanne, effectiveSavingsRatePct: 20, netMonthlyIncome: 3_000, incomeBasis: 'manual', expensesBasis: 'manual' },
       true,
     )
     render(<HealthScoreCard health={health} onOpenReceipt={() => {}} />)

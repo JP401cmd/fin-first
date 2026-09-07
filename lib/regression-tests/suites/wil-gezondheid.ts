@@ -45,7 +45,14 @@ const CAT = 'wil.gezondheid'
 
 function makeDashboardData(overrides: Partial<DashboardData> = {}): DashboardData {
   return {
+    // DashboardData draagt BEIDE grootheden: `savingsRate6m` is de rauwe
+    // 6-maands transactiemeting (die de kassabon verklaart),
+    // `effectiveSavingsRatePct` de grondslag-geresolveerde quote. Sinds R2
+    // (7 sep 2026) leest de niet-canonieke `computeHealthScore(DashboardData)`
+    // de tweede — daarvóór stil de eerste. Hier bewust gelijk gehouden, zodat
+    // deze suite hetzelfde meet als voorheen.
     savingsRate6m: 15,
+    effectiveSavingsRatePct: 15,
     totalAssets: 100_000,
     totalDebts: 0,
     netWorth: 100_000,
@@ -132,7 +139,7 @@ function makeDashboardData(overrides: Partial<DashboardData> = {}): DashboardDat
 
 function makeInput(overrides: Partial<HealthScoreInput> = {}): HealthScoreInput {
   return {
-    savingsRate6m: 20,
+    effectiveSavingsRatePct: 20,
     totalAssets: 100_000,
     totalDebts: 20_000,
     emergencyFundMonths: 3,
@@ -161,7 +168,7 @@ const tests: TestCase[] = [
     priority: 'critical',
     estimatedDurationMs: 10,
     fn() {
-      const score = computeHealthScoreFromInputs(makeInput({ savingsRate6m: 0 }), true)
+      const score = computeHealthScoreFromInputs(makeInput({ effectiveSavingsRatePct: 0 }), true)
       const pillar = score.pillars.find(p => p.id === 'savings_rate')!
       assertEqual(pillar.score, 0, 'Savings 0% → score 0')
     },
@@ -174,7 +181,7 @@ const tests: TestCase[] = [
     priority: 'high',
     estimatedDurationMs: 10,
     fn() {
-      const score = computeHealthScoreFromInputs(makeInput({ savingsRate6m: 10 }), true)
+      const score = computeHealthScoreFromInputs(makeInput({ effectiveSavingsRatePct: 10 }), true)
       const pillar = score.pillars.find(p => p.id === 'savings_rate')!
       assertEqual(pillar.score, 50, 'Savings 10% → score 50')
     },
@@ -187,7 +194,7 @@ const tests: TestCase[] = [
     priority: 'high',
     estimatedDurationMs: 10,
     fn() {
-      const score = computeHealthScoreFromInputs(makeInput({ savingsRate6m: 20 }), true)
+      const score = computeHealthScoreFromInputs(makeInput({ effectiveSavingsRatePct: 20 }), true)
       const pillar = score.pillars.find(p => p.id === 'savings_rate')!
       assertEqual(pillar.score, 80, 'Savings 20% → score 80')
     },
@@ -201,12 +208,12 @@ const tests: TestCase[] = [
     estimatedDurationMs: 10,
     fn() {
       assertEqual(
-        computeHealthScoreFromInputs(makeInput({ savingsRate6m: 30 }), true)
+        computeHealthScoreFromInputs(makeInput({ effectiveSavingsRatePct: 30 }), true)
           .pillars.find(p => p.id === 'savings_rate')!.score,
         100, '30% → 100',
       )
       assertEqual(
-        computeHealthScoreFromInputs(makeInput({ savingsRate6m: 50 }), true)
+        computeHealthScoreFromInputs(makeInput({ effectiveSavingsRatePct: 50 }), true)
           .pillars.find(p => p.id === 'savings_rate')!.score,
         100, '50% → 100',
       )
@@ -740,7 +747,7 @@ const tests: TestCase[] = [
     fn() {
       // Uitstekend (≥80)
       const perfect = computeHealthScoreFromInputs({
-        savingsRate6m: 35, totalAssets: 500_000, totalDebts: 0,
+        effectiveSavingsRatePct: 35, totalAssets: 500_000, totalDebts: 0,
         emergencyFundMonths: 8, freedomPct: 95,
         currentAge: null,
         fireAgeFractional: null,
@@ -753,7 +760,7 @@ const tests: TestCase[] = [
 
       // Kritiek (<20)
       const worst = computeHealthScoreFromInputs({
-        savingsRate6m: 0, totalAssets: 1_000, totalDebts: 50_000,
+        effectiveSavingsRatePct: 0, totalAssets: 1_000, totalDebts: 50_000,
         emergencyFundMonths: 0, freedomPct: 0,
         currentAge: null,
         fireAgeFractional: null,
@@ -776,7 +783,7 @@ const tests: TestCase[] = [
     estimatedDurationMs: 10,
     fn() {
       const score = computeHealthScoreFromInputs({
-        savingsRate6m: 0, totalAssets: 0, totalDebts: 0,
+        effectiveSavingsRatePct: 0, totalAssets: 0, totalDebts: 0,
         emergencyFundMonths: 0, freedomPct: 0,
         currentAge: null,
         fireAgeFractional: null,
@@ -804,7 +811,7 @@ const tests: TestCase[] = [
     estimatedDurationMs: 10,
     fn() {
       const score = computeHealthScoreFromInputs({
-        savingsRate6m: 2, totalAssets: 10_000, totalDebts: 80_000,
+        effectiveSavingsRatePct: 2, totalAssets: 10_000, totalDebts: 80_000,
         emergencyFundMonths: 0.5, freedomPct: 2,
         currentAge: null,
         fireAgeFractional: null,
@@ -871,7 +878,7 @@ const tests: TestCase[] = [
         { amount: -450, budget_id: 'sav' },
       ]
       const scalars = {
-        savingsRate6m: 25, totalAssets: 125_000, totalDebts: 30_000,
+        effectiveSavingsRatePct: 25, totalAssets: 125_000, totalDebts: 30_000,
         freedomPct: 40, avgMonthlyExpenses: 2_500, netMonthlyIncome: 4_000,
         netMonthlySalary: 4_000,
         incomeBasis: 'manual' as const,

@@ -64,7 +64,7 @@ function buildPeerInputs(
   }).result
 
   const hsInput: HealthScoreInput = {
-    savingsRate6m: ref.savingsRatePct,
+    effectiveSavingsRatePct: ref.savingsRatePct,
     totalAssets: ref.netWorthMedian,
     totalDebts: 0,
     emergencyFundMonths: 3,

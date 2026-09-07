@@ -147,7 +147,7 @@ describe('noodfonds — pijler en bundel delen één kern (H4 punt 1)', () => {
 
 describe('computeHealthScoreWithTrend — trend verandert het cijfer niet', () => {
   const input: HealthScoreInput = {
-    savingsRate6m: 18,
+    effectiveSavingsRatePct: 18,
     totalAssets: 120_000,
     totalDebts: 30_000,
     emergencyFundMonths: 4,

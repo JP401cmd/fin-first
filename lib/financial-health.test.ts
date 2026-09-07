@@ -16,7 +16,7 @@ import {
 // ── Canonical base input — alle 7 indicatoren actief ──────────────────────
 
 const baseInput: HealthScoreInput = {
-  savingsRate6m: 20,
+  effectiveSavingsRatePct: 20,
   totalAssets: 100_000,
   totalDebts: 20_000,
   emergencyFundMonths: 3,
@@ -43,7 +43,7 @@ describe('onbekend inkomen/uitgaven — geen score, geen oordeel (ADR 0131, UR3-
   //   WEGGELATEN, en `onbekend` draagt ze met één zin en één knop.
   const sanne: HealthScoreInput = {
     ...baseInput,
-    savingsRate6m: 0,
+    effectiveSavingsRatePct: 0,
     emergencyFundMonths: 0,
     freedomPct: 0,
     netMonthlyIncome: 0,
@@ -126,13 +126,27 @@ describe('onbekend inkomen/uitgaven — geen score, geen oordeel (ADR 0131, UR3-
     expect(score.onbekend?.pijlers.map(p => p.id)).toEqual(['savings_rate'])
   })
 
-  it('AC4 — met bekende grondslagen is het gedrag byte-identiek aan een input zónder de velden', () => {
+  it('AC4 — met bekende grondslagen is het OORDEEL identiek aan een input zónder de velden', () => {
     const met = computeHealthScoreFromInputs({ ...baseInput, incomeBasis: 'manual', expensesBasis: 'transaction' }, true)
     const zonder = computeHealthScoreFromInputs(baseInput, true)
     expect(met.total).toBe(zonder.total)
-    expect(met.pillars).toEqual(zonder.pillars)
     expect(met.onbekend).toBeNull()
     expect(zonder.onbekend).toBeNull()
+
+    // Het oordeel — scores, actief/inactief, groepering — mag niet verschillen.
+    const oordeel = (s: typeof met) =>
+      s.pillars.map(({ id, score, weight, pillarGroup, rawValue }) => ({ id, score, weight, pillarGroup, rawValue }))
+    expect(oordeel(met)).toEqual(oordeel(zonder))
+
+    // De UITLEG mag wél verschillen, en hoort dat ook te doen (R2): kennen we de
+    // grondslag, dan benoemt de spaarquote-pijler 'm. Deze test eiste eerder
+    // volledige gelijkheid van `pillars`, en dat verbood juist de verbetering —
+    // de uitleg zei toen "(6-maands gemiddelde)" terwijl het getal de effectieve,
+    // grondslag-geresolveerde quote was.
+    const uitleg = (s: typeof met) => s.pillars.find((p) => p.id === 'savings_rate')?.explanation ?? ''
+    expect(uitleg(zonder)).toBe('Hoeveel procent van je inkomen spaar je?')
+    expect(uitleg(met)).toContain('Hoeveel procent van je inkomen spaar je? (')
+    expect(uitleg(met)).not.toContain('6-maands')
   })
 
   it("'estimate' telt als bekend: de score rekent gewoon (label reist mee op de kaart, niet hier)", () => {
@@ -495,7 +509,7 @@ describe('alle 7 indicatoren inactief → total 0, label Kritiek', () => {
 describe('label-banden (80/60/40/20)', () => {
   it('≥80 → Uitstekend', () => {
     const highInput: HealthScoreInput = {
-      savingsRate6m: 30,
+      effectiveSavingsRatePct: 30,
       totalAssets: 500_000,
       totalDebts: 0,
       emergencyFundMonths: 6,
@@ -514,7 +528,7 @@ describe('label-banden (80/60/40/20)', () => {
 
   it('60≤total<80 → Sterk', () => {
     const input: HealthScoreInput = {
-      savingsRate6m: 20,
+      effectiveSavingsRatePct: 20,
       totalAssets: 200_000,
       totalDebts: 20_000,
       emergencyFundMonths: 4,
@@ -532,7 +546,7 @@ describe('label-banden (80/60/40/20)', () => {
 
   it('<20 → Kritiek', () => {
     const lowInput: HealthScoreInput = {
-      savingsRate6m: 0,
+      effectiveSavingsRatePct: 0,
       totalAssets: 1_000,
       totalDebts: 50_000,
       emergencyFundMonths: 0,
@@ -554,7 +568,7 @@ describe('label-banden (80/60/40/20)', () => {
     // Use an input that should land around 40.
     const input: HealthScoreInput = {
       ...baseInput,
-      savingsRate6m: 5,
+      effectiveSavingsRatePct: 5,
       freedomPct: 15,
       emergencyFundMonths: 1.5,
       totalDebts: 60_000,
@@ -584,7 +598,11 @@ describe('computeHealthScore(DashboardData) overload', () => {
   it('debt_service_ratio en asset_concentration zijn inactief (geen DashboardData-velden)', async () => {
     const { computeHealthScore } = await import('@/lib/financial-health')
     const data = {
+      // Zie de toelichting bij de mock in lib/regression-tests/suites/
+      // wil-gezondheid.ts: de bundel draagt de MÉTING én de effectieve quote;
+      // de overload leest sinds R2 de tweede. Gelijk gehouden.
       savingsRate6m: 15,
+      effectiveSavingsRatePct: 15,
       totalAssets: 100_000,
       totalDebts: 0,
       netWorth: 100_000,
@@ -772,7 +790,7 @@ describe('Defect B — buildHealthScoreInput deelt canoniek pad', () => {
   const rawTotalAssets = 125_000
 
   const routeScalars = {
-    savingsRate6m: 25,
+    effectiveSavingsRatePct: 25,
     totalAssets: rawTotalAssets + unlinkedCash,
     totalDebts: 30_000,
     freedomPct: 40,

@@ -458,6 +458,24 @@ describe('buildCashflowCards — CF-3: maandcijfers dragen hun venster', () => {
     expect(cards.find((c) => c.key === 'forecast')!.kpiWindow).toBeNull()
   })
 
+  /**
+   * R2 #5 (7 sep 2026): de Vooruitblik-kaart zet een STAND (het verwachte
+   * eindsaldo, het hoofdcijfer) naast een STROOM ("Netto per maand", het
+   * detailgetal). Zonder duiding lezen die twee als hetzelfde soort getal. De
+   * tip moet het verschil benoemen; de getallen zelf veranderen niet.
+   */
+  it('Vooruitblik: de tip benoemt het verschil tussen de maandmutatie en het eindsaldo', () => {
+    const forecast = cardsAt(baseDashboard({})).find((c) => c.key === 'forecast')!
+    expect(forecast.detail.label).toBe('Netto per maand')
+    expect(forecast.detail.tip).toMatch(/maandelijkse mutatie/i)
+    expect(forecast.detail.tip).toMatch(/verwachte saldo na \d+ maand(en)?/i)
+    // De tip moet de twee getallen uit elkaar houden ("iets anders"), maar in
+    // gewone taal. Kapitalen-als-nadruk (STAND) hoort in code-commentaar, niet
+    // in een tooltip — daar leest het als schreeuwen.
+    expect(forecast.detail.tip).toMatch(/iets anders/i)
+    expect(forecast.detail.tip).not.toMatch(/STAND/)
+  })
+
   it('`now` is optioneel: zonder argument blijft de bestaande callsite werken', () => {
     const cards = buildCashflowCards(
       baseDashboard({ currentMonthIncome: 100, currentMonthExpenses: 50 }),

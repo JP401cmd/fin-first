@@ -8,6 +8,10 @@
 // Engine-uitvoertype: wordt door buildGespreksstarters() geproduceerd en
 // door de route (app/api/checkin/gespreksstarters/route.ts) afgenomen.
 import type { GesprekStarterData } from '@/lib/checkin-types'
+// Grondslag-woordenboek: dezelfde zinsvorm die de kaarten en het instellingenblok
+// gebruiken, zodat de check-in de grondslag niet in eigen woorden herformuleert.
+import { savingsRateBasisPhrase, type ResolvedBasis } from '@/lib/budget-basis'
+import { ontbrekendeGrondslag } from '@/lib/grondslag-guard'
 
 // ── Voice (aanspreekvorm) ──────────────────────────────────────────────
 // Nederlands vervoegt werkwoorden per onderwerp; Voice levert vooraf-
@@ -154,6 +158,47 @@ function clamp(n: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, n))
 }
 
+/**
+ * De grondslag als ZINSDEEL ("volgens je eigen invoer") — het EIGEN label van de
+ * check-in, in plaats van het geleende venster-label ("over 6 maanden") van
+ * vóór R2. Canonieke bron: `savingsRateBasisPhrase` in lib/budget-basis.ts, die
+ * ook de kaarten en het instellingenblok bedient.
+ */
+function spaarquoteFrase(i: GespreksstartersInput): string {
+  return savingsRateBasisPhrase(i.savingsIncomeBasis, i.savingsExpensesBasis)
+}
+
+/**
+ * De volledige context-regel: "Spaarquote volgens je eigen invoer: 30%."
+ *
+ * `null` zodra de grondslag ontbreekt (ADR 0131) — de aanroeper valt dan terug
+ * op een context zonder quote. De détector zelf mag wél blijven vuren als hij op
+ * een gemeten €-bedrag rust; alleen het percentage is er dan niet.
+ */
+function spaarquoteZin(i: GespreksstartersInput): string | null {
+  if (!heeftGeldigeSpaarquote(i)) return null
+  return `Spaarquote ${spaarquoteFrase(i)}: ${i.effectiveSavingsRatePct.toFixed(0)}%.`
+}
+
+/**
+ * Mag de check-in überhaupt iets over de spaarquote zeggen? (ADR 0131)
+ *
+ * Ontbreekt één van beide grondslagen, dan is de quote geen meting maar een
+ * artefact van een gat: bij uitgaven `unknown` rekent
+ * `savingsRateFromAggregates(inkomen, 0, 0)` exact 100, en dan feliciteert de
+ * check-in iemand met een leeg profiel. `lib/architecture/calculations.ts` noemt
+ * deze surface bij naam — score, spaarquote-widget, instellingenblok én check-in
+ * tonen bij een onbekende grondslag géén cijfer en géén oordeel.
+ *
+ * Spiegelt `grondslagGuard` in lib/financial-health.ts, dat de pijlers om
+ * dezelfde reden inactief zet. Zwijgen is hier het juiste antwoord: de gebruiker
+ * krijgt de invulvraag via het reguliere grondslag-oppervlak, niet via een
+ * gespreksstarter over een getal dat niet bestaat.
+ */
+function heeftGeldigeSpaarquote(i: GespreksstartersInput): boolean {
+  return ontbrekendeGrondslag(i.savingsIncomeBasis, i.savingsExpensesBasis) === null
+}
+
 // ── Input ──────────────────────────────────────────────────────────────
 
 export interface GespreksstartersInput {
@@ -188,15 +233,40 @@ export interface GespreksstartersInput {
   monthBeforePrevExpenses: number
   monthBeforePrevSavings: number
   /**
-   * De GEMETEN 6-maands transactiequote (`computeSavingsRate6m`), NIET de
-   * effectieve spaarquote die de app-oppervlakken tonen (ADR 0103 /
-   * eigenaar-besluit 31 aug 2026). Dat is hier bewust: de gespreksstarters zetten
-   * dit getal steeds naast een gemeten maandbedrag, en elke tekst die 'm gebruikt
-   * benoemt het venster ("6-maands", "over 6 maanden") — de enige toegestane
-   * plek voor de meting. Gebruik hem NOOIT in een zin die 'm als "je spaarquote"
-   * presenteert; dat getal is `effectiveSavingsRatePct`.
+   * DE spaarquote: `resolveSavingsSource(...).effectiveSavingsRatePct` — hetzelfde
+   * getal dat de tegel op /overzicht, de Fin-zijbalk en het instellingenblok
+   * tonen (ADR 0103 / 0121).
+   *
+   * HIER STOND TOT R2 (7 sep 2026) DE MÉTING (`computeSavingsRate6m`). ADR 0121
+   * kende de check-in als uitzondering waar de rauwe 6-maands transactiequote
+   * mocht staan, mits elke zin zijn venster droeg ("6-maands", "over zes
+   * maanden"). Die uitzondering is met eigenaarsbesluit 5 ingetrokken: onder een
+   * handmatige of budget-grondslag toonde de check-in een ánder percentage dan
+   * /overzicht, en het venster-label maakte dat niet zichtbaar — het leek juist
+   * hetzelfde getal.
+   *
+   * De check-in leent daarom geen venster meer maar draagt zijn EIGEN label: de
+   * teksten hieronder benoemen de GRONDSLAG (`savingsRateBasisPhrase` over de
+   * twee velden hieronder), niet een meetvenster.
+   *
+   * LET OP — dit percentage komt NIET overeen met het €-bedrag ernaast. De
+   * gespreksstarters zetten deze quote steeds naast een GEMETEN maandbedrag
+   * (`monthlySavings`), en onder een handmatige grondslag rekent 30% niet terug
+   * naar die euro's. Dat is aanvaard gevolg van ADR 0121 — de spaarquote-widget
+   * heeft dezelfde eigenschap — en de grondslag-frase is wat het draagt. Ga het
+   * €-bedrag hier dus NIET "kloppend maken": dan vervang je een canoniek getal
+   * door een lokale som. (Deze waarschuwing stond hier vóór R2 al; ze is bij de
+   * hernoeming even weggevallen en staat er daarom expliciet weer.)
    */
-  savingsRate6m: number
+  effectiveSavingsRatePct: number
+  /**
+   * De grondslag waarop `effectiveSavingsRatePct` rust (ADR 0103), per kant.
+   * Vallen ze samen, dan noemt de tekst die grondslag; verschillen ze, dan zegt
+   * hij dát het gemengd is — beide via de canonieke `savingsRateBasisPhrase`,
+   * zodat de check-in dezelfde woorden gebruikt als de kaarten.
+   */
+  savingsIncomeBasis: ResolvedBasis
+  savingsExpensesBasis: ResolvedBasis
   dailyExpenses: number
 
   goals: Array<{
@@ -310,7 +380,7 @@ const detectSparenVergelijking: Detector = (i) => {
         variants: [
           (v) => ({
             vraag: `${v.subjCap} ${v.hebt} afgelopen maand ${eur} meer gespaard dan de maand daarvoor. Op jaarbasis is dat ${freedomLabel(extraDays)} extra vrijheid. Welke keuze maakte het verschil?`,
-            context: `Spaarquote: ${i.savingsRate6m.toFixed(0)}% (6-maands).`,
+            context: spaarquoteZin(i) ?? `Meer gespaard dan de maand ervoor: ${eur}.`,
             actie: `Bespreek welke uitgaven ${v.subj} bewust ${v.hebt} verminderd.`,
             vrijheidstijd: freedomLabel(extraDays),
           }),
@@ -526,13 +596,13 @@ const detectSparenVrijheid: Detector = (i) => {
     variants: [
       (v) => ({
         vraag: `${v.subjCap} ${v.hebt} deze maand ${formatEUR(i.monthlySavings)} gespaard — dat zijn ${days} nieuwe vrijheidsdagen. Hoe ${v.voelt} daarover?`,
-        context: `6-maands spaarquote (gemeten): ${i.savingsRate6m.toFixed(0)}% van het inkomen.`,
+        context: spaarquoteZin(i) ?? `Deze maand gespaard: ${formatEUR(i.monthlySavings)}.`,
         actie: `Bespreek of ${v.subj} tevreden ${v.bent} of ${v.wilt} versnellen.`,
         vrijheidstijd: `${days} dagen`,
       }),
       (v) => ({
         vraag: `${formatEUR(i.monthlySavings)} opzij = ${days} vrijheidsdagen erbij. Tevreden met dit tempo?`,
-        context: `6-maands spaarquote: ${i.savingsRate6m.toFixed(0)}%.`,
+        context: spaarquoteZin(i) ?? `Deze maand gespaard: ${formatEUR(i.monthlySavings)}.`,
         actie: `Bepaal ${v.samen} of het tempo omhoog kan.`,
         vrijheidstijd: `${days} dagen`,
       }),
@@ -587,37 +657,44 @@ const detectFire: Detector = (i) => {
 }
 
 const detectSpaarquoteTrend: Detector = (i) => {
-  if (i.savingsRate6m >= 25) {
+  // Zonder geldige grondslag is er geen quote om iets over te zeggen (ADR 0131).
+  // Deze detector is het scherpst getroffen: hij rust volledig op het percentage,
+  // en bij uitgaven `unknown` staat dat op 100 — dan zou hij een leeg profiel
+  // feliciteren. Vroeg terugkeren narrowt `zin` meteen naar string.
+  const zin = spaarquoteZin(i)
+  if (zin === null) return []
+  const pct = i.effectiveSavingsRatePct
+  if (pct >= 25) {
     return [{
       id: 'spaarquote-sterk', theme: 'sparen', sentiment: 'positive',
-      score: clamp(i.savingsRate6m, 25, 80),
+      score: clamp(pct, 25, 80),
       variants: [
         (v) => ({
-          vraag: `${v.subjCap} ${v.poss} spaarquote staat op ${i.savingsRate6m.toFixed(0)}% over 6 maanden — flink boven gemiddeld. Wat maakt dat mogelijk?`,
-          context: `6-maands spaarquote: ${i.savingsRate6m.toFixed(0)}%.`,
+          vraag: `${v.subjCap} ${v.poss} spaarquote staat op ${pct.toFixed(0)}% ${spaarquoteFrase(i)} — flink boven gemiddeld. Wat maakt dat mogelijk?`,
+          context: zin,
           actie: `Bespreek ${v.samen} of dit comfortabel voelt of te streng.`,
         }),
         (v) => ({
-          vraag: `${i.savingsRate6m.toFixed(0)}% spaarquote over de laatste zes maanden — sterk. Voelt de balans tussen nu en later goed?`,
-          context: `Gemiddeld over 6 maanden.`,
+          vraag: `${pct.toFixed(0)}% spaarquote ${spaarquoteFrase(i)} — sterk. Voelt de balans tussen nu en later goed?`,
+          context: zin,
           actie: `Toets ${v.samen} of ${v.subj} ook genoeg ${v.subj === 'je' ? 'geniet' : 'genieten'}.`,
         }),
       ],
     }]
   }
-  if (i.savingsRate6m > 0 && i.savingsRate6m < 10) {
+  if (pct > 0 && pct < 10) {
     return [{
       id: 'spaarquote-laag', theme: 'sparen', sentiment: 'neutral',
-      score: clamp(15 - i.savingsRate6m, 8, 55),
+      score: clamp(15 - pct, 8, 55),
       variants: [
         (v) => ({
-          vraag: `${v.subjCap} ${v.poss} spaarquote ligt op ${i.savingsRate6m.toFixed(0)}% over 6 maanden. Welke kleine stap zou die kunnen verhogen?`,
-          context: `6-maands spaarquote: ${i.savingsRate6m.toFixed(0)}%.`,
+          vraag: `${v.subjCap} ${v.poss} spaarquote ligt op ${pct.toFixed(0)}% ${spaarquoteFrase(i)}. Welke kleine stap zou die kunnen verhogen?`,
+          context: zin,
           actie: `Kies ${v.samen} één uitgave om bij te sturen.`,
         }),
         (v) => ({
-          vraag: `Met ${i.savingsRate6m.toFixed(0)}% spaarquote over zes maanden bouwt vrijheid langzaam op. Bewuste keuze of ruimte voor meer?`,
-          context: `Gemiddeld over 6 maanden.`,
+          vraag: `Met ${pct.toFixed(0)}% spaarquote ${spaarquoteFrase(i)} bouwt vrijheid langzaam op. Bewuste keuze of ruimte voor meer?`,
+          context: zin,
           actie: `Bepaal ${v.samen} een haalbaar streefpercentage.`,
         }),
       ],

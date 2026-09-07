@@ -444,7 +444,7 @@ export async function GET(request: Request) {
         monthlyExpenses,
         { income: cronBudgetBasis.income.monthlyTotal, expenses: cronBudgetBasis.expenses.monthlyTotal },
       )
-      const { effectiveSavingsRatePct: savingsRate6m } = resolveSavingsSource({
+      const { effectiveSavingsRatePct } = resolveSavingsSource({
         incomeSource: profile.income_source,
         expensesSource: profile.expenses_source,
         netMonthlyIncome: Number(profile.net_monthly_income ?? 0),
@@ -474,7 +474,7 @@ export async function GET(request: Request) {
       const healthScore = computeHealthScoreFromInputs(
         buildHealthScoreInput(
           {
-            savingsRate6m,
+            effectiveSavingsRatePct,
             totalAssets: weightedAssets + unlinkedCash,
             totalDebts,
             freedomPct: freedomPercentage,
@@ -518,9 +518,9 @@ export async function GET(request: Request) {
           ? null
           : Math.round(fireProjection.fireAge * 10) / 10,
         sovereignty_level: sovereigntyLevel,
-        // Canonieke spaarquote (savingsRate6m), NIET fireProjection.savingsRate:
+        // Canonieke spaarquote (effectiveSavingsRatePct), NIET fireProjection.savingsRate:
         // deze kolom voedt de spaarquote-widget-ontwikkeling (savingsHistory).
-        savings_rate: Math.round(savingsRate6m * 10) / 10,
+        savings_rate: Math.round(effectiveSavingsRatePct * 10) / 10,
         resilience_score: healthScore.total,
         // Methode-versie van de opgeslagen score (ADR 0010 / FR-7). DEFAULT 1 op
         // de kolom; v2-snapshots schrijven expliciet 2. De basic-fallback-upsert

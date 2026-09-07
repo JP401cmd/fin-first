@@ -526,7 +526,7 @@ const STAPPEN: readonly RondleidingStap[] = [
         }
       }
       // Het PERCENTAGE en het OORDEEL komen uit twee loaders: het getal uit
-      // `healthScoreInput.savingsRate6m` (horizon/dashboard), het oordeel uit
+      // `healthScoreInput.effectiveSavingsRatePct` (horizon/dashboard), het oordeel uit
       // `loadLeverScores`. Die tweede houdt zich op één venster bewust stil —
       // wel 12-maands, geen 6-maands transactie-inkomen (zie de kop van
       // lib/lever-scores-loader.ts). Zonder deze tak stond er dan "Je zet 25%

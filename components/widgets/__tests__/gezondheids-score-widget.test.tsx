@@ -67,7 +67,7 @@ function bundleWith(health: HealthScore, overrides: Partial<DashboardData> = {})
 describe('GezondheidScoreWidget — getoond cijfer = canonieke engine', () => {
   it('mini toont exact computeHealthScoreFromInputs(...).total', () => {
     const input: HealthScoreInput = {
-      savingsRate6m: 22,
+      effectiveSavingsRatePct: 22,
       totalAssets: 80_000,
       totalDebts: 5_000,
       emergencyFundMonths: 4,

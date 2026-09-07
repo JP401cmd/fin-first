@@ -1076,7 +1076,7 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
       // EFFECTIEVE spaarquote (handmatige invoer wint) — hetzelfde percentage
       // dat het instellingenblok onderaan /overzicht/budget toont en dat de
       // FIRE-prognose hierboven gebruikt. Niet de rauwe transactiequote.
-      savingsRate6m: effectiveSavingsRate,
+      effectiveSavingsRatePct: effectiveSavingsRate,
       totalAssets: perspectiveTotalAssets,
       totalDebts: perspectiveTotalDebts,
       freedomPct: 0,

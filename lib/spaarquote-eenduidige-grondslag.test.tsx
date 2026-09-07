@@ -44,10 +44,23 @@ import { injectParameterGoalCurrentValues } from '@/lib/goal-current-value'
 import { SpaarquoteWidget } from '@/components/widgets/spaarquote-widget'
 import { CashflowSection } from '@/components/fin/cashflow-section'
 import { DisplayModeProvider } from '@/lib/hooks/use-display-mode'
+import { GET as checkinStartersGET } from '@/app/api/checkin/gespreksstarters/route'
 
 // ── Render-randvoorwaarden ──────────────────────────────────────────────────
 vi.mock('@/components/app/perspective-provider', () => ({
   usePerspective: () => ({ perspective: 'personal', partnerName: null }),
+}))
+
+/**
+ * De check-in is een ROUTE, geen loader: hij haalt zijn client zelf op. Alleen
+ * die twee auth-schakels worden vervangen — de rekenketen eronder draait
+ * onvervalst op dezelfde nep-database als de loaders hierboven, zodat dit
+ * oppervlak op exact dezelfde fixture wordt gemeten.
+ */
+const routeClient: { client: unknown } = { client: null }
+vi.mock('@/lib/supabase/server', () => ({
+  createClient: async () => routeClient.client,
+  getAuthClaims: async () => ({ sub: 'user-parity' }),
 }))
 
 class MockResizeObserver {
@@ -102,8 +115,12 @@ const PROFILE: Row = {
 function transacties(): Row[] {
   const rows: Row[] = []
   for (const m of ['01', '02', '03', '04', '05', '06']) {
-    rows.push({ amount: 6000, date: `2026-${m}-05`, budget_id: B_INCOME, transaction_type: null })
-    rows.push({ amount: -5430, date: `2026-${m}-12`, budget_id: B_EXPENSE, transaction_type: null })
+    // `is_income` staat er expliciet bij naast het teken van `amount`: de loaders
+    // classificeren op het TEKEN (via `tx_month_aggregate`), maar de check-in-route
+    // filtert op de KOLOM. Zonder deze vlag zou de check-in een lege zes maanden
+    // meten en zou de suite de grondslag-vergelijking niet meer maken.
+    rows.push({ amount: 6000, is_income: true, date: `2026-${m}-05`, budget_id: B_INCOME, transaction_type: null })
+    rows.push({ amount: -5430, is_income: false, date: `2026-${m}-12`, budget_id: B_EXPENSE, transaction_type: null })
   }
   return rows
 }
@@ -197,5 +214,76 @@ describe('spaarquote — élk oppervlak toont de EFFECTIEVE quote', () => {
     const doelen = [{ goal_type: 'savings_rate' as const, current_value: 0 }]
     await injectParameterGoalCurrentValues(makeSupabase(DB).client, doelen, FAKE_USER_ID)
     expect(doelen[0].current_value).toBe(EFFECTIEF_PCT)
+  })
+
+  /**
+   * CHECK-IN (R2, eigenaarsbesluit 5 — 7 sep 2026). De gespreksstarters draaiden
+   * op `computeSavingsRate6m`: de rauwe 6-maandsmeting, mét spaarbudget-correctie
+   * en extrapolatie maar ZÓNDER grondslagresolutie. Onder een handmatige
+   * grondslag toonde de check-in daardoor een ánder percentage dan /overzicht,
+   * onder een identiek label ("6-maands spaarquote").
+   *
+   * Deze fixture maakt het gevolg categorisch in plaats van cosmetisch: op de
+   * gemeten 9,5 % vuurt de LAGE-spaarquote-starter (`< 10 %`, "welke kleine stap
+   * zou die kunnen verhogen?"), op de effectieve 30,0 % de STERKE (`>= 25 %`,
+   * "wat maakt dat mogelijk?"). Het verkeerde getal stelde dus letterlijk de
+   * verkeerde vraag.
+   */
+  it('check-in: de gespreksstarters draaien op de EFFECTIEVE quote (30,0 %), niet op de gemeten 9,5 %', async () => {
+    routeClient.client = makeSupabase(DB).client
+    const res = await checkinStartersGET()
+    const { starters } = (await res.json()) as { starters: { id: string }[] }
+    const ids = starters.map((s) => s.id)
+
+    expect(ids).toContain('spaarquote-sterk')
+    expect(ids).not.toContain('spaarquote-laag')
+
+    // `(9.5).toFixed(0)` is "10", `(30.0).toFixed(0)` is "30" — de teksten zijn
+    // dus onderscheidend zonder op een variant-rotatie te leunen.
+    const tekst = JSON.stringify(starters)
+    expect(tekst).toContain('30%')
+    expect(tekst).not.toContain('10%')
+  })
+
+  /**
+   * ADR 0121 kende de check-in als uitzondering waar de MÉTING mocht staan, mits
+   * elke zin "6-maands"/"over zes maanden" droeg. Die uitzondering vervalt met
+   * eigenaarsbesluit 5: het getal is nu de effectieve quote, dus een venster-
+   * label zou het cijfer verkeerd duiden. In plaats daarvan benoemt de check-in
+   * zijn eigen grondslag (`savingsRateBasisPhrase`).
+   */
+  it('check-in: de spaarquote-tekst leent geen venster meer, maar noemt de grondslag', async () => {
+    routeClient.client = makeSupabase(DB).client
+    const res = await checkinStartersGET()
+    const { starters } = (await res.json()) as { starters: { id: string }[] }
+    const tekst = JSON.stringify(starters)
+
+    expect(tekst).not.toContain('6-maands')
+    expect(tekst).not.toContain('over 6 maanden')
+    expect(tekst).not.toContain('over zes maanden')
+    // De fixture staat handmatig aan beide kanten ⇒ BASIS_PHRASE.manual.
+    expect(tekst).toContain('volgens je eigen invoer')
+  })
+
+  /**
+   * TEGENPROEF — de grondslagresolutie mag op het ZUIVERE transactiepad niets
+   * verschuiven: daar geeft `resolveSavingsSource` per definitie de meting terug.
+   * Zonder deze case zou de suite niet kunnen onderscheiden tussen "de check-in
+   * volgt nu de grondslag" en "de check-in toont voortaan altijd iets anders".
+   */
+  it('check-in: op een zuivere transactiegrondslag blijft het de gemeten 9,5 % — alleen het label verandert mee', async () => {
+    routeClient.client = makeSupabase({
+      ...DB,
+      profile: { ...PROFILE, income_source: 'transaction', expenses_source: 'transaction' },
+    }).client
+    const res = await checkinStartersGET()
+    const { starters } = (await res.json()) as { starters: { id: string }[] }
+    const ids = starters.map((s) => s.id)
+
+    expect(ids).toContain('spaarquote-laag')
+    expect(ids).not.toContain('spaarquote-sterk')
+    const tekst = JSON.stringify(starters)
+    expect(tekst).toContain('10%')      // (9.5).toFixed(0)
+    expect(tekst).toContain('volgens je transacties')
   })
 })

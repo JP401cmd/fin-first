@@ -73,7 +73,7 @@ export function ScenariosModal({ input, debts = [], open, onClose, simRows, simF
     }
     // Gezondheidsscore = canonieke huidige-staat "weerbaarheid". Deze hangt niet
     // van het gekozen scenario/weer af, dus de canonieke baseHealthInput wordt
-    // ONGEWIJZIGD geconsumeerd (geen savingsRate6m/freedomPct-override) — zo is de
+    // ONGEWIJZIGD geconsumeerd (geen spaarquote-/freedomPct-override) — zo is de
     // modal-score per definitie gelijk aan /toekomst en verdwijnt de drift.
     // Zonder prop (test-pagina): lichtgewicht reconstructie uit `input`/`debts`,
     // zónder noodfondsproxy te fabriceren (geen `totalAssets * 0.3`).
@@ -92,7 +92,7 @@ export function ScenariosModal({ input, debts = [], open, onClose, simRows, simF
         : input.yearlyMustExpenses > 0 ? input.yearlyMustExpenses / NL_SWR : 0
       const fPct = target > 0 ? Math.max(0, Math.min((nw / target) * 100, 100)) : 0
       healthInput = {
-        savingsRate6m: savingsRate,
+        effectiveSavingsRatePct: savingsRate,
         totalAssets: input.totalAssets,
         totalDebts: input.totalDebts,
         // Geen noodfonds fabriceren zonder cash-detail → neutraal 0.

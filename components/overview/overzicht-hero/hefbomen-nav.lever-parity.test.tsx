@@ -343,7 +343,7 @@ describe('Kompas == kaart: één statuswoord per status', () => {
  *
  *  (a) het percentage stond KAAL — het enige getal in de rij zonder eenheid,
  *      tussen drie euro-bedragen;
- *  (b) de kaart las de EFFECTIEVE quote (via `healthScoreInput.savingsRate6m`,
+ *  (b) de kaart las de EFFECTIEVE quote (via `healthScoreInput.effectiveSavingsRatePct`,
  *      een legacy-misnomer: de horizon-loader vult 'm met `effectiveSavingsRate`)
  *      terwijl het kompas de rauwe 6-maands transactiemeting toonde — 25 % naast
  *      12 %, met een stipje dat van de rauwe meting was afgeleid.
@@ -435,7 +435,7 @@ describe('B-030 — kaart en kompas tonen ÉÉN spaarquote (de effectieve, niet 
    * zelf declareert.
    *
    * Waarom dat verschil telt: de tegel op /overzicht leest
-   * `horizonData.healthScoreInput.savingsRate6m` (app/(app)/overzicht/page.tsx),
+   * `horizonData.healthScoreInput.effectiveSavingsRatePct` (app/(app)/overzicht/page.tsx),
    * en dát veld wordt door `loadHorizonRaw` gevuld met `effectiveSavingsRate`.
    * Een test die hier een letterlijke 30 invult, vergelijkt het kompas met een
    * getal uit zijn eigen bestand: "kaart == kompas" heet hij dan wel, maar hij
@@ -444,7 +444,7 @@ describe('B-030 — kaart en kompas tonen ÉÉN spaarquote (de effectieve, niet 
    */
   async function kaartPct(db: FakeDb): Promise<number> {
     const raw = await loadHorizonRaw(makeSupabase(db).client)
-    return raw.healthScoreInputBase.savingsRate6m
+    return raw.healthScoreInputBase.effectiveSavingsRatePct
   }
 
   /** De kompas-kant: de detailregel + status uit `loadLeverScores`. */
@@ -552,7 +552,7 @@ describe('bevinding 1 — leeggemaakt handmatig inkomen valt terug op de transac
 
   it('de kaart leidt 30 % af uit de transactie-extrapolatie', async () => {
     const raw = await loadHorizonRaw(makeSupabase(DB_LEEG).client)
-    expect(raw.healthScoreInputBase.savingsRate6m).toBe(VERWACHT_PCT)
+    expect(raw.healthScoreInputBase.effectiveSavingsRatePct).toBe(VERWACHT_PCT)
   })
 
   it('het kompas doet hetzelfde — géén 0 % naast 30 %', async () => {
@@ -560,7 +560,7 @@ describe('bevinding 1 — leeggemaakt handmatig inkomen valt terug op de transac
     const { scores } = await loadLeverScores(makeSupabase(DB_LEEG).client)
 
     expect(scores.cashflow.detail).toContain(
-      `Spaarquote ${Math.round(raw.healthScoreInputBase.savingsRate6m)}%`,
+      `Spaarquote ${Math.round(raw.healthScoreInputBase.effectiveSavingsRatePct)}%`,
     )
     // Expliciet: de oude bedrading landde hier op 0 %.
     expect(scores.cashflow.detail).not.toContain('Spaarquote 0%')
@@ -569,7 +569,7 @@ describe('bevinding 1 — leeggemaakt handmatig inkomen valt terug op de transac
   it('kaart en kompas staan op één tegel zonder elkaar tegen te spreken', async () => {
     const raw = await loadHorizonRaw(makeSupabase(DB_LEEG).client)
     const { scores } = await loadLeverScores(makeSupabase(DB_LEEG).client)
-    const pct = raw.healthScoreInputBase.savingsRate6m
+    const pct = raw.healthScoreInputBase.effectiveSavingsRatePct
 
     const { container } = render(
       <HefbomenNav health={null} leverScores={scores} totals={{ cashflow: pct }} />,

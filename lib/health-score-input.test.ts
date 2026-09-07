@@ -369,7 +369,7 @@ describe('buildHealthScoreInput — doorgifte v2-velden', () => {
     { asset_type: 'investment', current_value: 85_000 },
   ]
   const scalars = {
-    savingsRate6m: 22,
+    effectiveSavingsRatePct: 22,
     totalAssets: 100_000,
     totalDebts: 10_000,
     freedomPct: 30,
@@ -408,9 +408,9 @@ describe('buildHealthScoreInput — doorgifte v2-velden', () => {
     expect(input.largestAssetTypeShare).toBeCloseTo(0.85, 5)
   })
 
-  it('savingsRate6m, totalAssets, totalDebts, freedomPct ongewijzigd doorgegeven', () => {
+  it('effectiveSavingsRatePct, totalAssets, totalDebts, freedomPct ongewijzigd doorgegeven', () => {
     const input = buildHealthScoreInput(scalars, rows)
-    expect(input.savingsRate6m).toBe(22)
+    expect(input.effectiveSavingsRatePct).toBe(22)
     expect(input.totalAssets).toBe(100_000)
     expect(input.totalDebts).toBe(10_000)
     expect(input.freedomPct).toBe(30)

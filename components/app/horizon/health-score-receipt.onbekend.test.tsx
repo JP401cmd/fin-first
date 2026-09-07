@@ -13,7 +13,7 @@ vi.mock('@/components/app/chat/chat-provider', () => ({
 }))
 
 const sanne: HealthScoreInput = {
-  savingsRate6m: 0,
+  effectiveSavingsRatePct: 0,
   totalAssets: 14_000,
   totalDebts: 9_000,
   emergencyFundMonths: 0,

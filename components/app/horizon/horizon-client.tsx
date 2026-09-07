@@ -1946,12 +1946,12 @@ export default function HorizonPage({
   const currentAge = effectiveInput?.dateOfBirth ? ageAtDate(effectiveInput.dateOfBirth) : null
 
   // ── Baseline overrides for inline what-if sliders (feature #795) ───────
-  // savingsRate6m: server-canoniek getal (incl. spaarbudgetten + aflossing)
+  // effectiveSavingsRatePct: server-canoniek getal (grondslag-geresolveerd)
   // zodat de slider start op dezelfde spaarquote als de cashflow-pagina.
   const whatIfBaseline = useMemo<WhatIfOverrides | null>(() => {
     if (!effectiveInput) return null
-    return buildBaselineOverrides(effectiveInput, fireParams.grossReturn, initialData.healthScoreInput.savingsRate6m)
-  }, [effectiveInput, fireParams.grossReturn, initialData.healthScoreInput.savingsRate6m])
+    return buildBaselineOverrides(effectiveInput, fireParams.grossReturn, initialData.healthScoreInput.effectiveSavingsRatePct)
+  }, [effectiveInput, fireParams.grossReturn, initialData.healthScoreInput.effectiveSavingsRatePct])
 
   // ── Wat-als-hydratie + koppel-semantiek (stap 4) ──────────────────────────
   // Slider-standen reconstrueren uit de bewaarde pref zodra de baseline + leeftijd
@@ -3271,7 +3271,7 @@ export default function HorizonPage({
       const scenario = savedScenarios.find(s => s.id === scenarioId)
       if (!scenario) continue
 
-      const baselineOvr = buildBaselineOverrides(initialEffectiveInput, initialFireParams.grossReturn, initialData.healthScoreInput.savingsRate6m)
+      const baselineOvr = buildBaselineOverrides(initialEffectiveInput, initialFireParams.grossReturn, initialData.healthScoreInput.effectiveSavingsRatePct)
       const { adjustedInput, annualSavings } = applyWhatIfOverrides(initialEffectiveInput, scenario.overrides, baselineOvr)
 
       // Scenario-events → LifeEvent-vorm (numerieke velden normaliseren; sommige kunnen
@@ -9449,7 +9449,7 @@ export default function HorizonPage({
           cashflows={simCashflows}
           allRows={unifiedRows ?? []}
           monthlyIncome={effectiveInput?.monthlyIncome}
-          savingsRate6m={healthScoreInput.savingsRate6m}
+          savingsRate6m={healthScoreInput.effectiveSavingsRatePct}
           // tweede-motor: exempt — fase-modal-invoer, geen hero-KPI; de modal
           // rekent zijn eigen strategie-bewuste doel door. Zie C1.
           fireTarget={fire?.fireTarget}

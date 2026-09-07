@@ -170,7 +170,9 @@ function baseInput(over: Partial<GespreksstartersInput> = {}): GespreksstartersI
     prevMonthlySavings: 1000,
     monthBeforePrevExpenses: 3000,
     monthBeforePrevSavings: 1000,
-    savingsRate6m: 20,
+    effectiveSavingsRatePct: 20,
+    savingsIncomeBasis: 'manual',
+    savingsExpensesBasis: 'manual',
     dailyExpenses: 100,
     goals: [],
     totalDebts: 0,
@@ -231,12 +233,12 @@ describe('nieuwe detectoren A', () => {
     expect(hit).toBeDefined()
     expect(hit!.sentiment).toBe('alert')
   })
-  it('spaarquote-sterk fires when 6m rate >= 25%', () => {
-    const out = buildGespreksstarters(baseInput({ savingsRate6m: 32 }))
+  it('spaarquote-sterk fires when de effectieve quote >= 25%', () => {
+    const out = buildGespreksstarters(baseInput({ effectiveSavingsRatePct: 32 }))
     expect(ids(out)).toContain('spaarquote-sterk')
   })
-  it('spaarquote-laag fires when 6m rate between 0 and 10', () => {
-    const out = buildGespreksstarters(baseInput({ savingsRate6m: 6 }))
+  it('spaarquote-laag fires when de effectieve quote tussen 0 en 10 ligt', () => {
+    const out = buildGespreksstarters(baseInput({ effectiveSavingsRatePct: 6 }))
     expect(ids(out)).toContain('spaarquote-laag')
   })
   it('budgetcategorie-uitschieter fires on largest over-limit category', () => {
@@ -329,7 +331,7 @@ describe('buildGespreksstarters — contracten', () => {
       monthlySavings: 1500, prevMonthlySavings: 800,
       totalDebts: 30000, debtCount: 2,
       completedActionsThisMonth: 2, completedActionsFreedomDays: 10,
-      savingsRate6m: 30, fireAge: 50, prevFireAge: 53,
+      effectiveSavingsRatePct: 30, fireAge: 50, prevFireAge: 53,
     }))
     expect(loaded.length).toBeLessThanOrEqual(5)
   })
@@ -437,5 +439,55 @@ describe('vergelijkende starters kijken naar afgeronde maanden (B-016)', () => {
     const hit = out.find((s) => s.id === 'sparen-stijging')
     expect(hit).toBeDefined()
     expect(`${hit!.vraag} ${hit!.context}`).not.toContain('deze maand')
+  })
+})
+
+// ── ADR 0131: onbekend is geen nul ─────────────────────────────────────────
+
+describe('buildGespreksstarters — geen oordeel zonder grondslag (ADR 0131)', () => {
+  /**
+   * Profiel dat in de onboarding "Later invullen" koos: inkomen staat vast,
+   * uitgaven niet, en er zijn nog geen transacties. `resolveAmountWithBasis`
+   * valt dan door tot `{ amount: 0, basis: 'unknown' }`, en
+   * `savingsRateFromAggregates(inkomen, 0, 0)` levert exact 100. Zonder guard
+   * feliciteert de check-in iemand met een leeg profiel.
+   *
+   * `lib/architecture/calculations.ts` noemt deze surface bij naam: score,
+   * spaarquote-widget, instellingenblok én check-in tonen bij een onbekende
+   * grondslag géén cijfer en géén oordeel.
+   */
+  const zonderGrondslag = {
+    effectiveSavingsRatePct: 100,
+    savingsIncomeBasis: 'manual' as const,
+    savingsExpensesBasis: 'unknown' as const,
+  }
+
+  it('vuurt geen spaarquote-starter op een quote van 100% zonder bekende grondslag', () => {
+    const out = buildGespreksstarters(baseInput(zonderGrondslag))
+    expect(ids(out)).not.toContain('spaarquote-sterk')
+    expect(ids(out)).not.toContain('spaarquote-laag')
+  })
+
+  it('noemt nergens een percentage dat op een gat rust', () => {
+    const out = buildGespreksstarters(baseInput(zonderGrondslag))
+    const tekst = JSON.stringify(out)
+    expect(tekst).not.toContain('100%')
+    // De vangnet-frase uit budget-basis hoort nooit op het scherm te komen:
+    // een zin over een onbekende grondslag hoort niet te bestaan.
+    expect(tekst).not.toContain('zonder bekende grondslag')
+  })
+
+  it('laat een detector die op een GEMETEN eurobedrag rust wél staan', () => {
+    // Het spaarbedrag is echt gemeten; alleen het percentage ontbreekt. De
+    // starter blijft, met een context zonder quote.
+    const out = buildGespreksstarters(baseInput({ ...zonderGrondslag, monthlySavings: 1000 }))
+    const vrijheid = out.find((s) => s.id === 'sparen-vrijheid')
+    expect(vrijheid).toBeTruthy()
+    expect(vrijheid?.context).not.toContain('%')
+  })
+
+  it('blijft de quote WEL tonen zodra beide grondslagen bekend zijn (tegenproef)', () => {
+    const out = buildGespreksstarters(baseInput({ effectiveSavingsRatePct: 30 }))
+    expect(JSON.stringify(out)).toContain('30%')
   })
 })

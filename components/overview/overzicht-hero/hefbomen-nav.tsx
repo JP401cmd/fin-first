@@ -104,9 +104,9 @@ export type HefbomenTotals = {
    * De EFFECTIEVE spaarquote in procenten (0–100) — `resolveSavingsSource(...)
    * .effectiveSavingsRatePct`, waar een handmatige of budget-grondslag wint van
    * de meting (ADR 0121). De aanroeper leest dit uit
-   * `healthScoreInput.savingsRate6m`; die VELDNAAM is een legacy-misnomer — de
-   * horizon-loader vult 'm met `effectiveSavingsRate`, niet met de rauwe
-   * 6-maands quote.
+   * `healthScoreInput.effectiveSavingsRatePct` — een veld dat tot R2 (7 sep 2026)
+   * `savingsRate6m` heette terwijl de horizon-loader 'm al met
+   * `effectiveSavingsRate` vulde; de naam draagt nu zijn grondslag.
    */
   cashflow?: number | null
   /**

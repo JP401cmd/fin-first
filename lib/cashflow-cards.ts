@@ -549,9 +549,16 @@ export function buildCashflowCards(
     // staat in `detail.tip`, waar het bij de horizon hoort.
     kpiWindow: null,
     detail: {
+      // TWEE GROOTHEDEN IN ÉÉN BLOK — en de tip benoemt dat verschil (R2 #5,
+      // 7 sep 2026). Het hoofdcijfer van deze kaart is een STAND (het verwachte
+      // saldo aan het eind van de prognose); dit detailgetal is een STROOM (de
+      // gemiddelde mutatie per maand, rij 1 van `buildForecast`). Ze stonden
+      // naast elkaar zonder één woord dat ze uit elkaar hield, waardoor
+      // "+€ 1.100" en "€ 42.000" als hetzelfde soort getal lazen. De getallen
+      // zelf zijn ongewijzigd — alleen de duiding is toegevoegd.
       label: 'Netto per maand',
       value: signed(netPerMonth),
-      tip: `Verwacht saldo na ${rows.length} maanden: ${formatCurrency(endBalance)}.`,
+      tip: `Maandelijkse mutatie. Het bedrag op de kaart is iets anders: het verwachte saldo na ${rows.length} ${rows.length === 1 ? 'maand' : 'maanden'} (${formatCurrency(endBalance)}).`,
       actionLabel: 'Bekijk forecast',
     },
   }

@@ -255,7 +255,13 @@ export function makeSupabase(db: FakeDb): FakeSupabase {
       return { data, error: null, count: wantCount ? matched.length : null }
     }
     const q: Record<string, unknown> = {}
-    const passthrough = ['not', 'is', 'filter', 'contains', 'overlaps', 'match', 'textSearch']
+    // `like`/`ilike` staan hier bewust bij de passthroughs en niet bij de ECHT
+    // toegepaste filters: een patroonvergelijking nabouwen zou een tweede
+    // (mogelijk afwijkende) SQL-semantiek in de mock leggen. Passthrough maakt
+    // een test hooguit minder scherp — nooit stil van rijen beroofd.
+    const passthrough = [
+      'not', 'is', 'filter', 'contains', 'overlaps', 'match', 'textSearch', 'like', 'ilike',
+    ]
     for (const m of passthrough) q[m] = () => q
     q.select = (_cols?: string, opts?: { count?: string; head?: boolean }) => {
       if (opts?.count) wantCount = true

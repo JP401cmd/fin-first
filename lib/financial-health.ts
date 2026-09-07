@@ -29,14 +29,28 @@ import { budgetLimitStatus } from '@/lib/budget-alerts'
 import { DEFAULT_RETURN } from '@/lib/constants'
 import { firePeerAgeForAge, FIRE_PEER_CURVE_START_AGE } from '@/lib/benchmark/fire-peer-lat'
 import { legacyAnchorOf, type FireEndStrategy, type StopAnchorKind } from '@/lib/fire-strategy'
-import type { ResolvedBasis } from '@/lib/budget-basis'
+import { savingsRateBasisPhrase, type ResolvedBasis } from '@/lib/budget-basis'
 import { grondslagGuard, type OntbrekendeGrondslag } from '@/lib/grondslag-guard'
 
 // ── Lightweight input for server-side / snapshot usage ───────
 // Allows computing the health score without a full DashboardData bundle.
 
 export interface HealthScoreInput {
-  savingsRate6m: number
+  /**
+   * DE spaarquote: `resolveSavingsSource(...).effectiveSavingsRatePct` (ADR 0103
+   * / 0121) — de grondslag-geresolveerde quote, waar een handmatige of
+   * budget-grondslag de transactiemeting verslaat.
+   *
+   * HEETTE TOT R2 (7 sep 2026) `savingsRate6m`, en dat was een legacy-misnomer:
+   * álle producenten (de drie loaders, de check-funnel en de drie
+   * snapshot-routes) voedden het veld al met de EFFECTIEVE quote, terwijl de
+   * naam een 6-maands venster beloofde. Er bestaat ook een échte
+   * `savingsRate6m` — `DashboardData.savingsRate6m`, de rauwe 6-maands
+   * transactiemeting die de kassabon verklaart — en die twee gelijknamige velden
+   * hebben de UR3-17-triage al een keer op het verkeerde been gezet. De naam
+   * draagt sindsdien zijn grondslag (ADR 0073-stijl), niet een venster.
+   */
+  effectiveSavingsRatePct: number
   totalAssets: number
   totalDebts: number
   /**
@@ -82,7 +96,7 @@ export interface HealthScoreInput {
    */
   fireStopAnchor?: StopAnchorKind
   /**
-   * Netto maandinkomen — dezelfde canonieke inkomensbron die `savingsRate6m`
+   * Netto maandinkomen — dezelfde canonieke inkomensbron die `effectiveSavingsRatePct`
    * voedt (income6m/6 resp. effectiveMonthlyIncome). Noemer van de DSTI-pijler.
    */
   netMonthlyIncome: number
@@ -98,7 +112,7 @@ export interface HealthScoreInput {
   /** Budget categories with limit/spent; empty array if no budgets */
   budgetCategories: { limit: number; spent: number }[]
   /**
-   * Grondslag van het inkomen resp. de uitgaven waarop `savingsRate6m`,
+   * Grondslag van het inkomen resp. de uitgaven waarop `effectiveSavingsRatePct`,
    * `emergencyFundMonths`, `netMonthlyIncome` en `freedomPct` rusten (ADR 0131).
    * `'unknown'` = er is NIETS bekend (geen keuze, geen meting, geen profiel-
    * bedrag): de pijlers die die kant nodig hebben vallen dan inactief en de
@@ -678,7 +692,15 @@ export function computeHealthScore(
   // DashboardData lacks the inputs for the two new v2 indicators: concentratie
   // wordt inactief (null); DSTI volgt het geen-schulden-pad (actief, score 100).
   const input: HealthScoreInput = {
-    savingsRate6m: data.savingsRate6m,
+    // GRONDSLAG-CORRECTIE (R2, 7 sep 2026): hier stond `data.savingsRate6m` — de
+    // RAUWE 6-maands transactiemeting — terwijl dezelfde bundel de effectieve,
+    // grondslag-geresolveerde quote al draagt en élke andere producent van dit
+    // veld die aanlevert. Dat was de enige plek waar de meting het scorepad in
+    // lekte. Deze variant is niet-canoniek en heeft vandaag geen productie-
+    // aanroeper (alleen de regressiesuite `wil-gezondheid` en unit-tests), maar
+    // een veld dat `effectiveSavingsRatePct` heet mag niet met de meting gevuld
+    // worden — dat is precies de misnomer die R2 opruimt.
+    effectiveSavingsRatePct: data.effectiveSavingsRatePct,
     totalAssets: data.totalAssets,
     totalDebts: data.totalDebts,
     emergencyFundMonths: data.emergencyFund.monthsCovered,
@@ -705,8 +727,8 @@ export function computeHealthScore(
   const activeIds = new Set(current.pillars.map(p => p.id))
   const prevNetWorth = data.netWorthHistory[data.netWorthHistory.length - 2]?.value ?? data.netWorth
   const prevSavingsRate = data.savingsHistory.length >= 2
-    ? data.savingsHistory[data.savingsHistory.length - 2]?.value ?? data.savingsRate6m
-    : data.savingsRate6m
+    ? data.savingsHistory[data.savingsHistory.length - 2]?.value ?? data.effectiveSavingsRatePct
+    : data.effectiveSavingsRatePct
 
   const prevScores: Record<string, number> = {
     savings_rate: scoreSavingsRate(prevSavingsRate),
@@ -775,7 +797,7 @@ export function computeHealthScoreFromInputs(
 
   // Spaarquote — een waarde zodra inkomen én uitgaven bekend zijn (0 is dan een
   // echte score); zonder grondslag is er geen quote, geen 0.
-  const savingsRateScore = scoreSavingsRate(input.savingsRate6m)
+  const savingsRateScore = scoreSavingsRate(input.effectiveSavingsRatePct)
 
   // Budgetdiscipline — inactief zonder budgetten (FR-5; geen 70-dummy meer).
   // Teller en score komen uit DEZELFDE tally, zodat de rawValue ("32/33") nooit
@@ -834,15 +856,25 @@ export function computeHealthScoreFromInputs(
       'savings_rate',
       'Spaarquote',
       savingsRateScore,
-      'Hoeveel procent van je inkomen spaar je? (6-maands gemiddelde)',
-      input.savingsRate6m < 10
+      // R2: dit is de ENIGE gebruiker-zichtbare string die de oude naam droeg —
+      // health-score-receipt.tsx rendert 'm, ook in de aria-label achter de
+      // waarde. Hij zei "(6-maands gemiddelde)" terwijl het getal de effectieve,
+      // grondslag-geresolveerde quote is; bij een handmatige invoer las de
+      // gebruiker dus een venster dat niet klopte. Nu benoemt hij de grondslag,
+      // met dezelfde canonieke frase als de kaarten en de check-in.
+      // Beide grondslagen zijn optioneel op dit contract. Ontbreken ze, dan
+      // noemen we er géén — een verzonnen venster is precies wat hier fout was.
+      input.incomeBasis && input.expensesBasis
+        ? `Hoeveel procent van je inkomen spaar je? (${savingsRateBasisPhrase(input.incomeBasis, input.expensesBasis)})`
+        : 'Hoeveel procent van je inkomen spaar je?',
+      input.effectiveSavingsRatePct < 10
         ? 'Begin met 10% van je inkomen automatisch opzij te zetten.'
-        : input.savingsRate6m < 20
+        : input.effectiveSavingsRatePct < 20
         ? 'Bekijk je abonnementen en vaste lasten — kleine besparingen tellen snel op.'
-        : input.savingsRate6m < 30
+        : input.effectiveSavingsRatePct < 30
         ? 'Je bent op de goede weg! Verhoog bij elke loonsverhoging je spaarpercentage.'
         : 'Uitstekende spaarquote — blijf dit volhouden.',
-      `${Math.round(input.savingsRate6m)}%`,
+      `${Math.round(input.effectiveSavingsRatePct)}%`,
     ),
     makePillar(
       'budget_discipline',
@@ -1019,7 +1051,7 @@ export function computeHealthScoreWithTrend(
   history: {
     /** Vorige-maand netto vermogen (voor freedomPct + schuldratio-proxy). */
     prevNetWorth: number | null
-    /** Vorige-maand spaarquote-%; valt terug op huidige savingsRate6m. */
+    /** Vorige-maand spaarquote-%; valt terug op de huidige effectiveSavingsRatePct. */
     prevSavingsRate: number | null
     /** Canonieke benodigde portfolio (noemer freedomPct); valt terug op fireTarget. */
     requiredPortfolio: number | null
@@ -1040,7 +1072,7 @@ export function computeHealthScoreWithTrend(
   const prevInput: HealthScoreInput = {
     ...input,
     freedomPct: prevFreedomPct,
-    savingsRate6m: history.prevSavingsRate ?? input.savingsRate6m,
+    effectiveSavingsRatePct: history.prevSavingsRate ?? input.effectiveSavingsRatePct,
     // Schuldratio-proxy: prev-month vermogen met huidige schuld.
     totalAssets: history.prevNetWorth + input.totalDebts,
   }

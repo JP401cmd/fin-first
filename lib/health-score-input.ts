@@ -351,7 +351,13 @@ export function buildBudgetCategories(
  * (perspectief-totalen, spaarquote, strategy-adjusted freedomPct).
  */
 export interface HealthScoreScalars {
-  savingsRate6m: number
+  /**
+   * DE spaarquote: `resolveSavingsSource(...).effectiveSavingsRatePct` (ADR 0103
+   * / 0121). Heette tot R2 (7 sep 2026) `savingsRate6m` terwijl álle zeven
+   * producenten al de effectieve quote leverden — zie de uitgebreide
+   * toelichting bij `HealthScoreInput.effectiveSavingsRatePct`.
+   */
+  effectiveSavingsRatePct: number
   totalAssets: number
   totalDebts: number
   /** Strategy-adjusted FIRE-voortgang (0–100+); persisteer wat hier wordt gebruikt. */
@@ -391,7 +397,7 @@ export interface HealthScoreScalars {
    */
   netMonthlySalary: number
   /**
-   * Netto maandinkomen — DEZELFDE canonieke bron die `savingsRate6m` voedt
+   * Netto maandinkomen — DEZELFDE canonieke bron die `effectiveSavingsRatePct` voedt
    * (income6m/6 resp. effectiveMonthlyIncome). Noemer van de DSTI-pijler;
    * géén nieuwe/afwijkende inkomensbron introduceren (ADR 0010 / FR-2).
    */
@@ -466,7 +472,7 @@ export function buildHealthScoreInput(
   rows: HealthScoreRows,
 ): HealthScoreInput {
   return {
-    savingsRate6m: scalars.savingsRate6m,
+    effectiveSavingsRatePct: scalars.effectiveSavingsRatePct,
     totalAssets: scalars.totalAssets,
     totalDebts: scalars.totalDebts,
     freedomPct: scalars.freedomPct,
