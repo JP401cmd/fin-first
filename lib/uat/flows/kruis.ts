@@ -43,7 +43,7 @@ export const KRUIS_FLOW: UatFlow = {
     // ── 1 · cross-bronnen (waar de mutatie zijn oorsprong heeft) ───────────
     { id: 'x-bezit', label: 'Bezittingen', kind: 'cross', stage: 1, lane: 'mutatie', crossZone: 'BEZIT' },
     { id: 'x-schuld', label: 'Schulden', kind: 'cross', stage: 1, lane: 'mutatie', crossZone: 'SCHULD' },
-    { id: 'x-cash', label: 'Cashflow & import', kind: 'cross', stage: 1, lane: 'mutatie', crossZone: 'CASH' },
+    { id: 'x-cash', label: 'Rekeningen, transacties & import', kind: 'cross', stage: 1, lane: 'mutatie', crossZone: 'CASH' },
     { id: 'x-budget', label: 'Budgetteren', kind: 'cross', stage: 1, lane: 'mutatie', crossZone: 'BUDGET' },
 
     // ── 2 · consistentie-toetsen (zelfde getal overal — delta = 0) ─────────

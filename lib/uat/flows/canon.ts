@@ -43,7 +43,7 @@ export const CANON_FLOW: UatFlow = {
     { id: 'x-ovz', label: 'Overzicht-hub', kind: 'cross', stage: 2, lane: 'domein', crossZone: 'OVZ' },
     { id: 'x-bezit', label: 'Bezittingen', kind: 'cross', stage: 2, lane: 'domein', crossZone: 'BEZIT' },
     { id: 'x-schuld', label: 'Schulden & hypotheek', kind: 'cross', stage: 2, lane: 'domein', crossZone: 'SCHULD' },
-    { id: 'x-cash', label: 'Cashflow & import', kind: 'cross', stage: 2, lane: 'domein', crossZone: 'CASH' },
+    { id: 'x-cash', label: 'Rekeningen, transacties & import', kind: 'cross', stage: 2, lane: 'domein', crossZone: 'CASH' },
     { id: 'x-belast', label: 'Belasting (Box 1/2/3)', kind: 'cross', stage: 2, lane: 'domein', crossZone: 'BELAST' },
     { id: 'x-toek', label: 'Toekomst & tijdas', kind: 'cross', stage: 2, lane: 'domein', crossZone: 'TOEK' },
     { id: 'x-rapp', label: 'Rapportages', kind: 'cross', stage: 2, lane: 'domein', crossZone: 'RAPP' },

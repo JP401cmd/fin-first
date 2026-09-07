@@ -61,7 +61,11 @@ export const UAT_ZONES: UatZoneMeta[] = [
   { zone: 'OVZ', naam: "Overzicht-hub", band: 'dagelijks' },
   { zone: 'BEZIT', naam: "Bezittingen", band: 'fundament' },
   { zone: 'SCHULD', naam: "Schulden & hypotheek", band: 'fundament' },
-  { zone: 'CASH', naam: "Cashflow & import", band: 'fundament' },
+  // De cashflow-hub is opgeheven (ADR 0135, 6 sep 2026); de zone dekt sindsdien
+  // de rekeningen (als bezitgroep), de transactiepagina en de bankimport. De
+  // ZONE-SLEUTEL blijft bewust `CASH` — die zit in scenario-ids, flows en
+  // opgeslagen UAT-resultaten; alleen het getoonde label verhuist mee.
+  { zone: 'CASH', naam: 'Rekeningen, transacties & import', band: 'fundament' },
   { zone: 'BUDGET', naam: "Budgetteren", band: 'fundament' },
   { zone: 'BELAST', naam: "Belasting (Box 1/2/3)", band: 'vooruitkijken' },
   { zone: 'TOEK', naam: "Toekomst & tijdas", band: 'vooruitkijken' },
@@ -270,6 +274,7 @@ export const UAT_SCENARIOS: UatScenario[] = [
   { id: 'UAT-CASH-65', wf: 'WF-CASH-65', zone: 'CASH', band: 'fundament', naam: 'Gedeelde boeking markeren als "Te bespreken" met je partner (ADR 0128)', kriticiteit: 'BELANGRIJK', rooktest: false, platforms: ['webapp', 'mobiel'], subscenarios: ['a', 'b', 'c'], volgorde: 65, duurMin: 8 },
   { id: 'UAT-CASH-66', wf: 'WF-CASH-66', zone: 'CASH', band: 'fundament', naam: 'TrueLayer-sync stempelt ownership + ontdubbelt tegen de partner op een en/of-rekening', kriticiteit: 'KERN', rooktest: false, platforms: ['webapp', 'mobiel'], subscenarios: ['a', 'b'], volgorde: 66, duurMin: 8 },
   { id: 'UAT-CASH-67', wf: 'WF-CASH-67', zone: 'CASH', band: 'fundament', naam: 'Grenzenpot precies op de grens: "Grens bereikt" als vierde weergave-stand (ADR 0136)', kriticiteit: 'BELANGRIJK', rooktest: false, platforms: ['webapp', 'mobiel'], subscenarios: ['a', 'b'], volgorde: 67, duurMin: 5 },
+  { id: 'UAT-CASH-68', wf: 'WF-CASH-68', zone: 'CASH', band: 'fundament', naam: 'Vul-ingangen staan één keer op de transactiepagina, niet twee keer', kriticiteit: 'BELANGRIJK', rooktest: false, platforms: ['webapp', 'mobiel'], subscenarios: ['a', 'b'], volgorde: 68, duurMin: 4 },
   { id: 'UAT-BUDGET-01', wf: 'WF-BUDGET-01', zone: 'BUDGET', band: 'fundament', naam: 'Budgetteren voor het eerst instellen', kriticiteit: 'KERN', rooktest: true, platforms: ['webapp', 'mobiel'], subscenarios: ['a', 'b', 'c'], volgorde: 1, duurMin: 12 },
   { id: 'UAT-BUDGET-02', wf: 'WF-BUDGET-02', zone: 'BUDGET', band: 'fundament', naam: 'Budget-vs-realisatie van de maand bekijken', kriticiteit: 'KERN', rooktest: false, platforms: ['webapp', 'mobiel'], subscenarios: ['a', 'b', 'c'], volgorde: 2, duurMin: 15 },
   { id: 'UAT-BUDGET-03', wf: 'WF-BUDGET-03', zone: 'BUDGET', band: 'fundament', naam: 'Maand navigeren en periodemodus wisselen', kriticiteit: 'KERN', rooktest: false, platforms: ['webapp', 'mobiel'], subscenarios: ['a', 'b', 'c', 'd'], volgorde: 3, duurMin: 10 },
@@ -317,9 +322,9 @@ export const UAT_SCENARIOS: UatScenario[] = [
   { id: 'UAT-BELAST-18', wf: 'WF-BELAST-18', zone: 'BELAST', band: 'vooruitkijken', naam: 'Tegenbewijs simuleren (werkelijk vs forfaitair rendement)', kriticiteit: 'KERN', rooktest: false, platforms: ['webapp', 'mobiel'], subscenarios: ['a', 'b', 'c', 'd'], volgorde: 18, duurMin: 7 },
   { id: 'UAT-BELAST-19', wf: 'WF-BELAST-19', zone: 'BELAST', band: 'vooruitkijken', naam: 'Box 3-vermogen verdelen met je fiscale partner', kriticiteit: 'KERN', rooktest: false, platforms: ['webapp', 'mobiel'], subscenarios: ['a', 'b', 'c', 'd'], volgorde: 19, duurMin: 12 },
   { id: 'UAT-BELAST-21', wf: 'WF-BELAST-21', zone: 'BELAST', band: 'vooruitkijken', naam: 'Peildatum, arbitragevenster en het nieuwe stelsel (2028) lezen', kriticiteit: 'OVERIG', rooktest: false, platforms: ['webapp'], subscenarios: ['a'], volgorde: 21, duurMin: 3 },
-  { id: 'UAT-BELAST-23', wf: 'WF-BELAST-23', zone: 'BELAST', band: 'vooruitkijken', naam: 'Fiscale optimizer: leidende kans op netto effect, vergelijking en huidige stand', kriticiteit: 'KERN', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'b', 'c', 'd'], volgorde: 22, duurMin: 8 },
-  { id: 'UAT-BELAST-24', wf: 'WF-BELAST-24', zone: 'BELAST', band: 'vooruitkijken', naam: 'Fiscale optimizer: verloop over de jaren en de shift-verkenner', kriticiteit: 'KERN', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'b', 'c'], volgorde: 23, duurMin: 7 },
-  { id: 'UAT-BELAST-25', wf: 'WF-BELAST-25', zone: 'BELAST', band: 'vooruitkijken', naam: 'Fiscale optimizer: drie onttrekkingsvolgordes over je hele looptijd vergeleken', kriticiteit: 'KERN', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'b', 'c', 'd'], volgorde: 24, duurMin: 8 },
+  { id: 'UAT-BELAST-23', wf: 'WF-BELAST-23', zone: 'BELAST', band: 'vooruitkijken', naam: 'Fiscale kansen: leidende kans op netto effect, vergelijking en huidige stand', kriticiteit: 'KERN', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'b', 'c', 'd'], volgorde: 22, duurMin: 8 },
+  { id: 'UAT-BELAST-24', wf: 'WF-BELAST-24', zone: 'BELAST', band: 'vooruitkijken', naam: 'Fiscale kansen: verloop over de jaren en de shift-verkenner', kriticiteit: 'KERN', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'b', 'c'], volgorde: 23, duurMin: 7 },
+  { id: 'UAT-BELAST-25', wf: 'WF-BELAST-25', zone: 'BELAST', band: 'vooruitkijken', naam: 'Fiscale kansen: drie onttrekkingsvolgordes over je hele looptijd vergeleken', kriticiteit: 'KERN', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'b', 'c', 'd'], volgorde: 24, duurMin: 8 },
   { id: 'UAT-BELAST-26', wf: 'WF-BELAST-26', zone: 'BELAST', band: 'vooruitkijken', naam: 'Vrijheidsdagen op de huishoud-Box 2/3-routes: canoniek dagtarief', kriticiteit: 'BELANGRIJK', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'c'], volgorde: 25, duurMin: 4 },
   { id: 'UAT-TOEK-01', wf: 'WF-TOEK-01', zone: 'TOEK', band: 'vooruitkijken', naam: 'Tijdas-landing openen en FIRE-kerncijfers aflezen', kriticiteit: 'KERN', rooktest: true, platforms: ['webapp', 'mobiel'], subscenarios: ['a', 'b', 'c', 'd'], volgorde: 1, duurMin: 5 },
   { id: 'UAT-TOEK-02', wf: 'WF-TOEK-02', zone: 'TOEK', band: 'vooruitkijken', naam: 'KPI-kassabon openen en de berekening controleren', kriticiteit: 'KERN', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'c'], volgorde: 2, duurMin: 4 },

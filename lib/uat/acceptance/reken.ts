@@ -340,13 +340,13 @@ const criteria: AcceptanceCriterion[] = [
     titel: 'Samengestelde interest doorrekenen',
     kriticiteit: 'BELANGRIJK',
     persona: 'marijke',
-    given: 'Persona Marijke Vermeer. Prefill maandinleg: `net_monthly_income`(€3.400) − `estimated_monthly_expenses`(€2.800) = €600 (asset-`monthly_contribution`-som=€0, overschrijft niet); prefill rendement = haar `expected_return` = 5,0%.',
+    given: 'Persona Marijke Vermeer, maandinleg €600 (`net_monthly_income` €3.400 − `estimated_monthly_expenses` €2.800) en rendement = haar `expected_return` = 5,0%. LET OP (UR3-26, 7 sep 2026): de losse pagina /toekomst/samengestelde-interest bestaat niet meer — die had nul ingangen en redirect nu naar /toekomst/rekenhulp. Dit criterium toetst dus uitsluitend nog de rekenmotor `computeCompoundInterest`, die ongewijzigd doorleeft en op het scherm terugkomt via de rente-op-rente-kaart op /overzicht/bezittingen. De prefill-afleiding uit het profiel zat in de verwijderde pagina en is géén onderdeel meer van dit criterium.',
     when: 'Maandelijkse samenstelling (rente eerst op bestaand saldo, dan inleg toegevoegd — "ordinary annuity"): `waarde_m = waarde_(m-1) × (1+rendement/12) + maandinleg`, 240 maanden.',
     then: 'Na 20 jaar: totale waarde €246.620, totale inleg €144.000 (exact), rendement-deel €102.620. Referentiepunten: 10 jaar → €93.169 (inleg €72.000); 30 jaar → €499.355 (inleg €216.000). Rendement 0% → eindwaarde = pure inleg; maandinleg €0 → vlak op €0.',
     assertion: {
       kind: 'exact',
       expected: 'y10=93169; y20=246620; y30=499355; y20Deposits=144000; y20Returns=102620',
-      source: 'components/app/horizon/compound-interest-chart.tsx#computeCompoundInterest (échte productiefunctie) — zie reken-checks.ts',
+      source: 'lib/horizon/compound-interest.ts#computeCompoundInterest (échte productiefunctie) — zie reken-checks.ts',
     },
   },
   {

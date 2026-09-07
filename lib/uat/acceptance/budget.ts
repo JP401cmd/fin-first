@@ -60,7 +60,7 @@ const criteria: AcceptanceCriterion[] = [
     then: 'Volgens-plan/Werkelijk in de KPI-strip == de som van de boomweergave-realisatie == de per-budget realisatie op het detailpaneel — één gedeelde `loadSpending`-bron, geen tweede berekening per surface. De onderliggende bedragen zijn NIET hand-narekenbaar (transactie-generator gebruikt `Math.random()`-jitter).',
     assertion: {
       kind: 'consistency',
-      source: 'app/(app)/core/budgets/page.tsx + components/app/budgets-client.tsx delen één spending-map (buildSpendingSums/combineSpending); A=B-toets tussen KPI-strip, boom en detailpaneel i.p.v. een hard cijfer',
+      source: 'app/(app)/overzicht/budget/page.tsx + components/app/budgets-client.tsx delen één spending-map (buildSpendingSums/combineSpending); A=B-toets tussen KPI-strip, boom en detailpaneel i.p.v. een hard cijfer',
     },
   },
   {
@@ -69,9 +69,9 @@ const criteria: AcceptanceCriterion[] = [
     titel: 'Maand navigeren en periodemodus wisselen',
     kriticiteit: 'KERN',
     persona: 'lisa',
-    given: '"Nu" vastgezet op 15 juli 2026; gebruiker op de budgetpagina. WEERGAVEMODUS (BUD-1): de periode-toggle (Maand/YTD/12 mnd) is alleen zichtbaar in **Volledig** — `BudgetPeriodToggle` rendert `null` in **Eenvoudig**, waar de periode hard op "Maand" staat (`effectivePeriodMode`) en de afkorting "YTD" dus niet in beeld komt (APP-5, jargonregel). Dit criterium (YTD/12-maanden kiezen) is dus alleen uitvoerbaar in Volledig; `computeBudgetPeriod` zelf is in beide modi identiek — Eenvoudig roept hem alleen nooit met een andere waarde dan "maand" aan.',
-    when: 'De gebruiker navigeert naar maart 2026 (maand-modus), en schakelt daarna naar YTD en 12-maanden — beide alleen bereikbaar in Volledig.',
-    then: 'Maand-modus: bereik 2026-03-01 t/m 2026-04-01 (exclusief), 1 maand. YTD: bereik 2026-01-01 t/m 2026-08-01, 7 maanden (jan t/m lopende maand juli). 12-maanden: bereik 2025-08-01 t/m 2026-08-01, 12 maanden. Limieten schalen met `periodMonthCount`.',
+    given: '"Nu" vastgezet op 15 juli 2026; gebruiker op de budgetpagina. WEERGAVEMODUS (BUD-1), BIJGEWERKT 07-09-2026 (UR3-13 F2, optie C): de periode-toggle (Maand/Dit jaar/12 mnd) is alleen zichtbaar in **Volledig** — `BudgetPeriodToggle` rendert `null` in **Eenvoudig**, waar de periode hard op "Maand" staat (`effectivePeriodMode`). De middelste knop heet op het scherm NIET meer "YTD" maar **"Dit jaar"** — de afkorting is aan de bron vervangen (APP-5, jargonregel: een Engelse afkorting met een gangbaar Nederlands equivalent), zodat ze ook in Volledig nergens meer in beeld komt. De INTERNE modus-id blijft `ytd` (`computeBudgetPeriod`, `PERIOD_OPTIONS` in lib/benchmark-comparison.ts, opgeslagen voorkeuren) — hernoemen zou data raken in plaats van tekst. Toets dus op de knoptekst "Dit jaar"; ziet de tester "YTD" op het scherm, dan is dat een bevinding. Dit criterium (Dit jaar/12-maanden kiezen) is alleen uitvoerbaar in Volledig; `computeBudgetPeriod` zelf is in beide modi identiek — Eenvoudig roept hem alleen nooit met een andere waarde dan "maand" aan.',
+    when: 'De gebruiker navigeert naar maart 2026 (maand-modus), en schakelt daarna naar "Dit jaar" (modus-id `ytd`) en 12-maanden — beide alleen bereikbaar in Volledig.',
+    then: 'Maand-modus: bereik 2026-03-01 t/m 2026-04-01 (exclusief), 1 maand. "Dit jaar" (`ytd`): bereik 2026-01-01 t/m 2026-08-01, 7 maanden (jan t/m lopende maand juli). 12-maanden: bereik 2025-08-01 t/m 2026-08-01, 12 maanden. Limieten schalen met `periodMonthCount`.',
     assertion: {
       kind: 'exact',
       expected: 'maandStart=2026-03-01; maandEnd=2026-04-01; maandCount=1; ytdStart=2026-01-01; ytdEnd=2026-08-01; ytdCount=7; m12Start=2025-08-01; m12End=2026-08-01; m12Count=12',

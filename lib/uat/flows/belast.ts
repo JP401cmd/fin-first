@@ -92,7 +92,7 @@ export const BELAST_FLOW: UatFlow = {
     { id: 'tegenbewijs', scenarioId: 'UAT-BELAST-18', label: 'WF-BELAST-18 · Tegenbewijs simuleren (werkelijk vs forfaitair)', kind: 'action', stage: 3, lane: 'box3', subOf: 'box3' },
     { id: 'box3-partner', scenarioId: 'UAT-BELAST-19', label: 'WF-BELAST-19 · Box 3-vermogen verdelen met fiscale partner', kind: 'screen', stage: 3, lane: 'box3', subOf: 'box3' },
     { id: 'peildatum', scenarioId: 'UAT-BELAST-21', label: 'WF-BELAST-21 · Peildatum, arbitragevenster & 2028-stelsel', kind: 'screen', stage: 3, lane: 'box3', subOf: 'box3' },
-    { id: 'optimizer', scenarioId: 'UAT-BELAST-23', label: 'WF-BELAST-23 · Fiscale optimizer (leidende kans op netto effect, vergelijking, huidige stand)', kind: 'screen', stage: 3, lane: 'box3', subOf: 'box3' },
+    { id: 'optimizer', scenarioId: 'UAT-BELAST-23', label: 'WF-BELAST-23 · Fiscale kansen (leidende kans op netto effect, vergelijking, huidige stand)', kind: 'screen', stage: 3, lane: 'box3', subOf: 'box3' },
     { id: 'optimizer-verloop', scenarioId: 'UAT-BELAST-24', label: 'WF-BELAST-24 · Verloop over de jaren (2025·2026·≈2028) & shift-verkenner', kind: 'screen', stage: 3, lane: 'box3', subOf: 'optimizer' },
     { id: 'optimizer-levenslang', scenarioId: 'UAT-BELAST-25', label: 'WF-BELAST-25 · Drie onttrekkingsvolgordes over je hele looptijd (varianten-sweep)', kind: 'action', stage: 3, lane: 'box3', subOf: 'optimizer' },
 

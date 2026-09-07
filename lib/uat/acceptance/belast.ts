@@ -173,8 +173,8 @@ const criteria: AcceptanceCriterion[] = [
     titel: 'Box 1-druk inzien (hero, waterfall, heffingskortingen, marginale curve)',
     kriticiteit: 'KERN',
     persona: 'compleet',
-    given: 'Persona Tessa geladen; netto €7.600/mnd (net_monthly_income) → subpagina-bruto = grossFromNet(91.200, 2026) = €160.658; eigen woning WOZ €540.000 + gekoppelde hypotheek (rente €9.300). WEERGAVEMODUS (BEL-4/APP-7): de vier onderstaande cijfers (effectief tarief, marginaal tarief, netto besteedbaar, "Geschat bruto") zijn zelf mode-onafhankelijk berekend — `computeBox1Tax` draait ongeacht modus. Wat ZICHTBAAR is op de figures-strip verschilt: in **Volledig** staan alle vier de cellen; in **Eenvoudig** kapt `FiguresStrip` af tot 2 (`simpleFigures`) — Effectief tarief + Netto besteedbaar (de vraag "wat kost het en wat houd ik over"); "Geschat bruto" (bewerkbaar, zie WF-BELAST-08) en het marginale tarief staan dan alleen in Volledig.',
-    when: 'De gebruiker opent /overzicht/belasting/box1 en leest de druk-hero (Box 1-belasting, effectief/marginaal tarief, netto besteedbaar) + heffingskortingen (in Eenvoudig: alleen effectief tarief + netto besteedbaar op de strip zelf; de overige waarden gelden ongewijzigd voor de rest van de hero/waterfall).',
+    given: 'Persona Tessa geladen; netto €7.600/mnd (net_monthly_income) → subpagina-bruto = grossFromNet(91.200, 2026) = €160.658; eigen woning WOZ €540.000 + gekoppelde hypotheek (rente €9.300). WEERGAVEMODUS (BEL-4/APP-7): de vier onderstaande cijfers (effectief tarief, marginaal tarief, netto besteedbaar, "Geschat bruto") zijn zelf mode-onafhankelijk berekend — `computeBox1Tax` draait ongeacht modus. Wat ZICHTBAAR is verschilt: in **Volledig** staat de figures-strip met alle vier de cellen; in **Eenvoudig** staat er sinds BEL-9 (besluit 6 sep 2026) géén strip meer maar één gevolg-zin — "Van je bruto inkomen gaat ongeveer 42% naar Box 1 — je houdt € 93.983 per jaar over" (`components/overview/belasting/box1-kost-zin.tsx`, geswapt met `SwapInSimple`). Die zin draagt exact dezelfde twee motorvelden die de Eenvoudig-strip vóór BEL-9 als losse cellen toonde (`effectiveRate`, hier op hele procenten afgerond, + `nettoBesteedbaar`); "Geschat bruto" (bewerkbaar, zie WF-BELAST-08) en het marginale tarief staan alleen in Volledig.',
+    when: 'De gebruiker opent /overzicht/belasting/box1 en leest de druk-hero (Box 1-belasting, effectief/marginaal tarief, netto besteedbaar) + heffingskortingen (in Eenvoudig: effectief tarief + netto besteedbaar als één zin in plaats van de strip; de overige waarden gelden ongewijzigd voor de rest van de hero/waterfall).',
     then: 'Bij bruto €160.658 met eigen woning: belastbaar inkomen €153.248 (160.658 − 7.410 eigenwoning-saldo); Box 1-belasting €66.675; effectief tarief 41,5%; marginaal tarief 49,5%; algemene heffingskorting €0 + arbeidskorting €0 (beide volledig afgebouwd bij dit DGA-inkomen); netto besteedbaar €93.983. HERIJKT 26-08-2026 (bevinding H25, ADR 0106): de heffing bevat nu de tariefsaanpassing aftrekbare kosten eigen woning (art. 2.10 lid 2 Wet IB 2001) van €885 = het volledige aftreksaldo €7.410 × (49,50% − 37,56%), want bij dit inkomen ligt de hele aftrek boven de topschijfgrens €78.426. VÓÓR de fix stond hier tax €65.790 / effectief 41,0% / netto €94.868 — die cijfers verrekenden de hypotheekrente tegen 49,50% i.p.v. het maximale aftrektarief 37,56% en waren dus €885/jaar te gunstig. Het MARGINALE tarief (49,5%) verandert bewust NIET: de tariefsaanpassing is een bijtelling op de heffing, geen schijfwijziging, en de ±1-probe draait zonder eigenwoning-invoer. (Bruto is de SUBPAGINA-bron; de hub gebruikt een andere bron — zie kop.)',
     assertion: {
       kind: 'exact',
@@ -188,7 +188,7 @@ const criteria: AcceptanceCriterion[] = [
     titel: 'Bruto-jaarinkomen voor Box 1 aanpassen',
     kriticiteit: 'KERN',
     persona: 'compleet',
-    given: 'Persona Tessa geladen; de "Geschat bruto"-figuur op de Box 1-hero is aanpasbaar (Box1GrossIncomeEditor). WEERGAVEMODUS (BEL-4): deze cel staat op index 0 van de figures-strip en zit NIET in de `simpleFigures`-selectie (Effectief tarief + Netto besteedbaar) — dus alleen in **Volledig** zichtbaar/bewerkbaar. In **Eenvoudig** is deze editor niet bereikbaar via de strip.',
+    given: 'Persona Tessa geladen; de "Geschat bruto"-figuur op de Box 1-hero is aanpasbaar (Box1GrossIncomeEditor). WEERGAVEMODUS (BEL-4, herzien bij BEL-9 · 6 sep 2026): deze cel staat op index 0 van de figures-strip, en die strip staat sinds BEL-9 alléén nog in **Volledig** — in **Eenvoudig** vervangt één gevolg-zin de hele strip. De editor is dus alleen in Volledig zichtbaar/bewerkbaar; in Eenvoudig is hij niet bereikbaar via de hero.',
     when: 'De gebruiker leest de automatische schatting en zet daarna een handmatig bruto van €120.000.',
     then: 'De automatische schatting = grossFromNet(netto €91.200, 2026) = €160.658 (netto-inversie via de Box 1-motor; round-trip: het netto besteedbaar bij €160.658 ≈ €91.200 op €1 na). Bij handmatig bruto €120.000 wordt de Box 1-belasting €48.491 (herberekend zonder eigen woning-context in de editor-preview).',
     assertion: {
@@ -380,7 +380,7 @@ const criteria: AcceptanceCriterion[] = [
   {
     workflow: 'WF-BELAST-23',
     scenarioId: 'UAT-BELAST-23',
-    titel: 'Fiscale optimizer: leidende kans op netto effect, vergelijking en huidige stand',
+    titel: 'Fiscale kansen: leidende kans op netto effect, vergelijking en huidige stand',
     kriticiteit: 'KERN',
     persona: 'willem',
     given:
@@ -400,7 +400,7 @@ const criteria: AcceptanceCriterion[] = [
   {
     workflow: 'WF-BELAST-24',
     scenarioId: 'UAT-BELAST-24',
-    titel: 'Fiscale optimizer (Fase 2): verloop over de jaren en de shift-verkenner',
+    titel: 'Fiscale kansen (Fase 2): verloop over de jaren en de shift-verkenner',
     kriticiteit: 'KERN',
     persona: 'willem',
     given:
@@ -420,7 +420,7 @@ const criteria: AcceptanceCriterion[] = [
   {
     workflow: 'WF-BELAST-25',
     scenarioId: 'UAT-BELAST-25',
-    titel: 'Fiscale optimizer (Fase 3): drie onttrekkingsvolgordes over je hele looptijd vergeleken',
+    titel: 'Fiscale kansen (Fase 3): drie onttrekkingsvolgordes over je hele looptijd vergeleken',
     kriticiteit: 'KERN',
     persona: 'compleet',
     given:

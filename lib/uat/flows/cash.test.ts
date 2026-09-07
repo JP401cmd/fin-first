@@ -100,7 +100,11 @@ describe('CASH_FLOW — curatie-integriteit', () => {
     // toegevoegd.
     // 65 → 66: WF-CASH-67 (grenzenpot precies op de grens, ADR 0136) is als
     // flow-knoop 'grenzenpotbereikt' onder 'grenzenpotberekenen' toegevoegd.
-    expect(covered.size).toBe(66)
+    // 66 → 67: WF-CASH-68 (vul-ingangen staan één keer op de transactiepagina:
+    // de KoppelRekeningBanner biedt koppelen/importeren bij nul rekeningen, en
+    // dan laat de actie-rij ze juist weg) is als flow-knoop 'vulingangen'
+    // onder 'geldstroom' toegevoegd.
+    expect(covered.size).toBe(67)
   })
 
   it('de domeinoverschrijdende cross-knopen dekken BUDGET/OVZ/TOEK/WILL/BEZIT/MIJN', () => {

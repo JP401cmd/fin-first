@@ -141,7 +141,11 @@ describe('UAT Cash — acceptatiecriteria dekking', () => {
     // 66 → 67: WF-CASH-67 (ADR 0136 — "Grens bereikt" als vierde WEERGAVE-stand
     // van een grenzenpot; leest `periodHeadroom` uit de échte motoruitkomst en
     // toetst tegelijk dat de motor/score/reeks er NIET door bewegen, 'exact').
-    expect(workflows.length).toBe(67)
+    // 67 → 68: WF-CASH-68 (vul-ingangen staan één keer op de transactiepagina —
+    // `vulIngangenInBanner` laat "Importeer transacties"/"Bank koppelen" uit de
+    // actie-rij zodra de KoppelRekeningBanner ze al biedt; conditioneel
+    // renderen zonder eigen berekening, dus 'ui-only').
+    expect(workflows.length).toBe(68)
   })
 
   it('elk criterium heeft een geldige assertion.kind', () => {

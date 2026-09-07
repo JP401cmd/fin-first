@@ -371,9 +371,9 @@ const criteria: AcceptanceCriterion[] = [
     scenarioId: 'UAT-MIJN-27',
     titel: 'Check-in-historie bekijken en een oude maand terugzien',
     kriticiteit: 'BELANGRIJK',
-    given: 'Ingelogd met ≥1 afgeronde check-in, /mijn/checkins (identieke UI als /core/checkin/historie).',
-    when: 'De gebruiker bladert door afgeronde check-ins en opent een oude maand read-only.',
-    then: 'Afgeronde check-ins zijn doorbladerbaar; een oude maand toont read-only exact de destijds vastgelegde snapshot (A=B tussen historie en het oorspronkelijke moment); /mijn/checkins en /core/checkin/historie tonen identieke UI.',
+    given: 'Ingelogd met ≥1 afgeronde check-in. /mijn/checkins is sinds UR3-26 (7 sep 2026) het ENIGE canonieke pad: /core/checkin/historie redirect erheen op de routing-laag (het bestand blijft als backing-module bestaan, de URL niet).',
+    when: 'De gebruiker bladert door afgeronde check-ins en opent een oude maand read-only; daarnaast wordt /core/checkin/historie rechtstreeks aangeroepen.',
+    then: 'Afgeronde check-ins zijn doorbladerbaar; een oude maand toont read-only exact de destijds vastgelegde snapshot (A=B tussen historie en het oorspronkelijke moment). /core/checkin/historie landt op /mijn/checkins — geen tweede live URL voor dezelfde inhoud meer.',
     assertion: {
       kind: 'ui-only',
       source: 'app/(app)/mijn/checkins/page.tsx (re-export historie) — read-only snapshot-weergave, geen eigen berekening',

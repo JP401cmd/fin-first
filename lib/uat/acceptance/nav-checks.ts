@@ -251,6 +251,13 @@ export const NAV_ENGINE_CHECKS: NavEngineCheck[] = [
       // vertaalt hem naar het gekozen homescherm (profiles.home_screen).
       const dashboardGeenConfigRedirect = !redirects.some((r) => r.source === '/dashboard')
       const coreAssetsGeenRedirect = !redirects.some((r) => r.source === '/core/assets')
+      // ADR 0135-deeplinks: de vijf cashflow-regels moeten er zijn ÉN hun
+      // bestemming mag zelf geen query dragen — dan pas plakt Next de
+      // meegegeven ?budget=/?maand=/?limit=/?rekening= er weer achter.
+      const cashflowRegels = redirects.filter(
+        (r) => r.source === '/overzicht/cashflow' || r.source.startsWith('/overzicht/cashflow/'),
+      )
+      const cashflowBestemmingZonderQuery = cashflowRegels.every((r) => !r.destination.includes('?'))
       return {
         // 24 = de eerdere 25 (16 + React #310-lichtingen, zie het redirect-blok
         // in next.config.ts) MIN de /dashboard-regel (1 sep 2026, kiesbaar
@@ -258,8 +265,8 @@ export const NAV_ENGINE_CHECKS: NavEngineCheck[] = [
         // edge-middleware (lib/supabase/proxy.ts) naar profiles.home_screen
         // vertaalt — een statische config-regel zou die vertaling
         // onbereikbaar maken (config-redirects draaien vóór de middleware).
-        expected: 'aantalRedirects=29; coreNaarOverzicht=true; dashboardGeenConfigRedirect=true; coreAssetsGeenRedirect=true',
-        actual: `aantalRedirects=${redirects.length}; coreNaarOverzicht=${coreNaarOverzicht}; dashboardGeenConfigRedirect=${dashboardGeenConfigRedirect}; coreAssetsGeenRedirect=${coreAssetsGeenRedirect}`,
+        expected: 'aantalRedirects=31; coreNaarOverzicht=true; dashboardGeenConfigRedirect=true; coreAssetsGeenRedirect=true; cashflowRedirects=5; cashflowBestemmingZonderQuery=true',
+        actual: `aantalRedirects=${redirects.length}; coreNaarOverzicht=${coreNaarOverzicht}; dashboardGeenConfigRedirect=${dashboardGeenConfigRedirect}; coreAssetsGeenRedirect=${coreAssetsGeenRedirect}; cashflowRedirects=${cashflowRegels.length}; cashflowBestemmingZonderQuery=${cashflowBestemmingZonderQuery}`,
       }
     },
   },
