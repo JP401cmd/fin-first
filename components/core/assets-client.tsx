@@ -11,7 +11,7 @@ import { BottomSheet } from '@/components/app/bottom-sheet'
 // `ToastProvider` gerenderd (onboarding-achtige contexten, tests). De defensieve
 // variant degradeert daar stil in plaats van te gooien.
 import { useOptionalToast } from '@/components/app/toast-provider'
-import { Kicker, FiguresStrip, PageInfoButton, GlossaryTerm, PageOpening, SubtotalLine, type FigureProps } from '@/components/editorial'
+import { Kicker, FiguresStrip, PageInfoButton, GlossaryTerm, PageOpening, type FigureProps } from '@/components/editorial'
 import { buildAssetReturnBreakdown, formatGainPct, RETURN_BASIS_LABELS } from '@/lib/asset-return'
 import { OVERLAY_QUERY_KEYS } from '@/lib/navigation'
 import { createPaneUrlHistory } from '@/lib/pane-url-history'
@@ -30,7 +30,6 @@ import { DGA_LENING_DREMPEL } from '@/lib/box2-data'
 import { BudgetIcon, formatCurrency } from '@/components/app/budget-shared'
 import { calculateFreedomTime, formatFreedomTimeString, formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
-import { VrijheidstijdVoetnoot } from '@/components/app/vrijheidstijd-voetnoot'
 import { AmountInput } from '@/components/app/amount-input'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { parseAmountInput } from '@/lib/amount-input'
@@ -892,6 +891,16 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
       // dagtarief (marginaal) en runway (totaal). De runway-zin in de deck
       // hierboven is het geldige tijdantwoord op dit scherm.
       sub: `${activeAssets.length} bezitting${activeAssets.length === 1 ? '' : 'en'}`,
+      // Dubbele grondslag ONDER het totaal waar hij bij hoort (melding B-039).
+      // Tot deze melding hing dit als een eigen `SubtotalLine` over de volle
+      // breedte onder de strip: een derde uitlijning naast de kicker-kolommen,
+      // die op 384px als losse regel tussen de cijfers en de meta-regel viel.
+      // Het is een variant op ditzelfde getal — "hetzelfde totaal, zonder het
+      // huis" — dus hoort hij in deze cel, niet ernaast. Gating ongewijzigd:
+      // alleen bij een eigen woning én strategie ≠ include_full.
+      sub2: showExclHomeSubtotal
+        ? `excl. eigen woning ${fc(totalValueExclHome)}`
+        : undefined,
       variant: 'winner',
     },
     {
@@ -1009,57 +1018,33 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
         figures={figures}
       />
 
-      {/* Dubbele grondslag — subtieler subtotaal "excl. eigen woning" onder het
-          bruto totaal. Zelfde typografie-familie (mono/tabular-nums), kern-accent.
-          Alleen bij eigen woning + strategie ≠ include_full
-          (shouldShowDualHousingBasis).
+      {/* ÉÉN meta-regel onder de cijfers: de uitleg bij het rendement.
+          Voorgeschiedenis in twee stappen.
 
-          GEEN `trailing` met vrijheidstijd meer (UR3-19, optie A): het huis
-          eruit halen maakt de teller niet netto — de schulden staan er nog
-          steeds vol in — en de grootheid-fout (ADR 0126 D1) blijft sowieso
-          staan. Deze regel toont dus alleen het bedrag.
+          B-036 bracht drie losse stroken (voetnoot over de volle breedte,
+          rechts uitgelijnde knop, subtotaal) terug tot één linkerlijn: niet de
+          hoogte maakte het rommelig, maar de drie verschillende uitlijningen
+          onder elkaar.
 
-          Staat direct ónder de strip (melding B-036): dit is zélf een cijfer en
-          hoort bij de getallen, niet tussen de voetnoten.
+          B-039 (8 sep 2026) haalt er nog twee dingen uit. Het subtotaal
+          "excl. eigen woning" zit nu ín de cel Totale waarde (`sub2`) — het is
+          een variant op dát getal en hoort dus bij dat getal. En de
+          WISSELKOERS-VOETNOOT (de €/dag-regel) is verhuisd naar de rekenmodal
+          hieronder. Haar zin staat hier bewust niet uitgeschreven: de grendel
+          in `assets-client.wisselkoers-voetnoot.test.ts` toetst op afwezigheid
+          van die formulering, en een herdenkingsregel zou dat vals rood maken.
 
-          De `pt-6`-wrapper is nodig, geen sier: `SubtotalLine` draagt een vaste
-          `-mt-3` omdat hij ontworpen is om ónder een blok met eigen
-          ondermarge te hangen. Direct onder de strip gezet plakt hij daarmee
-          tegen de onderste hairline. De wrapper geeft die ruimte terug zonder
-          de gedeelde component (ook in gebruik op /core/debts) te veranderen. */}
-      {showExclHomeSubtotal && (
-        <div className="pt-6">
-          <SubtotalLine label="excl. eigen woning" amount={totalValueExclHome} />
-        </div>
-      )}
-
-      {/* ÉÉN meta-blok onder de cijfers (melding B-036): de koers waar élk
-          tijdgetal op deze pagina op rust, met daaronder de uitleg bij het
-          rendement — gestapeld op één linkerlijn.
-
-          Tot die melding waren dit drie losse stroken (voetnoot over de volle
-          breedte, rechts uitgelijnde knop, subtotaal), aan elkaar geknoopt met
-          twee negatieve marges. Wat het rommelig maakte was niet de hoogte maar
-          de DRIE VERSCHILLENDE UITLIJNINGEN onder elkaar; één linkerlijn ruimt
-          dat op. Bewust géén `flex-row`: de voetnoot beslaat op 384px twee
-          regels, dus een echte één-regel-rij bestaat daar niet — naast elkaar
-          zetten zou de knop alsnog laten omvallen, met een ongelijke basislijn
-          erbij.
-
-          DE WISSELKOERS ZELF (UR3-08). Henk las op deze pagina "1j 4m" bij zijn
-          eerste bezitting en begreep pas twee schermen later wat dat betekende:
-          nergens stond dat vrijheidstijd niets meer is dan bedrag ÷ dagtarief.
-          ÉÉN regel onder de héle strip, niet onder elke cel (eigenaarsbesluit
-          A): alle vrijheidstijden op deze pagina — de strip-cellen, de taartpunt
-          en elke kaart — delen exact ditzelfde `dailyExpenses`; de koers per
-          plek herhalen zou een rustige pagina in een dozijn voetnoten
-          veranderen. Het subtotaal excl. eigen woning hierbóven draagt sinds
-          UR3-19 géén tijd meer en valt dus buiten die opsomming. De voetnoot
-          verdwijnt vanzelf in privacymodus, bij een tarief van 0 en bij een
-          onbekende grondslag — dat zit in het component (ADR 0091 / 0131) — en
-          voegt zelf nooit een tijdgetal toe (eigenaarsbesluit 2, 12 jul 2026).
-          Valt hij weg, dan blijft de knop staan waar hij stond; dat is precies
-          waarom dit blok links uitlijnt en niet uitvult.
+          Waarom die voetnoot mocht verhuizen. UR3-08 zette hem hier neer omdat
+          persona Henk "1j 4m" op een bezittingkaart las zonder ooit te lezen
+          dat vrijheidstijd niets meer is dan bedrag ÷ dagtarief. Die reden
+          gold voor een pagina die op zes plekken tijd toonde. Sindsdien is dat
+          uitgedund: UR3-19 haalde de tijd van het subtotaal, B-035 de
+          runway-zin uit de deck, en de strip-cellen dragen sinds UR3-19 geen
+          tijdvertaling meer (zie de grondslag-notitie bij `figures`). Wat
+          overblijft zijn de bezittingkaarten en de taartpunt — en de plek waar
+          een lezer naar de wisselkoers vráágt is de uitleg, niet de kop van de
+          pagina. De koers staat nu dus in de rekenmodal, één klik verderop en
+          nog steeds precies één keer.
 
           Rekenmodal-trigger in BÉIDE weergaven (S11). Hij stond alleen in
           "Volledig" omdat de rendement-cel in Eenvoudig wegviel: een uitleg
@@ -1069,7 +1054,6 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
           `FigureProps` kent alleen `href` (een `<a>`), en een overlay openen via
           een nep-link breekt toetsenbord- en screenreader-gedrag. */}
       <div className="mb-5 mt-3 flex flex-col items-start">
-        <VrijheidstijdVoetnoot dailyRate={dailyExpenses} source={dailyExpensesSource} />
         <button
           type="button"
           onClick={() => setReturnModalOpen(true)}
@@ -1086,6 +1070,10 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
         onClose={closeReturnModal}
         breakdown={returnBreakdown}
         dailyExpenses={dailyExpenses}
+        // De wisselkoers hoort sinds B-039 bij de uitleg, niet boven de pagina:
+        // de bron moet mee, anders kan de modal niet zeggen wáár het tarief
+        // vandaan komt (geboekte uitgaven, profielschatting of leeftijd).
+        dailyExpensesSource={dailyExpensesSource}
       />
 
       {/* Toolbar — filter links (indien meegegeven), Herwaarderen + primaire

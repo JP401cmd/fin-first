@@ -141,7 +141,7 @@ describe('bron-grendel — elke TEKORT-status die de bridge voor een live anker 
 
   // F3b — het `age`-anker: sinds het generieke `anchor_shortfall`-blok in horizon-client
   // (ADR 0129 D3) is dit een gewone rij in de matrix; de UI schrijft het anker nu ook
-  // (Voorkeuren, strategie-modal, "Maak dit mijn plan").
+  // (Voorkeuren en de strategie-modal; de CTA "Maak dit mijn plan" verviel met B-038).
   it.each([
     ['aow (pensioen-gebruiker)', { fire_stop_anchor: 'aow' } as const],
     ['aow via legacy-kolom', { fire_end_strategy: 'pensioen' } as const],

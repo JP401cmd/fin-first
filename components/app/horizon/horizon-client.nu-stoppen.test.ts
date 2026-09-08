@@ -106,20 +106,33 @@ describe('planningMode blijft tweewaardig en volgt het anker (D6/B11)', () => {
 })
 
 describe('de stopkeuze (vrijheidsas)', () => {
-  it('de stop-slider is alleen onder het nu-anker verborgen; onder aow/age is hij verkenning met de CTA', () => {
+  it('de stop-slider is alleen onder het nu-anker verborgen; onder aow/age is hij verkenning', () => {
     const src = bron()
     expect(src).toContain('stopKeuzeVerborgen={isNuStoppenMode}')
     expect(src).toContain('ankerVast={isFixedAnchorMode}')
-    expect(src).toContain('onMaakPlan={handleMaakDitMijnPlan}')
   })
 
-  it('"Maak dit mijn plan" schrijft het VOLLEDIGE plan met anker age via de gedeelde body-helper', () => {
+  /**
+   * Melding B-038 — de vrijheidsas schrijft het plan niet meer zelf.
+   *
+   * Tot deze melding zat naast de strategie-modal een tweede schrijfpad: de CTA
+   * "Maak dit mijn plan" deed een eigen PUT met anker `age`. Dat pad schreef één
+   * van de vijf plan-keuzes en liet de andere vier (eindleeftijd, eind-vorm,
+   * nalatenschap, en de keuze tussen aow/age/nu) onzichtbaar. De as verwijst nu
+   * naar de modal die ze alle vijf toont — en dat is meteen het enige
+   * schrijfpad. Deze grendel bewaakt dat er geen tweede terugsluipt.
+   */
+  it('de as verwijst naar de strategie-modal in plaats van zelf het plan te schrijven', () => {
     const src = bron()
-    const start = src.indexOf('const handleMaakDitMijnPlan = useCallback(')
-    const fn = src.slice(start, src.indexOf('const handleStopAgeChange = useCallback(', start))
-    expect(fn).toContain('planDraftToFireSettingsBody({')
-    expect(fn).toContain("anchor: 'age'")
-    expect(fn).toContain('Je plan rekent nu met stoppen op ${formatStopAge(halved)}.')
+    expect(src).toContain("onKeuzesOpenen={() => setActiveModal('strategie')}")
+    expect(
+      src,
+      'de CTA "Maak dit mijn plan" is vervallen (B-038) — geen tweede schrijfpad naast de modal',
+    ).not.toContain('handleMaakDitMijnPlan')
+    expect(
+      src,
+      'de AOW-snelknop hing aan deze prop en is met B-038 vervallen',
+    ).not.toContain('onMaakPlan=')
   })
 
   it('de default van de slider is onder een vast anker het stopmoment van het plan', () => {

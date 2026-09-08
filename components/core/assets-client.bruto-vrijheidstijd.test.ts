@@ -85,11 +85,22 @@ describe('/overzicht/bezittingen — geen vrijheidstijd op een bruto teller (UR3
   })
 
   it('houdt de terugvallen die in de plaats kwamen — geen lege cellen', () => {
-    // Cel 1 telt bezittingen, cel 4 noemt de verwachte groei; het SubtotalLine
-    // draagt alleen nog het bedrag.
+    // Cel 1 telt bezittingen, cel 4 noemt de verwachte groei; het subtotaal
+    // excl. eigen woning draagt alleen nog het bedrag.
     expect(code).toContain("sub: `${activeAssets.length} bezitting${activeAssets.length === 1 ? '' : 'en'}`")
     expect(code).toContain('sub: `+${fc(projectedGrowth)} verwacht`')
-    expect(code).toContain('<SubtotalLine label="excl. eigen woning" amount={totalValueExclHome} />')
+    // Melding B-039 verhuisde dat subtotaal van een losse `SubtotalLine` onder
+    // de strip naar de `sub2` van de cel Totale waarde. De vorm veranderde, de
+    // eis van UR3-19 niet: BEDRAG ZONDER TIJD. Het huis eruit halen maakt de
+    // teller niet netto — de schulden staan er nog vol in — dus een
+    // vrijheidstijd naast dit getal blijft de grootheid-fout van ADR 0126 D1.
+    expect(code).toContain('excl. eigen woning ${fc(totalValueExclHome)}')
+    const sub2 = code.indexOf('sub2: showExclHomeSubtotal')
+    expect(sub2, 'de sub2-vorm van het subtotaal is verdwenen').toBeGreaterThan(-1)
+    expect(
+      code.slice(sub2, sub2 + 200),
+      'het subtotaal mag geen vrijheidstijd (terug)krijgen — bruto teller, ADR 0126 D1',
+    ).not.toMatch(/formatFreedomTime|calculateFreedomTime|formatWithFreedom/)
   })
 
   it('laat een ONBEZWAARD bezit zijn tijdvertaling houden, maar onderdrukt haar zodra er een schuld aan hangt', () => {

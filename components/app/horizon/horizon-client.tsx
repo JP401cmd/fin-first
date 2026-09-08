@@ -157,7 +157,6 @@ import {
   type AnkerStop,
 } from '@/lib/horizon/anker-copy'
 import { AnkerDrieslag } from '@/components/app/horizon/anker-drieslag'
-import { planDraftToFireSettingsBody } from '@/lib/horizon/plan-draft'
 import {
   guardFireTarget,
   guardFreedomMoment,
@@ -2601,8 +2600,8 @@ export default function HorizonPage({
   // Grafiek-weergave afgeleid van het ANKER (ADR 0129 B11): `aow` → pensioen-weergave
   // (split op AOW), `solved`/`now`/`age` → FIRE-weergave (split op het stopmoment).
   // De vroegere AOW-stop-toggle — een eigen `evaluateFireAt`-run met deplete-override
-  // in `useState` — is weg; de snelkoppeling "Op AOW-leeftijd" zet nu alleen de
-  // stop-slider van de vrijheidsas.
+  // in `useState` — is weg; de snelkoppeling "Op AOW-leeftijd" die haar opvolgde is
+  // met melding B-038 ook vervallen. Het AOW-stopmoment kies je in de strategie-modal.
   const planningMode: 'fire' | 'pensioen' = isPensioenMode ? 'pensioen' : 'fire'
 
   // Pensioen-specific computed values
@@ -3519,55 +3518,17 @@ export default function HorizonPage({
 
   // Slepen aan de stop-slider legt (bij koppel aan) een nieuwe vast te houden marge vast.
   // Vergrendelen alléén tegen de bezonken verwacht-waarde (nooit de basis-fallback).
-  // ── "Maak dit mijn plan" (ADR 0129 F3b, vrijheidsas) ───────────────────────
-  // De slider is verkenning; pas deze CTA zet het gekozen stopmoment als plan: PUT van
-  // het VOLLEDIGE plan (route-contract R3) met anker `age` + de sliderwaarde; de
-  // eind-vorm, eindleeftijd en nalatenschap blijven wat ze waren.
-  const [maakPlanBusy, setMaakPlanBusy] = useState(false)
-  const handleMaakDitMijnPlan = useCallback(
-    async (stopAge: number) => {
-      const plan = initialData.firePlan
-      const strat = fireStrategy ?? DEFAULT_FIRE_STRATEGY
-      const endForm =
-        plan?.endForm ??
-        (strat.strategy === 'legacy' || strat.strategy === 'perpetual' ? strat.strategy : 'deplete')
-      const endAge = plan?.endAge ?? strat.endAge
-      const halved = Math.round(stopAge * 2) / 2
-      if (halved >= endAge) {
-        addToast({ type: 'warning', title: 'Kies een stopmoment vóór de eindleeftijd van je plan.' })
-        return
-      }
-      setMaakPlanBusy(true)
-      try {
-        const res = await fetch('/api/fire-settings', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(
-            planDraftToFireSettingsBody({
-              anchor: 'age',
-              stopAge: halved,
-              endForm,
-              endAge,
-              legacyAmount: plan?.legacyAmount ?? strat.legacyAmount,
-            }),
-          ),
-        })
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}))
-          addToast({ type: 'error', title: 'Opslaan mislukt', message: typeof data?.error === 'string' ? data.error : undefined })
-          return
-        }
-        addToast({ type: 'success', title: `Je plan rekent nu met stoppen op ${formatStopAge(halved)}.` })
-        loadData()
-        router.refresh()
-      } catch {
-        addToast({ type: 'error', title: 'Opslaan mislukt — netwerkfout' })
-      } finally {
-        setMaakPlanBusy(false)
-      }
-    },
-    [initialData.firePlan, fireStrategy, addToast, loadData, router],
-  )
+  // ── Stopmoment vastzetten: uitsluitend via de strategie-modal ──────────────
+  // Hier stond de handler achter de CTA onder de vrijheidsas, die een PUT deed
+  // van het volledige plan met anker `age` en de sliderwaarde. (Zijn naam staat
+  // hier bewust niet uitgeschreven: de grendel in
+  // `horizon-client.nu-stoppen.test.ts` toetst op afwezigheid van die
+  // identifier, en een herdenkingsregel zou dat vals rood maken.)
+  // Melding B-038 haalt die knop weg: hij schreef één van de vijf
+  // plan-keuzes en verborg daarmee de andere vier. De vrijheidsas verwijst nu
+  // naar `setActiveModal('strategie')`, en die modal schrijft hetzelfde
+  // volledige plan via `planDraftToFireSettingsBody` — één schrijfpad in plaats
+  // van twee, en het pad dat álle keuzes toont.
 
   const handleStopAgeChange = useCallback(
     (v: number) => {
@@ -6930,8 +6891,8 @@ export default function HorizonPage({
                   margeJaren={stopMarge.margeJaren}
                   doelActief={doelActief}
                   // ADR 0129 — onder het NU-anker is het stopmoment vandaag: geen schuif.
-                  // Onder aow/age blijft de slider als VERKENNING tegen het plan (default =
-                  // het stopmoment van het plan), met de CTA "Maak dit mijn plan".
+                  // Onder aow/age blijft de slider een VERKENNING tegen het plan (default =
+                  // het stopmoment van het plan); vastzetten gebeurt in de strategie-modal.
                   stopKeuzeVerborgen={isNuStoppenMode}
                   stopKeuzeNotitie={
                     ankerReach != null ? (
@@ -6943,8 +6904,11 @@ export default function HorizonPage({
                   ankerVast={isFixedAnchorMode}
                   planStopAge={simResult?.vastStopLeeftijd ?? (planAnchor.kind === 'age' ? planAnchor.age : null)}
                   aowAge={userAowAge.fractional}
-                  onMaakPlan={handleMaakDitMijnPlan}
-                  maakPlanBusy={maakPlanBusy}
+                  // B-038 — de sectie wijst naar de plek waar het stopmoment én
+                  // de rest van het plan staat, in plaats van er zelf twee
+                  // snelknoppen voor te bieden. Dezelfde modal als de
+                  // "Stopmoment wijzigen"-link onder de grafiek.
+                  onKeuzesOpenen={() => setActiveModal('strategie')}
                   draaiknoppen={
                     <>
                       {/* De vier bestaande sliders (platgeslagen via `bare`) */}

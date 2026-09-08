@@ -341,39 +341,57 @@ describe('Vrijheidsas rendering', () => {
 })
 
 /**
- * ADR 0129 F3b — vast anker: de slider is verkenning, de CTA maakt het plan; de
- * AOW-knop (B11) zet alléén de slider (geen eigen kernel-run meer).
+ * ADR 0129 F3b + melding B-038 — vast anker: de slider blíjft verkenning, maar
+ * de twee snelknoppen eronder zijn weg.
+ *
+ * Wat er stond: "Op AOW-leeftijd" (zette alleen de slider) en "Maak dit mijn
+ * plan" (schreef alléén het stop-anker). Samen lazen ze als het keuzemenu van
+ * het plan terwijl ze twee van de vijf keuzes raakten — eindleeftijd, eind-vorm
+ * en nalatenschap kwamen er niet in voor en bleven onvindbaar. Wat ervoor in de
+ * plaats komt is één regel die naar de strategie-modal wijst, waar álle keuzes
+ * staan en waar het volledige plan in één keer geschreven wordt.
  */
-describe('Vrijheidsas — vast anker (ADR 0129 F3b)', () => {
-  it('toont de verken-intro met het plan-stopmoment en de CTA "Maak dit mijn plan"', () => {
-    const onMaakPlan = vi.fn()
-    render(<Vrijheidsas {...baseProps} ankerVast planStopAge={58.5} stopAge={62} onMaakPlan={onMaakPlan} />)
-    expect(screen.getByText(/Verken een ander stopmoment\. Je plan verandert pas als je het vastzet/)).toBeTruthy()
+describe('Vrijheidsas — vast anker (ADR 0129 F3b, knoppen weg per B-038)', () => {
+  it('toont de verken-intro met het plan-stopmoment, zonder naar een vastzet-knop te wijzen', () => {
+    render(<Vrijheidsas {...baseProps} ankerVast planStopAge={58.5} stopAge={62} />)
+    expect(screen.getByText(/Verken een ander stopmoment\. Je plan verandert er niet van/)).toBeTruthy()
     expect(screen.getByText('58,5')).toBeTruthy()
-    const cta = screen.getByRole('button', { name: 'Maak dit mijn plan' })
-    expect(cta).not.toBeDisabled()
-    fireEvent.click(cta)
-    expect(onMaakPlan).toHaveBeenCalledWith(62)
+    // De zin mag niet meer naar een knop verwijzen die niet bestaat.
+    expect(screen.queryByText(/pas als je het vastzet/)).toBeNull()
   })
 
-  it('de CTA is uitgeschakeld zolang de slider op het plan-stopmoment staat', () => {
-    render(<Vrijheidsas {...baseProps} ankerVast planStopAge={60} stopAge={60} onMaakPlan={vi.fn()} />)
-    expect(screen.getByRole('button', { name: 'Maak dit mijn plan' })).toBeDisabled()
-  })
-
-  it('"Op AOW-leeftijd" zet alleen de slider op de AOW-leeftijd (halve jaren), geen andere callback', () => {
-    const onStopAgeChange = vi.fn()
-    const onMaakPlan = vi.fn()
-    render(<Vrijheidsas {...baseProps} aowAge={67.25} onStopAgeChange={onStopAgeChange} onMaakPlan={onMaakPlan} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Op AOW-leeftijd' }))
-    expect(onStopAgeChange).toHaveBeenCalledWith(67.5)
-    expect(onMaakPlan).not.toHaveBeenCalled()
-  })
-
-  it('onder het nu-anker (stopKeuzeVerborgen) is er geen slider, geen AOW-knop en geen CTA', () => {
-    render(<Vrijheidsas {...baseProps} stopKeuzeVerborgen aowAge={67} onMaakPlan={vi.fn()} />)
-    expect(screen.queryByRole('button', { name: 'Op AOW-leeftijd' })).toBeNull()
+  it('de twee oude snelknoppen bestaan niet meer', () => {
+    render(<Vrijheidsas {...baseProps} ankerVast planStopAge={58.5} stopAge={62} aowAge={67.25} />)
     expect(screen.queryByRole('button', { name: 'Maak dit mijn plan' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Op AOW-leeftijd' })).toBeNull()
+  })
+
+  it('wijst in plaats daarvan naar de plek waar álle plan-keuzes staan', () => {
+    const onKeuzesOpenen = vi.fn()
+    render(<Vrijheidsas {...baseProps} aowAge={67.25} onKeuzesOpenen={onKeuzesOpenen} />)
+    expect(screen.getByText(/Schuiven verkent — je plan blijft staan/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /plan-keuzes/ }))
+    expect(onKeuzesOpenen).toHaveBeenCalledTimes(1)
+  })
+
+  it('de schuif zelf blijft verkennen — de link raakt de stopkeuze niet aan', () => {
+    const onStopAgeChange = vi.fn()
+    const onKeuzesOpenen = vi.fn()
+    render(
+      <Vrijheidsas
+        {...baseProps}
+        aowAge={67.25}
+        onStopAgeChange={onStopAgeChange}
+        onKeuzesOpenen={onKeuzesOpenen}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: /plan-keuzes/ }))
+    expect(onStopAgeChange).not.toHaveBeenCalled()
+  })
+
+  it('onder het nu-anker (stopKeuzeVerborgen) is er geen slider en geen verwijzing', () => {
+    render(<Vrijheidsas {...baseProps} stopKeuzeVerborgen aowAge={67} onKeuzesOpenen={vi.fn()} />)
+    expect(screen.queryByRole('button', { name: /plan-keuzes/ })).toBeNull()
     expect(screen.queryByLabelText('Gewenste stopleeftijd')).toBeNull()
   })
 })

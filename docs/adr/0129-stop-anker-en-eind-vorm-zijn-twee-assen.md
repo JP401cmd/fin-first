@@ -355,6 +355,16 @@ plan verandert pas als je het vastzet.* CTA **Maak dit mijn plan** → toast
 **Op AOW-leeftijd** — zet alleen de slider. Onder `now` blijft de bestaande
 notitie.
 
+> **Achterhaald per 8 sep 2026 (melding B-038).** Beide knoppen zijn
+> verwijderd. Ze lazen samen als het keuzemenu van het plan terwijl ze twee van
+> de vijf keuzes raakten — de eindleeftijd, de eind-vorm en de nalatenschap
+> kwamen er niet in voor en bleven daardoor onvindbaar. De as verwijst nu naar
+> de strategie-modal, die alle keuzes toont en het volledige plan in één keer
+> schrijft; daarmee is dat ook het énige schrijfpad geworden. De slider-intro
+> luidt *Verken een ander stopmoment. Je plan verandert er niet van* (de oude
+> zin wees naar een knop die niet meer bestaat). De rest van dit besluit — de
+> twee assen, de vier ankers, de statusblokken — blijft onverkort staan.
+
 ### /overzicht
 
 Kop (runway): `solved` bestaand — *Als je nu zou stoppen, reikt je liquide

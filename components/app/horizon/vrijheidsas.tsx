@@ -241,16 +241,25 @@ export interface VrijheidsasProps {
    * plan" schrijft de sliderwaarde als anker `age`. Verkennen is nooit destructief.
    */
   ankerVast?: boolean
-  /** Het stopmoment van het plan (fractioneel) — de referentie voor "verandert pas als je het vastzet". */
+  /** Het stopmoment van het plan (fractioneel) — de referentie voor "nu rekent het met stoppen op …". */
   planStopAge?: number | null
   /**
-   * AOW-leeftijd (fractioneel) uit de gebruikerstabel — voedt de snelkoppeling
-   * "Op AOW-leeftijd" (B11): die zet alleen de slider, geen eigen kernel-run meer.
+   * AOW-leeftijd (fractioneel) uit de gebruikerstabel. Voedde tot melding B-038 de
+   * snelkoppeling "Op AOW-leeftijd"; sinds die knop weg is bepaalt hij alleen nog
+   * mee hoe ver de as loopt (zie `candidates`), zodat de AOW binnen bereik blijft.
    */
   aowAge?: number | null
-  /** CTA "Maak dit mijn plan" — ontvangt de sliderwaarde (halve jaren). */
-  onMaakPlan?: (stopAge: number) => void
-  maakPlanBusy?: boolean
+  /**
+   * Opent de plek waar het stopmoment én de andere plan-keuzes staan (de
+   * strategie-modal op /toekomst). Melding B-038: hier stonden twee knoppen —
+   * "Op AOW-leeftijd" (zette alleen de slider) en "Maak dit mijn plan" (zette
+   * alléén het stop-anker vast). Samen suggereerden ze dat dít de plek was om
+   * je stopmoment te kiezen, terwijl ze maar twee van de vijf keuzes raakten:
+   * AOW-of-een-leeftijd, en verder niets over eindleeftijd, eind-vorm of
+   * nalatenschap. Eén verwijzing naar de plek waar álle keuzes staan is
+   * eerlijker dan twee snelknoppen die de rest onzichtbaar laten.
+   */
+  onKeuzesOpenen?: () => void
 }
 
 /**
@@ -284,8 +293,7 @@ export function Vrijheidsas({
   ankerVast = false,
   planStopAge = null,
   aowAge = null,
-  onMaakPlan,
-  maakPlanBusy = false,
+  onKeuzesOpenen,
 }: VrijheidsasProps) {
   // ── As-schaal (jaren, lineair, min-span 20 jr) — enkel voor de marge-band-posities ──
   const minAge = Math.floor(currentAge)
@@ -356,17 +364,14 @@ export function Vrijheidsas({
       : null
   const onzekerheidDegenereert = onzekerheid !== null && onzekerheid.vroegst === onzekerheid.laatst
 
-  // ADR 0129 F3b — snelkoppeling "Op AOW-leeftijd" (B11): zet alleen de slider, op
-  // halve jaren binnen de as. Geen eigen kernel-run, geen deplete-override.
-  const aowSliderAge =
-    aowAge != null && Number.isFinite(aowAge)
-      ? Math.max(minAge, Math.min(maxAge, Math.round(aowAge * 2) / 2))
-      : null
-  const aowActief = aowSliderAge !== null && Math.abs(stopAge - aowSliderAge) < 0.25
-  // "Maak dit mijn plan": alleen zinvol als de slider van het plan-stopmoment afwijkt.
+  // Het stopmoment van het plan, op halve jaren — de referentie in de intro
+  // ("nu rekent het met stoppen op …"). `aowAge` voedt alleen nog het bereik van
+  // de as (zie `candidates` hierboven); de AOW-snelknop is met B-038 vervallen.
   const planStopHalf = planStopAge != null && Number.isFinite(planStopAge) ? Math.round(planStopAge * 2) / 2 : null
-  const sliderIsPlan = planStopHalf !== null && Math.abs(stopAge - planStopHalf) < 0.25
-  const toonMaakPlan = onMaakPlan != null && !stopKeuzeVerborgen
+  // Verwijzing naar de plek waar de plan-keuzes staan (B-038). Onder het
+  // nu-anker is er geen stopkeuze om naartoe te wijzen: de sectie toont daar
+  // geen schuif, dus ook geen "waar stel ik dit in?"-vraag.
+  const toonKeuzesLink = onKeuzesOpenen != null && !stopKeuzeVerborgen
 
   return (
     <div>
@@ -419,9 +424,11 @@ export function Vrijheidsas({
             volgt uit je plan, niet uit een schuif. Hieronder draai je aan je aannames.
           </>
         ) : ankerVast ? (
-          // ADR 0129 — vast anker: de slider verkent, het plan blijft staan tot de CTA.
+          // ADR 0129 — vast anker: de slider verkent, het plan blijft staan.
+          // "…pas als je het vastzet" verwees naar de CTA die met B-038 verviel;
+          // wijzen naar een knop die er niet meer is, is erger dan geen zin.
           <>
-            Verken een ander stopmoment. Je plan verandert pas als je het vastzet
+            Verken een ander stopmoment. Je plan verandert er niet van
             {planStopHalf !== null && (
               <> — nu rekent het met stoppen op <b className="font-semibold text-[var(--ink-2)]">{formatAge(planStopHalf)}</b></>
             )}
@@ -516,42 +523,31 @@ export function Vrijheidsas({
             }`}
           />
 
-          {/* Snelkoppeling + CTA (ADR 0129 B11/F3b). De AOW-knop zet alleen de slider —
-              de vroegere toggle met eigen kernel-run en deplete-override is weg. De CTA
-              maakt het VERKENDE stopmoment het plan (anker `age`); verkennen zelf is
-              nooit destructief. */}
-          {(aowSliderAge !== null || toonMaakPlan) && (
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              {aowSliderAge !== null && (
-                <button
-                  type="button"
-                  onClick={() => onStopAgeChange(aowSliderAge)}
-                  aria-pressed={aowActief}
-                  className={`inline-flex min-h-[32px] items-center rounded-full border px-2.5 py-1 font-sans text-[11px] font-medium transition-colors ${
-                    aowActief
-                      ? 'border-horizon-300 bg-horizon-50 text-horizon-700'
-                      : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-200 hover:text-[var(--ink-2)]'
-                  }`}
-                  title={`Zet de stopleeftijd op je AOW-leeftijd (${formatAge(aowSliderAge)})`}
-                >
-                  Op AOW-leeftijd
-                </button>
-              )}
-              {toonMaakPlan && (
-                <button
-                  type="button"
-                  onClick={() => onMaakPlan?.(Math.round(stopAge * 2) / 2)}
-                  disabled={maakPlanBusy || sliderIsPlan}
-                  className="inline-flex min-h-[32px] items-center rounded-full border border-horizon-600 bg-horizon-600 px-3 py-1 font-sans text-[11px] font-semibold text-[var(--paper)] transition-colors hover:bg-horizon-700 disabled:cursor-not-allowed disabled:opacity-50"
-                  title={
-                    sliderIsPlan
-                      ? 'Dit is al het stopmoment van je plan'
-                      : `Zet stoppen op ${formatAge(stopAge)} vast als je plan`
-                  }
-                >
-                  {maakPlanBusy ? 'Vastzetten…' : 'Maak dit mijn plan'}
-                </button>
-              )}
+          {/* Waar de stopkeuze wél thuishoort (melding B-038). Hier stonden twee
+              snelknoppen: "Op AOW-leeftijd" (zette alleen de slider) en "Maak dit
+              mijn plan" (schreef alléén het stop-anker). Dat las als het
+              keuzemenu van je plan terwijl het er twee grepen uit was — de
+              eindleeftijd, de eind-vorm en de nalatenschap stonden er niet in en
+              bleven daardoor onvindbaar. Eén regel die naar de volledige
+              plan-keuzes wijst is eerlijker dan twee knoppen die de rest
+              verzwijgen; de schuif blijft doen waar hij goed in is: verkennen. */}
+          {toonKeuzesLink && (
+            // Tekst en link op één linkerlijn, de link op een EIGEN regel — zelfde
+            // recept als het meta-blok op /overzicht/bezittingen. Bewust niet
+            // inline in de zin: het tapdoel van 44px rekt dan de regelhoogte van
+            // precies die ene tekstregel op, wat de alinea scheef laat ogen.
+            <div className="mt-2 flex flex-col items-start">
+              <p className="font-sans text-[11px] leading-snug text-[var(--ink-3)]">
+                Schuiven verkent — je plan blijft staan. Wanneer je stopt, tot welke leeftijd
+                je geld moet reiken en wat er dan nog over moet zijn, kies je bij je plan-keuzes.
+              </p>
+              <button
+                type="button"
+                onClick={onKeuzesOpenen}
+                className="inline-flex min-h-[44px] items-center font-sans text-[11px] font-medium text-[var(--ink-2)] underline underline-offset-2 transition-colors hover:text-horizon-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+              >
+                Je plan-keuzes &rarr;
+              </button>
             </div>
           )}
 

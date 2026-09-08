@@ -29,7 +29,9 @@ import {
   calculateFreedomTime,
   formatFreedomTimeString,
   formatMaskedCurrency,
+  type FreedomRateSource,
 } from '@/lib/format'
+import { VrijheidstijdVoetnoot } from '@/components/app/vrijheidstijd-voetnoot'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { ASSET_TYPE_LABELS, type AssetType } from '@/lib/asset-data'
 import { formatGainPct, RETURN_BASIS_LABELS } from '@/lib/asset-return'
@@ -60,12 +62,22 @@ export function AssetReturnModal({
   onClose,
   breakdown,
   dailyExpenses,
+  dailyExpensesSource,
 }: {
   open: boolean
   onClose: () => void
   breakdown: AssetReturnBreakdown
   /** Canoniek €/dag uit de loader — voor de vrijheidstijd-vertaling. Nooit zelf afleiden. */
   dailyExpenses: number
+  /**
+   * Herkomst van dat tarief. Melding B-039 verhuisde de wisselkoers-voetnoot
+   * van de pagina naar déze modal: de rendement-cel vertaalt hieronder naar
+   * vrijheidstijd, dus hier wordt de koers gebruikt en hier hoort hij ook
+   * uitgelegd. Zonder de bron kan de voetnoot niet zeggen of het tarief uit
+   * geboekte uitgaven, uit het profiel of uit een leeftijdsschatting komt —
+   * en "onbekend is geen nul" (ADR 0131) vraagt juist dát onderscheid.
+   */
+  dailyExpensesSource?: FreedomRateSource
 }) {
   const { masked } = useMaskedAmounts()
   const fc = (v: number) => formatMaskedCurrency(v, masked)
@@ -130,6 +142,20 @@ export function AssetReturnModal({
             },
           ]}
         />
+
+        {/* De wisselkoers, direct onder de cel die hem gebruikt (melding B-039).
+            De rendement-cel hierboven zet een bedrag om in vrijheid; deze regel
+            zegt tegen welke koers dat gebeurt. Hij stond tot 8 sep 2026 boven
+            aan /overzicht/bezittingen, waar hij naast steeds minder tijdgetallen
+            kwam te staan (UR3-19 haalde de tijd van het subtotaal, B-035 de
+            runway-zin uit de deck) en de kop van de pagina onnodig zwaar maakte.
+            Hier wordt hij daadwerkelijk gebruikt.
+
+            Nog steeds precies één keer, nog steeds via het component: dat regelt
+            maskering in privacymodus en levert `null` bij tarief 0 of een
+            onbekende grondslag (ADR 0091 / 0131) — de helper zelf aanroepen of
+            de zin overtypen zou een tweede waarheid over dezelfde koers maken. */}
+        <VrijheidstijdVoetnoot dailyRate={dailyExpenses} source={dailyExpensesSource} />
 
         <Section
           kicker="MEEGETELD · MARKTPORTEFEUILLE"
