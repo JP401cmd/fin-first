@@ -589,7 +589,21 @@ export default async function AppLayout({
               (bevinding C1). Server- en client-seed zijn identiek, dus geen
               hydration-mismatch. */}
           <PerspectiveProvider initialPerspective={sidebarPerspective}>
-            <ChatProvider>
+            {/* W-004 — drie scalars voor de gespreksgeschiedenis van Fin.
+                Bewust GEEN store-import hier: de IndexedDB-/fetch-laag hoort in
+                de lazy chat-chunk te blijven en niet in de First-Load JS.
+                `chat_history_mode` valt stil terug op 'account' zolang de kolom
+                er nog niet is (migratie niet uitgerold) — nooit een 500, zelfde
+                defensieve lijn als /api/ai-execution-prefs bij foutcode 42703. */}
+            <ChatProvider
+              userId={user.id}
+              initialChatHistoryMode={
+                profile?.chat_history_mode === 'apparaat' || profile?.chat_history_mode === 'uit'
+                  ? profile.chat_history_mode
+                  : 'account'
+              }
+              dataGaps={coachDataGaps}
+            >
               <NotificationProvider>
               <GlobalSyncProvider>
                 <ModuleColorProvider initialConfig={moduleColors} initialBudgetConfig={budgetColors} initialPhaseConfig={phaseColors} initialFontTheme={(profile?.typography_theme as FontTheme) ?? 'editorial'}>

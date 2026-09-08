@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-08T09:48:34.506Z",
+  "generatedAt": "2026-09-08T21:32:12.286Z",
   "generatedDate": "2026-09-08",
   "repo": {
     "name": "fin",
@@ -141,7 +141,9 @@
         "custom_calculators",
         "calculator_likes",
         "calculator_reports",
-        "calculators"
+        "calculators",
+        "chat_conversations",
+        "chat_messages"
       ],
       "Nieuws & briefing": [
         "news_articles",
@@ -189,11 +191,11 @@
   "stats": {
     "routes": 134,
     "routesProduction": 91,
-    "api": 309,
-    "tables": 94,
-    "migrations": 231,
+    "api": 313,
+    "tables": 96,
+    "migrations": 232,
     "integrations": 25,
-    "components": 1074,
+    "components": 1078,
     "providers": 17,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -2707,6 +2709,42 @@
       "domain": "cashflow-forecast",
       "methods": [
         "GET"
+      ]
+    },
+    {
+      "url": "/api/chat/conversations",
+      "file": "app/api/chat/conversations/route.ts",
+      "domain": "chat",
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "url": "/api/chat/conversations/[id]",
+      "file": "app/api/chat/conversations/[id]/route.ts",
+      "domain": "chat",
+      "methods": [
+        "GET",
+        "PATCH",
+        "DELETE"
+      ]
+    },
+    {
+      "url": "/api/chat/conversations/[id]/messages",
+      "file": "app/api/chat/conversations/[id]/messages/route.ts",
+      "domain": "chat",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "url": "/api/chat/history-settings",
+      "file": "app/api/chat/history-settings/route.ts",
+      "domain": "chat",
+      "methods": [
+        "GET",
+        "PUT"
       ]
     },
     {
@@ -6057,6 +6095,49 @@
       ]
     },
     {
+      "domain": "chat",
+      "label": "chat",
+      "count": 4,
+      "routes": [
+        {
+          "url": "/api/chat/conversations",
+          "file": "app/api/chat/conversations/route.ts",
+          "domain": "chat",
+          "methods": [
+            "GET",
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/chat/conversations/[id]",
+          "file": "app/api/chat/conversations/[id]/route.ts",
+          "domain": "chat",
+          "methods": [
+            "GET",
+            "PATCH",
+            "DELETE"
+          ]
+        },
+        {
+          "url": "/api/chat/conversations/[id]/messages",
+          "file": "app/api/chat/conversations/[id]/messages/route.ts",
+          "domain": "chat",
+          "methods": [
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/chat/history-settings",
+          "file": "app/api/chat/history-settings/route.ts",
+          "domain": "chat",
+          "methods": [
+            "GET",
+            "PUT"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "guide-help",
       "label": "guide-help",
       "count": 4,
@@ -7940,6 +8021,14 @@
         "migration": "supabase/migrations/20260213122235_add_category_corrections.sql"
       },
       {
+        "name": "chat_conversations",
+        "migration": "supabase/migrations/20260908120000_chat_gespreksgeschiedenis.sql"
+      },
+      {
+        "name": "chat_messages",
+        "migration": "supabase/migrations/20260908120000_chat_gespreksgeschiedenis.sql"
+      },
+      {
         "name": "contract_events",
         "migration": "supabase/migrations/20260617190000_create_contract_events.sql"
       },
@@ -8212,7 +8301,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 231
+    "migrationCount": 232
   },
   "tablesByDomain": [
     {
@@ -8483,6 +8572,35 @@
       ]
     },
     {
+      "domain": "AI & calculators",
+      "tables": [
+        {
+          "name": "ai_calculator_usage",
+          "migration": "supabase/migrations/20260529100000_create_calculator_library.sql"
+        },
+        {
+          "name": "calculator_likes",
+          "migration": "supabase/migrations/20260529100000_create_calculator_library.sql"
+        },
+        {
+          "name": "calculator_reports",
+          "migration": "supabase/migrations/20260529100000_create_calculator_library.sql"
+        },
+        {
+          "name": "chat_conversations",
+          "migration": "supabase/migrations/20260908120000_chat_gespreksgeschiedenis.sql"
+        },
+        {
+          "name": "chat_messages",
+          "migration": "supabase/migrations/20260908120000_chat_gespreksgeschiedenis.sql"
+        },
+        {
+          "name": "custom_calculators",
+          "migration": "supabase/migrations/20260526000000_create_custom_calculators.sql"
+        }
+      ]
+    },
+    {
       "domain": "Toekomst & doelen",
       "tables": [
         {
@@ -8529,27 +8647,6 @@
         {
           "name": "user_streaks",
           "migration": "supabase/migrations/20260215000001_create_new_tables.sql"
-        }
-      ]
-    },
-    {
-      "domain": "AI & calculators",
-      "tables": [
-        {
-          "name": "ai_calculator_usage",
-          "migration": "supabase/migrations/20260529100000_create_calculator_library.sql"
-        },
-        {
-          "name": "calculator_likes",
-          "migration": "supabase/migrations/20260529100000_create_calculator_library.sql"
-        },
-        {
-          "name": "calculator_reports",
-          "migration": "supabase/migrations/20260529100000_create_calculator_library.sql"
-        },
-        {
-          "name": "custom_calculators",
-          "migration": "supabase/migrations/20260526000000_create_custom_calculators.sql"
         }
       ]
     },
@@ -8718,11 +8815,11 @@
     }
   ],
   "components": {
-    "total": 1074,
+    "total": 1078,
     "groups": [
       {
         "group": "app",
-        "count": 421,
+        "count": 423,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -8898,6 +8995,8 @@
           "freshness-label.test",
           "gap-analyse",
           "gekoppeld-bezit-label.test",
+          "gesprekken-lijst",
+          "gesprekken-lijst.test",
           "gids-view",
           "gids-view.test",
           "goal-form",
@@ -9614,7 +9713,7 @@
       },
       {
         "group": "mijn",
-        "count": 47,
+        "count": 49,
         "items": [
           "abonnement-section",
           "account-basis-section",
@@ -9632,6 +9731,8 @@
           "budget-tint-picker.test",
           "category-tint-picker",
           "category-tint-picker.test",
+          "chat-geschiedenis-instelling",
+          "chat-geschiedenis-instelling.test",
           "danger-zone",
           "display-mode-picker",
           "display-mode-picker.test",
@@ -10591,6 +10692,20 @@
         {
           "name": "transactions",
           "write": false
+        }
+      ],
+      "chat": [
+        {
+          "name": "chat_conversations",
+          "write": true
+        },
+        {
+          "name": "chat_messages",
+          "write": false
+        },
+        {
+          "name": "profiles",
+          "write": true
         }
       ],
       "check": [
@@ -11807,6 +11922,14 @@
           "write": true,
           "routes": [
             "/api/budgeting-active"
+          ]
+        },
+        {
+          "domain": "chat",
+          "label": "chat",
+          "write": true,
+          "routes": [
+            "/api/chat/history-settings"
           ]
         },
         {
@@ -14110,6 +14233,28 @@
           ]
         }
       ],
+      "chat_conversations": [
+        {
+          "domain": "chat",
+          "label": "chat",
+          "write": true,
+          "routes": [
+            "/api/chat/conversations",
+            "/api/chat/conversations/[id]",
+            "/api/chat/history-settings"
+          ]
+        }
+      ],
+      "chat_messages": [
+        {
+          "domain": "chat",
+          "label": "chat",
+          "write": false,
+          "routes": [
+            "/api/chat/conversations/[id]"
+          ]
+        }
+      ],
       "lead_intakes": [
         {
           "domain": "check",
@@ -14812,6 +14957,11 @@
         "from": "category_corrections",
         "to": "budgets",
         "column": "budget_id"
+      },
+      {
+        "from": "chat_messages",
+        "to": "chat_conversations",
+        "column": "conversation_id"
       },
       {
         "from": "crypto_holding_prices",
@@ -15553,6 +15703,16 @@
       "transaction_flags": {
         "user": true,
         "household": true,
+        "rls": true
+      },
+      "chat_conversations": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "chat_messages": {
+        "user": true,
+        "household": false,
         "rls": true
       }
     }
@@ -17269,6 +17429,21 @@
       ],
       "summary": "Een grenzenpot die precies op zijn grens staat, is rekenkundig binnen die grens en heeft tegelijk geen ruimte meer. De motor zei het eerste, elk oppervlak zei alleen dat, en de tekst beloofde daardoor ruimte die er niet was. De motor blijft ongemoeid — exact op de grens telt nog ",
       "file": "docs/adr/0136-grens-bereikt-is-een-weergave-stand.md"
+    },
+    {
+      "id": "0137-een-bewaard-gesprek-erft-zijn-bestemming-niet",
+      "title": "Een bewaard gesprek erft zijn bestemming niet — de gebruiker kiest waar het landt, en lokaal blijft lokaal",
+      "status": "aanvaard",
+      "date": "2026-09-08",
+      "elements": [
+        "as-coach",
+        "do-gesprek",
+        "t-aigateway",
+        "t-lokale-ai",
+        "sp-inzicht"
+      ],
+      "summary": "Gesprekken met Fin leefden tot nu toe alleen in de browser: na een refresh waren ze weg. Ze bewaren is een wens van testgebruikers (W-004), maar het is geen gewone opslagkeuze — het is de gevoeligste vrije tekst in de app. Mensen vertellen een financiële assistent over schulden, ",
+      "file": "docs/adr/0137-een-bewaard-gesprek-erft-zijn-bestemming-niet.md"
     }
   ],
   "churn": {
@@ -17280,19 +17455,19 @@
       },
       {
         "path": "lib/ai",
-        "commits": 53
+        "commits": 52
       },
       {
         "path": "app/(app)/toekomst",
-        "commits": 35
+        "commits": 34
       },
       {
         "path": "app/api/ai",
-        "commits": 19
+        "commits": 18
       },
       {
         "path": "app/api/household",
-        "commits": 17
+        "commits": 16
       },
       {
         "path": "app/api/assets",
@@ -17318,17 +17493,17 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 10252,
+        "loc": 10216,
         "commits": 83
       },
       {
         "file": "components/app/budgets-client.tsx",
         "loc": 5635,
-        "commits": 35
+        "commits": 36
       },
       {
         "file": "components/core/assets-client.tsx",
-        "loc": 5007,
+        "loc": 4995,
         "commits": 38
       },
       {
@@ -17344,7 +17519,7 @@
       {
         "file": "lib/release-notes.ts",
         "loc": 2763,
-        "commits": 3
+        "commits": 2
       },
       {
         "file": "app/(app)/core/cash/import/page.tsx",
@@ -18878,9 +19053,9 @@
     },
     {
       "date": "2026-09-08",
-      "api": 309,
-      "components": 1074,
-      "tables": 94,
+      "api": 313,
+      "components": 1078,
+      "tables": 96,
       "routesProduction": 91
     }
   ]

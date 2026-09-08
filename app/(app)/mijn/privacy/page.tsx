@@ -4,6 +4,7 @@ import { PrivacyOverview } from '@/components/mijn/privacy-overview'
 import { AiPrivacySettings } from '@/components/mijn/ai-privacy-settings'
 import { AiExecutionSettings } from '@/components/mijn/local-categorization-settings'
 import { BedragenVerbergenBlok } from '@/components/mijn/bedragen-verbergen-blok'
+import { ChatGeschiedenisInstelling } from '@/components/mijn/chat-geschiedenis-instelling'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { getPageInfo } from '@/lib/page-info-content'
 
@@ -34,6 +35,9 @@ export default function MijnPrivacyPage() {
       <PrivacyOverview />
       <AiPrivacySettings />
       <AiExecutionSettings />
+      {/* Waar bewaren we je gesprekken met Fin? Staat ná de uitvoerkeuze: eerst
+          "waar denkt Fin na", dan "wat blijft er van dat gesprek over". */}
+      <ChatGeschiedenisInstelling />
     </>
   )
 }

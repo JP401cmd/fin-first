@@ -18,6 +18,13 @@
 // meldingsvorm, maar met de welkomstgids als bron — en zolang die gids loopt
 // vervangt hij de data-gap-tip van WF-WILL-05.
 //
+// WF-WILL-27 t/m 31 (gespreksgeschiedenis, ADR 0137) zijn de jongste
+// toevoeging: de gesprekkenlijst is de VIERDE paneelmodus naast
+// chat/melding/gids, en hangt daarom náást 'vraag' i.p.v. eronder — openen is
+// een venster, geen gespreksactie (zie WF-WILL-24). WF-WILL-31 (de
+// suggestievragen) hangt wél onder 'vraag': dat is de lege staat van hetzelfde
+// scherm.
+//
 // Het proces leest links→rechts: instap (bubbel/bel/krant overal zichtbaar) →
 // chat-kern (vrije vraag, tip/actie-beslissing, pin, badge-heropak, contextuele
 // starters, foutherstel) → meldingen (bel, berichtencentrum, opvolgen,
@@ -56,6 +63,13 @@ export const WILL_FLOW: UatFlow = {
     { id: 'bespreek', scenarioId: 'UAT-WILL-07', label: 'WF-WILL-07 · "Bespreek met Fin" vanaf een onderwerp', kind: 'action', stage: 1, lane: 'chat' },
     { id: 'deeplink', scenarioId: 'UAT-WILL-08', label: 'WF-WILL-08 · Chat starten via ?prompt=-deeplink', kind: 'action', stage: 1, lane: 'chat' },
     { id: 'melding', scenarioId: 'UAT-WILL-24', label: 'WF-WILL-24 · Melding maken vanuit de chat (bug/vraag/wens)', kind: 'action', stage: 1, lane: 'chat' },
+    { id: 'suggesties', scenarioId: 'UAT-WILL-31', label: 'WF-WILL-31 · Suggestievragen in de lege staat', kind: 'action', stage: 1, lane: 'chat', subOf: 'vraag' },
+
+    // ── 1b · gespreksgeschiedenis (ADR 0137, de vierde paneelmodus) ───────
+    { id: 'gesprekken', scenarioId: 'UAT-WILL-27', label: 'WF-WILL-27 · Gesprek bewaren en later hervatten', kind: 'screen', stage: 1, lane: 'chat' },
+    { id: 'nieuwgesprek', scenarioId: 'UAT-WILL-28', label: 'WF-WILL-28 · Nieuw gesprek naast het oude', kind: 'action', stage: 1, lane: 'chat', subOf: 'gesprekken' },
+    { id: 'opslagkeuze', scenarioId: 'UAT-WILL-29', label: 'WF-WILL-29 · Opslagkeuze wijzigen (incl. "uit"-bevestiging)', kind: 'action', stage: 1, lane: 'chat', subOf: 'gesprekken' },
+    { id: 'privacyvloer', scenarioId: 'UAT-WILL-30', label: 'WF-WILL-30 · Privacyvloer: lokaal gesprek blijft op het toestel', kind: 'action', stage: 1, lane: 'chat', subOf: 'gesprekken' },
 
     // ── 2 · meldingen ─────────────────────────────────────────────────────
     { id: 'bel', scenarioId: 'UAT-WILL-10', label: 'WF-WILL-10 · Meldingen checken via de bel', kind: 'screen', stage: 2, lane: 'meldingen' },
@@ -77,7 +91,7 @@ export const WILL_FLOW: UatFlow = {
 
     // ── 5 · cross-doorwerking (OUTPUT) ───────────────────────────────────
     { id: 'x-ovz', label: 'Overzicht · Toptips & Open acties (/overzicht/tips), briefing (/overzicht#briefing)', kind: 'cross', stage: 5, crossZone: 'OVZ' },
-    { id: 'x-mijn', label: 'Mijn · Notificatievoorkeuren (/mijn/notificaties)', kind: 'cross', stage: 5, crossZone: 'MIJN' },
+    { id: 'x-mijn', label: 'Mijn · Notificatievoorkeuren (/mijn/notificaties) + opslagkeuze gesprekken (/mijn/privacy)', kind: 'cross', stage: 5, crossZone: 'MIJN' },
     { id: 'x-bezit', label: 'Bezittingen · Koersalert-instelling (UAT-BEZIT-17) voedt de bel-melding', kind: 'cross', stage: 5, crossZone: 'BEZIT' },
     { id: 'x-toek', label: 'Toekomst · "Bespreek met Fin"-knoppen bij fase-analyses/tijdas', kind: 'cross', stage: 5, crossZone: 'TOEK' },
   ],
@@ -103,6 +117,20 @@ export const WILL_FLOW: UatFlow = {
     { from: 'vraag', to: 'pin' },
     { from: 'vraag', to: 'fouth' },
     { from: 'vraag', to: 'ai-uit-block' },
+    { from: 'vraag', to: 'suggesties', label: 'lege staat: tip-chip + drie suggestievragen' },
+    { from: 'suggesties', to: 'vraag', label: 'aantikken verstuurt de vraag als gewone beurt' },
+
+    // gespreksgeschiedenis (ADR 0137) — de lijst is een venster naast het
+    // gesprek: openen raakt de lopende useChat-state niet aan (WF-WILL-24).
+    { from: 'vraag', to: 'gesprekken', label: 'gesprekkenknop in de chatheader (achter de Wft-gate)' },
+    { from: 'gesprekken', to: 'vraag', label: 'hervatten: eerst laden, dan omklappen' },
+    { from: 'gesprekken', to: 'nieuwgesprek' },
+    { from: 'gesprekken', to: 'opslagkeuze' },
+    { from: 'gesprekken', to: 'privacyvloer' },
+    { from: 'nieuwgesprek', to: 'vraag', label: 'vers gesprek náást het oude (lui aangemaakt)' },
+    { from: 'privacyvloer', to: 'nieuwgesprek', kind: 'branch', label: 'andere bestemming → splitsen i.p.v. hervatten' },
+    { from: 'opslagkeuze', to: 'x-mijn', kind: 'cross' },
+
     { from: 'bespreek', to: 'tip' },
     { from: 'bespreek', to: 'x-toek', kind: 'cross' },
     { from: 'deeplink', to: 'tip' },
@@ -133,6 +161,11 @@ export const WILL_FLOW: UatFlow = {
     { from: 'fouth', to: 'uitkomst' },
     { from: 'ai-uit-block', to: 'uitkomst' },
     { from: 'melding', to: 'uitkomst' },
+    { from: 'gesprekken', to: 'uitkomst' },
+    { from: 'nieuwgesprek', to: 'uitkomst' },
+    { from: 'opslagkeuze', to: 'uitkomst' },
+    { from: 'privacyvloer', to: 'uitkomst' },
+    { from: 'suggesties', to: 'uitkomst' },
     { from: 'opvolgen', to: 'uitkomst' },
     { from: 'voorkeuren', to: 'uitkomst' },
     { from: 'briefingmelding', to: 'uitkomst' },

@@ -188,3 +188,107 @@ describe('ChatSettingsPopover', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   })
 })
+
+/**
+ * W-004 — het derde blok: waar bewaren we je gesprekken?
+ *
+ * Twee dingen moeten hier hard staan. (1) De keuze loopt door dezelfde route
+ * als het volledige scherm op /mijn/privacy — één administratie, twee
+ * bedieningen. (2) De privacyvloer staat er letterlijk bij: wie "op mijn
+ * account" kiest mag niet denken dat zijn lokale gesprekken meeverhuizen.
+ */
+describe('ChatSettingsPopover — gesprekken bewaren', () => {
+  function mockMetHistory(mode: string) {
+    fetchMock.mockImplementation(async (url: unknown) => {
+      if (typeof url === 'string' && url.startsWith('/api/local-ai-gate')) {
+        return { ok: true, json: async () => ({ config: GATE_OPEN, cloudModel: CLOUD_MODEL }) }
+      }
+      if (typeof url === 'string' && url.startsWith('/api/chat/history-settings')) {
+        return { ok: true, json: async () => ({ mode, serverConversationCount: 3 }) }
+      }
+      return { ok: true, json: async () => ({ modes: ALL_CLOUD, prefs: {} }) }
+    })
+  }
+
+  it('toont de drie opties met de huidige keuze aangevinkt', async () => {
+    mockMetHistory('apparaat')
+    await open()
+
+    await screen.findByText('Gesprekken bewaren')
+    expect(screen.getByRole('radio', { name: /Op mijn account/ })).toHaveAttribute(
+      'aria-checked',
+      'false',
+    )
+    expect(screen.getByRole('radio', { name: /Alleen op dit apparaat/ })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    )
+    expect(screen.getByRole('radio', { name: /Niet bewaren/ })).toHaveAttribute(
+      'aria-checked',
+      'false',
+    )
+  })
+
+  it('noemt de privacyvloer expliciet', async () => {
+    mockMetHistory('account')
+    await open()
+    await screen.findByText('Gesprekken bewaren')
+    expect(
+      screen.getByText(/lokale AI voerde bewaren we altijd alleen op dit apparaat/i),
+    ).toBeTruthy()
+  })
+
+  it('schrijft de keuze via /api/chat/history-settings en meldt hem aan de chat', async () => {
+    mockMetHistory('account')
+    const onHistoryModeChanged = vi.fn()
+    render(<ChatSettingsPopover onHistoryModeChanged={onHistoryModeChanged} />)
+    fireEvent.click(screen.getByRole('button', { name: /Instellingen voor dit gesprek/i }))
+    await screen.findByText('Gesprekken bewaren')
+
+    fireEvent.click(screen.getByRole('radio', { name: /Alleen op dit apparaat/ }))
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/chat/history-settings',
+        expect.objectContaining({
+          method: 'PUT',
+          body: JSON.stringify({ mode: 'apparaat' }),
+        }),
+      ),
+    )
+    await waitFor(() => expect(onHistoryModeChanged).toHaveBeenCalledWith('apparaat'))
+  })
+
+  it('wist NOOIT vanuit de popover — "niet bewaren" stuurt geen deleteExisting mee', async () => {
+    mockMetHistory('account')
+    await open()
+    await screen.findByText('Gesprekken bewaren')
+
+    fireEvent.click(screen.getByRole('radio', { name: /Niet bewaren/ }))
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/chat/history-settings',
+        expect.objectContaining({ body: JSON.stringify({ mode: 'uit' }) }),
+      ),
+    )
+    const puts = fetchMock.mock.calls.filter(
+      ([url, init]) =>
+        url === '/api/chat/history-settings' &&
+        (init as { method?: string } | undefined)?.method === 'PUT',
+    )
+    for (const [, init] of puts) {
+      expect(String((init as { body?: string }).body)).not.toContain('deleteExisting')
+    }
+  })
+
+  it('valt terug op "op mijn account" als de route niets bruikbaars teruggeeft', async () => {
+    // De standaardmock geeft hier `{ modes, prefs }` terug — geen `mode`-veld.
+    await open()
+    await screen.findByText('Gesprekken bewaren')
+    expect(screen.getByRole('radio', { name: /Op mijn account/ })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    )
+  })
+})

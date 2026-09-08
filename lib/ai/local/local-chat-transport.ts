@@ -381,6 +381,30 @@ export class LocalChatTransport implements ChatTransport<UIMessage> {
   }
 
   /**
+   * Sluit de HUIDIGE on-device conversatie af zonder de transport zelf op te
+   * geven (W-004, contract C4).
+   *
+   * Nodig sinds een gesprek een identiteit heeft: "Nieuw gesprek" en "Hervat
+   * gesprek X" moeten de native beurthistorie van de sessie leegmaken, anders
+   * praat het model in het nieuwe gesprek door op de vorige context — stil
+   * contextlek, alleen zichtbaar aan een antwoord dat nergens op slaat.
+   *
+   * HET VERSCHIL MET `dispose()`: deze methode raakt `#disposeEngine` NIET. De
+   * engine is gedeeld met o.a. de categorisatie; hem hier omlaag halen zou een
+   * andere consument breken terwijl er niets mis is. `dispose()` is voor
+   * transport-wissel/unmount, dit is voor een nieuwe conversatie op dezelfde
+   * transport.
+   */
+  resetConversation(): void {
+    this.#session?.dispose()
+    this.#session = null
+    this.#sessionPromise = null
+    // Ook de kennis-boekhouding op nul: de volgende sessie begint met een lege
+    // historie en moet de uitleg dus opnieuw kunnen meesturen.
+    this.#turns.reset()
+  }
+
+  /**
    * Sluit de lopende `LocalChatSession` af (conversatie-resources vrij; de
    * gedeelde engine blijft intact). Aan te roepen bij transport-wissel/unmount
    * (FR-C2a.4) — geen lekkende WebGPU-resources.

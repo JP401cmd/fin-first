@@ -646,3 +646,72 @@ describe('LocalChatTransport — kennis per beurt (onderwerpwissel)', () => {
   })
 })
 
+
+/**
+ * W-004 / contract C4 — `resetConversation()`.
+ *
+ * Een gesprek heeft sinds W-004 een identiteit: "Nieuw gesprek" en "Hervat
+ * gesprek X" moeten de on-device conversatie afsluiten, anders praat het model
+ * in het nieuwe gesprek door op de context van het vorige. Het cruciale verschil
+ * met `dispose()` is dat de GEDEELDE ENGINE blijft staan — die is ook van de
+ * categorisatie, en hem hier omlaag halen zou een andere consument breken.
+ */
+describe('LocalChatTransport — resetConversation (nieuw/hervat gesprek)', () => {
+  const UITLEG: LocalKnowledgeItem = {
+    id: 'k-box3',
+    titel: 'Box 3',
+    tekst: 'Box 3 belast een forfaitair rendement op je vermogen.',
+    tags: ['box3'],
+    actief: true,
+    volgorde: 0,
+    bijgewerkt: '2026-07-19T00:00:00.000Z',
+    categorie: 'Belastingen',
+    laatstGecontroleerd: '2026-07-19T00:00:00.000Z',
+    controleerVoor: null,
+  }
+
+  it('sluit de sessie af en opent bij de volgende beurt een verse, met lege kennisboekhouding', async () => {
+    const eerste = mockSession('ok')
+    const tweede = mockSession('ok')
+    const createSession = vi
+      .fn()
+      .mockResolvedValueOnce(eerste.session)
+      .mockResolvedValueOnce(tweede.session)
+    const disposeEngine = vi.fn(async () => {})
+    const transport = new LocalChatTransport({
+      overview: OVERVIEW,
+      knowledgeItems: [UITLEG],
+      createSession,
+      disposeEngine,
+    })
+
+    await foldToMessage(await transport.sendMessages(sendOpts([userMessage('Wat is Box 3?')])))
+    expect(eerste.sends[0]).toContain('forfaitair rendement')
+
+    transport.resetConversation()
+
+    // De oude sessie is netjes afgesloten...
+    expect(eerste.disposed()).toBe(1)
+    // ...maar de GEDEELDE ENGINE is met rust gelaten. Dit is de hele reden dat
+    // resetConversation naast dispose bestaat.
+    expect(disposeEngine).not.toHaveBeenCalled()
+
+    await foldToMessage(await transport.sendMessages(sendOpts([userMessage('Wat is Box 3?')])))
+
+    // Verse sessie...
+    expect(createSession).toHaveBeenCalledTimes(2)
+    // ...en de uitleg gaat opnieuw mee: de native historie is leeg, dus de
+    // boekhouding "die heb ik al gestuurd" mag niet zijn blijven staan.
+    expect(tweede.sends[0]).toContain('forfaitair rendement')
+  })
+
+  it('is veilig zonder lopende sessie', () => {
+    const transport = new LocalChatTransport({
+      overview: OVERVIEW,
+      knowledgeItems: [],
+      createSession: async () => mockSession('x').session,
+      disposeEngine: async () => {},
+    })
+    expect(() => transport.resetConversation()).not.toThrow()
+  })
+})

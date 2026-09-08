@@ -194,6 +194,13 @@ export default function PrivacyPage() {
             afgeleide van je IP-adres tegen misbruik.
           </li>
           <li className="border-l-2 border-[var(--border-md)] pl-4">
+            <strong className="font-semibold text-[var(--ink)]">Gesprekken met Fin</strong>{' '}
+            &mdash; bewaar je je gesprekken (zie sectie 5), dan slaan we de tekst
+            op die jij en Fin uitwisselen. Grafieken en actiekaarten uit een
+            gesprek bewaren we bewust niet: die zouden cijfers van toen naast je
+            cijfers van nu zetten.
+          </li>
+          <li className="border-l-2 border-[var(--border-md)] pl-4">
             <strong className="font-semibold text-[var(--ink)]">Technische en beveiligingsgegevens</strong>{' '}
             — geanonimiseerde performance-signalen (Vercel Speed Insights),
             een log van verzonden e-mails, een audit-log van
@@ -301,6 +308,39 @@ export default function PrivacyPage() {
           grondslag). Met Mistral (EU) of een self-hosted model blijft de
           verwerking binnen de EU respectievelijk in eigen beheer.
         </p>
+        <p>
+          Sinds september 2026 blijft je gesprek met Fin ook bij óns staan,
+          zodat je het later kunt teruglezen. Je bepaalt zelf waar:
+        </p>
+        <ul className="ml-1 list-none space-y-2">
+          <li className="border-l-2 border-wil-300 pl-4">
+            <strong className="font-semibold text-[var(--ink)]">Op je account</strong>{' '}
+            — de standaardkeuze. Je gesprekken staan bij ons opgeslagen en zijn
+            op al je apparaten terug te lezen. Alleen jij kunt erbij: ons eigen
+            team kan je gesprekken niet inzien, ook niet voor support.
+          </li>
+          <li className="border-l-2 border-wil-300 pl-4">
+            <strong className="font-semibold text-[var(--ink)]">Alleen op dit apparaat</strong>{' '}
+            — je gesprekken blijven in de browser waarin je ze voerde en komen
+            niet op onze servers. Twee gevolgen die je moet weten: er is geen
+            back-up (leeg je je browsergegevens, dan zijn ze weg), en een
+            verwijderverzoek dat je elders indient bereikt dat apparaat pas
+            zodra je de app daarop weer opent.
+          </li>
+          <li className="border-l-2 border-wil-300 pl-4">
+            <strong className="font-semibold text-[var(--ink)]">Niet bewaren</strong>{' '}
+            — na het sluiten is het gesprek weg.
+          </li>
+        </ul>
+        <p>
+          Eén regel staat boven die keuze en is niet uit te zetten: voer je een
+          gesprek met de AI die op je eigen toestel draait, dan blijft dat
+          gesprek op dat toestel — ook als je &ldquo;op je account&rdquo; hebt
+          gekozen. Wat je apparaat niet verlaat, komt bij ons niet binnen. Je
+          verandert de keuze op{' '}
+          <strong className="font-semibold text-[var(--ink)]">Mijn &rsaquo; Privacy</strong>,
+          waar je je gesprekken ook per stuk of in één keer kunt verwijderen.
+        </p>
       </MarketingSection>
 
       <MarketingSection heading="6. Hoe lang we bewaren">
@@ -329,6 +369,15 @@ export default function PrivacyPage() {
             — niet-geconverteerde intakes worden automatisch opgeschoond;
             maak je een account, dan volgen ze de levensduur van je account.
             Wil je ze eerder kwijt, gebruik dan het contactkanaal uit sectie 1.
+          </li>
+          <li className="border-l-2 border-[var(--border-md)] pl-4">
+            <strong className="font-semibold text-[var(--ink)]">Gesprekken met Fin</strong>{' '}
+            — zolang je account bestaat, tenzij je ze eerder verwijdert. Dat kan
+            per gesprek of in één keer, op Mijn &rsaquo; Privacy. We ruimen ze
+            niet vanzelf op: een gesprek van vorig jaar kan nog steeds het
+            gesprek zijn waar je naar terug wilt. Kies je &ldquo;alleen op dit
+            apparaat&rdquo;, dan bewaren wij niets en bepaalt je browser hoe
+            lang ze blijven (zie sectie 5).
           </li>
           <li className="border-l-2 border-[var(--border-md)] pl-4">
             <strong className="font-semibold text-[var(--ink)]">AI-aanbieders</strong>{' '}
@@ -404,7 +453,7 @@ export default function PrivacyPage() {
           abonnement — niet je data.
         </p>
         <p className="font-serif text-sm italic text-[var(--ink-3)]">
-          Versie 2.1 — concept, 7 augustus 2026. Vragen? Gebruik de{' '}
+          Versie 2.2 — concept, 8 september 2026. Vragen? Gebruik de{' '}
           <a
             href="/contact"
             className="font-semibold not-italic text-kern-700 underline hover:text-kern-800"

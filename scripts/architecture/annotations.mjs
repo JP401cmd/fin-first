@@ -131,7 +131,9 @@ export const annotations = {
     // 'goal' (enkelvoud) dekt ook `goal_links` en `goal_contributions`; op
     // 'goals' matchten die niet en belandden ze in "Overig".
     'Toekomst & doelen': ['goal', 'goals', 'life_events', 'aow_leeftijd', 'retirement'],
-    'AI & calculators': ['ai_calculator_usage', 'custom_calculators', 'calculator_likes', 'calculator_reports', 'calculators'],
+    // chat_conversations/chat_messages horen hier: het bewaarde gesprek met Fin
+    // (ADR 0137), eigen-rij RLS, geen huishoud-deling, geen beheerinzage.
+    'AI & calculators': ['ai_calculator_usage', 'custom_calculators', 'calculator_likes', 'calculator_reports', 'calculators', 'chat_conversations', 'chat_messages'],
     'Nieuws & briefing': ['news_articles', 'news', 'briefing_history', 'briefing'],
     'Vragenlijsten': ['questionnaires', 'questionnaire_questions', 'questionnaire_sessions', 'questionnaire_responses', 'questionnaire'],
     'Engagement & features': ['user_feature_visits', 'next_step_completions', 'user_badges', 'user_streaks', 'app_settings'],

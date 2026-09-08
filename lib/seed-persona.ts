@@ -351,6 +351,15 @@ export async function deleteAllUserData(
     summary[batch0Tables[i]] = batch0Results[i]
   }
 
+  // Gespreksgeschiedenis met Fin (ADR 0137). Bewust SEQUENTIEEL en niet in de
+  // Promise.all hierboven: `chat_messages` hangt met ON DELETE CASCADE aan
+  // `chat_conversations`, dus parallel lopende deletes zouden dezelfde rijen
+  // vergrendelen. Het kind staat er expliciet bij ook al zou de cascade
+  // volstaan — deze lijst wordt met de hand nagelopen, en "de cascade doet het
+  // wel" is precies de aanname waarmee spend_limits ooit een reset overleefde.
+  summary.chat_messages = await deleteTable(supabase, 'chat_messages', userId)
+  summary.chat_conversations = await deleteTable(supabase, 'chat_conversations', userId)
+
   // Batch 0b: investment_holdings + crypto_holdings (FK to assets, must be deleted before assets)
   const [investmentHoldingsResult, cryptoHoldingsResult] = await Promise.all([
     deleteTable(supabase, 'investment_holdings', userId),
@@ -360,7 +369,8 @@ export async function deleteAllUserData(
   summary.crypto_holdings = cryptoHoldingsResult
 
   onProgress?.('Gebruikersdata verwijderen...', 'batch0', 'delete',
-    batch0Results.reduce((a, b) => a + b, 0) + investmentHoldingsResult + cryptoHoldingsResult)
+    batch0Results.reduce((a, b) => a + b, 0) + investmentHoldingsResult + cryptoHoldingsResult
+      + summary.chat_messages + summary.chat_conversations)
 
   // Batch 1a: deepest leaf tables (FK to goals, budgets)
   const batch1aResults = await Promise.all([

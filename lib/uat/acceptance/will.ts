@@ -11,7 +11,27 @@
  * `lib/uat/catalog.ts` bevat dan ook geen UAT-WILL-21/22 (het volgnummer na 20
  * is UAT-WILL-23, zie hieronder) — dit domein is dus, net als SCHULD/TOEK, NIET
  * volledig aaneengesloten op WF-nummer, maar WEL 1-op-1 met de catalogus-
- * scenario's die daadwerkelijk bestaan (20 + UAT-WILL-23 t/m 26 = 24).
+ * scenario's die daadwerkelijk bestaan (20 + UAT-WILL-23 t/m 31 = 29).
+ *
+ * UAT-WILL-27 t/m 31 (gespreksgeschiedenis voor de Fin-chat, ADR 0137 /
+ * melding W-004): tot deze release leefde een gesprek alleen in browser-state
+ * (`useChat`) en was het na een refresh weg. Er kwam een VIERDE paneelmodus bij
+ * ("gesprekken", naast chat/melding/gids) plus twee ruggen — Supabase en
+ * IndexedDB — achter één facade. Vijf criteria omdat het vijf onafhankelijk
+ * falende dingen zijn: bewaren+hervatten (27), een nieuw gesprek naast het
+ * oude (28), de opslagkeuze incl. de "uit"-bevestiging met twee uitgangen (29),
+ * de privacyvloer die een lokaal gevoerd gesprek nooit naar de server laat gaan
+ * (30) en de nieuwe lege staat met suggestievragen (31).
+ *
+ * WAAROM 31 EEN EIGEN CRITERIUM IS (en geen uitbreiding van WF-WILL-01): de
+ * lege staat is nu een ander scherm met een eigen, DETERMINISTISCHE
+ * selectiemotor (`selectSuggesties` — 105 records, datavereisten uit
+ * `CoachDataGaps`, roterende seed, géén `Math.random`). WF-WILL-01 is bewust
+ * 'ui-only' omdat AI-tekst niet toetsbaar is; hier valt juist wél iets exact na
+ * te rekenen, en de fout die het moet vangen is er al één geweest (een
+ * suggestie over "mijn volgende verdiende euro" op een account zonder
+ * inkomensgegevens). Zo'n gate onder een ui-only-criterium schuiven zou hem
+ * onzichtbaar maken.
  *
  * UAT-WILL-26 (Fin herinnert aan de volgende gidsstap, ADR 0130 fase 2): de
  * welkomstgids verhuisde van een banner op /overzicht naar Fin; de proactieve
@@ -364,11 +384,11 @@ const criteria: AcceptanceCriterion[] = [
     when:
       'De gebruiker kiest een type (bug/vraag/aanbeveling), vult het formulier in — bug/vraag verplicht een scherm, een aanbeveling juist NIET (en toont geen scherm-/verwachting-/toestemmingsveld) — voegt optioneel een screenshot toe (niet bij aanbeveling; PNG/JPEG/WebP tot 4 MB) en verstuurt. Tijdens het versturen probeert hij te sluiten (kruisje of mobiele backdrop) of de megafoon nogmaals te klikken.',
     then:
-      'Sluiten en de megafoon-toggle zijn geblokkeerd zolang de verzending loopt (`meldingBezig`) — geen halve/dubbele melding. Dit geldt sinds deze release ook voor het NIEUWE swipe-down-gebaar op mobiel (het paneel deelt `useSwipeToDismiss` met BottomSheet, zie WF-NAV-21): de hook wordt met `enabled: !isPinned && !meldingBezig` aangeroepen, dus wegslepen tijdens een lopende verzending sluit het paneel niet — consistent met de bestaande sluit-blokkade. Gepind (desktop-zijbalk) is het swipe-gebaar sowieso nooit actief. Het gesprek zelf (useChat-state) blijft intact wanneer de gebruiker terug naar chatmodus schakelt; de melding wordt pas geschreven bij "versturen", nooit tussentijds. Bij een 6e melding binnen het lopende uur wijst de server het verzoek af (HTTP 429, Nederlandse foutmelding "al veel meldingen... probeer het over een uur"); de eerste 5 lukken. Server-side validatie (zod) geeft bij een ontbrekend scherm op bug/vraag, een te korte omschrijving (<5 tekens) of een niet-toegestaan veld bij een aanbeveling een Nederlandse foutmelding, nooit de rauwe zod-tekst. Bij succes toont de meldmodus een bevestigingsstap; de rij komt eerst in Supabase (`user_reports`) te staan en pas daarna, best-effort, als Notion-kaartje — een falende Notion-push verliest de melding dus niet en wordt de volgende dag door de cron (UAT-BEHEER-31 → `/beheer/jobs`, job "Meldingen → Notion-sync") opnieuw geprobeerd. Sinds deze release geldt op het kaartje (niet op het formulier) een inhoudsdrempel: een melding met een omschrijving onder de 10 tekens ("test", "asdf") krijgt bewust géén Notion-kaartje — de rij blijft `pending` in Supabase (niets gaat verloren) en de cron telt haar als `skipped_leeg`, niet als `failed`. Kaartjes die wél doorgaan dragen een volgnummer-prefix in de titel (`B-001`/`V-004`/`W-012` — bug/vraag/wens), afgeleid geteld uit de eerdere meldingen mét inhoud van dezelfde soort; mislukt die telling, dan gaat het kaartje zonder nummer mee.',
+      'Sluiten en de megafoon-toggle zijn geblokkeerd zolang de verzending loopt (`meldingBezig`) — geen halve/dubbele melding. Dit geldt sinds deze release ook voor het NIEUWE swipe-down-gebaar op mobiel (het paneel deelt `useSwipeToDismiss` met BottomSheet, zie WF-NAV-21): de hook wordt met `enabled: !isPinned && !meldingBezig` aangeroepen, dus wegslepen tijdens een lopende verzending sluit het paneel niet — consistent met de bestaande sluit-blokkade. Gepind (desktop-zijbalk) is het swipe-gebaar sowieso nooit actief. Het gesprek zelf (useChat-state) blijft intact wanneer de gebruiker terug naar chatmodus schakelt; de melding wordt pas geschreven bij "versturen", nooit tussentijds. DEZELFDE EIS GELDT SINDS ADR 0137 VOOR ALLE VIER DE PANEELMODI: `mode` is één state (`chat | melding | gids | gesprekken`) en het gesprek leeft ernaast, dus ook het openen én weer sluiten van de gesprekkenlijst (WF-WILL-27) laat de lopende `useChat`-state ongemoeid — geen herstart, geen verloren beurten, geen extra rij in een rug. Alleen "Nieuw gesprek" (WF-WILL-28) en "Hervatten" (WF-WILL-27) klappen de conversatie bewust om; elke andere modusknop is puur een venster. Regressie-indicator: schakel je melding→chat→gesprekken→chat, dan staan alle eerdere beurten er nog en begint het antwoord op de volgende vraag niet op seq 0. Bij een 6e melding binnen het lopende uur wijst de server het verzoek af (HTTP 429, Nederlandse foutmelding "al veel meldingen... probeer het over een uur"); de eerste 5 lukken. Server-side validatie (zod) geeft bij een ontbrekend scherm op bug/vraag, een te korte omschrijving (<5 tekens) of een niet-toegestaan veld bij een aanbeveling een Nederlandse foutmelding, nooit de rauwe zod-tekst. Bij succes toont de meldmodus een bevestigingsstap; de rij komt eerst in Supabase (`user_reports`) te staan en pas daarna, best-effort, als Notion-kaartje — een falende Notion-push verliest de melding dus niet en wordt de volgende dag door de cron (UAT-BEHEER-31 → `/beheer/jobs`, job "Meldingen → Notion-sync") opnieuw geprobeerd. Sinds deze release geldt op het kaartje (niet op het formulier) een inhoudsdrempel: een melding met een omschrijving onder de 10 tekens ("test", "asdf") krijgt bewust géén Notion-kaartje — de rij blijft `pending` in Supabase (niets gaat verloren) en de cron telt haar als `skipped_leeg`, niet als `failed`. Kaartjes die wél doorgaan dragen een volgnummer-prefix in de titel (`B-001`/`V-004`/`W-012` — bug/vraag/wens), afgeleid geteld uit de eerdere meldingen mét inhoud van dezelfde soort; mislukt die telling, dan gaat het kaartje zonder nummer mee.',
     assertion: {
       kind: 'ui-only',
       source:
-        'components/app/chat/chat-panel.tsx (megafoon-toggle, veiligSluiten/meldingBezig-blokkade, useSwipeToDismiss({enabled: !isPinned && !meldingBezig})) + lib/hooks/use-swipe-to-dismiss.ts + components/app/chat/melding/melding-view.tsx + melding-form.tsx + melding-type-kiezer.tsx + app/api/user-reports/route.ts (ReportSchema/zod-validatie, dutchValidationMessage, RPC reserve_user_report_slot voor de 5/uur-rem, best-effort pushReportToNotion) + app/api/cron/user-reports-notion-sync/route.ts (retry-cron, telt `skipped_leeg`) + lib/user-reports/notion.ts (hasMeaningfulDescription-inhoudsdrempel, reportSequenceNumber/volgnummer-prefix) — procestoets/randvoorwaarden, geen AI-inhoud',
+        'components/app/chat/chat-panel.tsx (megafoon-toggle, veiligSluiten/meldingBezig-blokkade, useSwipeToDismiss({enabled: !isPinned && !meldingBezig}), de vier-modi-state `mode` waarnaast het gesprek zelfstandig leeft) + lib/hooks/use-swipe-to-dismiss.ts + components/app/chat/melding/melding-view.tsx + melding-form.tsx + melding-type-kiezer.tsx + app/api/user-reports/route.ts (ReportSchema/zod-validatie, dutchValidationMessage, RPC reserve_user_report_slot voor de 5/uur-rem, best-effort pushReportToNotion) + app/api/cron/user-reports-notion-sync/route.ts (retry-cron, telt `skipped_leeg`) + lib/user-reports/notion.ts (hasMeaningfulDescription-inhoudsdrempel, reportSequenceNumber/volgnummer-prefix) — procestoets/randvoorwaarden, geen AI-inhoud',
     },
   },
   {
@@ -403,6 +423,94 @@ const criteria: AcceptanceCriterion[] = [
       kind: 'ui-only',
       source:
         'lib/welcome-guide.ts#openGuideSteps/guideStepMatchesRoute/isProactiveGuideStep + lib/coach-suggestions.ts#getFirstUndismissedSuggestion (gids-laag, order 2, GUIDE_BUBBLE_EXCLUDED_ROUTES) + lib/hooks/use-coach-suggestion.ts (dagregel via isSameLocalDay, stempel bij verschijnen, kruisje vs. auto) + components/app/fin/fin-home.tsx#handleCta (openGids bij een stap zonder deeplink) + app/api/coach-state (PUT guideShown/dismiss) — gedekt door lib/welcome-guide.test.ts, lib/coach-suggestions.test.ts, lib/hooks/use-coach-suggestion.test.ts en components/app/fin/fin-home.test.tsx; in de live-run een PROCEStoets (verschijnt hij op de juiste pagina, en precies één keer), geen cijfermatige uitkomst',
+    },
+  },
+  {
+    workflow: 'WF-WILL-27',
+    scenarioId: 'UAT-WILL-27',
+    titel: 'Een gesprek bewaren en later hervatten',
+    kriticiteit: 'KERN',
+    given:
+      'ADR 0137 (melding W-004). Opslagkeuze staat op de default `account` en Fin draait in de cloud, dus `resolveBackend("account", "cloud")` = `server`. De gebruiker heeft de chat open, stelt een eerste vraag en krijgt een antwoord; het gesprek wordt LUI aangemaakt — pas bij die eerste beurt ontstaat er een rij, een leeg geopend paneel schrijft niets. De titel komt uit de eerste vraag (`chatTitelUitVraag`), niet uit het model. Daarna: pagina herladen.',
+    when:
+      'De gebruiker herlaadt, opent de chat, klikt de gesprekkenknop in de chatheader (de vierde paneelmodus, achter dezelfde Wft-gate als de lijst zelf), kiest het gesprek van zojuist, en stelt een vervolgvraag. Apart geval: dezelfde handeling terwijl het laden van de berichten faalt (netwerk uit).',
+    then:
+      'De lijst toont het gesprek met zijn afgeleide titel en een relatieve datum; een gesprek dat op dit toestel woont draagt een "lokaal"-chip, een servergesprek niet. Bij hervatten worden EERST de berichten geladen en pas DAARNA klapt de conversatie om — in één zetting, zodat er geen render bestaat waarin de nieuwe id de oude berichten draagt. Het transcript staat er compleet; is het gesprek tegen de bewaargrens aangelopen, dan meldt één regel bovenaan dat eerdere berichten niet bewaard zijn. Het vervolgnummer (`seq`) komt van de RUG (`meta.nextSeq`, ondergrens = hoogste geladen seq + 1) en wordt NOOIT door de client opgeteld — anders wordt een beurt na een afgebroken fetch stil weggegooid door de `ON CONFLICT … DO NOTHING` van de RPC. Hernoemen gebeurt inline in de regel (Escape annuleert alléén het hernoemen, niet het paneel), verwijderen is een tweestap ín de regel, zonder aparte overlay. FAALT HET LADEN, DAN WORDT ER NIET HERVAT: de gebruiker blijft in de lijst staan en ziet een `role="alert"`-foutregel ("Dit gesprek kon niet worden opgehaald…") — een half hervat gesprek is erger dan geen, want dat schrijft de volgende beurt op een bezette seq. DE VERZONDEN HISTORIE IS BEGRENSD: per cloud-beurt gaan maximaal 20 berichten (10 beurten) mee naar het model, en het venster schuift altijd dóór tot een user-bericht — de eerste beurt die de provider ziet moet van de gebruiker zijn.',
+    assertion: {
+      kind: 'exact',
+      expected: 'titel=Hoeveel vrijheidstijd levert het op als ik mijn hypotheek…; kortOngewijzigd=Wat kost mijn auto?; venster25=19; vensterStartRol=user',
+      source:
+        'lib/chat/history-copy.ts#chatTitelUitVraag (echte productiefunctie, geen mirror) + components/app/chat/chat-panel.tsx (MAX_VERZONDEN_BERICHTEN=20 en `verzendVenster`, gemirrord) + lib/chat/history/facade.ts + lib/chat/history/server-store.ts + lib/chat/history/device-store.ts + components/app/chat/gesprekken/gesprekken-lijst.tsx + app/api/chat/conversations/route.ts + app/api/chat/conversations/[id]/messages/route.ts — zie will-checks.ts',
+    },
+  },
+  {
+    workflow: 'WF-WILL-28',
+    scenarioId: 'UAT-WILL-28',
+    titel: 'Een nieuw gesprek beginnen zonder het oude te verliezen',
+    kriticiteit: 'BELANGRIJK',
+    given:
+      'ADR 0137. Een lopend gesprek met minstens één beantwoorde beurt, opslagkeuze `account` of `apparaat` (bij `uit` bestaat er niets om te bewaren en is dit scenario leeg). De gesprekkenlijst is open.',
+    when:
+      'De gebruiker klikt "Nieuw gesprek", stelt daar een eerste vraag, opent opnieuw de lijst en hervat het oorspronkelijke gesprek.',
+    then:
+      'Het nieuwe gesprek begint NAAST het oude, niet in plaats ervan: het oude blijft in de lijst staan met zijn eigen titel en beurten, en is daarna volledig te hervatten. De nieuwe conversatie is LUI — zolang er niets gestuurd is bestaat er geen rij, dus tien keer "Nieuw gesprek" klikken levert geen tien lege gesprekken. De lijst is aflopend gesorteerd op laatste bericht, dus het zojuist beantwoorde gesprek staat bovenaan. Een verwijderd gesprek dat op dat moment het actieve is, laat het paneel netjes op een vers gesprek achter (geen paneel dat naar een niet-bestaande rug blijft schrijven). Cross-check met WF-WILL-24: het openen en sluiten van de lijst zelf raakt het lopende gesprek niet aan — alleen "Nieuw gesprek" en "Hervatten" klappen de conversatie om.',
+    assertion: {
+      kind: 'ui-only',
+      source:
+        'components/app/chat/chat-panel.tsx (`startNieuwGesprek`/`versGesprek`, lui aanmaken bij de eerste beurt, GesprekStand als één state) + components/app/chat/gesprekken/gesprekken-lijst.tsx (sortering, onActiefVerwijderd) — gedekt door components/app/chat/chat-panel.test.tsx en components/app/chat/gesprekken/gesprekken-lijst.test.tsx; procestoets, geen cijfermatige uitkomst',
+    },
+  },
+  {
+    workflow: 'WF-WILL-29',
+    scenarioId: 'UAT-WILL-29',
+    titel: 'De opslagkeuze voor gesprekken wijzigen (inclusief de "uit"-bevestiging)',
+    kriticiteit: 'KERN',
+    given:
+      'ADR 0137. `profiles.chat_history_mode` staat op de default `account`. De keuze staat op TWEE bedieningen met ÉÉN tekstbron (`lib/chat/history-copy.ts#CHAT_HISTORY_OPTIES`): volledig op /mijn/privacy en compact in de chat-instellingen. De gebruiker heeft gesprekken op allebei de ruggen staan (server én dit apparaat).',
+    when:
+      'De gebruiker wisselt `account` → `apparaat` → terug, kiest daarna `uit`, en gebruikt in de bevestiging achtereenvolgens Annuleren, "Laat ze staan" en (in een tweede ronde) "Verwijder ze nu". Apart: de losse wisactie zonder de modus te wijzigen.',
+    then:
+      'EEN INSTELLING IS NOOIT EEN DESTRUCTIEVE HANDELING. Wisselen tussen `account` en `apparaat` verplaatst niets en wist niets: bestaande gesprekken blijven staan waar ze stonden, alleen NIEUWE gesprekken volgen de nieuwe keuze (`meta.backend` wordt bij het aanmaken afgeleid en ligt daarna vast). Alleen `uit` opent een bevestiging, en die heeft TWEE uitgangen die allebei even duidelijk zijn: "Laat ze staan" (modus uit, niets verwijderd) en "Verwijder ze nu" (modus uit én beide ruggen leeg). Annuleren — knop, Escape of backdrop — zet de instelling NIET om. De teller noemt altijd allebei de plekken ("X op je account en Y op dit apparaat") en de wisactie raakt ze allebei; mislukt het wissen op één van de twee, dan is de terugkoppeling een fout en geen groene bevestiging. Onder élke plek waar de keuze gemaakt wordt staat de vloerregel (`CHAT_HISTORY_VLOER_REGEL`), zodat de privacybelofte nooit naast een instelling staat die het tegendeel lijkt te zeggen. Een onbekende/kapotte waarde leest terug als `account` (`parseChatHistoryMode`), nooit als `uit` — stil stoppen met bewaren is de ergere fout.',
+    assertion: {
+      kind: 'ui-only',
+      source:
+        'components/mijn/chat-geschiedenis-instelling.tsx (bevestiging "uit" met de knoppen Annuleren/"Laat ze staan"/"Verwijder ze nu" in de sticky ShellOverlay-footer, teller over beide ruggen) + lib/chat/history-copy.ts (CHAT_HISTORY_OPTIES, CHAT_HISTORY_VLOER_REGEL, parseChatHistoryMode) + components/app/chat/chat-settings-popover.tsx (dezelfde keuze, compacte bediening) + app/api/chat/history-settings/route.ts + app/(app)/mijn/privacy/page.tsx — gedekt door components/mijn/chat-geschiedenis-instelling.test.tsx, components/app/chat/chat-settings-popover.test.tsx en app/api/chat/history-settings/route.test.ts; procestoets, geen cijfermatige uitkomst. De cijfermatige kern (welke rug volgt uit welke keuze) zit in WF-WILL-30.',
+    },
+  },
+  {
+    workflow: 'WF-WILL-30',
+    scenarioId: 'UAT-WILL-30',
+    titel: 'De privacyvloer: een lokaal gevoerd gesprek gaat nooit naar de server',
+    kriticiteit: 'KERN',
+    given:
+      'ADR 0137, de vloer. `resolveBackend(mode, origin)` is de enige plek waar de opslagkeuze en de privacybelofte elkaar ontmoeten. Vier gevallen; het vierde is de reden dat de functie bestaat. De gebruiker staat op opslagkeuze `account` (dus servergesprekken) en heeft één cloudgesprek én één on-device gesprek bewaard.',
+    when:
+      'De gebruiker zet Fin op zijn eigen toestel (privé-modus) en hervat vanuit de gesprekkenlijst het CLOUDgesprek; daarna doet hij het omgekeerde (cloud aan, on-device gesprek hervatten). Ook: hij wisselt van bestemming terwijl er berichten staan.',
+    then:
+      'DE VIER GEVALLEN: `uit` → `geen` (ongeacht herkomst), `apparaat` → `apparaat`, `account`+cloud → `server`, en `account`+lokaal → `apparaat`. Dat laatste IS de vloer: een gesprek dat met de lokale AI gevoerd is gaat nooit naar onze server, ook niet wanneer de gebruiker "op mijn account" koos — dezelfde vloer staat een tweede keer in de database als `CHECK (origin = \'cloud\')` op `chat_conversations`, zodat een fout in de clientlaag geen stil lek kan worden. HERVATTEN OVER DE GRENS SPLITST: draait de chat nu ergens anders dan waar het gesprek gevoerd is, dan wordt het NIET hervat maar begint er een nieuw gesprek met een uitlegregel ("Dat gesprek is in de cloud gevoerd. Fin draait nu op je toestel, dus we beginnen hier opnieuw — het staat gewoon in je gesprekken.", en omgekeerd). Hetzelfde gebeurt bij een bestemmingswissel mét berichten in beeld. Er wordt in geen van beide richtingen iets van het oude transcript naar de andere rug geschreven. GEHEUGENLOOS HERVATTEN OP DE LOKALE AI: boven een hervat on-device transcript staat precies één regel — "Fin leest dit gesprek terug maar begint zonder geheugen. Verwijs je naar iets van hierboven, noem het dan kort even opnieuw." — omdat de on-device sessie vers is en de bewaarde beurten niet opnieuw door het model gaan.',
+    assertion: {
+      kind: 'exact',
+      expected: 'uit+cloud=geen; uit+lokaal=geen; apparaat+cloud=apparaat; apparaat+lokaal=apparaat; account+cloud=server; account+lokaal=apparaat',
+      source:
+        'lib/chat/history/resolve.ts#resolveBackend (echte productiefunctie, geen mirror) + supabase/migrations/20260908120000_chat_gespreksgeschiedenis.sql (CHECK origin = cloud, de tweede afdwinging) + components/app/chat/chat-panel.tsx (`hervatGesprek` poort 1 = splitsen, `geheugenloosHervat`, de A9-bestemmingswissel) — zie will-checks.ts',
+    },
+  },
+  {
+    workflow: 'WF-WILL-31',
+    scenarioId: 'UAT-WILL-31',
+    titel: 'Suggestievragen in de lege staat van het gesprek',
+    kriticiteit: 'BELANGRIJK',
+    given:
+      'ADR 0137 (D7). De lege staat van de chat is sinds deze release een ander scherm: naast de vaste chip "Geef me een tip" (het anker, roteert nooit) en de eventuele paginachip staan drie aantikbare volzin-suggesties met een "Andere vragen"-knop. De bron is één tabel van 105 records in `lib/chat/suggesties.ts`; de vijf oude hardcoded `CONTEXT_CHIPS` zijn daar letterlijk de eerste vijf records van, dus er is geen tweede lijst meer. Twee accounts: een LEEG account (alle `CoachDataGaps` false) en een gevuld account, allebei op /overzicht.',
+    when:
+      'De gebruiker opent de lege chat, leest de rij, klikt "Andere vragen", en tikt een suggestie aan.',
+    then:
+      'DE SELECTIE IS DETERMINISTISCH — geen `Math.random`: gelijke (pathname, databeeld, seed) geeft gelijke uitkomst, anders zou elke re-render van het paneel andere vragen tonen. Routegebonden suggesties gaan vóór generieke; is er niets routegebonden, dan vult de generieke pool volledig aan, zodat de rij nooit leeg is. DE DATAVEREISTE IS DE KERN: belooft een vraag een antwoord over JOUW cijfers, dan draagt hij de `CoachDataGaps`-sleutel die daarvoor nodig is, en op een leeg account blijven precies de uitlegvragen ("hoe werkt Box 3?", "sneeuwbal of lawine?") over — nooit "Hoeveel houd ik netto over van mijn volgende verdiende euro?" tegen iemand zonder inkomensgegevens. "Andere vragen" schuift een heel blok op (index `(seed × aantal + i) % pool.length`) i.p.v. één vraag te verwisselen, en verschijnt alleen wanneer er daadwerkelijk iets anders te tonen is (pool > 4). Aantikken verstuurt de volledige vraag als gewone gebruikersbeurt; de chip "Geef me een tip" blijft ongewijzigd de eerste en roteert niet mee.',
+    assertion: {
+      kind: 'exact',
+      expected: 'aantalLeegAccount=3; alleZonderVereist=true; zelfdeSeedGelijk=true; andereSeedAnders=true; poolGroeitMetData=true',
+      source:
+        'lib/chat/suggesties.ts#selectSuggesties/#suggestiePoolGrootte (echte productiefuncties, geen mirror; CHAT_SUGGESTIES = 105 records, LEGE_DATA_GAPS) + components/app/chat/chat-panel.tsx#QuickActionChips (SUGGESTIE_AANTAL=3, GENERIC_PROMPT als vaste eerste chip, "Andere vragen" alleen bij pool > SUGGESTIE_AANTAL+1) — zie will-checks.ts',
     },
   },
 ]

@@ -24,6 +24,16 @@
 // WAT HIER NIET IN HOORT: weergavevoorkeuren per apparaat (ingeklapte secties,
 // view-modes, gekozen palet, chatpaneel vastgezet). Die zijn bewust toestelgebonden
 // en bevatten geen gegevens van de gebruiker.
+//
+// NIET ALLEEN localStorage. De gespreksgeschiedenis van Fin staat in IndexedDB
+// (`lib/chat/history/device-store.ts`) en draagt rauwe transcripts. Die rug wist
+// vreemde gebruikers zélf zodra hij geopend wordt — maar dat gebeurt pas als
+// iemand het chatvenster opent. Opent B nooit Fin, dan blijven A's gesprekken
+// maanden in het browserprofiel van een gedeeld toestel staan. Vandaar dat de
+// purge de hele database weggooit; hij hangt aan de binnenkomst, waar er maar
+// één van is.
+
+import { CHAT_DEVICE_DB_NAAM } from '@/lib/chat/history/device-db-naam'
 
 /**
  * Prefix van de krantcache. Hier canoniek, want deze module moet 'm kunnen
@@ -87,6 +97,18 @@ export function purgeAccountScopedStorage(): void {
     document.cookie = 'tf_perspective=; path=/; max-age=0; samesite=lax'
   } catch {
     // Opslag niet beschikbaar — in-/uitloggen gaat gewoon door.
+  }
+
+  // De chatgeschiedenis in IndexedDB, apart en faal-zacht: `deleteDatabase` kan
+  // blijven hangen zolang een ander tabblad de database open heeft (`onblocked`),
+  // en dat mag in-/uitloggen nooit ophouden. We wachten dus niet op de uitkomst;
+  // de per-record `userId`-scoping in device-store.ts blijft de tweede laag.
+  try {
+    if (typeof indexedDB !== 'undefined' && indexedDB !== null) {
+      indexedDB.deleteDatabase(CHAT_DEVICE_DB_NAAM)
+    }
+  } catch {
+    // Privémodus of beleid blokkeert IndexedDB — er staat dan sowieso niets.
   }
 }
 

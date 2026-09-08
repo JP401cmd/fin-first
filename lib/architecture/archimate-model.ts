@@ -331,8 +331,8 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
     {
       id: 'as-coach', x: 560, y: row(5), w: 220, h: 66, kind: 'appsvc',
       title: 'Inzicht- & coachingsdienst',
-      lead: 'Fin (AI-coach), aanbevelingen, volgende stappen, aandachtspunten-bus en de briefing-kaarten. Elk van deze diensten kan on-device draaien via t-lokale-ai in plaats van via de AI-gateway — dezelfde functie, ander transport. De gebruiker kiest dat per uitvoergroep op /mijn/privacy (ADR 0056, 0078). Draagt ook de gebruikersmelding (bug/vraag/aanbeveling) die vanuit het gesprek met Fin te openen is — Supabase blijft de bron, een dagelijkse cron duwt onverstuurde meldingen best-effort door naar de Trifinity-queue in Notion.',
-      items: ['/api/ai/*', '/api/briefing', '/api/next-steps', '/api/user-reports', 'lib/coach-suggestions'],
+      lead: 'Fin (AI-coach), aanbevelingen, volgende stappen, aandachtspunten-bus en de briefing-kaarten. Elk van deze diensten kan on-device draaien via t-lokale-ai in plaats van via de AI-gateway — dezelfde functie, ander transport. De gebruiker kiest dat per uitvoergroep op /mijn/privacy (ADR 0056, 0078). Draagt ook de gebruikersmelding (bug/vraag/aanbeveling) die vanuit het gesprek met Fin te openen is — Supabase blijft de bron, een dagelijkse cron duwt onverstuurde meldingen best-effort door naar de Trifinity-queue in Notion. Sinds ADR 0137 bewaart de dienst het gesprek zelf ook: een gesprekkenlijst met hervatten, hernoemen en verwijderen, plus route- en datagefilterde suggestievragen in de lege staat. Waar dat transcript landt kiest de gebruiker (profiles.chat_history_mode: account / apparaat / uit, default account), met één vloer boven die keuze — een beurt die via t-lokale-ai is gevoerd gaat nooit naar de server, ook niet bij "account", en die vloer wordt bij het HERVATTEN opnieuw getoetst en niet uit het opgeslagen record overgenomen. Beheer heeft geen inzage: dat is applicatielaag (ADMIN_EXPORT_UITGESLOTEN in lib/user-data-tables.ts), niet RLS.',
+      items: ['/api/ai/*', '/api/briefing', '/api/next-steps', '/api/user-reports', '/api/chat/*', 'lib/coach-suggestions'],
     },
     {
       id: 'as-nieuws', x: 560, y: row(6), w: 220, h: 66, kind: 'appsvc',
@@ -435,7 +435,7 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
 
     // ── Data ──
     {
-      id: 'data-cont', x: 700, y: 1064 + DATA_Y_SHIFT, w: 600, h: 280, kind: 'group',
+      id: 'data-cont', x: 700, y: 1064 + DATA_Y_SHIFT, w: 600, h: 346, kind: 'group',
       title: 'TriFinity-gegevens (informatieobjecten)',
       lead: 'De data-objecten waarmee de applicatie werkt — beheerd in Supabase Postgres met Row Level Security.',
       items: [],
@@ -500,6 +500,12 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
       title: 'Gebruikersmelding',
       lead: 'Bug/vraag/aanbeveling van een testgebruiker, met optioneel een screenshot (privé-bucket, signed URL) en de Notion-syncstatus. Een RPC (`reserve_user_report_slot`) begrenst het aantal meldingen per gebruiker.',
       items: ['user_reports'],
+    },
+    {
+      id: 'do-gesprek', x: 716, y: 1318 + DATA_Y_SHIFT, w: 180, h: 56, kind: 'data',
+      title: 'Bewaard gesprek',
+      lead: 'Het transcript van een gesprek met Fin — uitsluitend tekst, geen grafieken of actievoorstellen (die zouden bevroren cijfers naast de actuele zetten). Eigen-rij RLS, géén huishoud-deling; `chat_messages` is onveranderlijk en heeft geen INSERT-recht: de RPC `append_chat_turn` is de enige schrijver en bepaalt ook het volgnummer van de beurt. De gebruiker kiest de bestemming (`profiles.chat_history_mode`: account / apparaat / uit); bij "apparaat" staat het transcript in IndexedDB en raken deze tabellen niet. Beheer heeft geen inzage — afgedwongen in de applicatielaag via ADMIN_EXPORT_UITGESLOTEN, want een service-role omzeilt RLS per definitie (ADR 0137).',
+      items: ['chat_conversations', 'chat_messages'],
     },
 
     // ── Externe partijen ──
@@ -581,7 +587,7 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
     'as-belasting->sp-belasting': { payload: 'Box 1/2/3-druk, jaarruimte en tegenbewijs', mechanism: 'compute', cadence: 'on-demand', contractDomains: ['belasting'], note: 'Voornamelijk pure rekenmotoren in lib/; één API-route exposeert box1-inkomen.' },
     'as-planning->sp-plannen': { payload: 'FIRE-projecties, scenario’s en opnamestrategie', mechanism: 'compute', cadence: 'on-demand', contractDomains: ['scenarios', 'whatif', 'fire-settings', 'withdrawal-strategy', 'pot-rules', 'toekomst-doel'] },
     'as-planning->as-belasting': { payload: 'Unified-projectierijen van de canonieke Horizon-run (Box1Streams: AOW netto, pensioenuitkering/-onttrekking bruto; totalBox3/cumulativeBox3) — de invoer voor de levenslange-belastingdruk-rapportagelaag en de variantensweep over de pensioenpot-positie (ADR 0088)', mechanism: 'compute', cadence: 'on-demand', contractDomains: ['belasting'], note: 'GEEN terugkoppeling: de fiscale rapportagelaag (lib/tax-lifetime/) leest de kernel-rijen en berekent bovenop, maar niets vloeit terug in de kernel-cashflow (zie aandachtspunt box1-buiten-kernel-cashflow). De drie kernel-solves van de variantensweep draaien client-side in de bestaande kernel-worker (kind: "taxvarianten"), achter GET /api/belasting/varianten-sweep dat uitsluitend de serialiseerbare invoer levert.' },
-    'as-coach->sp-inzicht': { payload: 'Aanbevelingen, volgende stappen en aandachtspunten', mechanism: 'rest', cadence: 'on-demand', contractDomains: ['ai', 'next-steps', 'briefing', 'perspective'] },
+    'as-coach->sp-inzicht': { payload: 'Aanbevelingen, volgende stappen, aandachtspunten en — sinds ADR 0137 — de gesprekkenlijst met hervatten/hernoemen/verwijderen plus de suggestievragen in de lege staat', mechanism: 'rest', cadence: 'on-demand', contractDomains: ['ai', 'chat', 'next-steps', 'briefing', 'perspective'], note: 'De suggestievragen komen uit lib/chat/suggesties.ts (105 records) en worden op route en beschikbare data gefilterd; ze zijn geen AI-uitvoer maar gecureerde tekst.' },
     'as-nieuws->sp-nieuws': { payload: 'Nieuwsfeed en meldingen', mechanism: 'rest', cadence: 'daily', contractDomains: ['news', 'notifications'] },
     'as-rapport->sp-delen': { payload: 'Rapporten, snapshots, export en freedom-card', mechanism: 'rest', cadence: 'on-demand', contractDomains: ['report', 'snapshots', 'export', 'share'] },
     'as-huishouden->sp-delen': { payload: 'Partner-koppeling en perspectief-context', mechanism: 'rpc', cadence: 'on-demand', contractDomains: ['household', 'perspective'], note: 'Leest cross-user via RLS-veilige RPC’s; nooit directe tabel-selects over de huishoudgrens.' },
@@ -602,6 +608,7 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
     'app-comp->data-cont': { payload: 'Alle informatieobjecten — lezen en schrijven', mechanism: 'rpc', cadence: 'realtime', note: 'Elke query loopt server-side met Row Level Security op auth.uid().' },
     'as-coach->do-melding': { payload: 'Gebruikersmelding (bug/vraag/aanbeveling) + optionele screenshot-referentie; leest de eigen syncstatus terug', mechanism: 'rest', cadence: 'on-demand', contractDomains: ['user-reports'], note: 'RPC reserve_user_report_slot begrenst het aantal per gebruiker; own-row RLS.' },
     'as-coach->do-doel': { payload: 'gepasseerde mijlpalen + bevestigingsstatus', mechanism: 'rest', cadence: 'on-demand', contractDomains: ['milestones'], note: 'In-band RSC-append + acknowledge-route: detectie draait in-band in OverzichtSecondaryLoader per /overzicht-load (geen cron), idempotent via UNIQUE(user_id, milestone_key). De acknowledge-mutatie loopt wél via POST /api/milestones/acknowledge (ADR 0123).' },
+    'as-coach->do-gesprek': { payload: 'Gesprekstitel en de beurten (rol + tekst) van een gesprek met Fin; leest het transcript terug bij hervatten', mechanism: 'rpc', cadence: 'on-demand', contractDomains: ['chat'], note: 'Schrijven kan alleen via RPC append_chat_turn (SECURITY DEFINER): chat_messages heeft geen INSERT-policy, en het volgnummer komt uit de rug — een clientteller loopt na één afgebroken verbinding uit de pas. De bestemming volgt profiles.chat_history_mode (account / apparaat / uit, default account) via PUT /api/chat/history-settings; bij "apparaat" loopt dit pad niet en staat het transcript in IndexedDB. Boven die keuze ligt de privacyvloer: een beurt via t-lokale-ai bereikt deze tabellen nooit, en die toets draait óók op de hervat-tak, niet alleen bij aanmaak (ADR 0137).' },
     // Actor → proces
     'b-actor->b-main': { payload: 'Stuurt het proces, kiest modules', mechanism: 'process', cadence: 'on-demand' },
     'b-partner->b-main': { payload: 'Deelt financiën via huishouden-koppeling', mechanism: 'process', cadence: 'on-demand' },
@@ -723,7 +730,10 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
   // Inzicht- & coachingsdienst detecteert en bevestigt gepasseerde mijlpalen (ADR 0123)
   addEdge({ from: 'as-coach', to: 'do-doel', type: 'access', fromSide: 'B', toSide: 'T', readWrite: true, via: [[730, 1160 + DATA_Y_SHIFT]] })
 
-  return { width: 1660, height: 1370 + DATA_Y_SHIFT, nodes, edges }
+  // Inzicht- & coachingsdienst bewaart en hervat het gesprek met Fin (ADR 0137)
+  addEdge({ from: 'as-coach', to: 'do-gesprek', type: 'access', fromSide: 'B', toSide: 'L', readWrite: true, via: [[680, 1346 + DATA_Y_SHIFT]] })
+
+  return { width: 1660, height: 1436 + DATA_Y_SHIFT, nodes, edges }
 }
 
 // ── Afgeleide helpers ────────────────────────────────────────────────────────

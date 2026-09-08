@@ -962,3 +962,17 @@
 ## 2026-09-08
 
 - Geen wijzigingen.
+
+## 2026-09-08
+
+- **API-routes** toegevoegd: /api/chat/conversations, /api/chat/conversations/[id], /api/chat/conversations/[id]/messages, /api/chat/history-settings
+- **Tabellen** toegevoegd: chat_conversations, chat_messages
+- **Componenten (aantal)** toegevoegd: +4
+
+## 2026-09-08
+
+- Geen wijzigingen.
+
+## 2026-09-08
+
+- Geen wijzigingen.

@@ -1,6 +1,8 @@
 'use client'
 
 import { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from 'react'
+import type { CoachDataGaps } from '@/lib/coach-suggestions'
+import type { ChatHistoryMode } from '@/lib/chat/history/types'
 
 type ChatContextType = {
   isOpen: boolean
@@ -54,6 +56,27 @@ type ChatContextType = {
   /** True zolang ChatPanel de gidsmodus-intent nog moet oppakken. */
   gidsRequested: boolean
   clearGidsRequest: () => void
+  /**
+   * De ingelogde gebruiker. Alleen nodig voor de apparaatrug van de
+   * gespreksgeschiedenis (IndexedDB): daar is géén RLS, dus de scoping op
+   * `userId` moet de clientlaag zelf doen — zie `device-store.ts`.
+   */
+  userId: string | null
+  /**
+   * Waar bewaren we gesprekken met Fin? Server-geseed vanuit de layout
+   * (`profiles.chat_history_mode`), zodat het paneel niet hoeft te wachten op
+   * een fetch en er geen flits ontstaat. De instellingen-UI zet 'm hier bij,
+   * zodat de chat direct meebeweegt zonder herladen.
+   */
+  chatHistoryMode: ChatHistoryMode
+  setChatHistoryMode: (mode: ChatHistoryMode) => void
+  /**
+   * Het databeeld dat de layout tóch al berekent voor de coach-bubbel. De
+   * suggestievragen filteren erop ("welk budget loopt uit de pas" heeft weinig
+   * zin zonder budgetten). Bewust doorgegeven i.p.v. opnieuw opgehaald — geen
+   * tweede definitie van "heeft deze gebruiker schulden".
+   */
+  dataGaps: CoachDataGaps | null
 }
 
 const ChatContext = createContext<ChatContextType | null>(null)
@@ -75,8 +98,24 @@ export function useChatContextOptional() {
   return useContext(ChatContext)
 }
 
-export function ChatProvider({ children }: { children: ReactNode }) {
+export function ChatProvider({
+  children,
+  userId = null,
+  initialChatHistoryMode = 'account',
+  dataGaps = null,
+}: {
+  children: ReactNode
+  userId?: string | null
+  /**
+   * Server-geseed uit `profiles.chat_history_mode`. Default `'account'` — óók
+   * wanneer de kolom er nog niet is (migratie niet uitgerold): de layout valt
+   * dan stil terug op deze waarde in plaats van een 500 te veroorzaken.
+   */
+  initialChatHistoryMode?: ChatHistoryMode
+  dataGaps?: CoachDataGaps | null
+}) {
   const [isOpen, setIsOpen] = useState(false)
+  const [chatHistoryMode, setChatHistoryModeState] = useState<ChatHistoryMode>(initialChatHistoryMode)
   const [pendingMessage, setPendingMessage] = useState<string | null>(null)
   const [isPinned, setIsPinnedState] = useState(false)
   const [autoOpenMessage, setAutoOpenMessageState] = useState<string | null>(null)
@@ -187,6 +226,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setGidsRequested(false)
   }, [])
 
+  const setChatHistoryMode = useCallback((mode: ChatHistoryMode) => {
+    setChatHistoryModeState(mode)
+  }, [])
+
   return (
     <ChatContext.Provider value={{
       isOpen, open, close, toggle, openWithMessage,
@@ -196,6 +239,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       autoOpenMessage, setAutoOpenMessage,
       openMelding, meldingRequested, clearMeldingRequest,
       openGids, gidsRequested, clearGidsRequest,
+      userId, chatHistoryMode, setChatHistoryMode, dataGaps,
     }}>
       {children}
     </ChatContext.Provider>

@@ -18,6 +18,12 @@ import { getSelectedLocalModelId } from '@/lib/ai/local/selected-model'
 import { selectLocalModel } from '@/lib/ai/local/model-manager'
 import { DEFAULT_GATE_CONFIG, parseGateConfig, type LocalAiGateConfig } from '@/lib/ai/local/gate-config'
 import { notifyExecutionPrefsChanged } from '@/lib/ai/execution-prefs-signal'
+import type { ChatHistoryMode } from '@/lib/chat/history/types'
+import {
+  CHAT_HISTORY_OPTIES,
+  CHAT_HISTORY_VLOER_REGEL,
+  parseChatHistoryMode,
+} from '@/lib/chat/history-copy'
 
 /**
  * Compacte instellingen ín het chatvenster, achter een discrete knop naast het
@@ -66,8 +72,16 @@ const OTHER_GROUPS = AI_EXECUTION_GROUPS.filter((g) => g.id !== CHAT_GROUP)
 export function ChatSettingsPopover({
   onChanged,
   onOpenChange,
+  onHistoryModeChanged,
 }: {
   onChanged?: () => void
+  /**
+   * De opslagkeuze is net gewijzigd. ChatPanel zet 'm door naar de chatcontext,
+   * zodat de volgende beurt meteen in de nieuwe rug landt i.p.v. pas na een
+   * herlaadbeurt. Bewust een callback en geen context-read hier: deze popover
+   * hoort ook buiten een ChatProvider te kunnen renderen.
+   */
+  onHistoryModeChanged?: (mode: ChatHistoryMode) => void
   /**
    * Meldt de open/dicht-stand aan de ouder. ChatPanel gebruikt dit alleen om
    * Escape aan het juiste oppervlak toe te wijzen (M27): staat dit menu open,
@@ -86,6 +100,9 @@ export function ChatSettingsPopover({
   const [modelId, setModelId] = useState<LocalModelId>(getSelectedLocalModelId)
   /** Welke modellen staan er daadwerkelijk op dit toestel? */
   const [cached, setCached] = useState<Record<string, boolean>>({})
+  /** Waar bewaren we gesprekken? Verse lezing per opening, net als de rest. */
+  const [historyMode, setHistoryMode] = useState<ChatHistoryMode | null>(null)
+  const [historyBezig, setHistoryBezig] = useState(false)
 
   const wrapRef = useRef<HTMLDivElement>(null)
 
@@ -149,6 +166,21 @@ export function ChatSettingsPopover({
         if (active) setError('Je keuzes konden niet geladen worden.')
       }
 
+      // Waar bewaren we gesprekken? Faalt deze route (kolom of tabel nog niet
+      // uitgerold), dan tonen we de standaardkeuze i.p.v. een foutmelding —
+      // dit blok mag de rest van de popover nooit blokkeren.
+      try {
+        const res = await fetch('/api/chat/history-settings')
+        if (res.ok) {
+          const data = (await res.json()) as { mode?: unknown }
+          if (active) setHistoryMode(parseChatHistoryMode(data.mode))
+        } else if (active) {
+          setHistoryMode('account')
+        }
+      } catch {
+        if (active) setHistoryMode('account')
+      }
+
       // Cache-stand per model: bepaalt of een keuze hier gemaakt mág worden.
       try {
         const { isModelCached } = await import('@/lib/ai/local/litert-runtime')
@@ -191,6 +223,38 @@ export function ChatSettingsPopover({
       setSaving(null)
     }
   }, [onChanged])
+
+  /**
+   * De opslagkeuze zetten. Bewust ZONDER `deleteExisting`: een instelling is
+   * nooit een destructieve handeling. Wie "niet bewaren" kiest houdt zijn
+   * bestaande gesprekken; wissen is een aparte keuze op /mijn/privacy, waar de
+   * twee uitgangen expliciet gesteld worden (§2.4).
+   */
+  const setHistory = useCallback(
+    async (mode: ChatHistoryMode) => {
+      setHistoryBezig(true)
+      setError(null)
+      const vorige = historyMode
+      setHistoryMode(mode)
+      try {
+        const res = await fetch('/api/chat/history-settings', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode }),
+        })
+        if (!res.ok) throw new Error('save failed')
+        // De chat moet meteen meebewegen: de volgende beurt hoort in de nieuwe
+        // rug te landen, niet pas na een herlaadbeurt.
+        onHistoryModeChanged?.(mode)
+      } catch {
+        setHistoryMode(vorige)
+        setError('Deze keuze kon niet worden opgeslagen.')
+      } finally {
+        setHistoryBezig(false)
+      }
+    },
+    [onHistoryModeChanged, historyMode],
+  )
 
   const onPickModel = useCallback(async (model: LocalModelDescriptor) => {
     if (!cached[model.id]) return
@@ -310,6 +374,40 @@ export function ChatSettingsPopover({
               </ul>
             </>
           )}
+
+          {/* ── Bewaren van gesprekken (W-004) ── */}
+          <p className="mb-1.5 mt-4 font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--ink-4)]">
+            Gesprekken bewaren
+          </p>
+          <div className="space-y-1" role="radiogroup" aria-label="Waar bewaren we je gesprekken?">
+            {CHAT_HISTORY_OPTIES.map((optie) => {
+              const gekozen = historyMode === optie.mode
+              return (
+                <button
+                  key={optie.mode}
+                  type="button"
+                  role="radio"
+                  aria-checked={gekozen}
+                  disabled={historyBezig}
+                  onClick={() => void setHistory(optie.mode)}
+                  className={`flex w-full items-center justify-between gap-2 border px-2.5 py-1.5 text-left text-xs transition-colors ${
+                    gekozen
+                      ? 'border-[var(--ink)] bg-[var(--subtle)]'
+                      : 'border-[var(--rule-soft)] hover:bg-[var(--subtle)]'
+                  } disabled:opacity-50`}
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate text-[var(--ink)]">{optie.label}</span>
+                    <span className="block text-[10px] text-[var(--ink-4)]">{optie.kort}</span>
+                  </span>
+                  {gekozen && <Check className="h-3.5 w-3.5 shrink-0 text-[var(--ink)]" aria-hidden="true" />}
+                </button>
+              )
+            })}
+          </div>
+          <p className="mt-1.5 text-[10px] leading-relaxed text-[var(--ink-4)]">
+            {CHAT_HISTORY_VLOER_REGEL}
+          </p>
 
           {error && <p className="mt-3 text-[11px] text-[var(--negative)]">{error}</p>}
 

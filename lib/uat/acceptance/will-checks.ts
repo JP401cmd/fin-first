@@ -23,6 +23,9 @@
  */
 
 import { shouldAlert, budgetLimitStatus } from '@/lib/budget-alerts'
+import { chatTitelUitVraag } from '@/lib/chat/history-copy'
+import { resolveBackend } from '@/lib/chat/history/resolve'
+import { LEGE_DATA_GAPS, selectSuggesties, suggestiePoolGrootte } from '@/lib/chat/suggesties'
 import { getFirstUndismissedSuggestion, type CoachDataGaps } from '@/lib/coach-suggestions'
 import { amsterdamWeekKey } from '@/lib/briefing/snapshot'
 import { demotedCategories, demotionWindowStartIso } from '@/lib/news-feedback-summary'
@@ -74,6 +77,25 @@ const NO_GAPS: CoachDataGaps = {
 function postponedUntil(nowMs: number): number {
   const POSTPONE_DAYS = 14
   return nowMs + POSTPONE_DAYS * 24 * 60 * 60 * 1000
+}
+
+/**
+ * Mirror van `MAX_VERZONDEN_BERICHTEN = 20` + `verzendVenster` in
+ * components/app/chat/chat-panel.tsx (ADR 0137, M3).
+ *
+ * Niet importeerbaar: het staat in een `'use client'`-component naast `useChat`
+ * en is niet geëxporteerd. Twee dingen die deze mirror moet vasthouden: het
+ * venster is 20 berichten (10 beurten) EN het schuift altijd door tot een
+ * user-bericht — de eerste beurt die de provider ziet moet van de gebruiker
+ * zijn, anders weigert hij het verzoek.
+ */
+function verzendVensterMirror(rollen: Array<'user' | 'assistant'>): Array<'user' | 'assistant'> {
+  const MAX_VERZONDEN_BERICHTEN = 20
+  if (rollen.length <= MAX_VERZONDEN_BERICHTEN) return rollen
+  let start = rollen.length - MAX_VERZONDEN_BERICHTEN
+  while (start < rollen.length && rollen[start] !== 'user') start++
+  const venster = rollen.slice(start)
+  return venster.length > 0 ? venster : rollen.slice(-1)
 }
 
 /** Mirror van de bel-badge-cap in components/app/fin/fin-home.tsx. */
@@ -397,6 +419,79 @@ export const WILL_ENGINE_CHECKS: WillEngineCheck[] = [
       return {
         expected: 'macroNa1=false; macroNa2=true; wonenGedemoveerd=false',
         actual: `macroNa1=${na1.includes('macro')}; macroNa2=${na2.includes('macro')}; wonenGedemoveerd=${na2.includes('wonen')}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-WILL-27',
+    scenarioId: 'UAT-WILL-27',
+    label: 'Gesprekstitel uit de eerste vraag (echte chatTitelUitVraag) + het verzendvenster van 20 berichten start altijd op een user-beurt',
+    run: () => {
+      criterion('WF-WILL-27')
+      const lang = chatTitelUitVraag(
+        'Hoeveel vrijheidstijd levert het op als ik mijn hypotheek extra aflos?',
+      )
+      // Korter dan 60 tekens: onveranderd, alleen witruimte genormaliseerd.
+      const kort = chatTitelUitVraag('  Wat kost mijn   auto? ')
+      // 25 beurten, om en om beginnend bij de gebruiker. Kaal afkappen op 20
+      // zou op index 5 beginnen — een assistent-bericht — dus schuift het
+      // venster één op naar de user-beurt op index 6: 19 berichten.
+      const rollen = Array.from({ length: 25 }, (_, i) =>
+        i % 2 === 0 ? ('user' as const) : ('assistant' as const),
+      )
+      const venster = verzendVensterMirror(rollen)
+      return {
+        expected:
+          'titel=Hoeveel vrijheidstijd levert het op als ik mijn hypotheek…; kortOngewijzigd=Wat kost mijn auto?; venster25=19; vensterStartRol=user',
+        actual: `titel=${lang}; kortOngewijzigd=${kort}; venster25=${venster.length}; vensterStartRol=${venster[0]}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-WILL-30',
+    scenarioId: 'UAT-WILL-30',
+    label: 'Privacyvloer (echte resolveBackend): account+lokaal landt op het apparaat, nooit op de server',
+    run: () => {
+      criterion('WF-WILL-30')
+      const r = (m: 'account' | 'apparaat' | 'uit', o: 'cloud' | 'lokaal') => resolveBackend(m, o)
+      return {
+        expected:
+          'uit+cloud=geen; uit+lokaal=geen; apparaat+cloud=apparaat; apparaat+lokaal=apparaat; account+cloud=server; account+lokaal=apparaat',
+        actual:
+          `uit+cloud=${r('uit', 'cloud')}; uit+lokaal=${r('uit', 'lokaal')}; ` +
+          `apparaat+cloud=${r('apparaat', 'cloud')}; apparaat+lokaal=${r('apparaat', 'lokaal')}; ` +
+          `account+cloud=${r('account', 'cloud')}; account+lokaal=${r('account', 'lokaal')}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-WILL-31',
+    scenarioId: 'UAT-WILL-31',
+    label: 'Suggestieselectie (echte selectSuggesties/suggestiePoolGrootte): deterministisch, roterend, en op een leeg account alleen vragen zonder datavereiste',
+    run: () => {
+      criterion('WF-WILL-31')
+      const pathname = '/overzicht'
+      const leeg = { pathname, data: LEGE_DATA_GAPS, aantal: 3 }
+      const gevuld = {
+        pathname,
+        data: Object.fromEntries(
+          Object.keys(LEGE_DATA_GAPS).map((k) => [k, true]),
+        ) as CoachDataGaps,
+        aantal: 3,
+      }
+      const seed0 = selectSuggesties({ ...leeg, seed: 0 })
+      const seed0Opnieuw = selectSuggesties({ ...leeg, seed: 0 })
+      const seed1 = selectSuggesties({ ...leeg, seed: 1 })
+      const ids = (lijst: ReadonlyArray<{ id: string }>) => lijst.map((s) => s.id).join(',')
+      return {
+        expected:
+          'aantalLeegAccount=3; alleZonderVereist=true; zelfdeSeedGelijk=true; andereSeedAnders=true; poolGroeitMetData=true',
+        actual:
+          `aantalLeegAccount=${seed0.length}; ` +
+          `alleZonderVereist=${seed0.every((s) => (s.vereist ?? []).length === 0)}; ` +
+          `zelfdeSeedGelijk=${ids(seed0) === ids(seed0Opnieuw)}; ` +
+          `andereSeedAnders=${ids(seed0) !== ids(seed1)}; ` +
+          `poolGroeitMetData=${suggestiePoolGrootte(gevuld) > suggestiePoolGrootte(leeg)}`,
       }
     },
   },

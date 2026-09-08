@@ -22,9 +22,25 @@ import { FinDots } from '@/components/app/fin-dots'
 import { ActionEditModal } from '@/components/app/action-edit-modal'
 import type { Action, ActionStatus } from '@/lib/recommendation-data'
 import { renderMarkdown, findToolInvocation, TOOL_LOADING_STATES, TOOL_OUTPUT_STATES, type MessagePart } from './markdown-helpers'
-import { X, Send, Loader2, Zap, Check, AlertTriangle, RefreshCw, Pin, PinOff, ShieldCheck, Sparkles, Clock, ThumbsDown, Cpu, Megaphone, ListChecks } from 'lucide-react'
+import { X, Send, Loader2, Zap, Check, AlertTriangle, RefreshCw, Pin, PinOff, ShieldCheck, Sparkles, Clock, ThumbsDown, Cpu, Megaphone, ListChecks, History, RotateCw } from 'lucide-react'
 import { MeldingView } from './melding/melding-view'
 import { GidsView } from './gids/gids-view'
+import { GesprekkenLijst } from './gesprekken/gesprekken-lijst'
+import {
+  CHAT_SUGGESTIES,
+  LEGE_DATA_GAPS,
+  selectSuggesties,
+  suggestiePoolGrootte,
+} from '@/lib/chat/suggesties'
+import { createChatHistoryFacade, type ChatHistoryDoel } from '@/lib/chat/history/facade'
+import { chatTitelUitVraag } from '@/lib/chat/history-copy'
+import type {
+  ChatConversationMeta,
+  ChatOrigin,
+  ChatRichKind,
+  StoredChatMessage,
+} from '@/lib/chat/history/types'
+import type { CoachDataGaps } from '@/lib/coach-suggestions'
 import { countOpenGuideSteps, useWelcomeGuide } from './gids/welcome-guide-provider'
 import type { SuggestRecommendationResult } from '@/lib/ai/tools/suggest-recommendation'
 import { TIP_DECISION_LABELS, TIP_DECISION_DONE_LABELS } from '@/lib/tip-decision-labels'
@@ -406,84 +422,298 @@ function RecommendationSuggestionCard({
 /* ── Quick-action chips (empty state) ──────────────────────────────── */
 
 /**
- * Mappen van pathname-prefix naar een context-bewuste chip. Eerste match
- * wint. Pad-matching is bewust permissief (`startsWith`) zodat sub-routes
- * binnen een hefboom (bv. /overzicht/schulden/detail) ook de juiste chip
- * krijgen.
+ * De vaste eerste chip. LETTERLIJK ONGEWIJZIGD en bewust NIET in
+ * `CHAT_SUGGESTIES`: hij is het anker van de lege staat, staat altijd voorop en
+ * doet niet mee aan de rotatie.
  */
-const CONTEXT_CHIPS: Array<{
-  prefixes: string[]
-  label: string
-  prompt: string
-}> = [
-  {
-    prefixes: ['/overzicht/schulden', '/core/debts'],
-    label: 'Tip voor mijn schulden',
-    prompt: 'Geef me één concrete tip om mijn schulden sneller of slimmer af te lossen.',
-  },
-  {
-    prefixes: ['/overzicht/bezittingen', '/core/assets'],
-    label: 'Tip voor mijn bezittingen',
-    prompt: 'Geef me één concrete tip om mijn bezittingen beter te laten renderen of risico te verlagen.',
-  },
-  {
-    prefixes: ['/overzicht/budget', '/core/budgets', '/core/cash'],
-    label: 'Tip voor mijn cashflow',
-    prompt: 'Geef me één concrete tip om mijn maandelijkse cashflow te verbeteren.',
-  },
-  {
-    prefixes: ['/overzicht/belasting', '/core/belasting'],
-    label: 'Tip om belasting te besparen',
-    prompt: 'Geef me één concrete tip om dit jaar belasting te besparen (Box 1, 2 of 3).',
-  },
-  {
-    prefixes: ['/toekomst', '/horizon'],
-    label: 'Versnel mijn vrijheidsdatum',
-    prompt: 'Geef me één concrete tip om mijn FIRE-datum naar voren te halen.',
-  },
-]
-
 const GENERIC_PROMPT =
   'Geef me één concrete tip op basis van mijn huidige situatie. Begin met de grootste kans.'
 
+/**
+ * De vijf route-chips die hier vroeger als `CONTEXT_CHIPS` hardgecodeerd
+ * stonden, wonen nu in `lib/chat/suggesties.ts` met het `tip-`-voorvoegsel —
+ * één tabel, één waarheid. Dit is de enige plek die ze nog apart behandelt: ze
+ * horen op de chiprij naast de vaste tip, niet tussen de volzin-suggesties
+ * eronder.
+ */
+const TIP_CHIP_PREFIX = 'tip-'
+
+/** Hoeveel suggestieregels er onder de chiprij staan. */
+const SUGGESTIE_AANTAL = 3
+
+/**
+ * De lege staat: één vaste tip-chip, eventueel de chip die bij deze pagina
+ * hoort, en daaronder drie volzin-suggesties met een verversing.
+ *
+ * WAAROM DE SUGGESTIES GEEN CHIPS ZIJN. Het zijn hele vragen van ~60 tekens; in
+ * een chiprij vallen die om tot twee- en drieregelige blokjes. Als aantikbare
+ * regels lezen ze als een lijstje vragen dát je kunt stellen — precies wat het
+ * is. Drie, niet één (dat leest als een opdracht) en niet zes (dan duwt de rij
+ * het invoerveld van het scherm).
+ */
 function QuickActionChips({
   pathname,
+  dataGaps,
   disabled,
   onPick,
 }: {
   pathname: string
+  dataGaps: CoachDataGaps
   disabled: boolean
   onPick: (prompt: string) => void
 }) {
-  const contextChip = CONTEXT_CHIPS.find((c) => c.prefixes.some((p) => pathname.startsWith(p)))
-  const chips: Array<{ label: string; prompt: string }> = [
-    { label: 'Geef me een tip', prompt: GENERIC_PROMPT },
-  ]
-  if (contextChip) {
-    chips.push({ label: contextChip.label, prompt: contextChip.prompt })
-  }
+  const [seed, setSeed] = useState(0)
+
+  const routeChip = useMemo(
+    () =>
+      CHAT_SUGGESTIES.find(
+        (s) => s.id.startsWith(TIP_CHIP_PREFIX) && s.routes.some((p) => pathname.startsWith(p)),
+      ) ?? null,
+    [pathname],
+  )
+
+  // Eén extra ophalen en de paginachip eruit filteren: die staat al hierboven
+  // in de chiprij en mag niet dubbel verschijnen.
+  const suggesties = useMemo(
+    () =>
+      selectSuggesties({ pathname, data: dataGaps, seed, aantal: SUGGESTIE_AANTAL + 1 })
+        .filter((s) => s.id !== routeChip?.id)
+        .slice(0, SUGGESTIE_AANTAL),
+    [pathname, dataGaps, seed, routeChip],
+  )
+
+  // Verversen heeft alleen zin als er iets ánders te tonen is. Dat is geen dode
+  // tak: sinds elke vraag die persoonlijke cijfers belooft een datavereiste
+  // draagt (M4), houdt een leeg account precies de handvol uitlegvragen over
+  // die zonder gegevens te beantwoorden zijn — en dan valt er niets te
+  // verversen.
+  const poolGrootte = useMemo(
+    () => suggestiePoolGrootte({ pathname, data: dataGaps }),
+    [pathname, dataGaps],
+  )
+  const kanVerversen = poolGrootte > SUGGESTIE_AANTAL + 1
 
   return (
-    <div className="mt-4 flex max-w-[300px] flex-wrap justify-center gap-1.5">
-      {chips.map((c) => (
+    <div className="mt-4 w-full max-w-[320px]">
+      <div className="flex flex-wrap justify-center gap-1.5">
         <button
-          key={c.label}
           type="button"
-          onClick={() => onPick(c.prompt)}
+          onClick={() => onPick(GENERIC_PROMPT)}
           disabled={disabled}
           className="inline-flex items-center gap-1 rounded-full border border-fin-200 bg-fin-50 px-3 py-1 text-xs font-medium text-fin-700 transition-colors hover:bg-fin-100 disabled:opacity-50"
         >
-          {c.label}
+          Geef me een tip
         </button>
-      ))}
+        {routeChip && (
+          <button
+            type="button"
+            onClick={() => onPick(routeChip.prompt)}
+            disabled={disabled}
+            className="inline-flex items-center gap-1 rounded-full border border-fin-200 bg-fin-50 px-3 py-1 text-xs font-medium text-fin-700 transition-colors hover:bg-fin-100 disabled:opacity-50"
+          >
+            {routeChip.label}
+          </button>
+        )}
+      </div>
+
+      {suggesties.length > 0 && (
+        <>
+          <p className="mt-4 text-left text-[11px] text-[var(--ink-4)]">Of vraag me eens:</p>
+          <ul className="mt-1 space-y-0.5">
+            {suggesties.map((s) => (
+              <li key={s.id}>
+                <button
+                  type="button"
+                  onClick={() => onPick(s.prompt)}
+                  disabled={disabled}
+                  className="flex w-full items-start gap-1.5 py-1 text-left text-xs leading-snug text-[var(--ink-2)] transition-colors hover:text-fin-700 disabled:opacity-50"
+                >
+                  <span className="mt-px shrink-0 text-fin-500" aria-hidden="true">
+                    ›
+                  </span>
+                  <span>{s.label}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+          {kanVerversen && (
+            <div className="mt-1 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setSeed((s) => s + 1)}
+                disabled={disabled}
+                className="inline-flex items-center gap-1 text-[11px] text-[var(--ink-4)] transition-colors hover:text-[var(--ink-2)] disabled:opacity-50"
+              >
+                andere vragen
+                <RotateCw className="h-3 w-3" aria-hidden="true" />
+              </button>
+            </div>
+          )}
+        </>
+      )}
     </div>
   )
+}
+
+/* ── Bewaarde gesprekken: van UIMessage naar record en terug ───────────────── */
+
+/** Bovengrens per bericht (§3.4). Daarboven kappen we af en markeren we dat. */
+const MAX_CONTENT = 32_000
+
+/**
+ * Wat er in een bewaard bericht STOND. We slaan alleen tekst op; een grafiek of
+ * actiekaart terugtoveren zou de cijfers van tóén naast de canonieke van nú
+ * zetten — precies de drift die "consume, don't recompute" uitbant. In plaats
+ * daarvan onthouden we dát er iets stond en zetten we er een neutrale regel.
+ */
+const HISTORIE_REGELS: Record<ChatRichKind, string> = {
+  visualisatie: 'Fin toonde hier een grafiek.',
+  actievoorstel: 'Fin deed hier een actievoorstel.',
+  aanbeveling: 'Fin gaf hier een tip.',
+  afgekapt: 'Dit antwoord is ingekort bewaard.',
+}
+
+function tekstVanParts(parts: MessagePart[]): string {
+  return parts
+    .filter((p): p is { type: 'text'; text: string } => p.type === 'text' && 'text' in p && !!p.text)
+    .map((p) => p.text)
+    .join('')
+}
+
+function richKindsVanParts(parts: MessagePart[]): ChatRichKind[] {
+  const soorten = new Set<ChatRichKind>()
+  for (const part of parts) {
+    const p = part as Record<string, unknown>
+    if (findToolInvocation(p, 'showVisualization')) soorten.add('visualisatie')
+    if (findToolInvocation(p, 'suggestAction')) soorten.add('actievoorstel')
+    if (findToolInvocation(p, 'suggestRecommendation')) soorten.add('aanbeveling')
+    if (p.type === 'data-finActie' && p.data) soorten.add('actievoorstel')
+  }
+  return [...soorten]
+}
+
+function maakRecord(
+  seq: number,
+  role: 'user' | 'assistant',
+  parts: MessagePart[],
+  createdAt: string,
+): StoredChatMessage {
+  const volledig = tekstVanParts(parts)
+  const soorten = richKindsVanParts(parts)
+  const afgekapt = volledig.length > MAX_CONTENT
+  return {
+    seq,
+    role,
+    content: afgekapt ? volledig.slice(0, MAX_CONTENT) : volledig,
+    richKinds: afgekapt ? [...soorten, 'afgekapt'] : soorten,
+    createdAt,
+  }
+}
+
+/** Bewaard record → berichtvorm die `useChat` kan hydrateren. */
+function naarUIMessage(conversationId: string, bericht: StoredChatMessage): UIMessage {
+  const parts: Array<Record<string, unknown>> = []
+  if (bericht.content) parts.push({ type: 'text', text: bericht.content })
+  for (const soort of bericht.richKinds) {
+    parts.push({ type: 'data-finHistorie', data: { kind: soort } })
+  }
+  return {
+    id: `${conversationId}:${bericht.seq}`,
+    role: bericht.role,
+    parts,
+  } as unknown as UIMessage
+}
+
+/**
+ * Hoeveel berichten er per cloud-beurt maximaal meegaan (M3).
+ *
+ * TWINTIG = TIEN BEURTEN. Bewust niet hoger: dit is het venster waarin een
+ * vervolgvraag ("en als ik dat bedrag verdubbel?") nog naar iets kan verwijzen.
+ * Daarboven betaal je bij élke beurt opnieuw voor context die het model in de
+ * praktijk niet meer gebruikt — en de bovengrens zou anders de servercap zijn
+ * (200 berichten × 32.000 tekens). Bewust ook niet lager: onder de vijf beurten
+ * vergeet Fin middenin een gesprek waar het over ging, en dát merkt de
+ * gebruiker meteen.
+ */
+const MAX_VERZONDEN_BERICHTEN = 20
+
+/**
+ * De laatste beurten, ALTIJD beginnend bij een vraag van de gebruiker.
+ *
+ * Kaal afkappen op een vast aantal kan het venster op een assistent-bericht
+ * laten beginnen, en dat weigert de provider (de eerste beurt moet van de
+ * gebruiker zijn). We schuiven het venster daarom door tot de eerste
+ * user-beurt. Blijft er onverhoopt niets over, dan gaat het laatste bericht mee
+ * — dat is per definitie de zojuist gestelde vraag.
+ */
+function verzendVenster(messages: UIMessage[]): UIMessage[] {
+  if (messages.length <= MAX_VERZONDEN_BERICHTEN) return messages
+  let start = messages.length - MAX_VERZONDEN_BERICHTEN
+  while (start < messages.length && messages[start].role !== 'user') start++
+  const venster = messages.slice(start)
+  return venster.length > 0 ? venster : messages.slice(-1)
+}
+
+/** Nieuwe client-sleutel voor een gesprek dat nog niet in een rug staat. */
+function nieuweConversationId(): string {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID()
+  return `gesprek-${Date.now()}-${Math.round(Math.random() * 1e9)}`
+}
+
+/**
+ * De identiteit van het lopende gesprek — bewust ÉÉN state-object.
+ *
+ * `conversationId` en `messages` gaan samen naar `useChat`: een gewijzigde `id`
+ * bouwt daar een nieuwe chat mét de op dát moment meegegeven berichten. Zouden
+ * die twee in aparte states leven, dan is er een render waarin de nieuwe id de
+ * óude berichten krijgt (of andersom) — en dat is precies de fout die je pas
+ * ziet als een hervat gesprek half leeg blijft. Laden gebeurt dus eerst, het
+ * omklappen daarna, in één `setGesprek`.
+ */
+type GesprekStand = {
+  /** Sleutel voor `useChat`. Wijzigt ALLEEN bij "Nieuw gesprek" en "Hervatten". */
+  conversationId: string
+  /** Waar het in een rug staat. `null` = nog niet aangemaakt (lui, zie B5/B8). */
+  doel: ChatHistoryDoel | null
+  origin: ChatOrigin
+  messages: UIMessage[]
+  /** De oudste beurten zijn niet bewaard (cap) — de weergave meldt dat bovenaan. */
+  truncated: boolean
+  /**
+   * Volgende `seq` voor de eerstvolgende beurt — ALTIJD zoals de rug 'm laatst
+   * teruggaf (`ChatConversationMeta.nextSeq`), nooit hier opgeteld. Zie de
+   * toelichting bij dat veld: een clientteller die alleen in het succespad
+   * ophoogt verliest stil een beurt zodra een schrijfactie wél landt maar het
+   * antwoord niet terugkomt.
+   */
+  nextSeq: number
+  /**
+   * Dit gesprek is hervat op de lokale AI: het transcript staat er, maar de
+   * on-device sessie is vers en heeft de eerdere beurten nooit gezien. De
+   * weergave zegt dat met zoveel woorden — zie het blok boven de berichten.
+   */
+  geheugenloosHervat: boolean
+  /** Eén regel uitleg in de lege staat, bv. na een bestemmingswissel. */
+  notitie: string | null
+}
+
+function versGesprek(origin: ChatOrigin, notitie: string | null = null): GesprekStand {
+  return {
+    conversationId: nieuweConversationId(),
+    doel: null,
+    origin,
+    messages: [],
+    truncated: false,
+    nextSeq: 0,
+    geheugenloosHervat: false,
+    notitie,
+  }
 }
 
 /* ── Main ChatPanel ────────────────────────────────────────────────── */
 
 export function ChatPanel() {
-  const { isOpen, close, pendingMessage, clearPendingMessage, resolvePendingAnswer, dropPendingAnswer, isPinned, togglePin, autoOpenMessage, setAutoOpenMessage, meldingRequested, clearMeldingRequest, gidsRequested, clearGidsRequest } = useChatContext()
+  const { isOpen, close, pendingMessage, clearPendingMessage, resolvePendingAnswer, dropPendingAnswer, isPinned, togglePin, autoOpenMessage, setAutoOpenMessage, meldingRequested, clearMeldingRequest, gidsRequested, clearGidsRequest, userId, chatHistoryMode, setChatHistoryMode, dataGaps } = useChatContext()
   const router = useRouter()
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -542,10 +772,15 @@ export function ChatPanel() {
   // aan het juiste oppervlak toe te wijzen — zie het Escape-effect verderop.
   const [instellingenOpen, setInstellingenOpen] = useState(false)
 
-  // Chat-, meld- of gidsmodus. Het gesprek (useChat-state) leeft in dit
-  // component en blijft dus staan terwijl de gebruiker meldt of de welkomstgids
-  // doorloopt.
-  const [mode, setMode] = useState<'chat' | 'melding' | 'gids'>('chat')
+  // Chat-, meld-, gids- of gesprekkenmodus. Het gesprek (useChat-state) leeft in
+  // dit component en blijft dus staan terwijl de gebruiker meldt, de
+  // welkomstgids doorloopt óf zijn gesprekkenlijst opent — die vierde modus
+  // raakt `conversationId` bewust NIET aan (R1 / WF-WILL-24).
+  const [mode, setMode] = useState<'chat' | 'melding' | 'gids' | 'gesprekken'>('chat')
+  // Een gesprek dat niet opgehaald kon worden. Blijft in de LIJST staan (H1):
+  // half hervatten is erger dan niet hervatten, want dan schrijft de volgende
+  // beurt op nummers die al bezet zijn.
+  const [hervatFout, setHervatFout] = useState<string | null>(null)
   // Loopt er een verzending in MeldingView? Die state woont dáár, maar de drie
   // knoppen die het component kunnen weghalen (megafoon, sluitkruis, mobiele
   // backdrop) wonen hier — dus spiegelen we 'm en zetten we ze op slot. Zonder
@@ -638,7 +873,22 @@ export function ChatPanel() {
   const exec = useExecutionMode('gesprek', isOpen && hasAi)
 
   const cloudTransport = useMemo(
-    () => new DefaultChatTransport({ api: '/api/ai/chat', body: { domain } }),
+    () =>
+      new DefaultChatTransport({
+        api: '/api/ai/chat',
+        body: { domain },
+        // DE HISTORIE DIE MEEGAAT IS BEGRENSD — sinds een gesprek hervat kan
+        // worden (W-004) is dat geen theorie meer. Vóór die wijziging was een
+        // gesprek per definitie zo lang als je sessie; nu kan de eerste beurt na
+        // "hervatten" tot 200 bewaarde berichten meesturen, en dat bij ELKE
+        // volgende beurt opnieuw. Dat is een directe kosten-, latency- én
+        // creditlimiet-regressie. De begrenzing hoort hier, aan de clientkant
+        // van het transport: de route mag niet hoeven raden welk deel van een
+        // meegestuurd gesprek de bedoeling was.
+        prepareSendMessagesRequest: ({ id, messages: alle, body, trigger, messageId }) => ({
+          body: { ...body, id, messages: verzendVenster(alle), trigger, messageId },
+        }),
+      }),
     [domain],
   )
 
@@ -731,8 +981,25 @@ export function ChatPanel() {
         ? hydration.message
         : null
 
+  /* ── Gespreksgeschiedenis (W-004) ────────────────────────────────────────
+     De facade voegt de serverrug en de apparaatrug samen en kiest voor een
+     NIEUW gesprek de rug op (opslagkeuze × waar het gesprek draait) — inclusief
+     de privacyvloer: een lokaal gevoerd gesprek gaat nooit naar de server.
+     Zonder `userId` (bv. buiten de app-layout) is er geen rug en loopt het
+     gesprek gewoon door zonder bewaard te worden. */
+  const facade = useMemo(
+    () =>
+      userId
+        ? createChatHistoryFacade({ userId, mode: chatHistoryMode ?? 'account' })
+        : null,
+    [userId, chatHistoryMode],
+  )
+
+  const [gesprek, setGesprek] = useState<GesprekStand>(() => versGesprek('cloud'))
+
   const { messages: rawMessages, sendMessage, status, error, clearError, regenerate } = useChat({
-    id: 'chat-will',
+    id: gesprek.conversationId,
+    messages: gesprek.messages,
     transport,
   })
 
@@ -749,6 +1016,238 @@ export function ChatPanel() {
 
   const isStreaming = status === 'streaming' || status === 'submitted'
   const hasError = status === 'error' || !!error
+
+  /* ── De boekhouding rond het bewaren ──────────────────────────────────────
+     Refs, geen deps: het opslag-effect mag alleen op een STATUS-OVERGANG
+     vuren, niet elke keer dat er een letter bij komt. */
+  const gesprekRef = useRef(gesprek)
+  gesprekRef.current = gesprek
+  const messagesRef = useRef(messages)
+  messagesRef.current = messages
+  const facadeRef = useRef(facade)
+  facadeRef.current = facade
+  const transportRef = useRef(transport)
+  transportRef.current = transport
+  const opslaanBezigRef = useRef(false)
+  // Waar draait het gesprek op DIT moment? `bewaarBeurt` en `hervatGesprek`
+  // hangen bewust niet aan `isLocalMode` (ze mogen niet bij elke render
+  // opnieuw ontstaan), maar ze moeten de vloer wél op de actuele stand toetsen.
+  const isLocalRef = useRef(isLocalMode)
+  isLocalRef.current = isLocalMode
+
+  /**
+   * Sluit de on-device conversatie af zonder de gedeelde engine te slopen
+   * (contract C4). Duck-typed i.p.v. `instanceof`: de cloud-transport heeft de
+   * methode niet, en dat is precies de check die we willen.
+   */
+  const resetLokaleConversatie = useCallback(() => {
+    const t = transportRef.current as { resetConversation?: () => void }
+    if (typeof t?.resetConversation === 'function') t.resetConversation()
+  }, [])
+
+  /**
+   * Eén afgeronde beurt wegschrijven: de vraag en het antwoord, allebei als
+   * tekst. Bij de eerste beurt maken we het gesprek pas hier aan — lui, zodat
+   * een geopend-en-weer-verlaten leeg gesprek geen rij achterlaat.
+   *
+   * Fouten zijn STIL (één console-melding). Een mislukte opslag mag het gesprek
+   * nooit onderbreken: de gebruiker praat met Fin, niet met een database.
+   */
+  const bewaarBeurt = useCallback(async () => {
+    const huidigeFacade = facadeRef.current
+    if (!huidigeFacade || opslaanBezigRef.current) return
+
+    const stand = gesprekRef.current
+    const msgs = messagesRef.current
+    const antwoord = msgs[msgs.length - 1]
+    if (!antwoord || antwoord.role !== 'assistant') return
+    const vraag = [...msgs.slice(0, -1)].reverse().find((m) => m.role === 'user')
+    if (!vraag) return
+
+    // DE PRIVACYVLOER, VANGNET (B1). De bestemming van deze beurt volgt uit waar
+    // hij zojuist DRAAIDE — niet uit wat er ooit op het gesprek werd gezet.
+    // Zonder deze toets kon een hervat cloud-gesprek een on-device gevoerd
+    // antwoord alsnog naar de server schrijven, terwijl het scherm "Draait op je
+    // toestel" toont en CHAT_HISTORY_VLOER_REGEL het tegendeel belooft.
+    // `hervatGesprek` splitst zo'n gesprek al vóór het hervatten; dit is de
+    // tweede lijn, voor het geval de bestemming middenin een beurt omslaat.
+    const beurtOrigin: ChatOrigin = isLocalRef.current ? 'lokaal' : 'cloud'
+    const backend = huidigeFacade.backendVoorNieuwGesprek(beurtOrigin)
+    if (backend === 'geen') return
+    if (stand.doel && stand.doel.backend !== backend) {
+      console.warn(
+        '[chat] beurt NIET bewaard: het gesprek staat op een rug die niet bij de huidige uitvoering past.',
+      )
+      return
+    }
+
+    opslaanBezigRef.current = true
+    try {
+      let doel = stand.doel
+      // De teller komt van de rug, nooit van hier — zie GesprekStand.nextSeq.
+      let seq = stand.nextSeq
+      if (!doel) {
+        const titel = chatTitelUitVraag(tekstVanParts(vraag.parts as MessagePart[]))
+        const meta = await huidigeFacade.create({ title: titel, origin: beurtOrigin })
+        if (!meta) return
+        doel = { id: meta.id, backend: meta.backend }
+        seq = meta.nextSeq
+        // M1 — het doel meteen vastleggen, vóór de append. Stond dit ná
+        // `appendTurn`, dan liet een netwerkfout `doel` op null staan en maakte
+        // de volgende beurt opnieuw een gesprek aan: drie storingen = drie lege
+        // rijen met dezelfde titel en geen opruimpad.
+        const versDoel: ChatHistoryDoel = doel
+        setGesprek((g) =>
+          g.conversationId === stand.conversationId
+            ? { ...g, doel: versDoel, nextSeq: meta.nextSeq }
+            : g,
+        )
+      }
+      const nu = new Date().toISOString()
+      const meta = await huidigeFacade.appendTurn(doel, [
+        maakRecord(seq, 'user', vraag.parts as MessagePart[], nu),
+        maakRecord(seq + 1, 'assistant', antwoord.parts as MessagePart[], nu),
+      ])
+      const bevestigdDoel = doel
+      // H1 — de rug hertelt `max(seq) + 1` en dat is de enige waarheid. Alleen
+      // wanneer die er onverhoopt niet is vallen we terug op de oude optelling:
+      // een gat in de nummering is onschuldig, twee beurten op hetzelfde nummer
+      // niet (de RPC gooit de tweede stil weg).
+      const bevestigdeSeq =
+        typeof meta?.nextSeq === 'number' && Number.isFinite(meta.nextSeq)
+          ? meta.nextSeq
+          : seq + 2
+      setGesprek((g) =>
+        g.conversationId === stand.conversationId
+          ? {
+              ...g,
+              doel: bevestigdDoel,
+              nextSeq: bevestigdeSeq,
+              truncated: meta?.truncated ?? g.truncated,
+            }
+          : g,
+      )
+    } catch (err) {
+      console.warn('[chat] deze beurt kon niet bewaard worden — het gesprek loopt door:', err)
+    } finally {
+      opslaanBezigRef.current = false
+    }
+  }, [])
+
+  // A1 — bewaren zodra Fin klaar is met antwoorden, niet zodra je verzendt.
+  // Bij een fout-einde wordt er niets weggeschreven.
+  const vorigeStatusRef = useRef(status)
+  useEffect(() => {
+    const vorige = vorigeStatusRef.current
+    vorigeStatusRef.current = status
+    if (status !== 'ready') return
+    if (vorige !== 'streaming' && vorige !== 'submitted') return
+    if (hasError) return
+    void bewaarBeurt()
+  }, [status, hasError, bewaarBeurt])
+
+  /**
+   * "Nieuw gesprek" — een verse identiteit náást het huidige; er wordt niets
+   * weggegooid. Het vorige gesprek staat gewoon bovenaan de lijst (A3).
+   */
+  const startNieuwGesprek = useCallback(
+    (origin: ChatOrigin, notitie: string | null = null) => {
+      resetLokaleConversatie()
+      setGesprek(versGesprek(origin, notitie))
+      setMode('chat')
+    },
+    [resetLokaleConversatie],
+  )
+
+  /**
+   * Hervatten — eerst LADEN, dan pas de id omklappen. Beide in één
+   * `setGesprek`, zodat `useChat` de nieuwe chat meteen mét zijn berichten
+   * opbouwt (B4).
+   *
+   * DRIE POORTEN, IN DEZE VOLGORDE:
+   *
+   *  1. DE VLOER (B1). Draait de chat nu ergens anders dan waar dit gesprek
+   *     gevoerd is, dan wordt het NIET hervat maar GESPLITST — exact wat het
+   *     A9-effect doet bij een bestemmingswissel. Eén regel draagt de vloer, en
+   *     die regel is: waar het gesprek gevoerd is bepaalt waar het landt.
+   *  2. EEN MISLUKTE LEZING IS GEEN LEEG GESPREK (H1). Vroeger werd een gefaalde
+   *     `load()` opgevangen met `[]` en het doel tóch geadopteerd: het paneel
+   *     ging dan op seq 0 verder schrijven in een gesprek dat al 0..11 had, en
+   *     de RPC gooide elke volgende beurt stil weg. Nu blijft de gebruiker in de
+   *     lijst staan met een foutmelding.
+   *  3. GEEN GEHEUGEN OP HET LOKALE PAD (H2). Zie `geheugenloosHervat`.
+   */
+  const hervatGesprek = useCallback(
+    async (meta: ChatConversationMeta) => {
+      const huidigeFacade = facadeRef.current
+      if (!huidigeFacade) return
+      const lokaal = isLocalRef.current
+      const huidigeOrigin: ChatOrigin = lokaal ? 'lokaal' : 'cloud'
+      if (meta.origin !== huidigeOrigin) {
+        setHervatFout(null)
+        startNieuwGesprek(
+          huidigeOrigin,
+          lokaal
+            ? 'Dat gesprek is in de cloud gevoerd. Fin draait nu op je toestel, dus we beginnen hier opnieuw — het staat gewoon in je gesprekken.'
+            : 'Dat gesprek is op je toestel gevoerd. Fin draait nu in de cloud, dus we beginnen hier opnieuw — het staat gewoon in je gesprekken.',
+        )
+        return
+      }
+      let bewaard: StoredChatMessage[]
+      try {
+        bewaard = await huidigeFacade.load({ id: meta.id, backend: meta.backend })
+      } catch {
+        setHervatFout('Dit gesprek kon niet worden opgehaald. Probeer het zo nog eens.')
+        return
+      }
+      setHervatFout(null)
+      resetLokaleConversatie()
+      const laatste = bewaard.length > 0 ? bewaard[bewaard.length - 1].seq + 1 : 0
+      setGesprek({
+        conversationId: meta.id,
+        doel: { id: meta.id, backend: meta.backend },
+        origin: meta.origin,
+        messages: bewaard.map((b) => naarUIMessage(meta.id, b)),
+        truncated: meta.truncated,
+        // De rug weet het beste welk nummer vrij is; de geladen rijen zijn de
+        // ondergrens daaronder (een rug die `nextSeq` niet levert mag nooit
+        // ónder de hoogste bewaarde seq uitkomen).
+        nextSeq: Math.max(Number.isFinite(meta.nextSeq) ? meta.nextSeq : 0, laatste),
+        geheugenloosHervat: lokaal && bewaard.length > 0,
+        notitie: null,
+      })
+      setMode('chat')
+    },
+    [resetLokaleConversatie, startNieuwGesprek],
+  )
+
+  /**
+   * A9 — wisselt de bestemming (cloud ↔ lokaal) terwijl er berichten staan, dan
+   * SPLITST het gesprek. Doorlopen zou stil contextverlies zijn: de on-device
+   * sessie kan een cloudhistorie niet absorberen, en omgekeerd zou de cloud een
+   * gesprek krijgen waarvan de helft nooit door `convertToModelMessages` ging.
+   */
+  const vorigeLokaalRef = useRef<boolean | null>(null)
+  useEffect(() => {
+    if (vorigeLokaalRef.current === null) {
+      vorigeLokaalRef.current = isLocalMode
+      setGesprek((g) => (g.messages.length === 0 ? { ...g, origin: isLocalMode ? 'lokaal' : 'cloud' } : g))
+      return
+    }
+    if (vorigeLokaalRef.current === isLocalMode) return
+    vorigeLokaalRef.current = isLocalMode
+    const nieuweOrigin: ChatOrigin = isLocalMode ? 'lokaal' : 'cloud'
+    if (messagesRef.current.length === 0) {
+      setGesprek((g) => ({ ...g, origin: nieuweOrigin }))
+      return
+    }
+    startNieuwGesprek(
+      nieuweOrigin,
+      isLocalMode
+        ? 'Dit gesprek draait nu op je toestel, dus we beginnen opnieuw. Het vorige gesprek staat in je gesprekken.'
+        : 'Dit gesprek draait nu in de cloud, dus we beginnen opnieuw. Het vorige gesprek staat in je gesprekken.',
+    )
+  }, [isLocalMode, startNieuwGesprek])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -1072,6 +1571,21 @@ export function ChatPanel() {
         )
       }
 
+      // Hervat gesprek: waar ooit een grafiek, actiekaart of tip stond, staat nu
+      // één neutrale regel. Bewust GEEN herbouwde kaart — die zou de cijfers van
+      // toen naast de canonieke van nu zetten (A6). Historie is historie.
+      if (part.type === 'data-finHistorie') {
+        const soort = (part.data as { kind?: ChatRichKind } | undefined)?.kind
+        const regel = soort ? HISTORIE_REGELS[soort] : undefined
+        if (regel) {
+          elements.push(
+            <p key={`historie-${i}`} className="mt-1.5 text-[11px] italic text-[var(--ink-3)]">
+              {regel}
+            </p>
+          )
+        }
+      }
+
       const action = findToolInvocation(part, 'suggestAction')
       if (action) {
         const isLoading = TOOL_LOADING_STATES.includes(action.state)
@@ -1325,6 +1839,14 @@ export function ChatPanel() {
       ? 'Terug naar de chat'
       : 'Welkomstgids openen'
 
+  // En voor de gesprekkenlijst. Deze knop raakt het lopende gesprek NIET aan —
+  // heen en terug laat `conversationId` en de berichten ongemoeid (R1).
+  const gesprekkenKnopLabel = meldingBezig
+    ? 'Je melding wordt verstuurd'
+    : mode === 'gesprekken'
+      ? 'Terug naar de chat'
+      : 'Je gesprekken'
+
   // De launcher (FAB) leeft nu in FinHome — die toont de bubbel én opent de chat.
   // Wanneer de chat gesloten is, rendert ChatPanel niets.
   if (!isOpen) return null
@@ -1384,9 +1906,11 @@ export function ChatPanel() {
                     : `Welkomstgids · ${guideOpenCount} open`
                   : mode === 'melding'
                     ? 'Melding maken'
-                    : isLocalMode
-                      ? 'Draait op je toestel'
-                      : config.subtitle}
+                    : mode === 'gesprekken'
+                      ? 'Je gesprekken'
+                      : isLocalMode
+                        ? 'Draait op je toestel'
+                        : config.subtitle}
               </span>
             </div>
           </div>
@@ -1398,6 +1922,33 @@ export function ChatPanel() {
                 zonder AI-abonnement. Tijdens een lopende melding-verzending op
                 slot, zodat de weergave niet halverwege onder de gebruiker
                 vandaan wisselt. */}
+            {/* Je gesprekken — de vierde modus. Links van de gids: "waar was ik
+                gebleven" hoort vóór "wat kan ik hier doen". Alleen zichtbaar
+                met een AI-abonnement; zonder abonnement zijn er geen gesprekken
+                met Fin om terug te vinden. */}
+            {/* `wftAccepted !== false` is exact de gate van de lijst zelf (R2):
+                stond de knop er wél en de lijst niet, dan deed klikken zichtbaar
+                niets — het inhoudsgebied bleef op het akkoordscherm staan. */}
+            {hasAi && facade && wftAccepted !== false && (
+              <button
+                type="button"
+                onClick={() => {
+                  // Een oude foutmelding hoort niet te blijven staan bij een
+                  // volgende poging.
+                  setHervatFout(null)
+                  setMode((m) => (m === 'gesprekken' ? 'chat' : 'gesprekken'))
+                }}
+                disabled={meldingBezig}
+                aria-label={gesprekkenKnopLabel}
+                aria-pressed={mode === 'gesprekken'}
+                title={gesprekkenKnopLabel}
+                className={`touch-target flex items-center justify-center rounded-lg hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent ${
+                  mode === 'gesprekken' ? 'text-fin-700' : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
+                }`}
+              >
+                <History className="h-4 w-4" />
+              </button>
+            )}
             {guideDisplay !== 'none' && (
               <button
                 type="button"
@@ -1432,7 +1983,13 @@ export function ChatPanel() {
             {/* Instellingen — naast het pin-icoon. Compacte bediening van de
                 bestemming van dit gesprek, het lokale model en de overige
                 functies; de volledige uitleg blijft op /mijn/privacy. */}
-            {mode === 'chat' && <ChatSettingsPopover onChanged={exec.refresh} onOpenChange={setInstellingenOpen} />}
+            {mode === 'chat' && (
+              <ChatSettingsPopover
+                onChanged={exec.refresh}
+                onOpenChange={setInstellingenOpen}
+                onHistoryModeChanged={setChatHistoryMode}
+              />
+            )}
             {/* Pin toggle — desktop only. Pinnen dokt het paneel als zijbalk;
                 op mobiel is daar geen ruimte voor. `!hidden`/`md:!flex`
                 (i.p.v. kale `hidden`/`md:flex`): `.touch-target` zet zelf al
@@ -1480,15 +2037,30 @@ export function ChatPanel() {
           <WftDisclaimer onAccept={handleWftAccept} />
         )}
 
+        {/* Je gesprekken — staat ACHTER de Wft-gate (R2: een hervat gesprek mag
+            niet zichtbaar zijn vóór acceptatie) maar vóór de
+            bestemmings-blokkade: je geschiedenis teruglezen verstuurt niets, dus
+            een niet-gereed lokaal pad hoort die weg niet af te sluiten. */}
+        {hasAi && wftAccepted !== false && mode === 'gesprekken' && facade && (
+          <GesprekkenLijst
+            facade={facade}
+            actieveConversationId={gesprek.doel?.id ?? null}
+            foutmelding={hervatFout}
+            onNieuw={() => { setHervatFout(null); startNieuwGesprek(isLocalMode ? 'lokaal' : 'cloud') }}
+            onHervat={(meta) => { void hervatGesprek(meta) }}
+            onActiefVerwijderd={() => startNieuwGesprek(isLocalMode ? 'lokaal' : 'cloud')}
+          />
+        )}
+
         {/* Er mag/kan niets draaien → fail-closed blokkade (nooit stil terugvallen
             op de cloud). Twee families: AI staat uit (geldt op beide
             bestemmingen, M26), of het lokale pad is niet gereed. */}
-        {hasAi && wftAccepted !== false && blockedMessage !== null && (
+        {hasAi && wftAccepted !== false && mode !== 'gesprekken' && blockedMessage !== null && (
           <LocalBlockedNotice message={blockedMessage} reason={exec.reason} onNavigate={close} />
         )}
 
         {/* Messages */}
-        {hasAi && wftAccepted !== false && blockedMessage === null && (
+        {hasAi && wftAccepted !== false && mode !== 'gesprekken' && blockedMessage === null && (
         <>
         {/* Permanente lokaal-strip gedurende de hele privé-sessie. */}
         {isLocalMode && <LocalModeBanner />}
@@ -1499,6 +2071,28 @@ export function ChatPanel() {
           {/* Polite live-regio alléén om de berichten — de assertive foutbanner
               staat er bewust buiten (geen geneste live-regio's). */}
           <div aria-live="polite" aria-relevant="additions">
+          {/* De oudste beurten van dit gesprek zijn tegen de bewaargrens
+              aangelopen. Eerlijk melden i.p.v. een gesprek tonen dat
+              onaangekondigd halverwege begint. */}
+          {gesprek.truncated && messages.length > 0 && (
+            <p className="mb-3 border-b border-[var(--border-ed)] pb-2 text-center text-[11px] text-[var(--ink-4)]">
+              Eerdere berichten in dit gesprek zijn niet bewaard.
+            </p>
+          )}
+          {/* H2 — hervat op de lokale AI: het transcript is er, het geheugen
+              niet. De on-device sessie is vers (`resetConversation`) en de
+              context van een gesprek leeft in die sessie, niet in de berichten
+              die we hier tonen. Het alternatief — de bewaarde beurten opnieuw
+              door het model laten lezen — kost een generatie per beurt en past
+              niet in het contextvenster van 8192 tokens dat DNA en overzicht al
+              vullen. Dan liever één eerlijke regel dan een model dat doet alsof
+              het zich iets herinnert. */}
+          {gesprek.geheugenloosHervat && isLocalMode && messages.length > 0 && (
+            <p className="mb-3 border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2 text-[11px] leading-relaxed text-[var(--ink-3)]">
+              Fin leest dit gesprek terug maar begint zonder geheugen. Verwijs je naar
+              iets van hierboven, noem het dan kort even opnieuw.
+            </p>
+          )}
           {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center py-10 text-center">
               {config.fabAvatar(64)}
@@ -1508,8 +2102,14 @@ export function ChatPanel() {
               <p className="mt-1 max-w-[260px] text-xs text-[var(--ink-3)]">
                 {config.greetingDescription}
               </p>
+              {gesprek.notitie && (
+                <p className="mt-3 max-w-[280px] border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2 text-[11px] leading-relaxed text-[var(--ink-3)]">
+                  {gesprek.notitie}
+                </p>
+              )}
               <QuickActionChips
                 pathname={pathname}
+                dataGaps={dataGaps ?? LEGE_DATA_GAPS}
                 disabled={isStreaming || !chatReady}
                 onPick={(prompt) => { if (chatReady) sendMessage({ text: prompt }) }}
               />
@@ -1546,7 +2146,12 @@ export function ChatPanel() {
               // van het bericht zijn (het model gaf alleen het fenced blok terug,
               // geen omringende proza — cleanedText is dan ''). Zonder deze check
               // verdween de hele bubbel (incl. ActionSuggestionCard) stilzwijgend.
-              parts.some((p) => p.type === 'data-finActie' && (p as Record<string, unknown>).data)
+              parts.some((p) => p.type === 'data-finActie' && (p as Record<string, unknown>).data) ||
+              // Hervat gesprek: een bewaard antwoord dat alléén een grafiek of
+              // actiekaart bevatte heeft geen tekst, maar wél een neutrale
+              // regel. Zonder deze tak zou die bubbel stilzwijgend verdwijnen —
+              // dezelfde valkuil als bij `data-finActie` hierboven.
+              parts.some((p) => p.type === 'data-finHistorie')
 
             if (!hasContent) return null
 

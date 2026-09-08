@@ -95,6 +95,31 @@ export const SESSION_WIPE_TABLES: readonly string[] = [
   // een reset/verwijdering. De dekkings-vitest ziet dat niet — die bewaakt de
   // partitie, niet het wispad. Gemeld bij fix-brok FIX2-SEC (08-08-2026).
   'spend_limits',
+  // Gespreksgeschiedenis met Fin (migratie 20260908120000, ADR 0137). Beide
+  // tabellen dragen `user_id` én een eigen-rij DELETE-policy
+  // ("chat_conversations own delete" / "chat_messages own delete",
+  // `user_id = (select auth.uid())`, TO authenticated) — dus SESSIE-partitie,
+  // net als spend_limits en anders dan user_reports.
+  //
+  // WAAROM DIT GEEN NICE-TO-HAVE IS: `chat_messages.content` is vrije tekst
+  // waarin iemand zijn schulden, ziekte of scheiding beschreven kan hebben —
+  // de gevoeligste persoonsgegevens in de app. Stond dit er niet, dan was de
+  // AVG-export vanaf dag één onvolledig (art. 20) en zou niemand dat merken.
+  // De export leest ze zonder aanpassing mee: `chat_messages` heeft een eigen,
+  // gedenormaliseerde `user_id`, dus de generieke `.eq('user_id', …)` in
+  // app/api/account/export/route.ts werkt hier zonder uitzondering.
+  //
+  // MAAR NIET IN DE ADMIN-EXPORT. Deze lijst wordt door ADMIN_EXPORT_TABLES
+  // mee-gespreid en die route leest met de service-role; beide tabellen staan
+  // daarom in ADMIN_EXPORT_UITGESLOTEN. Beheer krijgt geen inzage in
+  // transcripten (ADR 0137) — lees de motivering daar vóór je hier iets
+  // verandert, want de twee lijsten hangen samen.
+  //
+  // Volgorde kind-vóór-ouder: materieel maakt het niets uit (de FK cascadeert
+  // van chat_conversations naar chat_messages), maar deze lijst wordt óók met
+  // de hand nagelopen en dan is die volgorde de leesbare.
+  'chat_messages',
+  'chat_conversations',
 ] as const
 
 /**
@@ -155,14 +180,47 @@ export const FULL_ERASE_SERVICE_TABLES: readonly string[] = [
 export const EXPORT_SESSION_TABLES: readonly string[] = SESSION_WIPE_TABLES
 
 /**
+ * Tabellen die NOOIT in de admin-export mogen belanden, ook al staan ze in de
+ * wislijsten. Dit is de enige plek waar dat afdwingbaar is.
+ *
+ * De gespreksgeschiedenis met Fin hoort in de WIS (AVG-wissing van de
+ * gevoeligste vrije tekst in de app) maar nadrukkelijk NIET in een
+ * service-role-leespad: eigenaarsbesluit bij ADR 0137 — beheer krijgt geen
+ * inzage in transcripten, en de migratie
+ * 20260908120000_chat_gespreksgeschiedenis.sql belooft in haar kop letterlijk
+ * dat er geen service-role-leespad is. Zonder deze uitsluiting zou het correct
+ * toevoegen van beide tabellen aan {@link SESSION_WIPE_TABLES} stilzwijgend
+ * dat besluit terugdraaien, want `/api/admin/user-export` loopt
+ * {@link ADMIN_EXPORT_TABLES} af met `getServiceClient()` + `select('*')` — een
+ * superadmin zou dan het volledige, verbatim transcript van elke gebruiker
+ * kunnen downloaden.
+ *
+ * Het pad is ook niet nodig voor art. 15/20: de zelf-service-export
+ * ({@link EXPORT_SESSION_TABLES}, sessieclient, eigen rijen) dekt de betrokkene
+ * al volledig. Wil beheer ooit wél meekijken, dan is dat een nieuw
+ * ADR-gesprek mét audit-eis en een regel in /privacy — geen stille regel hier.
+ *
+ * Vastgelegd in lib/user-data-tables.test.ts.
+ */
+export const ADMIN_EXPORT_UITGESLOTEN: readonly string[] = [
+  'chat_conversations',
+  'chat_messages',
+] as const
+
+/**
  * Volledige persoonlijke tabellen-set voor de ADMIN-export (service-role,
  * audit-gelogd): alles wat bij een inzageverzoek hoort, inclusief de tabellen
- * zonder eigen-rij leesrecht.
+ * zonder eigen-rij leesrecht — MINUS {@link ADMIN_EXPORT_UITGESLOTEN}.
+ *
+ * Bewust een expliciete aftrek en geen met de hand overgetypte lijst: een
+ * tweede opsomming zou wegdrijven van de wislijsten, en dan zou een nieuwe
+ * tabel juist stil buiten de export vallen. Nu is het omgekeerd — nieuw ⇒
+ * inbegrepen, tenzij iemand hem bewust uitsluit.
  */
 export const ADMIN_EXPORT_TABLES: readonly string[] = [
   ...SESSION_WIPE_TABLES,
   ...SERVICE_WIPE_TABLES,
-] as const
+].filter((table) => !ADMIN_EXPORT_UITGESLOTEN.includes(table))
 
 /**
  * Canonieke inventaris: álle public-tabellen met een `user_id`-kolom
@@ -196,6 +254,14 @@ export const ALL_USER_SCOPED_TABLES: readonly string[] = [
   'budgets',
   'calculator_likes',
   'category_corrections',
+  // Nieuw in migratie 20260908120000 (ADR 0137). LET OP — deze twee zijn NIET
+  // tegen information_schema gemeten zoals de rest van deze inventaris: de
+  // migratie was op 08-09-2026 geschreven maar bewust nog niet uitgerold. Ze
+  // staan hier vooruit zodat de partitie-dekkingstest de tabellen vanaf de
+  // eerste dag bewaakt en niemand ze na de uitrol alsnog vergeet. Meten bij de
+  // eerstvolgende regeneratie van deze lijst.
+  'chat_conversations',
+  'chat_messages',
   'crypto_holdings',
   'crypto_transactions',
   'custom_calculators',

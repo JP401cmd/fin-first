@@ -9,6 +9,14 @@ import { getOverlayCount, __resetOverlayCount } from '@/lib/overlay-signal'
 import { WelcomeGuideProvider } from './gids/welcome-guide-provider'
 import { DEFAULT_WELCOME_GUIDE, DEFAULT_WELCOME_GUIDE_STATE } from '@/lib/welcome-guide'
 import { getOverlayHistoryDepth, __resetOverlayHistory } from '@/lib/overlay-history'
+import { resolveBackend } from '@/lib/chat/history/resolve'
+import type {
+  ChatConversationMeta,
+  ChatHistoryMode,
+  ChatOrigin,
+  StoredChatMessage,
+} from '@/lib/chat/history/types'
+import type { CoachDataGaps } from '@/lib/coach-suggestions'
 
 /**
  * Regressietest voor de Wft-akkoord-gate in de Fin-chat.
@@ -34,21 +42,29 @@ let mockClearError = vi.fn()
 // Per-test in te stellen berichten-historie — default leeg (bestaande gedrags-
 // tests raken 'm niet); de data-finActie-tests zetten 'm vooraf aan render.
 let mockMessages: unknown[] = []
+// Per-test in te stellen useChat-status. Het opslag-effect vuurt alleen op de
+// OVERGANG streaming/submitted → ready; een test die een afgeronde beurt wil
+// zien moet die overgang dus echt maken.
+let mockStatus: 'ready' | 'streaming' | 'submitted' | 'error' = 'ready'
 
 // Mutabele chat-context — per test in te stellen
 let ctx: Record<string, unknown> = {}
 
 // Elke useChat(...)-aanroep wordt bewaard zodat een test kan verifiëren welke
 // transport-instance (cloud vs. lokaal) daadwerkelijk werd doorgegeven.
-let mockUseChatCalls: Array<{ transport: unknown }> = []
+// Sinds W-004 dragen de opties óók de gespreksidentiteit (`id`) en de
+// hydratatie (`messages`). Beide worden bewaard, want de regressie-eis
+// WF-WILL-24 gaat er letterlijk over: de vierde paneelmodus mag ze niet
+// aanraken.
+let mockUseChatCalls: Array<{ transport: unknown; id?: string; messages?: unknown[] }> = []
 
 vi.mock('@ai-sdk/react', () => ({
-  useChat: (opts: { transport: unknown }) => {
+  useChat: (opts: { transport: unknown; id?: string; messages?: unknown[] }) => {
     mockUseChatCalls.push(opts)
     return {
       messages: mockMessages,
       sendMessage: mockSendMessage,
-      status: 'ready',
+      status: mockStatus,
       error: mockError,
       clearError: mockClearError,
       regenerate: mockRegenerate,
@@ -70,6 +86,9 @@ let mockLocalTransportInstances: Array<{ opts: unknown; dispose: ReturnType<type
 vi.mock('@/lib/ai/local/local-chat-transport', () => ({
   LocalChatTransport: class {
     dispose = vi.fn()
+    // W-004/C4: het paneel sluit hiermee de on-device conversatie af bij een
+    // nieuw of hervat gesprek — zónder de gedeelde engine te slopen.
+    resetConversation = vi.fn()
     constructor(public opts: unknown) {
       mockLocalTransportInstances.push(this)
     }
@@ -96,6 +115,15 @@ vi.mock('./chat-provider', () => ({
   useChatContext: () => ctx,
 }))
 
+// De gespreksgeschiedenis-facade. Bewust gemockt: de echte zou hier de
+// IndexedDB-rug openen (die jsdom niet heeft) én de serverroutes aanroepen,
+// terwijl deze tests over het PANEEL gaan — welke beurten het wegschrijft, waar,
+// en met welk volgnummer.
+let facadeMock: FakeFacade
+vi.mock('@/lib/chat/history/facade', () => ({
+  createChatHistoryFacade: () => facadeMock,
+}))
+
 // MeldingView draagt de verzend-state; hier meldt hij meteen "bezig", zodat de
 // sluit-blokkade (`meldingBezig`) in ChatPanel actief is.
 vi.mock('./melding/melding-view', () => ({
@@ -113,7 +141,76 @@ vi.mock('@/lib/feature-registry', () => ({
   hasSubscription: () => true,
 }))
 
+const NU = '2026-09-08T10:00:00.000Z'
+
+type FakeFacade = ReturnType<typeof maakFacadeMock>
+
+function maakMeta(over: Partial<ChatConversationMeta> = {}): ChatConversationMeta {
+  return {
+    id: 'gesprek-1',
+    title: 'Hoeveel vrijheid heb ik?',
+    origin: 'cloud',
+    backend: 'server',
+    messageCount: 0,
+    nextSeq: 0,
+    truncated: false,
+    createdAt: NU,
+    lastMessageAt: NU,
+    ...over,
+  }
+}
+
+/**
+ * De dubbel van de facade. `backendVoorNieuwGesprek` draait op de ECHTE
+ * `resolveBackend` — de privacyvloer hoort niet in een test nagebouwd te worden,
+ * anders toetst hij zijn eigen kopie.
+ */
+function maakFacadeMock(over: Record<string, unknown> = {}) {
+  const mode: ChatHistoryMode = 'account'
+  return {
+    list: vi.fn(async () => [] as ChatConversationMeta[]),
+    load: vi.fn(async () => [] as StoredChatMessage[]),
+    create: vi.fn(async (init: { title: string; origin: ChatOrigin }) =>
+      maakMeta({
+        id: 'nieuw-gesprek',
+        title: init.title,
+        origin: init.origin,
+        backend: resolveBackend(mode, init.origin) === 'server' ? 'server' : 'apparaat',
+      }),
+    ),
+    appendTurn: vi.fn(async (doel: { id: string; backend: 'server' | 'apparaat' }, berichten: StoredChatMessage[]) =>
+      maakMeta({
+        id: doel.id,
+        backend: doel.backend,
+        messageCount: berichten.length,
+        nextSeq: berichten[berichten.length - 1].seq + 1,
+      }),
+    ),
+    rename: vi.fn(async () => {}),
+    remove: vi.fn(async () => {}),
+    removeAllDevice: vi.fn(async () => {}),
+    deviceAantal: vi.fn(async () => 0),
+    deviceBeschikbaar: vi.fn(async () => true),
+    backendVoorNieuwGesprek: vi.fn((origin: ChatOrigin) => resolveBackend(mode, origin)),
+    ...over,
+  }
+}
+
 const WFT_KEY = 'trifinity-chat-wft-accepted'
+
+/** Alles aanwezig — het tegenbeeld van `LEGE_DATA_GAPS`. */
+const VOLLE_DATA_GAPS: CoachDataGaps = {
+  hasBank: true,
+  hasAssets: true,
+  hasBudgets: true,
+  hasGoals: true,
+  hasDebts: true,
+  hasTransactions: true,
+  hasHoldings: true,
+  hasHoldingsWithIsin: true,
+  hasFireParams: true,
+  hasLifeEvents: true,
+}
 
 function makeCtx(overrides: Record<string, unknown> = {}) {
   return {
@@ -217,6 +314,8 @@ beforeEach(() => {
   localStorage.clear()
   ctx = makeCtx()
   mockMessages = []
+  mockStatus = 'ready'
+  facadeMock = maakFacadeMock()
   mockUseChatCalls = []
   mockLocalTransportInstances = []
   mockCheckLocalAiCapability.mockReset()
@@ -1230,5 +1329,358 @@ describe('ChatPanel — welkomstgids in de chat-kop (ADR 0130)', () => {
 
     await waitFor(() => expect(screen.getByText('Fin')).toBeInTheDocument())
     expect(screen.queryByRole('button', { name: 'Welkomstgids openen' })).not.toBeInTheDocument()
+  })
+})
+
+/**
+ * W-004 — de vierde paneelmodus (`gesprekken`) en de gespreksidentiteit.
+ *
+ * DE ZWAARSTE REGRESSIE-EIS VAN DEZE WIJZIGING IS R1 / WF-WILL-24: het openen
+ * van de gesprekkenlijst mag het LOPENDE gesprek niet aanraken. Concreet: de
+ * `id` die naar `useChat` gaat blijft dezelfde en de hydratatie-array verandert
+ * niet. Dat is precies het gedrag dat een refactor per ongeluk sloopt (een
+ * `key` op de verkeerde plek, een `setMessages([])` bij het wisselen van modus),
+ * en het is aan de buitenkant pas zichtbaar als iemand zijn halve gesprek
+ * kwijt is.
+ */
+describe('ChatPanel — gesprekkenmodus laat het lopende gesprek intact (R1)', () => {
+  const GESPREK = [
+    { id: 'u1', role: 'user', parts: [{ type: 'text', text: 'Hoeveel vrijheid heb ik?' }] },
+    { id: 'a1', role: 'assistant', parts: [{ type: 'text', text: 'Ruim acht jaar.' }] },
+  ]
+
+  function laatsteUseChat() {
+    return mockUseChatCalls[mockUseChatCalls.length - 1]
+  }
+
+  function renderMetGeschiedenis() {
+    stubExecutionFetch({ privacyMode: false })
+    localStorage.setItem(WFT_KEY, 'true')
+    mockMessages = GESPREK
+    ctx = makeCtx({ userId: 'gebruiker-a', chatHistoryMode: 'account', dataGaps: null })
+    render(<ChatPanel />)
+  }
+
+  it('houdt conversationId én de hydratatie ongewijzigd bij heen-en-weer schakelen', async () => {
+    renderMetGeschiedenis()
+
+    const idVoor = laatsteUseChat().id
+    const berichtenVoor = laatsteUseChat().messages
+    expect(typeof idVoor).toBe('string')
+
+    // Naar de gesprekkenlijst…
+    fireEvent.click(screen.getByRole('button', { name: 'Je gesprekken' }))
+    expect(await screen.findByRole('heading', { name: 'Je gesprekken' })).toBeInTheDocument()
+    expect(laatsteUseChat().id).toBe(idVoor)
+    expect(laatsteUseChat().messages).toEqual(berichtenVoor)
+
+    // …en terug. Het gesprek staat er nog precies zo.
+    fireEvent.click(screen.getByRole('button', { name: 'Terug naar de chat' }))
+    expect(screen.getByText('Ruim acht jaar.')).toBeInTheDocument()
+    expect(laatsteUseChat().id).toBe(idVoor)
+    expect(laatsteUseChat().messages).toEqual(berichtenVoor)
+  })
+
+  it('"Nieuw gesprek" geeft wél een verse identiteit met een lege hydratatie (A3)', async () => {
+    renderMetGeschiedenis()
+    const idVoor = laatsteUseChat().id
+
+    fireEvent.click(screen.getByRole('button', { name: 'Je gesprekken' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Nieuw gesprek' }))
+
+    await waitFor(() => expect(laatsteUseChat().id).not.toBe(idVoor))
+    expect(laatsteUseChat().messages).toEqual([])
+  })
+
+  it('toont de knop niet zonder ingelogde gebruiker — er is dan geen rug om in te kijken', async () => {
+    stubExecutionFetch({ privacyMode: false })
+    localStorage.setItem(WFT_KEY, 'true')
+    ctx = makeCtx()
+    render(<ChatPanel />)
+
+    expect(screen.queryByRole('button', { name: 'Je gesprekken' })).not.toBeInTheDocument()
+    await waitFor(() => expect(mockUseChatCalls.length).toBeGreaterThan(0))
+  })
+})
+
+/**
+ * De lege staat: de vaste tip-chip, de paginachip en de drie volzin-suggesties.
+ * R6 zit hier in: de vijf oude CONTEXT_CHIPS-prompts bestaan nog, alleen niet
+ * meer als tweede tabel in dit bestand.
+ */
+describe('ChatPanel — suggesties in de lege staat', () => {
+  it('toont de vaste tip-chip, de paginachip van deze route en drie suggesties', async () => {
+    stubExecutionFetch({ privacyMode: false })
+    localStorage.setItem(WFT_KEY, 'true')
+    ctx = makeCtx()
+    render(<ChatPanel />)
+
+    // usePathname is in deze suite gemockt op '/overzicht'; daar hoort géén
+    // tip-chip bij (die vijf zijn route-specifieker), wél drie suggesties.
+    expect(screen.getByRole('button', { name: 'Geef me een tip' })).toBeInTheDocument()
+    expect(screen.getByText('Of vraag me eens:')).toBeInTheDocument()
+    await waitFor(() => expect(mockUseChatCalls.length).toBeGreaterThan(0))
+  })
+
+  it('verstuurt de suggestie letterlijk zoals hij in de tabel staat', async () => {
+    stubExecutionFetch({ privacyMode: false })
+    localStorage.setItem(WFT_KEY, 'true')
+    ctx = makeCtx()
+    render(<ChatPanel />)
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Geef me een tip' })).not.toBeDisabled(),
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Geef me een tip' }))
+
+    expect(mockSendMessage).toHaveBeenCalledWith({
+      text: 'Geef me één concrete tip op basis van mijn huidige situatie. Begin met de grootste kans.',
+    })
+  })
+
+  it('"andere vragen" toont een andere selectie zonder het gesprek te raken', async () => {
+    stubExecutionFetch({ privacyMode: false })
+    localStorage.setItem(WFT_KEY, 'true')
+    // MET databeeld: sinds elke vraag die persoonlijke cijfers belooft een
+    // datavereiste draagt (M4), houdt een leeg account alleen de handvol
+    // uitlegvragen over — en dan is er per definitie niets te verversen. De
+    // rotatie hoort thuis bij iemand die wél gegevens heeft.
+    ctx = makeCtx({ dataGaps: VOLLE_DATA_GAPS })
+    render(<ChatPanel />)
+
+    const regels = () =>
+      screen
+        .getAllByRole('listitem')
+        .map((li) => li.textContent ?? '')
+        .join('|')
+
+    // Pas klikken als de bestemming beslist is: tot dan staan de knoppen
+    // fail-closed op slot en zou de klik niets doen.
+    const verversKnop = screen.getByRole('button', { name: /andere vragen/i })
+    await waitFor(() => expect(verversKnop).not.toBeDisabled())
+
+    const voor = regels()
+    fireEvent.click(verversKnop)
+    expect(regels()).not.toBe(voor)
+    expect(mockSendMessage).not.toHaveBeenCalled()
+  })
+})
+
+
+/**
+ * W-004, reparatieronde — de privacyvloer bij HERVATTEN (B1), het volgnummer
+ * dat de rug bepaalt (H1) en het venster op de verzonden historie (M3).
+ *
+ * Deze drie hangen samen: ze gaan allemaal over wat er ná "hervatten" gebeurt.
+ * Vóór die functie was een gesprek begrensd door de sessie en kon een lopend
+ * gesprek nooit van bestemming wisselen; sindsdien kan het allebei, en dan telt
+ * niet meer wat er ooit op het gesprek werd gezet maar waar het NU draait.
+ */
+describe('ChatPanel — hervatten: vloer, volgnummer en venster', () => {
+  function laatsteUseChat() {
+    return mockUseChatCalls[mockUseChatCalls.length - 1]
+  }
+
+  function bericht(seq: number, role: 'user' | 'assistant'): StoredChatMessage {
+    return { seq, role, content: `bericht ${seq}`, richKinds: [], createdAt: NU }
+  }
+
+  /** Rondt één beurt af: streaming → ready, met vraag + antwoord in beeld. */
+  async function voltooiBeurt(rerender: (ui: React.ReactElement) => void) {
+    mockMessages = [
+      { id: 'u9', role: 'user', parts: [{ type: 'text', text: 'En als ik dat verdubbel?' }] },
+      { id: 'a9', role: 'assistant', parts: [{ type: 'text', text: 'Dan ruim negen jaar.' }] },
+    ]
+    mockStatus = 'streaming'
+    rerender(<ChatPanel />)
+    mockStatus = 'ready'
+    rerender(<ChatPanel />)
+  }
+
+  async function openLijstEnHervat(titel: string) {
+    fireEvent.click(screen.getByRole('button', { name: 'Je gesprekken' }))
+    fireEvent.click(await screen.findByRole('button', { name: titel }))
+  }
+
+  it('B1 — een cloud-gesprek hervatten terwijl Fin lokaal draait SPLITST i.p.v. adopteert', async () => {
+    mockCheckLocalAiCapability.mockResolvedValue({ ok: true, reasons: [], shaderF16: true, deviceMemoryGb: 8 })
+    mockGetLocalModelState.mockResolvedValue({ state: 'klaar', bytes: null })
+    stubExecutionFetch({ privacyMode: true })
+    localStorage.setItem(WFT_KEY, 'true')
+    const cloudGesprek = maakMeta({ id: 'cloud-1', title: 'Cloudgesprek', origin: 'cloud', backend: 'server' })
+    facadeMock = maakFacadeMock({
+      list: vi.fn(async () => [cloudGesprek]),
+      load: vi.fn(async () => [bericht(0, 'user'), bericht(1, 'assistant')]),
+    })
+    // De opslagkeuze staat op 'account' — juist dán is de vloer aan zet.
+    ctx = makeCtx({ userId: 'gebruiker-a', chatHistoryMode: 'account', dataGaps: null })
+    render(<ChatPanel />)
+
+    await waitFor(() => expect(mockLocalTransportInstances).toHaveLength(1))
+    const idVoor = laatsteUseChat().id
+
+    await openLijstEnHervat('Cloudgesprek')
+
+    // Niet geladen, niet geadopteerd: een vers gesprek met een eerlijke uitleg.
+    await waitFor(() => expect(laatsteUseChat().id).not.toBe(idVoor))
+    expect(facadeMock.load).not.toHaveBeenCalled()
+    expect(laatsteUseChat().id).not.toBe('cloud-1')
+    expect(laatsteUseChat().messages).toEqual([])
+    expect(screen.getByText(/Dat gesprek is in de cloud gevoerd/)).toBeInTheDocument()
+  })
+
+  it('B1 — de beurt zelf landt op de rug die bij de HUIDIGE uitvoering hoort', async () => {
+    mockCheckLocalAiCapability.mockResolvedValue({ ok: true, reasons: [], shaderF16: true, deviceMemoryGb: 8 })
+    mockGetLocalModelState.mockResolvedValue({ state: 'klaar', bytes: null })
+    stubExecutionFetch({ privacyMode: true })
+    localStorage.setItem(WFT_KEY, 'true')
+    ctx = makeCtx({ userId: 'gebruiker-a', chatHistoryMode: 'account', dataGaps: null })
+    const { rerender } = render(<ChatPanel />)
+    await waitFor(() => expect(mockLocalTransportInstances).toHaveLength(1))
+
+    await voltooiBeurt(rerender)
+
+    // Modus 'account' + lokaal gevoerd ⇒ de vloer stuurt 'm naar het apparaat.
+    await waitFor(() => expect(facadeMock.create).toHaveBeenCalledTimes(1))
+    expect(facadeMock.create.mock.calls[0][0].origin).toBe('lokaal')
+    expect(facadeMock.backendVoorNieuwGesprek).toHaveBeenCalledWith('lokaal')
+    await waitFor(() => expect(facadeMock.appendTurn).toHaveBeenCalledTimes(1))
+    expect(facadeMock.appendTurn.mock.calls[0][0].backend).toBe('apparaat')
+  })
+
+  it('H1 — het volgnummer komt van de rug, niet van een clientteller', async () => {
+    stubExecutionFetch({ privacyMode: false })
+    localStorage.setItem(WFT_KEY, 'true')
+    const bestaand = maakMeta({
+      id: 'cloud-2',
+      title: 'Lang gesprek',
+      messageCount: 12,
+      nextSeq: 12,
+    })
+    facadeMock = maakFacadeMock({
+      list: vi.fn(async () => [bestaand]),
+      load: vi.fn(async () =>
+        Array.from({ length: 12 }, (_, i) => bericht(i, i % 2 === 0 ? 'user' : 'assistant')),
+      ),
+      // De rug hertelt en springt bewust NIET naar 14: alleen een client die de
+      // teruggegeven waarde adopteert komt hierna op 99 uit.
+      appendTurn: vi.fn(async () => maakMeta({ id: 'cloud-2', messageCount: 14, nextSeq: 99 })),
+    })
+    ctx = makeCtx({ userId: 'gebruiker-a', chatHistoryMode: 'account', dataGaps: null })
+    const { rerender } = render(<ChatPanel />)
+    await waitFor(() => expect(mockUseChatCalls.length).toBeGreaterThan(0))
+
+    await openLijstEnHervat('Lang gesprek')
+    await waitFor(() => expect(laatsteUseChat().id).toBe('cloud-2'))
+
+    await voltooiBeurt(rerender)
+    await waitFor(() => expect(facadeMock.appendTurn).toHaveBeenCalledTimes(1))
+    // Verdergaan waar het gesprek gebleven was — niet op 0.
+    expect(facadeMock.appendTurn.mock.calls[0][1].map((b: StoredChatMessage) => b.seq)).toEqual([12, 13])
+
+    mockStatus = 'ready'
+    rerender(<ChatPanel />)
+    await voltooiBeurt(rerender)
+    await waitFor(() => expect(facadeMock.appendTurn).toHaveBeenCalledTimes(2))
+    expect(facadeMock.appendTurn.mock.calls[1][1].map((b: StoredChatMessage) => b.seq)).toEqual([99, 100])
+  })
+
+  it('H1 — een gesprek dat niet opgehaald kan worden wordt NIET hervat', async () => {
+    stubExecutionFetch({ privacyMode: false })
+    localStorage.setItem(WFT_KEY, 'true')
+    facadeMock = maakFacadeMock({
+      list: vi.fn(async () => [maakMeta({ id: 'cloud-3', title: 'Onbereikbaar', nextSeq: 12 })]),
+      load: vi.fn(async () => {
+        throw new Error('netwerk weg')
+      }),
+    })
+    ctx = makeCtx({ userId: 'gebruiker-a', chatHistoryMode: 'account', dataGaps: null })
+    const { rerender } = render(<ChatPanel />)
+    await waitFor(() => expect(mockUseChatCalls.length).toBeGreaterThan(0))
+    const idVoor = laatsteUseChat().id
+
+    await openLijstEnHervat('Onbereikbaar')
+
+    // Blijft in de lijst staan, mét melding — half hervatten zou de volgende
+    // beurt op bezette volgnummers laten schrijven.
+    expect(await screen.findByRole('alert')).toHaveTextContent(/kon niet worden opgehaald/i)
+    expect(laatsteUseChat().id).toBe(idVoor)
+    expect(screen.getByRole('heading', { name: 'Je gesprekken' })).toBeInTheDocument()
+
+    // En er wordt niets weggeschreven op het gesprek dat niet geladen is.
+    await voltooiBeurt(rerender)
+    await waitFor(() => expect(facadeMock.create).toHaveBeenCalledTimes(1))
+    expect(facadeMock.create.mock.calls[0][0].origin).toBe('cloud')
+    expect(facadeMock.appendTurn.mock.calls[0][1].map((b: StoredChatMessage) => b.seq)).toEqual([0, 1])
+  })
+
+  it('H2 — een lokaal hervat gesprek zegt eerlijk dat Fin zonder geheugen begint', async () => {
+    mockCheckLocalAiCapability.mockResolvedValue({ ok: true, reasons: [], shaderF16: true, deviceMemoryGb: 8 })
+    mockGetLocalModelState.mockResolvedValue({ state: 'klaar', bytes: null })
+    stubExecutionFetch({ privacyMode: true })
+    localStorage.setItem(WFT_KEY, 'true')
+    facadeMock = maakFacadeMock({
+      list: vi.fn(async () => [
+        maakMeta({ id: 'lokaal-1', title: 'Op mijn toestel', origin: 'lokaal', backend: 'apparaat', nextSeq: 2 }),
+      ]),
+      load: vi.fn(async () => [bericht(0, 'user'), bericht(1, 'assistant')]),
+    })
+    ctx = makeCtx({ userId: 'gebruiker-a', chatHistoryMode: 'apparaat', dataGaps: null })
+    render(<ChatPanel />)
+    await waitFor(() => expect(mockLocalTransportInstances).toHaveLength(1))
+
+    // Het transcript staat in de useChat-hydratatie; de weergave komt uit de
+    // gemockte messages, dus die zetten we gelijk aan wat er hervat wordt.
+    mockMessages = [
+      { id: 'lokaal-1:0', role: 'user', parts: [{ type: 'text', text: 'bericht 0' }] },
+      { id: 'lokaal-1:1', role: 'assistant', parts: [{ type: 'text', text: 'bericht 1' }] },
+    ]
+    await openLijstEnHervat('Op mijn toestel')
+
+    expect(await screen.findByText(/begint zonder geheugen/i)).toBeInTheDocument()
+    expect(laatsteUseChat().id).toBe('lokaal-1')
+  })
+
+  it('M3 — de cloud-transport stuurt hooguit tien beurten mee, beginnend bij een vraag', async () => {
+    stubExecutionFetch({ privacyMode: false })
+    localStorage.setItem(WFT_KEY, 'true')
+    ctx = makeCtx({ userId: 'gebruiker-a', chatHistoryMode: 'account', dataGaps: null })
+    render(<ChatPanel />)
+    await waitFor(() => expect(mockUseChatCalls.length).toBeGreaterThan(0))
+
+    const transport = laatsteUseChat().transport as { opts: Record<string, unknown> }
+    const prepare = transport.opts.prepareSendMessagesRequest as (o: {
+      id: string
+      messages: unknown[]
+      body: Record<string, unknown>
+      trigger: string
+      messageId: string | undefined
+    }) => { body: Record<string, unknown> }
+    expect(typeof prepare).toBe('function')
+
+    // Een hervat gesprek van 60 berichten: zonder venster ging dát bij ELKE
+    // beurt opnieuw over de lijn.
+    const lang = Array.from({ length: 60 }, (_, i) => ({
+      id: `m${i}`,
+      role: i % 2 === 0 ? 'user' : 'assistant',
+      parts: [{ type: 'text', text: `bericht ${i}` }],
+    }))
+    const { body } = prepare({
+      id: 'c1',
+      messages: lang,
+      body: { domain: 'wil' },
+      trigger: 'submit-message',
+      messageId: undefined,
+    })
+    const verzonden = body.messages as Array<{ id: string; role: string }>
+    expect(verzonden.length).toBeLessThanOrEqual(20)
+    expect(verzonden[0].role).toBe('user')
+    expect(verzonden[verzonden.length - 1].id).toBe('m59')
+    // Het domein blijft meegaan — de route leest dat uit dezelfde body.
+    expect(body.domain).toBe('wil')
+
+    // Een kort gesprek gaat ongewijzigd mee.
+    const kort = lang.slice(0, 4)
+    expect((prepare({ id: 'c1', messages: kort, body: {}, trigger: 'submit-message', messageId: undefined }).body.messages as unknown[]).length).toBe(4)
   })
 })

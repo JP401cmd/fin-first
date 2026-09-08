@@ -25,6 +25,15 @@ export interface ArchiConcern {
 
 export const ARCHI_CONCERNS: ArchiConcern[] = [
   {
+    id: 'gesprek-op-apparaat-zonder-backup-of-wisgarantie',
+    title: 'Een gesprek dat op het apparaat staat heeft geen back-up en geen server-side wisgarantie',
+    detail:
+      'ADR 0137 geeft de gebruiker drie bestemmingen voor zijn gesprek met Fin (`profiles.chat_history_mode`: `account`, `apparaat`, `uit`). Bij `apparaat` staat het transcript in IndexedDB van díe browser (lib/chat/history/device-store.ts) en raakt het `chat_conversations`/`chat_messages` niet. Dat is precies de bedoeling, maar het heeft twee gevolgen die geen enkele policy kan dekken. (1) Er is geen back-up: leegt de gebruiker zijn browserdata, wisselt hij van browser of van toestel, dan is de geschiedenis weg — zonder waarschuwing, want de app kan het verschil tussen "nooit gehad" en "gewist" niet zien. (2) Er is geen wisgarantie op afstand: een "verwijder alles"-actie of de AVG-verwijderroute (`deleteAllUserData`) wist wat op de server staat, maar bereikt de IndexedDB van een ánder apparaat niet; die opslag ruimt pas op wanneer de gebruiker dát apparaat zelf opent. Bewust geaccepteerd — de modus bestáát juist omdat de tekst het toestel niet mag verlaten, en synchroniseren zou dat ongedaan maken. Wat er nog niet is: een expliciete regel op het instellingenscherm die beide gevolgen benoemt (nu draagt de keuze alleen de bestemming, niet het risico), en een lokale opruimstap die bij het opstarten van een apparaat een reeds-gewiste-op-de-server-stand kan herkennen. Verwijder dit punt zodra de gebruiker die twee gevolgen bij het maken van de keuze te lezen krijgt én een op-afstand ingezette wissing zich bij het eerstvolgende openen van dat apparaat alsnog voltrekt.',
+    severity: 'info',
+    elementIds: ['as-coach', 'do-gesprek', 't-lokale-ai'],
+    reviewedAt: '2026-09-08',
+  },
+  {
     id: 'versheidsvoorbehoud-nog-niet-op-elk-transactie-oppervlak',
     title: 'Het versheidsvoorbehoud dekt nog niet elk oppervlak dat op transactiecijfers rust',
     detail:
