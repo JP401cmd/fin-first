@@ -129,17 +129,36 @@ describe('fittingRowPlan — grootte-bewuste afkapping (geen halve rij)', () => 
 })
 
 describe('BudgettenWidget — edge cases', () => {
-  it('budget zonder limiet (limit 0) crasht niet en toont — als percentage', () => {
+  it('begroting nul mét besteding toont een vol percentage, geen streepje (B-032)', () => {
+    // Tot B-032 stond hier een em-dash náást een balk die wél volliep: de rij
+    // gold als "geen data" zodra de limiet 0 was, ongeacht wat erop geboekt
+    // stond. Een begroting van nul is geen ONTBREKENDE begroting maar een
+    // begrote nul — er is geen ruimte, dus 500 erop is 100% en niet "onbekend".
     const data = makeData([
       B('a', 'Geen limiet', 'expense', 0, 500),
       B('b', 'Met limiet', 'expense', 100, 50),
     ])
     render(<BudgettenWidget size="quarter" data={data} />)
-    // "Met limiet" (util 0.5) staat boven "Geen limiet" (util 0)
     expect(screen.getByText('Geen limiet')).toBeInTheDocument()
     expect(screen.getByText('Met limiet')).toBeInTheDocument()
-    // Zonder data toont de rij een em-dash i.p.v. een percentage.
-    expect(screen.getAllByText('—').length).toBeGreaterThan(0)
+    expect(screen.getByText('100%')).toBeInTheDocument()
+    expect(screen.queryByText('—')).toBeNull()
+  })
+
+  it('begroting nul zonder besteding haalt de lijst niet — daar is écht niets', () => {
+    // De tegenhanger van de test hierboven, en meteen de reden dat er geen
+    // em-dash-geval meer over is: de ranking filtert op `limit > 0 || spent > 0`,
+    // dus "€ 0 / € 0" verschijnt helemaal niet. Sinds B-032 gebruikt `hasData`
+    // in de rij exact datzelfde oordeel, waardoor élke gerenderde rij een
+    // percentage draagt.
+    const data = makeData([
+      B('a', 'Niets ingesteld', 'expense', 0, 0),
+      B('b', 'Met limiet', 'expense', 100, 50),
+    ])
+    render(<BudgettenWidget size="quarter" data={data} />)
+    expect(screen.queryByText('Niets ingesteld')).toBeNull()
+    expect(screen.getByText('Met limiet')).toBeInTheDocument()
+    expect(screen.queryByText('—')).toBeNull()
   })
 
   it('over-budget inkomen wordt positief (groen) geduid via isOverPositive', () => {

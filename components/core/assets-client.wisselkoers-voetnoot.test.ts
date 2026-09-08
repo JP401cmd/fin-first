@@ -53,10 +53,20 @@ describe('/overzicht/bezittingen — de wisselkoers staat naast de tijdgetallen 
     const voetnoot = at(clientSource, '<VrijheidstijdVoetnoot', 'assets-client.tsx')
     const subtotaal = at(clientSource, '<SubtotalLine', 'assets-client.tsx')
     expect(voetnoot).toBeGreaterThan(strip)
+    // Het subtotaal staat vóór de voetnoot, niet erna (melding B-036).
+    //
+    // Tot UR3-19 droeg `SubtotalLine` hier een `trailing` met een
+    // vrijheidstijd; dáárom moest de koers-voetnoot erbóven staan. Optie A van
+    // UR3-19 haalde die tijd weg (bruto teller op een niet-netto grondslag) —
+    // sindsdien toont de regel enkel nog een bedrag en deelt hij de koers dus
+    // niet meer. De oude volgorde-eis bleef daarna staan zonder grond.
+    // B-036 ("ruim dit op, het oogt rommelig onder de getallen") maakt het
+    // expliciet: het subtotaal is zélf een cijfer en hoort tegen de strip aan,
+    // en de voetnoot deelt één meta-rij met de rekenmodal-trigger eronder.
     expect(
-      voetnoot,
-      'de voetnoot hoort vóór het subtotaal excl. eigen woning: die deelt dezelfde koers',
-    ).toBeLessThan(subtotaal)
+      subtotaal,
+      'het subtotaal excl. eigen woning draagt geen tijd meer (UR3-19) en hoort bij de cijfers, boven de meta-regel',
+    ).toBeLessThan(voetnoot)
   })
 
   it('voert hem de bundelkoers én de bron — geen eigen som, geen afgeleide bron', () => {

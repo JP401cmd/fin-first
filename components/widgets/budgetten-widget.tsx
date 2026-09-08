@@ -8,6 +8,8 @@ import type { WidgetSize } from '@/lib/widget-catalog'
 import { calculateFreedomTime, formatFreedomTimeString, dailyExpenseRate } from '@/lib/format'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { isOverPositive, computeBarSegments, getTypeColors, BudgetIcon, type BudgetType } from '@/components/app/budget-shared'
+import { budgetBarPct, budgetFillRatio } from '@/lib/budget-spending'
+import { isOverBudget } from '@/lib/budget-alerts'
 import type { DashboardData } from './widget-renderer'
 import { LayoutGrid, Sparkles } from 'lucide-react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
@@ -20,16 +22,30 @@ interface Props {
 
 type TopBudget = DashboardData['topBudgets'][number]
 
+/**
+ * Consume, don't recompute: dit wás een eigen deling met een eigen klem, en
+ * daarmee het vierde afwijkende antwoord op dezelfde vraag. Nu de canonieke
+ * `budgetFillRatio` (lib/budget-spending.ts) — inclusief de onder-klem op 0
+ * voor een negatieve besteding én de nul-limiet-tak van B-032, die de eigen
+ * `if (limit <= 0) return 0` juist verkeerd beantwoordde.
+ *
+ * Bewust ONgerond, net als voorheen: de caller rondt zelf af voor het label.
+ */
 function progressPct(spent: number, limit: number): number {
-  if (limit <= 0) return 0
-  // Onderaan geklemd op 0: sinds de getekende besteed-som (6898c9dc7) kan
-  // `spent` negatief zijn — ongeklemd rendert het label "-410%".
-  return Math.min(Math.max((spent / limit) * 100, 0), 100)
+  return budgetFillRatio(spent, limit) * 100
 }
 
-/** Benuttingsgraad — kant-en-klaar veld, geen financiële herberekening. */
+/**
+ * Benuttingsgraad — de sorteersleutel die over-budget bovenaan zet.
+ *
+ * Via `budgetBarPct` (gedeeld) i.p.v. een eigen deling: onderaan geklemd op 0,
+ * bovenaan bewust ONgeklemd — anders zouden alle overschrijdingen op 1 landen en
+ * hun onderlinge volgorde verdwijnen. De nul-limiet-tak (B-032) tilt een post met
+ * een begroting van nul waar wél op geboekt is naar boven, waar hij hoort; de
+ * eigen `limit > 0 ? … : 0` zette 'm juist onderaan.
+ */
 function utilization(b: TopBudget): number {
-  return b.limit > 0 ? b.spent / b.limit : 0
+  return budgetBarPct(b.spent, b.limit) / 100
 }
 
 // ── Individuele budget-rij ────────────────────────────────────
@@ -45,9 +61,13 @@ interface RowProps {
 
 function TopBudgetRow({ budget, hasEntered, rich }: RowProps) {
   const colors       = getTypeColors(budget.budgetType as BudgetType)
-  const hasData      = budget.limit > 0
+  // Een percentage is pas betekenisloos ("—") als er NIETS is: geen begroting én
+  // geen besteding. Met een begroting van nul waar wél op geboekt is, loopt de
+  // balk vol en hoort het label dat te bevestigen (B-032) — vóórdien stond daar
+  // een streepje náást een volle balk.
+  const hasData      = budget.limit > 0 || budget.spent > 0
   const pct          = progressPct(budget.spent, budget.limit)
-  const overBudget   = hasData && budget.spent > budget.limit
+  const overBudget   = isOverBudget(budget.spent, budget.limit)
   const overPositive = isOverPositive(budget.budgetType as BudgetType)
   const pctLabel     = hasData ? `${Math.round(pct)}%` : '—'
   const seg          = computeBarSegments(budget.spent, budget.limit, 80, { barHex: colors.barHex, barHexWarn: colors.barHexWarn }, overPositive)

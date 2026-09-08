@@ -483,6 +483,25 @@ export const WORK_YEAR_MONTHS = 12
  */
 export const WORK_TIME_DISPLAY_MAX_MONTHS = 99
 
+/**
+ * DISPLAY-verzadiging (%) voor `budgetBarPct` bij een begroting van NUL of lager
+ * waar wél besteed/ontvangen is (bevinding B-032).
+ *
+ * `besteed / 0` is wiskundig oneindig; oneindig is geen geldige CSS-breedte en
+ * geen leesbaar percentage. Dit getal is de eindige stand-in, en 200 is niet
+ * willekeurig: het is het punt waarop de hele afnemersketen verzadigt.
+ * `getHeatmapColor` (components/app/budget-heatmap.tsx) klemt zélf al op 200%,
+ * en `computeBarSegments` (components/app/budget-shared.tsx) rendert alles boven
+ * de 105% identiek (volle balk in de over-kleur, staart geklemd op 5%). Hoger
+ * gaan voegt dus niets toe dat een afnemer nog kan zien; lager gaan zou de
+ * overschrijding wegpoetsen.
+ *
+ * Bewust NIET 100: dat betekent in deze familie "precies op de grens" en zou de
+ * overschrijdings-signalering uitschakelen. Dit is een WEERGAVE-grens op een
+ * degenereerde noemer — de som zelf (`buildBudgetSpendingMap`) blijft ongemoeid.
+ */
+export const BUDGET_ZERO_LIMIT_BAR_PCT = 200
+
 // ── Doelvoortgang: pace-toets ("haal je het tempo?") ─────────────
 //
 // Bevindingen M31 + M32. De oude on-track-toets voor doelen mat een LINEAIRE

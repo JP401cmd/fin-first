@@ -24,6 +24,8 @@
 // Houdt bewust GEEN rekening met perspectief-weging of effectieve limieten —
 // dat blijft loader/pagina-logica. Dit is enkel de spend-aggregatie + rollup.
 
+import { BUDGET_ZERO_LIMIT_BAR_PCT } from '@/lib/constants'
+
 export type SpendingTxRow = {
   /** Optioneel; alleen relevant voor callers die split-ids afleiden. */
   id?: string
@@ -194,6 +196,33 @@ export function spentForBudget(
 }
 
 /**
+ * DE NUL-LIMIET-TAK VAN DE WEERGAVE-KLEMFAMILIE (bevinding B-032).
+ *
+ * Een begroting van nul (of lager) is geen ontbrekende begroting maar een
+ * begrote nul: er is géén ruimte. Elke euro die er dan tóch op geboekt wordt
+ * vult de balk per definitie helemaal — en op een uitgaven-budget is het
+ * bovendien een overschrijding. Tot B-032 viel de hele familie hier terug op 0,
+ * en dat leest als "er is nog niets gebeurd": precies het tegenovergestelde van
+ * de waarheid. Gemeld op /overzicht/budget: een inkomstenpost met een
+ * begroting van nul waarop wel geboekt was, toonde een LEGE balk.
+ *
+ * Drie takken, in deze volgorde:
+ *   - limiet > 0            -> gewone deling (`null` hier; de caller rekent zelf)
+ *   - limiet <= 0, besteed > 0  -> VOL
+ *   - limiet <= 0, besteed <= 0 -> LEEG (er is niets gebeurd; "EUR 0 / EUR 0")
+ *
+ * GEEN richting-parameter (`budget_type`). Dat is bewust: "de balk is vol" geldt
+ * even hard voor een inkomsten- als voor een uitgaven-budget. Óf dat vol-lopen
+ * goed of slecht nieuws is, is een KLEUR-vraag, en die wordt stroomafwaarts al
+ * per type beantwoord — door `isOverPositive` (components/app/budget-shared.tsx)
+ * en door `getHeatmapColor` (components/app/budget-heatmap.tsx). Een signatuur-
+ * wijziging zou alle ~20 afnemers raken zonder iets toe te voegen.
+ */
+function zeroLimitIsFull(spent: number, limit: number): boolean {
+  return !(limit > 0) && spent > 0
+}
+
+/**
  * Weergave-vulling van de budgetring, geklemd op [0, 1].
  *
  * De bestedingssom kan sinds de norm van 30 aug 2026 NEGATIEF zijn (meer
@@ -201,9 +230,12 @@ export function spentForBudget(
  * negatief in beeld — dat is de expliciete wens — maar een ring vult niet
  * negatief en een percentage van -410% zegt niets. Klemmen gebeurt dus in de
  * WEERGAVE, nooit in de som.
+ *
+ * Bij een limiet van nul of lager: vol wanneer er besteed/ontvangen is, leeg
+ * wanneer niet — zie `zeroLimitIsFull`.
  */
 export function budgetFillRatio(spent: number, limit: number): number {
-  if (!(limit > 0)) return 0
+  if (!(limit > 0)) return zeroLimitIsFull(spent, limit) ? 1 : 0
   return Math.max(0, Math.min(spent / limit, 1))
 }
 
@@ -223,9 +255,17 @@ export function budgetSpentPct(spent: number, limit: number): number {
  * overschrijdings-signalering — een tweede bug in plaats van een fix. Alleen de
  * negatieve kant wordt weggenomen, want die produceert ongeldige CSS
  * (`width: -410%`) en een grijs-negatieve kleurstap.
+ *
+ * NUL-LIMIET (B-032): hier kán `budgetSpentPct`'s antwoord van 100 niet gebruikt
+ * worden — 100 betekent in deze functie "precies op de grens" en zou de
+ * overschrijding juist wegpoetsen. Daarom `BUDGET_ZERO_LIMIT_BAR_PCT` (200): een
+ * EINDIG getal (geen Infinity, geen NaN, geen absurde breedte) dat boven de
+ * verzadigingsdrempel van élke afnemer ligt — `computeBarSegments` rendert alles
+ * boven 105% identiek, `getHeatmapColor` klemt zelf op 200%. Zie de constante
+ * voor de onderbouwing van precies dat getal.
  */
 export function budgetBarPct(spent: number, limit: number): number {
-  if (!(limit > 0)) return 0
+  if (!(limit > 0)) return zeroLimitIsFull(spent, limit) ? BUDGET_ZERO_LIMIT_BAR_PCT : 0
   return Math.max(0, (spent / limit) * 100)
 }
 
@@ -241,6 +281,10 @@ export function budgetBarPct(spent: number, limit: number): number {
  *
  * De ONDERkant blijft bewust ongeklemd: een negatief bedrag is hier de
  * overschrijding, en die moet zichtbaar blijven.
+ *
+ * BIJ EEN LIMIET VAN NUL is dit oordeel al goed en blijft het ongewijzigd:
+ * `budgetBeschikbaar(0, 8000)` = -8000, oftewel de volle overschrijding, en
+ * `budgetBeschikbaar(0, 0)` = 0. De nul-limiet-tak van B-032 raakt hem dus niet.
  *
  * DERDE LID VAN DE WEERGAVE-KLEMFAMILIE, en daarom woont hij hier: net als
  * `budgetFillRatio`/`budgetSpentPct` (boven op 100) en `budgetBarPct` (alleen

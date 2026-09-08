@@ -23,6 +23,22 @@
  * Elk euro-bedrag loopt door `<MaskedAmount tone="kern">`. Reeks-getallen zijn
  * AANTALLEN periodes, geen bedragen — die maskeren dus niet (NFR-B2-04).
  *
+ * ── HOOGTEBUDGET OP DE COMPACTE TAKKEN (B-033) ──────────────────────────────
+ * `half` en `quarter` staan in een tegel met een VASTE hoogte (140px mobiel /
+ * 160px desktop). Wat daarvan overblijft voor de inhoud is ~93px (half: de
+ * hover-pijlrij kost er nog 18) resp. ~113px (quarter, geen pijlrij). Het
+ * aantal regels is daar dus geen smaakkwestie maar een budget — zie de
+ * commentaren bij die twee takken.
+ *
+ * Elke regel in die stapels draagt `shrink-0`, en dat is geen opmaak maar een
+ * vangrail. Zonder `shrink-0` krimpt de flex-stapel de regels zélf in: een
+ * regel met `truncate` heeft `overflow: hidden` en daarmee een automatische
+ * minimumhoogte van 0, dus flexbox perst 'm samen tot een paar pixels en de
+ * tegel snijdt dwars door de letterhoogte. Dat was B-033 ("schaamtepotten
+ * vallen van het scherm"): niet één regel die onderaan wegviel, maar élke
+ * getruncate regel — boven én onder — tot een sliver geknepen. Met `shrink-0`
+ * is een regel óf heel, óf hij staat er niet.
+ *
  * euro-view: exempt — dit zijn gerealiseerde historische bedragen, en sinds
  * ADR 0119 één geprojecteerd bedrag (het tempo van de lopende periode). Beide
  * blijven nominaal: het prognosebedrag ligt binnen dezelfde kalenderperiode als
@@ -139,7 +155,7 @@ function StreakCell({ label, value }: { label: string; value: ReactNode }) {
  */
 function TruncationNote({ compact = false }: { compact?: boolean }) {
   return (
-    <p className={`font-serif italic text-[var(--ink-3)] ${compact ? 'text-[10px] leading-tight' : 'text-[11px]'}`}>
+    <p className={`shrink-0 font-serif italic text-[var(--ink-3)] ${compact ? 'text-[10px] leading-tight' : 'text-[11px]'}`}>
       Dit bedrag kan onvolledig zijn.
     </p>
   )
@@ -176,7 +192,10 @@ function LimitBar({
       ? Math.min((matched - limitAmount) / limitAmount, 0.4)
       : 0
   return (
-    <div className={`relative w-full overflow-hidden rounded-full ${height}`} style={{ background: 'var(--subtle)' }}>
+    <div
+      className={`relative w-full shrink-0 overflow-hidden rounded-full ${height}`}
+      style={{ background: 'var(--subtle)' }}
+    >
       <div
         className="absolute inset-y-0 left-0 rounded-l-full"
         style={{
@@ -228,7 +247,7 @@ function PaceLine({ limit, compact = false }: { limit: SpendLimitWidgetData; com
   const showAmount = !compact && pace.projectedAmount !== null
   return (
     <p
-      className={`truncate text-[var(--ink-3)] ${compact ? 'text-[10px] leading-tight' : 'text-[11px]'}`}
+      className={`shrink-0 truncate text-[var(--ink-3)] ${compact ? 'text-[10px] leading-tight' : 'text-[11px]'}`}
     >
       {describeSpendLimitPace(pace, limit.currentPeriodLabel)}
       {showAmount && (
@@ -348,7 +367,7 @@ export const SpendLimitWidget = memo(function SpendLimitWidget({
   )
 
   const amountRow = (
-    <p className="text-[var(--ink)]">
+    <p className="shrink-0 text-[var(--ink)]">
       <MaskedAmount value={limit.currentMatchedAmount} tone="kern" className="text-lg font-semibold" />
       <span className="text-[var(--ink-4)]">
         {' '}van <MaskedAmount value={limit.limitAmount} tone="kern" className="text-sm" />
@@ -361,7 +380,7 @@ export const SpendLimitWidget = memo(function SpendLimitWidget({
   // overschreed de inhoud de vaste kaarthoogte. Compacter corps + hard op
   // één regel geklemd — truncate vangt extreem lange bedragen.
   const amountRowCompact = (
-    <p className="truncate whitespace-nowrap text-[var(--ink)]">
+    <p className="shrink-0 truncate whitespace-nowrap text-[var(--ink)]">
       <MaskedAmount value={limit.currentMatchedAmount} tone="kern" className="text-base font-semibold" />
       <span className="text-[var(--ink-4)]">
         {' '}van <MaskedAmount value={limit.limitAmount} tone="kern" className="text-xs" />
@@ -389,15 +408,41 @@ export const SpendLimitWidget = memo(function SpendLimitWidget({
     </>
   )
 
+  // `leading-tight` is hier geen smaak maar rekenwerk: zonder expliciete
+  // regelhoogte hangt deze regel aan de metrics van het geladen font, en op de
+  // compacte takken is de tegelhoogte tot op de pixel begroot.
   const metaRow = (
-    <p className="truncate font-serif italic text-[11px] text-[var(--ink-3)]">
+    <p className="shrink-0 truncate font-serif italic text-[11px] leading-tight text-[var(--ink-3)]">
       {copy.singularLower} · {limit.currentPeriodLabel}
       {!limit.isActive && <span className="text-[var(--ink-4)]"> · gepauzeerd</span>}
     </p>
   )
 
+  /**
+   * Stand én periode op ÉÉN regel — de aanhef van de compacte takken.
+   *
+   * Op `half` past de losse `metaRow` er niet meer bij (zie het hoogtebudget in
+   * de bestandskop): een aparte regel kost daar ~14 van de ~93 beschikbare
+   * pixels. De periode en het gepauzeerd-merk zijn te belangrijk om te laten
+   * vallen — "binnen je grens" over een gepauzeerde pot is misleidend — dus
+   * schuiven ze achter de stand aan, waar ze geen extra regelhoogte kosten.
+   * Wat wél wegvalt is het aliaswoord ("schaamtepot"): de kicker draagt de
+   * potnaam al, en `mini` laat het alias om dezelfde reden weg.
+   */
+  const statusMetaRow = (
+    <p className="flex min-w-0 shrink-0 items-center gap-1.5 text-[12px] leading-tight">
+      <StatusDot status={status} />
+      <span className={`shrink-0 ${STATUS_TEXT_CLASS[status]}`}>{STATUS_LABEL[status]}</span>
+      <span className="shrink-0 text-[var(--ink-4)]">·</span>
+      <span className="truncate text-[11px] text-[var(--ink-3)]">
+        {limit.currentPeriodLabel}
+        {!limit.isActive && <span className="text-[var(--ink-4)]"> · gepauzeerd</span>}
+      </span>
+    </p>
+  )
+
   const streakRow = (
-    <p className="text-[11px] text-[var(--ink-3)]">
+    <p className="shrink-0 text-[11px] text-[var(--ink-3)]">
       reeks <span className="font-mono tabular-nums text-[var(--ink)]">{limit.currentStreak}</span>
       {limit.currentStreak === 1 ? ' periode' : ' periodes'} binnen je grens
     </p>
@@ -537,47 +582,60 @@ export const SpendLimitWidget = memo(function SpendLimitWidget({
     )
   }
 
-  // ── Half: quarter + de ruimte/overschrijding in vrijheidstijd ──
+  // ── Half: stand + bedrag + balk + ruimte/reeks/score + vrijheidstijd ──
   if (size === 'half') {
     return (
       <WidgetShell module="kern" size={size} kicker={limit.name} href={href} kickerPosition="left">
-        {/* my-auto i.p.v. justify-center: auto-marges vallen bij overloop terug
-            op 0, zodat een te hoge inhoud alleen onderaan wegvalt — met
-            justify-center knipt de kaart boven én onder tekst half af. */}
+        {/* HOOGTEBUDGET — vijf regels, geteld (B-033).
+            Op mobiel zakt een opgeslagen `full` naar deze tak in een tegel van
+            140px; na de rand (2), de accentbalk (3), de p-3 (24) en de
+            hover-pijlrij (18) blijft 93px over — in Chrome nagemeten op een
+            384px-viewport. Deze stapel kost: stand+periode 14 · bedrag 24 ·
+            balk 6 · ruimte-regel 16 · vrijheidsregel 10, plus vier
+            tussenruimtes van 4px = ~86px. Er kan hier dus GEEN regel bij zonder
+            er één weg te halen — de tempo-ZIN is precies daarom weg (de
+            tempo-MARKERING op de balk blijft, dat is de informatie die telt).
+            Op desktop (160px ⇒ ~115px) centreert `my-auto` dezelfde stapel.
+
+            Elke regel draagt `shrink-0`; zie de bestandskop waaróm dat de
+            eigenlijke fix van B-033 is. */}
         <div ref={ref} className="flex h-full flex-col">
-          <div className="my-auto flex min-h-0 flex-col gap-1.5">
-          {metaRow}
-          <div className="text-[12px]">{statusRow}</div>
-          {amountRow}
-          <LimitBar
-            matched={limit.currentMatchedAmount}
-            limitAmount={limit.limitAmount}
-            hasEntered={hasEntered}
-            paceFraction={limit.pace?.elapsedFraction ?? null}
-          />
-          <p className={`truncate text-xs ${roomToneClass}`}>
-            {roomContent}
-            <span className="text-[var(--ink-4)]"> · </span>
-            {/* Reeks = een AANTAL periodes, geen bedrag → maskeert niet. */}
-            <span className="font-mono tabular-nums text-[var(--ink)]">{limit.currentStreak}</span>
-            <span className="text-[var(--ink-3)]"> op rij</span>
-            {/* Beide velden guarden, gelijk aan de xl-tak: guardt hier alleen
-                `score`, dan rendert een verweesde scheider zodra die twee ooit
-                uiteenlopen. */}
-            {limit.score !== null && limit.scoreLabel !== null && (
-              <>
-                <span className="text-[var(--ink-4)]"> · </span>
-                <ScoreLine limit={limit} />
-              </>
-            )}
-          </p>
-          {freedomLabel && (
-            <p className="truncate font-serif italic text-[10px] leading-none text-[var(--ink-3)]">
-              {isOver ? `≈ ${freedomLabel} vrijheid eroverheen` : `≈ ${freedomLabel} vrijheid over`}
+          <div className="my-auto flex min-h-0 flex-col gap-1">
+            {statusMetaRow}
+            {amountRowCompact}
+            <LimitBar
+              matched={limit.currentMatchedAmount}
+              limitAmount={limit.limitAmount}
+              hasEntered={hasEntered}
+              paceFraction={limit.pace?.elapsedFraction ?? null}
+            />
+            <p className={`shrink-0 truncate text-xs ${roomToneClass}`}>
+              {roomContent}
+              <span className="text-[var(--ink-4)]"> · </span>
+              {/* Reeks = een AANTAL periodes, geen bedrag → maskeert niet. */}
+              <span className="font-mono tabular-nums text-[var(--ink)]">{limit.currentStreak}</span>
+              <span className="text-[var(--ink-3)]"> op rij</span>
+              {/* Beide velden guarden, gelijk aan de xl-tak: guardt hier alleen
+                  `score`, dan rendert een verweesde scheider zodra die twee ooit
+                  uiteenlopen. */}
+              {limit.score !== null && limit.scoreLabel !== null && (
+                <>
+                  <span className="text-[var(--ink-4)]"> · </span>
+                  <ScoreLine limit={limit} />
+                </>
+              )}
             </p>
-          )}
-          <PaceLine limit={limit} />
-          {limit.aggregateTruncationSuspected && <TruncationNote compact />}
+            {/* De vijfde regel is óf de vrijheidstijd, óf de
+                betrouwbaarheidsmelding — nooit allebei. Dat is geen
+                ruimtetruc: een vrijheidstijd op een mogelijk afgekapt bedrag
+                geeft een preciezer antwoord dan de gegevens dragen. */}
+            {limit.aggregateTruncationSuspected ? (
+              <TruncationNote compact />
+            ) : freedomLabel ? (
+              <p className="shrink-0 truncate font-serif italic text-[10px] leading-none text-[var(--ink-3)]">
+                {isOver ? `≈ ${freedomLabel} vrijheid eroverheen` : `≈ ${freedomLabel} vrijheid over`}
+              </p>
+            ) : null}
           </div>
         </div>
       </WidgetShell>
@@ -587,20 +645,34 @@ export const SpendLimitWidget = memo(function SpendLimitWidget({
   // ── Quarter (default): status + lopend bedrag vs. grens + reeks ──
   return (
     <WidgetShell module="kern" size={size} kicker={limit.name} href={href} kickerPosition="left">
-      {/* Zelfde veilige centrering als half — zie de comment daar. */}
+      {/* HOOGTEBUDGET — zes regels, geteld (B-033).
+          Deze tak draait op mobiel in één kolom (~133px inhoudsbreedte) en op
+          desktop in één van vier. Beschikbaar: 140 − 2 (rand) − 3 (accentbalk)
+          − 24 (p-3) = 111px; geen hover-pijlrij op quarter. Deze stapel kost:
+          periode 14 · stand 15 · bedrag 24 · balk 6 · reeks 13 · tempo/melding
+          13, plus vijf tussenruimtes van 4px = ~105px.
+
+          Anders dan `half` houdt quarter periode en stand op twee regels: de
+          tegel is hier te smal om ze te ketenen zonder de periode weg te
+          truncaten. `shrink-0` per regel — zie de bestandskop. */}
       <div ref={ref} className="flex h-full flex-col">
         <div className="my-auto flex min-h-0 flex-col gap-1">
-        {metaRow}
-        <div className="text-[12px]">{statusRow}</div>
-        {amountRowCompact}
-        <LimitBar matched={limit.currentMatchedAmount} limitAmount={limit.limitAmount} hasEntered={hasEntered} />
-        <p className="truncate text-[10px] text-[var(--ink-3)]">
-          <span className="font-mono tabular-nums text-[var(--ink)]">{limit.currentStreak}</span> op rij binnen je grens
-        </p>
-        {/* Op de kleinste tegel alleen de tempo-markering, géén prognosebedrag:
-            de regel moet op 384px binnen één lijn passen. */}
-        <PaceLine limit={limit} compact />
-        {limit.aggregateTruncationSuspected && <TruncationNote compact />}
+          {metaRow}
+          <div className="shrink-0 text-[12px] leading-tight">{statusRow}</div>
+          {amountRowCompact}
+          <LimitBar matched={limit.currentMatchedAmount} limitAmount={limit.limitAmount} hasEntered={hasEntered} />
+          <p className="shrink-0 truncate text-[10px] leading-tight text-[var(--ink-3)]">
+            <span className="font-mono tabular-nums text-[var(--ink)]">{limit.currentStreak}</span> op rij binnen je grens
+          </p>
+          {/* De zesde regel is óf het tempo, óf de betrouwbaarheidsmelding —
+              nooit allebei (zelfde afweging als op half). Op de kleinste tegel
+              toont het tempo alleen de markering, géén prognosebedrag: de regel
+              moet op 384px binnen één lijn passen. */}
+          {limit.aggregateTruncationSuspected ? (
+            <TruncationNote compact />
+          ) : (
+            <PaceLine limit={limit} compact />
+          )}
         </div>
       </div>
     </WidgetShell>

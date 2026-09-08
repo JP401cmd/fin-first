@@ -14,8 +14,6 @@ import { PageStatusDot } from '@/components/app/page-status-dot'
 import { HideInSimple } from '@/components/app/hide-in-simple'
 import { getPageInfo } from '@/lib/page-info-content'
 import { hasInvestedAssets } from '@/lib/dashboard-wealth-weighting'
-import { computeHorizonRunway } from '@/lib/fire-target-shared'
-import { ankerReachFromRunway, ankerStopFromSim, ankerZin } from '@/lib/horizon/anker-copy'
 
 export const metadata: Metadata = {
   title: 'Bezittingen — TriFinity',
@@ -46,49 +44,32 @@ async function tryLoadAssetsData(
   }
 }
 
-/**
- * De runway-zin voor de deck (UR3-19, optie C).
+/*
+ * GEEN runway-zin meer in de deck (melding B-035, 8 sep 2026).
  *
- * Deze pagina toonde tot UR3-19 op zes plekken "bruto bezittingentotaal ÷
- * dagtarief" als vrijheidstijd. Dat is twee keer fout: de TELLER is bruto (de
- * eigen woning vol, geen enkele schuld eraf) én de GROOTHEID is verkeerd —
- * "vermogen ÷ dagtarief" stelt een TOTALE vraag met het MARGINALE instrument,
- * wat ADR 0126 D1 verbiedt. Het geldige totaal-antwoord is de RUNWAY: één
- * geforceerde kernel-run op het plan-anker, gelezen uit `kernelDepletionMonth`.
+ * UR3-19 (optie C) zette hier één runway-zin neer — "Als je nu stopt, reikt je
+ * liquide vermogen tot je Xe" — als vervanging van zes handgerolde "bruto
+ * bezittingentotaal ÷ dagtarief"-sommen. Die vervanging blijft staan: de
+ * verkeerde sommen zijn en blijven weg (zie ADR 0126 D1 en de grendel in
+ * components/core/assets-client.bruto-vrijheidstijd.test.ts).
  *
- * CONSUME, DON'T RECOMPUTE. `computeHorizonRunway` is de canonieke motor
- * (React-`cache()`'d op (client, perspectief)) en `ankerZin` is het enige huis
- * van de zin — hier wordt niets gerekend en niets geformuleerd. Kosten: één
- * extra kernel-run op deze route; bewust geaccepteerd bij het eigenaarsbesluit.
+ * Wat vervalt is alleen de PLAATSING op deze pagina. De eigenaar vroeg de zin
+ * hier weg te halen; hij staat al op /overzicht zelf, in de vrijheid-strip van
+ * de hero (`components/overview/overzicht-hero/vrijheid-strip.tsx`, ook via
+ * `ankerZin`). Twee keer dezelfde uitspraak op twee schermen is geen extra
+ * inzicht.
  *
- * `null` bij elke onbekende uitkomst (geen basisrun, geen geboortedatum, geen
- * geloofwaardige uitgavenbasis, of een kern-fout): dan zwijgt de deck. De zin
- * "we kunnen nog niet bepalen …" hoort in een statusmelding, niet in een
- * pagina-aanhef.
+ * Meegenomen winst: hiermee vervalt de extra kernel-run
+ * (`computeHorizonRunway`) die deze route ervoor draaide en die bij het
+ * UR3-19-besluit expliciet als kostenpost was geaccepteerd.
  */
-async function buildRunwayZin(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  perspective: Perspective,
-): Promise<string | null> {
-  const runway = await computeHorizonRunway(supabase, perspective).catch(() => null)
-  if (runway == null || runway.kind === 'unavailable') return null
-  const reach = ankerReachFromRunway(runway)
-  if (reach.kind === 'onbekend') return null
-  const stop =
-    ankerStopFromSim({
-      stopAnker: runway.planAnker ?? null,
-      vastStopLeeftijd: runway.stopAge ?? null,
-    }) ?? { kind: 'now' as const }
-  return ankerZin(reach, stop)
-}
 
 export default async function OverzichtBezittingenPage() {
   const supabase = await createClient()
   const perspective = await getServerPerspective()
-  const [assetsData, horizonData, runwayZin] = await Promise.all([
+  const [assetsData, horizonData] = await Promise.all([
     tryLoadAssetsData(supabase, perspective),
     loadHorizonRaw(supabase).catch(() => null),
-    buildRunwayZin(supabase, perspective),
   ])
 
   // Drempel-data voor de twee inspiratie-blokken. Alleen renderen wanneer
@@ -146,11 +127,7 @@ export default async function OverzichtBezittingenPage() {
           className="absolute right-4 top-4 sm:right-6"
         />
       </div>
-      <BezittingenView
-        initialData={assetsData}
-        inspirationCards={inspirationCards}
-        runwayZin={runwayZin}
-      />
+      <BezittingenView initialData={assetsData} inspirationCards={inspirationCards} />
     </>
   )
 }

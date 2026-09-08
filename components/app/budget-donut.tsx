@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect, memo } from 'react'
 import { type BudgetWithChildren } from '@/lib/budget-data'
 import { BudgetIcon, isOverPositive, type BudgetType } from '@/components/app/budget-shared'
 import { budgetSpentPct } from '@/lib/budget-spending'
+import { isOverBudget } from '@/lib/budget-alerts'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { Eye, EyeOff, ChevronDown } from 'lucide-react'
 import { MaskedAmount } from '@/components/app/masked-amount'
@@ -244,7 +245,7 @@ function TypeDonut({ budgetType, segments, onNavigate, hiddenBudgets, onToggleHi
       const spentRatio = seg.limit > 0 ? Math.min(seg.spent / seg.limit, 1) : 0
       const spentSweep = sweep * spentRatio
       const spentEnd = start + Math.max(spentSweep - gap, 0)
-      const isOver = seg.spent > seg.limit && seg.limit > 0
+      const isOver = isOverBudget(seg.spent, seg.limit)
 
       // Inner arcs: full 360° circle for children of this parent
       const childTotalLimit = seg.children.reduce((s, c) => s + c.limit, 0)
@@ -259,7 +260,7 @@ function TypeDonut({ budgetType, segments, onNavigate, hiddenBudgets, onToggleHi
           const cSpentRatio = child.limit > 0 ? Math.min(child.spent / child.limit, 1) : 0
           const cSpentSweep = childSweep * cSpentRatio
           const cSpentEnd = cStart + Math.max(cSpentSweep - innerGap, 0)
-          const cIsOver = child.spent > child.limit && child.limit > 0
+          const cIsOver = isOverBudget(child.spent, child.limit)
           innerArcs.push({ start: cStart, end: cEnd, spentEnd: cSpentEnd, isOver: cIsOver, childIdx: ci })
           childAngle += childSweep
         })
@@ -519,7 +520,7 @@ function TypeDonut({ budgetType, segments, onNavigate, hiddenBudgets, onToggleHi
         <div className="mt-4 space-y-1">
           {segments.map((seg, i) => {
             const pct = budgetSpentPct(seg.spent, seg.limit)
-            const isOver = seg.spent > seg.limit && seg.limit > 0
+            const isOver = isOverBudget(seg.spent, seg.limit)
             const isHidden = hiddenBudgets.has(seg.id)
             const visibleIdx = visibleSegments.indexOf(seg)
             const isExpanded = selectedIdx !== null && selectedIdx === visibleIdx && !isHidden
@@ -578,7 +579,7 @@ function TypeDonut({ budgetType, segments, onNavigate, hiddenBudgets, onToggleHi
                   <div className="ml-4 mt-0.5 space-y-0.5">
                     {seg.children.map((child, ci) => {
                       const childPct = budgetSpentPct(child.spent, child.limit)
-                      const childOver = child.spent > child.limit && child.limit > 0
+                      const childOver = isOverBudget(child.spent, child.limit)
                       const cc = childTypeColors(budgetType, ci, seg.children.length)
 
                       return (

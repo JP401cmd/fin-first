@@ -175,6 +175,7 @@ import {
   type NetWorthSnapshotRow,
 } from '@/lib/cashflow-kpis'
 import { buildBudgetSpendingMap, budgetBarPct, budgetBeschikbaar } from '@/lib/budget-spending'
+import { isOverBudget } from '@/lib/budget-alerts'
 import { getCurrentMonthSplits } from '@/lib/budget-spending-fetch'
 import { resolveSavingsSource, savingsRateFromAggregates, computeDebtAflossingMonthly, monthlySavingsFromRate } from './savings-source'
 import { extrapolateAnnualIncome } from '@/lib/retirement-expense-basis'
@@ -1946,6 +1947,15 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // ── Notifications: derived from budget alerts, milestones ──
   const notifications: Notification[] = []
   // Budget overspending alerts
+  //
+  // `vals.limit > 0` blijft hier BEWUST staan, ook na B-032. Dit is een
+  // MELD-pad, geen weergave-pad: een balk die je op het scherm ziet moet de
+  // waarheid tonen (daar is de nul-limiet-tak voor), maar iemand ongevraagd
+  // aanspreken op een categorie die hij nooit begroot heeft is ruis. Zelfde
+  // lijn als `shouldAlert` (lib/budget-alerts.ts) en de vroege
+  // `if (limit <= 0) return` in app/api/notifications/route.ts. Bovendien is dit
+  // een TOTAAL per budget-type — met een noemer van nul zou de eigen deling
+  // hieronder Infinity opleveren.
   for (const [type, vals] of Object.entries(budgetTotals) as [string, { limit: number; spent: number }][]) {
     if (vals.limit > 0 && vals.spent > vals.limit) {
       const pct = Math.round((vals.spent / vals.limit) * 100)
@@ -1970,6 +1980,11 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       : Number(bData.default_limit)
     if (bData.interval === 'quarterly') limit = limit / 3
     else if (bData.interval === 'yearly') limit = limit / 12
+    // Zie de toelichting bij het type-totaal hierboven: MELDEN vereist een
+    // ingestelde limiet. Zonder deze regel zou `budgetBarPct` na B-032 zijn
+    // nul-limiet-verzadiging teruggeven en élk niet-begroot budget met een
+    // drempel een "critical"-melding opleveren.
+    if (!(limit > 0)) continue
     // Besteed voor dit budget + zijn kinderen, uit de gedeelde canonieke map.
     const relevantIds = new Set<string>([bData.id])
     for (const c of children) relevantIds.add(c.id)
@@ -2197,7 +2212,15 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     savingsRatePct: effectiveSavingsRate,
     monthlyIncome: effectiveMonthlyIncome,
     monthlyRecurringAmount: totalRecurringAmount,
-    budgetsOverLimit: topBudgets.filter(b => b.budgetType === 'expense' && b.limit > 0 && b.spent > b.limit).length,
+    // MELDEN vereist een ingestelde limiet — zelfde grens als de twee
+    // alert-lussen hierboven. Dit veld is géén weergave-teller: het gaat naar
+    // `computeNextSteps` en wordt daar een ONGEVRAAGDE actiekaart ("Budgetten
+    // bijsturen — N budgetten over de limiet"). `topBudgets` filtert niet op
+    // limiet, dus zonder deze `b.limit > 0` zou een nooit-begrote categorie met
+    // besteding die kaart oproepen: een bewering over een limiet die de
+    // gebruiker nooit gesteld heeft. De nul-limiet-tak van B-032 geldt voor wat
+    // je op het scherm ziet, niet voor ongevraagd aanspreken.
+    budgetsOverLimit: topBudgets.filter(b => b.budgetType === 'expense' && b.limit > 0 && isOverBudget(b.spent, b.limit)).length,
     openActionCount: openActions.length,
     freedomDaysOpen: totalFreedomDaysOpen,
     lifeEventCount: (eventsResult.data ?? []).length,

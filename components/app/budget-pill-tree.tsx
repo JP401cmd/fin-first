@@ -34,6 +34,7 @@ import {
   BudgetOverWarningIcon,
   type BudgetType,
 } from '@/components/app/budget-shared'
+import { isOverBudget } from '@/lib/budget-alerts'
 import type { Budget, BudgetWithChildren } from '@/lib/budget-data'
 import { MaskedAmount } from '@/components/app/masked-amount'
 
@@ -65,7 +66,7 @@ function PillBars({
   colors: ReturnType<typeof getTypeColors>
   overPositive: boolean
 }) {
-  const overBudget = spent > limit && limit > 0
+  const overBudget = isOverBudget(spent, limit)
   const seg = computeBarSegments(spent, limit, alertThreshold, colors, overPositive)
 
   return (
@@ -159,7 +160,7 @@ function BudgetPill({
   warnChildOverBudget?: boolean
 }) {
   const limit = beschikbaar !== undefined ? beschikbaar + spent : Number(budget.default_limit)
-  const overBudget = spent > limit && limit > 0
+  const overBudget = isOverBudget(spent, limit)
   const alertThreshold = budget.alert_threshold ?? 80
   const isHard = budget.limit_type === 'hard'
   const colors = getTypeColors(budgetType)

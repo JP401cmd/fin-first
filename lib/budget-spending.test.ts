@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   buildBudgetSpendingMap,
+  budgetBeschikbaar,
   budgetFillRatio,
   budgetSpentPct,
   budgetBarPct,
@@ -10,6 +11,8 @@ import {
   spendingContribution,
   spentForBudget,
 } from '@/lib/budget-spending'
+import { budgetLimitStatus, isOverBudget } from '@/lib/budget-alerts'
+import { BUDGET_ZERO_LIMIT_BAR_PCT } from '@/lib/constants'
 
 /**
  * Type-map voor de tests: alle gebruikte budget-ids zijn UITGAVEN-budgetten,
@@ -313,10 +316,13 @@ describe('weergave-klemmen bij een negatieve besteding', () => {
     expect(budgetFillRatio(9265, 1642)).toBe(1)
   })
 
-  it('limiet 0 of negatief geeft 0, geen deling door nul', () => {
-    expect(budgetSpentPct(500, 0)).toBe(0)
-    expect(budgetFillRatio(500, 0)).toBe(0)
-    expect(budgetSpentPct(500, -10)).toBe(0)
+  it('een limiet van 0 of lager levert nooit NaN of Infinity op', () => {
+    // Geen deling door nul: de nul-limiet-tak wordt apart afgehandeld (B-032).
+    for (const [spent, limit] of [[500, 0], [500, -10], [0, 0], [-1, 0]] as const) {
+      expect(Number.isFinite(budgetSpentPct(spent, limit))).toBe(true)
+      expect(Number.isFinite(budgetFillRatio(spent, limit))).toBe(true)
+      expect(Number.isFinite(budgetBarPct(spent, limit))).toBe(true)
+    }
   })
 
   it('geen vrijheidstijd bij een negatief totaal', () => {
@@ -342,7 +348,79 @@ describe('budgetBarPct — onder geklemd, boven vrij', () => {
     expect(budgetBarPct(3284, 1642)).toBe(200)
   })
 
-  it('limiet 0 geeft 0', () => {
-    expect(budgetBarPct(500, 0)).toBe(0)
+  it('limiet 0 zonder besteding geeft 0', () => {
+    expect(budgetBarPct(0, 0)).toBe(0)
+  })
+})
+
+describe('B-032 — begroting nul met besteding erop', () => {
+  // Gemeld op /overzicht/budget, sectie INKOMEN: een inkomstenpost met een
+  // begroting van nul toonde een LEGE balk terwijl er wel op geboekt was.
+  // De bedragen hieronder zijn illustratief. Een begroting van nul die volloopt is
+  // per definitie vol — en op een uitgaven-budget bovendien een overschrijding.
+  // De klemfamilie viel bij `limit <= 0` terug op 0 ("er is nog niets
+  // gebeurd"), precies het omgekeerde van de waarheid.
+
+  it('gegeven limiet 0 en ontvangen 8000, wanneer de ring wordt gevuld, dan is zij VOL', () => {
+    expect(budgetFillRatio(8000, 0)).toBe(1)
+  })
+
+  it('gegeven limiet 0 en besteed 8000, wanneer het percentage wordt getoond, dan is het 100', () => {
+    expect(budgetSpentPct(8000, 0)).toBe(100)
+  })
+
+  it('gegeven limiet 0 en besteed 8000, wanneer de balk wordt geschaald, dan signaleert zij een overschrijding', () => {
+    // Boven de 105 (`computeBarSegments` markeert dan `isFullyOver`) en boven de
+    // 100 (`getHeatmapColor` kleurt dan pas de over-tak) — eindig, dus geldige CSS.
+    const pct = budgetBarPct(8000, 0)
+    expect(Number.isFinite(pct)).toBe(true)
+    expect(pct).toBeGreaterThan(105)
+    expect(pct).toBe(BUDGET_ZERO_LIMIT_BAR_PCT)
+  })
+
+  it('gegeven limiet 0 en besteed 0, wanneer de balk wordt getekend, dan blijft zij leeg', () => {
+    // "Overige inkomsten EUR 0 / EUR 0" — er is niets gebeurd, en dat klopt.
+    expect(budgetFillRatio(0, 0)).toBe(0)
+    expect(budgetSpentPct(0, 0)).toBe(0)
+    expect(budgetBarPct(0, 0)).toBe(0)
+  })
+
+  it('gegeven limiet 0 en een NEGATIEVE besteding, wanneer de balk wordt getekend, dan blijft zij leeg', () => {
+    // Netto geld binnen op een uitgaven-budget: geen vulling, geen overschrijding.
+    expect(budgetFillRatio(-6735, 0)).toBe(0)
+    expect(budgetSpentPct(-6735, 0)).toBe(0)
+    expect(budgetBarPct(-6735, 0)).toBe(0)
+  })
+
+  it('gegeven een NEGATIEVE limiet met besteding, wanneer de balk wordt getekend, dan is zij vol', () => {
+    // Een limiet onder nul is nog minder ruimte dan nul; elke besteding is over.
+    expect(budgetFillRatio(500, -10)).toBe(1)
+    expect(budgetSpentPct(500, -10)).toBe(100)
+    expect(budgetBarPct(500, -10)).toBe(BUDGET_ZERO_LIMIT_BAR_PCT)
+  })
+
+  it('gegeven een POSITIEVE limiet, wanneer de balk wordt getekend, dan is het gedrag ongewijzigd', () => {
+    expect(budgetFillRatio(821, 1642)).toBeCloseTo(0.5)
+    expect(budgetSpentPct(821, 1642)).toBe(50)
+    expect(budgetBarPct(821, 1642)).toBe(50)
+    expect(budgetSpentPct(9265, 1642)).toBe(100)
+    expect(budgetBarPct(9265, 1642)).toBeCloseTo(564.25, 2)
+    expect(budgetBarPct(-6735, 1642)).toBe(0)
+  })
+
+  it('gegeven limiet 0 en besteed 8000, wanneer het limiet-oordeel wordt geveld, dan is het "over"', () => {
+    expect(budgetLimitStatus(8000, 0)).toBe('over')
+    expect(isOverBudget(8000, 0)).toBe(true)
+  })
+
+  it('gegeven limiet 0 en besteed 0, wanneer het limiet-oordeel wordt geveld, dan is het niet "over"', () => {
+    expect(isOverBudget(0, 0)).toBe(false)
+    expect(isOverBudget(-5, 0)).toBe(false)
+  })
+
+  it('gegeven limiet 0 en besteed 8000, wanneer "beschikbaar" wordt bepaald, dan is het de volle overschrijding', () => {
+    // Al correct vóór B-032 — vastgelegd zodat de klem niet meeverandert.
+    expect(budgetBeschikbaar(0, 8000)).toBe(-8000)
+    expect(budgetBeschikbaar(0, 0)).toBe(0)
   })
 })

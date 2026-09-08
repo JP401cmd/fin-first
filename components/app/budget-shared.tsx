@@ -56,6 +56,7 @@ import { formatCurrency as _formatCurrency, formatCurrencyDecimals as _formatCur
 export { _formatCurrency as formatCurrency, _formatCurrencyDecimals as formatCurrencyDecimals }
 import type { Budget } from '@/lib/budget-data'
 import { budgetBarPct } from '@/lib/budget-spending'
+import { isOverBudget } from '@/lib/budget-alerts'
 
 export type BudgetType = 'income' | 'expense' | 'savings' | 'debt' | 'archive'
 
@@ -72,6 +73,10 @@ export function isOverPositive(budgetType: BudgetType): boolean {
  * Gebruikt dezelfde limit-afleiding als de boom-/pill-weergave
  * (`beschikbaar + spent` indien bekend, anders `default_limit`), zodat het
  * waarschuwingssignaal exact samenvalt met de rood-kleuring van een deelbudget.
+ *
+ * Het oordeel zelf komt van de canonieke `isOverBudget`. De eerdere eigen
+ * variant (`limit > 0 && spent > limit`) liet een deelbudget met een begroting
+ * van NUL waar wél op geboekt was ongemerkt passeren (B-032).
  */
 export function anyChildOverBudget(
   children: Budget[],
@@ -84,7 +89,7 @@ export function anyChildOverBudget(
     const spent = spending[c.id] ?? 0
     const limit =
       beschikbaarMap?.[c.id] !== undefined ? beschikbaarMap[c.id] + spent : Number(c.default_limit)
-    return limit > 0 && spent > limit
+    return isOverBudget(spent, limit)
   })
 }
 

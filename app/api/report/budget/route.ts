@@ -2,6 +2,7 @@ import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { fetchExpenseRowsForRate, recentDailyExpenseRateFromRows } from '@/lib/expense-rate'
 import { buildBudgetTypeMap } from '@/lib/budget-utils'
 import { buildBudgetSpendingMap, budgetBarPct } from '@/lib/budget-spending'
+import { isOverBudget } from '@/lib/budget-alerts'
 import type {
   BudgetReportData,
   BudgetReportCategory,
@@ -424,7 +425,7 @@ export async function GET(request: Request) {
     // ── Over/under budget lists ──────────────────────────────────────────────
 
     const overBudgetCategories: BudgetReportVarianceItem[] = expenseCategories
-      .filter(c => c.spent > c.limit && c.limit > 0)
+      .filter(c => isOverBudget(c.spent, c.limit))
       .sort((a, b) => a.variance - b.variance) // most over first (variance is negative)
       .map(c => ({
         categoryName: c.name,

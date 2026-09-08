@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback, useMemo, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
+import { isOverBudget } from '@/lib/budget-alerts'
+import { budgetSpentPct } from '@/lib/budget-spending'
 import {
   ArrowLeft,
   ArrowRight,
@@ -700,8 +702,13 @@ function CheckinPageContent() {
                 <p className="label-editorial text-[var(--ink-3)] mb-3">Budgetten</p>
                 <div className="space-y-2.5">
                   {snap.details.budgets.map((b: { name: string; icon: string | null; limit: number; spent: number; budget_type?: string }, i: number) => {
-                    const pct = b.limit > 0 ? Math.min(100, (b.spent / b.limit) * 100) : 0
-                    const isOver = b.spent > b.limit
+                    // Zuivere WEERGAVE van een historische momentopname — hier
+                    // geldt de nul-limiet-tak van B-032 wél: een begrote nul
+                    // waar op geboekt is, is vol en over. Tot dan stond hier
+                    // een eigen deling die bij limiet 0 een LEGE balk naast een
+                    // rood bedrag zette, precies het gemelde symptoom.
+                    const pct = budgetSpentPct(b.spent, b.limit)
+                    const isOver = isOverBudget(b.spent, b.limit)
                     const overPos = isOver && b.budget_type ? isOverPositive(b.budget_type as BudgetType) : false
                     return (
                       <div key={i}>
@@ -1797,8 +1804,15 @@ function StepBudget({
 }) {
   const [savingBudgets, setSavingBudgets] = useState(false)
   const expenseBudgets = budgets.filter(b => b.budget_type === 'expense')
-  // Groups based on original limit, not the edited value
-  const overBudget = expenseBudgets.filter(b => b.limit > 0 && b.spent > b.limit)
+  // Groups based on original limit, not the edited value.
+  //
+  // BEIDE lijsten eisen een INGESTELDE limiet, en dat is hier geen weergave-
+  // maar een bewerkbaarheids-grens: deze stap is een editor. `changedCount`
+  // hieronder slaat `limit <= 0` over en de opslaanknop hangt aan die teller,
+  // dus een nul-limiet-rij zou een invoerveld tonen dat niet weg te schrijven
+  // is. De nul-limiet-tak van B-032 hoort bij het tónen van een balk, niet bij
+  // het aanbieden van een regel om te bewerken.
+  const overBudget = expenseBudgets.filter(b => b.limit > 0 && isOverBudget(b.spent, b.limit))
   const underBudget = expenseBudgets.filter(b => b.limit > 0 && b.spent <= b.limit)
 
   const changedCount = useMemo(() => {
@@ -2041,7 +2055,10 @@ function StepReflectie({
   gespreksstarters: GesprekStarterData[]
 }) {
   const fc = useFc()
-  const overBudgetCount = budgets.filter(b => b.budget_type === 'expense' && b.limit > 0 && b.spent > b.limit).length
+  // Zelfde grens als de budget-stap hierboven: alleen budgetten met een
+  // ingestelde limiet tellen mee. Anders zou de reflectie een aantal noemen
+  // waar de gebruiker in de vorige stap geen enkele rij van te zien kreeg.
+  const overBudgetCount = budgets.filter(b => b.budget_type === 'expense' && b.limit > 0 && isOverBudget(b.spent, b.limit)).length
   const activeGoalCount = goals.filter(g => !g.is_completed).length
   const prevMetrics = previous?.metrics
   const dailyExpenses = overview ? dailyExpenseRate(stabieleMaanduitgaven(overview)) : 0

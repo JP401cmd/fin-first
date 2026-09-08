@@ -254,8 +254,15 @@ function BudgetTableCategoryRow({ cat, isExpanded, onToggle }: { cat: BudgetRepo
         <td className={`py-1.5 px-2 text-right font-dm-mono text-[12px] font-medium tabular-nums ${varianceColor}`}>
           {cat.variance >= 0 ? '+' : ''}{fc(cat.variance)}
         </td>
+        {/* Zonder ingestelde limiet is er geen percentage om te tónen: sinds
+            B-032 geeft `budgetBarPct` bij limiet 0 een verzadigingswaarde
+            (BUDGET_ZERO_LIMIT_BAR_PCT) zodat balken en kleuren de
+            overschrijding oppikken — maar dat getal uitschrijven maakt er een
+            meting van die niemand gedaan heeft ("200 %" van nul). De rij zegt
+            het al met € 0 · besteed · variance; de kleur blijft de
+            overschrijding dragen. */}
         <td className={`py-1.5 px-2 text-right font-dm-mono text-[11px] tabular-nums ${cat.percentUsed > 100 ? 'text-[var(--negative)]' : 'text-[var(--ink-2)]'}`}>
-          {cat.percentUsed}%
+          {cat.limit > 0 ? `${cat.percentUsed}%` : '—'}
         </td>
         <td className="py-1.5 pl-2 w-20">
           {cat.trendValues.length >= 2 && (
@@ -277,8 +284,12 @@ function BudgetTableCategoryRow({ cat, isExpanded, onToggle }: { cat: BudgetRepo
           <td className={`py-1 px-2 text-right font-dm-mono text-[11px] tabular-nums ${child.limit - child.spent >= 0 ? 'text-[var(--positive)]' : 'text-[var(--negative)]'}`}>
             {child.limit - child.spent >= 0 ? '+' : ''}{fc(child.limit - child.spent)}
           </td>
+          {/* Zelfde reden als bij de hoofdrij hierboven. Deelbudgetten zonder
+              limiet worden weliswaar al bij de bron gefilterd, maar de regel
+              hoort hier hetzelfde te zijn — anders is de ene tabelkolom wél en
+              de andere niet bestand tegen een limiet van nul. */}
           <td className={`py-1 px-2 text-right font-dm-mono text-[10px] tabular-nums ${child.percentUsed > 100 ? 'text-[var(--negative)]' : 'text-[var(--ink-3)]'}`}>
-            {child.percentUsed}%
+            {child.limit > 0 ? `${child.percentUsed}%` : '—'}
           </td>
           <td />
         </tr>

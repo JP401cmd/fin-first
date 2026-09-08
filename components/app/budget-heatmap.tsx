@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback, useRef, memo } from 'react'
 import type { BudgetWithChildren } from '@/lib/budget-data'
 import { BudgetIcon, isOverPositive, type BudgetType } from '@/components/app/budget-shared'
 import { budgetSpentPct, budgetBarPct } from '@/lib/budget-spending'
+import { isOverBudget } from '@/lib/budget-alerts'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import { MaskedAmount } from '@/components/app/masked-amount'
@@ -164,6 +165,25 @@ function getHeatmapColor(budgetType: BudgetType, percentUsed: number): string {
 
 /** Neutral gray for budgets with no limit or no spending */
 const NEUTRAL_COLOR = '#e4e4e7'
+
+/**
+ * De cel-/balkkleur van één budget — één plek, want de vier weergaven
+ * (treemap-cel, tooltip, sectie-blok, compacte lijst) moeten dezelfde kleur
+ * geven bij dezelfde cijfers.
+ *
+ * De neutrale grijstint betekent "er valt hier niets te beoordelen", en dat is
+ * alléén zo wanneer er géén begroting én géén besteding is. Tot B-032 stond de
+ * guard op `limit > 0` alleen: een post met een begroting van NUL waar wél
+ * EUR 8.000 op geboekt stond kreeg dus dezelfde grijze "niets aan de hand"-cel
+ * als een lege post, terwijl de balk ernaast (via `budgetSpentPct`) al vol
+ * liep. `budgetBarPct` levert bij die nul-limiet de verzadigingswaarde, zodat
+ * `getHeatmapColor` de over-tak van het TYPE kiest — rood voor uitgaven,
+ * donkergroen voor inkomsten/sparen/aflossen.
+ */
+function heatmapCellColor(budgetType: BudgetType, spent: number, limit: number): string {
+  if (limit <= 0 && spent <= 0) return NEUTRAL_COLOR
+  return getHeatmapColor(budgetType, budgetBarPct(spent, limit))
+}
 
 /* ── Squarified treemap algorithm ────────────────────────────── */
 
@@ -446,11 +466,11 @@ function HeatmapTooltip({
   // Weergave-percentage geklemd op [0,100]; de KLEUR gebruikt de niet-boven-
   // geklemde waarde, want getHeatmapColor kleurt pas rood boven de 100.
   const pct = budgetSpentPct(rect.spent, rect.limit)
-  const colorPct = budgetBarPct(rect.spent, rect.limit)
+  const cellColor = heatmapCellColor(budgetType, rect.spent, rect.limit)
   // Weergave volgt de carry-klem: meegenomen ruimte boven de limiet bestaat niet.
   const remaining = Math.max(0, Math.min(rect.limit, rect.limit - rect.spent))
   const overPositive = isOverPositive(budgetType)
-  const isOver = rect.spent > rect.limit && rect.limit > 0
+  const isOver = isOverBudget(rect.spent, rect.limit)
   const trend = getTrendArrow(rect.spent, previousSpending, rect.id)
 
   // Position tooltip relative to the container
@@ -497,7 +517,7 @@ function HeatmapTooltip({
             className="absolute inset-y-0 left-0 rounded-full transition-all"
             style={{
               width: `${pct}%`, // budgetSpentPct is al geklemd op [0,100]
-              backgroundColor: rect.limit > 0 ? getHeatmapColor(budgetType, colorPct) : NEUTRAL_COLOR,
+              backgroundColor: cellColor,
             }}
           />
         </div>
@@ -639,9 +659,8 @@ function MobileCombinedHeatmap({
                         {groupItems.map((item) => {
                           const idx = globalIndex++
                           const pct = budgetSpentPct(item.spent, item.limit)
-          const colorPct = budgetBarPct(item.spent, item.limit)
-                          const color = item.limit > 0 ? getHeatmapColor(section.budgetType, colorPct) : NEUTRAL_COLOR
-                          const isOver = item.spent > item.limit && item.limit > 0
+                          const color = heatmapCellColor(section.budgetType, item.spent, item.limit)
+                          const isOver = isOverBudget(item.spent, item.limit)
 
                           // Width proportional to weight within the group
                           const totalGroupWeight = groupItems.reduce((s, it) => s + it.weight, 0)
@@ -755,8 +774,7 @@ function MobileCompactHeatmapList({
       <ul aria-label="Grootste budgetten" className="min-h-0 flex-1 space-y-[3px] overflow-y-auto">
         {shown.map((item, idx) => {
           const pct = budgetSpentPct(item.spent, item.limit)
-          const colorPct = budgetBarPct(item.spent, item.limit)
-          const color = item.limit > 0 ? getHeatmapColor(item.budgetType, colorPct) : NEUTRAL_COLOR
+          const color = heatmapCellColor(item.budgetType, item.spent, item.limit)
           return (
             <li key={item.id}>
               <button
@@ -836,10 +854,9 @@ function TreemapCell({
   // Weergave-percentage geklemd op [0,100]; de KLEUR gebruikt de niet-boven-
   // geklemde waarde, want getHeatmapColor kleurt pas rood boven de 100.
   const pct = budgetSpentPct(rect.spent, rect.limit)
-  const colorPct = budgetBarPct(rect.spent, rect.limit)
-  const color = rect.limit > 0 ? getHeatmapColor(budgetType, colorPct) : NEUTRAL_COLOR
+  const color = heatmapCellColor(budgetType, rect.spent, rect.limit)
   const overPositive = isOverPositive(budgetType)
-  const isOver = rect.spent > rect.limit && rect.limit > 0
+  const isOver = isOverBudget(rect.spent, rect.limit)
 
   // Determine what text fits inside the cell — adjusted per widget size.
   // xl deelt de label-rijkdom van full (grotere cellen, dus icoon + bedrag).

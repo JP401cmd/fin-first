@@ -46,7 +46,7 @@ import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { buildSegments, typeColors, childTypeColors } from '@/components/app/budget-donut'
 import { type BudgetRollover, formatPeriod, getCarriedAmount, getPreviousPeriod, buildAutoRolloverInserts, computeEffectiveLimit } from '@/lib/budget-rollover'
 import { computeBudgetPeriod, localDateStr } from '@/lib/budget-period'
-import { budgetLimitStatus } from '@/lib/budget-alerts'
+import { budgetLimitStatus, isOverBudget } from '@/lib/budget-alerts'
 import { BudgetTree } from '@/components/app/budget-tree'
 import { BudgetPillTree } from '@/components/app/budget-pill-tree'
 import { BudgetDonut } from '@/components/app/budget-donut'
@@ -3164,7 +3164,7 @@ function DetailModalDonut({
   dailyExpenseRate: number
 }) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 600 })
-  const overBudget = spent > limit && limit > 0
+  const overBudget = isOverBudget(spent, limit)
   const overPositive = overBudget && isOverPositive(budgetType)
   // Zelfde gedeelde klem als `pct`: een negatieve besteding vult de ring niet
   // negatief. Vrijheidstijd drukt KOSTEN uit in levenstijd; bij een negatief
@@ -3486,10 +3486,15 @@ function BudgetDetailModal({
   const remaining = Math.min(limit, limit - spent)
   // Geklemd op [0, 100] via de gedeelde weergave-helper: bij een negatieve
   // besteding (meer inkomsten dan uitgaven) toont de ring "0% van budget" —
-  // geen negatief percentage. Het BEDRAG blijft wel negatief in beeld.
+  // geen negatief percentage. Het BEDRAG blijft wel negatief in beeld. Bij een
+  // begroting van nul waar wél op geboekt is, staat de ring VOL (B-032).
   const pct = budgetSpentPct(spent, limit)
   // Verdict op de rauwe bedragen, niet op het afgeronde/geklemde `pct`.
-  const limitStatus = limit > 0 ? budgetLimitStatus(spent, limit) : 'onder'
+  // Zonder `limit > 0`-guard (B-032): `budgetLimitStatus` vélt bij een limiet
+  // van nul al het juiste oordeel — 'over' met besteding, 'bereikt' zonder.
+  // De guard maakte daar 'onder' van, dus EUR 8.000 op een EUR 0-budget heette
+  // "er is nog ruimte".
+  const limitStatus = budgetLimitStatus(spent, limit)
   const carry = isParent
     ? children.reduce((sum, c) => sum + getBudgetCarry(c), 0)
     : getBudgetCarry(budget)
@@ -4287,7 +4292,7 @@ function BudgetDetailModal({
                 // anders een negatieve hoogte krijgen — ongeldige CSS, balk verdwijnt.
                 const spentH = Math.max(0, (h.spent / maxHistoryValue) * 100)
                 const limitH = (h.limit / maxHistoryValue) * 100
-                const over = h.spent > h.limit && h.limit > 0
+                const over = isOverBudget(h.spent, h.limit)
                 const isSelected = selectedHistMonth === h.month
                 const isCurrentMonth = i === history.length - 1
                 const barColor = over ? 'var(--negative)' : colors.barHex

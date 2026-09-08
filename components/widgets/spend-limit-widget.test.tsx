@@ -298,7 +298,7 @@ const PACE_ZONDER_BEDRAG: NonNullable<SpendLimitWidgetData['pace']> = {
 }
 
 describe('SpendLimitWidget — tempo van de lopende periode', () => {
-  it.each<WidgetSize>(['quarter', 'half', 'full', 'xl'])(
+  it.each<WidgetSize>(['quarter', 'full', 'xl'])(
     'toont de tempo-regel op %s',
     (size) => {
       const { container } = render(
@@ -310,6 +310,19 @@ describe('SpendLimitWidget — tempo van de lopende periode', () => {
     },
   )
 
+  it('laat de tempo-ZIN weg op half — daar past hij niet meer (B-033)', () => {
+    // Het hoogtebudget van de half-tak (~93px op mobiel) draagt vijf regels;
+    // de tempo-zin was de zesde. De tempo-MARKERING op de balk blijft wél
+    // staan, dus de informatie verdwijnt niet, alleen de zin.
+    const { container } = render(
+      <SpendLimitWidget size="half" limit={makeLimit({ pace: PACE_MET_BEDRAG })} dailyExp={50} />,
+    )
+    expect(container.textContent ?? '').not.toContain('voorbij')
+    const marker = container.querySelector('[style*="calc("]')
+    expect(marker).not.toBeNull()
+    expect((marker as HTMLElement).style.left).toContain('3.2258')
+  })
+
   it('toont op mini niets extra — daar is geen ruimte voor', () => {
     const { container } = render(
       <SpendLimitWidget size="mini" limit={makeLimit({ pace: PACE_MET_BEDRAG })} dailyExp={50} />,
@@ -317,14 +330,18 @@ describe('SpendLimitWidget — tempo van de lopende periode', () => {
     expect(container.textContent ?? '').not.toContain('voorbij')
   })
 
-  it('houdt het prognosebedrag weg van de kleinste tegel, maar toont het op half en groter', () => {
-    const quarter = render(
-      <SpendLimitWidget size="quarter" limit={makeLimit({ pace: PACE_MET_BEDRAG })} dailyExp={50} />,
-    )
-    expect(quarter.container.textContent ?? '').not.toContain('op weg naar')
-    quarter.unmount()
+  it('houdt het prognosebedrag weg van de compacte tegels, maar toont het op full en groter', () => {
+    // Sinds B-033 draagt half de tempo-zin helemaal niet meer; quarter draagt
+    // 'm zonder bedrag.
+    for (const size of ['quarter', 'half'] as WidgetSize[]) {
+      const { container, unmount } = render(
+        <SpendLimitWidget size={size} limit={makeLimit({ pace: PACE_MET_BEDRAG })} dailyExp={50} />,
+      )
+      expect(container.textContent ?? '').not.toContain('op weg naar')
+      unmount()
+    }
 
-    for (const size of ['half', 'full', 'xl'] as WidgetSize[]) {
+    for (const size of ['full', 'xl'] as WidgetSize[]) {
       const { container, unmount } = render(
         <SpendLimitWidget size={size} limit={makeLimit({ pace: PACE_MET_BEDRAG })} dailyExp={50} />,
       )
@@ -377,16 +394,122 @@ describe('SpendLimitWidget — tempo van de lopende periode', () => {
   })
 })
 
-describe('SpendLimitWidget — veilige centrering bij overloop', () => {
-  // Op een smalle mobiele kaart kan de bedragregel wrappen en wordt de inhoud
-  // hoger dan de vaste kaarthoogte. `justify-center` knipt dan boven ÉN onder
-  // tekst half af (bug /overzicht 31 aug); auto-marges (`my-auto`) vallen bij
-  // overloop terug op 0, zodat alleen de onderste (minst belangrijke) regel
-  // wegvalt en de potnaam/status leesbaar blijven.
+/**
+ * B-033 — "schaamtepotten vallen van het scherm" (Android, viewport 384px).
+ *
+ * WAT ER MISGING (gemeten in Chrome, niet uit de oude comment overgenomen):
+ * de compacte stapel is een flex-kolom met `min-h-0`, dus hij krimpt netjes
+ * tot de vaste tegelhoogte. Die krimp wordt echter DOORGEGEVEN aan zijn eigen
+ * kinderen, en elke regel met `truncate` heeft `overflow: hidden` — waardoor
+ * zijn automatische minimumhoogte 0 is. Flexbox perste die regels daarom samen
+ * tot 3–4px: een 15px-regel tekst in een 3px-hoge, geklipte doos. Zo raakte de
+ * bovenste regel (periode) én de onderste regel (ruimte/reeks/score) tegelijk
+ * halverwege de letterhoogte afgesneden, terwijl de niet-getruncate regels
+ * ("binnen je grens", het bedrag) op volle hoogte bleven staan. Gemeten op
+ * 384px: inhoud 134px in 93px beschikbaar.
+ *
+ * De oude comment ("my-auto zorgt dat te hoge inhoud alleen ONDERAAN wegvalt")
+ * beschreef dus een probleem dat er niet was: `my-auto` viel inderdaad terug op
+ * 0, maar er wás geen overloop — de regels werden verpletterd in plaats van
+ * eruit te lopen.
+ *
+ * WAT DEZE TESTS VASTLEGGEN. jsdom kent geen layout (elke hoogte is 0), dus de
+ * klipping zélf is hier niet te meten. Wat wél te pinnen valt, is precies wat
+ * er is veranderd: (1) geen enkele regel in de compacte stapels mag kunnen
+ * krimpen, en (2) het aantal regels op die takken — het hoogtebudget.
+ */
+describe('SpendLimitWidget — hoogtebudget van de compacte takken (B-033)', () => {
+  /** De stapel binnen de tegel: het `my-auto`-blok met de regels. */
+  function stack(container: HTMLElement): HTMLElement {
+    const el = container.querySelector('.my-auto')
+    expect(el).not.toBeNull()
+    return el as HTMLElement
+  }
+
+  it.each(['quarter', 'half'] as const)(
+    '%s: élke regel draagt shrink-0 — een regel is heel of hij staat er niet',
+    size => {
+      // Dit is de eigenlijke fix. Zonder shrink-0 knijpt flexbox een
+      // `truncate`-regel (overflow:hidden ⇒ automatische minimumhoogte 0)
+      // samen tot een paar pixels en snijdt de tegel door de letters heen.
+      const { container } = render(
+        <SpendLimitWidget size={size} limit={makeLimit({ pace: PACE_MET_BEDRAG })} dailyExp={50} />,
+      )
+      const rows = Array.from(stack(container).children)
+      expect(rows.length).toBeGreaterThan(0)
+      const zonderVangrail = rows.filter(el => !el.classList.contains('shrink-0'))
+      expect(zonderVangrail.map(el => el.className)).toEqual([])
+    },
+  )
+
+  it('half toont vijf regels — het gemeten budget van ~93px op mobiel', () => {
+    // stand+periode · bedrag · balk · ruimte/reeks/score · vrijheidstijd.
+    const { container } = render(
+      <SpendLimitWidget size="half" limit={makeLimit({ pace: PACE_MET_BEDRAG })} dailyExp={50} />,
+    )
+    expect(stack(container).children).toHaveLength(5)
+  })
+
+  it('quarter toont zes regels — het budget van ~113px', () => {
+    // periode · stand · bedrag · balk · reeks · tempo.
+    const { container } = render(
+      <SpendLimitWidget size="quarter" limit={makeLimit({ pace: PACE_MET_BEDRAG })} dailyExp={50} />,
+    )
+    expect(stack(container).children).toHaveLength(6)
+  })
+
+  it.each(['quarter', 'half'] as const)(
+    '%s: de betrouwbaarheidsmelding kost geen extra regel, hij vervangt er één',
+    size => {
+      // Anders groeit de stapel bij een afgekapt aggregaat alsnog buiten de
+      // tegel — precies de situatie waarin de gebruiker het minst aan een
+      // halve letter heeft.
+      const zonder = render(
+        <SpendLimitWidget size={size} limit={makeLimit({ pace: PACE_MET_BEDRAG })} dailyExp={50} />,
+      )
+      const basis = zonder.container.querySelector('.my-auto')!.children.length
+      zonder.unmount()
+
+      const { container } = render(
+        <SpendLimitWidget
+          size={size}
+          limit={makeLimit({ pace: PACE_MET_BEDRAG, aggregateTruncationSuspected: true })}
+          dailyExp={50}
+        />,
+      )
+      expect(stack(container).children).toHaveLength(basis)
+      expect(container.textContent ?? '').toContain('Dit bedrag kan onvolledig zijn.')
+    },
+  )
+
+  it('half: bij een afgekapt aggregaat verdwijnt de vrijheidsregel, niet de melding', () => {
+    // Een vrijheidstijd over een mogelijk onvolledig bedrag geeft een preciezer
+    // antwoord dan de gegevens dragen.
+    const { container } = render(
+      <SpendLimitWidget size="half" limit={makeLimit({ aggregateTruncationSuspected: true })} dailyExp={40} />,
+    )
+    const text = container.textContent ?? ''
+    expect(text).toContain('Dit bedrag kan onvolledig zijn.')
+    expect(text).not.toContain('vrijheid over')
+  })
+
+  it('half verliest de periode en het gepauzeerd-merk niet — die schuiven achter de stand', () => {
+    // De losse metaRow moest weg voor het budget; de informatie erin niet.
+    // "binnen je grens" over een gepauzeerde pot zou misleidend zijn.
+    const { container } = render(
+      <SpendLimitWidget size="half" limit={makeLimit({ isActive: false })} dailyExp={50} />,
+    )
+    const text = container.textContent ?? ''
+    expect(text).toContain('binnen je grens')
+    expect(text).toContain('augustus 2026')
+    expect(text).toContain('gepauzeerd')
+  })
+
   it.each(['quarter', 'half'] as const)('%s centreert via my-auto, niet via justify-center', size => {
+    // Blijft gelden: met vrije ruimte (desktop) centreert `my-auto` de stapel,
+    // en bij precies-passend valt hij terug op 0. `justify-center` zou bij een
+    // onverwachte overloop boven én onder afsnijden.
     const { container } = render(<SpendLimitWidget size={size} limit={makeLimit()} dailyExp={50} />)
-    // De kicker-rail van de shell mag centreren (één kort label); de
-    // content-kolom — herkenbaar aan de euro-bedragen — niet.
     const offenders = Array.from(container.querySelectorAll('.justify-center')).filter(el =>
       (el.textContent ?? '').includes('€'),
     )

@@ -66,3 +66,22 @@ export function budgetLimitStatus(spent: number, limit: number): BudgetLimitStat
   if (spent >= limit - CENT_EPSILON) return 'bereikt'
   return 'onder'
 }
+
+/**
+ * Kortschrift voor de `over`-tak hierboven — GEEN tweede formule, alleen een
+ * naam voor een bestaand oordeel.
+ *
+ * Hij bestaat omdat vijftien weergave-oppervlakken hun eigen variant schreven:
+ * `spent > limit && limit > 0`. Die `&& limit > 0` is dezelfde nul-limiet-blinde
+ * vlek als in de weergave-klemfamilie (bevinding B-032): een budget met een
+ * begroting van nul waar EUR 8.000 op geboekt staat, is overschreden — de balk
+ * liep vol maar het bedrag ernaast bleef neutraal gekleurd, omdat de guard het
+ * oordeel afving vóór het geveld werd.
+ *
+ * De cent-tolerantie van `budgetLimitStatus` komt hier mee, en dat is de winst:
+ * de losse `spent > limit` noemde 1280,0000000000002 tegen 1280 een
+ * overschrijding, terwijl dat float-ruis is en geen euro (bevinding H16).
+ */
+export function isOverBudget(spent: number, limit: number): boolean {
+  return budgetLimitStatus(spent, limit) === 'over'
+}

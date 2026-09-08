@@ -101,27 +101,34 @@ describe('/overzicht/bezittingen — geen vrijheidstijd op een bruto teller (UR3
   })
 })
 
-describe('/overzicht/bezittingen — de deck draagt de runway, niet een deling (UR3-19, optie C)', () => {
-  it('bouwt de zin server-side uit de canonieke motor en formuleert hem niet zelf', () => {
-    expect(pageSource).toContain('computeHorizonRunway(supabase, perspective)')
-    expect(pageSource).toContain('ankerReachFromRunway(runway)')
-    expect(pageSource).toContain('ankerZin(reach, stop)')
-  })
-
-  it('zwijgt bij een onbekende uitkomst in plaats van een terugval te verzinnen', () => {
-    expect(pageSource).toContain("runway.kind === 'unavailable'")
-    expect(pageSource).toContain("reach.kind === 'onbekend'")
-  })
-
-  it('rendert de zin in de deck — nooit als `sub` onder een KPI-bedrag', () => {
-    const deck = code.indexOf('deck={')
-    const strip = code.indexOf('<FiguresStrip')
-    const zin = code.indexOf('{runwayZin && (')
-    expect(zin, 'runwayZin niet gevonden in de client — de deck-zin ontbreekt').toBeGreaterThan(-1)
-    expect(zin).toBeGreaterThan(deck)
+describe('/overzicht/bezittingen — géén totaal-vrijheidstijd, in wélke vorm dan ook', () => {
+  /*
+   * UR3-19 verving de zes handgerolde "bruto totaal ÷ dagtarief"-sommen door
+   * één runway-zin in de deck. Melding B-035 (8 sep 2026) haalde die zin er
+   * weer af: hij staat al op /overzicht in de vrijheid-strip van de hero
+   * (`components/overview/overzicht-hero/vrijheid-strip.tsx`), en twee keer
+   * dezelfde uitspraak op twee schermen is geen extra inzicht.
+   *
+   * Wat NIET meebeweegt is de eigenlijke grendel: de verwijderde deling mag
+   * niet terugkeren — niet als deling, en ook niet als een tweede formulering
+   * van de runway naast `ankerZin`. Die eis staat hieronder, nu zonder eis
+   * over de plaatsing van een zin die er niet meer is.
+   */
+  it('bouwt geen eigen runway-zin meer op deze route — de kernel-run is hier vervallen', () => {
+    // Op de code-regels: de comment in de page legt het besluit juist vást en
+    // noemt beide namen bij naam.
+    const pageCode = codeLines(pageSource)
     expect(
-      zin,
-      'de runway volgt niet uit het bedrag in de strip; onder een KPI gezet suggereert hij het omgekeerde',
-    ).toBeLessThan(strip)
+      pageCode,
+      'de extra kernel-run op deze route is met B-035 vervallen; terugzetten kost een besluit, geen edit',
+    ).not.toContain('computeHorizonRunway')
+    expect(
+      pageCode,
+      'ankerZin heeft één huis; deze route formuleert de zin niet (meer)',
+    ).not.toContain('ankerZin')
+  })
+
+  it('rendert geen totaal-vrijheidstijd in de deck', () => {
+    expect(code).not.toContain('runwayZin')
   })
 })

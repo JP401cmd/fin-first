@@ -230,24 +230,9 @@ type AssetsPageProps = {
    *  `/overzicht/bezittingen` rendert de page-shell zélf de `i` (+ statuspunt
    *  + insight-toggle); dan `false` om een dubbele info-knop te voorkomen. */
   showPageInfo?: boolean
-  /**
-   * De runway-zin voor de deck (UR3-19, optie C) — kant-en-klaar server-side
-   * gebouwd uit `computeHorizonRunway` + `ankerZin` (lib/horizon/anker-copy.ts)
-   * en hier alleen gerenderd. Dit is het ENIGE geldige tijdgetal op deze pagina
-   * dat over het gehéél gaat: een TOTALE grootheid (hoe ver reikt je liquide
-   * vermogen) beantwoord met het totale instrument, in plaats van de verwijderde
-   * "bruto vermogen ÷ dagtarief" die een totale vraag met het marginale
-   * instrument beantwoordde (ADR 0126 D1).
-   *
-   * Bewust een STRING en geen reach/stop-paar: de zin heeft één huis
-   * (`ankerZin`) en deze component mag hem niet opnieuw formuleren. `null` /
-   * weggelaten (legacy `/core/assets`, geen basisrun, geen geboortedatum) ⇒
-   * geen zin — nooit een verzonnen terugval.
-   */
-  runwayZin?: string | null
 }
 
-export default function AssetsPage({ initialAssetId, initialData, toolbarFilter, inspirationCards, assetTypeFilter, showPageInfo = true, runwayZin }: AssetsPageProps = {}) {
+export default function AssetsPage({ initialAssetId, initialData, toolbarFilter, inspirationCards, assetTypeFilter, showPageInfo = true }: AssetsPageProps = {}) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
@@ -981,24 +966,13 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
                 woning op 50% inclusie telde hier gewoon vol mee. Netto vermogen
                 weegt wél (lib/asset-data.ts), vandaar de verwijzing. */}
             {activeAssets.length > 0 && ` ${activeAssets.length} bezitting${activeAssets.length === 1 ? '' : 'en'} bij elkaar, elk voor zijn volle waarde — je netto vermogen weegt ze naar inclusiepercentage en valt daardoor anders uit.`}
-            {/* De vertaling naar tijd op ditzelfde scherm (UR3-19, optie C).
-                Bewust HIER en niet onder een bedrag: de runway volgt niet uit
-                het bruto totaal erboven — hij rekent op je LIQUIDE vermogen,
-                mét rendement, AOW, Box 3 en woonstrategie. Onder een KPI gezet
-                zou hij opnieuw suggereren dat het ene uit het andere volgt. */}
-            {runwayZin && (
-              <>
-                {' '}
-                <span className="text-[var(--ink-2)]">{runwayZin}</span>{' '}
-                <Link
-                  href="/toekomst"
-                  className="underline decoration-dotted underline-offset-4 hover:text-[var(--ink)]"
-                >
-                  Bekijk je toekomst
-                </Link>
-                .
-              </>
-            )}
+            {/* GEEN runway-zin meer in deze deck (melding B-035, 8 sep 2026).
+                UR3-19 zette hem hier neer als vervanging van zes handgerolde
+                "bruto totaal ÷ dagtarief"-sommen; die vervanging blijft — de
+                foute sommen komen niet terug (ADR 0126 D1, bewaakt door
+                assets-client.bruto-vrijheidstijd.test.ts). Alleen de plaatsing
+                vervalt: dezelfde zin staat al op /overzicht in de vrijheid-strip
+                van de hero, en twee keer dezelfde uitspraak is geen inzicht. */}
           </>
         }
       >
@@ -1035,34 +1009,67 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
         figures={figures}
       />
 
-      {/* De wisselkoers naast het eerste tijdgetal van deze pagina (UR3-08).
-          Henk las hier "1j 4m" bij zijn eerste bezitting en begreep pas twee
-          schermen later wat dat betekende: nergens stond dat vrijheidstijd niets
-          meer is dan bedrag ÷ dagtarief.
+      {/* Dubbele grondslag — subtieler subtotaal "excl. eigen woning" onder het
+          bruto totaal. Zelfde typografie-familie (mono/tabular-nums), kern-accent.
+          Alleen bij eigen woning + strategie ≠ include_full
+          (shouldShowDualHousingBasis).
 
-          ÉÉN regel onder de héle strip, niet onder elke cel (eigenaarsbesluit A).
-          Alle vrijheidstijden op deze pagina — de twee strip-cellen, het
-          subtotaal excl. eigen woning hieronder, de taartpunt en elke kaart —
-          delen exact ditzelfde `dailyExpenses`; de koers per plek herhalen zou
-          een rustige pagina in een dozijn voetnoten veranderen.
+          GEEN `trailing` met vrijheidstijd meer (UR3-19, optie A): het huis
+          eruit halen maakt de teller niet netto — de schulden staan er nog
+          steeds vol in — en de grootheid-fout (ADR 0126 D1) blijft sowieso
+          staan. Deze regel toont dus alleen het bedrag.
 
-          Verdwijnt vanzelf in privacymodus, bij een tarief van 0 en bij een
-          onbekende grondslag — dat zit in het component (ADR 0091 / 0131). Voegt
-          zelf nooit een tijdgetal toe (eigenaarsbesluit 2, 12 jul 2026). */}
-      <VrijheidstijdVoetnoot
-        dailyRate={dailyExpenses}
-        source={dailyExpensesSource}
-        className="mt-2"
-      />
+          Staat direct ónder de strip (melding B-036): dit is zélf een cijfer en
+          hoort bij de getallen, niet tussen de voetnoten.
 
-      {/* Rekenmodal-trigger — in BÉIDE weergaven (S11). Hij stond alleen in
+          De `pt-6`-wrapper is nodig, geen sier: `SubtotalLine` draagt een vaste
+          `-mt-3` omdat hij ontworpen is om ónder een blok met eigen
+          ondermarge te hangen. Direct onder de strip gezet plakt hij daarmee
+          tegen de onderste hairline. De wrapper geeft die ruimte terug zonder
+          de gedeelde component (ook in gebruik op /core/debts) te veranderen. */}
+      {showExclHomeSubtotal && (
+        <div className="pt-6">
+          <SubtotalLine label="excl. eigen woning" amount={totalValueExclHome} />
+        </div>
+      )}
+
+      {/* ÉÉN meta-blok onder de cijfers (melding B-036): de koers waar élk
+          tijdgetal op deze pagina op rust, met daaronder de uitleg bij het
+          rendement — gestapeld op één linkerlijn.
+
+          Tot die melding waren dit drie losse stroken (voetnoot over de volle
+          breedte, rechts uitgelijnde knop, subtotaal), aan elkaar geknoopt met
+          twee negatieve marges. Wat het rommelig maakte was niet de hoogte maar
+          de DRIE VERSCHILLENDE UITLIJNINGEN onder elkaar; één linkerlijn ruimt
+          dat op. Bewust géén `flex-row`: de voetnoot beslaat op 384px twee
+          regels, dus een echte één-regel-rij bestaat daar niet — naast elkaar
+          zetten zou de knop alsnog laten omvallen, met een ongelijke basislijn
+          erbij.
+
+          DE WISSELKOERS ZELF (UR3-08). Henk las op deze pagina "1j 4m" bij zijn
+          eerste bezitting en begreep pas twee schermen later wat dat betekende:
+          nergens stond dat vrijheidstijd niets meer is dan bedrag ÷ dagtarief.
+          ÉÉN regel onder de héle strip, niet onder elke cel (eigenaarsbesluit
+          A): alle vrijheidstijden op deze pagina — de strip-cellen, de taartpunt
+          en elke kaart — delen exact ditzelfde `dailyExpenses`; de koers per
+          plek herhalen zou een rustige pagina in een dozijn voetnoten
+          veranderen. Het subtotaal excl. eigen woning hierbóven draagt sinds
+          UR3-19 géén tijd meer en valt dus buiten die opsomming. De voetnoot
+          verdwijnt vanzelf in privacymodus, bij een tarief van 0 en bij een
+          onbekende grondslag — dat zit in het component (ADR 0091 / 0131) — en
+          voegt zelf nooit een tijdgetal toe (eigenaarsbesluit 2, 12 jul 2026).
+          Valt hij weg, dan blijft de knop staan waar hij stond; dat is precies
+          waarom dit blok links uitlijnt en niet uitvult.
+
+          Rekenmodal-trigger in BÉIDE weergaven (S11). Hij stond alleen in
           "Volledig" omdat de rendement-cel in Eenvoudig wegviel: een uitleg
           zonder onderwerp. Nu die cel blijft staan, vervalt die reden — en juist
           de beginner heeft de uitleg nódig, want het rendement mengt twee
           grondslagen. Bewust een aparte knop en geen klikbare figures-cel —
           `FigureProps` kent alleen `href` (een `<a>`), en een overlay openen via
           een nep-link breekt toetsenbord- en screenreader-gedrag. */}
-      <div className="-mt-2 mb-5 flex justify-end">
+      <div className="mb-5 mt-3 flex flex-col items-start">
+        <VrijheidstijdVoetnoot dailyRate={dailyExpenses} source={dailyExpensesSource} />
         <button
           type="button"
           onClick={() => setReturnModalOpen(true)}
@@ -1080,19 +1087,6 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
         breakdown={returnBreakdown}
         dailyExpenses={dailyExpenses}
       />
-
-      {/* Dubbele grondslag — subtieler subtotaal "excl. eigen woning" onder het
-          bruto totaal. Zelfde typografie-familie (mono/tabular-nums), kern-accent.
-          Alleen bij eigen woning + strategie ≠ include_full
-          (shouldShowDualHousingBasis).
-
-          GEEN `trailing` met vrijheidstijd meer (UR3-19, optie A): het huis
-          eruit halen maakt de teller niet netto — de schulden staan er nog
-          steeds vol in — en de grootheid-fout (ADR 0126 D1) blijft sowieso
-          staan. Deze regel toont dus alleen het bedrag. */}
-      {showExclHomeSubtotal && (
-        <SubtotalLine label="excl. eigen woning" amount={totalValueExclHome} />
-      )}
 
       {/* Toolbar — filter links (indien meegegeven), Herwaarderen + primaire
           CTA rechts. flex-wrap zorgt dat op smalle schermen de filter onder

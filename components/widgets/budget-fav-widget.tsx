@@ -5,6 +5,7 @@ import { WidgetShell } from './widget-shell'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { isOverPositive, computeBarSegments, type BudgetType } from '@/components/app/budget-shared'
 import { budgetFillRatio } from '@/lib/budget-spending'
+import { isOverBudget } from '@/lib/budget-alerts'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import type { WidgetSize } from '@/lib/widget-catalog'
@@ -43,7 +44,7 @@ export const BudgetFavWidget = memo(function BudgetFavWidget({
   // negatief zijn (netto geld binnen) — ongeklemd werd de ring-offset ongeldig
   // en het label "-410%".
   const pct = budgetFillRatio(budget.spent, budget.limit)
-  const isOver = budget.spent > budget.limit && budget.limit > 0
+  const isOver = isOverBudget(budget.spent, budget.limit)
   const typeOverPositive = isOverPositive(budget.budgetType as BudgetType)
   const overPositive = isOver && typeOverPositive
   const cssType = budget.budgetType === 'archive' ? 'other' : budget.budgetType

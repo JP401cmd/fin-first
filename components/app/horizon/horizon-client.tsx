@@ -880,6 +880,15 @@ export default function HorizonPage({
   // ── Inline what-if sliders state (feature #795) ──────────────
   const [whatIfInlineOpen, setWhatIfInlineOpen] = useState(false)
 
+  // Heeft de gebruiker deze sessie zijn doel losgelaten? (melding B-031)
+  // In Eenvoudig hangt KATERN II aan `doelActief`; loslaten zet dat op false en
+  // nam daarmee óók de enige weg terug ("Maak dit mijn doel") uit beeld — de
+  // toast beloofde "je verkent weer vrij" terwijl de sectie zojuist was
+  // verdwenen. Deze vlag houdt de sectie open zolang de gebruiker op de pagina
+  // blijft; legt hij opnieuw vast, dan hangt de zichtbaarheid weer aan het doel
+  // zelf en gaat de vlag uit.
+  const [doelLosgelatenDezeSessie, setDoelLosgelatenDezeSessie] = useState(false)
+
   // ── Wat-als-scenariolaag (2e projectielijn, plan §B — stap 4) ─────────────
   // Slider-events leven hier GESCHEIDEN van de DB-events (`events`, :257) zodat de
   // hoofdlijn ongemoeid blijft; ze voeden uitsluitend de scenario-run. Hydratie uit
@@ -3045,6 +3054,23 @@ export default function HorizonPage({
   // Huishouden-view: de gecombineerde lijn is de hoofdlijn (matcht de hero-FIRE).
   const useHouseholdMainLine = isHouseholdView && householdMainLine !== null
 
+  // Rendert KATERN II ("Verken je aannames" / "Jouw doelsituatie")?
+  //
+  // ÉÉN afleiding, twee lezers: de sectie zelf en de meeklap-toets van KATERN III
+  // ("doel dicht = alles dicht"). Die stonden tot melding B-031 als twee
+  // handgetypte kopieën in het bestand — precies de constructie die stil uiteen
+  // loopt zodra er een tak bijkomt.
+  //
+  // Perspectief-gate: alleen solo (géén partner/huishouden), spiegelt de
+  // chart-overlay. Daarbinnen: in Volledig altijd; in Eenvoudig alleen wanneer
+  // er iets is om naar te kíjken — een vastgelegd doel (kernfunctionaliteit
+  // waar de Doelen-tab naartoe deep-linkt), een expliciete deeplink naar het
+  // wat-als-lab, of een doel dat de gebruiker zojuist heeft losgelaten en dus
+  // opnieuw moet kunnen vastleggen.
+  const verkenSectieZichtbaar =
+    !(usePartnerMainLine || useHouseholdMainLine) &&
+    (displayMode === 'full' || doelActief || whatIfInlineOpen || doelLosgelatenDezeSessie)
+
   // ── Welke grondslagen tekent de grafiek? (ADR 0114 D1/D6) ───────────────
   //
   // `chartPrimaryBasis` (bovenaan, uit server-props) zegt wat de woonstrategie
@@ -3715,6 +3741,9 @@ export default function HorizonPage({
           ...(json.goalIds ? { goalIds: json.goalIds } : {}),
         })
         setShowScenarioLine(true)
+        // Er is weer een doel — de zichtbaarheid hangt vanaf nu weer aan
+        // `doelActief` en niet meer aan de losgelaten-vlag (B-031).
+        setDoelLosgelatenDezeSessie(false)
         setDoelSheetOpen(false)
         addToast({
           type: 'success',
@@ -3748,6 +3777,10 @@ export default function HorizonPage({
         return
       }
       setDoelBlok(null)
+      // Houd de doelsectie deze sessie in beeld (B-031). In Eenvoudig hangt hij
+      // aan `doelActief`; zonder deze vlag verdwijnt de sectie op hetzelfde
+      // moment als het doel, en daarmee de knop om er weer één vast te leggen.
+      setDoelLosgelatenDezeSessie(true)
       setDoelLoslatenOpen(false)
       addToast({ type: 'success', title: 'Doel losgelaten', message: 'Je verkent weer vrij.' })
     } catch {
@@ -6709,8 +6742,7 @@ export default function HorizonPage({
           `whatIfInlineOpen` kan alleen wáár worden via die deeplink of via een
           control binnen deze sectie zelf, dus de gate blijft dicht zolang er
           niemand hierheen verwezen heeft. */}
-      {!(usePartnerMainLine || useHouseholdMainLine) &&
-        (displayMode === 'full' || doelActief || whatIfInlineOpen) && (
+      {verkenSectieZichtbaar && (
       <>
         <section
           id={VERKEN_SECTION_ID}
@@ -6759,7 +6791,13 @@ export default function HorizonPage({
                 </>
               ) : (
                 <>
-                  {hasScenario && (
+                  {/* Zelfde "er is iets vast te leggen"-oordeel als de
+                      ScenarioChip verderop: sliders ÓF een kale stopkeuze. Met
+                      alleen `hasScenario` bleef een doel dat puur een
+                      stopmoment was na loslaten onherstelbaar — de
+                      doelvastleg-sheet kent die vorm wél (de fire-preview hangt
+                      aan `stand.stopAge`/`stopKoppel`). Melding B-031. */}
+                  {(hasScenario || hasStopKeuze) && (
                     <button
                       type="button"
                       onClick={() => setDoelSheetOpen(true)}
@@ -7054,10 +7092,7 @@ export default function HorizonPage({
         // zichtbaar maar dichtgeklapt, dan blijft ook "Wat het betekent"
         // verborgen — doel dicht = alles dicht. In partner-/huishouden-view
         // bestaat KATERN II niet; dan blijft de duiding gewoon staan.
-        const katernIIZichtbaar =
-          !(usePartnerMainLine || useHouseholdMainLine) &&
-          (displayMode === 'full' || doelActief || whatIfInlineOpen)
-        if (katernIIZichtbaar && !verkenOpen) return null
+        if (verkenSectieZichtbaar && !verkenOpen) return null
         return (
           <>
             <HideInSimple>

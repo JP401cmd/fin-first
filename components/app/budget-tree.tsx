@@ -4,6 +4,7 @@ import { useState, memo } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { BudgetIcon, getTypeColors, isOverPositive, computeBarSegments, anyChildOverBudget, BudgetOverWarningIcon, type BudgetType } from '@/components/app/budget-shared'
 import { budgetSpentPct } from '@/lib/budget-spending'
+import { isOverBudget } from '@/lib/budget-alerts'
 import type { Budget, BudgetWithChildren } from '@/lib/budget-data'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { useFlashChange } from '@/lib/hooks/use-flash-change'
@@ -37,7 +38,7 @@ function ChildBar({
   rowIndex: number
 }) {
   const limit = beschikbaar !== undefined ? beschikbaar + spent : Number(child.default_limit)
-  const overBudget = spent > limit && limit > 0
+  const overBudget = isOverBudget(spent, limit)
   const alertThreshold = child.alert_threshold ?? 80
   const isHard = child.limit_type === 'hard'
   const colors = getTypeColors(budgetType)
@@ -181,7 +182,7 @@ function TreeGroup({
         : Number(parent.default_limit))
 
   const pct = budgetSpentPct(totalSpent, totalLimit)
-  const overBudget = totalSpent > totalLimit && totalLimit > 0
+  const overBudget = isOverBudget(totalSpent, totalLimit)
   // Waarschuwing voor een (mogelijk ingeklapte) parent waarvan een deelbudget
   // over budget is, terwijl het totaal zelf nog binnen budget kan vallen.
   const childOverBudget = anyChildOverBudget(parent.children, spending, beschikbaarMap, budgetType)

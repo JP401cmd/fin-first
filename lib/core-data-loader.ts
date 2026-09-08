@@ -34,6 +34,7 @@ import {
 import { computeHorizonFireSim, computeHorizonFireTarget, EMPTY_HORIZON_FIRE_TARGETS } from '@/lib/fire-target-shared'
 import { eindMaandVan } from '@/lib/horizon-kernel/gap'
 import { buildBudgetSpendingMap } from '@/lib/budget-spending'
+import { isOverBudget } from '@/lib/budget-alerts'
 import { BUDGET_SPENDING_TX_COLUMNS, fetchSpendingSplits } from '@/lib/budget-spending-fetch'
 import { buildBudgetTypeMap, computeYearlyMustExpenses, computeRetirementExpenses } from '@/lib/budget-utils'
 import { resolveFireParams } from '@/lib/fire-params'
@@ -1140,7 +1141,9 @@ export const loadCoreData = cache(async function loadCoreData(
       const limit = children.length > 0
         ? children.reduce((sum, c) => sum + Number(c.default_limit), 0)
         : Number(b.default_limit)
-      if (limit > 0 && spent > limit) overCount++
+      // Canoniek oordeel (B-032): een begroting van NUL waar wel op geboekt is,
+      // is overschreden. De eerdere `limit > 0`-guard telde die niet mee.
+      if (isOverBudget(spent, limit)) overCount++
     }
     overBudgetCount = overCount
 
