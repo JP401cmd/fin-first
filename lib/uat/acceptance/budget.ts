@@ -100,7 +100,7 @@ const criteria: AcceptanceCriterion[] = [
     persona: 'lisa',
     given: 'Persona Lisa geladen (Inkomen €5.200; Vaste lasten €1.455, Dagelijkse uitgaven €900, Vervoer €265, Leuke dingen €300, Sparen&schulden €600, Schulden&aflossingen €50 — statische hoofdbudget-limieten). WEERGAVEMODUS (BUD-3): de dekkingsgraad/alerts hieronder zijn de VOLLEDIGE hub-inhoud, ongewijzigd achter de disclosure-klik in beide modi. Alleen de INGEKLAPTE preview-regel bovenaan verschilt: in **Volledig** toont die tot 3 fragmenten (bv. "1 overschreden — 1 bijna vol — € 2.540 te verdelen"), in **Eenvoudig** wordt dat teruggeknepen tot 2 fragmenten (`HUB_PREVIEW_MAX_SIMPLE`) op één niet-afbrekende regel. Geen cijfermatig verschil, puur hoeveel van dezelfde snippets zichtbaar zijn vóór het uitklappen.',
     when: 'De gebruiker opent de analyse-hub en leest de dekkingsgraad en de alert-badges (80%/100%-drempels).',
-    then: 'Dekkingsgraad = toegewezen/inkomen×100 = (1.455+900+265+300+600+50)/5.200×100 = 3.570/5.200×100 = 68,65%. Alert-drempels: expense-budget op 85% van limiet met drempel 80% → alert; op 75% → geen alert. Savings-budget op 50% van doel met drempel 100% → alert (te weinig gespaard); op 150% → geen alert.',
+    then: 'Dekkingsgraad = toegewezen/inkomen×100 = (1.455+900+265+300+600+50)/5.200×100 = 3.570/5.200×100 = 68,65%. Alert-drempels: expense-budget op 85% van limiet met drempel 80% → alert; op 75% → geen alert. Savings-budget op 50% van doel met drempel 100% → alert (te weinig gespaard); op 150% → geen alert. ONGEWIJZIGD BIJ EEN BEGROTING VAN NUL (melding B-032, 08-09-2026): `shouldAlert` blijft een INGESTELDE limiet eisen en zwijgt dus bij `limit <= 0`, óók nu de weergave-klemfamilie zo\'n budget wél als vol toont. Dat is de grens weergave ≠ melding; hij wordt volledig getoetst in WF-BUDGET-28.',
     assertion: {
       kind: 'exact',
       expected: 'dekkingPct=68.65; alertExpenseOver=true; alertExpenseUnder=false; alertSavingsUnder=true; alertSavingsOver=false',
@@ -431,6 +431,26 @@ const criteria: AcceptanceCriterion[] = [
       kind: 'ui-only',
       source:
         'components/app/budgets-client.tsx (hasGoodBudgetData-ref, refreshError-state, blockingError/degradedError op de render-grens, loadBudgets-catch-tak) — resilience-gedrag, geen cijfermatige uitkomst',
+    },
+  },
+  {
+    workflow: 'WF-BUDGET-28',
+    scenarioId: 'UAT-BUDGET-28',
+    titel: 'Begroting van nul waar wél op geboekt is: de weergave loopt vol, de melding blijft uit (nul-limiet-tak, melding B-032)',
+    kriticiteit: 'BELANGRIJK',
+    persona: 'lisa',
+    given:
+      'Een budget met een begroting van NUL (`default_limit = 0`, of een effectieve limiet die op 0 uitkomt) waarop wél geboekt is — gemeld op /overzicht/budget, sectie INKOMEN. VOORHEEN gaf de weergave-klemfamilie (`budgetFillRatio`/`budgetSpentPct`/`budgetBarPct`, lib/budget-spending.ts) bij `limit <= 0` altijd 0, dus de balk stond LEEG naast een bedrag dat er wél stond — dat leest als "er is nog niets gebeurd", precies het tegenovergestelde. Daarnaast schreven ~15 oppervlakken hun eigen `spent > limit && limit > 0`-oordeel; die guard ving de overschrijding af vóór ze geveld werd.',
+    when:
+      'De gebruiker bekijkt zo\'n budget op de weergave-oppervlakken (boom, ring, heatmap, pillen, detailpaneel, de budget-widgets op /overzicht en de historische momentopname in de check-in), en kijkt daarna of hij er ook ongevraagd op aangesproken wordt (bel-melding, actiekaart "Budgetten bijsturen", check-in-oordeel).',
+    then:
+      'DRIE TAKKEN IN DE WEERGAVE. (a) limiet > 0: ongewijzigd. (b) limiet ≤ 0 MÉT besteding/ontvangst: VOL — `budgetFillRatio` = 1, `budgetSpentPct` = 100 en `budgetBarPct` = `BUDGET_ZERO_LIMIT_BAR_PCT` (200, de eindige verzadigingswaarde; 100 zou in deze familie "precies op de grens" betekenen en de overschrijding juist wegpoetsen). (c) limiet ≤ 0 ZONDER besteding: LEEG (0) — de correcte "€ 0 / € 0"-staat. `budgetBeschikbaar` verandert niet: die stond al goed (0 − 8.000 = −8.000). Het gedeelde oordeel is `isOverBudget(spent, limit)` (lib/budget-alerts.ts), dat delegeert aan `budgetLimitStatus` en dáármee de cent-tolerantie erft — 1280,0000000000002 tegen 1280 is float-ruis, geen overschrijding (bevinding H16). GEEN richting-parameter: "de balk is vol" geldt even hard voor een inkomsten- als voor een uitgaven-budget; óf dat goed of slecht nieuws is blijft een KLEUR-vraag (`isOverPositive`, `getHeatmapColor`). DE GRENS WEERGAVE ≠ MELDING (dit is de eigenlijke eis van dit criterium): tónen volgt de nul-limiet-tak, ongevraagd ALARMEREN niet. Bewust op "vereist een ingestelde limiet" gebleven: `shouldAlert` en `pushBudgetNotification` (lib/budget-alerts.ts / app/api/notifications/route.ts), de AI-contextbouwers, de twee alert-lussen in lib/dashboard-data-loader.ts, de teller `budgetsOverLimit` (die voedt `computeNextSteps` → een ONGEVRAAGDE actiekaart "N budgetten over de limiet") en de twee check-in-oordelen — die stap is een editor waarvan de opslaanknop `limit <= 0` overslaat, dus een nul-limiet-rij zou een niet-wegschrijfbaar invoerveld tonen. Ziet de tester een bel-melding of een actiekaart over een nooit begrote categorie, dan is dát de regressie. In het budgetrapport draagt `percentUsed` wél de verzadigingswaarde (zodat de over-classificatie en de kleur kloppen), maar de TABEL toont bij limiet 0 een streepje — "200 %" van nul uitschrijven maakt er een meting van die niemand gedaan heeft.',
+    assertion: {
+      kind: 'exact',
+      expected:
+        'volRatio=1; volPct=100; volBar=200; leegRatio=0; leegPct=0; leegBar=0; beschikbaarVol=-8000; beschikbaarLeeg=0; overVol=true; overLeeg=false; normaalRatio=0.5; normaalBar=50; centRuisOver=false',
+      source:
+        'lib/budget-spending.ts#budgetFillRatio/#budgetSpentPct/#budgetBarPct/#budgetBeschikbaar + lib/budget-alerts.ts#isOverBudget (delegeert aan #budgetLimitStatus, cent-tolerantie) + lib/constants.ts#BUDGET_ZERO_LIMIT_BAR_PCT — échte productiefuncties/constante, geen mirror; zie budget-checks.ts',
     },
   },
 ]

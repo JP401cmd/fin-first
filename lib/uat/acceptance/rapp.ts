@@ -134,11 +134,11 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'KERN',
     given: 'Persona Lisa, 100% deterministische `default_limit`-waarden (geen jitter): Vaste lasten €1.555, Dagelijks €925, Vervoer €265, Leuke dingen €300, Sparen €600, Schulden €50; Inkomen €5.200.',
     when: 'Begroot (totaal), Te verdelen en dekkingsgraad worden berekend.',
-    then: 'Totaal Uitgaven-begroot = 1.555+925+265+300 = €3.045; Begroot (totaal, incl. sparen/schulden) = 3.045+600+50 = €3.695; Te verdelen = 5.200−3.695 = €1.505; dekkingsgraad = 3.695/5.200×100 ≈ 71,1%; Essentieel-begroot (Vaste lasten+Dagelijks+Vervoer) = €2.745, Discretionair-begroot (Leuke dingen) = €300. Besteed/Verschil zelf leunen op gejitterde transacties (kruisverwijs 1-op-1 met /overzicht/budget/transacties — elk verschil is een bug).',
+    then: 'Totaal Uitgaven-begroot = 1.555+925+265+300 = €3.045; Begroot (totaal, incl. sparen/schulden) = 3.045+600+50 = €3.695; Te verdelen = 5.200−3.695 = €1.505; dekkingsgraad = 3.695/5.200×100 ≈ 71,1%; Essentieel-begroot (Vaste lasten+Dagelijks+Vervoer) = €2.745, Discretionair-begroot (Leuke dingen) = €300. Besteed/Verschil zelf leunen op gejitterde transacties (kruisverwijs 1-op-1 met /overzicht/budget/transacties — elk verschil is een bug). BEGROTING VAN NUL (melding B-032, 08-09-2026): de over-budget-lijst van dit rapport gebruikt niet langer een eigen `spent > limit && limit > 0`, maar het gedeelde `isOverBudget` (lib/budget-alerts.ts) — een categorie zonder ingestelde begroting waar wél op geboekt is telt daardoor mee als overschrijding, mét cent-tolerantie. `percentUsed` draagt bij limiet 0 de verzadigingswaarde uit `budgetBarPct` (BUDGET_ZERO_LIMIT_BAR_PCT = 200), zodat de over-classificatie en de rode kleur kloppen — maar de TABEL schrijft dat getal niet uit: bij `limit <= 0` toont zowel de hoofd- als de deelbudgetrij een streepje ("—") in plaats van "200 %". "200 % van nul" zou een meting suggereren die niemand gedaan heeft; de rij zegt het al met € 0 · besteed · verschil, en de kleur draagt de overschrijding. De cijfers hieronder zijn ONGEWIJZIGD — dit raakt de nul-limiet-randgevallen, niet de Begroot-som.',
     assertion: {
       kind: 'exact',
       expected: 'begroot=3695; teVerdelen=1505; dekkingsgraad=71.06; essentieelBegroot=2745; discretionairBegroot=300',
-      source: 'app/api/report/budget/route.ts (Begroot-som, 100% deterministisch op persona-budgetlimieten, gemirrord) — zie rapp-checks.ts',
+      source: 'app/api/report/budget/route.ts (Begroot-som, 100% deterministisch op persona-budgetlimieten, gemirrord) + de lezende route app/(app)/rapportages/budget/page.tsx (tabelweergave, incl. de streepje-tak bij een begroting van nul) — zie rapp-checks.ts',
     },
   },
   {

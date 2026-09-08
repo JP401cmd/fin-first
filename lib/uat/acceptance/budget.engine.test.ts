@@ -31,7 +31,7 @@ function criterion(workflow: string): AcceptanceCriterion {
 }
 
 describe('UAT Budget — acceptatiecriteria dekking', () => {
-  it('heeft precies één criterium per catalogus-BUDGET-scenario (01..27, geen gaten)', () => {
+  it('heeft precies één criterium per catalogus-BUDGET-scenario (01..28, geen gaten)', () => {
     const workflows = BUDGET_ACCEPTANCE.criteria.map((c) => c.workflow).sort()
     expect(workflows).toEqual(catalogBudgetWorkflows)
     expect(new Set(workflows).size).toBe(catalogBudgetWorkflows.length)
@@ -39,7 +39,9 @@ describe('UAT Budget — acceptatiecriteria dekking', () => {
     // meetellen, de expense-only-invariant en realisatie vóór plan; 'exact').
     // 26 → 27: WF-BUDGET-27 (degraded rendering bij een mislukte her-fetch,
     // bevinding C7, 26-08-2026; 'ui-only').
-    expect(workflows.length).toBe(27)
+    // 27 → 28: WF-BUDGET-28 (de nul-limiet-tak van de weergave-klemfamilie en
+    // de grens weergave ≠ melding, melding B-032, 08-09-2026; 'exact').
+    expect(workflows.length).toBe(28)
   })
 
   it('elk criterium heeft een geldige assertion.kind', () => {
@@ -66,7 +68,8 @@ describe('UAT Budget — acceptatiecriteria dekking', () => {
     const checkWorkflows = BUDGET_ENGINE_CHECKS.map((c) => c.workflow).sort()
     expect(checkWorkflows).toEqual(exactWorkflows)
     // 13 → 14: WF-BUDGET-26 is 'exact' en krijgt een BUDGET_ENGINE_CHECKS-rij.
-    expect(exactWorkflows.length).toBe(14)
+    // 14 → 15: WF-BUDGET-28 (nul-limiet-tak, B-032) idem.
+    expect(exactWorkflows.length).toBe(15)
   })
 
   it('markeert de niet-narekenbare/niet-exacte scenario\'s met de juiste kind', () => {

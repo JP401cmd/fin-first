@@ -91,6 +91,10 @@ export const BUDGET_FLOW: UatFlow = {
     { id: 'x-cash', label: 'Transacties & categorisatie (Cash-import)', kind: 'cross', stage: 4, lane: 'doorwerking', crossZone: 'CASH' },
     { id: 'rapport', scenarioId: 'UAT-BUDGET-24', label: 'WF-BUDGET-24 · Maandelijks budgetrapport openen', kind: 'screen', stage: 4, lane: 'doorwerking' },
     { id: 'grondslag', scenarioId: 'UAT-BUDGET-26', label: 'WF-BUDGET-26 · Doorwerking: budgetten als grondslag voor inkomen/uitgaven (ADR 0103)', kind: 'action', stage: 4, lane: 'doorwerking' },
+    // De nul-limiet-tak leeft in de doorwerking, niet in het beheren: hij
+    // bepaalt wat élk weergave-oppervlak toont én waar het ongevraagd
+    // aanspreken juist ophoudt (melding B-032).
+    { id: 'nullimiet', scenarioId: 'UAT-BUDGET-28', label: 'WF-BUDGET-28 · Begroting van nul: weergave loopt vol, melding blijft uit', kind: 'screen', stage: 4, lane: 'doorwerking' },
 
     // ── 5 · uitkomst ──────────────────────────────────────────────────────
     { id: 'uitkomst', label: 'Budget-dekking, resterend & vrijheidstijd bijgewerkt', kind: 'outcome', stage: 5 },
@@ -153,6 +157,8 @@ export const BUDGET_FLOW: UatFlow = {
     { from: 'hub', to: 'grondslag' },
     { from: 'grondslag', to: 'x-cash', kind: 'cross', label: 'grondslagkeuze op /overzicht/budget/transacties' },
     { from: 'grondslag', to: 'uitkomst' },
+    { from: 'hub', to: 'nullimiet' },
+    { from: 'nullimiet', to: 'uitkomst' },
 
     // samenvloeien → uitkomst
     { from: 'nieuw', to: 'uitkomst' },

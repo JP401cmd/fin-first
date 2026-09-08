@@ -649,6 +649,24 @@ const criteria: AcceptanceCriterion[] = [
         'components/future/gebeurtenissen-view.tsx (`LEVENSSTRATEGIEEN` wordt in beide modi volledig gerenderd; `simpleMode` stuurt alleen raster-, padding- en typografieklassen) — weergavemodus-gedrag zonder cijfermatige uitkomst. Bewaakt in `components/future/gebeurtenissen-view.test.tsx`.',
     },
   },
+  {
+    workflow: 'WF-TOEK-43',
+    scenarioId: 'UAT-TOEK-43',
+    titel: 'Doel loslaten houdt de weg terug open: de doelsectie blijft staan en "Maak dit mijn doel" keert terug (melding B-031)',
+    kriticiteit: 'BELANGRIJK',
+    persona: 'willem',
+    given:
+      'Persona Willem op /toekomst in **Eenvoudige weergave**, met een vastgelegd doel. KATERN II ("Verken je aannames" / "Jouw doelsituatie") hangt in Eenvoudig aan `doelActief`. VOORHEEN zette "Doel loslaten" onder de grafiek `doelBlok` op `null`, waarmee de héle sectie op datzelfde moment verdween — inclusief de enige knop om opnieuw een doel vast te leggen. De toast beloofde "Je verkent weer vrij" terwijl er niets meer te verkennen viel; de gebruiker kwam er binnen de sessie niet meer uit. Tweede tak: een doel dat alléén een stopkeuze was (geen sliders) — daar hing de knop aan `hasScenario`, dus die was ook ná de fix nog onherstelbaar.',
+    when:
+      'De gebruiker klikt "Doel loslaten" en bevestigt; hij blijft op de pagina, bekijkt de doelsectie, en legt daarna opnieuw een doel vast (a) vanuit sliders en (b) vanuit een kale stopkeuze zónder sliders.',
+    then:
+      'De doelsectie BLIJFT deze sessie zichtbaar na het loslaten — `doelLosgelatenDezeSessie` houdt hem open, naast de bestaande takken (Volledig altijd, of `doelActief`, of de wat-als-deeplink). De knop "Maak dit mijn doel" verschijnt óók wanneer er alleen een stopkeuze is (`hasScenario || hasStopKeuze`), niet meer uitsluitend bij sliders — de doelvastleg-sheet kent die vorm wél (de fire-preview hangt aan `stand.stopAge`/`stopKoppel`). Legt de gebruiker opnieuw vast, dan gaat de vlag uit en hangt de zichtbaarheid weer aan het doel zelf. De perspectief-gate blijft ongewijzigd: in partner-/huishoudweergave bestaat KATERN II niet. ÉÉN AFLEIDING, TWEE LEZERS: de sectie zelf en de meeklap-toets van KATERN III ("doel dicht = alles dicht") lezen nu allebei `verkenSectieZichtbaar`; dat stonden twee handgetypte kopieën, precies de constructie die uiteenloopt zodra er een tak bijkomt. Verdwijnt de sectie na loslaten alsnog, of blijft "Maak dit mijn doel" weg bij een kale stopkeuze, dan is dat een regressie.',
+    assertion: {
+      kind: 'ui-only',
+      source:
+        'components/app/horizon/horizon-client.tsx (`doelLosgelatenDezeSessie`-state, de gedeelde afleiding `verkenSectieZichtbaar`, en de `hasScenario || hasStopKeuze`-gate op "Maak dit mijn doel") — sessiegebonden zichtbaarheidsgedrag zonder cijfermatige uitkomst; bewaakt in `components/app/horizon/horizon-client.doel-loslaten-terugweg.test.ts`.',
+    },
+  },
 ]
 
 export const TOEK_ACCEPTANCE: AcceptanceSet = {
@@ -663,5 +681,5 @@ export const TOEK_ACCEPTANCE: AcceptanceSet = {
  */
 export const TOEK_EXPECTED_WORKFLOW_NUMBERS: number[] = [
   ...Array.from({ length: 26 }, (_, i) => i + 1), // 1..26
-  28, 29, 30, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42,
+  28, 29, 30, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43,
 ]

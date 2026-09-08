@@ -96,6 +96,9 @@ export const TOEK_FLOW: UatFlow = {
 
     { id: 'pillenrij', scenarioId: 'UAT-TOEK-41', label: 'WF-TOEK-41 · Pillenrij-invariant (label + badge samen) & het md-breekpunt van de cijferstrip', kind: 'screen', stage: 2, lane: 'aflezen', subOf: 'grafiek' },
     { id: 'strategiekaarten', scenarioId: 'UAT-TOEK-42', label: 'WF-TOEK-42 · Vier levensstrategieën in beide weergavemodi', kind: 'screen', stage: 4, lane: 'strategie', subOf: 'strategiebeslis' },
+    // Loslaten is een doel-actie, niet een aparte pagina: hij hangt onder de
+    // doelen-rail en moet terugleiden naar het opnieuw vastleggen (B-031).
+    { id: 'doelloslaten', scenarioId: 'UAT-TOEK-43', label: 'WF-TOEK-43 · Doel loslaten met een weg terug (doelsectie blijft, "Maak dit mijn doel" keert terug)', kind: 'action', stage: 4, lane: 'doelen', subOf: 'doelen' },
 
     // ── 5 · uitkomst ──────────────────────────────────────────────────────
     { id: 'fire', label: 'Toekomstbeeld bijgewerkt · vrijheidsleeftijd, FIRE-datum & doelen', kind: 'outcome', stage: 5 },
@@ -169,6 +172,7 @@ export const TOEK_FLOW: UatFlow = {
     { from: 'doelen', to: 'doelpace' },
     { from: 'doelen', to: 'doelkoppelen' },
     { from: 'doelen', to: 'doelbasis' },
+    { from: 'doelen', to: 'doelloslaten' },
 
     // samenvloeien → uitkomst
     { from: 'sliders', to: 'fire' },
@@ -187,6 +191,7 @@ export const TOEK_FLOW: UatFlow = {
     { from: 'doelpace', to: 'fire' },
     { from: 'doelkoppelen', to: 'fire' },
     { from: 'doelbasis', to: 'fire' },
+    { from: 'doelloslaten', to: 'fire' },
     { from: 'grafiek', to: 'pillenrij' },
     { from: 'strategiebeslis', to: 'strategiekaarten' },
     { from: 'pillenrij', to: 'fire' },

@@ -44,13 +44,17 @@ import {
   type BudgetAmountLite,
 } from '@/lib/budget-plan-diff'
 import { computeBudgetPeriod } from '@/lib/budget-period'
-import { shouldAlert } from '@/lib/budget-alerts'
+import { shouldAlert, isOverBudget } from '@/lib/budget-alerts'
+import { BUDGET_ZERO_LIMIT_BAR_PCT } from '@/lib/constants'
 import { computeRollover, getEffectiveLimit, getPreviousPeriod, type BudgetRollover } from '@/lib/budget-rollover'
 import { computeBudgetForecast } from '@/lib/budget-forecast'
 import { buildSpendingSums, combineSpending, shareFractionFor } from '@/lib/budget-perspective'
 import {
   buildBudgetSpendingMap,
+  budgetFillRatio,
   budgetSpentPct,
+  budgetBarPct,
+  budgetBeschikbaar,
   showsFreedomTime,
 } from '@/lib/budget-spending'
 import { buildTemplateSeed } from '@/lib/budget-templates/onboarding-presets'
@@ -534,6 +538,48 @@ export const BUDGET_ENGINE_CHECKS: BudgetEngineCheck[] = [
           'postenExpense=3; jaartotaalPlan=18000; maandtotaalPlan=1500; jaartotaalNaUitsluiting=16800; postenBlijvenZichtbaar=3; jaartotaalIncome=36000; oudBudgetRealisatie=2400/realized; jongBudgetGeextrapoleerd=1200/realized; zonderBoekingenPlan=12000/planned',
         actual:
           `postenExpense=${plan.entries.length}; jaartotaalPlan=${plan.annualTotal}; maandtotaalPlan=${plan.monthlyTotal}; jaartotaalNaUitsluiting=${naUitsluiting.annualTotal}; postenBlijvenZichtbaar=${naUitsluiting.entries.length}; jaartotaalIncome=${income.annualTotal}; oudBudgetRealisatie=${oud?.annualAmount}/${oud?.source}; jongBudgetGeextrapoleerd=${jong?.annualAmount}/${jong?.source}; zonderBoekingenPlan=${zonderBoekingen?.annualAmount}/${zonderBoekingen?.source}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-BUDGET-28',
+    scenarioId: 'UAT-BUDGET-28',
+    label:
+      'Nul-limiet-tak van de weergave-klemfamilie (B-032): begroting 0 mét besteding loopt VOL (ratio 1 / 100% / bar 200), zonder besteding LEEG, en isOverBudget erft de cent-tolerantie',
+    run: () => {
+      criterion('WF-BUDGET-28')
+      // De gemelde situatie: een inkomstenpost met een begroting van nul
+      // waarop wel geboekt was. Bedrag hieronder is illustratief.
+      const volRatio = budgetFillRatio(8000, 0)
+      const volPct = budgetSpentPct(8000, 0)
+      const volBar = budgetBarPct(8000, 0)
+      // De correcte "EUR 0 / EUR 0"-staat: begroot nul, niets gebeurd.
+      const leegRatio = budgetFillRatio(0, 0)
+      const leegPct = budgetSpentPct(0, 0)
+      const leegBar = budgetBarPct(0, 0)
+      // Derde lid van de familie — ongewijzigd door B-032, hier meegetoetst
+      // zodat een latere "fix" op deze functie zichtbaar wordt.
+      // Signatuur is (effectieveLimiet, besteed).
+      const beschikbaarVol = budgetBeschikbaar(0, 8000)
+      const beschikbaarLeeg = budgetBeschikbaar(0, 0)
+      // Het gedeelde oordeel dat de ~15 handgeschreven varianten vervangt.
+      const overVol = isOverBudget(8000, 0)
+      const overLeeg = isOverBudget(0, 0)
+      // Tak (a) — een gewone limiet blijft ongemoeid.
+      const normaalRatio = budgetFillRatio(500, 1000)
+      const normaalBar = budgetBarPct(500, 1000)
+      // Cent-tolerantie via budgetLimitStatus (bevinding H16): float-ruis is
+      // geen overschrijding.
+      const centRuisOver = isOverBudget(1280.0000000000002, 1280)
+      return {
+        expected:
+          `volRatio=1; volPct=100; volBar=${BUDGET_ZERO_LIMIT_BAR_PCT}; leegRatio=0; leegPct=0; leegBar=0;` +
+          ' beschikbaarVol=-8000; beschikbaarLeeg=0; overVol=true; overLeeg=false;' +
+          ' normaalRatio=0.5; normaalBar=50; centRuisOver=false',
+        actual:
+          `volRatio=${volRatio}; volPct=${volPct}; volBar=${volBar}; leegRatio=${leegRatio}; leegPct=${leegPct}; leegBar=${leegBar};` +
+          ` beschikbaarVol=${beschikbaarVol}; beschikbaarLeeg=${beschikbaarLeeg}; overVol=${overVol}; overLeeg=${overLeeg};` +
+          ` normaalRatio=${normaalRatio}; normaalBar=${normaalBar}; centRuisOver=${centRuisOver}`,
       }
     },
   },
