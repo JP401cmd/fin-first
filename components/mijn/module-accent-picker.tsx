@@ -23,53 +23,62 @@ import { DEFAULT_MODULE_COLORS, type ModuleColorConfig } from '@/lib/color-palet
  *  - horizon -> Budget      (kleurt ook /toekomst en Fins onderste stip)
  *  - fin     -> Fin         (bubbel, chat-header, verzendknop, /berichten, /nieuws)
  *
- * Geen enkele voorkeuze kan op de verzadigde stoplicht-status landen. Let op
- * de precieze formulering: dat is NIET "alle presets onder ACCENT_CHROMA_MAX"
- * (zo stond het tot 8 sep), want die toets weegt hue én chroma. Een tint ver
- * van elke statushue mag ruim boven de band uitkomen en blijft 'ok'. De regel
- * die telt — en die de test pint — is dus: `accentClashesWithStatus` geeft
- * 'ok' voor élke preset. Een eigen kleur via de color-input mag wél warnen —
- * daar waarschuwt de kaart voor (statusHint), zonder te blokkeren. Geborgd in
- * module-accent-picker.test.tsx en lib/color-palette.accent-status.test.ts.
+ * **De stoplicht-waarschuwing is hier bewust weg** (8 sep 2026, eigenaars-
+ * besluit). Tot dan hield deze kaart elke voorkeuze buiten de verzadigde
+ * stoplichtband en waarschuwde `statusHint` bij een eigen kleur die er wél in
+ * viel. Beide zijn losgelaten: de ring mag nu tot de gamutgrens gaan en een
+ * eigen kleur krijgt geen status-waarschuwing meer. `contrastHint` blijft wél —
+ * leesbaarheid is een andere afweging en die is niet losgelaten.
+ *
+ * `accentClashesWithStatus` bestaat nog en bewaakt onverkort de budget- en
+ * fasekleuren; die zijn hier niet bij betrokken.
  */
 
 type ModuleKey = keyof ModuleColorConfig
 
 /**
- * Gedeelde ring van alternatieven. Tot 8 sep stonden ze allemaal op C ~ 0,065;
- * dat las als één gedempte familie. Nu verzadigd tot waar de kleur het
- * toelaat — lightness ongewijzigd (lichter maken kostte contrast met papier) —
- * met één harde regel: **elke preset moet 'ok' geven op
- * `accentClashesWithStatus`** (gepind in module-accent-picker.test.tsx).
+ * Gedeelde ring van achttien alternatieven: een raster van 20° over de hele
+ * kleurencirkel, elk op zijn **sRGB-gamutgrens** bij L ~ 0,52 — de fysieke
+ * bovengrens, niet een gekozen getal.
  *
- * Die toets kijkt naar hue ÉN chroma, en dat maakt de ring bewust ongelijk.
- * Elke tint staat nu op zijn eigen plafond — welk plafond dat is verschilt:
- *  - **Gamut.** Olijf (0,106), Mos (0,141) en Petrol (0,088) zitten op de
- *    sRGB-grens voor hun kleurtoon bij L ≈ 0,52. Petrol oogt daardoor rustiger
- *    dan de rest; dat is natuurkunde, geen keuze, en niet "vergeten mee te
- *    verzadigen".
- *  - **Vangrail.** Bordeaux (4,5° van rood-status) en Oker (9,7° van amber)
- *    liggen bínnen het hue-venster en worden op ~0,094 gehouden. Bordeaux zou
- *    anders naar 0,212 lopen — vrijwel gelijk aan rood-status (0,208). Diezelfde
- *    grens optrekken is op 8 sep geprobeerd en teruggedraaid; zie de toelichting
- *    bij ACCENT_CHROMA_MAX.
- *  - **Doel.** Indigo en Oud-roze (110° resp. 45° van elke statushue) hebben
- *    ruimte zat en staan op 0,165; verder is puur smaak, niet nodig.
- *  - Olijf stond ooit op exact 90,1°, precies 20,0° van amber en daarmee net
- *    wél in het venster. 6° opgeschoven (95,6°) valt hij erbuiten.
+ * Het raster begint bewust op 17° en niet op 0°. Dat is de offset die de
+ * grootste afstand houdt tot de vier standaarden (kern 165,6° · wil 49,9° ·
+ * horizon 244,2° · fin 308,2°): minimaal 7,1°, tegen 4,1° bij zestien tinten en
+ * 3,2° bij twintig. Zonder die offset zou op elke kaart een ring-tint vrijwel
+ * samenvallen met de standaard erboven.
  *
- * Verzadig nooit een tint verder zonder die toets opnieuw te draaien: een
- * accent dat in de stoplichtband landt maakt "op koers / aandacht / actie"
- * onleesbaar, en dát is precies wat UR3-32 kwam repareren.
+ * Sinds 8 sep 2026 geldt hier GEEN chroma-plafond meer: de koppeling met de
+ * stoplicht-semantiek is voor accenten losgelaten (eigenaarsbesluit, zie
+ * DEFAULT_MODULE_COLORS in lib/color-palette.ts). Scharlaken en Karmijn liggen
+ * daardoor bewust naast "actie"-rood, Oker naast "aandacht"-amber en Smaragd
+ * naast "op koers"-groen. Dat is geen ongeluk en geen drift.
+ *
+ * Waarom ze niet allemaal even fel ogen: bij deze lichtheid laat sRGB in het
+ * groen/teal maar C ~ 0,09-0,12 toe, tegen ~0,28 in het blauw/paars. Jade en
+ * Petrol staan al op hun maximum — dat is de gamut, geen terughoudendheid.
+ *
+ * Alle achttien halen minimaal 4,94:1 tegen papier (WCAG AA voor tekst = 4,5),
+ * gepind in module-accent-picker.test.tsx.
  */
 const ACCENT_RING: ColorPreset[] = [
-  { name: 'Bordeaux', hex: '#985252' },
-  { name: 'Oker', hex: '#905b2b' },
-  { name: 'Olijf', hex: '#7b6700' },
-  { name: 'Mos', hex: '#4c7800' },
-  { name: 'Petrol', hex: '#00777d' },
-  { name: 'Indigo', hex: '#515bc6' },
-  { name: 'Oud-roze', hex: '#a33986' },
+  { name: 'Scharlaken', hex: '#c4003b' },
+  { name: 'Roest', hex: '#b73500' },
+  { name: 'Karamel', hex: '#9d5200' },
+  { name: 'Oker', hex: '#8c5f00' },
+  { name: 'Olijf', hex: '#7b6800' },
+  { name: 'Mos', hex: '#657100' },
+  { name: 'Gras', hex: '#367c00' },
+  { name: 'Smaragd', hex: '#007d4b' },
+  { name: 'Jade', hex: '#007b68' },
+  { name: 'Petrol', hex: '#00787a' },
+  { name: 'Staal', hex: '#00758c' },
+  { name: 'Kobalt', hex: '#0071a2' },
+  { name: 'Ultramarijn', hex: '#0064d0' },
+  { name: 'Indigo', hex: '#5238ff' },
+  { name: 'Violet', hex: '#8200f2' },
+  { name: 'Orchidee', hex: '#9f00c5' },
+  { name: 'Magenta', hex: '#b20097' },
+  { name: 'Karmijn', hex: '#bd006b' },
 ]
 
 const MODULE_SWATCHES: Record<
@@ -128,7 +137,6 @@ export function ModuleAccentPicker() {
             presets={presets}
             onChange={(hex) => handlePick(module, hex)}
             contrastHint
-            statusHint
           />
         )
       })}

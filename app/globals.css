@@ -54,13 +54,13 @@
   --s2: 0 4px 24px rgba(26,25,22,.09), 0 1px 4px rgba(26,25,22,.05);
 
   /* Legacy module colors (kept for backward compat) */
-  --color-kern: #247a5c;
+  --color-kern: #007c5a;
   --color-kern-light: #e6e9e7;
-  --color-wil: #945835;
+  --color-wil: #a54c00;
   --color-wil-light: #eae7e6;
   --color-horizon: #006ead;
   --color-horizon-light: #e6e8ea;
-  --color-fin: #4e0575;
+  --color-fin: #4f0077;
   --color-fin-light: #d6d5d7;
 
   /* ── Accent-paletten (overridden by user preferences) ──
@@ -86,31 +86,31 @@
      elkaar het dichtst naderen. Deze waarden zijn GEGENEREERD met
      generatePalette() uit lib/color-palette.ts — nooit met de hand bijstellen;
      regenereer ze als DEFAULT_MODULE_COLORS wijzigt. */
-  /* Kern = Bezittingen: groen #247a5c (emerald-familie) */
-  --color-kern-50: oklch(0.931 0.0058 165.6);
-  --color-kern-100: oklch(0.891 0.0141 165.6);
-  --color-kern-200: oklch(0.821 0.0283 165.6);
-  --color-kern-300: oklch(0.731 0.0503 165.6);
-  --color-kern-400: oklch(0.618 0.0754 165.6);
-  --color-kern-500: oklch(0.52 0.0943 165.6);
-  --color-kern-600: oklch(0.466 0.0972 165.6);
-  --color-kern-700: oklch(0.41 0.0855 165.6);
-  --color-kern-800: oklch(0.365 0.0762 165.6);
-  --color-kern-900: oklch(0.337 0.0618 165.6);
-  --color-kern-950: oklch(0.231 0.0419 165.6);
+  /* Kern = Bezittingen: groen #007c5a (emerald-familie) */
+  --color-kern-50: oklch(0.93 0.0066 165.8);
+  --color-kern-100: oklch(0.89 0.0162 165.8);
+  --color-kern-200: oklch(0.82 0.0325 165.8);
+  --color-kern-300: oklch(0.73 0.0577 165.8);
+  --color-kern-400: oklch(0.617 0.0865 165.8);
+  --color-kern-500: oklch(0.52 0.1082 165.8);
+  --color-kern-600: oklch(0.465 0.0969 165.8);
+  --color-kern-700: oklch(0.409 0.0853 165.8);
+  --color-kern-800: oklch(0.364 0.076 165.8);
+  --color-kern-900: oklch(0.336 0.0702 165.8);
+  --color-kern-950: oklch(0.23 0.0481 165.8);
 
-  /* Wil = Schulden: terracotta #945835 (amber-familie) */
-  --color-wil-50: oklch(0.931 0.0057 49.9);
-  --color-wil-100: oklch(0.891 0.014 49.9);
-  --color-wil-200: oklch(0.821 0.028 49.9);
-  --color-wil-300: oklch(0.731 0.0498 49.9);
-  --color-wil-400: oklch(0.618 0.0748 49.9);
-  --color-wil-500: oklch(0.521 0.0935 49.9);
-  --color-wil-600: oklch(0.466 0.1038 49.9);
-  --color-wil-700: oklch(0.41 0.0914 49.9);
-  --color-wil-800: oklch(0.365 0.0758 49.9);
-  --color-wil-900: oklch(0.337 0.0613 49.9);
-  --color-wil-950: oklch(0.231 0.0415 49.9);
+  /* Wil = Schulden: terracotta #a54c00 (amber-familie) */
+  --color-wil-50: oklch(0.931 0.0084 50.3);
+  --color-wil-100: oklch(0.891 0.0206 50.3);
+  --color-wil-200: oklch(0.821 0.0412 50.3);
+  --color-wil-300: oklch(0.731 0.0732 50.3);
+  --color-wil-400: oklch(0.618 0.1098 50.3);
+  --color-wil-500: oklch(0.521 0.1373 50.3);
+  --color-wil-600: oklch(0.466 0.123 50.3);
+  --color-wil-700: oklch(0.41 0.1082 50.3);
+  --color-wil-800: oklch(0.365 0.0964 50.3);
+  --color-wil-900: oklch(0.337 0.0891 50.3);
+  --color-wil-950: oklch(0.231 0.061 50.3);
 
   /* Horizon = Budget: staalsblauw #006ead (sky-familie) */
   --color-horizon-50: oklch(0.93 0.0079 244.4);
@@ -125,20 +125,20 @@
   --color-horizon-900: oklch(0.336 0.0839 244.4);
   --color-horizon-950: oklch(0.23 0.0574 244.4);
 
-  /* Fin: plum #4e0575 — Fins eigen accent (bubbel, chat-header, verzendknop,
+  /* Fin: plum #4f0077 — Fins eigen accent (bubbel, chat-header, verzendknop,
      /berichten en /nieuws). Fins avatar blijft driekleurig: linkeroog kern
      (Bezittingen), rechteroog wil (Schulden), onderste stip horizon (Budget). */
-  --color-fin-50: oklch(0.875 0.0101 308.1);
-  --color-fin-100: oklch(0.82 0.0248 308.1);
-  --color-fin-200: oklch(0.721 0.0495 308.1);
-  --color-fin-300: oklch(0.602 0.0881 308.1);
-  --color-fin-400: oklch(0.46 0.1321 308.1);
-  --color-fin-500: oklch(0.334 0.1651 308.1);
-  --color-fin-600: oklch(0.308 0.1576 308.1);
-  --color-fin-700: oklch(0.281 0.1439 308.1);
-  --color-fin-800: oklch(0.265 0.1339 308.1);
-  --color-fin-900: oklch(0.266 0.1082 308.1);
-  --color-fin-950: oklch(0.175 0.0734 308.1);
+  --color-fin-50: oklch(0.875 0.0104 308.2);
+  --color-fin-100: oklch(0.82 0.0256 308.2);
+  --color-fin-200: oklch(0.721 0.0511 308.2);
+  --color-fin-300: oklch(0.602 0.0909 308.2);
+  --color-fin-400: oklch(0.46 0.1364 308.2);
+  --color-fin-500: oklch(0.334 0.1705 308.2);
+  --color-fin-600: oklch(0.308 0.1576 308.2);
+  --color-fin-700: oklch(0.281 0.144 308.2);
+  --color-fin-800: oklch(0.265 0.1359 308.2);
+  --color-fin-900: oklch(0.266 0.1118 308.2);
+  --color-fin-950: oklch(0.175 0.0758 308.2);
 
   /* ── Legacy module-alias-tokens ──
      Historische shorthands die in ~25 componenten/charts worden gebruikt maar

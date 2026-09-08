@@ -34,42 +34,40 @@ export type ModuleColorConfig = {
  * werkelijke onderscheid tussen identiteit en status zit in chroma, niet in
  * hue — zie `accentClashesWithStatus` hieronder.
  *
- * UR3-32 zette ze daarom op C ≈ 0,065. Dat bleek in gebruik té gedempt; op
- * verzoek van de eigenaar (8 sep) opgetrokken tot elk accent zijn plafond
- * raakt: **kern 0,094 · wil 0,093 · horizon 0,129 · fin 0,165**. Hue én
- * lightness zijn per accent ONGEWIJZIGD — alleen verzadiging omhoog.
+ * UR3-32 zette ze daarom op C ≈ 0,065. Dat bleek in gebruik té gedempt.
  *
- * Waarom die vier zo ver uiteenlopen — drie verschillende plafonds:
+ * **EIGENAARSBESLUIT 8 sep 2026: voor de ACCENTEN is de koppeling met de
+ * stoplicht-semantiek losgelaten.** Elk accent staat nu op zijn sRGB-gamutgrens
+ * voor zijn eigen hue en lightness: kern 0,108 · wil 0,137 · horizon 0,129 ·
+ * fin 0,170. Er is geen chroma-plafond meer op de accenten.
  *
- * 1. **Horizon en fin liggen ver van elke statushue** (81,7° resp. 77,1°) en
- *    staan op hun sRGB-gamutgrens. Verder kan simpelweg niet.
+ * Wat dat opgeeft, expliciet: acceptatiecriterium 2 van UR3-32 luidde "welke
+ * accentkeuze dan ook — een statuskleur blijft te onderscheiden van de
+ * identiteitskleur". Dat geldt niet meer. Een accent mag er nu uitzien als
+ * "op koers", "aandacht" of "actie". De eigenaar heeft die afweging twee keer
+ * expliciet gemaakt, mét de meting erbij; dit is geen drift.
  *
- * 2. **Kern ligt 3,1° van "op koers"-groen** en wordt door `ACCENT_CHROMA_MAX`
- *    op 0,094 gehouden; z'n gamut zou 0,110 toelaten. Die 0,016 ophalen door de
- *    grens te verhogen is geprobeerd en verworpen — zie de toelichting daar.
+ * Wat NIET is losgelaten: `accentClashesWithStatus` bestaat gewoon nog en
+ * bewaakt onverkort de **budget- en fasekleuren** (zie de tests onderaan
+ * `color-palette.accent-status.test.ts`). Alleen de accenten zijn eruit
+ * gehaald. Verwar die twee niet — de vorige poging om dit via
+ * `ACCENT_CHROMA_MAX` te regelen ontwapende juist die andere groepen.
  *
- * 3. **Wil zit klem tussen twee statushues.** Tussen rood (25,3°) en amber
- *    (70,1°) ligt maar een corridor van 4,8° waar een accent buiten beide
- *    vensters valt, en terracotta staat er middenin (49,9°). Een poging hem vol
- *    te verzadigen leverde `#a54c00` op — waarvan de hue door 8-bit-afronding
- *    op 50,25° landt, 19,85° van amber, dus nét binnen het venster: 'warn'. De
- *    marge is kleiner dan de precisie van een hexcode. Terracotta hoort dus in
- *    de band, en dat is geen instelling maar een eigenschap van die kleurhoek.
- *
- * **Lightness is bewust niet verhoogd.** De eerste poging tilde L van 0,52 naar
- * 0,56 ("lichter leest als kleur"); dat kostte contrast met papier — kern zakte
- * van 5,06 naar 4,20, onder de 4,5 die WCAG AA voor normale tekst vraagt.
+ * **Lightness is bewust niet verhoogd.** Een eerdere poging tilde L van 0,52
+ * naar 0,56 ("lichter leest als kleur"); dat kostte contrast met papier — kern
+ * zakte van 5,06 naar 4,20, onder de 4,5 die WCAG AA voor normale tekst vraagt.
  * Verzadiging levert de felheid, lichtheid leverde alleen contrastverlies.
- * Huidige waarden: 4,97 / 5,38 / 5,20 / 12,45 — alle boven AA.
+ * Huidige waarden: 4,95 / 5,49 / 5,20 / 12,48 — alle boven AA.
  *
- * Let bij het beoordelen op de bell-curve: shade 600 piekt ~11% boven de 500,
- * dus dáár naderen identiteit en status elkaar het dichtst.
+ * Groen en teal blijven visueel rustiger dan paars of magenta. Bij L ≈ 0,52
+ * laat sRGB daar maar C ≈ 0,09–0,13 toe, tegen ~0,27 in het blauw/paars. Dat is
+ * de gamut, geen keuze — en de reden dat Bezittingen nooit zo fel wordt als Fin.
  */
 export const DEFAULT_MODULE_COLORS: ModuleColorConfig = {
-  kern: '#247a5c',
-  wil: '#945835',
+  kern: '#007c5a',
+  wil: '#a54c00',
   horizon: '#006ead',
-  fin: '#4e0575',
+  fin: '#4f0077',
 }
 
 export const SHADES = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950] as const
@@ -225,21 +223,23 @@ export const STATUS_HUES = {
  * (`#047857`, C = 0,1049, 3,1° van "op koers"-groen) — precies de botsing die
  * deze toets moet vangen.
  *
- * **Op 8 sep geprobeerd te verhogen naar 0,13 en teruggedraaid.** Aanleiding
- * was een terechte wens: kern en Oker liggen dicht bij een statushue en worden
- * door deze grens onder hun sRGB-maximum gehouden. Wat de proef liet zien is
- * dat de grens breder werkt dan de accenten:
- *   - `DEFAULT_BUDGET_COLORS.debt` (bewust bordeauxrood) stopte met waarschuwen;
- *   - `phase_recovery` (bewust in de rode band) idem;
- *   - `#047857` werd weer 'ok' — de kleur waarvoor UR3-32 bestaat.
- * Vier tests vingen dat. Voor 0,016 extra chroma op één accent is dat een
- * slechte ruil.
+ * **LET OP — waar deze toets sinds 8 sep 2026 nog wél voor geldt.** De
+ * accent-presets zijn er bewust uit gehaald (eigenaarsbesluit; zie
+ * `DEFAULT_MODULE_COLORS` hierboven). Wat overblijft is:
+ *   - de **budget-typekleuren** en de **fasekleuren** — die worden hier nog
+ *     onverkort op getoetst, en die tests staan onderaan
+ *     `color-palette.accent-status.test.ts`;
+ *   - elke toekomstige kleurgroep die de scheiding identiteit/status wél wil.
  *
- * Wil je hier ooit tóch ruimte: de toets weegt hue en chroma, maar NIET
- * lightness — en juist daar zit veel van het feitelijke onderscheid (accenten
- * L ≈ 0,52, stoplicht L ≈ 0,63–0,70). Een lightness-bewuste toets geeft die
- * ruimte zonder de budget- en fasekleuren te ontwapenen. Dat is een
- * ontwerpwijziging, geen constante die je even ophoogt.
+ * Verhoog deze constante dus NIET om een accent ruimte te geven — accenten
+ * kennen geen plafond meer, dus die reden bestaat niet. Op 8 sep is dat één
+ * keer geprobeerd (0,10 → 0,13) en het effect was uitsluitend collateraal:
+ * `DEFAULT_BUDGET_COLORS.debt` en `phase_recovery` stopten met waarschuwen en
+ * `#047857` werd weer 'ok'. Vier tests vingen het.
+ *
+ * De toets weegt hue en chroma, maar NIET lightness — terwijl daar veel van het
+ * feitelijke onderscheid zit (budget/fase L ≈ 0,4–0,55, stoplicht L ≈ 0,63–0,70).
+ * Wie hem ooit verfijnt, begint daar.
  */
 export const ACCENT_CHROMA_MAX = 0.10
 

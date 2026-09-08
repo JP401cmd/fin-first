@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import {
   accentClashesWithStatus,
+  contrastRatio,
   hexToOklch,
   ACCENT_CHROMA_MAX,
   STATUS_HUES,
-  STATUS_HUE_WINDOW,
   DEFAULT_MODULE_COLORS,
   DEFAULT_PHASE_COLORS,
   DEFAULT_BUDGET_COLORS,
@@ -48,71 +48,51 @@ describe('accentClashesWithStatus — het stoplicht', () => {
   })
 })
 
-describe('accentClashesWithStatus — de accent-defaults', () => {
-  it('alle vier de accent-defaults zijn ok', () => {
-    for (const [key, hex] of Object.entries(DEFAULT_MODULE_COLORS)) {
-      expect(accentClashesWithStatus(hex), `${key} (${hex})`).toBe('ok')
-    }
-  })
-
+describe('accentClashesWithStatus — de accent-defaults zijn hier bewust UIT', () => {
   /**
-   * Was tot 8 sep "alle vier onder ACCENT_CHROMA_MAX". Dat klopt niet meer en
-   * was ook nooit de eigenlijke regel: de band geldt alléén voor een accent
-   * dat bínnen `STATUS_HUE_WINDOW` van een statushue ligt. Wil (20,2° van
-   * amber), horizon (81,7°) en fin (77,1°) liggen erbuiten en mogen daarom vol
-   * verzadigen; kern (3,1° van "op koers") niet.
+   * EIGENAARSBESLUIT 8 sep 2026: de koppeling tussen de accenten en de
+   * stoplicht-semantiek is losgelaten. Acceptatiecriterium 2 van UR3-32 ("welke
+   * accentkeuze dan ook — een statuskleur blijft te onderscheiden van de
+   * identiteitskleur") geldt niet meer voor accenten.
+   *
+   * Deze test asserteert dus GEEN 'ok' meer. Hij legt vast dat de accenten op
+   * hun gamutgrens staan en dat het toegestaan is dat sommige daarvan 'warn'
+   * geven — zodat een latere lezer ziet dat dit een besluit is en geen
+   * regressie. Wat de toets nog wél bewaakt staat in het laatste describe-blok.
    */
-  it('elk accent-default respecteert de band die vóór hém geldt', () => {
+  it('accenten mogen op hun gamutgrens staan, ook als de toets waarschuwt', () => {
     for (const [key, hex] of Object.entries(DEFAULT_MODULE_COLORS)) {
-      const { C, h } = hexToOklch(hex)
+      const { C } = hexToOklch(hex)
       expect(C, `${key} (${hex}) is geen grijstint`).toBeGreaterThan(0.02)
-      const dichtbijStatus = Object.values(STATUS_HUES).some(
-        (statusHue) => Math.min(
-          Math.abs(((h - statusHue) % 360 + 360) % 360),
-          360 - Math.abs(((h - statusHue) % 360 + 360) % 360),
-        ) <= STATUS_HUE_WINDOW,
-      )
-      if (dichtbijStatus) {
-        expect(C, `${key} (${hex}) ligt bij een statushue en moet in de band`)
-          .toBeLessThan(ACCENT_CHROMA_MAX)
-      }
-      expect(accentClashesWithStatus(hex), `${key} (${hex})`).toBe('ok')
+      // Geen 'ok'-eis meer. Wél: de uitkomst moet een van beide zijn, zodat
+      // een gewijzigde signatuur van de toets hier alsnog opvalt.
+      expect(['ok', 'warn']).toContain(accentClashesWithStatus(hex))
     }
   })
 
   /**
-   * Terracotta zit klem tussen twee statushues: tussen rood (25,3°) en amber
-   * (70,1°) is de corridor waar een accent buiten béíde vensters valt maar
-   * 4,8° breed, en wil staat er middenin.
-   *
-   * Op 8 sep is geprobeerd hem vol te verzadigen op zijn eigen hue (49,9° —
-   * op papier 20,2° van amber, dus net vrij). De gegenereerde `#a54c00` bleek
-   * door 8-bit-afronding op hue 50,25° te landen: 19,85° van amber, binnen het
-   * venster, dus 'warn'. De marge was kleiner dan de precisie van een hexcode.
-   *
-   * Deze test pint waaróm wil in de band blijft, zodat een volgende poging niet
-   * opnieuw op dezelfde afrondingsval loopt.
+   * De prijs van dat besluit, expliciet vastgelegd: kern is nu verzadigder dan
+   * `#047857` — de emerald die UR3-32 juist verbood omdat hij op 3,1° van "op
+   * koers"-groen zat. Wie deze test rood ziet worden omdat kern weer ONDER die
+   * waarde zakt, is het besluit aan het terugdraaien; dat mag, maar dan bewust.
    */
-  it('wil blijft in de band: zijn hue-marge tot amber is kleiner dan hex-precisie', () => {
-    const { C, h } = hexToOklch(DEFAULT_MODULE_COLORS.wil)
-    expect(C, 'wil hoort onder de band').toBeLessThan(ACCENT_CHROMA_MAX)
-    const marge = Math.abs(h - STATUS_HUES.aandacht) - STATUS_HUE_WINDOW
-    expect(marge, 'de marge tot het amber-venster is < 1° — te dun om op te bouwen')
-      .toBeLessThan(1)
+  it('kern staat bewust boven de oude verboden emerald', () => {
+    const kern = hexToOklch(DEFAULT_MODULE_COLORS.kern)
+    const verbodenEmerald = hexToOklch('#047857')
+    expect(Math.abs(kern.h - verbodenEmerald.h), 'zelfde groene familie').toBeLessThan(5)
+    expect(kern.C, 'en nu verzadigder dan de kleur die UR3-32 afkeurde')
+      .toBeGreaterThan(verbodenEmerald.C)
   })
 
   /**
-   * De kern van de UR3-32-oplossing: Bezittingen HOUDT de groene familie van
-   * de oude hefboomtint (hue blijft dicht bij emerald), maar is ontzadigd tot
-   * in de accent-band. Herkenbaarheid behouden, botsing opgeheven.
+   * Wat NIET is losgelaten: leesbaarheid. Elke accent-default moet tegen papier
+   * minstens WCAG AA voor normale tekst halen (4,5:1). Dat is de vangrail die
+   * de plek van de status-toets inneemt.
    */
-  it('Bezittingen houdt de groene familie maar is ontzadigd', () => {
-    const nieuw = hexToOklch(DEFAULT_MODULE_COLORS.kern)
-    const oudeHefboomTint = hexToOklch('#047857') // emerald-700, de oude tint
-    expect(Math.abs(nieuw.h - oudeHefboomTint.h)).toBeLessThan(5)
-    expect(nieuw.C).toBeLessThan(oudeHefboomTint.C)
-    expect(accentClashesWithStatus(DEFAULT_MODULE_COLORS.kern)).toBe('ok')
-    expect(accentClashesWithStatus('#047857')).toBe('warn')
+  it('elke accent-default haalt WCAG AA tegen papier', () => {
+    for (const [key, hex] of Object.entries(DEFAULT_MODULE_COLORS)) {
+      expect(contrastRatio(hex, '#faf9f6'), `${key} (${hex})`).toBeGreaterThanOrEqual(4.5)
+    }
   })
 
   it('een gedempte kleur naast een statushue blijft ok (chroma, niet hue, beslist)', () => {

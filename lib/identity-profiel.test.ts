@@ -256,10 +256,10 @@ describe('Profiel — Color preferences (module, budget, phase)', () => {
   // kern, Schulden = wil, Budget = horizon) plus Fins eigen accent.
   // 8 sep: opgetrokken van C ~ 0,065 naar C ~ 0,094 — feller, hue ongewijzigd.
   it('DEFAULT_MODULE_COLORS has kern, wil, horizon, fin', () => {
-    expect(DEFAULT_MODULE_COLORS.kern).toBe('#247a5c')
-    expect(DEFAULT_MODULE_COLORS.wil).toBe('#945835')
+    expect(DEFAULT_MODULE_COLORS.kern).toBe('#007c5a')
+    expect(DEFAULT_MODULE_COLORS.wil).toBe('#a54c00')
     expect(DEFAULT_MODULE_COLORS.horizon).toBe('#006ead')
-    expect(DEFAULT_MODULE_COLORS.fin).toBe('#4e0575')
+    expect(DEFAULT_MODULE_COLORS.fin).toBe('#4f0077')
   })
 
   it('DEFAULT_BUDGET_COLORS has 5 budget types', () => {
