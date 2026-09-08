@@ -220,8 +220,16 @@ is dat de storing zich verstopt.
 > **Lees `/beheer/jobs` daarom zo: "geen regel" betekent níét "nog niet aan de beurt".** Op zes
 > van de zeven crons zit die weigering vóór `recordJobRun()`, dus zonder secret ontstaat er
 > helemaal geen regel — precies hetzelfde beeld als een taak die nooit is ingepland. Alleen
-> `news-ingest` logt de weigering wél. Zo bleef het uitvallen van alle zeven crons van 29 juli
-> t/m 11 augustus 2026 onopgemerkt, op één dagelijkse `news-ingest`-error na.
+> `news-ingest` logt de weigering wél, en dat ene spoor is dus de enige zichtbare thermometer
+> van de hele laag.
+>
+> **Stand: de uitval loopt sinds 29 juli 2026 en is niet bevestigd hersteld.** Eerdere versies
+> van dit runbook noemden hier een gesloten venster ("29 juli t/m 11 augustus"). Dat klopt niet:
+> `job_runs` toont op 7 september 2026 nog steeds een dagelijkse `news-ingest`-rij met
+> `"CRON_SECRET ontbreekt in productie — cron geweigerd"`, ononderbroken sinds 29 juli. Laatste
+> geslaagde `holdings-prices`/`integraties-health`: 3 juli; laatste geslaagde `snapshots`-cron:
+> 31 juli; `briefing-email` en `alerts-sweep` hebben nog nóóit een rij gehad. Behandel de
+> storing dus als **open** tot `/beheer/jobs` het tegendeel laat zien — niet als geschiedenis.
 
 Controleren en herstellen:
 1. `npx vercel env ls production` — `CRON_SECRET` hoort in de lijst te staan.
@@ -259,7 +267,7 @@ hieronder: de route is idempotent en getthrottled, dus elk kwartier aanroepen is
 Vercel-cronplanner uit, dan draait ook de sweep niet. Daarom hoort er een **externe** pinger
 omheen (healthchecks.io of cron-job.org, gratis) die elk kwartier dezelfde URL aanroept **en
 zelf alarm slaat als die aanroep uitblijft of faalt**. Zonder dat onderdeel is de hele opzet
-schijnzekerheid — precies het scenario van 29 juli t/m 11 augustus 2026.
+schijnzekerheid — precies het scenario dat sinds 29 juli 2026 loopt.
 
 > **Sinds de dagelijkse cron is die pinger niet alleen de wachter, maar ook de motor.** Zonder
 > hem is de detectietijd van een nieuwe soort fout tot 24 uur in plaats van een kwartier — en er
