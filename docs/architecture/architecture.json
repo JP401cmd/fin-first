@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-09-07T21:37:26.517Z",
-  "generatedDate": "2026-09-07",
+  "generatedAt": "2026-09-08T09:48:34.506Z",
+  "generatedDate": "2026-09-08",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -193,7 +193,7 @@
     "tables": 94,
     "migrations": 231,
     "integrations": 25,
-    "components": 1073,
+    "components": 1074,
     "providers": 17,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -8718,11 +8718,11 @@
     }
   ],
   "components": {
-    "total": 1073,
+    "total": 1074,
     "groups": [
       {
         "group": "app",
-        "count": 420,
+        "count": 421,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -8791,6 +8791,7 @@
           "budget-shared",
           "budget-sparkline",
           "budget-tree",
+          "budget-zero-limit.test",
           "budgets-client",
           "budgets-client-degraded.test",
           "budgets-client-empty-state.test",
@@ -17317,17 +17318,17 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 10217,
+        "loc": 10252,
         "commits": 83
       },
       {
         "file": "components/app/budgets-client.tsx",
-        "loc": 5630,
+        "loc": 5635,
         "commits": 35
       },
       {
         "file": "components/core/assets-client.tsx",
-        "loc": 5013,
+        "loc": 5007,
         "commits": 38
       },
       {
@@ -17337,7 +17338,7 @@
       },
       {
         "file": "lib/dashboard-data-loader.ts",
-        "loc": 3093,
+        "loc": 3116,
         "commits": 63
       },
       {
@@ -17352,7 +17353,7 @@
       },
       {
         "file": "app/(app)/core/checkin/page.tsx",
-        "loc": 2402,
+        "loc": 2419,
         "commits": 14
       }
     ]
@@ -18499,29 +18500,9 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-09-07",
-    "hasChanges": true,
-    "sections": [
-      {
-        "label": "Schermen",
-        "added": [],
-        "removed": [
-          "/core",
-          "/core/belasting",
-          "/core/budgets",
-          "/horizon",
-          "/horizon/samengestelde-interest",
-          "/toekomst/samengestelde-interest"
-        ]
-      },
-      {
-        "label": "Componenten (aantal)",
-        "added": [
-          "+11"
-        ],
-        "removed": []
-      }
-    ]
+    "previousDate": "2026-09-08",
+    "hasChanges": false,
+    "sections": []
   },
   "statsHistory": [
     {
@@ -18892,6 +18873,13 @@
       "date": "2026-09-07",
       "api": 309,
       "components": 1073,
+      "tables": 94,
+      "routesProduction": 91
+    },
+    {
+      "date": "2026-09-08",
+      "api": 309,
+      "components": 1074,
       "tables": 94,
       "routesProduction": 91
     }

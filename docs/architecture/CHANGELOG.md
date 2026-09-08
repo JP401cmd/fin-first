@@ -954,3 +954,11 @@
 
 - **Schermen** verwijderd: /core, /core/belasting, /core/budgets, /horizon, /horizon/samengestelde-interest, /toekomst/samengestelde-interest
 - **Componenten (aantal)** toegevoegd: +11
+
+## 2026-09-08
+
+- **Componenten (aantal)** toegevoegd: +1
+
+## 2026-09-08
+
+- Geen wijzigingen.
