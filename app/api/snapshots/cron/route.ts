@@ -21,7 +21,7 @@ import { resolveSavingsSource, savingsRateFromAggregates } from '@/lib/savings-s
 import { resolveEffectiveIncomeExpenses, resolveAmountWithBasis } from '@/lib/effective-financials'
 import { resolveBudgetBasisFromProfile } from '@/lib/cashflow-settings'
 import { budgetShareFractionById, selectBudgetsForBasisForUser } from '@/lib/household/budget-share'
-import { fetchRealizedBudgetAmounts } from '@/lib/budget-realized'
+import { fetchRealizedBudgetAmounts, transactionAnnualIncome } from '@/lib/budget-realized'
 import type { BudgetBasisRow } from '@/lib/budget-basis'
 import { recordJobRun } from '@/lib/job-runs'
 import { mapWithConcurrency } from '@/lib/concurrency'
@@ -426,10 +426,16 @@ export async function GET(request: Request) {
           realized: realizedWindow,
         },
       )
+      // Transactie-jaarinkomen op de HISTORIEBASIS (ADR 0138): uit hetzelfde
+      // venster als de budgetgrondslag — twaalf afgesloten maanden, één deler.
+      // Tot 11 sep 2026 stond hier `monthlyIncome * 12` (6-maands gemiddelde);
+      // een nachtelijke snapshot op de 3e van de maand kon daarmee een
+      // afwijkende `savings_rate` wegschrijven t.o.v. het dashboard.
+      const cronTxAnnualIncome = transactionAnnualIncome(realizedWindow)
       const cronAnnualIncome = resolveAmountWithBasis(
         profile.income_source,
         Number(profile.net_monthly_income ?? 0) * 12,
-        monthlyIncome * 12,
+        cronTxAnnualIncome,
         cronBudgetBasis.income.annualTotal,
       )
       const cronExpenses = resolveAmountWithBasis(
@@ -448,7 +454,7 @@ export async function GET(request: Request) {
         incomeSource: profile.income_source,
         expensesSource: profile.expenses_source,
         netMonthlyIncome: Number(profile.net_monthly_income ?? 0),
-        estimatedAnnualIncome: monthlyIncome * 12,
+        estimatedAnnualIncome: cronTxAnnualIncome,
         estimatedMonthlyExpenses: Number(profile.estimated_monthly_expenses ?? 0),
         savingsRate6m: savingsRateFromTx,
         basis: {

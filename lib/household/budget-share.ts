@@ -31,7 +31,7 @@ import { loadPerspectiveContext } from '@/lib/household/perspective-loader'
 import { FAIL_CLOSED_SHARE_PCT, isUuid } from '@/lib/unlinked-cash'
 import { resolveBudgetBasisFromProfile } from '@/lib/cashflow-settings'
 import type { BudgetBasisResult, BudgetBasisRow } from '@/lib/budget-basis'
-import { getRealizedBudgetAmounts } from '@/lib/budget-realized'
+import { getRealizedBudgetAmounts, type BudgetRealizedWindow } from '@/lib/budget-realized'
 
 /** Minimale rijvorm voor de weging: id + eigenaarschap. */
 export type BudgetShareRow = {
@@ -173,13 +173,20 @@ export async function resolveBudgetShare(
  * cron over álle gebruikers deelt. De cron combineert daarom de vooraf gebatchte
  * `householdShareByUser` met `fetchRealizedBudgetAmounts(supabase, scope)` — zelfde
  * rekenweg, andere ingang.
+ *
+ * Levert naast de twee kanten ook het REALISATIEVENSTER zelf (`realized`,
+ * ADR 0138): dat draagt de ene deler (`historyMonths`) en de venster-
+ * inkomstensom waaruit `transactionAnnualIncome` het transactie-jaarinkomen
+ * schaalt. Loaders die dat jaarinkomen nodig hebben lezen het hieruit — niet
+ * uit een eigen som over het 12-maands aggregaat, want dát venster loopt tot
+ * en met de lopende maand.
  */
 export async function loadBudgetBasis(
   supabase: SupabaseClient,
   profile: Record<string, unknown> | null | undefined,
   rows: BudgetBasisRow[],
   perspective: Perspective = 'personal',
-): Promise<{ income: BudgetBasisResult; expenses: BudgetBasisResult }> {
+): Promise<{ income: BudgetBasisResult; expenses: BudgetBasisResult; realized: BudgetRealizedWindow }> {
   // De twee ophalingen zijn onafhankelijk; het aandeel heeft bovendien meestal
   // een fast path zonder query. `getRealizedBudgetAmounts` is `cache()`-gewrapt,
   // dus de zeven aanroepers delen binnen één render dezelfde drie RPC's.
@@ -187,8 +194,11 @@ export async function loadBudgetBasis(
     resolveBudgetShare(supabase, rows, perspective),
     getRealizedBudgetAmounts(supabase),
   ])
-  return resolveBudgetBasisFromProfile(profile, rows, {
-    shareFractionById: budgetShareFractionById(rows, share),
+  return {
+    ...resolveBudgetBasisFromProfile(profile, rows, {
+      shareFractionById: budgetShareFractionById(rows, share),
+      realized,
+    }),
     realized,
-  })
+  }
 }

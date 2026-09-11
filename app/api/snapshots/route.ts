@@ -23,6 +23,7 @@ import { type Debt, computeRenteAflossingsSplit } from '@/lib/debt-data'
 import { resolveSavingsSource, savingsRateFromAggregates } from '@/lib/savings-source'
 import { resolveEffectiveIncomeExpenses, resolveAmountWithBasis } from '@/lib/effective-financials'
 import { loadBudgetBasis, selectBudgetsForBasis } from '@/lib/household/budget-share'
+import { transactionAnnualIncome } from '@/lib/budget-realized'
 import type { BudgetBasisRow } from '@/lib/budget-basis'
 import { localMonthBounds, localMonthStart } from '@/lib/month-range'
 import {
@@ -356,10 +357,15 @@ export async function POST() {
     (basisPrefsResult.data ?? null) as Record<string, unknown> | null,
     (basisBudgetsResult.data ?? []) as unknown as BudgetBasisRow[],
   )
+  // Transactie-jaarinkomen op de HISTORIEBASIS (ADR 0138): uit hetzelfde venster
+  // als de budgetgrondslag (twaalf afgesloten maanden, één deler) — niet langer
+  // `monthlyIncome * 12`, dat een 6-maands gemiddelde was en de opgeslagen
+  // `savings_rate` van het dashboard liet afwijken.
+  const snapshotTxAnnualIncome = transactionAnnualIncome(snapshotBudgetBasis.realized)
   const snapshotAnnualIncome = resolveAmountWithBasis(
     profileResult.data?.income_source,
     Number(profileResult.data?.net_monthly_income ?? 0) * 12,
-    monthlyIncome * 12,
+    snapshotTxAnnualIncome,
     snapshotBudgetBasis.income.annualTotal,
   )
   const snapshotExpenses = resolveAmountWithBasis(
@@ -378,7 +384,7 @@ export async function POST() {
     incomeSource: profileResult.data?.income_source,
     expensesSource: profileResult.data?.expenses_source,
     netMonthlyIncome: Number(profileResult.data?.net_monthly_income ?? 0),
-    estimatedAnnualIncome: monthlyIncome * 12,
+    estimatedAnnualIncome: snapshotTxAnnualIncome,
     estimatedMonthlyExpenses: Number(profileResult.data?.estimated_monthly_expenses ?? 0),
     savingsRate6m: savingsRateFromTx,
     basis: {

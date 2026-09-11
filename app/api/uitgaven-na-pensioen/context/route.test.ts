@@ -1,16 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { localMonthStartMonthsAgo } from '@/lib/month-range'
 
 /**
  * /api/uitgaven-na-pensioen/context — grondslag-pariteit met de SSR-loader.
  *
  * Given een profiel op de handmatige inkomensgrondslag (income_source 'manual',
  *   net_monthly_income €5.000) met methode 'current_income', en €82.907 aan
- *   positieve transacties over 12+ maanden,
+ *   positieve transacties over 12 afgesloten maanden,
  * When de uitgaven-na-pensioen-sheet zijn context ophaalt,
  * Then volgen `yearlyIncome` en `currentRetirementExpense` de GEKOZEN
  *   inkomensgrondslag (ADR 0103): €60.000 — identiek aan de "Na pensioen"-KPI
  *   op /toekomst (SSR-loader geeft `effectiveAnnualIncome` door aan
- *   `deriveRetirementExpenseBasis`). De rauwe transactie-extrapolatie
+ *   `deriveRetirementExpenseBasis`). Het rauwe transactie-jaarinkomen
  *   (€82.907) mag de sheet niet laten divergeren van de pagina.
  *
  * Aanleiding: testgebruikersmelding 29-08-2026 — sheet toonde €82.907/jaar
@@ -22,6 +23,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
  * kolomlijsten (`cashflow_basis_prefs`, `created_at`) achterliepen op de
  * canonieke `BUDGET_BASIS_COLUMNS` — precies de drift die deze suite moet
  * vangen.
+ *
+ * HISTORIEBASIS (ADR 0138): het transactie-jaarinkomen komt uit het
+ * realisatievenster (`tx_month_aggregate`, twaalf afgesloten maanden), niet
+ * meer uit een eigen transactiequery. De rpc-dubbel hieronder filtert daarom —
+ * net als de echte RPC — op `[p_from, p_to)`; de €82.907 staat in de OUDSTE
+ * maand van het venster, zodat `historyMonths` = 12 en de som de identiteit is.
  */
 
 let profileRow: Record<string, unknown>
@@ -42,16 +49,16 @@ vi.mock('@/lib/supabase/server', () => ({
   getAuthClaims: async () => ({ sub: 'u1' }),
 }))
 
-vi.mock('@/lib/server-data/base', () => ({
-  // All-time vroegste inkomstendatum, ruim >12 maanden terug → extrapolatie
-  // is de identiteit (last12Income blijft €82.907).
-  getEarliestIncomeDate: async () => ({ data: { date: '2023-01-01' } }),
-}))
-
 function makeClient() {
   return {
     auth: { getUser: async () => ({ data: { user: { id: 'u1' } }, error: null }) },
-    rpc: async () => ({ data: [], error: null }),
+    rpc: async (_fn: string, args: Record<string, unknown>) => {
+      const oudsteMaand = localMonthStartMonthsAgo(new Date(), 12).slice(0, 7)
+      const rows = [
+        { month: oudsteMaand, budget_id: null, transaction_type: 'income', sum_positief: 82907, sum_negatief: 0, count: 1 },
+      ].filter((r) => `${r.month}-01` >= String(args.p_from) && `${r.month}-01` < String(args.p_to))
+      return { data: rows, error: null }
+    },
     from(table: string) {
       if (table === 'profiles') {
         return {
@@ -59,16 +66,6 @@ function makeClient() {
             eq: () => ({ single: async () => ({ data: profileRow, error: null }) }),
           }),
         }
-      }
-      if (table === 'transactions') {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const b: any = {
-          select: () => b,
-          gt: () => b,
-          gte: () => b,
-          lt: () => Promise.resolve({ data: [{ amount: 82907, date: '2026-08-01' }], error: null }),
-        }
-        return b
       }
       // budgets + eventuele household-lookups uit loadBudgetBasis: leeg maar
       // geldig, op elke keten-vorm (select().eq()… of direct thenable).
@@ -101,11 +98,11 @@ describe('GET /api/uitgaven-na-pensioen/context — inkomensgrondslag (ADR 0103)
     // De sheet en de Toekomst-KPI moeten hetzelfde getal dragen: €60.000.
     expect(body.yearlyIncome).toBe(60000)
     expect(body.currentRetirementExpense).toBe(60000)
-    // De rauwe extrapolatie blijft beschikbaar als máátstaf, nooit als uitkomst.
+    // Het rauwe transactie-jaarinkomen blijft beschikbaar als máátstaf, nooit als uitkomst.
     expect(body.yearlyIncome).not.toBe(82907)
   })
 
-  it('volgt bij income_source=auto zonder budget-inkomen de transactie-extrapolatie (via de echte loadBudgetBasis)', async () => {
+  it('volgt bij income_source=auto zonder budget-inkomen het transactie-jaarinkomen uit het realisatievenster (via de echte loadBudgetBasis)', async () => {
     profileRow = { ...BASE_PROFILE, income_source: null }
     const { GET } = await import('./route')
     const res = await GET()

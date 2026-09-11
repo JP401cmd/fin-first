@@ -234,8 +234,10 @@ export const getTx12m = cache(async (supabase: SupabaseClient) => {
 /**
  * Vroegste datum van een positieve (inkomsten-)transactie — ALL-TIME, één rij.
  *
- * Voedt de inkomens-extrapolatie in de dashboard-loader (`incomeMonths` /
- * `dataMonths6`). Vroeger werd deze datum uit de 12-maands-slice (`getTx12m`)
+ * Voedt de 6-maands datamaand-telling van de spaarquote (`dataMonths6` /
+ * `savingsRateDataMonths`). Het 12-maands transactie-jaarinkomen leest zijn
+ * deler sinds ADR 0138 niet meer hieruit maar uit het realisatievenster
+ * (`historyMonths`, lib/budget-realized.ts). Vroeger werd deze datum uit de 12-maands-slice (`getTx12m`)
  * gescand — begrensd door ZOWEL het 12-mnd-venster ALS de stille
  * `max_rows=1000`-afkap: voor gebruikers met >1000 positieve rijen in het venster
  * kon de gescande "vroegste" datum te recent zijn → `incomeMonths` te klein →

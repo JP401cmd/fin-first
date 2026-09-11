@@ -75,6 +75,8 @@ import {
   type ResolvedBasis,
 } from './budget-basis'
 import { loadBudgetBasis } from '@/lib/household/budget-share'
+import { transactionAnnualIncome } from '@/lib/budget-realized'
+import { historyMonthKeys } from '@/lib/history-basis'
 import { getOwnProfile, getBudgets } from '@/lib/server-data/base'
 import { fetchLatestSnapshotsByMonth } from '@/lib/server-data/snapshot-aggregates'
 import {
@@ -82,7 +84,6 @@ import {
   aggLatestMonth,
   aggSumPositief,
   aggSumNegatiefAbs,
-  aggIncomeByMonth,
   aggExpenseByMonthAbs,
   aggSpendingByBudgetMonth,
 } from '@/lib/server-data/tx-aggregates'
@@ -105,12 +106,13 @@ export interface CorePageData {
 
   /**
    * Vaste 12-slots reeks (oudste → nieuwste) van inkomsten én uitgaven per
-   * kalendermaand, gebouwd uit hetzelfde transfer-gefilterde 12-maands
-   * maandaggregaat (`txAgg12`). Elke slot is een echte
-   * kalendermaand binnen het venster, ook als er geen transacties waren (dan
-   * 0). `label` is de nl-NL korte maandnaam ('jan', 'feb', …). Voedt de
-   * cashflow-kassabonnen (12-mnd inkomen, 6-mnd spaarquote) en de
-   * trend-achtergrond op de hefboomkaarten zonder een extra query.
+   * kalendermaand over de twaalf AFGESLOTEN maanden (ADR 0138), gebouwd uit
+   * het transfer-gefilterde realisatievenster (`BudgetRealizedWindow.byMonth`).
+   * Elke slot is een echte kalendermaand binnen het venster, ook als er geen
+   * transacties waren (dan 0); de lopende maand zit er niet in. `label` is de
+   * nl-NL korte maandnaam ('jan', 'feb', …). Voedt de cashflow-kassabonnen
+   * (12-mnd inkomen, 6-mnd spaarquote — `.slice(-6)` is exact het C6-venster)
+   * en de trend-achtergrond op de hefboomkaarten zonder een extra query.
    */
   monthlyIncomeExpenseSeries: { label: string; income: number; expenses: number }[]
 
@@ -645,7 +647,7 @@ export const loadCoreData = cache(async function loadCoreData(
   // consument de grondslagbeslissing herhaalt. Een leeg gezette selectie
   // (allExcluded) levert annualTotal 0 op en valt daarmee vanzelf terug op de
   // transactiegrondslag — precies wat het besluit voorschrijft.
-  const { income: budgetIncome, expenses: budgetExpenses } = await loadBudgetBasis(
+  const { income: budgetIncome, expenses: budgetExpenses, realized: coreRealized } = await loadBudgetBasis(
     supabase,
     ownProfileResult.data as Record<string, unknown> | null,
     (allBudgetsBasisResult.data ?? []) as unknown as BudgetBasisRow[],
@@ -669,61 +671,52 @@ export const loadCoreData = cache(async function loadCoreData(
   const activeModules: string[] = [...ALL_MODULES]
   const hasVermogen = activeModules.includes('vermogensregistratie')
 
-  // ── Last 12 months income — extrapolate if less than 12 months of data ──
-  // Bron = het 12-maands maandaggregaat (afkap-vrij). `realOnly: true` spiegelt de
-  // vroegere `isRealTx`-filter: eigen-rekening-transfers tellen niet mee in de
-  // inkomsten/uitgaven-sommen. De Σ-positief/Σ-negatief-split van het aggregaat
-  // vervangt de vroegere `.gt(amount,0)`/`.lt(amount,0)`-queries één-op-één.
+  // ── Het transactie-jaarinkomen op de HISTORIEBASIS (ADR 0138) ─────────────
+  // Uit het realisatievenster van `loadBudgetBasis`: de positieve som over
+  // twaalf AFGESLOTEN maanden, geschaald met dezelfde `historyMonths` als de
+  // budgetposten (`transactionAnnualIncome`, lib/budget-realized.ts). Dit was de
+  // laatste inline-kopie van de deler-clamp (Σ txAgg12 tot en met de lopende
+  // maand ÷ afgesloten maanden sinds de vroegste inkomstenboeking) — weg, en
+  // `incomeMonths` op de bundel is nu diezelfde ene deler. Transfer-EXCLUSIEF,
+  // zoals de vervangen `realOnly: true`-som.
+  //
+  // `txAgg12` (12 maanden INCLUSIEF de lopende) blijft de bron voor de reeksen
+  // hieronder die de lopende maand wél horen te tonen (kassabon-rijen, series).
   const txAgg12 = txAgg12Result.data ?? []
-
-  const last12MonthsIncome = aggSumPositief(txAgg12, { realOnly: true })
-  let extrapolatedIncome = last12MonthsIncome
-  let actualIncomeMonths = 12
+  const extrapolatedIncome = transactionAnnualIncome(coreRealized)
+  const actualIncomeMonths = coreRealized.historyMonths
+  // Vroegste inkomstendatum: voedt alleen nog de 6-maands datamaand-telling.
   const earliestIncomeDate = earliestIncomeResult.data?.[0]?.date
-  if (earliestIncomeDate && last12MonthsIncome > 0) {
-    const earliest = new Date(earliestIncomeDate)
-    actualIncomeMonths = Math.max(1,
-      (now.getFullYear() - earliest.getFullYear()) * 12 +
-      (now.getMonth() - earliest.getMonth()),
-    )
-    actualIncomeMonths = Math.min(actualIncomeMonths, 12)
-    if (actualIncomeMonths < 12) {
-      extrapolatedIncome = (last12MonthsIncome / actualIncomeMonths) * 12
-    }
-  }
 
-  // ── Group income by month for kassabon ──
-  // Het aggregaat groepeert al op kalendermaand ('YYYY-MM', = `date.slice(0,7)`);
-  // dat vervangt de vroegere `new Date(tx.date).getMonth()`-sleutel en haalt
-  // meteen de latente tijdzone-afhankelijkheid daaruit weg (een UTC-middernacht-
-  // datum kon op een negatieve-offset-server een maand terugvallen).
-  const incomeByMonth12 = aggIncomeByMonth(txAgg12, { realOnly: true })
-  const incomeMonthMap: Record<string, number> = Object.fromEntries(incomeByMonth12)
-  const sortedIncomeMonths = Object.entries(incomeMonthMap)
+  // ── Inkomen per maand voor de kassabon op de cash-pagina ──
+  // Uit HETZELFDE realisatievenster als `extrapolatedIncome` (ADR 0138, review
+  // golf 2 R1): rijen, subtotaal, deler (`incomeMonths`) en "Geschat
+  // jaarinkomen" komen zo uit één venster van twaalf afgesloten maanden. Tot
+  // 11 sep 2026 kwamen de rijen uit `txAgg12` (t/m de lopende maand) terwijl het
+  // totaal al op het afgesloten venster stond — de kassabon sprak zichzelf tegen
+  // (rijen ÷ deler × 12 ≠ het totaal eronder). Alleen maanden mét een boeking.
+  const sortedIncomeMonths = Object.entries(coreRealized.byMonth)
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([month, amount]) => ({ month, amount }))
+    .map(([month, flow]) => ({ month, amount: flow.income }))
 
   // ── Vaste 12-slots inkomsten/uitgaven-reeks per kalendermaand ──
-  // Hergebruikt EXACT hetzelfde transfer-gefilterde maandaggregaat als hierboven
-  // (txAgg12, geladen in batch 1) — geen extra query. We
-  // bouwen 12 vaste maand-slots (oudste → nieuwste, t/m de huidige maand) zodat
-  // de kassabonnen en de kaart-achtergronden een lege maand als 0 tonen i.p.v.
-  // 'm over te slaan. Sommeert per maand; uitgaven als positieve bedragen.
-  const seriesMonthKeys: { key: string; label: string }[] = []
-  for (let i = 11; i >= 0; i--) {
-    const d = new Date(Date.UTC(now.getFullYear(), now.getMonth() - i, 1))
-    seriesMonthKeys.push({
-      key: `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`,
-      label: d.toLocaleDateString('nl-NL', { month: 'short' }),
-    })
-  }
-  const seriesIncomeByMonth = incomeByMonth12
-  const seriesExpensesByMonth = aggExpenseByMonthAbs(txAgg12, { realOnly: true })
-  const monthlyIncomeExpenseSeries = seriesMonthKeys.map(({ key, label }) => ({
-    label,
-    income: Math.round(seriesIncomeByMonth.get(key) ?? 0),
-    expenses: Math.round(seriesExpensesByMonth.get(key) ?? 0),
-  }))
+  // Twaalf AFGESLOTEN maanden (eigenaarsbesluit 11 sep 2026, ADR 0138), oud →
+  // nieuw, uit `coreRealized.byMonth` — géén extra query. Daarmee toont de
+  // transactie-kassabon met `.slice(-6)` exact de zes afgesloten maanden waarop
+  // `savingsRate6m` rekent (C6-venster) en het jaartotaal de twaalf maanden
+  // waarop `extrapolatedIncome` staat. Een lege maand blijft als 0 staan i.p.v.
+  // overgeslagen te worden. Uitgaven als positieve bedragen. De lopende maand
+  // hoort hier niet in: die is een "tot nu toe"-grootheid (`currentMonth*`,
+  // ADR 0073), geen reeks-slot.
+  const monthlyIncomeExpenseSeries = historyMonthKeys(now).map((key) => {
+    const [y, m] = key.split('-').map(Number)
+    const flow = coreRealized.byMonth[key]
+    return {
+      label: new Date(y, m - 1, 1).toLocaleDateString('nl-NL', { month: 'short' }),
+      income: Math.round(flow?.income ?? 0),
+      expenses: Math.round(flow?.expenses ?? 0),
+    }
+  })
 
   // ── Last 6 months expenses & savings rate (rolling average) ──
   // Venster + datamaanden uit de gedeelde bron (lib/savings-source.ts): zes

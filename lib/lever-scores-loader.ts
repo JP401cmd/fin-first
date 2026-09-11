@@ -36,7 +36,7 @@ import {
   resolveAmountWithBasis,
   resolveEffectiveIncomeExpenses,
 } from '@/lib/effective-financials'
-import { extrapolateAnnualIncome } from '@/lib/retirement-expense-basis'
+import { transactionAnnualIncome } from '@/lib/budget-realized'
 import { loadBudgetBasis } from '@/lib/household/budget-share'
 import type { BudgetBasisRow } from '@/lib/budget-basis'
 import { resolveFireParams } from '@/lib/fire-params'
@@ -529,10 +529,11 @@ export const loadLeverScores = cache(async function loadLeverScores(
   // GEEN TWEEDE FORMULE: `resolveSavingsSource` blijft de enige plek waar de
   // grondslagkeuze in een percentage wordt omgezet. Wat hier staat is uitsluitend
   // dezelfde INVOER samenstellen als `loadForecastSectionData`/`loadDashboardData`
-  // (het parity-gekoppelde paar): jaarinkomen via `extrapolateAnnualIncome` op het
-  // 12-maands transactie-inkomen, uitgaven op de 6-maands MEETBASIS
-  // (`expenses6m / 6` — dezelfde meting waar de quote op staat, bewust niet de
-  // lopende maand), en de budgetgrondslag uit `loadBudgetBasis`.
+  // (het parity-gekoppelde paar): jaarinkomen via `transactionAnnualIncome` op
+  // het realisatievenster (twaalf AFGESLOTEN maanden, één deler — ADR 0138),
+  // uitgaven op de 6-maands MEETBASIS (`expenses6m / 6` — dezelfde meting waar
+  // de quote op staat, bewust niet de lopende maand), en de budgetgrondslag uit
+  // `loadBudgetBasis`.
   //
   // GEVOLG, BEWUST (eigenaar-besluit B-030): staat de grondslag NIET op
   // 'transaction', dan verschuiven de detailregel én de STATUSKLEUR van de
@@ -549,11 +550,7 @@ export const loadLeverScores = cache(async function loadLeverScores(
   // 'manual'` met een leeggemaakt bedrag) waarvoor hij bestaat. Dashboard
   // (`dashboard-data-loader.ts:1225`) en forecast (`cashflow-kpis.ts:869`) geven
   // hier om dezelfde reden de extrapolatie mee.
-  const leverExtrapolatedIncome = extrapolateAnnualIncome(
-    aggSumPositief(txAgg12, { realOnly: true }),
-    earliestIncomeDate,
-    now,
-  )
+  const leverExtrapolatedIncome = transactionAnnualIncome(leverBudgetBasis.realized)
   const leverAnnualIncome = resolveAmountWithBasis(
     profile.income_source,
     Number(profile.net_monthly_income ?? 0) * 12,

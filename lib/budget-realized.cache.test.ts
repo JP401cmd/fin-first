@@ -91,7 +91,7 @@ describe('getRealizedBudgetAmounts — cache-hit dedupe binnen één request', (
 })
 
 describe('getRealizedBudgetAmounts — chunking op vier maanden', () => {
-  it('knipt het 12-maands venster in drie chunks van vier maanden, oud naar nieuw', async () => {
+  it('knipt de twaalf AFGESLOTEN maanden in drie chunks van vier maanden, oud naar nieuw', async () => {
     const now = new Date(2026, 7, 8) // 8 augustus 2026, bevroren via de expected-berekening zelf
     vi.useFakeTimers()
     vi.setSystemTime(now)
@@ -100,23 +100,24 @@ describe('getRealizedBudgetAmounts — chunking op vier maanden', () => {
       await getRealizedBudgetAmounts(supabase)
 
       expect(rpcCalls).toHaveLength(3)
-      // Chunk 1: [11 mnd terug, 7 mnd terug)
+      // Chunk 1: [12 mnd terug, 8 mnd terug)
       expect(rpcCalls[0].args).toEqual({
-        p_from: localMonthStartMonthsAgo(now, 11),
-        p_to: localMonthStartMonthsAgo(now, 7),
+        p_from: localMonthStartMonthsAgo(now, 12),
+        p_to: localMonthStartMonthsAgo(now, 8),
         p_own_only: false,
       })
-      // Chunk 2: [7 mnd terug, 3 mnd terug)
+      // Chunk 2: [8 mnd terug, 4 mnd terug)
       expect(rpcCalls[1].args).toEqual({
-        p_from: localMonthStartMonthsAgo(now, 7),
-        p_to: localMonthStartMonthsAgo(now, 3),
+        p_from: localMonthStartMonthsAgo(now, 8),
+        p_to: localMonthStartMonthsAgo(now, 4),
         p_own_only: false,
       })
-      // Chunk 3: [3 mnd terug, maandeinde van nu) — de laatste chunk sluit af op
-      // hetzelfde punt als `getTxAgg12m`'s bovengrens.
+      // Chunk 3: [4 mnd terug, de 1e van de LOPENDE maand) — de lopende maand
+      // valt buiten het venster (ADR 0138); dit is dus bewust NIET
+      // `getTxAgg12m`'s bovengrens (het maandeinde van nu).
       expect(rpcCalls[2].args).toEqual({
-        p_from: localMonthStartMonthsAgo(now, 3),
-        p_to: localMonthBounds(now).end,
+        p_from: localMonthStartMonthsAgo(now, 4),
+        p_to: localMonthBounds(now).start,
         p_own_only: false,
       })
     } finally {

@@ -37,6 +37,7 @@ import {
 } from '@/lib/horizon-data'
 import { NL_AOW_AGE, NL_SWR } from '@/lib/constants'
 import { localMonthStart, localMonthStartMonthsAgo } from '@/lib/month-range'
+import { fetchRealizedBudgetAmounts, transactionAnnualIncome } from '@/lib/budget-realized'
 import {
   lifeEventsToCashflows,
   type SimCashflow,
@@ -648,10 +649,10 @@ export async function buildHouseholdProjectionInput(
   // Transacties: 13-maands-venster + paginatie (deterministisch). De ongebonden
   // `select('amount, user_id, date')` werd door PostgREST stil op 1000 rijen
   // afgekapt → bij >1000 transacties (huishouden telt beide partners samen!)
-  // rekende de projectie met een niet-deterministische subset. De enige twee
-  // consumers (memberMonthly-aggregatie op de lopende maand + de 12-maands-
-  // inkomensextrapolatie) hebben nooit meer dan ~13 maanden nodig; dezelfde
-  // venster-conventie als dashboard-/horizon-/core-data-loader. Maandgrens
+  // rekende de projectie met een niet-deterministische subset. De enige
+  // overgebleven consumer (memberMonthly-aggregatie op de lopende maand) heeft
+  // nooit meer dan ~13 maanden nodig; de 12-maands-inkomensextrapolatie komt
+  // sinds ADR 0138 uit het realisatievenster (zie hieronder). Maandgrens
   // tijdzone-veilig via localMonthStartMonthsAgo (géén toISOString()).
   const txWindowStart = localMonthStartMonthsAgo(new Date(), 12)
   const fetchHouseholdTransactions = async (): Promise<
@@ -682,6 +683,7 @@ export async function buildHouseholdProjectionInput(
     partnerDebtsRes,
     partnerIncomeRes,
     partnerEventsRes,
+    realizedWindow,
   ] = await Promise.all([
     // Profiles RLS is own-only; de RPC levert (privacy-respecterend) de
     // projectie-velden van ALLE huishoudleden — incl. partner-DOB/-naam.
@@ -702,6 +704,12 @@ export async function buildHouseholdProjectionInput(
     supabase.rpc('household_partner_items', { p_category: 'income' }),
     // Partner-levensgebeurtenissen (RLS-blind anders; gedeeld binnen huishouden).
     supabase.rpc('household_partner_life_events'),
+    // HISTORIEBASIS (ADR 0138): hetzelfde realisatievenster als de /toekomst-hero
+    // (RLS-client, `tx_month_aggregate` is SECURITY INVOKER → eigen + gedeelde
+    // boekingen), zodat het transactie-jaarinkomen van de huidige gebruiker
+    // hier letterlijk hetzelfde getal is als in de hero. Ongecachete variant:
+    // deze functie draait in de browser, buiten de RSC-`cache()`.
+    fetchRealizedBudgetAmounts(supabase),
   ])
 
   const profiles = (profilesRes.data ?? []) as MemberProfile[]
@@ -760,27 +768,18 @@ export async function buildHouseholdProjectionInput(
     memberMonthlyExpenses.set(id, exp)
   }
 
-  // Geëxtrapoleerd JAARinkomen van de HUIDIGE gebruiker uit 12 maanden transacties
-  // — EXACT dezelfde formule als de /toekomst-hero (som laatste 12 mnd ÷ actieve
-  // maanden × 12). Nodig zodat de 'current_income'-uitgave-na-pensioen + FIRE-leeftijd
-  // van de gebruiker matchen tussen de hero en de huishoud-sectie (anders gebruikte
-  // de sectie het huidige-maand-inkomen → afwijkende FIRE-leeftijd). Partner-tx zijn
+  // Transactie-JAARinkomen van de HUIDIGE gebruiker — DEZELFDE bron als de
+  // /toekomst-hero (lib/horizon/raw-data-loader.ts): `transactionAnnualIncome`
+  // op het realisatievenster, transfer-INCLUSIEF zoals de FIRE-projectiesom
+  // daar (ADR 0138: twaalf afgesloten maanden, één deler). Nodig zodat de
+  // 'current_income'-uitgave-na-pensioen + FIRE-leeftijd van de gebruiker
+  // matchen tussen de hero en de huishoud-sectie. Tot 11 sep 2026 stond hier een
+  // eigen dag-niveau rollend venster (inclusief vandaag) met een eigen
+  // deler-klem op de vroegste datum uit de slice — een tweede formule die na
+  // ADR 0138 niet meer gelijk was aan de hero (review golf 2, H1). Partner-tx zijn
   // niet zichtbaar (RLS) → die houdt de profiel/RPC-fallback via memberIncome.
   const currentUserId = user.id
-  // Dag-niveau rolling 12-mnd-grens (géén maandgrens): bouw de YYYY-MM-DD uit
-  // lokale componenten, anders schuift toISOString() de grens in NL een dag terug.
-  const twelveMoAgoDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate())
-  const twelveMoAgo = `${twelveMoAgoDate.getFullYear()}-${String(twelveMoAgoDate.getMonth() + 1).padStart(2, '0')}-${String(twelveMoAgoDate.getDate()).padStart(2, '0')}`
-  const ownIncomeTx = allTransactions.filter(t => t.user_id === currentUserId && Number(t.amount) > 0 && t.date >= twelveMoAgo)
-  const ownLast12Income = ownIncomeTx.reduce((s, t) => s + Number(t.amount), 0)
-  let ownExtrapolatedAnnualIncome = ownLast12Income
-  if (ownIncomeTx.length > 0 && ownLast12Income > 0) {
-    const earliest = ownIncomeTx.reduce((min, t) => (t.date < min ? t.date : min), ownIncomeTx[0].date)
-    const earliestD = new Date(earliest)
-    const incomeMonths = Math.max(1, Math.min(12,
-      (now.getFullYear() - earliestD.getFullYear()) * 12 + (now.getMonth() - earliestD.getMonth())))
-    if (incomeMonths < 12) ownExtrapolatedAnnualIncome = (ownLast12Income / incomeMonths) * 12
-  }
+  const ownExtrapolatedAnnualIncome = transactionAnnualIncome(realizedWindow, { includeTransfers: true })
 
   // Profiel-fallback voor income/expenses wanneer er geen transacties zijn.
   function memberIncome(id: string): number {

@@ -74,7 +74,7 @@ import { loadBudgetBasis } from '@/lib/household/budget-share'
 import type { BudgetBasisRow, ResolvedBasis } from '@/lib/budget-basis'
 import { localMonthBounds } from '@/lib/month-range'
 import { resolveAmountWithBasis } from '@/lib/effective-financials'
-import { extrapolateAnnualIncome } from '@/lib/retirement-expense-basis'
+import { transactionAnnualIncome } from '@/lib/budget-realized'
 import {
   computeSavingsRate6m,
   computeDebtAflossingMonthly,
@@ -771,8 +771,9 @@ export interface CashflowSectionScalars {
  * het eigenaar-besluit "één spaarquote, app-breed" is
  * de effectieve quote HET getal, en levert deze laag hem dus mee — via exact
  * dezelfde `resolveSavingsSource`-aanroep als `loadDashboardData`, met dezelfde
- * grondslag-invoer (jaarinkomen uit `extrapolateAnnualIncome`, uitgaven op de
- * 6-maands meetbasis). De parity-suite vergrendelt beide getallen.
+ * grondslag-invoer (jaarinkomen uit `transactionAnnualIncome` op het
+ * realisatievenster, uitgaven op de 6-maands meetbasis). De parity-suite
+ * vergrendelt beide getallen.
  *
  * RLS: MOET met de anon/authenticated client worden aangeroepen — nooit met
  * getServiceClient(). Zie de koptekst van lib/server-data/base.ts.
@@ -838,16 +839,13 @@ export const loadForecastSectionData = cache(async (supabase: SupabaseClient): P
   // ── De EFFECTIEVE quote: dezelfde assemblage als `loadDashboardData` ───────
   // Geen tweede formule — `resolveSavingsSource` blijft de enige plek waar de
   // grondslagkeuze in een percentage wordt omgezet. Wat hier staat is uitsluitend
-  // het samenstellen van dezelfde invoer: jaarinkomen via de gedeelde
-  // `extrapolateAnnualIncome`, uitgaven op de 6-maands MEETBASIS (`expenses6m/6`,
-  // dezelfde meting waar `savingsRate6m` op staat) en de budgetgrondslag uit
-  // `loadBudgetBasis`. De parity-suite draait beide paden tegen dezelfde fixtures.
+  // het samenstellen van dezelfde invoer: jaarinkomen via `transactionAnnualIncome`
+  // op het realisatievenster (twaalf AFGESLOTEN maanden, één deler — ADR 0138),
+  // uitgaven op de 6-maands MEETBASIS (`expenses6m/6`, dezelfde meting waar
+  // `savingsRate6m` op staat) en de budgetgrondslag uit `loadBudgetBasis`. De
+  // parity-suite draait beide paden tegen dezelfde fixtures.
   const forecastProfile = profile ?? {}
-  const forecastExtrapolatedIncome = extrapolateAnnualIncome(
-    aggSumPositief(txAgg12, { realOnly: true }),
-    earliestIncomeDate,
-    now,
-  )
+  const forecastExtrapolatedIncome = transactionAnnualIncome(forecastBudgetBasis.realized)
   const forecastAnnualIncome = resolveAmountWithBasis(
     forecastProfile.income_source,
     Number(forecastProfile.net_monthly_income ?? 0) * 12,

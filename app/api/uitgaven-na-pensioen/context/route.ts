@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server'
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
-import { getEarliestIncomeDate } from '@/lib/server-data/base'
 import {
   computeYearlyMustExpenses,
   type RetirementExpenseMethod,
 } from '@/lib/budget-utils'
-import { deriveRetirementExpenseBasis, extrapolateAnnualIncome } from '@/lib/retirement-expense-basis'
+import { deriveRetirementExpenseBasis } from '@/lib/retirement-expense-basis'
+import { transactionAnnualIncome } from '@/lib/budget-realized'
 import { resolveAmountWithBasis } from '@/lib/effective-financials'
 import { loadBudgetBasis, BUDGET_BASIS_COLUMNS } from '@/lib/household/budget-share'
 import type { BudgetBasisRow } from '@/lib/budget-basis'
@@ -28,15 +28,7 @@ async function handleGet() {
   const claims = await getAuthClaims(supabase)
   if (!claims) return unauthorized()
 
-  const now = new Date()
-  const twelveMonthsAgo = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 11, 1))
-    .toISOString()
-    .split('T')[0]
-  const monthEnd = new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 1))
-    .toISOString()
-    .split('T')[0]
-
-  const [profileResult, budgetsResult, incomeResult, earliestIncomeResult] = await Promise.all([
+  const [profileResult, budgetsResult] = await Promise.all([
     supabase
       .from('profiles')
       .select(
@@ -49,21 +41,11 @@ async function handleGet() {
       .single(),
     supabase
       .from('budgets')
-      // De canonieke grondslag-kolomlijst (o.a. `created_at` als
-      // extrapolatie-deler) + `is_essential` voor computeYearlyMustExpenses.
-      // Een eigen, smallere lijst liet de budget-grondslag stil driften van de
-      // SSR-loader (review 🔴) — daarom de gedeelde constante.
+      // De canonieke grondslag-kolomlijst + `is_essential` voor
+      // computeYearlyMustExpenses. Een eigen, smallere lijst liet de
+      // budget-grondslag stil driften van de SSR-loader (review 🔴) — daarom de
+      // gedeelde constante.
       .select(`${BUDGET_BASIS_COLUMNS}, is_essential`),
-    supabase
-      .from('transactions')
-      .select('amount, date')
-      .gt('amount', 0)
-      .gte('date', twelveMonthsAgo)
-      .lt('date', monthEnd),
-    // Vroegste inkomstendatum ALL-TIME — canonieke gedeelde fetcher, hetzelfde
-    // deler-anker als de SSR-loader. Een 12-maands-venster gaf een te recente
-    // datum → afwijkend jaarbedrag t.o.v. de KPI (WF-TOEK-02-bug2).
-    getEarliestIncomeDate(supabase),
   ])
 
   const profile = profileResult.data ?? {
@@ -96,21 +78,16 @@ async function handleGet() {
     allChildren.filter(c => !['archive', 'income', 'savings'].includes(c.budget_type)),
   )
 
-  const txs = incomeResult.data ?? []
-  const last12Income = txs.reduce((s, t) => s + Number(t.amount), 0)
-  const earliestIncomeDate =
-    (earliestIncomeResult.data as { date?: string | null } | null)?.date ?? null
-
   const profileMonthlyExpenses = Number(profile.estimated_monthly_expenses ?? 0)
   const estimatedYearlyExpenses = profileMonthlyExpenses * 12
 
   const initialMethod = (profile.retirement_expense_method ?? 'essential_budgets') as RetirementExpenseMethod
   const customAmount = profile.retirement_expense_custom_amount
 
-  // Extrapolatie (inkomen → jaarbasis) + pensioenuitgave-methode: ÉÉN gedeelde
-  // bron (lib/retirement-expense-basis.ts), identiek aan de SSR-loader en de
+  // Jaarinkomen + pensioenuitgave-methode: ÉÉN gedeelde bron
+  // (lib/retirement-expense-basis.ts), identiek aan de SSR-loader en de
   // horizon-client load()-refresh. Géén eigen net_monthly_income*12-fallback
-  // meer: die week af van de canonieke extrapolatie en zou de sheet weer laten
+  // meer: die week af van de canonieke afleiding en zou de sheet weer laten
   // divergeren van de KPI voor gebruikers zonder inkomenstransacties.
   //
   // Grondslag (ADR 0103, melding 29-08-2026): net als de SSR-loader geeft deze
@@ -119,12 +96,19 @@ async function handleGet() {
   // terwijl de "Na pensioen"-KPI op /toekomst de gekozen (bv. handmatige)
   // grondslag volgt. Zusterbug van WF-TOEK-02-bug2: toen het deler-anker, nu
   // de grondslag.
-  const { income: budgetIncome } = await loadBudgetBasis(
+  //
+  // HISTORIEBASIS (ADR 0138): het transactie-jaarinkomen komt uit hetzelfde
+  // realisatievenster als de budgetgrondslag — twaalf AFGESLOTEN maanden, één
+  // deler (`historyMonths`) — via `transactionAnnualIncome`. De eigen
+  // 12-maands-transactiequery en de all-time vroegste-inkomstendatum die hier
+  // stonden zijn daarmee weg: die som liep tot en met de lopende maand. Transfer-
+  // INCLUSIEF, zoals de horizon-loader (zelfde som, zelfde semantiek).
+  const { income: budgetIncome, realized } = await loadBudgetBasis(
     supabase,
     profile as Record<string, unknown>,
     allBudgets as unknown as BudgetBasisRow[],
   )
-  const txAnnualIncome = extrapolateAnnualIncome(last12Income, earliestIncomeDate, now)
+  const txAnnualIncome = transactionAnnualIncome(realized, { includeTransfers: true })
   const effectiveAnnualIncome = resolveAmountWithBasis(
     (profile as { income_source?: string | null }).income_source,
     Number(profile.net_monthly_income ?? 0) * 12,
@@ -134,11 +118,9 @@ async function handleGet() {
   const { extrapolatedIncome, yearlyRetirementExpenses } = deriveRetirementExpenseBasis({
     method: initialMethod,
     yearlyMustExpenses,
-    last12Income,
-    earliestIncomeDate,
+    transactionAnnualIncome: txAnnualIncome,
     customAmount,
     estimatedYearlyExpenses,
-    now,
     effectiveAnnualIncome: effectiveAnnualIncome.amount,
   })
   const yearlyIncome = extrapolatedIncome

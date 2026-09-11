@@ -47,7 +47,8 @@ import {
 } from '@/lib/horizon-data'
 import type { Action } from '@/lib/recommendation-data'
 import { buildBudgetTypeMap, computeYearlyMustExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
-import { deriveRetirementExpenseBasis, extrapolateAnnualIncome } from '@/lib/retirement-expense-basis'
+import { deriveRetirementExpenseBasis } from '@/lib/retirement-expense-basis'
+import { transactionAnnualIncome } from '@/lib/budget-realized'
 import { WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
 import type { Asset } from '@/lib/asset-data'
 import { type Debt } from '@/lib/debt-data'
@@ -689,7 +690,11 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
   // Zelfde motor en dezelfde rijen als de core-/dashboard-loader (`getBudgets`
   // is cache()-gedeeld binnen het request), zodat /toekomst per definitie op
   // dezelfde grondslag staat als /overzicht/budget. Geen extra query.
-  const { income: horizonBudgetIncome, expenses: horizonBudgetExpenses } = await loadBudgetBasis(
+  const {
+    income: horizonBudgetIncome,
+    expenses: horizonBudgetExpenses,
+    realized: horizonRealized,
+  } = await loadBudgetBasis(
     supabase,
     profile as Record<string, unknown>,
     (allBudgetsResult.data ?? []) as unknown as BudgetBasisRow[],
@@ -737,18 +742,22 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
     s + Number(d.current_balance) * ((d.net_worth_inclusion_pct ?? 100) / 100), 0)
   const monthlyContributions = (assetsResult.data ?? []).reduce((s, a) => s + Number(a.monthly_contribution), 0)
 
-  // Extrapolated 12-month income — TRANSFER-INCLUSIEF (realOnly:false), BEWUST NIET
-  // gelijkgetrokken. extrapolatedIncome voedt NIET computeSavingsRate6m of de
+  // Transactie-jaarinkomen — TRANSFER-INCLUSIEF (`includeTransfers: true`), BEWUST
+  // NIET gelijkgetrokken. extrapolatedIncome voedt NIET computeSavingsRate6m of de
   // gezondheidsscore-input, maar computeRetirementExpenses (FIRE-pensioenuitgave,
   // income-based) én de income-basis van baseAnnualSavingsFromCashflow (inkomen ×
   // spaarquote). Dat zijn FIRE-projectie-inputs die bewust alle kasstromen zien (buiten
   // de spaarquote-gelijktrekking); die raakt alleen de spaarquote-RATE (savingsRate6m,
   // nu transfer-exclusief), niet deze income-multiplier.
-  const last12Income = aggSumPositief(txAgg12, { realOnly: false })
+  //
+  // HISTORIEBASIS (ADR 0138): de som komt uit het realisatievenster van
+  // `loadBudgetBasis` — twaalf AFGESLOTEN maanden, geschaald met dezelfde
+  // `historyMonths` als de budgetposten — en niet meer uit `Σ txAgg12` (dat
+  // venster loopt tot en met de lopende maand). Zie `transactionAnnualIncome`.
+  //
   // Vroegste inkomens-datum: all-time via de gedeelde `getEarliestIncomeDate`
-  // (order(date asc).limit(1)) i.p.v. een reduce over een gecapte 12-maands-slice —
-  // die kon bij >1000 positieve rijen stil afkappen (incomeMonths te klein →
-  // over-extrapolatie). Spiegelt dashboard-data-loader.ts/lever-scores-loader.ts.
+  // (order(date asc).limit(1)) — voedt alleen nog de 6-maands datamaand-telling
+  // (`savingsRateDataMonths`) hieronder.
   const earliestIncomeDate =
     (earliestIncomeResult.data as { date?: string | null } | null)?.date ?? undefined
 
@@ -769,15 +778,14 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
     allChildren.filter(c => !['archive', 'income', 'savings'].includes(c.budget_type)),
   )
 
-  // Extrapolatie (inkomen → jaarbasis) + pensioenuitgave-methode: ÉÉN gedeelde
-  // bron (lib/retirement-expense-basis.ts), identiek gedeeld met horizon-client
+  // Jaarinkomen + pensioenuitgave-methode: ÉÉN gedeelde bron
+  // (lib/retirement-expense-basis.ts), identiek gedeeld met horizon-client
   // loadData() en /api/uitgaven-na-pensioen/context (consume, don't recompute).
   // JAAR-grondslag (ADR 0103): dezelfde precedentie als de maand-resolutie, op
-  // jaarbedragen. De TRANSACTIE-invoer blijft de bestaande, bewust
-  // transfer-INCLUSIEVE extrapolatie (realOnly:false, zie de motivatie bij
-  // `last12Income` hierboven) — die semantiek is hier niet aangeraakt; alleen de
-  // KEUZE welke van de drie grondslagen wint loopt nu door de gedeelde resolver.
-  const horizonTxAnnualIncome = extrapolateAnnualIncome(last12Income, earliestIncomeDate, now)
+  // jaarbedragen. De TRANSACTIE-invoer is de bewust transfer-INCLUSIEVE som op de
+  // historiebasis (zie hierboven) — alleen de KEUZE welke van de drie
+  // grondslagen wint loopt door de gedeelde resolver.
+  const horizonTxAnnualIncome = transactionAnnualIncome(horizonRealized, { includeTransfers: true })
   const horizonAnnualIncome = resolveAmountWithBasis(
     (profile as { income_source?: string | null }).income_source,
     Number(profile.net_monthly_income ?? 0) * 12,
@@ -788,11 +796,9 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
   const { extrapolatedIncome, yearlyRetirementExpenses } = deriveRetirementExpenseBasis({
     method: profile.retirement_expense_method as RetirementExpenseMethod,
     yearlyMustExpenses,
-    last12Income,
-    earliestIncomeDate,
+    transactionAnnualIncome: horizonTxAnnualIncome,
     customAmount: profile.retirement_expense_custom_amount,
     estimatedYearlyExpenses: profileMonthlyExpenses * 12,
-    now,
     effectiveAnnualIncome: horizonAnnualIncome.amount,
   })
 

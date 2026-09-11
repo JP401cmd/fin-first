@@ -125,7 +125,6 @@ import { formatCurrency, calculateFreedomTime, formatFreedomTimeString, dailyExp
 import { consumptionExpenseRows, recentDailyExpenseRateFromRows } from '@/lib/expense-rate'
 import {
   getTxAgg12m,
-  aggSumPositief,
   aggIncomeByMonth,
   aggExpenseByMonthAbs,
   aggSpendingByMonthForBudgets,
@@ -178,7 +177,7 @@ import { buildBudgetSpendingMap, budgetBarPct, budgetBeschikbaar } from '@/lib/b
 import { isOverBudget } from '@/lib/budget-alerts'
 import { getCurrentMonthSplits } from '@/lib/budget-spending-fetch'
 import { resolveSavingsSource, savingsRateFromAggregates, computeDebtAflossingMonthly, monthlySavingsFromRate } from './savings-source'
-import { extrapolateAnnualIncome } from '@/lib/retirement-expense-basis'
+import { transactionAnnualIncome } from '@/lib/budget-realized'
 import { buildHealthScoreInput, type HealthScoreTransaction } from '@/lib/health-score-input'
 import type { SpendingTxRow } from '@/lib/budget-spending'
 import { computeHealthScoreWithTrend, type HealthScore } from '@/lib/financial-health'
@@ -608,7 +607,11 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // (cache()-gedeeld binnen het request) — geen extra query, geen tweede
   // beslissing. Alle budgetten, ook de inkomstenkant: `allBudgetsRaw` hierboven
   // is dezelfde bron, maar dit blok leest 'm ongefilterd.
-  const { income: dashboardBudgetIncome, expenses: dashboardBudgetExpenses } =
+  const {
+    income: dashboardBudgetIncome,
+    expenses: dashboardBudgetExpenses,
+    realized: dashboardRealized,
+  } =
     await loadBudgetBasis(
       supabase,
       profileResult.data as Record<string, unknown> | null,
@@ -1088,15 +1091,17 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     })
   }
 
-  const last12Income = aggSumPositief(txAgg12, { realOnly: true })
-  // Annualiseren via de gedeelde `extrapolateAnnualIncome` (ADR 0050) i.p.v. een
-  // vierde inline-kopie van dezelfde deler-clamp. Byte-identiek aan de vorige
-  // inline-variant; het verschil in GRONDSLAG (hier transfer-exclusief) zit in de
-  // invoer, niet in de formule. `earliestIncomeDateD` komt uit de ALL-TIME
-  // `getEarliestIncomeDate`-query (`order(date asc).limit(1)`, zie hierboven) —
-  // nadrukkelijk NIET uit de 12-maands slice: die is gecapt en zou het deler-anker
-  // te recent zetten, wat precies de over-extrapolatie geeft die ADR 0050 opruimde.
-  const extrapolatedIncome = extrapolateAnnualIncome(last12Income, earliestIncomeDateD, now)
+  // Het transactie-jaarinkomen op de HISTORIEBASIS (ADR 0138): de positieve som
+  // over twaalf AFGESLOTEN maanden uit het realisatievenster van
+  // `loadBudgetBasis`, geschaald met dezelfde `historyMonths` als de
+  // budgetposten. Tot 11 sep 2026 stond hier `extrapolateAnnualIncome(Σ txAgg12,
+  // vroegste inkomstendatum)`: een som tot en met de lopende maand boven een
+  // deler die alleen afgesloten maanden telde — daardoor verschoof het
+  // jaarinkomen (en op de gemengde grondslag de spaarquote, B-041) dagelijks.
+  // Transfer-EXCLUSIEF, zoals de vervangen `realOnly: true`-som; de all-time
+  // vroegste inkomstendatum (`earliestIncomeDateD`) voedt alleen nog de
+  // 6-maands datamaand-telling hieronder.
+  const extrapolatedIncome = transactionAnnualIncome(dashboardRealized)
 
   // JAAR-grondslag (ADR 0103): dezelfde precedentie, op jaarbedragen. Voedt
   // `computeRetirementExpenses` (methode current_income → FIRE-doel) en de

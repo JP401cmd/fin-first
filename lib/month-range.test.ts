@@ -58,9 +58,11 @@ describe('localMonthStartMonthsAgo — N maanden terug, eerste dag (tijdzone-vei
 
   describe('6-kalendermaands-venster (savingsRate6m) — 5 maanden terug, incl. huidige maand', () => {
     it('juni 2026: 5 maanden terug → 2026-01-01 (Jan..Jun = 6 maanden, NIET 7)', () => {
-      // Het savingsRate6m-venster moet exact de laatste 6 maand-slots dekken
-      // die de kassabon toont (monthlyIncomeExpenseSeries.slice(-6) = Jan..Jun
-      // voor now=juni). 5 maanden terug vanaf 15 juni 2026 = 1 januari 2026.
+      // Historische helper-assertie (pre-C6): 5 maanden terug vanaf 15 juni 2026
+      // = 1 januari 2026. NB het savingsRate6m-venster zelf loopt sinds C6 over
+      // zes AFGESLOTEN maanden (Dec..Mei voor now=juni, `savingsRateWindow`), en
+      // sinds ADR 0138 toont de kassabon precies die maanden
+      // (monthlyIncomeExpenseSeries = 12 afgesloten maanden, `.slice(-6)`).
       expect(localMonthStartMonthsAgo(new Date(2026, 5, 15), 5)).toBe('2026-01-01')
     })
 

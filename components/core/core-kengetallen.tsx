@@ -27,7 +27,12 @@ interface CoreKengetallenProps {
    * dat de waarde uit het profiel komt (geen transactie-historie).
    */
   incomeMonths: number
-  /** Per-maand uitsplitsing voor de inkomen-kassabon. */
+  /**
+   * Per-maand uitsplitsing voor de inkomen-kassabon — uit HETZELFDE venster
+   * van twaalf afgesloten maanden als `yearlyIncome` en `incomeMonths`
+   * (`BudgetRealizedWindow.byMonth`, ADR 0138), zodat rijen ÷ deler × 12 het
+   * totaal eronder oplevert.
+   */
   incomeByMonth: IncomeMonthEntry[]
   /** Jaarlijkse must-uitgaven (essentiële budgetten × jaarfrequentie). */
   yearlyMustExpenses: number
@@ -77,7 +82,7 @@ export function CoreKengetallen({
               incomeMonths > 0 && incomeMonths < 12
                 ? `Geëxtrapoleerd vanuit ${incomeMonths} ${incomeMonths === 1 ? 'maand' : 'maanden'}`
                 : incomeMonths >= 12
-                  ? 'Laatste 12 maanden'
+                  ? 'Laatste 12 afgesloten maanden'
                   : 'Profiel-schatting'
             }
             icon={<TrendingUp className="h-5 w-5 text-kern-600" aria-hidden="true" />}
@@ -196,7 +201,7 @@ function IncomeKassabon({
     incomeMonths > 0 && incomeMonths < 12
       ? `${incomeMonths} ${incomeMonths === 1 ? 'maand' : 'maanden'} data beschikbaar`
       : incomeMonths >= 12
-        ? 'Laatste 12 maanden'
+        ? 'Laatste 12 afgesloten maanden'
         : 'Profiel-schatting'
 
   return (
@@ -213,7 +218,8 @@ function IncomeKassabon({
       <div className="mb-1 border-b border-dashed border-[var(--border-ed)] pb-2 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">
         Je geschat jaarinkomen is de basis voor veel berekeningen, zoals je
         spaarquote en vrijheidspercentage. We tellen alle positieve transacties
-        op over de afgelopen 12 maanden.
+        op over de afgelopen 12 afgesloten maanden — de lopende maand telt pas
+        mee als hij voorbij is.
       </div>
 
       {incomeByMonth.length > 0 && (
@@ -268,7 +274,7 @@ function IncomeKassabon({
           positieve transacties over{' '}
           {incomeMonths > 0 && incomeMonths < 12
             ? `${incomeMonths} maanden, gedeeld door ${incomeMonths} en vermenigvuldigd met 12`
-            : 'de laatste 12 maanden'}
+            : 'de laatste 12 afgesloten maanden'}
           .
         </p>
       </div>

@@ -487,30 +487,28 @@ describe('de twee grondslagen blijven uit elkaar (ADR 0073)', () => {
   it("fixture 6: 'auto' met budgetten ⇒ de BUDGETgrondslag wint, op beide paden gelijk (ADR 0103)", async () => {
     const { oud, nieuw } = await runBothPaths(buildFixtures()[5].db)
     // De budgetgrondslag is sinds de correctie van 11 aug 2026 de REALISATIE op
-    // de budgetten, niet hun geplande limiet. Deze fixture-budgetten dragen geen
-    // `created_at`, dus de deler is het VOLLE venster (12) — de conservatieve
-    // terugval. €4.200 op het inkomstenbudget over het jaar ⇒ €4.200/jr = €350/mnd.
+    // de budgetten, niet hun geplande limiet — en sinds ADR 0138 (11 sep 2026,
+    // B-041/B-045) over twaalf AFGESLOTEN maanden met ÉÉN deler per gebruiker.
     //
-    // NB dit is niet de spanwijdte-deler: die zou €4.200 / 1 × 12 = €50.400/jr
-    // ⇒ €4.200/mnd geven. Zie de jaarpost-test in lib/budget-basis.test.ts voor
-    // waarom die deler is verworpen. Vóór de hele correctie stond hier €3.000
-    // (de geplande €36.000/jr).
-    expect(nieuw.currentMonthIncome).toBe(4200)
-    expect(nieuw.monthlyIncome).toBe(350)
-    expect(oud.monthlyIncome).toBe(350)
-    // Uitgaven, per post geannualiseerd op de deler (hier: het volle venster,
-    // want de fixture-rijen dragen geen created_at):
-    //  • B_EXPENSE_KID: 1.300 (deze maand) + 1.500 (vorige maand) = 2.800/jr
-    //    ⇒ 2.800 / 12 × 12 = 2.800/jr ≈ 233,33/mnd.
-    //  • B_EXPENSE (de PARENT, die kinderen heeft): 250 rechtstreeks op hem
-    //    geboekt ⇒ 250/jr ≈ 20,83/mnd. Hij telt mee als extra post juist omdat er
-    //    écht op hem geboekt is; zijn geplande limiet (9.999) telt als 0 zodat
-    //    hij niet dubbelt met zijn kind.
+    // De klok staat op 15 juli; het venster is aug 2025 … juni 2026. De €4.200
+    // op het inkomstenbudget is van 1 JULI en telt dus nog niet: de post valt
+    // terug op zijn geplande limiet (€36.000/jr = €3.000/mnd). Vóór ADR 0138
+    // stond hier €350 (4.200 ÷ 12 — de lopende maand telde mee, de deler was
+    // het volle venster omdat de fixture-rijen geen created_at dragen).
+    expect(nieuw.currentMonthIncome).toBe(4200) // de gerealiseerde maand (ADR 0073) blijft
+    expect(nieuw.monthlyIncome).toBe(3000)
+    expect(oud.monthlyIncome).toBe(3000)
+    // Uitgaven op dezelfde historiebasis. In het venster staat één afgesloten
+    // maand met boekingen (juni: €2.000 zonder budget, −€1.500 op
+    // B_EXPENSE_KID) ⇒ historyMonths = 1 ⇒ élke gerealiseerde post ×12:
+    //  • B_EXPENSE_KID: 1.500 (vorige maand) ⇒ 1.500 / 1 × 12 = 18.000/jr =
+    //    1.500/mnd. De 1.300 van deze maand telt pas volgende maand mee.
+    //  • B_EXPENSE (de PARENT): de 250 is van deze maand ⇒ geen boeking in het
+    //    venster ⇒ géén extra post (zijn limiet 9.999 is een kop boven zijn kind).
     // DRAGENDE INVARIANT, end-to-end: het SPAARbudget telt NIET mee — ook niet
-    // nu de grondslag op realisatie draait. De €600 op B_SAVINGS blijft er dus
-    // buiten. Zou dat ooit veranderen, dan moet de spaarbudget-correctie in
-    // resolveSavingsSource terugkomen (zie ADR 0103).
-    expect(nieuw.monthlyExpenses).toBeCloseTo((2800 + 250) / 12, 6)
+    // nu de grondslag op realisatie draait. Zou dat ooit veranderen, dan moet de
+    // spaarbudget-correctie in resolveSavingsSource terugkomen (zie ADR 0103).
+    expect(nieuw.monthlyExpenses).toBe(1500)
     expect(oud.monthlyExpenses).toBe(nieuw.monthlyExpenses)
     // De gerealiseerde maand blijft onaangeraakt: één keuze, twee grondslagen.
     // (Die telt de €600 spaarboeking en de €77 zonder budget WEL mee.)

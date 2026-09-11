@@ -225,7 +225,9 @@ export function CashflowInstellingenBlok({
 
   // 6-maands transactie-kassabon (alleen zinvol wanneer BEIDE grondslagen de
   // transactiesom zijn — anders zou een breakdown getoond worden die het
-  // percentage niet produceerde).
+  // percentage niet produceerde). `monthlyBreakdown` bevat sinds ADR 0138 de
+  // twaalf AFGESLOTEN maanden, dus `.slice(-6)` is exact het C6-venster van
+  // `savingsRate6m` (zes afgesloten maanden, lopende maand exclusief).
   const sixMonth = useMemo(() => {
     const last6 = data.monthlyBreakdown.slice(-6)
     const income = last6.reduce((s, m) => s + m.income, 0)
@@ -266,7 +268,7 @@ export function CashflowInstellingenBlok({
   // spaarquote-widget benoemen dezelfde grondslag met dezelfde woorden.
   const savingsBasisLabel = savingsRateBasisLabel(incomeBasis, expensesBasis)
   const savingsSub = showTxReceipt
-    ? 'laatste 6 maanden'
+    ? 'laatste 6 afgesloten maanden'
     : showEstimateNote
       ? data.savingsRateMethod === 'net_worth_delta'
         ? 'geschat uit vermogensgroei'
@@ -684,7 +686,7 @@ export function CashflowInstellingenBlok({
                 label="Uit je budgetten"
                 hint={
                   data.budgetIncome.hasBudgets
-                    ? 'Wat er per post binnenkwam over de afgelopen 12 maanden; een post die korter bestaat telt over zijn eigen maanden. Vink aan wat meetelt.'
+                    ? 'Wat er per post binnenkwam over de afgelopen 12 afgesloten maanden — de lopende maand telt pas mee als hij voorbij is. Vink aan wat meetelt.'
                     : 'Je hebt nog geen inkomsten-budgetten om uit te rekenen.'
                 }
                 onSelect={() => chooseSource('income', 'budget')}
@@ -702,7 +704,7 @@ export function CashflowInstellingenBlok({
                 name={`${radioName}-income`}
                 checked={incomeOption === 'transaction'}
                 label="Uit je transacties"
-                hint="Wat er de afgelopen 12 maanden werkelijk binnenkwam."
+                hint="Wat er de afgelopen 12 afgesloten maanden werkelijk binnenkwam — de lopende maand telt pas mee als hij voorbij is."
                 onSelect={() => chooseSource('income', 'transaction')}
               >
                 <KassabonShell>
@@ -715,9 +717,14 @@ export function CashflowInstellingenBlok({
                     ))}
                     <div className="mt-2 border-t border-dashed border-[var(--border-md)] pt-2">
                       <div className="flex items-center justify-between font-bold">
-                        <span>Totaal (12 mnd)</span>
+                        <span>Totaal (12 afgesloten mnd)</span>
                         <span className="tabular-nums"><MaskedAmount value={twelveMonthIncome} tone="kern" /></span>
                       </div>
+                      {/* Rijen, totaal en "≈ €X/mnd" komen sinds ADR 0138 uit
+                          HETZELFDE venster van twaalf afgesloten maanden
+                          (`monthlyBreakdown` = `CorePageData.monthlyIncomeExpenseSeries`
+                          uit het realisatievenster). Bij volle historie is het
+                          maandbedrag dus letterlijk het totaal ÷ 12. */}
                       <p className="mt-1 text-[10px] text-[var(--ink-meta)]">
                         ≈ €{Math.round(data.estimatedAnnualIncome / 12).toLocaleString('nl-NL')}/mnd
                       </p>
@@ -785,7 +792,7 @@ export function CashflowInstellingenBlok({
                 label="Uit je budgetten"
                 hint={
                   data.budgetExpenses.hasBudgets
-                    ? 'Wat je per post uitgaf over de afgelopen 12 maanden; een post die korter bestaat telt over zijn eigen maanden. Vink aan wat meetelt.'
+                    ? 'Wat je per post uitgaf over de afgelopen 12 afgesloten maanden — de lopende maand telt pas mee als hij voorbij is. Vink aan wat meetelt.'
                     : 'Je hebt nog geen uitgaven-budgetten om uit te rekenen.'
                 }
                 onSelect={() => chooseSource('expenses', 'budget')}
@@ -1126,7 +1133,9 @@ function BudgetKassabon({ basis, excluded, onToggle, annualTotal, emptyNote }: {
   // `realizedWindowMonths` is de BREEDTE van het venster dat de rekenkant
   // bevraagt en staat altijd op 12 (REALIZED_WINDOW_MONTHS) — daarop toetsen was
   // dode code. Wat de gebruiker wil weten is hoeveel maanden er werkelijk data
-  // ONDER zijn cijfer zit, en dat staat per post in `realizedMonths`.
+  // ONDER zijn cijfer zit, en dat staat per post in `realizedMonths` — sinds
+  // ADR 0138 voor élke gerealiseerde post dezelfde N (één deler per gebruiker),
+  // dus de regel onder het totaal is dé plek en de posten herhalen 'm niet.
   //
   // B-017: dat werd samengevat met `Math.max`, dus één post met een vol jaar
   // liet de regel volledig weg terwijl ernaast een post van 2 maanden ×6 was
@@ -1134,7 +1143,6 @@ function BudgetKassabon({ basis, excluded, onToggle, annualTotal, emptyNote }: {
   // uit de melding. De samenvatting woont nu in lib/budget-basis.ts en kijkt
   // naar de ZWAKSTE posten, met de LIVE selectie: wat niet meetelt in het
   // totaal, hoort deze regel ook niet te sturen.
-  const windowMonths = basis.realizedWindowMonths
   const windowNote = extrapolationNote(summarizeBasisWindow(basis, excluded))
   return (
     <>
@@ -1142,7 +1150,7 @@ function BudgetKassabon({ basis, excluded, onToggle, annualTotal, emptyNote }: {
         <div className="space-y-1.5">
           {basis.entries.map((entry) => {
             const off = excluded.has(entry.id)
-            const meta = entryMeta(entry, windowMonths)
+            const meta = entryMeta(entry)
             return (
               <label key={entry.id} className="flex cursor-pointer flex-col gap-0.5">
                 <span className="flex items-center justify-between gap-3">
@@ -1209,16 +1217,21 @@ function BudgetKassabon({ basis, excluded, onToggle, annualTotal, emptyNote }: {
 /**
  * De fijndruk onder één budgetpost (ADR 0103, gerealiseerde grondslag).
  *
- * "Uit je budgetten" betekent: wat er de afgelopen 12 maanden werkelijk op deze
- * post is binnengekomen of uitgegeven. Alleen zonder transacties valt een post
- * terug op zijn geplande limiet — en dát is een zwakker getal, dus dat zegt de
- * regel expliciet. Waar realisatie en planning uiteenlopen, toont hij de
- * planning erbij: dat verschil ís de informatie (je geeft structureel meer of
- * minder uit dan je begrootte). Eén regel, nooit meer.
+ * "Uit je budgetten" betekent: wat er de afgelopen 12 AFGESLOTEN maanden
+ * werkelijk op deze post is binnengekomen of uitgegeven (ADR 0138). Alleen
+ * zonder transacties valt een post terug op zijn geplande limiet — en dát is een
+ * zwakker getal, dus dat zegt de regel expliciet. Waar realisatie en planning
+ * uiteenlopen, toont hij de planning erbij: dat verschil ís de informatie (je
+ * geeft structureel meer of minder uit dan je begrootte). Eén regel, nooit meer.
+ *
+ * Het meetvenster staat hier NIET meer per post: sinds ADR 0138 is de deler per
+ * gebruiker, dus elke gerealiseerde post is over dezelfde N maanden gemeten en
+ * die ene zin staat onder het totaal (`extrapolationNote`). Per post herhalen
+ * zou twaalf keer hetzelfde feit zijn.
  */
 const PLANNED_DEVIATION_THRESHOLD = 0.05
 
-function entryMeta(entry: BudgetBasisEntry, windowMonths: number): string | null {
+function entryMeta(entry: BudgetBasisEntry): string | null {
   if (entry.source === 'planned') {
     return entry.realizedMonths === 0
       ? 'gepland — nog geen transacties gelogd'
@@ -1226,11 +1239,6 @@ function entryMeta(entry: BudgetBasisEntry, windowMonths: number): string | null
   }
 
   const parts: string[] = []
-  if (entry.realizedMonths > 0 && entry.realizedMonths < windowMonths) {
-    parts.push(
-      `gemeten over ${entry.realizedMonths} ${entry.realizedMonths === 1 ? 'maand' : 'maanden'}`,
-    )
-  }
   const planned = entry.plannedAnnualAmount
   if (
     planned > 0 &&

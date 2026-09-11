@@ -25,6 +25,7 @@ import {
   REALIZED_WINDOW_MONTHS,
   type BudgetRealizedWindow,
 } from '@/lib/budget-realized'
+import { annualizeHistorySum, clampHistoryMonths } from '@/lib/history-basis'
 
 /**
  * De KEUZE die op `profiles.income_source` / `profiles.expenses_source` staat.
@@ -184,16 +185,18 @@ export const BASIS_BUDGET_TYPE: Readonly<Record<'income' | 'expense', string>> =
 export const MAX_BASIS_ENTRIES = 500
 
 /**
- * Hoe hard leunt de getoonde budgetsom op EXTRAPOLATIE? (B-017)
+ * Hoe hard leunt de getoonde budgetsom op EXTRAPOLATIE? (B-017, ADR 0138)
  *
- * De deler is bewust PER POST (`resolveDenominatorMonths`: de leeftijd van het
- * budget) — een post die twee maanden bestaat heeft geen twaalf maanden
- * historie, en die per-post-keuze blijft staan. Wat mis was, is dat de
- * kassabon dat samenvatte met `Math.max` over de posten: één post met een vol
- * jaar zette de max op 12 en liet de eerlijkheidsregel dus volledig weg,
- * terwijl ernaast een post van twee maanden ×6 werd doorgerekend. De MAX is de
- * verkeerde samenvatter: de zwakste post bepaalt hoe hard het totaal op
- * extrapolatie leunt, niet de sterkste.
+ * Sinds ADR 0138 is de deler PER GEBRUIKER (`BudgetRealizedWindow.historyMonths`:
+ * afgesloten maanden met transactiehistorie, 1..12), dus élke gerealiseerde
+ * post draagt hetzelfde `realizedMonths`. De samenvatting hieronder blijft
+ * bestaan omdat ze op de POSTEN kijkt en niet op een constante — zo blijft de
+ * regel "Gemeten over N maanden en doorgerekend naar een heel jaar" gekoppeld
+ * aan wat er daadwerkelijk in het totaal zit (de live selectie), en verdwijnt
+ * hij vanzelf zodra er geen gerealiseerde post meer meetelt. Vóór ADR 0138
+ * was de deler per post (de leeftijd van het budget) en vatte de kassabon dat
+ * samen met `Math.max` — één post met een vol jaar verborg dan een post van
+ * twee maanden ×6; vandaar dat de zwakste post hier de regel bepaalt.
  */
 export interface BasisWindowSummary {
   /** Breedte van het meetvenster (`realizedWindowMonths`, in productie 12). */
@@ -299,9 +302,11 @@ export interface BudgetBasisRow {
    */
   ownership?: string | null
   /**
-   * Aanmaakmoment (`budgets.created_at`, NOT NULL DEFAULT now()). Anker voor de
-   * extrapolatie-deler; zie `resolveDenominatorMonths`. Optioneel getypt zodat
-   * een rij zonder de kolom niet breekt — dan vervalt de extrapolatie.
+   * Aanmaakmoment (`budgets.created_at`). Sinds ADR 0138 NIET meer gelezen: de
+   * deler is per gebruiker (`BudgetRealizedWindow.historyMonths`), niet de
+   * leeftijd van het budget. Het veld blijft optioneel in het type omdat
+   * `BUDGET_BASIS_COLUMNS` (lib/household/budget-share.ts) de kolom nog
+   * selecteert en bestaande rijen 'm dragen.
    */
   created_at?: string | null
 }
@@ -326,9 +331,11 @@ export interface BudgetBasisEntry {
   /** Waar `annualAmount` van deze post vandaan komt. */
   source: BudgetAmountSource
   /**
-   * Het meetvenster van deze post in maanden (0 = geen transactiedata → de post
-   * staat op `'planned'`). Zie `BudgetRealizedEntry.coveredMonths`: dit is de
-   * spanwijdte vanaf de eerste boeking, niet het aantal maanden mét een boeking.
+   * De deler waarmee deze post naar een jaarbedrag is geschaald (0 = geen
+   * transactiedata in het venster → de post staat op `'planned'`). Sinds
+   * ADR 0138 is dat voor élke gerealiseerde post dezelfde waarde:
+   * `BudgetRealizedWindow.historyMonths`, de afgesloten maanden met
+   * transactiehistorie van de gebruiker (1..12).
    */
   realizedMonths: number
   /**
@@ -349,7 +356,7 @@ export interface BudgetBasisResult {
   hasBudgets: boolean
   /** Er zijn posten, maar de gebruiker heeft ze allemaal uitgesloten. */
   allExcluded: boolean
-  /** Breedte van het realisatie-meetvenster in maanden (12). */
+  /** Breedte van het realisatie-meetvenster in AFGESLOTEN maanden (12). */
   realizedWindowMonths: number
   /** Kanarie uit het aggregaat: een chunk kwam op exact de PostgREST-cap terug. */
   truncationSuspected: boolean
@@ -370,63 +377,31 @@ function limitOf(row: BudgetBasisRow): number {
   return Number(row.default_limit) || 0
 }
 
-/** Aantal maanden van `created_at` t/m `windowEndMonth`, beide inclusief. */
-function monthsSinceCreation(createdAt: unknown, windowEndMonth: string): number | null {
-  if (typeof createdAt !== 'string' || !windowEndMonth) return null
-  const created = createdAt.slice(0, 7)
-  if (!/^\d{4}-\d{2}$/.test(created) || !/^\d{4}-\d{2}$/.test(windowEndMonth)) return null
-  const [cy, cm] = created.split('-').map(Number)
-  const [wy, wm] = windowEndMonth.split('-').map(Number)
-  return (wy - cy) * 12 + (wm - cm) + 1
-}
-
 /**
- * DE DELER waarmee de realisatie naar een jaarbedrag wordt geschaald.
+ * DE DELER waarmee de realisatie naar een jaarbedrag wordt geschaald (ADR 0138).
  *
- * = clamp( max(leeftijd van het budget, spanwijdte van de boekingen), 1, 12 )
+ * = `realized.historyMonths`: het aantal AFGESLOTEN maanden met
+ * transactiehistorie van de GEBRUIKER in het venster, geklemd op 1..12 — en dus
+ * dezelfde deler voor élke post, ongeacht wanneer het budget is aangemaakt of
+ * wanneer erop geboekt is. Eén boeking van €1.200 telt als €1.200 / N per maand
+ * op een budget van drie maanden oud én op een budget van drie jaar oud.
  *
- * WAAROM DE LEEFTIJD EN NIET DE SPANWIJDTE. De realisatie is een METING over een
- * vast venster — "wat is er de afgelopen twaalf maanden op dit budget gebeurd" —
- * en niet een run-rate. Het antwoord op die vraag is de som; delen door twaalf is
- * dan de maandwaarde. Extrapolatie bestaat UITSLUITEND om te compenseren dat een
- * budget nog geen heel jaar bestaat, dus de deler hoort de leeftijd van het
- * budget te zijn.
+ * WAT HIER BEWUST NIET MEER STAAT. Tot 11 sep 2026 was de deler per post de
+ * leeftijd van het budget (`budgets.created_at`), met de spanwijdte van de
+ * boekingen als ondergrens. Dat gaf per budget een andere noemer voor dezelfde
+ * meting ("€300 per maand, berekend over 4 maanden" naast "€100 per maand" op
+ * een ouder budget, B-045) — en omdat de spanwijdte met het venster meeschoof,
+ * kon een jaarpost aan de vensterrand alsnog tijdelijk ×12 gaan. Eén deler per
+ * gebruiker, uit het venster zelf, heeft geen van beide eigenschappen: de
+ * jaarpost aan de vensterrand deelt door dezelfde N als alle andere posten, en
+ * de klem op 12 maakt ×12 onbereikbaar zodra er een jaar historie is.
  *
- * Ankeren op de spanwijdte van de boekingen (de eerste versie hiervan) is fout
- * aan de BOVENkant: een jaarlijkse gemeentebelasting die in de lopende maand is
- * afgeschreven heeft spanwijdte 1, en (€800 / 1) × 12 = €9.600 — twaalf keer te
- * hoog, en maandelijks golvend omdat de spanwijdte met het venster meeschuift.
- * Dat is dezelfde over-extrapolatie-fout-klasse die ADR 0050 voor het inkomen
- * opruimde (`extrapolateAnnualIncome` ankert daarom op de ALL-TIME vroegste
- * datum, niet op een venster-slice).
- *
- * BEWUSTE KEERZIJDE, afgewogen: een OUD budget dat pas sinds kort gebruikt wordt
- * (bv. een nieuw abonnement onder een bestaande categorie) wordt niet
- * opgeschaald — €200 in twee maanden telt als €200 per jaar, niet €1.200. Dat is
- * geen onderschatting maar het juiste antwoord op de vraag die deze grondslag
- * stelt: er ís het afgelopen jaar €200 uitgegeven. Blijft de gebruiker uitgeven,
- * dan groeit het getal vanzelf mee terwijl het venster opschuift. Het alternatief
- * zou een volatiele run-rate zijn die bij elke jaarpost ontspoort — en voor
- * uitgaven is te HOOG schatten net zo schadelijk (te late FIRE-datum) als te
- * laag. Van de twee fouten is deze de kleinste, de stabielste en de best
- * uitlegbare.
- *
- * `coveredMonths` blijft de ONDERGRENS: zijn er boekingen ouder dan `created_at`
- * (data-import, samengevoegd budget), dan is de leeftijd niet te vertrouwen en
- * dekt de data aantoonbaar meer maanden.
- *
- * Ontbrekende/onleesbare `created_at` → geen extrapolatie (deler = het volle
- * venster). Conservatief: liever niet opschalen dan ten onrechte ×12.
+ * De klem hier is defensief: het venster levert `historyMonths` al geklemd aan
+ * (`historyMonthsFromRows`), maar een handgebouwde window mag de som niet
+ * kunnen laten ontsporen.
  */
-function resolveDenominatorMonths(
-  row: BudgetBasisRow,
-  realizedEntry: { coveredMonths: number },
-  realized: BudgetRealizedWindow,
-): number {
-  const windowMonths = Math.max(1, realized.windowMonths)
-  const age = monthsSinceCreation(row.created_at, realized.windowEndMonth)
-  const base = age != null && age > 0 ? age : windowMonths
-  return Math.max(1, Math.min(windowMonths, Math.max(base, realizedEntry.coveredMonths)))
+function resolveDenominatorMonths(realized: BudgetRealizedWindow): number {
+  return clampHistoryMonths(realized.historyMonths)
 }
 
 /**
@@ -505,16 +480,17 @@ export function computeBudgetBasis(
    * bedrag op een inkomstenbudget (terugboeking) verlaagt zo niet stil het
    * inkomen, en andersom.
    *
-   * EXTRAPOLATIE: zie `resolveDenominatorMonths` — de deler is de LEEFTIJD van
-   * het budget binnen het venster, niet de spanwijdte van zijn boekingen.
+   * EXTRAPOLATIE: zie `resolveDenominatorMonths` — één deler per gebruiker
+   * (ADR 0138), dezelfde schaalformule als het transactie-jaarinkomen
+   * (`annualizeHistorySum`).
    */
+  const months = resolveDenominatorMonths(realized)
   const realizedAnnualOf = (row: BudgetBasisRow): { annual: number; months: number } | null => {
     const r = realized.byBudgetId[row.id]
     if (!r) return null
     const gross = type === 'income' ? r.incoming : r.outgoing
     if (!(gross > 0)) return null
-    const months = resolveDenominatorMonths(row, r, realized)
-    return { annual: (gross / months) * 12, months }
+    return { annual: annualizeHistorySum(gross, months), months }
   }
 
   const push = (row: BudgetBasisRow, fallbackInterval: string | null, plannedZero = false) => {

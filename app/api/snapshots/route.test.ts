@@ -15,9 +15,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
  * flushen microtasks vóór de assert.
  */
 
-const { mockAuthGetUser, mockFrom, mockCapture, mockLogError } = vi.hoisted(() => ({
+const { mockAuthGetUser, mockFrom, mockRpc, mockCapture, mockLogError } = vi.hoisted(() => ({
   mockAuthGetUser: vi.fn(),
   mockFrom: vi.fn(),
+  mockRpc: vi.fn(),
   mockCapture: vi.fn(),
   mockLogError: vi.fn(),
 }))
@@ -26,6 +27,9 @@ vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(async () => ({
     auth: { getUser: mockAuthGetUser },
     from: mockFrom,
+    // `tx_month_aggregate` — het realisatievenster van de budgetgrondslag én
+    // (sinds ADR 0138) het transactie-jaarinkomen (`transactionAnnualIncome`).
+    rpc: mockRpc,
   })),
   getAuthClaims: vi.fn(),
 }))
@@ -87,9 +91,12 @@ async function flush() {
 beforeEach(() => {
   mockAuthGetUser.mockReset()
   mockFrom.mockReset()
+  mockRpc.mockReset()
   mockCapture.mockReset()
   mockLogError.mockReset()
   mockAuthGetUser.mockResolvedValue({ data: { user: USER } })
+  // Leeg venster: geen realisatie, transactie-jaarinkomen 0 (→ profiel/unknown).
+  mockRpc.mockResolvedValue({ data: [], error: null })
   mockHappyPath()
 })
 
@@ -193,6 +200,19 @@ describe('POST /api/snapshots — savings_rate = canonieke spaarquote (niet flat
   beforeEach(() => {
     mockCapture.mockResolvedValue({ count: 0 })
     mockSavingsPersona()
+    // HISTORIEBASIS (ADR 0138): de inkomstengrondslag van de snapshot is pas
+    // 'transaction' als het realisatievenster inkomen draagt — €60.000 in de
+    // OUDSTE afgesloten maand (historyMonths = 12 → geen extrapolatie), zodat
+    // het transactie-jaarinkomen exact 12 × MONTHLY_INCOME is. Gefilterd op
+    // [p_from, p_to) zoals de echte RPC, anders telt elke chunk 'm mee.
+    const oudsteMaand = new Date(new Date().getFullYear(), new Date().getMonth() - 12, 1)
+    const key = `${oudsteMaand.getFullYear()}-${String(oudsteMaand.getMonth() + 1).padStart(2, '0')}`
+    mockRpc.mockImplementation(async (_fn: string, args: Record<string, unknown>) => ({
+      data: [
+        { month: key, budget_id: null, transaction_type: 'income', sum_positief: MONTHLY_INCOME * 12, sum_negatief: 0, count: 1 },
+      ].filter((r) => `${r.month}-01` >= String(args.p_from) && `${r.month}-01` < String(args.p_to)),
+      error: null,
+    }))
   })
 
   it('persisteert savingsRateFromAggregates (incl. aflossing), niet de flatte FIRE-quote', async () => {

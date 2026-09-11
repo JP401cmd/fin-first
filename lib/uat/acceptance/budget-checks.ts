@@ -477,7 +477,7 @@ export const BUDGET_ENGINE_CHECKS: BudgetEngineCheck[] = [
     workflow: 'WF-BUDGET-26',
     scenarioId: 'UAT-BUDGET-26',
     label:
-      'Budgetgrondslag (computeBudgetBasis, ADR 0103): selectieniveau + expense-only-invariant + kind-oprol op eigen interval, uitsluiten verlaagt maar verbergt niet, en realisatie vóór plan met de budgetleeftijd als deler',
+      'Budgetgrondslag (computeBudgetBasis, ADR 0103 + 0138): selectieniveau + expense-only-invariant + kind-oprol op eigen interval, uitsluiten verlaagt maar verbergt niet, en realisatie vóór plan met ÉÉN historiedeler per gebruiker (budgetleeftijd irrelevant)',
     run: () => {
       criterion('WF-BUDGET-26')
 
@@ -509,16 +509,20 @@ export const BUDGET_ENGINE_CHECKS: BudgetEngineCheck[] = [
       const naUitsluiting = computeBudgetBasis(budgets, 'expense', ['markt'])
       const income = computeBudgetBasis(budgets, 'income', [])
 
-      // Realisatie-venster dat eindigt op 2026-08 (12 maanden breed).
+      // Realisatie-venster van twaalf AFGESLOTEN maanden dat eindigt op 2026-08
+      // (ADR 0138), met ÉÉN deler voor de hele gebruiker: zes afgesloten maanden
+      // transactiehistorie. Die deler geldt voor élke post — het budget van
+      // 2020 en het budget van maart 2026 schalen allebei ×2.
       const realized: BudgetRealizedWindow = {
         windowMonths: 12,
         windowEndMonth: '2026-08',
+        historyMonths: 6,
+        windowIncome: { real: 0, all: 0 },
+        byMonth: {},
         truncationSuspected: false,
         byBudgetId: {
-          // Budget ouder dan het venster → deler 12 → de som telt onverkort.
-          supermarkt: { incoming: 0, outgoing: 2400, coveredMonths: 12 },
-          // Budget aangemaakt in maart 2026 → leeftijd 6 → ×2 geëxtrapoleerd.
-          jong: { incoming: 0, outgoing: 600, coveredMonths: 6 },
+          supermarkt: { incoming: 0, outgoing: 2400 },
+          jong: { incoming: 0, outgoing: 600 },
         },
       }
       const metRealisatie = computeBudgetBasis(
@@ -535,9 +539,9 @@ export const BUDGET_ENGINE_CHECKS: BudgetEngineCheck[] = [
 
       return {
         expected:
-          'postenExpense=3; jaartotaalPlan=18000; maandtotaalPlan=1500; jaartotaalNaUitsluiting=16800; postenBlijvenZichtbaar=3; jaartotaalIncome=36000; oudBudgetRealisatie=2400/realized; jongBudgetGeextrapoleerd=1200/realized; zonderBoekingenPlan=12000/planned',
+          'postenExpense=3; jaartotaalPlan=18000; maandtotaalPlan=1500; jaartotaalNaUitsluiting=16800; postenBlijvenZichtbaar=3; jaartotaalIncome=36000; oudBudgetRealisatie=4800/realized/6; jongBudgetRealisatie=1200/realized/6; zonderBoekingenPlan=12000/planned',
         actual:
-          `postenExpense=${plan.entries.length}; jaartotaalPlan=${plan.annualTotal}; maandtotaalPlan=${plan.monthlyTotal}; jaartotaalNaUitsluiting=${naUitsluiting.annualTotal}; postenBlijvenZichtbaar=${naUitsluiting.entries.length}; jaartotaalIncome=${income.annualTotal}; oudBudgetRealisatie=${oud?.annualAmount}/${oud?.source}; jongBudgetGeextrapoleerd=${jong?.annualAmount}/${jong?.source}; zonderBoekingenPlan=${zonderBoekingen?.annualAmount}/${zonderBoekingen?.source}`,
+          `postenExpense=${plan.entries.length}; jaartotaalPlan=${plan.annualTotal}; maandtotaalPlan=${plan.monthlyTotal}; jaartotaalNaUitsluiting=${naUitsluiting.annualTotal}; postenBlijvenZichtbaar=${naUitsluiting.entries.length}; jaartotaalIncome=${income.annualTotal}; oudBudgetRealisatie=${oud?.annualAmount}/${oud?.source}/${oud?.realizedMonths}; jongBudgetRealisatie=${jong?.annualAmount}/${jong?.source}/${jong?.realizedMonths}; zonderBoekingenPlan=${zonderBoekingen?.annualAmount}/${zonderBoekingen?.source}`,
       }
     },
   },

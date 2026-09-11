@@ -186,6 +186,30 @@ export const EXPENSE_RATE_ROLLING_MONTHS = 12
  */
 export const SAVINGS_RATE_WINDOW_MONTHS = 6
 
+// ── Historiebasis (budgetgrondslag + transactie-jaarinkomen) ────────
+
+/**
+ * Breedte van het venster waarover de BUDGETREALISATIE en het
+ * TRANSACTIE-JAARINKOMEN worden gemeten, in AFGESLOTEN kalendermaanden
+ * (`lib/history-basis.ts`, ADR 0138). De lopende maand valt er per definitie
+ * buiten: een boeking van vandaag telt pas mee zodra de maand voorbij is.
+ *
+ * Dit is tegelijk de BOVENGRENS van de ene deler per gebruiker
+ * (`historyMonths`): het aantal afgesloten maanden met transactiehistorie in
+ * het venster, geklemd op 1..HISTORY_WINDOW_MONTHS, voor ÁLLE budgetten. Tot
+ * 11 sep 2026 telde de budgetsom de lopende maand mee en had elk budget zijn
+ * eigen deler (de leeftijd sinds `budgets.created_at`) — waardoor de spaarquote
+ * gedurende de maand verschoof (B-041) en een boeking van €1.200 op een budget
+ * van drie maanden oud als "€300 per maand, berekend over 4 maanden" doortelde
+ * (B-045).
+ *
+ * BEWUST een eigen constante naast `EXPENSE_RATE_ROLLING_MONTHS` (12, rollend
+ * INCLUSIEF de lopende maand — het dagtarief) en `SAVINGS_RATE_WINDOW_MONTHS`
+ * (6 afgesloten maanden — de transactie-spaarquote): drie vensters, drie
+ * grootheden, elk met zijn eigen reden.
+ */
+export const HISTORY_WINDOW_MONTHS = 12
+
 /**
  * Welk aandeel van een normaal maandinkomen binnen moet zijn voordat de
  * GEREALISEERDE lopende maand als "inkomen compleet" telt.

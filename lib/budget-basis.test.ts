@@ -252,27 +252,31 @@ describe('computeBudgetBasis — deelfractie en defensieve invoer', () => {
   })
 })
 
-describe('realisatie i.p.v. geplande limiet (ADR 0103, correctie 11 aug 2026)', () => {
+describe('realisatie i.p.v. geplande limiet (ADR 0103, correctie 11 aug 2026; historiebasis ADR 0138)', () => {
+  /**
+   * Een realisatievenster zoals `fetchRealizedBudgetAmounts` 'm levert: twaalf
+   * AFGESLOTEN maanden, één `historyMonths`-deler voor de hele gebruiker.
+   */
   function win(
-    byBudgetId: Record<string, { incoming?: number; outgoing?: number; coveredMonths: number }>,
-    truncationSuspected = false,
+    byBudgetId: Record<string, { incoming?: number; outgoing?: number }>,
+    opts: { historyMonths?: number; truncationSuspected?: boolean } = {},
   ) {
     return {
       windowMonths: 12,
       windowEndMonth: '2026-08',
-      truncationSuspected,
+      historyMonths: opts.historyMonths ?? 12,
+      windowIncome: { real: 0, all: 0 },
+      byMonth: {},
+      truncationSuspected: opts.truncationSuspected ?? false,
       byBudgetId: Object.fromEntries(
-        Object.entries(byBudgetId).map(([k, v]) => [
-          k,
-          { incoming: v.incoming ?? 0, outgoing: v.outgoing ?? 0, coveredMonths: v.coveredMonths },
-        ]),
+        Object.entries(byBudgetId).map(([k, v]) => [k, { incoming: v.incoming ?? 0, outgoing: v.outgoing ?? 0 }]),
       ),
     }
   }
 
   it('een post MET realisatie gebruikt de gemeten som, niet de limiet', () => {
     const r = computeBudgetBasis([row({ id: 'e', default_limit: 1000 })], 'expense', [], {
-      realized: win({ e: { outgoing: 9_600, coveredMonths: 12 } }),
+      realized: win({ e: { outgoing: 9_600 } }),
     })
     expect(r.entries[0].source).toBe('realized')
     expect(r.entries[0].annualAmount).toBe(9_600) // niet 12.000 (de limiet)
@@ -298,41 +302,40 @@ describe('realisatie i.p.v. geplande limiet (ADR 0103, correctie 11 aug 2026)', 
     const realized = win({
       // Een terugboeking op het inkomstenbudget mag het inkomen niet verlagen,
       // en een creditering op een uitgavenbudget niet als uitgave tellen.
-      i: { incoming: 60_000, outgoing: 500, coveredMonths: 12 },
-      e: { incoming: 200, outgoing: 24_000, coveredMonths: 12 },
+      i: { incoming: 60_000, outgoing: 500 },
+      e: { incoming: 200, outgoing: 24_000 },
     })
     expect(computeBudgetBasis(rows, 'income', [], { realized }).annualTotal).toBe(60_000)
     expect(computeBudgetBasis(rows, 'expense', [], { realized }).annualTotal).toBe(24_000)
   })
 
-  it('BEWUSTE KEERZIJDE: een OUD budget dat pas sinds kort gebruikt wordt, schaalt NIET op', () => {
-    // Zonder created_at-signaal (of met een oud budget) is de deler het volle
-    // venster: €900 in de laatste 3 maanden telt als €900 per jaar, niet €3.600.
-    // Dat is het juiste antwoord op "wat is er het afgelopen jaar gebeurd" en het
-    // groeit vanzelf mee terwijl het venster opschuift. De run-rate-lezing zou
-    // hier €3.600 geven — en op een jaarpost €9.600 (zie de test hieronder).
+  it('volle historie: een OUD budget dat pas sinds kort gebruikt wordt, schaalt NIET op', () => {
+    // De gebruiker heeft twaalf afgesloten maanden historie, dus de deler is 12:
+    // €900 in de laatste 3 maanden telt als €900 per jaar, niet €3.600. Dat is
+    // het antwoord op "wat is er het afgelopen jaar gebeurd" en het groeit
+    // vanzelf mee terwijl het venster opschuift.
     const r = computeBudgetBasis(
       [row({ id: 'e', default_limit: 0, created_at: '2020-01-01T00:00:00Z' })],
       'expense',
       [],
-      { realized: win({ e: { outgoing: 900, coveredMonths: 3 } }) },
+      { realized: win({ e: { outgoing: 900 } }, { historyMonths: 12 }) },
     )
     expect(r.entries[0].annualAmount).toBe(900)
     expect(r.entries[0].realizedMonths).toBe(12)
   })
 
-  it('een KWARTAALpost wordt NIET verviervoudigd: de spanwijdte telt, niet het aantal boekingsmaanden', () => {
+  it('een KWARTAALpost wordt NIET verviervoudigd: het aantal boekingsmaanden is geen deler', () => {
     // Vier kwartaalpremies van €300 = €1.200/jaar, geboekt in 4 van de 12
-    // maanden. `coveredMonths` is de spanwijdte (12), dus 1.200 / 12 × 12.
+    // maanden. De deler is de historie van de gebruiker (12), dus 1.200 / 12 × 12.
     const r = computeBudgetBasis([row({ id: 'e', default_limit: 0 })], 'expense', [], {
-      realized: win({ e: { outgoing: 1_200, coveredMonths: 12 } }),
+      realized: win({ e: { outgoing: 1_200 } }),
     })
     expect(r.entries[0].annualAmount).toBe(1_200)
   })
 
   it('de deelfractie werkt onverkort door op het GEREALISEERDE bedrag', () => {
     const r = computeBudgetBasis([row({ id: 'e', default_limit: 1000 })], 'expense', [], {
-      realized: win({ e: { outgoing: 9_600, coveredMonths: 12 } }),
+      realized: win({ e: { outgoing: 9_600 } }),
       shareFractionById: { e: 0.5 },
     })
     expect(r.entries[0].annualAmount).toBe(4_800)
@@ -346,7 +349,7 @@ describe('realisatie i.p.v. geplande limiet (ADR 0103, correctie 11 aug 2026)', 
       row({ id: 'c2', parent_id: 'p', default_limit: 100 }),
     ]
     const r = computeBudgetBasis(rows, 'expense', [], {
-      realized: win({ c1: { outgoing: 1_200, coveredMonths: 12 }, c2: { outgoing: 2_400, coveredMonths: 12 } }),
+      realized: win({ c1: { outgoing: 1_200 }, c2: { outgoing: 2_400 } }),
     })
     expect(r.entries.map(e => e.id)).toEqual(['c1', 'c2'])
     expect(r.annualTotal).toBe(3_600)
@@ -361,8 +364,8 @@ describe('realisatie i.p.v. geplande limiet (ADR 0103, correctie 11 aug 2026)', 
     ]
     const r = computeBudgetBasis(rows, 'expense', [], {
       realized: win({
-        c1: { outgoing: 1_200, coveredMonths: 12 },
-        p: { outgoing: 600, coveredMonths: 12 },
+        c1: { outgoing: 1_200 },
+        p: { outgoing: 600 },
       }),
     })
     expect(r.entries.map(e => e.id)).toEqual(['c1', 'p'])
@@ -373,7 +376,7 @@ describe('realisatie i.p.v. geplande limiet (ADR 0103, correctie 11 aug 2026)', 
   it('zonder eigen boeking krijgt een parent-mét-kinderen GEEN extra vinkregel', () => {
     const rows = [row({ id: 'p', default_limit: 9999 }), row({ id: 'c1', parent_id: 'p', default_limit: 100 })]
     const r = computeBudgetBasis(rows, 'expense', [], {
-      realized: win({ c1: { outgoing: 1_200, coveredMonths: 12 } }),
+      realized: win({ c1: { outgoing: 1_200 } }),
     })
     expect(r.entries.map(e => e.id)).toEqual(['c1'])
   })
@@ -381,7 +384,7 @@ describe('realisatie i.p.v. geplande limiet (ADR 0103, correctie 11 aug 2026)', 
   it('de uitsluitlijst werkt ongewijzigd op gerealiseerde posten', () => {
     const rows = [row({ id: 'a', default_limit: 0 }), row({ id: 'b', default_limit: 0 })]
     const r = computeBudgetBasis(rows, 'expense', ['b'], {
-      realized: win({ a: { outgoing: 1_200, coveredMonths: 12 }, b: { outgoing: 6_000, coveredMonths: 12 } }),
+      realized: win({ a: { outgoing: 1_200 }, b: { outgoing: 6_000 } }),
     })
     expect(r.annualTotal).toBe(1_200)
     expect(r.entries.find(e => e.id === 'b')!.excluded).toBe(true)
@@ -399,17 +402,12 @@ describe('realisatie i.p.v. geplande limiet (ADR 0103, correctie 11 aug 2026)', 
     expect(zonder.entries.every(e => e.source === 'planned')).toBe(true)
   })
 
-  it('JAARPOST in de lopende maand wordt NIET ×12 — de deler is de leeftijd, niet de spanwijdte', () => {
-    // Het defect dat de eindreview vond: venster 2025-09…2026-08, een jaarlijkse
-    // gemeentebelasting van €800 afgeschreven in aug 2026. De vorige betaling
-    // (aug 2025) valt net buiten het venster, dus er is één rij → spanwijdte 1.
-    // Met de spanwijdte als deler zou dit €9.600/jr worden.
-    const realized = {
-      windowMonths: 12,
-      windowEndMonth: '2026-08',
-      truncationSuspected: false,
-      byBudgetId: { e: { incoming: 0, outgoing: 800, coveredMonths: 1 } },
-    }
+  it('JAARPOST in de laatste afgesloten maand wordt NIET ×12 bij volle historie', () => {
+    // Venster 2025-09…2026-08, een jaarlijkse gemeentebelasting van €800
+    // afgeschreven in aug 2026 (de laatste afgesloten maand). De vorige betaling
+    // (aug 2025) valt net buiten het venster. De deler is de historie van de
+    // GEBRUIKER (12), niet de spanwijdte van deze ene boeking — €800/jr.
+    const realized = win({ e: { outgoing: 800 } }, { historyMonths: 12 })
     const rows = [
       row({ id: 'e', default_limit: 800, interval: 'yearly', created_at: '2019-03-04T10:00:00Z' }),
     ]
@@ -419,49 +417,48 @@ describe('realisatie i.p.v. geplande limiet (ADR 0103, correctie 11 aug 2026)', 
     expect(r.annualTotal).not.toBe(9_600)
   })
 
-  it('een JONG budget wordt wél opgeschaald — op zijn leeftijd', () => {
-    const realized = {
-      windowMonths: 12,
-      windowEndMonth: '2026-08',
-      truncationSuspected: false,
-      byBudgetId: { e: { incoming: 0, outgoing: 900, coveredMonths: 3 } },
-    }
-    // Aangemaakt in juni 2026 ⇒ leeftijd 3 maanden (jun/jul/aug).
-    const rows = [row({ id: 'e', default_limit: 0, created_at: '2026-06-15T10:00:00Z' })]
+  it('korte historie van de GEBRUIKER schaalt élke post op — ook een oud budget (ADR 0138)', () => {
+    // Drie afgesloten maanden historie ⇒ deler 3 voor iedereen: €900 → €3.600.
+    const realized = win({ oud: { outgoing: 900 }, jong: { outgoing: 900 } }, { historyMonths: 3 })
+    const rows = [
+      row({ id: 'oud', default_limit: 0, created_at: '2020-01-01T00:00:00Z' }),
+      row({ id: 'jong', default_limit: 0, created_at: '2026-06-15T10:00:00Z' }),
+    ]
     const r = computeBudgetBasis(rows, 'expense', [], { realized })
-    expect(r.entries[0].realizedMonths).toBe(3)
-    expect(r.entries[0].annualAmount).toBe(3_600)
+    for (const e of r.entries) {
+      expect(e.realizedMonths).toBe(3)
+      expect(e.annualAmount).toBe(3_600)
+    }
   })
 
-  it('boekingen OUDER dan created_at: de spanwijdte is de ondergrens', () => {
-    // Data-import of samengevoegd budget — created_at is dan niet te vertrouwen.
-    const realized = {
-      windowMonths: 12,
-      windowEndMonth: '2026-08',
-      truncationSuspected: false,
-      byBudgetId: { e: { incoming: 0, outgoing: 1_200, coveredMonths: 12 } },
-    }
-    const rows = [row({ id: 'e', default_limit: 0, created_at: '2026-08-01T10:00:00Z' })]
+  it('created_at is irrelevant: een budget van gisteren met een boeking in het venster deelt door dezelfde N', () => {
+    const realized = win({ e: { outgoing: 1_200 } }, { historyMonths: 12 })
+    const rows = [row({ id: 'e', default_limit: 0, created_at: '2026-08-31T10:00:00Z' })]
     const r = computeBudgetBasis(rows, 'expense', [], { realized })
     expect(r.entries[0].realizedMonths).toBe(12)
     expect(r.entries[0].annualAmount).toBe(1_200)
   })
 
-  it('ontbrekende created_at → geen extrapolatie (conservatief)', () => {
-    const realized = {
-      windowMonths: 12,
-      windowEndMonth: '2026-08',
-      truncationSuspected: false,
-      byBudgetId: { e: { incoming: 0, outgoing: 800, coveredMonths: 1 } },
-    }
+  it('ontbrekende created_at maakt geen verschil — de deler komt uit het venster', () => {
+    const realized = win({ e: { outgoing: 800 } }, { historyMonths: 1 })
     const rows = [row({ id: 'e', default_limit: 0, created_at: null })]
     const r = computeBudgetBasis(rows, 'expense', [], { realized })
-    expect(r.entries[0].annualAmount).toBe(800)
+    // Eén afgesloten maand historie ⇒ €800 in die maand is €9.600 per jaar.
+    expect(r.entries[0].annualAmount).toBe(9_600)
+    expect(r.entries[0].realizedMonths).toBe(1)
+  })
+
+  it('een handgebouwd venster met een onzinnige deler wordt geklemd (defensief)', () => {
+    const r = computeBudgetBasis([row({ id: 'e', default_limit: 0 })], 'expense', [], {
+      realized: win({ e: { outgoing: 1_200 } }, { historyMonths: 0 }),
+    })
+    expect(r.entries[0].realizedMonths).toBe(1)
+    expect(Number.isFinite(r.entries[0].annualAmount)).toBe(true)
   })
 
   it('de truncatie-kanarie reist mee naar het resultaat', () => {
     const r = computeBudgetBasis([row({ id: 'e', default_limit: 100 })], 'expense', [], {
-      realized: win({ e: { outgoing: 1_200, coveredMonths: 12 } }, true),
+      realized: win({ e: { outgoing: 1_200 } }, { truncationSuspected: true }),
     })
     expect(r.truncationSuspected).toBe(true)
     expect(r.realizedWindowMonths).toBe(12)

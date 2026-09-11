@@ -53,7 +53,7 @@ import { deriveMarginaalTarief } from '@/lib/box1-tax'
 import { type WithdrawalStrategyType, type WithdrawalStrategyConfig, WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
 import type { Action, ActionStatus } from '@/lib/recommendation-data'
 import { computeRetirementExpenses, computeYearlyMustExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
-import { deriveRetirementExpenseBasis } from '@/lib/retirement-expense-basis'
+import { deriveRetirementExpenseBasis, extrapolateAnnualIncome } from '@/lib/retirement-expense-basis'
 import type { CashflowSettingsData } from '@/lib/cashflow-settings-data'
 import { resolveEffectiveIncomeExpenses, type IncomeExpenseSources } from '@/lib/effective-financials'
 import type { Debt } from '@/lib/debt-data'
@@ -1360,7 +1360,10 @@ export default function HorizonPage({
       const monthEnd = new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 1)).toISOString().split('T')[0]
       const oneYearFromNow = new Date(Date.UTC(now.getFullYear() + 1, now.getMonth(), now.getDate())).toISOString().split('T')[0]
       const today = now.toISOString().split('T')[0]
-      const twelveMonthsAgo = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 11, 1)).toISOString().split('T')[0]
+      // Twaalf AFGESLOTEN maanden (ADR 0138): van 12 maanden terug tot de 1e van
+      // de lopende maand — hetzelfde venster als het realisatievenster op de
+      // server, zodat deze terugval niet met de lopende maand meeschuift.
+      const twelveMonthsAgo = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 12, 1)).toISOString().split('T')[0]
       // 6-maands venster uit de CANONIEKE bron (lib/savings-source.ts): zes
       // VOLTOOIDE kalendermaanden, de lopende maand EXCLUSIEF — dezelfde grenzen
       // als de SSR-loader (lib/horizon/raw-data-loader.ts) waar
@@ -1392,7 +1395,7 @@ export default function HorizonPage({
           .select('snapshot_date, resilience_score, net_worth, freedom_percentage, fire_age, score_version')
           .order('snapshot_date', { ascending: true })
           .limit(60),
-        supabase.from('transactions').select('amount, date').gt('amount', 0).gte('date', twelveMonthsAgo).lt('date', monthEnd),
+        supabase.from('transactions').select('amount, date').gt('amount', 0).gte('date', twelveMonthsAgo).lt('date', monthStart),
         // Vroegste inkomstendatum ALL-TIME (geen 12-maands-venster) — deler-anker
         // voor de extrapolatie. Spiegelt de canonieke getEarliestIncomeDate
         // (SSR-loader / API-route); een gecapt venster gaf een te recente datum →
@@ -1499,16 +1502,16 @@ export default function HorizonPage({
       // FIRE-doel.
       //
       // Terugval wanneer de bundel niet beschikbaar is: de gedeelde
-      // extrapolatie-helper (lib/retirement-expense-basis.ts) op de rauwe
-      // 12-maands transactiesom — nooit een eigen, vierde afleiding.
+      // client-extrapolatie (lib/retirement-expense-basis.ts) op de rauwe som
+      // over twaalf afgesloten maanden, met de all-time vroegste inkomstendatum
+      // als deler-anker — dezelfde schaalformule als de server (ADR 0138), nooit
+      // een eigen, vierde afleiding.
       const fallbackBasis = deriveRetirementExpenseBasis({
         method: profileResult.data?.retirement_expense_method as RetirementExpenseMethod,
         yearlyMustExpenses,
-        last12Income,
-        earliestIncomeDate,
+        transactionAnnualIncome: extrapolateAnnualIncome(last12Income, earliestIncomeDate, now),
         customAmount: profileResult.data?.retirement_expense_custom_amount,
         estimatedYearlyExpenses: profileMonthlyExpenses * 12,
-        now,
       })
       const extrapolatedIncome = cashflowSettings
         ? cashflowSettings.effectiveAnnualIncome
