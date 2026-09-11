@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { ToolSet } from 'ai'
 import type { AIDomain, ChatContext } from '@/lib/ai/dna'
-import { freedomCalcTool } from './freedom-calc'
+import { createFreedomCalcTool } from './freedom-calc'
 import { createLookupTool } from './lookup'
 import { suggestActionTool } from './suggest-action'
 import { suggestLifeEventTool } from './suggest-life-event'
@@ -23,7 +23,8 @@ export function getTools(
   userId?: string | null,
 ): ToolSet {
   const base: ToolSet = {
-    freedomCalc: freedomCalcTool,
+    // Per request: leest het canonieke dagtarief server-side (B-040).
+    freedomCalc: createFreedomCalcTool(supabase),
     lookup: createLookupTool(supabase),
     showVisualization: showVisualizationTool,
   }

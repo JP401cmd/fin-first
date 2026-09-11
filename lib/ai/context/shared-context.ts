@@ -278,8 +278,12 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
     anchorFixed ? null : formatFireGoalLine(displayFireGoal ?? core.fireTarget, horizonRun, facts.fireDoelUitKernel),
     anchorFixed ? null : buildFireMomentLine(kernelFireAgeFractional, coreData.currentAge ?? null),
     `Maandinkomen: ${formatCurrency(rawFinancials.monthlyIncome)} | Maanduitgaven: ${formatCurrency(rawFinancials.monthlyExpenses)}`,
-    monthlyMustExpenses > 0 ? `Must-uitgaven (essentieel): ${formatCurrency(monthlyMustExpenses)}/mnd` : null,
-    monthlyRetirementExpenses > 0 ? `Jaarlijkse uitgave na retirement: ${formatCurrency(monthlyRetirementExpenses)}/mnd (methode: ${coreData.retirementMethodUsed}) — basis voor FIRE & vrijheidsdagen` : null,
+    // B-040: deze twee regels zijn GEEN noemer voor vrijheidsdagen. Die noemer is
+    // uitsluitend het dagtarief verderop (ook de freedomCalc-tool leest dat tarief
+    // server-side). Het oude must-label en "basis voor FIRE & vrijheidsdagen" boden
+    // het model een tweede en derde wisselkoers aan.
+    monthlyMustExpenses > 0 ? `Must-uitgaven (essentiële vaste lasten): ${formatCurrency(monthlyMustExpenses)}/mnd` : null,
+    monthlyRetirementExpenses > 0 ? `Jaarlijkse uitgave na retirement: ${formatCurrency(monthlyRetirementExpenses)}/mnd (methode: ${coreData.retirementMethodUsed}) — basis voor FIRE` : null,
     `Spaarquote: ${formatPercentage(coreData.effectiveSavingsRatePct)} — DE spaarquote: grondslag-geresolveerd (budget/transactie/handmatig, ADR 0103). Exact hetzelfde getal als onderaan /overzicht/budget — dat instellingenblok leest deze ééne loader, dus daar kan het niet uiteenlopen. De hefboomkaart op /overzicht en de spaarquote-widget draaien op dezelfde formule via hun eigen loader en tonen hetzelfde percentage, op afronding en één bekende grondslagafwijking na (de spaarbudget-correctie telt hier bruto én transfer-inclusief). Gebruik dit getal letterlijk; herbereken het NIET uit inkomen/uitgaven.`,
     `Dagen vrijheid verdiend per maand: ${core.daysWonPerMonth}`,
     `Vrije dagen per jaar (passief inkomen): ${core.freeDaysPerYear}`,

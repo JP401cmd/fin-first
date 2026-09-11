@@ -330,16 +330,15 @@ const ALLOWED_FILES = new Map([
       'niet bij het rolling vandaag-tarief (anders verandert de historie met terugwerkende kracht).',
   ],
   ['app/(app)/core/checkin/historie/page.tsx', 'Idem: snapshot-historie.'],
-  [
-    'lib/ai/tools/freedom-calc.ts',
-    'AI-tool die een DOOR DE GEBRUIKER OPGEGEVEN maandbedrag omrekent ("wat als ik ' +
-      '€X/mnd uitgeef") — een hypothese, geen weergave van zijn eigen dagtarief.',
-  ],
+  // lib/ai/tools/freedom-calc.ts stond hier tot B-040 (model gaf zelf een
+  // maandbedrag als noemer mee). De tool leest nu server-side het canonieke
+  // tarief via getRecentDailyExpenseRate en roept dailyExpenseRate() niet meer
+  // aan — zet hem hier NIET terug.
   [
     'app/(app)/horizon/whatif/whatif-page-client.tsx',
     'WHAT-IF-grondslag: het scenariobedrag dat de gebruiker in de schuifjes zet is ' +
-      'hier de hele vraag ("wat als ik €X/mnd uitgeef"), net als bij de AI-tool ' +
-      'hierboven. De CONVERSIE is wél canoniek — dit verving een ÷30 (M22).',
+      'hier de hele vraag ("wat als ik €X/mnd uitgeef"). ' +
+      'De CONVERSIE is wél canoniek — dit verving een ÷30 (M22).',
   ],
   [
     'lib/briefing/engine.ts',
