@@ -36,6 +36,9 @@ import { useFeatureAccess } from '@/components/app/feature-access-provider'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { HideInSimple } from '@/components/app/hide-in-simple'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
+import { useDisplayMode } from '@/lib/hooks/use-display-mode'
+import { EenvoudigPillList } from '@/components/overview/eenvoudig-pill-list'
+import { assetPillItem, withSharePct } from '@/components/overview/eenvoudig-pill-items'
 import { bankLinkRowForAccount, type CashBankLink } from '@/lib/bank-connection-status'
 import { detailBankAccountIdForAsset } from '@/lib/cash-detail-target'
 import { AddCategoryCard } from './add-category-card'
@@ -1013,8 +1016,41 @@ function ItemsTab({
   onRevalueClick,
   onAddClick,
 }: ItemsTabProps) {
+  // Vóór de early return: hooks-volgorde blijft gelijk ongeacht de lijstlengte.
+  const simple = useDisplayMode().mode === 'simple'
+
   if (assets.length === 0) {
     return <EmptyItemsState type={type} onAddClick={onAddClick} />
+  }
+
+  // B-044 — Eenvoudig toont hier dezelfde pillen als /overzicht/bezittingen
+  // voor dit type (gedeelde opbouw in eenvoudig-pill-items.ts), niet het
+  // kaarten-grid van Volledig. Bedrag = `current_value`, dezelfde grondslag als
+  // het hero-totaal hierboven, zodat de aandeel-balken optellen tot dat totaal.
+  // De toevoegroute blijft staan: een vul-route is geen diepte die Eenvoudig
+  // mag wegnemen.
+  if (simple) {
+    const items = withSharePct(
+      assets.map((asset) =>
+        assetPillItem(asset, type, {
+          amount: Number(asset.current_value) || 0,
+          sparklineValues: sparklinesByAssetId?.[asset.id],
+          onClick: () => onItemClick(asset),
+        }),
+      ),
+    )
+    return (
+      <div className="space-y-3">
+        <EenvoudigPillList items={items} variant="asset" />
+        <AddCategoryCard
+          label={addItemCta(type)}
+          onClick={onAddClick}
+          variant="asset"
+          shape="item"
+          staggerIndex={assets.length}
+        />
+      </div>
+    )
   }
 
   return (

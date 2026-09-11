@@ -129,6 +129,7 @@ import { VermogenAssetCard } from './vermogen-asset-card'
 import { AddCategoryCard } from './add-category-card'
 import { CategoryGroupHeader } from './category-group-header'
 import { EenvoudigPillList, type PillItem } from '@/components/overview/eenvoudig-pill-list'
+import { assetPillItem, withSharePct } from '@/components/overview/eenvoudig-pill-items'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import { buildKpiContext } from '@/lib/kpi-context'
 import { computeAssetKpi, type KpiPair } from '@/lib/asset-kpi'
@@ -615,35 +616,30 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
       .flatMap((type): PillItem[] => {
         const group = byType[type]
         if (!group || group.assets.length === 0) return []
-        return group.assets.map((asset) => ({
-          id: asset.id,
-          name: asset.name,
-          iconName: ASSET_TYPE_ICONS[type],
-          iconColor: ASSET_TYPE_COLORS[type],
-          amount: perspectiveAssetValue(asset, perspective),
-          sparklineValues: assetSparklines[asset.id],
-          onClick: () => handleAssetClick(asset),
-        }))
+        // Gedeelde opbouw met de categoriepagina (B-044) — zie eenvoudig-pill-items.ts.
+        return group.assets.map((asset) =>
+          assetPillItem(asset, type, {
+            amount: perspectiveAssetValue(asset, perspective),
+            sparklineValues: assetSparklines[asset.id],
+            onClick: () => handleAssetClick(asset),
+          }),
+        )
       })
 
     // Partner-aggregaat als pills (optie A) — alleen buiten een type-filter,
     // zelfde conditie als het kaart-grid (partnerAggregateAssets.length > 0).
     if (!assetTypeFilter) {
       for (const asset of partnerAggregateAssets) {
-        items.push({
-          id: asset.id,
-          name: asset.name,
-          iconName: ASSET_TYPE_ICONS.other,
-          iconColor: ASSET_TYPE_COLORS.other,
-          amount: perspectiveAssetValue(asset, perspective),
-          onClick: () => handleAssetClick(asset),
-        })
+        items.push(
+          assetPillItem(asset, 'other', {
+            amount: perspectiveAssetValue(asset, perspective),
+            onClick: () => handleAssetClick(asset),
+          }),
+        )
       }
     }
     // Aandeel van elke post in het getoonde totaal (voor de balk in de pill).
-    const total = items.reduce((s, it) => s + it.amount, 0)
-    if (total > 0) for (const it of items) it.sharePct = (it.amount / total) * 100
-    return items
+    return withSharePct(items)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [byType, assetTypeFilter, perspective, assetSparklines, partnerAggregateAssets])
 

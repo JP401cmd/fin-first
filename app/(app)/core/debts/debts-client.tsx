@@ -48,6 +48,7 @@ import { VermogenDebtCard } from '@/components/core/vermogen-debt-card'
 import { AddCategoryCard } from '@/components/core/add-category-card'
 import { CategoryGroupHeader } from '@/components/core/category-group-header'
 import { EenvoudigPillList, type PillItem } from '@/components/overview/eenvoudig-pill-list'
+import { debtPillItem, withSharePct } from '@/components/overview/eenvoudig-pill-items'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import { Kicker, FiguresStrip, PageInfoButton, GlossaryTerm, PageOpening, SubtotalLine } from '@/components/editorial'
 import { getPageInfo } from '@/lib/page-info-content'
@@ -573,36 +574,25 @@ export function DebtsClient({ toolbarFilter, debtTypeFilter, initialData, showPa
       .flatMap((type): PillItem[] => {
         const group = byType[type]
         if (!group || group.debts.length === 0) return []
-        const iconName = DEBT_TYPE_ICONS[type] ?? 'CircleDot'
-        const iconColor = DEBT_TYPE_COLORS[type]
-        return group.debts.map((debt) => ({
-          id: debt.id,
-          name: debt.name,
-          iconName,
-          iconColor,
-          amount: shareOf(debt, Number(debt.current_balance)),
-          sparklineValues: debtSparklines[debt.id],
-          onClick: () => openDebtModal(debt),
-        }))
+        // Gedeelde opbouw met de categoriepagina (B-044) — zie eenvoudig-pill-items.ts.
+        return group.debts.map((debt) =>
+          debtPillItem(debt, type, {
+            amount: shareOf(debt, Number(debt.current_balance)),
+            sparklineValues: debtSparklines[debt.id],
+            onClick: () => openDebtModal(debt),
+          }),
+        )
       })
 
     // Partner-aggregaat als pills (optie A) — alleen buiten een type-filter,
     // zelfde conditie als het kaart-grid (aggregatedDebts.length > 0).
     if (!debtTypeFilter) {
       for (const debt of aggregatedDebts) {
-        items.push({
-          id: debt.id,
-          name: debt.name,
-          iconName: DEBT_TYPE_ICONS.other ?? 'CircleDot',
-          iconColor: DEBT_TYPE_COLORS.other,
-          amount: Number(debt.current_balance),
-        })
+        items.push(debtPillItem(debt, 'other', { amount: Number(debt.current_balance) }))
       }
     }
     // Aandeel van elke post in het getoonde totaal (voor de balk in de pill).
-    const total = items.reduce((s, it) => s + it.amount, 0)
-    if (total > 0) for (const it of items) it.sharePct = (it.amount / total) * 100
-    return items
+    return withSharePct(items)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [byType, debtTypeFilter, shareOf, debtSparklines, aggregatedDebts])
 

@@ -839,7 +839,10 @@ export function TransactiesAnalyse({
             </HideInSimple>
           )}
 
-          <div className="grid gap-5 sm:grid-cols-2">
+          {/* B-046 — expliciet `grid-cols-1` (= minmax(0,1fr)): zonder kolom-
+              definitie groeit het impliciete `auto`-spoor mee met de min-content
+              van de tabel erin en duwde de kaart op 384px 12px buiten beeld. */}
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             <HideInSimple>
               <Card>
                 <PeriodeTrend current={currentSummary} previous={prevSummary} />
@@ -855,7 +858,10 @@ export function TransactiesAnalyse({
             </HideInSimple>
           </div>
 
-          <div className="grid gap-5 sm:grid-cols-2">
+          {/* B-046 — expliciet `grid-cols-1` (= minmax(0,1fr)): zonder kolom-
+              definitie groeit het impliciete `auto`-spoor mee met de min-content
+              van de tabel erin en duwde de kaart op 384px 12px buiten beeld. */}
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             <HideInSimple>
               <Card>
                 <TopTegenpartijen transactions={currentTxns} onSelect={setDrillCp} />

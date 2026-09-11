@@ -15,6 +15,9 @@ import { MaskedAmount } from '@/components/app/masked-amount'
 import { PageInfoButton } from '@/components/editorial'
 import { getPageInfo, hasPageInfo } from '@/lib/page-info-content'
 import { HideInSimple } from '@/components/app/hide-in-simple'
+import { useDisplayMode } from '@/lib/hooks/use-display-mode'
+import { EenvoudigPillList } from '@/components/overview/eenvoudig-pill-list'
+import { debtPillItem, withSharePct } from '@/components/overview/eenvoudig-pill-items'
 import { AddCategoryCard } from './add-category-card'
 import { VermogenDebtCard } from './vermogen-debt-card'
 import { buildKpiContext, type KpiContextRefs } from '@/lib/kpi-context'
@@ -150,6 +153,20 @@ type PerspectiveDebt = Debt & {
   _provenance: 'eigen' | 'partner' | 'gezamenlijk'
   _myShareFraction: number
   _aggregated?: boolean
+}
+
+/**
+ * Perspectief-correcte restschuld van één rij: een gedeelde schuld telt in
+ * eigen/partner-view alleen met het aandeel mee (`_myShareFraction`), in
+ * huishouden-view (en voor persoonlijke items) de volle waarde. Eén bron voor
+ * het hero-totaal én de Eenvoudig-pillen, zodat de aandeel-balken optellen
+ * tot het getoonde totaal.
+ */
+function debtDisplayValue(debt: PerspectiveDebt, perspective: Perspective): number {
+  const raw = Number(debt.current_balance)
+  return debt.ownership === 'shared' && perspective !== 'household'
+    ? raw * (debt._myShareFraction ?? 1)
+    : raw
 }
 
 // ── Component ────────────────────────────────────────────────
@@ -365,15 +382,7 @@ export function DebtCategoryPage({
   // eigen/partner-view alleen met hun aandeel mee (`_myShareFraction`), in
   // huishouden-view (en voor persoonlijke items) telt de volle waarde.
   const total = useMemo(
-    () =>
-      debts.reduce((sum, debt) => {
-        const raw = Number(debt.current_balance)
-        const v =
-          debt.ownership === 'shared' && perspective !== 'household'
-            ? raw * (debt._myShareFraction ?? 1)
-            : raw
-        return sum + v
-      }, 0),
+    () => debts.reduce((sum, debt) => sum + debtDisplayValue(debt, perspective), 0),
     [debts, perspective],
   )
   const count = debts.length
@@ -711,8 +720,39 @@ function DebtItemsTab({
   perspective,
   partnerName,
 }: DebtItemsTabProps) {
+  // Vóór de early return: hooks-volgorde blijft gelijk ongeacht de lijstlengte.
+  const simple = useDisplayMode().mode === 'simple'
+
   if (debts.length === 0) {
     return <EmptyDebtsState type={type} onAddClick={onAddClick} />
+  }
+
+  // B-044 — zelfde gat als bij de bezittingen: /overzicht/schulden toont in
+  // Eenvoudig pillen, deze categoriepagina viel terug op het kaarten-grid.
+  // Gedeelde opbouw (eenvoudig-pill-items.ts), bedrag via dezelfde
+  // perspectief-weging als het hero-totaal. Toevoegroute blijft staan.
+  if (simple) {
+    const items = withSharePct(
+      debts.map((debt) =>
+        debtPillItem(debt, type, {
+          amount: debtDisplayValue(debt, perspective),
+          sparklineValues: sparklinesByDebtId?.[debt.id],
+          onClick: () => onItemClick(debt.id),
+        }),
+      ),
+    )
+    return (
+      <div className="space-y-3">
+        <EenvoudigPillList items={items} variant="debt" />
+        <AddCategoryCard
+          label={addDebtCta(type)}
+          onClick={onAddClick}
+          variant="debt"
+          shape="item"
+          staggerIndex={debts.length}
+        />
+      </div>
+    )
   }
 
   return (

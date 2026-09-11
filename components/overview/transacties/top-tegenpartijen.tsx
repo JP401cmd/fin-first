@@ -68,7 +68,9 @@ export function TopTegenpartijen({
               >
                 <FinTable.Td muted>{i + 1}</FinTable.Td>
                 <FinTable.Td>
-                  <span className="block max-w-[22ch] truncate text-[var(--ink)]">{cp.name}</span>
+                  {/* Smaller op mobiel (B-046): anders scrolt de tabel op 384px
+                      binnen zijn eigen container om een handvol pixels. */}
+                  <span className="block max-w-[14ch] truncate text-[var(--ink)] sm:max-w-[22ch]">{cp.name}</span>
                 </FinTable.Td>
                 <FinTable.Td numeric muted>
                   {cp.count}
