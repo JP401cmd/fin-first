@@ -8,8 +8,9 @@ import { assertCloudAllowed } from '@/lib/ai/privacy-gate'
 import { detectRecurringTransactions } from '@/lib/recurring-detection'
 import { SUBSCRIPTION_DETECT_PROMPT } from '@/lib/ai/subscription-detect-prompt'
 import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
-import { unauthorized, errorResponse } from '@/lib/api/respond'
+import { unauthorized, errorResponse, serverError } from '@/lib/api/respond'
 import { localMonthStartMonthsAgo } from '@/lib/month-range'
+import { fetchAllRecurringTx } from '@/lib/vaste-lasten-summary'
 import { isRefusedProviderError } from '@/lib/ai/provider-error'
 import { AI_ERROR_CODE, describeAiError } from '@/lib/ai/error-copy'
 
@@ -50,12 +51,10 @@ export async function POST() {
     const now = new Date()
     const startDateStr = localMonthStartMonthsAgo(now, 11)
 
+    // Transacties via de keyset-ophaal: één kale query kapt af op max_rows (1000)
+    // en levert dan alleen de oudste rijen (V-001).
     const [txResult, recurringResult, budgetResult] = await Promise.all([
-      supabase
-        .from('transactions')
-        .select('id, date, amount, description, counterparty_name, is_income, budget_id, transaction_type')
-        .gte('date', startDateStr)
-        .order('date', { ascending: true }),
+      fetchAllRecurringTx(supabase, startDateStr),
       supabase
         .from('recurring_transactions')
         .select('id, counterparty_name, amount, name, frequency')
@@ -66,7 +65,11 @@ export async function POST() {
         .order('sort_order', { ascending: true }),
     ])
 
-    const transactions = txResult.data ?? []
+    // Een afgekapte ophaal zou stil op alleen de oudste rijen detecteren.
+    if (!txResult.complete) {
+      return serverError(new Error('transactions fetch incomplete'), 'subscriptions/detect-ai:POST')
+    }
+    const transactions = txResult.rows
     const existingRecurrings = recurringResult.data ?? []
     const budgets = budgetResult.data ?? []
 

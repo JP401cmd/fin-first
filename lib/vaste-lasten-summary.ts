@@ -104,10 +104,17 @@ type RecurringTxRow = {
  * wordt overgeslagen, en dan zou één storing de automatisch gedetecteerde vaste
  * lasten een half uur lang laten verdwijnen. De aanroeper onthoudt daarom alleen
  * een HELE uitkomst.
+ *
+ * GEËXPORTEERD voor de abonnementen-routes (`/api/detect-recurring`,
+ * `/api/subscriptions/detect-ai` en `analyse-ai`): die haalden hetzelfde venster
+ * met één kale query op en zagen daardoor bij >1000 rijen alleen de oudste
+ * transacties (V-001). `accountId` beperkt de ophaal tot één rekening — het filter
+ * zit in de basisquery en geldt dus op élke pagina.
  */
-async function fetchAllRecurringTx(
+export async function fetchAllRecurringTx(
   supabase: SupabaseClient,
   startDateStr: string,
+  opts: { accountId?: string } = {},
 ): Promise<{ rows: RecurringTxRow[]; complete: boolean }> {
   const PAGE = 1000
   const rows: RecurringTxRow[] = []
@@ -120,9 +127,10 @@ async function fetchAllRecurringTx(
       .from('transactions')
       .select('id, date, amount, description, counterparty_name, is_income, budget_id, transaction_type')
       .gte('date', cursor ? cursor.date : startDateStr)
+    const accountScoped = opts.accountId ? base.eq('account_id', opts.accountId) : base
     const scoped = cursor
-      ? base.or(`date.gt.${cursor.date},and(date.eq.${cursor.date},id.gt.${cursor.id})`)
-      : base
+      ? accountScoped.or(`date.gt.${cursor.date},and(date.eq.${cursor.date},id.gt.${cursor.id})`)
+      : accountScoped
     const { data, error } = await scoped
       .order('date', { ascending: true })
       .order('id', { ascending: true })

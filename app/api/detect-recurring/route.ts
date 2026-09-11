@@ -5,6 +5,8 @@ import {
   type DetectedRecurring,
 } from '@/lib/recurring-detection'
 import { localMonthStartMonthsAgo } from '@/lib/month-range'
+import { fetchAllRecurringTx } from '@/lib/vaste-lasten-summary'
+import { serverError } from '@/lib/api/respond'
 
 /**
  * GET /api/detect-recurring
@@ -34,19 +36,11 @@ export async function GET(request: Request) {
     const now = new Date()
     const startDateStr = localMonthStartMonthsAgo(now, months)
 
-    // Fetch transactions, existing recurrings, and budgets in parallel
-    const txQuery = supabase
-      .from('transactions')
-      .select('id, date, amount, description, counterparty_name, is_income, budget_id, transaction_type')
-      .gte('date', startDateStr)
-      .order('date', { ascending: true })
-
-    if (accountId) {
-      txQuery.eq('account_id', accountId)
-    }
-
+    // Fetch transactions, existing recurrings, and budgets in parallel.
+    // Transacties via de keyset-ophaal: één kale query kapt af op max_rows (1000)
+    // en levert dan alleen de oudste rijen (V-001).
     const [txResult, recurringResult, budgetResult] = await Promise.all([
-      txQuery,
+      fetchAllRecurringTx(supabase, startDateStr, { accountId: accountId ?? undefined }),
       supabase
         .from('recurring_transactions')
         .select('counterparty_name, amount, name')
@@ -57,7 +51,13 @@ export async function GET(request: Request) {
         .order('sort_order', { ascending: true }),
     ])
 
-    const transactions = txResult.data ?? []
+    // Een afgekapte ophaal zou stil op alleen de oudste rijen detecteren — liever
+    // een eerlijke fout dan een onvolledig antwoord (zelfde discipline als de
+    // vaste-lastenpagina).
+    if (!txResult.complete) {
+      return serverError(new Error('transactions fetch incomplete'), 'detect-recurring:GET')
+    }
+    const transactions = txResult.rows
     const existingRecurrings = recurringResult.data ?? []
     const budgets = budgetResult.data ?? []
 
@@ -78,8 +78,14 @@ export async function GET(request: Request) {
     // Run detection algorithm
     const allDetected = detectRecurringTransactions(
       transactions.map(t => ({
-        ...t,
+        id: t.id,
+        date: t.date,
         amount: Number(t.amount),
+        description: t.description ?? '',
+        counterparty_name: t.counterparty_name ?? null,
+        is_income: t.is_income ?? false,
+        budget_id: t.budget_id ?? null,
+        transaction_type: t.transaction_type ?? null,
       })),
       existingRecurrings.map(r => ({
         counterparty_name: r.counterparty_name,
