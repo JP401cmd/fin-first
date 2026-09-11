@@ -21,6 +21,7 @@ import { resolveFireParams } from '@/lib/fire-params'
 import { parseFireStrategy, resolveFirePlanWithOverride, STRATEGY_LABELS } from '@/lib/fire-strategy'
 import {
   resolveWithdrawalStrategy,
+  resolveWithdrawalProfiel,
   WITHDRAWAL_DEFAULTS,
 } from '@/lib/withdrawal-strategy'
 import {
@@ -65,6 +66,12 @@ export interface PersoonlijkPlanProfileRow {
   retirement_expense_method: string | null
   retirement_expense_custom_amount: number | null
   withdrawal_strategy: string | null
+  /**
+   * Het expliciet gekozen onttrekkingsprofiel (JSONB, `profiel` + fase-curve). De
+   * rapport-routes selecteren de kolom sinds B-042; optioneel voor oudere fixtures —
+   * ontbreekt hij, dan valt `resolveWithdrawalProfiel` terug op de enum.
+   */
+  withdrawal_profile_config?: unknown
   guardrail_floor: number | null
   guardrail_ceiling: number | null
   guardrail_cut_step: number | null
@@ -278,11 +285,15 @@ export function buildPersoonlijkPlanSections(
   }
 
   // ── Onttrekkingsstrategie ──
+  // Het PROFIEL komt uit dezelfde voorrangsregel als de kernel-adapter
+  // (`resolveWithdrawalProfiel`: withdrawal_profile_config.profiel > enum); de
+  // guardrail-parameters blijven uit de enum-config komen (daar wonen ze).
   const withdrawalCfg = resolveWithdrawalStrategy(profile)
+  const profiel = resolveWithdrawalProfiel(profile)
   const onttrekking: PersoonlijkPlanOnttrekking = {
-    type: withdrawalCfg.strategy,
-    typeLabel: WITHDRAWAL_LABELS[withdrawalCfg.strategy].name,
-    typeSubtitle: WITHDRAWAL_LABELS[withdrawalCfg.strategy].subtitle,
+    type: profiel,
+    typeLabel: WITHDRAWAL_LABELS[profiel].name,
+    typeSubtitle: WITHDRAWAL_LABELS[profiel].subtitle,
     guardrailFloor: withdrawalCfg.guardrailFloor || WITHDRAWAL_DEFAULTS.guardrailFloor,
     guardrailCeiling: withdrawalCfg.guardrailCeiling || WITHDRAWAL_DEFAULTS.guardrailCeiling,
     guardrailCutStep: withdrawalCfg.guardrailCutStep || WITHDRAWAL_DEFAULTS.guardrailCutStep,

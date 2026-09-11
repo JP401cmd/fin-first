@@ -6,6 +6,7 @@ import { loadHorizonData } from '@/lib/horizon-data-loader'
 import { loadFinData } from '@/lib/fin-data-loader'
 import HorizonPage from '@/components/app/horizon/horizon-client'
 import { ToekomstNavCards } from '@/components/future/toekomst-nav-cards'
+import { resolveWithdrawalProfiel } from '@/lib/withdrawal-strategy'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { PageOpening, EditorialDeck, OrnamentColophon } from '@/components/editorial'
 import { getPageInfo } from '@/lib/page-info-content'
@@ -168,6 +169,13 @@ export default async function ToekomstPage({
           events={horizonData.events}
           fireStrategy={horizonData.fireStrategy}
           withdrawalStrategy={horizonData.withdrawalStrategy}
+          // Het profiel zoals de kernel het leest: dezelfde rauwe rij (rawProfile,
+          // select('*') incl. withdrawal_profile_config) door dezelfde voorrangs-
+          // regel als de adapter (B-042). Enum-terugval = de al-geresolveerde config.
+          withdrawalProfiel={resolveWithdrawalProfiel({
+            withdrawal_strategy: horizonData.withdrawalStrategy.strategy,
+            withdrawal_profile_config: horizonData.rawProfile?.withdrawal_profile_config,
+          })}
           fireParams={horizonData.fireParams}
           calculatorCount={calculatorCount}
         />

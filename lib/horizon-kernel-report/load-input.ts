@@ -22,6 +22,7 @@ import { getAowLeeftijden } from '@/lib/reference-cache'
 import { resolveFireParams } from '@/lib/fire-params'
 import { FIRE_PLAN_COLUMNS } from '@/lib/fire-strategy'
 import { parseHousingStrategy } from '@/lib/housing-strategy'
+import { resolveWithdrawalProfiel } from '@/lib/withdrawal-strategy'
 import { computeYearlyMustExpenses } from '@/lib/budget-utils'
 import { formatCurrency } from '@/lib/format'
 import type { KernelAdapterInput, KernelAdapterProfile } from '@/lib/horizon-kernel/adapter'
@@ -92,7 +93,10 @@ export async function loadKernelReportInput(supabase: SupabaseClient): Promise<K
       supabase
         .from('profiles')
         .select(
-          `date_of_birth, household_type, number_of_children, net_monthly_income, estimated_monthly_expenses, income_source, expenses_source, expected_return, inflation_rate, marginaal_tarief, box3_method, ${FIRE_PLAN_COLUMNS}, retirement_expense_method, retirement_expense_custom_amount, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step, housing_strategy_config, pot_rules, feature_preferences`,
+          // `withdrawal_profile_config` reist mee (B-042): zonder die kolom rekende
+          // dit rapport een afnemend/oplopend plan als 'Vast' terwijl /toekomst
+          // (rawProfile via select('*')) het echte profiel wél aan de adapter gaf.
+          `date_of_birth, household_type, number_of_children, net_monthly_income, estimated_monthly_expenses, income_source, expenses_source, expected_return, inflation_rate, marginaal_tarief, box3_method, ${FIRE_PLAN_COLUMNS}, retirement_expense_method, retirement_expense_custom_amount, withdrawal_strategy, withdrawal_profile_config, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step, housing_strategy_config, pot_rules, feature_preferences`,
         )
         .single(),
       supabase.from('assets').select('*').eq('is_active', true).limit(500),
@@ -165,6 +169,7 @@ export async function loadKernelReportInput(supabase: SupabaseClient): Promise<K
     fire_stop_age: profileRaw.fire_stop_age as number | string | null,
     feature_preferences: profileRaw.feature_preferences as Record<string, unknown> | null,
     withdrawal_strategy: profileRaw.withdrawal_strategy as string | null,
+    withdrawal_profile_config: profileRaw.withdrawal_profile_config,
     guardrail_floor: profileRaw.guardrail_floor as number | null,
     guardrail_ceiling: profileRaw.guardrail_ceiling as number | null,
     guardrail_cut_step: profileRaw.guardrail_cut_step as number | null,
@@ -211,7 +216,9 @@ export async function loadKernelReportInput(supabase: SupabaseClient): Promise<K
       { label: 'Eindstrategie', waarde: String(profileRaw.fire_end_strategy ?? 'perpetual'), bron: 'profiles.fire_end_strategy' },
       { label: 'Eindleeftijd', waarde: String(num(profileRaw.fire_end_age) || 90), bron: 'profiles.fire_end_age' },
       { label: 'Nalatenschap-bedrag', waarde: formatCurrency(num(profileRaw.fire_legacy_amount)), bron: 'profiles.fire_legacy_amount' },
-      { label: 'Onttrekkingsstrategie', waarde: String(profileRaw.withdrawal_strategy ?? 'static'), bron: 'profiles.withdrawal_strategy' },
+      // Het PROFIEL zoals de adapter het leest (profiel > enum), niet de kale enum
+      // die vast/afnemend/oplopend alle drie als 'static' draagt (B-042).
+      { label: 'Onttrekkingsprofiel', waarde: resolveWithdrawalProfiel(adapterProfile), bron: 'profiles.withdrawal_profile_config.profiel → profiles.withdrawal_strategy' },
       { label: 'Guardrail floor / ceiling', waarde: `${pct(profileRaw.guardrail_floor ?? 0.8)} / ${pct(profileRaw.guardrail_ceiling ?? 1.2)}`, bron: 'profiles.guardrail_floor/ceiling' },
       { label: 'Woningstrategie', waarde: housing.mode, bron: 'profiles.housing_strategy_config' },
       { label: 'Pensioen-uitgaven-methode', waarde: String(profileRaw.retirement_expense_method ?? '—'), bron: 'profiles.retirement_expense_method' },

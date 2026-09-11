@@ -4,6 +4,7 @@ import { loadHorizonRaw } from '@/lib/horizon-data-loader'
 import { loadDashboardData } from '@/lib/dashboard-data-loader'
 import { ToekomstSubpageShell } from '@/components/future/toekomst-subpage-shell'
 import { VoorkeurenView } from '@/components/future/voorkeuren-view'
+import { resolveWithdrawalProfiel } from '@/lib/withdrawal-strategy'
 import { WEALTH_GROUPS, type WealthGroup } from '@/lib/wealth-composition'
 
 export const metadata: Metadata = {
@@ -59,6 +60,11 @@ export default async function ToekomstVoorkeurenPage() {
         fireStrategy={horizonData.fireStrategy}
         firePlan={horizonData.firePlan}
         withdrawalStrategy={horizonData.withdrawalStrategy}
+        // Zelfde rauwe rij + zelfde voorrangsregel als de kernel-adapter (B-042).
+        withdrawalProfiel={resolveWithdrawalProfiel({
+          withdrawal_strategy: horizonData.withdrawalStrategy.strategy,
+          withdrawal_profile_config: horizonData.rawProfile?.withdrawal_profile_config,
+        })}
         fireAge={fireAge}
         simRows={simRows}
         simSnapshot={dashboardResult.regelSimSnapshot}

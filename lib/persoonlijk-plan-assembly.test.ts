@@ -127,3 +127,50 @@ describe('buildPersoonlijkPlanSections — essentiële uitgaven tellen alleen bu
     expect(uitgaven.pctOfCurrent).toBeNull()
   })
 })
+
+/**
+ * Regressieslot B-042 — "verkeerde onttrekkingsstrategie in het totaalplan".
+ *
+ * De editor op /toekomst en de onboarding slaan vast/afnemend/oplopend álle drie op
+ * als enum `withdrawal_strategy = 'static'` en zetten het echte profiel in
+ * `withdrawal_profile_config.profiel`; de kernel-adapter laat dat profiel voorgaan.
+ * De assemblage las tot B-042 alleen de enum en toonde daardoor "Vaste onttrekking
+ * (SWR) — Klassieke 4%-regel" terwijl de motor Afnemend rekende. Sinds B-042 lezen
+ * motor én rapport dezelfde `resolveWithdrawalProfiel`.
+ */
+describe('buildPersoonlijkPlanSections — onttrekking toont het profiel waarmee de motor rekent (B-042)', () => {
+  function onttrekkingFor(overrides: Partial<PersoonlijkPlanProfileRow>) {
+    return buildPersoonlijkPlanSections({
+      profile: { ...PROFILE, ...overrides },
+      aowRows: [],
+      events: [],
+      budgetRows: [],
+    }).onttrekking
+  }
+
+  it('enum static + profiel afnemend (onboarding-default) → Afnemend, zonder SWR-/4%-tekst', () => {
+    const o = onttrekkingFor({ withdrawal_strategy: 'static', withdrawal_profile_config: { profiel: 'afnemend' } })
+    expect(o.type).toBe('afnemend')
+    expect(o.typeLabel).toMatch(/afnemend/i)
+    expect(o.typeLabel).not.toMatch(/SWR|vast/i)
+    expect(o.typeSubtitle).not.toMatch(/4%/)
+  })
+
+  it('enum static zonder profiel-config (oude rij) → vast, mét SWR-label (ongewijzigd gedrag)', () => {
+    const o = onttrekkingFor({ withdrawal_strategy: 'static' })
+    expect(o.type).toBe('vast')
+    expect(o.typeLabel).toBe('Vaste onttrekking (SWR)')
+  })
+
+  it('enum static + profiel oplopend → Oplopend', () => {
+    expect(onttrekkingFor({ withdrawal_profile_config: { profiel: 'oplopend' } }).type).toBe('oplopend')
+  })
+
+  it('guardrails via profiel óf enum → guardrails, met de guardrail-parameters uit de enum-config', () => {
+    const viaProfiel = onttrekkingFor({ withdrawal_strategy: 'static', withdrawal_profile_config: { profiel: 'guardrails' }, guardrail_floor: 0.7 })
+    expect(viaProfiel.type).toBe('guardrails')
+    expect(viaProfiel.guardrailFloor).toBe(0.7)
+    const viaEnum = onttrekkingFor({ withdrawal_strategy: 'guardrails' })
+    expect(viaEnum.type).toBe('guardrails')
+  })
+})

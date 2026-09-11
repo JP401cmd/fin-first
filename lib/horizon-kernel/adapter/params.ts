@@ -26,8 +26,8 @@ import {
 } from '@/lib/fire-strategy'
 import {
   resolveWithdrawalStrategy,
+  resolveWithdrawalProfiel,
   parseWithdrawalProfileConfig,
-  type WithdrawalStrategyType,
   type WithdrawalProfiel,
 } from '@/lib/withdrawal-strategy'
 import { parseHousingStrategy } from '@/lib/housing-strategy'
@@ -373,16 +373,12 @@ export function buildWoning(housingConfigRaw: unknown): WoningStrategieParams {
   return base
 }
 
-const WITHDRAWAL_TO_PROFIEL: Record<WithdrawalStrategyType, Onttrekkingsprofiel> = {
-  static: 'Vast',
-  guardrails: 'Guardrails',
-}
-
 /**
- * V4/F4 — expliciet profiel (`withdrawal_profile_config.profiel`) → kern-selector.
- * Wint van de enum-mapping zodra de gebruiker een profiel heeft gekozen (de enum
- * kent 'Afnemend'/'Oplopend' niet, dus zonder dit veld zou go-go/slow-go/no-go
- * onbereikbaar zijn).
+ * V4/F4 — app-profiel (`WithdrawalProfiel`) → kern-selector. WELK profiel actief is
+ * (expliciet gekozen `withdrawal_profile_config.profiel` wint van de enum, de enum
+ * kent 'Afnemend'/'Oplopend' immers niet) bepaalt `resolveWithdrawalProfiel` in
+ * lib/withdrawal-strategy.ts — de ENE voorrangsregel die ook de rapporten en de
+ * Voorkeuren-kaarten lezen (B-042). Hier staat alleen nog de naamvertaling.
  */
 const PROFIEL_TO_KERNEL: Record<WithdrawalProfiel, Onttrekkingsprofiel> = {
   vast: 'Vast',
@@ -407,9 +403,10 @@ export function buildOnttrekkingsprofiel(profile: KernelAdapterProfile): Onttrek
   // single source). `curve === null` (kolom NULL) → alles Excel → byte-identiek aan snede 1/2.
   const curve = parseWithdrawalProfileConfig(profile)
   return {
-    // Voorrang: expliciet gekozen profiel > enum-mapping (byte-identiek wanneer
-    // `curve.profiel` niet gezet is → `null`).
-    profiel: curve?.profiel ? PROFIEL_TO_KERNEL[curve.profiel] : WITHDRAWAL_TO_PROFIEL[cfg.strategy],
+    // Voorrang (profiel > enum) woont in resolveWithdrawalProfiel — gedeeld met de
+    // weergave-oppervlakken, zodat "wat de motor rekent" en "wat het scherm zegt"
+    // niet meer uiteen kunnen lopen. Byte-identiek aan de vroegere inline-regel.
+    profiel: PROFIEL_TO_KERNEL[resolveWithdrawalProfiel(profile)],
     fase1TotLeeftijd: curve?.gogoTotLeeftijd ?? EXCEL_FASE_CURVE.fase1TotLeeftijd,
     factor1Pct: curve?.gogoPct ?? EXCEL_FASE_CURVE.factor1Pct,
     fase2TotLeeftijd: curve?.slowgoTotLeeftijd ?? EXCEL_FASE_CURVE.fase2TotLeeftijd,

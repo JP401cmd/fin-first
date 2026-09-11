@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest'
 import {
   applyWithdrawalStrategy,
   resolveWithdrawalStrategy,
+  resolveWithdrawalProfiel,
+  withdrawalProfielFromEnum,
   initBucketState,
   rebalanceBuckets,
   WITHDRAWAL_DEFAULTS,
@@ -9,6 +11,52 @@ import {
   type WithdrawalContext,
   type BucketState,
 } from './withdrawal-strategy'
+
+// ── resolveWithdrawalProfiel — ÉÉN voorrangsregel voor motor en weergave (B-042) ──
+
+describe('resolveWithdrawalProfiel', () => {
+  it('expliciet profiel wint van de enum: static + {profiel: afnemend} → afnemend', () => {
+    // De editor en de onboarding schrijven afnemend/oplopend weg als enum 'static';
+    // het rapport las tot B-042 alleen de enum en toonde "Vast" waar de motor Afnemend rekende.
+    expect(
+      resolveWithdrawalProfiel({ withdrawal_strategy: 'static', withdrawal_profile_config: { profiel: 'afnemend' } }),
+    ).toBe('afnemend')
+    expect(
+      resolveWithdrawalProfiel({ withdrawal_strategy: 'guardrails', withdrawal_profile_config: { profiel: 'oplopend' } }),
+    ).toBe('oplopend')
+  })
+
+  it('zonder profiel → enum-terugval (static → vast, guardrails → guardrails)', () => {
+    expect(resolveWithdrawalProfiel({ withdrawal_strategy: 'static' })).toBe('vast')
+    expect(resolveWithdrawalProfiel({ withdrawal_strategy: 'guardrails' })).toBe('guardrails')
+    // Curve-config zonder profiel wijzigt de selector niet.
+    expect(
+      resolveWithdrawalProfiel({ withdrawal_strategy: 'static', withdrawal_profile_config: { gogo_pct: 90 } }),
+    ).toBe('vast')
+  })
+
+  it('ongeldig profiel of ongeldige enum → dezelfde terugval als de motor', () => {
+    expect(
+      resolveWithdrawalProfiel({ withdrawal_strategy: 'guardrails', withdrawal_profile_config: { profiel: 'onzin' } }),
+    ).toBe('guardrails')
+    // Oude enum-waarden (vpw/bucket) zijn geen geldige strategie meer → WITHDRAWAL_DEFAULTS → vast.
+    expect(resolveWithdrawalProfiel({ withdrawal_strategy: 'vpw' })).toBe('vast')
+    expect(resolveWithdrawalProfiel({})).toBe('vast')
+    expect(resolveWithdrawalProfiel(null)).toBe('vast')
+    expect(resolveWithdrawalProfiel(undefined)).toBe('vast')
+  })
+
+  it('JSONB als string (ruwe DB-rij) wordt geparsed', () => {
+    expect(
+      resolveWithdrawalProfiel({ withdrawal_strategy: 'static', withdrawal_profile_config: '{"profiel":"guardrails"}' }),
+    ).toBe('guardrails')
+  })
+
+  it('withdrawalProfielFromEnum is exhaustief over de enum', () => {
+    expect(withdrawalProfielFromEnum('static')).toBe('vast')
+    expect(withdrawalProfielFromEnum('guardrails')).toBe('guardrails')
+  })
+})
 
 // ── Helpers ──────────────────────────────────────────────────────────
 

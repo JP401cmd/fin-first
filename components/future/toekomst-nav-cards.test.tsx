@@ -387,6 +387,16 @@ describe('ToekomstNavCards — Voorkeuren-kaart', () => {
     expect(within(card).getByText(/Vast \(4%\) · SWR 3\.4%/)).toBeTruthy()
   })
 
+  // B-042 — het PROFIEL wint van de enum: een afnemend plan staat in de DB als enum
+  // 'static' + withdrawal_profile_config.profiel 'afnemend'. De kaart toonde "Vast (4%)"
+  // waar de motor Afnemend rekende; de server-page levert nu het geresolveerde profiel.
+  it('toont het onttrekkingsprofiel (Afnemend) i.p.v. de enum-terugval (Vast) wanneer de page het meegeeft', () => {
+    const { container } = renderCards({ withdrawalProfiel: 'afnemend' })
+    const card = cardByHref(container, '/toekomst/voorkeuren')
+    expect(within(card).getByText(/Afnemend · SWR 3\.4%/)).toBeTruthy()
+    expect(within(card).queryByText(/Vast \(4%\)/)).toBeNull()
+  })
+
   it('heeft altijd een neutrale (stone) status-dot', () => {
     const { container } = renderCards()
     const card = cardByHref(container, '/toekomst/voorkeuren')

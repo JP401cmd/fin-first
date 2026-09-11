@@ -253,6 +253,46 @@ export function parseWithdrawalProfileConfig(profile: {
   }
 }
 
+// ── Actief onttrekkingsprofiel — ÉÉN voorrangsregel voor motor én weergave ──
+//
+// De editor (components/future/regels/onttrekkingsstrategie-body.tsx) en de
+// onboarding schrijven vast/afnemend/oplopend álle drie weg als enum 'static' en
+// zetten het echte profiel in `withdrawal_profile_config.profiel`. De kernel-adapter
+// (`lib/horizon-kernel/adapter/params.ts#buildOnttrekkingsprofiel`) laat dat profiel
+// daarom voorgaan op de enum. Elk oppervlak dat alléén de enum las — het
+// persoonlijk-plan-/totaalplan-rapport, de Voorkeuren-kaarten — toonde "Vast" terwijl
+// de motor Afnemend rekende (B-042). Deze resolver is sindsdien het ene huis van die
+// voorrang: motor en weergave lezen dezelfde functie en kunnen niet meer uiteenlopen.
+
+/** Enum → profiel-terugval (zonder expliciet profiel): static → 'vast', guardrails → 'guardrails'. */
+export function withdrawalProfielFromEnum(strategy: WithdrawalStrategyType): WithdrawalProfiel {
+  return strategy === 'guardrails' ? 'guardrails' : 'vast'
+}
+
+/** De twee profielvelden waaruit het actieve onttrekkingsprofiel volgt. */
+export interface WithdrawalProfielSource {
+  withdrawal_strategy?: string | null
+  withdrawal_profile_config?: unknown
+}
+
+/**
+ * Het onttrekkingsprofiel waarmee de horizon-kernel rekent — en dus het profiel dat
+ * elk oppervlak hoort te tonen. Voorrang: expliciet gekozen profiel
+ * (`withdrawal_profile_config.profiel`, gevalideerd) > enum-terugval
+ * (`withdrawal_strategy` via `resolveWithdrawalStrategy`, dus incl. de
+ * `WITHDRAWAL_DEFAULTS`-terugval op 'static' → 'vast').
+ *
+ * Byte-identiek aan de vroegere inline-voorrang in de kernel-adapter
+ * (`curve?.profiel ? PROFIEL_TO_KERNEL[curve.profiel] : WITHDRAWAL_TO_PROFIEL[enum]`).
+ */
+export function resolveWithdrawalProfiel(
+  profile: WithdrawalProfielSource | null | undefined,
+): WithdrawalProfiel {
+  const parsed = parseWithdrawalProfileConfig(profile)
+  if (parsed?.profiel) return parsed.profiel
+  return withdrawalProfielFromEnum(resolveWithdrawalStrategy(profile ?? {}).strategy)
+}
+
 // ── Engine ───────────────────────────────────────────────────────────
 
 /**

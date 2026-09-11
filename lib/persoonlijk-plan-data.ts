@@ -12,7 +12,7 @@
  * Spec: docs/superpowers/specs/2026-05-11-kern-rapport-en-instellingen-rapport-design.md
  */
 import type { FireEndStrategy } from './fire-strategy'
-import type { WithdrawalStrategyType } from './withdrawal-strategy'
+import type { WithdrawalProfiel } from './withdrawal-strategy'
 
 // ── Hero / demografie ────────────────────────────────────────────────
 
@@ -175,8 +175,15 @@ export interface PersoonlijkPlanEindstrategie {
 // ── Onttrekkingsstrategie ─────────────────────────────────────────────
 
 export interface PersoonlijkPlanOnttrekking {
-  type: WithdrawalStrategyType
-  /** NL-label voor de type. */
+  /**
+   * Het actieve onttrekkingsPROFIEL — precies het profiel waarmee de horizon-kernel
+   * rekent (`resolveWithdrawalProfiel`: `withdrawal_profile_config.profiel` wint van
+   * de enum `withdrawal_strategy`). Tot B-042 stond hier de kale enum, die
+   * vast/afnemend/oplopend alle drie als 'static' draagt — het rapport zei dan
+   * "Vaste onttrekking (SWR)" terwijl de motor Afnemend rekende.
+   */
+  type: WithdrawalProfiel
+  /** NL-label voor het profiel. */
   typeLabel: string
   /** Korte uitleg (italic). */
   typeSubtitle: string
@@ -209,12 +216,23 @@ export interface PersoonlijkPlanData {
 // echte DB-waarden en toonde de ruwe string. De assembly consumeert de helper.
 
 /**
- * Labels voor onttrekkingsstrategieën. Spiegelt `WITHDRAWAL_DEFAULTS.strategy`.
+ * Rapport-labels per onttrekkingsPROFIEL (`WithdrawalProfiel`, de vier keuzes van de
+ * editor). Exhaustief via het Record-type: een nieuw profiel zonder label is een
+ * compile-fout. De SWR-/4%-duiding hoort alleen bij 'vast' — de fase-profielen
+ * (afnemend/oplopend) en guardrails rekenen expliciet níet met een vast bedrag.
  */
-export const WITHDRAWAL_LABELS: Record<WithdrawalStrategyType, { name: string; subtitle: string }> = {
-  static: {
+export const WITHDRAWAL_LABELS: Record<WithdrawalProfiel, { name: string; subtitle: string }> = {
+  vast: {
     name: 'Vaste onttrekking (SWR)',
     subtitle: 'Klassieke 4%-regel — vast bedrag, geïndexeerd voor inflatie.',
+  },
+  afnemend: {
+    name: 'Afnemende onttrekking',
+    subtitle: 'Meer uitgeven in je actieve jaren, daarna afbouwen: go-go → slow-go → no-go.',
+  },
+  oplopend: {
+    name: 'Oplopende onttrekking',
+    subtitle: 'Bescheiden beginnen en later méér uitgeven — bijvoorbeeld voor zorgkosten op hoge leeftijd.',
   },
   guardrails: {
     name: 'Guyton-Klinger guardrails',

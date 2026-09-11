@@ -17,16 +17,41 @@
  * + `max-width:100%` maken 'm print- én responsive-veilig. Kleuren via
  * `var(--module-active-*)` (in `.report-pdf-root[data-report-module="horizon"]`
  * overschreven naar print-vaste hexen).
+ *
+ * ## Euro-weergave (ADR 0090/0093) — B-043
+ * Het rapport volgt `profiles.euro_view` zoals /toekomst: elk bedrag op een
+ * toekomstige leeftijd wordt aan déze render-grens precies één keer gedeeld door
+ * de kernelfactor van zijn rij (`inflationFactor`, meegedragen op elk pad-punt),
+ * uitsluitend via de helpers uit `lib/euro-display.ts`. Nergens een eigen
+ * `Math.pow`. De vrijheidstijd-regels zijn REAL-VERANKERD en volgen de
+ * schakelaar bewust NIET (`lib/horizon/vrijheidsdagen.ts`).
+ *
+ * ## Planeinde + 0-vloer — B-043
+ * Het pad is door de assemblage al geclipt op `displayEndAge − 1` (zoals
+ * /toekomst); de lijn vloert op 0 (y-schaal-invariant, zoals /toekomst). Wat de
+ * vloer zou verbergen — een anker-tekort of een aangesproken tekort-lening —
+ * staat als expliciete melding boven de grafiek, met de gedeelde /toekomst-copy.
  */
 
+import { AlertTriangle } from 'lucide-react'
 import { formatCurrency, formatWithFreedom } from '@/lib/format'
 import { formatFireAge } from '@/lib/horizon-data'
 import { STRATEGY_LABELS } from '@/lib/fire-strategy'
+import { useEuroView } from '@/lib/hooks/use-euro-view'
+import {
+  buildFactorByAge,
+  deflate,
+  deflateRowsByAge,
+  euroViewLabel,
+  factorAtAge,
+} from '@/lib/euro-display'
+import { widgetSimRowsToChartPoints } from '@/lib/horizon/sim-chart-geometry'
+import { freedomDaysAtAge } from '@/lib/horizon/vrijheidsdagen'
+import { leeftijdJaar } from '@/lib/horizon/leeftijd-jaar'
 import { SectionLabel } from '@/components/editorial'
 import { DefinitionRow } from '@/components/rapportage/persoonlijk-plan-blocks'
 import type {
   ProjectieData,
-  ProjectieVermogenspadPunt,
   SlagingskansData,
   InzichtItem,
 } from '@/lib/totaalplan-data'
@@ -52,28 +77,40 @@ const CHART = {
   padB: 30,
 }
 
-/** Lineaire interpolatie van het netto vermogen op een (fractionele) leeftijd. */
-function interpolateNetWorth(pad: ProjectieVermogenspadPunt[], age: number): number {
-  if (pad.length === 0) return 0
-  if (age <= pad[0].age) return pad[0].nettoVermogen
-  const last = pad[pad.length - 1]
-  if (age >= last.age) return last.nettoVermogen
-  for (let i = 0; i < pad.length - 1; i++) {
-    const a = pad[i]
-    const b = pad[i + 1]
-    if (age >= a.age && age <= b.age) {
-      const span = b.age - a.age
-      if (span === 0) return a.nettoVermogen
-      const t = (age - a.age) / span
-      return a.nettoVermogen + t * (b.nettoVermogen - a.nettoVermogen)
+/** Lineaire interpolatie van de (al gevloerde) lijnwaarde op een (fractionele) leeftijd. */
+function interpolateLine(points: readonly [number, number][], age: number): number {
+  if (points.length === 0) return 0
+  if (age <= points[0][0]) return points[0][1]
+  const last = points[points.length - 1]
+  if (age >= last[0]) return last[1]
+  for (let i = 0; i < points.length - 1; i++) {
+    const [a0, v0] = points[i]
+    const [a1, v1] = points[i + 1]
+    if (age >= a0 && age <= a1) {
+      const span = a1 - a0
+      if (span === 0) return v0
+      const t = (age - a0) / span
+      return v0 + t * (v1 - v0)
     }
   }
-  return last.nettoVermogen
+  return last[1]
 }
 
-function VermogenspadChart({ projectie }: { projectie: ProjectieData }) {
-  const pad = projectie.vermogenspad
-  if (pad.length < 2) {
+/**
+ * @param points  `[leeftijd, bedrag]` in de actieve euro-weergave, op de canonieke
+ *                as-conventie (seed op de beginleeftijd + eindstand op `age + 1`).
+ * @param doel    Doelbedrag (netto vermogen incl. woning) in dezelfde weergave.
+ */
+function VermogenspadChart({
+  projectie,
+  points,
+  doel,
+}: {
+  projectie: ProjectieData
+  points: readonly [number, number][]
+  doel: number | null
+}) {
+  if (points.length < 2) {
     return (
       <ReportEmptyState>
         Onvoldoende projectie-punten om een vermogenspad te tekenen.
@@ -85,16 +122,17 @@ function VermogenspadChart({ projectie }: { projectie: ProjectieData }) {
   const plotW = width - padL - padR
   const plotH = height - padT - padB
 
-  const ages = pad.map((p) => p.age)
-  const minAge = ages[0]
-  const maxAge = ages[ages.length - 1]
+  const minAge = points[0][0]
+  const maxAge = points[points.length - 1][0]
   const ageSpan = maxAge - minAge || 1
 
-  const values = pad.map((p) => p.nettoVermogen)
-  const doel = projectie.doelbedragNettoVermogen
+  // 0-VLOER (zoals /toekomst, y-schaal-invariant): een negatieve stand — de
+  // tekort-lening — verdwijnt niet stil; die staat als melding boven de grafiek.
+  const floored: [number, number][] = points.map(([age, v]) => [age, Math.max(v, 0)])
+  const values = floored.map(([, v]) => v)
   const rawMax = Math.max(...values, doel ?? 0)
   const maxVal = rawMax > 0 ? rawMax * 1.06 : 1
-  const minVal = Math.min(0, ...values)
+  const minVal = 0
   const valSpan = maxVal - minVal || 1
 
   const xScale = (age: number) => padL + ((age - minAge) / ageSpan) * plotW
@@ -102,7 +140,7 @@ function VermogenspadChart({ projectie }: { projectie: ProjectieData }) {
 
   const baselineY = yScale(minVal)
 
-  const linePoints = pad.map((p) => `${xScale(p.age).toFixed(1)},${yScale(p.nettoVermogen).toFixed(1)}`).join(' ')
+  const linePoints = floored.map(([age, v]) => `${xScale(age).toFixed(1)},${yScale(v).toFixed(1)}`).join(' ')
   const areaPoints = `${xScale(minAge).toFixed(1)},${baselineY.toFixed(1)} ${linePoints} ${xScale(maxAge).toFixed(1)},${baselineY.toFixed(1)}`
 
   const showDoel = doel != null && doel > minVal && doel <= maxVal
@@ -112,7 +150,7 @@ function VermogenspadChart({ projectie }: { projectie: ProjectieData }) {
   const showFire =
     projectie.fireReachable && fireAge != null && fireAge >= minAge && fireAge <= maxAge
   const fireX = showFire ? xScale(fireAge as number) : 0
-  const fireValueY = showFire ? yScale(interpolateNetWorth(pad, fireAge as number)) : 0
+  const fireValueY = showFire ? yScale(interpolateLine(floored, fireAge as number)) : 0
 
   const accent = 'var(--module-active-700)'
   const accentSoft = 'var(--module-active-500)'
@@ -224,10 +262,34 @@ function VermogenspadChart({ projectie }: { projectie: ProjectieData }) {
         textAnchor="end"
         style={{ fill: ink3, fontFamily: 'var(--font-dm-mono, monospace)', fontSize: '10px' }}
       >
-        {maxAge} jr
+        {leeftijdJaar(maxAge)} jr
       </text>
     </svg>
   )
+}
+
+// ── Meldingen (stoplicht-amber, zoals de /toekomst-blokken; bewust geen module-accent) ──
+
+function ReportNotice({ testId, children }: { testId: string; children: React.ReactNode }) {
+  return (
+    <div
+      data-testid={testId}
+      className="mt-4 flex items-start gap-2.5 border border-dashed border-amber-200 bg-amber-50/60 px-3 py-2.5"
+    >
+      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" aria-hidden />
+      <div className="font-source-serif text-[13px] leading-snug text-amber-800">{children}</div>
+    </div>
+  )
+}
+
+/**
+ * Vrijheidsdagen → "X jaar en Y maanden". Dezelfde decompositie (incl. de
+ * 12-maanden-carry) als elk ander vrijheidsgetal; `amount = dagen` tegen €1/dag is
+ * die decompositie zónder een tweede deling — de ene deling zit al in
+ * `freedomDaysAtAge`.
+ */
+function freedomLabel(days: number): string {
+  return formatWithFreedom(days, 1, { includeCurrency: false, includeDays: false })
 }
 
 // ── ProjectieBlock ───────────────────────────────────────────────────
@@ -241,6 +303,9 @@ export function ProjectieBlock({
   dailyExpenseRate: number
   num?: string
 }) {
+  // Hook vóór de early-return (hooks-regel); buiten een provider = 'nominal'.
+  const { view: euroView } = useEuroView()
+
   if (!projectie.ok) {
     return (
       <section className="report-section mb-6">
@@ -255,7 +320,49 @@ export function ProjectieBlock({
   }
 
   const strategyLabel = STRATEGY_LABELS[projectie.strategy]?.name ?? projectie.strategy
+  const pad = projectie.vermogenspad
   const doel = projectie.doelbedragNettoVermogen
+  const fireAge = projectie.fireAgeFractional ?? projectie.fireAge
+  const lastPunt = pad.length > 0 ? pad[pad.length - 1] : null
+
+  // ── EURO-WEERGAVE aan de render-grens (ADR 0090/0093) ──
+  // Pad: klasse F — elk punt door de factor van zíjn rij (deflateRowsByAge; in
+  // 'nominal' dezelfde referentie). Puntbedragen: één keer via `deflate` met de
+  // factor van hun leeftijd — doel/liquide pot op de FIRE-leeftijd, de eindstand
+  // op de laatste geclipte rij (dezelfde rij-factor als de /overzicht-widget).
+  const factorByAge = buildFactorByAge(pad)
+  const viewPad = deflateRowsByAge(pad, factorByAge, ['nettoVermogen', 'startNettoVermogen'], euroView)
+  const fireFactor = factorAtAge(pad, fireAge)
+  const eindFactor = lastPunt?.inflationFactor ?? 1
+  const viewDoel = doel != null ? deflate(doel, fireFactor, euroView) : null
+  const viewEind = deflate(projectie.eindwaardeNettoVermogen, eindFactor, euroView)
+  const viewPot = deflate(projectie.fireLiquidePot, fireFactor, euroView)
+  // Canonieke as-conventie: seed op de beginleeftijd, eindstand van rij `age` op
+  // `age + 1` — één huis met SimChart en de /overzicht-widgets. De laatste x is
+  // daarmee exact `displayEndAge`, het jaar in het Eindvermogen-label.
+  const points = widgetSimRowsToChartPoints(
+    viewPad.map((p) => ({ age: p.age, startPortfolio: p.startNettoVermogen, endPortfolio: p.nettoVermogen })),
+  )
+
+  // ── VRIJHEIDSTIJD — real-verankerd, J-grondslag (lib/horizon/vrijheidsdagen.ts) ──
+  // Teller één keer door de rij-factor (onafhankelijk van de schakelaar), noemer =
+  // het canonieke dagtarief van vandaag; 0 = geen eerlijke dagbasis → geen regel.
+  // Alleen het LIQUIDE deel telt als op te leven vrijheid — een huis leef je niet op.
+  const eindVrijheidDagen = freedomDaysAtAge({
+    rows: pad,
+    age: lastPunt?.age ?? null,
+    nominalAmount: projectie.eindwaardeNettoLiquide,
+    canonicalDailyRate: dailyExpenseRate,
+  })
+  const potVrijheidDagen = freedomDaysAtAge({
+    rows: pad,
+    age: fireAge,
+    nominalAmount: projectie.fireLiquidePot,
+    canonicalDailyRate: dailyExpenseRate,
+  })
+
+  const eindLeeftijd = leeftijdJaar(projectie.displayEndAge)
+  const weergave = euroViewLabel(euroView).toLowerCase()
 
   return (
     <section className="report-section mb-6">
@@ -275,22 +382,47 @@ export function ProjectieBlock({
         />
         <DefinitionRow
           label="Doelbedrag — netto vermogen (incl. eigen woning)"
-          value={doel != null ? formatCurrency(doel) : null}
-          sub={doel != null ? `${formatWithFreedom(doel, dailyExpenseRate, { includeCurrency: false })} vrijheid` : undefined}
+          value={viewDoel != null ? formatCurrency(viewDoel) : null}
+          sub={viewDoel != null ? `op je vrijheidsleeftijd · ${weergave}` : undefined}
         />
         <DefinitionRow
-          label="Eindwaarde netto vermogen"
-          value={formatCurrency(projectie.eindwaardeNettoVermogen)}
-          sub={`${formatWithFreedom(projectie.eindwaardeNettoVermogen, dailyExpenseRate, { includeCurrency: false })} vrijheid · op ${projectie.displayEndAge} jaar`}
+          label={`Eindvermogen (${eindLeeftijd} j)`}
+          value={formatCurrency(viewEind)}
+          sub={
+            eindVrijheidDagen != null
+              ? `${freedomLabel(eindVrijheidDagen)} vrijheid in het liquide deel · ${weergave}`
+              : `netto vermogen op het einde van je plan · ${weergave}`
+          }
         />
       </div>
 
-      {/* Vermogenspad — grondslag expliciet benoemd */}
+      {/* Anker-tekort (ADR 0129 D3) — dezelfde zin als het /toekomst-tekortblok. */}
+      {projectie.ankerTekortZin && (
+        <ReportNotice testId="anchor-shortfall-blok">
+          <p>{projectie.ankerTekortZin}</p>
+        </ReportNotice>
+      )}
+
+      {/* Tekort-lening vóór het planeinde (V7) — wat de 0-vloer hieronder anders verbergt. */}
+      {projectie.tekortLening && (
+        <ReportNotice testId="tekort-lening-blok">
+          <p>
+            {projectie.tekortLening.copy.periode} {projectie.tekortLening.copy.waarom}
+          </p>
+          {projectie.tekortLening.copy.woning && <p className="mt-1">{projectie.tekortLening.copy.woning}</p>}
+          <p className="mt-1">
+            {projectie.tekortLening.copy.piek} {projectie.tekortLening.copy.lijn}
+          </p>
+          <p className="mt-1 italic">{projectie.tekortLening.copy.disclaimer}</p>
+        </ReportNotice>
+      )}
+
+      {/* Vermogenspad — grondslag én euro-weergave expliciet benoemd */}
       <div className="mt-5 border border-[var(--border-ed)] p-3 sm:p-4">
         <p className="mb-1 font-mono text-[9px] uppercase tracking-[0.14em] text-[var(--ink-3)]">
-          Vermogenspad — netto vermogen (inclusief eigen woning)
+          Vermogenspad — netto vermogen (inclusief eigen woning) · {weergave} · tot {eindLeeftijd} jaar
         </p>
-        <VermogenspadChart projectie={projectie} />
+        <VermogenspadChart projectie={projectie} points={points} doel={viewDoel} />
       </div>
 
       {/* Liquide FIRE-pot — losse tekstduiding, bewust NIET op de as hierboven */}
@@ -300,8 +432,8 @@ export function ProjectieBlock({
           style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
         >
           Ter duiding: de <strong className="not-italic font-semibold text-[var(--ink-2)]">liquide FIRE-pot</strong> — je
-          belegbare vermogen exclusief de eigen woning — is {formatCurrency(projectie.fireLiquidePot)} (
-          {formatWithFreedom(projectie.fireLiquidePot, dailyExpenseRate, { includeCurrency: false })} vrijheid). Dat is een
+          belegbare vermogen exclusief de eigen woning — is {formatCurrency(viewPot)}
+          {potVrijheidDagen != null ? ` (${freedomLabel(potVrijheidDagen)} vrijheid)` : ''}. Dat is een
           andere grootheid dan het netto vermogen hierboven en staat daarom bewust niet op dezelfde as.
         </p>
       )}

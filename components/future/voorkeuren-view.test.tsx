@@ -95,6 +95,20 @@ describe('VoorkeurenView — toekomst-regels', () => {
     expect(screen.getAllByText('Guardrails').length).toBeGreaterThan(0)
   })
 
+  // B-042 — het PROFIEL (uit withdrawal_profile_config, zoals de kernel het leest) wint
+  // van de enum: enum 'static' + profiel 'afnemend' toonde "Vast (4%)" waar de motor
+  // Afnemend rekende. Zonder de prop blijft de enum-terugval gelden (oude callers).
+  it('toont het meegegeven onttrekkingsprofiel (Afnemend) en dan géén guardrails-badge', () => {
+    render(
+      <DisplayModeProvider initialMode="full">
+        <VoorkeurenView {...baseProps} withdrawalStrategy={{ ...mockWithdrawal, strategy: 'static' }} withdrawalProfiel="afnemend" />
+      </DisplayModeProvider>,
+    )
+    expect(screen.getByText('Afnemend')).toBeTruthy()
+    expect(screen.queryByText('Vast (4%)')).toBeNull()
+    expect(screen.queryByText(/Floor 80\.0%/)).toBeNull()
+  })
+
   it('toont guardrail floor/ceiling-badge bij guardrails-strategie', () => {
     render(<DisplayModeProvider initialMode="full"><VoorkeurenView {...baseProps} /></DisplayModeProvider>)
     expect(screen.getByText(/Floor 80\.0%/)).toBeTruthy()

@@ -340,7 +340,9 @@ export function OnttrekkingBlock({ data }: { data: PersoonlijkPlanOnttrekking })
           </div>
         )}
 
-        {data.type === 'static' && (
+        {/* De SWR-/4%-duiding hoort ALLEEN bij het vaste profiel: afnemend/oplopend
+            rekenen met een fase-curve, guardrails met een bandbreedte (B-042). */}
+        {data.type === 'vast' && (
           <p
             className="mt-3 text-[12px] italic text-[var(--ink-3)]"
             style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}

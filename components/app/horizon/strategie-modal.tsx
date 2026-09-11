@@ -29,7 +29,7 @@ import {
   type WithdrawalProfiel,
   WITHDRAWAL_DEFAULTS,
   resolveWithdrawalStrategy,
-  parseWithdrawalProfileConfig,
+  resolveWithdrawalProfiel,
 } from '@/lib/withdrawal-strategy'
 import {
   type SimResult,
@@ -403,14 +403,18 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
     [fireStrategy],
   )
 
-  // Het huidig opgeslagen onttrekkingsPROFIEL (read-only): uit
-  // `withdrawal_profile_config.profiel`; valt anders terug op de guardrails-enum
-  // → 'guardrails', anders 'vast'. Bepaalt de "Actief"-markering en de header-badge.
-  const activeProfiel = useMemo<WithdrawalProfiel>(() => {
-    const parsed = parseWithdrawalProfileConfig(kernelRawProfile ?? undefined)
-    if (parsed?.profiel) return parsed.profiel
-    return withdrawalConfig.strategy === 'guardrails' ? 'guardrails' : 'vast'
-  }, [kernelRawProfile, withdrawalConfig.strategy])
+  // Het huidig opgeslagen onttrekkingsPROFIEL (read-only): dezelfde voorrangsregel
+  // als de kernel-adapter (`resolveWithdrawalProfiel`, B-042) — het expliciete
+  // profiel uit `withdrawal_profile_config` wint, anders de (lokaal geladen) enum.
+  // Bepaalt de "Actief"-markering en de header-badge.
+  const activeProfiel = useMemo<WithdrawalProfiel>(
+    () =>
+      resolveWithdrawalProfiel({
+        withdrawal_profile_config: kernelRawProfile?.withdrawal_profile_config,
+        withdrawal_strategy: withdrawalConfig.strategy,
+      }),
+    [kernelRawProfile?.withdrawal_profile_config, withdrawalConfig.strategy],
+  )
 
   // Kernel-only: de onttrekking-tab vergelijkt de vier PROFIELEN via de horizon-kernel.
   // Zonder rauwe kernel-context of geldige basisgegevens tonen we een nette degradatie

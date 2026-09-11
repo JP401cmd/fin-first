@@ -39,7 +39,11 @@ import type { GoalWithBudget } from '@/lib/fin-data-loader'
 import type { LifeEvent } from '@/lib/horizon-data'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
 import { STRATEGY_LABELS } from '@/lib/fire-strategy'
-import type { WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
+import {
+  withdrawalProfielFromEnum,
+  type WithdrawalProfiel,
+  type WithdrawalStrategyConfig,
+} from '@/lib/withdrawal-strategy'
 import type { FireParams } from '@/lib/fire-params'
 import { goalReachedFromProgress, type GoalProgress as CanonicalGoalProgress } from '@/lib/goal-data'
 
@@ -107,15 +111,16 @@ export function formatPct(value: number): string {
 }
 
 /**
- * Onttrekkingsstrategie → leesbare naam voor de Voorkeuren-substext.
- * Spiegelt de WITHDRAWAL_LABELS-mapping uit voorkeuren-view.tsx (alleen de
- * `name`-velden — de uitleg zelf staat in `lib/glossary-data.ts`).
+ * OnttrekkingsPROFIEL → leesbare naam voor de Voorkeuren-substext (B-042: gesleuteld
+ * op `WithdrawalProfiel`, niet op de enum die vast/afnemend/oplopend alle drie als
+ * 'static' draagt). Spiegelt de WITHDRAWAL_LABELS-mapping uit voorkeuren-view.tsx
+ * (alleen de `name`-velden — de uitleg zelf staat in `lib/glossary-data.ts`).
  */
-const WITHDRAWAL_NAMES: Record<string, string> = {
-  static: 'Vast (4%)',
+const WITHDRAWAL_NAMES: Record<WithdrawalProfiel, string> = {
+  vast: 'Vast (4%)',
+  afnemend: 'Afnemend',
+  oplopend: 'Oplopend',
   guardrails: 'Guardrails',
-  vpw: 'VPW',
-  bucket: 'Bucket',
 }
 
 /**
@@ -279,6 +284,7 @@ export function buildNavCards({
   events,
   fireStrategy,
   withdrawalStrategy,
+  withdrawalProfiel,
   fireParams,
   calculatorCount,
 }: {
@@ -287,6 +293,13 @@ export function buildNavCards({
   events: LifeEvent[]
   fireStrategy: FireStrategyConfig
   withdrawalStrategy: WithdrawalStrategyConfig
+  /**
+   * Het actieve onttrekkingsPROFIEL zoals de kernel het leest
+   * (`resolveWithdrawalProfiel`, B-042). Optioneel: zonder prop valt de kaart terug
+   * op de enum-mapping (static → vast) en kan hij "Vast" tonen waar de motor
+   * Afnemend rekent — de server-page levert hem daarom altijd mee.
+   */
+  withdrawalProfiel?: WithdrawalProfiel
   fireParams: FireParams
   calculatorCount: number
 }): NavCard[] {
@@ -312,8 +325,10 @@ export function buildNavCards({
 
   // Voorkeuren — neutrale dot, KPI = eindstrategie-naam.
   const strategy = STRATEGY_LABELS[fireStrategy.strategy]
-  const withdrawalName =
-    WITHDRAWAL_NAMES[withdrawalStrategy.strategy] ?? withdrawalStrategy.strategy
+  // Profiel > enum-terugval — dezelfde voorrang als de kernel-adapter (B-042).
+  const activeProfiel: WithdrawalProfiel =
+    withdrawalProfiel ?? withdrawalProfielFromEnum(withdrawalStrategy.strategy)
+  const withdrawalName = WITHDRAWAL_NAMES[activeProfiel]
 
   // Rekenhulp — neutrale dot.
   const calcCount = calculatorCount
@@ -373,7 +388,7 @@ export function buildNavCards({
       detail: {
         detailLabel: 'Onttrekking',
         value: withGlossary(
-          WITHDRAWAL_GLOSSARY_KEYS[withdrawalStrategy.strategy],
+          WITHDRAWAL_GLOSSARY_KEYS[activeProfiel],
           withdrawalName,
         ),
         // Vaktermen uit de kaart-voorkant ("Vermogen opeten", "SWR") krijgen
@@ -420,6 +435,8 @@ export function ToekomstNavCards(props: {
   events: LifeEvent[]
   fireStrategy: FireStrategyConfig
   withdrawalStrategy: WithdrawalStrategyConfig
+  /** Zie `buildNavCards` — het profiel zoals de kernel het leest (B-042). */
+  withdrawalProfiel?: WithdrawalProfiel
   fireParams: FireParams
   calculatorCount: number
 }) {

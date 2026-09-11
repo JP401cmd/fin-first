@@ -6,7 +6,11 @@ import Link from 'next/link'
 import { SlidersHorizontal, ArrowRight, TrendingUp, Wallet, Pencil } from 'lucide-react'
 import type { FireParams } from '@/lib/fire-params'
 import type { FirePlan, FireStrategyConfig } from '@/lib/fire-strategy'
-import type { WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
+import {
+  withdrawalProfielFromEnum,
+  type WithdrawalProfiel,
+  type WithdrawalStrategyConfig,
+} from '@/lib/withdrawal-strategy'
 import { STRATEGY_LABELS } from '@/lib/fire-strategy'
 import { STOP_ANCHOR_OPTIONS, formatPlanAge } from '@/lib/horizon/plan-draft'
 import { GlossaryTerm } from '@/components/editorial/glossary-term'
@@ -60,11 +64,16 @@ import { WEALTH_GROUP_LABELS, type WealthGroup } from '@/lib/wealth-composition'
  * bedieningsvlak, en valt daarmee aan de goede kant van diezelfde norm.
  */
 
+/**
+ * Kaart-labels per onttrekkingsPROFIEL (de vier keuzes van de editor, B-042).
+ * Gesleuteld op `WithdrawalProfiel` — niet op de enum, die vast/afnemend/oplopend
+ * alle drie als 'static' draagt. Exhaustief via het Record-type.
+ */
 const WITHDRAWAL_LABELS: Record<
-  string,
+  WithdrawalProfiel,
   { name: string; subtitle: React.ReactNode }
 > = {
-  static: {
+  vast: {
     name: 'Vast (4%)',
     subtitle: (
       <>
@@ -72,6 +81,14 @@ const WITHDRAWAL_LABELS: Record<
         geïndexeerd, geen reactie op markt
       </>
     ),
+  },
+  afnemend: {
+    name: 'Afnemend',
+    subtitle: 'Meer uitgeven in je actieve jaren, daarna afbouwen (go-go → slow-go → no-go)',
+  },
+  oplopend: {
+    name: 'Oplopend',
+    subtitle: 'Bescheiden beginnen, later méér uitgeven — het spiegelbeeld van afnemend',
   },
   guardrails: {
     name: 'Guardrails',
@@ -82,24 +99,8 @@ const WITHDRAWAL_LABELS: Record<
       </>
     ),
   },
-  vpw: {
-    name: 'VPW',
-    subtitle: (
-      <>
-        <GlossaryTerm term="vpw">Variable Percentage Withdrawal</GlossaryTerm>
-        {' '}— leeftijd-afhankelijk
-      </>
-    ),
-  },
-  bucket: {
-    name: 'Bucket',
-    subtitle: (
-      <>
-        <GlossaryTerm term="bucket">Cash-buffer</GlossaryTerm> + lange-termijn
-        portfolio gescheiden
-      </>
-    ),
-  },
+  // vpw/bucket zijn sinds migratie 20260703115225 samengevoegd tot 'static' en
+  // bestaan niet als profiel; de enum-terugval zet ze op 'vast'.
 }
 
 function formatPct(value: number, digits = 1): string {
@@ -123,6 +124,7 @@ export function VoorkeurenView({
   fireStrategy,
   firePlan = null,
   withdrawalStrategy,
+  withdrawalProfiel,
   fireAge,
   simRows,
   simSnapshot,
@@ -134,6 +136,13 @@ export function VoorkeurenView({
   /** ADR 0129 — het volledige plan (stop-anker + eind-vorm); voedt de plan-regel. */
   firePlan?: FirePlan | null
   withdrawalStrategy: WithdrawalStrategyConfig
+  /**
+   * Het actieve onttrekkingsPROFIEL zoals de kernel het leest
+   * (`resolveWithdrawalProfiel` op de rauwe profielrij, B-042). Optioneel voor
+   * oudere callers/fixtures: zonder prop valt de kaart terug op de enum-mapping
+   * (static → vast) — dan kan hij "Vast" tonen waar de motor Afnemend rekent.
+   */
+  withdrawalProfiel?: WithdrawalProfiel
   /** Vrijheidsleeftijd (gerond) voor AfbouwOverzichtCard. */
   fireAge?: number | null
   /** Per-jaar projectie uit runUnifiedProjection — voor eindsaldo-berekening. */
@@ -194,10 +203,10 @@ export function VoorkeurenView({
     const opt = STOP_ANCHOR_OPTIONS.find((o) => o.kind === a.kind)
     return opt ? `Stopmoment: ${opt.name.charAt(0).toLowerCase()}${opt.name.slice(1)}` : null
   })()
-  const wsLabel = WITHDRAWAL_LABELS[withdrawalStrategy.strategy] ?? {
-    name: withdrawalStrategy.strategy,
-    subtitle: 'Onbekende strategie',
-  }
+  // Profiel > enum-terugval — dezelfde voorrang als de kernel-adapter (B-042).
+  const activeProfiel: WithdrawalProfiel =
+    withdrawalProfiel ?? withdrawalProfielFromEnum(withdrawalStrategy.strategy)
+  const wsLabel = WITHDRAWAL_LABELS[activeProfiel]
 
   const openRegel = (id: RegelId) => () => setEditingRegel(id)
 
@@ -353,7 +362,7 @@ export function VoorkeurenView({
             subtitle={wsLabel.subtitle}
             Icon={SlidersHorizontal}
             badge={
-              withdrawalStrategy.strategy === 'guardrails'
+              activeProfiel === 'guardrails'
                 ? `Floor ${formatPct(withdrawalStrategy.guardrailFloor)} · Ceiling ${formatPct(withdrawalStrategy.guardrailCeiling)}`
                 : undefined
             }

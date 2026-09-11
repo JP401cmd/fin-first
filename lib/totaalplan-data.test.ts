@@ -3,6 +3,7 @@ import type { Asset } from '@/lib/asset-data'
 import type { Aandachtspunt } from '@/lib/aandachtspunten'
 import { DEFAULT_VOLATILITY } from '@/lib/constants'
 import { toSimResult } from '@/lib/unified-projection'
+import { clipRowsToPlanEnd } from '@/lib/horizon/clip-rows-to-plan-end'
 import { computeConvergentieProjection, type ConvergentieRawContext } from '@/lib/horizon-kernel/convergentie-router'
 import { runMonteCarlo } from '@/lib/horizon-kernel/wrappers/mc'
 import {
@@ -145,12 +146,19 @@ describe('assembleTotaalplan — projectie-parity (single source)', () => {
     expect(report.projectie.doelbedragNettoVermogen).toBe(outcome.result.requiredFireNetWorth ?? null)
     expect(report.projectie.fireLiquidePot).toBe(Math.round(sim.requiredFirePortfolio))
 
-    const lastRow = outcome.result.rows[outcome.result.rows.length - 1]
+    // B-043: het rapport-pad is de WEERGAVE-geclipte reeks (t/m displayEndAge − 1),
+    // exact zoals /toekomst en /overzicht 'm tonen — niet de rauwe kernelreeks tot ~100.
+    const displayRows = clipRowsToPlanEnd(outcome.result.rows, sim.displayEndAge)
+    const lastRow = displayRows[displayRows.length - 1]
     expect(report.projectie.eindwaardeNettoVermogen).toBe(Math.round(lastRow.netWorth))
-    expect(report.projectie.vermogenspad.length).toBe(outcome.result.rows.length)
+    expect(report.projectie.eindwaardeNettoLiquide).toBe(Math.round(lastRow.nettoLiquide))
+    expect(report.projectie.vermogenspad.length).toBe(displayRows.length)
     expect(report.projectie.vermogenspad[report.projectie.vermogenspad.length - 1].nettoVermogen).toBe(
       Math.round(lastRow.netWorth),
     )
+    // De deflator reist per punt mee (puur doorgeleid, jaar 0 = exact 1.0).
+    expect(report.projectie.vermogenspad[0].inflationFactor).toBe(1)
+    expect(report.projectie.vermogenspad[report.projectie.vermogenspad.length - 1].inflationFactor).toBe(lastRow.inflationFactor)
   })
 })
 
@@ -197,16 +205,104 @@ describe('assembleTotaalplan — regressie: totaalplan-projectie == /toekomst-pr
     const raw = makeRawInputs()
     const report = assembleTotaalplan(raw)
 
-    // Simuleert wat /toekomst zou doen: dezelfde rawContext, los aangeroepen.
+    // Simuleert wat /toekomst zou doen: dezelfde rawContext, los aangeroepen, en
+    // dezelfde weergave-clip (`clipRowsToPlanEnd` op de kernel-`displayEndAge`).
     const direct = computeConvergentieProjection({ rawContext: raw.kernelContext })
     expect(direct.ok).toBe(true)
     if (!direct.ok) return
+    const toekomstRows = clipRowsToPlanEnd(direct.result.rows, direct.result.displayEndAge)
 
-    expect(report.projectie.vermogenspad.length).toBe(direct.result.rows.length)
-    expect(report.projectie.vermogenspad[0].nettoVermogen).toBe(Math.round(direct.result.rows[0].netWorth))
+    expect(report.projectie.vermogenspad.length).toBe(toekomstRows.length)
+    expect(report.projectie.vermogenspad[0].nettoVermogen).toBe(Math.round(toekomstRows[0].netWorth))
     expect(report.projectie.vermogenspad[report.projectie.vermogenspad.length - 1].nettoVermogen).toBe(
-      Math.round(direct.result.rows[direct.result.rows.length - 1].netWorth),
+      Math.round(toekomstRows[toekomstRows.length - 1].netWorth),
     )
+  })
+})
+
+/**
+ * Regressieslot B-043 — "eindwaarde van −1 mln zonder leeftijd in het totaalplan".
+ *
+ * `buildProjectie` nam `result.rows` ongeknipt en las de eindwaarde van de laatste
+ * kernelrij (~leeftijd 100). Bij opeten/nalatenschap met een eindleeftijd onder 100
+ * is dat de staart van de tekort-lening: diep negatief en nominaal. Eigenaarsbesluit:
+ * zoals /toekomst — de staart is modelmarge (4 juli 2026), dus pad én eindwaarde
+ * knippen op `displayEndAge − 1` met dezelfde helper.
+ */
+describe('assembleTotaalplan — pad en eindwaarde stoppen op het planeinde (B-043)', () => {
+  function projectieFor(plan: Partial<ConvergentieRawContext['profile']>) {
+    const kernelContext = makeKernelContext({ profile: { ...makeKernelContext().profile, ...plan } })
+    const report = assembleTotaalplan(makeRawInputs({ kernelContext }))
+    const run = computeConvergentieProjection({ rawContext: kernelContext })
+    if (!run.ok) throw new Error(`fixture: run niet ok (${run.reason})`)
+    return { projectie: report.projectie, run: run.result }
+  }
+
+  it('opeten met eindleeftijd 90: de eindwaarde staat op het planeinde, niet op de tekort-lening-staart', () => {
+    const { projectie, run } = projectieFor({ fire_end_strategy: 'deplete', fire_end_age: 90 })
+    expect(projectie.ok).toBe(true)
+    expect(projectie.displayEndAge).toBe(90)
+
+    const laatste = projectie.vermogenspad[projectie.vermogenspad.length - 1]
+    expect(laatste.age).toBe(89) // t/m displayEndAge − 1, zoals /toekomst
+    expect(projectie.eindwaardeNettoVermogen).toBe(laatste.nettoVermogen)
+
+    // De rauwe kernelstaart (tot ~100) IS diep negatief — precies het "−1 mln" uit de melding.
+    const staart = run.rows[run.rows.length - 1]
+    expect(staart.age).toBeGreaterThan(89)
+    expect(staart.netWorth).toBeLessThan(0)
+    expect(projectie.eindwaardeNettoVermogen).toBeGreaterThan(Math.round(staart.netWorth))
+    // Opeten landt per constructie op ~€0 op het planeinde: geen miljoenen-tekort meer.
+    expect(Math.abs(projectie.eindwaardeNettoVermogen)).toBeLessThan(Math.abs(staart.netWorth) / 10)
+  })
+
+  it.each([
+    ['perpetual', { fire_end_strategy: 'perpetual', fire_end_age: 90 }],
+    ['pensioen', { fire_end_strategy: 'pensioen', fire_end_age: 90 }],
+    ['deplete', { fire_end_strategy: 'deplete', fire_end_age: 85 }],
+    ['legacy', { fire_end_strategy: 'legacy', fire_end_age: 90, fire_legacy_amount: 100_000 }],
+  ] as const)('%s: pad t/m displayEndAge − 1 en eindwaarde = eindstand van die rij', (_naam, plan) => {
+    const { projectie, run } = projectieFor(plan)
+    expect(projectie.ok).toBe(true)
+    const verwacht = clipRowsToPlanEnd(run.rows, run.displayEndAge)
+    expect(projectie.vermogenspad.map((p) => p.age)).toEqual(verwacht.map((r) => r.age))
+    expect(projectie.vermogenspad[projectie.vermogenspad.length - 1].age).toBe(run.displayEndAge - 1)
+    expect(projectie.eindwaardeNettoVermogen).toBe(Math.round(verwacht[verwacht.length - 1].netWorth))
+    expect(projectie.eindwaardeNettoLiquide).toBe(Math.round(verwacht[verwacht.length - 1].nettoLiquide))
+    // Elk punt draagt de canonieke deflator van zijn rij mee.
+    projectie.vermogenspad.forEach((p, i) => expect(p.inflationFactor).toBe(verwacht[i].inflationFactor))
+  })
+
+  it('zonder tekort: geen anker-tekort-zin en geen tekort-lening-melding', () => {
+    const { projectie } = projectieFor({ fire_end_strategy: 'deplete', fire_end_age: 90 })
+    expect(projectie.ankerTekortZin).toBeNull()
+    expect(projectie.tekortLening).toBeNull()
+  })
+
+  it('anker-tekort (arm + vast stopmoment): de /toekomst-zin komt mee in het rapport', () => {
+    // Zelfde constructie als anker.test.ts ("arm + stop op 43 ⇒ anchor_shortfall"):
+    // nauwelijks vermogen, geen inleg, stoppen op 43 → het liquide vermogen reikt niet.
+    const kernelContext = makeKernelContext({
+      profile: {
+        ...makeKernelContext().profile,
+        fire_end_strategy: 'deplete',
+        fire_end_age: 90,
+        fire_stop_anchor: 'age',
+        fire_stop_age: 43,
+      },
+      assets: makeAssets().map((a) => ({ ...a, current_value: 5_000, monthly_contribution: 0 })),
+    })
+    const report = assembleTotaalplan(makeRawInputs({ kernelContext }))
+    const run = computeConvergentieProjection({ rawContext: kernelContext })
+    if (!run.ok) throw new Error('fixture: run niet ok')
+    expect(['anchor_shortfall', 'pension_shortfall', 'stop_now_shortfall']).toContain(run.kernelStatus)
+
+    const zin = report.projectie.ankerTekortZin
+    expect(zin).not.toBeNull()
+    expect(zin).toMatch(/liquide vermogen/)
+    expect(zin).toMatch(/op 43 stopt/)
+    // Beschrijvend, nooit aansporend (toon-invariant uit anker-copy).
+    expect(zin).not.toMatch(/je kunt stoppen|oneindig|AOW/)
   })
 })
 

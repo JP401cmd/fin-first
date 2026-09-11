@@ -60,7 +60,10 @@ export async function GET() {
       supabase
         .from('profiles')
         .select(
-          `full_name, date_of_birth, household_type, number_of_children, net_monthly_income, estimated_monthly_expenses, expected_return, inflation_rate, marginaal_tarief, ${FIRE_PLAN_COLUMNS}, retirement_expense_method, retirement_expense_custom_amount, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step, feature_preferences`,
+          // `withdrawal_profile_config` draagt het echte onttrekkingsprofiel (B-042):
+          // zonder die kolom las de assemblage alleen de enum en toonde "Vast"
+          // terwijl de kernel (via horizonData.rawProfile) Afnemend rekende.
+          `full_name, date_of_birth, household_type, number_of_children, net_monthly_income, estimated_monthly_expenses, expected_return, inflation_rate, marginaal_tarief, ${FIRE_PLAN_COLUMNS}, retirement_expense_method, retirement_expense_custom_amount, withdrawal_strategy, withdrawal_profile_config, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step, feature_preferences`,
         )
         .single(),
       supabase.from('aow_leeftijd').select('*'),
