@@ -5,8 +5,10 @@
  *
  * UX-patroon (eigen overlay-categorie, niet via ShellOverlay):
  *  - Top-anchored op desktop (top: 12vh), full-screen op mobile.
- *  - Eén input + meerdere secties (Recent / Pagina's / Items / Acties).
- *  - Keyboard-nav over alle visible items: ↑/↓ scrollt, ⏎ activeert, Esc sluit.
+ *  - Eén input + meerdere secties (Recent / Pagina's / Items / Acties). De
+ *    acties staan als knoppen-grid (W-006), de rest als lijst.
+ *  - Keyboard-nav over alle visible items: ↑/↓ scrollt, ⏎ activeert, Esc sluit;
+ *    ←/→ beweegt binnen het acties-grid.
  *  - Server-side ilike-prefilter via /api/command-palette/search; client-side
  *    fuzzy-rank via lib/command-palette/fuzzy.ts voor pages + actions.
  *
@@ -283,9 +285,17 @@ export function CommandPalette({ open, onClose, role, userId }: CommandPalettePr
       .sort((a, b) => b.score - a.score)
       .map((r) => r.item)
 
-    // Actions: ook fuzzy-rank zodat "verberg" → "Bedragen verbergen" werkt
+    // Actions: ook fuzzy-rank, op label én `keywords` — de schakelaars heten
+    // "Switch naar <doelstand>" (W-006), en "verberg" of "startscherm" moeten
+    // ze blijven vinden.
     const rankedActions = generalActions
-      .map((a) => ({ item: a, score: fuzzyScore(a.label, trimmed)?.score ?? 0 }))
+      .map((a) => ({
+        item: a,
+        score: Math.max(
+          0,
+          ...[a.label, ...(a.keywords ?? [])].map((t) => fuzzyScore(t, trimmed)?.score ?? 0),
+        ),
+      }))
       .filter((r) => r.score > 0)
       .sort((a, b) => b.score - a.score)
       .slice(0, ACTIONS_LIMIT_VISIBLE)
@@ -309,6 +319,18 @@ export function CommandPalette({ open, onClose, role, userId }: CommandPalettePr
 
   // ── Vlakke item-lijst voor keyboard-nav ────────────────────────────────────
   const flatItems = useMemo(() => sections.flatMap((s) => s.items), [sections])
+
+  // Plek van het acties-grid in de platte lijst ([start, end)). Pijl omhoog/
+  // omlaag blijft de platte navigatie over álle items; pijl links/rechts
+  // beweegt alleen binnen dit grid (W-006).
+  const actionRange = useMemo(() => {
+    let start = 0
+    for (const s of sections) {
+      if (s.key === 'actions') return { start, end: start + s.items.length }
+      start += s.items.length
+    }
+    return null
+  }, [sections])
 
   // Reset selectedIndex naar 0 bij elke nieuwe item-set; behoud anders
   useEffect(() => {
@@ -360,6 +382,22 @@ export function CommandPalette({ open, onClose, role, userId }: CommandPalettePr
         setSelectedIndex((i) => (flatItems.length === 0 ? 0 : (i - 1 + flatItems.length) % flatItems.length))
         return
       }
+      if (
+        (e.key === 'ArrowRight' || e.key === 'ArrowLeft') &&
+        actionRange &&
+        selectedIndex >= actionRange.start &&
+        selectedIndex < actionRange.end
+      ) {
+        // Met tekst in het zoekveld horen links/rechts bij de cursor.
+        const input = inputRef.current
+        if (input && document.activeElement === input && input.value !== '') return
+        e.preventDefault()
+        const size = actionRange.end - actionRange.start
+        const offset = selectedIndex - actionRange.start
+        const next = (offset + (e.key === 'ArrowRight' ? 1 : -1) + size) % size
+        setSelectedIndex(actionRange.start + next)
+        return
+      }
       if (e.key === 'Enter') {
         e.preventDefault()
         const item = flatItems[selectedIndex]
@@ -368,7 +406,7 @@ export function CommandPalette({ open, onClose, role, userId }: CommandPalettePr
     }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
-  }, [open, flatItems, selectedIndex, activate, onClose])
+  }, [open, flatItems, selectedIndex, activate, onClose, actionRange])
 
   // ── Auto-scroll selected row in view ───────────────────────────────────────
   useEffect(() => {
@@ -565,6 +603,38 @@ function SectionView({
   onSelect: (idx: number) => void
   onActivate: (item: CommandItem) => void
 }) {
+  // W-006 — acties als knoppen-grid (2 kolommen mobiel, 3 breder). Zelfde
+  // listbox/option-semantiek en dezelfde platte index als de lijstrijen, zodat
+  // de toetsenbordnavigatie ongewijzigd over de knoppen loopt.
+  if (section.key === 'actions') {
+    return (
+      <div className="px-2 pb-2">
+        <div className="px-3 pt-3 pb-1.5 text-[10px] uppercase tracking-[0.18em] text-[var(--ink-4)] font-medium">
+          {section.label}
+        </div>
+        <ul
+          role="listbox"
+          aria-label={section.label}
+          data-cmd-grid="actions"
+          className="grid grid-cols-2 gap-2 px-1 sm:grid-cols-3"
+        >
+          {section.items.map((item) => {
+            const idx = flatItems.indexOf(item)
+            return (
+              <ActionTile
+                key={item.id}
+                item={item}
+                selected={idx === selectedIndex}
+                onPointerEnter={() => onSelect(idx)}
+                onClick={() => onActivate(item)}
+              />
+            )
+          })}
+        </ul>
+      </div>
+    )
+  }
+
   return (
     <div className="px-2 pb-2">
       <div className="px-3 pt-3 pb-1.5 text-[10px] uppercase tracking-[0.18em] text-[var(--ink-4)] font-medium">
@@ -647,6 +717,66 @@ function CommandRow({
             className="w-3.5 h-3.5 shrink-0 text-[var(--ink-4)]"
             aria-hidden
           />
+        )}
+      </button>
+    </li>
+  )
+}
+
+/**
+ * Eén actie als knop in het acties-grid: icoon, korte titel, korte sublabel.
+ * Scherpe hoeken (krant-discipline), tokens voor elke kleur. Een ondergeschikte
+ * actie (Uitloggen) krijgt een gestippelde rand zonder vulling en gedempte inkt
+ * — wel in het rijtje, nooit als primaire knop.
+ */
+function ActionTile({
+  item,
+  selected,
+  onPointerEnter,
+  onClick,
+}: {
+  item: CommandItem
+  selected: boolean
+  onPointerEnter: () => void
+  onClick: () => void
+}) {
+  const Icon = item.icon
+  const subordinate = item.subordinate === true
+  const surface = subordinate
+    ? `border-dashed border-[var(--border-ed)] ${selected ? 'bg-[var(--subtle)]/50' : 'bg-transparent hover:bg-[var(--subtle)]/30'}`
+    : selected
+      ? 'border-[var(--ink-3)] bg-[var(--subtle)]/70'
+      : 'border-[var(--border-ed)] bg-[var(--paper)] hover:bg-[var(--subtle)]/40'
+  return (
+    <li className="min-w-0">
+      <button
+        type="button"
+        role="option"
+        aria-selected={selected}
+        data-cmd-selected={selected ? 'true' : undefined}
+        data-cmd-tile="true"
+        data-subordinate={subordinate ? 'true' : undefined}
+        onPointerEnter={onPointerEnter}
+        onClick={onClick}
+        className={`flex h-full min-h-[88px] w-full flex-col items-start gap-1.5 border p-3 text-left transition-colors duration-100 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--ink)] ${surface}`}
+      >
+        {Icon && (
+          <Icon
+            className={`h-5 w-5 shrink-0 ${subordinate ? 'text-[var(--ink-4)]' : 'text-[var(--ink-2)]'}`}
+            aria-hidden
+          />
+        )}
+        <span
+          className={`line-clamp-2 text-[13px] font-medium leading-snug ${
+            subordinate ? 'text-[var(--ink-3)]' : 'text-[var(--ink)]'
+          }`}
+        >
+          {item.label}
+        </span>
+        {item.sublabel && (
+          <span className="line-clamp-2 text-[11.5px] leading-snug text-[var(--ink-3)]">
+            {item.sublabel}
+          </span>
         )}
       </button>
     </li>

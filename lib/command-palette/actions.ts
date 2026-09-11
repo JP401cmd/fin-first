@@ -32,11 +32,11 @@ export type ActionRunContext = {
   closePalette: () => void
   /** Toggle privacy-masking voor bedragen. */
   togglePrivacy: () => void
-  /** Huidige privacy-state — bepaalt label "Bedragen verbergen" vs "Bedragen tonen". */
+  /** Huidige privacy-state — bepaalt de doelstand in "Switch naar verborgen/zichtbare bedragen". */
   privacyMasked: boolean
   /** Toggle de profiel-brede weergavemodus (Eenvoudig ⇄ Volledig). */
   toggleDisplayMode: () => void
-  /** Huidige weergavemodus — bepaalt label "Volledige/Eenvoudige weergave tonen". */
+  /** Huidige weergavemodus — bepaalt de doelstand in "Switch naar volledig/eenvoudig". */
   displayMode: 'simple' | 'full'
   /** Toggle de profiel-brede euro-weergave (toekomstige ⇄ huidige euro's). */
   toggleEuroView: () => void
@@ -81,10 +81,21 @@ type ActionDef = {
   getLabel: (ctx: ActionRunContext) => string
   getSublabel?: (ctx: ActionRunContext) => string
   getIcon: (ctx: ActionRunContext) => LucideIcon
+  /** Extra zoektermen — zie `CommandItem.keywords`. */
+  keywords?: string[]
+  /** Visueel ondergeschikt — zie `CommandItem.subordinate`. */
+  subordinate?: boolean
   module?: CommandModuleContext
   requiredModule?: ModuleId
   build: (ctx: ActionRunContext) => () => void | Promise<void>
 }
+
+/*
+ * W-006 — de acties staan in de palette als knoppen, en de vier schakelaars
+ * dragen als titel "Switch naar <doelstand>": de knop noemt waar je náártoe
+ * gaat, nooit de huidige stand (dat zou een no-op suggereren). Synchroniseren
+ * en uitloggen zijn geen schakelaar en houden hun eigen werkwoord.
+ */
 
 // ── Register ─────────────────────────────────────────────────────────────────
 
@@ -95,9 +106,11 @@ type ActionDef = {
 const ACTIONS: ActionDef[] = [
   {
     id: 'action:toggle-privacy',
-    getLabel: (ctx) => (ctx.privacyMasked ? 'Bedragen tonen' : 'Bedragen verbergen'),
-    getSublabel: () => 'Verberg je bedragen op dit apparaat',
+    getLabel: (ctx) =>
+      ctx.privacyMasked ? 'Switch naar zichtbare bedragen' : 'Switch naar verborgen bedragen',
+    getSublabel: () => 'Alleen op dit apparaat',
     getIcon: (ctx) => (ctx.privacyMasked ? Eye : EyeOff),
+    keywords: ['Bedragen verbergen', 'Bedragen tonen', 'Privacy'],
     module: 'globaal',
     build: (ctx) => () => {
       ctx.togglePrivacy()
@@ -107,16 +120,19 @@ const ACTIONS: ActionDef[] = [
   {
     id: 'action:toggle-display-mode',
     getLabel: (ctx) =>
-      ctx.displayMode === 'simple' ? 'Volledige weergave tonen' : 'Eenvoudige weergave tonen',
+      ctx.displayMode === 'simple' ? 'Switch naar volledig' : 'Switch naar eenvoudig',
     // Beschrijft wat de modus ECHT doet, en dat is niet één mechanisme: het
     // leeuwendeel van de reductie is `HideInSimple` (hard weg in Eenvoudig,
     // terug in Volledig), en op drie plekken `DepthSection` (ingeklapt mét
     // behoud — cashflow-instellingen, "Alle meldingstypen", de AI-uitvoerings-
     // groepen). De oude tekst ("Diepte-secties standaard tonen of inklappen")
     // beloofde dát laatste voor de héle app en klopte dus voor vrijwel geen
-    // enkel oppervlak; deze sublabel dekt beide mechanismen.
-    getSublabel: () => 'Meer/minder detail op elke pagina',
+    // enkel oppervlak; deze sublabel dekt beide mechanismen. Sinds W-006
+    // richtinggevend: de knop noemt wat de doelstand je oplevert.
+    getSublabel: (ctx) =>
+      ctx.displayMode === 'simple' ? 'Meer detail op elke pagina' : 'Minder detail op elke pagina',
     getIcon: (ctx) => (ctx.displayMode === 'simple' ? Layers : PanelTopClose),
+    keywords: ['Weergave', 'Volledige weergave', 'Eenvoudige weergave'],
     module: 'globaal',
     build: (ctx) => () => {
       ctx.toggleDisplayMode()
@@ -128,12 +144,11 @@ const ACTIONS: ActionDef[] = [
     // weergavekeuzes die cross-device meereizen.
     id: 'action:toggle-euro-view',
     getLabel: (ctx) =>
-      ctx.euroView === 'nominal' ? "Toon huidige euro's" : "Toon toekomstige euro's",
+      ctx.euroView === 'nominal' ? "Switch naar huidige euro's" : "Switch naar toekomstige euro's",
     getSublabel: (ctx) =>
-      ctx.euroView === 'nominal'
-        ? 'Projecties in koopkracht van vandaag'
-        : 'Projecties in de euro’s van dat jaar',
+      ctx.euroView === 'nominal' ? 'Koopkracht van vandaag' : 'Euro’s van dat jaar',
     getIcon: (ctx) => (ctx.euroView === 'nominal' ? Wallet : CalendarClock),
+    keywords: ['Euro-weergave', 'Inflatie', 'Koopkracht'],
     module: 'globaal',
     build: (ctx) => () => {
       ctx.toggleEuroView()
@@ -150,11 +165,10 @@ const ACTIONS: ActionDef[] = [
     // zelfverklarend en hier direct omkeerbaar.
     id: 'action:toggle-home-screen',
     getLabel: (ctx) =>
-      ctx.homeScreen === 'overzicht'
-        ? 'Budgetteren als startscherm'
-        : 'Overzicht als startscherm',
-    getSublabel: () => 'Waar de app voor je opent',
+      ctx.homeScreen === 'overzicht' ? 'Switch naar Budgetteren' : 'Switch naar Overzicht',
+    getSublabel: () => 'Als startscherm',
     getIcon: (ctx) => (ctx.homeScreen === 'overzicht' ? PiggyBank : Home),
+    keywords: ['Startscherm', 'Homescherm'],
     module: 'globaal',
     build: (ctx) => () => {
       ctx.toggleHomeScreen()
@@ -167,7 +181,7 @@ const ACTIONS: ActionDef[] = [
     // RONDE is verbreed, niet de actie vervangen.
     id: 'action:sync-prices',
     getLabel: () => 'Alles synchroniseren',
-    getSublabel: () => 'Koersen, banktransacties en cryptosaldi ophalen',
+    getSublabel: () => 'Koersen, bank en crypto ophalen',
     getIcon: () => RefreshCw,
     module: 'globaal',
     // GEEN module-gate — bewust, en dat is een correctie (B-029, 7 sep 2026).
@@ -190,6 +204,8 @@ const ACTIONS: ActionDef[] = [
     getLabel: () => 'Uitloggen',
     getSublabel: () => 'Sessie beëindigen',
     getIcon: () => LogOut,
+    // Ondergeschikt: uitloggen hoort in het rijtje, maar niet als primaire knop.
+    subordinate: true,
     module: 'globaal',
     build: (ctx) => () => {
       ctx.closePalette()
@@ -253,6 +269,8 @@ export function buildActionItems(
       label: a.getLabel(ctx),
       sublabel: a.getSublabel?.(ctx),
       icon: a.getIcon(ctx),
+      keywords: a.keywords,
+      subordinate: a.subordinate,
       module: a.module,
       requiredModule: a.requiredModule,
       run: a.build(ctx),

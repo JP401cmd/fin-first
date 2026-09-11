@@ -43,6 +43,14 @@ export type CommandItem = {
    * de palette automatisch ná run; de runner mag z'n eigen router-push doen.
    */
   run?: () => void | Promise<void>
+  /**
+   * Extra zoektermen naast `label` (alleen acties). De schakelaars heten
+   * "Switch naar <doelstand>"; zonder deze termen vond "verberg" of
+   * "startscherm" ze niet meer.
+   */
+  keywords?: string[]
+  /** Visueel ondergeschikt weergeven (bv. Uitloggen) — geen primaire actie. */
+  subordinate?: boolean
 }
 
 /** Resultaat van entity-search API. */

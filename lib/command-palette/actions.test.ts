@@ -186,11 +186,11 @@ describe('buildActionItems — euro-weergave', () => {
   }
 
   it('biedt in nominaal de stap naar huidige euro’s aan', () => {
-    expect(euroItem(makeCtx({ euroView: 'nominal' })).label).toBe("Toon huidige euro's")
+    expect(euroItem(makeCtx({ euroView: 'nominal' })).label).toBe("Switch naar huidige euro's")
   })
 
   it('biedt in reële weergave de stap terug naar toekomstige euro’s aan', () => {
-    expect(euroItem(makeCtx({ euroView: 'real' })).label).toBe("Toon toekomstige euro's")
+    expect(euroItem(makeCtx({ euroView: 'real' })).label).toBe("Switch naar toekomstige euro's")
   })
 
   it('roept de toggle aan en sluit het palet', () => {
@@ -222,15 +222,13 @@ describe('buildActionItems — homescherm', () => {
   }
 
   it('biedt vanuit Overzicht de stap naar Budgetteren als startscherm aan', () => {
-    expect(homeItem(makeCtx({ homeScreen: 'overzicht' })).label).toBe(
-      'Budgetteren als startscherm',
-    )
+    const item = homeItem(makeCtx({ homeScreen: 'overzicht' }))
+    expect(item.label).toBe('Switch naar Budgetteren')
+    expect(item.sublabel).toBe('Als startscherm')
   })
 
   it('biedt vanuit Budgetteren de stap terug naar Overzicht als startscherm aan', () => {
-    expect(homeItem(makeCtx({ homeScreen: 'budget' })).label).toBe(
-      'Overzicht als startscherm',
-    )
+    expect(homeItem(makeCtx({ homeScreen: 'budget' })).label).toBe('Switch naar Overzicht')
   })
 
   it('roept de toggle aan en sluit het palet', () => {
@@ -261,11 +259,65 @@ describe('buildActionItems — weergavemodus (APP-3)', () => {
    * haalt secties hard weg. De sublabel moet beschrijven wat er écht gebeurt.
    */
   it('omschrijft de modus als meer/minder detail, niet als inklappen', () => {
-    const item = buildActionItems(makeCtx(), []).find(
-      (i) => i.id === 'action:toggle-display-mode',
-    )
-    if (!item) throw new Error('action:toggle-display-mode ontbreekt in het register')
-    expect(item.sublabel).toBe('Meer/minder detail op elke pagina')
-    expect(item.sublabel).not.toMatch(/inklappen/i)
+    const find = (ctx: ActionRunContext) => {
+      const item = buildActionItems(ctx, []).find((i) => i.id === 'action:toggle-display-mode')
+      if (!item) throw new Error('action:toggle-display-mode ontbreekt in het register')
+      return item
+    }
+    // Richtinggevend sinds W-006: de sublabel noemt wat de doelstand oplevert.
+    expect(find(makeCtx({ displayMode: 'simple' })).sublabel).toBe('Meer detail op elke pagina')
+    expect(find(makeCtx({ displayMode: 'full' })).sublabel).toBe('Minder detail op elke pagina')
+    expect(find(makeCtx()).sublabel).not.toMatch(/inklappen/i)
+  })
+})
+
+describe('buildActionItems — schakelaars noemen hun doelstand (W-006)', () => {
+  function label(id: string, ctx: ActionRunContext) {
+    const item = buildActionItems(ctx, []).find((i) => i.id === id)
+    if (!item) throw new Error(`${id} ontbreekt in het register`)
+    return item.label
+  }
+
+  it('weergavemodus: "Switch naar volledig" vanuit Eenvoudig en andersom', () => {
+    expect(label('action:toggle-display-mode', makeCtx({ displayMode: 'simple' }))).toBe('Switch naar volledig')
+    expect(label('action:toggle-display-mode', makeCtx({ displayMode: 'full' }))).toBe('Switch naar eenvoudig')
+  })
+
+  it('bedragen: de doelstand, nooit de huidige stand', () => {
+    expect(label('action:toggle-privacy', makeCtx({ privacyMasked: false }))).toBe('Switch naar verborgen bedragen')
+    expect(label('action:toggle-privacy', makeCtx({ privacyMasked: true }))).toBe('Switch naar zichtbare bedragen')
+  })
+
+  it('precies de vier schakelaars beginnen met "Switch naar"; sync en uitloggen houden hun werkwoord', () => {
+    const general = buildActionItems(makeCtx(), []).filter((i) => !i.id.startsWith('action:perspective-'))
+    const switches = general.filter((i) => i.label.startsWith('Switch naar ')).map((i) => i.id)
+    expect(switches).toEqual([
+      'action:toggle-privacy',
+      'action:toggle-display-mode',
+      'action:toggle-euro-view',
+      'action:toggle-home-screen',
+    ])
+    expect(general.find((i) => i.id === 'action:sync-prices')!.label).toBe('Alles synchroniseren')
+    expect(general.find((i) => i.id === 'action:logout')!.label).toBe('Uitloggen')
+  })
+
+  it('elke actie heeft een icoon en een korte sublabel (knop-inhoud)', () => {
+    const general = buildActionItems(makeCtx(), []).filter((i) => !i.id.startsWith('action:perspective-'))
+    for (const item of general) {
+      expect(item.icon, item.id).toBeDefined()
+      expect(item.sublabel, item.id).toBeTruthy()
+      expect(item.sublabel!.length, item.id).toBeLessThanOrEqual(32)
+    }
+  })
+
+  it('uitloggen is ondergeschikt, de rest niet', () => {
+    const general = buildActionItems(makeCtx(), []).filter((i) => !i.id.startsWith('action:perspective-'))
+    expect(general.filter((i) => i.subordinate).map((i) => i.id)).toEqual(['action:logout'])
+  })
+
+  it('draagt zoektermen voor de oude benamingen, zodat "verberg" en "startscherm" blijven vinden', () => {
+    const items = buildActionItems(makeCtx(), [])
+    expect(items.find((i) => i.id === 'action:toggle-privacy')!.keywords).toContain('Bedragen verbergen')
+    expect(items.find((i) => i.id === 'action:toggle-home-screen')!.keywords).toContain('Startscherm')
   })
 })

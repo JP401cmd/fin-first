@@ -190,7 +190,7 @@ export const NAV_ENGINE_CHECKS: NavEngineCheck[] = [
         // banktransacties ophaalt en de header-knop die dezelfde ronde draait
         // nooit een gate had. De check blijft staan om precies dát vast te
         // pinnen — een teruggekeerde gate hoort hier rood te worden.
-        expected: 'perspectiefItems=3; actiefLabel=Persoonlijk · actief; privacyLabel=Bedragen verbergen; syncPricesMetModule=true; syncPricesZonderModule=true',
+        expected: 'perspectiefItems=3; actiefLabel=Persoonlijk · actief; privacyLabel=Switch naar verborgen bedragen; syncPricesMetModule=true; syncPricesZonderModule=true',
         actual: `perspectiefItems=${perspectiefItems.length}; actiefLabel=${actiefItem.sublabel}; privacyLabel=${privacyItem.label}; syncPricesMetModule=${syncMetModule}; syncPricesZonderModule=${syncZonderModule}`,
       }
     },
@@ -314,7 +314,7 @@ export const NAV_ENGINE_CHECKS: NavEngineCheck[] = [
       const labelNominal = toggleItem(baseCtx).label
       const labelReal = toggleItem({ ...baseCtx, euroView: 'real' }).label
       return {
-        expected: "labelNominal=Toon huidige euro's; labelReal=Toon toekomstige euro's; euroViewLabelNominal=Toekomstige euro's; euroViewLabelReal=Huidige euro's",
+        expected: "labelNominal=Switch naar huidige euro's; labelReal=Switch naar toekomstige euro's; euroViewLabelNominal=Toekomstige euro's; euroViewLabelReal=Huidige euro's",
         actual: `labelNominal=${labelNominal}; labelReal=${labelReal}; euroViewLabelNominal=${euroViewLabel('nominal')}; euroViewLabelReal=${euroViewLabel('real')}`,
       }
     },

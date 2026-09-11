@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { CommandPalette } from './command-palette'
 
 /**
@@ -98,14 +98,29 @@ describe('command-palette — touch-gedrag (M18)', () => {
     expect(screen.getByText('⌘K')).toBeTruthy()
   })
 
-  it('laat label en sublabel niet op één afkappende regel staan', () => {
+  it('laat de titel van een actieknop niet op één afkappende regel staan', () => {
     zetPointer(true)
     render(<CommandPalette open onClose={vi.fn()} userId="u1" />)
 
-    // Pak een standaardactie die in de lege-query-staat altijd zichtbaar is
-    // (state-onafhankelijk label; de oorspronkelijke bevinding trof 'Open
-    // AI-chat', maar die actie is verwijderd — B-011-vervolg).
-    const label = screen.getAllByText('Uitloggen')[0] as HTMLElement
+    // Sinds W-006 staan de acties als knoppen: titel en sublabel staan per
+    // definitie onder elkaar en mogen elk twee regels lopen.
+    const titel = screen.getByText('Uitloggen') as HTMLElement
+    const klassen = Array.from(titel.classList)
+    expect(klassen).not.toContain('truncate')
+    expect(klassen).toContain('line-clamp-2')
+    expect(titel.closest('[data-cmd-tile]')).toBeTruthy()
+  })
+
+  it('laat label en sublabel van een lijstrij niet op één afkappende regel staan', () => {
+    zetPointer(true)
+    render(<CommandPalette open onClose={vi.fn()} userId="u1" />)
+
+    // De lijstrijen (pagina's, items, perspectief) houden het M18-gedrag. Een
+    // zoekterm levert pagina-rijen op; de acties staan sinds W-006 in een grid.
+    fireEvent.change(screen.getByLabelText('Zoekopdracht'), { target: { value: 'overzicht' } })
+    const rij = paneel().querySelector<HTMLElement>('[role="option"]:not([data-cmd-tile])')
+    expect(rij).toBeTruthy()
+    const label = rij!.querySelector<HTMLElement>('span.line-clamp-2') as HTMLElement
     expect(label).toBeTruthy()
 
     // Het label zelf mag op mobiel niet meer op één regel worden afgekapt.
