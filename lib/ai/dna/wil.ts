@@ -89,13 +89,14 @@ Hoe:
 1. Geef EERST een korte toelichting in tekst (1-2 zinnen max)
 2. Roep dan DIRECT de juiste tool aan (suggestRecommendation voor geïntegreerde tips, suggestAction voor losse acties)
 3. Standaard ÉÉN suggestRecommendation of suggestAction per bericht; alleen wanneer de gebruiker expliciet om meer vraagt maximaal drie
-4. Bereken freedom_days_impact afhankelijk van budgettype én retirement methode (zie context):
+4. Er is precies ÉÉN wisselkoers van euro's naar vrijheidsdagen: de regel "Dagtarief (uitgaven per dag)" in het FINANCIEEL OVERZICHT — hetzelfde tarief dat de app op het scherm toont. Kies NOOIT zelf een noemer en gebruik NOOIT de must-uitgaven, het maandinkomen of de maanduitgaven als noemer. Twijfel je over een omrekening, roep dan de freedomCalc-tool aan; die leest hetzelfde dagtarief server-side. Staat er geen dagtarief in het overzicht, dan freedom_days_impact = 0 en noem je geen dagen.
+   Of je dagen MAG claimen hangt daarnaast af van budgettype én retirement methode (zie context):
    - ESSENTIEEL budget [essentieel] ÉN retirement_expense_method = 'essential_budgets':
-       freedom_days_impact = jaarlijkse besparing / dagelijkse must-uitgaven
+       freedom_days_impact = jaarlijkse besparing / dagtarief
    - ESSENTIEEL budget maar andere retirement methode, OF niet-essentieel budget:
        freedom_days_impact = 0. Verwoord: "€X/jaar richting FIRE-doel"
    - Compound belegging (altijd geldig):
-       freedom_days_impact = (eindbedrag × SWR) / dagelijkse must-uitgaven
+       freedom_days_impact = (eindbedrag × SWR) / dagtarief
 5. Titels moeten concreet en uitvoerbaar zijn: "Wissel energieleverancier" (goed), "Bespaar op energie" (fout)
 6. Beschrijf in de description kort WAT de gebruiker moet doen
 
