@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
-import { render, screen, cleanup, within } from '@testing-library/react'
+import { render, screen, cleanup, within, fireEvent } from '@testing-library/react'
 import { NavMenuSheet } from './nav-menu-sheet'
 import { ActiveAppKeysContext } from './shell-contexts'
 import { DisplayModeProvider, type DisplayMode } from '@/lib/hooks/use-display-mode'
@@ -67,6 +67,52 @@ describe('NavMenuSheet — NAV-2: alleen de actieve tak klapt uit', () => {
     expect(screen.getByText('Overzicht')).toBeInTheDocument()
     // De actieve tak (/toekomst) houdt zijn sub-items.
     expect(screen.getByText('Doelen')).toBeInTheDocument()
+  })
+})
+
+/**
+ * B-048 (testgebruiker, 12-09-2026) — NAV-2 maakte van een niet-actieve tak een
+ * doodlopend eind: je zag niet wat eronder hing en kon er niet heen zonder eerst
+ * de hoofdpagina te openen. Elke tak heeft nu een chevron die hem openklapt
+ * ZONDER te navigeren. De begintoestand blijft die van NAV-2 (hierboven
+ * getoetst); deze suite bewaakt de uitgang die erbij kwam.
+ */
+describe('NavMenuSheet — B-048: elke tak is zelf uitklapbaar', () => {
+  afterEach(cleanup)
+
+  it("klapt in 'simple' een niet-actieve tak open zonder te navigeren", () => {
+    renderSheet('simple')
+    // Uitgangspunt = NAV-2: de niet-actieve tak is dicht.
+    expect(screen.queryByText('Bezittingen')).not.toBeInTheDocument()
+
+    const toggle = screen.getByRole('button', { name: /Toon de onderdelen van Overzicht/i })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(toggle)
+
+    // De sub-items staan er nu — en de sheet is niet gesloten/genavigeerd:
+    // de chevron is een knop, geen link.
+    expect(screen.getByText('Bezittingen')).toBeInTheDocument()
+    expect(screen.getByText('Schulden')).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: /Verberg de onderdelen van Overzicht/i }),
+    ).toHaveAttribute('aria-expanded', 'true')
+  })
+
+  it("klapt in 'full' een tak juist dicht — de chevron werkt beide kanten op", () => {
+    renderSheet('full')
+    expect(screen.getByText('Bezittingen')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /Verberg de onderdelen van Overzicht/i }))
+
+    expect(screen.queryByText('Bezittingen')).not.toBeInTheDocument()
+    // De actieve tak blijft ongemoeid: dichtklappen is per tak, niet globaal.
+    expect(screen.getByText('Doelen')).toBeInTheDocument()
+  })
+
+  it('laat de hoofdpagina zelf een link blijven — de chevron kaapt de rij niet', () => {
+    renderSheet('simple')
+    const overzicht = screen.getByRole('link', { name: /Overzicht/ })
+    expect(overzicht).toHaveAttribute('href', '/overzicht')
   })
 })
 

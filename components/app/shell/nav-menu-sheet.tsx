@@ -1,10 +1,11 @@
 'use client'
 
-import { useTransition } from 'react'
+import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { RotateCw } from 'lucide-react'
+import { ChevronDown, RotateCw } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
+import { TapTarget } from '@/components/editorial/tap-target'
 import {
   mainNav,
   navGroups,
@@ -77,6 +78,15 @@ type NavMenuSheetProps = {
  * ontstaat — gebruiker scrollt één lijst i.p.v. context-switchen tussen
  * "Hoofd" en "Onder [naam]". Globale items (Krant, Berichten, Account)
  * blijven in eigen footer-sectie onderaan.
+ *
+ * ELKE TAK IS UITKLAPBAAR (melding B-048, 12-09-2026). NAV-2 liet in
+ * Eenvoudig alleen de ACTIEVE hoofdpagina zijn sub-items tonen; de andere
+ * takken waren daarmee een doodlopend eind — je moest eerst naar de
+ * hoofdpagina navigeren om te zien wat eronder hing. De chevron naast elke
+ * hoofdpagina klapt die tak nu open zónder te navigeren. Wat NIET verandert
+ * is de begintoestand: in Eenvoudig staat alleen de actieve tak open, in
+ * Volledig staan ze alle open — precies zoals NAV-2 het liet. De chevron
+ * voegt een uitgang toe, hij herschikt de rustvorm niet.
  */
 export function NavMenuSheet({ open, onClose, onAction }: NavMenuSheetProps) {
   const pathname = usePathname() ?? '/'
@@ -90,6 +100,11 @@ export function NavMenuSheet({ open, onClose, onAction }: NavMenuSheetProps) {
   const leverScores = useLeverScores()
   const activeAppKeys = useActiveAppKeys()
   const { mode: displayMode } = useDisplayMode()
+  // Handmatig open/dicht gezette takken, per hoofdpagina-href. Leeg = volg de
+  // begintoestand (zie `expandedFor` hieronder). Bewust géén localStorage: dit
+  // is een kijkje-nemen binnen één sessie, geen voorkeur die een apparaat moet
+  // onthouden — en de begintoestand is al afgestemd op de weergavemodus.
+  const [branchOverride, setBranchOverride] = useState<Record<string, boolean>>({})
 
   const isActive = (href: string) =>
     href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(href + '/')
@@ -140,14 +155,19 @@ export function NavMenuSheet({ open, onClose, onAction }: NavMenuSheetProps) {
           const Icon = item.icon!
           const active = isActive(item.href)
           const c = colorClasses[item.color]
-          // NAV-2 — in Eenvoudig klapt alleen de ACTIEVE hoofdpagina zijn
-          // sub-items uit; de rest blijft één regel. De routes zelf blijven
-          // bereikbaar: tik de hoofdpagina aan en zijn sub-items staan er.
-          // In Volledig blijft alles uitgeklapt (één blik op de hele boom).
-          const subs =
-            displayMode === 'simple' && !active
-              ? { base: [] as NavItem[], apps: [] as NavItem[] }
-              : subRoutesFor(item.href)
+          // NAV-2 bepaalt nog steeds de BEGINtoestand: in Eenvoudig staat
+          // alleen de actieve tak open, in Volledig staan ze alle open (één
+          // blik op de hele boom). Sinds B-048 kan de gebruiker elke tak zelf
+          // open- of dichtklappen met de chevron; die keuze wint dan van de
+          // begintoestand.
+          const allSubs = subRoutesFor(item.href)
+          const hasSubs = allSubs.base.length > 0 || allSubs.apps.length > 0
+          const expandedByDefault = displayMode !== 'simple' || active
+          const expanded = branchOverride[item.href] ?? expandedByDefault
+          const subs: { base: NavItem[]; apps: NavItem[] } = expanded
+            ? allSubs
+            : { base: [], apps: [] }
+          const branchId = `nav-sheet-branch-${item.href.replace(/\//g, '-')}`
           const appsHeadingId = `nav-sheet-apps-${item.href.replace(/\//g, '-')}`
           // Eén renderer voor beide groepen — hoofdonderdelen en apps zijn
           // dezelfde soort rij; alleen de groepering eromheen verschilt.
@@ -201,28 +221,58 @@ export function NavMenuSheet({ open, onClose, onAction }: NavMenuSheetProps) {
           }
           return (
             <section key={item.href}>
-              <Link
-                href={item.href}
-                onClick={onClose}
-                className={`flex items-start gap-3 px-3 py-3 rounded-xl border-2 transition-colors ${
+              {/* De rand/achtergrond van de hoofdregel zit op de wrapper, niet
+                  meer op de link zelf: de chevron is een eigen knop en mag dus
+                  niet ín het anker staan (genest interactief element). */}
+              <div
+                className={`flex items-stretch rounded-xl border-2 transition-colors ${
                   active ? c.active : `border-transparent ${c.idle}`
                 }`}
               >
-                <div className={`mt-0.5 ${c.icon}`}>
-                  <Icon size={20} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-semibold text-[15px] leading-tight">{item.label}</div>
-                  {item.description && (
-                    <div className="text-[12px] text-[var(--ink-3)] leading-snug mt-0.5">
-                      {item.description}
-                    </div>
-                  )}
-                </div>
-              </Link>
+                <Link
+                  href={item.href}
+                  onClick={onClose}
+                  className="flex flex-1 min-w-0 items-start gap-3 px-3 py-3"
+                >
+                  <div className={`mt-0.5 ${c.icon}`}>
+                    <Icon size={20} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-[15px] leading-tight">{item.label}</div>
+                    {item.description && (
+                      <div className="text-[12px] text-[var(--ink-3)] leading-snug mt-0.5">
+                        {item.description}
+                      </div>
+                    )}
+                  </div>
+                </Link>
+                {hasSubs && (
+                  <TapTarget
+                    label={
+                      expanded
+                        ? `Verberg de onderdelen van ${item.label}`
+                        : `Toon de onderdelen van ${item.label}`
+                    }
+                    hit="extend"
+                    aria-expanded={expanded}
+                    // Alleen verwijzen zolang het paneel er ook daadwerkelijk
+                    // staat; dicht is het uit de DOM, niet verborgen.
+                    aria-controls={expanded ? branchId : undefined}
+                    onClick={() =>
+                      setBranchOverride((prev) => ({ ...prev, [item.href]: !expanded }))
+                    }
+                    className={`shrink-0 self-stretch px-3 ${c.icon}`}
+                  >
+                    <ChevronDown
+                      size={18}
+                      className={`transition-transform ${expanded ? 'rotate-180' : ''}`}
+                    />
+                  </TapTarget>
+                )}
+              </div>
 
               {(subs.base.length > 0 || subs.apps.length > 0) && (
-                <div className="mt-1 ml-3 pl-3 border-l border-[var(--border-ed)]">
+                <div id={branchId} className="mt-1 ml-3 pl-3 border-l border-[var(--border-ed)]">
                   {subs.base.length > 0 && (
                     <div className="grid grid-cols-1 gap-0.5">{subs.base.map(renderSub)}</div>
                   )}
