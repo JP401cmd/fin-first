@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { pickRecurringAccountId } from '@/lib/recurring-account'
+import { localMonthStartMonthsAgo } from '@/lib/month-range'
 
 /**
  * POST /api/recurring — Confirm a detected pattern as a recurring transaction.
@@ -51,15 +53,32 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Ongeldige categorie' }, { status: 400 })
     }
 
-    // Get user's first account as default
-    const { data: accounts } = await supabase
-      .from('bank_accounts')
-      .select('id')
-      .limit(1)
+    // Op welke rekening hoort deze regel? `bank_accounts` is huishoud-gedeeld, dus
+    // zichtbaar is GEEN bewijs van eigenaarschap: expliciet op de eigen gebruiker
+    // filteren (zelfde regel als /api/recurring/bulk). De keuze zelf woont in
+    // `pickRecurringAccountId`: de rekening waar de betalingen van deze tegenpartij
+    // staan wint, anders de eerste actieve eigen rekening. Nooit een uitgezette of
+    // archiefrekening.
+    const [{ data: accountRows }, { data: txRows }] = await Promise.all([
+      supabase
+        .from('bank_accounts')
+        .select('id, is_active, is_archive_bucket, sort_order')
+        .eq('user_id', user.id),
+      supabase
+        .from('transactions')
+        .select('account_id')
+        .eq('user_id', user.id)
+        .eq('counterparty_name', String(counterparty_name || name))
+        .gte('date', localMonthStartMonthsAgo(new Date(), 11))
+        .limit(500),
+    ])
 
-    const accountId = accounts?.[0]?.id
+    const accountId = pickRecurringAccountId({
+      accounts: accountRows ?? [],
+      accountIdsOfCounterparty: (txRows ?? []).map((t) => t.account_id),
+    })
     if (!accountId) {
-      return NextResponse.json({ error: 'Geen bankrekening gevonden' }, { status: 400 })
+      return NextResponse.json({ error: 'Geen actieve bankrekening gevonden' }, { status: 400 })
     }
 
     const { data, error } = await supabase
