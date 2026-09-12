@@ -53,6 +53,7 @@ import { freedomDays } from '@/lib/transaction-display'
 import { recentDailyExpenseRateFromRows } from '@/lib/expense-rate'
 import { computeCounterpartyStats, type CounterpartyTransaction } from '@/lib/counterparty-analysis'
 import { recurringPerMonth, buildForecast, type ForecastRow } from '@/lib/cashflow-forecast-math'
+import { RECURRING_ANALYSIS_MONTHS } from '@/lib/recurring-detection'
 import type { RecurringTransaction } from '@/lib/recurring-data'
 import { getExpectedMonthlyTotal } from '@/lib/recurring-data'
 import { cancelEffect } from '@/lib/vaste-lasten-insights'
@@ -574,9 +575,12 @@ export const CASH_ENGINE_CHECKS: CashEngineCheck[] = [
       const aandeelPctVal = (totaalMaand / 3400) * 100
       const rate = dailyExpenseRate(2200)
       const vrijheidsdagen = calculateFreedomTime(totaalMaand, rate).totalDays
+      // GRONDSLAG-REGEL (V-001): de constante die de grondslag-regel op de
+      // pagina draagt ("... · 24 maanden transacties") is dezelfde
+      // RECURRING_ANALYSIS_MONTHS die de detectie zelf voedt — geen los getal.
       return {
-        expected: 'totaalMaand=338.33; aandeelPct=9.95; vrijheidsdagen=4.7',
-        actual: `totaalMaand=${fx(totaalMaand, 2)}; aandeelPct=${fx(aandeelPctVal, 2)}; vrijheidsdagen=${vrijheidsdagen}`,
+        expected: 'totaalMaand=338.33; aandeelPct=9.95; vrijheidsdagen=4.7; grondslagMaanden=24',
+        actual: `totaalMaand=${fx(totaalMaand, 2)}; aandeelPct=${fx(aandeelPctVal, 2)}; vrijheidsdagen=${vrijheidsdagen}; grondslagMaanden=${RECURRING_ANALYSIS_MONTHS}`,
       }
     },
   },

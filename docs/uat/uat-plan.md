@@ -1255,13 +1255,13 @@ Dit deelgebied heeft geen eigen pagina's: het beschrijft de app-brede bediening 
 
 #### WF-NAV-09 — Command-palette: acties uitvoeren
 - **Doel:** Als gebruiker wil ik veelgebruikte handelingen (chat openen, bedragen verbergen, weergave wisselen, prijzen verversen, uitloggen, perspectief wisselen) zonder navigatie uitvoeren.
-- **Trigger/startpunt:** Command-palette open; sectie "Acties" (zonder query direct zichtbaar, max 4; met query fuzzy doorzoekbaar) en sectie "Perspectief" (alleen huishoudens).
+- **Trigger/startpunt:** Command-palette open; sectie "Acties" (zonder query direct zichtbaar als knoppengrid, max 6; met query fuzzy doorzoekbaar) en sectie "Perspectief" (alleen huishoudens). Sinds W-006 (11 sep 2026) staan de acties als knoppen in een grid, niet als lijstrijen, en dragen de vier schakelaars als titel "Switch naar <doelstand>" — de knop noemt waar je náártoe gaat, nooit de huidige stand.
 - **Eindresultaat:** De actie is uitgevoerd en het palette is gesloten.
 - **Stappen:**
   1. Open ⌘K en kies "Open AI-chat" → het Will-chatpaneel opent.
-  2. Of kies "Bedragen verbergen" / "Bedragen tonen" → alle saldi maskeren/tonen direct.
-  3. Of kies "Volledige weergave tonen" / "Eenvoudige weergave tonen" → de weergavemodus wisselt (zie WF-NAV-10).
-  4. Of kies "Synchroniseer prijzen" → beleggings- en cryptokoersen worden ververst (alleen zichtbaar met actieve vermogensregistratie-module).
+  2. Of kies "Switch naar verborgen bedragen" / "Switch naar zichtbare bedragen" → alle saldi maskeren/tonen direct.
+  3. Of kies "Switch naar volledig" / "Switch naar eenvoudig" → de weergavemodus wisselt (zie WF-NAV-10).
+  4. Of kies "Alles synchroniseren" → koersen, bankgegevens en crypto worden ververst (geen module-gate meer sinds B-029, 7 sep 2026 — zichtbaar ongeacht welke modules actief zijn).
   5. Of kies "Uitloggen" → je wordt naar /logout gestuurd.
   6. Huishouden: kies onder "Perspectief" Persoonlijk/Huishouden/Partner; het actieve perspectief is gemarkeerd met "· actief".
 - **Schermen/componenten:** `lib/command-palette/actions.ts` (buildActionItems), contexts uit `command-palette.tsx`.
@@ -1269,22 +1269,22 @@ Dit deelgebied heeft geen eigen pagina's: het beschrijft de app-brede bediening 
 - **Rekenend:** nee
 - **Varianten & randgevallen:**
   - Klik op het al-actieve perspectief = alleen sluiten (no-op).
-  - "Synchroniseer prijzen" ontbreekt wanneer de vereiste module uit staat.
-  - Labels wisselen dynamisch mee met de huidige toestand (verbergen↔tonen, volledig↔eenvoudig).
+  - "Alles synchroniseren" is altijd zichtbaar — geen module-gate meer.
+  - Knop-titels wisselen dynamisch mee met de huidige toestand (Switch naar verborgen ↔ Switch naar zichtbare, Switch naar volledig ↔ Switch naar eenvoudig).
 - **Cross-module effecten:** prijssync ververst waarden in Bezittingen/Overzicht/Toekomst; perspectiefwissel verandert app-breed welke cijfers getoond worden.
 
 ---
 
 #### WF-NAV-10 — Weergavemodus Eenvoudig ↔ Volledig en doorwerking op navigatie en pagina's
 - **Doel:** Als gebruiker wil ik kunnen kiezen tussen een rustige (Eenvoudig) en complete (Volledig) weergave, en die keuze moet op al mijn apparaten gelden.
-- **Trigger/startpunt:** ⌘K-actie "Volledige/Eenvoudige weergave tonen" (het enige app-brede schakelpunt in de shell).
+- **Trigger/startpunt:** ⌘K-actie "Switch naar volledig" / "Switch naar eenvoudig" (als knop in de acties-grid, sinds W-006; het enige app-brede schakelpunt in de shell naast `/mijn/uiterlijk`).
 - **Eindresultaat:** In Eenvoudig zijn de menu-ingangen Rekenhulp en Wat-Als verborgen in sidebar, mobiel nav-menu én ⌘K, en verbergen `HideInSimple`-secties hun inhoud volledig; in Volledig is alles zichtbaar. De keuze staat server-side op het profiel (cross-device).
 - **Stappen:**
-  1. Open ⌘K en voer "Eenvoudige weergave tonen" uit.
+  1. Open ⌘K en voer de knop "Switch naar eenvoudig" uit.
   2. Controleer in de desktop-sidebar (Toekomst actief) dat Rekenhulp en Wat-Als uit de subroutes verdwenen zijn.
   3. Open het mobiele nav-menu en controleer hetzelfde; zoek in ⌘K op "rekenhulp" en zie geen pagina-resultaat.
   4. Navigeer via een directe URL naar /toekomst/rekenhulp en controleer dat de pagina gewoon bereikbaar blijft (alleen de menu-ingang is gefilterd) én dat de mobiele TopBar-titel klopt.
-  5. Schakel terug naar "Volledige weergave tonen" en controleer dat alles terug is; herlaad (of open op een ander apparaat) en controleer dat de modus bewaard bleef.
+  5. Schakel terug via de knop "Switch naar volledig" en controleer dat alles terug is; herlaad (of open op een ander apparaat) en controleer dat de modus bewaard bleef.
 - **Schermen/componenten:** `lib/hooks/use-display-mode.tsx` (server-geseed via `app/(app)/layout.tsx`, persist via PUT `/api/display-mode` met rollback), `SIMPLE_HIDDEN_NAV_HREFS` in `lib/nav-config.ts`, filtering in `components/app/shell/sidebar.tsx`, `components/app/shell/nav-menu-sheet.tsx`, `components/command-palette/command-palette.tsx`; content-hard-hide via `components/app/hide-in-simple.tsx`.
 - **Kriticiteit:** BELANGRIJK
 - **Rekenend:** nee
@@ -1298,14 +1298,14 @@ Dit deelgebied heeft geen eigen pagina's: het beschrijft de app-brede bediening 
 
 #### WF-NAV-11 — Bedragen maskeren (privacy-toggle) en doorwerking
 - **Doel:** Als gebruiker wil ik met één tik alle saldi vervangen door bullets (bv. in de trein), per apparaat onthouden.
-- **Trigger/startpunt:** De ⌘K-actie "Bedragen verbergen" / "Bedragen tonen" (mobiel: via de zoek-pill). Dit is sinds B-011 de ENIGE plek om te wisselen — er staat bewust géén los oog-icoon meer in de mobiele TopBar of de desktop-Sidebar.
-- **Eindresultaat:** Alle bedragen die via de masking-componenten lopen tonen "••••••" (module-accentkleur); de ⌘K-actie wisselt van label en icoon mee met de actieve staat; de keuze overleeft herladen op hetzelfde apparaat (localStorage).
+- **Trigger/startpunt:** De ⌘K-actie "Switch naar verborgen bedragen" / "Switch naar zichtbare bedragen" (als knop in de acties-grid, sinds W-006; mobiel: via de zoek-pill). Dit is sinds B-011 de ENIGE plek om te wisselen — er staat bewust géén los oog-icoon meer in de mobiele TopBar of de desktop-Sidebar.
+- **Eindresultaat:** Alle bedragen die via de masking-componenten lopen tonen "••••••" (module-accentkleur); de ⌘K-knop wisselt van titel en icoon mee met de actieve staat; de keuze overleeft herladen op hetzelfde apparaat (localStorage).
 - **Stappen:**
-  1. Open ⌘K (of de zoek-pill op mobiel) en voer de actie "Bedragen verbergen" uit.
+  1. Open ⌘K (of de zoek-pill op mobiel) en klik de knop "Switch naar verborgen bedragen".
   2. Controleer dat het netto vermogen in de sidebar, hero-bedragen en gemaskeerde kaarten bullets tonen.
-  3. Open ⌘K opnieuw en controleer dat de actie nu "Bedragen tonen" heet (icoon wisselt oog ↔ doorgestreept oog).
+  3. Open ⌘K opnieuw en controleer dat de knop nu "Switch naar zichtbare bedragen" heet (icoon wisselt oog ↔ doorgestreept oog).
   4. Herlaad de pagina en controleer dat de maskering aan blijft.
-  5. Voer "Bedragen tonen" uit om bedragen weer zichtbaar te maken.
+  5. Klik "Switch naar zichtbare bedragen" om bedragen weer zichtbaar te maken.
 - **Schermen/componenten:** `lib/command-palette/actions.ts` (`action:toggle-privacy`), `lib/hooks/use-privacy.tsx` (localStorage-sleutel `trifinity.privacy.masked`), consumenten o.a. `components/app/masked-amount.tsx` en `formatNetWorthShort` in de sidebar.
 - **Kriticiteit:** BELANGRIJK
 - **Rekenend:** nee
@@ -6032,13 +6032,13 @@ Alle workflows zijn gebaseerd op de daadwerkelijke code onder `app/(app)/mijn/**
 
 #### WF-MIJN-17 — Bedragen maskeren (privacy-toggle, app-breed)
 - **Doel:** De gebruiker verbergt alle saldi/bedragen in de app (bijv. in het openbaar vervoer) en toont ze later weer.
-- **Trigger/startpunt:** De command-palette-actie "Bedragen verbergen"/"Bedragen tonen" (⌘K, mobiel via de zoek-pill) — op elk ingelogd scherm bereikbaar. Sinds B-011 is dit de enige ingang; er staat geen los oog-icoon meer in de TopBar of Sidebar.
+- **Trigger/startpunt:** De command-palette-knop "Switch naar verborgen bedragen"/"Switch naar zichtbare bedragen" (⌘K, mobiel via de zoek-pill) — op elk ingelogd scherm bereikbaar. Sinds B-011 is dit de enige ingang; er staat geen los oog-icoon meer in de TopBar of Sidebar. Sinds W-006 (11 sep 2026) staat de actie als knop in de acties-grid, niet als lijstrij.
 - **Eindresultaat:** Alle bedragen die via `formatMaskedCurrency`/`MaskedAmount` lopen tonen bullet-placeholders; de voorkeur overleeft herladen op hetzelfde apparaat.
 - **Stappen:**
-  1. Voer via ⌘K de actie "Bedragen verbergen" uit; het actie-icoon wisselt naar een doorgestreept oog.
+  1. Klik via ⌘K de knop "Switch naar verborgen bedragen"; het icoon wisselt naar een doorgestreept oog.
   2. Controleer op een cijferrijke pagina (bv. check-in of koppelingen) dat bedragen gemaskeerd zijn.
   3. Herlaad de pagina en controleer dat de maskering aan blijft (localStorage `trifinity.privacy.masked`).
-  4. Voer "Bedragen tonen" uit om de bedragen weer te tonen.
+  4. Klik "Switch naar zichtbare bedragen" om de bedragen weer te tonen.
 - **Schermen/componenten:** `lib/command-palette/actions.ts` (`action:toggle-privacy`), `lib/hooks/use-privacy.tsx` (device-lokaal, localStorage; bewust niet server-synced), `lib/format.ts#formatMaskedCurrency`.
 - **Kriticiteit:** BELANGRIJK
 - **Rekenend:** nee (verandert weergave, niet de cijfers; let op: plain `formatCurrency`-plekken negeren de toggle — bekend aandachtspunt)
@@ -6159,14 +6159,14 @@ Alle workflows zijn gebaseerd op de daadwerkelijke code onder `app/(app)/mijn/**
 
 #### WF-MIJN-23 — Weergavemodus wisselen: Eenvoudig ⇄ Volledig
 - **Doel:** De gebruiker schakelt tussen een rustige beginnersweergave (diepte-secties ingeklapt, sommige menu-ingangen verborgen) en de volledige expertweergave.
-- **Trigger/startpunt:** TWEE gelijkwaardige ingangen sinds fase 1 van de eenvoudige weergave (APP-1): het blok "Weergave" bovenaan `/mijn/uiterlijk` (`DisplayModePicker`) én de command-palette (⌘K / Ctrl+K) → actie "Volledige weergave tonen" resp. "Eenvoudige weergave tonen". Beide schrijven via hetzelfde `PUT /api/display-mode`.
+- **Trigger/startpunt:** TWEE gelijkwaardige ingangen sinds fase 1 van de eenvoudige weergave (APP-1): het blok "Weergave" bovenaan `/mijn/uiterlijk` (`DisplayModePicker`) én de command-palette (⌘K / Ctrl+K) → knop "Switch naar volledig" resp. "Switch naar eenvoudig" (sinds W-006, 11 sep 2026, als knop in de acties-grid; was "Volledige/Eenvoudige weergave tonen" als lijstrij). Beide schrijven via hetzelfde `PUT /api/display-mode`.
 - **Eindresultaat:** Profiel-brede modus omgeschakeld en server-side opgeslagen (cross-device). In Eenvoudig verdwijnt diepte hard (`HideInSimple`: analyses, katernen, extra grafieken), klappen drie bedieningsblokken in mét behoud (`DepthSection`: cashflow-instellingen, "Alle meldingstypen", AI-uitvoeringsgroepen) en verdwijnen aangewezen menu-ingangen (Rekenhulp/Wat-Als) uit sidebar en menusheet.
 - **Stappen:**
   1. Open de command-palette met ⌘K.
-  2. Zoek/kies de actie "Volledige weergave tonen" (of andersom). De omschrijving luidt "Meer/minder detail op elke pagina" — niet meer "Diepte-secties standaard tonen of inklappen" (APP-3: die tekst beschreef gedrag dat toen op geen enkel oppervlak bestond).
+  2. Klik de knop "Switch naar volledig" (of andersom). De sublabel luidt "Meer/minder detail op elke pagina" — niet meer "Diepte-secties standaard tonen of inklappen" (APP-3: die tekst beschreef gedrag dat toen op geen enkel oppervlak bestond).
   3. Controleer dat de diepte op bv. Overzicht-pagina's nu zichtbaar (Volledig) of weg (Eenvoudig) is, en dat de drie `DepthSection`-blokken in Eenvoudig ingeklapt-maar-openklikbaar staan.
   4. Controleer in Eenvoudig dat de verborgen nav-ingangen weg zijn maar de pagina's via deeplink bereikbaar blijven.
-  5. Zet de modus nu andersom, via `/mijn/uiterlijk` → blok "Weergave" → de niet-actieve kaart. → *verwacht:* zelfde effect als via ⌘K, vinkje + `aria-pressed` verspringen, geen reload. Open daarna ⌘K: het actie-label toont de tegenovergestelde stand — de twee ingangen lezen dus dezelfde bron.
+  5. Zet de modus nu andersom, via `/mijn/uiterlijk` → blok "Weergave" → de niet-actieve kaart. → *verwacht:* zelfde effect als via ⌘K, vinkje + `aria-pressed` verspringen, geen reload. Open daarna ⌘K: de knop-titel toont de tegenovergestelde doelstand — de twee ingangen lezen dus dezelfde bron.
 - **Schermen/componenten:** `components/command-palette/command-palette.tsx` + `lib/command-palette/actions.ts` (`action:toggle-display-mode`), `lib/hooks/use-display-mode.tsx` (optimistisch + `PUT /api/display-mode`, rollback bij fout), consumenten `components/app/depth-section.tsx`, `hide-in-simple.tsx`, `components/app/shell/sidebar.tsx`, `nav-menu-sheet.tsx` (filter op `SIMPLE_HIDDEN_NAV_HREFS`).
 - **Kriticiteit:** BELANGRIJK
 - **Rekenend:** nee
@@ -9077,7 +9077,7 @@ Dit deelgebied heeft geen eigen pagina's — het toetst de app-brede bediening d
   6. Klik in "overige" achtereenvolgens Tips & acties, Berichten, Nieuws, Rapportages. → *verwacht:* elke klik laadt de bijbehorende pagina.
   7. Klik in de footer op "Mijn". → *verwacht:* /mijn laadt.
   **Eindresultaat:** elke klik laadt de juiste pagina; actieve-module-markering en subroutes/derde niveau volgen exact de huidige route.
-- **c. Foutpad (compact):** Activeer bedragen-verbergen (⌘K → "Bedragen verbergen") en kijk opnieuw naar de sidebar. → *verwacht:* het netto vermogen naast "Het Overzicht" toont bullets i.p.v. het bedrag; "· N acties" blijft een cijfer (geen bedrag, dus niet gemaskeerd). Zet weer uit.
+- **c. Foutpad (compact):** Activeer bedragen-verbergen (⌘K → knop "Switch naar verborgen bedragen") en kijk opnieuw naar de sidebar. → *verwacht:* het netto vermogen naast "Het Overzicht" toont bullets i.p.v. het bedrag; "· N acties" blijft een cijfer (geen bedrag, dus niet gemaskeerd). Zet weer uit.
 
 ---
 
@@ -9183,15 +9183,15 @@ WF-NAV-13 (Uitloggen) → **géén eigen scenario** in dit document; gedekt door
 
 #### UAT-NAV-09 — Command-palette: acties uitvoeren (dekt WF-NAV-09)
 - **Kriticiteit:** BELANGRIJK · **Platform:** webapp+mobiel · **Rooktest:** nee · **Duur:** ~7 min
-- **Preconditie:** Huishoud-account (voor sectie "Perspectief") + module vermogensregistratie actief (voor "Synchroniseer prijzen"); hergebruik het testhuishouden uit UAT-NAV-19.
+- **Preconditie:** Huishoud-account (voor sectie "Perspectief"); hergebruik het testhuishouden uit UAT-NAV-19. Sinds W-006 (11 sep 2026) staan de acties als knoppen in een grid; de vier schakelaars dragen als titel "Switch naar <doelstand>".
 - **a. Happy path:**
   1. Open ⌘K, kies "Open AI-chat". → *verwacht:* het Will-chatpaneel opent, palette sluit.
-  2. Open ⌘K, kies "Bedragen verbergen". → *verwacht:* bedragen app-breed gemaskeerd; label wisselt bij de volgende opening naar "Bedragen tonen".
-  3. Open ⌘K, kies "Bedragen tonen" om terug te zetten.
-  4. Open ⌘K, kies "Volledige weergave tonen"/"Eenvoudige weergave tonen" (afhankelijk van de huidige stand). → *verwacht:* weergavemodus wisselt (zie UAT-NAV-10).
-  5. Open ⌘K, kies "Synchroniseer prijzen" (zichtbaar met vermogensregistratie-module actief). → *verwacht:* koersen-sync start.
+  2. Open ⌘K, klik de knop "Switch naar verborgen bedragen". → *verwacht:* bedragen app-breed gemaskeerd; de knop-titel wisselt bij de volgende opening naar "Switch naar zichtbare bedragen".
+  3. Open ⌘K, klik "Switch naar zichtbare bedragen" om terug te zetten.
+  4. Open ⌘K, klik "Switch naar volledig"/"Switch naar eenvoudig" (afhankelijk van de huidige stand). → *verwacht:* weergavemodus wisselt (zie UAT-NAV-10).
+  5. Open ⌘K, klik "Alles synchroniseren" (altijd zichtbaar, geen module-gate sinds B-029). → *verwacht:* de volledige sync-ronde start (koersen, bank, crypto).
   6. Open ⌘K, sectie "Perspectief": kies "Huishouden". → *verwacht:* perspectief wisselt, badge toont "Huishouden".
-  **Eindresultaat:** elke actie voert direct uit wat het label belooft en sluit het palette; labels wisselen consistent met de nieuwe staat.
+  **Eindresultaat:** elke knop voert direct uit wat de titel belooft en sluit het palette; titels wisselen consistent met de nieuwe staat.
 - **c. Foutpad (compact):** Klik in "Perspectief" op het reeds-actieve perspectief. → *verwacht:* alleen het palette sluit, geen herlaad/flikkering (no-op). Log in als solo-gebruiker (geen huishouden). → *verwacht:* de sectie "Perspectief" ontbreekt volledig.
 
 ---
@@ -9200,13 +9200,13 @@ WF-NAV-13 (Uitloggen) → **géén eigen scenario** in dit document; gedekt door
 - **Kriticiteit:** BELANGRIJK (leidend voor OVZ/SCHULD) · **Platform:** webapp+mobiel · **Rooktest:** nee · **Duur:** ~8 min
 - **Preconditie:** Ingelogd, willekeurige persona.
 - **a. Happy path:**
-  1. Open ⌘K, voer "Eenvoudige weergave tonen" uit. → *verwacht:* label wisselt, palette sluit.
+  1. Open ⌘K, klik de knop "Switch naar eenvoudig". → *verwacht:* knop-titel wisselt naar "Switch naar volledig", palette sluit.
   2. Bekijk de desktop-sidebar met De Toekomst actief. → *verwacht:* Rekenhulp en Wat-Als zijn verdwenen uit de subroutes.
   3. Open op mobiel het nav-menu. → *verwacht:* dezelfde twee items ontbreken onder Toekomst; bovendien staan alleen de sub-items van de ACTIEVE hoofdpagina uitgeklapt, de rest is één regel (NAV-2). Kijk ook naast "Het Overzicht" in de desktop-sidebar: de netto-vermogen-badge is weg (NAV-5).
   4. Zoek in ⌘K op "rekenhulp". → *verwacht:* geen pagina-resultaat in de sectie Pagina's.
   5. Navigeer via de adresbalk rechtstreeks naar /toekomst/rekenhulp. → *verwacht:* pagina laadt gewoon (alleen de menu-ingang is gefilterd); de mobiele TopBar toont de juiste titel.
   6. **Tweede ingang (APP-1):** ga naar `/mijn/uiterlijk`. → *verwacht:* bovenaan, vóór palet en typografie, staat het blok "Weergave" met twee kaarten ("Eenvoudig — de kern" / "Volledig — alle detail"); de kaart die overeenkomt met de zojuist via ⌘K gezette stand draagt het vinkje en `aria-pressed="true"` — de picker leest dus dezelfde bron als het palet.
-  7. Klik in dat blok "Volledige weergave tonen"-kaart ("Volledig — alle detail"). → *verwacht:* Rekenhulp/Wat-Als staan overal terug, zonder page-reload; het ⌘K-actielabel is bij de volgende opening omgedraaid. Er is geen tweede schrijfpad: ook deze klik gaat via `setMode` → `PUT /api/display-mode`.
+  7. Klik in dat blok de kaart "Volledig — alle detail". → *verwacht:* Rekenhulp/Wat-Als staan overal terug, zonder page-reload; de ⌘K-knop-titel is bij de volgende opening omgedraaid naar "Switch naar eenvoudig". Er is geen tweede schrijfpad: ook deze klik gaat via `setMode` → `PUT /api/display-mode`.
   8. Herlaad de pagina. → *verwacht:* de laatst gekozen modus staat direct bij eerste render (geen flits van de andere modus — server-geseed).
   **Eindresultaat:** Eenvoudig/Volledig is via BEIDE ingangen te zetten (`/mijn/uiterlijk` en ⌘K), filtert consistent de menu-ingangen op alle drie oppervlakken (sidebar, nav-sheet, ⌘K) en de keuze is server-side (profielrij) bewaard, dus cross-device.
 - **c. Foutpad (compact):** Zet devtools op offline vlak vóór het wisselen van modus (PUT /api/display-mode faalt). → *verwacht:* de toggle rolt zichtbaar terug naar de vorige stand — geen blijvend inconsistente UI-staat.
@@ -9217,9 +9217,9 @@ WF-NAV-13 (Uitloggen) → **géén eigen scenario** in dit document; gedekt door
 - **Kriticiteit:** BELANGRIJK (leidend; RAPP heeft eigen toepassing) · **Platform:** webapp+mobiel (⌘K, mobiel via de zoek-pill) · **Rooktest:** nee · **Duur:** ~6 min
 - **Preconditie:** Ingelogd, persona met zichtbare bedragen (bv. "compleet").
 - **a. Happy path:**
-  1. Voer via ⌘K (mobiel: de zoek-pill) de actie "Bedragen verbergen" uit. → *verwacht:* netto vermogen in sidebar/hero en alle gemaskeerde bedragen tonen "••••••" in module-accentkleur. Er is bewust géén los oog-icoon in TopBar/Sidebar (B-011) — dat is geen defect.
+  1. Klik via ⌘K (mobiel: de zoek-pill) de knop "Switch naar verborgen bedragen". → *verwacht:* netto vermogen in sidebar/hero en alle gemaskeerde bedragen tonen "••••••" in module-accentkleur. Er is bewust géén los oog-icoon in TopBar/Sidebar (B-011) — dat is geen defect.
   2. Herlaad de pagina. → *verwacht:* maskering blijft aan (localStorage `trifinity.privacy.masked`).
-  3. Open ⌘K opnieuw en voer "Bedragen tonen" uit. → *verwacht:* het actielabel is meegewisseld (icoon doorgestreept oog) en de bedragen zijn weer zichtbaar.
+  3. Open ⌘K opnieuw en klik "Switch naar zichtbare bedragen". → *verwacht:* de knop-titel is meegewisseld (icoon doorgestreept oog) en de bedragen zijn weer zichtbaar.
   **Eindresultaat:** maskering werkt app-breed consistent en overleeft een herlaad op hetzelfde apparaat.
 - **c. Foutpad (compact):** Open de app op een tweede apparaat/browser (of incognito). → *verwacht:* maskering staat daar standaard UIT (apparaat-lokaal, geen account-instelling) — dit is verwacht gedrag, geen defect. Controleer of plus/min-tekens vóór gemaskeerde delta's mee-verborgen worden (richting mag niet lekken).
 
@@ -11899,7 +11899,7 @@ Drie workflows zijn hier bewust géén volledig scenario maar een verwijsregel, 
 ---
 
 #### UAT-MIJN-17 — Bedragen maskeren (privacy-toggle, app-breed)
-- **Dekt WF-MIJN-17.** → **Gedekt door UAT-NAV-11.** Test hier niet apart; de ⌘K-actie "Bedragen verbergen"/"Bedragen tonen" (sinds B-011 de enige ingang, geen los oog-icoon in TopBar/Sidebar), de device-lokale opslag (localStorage) en de doorwerking op `formatMaskedCurrency`/`MaskedAmount` app-breed zijn daar leidend uitgewerkt.
+- **Dekt WF-MIJN-17.** → **Gedekt door UAT-NAV-11.** Test hier niet apart; de ⌘K-knop "Switch naar verborgen bedragen"/"Switch naar zichtbare bedragen" (sinds B-011 de enige ingang, geen los oog-icoon in TopBar/Sidebar; sinds W-006 als knop in de acties-grid), de device-lokale opslag (localStorage) en de doorwerking op `formatMaskedCurrency`/`MaskedAmount` app-breed zijn daar leidend uitgewerkt.
 
 ---
 
@@ -12027,7 +12027,7 @@ Drie workflows zijn hier bewust géén volledig scenario maar een verwijsregel, 
   **Berekening verwachting (exact, met de synthetische + 1.200-herwaardering uit stap 3):** dagelijkse-uitgaven-tarief = (maandelijkse uitgaven × 12) ÷ 365. Voorbeeld met het genoteerde maandbedrag € 2.400: dagtarief = (2.400 × 12) ÷ 365 = **€ 78,90/dag**. De vrijheidstijd-toename door de + € 1.200-herwaardering = 1.200 ÷ 78,90 ≈ **15,2 dagen** (ca. 2 weken). Controleer dat de regel "Sinds vorige check-in" (indien een eerdere check-in bestaat) of de reflectie-samenvatting een vergelijkbare orde van grootte toont — herbereken met het dan geldende maandbedrag als dat afwijkt van € 2.400.
 - **b. Randgeval — lege staten & "geen wijzigingen":** test elke stap op een account zonder bezittingen/schulden/doelen/budgetten/geplande posten → *verwacht:* respectievelijk "Voeg bezittingen toe", "goed bezig!", link naar Toekomst, link naar budgetten, en een lege vooruitblik-sectie. Doorloop een stap zonder wijzigingen te maken → *verwacht:* de opslaan-knop is disabled; na een eerdere succesvolle opslag toont de knop groen "Opgeslagen".
 - **c. Randgeval — geblokkeerde/afwijkende invoer:** probeer bij een holdings-gekoppelde bezitting de waarde handmatig te wijzigen → *verwacht:* het veld is vergrendeld met een "Holdings"-label. Zet een schuld op € 0 of lager → *verwacht:* deze schuld wordt automatisch gedeactiveerd en verdwijnt uit de lijst. Typ letters in een bedragveld → *verwacht:* geweigerd (alleen cijfers/punt; de budgetstap accepteert ook komma).
-- **d. Randgeval — halverwege afbreken & privacy-maskering:** sla de Bezittingen-stap op en navigeer weg zonder "Afronden" te klikken → *verwacht:* de herwaardering blijft bewaard, maar het maand-snapshot en de maand-voltooiing ontbreken nog (banner blijft actief tot een volledige afronding). Zet de privacy-maskering aan (⌘K → "Bedragen verbergen") tijdens de check-in → *verwacht:* alle bedragen in de check-in tonen bullet-placeholders, conform UAT-NAV-11.
+- **d. Randgeval — halverwege afbreken & privacy-maskering:** sla de Bezittingen-stap op en navigeer weg zonder "Afronden" te klikken → *verwacht:* de herwaardering blijft bewaard, maar het maand-snapshot en de maand-voltooiing ontbreken nog (banner blijft actief tot een volledige afronding). Zet de privacy-maskering aan (⌘K → knop "Switch naar verborgen bedragen") tijdens de check-in → *verwacht:* alle bedragen in de check-in tonen bullet-placeholders, conform UAT-NAV-11.
 
 ---
 
