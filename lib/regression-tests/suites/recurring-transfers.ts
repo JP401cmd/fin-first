@@ -40,18 +40,38 @@ registerCategory({
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Generate monthly transactions for a counterparty */
+/**
+ * Generate monthly transactions for a counterparty.
+ *
+ * DE REEKS EINDIGT IN DE VORIGE MAAND, niet in een vast jaar (V-001). Dit stond
+ * op een harde startdatum in januari 2025, en dat werkte zolang de detectie
+ * alleen naar de INTERVALLEN tussen betalingen keek. Sinds er een staarttermijn
+ * bestaat — een patroon waarvan de laatste betaling te lang geleden is zakt naar
+ * 'low', zodat een opgezegd abonnement niet blijft meetellen — meet deze suite
+ * óók de afstand tot vandaag. Een vaste fixture uit 2025 is daardoor op zeker
+ * moment een GESTOPT patroon, en dan faalt "Reasonable confidence" zonder dat er
+ * iets aan de code mankeert. Dat is geen theoretisch risico: precies dat gebeurde
+ * toen de staarttermijn werd toegevoegd.
+ *
+ * De reeks eindigt bewust in de VORIGE maand (dag 25), zodat er geen transacties
+ * in de toekomst ontstaan en de laatste betaling hooguit ~37 dagen oud is — ruim
+ * binnen de maandelijkse staarttermijn, ongeacht wanneer de suite draait.
+ */
 function generateMonthlyTx(
   counterparty: string,
   amount: number,
   months: number,
-  startYear = 2025,
-  startMonth = 1,
+  startYear?: number,
+  startMonth?: number,
 ): TransactionForDetection[] {
+  const nu = new Date()
+  const eerste = new Date(nu.getFullYear(), nu.getMonth() - months, 1)
+  const jaar = startYear ?? eerste.getFullYear()
+  const maand = startMonth ?? eerste.getMonth() + 1
   const txs: TransactionForDetection[] = []
   for (let i = 0; i < months; i++) {
-    const m = ((startMonth - 1 + i) % 12) + 1
-    const y = startYear + Math.floor((startMonth - 1 + i) / 12)
+    const m = ((maand - 1 + i) % 12) + 1
+    const y = jaar + Math.floor((maand - 1 + i) / 12)
     txs.push({
       id: `tx-${counterparty}-${i}`,
       date: `${y}-${String(m).padStart(2, '0')}-25`,

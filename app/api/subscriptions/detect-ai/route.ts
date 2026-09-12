@@ -5,7 +5,10 @@ import { NextResponse } from 'next/server'
 import { getModel, AIConfigError } from '@/lib/ai/config'
 import { checkTierGate } from '@/lib/require-tier'
 import { assertCloudAllowed } from '@/lib/ai/privacy-gate'
-import { detectRecurringTransactions } from '@/lib/recurring-detection'
+import {
+  detectRecurringTransactions,
+  RECURRING_ANALYSIS_MONTHS,
+} from '@/lib/recurring-detection'
 import { SUBSCRIPTION_DETECT_PROMPT } from '@/lib/ai/subscription-detect-prompt'
 import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
 import { unauthorized, errorResponse, serverError } from '@/lib/api/respond'
@@ -49,7 +52,9 @@ export async function POST() {
     }
 
     const now = new Date()
-    const startDateStr = localMonthStartMonthsAgo(now, 11)
+    // Zelfde venster als de vaste-lastenpagina (V-001: 24 maanden, was 12) —
+    // anders beoordeelt de AI een andere verzameling dan het scherm toont.
+    const startDateStr = localMonthStartMonthsAgo(now, RECURRING_ANALYSIS_MONTHS - 1)
 
     // Transacties via de keyset-ophaal: één kale query kapt af op max_rows (1000)
     // en levert dan alleen de oudste rijen (V-001).

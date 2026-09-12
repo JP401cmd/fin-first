@@ -1,7 +1,7 @@
 /**
  * KEYSET-PAGINATIE OP DE VASTE-LASTENDETECTIE (T3.2).
  *
- * `fetchAllRecurringTx` haalde het 12-maandsvenster met OFFSET-paginatie op
+ * `fetchAllRecurringTx` haalde het analysevenster met OFFSET-paginatie op
  * (`.range(from, from + 999)`); dat is nu een cursor op (date, id). De wissel mag
  * alleen als de detectie exact dezelfde rijen in exact dezelfde volgorde krijgt:
  *
@@ -28,15 +28,43 @@ vi.mock('@/lib/recurring-detection', async (importOriginal) => {
   return { ...actual, detectRecurringTransactions: vi.fn(actual.detectRecurringTransactions) }
 })
 
-import { detectRecurringTransactions, type TransactionForDetection } from '@/lib/recurring-detection'
+import {
+  detectRecurringTransactions,
+  isPatternStale,
+  type TransactionForDetection,
+} from '@/lib/recurring-detection'
 import { makeSupabase, withFailingTxFetches, MAX_ROWS, type Row } from '@/test/helpers/fake-supabase'
 import { __resetVasteLastenCache } from '@/lib/vaste-lasten-cache'
 import { loadVasteLastenSummary } from './vaste-lasten-summary'
 
 const detectSpy = vi.mocked(detectRecurringTransactions)
 
-/** Vast "nu", zodat het 12-maandsvenster (ondergrens 2025-07-01) niet meebeweegt. */
-const NU = new Date(2026, 5, 15, 12, 0, 0)
+/**
+ * Vast "nu", zodat de ondergrens van het analysevenster niet meebeweegt.
+ *
+ * V-001 — HET VENSTER IS HIER BEWUST NIET MEER EEN VAST GETAL. Dit stond als
+ * "het 12-maandsvenster (ondergrens 2025-07-01)"; sinds het venster 24 maanden
+ * breed is (`RECURRING_ANALYSIS_MONTHS`) ligt de ondergrens op 2024-07-01. De
+ * fixture hieronder is daar ONGEVOELIG voor: élke rij ligt in 2025-2026 en dus
+ * binnen beide vensters, precies omdat deze suite over PAGINATIE gaat en niet
+ * over de venstergrens. Dat is geen toeval maar een eis — verschuift de grens
+ * ooit tot bóven 2025-07-01, dan zou deze fixture stil rijen verliezen en zou
+ * de paginagrens niet meer midden in een reeks gelijke datums vallen (de eerste
+ * `it` hieronder bewaakt dat).
+ *
+ * De venstergrens zelf heeft een eigen getuige: lib/vaste-lasten-summary.venster.test.ts.
+ *
+ * STOND OP 15 JUNI 2026 (V-001). Sinds de detectie een STAARTTERMIJN kent — een
+ * patroon waarvan de laatste betaling te lang geleden is zakt naar 'low', zodat
+ * een opgezegd abonnement niet blijft meetellen — was dat te ver ná de fixture:
+ * de tweeling- en gelijkspelreeksen lopen tot begin 2026, dus in juni golden ze
+ * als gestopt en verdwenen ze uit `summary.vasteKosten`, waarmee de
+ * gelijkspel-getuigen hieronder niets meer te vergelijken hadden. De datums van
+ * de fixture zijn BEWUST ONGEMOEID gelaten: die bepalen de paginagrens, en die
+ * verschuiven zou deze suite van onderwerp laten veranderen. Alleen "nu" is
+ * verplaatst, tot vlak ná de laatste fixture-rij.
+ */
+const NU = new Date(2026, 1, 10, 12, 0, 0)
 
 /** Aantal fillerrijen dat dezelfde datum deelt — meer dan één, dus de cursor
  *  moet de `date.eq.X AND id.gt.Y`-tak echt gebruiken. */
@@ -164,6 +192,12 @@ describe('fetchAllRecurringTx — keyset-paginatie levert het volledige venster'
     expect(TRANSACTIES.length).toBeGreaterThan(MAX_ROWS)
     expect(CANONIEK[MAX_ROWS - 1].date).toBe(CANONIEK[MAX_ROWS].date)
     expect(CANONIEK[MAX_ROWS - 1].id).not.toBe(CANONIEK[MAX_ROWS].id)
+
+    // ... en de patronen waarop de gelijkspel-getuigen leunen zijn ten opzichte
+    // van NU nog LOPEND. Zonder deze regel verdwijnen ze stil uit de
+    // samenvatting zodra iemand NU of de staarttermijn verzet, en dan toetsen
+    // die getuigen niets meer. Laatste tweeling-rij: 2026-01-01.
+    expect(isPatternStale('monthly', '2026-01-01', NU)).toBe(false)
   })
 
   it('levert élke rij precies één keer, in de canonieke (date, id)-volgorde', async () => {

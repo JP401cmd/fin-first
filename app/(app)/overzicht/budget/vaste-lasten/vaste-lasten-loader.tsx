@@ -8,6 +8,7 @@ import {
 import { loadCashflowKpis } from '@/lib/cashflow-kpis'
 import { loadCashflowData } from '@/lib/cashflow-data-loader'
 import { loadVasteLastenSummary } from '@/lib/vaste-lasten-summary'
+import { RECURRING_ANALYSIS_MONTHS } from '@/lib/recurring-detection'
 import { buildVasteLastenInsights } from '@/lib/vaste-lasten-insights'
 import { VasteLastenClient } from '@/components/overview/vaste-lasten-client'
 import { CashflowKalender } from '@/components/overview/cashflow-kalender'
@@ -97,6 +98,18 @@ export async function VasteLastenLoader({ perspective }: { perspective: Perspect
         vasteKosten={summary.vasteKosten}
         terugkerendVariabel={summary.terugkerendVariabel}
         fullName={cashflow.fullName}
+        // GRONDSLAG-REGEL (V-001). De melding was niet "het getal klopt niet"
+        // maar "ik verwacht er meer" — dus hoort het scherm te zeggen waar het
+        // naar kéék. `accountCount` komt uit dezelfde perspectief-gescoopte
+        // `loadCashflowData` als de rest van deze pagina (kalender, saldo), dus
+        // de regel telt dezelfde rekeningen als de cijfers eromheen; de maanden
+        // zijn het canonieke detectievenster. Bewust géén extra query en geen
+        // extra kolom in de keyset-ophaal: dit is een duidingsregel, geen
+        // meting die zijn eigen datapad verdient.
+        detectionBasis={{
+          accountCount: cashflow.accountCount,
+          months: RECURRING_ANALYSIS_MONTHS,
+        }}
       />
       {/* Kalender = secundaire diepte ("wanneer komt het"): in Eenvoudig
           verborgen, in Volledig zichtbaar. De primaire analyse + het

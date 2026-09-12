@@ -42,8 +42,23 @@ import { loadVasteLastenSummary, type VasteLastenSummary } from './vaste-lasten-
 
 const detectSpy = vi.mocked(detectRecurringTransactions)
 
-/** Vast "nu", zodat het 12-maandsvenster (ondergrens 2025-07-01) niet meebeweegt. */
-const NU = new Date(2026, 5, 15, 12, 0, 0)
+/**
+ * Vast "nu", zodat de ondergrens van het analysevenster niet meebeweegt. De
+ * `windowStart` in `BASIS_INPUT` hieronder is een vrij gekozen literal: de
+ * vingerafdruk hasht die waarde, hij leidt 'm niet af — de suite blijft dus
+ * geldig nu het venster 24 maanden breed is (V-001). De venstergrens zelf heeft
+ * een eigen getuige: lib/vaste-lasten-summary.venster.test.ts.
+ *
+ * STOND OP 15 JUNI 2026 (V-001). Sinds de detectie een STAARTTERMIJN kent —
+ * een patroon waarvan de laatste betaling te lang geleden is zakt naar 'low',
+ * zodat een opgezegd abonnement niet blijft meetellen — was dat te ver ná de
+ * fixture: `transacties()` loopt tot 2026-01-05, dus die maandpatronen golden in
+ * juni als allang gestopt en er viel niets meer te detecteren. Deze suite gaat
+ * over de VINGERAFDRUK-CACHE en heeft lopende patronen nodig; de staarttermijn
+ * zelf wordt getest in recurring-detection.test.ts en
+ * vaste-lasten-summary.venster.test.ts.
+ */
+const NU = new Date(2026, 1, 10, 12, 0, 0)
 
 const SAMENVATTING: VasteLastenSummary = {
   subscriptions: [],

@@ -5,13 +5,18 @@ import { NextResponse } from 'next/server'
 import { getModel, AIConfigError } from '@/lib/ai/config'
 import { checkTierGate } from '@/lib/require-tier'
 import { assertCloudAllowed } from '@/lib/ai/privacy-gate'
-import { detectRecurringTransactions, CATEGORY_LABELS } from '@/lib/recurring-detection'
+import {
+  detectRecurringTransactions,
+  CATEGORY_LABELS,
+  RECURRING_ANALYSIS_MONTHS,
+} from '@/lib/recurring-detection'
 import { VASTE_KOSTEN_ANALYSE_PROMPT } from '@/lib/ai/dna/wil'
 import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
 import { unauthorized, badRequest, errorResponse, serverError } from '@/lib/api/respond'
 import { localMonthStartMonthsAgo } from '@/lib/month-range'
 import { fetchAllRecurringTx } from '@/lib/vaste-lasten-summary'
 import type { VasteKostenCandidate } from '@/lib/ai/local/local-vaste-kosten-resolver'
+import { selectVasteKostenAiKandidaten } from '@/lib/ai/vaste-kosten-kandidaten'
 import { isRefusedProviderError } from '@/lib/ai/provider-error'
 import { AI_ERROR_CODE, describeAiError } from '@/lib/ai/error-copy'
 
@@ -59,7 +64,7 @@ const AnalyseBodySchema = z.object({
  * geeft hij alleen die lijst terug; de browser classificeert dan zelf on-device
  * (lib/ai/local/local-vaste-kosten-resolver.ts). Bewust deze kleine ingreep en
  * geen aparte hydratie-route naast app/api/local-chat-overview: de hele
- * voorbewerking (12 maanden transacties, detectie, confidence-filter,
+ * voorbewerking (het analysevenster aan transacties, detectie,
  * al-bevestigd-filter, `toMonthly`) is precies dezelfde en zou daar regel voor
  * regel gedupliceerd moeten worden — twee kandidatenlijsten die uit elkaar
  * kunnen lopen is een duurdere prijs dan één extra vlag.
@@ -108,7 +113,9 @@ export async function POST(req: Request) {
     }
 
     const now = new Date()
-    const startDateStr = localMonthStartMonthsAgo(now, 11)
+    // Zelfde venster als de vaste-lastenpagina (V-001: 24 maanden, was 12) —
+    // anders classificeert de AI een andere verzameling dan het scherm toont.
+    const startDateStr = localMonthStartMonthsAgo(now, RECURRING_ANALYSIS_MONTHS - 1)
 
     // Transacties via de keyset-ophaal: één kale query kapt af op max_rows (1000)
     // en levert dan alleen de oudste rijen (V-001).
@@ -171,19 +178,47 @@ export async function POST(req: Request) {
       budgets,
     )
 
-    // Filter: medium+ confidence, not already confirmed, expenses only
+    // Filter: nog niet bevestigd, uitgaven only.
+    //
+    // DE TWIJFELGEVALLEN GAAN MEE (V-001). Hier stond `d.confidence !== 'low'`.
+    // Dat gaf de AI precies de posten die de heuristiek al zéker wist en hield
+    // haar weg bij de posten waar ze iets toevoegt: het jaarabonnement met een
+    // grillig bedrag, de onherkende tegenpartij, het patroon met twee
+    // waarnemingen. Beoordelen is nu juist de taak van deze route — de
+    // classificatie ('subscription' / 'vaste_kosten' / 'skip') komt van het
+    // model, niet van de drempel ervoor.
+    //
+    // WAT DIT *NIET* DOET: de drempel in de vaste-lastensamenvatting verlagen.
+    // `lib/vaste-lasten-summary.ts` filtert 'low' onverkort weg; een twijfelgeval
+    // komt dus niet ongevraagd in het TOTAAL terecht, alleen in deze lijst met
+    // voorstellen die de gebruiker bevestigt of afwijst.
+    //
+    // WAAROM DE CAP VOLSTAAT: `detectRecurringTransactions` sorteert aflopend op
+    // betrouwbaarheid, dus de 'low'-kandidaten staan achteraan en vullen alleen
+    // de plekken die overblijven. Geen enkele high/medium-kandidaat die er vóór
+    // deze wijziging in zat, wordt er nu door verdrongen.
     const confirmedKeys = new Set(
       existingRecurrings.flatMap(r => [
         (r.counterparty_name ?? '').toLowerCase().trim(),
         (r.name ?? '').toLowerCase().trim(),
       ].filter(Boolean))
     )
-    const candidates = allDetected.filter(
+    const nogNietBevestigd = allDetected.filter(
       d =>
-        d.confidence !== 'low' &&
         !d.alreadyExists &&
         !confirmedKeys.has((d.counterpartyName ?? '').toLowerCase().trim()),
     )
+
+    // EIGENAARSBESLUIT 12-09-2026 — een 'low'-kandidaat gaat alleen naar de
+    // CLOUD als we zijn tegenpartij herkennen als merk; het lokale pad houdt de
+    // volle lijst. De regel plus de volledige motivering (waarom `sanitizeForAI`
+    // dit niet afdekt, en waarom het lokale pad buiten schot blijft) staat in
+    // lib/ai/vaste-kosten-kandidaten.ts — daar is hij ook getest, wat in een
+    // App Router-`route.ts` niet kan.
+    const candidates = selectVasteKostenAiKandidaten(nogNietBevestigd, {
+      lokaal: candidatesOnly,
+      now,
+    })
 
     if (candidates.length === 0) {
       // `candidates: []` staat er voor het lokale pad bij: beide modi krijgen zo
@@ -197,6 +232,15 @@ export async function POST(req: Request) {
     }
 
     // Cap candidates to avoid excessive token usage (cloud) resp. wachttijd (lokaal)
+    //
+    // V-001 — DE CAP IS NU ÉCHT DE GRENS, niet de betrouwbaarheidsdrempel
+    // ervoor. Met de 'low'-kandidaten erbij loopt deze lijst voor een gebruiker
+    // met veel losse afschrijvingen vol tot de cap, waar hij voorheen vaak korter
+    // was. Cloud: begrensde tokenkosten (50). Lokaal: begrensde wachttijd (30 ×
+    // ~30 outputtokens op 9-12 tok/s ≈ een minuut) — dat kan dus mérkbaar langer
+    // duren dan vóór deze wijziging. De caps zijn bewust ONGEWIJZIGD gelaten; wie
+    // die staart korter wil, draait aan `MAX_LOCAL_AI_CANDIDATES` (en aan
+    // `LOCAL_VASTE_KOSTEN_CANDIDATE_CAP`, die 'm spiegelt), niet aan het filter.
     const cappedCandidates = candidates.slice(
       0,
       candidatesOnly ? MAX_LOCAL_AI_CANDIDATES : MAX_AI_CANDIDATES,

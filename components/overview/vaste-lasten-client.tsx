@@ -152,12 +152,39 @@ function OordeelDeck({ insights }: { insights: Insights }) {
   )
 }
 
+/**
+ * GRONDSLAG-REGEL (V-001) — één regel die zegt waaróp de detectie is gebaseerd.
+ *
+ * De melding die hierachter zit was niet "dit bedrag klopt niet" maar "ik
+ * verwacht er méér". Zonder zichtbare grondslag is dat niet te beoordelen: een
+ * ontbrekend abonnement kan betekenen dat de rekening waarvan het afgaat niet
+ * gekoppeld is, of dat het buiten het analysevenster viel. Deze regel maakt
+ * beide controleerbaar in de taal van de gebruiker.
+ *
+ * Vorm = de bestaande grondslag-microcopy elders in de app (budgets-client:
+ * "Gebaseerd op N maanden transactiedata"), dus geen nieuw patroon; tokens
+ * `--ink-4` + `text-[10px]`, links uitgelijnd onder het cijferblok.
+ */
+function GrondslagRegel({ accountCount, months }: { accountCount: number; months: number }) {
+  // Zonder gekoppelde rekening zegt "0 rekeningen" niets over de detectie maar
+  // alles over de koppeling — dat is de boodschap van de lege staat, niet van
+  // deze regel. Dan liever niets tonen dan een nul.
+  if (accountCount <= 0) return null
+  return (
+    <p className="font-sans text-[10px] text-[var(--ink-4)]">
+      Gebaseerd op {accountCount} {accountCount === 1 ? 'rekening' : 'rekeningen'} ·{' '}
+      {months} maanden transacties
+    </p>
+  )
+}
+
 export function VasteLastenClient({
   insights,
   subscriptions,
   vasteKosten,
   terugkerendVariabel = [],
   fullName,
+  detectionBasis,
 }: {
   insights: Insights
   subscriptions: RecurringItem[]
@@ -165,6 +192,13 @@ export function VasteLastenClient({
   /** Terugkerend maar variabel (H14) — buiten de quote, wél getoond. */
   terugkerendVariabel?: RecurringItem[]
   fullName: string | null
+  /**
+   * Waarop de detectie draaide: aantal zichtbare rekeningen + de breedte van
+   * het analysevenster in maanden. Optioneel, zodat bestaande aanroepers
+   * (tests, regressiesuites) niet hoeven mee te bewegen; ontbreekt hij, dan
+   * blijft de regel weg in plaats van een verzonnen getal te tonen.
+   */
+  detectionBasis?: { accountCount: number; months: number }
 }) {
   const router = useRouter()
   const { mode } = useDisplayMode()
@@ -282,6 +316,15 @@ export function VasteLastenClient({
           <OordeelDeck insights={insights} />
         ) : (
           insights.hasData && <CompactMeter insights={insights} />
+        )}
+
+        {/* Grondslag — in BEIDE modi, ook zonder detecties: juist wie niets ziet
+            staan moet kunnen nagaan waar we naar keken. */}
+        {detectionBasis && (
+          <GrondslagRegel
+            accountCount={detectionBasis.accountCount}
+            months={detectionBasis.months}
+          />
         )}
       </div>
 

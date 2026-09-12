@@ -187,3 +187,52 @@ describe('VasteLastenClient — Volledig blijft ongewijzigd (S2)', () => {
     expect(screen.getByText('Aandeel van je inkomen')).toBeTruthy()
   })
 })
+
+/**
+ * GRONDSLAG-REGEL (V-001) — "Gebaseerd op N rekeningen · M maanden transacties".
+ *
+ * De melding erachter was niet "dit getal klopt niet" maar "ik verwacht er
+ * méér". Dat is alleen te beoordelen als het scherm zegt waar het naar kéék:
+ * een ontbrekend abonnement kan een niet-gekoppelde rekening zijn óf een post
+ * buiten het analysevenster. De regel hoort daarom in BEIDE weergavemodi te
+ * staan — juist wie weinig ziet staan heeft hem nodig.
+ */
+function renderMetGrondslag(
+  mode: 'simple' | 'full',
+  detectionBasis?: { accountCount: number; months: number },
+) {
+  return render(
+    <DisplayModeProvider initialMode={mode}>
+      <VasteLastenClient
+        insights={insights}
+        subscriptions={subscriptions}
+        vasteKosten={vasteKosten}
+        terugkerendVariabel={[]}
+        fullName="Test Gebruiker"
+        detectionBasis={detectionBasis}
+      />
+    </DisplayModeProvider>,
+  )
+}
+
+describe('VasteLastenClient — grondslag-regel (V-001)', () => {
+  it.each(['simple', 'full'] as const)('staat er in de %s-modus', (mode) => {
+    renderMetGrondslag(mode, { accountCount: 3, months: 24 })
+    expect(screen.getByText(/Gebaseerd op 3 rekeningen · 24 maanden transacties/)).toBeTruthy()
+  })
+
+  it('gebruikt enkelvoud bij één rekening', () => {
+    renderMetGrondslag('full', { accountCount: 1, months: 24 })
+    expect(screen.getByText(/Gebaseerd op 1 rekening · 24 maanden transacties/)).toBeTruthy()
+  })
+
+  it('blijft weg zonder grondslag — liever niets dan een verzonnen getal', () => {
+    renderMetGrondslag('full')
+    expect(screen.queryByText(/Gebaseerd op/)).toBeNull()
+  })
+
+  it('blijft weg bij nul rekeningen: dat is de boodschap van de lege staat, niet van deze regel', () => {
+    renderMetGrondslag('full', { accountCount: 0, months: 24 })
+    expect(screen.queryByText(/Gebaseerd op/)).toBeNull()
+  })
+})

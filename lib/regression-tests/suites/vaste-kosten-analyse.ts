@@ -47,17 +47,29 @@ const EXCLUDED_CATEGORIES: RecurringCategory[] = ['salary', 'savings', 'other_in
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
+/**
+ * De reeks eindigt bewust in de VORIGE maand, zodat de laatste betaling hooguit
+ * ~45 dagen oud is — ruim binnen de maandelijkse staarttermijn (`isPatternStale`),
+ * ongeacht wanneer de suite draait. Met de vroegere vaste startdatum (2025-01) werd
+ * deze fixture vanzelf "stilgevallen" en zakten Netflix en Spotify naar 'low',
+ * waarna de suite rood ging op iets wat niets met de detectie te maken had.
+ * Zelfde patroon als in recurring-transfers.ts.
+ */
 function generateMonthlyTx(
   counterparty: string,
   amount: number,
   months: number,
-  startYear = 2025,
-  startMonth = 1,
+  startYear?: number,
+  startMonth?: number,
 ): TransactionForDetection[] {
+  const nu = new Date()
+  const eerste = new Date(nu.getFullYear(), nu.getMonth() - months, 1)
+  const jaar = startYear ?? eerste.getFullYear()
+  const maand = startMonth ?? eerste.getMonth() + 1
   const txs: TransactionForDetection[] = []
   for (let i = 0; i < months; i++) {
-    const m = ((startMonth - 1 + i) % 12) + 1
-    const y = startYear + Math.floor((startMonth - 1 + i) / 12)
+    const m = ((maand - 1 + i) % 12) + 1
+    const y = jaar + Math.floor((maand - 1 + i) / 12)
     txs.push({
       id: `tx-${counterparty}-${i}`,
       date: `${y}-${String(m).padStart(2, '0')}-15`,

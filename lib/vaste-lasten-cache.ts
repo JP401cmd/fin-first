@@ -156,8 +156,28 @@ function digest(input: string): string {
  *       telde onvoorwaardelijk mee)
  *   2 — H14 fase 1: terugkerend-variabele posten uit de quote (frequentiesnede
  *       + variabele tegenpartijen), als eigen groep getoond
+ *   3 — V-001, vier wijzigingen die bij ONVERANDERDE transacties een ander
+ *       totaal geven — precies het geval waarvoor deze teller bestaat:
+ *         a. halfjaar-/jaarpatronen worden 'medium' vanaf twee waarnemingen (en
+ *            halen dus de lijst);
+ *         b. bij precies twee waarnemingen geldt een strengere bedragseis
+ *            (amountCV < 0,15 i.p.v. < 0,50);
+ *         c. STILGEVALLEN patronen zakken naar 'low' (`STALE_AFTER_DAYS`) — een
+ *            opgezegd abonnement verdwijnt daarmee uit het totaal, dus dit kan
+ *            een totaal ook VERLAGEN;
+ *         d. de namenlijst in `CATEGORY_PATTERNS` is uitgebreid.
+ *       De vensterverbreding 12→24 maanden zit hier NIET in: die verschuift
+ *       `windowStart`, en dat zit al in de vingerafdruk.
+ *
+ *       LET OP bij (c): de uitkomst hangt nu óók van de DATUM af, niet alleen
+ *       van de gegevens. Een patroon dat vandaag nog loopt, is over twee maanden
+ *       stilgevallen zonder dat er één rij veranderde — en de vingerafdruk ziet
+ *       dat niet (net zomin als hij `end_date`-verval ziet; zie de kop van
+ *       `VasteLastenFingerprintInput`). De TTL van 30 minuten is daar het
+ *       vangnet: de staarttermijnen zijn tientallen dagen, dus een half uur
+ *       vertraging op die grens is niet waarneembaar.
  */
-const SUMMARY_LOGIC_VERSION = 2
+const SUMMARY_LOGIC_VERSION = 3
 
 export function vasteLastenFingerprint(input: VasteLastenFingerprintInput): string {
   const recurring = [...input.recurring]

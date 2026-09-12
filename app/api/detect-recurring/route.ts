@@ -2,6 +2,7 @@ import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import {
   detectRecurringTransactions,
+  RECURRING_ANALYSIS_MONTHS,
   type DetectedRecurring,
 } from '@/lib/recurring-detection'
 import { localMonthStartMonthsAgo } from '@/lib/month-range'
@@ -16,7 +17,7 @@ import { serverError } from '@/lib/api/respond'
  *
  * Query params:
  * - account_id (optional): Filter to specific bank account
- * - months (optional): Number of months to analyze (default: 12)
+ * - months (optional): Number of months to analyze (default: RECURRING_ANALYSIS_MONTHS)
  * - min_confidence (optional): Minimum confidence level ('high' | 'medium' | 'low', default: 'low')
  */
 export async function GET(request: Request) {
@@ -29,7 +30,13 @@ export async function GET(request: Request) {
 
     const url = new URL(request.url)
     const accountId = url.searchParams.get('account_id')
-    const months = Math.min(24, Math.max(3, parseInt(url.searchParams.get('months') || '12')))
+    // Default = het canonieke analysevenster (V-001: 24, was een losse 12), zodat
+    // deze route standaard dezelfde verzameling ziet als de vaste-lastenpagina.
+    // De bovengrens stond al op 24 en blijft ongewijzigd.
+    const months = Math.min(
+      24,
+      Math.max(3, parseInt(url.searchParams.get('months') || String(RECURRING_ANALYSIS_MONTHS))),
+    )
     const minConfidence = url.searchParams.get('min_confidence') || 'low'
 
     // Calculate date range — lokale maandgrens, geen toISOString() (NL-dag-shift)

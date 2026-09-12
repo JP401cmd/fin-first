@@ -172,6 +172,36 @@ const CATEGORY_PATTERNS: { patterns: RegExp[]; category: RecurringCategory }[] =
       // Clubs & verenigingen
       /golfclub/i, /bridgeclub/i, /tennisclub/i, /voetbalvereniging/i,
       /vereniging/i, /rotary/i, /lions\s*club/i,
+
+      // ── V-001: gangbare NL-diensten die ontbraken ──────────────────────────
+      // WOORDGRENZEN ZIJN HIER DE REGEL, GEEN STIJLKEUZE. Een kaal `/max/i`
+      // vangt Maxime, Maxis en "maximaal"; een kaal `\bmax\b` vangt nog steeds
+      // elke particuliere "Max" die huur of alimentatie ontvangt — en dan zou
+      // een echte betaling aan een persoon als abonnement in beeld komen.
+      // Vandaar: HBO Max alleen in een vorm die de dienst identificeert.
+      // Streaming & video
+      /\bhbo\s*max\b/i, /\bmax\.com\b/i, /warner\s*bros/i,
+      /skyshowtime/i, /\bdazn\b/i, /\bf1\s*tv\b/i,
+      /path[eé]\s*(?:thuis|unlimited)/i,
+      /apple\s*tv\b/i, /apple\s*one\b/i, /apple\.com\/bill/i,
+      /google\s*play/i, /youtube\s*music/i, /\btwitch\b/i,
+      /soundcloud/i, /patreon/i, /substack/i,
+      // Kranten & tijdschriften
+      /financieele\s*dagblad/i, /\bfd\.nl\b/i, /groene\s*amsterdammer/i,
+      /vrij\s*nederland/i,
+      // Software, opslag & beveiliging
+      /\bcanva\b/i, /\bfigma\b/i, /wetransfer/i, /onedrive/i,
+      /\bnorton\b/i, /mcafee/i, /bitdefender/i, /malwarebytes/i,
+      /nordvpn/i, /expressvpn/i, /surfshark/i, /\bvpn\b/i,
+      /1password/i, /lastpass/i, /bitwarden/i,
+      // Leren, sport & gezondheid (apps)
+      /\bduolingo\b/i, /\bstrava\b/i, /headspace/i, /\bzwift\b/i,
+      // Gaming & sociaal
+      /\bea\s*play\b/i, /\bdiscord\b/i, /linkedin/i,
+      // Sportschoolketens (naast het generieke /fitness/ hierboven)
+      /sportcity/i, /fit\s*for\s*free/i, /trainmore/i,
+      // Lidmaatschappen
+      /consumentenbond/i, /\bfnv\b/i, /\bcnv\b/i,
     ],
     category: 'subscription',
   },
@@ -557,6 +587,103 @@ const MIN_OCCURRENCES: Record<string, number> = {
   yearly: 2,
 }
 
+/**
+ * ANALYSEVENSTER van de detectie, in maanden (V-001).
+ *
+ * Was 12. Een jaarabonnement heeft per definitie TWEE betalingen nodig om als
+ * patroon te bestaan, en twee betalingen met een jaar ertussen passen niet in
+ * een venster van twaalf maanden — die stonden dus structureel buiten beeld,
+ * ongeacht welke drempel eronder stond.
+ *
+ * ÉÉN getal, vier ophaalplekken: `loadVasteLastenSummary`,
+ * `/api/detect-recurring`, `/api/subscriptions/detect-ai` en
+ * `/api/subscriptions/analyse-ai` haalden ieder hun eigen venster op met een
+ * los `11`. Die vier moeten hetzelfde zien — anders toont de pagina een andere
+ * verzameling dan de AI beoordeelt.
+ *
+ * LET OP bij het gebruik: `localMonthStartMonthsAgo(now, N)` telt maanden
+ * TERUG vanaf de huidige maand, dus een venster van 24 maanden (huidige maand
+ * meegeteld) is `RECURRING_ANALYSIS_MONTHS - 1`.
+ *
+ * KOSTEN: ~2× zoveel transactierijen door de keyset-ophaal en door de
+ * regex-zware detectie. `fetchAllRecurringTx` pagineert al, dus dit is meer
+ * werk, geen nieuw faalpad; de vingerafdruk-cache erachter vangt de herhaling.
+ */
+export const RECURRING_ANALYSIS_MONTHS = 24
+
+/**
+ * Frequenties met een LANG interval: halfjaar en jaar vallen allebei onder het
+ * label 'yearly' (zie `detectFrequency` — 160-200 dagen wordt als jaarlijks
+ * benaderd, 340-395 dagen is jaarlijks).
+ *
+ * Waarom ze een eigen betrouwbaarheidsregel krijgen (V-001): de generieke regel
+ * hieronder vraagt DRIE waarnemingen voor 'medium', en alles wat 'low' blijft
+ * wordt door `lib/vaste-lasten-summary.ts` weggefilterd. Een jaarabonnement
+ * haalt drie betalingen pas na drie jaar historie — dus was `MIN_OCCURRENCES`
+ * op 2 zetten zonder deze uitzondering een lege belofte: het patroon werd wél
+ * gedetecteerd en daarna stil weggefilterd.
+ *
+ * Maandelijks en wekelijks houden hun eigen drempels: daar is een derde
+ * waarneming binnen een kwartaal te halen, en juist dáár is een toevallig paar
+ * betalingen (twee keer dezelfde webshop) een realistisch vals-positief.
+ */
+const LONG_INTERVAL_FREQUENCIES = new Set<string>(['yearly'])
+
+/**
+ * STAARTTERMIJN — hoe lang ná de laatste waarneming een patroon nog als LOPEND
+ * telt, per frequentie in dagen (ruwweg 1,5× het interval).
+ *
+ * HET DEFECT DAT DIT REPAREERT: `detectFrequency` rekent uitsluitend met de
+ * intervallen TÚSSEN betalingen en kijkt nooit naar "hoe lang geleden was de
+ * laatste". Een opgezegd abonnement laat een reeks keurige maandbetalingen
+ * achter, dus het blijft een 'high'-patroon — en niets verderop vangt dat op:
+ * `lib/vaste-lasten-summary.ts` filtert alleen op categorie, richting en
+ * betrouwbaarheid, en `isRecurringExpired` geldt alleen voor BEVESTIGDE rijen
+ * met een `end_date`. Gevolg: een in februari 2025 opgezegde Ziggo van EUR 55
+ * stond in september 2026 gewoon weer in het maandtotaal, in de inkomensmeter
+ * en in de vrijheidsdagen.
+ *
+ * Dit bestond al bij een venster van twaalf maanden; de verbreding naar 24
+ * maanden maakt de staart twee keer zo lang, dus de reparatie hoort hierbij.
+ *
+ * WAAROM PER FREQUENTIE EN NIET ÉÉN TERMIJN: bij een jaarabonnement is dertien
+ * maanden stilte volstrekt normaal. Eén vaste termijn zou elk jaarabonnement
+ * laten vervallen — precies wat deze wijziging juist zichtbaar moest maken.
+ *
+ * WAAROM DEGRADEREN EN NIET WEGGOOIEN: de historie is echt. Het patroon blijft
+ * bestaan als 'low', zodat oppervlakken die bewust ook onzekere patronen tonen
+ * (de AI-beoordeling) hem kunnen zien, terwijl alles wat op 'medium' filtert —
+ * het vaste-lastentotaal voorop — hem met rust laat.
+ */
+const STALE_AFTER_DAYS: Record<string, number> = {
+  weekly: 21,
+  monthly: 50,
+  quarterly: 140,
+  yearly: 430,
+}
+
+const MS_PER_DAY = 1000 * 60 * 60 * 24
+
+/**
+ * Is dit patroon STILGEVALLEN — ligt de laatste waarneming zo lang achter ons
+ * dat er inmiddels een betaling gemist is die er had moeten zijn?
+ *
+ * Geëxporteerd zodat een aanroeper dezelfde grens kan gebruiken zonder de
+ * termijnen te herhalen; `lastDate` is `YYYY-MM-DD` (de laatste datum van het
+ * patroon, dus `dates[dates.length - 1]`).
+ */
+export function isPatternStale(
+  frequency: string,
+  lastDate: string | undefined,
+  now: Date,
+): boolean {
+  if (!lastDate) return false
+  const grens = STALE_AFTER_DAYS[frequency]
+  if (grens === undefined) return false
+  const verstreken = (now.getTime() - new Date(lastDate).getTime()) / MS_PER_DAY
+  return verstreken > grens
+}
+
 export interface TransactionForDetection {
   id: string
   date: string
@@ -571,7 +698,7 @@ export interface TransactionForDetection {
 /**
  * Main detection function: analyzes transactions and returns detected recurring patterns.
  *
- * @param transactions - All transactions to analyze (typically 6-18 months)
+ * @param transactions - All transactions to analyze (venster: `RECURRING_ANALYSIS_MONTHS`)
  * @param existingRecurrings - Already confirmed recurring transactions (to flag duplicates)
  * @param budgets - Budget list for category matching
  */
@@ -579,7 +706,15 @@ export function detectRecurringTransactions(
   transactions: TransactionForDetection[],
   existingRecurrings: { counterparty_name: string | null; amount: number; name: string }[] = [],
   budgets: { id: string; name: string; parent_id: string | null; budget_type: string }[] = [],
+  /**
+   * `now` bepaalt vanaf wanneer een patroon STILGEVALLEN heet (zie
+   * `STALE_AFTER_DAYS`). Injecteerbaar omdat de uitkomst er anders van de
+   * wandklok afhangt — een test die een opgezegd abonnement pint zou dan met de
+   * tijd stil van betekenis veranderen.
+   */
+  opts: { now?: Date } = {},
 ): DetectedRecurring[] {
+  const now = opts.now ?? new Date()
   if (transactions.length < 3) return []
 
   // Filter out own-account transfers — they're not recurring expenses/income
@@ -652,12 +787,48 @@ export function detectRecurringTransactions(
       const isVariable = amountCV > 0.1 // More than 10% variation
 
       // Overall confidence based on frequency confidence + amount consistency + occurrences
+      //
+      // MINIMUM VOOR 'medium' (V-001). Normaal drie waarnemingen; voor een
+      // halfjaar-/jaarpatroon de frequentie-eigen ondergrens (twee), want een
+      // derde waarneming vraagt daar drie jaar historie. Zie
+      // `LONG_INTERVAL_FREQUENCIES`. De BEDRAGSEIS blijft ongewijzigd dezelfde
+      // variatiegrens (`amountCV < 0.50`), dus een jaarlijkse post met een
+      // grillig bedrag blijft 'low' — precies de twijfelgevallen die we aan de
+      // AI voorleggen in plaats van ze als vaste last te tonen.
+      const minVoorMedium = LONG_INTERVAL_FREQUENCIES.has(frequency)
+        ? (MIN_OCCURRENCES[frequency] ?? 3)
+        : 3
+      // BEDRAGSEIS BIJ PRECIES TWEE WAARNEMINGEN. Met n=2 is de
+      // variatiecoefficient een zwak signaal: twee willekeurige bedragen liggen
+      // al gauw "dicht genoeg" bij elkaar voor de generieke grens van 0,50 —
+      // EUR 100 en EUR 280 geeft 0,47. Twee losse aankopen met een half jaar
+      // ertussen zouden zo een abonnement worden. Vanaf drie waarnemingen draagt
+      // de reeks zelf het bewijs en blijft de oude, ruimere grens staan (een
+      // energienota varieert nu eenmaal).
+      const maxCvVoorMedium = subGroup.length === 2 ? 0.15 : 0.50
       let confidence: 'high' | 'medium' | 'low'
       if (freqConfidence === 'high' && amountCV < 0.15 && subGroup.length >= 5) {
         confidence = 'high'
-      } else if (freqConfidence !== 'low' && amountCV < 0.50 && subGroup.length >= 3) {
+      } else if (
+        freqConfidence !== 'low' &&
+        amountCV < maxCvVoorMedium &&
+        subGroup.length >= minVoorMedium
+      ) {
         confidence = 'medium'
       } else {
+        confidence = 'low'
+      }
+
+      // STILGEVALLEN PATRONEN ZAKKEN NAAR 'low'. Dit staat bewust ná de
+      // berekening hierboven en niet erin: het is een ander soort oordeel. De
+      // regels hierboven meten of het patroon ECHT is; deze meet of het nog
+      // LOOPT. Een opgezegd abonnement is allebei — een echt patroon dat niet
+      // meer loopt — en mag daarom niet in het vaste-lastentotaal blijven staan.
+      // `dates` erft de datumvolgorde van `sortedTx`, maar het maximum wordt hier
+      // expliciet gepakt: dit oordeel mag niet afhangen van een sorteervolgorde
+      // die twintig regels hoger is vastgelegd.
+      const laatsteDatum = dates.reduce((max, d) => (d > max ? d : max), dates[0])
+      if (confidence !== 'low' && isPatternStale(frequency, laatsteDatum, now)) {
         confidence = 'low'
       }
 

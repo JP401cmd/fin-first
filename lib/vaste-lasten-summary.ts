@@ -1,7 +1,8 @@
 // lib/vaste-lasten-summary.ts
 // Gedeelde bron-van-waarheid voor de vaste-lasten-samenvatting: confirmed
 // recurring_transactions (amount < 0, niet 'excluded') + auto-detectie over de
-// laatste 12 maanden transacties. Geëxtraheerd uit app/api/subscriptions/route.ts
+// laatste `RECURRING_ANALYSIS_MONTHS` maanden transacties (V-001: 24, was 12).
+// Geëxtraheerd uit app/api/subscriptions/route.ts
 // zodat zowel die API (de Vaste-lasten-pagina) als de cashflow-landingskaart
 // EXACT hetzelfde totaal tonen — voorheen telde de kaart alleen confirmed rows
 // en miste auto-gedetecteerde vaste lasten.
@@ -13,6 +14,7 @@ import {
   detectCategory,
   isVariableMerchant,
   CATEGORY_LABELS,
+  RECURRING_ANALYSIS_MONTHS,
   type RecurringCategory,
 } from '@/lib/recurring-detection'
 import { isRecurringExpired, type RecurringSchedule } from '@/lib/recurring-data'
@@ -49,7 +51,9 @@ type RecurringTxRow = {
 }
 
 /**
- * Haal ALLE 12-maands transactie-rijen op via KEYSET-paginatie op (date, id).
+ * Haal ALLE transactie-rijen van het analysevenster op via KEYSET-paginatie op
+ * (date, id). Het venster is `RECURRING_ANALYSIS_MONTHS` maanden breed (V-001:
+ * 24, was 12) — dus ~2× zoveel rijen dan voorheen, over dezelfde paginatie.
  * PostgREST kapt elk antwoord af op `max_rows` (config.toml = 1000) — een enkele
  * `.limit(n)` boven die grens is een NO-OP. Voor recurring-detectie moeten we
  * élke transactie zien, anders mist de detectie (en dus het vaste-lasten-totaal)
@@ -425,8 +429,8 @@ async function loadFingerprintRound(
 }
 
 /**
- * Detecteert vaste lasten uit de laatste 12 maanden transactie-historie +
- * confirmed recurring_transactions. Queries zijn RLS-gescoped op de ingelogde
+ * Detecteert vaste lasten uit `RECURRING_ANALYSIS_MONTHS` maanden transactie-
+ * historie + confirmed recurring_transactions. Queries zijn RLS-gescoped op de ingelogde
  * gebruiker. `cache()` dedupt per request.
  *
  * De auth-check loopt via `getCachedUser` (óók `cache()`-gewrapt): op de
@@ -449,9 +453,10 @@ export const loadVasteLastenSummary = cache(
     if (!user) return EMPTY
 
     const now = new Date()
-    // 12-maands ondergrens, tijdzone-veilig (nooit toISOString() — dat schuift de
-    // grens in NL een dag terug).
-    const startDateStr = localMonthStartMonthsAgo(now, 11)
+    // Ondergrens van het analysevenster (V-001: 24 maanden, was 12), tijdzone-
+    // veilig — nooit toISOString(), dat schuift de grens in NL een dag terug.
+    // `-1` omdat de huidige maand meetelt; zie `RECURRING_ANALYSIS_MONTHS`.
+    const startDateStr = localMonthStartMonthsAgo(now, RECURRING_ANALYSIS_MONTHS - 1)
 
     const { fingerprint, recurring: existingRecurrings } = await loadFingerprintRound(
       supabase,
@@ -552,6 +557,12 @@ export const loadVasteLastenSummary = cache(
         name: r.name,
       })),
       budgets,
+      // Dezelfde `now` als de venstergrens hierboven — één klokaflezing per
+      // load. De detector meet hiermee of een patroon nog LOOPT (een opgezegd
+      // abonnement laat een keurig patroon achter en zou anders tot het eind van
+      // het venster blijven meetellen); zou dat een tweede aflezing zijn, dan
+      // konden venster en staart net over een middernachtgrens uiteenlopen.
+      { now },
     )
 
     const relevantCategories = [...SUBSCRIPTION_CATEGORIES, ...VASTE_KOSTEN_CATEGORIES]
