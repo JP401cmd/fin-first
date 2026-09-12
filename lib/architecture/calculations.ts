@@ -104,6 +104,7 @@ export const CALCULATIONS: Calculation[] = [
       'supabase/migrations/20260811160000_add_cashflow_basis_prefs.sql',
       'supabase/migrations/20260811180000_tx_month_aggregate_user_scope.sql',
       'supabase/migrations/20260912120000_tx_month_aggregate_budgetteren_uit.sql',
+      'supabase/migrations/20260912170000_budget_excluded_account_ids_uit_public.sql',
     ],
     functions: [
       'computeBudgetBasis',

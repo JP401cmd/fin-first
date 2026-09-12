@@ -232,7 +232,7 @@ const withUserId = (rows: Row[]): Row[] =>
 
 /**
  * "Budgetteren staat uit op deze rekening" — de TS-spiegel van
- * `public.budget_excluded_account_ids(uuid[])` (migratie
+ * `intern.budget_excluded_account_ids(uuid[])` (migratie
  * 20260912120000, ADR 0139). Boekingen op zo'n rekening vallen buiten
  * `tx_month_aggregate` en dus buiten budgetsom, spaarquote, dagtarief,
  * FIRE-uitgaven en snapshots; alleen het SALDO telt nog, als cash-bezitting.

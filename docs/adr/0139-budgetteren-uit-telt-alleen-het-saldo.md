@@ -84,7 +84,7 @@ zonder `linked_asset_id` aangemaakt, en het bezit dat in stap 8 op
 **2. De vorm: aftrekken, niet joinen.** Het aggregaat bepaalt eerst de zichtbare
 transactierijen (ongewijzigd, onder de RLS van `transactions`), verzamelt daaruit
 de voorkomende `account_id`'s, en vraagt aan een SECURITY DEFINER-helper
-`public.budget_excluded_account_ids(uuid[])` welke daarvan "budgetteren uit"
+`intern.budget_excluded_account_ids(uuid[])` welke daarvan "budgetteren uit"
 hebben. Die ids worden afgetrokken.
 
 De rijverzameling hangt daarmee nog steeds uitsluitend aan de policy op
@@ -98,15 +98,27 @@ waar `auth.uid()` NULL is (ADR 0103). Een perimeter uit `auth.uid()` zou daar ee
 lege set geven en de cron stil op de oude regel laten rekenen — twee grondslagen
 in één tijdreeks, precies wat ADR 0103 heeft opgeruimd.
 
-**3. De geaccepteerde rest.** De helper staat als RPC op het REST-oppervlak. Hij
-geeft geen enkele transactierij en geen enkel rekening-attribuut terug (geen
-naam, saldo, IBAN of eigenaar), alleen een deelverzameling van de uuid's die de
-aanroeper zélf meegaf. Wat eruit te leren valt, is voor een rekening-uuid die je
-al bezit het feit "hierop staat budgetteren uit" — en dat is niet te
-onderscheiden van "dit id bestaat niet", want beide leveren niets op. Uuid's zijn
-niet te raden. Dat is de bewust geaccepteerde, begrensde rest; `anon` houdt
-execute-recht zodat een uitgelogde render 0 rijen krijgt en geen 42501 (ADR
-0048).
+**3. De helper woont buiten het REST-oppervlak** (migratie `20260912170000`,
+12 sep 2026). In de eerste vorm stond hij in `public`, en daarmee gaf PostgREST
+hem automatisch een RPC-eindpunt: `POST /rest/v1/rpc/budget_excluded_account_ids`
+antwoordde uitgelogd met **200** — een orakel dat voor een rekening-uuid dat je
+al bezit verklapt of daarop budgetteren uit staat. Dat stond hier eerst als
+"geaccepteerde rest"; die acceptatie is ingetrokken.
+
+De reflex — `revoke execute … from anon` — kán niet: Postgres toetst
+EXECUTE-rechten bij **expressie-initialisatie**, niet bij het nemen van een tak.
+Zonder dat recht geeft een anon-aanroep van `tx_month_aggregate` een harde
+`42501` in plaats van nul rijen, en een `case`-guard rond de aanroep verandert
+dat niet (beide gemeten, 12 sep 2026). Dat raakt het reële geval van een sessie
+die tijdens het renderen net verlopen is.
+
+De oplossing scheidt het **recht** van de **bereikbaarheid**: de helper verhuist
+naar schema `intern`, dat PostgREST niet doorzoekt, en houdt zijn EXECUTE voor
+`anon`/`authenticated`/`service_role` plus `usage` op dat schema. Gemeten vóór en
+na, met de publishable key tegen productie: het helper-eindpunt ging van **200**
+naar **404 PGRST202**, terwijl `POST /rest/v1/rpc/tx_month_aggregate` uitgelogd
+**200 `[]`** blijft geven — nul rijen, geen fout. De faalmodus bij een verlopen
+sessie is dus ongewijzigd; alleen het eindpunt is weg.
 
 ## Gevolgen
 
@@ -152,7 +164,8 @@ dan herstelt één correctiemigratie hem: `create or replace` van
 `public.tx_month_aggregate` met exact het lichaam van migratie
 `20260811180000_tx_month_aggregate_user_scope.sql` (signatuur en returns-clausule
 zijn ongewijzigd gebleven, dus dat is een zuivere terugzetting), gevolgd door
-`drop function if exists public.budget_excluded_account_ids(uuid[])` in een
+`drop function if exists intern.budget_excluded_account_ids(uuid[])` (plus
+`drop schema if exists intern`, mits leeg) in een
 **tweede, latere** migratie — pas nadat de terugzetting zich bewezen heeft.
 
 Waaraan je ziet dat het misging:
@@ -161,7 +174,7 @@ Waaraan je ziet dat het misging:
    is de aggregaat-diff zoals hierboven: draai de oude en de nieuwe definitie
    naast elkaar over de volledige historie en vergelijk met `except` in beide
    richtingen. Nul rijen verschil zolang niemand budgetteren uitzet.
-2. **`cardinality(public.budget_excluded_account_ids(array(select id from public.bank_accounts)))`
+2. **`cardinality(intern.budget_excluded_account_ids(array(select id from public.bank_accounts)))`
    groter dan het aantal rekeningen waarvan de gebruiker zégt dat budgetteren
    uit staat.** Dat wijst op een vlag die per ongeluk uit staat (bv. een
    `has_budget_tracking` die op false bleef) in plaats van op een fout in de
