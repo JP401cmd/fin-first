@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-07T18:33:01.081Z",
+  "generatedAt": "2026-09-12T08:58:57.637Z",
   "manifestGeneratedAt": "2026-09-07T16:29:38.925Z",
   "inSync": false,
   "budgetsOk": true,
@@ -17,7 +17,7 @@
     {
       "file": "lib/ai/dna/wil.ts",
       "storedSha256": "db0a1336f20b520e46d320bc45eacefc81f994ccce54fd29cc8823fd39d3aa8f",
-      "liveSha256": "ee469b8f03c44ef5a4af3dcc65ab115c2a5712a83cd858e29419bcdb97ffdb5b",
+      "liveSha256": "247f68daabe9cdcbb8bfad733529795bfd8594e502a7bdb6671f8e6d189ee002",
       "inSync": false,
       "driftSince": "2026-09-07T18:33:01.081Z"
     }
@@ -44,7 +44,7 @@
         {
           "file": "lib/ai/dna/wil.ts",
           "storedSha256": "db0a1336f20b520e46d320bc45eacefc81f994ccce54fd29cc8823fd39d3aa8f",
-          "liveSha256": "ee469b8f03c44ef5a4af3dcc65ab115c2a5712a83cd858e29419bcdb97ffdb5b",
+          "liveSha256": "247f68daabe9cdcbb8bfad733529795bfd8594e502a7bdb6671f8e6d189ee002",
           "inSync": false,
           "driftSince": "2026-09-07T18:33:01.081Z"
         }
@@ -129,8 +129,9 @@
         {
           "file": "lib/ai/dna/recommendations.ts",
           "storedSha256": "3bb8423b6d9ae4b2de44dc13005bd489594ca4f11274fd0d0642ed74458e6787",
-          "liveSha256": "3bb8423b6d9ae4b2de44dc13005bd489594ca4f11274fd0d0642ed74458e6787",
-          "inSync": true
+          "liveSha256": "7d7751a4615f7375491433950f5b19331695249de1ba1788c168e583131d364d",
+          "inSync": false,
+          "driftSince": "2026-09-12T08:58:57.637Z"
         },
         {
           "file": "lib/ai/dna/base.ts",
