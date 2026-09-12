@@ -4,7 +4,7 @@ description: "Use this agent for TriFinity's financial calculation engines (reke
 model: fable
 experimental:
   cacheTtl: "1h"
-effort: xhigh
+effort: high
 color: amber
 ---
 

@@ -35,8 +35,8 @@ De `ai-specialist-prompt-dna`:
 ### 4. Regressiebewijs — `tester`
 De `tester` legt élk voorbeeldgeval uit stap 1 vast als testcase — categorisatie in `lib/parsers/categorize.test.ts` / `lib/auto-categorize.test.ts` en de `categorisatie`-regressiesuite; gedragsregels waar toetsbaar in de relevante suites. Draai de bestaande prompt-gerelateerde tests om te bewijzen dat eerder gefixte gevallen niet terugvallen. Groen met echte output.
 
-### 5. Gedragsreview — `code-review` + steekproef
-`code-review` beoordeelt de prompt-diff (before/after geciteerd, redenering erbij). Doe waar mogelijk een steekproef met de echte flow (bv. een categorisatie-run op de voorbeelden) en vergelijk voor/na.
+### 5. Gedragsreview — fork-review + steekproef
+Een **fork-subagent** (`subagent_type: "fork"` — níet de `code-review`-agent, zie de gedeelde conventies) beoordeelt de prompt-diff (before/after geciteerd, redenering erbij). Doe waar mogelijk een steekproef met de echte flow (bv. een categorisatie-run op de voorbeelden) en vergelijk voor/na.
 
 ### 6. Borging
 - Raakt de wijziging een **aanname die ergens gedocumenteerd is** (bv. categoriedefinities, compliance-formulering)? Laat de `architect` kort toetsen of een ADR/concern bijgewerkt moet worden; meestal niet nodig.
