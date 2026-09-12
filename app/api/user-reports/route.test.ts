@@ -238,15 +238,29 @@ describe('POST /api/user-reports — zod-validatie (400)', () => {
     expect(body.error).toBe('Bij een wens hoort geen toestemmingsvraag.')
   })
 
-  it('aanbeveling met een meegestuurd screenshot → 400', async () => {
+  // W-008 (12-09-2026) — omgekeerd gedrag. Tot deze datum gaf dit een 400
+  // ("Bij een aanbeveling kun je geen schermafbeelding meesturen"); een wens
+  // mag nu wél een plaatje. De ándere drie aanbeveling-beperkingen (scherm,
+  // verwachting, toestemming) staan hierboven en blijven 400 geven — deze test
+  // bewaakt dus óók dat de versoepeling niet is doorgelekt naar die drie.
+  it('aanbeveling MET screenshot → geaccepteerd, pad gaat mee naar de RPC', async () => {
     const req = makeRequest(
       basePayload({ type: 'aanbeveling', screen: undefined, expected: undefined, consent: false }),
       { type: 'image/png' },
     )
     const res = await POST(req)
     const body = await res.json()
-    expect(res.status).toBe(400)
-    expect(body.error).toBe('Bij een aanbeveling kun je geen schermafbeelding meesturen.')
+    expect(res.status).toBe(200)
+    expect(body.ok).toBe(true)
+    // De bijlage landt als pad in dezelfde RPC-aanroep, én de vorm-beperkingen
+    // van een aanbeveling blijven onaangeroerd.
+    expect(capturedRpcArgs).toMatchObject({
+      p_report_type: 'aanbeveling',
+      p_screen_label: null,
+      p_expected: null,
+      p_consent_inzage: false,
+    })
+    expect(capturedRpcArgs!.p_screenshot_path).toEqual(expect.any(String))
   })
 
   it('verkeerde mime → 400', async () => {

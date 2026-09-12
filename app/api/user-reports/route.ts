@@ -15,7 +15,7 @@ import { pushReportToNotion, type UserReportRow } from '@/lib/user-reports/notio
  *
  * Body is multipart FormData:
  *   - `payload`    JSON-string met de tekstvelden (schema hieronder)
- *   - `screenshot` optioneel bestand (png/jpeg/webp, ≤ 4 MB; niet bij aanbeveling)
+ *   - `screenshot` optioneel bestand (png/jpeg/webp, ≤ 4 MB) — bij ELK type
  *
  * `parseBody` is JSON-only en past hier dus niet; de payload wordt handmatig
  * geparsed en met hetzelfde zod-fundament gevalideerd (ADR 0044-envelope).
@@ -191,10 +191,14 @@ export async function POST(request: Request) {
     // 2. Screenshot valideren (aanwezigheid, type en grootte).
     const rawFile = formData.get('screenshot')
     let screenshot: File | null = null
+    //    Geldt voor ALLE drie de types. Een aanbeveling mocht er tot 12-09-2026
+    //    geen meesturen (melding W-008): de redenering was dat een wens over de
+    //    toekomst gaat en dus niets te tónen heeft. Dat klopt niet — "maak deze
+    //    knop groter" is juist een plaatje. De andere twee beperkingen op een
+    //    aanbeveling (geen scherm, geen verwachting, geen toestemmingsvraag)
+    //    blijven ongewijzigd: die gaan over de vórm van het bericht, niet over
+    //    wat de melder kan bijvoegen.
     if (rawFile instanceof File && rawFile.size > 0) {
-      if (body.type === 'aanbeveling') {
-        return badRequest('Bij een aanbeveling kun je geen schermafbeelding meesturen.')
-      }
       if (!ALLOWED_MIME[rawFile.type] || rawFile.size > MAX_FILE_SIZE) {
         return badRequest('Alleen PNG, JPEG of WebP tot 4 MB.')
       }

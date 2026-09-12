@@ -68,6 +68,14 @@ type TypeConfig = {
  * toegang bestaat technisch niet. De eerdere tekst ("we kijken alleen mee als je
  * ja kiest") beloofde iets anders dan de code doet.
  */
+/**
+ * Korte tegenhanger van CONSENT_UITLEG voor een melding zonder
+ * toestemmingsvraag (de aanbeveling). Zegt hetzelfde over de bijlage, zonder
+ * de contact-belofte die bij dit type niet gedaan wordt.
+ */
+const BIJLAGE_UITLEG =
+  'Je melding, de technische context en een eventuele schermafbeelding gaan mee naar onze werklijst.'
+
 const CONSENT_UITLEG =
   'Je melding, de technische context en een eventuele schermafbeelding gaan altijd mee naar onze werklijst. Met ‘ja’ mogen we je benaderen en samen met jou meekijken — toegang tot je account krijgen we daar niet mee.'
 
@@ -100,7 +108,11 @@ const TYPE_CONFIG: Record<MeldingType, TypeConfig> = {
     beschrijvingPlaceholder: 'Beschrijf je idee of wens — en waarom het je zou helpen.',
     verwacht: false,
     consentLabel: null,
-    schermafbeelding: false,
+    // W-008 (12-09-2026): een wens mág een plaatje. "Maak deze knop groter" is
+    // nu eenmaal makkelijker te wijzen dan te beschrijven. Dat een aanbeveling
+    // géén scherm, géén verwachting en géén toestemmingsvraag heeft blijft
+    // staan — dat gaat over de vorm van het bericht, niet over de bijlage.
+    schermafbeelding: true,
   },
 }
 
@@ -442,6 +454,16 @@ export function MeldingForm({
                 <p className="mt-1 flex items-center gap-1 text-xs text-negative">
                   <AlertCircle className="h-3 w-3 shrink-0" aria-hidden="true" />
                   {afbeeldingFout}
+                </p>
+              )}
+
+              {/* Zonder toestemmingsvraag (een aanbeveling kent die niet) valt
+                  ook CONSENT_UITLEG weg — en dáár stond de enige zin die
+                  vertelt waar de afbeelding heen gaat. Die transparantie mag
+                  niet afhangen van het type melding, dus hier de korte vorm. */}
+              {!config.consentLabel && (
+                <p className="mt-1.5 text-[11px] leading-snug text-[var(--ink-4)]">
+                  {BIJLAGE_UITLEG}
                 </p>
               )}
             </div>

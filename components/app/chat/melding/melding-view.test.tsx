@@ -90,14 +90,17 @@ describe('MeldingView', () => {
     expect(String((payload.context as Record<string, string>).viewport)).toMatch(/^\d+x\d+$/)
   })
 
-  it('laat bij een aanbeveling scherm, verwachting, toestemming en afbeelding weg', async () => {
+  it('laat bij een aanbeveling scherm, verwachting en toestemming weg — maar de afbeelding blijft (W-008)', async () => {
     render(<MeldingView onClose={() => {}} />)
     kies('Aanbeveling doen')
 
     expect(screen.queryByLabelText('Scherm')).toBeNull()
     expect(screen.queryByText(/Wat had je verwacht/)).toBeNull()
     expect(screen.queryByText(/Toestemming/)).toBeNull()
-    expect(screen.queryByText(/Schermafbeelding/)).toBeNull()
+    // W-008: de bijlage mag hier wél, en omdat dit type géén toestemmingsblok
+    // heeft draagt het veld zijn eigen zin over waar de afbeelding heen gaat.
+    expect(screen.getByText(/Schermafbeelding/)).toBeInTheDocument()
+    expect(screen.getByText(/gaan mee naar onze werklijst/)).toBeInTheDocument()
 
     fireEvent.change(screen.getByLabelText('Wat zou je willen?'), {
       target: { value: 'Een donkere modus zou fijn zijn.' },
