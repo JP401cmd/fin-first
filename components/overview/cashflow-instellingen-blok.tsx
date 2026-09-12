@@ -810,7 +810,7 @@ export function CashflowInstellingenBlok({
                 name={`${radioName}-expenses`}
                 checked={expensesOption === 'transaction'}
                 label="Uit je transacties"
-                hint="Het gemiddelde over de afgelopen 6 maanden."
+                hint="Het gemiddelde over de laatste 6 afgesloten maanden — de lopende maand telt pas mee als hij voorbij is."
                 onSelect={() => chooseSource('expenses', 'transaction')}
               >
                 <KassabonShell>
