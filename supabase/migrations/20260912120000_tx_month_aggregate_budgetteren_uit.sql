@@ -78,7 +78,7 @@
 -- GEEN GEKOPPELD BEZIT = MEETELLEN (belangrijk, en gemeten). Een rekening ZONDER
 -- `linked_asset_id` heeft geen canonieke gate; die valt terug op `is_active`. Op
 -- productie (gemeten tegen `public.bank_accounts`/`public.transactions`,
--- 12-09-2026) zijn dat 2 actieve rekeningen met samen 7.975 van de 24.606
+-- 12-09-2026) zijn dat 2 actieve rekeningen met samen ruwweg een derde van alle
 -- transacties — een regel die "geen gekoppeld bezit" als "budgetteren uit" leest,
 -- zou een derde van alle boekingen laten verdwijnen.
 --
@@ -147,7 +147,7 @@
 -- productie, 12-09-2026: 27 rekeningen, waarvan NUL uitgesloten. De enige
 -- kandidaat was de archief-bucket (`is_active = false` + `is_archive_bucket =
 -- true`, 0 transacties) en die is sinds het eigenaarsbesluit van 12 sep 2026
--- juist expliciet vrijgesteld. 24.606 transacties, 0 zonder rekening. De oude en
+-- juist expliciet vrijgesteld. Geen enkele transactie zonder rekening. De oude en
 -- de nieuwe definitie leveren over de VOLLEDIGE historie exact dezelfde 3.105
 -- aggregaatrijen op (`except` in beide richtingen = 0 rijen, ad-hoc nagerekend
 -- 12-09-2026).

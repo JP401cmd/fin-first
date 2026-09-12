@@ -50,7 +50,7 @@ huishoudcijfers vallen — een bedragverschuiving zonder financiële gebeurtenis
 `bank_accounts.is_active = false`, of een gekoppeld cash-bezit met
 `has_budget_tracking`/`is_active` niet waar. Een rekening **zonder** gekoppeld
 bezit valt terug op `is_active` en telt dus mee zolang hij actief is — op
-productie hangen daar 7.975 van de 24.606 boekingen aan (gemeten 12-09-2026).
+productie hangt daar ruwweg een derde van alle boekingen aan (gemeten 12-09-2026).
 
 De keuze voor "één vlag volstaat" is bewust. De vlaggen kunnen alleen uiteenlopen
 door een half geslaagde schrijfactie (de gedocumenteerde faalvorm: de
@@ -113,7 +113,7 @@ execute-recht zodat een uitgelogde render 0 rijen krijgt en geen 42501 (ADR
 - **Vandaag verschuift er geen enkel getal.** De wijziging is preventief. Gemeten
   op productie 12-09-2026: 27 rekeningen waarvan **nul** uitgesloten — de enige
   kandidaat was de archief-bucket (0 transacties) en die is nu juist expliciet
-  vrijgesteld; 24.606 transacties, 0 zonder rekening. Oude en nieuwe definitie
+  vrijgesteld; geen enkele transactie zonder rekening. Oude en nieuwe definitie
   leveren over de volledige historie exact dezelfde 3.105 aggregaatrijen
   (`except` in beide richtingen leeg).
 - **Transacties in het archief blijven de 12-maands vensters voeden.** Ze tellen

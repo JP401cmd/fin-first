@@ -98,9 +98,10 @@ een stille correctie.
 
 **Geen backfill.** Bestaande losse hypotheekrijen worden niet automatisch aan
 elkaar geknoopt; de app stelt samenvoegen vóór en de gebruiker bevestigt.
-Meting op productie (12-09-2026): 12 actieve `mortgage`-rijen over 9
-gebruikers, waarvan **0 gebruikers met meer dan één hypotheekrij op dezelfde
-woning**. Er is vandaag dus geen stapel om op te ruimen — de samenvoeg-suggestie
+Meting op productie (12-09-2026): een handvol actieve `mortgage`-rijen,
+verdeeld over evenzoveel gebruikers, en **geen enkele gebruiker met meer dan één
+hypotheekrij op dezelfde woning** (exacte aantallen bewust niet hier — publieke
+repo, ADR 0111). Er is vandaag dus geen stapel om op te ruimen — de samenvoeg-suggestie
 is vooruitkijkend, niet herstellend.
 
 ## Gevolgen

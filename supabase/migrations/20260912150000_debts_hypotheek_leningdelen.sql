@@ -29,9 +29,10 @@
 -- GEEN BACKFILL (eigenaarsbesluit 11-09-2026)
 -- Bestaande losse hypotheekrijen worden niet automatisch aan elkaar geknoopt.
 -- De app stelt samenvoegen vóór, de gebruiker bevestigt. Meting op productie
--- (12-09-2026): 12 actieve mortgage-rijen over 9 gebruikers, waarvan 0
--- gebruikers met meer dan één hypotheekrij op dezelfde woning. Er is vandaag
--- dus geen bestaande stapel om op te ruimen.
+-- (12-09-2026): een handvol actieve mortgage-rijen, verdeeld over evenzoveel
+-- gebruikers, en GEEN ENKELE gebruiker met meer dan één hypotheekrij op dezelfde
+-- woning. Er is vandaag dus geen bestaande stapel om op te ruimen. (Exacte
+-- aantallen bewust niet hier: deze repo is publiek, zie ADR 0111.)
 --
 -- RLS-DEKKING VAN DE NIEUWE KOLOM (additieve kolom = expliciete check)
 -- `debts` draagt al RLS; `parent_debt_id` erft deze bestaande policies
