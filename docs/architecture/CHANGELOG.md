@@ -976,3 +976,11 @@
 ## 2026-09-08
 
 - Geen wijzigingen.
+
+## 2026-09-11
+
+- **Componenten (aantal)** toegevoegd: +3
+
+## 2026-09-12
+
+- **Componenten (aantal)** verwijderd: -9

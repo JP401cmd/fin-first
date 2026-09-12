@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-09-08T21:32:12.286Z",
-  "generatedDate": "2026-09-08",
+  "generatedAt": "2026-09-12T09:18:15.373Z",
+  "generatedDate": "2026-09-12",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -193,9 +193,9 @@
     "routesProduction": 91,
     "api": 313,
     "tables": 96,
-    "migrations": 232,
+    "migrations": 234,
     "integrations": 25,
-    "components": 1078,
+    "components": 1072,
     "providers": 17,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -8301,7 +8301,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 232
+    "migrationCount": 234
   },
   "tablesByDomain": [
     {
@@ -8815,7 +8815,7 @@
     }
   ],
   "components": {
-    "total": 1078,
+    "total": 1072,
     "groups": [
       {
         "group": "app",
@@ -9248,7 +9248,7 @@
       },
       {
         "group": "overview",
-        "count": 205,
+        "count": 198,
         "items": [
           "aandachtspunt-actie-button",
           "atomic-cards",
@@ -9316,16 +9316,12 @@
           "cashflow-landing-cards.test",
           "checkin-banner",
           "checkin-banner.test",
-          "compound-insight-card",
-          "compound-insight-card.test",
           "eenvoudig-pill-list",
           "embedded-page-info.test",
           "empty-states",
           "empty-states.test",
           "entity-backfill-editor",
           "entity-backfill-editor.test",
-          "fee-impact-card",
-          "fee-impact-card.test",
           "filter-dropdown",
           "filter-dropdown.test",
           "geldstroom-daggrafiek",
@@ -9355,8 +9351,6 @@
           "hub-totale-druk",
           "hub-totale-druk.test",
           "hub-verdeling",
-          "inflation-impact-card",
-          "inflation-impact-card.test",
           "info-tooltip",
           "jaarruimte-card",
           "jaarruimte-card.test",
@@ -9437,7 +9431,6 @@
           "transacties-analyse.test",
           "transacties-geldstroom",
           "transacties-geldstroom.test",
-          "transacties-notices-loader",
           "uitgaven-heatmap",
           "vaste-lasten-client",
           "vaste-lasten-client.eenvoudig.test",
@@ -9563,7 +9556,7 @@
       },
       {
         "group": "core",
-        "count": 79,
+        "count": 80,
         "items": [
           "account-source-icon",
           "account-source-icon.test",
@@ -9587,6 +9580,7 @@
           "category-card-app-strip",
           "category-group-header",
           "category-history-chart",
+          "category-page.eenvoudig-pills.test",
           "category-tabs",
           "category-tabs.test",
           "connection-indicator",
@@ -9851,7 +9845,7 @@
       },
       {
         "group": "editorial",
-        "count": 21,
+        "count": 19,
         "items": [
           "aanname-hint",
           "button",
@@ -9863,8 +9857,6 @@
           "index",
           "info-icon-tooltip",
           "inline-info-disclosure",
-          "insight-toggle-button",
-          "insight-toggle-button.test",
           "page-blueprints",
           "page-info-button",
           "page-info-button.test",
@@ -9943,6 +9935,18 @@
         ]
       },
       {
+        "group": "command-palette",
+        "count": 6,
+        "items": [
+          "command-palette",
+          "command-palette-provider",
+          "command-palette.actions-grid.test",
+          "command-palette.overlay.test",
+          "command-palette.sync.test",
+          "command-palette.touch.test"
+        ]
+      },
+      {
         "group": "holdings",
         "count": 6,
         "items": [
@@ -9967,14 +9971,13 @@
         ]
       },
       {
-        "group": "command-palette",
-        "count": 5,
+        "group": "rapportage",
+        "count": 4,
         "items": [
-          "command-palette",
-          "command-palette-provider",
-          "command-palette.overlay.test",
-          "command-palette.sync.test",
-          "command-palette.touch.test"
+          "persoonlijk-plan-blocks",
+          "persoonlijk-plan-blocks.onttrekking.test",
+          "totaalplan-blocks",
+          "totaalplan-blocks.test"
         ]
       },
       {
@@ -9993,15 +9996,6 @@
           "fire-retirement-expense-panel",
           "fire-savings-panel",
           "stop-plan-vragen"
-        ]
-      },
-      {
-        "group": "rapportage",
-        "count": 3,
-        "items": [
-          "persoonlijk-plan-blocks",
-          "totaalplan-blocks",
-          "totaalplan-blocks.test"
         ]
       },
       {
@@ -10880,10 +10874,6 @@
         {
           "name": "recurring_transactions",
           "write": false
-        },
-        {
-          "name": "transactions",
-          "write": false
         }
       ],
       "display-mode": [
@@ -11496,6 +11486,10 @@
         {
           "name": "recurring_transactions",
           "write": true
+        },
+        {
+          "name": "transactions",
+          "write": false
         }
       ],
       "report": [
@@ -11660,10 +11654,6 @@
         {
           "name": "recurring_transactions",
           "write": false
-        },
-        {
-          "name": "transactions",
-          "write": false
         }
       ],
       "sync": [
@@ -11727,10 +11717,6 @@
         },
         {
           "name": "profiles",
-          "write": false
-        },
-        {
-          "name": "transactions",
           "write": false
         }
       ],
@@ -12872,14 +12858,6 @@
           ]
         },
         {
-          "domain": "detect-recurring",
-          "label": "detect-recurring",
-          "write": false,
-          "routes": [
-            "/api/detect-recurring"
-          ]
-        },
-        {
           "domain": "export",
           "label": "export",
           "write": false,
@@ -12921,6 +12899,14 @@
           ]
         },
         {
+          "domain": "recurring",
+          "label": "recurring",
+          "write": false,
+          "routes": [
+            "/api/recurring"
+          ]
+        },
+        {
           "domain": "report",
           "label": "Rapportages",
           "write": false,
@@ -12947,23 +12933,6 @@
           "write": false,
           "routes": [
             "/api/spending-patterns"
-          ]
-        },
-        {
-          "domain": "subscriptions",
-          "label": "subscriptions",
-          "write": false,
-          "routes": [
-            "/api/subscriptions/analyse-ai",
-            "/api/subscriptions/detect-ai"
-          ]
-        },
-        {
-          "domain": "uitgaven-na-pensioen",
-          "label": "uitgaven-na-pensioen",
-          "write": false,
-          "routes": [
-            "/api/uitgaven-na-pensioen/context"
           ]
         },
         {
@@ -17444,6 +17413,51 @@
       ],
       "summary": "Gesprekken met Fin leefden tot nu toe alleen in de browser: na een refresh waren ze weg. Ze bewaren is een wens van testgebruikers (W-004), maar het is geen gewone opslagkeuze — het is de gevoeligste vrije tekst in de app. Mensen vertellen een financiële assistent over schulden, ",
       "file": "docs/adr/0137-een-bewaard-gesprek-erft-zijn-bestemming-niet.md"
+    },
+    {
+      "id": "0138-historiebasis-afgesloten-maanden-een-deler",
+      "title": "De historiebasis: alleen afgesloten maanden, en één deler per gebruiker voor budgetsom en transactie-jaarinkomen",
+      "status": "aanvaard",
+      "date": "2026-09-11",
+      "elements": [
+        "as-budget",
+        "as-transacties",
+        "as-planning",
+        "as-belasting",
+        "fn-budgetteren"
+      ],
+      "summary": "De budgetgrondslag (ADR 0103) en het transactie-jaarinkomen meten sinds dit besluit over twaalf **afgesloten** kalendermaanden — de lopende maand telt pas mee zodra hij voorbij is — en delen door **één** deler per gebruiker: het aantal afgesloten maanden met transactiehistorie in",
+      "file": "docs/adr/0138-historiebasis-afgesloten-maanden-een-deler.md"
+    },
+    {
+      "id": "0139-budgetteren-uit-telt-alleen-het-saldo",
+      "title": "Budgetteren uit: alleen het saldo telt, de boekingen vallen buiten de cijfers",
+      "status": "aanvaard",
+      "date": "2026-09-12",
+      "elements": [
+        "as-budget",
+        "as-transacties",
+        "as-planning",
+        "fn-budgetteren",
+        "t-supabase"
+      ],
+      "summary": "Zet een gebruiker \"budgetteren\" uit op een rekening, dan telt vanaf nu alleen nog het **saldo** van die rekening mee (als cash-bezitting, mét rendement). De **boekingen** van die rekening vallen buiten élk cijfer dat uit `public.tx_month_aggregate` komt: de budgetsom, het transac",
+      "file": "docs/adr/0139-budgetteren-uit-telt-alleen-het-saldo.md"
+    },
+    {
+      "id": "0140-een-hypotheek-is-een-groep-leningdelen",
+      "title": "Een hypotheek is een groep leningdelen, geen aparte tabel",
+      "status": "aanvaard",
+      "date": "2026-09-12",
+      "elements": [
+        "as-vermogen",
+        "as-belasting",
+        "as-planning",
+        "do-bezitting",
+        "t-supabase"
+      ],
+      "summary": "Een Nederlandse hypotheek bestaat vrijwel altijd uit meerdere **leningdelen**: losse leningen onder één hypotheekschuld, elk met een eigen rente, aflossingsvorm en rentevaste periode. We modelleren dat met een nullable `parent_debt_id` op `public.debts` — een zelfverwijzing die b",
+      "file": "docs/adr/0140-een-hypotheek-is-een-groep-leningdelen.md"
     }
   ],
   "churn": {
@@ -17455,23 +17469,23 @@
       },
       {
         "path": "lib/ai",
-        "commits": 52
+        "commits": 50
       },
       {
         "path": "app/(app)/toekomst",
-        "commits": 34
+        "commits": 32
       },
       {
         "path": "app/api/ai",
-        "commits": 18
-      },
-      {
-        "path": "app/api/household",
-        "commits": 16
+        "commits": 15
       },
       {
         "path": "app/api/assets",
         "commits": 13
+      },
+      {
+        "path": "app/api/household",
+        "commits": 12
       },
       {
         "path": "lib/fire-simulation.ts",
@@ -17493,43 +17507,43 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 10216,
+        "loc": 10219,
         "commits": 83
       },
       {
         "file": "components/app/budgets-client.tsx",
         "loc": 5635,
-        "commits": 36
+        "commits": 34
       },
       {
         "file": "components/core/assets-client.tsx",
-        "loc": 4995,
-        "commits": 38
+        "loc": 4978,
+        "commits": 39
       },
       {
         "file": "components/app/cash-account-view.tsx",
         "loc": 3698,
-        "commits": 23
+        "commits": 21
       },
       {
         "file": "lib/dashboard-data-loader.ts",
-        "loc": 3116,
-        "commits": 63
+        "loc": 3121,
+        "commits": 59
       },
       {
         "file": "lib/release-notes.ts",
         "loc": 2763,
-        "commits": 2
+        "commits": 1
       },
       {
         "file": "app/(app)/core/cash/import/page.tsx",
         "loc": 2436,
-        "commits": 19
+        "commits": 15
       },
       {
         "file": "app/(app)/core/checkin/page.tsx",
         "loc": 2419,
-        "commits": 14
+        "commits": 13
       }
     ]
   },
@@ -17731,8 +17745,8 @@
             "index": 7,
             "title": "Review",
             "agents": [
-              "code-review",
-              "security-specialist"
+              "security-specialist",
+              "code-review"
             ]
           },
           {
@@ -17865,8 +17879,8 @@
             "index": 7,
             "title": "Review",
             "agents": [
-              "code-review",
-              "security-specialist"
+              "security-specialist",
+              "code-review"
             ]
           },
           {
@@ -17972,8 +17986,8 @@
             "index": 8,
             "title": "Review",
             "agents": [
-              "code-review",
-              "security-specialist"
+              "security-specialist",
+              "code-review"
             ]
           },
           {
@@ -18207,8 +18221,8 @@
             "index": 7,
             "title": "Review",
             "agents": [
-              "code-review",
               "security-specialist",
+              "code-review",
               "ux-review-expert"
             ]
           },
@@ -18675,9 +18689,17 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-09-08",
-    "hasChanges": false,
-    "sections": []
+    "previousDate": "2026-09-11",
+    "hasChanges": true,
+    "sections": [
+      {
+        "label": "Componenten (aantal)",
+        "added": [],
+        "removed": [
+          "-9"
+        ]
+      }
+    ]
   },
   "statsHistory": [
     {
@@ -19055,6 +19077,20 @@
       "date": "2026-09-08",
       "api": 313,
       "components": 1078,
+      "tables": 96,
+      "routesProduction": 91
+    },
+    {
+      "date": "2026-09-11",
+      "api": 313,
+      "components": 1081,
+      "tables": 96,
+      "routesProduction": 91
+    },
+    {
+      "date": "2026-09-12",
+      "api": 313,
+      "components": 1072,
       "tables": 96,
       "routesProduction": 91
     }
