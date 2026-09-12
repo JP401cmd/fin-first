@@ -88,6 +88,15 @@ export const ARCHI_CONCERNS: ArchiConcern[] = [
     reviewedAt: '2026-08-29',
   },
   {
+    id: 'budgetteren-uit-geldt-alleen-op-het-maandaggregaat',
+    title: '"Budgetteren uit" wordt alleen door het maandaggregaat gehonoreerd, niet door de rauwe transactie-lezers',
+    detail:
+      'ADR 0139 legt de filter op rekeningen met "budgetteren uit" in `public.tx_month_aggregate` (migratie 20260912120000). Daarmee honoreren de zes cijfers die op dat aggregaat staan de keuze: budgetsom, transactie-jaarinkomen, spaarquote, dagtarief, FIRE-uitgaven en de snapshots. De oppervlakken die hun eigen rijen uit `transactions` halen, doen dat NIET — en dat zijn er meer dan één: `lib/core-data-loader.ts` haalt de huidige-maand- en vorige-maand-besteding rauw op (`BUDGET_SPENDING_TX_COLUMNS`, r1028/r1070) plus een 6-maands budget-sparklinevenster (r1061); `lib/budgets-data-loader.ts` doet hetzelfde voor /overzicht/budget (r96 huidige maand, r120 twaalf maanden); en de AI-contextbouwers (`lib/ai/context/budget-insights-context.ts`, `budget-summary.ts`, `spending-patterns-context.ts`, `wil-context.ts`, `lib/ai/tools/lookup.ts`, `lib/ai/local/local-chat-context.ts`) lezen rechtstreeks. Gevolg zodra iemand budgetteren uitzet: /overzicht/budget kan voor "deze maand" een hoger uitgavenbedrag tonen dan de 12-maands grondslag op datzelfde scherm, en Fin kan een bedrag citeren dat nergens anders in de app staat — één keuze, twee werkelijkheden. Vandaag INERT: op productie is er precies één uitgesloten rekening (de archief-bucket) met 0 transacties (gemeten 12-09-2026); dat venster sluit bij de eerste gebruiker die budgetteren uitzet op een rekening met historie. BEWUST NIET in dezelfde snede gerepareerd: de huidige-maand-vensters zijn een andere grootheid met een eigen regressie-oppervlak (ADR 0073 `currentMonth*`/`prevMonth*`), en ze meeveranderen zou zichtbare bedragen verschuiven om een reden die los staat van de aggregaat-definitie. De richting ligt wel vast en staat al als norm in CLAUDE.md ("consume, don\'t recompute" — nooit een eigen tel-lus over transacties). Verwijder dit punt zodra die vensters via het maandaggregaat lopen, of zodra de rauwe lezers dezelfde rekeningfilter toepassen.',
+    severity: 'risk',
+    elementIds: ['as-budget', 'as-transacties', 'as-coach', 'fn-budgetteren'],
+    reviewedAt: '2026-09-12',
+  },
+  {
     id: 'huishoud-inkomensverhouding-zonder-intervalconversie',
     title: 'De huishoud-inkomensverhouding telt budgetlimieten op zonder interval-conversie',
     detail:
@@ -181,10 +190,10 @@ export const ARCHI_CONCERNS: ArchiConcern[] = [
     id: 'projectiemotoren-naast-de-kernel',
     title: 'Eigen projectiemotoren náást de horizon-kernel, buiten de euro-weergave-toggle',
     detail:
-      'De euro-weergave-toggle (ADR 0093) volgt de kernel: alleen oppervlakken met een kernelrij onder zich (UnifiedProjectionRow.inflationFactor) kunnen meebewegen tussen nominaal en huidige euro\'s. Vier oppervlakken draaien een EIGEN projectiemotor náást de kernel en hebben dus geen canonieke factor — ze zijn `// euro-view: exempt` gemarkeerd, niet gedeflateerd: `components/core/net-worth-projection-chart.tsx` (eigen compound-projectie), `components/overview/compound-insight-card.tsx` + `fee-impact-card.tsx` (lib/compound-projection.ts, illustratief rekenvoorbeeld met slider) en — het vierde geval, niet voorzien in het oorspronkelijke ontwerp — de aanvullend-pensioenprojectie achter `DashboardData.pensionMonthlyGross` in `components/widgets/pensioen-aow-widget.tsx`. Dit is een structurele klasse, geen losse voetnoten: elke motor náást de kernel is een toekomstige plek waar "€ vandaag" en "€ toekomstig" impliciet door elkaar kunnen lopen zodra iemand er zonder dit punt te lezen een tweede weergave aan toevoegt. Opvolging is een rekenmotor-sanering (aparte productkaart), geen presentatiewerk — vermeng de twee soorten besluiten niet. Verwijder dit punt zodra die sanering deze vier motoren onder de kernel brengt of ze expliciet en blijvend als losstaand besluit.',
+      'De euro-weergave-toggle (ADR 0093) volgt de kernel: alleen oppervlakken met een kernelrij onder zich (UnifiedProjectionRow.inflationFactor) kunnen meebewegen tussen nominaal en huidige euro\'s. Twee oppervlakken draaien een EIGEN projectiemotor náást de kernel en hebben dus geen canonieke factor — ze zijn `// euro-view: exempt` gemarkeerd, niet gedeflateerd: `components/core/net-worth-projection-chart.tsx` (eigen compound-projectie) en — het geval dat niet in het oorspronkelijke ontwerp voorzien was — de aanvullend-pensioenprojectie achter `DashboardData.pensionMonthlyGross` in `components/widgets/pensioen-aow-widget.tsx`. HERIJKT 12-09-2026 (B-047): het waren er vier; de twee slider-kaarten (`compound-insight-card.tsx` + `fee-impact-card.tsx` op `lib/compound-projection.ts`) zijn met hun rekenmotor uit de app verwijderd, dus dat deel van de schuld is afgelost in plaats van gesaneerd. Dit is een structurele klasse, geen losse voetnoten: elke motor náást de kernel is een toekomstige plek waar "€ vandaag" en "€ toekomstig" impliciet door elkaar kunnen lopen zodra iemand er zonder dit punt te lezen een tweede weergave aan toevoegt. Opvolging is een rekenmotor-sanering (aparte productkaart), geen presentatiewerk — vermeng de twee soorten besluiten niet. Verwijder dit punt zodra die sanering de twee resterende motoren onder de kernel brengt of ze expliciet en blijvend als losstaand besluit.',
     severity: 'debt',
     elementIds: ['as-planning', 'as-vermogen', 'fn-toekomstplannen'],
-    reviewedAt: '2026-08-08',
+    reviewedAt: '2026-09-12',
   },
   {
     id: 'simchart-grondslag-per-reeks',

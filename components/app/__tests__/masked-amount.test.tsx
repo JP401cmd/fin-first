@@ -132,28 +132,6 @@ describe('<MaskedAmount>', () => {
  * onpraktisch — die staan op de handmatige checklist in de werkqueue-kaart.
  */
 describe('masking-bypass regressies', () => {
-  it('CompoundInsightCard toont géén euro-cijfers wanneer masked (incl. slider-label)', async () => {
-    const { CompoundInsightCard } = await import(
-      '@/components/overview/compound-insight-card'
-    )
-    const { container } = renderInProvider(
-      <CompoundInsightCard liquidCash={10000} monthlyContribution={100} />,
-      { masked: true },
-    )
-    const text = container.textContent ?? ''
-    // Alle saldo-gevoelige bedragen (hoofdvraag, slider-label A6, balken,
-    // verschil) → bullets.
-    expect(text).toContain(MASKED_AMOUNT_PLACEHOLDER)
-    // liquidCash mag nergens meer als cijfer opduiken.
-    expect(text).not.toMatch(/10\.000/)
-    // De enige zichtbare euro-cijfers zijn de statische slider-schaallabels
-    // (€ 0 / € 500 / € 1.000 — vaste referentiewaarden, geen gebruikersdata).
-    const euroDigits = (text.match(/€\s?[\d.,]+/g) ?? []).map((s) =>
-      s.replace(/ /g, ' '),
-    )
-    expect(euroDigits).toEqual(['€ 0', '€ 500', '€ 1.000'])
-  })
-
   it('EnvelopeTransferSheet-foutmelding maskeert het budgetlimiet (A7)', async () => {
     const { EnvelopeTransferSheet } = await import(
       '@/components/app/envelope-transfer-sheet'

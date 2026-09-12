@@ -76,8 +76,7 @@ export async function loadLatestCheckinForBriefing(
   }
 }
 
-/** Liquide cash = niet-gekoppelde cash + cash/savings/checking-assets.
- *  Zelfde definitie als in de overzicht-page (CompoundInsightCard). */
+/** Liquide cash = niet-gekoppelde cash + cash/savings/checking-assets. */
 function computeLiquidCash(horizonData: HorizonData): number {
   return (
     (horizonData?.unlinkedCash ?? 0) +

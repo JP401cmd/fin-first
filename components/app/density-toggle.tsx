@@ -11,8 +11,7 @@ import { Rows2, Rows3 } from 'lucide-react'
  * `useListDensity(listKey)` bewaart de keuze per lijst in localStorage. Default
  * is 'ruim' — exact het bestaande uiterlijk, zodat het geen regressie is. De
  * keuze leeft op het apparaat zelf (geen server-sync nodig): "ik wil deze lijst
- * compacter zien" is een per-apparaat weergavevoorkeur, net als
- * use-insight-visibility.
+ * compacter zien" is een per-apparaat weergavevoorkeur.
  *
  * SSR-veilig: server + eerste client-render tonen altijd 'ruim'; pas ná mount
  * leest de hook localStorage (voorkomt hydration-mismatch). `mounted` is

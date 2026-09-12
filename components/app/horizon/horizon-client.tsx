@@ -1081,8 +1081,8 @@ export default function HorizonPage({
   const [editingCashflowId, setEditingCashflowId] = useState<string | null>(null)
 
   // Eerste-sleep-hint: éénmalig (per apparaat) een aanwijzer naar de gestippelde grafieklijn
-  // bij de allereerste sliderbeweging. "Even niet meer tonen"-klasse → localStorage (patroon
-  // use-insight-visibility), géén server-pref.
+  // bij de allereerste sliderbeweging. "Even niet meer tonen"-klasse → localStorage,
+  // géén server-pref.
   const [firstDragHintVisible, setFirstDragHintVisible] = useState(false)
   const firstDragHandledRef = useRef(false)
   const markFirstSliderDrag = useCallback(() => {

@@ -24,13 +24,18 @@
 // drie onderdeel-kaarten Transacties/Vaste lasten/Vooruitblik) en
 // /overzicht/bezittingen/cash (de rekeningen, als gewone bezitgroep, mét het
 // archief en "Bank koppelen"). De geldstroom, kassabonnen, daggrafiek,
-// versheidsmelding, inflatiekaart en het grondslagblok wonen op
-// /overzicht/budget/transacties en hangen in deze graaf dus onder de
-// Transacties-tak. De verhuisde geldstroom volgt de PERIODEKIEZER (standaard
-// rollend 30 dagen) in plaats van kalendermaand-tot-nu-toe.
+// versheidsmelding en het grondslagblok wonen op /overzicht/budget/transacties
+// en hangen in deze graaf dus onder de Transacties-tak. De verhuisde
+// geldstroom volgt de PERIODEKIEZER (standaard rollend 30 dagen) in plaats van
+// kalendermaand-tot-nu-toe.
+//
+// VERVALLEN 12-09-2026 (B-047, "helemaal weg"): de knoop 'inflatie'
+// (WF-CASH-06, de inflatiekaart) is verwijderd — die kaart bestaat niet meer.
+// De versheidsmelding (StaleDataGuard) op dezelfde pagina is een los
+// mechanisme en blijft, gedekt door de knoop 'statusmelding' (WF-CASH-07).
 //
 // Het proces leest links→rechts: landing (3 onderdeel-kaarten) → verkennen
-// (geldstroom/kassabon/rekeningen/instellingen/inflatie/status) →
+// (geldstroom/kassabon/rekeningen/instellingen/status) →
 // analyse (periode/inzichten/zoeken) → transactiebeheer (toevoegen/bewerken/
 // splitsen/verwijderen/tegenpartij) → vaste lasten (bekijken/classificeren/
 // opzeggen/AI/wat-als/kalender/forecast/regelbeheer) → bankimport (MT940-CSV/
@@ -67,8 +72,7 @@ export const CASH_FLOW: UatFlow = {
     { id: 'instellingen', scenarioId: 'UAT-CASH-05', label: 'WF-CASH-05 · Grondslag-instellingen (inkomen/spaarquote/uitgaven, op /overzicht/budget/transacties)', kind: 'screen', stage: 1, lane: 'verkennen' },
     { id: 'grondslagkeuze', scenarioId: 'UAT-CASH-60', label: 'WF-CASH-60 · Grondslag inkomen/uitgaven kiezen: budgetten, transacties of eigen bedrag (ADR 0103)', kind: 'action', stage: 1, lane: 'verkennen', subOf: 'instellingen' },
     { id: 'vulingangen', scenarioId: 'UAT-CASH-68', label: 'WF-CASH-68 · Vul-ingangen één keer: koppel-banner OF de actie-rij, nooit allebei', kind: 'screen', stage: 1, lane: 'verkennen', subOf: 'geldstroom' },
-    { id: 'inflatie', scenarioId: 'UAT-CASH-06', label: 'WF-CASH-06 · Inflatie-impact verkennen', kind: 'screen', stage: 1, lane: 'verkennen' },
-    { id: 'statusmelding', scenarioId: 'UAT-CASH-07', label: 'WF-CASH-07 · Status-melding minimaliseren/heropenen', kind: 'screen', stage: 1, lane: 'verkennen' },
+    { id: 'statusmelding', scenarioId: 'UAT-CASH-07', label: 'WF-CASH-07 · Status-/versheidsmelding minimaliseren/heropenen', kind: 'screen', stage: 1, lane: 'verkennen' },
 
     // ── 2 · analyse ───────────────────────────────────────────────────────
     { id: 'periode', scenarioId: 'UAT-CASH-08', label: 'WF-CASH-08 · Analyse-periode kiezen & historie bladeren', kind: 'screen', stage: 2, lane: 'analyse' },
@@ -157,7 +161,6 @@ export const CASH_FLOW: UatFlow = {
     { from: 'hefboom', to: 'instellingen' },
     { from: 'instellingen', to: 'grondslagkeuze' },
     { from: 'grondslagkeuze', to: 'x-budget', kind: 'cross', label: 'budgetgrondslag' },
-    { from: 'hefboom', to: 'inflatie' },
     { from: 'hefboom', to: 'statusmelding' },
 
     // analyse

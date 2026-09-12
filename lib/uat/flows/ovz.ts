@@ -17,9 +17,13 @@
 // doelen & vrijheid (doelen-kaart, vrijheidsstrip, hero-widgets) → briefing
 // (vrijheidsweek, briefing-kaartjes, delen) → status & onboarding
 // (statusmelding, check-in-banner, welkomstgids in Fin met de rondleiding
-// eronder) → inzichten
-// (samengestelde rente, afdrukken) → tips & acties (Fin-tips beslissen,
-// handmatige actie, actiebeheer) → uitkomst → cross-doorwerking.
+// eronder) → tips & acties (Fin-tips beslissen, handmatige actie, actiebeheer)
+// → uitkomst → cross-doorwerking.
+//
+// VERVALLEN 12-09-2026 (B-047, "helemaal weg"): de knoop 'samengesteldrente'
+// (WF-OVZ-15, de CompoundInsightCard op /overzicht) is verwijderd — die kaart
+// en `lib/compound-projection.ts` bestaan niet meer. De cross-link naar
+// Bezittingen (asset-herwaardering) hangt sindsdien rechtstreeks aan 'hefboom'.
 //
 // OMGEKEERDE VERWIJZING: WF-WILL-21/22 wezen door naar UAT-OVZ-19/20/21 — de
 // 'tipsbeslissen'/'actietoevoegen'/'actiesbeheren'-knopen hieronder zijn dus
@@ -29,8 +33,8 @@
 // GRONDSLAG-REGEL (CLAUDE.md / zone-specifieke notitie): de hub is vooral een
 // CONSISTENTIE-oppervlak (dezelfde cijfers als hero/widget/sidebar/deelpagina's,
 // overlap met KRUIS) — een klein aantal criteria is 'exact' (Box 3, gezond-
-// heidspijlers, doel-%, vrijheidsdagen-formule, samengestelde rente, tips-/
-// actiebeheer-mechaniek), twee zijn 'oracle' (freedomPct/simNetWorthRows —
+// heidspijlers, doel-%, vrijheidsdagen-formule, tips-/actiebeheer-mechaniek),
+// twee zijn 'oracle' (freedomPct/simNetWorthRows —
 // horizon-kernel-solver, verifieerbaar via /beheer/horizon-tabellen-mij).
 //
 // GEEN React, GEEN data-fetching — pure curatie.
@@ -71,9 +75,6 @@ export const OVZ_FLOW: UatFlow = {
     { id: 'welkomstgids', scenarioId: 'UAT-OVZ-14', label: 'WF-OVZ-14 · Welkomstgids doorlopen in Fin', kind: 'action', stage: 4, lane: 'status' },
     { id: 'rondleiding', scenarioId: 'UAT-OVZ-26', label: 'WF-OVZ-26 · Interactieve rondleiding (spotlight op /overzicht)', kind: 'action', stage: 4, lane: 'status', subOf: 'welkomstgids' },
 
-    // ── 5 · inzichten ─────────────────────────────────────────────
-    { id: 'samengesteldrente', scenarioId: 'UAT-OVZ-15', label: 'WF-OVZ-15 · Samengestelde-rente-inzicht', kind: 'screen', stage: 5, lane: 'inzichten' },
-
     // ── 6 · tips & acties ─────────────────────────────────────────────────
     { id: 'tipsbeslissen', scenarioId: 'UAT-OVZ-19', label: 'WF-OVZ-19 · Tips van Fin beoordelen (Doe nu/Later/Negeren)', kind: 'screen', stage: 6, lane: 'tips' },
     { id: 'actietoevoegen', scenarioId: 'UAT-OVZ-20', label: 'WF-OVZ-20 · Handmatig een actie toevoegen', kind: 'action', stage: 6, lane: 'tips', subOf: 'tipsbeslissen' },
@@ -87,7 +88,7 @@ export const OVZ_FLOW: UatFlow = {
     { id: 'x-toek', label: 'Toekomst · doelbeheer, projectie, FIRE-parameters', kind: 'cross', stage: 8, crossZone: 'TOEK' },
     { id: 'x-mijn', label: 'Mijn · profiel-/huishoudinstellingen, check-in-historie', kind: 'cross', stage: 8, crossZone: 'MIJN' },
     { id: 'x-nav', label: 'Navigatie · perspectiefwissel (WF-OVZ-17) + weergavemodus (WF-OVZ-18)', kind: 'cross', stage: 8, crossZone: 'NAV' },
-    { id: 'x-bezit', label: 'Bezittingen · cash-asset herwaarderen, "Bekijk beleggen"-CTA', kind: 'cross', stage: 8, crossZone: 'BEZIT' },
+    { id: 'x-bezit', label: 'Bezittingen · cash-asset herwaarderen (AssetPane)', kind: 'cross', stage: 8, crossZone: 'BEZIT' },
   ],
   edges: [
     // instap → verkennen
@@ -121,9 +122,11 @@ export const OVZ_FLOW: UatFlow = {
     { from: 'hefboom', to: 'welkomstgids' },
     { from: 'welkomstgids', to: 'rondleiding' },
 
-    // inzichten
-    { from: 'hefboom', to: 'samengesteldrente' },
-    { from: 'samengesteldrente', to: 'x-bezit', kind: 'cross' },
+    // inzichten (WF-OVZ-15 vervallen, B-047, 12-09-2026 — de knoop
+    // 'samengesteldrente' en de kaart die zij toetste bestaan niet meer; de
+    // cross-link naar Bezittingen (asset-herwaardering) blijft bestaan en
+    // hangt nu rechtstreeks aan 'hefboom')
+    { from: 'hefboom', to: 'x-bezit', kind: 'cross' },
 
     // tips & acties
     { from: 'hefboom', to: 'tipsbeslissen' },

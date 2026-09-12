@@ -27,7 +27,6 @@ import {
   HeroWidgetRail,
   useHeroRailState,
 } from './hero-widget-rail'
-import { CompoundInsightCard } from './compound-insight-card'
 import {
   MilestoneCelebrationHost,
   type CelebratableMilestone,
@@ -110,14 +109,6 @@ export type OverzichtSecondaryProps = {
    * uit de rotatiecookie). Zie lib/briefing/rotation.ts.
    */
   briefingRotation?: number
-  /** Liquide cash op spaarrekeningen — voor compound-insight reveal. */
-  liquidCash?: number
-  /**
-   * Belegt de gebruiker al? Stuurt de CTA-variant van de compound-kaart
-   * ("Bekijk beleggen" vs. "Bekijk je portefeuille") — niet de rendergate,
-   * die blijft op liquide cash. Zie kaart H15.
-   */
-  hasInvestments?: boolean
   /**
    * Volledige DashboardData voor de optionele HeroWidgetRail (power-user
    * edit-mode). De widget-gated velden in de bundel zijn leeg voor een
@@ -160,8 +151,6 @@ export function OverzichtSecondary({
   dashboardData,
   activeWidgets,
   allWidgetPrefs,
-  liquidCash,
-  hasInvestments = false,
   freshMilestone = null,
 }: OverzichtSecondaryProps) {
   const rail = useHeroRailState(activeWidgets ?? [])
@@ -297,13 +286,6 @@ export function OverzichtSecondary({
           </>
         )}
       </div>
-      )}
-
-      {/* T-4 Dramatic Compound — alleen voor cash-zware users. */}
-      {liquidCash != null && liquidCash >= 10_000 && (
-        <div className="mt-6">
-          <CompoundInsightCard liquidCash={liquidCash} hasInvestments={hasInvestments} />
-        </div>
       )}
 
       {/* dataChanged is het compenserende versheidssignaal bij het bewust

@@ -27,7 +27,6 @@
 import { PERSONAS } from '@/lib/test-personas'
 import { projectAsset, type Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
-import { compareCompound, projectCompound } from '@/lib/compound-projection'
 import {
   computePositionFromTransactions,
   valuePosition,
@@ -196,28 +195,10 @@ export const BEZIT_ENGINE_CHECKS: BezitEngineCheck[] = [
       }
     },
   },
-  {
-    workflow: 'WF-BEZIT-04',
-    scenarioId: 'UAT-BEZIT-04',
-    label: 'compareCompound / projectCompound (inspiratie-inzichten)',
-    run: () => {
-      criterion('WF-BEZIT-04')
-      const cmp = compareCompound({
-        principal: 0,
-        monthlyContribution: 500,
-        years: 30,
-        conservativeRate: 0.005,
-        ambitiousRate: 0.07,
-      })
-      const meesman = compleet.assets.find((a) => a.name === 'Meesman Wereldwijd Totaal')!
-      const fee7 = projectCompound(meesman.current_value, meesman.monthly_contribution, 30, 0.07)
-      const fee6 = projectCompound(meesman.current_value, meesman.monthly_contribution, 30, 0.06)
-      return {
-        expected: 'conservatief=193680; ambitieus=566765; verschil=373085; fee7=3983971; fee6=3146095; feeImpact=837876',
-        actual: `conservatief=${cmp.conservative}; ambitieus=${cmp.ambitious}; verschil=${cmp.difference}; fee7=${fee7}; fee6=${fee6}; feeImpact=${fee7 - fee6}`,
-      }
-    },
-  },
+  // WF-BEZIT-04 had hier een check (compareCompound/projectCompound op de
+  // inspiratie-inzichten-sliders) — VERVALLEN 12-09-2026 (B-047): de kaarten
+  // zijn uit de app verwijderd en het criterium is nu 'ui-only' (zie bezit.ts),
+  // dus zonder eigen CASH_ENGINE_CHECKS/BEZIT_ENGINE_CHECKS-rij.
   {
     workflow: 'WF-BEZIT-05',
     scenarioId: 'UAT-BEZIT-05',

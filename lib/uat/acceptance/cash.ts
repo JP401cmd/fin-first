@@ -9,9 +9,8 @@
  * Lisa de Groot voor huishoud-/gedeeld-eigendom-varianten). WF-CASH-32 is een
  * NÓG latere dekkingscontrole-toevoeging (feature #881, "Vraag Fin"-wizard).
  *
- * CASH is de grootste zone tot nu toe (32 scenario's) en combineert drie
- * toetsbaarheidsprofielen (zie ook de zone-specifieke notitie op de
- * Notion-kaart):
+ * CASH combineert drie toetsbaarheidsprofielen (zie ook de zone-specifieke
+ * notitie op de Notion-kaart):
  *  (1) Persona-jitter: Daans 15-maands transactiehistorie wordt geseed met
  *      `Math.random()`-jitter (±15–30%) — maandtotalen/spaarquote/vaste-lasten-
  *      SOM zijn dus NIET hand-narekenbaar; die criteria zijn 'consistency'
@@ -20,11 +19,21 @@
  *      rekenmotoren (statusdrempels, periodevensters, forecast, tegenpartij-
  *      analyse, recurring-totalen, split-validatie, eigen-rekening-detectie,
  *      sleepmodus-toewijzing, AI-groepsvolgorde) zijn WEL volledig 'exact'
- *      narekenbaar — 21 van de 32 criteria, de kern van deze acceptatieset.
+ *      narekenbaar — de kern van deze acceptatieset.
  *  (3) AI-wizard-interactie (bulk-kaart/groepkeuzes/stoppen/resolver-fout,
  *      WF-CASH-19 en WF-CASH-32) en generieke/gebonden randgevallen (TrueLayer-
- *      sandbox, status-banner-verwijsregel naar UAT-OVZ-12, inflatie-slider
- *      verwezen naar UAT-REKEN-21) zijn 'ui-only'.
+ *      sandbox, status-banner-verwijsregel naar UAT-OVZ-12) zijn 'ui-only'.
+ *
+ * VERVALLEN 12-09-2026 (B-047, "helemaal weg"): de drie wegklikbare
+ * "inspiratie"-kaarten (compound-insight-card, fee-impact-card,
+ * inflation-impact-card) plus hun terughaalknop (InsightToggleButton) en
+ * localStorage-mechaniek (use-insight-visibility.ts, sleutel
+ * `tf-insight-hidden`) zijn volledig uit de app verwijderd, samen met
+ * `transacties-notices-loader.tsx` (die alleen nog voor de inflatiekaart
+ * bestond). WF-CASH-06 ("Inflatie-impact verkennen") is daarmee vervallen; de
+ * VERSHEIDSMELDING die op dezelfde pagina stond (StaleDataGuard/-Banner/-Dot)
+ * is een LOS mechanisme en blijft bestaan — die dekking is verhuisd naar
+ * WF-CASH-07.
  *
  * TWEE MIRRORS met bronregel-verwijzing (client-inline formules zonder eigen
  * pure export — spiegelt de mirrors in `start-checks.ts`/`will-checks.ts`):
@@ -43,7 +52,7 @@
  * (`/overzicht/cashflow`) is opgeheven en `/overzicht/budget` is de derde
  * hefboom geworden. Voor deze zone verschoof daarmee:
  *  - rekeningen/rekeningdetail/archief/"Bank koppelen" → /overzicht/bezittingen/cash
- *  - geldstroom, kassabonnen, daggrafiek, versheidsmelding, inflatiekaart en het
+ *  - geldstroom, kassabonnen, daggrafiek, versheidsmelding en het
  *    grondslag-instellingenblok → /overzicht/budget/transacties
  *  - de drie overige kaarten (Transacties/Vaste lasten/Vooruitblik) → bovenaan
  *    /overzicht/budget; de Budget-kaart wordt daar bewust NIET gerenderd
@@ -140,29 +149,16 @@ const criteria: AcceptanceCriterion[] = [
     },
   },
   {
-    workflow: 'WF-CASH-06',
-    scenarioId: 'UAT-CASH-06',
-    titel: 'Inflatie-impact verkennen en het inzicht wegklikken/terughalen',
-    kriticiteit: 'OVERIG',
-    given: 'Kaart "Inflatie & koopkracht" onder de kicker "Koopkracht" (alleen bij ≥€500/mnd `cashflow.baselineExpenses`, en `HideInSimple` — dus Volledig-materiaal), inflatie-aanname 1–5%. VERHUISD 06-09-2026 (ADR 0135): de kaart stond boven de hefboom-kaarten op de cashflow-hub en wordt nu gerenderd door `TransactiesNoticesLoader` op /overzicht/budget/transacties — de kaart hangt aan de gemeten uitgaven en hoort dus aan de transactiekant van de splitsing. Drempel, `HideInSimple` en kicker zijn byte-identiek meeverhuisd. De VERSHEIDSMELDING is 07-09-2026 (UR3-22) uit deze loader gehaald: de pagina wordt nu door `StaleDataGuard` omspannen, die het versheidsoordeel velt en zowel `StaleNoticeBanner` (boven de analyse) als `StaleNoticeDot` (in de header-cluster, links van het statuspunt) voedt. Nog steeds dezelfde melding als op /overzicht onder dezelfde pref-sleutel (`STALE_TX_NOTICE_MINIMIZE_KEY`), dus wie haar daar inklapte ziet haar hier niet opnieuw op volle grootte — maar terughalen kan nu ook HÍER, via het statuspunt.',
-    when: 'De gebruiker verandert de slider en minimaliseert/herstelt de kaart via de inzicht-toggle.',
-    then: 'De tegels herrekenen live; de kaart is minimaliseerbaar/herstelbaar (localStorage, per apparaat). De onderliggende samengestelde-groeiformule (`projectCompound`) wordt VOLLEDIG narekenbaar getoetst in UAT-REKEN-21 — hier alleen een oogtoets (30-jaars-tegel > 10-jaars-tegel bij positieve inflatie). De versheidsmelding verschijnt uitsluitend bij `transactionFreshness(...).state === "stale"` én een niet-onderdrukte pref; is ze geminimaliseerd, dan staat het oranje statuspunt op deze pagina links van het status-/pagina-`i`-cluster en klapt een klik erop haar wéér uit.',
-    assertion: {
-      kind: 'ui-only',
-      source: 'components/overview/transacties/transacties-notices-loader.tsx → components/overview/inflation-impact-card.tsx + components/app/stale-data-guard.tsx + components/app/stale-transactions-notice.tsx + lib/hooks/use-insight-visibility.ts — rekenkern gedekt door UAT-REKEN-21, hier geen dubbele exacte toets',
-    },
-  },
-  {
     workflow: 'WF-CASH-07',
     scenarioId: 'UAT-CASH-07',
-    titel: 'Status-melding minimaliseren en heropenen via het statuspunt',
+    titel: 'Status-melding en versheidsmelding minimaliseren en heropenen via het statuspunt',
     kriticiteit: 'OVERIG',
-    given: 'De PageStatusBanner/-dot-mechaniek is generiek over alle /overzicht-routes. GEWIJZIGDE BRON 06-09-2026 (ADR 0135): `/overzicht/budget` zit in `ROUTE_FAMILY` nu in de familie `lever` — de lichte `loadLeverScores` die ook de sidebar-dots voedt — in plaats van de zware kaart-loaderset `cashflow`; het is immers de hefboom zelf geworden. De drie ONDERDELEN (/transacties, /vaste-lasten, /forecast) blijven wél de cashflow-familie: die krijgen hun status uit de kaart waar ze bij horen. `PAGE_STATUS_COPY` voor `/overzicht/budget` draagt daarom géén actie-knop meer (die wees naar zichzelf), en `resolvePageStatus` levert voor die route geen kaart-entry meer maar `leverInfo(scores.cashflow)`.',
-    when: 'De gebruiker minimaliseert/heropent de status-banner op /overzicht/budget of een van de drie onderdelen.',
-    then: 'Verwijsregel: dit generieke patroon wordt grondig getoetst door UAT-OVZ-12 (steekproef-oppervlak) — hier geen aparte uitwerking om duplicatie te voorkomen. Wel zone-specifiek: de duiding op /overzicht/budget moet dezelfde hefboomstatus tonen als de Budget-tegel op /overzicht en de sidebar-dot bij "Budget" (één bron: `loadLeverScores`), en de drie onderdelen die van hun eigen kaart.',
+    given: 'De PageStatusBanner/-dot-mechaniek is generiek over alle /overzicht-routes. GEWIJZIGDE BRON 06-09-2026 (ADR 0135): `/overzicht/budget` zit in `ROUTE_FAMILY` nu in de familie `lever` — de lichte `loadLeverScores` die ook de sidebar-dots voedt — in plaats van de zware kaart-loaderset `cashflow`; het is immers de hefboom zelf geworden. De drie ONDERDELEN (/transacties, /vaste-lasten, /forecast) blijven wél de cashflow-familie: die krijgen hun status uit de kaart waar ze bij horen. `PAGE_STATUS_COPY` voor `/overzicht/budget` draagt daarom géén actie-knop meer (die wees naar zichzelf), en `resolvePageStatus` levert voor die route geen kaart-entry meer maar `leverInfo(scores.cashflow)`. DAARNAAST (apart mechanisme, géén PageStatus): op /overzicht/budget/transacties omspant `StaleDataGuard` (sinds UR3-22, 07-09-2026) de héle pagina en voedt zowel `StaleNoticeBanner` (boven de analyse) als `StaleNoticeDot` (in de header-cluster, links van het statuspunt) met hetzelfde versheidsoordeel — dezelfde melding en dezelfde gedeelde pref-sleutel (`STALE_TX_NOTICE_MINIMIZE_KEY`) als op /overzicht, dus wie haar daar inklapte ziet haar hier niet opnieuw op volle grootte, maar terughalen kan nu ook HÍER via het statuspunt. VERVALLEN 12-09-2026 (B-047, "helemaal weg"): de inflatiekaart die voorheen op dezelfde pagina naast deze versheidsmelding stond (`inflation-impact-card.tsx`, aangeroepen door de inmiddels verwijderde `transacties-notices-loader.tsx`) bestaat niet meer — de versheidsmelding zelf is losstaand en blijft.',
+    when: 'De gebruiker minimaliseert/heropent de status-banner op /overzicht/budget of een van de drie onderdelen, en apart: minimaliseert/herstelt de versheidsmelding op /overzicht/budget/transacties via het statuspunt.',
+    then: 'Verwijsregel voor de PageStatusBanner: dit generieke patroon wordt grondig getoetst door UAT-OVZ-12 (steekproef-oppervlak) — hier geen aparte uitwerking om duplicatie te voorkomen. Wel zone-specifiek: de duiding op /overzicht/budget moet dezelfde hefboomstatus tonen als de Budget-tegel op /overzicht en de sidebar-dot bij "Budget" (één bron: `loadLeverScores`), en de drie onderdelen die van hun eigen kaart. Voor de versheidsmelding: die verschijnt uitsluitend bij `transactionFreshness(...).state === "stale"` én een niet-onderdrukte pref; is ze geminimaliseerd, dan staat het oranje statuspunt op /overzicht/budget/transacties links van het status-/pagina-`i`-cluster en klapt een klik erop haar wéér uit.',
     assertion: {
       kind: 'ui-only',
-      source: 'app/(app)/overzicht/layout.tsx (PageStatusProvider) + lib/page-status/compute.ts#ROUTE_FAMILY + lib/page-status/resolve.ts (leverInfo voor /overzicht/budget) — verwijsregel naar UAT-OVZ-12, geen eigen cijfermatige uitkomst hier',
+      source: 'app/(app)/overzicht/layout.tsx (PageStatusProvider) + lib/page-status/compute.ts#ROUTE_FAMILY + lib/page-status/resolve.ts (leverInfo voor /overzicht/budget) — verwijsregel naar UAT-OVZ-12; daarnaast app/(app)/overzicht/budget/transacties/page.tsx + components/app/stale-data-guard.tsx + components/app/stale-transactions-notice.tsx + components/app/stale-notice-provider.tsx + lib/transaction-staleness.ts + lib/transaction-staleness-minimize.ts voor de versheidsmelding — geen eigen cijfermatige uitkomst hier',
     },
   },
   {
@@ -281,11 +277,11 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'KERN',
     given: 'Synthetische recurrings: monthly €100, weekly €25, quarterly €90, yearly €1.200; maandinkomen €3.400, maanduitgaven €2.200.',
     when: 'Elke recurring wordt naar een maandbedrag omgerekend en opgeteld; het aandeel en de vrijheidstijd worden berekend.',
-    then: 'Maandequivalenten: monthly=100, weekly=25×52/12≈108,33, quarterly=90/3=30, yearly=1.200/12=100 → totaal ≈338,33/mnd. Aandeel = 338,33/3.400×100 ≈9,95% (< 50% → groen). Vrijheidsdagen/mnd = `calculateFreedomTime(338.33, dailyExpenseRate(2200)).totalDays` ≈ 4,7 dagen (al afgerond op 1 decimaal door de canonieke engine).',
+    then: 'Maandequivalenten: monthly=100, weekly=25×52/12≈108,33, quarterly=90/3=30, yearly=1.200/12=100 → totaal ≈338,33/mnd. Aandeel = 338,33/3.400×100 ≈9,95% (< 50% → groen). Vrijheidsdagen/mnd = `calculateFreedomTime(338.33, dailyExpenseRate(2200)).totalDays` ≈ 4,7 dagen (al afgerond op 1 decimaal door de canonieke engine). NIEUW 12-09-2026 (V-001, grondslag-regel): onder het cijferblok — in zowel Eenvoudig als Volledig — staat nu een regel "Gebaseerd op N rekeningen · 24 maanden transacties" (`GrondslagRegel`), zodat een gebruiker die méér posten verwacht kan nagaan waar de detectie naar keek. `N` = het aantal zichtbare rekeningen uit dezelfde perspectief-gescoopte `loadCashflowData` als de rest van de pagina; "24" is het canonieke analysevenster `RECURRING_ANALYSIS_MONTHS` (was 12 vóór V-001 — een jaarabonnement heeft twee betalingen nodig om als patroon te bestaan, en die passen niet binnen twaalf maanden). Bij 0 rekeningen blijft de regel weg (een "0 rekeningen"-tekst zou over de koppeling gaan, niet over de detectie).',
     assertion: {
       kind: 'exact',
-      expected: 'totaalMaand=338.33; aandeelPct=9.95; vrijheidsdagen=4.7',
-      source: 'lib/cashflow-forecast-math.ts#recurringPerMonth (het toMonthly-equivalent, echte productiefunctie) + lib/format.ts#dailyExpenseRate — gerenderd op app/(app)/overzicht/budget/vaste-lasten/page.tsx; zie cash-checks.ts',
+      expected: 'totaalMaand=338.33; aandeelPct=9.95; vrijheidsdagen=4.7; grondslagMaanden=24',
+      source: 'lib/cashflow-forecast-math.ts#recurringPerMonth (het toMonthly-equivalent, echte productiefunctie) + lib/format.ts#dailyExpenseRate + lib/recurring-detection.ts#RECURRING_ANALYSIS_MONTHS — gerenderd op app/(app)/overzicht/budget/vaste-lasten/page.tsx (cijferblok) en components/overview/vaste-lasten-client.tsx#GrondslagRegel (grondslag-regel, gevoed door app/(app)/overzicht/budget/vaste-lasten/vaste-lasten-loader.tsx); zie cash-checks.ts',
     },
   },
   {
@@ -293,12 +289,12 @@ const criteria: AcceptanceCriterion[] = [
     scenarioId: 'UAT-CASH-17',
     titel: 'Terugkerend item classificeren of bevestigen',
     kriticiteit: 'KERN',
-    given: 'Een auto-gedetecteerd item "Basic-Fit" €44,90/mnd.',
+    given: 'Een auto-gedetecteerd item "Basic-Fit" €44,90/mnd, aangeleverd door `GET /api/detect-recurring` (`detectRecurringTransactions`). GEWIJZIGD 12-09-2026 (V-001): het analysevenster ging van 12 naar 24 maanden (`RECURRING_ANALYSIS_MONTHS`, één gedeelde constante voor deze route, `/api/subscriptions/detect-ai` en `/api/subscriptions/analyse-ai`), en een jaar-/halfjaarpatroon (frequency `yearly`) telt al bij 2 waarnemingen als \'medium\' mee (was 3 — met 3 verplichte betalingen viel elk jaarabonnement structureel buiten de lijst, want dat vraagt 3 jaar historie). Maandelijks/wekelijks/kwartaal houden hun eigen, ongewijzigde drempels (3/4/2). De merknamenlijst is met ~38 patronen uitgebreid.',
     when: 'De gebruiker kiest "Abonnement", "Vaste kosten" of "Niet opnemen".',
-    then: 'Bevestigen maakt een `recurring_transactions`-rij (amount=−44,90, frequency=\'monthly\'); "Niet opnemen" verwijdert het item uit alle vaste-lasten-cijfers; zonder gekoppelde `accountId` doet opslaan zichtbaar niets (bekend randgeval).',
+    then: 'Bevestigen maakt een `recurring_transactions`-rij (amount=−44,90, frequency=\'monthly\'); "Niet opnemen" verwijdert het item uit alle vaste-lasten-cijfers; zonder gekoppelde `accountId` doet opslaan zichtbaar niets (bekend randgeval). Door V-001 verschijnen op deze lijst nu ook jaar-/halfjaarabonnementen met precies 2 betalingen binnen 24 maanden, waar ze voorheen (12 mnd/3 betalingen) nooit hadden gehaald.',
     assertion: {
       kind: 'ui-only',
-      source: 'components/app/recurring-classify-sheet.tsx (handleSave) — DB-insert/update workflow, geen pure functie',
+      source: 'components/app/recurring-classify-sheet.tsx (handleSave) — DB-insert/update workflow, geen pure functie; kandidaten komen van app/api/detect-recurring/route.ts + app/api/recurring/route.ts, beide op lib/recurring-detection.ts#detectRecurringTransactions + RECURRING_ANALYSIS_MONTHS',
     },
   },
   {
@@ -320,12 +316,12 @@ const criteria: AcceptanceCriterion[] = [
     scenarioId: 'UAT-CASH-19',
     titel: 'Vaste kosten laten analyseren door Fin (AI)',
     kriticiteit: 'BELANGRIJK',
-    given: 'AI-add-on actief resp. uit/kill-switch aan.',
+    given: 'AI-add-on actief resp. uit/kill-switch aan. GEWIJZIGD 12-09-2026 (V-001): `app/api/subscriptions/analyse-ai/route.ts` stuurt nu ook de \'low\'-confidence-kandidaten van `detectRecurringTransactions` naar de AI ter beoordeling (voorheen alleen \'medium\'/\'high\'); die kandidaten komen — mét AI-oordeel — in de voorstellenlijst terecht, maar tellen NIET mee in het bestaande vaste-lasten-totaal totdat de gebruiker ze bevestigt. Zelfde 24-maands-venster (`RECURRING_ANALYSIS_MONTHS`) als WF-CASH-17.',
     when: 'De gebruiker klikt "Laat Fin analyseren".',
-    then: 'Mét AI: voorstellen per rij met classificatie + reden; opslaan toont een toast met het aantal en ververst de vaste-lasten-cijfers. Zonder AI: melding "AI is niet geconfigureerd…" (422), handmatige weg blijft beschikbaar.',
+    then: 'Mét AI: voorstellen per rij met classificatie + reden — nu inclusief de eerder weggefilterde \'low\'-kandidaten (bv. een net-op-2-betalingen jaarabonnement) — waarbij de AI-reden aangeeft dat het om een onzekere/lage-confidence-match gaat; opslaan toont een toast met het aantal en ververst de vaste-lasten-cijfers. Zonder AI: melding "AI is niet geconfigureerd…" (422), handmatige weg blijft beschikbaar.',
     assertion: {
       kind: 'ui-only',
-      source: 'components/app/ai-vaste-kosten-sheet.tsx (POST /api/subscriptions/analyse-ai) — AI-output, niet deterministisch toetsbaar',
+      source: 'components/app/ai-vaste-kosten-sheet.tsx (POST /api/subscriptions/analyse-ai) → app/api/subscriptions/analyse-ai/route.ts, op lib/recurring-detection.ts#detectRecurringTransactions + RECURRING_ANALYSIS_MONTHS (zie ook app/api/subscriptions/detect-ai/route.ts, dezelfde detectiekern voor de bredere \'herkent de gebruiker dit als abonnement\'-vraag) — AI-output, niet deterministisch toetsbaar',
     },
   },
   {

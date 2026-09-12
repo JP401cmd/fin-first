@@ -149,14 +149,6 @@ export default async function OverzichtPage() {
     aowAge: aowAgeFractional,
   }).framing
 
-  // Liquide cash = niet-gekoppelde bank-accounts + cash/savings-typed assets.
-  // Basis voor de CompoundInsightCard (in blok 2).
-  const liquidCash =
-    (horizonData?.unlinkedCash ?? 0) +
-    (horizonData?.assets ?? [])
-      .filter((a) => ['cash', 'savings', 'checking'].includes(a.asset_type ?? ''))
-      .reduce((s, a) => s + Number(a.current_value ?? 0), 0)
-
   // Totaalbedragen per hefboom-tegel — uit healthScoreInput (horizonData,
   // perspectief-correct). Belasting = Box 3-druk per jaar.
   //
@@ -369,7 +361,6 @@ export default async function OverzichtPage() {
                 freedomPct={freedomPct}
                 currentAge={currentAge}
                 currentNetWorth={currentNetWorth}
-                liquidCash={liquidCash}
               />
             </Suspense>
           }

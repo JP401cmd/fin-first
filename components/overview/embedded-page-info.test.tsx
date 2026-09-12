@@ -36,7 +36,7 @@ import { SchuldenView } from './schulden-view'
 
 describe('Embedded overzicht-wrappers onderdrukken de ingebouwde PageInfoButton', () => {
   it('BezittingenView geeft showPageInfo=false aan AssetsPage (page-shell rendert de i)', () => {
-    render(<BezittingenView inspirationCards={null} />)
+    render(<BezittingenView />)
     expect(screen.getByTestId('assets-client').getAttribute('data-show-page-info')).toBe('false')
   })
 

@@ -38,7 +38,6 @@ import { GOAL_TYPE_META } from '@/lib/goal-data'
 import type { AchievedMilestoneRow } from '@/lib/milestones/types'
 import { buildMilestoneCopy } from '@/lib/milestones/copy'
 import { withFreshMilestone } from '@/lib/briefing/milestone-entry'
-import { hasInvestedAssets } from '@/lib/dashboard-wealth-weighting'
 import { OverzichtSecondary } from './overzicht-secondary'
 
 // Stabiele lege-array-referentie voor de mini-vermogen-grafiek — voorkomt dat
@@ -92,7 +91,6 @@ export async function OverzichtSecondaryLoader({
   freedomPct,
   currentAge,
   currentNetWorth,
-  liquidCash,
 }: {
   supabase: SupabaseClient
   perspective: Perspective
@@ -108,7 +106,6 @@ export async function OverzichtSecondaryLoader({
   currentAge: number | null
   /** Netto vermogen (perspectief-correct, blok 1) — basis voor de vrijheidstijd-briefing. */
   currentNetWorth: number
-  liquidCash: number
 }) {
   const [
     dashboardResult,
@@ -487,11 +484,6 @@ export async function OverzichtSecondaryLoader({
         dashboardData={dashboardData}
         activeWidgets={activeWidgets}
         allWidgetPrefs={allWidgetPrefs}
-        liquidCash={liquidCash}
-        // H15: de compound-CTA conditioneert op "belegt al", niet alleen op
-        // cash. Hier afgeleid uit de al geladen `horizonData` — geen extra
-        // query en geen tweede lezing (hasInvestedAssets is de ene bron).
-        hasInvestments={hasInvestedAssets(horizonData?.assets ?? [])}
       />
     </>
   )

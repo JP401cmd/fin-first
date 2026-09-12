@@ -145,7 +145,12 @@ describe('UAT Cash — acceptatiecriteria dekking', () => {
     // `vulIngangenInBanner` laat "Importeer transacties"/"Bank koppelen" uit de
     // actie-rij zodra de KoppelRekeningBanner ze al biedt; conditioneel
     // renderen zonder eigen berekening, dus 'ui-only').
-    expect(workflows.length).toBe(68)
+    // 68 → 67: WF-CASH-06 ("Inflatie-impact verkennen") is VERVALLEN
+    // (B-047, 12-09-2026) — de inflatiekaart en haar wegklik-mechaniek zijn
+    // volledig uit de app verwijderd. De nog-geldige versheidsmelding-dekking
+    // (StaleDataGuard/-Banner/-Dot) die op datzelfde criterium stond is
+    // verhuisd naar WF-CASH-07.
+    expect(workflows.length).toBe(67)
   })
 
   it('elk criterium heeft een geldige assertion.kind', () => {
@@ -233,7 +238,7 @@ describe('UAT Cash — acceptatiecriteria dekking', () => {
       expect(criterion(wf).assertion.kind, `${wf} moet consistency zijn`).toBe('consistency')
     }
     // ui-only (AI, verwijsregels, DB-bulk-workflows, TrueLayer-sandbox)
-    for (const wf of ['WF-CASH-06', 'WF-CASH-07', 'WF-CASH-12', 'WF-CASH-17', 'WF-CASH-19', 'WF-CASH-29', 'WF-CASH-30', 'WF-CASH-32', 'WF-CASH-45', 'WF-CASH-47']) {
+    for (const wf of ['WF-CASH-07', 'WF-CASH-12', 'WF-CASH-17', 'WF-CASH-19', 'WF-CASH-29', 'WF-CASH-30', 'WF-CASH-32', 'WF-CASH-45', 'WF-CASH-47']) {
       expect(criterion(wf).assertion.kind, `${wf} moet ui-only zijn`).toBe('ui-only')
     }
   })

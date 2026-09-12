@@ -9,7 +9,7 @@
  *
  * De meeste checks roepen ÉCHTE productiefuncties aan (calculateBox3,
  * scoreDSTI/scoreAssetConcentration/scoreDebtRatio, pillarStatus,
- * computeGoalProgress, summarizeRunway/computeRunwayWeekDelta, compareCompound,
+ * computeGoalProgress, summarizeRunway/computeRunwayWeekDelta,
  * buildSimNetWorthRows, deflate). Nog één mirror met bronregel-verwijzing
  * (spiegelt de mirrors in start/will/cash-checks.ts):
  *  - de postpone-/uitstel-termijn (POSTPONE_DAYS=14 resp. weken×7, identiek
@@ -37,7 +37,6 @@ import {
   runwaySentence,
   computeRunwayWeekDelta,
 } from '@/lib/briefing/overview-briefing'
-import { compareCompound } from '@/lib/compound-projection'
 import { buildSimNetWorthRows } from '@/lib/horizon/networth-rows'
 import { DEFAULT_HOUSING_STRATEGY } from '@/lib/housing-strategy'
 import { deflate } from '@/lib/euro-display'
@@ -356,20 +355,11 @@ export const OVZ_ENGINE_CHECKS: OvzEngineCheck[] = [
       }
     },
   },
-  {
-    workflow: 'WF-OVZ-15',
-    scenarioId: 'UAT-OVZ-15',
-    label: 'Samengestelde rente (compareCompound): €57.700 principal, 0 en €500/mnd, 30 jaar',
-    run: () => {
-      criterion('WF-OVZ-15')
-      const r0 = compareCompound({ principal: 57700, monthlyContribution: 0, years: 30, conservativeRate: 0.005, ambitiousRate: 0.07 })
-      const r500 = compareCompound({ principal: 57700, monthlyContribution: 500, years: 30, conservativeRate: 0.005, ambitiousRate: 0.07 })
-      return {
-        expected: 'cons0=67013; amb0=439227; hasDramaticDelta=true; cons500=260693; amb500=1005992',
-        actual: `cons0=${r0.conservative}; amb0=${r0.ambitious}; hasDramaticDelta=${r0.hasDramaticDelta}; cons500=${r500.conservative}; amb500=${r500.ambitious}`,
-      }
-    },
-  },
+  // WF-OVZ-15 had hier een check (compareCompound op de CompoundInsightCard-
+  // sliderwaarden) — VERVALLEN 12-09-2026 (B-047): de kaart is uit de app
+  // verwijderd en het criterium zelf is verwijderd uit ovz.ts/catalog.ts/
+  // flows/ovz.ts (OVZ is niet aaneengesloten op WF-nummer, dus geen
+  // herschrijf-truc nodig zoals bij BEZIT-04).
   {
     workflow: 'WF-OVZ-19',
     scenarioId: 'UAT-OVZ-19',

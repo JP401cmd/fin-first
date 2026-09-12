@@ -1,12 +1,8 @@
 import type { Metadata } from 'next'
-import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
-import { TransactiesKoopkrachtKaart } from '@/components/overview/transacties/transacties-notices-loader'
 import { StaleDataGuard } from '@/components/app/stale-data-guard'
 import { StaleNoticeBanner } from '@/components/app/stale-transactions-notice'
 import { StaleNoticeDot } from '@/components/app/stale-notice-provider'
-import { InsightToggleButton } from '@/components/editorial/insight-toggle-button'
-import { INFLATION_IMPACT_ID } from '@/components/overview/inflation-impact-card'
 import { loadAccountCount } from '@/lib/account-count'
 import { getServerPerspective } from '@/lib/household/server-perspective'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
@@ -106,13 +102,6 @@ export default async function OverzichtCashflowTransactiesPage({
           header-cluster hieronder dezelfde toestand delen. */}
       <StaleDataGuard>
       <div className="relative mx-auto max-w-6xl px-4 pt-4 sm:px-6">
-        {/* Verhuisd van de opgeheven cashflow-hub, samen met de inflatiekaart
-            waar hij bij hoort: haalt het weggeklikte inzicht terug. Vaste
-            offsets links van de punten (meldingen-conventie). */}
-        <InsightToggleButton
-          ids={[INFLATION_IMPACT_ID]}
-          className="absolute right-[116px] top-4 sm:right-[124px]"
-        />
         {/* Geminimaliseerde "Gegevens verouderd"-melding, links van het
             statuspunt — dezelfde volgorde als de utility-cluster van /overzicht
             (stale · status · 'i'), hier met de absolute offsets die de conventie
@@ -160,14 +149,6 @@ export default async function OverzichtCashflowTransactiesPage({
             />
           }
         />
-        {/* Koopkracht ONDER de analyse — de pagina vraagt waar je tijd naartoe
-            gaat, dus eerst het antwoord, dan de zijstap over dertig jaar. Geen
-            gereserveerde hoogte: hij verschijnt alleen boven €500
-            baseline-uitgaven én kan weggeklikt zijn, dus een vaste reservering
-            zou voor een deel van de gebruikers een permanent gat zijn. */}
-        <Suspense fallback={null}>
-          <TransactiesKoopkrachtKaart perspective={perspective} />
-        </Suspense>
       </div>
       </StaleDataGuard>
 

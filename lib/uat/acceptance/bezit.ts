@@ -58,16 +58,15 @@ const criteria: AcceptanceCriterion[] = [
   {
     workflow: 'WF-BEZIT-04',
     scenarioId: 'UAT-BEZIT-04',
-    titel: 'Inspiratie-inzichten gebruiken en minimaliseren',
+    titel: 'Geen inspiratie-inzichten meer op het bezittingenoverzicht',
     kriticiteit: 'OVERIG',
     persona: 'compleet',
-    given: 'Persona Tessa Compleet geladen (liquide cash €64.000 ≥ €10.000-drempel; belegd vermogen €300.000 ≥ €25.000-drempel — beide inzichtkaarten actief).',
-    when: 'De compound-slider wordt op €500/mnd gezet (principal €0, 30 jaar); de fee-slider op 1% extra kosten (Meesman-positie €300.000/€1.500 mnd, 30 jaar, 7% vs 6%).',
-    then: 'Compound-vergelijking: conservatief (0,5%) €193.680, ambitieus (7%) €566.765, verschil €373.085, multiplier ≈2,93 (≥1,05 dus zichtbaar). Fee-impact: eindwaarde@7% €3.983.971 vs eindwaarde@6% €3.146.095, kostenimpact €837.876.',
+    given: 'VERVALLEN 12-09-2026 (B-047, "helemaal weg"): de drie wegklikbare "inspiratie"-kaarten zijn volledig uit de app verwijderd — `compound-insight-card.tsx` (compound-slider), `fee-impact-card.tsx` (fee-slider) en `inflation-impact-card.tsx` (dekking hoorde al bij CASH, zie WF-CASH-07), samen met hun terughaalknop (`InsightToggleButton`) en het localStorage-mechaniek (`use-insight-visibility.ts`, sleutel `tf-insight-hidden`). Op /overzicht/bezittingen is de hele `inspirationCards`-propketen (page.tsx → `bezittingen-view.tsx` → `components/core/assets-client.tsx`) opgeruimd, inclusief de `loadHorizonRaw`-aanroep die alleen de drempeldata voor deze kaarten leverde. Persona Tessa Compleet geladen op /overzicht/bezittingen (liquide cash €64.000 en belegd vermogen €300.000 zouden voorheen boven de drempel hebben gezeten).',
+    when: 'De gebruiker opent /overzicht/bezittingen.',
+    then: 'Er verschijnt géén inspiratiekaart (compound- of fee-slider) meer, ongeacht cash-/beleggingssaldo — de drempellogica bestaat niet meer. de losse rente-op-rente-hulpmodule met de rekenfuncties `compareCompound`/`projectCompound` die deze kaarten voedde is INMIDDELS OOK VERWIJDERD (geen enkele consument meer over; het bestandspad staat hier bewust niet, omdat acceptance-sources.test.ts elk genoemd pad op bestaan toetst) — dit criterium bewaakt alleen dat de kaarten niet meer gemount worden, en toetst dus bewust geen rekenfunctie meer. Samengestelde groei blijft elders getoetst via andere, nog wél bestaande functies (UAT-REKEN-21 op `computeInflationErosion`, UAT-BEZIT-03 op `lib/asset-data.ts#projectAsset`) — die zijn NIET dezelfde functies als de verwijderde `compareCompound`/`projectCompound`.',
     assertion: {
-      kind: 'exact',
-      expected: 'conservatief=193680; ambitieus=566765; verschil=373085; fee7=3983971; fee6=3146095; feeImpact=837876',
-      source: 'lib/compound-projection.ts#compareCompound({principal:0, monthlyContribution:500, years:30, conservativeRate:0.005, ambitiousRate:0.07}) en #projectCompound(300000,1500,30,0.07 / 0.06)',
+      kind: 'ui-only',
+      source: 'app/(app)/overzicht/bezittingen/page.tsx + components/overview/bezittingen-view.tsx + components/core/assets-client.tsx — geen inspirationCards-prop meer; compound-insight-card.tsx/fee-impact-card.tsx/insight-toggle-button.tsx/use-insight-visibility.ts bestaan niet meer',
     },
   },
   {

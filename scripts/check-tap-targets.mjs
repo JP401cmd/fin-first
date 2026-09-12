@@ -46,8 +46,8 @@ const INFRASTRUCTURE = new Set(['components/editorial/tap-target.tsx'])
  * vangen — doe dat niet zonder expliciete motivering in de PR.
  *
  * Twee categorieën staan er BEWUST op, vastgelegd in de ui-ux-skill:
- *  - de pagina-header-controls (`page-info-button.tsx`, `insight-toggle-button.tsx`,
- *    `page-status-dot.tsx`) op 28×28 — besluit eigenaar 26-08-2026;
+ *  - de pagina-header-controls (`page-info-button.tsx`, `page-status-dot.tsx`)
+ *    op 28×28 — besluit eigenaar 26-08-2026;
  *  - de mobiele TopBar-utility-cluster op 36px breed (verticaal wél 44).
  */
 const ALLOWLIST_ENTRIES = [
@@ -100,7 +100,6 @@ const ALLOWLIST_ENTRIES = [
   'components/editorial/chart-tips.tsx',
   'components/editorial/info-icon-tooltip.tsx',
   'components/editorial/inline-info-disclosure.tsx',
-  'components/editorial/insight-toggle-button.tsx',
   'components/editorial/page-info-button.tsx',
   'components/future/doelen-view.tsx',
   'components/future/rekenhulp-view.tsx',
@@ -110,10 +109,7 @@ const ALLOWLIST_ENTRIES = [
   'components/landing/header.tsx',
   'components/onboarding/onboarding-horizon.tsx',
   'components/overview/checkin-banner.tsx',
-  'components/overview/compound-insight-card.tsx',
-  'components/overview/fee-impact-card.tsx',
   'components/overview/hero-widget-rail.tsx',
-  'components/overview/inflation-impact-card.tsx',
   'components/overview/leverage-card.tsx',
   'components/overview/print-overzicht-button.tsx',
   'components/overview/transacties/bulk/bulk-resultaten.tsx',

@@ -27,10 +27,6 @@ const clientSource = readFileSync(
   join(process.cwd(), 'components', 'core', 'assets-client.tsx'),
   'utf8',
 )
-const pageSource = readFileSync(
-  join(process.cwd(), 'app', '(app)', 'overzicht', 'bezittingen', 'page.tsx'),
-  'utf8',
-)
 
 /** Index van een fragment, met een sprekende fout als het ontbreekt. */
 function at(source: string, needle: string, where: string): number {
@@ -73,30 +69,5 @@ describe('/overzicht/bezittingen — één figures-strip, geen mode-ternary (S11
       blok.includes('{!simple &&'),
       'de knop staat weer alleen in Volledig — maar de rendement-cel staat er in Eenvoudig óók, dus de uitleg hoort erbij',
     ).toBe(false)
-  })
-})
-
-describe('/overzicht/bezittingen — hoogstens één inspiratiekaart in Eenvoudig (OVZ-5, beperkt)', () => {
-  it('de beheerkosten-simulator staat in `HideInSimple`', () => {
-    const hide = at(pageSource, '<HideInSimple>', 'bezittingen/page.tsx')
-    const fee = at(pageSource, '<FeeImpactCard', 'bezittingen/page.tsx')
-    expect(fee).toBeGreaterThan(hide)
-    expect(pageSource.indexOf('</HideInSimple>')).toBeGreaterThan(fee)
-  })
-
-  it('de samengestelde-rente-kaart blijft in BEIDE modi staan', () => {
-    const compound = at(pageSource, '<CompoundInsightCard', 'bezittingen/page.tsx')
-    const hide = at(pageSource, '<HideInSimple>', 'bezittingen/page.tsx')
-    expect(
-      compound,
-      'CompoundInsightCard is mee naar Volledig verhuisd — dat is optie B, en die is niet gekozen: hij is de enige "waarom zou ik"-motivatie voor wie nog niet belegt',
-    ).toBeLessThan(hide)
-  })
-
-  it('de kaarten-container klapt weg als er in Eenvoudig niets overblijft', () => {
-    expect(
-      clientSource,
-      'zonder empty:hidden blijft er een lege doos met marge staan zodra alleen de fee-kaart haar drempel haalt',
-    ).toContain('space-y-4 empty:hidden')
   })
 })

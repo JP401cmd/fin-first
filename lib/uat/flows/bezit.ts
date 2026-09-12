@@ -29,7 +29,7 @@ export const BEZIT_FLOW: UatFlow = {
     // ── 2 · verkennen ─────────────────────────────────────────────────────
     { id: 'filter', scenarioId: 'UAT-BEZIT-02', label: 'WF-BEZIT-02 · Filteren op categorie', kind: 'screen', stage: 2, lane: 'verkennen' },
     { id: 'verdeling', scenarioId: 'UAT-BEZIT-03', label: 'WF-BEZIT-03 · Verdeling & projectie', kind: 'screen', stage: 2, lane: 'verkennen' },
-    { id: 'inspiratie', scenarioId: 'UAT-BEZIT-04', label: 'WF-BEZIT-04 · Inspiratie-inzichten', kind: 'screen', stage: 2, lane: 'verkennen' },
+    { id: 'inspiratie', scenarioId: 'UAT-BEZIT-04', label: 'WF-BEZIT-04 · Geen inspiratie-inzichten meer (vervallen)', kind: 'screen', stage: 2, lane: 'verkennen' },
     { id: 'categorie', scenarioId: 'UAT-BEZIT-11', label: 'WF-BEZIT-11 · Categoriepagina per type', kind: 'screen', stage: 2, lane: 'verkennen' },
 
     // ── 2 · toevoegen ─────────────────────────────────────────────────────

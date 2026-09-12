@@ -216,10 +216,6 @@ type AssetsPageProps = {
    *  "N bezittingen" toont) zodat de filter zelf kan besluiten of hij
    *  zichtbaar is — zie de BEZ-2-drempel in `<BezittingenFilter>`. */
   toolbarFilter?: ReactNode | ((ctx: { assetCount: number }) => ReactNode)
-  /** Inspiratie-blokken (CompoundInsightCard, FeeImpactCard) die direct
-   *  onder de toolbar rendert. Drempel-logica leeft op de page-server zodat
-   *  deze component pure render-laag blijft. */
-  inspirationCards?: ReactNode
   /** Wanneer gezet: client-side filter op asset-type. Verbergt alle
    *  categorie-groepen behalve die met het gefilterde type. Wordt
    *  gecontroleerd door de page-wrapper die ook `toolbarFilter` rendert
@@ -227,12 +223,12 @@ type AssetsPageProps = {
   assetTypeFilter?: AssetType | null
   /** Verberg de ingebouwde PageInfoButton in de PageOpening. Default `true`
    *  (standalone `/core/assets`). Ge-embed via `<BezittingenView>` op
-   *  `/overzicht/bezittingen` rendert de page-shell zélf de `i` (+ statuspunt
-   *  + insight-toggle); dan `false` om een dubbele info-knop te voorkomen. */
+   *  `/overzicht/bezittingen` rendert de page-shell zélf de `i` en het
+   *  statuspunt; dan `false` om een dubbele info-knop te voorkomen. */
   showPageInfo?: boolean
 }
 
-export default function AssetsPage({ initialAssetId, initialData, toolbarFilter, inspirationCards, assetTypeFilter, showPageInfo = true }: AssetsPageProps = {}) {
+export default function AssetsPage({ initialAssetId, initialData, toolbarFilter, assetTypeFilter, showPageInfo = true }: AssetsPageProps = {}) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
@@ -1097,15 +1093,6 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
           <span className="hidden sm:inline">Bezitting toevoegen</span>
         </button>
       </div>
-
-      {/* Inspiratie-blokken direct onder de toolbar — leeg/null als de
-          page-server geen drempels haalt. */}
-      {inspirationCards && (
-        // `empty:hidden`: sinds S11 kan de beheerkosten-kaart in Eenvoudig
-        // wegvallen (HideInSimple). Haalt de gebruiker wél die drempel maar de
-        // cash-drempel niet, dan blijft hier anders een lege doos met marge over.
-        <div className="mb-5 space-y-4 empty:hidden">{inspirationCards}</div>
-      )}
 
       {/* Allocation + projection — collapsible card. Bewust óók in Eenvoudig
           zichtbaar (eigen dropdown), zodat /overzicht/bezittingen symmetrisch is

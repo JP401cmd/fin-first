@@ -10,8 +10,11 @@
  * OVZ is — net als SCHULD/TOEK/WILL — NIET aaneengesloten op WF-nummer:
  * WF-OVZ-17/18 hebben geen eigen UAT-OVZ-scenario (→ gedekt door UAT-NAV-19
  * resp. UAT-NAV-10) en ontbreken dus terecht in de catalogus voor zone OVZ.
- * De 22 criteria hier zijn wél 1-op-1 met de 22 catalogus-scenario's
- * (UAT-OVZ-01..16, 19..24).
+ * WF-OVZ-15 ("Samengestelde-rente-inzicht") is VERVALLEN (B-047, 12-09-2026):
+ * de CompoundInsightCard op /overzicht is uit de app verwijderd, samen met
+ * `lib/compound-projection.ts` (geen enkele consument meer). WF-OVZ-16 bestond
+ * al niet in de catalogus (bestaande dekkingsleemte). De 22 criteria hier zijn
+ * wél 1-op-1 met de 22 catalogus-scenario's (UAT-OVZ-01..14, 19..26).
  */
 
 import { describe, it, expect } from 'vitest'
@@ -34,7 +37,7 @@ function criterion(workflow: string): AcceptanceCriterion {
 }
 
 describe('UAT Ovz — acceptatiecriteria dekking', () => {
-  it('heeft precies één criterium per catalogus-OVZ-scenario (22 stuks, WF-OVZ-17/18 bestaan niet in de catalogus)', () => {
+  it('heeft precies één criterium per catalogus-OVZ-scenario (22 stuks, WF-OVZ-15/16/17/18 bestaan niet in de catalogus)', () => {
     const workflows = OVZ_ACCEPTANCE.criteria.map((c) => c.workflow).sort()
     expect(workflows).toEqual(catalogOvzWorkflows)
     // Afgeleid van de catalogus — bewust géén hardgecodeerde telling: die

@@ -47,18 +47,22 @@ describe('OVZ_FLOW — curatie-integriteit', () => {
     }
   })
 
-  it('dekt alle 23 WF-OVZ-scenario\'s (01..15, 19..26 — WF-OVZ-16/17/18 bestaan niet in de catalogus)', () => {
+  it('dekt alle 22 WF-OVZ-scenario\'s (01..14, 19..26 — WF-OVZ-15/16/17/18 bestaan niet (meer) in de catalogus)', () => {
     const covered = new Set(
       OVZ_FLOW.nodes.map((n) => n.scenarioId).filter((id): id is string => Boolean(id)),
     )
+    // WF-OVZ-15 ("Samengestelde-rente-inzicht") is VERVALLEN (B-047,
+    // 12-09-2026): de CompoundInsightCard op /overzicht is uit de app
+    // verwijderd, samen met lib/compound-projection.ts. WF-OVZ-16 bestond al
+    // niet in de catalogus (bestaande, hier ongewijzigde dekkingsleemte).
     const expected = [
-      ...Array.from({ length: 15 }, (_, i) => i + 1),
+      ...Array.from({ length: 14 }, (_, i) => i + 1),
       19, 20, 21, 22, 23, 24, 25, 26,
     ].map((n) => `UAT-OVZ-${String(n).padStart(2, '0')}`)
     for (const id of expected) {
       expect(covered.has(id), `${id} moet als flow-knoop voorkomen`).toBe(true)
     }
-    expect(covered.size).toBe(23)
+    expect(covered.size).toBe(22)
   })
 
   it('de domeinoverschrijdende cross-knopen dekken WILL/TOEK/MIJN/NAV/BEZIT', () => {

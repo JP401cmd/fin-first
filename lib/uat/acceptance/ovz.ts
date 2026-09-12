@@ -20,10 +20,19 @@
  * alleen de AI-context (aanbevelingen-generatie), OVZ toetst het volledige
  * beslis-/actiebeheer-gedrag.
  *
+ * VERVALLEN 12-09-2026 (B-047, "helemaal weg"): WF-OVZ-15
+ * ("Samengestelde-rente-inzicht verkennen") is verwijderd — de
+ * CompoundInsightCard op /overzicht bestaat niet meer, samen met de losse
+ * rente-op-rente-hulpmodule die haar voedde (geen enkele consument meer over;
+ * het bestandspad is hier bewust niet genoemd — acceptance-sources.test.ts
+ * toetst elk genoemd pad op bestaan).
+ *
  * KERN-BEVINDING (bepaalt exact/oracle/direction/ui-only): de hub combineert
  * (1) volledig deterministische pure functies (statusdrempels, gezondheids-
  * pijler-formules, doel-percentages, Box 3-forfait, vrijheidsdagen-formule,
- * samengestelde-rente, postpone-termijnen) — 10 'exact' criteria; (2)
+ * postpone-termijnen) — 'exact' criteria (dit getal is sinds meerdere
+ * uitbreidingen niet meer met de hand bijgehouden; zie de dynamische
+ * `toEqual`-telling in ovz.engine.test.ts voor de bindende bron); (2)
  * kernel-afhankelijke cijfers (freedomPct, simNetWorthRows/simRequiredPortfolio)
  * die de horizon-kernel-solver vereisen, niet met de hand na te rekenen — 2
  * 'oracle' criteria (verifieerbaar via `/beheer/horizon-tabellen-mij`, net als
@@ -233,20 +242,6 @@ const criteria: AcceptanceCriterion[] = [
       kind: 'exact',
       expected: 'gevuld=4/4; leeg=0/4; nvt=3/3+1; partner=0/4',
       source: 'lib/welcome-guide.ts#deriveGuideStates + #countScreenProgress (échte productiefuncties op deterministische feiten) + app/api/welcome-guide/route.ts (actie `reactivate`, PUT — gedekt door components/app/chat/gids/gids-view.test.tsx en welcome-guide-provider.tsx#reactivate) voor "Gids opnieuw tonen"',
-    },
-  },
-  {
-    workflow: 'WF-OVZ-15',
-    scenarioId: 'UAT-OVZ-15',
-    titel: 'Samengestelde-rente-inzicht verkennen (spaargeld vs. beleggen)',
-    kriticiteit: 'BELANGRIJK',
-    given: 'Persona Willem Jansen: liquide cash €57.700 (ruim boven de €10.000-drempel), 30 jaar, 0,5% vs. 7%, slider €0 en €500/mnd.',
-    when: '`compareCompound` berekent beide scenario\'s.',
-    then: 'Bij €0/mnd: conservatief ≈ €67.013, ambitieus ≈ €439.227, verschil ≈ €372.214, multiplier 6,55 ≥ 1,05 → kaart terecht zichtbaar (`hasDramaticDelta=true`). Bij €500/mnd: conservatief ≈ €260.693, ambitieus ≈ €1.005.992.',
-    assertion: {
-      kind: 'exact',
-      expected: 'cons0=67013; amb0=439227; hasDramaticDelta=true; cons500=260693; amb500=1005992',
-      source: 'lib/compound-projection.ts#compareCompound — échte productiefunctie, geen mirror',
     },
   },
   {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type ReactNode } from 'react'
+import { useState } from 'react'
 import AssetsPage from '@/components/core/assets-client'
 import { BezittingenFilter } from '@/components/overview/bezittingen-filter'
 import type { AssetType } from '@/lib/asset-data'
@@ -26,10 +26,9 @@ import type { AssetsPageData } from '@/lib/assets-data-loader'
  */
 interface BezittingenViewProps {
   initialData?: AssetsPageData
-  inspirationCards: ReactNode
 }
 
-export function BezittingenView({ initialData, inspirationCards }: BezittingenViewProps) {
+export function BezittingenView({ initialData }: BezittingenViewProps) {
   const [filter, setFilter] = useState<AssetType | null>(null)
 
   return (
@@ -38,10 +37,9 @@ export function BezittingenView({ initialData, inspirationCards }: BezittingenVi
       toolbarFilter={({ assetCount }: { assetCount: number }) => (
         <BezittingenFilter value={filter} onChange={setFilter} assetCount={assetCount} />
       )}
-      inspirationCards={inspirationCards}
       assetTypeFilter={filter}
       // De page-shell (`overzicht/bezittingen/page.tsx`) rendert de i +
-      // statuspunt + insight-toggle; onderdruk de ingebouwde i hier.
+      // statuspunt; onderdruk de ingebouwde i hier.
       showPageInfo={false}
     />
   )

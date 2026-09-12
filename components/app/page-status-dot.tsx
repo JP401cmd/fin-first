@@ -9,8 +9,8 @@ import { usePageStatusContext } from '@/components/app/page-status-provider'
  * (`PageInfoButton`) verschijnt zodra de gebruiker de banner heeft
  * geminimaliseerd. Klik → banner weer uitklappen.
  *
- * Spiegelt de vorm/plaatsing van `InsightToggleButton` (h-7 w-7 rounded-full,
- * zelfde border) zodat de knop een koppel vormt met de 'i'. De dot binnenin
+ * Spiegelt de vorm/plaatsing van de pagina-'i' (h-7 w-7 rounded-full,
+ * zelfde border) zodat de knop daarmee een koppel vormt. De dot binnenin
  * draagt de status-kleur (amber/red) via LEVERAGE_STATUS_DOT — semantisch
  * stoplicht, géén module-accent.
  *

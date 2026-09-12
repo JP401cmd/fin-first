@@ -80,11 +80,8 @@ export async function CashflowCardsLoader({ perspective }: { perspective: Perspe
  * blijft hier, zodat de fallback dezelfde breedte/uitlijning houdt als het
  * echte blok.
  *
- * De INFLATIEKAART krijgt géén gereserveerde hoogte: hij verschijnt alleen boven
- * €500 baseline-uitgaven én kan client-side verborgen zijn
- * (`useInsightVisibility`), dus een vaste reservering zou voor een deel van de
- * gebruikers een permanent gat zijn. Hij staat bovendien onder het kaartenraster,
- * dus buiten het eerste scherm.
+ * (De inflatiekaart die hier ooit onder hing is met de overige wegklikbare
+ * inspiratieblokken verwijderd — melding B-047.)
  */
 export function CashflowCardsFallback() {
   return (

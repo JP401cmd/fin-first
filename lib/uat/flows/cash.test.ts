@@ -47,7 +47,7 @@ describe('CASH_FLOW — curatie-integriteit', () => {
     }
   })
 
-  it('dekt alle 61 WF-CASH-scenario\'s (01..61, aaneengesloten — geen verwijsregel-gaten)', () => {
+  it('dekt alle WF-CASH-scenario\'s 01..61 op één gat na (WF-CASH-06, vervallen 12-09-2026 B-047)', () => {
     const covered = new Set(
       CASH_FLOW.nodes.map((n) => n.scenarioId).filter((id): id is string => Boolean(id)),
     )
@@ -83,7 +83,14 @@ describe('CASH_FLOW — curatie-integriteit', () => {
     // bulkbewerken.md, ADR 0104) — WF-CASH-55..59 (zoeken/selecteren/impact,
     // hercategoriseren, verwijderen, huishoud-scoping/5.000-grens,
     // regelaanbod/gedeeltelijke mislukking).
-    const expected = Array.from({ length: 61 }, (_, i) => `UAT-CASH-${String(i + 1).padStart(2, '0')}`)
+    // WF-CASH-06 ("Inflatie-impact verkennen") is VERVALLEN op 12-09-2026
+    // (B-047, "helemaal weg"): de inflatiekaart en haar wegklik-mechaniek zijn
+    // volledig uit de app verwijderd. Dit is dus een bewust gat, geen
+    // verwijsregel-leemte — de nog-geldige versheidsmelding-dekking die op
+    // dezelfde knoop stond is verhuisd naar WF-CASH-07 ('statusmelding').
+    const expected = Array.from({ length: 61 }, (_, i) => i + 1)
+      .filter((n) => n !== 6)
+      .map((n) => `UAT-CASH-${String(n).padStart(2, '0')}`)
     for (const id of expected) {
       expect(covered.has(id), `${id} moet als flow-knoop voorkomen`).toBe(true)
     }
@@ -104,7 +111,7 @@ describe('CASH_FLOW — curatie-integriteit', () => {
     // de KoppelRekeningBanner biedt koppelen/importeren bij nul rekeningen, en
     // dan laat de actie-rij ze juist weg) is als flow-knoop 'vulingangen'
     // onder 'geldstroom' toegevoegd.
-    expect(covered.size).toBe(67)
+    expect(covered.size).toBe(66)
   })
 
   it('de domeinoverschrijdende cross-knopen dekken BUDGET/OVZ/TOEK/WILL/BEZIT/MIJN', () => {
