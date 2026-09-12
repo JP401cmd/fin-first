@@ -132,7 +132,8 @@ describe('buildWhatifKernelAdapterInput', () => {
     expect(out.profile.yearly_essential_expenses).toBeUndefined()
     expect(out.profile.marginaal_tarief).toBeUndefined()
     expect(out.profile.deficit_loan_rate).toBeUndefined()
-    expect(out.profile.withdrawal_profile_config).toBeUndefined()
+    // withdrawal_profile_config is GEEN bedradingsgat meer: het gekozen profiel
+    // reist mee (B-042-vervolg, zie whatif-page-client.onttrekkingsprofiel.test.ts).
   })
 })
 

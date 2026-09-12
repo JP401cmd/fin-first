@@ -56,8 +56,11 @@
  *     what-if-client zijn NIET beschikbaar: `yearly_essential_expenses` (→ valt in de
  *     adapter terug op geschatte_jaaruitgaven i.p.v. de echte essentiële budgetten;
  *     raakt de pensioen-uitgave-methode 'essential_budgets'), `marginaal_tarief`,
- *     `deficit_loan_rate` (→ Excel-default 0,05), `withdrawal_profile_config` (→ Excel-
- *     3-fasen-curve). Deze blijven undefined; de adapter vult neutrale defaults in.
+ *     `deficit_loan_rate` (→ Excel-default 0,05). Deze blijven undefined; de adapter
+ *     vult neutrale defaults in. `withdrawal_profile_config` hoorde in dit rijtje maar
+ *     is er sinds het B-042-vervolg uit: het gekozen profiel, de fasecurve en de
+ *     flex-spending-config reizen mee, anders rekent what-if een ander plan door dan
+ *     /toekomst.
  */
 
 import type { Asset } from '@/lib/asset-data'
@@ -117,6 +120,13 @@ export interface WhatifRawProfileRow {
   fire_stop_age?: number | string | null
   feature_preferences?: Record<string, unknown> | null
   withdrawal_strategy?: string | null
+  /**
+   * Zelfde eis als het stop-anker (ADR 0129 D3): het GEKOZEN onttrekkingsprofiel —
+   * en zijn fasegrenzen — moet ook op het what-if-pad meereizen. Zonder deze kolom
+   * leest `resolveWithdrawalProfiel` alleen de enum, die geen Afnemend/Oplopend kent,
+   * en rekent what-if stil een ander plan door dan /toekomst (B-042-vervolg).
+   */
+  withdrawal_profile_config?: unknown
   guardrail_floor?: number | null
   guardrail_ceiling?: number | null
   guardrail_cut_step?: number | null
@@ -179,7 +189,12 @@ export function buildWhatifKernelAdapterInput(
     guardrail_ceiling: p.guardrail_ceiling ?? null,
     guardrail_cut_step: p.guardrail_cut_step ?? null,
     guardrail_raise_step: p.guardrail_raise_step ?? null,
-    // withdrawal_profile_config + deficit_loan_rate: BEDRADINGS­GATEN — Excel-defaults.
+    // Het gekozen profiel reist mee (B-042-vervolg): profiel, fasecurve én
+    // flex-spending-config komen hier vandaan, zodat what-if hetzelfde plan rekent
+    // als /toekomst. Ontbreekt de kolom, dan vallen de velden per stuk terug op de
+    // Excel-defaults — byte-identiek aan hiervoor.
+    withdrawal_profile_config: p.withdrawal_profile_config ?? null,
+    // deficit_loan_rate: BEDRADINGS­GAT — Excel-default.
     housing_strategy_config: p.housing_strategy_config,
     pot_rules: p.pot_rules,
     retirement_expense_method: p.retirement_expense_method ?? null,
