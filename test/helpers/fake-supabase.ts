@@ -20,7 +20,10 @@
  *     kent — een count telt immers in de database;
  *   • de `tx_month_aggregate`-RPC wordt uit dezelfde rijen opgebouwd met
  *     `buildMonthAggregatesFromRows` (de geteste TS-spiegel van de SQL) en kent
- *     die afkap NIET — precies zoals een SQL-aggregaat.
+ *     die afkap NIET — precies zoals een SQL-aggregaat — maar kent wél de
+ *     BUDGET-STATUS van de rekening: boekingen op een rekening met "budgetteren
+ *     uit" vallen erbuiten (ADR 0139, `isBudgetExcludedAccount`), zodat de mock
+ *     op dit punt niet stiller is dan productie.
  *
  * GEDEELD, niet gekopieerd: twee kopieën van deze mock zouden onafhankelijk van
  * elkaar kunnen wegdrijven (een cap die in de ene kopie verdwijnt, een filter dat
@@ -166,6 +169,14 @@ export interface FakeDb {
   transactions?: Row[]
   debts?: Row[]
   assets?: Row[]
+  /**
+   * De rekeningen (`bank_accounts`). Alleen nodig voor fixtures die de
+   * BUDGET-STATUS van een rekening willen meten: `tx_month_aggregate` sluit
+   * sinds ADR 0139 de boekingen uit van een rekening waarop budgetteren uit
+   * staat (zie `isBudgetExcludedAccount`). Een fixture die deze tabel weglaat
+   * krijgt ongewijzigd gedrag: onbekende rekening = meetellen, net als in SQL.
+   */
+  bankAccounts?: Row[]
   netWorthSnapshots?: Row[]
   recurringTransactions?: Row[]
   /** Rollover-carry per budget/periode (`budget_rollovers`). */
@@ -219,18 +230,76 @@ export const FAKE_USER_ID = 'user-parity'
 const withUserId = (rows: Row[]): Row[] =>
   rows.map((r) => (r.user_id === undefined ? { ...r, user_id: FAKE_USER_ID } : r))
 
+/**
+ * "Budgetteren staat uit op deze rekening" — de TS-spiegel van
+ * `public.budget_excluded_account_ids(uuid[])` (migratie
+ * 20260912120000, ADR 0139). Boekingen op zo'n rekening vallen buiten
+ * `tx_month_aggregate` en dus buiten budgetsom, spaarquote, dagtarief,
+ * FIRE-uitgaven en snapshots; alleen het SALDO telt nog, als cash-bezitting.
+ *
+ * Twee vlaggen, één regel — uitgesloten zodra ÉÉN van de twee "uit" zegt:
+ *   • `bank_accounts.is_active = false`      — de companion-spiegel
+ *   • het gekoppelde cash-bezit met `has_budget_tracking`/`is_active` niet waar
+ *     — de canonieke gate; GEEN gekoppeld bezit = meetellen.
+ *
+ * HET ARCHIEF IS NOOIT UITGESLOTEN, en die test staat VOORAAN — niet als derde
+ * OR-tak. `is_archive_bucket` was in de eerste lezing van ADR 0139 wél een
+ * uitsluitingsgrond; dat is op 12 sep 2026 teruggedraaid. "Budgetteren uit" is
+ * een bewuste keuze per rekening, het archief is opruimen: daar belanden
+ * boekingen wanneer iemand een rekening verwijdert MÉT "transacties bewaren"
+ * (de rekeningoverstap). `delete_bank_account` maakt de bucket aan met
+ * `is_active = false` en verplaatst de boekingen erheen — de vlag alleen uit de
+ * OR-keten halen zou de bucket dus alsnog via de actief-vlag laten wegvallen, en
+ * daarmee de hele voorgeschiedenis uit dagtarief, spaarquote en FIRE.
+ *
+ * ONTBREKENDE VELDEN KRIJGEN DE DB-DEFAULT, niet `undefined`. In de echte
+ * database zijn deze kolommen NOT NULL met een default (gemeten tegen
+ * `information_schema.columns`, 12-09-2026: `bank_accounts.is_active` true,
+ * `is_archive_bucket` false, `assets.is_active` true, `has_budget_tracking`
+ * false). Een rij zónder die waarde bestaat daar dus niet, en een fixture die 'm
+ * weglaat hoort hetzelfde te meten als productie — dezelfde redenering als
+ * `withUserId`. Let op de default van `has_budget_tracking`: **false**. Een
+ * fixture die een rekening aan een bezit koppelt en de vlag vergeet, meet
+ * "budgetteren uit" — precies zoals de database.
+ *
+ * Een rekening-id dat de fixture niet kent, telt gewoon mee. Dat is geen
+ * slordigheid maar de faalrichting van de SQL: die trekt een definer-bepaalde
+ * set AF van de zichtbare rijen, dus onbekend = ongewijzigd, nooit "stil
+ * verdwenen". De mock mag een test hooguit minder scherp maken, nooit stil van
+ * rijen beroven.
+ */
+export function isBudgetExcludedAccount(account: Row, assetRows: Row[]): boolean {
+  // Vooraf, niet als OR-tak: de bucket draagt `is_active = false`.
+  if (account.is_archive_bucket === true) return false
+  if (account.is_active === false) return true
+  const linked = account.linked_asset_id
+  if (linked === null || linked === undefined) return false
+  const asset = assetRows.find((a) => a.id === linked)
+  if (!asset) return false
+  const tracking = asset.has_budget_tracking ?? false
+  const assetActive = asset.is_active ?? true
+  return tracking !== true || assetActive !== true
+}
+
 export function makeSupabase(db: FakeDb): FakeSupabase {
   let tableQueries = 0
   const perTable = new Map<string, number>()
   const rpcCalls: string[] = []
   const transactions = withUserId(db.transactions ?? [])
+  const assetRows = withUserId(db.assets ?? [])
+  const bankAccounts = withUserId(db.bankAccounts ?? [])
+  /** De rekeningen waarop budgetteren uit staat — zie `isBudgetExcludedAccount`. */
+  const budgetExcludedAccountIds = new Set(
+    bankAccounts.filter((ba) => isBudgetExcludedAccount(ba, assetRows)).map((ba) => String(ba.id)),
+  )
 
   const tables: Record<string, Row[]> = {
     profiles: [db.profile],
     budgets: withUserId(db.budgets ?? []),
     transactions,
     debts: withUserId(db.debts ?? []),
-    assets: withUserId(db.assets ?? []),
+    assets: assetRows,
+    bank_accounts: bankAccounts,
     net_worth_snapshots: withUserId(db.netWorthSnapshots ?? []),
     recurring_transactions: withUserId(db.recurringTransactions ?? []),
     budget_rollovers: withUserId(db.budgetRollovers ?? []),
@@ -310,8 +379,17 @@ export function makeSupabase(db: FakeDb): FakeSupabase {
         // Een aggregaat kent de rij-cap NIET: het telt in de database.
         const from = String(args.p_from ?? '')
         const to = String(args.p_to ?? '')
+        // …maar hij kent sinds ADR 0139 wél de BUDGET-STATUS van de rekening:
+        // boekingen op een rekening met "budgetteren uit" vallen erbuiten. Zonder
+        // deze spiegel zou de mock stiller zijn dan productie en zou een test een
+        // budgetsom/spaarquote/dagtarief meten die de database niet meer geeft.
+        // Een rij zonder `account_id`, of met een id dat de fixture niet kent,
+        // telt gewoon mee — dezelfde faalrichting als de SQL.
         const inWindow = transactions.filter(
-          (t) => String(t.date) >= from && String(t.date) < to,
+          (t) =>
+            String(t.date) >= from &&
+            String(t.date) < to &&
+            !(t.account_id != null && budgetExcludedAccountIds.has(String(t.account_id))),
         ) as { amount: number; date: string; budget_id?: string | null; transaction_type?: string | null }[]
         return { data: buildMonthAggregatesFromRows(inWindow), error: null }
       }
