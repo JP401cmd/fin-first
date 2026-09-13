@@ -43,7 +43,9 @@ De kaart zette "alle body-extracties" als losse eerste fase. Twee bodies bestaan
 - [x] A/1/2 — bewerkstand + editor-register; stap 1 EindstrategieBody; stap 2 extracties + UitgavenEditor — 6486e8611 (incl. reviewfixes H1/H2/M1/M2/M3/L1)
 - [x] 5 — PottenEditor (vier regel-bodies), pot-saldi pure move — 38adf255a + daa7c5a92
 - [x] Visuele check 13 sep (jochen@/Tessa): stap 1, 2, 5 bewerkstand renderen; knopwissel Bevestigen ↔ Opslaan en bevestigen; trede 3 zichtbaar; niets opgeslagen
-- [ ] 4 — eerst smalle schrijfroute sale_config (+ security), dan woonstrategie + verkoopinstelling inline
+- [x] 4 — pure move verkoopvelden → `SaleConfigFields` + `sale-config-draft` — 10190ca45
+- [x] 4 — `PATCH /api/assets/[id]/sale-config` (+ security-specialist: geen blokkade; 🟡 schuldenregel ≠ formulier opgelost via `lib/sale-config-debts.ts`), `WoningEditor` (woonstrategie in host-modus + verkoopinstelling per eigen bezitting, live effect via `assetSaleConfigs`), editor-context `woning`, register `potLiquidaties → woning` — cfe020303 (incl. reviewfixes M1/M3/L1/L3/L4)
+- [x] Visuele check 13 sep (jochen@/Tessa): stap 4 pills (huis + 5 bezittingen), woonstrategie met live preview, auto → Niet verkopen → "Opslaan en bevestigen" + footer; AssetForm-verkoopvelden ongewijzigd; niets opgeslagen
 - [ ] 3 — eerst `life_events`-schrijfroute (+ security), dan AOW (aanmaken bij opslaan) / pensioen / werk inline; `raw.events` op eigen user_id
 - [ ] L2 — inflatie, terugvalrendement, Box 3, rendement per bezitting inline; RegelSimOverride uitbreiden; `/api/parameters`-retry
 - [ ] Slot — meebeweeg-check laag c, ADR 0142-aanvulling, CLAUDE.md-regel, register.ts `partner`, UAT WF-TOEK-44, will-tests `toBe(30)`, uat-plan.md:6432, compliance-check nieuwe kopij, arch:diagram, parity-rebaseline, merkstem:scan
@@ -54,4 +56,9 @@ De kaart zette "alle body-extracties" als losse eerste fase. Twee bodies bestaan
 - `overzicht.ts` draait bij trede 3 één extra basisrun per stap (`b.run({})`); kan uit de bundel zodra `SimResult` het liquide eindvermogen draagt.
 - Dubbele `router.refresh()` na een uitgaven-save in de wizard (hook + `onChanged`).
 - Kolom-whitelist per rijtype voor assets/debts in de client-snapshot (nu alleen suffix-vangrail); schulden dragen `creditor`/`notes`.
-- Stap 5 in de wizard toont de bestaande regel-intro ("de 4%-regel", "beschermen je tegen slechte beursjaren") — meenemen in de compliance-check.
+- Stap 5 in de wizard toont de bestaande regel-intro ("beschermen je tegen slechte beursjaren") — meenemen in de compliance-check. ("de 4%-regel" is sinds 4fcd352d8 weg.)
+- Stap 4 (review M2): `MODE_META` in `housing-strategy-section.tsx` oordeelt ("Eenvoudig, maar onrealistisch", "past bij internationale standaard", tag "Internationale standaard") en verschijnt nu ook in de wizard, terwijl `overzicht.test.ts` A8 die woorden voor dezelfde stap verbiedt → compliance-check; neutraliseer in beide hosts en breid de A8-toets uit naar de sectie.
+- Stap 4 (review M1, deel 1 — voorleggen aan eigenaar): opslaan van één onderdeel (bv. één bezitting) bevestigt de hele stap en gaat door, ook als er meer onderdelen zijn. Consistent met "opslaan = bevestigen" en stap 5; wél opgelost: blijft de stap open (A10), dan blijft de wizard in de stap met de reden.
+- Stap 4 (review L2): wizard begrenst leeftijd ≤120 en kosten ≤20% (= route); AssetForm niet → een in het formulier opgeslagen buiten-bereik-waarde moet in de wizard eerst worden aangepast (melding zichtbaar).
+- Security-bijvangst: `/toekomst/gebeurtenissen` geeft `housingPreview.kernelRawContext.profile` = volledige profielrij (`select('*')`) als client-prop; eigen rij, geen lek — door `alleenKernelProfiel`/`buildClientRegelSimSnapshot` halen.
+- SWR-widget toont nog "Trinity Study 4%" (eigenaar: later behandelen).
