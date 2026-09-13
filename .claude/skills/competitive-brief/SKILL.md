@@ -25,6 +25,10 @@ Vuistregel: gaat het over **een pagina die we willen schrijven** → `zoekvraag-
 
 Het Nederlandse veld is bezet: vergelijkers, bankeigen inzicht-tools, budget-apps en FIRE-rekenmachines. Kijk per aanbieder naar wat hij **belooft** (de kop, niet de featurelijst), wat hij **bewust niet doet**, en waar hij de gebruiker **doorverwijst** — dat laatste is vaak de rand van zijn model. Let ook op de Wft-grens die zíj trekken: wie advies geeft heeft een vergunning, en dat verklaart een deel van hun zwijgen.
 
+**Vaste as: hoe zet een aanbieder zijn aannames op?** Naast wat hij belooft: laat hij de gebruiker rendement, inflatie, uitgaven na stoppen en stopmoment zelf kiezen en uitgelegd zien, of rekent hij met stille defaults? Dat is sinds de plan-review (ADR 0142) een eigen positioneringsvraag — "je ziet waarmee we rekenen en wat een andere keuze doet" is alleen een gat als de ander het niet laat zien.
+
+**Bronnen die niet bereikbaar zijn.** Reddit en het Bogleheads-forum blokkeren geautomatiseerde ophaling (ronde 13 sep 2026). Noteer ze als "niet geraadpleegd" in de brief in plaats van ze te citeren uit geheugen of zoekresultaat-snippets; gebruik waar mogelijk een andere openbare bron (reviews, app-store-teksten, de eigen documentatie van de aanbieder).
+
 ## De uitkomst
 
 Per ronde, kort: **wie · wat belooft hij · waar houdt hij op · is dat gat van ons (ja/nee + waarom)**. Sluit af met één zin positionering — die zin is het hele doel van de brief.

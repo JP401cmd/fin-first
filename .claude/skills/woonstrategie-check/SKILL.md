@@ -19,7 +19,7 @@ Meet per strategie (`include_full`, `exclude_from_fire`, `downsize`, `reverse_mo
 2. **Seed + kalibratie** (alles via `evaluate_script` in de ingelogde sessie):
    - `POST /api/admin/seed` `{"persona":"lisa"}` — stream uitlezen tot `{"done":true}`.
    - `PUT /api/parameters` `{income_source:'manual', net_monthly_income:5200, expenses_source:'manual', estimated_monthly_expenses:5100}`
-   - `PUT /api/fire-settings` `{fire_end_strategy:'deplete', fire_end_age:90, fire_legacy_amount:0, retirement_expense_method:'custom_amount', retirement_expense_custom_amount:42000, monthly_savings_override:null}`
+   - `PUT /api/fire-settings` `{fire_end_strategy:'deplete', fire_end_age:90, fire_legacy_amount:0, retirement_expense_method:'custom_amount', retirement_expense_custom_amount:42000}`
    - Verwacht op /toekomst: referentie-FIRE ≈ 59–60 (±1 jr leeftijdsdrift), inleg ≈ € 200/mnd. Fors anders → kalibratie bijstellen, niet doorduwen.
 3. **Per strategie (4×)**, in deze volgorde. Body is telkens `{config: <config>}` op `PUT /api/housing-strategy`; configs exact als de matrix-goldens:
    - `{mode:'include_full'}` — de referentie, meet deze eerst.
@@ -40,7 +40,7 @@ Meet per strategie (`include_full`, `exclude_from_fire`, `downsize`, `reverse_mo
 | Signaal | Oorzaak / actie |
 |---|---|
 | Alle 4 strategieën zelfde FIRE-leeftijd én zelfde excl.-doel | Persona te rijk: FIRE al op de huidige leeftijd bereikt, strategie-effecten spelen pas ná dat moment. Geen bug — neem de lisa-kalibratie. |
-| INLEG/MAAND verandert niet na `monthly_savings_override` | De kernel rekent op de effectieve cashflow, niet op die override. Gebruik `income_source`/`expenses_source='manual'` via `/api/parameters`. |
+| INLEG/MAAND wil je bijsturen | Er is geen handmatige spaar-override meer (`monthly_savings_override` vervallen, ADR 0141 — één spaargrondslag). De kernel rekent op de effectieve cashflow: stuur bij met `income_source`/`expenses_source='manual'` via `/api/parameters`. |
 | KPI's ongewijzigd na PUT | RSC-render van vóór de PUT. Harde reload met ignoreCache; config verifiëren via GET. |
 | Klik doet niets op een React-knop | Dispatch `pointerdown`+`pointerup`+`click`; verse snapshot vóór uid-kliks. |
 | Wat-als-stippellijn vervuilt de figuur | Wat-als-toggle (aria-pressed=true) uitzetten vóór elke screenshot; komt na reload terug. |
