@@ -5,36 +5,17 @@ import { ShellOverlay, type PaneAction } from '@/components/app/shell/shell-over
 import UitgavenNaPensioenClient, {
   type UitgavenPaneActionsState,
 } from '@/app/(app)/horizon/uitgaven-na-pensioen/uitgaven-client'
-import type { RetirementExpenseMethod } from '@/lib/budget-utils'
 import { formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+import { useUitgavenContext } from './use-uitgaven-context'
 
 interface UitgavenPaneProps {
   open: boolean
   onClose: () => void
 }
 
-interface Context {
-  initialMethod: RetirementExpenseMethod
-  customAmount: number | null
-  yearlyMustExpenses: number
-  yearlyIncome: number
-  estimatedYearlyExpenses: number
-  currentRetirementExpense: number
-  budgetingActive: boolean
-  savedAspirations: unknown
-}
-
 export function UitgavenPane({ open, onClose }: UitgavenPaneProps) {
-  const [ctx, setCtx] = useState<Context | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  // Bumpt de fetch-effect-dep zodat de pane zijn ctx opnieuw ophaalt ná een
-  // methode-wissel (save) terwijl 'ie open blijft. Zonder dit blijft `ctx`
-  // (incl. currentRetirementExpense) hangen op de waarde van de initiële open —
-  // `router.refresh()` in de child raakt deze client-fetch-state niet.
-  const [reloadKey, setReloadKey] = useState(0)
-  const reloadContext = useCallback(() => setReloadKey(k => k + 1), [])
+  const { ctx, loading, error, reloadContext, retry } = useUitgavenContext(open)
   // Save-state komt uit de child via `onActionsChange`. We houden 'm hier
   // in lokale state zodat de pane-footer (primary/secondary) reactief is.
   // Default = `null` → footer wordt niet gerenderd zolang de child nog niet
@@ -42,38 +23,10 @@ export function UitgavenPane({ open, onClose }: UitgavenPaneProps) {
   const [actions, setActions] = useState<UitgavenPaneActionsState | null>(null)
   const { masked } = useMaskedAmounts()
 
-  // Bewust setState-in-effect voor data-fetching: we synchroniseren externe
-  // state (HTTP) met React. De alternatieve patronen (Suspense / SWR) zouden
-  // de pane-wrapper veel ingrijpender maken; dit volgt het bestaande pattern
-  // in `account-form-modal.tsx` en sheet-componenten.
-  /* eslint-disable react-hooks/set-state-in-effect */
-  useEffect(() => {
-    if (!open) return
-    let cancelled = false
-    setLoading(true)
-    setError(null)
-    fetch('/api/uitgaven-na-pensioen/context')
-      .then(async r => {
-        if (!r.ok) throw new Error((await r.json()).error ?? 'Laden mislukt')
-        return r.json() as Promise<Context>
-      })
-      .then(data => {
-        if (!cancelled) setCtx(data)
-      })
-      .catch(e => {
-        if (!cancelled) setError(e instanceof Error ? e.message : 'Onbekende fout')
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [open, reloadKey])
-
   // Reset actions wanneer de pane sluit, anders blijft een stale snapshot
   // hangen voor de volgende open (tot child re-publishes). Bewust set-state-
   // in-effect: synchroniseert externe lifecycle (open/close) met lokale state.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!open) setActions(null)
   }, [open])
@@ -141,17 +94,7 @@ export function UitgavenPane({ open, onClose }: UitgavenPaneProps) {
           <p className="text-sm text-red-700">Fout bij laden: {error}</p>
           <button
             type="button"
-            onClick={() => {
-              setCtx(null)
-              setError(null)
-              // Trigger reload
-              setLoading(true)
-              fetch('/api/uitgaven-na-pensioen/context')
-                .then(async r => (r.ok ? r.json() : Promise.reject(await r.json())))
-                .then(setCtx)
-                .catch(e => setError(e?.error ?? 'Onbekende fout'))
-                .finally(() => setLoading(false))
-            }}
+            onClick={retry}
             className="mt-3 text-xs underline text-[var(--ink-2)]"
           >
             Probeer opnieuw

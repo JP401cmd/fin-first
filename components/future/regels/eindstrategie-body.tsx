@@ -176,10 +176,11 @@ export function EindstrategieBody({
       saving,
       save: () => saveRef.current(),
       footerInfo: <FireDeltaFooter baseline={baseline} draft={draftProj} />,
+      changed,
     })
     // baseline/draftProj zijn useMemo-stabiel; deltaMonths bewaakt republish.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onActionsChange, canSave, saving, deltaMonths])
+  }, [onActionsChange, canSave, saving, deltaMonths, changed])
 
   return (
     <div className="pb-6">

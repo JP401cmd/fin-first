@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { createContext, useContext, useState } from 'react'
 import {
   Plane,
   Car,
@@ -50,13 +50,23 @@ export const LIFESTYLE_COPY: Record<LifestyleId, { label: string; line: string }
  * persoonlijke uitgaven-client levert ze inline; de huishoud-pane levert ze in
  * de BottomSheet-footer). De component berekent de breakdown zelf voor weergave.
  */
+/**
+ * Kopniveau van de vragenlijst (ADR 0110). Default h3 — de uitgaven-pane en de huishoud-pane.
+ * De plan-review-wizard hangt de vragenlijst onder zijn stap-h4 en zet h5 (TPR-15).
+ */
+type VragenlijstKop = 'h3' | 'h5'
+const KopContext = createContext<VragenlijstKop>('h3')
+
 export function AspirationQuestionnaire({
   answers,
   setAnswers,
+  kop = 'h3',
 }: {
   answers: AspirationAnswers
   setAnswers: (a: AspirationAnswers) => void
+  kop?: VragenlijstKop
 }) {
+  const Kop = kop
   const { masked } = useMaskedAmounts()
   const breakdown = computeAspirationTotal(answers)
 
@@ -66,6 +76,7 @@ export function AspirationQuestionnaire({
     : breakdown.total
 
   return (
+    <KopContext.Provider value={kop}>
     <div className="space-y-6">
       <ReisSection answers={answers} setAnswers={setAnswers} subtotal={breakdown.travel} />
       <VervoerSection answers={answers} setAnswers={setAnswers} subtotal={breakdown.transport} />
@@ -77,12 +88,12 @@ export function AspirationQuestionnaire({
       {/* Receipt */}
       <div className="mt-10">
         <Kicker>Samenvatting</Kicker>
-        <h3
+        <Kop
           className="mt-2 text-2xl sm:text-3xl font-black tracking-[-0.02em]"
           style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
         >
           Jouw pensioenleven, opgeteld
-        </h3>
+        </Kop>
         {/* APP-7-opt-out: dit is geen KPI-strip maar de opsplitsing van het
             eindbedrag dat er direct onder staat — de vier cellen tellen op tot
             dat getal. Twee cellen tonen zou een optelsom laten zien die niet
@@ -177,6 +188,7 @@ export function AspirationQuestionnaire({
         </div>
       </div>
     </div>
+    </KopContext.Provider>
   )
 }
 
@@ -199,6 +211,7 @@ function Section({
   subtotal: number
   children: React.ReactNode
 }) {
+  const Kop = useContext(KopContext)
   return (
     <CardEditorial accent className="p-5 sm:p-7">
       <div className="flex items-start justify-between gap-4 mb-4">
@@ -210,12 +223,12 @@ function Section({
             <div className="text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--ink-3)]">
               {number} · {title}
             </div>
-            <h3
+            <Kop
               className="mt-1 text-xl sm:text-2xl italic font-normal leading-tight"
               style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
             >
               {question}
-            </h3>
+            </Kop>
           </div>
         </div>
         <div className="text-right shrink-0">

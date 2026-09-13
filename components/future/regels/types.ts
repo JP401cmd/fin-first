@@ -20,6 +20,13 @@ export interface RegelEditActionsState {
   save: () => void
   /** Optionele live-info naast de footer-knoppen (bv. FIRE-delta-tekst). */
   footerInfo?: ReactNode
+  /**
+   * TPR-15 — wijkt het concept af van wat er opgeslagen staat? De plan-review toont bij
+   * `false` "Bevestigen" in plaats van "Opslaan en bevestigen" (besluit eigenaar 13 sep
+   * 2026). Optioneel: een body die het niet publiceert, blijft in de wizard "Opslaan en
+   * bevestigen" houden; RegelBewerkenPane leest het niet.
+   */
+  changed?: boolean
 }
 
 /**

@@ -14,6 +14,15 @@
  * via `PUT /api/plan-review` (A5). "Overslaan" gaat door zonder te bevestigen; de pane
  * is op elk moment te sluiten en bevestigde stappen blijven bevestigd (A6).
  *
+ * BEWERKSTAND (TPR-15). Heeft een stap een editor in `PLAN_REVIEW_EDITORS`, dan klapt
+ * "Aanpassen" die bestaande editor-body ín de stap uit — geen navigatie, geen geneste
+ * overlay. De body schrijft via zijn eigen, bestaande route; de footer wordt "Opslaan en
+ * bevestigen" (besluit eigenaar 13 sep 2026: opslaan = bevestigen) en na de write zet de
+ * pane de markering en gaat door. "Annuleren" sluit alleen de bewerkstand; er is dan
+ * niets geschreven. Wat de editors nodig hebben (snapshot, plan) wordt pas bij de eerste
+ * bewerkstand gelezen (`GET /api/plan-review/editor-context`). Stappen zonder editor
+ * verwijzen nog naar het bestaande scherm.
+ *
  * Na de laatste stap: het afsluitscherm "Voor wie wil" met verwijzingen naar de
  * bestaande Voorkeuren-kaarten en het bezittingenoverzicht (laag 2, alleen doorverwijzen).
  *
@@ -21,11 +30,14 @@
  * naast de pane (A12). Kopniveau: de pane-titel is h3, de stapnaam h4.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Check, Circle, Minus } from 'lucide-react'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
+import type { RegelEditActionsState } from '@/components/future/regels/types'
+import { PLAN_REVIEW_EDITOR_CONTEXT_URL, type PlanReviewEditorContext } from '@/lib/plan-review/editor-context'
+import { PLAN_REVIEW_EDITORS } from './editors'
 import { noteOverlayNavigation } from '@/lib/overlay-history'
 import { derivePlanReviewProgress } from '@/lib/plan-review/progress'
 import {
@@ -89,6 +101,15 @@ export function PlanReviewPane({
   const [keuzeId, setKeuzeId] = useState<string | null>(null)
   const [bezig, setBezig] = useState(false)
   const [opslaanFout, setOpslaanFout] = useState<string | null>(null)
+  // TPR-15 — bewerkstand van de huidige stap.
+  const [bewerken, setBewerken] = useState(false)
+  const [editorContext, setEditorContext] = useState<PlanReviewEditorContext | null>(null)
+  const [editorLaadFout, setEditorLaadFout] = useState<string | null>(null)
+  const [editorActions, setEditorActions] = useState<RegelEditActionsState | null>(null)
+  /** Fout van een markering ná een geslaagde editor-write; overleeft de herlezing van de stap. */
+  const [markeerFout, setMarkeerFout] = useState<string | null>(null)
+  /** De stap waarin de bewerkstand geopend werd — daar hoort een editor-write bij. */
+  const bewerkStapRef = useRef<PlanReviewStap | null>(null)
 
   const huidigAntwoord = scherm === 'afsluiten' ? null : cache[scherm]
 
@@ -132,7 +153,49 @@ export function PlanReviewPane({
     setKeuzeId(huidigAntwoord?.overzicht.keuzes.find((k) => k.huidig)?.id ?? null)
   }, [scherm, huidigAntwoord])
 
+  // De bewerkstand hoort bij één stap: een andere stap openen sluit hem (zonder te schrijven).
+  useEffect(() => {
+    setBewerken(false)
+    setEditorActions(null)
+    setEditorLaadFout(null)
+    setMarkeerFout(null)
+  }, [scherm])
+
   const gaNaar = (s: Scherm) => setScherm(s)
+
+  /**
+   * Zet de markering voor de huidige stap en gaat door. `geschreven` = er is zojuist via
+   * een domeinroute geschreven: dan kunnen andere stappen en de editor-context verschoven
+   * zijn, dus die worden opnieuw gelezen. `woonstrategieGeschreven` is het enige feit dat
+   * een review-write zelf verandert; zonder die bijwerking bleef de woningstap lokaal
+   * 'open' tot de volgende lezing.
+   */
+  async function markeerEnGaDoor(
+    stap: PlanReviewStap,
+    facts: PlanReviewFacts,
+    opties: { geschreven: boolean; woonstrategieGeschreven: boolean },
+  ): Promise<string | null> {
+    // Is er geschreven, dan zijn andere stappen en de editor-context verouderd — ook als
+    // de markering hierna faalt (anders neemt een volgende bewerkstand het oude plan
+    // als "opgeslagen" en schrijft een tweede edit de eerste deels terug).
+    if (opties.geschreven) setEditorContext(null)
+    const res = await fetch('/api/plan-review', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ stap, bevestigd: true }),
+    })
+    const data = (await res.json().catch(() => ({}))) as { plan_review_state?: unknown; error?: unknown }
+    if (!res.ok) {
+      return typeof data.error === 'string' ? data.error : 'Bevestigen is niet gelukt.'
+    }
+    const nieuweFacts: PlanReviewFacts = opties.woonstrategieGeschreven ? { ...facts, housingConfigured: true } : facts
+    const nieuw = derivePlanReviewProgress(parsePlanReviewState(data.plan_review_state), nieuweFacts)
+    setProgress(nieuw)
+    if (opties.geschreven) setCache({})
+    onChanged()
+    gaNaar(volgendScherm(nieuw, stap))
+    return null
+  }
 
   async function bevestig() {
     if (scherm === 'afsluiten' || !huidigAntwoord) return
@@ -141,6 +204,7 @@ export function PlanReviewPane({
     const acties = keuze ? keuze.schrijf : overzicht.schrijf
     setBezig(true)
     setOpslaanFout(null)
+    setMarkeerFout(null)
     try {
       for (const actie of acties) {
         const fout = await schrijf(actie)
@@ -149,30 +213,100 @@ export function PlanReviewPane({
           return
         }
       }
-      const res = await fetch('/api/plan-review', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ stap: scherm, bevestigd: true }),
+      const fout = await markeerEnGaDoor(scherm, facts, {
+        geschreven: acties.length > 0,
+        woonstrategieGeschreven: acties.some((a) => a.url === '/api/housing-strategy'),
       })
-      const data = (await res.json().catch(() => ({}))) as { plan_review_state?: unknown; error?: unknown }
-      if (!res.ok) {
-        setOpslaanFout(typeof data.error === 'string' ? data.error : 'Bevestigen is niet gelukt.')
-        return
-      }
-      // Het enige feit dat een review-write zelf verandert: een woonstrategie is nu
-      // opgeslagen. Zonder deze bijwerking bleef de woningstap lokaal 'open' tot de
-      // volgende lezing.
-      const nieuweFacts: PlanReviewFacts = acties.some((a) => a.url === '/api/housing-strategy')
-        ? { ...facts, housingConfigured: true }
-        : facts
-      const nieuw = derivePlanReviewProgress(parsePlanReviewState(data.plan_review_state), nieuweFacts)
-      setProgress(nieuw)
-      // Een write kan de uitkomst van andere stappen verschuiven: die opnieuw laden.
-      if (acties.length > 0) setCache({})
-      onChanged()
-      gaNaar(volgendScherm(nieuw, scherm))
+      if (fout) setOpslaanFout(fout)
     } catch {
       setOpslaanFout('Bevestigen is niet gelukt.')
+    } finally {
+      setBezig(false)
+    }
+  }
+
+  async function laadEditorContext() {
+    setEditorLaadFout(null)
+    try {
+      const res = await fetch(PLAN_REVIEW_EDITOR_CONTEXT_URL)
+      const data = (await res.json().catch(() => ({}))) as Partial<PlanReviewEditorContext> & { error?: unknown }
+      if (!res.ok || !('snapshot' in data)) {
+        setEditorLaadFout(typeof data.error === 'string' ? data.error : 'Aanpassen kon niet geladen worden.')
+        return
+      }
+      setEditorContext({ snapshot: data.snapshot ?? null, firePlan: data.firePlan ?? null })
+    } catch {
+      setEditorLaadFout('Aanpassen kon niet geladen worden.')
+    }
+  }
+
+  function startBewerken() {
+    if (scherm === 'afsluiten') return
+    setOpslaanFout(null)
+    setMarkeerFout(null)
+    setEditorActions(null)
+    bewerkStapRef.current = scherm
+    setBewerken(true)
+    if (!editorContext) void laadEditorContext()
+  }
+
+  function stopBewerken() {
+    setBewerken(false)
+    setEditorActions(null)
+  }
+
+  // Stabiele identiteit: de body publiceert in een effect dat hierop leunt.
+  const handleEditorActions = useCallback((next: RegelEditActionsState) => {
+    setEditorActions(next)
+  }, [])
+
+  // Ook `onSaved` krijgt een stabiele identiteit (via een ref naar de laatste closure): een
+  // body die hem in een publiceer-effect meeneemt, zou anders elke render opnieuw
+  // publiceren → state-update → render → eindeloze lus.
+  const naOpslaanRef = useRef<() => void>(() => {})
+  useEffect(() => {
+    naOpslaanRef.current = () => void naOpslaanInEditor()
+  })
+  const handleEditorSaved = useCallback(() => naOpslaanRef.current(), [])
+
+  /**
+   * De body heeft via zijn bestaande route geschreven: opslaan = bevestigen. De markering
+   * gaat naar de stap waarin de bewerkstand geopend werd (`bewerkStapRef`), nooit naar
+   * een stap die intussen open staat.
+   */
+  async function naOpslaanInEditor() {
+    const stap = bewerkStapRef.current
+    const antwoord = stap ? cache[stap] : undefined
+    if (!stap || stap !== schermRef.current || !antwoord) {
+      // Geschreven, maar de gebruiker staat niet meer in die stap: niet bevestigen, wel
+      // alles wat op de oude waarde leunt opnieuw laten lezen.
+      setEditorContext(null)
+      setCache({})
+      onChanged()
+      return
+    }
+    setBezig(true)
+    setOpslaanFout(null)
+    setMarkeerFout(null)
+    try {
+      const fout = await markeerEnGaDoor(stap, antwoord.facts, {
+        geschreven: true,
+        woonstrategieGeschreven: stap === 'woning',
+      })
+      if (fout) {
+        // De instelling staat opgeslagen, alleen de markering niet: terug naar het overzicht
+        // van de stap (herlezen), zodat "Bevestigen" het opnieuw kan proberen zonder nog eens
+        // te schrijven. Eigen foutregel: `opslaanFout` wist mee met de herlezing.
+        setMarkeerFout(`Je instelling is opgeslagen, maar bevestigen is niet gelukt: ${fout}`)
+        setBewerken(false)
+        setCache({})
+        onChanged()
+      }
+    } catch {
+      setMarkeerFout('Je instelling is opgeslagen, maar bevestigen is niet gelukt.')
+      setEditorContext(null)
+      setBewerken(false)
+      setCache({})
     } finally {
       setBezig(false)
     }
@@ -194,6 +328,32 @@ export function PlanReviewPane({
   const stapStatus = (stap: PlanReviewStap): PlanReviewStapStatus =>
     progress.stappen.find((s) => s.stap === stap)?.status ?? 'open'
 
+  const Editor = isAfsluiten ? null : PLAN_REVIEW_EDITORS[scherm]
+  const inBewerkstand = bewerken && Editor != null
+  const editorBezig = bezig || (editorActions?.saving ?? false)
+
+  let editorSlot: ReactNode = null
+  if (inBewerkstand) {
+    editorSlot = editorLaadFout ? (
+      <div className="space-y-2">
+        <p role="alert" className="text-negative">{editorLaadFout}</p>
+        <button
+          type="button"
+          onClick={() => void laadEditorContext()}
+          className="inline-flex min-h-[44px] items-center text-xs font-semibold text-[var(--ink-2)] underline hover:text-[var(--ink)]"
+        >
+          Opnieuw proberen
+        </button>
+      </div>
+    ) : !editorContext ? (
+      <p className="text-[var(--ink-3)]" aria-live="polite">
+        Je instellingen worden geladen…
+      </p>
+    ) : (
+      <Editor context={editorContext} onActionsChange={handleEditorActions} onSaved={handleEditorSaved} />
+    )
+  }
+
   return (
     <ShellOverlay
       open={open}
@@ -204,17 +364,30 @@ export function PlanReviewPane({
       primaryAction={
         isAfsluiten
           ? { label: 'Sluiten', onClick: onClose }
-          : { label: 'Bevestigen', onClick: () => void bevestig(), disabled: !kanBevestigen, loading: bezig }
+          : inBewerkstand && editorActions?.changed !== false
+            ? {
+                label: 'Opslaan en bevestigen',
+                onClick: () => editorActions?.save(),
+                disabled: !editorActions?.canSave || editorBezig,
+                loading: editorBezig,
+              }
+            : { label: 'Bevestigen', onClick: () => void bevestig(), disabled: !kanBevestigen, loading: bezig }
       }
       secondaryAction={
         isAfsluiten
           ? undefined
-          : { label: 'Overslaan', onClick: () => gaNaar(volgendScherm(progress, scherm)), disabled: bezig }
+          : inBewerkstand
+            ? { label: 'Annuleren', onClick: stopBewerken, disabled: editorBezig }
+            : { label: 'Overslaan', onClick: () => gaNaar(volgendScherm(progress, scherm)), disabled: bezig }
       }
       footerInfo={
-        <span className="font-mono text-[11px] tabular-nums text-[var(--ink-3)]">
-          {progress.bevestigd} van {progress.totaal} bevestigd
-        </span>
+        inBewerkstand && editorActions?.footerInfo ? (
+          editorActions.footerInfo
+        ) : (
+          <span className="font-mono text-[11px] tabular-nums text-[var(--ink-3)]">
+            {progress.bevestigd} van {progress.totaal} bevestigd
+          </span>
+        )
       }
     >
       <div className="space-y-5 px-4 py-4 sm:px-6">
@@ -228,7 +401,7 @@ export function PlanReviewPane({
                 <button
                   type="button"
                   onClick={() => gaNaar(stap)}
-                  disabled={status === 'nvt' || bezig}
+                  disabled={status === 'nvt' || editorBezig}
                   aria-current={actief ? 'step' : undefined}
                   className={`inline-flex min-h-[32px] items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors disabled:opacity-50 ${
                     actief
@@ -273,10 +446,18 @@ export function PlanReviewPane({
             keuzeId={keuzeId}
             onKeuze={setKeuzeId}
             onAanpassen={naarAanpassen}
-            bezig={bezig}
+            bezig={editorBezig}
+            heeftEditor={Editor != null}
+            onBewerken={startBewerken}
+            editorSlot={inBewerkstand ? editorSlot : null}
           />
         )}
 
+        {markeerFout && (
+          <p role="alert" className="text-sm text-negative">
+            {markeerFout}
+          </p>
+        )}
         {opslaanFout && (
           <p role="alert" className="text-sm text-negative">
             {opslaanFout}
@@ -300,6 +481,9 @@ function StapInhoud({
   onKeuze,
   onAanpassen,
   bezig,
+  heeftEditor,
+  onBewerken,
+  editorSlot,
 }: {
   overzicht: PlanReviewStapOverzicht
   index: number
@@ -307,7 +491,13 @@ function StapInhoud({
   onKeuze: (id: string) => void
   onAanpassen: (href: string) => void
   bezig: boolean
+  /** TPR-15 — de stap heeft een inline editor: "Aanpassen" opent die in plaats van te navigeren. */
+  heeftEditor: boolean
+  onBewerken: () => void
+  /** Niet-null = bewerkstand; vervangt effect/vergelijking/keuzes door de editor-body. */
+  editorSlot: ReactNode
 }) {
+  const inBewerkstand = editorSlot != null
   return (
     <article className="space-y-5 text-sm leading-relaxed text-[var(--ink-2)]">
       <header>
@@ -333,6 +523,77 @@ function StapInhoud({
         )}
       </section>
 
+      {inBewerkstand ? (
+        /* AANPASSEN — de bestaande editor-body; keuze en live effect staan daarin. */
+        <section aria-label="Aanpassen" className="space-y-2">
+          <Kicker>Aanpassen</Kicker>
+          <p className="text-xs text-[var(--ink-3)]">
+            Je wijzigt hier dezelfde instelling als op het gewone scherm. Het effect zie je direct; opslaan
+            bevestigt deze stap.
+          </p>
+          {editorSlot}
+        </section>
+      ) : (
+        <StapEffect overzicht={overzicht} keuzeId={keuzeId} onKeuze={onKeuze} bezig={bezig} />
+      )}
+
+      {/* WAAROM */}
+      <section aria-label="Waarom dit ertoe doet" className="space-y-2">
+        <Kicker>Waarom dit ertoe doet</Kicker>
+        <p>{overzicht.waarom}</p>
+      </section>
+
+      {!inBewerkstand && overzicht.beperking && (
+        <p className="text-xs italic text-[var(--ink-3)]">{overzicht.beperking}</p>
+      )}
+      {!inBewerkstand && overzicht.blokkade && (
+        <p className="text-xs font-semibold text-[var(--ink)]">{overzicht.blokkade}</p>
+      )}
+
+      {!inBewerkstand && (heeftEditor || overzicht.aanpassen.length > 0) && (
+        <div className="flex flex-wrap gap-x-4 border-t border-[var(--border-ed)] pt-1">
+          {heeftEditor ? (
+            <button
+              type="button"
+              onClick={onBewerken}
+              disabled={bezig}
+              className="inline-flex min-h-[44px] items-center text-xs font-semibold text-[var(--ink-2)] underline-offset-2 hover:text-[var(--ink)] hover:underline"
+            >
+              {overzicht.aanpassen[0]?.label ?? 'Aanpassen'}
+            </button>
+          ) : (
+            overzicht.aanpassen.map((a) => (
+              <button
+                key={a.href}
+                type="button"
+                onClick={() => onAanpassen(a.href)}
+                disabled={bezig}
+                className="inline-flex min-h-[44px] items-center text-xs font-semibold text-[var(--ink-2)] underline-offset-2 hover:text-[var(--ink)] hover:underline"
+              >
+                {a.label} →
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </article>
+  )
+}
+
+/** EFFECT — de uitkomst, de vergelijking en (stap 4) de keuzes naast elkaar. */
+function StapEffect({
+  overzicht,
+  keuzeId,
+  onKeuze,
+  bezig,
+}: {
+  overzicht: PlanReviewStapOverzicht
+  keuzeId: string | null
+  onKeuze: (id: string) => void
+  bezig: boolean
+}) {
+  return (
+    <>
       {/* EFFECT */}
       <section aria-label="Wat het doet" className="space-y-2">
         <Kicker>Wat het doet</Kicker>
@@ -384,32 +645,7 @@ function StapInhoud({
           </fieldset>
         )}
       </section>
-
-      {/* WAAROM */}
-      <section aria-label="Waarom dit ertoe doet" className="space-y-2">
-        <Kicker>Waarom dit ertoe doet</Kicker>
-        <p>{overzicht.waarom}</p>
-      </section>
-
-      {overzicht.beperking && <p className="text-xs italic text-[var(--ink-3)]">{overzicht.beperking}</p>}
-      {overzicht.blokkade && <p className="text-xs font-semibold text-[var(--ink)]">{overzicht.blokkade}</p>}
-
-      {overzicht.aanpassen.length > 0 && (
-        <div className="flex flex-wrap gap-x-4 border-t border-[var(--border-ed)] pt-1">
-          {overzicht.aanpassen.map((a) => (
-            <button
-              key={a.href}
-              type="button"
-              onClick={() => onAanpassen(a.href)}
-              disabled={bezig}
-              className="inline-flex min-h-[44px] items-center text-xs font-semibold text-[var(--ink-2)] underline-offset-2 hover:text-[var(--ink)] hover:underline"
-            >
-              {a.label} →
-            </button>
-          ))}
-        </div>
-      )}
-    </article>
+    </>
   )
 }
 
