@@ -82,7 +82,6 @@ export interface KernelSimData {
   aowAgeFractional: number
   box3Method: Box3Method
   bankAccountCash: number
-  monthlySavingsOverride: number | null
   baseAnnualSavingsFromCashflow: number | null
   housingStrategy?: HousingStrategyConfig
   /** Gehanteerde tekort-lening-jaarrente (canonieke V7-resolver, 0..1). */
@@ -302,7 +301,6 @@ export function GebeurtenissenView({
           box3Method: kernelSim.box3Method,
           hasPartner: eventPaneData.householdMode,
           bankAccountCash: kernelSim.bankAccountCash,
-          monthlySavingsOverride: kernelSim.monthlySavingsOverride,
           baseAnnualSavingsFromCashflow: kernelSim.baseAnnualSavingsFromCashflow,
           housingStrategy: kernelSim.housingStrategy,
           kernelRawProfile: rawContext.profile,

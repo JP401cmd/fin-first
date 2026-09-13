@@ -16,7 +16,12 @@
  */
 
 import type { TaxYear } from '@/lib/box3-data'
-import { DEFAULT_VOLATILITY, NL_AOW_MONTHLY, NL_AOW_MONTHLY_SAMENWONEND } from '@/lib/constants'
+import {
+  DEFAULT_VOLATILITY,
+  HOUSING_DEPLETION_MARGIN_DEFAULT_MONTHS,
+  NL_AOW_MONTHLY,
+  NL_AOW_MONTHLY_SAMENWONEND,
+} from '@/lib/constants'
 import type { AowBasisPerMaand } from '../types'
 
 /**
@@ -35,7 +40,8 @@ export const EXCEL_TEKORT_LENING_RENTE = 0.05
 /**
  * P!B91 — heffingvrij inkomen per persoon per jaar (werkelijk-Box 3-tak). Alléén
  * relevant wanneer `box3Method === 'werkelijk'`; de kern schaalt dit × personen tot
- * P!B92. Er is geen app-veld → Excel-default P!B91 = 1800.
+ * P!B92. Sinds TPR-12 de TERUGVAL voor `profiles.box3_heffingvrij_inkomen` (NULL →
+ * deze waarde; zie `params.ts#resolveHeffingvrijInkomenPP`). Excel-default P!B91 = 1800.
  */
 export const EXCEL_HEFFINGVRIJ_INKOMEN_PP = 1800
 
@@ -104,15 +110,18 @@ export const EXCEL_GUARDRAIL_DEFAULTS = {
 export const EXCEL_WONING_DEFAULTS = {
   /** P!B59 — verkoopleeftijd (vaste leeftijd / fallback bij "wanneer nodig"). */
   verkoopleeftijd: 75,
-  /** P!B60 — drempel in maanden-uitgave ("wanneer nodig"). */
-  drempelMaandenUitgave: 24,
+  /** P!B60 — drempel in maanden-uitgave ("wanneer nodig"). Verwijst naar de app-
+   *  constante (TPR-06) zodat kern-default en app-default niet kunnen driften; de
+   *  waarde is en blijft de oracle-cel (24). */
+  drempelMaandenUitgave: HOUSING_DEPLETION_MARGIN_DEFAULT_MONTHS,
   /** P!B61 — verkoopprijs als % van WOZ. */
   verkoopprijsPctWoz: 1,
   /** P!B62 — verkoopkosten %. */
   verkoopkostenPct: 0.04,
-  /** P!B63 — huur na verkoop (% van WOZ per jaar). De app kent een €-maandlast
-   *  (`newMonthlyHousingCost`), geen %/WOZ; tot de conversie er is gebruikt de
-   *  adapter de Excel-default. */
+  /** P!B63 — huur na verkoop (% van WOZ per jaar). TERUGVAL: de app-€-maandlast
+   *  (`newMonthlyHousingCost`) reist sinds TPR-03 als `WoningStrategieParams.
+   *  huurNaVerkoopPerMaand` mee en wint in de kern; alleen bij null (auto-schatting)
+   *  rekent `tables/bez.ts` met dit percentage van de huiswaarde. */
   huurNaVerkoopPctWozPerJaar: 0.04,
   /** P!B64 — startleeftijd opname (opeethypotheek). */
   opeetStartleeftijdOpname: 67,

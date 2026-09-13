@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { HousingStrategySection } from '@/components/identity/instellingen/housing-strategy-section'
+import { HousingStrategySection } from '@/components/future/strategie/housing-strategy-section'
 import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import type { ManagedStrategy } from '@/lib/strategy-events'
 import type { LifeEvent } from '@/lib/horizon-data'

@@ -362,6 +362,19 @@ export const DOWNSIZE_DEFAULT_SALES_COSTS_PCT = 0.04
  */
 export const HOUSING_COST_AFTER_SALE_PCT = 0.04
 
+/**
+ * Veiligheidsmarge bij "verkopen wanneer nodig" wanneer de gebruiker GEEN eigen marge
+ * heeft ingevuld — 24 maanden uitgaven (geïndexeerd). Spiegelt de Excel-oracle-drempel
+ * P!B60 (`EXCEL_WONING_DEFAULTS.drempelMaandenUitgave` verwijst hiernaar, zelfde patroon
+ * als DEFAULT_VOLATILITY → mcSigma, ADR 0117). TPR-06 (13 sep 2026): een
+ * `depletionThresholdYears` van 0 betekent in de app "geen eigen marge" — élke opgeslagen
+ * config draagt die 0 als niet-gekozen literal (onboarding, backfill, housing-choice) —
+ * en valt op deze default terug; vóór TPR-06 overschreef die 0 de drempel en vuurde de
+ * verkoop pas als de liquide pot exact leeg was. Eén resolver:
+ * `resolveDepletionMarginYears` (lib/housing-strategy.ts).
+ */
+export const HOUSING_DEPLETION_MARGIN_DEFAULT_MONTHS = 24
+
 // ── Opeethypotheek (reverse mortgage) ───────────────────────────
 
 /**

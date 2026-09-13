@@ -207,6 +207,8 @@ export function computeRunwayFromRawContext(
       debts: rawContext.debts,
       lifeEvents: rawContext.lifeEvents,
       aowRows: rawContext.aowRows,
+      // TPR-07: het partnerblok van de hoofdrun reist mee — kop en hoofdlijn op één grondslag.
+      ...(rawContext.partner ? { partner: rawContext.partner } : {}),
       yearlyExpenses: rawContext.yearlyExpenses,
       stopAge: opts.stop ?? 'nu',
       endStrategy: 'inherit',

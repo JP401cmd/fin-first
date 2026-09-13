@@ -84,7 +84,7 @@ export async function GET() {
         .limit(1),
       supabase
         .from('profiles')
-        .select('full_name, date_of_birth, household_type, expected_return, inflation_rate, box3_method, marginaal_tarief, net_monthly_income')
+        .select('full_name, date_of_birth, household_type, expected_return, inflation_rate, box3_method, net_monthly_income')
         .eq('id', claims.sub)
         .maybeSingle(),
       supabase

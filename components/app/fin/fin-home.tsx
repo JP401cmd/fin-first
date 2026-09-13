@@ -27,11 +27,8 @@ import {
 } from '@/lib/coach-suggestions'
 import { GUIDE_SUGGESTION_KEY_PREFIX, type CoachState } from '@/lib/coach-state'
 import type { ModuleId } from '@/lib/module-registry'
-import { inflight } from '@/lib/inflight'
 
 const THINK_MS = 400
-const POSTPONED_PROMPT =
-  'Ik wil opnieuw kijken naar tips die ik eerder heb uitgesteld en waarvan de wachttijd voorbij is. Begin met de belangrijkste.'
 
 export type FinHomeProps = {
   /**
@@ -63,7 +60,7 @@ export function FinHome({
   autoDismissMs = DEFAULT_COACH_TIMING.autoDismissMs,
   headerLabel = DEFAULT_COACH_HEADER,
 }: FinHomeProps) {
-  const { isOpen, toggle, open, openWithMessage, openGids } = useChatContext()
+  const { isOpen, toggle, open, openGids } = useChatContext()
   // Zwevende bottom-FAB: verberg de Fin-bubbel én de melding zolang er een
   // modal/overlay open is. Anders bloedt de halftransparante z-[70]-backdrop
   // door en lijkt de FAB bovenop de primaire actieknop onderin de sheet te
@@ -183,30 +180,7 @@ export function FinHome({
     return () => clearTimeout(t)
   }, [mode, done, suggestion?.key, autoDismissMs, dismiss])
 
-  const [postponedReady, setPostponedReady] = useState(0)
-  const fetchPostponedReady = useCallback(async () => {
-    try {
-      // Dedupe (perf fase 1): op mount vuren BEIDE effecten hieronder (de
-      // onvoorwaardelijke + de `!isOpen`-variant, want isOpen start false) →
-      // 2× dezelfde fetch. `inflight` vouwt gelijktijdige calls samen tot één
-      // roundtrip; een latere ververs (bij chat-sluiten) fetcht gewoon vers.
-      const count = await inflight('postponed-ready', async () => {
-        const res = await fetch('/api/ai/recommendations/postponed-ready', { cache: 'no-store' })
-        if (!res.ok) return null
-        return ((await res.json()) as { count: number }).count
-      })
-      if (count != null) setPostponedReady(count)
-    } catch { /* informatief — stil falen */ }
-  }, [])
-  useEffect(() => { void fetchPostponedReady() }, [fetchPostponedReady])
-  useEffect(() => { if (!isOpen) void fetchPostponedReady() }, [isOpen, fetchPostponedReady])
-
   const finState = mode === 'bubble' ? 'idle' : thinking ? 'thinking' : done ? 'listening' : 'talking'
-
-  const handleBubbleClick = useCallback(() => {
-    if (postponedReady > 0) openWithMessage(POSTPONED_PROMPT)
-    else toggle()
-  }, [postponedReady, openWithMessage, toggle])
 
   const handleCta = useCallback(() => {
     // Een gids-bubbel ZONDER bestemming wijst naar de pagina waar je al staat
@@ -296,18 +270,16 @@ export function FinHome({
 
   const fabAria = localBlocked
     ? 'Open chat met Fin — let op: lokale AI werkt niet op dit toestel'
-    : postponedReady > 0
-      ? `Open chat met Fin — ${postponedReady} uitgestelde tip${postponedReady === 1 ? '' : 's'} klaar`
-      : 'Open chat met Fin'
+    : 'Open chat met Fin'
 
   // De bubbel is drie lagen die absoluut aan hun eigen context hangen: knop
-  // (met badge), avatar erover, en het privacy-/waarschuwingsteken. Eén bron,
+  // (open/dicht-toggle), avatar erover, en het privacy-/waarschuwingsteken. Eén bron,
   // twee plekken — in het nav-pill-slot (mobiel) en zwevend in de hoek (desktop).
   const renderBubble = (variant: 'floating' | 'slot') => (
     <>
       <button
         type="button"
-        onClick={handleBubbleClick}
+        onClick={toggle}
         className={variant === 'slot' ? 'wh-bubble wh-bubble--slot' : 'wh-bubble'}
         aria-label={fabAria}
       >
@@ -316,9 +288,6 @@ export function FinHome({
             hieronder) en telt dus niet vanzelf mee voor de knopmaat; zonder
             dit zou het slot-segment smaller ogen dan de andere twee. */}
         {variant === 'slot' && <span aria-hidden className="block h-[18px] w-[18px]" />}
-        {postponedReady > 0 && (
-          <span className="wh-badge" aria-hidden>{postponedReady > 9 ? '9+' : postponedReady}</span>
-        )}
       </button>
 
       <div className="wh-avatar wh-avatar--bubble" aria-hidden>
@@ -341,8 +310,10 @@ export function FinHome({
     <>
       {/* Mobiel/tablet: de bubbel staat in de nav-pill-rij en blijft dáár staan,
           óók terwijl een melding in de hoek openstaat — de melding is het grote
-          signaal, dit de vaste ingang (net als de badge, die ook niet meebeweegt
-          met de modus). Boven lg verbergt de pill zichzelf en valt alles terug
+          signaal, dit de vaste ingang.
+          Uitgestelde tips die terug zijn tellen hier niet meer als badge: die
+          komen als eigen bericht in het berichtencentrum binnen
+          (lib/notifications/tip-terug.ts). Boven lg verbergt de pill zichzelf en valt alles terug
           op de zwevende instantie hieronder.
 
           `!hideFloating` is hier VERPLICHT, niet optioneel: de pill verbergt

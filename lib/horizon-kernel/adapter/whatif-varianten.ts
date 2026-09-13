@@ -40,22 +40,28 @@
  *    `buildPotLiquidaties` niet kan mappen worden door de adapter met een `notice` gemeld.
  *
  * ## Bekende afwijkingen (gedocumenteerd, NIET gefixt in 2a)
- *  1. **Spaargrondslag-divergentie (grootste baseline-afwijking, GEEN fallback-trigger).**
- *     De kernel LEIDT sparen af als (netto_jaarinkomen − geschatte_jaaruitgaven); de
- *     what-if-baseline gebruikt `resolveSavingsSource`/spaarquote-override
- *     (`baseAnnualSavingsFromCashflow`, `monthly_savings_override`). Dat geeft bij
- *     gelijke data een andere jaarlijkse inleg → andere FIRE-leeftijd. Bewust gemarkeerd
- *     voor convergentie in stap 2b.
- *  2. **Nul-rendement-asset bij een rendement-delta.** In v2 krijgt een asset met
- *     `expected_return = 0` de fallback-grossReturn als voet en dán de delta erbovenop
- *     (`initRunningBuckets`: `baseRet = expected_return/100 || fallbackReturn`); de kernel
- *     gebruikt puur `expected_return/100` (nul-basis, GEEN grossReturn-backfill). Een
- *     +delta op zo'n asset landt dus op `0 + delta` (kernel) i.p.v. `grossReturn + delta`
- *     (v2). Zie `applyReturnDeltasToAssets`.
+ *  1. **Spaargrondslag-divergentie — OPGEHEVEN (TPR-08, ADR 0141, 13 sep 2026).**
+ *     De kernel leidt sparen af als (netto_jaarinkomen − geschatte_jaaruitgaven) op de
+ *     grondslag-geresolveerde profielrij (`kernel-profile-basis.ts`, ADR 0103); de
+ *     what-if-baseline en `buildHorizonInput` lezen `baseAnnualSavingsFromCashflow` uit
+ *     diezelfde `resolveSavingsSource`-resolutie (ADR 0121). Wat de twee uiteen liet
+ *     lopen was de handmatige `profiles.monthly_savings_override`, die alleen de
+ *     metadata-tak (`annualSavings`) voedde en de kern nooit bereikte. Die override is
+ *     vervallen: één spaargrondslag app-breed, geen bekende afwijking meer op dit punt.
+ *  2. **Nul-rendement-asset bij een rendement-delta (herzien TPR-02, 13 sep 2026).** In
+ *     v2 kreeg élke asset met `expected_return = 0` de fallback-grossReturn als voet en
+ *     dán de delta erbovenop (`initRunningBuckets`: `baseRet = expected_return/100 ||
+ *     fallbackReturn` — de `||` maakte van een bewuste 0 een 7%). De kernel maakt sinds
+ *     TPR-02 het onderscheid dat v2 miste: een INGEVULDE 0 blijft 0 (bewuste keuze) en
+ *     landt op `0 + delta`; alleen een ONTBREKEND rendement (null/undefined) valt terug
+ *     op het profielrendement (`potten.ts#potRendement`) en landt op
+ *     `profielrendement + delta`. `applyReturnDeltasToAssets` past dezelfde terugval
+ *     toe vóór de mutatie (`basisRendementPct`), anders zou een delta op zo'n asset de
+ *     kern-terugval stil omzeilen en wijkt what-if van de hoofdlijn af.
  *  3. **Profiel-veld-bedradings­gaten (bewust undefined → adapter-defaults).** Op de
  *     what-if-client zijn NIET beschikbaar: `yearly_essential_expenses` (→ valt in de
  *     adapter terug op geschatte_jaaruitgaven i.p.v. de echte essentiële budgetten;
- *     raakt de pensioen-uitgave-methode 'essential_budgets'), `marginaal_tarief`,
+ *     raakt de pensioen-uitgave-methode 'essential_budgets') en
  *     `deficit_loan_rate` (→ Excel-default 0,05). Deze blijven undefined; de adapter
  *     vult neutrale defaults in. `withdrawal_profile_config` hoorde in dit rijtje maar
  *     is er sinds het B-042-vervolg uit: het gekozen profiel, de fasecurve en de
@@ -78,21 +84,30 @@ import type { KernelAdapterInput, KernelAdapterProfile } from './index'
  * behouden hun referentie. Per-type-delta wint van de uniforme delta; een delta is een
  * decimaal (bv. 0,02 = +2 procentpunt op `expected_return`).
  *
- * BEWUSTE AFWIJKING t.o.v. v2 (nul-rendement-asset): de kern-basis is `expected_return`
- * (nul-basis bij 0/ontbrekend), NIET de grossReturn-backfill die v2 (`initRunningBuckets`)
- * toepast. Een +delta op een 0%-asset landt hier dus op `0 + delta×100` pp, terwijl v2
- * `grossReturn + delta` zou hanteren. Zie de module-doc, punt 2.
+ * Basis vóór de delta = dezelfde ketting als de kern (`potten.ts#potRendement`, TPR-02):
+ * een INGEVULDE waarde (ook 0) is de basis; ontbreekt het rendement (null/undefined),
+ * dan is `basisRendementPct` (het profielrendement in PROCENT, bv. 7) de basis. Een
+ * +delta op een bewuste 0%-asset landt dus op `0 + delta×100` pp (geen v2-achtige
+ * grossReturn-backfill); op een asset zónder rendement op `basis + delta×100`.
+ * Zonder delta blijft de rij ongewijzigd (ook een ontbrekend rendement blijft
+ * ontbrekend — de terugval gebeurt dan in de kern zelf). `basisRendementPct`
+ * weggelaten → 0 (byte-identiek aan vóór TPR-02). Zie de module-doc, punt 2.
  */
 export function applyReturnDeltasToAssets(
   assets: readonly Asset[],
   returnDeltaByAssetType?: Record<string, number>,
   uniformReturnDelta = 0,
+  basisRendementPct = 0,
 ): Asset[] {
   return assets.map((a) => {
     const perType = returnDeltaByAssetType?.[a.asset_type]
     const delta = perType !== undefined ? perType : uniformReturnDelta
     if (!delta) return a // 0/afwezig → geen verschuiving (referentie behouden)
-    const basePp = Number.isFinite(Number(a.expected_return)) ? Number(a.expected_return) : 0
+    const eigen = a.expected_return as number | null | undefined
+    const basePp =
+      eigen == null
+        ? Number.isFinite(basisRendementPct) ? basisRendementPct : 0
+        : Number.isFinite(Number(eigen)) ? Number(eigen) : 0
     return { ...a, expected_return: basePp + delta * 100 }
   })
 }
@@ -111,9 +126,13 @@ export interface WhatifRawProfileRow {
   expected_return?: number | null
   inflation_rate?: number | null
   box3_method?: string | null
+  /** TPR-12 — P!B91 heffingvrij inkomen (euro p.p. per jaar); NULL → kernel-default 1800. */
+  box3_heffingvrij_inkomen?: number | string | null
   fire_end_strategy?: string | null
   fire_end_age?: number | null
   fire_legacy_amount?: number | string | null
+  /** TPR-12 — P!B54 niet-liquide meetellen in de nalatenschap; NULL → 'Nee'. */
+  fire_legacy_include_illiquid?: boolean | null
   /** ADR 0129 D1 — stop-anker (`solved`/`aow`/`now`/`age`). */
   fire_stop_anchor?: string | null
   /** ADR 0129 D1 — zelfgekozen stopleeftijd (halve jaren). */
@@ -130,7 +149,6 @@ export interface WhatifRawProfileRow {
   guardrail_floor?: number | null
   guardrail_ceiling?: number | null
   guardrail_cut_step?: number | null
-  guardrail_raise_step?: number | null
   housing_strategy_config?: unknown
   pot_rules?: unknown
   retirement_expense_method?: string | null
@@ -174,10 +192,13 @@ export function buildWhatifKernelAdapterInput(
     expected_return: p.expected_return ?? null,
     inflation_rate: p.inflation_rate ?? null,
     box3_method: p.box3_method ?? null,
-    // marginaal_tarief: BEDRADINGS­GAT — adapter-default.
+    // TPR-12 — beide instelbare kernel-defaults reizen mee (zelfde eis als het
+    // stop-anker: what-if rekent hetzelfde plan als /toekomst).
+    box3_heffingvrij_inkomen: p.box3_heffingvrij_inkomen ?? null,
     fire_end_strategy: p.fire_end_strategy ?? null,
     fire_end_age: p.fire_end_age ?? null,
     fire_legacy_amount: p.fire_legacy_amount ?? null,
+    fire_legacy_include_illiquid: p.fire_legacy_include_illiquid ?? null,
     // ADR 0129 D3 — het stop-anker moet ook op het what-if-pad meereizen; zonder deze
     // twee regels zou een vast stopmoment in een what-if-run stil terugvallen op de
     // bisectie en een ánder plan tonen dan de hoofdlijn.
@@ -188,7 +209,6 @@ export function buildWhatifKernelAdapterInput(
     guardrail_floor: p.guardrail_floor ?? null,
     guardrail_ceiling: p.guardrail_ceiling ?? null,
     guardrail_cut_step: p.guardrail_cut_step ?? null,
-    guardrail_raise_step: p.guardrail_raise_step ?? null,
     // Het gekozen profiel reist mee (B-042-vervolg): profiel, fasecurve én
     // flex-spending-config komen hier vandaan, zodat what-if hetzelfde plan rekent
     // als /toekomst. Ontbreekt de kolom, dan vallen de velden per stuk terug op de

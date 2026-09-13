@@ -19,7 +19,7 @@
  *    Hier daarom een 1-op-1-mirror van de pure logica.
  *  - de FIFO-stack-trim (component-interne logica in nav-stack-provider.tsx,
  *    hier op de geëxporteerde `STACK_DEPTH_LIMIT`-constante toegepast)
- *  - de bel-badge-cap "9+" (identiek aan will-checks.ts#capBadge)
+ *  - de bel-badge-cap "9+" (components/app/shell/top-bar.tsx)
  *
  * `next.config.ts` wordt WEL rechtstreeks geïmporteerd (via de `@/`-alias):
  * het is een platte configuratie-module zonder Node-specifieke of server-only
@@ -67,7 +67,7 @@ function trimStack<T>(stack: T[], limit: number): T[] {
   return stack.length > limit ? stack.slice(stack.length - limit) : stack
 }
 
-/** Mirror van de bel-badge-cap (identiek aan will-checks.ts#capBadge). */
+/** Mirror van de bel-badge-cap in components/app/shell/top-bar.tsx. */
 function capBadge(n: number): string {
   return n > 9 ? '9+' : n === 0 ? '' : String(n)
 }

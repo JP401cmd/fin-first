@@ -252,7 +252,7 @@ export async function GET(request: Request) {
         .select('id, name, goal_type, target_value, current_value, is_completed'),
       supabase
         .from('profiles')
-        .select('full_name, date_of_birth, expected_return, inflation_rate, box3_method, marginaal_tarief, net_monthly_income, estimated_monthly_expenses, income_source, expenses_source, housing_strategy_config')
+        .select('full_name, date_of_birth, expected_return, inflation_rate, box3_method, net_monthly_income, estimated_monthly_expenses, income_source, expenses_source, housing_strategy_config')
         .single(),
       // Grondslag-selectie (ADR 0103), apart gehouden: `cashflow_basis_prefs`
       // bestaat pas na migratie 20260811160000 en zou als extra kolom hierboven

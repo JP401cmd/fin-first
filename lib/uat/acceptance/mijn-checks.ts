@@ -32,6 +32,7 @@
  */
 
 import { PERSONAS } from '@/lib/test-personas'
+import { resolveFireParams } from '@/lib/fire-params'
 import {
   box1JaarruimteStatus,
   computeJaarruimte,
@@ -77,11 +78,12 @@ export const MIJN_ENGINE_CHECKS: MijnEngineCheck[] = [
     label: 'Jaarruimte per persoon (Tessa): bruto-afleiding → computeJaarruimte 2026 (geplafonneerd) + resolvePensionFactorA (NULL≠0)',
     run: () => {
       criterion('WF-MIJN-03')
-      // Netto maandinkomen + marginaal tarief zijn de persona-bron; de
+      // Netto maandinkomen is de persona-bron; het marginale tarief is sinds TPR-10
+      // uitsluitend jaar-afgeleid (resolveFireParams → deriveMarginaalTarief), en de
       // bruto-afleiding (netto×12 / (1−marginaal)) loopt via de canonieke
       // box1JaarruimteStatus (dezelfde afleiding als de Belasting-pagina).
       const netMonthly = Number(compleet.profile.net_monthly_income)
-      const marginaalTarief = Number(compleet.profile.marginaal_tarief)
+      const { marginaalTarief } = resolveFireParams({ net_monthly_income: netMonthly })
       const { grossYearly } = box1JaarruimteStatus({ netMonthly, marginaalTarief })
       // PersonaProfile modelleert factor A niet → onbekend (NULL ≠ €0), factorA 0.
       const resolved = resolvePensionFactorA({ pension_factor_a: null })

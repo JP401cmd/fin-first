@@ -6,7 +6,7 @@ import { OnboardingShell } from './onboarding-shell'
 import { FactsPanel } from './facts-panel'
 import { StrategyTile } from './strategy-tile'
 import { parseBedragInput } from './onboarding-inkomen'
-import type { HorizonData } from './onboarding-horizon'
+import type { HorizonData } from '@/lib/onboarding/horizon-draft'
 import {
   DEFAULT_FIRE_STRATEGY,
   isFireEndForm,

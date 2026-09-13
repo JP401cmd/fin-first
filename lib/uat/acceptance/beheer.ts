@@ -270,13 +270,13 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'BELANGRIJK',
     given: '/beheer/vragenlijsten.',
     when:
-      'De beheerder maakt een vragenlijst (vragen van type open/schaal/meerkeuze), zet ’m live/offline en opent de respons-sheet.',
+      'De beheerder maakt een vragenlijst (vragen van type open, schaal met instelbaar bereik, meerkeuze met optioneel "Anders, namelijk…", ja/nee of rangschikken; per vraag verplicht aan/uit), zet ’m live/offline en opent de respons-sheet.',
     then:
-      'Een actieve vragenlijst staat live voor gebruikers; de lijst toont per vragenlijst een Actief/Inactief-badge en rij-tellingen (vragen/invullingen/voltooid) en respons per deelnemer; lege staat = "Nog geen vragenlijsten aangemaakt". Weergave van rij-aantallen, geen eigen berekening.',
+      'Een nieuwe vragenlijst start inactief; opslaan met een lege vraag of een meerkeuze-/rangschikvraag met minder dan twee unieke opties geeft een melding per vraag en slaat niets op. Een actieve vragenlijst met minstens één vraag verschijnt voor gebruikers als klembord-icoon in de chat bij Fin, waar Fin de vragen één voor één stelt en elk antwoord per vraag bewaart (inactief = icoon weg); de lijst toont per vragenlijst een Actief/Inactief-badge en rij-tellingen (vragen/invullingen/voltooid) en respons per deelnemer en per vraag (schaal: gemiddelde + NPS bij 0–10; ja/nee: % ja; rangschikken: gemiddelde positie; meerkeuze: telling + Anders-teksten); lege staat = "Nog geen vragenlijsten aangemaakt". Weergave van rij-aantallen, geen eigen berekening.',
     assertion: {
       kind: 'ui-only',
       source:
-        'app/(app)/beheer/vragenlijsten/page.tsx; API /api/admin/questionnaires(/[id]) — inhoudsbeheer, geen cijfermatige uitkomst',
+        'app/(app)/beheer/vragenlijsten/page.tsx; API /api/admin/questionnaires(/[id]); invullen: components/app/chat/vragenlijst/vragenlijst-view.tsx + /api/questionnaires/[id]/{session,respond} — inhoudsbeheer, geen cijfermatige uitkomst',
     },
   },
   {

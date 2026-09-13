@@ -17,7 +17,7 @@ import {
  *
  * De scenario-run MOET via `computeConvergentieProjection` (zelfde motorpad als de
  * hoofdlijn) lopen en NIET via `computeWhatifProjection`: de what-if-adapter
- * (`whatif-varianten.ts:132-161`) laat `yearly_essential_expenses`, `marginaal_tarief`,
+ * (`whatif-varianten.ts:132-161`) laat `yearly_essential_expenses`,
  * `deficit_loan_rate` en `withdrawal_profile_config` bewust weg. Deze test pint dat besluit
  * vast met een REALISTISCHE `ConvergentieRawContext` mét juist die velden gezet:
  *   (a) een nul-override-scenario (assets door `applyReturnDeltasToAssets` met lege delta +
@@ -41,7 +41,6 @@ const profile: ConvergentieRawProfileRow = {
   ...buildCompleetKernelProfileBase(PINNED_AGE),
   yearly_essential_expenses: 30_000,
   retirement_expense_method: 'essential_budgets',
-  marginaal_tarief: 0.37,
   deficit_loan_rate: 0.05,
   withdrawal_profile_config: { profiel: 'afnemend', gogo_pct: 100, slowgo_pct: 85, nogo_pct: 70 },
   fire_end_strategy: 'perpetual',
@@ -102,7 +101,7 @@ describe('scenario-baseline-pariteit', () => {
     expect(whatif.ok).toBe(true)
     if (!conv.ok || !whatif.ok) return
 
-    // De what-if-adapter laat yearly_essential_expenses (+ marginaal_tarief, deficit_loan_rate,
+    // De what-if-adapter laat yearly_essential_expenses (+ deficit_loan_rate,
     // withdrawal_profile_config) vallen → essential_budgets valt terug op de geschatte
     // jaaruitgaven → ander doelbedrag én andere FIRE-leeftijd.
     expect(whatif.result.requiredFirePortfolio).not.toEqual(conv.result.requiredFirePortfolio)

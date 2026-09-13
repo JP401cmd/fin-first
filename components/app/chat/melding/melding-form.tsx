@@ -133,8 +133,8 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-// Zelfde labelstijl als de overige formulieren in de app (action-edit-modal,
-// module-activation-modal): sentence case, want deze labels zijn vragen.
+// Zelfde labelstijl als de overige formulieren in de app (action-edit-modal):
+// sentence case, want deze labels zijn vragen.
 const LABEL_CLASS = 'block text-xs font-medium text-[var(--ink-2)]'
 const VELD_CLASS =
   'mt-1.5 w-full border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2 text-sm text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--ink-4)] focus:border-fin-400 focus:ring-1 focus:ring-fin-200 disabled:opacity-60'

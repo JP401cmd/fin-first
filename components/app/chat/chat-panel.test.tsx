@@ -133,6 +133,16 @@ vi.mock('./melding/melding-view', () => ({
   },
 }))
 
+// Vragenlijstmodus: de lijst wordt per test gestuurd, zodat de fetch-stubs van
+// de overige tests niet ook /api/questionnaires hoeven te kennen.
+const vragenlijstenMock = vi.hoisted(() => ({ lijsten: [] as { id: string }[] }))
+vi.mock('./vragenlijst/use-actieve-vragenlijsten', () => ({
+  useActieveVragenlijsten: () => ({ lijsten: vragenlijstenMock.lijsten, geladen: true, herlaad: () => {} }),
+}))
+vi.mock('./vragenlijst/vragenlijst-view', () => ({
+  VragenlijstView: () => <div>vragenlijst-weergave</div>,
+}))
+
 vi.mock('@/components/app/feature-access-provider', () => ({
   useModuleAccess: () => ({ activeModules: ['inzicht_acties'], subscriptions: ['ai'] }),
 }))
@@ -1682,5 +1692,56 @@ describe('ChatPanel — hervatten: vloer, volgnummer en venster', () => {
     // Een kort gesprek gaat ongewijzigd mee.
     const kort = lang.slice(0, 4)
     expect((prepare({ id: 'c1', messages: kort, body: {}, trigger: 'submit-message', messageId: undefined }).body.messages as unknown[]).length).toBe(4)
+  })
+})
+
+/**
+ * Vragenlijst in de chat bij Fin — de vijfde modus. Het icoon verschijnt alleen
+ * als er een actieve vragenlijst klaarstaat, schakelt heen en terug en valt —
+ * net als melden en de gids — buiten de AI-gates.
+ */
+describe('ChatPanel — vragenlijst in de chat-kop', () => {
+  afterEach(() => {
+    vragenlijstenMock.lijsten = []
+  })
+
+  it('toont géén vragenlijst-icoon zonder actieve vragenlijst', async () => {
+    localStorage.setItem(WFT_KEY, 'true')
+    stubExecutionFetch({ privacyMode: false })
+    ctx = makeCtx()
+    render(<ChatPanel />)
+
+    await screen.findByRole('button', { name: 'Melding maken' })
+    expect(screen.queryByRole('button', { name: 'Vragenlijst invullen' })).not.toBeInTheDocument()
+  })
+
+  it('toont het icoon bij een actieve lijst en schakelt heen en terug', async () => {
+    vragenlijstenMock.lijsten = [{ id: 'q1' }]
+    localStorage.setItem(WFT_KEY, 'true')
+    stubExecutionFetch({ privacyMode: false })
+    ctx = makeCtx()
+    render(<ChatPanel />)
+
+    const knop = await screen.findByRole('button', { name: 'Vragenlijst invullen' })
+    expect(knop.getAttribute('aria-pressed')).toBe('false')
+    fireEvent.click(knop)
+
+    await waitFor(() => expect(screen.getByText('vragenlijst-weergave')).toBeInTheDocument())
+    const terug = screen.getByRole('button', { name: 'Terug naar de chat' })
+    expect(terug.getAttribute('aria-pressed')).toBe('true')
+
+    fireEvent.click(terug)
+    expect(screen.queryByText('vragenlijst-weergave')).not.toBeInTheDocument()
+  })
+
+  it('werkt ZONDER AI-abonnement — de vragenlijst staat buiten de AI-gates', async () => {
+    vragenlijstenMock.lijsten = [{ id: 'q1' }]
+    stubExecutionFetch({ privacyMode: false, hasAiSubscription: false })
+    ctx = makeCtx()
+    render(<ChatPanel />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Vragenlijst invullen' }))
+    await waitFor(() => expect(screen.getByText('vragenlijst-weergave')).toBeInTheDocument())
+    expect(screen.queryByText('Belangrijke mededeling')).not.toBeInTheDocument()
   })
 })

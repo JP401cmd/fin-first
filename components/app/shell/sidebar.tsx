@@ -34,9 +34,7 @@ import {
   Activity,
   type LucideIcon,
 } from 'lucide-react'
-import { EuroViewBadge } from '@/components/app/shell/euro-view-badge'
 import { TAP_TARGET_ROW_MIN } from '@/components/editorial/tap-target'
-import { useIsLgUp } from '@/lib/hooks/use-media-query'
 import { useModuleAccess } from '@/components/app/feature-access-provider'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import { SIMPLE_HIDDEN_NAV_HREFS } from '@/lib/nav-config'
@@ -47,8 +45,6 @@ import {
 import { useSidebarCollapsed } from '@/lib/hooks/use-sidebar-collapsed'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { formatNetWorthShort } from '@/lib/net-worth-format'
-import { usePerspective } from '@/components/app/perspective-provider'
-import { PerspectiveSwitcher } from '@/components/app/perspective-switcher'
 import { LeverCompassCollapsed, type LeverScores, type LeverStatus } from '@/components/app/shell/lever-compass'
 import { leverStatusLabel } from '@/components/app/shell/lever-scores'
 import { GlobalSyncButton } from '@/components/sync/global-sync-button'
@@ -410,7 +406,8 @@ export function Sidebar({
         onToggle={() => setCollapsed(!collapsed)}
       />
 
-      <SidebarWeergaveSection collapsed={collapsed} />
+      {/* Geen eigen Weergave-sectie meer (perspectief + euro-weergave): beide
+          schakelaars zitten in het zoekmenu (⌘K), de SearchTrigger hierboven. */}
 
       <ModulesSection
         collapsed={collapsed}
@@ -530,65 +527,6 @@ function SearchTrigger() {
       <Search className="w-3.5 h-3.5" aria-hidden />
       <span className="font-mono text-[10px] uppercase tracking-[0.15em]">⌘K</span>
     </button>
-  )
-}
-
-// ─────────────────────────────────────────────────────────────────
-// Weergave-sectie (perspectief + euro-weergave)
-// ─────────────────────────────────────────────────────────────────
-
-/**
- * De weergave-sectie bovenaan de sidebar: één blok met de instellingen die
- * bepalen WAT je op elk scherm leest.
- *
- *  - **Perspectief** (eigen / huishouden / partner) — alleen voor leden van een
- *    huishouden (self-gating via PerspectiveSwitcher + isHousehold).
- *  - **Euro-weergave** (toekomstige ⇄ huidige euro's) — altijd zichtbaar.
- *
- * Bewust één sectie met één kicker: het zijn allebei profiel-brede
- * weergavekeuzes die cross-device meereizen, en twee losse "Weergave"-blokken
- * boven elkaar zouden lezen als twee verschillende dingen.
- */
-function SidebarWeergaveSection({ collapsed }: { collapsed: boolean }) {
-  const { isHousehold, loading } = usePerspective()
-  const showPerspective = !loading && isHousehold
-  // De zijbalk is `hidden lg:flex` — onder 1024 px staat dit blok wél in de DOM
-  // maar is het onzichtbaar. Zonder deze breakpoint-gate vroeg de coachmark
-  // daar zijn staat op (een fetch) en hing er een popover in de DOM die op
-  // mobiel nooit te zien en dus nooit te sluiten was (UR3-10). Server-snapshot
-  // is `false`, dus de eerste render is overal gelijk.
-  const isLgUp = useIsLgUp()
-
-  if (collapsed) {
-    return (
-      <div className="flex flex-col items-center gap-1.5 py-2 border-b border-[var(--border-ed)]">
-        {showPerspective && <PerspectiveSwitcher compact menuAlign="left" />}
-        {/* Ingeklapt is de badge icoon-only; de coachmark hangt bewust aan het
-            uitgeklapte exemplaar en aan de mobiele TopBar, zodat een gebruiker
-            met een ingeklapte zijbalk geen popover naast een naamloos icoontje
-            krijgt. */}
-        <EuroViewBadge variant="compact" />
-      </div>
-    )
-  }
-
-  return (
-    <div className="px-4 py-3 border-b border-[var(--border-ed)]">
-      <div className="flex items-center gap-2.5 mb-1.5">
-        <span
-          aria-hidden
-          className="inline-block w-7 h-px"
-          style={{ background: 'var(--color-horizon-500)' }}
-        />
-        <span className="text-[10px] font-mono uppercase tracking-[0.20em] text-[var(--ink-2)]">
-          Weergave
-        </span>
-      </div>
-      <div className="flex flex-col items-start gap-1.5">
-        {showPerspective && <PerspectiveSwitcher menuAlign="left" />}
-        <EuroViewBadge showCoachmark={isLgUp} coachmarkAlign="left" />
-      </div>
-    </div>
   )
 }
 

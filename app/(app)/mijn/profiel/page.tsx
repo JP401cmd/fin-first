@@ -10,17 +10,32 @@ import { PageOpening, Button, PageInfoButton } from '@/components/editorial'
 import { FormError, formErrorId } from '@/components/app/form-error'
 import { useToast } from '@/components/app/toast-provider'
 import { getPageInfo } from '@/lib/page-info-content'
-import { isAuthNetworkError } from '@/lib/auth-errors'
-
-type HouseholdType = 'solo' | 'samen' | 'gezin'
+import { VALID_HOUSEHOLD_TYPES, type HouseholdType } from '@/lib/household-type'
 
 /**
- * Eén opslag-fouttekst voor deze pagina — zowel wanneer de upsert faalt als
- * wanneer de voorafgaande sessiecheck op een netwerkstoring stukloopt. Beide
+ * Eén opslag-fouttekst voor deze pagina — zowel wanneer de server de opslag
+ * weigert als wanneer het verzoek door een netwerkstoring niet aankomt. Beide
  * zijn voor de gebruiker hetzelfde geval: "het opslaan lukte niet, probeer
  * opnieuw". Gedocumenteerd in lib/uat/acceptance/mijn.ts (WF-MIJN-02c).
  */
 const SAVE_FAILED_MESSAGE = 'Opslaan is mislukt. Probeer het opnieuw.'
+
+const NOT_LOGGED_IN_MESSAGE = 'Je bent niet ingelogd. Log opnieuw in en probeer het nog eens.'
+
+/**
+ * De 400-tekst van `parseBody` heeft de vorm `veld.pad: melding`. De melding zelf
+ * is Nederlands en client-veilig (gezet in het schema van /api/profile); het
+ * technische veldpad hoort niet op het scherm.
+ */
+function validationMessage(error: unknown): string {
+  if (typeof error !== 'string' || !error) return SAVE_FAILED_MESSAGE
+  return error.replace(/^[\w.]+: /, '')
+}
+
+/** Canoniek huishoudtype; de dode kolom-default 'single' en onbekende waarden → 'solo'. */
+function toHouseholdType(value: unknown): HouseholdType {
+  return VALID_HOUSEHOLD_TYPES.includes(value as HouseholdType) ? (value as HouseholdType) : 'solo'
+}
 
 export default function ProfielPage() {
   const supabase = createClient()
@@ -66,7 +81,7 @@ export default function ProfielPage() {
         setFullName(data.full_name ?? '')
         setDateOfBirth(data.date_of_birth ?? '')
         setCountry(data.country ?? 'NL')
-        setHouseholdType(data.household_type ?? 'solo')
+        setHouseholdType(toHouseholdType(data.household_type))
         setMarketplaceDisplayName(data.marketplace_display_name ?? '')
         setNumberOfChildren(data.number_of_children ?? 0)
         setChildrenAges(data.children_ages ?? [])
@@ -86,82 +101,49 @@ export default function ProfielPage() {
     setSaving(true)
     setSaveError(null)
 
-    // WF-MIJN-02c: `getUser()` is zelf een netwerkcall. Bij netwerkuitval geeft
-    // auth-js `{ user: null, error: AuthRetryableFetchError }` terug zónder te
-    // gooien — de sessie is dan intact, alleen even onbereikbaar. Die tak mag
-    // dus NIET de "je bent uitgelogd"-tekst tonen (misleidend: de gebruiker
-    // gaat onnodig opnieuw inloggen), maar dezelfde opslag-fouttekst als de
-    // upsert-catch hieronder.
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (!user) {
-      setSaveError(
-        isAuthNetworkError(authError)
-          ? SAVE_FAILED_MESSAGE
-          : 'Je bent niet ingelogd. Log opnieuw in en probeer het nog eens.',
-      )
+    // TPR-14: opslaan loopt via PUT /api/profile (zod + error-envelope) i.p.v.
+    // een client-upsert — geboortedatum en huishoudtype sturen de rekenmotor.
+    // De route leidt de gebruiker af uit de sessie, zet `income_source` bij een
+    // eigen bedrag en ruimt het uitgestelde inkomen-veld op (feature #830).
+    let response: Response
+    try {
+      response = await fetch('/api/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          full_name: fullName,
+          date_of_birth: dateOfBirth || null,
+          country,
+          household_type: householdType,
+          marketplace_display_name: marketplaceDisplayName,
+          number_of_children: numberOfChildren,
+          children_ages: childrenAges,
+          housing_type: housingType,
+          net_monthly_income: netMonthlyIncome ? Number(netMonthlyIncome) : null,
+        }),
+      })
+    } catch {
+      // WF-MIJN-02c: een netwerkstoring is géén uitgelogde sessie. Die tak mag
+      // dus NIET de "je bent niet ingelogd"-tekst tonen (misleidend: de
+      // gebruiker gaat onnodig opnieuw inloggen), maar de opslag-fouttekst.
+      setSaveError(SAVE_FAILED_MESSAGE)
       setSaving(false)
       return
     }
 
-    const { error } = await supabase
-      .from('profiles')
-      .upsert({
-        id: user.id,
-        full_name: fullName || null,
-        date_of_birth: dateOfBirth || null,
-        country: country || 'NL',
-        household_type: householdType,
-        marketplace_display_name: marketplaceDisplayName.trim() || null,
-        number_of_children: numberOfChildren,
-        children_ages: childrenAges,
-        housing_type: housingType,
-        net_monthly_income: netMonthlyIncome ? Number(netMonthlyIncome) : null,
-        // De BRON hoort bij het bedrag (ADR 0103/0131). Zonder deze regel bleef
-        // een `income_source = 'estimate'` uit de onboarding-knop "Schat het
-        // voor me" staan nadat de gebruiker hier zijn eigen bedrag invulde — en
-        // dan blijft het voorbehoud "geschat op je leeftijd" app-breed hangen op
-        // een getal dat hij zélf koos. Een bedrag hier is per definitie eigen
-        // invoer; leeggehaald laten we de bron met rust (dan bepaalt de resolver
-        // 'unknown' op het lege bedrag, niet dit scherm).
-        ...(netMonthlyIncome ? { income_source: 'manual' } : {}),
-        updated_at: new Date().toISOString(),
-      })
-
-    if (error) {
-      setSaveError(SAVE_FAILED_MESSAGE)
-    } else {
+    if (response.ok) {
       setSaveError(null)
       addToast({ type: 'success', title: 'Je profiel is opgeslagen.' })
-
-      // Feature #830: clear 'income' from deferred onboarding fields when
-      // the user has now filled in their income. This removes the coach-bubble
-      // suggestion prompting them to complete this field. Stored in
-      // feature_preferences.deferred_onboarding_fields (JSONB sub-key).
-      if (netMonthlyIncome && Number(netMonthlyIncome) > 0) {
-        try {
-          const { data: currentProfile } = await supabase
-            .from('profiles')
-            .select('feature_preferences')
-            .eq('id', user.id)
-            .single()
-          const prefs = (currentProfile?.feature_preferences as Record<string, unknown>) ?? {}
-          const deferred = Array.isArray(prefs.deferred_onboarding_fields)
-            ? prefs.deferred_onboarding_fields as string[]
-            : []
-          if (deferred.includes('income')) {
-            prefs.deferred_onboarding_fields = deferred.filter((f: string) => f !== 'income')
-            await supabase
-              .from('profiles')
-              .update({ feature_preferences: prefs })
-              .eq('id', user.id)
-          }
-        } catch {
-          // Graceful degradation
-        }
-      }
+    } else if (response.status === 401) {
+      setSaveError(NOT_LOGGED_IN_MESSAGE)
+    } else if (response.status === 400) {
+      const data = (await response.json().catch(() => null)) as { error?: unknown } | null
+      setSaveError(validationMessage(data?.error))
+    } else {
+      setSaveError(SAVE_FAILED_MESSAGE)
     }
     setSaving(false)
-  }, [supabase, addToast, fullName, dateOfBirth, country, householdType, marketplaceDisplayName, numberOfChildren, childrenAges, housingType, netMonthlyIncome])
+  }, [addToast, fullName, dateOfBirth, country, householdType, marketplaceDisplayName, numberOfChildren, childrenAges, housingType, netMonthlyIncome])
 
   if (loading) {
     return (
@@ -241,8 +223,14 @@ export default function ProfielPage() {
               type="date"
               value={dateOfBirth}
               onChange={(e) => setDateOfBirth(e.target.value)}
+              aria-describedby="dob-hint"
               className="w-full border border-[var(--border-md)] bg-[var(--subtle)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
             />
+            <p id="dob-hint" className="mt-1 text-[11px] text-[var(--ink-3)]">
+              Hieruit volgen je leeftijd nu en je AOW-leeftijd in de toekomstgrafiek. Dat
+              telt, omdat elke projectie per levensjaar rekent: wanneer je vrij kunt zijn
+              en hoe lang je vermogen reikt.
+            </p>
           </div>
 
           <div>
@@ -260,13 +248,20 @@ export default function ProfielPage() {
           </div>
 
           <div>
-            <span className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
+            <span id="household-label" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
               Huishouden
             </span>
-            <div className="flex gap-2">
-              {(['solo', 'samen', 'gezin'] as const).map((type) => (
+            <div
+              role="group"
+              aria-labelledby="household-label"
+              aria-describedby="household-hint"
+              className="flex gap-2"
+            >
+              {VALID_HOUSEHOLD_TYPES.map((type) => (
                 <button
                   key={type}
+                  type="button"
+                  aria-pressed={householdType === type}
                   onClick={() => setHouseholdType(type)}
                   className={`flex-1 border px-3 py-2 text-sm font-medium transition-colors ${
                     householdType === type
@@ -278,6 +273,12 @@ export default function ProfielPage() {
                 </button>
               ))}
             </div>
+            <p id="household-hint" className="mt-1 text-[11px] text-[var(--ink-3)]">
+              Je kiest of je alleen woont, samen of als gezin. Bij samen en gezin rekent de
+              app met een fiscaal partner, wat onder meer je Box 3-vrijstelling verandert.
+              Dat telt, omdat die belasting jaarlijks van je vermogen afgaat en dus je
+              vrijheidstijd raakt.
+            </p>
           </div>
         </div>
 

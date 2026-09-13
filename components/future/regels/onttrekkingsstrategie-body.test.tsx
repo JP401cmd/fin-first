@@ -36,7 +36,6 @@ beforeEach(() => {
           guardrail_floor: 0.8,
           guardrail_ceiling: 1.2,
           guardrail_cut_step: 0.1,
-          guardrail_raise_step: 0.1,
           withdrawal_profile_config: null,
         }),
     })

@@ -25,6 +25,8 @@ import {
 } from './index'
 import type { AssetCategorie, DebtCategorie } from '../types'
 import { EXCEL_TEKORT_LENING_RENTE } from './defaults'
+import { potRendement } from './potten'
+import { DEFAULT_RETURN } from '@/lib/constants'
 
 /**
  * Woningblok voor de pot-tests: 'Meerekenen' (de app-default) — géén opeethypotheek,
@@ -179,6 +181,84 @@ describe('potten — totalen behouden (V6-schaling)', () => {
     const pots = buildSchuldPotten(debts, new Set(), EXCEL_TEKORT_LENING_RENTE, WONING_MEEREKENEN)
     const userDebtTotal = pots.filter((p) => p.rol !== 'tekortLening').reduce((s, p) => s + p.startwaarde, 0)
     expect(userDebtTotal).toBeCloseTo(10_000 + 20_000 * 0.8, 6)
+  })
+})
+
+// ── Rendement per pot: eigen rendement vóór, terugval op profielrendement (TPR-02) ──
+
+/** `Asset.expected_return` is in TS `number`; de DB/legacy-rand kan toch null dragen. */
+const GEEN_RENDEMENT = null as unknown as number
+
+describe('potten — rendement: per bezitting, terugval op profielrendement (TPR-02)', () => {
+  it('potRendement: ingevuld percentage telt letterlijk (7 → 0,07), ook mét terugval', () => {
+    expect(potRendement(7, 0.04)).toBeCloseTo(0.07, 12)
+  })
+
+  it('potRendement: een bewuste 0 blijft 0 — GEEN terugval (0 ≠ ontbrekend)', () => {
+    expect(potRendement(0, 0.07)).toBe(0)
+  })
+
+  it('potRendement: null/undefined → terugvalrendement (decimaal, ongewijzigd)', () => {
+    expect(potRendement(null, 0.07)).toBe(0.07)
+    expect(potRendement(undefined, 0.055)).toBe(0.055)
+  })
+
+  it('potRendement: zonder terugval → 0 (byte-identiek aan vóór TPR-02)', () => {
+    expect(potRendement(null, undefined)).toBe(0)
+  })
+
+  it('potRendement: NaN is geen "ontbreken" en blijft 0', () => {
+    expect(potRendement(Number.NaN, 0.07)).toBe(0)
+    expect(potRendement(null, Number.NaN)).toBe(0)
+  })
+
+  it('buildAssetPotten: pot zonder rendement groeit op opties.terugvalRendement; ingevuld gaat vóór', () => {
+    const pots = buildAssetPotten(
+      [
+        makeAsset({ id: 'leeg', asset_type: 'investment', current_value: 10_000, expected_return: GEEN_RENDEMENT }),
+        makeAsset({ id: 'nul', asset_type: 'cash', current_value: 10_000, expected_return: 0 }),
+        makeAsset({ id: 'eigen', asset_type: 'savings', current_value: 10_000, expected_return: 2.5 }),
+      ],
+      { terugvalRendement: 0.07 },
+    )
+    const byNaam = new Map(pots.map((p) => [p.naam, p.rendement]))
+    expect(byNaam.get('investment')).toBe(0.07) // ontbrekend → profielrendement
+    expect(byNaam.get('cash')).toBe(0) // bewuste 0 → 0, geen stille 7%
+    expect(byNaam.get('savings')).toBeCloseTo(0.025, 12) // eigen rendement wint
+  })
+
+  it('buildAssetPotten zonder opties: ontbrekend rendement → 0 (bestaande callers ongewijzigd)', () => {
+    const [pot] = buildAssetPotten([
+      makeAsset({ id: 'leeg', asset_type: 'investment', current_value: 10_000, expected_return: GEEN_RENDEMENT }),
+    ])
+    expect(pot.rendement).toBe(0)
+  })
+
+  it('barrel: de terugval is resolveFireParams(profile).grossReturn — de profielkeuze (decimaal)', () => {
+    const input = buildKernelInputFromApp({
+      profile: pinnedProfile({ expected_return: 0.06 }),
+      assets: [makeAsset({ id: 'leeg', asset_type: 'investment', current_value: 10_000, expected_return: GEEN_RENDEMENT })],
+      debts: [],
+    })
+    expect(input.assetPotten.find((p) => p.naam === 'investment')?.rendement).toBe(0.06)
+  })
+
+  it('barrel: profiel zonder rendement → DEFAULT_RETURN als laatste terugval', () => {
+    const input = buildKernelInputFromApp({
+      profile: pinnedProfile({ expected_return: null }),
+      assets: [makeAsset({ id: 'leeg', asset_type: 'investment', current_value: 10_000, expected_return: GEEN_RENDEMENT })],
+      debts: [],
+    })
+    expect(input.assetPotten.find((p) => p.naam === 'investment')?.rendement).toBe(DEFAULT_RETURN)
+  })
+
+  it('barrel: een bewuste 0 op de bezitting wint van het profielrendement', () => {
+    const input = buildKernelInputFromApp({
+      profile: pinnedProfile({ expected_return: 0.07 }),
+      assets: [makeAsset({ id: 'nul', asset_type: 'crypto', current_value: 10_000, expected_return: 0 })],
+      debts: [],
+    })
+    expect(input.assetPotten.find((p) => p.naam === 'crypto')?.rendement).toBe(0)
   })
 })
 

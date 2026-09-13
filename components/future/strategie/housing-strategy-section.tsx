@@ -8,10 +8,12 @@ import {
   DEFAULT_REVERSE_MORTGAGE_CONFIG,
   estimateMonthlyHousingCostAfterSale,
   estimateReverseMortgagePayout,
+  isDepletionMarginDefault,
   type HousingStrategyConfig,
   type HousingStrategyMode,
   type HousingStrategyTrigger,
 } from '@/lib/housing-strategy'
+import { HOUSING_DEPLETION_MARGIN_DEFAULT_MONTHS } from '@/lib/constants'
 import {
   type HousingPreviewData,
   type HousingScenarioResult,
@@ -73,9 +75,8 @@ const MODES: HousingStrategyMode[] = [
 /**
  * Eigen-woning-sectie. Wordt nu gerenderd binnen de strategie-modal op
  * /toekomst (geïmporteerd door components/app/horizon/strategie-modal.tsx).
- * De oude /identity/instellingen-monolith is opgeheven; het component-pad
- * blijft historisch onder components/identity/instellingen/ totdat een
- * herschikking van deze map opportuun is.
+ * De oude /identity/instellingen-monolith is opgeheven; het component staat
+ * sinds TPR-13 naast de andere strategie-editors onder components/future/strategie/.
  *
  * Beheert zijn eigen GET/PUT naar /api/housing-strategy zodat de bestaande
  * instellingen-pagina niet hoeft te weten van housing-strategy-state. De
@@ -480,7 +481,13 @@ function StrategyDetailsPanel({
             onChange={(depletionThresholdYears) =>
               onChange({ ...config, depletionThresholdYears })
             }
-            hint="Extra buffer bovenop de verkoopkosten: activeer zoveel jaar uitgaven vóór je vermogen op is. 0 = pas wanneer het echt nodig is."
+            // Norm keuze · effect · waarom (13 sep 2026). TPR-06: 0 = geen eigen marge →
+            // de projectie rekent met de app-default (24 mnd), en zegt dat hier.
+            hint={
+              isDepletionMarginDefault(config.depletionThresholdYears)
+                ? `Je kiest hoeveel jaar uitgaven je nog in kas wilt hebben op het moment dat de strategie ingaat. Zonder eigen marge rekent de projectie met ${HOUSING_DEPLETION_MARGIN_DEFAULT_MONTHS / 12} jaar (${HOUSING_DEPLETION_MARGIN_DEFAULT_MONTHS} maanden) uitgaven — dat is een aanname, geen keuze van jou. Een grotere marge verkoopt eerder en houdt langer geld op de bank; relevant omdat het verkoopmoment je vrijheidsleeftijd en je woonlast daarna bepaalt.`
+                : 'Je kiest hoeveel jaar uitgaven je nog in kas wilt hebben op het moment dat de strategie ingaat. Een grotere marge verkoopt eerder en houdt langer geld op de bank; een kleinere later. Relevant omdat het verkoopmoment je vrijheidsleeftijd en je woonlast daarna bepaalt.'
+            }
           />
           <LabeledNumber
             label={

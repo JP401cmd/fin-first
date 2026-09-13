@@ -83,10 +83,10 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'KERN',
     given: 'Ingelogd, /mijn/profiel, sectie "Persoonlijke Gegevens".',
     when: 'De gebruiker wijzigt naam, bibliotheek-weergavenaam (max 40), geboortedatum, land en huishoudtype en klikt "Opslaan" (boven- of onderknop).',
-    then: 'Groene melding "Opgeslagen!" (verdwijnt na ~3s); na herladen zijn alle waarden intact (upsert op `profiles`); beide "Opslaan"-knoppen bewaren het volledige formulier (persoonlijk + huishoudprofiel) in één keer; lege bibliotheeknaam → later "Anoniem". Sub c (netwerkonderbreking tijdens opslaan): rode melding "Opslaan is mislukt. Probeer het opnieuw." — NIET de niet-ingelogd-tekst, want de sessie blijft geldig; alleen een écht ontbrekende sessie geeft "Je bent niet ingelogd…".',
+    then: 'Groene melding "Opgeslagen!" (verdwijnt na ~3s); na herladen zijn alle waarden intact (PUT /api/profile → eigen `profiles`-rij, sinds TPR-14 geen client-upsert meer); beide "Opslaan"-knoppen bewaren het volledige formulier (persoonlijk + huishoudprofiel) in één keer; lege bibliotheeknaam → later "Anoniem". Onder Geboortedatum en Huishouden staat een uitleg (keuze · effect · waarom). Sub c (netwerkonderbreking tijdens opslaan): rode melding "Opslaan is mislukt. Probeer het opnieuw." — NIET de niet-ingelogd-tekst, want de sessie blijft geldig; alleen een écht ontbrekende sessie (401) geeft "Je bent niet ingelogd…". Sub d (ongeldige geboortedatum, bv. in de toekomst): rode melding "Vul een geldige geboortedatum in." en er wordt niets opgeslagen.',
     assertion: {
       kind: 'ui-only',
-      source: 'app/(app)/mijn/profiel/page.tsx#saveProfile (Supabase upsert profiles), geen cijfermatige uitkomst; sub c gepind door app/(app)/mijn/profiel/page.test.tsx',
+      source: 'app/(app)/mijn/profiel/page.tsx#saveProfile → app/api/profile/route.ts (zod + error-envelope), geen cijfermatige uitkomst; sub c/d gepind door app/(app)/mijn/profiel/page.test.tsx en app/api/profile/route.test.ts',
     },
   },
   {
@@ -95,13 +95,13 @@ const criteria: AcceptanceCriterion[] = [
     titel: 'Huishoudprofiel (NIBUD) invullen',
     kriticiteit: 'KERN',
     persona: 'compleet',
-    given: 'Persona Tessa Compleet geladen (net_monthly_income €7.600, marginaal_tarief 49,5%, geen `pension_factor_a`). Het netto maandinkomen wordt in dit scherm vastgelegd en is dezelfde bron die de canonieke jaarruimte (pensioen-aftrekruimte Box 1) voedt.',
+    given: 'Persona Tessa Compleet geladen (net_monthly_income €7.600 → jaar-afgeleid marginaal tarief 49,5% (topschijf, TPR-10: geen profieloverride meer), geen `pension_factor_a`). Het netto maandinkomen wordt in dit scherm vastgelegd en is dezelfde bron die de canonieke jaarruimte (pensioen-aftrekruimte Box 1) voedt.',
     when: 'De gebruiker vult het huishoudprofiel (incl. netto maandinkomen) in en slaat op; de belasting-doorwerking leidt hieruit de jaarruimte 2026 af.',
     then: 'Afgeleid bruto jaarinkomen ≈ €180.594 (netto×12 / (1−marginaal), zelfde afleiding als de Belasting-pagina). Jaarruimte 2026 = €35.588 (geplafonneerd via de grondslag-cap 30% × (137.800 − 19.172), inkomen ligt boven de cap). Factor A is niet ingevuld → `resolvePensionFactorA` geeft factorA 0 met isKnown=false (NULL ≠ €0: "niet ingevuld", geen "€0 aangroei"), dus geen factor-A-aftrek.',
     assertion: {
       kind: 'exact',
       expected: 'jaarruimte2026=35588; factorA=0; factorAKnown=false',
-      source: 'lib/jaarruimte.ts#box1JaarruimteStatus (bruto-afleiding uit net_monthly_income + marginaal_tarief) → computeJaarruimte(gross, factorA, 2026) + resolvePensionFactorA(PERSONAS.compleet.profile) — zie mijn-checks.ts',
+      source: 'lib/jaarruimte.ts#box1JaarruimteStatus (bruto-afleiding uit net_monthly_income + jaar-afgeleid marginaal tarief via resolveFireParams) → computeJaarruimte(gross, factorA, 2026) + resolvePensionFactorA(PERSONAS.compleet.profile) — zie mijn-checks.ts',
     },
   },
   {

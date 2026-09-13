@@ -74,6 +74,7 @@ import { buildSimNetWorthRows } from '@/lib/horizon/networth-rows'
 import { buildFactorByAge } from '@/lib/euro-display'
 import { clipRowsToPlanEnd } from '@/lib/horizon/clip-rows-to-plan-end'
 import type { RegelSimSnapshot } from '@/lib/future/regel-sim'
+import { rawContextZonderPartner } from '@/lib/horizon-kernel/convergentie-router'
 import { resolvePotRules, POT_RULES_DEFAULTS, type PotRulesConfig } from '@/lib/pot-rules'
 import { computeRetirementExpenses, computeYearlyMustExpenses, type RetirementExpenseMethod, type BudgetRow, type ChildBudgetRow } from '@/lib/budget-utils'
 import {
@@ -1202,8 +1203,9 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
 
   const yearlyExpenses = effectiveMonthlyExpenses * 12
 
-  // Spaarbron voor de FIRE-prognose — gelijk aan /toekomst en /overzicht/budget.
-  // Prioriteit: handmatige override → inkomen × spaarquote → asset-aggregaat.
+  // Spaarbron voor de FIRE-prognose — gelijk aan /toekomst en /overzicht/budget:
+  // de effectieve spaargrondslag (inkomen × spaarquote, ADR 0121), terugval
+  // asset-aggregaat. Geen handmatige override meer (ADR 0141).
   // De unified engine indexeert dit jaarbedrag zelf met inflatie.
   // Uitgaven-grondslag voor de spaarquote, op de 6-maands meetbasis.
   const dashboardSavingsExpenses = resolveAmountWithBasis(
@@ -1212,8 +1214,6 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     expenses6m / SAVINGS_RATE_WINDOW_MONTHS,
     dashboardBudgetExpenses.monthlyTotal,
   )
-  const dashboardSavingsOverrideRaw = (profileResult.data as { monthly_savings_override?: number | string | null } | null)?.monthly_savings_override
-  const dashboardSavingsOverride = dashboardSavingsOverrideRaw == null ? null : Number(dashboardSavingsOverrideRaw)
   const {
     baseAnnualSavings: dashboardBaseAnnualSavings,
     // De EFFECTIEVE spaarquote: de gekozen grondslag wint over de 6-maands
@@ -1240,9 +1240,9 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       monthlyExpenses: dashboardSavingsExpenses.amount,
     },
   })
-  // dashboardSavingsOverride + dashboardBaseAnnualSavings worden als parameters aan
-  // buildHorizonInput doorgegeven (dezelfde annualSavings-prioriteit als de
-  // /toekomst-hook); de engine-input wordt daar samengesteld (SSoT).
+  // dashboardBaseAnnualSavings gaat als parameter naar buildHorizonInput (dezelfde
+  // annualSavings-grondslag als de /toekomst-hook); de engine-input wordt daar
+  // samengesteld (SSoT).
 
   // Het €-bedrag dat bij de GETOONDE quote hoort. Geen tweede som: het is
   // letterlijk `baseAnnualSavings` uit `resolveSavingsSource`, gedeeld door twaalf.
@@ -1251,11 +1251,10 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   //  · het is `effectiveAnnualIncome × effectiveSavingsRatePct% / 12`, dus percentage
   //    en bedrag staan per definitie op DEZELFDE grondslag — dat is de eigenschap
   //    waar de widget op leunt;
-  //  · het is NIET automatisch het bedrag waarmee de FIRE-prognose rekent. Die
-  //    kiest via `buildHorizonInput` eerst `monthly_savings_override` (handmatig
-  //    gezet door de gebruiker) en pas daarna dit jaarbedrag. Staat die override,
-  //    dan spaart de prognose een ander bedrag dan hier staat — bewust, want de
-  //    override is een expliciete keuze;
+  //  · het is sinds ADR 0141 óók het bedrag waarmee de FIRE-prognose rekent:
+  //    `buildHorizonInput` leest ditzelfde jaarbedrag (de vroegere handmatige
+  //    `monthly_savings_override`, die de prognose een ander bedrag liet sparen
+  //    dan hier stond, is vervallen);
   //  · `bedrag / inkomen == quote` geldt met het JAAR-geresolveerde inkomen
   //    (`dashboardEffectiveAnnualIncome / 12`), niet met `monthlyIncome` uit de
   //    maand-resolutie. Op de transactiegrondslag lopen die twee uiteen (12-maands
@@ -1334,14 +1333,12 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // meebeweegt). Eén keer berekend in de bundel; de widgets Vrijheidsvoortgang
   // en Vrijheidsmijlpalen consumeren dit i.p.v. eigen, onderling verschillende
   // datum-sommen (consume-don't-recompute). Grondslag: FIRE-eligible vermogen
-  // (ADR 0009) + dezelfde spaarbron-prioriteit als buildHorizonInput
-  // (override → cashflow-spaarquote → asset-aggregaat).
+  // (ADR 0009) + dezelfde spaarbron als buildHorizonInput (effectieve
+  // spaargrondslag → asset-aggregaat; geen override meer, ADR 0141).
   const milestoneMonthlySavings =
-    dashboardSavingsOverride != null && dashboardSavingsOverride >= 0
-      ? dashboardSavingsOverride
-      : dashboardBaseAnnualSavings > 0
-        ? dashboardBaseAnnualSavings / 12
-        : monthlyContributions
+    dashboardBaseAnnualSavings > 0
+      ? dashboardBaseAnnualSavings / 12
+      : monthlyContributions
   const freedomMilestones = computeScalarFreedomMilestones({
     netWorth: fireEligibleNetWorth,
     monthlyExpenses: effectiveMonthlyExpenses,
@@ -1402,7 +1399,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
         // Snapshot voor de /toekomst Voorkeuren-editors: exact de rauwe context die
         // DEZE run voedde, zodat de editor-baseline per constructie de Tijdas-curve is.
         regelSimSnapshot = {
-          rawContext: shared.rawContext,
+          rawContext: rawContextZonderPartner(shared.rawContext),
           fireStrategy: shared.fireStrategy,
           withdrawalStrategy: shared.withdrawalStrategy,
           aowAgeInt: shared.aowAgeInt,

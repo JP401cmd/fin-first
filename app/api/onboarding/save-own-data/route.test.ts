@@ -23,9 +23,9 @@ import { parseHousingStrategy } from '@/lib/housing-strategy'
  *     verschuift. Deze suite pint dáárom twee dingen: de bedrading in de bron
  *     (twee write-plekken, één vertaling, geen literal) én het gedrag van die
  *     vertaling (default bij ontbrekende keuze + mapping bij keuze).
- *   - Onttrekkingsprofiel: afnemend (`withdrawal_profile_config.profiel`), met
- *     de enum-spiegel `withdrawal_strategy = 'static'` (mapping afnemend→static).
- *   - Verdeling bij toename: naar beleggen (`pot_rules.surplus_group`).
+ *   - Onttrekkingsprofiel en verdeling bij toename: sinds TPR-05 GEEN write
+ *     meer — de onboarding vraagt er niet naar, dus de kern-default geldt (zie
+ *     de TPR-05-tests onderaan deze suite).
  *   - Eindstrategie deplete/90 blijft via de bestaande ?? fallbacks — een
  *     expliciete gebruikerskeuze in de horizon-stap wint en wordt hier niet
  *     geforceerd, dus die assertie hoort niet in deze bron-scan thuis.
@@ -105,20 +105,29 @@ describe('onboarding save-own-data — standaardinstellingen nieuwe gebruiker', 
     expect(codeOnly).not.toMatch(/housing_strategy_config[^=:]*[=:]\s*\{\s*mode:/)
   })
 
-  it('schrijft onttrekkingsprofiel = afnemend (met static enum-spiegel)', () => {
-    expect(codeOnly).toContain("profiel: 'afnemend'")
-    expect(codeOnly).toContain("withdrawal_strategy")
-    // De enum-spiegel is 'static' (mapping vast/afnemend/oplopend → static).
-    const staticEnum = codeOnly.match(/withdrawal_strategy[^=:]*[=:]\s*'static'/g) ?? []
-    expect(staticEnum.length).toBeGreaterThanOrEqual(1)
+  /**
+   * TPR-05 (13 sep 2026) — de onboarding vraagt niet naar onttrekkingsprofiel of
+   * verdeling-bij-toename, dus schrijft ze die ook niet weg. Vóór TPR-05 pinden
+   * deze tests juist de writes `profiel: 'afnemend'` en `surplus_group:
+   * 'beleggingen'`; die lieten een default eruitzien als eigen keuze. Nu geldt
+   * de kern-default (NULL-config → 'vast'; pot_rules → DB-default), en blijft
+   * een NULL herkenbaar als "nog niet gekozen" voor de plan-review.
+   */
+  it('schrijft geen onttrekkingsprofiel of enum-spiegel weg (kern-default geldt)', () => {
+    expect(codeOnly).not.toMatch(/withdrawal_profile_config[^=:\n]*[=:]/)
+    expect(codeOnly).not.toMatch(/withdrawal_strategy[^=:\n]*[=:]/)
+    expect(codeOnly).not.toContain("profiel: 'afnemend'")
   })
 
-  it('schrijft verdeling-bij-toename = beleggen (pot_rules.surplus_group)', () => {
-    const surplus = codeOnly.match(/surplus_group:\s*'([a-z_]+)'/g) ?? []
-    expect(surplus.length).toBeGreaterThanOrEqual(1)
-    for (const write of surplus) {
-      expect(write).toContain("surplus_group: 'beleggingen'")
-    }
+  it('schrijft geen verdeling-bij-toename weg (pot_rules houdt de DB-/kern-default)', () => {
+    expect(codeOnly).not.toMatch(/pot_rules[^=:\n]*[=:]/)
+    expect(codeOnly).not.toMatch(/surplus_group:/)
+  })
+
+  it('noemt de niet-geschreven kolommen ook niet meer als optionele kolom', () => {
+    expect(codeOnly).not.toContain("'withdrawal_profile_config',")
+    expect(codeOnly).not.toContain("'withdrawal_strategy',")
+    expect(codeOnly).not.toContain("'pot_rules',")
   })
 })
 

@@ -6,7 +6,7 @@ import {
   planDraftFromOnboarding,
   type OnboardingPlanValue,
 } from './onboarding-eindstrategie'
-import { INITIAL_HORIZON_DATA } from './onboarding-horizon'
+import { INITIAL_HORIZON_DATA } from '@/lib/onboarding/horizon-draft'
 import { END_AGE_MIN, END_AGE_MAX } from '@/lib/fire-strategy'
 
 /**

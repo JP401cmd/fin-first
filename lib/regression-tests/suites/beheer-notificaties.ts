@@ -83,7 +83,7 @@ const tests: TestCase[] = [
     id: 'notif-prefs-valid-types',
     name: 'Notification preferences bevat alle geldige typen',
     category: CAT,
-    description: 'PUT /api/notifications sanitiseert naar de 10 bekende notification types',
+    description: 'PUT /api/notifications sanitiseert naar de 11 bekende notification types',
     priority: 'high',
     estimatedDurationMs: 10,
     fn() {
@@ -91,9 +91,9 @@ const tests: TestCase[] = [
       const validTypes = [
         'budget', 'sync', 'recommendation', 'partner_transaction',
         'horizon', 'holding_alert', 'briefing', 'budget_model_proposal',
-        'spend_limit', 'milestone',
+        'spend_limit', 'milestone', 'postponed_tip',
       ]
-      assertEqual(validTypes.length, 10, '10 valid notification preference types')
+      assertEqual(validTypes.length, 11, '11 valid notification preference types')
       // Each must be a non-empty string
       for (const t of validTypes) {
         assert(t.length > 0, `Type "${t}" is non-empty`)
@@ -116,9 +116,10 @@ const tests: TestCase[] = [
         holding_alert: true, briefing: true,
         budget_model_proposal: true,
         spend_limit: true, milestone: true,
+        postponed_tip: true,
       }
       const keys = Object.keys(defaultPrefs)
-      assertGreaterThanOrEqual(keys.length, 10, 'At least 10 default pref keys')
+      assertGreaterThanOrEqual(keys.length, 11, 'At least 11 default pref keys')
       for (const [key, val] of Object.entries(defaultPrefs)) {
         assertEqual(val, true, `Default pref for "${key}" is true`)
       }
@@ -176,21 +177,22 @@ const tests: TestCase[] = [
     //
     // De telling stond tot 2026-08-31 op 8 en liep achter: `spend_limit` was er
     // al bij gekomen en `milestone` kwam erbij met de mijlpalen-motor
-    // (ADR 0123). Deze lijst spiegelt de union in app/api/notifications/route.ts
+    // (ADR 0123); op 2026-09-13 kwam `postponed_tip` erbij (de teller op Fins
+    // bubbel werd een bericht per teruggekeerde tip). Deze lijst spiegelt de union in app/api/notifications/route.ts
     // — loopt hij achter, dan bewaakt hij niets.
-    description: 'NotificationType union omvat budget, sync, recommendation, partner_transaction, horizon, holding_alert, briefing, budget_model_proposal, spend_limit, milestone',
+    description: 'NotificationType union omvat budget, sync, recommendation, partner_transaction, horizon, holding_alert, briefing, budget_model_proposal, spend_limit, milestone, postponed_tip',
     priority: 'high',
     estimatedDurationMs: 10,
     fn() {
       const allTypes = [
         'budget', 'sync', 'recommendation', 'partner_transaction',
         'horizon', 'holding_alert', 'briefing', 'budget_model_proposal',
-        'spend_limit', 'milestone',
+        'spend_limit', 'milestone', 'postponed_tip',
       ]
-      assertEqual(allTypes.length, 10, '10 notification types')
+      assertEqual(allTypes.length, 11, '11 notification types')
       // Verify uniqueness
       const unique = new Set(allTypes)
-      assertEqual(unique.size, 10, 'All types are unique')
+      assertEqual(unique.size, 11, 'All types are unique')
     },
   },
   {
@@ -334,9 +336,10 @@ const tests: TestCase[] = [
         budget_model_proposal: { label: 'Huishouden' },
         spend_limit:           { label: 'Je grens' },
         milestone:             { label: 'Mijlpaal' },
+        postponed_tip:         { label: 'Tip' },
       }
       const keys = Object.keys(moduleMap)
-      assertEqual(keys.length, 10, '10 types in MODULE_MAP')
+      assertEqual(keys.length, 11, '11 types in MODULE_MAP')
       // Verify each has a non-empty label
       for (const [type, info] of Object.entries(moduleMap)) {
         assert(info.label.length > 0, `${type} maps to a non-empty label: ${info.label}`)

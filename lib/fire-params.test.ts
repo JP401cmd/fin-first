@@ -61,12 +61,13 @@ describe('resolveFireParams — defaults + overrides', () => {
     expect(params.marginaalTarief).toBe(0.3575)
   })
 
-  it('hand-ingevuld marginaal_tarief wint over inkomen-afleiding', () => {
-    const params = resolveFireParams({
-      marginaal_tarief: 0.4950,
-      net_monthly_income: 2000,
-    })
-    expect(params.marginaalTarief).toBe(0.4950)
+  // TPR-10 — de profielkolom `marginaal_tarief` is geen invoer meer: geen scherm
+  // schreef 'm en de kern las 'm niet. Een rauwe rij die de kolom nog draagt
+  // (select('*') op een oude rij) mag de jaar-afleiding niet meer overrulen.
+  it('een meegespreide marginaal_tarief-kolom overrulet de inkomen-afleiding NIET meer', () => {
+    const rauweRij = { marginaal_tarief: 0.4950, net_monthly_income: 2000 }
+    const params = resolveFireParams(rauweRij)
+    expect(params.marginaalTarief).toBe(0.3575)
   })
 
   it('box3Method default = forfaitair', () => {

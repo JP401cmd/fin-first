@@ -66,14 +66,28 @@ import { dedupeById, expanderFor, isSliderWorkEvent, partitionEvents } from './g
 
 // ── Diagnostiek ──────────────────────────────────────────────────────────────────
 
+/**
+ * Stabiele, machine-leesbare code voor notices die een OPPERVLAK consumeert (niet
+ * alleen het beheer-rapport). Een consument matcht op de code, nooit op de tekst.
+ *  - `aow_ontbreekt` (TPR-04): geen actief AOW-event → de kern rekent met €0 AOW.
+ */
+export type EventMappingNoticeCode = 'aow_ontbreekt'
+
 /** Eén niet-(volledig-)mapbaar punt voor het orchestrator-/beheer-rapport. */
 export interface EventMappingNotice {
   /** `skip` = event/post niet meegenomen · `overflow` = kern-/Excel-capaciteit · `info` = keuze/aanname. */
   readonly kind: 'skip' | 'overflow' | 'info'
+  /** Stabiele code voor notices die de UI toont (zie `EventMappingNoticeCode`). */
+  readonly code?: EventMappingNoticeCode
   /** Betrokken event-id (indien van toepassing). */
   readonly eventId?: string
   /** Leesbare toelichting (NL). */
   readonly message: string
+}
+
+/** Draagt deze run de 'AOW ontbreekt'-notice (TPR-04)? Dé ene lezer van de code. */
+export function hasAowOntbreektNotice(notices: readonly EventMappingNotice[]): boolean {
+  return notices.some((n) => n.code === 'aow_ontbreekt')
 }
 
 /** De gebeurtenis-gerelateerde kern-invoer + diagnostiek. */
@@ -225,7 +239,19 @@ function pick(managed: readonly LifeEvent[], kind: ReturnType<typeof expanderFor
  * jaren-buiten-NL` (2%/jr korting; spiegelt `computeAowMonthly`).
  */
 function mapAow(events: LifeEvent[], notices: EventMappingNotice[]): Partial<AutoGebeurtenisParams> {
-  if (events.length === 0) return {}
+  if (events.length === 0) {
+    // TPR-04 (eigenaarsbesluit 13 sep 2026): de kern BLIJFT €0 AOW rekenen zonder actief
+    // AOW-event (NEUTRAL_AUTO_GEBEURTENISSEN.aowOpbouwjaren = 0) — bewust géén terugval
+    // op volledige opbouw. Maar niet meer stil: deze notice reist via de run mee naar
+    // /toekomst (status-melding + kassabon). De loader laadt alleen is_active-events,
+    // dus 'ontbreekt' en 'inactief' vallen hier samen.
+    notices.push({
+      kind: 'info',
+      code: 'aow_ontbreekt',
+      message: 'Geen actief AOW-event op de tijdas — de kern rekent met €0 AOW (aowOpbouwjaren 0).',
+    })
+    return {}
+  }
   if (events.length > 1) {
     notices.push({
       kind: 'info',

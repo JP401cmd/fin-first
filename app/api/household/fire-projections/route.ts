@@ -161,8 +161,8 @@ export async function GET() {
     // Profiles for all members.
     // De FIRE-kolommen zijn MARKT-aannames + eindstrategie (rendement, inflatie,
     // box3-methode, stop-leeftijd) — geen persoonlijke financiële feiten. Bewust
-    // GEEN `net_monthly_income`/`marginaal_tarief` erbij: die voeden alleen
-    // `FireParams.marginaalTarief`, dat deze route niet gebruikt, en zouden de
+    // GEEN `net_monthly_income` erbij: die voedt alleen het jaar-afgeleide
+    // `FireParams.marginaalTarief`, dat deze route niet gebruikt, en zou de
     // partner-datastroom onnodig verbreden.
     supabase
       .from('profiles')

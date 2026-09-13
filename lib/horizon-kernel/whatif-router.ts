@@ -28,6 +28,7 @@ import type { Debt } from '@/lib/debt-data'
 import type { LifeEvent } from '@/lib/horizon-data'
 import type { AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import type { TaxYear } from '@/lib/box3-data'
+import { resolveFireParams } from '@/lib/fire-params'
 import { runKernelUnified } from '@/lib/horizon-kernel/run-unified'
 import type { KernelUnifiedResult } from '@/lib/horizon-kernel/bridge'
 import {
@@ -73,6 +74,16 @@ export interface WhatifRawContext {
   readonly marktVolatiliteit?: number
 }
 
+/**
+ * Profielrendement in PROCENT als basis voor de rendement-delta op een bezitting
+ * zonder eigen rendement (TPR-02). Consumeert `resolveFireParams` — dezelfde resolver
+ * als de adapter-barrel, dus dezelfde precedentie (gebruikerskeuze → jaarlaag-shadow
+ * uit de loader → DEFAULT_RETURN). Geen tweede rendement-afleiding.
+ */
+function terugvalRendementPct(profile: WhatifRawProfileRow): number {
+  return resolveFireParams(profile).grossReturn * 100
+}
+
 /** Parameters voor `computeWhatifProjection`. */
 export interface ComputeWhatifProjectionParams {
   /** Rauwe context waaruit de kernel-invoer wordt samengesteld (verplicht). */
@@ -89,10 +100,13 @@ export function computeWhatifProjection(
   const { rawContext } = params
   try {
     // Rendement-slider/uniforme shift → pre-muteer `expected_return` vóór de adapter.
+    // Basis voor een bezitting zónder eigen rendement = hetzelfde profielrendement als
+    // de adapter-terugval (TPR-02), zodat what-if en hoofdlijn één ketting delen.
     const mutatedAssets = applyReturnDeltasToAssets(
       rawContext.assets,
       rawContext.returnDeltaByAssetType,
       rawContext.uniformReturnDelta,
+      terugvalRendementPct(rawContext.profile),
     )
     const adapterInput = buildWhatifKernelAdapterInput({
       profile: rawContext.profile,
@@ -140,6 +154,7 @@ export function computeWhatifMarktcheck(params: {
       rawContext.assets,
       rawContext.returnDeltaByAssetType,
       rawContext.uniformReturnDelta,
+      terugvalRendementPct(rawContext.profile),
     )
     const adapterInput = buildWhatifKernelAdapterInput({
       profile: rawContext.profile,

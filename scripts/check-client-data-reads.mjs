@@ -140,7 +140,6 @@ const ALLOWLIST = new Set([
   // client-direct gelezen.
   'app/(app)/core/checkin/page.tsx',
   'app/(onboarding)/onboarding/page.tsx',
-  'components/app/module-activation-modal.tsx',
   'components/app/app-setup/use-is-setup-completed.tsx',
   'app/(app)/mijn/profiel/page.tsx',
   // — Binnen de conventie (prefs/realtime), grandfathered vanwege initiële display-read —

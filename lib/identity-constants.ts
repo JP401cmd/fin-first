@@ -1,4 +1,4 @@
-import { Wallet, RefreshCw, Compass, Bell, CheckCircle2, Sparkles, Mail, Gauge } from 'lucide-react'
+import { Wallet, RefreshCw, Compass, Bell, CheckCircle2, Sparkles, Mail, Gauge, Lightbulb } from 'lucide-react'
 
 // ── Temporal Balance levels ──────────────────────────────────────────
 
@@ -162,6 +162,7 @@ export const NOTIFICATION_TYPES = [
   // niet zijn zelfgekozen uitgavengrenzen uit. Naamneutraal gelabeld, want de
   // gebruiker kiest zelf hoe dit concept heet (grenzenpot/schaamtepot).
   { type: 'spend_limit', label: 'Je eigen grenzen', description: 'Als je een zelfgekozen uitgavengrens nadert, overschrijdt of juist volhoudt', icon: Gauge },
+  { type: 'postponed_tip', label: 'Uitgestelde tips', description: 'Als de wachttijd van een tip die je uitstelde voorbij is', icon: Lightbulb },
 ] as const
 
 /**

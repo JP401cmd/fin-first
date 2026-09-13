@@ -113,7 +113,6 @@ interface LeverScoresProfile {
   estimated_monthly_expenses?: number | null
   income_source?: string | null
   expenses_source?: string | null
-  marginaal_tarief?: number | null
   expected_return?: number | null
   inflation_rate?: number | null
   box3_method?: string | null

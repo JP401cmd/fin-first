@@ -34,6 +34,7 @@ import type { LifeEvent } from '@/lib/horizon-data'
 import type { AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import type { TaxYear } from '@/lib/box3-data'
 import { resolveFireParams } from '@/lib/fire-params'
+import { applyDownsizeValuationBasis, parseHousingStrategy } from '@/lib/housing-strategy'
 import { resolvePotRules } from '@/lib/pot-rules'
 import type { KernelInput } from '../types'
 import { buildAssetPotten, buildPotLiquidaties, buildSchuldPotten, deriveEigenHuisIds } from './potten'
@@ -49,7 +50,7 @@ import {
   buildPersoonTijdas,
   buildStopAnker,
   buildStrategieSelectors,
-  buildWoning,
+  buildWoningFromConfig,
   resolveDeficitLoanRate,
   type KernelAdapterProfile,
 } from './params'
@@ -120,7 +121,13 @@ export function buildKernelInputFromAppWithNotices(input: KernelAdapterInput): K
   }
   const taxYear = input.taxYear ?? DEFAULT_TAX_YEAR
   const aowRows = input.aowRows ?? []
-  const inflatie = resolveFireParams(profile).inflationRate
+  // Eén resolver-aanroep voor beide profiel-marktaannames: inflatie (kern-scalar) én —
+  // sinds TPR-02 — het bruto rendement als TERUGVAL voor bezittingen zonder eigen
+  // rendement. Het profiel dat hier binnenkomt is in de loaders al geshadowd met de
+  // fire_assumptions-jaarlaag (resolveFireParamsWithAssumptions-keten), dus de
+  // precedentie is: gebruikerskeuze → jaarlaag → DEFAULT_RETURN.
+  const fireParams = resolveFireParams(profile)
+  const inflatie = fireParams.inflationRate
 
   // F6 — peildatum: expliciete `asOf` maakt de run reproduceerbaar; weglaten = `new Date()`
   // (nu aan de rand). `asOf` pint via `buildPersoonTijdas` de startleeftijd en dus de hele run.
@@ -130,13 +137,21 @@ export function buildKernelInputFromAppWithNotices(input: KernelAdapterInput): K
   const eigenHuisIds = deriveEigenHuisIds(assets)
   // V7: tekort-lening-rente uit het profiel (deficit_loan_rate) of Excel-default.
   const deficitLoanRate = resolveDeficitLoanRate(profile)
-  const assetPotten = buildAssetPotten(assets)
-  // Woning-strategie (P!B57-B67) — ÉÉN parse voor de drie consumenten: de opeethypotheek-
-  // pot (slot 3 + opeetrente), de niet-liquide-vlag in de TS-laag en het kern-woningblok
-  // zelf. `buildWoning` doet de `parseHousingStrategy` intern; een tweede losse parse hier
-  // zou een tweede bron zijn. `selector === 'Meerekenen'` ⟺ `mode === 'include_full'`
-  // (HOUSING_MODE_TO_SELECTOR is totaal over de vier modi die parseHousingStrategy oplevert).
-  const woning = buildWoning(profile.housing_strategy_config)
+  // TPR-02 (eigenaarsbesluit 13 sep 2026): een bezitting ZONDER eigen rendement groeit
+  // op het profielrendement i.p.v. stil 0% — per-bezitting-rendement (ook een bewuste 0)
+  // gaat vóór. Zie `potten.ts#potRendement` voor de ketting en de geverifieerde reikwijdte.
+  // Fixture-/parity-pad (input-from-fixture) bouwt zijn potten zelf → byte-identiek.
+  // Woning-strategie (P!B57-B67) — ÉÉN parse voor de vier consumenten: de WOZ-substitutie
+  // op het huis-pot (TPR-03), de opeethypotheek-pot (slot 3 + opeetrente), de niet-
+  // liquide-vlag in de TS-laag en het kern-woningblok zelf. `selector === 'Meerekenen'`
+  // ⟺ `mode === 'include_full'` (HOUSING_MODE_TO_SELECTOR is totaal over de vier modi).
+  const housingCfg = parseHousingStrategy(profile.housing_strategy_config)
+  const woning = buildWoningFromConfig(housingCfg)
+  // TPR-03: `saleValuationBasis === 'woz'` → het huis-pot start op `woz_value` i.p.v.
+  // `current_value`, via de ENE bron die preview en buildHorizonInput al gebruikten
+  // (ADR 0031). Bij 'market' komt dezelfde lijst ongewijzigd terug (referentie behouden).
+  const potAssets = applyDownsizeValuationBasis([...assets], housingCfg)
+  const assetPotten = buildAssetPotten(potAssets, { terugvalRendement: fireParams.grossReturn })
   // Ids van álle actieve bezittingen: nodig om een hypotheek die op een ánder bezit
   // rust (beleggingshypotheek op een verhuurd pand) uit schuldcategorie 'Woning' te
   // houden — die categorie is de niet-liquide-as van het eigen-woningblok, en een
@@ -259,6 +274,8 @@ export {
   deriveEigenHuisIds,
   isNietEigenWoningHypotheek,
   mapInSparenNaAflossing,
+  potRendement,
+  type AssetPotOpties,
   type DebtSlot,
   type LiquidatieContext,
 } from './potten'
@@ -271,13 +288,16 @@ export {
   buildPersoonTijdas,
   buildStopAnker,
   buildWoning,
+  buildWoningFromConfig,
   resolveDeficitLoanRate,
 } from './params'
 export {
   buildEventInputs,
+  hasAowOntbreektNotice,
   type EventInputs,
   type EventMappingContext,
   type EventMappingNotice,
+  type EventMappingNoticeCode,
 } from './events'
 export {
   partitionEvents,

@@ -121,7 +121,7 @@ export async function GET(request: Request) {
       // User profile — incl. FIRE-parameters voor de canonieke effectiveSwr
       supabase
         .from('profiles')
-        .select('full_name, date_of_birth, expected_return, inflation_rate, box3_method, marginaal_tarief, net_monthly_income')
+        .select('full_name, date_of_birth, expected_return, inflation_rate, box3_method, net_monthly_income')
         .single(),
 
       // Current assets (for end-of-year FIRE calc)

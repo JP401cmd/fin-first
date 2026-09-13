@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-09-12T09:18:15.373Z",
-  "generatedDate": "2026-09-12",
+  "generatedAt": "2026-09-13T14:39:42.746Z",
+  "generatedDate": "2026-09-13",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -191,11 +191,11 @@
   "stats": {
     "routes": 134,
     "routesProduction": 91,
-    "api": 313,
+    "api": 314,
     "tables": 96,
-    "migrations": 234,
+    "migrations": 239,
     "integrations": 25,
-    "components": 1072,
+    "components": 1081,
     "providers": 17,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -2352,14 +2352,6 @@
       ]
     },
     {
-      "url": "/api/ai/recommendations/postponed-ready",
-      "file": "app/api/ai/recommendations/postponed-ready/route.ts",
-      "domain": "ai",
-      "methods": [
-        "GET"
-      ]
-    },
-    {
       "url": "/api/appearance",
       "file": "app/api/appearance/route.ts",
       "domain": "appearance",
@@ -3872,6 +3864,15 @@
       ]
     },
     {
+      "url": "/api/plan-review",
+      "file": "app/api/plan-review/route.ts",
+      "domain": "plan-review",
+      "methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    {
       "url": "/api/portfolio-allocation",
       "file": "app/api/portfolio-allocation/route.ts",
       "domain": "portfolio-allocation",
@@ -3905,6 +3906,14 @@
       "methods": [
         "GET",
         "POST"
+      ]
+    },
+    {
+      "url": "/api/profile",
+      "file": "app/api/profile/route.ts",
+      "domain": "profile",
+      "methods": [
+        "PUT"
       ]
     },
     {
@@ -5181,94 +5190,6 @@
       ]
     },
     {
-      "domain": "ai",
-      "label": "AI & Coach",
-      "count": 10,
-      "routes": [
-        {
-          "url": "/api/ai/actions",
-          "file": "app/api/ai/actions/route.ts",
-          "domain": "ai",
-          "methods": [
-            "POST"
-          ]
-        },
-        {
-          "url": "/api/ai/actions/[id]",
-          "file": "app/api/ai/actions/[id]/route.ts",
-          "domain": "ai",
-          "methods": [
-            "PATCH"
-          ]
-        },
-        {
-          "url": "/api/ai/actions/[id]/assign",
-          "file": "app/api/ai/actions/[id]/assign/route.ts",
-          "domain": "ai",
-          "methods": [
-            "POST"
-          ]
-        },
-        {
-          "url": "/api/ai/build-calculator",
-          "file": "app/api/ai/build-calculator/route.ts",
-          "domain": "ai",
-          "methods": [
-            "POST"
-          ]
-        },
-        {
-          "url": "/api/ai/categorize",
-          "file": "app/api/ai/categorize/route.ts",
-          "domain": "ai",
-          "methods": [
-            "POST"
-          ]
-        },
-        {
-          "url": "/api/ai/chat",
-          "file": "app/api/ai/chat/route.ts",
-          "domain": "ai",
-          "methods": [
-            "POST"
-          ]
-        },
-        {
-          "url": "/api/ai/recommendations",
-          "file": "app/api/ai/recommendations/route.ts",
-          "domain": "ai",
-          "methods": [
-            "POST"
-          ]
-        },
-        {
-          "url": "/api/ai/recommendations/[id]",
-          "file": "app/api/ai/recommendations/[id]/route.ts",
-          "domain": "ai",
-          "methods": [
-            "PATCH"
-          ]
-        },
-        {
-          "url": "/api/ai/recommendations/initial",
-          "file": "app/api/ai/recommendations/initial/route.ts",
-          "domain": "ai",
-          "methods": [
-            "GET",
-            "POST"
-          ]
-        },
-        {
-          "url": "/api/ai/recommendations/postponed-ready",
-          "file": "app/api/ai/recommendations/postponed-ready/route.ts",
-          "domain": "ai",
-          "methods": [
-            "GET"
-          ]
-        }
-      ]
-    },
-    {
       "domain": "bank-connect",
       "label": "Bank-connect",
       "count": 10,
@@ -5350,6 +5271,86 @@
           "file": "app/api/bank-connect/sync/route.ts",
           "domain": "bank-connect",
           "methods": [
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
+      "domain": "ai",
+      "label": "AI & Coach",
+      "count": 9,
+      "routes": [
+        {
+          "url": "/api/ai/actions",
+          "file": "app/api/ai/actions/route.ts",
+          "domain": "ai",
+          "methods": [
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/ai/actions/[id]",
+          "file": "app/api/ai/actions/[id]/route.ts",
+          "domain": "ai",
+          "methods": [
+            "PATCH"
+          ]
+        },
+        {
+          "url": "/api/ai/actions/[id]/assign",
+          "file": "app/api/ai/actions/[id]/assign/route.ts",
+          "domain": "ai",
+          "methods": [
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/ai/build-calculator",
+          "file": "app/api/ai/build-calculator/route.ts",
+          "domain": "ai",
+          "methods": [
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/ai/categorize",
+          "file": "app/api/ai/categorize/route.ts",
+          "domain": "ai",
+          "methods": [
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/ai/chat",
+          "file": "app/api/ai/chat/route.ts",
+          "domain": "ai",
+          "methods": [
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/ai/recommendations",
+          "file": "app/api/ai/recommendations/route.ts",
+          "domain": "ai",
+          "methods": [
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/ai/recommendations/[id]",
+          "file": "app/api/ai/recommendations/[id]/route.ts",
+          "domain": "ai",
+          "methods": [
+            "PATCH"
+          ]
+        },
+        {
+          "url": "/api/ai/recommendations/initial",
+          "file": "app/api/ai/recommendations/initial/route.ts",
+          "domain": "ai",
+          "methods": [
+            "GET",
             "POST"
           ]
         }
@@ -7497,6 +7498,22 @@
       ]
     },
     {
+      "domain": "plan-review",
+      "label": "plan-review",
+      "count": 1,
+      "routes": [
+        {
+          "url": "/api/plan-review",
+          "file": "app/api/plan-review/route.ts",
+          "domain": "plan-review",
+          "methods": [
+            "GET",
+            "PUT"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "portfolio-allocation",
       "label": "portfolio-allocation",
       "count": 1,
@@ -7556,6 +7573,21 @@
           "methods": [
             "GET",
             "POST"
+          ]
+        }
+      ]
+    },
+    {
+      "domain": "profile",
+      "label": "profile",
+      "count": 1,
+      "routes": [
+        {
+          "url": "/api/profile",
+          "file": "app/api/profile/route.ts",
+          "domain": "profile",
+          "methods": [
+            "PUT"
           ]
         }
       ]
@@ -8301,7 +8333,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 234
+    "migrationCount": 239
   },
   "tablesByDomain": [
     {
@@ -8815,11 +8847,11 @@
     }
   ],
   "components": {
-    "total": 1072,
+    "total": 1081,
     "groups": [
       {
         "group": "app",
-        "count": 423,
+        "count": 428,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -8849,6 +8881,8 @@
           "analysis-section",
           "anker-drieslag",
           "anker-drieslag.test",
+          "aow-notice-provider",
+          "aow-notice-provider.test",
           "app-link-gate",
           "app-link-gate.test",
           "app-setup-gate",
@@ -9063,7 +9097,6 @@
           "mobile-stack-shell",
           "modal-footer",
           "modal-footer.test",
-          "module-activation-modal",
           "module-color-provider",
           "module-color-provider.persist.test",
           "module-nav",
@@ -9188,6 +9221,8 @@
           "step-link-debt",
           "step-type",
           "step-type.test",
+          "stop-plan-confirm",
+          "stop-plan-confirm.test",
           "strategie-modal",
           "stress-test-section",
           "success-banner",
@@ -9220,6 +9255,8 @@
           "use-app-setup-state",
           "use-is-setup-completed",
           "verhuurrendement.config",
+          "vragenlijst-view",
+          "vragenlijst-view.test",
           "vrijheidsas",
           "vrijheidsas.test",
           "vrijheidstijd-voetnoot",
@@ -9642,11 +9679,13 @@
       },
       {
         "group": "future",
-        "count": 59,
+        "count": 66,
         "items": [
           "afbouw-overzicht-card",
           "afbouw-overzicht-card.test",
           "aow-strategie-editor",
+          "box3-methode-sheet",
+          "box3-methode-sheet.test",
           "calculator-runner",
           "calculator-to-life-event-sheet",
           "calculator-to-life-event-sheet.test",
@@ -9662,11 +9701,13 @@
           "doelen-view.test",
           "duplicate-confirm-sheet",
           "eindstrategie-body",
+          "eindstrategie-body.nalatenschap.test",
           "event-bewerken-sheet",
           "event-bewerken-sheet.test",
           "fields",
           "gebeurtenissen-view",
           "gebeurtenissen-view.test",
+          "housing-strategy-section",
           "library-card",
           "library-filter",
           "like-button",
@@ -9681,6 +9722,9 @@
           "pensioen-projectie-chart",
           "pensioen-strategie-editor",
           "pensioen-strategie-editor.test",
+          "plan-review-pane",
+          "plan-review-pane.test",
+          "plan-review-provider",
           "pot-flow-diagram",
           "publish-curation-sheet",
           "rate-limit-badge",
@@ -9762,7 +9806,7 @@
       },
       {
         "group": "onboarding",
-        "count": 39,
+        "count": 38,
         "items": [
           "aangifte-import-pane",
           "budget-amount-editor",
@@ -9774,7 +9818,6 @@
           "onboarding-data-note.test",
           "onboarding-eindstrategie",
           "onboarding-eindstrategie.test",
-          "onboarding-horizon",
           "onboarding-identity",
           "onboarding-identity.test",
           "onboarding-inkomen",
@@ -9991,10 +10034,9 @@
       },
       {
         "group": "horizon",
-        "count": 3,
+        "count": 2,
         "items": [
           "fire-retirement-expense-panel",
-          "fire-savings-panel",
           "stop-plan-vragen"
         ]
       },
@@ -10017,13 +10059,6 @@
         "count": 1,
         "items": [
           "monthly-checkin-card"
-        ]
-      },
-      {
-        "group": "identity",
-        "count": 1,
-        "items": [
-          "housing-strategy-section"
         ]
       },
       {
@@ -11312,6 +11347,10 @@
           "write": false
         },
         {
+          "name": "recommendations",
+          "write": false
+        },
+        {
           "name": "spend_limits",
           "write": false
         },
@@ -11424,6 +11463,12 @@
           "write": true
         }
       ],
+      "plan-review": [
+        {
+          "name": "profiles",
+          "write": true
+        }
+      ],
       "portfolio-allocation": [
         {
           "name": "investment_holdings",
@@ -11446,7 +11491,17 @@
           "write": true
         }
       ],
+      "profile": [
+        {
+          "name": "profiles",
+          "write": true
+        }
+      ],
       "questionnaires": [
+        {
+          "name": "questionnaire_questions",
+          "write": false
+        },
         {
           "name": "questionnaire_responses",
           "write": true
@@ -12065,6 +12120,14 @@
           ]
         },
         {
+          "domain": "plan-review",
+          "label": "plan-review",
+          "write": true,
+          "routes": [
+            "/api/plan-review"
+          ]
+        },
+        {
           "domain": "pot-rules",
           "label": "pot-rules",
           "write": true,
@@ -12078,6 +12141,14 @@
           "write": true,
           "routes": [
             "/api/privacy-mode"
+          ]
+        },
+        {
+          "domain": "profile",
+          "label": "profile",
+          "write": true,
+          "routes": [
+            "/api/profile"
           ]
         },
         {
@@ -13338,7 +13409,9 @@
           "label": "Vragenlijsten",
           "write": false,
           "routes": [
-            "/api/questionnaires"
+            "/api/questionnaires",
+            "/api/questionnaires/[id]/respond",
+            "/api/questionnaires/[id]/session"
           ]
         }
       ],
@@ -13351,6 +13424,14 @@
             "/api/admin/questionnaires",
             "/api/admin/questionnaires/[id]",
             "/api/admin/questionnaires/[id]/responses"
+          ]
+        },
+        {
+          "domain": "questionnaires",
+          "label": "Vragenlijsten",
+          "write": false,
+          "routes": [
+            "/api/questionnaires/[id]/respond"
           ]
         }
       ],
@@ -13713,8 +13794,7 @@
           "routes": [
             "/api/ai/recommendations",
             "/api/ai/recommendations/[id]",
-            "/api/ai/recommendations/initial",
-            "/api/ai/recommendations/postponed-ready"
+            "/api/ai/recommendations/initial"
           ]
         },
         {
@@ -13723,6 +13803,14 @@
           "write": true,
           "routes": [
             "/api/local-tips"
+          ]
+        },
+        {
+          "domain": "notifications",
+          "label": "notifications",
+          "write": false,
+          "routes": [
+            "/api/notifications"
           ]
         }
       ],
@@ -17458,6 +17546,30 @@
       ],
       "summary": "Een Nederlandse hypotheek bestaat vrijwel altijd uit meerdere **leningdelen**: losse leningen onder één hypotheekschuld, elk met een eigen rente, aflossingsvorm en rentevaste periode. We modelleren dat met een nullable `parent_debt_id` op `public.debts` — een zelfverwijzing die b",
       "file": "docs/adr/0140-een-hypotheek-is-een-groep-leningdelen.md"
+    },
+    {
+      "id": "0141-een-spaargrondslag-de-handmatige-spaar-override-vervalt",
+      "title": "Eén spaargrondslag: de handmatige spaar-override (monthly_savings_override) vervalt",
+      "status": "aanvaard",
+      "date": "2026-09-13",
+      "elements": [
+        "as-planning",
+        "as-budget",
+        "fn-budgetteren"
+      ],
+      "summary": "Sinds ADR 0121 is de **effectieve spaarquote** (`resolveSavingsSource(...)`, de grondslag-geresolveerde quote van ADR 0103) hét spaargetal op elk oppervlak, en `baseAnnualSavings` (= inkomen × die quote) de €-stroom die de FIRE-prognose voedt. Daarnaast bestond nog een oudere, tw",
+      "file": "docs/adr/0141-een-spaargrondslag-de-handmatige-spaar-override-vervalt.md"
+    },
+    {
+      "id": "0142-plan-review-toekomst-registerplicht",
+      "title": "Plan-review Toekomst: afgeleide voortgang op een eigen markering, en registerplicht voor elke kern-instelling",
+      "status": "aanvaard",
+      "date": "2026-09-13",
+      "elements": [
+        "as-planning"
+      ],
+      "summary": "De Toekomst-grafiek rekent, naast bezittingen, schulden en spaarquote, met zo'n veertig keuzes die verspreid staan over acht schermen. Negen daarvan hebben een stille default met groot effect (AOW €0 zonder gebeurtenis, eindleeftijd 90, onttrekkingsprofiel, verdeling bij toename,",
+      "file": "docs/adr/0142-plan-review-toekomst-registerplicht.md"
     }
   ],
   "churn": {
@@ -17465,7 +17577,7 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 78
+        "commits": 76
       },
       {
         "path": "lib/ai",
@@ -17473,7 +17585,7 @@
       },
       {
         "path": "app/(app)/toekomst",
-        "commits": 32
+        "commits": 28
       },
       {
         "path": "app/api/ai",
@@ -17488,12 +17600,12 @@
         "commits": 12
       },
       {
-        "path": "lib/fire-simulation.ts",
+        "path": "lib/horizon-data.ts",
         "commits": 8
       },
       {
-        "path": "lib/horizon-data.ts",
-        "commits": 8
+        "path": "lib/fire-simulation.ts",
+        "commits": 7
       },
       {
         "path": "app/api/budgets",
@@ -17507,13 +17619,13 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 10219,
-        "commits": 83
+        "loc": 10377,
+        "commits": 76
       },
       {
         "file": "components/app/budgets-client.tsx",
         "loc": 5635,
-        "commits": 34
+        "commits": 33
       },
       {
         "file": "components/core/assets-client.tsx",
@@ -17523,12 +17635,12 @@
       {
         "file": "components/app/cash-account-view.tsx",
         "loc": 3698,
-        "commits": 21
+        "commits": 20
       },
       {
         "file": "lib/dashboard-data-loader.ts",
-        "loc": 3121,
-        "commits": 59
+        "loc": 3118,
+        "commits": 57
       },
       {
         "file": "lib/release-notes.ts",
@@ -18689,15 +18801,23 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-09-11",
+    "previousDate": "2026-09-13",
     "hasChanges": true,
     "sections": [
       {
+        "label": "API-routes",
+        "added": [
+          "/api/plan-review",
+          "/api/profile"
+        ],
+        "removed": []
+      },
+      {
         "label": "Componenten (aantal)",
-        "added": [],
-        "removed": [
-          "-9"
-        ]
+        "added": [
+          "+10"
+        ],
+        "removed": []
       }
     ]
   },
@@ -19091,6 +19211,13 @@
       "date": "2026-09-12",
       "api": 313,
       "components": 1072,
+      "tables": 96,
+      "routesProduction": 91
+    },
+    {
+      "date": "2026-09-13",
+      "api": 314,
+      "components": 1081,
       "tables": 96,
       "routesProduction": 91
     }

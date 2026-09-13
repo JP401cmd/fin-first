@@ -16,7 +16,7 @@
  * aangemaakt. Server-side: `app/api/budgetteren/setup/route.ts` en
  * `app/api/onboarding/save-own-data/route.ts`. Client-side inserten
  * `components/app/budget-form.tsx` (de component achter de CTA van de lege
- * staat) en `components/app/module-activation-modal.tsx` nog, net als de
+ * staat) nog, net als de
  * update-paden in budgets-client zelf (`moveBudget`, `handleSave`).
  * Die staan open onder ADR 0058
  * fase b; de seed-schuld is versmald, niet weggewerkt. Vandaar dat de

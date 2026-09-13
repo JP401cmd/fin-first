@@ -242,25 +242,68 @@ export function assignAssetSlots(assets: readonly Asset[]): AssetSlot[] {
   })
 }
 
+/** Opties voor `buildAssetPotten` (alle optioneel; weggelaten = pre-TPR-02-gedrag). */
+export interface AssetPotOpties {
+  /**
+   * TPR-02 — terugvalrendement (DECIMAAL per jaar, bv. 0,07) voor een bezitting
+   * ZONDER eigen rendement (`expected_return` null/undefined). De barrel geeft hier
+   * `resolveFireParams(profile).grossReturn` mee: de profielkeuze, in de loader al
+   * geshadowd met de `fire_assumptions`-jaarlaag, met `DEFAULT_RETURN` als laatste
+   * terugval. Weggelaten → 0 (byte-identiek aan vóór TPR-02).
+   */
+  readonly terugvalRendement?: number
+}
+
+/**
+ * Rendement van één pot (decimaal per jaar) — de ENIGE plek waar de ketting
+ * `asset.expected_return ?? profielrendement` leeft (TPR-02, eigenaarsbesluit 13 sep 2026).
+ *
+ * - `expected_return` is een PERCENTAGE (7 = 7%), het terugvalrendement een DECIMAAL
+ *   (0,07): twee schalen, hier op één plek samengebracht.
+ * - Terugval ALLEEN bij ontbreken (`null`/`undefined`). Een ingevulde `0` is een
+ *   bewuste keuze (betaalrekening, crypto, afschrijvend bezit — `TYPICAL_RETURNS`
+ *   kent zes types met default 0) en blijft 0%. Een niet-eindige waarde (NaN uit een
+ *   corrupte rij) is óók geen "ontbreken" en blijft 0, zoals vóór TPR-02.
+ * - Geverifieerde reikwijdte (13 sep 2026): `assets.expected_return` is NOT NULL
+ *   DEFAULT 0, het bezittingenformulier weigert een leeg veld (rendementsband-check)
+ *   en stuurt anders altijd een getal, `POST /api/assets` eist `z.number()`, quick-add
+ *   en de onboarding-RPC vullen `TYPICAL_RETURNS`/COALESCE(…, 0). Via de DB komt
+ *   `null` dus vandaag niet binnen; de terugval dekt in-memory/synthetische/legacy-
+ *   rijen en is het CONTRACT waarop de Voorkeuren-kaart "Bruto rendement" leunt.
+ *   Wil de app "geen eigen rendement" ook voor gebruikersdata kunnen uitdrukken,
+ *   dan is dat een aparte kaart (kolom nullable + formulier/API — schemawijziging).
+ */
+export function potRendement(
+  expectedReturnPct: number | null | undefined,
+  terugvalRendement: number | undefined,
+): number {
+  if (expectedReturnPct == null) {
+    const t = Number(terugvalRendement ?? 0)
+    return Number.isFinite(t) ? t : 0
+  }
+  const r = Number(expectedReturnPct) / 100
+  return Number.isFinite(r) ? r : 0
+}
+
 /**
  * Bezittingen → `AssetPot[]`. De eerste actieve `eigen_huis`-asset krijgt slot 2 +
  * rol 'eigenHuis'; overige bezittingen vullen de resterende slots deterministisch.
  * `startwaarde` = `current_value × inclusion_pct` (V6). `rendement` = `expected_return`
- * als decimaal. Box 3-type via de canonieke `classifyAsset` (consume, geen tweede
- * classificatie).
+ * als decimaal, met `opties.terugvalRendement` voor een bezitting zonder eigen
+ * rendement (`potRendement`, TPR-02). Box 3-type via de canonieke `classifyAsset`
+ * (consume, geen tweede classificatie).
  */
-export function buildAssetPotten(assets: readonly Asset[]): AssetPot[] {
+export function buildAssetPotten(assets: readonly Asset[], opties: AssetPotOpties = {}): AssetPot[] {
   const pots: AssetPot[] = assignAssetSlots(assets).map(({ asset: a, slot, isHouse }) => {
     const rol: AssetRol | null = isHouse ? 'eigenHuis' : null
     const categorie = ASSET_TYPE_TO_CATEGORIE[a.asset_type as AssetType] ?? 'Overig'
-    const rendement = Number(a.expected_return ?? 0) / 100
     return {
       slot,
       naam: a.name ?? null,
       box3Type: assetBox3Type(classifyAsset(a).category),
       categorie,
       startwaarde: Number(a.current_value ?? 0) * inclusionFactor(a.net_worth_inclusion_pct),
-      rendement: Number.isFinite(rendement) ? rendement : 0,
+      rendement: potRendement(a.expected_return, opties.terugvalRendement),
       investering: INVESTERING_CATEGORIEEN.has(categorie),
       // ADR 0117 — markt-risicofactor (beta) uit risk_profile/subtype/categorie. Een
       // tweede, ADDITIEVE as náást `investering`: die vlag blijft het bens!F-contract

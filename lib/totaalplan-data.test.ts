@@ -45,7 +45,6 @@ const PROFILE: PersoonlijkPlanProfileRow = {
   estimated_monthly_expenses: 2500,
   expected_return: 7,
   inflation_rate: 2,
-  marginaal_tarief: null,
   fire_end_strategy: 'perpetual',
   fire_end_age: 90,
   fire_legacy_amount: 0,
@@ -55,7 +54,6 @@ const PROFILE: PersoonlijkPlanProfileRow = {
   guardrail_floor: null,
   guardrail_ceiling: null,
   guardrail_cut_step: null,
-  guardrail_raise_step: null,
   feature_preferences: null,
 }
 

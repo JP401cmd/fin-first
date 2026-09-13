@@ -71,11 +71,11 @@
  *  - `lib/briefing/snapshot.ts#amsterdamWeekKey` — de ISO-weeksleutel-berekening
  *    (WF-WILL-14) is eveneens de daadwerkelijke productiefunctie.
  *
- * VIJF MIRRORS met bronregel-verwijzing (server-only routes met een Supabase-
+ * VIER MIRRORS met bronregel-verwijzing (server-only routes met een Supabase-
  * client-parameter, dus niet importeerbaar in een pure module — spiegelt de
  * spaardoel-mirror in `budget-checks.ts` en de netto-vermogen-mirror in
  * `start-checks.ts`): de postpone-termijn (chat-panel.tsx/tips-lijst.tsx,
- * beide `POSTPONE_DAYS = 14`), de bel-badge-cap "9+" (fin-home.tsx), de
+ * beide `POSTPONE_DAYS = 14`), de
  * budgetmelding-titel/omschrijving (`app/api/notifications/route.ts#pushBudgetNotification`),
  * het krant-editienummer/jaargang + ververs-resterend (`app/api/news/route.ts`),
  * en de "minder hierover"-demotiedrempel (`app/api/news/route.ts#getDemotedCategories`).
@@ -104,7 +104,7 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'KERN',
     given: 'Een "Tip van Fin"-kaart in de chat; "nu" = 5 juli 2026. De drie knoppen dragen dezelfde woorden als de TipsLijst op /overzicht/tips (WF-OVZ-19).',
     when: 'De gebruiker kiest "Later".',
-    then: '`postponed_until` = nu + 14 dagen = 19 juli 2026 (POSTPONE_DAYS = 14, identiek in chat-panel.tsx en tips-lijst.tsx); de tip mag pas vanaf die datum via de badge terugkomen (WF-WILL-06). De tip-inhoud zelf ("+X dagen vrijheid/jaar") is AI-tool-output en niet hand-narekenbaar.',
+    then: '`postponed_until` = nu + 14 dagen = 19 juli 2026 (POSTPONE_DAYS = 14, identiek in chat-panel.tsx en tips-lijst.tsx); de tip komt pas vanaf die datum terug, als bericht "Uitgestelde tip is terug" in het berichtencentrum (WF-WILL-06). De tip-inhoud zelf ("+X dagen vrijheid/jaar") is AI-tool-output en niet hand-narekenbaar.',
     assertion: {
       kind: 'exact',
       expected: 'postponedUntil=2026-07-19',
@@ -154,15 +154,15 @@ const criteria: AcceptanceCriterion[] = [
   {
     workflow: 'WF-WILL-06',
     scenarioId: 'UAT-WILL-06',
-    titel: 'Uitgestelde tips heropakken via de badge',
+    titel: 'Uitgestelde tip komt terug als bericht',
     kriticiteit: 'BELANGRIJK',
-    given: 'Badge-aantal = 0 (geen uitgestelde tips klaar) resp. 12 (meer dan 9 klaar).',
-    when: 'De gebruiker bekijkt de badge op de Fin-bubbel.',
-    then: 'Bij 0: geen badge, klik opent de lege chat (geen automatische vraag). Bij 12: de badge toont "9+" in plaats van het exacte aantal.',
+    given: 'Vandaag 13-09-2026. Drie uitgestelde tips: A met termijn 12-09 (verlopen), B met termijn 14-09 (loopt nog), C met termijn 01-08 (langer dan 30 dagen geleden verlopen).',
+    when: 'De gebruiker opent het berichtencentrum (/berichten) of de bel.',
+    then: 'Alleen tip A staat er als bericht "Uitgestelde tip is terug" met de tip-titel; klikken leidt naar /overzicht/tips. De Fin-bubbel in de nav-pill draagt geen teller meer. Stelt de gebruiker A opnieuw uit en verloopt die termijn ook, dan komt er een nieuw bericht.',
     assertion: {
       kind: 'exact',
-      expected: 'badge0=; badge12=9+',
-      source: 'components/app/fin/fin-home.tsx (badge-cap-formule, gemirrord) — zie will-checks.ts',
+      expected: 'berichten=postponed_tip_A_2026-09-12; url=/overzicht/tips',
+      source: 'lib/notifications/tip-terug.ts#buildTipTerugNotifications (echte import) — zie will-checks.ts',
     },
   },
   {
@@ -511,6 +511,23 @@ const criteria: AcceptanceCriterion[] = [
       expected: 'aantalLeegAccount=3; alleZonderVereist=true; zelfdeSeedGelijk=true; andereSeedAnders=true; poolGroeitMetData=true',
       source:
         'lib/chat/suggesties.ts#selectSuggesties/#suggestiePoolGrootte (echte productiefuncties, geen mirror; CHAT_SUGGESTIES = 105 records, LEGE_DATA_GAPS) + components/app/chat/chat-panel.tsx#QuickActionChips (SUGGESTIE_AANTAL=3, GENERIC_PROMPT als vaste eerste chip, "Andere vragen" alleen bij pool > SUGGESTIE_AANTAL+1) — zie will-checks.ts',
+    },
+  },
+  {
+    workflow: 'WF-WILL-32',
+    scenarioId: 'UAT-WILL-32',
+    titel: 'Een vragenlijst invullen in de chat bij Fin (stoppen en later verdergaan)',
+    kriticiteit: 'BELANGRIJK',
+    given:
+      'Een beheerder heeft op /beheer/vragenlijsten één actieve vragenlijst met vier vragen gezet (WF-BEHEER-14): een verplichte schaalvraag, een niet-verplichte open vraag, een meerkeuzevraag met "Anders, namelijk…" en een rangschikvraag. De testgebruiker heeft géén AI-abonnement nodig: in deze modus draait geen model.',
+    when:
+      '(a) De gebruiker opent de chat en kijkt naar de knoppen in de kop; (b) tikt het klembord-icoon, beantwoordt de schaalvraag, slaat de open vraag over en tikt "Later afmaken"; (c) opent de chat opnieuw en het icoon; (d) wijzigt een eerder antwoord, beantwoordt de rest en rondt af; (e) de beheerder zet de lijst inactief.',
+    then:
+      '(a) Het klembord-icoon ("Vragenlijst invullen") staat vóór de megafoon en verschijnt alleen zolang er een actieve lijst met minstens één vraag is. (b) Bij precies één lijst begint het invullen direct (geen keuzescherm); Fin stelt de vragen één voor één als chatbubbel met "Vraag N van 4", de gebruiker antwoordt eronder. Elk antwoord gaat meteen per vraag naar de server (POST /api/questionnaires/[id]/respond); "Overslaan" staat alleen bij een niet-verplichte vraag en bewaart niets. Een mislukte opslag toont "Je antwoord is niet opgeslagen. Controleer je verbinding en probeer het opnieuw." en gaat niet door. (c) Fin zegt "Welkom terug! Je had al 1 van de 4 vragen beantwoord." en gaat verder bij de eerste open vraag; in een keuzelijst (meer dan één lijst) staat "1 van 4 beantwoord · verder waar je was". (d) Een eerder antwoord is aan te passen (knop onder de eigen bubbel, "Annuleren" om terug te gaan); na afronden: "Dank je wel! Je antwoorden zijn bewaard en gaan naar het TriFinity-team, niet naar de AI." — de antwoorden verschijnen in de respons-sheet in beheer. (e) Inactief = het icoon is weg bij het volgende openen. Nergens komt een vragenlijstantwoord in een AI-context terecht.',
+    assertion: {
+      kind: 'ui-only',
+      source:
+        'components/app/chat/chat-panel.tsx (modus `vragenlijst`, `toonVragenlijstKnop`) + components/app/chat/vragenlijst/use-actieve-vragenlijsten.ts + vragenlijst-view.tsx (Keuze/Invullen, hervatten, wijzigen, afronden) + app/api/questionnaires/route.ts + app/api/questionnaires/[id]/{session,respond}/route.ts + lib/questionnaires/antwoord.ts (antwoordvalidatie per vraagtype) — invulproces zonder cijfermatige uitkomst; bewaakt in `components/app/chat/vragenlijst/vragenlijst-view.test.tsx`, `app/api/questionnaires/[id]/respond/route.test.ts` en `lib/questionnaires/*.test.ts`.',
     },
   },
 ]

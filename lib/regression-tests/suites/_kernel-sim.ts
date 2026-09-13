@@ -116,7 +116,6 @@ export function runScalarProjectionV2(
     guardrail_floor: withdrawal.guardrailFloor,
     guardrail_ceiling: withdrawal.guardrailCeiling,
     guardrail_cut_step: withdrawal.guardrailCutStep,
-    guardrail_raise_step: withdrawal.guardrailRaiseStep,
   }
 
   const { result } = runKernelUnified({

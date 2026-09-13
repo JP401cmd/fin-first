@@ -41,6 +41,7 @@ import {
 } from '@/lib/horizon-kernel/adapter'
 import { runKernelUnified } from '@/lib/horizon-kernel/run-unified'
 import type { KernelUnifiedResult } from '@/lib/horizon-kernel/bridge'
+import { buildKernelPartnerBlok } from '@/lib/horizon-kernel/adapter/partner-blok'
 
 /**
  * Eén huishoudlid in de kernel-context: profiel + eigen (persoonlijke) gebeurtenissen +
@@ -169,6 +170,18 @@ export function computeHouseholdProjection(
     return { ok: false, reason: 'ontbrekende jaaruitgave (gecombineerd of per lid)' }
   }
 
+  // Partnerblok via de gedeelde helper (TPR-07) — dezelfde samenstelling als de
+  // convergentie-route in huishoudperspectief. De geboortedatum is hierboven al
+  // gepoort, dus `null` kan hier alleen bij een leeg profiel; expliciet afvangen.
+  const partnerBlok = buildKernelPartnerBlok({
+    profile: partner.profile,
+    aowRows: partner.aowRows,
+    lifeEvents: partner.lifeEvents,
+  })
+  if (!partnerBlok) {
+    return { ok: false, reason: 'partnerblok kon niet worden samengesteld' }
+  }
+
   try {
     // Gecombineerde huishouden-invoer: head-profiel (met huishoud-brede uitgave) + partner-
     // blok (PT-laag). De partner-profiel-uitgave is irrelevant voor de combined run (de
@@ -180,11 +193,7 @@ export function computeHouseholdProjection(
       lifeEvents: rawContext.combinedLifeEvents,
       aowRows: head.aowRows,
       taxYear: rawContext.taxYear,
-      partner: {
-        profile: partner.profile,
-        aowRows: partner.aowRows,
-        lifeEvents: partner.lifeEvents,
-      },
+      partner: partnerBlok,
     }
 
     // Eigenaar-splitsing (persoonlijk 1:1, gedeeld naar aandeel). `gecombineerd` === household.

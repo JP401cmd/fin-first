@@ -101,6 +101,8 @@ import { detectDeficitLoanFromRows } from '@/lib/horizon/deficit-loan-display'
 import { buildDeficitLoanCopy } from '@/lib/horizon/deficit-loan-copy'
 import { nettoLiquideAtAge } from '@/lib/horizon/vrijheidsdagen'
 import { useDeficitNotice } from '@/components/app/horizon/deficit-notice-provider'
+import { useAowNotice } from '@/components/app/horizon/aow-notice-provider'
+import { AOW_ONTBREEKT_COPY } from '@/lib/horizon/aow-notice-minimize'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { FreedomTimeBadge } from '@/components/app/freedom-time-label'
 import { HideInSimple } from '@/components/app/hide-in-simple'
@@ -180,6 +182,8 @@ import {
 } from '@/components/app/horizon/doel-vastleg-sheet'
 import { WhatIfMarketAssumptions } from '@/components/app/horizon/whatif-market-assumptions'
 import { DoelLoslatenConfirm } from '@/components/future/doel-loslaten-confirm'
+import { StopPlanConfirm } from '@/components/app/horizon/stop-plan-confirm'
+import { planDraftFromSettings, planDraftToFireSettingsBody, validatePlanDraft } from '@/lib/horizon/plan-draft'
 import { buildSliderEvent, readSliderValueFromEvents, type SliderKey } from '@/lib/scenario-events'
 import type { HorizonScenarioOverrides } from '@/lib/hooks/use-horizon-fire-sim'
 import type { AssetCategorie } from '@/lib/horizon-kernel/types'
@@ -930,6 +934,11 @@ export default function HorizonPage({
   const [doelSaving, setDoelSaving] = useState(false)
   // "Doel loslaten"-bevestiging (gedeelde ShellOverlay-confirm i.p.v. window.confirm).
   const [doelLoslatenOpen, setDoelLoslatenOpen] = useState(false)
+  // TPR-09 — "Maak dit mijn plan": de verkende stopleeftijd wordt het plan-anker.
+  // Bevestiging (ShellOverlay-confirm) + PUT-in-flight + inline fout (validatie/route).
+  const [stopPlanConfirmOpen, setStopPlanConfirmOpen] = useState(false)
+  const [stopPlanSaving, setStopPlanSaving] = useState(false)
+  const [stopPlanError, setStopPlanError] = useState('')
   // KATERN II ("Jouw doel" / "Wat als je draait") — standaard INGEKLAPT, in
   // béíde weergavemodi (bewuste afwijking van het DepthSection-gedrag waar
   // Volledig standaard opent): de sectie is een werkbank, geen leesstof. De
@@ -973,9 +982,6 @@ export default function HorizonPage({
   const [overlayVisible, setOverlayVisible] = useState(true)
   // overlayEmphasis: welke grafiekfase een gehoverde/gefocuste ballon accentueert.
   const [overlayEmphasis, setOverlayEmphasis] = useState<'accumulation' | 'withdrawal' | 'fire' | null>(null)
-  // monthlySavingsOverride wordt doorgegeven aan useHorizonFireSim zodat
-  // de prognose de override-waarde gebruikt boven het asset-aggregaat.
-  const [monthlySavingsOverride] = useState<number | null>(initialData.monthlySavingsOverride)
 
   // Deep-link: open modal via ?modal= URL param (from dashboard widgets)
   const searchParams = useSearchParams()
@@ -1150,7 +1156,7 @@ export default function HorizonPage({
   // Fase 2b (#495): gemigreerd naar runUnifiedProjection() met per-asset-type rendement
   // Task 4.2: de kernel-runs draaien in een web worker (met synchrone jsdom/SSR-fallback);
   // `firstPaint*` levert de server-scalars zolang de worker-run nog niet geland is.
-  const { result: simResult, cashflows: simCashflows, error: simError, unifiedRows, effectiveLifeEvents, kernelStatus, kernelMaandHint, kernelHousingSale, scenario, stopPad, scenarioPending, stopPadPending, isRefining: kernelIsRefining, firstPaintFireAge, firstPaintFreedomPct, firstPaintRequiredPortfolio, firstPaintRequiredNetWorth } = useHorizonFireSim(
+  const { result: simResult, cashflows: simCashflows, error: simError, unifiedRows, effectiveLifeEvents, kernelStatus, kernelMaandHint, kernelHousingSale, aowOntbreekt, scenario, stopPad, scenarioPending, stopPadPending, isRefining: kernelIsRefining, firstPaintFireAge, firstPaintFreedomPct, firstPaintRequiredPortfolio, firstPaintRequiredNetWorth } = useHorizonFireSim(
     input
       ? {
           horizonInput: input,
@@ -1166,7 +1172,6 @@ export default function HorizonPage({
           box3Method: initialData.box3Method,
           hasPartner: initialData.hasPartner,
           bankAccountCash: initialData.unlinkedCash,
-          monthlySavingsOverride,
           baseAnnualSavingsFromCashflow: initialData.baseAnnualSavingsFromCashflow,
           housingStrategy: initialData.housingStrategy,
           kernelRawProfile,
@@ -1222,7 +1227,6 @@ export default function HorizonPage({
       box3Method: initialData.box3Method,
       hasPartner: initialData.hasPartner,
       bankAccountCash: initialData.unlinkedCash,
-      monthlySavingsOverride,
       baseAnnualSavingsFromCashflow: initialData.baseAnnualSavingsFromCashflow,
       housingStrategy: initialData.housingStrategy,
     })
@@ -1242,7 +1246,7 @@ export default function HorizonPage({
         marktVolatiliteit: initialData.marktVolatiliteit,
       },
     }
-  }, [input, fireStrategy, withdrawalStrategyConfig, fireParams.grossReturn, fireParams.inflationRate, userAowAge.fractional, debts, monthlySavingsOverride, initialData, kernelRawProfile, aowRows])
+  }, [input, fireStrategy, withdrawalStrategyConfig, fireParams.grossReturn, fireParams.inflationRate, userAowAge.fractional, debts, initialData, kernelRawProfile, aowRows])
 
   // ── Marktcheck-context ────────────────────────────────────────────────────
   // De rauwe kernel-context voor de Monte-Carlo-band: de preview-baseline (die de
@@ -1315,7 +1319,7 @@ export default function HorizonPage({
           // de bijbehorende bronsignalen, terwijl de `loadData`-select ze al
           // meenam. Zonder die twee kan de rekenlaag hier niet zien welke
           // grondslag geldt en leest ze een profielbedrag alsof het de waarheid is.
-          .select(`date_of_birth, retirement_expense_method, retirement_expense_custom_amount, ${FIRE_PLAN_COLUMNS}, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, income_source, expenses_source, box3_method, marginaal_tarief, feature_preferences, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step, withdrawal_profile_config, deficit_loan_rate, housing_strategy_config, pot_rules`)
+          .select(`date_of_birth, retirement_expense_method, retirement_expense_custom_amount, ${FIRE_PLAN_COLUMNS}, fire_legacy_include_illiquid, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, income_source, expenses_source, box3_method, box3_heffingvrij_inkomen, feature_preferences, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, withdrawal_profile_config, deficit_loan_rate, housing_strategy_config, pot_rules`)
           .single()
         if (cancelled || !profileData) return
         // Jaarlijkse essentiële uitgaven — zelfde grondslag (echte essentiële
@@ -1377,7 +1381,7 @@ export default function HorizonPage({
         supabase.from('transactions').select('amount').gte('date', monthStart).lt('date', monthEnd),
         supabase.from('assets').select('current_value, monthly_contribution, net_worth_inclusion_pct').eq('is_active', true),
         supabase.from('debts').select('current_balance, net_worth_inclusion_pct').eq('is_active', true),
-        supabase.from('profiles').select(`date_of_birth, retirement_expense_method, retirement_expense_custom_amount, ${FIRE_PLAN_COLUMNS}, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, income_source, expenses_source, box3_method, marginaal_tarief, feature_preferences, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step, withdrawal_profile_config, deficit_loan_rate, housing_strategy_config, pot_rules`).single(),
+        supabase.from('profiles').select(`date_of_birth, retirement_expense_method, retirement_expense_custom_amount, ${FIRE_PLAN_COLUMNS}, fire_legacy_include_illiquid, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, income_source, expenses_source, box3_method, box3_heffingvrij_inkomen, feature_preferences, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, withdrawal_profile_config, deficit_loan_rate, housing_strategy_config, pot_rules`).single(),
         supabase.from('budgets').select('id, name, default_limit, interval, budget_type, is_essential').eq('is_essential', true).in('budget_type', ['expense']).is('parent_id', null),
         supabase.from('life_events').select('*').eq('is_active', true).order('sort_order', { ascending: true }),
         supabase
@@ -1592,7 +1596,6 @@ export default function HorizonPage({
             guardrailFloor: wsData.guardrail_floor ?? WITHDRAWAL_DEFAULTS.guardrailFloor,
             guardrailCeiling: wsData.guardrail_ceiling ?? WITHDRAWAL_DEFAULTS.guardrailCeiling,
             guardrailCutStep: wsData.guardrail_cut_step ?? WITHDRAWAL_DEFAULTS.guardrailCutStep,
-            guardrailRaiseStep: wsData.guardrail_raise_step ?? WITHDRAWAL_DEFAULTS.guardrailRaiseStep,
           })
         }
       } catch { /* defaults */ }
@@ -3108,6 +3111,17 @@ export default function HorizonPage({
     minimize: minimizeDeficitNotice,
   } = useDeficitNotice(deficitNoticeVisible ? deficitLoanNotice!.peak : null)
 
+  // ── "AOW ontbreekt"-melding (TPR-04) ───────────────────────────────────────
+  // De adapter-notice (code `aow_ontbreekt`) komt via de run mee (`aowOntbreekt`);
+  // zelfde view-gating als de tekort-melding: in partner-weergave mét partner-pad
+  // hoort het eigen AOW-verhaal er niet. Zusje van de tekort-provider in de /toekomst-kop.
+  const aowNoticeVisible = Boolean(aowOntbreekt) && !usePartnerMainLine
+  const {
+    display: aowDisplay,
+    canMinimize: canMinimizeAow,
+    minimize: minimizeAowNotice,
+  } = useAowNotice(aowNoticeVisible)
+
   // Situatie-specifieke uitleg bij de melding. Alle getallen komen uit DEZELFDE
   // run (detector + `displayEndAge` + AOW-leeftijd + woonstrategie); de copy
   // zelf woont in een pure sibling-module met eigen toon-grendel. Bedragen gaan
@@ -3433,9 +3447,11 @@ export default function HorizonPage({
 
   // Gewogen baseline-rendement per bezeten categorie (Marktbias-UI). Gememoized zodat
   // de inline-call in de JSX niet elke render een verse array-identiteit oplevert.
+  // `fireParams.grossReturn` = dezelfde terugval als de kernel voor een bezitting
+  // zonder eigen rendement (TPR-02) — zo toont de Marktbias wat de simulatie rekent.
   const categorieReturnGroups = useMemo(
-    () => buildCategorieReturnGroups(initialData.assets),
-    [initialData.assets],
+    () => buildCategorieReturnGroups(initialData.assets, fireParams.grossReturn),
+    [initialData.assets, fireParams.grossReturn],
   )
 
   // ── Vrijheidsas + stop-marge (plan §D) ──────────────────────────────────────
@@ -3619,8 +3635,9 @@ export default function HorizonPage({
       doelGewogenRendement(
         initialData.assets,
         scenarioReturnDeltas as Partial<Record<AssetCategorie, number>>,
+        fireParams.grossReturn, // TPR-02: zelfde terugval als de kernel
       ),
-    [initialData.assets, scenarioReturnDeltas],
+    [initialData.assets, scenarioReturnDeltas, fireParams.grossReturn],
   )
   // FIRE-doelwaarden: L = gekozen stop, anders verwacht-FIRE naar boven op 0,5; M = marge op 0,5, ≥ 0.
   const doelFireLeeftijd =
@@ -3753,6 +3770,62 @@ export default function HorizonPage({
       setDoelSaving(false)
     }
   }, [addToast])
+
+  // TPR-09 — de verkenning wordt het plan. Twee stopleeftijden stonden naast elkaar
+  // (scenario-marker `toekomst_scenario_prefs.stopAge` vs. plan-anker `fire_stop_age`)
+  // zonder brug; dit is de brug. Schrijft het VOLLEDIGE plan (route-contract R3):
+  // het gelezen plan uit GET /api/fire-settings (eindleeftijd, eind-vorm,
+  // nalatenschap blijven wat ze zijn) met alleen het anker op `age` + de verkende
+  // leeftijd. Dezelfde toets als de eindstrategie-body (`validatePlanDraft`:
+  // stopleeftijd < eindleeftijd, halve jaren) vóór de PUT; de route toetst 'm nogmaals.
+  // Ná succes: de scenario-marker wissen (de verkenning ís nu het plan, de slider
+  // landt op het plan-stopmoment), koppelmodus uit (anders schuift de marker meteen
+  // weer weg van het zojuist gekozen plan), en de pagina verversen zoals na de
+  // strategie-modal (`loadData` + `router.refresh`).
+  const handleStopPlanBevestigen = useCallback(async () => {
+    setStopPlanSaving(true)
+    setStopPlanError('')
+    try {
+      const fsRes = await fetch('/api/fire-settings')
+      if (!fsRes.ok) {
+        setStopPlanError('Je huidige plan kon niet worden gelezen. Probeer het zo nog eens.')
+        return
+      }
+      const huidig = planDraftFromSettings(await fsRes.json())
+      const draft = { ...huidig, anchor: 'age' as const, stopAge: effectiveStopAge }
+      const check = validatePlanDraft(draft, { aowAge: userAowAge.fractional })
+      if (!check.ok) {
+        setStopPlanError(
+          check.errors.stopAge ?? check.errors.endAge ?? check.errors.legacyAmount ?? 'Dit stopmoment past niet in je plan.',
+        )
+        return
+      }
+      const res = await fetch('/api/fire-settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(planDraftToFireSettingsBody(draft)),
+      })
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as { error?: unknown } | null
+        setStopPlanError(typeof data?.error === 'string' ? data.error : 'Opslaan mislukt. Probeer het zo nog eens.')
+        return
+      }
+      setScenarioStopAge(null)
+      setScenarioStopKoppel(false)
+      setStopPlanConfirmOpen(false)
+      addToast({
+        type: 'success',
+        title: 'Plan bijgewerkt',
+        message: `Je plan rekent nu met stoppen op ${formatStopAge(effectiveStopAge)}.`,
+      })
+      loadData()
+      router.refresh()
+    } catch {
+      setStopPlanError('Opslaan mislukt. Probeer het zo nog eens.')
+    } finally {
+      setStopPlanSaving(false)
+    }
+  }, [effectiveStopAge, userAowAge.fractional, addToast, loadData, router])
 
   // "Herstel mijn doel": kopieer de vastgelegde `doel.stand` terug naar de live-states.
   // Sliders reconstrueren zoals de pref-hydratie (buildSliderEvent per key); rendement-delta's,
@@ -5794,6 +5867,59 @@ export default function HorizonPage({
                 )}
               </section>
 
+              {/* TPR-04 — geen actief AOW-event: de kern rekent bewust met €0 AOW
+                  (eigenaarsbesluit, geen terugval op volledige opbouw), maar niet meer
+                  stil. Bron = de adapter-notice `aow_ontbreekt` uit dezelfde run; kopij
+                  (keuze · effect · waarom) uit `lib/horizon/aow-notice-minimize.ts`, ook
+                  de bron van de kassabon-regel. Minimaliseerbaar via `AowNoticeProvider`
+                  (statuspunt naast de pagina-'i'); kleur = stoplicht-'aandacht'. Staat
+                  bewust NÁ de tekort-sectie: de bron-grendel
+                  horizon-client.tekort-lening.test.ts leest de éérste aria-live-sectie. */}
+              <section role="status" aria-live="polite">
+                {aowDisplay === 'minimized' && (
+                  <span className="sr-only">
+                    Melding over je AOW geminimaliseerd. Activeer de gekleurde stip naast de
+                    informatie-knop om de melding opnieuw te tonen.
+                  </span>
+                )}
+                {aowDisplay === 'expanded' && (
+                  <div className="mb-4 flex items-start gap-2.5 rounded-[var(--r)] border border-dashed border-amber-300 bg-amber-50/60 px-3 py-2.5">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" aria-hidden="true" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="font-sans text-[12px] font-semibold text-amber-900">
+                          {AOW_ONTBREEKT_COPY.kop}
+                        </p>
+                        {canMinimizeAow && (
+                          <button
+                            type="button"
+                            onClick={minimizeAowNotice}
+                            aria-label="Minimaliseren"
+                            title="Minimaliseren"
+                            className="-mr-1 -mt-1 inline-flex shrink-0 items-center gap-1 rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--paper)] px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--ink-3)] transition-colors hover:text-[var(--ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+                          >
+                            <Minus className="h-3.5 w-3.5" aria-hidden="true" />
+                            Minimaliseren
+                          </button>
+                        )}
+                      </div>
+                      <p className="mt-1 font-sans text-[12px] leading-relaxed text-amber-800">
+                        {AOW_ONTBREEKT_COPY.keuze} {AOW_ONTBREEKT_COPY.effect}
+                      </p>
+                      <p className="mt-1.5 font-sans text-[12px] leading-relaxed text-amber-800">
+                        {AOW_ONTBREEKT_COPY.waarom}
+                      </p>
+                      <Link
+                        href={AOW_ONTBREEKT_COPY.actieHref}
+                        className="mt-2 inline-flex items-center gap-1 font-sans text-[12px] font-semibold text-amber-900 underline underline-offset-2 hover:text-amber-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+                      >
+                        {AOW_ONTBREEKT_COPY.actieLabel}
+                      </Link>
+                    </div>
+                  </div>
+                )}
+              </section>
+
               {/* "Huis wordt nooit verkocht" — beschrijvende info (geen advies, Wft-veilig).
                   Neutrale horizon-toon, niet de rode "fout"-stijl. */}
               {housingHeldNotice && !isPensioenMode && (() => {
@@ -6912,6 +7038,14 @@ export default function HorizonPage({
                   // snelknoppen voor te bieden. Dezelfde modal als de
                   // "Stopmoment wijzigen"-link onder de grafiek.
                   onKeuzesOpenen={() => setActiveModal('strategie')}
+                  // TPR-09 — de verkenning tot plan maken: bevestiging eerst (keuze ·
+                  // effect · waarom), dan het volledige plan via /api/fire-settings.
+                  onMaakPlan={() => {
+                    setStopPlanError('')
+                    setStopPlanConfirmOpen(true)
+                  }}
+                  maakPlanBusy={stopPlanSaving}
+                  planIsDezeStop={planAnchor.kind === 'age' && planAnchor.age === effectiveStopAge}
                   draaiknoppen={
                     <>
                       {/* De vier bestaande sliders (platgeslagen via `bare`) */}
@@ -7039,6 +7173,21 @@ export default function HorizonPage({
           error=""
           onConfirm={handleDoelLoslaten}
           onClose={() => setDoelLoslatenOpen(false)}
+        />
+
+        {/* TPR-09 — "Maak dit mijn plan": bevestiging vóór de verkenning het plan wordt.
+            Fouten (validatie/route) inline in de confirm, zodat de gebruiker ze ziet
+            naast de keuze die ze afwijzen. */}
+        <StopPlanConfirm
+          open={stopPlanConfirmOpen}
+          busy={stopPlanSaving}
+          error={stopPlanError}
+          stopAge={effectiveStopAge}
+          planAnchor={planAnchor}
+          planEndAge={simResult?.displayEndAge ?? initialData.firePlan?.endAge ?? null}
+          aowAge={userAowAge.fractional}
+          onConfirm={handleStopPlanBevestigen}
+          onClose={() => setStopPlanConfirmOpen(false)}
         />
       </>
       )}
@@ -9595,6 +9744,15 @@ export default function HorizonPage({
                 <span className="font-sans text-sm text-[var(--ink-2)]">Pensioenuitgaven/jr</span>
                 <span className="tabular-nums text-[var(--ink)]">{<MaskedAmount value={effectiveInput?.yearlyMustExpenses ?? 0} tone="horizon" />}</span>
               </div>
+              {/* TPR-04 — de stille €0 benoemd: zonder actief AOW-event rekent de run
+                  (adapter-notice `aow_ontbreekt`) met €0 AOW. Zelfde bron en kopij als
+                  de melding boven de grafiek; geen eigen event-telling hier. */}
+              {aowOntbreekt && (
+                <div className="flex justify-between py-0.5">
+                  <span className="font-sans text-sm text-[var(--ink-2)]">{AOW_ONTBREEKT_COPY.kassabonLabel}</span>
+                  <span className="tabular-nums text-[var(--ink)]">{AOW_ONTBREEKT_COPY.kassabonWaarde}</span>
+                </div>
+              )}
               {/* ADR 0129 — het stopmoment als aanname in de bon (uit `vastStopLeeftijd`, nooit `fireAge`). */}
               {isFixedAnchorMode && ankerStop != null && (
                 <div className="flex justify-between py-0.5">

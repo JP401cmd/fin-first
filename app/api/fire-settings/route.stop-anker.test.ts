@@ -94,7 +94,6 @@ const BASE_ROW: Row = {
   retirement_expense_method: 'essential_budgets',
   retirement_expense_custom_amount: null,
   deficit_loan_rate: null,
-  monthly_savings_override: null,
   fire_stop_anchor: 'solved',
   fire_stop_age: null,
 }

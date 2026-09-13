@@ -17,6 +17,7 @@ import {
 } from '@/lib/horizon-kernel/convergentie-router'
 import type { SimRow } from '@/lib/fire-simulation'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
+import { ankerReachFromSim, type AnkerReach } from '@/lib/horizon/anker-copy'
 import type { PlanDraft } from '@/lib/horizon/plan-draft'
 import type { WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
 
@@ -45,6 +46,20 @@ export interface RegelSimSnapshot {
 export interface RegelProjection {
   rows: SimRow[]
   fireAgeFractional: number | null
+  /**
+   * TPR-01 — "reikt tot": het bereik van het vermogen uit DEZELFDE run, via de
+   * canonieke `ankerReachFromSim` (uitputtingsmaand × startleeftijd × eindleeftijd).
+   * Bij een kern-fout `{ kind: 'onbekend' }`. Consume-only: de plan-review toont
+   * hiermee het effect van een keuze zonder een eigen "wanneer is het op"-som.
+   * Optioneel/additief in het TYPE (bestaande lege-projectie-literals in de
+   * regel-bodies blijven compileerbaar); `runRegelProjection` zet 'm altijd.
+   */
+  reach?: AnkerReach
+}
+
+/** Verse lege projectie per aanroep — geen gedeelde (muteerbare) `rows`-array. */
+function emptyProjection(): RegelProjection {
+  return { rows: [], fireAgeFractional: null, reach: { kind: 'onbekend' } }
 }
 
 /**
@@ -64,8 +79,29 @@ export interface RegelSimOverride {
    * gekozen stopleeftijd hetzelfde rekent als de kernel na de save.
    */
   firePlan?: PlanDraft
+  /**
+   * TPR-12 — de schakelaar "niet-liquide bezit meetellen in de nalatenschap"
+   * (`profiles.fire_legacy_include_illiquid`, P!B54). `undefined` = kolom ongewijzigd;
+   * `null` = terug naar de kernel-default ('Nee').
+   */
+  legacyIncludeIlliquid?: boolean | null
   withdrawalStrategy?: WithdrawalStrategyConfig
   withdrawalProfileConfig?: Record<string, unknown> | null
+  /**
+   * TPR-01 — een kandidaat-woonstrategie als rauwe `housing_strategy_config`-JSONB
+   * (dezelfde vorm als `serializeHousingStrategyConfig`/de PUT-body van
+   * `/api/housing-strategy`). De plan-review zet hiermee de vier strategieën naast
+   * elkaar. `undefined` = kolom ongewijzigd; `null` = geen config (kern-default).
+   */
+  housingStrategyConfig?: Record<string, unknown> | null
+  /**
+   * TPR-01 — een kandidaat-grondslag voor de uitgaven ná stoppen, als de twee
+   * profielkolommen die de adapter leest (`retirement_expense_method` +
+   * `retirement_expense_custom_amount` → `computeRetirementExpenses`). De plan-review
+   * toont hiermee wat een ander uitgavenbedrag met de uitkomst doet; de kern rekent
+   * het bedrag zelf door. `undefined` = kolommen ongewijzigd.
+   */
+  retirementExpense?: { method: string; customAmount: number | null }
 }
 
 /**
@@ -81,9 +117,18 @@ export function runRegelProjection(
   const outcome = computeConvergentieProjection({
     rawContext: applyDraftToRawContext(snapshot.rawContext, override),
   })
-  if (!outcome.ok) return { rows: [], fireAgeFractional: null }
+  if (!outcome.ok) return emptyProjection()
   const res = toSimResult(outcome.result)
-  return { rows: res.rows, fireAgeFractional: res.fireAgeFractional }
+  return {
+    rows: res.rows,
+    fireAgeFractional: res.fireAgeFractional,
+    // Rij 0 = de startleeftijd (maand 0) — dezelfde as als `KernelInput.startLeeftijd`.
+    reach: ankerReachFromSim({
+      startAge: res.rows[0]?.age ?? null,
+      kernelDepletionMonth: res.kernelDepletionMonth,
+      endAge: res.displayEndAge,
+    }),
+  }
 }
 
 /**
@@ -101,11 +146,26 @@ function applyDraftToRawContext(
     !override?.fireStrategy &&
     !override?.firePlan &&
     !override?.withdrawalStrategy &&
-    override?.withdrawalProfileConfig === undefined
+    override?.withdrawalProfileConfig === undefined &&
+    override?.legacyIncludeIlliquid === undefined &&
+    override?.housingStrategyConfig === undefined &&
+    override?.retirementExpense === undefined
   ) {
     return base
   }
   const profile = { ...base.profile }
+  // TPR-01 — kandidaat-uitgavengrondslag na stoppen (de kern leidt het jaarbedrag af).
+  if (override.retirementExpense !== undefined) {
+    profile.retirement_expense_method = override.retirementExpense.method
+    profile.retirement_expense_custom_amount = override.retirementExpense.customAmount
+  }
+  // TPR-01 — kandidaat-woonstrategie; `null` = kolom leeg (kern-default include_full).
+  if (override.housingStrategyConfig !== undefined) {
+    profile.housing_strategy_config = override.housingStrategyConfig
+  }
+  if (override.legacyIncludeIlliquid !== undefined) {
+    profile.fire_legacy_include_illiquid = override.legacyIncludeIlliquid
+  }
   if (override.firePlan) {
     const p = override.firePlan
     profile.fire_end_strategy = p.endForm
@@ -123,7 +183,6 @@ function applyDraftToRawContext(
     profile.guardrail_floor = override.withdrawalStrategy.guardrailFloor
     profile.guardrail_ceiling = override.withdrawalStrategy.guardrailCeiling
     profile.guardrail_cut_step = override.withdrawalStrategy.guardrailCutStep
-    profile.guardrail_raise_step = override.withdrawalStrategy.guardrailRaiseStep
   }
   // Roadmap M / V4 — volledige withdrawal_profile_config-draft (profiel + curve + flex).
   // `undefined` = niet meegegeven (kolom ongewijzigd); `null` = expliciet wissen.

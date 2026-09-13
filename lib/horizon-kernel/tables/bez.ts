@@ -353,12 +353,17 @@ function computeWoningblok(
     : 0
 
   // ── BA huur/mnd (verkoopmaand op WOZ; daarna geïndexeerd) ────────────────────
+  // TPR-03 (buiten oracle-domein): een app-€-woonlast (`huurNaVerkoopPerMaand`, geld
+  // van vandaag) vervangt in de verkoopmaand het %-WOZ-startpunt — × idx, zoals élk
+  // P-blok-€-bedrag (uitgaveNaPensioenPerJaar × idx). Het doorindexeer-pad is identiek.
   let huurPerMaand = 0
   if (verkocht === 1) {
     huurPerMaand =
       dep.ayVorig === 1
         ? dep.baVorig * Math.pow(1 + input.inflatie, 1 / 12)
-        : (jVorig * w.huurNaVerkoopPctWozPerJaar) / 12
+        : w.huurNaVerkoopPerMaand != null
+          ? w.huurNaVerkoopPerMaand * idx
+          : (jVorig * w.huurNaVerkoopPctWozPerJaar) / 12
   }
 
   // ── BB vervallen hypotheeklast/mnd (bevroren rente op de verkoopmaand) ────────

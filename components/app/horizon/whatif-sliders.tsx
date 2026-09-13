@@ -13,6 +13,7 @@ import {
 import type { WhatIfEvent } from '@/components/app/horizon/whatif-events'
 import { WhatIfDevelopmentNotice } from '@/components/app/horizon/whatif-development-notice'
 import { useOptionalToast } from '@/components/app/toast-provider'
+import { rangeTouchSeekProps } from '@/lib/range-touch-seek'
 
 /**
  * WhatIfOverrides is now a derived view, but kept as a public type for
@@ -166,6 +167,7 @@ function SliderRow({
           aria-label={label}
           aria-valuetext={formatValue(value)}
           className="slider-module relative z-10 w-full"
+          {...rangeTouchSeekProps}
         />
       </div>
       <div className="relative flex justify-between font-sans text-[10px] text-[var(--ink-4)]">

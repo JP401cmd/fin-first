@@ -38,6 +38,9 @@ const MODULE_MAP: Record<NotificationType, ModuleInfo> = {
   // Mijlpaal = een moment van De Wil (vieren/handelen), dus de will-tokens —
   // dezelfde familie als briefing en partner-actie.
   milestone:           { label: 'Mijlpaal',    colorVar: 'var(--will)',   textVar: 'var(--will-t)',   lightVar: 'var(--will-l)', mediumVar: 'var(--will-m)' },
+  // Een tip die terug is van uitstel (lib/notifications/tip-terug.ts) — een
+  // handelmoment, dus dezelfde will-familie als briefing en mijlpaal.
+  postponed_tip:       { label: 'Tip',         colorVar: 'var(--will)',   textVar: 'var(--will-t)',   lightVar: 'var(--will-l)', mediumVar: 'var(--will-m)' },
 }
 
 /**

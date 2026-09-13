@@ -15,7 +15,7 @@
 
 import type { Asset, AssetType } from '@/lib/asset-data'
 import type { AssetCategorie } from '@/lib/horizon-kernel/types'
-import { ASSET_TYPE_TO_CATEGORIE } from '@/lib/horizon-kernel/adapter/potten'
+import { ASSET_TYPE_TO_CATEGORIE, potRendement } from '@/lib/horizon-kernel/adapter/potten'
 import { GOAL_TYPE_META, GOAL_TYPE_ICONS, type GoalType } from '@/lib/goal-data'
 import { DOEL_PARAMETERS, type DoelParameter } from '@/lib/horizon/toekomst-scenario'
 
@@ -49,18 +49,21 @@ const PARAMETER_GOAL_COLOR = 'purple'
 
 /**
  * Doel-gewogen TOTAALrendement (%) over de bezittingen: dezelfde weging als
- * `buildCategorieReturnGroups` (actieve assets, inclusion-gewogen, `expected_return/100`
- * op nul-basis) met de per-categorie rendement-delta erbovenop —
- * `Σ w·(er + delta) / Σ w · 100`.
+ * `buildCategorieReturnGroups` (actieve assets, inclusion-gewogen, per bezitting
+ * `potRendement(expected_return, terugvalRendement)`) met de per-categorie
+ * rendement-delta erbovenop — `Σ w·(er + delta) / Σ w · 100`.
  *
- * NUL-BASIS + delta spiegelen exact wat de kernel toepast (`buildAssetPotten`:
- * `expected_return/100`; `applyReturnDeltasToAssets`: `0 + delta`), zodat het
+ * Basis + delta spiegelen exact wat de kernel toepast (`buildAssetPotten` +
+ * `applyReturnDeltasToAssets`, TPR-02: ingevuld rendement — ook 0 — telt letterlijk,
+ * alleen een ontbrekend rendement valt terug op het profielrendement), zodat het
  * getoonde doelrendement niet drift met wat de simulatie werkelijk laat landen.
+ * `terugvalRendement` (decimaal) weggelaten → 0 (de oude nul-basis).
  * Geen assets met waarde (> 0) → `null` (geen betekenisvol gewogen gemiddelde).
  */
 export function doelGewogenRendement(
   assets: readonly Asset[],
   returnDeltaByCategorie: Partial<Record<AssetCategorie, number>> | undefined,
+  terugvalRendement = 0,
 ): number | null {
   let totalWeight = 0
   let weightedSum = 0
@@ -72,8 +75,7 @@ export function doelGewogenRendement(
     if (!(value > 0)) continue
 
     const categorie = ASSET_TYPE_TO_CATEGORIE[a.asset_type as AssetType] ?? 'Overig'
-    const er = Number(a.expected_return ?? 0) / 100
-    const safeEr = Number.isFinite(er) ? er : 0
+    const safeEr = potRendement(a.expected_return, terugvalRendement)
     const delta = returnDeltaByCategorie?.[categorie]
     const safeDelta = typeof delta === 'number' && Number.isFinite(delta) ? delta : 0
 

@@ -487,7 +487,7 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
     insight:
       'Deze tijdas laat zien waar je financieel heen gaat: de opbouwjaren (groen) en de afbouwjaren (oranje) tot je gekozen eindleeftijd, met doelen, levensgebeurtenissen en voorkeuren die samen je route bepalen.',
     grip:
-      'Sleep een gebeurtenis naar een ander jaar en zie meteen hoe je vrijheidsmoment verschuift; van hieruit open je doelen, gebeurtenissen en voorkeuren om de projectie bij te stellen.',
+      'Sleep een gebeurtenis naar een ander jaar en zie meteen hoe je vrijheidsmoment verschuift; van hieruit open je doelen, gebeurtenissen en voorkeuren om de projectie bij te stellen. Heet de Voorkeuren-kaart "Je voorkeuren voor je plan instellen", dan loop je daar stap voor stap na waar de app mee rekent en wat een andere keuze doet.',
     werking: [
       {
         title: 'De tijdas lezen',
@@ -503,7 +503,7 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
       },
       {
         title: 'Aannames erachter',
-        text: 'Rendement, inflatie, je uitgaven na pensioen en je eindleeftijd bepalen samen de uitkomst. Je stelt ze zelf in bij Voorkeuren — een kleine bijstelling kan jaren schelen.',
+        text: 'Rendement, inflatie, je uitgaven na pensioen en je eindleeftijd bepalen samen de uitkomst. Je stelt ze zelf in bij Voorkeuren — een kleine bijstelling kan jaren schelen. Je AOW telt alleen mee als er een actieve AOW-gebeurtenis op je tijdas staat; ontbreekt die, dan rekent de projectie met €0 AOW en zegt een melding boven de grafiek dat.',
       },
     ],
     terms: ['fire', 'vrijheidstijd', 'swr', 'inflatie', 'omslagpunt', 'stopmoment', 'bandbreedte'],
@@ -596,7 +596,7 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
   '/toekomst/voorkeuren': {
     insight:
       'Achter elke projectie zitten aannames — verwacht rendement, inflatie, je uitgaven na pensioen, je eindleeftijd — en die bepalen samen hoeveel jaar vrijheid je berekening laat zien.',
-    grip: 'Draai hier aan die knoppen; een kleine bijstelling kan je uitkomst met jaren verschuiven.',
+    grip: 'Draai hier aan die knoppen; een kleine bijstelling kan je uitkomst met jaren verschuiven. Liever stap voor stap? "Je voorkeuren voor je plan instellen" zet de belangrijkste keuzes met hun effect op een rij.',
     // De plan-regel (ADR 0129) is hier twee vragen: wanneer stop je, en wat moet
     // er aan het eind gelden. De opties van die twee vragen zijn precies deze
     // begrippen — als radio-label kunnen ze geen popover dragen, dus staan ze

@@ -61,10 +61,10 @@ const adapterInput = {
   profile: {
     date_of_birth: '1980-01-01', net_monthly_income: 5000, estimated_monthly_expenses: 3500,
     yearly_essential_expenses: 42000, expected_return: 0.07, inflation_rate: 0.02,
-    box3_method: 'forfaitair', marginaal_tarief: 0.495, fire_end_strategy: 'deplete',
+    box3_method: 'forfaitair', fire_end_strategy: 'deplete',
     fire_end_age: 90, fire_legacy_amount: null, feature_preferences: { horizon_kernel_convergentie: true },
     withdrawal_strategy: 'static', guardrail_floor: 0.8, guardrail_ceiling: 1.2,
-    guardrail_cut_step: 0.1, guardrail_raise_step: 0.1,
+    guardrail_cut_step: 0.1,
     housing_strategy_config: housingStrategy,
     pot_rules: {
       surplus_group: 'beleggingen',

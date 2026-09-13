@@ -56,7 +56,6 @@ export interface PersoonlijkPlanProfileRow {
   estimated_monthly_expenses: number | null
   expected_return: number | null
   inflation_rate: number | null
-  marginaal_tarief: number | null
   fire_end_strategy: string | null
   fire_end_age: number | null
   fire_legacy_amount: number | null
@@ -75,7 +74,6 @@ export interface PersoonlijkPlanProfileRow {
   guardrail_floor: number | null
   guardrail_ceiling: number | null
   guardrail_cut_step: number | null
-  guardrail_raise_step: number | null
   feature_preferences: Record<string, unknown> | null
 }
 
@@ -297,7 +295,6 @@ export function buildPersoonlijkPlanSections(
     guardrailFloor: withdrawalCfg.guardrailFloor || WITHDRAWAL_DEFAULTS.guardrailFloor,
     guardrailCeiling: withdrawalCfg.guardrailCeiling || WITHDRAWAL_DEFAULTS.guardrailCeiling,
     guardrailCutStep: withdrawalCfg.guardrailCutStep || WITHDRAWAL_DEFAULTS.guardrailCutStep,
-    guardrailRaiseStep: withdrawalCfg.guardrailRaiseStep || WITHDRAWAL_DEFAULTS.guardrailRaiseStep,
   }
 
   return {

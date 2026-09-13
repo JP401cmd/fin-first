@@ -508,6 +508,21 @@ describe('buildCategorieReturnGroups', () => {
     expect(bel.weightedReturn).toBeCloseTo(0.04, 6)
   })
 
+  // TPR-02 — dezelfde ketting als de kernel: een ONTBREKEND rendement valt terug op het
+  // meegegeven profielrendement; een bewuste 0 blijft 0; zonder terugval → 0 (oud gedrag).
+  it('ontbrekend rendement → terugvalRendement (zoals buildAssetPotten); bewuste 0 blijft 0', () => {
+    const assets = [
+      makeAsset({ asset_type: 'investment', current_value: 100_000, expected_return: null as unknown as number }),
+      makeAsset({ asset_type: 'crypto', current_value: 100_000, expected_return: 0 }),
+    ]
+    const bel = buildCategorieReturnGroups(assets, 0.07).find((g) => g.assetType === 'Beleggingen')!
+    // (100k×0,07 + 100k×0) / 200k = 0,035
+    expect(bel.weightedReturn).toBeCloseTo(0.035, 6)
+    // Zonder terugval: (100k×0 + 100k×0) / 200k = 0 — byte-identiek aan de oude nul-basis.
+    const oud = buildCategorieReturnGroups(assets).find((g) => g.assetType === 'Beleggingen')!
+    expect(oud.weightedReturn).toBe(0)
+  })
+
   it('weegt met inclusion_pct en negeert inactieve / waardeloze assets', () => {
     const assets = [
       makeAsset({ asset_type: 'investment', current_value: 100_000, expected_return: 6, net_worth_inclusion_pct: 50 }),

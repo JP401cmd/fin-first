@@ -44,6 +44,10 @@ import {
   STALE_TX_NOTICE_MINIMIZE_KEY,
   asStaleMinimizedMonths,
 } from '@/lib/transaction-staleness-minimize'
+import {
+  AOW_NOTICE_MINIMIZE_KEY,
+  asAowMinimizedFlag,
+} from '@/lib/horizon/aow-notice-minimize'
 
 /** Welke databron(nen) een in-scope route nodig heeft. */
 export type Family = 'lever' | 'cashflow' | 'box2' | 'freedom'
@@ -120,11 +124,14 @@ export const NUMERIC_MINIMIZE_NARROWERS: ReadonlyMap<string, (value: unknown) =>
   new Map([
     [DEFICIT_NOTICE_MINIMIZE_KEY, asDeficitMinimizedPeak],
     [STALE_TX_NOTICE_MINIMIZE_KEY, asStaleMinimizedMonths],
+    // TPR-04: de "AOW ontbreekt"-melding op /toekomst — vlag 1, geen escalatie-dimensie.
+    [AOW_NOTICE_MINIMIZE_KEY, asAowMinimizedFlag],
   ])
 
 export const EXTRA_MINIMIZE_KEYS: readonly string[] = [
   DEFICIT_NOTICE_MINIMIZE_KEY,
   STALE_TX_NOTICE_MINIMIZE_KEY,
+  AOW_NOTICE_MINIMIZE_KEY,
 ]
 
 /**

@@ -19,6 +19,7 @@
 import { ageAtDate } from '@/lib/horizon-data'
 import { BOX3_PARAMS, type TaxYear } from '@/lib/box3-data'
 import { resolveFireParams } from '@/lib/fire-params'
+import { PARAMETER_BANDS } from '@/lib/parameters-band'
 import {
   resolveFirePlanWithOverride,
   type FireEndForm,
@@ -30,7 +31,11 @@ import {
   parseWithdrawalProfileConfig,
   type WithdrawalProfiel,
 } from '@/lib/withdrawal-strategy'
-import { parseHousingStrategy } from '@/lib/housing-strategy'
+import {
+  parseHousingStrategy,
+  resolveDepletionMarginYears,
+  type HousingStrategyConfig,
+} from '@/lib/housing-strategy'
 import { computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
 import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import type {
@@ -76,10 +81,19 @@ export interface KernelAdapterProfile {
   expected_return?: number | null
   inflation_rate?: number | null
   box3_method?: string | null
-  marginaal_tarief?: number | null
+  /**
+   * TPR-12 — P!B91 heffingvrij inkomen (euro per persoon per jaar, werkelijk-Box 3-tak);
+   * NULL → `EXCEL_HEFFINGVRIJ_INKOMEN_PP` (1800).
+   */
+  box3_heffingvrij_inkomen?: number | string | null
   fire_end_strategy?: string | null
   fire_end_age?: number | null
   fire_legacy_amount?: number | string | null
+  /**
+   * TPR-12 — P!B54 niet-liquide bezit meetellen in de nalatenschapstoets; NULL → 'Nee'
+   * (de bestaande kernel-default). Alleen betekenisvol bij eind-vorm `legacy`.
+   */
+  fire_legacy_include_illiquid?: boolean | null
   /** ADR 0129 D1 — stop-anker (`solved`/`aow`/`now`/`age`); NULL → `solved`. */
   fire_stop_anchor?: string | null
   /** ADR 0129 D1 — zelfgekozen stopleeftijd (halve jaren); alleen bij anker `age`. */
@@ -89,7 +103,6 @@ export interface KernelAdapterProfile {
   guardrail_floor?: number | null
   guardrail_ceiling?: number | null
   guardrail_cut_step?: number | null
-  guardrail_raise_step?: number | null
   /** V4 — onttrekkingsprofiel 3-fasen-curve (JSONB); NULL → Excel-defaults. */
   withdrawal_profile_config?: unknown
   /** V7 — tekort-lening-jaarrente (0..1); NULL → Excel-default P!B25 = 0,05. */
@@ -205,6 +218,10 @@ export function buildInkomenUitgaven(profile: KernelAdapterProfile): InkomenUitg
  * die worden hier NIET voor-verdubbeld — alleen `heffingvrijInkomenTotaal` (P!B92 =
  * P!B91 × personen, werkelijk-tak) wordt hier geschaald omdat de kern die al als
  * totaal verwacht. `personen = 1` (default) → byte-identiek aan snede 1/2.
+ *
+ * P!B91 zelf komt sinds TPR-12 uit `profiles.box3_heffingvrij_inkomen` (via
+ * `resolveHeffingvrijInkomenPP`); NULL → de Excel-default, dus bestaande rijen
+ * rekenen byte-identiek.
  */
 export function buildBox3(profile: KernelAdapterProfile, taxYear: TaxYear, personen = 1): Box3Params {
   const p = BOX3_PARAMS[taxYear]
@@ -217,8 +234,23 @@ export function buildBox3(profile: KernelAdapterProfile, taxYear: TaxYear, perso
     heffingvrijVermogenPP: p.heffingsvrijSingle,
     personen,
     schuldendrempelPP: p.schuldendrempelSingle,
-    heffingvrijInkomenTotaal: EXCEL_HEFFINGVRIJ_INKOMEN_PP * personen,
+    heffingvrijInkomenTotaal: resolveHeffingvrijInkomenPP(profile) * personen,
   }
+}
+
+/**
+ * TPR-12 — heffingvrij inkomen per persoon per jaar (P!B91). Uit
+ * `box3_heffingvrij_inkomen` wanneer aanwezig én geldig (finite, binnen de band
+ * `PARAMETER_BANDS.box3_heffingvrij_inkomen` = de DB-CHECK 0..100000); anders de
+ * Excel-default (`EXCEL_HEFFINGVRIJ_INKOMEN_PP` = 1800). NULL/ontbrekend → default →
+ * byte-identiek aan vóór TPR-12. Zelfde patroon als `resolveDeficitLoanRate`.
+ */
+export function resolveHeffingvrijInkomenPP(profile: KernelAdapterProfile): number {
+  const raw = profile.box3_heffingvrij_inkomen
+  if (raw == null) return EXCEL_HEFFINGVRIJ_INKOMEN_PP
+  const n = Number(raw)
+  const band = PARAMETER_BANDS.box3_heffingvrij_inkomen
+  return Number.isFinite(n) && n >= band.min && n <= band.max ? n : EXCEL_HEFFINGVRIJ_INKOMEN_PP
 }
 
 /**
@@ -268,8 +300,12 @@ function resolveFirePlan(profile: KernelAdapterProfile): FirePlan {
  * kolom op 100 voor precies die rijen, zodat de kernel identiek blijft rekenen —
  * F2 hoort dus niet live te gaan vóór M1 gedraaid is.
  *
- * `nietLiquideMeetellen = 'Nee'` (geen app-veld — open punt); de app kent geen aparte
- * eind-leeftijden per eind-vorm, dus B51/B52 delen `endAge` en B53 = `legacyAmount`.
+ * `nietLiquideMeetellen` (P!B54) komt sinds TPR-12 uit `fire_legacy_include_illiquid`
+ * (schakelaar in de eindstrategie-pane, alleen bij eind-vorm nalatenschap): `true` →
+ * 'Ja' = de nalatenschapstoets (gap.ts) leest Prognose!I (totaal netto vermogen incl.
+ * niet-liquide bezit), anders 'Nee' = Prognose!J (liquide) — de bestaande default, dus
+ * NULL rekent byte-identiek. De app kent geen aparte eind-leeftijden per eind-vorm,
+ * dus B51/B52 delen `endAge` en B53 = `legacyAmount`.
  */
 export function buildEindstrategie(profile: KernelAdapterProfile): EindstrategieParams {
   const plan = resolveFirePlan(profile)
@@ -278,7 +314,7 @@ export function buildEindstrategie(profile: KernelAdapterProfile): Eindstrategie
     eindleeftijdOpeten: plan.endAge,
     eindleeftijdNalatenschap: plan.endAge,
     nalatenschapBedrag: plan.legacyAmount,
-    nietLiquideMeetellen: 'Nee',
+    nietLiquideMeetellen: profile.fire_legacy_include_illiquid === true ? 'Ja' : 'Nee',
   }
 }
 
@@ -311,14 +347,27 @@ const HOUSING_MODE_TO_SELECTOR: Record<string, WoningStrategie> = {
 }
 
 /**
- * Woning-strategie (P!B57-B67). Uit `parseHousingStrategy`. Velden zonder app-
- * tegenhanger (verkoopleeftijd-fallback, huur %/WOZ, opeet-parameters) vallen terug
- * op de Excel-defaults (V8). De app-`depletionThresholdYears` (JAREN) → drempel in
- * MAANDEN (× 12); de app-`triggerAge` is bij "wanneer nodig" de fallback-leeftijd.
+ * Woning-strategie (P!B57-B67) uit een RAUWE `housing_strategy_config` (parse inbegrepen).
+ * Dunne wrapper rond `buildWoningFromConfig` voor consumenten/tests die geen eigen parse
+ * hebben; de barrel parseert zelf één keer (die parse voedt óók de WOZ-substitutie van
+ * het huis-pot, TPR-03) en roept `buildWoningFromConfig` aan.
  */
 export function buildWoning(housingConfigRaw: unknown): WoningStrategieParams {
-  const cfg = parseHousingStrategy(housingConfigRaw)
+  return buildWoningFromConfig(parseHousingStrategy(housingConfigRaw))
+}
 
+/**
+ * Woning-strategie (P!B57-B67) uit een al-geparste `HousingStrategyConfig`. Velden
+ * zonder app-tegenhanger (verkoopleeftijd-fallback, huur %/WOZ, opeet-parameters) vallen
+ * terug op de Excel-defaults (V8). De app-`depletionThresholdYears` (JAREN) → drempel in
+ * MAANDEN (× 12); de app-`triggerAge` is bij "wanneer nodig" de fallback-leeftijd.
+ *
+ * TPR-03: de app-€-woonlast `newMonthlyHousingCost` reist als `huurNaVerkoopPerMaand`
+ * mee (null = auto → %-WOZ-pad in de kern; bewuste 0 = geen woonlast). De
+ * waarderingsgrondslag `saleValuationBasis` is GEEN woning-parameter maar een
+ * substitutie op het huis-pot zelf (`applyDownsizeValuationBasis`, barrel).
+ */
+export function buildWoningFromConfig(cfg: HousingStrategyConfig): WoningStrategieParams {
   // Defaults (Meerekenen/Uitsluiten dragen geen verkoop-/opeet-parameters).
   const base: WoningStrategieParams = {
     selector: HOUSING_MODE_TO_SELECTOR[cfg.mode] ?? 'Meerekenen',
@@ -350,9 +399,14 @@ export function buildWoning(housingConfigRaw: unknown): WoningStrategieParams {
       ...base,
       trigger: cfg.trigger === 'on_depletion' ? 'Wanneer nodig' : 'Vaste leeftijd',
       verkoopleeftijd,
-      drempelMaandenUitgave: Math.round(cfg.depletionThresholdYears * 12),
+      // TPR-06: 0 = "geen eigen marge" → app-default 24 mnd (= P!B60) i.p.v. een drempel
+      // van 0 die de verkoop pas op een lege liquide pot liet vuren. Eén resolver, gedeeld
+      // met de app-zijdige trigger-schatting en de UI-aanname-regel.
+      drempelMaandenUitgave: Math.round(resolveDepletionMarginYears(cfg.depletionThresholdYears) * 12),
       verkoopprijsPctWoz: cfg.salePricePct,
       verkoopkostenPct: cfg.salesCostsPct,
+      // TPR-03: €/mnd uit de expertvelden; null (auto-schatting) laat de kern op P!B63 rekenen.
+      huurNaVerkoopPerMaand: cfg.newMonthlyHousingCost,
     }
   }
 

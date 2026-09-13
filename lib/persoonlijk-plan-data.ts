@@ -187,11 +187,10 @@ export interface PersoonlijkPlanOnttrekking {
   typeLabel: string
   /** Korte uitleg (italic). */
   typeSubtitle: string
-  /** Floor/ceiling/cut/raise — alleen relevant bij `guardrails`. */
+  /** Floor/ceiling/stap — alleen relevant bij `guardrails`. Eén stap voor omlaag én omhoog (TPR-10). */
   guardrailFloor: number
   guardrailCeiling: number
   guardrailCutStep: number
-  guardrailRaiseStep: number
 }
 
 // ── Root ──────────────────────────────────────────────────────────────

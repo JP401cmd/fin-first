@@ -23,8 +23,9 @@ import {
   type ConvergentieProjectionOutcome,
   type ConvergentieRawProfileRow,
 } from '@/lib/horizon-kernel/convergentie-router'
-import { dedupeById } from '@/lib/horizon-kernel/adapter'
+import { dedupeById, hasAowOntbreektNotice } from '@/lib/horizon-kernel/adapter'
 import { applyReturnDeltasToAssets } from '@/lib/horizon-kernel/adapter/whatif-varianten'
+import { resolveFireParams } from '@/lib/fire-params'
 import { expandCategorieReturnDeltas } from '@/lib/horizon/toekomst-scenario'
 import { runForcedStopPath, type ForcedStopPathInput, type ForcedStopPathResult } from '@/lib/horizon/scenario-presets'
 import {
@@ -87,13 +88,23 @@ function resolveScenarioAssetsAndEvents(
   assets: Asset[] | undefined,
   lifeEvents: LifeEvent[] | undefined,
   ov: HorizonScenarioOverrides | null,
+  profile: ConvergentieRawProfileRow,
 ): { assets: Asset[]; lifeEvents: LifeEvent[] } {
   const extraEvents = ov?.extraLifeEvents ?? []
   const returnDeltas = ov?.returnDeltaByCategorie
   const hasReturnDeltas = returnDeltas != null && Object.keys(returnDeltas).length > 0
   const baseAssets = assets ?? []
+  // Basis voor een bezitting zónder eigen rendement = het profielrendement (PROCENT),
+  // dezelfde `resolveFireParams`-ketting als de adapter-terugval (TPR-02) — anders zou
+  // een delta op zo'n bezitting de kern-terugval omzeilen en de scenariolijn van de
+  // hoofdlijn afwijken. Zonder delta blijft de rij ongewijzigd (referentie behouden).
   const scenarioAssets = hasReturnDeltas
-    ? applyReturnDeltasToAssets(baseAssets, expandCategorieReturnDeltas(returnDeltas, baseAssets))
+    ? applyReturnDeltasToAssets(
+        baseAssets,
+        expandCategorieReturnDeltas(returnDeltas, baseAssets),
+        0,
+        resolveFireParams(profile).grossReturn * 100,
+      )
     : baseAssets
   const baseLifeEvents = lifeEvents ?? []
   const scenarioLifeEvents = extraEvents.length > 0 ? [...baseLifeEvents, ...extraEvents] : baseLifeEvents
@@ -121,6 +132,13 @@ export interface HorizonFireSimResult {
   kernelHousingSale: KernelHousingSale | null
   /** Pensioenpot-weergave (feature #876; bridge-weergaveveld); null in loading/null-paden. */
   kernelPensionPots: readonly KernelPensionPotView[] | null
+  /**
+   * TPR-04 — de hoofdrun draagt de adapter-notice `aow_ontbreekt`: geen actief AOW-event,
+   * de kern rekent met €0 AOW. Afgeleid uit `outcome.notices` (code-match, geen eigen
+   * event-telling); false in loading/null-paden. Optioneel in het TYPE (additief,
+   * non-breaking voor hook-mocks in tests); de hook zet het veld altijd.
+   */
+  aowOntbreekt?: boolean
   /**
    * Tweede, GESCHEIDEN wat-als-scenario-projectie (2e lijn op /toekomst, plan §A/§B).
    * `null` = geen actieve override (of loading/null-pad). Berekend in een eigen useMemo
@@ -210,8 +228,6 @@ interface HorizonFireSimInput {
   hasPartner?: boolean
   /** Totaal saldo van ontkoppelde bankrekeningen (niet gekoppeld aan assets) */
   bankAccountCash?: number
-  /** Handmatige spaargeld-override uit profiles.monthly_savings_override. */
-  monthlySavingsOverride?: number | null
   /** Jaarlijks spaarbedrag afgeleid van de cashflow-pagina (inkomen × spaarquote). */
   baseAnnualSavingsFromCashflow?: number | null
   /** Eigen-woning-strategie uit profiles.housing_strategy_config. */
@@ -267,7 +283,6 @@ interface KernelInputBundle {
   box3Method: Box3Method | undefined
   hasPartner: boolean | undefined
   bankAccountCash: number | undefined
-  monthlySavingsOverride: number | null | undefined
   baseAnnualSavingsFromCashflow: number | null | undefined
   housingStrategy: HousingStrategyConfig | undefined
   kernelRawProfile: ConvergentieRawProfileRow | null | undefined
@@ -293,7 +308,6 @@ function buildInputFromBundle(p: KernelInputBundle) {
     box3Method: p.box3Method,
     hasPartner: p.hasPartner,
     bankAccountCash: p.bankAccountCash,
-    monthlySavingsOverride: p.monthlySavingsOverride,
     baseAnnualSavingsFromCashflow: p.baseAnnualSavingsFromCashflow,
     housingStrategy: p.housingStrategy,
   })
@@ -318,7 +332,7 @@ function buildStopPadInput(
   stopAge: number,
   yearlyExpenses: number,
 ): ForcedStopPathInput {
-  const { assets, lifeEvents } = resolveScenarioAssetsAndEvents(p.assets, p.lifeEvents, ov)
+  const { assets, lifeEvents } = resolveScenarioAssetsAndEvents(p.assets, p.lifeEvents, ov, profile)
   return {
     profile,
     assets,
@@ -342,6 +356,7 @@ interface HorizonMainSimResult {
   kernelMaandHint: number | null
   kernelHousingSale: KernelHousingSale | null
   kernelPensionPots: readonly KernelPensionPotView[]
+  aowOntbreekt: boolean
 }
 
 /** Mapt een geslaagde convergentie-outcome naar de hoofd-run-resultaatvorm (één home). */
@@ -364,11 +379,13 @@ function mapMainOutcome(
     kernelMaandHint: outcome.kernelMaandHint ?? null,
     kernelHousingSale: outcome.kernelHousingSale ?? null,
     kernelPensionPots: unifiedResult.kernelPensionPots,
+    // TPR-04: consumeer de adapter-notice (code-match), geen eigen AOW-event-telling.
+    aowOntbreekt: hasAowOntbreektNotice(outcome.notices ?? []),
   }
 }
 
 export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFireSimResult {
-  const { horizonInput, lifeEvents, fireStrategy, withdrawalStrategy, grossReturn: grossReturnParam, inflation: inflationParam, profileError, aowAgeFractional: aowAgeFractionalParam, assets, debts, box3Method, hasPartner, bankAccountCash, monthlySavingsOverride, baseAnnualSavingsFromCashflow, housingStrategy, kernelRawProfile, aowRows } = params ?? {}
+  const { horizonInput, lifeEvents, fireStrategy, withdrawalStrategy, grossReturn: grossReturnParam, inflation: inflationParam, profileError, aowAgeFractional: aowAgeFractionalParam, assets, debts, box3Method, hasPartner, bankAccountCash, baseAnnualSavingsFromCashflow, housingStrategy, kernelRawProfile, aowRows } = params ?? {}
   // Scenario-overrides apart gedestructureerd — mag GEEN dep van de hoofd-memo worden
   // (de hoofdlijn herrekent nooit op een scenario-wijziging).
   const scenarioOverrides = params?.scenarioOverrides ?? null
@@ -417,12 +434,11 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
     box3Method,
     hasPartner,
     bankAccountCash,
-    monthlySavingsOverride,
     baseAnnualSavingsFromCashflow,
     housingStrategy,
     kernelRawProfile,
     aowRows,
-  }), [horizonInput, lifeEvents, fireStrategy, withdrawalStrategy, grossReturnParam, inflationParam, aowAgeFractionalParam, assets, debts, box3Method, hasPartner, monthlySavingsOverride, baseAnnualSavingsFromCashflow, housingStrategy, kernelRawProfile, aowRows])
+  }), [horizonInput, lifeEvents, fireStrategy, withdrawalStrategy, grossReturnParam, inflationParam, aowAgeFractionalParam, assets, debts, box3Method, hasPartner, baseAnnualSavingsFromCashflow, housingStrategy, kernelRawProfile, aowRows])
 
   const deferredKernelInput = useDeferredValue(kernelInput)
 
@@ -524,7 +540,7 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
     // (a) assets pre-muteren met de categorie-rendement-delta's + (b) scenario-events
     //     bovenop de hoofd-events — via de gedeelde assemblage (één home; identiek gedrag).
     const { assets: scenarioAssets, lifeEvents: scenarioLifeEvents } =
-      resolveScenarioAssetsAndEvents(p.assets, p.lifeEvents, ov)
+      resolveScenarioAssetsAndEvents(p.assets, p.lifeEvents, ov, kernelProfileWithBasis)
 
     const outcome = computeConvergentieProjection({
       rawContext: {
@@ -623,7 +639,7 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
     const built = buildInputFromBundle(p)
     if (!built || !kernelProfileWithBasis) { setAsyncScenario(null); return }
     const { assets: scenarioAssets, lifeEvents: scenarioLifeEvents } =
-      resolveScenarioAssetsAndEvents(p.assets, p.lifeEvents, ov)
+      resolveScenarioAssetsAndEvents(p.assets, p.lifeEvents, ov, kernelProfileWithBasis)
     const rawContext: ConvergentieRawContext = {
       profile: kernelProfileWithBasis,
       assets: scenarioAssets,
@@ -762,7 +778,7 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
   }, [simResult])
 
   if (!params || !horizonInput) {
-    return { result: null, cashflows: [], isLoading: true, error: profileError ?? null, unifiedRows: null, effectiveLifeEvents: [], kernelStatus: null, kernelMaandHint: null, kernelHousingSale: null, kernelPensionPots: null, scenario: null, stopPad: null, scenarioPending: false, stopPadPending: false, isRefining: false, firstPaintFireAge: null, firstPaintFreedomPct: null, firstPaintRequiredPortfolio: null, firstPaintRequiredNetWorth: null }
+    return { result: null, cashflows: [], isLoading: true, error: profileError ?? null, unifiedRows: null, effectiveLifeEvents: [], kernelStatus: null, kernelMaandHint: null, kernelHousingSale: null, kernelPensionPots: null, aowOntbreekt: false, scenario: null, stopPad: null, scenarioPending: false, stopPadPending: false, isRefining: false, firstPaintFireAge: null, firstPaintFreedomPct: null, firstPaintRequiredPortfolio: null, firstPaintRequiredNetWorth: null }
   }
 
   return {
@@ -776,6 +792,7 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
     kernelMaandHint: simResult?.kernelMaandHint ?? null,
     kernelHousingSale: simResult?.kernelHousingSale ?? null,
     kernelPensionPots: simResult?.kernelPensionPots ?? null,
+    aowOntbreekt: simResult?.aowOntbreekt ?? false,
     scenario: scenario ?? null,
     stopPad: stopPad ?? null,
     scenarioPending,

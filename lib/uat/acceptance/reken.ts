@@ -239,7 +239,7 @@ const criteria: AcceptanceCriterion[] = [
     persona: 'tessa',
     given: 'Persona Tessa Compleet, volledige Wat-Als-pagina (netto maandinkomen €7.600, `expected_return` 7%).',
     when: 'De gebruiker verschuift spaarquote/marktbias-sliders.',
-    then: 'Hogere spaarquote/marktbias → lagere FIRE-leeftijd (richting); gemengde per-categorie marktbias → master-slider toont "gemengd" (staat op 0); spaarquote 0% + marktbias −5pp → FIRE-onbereikbaar-waarschuwing; slider terug op baseline → delta-badge en scenario-event verdwijnen.',
+    then: 'Hogere spaarquote/marktbias → lagere FIRE-leeftijd (richting); gemengde per-categorie marktbias → master-slider toont "gemengd" (staat op 0); spaarquote 0% + marktbias −5pp → FIRE-onbereikbaar-waarschuwing; slider terug op baseline → delta-badge en scenario-event verdwijnen. Mobiel (iOS Safari): een tik of veeg op de BAAN verschuift de slider naar de vingerpositie, niet alleen een aanraking op het bolletje (sinds 13 sep 2026 via `lib/range-touch-seek.ts`, dezelfde onChange-route); op Android/desktop blijft het native gedrag.',
     assertion: {
       kind: 'direction',
       source: 'components/app/horizon/whatif-sliders.tsx + lib/horizon-kernel/whatif-router.ts#computeWhatifProjection — richting-toets, cel-voor-cel oracle op /beheer/horizon-kernel bij twijfel',

@@ -113,26 +113,32 @@ describe('de stopkeuze (vrijheidsas)', () => {
   })
 
   /**
-   * Melding B-038 — de vrijheidsas schrijft het plan niet meer zelf.
+   * Melding B-038 → TPR-09 — de vrijheidsas schrijft nooit een HALF plan.
    *
-   * Tot deze melding zat naast de strategie-modal een tweede schrijfpad: de CTA
-   * "Maak dit mijn plan" deed een eigen PUT met anker `age`. Dat pad schreef één
-   * van de vijf plan-keuzes en liet de andere vier (eindleeftijd, eind-vorm,
-   * nalatenschap, en de keuze tussen aow/age/nu) onzichtbaar. De as verwijst nu
-   * naar de modal die ze alle vijf toont — en dat is meteen het enige
-   * schrijfpad. Deze grendel bewaakt dat er geen tweede terugsluipt.
+   * B-038 haalde de CTA "Maak dit mijn plan" weg omdat die een eigen PUT deed met
+   * alléén anker `age`: één van de vijf plan-keuzes, de andere vier onzichtbaar.
+   * TPR-09 (eigenaarsbesluit 13 sep 2026) brengt de CTA terug, maar het bezwaar
+   * blijft de grendel: de as verwijst nog steeds naar de modal met álle keuzes,
+   * en het schrijfpad dat de CTA gebruikt bouwt zijn body UITSLUITEND via
+   * `planDraftToFireSettingsBody` (het volledige plan, route-contract R3) op een
+   * draft die uit de gelezen instellingen komt — geen hand-gebouwde
+   * `fire_stop_anchor: 'age'`-body meer in dit bestand.
    */
-  it('de as verwijst naar de strategie-modal in plaats van zelf het plan te schrijven', () => {
+  it('de as verwijst naar de strategie-modal én schrijft het plan alleen volledig (plan-draft)', () => {
     const src = bron()
     expect(src).toContain("onKeuzesOpenen={() => setActiveModal('strategie')}")
+    expect(src, 'de CTA schrijft via de plan-draft-helper, niet met een eigen body').toContain(
+      'planDraftToFireSettingsBody(',
+    )
+    expect(src, 'de draft start bij het GELEZEN plan (alle vijf keuzes)').toContain('planDraftFromSettings(')
     expect(
       src,
-      'de CTA "Maak dit mijn plan" is vervallen (B-038) — geen tweede schrijfpad naast de modal',
-    ).not.toContain('handleMaakDitMijnPlan')
+      'geen hand-gebouwde half-plan-body (het B-038-defect) in dit bestand',
+    ).not.toMatch(/fire_stop_anchor:\s*'age'/)
     expect(
       src,
-      'de AOW-snelknop hing aan deze prop en is met B-038 vervallen',
-    ).not.toContain('onMaakPlan=')
+      'de AOW-snelknop is met B-038 vervallen en komt niet terug',
+    ).not.toContain("'Op AOW-leeftijd'")
   })
 
   it('de default van de slider is onder een vast anker het stopmoment van het plan', () => {

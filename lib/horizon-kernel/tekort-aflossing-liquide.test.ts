@@ -49,10 +49,10 @@ const adapterInput = {
   profile: {
     date_of_birth: '1980-01-01', net_monthly_income: 5000, estimated_monthly_expenses: 3500,
     yearly_essential_expenses: 42000, expected_return: 0.07, inflation_rate: 0.02,
-    box3_method: 'forfaitair', marginaal_tarief: 0.495, fire_end_strategy: 'deplete',
+    box3_method: 'forfaitair', fire_end_strategy: 'deplete',
     fire_end_age: 90, fire_legacy_amount: null, feature_preferences: { horizon_kernel_convergentie: true },
     withdrawal_strategy: 'static', guardrail_floor: 0.8, guardrail_ceiling: 1.2,
-    guardrail_cut_step: 0.1, guardrail_raise_step: 0.1,
+    guardrail_cut_step: 0.1,
     housing_strategy_config: { mode: 'downsize', trigger: 'on_depletion', triggerAge: 67, salePricePct: 1, salesCostsPct: 0.04, newMonthlyHousingCost: null, depletionThresholdYears: 0 },
     pot_rules: { surplus_group: 'beleggingen', deficit_order_groups: ['spaargeld', 'beleggingen', 'overig', 'pensioen', 'vastgoed'], withdrawal_order_groups: ['spaargeld', 'beleggingen', 'overig', 'pensioen', 'vastgoed'] },
     retirement_expense_method: 'essential_budgets', retirement_custom_amount: null,
@@ -61,7 +61,14 @@ const adapterInput = {
 }
 
 function buildInput(): KernelInput {
-  return buildKernelInputFromAppWithNotices(adapterInput as never).input
+  const input = buildKernelInputFromAppWithNotices(adapterInput as never).input
+  // TPR-06 (13 sep 2026): de adapter vertaalt marge 0 sindsdien naar de app-default
+  // (24 mnd uitgaven), waardoor de "wanneer nodig"-verkoop hier ~2 jaar eerder valt en
+  // de transitie-lag-piek (verkoop op een lége liquide pot → tekort-lening) niet meer
+  // ontstaat — het bedoelde effect van die kaart. Deze suite toetst de F6-vlag op
+  // KERNEL-niveau, niet de marge: pin de kern-drempel expliciet op 0 zodat het
+  // piek-scenario behouden blijft. De kern ondersteunt 0 nog steeds (oracle P!B60).
+  return { ...input, woning: { ...input.woning, drempelMaandenUitgave: 0 } }
 }
 
 function tekortSlotIdx(input: KernelInput): number {

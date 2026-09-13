@@ -10,6 +10,7 @@
  */
 
 import { describe, it, expect } from 'vitest'
+import { hasAowOntbreektNotice } from './events'
 import type { Asset, AssetType } from '@/lib/asset-data'
 import type { Debt, DebtType } from '@/lib/debt-data'
 import { nibudChildrenCost, type LifeEvent, type UserDefinedCashflow } from '@/lib/horizon-data'
@@ -115,6 +116,17 @@ describe('events — AOW', () => {
     const { autoGebeurtenissen } = buildEventInputs([aow], CTX)
     expect(autoGebeurtenissen.leefsituatie).toBe('Alleenstaand')
     expect(autoGebeurtenissen.aowOpbouwjaren).toBe(50)
+  })
+
+  // TPR-04 — €0 AOW blijft (eigenaarsbesluit), maar met een notice met stabiele code.
+  it('geen AOW-event → notice `aow_ontbreekt` (kind info); mét AOW-event géén notice', () => {
+    const zonder = buildEventInputs([], CTX)
+    expect(hasAowOntbreektNotice(zonder.notices)).toBe(true)
+    expect(zonder.notices.find((n) => n.code === 'aow_ontbreekt')?.kind).toBe('info')
+    expect(zonder.autoGebeurtenissen.aowOpbouwjaren).toBe(0) // géén terugval op volledige opbouw
+
+    const met = buildEventInputs([makeEvent({ id: 'aow', event_type: 'aow', target_age: 67 })], CTX)
+    expect(hasAowOntbreektNotice(met.notices)).toBe(false)
   })
 
   it('geen AOW-event → inert (opbouwjaren 0 = geen AOW)', () => {

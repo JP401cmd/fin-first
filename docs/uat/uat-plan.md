@@ -4988,7 +4988,7 @@ Scope: /toekomst (tijdas-landing), /toekomst/doelen, /toekomst/gebeurtenissen, /
   2. Kies de strategie-variant en de bijbehorende parameters (bv. verkoopmoment/trigger, opeethypotheek).
   3. Bekijk de live preview: per scenario het trigger-moment en de vrijheidsleeftijd (zelfde rekenbasis als de grafiek).
   4. Sla op → modal sluit, pagina ververst.
-- **Schermen/componenten:** components/future/strategie/strategie-editors.tsx ('huis'-tak) → components/identity/instellingen/housing-strategy-section.tsx (HousingStrategySection) in StrategieModalShell; preview-data uit app/(app)/toekomst/gebeurtenissen/page.tsx (housingPreview: simBasis + kernelRawContext); lib/housing-trigger.ts.
+- **Schermen/componenten:** components/future/strategie/strategie-editors.tsx ('huis'-tak) → components/future/strategie/housing-strategy-section.tsx (HousingStrategySection) in StrategieModalShell; preview-data uit app/(app)/toekomst/gebeurtenissen/page.tsx (housingPreview: simBasis + kernelRawContext); lib/housing-trigger.ts.
 - **Kriticiteit:** KERN
 - **Rekenend:** ja — trigger-moment (on_depletion resolved uit dezelfde unified projection als de grafiek), netto verkoopopbrengst, restschuld-aflossing en de per-scenario vrijheidsleeftijd; kernel-native preview via de rauwe kernel-context (adapter mapt housing_strategy_config naar kernel-woningparams).
 - **Varianten & randgevallen:**

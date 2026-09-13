@@ -18,6 +18,9 @@ import { HideInSimple } from '@/components/app/hide-in-simple'
 import { DepthSection } from '@/components/app/depth-section'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import { VoorkeurBewerkenSheet } from './voorkeur-bewerken-sheet'
+import { Box3MethodeSheet } from './box3-methode-sheet'
+import { BOX3_METHOD_LABELS } from '@/lib/box3-method'
+import { EXCEL_HEFFINGVRIJ_INKOMEN_PP } from '@/lib/horizon-kernel/adapter/defaults'
 import { AfbouwOverzichtCard } from './afbouw-overzicht-card'
 import { RegelBewerkenPane } from './regel-bewerken-pane'
 import { REGEL_ORDER, type RegelId } from '@/lib/future/regel-registry'
@@ -130,8 +133,14 @@ export function VoorkeurenView({
   simSnapshot,
   regelVoorkeuren,
   potBalances,
+  box3HeffingvrijInkomen = null,
 }: {
   fireParams: FireParams
+  /**
+   * TPR-12 — `profiles.box3_heffingvrij_inkomen` (euro p.p. per jaar) uit de rauwe
+   * profielrij; null = kernel-default. Alleen getoond/bewerkbaar onder werkelijk rendement.
+   */
+  box3HeffingvrijInkomen?: number | null
   fireStrategy: FireStrategyConfig
   /** ADR 0129 — het volledige plan (stop-anker + eind-vorm); voedt de plan-regel. */
   firePlan?: FirePlan | null
@@ -170,6 +179,8 @@ export function VoorkeurenView({
         helperText: string
       }
   >(null)
+  // Box 3-methode-editor (TPR-10): enum-keuze, eigen sheet naast de numerieke editor.
+  const [editingBox3, setEditingBox3] = useState(false)
   // Welke "Regel op de hele tijdas" wordt bewerkt (null = gesloten).
   const [editingRegel, setEditingRegel] = useState<RegelId | null>(null)
 
@@ -244,7 +255,7 @@ export function VoorkeurenView({
   )
 
   const marktAannameCards = (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
       <VoorkeurCard
         label="Inflatie"
         value={formatPct(fireParams.inflationRate)}
@@ -263,7 +274,7 @@ export function VoorkeurenView({
       <VoorkeurCard
         label="Bruto rendement"
         value={formatPct(fireParams.grossReturn)}
-        subtitle="Verwacht jaarrendement op het belegbaar vermogen"
+        subtitle="Terugval voor bezittingen zonder eigen rendement · voedt je onttrekkingsvoet"
         Icon={TrendingUp}
         badge="Per jaar"
         onEdit={() =>
@@ -271,7 +282,15 @@ export function VoorkeurenView({
             title: 'Bruto rendement',
             column: 'expected_return',
             currentValuePct: fireParams.grossReturn * 100,
-            helperText: 'Wereldwijde aandelen-historie: ~6-8%. Conservatief: 4-5%. Voorkeur per asset-groep op /overzicht/bezittingen.',
+            // Norm keuze · effect · waarom (eigenaarsnorm 13 sep 2026). TPR-02: de kern
+            // valt voor een bezitting zonder eigen rendement terug op dit getal; een
+            // rendement dat bij de bezitting zelf staat (ook 0%) gaat vóór.
+            helperText:
+              'Je kiest het rendement dat geldt voor bezittingen waar geen eigen rendement bij staat. ' +
+              'Dat bepaalt hoe snel die potten in de grafiek groeien, en samen met inflatie en Box 3 je effectieve onttrekkingsvoet en dus je vrijheidsgetal. ' +
+              'Een rendement dat je bij een bezitting zelf hebt ingevuld, ook 0%, gaat vóór. ' +
+              'Relevant omdat een ontbrekend rendement anders stil als 0% zou tellen. ' +
+              'Ter referentie: wereldwijde aandelen deden historisch zo\'n 6 tot 8% per jaar; 4 tot 5% is een voorzichtige aanname.',
           })
         }
       />
@@ -292,12 +311,27 @@ export function VoorkeurenView({
         badge="Afgeleid"
         hint="Niet handmatig"
       />
+      {/* TPR-10 — de kern-selector P!B90 had een PUT-pad maar geen scherm. De
+          kaart leest fireParams.box3Method (dezelfde resolver als de adapter);
+          de uitleg (keuze · effect · waarom) woont in de sheet. */}
+      <VoorkeurCard
+        label="Box 3-methode"
+        value={BOX3_METHOD_LABELS[fireParams.box3Method]}
+        subtitle={
+          fireParams.box3Method === 'werkelijk'
+            ? `Heffingvrij inkomen € ${(box3HeffingvrijInkomen ?? EXCEL_HEFFINGVRIJ_INKOMEN_PP).toLocaleString('nl-NL')} per persoon per jaar${box3HeffingvrijInkomen == null ? ' (standaard)' : ''}`
+            : 'Hoe de projectie je vermogensbelasting rekent: over een fictief of over het werkelijke rendement'
+        }
+        Icon={Wallet}
+        badge="Belasting"
+        onEdit={() => setEditingBox3(true)}
+      />
     </div>
   )
 
   const marktAannamesIntro = (
     <p className="text-xs text-[var(--ink-3)]">
-      Inflatie geldt op alle bedragen. Rendement per bezittingen-groep stel je in
+      Inflatie geldt op alle bedragen. Het rendement per bezitting stel je in
       op{' '}
       <Link
         href="/overzicht/bezittingen"
@@ -305,7 +339,8 @@ export function VoorkeurenView({
       >
         /overzicht/bezittingen
       </Link>{' '}
-      (cash, beleggen, huis, pensioen).
+      en gaat vóór; het bruto rendement hier is de terugval voor bezittingen zonder
+      eigen rendement.
     </p>
   )
 
@@ -322,7 +357,7 @@ export function VoorkeurenView({
     fireParams.inflationRate,
   )} · rendement ${formatPct(fireParams.grossReturn)} · SWR ${formatPct(
     fireParams.effectiveSwr,
-  )}`
+  )} · Box 3 ${BOX3_METHOD_LABELS[fireParams.box3Method].toLowerCase()}`
 
   return (
     <section className="mx-auto max-w-6xl px-4 sm:px-6 pb-8 space-y-8">
@@ -439,6 +474,15 @@ export function VoorkeurenView({
           currentValuePct={editing.currentValuePct}
           helperText={editing.helperText}
           onClose={() => setEditing(null)}
+        />
+      )}
+
+      {/* Box 3-methode-editor (TPR-10) — zelfde mount-patroon als de sheet hierboven. */}
+      {editingBox3 && (
+        <Box3MethodeSheet
+          current={fireParams.box3Method}
+          currentHeffingvrijInkomen={box3HeffingvrijInkomen}
+          onClose={() => setEditingBox3(false)}
         />
       )}
 

@@ -19,6 +19,11 @@ import {
   DEFICIT_NOTICE_MINIMIZE_KEY,
   asDeficitMinimizedPeak,
 } from '@/lib/horizon/deficit-loan-minimize'
+import { AowNoticeProvider, AowNoticeDot } from '@/components/app/horizon/aow-notice-provider'
+import { AOW_NOTICE_MINIMIZE_KEY, asAowMinimizedFlag } from '@/lib/horizon/aow-notice-minimize'
+import { PlanReviewProvider } from '@/components/future/plan-review/plan-review-provider'
+import { readPlanReviewState } from '@/lib/plan-review/read-state'
+import { buildPlanReviewFacts, derivePlanReviewProgress } from '@/lib/plan-review/progress'
 
 export const metadata: Metadata = {
   title: 'Toekomst — TriFinity',
@@ -99,7 +104,7 @@ export default async function ToekomstPage({
     data: { user },
   } = await supabase.auth.getUser()
 
-  const [horizonData, finData, calcCountRes, minimizedMap] = await Promise.all([
+  const [horizonData, finData, calcCountRes, minimizedMap, planReviewState] = await Promise.all([
     loadHorizonData(supabase),
     loadFinData(supabase),
     user
@@ -114,11 +119,31 @@ export default async function ToekomstPage({
     user
       ? readMinimizedMap(supabase, user.id)
       : Promise.resolve({} as Record<string, unknown>),
+    // TPR-01 — de plan-review-markering (own-row jsonb-pref). `null` = kolom nog niet
+    // uitgerold → geen review-ingang.
+    user ? readPlanReviewState(supabase, user.id) : Promise.resolve(null),
   ])
+  // TPR-01 — voortgang AFGELEID uit markering + profielstaat (A9/A10), op de al-geladen
+  // bundelrijen (geen extra query). Alleen de eigen bezittingen: de assets-policy is
+  // huishoud-gedeeld en de woonstrategie is per profiel.
+  const planReviewProgress =
+    user && planReviewState
+      ? derivePlanReviewProgress(
+          planReviewState,
+          buildPlanReviewFacts({
+            events: horizonData.events,
+            assets: horizonData.assets,
+            housingStrategyRaw: horizonData.rawProfile?.housing_strategy_config,
+            ownerId: user.id,
+          }),
+        )
+      : null
   const calculatorCount = calcCountRes.count ?? 0
   const deficitMinimizedPeak = asDeficitMinimizedPeak(
     minimizedMap[DEFICIT_NOTICE_MINIMIZE_KEY],
   )
+  // TPR-04 — zelfde server-seed voor de "AOW ontbreekt"-melding (vlag 1 of null).
+  const aowMinimizedFlag = asAowMinimizedFlag(minimizedMap[AOW_NOTICE_MINIMIZE_KEY])
 
   return (
     <>
@@ -133,6 +158,14 @@ export default async function ToekomstPage({
           (jsonb-pref → PUT /api/overzicht/page-status). Zie
           `components/app/horizon/deficit-notice-provider.tsx`. */}
       <DeficitNoticeProvider initialMinimizedPeak={deficitMinimizedPeak}>
+      {/* TPR-04 — zusje van de tekort-provider: de "AOW ontbreekt"-melding (uit de
+          adapter-notice in de horizon-run) deelt haar toestand met een tweede
+          statuspunt naast de 'i'; zelfde PUT-pad, eigen pref-only sleutel. */}
+      <AowNoticeProvider initialMinimizedFlag={aowMinimizedFlag}>
+      {/* TPR-01 — plan-review: deelt `open()` met de Voorkeuren-kaart en montert de
+          review-pane (ShellOverlay pane) naast de tijdas, zodat de grafiek zichtbaar
+          blijft. Consumeert ook de deeplink `?planreview=open`. */}
+      <PlanReviewProvider initialProgress={planReviewProgress}>
       <section className="mx-auto max-w-6xl px-4 sm:px-6 pt-4 sm:pt-6 print:hidden">
         <div className="mb-3 flex items-start justify-between gap-3">
           {/* Deck bewust NIET via de `deck`-prop: dan zit hij in deze flex-
@@ -152,6 +185,7 @@ export default async function ToekomstPage({
                 conventie noemt absolute offsets voor pagina's waar de 'i'
                 absoluut staat; deze kop is een flex-cluster, dus DOM-volgorde +
                 gap-2 (8px) geeft exact dezelfde plaatsing. */}
+            <AowNoticeDot />
             <DeficitNoticeDot />
             <PageInfoButton content={getPageInfo('/toekomst')} />
           </div>
@@ -178,6 +212,7 @@ export default async function ToekomstPage({
           })}
           fireParams={horizonData.fireParams}
           calculatorCount={calculatorCount}
+          planReview={planReviewProgress}
         />
       </section>
 
@@ -196,6 +231,8 @@ export default async function ToekomstPage({
       <div className="print:hidden">
         <OrnamentColophon text="Geld is opgeslagen tijd" module="De Toekomst" />
       </div>
+      </PlanReviewProvider>
+      </AowNoticeProvider>
       </DeficitNoticeProvider>
     </>
   )

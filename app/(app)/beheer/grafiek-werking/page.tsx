@@ -217,7 +217,6 @@ const GAPS: { titel: string; onderdeel: string; impact: string; ernst: Ernst; fi
   { titel: 'Geen Box 1-loonheffing in de projectie', onderdeel: 'Belasting', ernst: 'midden', impact: 'De kern rekent Box 3 (tabel Bel) maar geen Box 1 op AOW/pensioen-inkomen. AOW komt netto binnen, pensioen bruto/geannuïteerd; zonder jaarlijkse loonheffing wordt het besteedbaar pensioeninkomen overschat.', files: 'lib/horizon-kernel/tables/ (geen Box 1-tabel)' },
   { titel: 'Deterministische hoofdlijn; volatiliteit alleen in wrappers', onderdeel: 'Werking', ernst: 'midden', impact: 'De primaire lijn draait op een vast rendement per pot. Sequence-of-returns / "crash net bij FIRE" zit alleen in de scenario-band (RunScenarioBand) en Monte Carlo (RunMonteCarlo, deterministische sin-hash) als aparte wrappers, niet op de hoofdlijn.', files: 'lib/horizon-kernel/ (band/mc-wrappers)' },
   { titel: 'Toekomstige huis-aankoop niet als strategie', onderdeel: 'Strategieën', ernst: 'laag', impact: 'De woning-strategie modelleert alleen de EXIT van een bestaand huis (meerekenen/uitsluiten/verkopen/opeethypotheek). Een toekomstige aankoop kan alleen als los life-event via de generieke fallback.', files: 'lib/horizon-kernel/adapter/params.ts (buildWoning) · adapter/events.ts' },
-  { titel: 'marginaal_tarief nog niet geconsumeerd', onderdeel: 'Belasting', ernst: 'laag', impact: 'Het marginale tarief wordt naar de kernel-adapter doorgegeven (params-interface + convergentie-router) maar nog niet gelezen door de werkelijk-Box 3-tak — een bewust bedradingsgat (adapter-default). Raakt alleen de "werkelijk rendement"-methode.', files: 'lib/horizon-kernel/adapter/params.ts · adapter/whatif-varianten.ts:149' },
   { titel: 'Eén belastingjaar over de hele horizon', onderdeel: 'Belasting', ernst: 'laag', impact: 'Bel gebruikt de fiscale parameters van één belastingjaar (BOX3_PARAMS[jaar]) over de volledige horizon. Heffingvrij vermogen en schuldendrempel worden wél geïndexeerd en de schulden tellen mee (forfaitSchuld + schuldendrempel), maar toekomstige wetswijzigingen niet.', files: 'lib/horizon-kernel/adapter/params.ts (buildBox3) · lib/box3-data.ts' },
   { titel: "Schuld-per-categorie-prio's nog niet geconsumeerd", onderdeel: 'Voorkeuren', ernst: 'laag', impact: "De V5-overlay legt expliciete BEZIT-per-categorie-prio's over de orde-groep-afleiding, maar SCHULD-per-categorie-prio's uit categorie_prios worden nog niet gelezen (wacht op oracle-fixture). De drie pot-regels (volgorde, verdeling-bij-toename incl. schuld-aflossen, onttrekking-bij-afname) worden wél gehonoreerd.", files: 'lib/horizon-kernel/adapter/prio-overgang.ts' },
 ]
@@ -583,7 +582,7 @@ export default function GrafiekWerkingPage() {
         </p>
         <Register />
         <p className="text-[12px] text-[var(--ink-3)]">
-          Grootste vervolgstappen: de adapter-bedrading afmaken (o.a. <C>marginaal_tarief</C>) en de Box 1-loonheffing toevoegen. De
+          Grootste vervolgstap: de Box 1-loonheffing toevoegen (het vroegere bedradingsgat <C>marginaal_tarief</C> is per TPR-10 opgeheven door de kolom te schrappen als invoer — de kern rekent uitsluitend jaar-afgeleid). De
           v2-grootboek-engine is inmiddels verwijderd; de kernel is de enige, onvoorwaardelijke motor.
         </p>
       </Sec>

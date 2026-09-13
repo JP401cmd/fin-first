@@ -26,11 +26,8 @@ describe('AOW-bedragen — canonieke waarden per 1-7-2026 (SVB)', () => {
     expect(src).not.toMatch(/\b1072\b/)
   })
 
-  it('geen losse 1558-literal meer in onboarding-horizon.tsx', () => {
-    const src = read('components/onboarding/onboarding-horizon.tsx')
-    expect(src).not.toMatch(/\b1558\b/)
-    expect(src).not.toMatch(/\b1072\b/)
-  })
+  // De derde plek, components/onboarding/onboarding-horizon.tsx, is als dood
+  // oppervlak verwijderd (TPR-13); de guard op dat bestand verviel mee.
 })
 
 describe('DGA-leningdrempel — één canonieke bron', () => {

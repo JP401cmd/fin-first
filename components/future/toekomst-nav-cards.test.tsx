@@ -1,4 +1,6 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
+import { PLAN_REVIEW_HREF, PLAN_REVIEW_STAPPEN, type PlanReviewProgress, type PlanReviewStap } from '@/lib/plan-review/types'
+import { PlanReviewContext } from '@/components/future/plan-review/plan-review-provider'
 import { render, screen, within, fireEvent } from '@testing-library/react'
 import {
   ToekomstNavCards,
@@ -105,7 +107,6 @@ const mockWithdrawal: WithdrawalStrategyConfig = {
   guardrailFloor: 0.8,
   guardrailCeiling: 1.2,
   guardrailCutStep: 0.1,
-  guardrailRaiseStep: 0.1,
 }
 
 type RenderProps = Partial<Parameters<typeof ToekomstNavCards>[0]>
@@ -692,5 +693,83 @@ describe('formatPct', () => {
     expect(formatPct(0.034)).toBe('3.4%')
     expect(formatPct(0.04)).toBe('4.0%')
     expect(formatPct(0)).toBe('0.0%')
+  })
+})
+
+// ── TPR-01 — plan-review-ingang op de Voorkeuren-kaart ────────────────────────
+
+function progress(bevestigd: PlanReviewStap[], nvt: PlanReviewStap[] = []): PlanReviewProgress {
+  const stappen = PLAN_REVIEW_STAPPEN.map((stap) => ({
+    stap,
+    status: nvt.includes(stap) ? ('nvt' as const) : bevestigd.includes(stap) ? ('bevestigd' as const) : ('open' as const),
+    reden: null,
+  }))
+  const meetellend = stappen.filter((s) => s.status !== 'nvt')
+  const eersteOpen = stappen.find((s) => s.status === 'open')?.stap ?? null
+  return {
+    stappen,
+    bevestigd: meetellend.filter((s) => s.status === 'bevestigd').length,
+    totaal: meetellend.length,
+    eersteOpen,
+    voltooid: eersteOpen === null,
+  }
+}
+
+describe('ToekomstNavCards — plan-review-ingang (TPR-01, A2)', () => {
+  it('niet voltooid: "Je voorkeuren voor je plan instellen" met "N van M", aandacht-status en de review-deeplink', () => {
+    const { container } = renderCards({ planReview: progress(['plan', 'uitgaven', 'inkomsten']) })
+    const card = cardByHref(container, PLAN_REVIEW_HREF)
+    expect(within(card).getByText('Je voorkeuren voor je plan instellen')).toBeInTheDocument()
+    expect(within(card).getByText('3 van 5')).toBeInTheDocument()
+    expect(within(card).getByText('2 stappen nog niet bevestigd')).toBeInTheDocument()
+    expect(dotClass(card)).toContain('amber')
+    expect(container.querySelector('a[href="/toekomst/voorkeuren"]')).toBeNull()
+  })
+
+  it('n.v.t.-stappen tellen niet mee in het totaal', () => {
+    const { container } = renderCards({ planReview: progress(['plan'], ['woning']) })
+    expect(within(cardByHref(container, PLAN_REVIEW_HREF)).getByText('1 van 4')).toBeInTheDocument()
+  })
+
+  it('voltooid of niet beschikbaar: weer de gewone Voorkeuren-kaart', () => {
+    const { container, unmount } = renderCards({ planReview: progress([...PLAN_REVIEW_STAPPEN]) })
+    expect(cardByHref(container, '/toekomst/voorkeuren')).toBeTruthy()
+    unmount()
+    const r2 = renderCards({ planReview: null })
+    expect(cardByHref(r2.container, '/toekomst/voorkeuren')).toBeTruthy()
+  })
+
+  it('Eenvoudig: compact label "Je voorkeuren voor je plan instellen · N/M"', () => {
+    renderCards({ planReview: progress(['plan']) }, 'simple')
+    expect(screen.getByText('Je voorkeuren voor je plan instellen · 1/5')).toBeInTheDocument()
+  })
+
+  it('binnen de provider opent een klik de review i.p.v. te navigeren; een ctrl-klik volgt de link', () => {
+    const open = vi.fn()
+    const { container } = render(
+      <DisplayModeProvider initialMode="full">
+        <PlanReviewContext.Provider value={{ open }}>
+          <ToekomstNavCards
+            goals={[mockGoal()]}
+            goalProgresses={[mockProgress()]}
+            events={[mockEvent()]}
+            fireStrategy={mockFireStrategy}
+            withdrawalStrategy={mockWithdrawal}
+            fireParams={mockFireParams}
+            calculatorCount={4}
+            planReview={progress(['plan'])}
+          />
+        </PlanReviewContext.Provider>
+      </DisplayModeProvider>,
+    )
+    const card = cardByHref(container, PLAN_REVIEW_HREF)
+    const klik = new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 })
+    card.dispatchEvent(klik)
+    expect(open).toHaveBeenCalledTimes(1)
+    expect(klik.defaultPrevented).toBe(true)
+
+    const ctrl = new MouseEvent('click', { bubbles: true, cancelable: true, button: 0, ctrlKey: true })
+    card.dispatchEvent(ctrl)
+    expect(open).toHaveBeenCalledTimes(1)
   })
 })

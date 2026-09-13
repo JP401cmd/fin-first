@@ -88,7 +88,6 @@ describe('resolveWithdrawalStrategy', () => {
     expect(config.guardrailFloor).toBe(0.80)
     expect(config.guardrailCeiling).toBe(1.20)
     expect(config.guardrailCutStep).toBe(0.10)
-    expect(config.guardrailRaiseStep).toBe(0.10)
   })
 
   it('reads valid strategy from profile', () => {
@@ -106,12 +105,19 @@ describe('resolveWithdrawalStrategy', () => {
       guardrail_floor: 0.70,
       guardrail_ceiling: 1.30,
       guardrail_cut_step: 0.05,
-      guardrail_raise_step: 0.15,
     })
     expect(config.guardrailFloor).toBe(0.70)
     expect(config.guardrailCeiling).toBe(1.30)
     expect(config.guardrailCutStep).toBe(0.05)
-    expect(config.guardrailRaiseStep).toBe(0.15)
+  })
+
+  // TPR-10 — de kolom bestaat nog, maar is geen config-veld meer: een rauwe rij
+  // die 'm meespreidt levert geen raise-step op (de kern kent maar één stap).
+  it('ignores a legacy guardrail_raise_step column on the row', () => {
+    const rauweRij = { guardrail_cut_step: 0.05, guardrail_raise_step: 0.15 }
+    const config = resolveWithdrawalStrategy(rauweRij)
+    expect('guardrailRaiseStep' in config).toBe(false)
+    expect(config.guardrailCutStep).toBe(0.05)
   })
 })
 
@@ -309,7 +315,6 @@ describe('guardrails strategy', () => {
     guardrailFloor: 0.80,
     guardrailCeiling: 1.20,
     guardrailCutStep: 0.10,
-    guardrailRaiseStep: 0.10,
   })
 
   it('first year returns same as static', () => {
@@ -328,8 +333,19 @@ describe('guardrails strategy', () => {
       previousWithdrawal: 40_000,
       yearsIntoRetirement: 3,
     }))
-    // Previous * (1 + raiseStep) = 40_000 * 1.10 = 44_000
+    // Previous * (1 + cutStep) = 40_000 * 1.10 = 44_000 — één stap, beide richtingen (TPR-10)
     expect(result).toBe(44_000)
+  })
+
+  it('prosperity rule uses the SAME step as the cut (no separate raise-step)', () => {
+    const asymmetric = makeConfig({ strategy: 'guardrails', guardrailCutStep: 0.05 })
+    const result = applyWithdrawalStrategy(asymmetric, makeCtx({
+      currentPortfolio: 1_500_000,
+      startPortfolio: 1_000_000,
+      previousWithdrawal: 40_000,
+      yearsIntoRetirement: 3,
+    }))
+    expect(result).toBe(42_000)
   })
 
   it('capital preservation: cuts withdrawal when portfolio below floor', () => {
@@ -543,7 +559,6 @@ describe('guardrails + pensioen — high portfolio anchoring (#475)', () => {
     guardrailFloor: 0.80,
     guardrailCeiling: 1.20,
     guardrailCutStep: 0.10,
-    guardrailRaiseStep: 0.10,
   })
 
   it('with €1M+ portfolio and €33k expenses, guardrails stay in neutral zone for early years', () => {
@@ -773,7 +788,6 @@ describe('guardrails + deplete — annuity as base (#522)', () => {
     guardrailFloor: 0.80,
     guardrailCeiling: 1.20,
     guardrailCutStep: 0.10,
-    guardrailRaiseStep: 0.10,
   })
 
   it('first year uses annuity base instead of netBaseExpenses for deplete', () => {
@@ -934,7 +948,6 @@ describe('guardrails + legacy — annuity as base (#522)', () => {
     guardrailFloor: 0.80,
     guardrailCeiling: 1.20,
     guardrailCutStep: 0.10,
-    guardrailRaiseStep: 0.10,
   })
 
   it('first year uses legacy-aware annuity (portfolio minus indexed legacy)', () => {

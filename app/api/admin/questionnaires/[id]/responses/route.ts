@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
-import { forbidden, serverError } from '@/lib/api/respond'
+import { badRequest, forbidden, notFound, serverError } from '@/lib/api/respond'
 import { createClient } from '@/lib/supabase/server'
 import { isSuperAdmin } from '@/lib/admin'
+import { isGeldigVragenlijstId } from '@/lib/questionnaires/antwoord'
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -9,6 +10,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   if (!(await isSuperAdmin(supabase))) {
     return forbidden()
   }
+  if (!isGeldigVragenlijstId(id)) return notFound()
 
   const { data: sessions, error: sError } = await supabase
     .from('questionnaire_sessions')
@@ -32,11 +34,14 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   if (sError) return serverError(sError, 'admin-questionnaire-responses:GET')
 
-  const { data: questions } = await supabase
+  const { data: questions, error: qError } = await supabase
     .from('questionnaire_questions')
-    .select('id, sort_order, type, question_text')
+    .select('id, sort_order, type, question_text, options, scale_min, scale_max, allow_other')
     .eq('questionnaire_id', id)
     .order('sort_order', { ascending: true })
+
+  // Niet stil doorgaan: zonder vragen blijft "Per vraag" leeg en lijkt er niets te zijn.
+  if (qError) return serverError(qError, 'admin-questionnaire-responses:GET')
 
   // Resolve user name + email via profiles table
   const userIds = [...new Set((sessions ?? []).map(s => s.user_id))]
@@ -86,8 +91,8 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   const { searchParams } = new URL(req.url)
   const sessionId = searchParams.get('session_id')
 
-  if (!sessionId) {
-    return NextResponse.json({ error: 'session_id required' }, { status: 400 })
+  if (!sessionId || !isGeldigVragenlijstId(sessionId) || !isGeldigVragenlijstId(id)) {
+    return badRequest('Ongeldige invulling')
   }
 
   // Responses are deleted automatically via CASCADE

@@ -120,10 +120,10 @@ export const getActiveDebts = cache(async (supabase: SupabaseClient) =>
  * De eigen profielrij (RLS geeft precies één rij → `.single()`), met ALLE
  * kolommen. Union van 4+ deel-selects (dashboard 34 kolommen, horizon 28 +
  * twee defensieve legacy-probes, lever-scores 9, layout 15) + de losse
- * pot_rules-/monthly_savings_override-probes. Egress verwaarloosbaar: één rij.
+ * pot_rules-probe. Egress verwaarloosbaar: één rij.
  *
- * Vervangt óók de horizon-legacy-probes (withdrawal_strategy/guardrail_*,
- * monthly_savings_override): `select('*')` levert een ontbrekende legacy-kolom
+ * Vervangt óók de horizon-legacy-probes (withdrawal_strategy/guardrail_*):
+ * `select('*')` levert een ontbrekende legacy-kolom
  * simpelweg NIET op (geen kolom-fout, anders dan een expliciete `.select('kol')`
  * op een oude DB) → downstream `?? default` blijft werken. Op de huidige DB
  * (alle migraties toegepast) is dit byte-identiek; de enige nuance is dat op een

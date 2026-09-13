@@ -40,6 +40,7 @@ import { solveFireAgeWithoutAnchor } from '@/lib/horizon/scenario-presets'
 import type { WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
 import type { FactorRow } from '@/lib/euro-display'
 import { computeRunwayFromRawContext, type RunwayResult } from '@/lib/horizon/runway'
+import { loadPartnerKernelBlok } from '@/lib/horizon/partner-kernel-blok'
 
 /**
  * Beide FIRE-doel-grondslagen uit ÉÉN kernel-run (ADR 0034).
@@ -224,7 +225,6 @@ const computeHorizonFireSimCached = cache(async function computeHorizonFireSimIn
     box3Method: data.box3Method,
     hasPartner: data.hasPartner,
     bankAccountCash: data.unlinkedCash,
-    monthlySavingsOverride: data.monthlySavingsOverride,
     baseAnnualSavingsFromCashflow: data.baseAnnualSavingsFromCashflow,
     housingStrategy: data.housingStrategy,
   })
@@ -232,6 +232,16 @@ const computeHorizonFireSimCached = cache(async function computeHorizonFireSimIn
 
   // Zonder rauwe profiel-rij kan de kernel-invoer niet worden samengesteld → geen doel.
   if (!data.rawProfile) return null
+
+  // ── Partnerblok — ALLEEN in het huishoudperspectief (TPR-07, 13 sep 2026) ──
+  // De huishoud-FIRE-sectie draait de partner via de PT-laag; deze canonieke run deed
+  // dat niet en rekende de gecombineerde potten als solo (Box 3 heffingvrij ×1, geen
+  // partner-inkomen/-AOW). Zelfde helper, zelfde privacy-gated RPC als de sectie
+  // (lib/horizon/partner-kernel-blok.ts); `null` → solo-run, exact het oude gedrag.
+  // Het eigen-/partnerperspectief blijft solo: daar zijn de potten niet de
+  // huishoud-som en zou een PT-laag partner-inkomen op een deel-portefeuille zetten.
+  const partner =
+    perspective === 'household' ? await loadPartnerKernelBlok(supabase).catch(() => null) : null
 
   // Horizon-kernel via de convergentie-router. De kernel resolvet pensioen/AOW zélf en levert
   // per constructie `firePortfolioAtFire === requiredFirePortfolio` op de FIRE-maand (de
@@ -244,6 +254,8 @@ const computeHorizonFireSimCached = cache(async function computeHorizonFireSimIn
     lifeEvents: data.events ?? [],
     aowRows: aowRowsForContext,
     yearlyExpenses: built.input.yearlyExpenses,
+    // Sleutel alléén aanwezig mét blok — een solo-context blijft structureel identiek.
+    ...(partner ? { partner } : {}),
   }
   const outcome = computeConvergentieProjection({ rawContext })
   if (!outcome.ok) return null
@@ -333,6 +345,8 @@ const computeHorizonSolvedFireAgeCached = cache(async function computeHorizonSol
     debts: rawContext.debts,
     lifeEvents: rawContext.lifeEvents,
     aowRows: rawContext.aowRows,
+    // TPR-07: dezelfde PT-laag als de hoofdrun (huishoudperspectief); solo ⇒ geen sleutel.
+    ...(rawContext.partner ? { partner: rawContext.partner } : {}),
   })
 })
 

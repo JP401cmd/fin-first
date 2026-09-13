@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { describe, it, expect, vi, afterEach } from 'vitest'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { computeSliderUiRange, WhatIfSliders, type WhatIfOverrides } from './whatif-sliders'
 import { formatCurrency } from '@/lib/format'
 
@@ -125,5 +125,67 @@ describe('WhatIfSliders — a11y: slider heeft naam + valuetext', () => {
       'aria-valuetext',
       formatCurrency(0),
     )
+  })
+})
+
+/**
+ * iOS (bugmelding 13 sep 2026, "lastig te pakken"): Safari op iOS verschuift een range
+ * alléén vanaf het 18px-bolletje. Given een iPhone, When de vinger ergens op de baan
+ * tikt of zijwaarts veegt, Then springt de slider naar die plek (zoals Android native
+ * doet) en komt de wijziging via de gewone onChange-route in de scenario-events terecht.
+ * Een verticale scroll over de slider laat de waarde staan. Buiten iOS blijft het native
+ * gedrag leidend en doet de handler niets.
+ */
+describe('WhatIfSliders — iOS: tik op de baan verschuift de slider', () => {
+  const baseline: WhatIfOverrides = {
+    monthlyIncome: 3000,
+    workDaysPerWeek: 5,
+    savingsRate: 20,
+    expectedReturn: 6,
+    extraContribution: 0,
+  }
+  const IPHONE_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15'
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  function stubNavigator(userAgent: string, maxTouchPoints: number) {
+    vi.stubGlobal('navigator', { ...window.navigator, userAgent, platform: '', maxTouchPoints })
+  }
+
+  function renderWithSpy() {
+    const setEvents = vi.fn()
+    render(<WhatIfSliders baseline={baseline} events={[]} setEvents={setEvents} currentAge={40} />)
+    const slider = screen.getByRole('slider', { name: 'Spaarquote' })
+    // Baan van 218px (bruikbaar traject 200px met een 18px-bolletje).
+    slider.getBoundingClientRect = () =>
+      ({ left: 0, width: 218, top: 0, height: 19, right: 218, bottom: 19, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect
+    return { setEvents, slider }
+  }
+
+  it('Given een iPhone, When een tik aan de rechterrand van de baan, Then de spaarquote verschuift', () => {
+    stubNavigator(IPHONE_UA, 5)
+    const { setEvents, slider } = renderWithSpy()
+    fireEvent.touchStart(slider, { touches: [{ clientX: 218, clientY: 5 }] })
+    fireEvent.touchEnd(slider, { touches: [] })
+    expect(setEvents).toHaveBeenCalled()
+  })
+
+  it('Given een iPhone, When de duim over de slider heen scrolt, Then blijft de waarde staan', () => {
+    stubNavigator(IPHONE_UA, 5)
+    const { setEvents, slider } = renderWithSpy()
+    fireEvent.touchStart(slider, { touches: [{ clientX: 218, clientY: 5 }] })
+    fireEvent.touchMove(slider, { touches: [{ clientX: 214, clientY: 60 }] })
+    fireEvent.touchEnd(slider, { touches: [] })
+    expect(setEvents).not.toHaveBeenCalled()
+  })
+
+  it('Given Android, When een tik op de baan, Then doet de handler niets (native gedrag)', () => {
+    stubNavigator('Mozilla/5.0 (Linux; Android 14; Pixel 8) Chrome/128.0', 5)
+    const { setEvents, slider } = renderWithSpy()
+    fireEvent.touchStart(slider, { touches: [{ clientX: 218, clientY: 5 }] })
+    fireEvent.touchEnd(slider, { touches: [] })
+    expect(setEvents).not.toHaveBeenCalled()
   })
 })

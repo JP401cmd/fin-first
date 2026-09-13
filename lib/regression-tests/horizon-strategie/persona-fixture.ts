@@ -311,7 +311,6 @@ export function buildCompleetKernelProfileBase(
     expected_return: p.expected_return ?? 0.07,
     inflation_rate: p.inflation_rate ?? 0.02,
     box3_method: 'forfaitair',
-    marginaal_tarief: p.marginaal_tarief ?? null,
     withdrawal_strategy: p.withdrawal_strategy ?? 'static',
     feature_preferences: p.feature_preferences ?? null,
   }

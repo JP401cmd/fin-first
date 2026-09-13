@@ -90,7 +90,7 @@ describe.skipIf(process.env.EIGENAAR_LIVE !== '1')('eigenaar-live dump', () => {
         supabase
           .from('profiles')
           .select(
-            'date_of_birth, household_type, number_of_children, net_monthly_income, estimated_monthly_expenses, income_source, expenses_source, expected_return, inflation_rate, marginaal_tarief, box3_method, fire_end_strategy, fire_end_age, fire_legacy_amount, retirement_expense_method, retirement_expense_custom_amount, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step, housing_strategy_config, pot_rules, feature_preferences',
+            'date_of_birth, household_type, number_of_children, net_monthly_income, estimated_monthly_expenses, income_source, expenses_source, expected_return, inflation_rate, box3_method, box3_heffingvrij_inkomen, fire_end_strategy, fire_end_age, fire_legacy_amount, fire_legacy_include_illiquid, retirement_expense_method, retirement_expense_custom_amount, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, housing_strategy_config, pot_rules, feature_preferences',
           )
           .eq('id', OWNER_ID)
           .single(),
@@ -153,16 +153,16 @@ describe.skipIf(process.env.EIGENAAR_LIVE !== '1')('eigenaar-live dump', () => {
       expected_return: profileRaw.expected_return as number | null,
       inflation_rate: profileRaw.inflation_rate as number | null,
       box3_method: profileRaw.box3_method as string | null,
-      marginaal_tarief: profileRaw.marginaal_tarief as number | null,
+      box3_heffingvrij_inkomen: profileRaw.box3_heffingvrij_inkomen as number | null,
       fire_end_strategy: profileRaw.fire_end_strategy as string | null,
       fire_end_age: profileRaw.fire_end_age as number | null,
       fire_legacy_amount: profileRaw.fire_legacy_amount as number | string | null,
+      fire_legacy_include_illiquid: profileRaw.fire_legacy_include_illiquid as boolean | null,
       feature_preferences: profileRaw.feature_preferences as Record<string, unknown> | null,
       withdrawal_strategy: profileRaw.withdrawal_strategy as string | null,
       guardrail_floor: profileRaw.guardrail_floor as number | null,
       guardrail_ceiling: profileRaw.guardrail_ceiling as number | null,
       guardrail_cut_step: profileRaw.guardrail_cut_step as number | null,
-      guardrail_raise_step: profileRaw.guardrail_raise_step as number | null,
       housing_strategy_config: profileRaw.housing_strategy_config,
       pot_rules: profileRaw.pot_rules,
       retirement_expense_method: profileRaw.retirement_expense_method as string | null,

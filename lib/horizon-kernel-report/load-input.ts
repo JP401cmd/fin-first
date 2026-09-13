@@ -96,7 +96,7 @@ export async function loadKernelReportInput(supabase: SupabaseClient): Promise<K
           // `withdrawal_profile_config` reist mee (B-042): zonder die kolom rekende
           // dit rapport een afnemend/oplopend plan als 'Vast' terwijl /toekomst
           // (rawProfile via select('*')) het echte profiel wél aan de adapter gaf.
-          `date_of_birth, household_type, number_of_children, net_monthly_income, estimated_monthly_expenses, income_source, expenses_source, expected_return, inflation_rate, marginaal_tarief, box3_method, ${FIRE_PLAN_COLUMNS}, retirement_expense_method, retirement_expense_custom_amount, withdrawal_strategy, withdrawal_profile_config, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step, housing_strategy_config, pot_rules, feature_preferences`,
+          `date_of_birth, household_type, number_of_children, net_monthly_income, estimated_monthly_expenses, income_source, expenses_source, expected_return, inflation_rate, box3_method, box3_heffingvrij_inkomen, ${FIRE_PLAN_COLUMNS}, fire_legacy_include_illiquid, retirement_expense_method, retirement_expense_custom_amount, withdrawal_strategy, withdrawal_profile_config, guardrail_floor, guardrail_ceiling, guardrail_cut_step, housing_strategy_config, pot_rules, feature_preferences`,
         )
         .single(),
       supabase.from('assets').select('*').eq('is_active', true).limit(500),
@@ -159,10 +159,11 @@ export async function loadKernelReportInput(supabase: SupabaseClient): Promise<K
     expected_return: profileRaw.expected_return as number | null,
     inflation_rate: profileRaw.inflation_rate as number | null,
     box3_method: profileRaw.box3_method as string | null,
-    marginaal_tarief: profileRaw.marginaal_tarief as number | null,
+    box3_heffingvrij_inkomen: profileRaw.box3_heffingvrij_inkomen as number | null,
     fire_end_strategy: profileRaw.fire_end_strategy as string | null,
     fire_end_age: profileRaw.fire_end_age as number | null,
     fire_legacy_amount: profileRaw.fire_legacy_amount as number | string | null,
+    fire_legacy_include_illiquid: profileRaw.fire_legacy_include_illiquid as boolean | null,
     // ADR 0129 L1 — het anker reist mee; zonder deze twee rekende het kernel-rapport
     // een aow-/age-plan als `solved` (bisectie) terwijl /toekomst het anker wél kent.
     fire_stop_anchor: profileRaw.fire_stop_anchor as string | null,
@@ -173,7 +174,6 @@ export async function loadKernelReportInput(supabase: SupabaseClient): Promise<K
     guardrail_floor: profileRaw.guardrail_floor as number | null,
     guardrail_ceiling: profileRaw.guardrail_ceiling as number | null,
     guardrail_cut_step: profileRaw.guardrail_cut_step as number | null,
-    guardrail_raise_step: profileRaw.guardrail_raise_step as number | null,
     housing_strategy_config: profileRaw.housing_strategy_config,
     pot_rules: profileRaw.pot_rules,
     retirement_expense_method: profileRaw.retirement_expense_method as string | null,
@@ -209,8 +209,8 @@ export async function loadKernelReportInput(supabase: SupabaseClient): Promise<K
     parameters: [
       { label: 'Verwacht rendement', waarde: pct(fireParams.grossReturn), bron: 'profiles.expected_return' },
       { label: 'Inflatie', waarde: pct(fireParams.inflationRate), bron: 'profiles.inflation_rate' },
-      { label: 'Marginaal tarief', waarde: profileRaw.marginaal_tarief != null ? pct(profileRaw.marginaal_tarief) : '—', bron: 'profiles.marginaal_tarief' },
-      { label: 'Box 3-methode', waarde: fireParams.box3Method, bron: 'afgeleid (profiles.box3_method / fire-params)' },
+      { label: 'Marginaal tarief', waarde: pct(fireParams.marginaalTarief), bron: 'jaar-afgeleid uit net_monthly_income (BOX1_PARAMS)' },
+      { label: 'Box 3-methode', waarde: fireParams.box3Method, bron: 'profiles.box3_method (instelbaar op /toekomst/voorkeuren)' },
     ],
     strategie: [
       { label: 'Eindstrategie', waarde: String(profileRaw.fire_end_strategy ?? 'perpetual'), bron: 'profiles.fire_end_strategy' },

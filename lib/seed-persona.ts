@@ -459,6 +459,18 @@ export async function deleteAllUserData(
     summary[batch2cTables[i]] = batch2cResults[i]
   }
 
+  // Vragenlijst-invullingen: sinds migratie 20260913130000 mag de eigenaar via
+  // RLS alleen nog een OPEN sessie verwijderen (een ingeleverde invulling is niet
+  // meer zelf te wissen/wijzigen). De sessie-delete hierboven raakt dus alleen de
+  // open sessies; de afgeronde (mét vrije-tekstantwoorden, cascade) gaan via de
+  // service-client. Beide reset-routes (onboarding-reset, account-delete) geven
+  // `service` mee; een volledige accountverwijdering wist ze bovendien via de
+  // FK-cascade vanaf auth.users.
+  if (opts?.service) {
+    summary.questionnaire_sessions =
+      (summary.questionnaire_sessions ?? 0) + (await serviceWipeTable(opts.service, 'questionnaire_sessions', userId))
+  }
+
   // Batch 3: parent tables
   const batch3Results = await Promise.all([
     deleteTable(supabase, 'recommendations', userId),
@@ -614,7 +626,6 @@ export async function seedPersonaData(
   if (persona.profile.guardrail_floor != null) profileData.guardrail_floor = persona.profile.guardrail_floor
   if (persona.profile.guardrail_ceiling != null) profileData.guardrail_ceiling = persona.profile.guardrail_ceiling
   if (persona.profile.guardrail_cut_step != null) profileData.guardrail_cut_step = persona.profile.guardrail_cut_step
-  if (persona.profile.guardrail_raise_step != null) profileData.guardrail_raise_step = persona.profile.guardrail_raise_step
 
   // Profile income/expense estimates
   if (persona.profile.net_monthly_income != null) profileData.net_monthly_income = persona.profile.net_monthly_income
@@ -630,9 +641,6 @@ export async function seedPersonaData(
   profileData.feature_preferences = {
     ...(typeof persona.profile.feature_preferences === 'object' ? persona.profile.feature_preferences : {}),
   }
-
-  // Marginaal tarief (optional, per-persona — null means auto-derived)
-  if (persona.profile.marginaal_tarief != null) profileData.marginaal_tarief = persona.profile.marginaal_tarief
 
   // Rebalancing threshold (optional, per-persona)
   if (persona.profile.rebalance_threshold != null) profileData.rebalance_threshold = persona.profile.rebalance_threshold

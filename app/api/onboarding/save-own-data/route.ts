@@ -308,12 +308,9 @@ function buildRpcPayload(
       // 0131, dus dit verschuift geen enkel bestaand getal. Zonder eigen_huis-
       // asset is de config een no-op.
       housing_strategy_config: housingChoiceToConfig(housingChoice),
-      // Onttrekkingsprofiel: afnemend (enum-spiegel 'static', zoals de
-      // onttrekkings-UI schrijft). Verdeling bij toename: naar beleggen
-      // (pot_rules.surplus_group; resolvePotRules vult de orde-regels aan).
-      withdrawal_strategy: 'static',
-      withdrawal_profile_config: { profiel: 'afnemend' },
-      pot_rules: { surplus_group: 'beleggingen' },
+      // Onttrekkingsprofiel en verdeling-bij-toename worden bewust NIET
+      // geschreven (TPR-05): de onboarding vraagt er niet naar, dus de
+      // kern-default geldt — zie het multi-step pad hieronder.
     },
     budget_amounts: budgetAmounts,
     budgettering_mode: budgetteringMode ?? 'manual',
@@ -964,12 +961,21 @@ export async function POST(req: Request) {
     //      wanneer nodig"), 'exclude' → exclude_from_fire. Zonder keuze geldt
     //      `HOUSING_CHOICE_FALLBACK` = 'sell': exact de default van vóór ADR
     //      0131, dus geen enkel bestaand getal verschuift.
-    //   3. Onttrekkingsprofiel: afnemend (withdrawal_profile_config.profiel;
-    //      enum-spiegel 'static' zoals de onttrekkings-UI schrijft).
-    //   4. Verdeling bij toename: naar beleggen (pot_rules.surplus_group;
-    //      resolvePotRules vult de orde-regels met de defaults aan).
-    // Expliciet zodat elke nieuwe gebruiker deze actieve voorkeuren heeft,
-    // onafhankelijk van latere default/fallback-drift.
+    //   3+4. Onttrekkingsprofiel en verdeling-bij-toename: bewust NIET
+    //      geschreven (TPR-05, 13 sep 2026). De onboarding stelt die vragen
+    //      niet; een weggeschreven waarde leek daarna een eigen keuze en de
+    //      plan-review kon 'm niet als aanname herkennen. Zonder write geldt de
+    //      kern-default, zonder dat er een consumer breekt:
+    //        - `withdrawal_profile_config` is nullable zonder default → NULL →
+    //          `resolveWithdrawalProfiel` valt via de enum (DB-default 'static')
+    //          op 'vast'; `parseWithdrawalProfileConfig` → Excel-curvedefaults.
+    //          NULL = "nog niet gekozen", herkenbaar voor de plan-review.
+    //        - `pot_rules` is NOT NULL met een DB-default die gelijk is aan
+    //          `potRulesToRaw(POT_RULES_DEFAULTS)` (surplus → beleggingen);
+    //          `resolvePotRules` vangt elke vorm op.
+    //      Niet schrijven betekent ook: een herhaalde onboarding-save (upsert)
+    //      overschrijft een eerder in Voorkeuren gemaakte keuze niet meer.
+    //      Bestaande accounts blijven ongemoeid (besluit eigenaar: geen backfill).
     profileData.housing_strategy_config = housingChoiceToConfig(housingChoice)
     // Het plan (ADR 0129) uit het ene opgeloste blok — zie `planColumns` hierboven.
     profileData.fire_end_strategy = planColumns.fire_end_strategy
@@ -978,9 +984,6 @@ export async function POST(req: Request) {
     profileData.fire_stop_anchor = planColumns.fire_stop_anchor
     profileData.fire_stop_age = planColumns.fire_stop_age
     profileData.temporal_balance = horizonData?.temporal_balance ?? identity.temporal_balance ?? 3
-    profileData.withdrawal_strategy = 'static'
-    profileData.withdrawal_profile_config = { profiel: 'afnemend' }
-    profileData.pot_rules = { surplus_group: 'beleggingen' }
     // Optionele metadata-kolommen: schrijf alléén als er waarde is. Dat
     // voorkomt een schema-cache-miss in omgevingen waar de bijbehorende
     // migratie nog niet is toegepast (PostgREST faalt op een onbekende
@@ -1043,9 +1046,6 @@ export async function POST(req: Request) {
       'income_source',
       'expenses_source',
       'housing_strategy_config',
-      'withdrawal_strategy',
-      'withdrawal_profile_config',
-      'pot_rules',
     ] as const
     let profileErr: { message?: string; code?: string } | null = null
     for (let attempt = 0; attempt < OPTIONAL_PROFILE_COLUMNS.length + 1; attempt++) {

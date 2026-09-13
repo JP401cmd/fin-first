@@ -91,7 +91,6 @@ const BASE_ROW: Row = {
   retirement_expense_method: 'essential_budgets',
   retirement_expense_custom_amount: null,
   deficit_loan_rate: null,
-  monthly_savings_override: null,
 }
 
 beforeEach(() => {
@@ -159,6 +158,51 @@ describe('PUT — gewone opslag', () => {
     expect(db.row.fire_end_strategy).toBe('perpetual')
     expect((db.row.feature_preferences as Row).fire_strategy_override).toBeUndefined()
     expect(await getStrategy()).toBe('perpetual')
+  })
+})
+
+describe('TPR-12 — fire_legacy_include_illiquid (niet-liquide meetellen in de nalatenschap)', () => {
+  it('PUT met het volledige plan + true schrijft de kolom en echoot \'m', async () => {
+    const res = await put({
+      fire_end_strategy: 'legacy',
+      fire_end_age: 90,
+      fire_legacy_amount: 50_000,
+      fire_stop_anchor: 'solved',
+      fire_legacy_include_illiquid: true,
+    })
+    expect(res.status).toBe(200)
+    expect(db.row.fire_legacy_include_illiquid).toBe(true)
+    expect(((await res.json()) as Row).fire_legacy_include_illiquid).toBe(true)
+  })
+
+  it('null wist de keuze (→ kernel-default) en mag alleen komen', async () => {
+    db = makeDb({ ...BASE_ROW, fire_legacy_include_illiquid: true }, ['perpetual', 'legacy', 'deplete'])
+    const res = await put({ fire_legacy_include_illiquid: null })
+    expect(res.status).toBe(200)
+    expect(db.row.fire_legacy_include_illiquid).toBeNull()
+  })
+
+  it('een niet-boolean wordt geweigerd (400, platte envelope), niets geschreven', async () => {
+    for (const bad of ['ja', 1, 'true', {}]) {
+      db = makeDb(BASE_ROW, ['perpetual', 'legacy', 'deplete'])
+      const res = await put({ fire_legacy_include_illiquid: bad })
+      expect(res.status).toBe(400)
+      expect(typeof ((await res.json()) as Row).error).toBe('string')
+      expect(db.updates).toHaveLength(0)
+    }
+  })
+
+  it('zonder de sleutel blijft de kolom onaangeraakt', async () => {
+    db = makeDb({ ...BASE_ROW, fire_legacy_include_illiquid: true }, ['perpetual', 'legacy', 'deplete'])
+    await put({ fire_end_strategy: 'deplete', fire_end_age: 90 })
+    expect(db.row.fire_legacy_include_illiquid).toBe(true)
+  })
+
+  it('GET geeft de kolom terug (NULL = niet gekozen)', async () => {
+    db = makeDb({ ...BASE_ROW, fire_legacy_include_illiquid: null }, [])
+    expect(((await (await GET()).json()) as Row).fire_legacy_include_illiquid).toBeNull()
+    db = makeDb({ ...BASE_ROW, fire_legacy_include_illiquid: true }, [])
+    expect(((await (await GET()).json()) as Row).fire_legacy_include_illiquid).toBe(true)
   })
 })
 

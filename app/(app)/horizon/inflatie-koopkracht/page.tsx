@@ -30,7 +30,7 @@ export default async function InflatieKoopkrachtPage() {
   if (user) {
     const { data: profile } = await supabase
       .from('profiles')
-      .select('expected_return, inflation_rate, box3_method, marginaal_tarief, net_monthly_income, estimated_monthly_expenses')
+      .select('expected_return, inflation_rate, box3_method, net_monthly_income, estimated_monthly_expenses')
       .eq('id', user.id)
       .single()
 

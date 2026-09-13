@@ -74,6 +74,9 @@ export const SESSION_WIPE_TABLES: readonly string[] = [
   'calculator_likes',
   'ai_calculator_usage',
   'news_feedback',
+  // Eigen-rij DELETE geldt sinds migratie 20260913130000 alleen voor een OPEN
+  // sessie; afgeronde invullingen wist deleteAllUserData via de service-client.
+  // Blijft in deze lijst voor de export (eigen rijen, embed van de antwoorden).
   'questionnaire_sessions',
   'report_configs',
   'user_own_ibans',

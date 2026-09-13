@@ -69,7 +69,6 @@ const PROFILE_ROW = {
   expected_return: 0.07,
   inflation_rate: 0.02,
   box3_method: null,
-  marginaal_tarief: null,
   net_monthly_income: 4000,
   estimated_monthly_expenses: 3100,
   income_source: 'manual',

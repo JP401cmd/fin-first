@@ -4,7 +4,6 @@ import { FinHome, type FinHomeProps } from './fin-home'
 import { FinSlotProvider } from '@/lib/shell/fin-slot'
 import type { CoachDataGaps, GuideSuggestionInput } from '@/lib/coach-suggestions'
 import type { GuideNextStep } from '@/lib/welcome-guide'
-import { __resetInflight } from '@/lib/inflight'
 import { acquireOverlay, __resetOverlayCount } from '@/lib/overlay-signal'
 import { setRondleidingActive, __resetRondleidingSignal } from '@/lib/rondleiding/signal'
 import { EMPTY_COACH_STATE, type CoachState } from '@/lib/coach-state'
@@ -64,7 +63,7 @@ beforeEach(() => {
   }))
 })
 afterEach(() => {
-  vi.useRealTimers(); vi.restoreAllMocks(); __resetInflight()
+  vi.useRealTimers(); vi.restoreAllMocks()
   __resetOverlayCount(); __resetRondleidingSignal()
 })
 
@@ -74,6 +73,18 @@ describe('FinHome', () => {
     const launcher = screen.getByRole('button', { name: /Open chat met Fin/i })
     fireEvent.click(launcher)
     expect(toggle).toHaveBeenCalled()
+  })
+
+  it('draagt geen teller voor uitgestelde tips meer — die komen als bericht binnen (sep 2026)', async () => {
+    renderFin({ dataGaps: gaps(), delayMs: 1000 })
+    await act(async () => { await Promise.resolve() })
+    const fetchMock = vi.mocked(fetch)
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes('postponed-ready'))).toBe(false)
+    const launcher = screen.getByRole('button', { name: 'Open chat met Fin' })
+    expect(launcher.querySelector('.wh-badge')).toBeNull()
+    fireEvent.click(launcher)
+    expect(toggle).toHaveBeenCalled()
+    expect(openWithMessage).not.toHaveBeenCalled()
   })
 
   it('toont de melding na delayMs met reduced-motion-tekst', () => {

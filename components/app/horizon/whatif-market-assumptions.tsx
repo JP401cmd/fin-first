@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { ChevronDown, ChevronUp, LineChart } from 'lucide-react'
 import { formatDecimal } from '@/lib/format'
+import { rangeTouchSeekProps } from '@/lib/range-touch-seek'
 
 // Datacontract(en) wonen nu in @/lib/types/horizon-whatif (import-richting UI→lib).
 import type { AssetGroupReturn } from '@/lib/types/horizon-whatif'
@@ -147,6 +148,7 @@ export function WhatIfMarketAssumptions({ value, onChange, assetGroups = [] }: P
                   value={isMixed ? 0 : masterValue}
                   onChange={e => setMaster(Number(e.target.value))}
                   className="slider-module w-full"
+                  {...rangeTouchSeekProps}
                   aria-label="Master rendement-delta voor alle vermogensgroepen"
                 />
                 <div className="flex justify-between font-sans text-[10px] text-[var(--ink-4)]">
@@ -183,6 +185,7 @@ export function WhatIfMarketAssumptions({ value, onChange, assetGroups = [] }: P
                           value={delta}
                           onChange={e => setGroupDelta(g.assetType, Number(e.target.value))}
                           className="slider-module w-full"
+                          {...rangeTouchSeekProps}
                           aria-label={`${g.label} rendement-delta`}
                         />
                         <span className={`shrink-0 text-right font-mono text-[10px] tabular-nums ${

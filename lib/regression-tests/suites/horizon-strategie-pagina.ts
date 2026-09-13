@@ -188,21 +188,21 @@ const tests: TestCase[] = [
     id: 'strategie-guardrail-defaults',
     name: 'Guardrail standaard parameters',
     category: CAT,
-    description: 'Default floor=0.80, ceiling=1.20, cut/raise=0.10',
+    description: 'Default floor=0.80, ceiling=1.20, stap=0.10 (één stap voor omlaag én omhoog, TPR-10)',
     priority: 'critical',
     estimatedDurationMs: 10,
     fn() {
       assertEqual(WITHDRAWAL_DEFAULTS.guardrailFloor, 0.80, 'floor')
       assertEqual(WITHDRAWAL_DEFAULTS.guardrailCeiling, 1.20, 'ceiling')
       assertEqual(WITHDRAWAL_DEFAULTS.guardrailCutStep, 0.10, 'cut step')
-      assertEqual(WITHDRAWAL_DEFAULTS.guardrailRaiseStep, 0.10, 'raise step')
+      assert(!('guardrailRaiseStep' in WITHDRAWAL_DEFAULTS), 'geen aparte raise step meer')
     },
   },
   {
     id: 'strategie-guardrail-custom-params',
     name: 'Custom guardrail parameters doorwerking',
     category: CAT,
-    description: 'Aangepaste floor/ceiling/cut/raise beïnvloeden onttrekking',
+    description: 'Aangepaste floor/ceiling/stap beïnvloeden onttrekking',
     priority: 'high',
     estimatedDurationMs: 50,
     fn() {
@@ -211,13 +211,11 @@ const tests: TestCase[] = [
         guardrail_floor: 0.70,
         guardrail_ceiling: 1.40,
         guardrail_cut_step: 0.15,
-        guardrail_raise_step: 0.20,
       })
       assertEqual(config.strategy, 'guardrails', 'strategy')
       assertEqual(config.guardrailFloor, 0.70, 'custom floor')
       assertEqual(config.guardrailCeiling, 1.40, 'custom ceiling')
       assertEqual(config.guardrailCutStep, 0.15, 'custom cut')
-      assertEqual(config.guardrailRaiseStep, 0.20, 'custom raise')
     },
   },
   {
@@ -233,7 +231,6 @@ const tests: TestCase[] = [
         guardrailFloor: 0.80,
         guardrailCeiling: 1.20,
         guardrailCutStep: 0.10,
-        guardrailRaiseStep: 0.10,
       }
       // Portfolio dropped below floor threshold (800K < 0.80 * 1M)
       const w = applyWithdrawalStrategy(config, makeCtx({
@@ -249,7 +246,7 @@ const tests: TestCase[] = [
     id: 'strategie-guardrail-raise-effect',
     name: 'Guardrail raise verhoogt onttrekking',
     category: CAT,
-    description: 'Bij portfolio > ceiling * start → raise step verhoogt withdrawal',
+    description: 'Bij portfolio > ceiling * start → dezelfde stap (cut) verhoogt withdrawal',
     priority: 'high',
     estimatedDurationMs: 20,
     fn() {
@@ -258,7 +255,6 @@ const tests: TestCase[] = [
         guardrailFloor: 0.80,
         guardrailCeiling: 1.20,
         guardrailCutStep: 0.10,
-        guardrailRaiseStep: 0.10,
       }
       // Portfolio above ceiling threshold (1.3M > 1.20 * 1M)
       const w = applyWithdrawalStrategy(config, makeCtx({

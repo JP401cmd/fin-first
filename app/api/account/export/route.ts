@@ -19,6 +19,20 @@ import { shapeExportRows, shapeExportRow, type ExportRow } from '@/lib/account-e
  * (logs, net_worth_history) vallen buiten de zelf-service-export en zitten in de
  * superadmin-inzage-export (/api/admin/user-export, service-role, audit-gelogd).
  */
+/**
+ * Kindtabellen zónder eigen `user_id` vallen buiten de generieke
+ * `.eq('user_id', …)` hierboven en zouden stil uit de export wegblijven. Die
+ * hangen we als embed aan hun ouder. De RLS op het kind scoped de embed al op
+ * de eigen ouderrij.
+ *
+ * `questionnaire_responses` — de vrije-tekstantwoorden op vragenlijsten in de
+ * chat bij Fin; bereikbaar via `questionnaire_sessions.id`. Wissen gaat via de
+ * FK-cascade vanaf de sessie.
+ */
+const EXPORT_EMBEDS: Record<string, string> = {
+  questionnaire_sessions: '*, questionnaire_responses(*)',
+}
+
 export async function GET() {
   const supabase = await createClient()
   const claims = await getAuthClaims(supabase)
@@ -45,7 +59,10 @@ export async function GET() {
     // maar begrensd: het zijn eigen-rij-selects op geïndexeerde user_id-kolommen.
     const results = await Promise.all(
       EXPORT_SESSION_TABLES.map(async (table) => {
-        const { data, error } = await supabase.from(table).select('*').eq('user_id', claims.sub)
+        const { data, error } = await supabase
+          .from(table)
+          .select(EXPORT_EMBEDS[table] ?? '*')
+          .eq('user_id', claims.sub)
         // RLS-afscherming of een ontbrekende tabel levert een lege set, geen 500:
         // een export mag niet breken op één tabel. De echte fout is server-side
         // niet nodig (leeg = leeg voor de gebruiker).
@@ -54,7 +71,9 @@ export async function GET() {
         // het rekeningnummer ontsleuteld en leesbaar, de crypto-kolommen
         // (`iban_encrypted`/`iban_hash`) en de bank-/exchange-/broker-tokens eruit.
         // Zie `lib/account-export-shape.ts` voor waarom die er niet in horen.
-        const rows = error ? [] : ((data ?? []) as ExportRow[])
+        // Via `unknown`: een dynamische select-string laat supabase-js het rijtype
+        // niet afleiden; de vorm is hier sowieso generiek (ExportRow).
+        const rows = error ? [] : ((data ?? []) as unknown as ExportRow[])
         return [table, shapeExportRows(table, rows, decryptField)] as const
       }),
     )

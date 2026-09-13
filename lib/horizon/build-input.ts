@@ -44,7 +44,11 @@ export interface BuildHorizonInputParams {
   box3Method?: Box3Method
   hasPartner?: boolean
   bankAccountCash?: number
-  monthlySavingsOverride?: number | null
+  /**
+   * Jaarlijks spaarbedrag op de EFFECTIEVE spaargrondslag (`resolveSavingsSource(...)
+   * .baseAnnualSavings`, ADR 0121). Dit is de ENIGE spaarbron van de prognose; de
+   * vroegere handmatige `profiles.monthly_savings_override` is vervallen (ADR 0141).
+   */
   baseAnnualSavingsFromCashflow?: number | null
   housingStrategy?: HousingStrategyConfig
 }
@@ -67,13 +71,13 @@ export function buildHorizonInput(p: BuildHorizonInputParams): BuiltHorizonInput
   const yearlyExpenses = yearlyMustExpenses > 0 ? yearlyMustExpenses : 0
   if (yearlyExpenses <= 0) return null
 
-  // annualSavings — prioriteit: override → cashflow-spaarquote → asset-aggregaat.
+  // annualSavings — de effectieve spaargrondslag (ADR 0121); alleen zónder bruikbare
+  // grondslag valt de metadata terug op het asset-aggregaat. Geen handmatige override
+  // meer (ADR 0141): één spaargrondslag app-breed.
   const annualSavings =
-    p.monthlySavingsOverride != null && p.monthlySavingsOverride >= 0
-      ? p.monthlySavingsOverride * 12
-      : p.baseAnnualSavingsFromCashflow != null && p.baseAnnualSavingsFromCashflow > 0
-        ? p.baseAnnualSavingsFromCashflow
-        : (monthlyContributions ?? 0) * 12
+    p.baseAnnualSavingsFromCashflow != null && p.baseAnnualSavingsFromCashflow > 0
+      ? p.baseAnnualSavingsFromCashflow
+      : (monthlyContributions ?? 0) * 12
   const monthlySurplus = annualSavings / 12
 
   const grossReturn = p.grossReturn ?? DEFAULT_RETURN

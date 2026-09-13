@@ -26,7 +26,7 @@
 // scherm.
 //
 // Het proces leest links→rechts: instap (bubbel/bel/krant overal zichtbaar) →
-// chat-kern (vrije vraag, tip/actie-beslissing, pin, badge-heropak, contextuele
+// chat-kern (vrije vraag, tip/actie-beslissing, pin, tip-terug-bericht, contextuele
 // starters, foutherstel) → meldingen (bel, berichtencentrum, opvolgen,
 // voorkeuren, briefing) → krant (lezen, verversen, archief, bespreken,
 // actie maken, minder-hierover) → uitkomst → cross-doorwerking.
@@ -47,7 +47,7 @@ export const WILL_FLOW: UatFlow = {
   nodes: [
     // ── 0 · instap ────────────────────────────────────────────────────────
     { id: 'nav', label: 'Fin-bubbel/bel/krant-icoon zichtbaar op elke pagina', kind: 'entry', stage: 0 },
-    { id: 'chatbeslis', label: 'Vrije vraag, tip/badge, of vanuit context elders?', kind: 'decision', stage: 0 },
+    { id: 'chatbeslis', label: 'Vrije vraag, teruggekeerde tip, of vanuit context elders?', kind: 'decision', stage: 0 },
     { id: 'coachmelding', scenarioId: 'UAT-WILL-05', label: 'WF-WILL-05 · Coach-melding ontvangen en opvolgen', kind: 'screen', stage: 0, lane: 'chat' },
     { id: 'gidsstap', scenarioId: 'UAT-WILL-26', label: 'WF-WILL-26 · Fin herinnert aan de volgende gidsstap', kind: 'action', stage: 0, lane: 'chat', subOf: 'coachmelding' },
 
@@ -59,10 +59,11 @@ export const WILL_FLOW: UatFlow = {
     { id: 'pin', scenarioId: 'UAT-WILL-04', label: 'WF-WILL-04 · Chat vastzetten als zijpaneel', kind: 'action', stage: 1, lane: 'chat', subOf: 'vraag' },
     { id: 'fouth', scenarioId: 'UAT-WILL-09', label: 'WF-WILL-09 · Foutherstel in de chat', kind: 'action', stage: 1, lane: 'chat', subOf: 'vraag' },
     { id: 'ai-uit-block', scenarioId: 'UAT-WILL-25', label: 'WF-WILL-25 · Chat blokkeert vóóraf bij AI uit (beide bestemmingen)', kind: 'action', stage: 1, lane: 'chat', subOf: 'vraag' },
-    { id: 'badge', scenarioId: 'UAT-WILL-06', label: 'WF-WILL-06 · Uitgestelde tips heropakken via de badge', kind: 'action', stage: 1, lane: 'chat' },
+    { id: 'badge', scenarioId: 'UAT-WILL-06', label: 'WF-WILL-06 · Uitgestelde tip komt terug als bericht', kind: 'action', stage: 1, lane: 'chat' },
     { id: 'bespreek', scenarioId: 'UAT-WILL-07', label: 'WF-WILL-07 · "Bespreek met Fin" vanaf een onderwerp', kind: 'action', stage: 1, lane: 'chat' },
     { id: 'deeplink', scenarioId: 'UAT-WILL-08', label: 'WF-WILL-08 · Chat starten via ?prompt=-deeplink', kind: 'action', stage: 1, lane: 'chat' },
     { id: 'melding', scenarioId: 'UAT-WILL-24', label: 'WF-WILL-24 · Melding maken vanuit de chat (bug/vraag/wens)', kind: 'action', stage: 1, lane: 'chat' },
+    { id: 'vragenlijst', scenarioId: 'UAT-WILL-32', label: 'WF-WILL-32 · Vragenlijst invullen bij Fin (stoppen en later verder)', kind: 'action', stage: 1, lane: 'chat' },
     { id: 'suggesties', scenarioId: 'UAT-WILL-31', label: 'WF-WILL-31 · Suggestievragen in de lege staat', kind: 'action', stage: 1, lane: 'chat', subOf: 'vraag' },
 
     // ── 1b · gespreksgeschiedenis (ADR 0137, de vierde paneelmodus) ───────
@@ -93,6 +94,7 @@ export const WILL_FLOW: UatFlow = {
     { id: 'x-ovz', label: 'Overzicht · Toptips & Open acties (/overzicht/tips), briefing (/overzicht#briefing)', kind: 'cross', stage: 5, crossZone: 'OVZ' },
     { id: 'x-mijn', label: 'Mijn · Notificatievoorkeuren (/mijn/notificaties) + opslagkeuze gesprekken (/mijn/privacy)', kind: 'cross', stage: 5, crossZone: 'MIJN' },
     { id: 'x-bezit', label: 'Bezittingen · Koersalert-instelling (UAT-BEZIT-17) voedt de bel-melding', kind: 'cross', stage: 5, crossZone: 'BEZIT' },
+    { id: 'x-beheer', label: 'Beheer · Vragenlijst opstellen/activeren en respons bekijken (UAT-BEHEER-14)', kind: 'cross', stage: 5, crossZone: 'BEHEER' },
     { id: 'x-toek', label: 'Toekomst · "Bespreek met Fin"-knoppen bij fase-analyses/tijdas', kind: 'cross', stage: 5, crossZone: 'TOEK' },
   ],
   edges: [
@@ -105,12 +107,13 @@ export const WILL_FLOW: UatFlow = {
     { from: 'coachmelding', to: 'gidsstap', label: 'gids loopt nog → gidsstap i.p.v. data-gap-tip' },
     { from: 'gidsstap', to: 'uitkomst', label: '"Bekijk in de gids" opent de gidsweergave in Fin' },
     { from: 'nav', to: 'melding', label: 'megafoon-toggle, buiten alle AI-gates' },
+    { from: 'nav', to: 'vragenlijst', label: 'klembord-icoon (alleen bij een actieve lijst), buiten alle AI-gates' },
 
     // chat-kern (beslispunt: hoe de chat wordt geopend)
     { from: 'chatbeslis', to: 'vraag', kind: 'branch', label: 'vrije vraag' },
     { from: 'chatbeslis', to: 'bespreek', kind: 'branch', label: 'vanuit context elders' },
     { from: 'chatbeslis', to: 'deeplink', kind: 'branch', label: '?prompt=-deeplink' },
-    { from: 'chatbeslis', to: 'badge', kind: 'branch', label: 'badge > 0 (uitgestelde tips)' },
+    { from: 'chatbeslis', to: 'badge', kind: 'branch', label: 'bericht: uitgestelde tip is terug' },
     { from: 'vraag', to: 'tip' },
     { from: 'vraag', to: 'actie' },
     { from: 'vraag', to: 'actie-lokaal' },
@@ -161,6 +164,7 @@ export const WILL_FLOW: UatFlow = {
     { from: 'fouth', to: 'uitkomst' },
     { from: 'ai-uit-block', to: 'uitkomst' },
     { from: 'melding', to: 'uitkomst' },
+    { from: 'vragenlijst', to: 'x-beheer', kind: 'cross', label: 'antwoorden in de respons-sheet' },
     { from: 'gesprekken', to: 'uitkomst' },
     { from: 'nieuwgesprek', to: 'uitkomst' },
     { from: 'opslagkeuze', to: 'uitkomst' },

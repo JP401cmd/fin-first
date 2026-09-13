@@ -218,7 +218,8 @@ export function FloatingNavButton() {
   }
 
   const handleWaffleContextMenu = (e: React.MouseEvent<HTMLButtonElement>) => {
-    // Onderdrukt het iOS/Android-systeemmenu tijdens de long-press.
+    // Onderdrukt het Android-systeemmenu tijdens de long-press. iOS stuurt dit
+    // event niet; daar doet de CSS op de capsule het werk (zie hieronder).
     e.preventDefault()
   }
 
@@ -246,7 +247,11 @@ export function FloatingNavButton() {
         aria-hidden={hidden || undefined}
         data-mobile-floating-nav="true"
       >
-        <div className="flex items-stretch gap-px rounded-full bg-stone-900 p-1 shadow-[0_8px_24px_rgba(0,0,0,0.25),0_2px_8px_rgba(0,0,0,0.15)]">
+        {/* select-none + geen touch-callout: iOS Safari start bij ~500 ms vasthouden
+            anders tekstselectie (vergrootglas/Kopieer-menu) en breekt de aanraking af
+            met een touchcancel, waardoor de 1000 ms-long-press nooit afgaat. iOS stuurt
+            daarbij géén contextmenu-event, dus onContextMenu vangt het niet (bug 13 sep 2026). */}
+        <div className="flex items-stretch gap-px rounded-full bg-stone-900 p-1 shadow-[0_8px_24px_rgba(0,0,0,0.25),0_2px_8px_rgba(0,0,0,0.15)] select-none [-webkit-touch-callout:none]">
           <button
             type="button"
             onClick={() => cmd.open()}

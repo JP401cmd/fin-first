@@ -300,11 +300,11 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'BELANGRIJK',
     given: 'Badge-aantal 0, 5 en 12 ongelezen meldingen.',
     when: 'De bel-badge en de sidebar-teller worden weergegeven.',
-    then: 'Bij 0: geen badge. Bij 5: badge toont "5". Bij 12 (>9): badge toont "9+" — identieke cap-conventie als de WILL-bel-badge.',
+    then: 'Bij 0: geen badge. Bij 5: badge toont "5". Bij 12 (>9): badge toont "9+". De Fin-bubbel in de nav-pill draagt sinds sep 2026 géén eigen teller meer (uitgestelde tips komen als bericht binnen en tellen dus hier mee, WF-WILL-06) — de bel is de enige teller.',
     assertion: {
       kind: 'exact',
       expected: 'badge0=; badge5=5; badge12=9+',
-      source: 'components/app/shell/top-bar.tsx (badge-cap-formule, identiek aan de WILL-mirror in will-checks.ts#capBadge) — zie nav-checks.ts',
+      source: 'components/app/shell/top-bar.tsx (badge-cap-formule) — zie nav-checks.ts',
     },
   },
   {

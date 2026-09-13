@@ -27,6 +27,19 @@ const EMPTY_PROJ: RegelProjection = { rows: [], fireAgeFractional: null }
 const DEFAULT_DEFICIT_PCT = 5
 
 /**
+ * TPR-12 — uitleg bij de schakelaar, norm keuze · effect · waarom (eigenaarsnorm
+ * 13 sep 2026), beschrijvend. Wat de kern doet: `gap.ts` toetst het nalatenschapsbedrag
+ * op Prognose!I (totaal netto vermogen incl. niet-liquide bezit) bij 'Ja', anders op
+ * Prognose!J (alleen liquide). Geëxporteerd voor de test.
+ */
+export const NALATENSCHAP_NIET_LIQUIDE_UITLEG =
+  'Je kiest of je eigen woning en ander niet-liquide bezit meetellen in het bedrag dat op de ' +
+  'eindleeftijd over moet zijn. Aan: de app toetst dat bedrag op je totale vermogen, inclusief de ' +
+  'woning. Uit (standaard): alleen op het geld dat je vrij kunt opnemen, dus dat bedrag moet ook ' +
+  'liquide overblijven. Dat verandert hoeveel je onderweg kunt onttrekken, en dus wanneer je vrij ' +
+  'bent. Relevant omdat een woning wel waarde heeft, maar niet zomaar opneembaar is.'
+
+/**
  * Regel 1 — de plan-regel als TWEE VRAGEN (ADR 0129 B13: Voorkeuren is de bron;
  * de strategie-modal op /toekomst spiegelt dezelfde twee vragen via hetzelfde
  * `StopPlanVragen`-component). Vraag 1 = het stop-anker, vraag 2 = de eind-vorm met
@@ -69,6 +82,11 @@ export function EindstrategieBody({
   const [deficitPct, setDeficitPct] = useState(DEFAULT_DEFICIT_PCT)
   const [savedDeficitPct, setSavedDeficitPct] = useState(DEFAULT_DEFICIT_PCT)
   const [deficitLoaded, setDeficitLoaded] = useState(false)
+  // TPR-12 — niet-liquide bezit meetellen in de nalatenschap (kernel P!B54). NULL in de
+  // kolom = kernel-default 'Nee' → schakelaar uit. Alleen zichtbaar bij eind-vorm
+  // nalatenschap; dezelfde GET/PUT als de tekort-lening-rente.
+  const [includeIlliquid, setIncludeIlliquid] = useState(false)
+  const [savedIncludeIlliquid, setSavedIncludeIlliquid] = useState(false)
   useEffect(() => {
     let cancelled = false
     fetch('/api/fire-settings')
@@ -81,6 +99,9 @@ export function EindstrategieBody({
           setDeficitPct(pct)
           setSavedDeficitPct(pct)
         }
+        const illiquid = d.fire_legacy_include_illiquid === true
+        setIncludeIlliquid(illiquid)
+        setSavedIncludeIlliquid(illiquid)
       })
       .catch(() => {})
       .finally(() => {
@@ -92,18 +113,25 @@ export function EindstrategieBody({
   }, [])
   const deficitValid = Number.isFinite(deficitPct) && deficitPct >= 0 && deficitPct <= 100
 
+  const isLegacy = draft.endForm === 'legacy'
   const { baseline, draftProj } = useMemo(() => {
     if (!simSnapshot) return { baseline: EMPTY_PROJ, draftProj: EMPTY_PROJ }
     const baseline = runRegelProjection(simSnapshot)
-    const draftProj = runRegelProjection(simSnapshot, { firePlan: debounced })
+    // De schakelaar reist mee in de live-sim (kernel leest 'm via de rauwe context),
+    // alleen onder nalatenschap — daarbuiten heeft P!B54 geen betekenis.
+    const draftProj = runRegelProjection(simSnapshot, {
+      firePlan: debounced,
+      ...(debounced.endForm === 'legacy' ? { legacyIncludeIlliquid: includeIlliquid } : {}),
+    })
     return { baseline, draftProj }
-  }, [simSnapshot, debounced])
+  }, [simSnapshot, debounced, includeIlliquid])
 
   // De AOW-toets kan alleen hier (de route kent de AOW niet): uit de snapshot, die
   // dezelfde tabel-lookup draagt als de Tijdas.
   const aowAge = simSnapshot?.aowFractional ?? null
   const validatie = validatePlanDraft(draft, { aowAge })
-  const changed = !planDraftEquals(draft, opgeslagen) || deficitPct !== savedDeficitPct
+  const illiquidChanged = isLegacy && includeIlliquid !== savedIncludeIlliquid
+  const changed = !planDraftEquals(draft, opgeslagen) || deficitPct !== savedDeficitPct || illiquidChanged
   const canSave = !saving && validatie.ok && deficitValid && changed
 
   // Save-handler via ref tegen stale closures (zelfde patroon als event-pane-edit).
@@ -121,6 +149,8 @@ export function EindstrategieBody({
             ...planDraftToFireSettingsBody(draft),
             // V7 — tekort-lening-rente als fractie 0..1.
             deficit_loan_rate: deficitPct / 100,
+            // TPR-12 — alleen meesturen onder nalatenschap (daarbuiten blijft de kolom staan).
+            ...(draft.endForm === 'legacy' ? { fire_legacy_include_illiquid: includeIlliquid } : {}),
           }),
         })
         if (!res.ok) {
@@ -137,7 +167,7 @@ export function EindstrategieBody({
         setSaving(false)
       }
     }
-  }, [draft, deficitPct, onClose, onSaved])
+  }, [draft, deficitPct, includeIlliquid, onClose, onSaved])
 
   const deltaMonths = fireDeltaMonths(baseline, draftProj)
   useEffect(() => {
@@ -169,6 +199,46 @@ export function EindstrategieBody({
         currentAge={null}
         solvedFireAge={simSnapshot ? baseline.fireAgeFractional : null}
       />
+
+      {/* TPR-12 — niet-liquide bezit meetellen in de nalatenschap (alleen bij eind-vorm nalatenschap). */}
+      {isLegacy && (
+        <div
+          aria-busy={!deficitLoaded}
+          className={`mt-6 transition-opacity duration-300 ${deficitLoaded ? 'opacity-100' : 'opacity-60'}`}
+        >
+          <SubsectionLabel>Wat telt mee voor het bedrag dat over moet zijn</SubsectionLabel>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={includeIlliquid}
+            onClick={() => setIncludeIlliquid((v) => !v)}
+            className="flex w-full items-start gap-3 text-left"
+          >
+            <span
+              className={`mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors ${
+                includeIlliquid
+                  ? 'border-[var(--module-active-700)] bg-[var(--module-active-700)]'
+                  : 'border-[var(--border-md)] bg-[var(--paper)]'
+              }`}
+              aria-hidden="true"
+            >
+              <span
+                className={`inline-block h-3.5 w-3.5 rounded-full bg-[var(--paper)] shadow transition-transform ${
+                  includeIlliquid ? 'translate-x-4' : 'translate-x-0.5'
+                }`}
+              />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-semibold text-[var(--ink)]">
+                Niet-liquide bezit meetellen in de nalatenschap
+              </span>
+              <span className="mt-0.5 block text-[11px] leading-snug text-[var(--ink-2)]">
+                {NALATENSCHAP_NIET_LIQUIDE_UITLEG}
+              </span>
+            </span>
+          </button>
+        </div>
+      )}
 
       {/* V7 — tekort-lening-rente (FIRE-instelling, opgeslagen via dezelfde PUT). */}
       <div

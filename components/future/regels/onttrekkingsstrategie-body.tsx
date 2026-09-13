@@ -204,7 +204,7 @@ function CurveNumber({
 
 /**
  * Regel 2 — Onttrekkingsprofiel. Kiest een van de vier profielen; Afnemend/Oplopend
- * tonen de instelbare 3-fasen-curve, Guardrails de floor/ceiling/cut/raise-velden.
+ * tonen de instelbare 3-fasen-curve, Guardrails de floor/ceiling/stap-velden.
  */
 export function OnttrekkingsstrategieBody({
   simSnapshot,
@@ -218,11 +218,11 @@ export function OnttrekkingsstrategieBody({
   const [profiel, setProfiel] = useState<WithdrawalProfiel>(() => enumToProfiel(ws.strategy))
   const [savedProfiel, setSavedProfiel] = useState<WithdrawalProfiel>(() => enumToProfiel(ws.strategy))
 
-  // Guardrail-parameters (fracties). Blijven de app-config voeden.
+  // Guardrail-parameters (fracties). Blijven de app-config voeden. Eén stap voor
+  // omlaag én omhoog — de kern kent geen aparte raise-step (P!B81, TPR-10).
   const [grFloor, setGrFloor] = useState(ws.guardrailFloor)
   const [grCeiling, setGrCeiling] = useState(ws.guardrailCeiling)
   const [grCut, setGrCut] = useState(ws.guardrailCutStep)
-  const [grRaise, setGrRaise] = useState(ws.guardrailRaiseStep)
 
   // Roadmap M — flex-spending (must/nice) als verfijning ván het guardrails-profiel:
   // laat de guardrail alléén op je flexibele (nice) uitgaven grijpen; essentiële
@@ -302,9 +302,8 @@ export function OnttrekkingsstrategieBody({
       guardrailFloor: grFloor,
       guardrailCeiling: grCeiling,
       guardrailCutStep: grCut,
-      guardrailRaiseStep: grRaise,
     }),
-    [profiel, grFloor, grCeiling, grCut, grRaise],
+    [profiel, grFloor, grCeiling, grCut],
   )
   const debounced = useDebouncedValue(simConfig, 200)
 
@@ -335,8 +334,7 @@ export function OnttrekkingsstrategieBody({
     isGuardrails &&
     (grFloor !== ws.guardrailFloor ||
       grCeiling !== ws.guardrailCeiling ||
-      grCut !== ws.guardrailCutStep ||
-      grRaise !== ws.guardrailRaiseStep)
+      grCut !== ws.guardrailCutStep)
   const flexChanged =
     isGuardrails &&
     (flexNiceOnly !== savedFlex.on ||
@@ -366,7 +364,6 @@ export function OnttrekkingsstrategieBody({
             guardrail_floor: grFloor,
             guardrail_ceiling: grCeiling,
             guardrail_cut_step: grCut,
-            guardrail_raise_step: grRaise,
             withdrawal_profile_config: profileConfig,
           }),
         })
@@ -390,7 +387,6 @@ export function OnttrekkingsstrategieBody({
     grFloor,
     grCeiling,
     grCut,
-    grRaise,
     flexNiceOnly,
     flexNicePct,
     flexCutPct,
@@ -534,20 +530,12 @@ export function OnttrekkingsstrategieBody({
               hint="Maximale opname als % van je basisbudget."
             />
             <GuardrailSlider
-              label="Verlaging bij dip"
+              label="Aanpassingsstap"
               value={grCut}
               min={0.05}
               max={0.5}
               onChange={setGrCut}
-              hint="Stap waarmee je opname daalt na een slecht beursjaar."
-            />
-            <GuardrailSlider
-              label="Verhoging bij top"
-              value={grRaise}
-              min={0.05}
-              max={0.5}
-              onChange={setGrRaise}
-              hint="Stap waarmee je opname stijgt na een goed beursjaar."
+              hint="Stap waarmee je opname daalt na een slecht beursjaar en stijgt na een goed beursjaar — één stap voor beide richtingen."
             />
           </div>
           {!floorCeilingValid && (

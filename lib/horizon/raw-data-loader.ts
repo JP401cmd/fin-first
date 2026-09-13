@@ -53,6 +53,7 @@ import { WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
 import type { Asset } from '@/lib/asset-data'
 import { type Debt } from '@/lib/debt-data'
 import {
+  DEFAULT_FIRE_STRATEGY,
   resolveFirePlanWithOverride,
   resolveFireStrategyWithOverride,
   type FirePlan,
@@ -359,9 +360,6 @@ export interface HorizonRawData {
    *  tips-overlay. True → toon die toast niet meer. De overlay zelf sluit
    *  sinds M38 altijd direct; deze marker raakt alleen de melding. */
   exitNoticeDismissed: boolean
-  /** Maandelijks spaar-override uit profiles.monthly_savings_override.
-   *  NULL = gebruik asset-aggregaat (monthlyContributionFromAssets). */
-  monthlySavingsOverride: number | null
   /** Maandelijkse asset-contributie-aggregaat (assets.monthly_contribution).
    *  Voor weergave in setup-pane als "berekende waarde". */
   monthlyContributionFromAssets: number
@@ -466,14 +464,21 @@ export const HORIZON_EXIT_NOTICE_DISMISSED_SLUG = 'horizon_exit_notice_dismissed
  *  geschreven. Niet hergebruiken voor iets anders. */
 export const HORIZON_TIPS_FIRST_CLOSE_NAVIGATED_SLUG = 'horizon_tips_first_close_navigated'
 
-/** Default profile fallback values when profile query fails */
-const PROFILE_DEFAULTS = {
+/**
+ * Default profile fallback values when profile query fails. Geëxporteerd (TPR-11) zodat
+ * de test kan pinnen dat de plan-defaults hier uit `lib/fire-strategy.ts` komen en niet
+ * uit een eigen literal — een tweede default voor hetzelfde veld liet /toekomst bij een
+ * queryfout een andere eind-vorm rekenen dan elk ander pad.
+ */
+export const PROFILE_DEFAULTS = {
   date_of_birth: null as string | null,
   retirement_expense_method: null as string | null,
   retirement_expense_custom_amount: null as number | null,
-  fire_end_strategy: 'perpetual' as string,
-  fire_end_age: 90,
-  fire_legacy_amount: 0,
+  // TPR-11: de plan-default heeft één home (lib/fire-strategy.ts). Een eigen literal
+  // ('perpetual') liet deze terugval een andere eind-vorm rekenen dan parseFireStrategy.
+  fire_end_strategy: DEFAULT_FIRE_STRATEGY.strategy as string,
+  fire_end_age: DEFAULT_FIRE_STRATEGY.endAge,
+  fire_legacy_amount: DEFAULT_FIRE_STRATEGY.legacyAmount,
   expected_return: null as number | null,
   inflation_rate: null as number | null,
   net_monthly_income: 0,
@@ -483,8 +488,6 @@ const PROFILE_DEFAULTS = {
   guardrail_floor: 0.80,
   guardrail_ceiling: 1.20,
   guardrail_cut_step: WITHDRAWAL_DEFAULTS.guardrailCutStep,
-  guardrail_raise_step: WITHDRAWAL_DEFAULTS.guardrailRaiseStep,
-  monthly_savings_override: null as number | null,
 }
 
 const loadHorizonRawCached = cache(async function loadHorizonRawInner(
@@ -519,8 +522,8 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
   ] = await Promise.all([
     // Gedeelde basisdata-laag (lib/server-data/base.ts): huidige-maand-tx,
     // actieve assets, eigen profiel (select('*') dekt óók de withdrawal/guardrail-
-    // én monthly_savings_override-kolommen — de twee vroegere legacy-.maybeSingle()-
-    // probes vervallen daarmee), alle budgetten, het 12-maands maandaggregaat
+    // kolommen — de vroegere legacy-.maybeSingle()-probe vervalt daarmee), alle
+    // budgetten, het 12-maands maandaggregaat
     // en de niet-gekoppelde bankrekeningen draaien nu als ÉÉN query per tabel per
     // request, gedeeld met de andere loaders + de shell.
     getCurrentMonthTx(supabase),
@@ -635,7 +638,6 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
     guardrail_floor?: number | null
     guardrail_ceiling?: number | null
     guardrail_cut_step?: number | null
-    guardrail_raise_step?: number | null
   }
 
   const profile = {
@@ -644,7 +646,6 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
     guardrail_floor: wsData.guardrail_floor ?? PROFILE_DEFAULTS.guardrail_floor,
     guardrail_ceiling: wsData.guardrail_ceiling ?? PROFILE_DEFAULTS.guardrail_ceiling,
     guardrail_cut_step: wsData.guardrail_cut_step ?? PROFILE_DEFAULTS.guardrail_cut_step,
-    guardrail_raise_step: wsData.guardrail_raise_step ?? PROFILE_DEFAULTS.guardrail_raise_step,
   }
 
   // ── FIRE-marktaannames: jaarlaag-shadow (Optie 2, DB-override met TS-fallback) ──
@@ -653,10 +654,11 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
   // Bij een ontbrekende/lege jaarlaag geeft resolveFireAssumptions exact
   // DEFAULT_RETURN/INFLATION terug → byte-identiek aan vóór deze override.
   // Downstream werkt de override consistent: resolveFireParams (scalar/target:
-  // freedomPct, FIRE-doel, effectiveSwr) én — voor inflatie — de kernel-scalar
-  // (adapter/index.ts leest resolveFireParams(profile).inflationRate). Rendement
-  // beweegt bewust NIET de kernel-accumulatiecurve: die leidt groei per-asset af
-  // (asset.expected_return), IDENTIEK aan hoe DEFAULT_RETURN vandaag al werkt.
+  // freedomPct, FIRE-doel, effectiveSwr) én de kernel-adapter (adapter/index.ts leest
+  // resolveFireParams(profile) voor inflatie én — sinds TPR-02 — voor het bruto
+  // rendement als TERUGVAL van een bezitting zonder eigen rendement). De
+  // accumulatiecurve blijft per-asset (asset.expected_return gaat vóór, ook een
+  // bewuste 0); de geshadowde profielwaarde vult alleen een ontbrekend rendement.
   const fireAssumptions = resolveFireAssumptions(
     (fireAssumptionsResult.data ?? []) as FireAssumptionRow[],
   )
@@ -1189,17 +1191,13 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
   // Bug-fix: voorheen tegen de verouderde woordenschat ('samenwonend'/'getrouwd')
   // die household_type nooit is → altijd false. Nu via canonieke helper.
   const housingHasPartner = hasPartner(housingHouseholdType)
-  // Annual savings: zelfde bron als de client-sim (override > cashflow-
-  // spaarquote > asset-contributies), zodat het trigger-moment overeenkomt.
-  const housingOverrideRaw =
-    (profile as { monthly_savings_override?: number | string | null }).monthly_savings_override ?? null
-  const housingMonthlyOverride = housingOverrideRaw == null ? null : Number(housingOverrideRaw)
+  // Annual savings: zelfde bron als de client-sim (effectieve spaargrondslag,
+  // ADR 0121 — terugval asset-contributies), zodat het trigger-moment overeenkomt.
+  // Geen handmatige override meer (ADR 0141).
   const annualSavingsForHousing =
-    housingMonthlyOverride != null && housingMonthlyOverride >= 0
-      ? housingMonthlyOverride * 12
-      : (baseAnnualSavingsFromCashflow != null && baseAnnualSavingsFromCashflow > 0
-          ? baseAnnualSavingsFromCashflow
-          : monthlyContributions * 12)
+    baseAnnualSavingsFromCashflow != null && baseAnnualSavingsFromCashflow > 0
+      ? baseAnnualSavingsFromCashflow
+      : monthlyContributions * 12
   // Pensioen-modus: FIRE-moment is exogeen (AOW). Geen aow-tabel in deze
   // loader — NL_AOW_AGE volstaat; de client regenereert met de echte
   // fractionele AOW-leeftijd.
@@ -1290,12 +1288,6 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
   // exit-melding minstens kan verschijnen (graceful degrade).
   const exitNoticeDismissed = !exitNoticeDismissedResult.error
     && exitNoticeDismissedResult.data?.feature_slug === HORIZON_EXIT_NOTICE_DISMISSED_SLUG
-
-  // monthlySavingsOverride: handmatige override uit profiles. Null = geen
-  // override, simulator gebruikt monthlyContributionFromAssets.
-  const overrideRaw =
-    (profile as { monthly_savings_override?: number | string | null }).monthly_savings_override ?? null
-  const monthlySavingsOverride = overrideRaw == null ? null : Number(overrideRaw)
 
   // monthlyContributionFromAssets: raw asset-aggregaat (identiek aan
   // monthlyContributions hierboven, geëxporteerd voor de setup-pane).
@@ -1399,7 +1391,6 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
     numberOfChildren,
     hasCompletedHorizonSetup,
     exitNoticeDismissed,
-    monthlySavingsOverride,
     monthlyContributionFromAssets,
     monthlySurplusFromBudget,
     baseAnnualSavingsFromCashflow,

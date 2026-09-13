@@ -16,7 +16,8 @@
  * uit, bevinding M26, 26-08-2026) + UAT-WILL-26 (Fin herinnert aan de volgende
  * gidsstap, ADR 0130 fase 2) + UAT-WILL-27 t/m 31 (gespreksgeschiedenis voor
  * de Fin-chat, ADR 0137 / melding W-004: bewaren+hervatten, nieuw gesprek,
- * opslagkeuze, de privacyvloer en de suggestievragen in de lege staat).
+ * opslagkeuze, de privacyvloer en de suggestievragen in de lege staat) +
+ * UAT-WILL-32 (een vragenlijst invullen in de chat, sep 2026).
  */
 
 import { describe, it, expect } from 'vitest'
@@ -45,11 +46,11 @@ function criterion(workflow: string): AcceptanceCriterion {
 }
 
 describe('UAT Fin — acceptatiecriteria dekking', () => {
-  it('heeft precies één criterium per catalogus-WILL-scenario (29 stuks: 01..20 + 23 t/m 31, WF-WILL-21/22 bestaan niet in de catalogus)', () => {
+  it('heeft precies één criterium per catalogus-WILL-scenario (30 stuks: 01..20 + 23 t/m 32, WF-WILL-21/22 bestaan niet in de catalogus)', () => {
     const workflows = WILL_ACCEPTANCE.criteria.map((c) => c.workflow).sort()
     expect(workflows).toEqual(catalogWillWorkflows)
     expect(new Set(workflows).size).toBe(catalogWillWorkflows.length)
-    expect(workflows.length).toBe(29)
+    expect(workflows.length).toBe(30)
   })
 
   it('elk criterium heeft een geldige assertion.kind', () => {

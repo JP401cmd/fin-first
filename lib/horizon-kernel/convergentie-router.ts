@@ -23,6 +23,7 @@
 import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
 import type { LifeEvent } from '@/lib/horizon-data'
+import type { EventMappingNotice } from '@/lib/horizon-kernel/adapter'
 import type { AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import type { TaxYear } from '@/lib/box3-data'
 import { runKernelUnified } from '@/lib/horizon-kernel/run-unified'
@@ -41,16 +42,16 @@ import type {
 } from '@/lib/horizon-kernel/bridge'
 import type { SolverStatus } from '@/lib/horizon-kernel/solver'
 import type { WhatifRawProfileRow } from '@/lib/horizon-kernel/adapter/whatif-varianten'
+import type { KernelAdapterPartner } from '@/lib/horizon-kernel/adapter/household'
 
 /**
  * Rauwe profiel-rij voor de convergentie-set — superset van de what-if-rij: de
  * server-loaders (en de uitgebreide /toekomst-client-select) hebben óók de
  * kernel-instellingen-kolommen beschikbaar die op de what-if-client ontbraken
- * (`marginaal_tarief`, `deficit_loan_rate`, `withdrawal_profile_config`) plus de
+ * (`deficit_loan_rate`, `withdrawal_profile_config`) plus de
  * berekende jaarlijkse essentiële uitgaven (geen DB-kolom — uit de budgetten).
  */
 export interface ConvergentieRawProfileRow extends WhatifRawProfileRow {
-  marginaal_tarief?: number | null
   /** V7 — tekort-lening-jaarrente (0..1); NULL → Excel-default 0,05. */
   deficit_loan_rate?: number | null
   /** V4 — onttrekkingsprofiel 3-fasen-curve (JSONB); NULL → Excel-defaults. */
@@ -80,10 +81,11 @@ export function buildConvergentieAdapterProfile(
     expected_return: p.expected_return ?? null,
     inflation_rate: p.inflation_rate ?? null,
     box3_method: p.box3_method ?? null,
-    marginaal_tarief: p.marginaal_tarief ?? null,
+    box3_heffingvrij_inkomen: p.box3_heffingvrij_inkomen ?? null,
     fire_end_strategy: p.fire_end_strategy ?? null,
     fire_end_age: p.fire_end_age ?? null,
     fire_legacy_amount: p.fire_legacy_amount ?? null,
+    fire_legacy_include_illiquid: p.fire_legacy_include_illiquid ?? null,
     // ADR 0129 D1/D3 — het stop-anker reist mee naar de adapter, die het naar
     // `KernelInput.stopAnker` vertaalt. Ontbreekt de kolom (oude rij), dan leest
     // `parseFirePlan` het anker nog uit `fire_end_strategy` (de tegenspraak-regel D2).
@@ -94,7 +96,6 @@ export function buildConvergentieAdapterProfile(
     guardrail_floor: p.guardrail_floor ?? null,
     guardrail_ceiling: p.guardrail_ceiling ?? null,
     guardrail_cut_step: p.guardrail_cut_step ?? null,
-    guardrail_raise_step: p.guardrail_raise_step ?? null,
     withdrawal_profile_config: p.withdrawal_profile_config,
     deficit_loan_rate: p.deficit_loan_rate ?? null,
     housing_strategy_config: p.housing_strategy_config,
@@ -125,6 +126,36 @@ export interface ConvergentieRawContext {
    * Draagt de MARKTCHECK-breedte; raakt de hoofdprojectie niet.
    */
   readonly marktVolatiliteit?: number
+  /**
+   * TPR-07 (13 sep 2026) — het PARTNERBLOK voor de huishouden-run. Aanwezig → de kern
+   * draait als huishouden (PT-laag: `box3.personen = 2`, `leefsituatie = 'Samenwonend'`,
+   * partner-inkomen/-AOW), exact zoals de huishoud-FIRE-sectie (`household-router.ts`)
+   * dat al deed; `assets`/`debts` zijn dan de GECOMBINEERDE huishoud-potten (de PT-laag
+   * voegt alléén partner-INKOMEN toe — geen dubbeltelling). Weggelaten → solo-run,
+   * byte-identiek aan vóór TPR-07 (het veld verschijnt dan niet op de adapter-invoer).
+   *
+   * Gebouwd door ÉÉN helper — `adapter/partner-blok.ts#buildKernelPartnerBlok` — voor
+   * beide routes; server-side gevuld door `lib/horizon/partner-kernel-blok.ts`
+   * uitsluitend in het huishoudperspectief en uitsluitend uit de privacy-gated RPC.
+   */
+  readonly partner?: KernelAdapterPartner
+}
+
+/**
+ * Rauwe context zónder partnerblok — voor elke snapshot die als prop of JSON naar de
+ * browser gaat (`RegelSimSnapshot`, `VariantenSweepSnapshot`). Het partnerblok draagt
+ * inkomen en AOW-gegevens van de partner (TPR-07) en hoort uitsluitend server-side in
+ * de huishouden-run; een prop serialiseert Next volledig in de RSC-payload. De huidige
+ * snapshot-bouwers draaien het persoonlijke perspectief (geen blok), dus dit is een
+ * vangrail tegen een latere perspectief-wissel, geen gedragswijziging.
+ */
+export function rawContextZonderPartner(
+  rawContext: ConvergentieRawContext,
+): ConvergentieRawContext {
+  if (!rawContext.partner) return rawContext
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { partner: _partner, ...rest } = rawContext
+  return rest
 }
 
 /**
@@ -149,6 +180,9 @@ export function buildConvergentieAdapterInput(
     aowRows: rawContext.aowRows,
     taxYear: rawContext.taxYear,
     marktVolatiliteit: rawContext.marktVolatiliteit,
+    // TPR-07: partnerblok alléén als sleutel wanneer aanwezig — een solo-context levert
+    // een adapter-invoer zónder `partner`-sleutel (structureel identiek aan vóór TPR-07).
+    ...(rawContext.partner ? { partner: rawContext.partner } : {}),
   }
 }
 
@@ -167,6 +201,12 @@ export type ConvergentieProjectionOutcome =
       readonly kernelMaandHint: number
       /** Verkoopmoment eigen woning (marker-contract), `null` = geen verkoop. */
       readonly kernelHousingSale: KernelHousingSale | null
+      /**
+       * TPR-04 — de adapter-notices van deze run (o.a. code `aow_ontbreekt`). Plain-
+       * serializable (structured-clone-veilig over de worker-grens). Consumenten
+       * matchen op `code`, nooit op tekst (`hasAowOntbreektNotice`).
+       */
+      readonly notices: readonly EventMappingNotice[]
     }
   | {
       readonly ok: false
@@ -189,7 +229,7 @@ export function computeConvergentieProjection(
   const { rawContext } = params
   try {
     const adapterInput = buildConvergentieAdapterInput(rawContext)
-    const { result } = runKernelUnified({
+    const { result, notices } = runKernelUnified({
       adapterInput,
       yearlyExpenses: rawContext.yearlyExpenses,
     })
@@ -199,6 +239,7 @@ export function computeConvergentieProjection(
       kernelStatus: result.kernelStatus,
       kernelMaandHint: result.kernelMaandHint,
       kernelHousingSale: result.kernelHousingSale,
+      notices,
     }
   } catch (err) {
     // Een kern-fout (bv. ontbrekende geboortedatum) mag het oppervlak nooit laten

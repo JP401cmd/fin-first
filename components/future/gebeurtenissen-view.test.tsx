@@ -339,7 +339,6 @@ const mockKernelSim: KernelSimData = {
   aowAgeFractional: 67,
   box3Method: 'forfaitair' as KernelSimData['box3Method'],
   bankAccountCash: 0,
-  monthlySavingsOverride: null,
   baseAnnualSavingsFromCashflow: null,
   housingStrategy: undefined,
   deficitLoanRate: 0.05,

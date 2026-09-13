@@ -167,11 +167,13 @@ export const RAPP_ENGINE_CHECKS: RappEngineCheck[] = [
         { id: 'r1', birth_date_from: '1966-10-01', birth_date_through: '1970-06-30', aow_years: 67, aow_months: 6, is_definitive: false, source: 'test' },
       ]
       const willemAow = lookupAowAge(rows, '1968-11-30')
-      const willemFire = resolveFireParams({ expected_return: 0.06, inflation_rate: 0.02, marginaal_tarief: null, net_monthly_income: null })
-      const marijkeFire = resolveFireParams({ expected_return: 0.06, inflation_rate: 0.02, marginaal_tarief: 0.495, net_monthly_income: 3400 })
+      // TPR-10: marginaal tarief uitsluitend jaar-afgeleid uit het netto maandinkomen
+      // (Marijke: €3.400 → schijf 1 = 35,75% in 2026; de oude 49,5%-override bestaat niet meer).
+      const willemFire = resolveFireParams({ expected_return: 0.06, inflation_rate: 0.02, net_monthly_income: null })
+      const marijkeFire = resolveFireParams({ expected_return: 0.06, inflation_rate: 0.02, net_monthly_income: 3400 })
       return {
-        expected: 'willemAowJaren=67; willemAowMaanden=6; willemAowDefinitief=false; effectieveSwr=1.84; willemMarginaalTarief=35.75; marijkeMarginaalTarief=49.5',
-        actual: `willemAowJaren=${willemAow.years}; willemAowMaanden=${willemAow.months}; willemAowDefinitief=${willemAow.isDefinitive}; effectieveSwr=${fx(willemFire.effectiveSwr * 100, 2)}; willemMarginaalTarief=${fx(willemFire.marginaalTarief * 100, 2)}; marijkeMarginaalTarief=${fx(marijkeFire.marginaalTarief * 100, 1)}`,
+        expected: 'willemAowJaren=67; willemAowMaanden=6; willemAowDefinitief=false; effectieveSwr=1.84; willemMarginaalTarief=35.75; marijkeMarginaalTarief=35.75',
+        actual: `willemAowJaren=${willemAow.years}; willemAowMaanden=${willemAow.months}; willemAowDefinitief=${willemAow.isDefinitive}; effectieveSwr=${fx(willemFire.effectiveSwr * 100, 2)}; willemMarginaalTarief=${fx(willemFire.marginaalTarief * 100, 2)}; marijkeMarginaalTarief=${fx(marijkeFire.marginaalTarief * 100, 2)}`,
       }
     },
   },

@@ -18,7 +18,6 @@ function data(type: PersoonlijkPlanOnttrekking['type']): PersoonlijkPlanOnttrekk
     guardrailFloor: 0.8,
     guardrailCeiling: 1.2,
     guardrailCutStep: 0.1,
-    guardrailRaiseStep: 0.1,
   }
 }
 

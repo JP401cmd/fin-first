@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server'
 import { forbidden, serverError } from '@/lib/api/respond'
+import { parseBody } from '@/lib/api/parse-body'
 import { createClient } from '@/lib/supabase/server'
 import { isSuperAdmin } from '@/lib/admin'
+import { VragenlijstAanmaakSchema, vraagNaarRij } from '@/lib/questionnaires/vraag-invoer'
 
 export async function GET() {
   const supabase = await createClient()
@@ -35,34 +37,24 @@ export async function GET() {
   return NextResponse.json({ questionnaires: result })
 }
 
+/**
+ * Nieuwe vragenlijst. Start bewust INACTIEF: een lijst die je nog aan het
+ * opstellen bent hoort niet meteen in de chat van elke gebruiker te staan.
+ * Live zetten is een aparte, bewuste handeling (de schakelaar in beheer).
+ */
 export async function POST(req: Request) {
   const supabase = await createClient()
   if (!(await isSuperAdmin(supabase))) {
     return forbidden()
   }
 
-  const body = await req.json()
-  const { title, description, questions } = body as {
-    title: string
-    description?: string
-    questions: {
-      type: 'open' | 'scale' | 'multiple_choice'
-      question_text: string
-      options?: string[]
-      scale_min_label?: string
-      scale_max_label?: string
-      is_required?: boolean
-      is_multi_select?: boolean
-    }[]
-  }
-
-  if (!title || !questions?.length) {
-    return NextResponse.json({ error: 'Title and at least one question required' }, { status: 400 })
-  }
+  const parsed = await parseBody(VragenlijstAanmaakSchema, req)
+  if (!parsed.ok) return parsed.response
+  const { title, description, questions } = parsed.data
 
   const { data: questionnaire, error: qError } = await supabase
     .from('questionnaires')
-    .insert({ title, description: description ?? null })
+    .insert({ title, description: description || null, is_active: false })
     .select('id')
     .single()
 
@@ -70,23 +62,13 @@ export async function POST(req: Request) {
     return serverError(qError, 'admin-questionnaires:POST')
   }
 
-  const questionRows = questions.map((q, i) => ({
-    questionnaire_id: questionnaire.id,
-    sort_order: i + 1,
-    type: q.type,
-    question_text: q.question_text,
-    options: q.type === 'multiple_choice' ? q.options ?? null : null,
-    scale_min_label: q.type === 'scale' ? q.scale_min_label ?? null : null,
-    scale_max_label: q.type === 'scale' ? q.scale_max_label ?? null : null,
-    is_required: q.is_required ?? true,
-    is_multi_select: q.is_multi_select ?? false,
-  }))
-
   const { error: questionsError } = await supabase
     .from('questionnaire_questions')
-    .insert(questionRows)
+    .insert(questions.map((q, i) => ({ questionnaire_id: questionnaire.id, ...vraagNaarRij(q, i + 1) })))
 
   if (questionsError) {
+    // Geen lege schil achterlaten als de vragen niet door de database komen.
+    await supabase.from('questionnaires').delete().eq('id', questionnaire.id)
     return serverError(questionsError, 'admin-questionnaires:POST')
   }
 

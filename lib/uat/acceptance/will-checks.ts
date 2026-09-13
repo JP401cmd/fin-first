@@ -7,18 +7,20 @@
  *  2. de in-app regressietest-pagina (`lib/regression-tests/suites/uat-will.ts`):
  *     `assertEqual(actual, expected, label)` per check.
  *
- * DRIE ECHTE PURE IMPORTS (geen mirror — de productiefunctie zelf is al
+ * VIER ECHTE PURE IMPORTS (geen mirror — de productiefunctie zelf is al
  * client-veilig): `getFirstUndismissedSuggestion` (lib/coach-suggestions.ts),
  * `amsterdamWeekKey` (lib/briefing/snapshot.ts) en sinds ADR 0113
  * `demotedCategories`/`demotionWindowStartIso` (lib/news-feedback-summary.ts —
  * dezelfde functie die zowel `/api/news` als het beheervenster op
  * `/beheer/nieuws` consumeren; vóór ADR 0113 stond hier nog een handmatige
- * mirror van een inline `getDemotedCategories` in app/api/news/route.ts).
+ * mirror van een inline `getDemotedCategories` in app/api/news/route.ts) en
+ * sinds sep 2026 `buildTipTerugNotifications` (lib/notifications/tip-terug.ts —
+ * de producent die `/api/notifications` gebruikt; verving de bel-badge-mirror).
  *
- * VIER MIRRORS met bronregel-verwijzing (server-only API-routes met een
+ * DRIE MIRRORS met bronregel-verwijzing (server-only API-routes met een
  * Supabase-client-parameter — niet importeerbaar in een pure module, spiegelt
  * de spaardoel-mirror in `budget-checks.ts` en de netto-vermogen-mirror in
- * `start-checks.ts`): postpone-termijn, bel-badge-cap, budgetmelding-tekst,
+ * `start-checks.ts`): postpone-termijn, budgetmelding-tekst,
  * krant-editienummer/jaargang/ververs-resterend.
  */
 
@@ -29,6 +31,7 @@ import { LEGE_DATA_GAPS, selectSuggesties, suggestiePoolGrootte } from '@/lib/ch
 import { getFirstUndismissedSuggestion, type CoachDataGaps } from '@/lib/coach-suggestions'
 import { amsterdamWeekKey } from '@/lib/briefing/snapshot'
 import { demotedCategories, demotionWindowStartIso } from '@/lib/news-feedback-summary'
+import { buildTipTerugNotifications } from '@/lib/notifications/tip-terug'
 import { WILL_ACCEPTANCE } from './will'
 import type { AcceptanceCriterion } from './types'
 
@@ -96,11 +99,6 @@ function verzendVensterMirror(rollen: Array<'user' | 'assistant'>): Array<'user'
   while (start < rollen.length && rollen[start] !== 'user') start++
   const venster = rollen.slice(start)
   return venster.length > 0 ? venster : rollen.slice(-1)
-}
-
-/** Mirror van de bel-badge-cap in components/app/fin/fin-home.tsx. */
-function capBadge(n: number): string {
-  return n > 9 ? '9+' : n === 0 ? '' : String(n)
 }
 
 /** Mirror van app/api/notifications/route.ts#formatAmountPair — centen zodra
@@ -260,14 +258,20 @@ export const WILL_ENGINE_CHECKS: WillEngineCheck[] = [
   {
     workflow: 'WF-WILL-06',
     scenarioId: 'UAT-WILL-06',
-    label: 'Bel-badge-cap: 0 toont leeg, 12 toont "9+"',
+    label: 'Tip terug: alleen een verlopen termijn binnen 30 dagen geeft een bericht',
     run: () => {
       criterion('WF-WILL-06')
-      const badge0 = capBadge(0)
-      const badge12 = capBadge(12)
+      const berichten = buildTipTerugNotifications(
+        [
+          { id: 'A', title: 'Tip A', status: 'postponed', postponed_until: '2026-09-12' },
+          { id: 'B', title: 'Tip B', status: 'postponed', postponed_until: '2026-09-14' },
+          { id: 'C', title: 'Tip C', status: 'postponed', postponed_until: '2026-08-01' },
+        ],
+        '2026-09-13',
+      )
       return {
-        expected: 'badge0=; badge12=9+',
-        actual: `badge0=${badge0}; badge12=${badge12}`,
+        expected: 'berichten=postponed_tip_A_2026-09-12; url=/overzicht/tips',
+        actual: `berichten=${berichten.map((b) => b.id).join(',')}; url=${berichten.map((b) => b.actionUrl).join(',')}`,
       }
     },
   },

@@ -54,7 +54,6 @@ const mockWithdrawal: WithdrawalStrategyConfig = {
   guardrailFloor: 0.8,
   guardrailCeiling: 1.2,
   guardrailCutStep: 0.1,
-  guardrailRaiseStep: 0.1,
 }
 
 const mockPotBalances: Record<WealthGroup, number> = {
@@ -122,12 +121,53 @@ describe('VoorkeurenView — toekomst-regels', () => {
 })
 
 describe('VoorkeurenView — markt-aannames', () => {
-  it('rendert drie markt-aanname cards', () => {
+  it('rendert vier markt-aanname cards (incl. Box 3-methode)', () => {
     render(<DisplayModeProvider initialMode="full"><VoorkeurenView {...baseProps} /></DisplayModeProvider>)
     expect(screen.getByText('Inflatie')).toBeTruthy()
     expect(screen.getByText('Bruto rendement')).toBeTruthy()
+    expect(screen.getByText('Box 3-methode')).toBeTruthy()
     expect(document.body.textContent).toMatch(/Effectief/)
     expect(document.body.textContent).toMatch(/SWR/)
+  })
+
+  // TPR-10 — box3_method had een PUT-pad maar geen scherm. De kaart leest dezelfde
+  // resolver-uitkomst als de adapter (fireParams.box3Method) en opent de sheet.
+  it('Box 3-kaart toont de opgeslagen methode en opent de bewerk-sheet', () => {
+    render(<DisplayModeProvider initialMode="full"><VoorkeurenView {...baseProps} /></DisplayModeProvider>)
+    expect(screen.getByText('Forfaitair')).toBeTruthy()
+    expect(screen.queryByRole('dialog')).toBeNull()
+    fireEvent.click(screen.getByText('Box 3-methode'))
+    expect(screen.getByRole('dialog')).toBeTruthy()
+    // Beide opties staan in de sheet; de huidige is voorgeselecteerd.
+    const pressed = screen.getAllByRole('button', { pressed: true })
+    expect(pressed.map((b) => b.textContent)).toEqual([expect.stringContaining('Forfaitair')])
+    expect(document.body.textContent).toMatch(/Werkelijk rendement/)
+  })
+
+  it('Box 3-kaart volgt de props (werkelijk) en toont dan het heffingvrij inkomen (TPR-12)', () => {
+    render(
+      <DisplayModeProvider initialMode="full">
+        <VoorkeurenView {...baseProps} fireParams={{ ...mockFireParams, box3Method: 'werkelijk' }} />
+      </DisplayModeProvider>,
+    )
+    expect(screen.getByText('Werkelijk rendement')).toBeTruthy()
+    expect(screen.queryByText('Forfaitair')).toBeNull()
+    // Zonder eigen keuze: de kernel-default, gemarkeerd als standaard.
+    expect(document.body.textContent).toMatch(/Heffingvrij inkomen € 1\.800 per persoon per jaar \(standaard\)/)
+  })
+
+  it('Box 3-kaart toont een eigen heffingvrij inkomen zonder "standaard"', () => {
+    render(
+      <DisplayModeProvider initialMode="full">
+        <VoorkeurenView
+          {...baseProps}
+          fireParams={{ ...mockFireParams, box3Method: 'werkelijk' }}
+          box3HeffingvrijInkomen={2500}
+        />
+      </DisplayModeProvider>,
+    )
+    expect(document.body.textContent).toMatch(/Heffingvrij inkomen € 2\.500 per persoon per jaar/)
+    expect(document.body.textContent).not.toMatch(/\(standaard\)/)
   })
 
   it('formatteert percentages met 1 decimaal', () => {
@@ -135,6 +175,17 @@ describe('VoorkeurenView — markt-aannames', () => {
     expect(screen.getByText('2.5%')).toBeTruthy() // inflatie
     expect(screen.getByText('7.0%')).toBeTruthy() // grossReturn
     expect(screen.getByText('4.0%')).toBeTruthy() // effectiveSwr
+  })
+
+  // TPR-02 — de kaart zegt wat de kern doet: het profielrendement is de TERUGVAL voor
+  // bezittingen zonder eigen rendement; per-bezitting-rendement gaat vóór. De oude
+  // ondertitel ("Verwacht jaarrendement op het belegbaar vermogen") beloofde een
+  // groeicurve die de kern niet uit dit veld las.
+  it('rendementkaart benoemt de terugval-rol en de voorrang van het per-bezitting-rendement', () => {
+    render(<DisplayModeProvider initialMode="full"><VoorkeurenView {...baseProps} /></DisplayModeProvider>)
+    expect(screen.getByText(/Terugval voor bezittingen zonder eigen rendement/)).toBeTruthy()
+    expect(screen.queryByText('Verwacht jaarrendement op het belegbaar vermogen')).toBeNull()
+    expect(document.body.textContent).toMatch(/gaat vóór/)
   })
 })
 
@@ -220,6 +271,7 @@ describe('VoorkeurenView — weergavemodus (S7, herziet TOE-3)', () => {
     expect(screen.getByText('Onttrekking bij afname')).toBeTruthy()
     expect(screen.getByText('Inflatie')).toBeTruthy()
     expect(screen.getByText('Bruto rendement')).toBeTruthy()
+    expect(screen.getByText('Box 3-methode')).toBeTruthy()
   })
 
   it('Eenvoudig: de leesregels dragen de huidige waarden', () => {
@@ -229,7 +281,7 @@ describe('VoorkeurenView — weergavemodus (S7, herziet TOE-3)', () => {
     ).map((el) => el.textContent)
     // POT_RULES_DEFAULTS: afbouw begint bij spaargeld, overschot naar beleggingen.
     expect(summaries[0]).toBe('Bij afbouw eerst spaargeld · bij overschot naar beleggingen')
-    expect(summaries[1]).toBe('Inflatie 2.5% · rendement 7.0% · SWR 4.0%')
+    expect(summaries[1]).toBe('Inflatie 2.5% · rendement 7.0% · SWR 4.0% · Box 3 forfaitair')
   })
 
   it('Eenvoudig: leesregel volgt de props (anti-drift, geen hardgecodeerde zin)', () => {
@@ -273,8 +325,8 @@ describe('VoorkeurenView — weergavemodus (S7, herziet TOE-3)', () => {
     ]) {
       expect(screen.getByText(label)).toBeTruthy()
     }
-    // 5 regel-kaarten + inflatie + bruto rendement (effectief SWR is statisch).
-    expect(cardCount(container)).toBe(7)
+    // 5 regel-kaarten + inflatie + bruto rendement + Box 3-methode (effectief SWR is statisch).
+    expect(cardCount(container)).toBe(8)
     expect(container.querySelectorAll('[data-testid="depth-section"]').length).toBe(0)
   })
 })

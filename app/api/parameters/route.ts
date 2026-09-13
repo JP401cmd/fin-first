@@ -3,7 +3,25 @@ import { NextRequest, NextResponse } from 'next/server'
 import { sanitizeCashSettingsInput, parseCashflowBasisPrefs } from '@/lib/cashflow-settings'
 import { unauthorized, badRequest, serverError } from '@/lib/api/respond'
 import { loadParameterSavingsRateTarget } from '@/lib/cashflow-settings-data'
-import { bandError, isWithinBand } from '@/lib/parameters-band'
+import { PARAMETER_BANDS, bandError, isWithinBand } from '@/lib/parameters-band'
+import { z } from 'zod'
+import { BOX3_METHODS } from '@/lib/box3-method'
+
+/**
+ * Box 3-methode — de enige enum-parameter op deze route, sinds TPR-10 met een
+ * scherm (/toekomst/voorkeuren) en daarom met zod bewaakt (ADR 0044). `optional`
+ * omdat de route deelpatches accepteert; `undefined` = niet meegestuurd.
+ */
+const box3MethodSchema = z.enum(BOX3_METHODS).optional()
+
+/**
+ * TPR-12 — heffingvrij inkomen (Box 3, werkelijk-tak; kernel P!B91) in euro per persoon
+ * per jaar. Band uit de GEDEELDE bron `PARAMETER_BANDS` (= de DB-CHECK
+ * profiles_box3_heffingvrij_inkomen_range). `null` = wis → kernel-default 1800.
+ */
+const HEFFINGVRIJ_KEY = 'box3_heffingvrij_inkomen'
+const heffingvrijBand = PARAMETER_BANDS[HEFFINGVRIJ_KEY]
+const heffingvrijInkomenSchema = z.number().min(heffingvrijBand.min).max(heffingvrijBand.max).nullable()
 
 // ── GET — Lees berekeningsparameters uit profiles ─────────────────────
 
@@ -17,17 +35,18 @@ export async function GET() {
   }
 
   // Drie tiers, elk met één kolom minder. Tier 0 vraagt `cashflow_basis_prefs`
-  // (ADR 0103) erbij; die kolom kan op een DB zonder de migratie nog ontbreken en
-  // zou dan de HELE select laten falen — met tier 1 als vangnet levert de route
-  // dan nog steeds alle bestaande velden, in plaats van stil terug te vallen op
-  // de kale tier 2 (waar income_source/expenses_source verdwijnen).
+  // (ADR 0103) en `box3_heffingvrij_inkomen` (TPR-12, migratie 20260913150000) erbij;
+  // die kolommen kunnen op een DB zonder de migratie nog ontbreken en zouden dan de
+  // HELE select laten falen — met tier 1 als vangnet levert de route dan nog steeds
+  // alle bestaande velden, in plaats van stil terug te vallen op de kale tier 2
+  // (waar income_source/expenses_source verdwijnen).
   const BASE_COLUMNS =
-    'expected_return, inflation_rate, box3_method, marginaal_tarief, pension_factor_a, pension_factor_a_source, net_monthly_income, estimated_monthly_expenses, retirement_expense_method, retirement_expense_custom_amount, target_savings_rate, income_source, expenses_source'
+    'expected_return, inflation_rate, box3_method, pension_factor_a, pension_factor_a_source, net_monthly_income, estimated_monthly_expenses, retirement_expense_method, retirement_expense_custom_amount, target_savings_rate, income_source, expenses_source'
 
   let data: Record<string, unknown> | null = null
   const { data: d0, error: e0 } = await supabase
     .from('profiles')
-    .select(`${BASE_COLUMNS}, cashflow_basis_prefs`)
+    .select(`${BASE_COLUMNS}, cashflow_basis_prefs, ${HEFFINGVRIJ_KEY}`)
     .eq('id', claims.sub)
     .single()
 
@@ -59,7 +78,8 @@ export async function GET() {
     expected_return: data?.expected_return ?? 0.07,
     inflation_rate: data?.inflation_rate ?? 0.02,
     box3_method: data?.box3_method ?? 'forfaitair',
-    marginaal_tarief: data?.marginaal_tarief ?? null,
+    // TPR-12 — NULL = kernel-default (EXCEL_HEFFINGVRIJ_INKOMEN_PP); de client toont dan de default.
+    box3_heffingvrij_inkomen: data?.box3_heffingvrij_inkomen ?? null,
     pension_factor_a: data?.pension_factor_a ?? null,
     pension_factor_a_source: data?.pension_factor_a_source ?? null,
     net_monthly_income: data?.net_monthly_income ?? null,
@@ -117,28 +137,24 @@ export async function PUT(request: NextRequest) {
     inflationRate = n
   }
 
-  // Validate box3_method if provided
-  const box3Method = body.box3_method as string | undefined
-  if (box3Method !== undefined && box3Method !== 'forfaitair' && box3Method !== 'werkelijk') {
-    return NextResponse.json({ error: 'Box 3 methode moet "forfaitair" of "werkelijk" zijn' }, { status: 400 })
+  // Box 3-methode (enum, zod). `marginaal_tarief` wordt hier sinds TPR-10 NIET
+  // meer geaccepteerd of geschreven: geen scherm zette 'm en de kern las 'm niet;
+  // het marginale tarief is uitsluitend jaar-afgeleid (lib/fire-params.ts).
+  const parsedBox3 = box3MethodSchema.safeParse(body.box3_method)
+  if (!parsedBox3.success) {
+    return badRequest(`Box 3-methode moet ${BOX3_METHODS.map((m) => `"${m}"`).join(' of ')} zijn`)
   }
+  const box3Method = parsedBox3.data
 
-  // Validate marginaal_tarief if provided — null means "automatic".
-  // Range-validatie i.p.v. een exacte whitelist: het marginale tarief wordt per
-  // belastingjaar uit BOX1_PARAMS afgeleid (schijf-1 t/m topschijf), dus elke
-  // fractie binnen [0,30; 0,60] is een geldige expliciete override. null = auto
-  // (blijft jaar-afgeleid). Een vaste whitelist weigerde eerder elk niet-2024-
-  // tarief, waardoor 2026-tarieven (35,75%) niet opslaanbaar waren.
-  const rawMT = body.marginaal_tarief
-  let marginaalTarief: number | null | undefined
-  if (rawMT === null) {
-    marginaalTarief = null // explicitly set to automatic
-  } else if (rawMT !== undefined) {
-    const mt = Number(rawMT)
-    if (isNaN(mt) || mt < 0.30 || mt > 0.60) {
-      return NextResponse.json({ error: 'Marginaal tarief moet tussen 30% en 60% liggen' }, { status: 400 })
+  // TPR-12 — heffingvrij inkomen (euro p.p. per jaar): alleen wanneer de sleutel in de
+  // body staat; null = wis (→ kernel-default). Buiten de band → 400 met de gedeelde tekst.
+  let heffingvrijInkomen: number | null | undefined
+  if (HEFFINGVRIJ_KEY in body) {
+    const parsed = heffingvrijInkomenSchema.safeParse(body[HEFFINGVRIJ_KEY])
+    if (!parsed.success) {
+      return badRequest(bandError(HEFFINGVRIJ_KEY))
     }
-    marginaalTarief = mt
+    heffingvrijInkomen = parsed.data
   }
 
   // Validate pension_factor_a if provided — null means "wissen / niet ingevuld".
@@ -181,8 +197,8 @@ export async function PUT(request: NextRequest) {
   if (box3Method !== undefined) {
     updateData.box3_method = box3Method
   }
-  if (marginaalTarief !== undefined) {
-    updateData.marginaal_tarief = marginaalTarief
+  if (heffingvrijInkomen !== undefined) {
+    updateData[HEFFINGVRIJ_KEY] = heffingvrijInkomen
   }
   if (pensionFactorA !== undefined) {
     updateData.pension_factor_a = pensionFactorA
@@ -203,18 +219,20 @@ export async function PUT(request: NextRequest) {
   const persistedCashSettings: typeof cashSettings = { ...cashSettings }
 
   // If upsert fails (e.g. a newer column doesn't exist yet on a legacy DB),
-  // retry once without the optional columns (marginaal_tarief, the factor-A pair
-  // and cashflow_basis_prefs). Zonder die laatste zou een DB waarop migratie
-  // 20260811160000 nog niet draaide de HELE parameters-PUT laten falen — dus ook
-  // het opslaan van de bronwaarde zelf.
+  // retry once without the optional columns (the factor-A pair,
+  // cashflow_basis_prefs en het TPR-12-veld box3_heffingvrij_inkomen). Zonder die
+  // zou een DB waarop migratie 20260811160000 resp. 20260913150000 nog niet draaide
+  // de HELE parameters-PUT laten falen — dus ook het opslaan van de bronwaarde zelf.
+  let persistedHeffingvrij = heffingvrijInkomen
   if (
     error &&
-    (marginaalTarief !== undefined ||
-      pensionFactorA !== undefined ||
+    (pensionFactorA !== undefined ||
       pensionFactorASource !== undefined ||
+      heffingvrijInkomen !== undefined ||
       cashSettings.cashflow_basis_prefs !== undefined)
   ) {
-    delete updateData.marginaal_tarief
+    delete updateData[HEFFINGVRIJ_KEY]
+    persistedHeffingvrij = undefined
     delete updateData.pension_factor_a
     delete updateData.pension_factor_a_source
     delete updateData.cashflow_basis_prefs
@@ -237,8 +255,11 @@ export async function PUT(request: NextRequest) {
     success: true,
     expected_return: expectedReturn ?? null,
     inflation_rate: inflationRate ?? null,
-    box3_method: box3Method ?? 'forfaitair',
-    marginaal_tarief: marginaalTarief !== undefined ? marginaalTarief : null,
+    // Alleen echoën wat écht is weggeschreven: een deelpatch zonder methode (bv. alleen
+    // het heffingvrije inkomen) mag geen 'forfaitair' bevestigen die niet is opgeslagen.
+    ...(box3Method !== undefined ? { box3_method: box3Method } : {}),
+    // Idem voor het heffingvrije inkomen (zie de retry hierboven).
+    ...(persistedHeffingvrij !== undefined ? { [HEFFINGVRIJ_KEY]: persistedHeffingvrij } : {}),
     pension_factor_a: pensionFactorA !== undefined ? pensionFactorA : null,
     pension_factor_a_source: pensionFactorASource !== undefined ? pensionFactorASource : null,
     ...persistedCashSettings,

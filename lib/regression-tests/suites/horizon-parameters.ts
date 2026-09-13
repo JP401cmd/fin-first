@@ -283,7 +283,6 @@ const tests: TestCase[] = [
       assertEqual(c.guardrailFloor, WITHDRAWAL_DEFAULTS.guardrailFloor, 'floor')
       assertEqual(c.guardrailCeiling, WITHDRAWAL_DEFAULTS.guardrailCeiling, 'ceiling')
       assertEqual(c.guardrailCutStep, WITHDRAWAL_DEFAULTS.guardrailCutStep, 'cutStep')
-      assertEqual(c.guardrailRaiseStep, WITHDRAWAL_DEFAULTS.guardrailRaiseStep, 'raiseStep')
     },
   },
   {
@@ -299,13 +298,11 @@ const tests: TestCase[] = [
         guardrail_floor: 0.70,
         guardrail_ceiling: 1.30,
         guardrail_cut_step: 0.05,
-        guardrail_raise_step: 0.15,
       })
       assertEqual(c.strategy, 'guardrails', 'strategy')
       assertEqual(c.guardrailFloor, 0.70, 'floor')
       assertEqual(c.guardrailCeiling, 1.30, 'ceiling')
       assertEqual(c.guardrailCutStep, 0.05, 'cutStep')
-      assertEqual(c.guardrailRaiseStep, 0.15, 'raiseStep')
     },
   },
   {
@@ -371,7 +368,7 @@ const tests: TestCase[] = [
         const expected = s === 'static' || s === 'guardrails' ? s : 'static'
         assertEqual(c.strategy, expected, `resolve ${s} -> ${expected}`)
       }
-      // Guardrail bounds from API: floor/ceiling 0.50-2.00, cutStep/raiseStep 0.01-0.50
+      // Guardrail bounds from API: floor/ceiling 0.50-2.00, cutStep 0.01-0.50 (één stap, TPR-10)
       const minFloor = 0.50, maxFloor = 2.00
       const minStep = 0.01, maxStep = 0.50
       assert(WITHDRAWAL_DEFAULTS.guardrailFloor >= minFloor && WITHDRAWAL_DEFAULTS.guardrailFloor <= maxFloor,
@@ -380,8 +377,6 @@ const tests: TestCase[] = [
         'default ceiling within API bounds')
       assert(WITHDRAWAL_DEFAULTS.guardrailCutStep >= minStep && WITHDRAWAL_DEFAULTS.guardrailCutStep <= maxStep,
         'default cutStep within API bounds')
-      assert(WITHDRAWAL_DEFAULTS.guardrailRaiseStep >= minStep && WITHDRAWAL_DEFAULTS.guardrailRaiseStep <= maxStep,
-        'default raiseStep within API bounds')
       // floor < ceiling invariant
       assert(WITHDRAWAL_DEFAULTS.guardrailFloor < WITHDRAWAL_DEFAULTS.guardrailCeiling,
         'floor < ceiling')

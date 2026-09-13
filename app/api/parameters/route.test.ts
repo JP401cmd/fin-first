@@ -114,24 +114,96 @@ describe('GET /api/parameters — spaarquote-doel resolutie', () => {
   })
 })
 
-describe('PUT /api/parameters — marginaal_tarief range-validatie (Arch F1)', () => {
-  it('accepteert het jaar-afgeleide 2026-tarief (0.3575) — vroeger door de whitelist geweigerd', async () => {
-    const res = await PUT(putRequest({ marginaal_tarief: 0.3575 }))
+describe('PUT /api/parameters — box3_method (TPR-10: instelbaar, zod-enum)', () => {
+  it('accepteert "werkelijk" en schrijft de kolom', async () => {
+    const res = await PUT(putRequest({ box3_method: 'werkelijk' }))
     expect(res.status).toBe(200)
     const upsert = upserted.find((u) => u.table === 'profiles')
-    expect(upsert!.payload.marginaal_tarief).toBe(0.3575)
+    expect(upsert!.payload.box3_method).toBe('werkelijk')
+    expect((await res.json()).box3_method).toBe('werkelijk')
   })
 
-  it('weigert een tarief buiten [0,30; 0,60]', async () => {
-    const res = await PUT(putRequest({ marginaal_tarief: 0.9 }))
-    expect(res.status).toBe(400)
+  it('accepteert "forfaitair"', async () => {
+    const res = await PUT(putRequest({ box3_method: 'forfaitair' }))
+    expect(res.status).toBe(200)
+    expect(upserted.find((u) => u.table === 'profiles')!.payload.box3_method).toBe('forfaitair')
   })
 
-  it('null blijft "automatisch" (jaar-afgeleid)', async () => {
-    const res = await PUT(putRequest({ marginaal_tarief: null }))
+  it('weigert elke andere waarde met een platte error-envelope (400)', async () => {
+    for (const bad of ['fictief', '', 1, null, true]) {
+      upserted = []
+      const res = await PUT(putRequest({ box3_method: bad }))
+      expect(res.status).toBe(400)
+      expect(typeof (await res.json()).error).toBe('string')
+      expect(upserted).toHaveLength(0)
+    }
+  })
+
+  it('niet meegestuurd = kolom ongemoeid (deelpatch)', async () => {
+    const res = await PUT(putRequest({ net_monthly_income: 3500 }))
     expect(res.status).toBe(200)
     const upsert = upserted.find((u) => u.table === 'profiles')
-    expect(upsert!.payload.marginaal_tarief).toBeNull()
+    expect('box3_method' in upsert!.payload).toBe(false)
+    // …en de echo bevestigt geen methode die niet is opgeslagen.
+    expect('box3_method' in (await res.json())).toBe(false)
+  })
+})
+
+describe('PUT /api/parameters — box3_heffingvrij_inkomen (TPR-12: server-band uit PARAMETER_BANDS)', () => {
+  it('accepteert een bedrag binnen de band en schrijft + echoot het', async () => {
+    const res = await PUT(putRequest({ box3_heffingvrij_inkomen: 2500 }))
+    expect(res.status).toBe(200)
+    const upsert = upserted.find((u) => u.table === 'profiles')
+    expect(upsert!.payload.box3_heffingvrij_inkomen).toBe(2500)
+    expect((await res.json()).box3_heffingvrij_inkomen).toBe(2500)
+  })
+
+  it('null wist de keuze (→ kernel-default 1800 in de adapter)', async () => {
+    const res = await PUT(putRequest({ box3_heffingvrij_inkomen: null }))
+    expect(res.status).toBe(200)
+    const upsert = upserted.find((u) => u.table === 'profiles')
+    expect(upsert!.payload.box3_heffingvrij_inkomen).toBeNull()
+  })
+
+  it('buiten de band of geen getal → 400 met de gedeelde bandtekst, niets geschreven', async () => {
+    for (const bad of [100_001, -1, 'veel', true]) {
+      upserted = []
+      const res = await PUT(putRequest({ box3_heffingvrij_inkomen: bad }))
+      expect(res.status).toBe(400)
+      expect((await res.json()).error).toMatch(/Heffingvrij inkomen moet tussen/)
+      expect(upserted).toHaveLength(0)
+    }
+  })
+
+  it('niet meegestuurd = kolom ongemoeid én niet in de echo', async () => {
+    const res = await PUT(putRequest({ box3_method: 'werkelijk' }))
+    expect(res.status).toBe(200)
+    const upsert = upserted.find((u) => u.table === 'profiles')
+    expect('box3_heffingvrij_inkomen' in upsert!.payload).toBe(false)
+    expect('box3_heffingvrij_inkomen' in (await res.json())).toBe(false)
+  })
+
+  it('GET geeft de kolom terug (NULL = niet gekozen)', async () => {
+    results.profilesSelect.mockReturnValue({ data: { box3_heffingvrij_inkomen: 2400 }, error: null })
+    expect((await (await GET()).json()).box3_heffingvrij_inkomen).toBe(2400)
+    results.profilesSelect.mockReturnValue({ data: {}, error: null })
+    expect((await (await GET()).json()).box3_heffingvrij_inkomen).toBeNull()
+  })
+})
+
+describe('PUT /api/parameters — marginaal_tarief is geen invoer meer (TPR-10)', () => {
+  it('een meegestuurd marginaal_tarief wordt genegeerd: niet in de payload, niet in de echo', async () => {
+    const res = await PUT(putRequest({ marginaal_tarief: 0.3575, expected_return: 0.07 }))
+    expect(res.status).toBe(200)
+    const upsert = upserted.find((u) => u.table === 'profiles')
+    expect('marginaal_tarief' in upsert!.payload).toBe(false)
+    expect('marginaal_tarief' in (await res.json())).toBe(false)
+  })
+
+  it('GET geeft geen marginaal_tarief meer terug', async () => {
+    results.profilesSelect.mockReturnValue({ data: { marginaal_tarief: 0.495 }, error: null })
+    const res = await GET()
+    expect('marginaal_tarief' in (await res.json())).toBe(false)
   })
 })
 

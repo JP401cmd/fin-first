@@ -667,6 +667,60 @@ const criteria: AcceptanceCriterion[] = [
         'components/app/horizon/horizon-client.tsx (`doelLosgelatenDezeSessie`-state, de gedeelde afleiding `verkenSectieZichtbaar`, en de `hasScenario || hasStopKeuze`-gate op "Maak dit mijn doel") — sessiegebonden zichtbaarheidsgedrag zonder cijfermatige uitkomst; bewaakt in `components/app/horizon/horizon-client.doel-loslaten-terugweg.test.ts`.',
     },
   },
+  {
+    workflow: 'WF-TOEK-44',
+    scenarioId: 'UAT-TOEK-44',
+    titel: 'Plan-review: de Voorkeuren-kaart telt je nagelopen keuzes en opent vijf stappen met keuze · effect · waarom (ADR 0142)',
+    kriticiteit: 'BELANGRIJK',
+    persona: 'willem',
+    given:
+      'Persona Willem op /toekomst met een grafiek (geboortedatum, bezittingen), een actief AOW-event en een eigen huis. Migratie 20260913160000 (`profiles.plan_review_state`) is uitgerold. Nog geen stap bevestigd. De review is optioneel: de grafiek bestaat en klopt zonder (A1).',
+    when:
+      '(a) Hij bekijkt de Voorkeuren-kaart en klikt erop; (b) hij doorloopt de stappen — bevestigt "Je plan", slaat "Leven na stoppen" over, kiest bij "Je huis" een woonstrategie en bevestigt; (c) hij sluit de pane, laadt /toekomst opnieuw en opent de review via ⌘K "Je voorkeuren voor je plan instellen" en via de knop met dezelfde naam op /toekomst/voorkeuren; (d) hij zet het AOW-event uit bij Gebeurtenissen en komt terug.',
+    then:
+      '(a) Zolang niet alles bevestigd is heet de kaart "Je voorkeuren voor je plan instellen", KPI "N van M" (n.v.t.-stappen tellen niet mee), stoplicht aandacht (oranje), substext "X stappen nog niet bevestigd"; in Eenvoudig compact "Je voorkeuren voor je plan instellen · N/M". Een klik opent de pane (ShellOverlay pane, z-[70]) bij de EERSTE onbevestigde stap, met de tijdas op desktop zichtbaar ernaast. (b) Elke stap toont drie blokken: "Waar de app nu mee rekent" (opent met "De app rekent nu …", nooit een leeg veld), "Wat het doet" (vrijheidsleeftijd — of onder een vast stopmoment: tot waar het liquide vermogen reikt — plus een vergelijking uit een tweede kernel-run) en "Waarom dit ertoe doet". "Je huis" zet de vier woonstrategieën in vaste volgorde naast elkaar met de uitkomst per keuze en een bereik ("tussen X en Y"); zonder opgeslagen strategie kan pas bevestigd worden na een keuze. Bevestigen schrijft eerst via de bestaande route (/api/fire-settings, /api/withdrawal-strategy, /api/pot-rules, /api/housing-strategy) en zet dán de markering (PUT /api/plan-review); mislukt de eerste, dan geen markering en een zichtbare fout. Overslaan schrijft niets. Na de laatste stap: "Voor wie wil" met links naar Inflatie, Bruto rendement, Box 3-methode, Heffingvrij inkomen (Voorkeuren) en Bezittingen. (c) Bevestigde stappen blijven bevestigd na herladen (server-side, cross-device); ⌘K en de knop op /toekomst/voorkeuren openen de pane (de laatste bij stap 1). Zijn alle stappen bevestigd, dan is de kaart weer de gewone Voorkeuren-kaart. (d) Zonder actief AOW-event gaat "Wat er binnenkomt" weer open (€ 0 AOW benoemd, bevestigen geblokkeerd) en krijgt de kaart weer de review-naam (A10). Nergens staat "aanbevolen" of "past bij jou" (Wft).',
+    assertion: {
+      kind: 'ui-only',
+      source:
+        'components/future/toekomst-nav-cards.tsx (`planReviewCard`, klik-onderschepping binnen `PlanReviewProvider`) + components/future/plan-review/plan-review-provider.tsx + plan-review-pane.tsx (stap-UI, schrijfvolgorde) + app/api/plan-review/route.ts (GET per stap, PUT markering) + lib/plan-review/progress.ts (afgeleide voortgang, A9/A10) + lib/plan-review/overzicht.ts (kopij en vergelijkingsruns via `runRegelProjection`). De uitkomstgetallen komen uit de kernel en worden hier niet herberekend; bewaakt in `lib/plan-review/*.test.ts`, `app/api/plan-review/route.test.ts`, `components/future/plan-review/plan-review-pane.test.tsx` en `components/future/toekomst-nav-cards.test.tsx`.',
+    },
+  },
+  {
+    workflow: 'WF-TOEK-45',
+    scenarioId: 'UAT-TOEK-45',
+    titel: 'Geen AOW op je tijdas: de stille €0 wordt benoemd, is te minimaliseren en komt terug via het statuspunt (TPR-04)',
+    kriticiteit: 'BELANGRIJK',
+    persona: 'willem',
+    given:
+      'Persona Willem op /toekomst in eigen perspectief. Bij Gebeurtenissen staat het AOW-event UIT (geen actieve AOW-gebeurtenis). De kern rekent dan bewust met €0 AOW (eigenaarsbesluit: geen terugval op volledige opbouw); de horizon-run draagt de adapter-notice `aow_ontbreekt`. VOORHEEN gebeurde dat stil.',
+    when:
+      '(a) Hij bekijkt de tijdas en de kassabon met aannames; (b) klikt "Minimaliseren" op de melding; (c) laadt de pagina opnieuw (ook op een ander apparaat); (d) klikt het oranje statuspunt naast de pagina-\'i\'; (e) volgt "Naar je AOW-gebeurtenis", zet het event aan en komt terug; (f) bekijkt /toekomst in partnerweergave met een partnerlijn.',
+    then:
+      '(a) Boven de grafiek staat een amberkleurige melding "Geen AOW op je tijdas" met keuze + effect ("Er staat geen actieve AOW-gebeurtenis op je tijdas, dus de projectie rekent met €0 AOW. Vanaf je AOW-leeftijd komt er in de grafiek geen AOW-inkomen bij …") en waarom ("Voor de meeste huishoudens is de AOW de grootste vaste post na het stoppen …"), plus de link "Naar je AOW-gebeurtenis" (/toekomst/gebeurtenissen?strategie=aow). De aannames-kassabon toont de regel "AOW-inkomen · € 0 — geen AOW-gebeurtenis" (zelfde kopij-bron). (b) De melding verdwijnt; er blijft een oranje statuspunt (stoplicht-aandacht, geen module-accent) naast de \'i\' met aria-label "… — toon de melding over je AOW"; de aria-live-regio kondigt het minimaliseren aan. (c) Geminimaliseerd blijft geminimaliseerd na herladen en cross-device (own-row pref `profiles.status_banner_minimized`, sleutel van de AOW-melding, via PUT /api/overzicht/page-status — geen localStorage), zonder flikkering (server-seed). (d) Klikken op het punt heropent de melding en wist de vlag. (e) Met een actief AOW-event is er geen melding, geen punt en geen kassabon-regel. (f) In partnerweergave met partnerlijn verschijnt de melding niet (zelfde view-gating als de tekort-melding).',
+    assertion: {
+      kind: 'ui-only',
+      source:
+        'lib/horizon-kernel/adapter/events.ts (`aow_ontbreekt`-notice) → lib/hooks/use-horizon-fire-sim.ts → components/app/horizon/horizon-client.tsx (`aowNoticeVisible`, melding + kassabon-regel) + components/app/horizon/aow-notice-provider.tsx (`AowNoticeProvider`/`AowNoticeDot`, PUT-schrijfpad) + lib/horizon/aow-notice-minimize.ts (`AOW_ONTBREEKT_COPY`, `resolveAowNoticeDisplay`, minimize-sleutel) + lib/page-status/compute.ts (sleutel toegestaan) + app/(app)/toekomst/page.tsx (server-seed) — weergave- en voorkeurgedrag zonder cijfermatige uitkomst; bewaakt in `components/app/horizon/aow-notice-provider.test.tsx` en `lib/horizon/aow-notice-minimize.test.ts`.',
+    },
+  },
+  {
+    workflow: 'WF-TOEK-46',
+    scenarioId: 'UAT-TOEK-46',
+    titel: 'Verkenning op de vrijheidsas tot plan maken met "Maak dit mijn plan" (TPR-09)',
+    kriticiteit: 'KERN',
+    persona: 'willem',
+    given:
+      'Persona Willem op /toekomst met een plan dat stopt op zijn AOW-leeftijd (anker `aow`, eindleeftijd 90, eind-vorm "Niets, het mag op zijn"). Op de vrijheidsas staan twee stopleeftijden: de marker die hij met de schuif verkent (scenario-voorkeur, niet het plan) en het anker in het plan (`profiles.fire_stop_anchor`/`fire_stop_age`). VOORHEEN stond er geen brug tussen die twee, en heette de marker niet wat hij is.',
+    when:
+      '(a) Hij schuift de stopleeftijd naar 62,5 en leest de marker en de tekst eronder; (b) klikt "Maak dit mijn plan" en leest de bevestiging; (c) bevestigt; (d) schuift daarna opnieuw en kijkt naar de knop wanneer de schuif weer op 62,5 staat; (e) herhaalt (b)-(c) terwijl de route faalt (netwerk weg).',
+    then:
+      '(a) De marker heet "verkenning 62,5" en eronder staat "Dit is een verkenning: de lijn verschuift alleen hier. Maak je het je plan, dan rekent de hele app met deze stopleeftijd. …" met de knoppen "Maak dit mijn plan" en "Je plan-keuzes →". Onder het nu-anker (geen schuif) ontbreken beide. (b) Een bevestiging (ShellOverlay confirm, titel "Maak dit mijn plan") noemt keuze ("Je kiest 62,5 jaar als stopleeftijd van je plan. Nu rekent je plan met stoppen op je AOW-leeftijd (…)."), effect (de hele app rekent ermee; eindleeftijd (90) en wat er over moet zijn veranderen niet) en waarom — beschrijvend, niet aansporend. (c) Het VOLLEDIGE gelezen plan gaat via PUT /api/fire-settings terug met alleen het anker op `age` en fire_stop_age=62.5 (eindleeftijd, eind-vorm en nalatenschap ongewijzigd; stopleeftijd < eindleeftijd en halve jaren vooraf getoetst, de route toetst opnieuw — WF-KRUIS-28); toast "Plan bijgewerkt — Je plan rekent nu met stoppen op 62,5."; de verkenningsmarker wordt gewist (de schuif landt op het plan-stopmoment) en de pagina ververst. (d) Staat de schuif op het plan-stopmoment, dan leest de knop "Dit is al je plan" en is hij uitgeschakeld. (e) Een mislukte lees- of schrijfactie toont de fout inline in de bevestiging ("Opslaan mislukt. Probeer het zo nog eens." of de route-fout); het plan blijft ongewijzigd.',
+    assertion: {
+      kind: 'ui-only',
+      source:
+        'components/app/horizon/vrijheidsas.tsx (marker "verkenning", `toonMaakPlan`, `planIsDezeStop`) + components/app/horizon/stop-plan-confirm.tsx (`StopPlanConfirm`, `huidigPlanZin`) + components/app/horizon/horizon-client.tsx#handleStopPlanBevestigen (GET → `planDraftFromSettings` → `validatePlanDraft` → PUT `planDraftToFireSettingsBody`) + app/api/fire-settings/route.ts (plan-contract) — interactie met een schrijfpad; de plan-regels zelf zijn exact getoetst in WF-KRUIS-28 en WF-START-28.',
+    },
+  },
 ]
 
 export const TOEK_ACCEPTANCE: AcceptanceSet = {
@@ -681,5 +735,5 @@ export const TOEK_ACCEPTANCE: AcceptanceSet = {
  */
 export const TOEK_EXPECTED_WORKFLOW_NUMBERS: number[] = [
   ...Array.from({ length: 26 }, (_, i) => i + 1), // 1..26
-  28, 29, 30, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43,
+  28, 29, 30, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46,
 ]

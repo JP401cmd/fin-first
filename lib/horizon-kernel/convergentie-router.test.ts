@@ -257,20 +257,26 @@ describe('buildConvergentieAdapterProfile — veld-mapping', () => {
     const mapped = buildConvergentieAdapterProfile({
       ...PROFILE,
       retirement_expense_custom_amount: 24_000,
-      marginaal_tarief: 0.37,
       deficit_loan_rate: 0.06,
       withdrawal_profile_config: { fase1: 1 },
       yearly_essential_expenses: 18_000,
     })
     expect(mapped.retirement_custom_amount).toBe(24_000)
-    expect(mapped.marginaal_tarief).toBe(0.37)
     expect(mapped.deficit_loan_rate).toBe(0.06)
     expect(mapped.withdrawal_profile_config).toEqual({ fase1: 1 })
     expect(mapped.yearly_essential_expenses).toBe(18_000)
     // Ontbrekend → null (adapter-default-territorium).
     const minimal = buildConvergentieAdapterProfile({ date_of_birth: DOB })
     expect(minimal.deficit_loan_rate).toBeNull()
-    expect(minimal.marginaal_tarief).toBeNull()
+    // TPR-10 — de geschrapte kolommen reizen niet meer mee, ook niet als de rauwe
+    // rij (select('*')) ze nog draagt.
+    const rauw = buildConvergentieAdapterProfile({
+      ...PROFILE,
+      marginaal_tarief: 0.37,
+      guardrail_raise_step: 0.2,
+    } as ConvergentieRawProfileRow)
+    expect('marginaal_tarief' in rauw).toBe(false)
+    expect('guardrail_raise_step' in rauw).toBe(false)
   })
 })
 

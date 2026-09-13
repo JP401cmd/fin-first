@@ -42,6 +42,10 @@ vi.mock('./unified-projection', () => ({
 vi.mock('./reference-cache', () => ({
   getAowLeeftijden: () => Promise.resolve([]),
 }))
+const loadPartnerKernelBlokMock = vi.fn()
+vi.mock('./horizon/partner-kernel-blok', () => ({
+  loadPartnerKernelBlok: (...args: unknown[]) => loadPartnerKernelBlokMock(...args),
+}))
 
 import { computeHorizonFireSim, computeHorizonFireTarget } from './fire-target-shared'
 
@@ -65,7 +69,6 @@ const RAW_HAPPY = {
   box3Method: 'forfaitair',
   hasPartner: false,
   unlinkedCash: 1000,
-  monthlySavingsOverride: null,
   baseAnnualSavingsFromCashflow: 12000,
   housingStrategy: { mode: 'include_full' },
   rawProfile: { id: 'profile-1', yearly_essential_expenses: 24000 },
@@ -90,6 +93,7 @@ function armHappyPath() {
 beforeEach(() => {
   vi.clearAllMocks()
   armHappyPath()
+  loadPartnerKernelBlokMock.mockResolvedValue(null)
 })
 
 describe('computeHorizonFireSim — de canonieke FIRE-run', () => {
@@ -156,7 +160,6 @@ describe('computeHorizonFireSim — de canonieke FIRE-run', () => {
       box3Method: 'forfaitair',
       hasPartner: false,
       unlinkedCash: 0,
-      monthlySavingsOverride: null,
       baseAnnualSavingsFromCashflow: 0,
       housingStrategy: { mode: 'include_full' },
       rawProfile: { id: 'profile-1' },
@@ -167,6 +170,34 @@ describe('computeHorizonFireSim — de canonieke FIRE-run', () => {
     expect(buildHorizonInputMock).toHaveBeenLastCalledWith(
       expect.objectContaining({ assets: [{ id: 'huishoud' }], debts: [{ id: 'huishoud-schuld' }] }),
     )
+  })
+
+  // ── TPR-07 — partnerblok in het huishoudperspectief ─────────────────────────
+  it('huishoudperspectief: het partnerblok uit de gedeelde loader reist mee in de rawContext', async () => {
+    const partner = { profile: { date_of_birth: '1983-06-15', net_monthly_income: 2800 } }
+    loadPartnerKernelBlokMock.mockResolvedValue(partner)
+    const run = await computeHorizonFireSim(SUPABASE, 'household')
+    expect(loadPartnerKernelBlokMock).toHaveBeenCalledWith(SUPABASE)
+    expect(run!.rawContext.partner).toBe(partner)
+    expect(computeConvergentieProjectionMock).toHaveBeenCalledWith({ rawContext: run!.rawContext })
+  })
+
+  it('eigen perspectief: géén partnerblok — de loader wordt niet eens aangeroepen (solo byte-identiek)', async () => {
+    const run = await computeHorizonFireSim(SUPABASE)
+    expect(loadPartnerKernelBlokMock).not.toHaveBeenCalled()
+    expect('partner' in run!.rawContext).toBe(false)
+  })
+
+  it('partnerperspectief: ook solo — de potten zijn daar een deel-portefeuille, geen huishoud-som', async () => {
+    const run = await computeHorizonFireSim(SUPABASE, 'partner')
+    expect(loadPartnerKernelBlokMock).not.toHaveBeenCalled()
+    expect('partner' in run!.rawContext).toBe(false)
+  })
+
+  it('huishoudperspectief zonder blok (privacy/solo) → rawContext zonder `partner`-sleutel', async () => {
+    loadPartnerKernelBlokMock.mockResolvedValue(null)
+    const run = await computeHorizonFireSim(SUPABASE, 'household')
+    expect('partner' in run!.rawContext).toBe(false)
   })
 
   it('weigert te draaien op privacy-aggregaatrijen i.p.v. een pot met verzonnen aannames te bouwen', async () => {

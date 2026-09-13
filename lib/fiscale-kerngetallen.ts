@@ -563,8 +563,8 @@ export const FISCALE_DRIFT_PUNTEN: DriftPunt[] = [
     title: 'AOW-maandbedrag dubbel hardcoded',
     status: 'opgelost',
     description:
-      'De AOW-bedragen stonden als NL_AOW_MONTHLY(_SAMENWONEND) in constants.ts én los hardcoded in CASHFLOW_CATALOG en de AOW-prefab (defaultMonthlyIncome) in horizon-data.ts (plus in onboarding-horizon.tsx). Opgelost: alle plekken importeren nu de constante en de labels/tips zijn afgeleid; constants.ts is bijgewerkt naar de SVB-bedragen per 1-7-2026 (€1.581,55 / €1.084,13). Bewaakt door lib/fiscale-duplicaten-guard.test.ts.',
-    files: ['lib/constants.ts', 'lib/horizon-data.ts', 'components/onboarding/onboarding-horizon.tsx'],
+      'De AOW-bedragen stonden als NL_AOW_MONTHLY(_SAMENWONEND) in constants.ts én los hardcoded in CASHFLOW_CATALOG en de AOW-prefab (defaultMonthlyIncome) in horizon-data.ts (plus in onboarding-horizon.tsx). Opgelost: alle plekken importeren nu de constante en de labels/tips zijn afgeleid; constants.ts is bijgewerkt naar de SVB-bedragen per 1-7-2026 (€1.581,55 / €1.084,13). Bewaakt door lib/fiscale-duplicaten-guard.test.ts. onboarding-horizon.tsx is later als dood oppervlak verwijderd (TPR-13).',
+    files: ['lib/constants.ts', 'lib/horizon-data.ts'],
   },
   {
     id: 'aow-bedrag-kernel-divergentie',

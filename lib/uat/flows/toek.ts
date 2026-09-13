@@ -65,6 +65,10 @@ export const TOEK_FLOW: UatFlow = {
     { id: 'sliders', scenarioId: 'UAT-TOEK-10', label: 'WF-TOEK-10 · Wat-als-sliders inline', kind: 'action', stage: 3, lane: 'simuleren' },
     { id: 'aowbeslis', label: 'Shortfall — FIRE pas ná AOW?', kind: 'decision', stage: 3, lane: 'simuleren' },
     { id: 'aowstop', scenarioId: 'UAT-TOEK-11', label: 'WF-TOEK-11 · AOW-stop-simulatie (doorwerken)', kind: 'action', stage: 3, lane: 'simuleren', subOf: 'aowbeslis' },
+    // TPR-09 — de verkende stopleeftijd op de vrijheidsas tot plan maken (schrijft het volledige plan).
+    { id: 'maakplan', scenarioId: 'UAT-TOEK-46', label: 'WF-TOEK-46 · Verkenning tot plan maken ("Maak dit mijn plan")', kind: 'action', stage: 3, lane: 'simuleren', subOf: 'sliders' },
+    // TPR-04 — geen actief AOW-event: de €0 AOW benoemd, minimaliseerbaar naar een statuspunt.
+    { id: 'aowmelding', scenarioId: 'UAT-TOEK-45', label: 'WF-TOEK-45 · Melding "Geen AOW op je tijdas" (minimaliseren/heropenen)', kind: 'screen', stage: 2, lane: 'aflezen' },
 
     // ── 3 · gebeurtenissen op de tijdas ───────────────────────────────────
     { id: 'eventadd', scenarioId: 'UAT-TOEK-13', label: 'WF-TOEK-13 · Levensgebeurtenis toevoegen', kind: 'action', stage: 3, lane: 'gebeurtenissen' },
@@ -85,6 +89,9 @@ export const TOEK_FLOW: UatFlow = {
     // ── 4 · de toekomst configureren · voorkeuren ─────────────────────────
     { id: 'eindstrat', scenarioId: 'UAT-TOEK-24', label: 'WF-TOEK-24 · Plan (stop × eind-vorm) / onttrekkingsstrategie', kind: 'screen', stage: 4, lane: 'voorkeuren' },
     { id: 'potregels', scenarioId: 'UAT-TOEK-25', label: 'WF-TOEK-25 · Pot-regels (volgorde, toe-/afname)', kind: 'screen', stage: 4, lane: 'voorkeuren' },
+    // TPR-01 / ADR 0142 — de Voorkeuren-kaart is zolang niet voltooid de ingang van de
+    // plan-review; bevestigen schrijft via de bestaande routes en voedt dus de uitkomst.
+    { id: 'planreview', scenarioId: 'UAT-TOEK-44', label: 'WF-TOEK-44 · Plan-review: vijf stappen met keuze · effect · waarom', kind: 'screen', stage: 4, lane: 'voorkeuren' },
     { id: 'marktaannames', scenarioId: 'UAT-TOEK-26', label: 'WF-TOEK-26 · Markt-aannames (inflatie, rendement)', kind: 'screen', stage: 4, lane: 'voorkeuren' },
 
     // ── 4 · de toekomst configureren · doelen ─────────────────────────────
@@ -141,6 +148,11 @@ export const TOEK_FLOW: UatFlow = {
     { from: 'tijdas', to: 'scenarios' },
     { from: 'tijdas', to: 'ghost' },
     { from: 'tijdas', to: 'sliders' },
+    { from: 'sliders', to: 'maakplan', kind: 'branch', label: 'verkenning → plan' },
+    { from: 'maakplan', to: 'eindstrat', label: 'zelfde plan-contract' },
+    { from: 'maakplan', to: 'fire' },
+    { from: 'tijdas', to: 'aowmelding', kind: 'branch', label: 'geen actief AOW-event' },
+    { from: 'aowmelding', to: 'aowstrat', label: 'Naar je AOW-gebeurtenis' },
     { from: 'tijdas', to: 'aowbeslis' },
     { from: 'aowbeslis', to: 'aowstop', kind: 'branch', label: 'ja: doorwerken tot AOW' },
     { from: 'sliders', to: 'x-reken', kind: 'cross', label: 'volledige wat-als → Rekenhulp' },
@@ -167,6 +179,9 @@ export const TOEK_FLOW: UatFlow = {
     { from: 'navkaarten', to: 'eindstrat', kind: 'branch', label: 'Voorkeuren' },
     { from: 'eindstrat', to: 'potregels' },
     { from: 'eindstrat', to: 'marktaannames' },
+    { from: 'navkaarten', to: 'planreview', kind: 'branch', label: 'Je plan (niet voltooid)' },
+    { from: 'planreview', to: 'marktaannames', kind: 'branch', label: 'Voor wie wil' },
+    { from: 'planreview', to: 'fire' },
     { from: 'navkaarten', to: 'doelen', kind: 'branch', label: 'Doelen' },
     { from: 'doelen', to: 'doelvoortgang' },
     { from: 'doelen', to: 'doelpace' },

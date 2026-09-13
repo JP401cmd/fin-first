@@ -79,6 +79,7 @@ const BUNDLE_LABEL: Partial<Record<NotificationType, (n: number) => string>> = {
   recommendation: (n) => `${n} partner-acties`,
   horizon: (n) => `${n} signalen over je toekomst`,
   briefing: (n) => `${n} briefings`,
+  postponed_tip: (n) => `${n} uitgestelde tips zijn terug`,
 }
 
 function bundleTitle(type: string, count: number): string {

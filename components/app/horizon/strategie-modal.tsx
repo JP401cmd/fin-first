@@ -55,7 +55,7 @@ import {
 } from '@/lib/effective-financials'
 import type { CashflowSettingsData } from '@/lib/cashflow-settings-data'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
-import { HousingStrategySection } from '@/components/identity/instellingen/housing-strategy-section'
+import { HousingStrategySection } from '@/components/future/strategie/housing-strategy-section'
 import {
   HOUSING_STRATEGY_LABELS,
   type HousingStrategyConfig,
@@ -229,12 +229,11 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
         guardrail_floor?: number | null
         guardrail_ceiling?: number | null
         guardrail_cut_step?: number | null
-        guardrail_raise_step?: number | null
       } = {}
       try {
         const wsResult = await supabase
           .from('profiles')
-          .select('withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step')
+          .select('withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step')
           .single()
         if (wsResult.error) {
           console.warn(

@@ -35,6 +35,7 @@ import type { ReactNode } from 'react'
 import type { StopMargeZone } from '@/lib/horizon/stop-marge'
 import { resolveVoorzichtigeRand, TERUGVAL_RAND_JAREN } from '@/lib/horizon/stop-marge'
 import { InlineInfoDisclosure } from '@/components/editorial'
+import { rangeTouchSeekProps } from '@/lib/range-touch-seek'
 
 const PLAYFAIR = 'var(--font-playfair, Georgia, serif)'
 
@@ -185,8 +186,8 @@ export const LABEL_WIDTH_PCT = 9
 
 /** Halve breedte (pp) van het marge-bracket-label ("marge +X jr · zone", gecentreerd). */
 const MARGE_LABEL_CLAMP_PCT = 11
-/** Halve breedte (pp) van het "stop X"-label (gecentreerd boven de band). */
-const STOP_LABEL_CLAMP_PCT = 5
+/** Halve breedte (pp) van het "verkenning X"-label (gecentreerd boven de band). */
+const STOP_LABEL_CLAMP_PCT = 9
 /** Halve breedte (pp) van het "basis"-label (gecentreerd onder de band). */
 const BASIS_LABEL_CLAMP_PCT = 4
 
@@ -260,6 +261,25 @@ export interface VrijheidsasProps {
    * eerlijker dan twee snelknoppen die de rest onzichtbaar laten.
    */
   onKeuzesOpenen?: () => void
+  /**
+   * TPR-09 (eigenaarsbesluit 13 sep 2026) — "Maak dit mijn plan": de verkende
+   * stopleeftijd wordt het plan-anker (`fire_stop_anchor = 'age'`). Twee
+   * stopleeftijden stonden naast elkaar zonder dat de UI zei welke wat doet: de
+   * scenario-marker (alleen de lijn hier) en het plan-anker (de hele app).
+   *
+   * Waarom dit níet de B-038-knop terugbrengt: die schreef een HALF plan (alleen
+   * het anker) en stond naast een AOW-snelknop. Deze CTA (a) schrijft via de
+   * consumer het VOLLEDIGE plan (`planDraftToFireSettingsBody`, route-contract R3),
+   * (b) draagt vóór de klik keuze · effect · waarom en vraagt een bevestiging, en
+   * (c) staat náást de verwijzing naar de plan-keuzes, niet in plaats ervan. De
+   * eindleeftijd, eind-vorm en nalatenschap blijven wat ze zijn — en dát staat er.
+   * Afwezig ⇒ geen knop (alleen de verwijzing).
+   */
+  onMaakPlan?: (stopAge: number) => void
+  /** PUT in-flight — blokkeert de knop. */
+  maakPlanBusy?: boolean
+  /** De verkende leeftijd IS al het plan-anker (`age` op exact deze leeftijd) → knop inert. */
+  planIsDezeStop?: boolean
 }
 
 /**
@@ -294,6 +314,9 @@ export function Vrijheidsas({
   planStopAge = null,
   aowAge = null,
   onKeuzesOpenen,
+  onMaakPlan,
+  maakPlanBusy = false,
+  planIsDezeStop = false,
 }: VrijheidsasProps) {
   // ── As-schaal (jaren, lineair, min-span 20 jr) — enkel voor de marge-band-posities ──
   const minAge = Math.floor(currentAge)
@@ -372,6 +395,9 @@ export function Vrijheidsas({
   // nu-anker is er geen stopkeuze om naartoe te wijzen: de sectie toont daar
   // geen schuif, dus ook geen "waar stel ik dit in?"-vraag.
   const toonKeuzesLink = onKeuzesOpenen != null && !stopKeuzeVerborgen
+  // TPR-09 — de verkenning tot plan maken. Alleen wanneer de consumer het schrijfpad
+  // aanbiedt; onder het nu-anker is er geen schuif en dus niets te verankeren.
+  const toonMaakPlan = onMaakPlan != null && !stopKeuzeVerborgen
 
   return (
     <div>
@@ -404,8 +430,9 @@ export function Vrijheidsas({
           <b className="text-[var(--ink)]">basis</b> → <b className="text-[var(--ink)]">verwacht</b> →{' '}
           <b className="text-[var(--ink)]">laatst</b> zijn de FIRE-leeftijden (van je basislijn, je
           actieve pad en de voorzichtige variant). De <b className="text-[var(--ink)]">stop-marker</b> is
-          jouw ambitie; de <b className="text-[var(--ink)]">marge</b> is de overspanning tussen verwacht
-          en stop.
+          jouw <b className="text-[var(--ink)]">verkenning</b> — een stopleeftijd die je hier uitprobeert
+          en die alleen deze lijn verschuift; je plan verandert pas als je hem tot je plan maakt. De{' '}
+          <b className="text-[var(--ink)]">marge</b> is de overspanning tussen verwacht en stop.
         </p>
         </>
         )}
@@ -478,6 +505,10 @@ export function Vrijheidsas({
             <span className="font-sans text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">
               Gewenste stopleeftijd
             </span>
+            {/* TPR-09 — de marker is een VERKENNING, geen plan: dat staat er nu bij. */}
+            <span className="rounded-full border border-horizon-300 px-1.5 py-px font-mono text-[9px] uppercase tracking-[0.08em] text-horizon-700">
+              verkenning
+            </span>
             <span className="flex min-w-0 flex-wrap items-baseline justify-end gap-x-1.5 gap-y-0.5">
               <span className="font-mono text-sm tabular-nums text-[var(--ink)]">
                 {formatAge(stopAge)}
@@ -515,6 +546,7 @@ export function Vrijheidsas({
             value={stopAge}
             onChange={e => onStopAgeChange(Number(e.target.value))}
             className="slider-module w-full"
+            {...rangeTouchSeekProps}
             aria-label="Gewenste stopleeftijd"
             aria-valuetext={`${formatAge(stopAge)} jaar${
               margeJaren !== null
@@ -523,31 +555,56 @@ export function Vrijheidsas({
             }`}
           />
 
-          {/* Waar de stopkeuze wél thuishoort (melding B-038). Hier stonden twee
-              snelknoppen: "Op AOW-leeftijd" (zette alleen de slider) en "Maak dit
-              mijn plan" (schreef alléén het stop-anker). Dat las als het
-              keuzemenu van je plan terwijl het er twee grepen uit was — de
-              eindleeftijd, de eind-vorm en de nalatenschap stonden er niet in en
-              bleven daardoor onvindbaar. Eén regel die naar de volledige
-              plan-keuzes wijst is eerlijker dan twee knoppen die de rest
-              verzwijgen; de schuif blijft doen waar hij goed in is: verkennen. */}
-          {toonKeuzesLink && (
-            // Tekst en link op één linkerlijn, de link op een EIGEN regel — zelfde
+          {/* Verkenning vs. plan (TPR-09, bovenop melding B-038).
+              B-038 haalde hier twee snelknoppen weg — "Op AOW-leeftijd" (zette
+              alleen de slider) en een "Maak dit mijn plan" dat alléén het
+              stop-anker schreef en zo een half plan achterliet — en zette er één
+              verwijzing naar de volledige plan-keuzes voor in de plaats. Wat
+              overbleef was het omgekeerde gat: twee stopleeftijden op het scherm
+              (de marker hier, het anker in het plan) zonder dat de UI zei welke wat
+              doet. Daarom nu, in gewone taal: welke keuze je maakt · wat het effect
+              is · waarom het relevant is — plus één knop die de verkenning tot plan
+              maakt via het VOLLEDIGE plan (consumer: planDraftToFireSettingsBody),
+              náást de verwijzing naar de plek waar de rest van het plan staat. */}
+          {(toonKeuzesLink || toonMaakPlan) && (
+            // Tekst en acties op één linkerlijn, de acties op een EIGEN regel — zelfde
             // recept als het meta-blok op /overzicht/bezittingen. Bewust niet
             // inline in de zin: het tapdoel van 44px rekt dan de regelhoogte van
             // precies die ene tekstregel op, wat de alinea scheef laat ogen.
             <div className="mt-2 flex flex-col items-start">
               <p className="font-sans text-[11px] leading-snug text-[var(--ink-3)]">
-                Schuiven verkent — je plan blijft staan. Wanneer je stopt, tot welke leeftijd
-                je geld moet reiken en wat er dan nog over moet zijn, kies je bij je plan-keuzes.
+                Dit is een verkenning: de lijn verschuift alleen hier.
+                {toonMaakPlan && (
+                  <> Maak je het je plan, dan rekent de hele app met deze stopleeftijd. Relevant omdat je
+                  plan je vrijheidsleeftijd en je doelen bepaalt.</>
+                )}
+                {toonKeuzesLink && (
+                  <> Tot welke leeftijd je geld moet reiken en wat er dan nog over moet zijn, kies je bij je
+                  plan-keuzes.</>
+                )}
               </p>
-              <button
-                type="button"
-                onClick={onKeuzesOpenen}
-                className="inline-flex min-h-[44px] items-center font-sans text-[11px] font-medium text-[var(--ink-2)] underline underline-offset-2 transition-colors hover:text-horizon-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
-              >
-                Je plan-keuzes &rarr;
-              </button>
+              <div className="flex flex-wrap items-center gap-x-4">
+                {toonMaakPlan && (
+                  <button
+                    type="button"
+                    onClick={() => onMaakPlan(stopAge)}
+                    disabled={maakPlanBusy || planIsDezeStop}
+                    aria-disabled={maakPlanBusy || planIsDezeStop}
+                    className="inline-flex min-h-[44px] items-center font-sans text-[11px] font-semibold text-horizon-700 underline underline-offset-2 transition-colors hover:text-horizon-800 disabled:no-underline disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+                  >
+                    {planIsDezeStop ? 'Dit is al je plan' : maakPlanBusy ? 'Opslaan…' : 'Maak dit mijn plan'}
+                  </button>
+                )}
+                {toonKeuzesLink && (
+                  <button
+                    type="button"
+                    onClick={onKeuzesOpenen}
+                    className="inline-flex min-h-[44px] items-center font-sans text-[11px] font-medium text-[var(--ink-2)] underline underline-offset-2 transition-colors hover:text-horizon-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+                  >
+                    Je plan-keuzes &rarr;
+                  </button>
+                )}
+              </div>
             </div>
           )}
 
@@ -566,12 +623,13 @@ export function Vrijheidsas({
               </div>
             )}
 
-            {/* stop-label (tweede rij, altijd boven de marge-bracket) */}
+            {/* stop-label (tweede rij, altijd boven de marge-bracket). TPR-09: de
+                marker heet wat hij is — een verkenning, geen plan. */}
             <div
               className="absolute -translate-x-1/2 whitespace-nowrap font-mono text-[10px] font-semibold tabular-nums text-horizon-700"
               style={{ top: '-24px', left: `${clampLabelPct(stopPos, STOP_LABEL_CLAMP_PCT)}%` }}
             >
-              stop {formatAge(stopAge)}
+              verkenning {formatAge(stopAge)}
             </div>
 
             {/* marge-bracket (⊓ boven de band, opent naar de band toe) */}

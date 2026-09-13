@@ -107,7 +107,6 @@ const ALLOWLIST_ENTRIES = [
   'components/future/scenario-bibliotheek.tsx',
   'components/holdings/holding-favorite-button.tsx',
   'components/landing/header.tsx',
-  'components/onboarding/onboarding-horizon.tsx',
   'components/overview/checkin-banner.tsx',
   'components/overview/hero-widget-rail.tsx',
   'components/overview/leverage-card.tsx',

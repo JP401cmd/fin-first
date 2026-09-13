@@ -1,6 +1,7 @@
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { serverError, unauthorized } from '@/lib/api/respond'
+import { z } from 'zod'
+import { badRequest, serverError, unauthorized } from '@/lib/api/respond'
 import {
   END_AGE_MAX,
   END_AGE_MIN,
@@ -46,6 +47,18 @@ const FP_KEY = 'fire_strategy_override'
 const LEGACY_SHADOW_STRATEGY = 'pensioen'
 
 /**
+ * TPR-12 — `profiles.fire_legacy_include_illiquid` (kernel P!B54): telt niet-liquide
+ * bezit mee in de nalatenschapstoets? `true`/`false`, of `null` = terug naar de
+ * kernel-default ('Nee'). Zod (ADR 0044); alleen geraakt wanneer de sleutel in de body
+ * staat. De kolom komt uit migratie 20260913150000; tot die live is valt de PUT via
+ * het 42703-vangnet terug op een schrijf zónder dit veld (en echoot het dan niet).
+ */
+const LEGACY_INCLUDE_ILLIQUID_KEY = 'fire_legacy_include_illiquid'
+const legacyIncludeIlliquidSchema = z.boolean().nullable()
+const SELECT_MET_TPR12 = `retirement_expense_method, retirement_expense_custom_amount, ${FIRE_PLAN_COLUMNS}, ${LEGACY_INCLUDE_ILLIQUID_KEY}, feature_preferences, deficit_loan_rate`
+const SELECT_ZONDER_TPR12 = `retirement_expense_method, retirement_expense_custom_amount, ${FIRE_PLAN_COLUMNS}, feature_preferences, deficit_loan_rate`
+
+/**
  * ── Het PLAN: stop-anker × eind-vorm (ADR 0129) ────────────────────────────
  *
  * De vijf plan-kolommen (`fire_end_strategy`, `fire_end_age`, `fire_legacy_amount`,
@@ -75,8 +88,10 @@ const LEGACY_SHADOW_STRATEGY = 'pensioen'
  *    = 100` voor de live pensioen-gebruikers dragend, dus een client die alleen
  *    `{fire_stop_anchor:'aow'}` stuurde zette stil `deplete × aow × 90`.
  *  - Géén plan-veld in de body ⇒ het plan wordt niet geraakt en alleen de losse
- *    velden (`deficit_loan_rate`, `retirement_*`, `monthly_savings_override`) gaan
- *    mee. Een lege body is een client-fout → 400.
+ *    velden (`deficit_loan_rate`, `retirement_*`) gaan mee. Een lege body is een
+ *    client-fout → 400. (`monthly_savings_override` is vervallen — ADR 0141: één
+ *    spaargrondslag; de route leest noch schrijft de kolom nog, een meegestuurde
+ *    waarde wordt genegeerd.)
  *
  * Waarom niet "alle vijf altijd verplicht" (de eerste optie uit de review): dat had
  * élke live client vandaag een 400 gegeven — geen daarvan kent het anker vóór F3b.
@@ -214,11 +229,21 @@ export async function GET() {
   // Eén select voor het hele plan (FIRE_PLAN_COLUMNS, L1) — de ankerkolommen zijn
   // live (migratie 20260903140000 + backfill 20260903141000), dus geen aparte query
   // en geen 42703-vangnet meer.
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('profiles')
-    .select(`retirement_expense_method, retirement_expense_custom_amount, ${FIRE_PLAN_COLUMNS}, feature_preferences, deficit_loan_rate`)
+    .select(SELECT_MET_TPR12)
     .eq('id', claims.sub)
     .single()
+
+  // 42703 = kolom bestaat (nog) niet — migratie 20260913150000 niet toegepast. Dan de
+  // select zonder het TPR-12-veld, zodat het plan zelf gewoon leesbaar blijft.
+  if (error?.code === '42703') {
+    ;({ data, error } = await supabase
+      .from('profiles')
+      .select(SELECT_ZONDER_TPR12)
+      .eq('id', claims.sub)
+      .single())
+  }
 
   if (error) return NextResponse.json({ error: 'Fout bij laden' }, { status: 500 })
 
@@ -228,6 +253,7 @@ export async function GET() {
     fire_end_strategy?: string | null
     fire_end_age?: number | null
     fire_legacy_amount?: number | string | null
+    fire_legacy_include_illiquid?: boolean | null
     fire_stop_anchor?: string | null
     fire_stop_age?: number | string | null
     feature_preferences?: unknown
@@ -240,20 +266,6 @@ export async function GET() {
   // route en kernel nooit twee lezingen van dezelfde rij hebben.
   const plan = parseFirePlan({ ...row, fire_end_strategy: strategy })
 
-  // monthly_savings_override — aparte maybeSingle() zodat ontbrekende kolom
-  // op legacy DBs (migratie 20260513000001 nog niet gerund) graceful null
-  // returnt ipv 500.
-  let monthlySavingsOverride: number | null = null
-  const { data: overrideData, error: overrideError } = await supabase
-    .from('profiles')
-    .select('monthly_savings_override')
-    .eq('id', claims.sub)
-    .maybeSingle()
-  if (!overrideError && overrideData) {
-    const raw = (overrideData as { monthly_savings_override?: number | string | null }).monthly_savings_override
-    monthlySavingsOverride = raw == null ? null : Number(raw)
-  }
-
   return NextResponse.json({
     fire_stop_anchor: plan.anchor.kind,
     fire_stop_age: plan.anchor.kind === 'age' ? plan.anchor.age : null,
@@ -262,7 +274,8 @@ export async function GET() {
     fire_end_strategy: strategy,
     fire_end_age: row.fire_end_age ?? 90,
     fire_legacy_amount: row.fire_legacy_amount ?? null,
-    monthly_savings_override: monthlySavingsOverride,
+    // TPR-12 — niet-liquide meetellen in de nalatenschap. NULL = kernel-default ('Nee').
+    fire_legacy_include_illiquid: row.fire_legacy_include_illiquid ?? null,
     // V7 — tekort-lening-jaarrente (0..1). NULL = adapter gebruikt Excel-default 0,05.
     deficit_loan_rate: row.deficit_loan_rate ?? null,
   })
@@ -320,6 +333,15 @@ export async function PUT(request: NextRequest) {
   }
   if (deficitLoanRate !== undefined) updatePayload.deficit_loan_rate = deficitLoanRate
 
+  // TPR-12 — niet-liquide meetellen in de nalatenschap (boolean | null), zod-gevalideerd.
+  if (LEGACY_INCLUDE_ILLIQUID_KEY in body) {
+    const parsed = legacyIncludeIlliquidSchema.safeParse(body[LEGACY_INCLUDE_ILLIQUID_KEY])
+    if (!parsed.success) {
+      return badRequest('fire_legacy_include_illiquid moet true, false of null zijn')
+    }
+    updatePayload[LEGACY_INCLUDE_ILLIQUID_KEY] = parsed.data
+  }
+
   if ('retirement_expense_method' in body) {
     const retirementMethod = String(body.retirement_expense_method ?? 'essential_budgets')
     if (!VALID_RETIREMENT_METHODS.includes(retirementMethod as typeof VALID_RETIREMENT_METHODS[number])) {
@@ -329,22 +351,23 @@ export async function PUT(request: NextRequest) {
     updatePayload.retirement_expense_custom_amount = body.retirement_expense_custom_amount != null ? Number(body.retirement_expense_custom_amount) : null
   }
 
-  // monthly_savings_override — alleen meenemen als expliciet aanwezig in body.
-  // Apart bijgewerkt na de hoofd-update zodat een ontbrekende kolom (legacy DBs
-  // zonder migratie 20260513000001) niet de hele save laat falen. Dit is de ENIGE
-  // kolom die nog een eigen statement heeft — die is écht optioneel op legacy-DB's.
-  const overrideInBody = 'monthly_savings_override' in body
-  const overrideValue = overrideInBody
-    ? (body.monthly_savings_override == null ? null : Number(body.monthly_savings_override))
-    : undefined
-
-  // Niets te schrijven (alleen updated_at) en geen override → client-fout, geen stille no-op.
-  if (Object.keys(updatePayload).length === 1 && !overrideInBody) {
+  // Niets te schrijven (alleen updated_at) → client-fout, geen stille no-op.
+  if (Object.keys(updatePayload).length === 1) {
     return NextResponse.json({ error: 'Geen instellingen om op te slaan' }, { status: 400 })
   }
 
   // De ene UPDATE — plan + losse velden atomair.
-  const { error } = await supabase.from('profiles').update(updatePayload).eq('id', user.id)
+  let { error } = await supabase.from('profiles').update(updatePayload).eq('id', user.id)
+
+  // 42703 op het TPR-12-veld (migratie 20260913150000 nog niet live): schrijf de rest
+  // alsnog en laat het veld uit de echo — nooit een 200 die iets bevestigt dat niet is
+  // opgeslagen (dezelfde regel als de cashflow_basis_prefs-retry op /api/parameters).
+  if (error?.code === '42703' && LEGACY_INCLUDE_ILLIQUID_KEY in updatePayload) {
+    delete updatePayload[LEGACY_INCLUDE_ILLIQUID_KEY]
+    if (Object.keys(updatePayload).length > 1) {
+      ;({ error } = await supabase.from('profiles').update(updatePayload).eq('id', user.id))
+    }
+  }
 
   if (!error) {
     // Success — de kolom draagt de keuze zelf; een eventuele (stale) override weg.
@@ -356,23 +379,7 @@ export async function PUT(request: NextRequest) {
         await supabase.from('profiles').update({ feature_preferences: fp }).eq('id', user.id)
       }
     }
-    // monthly_savings_override — defensieve aparte update zodat een ontbrekende
-    // kolom op legacy DBs niet de hele save laat falen. Bij missing-column-error
-    // loggen we maar retourneren we nog steeds success voor de andere velden.
-    if (overrideInBody) {
-      const { error: overrideError } = await supabase
-        .from('profiles')
-        .update({ monthly_savings_override: overrideValue })
-        .eq('id', user.id)
-      if (overrideError) {
-        console.warn('[fire-settings] monthly_savings_override update failed (column may be missing):', overrideError.message)
-      }
-    }
-    return NextResponse.json({
-      success: true,
-      ...updatePayload,
-      monthly_savings_override: overrideValue,
-    })
+    return NextResponse.json({ success: true, ...updatePayload })
   }
 
   // CHECK-constraint-violation (23514) op de strategiekolom: de database kent deze

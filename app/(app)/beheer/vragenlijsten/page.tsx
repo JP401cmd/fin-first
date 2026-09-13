@@ -8,18 +8,35 @@ import {
 import { BottomSheet } from '@/components/app/bottom-sheet'
 // Amsterdamse tijd i.p.v. de runtime-tijdzone (#418-klasse, sweep fase 1).
 import { formatAmsterdamLongDateTime } from '@/lib/tz'
-
-type QuestionType = 'open' | 'scale' | 'multiple_choice'
+import {
+  antwoordAlsTekst,
+  ANDERS_LABEL,
+  JA,
+  NEE,
+  schaalBereik,
+  type VraagType as QuestionType,
+} from '@/lib/questionnaires/antwoord'
+import { SCHAAL_VOORINSTELLINGEN, vertaalVeldpad } from '@/lib/questionnaires/vraag-invoer'
+import {
+  gemiddeldePositie,
+  jaNeeTelling,
+  keuzeTelling,
+  npsScore,
+  schaalGemiddelde,
+} from '@/lib/questionnaires/resultaten'
 
 interface QuestionDraft {
   id?: string
   type: QuestionType
   question_text: string
   options?: string[]
+  scale_min: number
+  scale_max: number
   scale_min_label?: string
   scale_max_label?: string
   is_required: boolean
   is_multi_select: boolean
+  allow_other: boolean
 }
 
 interface QuestionnaireSummary {
@@ -44,10 +61,13 @@ interface QuestionnaireDetail {
     type: QuestionType
     question_text: string
     options: string[] | null
+    scale_min: number | null
+    scale_max: number | null
     scale_min_label: string | null
     scale_max_label: string | null
     is_required: boolean
     is_multi_select: boolean
+    allow_other: boolean | null
   }[]
 }
 
@@ -73,6 +93,18 @@ interface QuestionSummary {
   sort_order: number
   type: QuestionType
   question_text: string
+  options: string[] | null
+  scale_min: number | null
+  scale_max: number | null
+  allow_other: boolean | null
+}
+
+const TYPE_LABELS: Record<QuestionType, string> = {
+  open: 'Open',
+  scale: 'Schaal',
+  multiple_choice: 'Meerkeuze',
+  yes_no: 'Ja/nee',
+  ranking: 'Rangschikken',
 }
 
 export default function BeheerVragenlijsten() {
@@ -107,11 +139,15 @@ export default function BeheerVragenlijsten() {
   useEffect(() => { loadList() }, [loadList])
 
   const toggleActive = async (id: string, currentlyActive: boolean) => {
-    await fetch(`/api/admin/questionnaires/${id}`, {
+    const res = await fetch(`/api/admin/questionnaires/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ is_active: !currentlyActive }),
     })
+    if (!res.ok) {
+      const data: unknown = await res.json().catch(() => null)
+      setListError((data as { error?: string } | null)?.error ?? `HTTP ${res.status}`)
+    }
     loadList()
   }
 
@@ -218,10 +254,13 @@ function EditorSheet({ questionnaireId, onClose, onSaved }: {
             type: qq.type,
             question_text: qq.question_text,
             options: qq.options ?? undefined,
+            scale_min: qq.scale_min ?? 1,
+            scale_max: qq.scale_max ?? 10,
             scale_min_label: qq.scale_min_label ?? undefined,
             scale_max_label: qq.scale_max_label ?? undefined,
             is_required: qq.is_required,
             is_multi_select: qq.is_multi_select,
+            allow_other: qq.allow_other ?? false,
           }))
         )
         setLoading(false)
@@ -234,13 +273,18 @@ function EditorSheet({ questionnaireId, onClose, onSaved }: {
       {
         type,
         question_text: '',
+        scale_min: 1,
+        scale_max: 10,
         is_required: true,
         is_multi_select: false,
-        ...(type === 'multiple_choice' ? { options: [''] } : {}),
+        allow_other: false,
+        ...(type === 'multiple_choice' || type === 'ranking' ? { options: ['', ''] } : {}),
         ...(type === 'scale' ? { scale_min_label: 'Zeer slecht', scale_max_label: 'Uitstekend' } : {}),
       },
     ])
   }
+
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   const updateQuestion = (index: number, updates: Partial<QuestionDraft>) => {
     setQuestions(prev => prev.map((q, i) => (i === index ? { ...q, ...updates } : q)))
@@ -263,6 +307,7 @@ function EditorSheet({ questionnaireId, onClose, onSaved }: {
   const handleSave = async () => {
     if (!title.trim() || questions.length === 0) return
     setSaving(true)
+    setSaveError(null)
 
     const payload = {
       title: title.trim(),
@@ -272,35 +317,38 @@ function EditorSheet({ questionnaireId, onClose, onSaved }: {
         type: q.type,
         question_text: q.question_text,
         options: q.options,
+        scale_min: q.scale_min,
+        scale_max: q.scale_max,
         scale_min_label: q.scale_min_label,
         scale_max_label: q.scale_max_label,
         is_required: q.is_required,
         is_multi_select: q.is_multi_select,
+        allow_other: q.allow_other,
       })),
     }
 
-    if (questionnaireId) {
-      await fetch(`/api/admin/questionnaires/${questionnaireId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-    } else {
-      await fetch('/api/admin/questionnaires', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
+    try {
+      const res = await fetch(
+        questionnaireId ? `/api/admin/questionnaires/${questionnaireId}` : '/api/admin/questionnaires',
+        {
+          method: questionnaireId ? 'PUT' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        },
+      )
+      if (!res.ok) {
+        // De keuring zit in de route (zod); laat zien wát er niet klopt en
+        // houd de editor open, anders lijkt opslaan gelukt terwijl er niets staat.
+        const data: unknown = await res.json().catch(() => null)
+        setSaveError(vertaalVeldpad((data as { error?: string } | null)?.error ?? `Opslaan mislukt (HTTP ${res.status})`))
+        return
+      }
+      onSaved()
+    } catch {
+      setSaveError('Opslaan mislukt — controleer je verbinding.')
+    } finally {
+      setSaving(false)
     }
-
-    setSaving(false)
-    onSaved()
-  }
-
-  const TYPE_LABELS: Record<QuestionType, string> = {
-    open: 'Open',
-    scale: 'Schaal 1-10',
-    multiple_choice: 'Meerkeuze',
   }
 
   return (
@@ -338,7 +386,7 @@ function EditorSheet({ questionnaireId, onClose, onSaved }: {
               <div key={i} className="rounded border border-[var(--border-ed)] bg-[var(--paper)] p-4">
                 <div className="flex items-start gap-2">
                   <span className="mt-1 rounded bg-[var(--subtle)] px-1.5 py-0.5 text-[10px] font-bold uppercase text-[var(--ink-4)]">
-                    {TYPE_LABELS[q.type]}
+                    {q.type === 'scale' ? `${TYPE_LABELS.scale} ${q.scale_min}–${q.scale_max}` : TYPE_LABELS[q.type]}
                   </span>
                   <div className="min-w-0 flex-1">
                     <textarea
@@ -349,29 +397,72 @@ function EditorSheet({ questionnaireId, onClose, onSaved }: {
                       className="w-full resize-none bg-transparent text-sm text-[var(--ink)] placeholder:text-[var(--ink-4)] focus:outline-none"
                     />
                     {q.type === 'scale' && (
-                      <div className="mt-2 flex gap-3">
-                        <input type="text" value={q.scale_min_label ?? ''} onChange={e => updateQuestion(i, { scale_min_label: e.target.value })} placeholder="Label 1 (bijv. Zeer slecht)" className="flex-1 border-b border-[var(--border-ed)] bg-transparent pb-1 text-xs text-[var(--ink-3)] focus:outline-none" />
-                        <input type="text" value={q.scale_max_label ?? ''} onChange={e => updateQuestion(i, { scale_max_label: e.target.value })} placeholder="Label 10 (bijv. Uitstekend)" className="flex-1 border-b border-[var(--border-ed)] bg-transparent pb-1 text-xs text-[var(--ink-3)] focus:outline-none" />
-                      </div>
-                    )}
-                    {q.type === 'multiple_choice' && (
-                      <div className="mt-2 space-y-1.5">
-                        {(q.options ?? []).map((opt, oi) => (
-                          <div key={oi} className="flex items-center gap-2">
-                            <span className="h-4 w-4 rounded-full border border-[var(--border-md)]" />
-                            <input type="text" value={opt} onChange={e => { const newOpts = [...(q.options ?? [])]; newOpts[oi] = e.target.value; updateQuestion(i, { options: newOpts }) }} placeholder={`Optie ${oi + 1}`} className="flex-1 border-b border-[var(--border-ed)] bg-transparent pb-1 text-xs text-[var(--ink-2)] focus:outline-none" />
-                            <button type="button" onClick={() => { updateQuestion(i, { options: (q.options ?? []).filter((_, j) => j !== oi) }) }} className="text-[var(--ink-4)] hover:text-red-500"><X className="h-3 w-3" /></button>
-                          </div>
-                        ))}
-                        <div className="flex items-center justify-between">
-                          <button type="button" onClick={() => updateQuestion(i, { options: [...(q.options ?? []), ''] })} className="text-xs text-[var(--ink-3)] hover:text-[var(--ink-2)]">+ Optie toevoegen</button>
-                          <label className="flex items-center gap-1.5 text-[10px] text-[var(--ink-3)]">
-                            <input type="checkbox" checked={q.is_multi_select} onChange={e => updateQuestion(i, { is_multi_select: e.target.checked })} className="h-3 w-3 rounded border-[var(--border-md)]" />
-                            Meerdere antwoorden
-                          </label>
+                      <div className="mt-2 space-y-2">
+                        <label className="flex items-center gap-2 text-[10px] text-[var(--ink-3)]">
+                          Bereik
+                          <select
+                            value={`${q.scale_min}-${q.scale_max}`}
+                            onChange={e => { const [min, max] = e.target.value.split('-').map(Number); updateQuestion(i, { scale_min: min, scale_max: max }) }}
+                            className="border border-[var(--border-ed)] bg-[var(--paper)] px-1.5 py-0.5 text-xs text-[var(--ink-2)] focus:outline-none"
+                          >
+                            {SCHAAL_VOORINSTELLINGEN.map(p => (
+                              <option key={p.label} value={`${p.min}-${p.max}`}>{p.label}</option>
+                            ))}
+                          </select>
+                          {q.id && (
+                            <span className="text-[var(--ink-4)]">— wijzig het bereik niet als er al antwoorden zijn</span>
+                          )}
+                        </label>
+                        <div className="flex gap-3">
+                          <input type="text" value={q.scale_min_label ?? ''} onChange={e => updateQuestion(i, { scale_min_label: e.target.value })} placeholder={`Label ${q.scale_min} (bijv. Zeer slecht)`} className="flex-1 border-b border-[var(--border-ed)] bg-transparent pb-1 text-xs text-[var(--ink-3)] focus:outline-none" />
+                          <input type="text" value={q.scale_max_label ?? ''} onChange={e => updateQuestion(i, { scale_max_label: e.target.value })} placeholder={`Label ${q.scale_max} (bijv. Uitstekend)`} className="flex-1 border-b border-[var(--border-ed)] bg-transparent pb-1 text-xs text-[var(--ink-3)] focus:outline-none" />
                         </div>
                       </div>
                     )}
+                    {q.type === 'yes_no' && (
+                      <p className="mt-2 text-[10px] text-[var(--ink-4)]">De gebruiker kiest Ja of Nee.</p>
+                    )}
+                    {(q.type === 'multiple_choice' || q.type === 'ranking') && (
+                      <div className="mt-2 space-y-1.5">
+                        {q.type === 'ranking' && (
+                          <p className="text-[10px] text-[var(--ink-4)]">De gebruiker zet deze opties in volgorde van belang (max. 10).</p>
+                        )}
+                        {(q.options ?? []).map((opt, oi) => (
+                          <div key={oi} className="flex items-center gap-2">
+                            {q.type === 'ranking'
+                              ? <span className="w-4 text-center font-mono text-[10px] tabular-nums text-[var(--ink-4)]">{oi + 1}</span>
+                              : <span className="h-4 w-4 rounded-full border border-[var(--border-md)]" />}
+                            <input type="text" value={opt} onChange={e => { const newOpts = [...(q.options ?? [])]; newOpts[oi] = e.target.value; updateQuestion(i, { options: newOpts }) }} placeholder={`Optie ${oi + 1}`} className="flex-1 border-b border-[var(--border-ed)] bg-transparent pb-1 text-xs text-[var(--ink-2)] focus:outline-none" />
+                            <button type="button" aria-label={`Optie ${oi + 1} verwijderen`} onClick={() => { updateQuestion(i, { options: (q.options ?? []).filter((_, j) => j !== oi) }) }} className="text-[var(--ink-4)] hover:text-negative"><X className="h-3 w-3" /></button>
+                          </div>
+                        ))}
+                        {q.type === 'multiple_choice' && q.allow_other && (
+                          <div className="flex items-center gap-2 text-xs italic text-[var(--ink-4)]">
+                            <span className="h-4 w-4 rounded-full border border-dashed border-[var(--border-md)]" />
+                            {ANDERS_LABEL}… (eigen tekst)
+                          </div>
+                        )}
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <button type="button" onClick={() => updateQuestion(i, { options: [...(q.options ?? []), ''] })} className="text-xs text-[var(--ink-3)] hover:text-[var(--ink-2)]">+ Optie toevoegen</button>
+                          {q.type === 'multiple_choice' && (
+                            <div className="flex items-center gap-3">
+                              <label className="flex items-center gap-1.5 text-[10px] text-[var(--ink-3)]">
+                                <input type="checkbox" checked={q.allow_other} onChange={e => updateQuestion(i, { allow_other: e.target.checked })} className="h-3 w-3 rounded border-[var(--border-md)]" />
+                                Anders, namelijk…
+                              </label>
+                              <label className="flex items-center gap-1.5 text-[10px] text-[var(--ink-3)]">
+                                <input type="checkbox" checked={q.is_multi_select} onChange={e => updateQuestion(i, { is_multi_select: e.target.checked })} className="h-3 w-3 rounded border-[var(--border-md)]" />
+                                Meerdere antwoorden
+                              </label>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    <label className="mt-3 flex items-center gap-1.5 text-[10px] text-[var(--ink-3)]">
+                      <input type="checkbox" checked={q.is_required} onChange={e => updateQuestion(i, { is_required: e.target.checked })} className="h-3 w-3 rounded border-[var(--border-md)]" />
+                      Verplicht
+                    </label>
                   </div>
                   <div className="flex flex-col gap-0.5">
                     <button type="button" onClick={() => moveQuestion(i, -1)} disabled={i === 0} className="text-[var(--ink-4)] hover:text-[var(--ink-2)] disabled:opacity-20"><ChevronUp className="h-4 w-4" /></button>
@@ -383,11 +474,19 @@ function EditorSheet({ questionnaireId, onClose, onSaved }: {
             ))}
           </div>
 
-          <div className="flex gap-2">
-            <button type="button" onClick={() => addQuestion('open')} className="rounded border border-[var(--border-ed)] px-3 py-1.5 text-xs font-medium text-[var(--ink-3)] hover:bg-[var(--subtle)]">+ Open vraag</button>
-            <button type="button" onClick={() => addQuestion('scale')} className="rounded border border-[var(--border-ed)] px-3 py-1.5 text-xs font-medium text-[var(--ink-3)] hover:bg-[var(--subtle)]">+ Schaal 1-10</button>
-            <button type="button" onClick={() => addQuestion('multiple_choice')} className="rounded border border-[var(--border-ed)] px-3 py-1.5 text-xs font-medium text-[var(--ink-3)] hover:bg-[var(--subtle)]">+ Meerkeuze</button>
+          <div className="flex flex-wrap gap-2">
+            {(['open', 'scale', 'multiple_choice', 'yes_no', 'ranking'] as QuestionType[]).map(t => (
+              <button key={t} type="button" onClick={() => addQuestion(t)} className="rounded border border-[var(--border-ed)] px-3 py-1.5 text-xs font-medium text-[var(--ink-3)] hover:bg-[var(--subtle)]">+ {TYPE_LABELS[t]}</button>
+            ))}
           </div>
+
+          {!questionnaireId && (
+            <p className="text-[11px] text-[var(--ink-4)]">Een nieuwe vragenlijst start inactief. Zet hem live met de schakelaar in het overzicht.</p>
+          )}
+
+          {saveError && (
+            <p role="alert" className="text-xs text-negative">{saveError}</p>
+          )}
 
           <button type="button" onClick={handleSave} disabled={saving || !title.trim() || questions.length === 0} className="w-full rounded bg-kern-500 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-kern-600 disabled:opacity-40">
             {saving ? 'Opslaan...' : 'Opslaan'}
@@ -398,14 +497,39 @@ function EditorSheet({ questionnaireId, onClose, onSaved }: {
   )
 }
 
-function formatChoice(choice: string | null): string {
-  if (!choice) return '\u2014'
-  try {
-    const parsed = JSON.parse(choice)
-    if (Array.isArray(parsed)) return parsed.join(', ')
-  } catch { /* plain string */ }
-  return choice
+function Waarde({ children }: { children: React.ReactNode }) {
+  return <span className="font-mono tabular-nums font-semibold">{children}</span>
 }
+
+/** Eén kerncijfer per vraag in het overzicht "Per vraag". */
+function VraagKerncijfer({ vraag, antwoorden }: {
+  vraag: QuestionSummary
+  antwoorden: { answer_text: string | null; answer_scale: number | null; answer_choice: string | null }[]
+}) {
+  if (antwoorden.length === 0) return null
+
+  if (vraag.type === 'scale') {
+    const { min, max } = schaalBereik(vraag)
+    const gem = schaalGemiddelde(antwoorden)
+    const nps = min === 0 && max === 10 ? npsScore(antwoorden) : null
+    return (
+      <>
+        {gem != null && <span className="ml-2">Gem. <Waarde>{gem.toFixed(1)}</Waarde>/{max}</span>}
+        {nps && <span className="ml-2">NPS <Waarde>{nps.score > 0 ? '+' : ''}{nps.score}</Waarde></span>}
+      </>
+    )
+  }
+  if (vraag.type === 'yes_no') {
+    const t = jaNeeTelling(antwoorden)
+    return t ? <span className="ml-2"><Waarde>{t.jaPct}%</Waarde> ja</span> : null
+  }
+  if (vraag.type === 'ranking') {
+    const top = gemiddeldePositie(antwoorden, vraag.options ?? [])[0]
+    return top ? <span className="ml-2">Bovenaan: <span className="font-semibold">{top.optie}</span></span> : null
+  }
+  return null
+}
+
 
 function ResponsesSheet({ questionnaireId, onClose }: {
   questionnaireId: string
@@ -513,7 +637,7 @@ function ResponsesSheet({ questionnaireId, onClose }: {
                   .map(r => (
                   <div key={r.id} className="rounded border border-[var(--border-ed)] px-4 py-3">
                     <p className="text-xs font-medium text-[var(--ink-3)]">{r.question_text_snapshot}</p>
-                    <p className="mt-1 text-sm text-[var(--ink)]">{r.answer_text ?? (r.answer_scale != null ? `${r.answer_scale}/10` : formatChoice(r.answer_choice)) ?? '\u2014'}</p>
+                    <p className="mt-1 text-sm text-[var(--ink)]">{antwoordAlsTekst(r, questions.find(q => q.id === r.question_id)) || '\u2014'}</p>
                   </div>
                 ))}
               </div>
@@ -524,16 +648,14 @@ function ResponsesSheet({ questionnaireId, onClose }: {
             <div className="space-y-2">
               {questions.map(q => {
                 const responses = questionAggregates(q.id)
-                const scaleAvg = q.type === 'scale' && responses.length > 0
-                  ? (responses.reduce((sum, r) => sum + (r.answer_scale ?? 0), 0) / responses.length).toFixed(1)
-                  : null
                 return (
                   <button key={q.id} type="button" onClick={() => setSelectedQuestionId(q.id)} className="flex w-full items-center justify-between rounded border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3 text-left transition-colors hover:bg-[var(--subtle)]">
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-[var(--ink)]">{q.question_text}</p>
+                      <p className="line-clamp-2 whitespace-pre-line text-sm font-medium text-[var(--ink)]">{q.question_text}</p>
                       <p className="mt-0.5 text-xs text-[var(--ink-4)]">
+                        <span className="mr-2 uppercase">{TYPE_LABELS[q.type]}</span>
                         {responses.length} antwoorden
-                        {scaleAvg && <span className="ml-2">Gem. <span className="font-mono tabular-nums font-semibold">{scaleAvg}</span>/10</span>}
+                        <VraagKerncijfer vraag={q} antwoorden={responses} />
                       </p>
                     </div>
                   </button>
@@ -550,45 +672,64 @@ function ResponsesSheet({ questionnaireId, onClose }: {
             return (
               <div>
                 <button type="button" onClick={() => setSelectedQuestionId(null)} className="mb-4 text-xs text-[var(--ink-3)] hover:text-[var(--ink-2)]">&larr; Terug naar overzicht</button>
-                <p className="mb-4 text-sm font-medium text-[var(--ink)]">{q.question_text}</p>
+                <p className="mb-4 whitespace-pre-line text-sm font-medium text-[var(--ink)]">{q.question_text}</p>
 
-                {q.type === 'scale' && responses.length > 0 && (
-                  <div className="mb-4 flex items-end gap-1">
-                    {Array.from({ length: 10 }, (_, i) => i + 1).map(n => {
-                      const count = responses.filter(r => r.answer_scale === n).length
-                      const maxCount = Math.max(...Array.from({ length: 10 }, (_, i) => responses.filter(r => r.answer_scale === i + 1).length), 1)
-                      return (
-                        <div key={n} className="flex flex-1 flex-col items-center gap-1">
-                          <div className="w-full rounded-t bg-kern-500/60" style={{ height: `${Math.max((count / maxCount) * 60, 2)}px` }} />
-                          <span className="text-[10px] font-mono tabular-nums text-[var(--ink-4)]">{n}</span>
-                          <span className="text-[10px] font-mono tabular-nums text-[var(--ink-3)]">{count}</span>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
+                {q.type === 'scale' && responses.length > 0 && (() => {
+                  const { min, max } = schaalBereik(q)
+                  const stappen = Array.from({ length: max - min + 1 }, (_, i) => min + i)
+                  const maxCount = Math.max(...stappen.map(n => responses.filter(r => r.answer_scale === n).length), 1)
+                  return (
+                    <div className="mb-4 flex items-end gap-1">
+                      {stappen.map(n => {
+                        const count = responses.filter(r => r.answer_scale === n).length
+                        return (
+                          <div key={n} className="flex flex-1 flex-col items-center gap-1">
+                            <div className="w-full rounded-t bg-kern-500/60" style={{ height: `${Math.max((count / maxCount) * 60, 2)}px` }} />
+                            <span className="text-[10px] font-mono tabular-nums text-[var(--ink-4)]">{n}</span>
+                            <span className="text-[10px] font-mono tabular-nums text-[var(--ink-3)]">{count}</span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )
+                })()}
 
-                {q.type === 'multiple_choice' && responses.length > 0 && (() => {
-                  const counts: Record<string, number> = {}
-                  for (const r of responses) {
-                    if (!r.answer_choice) continue
-                    let choices: string[]
-                    try { const parsed = JSON.parse(r.answer_choice); choices = Array.isArray(parsed) ? parsed : [r.answer_choice] } catch { choices = [r.answer_choice] }
-                    for (const c of choices) counts[c] = (counts[c] ?? 0) + 1
-                  }
-                  const maxCount = Math.max(...Object.values(counts), 1)
+                {(q.type === 'multiple_choice' || q.type === 'yes_no') && responses.length > 0 && (() => {
+                  const opties = q.type === 'yes_no' ? [JA, NEE] : [...(q.options ?? []), ...(q.allow_other ? [ANDERS_LABEL] : [])]
+                  const { telling, anders } = keuzeTelling(responses, opties)
+                  const maxCount = Math.max(...telling.map(([, c]) => c), 1)
                   return (
                     <div className="mb-4 space-y-1.5">
-                      {Object.entries(counts).map(([choice, count]) => (
+                      {telling.map(([choice, count]) => (
                         <div key={choice} className="flex items-center gap-3">
-                          <span className="w-24 truncate text-xs text-[var(--ink-2)]">{choice}</span>
+                          <span className="w-32 truncate text-xs text-[var(--ink-2)]" title={choice}>{choice}</span>
                           <div className="flex-1 h-4 rounded bg-[var(--subtle)]"><div className="h-full rounded bg-kern-500/60" style={{ width: `${(count / maxCount) * 100}%` }} /></div>
                           <span className="font-mono text-xs tabular-nums text-[var(--ink-3)]">{count}</span>
                         </div>
                       ))}
+                      {anders.length > 0 && (
+                        <div className="pt-2">
+                          <p className="text-[10px] uppercase tracking-wide text-[var(--ink-4)]">Anders, namelijk</p>
+                          <ul className="mt-1 space-y-0.5 text-xs text-[var(--ink-2)]">
+                            {anders.map((t, ti) => <li key={ti}>“{t}”</li>)}
+                          </ul>
+                        </div>
+                      )}
                     </div>
                   )
                 })()}
+
+                {q.type === 'ranking' && responses.length > 0 && (
+                  <ol className="mb-4 space-y-1.5">
+                    {gemiddeldePositie(responses, q.options ?? []).map(({ optie, positie }) => (
+                      <li key={optie} className="flex items-center gap-3 text-xs text-[var(--ink-2)]">
+                        <span className="w-12 font-mono tabular-nums text-[var(--ink-3)]">{positie.toFixed(1)}</span>
+                        <span>{optie}</span>
+                      </li>
+                    ))}
+                    <li className="text-[10px] text-[var(--ink-4)]">Gemiddelde positie — lager is belangrijker.</li>
+                  </ol>
+                )}
 
                 <div className="space-y-2">
                   {responses.map(r => {
@@ -596,7 +737,7 @@ function ResponsesSheet({ questionnaireId, onClose }: {
                     return (
                       <div key={r.id} className="rounded border border-[var(--border-ed)] px-4 py-3">
                         <p className="text-xs text-[var(--ink-4)]">{session?.user_email ?? '?'} &mdash; {new Date(r.created_at).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}</p>
-                        <p className="mt-1 text-sm text-[var(--ink)]">{r.answer_text ?? (r.answer_scale != null ? `${r.answer_scale}/10` : formatChoice(r.answer_choice)) ?? '\u2014'}</p>
+                        <p className="mt-1 text-sm text-[var(--ink)]">{antwoordAlsTekst(r, q) || '\u2014'}</p>
                       </div>
                     )
                   })}

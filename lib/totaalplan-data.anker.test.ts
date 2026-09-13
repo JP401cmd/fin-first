@@ -14,10 +14,10 @@ const DOB = '1986-01-01'
 
 const PROFILE: PersoonlijkPlanProfileRow = {
   full_name: 'Test Persoon', date_of_birth: DOB, household_type: 'single', number_of_children: 0,
-  net_monthly_income: 4000, estimated_monthly_expenses: 2500, expected_return: 7, inflation_rate: 2, marginaal_tarief: null,
+  net_monthly_income: 4000, estimated_monthly_expenses: 2500, expected_return: 7, inflation_rate: 2,
   fire_end_strategy: 'deplete', fire_end_age: 90, fire_legacy_amount: 0,
   retirement_expense_method: 'current_expenses', retirement_expense_custom_amount: null,
-  withdrawal_strategy: 'static', guardrail_floor: null, guardrail_ceiling: null, guardrail_cut_step: null, guardrail_raise_step: null,
+  withdrawal_strategy: 'static', guardrail_floor: null, guardrail_ceiling: null, guardrail_cut_step: null,
   feature_preferences: null,
 }
 

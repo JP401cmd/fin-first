@@ -46,6 +46,8 @@ import {
 } from '@/lib/withdrawal-strategy'
 import type { FireParams } from '@/lib/fire-params'
 import { goalReachedFromProgress, type GoalProgress as CanonicalGoalProgress } from '@/lib/goal-data'
+import { PLAN_REVIEW_HREF, PLAN_REVIEW_NAAM, PLAN_REVIEW_STAP_TITELS, type PlanReviewProgress } from '@/lib/plan-review/types'
+import { usePlanReviewOpener } from '@/components/future/plan-review/plan-review-provider'
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -101,6 +103,10 @@ type NavCard = {
   status: LeverageStatus
   subText: string | null
   detail: NavCardDetail
+  /** Label in Eenvoudig (compact, zonder KPI) — valt terug op `label`. */
+  compactLabel?: string
+  /** TPR-01: deze kaart opent de plan-review in plaats van naar `href` te navigeren. */
+  opensPlanReview?: boolean
 }
 
 // ── Helpers (pure, geëxporteerd voor tests) ────────────────────────────
@@ -276,6 +282,35 @@ function tintForStatus(status: LeverageStatus): string {
     : 'text-horizon-700 bg-horizon-50'
 }
 
+/**
+ * TPR-01 — de Voorkeuren-kaart in review-stand. Status `warn` (stoplicht: aandacht —
+ * er staan nog keuzes onbevestigd), KPI = afgeleide voortgang, drilldown noemt de open
+ * stappen. De href is de deeplink; op /toekomst onderschept de provider de klik en
+ * opent de pane zonder route-roundtrip.
+ */
+export function planReviewCard(progress: PlanReviewProgress): NavCard {
+  const open = progress.stappen.filter((s) => s.status === 'open')
+  const n = open.length
+  return {
+    key: 'voorkeuren',
+    label: PLAN_REVIEW_NAAM,
+    compactLabel: `${PLAN_REVIEW_NAAM} · ${progress.bevestigd}/${progress.totaal}`,
+    href: PLAN_REVIEW_HREF,
+    Icon: SlidersHorizontal,
+    tint: tintForStatus('warn'),
+    kpi: `${progress.bevestigd} van ${progress.totaal}`,
+    status: 'warn',
+    subText: `${n} ${n === 1 ? 'stap' : 'stappen'} nog niet bevestigd`,
+    opensPlanReview: true,
+    detail: {
+      detailLabel: 'Nog open',
+      value: `${n}`,
+      tip: `${open.map((s) => PLAN_REVIEW_STAP_TITELS[s.stap]).join(' · ')}. Per stap zie je waar de app nu mee rekent en wat een andere keuze doet.`,
+      actionLabel: PLAN_REVIEW_NAAM,
+    },
+  }
+}
+
 // ── Card-afleiding ─────────────────────────────────────────────────────
 
 export function buildNavCards({
@@ -287,6 +322,7 @@ export function buildNavCards({
   withdrawalProfiel,
   fireParams,
   calculatorCount,
+  planReview,
 }: {
   goals: GoalWithBudget[]
   goalProgresses: GoalProgress[]
@@ -302,6 +338,13 @@ export function buildNavCards({
   withdrawalProfiel?: WithdrawalProfiel
   fireParams: FireParams
   calculatorCount: number
+  /**
+   * TPR-01 — afgeleide voortgang van de plan-review (`derivePlanReviewProgress`).
+   * Niet voltooid → de Voorkeuren-kaart wordt "Je plan · N van M" met status aandacht
+   * en opent de review (besluit eigenaar 13 sep 2026). Voltooid, of `null`/afwezig
+   * (review niet beschikbaar) → de gewone Voorkeuren-kaart.
+   */
+  planReview?: PlanReviewProgress | null
 }): NavCard[] {
   // Doelen — enige kaart met een betekenisvolle kleur-status.
   const doelen = deriveDoelenStatus(goals, goalProgresses)
@@ -332,6 +375,40 @@ export function buildNavCards({
 
   // Rekenhulp — neutrale dot.
   const calcCount = calculatorCount
+
+  // Voorkeuren-kaart: zolang de plan-review niet voltooid is, is dit de review-ingang.
+  const voorkeurenCard: NavCard =
+    planReview && !planReview.voltooid
+      ? planReviewCard(planReview)
+      : {
+          key: 'voorkeuren',
+          label: 'Voorkeuren',
+          href: '/toekomst/voorkeuren',
+          Icon: SlidersHorizontal,
+          tint: tintForStatus('neutral'),
+          kpi: strategy.name,
+          status: 'neutral',
+          subText: `${withdrawalName} · SWR ${formatPct(fireParams.effectiveSwr)}`,
+          detail: {
+            detailLabel: 'Onttrekking',
+            value: withGlossary(
+              WITHDRAWAL_GLOSSARY_KEYS[activeProfiel],
+              withdrawalName,
+            ),
+            // Vaktermen uit de kaart-voorkant ("Vermogen opeten", "SWR") krijgen
+            // hier hun uitleg — zie WITHDRAWAL_GLOSSARY_KEYS voor het waarom.
+            tip: (
+              <>
+                {withGlossary(`eindstrategie_${fireStrategy.strategy}`, strategy.name)}
+                {' · '}
+                <GlossaryTerm term="swr">SWR</GlossaryTerm>{' '}
+                {formatPct(fireParams.effectiveSwr)}
+                {` · rendement ${formatPct(fireParams.grossReturn)} · inflatie ${formatPct(fireParams.inflationRate)}`}
+              </>
+            ),
+            actionLabel: 'Pas voorkeuren aan',
+          },
+        }
 
   return [
     {
@@ -376,35 +453,7 @@ export function buildNavCards({
         actionLabel: 'Bekijk tijdas',
       },
     },
-    {
-      key: 'voorkeuren',
-      label: 'Voorkeuren',
-      href: '/toekomst/voorkeuren',
-      Icon: SlidersHorizontal,
-      tint: tintForStatus('neutral'),
-      kpi: strategy.name,
-      status: 'neutral',
-      subText: `${withdrawalName} · SWR ${formatPct(fireParams.effectiveSwr)}`,
-      detail: {
-        detailLabel: 'Onttrekking',
-        value: withGlossary(
-          WITHDRAWAL_GLOSSARY_KEYS[activeProfiel],
-          withdrawalName,
-        ),
-        // Vaktermen uit de kaart-voorkant ("Vermogen opeten", "SWR") krijgen
-        // hier hun uitleg — zie WITHDRAWAL_GLOSSARY_KEYS voor het waarom.
-        tip: (
-          <>
-            {withGlossary(`eindstrategie_${fireStrategy.strategy}`, strategy.name)}
-            {' · '}
-            <GlossaryTerm term="swr">SWR</GlossaryTerm>{' '}
-            {formatPct(fireParams.effectiveSwr)}
-            {` · rendement ${formatPct(fireParams.grossReturn)} · inflatie ${formatPct(fireParams.inflationRate)}`}
-          </>
-        ),
-        actionLabel: 'Pas voorkeuren aan',
-      },
-    },
+    voorkeurenCard,
     {
       key: 'rekenhulp',
       label: 'Rekenhulp',
@@ -439,8 +488,13 @@ export function ToekomstNavCards(props: {
   withdrawalProfiel?: WithdrawalProfiel
   fireParams: FireParams
   calculatorCount: number
+  /** Zie `buildNavCards` — TPR-01, afgeleide plan-review-voortgang. */
+  planReview?: PlanReviewProgress | null
 }) {
   const allCards = buildNavCards(props)
+  // Binnen de PlanReviewProvider (op /toekomst) opent de review-kaart de pane
+  // direct; daarbuiten volgt hij gewoon zijn deeplink.
+  const planReviewOpener = usePlanReviewOpener()
 
   // In Eenvoudig-modus renderen de kaarten COMPACT (1 regel: icoon + titel,
   // géén KPI/substext/status-dot) en vervalt de drilldown-chevron — de extra
@@ -472,14 +526,14 @@ export function ToekomstNavCards(props: {
       }
     >
       {cards.map((card) => {
-        const { key, label, href, Icon, tint, kpi, status, subText, detail } = card
+        const { key, label, compactLabel, href, Icon, tint, kpi, status, subText, detail, opensPlanReview } = card
         const expanded = expandedKey === key
-        return (
+        const leverageCard = (
           <LeverageCard
             key={key}
             Icon={Icon}
             tint={tint}
-            label={label}
+            label={simple ? (compactLabel ?? label) : label}
             kpi={kpi}
             status={status}
             subText={subText}
@@ -495,6 +549,26 @@ export function ToekomstNavCards(props: {
           >
             <NavDrilldownCard detail={detail} status={status} href={href} />
           </LeverageCard>
+        )
+        if (!opensPlanReview || !planReviewOpener) return leverageCard
+        // Onderschep de klik op de kaart-link én de drilldown-actielink (capture-fase,
+        // vóór Next's eigen handler). Een gewone klik opent de pane zonder dat /toekomst
+        // al zijn loaders opnieuw draait; ctrl/cmd/shift/middelklik volgen de deeplink.
+        return (
+          <div
+            key={key}
+            className="contents"
+            onClickCapture={(e) => {
+              if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
+              const anchor = (e.target as HTMLElement).closest('a')
+              if (!anchor || anchor.getAttribute('href') !== PLAN_REVIEW_HREF) return
+              e.preventDefault()
+              e.stopPropagation()
+              planReviewOpener.open()
+            }}
+          >
+            {leverageCard}
+          </div>
         )
       })}
     </nav>

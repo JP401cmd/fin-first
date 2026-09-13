@@ -23,10 +23,13 @@ export interface WithdrawalStrategyConfig {
   guardrailFloor: number
   /** Maximale onttrekking als fractie van basis (alleen guardrails) */
   guardrailCeiling: number
-  /** Verlagingsstap bij slechte returns (alleen guardrails) */
+  /**
+   * Aanpassingsstap (alleen guardrails) — omlaag bij een slecht jaar én omhoog bij
+   * een goed jaar. Eén stap voor beide richtingen, zoals de horizon-kernel hem leest
+   * (P!B81 `guardrailStap`); een aparte raise-step bestond alleen in deze v2-config
+   * en bereikte de kern nooit (TPR-10).
+   */
   guardrailCutStep: number
-  /** Verhogingsstap bij goede returns (alleen guardrails) */
-  guardrailRaiseStep: number
 }
 
 /** Context for applyWithdrawalStrategy — all values for ONE simulation year */
@@ -111,7 +114,6 @@ export const WITHDRAWAL_DEFAULTS: WithdrawalStrategyConfig = {
   guardrailFloor: 0.80,
   guardrailCeiling: 1.20,
   guardrailCutStep: 0.10,
-  guardrailRaiseStep: 0.10,
 } as const
 
 // ── Resolver ─────────────────────────────────────────────────────────
@@ -125,7 +127,6 @@ export function resolveWithdrawalStrategy(profile: {
   guardrail_floor?: number | null
   guardrail_ceiling?: number | null
   guardrail_cut_step?: number | null
-  guardrail_raise_step?: number | null
 }): WithdrawalStrategyConfig {
   const validStrategies: WithdrawalStrategyType[] = ['static', 'guardrails']
 
@@ -139,7 +140,6 @@ export function resolveWithdrawalStrategy(profile: {
     guardrailFloor: profile.guardrail_floor ?? WITHDRAWAL_DEFAULTS.guardrailFloor,
     guardrailCeiling: profile.guardrail_ceiling ?? WITHDRAWAL_DEFAULTS.guardrailCeiling,
     guardrailCutStep: profile.guardrail_cut_step ?? WITHDRAWAL_DEFAULTS.guardrailCutStep,
-    guardrailRaiseStep: profile.guardrail_raise_step ?? WITHDRAWAL_DEFAULTS.guardrailRaiseStep,
   }
 }
 
@@ -255,9 +255,10 @@ export function parseWithdrawalProfileConfig(profile: {
 
 // ── Actief onttrekkingsprofiel — ÉÉN voorrangsregel voor motor én weergave ──
 //
-// De editor (components/future/regels/onttrekkingsstrategie-body.tsx) en de
-// onboarding schrijven vast/afnemend/oplopend álle drie weg als enum 'static' en
-// zetten het echte profiel in `withdrawal_profile_config.profiel`. De kernel-adapter
+// De editor (components/future/regels/onttrekkingsstrategie-body.tsx) schrijft
+// vast/afnemend/oplopend álle drie weg als enum 'static' en zet het echte profiel
+// in `withdrawal_profile_config.profiel` (de onboarding deed dat tot TPR-05 ook
+// met 'afnemend'; sindsdien schrijft die niets en geldt NULL → 'vast'). De kernel-adapter
 // (`lib/horizon-kernel/adapter/params.ts#buildOnttrekkingsprofiel`) laat dat profiel
 // daarom voorgaan op de enum. Elk oppervlak dat alléén de enum las — het
 // persoonlijk-plan-/totaalplan-rapport, de Voorkeuren-kaarten — toonde "Vast" terwijl
@@ -483,10 +484,11 @@ function applyGuardrails(
     // (withdrawal already equals previousWithdrawal which is nominal)
   }
 
-  // Prosperity rule: portfolio doing well → raise withdrawal
+  // Prosperity rule: portfolio doing well → raise withdrawal. Dezelfde stap als
+  // de verlaging (één symmetrische stap, zoals kernel-P!B81) — TPR-10.
   const ceilingThreshold = config.guardrailCeiling * ctx.startPortfolio
   if (ctx.currentPortfolio > ceilingThreshold) {
-    withdrawal *= (1 + config.guardrailRaiseStep)
+    withdrawal *= (1 + config.guardrailCutStep)
   }
 
   // Capital preservation rule: portfolio struggling → cut withdrawal

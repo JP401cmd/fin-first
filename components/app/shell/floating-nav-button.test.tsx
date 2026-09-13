@@ -164,6 +164,19 @@ describe('FloatingNavButton — long-press waffle', () => {
     expect(sheetOpen()).toBe('true')
   })
 
+  it('iOS: de capsule start geen tekstselectie of callout tijdens het vasthouden (bug 13 sep 2026)', () => {
+    // Given een iPhone, When de waffle ~500 ms wordt vastgehouden, Then begint iOS
+    // Safari tekstselectie (vergrootglas/Kopieer-menu) en breekt de aanraking af met
+    // een touchcancel — onze 1000 ms-timer haalt de drempel dan nooit. iOS stuurt bij
+    // lang indrukken géén contextmenu-event, dus onContextMenu vangt dit niet: alleen
+    // user-select:none + -webkit-touch-callout:none op de capsule voorkomt het. jsdom
+    // kan het systeemgebaar niet nabootsen; deze toets pint de CSS die het voorkomt.
+    renderPill()
+    const capsule = waffleButton().parentElement
+    expect(capsule?.className).toContain('select-none')
+    expect(capsule?.className).toContain('[-webkit-touch-callout:none]')
+  })
+
   it('meer dan 8px bewegen cancelt de long-press (scroll wint)', () => {
     renderPill()
     fireEvent.touchStart(waffleButton(), touchAt(10, 10))

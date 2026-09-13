@@ -22,6 +22,7 @@ import {
 } from '@/lib/page-status/compute'
 import { DEFICIT_NOTICE_MINIMIZE_KEY } from '@/lib/horizon/deficit-loan-minimize'
 import { STALE_TX_NOTICE_MINIMIZE_KEY } from '@/lib/transaction-staleness-minimize'
+import { AOW_NOTICE_MINIMIZE_KEY } from '@/lib/horizon/aow-notice-minimize'
 
 /** Sleutels die via Object.prototype op élk object-literal "bestaan". */
 const PROTOTYPE_SLEUTELS = [
@@ -77,6 +78,13 @@ describe('normalizeMinimizeKey — schrijf-allowlist', () => {
     expect(normalizeMinimizeKey(`${STALE_TX_NOTICE_MINIMIZE_KEY}/`)).toBe(
       STALE_TX_NOTICE_MINIMIZE_KEY,
     )
+  })
+
+  it('laat de "AOW ontbreekt"-sleutel door (TPR-04) — en de GET-scope groeit niet mee', () => {
+    expect(EXTRA_MINIMIZE_KEYS).toContain(AOW_NOTICE_MINIMIZE_KEY)
+    expect(normalizeMinimizeKey(AOW_NOTICE_MINIMIZE_KEY)).toBe(AOW_NOTICE_MINIMIZE_KEY)
+    expect(normalizeMinimizeKey(`${AOW_NOTICE_MINIMIZE_KEY}/`)).toBe(AOW_NOTICE_MINIMIZE_KEY)
+    expect(normalizePageStatusRoute(AOW_NOTICE_MINIMIZE_KEY)).toBeNull()
   })
 
   it('weigert prototype-sleutels → 400', () => {

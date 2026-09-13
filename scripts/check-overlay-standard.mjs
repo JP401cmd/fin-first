@@ -105,7 +105,6 @@ const ALLOWLIST_ENTRIES = [
   'components/app/horizon/whatif-events.tsx',
   'components/app/household-section.tsx',
   'components/app/manual-transfer-sheet.tsx',
-  'components/app/module-activation-modal.tsx',
   'components/app/notifications/notification-panel.tsx',
   'components/app/persona-card.tsx',
   'components/app/portfolio-allocation-chart.tsx',

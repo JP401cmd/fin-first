@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { FinDots } from '@/components/app/fin-dots'
 import type { IdentityData } from '@/components/onboarding/onboarding-identity'
-import type { HorizonData } from '@/components/onboarding/onboarding-horizon'
+import type { HorizonData } from '@/lib/onboarding/horizon-draft'
 import type { AssetQuickInput, DebtQuickInput } from '@/lib/quick-add/types'
 
 import { OnboardingIdentity } from '@/components/onboarding/onboarding-identity'
@@ -47,7 +47,7 @@ import {
   type HousingChoice,
 } from '@/lib/housing-choice'
 import { OnboardingFreedomTickerProvider } from '@/components/onboarding/freedom-ticker'
-import { INITIAL_HORIZON_DATA } from '@/components/onboarding/onboarding-horizon'
+import { INITIAL_HORIZON_DATA } from '@/lib/onboarding/horizon-draft'
 import { OnboardingSuccess } from '@/components/onboarding/onboarding-success'
 import { WelcomePopup } from '@/components/onboarding/welcome-popup'
 import { type ModuleId, ALL_MODULES } from '@/lib/module-registry'

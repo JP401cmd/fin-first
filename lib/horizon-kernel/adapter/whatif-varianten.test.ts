@@ -70,6 +70,32 @@ describe('applyReturnDeltasToAssets', () => {
     expect(out[0].expected_return).toBeCloseTo(2, 10) // 0 + 2 pp, niet grossReturn + 2 pp
   })
 
+  // TPR-02 — een bewuste 0 blijft 0-basis óók mét een meegegeven profielrendement.
+  it('bewuste 0 + basisRendementPct: de 0 wint (geen v2-achtige ||-backfill)', () => {
+    const assets = [makeAsset({ id: 'btc', asset_type: 'crypto', expected_return: 0 })]
+    const out = applyReturnDeltasToAssets(assets, { crypto: 0.02 }, 0, 7)
+    expect(out[0].expected_return).toBeCloseTo(2, 10)
+  })
+
+  it('ONTBREKEND rendement + delta: basis = basisRendementPct (profiel + delta, zoals de kern-terugval)', () => {
+    const assets = [makeAsset({ id: 'leeg', asset_type: 'investment', expected_return: null as unknown as number })]
+    const out = applyReturnDeltasToAssets(assets, { investment: 0.02 }, 0, 7)
+    expect(out[0].expected_return).toBeCloseTo(9, 10) // 7 + 2 pp
+  })
+
+  it('ONTBREKEND rendement + delta zonder basisRendementPct → 0 + delta (byte-identiek aan vóór TPR-02)', () => {
+    const assets = [makeAsset({ id: 'leeg', asset_type: 'investment', expected_return: null as unknown as number })]
+    const out = applyReturnDeltasToAssets(assets, { investment: 0.02 })
+    expect(out[0].expected_return).toBeCloseTo(2, 10)
+  })
+
+  it('ONTBREKEND rendement zonder delta blijft ontbrekend (terugval gebeurt in de kern, niet hier)', () => {
+    const assets = [makeAsset({ id: 'leeg', asset_type: 'investment', expected_return: null as unknown as number })]
+    const out = applyReturnDeltasToAssets(assets, { cash: 0.02 }, 0, 7)
+    expect(out[0]).toBe(assets[0])
+    expect(out[0].expected_return).toBeNull()
+  })
+
   it('muteert de originele array niet', () => {
     const assets = [makeAsset({ id: 'inv', expected_return: 7 })]
     applyReturnDeltasToAssets(assets, { investment: 0.02 })
@@ -130,7 +156,6 @@ describe('buildWhatifKernelAdapterInput', () => {
   it('laat bedradingsgat-velden undefined (adapter-defaults)', () => {
     const out = buildWhatifKernelAdapterInput({ profile, assets, debts: [], lifeEvents: [] })
     expect(out.profile.yearly_essential_expenses).toBeUndefined()
-    expect(out.profile.marginaal_tarief).toBeUndefined()
     expect(out.profile.deficit_loan_rate).toBeUndefined()
     // withdrawal_profile_config is GEEN bedradingsgat meer: het gekozen profiel
     // reist mee (B-042-vervolg, zie whatif-page-client.onttrekkingsprofiel.test.ts).

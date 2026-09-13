@@ -3,6 +3,7 @@
 import { memo, useMemo, useState } from 'react'
 import { SankeyDiagram, type SankeyNode, type SankeyLink } from '@/components/app/sankey-diagram'
 import { formatMaskedCurrency } from '@/lib/format'
+import { rangeTouchSeekProps } from '@/lib/range-touch-seek'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import type { SimRow } from '@/lib/fire-simulation'
 import type { UnifiedProjectionRow } from '@/lib/unified-projection'
@@ -395,6 +396,7 @@ export const HorizonCashflowSankey = memo(function HorizonCashflowSankey({
             value={year}
             onChange={(e) => setYear(parseInt(e.target.value, 10))}
             className="slider-module"
+            {...rangeTouchSeekProps}
             aria-label="Selecteer leeftijd"
             aria-valuemin={minAge}
             aria-valuemax={maxAge}

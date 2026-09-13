@@ -36,7 +36,13 @@ export interface FireParams {
   inflationRate: number  // bijv. 0.02
   effectiveSwr: number   // grossReturn - BOX3_DRAG - inflationRate
   box3Method: Box3Method // 'forfaitair' | 'werkelijk'
-  marginaalTarief: number // schijf-1- of topschijf-tarief (jaar-afgeleid via BOX1_PARAMS)
+  /**
+   * Schijf-1- of topschijf-tarief, ALTIJD jaar-afgeleid via BOX1_PARAMS uit het
+   * netto maandinkomen. De profielkolom `marginaal_tarief` is per TPR-10 geen
+   * invoer meer (geen scherm schreef 'm, de kern las 'm niet); de kolom blijft
+   * bestaan maar wordt nergens meer gelezen of geschreven.
+   */
+  marginaalTarief: number
 }
 
 /**
@@ -67,7 +73,7 @@ export function resolveFireParams(profile: FireProfileInput): FireParams {
   const inflationRate = profile.inflation_rate ?? INFLATION
   const effectiveSwr = computeEffectiveSwr(grossReturn, inflationRate)
   const box3Method: Box3Method = (profile.box3_method === 'werkelijk') ? 'werkelijk' : 'forfaitair'
-  const marginaalTarief = profile.marginaal_tarief ?? deriveMarginaalTarief({ netMonthlyIncome: profile.net_monthly_income })
+  const marginaalTarief = deriveMarginaalTarief({ netMonthlyIncome: profile.net_monthly_income })
   return { grossReturn, inflationRate, effectiveSwr, box3Method, marginaalTarief }
 }
 
@@ -76,7 +82,6 @@ export interface FireProfileInput {
   expected_return?: number | null
   inflation_rate?: number | null
   box3_method?: string | null
-  marginaal_tarief?: number | null
   net_monthly_income?: number | null
 }
 

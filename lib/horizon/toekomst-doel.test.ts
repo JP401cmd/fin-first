@@ -226,6 +226,18 @@ describe('doelGewogenRendement', () => {
     expect(doelGewogenRendement(assets, undefined)).toBeCloseTo(7, 6)
   })
 
+  // TPR-02 — zelfde ketting als de kernel: ontbrekend rendement → terugval; bewuste 0 → 0.
+  it('ontbrekend rendement → terugvalRendement, bewuste 0 blijft 0, zonder terugval → 0', () => {
+    const assets = [
+      asset({ current_value: 10_000, expected_return: null as unknown as number, asset_type: 'investment' }),
+      asset({ current_value: 10_000, expected_return: 0, asset_type: 'crypto' }),
+    ]
+    // (10000·0,07 + 10000·0) / 20000 · 100 = 3,5
+    expect(doelGewogenRendement(assets, undefined, 0.07)).toBeCloseTo(3.5, 6)
+    // Oude nul-basis blijft het gedrag zonder terugval.
+    expect(doelGewogenRendement(assets, undefined)).toBe(0)
+  })
+
   it('geeft null zonder assets met waarde', () => {
     expect(doelGewogenRendement([], undefined)).toBeNull()
     expect(

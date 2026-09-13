@@ -45,6 +45,7 @@ import type { LifeEvent, UserDefinedCashflow } from '@/lib/horizon-data'
 import {
   DOWNSIZE_DEFAULT_SALES_COSTS_PCT,
   HOUSING_COST_AFTER_SALE_PCT,
+  HOUSING_DEPLETION_MARGIN_DEFAULT_MONTHS,
   REVERSE_MORTGAGE_DEFAULT_MAX_LOAN_PCT,
   REVERSE_MORTGAGE_DEFAULT_RATE,
 } from '@/lib/constants'
@@ -161,7 +162,10 @@ export const HOUSING_STRATEGY_DESCRIPTIONS: Record<HousingStrategyMode, string> 
 // depletionThresholdYears default 0: sinds de simulatie-gebaseerde trigger
 // (lib/housing-trigger.ts) is dit veld een VEILIGHEIDSMARGE bovenop de
 // verkoopkosten-buffer (jaren uitgaven, geïndexeerd) — geen drempel meer.
-// 0 = trigger precies wanneer het echt nodig is (liquide ≤ verkoopkosten).
+// TPR-06 (13 sep 2026): 0 betekent "geen eigen marge" en valt via
+// `resolveDepletionMarginYears` terug op HOUSING_DEPLETION_MARGIN_DEFAULT_MONTHS
+// (24 mnd, = Excel P!B60). Vóór TPR-06 gold 0 letterlijk (verkoop pas bij een lege
+// liquide pot), terwijl geen enkele opgeslagen 0 een bewuste keuze was.
 export const DEFAULT_DOWNSIZE_CONFIG: DownsizeConfig = {
   mode: 'downsize',
   trigger: 'fixed_age',
@@ -797,6 +801,28 @@ export function resolveDownsizeTriggerOnDepletion(
  *               Als liquide al onder threshold zit: trigger op currentAge.
  *               Bij yearlyExpenses ≤ 0: fallback naar config.triggerAge.
  */
+/**
+ * Effectieve veiligheidsmarge (JAREN uitgaven) bij "wanneer nodig" — de ENE plek van de
+ * regel "geen eigen marge → app-default" (TPR-06, 13 sep 2026). Een positieve
+ * `depletionThresholdYears` is de eigen keuze en telt letterlijk; 0/negatief/niet-eindig
+ * is "geen eigen marge" en valt terug op `HOUSING_DEPLETION_MARGIN_DEFAULT_MONTHS / 12`
+ * (2 jaar = Excel P!B60). Consumenten: de kernel-adapter (`buildWoningFromConfig` →
+ * `drempelMaandenUitgave`), `resolveTriggerAge` (app-zijdige trigger-schatting) en de
+ * UI-aanname-regel (`isDepletionMarginDefault`). Waarom 0 en niet null: het veld is
+ * `number` en élke opgeslagen rij draagt 0 als niet-gekozen literal; een nullable veld
+ * zou een backfill vragen zonder dat er een bewuste 0 te bewaren valt.
+ */
+export function resolveDepletionMarginYears(depletionThresholdYears: number): number {
+  const v = Number(depletionThresholdYears)
+  return Number.isFinite(v) && v > 0 ? v : HOUSING_DEPLETION_MARGIN_DEFAULT_MONTHS / 12
+}
+
+/** Geldt voor deze config de app-default-marge (geen eigen marge ingevuld)? */
+export function isDepletionMarginDefault(depletionThresholdYears: number): boolean {
+  const v = Number(depletionThresholdYears)
+  return !(Number.isFinite(v) && v > 0)
+}
+
 export function resolveTriggerAge(
   trigger: HousingStrategyTrigger,
   triggerAge: number,
@@ -807,7 +833,8 @@ export function resolveTriggerAge(
 ): number {
   if (trigger === 'fixed_age') return Math.max(currentAge, triggerAge)
   if (yearlyExpenses <= 0) return Math.max(currentAge, triggerAge)
-  const threshold = depletionThresholdYears * yearlyExpenses
+  // TPR-06: zelfde marge-resolutie als de kernel (0 = geen eigen marge → 24 mnd).
+  const threshold = resolveDepletionMarginYears(depletionThresholdYears) * yearlyExpenses
   if (currentLiquidPortfolio <= threshold) return currentAge
   const yearsToTrigger = (currentLiquidPortfolio - threshold) / yearlyExpenses
   const predicted = currentAge + Math.floor(yearsToTrigger)

@@ -134,6 +134,9 @@ const HORIZON_PAGES: StaticPage[] = [
   { label: 'Doelen',                    sublabel: 'Financiële doelen en voortgang',     href: '/toekomst/doelen',                       icon: Goal,        module: 'horizon', requiredModule: 'toekomstplannen' },
   { label: 'Gebeurtenissen',            sublabel: 'Levensgebeurtenissen plannen',       href: '/toekomst/gebeurtenissen',               icon: Calendar,    module: 'horizon', requiredModule: 'toekomstplannen' },
   { label: 'Voorkeuren',                sublabel: 'Rendement, inflatie en regels',      href: '/toekomst/voorkeuren',                   icon: Settings,    module: 'horizon', requiredModule: 'toekomstplannen' },
+  // TPR-01 — de plan-review heropenen (deeplink; de pane leeft op /toekomst). Literal i.p.v.
+  // PLAN_REVIEW_HREF: de route-dekkingstest leest dit bestand letterlijk.
+  { label: 'Je voorkeuren voor je plan instellen', sublabel: 'Je toekomstkeuzes stap voor stap',   href: '/toekomst?planreview=open',              icon: ListChecks,  module: 'horizon', requiredModule: 'toekomstplannen' },
   { label: 'Rekenhulp',                 sublabel: 'AI-rekenhulpen en bibliotheek',      href: '/toekomst/rekenhulp',                    icon: Calculator,  module: 'horizon', requiredModule: 'toekomstplannen' },
   { label: 'Wat-als',                   sublabel: 'Scenario builder met sliders',       href: '/toekomst/whatif',                       icon: Compass,     module: 'horizon', requiredModule: 'toekomstplannen' },
 ]

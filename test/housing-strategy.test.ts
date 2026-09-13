@@ -291,6 +291,15 @@ describe('resolveTriggerAge', () => {
   it('on_depletion valt terug op fixed_age bij yearlyExpenses ≤ 0', () => {
     expect(resolveTriggerAge('on_depletion', 70, 2, 45, 0, 100_000)).toBe(70)
   })
+
+  // TPR-06 — 0 = geen eigen marge → dezelfde app-default als de kernel (2 jaar).
+  it('on_depletion met marge 0 rekent met de default-marge (2 jaar), identiek aan marge 2', () => {
+    expect(resolveTriggerAge('on_depletion', 80, 0, 45, 30_000, 250_000)).toBe(
+      resolveTriggerAge('on_depletion', 80, 2, 45, 30_000, 250_000),
+    )
+    // Zonder de default zou 250K/30K = 8,33 → 53; mét 2 jaar marge → 51.
+    expect(resolveTriggerAge('on_depletion', 80, 0, 45, 30_000, 250_000)).toBe(51)
+  })
 })
 
 // ── estimators ───────────────────────────────────────────────

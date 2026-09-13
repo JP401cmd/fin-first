@@ -60,6 +60,7 @@ import {
   computeHouseholdProjection,
   type HouseholdProjectionOutcome,
 } from '@/lib/horizon-kernel/household-router'
+import { memberProfileToKernelAdapterProfile } from '@/lib/horizon-kernel/adapter/partner-blok'
 
 // ── Result types ────────────────────────────────────────────────────────────
 
@@ -245,25 +246,15 @@ export interface HouseholdProjectionResult {
 
 /**
  * Vertaal een huishoud-lid-profiel (`MemberProfile`, uit de privacy-gated RPC
- * `household_member_profiles`) naar een `KernelAdapterProfile`. Mapt UITSLUITEND de al-
- * geladen velden — géén data-verbreding. Ontbrekende kern-velden (box3-methode, woning-/
- * onttrekkings-config, guardrails) blijven undefined → adapter-defaults. De post-pensioen-
- * uitgave wordt in de router expliciet geïnjecteerd (via `essential_budgets`), dus de
- * retirement-velden hier zijn slechts een neutrale doorgifte.
+ * `household_member_profiles`) naar een `KernelAdapterProfile`. Sinds TPR-07 (13 sep
+ * 2026) de GEDEELDE mapper `memberProfileToKernelAdapterProfile` (lib/horizon-kernel/
+ * adapter/partner-blok.ts) — dezelfde functie voedt het partnerblok van de convergentie-
+ * route in huishoudperspectief, zodat de hoofdgrafiek en deze sectie één grondslag delen.
+ * De post-pensioen-uitgave wordt in de router expliciet geïnjecteerd (via
+ * `essential_budgets`), dus de retirement-velden hier zijn slechts een neutrale doorgifte.
  */
 function toKernelAdapterProfile(p: MemberProfile | null): KernelAdapterProfile {
-  return {
-    date_of_birth: p?.date_of_birth ?? null,
-    net_monthly_income: p?.net_monthly_income ?? null,
-    estimated_monthly_expenses: p?.estimated_monthly_expenses ?? null,
-    expected_return: p?.expected_return ?? null,
-    inflation_rate: p?.inflation_rate ?? null,
-    fire_end_strategy: p?.fire_end_strategy ?? null,
-    fire_end_age: p?.fire_end_age ?? null,
-    fire_legacy_amount: p?.fire_legacy_amount ?? null,
-    retirement_expense_method: p?.retirement_expense_method ?? null,
-    retirement_custom_amount: p?.retirement_expense_custom_amount ?? null,
-  }
+  return memberProfileToKernelAdapterProfile(p)
 }
 
 // ── Kernel-only projectie-helpers (FASE 6 stap 5A) ────────────────────────────

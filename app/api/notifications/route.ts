@@ -20,6 +20,14 @@ import { loadSpendLimitsSection } from '@/lib/spend-limits/loader'
 import { BUDGET_OR_SPLIT_FILTER, BUDGET_SPENDING_TX_COLUMNS } from '@/lib/budget-spending-fetch'
 import { buildMilestoneCopy } from '@/lib/milestones/copy'
 import { MILESTONE_FRESH_WINDOW_MS, type AchievedMilestoneRow } from '@/lib/milestones/types'
+import {
+  buildTipTerugNotifications,
+  tipTerugLookbackStart,
+  TIP_TERUG_COLUMNS,
+  TIP_TERUG_QUERY_LIMIT,
+  retractStaleTipTerug,
+  type TipTerugRow,
+} from '@/lib/notifications/tip-terug'
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -34,6 +42,7 @@ export type NotificationType =
   | 'budget_model_proposal'
   | 'spend_limit'
   | 'milestone'
+  | 'postponed_tip'
 
 /**
  * Eén koppelrij met de embed erbij. PostgREST levert een to-one embed soms als
@@ -162,6 +171,7 @@ export async function GET(request: NextRequest) {
       budget_model_proposal: true,
       spend_limit: true,
       milestone: true,
+      postponed_tip: true,
     }
     const prefs: Record<string, boolean> = prefsRes.data?.value
       ? { ...defaultPrefs, ...JSON.parse(prefsRes.data.value) }
@@ -799,6 +809,47 @@ export async function GET(request: NextRequest) {
       console.error('Milestone notification error:', err)
     }
 
+    // ── 4f. Uitgestelde tip is terug ─────────────────────────────────
+    // Eén bericht per aanbeveling waarvan `postponed_until` verstreken is —
+    // vervangt de teller op Fins bubbel (sep 2026). Beslislogica en dedupe-id in
+    // `lib/notifications/tip-terug.ts`; het "verstreken?"-oordeel is dat van de
+    // tips-pagina (lib/recommendation-status.ts).
+    //
+    // Bewust NIET in de langzame checks: dezelfde set is de geldigheidsset
+    // waarmee de historie-merge hieronder berichten intrekt zodra de tip
+    // geaccepteerd, genegeerd of opnieuw uitgesteld is. Met 15 min cache bleef
+    // "je wachttijd is voorbij" na een beslissing nog een kwartier staan. Eén
+    // smalle query per poll.
+    //
+    // Net als bij de mijlpaal geen voorkeur-check in de generatie — het
+    // eindfilter doet dat. Expliciete `.eq('user_id')`: dit is een persoonlijk
+    // bericht, niet leunen op de RLS-scoping van `recommendations`.
+    //
+    // `tipTerugValidIds` blijft `null` bij een fout: dan wordt er niets
+    // ingetrokken (een lege set zou elk tip-bericht uit de historie vegen).
+    let tipTerugValidIds: Set<string> | null = null
+    try {
+      const today = new Date().toISOString().slice(0, 10)
+      const { data: tipRows, error: tipError } = await supabase
+        .from('recommendations')
+        .select(TIP_TERUG_COLUMNS)
+        .eq('user_id', user.id)
+        .eq('status', 'postponed')
+        .lte('postponed_until', today)
+        .gte('postponed_until', tipTerugLookbackStart(today))
+        .order('postponed_until', { ascending: false })
+        .limit(TIP_TERUG_QUERY_LIMIT)
+
+      if (tipError) throw tipError
+      const tips = buildTipTerugNotifications((tipRows ?? []) as TipTerugRow[], today)
+      tipTerugValidIds = new Set(tips.map((n) => n.id))
+      for (const n of tips) {
+        notifications.push({ ...n, createdAt: now, read: readIds.includes(n.id) })
+      }
+    } catch (err) {
+      console.error('Postponed tip notification error:', err)
+    }
+
     // ── 6. Partner transaction notifications ─────────────────────────
     // Check if user is in a household and has partner transaction notification prefs
 
@@ -1327,6 +1378,11 @@ export async function GET(request: NextRequest) {
     // Start from stored history, prune entries older than 30 days
     let history = storedHistory.filter((h) => h.createdAt >= storageCutoffStr)
 
+    // Tip-terug-berichten die niet meer waar zijn (tip geaccepteerd, genegeerd of
+    // opnieuw uitgesteld) verdwijnen óók uit de historie — zie sectie 4f. Alleen
+    // met een set uit een geslaagde query.
+    if (tipTerugValidIds) history = retractStaleTipTerug(history, tipTerugValidIds)
+
     // Merge current notifications into history (upsert by id)
     const historyIds = new Set(history.map((h) => h.id))
     for (const n of filtered) {
@@ -1490,7 +1546,7 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    const validTypes = ['budget', 'sync', 'recommendation', 'partner_transaction', 'horizon', 'holding_alert', 'briefing', 'budget_model_proposal', 'spend_limit', 'milestone']
+    const validTypes = ['budget', 'sync', 'recommendation', 'partner_transaction', 'horizon', 'holding_alert', 'briefing', 'budget_model_proposal', 'spend_limit', 'milestone', 'postponed_tip']
     const sanitized: Record<string, boolean> = {}
     for (const key of validTypes) {
       sanitized[key] = preferences[key] !== false

@@ -20,7 +20,9 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('profiles')
-    .select('withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step, withdrawal_profile_config')
+    // `guardrail_raise_step` is per TPR-10 geen contractveld meer: de kern kent
+    // één stap (cut) voor beide richtingen; de kolom blijft, wordt niet gelezen.
+    .select('withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, withdrawal_profile_config')
     .eq('id', claims.sub)
     .single()
 
@@ -33,7 +35,6 @@ export async function GET() {
     guardrail_floor: data?.guardrail_floor ?? WITHDRAWAL_DEFAULTS.guardrailFloor,
     guardrail_ceiling: data?.guardrail_ceiling ?? WITHDRAWAL_DEFAULTS.guardrailCeiling,
     guardrail_cut_step: data?.guardrail_cut_step ?? WITHDRAWAL_DEFAULTS.guardrailCutStep,
-    guardrail_raise_step: data?.guardrail_raise_step ?? WITHDRAWAL_DEFAULTS.guardrailRaiseStep,
     // V4 — onttrekkingsprofiel-curve (JSONB). NULL = frontend/adapter gebruikt Excel-defaults.
     withdrawal_profile_config: data?.withdrawal_profile_config ?? null,
   })
@@ -130,7 +131,6 @@ export async function PUT(request: NextRequest) {
   const floor = body.guardrail_floor !== undefined ? Number(body.guardrail_floor) : undefined
   const ceiling = body.guardrail_ceiling !== undefined ? Number(body.guardrail_ceiling) : undefined
   const cutStep = body.guardrail_cut_step !== undefined ? Number(body.guardrail_cut_step) : undefined
-  const raiseStep = body.guardrail_raise_step !== undefined ? Number(body.guardrail_raise_step) : undefined
 
   if (floor !== undefined) {
     if (isNaN(floor) || floor < 0.50 || floor > 2.00) {
@@ -155,12 +155,6 @@ export async function PUT(request: NextRequest) {
     }
   }
 
-  if (raiseStep !== undefined) {
-    if (isNaN(raiseStep) || raiseStep < 0.01 || raiseStep > 0.50) {
-      return NextResponse.json({ error: 'Raise step moet tussen 0.01 en 0.50 liggen' }, { status: 400 })
-    }
-  }
-
   // ── Validate onttrekkingsprofiel-curve (V4) + flex-spending (roadmap M), optioneel ──
   let profileConfig: Record<string, number | string | boolean> | null | undefined
   if ('withdrawal_profile_config' in body) {
@@ -181,7 +175,6 @@ export async function PUT(request: NextRequest) {
   if (floor !== undefined) updateData.guardrail_floor = floor
   if (ceiling !== undefined) updateData.guardrail_ceiling = ceiling
   if (cutStep !== undefined) updateData.guardrail_cut_step = cutStep
-  if (raiseStep !== undefined) updateData.guardrail_raise_step = raiseStep
   if (profileConfig !== undefined) updateData.withdrawal_profile_config = profileConfig
 
   const { error } = await supabase
@@ -198,7 +191,6 @@ export async function PUT(request: NextRequest) {
     guardrail_floor: floor ?? WITHDRAWAL_DEFAULTS.guardrailFloor,
     guardrail_ceiling: ceiling ?? WITHDRAWAL_DEFAULTS.guardrailCeiling,
     guardrail_cut_step: cutStep ?? WITHDRAWAL_DEFAULTS.guardrailCutStep,
-    guardrail_raise_step: raiseStep ?? WITHDRAWAL_DEFAULTS.guardrailRaiseStep,
     ...(profileConfig !== undefined ? { withdrawal_profile_config: profileConfig } : {}),
   })
 }

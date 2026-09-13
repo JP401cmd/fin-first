@@ -11,7 +11,14 @@ import {
   parseWithdrawalProfileConfig,
 } from '@/lib/withdrawal-strategy'
 import { resolvePotRules, sanitizeCategoriePrios } from '@/lib/pot-rules'
-import { parseHousingStrategy, type DownsizeConfig, type ReverseMortgageConfig } from '@/lib/housing-strategy'
+import {
+  isDepletionMarginDefault,
+  parseHousingStrategy,
+  resolveDepletionMarginYears,
+  type DownsizeConfig,
+  type ReverseMortgageConfig,
+} from '@/lib/housing-strategy'
+import { HOUSING_DEPLETION_MARGIN_DEFAULT_MONTHS } from '@/lib/constants'
 import {
   buildOnttrekkingsprofiel,
   buildWoning,
@@ -215,6 +222,48 @@ describe('V8 — housing fallbackAge', () => {
   it('leeg → base-defaults ongemoeid (Excel-verkoopleeftijd)', () => {
     const w = buildWoning({ mode: 'include_full' })
     expect(w.verkoopleeftijd).toBe(EXCEL_WONING_DEFAULTS.verkoopleeftijd)
+  })
+})
+
+// ── TPR-06 — veiligheidsmarge: 0 = geen eigen marge → app-default (= Excel P!B60) ──
+
+describe('TPR-06 — depletionThresholdYears → drempelMaandenUitgave', () => {
+  const downsizeBase = {
+    mode: 'downsize' as const,
+    trigger: 'on_depletion' as const,
+    triggerAge: 68,
+    salePricePct: 1,
+    salesCostsPct: 0.04,
+    newMonthlyHousingCost: null,
+  }
+
+  it('0 (geen eigen marge) → 24 maanden, niet 0 — verkoop vuurt niet pas op een lege pot', () => {
+    const w = buildWoning({ ...downsizeBase, depletionThresholdYears: 0 })
+    expect(w.drempelMaandenUitgave).toBe(HOUSING_DEPLETION_MARGIN_DEFAULT_MONTHS)
+    expect(w.drempelMaandenUitgave).toBe(24)
+  })
+
+  it('veld ontbreekt in de JSONB → parse-default 0 → óók 24 maanden', () => {
+    const w = buildWoning({ ...downsizeBase })
+    expect(w.drempelMaandenUitgave).toBe(24)
+  })
+
+  it('eigen marge > 0 telt letterlijk (1,5 jaar → 18 mnd; 3 jaar → 36 mnd)', () => {
+    expect(buildWoning({ ...downsizeBase, depletionThresholdYears: 1.5 }).drempelMaandenUitgave).toBe(18)
+    expect(buildWoning({ ...downsizeBase, depletionThresholdYears: 3 }).drempelMaandenUitgave).toBe(36)
+  })
+
+  it('kern-default en app-default zijn één getal (P!B60 = HOUSING_DEPLETION_MARGIN_DEFAULT_MONTHS)', () => {
+    expect(EXCEL_WONING_DEFAULTS.drempelMaandenUitgave).toBe(HOUSING_DEPLETION_MARGIN_DEFAULT_MONTHS)
+  })
+
+  it('resolveDepletionMarginYears: 0/negatief/NaN → 2 jaar; positief → letterlijk', () => {
+    expect(resolveDepletionMarginYears(0)).toBe(2)
+    expect(resolveDepletionMarginYears(-1)).toBe(2)
+    expect(resolveDepletionMarginYears(Number.NaN)).toBe(2)
+    expect(resolveDepletionMarginYears(0.5)).toBe(0.5)
+    expect(isDepletionMarginDefault(0)).toBe(true)
+    expect(isDepletionMarginDefault(0.5)).toBe(false)
   })
 })
 

@@ -82,14 +82,11 @@ export interface PersonaProfile {
   guardrail_floor?: number
   guardrail_ceiling?: number
   guardrail_cut_step?: number
-  guardrail_raise_step?: number
   // Profile income/expense estimates (for users without budgets/transactions)
   net_monthly_income?: number
   estimated_monthly_expenses?: number
   // Arbitrary feature preferences (JSONB)
   feature_preferences?: Record<string, unknown>
-  // Marginaal tarief (IB Box 1)
-  marginaal_tarief?: number | null // expliciete override (fractie 0–1) of null = auto (jaar-afgeleid)
   // Rebalancing
   rebalance_threshold?: number // drift threshold 1-20%, default 5
   // Widget dashboard
@@ -1005,7 +1002,6 @@ const lisaData: PersonaData = {
     retirement_expense_method: 'essential_budgets',
     // 'bucket' is verwijderd (DB genormaliseerd → static, migratie 20260703115225).
     withdrawal_strategy: 'static',
-    marginaal_tarief: null, // modaal inkomen → auto (laagste schijf, jaar-afgeleid uit BOX1_PARAMS)
     feature_preferences: {},
     widget_prefs: makeWidgetPrefs([
       'netto_vermogen', 'cash_flow', { id: 'fire_prognose', size: 'full' }, 'doelen',
@@ -1717,8 +1713,7 @@ const marijkeData: PersonaData = {
     guardrail_floor: 0.80,
     guardrail_ceiling: 1.20,
     guardrail_cut_step: 0.10,
-    guardrail_raise_step: 0.10,
-    marginaal_tarief: 0.4950, // hoog inkomen — hoogste schijf
+    // marginaal tarief: jaar-afgeleid uit net_monthly_income (TPR-10) — geen override meer.
     net_monthly_income: 3400,
     estimated_monthly_expenses: 2800,
     feature_preferences: {},
@@ -1999,7 +1994,6 @@ const tessaData: PersonaData = {
     withdrawal_strategy: 'static',
     net_monthly_income: 7600,
     estimated_monthly_expenses: 4100,
-    marginaal_tarief: 0.4950,
     feature_preferences: {},
     widget_prefs: makeWidgetPrefs([
       'netto_vermogen', 'cash_flow', { id: 'fire_prognose', size: 'full' }, 'doelen',

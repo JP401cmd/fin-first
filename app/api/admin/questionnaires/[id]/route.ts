@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server'
 import { forbidden, notFound, serverError } from '@/lib/api/respond'
+import { parseBody } from '@/lib/api/parse-body'
 import { createClient } from '@/lib/supabase/server'
 import { isSuperAdmin } from '@/lib/admin'
+import { isGeldigVragenlijstId } from '@/lib/questionnaires/antwoord'
+import { VragenlijstWijzigSchema, vraagNaarRij } from '@/lib/questionnaires/vraag-invoer'
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -9,6 +12,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   if (!(await isSuperAdmin(supabase))) {
     return forbidden()
   }
+  if (!isGeldigVragenlijstId(id)) return notFound()
 
   const { data, error } = await supabase
     .from('questionnaires')
@@ -31,27 +35,17 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   if (!(await isSuperAdmin(supabase))) {
     return forbidden()
   }
+  if (!isGeldigVragenlijstId(id)) return notFound()
 
-  const body = await req.json()
-  const { title, description, is_active, questions } = body as {
-    title?: string
-    description?: string
-    is_active?: boolean
-    questions?: {
-      id?: string
-      type: 'open' | 'scale' | 'multiple_choice'
-      question_text: string
-      options?: string[]
-      scale_min_label?: string
-      scale_max_label?: string
-      is_required?: boolean
-      is_multi_select?: boolean
-    }[]
-  }
+  // Eerst de hele body keuren, dan pas schrijven: een ongeldige vraag halverwege
+  // mag de lijst niet half bijgewerkt achterlaten.
+  const parsed = await parseBody(VragenlijstWijzigSchema, req)
+  if (!parsed.ok) return parsed.response
+  const { title, description, is_active, questions } = parsed.data
 
   const updates: Record<string, unknown> = {}
   if (title !== undefined) updates.title = title
-  if (description !== undefined) updates.description = description
+  if (description !== undefined) updates.description = description || null
   if (is_active !== undefined) updates.is_active = is_active
 
   if (Object.keys(updates).length > 0) {
@@ -63,67 +57,57 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   }
 
   if (questions) {
-    // Separate existing (have id) from new questions (no id)
-    // This preserves question IDs so response foreign keys stay intact
-    const { data: existingQuestions } = await supabase
+    // Bestaande vragen houden hun id, zodat antwoorden eraan gekoppeld blijven.
+    const { data: existingQuestions, error: bestaandFout } = await supabase
       .from('questionnaire_questions')
       .select('id')
       .eq('questionnaire_id', id)
+    if (bestaandFout) return serverError(bestaandFout, 'admin-questionnaire:PUT')
 
     const existingIds = new Set((existingQuestions ?? []).map(q => q.id))
     const incomingIds = new Set(questions.filter(q => q.id).map(q => q.id))
 
-    // 1. Delete removed questions
-    const toDelete = [...existingIds].filter(eid => !incomingIds.has(eid))
-    if (toDelete.length > 0) {
-      await supabase
-        .from('questionnaire_questions')
-        .delete()
-        .in('id', toDelete)
-    }
+    // Volgorde bewust: eerst bijwerken en invoegen, pas als laatste verwijderen.
+    // Faalt een eerdere stap, dan is er nog niets weggegooid — een verwijderde
+    // vraag laat zijn antwoorden achter met question_id = null, en dat is niet
+    // terug te draaien. (Echt atomair kan alleen in één databasetransactie.)
 
-    // 2. Update existing questions in place
+    // 1. Bestaande vragen ter plekke bijwerken
     for (let i = 0; i < questions.length; i++) {
       const q = questions[i]
       if (q.id && existingIds.has(q.id)) {
-        await supabase
+        const { error } = await supabase
           .from('questionnaire_questions')
-          .update({
-            sort_order: i + 1,
-            type: q.type,
-            question_text: q.question_text,
-            options: q.type === 'multiple_choice' ? q.options ?? null : null,
-            scale_min_label: q.type === 'scale' ? q.scale_min_label ?? null : null,
-            scale_max_label: q.type === 'scale' ? q.scale_max_label ?? null : null,
-            is_required: q.is_required ?? true,
-            is_multi_select: q.is_multi_select ?? false,
-          })
+          .update(vraagNaarRij(q, i + 1))
           .eq('id', q.id)
+          .eq('questionnaire_id', id)
+        if (error) return serverError(error, 'admin-questionnaire:PUT')
       }
     }
 
-    // 3. Insert new questions
-    const newQuestions = questions
+    // 2. Nieuwe vragen invoegen
+    const newRows = questions
       .map((q, i) => ({ q, i }))
       .filter(({ q }) => !q.id || !existingIds.has(q.id))
-    if (newQuestions.length > 0) {
-      const rows = newQuestions.map(({ q, i }) => ({
-        questionnaire_id: id,
-        sort_order: i + 1,
-        type: q.type,
-        question_text: q.question_text,
-        options: q.type === 'multiple_choice' ? q.options ?? null : null,
-        scale_min_label: q.type === 'scale' ? q.scale_min_label ?? null : null,
-        scale_max_label: q.type === 'scale' ? q.scale_max_label ?? null : null,
-        is_required: q.is_required ?? true,
-        is_multi_select: q.is_multi_select ?? false,
-      }))
+      .map(({ q, i }) => ({ questionnaire_id: id, ...vraagNaarRij(q, i + 1) }))
 
+    if (newRows.length > 0) {
       const { error: insertError } = await supabase
         .from('questionnaire_questions')
-        .insert(rows)
+        .insert(newRows)
 
       if (insertError) return serverError(insertError, 'admin-questionnaire:PUT')
+    }
+
+    // 3. Pas nu: vragen die uit de lijst zijn gehaald (antwoorden houden hun snapshot)
+    const toDelete = [...existingIds].filter(eid => !incomingIds.has(eid))
+    if (toDelete.length > 0) {
+      const { error } = await supabase
+        .from('questionnaire_questions')
+        .delete()
+        .in('id', toDelete)
+        .eq('questionnaire_id', id)
+      if (error) return serverError(error, 'admin-questionnaire:PUT')
     }
   }
 

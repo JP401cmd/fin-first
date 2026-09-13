@@ -1747,8 +1747,8 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
       // Let op: dit betekent NIET dat budgetten uitsluitend server-side worden
       // aangemaakt. Server-side gebeurt het in `/api/budgetteren/setup` en
       // `/api/onboarding/save-own-data`; client-side bestaan `budget-form.tsx`
-      // (:341/:370/:422 — de component achter de CTA hierboven) en
-      // `module-activation-modal.tsx` nog. Ook dit bestand update budgets nog
+      // (:341/:370/:422 — de component achter de CTA hierboven) nog. Ook dit
+      // bestand update budgets nog
       // client-side, in `moveBudget()` (sort_order) en in `handleSave()` van
       // de budget-detailpane. Die client-writes staan open onder ADR 0058
       // fase b; de seed-schuld is dus versmald, niet weg.

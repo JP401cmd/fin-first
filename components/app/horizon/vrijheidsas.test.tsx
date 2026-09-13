@@ -253,11 +253,15 @@ describe('Vrijheidsas rendering', () => {
     expect(slider).toHaveAttribute('aria-valuetext', expect.stringContaining('stevig'))
   })
 
-  it('rendert de driezone-tick-labels (verwacht/laatst) en stop-marker', () => {
+  it('rendert de driezone-tick-labels (verwacht/laatst) en de stop-marker als VERKENNING (TPR-09)', () => {
     render(<Vrijheidsas {...baseProps} />)
     expect(screen.getByText('verwacht')).toBeInTheDocument()
     expect(screen.getByText('laatst')).toBeInTheDocument()
-    expect(screen.getByText(/^stop\s/)).toBeInTheDocument()
+    // De marker heet wat hij is: een verkenning, geen plan — het oude "stop X" is weg.
+    expect(screen.getByText(/^verkenning\s60$/)).toBeInTheDocument()
+    expect(screen.queryByText(/^stop\s/)).not.toBeInTheDocument()
+    // …en de stopleeftijd-regel draagt dezelfde markering.
+    expect(screen.getByText('verkenning')).toBeInTheDocument()
   })
 
   it('toont GEEN afwijking-duiding zonder actief scenario', () => {
@@ -341,17 +345,17 @@ describe('Vrijheidsas rendering', () => {
 })
 
 /**
- * ADR 0129 F3b + melding B-038 — vast anker: de slider blíjft verkenning, maar
- * de twee snelknoppen eronder zijn weg.
+ * ADR 0129 F3b + melding B-038 + TPR-09 — vast anker: de slider blíjft verkenning.
  *
- * Wat er stond: "Op AOW-leeftijd" (zette alleen de slider) en "Maak dit mijn
- * plan" (schreef alléén het stop-anker). Samen lazen ze als het keuzemenu van
- * het plan terwijl ze twee van de vijf keuzes raakten — eindleeftijd, eind-vorm
- * en nalatenschap kwamen er niet in voor en bleven onvindbaar. Wat ervoor in de
- * plaats komt is één regel die naar de strategie-modal wijst, waar álle keuzes
- * staan en waar het volledige plan in één keer geschreven wordt.
+ * B-038 haalde twee snelknoppen weg: "Op AOW-leeftijd" (zette alleen de slider) en
+ * een "Maak dit mijn plan" dat alléén het stop-anker schreef — een half plan, naast
+ * een verwijzing die ontbrak. TPR-09 (eigenaarsbesluit 13 sep 2026) brengt één knop
+ * terug, maar anders: zij verschijnt alleen als de consumer het schrijfpad aanbiedt
+ * (`onMaakPlan`), draagt vóór de klik keuze · effect · waarom, staat NAAST de
+ * verwijzing naar de volledige plan-keuzes, en de consumer schrijft het volledige
+ * plan (route-contract R3). De AOW-snelknop blijft weg.
  */
-describe('Vrijheidsas — vast anker (ADR 0129 F3b, knoppen weg per B-038)', () => {
+describe('Vrijheidsas — vast anker (ADR 0129 F3b, B-038, TPR-09)', () => {
   it('toont de verken-intro met het plan-stopmoment, zonder naar een vastzet-knop te wijzen', () => {
     render(<Vrijheidsas {...baseProps} ankerVast planStopAge={58.5} stopAge={62} />)
     expect(screen.getByText(/Verken een ander stopmoment\. Je plan verandert er niet van/)).toBeTruthy()
@@ -360,18 +364,52 @@ describe('Vrijheidsas — vast anker (ADR 0129 F3b, knoppen weg per B-038)', () 
     expect(screen.queryByText(/pas als je het vastzet/)).toBeNull()
   })
 
-  it('de twee oude snelknoppen bestaan niet meer', () => {
+  it('zonder schrijfpad (geen onMaakPlan) is er geen plan-knop; de AOW-snelknop bestaat niet meer', () => {
     render(<Vrijheidsas {...baseProps} ankerVast planStopAge={58.5} stopAge={62} aowAge={67.25} />)
     expect(screen.queryByRole('button', { name: 'Maak dit mijn plan' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Op AOW-leeftijd' })).toBeNull()
   })
 
-  it('wijst in plaats daarvan naar de plek waar álle plan-keuzes staan', () => {
+  it('wijst naar de plek waar álle plan-keuzes staan', () => {
     const onKeuzesOpenen = vi.fn()
     render(<Vrijheidsas {...baseProps} aowAge={67.25} onKeuzesOpenen={onKeuzesOpenen} />)
-    expect(screen.getByText(/Schuiven verkent — je plan blijft staan/)).toBeTruthy()
+    expect(screen.getByText(/Dit is een verkenning: de lijn verschuift alleen hier/)).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: /plan-keuzes/ }))
     expect(onKeuzesOpenen).toHaveBeenCalledTimes(1)
+  })
+
+  // ── TPR-09 — verkenning → plan ──────────────────────────────────────────────
+  it('met onMaakPlan: de knop geeft de VERKENDE stopleeftijd door en de tekst draagt keuze · effect · waarom', () => {
+    const onMaakPlan = vi.fn()
+    render(<Vrijheidsas {...baseProps} stopAge={58.5} onMaakPlan={onMaakPlan} onKeuzesOpenen={vi.fn()} />)
+    const uitleg = screen.getByText(/Dit is een verkenning: de lijn verschuift alleen hier/)
+    // effect
+    expect(uitleg.textContent).toContain('dan rekent de hele app met deze stopleeftijd')
+    // waarom
+    expect(uitleg.textContent).toContain('Relevant omdat je plan je vrijheidsleeftijd en je doelen bepaalt')
+    // de verwijzing naar de rest van het plan blijft NAAST de knop staan (B-038-bezwaar)
+    expect(screen.getByRole('button', { name: /plan-keuzes/ })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Maak dit mijn plan' }))
+    expect(onMaakPlan).toHaveBeenCalledWith(58.5)
+  })
+
+  it('is inert wanneer de verkende leeftijd al het plan-anker is', () => {
+    const onMaakPlan = vi.fn()
+    render(<Vrijheidsas {...baseProps} ankerVast planStopAge={60} stopAge={60} onMaakPlan={onMaakPlan} planIsDezeStop />)
+    const knop = screen.getByRole('button', { name: 'Dit is al je plan' })
+    expect(knop).toBeDisabled()
+    fireEvent.click(knop)
+    expect(onMaakPlan).not.toHaveBeenCalled()
+  })
+
+  it('toont de laadstaat en blokkeert de knop tijdens de PUT', () => {
+    render(<Vrijheidsas {...baseProps} onMaakPlan={vi.fn()} maakPlanBusy />)
+    expect(screen.getByRole('button', { name: 'Opslaan…' })).toBeDisabled()
+  })
+
+  it('onder het nu-anker is er ook met onMaakPlan geen plan-knop (niets te verankeren)', () => {
+    render(<Vrijheidsas {...baseProps} stopKeuzeVerborgen onMaakPlan={vi.fn()} />)
+    expect(screen.queryByRole('button', { name: 'Maak dit mijn plan' })).toBeNull()
   })
 
   it('de schuif zelf blijft verkennen — de link raakt de stopkeuze niet aan', () => {

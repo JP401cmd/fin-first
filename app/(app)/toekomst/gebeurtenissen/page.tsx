@@ -64,7 +64,6 @@ export default async function ToekomstGebeurtenissenPage() {
     box3Method: horizonData.box3Method,
     hasPartner: horizonData.hasPartner,
     bankAccountCash: horizonData.unlinkedCash,
-    monthlySavingsOverride: horizonData.monthlySavingsOverride,
     baseAnnualSavingsFromCashflow: horizonData.baseAnnualSavingsFromCashflow,
     housingStrategy: horizonData.housingStrategy,
   })
@@ -174,7 +173,6 @@ export default async function ToekomstGebeurtenissenPage() {
           aowAgeFractional: aowFractional,
           box3Method: horizonData.box3Method,
           bankAccountCash: horizonData.unlinkedCash,
-          monthlySavingsOverride: horizonData.monthlySavingsOverride,
           baseAnnualSavingsFromCashflow: horizonData.baseAnnualSavingsFromCashflow,
           housingStrategy: horizonData.housingStrategy,
           deficitLoanRate: resolveDeficitLoanRate(

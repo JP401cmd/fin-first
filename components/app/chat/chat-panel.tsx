@@ -22,8 +22,10 @@ import { FinDots } from '@/components/app/fin-dots'
 import { ActionEditModal } from '@/components/app/action-edit-modal'
 import type { Action, ActionStatus } from '@/lib/recommendation-data'
 import { renderMarkdown, findToolInvocation, TOOL_LOADING_STATES, TOOL_OUTPUT_STATES, type MessagePart } from './markdown-helpers'
-import { X, Send, Loader2, Zap, Check, AlertTriangle, RefreshCw, Pin, PinOff, ShieldCheck, Sparkles, Clock, ThumbsDown, Cpu, Megaphone, ListChecks, History, RotateCw } from 'lucide-react'
+import { X, Send, Loader2, Zap, Check, AlertTriangle, RefreshCw, Pin, PinOff, ShieldCheck, Sparkles, Clock, ThumbsDown, Cpu, Megaphone, ListChecks, History, RotateCw, ClipboardList } from 'lucide-react'
 import { MeldingView } from './melding/melding-view'
+import { VragenlijstView } from './vragenlijst/vragenlijst-view'
+import { useActieveVragenlijsten } from './vragenlijst/use-actieve-vragenlijsten'
 import { GidsView } from './gids/gids-view'
 import { GesprekkenLijst } from './gesprekken/gesprekken-lijst'
 import {
@@ -776,7 +778,9 @@ export function ChatPanel() {
   // dit component en blijft dus staan terwijl de gebruiker meldt, de
   // welkomstgids doorloopt óf zijn gesprekkenlijst opent — die vierde modus
   // raakt `conversationId` bewust NIET aan (R1 / WF-WILL-24).
-  const [mode, setMode] = useState<'chat' | 'melding' | 'gids' | 'gesprekken'>('chat')
+  // De vijfde, 'vragenlijst', laat Fin de vragen van een actieve vragenlijst
+  // één voor één stellen; ook die raakt het lopende gesprek niet aan.
+  const [mode, setMode] = useState<'chat' | 'melding' | 'gids' | 'gesprekken' | 'vragenlijst'>('chat')
   // Een gesprek dat niet opgehaald kon worden. Blijft in de LIJST staan (H1):
   // half hervatten is erger dan niet hervatten, want dan schrijft de volgende
   // beurt op nummers die al bezet zijn.
@@ -822,6 +826,11 @@ export function ChatPanel() {
   // `mode`: dat zou de intent op mount overrulen (de payload landt een tick
   // later) en de gebruiker in het gesprek laten staan.
   const gidsActief = mode === 'gids' && guideDisplay !== 'none'
+
+  // Actieve vragenlijsten (beheer zet ze live op /beheer/vragenlijsten). Het
+  // icoon verschijnt alleen als er iets in te vullen is; opgehaald bij openen.
+  const { lijsten: vragenlijsten, herlaad: herlaadVragenlijsten } = useActieveVragenlijsten(isOpen)
+  const toonVragenlijstKnop = vragenlijsten.length > 0 || mode === 'vragenlijst'
 
   // Dynamic domain: route-aware and gated by active modules
   const pathname = usePathname()
@@ -1847,6 +1856,13 @@ export function ChatPanel() {
       ? 'Terug naar de chat'
       : 'Je gesprekken'
 
+  // En voor de vragenlijst.
+  const vragenlijstKnopLabel = meldingBezig
+    ? 'Je melding wordt verstuurd'
+    : mode === 'vragenlijst'
+      ? 'Terug naar de chat'
+      : 'Vragenlijst invullen'
+
   // De launcher (FAB) leeft nu in FinHome — die toont de bubbel én opent de chat.
   // Wanneer de chat gesloten is, rendert ChatPanel niets.
   if (!isOpen) return null
@@ -1906,6 +1922,10 @@ export function ChatPanel() {
                     : `Welkomstgids · ${guideOpenCount} open`
                   : mode === 'melding'
                     ? 'Melding maken'
+                    : mode === 'vragenlijst'
+                    // Kort houden: naast vijf kop-iconen breekt een langere tekst op
+                    // mobiel over twee regels. "Niet naar de AI" staat in de lijst zelf.
+                    ? 'Vragenlijst'
                     : mode === 'gesprekken'
                       ? 'Je gesprekken'
                       : isLocalMode
@@ -1962,6 +1982,26 @@ export function ChatPanel() {
                 }`}
               >
                 <ListChecks className="h-4 w-4" />
+              </button>
+            )}
+            {/* Vragenlijst — alleen als er een actieve lijst klaarstaat. Staat
+                vóór de megafoon: beide gaan over "wat vind je ervan", maar
+                de vragenlijst is een uitnodiging van ons, de megafoon jouw
+                eigen initiatief. Werkt zonder AI-abonnement: er draait geen
+                model, de vragen komen letterlijk uit beheer. */}
+            {toonVragenlijstKnop && (
+              <button
+                type="button"
+                onClick={() => setMode((m) => (m === 'vragenlijst' ? 'chat' : 'vragenlijst'))}
+                disabled={meldingBezig}
+                aria-label={vragenlijstKnopLabel}
+                aria-pressed={mode === 'vragenlijst'}
+                title={vragenlijstKnopLabel}
+                className={`touch-target flex items-center justify-center rounded-lg hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent ${
+                  mode === 'vragenlijst' ? 'text-fin-700' : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
+                }`}
+              >
+                <ClipboardList className="h-4 w-4" />
               </button>
             )}
             {/* Melding maken — bug, vraag of aanbeveling. Bewust náást de
@@ -2025,6 +2065,12 @@ export function ChatPanel() {
           <GidsView />
         ) : mode === 'melding' ? (
           <MeldingView onClose={() => setMode('chat')} onBezigChange={setMeldingBezig} />
+        ) : mode === 'vragenlijst' ? (
+          <VragenlijstView
+            lijsten={vragenlijsten}
+            onClose={() => setMode('chat')}
+            onVeranderd={herlaadVragenlijsten}
+          />
         ) : (
         <>
         {/* Geen AI-abonnement → upsell i.p.v. chat. Bewust vóór de Wft-gate en

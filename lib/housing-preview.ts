@@ -1,6 +1,6 @@
 /**
  * housing-preview — kernel-native eigen-woning-scenario-preview voor de strategie-modal
- * (`components/identity/instellingen/housing-strategy-section.tsx`).
+ * (`components/future/strategie/housing-strategy-section.tsx`).
  *
  * (FASE 6 stap 5A — kernel-only.) De preview toont per (concept-)woonstrategie het
  * trigger-moment, de kernbedragen en de nieuwe vrijheidsleeftijd. Sinds de v2-verwijdering

@@ -188,8 +188,6 @@ export default function WhatIfPage({ marktVolatiliteit }: WhatIfPageProps) {
   const [bankAccountCash, setBankAccountCash] = useState(0)
   /** Canonieke 6m-spaarquote (incl. aflossing) — baseline voor de spaarquote-slider. */
   const [savingsRate6m, setSavingsRate6m] = useState<number | null>(null)
-  /** Handmatige spaar-override uit profiles.monthly_savings_override (null = geen). */
-  const [monthlySavingsOverride, setMonthlySavingsOverride] = useState<number | null>(null)
   /** Jaarlijks spaarbedrag uit de cashflow (inkomen × spaarquote) — zelfde
    *  bron als /toekomst, via resolveSavingsSource. */
   const [baseAnnualSavingsFromCashflow, setBaseAnnualSavingsFromCashflow] = useState(0)
@@ -254,7 +252,7 @@ export default function WhatIfPage({ marktVolatiliteit }: WhatIfPageProps) {
         supabase.from('transactions').select('amount').gte('date', monthStart).lt('date', monthEnd),
         supabase.from('assets').select('current_value, monthly_contribution, net_worth_inclusion_pct').eq('is_active', true),
         supabase.from('debts').select('current_balance, net_worth_inclusion_pct').eq('is_active', true),
-        supabase.from('profiles').select(`date_of_birth, retirement_expense_method, retirement_expense_custom_amount, ${FIRE_PLAN_COLUMNS}, expected_return, inflation_rate, estimated_monthly_expenses, household_type, box3_method, withdrawal_strategy, withdrawal_profile_config, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step, net_monthly_income, income_source, expenses_source, monthly_savings_override, housing_strategy_config, feature_preferences`).single(),
+        supabase.from('profiles').select(`date_of_birth, retirement_expense_method, retirement_expense_custom_amount, ${FIRE_PLAN_COLUMNS}, fire_legacy_include_illiquid, expected_return, inflation_rate, estimated_monthly_expenses, household_type, box3_method, box3_heffingvrij_inkomen, withdrawal_strategy, withdrawal_profile_config, guardrail_floor, guardrail_ceiling, guardrail_cut_step, net_monthly_income, income_source, expenses_source, housing_strategy_config, feature_preferences`).single(),
         supabase.from('budgets').select('id, name, default_limit, interval, budget_type, is_essential').eq('is_essential', true).in('budget_type', ['expense']).is('parent_id', null),
         supabase.from('life_events').select('*').eq('is_active', true).order('sort_order', { ascending: true }),
         supabase.from('budgets').select('id, name, parent_id, default_limit, is_essential, interval, budget_type').not('parent_id', 'is', null).not('budget_type', 'in', '("archive","income","savings")'),
@@ -465,9 +463,7 @@ export default function WhatIfPage({ marktVolatiliteit }: WhatIfPageProps) {
       })
       setBaseAnnualSavingsFromCashflow(baseAnnualSavings)
 
-      // Handmatige spaar-override + housing-strategie (zelfde bronnen als /toekomst).
-      const overrideRaw = profileResult.data?.monthly_savings_override
-      setMonthlySavingsOverride(overrideRaw == null ? null : Number(overrideRaw))
+      // Housing-strategie (zelfde bron als /toekomst).
       setHousingStrategy(parseHousingStrategy(profileResult.data?.housing_strategy_config))
 
       setBox3Method(fireParams.box3Method)
@@ -700,14 +696,13 @@ export default function WhatIfPage({ marktVolatiliteit }: WhatIfPageProps) {
         box3Method,
         hasPartner,
         bankAccountCash,
-        monthlySavingsOverride,
         baseAnnualSavingsFromCashflow,
         housingStrategy,
       })
       if (!built) return null
       return { input: built.input }
     },
-    [input, fireStrategy, withdrawalStrategyConfig, userGrossReturn, userInflation, userAowAge, fullAssets, fullDebts, box3Method, hasPartner, bankAccountCash, monthlySavingsOverride, baseAnnualSavingsFromCashflow, housingStrategy],
+    [input, fireStrategy, withdrawalStrategyConfig, userGrossReturn, userInflation, userAowAge, fullAssets, fullDebts, box3Method, hasPartner, bankAccountCash, baseAnnualSavingsFromCashflow, housingStrategy],
   )
 
   // ── Base UnifiedProjectionInput (geen scenario-events) — voor consumers die

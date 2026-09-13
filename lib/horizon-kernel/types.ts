@@ -377,6 +377,15 @@ export interface WoningStrategieParams {
   readonly verkoopkostenPct: number
   /** P!B63 — huur na verkoop (% van WOZ per jaar). */
   readonly huurNaVerkoopPctWozPerJaar: number
+  /**
+   * BUITEN ORACLE-DOMEIN (TPR-03, 13 sep 2026) — nieuwe woonlast na verkoop in €/MAAND,
+   * in geld van vandaag (app-veld `newMonthlyHousingCost`). Gezet → `tables/bez.ts` boekt
+   * in de verkoopmaand `bedrag × inflatie-index(m)` i.p.v. `huiswaarde(m−1) × P!B63 / 12`,
+   * en indexeert daarna maandelijks door (ongewijzigd BA-pad). `null`/weggelaten → het
+   * %-WOZ-pad; `input-from-fixture` zet dit veld nooit → oracle-parity byte-identiek.
+   * Een bewuste 0 = geen woonlast na verkoop.
+   */
+  readonly huurNaVerkoopPerMaand?: number | null
   /** P!B64 — startleeftijd opname (opeethypotheek). */
   readonly opeetStartleeftijdOpname: number
   /** P!B65 — max lening als % van de overwaarde. */

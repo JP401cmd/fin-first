@@ -17,6 +17,7 @@ import { useCallback } from 'react'
 import { formatDecimal, formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { SectionLabel } from '@/components/editorial'
+import { BOX3_METHOD_LABELS } from '@/lib/box3-method'
 import type {
   PersoonlijkPlanCashflow,
   PersoonlijkPlanDemografie,
@@ -129,7 +130,7 @@ export function InkomenBlock({ data }: { data: PersoonlijkPlanInkomen }) {
         />
         <DefinitionRow
           label="Box 3 methode"
-          value={data.box3Method === 'forfaitair' ? 'Forfaitair (vermogensmix)' : 'Werkelijk rendement'}
+          value={BOX3_METHOD_LABELS[data.box3Method]}
         />
       </div>
     </section>
@@ -256,7 +257,7 @@ export function FireParamsBlock({ data }: { data: PersoonlijkPlanFireParams }) {
         />
         <DefinitionRow
           label="Box 3 methode"
-          value={data.box3Method === 'forfaitair' ? 'Forfaitair' : 'Werkelijk'}
+          value={BOX3_METHOD_LABELS[data.box3Method]}
         />
         <DefinitionRow
           label="Effectieve SWR"
@@ -328,14 +329,9 @@ export function OnttrekkingBlock({ data }: { data: PersoonlijkPlanOnttrekking })
               value={`${formatDecimal(data.guardrailCeiling * 100, 0)}% van basis`}
             />
             <DefinitionRow
-              label="Cut-step"
+              label="Aanpassingsstap"
               value={`${formatDecimal(data.guardrailCutStep * 100, 0)}%`}
-              sub="verlaging bij beurswind tegen"
-            />
-            <DefinitionRow
-              label="Raise-step"
-              value={`${formatDecimal(data.guardrailRaiseStep * 100, 0)}%`}
-              sub="verhoging bij beurswind mee"
+              sub="omlaag bij beurswind tegen, omhoog bij beurswind mee"
             />
           </div>
         )}

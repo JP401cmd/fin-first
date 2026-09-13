@@ -36,6 +36,7 @@ const PRODUCER_FILES = [
   'lib/notifications/woz-reminder.ts',
   'lib/notifications/pension-reminder.ts',
   'lib/notifications/spend-limit.ts',
+  'lib/notifications/tip-terug.ts',
 ]
 
 /**

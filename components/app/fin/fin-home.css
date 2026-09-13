@@ -87,21 +87,6 @@
    centreren de 28px-avatar dáárover heen. */
 .wh-slot .wh-avatar--bubble { right: 0.9375rem; bottom: 0.3125rem; }
 .wh-slot .wh-privacy, .wh-slot .wh-warning { top: -0.1875rem; right: -0.1875rem; }
-.wh-bubble--slot .wh-badge {
-  top: -0.3125rem; left: -0.3125rem;
-  min-width: 1.125rem; height: 1.125rem; padding: 0 0.25rem;
-  font-size: 10px;
-}
-
-.wh-badge {
-  position: absolute; top: -0.375rem; left: -0.375rem;
-  display: flex; align-items: center; justify-content: center;
-  min-width: 1.5rem; height: 1.5rem; padding: 0 0.375rem;
-  border-radius: 9999px; background: var(--color-fin-600);
-  color: #fff; font-size: 11px; font-weight: 600;
-  box-shadow: 0 1px 4px rgba(0,0,0,.2);
-  outline: 2px solid var(--paper);
-}
 .wh-privacy { position: absolute; top: -0.25rem; right: -0.25rem; }
 
 /* Waarschuwing op de FAB: lokaal gekozen, maar op dít toestel niet bruikbaar.

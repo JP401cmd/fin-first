@@ -332,7 +332,7 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
       id: 'as-coach', x: 560, y: row(5), w: 220, h: 66, kind: 'appsvc',
       title: 'Inzicht- & coachingsdienst',
       lead: 'Fin (AI-coach), aanbevelingen, volgende stappen, aandachtspunten-bus en de briefing-kaarten. Elk van deze diensten kan on-device draaien via t-lokale-ai in plaats van via de AI-gateway — dezelfde functie, ander transport. De gebruiker kiest dat per uitvoergroep op /mijn/privacy (ADR 0056, 0078). Draagt ook de gebruikersmelding (bug/vraag/aanbeveling) die vanuit het gesprek met Fin te openen is — Supabase blijft de bron, een dagelijkse cron duwt onverstuurde meldingen best-effort door naar de Trifinity-queue in Notion. Sinds ADR 0137 bewaart de dienst het gesprek zelf ook: een gesprekkenlijst met hervatten, hernoemen en verwijderen, plus route- en datagefilterde suggestievragen in de lege staat. Waar dat transcript landt kiest de gebruiker (profiles.chat_history_mode: account / apparaat / uit, default account), met één vloer boven die keuze — een beurt die via t-lokale-ai is gevoerd gaat nooit naar de server, ook niet bij "account", en die vloer wordt bij het HERVATTEN opnieuw getoetst en niet uit het opgeslagen record overgenomen. Beheer heeft geen inzage: dat is applicatielaag (ADMIN_EXPORT_UITGESLOTEN in lib/user-data-tables.ts), niet RLS.',
-      items: ['/api/ai/*', '/api/briefing', '/api/next-steps', '/api/user-reports', '/api/chat/*', 'lib/coach-suggestions'],
+      items: ['/api/ai/*', '/api/briefing', '/api/next-steps', '/api/user-reports', '/api/questionnaires', '/api/chat/*', 'lib/coach-suggestions'],
     },
     {
       id: 'as-nieuws', x: 560, y: row(6), w: 220, h: 66, kind: 'appsvc',

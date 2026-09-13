@@ -22,6 +22,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Box1TaxYear } from '@/lib/box1-tax'
 import { computeHorizonFireSim } from '@/lib/fire-target-shared'
+import { rawContextZonderPartner } from '@/lib/horizon-kernel/convergentie-router'
 import type { VariantenSweepSnapshot } from './varianten-sweep'
 
 /**
@@ -39,7 +40,8 @@ export async function loadVariantenSweepSnapshot(
   const run = await computeHorizonFireSim(supabase)
   if (!run) return null
   return {
-    rawContext: run.rawContext,
+    // Vangrail TPR-07: de snapshot gaat naar de client — nooit het partnerblok mee.
+    rawContext: rawContextZonderPartner(run.rawContext),
     // De AOW-leeftijd komt UIT de run (dezelfde die de kernel-adapter gebruikte);
     // deze laag leidt 'm nooit zelf af — dat zou een tweede bron zijn.
     aowLeeftijd: run.aowAgeFractional,

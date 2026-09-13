@@ -10,6 +10,7 @@ import {
   type FigureProps,
 } from '@/components/editorial'
 import { useModalAnimation } from '@/lib/hooks/use-modal-animation'
+import { rangeTouchSeekProps } from '@/lib/range-touch-seek'
 import { JaarruimteCard } from '@/components/overview/jaarruimte-card'
 import {
   JAARRUIMTE_TITLE,
@@ -605,6 +606,7 @@ function ShiftVerkenner({
           value={i}
           onChange={(e) => setIndex(Number(e.target.value))}
           className="slider-module w-full"
+          {...rangeTouchSeekProps}
           aria-valuetext={`${fc(selected.shifted)} verschoven — netto ${signed(
             selected.netEffect,
             fc,

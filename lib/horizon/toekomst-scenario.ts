@@ -21,7 +21,7 @@
 
 import type { Asset, AssetType } from '@/lib/asset-data'
 import type { AssetCategorie } from '@/lib/horizon-kernel/types'
-import { ASSET_TYPE_TO_CATEGORIE } from '@/lib/horizon-kernel/adapter/potten'
+import { ASSET_TYPE_TO_CATEGORIE, potRendement } from '@/lib/horizon-kernel/adapter/potten'
 import { isSliderWorkEvent } from '@/lib/horizon-kernel/adapter/guard'
 import type { WhatIfEvent } from '@/lib/types/horizon-whatif'
 import type { AssetGroupReturn } from '@/lib/types/horizon-whatif'
@@ -394,18 +394,24 @@ export function expandCategorieReturnDeltas(
  * kern-categorie (Nederlandse labels) i.p.v. per asset_type. Alleen actieve assets met
  * waarde > 0 (inclusion-gewogen) tellen mee; categorieën zonder waarde verschijnen niet.
  *
- * NUL-BASIS (bewuste keuze): het baseline-rendement is `expected_return/100` ZONDER de
- * `userGrossReturn`-fallback die de whatif-pagina-preview gebruikt. Dit spiegelt exact
- * wat de kernel toepast (`buildAssetPotten`: `expected_return/100`, nul-basis) én wat de
- * delta raakt (`applyReturnDeltasToAssets`: `0 + delta` op een 0%-asset — zie
- * whatif-varianten.ts module-doc punt 2). Een grossReturn-fallback zou een display-vs-
- * effect-drift introduceren (baseline 7% getoond, maar +2 pp landt op 0+2 in de kernel).
+ * DEZELFDE KETTING ALS DE KERNEL (bewuste keuze): het baseline-rendement per bezitting
+ * is `potRendement(expected_return, terugvalRendement)` — een ingevulde waarde (ook een
+ * bewuste 0) telt letterlijk, alleen een ONTBREKEND rendement valt terug op het
+ * meegegeven profielrendement (TPR-02). Dat spiegelt exact wat de kernel toepast
+ * (`buildAssetPotten`) én wat de delta raakt (`applyReturnDeltasToAssets`). Vóór TPR-02
+ * was dit een pure nul-basis; de v2-achtige `||`-backfill die van een bewuste 0 een 7%
+ * maakte blijft bewust afwezig — die zou een display-vs-effect-drift geven (baseline 7%
+ * getoond, maar +2 pp landt op 0+2 in de kernel). `terugvalRendement` (decimaal)
+ * weggelaten → 0 (byte-identiek aan de oude nul-basis).
  *
  * `assetType` draagt hier de CATEGORIE-naam (bv. `'Beleggingen'`), zodat de Marktbias-
  * `value`-record op `returnDeltaByCategorie` gekeyed is; `label` = dezelfde Nederlandse
  * categorie-naam. Uitvoer in de canonieke categorie-volgorde (stabiele UI).
  */
-export function buildCategorieReturnGroups(assets: readonly Asset[]): AssetGroupReturn[] {
+export function buildCategorieReturnGroups(
+  assets: readonly Asset[],
+  terugvalRendement = 0,
+): AssetGroupReturn[] {
   const acc = new Map<AssetCategorie, { totalValue: number; weightedReturnSum: number }>()
 
   for (const a of assets) {
@@ -415,8 +421,7 @@ export function buildCategorieReturnGroups(assets: readonly Asset[]): AssetGroup
     if (!(value > 0)) continue
 
     const categorie = ASSET_TYPE_TO_CATEGORIE[a.asset_type as AssetType] ?? 'Overig'
-    const ret = Number(a.expected_return ?? 0) / 100
-    const safeRet = Number.isFinite(ret) ? ret : 0
+    const safeRet = potRendement(a.expected_return, terugvalRendement)
 
     const existing = acc.get(categorie)
     if (existing) {

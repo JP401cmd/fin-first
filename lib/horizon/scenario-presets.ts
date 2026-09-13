@@ -45,6 +45,7 @@ import {
   buildStopAnker,
   deriveEigenHuisIds,
   type KernelAdapterInput,
+  type KernelAdapterPartner,
 } from '@/lib/horizon-kernel/adapter'
 import { evaluateFireAt, resolveVastAnker, solveFire, type SolveFireResult } from '@/lib/horizon-kernel/solver'
 import { computeEs } from '@/lib/horizon-kernel/tables/es'
@@ -174,6 +175,12 @@ export interface ForcedStopPathInput {
   debts: readonly Debt[]
   lifeEvents: readonly LifeEvent[]
   aowRows?: readonly AowLeeftijdRow[]
+  /**
+   * TPR-07 — partnerblok van de hoofdrun (huishoudperspectief). Doorgegeven zodat de
+   * runway-kop en "vrij vanaf" op DEZELFDE grondslag (PT-laag) draaien als de hoofdlijn;
+   * afwezig ⇒ solo, byte-identiek aan vóór TPR-07 (sleutel wordt dan niet gezet).
+   */
+  partner?: KernelAdapterPartner
   yearlyExpenses: number
   /** Geforceerde stopleeftijd (fractioneel). */
   stopAge: number
@@ -292,6 +299,7 @@ export function buildForcedStopSolve(input: ForcedStopSolveInput): ForcedStopSol
     debts: input.debts,
     lifeEvents: input.lifeEvents,
     aowRows: input.aowRows,
+    ...(input.partner ? { partner: input.partner } : {}),
   }
   const kernelInput = buildKernelInputFromApp(adapterInput)
   const stopAge =
@@ -650,7 +658,9 @@ export function runScenarioPresets(ctx: ScenarioPresetContext): ScenarioPresetRe
  * volledige solves doen), dus het is een fractie van wat er toch al loopt.
  */
 export function solveFireAgeWithoutAnchor(
-  ctx: Pick<ScenarioPresetContext, 'profile' | 'assets' | 'debts' | 'lifeEvents' | 'aowRows'>,
+  ctx: Pick<ScenarioPresetContext, 'profile' | 'assets' | 'debts' | 'lifeEvents' | 'aowRows'> & {
+    partner?: KernelAdapterPartner
+  },
 ): number | null {
   return solveWithoutAnchor(ctx)?.fireAge ?? null
 }
@@ -671,7 +681,10 @@ export interface SolvedWithoutAnchor {
 
 /** Als `solveFireAgeWithoutAnchor`, maar met de eindleeftijd van de run erbij (bevinding 6). */
 export function solveWithoutAnchor(
-  ctx: Pick<ScenarioPresetContext, 'profile' | 'assets' | 'debts' | 'lifeEvents' | 'aowRows'>,
+  ctx: Pick<ScenarioPresetContext, 'profile' | 'assets' | 'debts' | 'lifeEvents' | 'aowRows'> & {
+    /** TPR-07 — partnerblok van de hoofdrun (huishoudperspectief); afwezig ⇒ solo. */
+    partner?: KernelAdapterPartner
+  },
 ): SolvedWithoutAnchor | null {
   try {
     const input = buildKernelInputFromApp({
@@ -680,6 +693,7 @@ export function solveWithoutAnchor(
       debts: ctx.debts,
       lifeEvents: ctx.lifeEvents,
       aowRows: ctx.aowRows,
+      ...(ctx.partner ? { partner: ctx.partner } : {}),
     })
     if (input.stopAnker === undefined) return null
     const solve = solveFire({ ...input, stopAnker: undefined })

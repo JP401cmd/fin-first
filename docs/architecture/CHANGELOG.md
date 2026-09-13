@@ -984,3 +984,13 @@
 ## 2026-09-12
 
 - **Componenten (aantal)** verwijderd: -9
+
+## 2026-09-13
+
+- **API-routes** verwijderd: /api/ai/recommendations/postponed-ready
+- **Componenten (aantal)** verwijderd: -1
+
+## 2026-09-13
+
+- **API-routes** toegevoegd: /api/plan-review, /api/profile
+- **Componenten (aantal)** toegevoegd: +10
