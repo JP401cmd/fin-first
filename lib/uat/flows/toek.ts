@@ -92,8 +92,13 @@ export const TOEK_FLOW: UatFlow = {
     { id: 'potregels', scenarioId: 'UAT-TOEK-25', label: 'WF-TOEK-25 · Pot-regels (volgorde, toe-/afname)', kind: 'screen', stage: 4, lane: 'voorkeuren' },
     // TPR-01 / ADR 0142 — de Voorkeuren-kaart is zolang niet voltooid de ingang van de
     // plan-review; bevestigen schrijft via de bestaande routes en voedt dus de uitkomst.
-    { id: 'planreview', scenarioId: 'UAT-TOEK-44', label: 'WF-TOEK-44 · Plan-review: vijf stappen met keuze · effect · waarom', kind: 'screen', stage: 4, lane: 'voorkeuren' },
+    // TPR-15 — elke stap heeft een inline editor (bewerkstand): opslaan = bevestigen.
+    { id: 'planreview', scenarioId: 'UAT-TOEK-44', label: 'WF-TOEK-44 · Plan-review: vijf stappen, elk inline bewerkbaar', kind: 'screen', stage: 4, lane: 'voorkeuren' },
     { id: 'marktaannames', scenarioId: 'UAT-TOEK-26', label: 'WF-TOEK-26 · Markt-aannames (inflatie, rendement)', kind: 'screen', stage: 4, lane: 'voorkeuren' },
+    // TPR-15 — het afsluitscherm "Voor wie wil" is sinds ADR 0142/TPR-15 zelf inline
+    // instelbaar (geen navigatie meer naar Voorkeuren/Bezittingen); eigen scenario omdat
+    // het geen stap is en geen markering zet.
+    { id: 'planreviewlaag2', scenarioId: 'UAT-TOEK-48', label: 'WF-TOEK-48 · "Voor wie wil": inflatie/rendement/Box 3/rendement per bezitting inline', kind: 'screen', stage: 4, lane: 'voorkeuren', subOf: 'planreview' },
 
     // ── 4 · de toekomst configureren · doelen ─────────────────────────────
     { id: 'doelen', scenarioId: 'UAT-TOEK-22', label: 'WF-TOEK-22 · Doelen bekijken & toevoegen (ETA)', kind: 'screen', stage: 4, lane: 'doelen' },
@@ -181,7 +186,8 @@ export const TOEK_FLOW: UatFlow = {
     { from: 'eindstrat', to: 'potregels' },
     { from: 'eindstrat', to: 'marktaannames' },
     { from: 'navkaarten', to: 'planreview', kind: 'branch', label: 'Je plan (niet voltooid)' },
-    { from: 'planreview', to: 'marktaannames', kind: 'branch', label: 'Voor wie wil' },
+    { from: 'planreview', to: 'planreviewlaag2', kind: 'branch', label: 'Voor wie wil (inline, geen markering)' },
+    { from: 'planreviewlaag2', to: 'fire' },
     { from: 'planreview', to: 'fire' },
     { from: 'navkaarten', to: 'doelen', kind: 'branch', label: 'Doelen' },
     { from: 'doelen', to: 'doelvoortgang' },

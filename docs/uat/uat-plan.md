@@ -6422,20 +6422,17 @@ Scope: de app-brede Will-chat-overlay (bubbel → coach-melding → chatpaneel),
 ---
 
 #### WF-WILL-06 — Uitgestelde tips heropakken via de badge op de Will-bubbel
-- **Doel:** De gebruiker pakt tips die hij eerder heeft uitgesteld en waarvan de wachttijd (14 dagen) voorbij is opnieuw op.
-- **Trigger/startpunt:** De Will-bubbel toont een numerieke badge (max "9+") wanneer er uitgestelde tips klaarstaan.
-- **Eindresultaat:** De chat is open en Will behandelt de belangrijkste uitgestelde tip; de gebruiker kan opnieuw beslissen (WF-WILL-02).
-- **Stappen:**
-  1. Zie de badge op de Will-bubbel (aria-label vermeldt het aantal uitgestelde tips).
-  2. Klik op de bubbel — in plaats van een lege chat stuurt de app automatisch de vraag "Ik wil opnieuw kijken naar tips die ik eerder heb uitgesteld…".
-  3. Beslis over de tip(s) die Will opnieuw voorlegt.
-- **Schermen/componenten:** components/app/will/will-home.tsx (postponedReady-fetch + POSTPONED_PROMPT), API: app/api/ai/recommendations/postponed-ready/route.ts; zelfde kick-off ook via deeplink `?prompt=herbekijk-uitgesteld` (components/app/chat/chat-prompt-deeplink.tsx).
+~~**Doel:** De gebruiker pakt tips die hij eerder heeft uitgesteld en waarvan de wachttijd (14 dagen) voorbij is opnieuw op, via een numerieke badge op de Will-bubbel.~~ **VERVALLEN (sep 2026, zie `lib/notifications/tip-terug.ts` header).** De teller op de bubbel (eerst Will, later Fin) is vervangen door een eigen bericht per verlopen tip in het berichtencentrum ("Je uitgestelde tip is terug"): `components/app/will/will-home.tsx` en `app/api/ai/recommendations/postponed-ready/route.ts` bestaan niet meer (weggehaald resp. bij `9ed381438`/`123f154ec`, "WillHome oppervlak met morph", en definitief bij de Fin-omzetting). Het huidige oppervlak:
+- **Doel:** De gebruiker ziet dat een eerder uitgestelde tip weer actueel is en pakt hem op vanuit het berichtencentrum, niet vanuit een badge.
+- **Trigger/startpunt:** `lib/notifications/tip-terug.ts` (producent, gewired in `app/api/notifications/route.ts`) genereert één notificatiebericht per aanbeveling waarvan `postponed_until` verstreken is (oordeel via `lib/recommendation-status.ts`, dezelfde bron als de tips-pagina); dedupe via de id `postponed_tip_<id>_<postponed_until>`.
+- **Eindresultaat:** De gebruiker leest het bericht in /berichten (of het notificatiecentrum) en volgt de link naar de tip op /overzicht/tips (WF-WILL-21) om opnieuw te beslissen (WF-WILL-02).
+- **Schermen/componenten:** lib/notifications/tip-terug.ts, app/api/notifications/route.ts, components/overview/tips-lijst.tsx (label "Eerder uitgesteld"), components/app/fin/fin-home.tsx (bewust GEEN badge meer — zie regel 314 aldaar).
 - **Kriticiteit:** BELANGRIJK
-- **Rekenend:** ja — het badge-aantal = aantal recommendations met status 'postponed' waarvan `postponed_until` verstreken is (app/api/ai/recommendations/postponed-ready/route.ts); badge capt op "9+".
+- **Rekenend:** ja — of de wachttijd voorbij is (`isRecommendationOpen`/`postponed_until`); geen badge-telling meer.
 - **Varianten & randgevallen:**
-  - Badge = 0: klik op de bubbel opent gewoon de lege chat (WF-WILL-01).
-  - Het aantal wordt ververst bij het sluiten van de chat (dus na beslissen zakt de badge).
-- **Cross-module effecten:** dezelfde tips staan ook bovenaan /overzicht/tips met het label "Eerder uitgesteld" (WF-WILL-21).
+  - Wordt de tip alsnog geaccepteerd, genegeerd of opnieuw uitgesteld vóórdat de gebruiker het bericht leest, dan trekt `retractStaleTipTerug` het bericht in — ook uit de 30-daagse historie.
+  - Een nieuwe keer uitstellen met een nieuwe verlopen termijn levert een NIEUW bericht op (de termijn zit in de id); een poll binnen hetzelfde moment levert steeds dezelfde id.
+- **Cross-module effecten:** dezelfde tips staan ook bovenaan /overzicht/tips met het label "Eerder uitgesteld" (WF-WILL-21); het bericht zelf leeft in het berichtencentrum, niet meer op de bubbel.
 
 ---
 
