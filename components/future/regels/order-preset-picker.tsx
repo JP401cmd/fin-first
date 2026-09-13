@@ -15,26 +15,31 @@ import { GroupOrderEditor } from './pot-flow-diagram'
  *
  * Puur volgorde-herordening → geen datamodel-/kernelwijziging (zie pot-rules.ts).
  */
+/**
+ * Beschrijft de volgorde zoals de kern hem rekent (`prio-overgang.ts#orderedGroupsToPrio`:
+ * plek → prio min(plek, 4), gewicht ½^(prio−1)): vooraan = het zwaarst aangesproken, de rest
+ * loopt in afnemende mate mee. Geen oordeel ("gunstig", "beschermen"), geen belofte (Wft;
+ * compliance-check TPR-15 14 sep 2026). Getoetst in `plan-review/wizard-kopij.test.ts`.
+ */
 export const ORDER_PRESET_COPY: Record<OrderPresetId, { title: string; description: string }> = {
   'liquide-eerst': {
-    title: 'Liquide eerst',
+    title: 'Spaargeld eerst',
     description:
-      'Spaargeld en cash eerst — maximale liquiditeit; je rendement-potten blijven zo lang mogelijk staan.',
+      'Spaargeld staat vooraan en wordt het zwaarst aangesproken; beleggingen en overig lopen in afnemende mate mee, pensioen en vastgoed het minst.',
   },
   'rendement-beschermen': {
-    title: 'Rendement beschermen',
-    description:
-      'Beleggingen als laatste — dempt je sequence-risk als de beurs juist tegenzit wanneer je onttrekt.',
+    title: 'Beleggingen achteraan',
+    description: 'Spaargeld staat vooraan; beleggingen staan achteraan en worden het minst aangesproken.',
   },
   'fiscaal-box3': {
-    title: 'Fiscaal gunstig (Box 3 eerst)',
+    title: 'Beleggingen eerst',
     description:
-      'Beleggingen eerst — verkleint je Box 3-grondslag sneller, maar je verkoopt groei-vermogen als eerste.',
+      'Beleggingen staan vooraan en worden het zwaarst aangesproken; spaargeld loopt in mindere mate mee.',
   },
   'pensioen-sparen': {
-    title: 'Pensioen sparen',
+    title: 'Pensioen achteraan',
     description:
-      'Pensioen als laatste — laat je fiscaal-vriendelijke pot zo lang mogelijk doorgroeien.',
+      'Je pensioenbezittingen staan achteraan en worden het minst aangesproken; spaargeld staat vooraan.',
   },
   aangepast: {
     title: 'Aangepast',

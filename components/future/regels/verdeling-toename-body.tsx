@@ -19,7 +19,7 @@ export const SURPLUS_OPTIONS: { value: SurplusGroup; title: string; description:
   { value: 'beleggingen', title: 'Naar beleggingen', description: 'Het overschot gaat naar je beleggingen en groeit mee met hun rendement, dat van jaar tot jaar kan schommelen.' },
   { value: 'spaargeld', title: 'Naar spaargeld', description: 'Het overschot gaat naar je spaargeld: direct opneembaar, en het groeit mee met de spaarrente.' },
   { value: 'schuld_aflossen', title: 'Schulden aflossen', description: 'Het overschot lost eerst schulden af. Elke afgeloste euro scheelt de rente over die schuld.' },
-  { value: 'pensioen', title: 'Naar pensioen', description: 'Het overschot gaat naar je pensioenpot, die pas vanaf de ingangsleeftijd uitkeert.' },
+  { value: 'pensioen', title: 'Naar pensioen', description: 'Het overschot gaat naar je pensioenbezittingen.' },
   { value: 'vastgoed', title: 'Naar vastgoed', description: 'Aflossen op of uitbreiden van vastgoed.' },
   { value: 'overig', title: 'Naar overig', description: 'Crypto, voertuigen en andere bezittingen.' },
 ]

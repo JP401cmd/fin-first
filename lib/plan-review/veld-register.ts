@@ -48,7 +48,7 @@ const WERK: VeldPlek = { wizard: 'inkomsten', editor: 'WerkStrategieBody (Inkoms
 const POT: VeldPlek = { wizard: 'inkomsten', editor: 'PensioenPotBody (InkomstenEditor)' }
 const MARKT: VeldPlek = { wizard: 'laag2', editor: 'VoorkeurBewerkenBody' }
 const BOX3: VeldPlek = { wizard: 'laag2', editor: 'Box3MethodeBody' }
-const TECHNISCH: VeldPlek = { buitenWizard: 'Technisch veld van de rij (id/tijdstempel), geen instelling.' }
+const TECHNISCH: VeldPlek = { buitenWizard: 'Technisch veld van de rij (id/eigenaar/tijdstempel), geen instelling.' }
 
 export const SCHRIJFROUTE_VELD_REGISTER = {
   '/api/fire-settings': {
@@ -78,7 +78,14 @@ export const SCHRIJFROUTE_VELD_REGISTER = {
       guardrail_cut_step: ONTTREKKING,
       withdrawal_profile_config: ONTTREKKING,
       profiel: ONTTREKKING,
+      gogo_tot_leeftijd: ONTTREKKING,
+      gogo_pct: ONTTREKKING,
+      slowgo_tot_leeftijd: ONTTREKKING,
+      slowgo_pct: ONTTREKKING,
+      nogo_pct: ONTTREKKING,
       flex_nice_only: ONTTREKKING,
+      flex_nice_fractie: ONTTREKKING,
+      flex_cut_step: ONTTREKKING,
     },
   },
   '/api/pot-rules': {
@@ -130,18 +137,29 @@ export const SCHRIJFROUTE_VELD_REGISTER = {
         buitenWizard: 'Selectie binnen de budgetgrondslag (ADR 0103) — brondata-keuze op het cashflow-scherm.',
       },
       pension_factor_a: {
-        buitenWizard: 'Jaarruimte/factor A staat bewust op het pensioenscherm (TPR-15 stap 3, restpunt).',
+        buitenWizard:
+          'De route accepteert het, maar het pensioenscherm schrijft factor A client-direct (grandfathered, ADR 0058); jaarruimte blijft bewust buiten de wizard (TPR-15 stap 3).',
       },
       pension_factor_a_source: {
-        buitenWizard: 'Bron van factor A, hoort bij factor A op het pensioenscherm.',
+        buitenWizard: 'Bron van factor A — zelfde situatie als factor A: route accepteert het, geen scherm stuurt het hier.',
       },
       retirement_expense_method: {
         buitenWizard:
-          'Tweede schrijver op dezelfde kolom (cashflow-instellingen); de wizard schrijft haar via /api/fire-settings in stap 2.',
+          'De route accepteert het (gedeelde cashflow-validator), maar geen scherm stuurt het hier; wizard en uitgavenscherm schrijven via /api/fire-settings (stap 2).',
       },
       retirement_expense_custom_amount: {
         buitenWizard:
-          'Tweede schrijver op dezelfde kolom (cashflow-instellingen); de wizard schrijft haar via /api/fire-settings in stap 2.',
+          'De route accepteert het (gedeelde cashflow-validator), maar geen scherm stuurt het hier; wizard en uitgavenscherm schrijven via /api/fire-settings (stap 2).',
+      },
+    },
+  },
+  '/api/retirement-aspirations': {
+    bronnen: ['app/api/retirement-aspirations/route.ts'],
+    velden: {
+      aspirations: { wizard: 'uitgaven', editor: 'UitgavenEigenBedrag (UitgavenEditor, zelf samenstellen)' },
+      feature_preferences: {
+        wizard: 'uitgaven',
+        editor: 'UitgavenEigenBedrag — de aspiraties staan onder feature_preferences.retirement_aspirations',
       },
     },
   },
@@ -151,6 +169,9 @@ export const SCHRIJFROUTE_VELD_REGISTER = {
       sale_config: VERKOOP,
       stand: VERKOOP,
       triggerAge: VERKOOP,
+      triggerDate: VERKOOP,
+      salesCostsPct: VERKOOP,
+      payoffDebtIds: VERKOOP,
     },
   },
   '/api/assets/[id]/expected-return': {
@@ -171,6 +192,14 @@ export const SCHRIJFROUTE_VELD_REGISTER = {
       reeleGroeiPct: WERK,
       groeiTotLeeftijd: WERK,
       plafondNettoMaand: WERK,
+      faseStappen: WERK,
+      fromAge: WERK,
+      pct: WERK,
+      sprongen: WERK,
+      atAge: WERK,
+      deltaNettoMaand: WERK,
+      user_id: TECHNISCH,
+      sort_order: { buitenWizard: 'Volgorde van de pensioenpotten (server bepaalt die bij een nieuwe pot) — geen instelling.' },
       id: POT,
       pot: POT,
       name: POT,

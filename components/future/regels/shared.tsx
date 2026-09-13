@@ -7,7 +7,10 @@ import { EventImpactPreview } from '@/components/app/horizon/event-impact-previe
 import { REGEL_META, type RegelId } from '@/lib/future/regel-registry'
 import type { RegelProjection } from '@/lib/future/regel-sim'
 import { deflate } from '@/lib/euro-display'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+import { ankerReachesAge, type AnkerReach } from '@/lib/horizon/anker-copy'
+import { leeftijdJaar } from '@/lib/horizon/leeftijd-jaar'
 import { EFFECT_BEDRAG_AFRONDING } from '@/lib/plan-review/types'
 
 /** Intro-blok bovenaan elke body: uitleg-deck uit de registry. */
@@ -122,37 +125,53 @@ export function fireDeltaMonths(baseline: RegelProjection, draft: RegelProjectio
 export type FireFooterEffect =
   | { kind: 'onbekend' }
   | { kind: 'maanden'; maanden: number }
-  | { kind: 'reikt'; totLeeftijd: number | null; eerder: boolean }
+  | {
+      kind: 'reikt'
+      /** Tot waar het geld onder het concept reikt (hele jaren via `leeftijdJaar`). */
+      tot: { soort: 'einde'; eindLeeftijd: number | null } | { soort: 'leeftijd'; leeftijd: number } | { soort: 'nu-op' }
+      /** Reikt het concept verder dan de basis? Bepaalt de kleur. */
+      verder: boolean
+    }
   | { kind: 'einde'; euro: number }
-  | { kind: 'geen' }
+  | { kind: 'geen'; waarin: 'bereik' | 'eindbedrag' }
 
-function reiktTot(p: RegelProjection): number | null | undefined {
-  const r = p.reach
-  if (!r) return undefined
-  if (r.kind === 'gedekt') return null
-  if (r.kind === 'reikt-tot') return Math.floor(r.age)
-  if (r.kind === 'nu-op') return p.rows[0]?.age != null ? Math.floor(p.rows[0].age) : undefined
-  return undefined
+/**
+ * Tot welke leeftijd het geld reikt, op dezelfde as voor alle uitkomsten: "gedekt" = de eigen
+ * eindleeftijd (een ander plan-einde is dus ook een ander bereik), "nu op" = vóór alles.
+ * `null` = niets te zeggen.
+ */
+function reikAs(r: AnkerReach | undefined): number | null {
+  if (!r || r.kind === 'onbekend') return null
+  if (r.kind === 'nu-op') return Number.NEGATIVE_INFINITY
+  return leeftijdJaar(ankerReachesAge(r) ?? Number.NaN)
 }
 
 export function fireFooterEffect(baseline: RegelProjection, draft: RegelProjection): FireFooterEffect {
   const delta = fireDeltaMonths(baseline, draft)
   if (delta == null) return { kind: 'onbekend' }
   if (delta !== 0) return { kind: 'maanden', maanden: delta }
-  const basisTot = reiktTot(baseline)
-  const draftTot = reiktTot(draft)
-  if (basisTot !== undefined && draftTot !== undefined && basisTot !== draftTot) {
-    // null = tot het einde van het plan; dat is altijd verder dan een leeftijd.
-    const eerder = draftTot != null && (basisTot == null || draftTot < basisTot)
-    return { kind: 'reikt', totLeeftijd: draftTot, eerder }
+  const basisAs = reikAs(baseline.reach)
+  const draftAs = reikAs(draft.reach)
+  if (basisAs == null || draftAs == null || Number.isNaN(basisAs) || Number.isNaN(draftAs)) return { kind: 'onbekend' }
+  const r = draft.reach!
+  if (r.kind !== baseline.reach!.kind || basisAs !== draftAs) {
+    const tot: Extract<FireFooterEffect, { kind: 'reikt' }>['tot'] =
+      r.kind === 'gedekt'
+        ? { soort: 'einde', eindLeeftijd: r.endAge != null ? leeftijdJaar(r.endAge) : null }
+        : r.kind === 'reikt-tot'
+          ? { soort: 'leeftijd', leeftijd: leeftijdJaar(r.age) }
+          : { soort: 'nu-op' }
+    return { kind: 'reikt', tot, verder: draftAs > basisAs }
   }
-  if (basisTot === null && draftTot === null && baseline.eindeLiquide && draft.eindeLiquide) {
-    const vandaag = (e: NonNullable<RegelProjection['eindeLiquide']>) => deflate(e.nominaal, e.inflationFactor, 'real')
-    const verschil = vandaag(draft.eindeLiquide) - vandaag(baseline.eindeLiquide)
-    const euro = Math.round(verschil / EFFECT_BEDRAG_AFRONDING) * EFFECT_BEDRAG_AFRONDING
-    if (euro !== 0) return { kind: 'einde', euro }
-  }
-  return { kind: 'geen' }
+  if (r.kind !== 'gedekt') return { kind: 'geen', waarin: 'bereik' }
+  // Beide tot hetzelfde plan-einde: vergelijk wat er dan over is (eigen factor per eindrij).
+  if (!baseline.eindeLiquide || !draft.eindeLiquide) return { kind: 'onbekend' }
+  const vandaag = (e: NonNullable<RegelProjection['eindeLiquide']>) => deflate(e.nominaal, e.inflationFactor, 'real')
+  const rond = (v: number) => Math.round(v / EFFECT_BEDRAG_AFRONDING) * EFFECT_BEDRAG_AFRONDING
+  // Elk bedrag apart afgerond, zoals de overzichten het tonen: dan betekent "geen verschil" hier
+  // hetzelfde als twee gelijke bedragen daar.
+  const euro = rond(vandaag(draft.eindeLiquide)) - rond(vandaag(baseline.eindeLiquide))
+  return euro !== 0 ? { kind: 'einde', euro } : { kind: 'geen', waarin: 'eindbedrag' }
 }
 
 /**
@@ -171,38 +190,52 @@ export function FireDeltaFooter({
   baseline: RegelProjection
   draft: RegelProjection
 }) {
+  const { masked } = useMaskedAmounts()
   const effect = fireFooterEffect(baseline, draft)
+  const toon = (goed: boolean) => (goed ? 'text-positive' : 'text-negative')
   switch (effect.kind) {
     case 'onbekend':
       return <span className="text-[11px] text-[var(--ink-3)]">Geen vergelijking</span>
     case 'geen':
-      return <span className="text-[11px] text-[var(--ink-3)]">Geen verschil in je plan</span>
+      return (
+        <span className="text-[11px] text-[var(--ink-3)]">
+          {effect.waarin === 'eindbedrag' ? 'Geen verschil in vrijheidsdatum of eindbedrag' : 'Geen verschil in vrijheidsdatum of bereik'}
+        </span>
+      )
     case 'maanden': {
       const earlier = effect.maanden < 0
       return (
         <span className="text-[12px]">
           <span className="text-[var(--ink-3)]">Vrijheid </span>
-          <span className="font-semibold" style={{ color: earlier ? 'var(--positive)' : 'var(--negative)' }}>
+          <span className={`font-semibold ${toon(earlier)}`}>
             {earlier ? `${Math.abs(effect.maanden)} mnd eerder` : `${effect.maanden} mnd later`}
           </span>
         </span>
       )
     }
-    case 'reikt':
+    case 'reikt': {
+      const t = effect.tot
       return (
         <span className="text-[12px]">
-          <span className="text-[var(--ink-3)]">Geld reikt dan </span>
-          <span className="font-semibold" style={{ color: effect.eerder ? 'var(--negative)' : 'var(--positive)' }}>
-            {effect.totLeeftijd == null ? 'tot het einde' : `tot je ${effect.totLeeftijd}e`}
+          <span className="text-[var(--ink-3)]">Geld </span>
+          <span className={`font-semibold ${toon(effect.verder)}`}>
+            {t.soort === 'nu-op'
+              ? 'dekt je uitgaven vanaf vandaag niet'
+              : t.soort === 'leeftijd'
+                ? `reikt dan tot je ${t.leeftijd}e`
+                : t.eindLeeftijd != null
+                  ? `reikt dan tot het einde (${t.eindLeeftijd})`
+                  : 'reikt dan tot het einde'}
           </span>
         </span>
       )
+    }
     case 'einde': {
       const meer = effect.euro > 0
       return (
         <span className="text-[12px]" title="In euro's van vandaag">
-          <span className="font-semibold" style={{ color: meer ? 'var(--positive)' : 'var(--negative)' }}>
-            {formatCurrency(Math.abs(effect.euro))} {meer ? 'meer' : 'minder'}
+          <span className={`font-semibold ${toon(meer)}`}>
+            {formatMaskedCurrency(Math.abs(effect.euro), masked)} {meer ? 'meer' : 'minder'}
           </span>
           <span className="text-[var(--ink-3)]"> over aan het einde</span>
         </span>

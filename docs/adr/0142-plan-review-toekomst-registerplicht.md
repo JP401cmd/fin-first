@@ -104,7 +104,7 @@ alleen via een grandfathered client-directe rij-update te schrijven was (ADR 005
 wizard een route die uitsluitend die kolom schrijft, op de eigen rij, met dezelfde validatie
 als het formulier: `PATCH /api/assets/[id]/sale-config`, `PATCH /api/assets/[id]/expected-return`
 en `PUT/DELETE /api/life-events/strategie` (die laatste gebruiken nu ook de bestaande editors).
-Twee schrijvers op één kolom delen hun validatie uit één module.
+Twee schrijvers op één kolom delen hun validatie waar dat kan uit één module (`expected_return`: `lib/asset-parameter-bands.ts`); de sale-config-route spiegelt nog het bereik van `parseSaleConfig` in zijn eigen zod-schema (restpunt).
 
 **D8 — Meebeweeg-check in drie lagen.** Verandert elders een instelling die de review behandelt,
 dan moet de wizard mee — afgedwongen, niet op goed vertrouwen:
@@ -122,6 +122,6 @@ dan moet de wizard mee — afgedwongen, niet op goed vertrouwen:
 Gevolgen: geen migratie. `RegelSimOverride` kreeg `firePlan`/`legacyIncludeIlliquid`-gebruik in
 de wizard, `assetSaleConfigs`, `lifeEvent`, `parameters` en `assetExpectedReturns`. De
 effectmaat in de overzichten kent drie treden (vrijheidsleeftijd → geld reikt tot → wat er aan
-het einde over is); de live footer van de bewerkstand toont nog alleen trede 1 (restpunt).
+het einde over is); de live footer van de bewerkstand volgt dezelfde treden (`fireFooterEffect`).
 Het terugvalrendement verandert voor echte gebruikers niets zolang `assets.expected_return`
 NOT NULL is (TPR-02); de wizard zegt dat.

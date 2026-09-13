@@ -75,8 +75,8 @@ export const REGEL_META: Record<RegelId, RegelMeta> = {
     title: 'Onttrekking bij afname',
     kicker: 'Regel · potten',
     intro:
-      'Waar haal je geld vandaan bij een grote eenmalige uitgave of een tegenvaller? Eerst uit de ' +
-      'liquide pot (je beleggingen blijven dan staan) of naar verhouding uit alles (je verdeling blijft gelijk).',
+      'Waar haal je geld vandaan bij een grote eenmalige uitgave of een tegenvaller? De groep die vooraan ' +
+      'staat, wordt het zwaarst aangesproken; de groepen daarna lopen in afnemende mate mee.',
     impactKind: 'illustratief',
   },
 }

@@ -41,15 +41,15 @@ describe('OnttrekkingsvolgordeBody — presets + opslaan', () => {
 
   it('een afwijkende preset activeert opslaan', () => {
     const { getState } = renderBody()
-    fireEvent.click(card('Rendement beschermen'))
+    fireEvent.click(card('Beleggingen achteraan'))
     expect(getState().canSave).toBe(true)
   })
 
-  it('opnieuw "Liquide eerst" (= default) kiezen laat opslaan uit', () => {
+  it('opnieuw "Spaargeld eerst" (= default) kiezen laat opslaan uit', () => {
     const { getState } = renderBody()
-    fireEvent.click(card('Rendement beschermen'))
+    fireEvent.click(card('Beleggingen achteraan'))
     expect(getState().canSave).toBe(true)
-    fireEvent.click(card('Liquide eerst'))
+    fireEvent.click(card('Spaargeld eerst'))
     expect(getState().canSave).toBe(false)
   })
 

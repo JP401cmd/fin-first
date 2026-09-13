@@ -37,7 +37,7 @@ interface HousingStrategyContext {
  * Kopij per woonstrategie — beschrijft wat de kern doet, zonder oordeel of rangorde (Wft,
  * compliance-check TPR-15 14 sep 2026: "onrealistisch" en "past bij internationale standaard"
  * waren waardeoordelen over een woonkeuze). Geëxporteerd voor de A8-toets in
- * `lib/plan-review/overzicht.test.ts`: deze sectie rendert ook in de plan-review.
+ * `components/future/plan-review/wizard-kopij.test.ts`: deze sectie rendert ook in de plan-review.
  */
 export const WOONSTRATEGIE_MODE_META: Record<
   HousingStrategyMode,

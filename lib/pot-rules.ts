@@ -259,7 +259,7 @@ export interface OrderPreset {
   order: WealthGroup[]
 }
 
-/** Regel 3 — onttrekkingsvolgorde: vier presets, 'Liquide eerst' == default. */
+/** Regel 3 — onttrekkingsvolgorde: vier presets, 'Spaargeld eerst' (id liquide-eerst) == default. */
 export const WITHDRAWAL_ORDER_PRESETS: OrderPreset[] = [
   { id: 'liquide-eerst', order: ['spaargeld', 'beleggingen', 'overig', 'pensioen', 'vastgoed'] },
   { id: 'rendement-beschermen', order: ['spaargeld', 'overig', 'pensioen', 'vastgoed', 'beleggingen'] },

@@ -81,10 +81,9 @@ export function OnttrekkingsvolgordeBody({
       </div>
 
       <p className="mt-5 text-[11px] text-[var(--ink-3)] italic leading-snug">
-        Cash eerst: je beleggingen blijven langer staan en je houdt minder liquide geld over.
-        Beleggingen eerst: je spaargeld blijft als buffer staan, maar je verkoopt dan ook in
-        slechte beursjaren. Je keuze wordt opgeslagen en hierboven illustratief getoond op je
-        huidige potten; de volledige doorrekening in de tijdas-grafiek volgt later.
+        Wie vooraan staat, wordt het zwaarst aangesproken; elke volgende plek weegt half zo
+        zwaar, en de laatste twee plekken wegen even zwaar. Hierboven zie je het op je huidige
+        potten; de tijdas-grafiek rekent met dezelfde volgorde.
       </p>
     </div>
   )

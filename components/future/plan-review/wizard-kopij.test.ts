@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { WOONSTRATEGIE_MODE_META } from '@/components/future/strategie/housing-strategy-section'
 import { SURPLUS_OPTIONS } from '@/components/future/regels/verdeling-toename-body'
+import { ORDER_PRESET_COPY } from '@/components/future/regels/order-preset-picker'
 import { PROFIEL_INFO } from '@/components/future/regels/onttrekkingsstrategie-body'
 import { VOORKEUR_UITLEG } from '@/components/future/voorkeur-bewerken-body'
 import { BOX3_METHOD_INTRO, BOX3_METHOD_UITLEG, HEFFINGVRIJ_INKOMEN_UITLEG } from '@/components/future/box3-methode-body'
@@ -40,11 +41,25 @@ const VERBODEN = [
   'meer rust',
   'geeft rust',
   'voorzichtige aanname',
+  'dempt',
+  'maximale',
+  'sequence-risk',
+  'pro-rata',
+  'volgt later',
 ]
 
-const kopij = JSON.stringify([
+/** Alleen de tekstwaarden (geen sleutels of id's zoals `rendement-beschermen`). */
+function teksten(v: unknown): string[] {
+  if (typeof v === 'string') return [v]
+  if (Array.isArray(v)) return v.flatMap(teksten)
+  if (v && typeof v === 'object') return Object.values(v).flatMap(teksten)
+  return []
+}
+
+const kopij = teksten([
   WOONSTRATEGIE_MODE_META,
   SURPLUS_OPTIONS,
+  ORDER_PRESET_COPY,
   PROFIEL_INFO,
   VOORKEUR_UITLEG,
   BOX3_METHOD_INTRO,
@@ -53,7 +68,9 @@ const kopij = JSON.stringify([
   INKOMSTEN_UITLEG,
   REGEL_META,
   PLAN_REVIEW_LAAG2,
-]).toLowerCase()
+])
+  .join(' | ')
+  .toLowerCase()
 
 describe('A8 — wizardkopij in de editor-bodies oordeelt en belooft niet', () => {
   it.each(VERBODEN)('bevat niet "%s"', (woord) => {
