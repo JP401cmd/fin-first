@@ -52,11 +52,17 @@ De kaart zette "alle body-extracties" als losse eerste fase. Twee bodies bestaan
 - [x] L2 — pure move `VoorkeurBewerkenBody` + `Box3MethodeBody` — 6a0ea94be
 - [x] L2 — afsluitscherm "Voor wie wil" als host (vier onderdelen, pill in de stappenbalk, geen markering), `PATCH /api/assets/[id]/expected-return` (+ security-specialist: geen blokkade; 🟢 teller over eigen rijen verwerkt), `RegelSimOverride.parameters`/`assetExpectedReturns`, editor-context `laag2`, `/api/parameters`-retry alleen bij ontbrekende kolom, register — c7bd25316 (incl. reviewfixes M1–M3 + L's)
 - [x] Visuele check 14 sep (jochen@/Tessa): lijst met waarden (2,0% · 7,0% · Forfaitair · 16 bezittingen), inflatie- en bezitting-bewerkstand, validatie houdt Opslaan dicht, footer; niets opgeslagen
-- [ ] Slot — meebeweeg-check laag c, ADR 0142-aanvulling, CLAUDE.md-regel, register.ts `partner`, UAT WF-TOEK-44, will-tests `toBe(30)`, uat-plan.md:6432, compliance-check nieuwe kopij, arch:diagram, parity-rebaseline, merkstem:scan
+- [x] Slot — meebeweeg-check laag c (`veld-register.ts` + bron-scan-test, 8 routes), ADR 0142 D6–D8, CLAUDE.md plan-review-conventie, register.ts `partner`, will-tests afgeleid, apply-parse-result-comment — e6e10aed3
+- [x] Slot — compliance-check wizardkopij (stap 3 + laag 2 goedgekeurd; stap 4 MODE_META en stap 5 verdeling/onttrekking/guardrails aangepast, o.a. "gegarandeerd rendement" weg; optimizer-chip) + A8-uitbreiding `wizard-kopij.test.ts` — 3d41f74fa
+- [x] Slot — live footer in drie treden (`fireFooterEffect`/`fireFooterSleutel`, bodies republishen op het effect) — db5592ab0
+- [x] Slot — UAT WF-TOEK-44 bijgewerkt, WF-TOEK-48 laag 2 nieuw, uat-plan WF-WILL-06 vervallen — 0c51d35b1
+- [x] Slot — gebundelde eindreview (2H/6M/6L): pot-regelkopij volgt de kernweging, preset-kopij neutraal + in A8, scanner uitgebreid (12 gemiste velden), /api/retirement-aspirations in register, footer-afronding/nu-op/eindleeftijd/masking — d4ea8278e
+- [x] Slot — `npm run arch:diagram` gedraaid (nieuwe routes zichtbaar); docs/architecture/* bewust niet gecommit (gedeeld met parallelle sessie)
+- [ ] Vóór push (release-skill): parity-rebaseline (uiterlijk ~22 sep), `npm run merkstem:scan` + attestatie, docs/architecture/* committen
 
 ## Restpunten uit review/visuele check (nog open)
 
-- Live footer in de bewerkstand (`FireDeltaFooter`) toont maanden-delta (trede 1), ook bij accounts in trede 3 — overweeg dezelfde treden in de footer.
+- ~~Live footer in de bewerkstand (`FireDeltaFooter`) toont maanden-delta (trede 1), ook bij accounts in trede 3 — overweeg dezelfde treden in de footer.~~ Opgelost in db5592ab0.
 - `overzicht.ts` draait bij trede 3 één extra basisrun per stap (`b.run({})`); kan uit de bundel zodra `SimResult` het liquide eindvermogen draagt.
 - Dubbele `router.refresh()` na een uitgaven-save in de wizard (hook + `onChanged`).
 - Kolom-whitelist per rijtype voor assets/debts in de client-snapshot (nu alleen suffix-vangrail); schulden dragen `creditor`/`notes`.
@@ -68,7 +74,7 @@ De kaart zette "alle body-extracties" als losse eerste fase. Twee bodies bestaan
 - SWR-widget toont nog "Trinity Study 4%" (eigenaar: later behandelen).
 
 ### Restpunten stap 3 (310f38ce3)
-- Footer-delta in trede 3 zegt bij Tessa "Geen verschil in vrijheidsdatum" terwijl een pensioenwijziging het eindbedrag wél verschuift — valt bij stap 3 extra op; hoort bij het bestaande footer-restpunt (drie treden in `FireDeltaFooter`).
+- ~~Footer-delta in trede 3 zegt bij Tessa "Geen verschil in vrijheidsdatum" terwijl een pensioenwijziging het eindbedrag wél verschuift — valt bij stap 3 extra op; hoort bij het bestaande footer-restpunt (drie treden in `FireDeltaFooter`).~~ Opgelost in db5592ab0.
 - Geen unieke index op `life_events (user_id, event_type)` voor aow/werk: race over twee tabs kan een dubbele rij geven (kern pakt de eerste; route en lezer delen nu dezelfde tiebreaker). Fix = schemawijziging (partial unique index, live 0 duplicaten) + 23505 → herlezen.
 - `vervangLifeEvent` per type haalt in de snapshot ook een gedeelde partnerrij weg; stap 3 telt alleen eigen rijen. Latent: geen schrijver zet `ownership='shared'` op `life_events`.
 - UPO-import: `ingangLeeftijd` kan 0 worden (`lib/pension/mijnpensioen-json.ts:239`) en de parser is onbegrensd; zo'n pot is pas op te slaan na corrigeren. `apply-parse-result.ts` en onboarding `save-own-data` schrijven nog client-direct/zonder deze validatie.
@@ -76,6 +82,13 @@ De kaart zette "alle body-extracties" als losse eerste fase. Twee bodies bestaan
 - `strategie-impact.tsx` draait de basis-run opnieuw per onderdeelwissel (perf, L11); de body-foutbanners zijn amber, de pane-meldingen `text-negative`.
 - Wft/compliance-check: nieuwe kopij stap 3 (UITLEG in `inkomsten-editor.tsx`, vergelijkingslabels, beperkingstekst) meenemen in de slot-compliance-check.
 - `lib/pension/apply-parse-result.ts` r.7 verwijst nog naar de oude plek van `eventFromPot`/`potFromEvent`.
+
+### Restpunten slotfase
+- Oordelende kopij buiten de wizard (niet getoetst, eigen compliance-ronde): `HOUSING_STRATEGY_DESCRIPTIONS` in `lib/housing-strategy.ts` ("onrealistisch"), `lib/calculator/prefab-definitions.ts` ("gegarandeerd rendement"), `lib/financial-health.ts` ("meer rust"), horizon-client AOW-waarschuwing.
+- `docs/uat/uat-plan.md` r.1485/4122/6328 verwijzen nog naar `components/app/will/*` (verhuisd naar `components/app/fin/`).
+- Veld-register-scanner blijft een heuristiek: helpers buiten de opgegeven bronbestanden ziet hij niet — bronnen per route bijhouden bij een nieuwe validator-module. Robuuster alternatief (review M1): zod-routes via `schema.shape` toetsen; kan pas als de schema's buiten `route.ts` staan (Next staat geen extra exports toe).
+- De pure-move-sheets tonen sinds laag 2 live validatie; de optimizer-helptekst en het pot-regel-illustratiepijl-diagram zijn niet visueel nagekeken na de kopijwijziging.
+- `lib/pot-rules-presets.test.ts` noemt de preset nog "Liquide eerst" in een testnaam (id ongewijzigd).
 
 ### Restpunten laag 2 (c7bd25316)
 - Het terugvalrendement (`profiles.expected_return`) verandert het plan van echte gebruikers nu niet: `assets.expected_return` is NOT NULL, dus de kern valt nooit terug. De wizard zegt dat eerlijk. Wordt pas betekenisvol met TPR-02 fase 2 (kolom nullable = schemawijziging); dan telt `zonderEigenRendement` al over eigen rijen.
