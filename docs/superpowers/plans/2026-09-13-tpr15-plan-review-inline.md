@@ -46,7 +46,9 @@ De kaart zette "alle body-extracties" als losse eerste fase. Twee bodies bestaan
 - [x] 4 — pure move verkoopvelden → `SaleConfigFields` + `sale-config-draft` — 10190ca45
 - [x] 4 — `PATCH /api/assets/[id]/sale-config` (+ security-specialist: geen blokkade; 🟡 schuldenregel ≠ formulier opgelost via `lib/sale-config-debts.ts`), `WoningEditor` (woonstrategie in host-modus + verkoopinstelling per eigen bezitting, live effect via `assetSaleConfigs`), editor-context `woning`, register `potLiquidaties → woning` — cfe020303 (incl. reviewfixes M1/M3/L1/L3/L4)
 - [x] Visuele check 13 sep (jochen@/Tessa): stap 4 pills (huis + 5 bezittingen), woonstrategie met live preview, auto → Niet verkopen → "Opslaan en bevestigen" + footer; AssetForm-verkoopvelden ongewijzigd; niets opgeslagen
-- [ ] 3 — eerst `life_events`-schrijfroute (+ security), dan AOW (aanmaken bij opslaan) / pensioen / werk inline; `raw.events` op eigen user_id
+- [x] 3 — pure move AOW/werk/pot-bodies + `lib/pension/pot-draft.ts` — 62399cf81
+- [x] 3 — `PUT/DELETE /api/life-events/strategie` (+ security-specialist: geen blokkade; 🟢 fail-closed/tiebreaker/assert/foutteksten verwerkt), beide hosts schrijven via de route, `InkomstenEditor` (AOW pas bij opslaan, werk, pot per id/nieuw), override `lifeEvent`, eigen rijen via `loadEigenStrategieEvents` (voortgang, stap 3, editor-context), vergelijking stap 3, `aowGeschreven` in de pane — 310f38ce3 (incl. reviewfixes M1–M4, L6–L10)
+- [x] Visuele check 13 sep (jochen@/Tessa): stap 3 vergelijking trede 3 (€1,115M / zonder AOW €823k / zonder pensioen €790k), bewerkstand AOW/Werk/pot/nieuwe pot, wijziging → "Opslaan en bevestigen"; modal op /toekomst/gebeurtenissen ongewijzigd; niets opgeslagen
 - [ ] L2 — inflatie, terugvalrendement, Box 3, rendement per bezitting inline; RegelSimOverride uitbreiden; `/api/parameters`-retry
 - [ ] Slot — meebeweeg-check laag c, ADR 0142-aanvulling, CLAUDE.md-regel, register.ts `partner`, UAT WF-TOEK-44, will-tests `toBe(30)`, uat-plan.md:6432, compliance-check nieuwe kopij, arch:diagram, parity-rebaseline, merkstem:scan
 
@@ -62,3 +64,13 @@ De kaart zette "alle body-extracties" als losse eerste fase. Twee bodies bestaan
 - Stap 4 (review L2): wizard begrenst leeftijd ≤120 en kosten ≤20% (= route); AssetForm niet → een in het formulier opgeslagen buiten-bereik-waarde moet in de wizard eerst worden aangepast (melding zichtbaar).
 - Security-bijvangst: `/toekomst/gebeurtenissen` geeft `housingPreview.kernelRawContext.profile` = volledige profielrij (`select('*')`) als client-prop; eigen rij, geen lek — door `alleenKernelProfiel`/`buildClientRegelSimSnapshot` halen.
 - SWR-widget toont nog "Trinity Study 4%" (eigenaar: later behandelen).
+
+### Restpunten stap 3 (310f38ce3)
+- Footer-delta in trede 3 zegt bij Tessa "Geen verschil in vrijheidsdatum" terwijl een pensioenwijziging het eindbedrag wél verschuift — valt bij stap 3 extra op; hoort bij het bestaande footer-restpunt (drie treden in `FireDeltaFooter`).
+- Geen unieke index op `life_events (user_id, event_type)` voor aow/werk: race over twee tabs kan een dubbele rij geven (kern pakt de eerste; route en lezer delen nu dezelfde tiebreaker). Fix = schemawijziging (partial unique index, live 0 duplicaten) + 23505 → herlezen.
+- `vervangLifeEvent` per type haalt in de snapshot ook een gedeelde partnerrij weg; stap 3 telt alleen eigen rijen. Latent: geen schrijver zet `ownership='shared'` op `life_events`.
+- UPO-import: `ingangLeeftijd` kan 0 worden (`lib/pension/mijnpensioen-json.ts:239`) en de parser is onbegrensd; zo'n pot is pas op te slaan na corrigeren. `apply-parse-result.ts` en onboarding `save-own-data` schrijven nog client-direct/zonder deze validatie.
+- Buiten de wizard (bewust): UPO-upload, jaarruimte/factor A, projectiegrafiek, pot/werk verwijderen — op het pensioenscherm.
+- `strategie-impact.tsx` draait de basis-run opnieuw per onderdeelwissel (perf, L11); de body-foutbanners zijn amber, de pane-meldingen `text-negative`.
+- Wft/compliance-check: nieuwe kopij stap 3 (UITLEG in `inkomsten-editor.tsx`, vergelijkingslabels, beperkingstekst) meenemen in de slot-compliance-check.
+- `lib/pension/apply-parse-result.ts` r.7 verwijst nog naar de oude plek van `eventFromPot`/`potFromEvent`.
