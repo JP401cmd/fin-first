@@ -42,7 +42,7 @@ const INCOME_HEX_BY_ID: Record<string, string> = {
   growth: '#c4a06b',    // Rendement: horizon-500
   savings: '#a37a3a',   // Besparingen: horizon-700
   salaris: '#d8be93',   // Salaris & werk: horizon-300 (lichte goud)
-  'gebeurtenis-baten': '#b3894e', // AOW & pensioen: horizon-500 warm
+  'gebeurtenis-baten': '#b3894e', // Inkomsten uit gebeurtenissen (AOW, pensioen, eigen baten): horizon-500 warm
 }
 
 const EXPENSE_HEX_BY_ID: Record<string, string> = {

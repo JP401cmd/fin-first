@@ -16,6 +16,7 @@ const baseState: EditFormState = {
   contAmount: 0,
   contDirection: 'expense',
   contIndexed: true,
+  contUntilStop: false,
 }
 
 describe('buildDraftEvent', () => {

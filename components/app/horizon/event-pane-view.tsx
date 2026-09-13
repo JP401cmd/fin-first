@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Sparkles, ArrowRight } from 'lucide-react'
 import {
   LIFE_EVENT_CATALOG,
+  isTotStopmoment,
   type LifeEvent,
   type FinancialInput,
 } from '@/lib/horizon-data'
@@ -124,7 +125,7 @@ export function EventPaneView({
       kicker: 'Duur',
       amount:
         event.duration_months === 0 && (event.monthly_cost_change > 0 || event.monthly_income_change > 0) ? (
-          <span className="text-base">blijvend</span>
+          <span className="text-base">{isTotStopmoment(event) ? 'tot stopmoment' : 'blijvend'}</span>
         ) : event.duration_months > 0 ? (
           <span>
             {Math.round(event.duration_months / 12)}

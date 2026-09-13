@@ -721,6 +721,24 @@ const criteria: AcceptanceCriterion[] = [
         'components/app/horizon/vrijheidsas.tsx (marker "verkenning", `toonMaakPlan`, `planIsDezeStop`) + components/app/horizon/stop-plan-confirm.tsx (`StopPlanConfirm`, `huidigPlanZin`) + components/app/horizon/horizon-client.tsx#handleStopPlanBevestigen (GET → `planDraftFromSettings` → `validatePlanDraft` → PUT `planDraftToFireSettingsBody`) + app/api/fire-settings/route.ts (plan-contract) — interactie met een schrijfpad; de plan-regels zelf zijn exact getoetst in WF-KRUIS-28 en WF-START-28.',
     },
   },
+  {
+    workflow: 'WF-TOEK-47',
+    scenarioId: 'UAT-TOEK-47',
+    titel: 'Een blijvende gebeurtenis zegt tot wanneer hij loopt: doorlopend of tot je stopt met werken (ADR 0143)',
+    kriticiteit: 'KERN',
+    persona: 'willem',
+    given:
+      'Persona Willem op /toekomst met een berekend stopmoment vóór zijn AOW-leeftijd. VOORHEEN liep een blijvend maandbedrag uit een gebeurtenis (bv. "Extra beleggen €1.700/mnd" uit de keuzehulp "Wat doe je met extra geld?") stil door tot leeftijd 100, óók na het stopmoment, en verscheen het in Inkomen & Uitgaven onder "AOW & pensioen".',
+    when:
+      '(a) Hij voegt een eigen gebeurtenis toe met in "03 · Blijvend" een inkomst van €1.000 per maand en leest de keuze "Tot wanneer"; (b) kiest "Tot ik stop met werken", slaat op en opent de gebeurtenis opnieuw; (c) bekijkt de detailweergave en de tooltip van Inkomen & Uitgaven op een leeftijd ná het stopmoment; (d) zet de keuze op "Blijft doorlopen" en bekijkt dezelfde leeftijd, en opent daarna in de keuzehulp "Wat doe je met extra geld?" de optie "Zet op tijdas".',
+    then:
+      '(a) Onder bedrag en type staat "Tot wanneer" met "Blijft doorlopen" (standaard voor een nieuwe eigen gebeurtenis) en "Tot ik stop met werken"; de helptekst noemt per keuze wat er gebeurt en voor welk soort geld hij past. (b) De keuze staat na heropenen nog op "Tot ik stop met werken" (`life_events.metadata.tot_stopmoment = true`). (c) De Duur-figuur leest "tot stopmoment"; ná het stopmoment staat het bedrag niet meer in de tooltip. (d) Bij "Blijft doorlopen" staat het bedrag er wél, onder "Inkomsten uit gebeurtenissen" (nooit meer "AOW & pensioen" vóór de AOW-leeftijd); de sheet "Maak een levensgebeurtenis" toont "Tot wanneer" met "Tot ik stop met werken" voorgeselecteerd en de uitleg eronder. Bestaande gebeurtenissen zonder keuze rekenen ongewijzigd door.',
+    assertion: {
+      kind: 'ui-only',
+      source:
+        'components/app/horizon/event-pane-edit.tsx (`UntilToggle`) + lib/horizon/event-pane-edit-form.ts (`contUntilStop`, `buildDraftEvent`) + components/app/horizon/event-pane-view.tsx + components/future/calculator-to-life-event-sheet.tsx (`defaultUntilStop`) + lib/income-expense-breakdown.ts (`FIXED_LABELS`); het rekengedrag (afkap op fireMonth − 1, inert zonder vlag) is exact getoetst in lib/horizon-kernel/geb-eind-bij-stopmoment.test.ts.',
+    },
+  },
 ]
 
 export const TOEK_ACCEPTANCE: AcceptanceSet = {
@@ -735,5 +753,5 @@ export const TOEK_ACCEPTANCE: AcceptanceSet = {
  */
 export const TOEK_EXPECTED_WORKFLOW_NUMBERS: number[] = [
   ...Array.from({ length: 26 }, (_, i) => i + 1), // 1..26
-  28, 29, 30, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46,
+  28, 29, 30, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47,
 ]

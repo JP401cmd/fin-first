@@ -23,6 +23,7 @@ import {
   berekenKinderopvangNetto,
   kinderbijslagPerMaand,
   type WerkMetadata,
+  isTotStopmoment,
 } from '@/lib/horizon-data'
 import { type FireEndStrategy } from '@/lib/fire-strategy'
 import type { KernelStopAnker } from '@/lib/horizon-kernel/types'
@@ -453,6 +454,11 @@ export function lifeEventsToCashflows(events: LifeEvent[], skipEventIds?: Set<st
       }
     }
 
+    // "Stopt als ik stop met werken" (ADR 0143): de gebruiker koos in de gebeurtenis dat de
+    // maandelijkse verandering eindigt op het stopmoment. Alleen zetten als waar, zodat
+    // flows zonder die keuze exact hun oude vorm houden.
+    const stopmoment = isTotStopmoment(ev) ? { onlyWhileWorking: true as const } : {}
+
     // 2. Maandelijkse kostenwijziging (monthly_cost_change)
     if (!skipGenericMonthlyCost) {
       const monthlyCost = Number(ev.monthly_cost_change ?? 0)
@@ -469,6 +475,7 @@ export function lifeEventsToCashflows(events: LifeEvent[], skipEventIds?: Set<st
           fromAge: age,
           toAge,
           indexed: isIndexed,
+          ...stopmoment,
         })
       }
     }
@@ -489,6 +496,7 @@ export function lifeEventsToCashflows(events: LifeEvent[], skipEventIds?: Set<st
           fromAge: age,
           toAge,
           indexed: isIndexed,
+          ...stopmoment,
         })
       }
     }

@@ -40,11 +40,15 @@ export interface YearCashflow {
  * @param inflationFactor Kernel-inflatiefactor van dat jaar
  *                        (`UnifiedProjectionRow.inflationFactor`). Niet-eindig of
  *                        ≤ 0 ⇒ behandeld als 1 (geen indexatie).
+ * @param stopAge         Stopmoment van de run (leeftijd). Een `onlyWhileWorking`-stroom
+ *                        (o.a. "tot ik stop met werken", ADR 0143) eindigt daar — zoals de
+ *                        kernel hem afkapt. Null/undefined/niet-eindig ⇒ geen afkap.
  */
 export function cashflowsForYear(
   cashflows: readonly SimCashflow[],
   yearStartAge: number,
   inflationFactor: number,
+  stopAge?: number | null,
 ): YearCashflow[] {
   const yearEndAge = yearStartAge + 1
   // Geïndexeerde stromen groeien mee met inflatie: schaal met de kernel-factor
@@ -59,7 +63,11 @@ export function cashflowsForYear(
         delta = cf.amount * (cf.direction === 'income' ? 1 : -1)
       }
     } else {
-      const cfEnd = cf.toAge ?? Number.POSITIVE_INFINITY
+      const eigenEind = cf.toAge ?? Number.POSITIVE_INFINITY
+      const cfEnd =
+        cf.onlyWhileWorking === true && stopAge != null && Number.isFinite(stopAge)
+          ? Math.min(eigenEind, stopAge)
+          : eigenEind
       const overlapStart = Math.max(cf.fromAge, yearStartAge)
       const overlapEnd = Math.min(cfEnd, yearEndAge)
       if (overlapStart < overlapEnd) {

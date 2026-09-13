@@ -421,19 +421,23 @@ interface GebHelperPost {
  * indexeren centraal). Empirisch geverifieerd tegen de fixture-Geb!W:AE (o.a. de
  * "Pensionering"-post3 Periodiek-zonder-eind: sIdx=348, eIdx=1199, bn=100).
  */
-function buildGebPosten(input: KernelInput): GebHelperPost[] {
+function buildGebPosten(input: KernelInput, fireMonth: number): GebHelperPost[] {
   const posten: GebHelperPost[] = []
 
   // Handmatige gebeurtenissen (Geb rij 4-13).
   for (const rij of input.gebeurtenissen) {
     for (const post of rij.posten) {
       const sIdx = (post.startLeeftijd - input.startLeeftijd) * 12 + (post.startMaand - 1)
-      const eIdx =
+      const eIdxExcel =
         post.eindLeeftijd !== null && post.eindMaand !== null
           ? (post.eindLeeftijd - input.startLeeftijd) * 12 + (post.eindMaand - 1)
           : post.type === 'Periodiek'
             ? HORIZON_MONTHS - 1 // doorlopend → tot de laatste maandindex (1199)
             : sIdx // Eenmalig → vuurt één maand
+      // ADR 0143 (buiten oracle-domein): "stopt als ik stop met werken" → laatste actieve
+      // maand = de maand vóór het stopmoment van déze run. eIdx < sIdx ⇒ de post vuurt
+      // nooit (de CF/Af-lussen toetsen `sIdx ≤ m ≤ eIdx`). Zonder vlag byte-identiek.
+      const eIdx = post.eindBijStopmoment === true ? Math.min(eIdxExcel, fireMonth - 1) : eIdxExcel
       posten.push({ sIdx, eIdx, bedrag: post.bedrag })
     }
   }
@@ -479,7 +483,7 @@ export function runKernelProjection(
   const autoGebeurtenissen = computeAutoGebeurtenissen(input)
   const gebAutoRows = computeGebAutoRows(input)
   const partnerHead = computePartnerHead(input)
-  const gebPosten: readonly GebPostHelper[] = buildGebPosten(input) // {sIdx,eIdx,bedrag}
+  const gebPosten: readonly GebPostHelper[] = buildGebPosten(input, fireMonth) // {sIdx,eIdx,bedrag}
   const afGebPosten: AfDep = {
     gebPosten: gebPosten.map((p) => ({
       startIndex: p.sIdx,

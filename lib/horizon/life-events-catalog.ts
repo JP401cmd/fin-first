@@ -60,6 +60,40 @@ export interface LifeEvent {
   metadata?: Record<string, unknown>
 }
 
+/**
+ * `metadata`-sleutel (ADR 0143): `true` ⇒ de maandelijkse verandering van dit event
+ * stopt op het stopmoment ("stopt als ik stop met werken") — de berekende
+ * vrijheidsleeftijd óf de zelfgekozen stopleeftijd van de run. Afwezig ⇒ doorlopend
+ * (het bestaande gedrag). Eén bron voor schrijver (formulier/sheet) en lezer
+ * (`lifeEventsToCashflows`).
+ */
+export const LIFE_EVENT_TOT_STOPMOMENT_KEY = 'tot_stopmoment'
+
+/**
+ * Leest de stopmoment-keuze van een event. Alleen een expliciete `true` op een
+ * BLIJVENDE verandering (duur 0) telt: een tijdelijk event heeft al een eigen eind, en
+ * een achtergebleven sleutel mag dat nooit stil inkorten.
+ */
+export function isTotStopmoment(event: Pick<LifeEvent, 'metadata' | 'duration_months'>): boolean {
+  return event.metadata?.[LIFE_EVENT_TOT_STOPMOMENT_KEY] === true && !(event.duration_months > 0)
+}
+
+/**
+ * Event-typen waarvan de maandbedragen NIET via de generieke maandstromen rekenen (een
+ * strategie, auto-expander of eigen kasstroom-logica neemt het over). Bij die typen doet
+ * de keuze "tot ik stop met werken" niets — de editor biedt hem daar dus niet aan.
+ */
+const EIGEN_MAANDLOGICA_TYPES: ReadonlySet<string> = new Set([
+  'children', 'inheritance', 'aow', 'pension', 'werk', 'market_shock',
+])
+
+/** Heeft de stopmoment-keuze effect op dit event? (ADR 0143) */
+export function stopmomentKeuzeTeltMee(event: Pick<LifeEvent, 'event_type' | 'metadata'>): boolean {
+  if (EIGEN_MAANDLOGICA_TYPES.has(event.event_type)) return false
+  const custom = event.metadata?.cashflows
+  return !(Array.isArray(custom) && custom.length > 0)
+}
+
 /** LifeEvent with camelCase keys (frontend representation). */
 export type LifeEventFe = CamelCaseKeys<LifeEvent>
 

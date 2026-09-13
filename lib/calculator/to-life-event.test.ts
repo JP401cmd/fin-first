@@ -51,6 +51,21 @@ describe('buildLifeEventDraft', () => {
     expect(d.one_time_cost).toBe(5000)
   })
 
+  it('ADR 0143: doorlopend maandbedrag met untilStop → metadata.tot_stopmoment; anders lege metadata', () => {
+    const stop = buildLifeEventDraft({ name: 'Extra beleggen', targetAge: 46, impactKind: 'monthly_income', amount: 1700, untilStop: true })
+    expect(stop.duration_months).toBe(0)
+    expect(stop.metadata).toEqual({ tot_stopmoment: true })
+
+    const periode = buildLifeEventDraft({ name: 'X', targetAge: 46, impactKind: 'monthly_income', amount: 1700, durationMonths: 24, untilStop: true })
+    expect(periode.metadata).toEqual({})
+
+    const eenmalig = buildLifeEventDraft({ name: 'X', targetAge: 46, impactKind: 'one_time_cost', amount: 1700, untilStop: true })
+    expect(eenmalig.metadata).toEqual({})
+
+    const doorlopend = buildLifeEventDraft({ name: 'Huur', targetAge: 46, impactKind: 'monthly_income', amount: 800 })
+    expect(doorlopend.metadata).toEqual({})
+  })
+
   it('lege naam valt terug op default', () => {
     const d = buildLifeEventDraft({
       name: '   ',

@@ -777,7 +777,10 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
     // kernel-inflatiefactor van dit jaar (row.inflationFactor, V14) i.p.v. een
     // eigen (1+inflatie)^t. Zo hanteert de Gebeurtenissen-sectie dezelfde
     // grondslag als de "Kosten en inkomsten"-sectie hierboven.
-    const cfs = cashflowsForYear(cashflows, age, row?.inflationFactor ?? 1)
+    // `fireAge` = het stopmoment van de run: "tot ik stop met werken"-stromen (ADR 0143)
+    // eindigen daar, net als in de kernel — anders toont de bon een bedrag dat de
+    // projectie niet meer telt.
+    const cfs = cashflowsForYear(cashflows, age, row?.inflationFactor ?? 1, fireAge)
     let aowAmount = 0
     const aggregated = new Map<string, { name: string; icon: string; amount: number }>()
     for (const cf of cfs) {
@@ -811,7 +814,7 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
       // het toevoegt. Geen heuristische "fake" AOW-bedragen.
     }
     return { aowAmount, others }
-  }, [age, cashflows, lifeEvents, aowAge, row])
+  }, [age, cashflows, lifeEvents, aowAge, row, fireAge])
 
   // ── Titel + delta-context ───────────────────────────────────────
   const title = useMemo(() => {

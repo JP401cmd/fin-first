@@ -3,7 +3,13 @@
 // components/app/horizon/event-pane-edit.tsx zodat lib (tests) ze kan
 // importeren zonder terug naar components te reiken (import-richting UI→lib).
 
-import { LIFE_EVENT_CATALOG, type LifeEvent } from '@/lib/horizon-data'
+import {
+  LIFE_EVENT_CATALOG,
+  LIFE_EVENT_TOT_STOPMOMENT_KEY,
+  isTotStopmoment,
+  stopmomentKeuzeTeltMee,
+  type LifeEvent,
+} from '@/lib/horizon-data'
 import { LIFE_EVENT_STORIES, hasStory, defaultStoryAnswers, type StoryAnswerValue } from '@/lib/life-event-stories'
 
 /** Form-state voor de drie-blokken-edit-flow. */
@@ -25,6 +31,11 @@ export interface EditFormState {
   contAmount: number
   contDirection: 'income' | 'expense'
   contIndexed: boolean
+  /**
+   * Tot wanneer loopt de blijvende verandering? `true` = "stopt als ik stop met werken"
+   * (ADR 0143, `metadata.tot_stopmoment`), `false` = blijft doorlopen.
+   */
+  contUntilStop: boolean
   /** Story-antwoorden (alleen voor types met een story-config). */
   storyAnswers?: Record<string, string | number | boolean>
 }
@@ -100,6 +111,7 @@ export function buildDraftEvent(
   let monthlyIncome = 0
   let duration = 0
   let indexed = false
+  let untilStop = false
   // Block 2 (tijdelijk) wint van Block 3 als beide aan staan
   if (s.tempEnabled && s.tempAmount > 0) {
     if (s.tempDirection === 'expense') monthlyCost = s.tempAmount
@@ -111,7 +123,12 @@ export function buildDraftEvent(
     else monthlyIncome = s.contAmount
     duration = 0
     indexed = s.contIndexed
+    untilStop = s.contUntilStop && stopmomentKeuzeTeltMee({ event_type: s.event_type, metadata: existingEvent?.metadata })
   }
+  // De stopmoment-keuze hoort alleen bij een blijvende verandering: bij elke andere
+  // vorm de sleutel expliciet wissen, anders erft een omgezet event 'm stil uit de
+  // bestaande metadata.
+  const { [LIFE_EVENT_TOT_STOPMOMENT_KEY]: _vorigeKeuze, ...restMetadata } = existingEvent?.metadata ?? {}
   const oneTimeSigned =
     s.oneTimeAmount > 0
       ? s.oneTimeDirection === 'expense'
@@ -135,8 +152,9 @@ export function buildDraftEvent(
     sort_order: existingEvent?.sort_order ?? 0,
     is_indexed: indexed,
     metadata: {
-      ...(existingEvent?.metadata ?? {}),
+      ...restMetadata,
       ...(s.storyAnswers ? { story_answers: s.storyAnswers } : {}),
+      ...(untilStop ? { [LIFE_EVENT_TOT_STOPMOMENT_KEY]: true } : {}),
     },
   }
 }
@@ -188,6 +206,7 @@ export function initFormState(
           : 0,
       contDirection: existing.monthly_income_change > 0 ? 'income' : 'expense',
       contIndexed: existing.is_indexed,
+      contUntilStop: isTotStopmoment(existing),
       storyAnswers: savedStoryAnswers,
     }
   }
@@ -208,6 +227,7 @@ export function initFormState(
       contAmount: 0,
       contDirection: 'expense',
       contIndexed: true,
+      contUntilStop: false,
     }
   }
   const oneTimeSigned = entry.defaultCost
@@ -233,6 +253,7 @@ export function initFormState(
     contAmount: isContinuous ? monthlyAmount : 0,
     contDirection: monthlyDirection,
     contIndexed: true,
+    contUntilStop: false,
   }
   // Als dit type een inspirerende story heeft: initialiseer met story-defaults
   // en pas computeImpact toe — zo zien gebruikers direct de berekende cijfers

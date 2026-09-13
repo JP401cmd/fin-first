@@ -569,6 +569,10 @@ function cashflowToGebPost(cf: SimCashflow, ctx: EventMappingContext): GebPost |
   }
 
   // recurring
+  // ADR 0143: "stopt als ik stop met werken" (`onlyWhileWorking`) → de engine kapt de post
+  // af op het stopmoment van de run. Alleen gezet als waar, zodat posten zonder die keuze
+  // exact de oude vorm houden.
+  const stopmoment = cf.onlyWhileWorking === true ? { eindBijStopmoment: true as const } : {}
   if (cf.toAge == null) {
     return {
       type: 'Periodiek',
@@ -577,6 +581,7 @@ function cashflowToGebPost(cf: SimCashflow, ctx: EventMappingContext): GebPost |
       startMaand: start.maand,
       eindLeeftijd: null, // doorlopend → de kern loopt tot de horizon (eIdx = 1199)
       eindMaand: null,
+      ...stopmoment,
     }
   }
   // Laatste actieve maand = maand vóór `toAge` (de app-flow loopt [fromAge, toAge)).
@@ -590,6 +595,7 @@ function cashflowToGebPost(cf: SimCashflow, ctx: EventMappingContext): GebPost |
     startMaand: start.maand,
     eindLeeftijd: end.leeftijd,
     eindMaand: end.maand,
+    ...stopmoment,
   }
 }
 

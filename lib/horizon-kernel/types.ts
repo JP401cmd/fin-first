@@ -554,6 +554,14 @@ export interface GebPost {
   readonly eindLeeftijd: number | null
   /** kolom H/O/V — eindmaand (`null` = leeg). */
   readonly eindMaand: number | null
+  /**
+   * BUITEN ORACLE-DOMEIN (ADR 0143): `true` ⇒ de post loopt tot de maand vóór het
+   * stopmoment van déze run (`fireAge`: het door de solver gezochte moment óf het vaste
+   * stop-anker) — de gebruiker koos in de gebeurtenis "stopt als ik stop met werken".
+   * De engine kapt `eIdx` daar af; een post die pas op/na het stopmoment start vuurt dus
+   * nooit. Afwezig/`false` ⇒ exact het Excel-gedrag (byte-identiek).
+   */
+  readonly eindBijStopmoment?: boolean
 }
 
 /** Eén handmatige gebeurtenis-rij (Geb rij 4-13) met 0-3 gevulde posten. */

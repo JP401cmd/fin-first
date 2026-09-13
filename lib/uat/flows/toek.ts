@@ -73,6 +73,7 @@ export const TOEK_FLOW: UatFlow = {
     // ── 3 · gebeurtenissen op de tijdas ───────────────────────────────────
     { id: 'eventadd', scenarioId: 'UAT-TOEK-13', label: 'WF-TOEK-13 · Levensgebeurtenis toevoegen', kind: 'action', stage: 3, lane: 'gebeurtenissen' },
     { id: 'eventedit', scenarioId: 'UAT-TOEK-14', label: 'WF-TOEK-14 · Bekijken / bewerken / verwijderen', kind: 'screen', stage: 3, lane: 'gebeurtenissen', subOf: 'eventadd' },
+    { id: 'eventtotwanneer', scenarioId: 'UAT-TOEK-47', label: 'WF-TOEK-47 · Blijvend: doorlopend of tot je stopt met werken', kind: 'action', stage: 3, lane: 'gebeurtenissen', subOf: 'eventadd' },
     { id: 'eventdrag', scenarioId: 'UAT-TOEK-15', label: 'WF-TOEK-15 · Slepen op de tijdas & undo', kind: 'action', stage: 3, lane: 'gebeurtenissen', subOf: 'eventadd' },
     { id: 'eventpagina', scenarioId: 'UAT-TOEK-17', label: 'WF-TOEK-17 · Gebeurtenissen-pagina (kernel-momenten)', kind: 'screen', stage: 3, lane: 'gebeurtenissen' },
     { id: 'tekortbeslis', label: 'Tekort in de projectie?', kind: 'decision', stage: 3, lane: 'gebeurtenissen', subOf: 'eventpagina' },

@@ -9,7 +9,7 @@ import {
 import { computeWhatifProjection } from '@/lib/horizon-kernel/whatif-router'
 import type { WhatifRawProfileRow } from '@/lib/horizon-kernel/adapter/whatif-varianten'
 import { lifeEventsToCashflows, type SimCashflow, type SimResult } from '@/lib/fire-simulation'
-import { formatFireAge } from '@/lib/horizon-data'
+import { formatFireAge, LIFE_EVENT_TOT_STOPMOMENT_KEY } from '@/lib/horizon-data'
 import { formatDecimal } from '@/lib/format'
 import type { WhatIfEvent } from '@/components/app/horizon/whatif-events'
 import type { Debt } from '@/lib/debt-data'
@@ -162,7 +162,10 @@ export function WhatIfBeslishulp({
     is_active: true,
     sort_order: 999,
     is_indexed: true,
-    metadata: {},
+    // Zelfde grondslag als de gebeurtenis die "Zet op tijdas" standaard vastlegt: extra
+    // inleg uit je werk stopt op je stopmoment (ADR 0143). Anders rekent de kaart met
+    // inleg die na FIRE doorloopt en het opgeslagen event niet.
+    metadata: { [LIFE_EVENT_TOT_STOPMOMENT_KEY]: true },
     is_scenario_only: true,
     scenario_origin: `beslishulp:${id}`,
   })
@@ -391,6 +394,9 @@ export function WhatIfBeslishulp({
           defaultAge={currentAge}
           defaultImpactKind={commitConfig[committing].kind}
           defaultDurationMonths={0}
+          // Extra geld per maand komt uit je werk: standaard stopt het op je stopmoment
+          // (ADR 0143). Zichtbaar en aanpasbaar in de sheet — geen stille aanname.
+          defaultUntilStop
           onClose={() => setCommitting(null)}
         />
       )}

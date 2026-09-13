@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Sparkles, Hourglass, Repeat, Trash2, ArrowLeft } from 'lucide-react'
 import {
   LIFE_EVENT_CATALOG,
+  stopmomentKeuzeTeltMee,
   type LifeEvent,
   type FinancialInput,
   type FireProjection,
@@ -445,8 +446,8 @@ export function EventPaneEdit({
         {state.contEnabled && (
           <div className="space-y-4">
             <p className="text-sm text-[var(--ink-2)]">
-              Een structurele verandering die vanaf die leeftijd niet meer weggaat — bijvoorbeeld
-              pensioen, AOW, een hypotheekverandering.
+              Een structurele verandering vanaf die leeftijd — bijvoorbeeld een pensioen,
+              huurinkomsten of extra inleg uit je salaris. Hieronder kies je tot wanneer.
             </p>
             <div className="flex items-end gap-3 flex-wrap">
               <div>
@@ -469,6 +470,15 @@ export function EventPaneEdit({
                 onChange={v => setState({ ...state, contDirection: v })}
               />
             </div>
+            {/* ADR 0143 — tot wanneer loopt dit bedrag? Expliciet in de gebeurtenis,
+                zodat de rekenmotor nooit stil aanneemt dat geld uit je werk ook na je
+                stopmoment doorloopt (of juist stopt). */}
+            {stopmomentKeuzeTeltMee({ event_type: state.event_type, metadata: existingEvent?.metadata }) && (
+              <UntilToggle
+                value={state.contUntilStop}
+                onChange={v => setState({ ...state, contUntilStop: v })}
+              />
+            )}
             <label className="flex items-center gap-2 text-sm text-[var(--ink-2)]">
               <input
                 type="checkbox"
@@ -926,6 +936,61 @@ function DirectionToggle({
           </button>
         ))}
       </div>
+    </div>
+  )
+}
+
+/**
+ * "Tot wanneer?" voor een blijvende verandering (ADR 0143). Helptekst volgt de keuze en
+ * noemt keuze · effect · waarom.
+ */
+function UntilToggle({
+  value,
+  onChange,
+}: {
+  value: boolean
+  onChange: (untilStop: boolean) => void
+}) {
+  const options = [
+    { untilStop: false, label: 'Blijft doorlopen' },
+    { untilStop: true, label: 'Tot ik stop met werken' },
+  ] as const
+  const labelId = useId()
+  const hintId = useId()
+  return (
+    <div>
+      <div id={labelId} className="text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--ink-3)]">
+        Tot wanneer
+      </div>
+      {/* Geen flex-wrap: bij omslaan brak de gedeelde rand lelijk af. Twee korte
+          knoppen passen naast elkaar op ~400px; de tekst mag binnen een knop omslaan. */}
+      <div
+        role="group"
+        aria-labelledby={labelId}
+        aria-describedby={hintId}
+        className="mt-1 inline-flex max-w-full border border-[var(--border-md)] overflow-hidden"
+      >
+        {options.map(opt => (
+          <button
+            key={opt.label}
+            type="button"
+            aria-pressed={value === opt.untilStop}
+            onClick={() => onChange(opt.untilStop)}
+            className={`px-3 py-2 text-sm text-left transition-colors ${
+              value === opt.untilStop
+                ? 'bg-[var(--ink)] text-[var(--paper)]'
+                : 'bg-[var(--paper)] text-[var(--ink-2)] hover:bg-[var(--subtle)]'
+            }`}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+      <p id={hintId} className="mt-2 text-xs text-[var(--ink-3)]">
+        {value
+          ? 'Het bedrag stopt zodra je stopt met werken: op je vrijheidsleeftijd, of op de stopleeftijd die je zelf koos. Daarna telt het niet meer mee in je plan. Kies dit voor geld dat uit je werk komt, zoals extra inleg uit je salaris.'
+          : 'Het bedrag loopt door tot het einde van je plan, ook nadat je gestopt bent met werken. Het telt dus elk jaar mee, ook in de jaren waarin je van je vermogen leeft. Kies dit voor geld dat los van je werk binnenkomt, zoals een pensioen of huurinkomsten.'}
+      </p>
     </div>
   )
 }

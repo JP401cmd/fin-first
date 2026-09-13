@@ -7,6 +7,8 @@
  * formaat met veilige defaults; de UI vult naam/leeftijd/bedrag in.
  */
 
+import { LIFE_EVENT_TOT_STOPMOMENT_KEY } from '@/lib/horizon-data'
+
 export type LifeEventImpactKind = 'one_time_cost' | 'monthly_cost' | 'monthly_income'
 
 export interface LifeEventDraft {
@@ -19,6 +21,7 @@ export interface LifeEventDraft {
   duration_months: number
   is_indexed: boolean
   icon: string
+  metadata: Record<string, unknown>
 }
 
 export interface LifeEventDraftInput {
@@ -29,6 +32,11 @@ export interface LifeEventDraftInput {
   amount: number
   /** Alleen relevant voor maandelijkse impact. */
   durationMonths?: number
+  /**
+   * Alleen relevant voor doorlopende maandelijkse impact (duur 0): `true` = stopt als je
+   * stopt met werken (ADR 0143). Bij een eindige duur genegeerd.
+   */
+  untilStop?: boolean
 }
 
 /**
@@ -49,6 +57,7 @@ export function buildLifeEventDraft(input: LifeEventDraftInput): LifeEventDraft 
     duration_months: 0,
     is_indexed: false,
     icon: 'Calculator',
+    metadata: {},
   }
   switch (input.impactKind) {
     case 'one_time_cost':
@@ -62,6 +71,9 @@ export function buildLifeEventDraft(input: LifeEventDraftInput): LifeEventDraft 
       draft.monthly_income_change = amount
       draft.duration_months = Math.max(0, Math.round(input.durationMonths ?? 0))
       break
+  }
+  if (input.impactKind !== 'one_time_cost' && draft.duration_months === 0 && input.untilStop === true) {
+    draft.metadata = { [LIFE_EVENT_TOT_STOPMOMENT_KEY]: true }
   }
   return draft
 }

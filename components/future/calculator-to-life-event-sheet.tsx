@@ -25,6 +25,7 @@ export function CalculatorToLifeEventSheet({
   defaultAge,
   defaultImpactKind = 'one_time_cost',
   defaultDurationMonths = 0,
+  defaultUntilStop = false,
   onClose,
 }: {
   defaultName: string
@@ -36,8 +37,14 @@ export function CalculatorToLifeEventSheet({
    * noodfonds → monthly_cost, etc.
    */
   defaultImpactKind?: LifeEventImpactKind
-  /** Voorgevulde duur in maanden voor maandelijkse impact (0 = doorlopend). */
+  /** Voorgevulde duur in maanden voor maandelijkse impact (0 = geen vaste periode). */
   defaultDurationMonths?: number
+  /**
+   * Voorgeselecteerd bij een doorlopende maandelijkse impact: stopt het bedrag als je
+   * stopt met werken (ADR 0143)? Beslishulp-opties (extra inleg uit je salaris) zetten dit
+   * aan; de rekenhulp laat het uit. De keuze staat zichtbaar in het formulier.
+   */
+  defaultUntilStop?: boolean
   onClose: () => void
 }) {
   const router = useRouter()
@@ -45,7 +52,11 @@ export function CalculatorToLifeEventSheet({
   const [impactKind, setImpactKind] = useState<LifeEventImpactKind>(defaultImpactKind)
   const [amount, setAmount] = useState(String(Math.round(Math.abs(defaultAmount)) || 0))
   const [age, setAge] = useState(defaultAge != null ? String(defaultAge) : '')
-  const [durationMonths, setDurationMonths] = useState(String(Math.max(0, Math.round(defaultDurationMonths))))
+  const initialDuration = Math.max(0, Math.round(defaultDurationMonths))
+  const [until, setUntil] = useState<'doorlopend' | 'stopmoment' | 'periode'>(
+    initialDuration > 0 ? 'periode' : defaultUntilStop ? 'stopmoment' : 'doorlopend',
+  )
+  const [durationMonths, setDurationMonths] = useState(String(initialDuration > 0 ? initialDuration : 12))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -57,6 +68,12 @@ export function CalculatorToLifeEventSheet({
       setError('Vul een positief bedrag in.')
       return
     }
+    // "Een vaste periode" zonder geldige duur mag nooit stil een doorlopend event worden
+    // (duur 0 = geen eind — precies het lek uit ADR 0143).
+    if (isMonthly && until === 'periode' && !(Number(durationMonths) >= 1)) {
+      setError('Vul een duur van minstens 1 maand in, of kies een andere optie bij "Tot wanneer".')
+      return
+    }
     setSaving(true)
     setError(null)
     const draft = buildLifeEventDraft({
@@ -64,7 +81,8 @@ export function CalculatorToLifeEventSheet({
       targetAge: age ? Number(age) : null,
       impactKind,
       amount: numAmount,
-      durationMonths: Number(durationMonths) || 0,
+      durationMonths: until === 'periode' ? Number(durationMonths) || 0 : 0,
+      untilStop: until === 'stopmoment',
     })
     const supabase = createClient()
     const {
@@ -169,19 +187,42 @@ export function CalculatorToLifeEventSheet({
           </div>
 
           {isMonthly && (
-            <label className="block">
-              <span className="block text-xs font-semibold text-[var(--ink-2)] mb-1">
-                Duur (maanden, 0 = doorlopend)
-              </span>
-              <input
-                type="number"
-                inputMode="numeric"
-                min={0}
-                value={durationMonths}
-                onChange={(e) => setDurationMonths(e.target.value)}
-                className="w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm focus:outline-none focus:border-[var(--ink-3)]"
-              />
-            </label>
+            <div className="space-y-3">
+              <div>
+                <label htmlFor="life-event-until" className="block text-xs font-semibold text-[var(--ink-2)] mb-1">Tot wanneer</label>
+                <select
+                  id="life-event-until"
+                  aria-describedby="life-event-until-hint"
+                  value={until}
+                  onChange={(e) => setUntil(e.target.value as typeof until)}
+                  className="w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm focus:outline-none focus:border-[var(--ink-3)]"
+                >
+                  <option value="stopmoment">Tot ik stop met werken</option>
+                  <option value="doorlopend">Blijft doorlopen</option>
+                  <option value="periode">Een vaste periode</option>
+                </select>
+                <p id="life-event-until-hint" className="mt-1 text-xs text-[var(--ink-3)]">
+                  {until === 'stopmoment'
+                    ? 'Het bedrag stopt zodra je stopt met werken: op je vrijheidsleeftijd, of op de stopleeftijd die je zelf koos. Daarna telt het niet meer mee. Kies dit voor geld dat uit je werk komt, zoals extra inleg uit je salaris.'
+                    : until === 'doorlopend'
+                      ? 'Het bedrag loopt door tot het einde van je plan, ook nadat je gestopt bent met werken. Het telt dus ook mee in de jaren waarin je van je vermogen leeft. Kies dit voor geld dat los van je werk binnenkomt, zoals huurinkomsten.'
+                      : 'Het bedrag telt alleen mee gedurende het aantal maanden dat je hieronder invult. Daarna stopt het, of je nu werkt of niet.'}
+                </p>
+              </div>
+              {until === 'periode' && (
+                <label className="block">
+                  <span className="block text-xs font-semibold text-[var(--ink-2)] mb-1">Duur (maanden)</span>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    value={durationMonths}
+                    onChange={(e) => setDurationMonths(e.target.value)}
+                    className="w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm focus:outline-none focus:border-[var(--ink-3)]"
+                  />
+                </label>
+              )}
+            </div>
           )}
         </div>
       </div>

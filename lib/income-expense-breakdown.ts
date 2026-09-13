@@ -55,7 +55,10 @@ const FIXED_LABELS: Record<string, string> = {
   savings: 'Besparingen',
   growth: 'Rendement',
   salaris: 'Salaris & werk',
-  'gebeurtenis-baten': 'AOW & pensioen',
+  // CF!H = álle positieve gebeurtenis-posten: AOW en pensioen, maar óók eigen
+  // gebeurtenissen met inkomen (bv. extra inleg, huur). Het oude label "AOW & pensioen"
+  // wekte de indruk dat er vóór de AOW-leeftijd al AOW binnenkwam.
+  'gebeurtenis-baten': 'Inkomsten uit gebeurtenissen',
   // Levensonderhoud toont ná box3-ontdubbeling alléén het niet-fiscale deel van
   // de onttrekking; Box 3 staat als eigen post ernaast (zie buildBreakdown).
   withdrawal: 'Levensonderhoud via onttrekking',

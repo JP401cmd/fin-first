@@ -37,6 +37,26 @@ function oneTime(partial: Partial<SimCashflow> & Pick<SimCashflow, 'id' | 'index
 const AOW_MONTHLY = 1_581.55
 const AOW_YEAR = AOW_MONTHLY * 12 // 18.978,60 vlak reëel
 
+describe('cashflowsForYear — "tot ik stop met werken" (ADR 0143)', () => {
+  const inleg: SimCashflow = {
+    id: 'le-incomechange-inleg', name: 'Extra beleggen', type: 'recurring', direction: 'income',
+    amount: 1_000, fromAge: 46, toAge: null, indexed: false, onlyWhileWorking: true,
+  }
+
+  it('telt t/m het stopmoment en daarna niet meer; zonder stopmoment loopt hij door', () => {
+    expect(cashflowsForYear([inleg], 50, 1, 55)[0].amount).toBe(12_000)
+    // Stopmoment halverwege het jaar → alleen de maanden ervoor.
+    expect(cashflowsForYear([inleg], 55, 1, 55.5)[0].amount).toBe(6_000)
+    expect(cashflowsForYear([inleg], 56, 1, 55.5)).toHaveLength(0)
+    expect(cashflowsForYear([inleg], 60, 1, null)[0].amount).toBe(12_000)
+  })
+
+  it('een stroom zonder de vlag negeert het stopmoment', () => {
+    const huur: SimCashflow = { ...inleg, id: 'le-incomechange-huur', onlyWhileWorking: undefined }
+    expect(cashflowsForYear([huur], 60, 1, 55)[0].amount).toBe(12_000)
+  })
+})
+
 describe('cashflowsForYear — inflatie-indexatie', () => {
   it('indexeert een geïndexeerde recurring stroom (AOW) met de inflatiefactor van het jaar', () => {
     const aow = recurring({ id: '__aow', name: 'AOW-uitkering', amount: AOW_MONTHLY, fromAge: 67, indexed: true })

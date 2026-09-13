@@ -329,6 +329,24 @@ describe('events — handmatige Geb-rijen', () => {
     expect(post.bedrag).toBe(-200)
   })
 
+  it('ADR 0143: metadata.tot_stopmoment → Periodiek-post met eindBijStopmoment; zonder keuze geen veld', () => {
+    const totStop = makeEvent({
+      id: 'inleg',
+      event_type: 'custom',
+      target_age: 46,
+      monthly_income_change: 1_700,
+      metadata: { tot_stopmoment: true },
+    })
+    const [post] = buildEventInputs([totStop], CTX).gebeurtenissen[0].posten
+    expect(post.type).toBe('Periodiek')
+    expect(post.eindLeeftijd).toBeNull()
+    expect(post.eindBijStopmoment).toBe(true)
+
+    const doorlopend = makeEvent({ id: 'huur', event_type: 'custom', target_age: 46, monthly_income_change: 1_700 })
+    const [postDoorlopend] = buildEventInputs([doorlopend], CTX).gebeurtenissen[0].posten
+    expect('eindBijStopmoment' in postDoorlopend).toBe(false)
+  })
+
   it('market_shock (portfolio-mutatie) → potMutatie op de juiste maand (V9), geen Geb-rij', () => {
     const shock = makeEvent({ id: 's', event_type: 'market_shock', target_age: 55, metadata: { shockPercentage: -0.3 } })
     const { gebeurtenissen, potMutaties } = buildEventInputs([shock], CTX)

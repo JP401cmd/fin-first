@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { initFormState, applyStory, setSharedAge, storyAgeKey } from './event-pane-edit-form'
+import { initFormState, applyStory, setSharedAge, storyAgeKey, buildDraftEvent } from './event-pane-edit-form'
 import { LIFE_EVENT_STORIES, defaultStoryAnswers } from '@/lib/life-event-stories'
+import { isTotStopmoment } from '@/lib/horizon-data'
 
 /**
  * Leeftijd is één waarde met twee vensters: het veld "Leeftijd" bovenaan het
@@ -91,5 +92,61 @@ describe('event-pane-edit-form — leeftijd is één bron met twee vensters', ()
     // "45" nooit getypt worden (leeg → 40, "4" erachter → 404 → 90).
     const base = initFormState('world_trip', null, 40)
     expect(setSharedAge(base, 4).shared_age).toBe(4)
+  })
+})
+
+/**
+ * ADR 0143 — "Tot wanneer?" bij een blijvende verandering. De keuze staat expliciet in de
+ * gebeurtenis (`metadata.tot_stopmoment`) en overleeft opslaan → opnieuw openen.
+ */
+describe('event-pane-edit-form — tot wanneer loopt een blijvende verandering', () => {
+  const existing = {
+    id: 'inleg', name: 'Extra beleggen €1.700/mnd', event_type: 'custom', target_age: 46, target_date: null,
+    one_time_cost: 0, monthly_cost_change: 0, monthly_income_change: 1700, duration_months: 0,
+    icon: 'Calculator', is_active: true, sort_order: 0, is_indexed: false,
+    metadata: { story_answers: undefined, andere_sleutel: 'blijft' } as Record<string, unknown>,
+  }
+
+  it('een bestaand event zonder keuze opent als "blijft doorlopen" en slaat geen sleutel op', () => {
+    const s = initFormState('custom', existing, 46)
+    expect(s.contEnabled).toBe(true)
+    expect(s.contUntilStop).toBe(false)
+    const draft = buildDraftEvent(s, existing)
+    expect(draft.metadata).not.toHaveProperty('tot_stopmoment')
+    expect(draft.metadata).toHaveProperty('andere_sleutel', 'blijft')
+  })
+
+  it('"tot ik stop met werken" wordt opgeslagen en komt terug bij opnieuw openen', () => {
+    const s = { ...initFormState('custom', existing, 46), contUntilStop: true }
+    const draft = buildDraftEvent(s, existing)
+    expect(draft.metadata).toHaveProperty('tot_stopmoment', true)
+    expect(draft.duration_months).toBe(0)
+    expect(initFormState('custom', draft, 46).contUntilStop).toBe(true)
+  })
+
+  it('bij een type met eigen maandlogica (kinderen) wordt de keuze niet opgeslagen — hij zou niets doen', () => {
+    const kind = { ...existing, event_type: 'children' }
+    const draft = buildDraftEvent({ ...initFormState('children', kind, 46), contEnabled: true, contAmount: 500, contUntilStop: true }, kind)
+    expect(draft.metadata).not.toHaveProperty('tot_stopmoment')
+  })
+
+  it('isTotStopmoment negeert een achtergebleven sleutel op een tijdelijk event', () => {
+    expect(isTotStopmoment({ metadata: { tot_stopmoment: true }, duration_months: 24 })).toBe(false)
+    expect(isTotStopmoment({ metadata: { tot_stopmoment: true }, duration_months: 0 })).toBe(true)
+  })
+
+  it('omzetten naar tijdelijk wist de stopmoment-keuze (geen stille erfenis uit de oude metadata)', () => {
+    const metKeuze = { ...existing, metadata: { tot_stopmoment: true } }
+    const s = {
+      ...initFormState('custom', metKeuze, 46),
+      contEnabled: false,
+      tempEnabled: true,
+      tempAmount: 1700,
+      tempDirection: 'income' as const,
+      tempDurationYears: 5,
+    }
+    const draft = buildDraftEvent(s, metKeuze)
+    expect(draft.duration_months).toBe(60)
+    expect(draft.metadata).not.toHaveProperty('tot_stopmoment')
   })
 })
