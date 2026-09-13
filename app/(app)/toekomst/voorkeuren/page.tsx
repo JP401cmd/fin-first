@@ -10,7 +10,7 @@ import { loadDashboardData } from '@/lib/dashboard-data-loader'
 import { ToekomstSubpageShell } from '@/components/future/toekomst-subpage-shell'
 import { VoorkeurenView } from '@/components/future/voorkeuren-view'
 import { resolveWithdrawalProfiel } from '@/lib/withdrawal-strategy'
-import { WEALTH_GROUPS, type WealthGroup } from '@/lib/wealth-composition'
+import { buildPotBalances } from '@/lib/future/pot-balances'
 
 export const metadata: Metadata = {
   title: 'Voorkeuren — TriFinity',
@@ -43,15 +43,7 @@ export default async function ToekomstVoorkeurenPage() {
       : null
 
   // Huidig saldo per WealthGroup voor de illustratieve pot-flow-weergave (regel 3/4/5).
-  const potBalances: Record<WealthGroup, number> = {
-    spaargeld: 0, beleggingen: 0, pensioen: 0, vastgoed: 0, overig: 0,
-  }
-  for (const a of horizonData.assets ?? []) {
-    if (a.is_active === false) continue
-    const g = WEALTH_GROUPS[a.asset_type]
-    if (g) potBalances[g] += Number(a.current_value) || 0
-  }
-  potBalances.spaargeld += Math.max(0, horizonData.unlinkedCash ?? 0)
+  const potBalances = buildPotBalances(horizonData.assets, horizonData.unlinkedCash)
 
   // TPR-12 — heffingvrij inkomen (Box 3, werkelijk-tak) uit de rauwe profielrij; de
   // select('*') van de loader laat de nieuwe kolom vanzelf door. NULL = kernel-default.
