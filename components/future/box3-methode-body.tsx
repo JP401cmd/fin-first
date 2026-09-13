@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
-import { RegelOptionCard } from './regels/shared'
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
+import { FireDeltaFooter, RegelOptionCard, fireDeltaMonths } from './regels/shared'
+import { runRegelProjection, type RegelSimSnapshot } from '@/lib/future/regel-sim'
 import type { RegelEditActionsState } from './regels/types'
 import type { Box3Method } from '@/lib/bucket-projection'
 import { BOX3_METHODS, BOX3_METHOD_LABELS } from '@/lib/box3-method'
@@ -65,6 +66,13 @@ export interface Box3MethodeBodyProps {
   current: Box3Method
   /** Opgeslagen heffingvrij inkomen (euro p.p. per jaar); null = kernel-default. */
   currentHeffingvrijInkomen?: number | null
+  /** Kopniveau van de titel: 'h2' in de sheet, 'h5' in de plan-review (pane h3 → scherm h4). */
+  kop?: 'h2' | 'h5'
+  /**
+   * TPR-15 — met een snapshot draait het effect live mee (`runRegelProjection` met de
+   * `parameters`-override) en publiceert de body een FIRE-delta als footer-info.
+   */
+  snapshot?: RegelSimSnapshot | null
   /** Host-contract (`RegelEditActionsState`): de host rendert de opslaanknop. */
   onActionsChange: (s: RegelEditActionsState) => void
   /** Opslaan zonder wijziging (formulier-submit): de host sluit. */
@@ -86,6 +94,8 @@ export interface Box3MethodeBodyProps {
 export function Box3MethodeBody({
   current,
   currentHeffingvrijInkomen = null,
+  kop = 'h2',
+  snapshot = null,
   onActionsChange,
   onClose,
   onSaved,
@@ -104,6 +114,25 @@ export function Box3MethodeBody({
   const heffingvrijChanged =
     method === 'werkelijk' && heffingvrijValid && parsedHeffingvrij !== currentHeffingvrijInkomen
   const changed = methodChanged || heffingvrijChanged
+  // Een ongeldig bedrag onder werkelijk rendement houdt "Opslaan" dicht (de tekst staat bij het veld).
+  const invoerGeldig = method !== 'werkelijk' || heffingvrijValid
+
+  // Live effect: dezelfde kern-run als de Tijdas, met alleen de Box 3-kolommen vervangen.
+  const concept = useMemo(
+    () => ({
+      box3_method: method,
+      ...(method === 'werkelijk' && heffingvrijValid ? { box3_heffingvrij_inkomen: parsedHeffingvrij } : {}),
+    }),
+    [method, heffingvrijValid, parsedHeffingvrij],
+  )
+  const deferredConcept = useDeferredValue(concept)
+  // Kernel-runs pas zodra er iets gewijzigd is: zonder wijziging toont de footer geen effect.
+  const baseline = useMemo(() => (snapshot && changed ? runRegelProjection(snapshot) : null), [snapshot, changed])
+  const draftProj = useMemo(
+    () => (snapshot && changed ? runRegelProjection(snapshot, { parameters: deferredConcept }) : null),
+    [snapshot, changed, deferredConcept],
+  )
+  const deltaMonths = baseline && draftProj ? fireDeltaMonths(baseline, draftProj) : null
 
   async function handleSubmit(e?: React.FormEvent) {
     e?.preventDefault()
@@ -134,6 +163,20 @@ export function Box3MethodeBody({
         setSaving(false)
         return
       }
+      // Review M3 — de route echoot alleen wat écht is weggeschreven. Ontbreekt de kolom nog
+      // (migratie niet toegepast), dan valt het bedrag in de retry weg: dat niet als "opgeslagen" melden.
+      if (heffingvrijChanged) {
+        const data = (await res.json().catch(() => null)) as Record<string, unknown> | null
+        if (!data || !('box3_heffingvrij_inkomen' in data)) {
+          setError(
+            methodChanged
+              ? 'De methode is opgeslagen, maar het heffingvrije inkomen niet. Probeer het later opnieuw.'
+              : 'Het heffingvrije inkomen kon niet worden opgeslagen. Probeer het later opnieuw.',
+          )
+          setSaving(false)
+          return
+        }
+      }
     } catch {
       setError('Opslaan mislukt. Controleer je verbinding en probeer het opnieuw.')
       setSaving(false)
@@ -150,12 +193,22 @@ export function Box3MethodeBody({
   })
 
   useEffect(() => {
-    onActionsChange({ canSave: changed && !saving, saving, save: () => void saveRef.current(), changed })
-  }, [onActionsChange, changed, saving])
+    onActionsChange({
+      canSave: changed && !saving && invoerGeldig,
+      saving,
+      save: () => void saveRef.current(),
+      changed,
+      footerInfo: changed && baseline && draftProj ? <FireDeltaFooter baseline={baseline} draft={draftProj} /> : undefined,
+    })
+    // baseline/draftProj zijn useMemo-stabiel; deltaMonths bewaakt republish.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onActionsChange, changed, saving, invoerGeldig, deltaMonths])
+
+  const Kop = kop
 
   return (
-    <form onSubmit={handleSubmit} className="p-5 sm:p-6">
-      <h2 className="font-serif text-lg text-[var(--ink)] mb-2">Box 3-methode</h2>
+    <form onSubmit={handleSubmit} className={kop === 'h2' ? 'p-5 sm:p-6' : ''}>
+      <Kop className="font-serif text-lg text-[var(--ink)] mb-2">Box 3-methode</Kop>
       <p className="mb-4 text-[11px] text-[var(--ink-3)] italic leading-snug">{BOX3_METHOD_INTRO}</p>
 
       {error && (

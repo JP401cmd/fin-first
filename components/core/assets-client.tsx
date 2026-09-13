@@ -39,6 +39,7 @@ import {
   assetAmountLimitError,
   assetReturnBand,
   assetReturnBandError,
+  assetReturnLabel,
   isPurchaseDateInFuture,
   isWithinAssetAmountLimit,
   isWithinAssetReturnBand,
@@ -3995,7 +3996,7 @@ export function AssetForm({
               <div className={`grid ${assetType === 'eigen_huis' ? 'grid-cols-2' : 'grid-cols-3'} gap-3`}>
                 {!(visibleFields.includes('depreciation_rate') && depreciationRate && Number(depreciationRate) > 0) && (
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">{assetType === 'vordering' || assetType === 'savings' ? 'Rente (% p.j.)' : 'Rendement (% p.j.)'}</label>
+                  <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">{assetReturnLabel(assetType)} (% p.j.)</label>
                   {/* Negatief mag: afschrijvende types ('vehicle', 'physical')
                       dragen een negatief rendement. De band per type staat in
                       lib/asset-parameter-bands.ts en wordt bij opslaan getoetst. */}

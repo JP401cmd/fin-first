@@ -250,3 +250,42 @@ describe('PUT /api/parameters — schrijfpad dicht', () => {
     expect('target_savings_rate' in (await res.json())).toBe(false)
   })
 })
+
+/**
+ * TPR-15 — de retry zonder de optionele kolommen is een vangnet voor een DB waarop een
+ * migratie nog niet draaide (ontbrekende kolom). Hij mag NIET vuren op elke andere fout:
+ * dan zou bv. een CHECK-schending of een tijdelijke storing stil worden "opgelost" door
+ * de optionele velden weg te laten, en de response bevestigt dan minder dan gevraagd.
+ */
+describe('PUT /api/parameters — retry alleen bij een ontbrekende kolom', () => {
+  it('ontbrekende kolom (PGRST204) → één retry zonder de optionele kolommen', async () => {
+    results.profilesUpsert
+      .mockReturnValueOnce({ error: { code: 'PGRST204', message: "Could not find the 'box3_heffingvrij_inkomen' column" } })
+      .mockReturnValueOnce({ error: null })
+    const res = await PUT(putRequest({ box3_method: 'werkelijk', box3_heffingvrij_inkomen: 2500 }))
+    expect(res.status).toBe(200)
+    const profileUpserts = upserted.filter((u) => u.table === 'profiles')
+    expect(profileUpserts).toHaveLength(2)
+    expect('box3_heffingvrij_inkomen' in profileUpserts[1].payload).toBe(false)
+    expect('box3_heffingvrij_inkomen' in (await res.json())).toBe(false)
+  })
+
+  it('ontbrekende kolom (42703) → ook een retry', async () => {
+    results.profilesUpsert
+      .mockReturnValueOnce({ error: { code: '42703', message: 'column does not exist' } })
+      .mockReturnValueOnce({ error: null })
+    const res = await PUT(putRequest({ pension_factor_a: 1000 }))
+    expect(res.status).toBe(200)
+    expect(upserted.filter((u) => u.table === 'profiles')).toHaveLength(2)
+  })
+
+  it('een andere fout (bv. CHECK-schending 23514) → géén retry, generieke 500', async () => {
+    results.profilesUpsert.mockReturnValue({ error: { code: '23514', message: 'violates check constraint' } })
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const res = await PUT(putRequest({ box3_heffingvrij_inkomen: 2500 }))
+    spy.mockRestore()
+    expect(res.status).toBe(500)
+    expect(upserted.filter((u) => u.table === 'profiles')).toHaveLength(1)
+    expect(JSON.stringify(await res.json())).not.toMatch(/violates|constraint/)
+  })
+})

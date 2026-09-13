@@ -1,8 +1,10 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import type { RegelEditActionsState } from '@/components/future/regels/types'
+import { FireDeltaFooter, fireDeltaMonths } from '@/components/future/regels/shared'
+import { runRegelProjection, type RegelSimSnapshot } from '@/lib/future/regel-sim'
 import { bandPct } from '@/lib/parameters-band'
 
 /** Profiel-kolommen die deze body kan bewerken. */
@@ -21,6 +23,27 @@ export type VoorkeurColumn = 'inflation_rate' | 'expected_return'
 const SERVER_BAND: Record<VoorkeurColumn, { min: number; max: number }> = {
   expected_return: bandPct('expected_return'),
   inflation_rate: bandPct('inflation_rate'),
+}
+
+/**
+ * Keuze · effect · waarom (eigenaarsnorm 13 sep 2026) per kolom — de uitleg die
+ * /toekomst/voorkeuren én de plan-review tonen. `Record<VoorkeurColumn, …>`: een nieuwe
+ * kolom heeft pas een geldige body wanneer hij uitleg heeft (meebeweeg-check, laag b).
+ * TPR-02: de kern valt voor een bezitting zonder eigen rendement terug op het bruto
+ * rendement; een rendement dat bij de bezitting zelf staat (ook 0%) gaat vóór.
+ */
+export const VOORKEUR_UITLEG: Record<VoorkeurColumn, string> = {
+  inflation_rate:
+    'Je kiest met hoeveel prijsstijging per jaar de app rekent. De bedragen in je plan groeien daarmee elk jaar mee, ' +
+    'zoals je uitgaven na het stoppen; een hogere inflatie betekent dat je later meer nodig hebt, en dat schuift je ' +
+    'vrijheidsmoment op. Relevant omdat een klein verschil over tientallen jaren flink oploopt. Ter referentie: het ' +
+    'inflatiedoel van de Europese Centrale Bank is 2% per jaar.',
+  expected_return:
+    'Je kiest het rendement dat geldt voor bezittingen waar geen eigen rendement bij staat. ' +
+    'Dat bepaalt hoe snel die potten in de grafiek groeien, en samen met inflatie en Box 3 je effectieve onttrekkingsvoet en dus je vrijheidsgetal. ' +
+    'Een rendement dat je bij een bezitting zelf hebt ingevuld, ook 0%, gaat vóór. ' +
+    'Relevant omdat een ontbrekend rendement anders stil als 0% zou tellen. ' +
+    "Ter referentie: wereldwijde aandelen deden historisch zo'n 6 tot 8% per jaar; een lagere aanname geeft een later vrijheidsmoment.",
 }
 
 export interface VoorkeurBewerkenBodyProps {
@@ -43,10 +66,23 @@ export interface VoorkeurBewerkenBodyProps {
    * optimizer); de voorkeuren-pagina zelf laat 'm weg — die ís die plek.
    */
   secondaryLink?: { href: string; label: string }
+  /** Kopniveau van de titel: 'h2' in de sheet, 'h5' in de plan-review (pane h3 → scherm h4). */
+  kop?: 'h2' | 'h5'
+  /**
+   * TPR-15 — met een snapshot draait het effect live mee (`runRegelProjection` met de
+   * `parameters`-override) en publiceert de body een FIRE-delta als footer-info. Zonder
+   * snapshot (sheet op /toekomst/voorkeuren en de optimizer) geen live effect.
+   */
+  snapshot?: RegelSimSnapshot | null
   /** Host-contract (`RegelEditActionsState`): de host rendert de opslaanknop. */
   onActionsChange: (s: RegelEditActionsState) => void
   /** Na een geslaagde write via `PUT /api/parameters`. */
   onSaved: () => void
+  /**
+   * Opslaan zonder wijziging (bv. Enter in het veld). Meegegeven = niets schrijven en dit
+   * aanroepen (plan-review); weggelaten = de sheet schrijft de waarde zoals altijd.
+   */
+  onOngewijzigd?: () => void
 }
 
 /**
@@ -70,8 +106,11 @@ export function VoorkeurBewerkenBody({
   stepPct,
   helperText,
   secondaryLink,
+  kop = 'h2',
+  snapshot = null,
   onActionsChange,
   onSaved,
+  onOngewijzigd,
 }: VoorkeurBewerkenBodyProps) {
   const [value, setValue] = useState(String(currentValuePct))
   const [saving, setSaving] = useState(false)
@@ -81,17 +120,46 @@ export function VoorkeurBewerkenBody({
   const max = maxPct ?? SERVER_BAND[column].max
   const step = stepPct ?? 0.1
 
+  // Live validatie: een ongeldige waarde houdt "Opslaan" dicht (canSave) en zegt waarom.
+  const pctNu = value.trim() === '' ? Number.NaN : Number(value)
+  const invoerFout = !Number.isFinite(pctNu)
+    ? 'Vul een getal in.'
+    : pctNu < min || pctNu > max
+      ? `Vul een waarde tussen ${min}% en ${max}% in.`
+      : null
+  // Vergeleken met wat er opgeslagen staat (afgerond op de invoerstap, tegen float-ruis).
+  const changed = invoerFout == null && Math.abs(pctNu - currentValuePct) > 1e-9
+
+  // Kernel-runs pas zodra er iets gewijzigd is: zonder wijziging toont de footer geen effect.
+  const deferredPct = useDeferredValue(pctNu)
+  const deferredChanged = Number.isFinite(deferredPct) && Math.abs(deferredPct - currentValuePct) > 1e-9
+  const baseline = useMemo(
+    () => (snapshot && deferredChanged ? runRegelProjection(snapshot) : null),
+    [snapshot, deferredChanged],
+  )
+  const draftProj = useMemo(
+    () =>
+      snapshot && deferredChanged && deferredPct >= min && deferredPct <= max
+        ? runRegelProjection(snapshot, { parameters: { [column]: deferredPct / 100 } })
+        : null,
+    [snapshot, column, deferredPct, deferredChanged, min, max],
+  )
+  const deltaMonths = baseline && draftProj ? fireDeltaMonths(baseline, draftProj) : null
+
   async function handleSubmit(e?: React.FormEvent) {
     e?.preventDefault()
-    const pct = Number(value)
-    if (!Number.isFinite(pct)) {
-      setError('Waarde moet een getal zijn.')
+    // Eén tekst per fout: dezelfde als de live veldregel (die wijkt zolang de melding staat).
+    if (invoerFout != null) {
+      setError(invoerFout)
       return
     }
-    if (pct < min || pct > max) {
-      setError(`Waarde moet tussen ${min}% en ${max}% liggen.`)
+    // Review M1 — een host die niets wil schrijven zonder wijziging (de plan-review): Enter in
+    // het veld mag dan geen ongewijzigde (bv. uit de jaarlaag ingevulde) waarde vastleggen.
+    if (!changed && onOngewijzigd) {
+      onOngewijzigd()
       return
     }
+    const pct = pctNu
     setSaving(true)
     setError(null)
     // Persist als fractie (0.025 voor 2.5%), conform horizon-data-loader.
@@ -129,14 +197,26 @@ export function VoorkeurBewerkenBody({
   })
 
   useEffect(() => {
-    onActionsChange({ canSave: !saving, saving, save: () => void saveRef.current() })
-  }, [onActionsChange, saving])
+    onActionsChange({
+      canSave: !saving && invoerFout == null,
+      saving,
+      save: () => void saveRef.current(),
+      changed,
+      // Zonder wijziging geen effect (er verandert niets); zonder snapshot geen live effect.
+      footerInfo: changed && baseline && draftProj ? <FireDeltaFooter baseline={baseline} draft={draftProj} /> : undefined,
+    })
+    // baseline/draftProj zijn useMemo-stabiel; deltaMonths bewaakt republish.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onActionsChange, saving, invoerFout, changed, deltaMonths])
+
+  const Kop = kop
+  const foutId = `voorkeur-${column}-fout`
 
   return (
-    <form onSubmit={handleSubmit} className="p-5 sm:p-6">
-      <h2 className="font-serif text-lg text-[var(--ink)] mb-4">
+    <form onSubmit={handleSubmit} className={kop === 'h2' ? 'p-5 sm:p-6' : ''}>
+      <Kop className="font-serif text-lg text-[var(--ink)] mb-4">
         {title}
-      </h2>
+      </Kop>
 
       {error && (
         <div
@@ -165,12 +245,19 @@ export function VoorkeurBewerkenBody({
             step={step}
             value={value}
             onChange={(e) => setValue(e.target.value)}
+            aria-invalid={invoerFout ? true : undefined}
+            aria-describedby={invoerFout ? foutId : undefined}
             className="flex-1 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm focus:outline-none focus:border-[var(--ink-3)]"
             required
             autoFocus
           />
           <span className="text-sm text-[var(--ink-3)]">%</span>
         </div>
+        {invoerFout && invoerFout !== error && (
+          <p id={foutId} className="mt-1 text-[11px] text-negative">
+            {invoerFout}
+          </p>
+        )}
         {helperText && (
           <p className="mt-1.5 text-[11px] text-[var(--ink-3)] italic leading-snug">
             {helperText}

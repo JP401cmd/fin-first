@@ -11,6 +11,7 @@ import type { AssetType } from '@/lib/asset-data'
 import type { LifeEvent } from '@/lib/horizon-data'
 import type { AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import type { StrategieEditorBasis } from '@/lib/horizon/strategie-editor-basis'
+import type { Box3Method } from '@/lib/bucket-projection'
 
 /** Eén eigen, niet-liquide bezitting met een verkoopinstelling (stap 4). */
 export interface PlanReviewVastBezit {
@@ -47,6 +48,36 @@ export interface PlanReviewInkomstenContext {
   basis: StrategieEditorBasis
 }
 
+/** Laag 2 — één eigen bezitting met haar rendement. */
+export interface PlanReviewLaag2Bezitting {
+  id: string
+  name: string
+  asset_type: AssetType
+  /** PERCENT (7 = 7%), zoals opgeslagen. */
+  expected_return: number
+  /** `depreciation_rate > 0`: het rendement is dan per definitie 0 en niet hier in te stellen. */
+  afschrijvend: boolean
+}
+
+/** Laag 2 — "Voor wie wil": de aannames onder het plan (TPR-15). */
+export interface PlanReviewLaag2Context {
+  /** Zoals de kern er nu mee rekent (`resolveFireParams` op de geshadowde profielrij): FRACTIE. */
+  inflationRate: number
+  /** Terugvalrendement voor een bezitting zonder eigen rendement: FRACTIE. */
+  terugvalRendement: number
+  box3Method: Box3Method
+  /** Euro p.p. per jaar; `null` = de standaard van het rekenmodel. */
+  box3HeffingvrijInkomen: number | null
+  /** Alleen EIGEN actieve bezittingen (`user_id` = jij): alleen die wijzigt de schrijfroute. */
+  bezittingen: PlanReviewLaag2Bezitting[]
+  /**
+   * Bezittingen in de rekenrun zonder eigen rendement — alleen daarop werkt het
+   * terugvalrendement. Uit de database is dat vandaag 0 (kolom NOT NULL, TPR-02); de wizard
+   * zegt dan eerlijk dat dit getal het plan nu niet verandert.
+   */
+  zonderEigenRendement: number
+}
+
 export interface PlanReviewEditorContext {
   /** Client-veilig (`buildClientRegelSimSnapshot`); `null` = geen run → geen live effect. */
   snapshot: RegelSimSnapshot | null
@@ -59,6 +90,8 @@ export interface PlanReviewEditorContext {
   woning: PlanReviewWoningContext | null
   /** Stap 3 — AOW, werk en pensioen; `null` = niet geladen (alleen die editor meldt het). */
   inkomsten: PlanReviewInkomstenContext | null
+  /** Laag 2 — markt-aannames, Box 3 en rendement per bezitting; `null` = niet geladen. */
+  laag2: PlanReviewLaag2Context | null
 }
 
 export const PLAN_REVIEW_EDITOR_CONTEXT_URL = '/api/plan-review/editor-context'

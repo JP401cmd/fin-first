@@ -14,6 +14,7 @@ import { toSimResult } from '@/lib/unified-projection'
 import {
   computeConvergentieProjection,
   type ConvergentieRawContext,
+  type ConvergentieRawProfileRow,
 } from '@/lib/horizon-kernel/convergentie-router'
 import type { SimRow } from '@/lib/fire-simulation'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
@@ -135,6 +136,23 @@ export interface RegelSimOverride {
     vervang: { eventType: string } | { id: string | null }
     event: LifeEvent | null
   }
+  /**
+   * TPR-15 laag 2 — kandidaat-markt-aannames en Box 3, als de profielkolommen die de adapter
+   * leest (dezelfde namen en eenheden als `PROFIEL_KERNEL_KOLOMMEN` en de PUT-body van
+   * `/api/parameters`: rendement en inflatie als FRACTIE, heffingvrij in euro p.p. per jaar).
+   * Een afwezige sleutel = kolom ongewijzigd; `box3_heffingvrij_inkomen: null` = terug naar de
+   * kernel-default. `expected_return` is het terugvalrendement: de kern gebruikt het alleen voor
+   * een bezitting zonder eigen rendement (`potRendement`, TPR-02).
+   */
+  parameters?: Partial<
+    Pick<ConvergentieRawProfileRow, 'inflation_rate' | 'expected_return' | 'box3_method' | 'box3_heffingvrij_inkomen'>
+  >
+  /**
+   * TPR-15 laag 2 — kandidaat-rendement per bezitting-id (`assets.expected_return`, PERCENT:
+   * 7 = 7%, dezelfde eenheid als de PATCH-body van `/api/assets/[id]/expected-return`). Alleen
+   * de rij in de rauwe context wordt vervangen; een onbekend id verandert niets.
+   */
+  assetExpectedReturns?: Readonly<Record<string, number>>
 }
 
 /**
@@ -188,17 +206,33 @@ function applyDraftToRawContext(
     override?.housingStrategyConfig === undefined &&
     override?.retirementExpense === undefined &&
     override?.assetSaleConfigs === undefined &&
-    override?.lifeEvent === undefined
+    override?.lifeEvent === undefined &&
+    override?.parameters === undefined &&
+    override?.assetExpectedReturns === undefined
   ) {
     return base
   }
   const profile = { ...base.profile }
   const saleConfigs = override.assetSaleConfigs
-  const assets = saleConfigs
-    ? base.assets.map((a) =>
-        Object.prototype.hasOwnProperty.call(saleConfigs, a.id) ? { ...a, sale_config: saleConfigs[a.id] } : a,
-      )
-    : base.assets
+  const rendementen = override.assetExpectedReturns
+  const heeft = (map: object | undefined, id: string) => map != null && Object.prototype.hasOwnProperty.call(map, id)
+  const assets =
+    saleConfigs || rendementen
+      ? base.assets.map((a) => {
+          if (!heeft(saleConfigs, a.id) && !heeft(rendementen, a.id)) return a
+          return {
+            ...a,
+            ...(heeft(saleConfigs, a.id) ? { sale_config: saleConfigs![a.id] } : {}),
+            ...(heeft(rendementen, a.id) ? { expected_return: rendementen![a.id] } : {}),
+          }
+        })
+      : base.assets
+  // TPR-15 laag 2 — alleen de meegegeven sleutels (een afwezige sleutel laat de kolom staan).
+  if (override.parameters) {
+    for (const [kolom, waarde] of Object.entries(override.parameters)) {
+      if (waarde !== undefined) (profile as Record<string, unknown>)[kolom] = waarde
+    }
+  }
   const lifeEvents = override.lifeEvent ? vervangLifeEvent(base.lifeEvents, override.lifeEvent) : base.lifeEvents
   // TPR-01 — kandidaat-uitgavengrondslag na stoppen (de kern leidt het jaarbedrag af).
   if (override.retirementExpense !== undefined) {

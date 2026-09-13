@@ -18,6 +18,7 @@ import { HideInSimple } from '@/components/app/hide-in-simple'
 import { DepthSection } from '@/components/app/depth-section'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import { VoorkeurBewerkenSheet } from './voorkeur-bewerken-sheet'
+import { VOORKEUR_UITLEG } from './voorkeur-bewerken-body'
 import { Box3MethodeSheet } from './box3-methode-sheet'
 import { BOX3_METHOD_LABELS } from '@/lib/box3-method'
 import { EXCEL_HEFFINGVRIJ_INKOMEN_PP } from '@/lib/horizon-kernel/adapter/defaults'
@@ -267,7 +268,7 @@ export function VoorkeurenView({
             title: 'Inflatie',
             column: 'inflation_rate',
             currentValuePct: fireParams.inflationRate * 100,
-            helperText: 'NL-default 2.5% per jaar. Past op alle euro-bedragen in de projectie.',
+            helperText: VOORKEUR_UITLEG.inflation_rate,
           })
         }
       />
@@ -282,15 +283,8 @@ export function VoorkeurenView({
             title: 'Bruto rendement',
             column: 'expected_return',
             currentValuePct: fireParams.grossReturn * 100,
-            // Norm keuze · effect · waarom (eigenaarsnorm 13 sep 2026). TPR-02: de kern
-            // valt voor een bezitting zonder eigen rendement terug op dit getal; een
-            // rendement dat bij de bezitting zelf staat (ook 0%) gaat vóór.
-            helperText:
-              'Je kiest het rendement dat geldt voor bezittingen waar geen eigen rendement bij staat. ' +
-              'Dat bepaalt hoe snel die potten in de grafiek groeien, en samen met inflatie en Box 3 je effectieve onttrekkingsvoet en dus je vrijheidsgetal. ' +
-              'Een rendement dat je bij een bezitting zelf hebt ingevuld, ook 0%, gaat vóór. ' +
-              'Relevant omdat een ontbrekend rendement anders stil als 0% zou tellen. ' +
-              'Ter referentie: wereldwijde aandelen deden historisch zo\'n 6 tot 8% per jaar; 4 tot 5% is een voorzichtige aanname.',
+            // Norm keuze · effect · waarom — één bron met de plan-review (TPR-15).
+            helperText: VOORKEUR_UITLEG.expected_return,
           })
         }
       />

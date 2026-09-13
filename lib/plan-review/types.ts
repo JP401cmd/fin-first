@@ -45,37 +45,37 @@ export const PLAN_REVIEW_STAP_TITELS: Record<PlanReviewStap, string> = {
 }
 
 /**
- * Laag 2 — "Voor wie wil" (besluit eigenaar 13 sep 2026: in deze release ALLEEN
- * doorverwijzen). Bestaande kaarten; de review bewerkt ze niet. Het afsluitscherm van de
- * pane toont deze lijst.
+ * Laag 2 — "Voor wie wil" (TPR-15; besluit eigenaar 13 sep 2026: inline met één waarde, een
+ * bereik later). De aannames onder het plan, op het afsluitscherm van de pane en daar ook in
+ * te stellen. Ze horen niet bij een stap: opslaan zet geen markering.
  */
-export const PLAN_REVIEW_LAAG2: ReadonlyArray<{ href: string; label: string; uitleg: string }> = [
-  {
-    href: '/toekomst/voorkeuren',
+export const PLAN_REVIEW_LAAG2_ONDERDELEN = ['inflatie', 'bruto-rendement', 'box3', 'rendement-bezitting'] as const
+export type PlanReviewLaag2Onderdeel = (typeof PLAN_REVIEW_LAAG2_ONDERDELEN)[number]
+
+/**
+ * Naam en korte uitleg per onderdeel. `Record<PlanReviewLaag2Onderdeel, …>`: een nieuw
+ * onderdeel heeft pas geldige kopij (en een editor, `PLAN_REVIEW_LAAG2_EDITORS`) wanneer
+ * het hier staat (meebeweeg-check, laag b).
+ */
+export const PLAN_REVIEW_LAAG2: Record<PlanReviewLaag2Onderdeel, { label: string; uitleg: string }> = {
+  inflatie: {
     label: 'Inflatie',
     uitleg: 'Met hoeveel prijsstijging per jaar de app je bedragen laat meegroeien.',
   },
-  {
-    href: '/toekomst/voorkeuren',
+  'bruto-rendement': {
     label: 'Bruto rendement',
     uitleg: 'Het rendement voor bezittingen waar geen eigen rendement bij staat.',
   },
-  {
-    href: '/toekomst/voorkeuren',
+  box3: {
     label: 'Box 3-methode',
-    uitleg: 'Of de app Box 3 rekent met het forfaitaire stelsel of met je werkelijke rendement.',
+    uitleg:
+      'Of de app Box 3 rekent met het forfaitaire stelsel of met je werkelijke rendement, en welk deel daarvan onbelast blijft.',
   },
-  {
-    href: '/toekomst/voorkeuren',
-    label: 'Heffingvrij inkomen',
-    uitleg: 'Het deel van je werkelijke rendement waarover je in Box 3 geen belasting betaalt.',
+  'rendement-bezitting': {
+    label: 'Rendement per bezitting',
+    uitleg: 'Met welk rendement elke eigen bezitting in je plan groeit.',
   },
-  {
-    href: '/overzicht/bezittingen',
-    label: 'Bezittingen',
-    uitleg: 'Rendement per bezitting. De verkoopinstelling stel je ook in stap 4 in.',
-  },
-]
+}
 
 export function isPlanReviewStap(value: unknown): value is PlanReviewStap {
   return typeof value === 'string' && (PLAN_REVIEW_STAPPEN as readonly string[]).includes(value)

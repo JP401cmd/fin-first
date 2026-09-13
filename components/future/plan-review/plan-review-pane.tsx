@@ -23,31 +23,36 @@
  * bewerkstand gelezen (`GET /api/plan-review/editor-context`). Stappen zonder editor
  * verwijzen nog naar het bestaande scherm.
  *
- * Na de laatste stap: het afsluitscherm "Voor wie wil" met verwijzingen naar de
- * bestaande Voorkeuren-kaarten en het bezittingenoverzicht (laag 2, alleen doorverwijzen).
+ * Na de laatste stap (en via de laatste pill): het afsluitscherm "Voor wie wil" — laag 2, de
+ * aannames onder het plan (inflatie, bruto rendement, Box 3, rendement per bezitting). Ook die
+ * zijn inline in te stellen (`PLAN_REVIEW_LAAG2_EDITORS`, zelfde host-contract), maar ze horen
+ * niet bij een stap: de knop heet "Opslaan" en er komt geen markering. De huidige waarden komen
+ * uit dezelfde editor-context, gelezen zodra het afsluitscherm opent.
  *
  * Overlay via `ShellOverlay kind="pane"` (z-[70]); de Tijdas blijft op desktop zichtbaar
  * naast de pane (A12). Kopniveau: de pane-titel is h3, de stapnaam h4.
  */
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Check, Circle, Minus } from 'lucide-react'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import type { RegelEditActionsState } from '@/components/future/regels/types'
 import { PLAN_REVIEW_EDITOR_CONTEXT_URL, type PlanReviewEditorContext } from '@/lib/plan-review/editor-context'
 import { PLAN_REVIEW_EDITORS } from './editors'
+import { PLAN_REVIEW_LAAG2_EDITORS, laag2Waarde } from './laag2-editors'
 import { noteOverlayNavigation } from '@/lib/overlay-history'
 import { derivePlanReviewProgress } from '@/lib/plan-review/progress'
 import {
   PLAN_REVIEW_LAAG2,
+  PLAN_REVIEW_LAAG2_ONDERDELEN,
   PLAN_REVIEW_STAPPEN,
   PLAN_REVIEW_STAP_TITELS,
   parsePlanReviewState,
   type PlanReviewFacts,
   type PlanReviewOpenReden,
   PLAN_REVIEW_NAAM,
+  type PlanReviewLaag2Onderdeel,
   type PlanReviewProgress,
   type PlanReviewStap,
   type PlanReviewStapStatus,
@@ -119,6 +124,13 @@ export function PlanReviewPane({
   const [openMelding, setOpenMelding] = useState<string | null>(null)
   /** De stap waarin de bewerkstand geopend werd — daar hoort een editor-write bij. */
   const bewerkStapRef = useRef<PlanReviewStap | null>(null)
+  // TPR-15 laag 2 — welk onderdeel van "Voor wie wil" in bewerkstand staat (geen markering).
+  const [laag2Bewerken, setLaag2Bewerken] = useState<PlanReviewLaag2Onderdeel | null>(null)
+  const [laag2Melding, setLaag2Melding] = useState<string | null>(null)
+  const laag2BewerkenRef = useRef<PlanReviewLaag2Onderdeel | null>(null)
+  useEffect(() => {
+    laag2BewerkenRef.current = laag2Bewerken
+  }, [laag2Bewerken])
 
   const huidigAntwoord = scherm === 'afsluiten' ? null : cache[scherm]
 
@@ -169,6 +181,8 @@ export function PlanReviewPane({
     setEditorLaadFout(null)
     setMarkeerFout(null)
     setOpenMelding(null)
+    setLaag2Bewerken(null)
+    setLaag2Melding(null)
   }, [scherm])
 
   const gaNaar = (s: Scherm) => setScherm(s)
@@ -250,11 +264,16 @@ export function PlanReviewPane({
     }
   }
 
+  // Alleen de laatste lezing telt: een late, oude respons (dubbele klik op "Opnieuw proberen",
+  // of een lezing die een write inhaalt) mag een verse context niet overschrijven.
+  const contextLaadIdRef = useRef(0)
   async function laadEditorContext() {
+    const id = ++contextLaadIdRef.current
     setEditorLaadFout(null)
     try {
       const res = await fetch(PLAN_REVIEW_EDITOR_CONTEXT_URL)
       const data = (await res.json().catch(() => ({}))) as Partial<PlanReviewEditorContext> & { error?: unknown }
+      if (id !== contextLaadIdRef.current) return
       if (!res.ok || !('snapshot' in data)) {
         setEditorLaadFout(typeof data.error === 'string' ? data.error : 'Aanpassen kon niet geladen worden.')
         return
@@ -266,9 +285,10 @@ export function PlanReviewPane({
         potBalances: data.potBalances ?? null,
         woning: data.woning ?? null,
         inkomsten: data.inkomsten ?? null,
+        laag2: data.laag2 ?? null,
       })
     } catch {
-      setEditorLaadFout('Aanpassen kon niet geladen worden.')
+      if (id === contextLaadIdRef.current) setEditorLaadFout('Aanpassen kon niet geladen worden.')
     }
   }
 
@@ -348,6 +368,46 @@ export function PlanReviewPane({
     }
   }
 
+  // Laag 2: het afsluitscherm toont de huidige waarden, dus de editor-context wordt gelezen
+  // zodra het opent (één keer per pane-open; na een write opnieuw). Niet na een leesfout —
+  // dan staat er "Opnieuw proberen".
+  const laadBezigRef = useRef(false)
+  useEffect(() => {
+    if (!open || scherm !== 'afsluiten' || editorContext || editorLaadFout || laadBezigRef.current) return
+    laadBezigRef.current = true
+    void laadEditorContext().finally(() => {
+      laadBezigRef.current = false
+    })
+    // laadEditorContext leest alleen setters en de vaste URL.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, scherm, editorContext, editorLaadFout])
+
+  function startLaag2Bewerken(onderdeel: PlanReviewLaag2Onderdeel) {
+    setEditorActions(null)
+    setLaag2Melding(null)
+    setLaag2Bewerken(onderdeel)
+  }
+
+  function stopLaag2Bewerken() {
+    setLaag2Bewerken(null)
+    setEditorActions(null)
+  }
+
+  /**
+   * Laag 2 heeft via de bestaande route geschreven. Geen markering (het hoort bij geen stap),
+   * wel alles opnieuw laten lezen wat op de oude aanname leunt: de editor-context (de huidige
+   * waarden en de snapshot), de stap-overzichten (hun effect rekent met de aanname) en de pagina.
+   */
+  const handleLaag2Saved = useCallback(() => {
+    const onderdeel = laag2BewerkenRef.current
+    setLaag2Bewerken(null)
+    setEditorActions(null)
+    setLaag2Melding(onderdeel ? `${PLAN_REVIEW_LAAG2[onderdeel].label} is opgeslagen.` : null)
+    setEditorContext(null)
+    setCache({})
+    onChanged()
+  }, [onChanged])
+
   function naarAanpassen(href: string) {
     // Programmatische navigatie uit een overlay: meld het vóór het sluiten, anders
     // breekt de history-release de lopende navigatie af (vijfde sluitroute).
@@ -366,7 +426,22 @@ export function PlanReviewPane({
 
   const Editor = isAfsluiten ? null : PLAN_REVIEW_EDITORS[scherm]
   const inBewerkstand = bewerken && Editor != null
+  const inLaag2Bewerkstand = isAfsluiten && laag2Bewerken != null
   const editorBezig = bezig || (editorActions?.saving ?? false)
+
+  let laag2Slot: ReactNode = null
+  if (isAfsluiten && laag2Bewerken != null) {
+    const Laag2Editor = PLAN_REVIEW_LAAG2_EDITORS[laag2Bewerken]
+    laag2Slot = editorContext?.laag2 ? (
+      <Laag2Editor
+        key={laag2Bewerken}
+        laag2={editorContext.laag2}
+        snapshot={editorContext.snapshot}
+        onActionsChange={handleEditorActions}
+        onSaved={handleLaag2Saved}
+      />
+    ) : null
+  }
 
   let editorSlot: ReactNode = null
   if (inBewerkstand) {
@@ -398,7 +473,14 @@ export function PlanReviewPane({
       title={PLAN_REVIEW_NAAM}
       mobileBackCloses
       primaryAction={
-        isAfsluiten
+        inLaag2Bewerkstand
+          ? {
+              label: 'Opslaan',
+              onClick: () => editorActions?.save(),
+              disabled: !editorActions?.canSave || editorActions?.changed === false || editorBezig,
+              loading: editorBezig,
+            }
+          : isAfsluiten
           ? { label: 'Sluiten', onClick: onClose }
           : inBewerkstand && editorActions?.changed !== false
             ? {
@@ -410,14 +492,16 @@ export function PlanReviewPane({
             : { label: 'Bevestigen', onClick: () => void bevestig(), disabled: !kanBevestigen, loading: bezig }
       }
       secondaryAction={
-        isAfsluiten
+        inLaag2Bewerkstand
+          ? { label: 'Annuleren', onClick: stopLaag2Bewerken, disabled: editorBezig }
+          : isAfsluiten
           ? undefined
           : inBewerkstand
             ? { label: 'Annuleren', onClick: stopBewerken, disabled: editorBezig }
             : { label: 'Overslaan', onClick: () => gaNaar(volgendScherm(progress, scherm)), disabled: bezig }
       }
       footerInfo={
-        inBewerkstand && editorActions?.footerInfo ? (
+        (inBewerkstand || inLaag2Bewerkstand) && editorActions?.footerInfo ? (
           editorActions.footerInfo
         ) : (
           <span className="font-mono text-[11px] tabular-nums text-[var(--ink-3)]">
@@ -456,10 +540,37 @@ export function PlanReviewPane({
               </li>
             )
           })}
+          {/* Laag 2 — niet genummerd en niet meegeteld: de aannames onder het plan. */}
+          <li>
+            <button
+              type="button"
+              onClick={() => gaNaar('afsluiten')}
+              disabled={editorBezig}
+              aria-current={isAfsluiten ? 'step' : undefined}
+              className={`inline-flex min-h-[32px] items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors disabled:opacity-50 ${
+                isAfsluiten
+                  ? 'border-[var(--ink)] bg-[var(--ink)] text-[var(--paper)]'
+                  : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-2)] hover:text-[var(--ink)]'
+              }`}
+            >
+              Voor wie wil
+            </button>
+          </li>
         </ol>
 
         {isAfsluiten ? (
-          <VoorWieWil progress={progress} />
+          <VoorWieWil
+            progress={progress}
+            laag2={editorContext?.laag2 ?? null}
+            contextGeladen={editorContext != null}
+            laadFout={editorLaadFout}
+            onOpnieuw={() => void laadEditorContext()}
+            bewerken={laag2Bewerken}
+            onBewerken={startLaag2Bewerken}
+            editorSlot={laag2Slot}
+            melding={laag2Melding}
+            bezig={editorBezig}
+          />
         ) : laadFout ? (
           <div className="space-y-2 text-sm text-[var(--ink-2)]">
             <p role="alert" className="text-negative">{laadFout}</p>
@@ -690,7 +801,31 @@ function StapEffect({
   )
 }
 
-function VoorWieWil({ progress }: { progress: PlanReviewProgress }) {
+function VoorWieWil({
+  progress,
+  laag2,
+  contextGeladen,
+  laadFout,
+  onOpnieuw,
+  bewerken,
+  onBewerken,
+  editorSlot,
+  melding,
+  bezig,
+}: {
+  progress: PlanReviewProgress
+  /** `null` = (nog) niet geladen of niet te laden. */
+  laag2: PlanReviewEditorContext['laag2']
+  /** De editor-context is binnen; `laag2: null` betekent dan: niet te laden. */
+  contextGeladen: boolean
+  laadFout: string | null
+  onOpnieuw: () => void
+  bewerken: PlanReviewLaag2Onderdeel | null
+  onBewerken: (onderdeel: PlanReviewLaag2Onderdeel) => void
+  editorSlot: ReactNode
+  melding: string | null
+  bezig: boolean
+}) {
   return (
     <article className="space-y-4 text-sm leading-relaxed text-[var(--ink-2)]">
       <header>
@@ -699,22 +834,80 @@ function VoorWieWil({ progress }: { progress: PlanReviewProgress }) {
         </Kicker>
         <h4 className="mt-1 font-serif text-xl text-[var(--ink)]">Voor wie wil</h4>
       </header>
-      <p>
-        {progress.voltooid
-          ? 'Je hebt alle keuzes van je plan nagelopen. '
-          : 'Stappen die je oversloeg blijven open; je kunt ze later afmaken via de Voorkeuren-kaart. '}
-        Wie verder wil kijken, vindt de aannames onder je plan op deze plekken. De review past ze niet aan.
-      </p>
-      <ul className="divide-y divide-[var(--border-ed)] border-y border-[var(--border-ed)]">
-        {PLAN_REVIEW_LAAG2.map((l) => (
-          <li key={l.label} className="py-2">
-            <Link href={l.href} className="font-semibold text-[var(--ink)] hover:underline">
-              {l.label}
-            </Link>
-            <p className="text-xs text-[var(--ink-3)]">{l.uitleg}</p>
-          </li>
-        ))}
-      </ul>
+      {bewerken != null ? (
+        <section aria-label="Aanpassen" className="space-y-2">
+          <Kicker>Aanpassen</Kicker>
+          <p className="text-xs text-[var(--ink-3)]">
+            Je wijzigt hier dezelfde instelling als op het gewone scherm. Het effect zie je direct onderaan; opslaan
+            legt de nieuwe waarde vast.
+          </p>
+          {editorSlot}
+        </section>
+      ) : (
+        <>
+          <p>
+            {progress.voltooid
+              ? 'Je hebt alle keuzes van je plan nagelopen. '
+              : 'Stappen die je oversloeg blijven open; je kunt ze later afmaken via de Voorkeuren-kaart. '}
+            Hieronder staan de aannames onder je plan. Je kunt ze hier aanpassen; ze horen bij geen stap en hoeven niet
+            bevestigd te worden.
+          </p>
+          {melding && (
+            <p role="status" className="text-sm text-[var(--ink)]">
+              {melding}
+            </p>
+          )}
+          {laadFout && (
+            <div className="space-y-2">
+              <p role="alert" className="text-negative">{laadFout}</p>
+              <button
+                type="button"
+                onClick={onOpnieuw}
+                className="inline-flex min-h-[44px] items-center text-xs font-semibold text-[var(--ink-2)] underline hover:text-[var(--ink)]"
+              >
+                Opnieuw proberen
+              </button>
+            </div>
+          )}
+          <ul className="divide-y divide-[var(--border-ed)] border-y border-[var(--border-ed)]">
+            {PLAN_REVIEW_LAAG2_ONDERDELEN.map((onderdeel) => {
+              const { label, uitleg } = PLAN_REVIEW_LAAG2[onderdeel]
+              return (
+                <li key={onderdeel} className="flex items-start justify-between gap-3 py-2">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-[var(--ink)]">{label}</p>
+                    <p className="text-xs text-[var(--ink-3)]">{uitleg}</p>
+                    {laag2 && (
+                      <p className="mt-0.5 font-mono text-xs tabular-nums text-[var(--ink)]">
+                        {laag2Waarde(onderdeel, laag2)}
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onBewerken(onderdeel)}
+                    disabled={bezig || !laag2}
+                    aria-label={`${label} aanpassen`}
+                    className="inline-flex min-h-[44px] shrink-0 items-center text-xs font-semibold text-[var(--ink-2)] underline-offset-2 hover:text-[var(--ink)] hover:underline disabled:opacity-50"
+                  >
+                    Aanpassen
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+          {!laag2 && !laadFout &&
+            (contextGeladen ? (
+              <p role="alert" className="text-xs text-negative">
+                Deze aannames konden niet geladen worden. Sluit de review en probeer het later opnieuw.
+              </p>
+            ) : (
+              <p className="text-xs text-[var(--ink-3)]" aria-live="polite">
+                Je instellingen worden geladen…
+              </p>
+            ))}
+        </>
+      )}
     </article>
   )
 }

@@ -27,7 +27,11 @@ function errorResponse(status: number, body: unknown) {
 beforeEach(() => {
   mockRefresh.mockReset()
   mockFetch.mockReset()
-  mockFetch.mockResolvedValue(okResponse())
+  // Zoals de route: echoot wat er is weggeschreven (de body controleert dat bij het heffingvrije inkomen).
+  mockFetch.mockImplementation(async (_url: string, init?: RequestInit) => ({
+    ...okResponse(),
+    json: async () => ({ success: true, ...JSON.parse(String(init?.body ?? '{}')) }),
+  }))
   vi.stubGlobal('fetch', mockFetch)
 })
 
@@ -148,6 +152,17 @@ describe('Box3MethodeSheet — heffingvrij inkomen (TPR-12)', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Opslaan/ }))
     await waitFor(() => expect(onClose).toHaveBeenCalled())
     expect(lastRequestBody()).toEqual({ box3_heffingvrij_inkomen: null })
+  })
+
+  it('echoot de route het bedrag niet (kolom ontbreekt nog), dan geen "opgeslagen": foutregel en de sheet blijft open', async () => {
+    const onClose = vi.fn()
+    mockFetch.mockResolvedValueOnce(okResponse())
+    render(<Box3MethodeSheet current="werkelijk" currentHeffingvrijInkomen={2500} onClose={onClose} />)
+    fireEvent.change(screen.getByLabelText(/Heffingvrij inkomen in euro/), { target: { value: '3000' } })
+    fireEvent.click(screen.getByRole('button', { name: /^Opslaan/ }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Het heffingvrije inkomen kon niet worden opgeslagen')
+    expect(onClose).not.toHaveBeenCalled()
+    expect(mockRefresh).not.toHaveBeenCalled()
   })
 
   it('weigert een bedrag buiten de band client-side (servernorm) zonder te schrijven', () => {

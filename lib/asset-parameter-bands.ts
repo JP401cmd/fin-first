@@ -120,6 +120,15 @@ export function assetReturnBandError(type: string): string {
   return `Rendement moet tussen ${band.min}% en ${band.max}% per jaar liggen`
 }
 
+/**
+ * Hoe het veld heet per type: bij spaargeld en een vordering is het rendement een rente.
+ * Gedeeld door het bezittingenformulier en de plan-review (TPR-15), zodat beide dezelfde
+ * naam tonen.
+ */
+export function assetReturnLabel(type: string): 'Rente' | 'Rendement' {
+  return type === 'vordering' || type === 'savings' ? 'Rente' : 'Rendement'
+}
+
 // ── Bedragen ────────────────────────────────────────────────────────────────
 
 /** De bedragvelden op `assets` met een servergrens. */

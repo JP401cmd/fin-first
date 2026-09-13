@@ -84,3 +84,37 @@ describe('runRegelProjection — lifeEvent (TPR-15 stap 3)', () => {
     expect((metEvents.rawContext.lifeEvents as unknown[]).length).toBe(4)
   })
 })
+
+describe('runRegelProjection — parameters en assetExpectedReturns (TPR-15 laag 2)', () => {
+  const profiel = { housing_strategy_config: null, inflation_rate: 0.02, expected_return: 0.07, box3_method: 'forfaitair', box3_heffingvrij_inkomen: 1800 }
+  const metProfiel = { rawContext: { ...snapshot.rawContext, profile: profiel } } as unknown as RegelSimSnapshot
+  const ctx = () => ontvangen.contexts[0] as { profile: Record<string, unknown>; assets: Record<string, unknown>[] }
+
+  it('zet alleen de meegegeven profielkolommen; de rest blijft staan', () => {
+    runRegelProjection(metProfiel, { parameters: { inflation_rate: 0.03 } })
+    expect(ctx().profile).toEqual({ ...profiel, inflation_rate: 0.03 })
+    expect(profiel.inflation_rate).toBe(0.02)
+  })
+
+  it('box3_heffingvrij_inkomen null = terug naar de kernel-default (kolom leeg)', () => {
+    runRegelProjection(metProfiel, { parameters: { box3_method: 'werkelijk', box3_heffingvrij_inkomen: null } })
+    expect(ctx().profile.box3_method).toBe('werkelijk')
+    expect(ctx().profile.box3_heffingvrij_inkomen).toBeNull()
+  })
+
+  it('vervangt expected_return (PERCENT) alleen van de genoemde bezitting, naast een sale_config-override', () => {
+    runRegelProjection(metProfiel, {
+      assetExpectedReturns: { a2: -5 },
+      assetSaleConfigs: { a1: { stand: 'niet_verkopen' } },
+    })
+    expect(ctx().assets[0]).toEqual({ ...AUTO, sale_config: { stand: 'niet_verkopen' } })
+    expect(ctx().assets[1]).toEqual({ ...KUNST, expected_return: -5 })
+  })
+
+  it('de override-sleutels zijn kolommen die de client-snapshot meestuurt', async () => {
+    const { PROFIEL_KERNEL_KOLOMMEN } = await import('./regel-sim-snapshot')
+    for (const kolom of ['inflation_rate', 'expected_return', 'box3_method', 'box3_heffingvrij_inkomen']) {
+      expect(PROFIEL_KERNEL_KOLOMMEN as readonly string[]).toContain(kolom)
+    }
+  })
+})

@@ -79,6 +79,7 @@ function renderEditor(i: PlanReviewInkomstenContext | null = inkomsten()) {
     potBalances: null,
     woning: null,
     inkomsten: i,
+    laag2: null,
   }
   render(<InkomstenEditor context={context} onActionsChange={(s) => (actions = s)} onSaved={onSaved} />)
 }

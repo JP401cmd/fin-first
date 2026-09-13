@@ -52,7 +52,7 @@ function renderEditor() {
   const onActionsChange = vi.fn()
   render(
     <PottenEditor
-      context={{ snapshot: null, firePlan: null, potRules: POT_RULES as never, potBalances: SALDI, woning: null, inkomsten: null }}
+      context={{ snapshot: null, firePlan: null, potRules: POT_RULES as never, potBalances: SALDI, woning: null, inkomsten: null, laag2: null }}
       onActionsChange={onActionsChange}
       onSaved={onSaved}
     />,

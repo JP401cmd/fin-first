@@ -16,7 +16,7 @@ import type { PlanReviewStap } from './types'
 /**
  * Waar een kernel-blok in de review landt:
  *  - een stap-sleutel     → de gebruiker bevestigt/wijzigt het in die stap;
- *  - `'laag2'`            → bereikbaar vanuit het afsluitscherm (bestaande Voorkeuren-kaarten);
+ *  - `'laag2'`            → inline in te stellen op het afsluitscherm "Voor wie wil" (TPR-15), zonder markering;
  *  - `'brondata'`         → volgt uit de eigen bezittingen/schulden/inkomsten; geen review-keuze;
  *  - `'kern-intern'`      → kern-afstemming zonder gebruikersvrijheid (oracle-vlaggen, parity).
  */
@@ -39,18 +39,18 @@ export const PLAN_REVIEW_DEKKINGEN: readonly PlanReviewDekking[] = [
  */
 export const KERNEL_INPUT_REVIEW_REGISTER: Record<keyof KernelInput, { dekking: PlanReviewDekking; toelichting: string }> = {
   startLeeftijd: { dekking: 'brondata', toelichting: 'Geboortedatum (/mijn/profiel) — geen review-keuze.' },
-  inflatie: { dekking: 'laag2', toelichting: 'profiles.inflation_rate — Voorkeuren-kaart Inflatie.' },
-  box3: { dekking: 'laag2', toelichting: 'profiles.box3_method + heffingvrij inkomen — Voorkeuren-kaarten (TPR-10/12).' },
-  assetPotten: { dekking: 'brondata', toelichting: 'Bezittingen zelf; rendement per bezitting via het bezittingenoverzicht (laag 2 verwijst). sale_config: zie potLiquidaties.' },
+  inflatie: { dekking: 'laag2', toelichting: 'profiles.inflation_rate — inline in "Voor wie wil" (VoorkeurBewerkenBody, PUT /api/parameters, TPR-15); ook de Voorkeuren-kaart Inflatie.' },
+  box3: { dekking: 'laag2', toelichting: 'profiles.box3_method + heffingvrij inkomen — inline in "Voor wie wil" (Box3MethodeBody, PUT /api/parameters, TPR-15); ook de Voorkeuren-kaart (TPR-10/12).' },
+  assetPotten: { dekking: 'brondata', toelichting: 'Bezittingen zelf. Rendement per eigen bezitting inline in "Voor wie wil" (PATCH /api/assets/[id]/expected-return, TPR-15); het terugvalrendement (profiles.expected_return) ook daar. sale_config: zie potLiquidaties.' },
   schuldPotten: { dekking: 'brondata', toelichting: 'Schulden zelf.' },
   persoon: { dekking: 'brondata', toelichting: 'Geboortejaar/AOW-leeftijd uit de geboortedatum.' },
   inkomenUitgaven: { dekking: 'uitgaven', toelichting: 'uitgaveNaPensioenPerJaar = retirement_expense_method/-amount (stap 2); inkomen/uitgaven nu = brondata.' },
-  tekortLeningRente: { dekking: 'laag2', toelichting: 'profiles.deficit_loan_rate — in de eindstrategie-pane van Voorkeuren.' },
+  tekortLeningRente: { dekking: 'plan', toelichting: 'profiles.deficit_loan_rate — in de eindstrategie-body, dus inline in stap 1 (TPR-15) en in de eindstrategie-pane van Voorkeuren.' },
   strategie: { dekking: 'potten', toelichting: 'Onttrekkingsstrategie-selectors (vast/afnemend/oplopend/guardrails).' },
   eindstrategie: { dekking: 'plan', toelichting: 'Stop-anker × eind-vorm × eindleeftijd × nalatenschap (fire_*-kolommen).' },
   woning: { dekking: 'woning', toelichting: 'housing_strategy_config — woonstrategie + trigger + expertvelden.' },
   onttrekkingsprofiel: { dekking: 'potten', toelichting: 'withdrawal_profile_config (profiel + fasecurve + flex) en guardrails.' },
-  onzekerheid: { dekking: 'laag2', toelichting: 'Marktvolatiliteit uit fire_assumptions (beheer) — band/Monte Carlo, niet per gebruiker.' },
+  onzekerheid: { dekking: 'kern-intern', toelichting: 'Marktvolatiliteit uit fire_assumptions (beheer) — band/Monte Carlo, niet per gebruiker; buiten de review.' },
   ts: { dekking: 'potten', toelichting: 'pot_rules: onttrekkingsvolgorde, verdeling bij toename, afname-volgorde, categorie-prio’s.' },
   gebeurtenissen: { dekking: 'brondata', toelichting: 'Handmatige life-events op /toekomst/gebeurtenissen.' },
   autoGebeurtenissen: { dekking: 'inkomsten', toelichting: 'AOW-event (leefsituatie, jaren buiten NL) en pensioenpotten — inline instelbaar in stap 3 (TPR-15).' },

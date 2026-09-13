@@ -7,7 +7,8 @@ import { buildClientRegelSimSnapshot } from '@/lib/future/regel-sim-snapshot'
 import { buildPotBalances } from '@/lib/future/pot-balances'
 import { loadHorizonRaw } from '@/lib/horizon/raw-data-loader'
 import { resolvePotRules } from '@/lib/pot-rules'
-import { SALE_CONFIG_ASSET_TYPES } from '@/lib/asset-data'
+import { SALE_CONFIG_ASSET_TYPES, type AssetType } from '@/lib/asset-data'
+import { resolveFireParams } from '@/lib/fire-params'
 import { getHouseholdIdForUser, selectAflosbareSchulden } from '@/lib/sale-config-debts'
 import { loadEigenStrategieEvents } from '@/lib/plan-review/eigen-strategie-events'
 import { AOW_LEEFTIJD_KOLOMMEN, strategieEditorBasis } from '@/lib/horizon/strategie-editor-basis'
@@ -15,6 +16,7 @@ import type { AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import type {
   PlanReviewEditorContext,
   PlanReviewInkomstenContext,
+  PlanReviewLaag2Context,
   PlanReviewVastBezit,
   PlanReviewWoningContext,
 } from '@/lib/plan-review/editor-context'
@@ -106,6 +108,54 @@ async function loadInkomsten(
   }
 }
 
+/**
+ * Laag 2 — de aannames zoals de kern er nu mee rekent (`resolveFireParams` op de al
+ * geshadowde profielrij, dezelfde resolver als de adapter en de Voorkeuren-kaarten) en de
+ * EIGEN actieve bezittingen met hun rendement. Expliciete kolomlijst en `.eq('user_id', …)`:
+ * de SELECT-policy op `assets` is huishoud-gedeeld, en `PATCH /api/assets/[id]/expected-return`
+ * wijzigt alleen eigen rijen.
+ */
+const LAAG2_BEZIT_KOLOMMEN = 'id, name, asset_type, expected_return, depreciation_rate'
+
+async function loadLaag2(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  raw: Awaited<ReturnType<typeof loadHorizonRaw>>,
+): Promise<PlanReviewLaag2Context> {
+  const { data, error } = await supabase
+    .from('assets')
+    .select(LAAG2_BEZIT_KOLOMMEN)
+    .eq('user_id', userId)
+    .eq('is_active', true)
+    .order('name', { ascending: true })
+  if (error) throw error
+  const profiel = raw.rawProfile ?? {}
+  const params = resolveFireParams(profiel)
+  const rijen = (data ?? []) as {
+    id: string
+    name: string
+    asset_type: AssetType
+    expected_return: number | string | null
+    depreciation_rate: number | string | null
+  }[]
+  return {
+    inflationRate: params.inflationRate,
+    terugvalRendement: params.grossReturn,
+    box3Method: params.box3Method,
+    box3HeffingvrijInkomen: (profiel as { box3_heffingvrij_inkomen?: number | null }).box3_heffingvrij_inkomen ?? null,
+    bezittingen: rijen.map((a) => ({
+      id: a.id,
+      name: a.name,
+      asset_type: a.asset_type,
+      expected_return: Number(a.expected_return) || 0,
+      afschrijvend: Number(a.depreciation_rate) > 0,
+    })),
+    // Over de eigen-rij-lezing, niet over `raw.assets` (huishoud-gedeelde SELECT): lijst en zin
+    // delen zo één grondslag, en er telt nooit een partnerrij mee (security-gate 13 sep 2026).
+    zonderEigenRendement: rijen.filter((a) => a.expected_return == null).length,
+  }
+}
+
 export async function GET() {
   try {
     const supabase = await createClient()
@@ -128,6 +178,10 @@ export async function GET() {
       }),
       inkomsten: await loadInkomsten(supabase, user.id, raw).catch((err: unknown) => {
         console.error('[plan-review:editor-context:inkomsten]', err)
+        return null
+      }),
+      laag2: await loadLaag2(supabase, user.id, raw).catch((err: unknown) => {
+        console.error('[plan-review:editor-context:laag2]', err)
         return null
       }),
     }

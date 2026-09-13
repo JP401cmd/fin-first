@@ -23,6 +23,14 @@ const HEFFINGVRIJ_KEY = 'box3_heffingvrij_inkomen'
 const heffingvrijBand = PARAMETER_BANDS[HEFFINGVRIJ_KEY]
 const heffingvrijInkomenSchema = z.number().min(heffingvrijBand.min).max(heffingvrijBand.max).nullable()
 
+/**
+ * Ontbreekt een kolom? PostgREST meldt een onbekende kolom in een upsert-payload als
+ * `PGRST204` (schema cache); Postgres zelf als `42703` (undefined_column).
+ */
+function isOntbrekendeKolom(error: { code?: string } | null): boolean {
+  return error?.code === 'PGRST204' || error?.code === '42703'
+}
+
 // ── GET — Lees berekeningsparameters uit profiles ─────────────────────
 
 export async function GET() {
@@ -218,14 +226,16 @@ export async function PUT(request: NextRequest) {
   // bevestigen dat niet is opgeslagen (zie hieronder).
   const persistedCashSettings: typeof cashSettings = { ...cashSettings }
 
-  // If upsert fails (e.g. a newer column doesn't exist yet on a legacy DB),
-  // retry once without the optional columns (the factor-A pair,
-  // cashflow_basis_prefs en het TPR-12-veld box3_heffingvrij_inkomen). Zonder die
-  // zou een DB waarop migratie 20260811160000 resp. 20260913150000 nog niet draaide
-  // de HELE parameters-PUT laten falen — dus ook het opslaan van de bronwaarde zelf.
+  // Ontbreekt een nieuwere kolom nog (legacy-DB), retry dan één keer zonder de optionele
+  // kolommen (the factor-A pair, cashflow_basis_prefs en het TPR-12-veld
+  // box3_heffingvrij_inkomen). Zonder die zou een DB waarop migratie 20260811160000 resp.
+  // 20260913150000 nog niet draaide de HELE parameters-PUT laten falen — dus ook het
+  // opslaan van de bronwaarde zelf. ALLEEN bij een ontbrekende kolom (TPR-15): bij elke
+  // andere fout (CHECK-schending, storing) zou de retry de optionele velden stil laten
+  // vallen en een deels geslaagde write als succes melden.
   let persistedHeffingvrij = heffingvrijInkomen
   if (
-    error &&
+    isOntbrekendeKolom(error) &&
     (pensionFactorA !== undefined ||
       pensionFactorASource !== undefined ||
       heffingvrijInkomen !== undefined ||

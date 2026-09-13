@@ -119,8 +119,14 @@ describe('GET /api/plan-review/editor-context', () => {
       vastBezit: [{ id: 'a9', name: 'Auto', asset_type: 'vehicle', current_value: 12000, sale_config: null }],
       schulden: [{ id: 'd1', name: 'Autolening' }],
     })
-    expect(calls.assets.select).toEqual([['id, name, asset_type, current_value, sale_config']])
+    // Twee eigen-rij-lezingen op assets, elk met een expliciete kolomlijst: stap 4 en laag 2.
+    expect(calls.assets.select).toEqual([
+      ['id, name, asset_type, current_value, sale_config'],
+      ['id, name, asset_type, expected_return, depreciation_rate'],
+    ])
     expect(calls.assets.eq).toEqual([
+      ['user_id', 'u1'],
+      ['is_active', true],
       ['user_id', 'u1'],
       ['is_active', true],
     ])
@@ -154,6 +160,47 @@ describe('GET /api/plan-review/editor-context', () => {
     expect(body.woning.schulden).toEqual([{ id: 'd1', name: 'Autolening' }])
     expect(calls.debts.eq?.[0]).toEqual(['user_id', 'u1'])
     expect(calls.debts.or).toBeUndefined()
+    spy.mockRestore()
+  })
+
+  it('laag 2: aannames zoals de kern rekent en alleen eigen bezittingen met hun rendement', async () => {
+    tabelRijen.assets = {
+      data: [
+        { id: 'a1', name: 'ETF', asset_type: 'investment', expected_return: '6.5', depreciation_rate: null },
+        { id: 'a9', name: 'Auto', asset_type: 'vehicle', expected_return: 0, depreciation_rate: '15' },
+      ],
+      error: null,
+    }
+    const res = await GET()
+    const body = await res.json()
+    expect(body.laag2).toEqual({
+      // Geen profielwaarden in de fixture → de resolver-defaults (2% / 7% / forfaitair).
+      inflationRate: 0.02,
+      terugvalRendement: 0.07,
+      box3Method: 'forfaitair',
+      box3HeffingvrijInkomen: null,
+      bezittingen: [
+        { id: 'a1', name: 'ETF', asset_type: 'investment', expected_return: 6.5, afschrijvend: false },
+        { id: 'a9', name: 'Auto', asset_type: 'vehicle', expected_return: 0, afschrijvend: true },
+      ],
+      // Geteld over de eigen-rij-lezing (niet de huishoud-gedeelde rekenrun): beide hebben een rendement.
+      zonderEigenRendement: 0,
+    })
+  })
+
+  it('laag 2: een DB-fout maakt alleen laag2 null', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    let n = 0
+    const echt = tabelRijen.assets
+    Object.defineProperty(tabelRijen, 'assets', {
+      configurable: true,
+      get: () => (++n > 1 ? { data: null, error: { message: 'pg: secret_assets kapot' } } : echt),
+    })
+    const res = await GET()
+    const body = await res.json()
+    expect(body.laag2).toBeNull()
+    expect(body.woning).not.toBeNull()
+    expect(JSON.stringify(body)).not.toContain('secret_assets')
     spy.mockRestore()
   })
 

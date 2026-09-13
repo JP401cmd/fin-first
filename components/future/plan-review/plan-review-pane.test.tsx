@@ -82,6 +82,41 @@ vi.mock('./editors', async () => {
   }
 })
 
+// TPR-15 laag 2 — een neppe editor per onderdeel: publiceert het host-contract en schrijft via
+// een domeinroute, zonder de echte bodies (en de kernel) te laden.
+vi.mock('./laag2-editors', async () => {
+  const React = await import('react')
+  function maak(naam: string) {
+    return function NepLaag2Editor(props: {
+      onActionsChange: (s: { canSave: boolean; saving: boolean; save: () => void; changed?: boolean }) => void
+      onSaved: () => void
+    }) {
+      const { onActionsChange, onSaved } = props
+      React.useEffect(() => {
+        onActionsChange({
+          canSave: true,
+          saving: false,
+          changed: true,
+          save: async () => {
+            await fetch('/api/parameters', { method: 'PUT', body: JSON.stringify({ inflation_rate: 0.03 }) })
+            onSaved()
+          },
+        })
+      }, [onActionsChange, onSaved])
+      return React.createElement('p', null, `Laag-2-editor ${naam}`)
+    }
+  }
+  return {
+    PLAN_REVIEW_LAAG2_EDITORS: {
+      inflatie: maak('inflatie'),
+      'bruto-rendement': maak('bruto-rendement'),
+      box3: maak('box3'),
+      'rendement-bezitting': maak('rendement-bezitting'),
+    },
+    laag2Waarde: (onderdeel: string) => `waarde ${onderdeel}`,
+  }
+})
+
 import { PlanReviewPane, volgendScherm } from './plan-review-pane'
 import { resolveStartStap } from './plan-review-provider'
 import type { PlanReviewFacts, PlanReviewProgress, PlanReviewStap } from '@/lib/plan-review/types'
@@ -132,6 +167,15 @@ function overzicht(stap: PlanReviewStap): PlanReviewStapOverzicht {
   }
 }
 
+const LAAG2 = {
+  inflationRate: 0.02,
+  terugvalRendement: 0.07,
+  box3Method: 'forfaitair',
+  box3HeffingvrijInkomen: null,
+  bezittingen: [],
+  zonderEigenRendement: 0,
+}
+
 let calls: Array<{ url: string; method: string; body: unknown }>
 let facts: PlanReviewFacts = FACTS
 let hangGetVoor: PlanReviewStap | null = null
@@ -161,7 +205,7 @@ beforeEach(() => {
       if (url === '/api/plan-review/editor-context') {
         return failEditorContext
           ? new Response(JSON.stringify({ error: 'Er ging iets mis' }), { status: 500 })
-          : new Response(JSON.stringify({ snapshot: null, firePlan: { endAge: 90 } }))
+          : new Response(JSON.stringify({ snapshot: null, firePlan: { endAge: 90 }, laag2: LAAG2 }))
       }
       if (method === 'GET') {
         const stap = new URL(url, 'http://x').searchParams.get('stap') as PlanReviewStap
@@ -170,6 +214,7 @@ beforeEach(() => {
         if (hangGetVoor === stap) return new Promise<Response>(() => {})
         return new Response(JSON.stringify({ overzicht: overzicht(stap), progress: progress([]), facts }))
       }
+      if (url === '/api/parameters') return new Response(JSON.stringify({ success: true }))
       if (url === '/api/fire-settings') {
         return failDomain
           ? new Response(JSON.stringify({ error: 'Ongeldige eindleeftijd' }), { status: 400 })
@@ -234,13 +279,18 @@ describe('PlanReviewPane', () => {
     expect(calls.some((c) => c.method === 'PUT')).toBe(false)
   })
 
-  it('na de laatste stap: "Voor wie wil" met de laag-2-verwijzingen', async () => {
+  it('na de laatste stap: "Voor wie wil" met de vier aannames en hun huidige waarde (laag 2)', async () => {
     renderPane('potten')
     await screen.findByText('De app rekent nu met potten.')
     fireEvent.click(screen.getAllByRole('button', { name: 'Overslaan' })[0])
-    expect(await screen.findByText('Voor wie wil')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Box 3-methode' })).toHaveAttribute('href', '/toekomst/voorkeuren')
-    expect(screen.getByRole('link', { name: 'Bezittingen' })).toHaveAttribute('href', '/overzicht/bezittingen')
+    expect(await screen.findByRole('heading', { name: 'Voor wie wil' })).toBeInTheDocument()
+    // De huidige waarden komen uit de editor-context, gelezen zodra het scherm opent.
+    expect(await screen.findByText('waarde box3')).toBeInTheDocument()
+    for (const label of ['Inflatie', 'Bruto rendement', 'Box 3-methode', 'Rendement per bezitting']) {
+      expect(screen.getByRole('button', { name: `${label} aanpassen` })).toBeEnabled()
+    }
+    expect(screen.queryByRole('link')).not.toBeInTheDocument()
+    expect(calls.filter((c) => c.url === '/api/plan-review/editor-context')).toHaveLength(1)
   })
 
   it('een stap zónder inline editor: Aanpassen sluit de pane en navigeert naar het bestaande scherm', async () => {
@@ -433,5 +483,61 @@ describe('navigatie-helpers', () => {
     expect(resolveStartStap(progress(['plan']), null)).toBe('uitgaven')
     expect(resolveStartStap(progress(['plan']), 'potten')).toBe('potten')
     expect(resolveStartStap(progress(['plan', 'uitgaven', 'inkomsten', 'potten']), null)).toBe('plan')
+  })
+})
+
+describe('PlanReviewPane — laag 2 "Voor wie wil" inline (TPR-15)', () => {
+  async function openLaag2() {
+    const handles = renderPane('plan')
+    await screen.findByText('De app rekent nu met plan.')
+    fireEvent.click(screen.getByRole('button', { name: 'Voor wie wil' }))
+    await screen.findByText('waarde inflatie')
+    return handles
+  }
+
+  it('de pill "Voor wie wil" opent het afsluitscherm vanuit elke stap, zonder te schrijven', async () => {
+    await openLaag2()
+    expect(screen.getByRole('button', { name: 'Voor wie wil' })).toHaveAttribute('aria-current', 'step')
+    expect(calls.some((c) => c.method === 'PUT')).toBe(false)
+  })
+
+  it('Aanpassen opent de editor ín het scherm; opslaan schrijft via de route, zonder markering', async () => {
+    const { onChanged } = await openLaag2()
+    fireEvent.click(screen.getByRole('button', { name: 'Inflatie aanpassen' }))
+    await screen.findByText('Laag-2-editor inflatie')
+    // Geen stap: de knop heet "Opslaan", niet "Opslaan en bevestigen".
+    expect(screen.queryAllByRole('button', { name: 'Opslaan en bevestigen' })).toHaveLength(0)
+    const knop = () => screen.getAllByRole('button', { name: 'Opslaan' })[0]
+    await waitFor(() => expect(knop()).toBeEnabled())
+    fireEvent.click(knop())
+    expect(await screen.findByRole('status')).toHaveTextContent('Inflatie is opgeslagen.')
+    const puts = calls.filter((c) => c.method === 'PUT').map((c) => c.url)
+    expect(puts).toEqual(['/api/parameters'])
+    expect(onChanged).toHaveBeenCalledTimes(1)
+    // De huidige waarden en de snapshot leunden op de oude aanname: opnieuw gelezen.
+    await waitFor(() => expect(calls.filter((c) => c.url === '/api/plan-review/editor-context')).toHaveLength(2))
+    expect(screen.queryByText('Laag-2-editor inflatie')).not.toBeInTheDocument()
+  })
+
+  it('Annuleren gaat terug naar de lijst en schrijft niets', async () => {
+    await openLaag2()
+    fireEvent.click(screen.getByRole('button', { name: 'Box 3-methode aanpassen' }))
+    await screen.findByText('Laag-2-editor box3')
+    fireEvent.click(screen.getAllByRole('button', { name: 'Annuleren' })[0])
+    expect(await screen.findByText('waarde box3')).toBeInTheDocument()
+    expect(screen.queryByText('Laag-2-editor box3')).not.toBeInTheDocument()
+    expect(calls.some((c) => c.method === 'PUT')).toBe(false)
+  })
+
+  it('een mislukte editor-context: foutregel met opnieuw proberen, Aanpassen blijft dicht', async () => {
+    failEditorContext = true
+    renderPane('plan')
+    await screen.findByText('De app rekent nu met plan.')
+    fireEvent.click(screen.getByRole('button', { name: 'Voor wie wil' }))
+    expect(await screen.findByText('Er ging iets mis')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Inflatie aanpassen' })).toBeDisabled()
+    failEditorContext = false
+    fireEvent.click(screen.getByRole('button', { name: 'Opnieuw proberen' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Inflatie aanpassen' })).toBeEnabled())
   })
 })
