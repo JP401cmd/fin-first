@@ -36,12 +36,22 @@ De kaart zette "alle body-extracties" als losse eerste fase. Twee bodies bestaan
 
 ## Checklist
 
-- [ ] A — client-veilige snapshot + toepassing in dashboard-data-loader
-- [ ] A — `GET /api/plan-review/editor-context` + test
-- [ ] A — bewerkstand + editor-register in PlanReviewPane + test
-- [ ] A — effectmaat drie treden in overzicht.ts + test
-- [ ] A — security-specialist
-- [ ] 1 — EindstrategieBody inline
-- [ ] 2 — extracties (pure move) + UitgavenMethodeBody inline
-- [ ] 5, 4, 3, L2 — zie tabel
-- [ ] Slot
+- [x] A — client-veilige snapshot (profiel-whitelist + Proxy-meting) + toepassing in dashboard-data-loader — 811de5c36
+- [x] A — `GET /api/plan-review/editor-context` + test — 811de5c36 (uitgebreid in daa7c5a92)
+- [x] A — effectmaat drie treden in overzicht.ts + test — bfc523777
+- [x] A — security-specialist: geen blokkade; 🟡 profiel-whitelist opgelost
+- [x] A/1/2 — bewerkstand + editor-register; stap 1 EindstrategieBody; stap 2 extracties + UitgavenEditor — 6486e8611 (incl. reviewfixes H1/H2/M1/M2/M3/L1)
+- [x] 5 — PottenEditor (vier regel-bodies), pot-saldi pure move — 38adf255a + daa7c5a92
+- [x] Visuele check 13 sep (jochen@/Tessa): stap 1, 2, 5 bewerkstand renderen; knopwissel Bevestigen ↔ Opslaan en bevestigen; trede 3 zichtbaar; niets opgeslagen
+- [ ] 4 — eerst smalle schrijfroute sale_config (+ security), dan woonstrategie + verkoopinstelling inline
+- [ ] 3 — eerst `life_events`-schrijfroute (+ security), dan AOW (aanmaken bij opslaan) / pensioen / werk inline; `raw.events` op eigen user_id
+- [ ] L2 — inflatie, terugvalrendement, Box 3, rendement per bezitting inline; RegelSimOverride uitbreiden; `/api/parameters`-retry
+- [ ] Slot — meebeweeg-check laag c, ADR 0142-aanvulling, CLAUDE.md-regel, register.ts `partner`, UAT WF-TOEK-44, will-tests `toBe(30)`, uat-plan.md:6432, compliance-check nieuwe kopij, arch:diagram, parity-rebaseline, merkstem:scan
+
+## Restpunten uit review/visuele check (nog open)
+
+- Live footer in de bewerkstand (`FireDeltaFooter`) toont maanden-delta (trede 1), ook bij accounts in trede 3 — overweeg dezelfde treden in de footer.
+- `overzicht.ts` draait bij trede 3 één extra basisrun per stap (`b.run({})`); kan uit de bundel zodra `SimResult` het liquide eindvermogen draagt.
+- Dubbele `router.refresh()` na een uitgaven-save in de wizard (hook + `onChanged`).
+- Kolom-whitelist per rijtype voor assets/debts in de client-snapshot (nu alleen suffix-vangrail); schulden dragen `creditor`/`notes`.
+- Stap 5 in de wizard toont de bestaande regel-intro ("de 4%-regel", "beschermen je tegen slechte beursjaren") — meenemen in de compliance-check.
