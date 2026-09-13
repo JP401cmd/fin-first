@@ -91,7 +91,8 @@ const WEERGAVE_OPPERVLAKKEN: Record<string, string> = {
   'tekort-lening-copy': 'lib/horizon/deficit-loan-copy.ts',
   'plan-validatie (stop-plan)': 'lib/horizon/plan-draft.ts',
   'stop-plan-vragen (strategieën)': 'components/horizon/stop-plan-vragen.tsx',
-  'AOW-strategie-editor': 'components/future/strategie/aow-strategie-editor.tsx',
+  // TPR-15: de weergave verhuisde met de velden naar de body; de editor is nu een dunne modal-host.
+  'AOW-strategie-editor': 'components/future/strategie/aow-strategie-body.tsx',
   'Fin-context (cloud)': 'lib/ai/context/shared-context.ts',
   // Zusteroppervlakken met dezelfde invoer en dezelfde semantiek — die stonden NIET
   // op de kaart maar droegen wél een eigen kopie van dezelfde omzetting. Een guard
