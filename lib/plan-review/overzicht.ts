@@ -3,9 +3,9 @@
  *
  * Elke stap draagt drie dingen zichtbaar (eigenaarsnorm formulier-uitleg, 13 sep 2026):
  *  - KEUZE   `rekentNu` + `details` — "De app rekent nu met …", nooit een leeg veld (A3);
- *  - EFFECT  `effect` + `vergelijking` — wat de keuze met de uitkomst doet, in leeftijd
- *            (vrijheidsleeftijd, of onder een vast stopmoment: tot waar je liquide
- *            vermogen reikt) (A4);
+ *  - EFFECT  `effect` + `vergelijking` — wat de keuze met de uitkomst doet, in de
+ *            effectmaat van de stap (drie treden, TPR-15: vrijheidsleeftijd → tot waar
+ *            je liquide vermogen reikt → wat er aan het einde over is) (A4);
  *  - WAAROM  `waarom` — waarom dit ertoe doet.
  *
  * CONSUME, DON'T RECOMPUTE. Elke uitkomst komt uit een kernel-run: de basis is de
@@ -33,6 +33,7 @@ import type { Asset } from '@/lib/asset-data'
 import { ASSET_TYPE_LABELS } from '@/lib/asset-data'
 import type { LifeEvent } from '@/lib/horizon-data'
 import { formatCurrency } from '@/lib/format'
+import { deflate } from '@/lib/euro-display'
 import { formatAowAge } from '@/lib/aow-leeftijd'
 import { ankerReachFromSim, formatStopAge, type AnkerReach } from '@/lib/horizon/anker-copy'
 import { leeftijdJaar } from '@/lib/horizon/leeftijd-jaar'
@@ -148,9 +149,12 @@ export interface PlanReviewBronnen {
 
 // ── Uitkomst in woorden ──────────────────────────────────────────────────────
 
-type Uitkomst = Pick<RegelProjection, 'fireAgeFractional' | 'reach'>
+type Uitkomst = Pick<RegelProjection, 'fireAgeFractional' | 'reach' | 'eindeLiquide'>
 
 const ONBEKEND = 'nog niet te bepalen'
+
+/** Bedragen in de vergelijking afgerond op duizenden: een weergavekeuze, geen aanname. */
+const BEDRAG_AFRONDING = 1000
 
 function isVastAnker(plan: FirePlan): boolean {
   return plan.anchor.kind !== 'solved'
@@ -169,18 +173,84 @@ function uitkomstVanSim(sim: SimResult | null): Uitkomst | null {
 }
 
 /**
- * De uitkomst als korte frase. Onder "zo vroeg als het kan" is dat de vrijheidsleeftijd;
- * onder een vast stopmoment is die per constructie het stopmoment zelf, dus dan telt
- * tot waar het LIQUIDE vermogen reikt (ADR 0129, `anker-copy.ts`).
+ * EFFECTMAAT (besluit eigenaar 13 sep 2026, TPR-15) — drie treden, per stap één keer
+ * gekozen op de BASISRUN, zodat alle regels van één vergelijking dezelfde grootheid tonen:
+ *
+ *  1. `vrijheidsleeftijd` — onder "zo vroeg als het kan", zolang je nog niet kunt stoppen;
+ *  2. `reikt-tot`         — onder een vast stopmoment (daar is de vrijheidsleeftijd per
+ *                           constructie het stopmoment, ADR 0129), of wanneer je nu al kunt
+ *                           stoppen (dan is die bij elke keuze gewoon je huidige leeftijd);
+ *  3. `over-aan-einde`    — wanneer het liquide vermogen al tot het einde van het plan reikt,
+ *                           zodat ook trede 2 bij elke keuze hetzelfde zegt: wat er dan aan
+ *                           liquide vermogen over is, in euro's van vandaag.
+ *
+ * Een keuze die van de maat afwijkt, zegt dat erbij: hij reikt dan níét meer tot het einde
+ * (dan de reikt-frase), of je kunt dan niet meer direct stoppen.
  */
-export function uitkomstFrase(u: Uitkomst | null, vast: boolean): string {
+export type EffectMaatKind = 'vrijheidsleeftijd' | 'reikt-tot' | 'over-aan-einde'
+
+export interface EffectMaat {
+  kind: EffectMaatKind
+  vast: boolean
+  /** Leeftijd in rij 0 van de basisrun; `null` = geen run. */
+  startLeeftijd: number | null
+}
+
+function kanNuStoppen(u: Uitkomst | null, startLeeftijd: number | null): boolean {
+  return (
+    u?.fireAgeFractional != null &&
+    startLeeftijd != null &&
+    leeftijdJaar(u.fireAgeFractional) <= leeftijdJaar(startLeeftijd)
+  )
+}
+
+/**
+ * De basis-uitkomst van een stap plus de maat. Trede 3 heeft het liquide eindvermogen
+ * nodig; dat draagt de canonieke `SimResult` niet, dus dan leest hij het uit de
+ * snapshot-run zónder override (per constructie dezelfde run als de Tijdas).
+ */
+function basisEnMaat(b: PlanReviewBronnen): { basis: Uitkomst | null; maat: EffectMaat } {
+  const vast = isVastAnker(b.firePlan)
+  const startLeeftijd = b.sim?.rows[0]?.age ?? null
+  let basis = uitkomstVanSim(b.sim)
+  if (!basis || (!vast && !kanNuStoppen(basis, startLeeftijd))) {
+    return { basis, maat: { kind: 'vrijheidsleeftijd', vast, startLeeftijd } }
+  }
+  if (basis.reach?.kind === 'gedekt' && b.run) {
+    basis = { ...basis, eindeLiquide: b.run({}).eindeLiquide ?? null }
+    if (basis.eindeLiquide) return { basis, maat: { kind: 'over-aan-einde', vast, startLeeftijd } }
+  }
+  return { basis, maat: { kind: 'reikt-tot', vast, startLeeftijd } }
+}
+
+function bedragOverFrase(u: Uitkomst): string | null {
+  const reach = u.reach
+  if (reach?.kind !== 'gedekt' || !u.eindeLiquide) return null
+  // Precies één keer deflateren, met de kernel-factor van dezelfde eindrij (ADR 0090).
+  const vandaag = deflate(u.eindeLiquide.nominaal, u.eindeLiquide.inflationFactor, 'real')
+  const bedrag = formatCurrency(Math.round(vandaag / BEDRAG_AFRONDING) * BEDRAG_AFRONDING)
+  // Label = de leeftijd van DEZELFDE rij als het bedrag (de laatste weergaverij, eindleeftijd
+  // − 1), niet de eindleeftijd zelf: onder "opmaken" is die per constructie ≈ € 0.
+  return `${bedrag} liquide vermogen over in het laatste jaar van je plan (je ${leeftijdJaar(u.eindeLiquide.leeftijd)}e), in euro's van vandaag`
+}
+
+/** De uitkomst als korte frase, in de maat van de stap. */
+export function uitkomstFrase(u: Uitkomst | null, maat: EffectMaat): string {
   if (!u) return ONBEKEND
-  if (!vast) {
+  if (maat.kind === 'vrijheidsleeftijd') {
     return u.fireAgeFractional != null
       ? `vrijheidsleeftijd ${leeftijdJaar(u.fireAgeFractional)}`
       : 'geen vrijheidsleeftijd binnen je plan'
   }
-  return reachFrase(u.reach ?? { kind: 'onbekend' })
+  const kern =
+    (maat.kind === 'over-aan-einde' ? bedragOverFrase(u) : null) ?? reachFrase(u.reach ?? { kind: 'onbekend' })
+  // Onder "zo vroeg als het kan": verschuift deze keuze het stopmoment naar later, zeg dat.
+  if (!maat.vast && !kanNuStoppen(u, maat.startLeeftijd)) {
+    return u.fireAgeFractional != null
+      ? `${kern}; stoppen kan dan pas op je ${leeftijdJaar(u.fireAgeFractional)}e`
+      : `${kern}; stoppen kan dan niet binnen je plan`
+  }
+  return kern
 }
 
 function reachFrase(reach: AnkerReach): string {
@@ -198,11 +268,20 @@ function reachFrase(reach: AnkerReach): string {
   }
 }
 
-/** Numerieke sleutel voor een bereik over keuzes (vrijheidsleeftijd of reikt-tot-leeftijd). */
-function uitkomstLeeftijd(u: Uitkomst | null, vast: boolean): number | null {
+/**
+ * Numerieke sleutel voor een bereik over keuzes, in de maat van de stap: leeftijd bij
+ * trede 1 en 2, afgerond bedrag bij trede 3. Een keuze die in trede 3 níét tot het einde
+ * reikt, valt buiten het bedragbereik (`null`) — die noemt zijn eigen frase.
+ */
+function uitkomstSleutel(u: Uitkomst | null, maat: EffectMaat): number | null {
   if (!u) return null
-  if (!vast) return u.fireAgeFractional != null ? leeftijdJaar(u.fireAgeFractional) : null
+  if (maat.kind === 'vrijheidsleeftijd') return u.fireAgeFractional != null ? leeftijdJaar(u.fireAgeFractional) : null
   const r = u.reach
+  if (maat.kind === 'over-aan-einde') {
+    if (r?.kind !== 'gedekt' || !u.eindeLiquide) return null
+    const vandaag = deflate(u.eindeLiquide.nominaal, u.eindeLiquide.inflationFactor, 'real')
+    return Math.round(vandaag / BEDRAG_AFRONDING) * BEDRAG_AFRONDING
+  }
   if (!r) return null
   if (r.kind === 'reikt-tot') return leeftijdJaar(r.age)
   if (r.kind === 'gedekt' && r.endAge != null) return leeftijdJaar(r.endAge)
@@ -226,7 +305,6 @@ const PLAN_VERGELIJKING_EXTRA_JAREN = 5
 function stapPlan(b: PlanReviewBronnen): PlanReviewStapOverzicht {
   const plan = b.firePlan
   const draft = planDraftFromPlan(plan)
-  const vast = isVastAnker(plan)
   const eindvorm = END_FORM_OPTIONS.find((o) => o.form === plan.endForm)?.name ?? plan.endForm
   const stopmoment =
     plan.anchor.kind === 'age'
@@ -246,15 +324,15 @@ function stapPlan(b: PlanReviewBronnen): PlanReviewStapOverzicht {
     details.push({ label: 'Bedrag dat overblijft', waarde: formatCurrency(plan.legacyAmount) })
   }
 
-  const basis = uitkomstVanSim(b.sim)
-  const effect = [`Met dit plan: ${uitkomstFrase(basis, vast)}.`]
+  const { basis, maat } = basisEnMaat(b)
+  const effect = [`Met dit plan: ${uitkomstFrase(basis, maat)}.`]
   const vergelijking: PlanReviewRegel[] = []
   const langer = plan.endAge + PLAN_VERGELIJKING_EXTRA_JAREN
   if (b.run && basis && toontEindleeftijd && langer <= END_AGE_MAX) {
     const alt = b.run({ firePlan: { ...draft, endAge: langer } })
     vergelijking.push(
-      { label: `Geld reikt tot ${plan.endAge} (nu)`, waarde: uitkomstFrase(basis, vast) },
-      { label: `Geld reikt tot ${langer}`, waarde: uitkomstFrase(alt, vast) },
+      { label: `Geld reikt tot ${plan.endAge} (nu)`, waarde: uitkomstFrase(basis, maat) },
+      { label: `Geld reikt tot ${langer}`, waarde: uitkomstFrase(alt, maat) },
     )
   }
 
@@ -304,16 +382,15 @@ function stapUitgaven(b: PlanReviewBronnen): PlanReviewStapOverzicht {
   const opgeslagenBedrag = Number.isFinite(rawCustom) && rawCustom > 0 ? rawCustom : null
   const custom = method === 'custom_amount' ? opgeslagenBedrag : null
   const jaar = b.uitgaveNaPensioenPerJaar
-  const vast = isVastAnker(b.firePlan)
-  const basis = uitkomstVanSim(b.sim)
+  const { basis, maat } = basisEnMaat(b)
 
   const vergelijking: PlanReviewRegel[] = []
   if (b.run && basis && jaar != null && jaar > 0) {
     const lager = Math.round((jaar * UITGAVEN_VERGELIJKING_FACTOR) / UITGAVEN_AFRONDING) * UITGAVEN_AFRONDING
     const alt = b.run({ retirementExpense: { method: 'custom_amount', customAmount: lager } })
     vergelijking.push(
-      { label: `${formatCurrency(jaar)} per jaar (nu)`, waarde: uitkomstFrase(basis, vast) },
-      { label: `${formatCurrency(lager)} per jaar`, waarde: uitkomstFrase(alt, vast) },
+      { label: `${formatCurrency(jaar)} per jaar (nu)`, waarde: uitkomstFrase(basis, maat) },
+      { label: `${formatCurrency(lager)} per jaar`, waarde: uitkomstFrase(alt, maat) },
     )
   }
 
@@ -328,7 +405,7 @@ function stapUitgaven(b: PlanReviewBronnen): PlanReviewStapOverzicht {
       { label: 'Grondslag', waarde: hoofdletter(RETIREMENT_METHOD_LABELS[method]) },
       ...(custom != null ? [{ label: 'Eigen bedrag', waarde: `${formatCurrency(custom)} per jaar` }] : []),
     ],
-    effect: [`Met dit bedrag: ${uitkomstFrase(basis, vast)}.`],
+    effect: [`Met dit bedrag: ${uitkomstFrase(basis, maat)}.`],
     vergelijking,
     waarom:
       'Dit is het bedrag dat je vermogen, samen met AOW en pensioen, elk jaar na stoppen moet opbrengen. ' +
@@ -363,7 +440,7 @@ function stapInkomsten(b: PlanReviewBronnen): PlanReviewStapOverzicht {
   const werkplan = events.some((e) => e.event_type === 'werk')
   const heeftAow = b.facts.hasAowEvent
   const vast = isVastAnker(b.firePlan)
-  const basis = uitkomstVanSim(b.sim)
+  const { basis, maat } = basisEnMaat(b)
 
   const meta = (aowEvent?.metadata ?? {}) as Record<string, unknown>
   const leefsituatie = meta.leefsituatie === 'samenwonend' ? 'Samenwonend' : 'Alleenstaand'
@@ -383,7 +460,7 @@ function stapInkomsten(b: PlanReviewBronnen): PlanReviewStapOverzicht {
   details.push({ label: 'Pensioenregelingen', waarde: pensioenen > 0 ? String(pensioenen) : 'geen' })
   details.push({ label: 'Werkplan tot stoppen', waarde: werkplan ? 'ja' : 'geen' })
 
-  const effect = [`Met deze inkomsten: ${uitkomstFrase(basis, vast)}.`]
+  const effect = [`Met deze inkomsten: ${uitkomstFrase(basis, maat)}.`]
   if (!heeftAow) {
     effect.push(
       'Zonder AOW-gegevens telt de app geen AOW mee. Je vermogen draagt dan ook na je AOW-leeftijd alle uitgaven.',
@@ -495,9 +572,22 @@ function woonKeuzeSchrijf(
   }
 }
 
+/** Het bereik over de vier woonkeuzes, in de maat van de stap. */
+function woonBereikZin(maat: EffectMaat, lo: number, hi: number, nietAlleKeuzes: boolean): string {
+  if (maat.kind === 'over-aan-einde') {
+    const bij = nietAlleKeuzes ? 'Bij de keuzes die tot het einde van je plan reiken' : 'Afhankelijk van wat je met je huis doet'
+    return lo === hi
+      ? `${bij} blijft er in het laatste jaar van je plan evenveel liquide vermogen over (${formatCurrency(lo)}, in euro's van vandaag).`
+      : `${bij} blijft er in het laatste jaar van je plan tussen ${formatCurrency(lo)} en ${formatCurrency(hi)} aan liquide vermogen over, in euro's van vandaag.`
+  }
+  const wat = maat.kind === 'reikt-tot' ? 'reikt je liquide vermogen tot' : 'ligt je vrijheidsleeftijd op'
+  return lo === hi
+    ? `Bij elk van de vier keuzes ${wat} dezelfde leeftijd (${lo}).`
+    : `Afhankelijk van wat je met je huis doet, ${wat} een leeftijd tussen ${lo} en ${hi}.`
+}
+
 function stapWoning(b: PlanReviewBronnen): PlanReviewStapOverzicht {
-  const vast = isVastAnker(b.firePlan)
-  const basis = uitkomstVanSim(b.sim)
+  const { basis, maat } = basisEnMaat(b)
   const assets = actief(b.assets)
   const heeftHuis = b.facts.hasEigenHuis
   const huidig = b.facts.housingConfigured ? parseHousingStrategy(b.profile?.housing_strategy_config) : null
@@ -528,33 +618,26 @@ function stapWoning(b: PlanReviewBronnen): PlanReviewStapOverzicht {
   const keuzes: PlanReviewKeuze[] = []
   const effect: string[] = []
   if (heeftHuis) {
-    const leeftijden: number[] = []
+    const sleutels: number[] = []
     for (const mode of WOON_VOLGORDE) {
       const { config, schrijf } = woonKeuzeSchrijf(mode, huidig)
       const isHuidig = mode === effectieveMode
       const u = isHuidig ? basis : b.run ? b.run({ housingStrategyConfig: config as unknown as Record<string, unknown> }) : null
-      const leeftijd = uitkomstLeeftijd(u, vast)
-      if (leeftijd != null) leeftijden.push(leeftijd)
+      const sleutel = uitkomstSleutel(u, maat)
+      if (sleutel != null) sleutels.push(sleutel)
       keuzes.push({
         id: mode,
         label: WOON_KOPIJ[mode].label,
         beschrijving: WOON_KOPIJ[mode].beschrijving,
-        uitkomst: u ? hoofdletter(uitkomstFrase(u, vast)) : hoofdletter(ONBEKEND),
+        uitkomst: u ? hoofdletter(uitkomstFrase(u, maat)) : hoofdletter(ONBEKEND),
         huidig: huidig != null && isHuidig,
         schrijf,
       })
     }
-    if (leeftijden.length >= 2) {
-      const lo = Math.min(...leeftijden)
-      const hi = Math.max(...leeftijden)
-      const wat = vast ? 'reikt je liquide vermogen' : 'ligt je vrijheidsleeftijd'
-      effect.push(
-        lo === hi
-          ? `Bij elk van de vier keuzes ${wat} op dezelfde leeftijd (${lo}).`
-          : `Afhankelijk van wat je met je huis doet, ${wat} tussen ${lo} en ${hi}.`,
-      )
+    if (sleutels.length >= 2) {
+      effect.push(woonBereikZin(maat, Math.min(...sleutels), Math.max(...sleutels), sleutels.length < WOON_VOLGORDE.length))
     } else {
-      effect.push(`Met de huidige keuze: ${uitkomstFrase(basis, vast)}.`)
+      effect.push(`Met de huidige keuze: ${uitkomstFrase(basis, maat)}.`)
     }
   }
   if (overig.length > 0) {
@@ -616,8 +699,7 @@ function stapPotten(b: PlanReviewBronnen): PlanReviewStapOverzicht {
   const profile = b.profile ?? {}
   const profiel = resolveWithdrawalProfiel(profile as { withdrawal_strategy?: string | null; withdrawal_profile_config?: unknown })
   const potRules = resolvePotRules(profile as { pot_rules?: unknown })
-  const vast = isVastAnker(b.firePlan)
-  const basis = uitkomstVanSim(b.sim)
+  const { basis, maat } = basisEnMaat(b)
 
   const rawConfig = profile.withdrawal_profile_config
   const configObject =
@@ -628,8 +710,8 @@ function stapPotten(b: PlanReviewBronnen): PlanReviewStapOverzicht {
   if (b.run && basis) {
     const alt = b.run({ withdrawalProfileConfig: { ...configObject, profiel: ander } })
     vergelijking.push(
-      { label: `${PROFIEL_KOPIJ[profiel].naam} (nu)`, waarde: uitkomstFrase(basis, vast) },
-      { label: PROFIEL_KOPIJ[ander].naam, waarde: uitkomstFrase(alt, vast) },
+      { label: `${PROFIEL_KOPIJ[profiel].naam} (nu)`, waarde: uitkomstFrase(basis, maat) },
+      { label: PROFIEL_KOPIJ[ander].naam, waarde: uitkomstFrase(alt, maat) },
     )
   }
 
@@ -643,7 +725,7 @@ function stapPotten(b: PlanReviewBronnen): PlanReviewStapOverzicht {
       { label: 'Opnemen na stoppen, in volgorde', waarde: volgordeFrase(potRules.withdrawalOrderGroups) },
       { label: 'Bij een tegenvaller eerst uit', waarde: volgordeFrase(potRules.deficitOrderGroups) },
     ],
-    effect: [`Met deze regels: ${uitkomstFrase(basis, vast)}.`],
+    effect: [`Met deze regels: ${uitkomstFrase(basis, maat)}.`],
     vergelijking,
     waarom:
       'Deze regels bepalen waar extra geld landt, en dus met welk rendement het groeit, en hoe je na stoppen opneemt. ' +

@@ -18,6 +18,7 @@ import {
 import type { SimRow } from '@/lib/fire-simulation'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
 import { ankerReachFromSim, type AnkerReach } from '@/lib/horizon/anker-copy'
+import { clipRowsToPlanEnd } from '@/lib/horizon/clip-rows-to-plan-end'
 import type { PlanDraft } from '@/lib/horizon/plan-draft'
 import type { WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
 
@@ -55,11 +56,20 @@ export interface RegelProjection {
    * regel-bodies blijven compileerbaar); `runRegelProjection` zet 'm altijd.
    */
   reach?: AnkerReach
+  /**
+   * TPR-15 — het netto LIQUIDE vermogen aan het einde van het plan: de laatste
+   * weergaverij (`clipRowsToPlanEnd` op de kernel-eindleeftijd), met de canonieke
+   * weergave-deflator van díe rij. Nominaal: de consument deflateert precies één keer
+   * via `deflate()` (`lib/euro-display.ts`). `null` = geen rijen. Consume-only — de
+   * plan-review toont hiermee "wat er aan het einde over is" wanneer elke keuze tot het
+   * einde van het plan reikt (effectmaat trede 3). Optioneel/additief in het TYPE.
+   */
+  eindeLiquide?: { leeftijd: number; nominaal: number; inflationFactor: number } | null
 }
 
 /** Verse lege projectie per aanroep — geen gedeelde (muteerbare) `rows`-array. */
 function emptyProjection(): RegelProjection {
-  return { rows: [], fireAgeFractional: null, reach: { kind: 'onbekend' } }
+  return { rows: [], fireAgeFractional: null, reach: { kind: 'onbekend' }, eindeLiquide: null }
 }
 
 /**
@@ -119,6 +129,7 @@ export function runRegelProjection(
   })
   if (!outcome.ok) return emptyProjection()
   const res = toSimResult(outcome.result)
+  const eindRij = clipRowsToPlanEnd(outcome.result.rows, res.displayEndAge).at(-1)
   return {
     rows: res.rows,
     fireAgeFractional: res.fireAgeFractional,
@@ -128,6 +139,9 @@ export function runRegelProjection(
       kernelDepletionMonth: res.kernelDepletionMonth,
       endAge: res.displayEndAge,
     }),
+    eindeLiquide: eindRij
+      ? { leeftijd: eindRij.age, nominaal: eindRij.nettoLiquide, inflationFactor: eindRij.inflationFactor }
+      : null,
   }
 }
 

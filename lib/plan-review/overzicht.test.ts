@@ -119,6 +119,79 @@ describe('plan-review overzicht — keuze · effect · waarom', () => {
   })
 })
 
+describe('effectmaat in drie treden (TPR-15, besluit eigenaar 13 sep 2026)', () => {
+  // "Tessa": kan nu al stoppen (vrijheidsleeftijd = huidige leeftijd 42), geld raakt nooit op.
+  // formatCurrency zet een harde spatie tussen € en het bedrag.
+  const norm = (t: string) => t.replace(/\u00a0/g, ' ')
+  const nuVrij = () => sim(42, { rows: [{ age: 42 }] as unknown as SimResult['rows'], kernelDepletionMonth: null })
+
+  function projectie(p: Partial<RegelProjection>): RegelProjection {
+    return { rows: [], fireAgeFractional: 42, reach: { kind: 'gedekt', endAge: 90 }, eindeLiquide: null, ...p }
+  }
+
+  it('trede 3 — kan al stoppen en reikt tot het einde: het liquide eindbedrag, één keer gedeflateerd', () => {
+    const run = vi.fn((o: RegelSimOverride): RegelProjection =>
+      Object.keys(o).length === 0
+        ? projectie({ eindeLiquide: { leeftijd: 89, nominaal: 2_000_000, inflationFactor: 2 } })
+        : projectie({ eindeLiquide: { leeftijd: 89, nominaal: 1_500_000, inflationFactor: 2 } }),
+    )
+    const o = buildPlanReviewStap('uitgaven', bronnen({ sim: nuVrij(), run }))
+    // Basis: de snapshot-run zónder override levert het eindbedrag (de SimResult draagt het niet).
+    expect(run).toHaveBeenCalledWith({})
+    expect(norm(o.effect[0])).toContain("€ 1.000.000 liquide vermogen over in het laatste jaar van je plan (je 89e), in euro's van vandaag")
+    expect(o.vergelijking.map((r) => norm(r.waarde))).toEqual([
+      "€ 1.000.000 liquide vermogen over in het laatste jaar van je plan (je 89e), in euro's van vandaag",
+      "€ 750.000 liquide vermogen over in het laatste jaar van je plan (je 89e), in euro's van vandaag",
+    ])
+    expect(JSON.stringify(o)).not.toContain('vrijheidsleeftijd 42')
+  })
+
+  it('trede 3 — een keuze die níét meer tot het einde reikt, zegt tot waar hij reikt', () => {
+    const run = vi.fn((o: RegelSimOverride): RegelProjection =>
+      Object.keys(o).length === 0
+        ? projectie({ eindeLiquide: { leeftijd: 89, nominaal: 800_000, inflationFactor: 1 } })
+        : projectie({ reach: { kind: 'reikt-tot', age: 81, endAge: 90 } }),
+    )
+    const o = buildPlanReviewStap('potten', bronnen({ sim: nuVrij(), run }))
+    expect(o.vergelijking[1].waarde).toBe('liquide vermogen reikt tot je 81e')
+  })
+
+  it('een keuze die stoppen-nu onmogelijk maakt, noemt het latere stopmoment', () => {
+    const run = vi.fn((o: RegelSimOverride): RegelProjection =>
+      Object.keys(o).length === 0
+        ? projectie({ eindeLiquide: { leeftijd: 89, nominaal: 500_000, inflationFactor: 1 } })
+        : projectie({ fireAgeFractional: 47.3, eindeLiquide: { leeftijd: 89, nominaal: 20_000, inflationFactor: 1 } }),
+    )
+    const o = buildPlanReviewStap('uitgaven', bronnen({ sim: nuVrij(), run }))
+    expect(o.vergelijking[1].waarde).toContain('stoppen kan dan pas op je 47e')
+  })
+
+  it('trede 2 — kan al stoppen maar zonder snapshot-run: tot waar het liquide vermogen reikt', () => {
+    const o = buildPlanReviewStap('uitgaven', bronnen({ sim: nuVrij(), run: null }))
+    expect(o.effect[0]).toContain('liquide vermogen reikt tot het einde van je plan (90)')
+    expect(o.effect[0]).not.toContain('vrijheidsleeftijd')
+  })
+
+  it('trede 1 blijft staan zolang je nog niet kunt stoppen (geen extra basisrun)', () => {
+    const run = vi.fn((_: RegelSimOverride): RegelProjection => projectie({ fireAgeFractional: 58 }))
+    buildPlanReviewStap('uitgaven', bronnen({ run }))
+    expect(run).not.toHaveBeenCalledWith({})
+  })
+
+  it('stap 4 — het bereik over de woonkeuzes staat in euro\'s bij trede 3', () => {
+    let n = 0
+    const run = vi.fn((o: RegelSimOverride): RegelProjection =>
+      Object.keys(o).length === 0
+        ? projectie({ eindeLiquide: { leeftijd: 89, nominaal: 400_000, inflationFactor: 1 } })
+        : projectie({ eindeLiquide: { leeftijd: 89, nominaal: 400_000 + 100_000 * ++n, inflationFactor: 1 } }),
+    )
+    const o = buildPlanReviewStap('woning', bronnen({ sim: nuVrij(), run }))
+    expect(norm(o.effect[0])).toBe(
+      "Afhankelijk van wat je met je huis doet blijft er in het laatste jaar van je plan tussen € 400.000 en € 700.000 aan liquide vermogen over, in euro's van vandaag.",
+    )
+  })
+})
+
 describe('stap 1 — Je plan', () => {
   it('schrijft het volledige huidige plan naar /api/fire-settings', () => {
     const o = buildPlanReviewStap('plan', bronnen())
