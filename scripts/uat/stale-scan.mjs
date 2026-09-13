@@ -17,7 +17,9 @@
  * Output: mensvriendelijke samenvatting → stderr; machine-JSON → stdout:
  *   { affectedCriteria: [{zone, workflow, scenarioId, matchedFiles, confidence}],
  *     newSurfaces:      [{path}],
- *     anyImpact:        boolean }
+ *     anyImpact:        boolean,
+ *     docPathsStale:    [{path, lines}] }   ← waarschuwing: paden in docs/uat/uat-plan.md
+ *                                           die niet meer bestaan; telt niet mee in anyImpact
  *
  * `confidence` is 'symbol' | 'file' | 'unlikely' — de triage draait op SYMBOOL-
  * niveau waar dat kan (git's functiecontext per hunk) en valt terug op
@@ -33,7 +35,7 @@
  * geen bewijs; de guard-test (test/uat-stale-scan.test.ts) borgt de matching.
  */
 
-import { readFileSync, readdirSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { execFileSync } from 'node:child_process'
@@ -41,6 +43,7 @@ import { execFileSync } from 'node:child_process'
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..', '..')
 const ACCEPTANCE_DIR = join(ROOT, 'lib', 'uat', 'acceptance')
+const UAT_PLAN = join(ROOT, 'docs', 'uat', 'uat-plan.md')
 
 // ── pure kern (importeerbaar door de guard-test) ────────────────────────────
 
@@ -214,6 +217,33 @@ export function computeImpact(criteria, changedFiles, appSurfaces, changedSymbol
   return { affectedCriteria, newSurfaces, anyImpact: affectedCriteria.length > 0 || newSurfaces.length > 0 }
 }
 
+/**
+ * Bestandspaden in een vrije-tekstdocument (het UAT-plan) die niet meer bestaan.
+ *
+ * `docs/uat/uat-plan.md` heeft geen generator: een verwijzing naar een verhuisd of
+ * verwijderd bestand blijft er stil staan (precedent 14 sep 2026: vier verwijzingen naar
+ * `components/app/will/*` en een verwijderde API-route). Dezelfde padherkenning als
+ * `extractSourceRefs`; `exists` is injecteerbaar zodat de guard-test geen schijf nodig heeft.
+ *
+ * Een WAARSCHUWING, geen gate: het plan is proza, en een pad kan bewust historisch zijn.
+ * Telt daarom niet mee in `anyImpact`.
+ */
+export function findStaleDocPaths(text, exists) {
+  if (!text || typeof text !== 'string') return []
+  const byPath = new Map()
+  const lines = text.split('\n')
+  lines.forEach((line, i) => {
+    for (const m of line.matchAll(PATH_RE)) {
+      const path = m[0].replace(/\\/g, '/')
+      if (exists(path)) continue
+      const regels = byPath.get(path) ?? []
+      regels.push(i + 1)
+      byPath.set(path, regels)
+    }
+  })
+  return [...byPath.entries()].map(([path, regels]) => ({ path, lines: regels }))
+}
+
 // ── CLI (alleen bij directe aanroep; niet bij import in de test) ─────────────
 
 /** Zone-bronbestanden = <zone>.ts, exclusief types/-checks/.engine.test. */
@@ -315,6 +345,9 @@ function main() {
   // te lezen; dan blijft het bestandsniveau (ruim), wat het veilige gedrag is.
   const changedSymbols = changedSymbolsByFile(git, base)
   const impact = computeImpact(criteria, changed, changed.filter(isAppSurface), changedSymbols)
+  let planText = ''
+  try { planText = readFileSync(UAT_PLAN, 'utf8') } catch { /* geen plan → niets te melden */ }
+  const docPathsStale = findStaleDocPaths(planText, (p) => existsSync(join(ROOT, p)))
 
   process.stderr.write(`\nUAT-staleness — ${changed.length} gewijzigde bestand(en) t.o.v. ${base}\n`)
   if (!impact.anyImpact) {
@@ -346,7 +379,14 @@ function main() {
     }
     process.stderr.write('\n  → Dispatch `uat-docs-keeper`: werk de acceptatiecriteria/flows bij (NIET uitvoeren — dat is /uat).\n\n')
   }
-  process.stdout.write(JSON.stringify(impact, null, 2) + '\n')
+  if (docPathsStale.length) {
+    process.stderr.write(
+      `  · ${docPathsStale.length} bestandspad(en) in docs/uat/uat-plan.md bestaan niet meer (waarschuwing, geen gate):\n`,
+    )
+    for (const d of docPathsStale) process.stderr.write(`     ${d.path} (r.${d.lines.join(', ')})\n`)
+    process.stderr.write('\n')
+  }
+  process.stdout.write(JSON.stringify({ ...impact, docPathsStale }, null, 2) + '\n')
 }
 
 const invokedDirectly = (process.argv[1] || '').replace(/\\/g, '/').endsWith('scripts/uat/stale-scan.mjs')

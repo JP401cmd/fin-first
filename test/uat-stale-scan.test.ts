@@ -9,6 +9,7 @@ import {
   extractCriteria,
   computeImpact,
   isZoneAcceptanceFile,
+  findStaleDocPaths,
 } from '../scripts/uat/stale-scan.mjs'
 
 describe('uat-stale-scan — extractSourceFiles', () => {
@@ -253,5 +254,24 @@ describe('uat-stale-scan — isZoneAcceptanceFile', () => {
     expect(isZoneAcceptanceFile('types.ts')).toBe(false)
     expect(isZoneAcceptanceFile('start-checks.ts')).toBe(false)
     expect(isZoneAcceptanceFile('start.engine.test.ts')).toBe(false)
+  })
+})
+
+describe('uat-stale-scan — findStaleDocPaths (uat-plan.md, waarschuwing)', () => {
+  it('meldt paden die niet bestaan, met regelnummers, en laat bestaande paden staan', () => {
+    const plan = [
+      '- **Schermen:** components/app/will/will-home.tsx en lib/format.ts',
+      '- API: app/api/ai/recommendations/postponed-ready/route.ts',
+      '- nogmaals components/app/will/will-home.tsx',
+    ].join('\n')
+    const bestaat = (p: string) => p === 'lib/format.ts'
+    expect(findStaleDocPaths(plan, bestaat)).toEqual([
+      { path: 'components/app/will/will-home.tsx', lines: [1, 3] },
+      { path: 'app/api/ai/recommendations/postponed-ready/route.ts', lines: [2] },
+    ])
+  })
+
+  it('leeg of geen tekst → niets', () => {
+    expect(findStaleDocPaths('', () => false)).toEqual([])
   })
 })
