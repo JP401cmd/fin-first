@@ -42,12 +42,16 @@ describe('rawContextZonderPartner', () => {
 
 describe('snapshot-bouwers gebruiken de vangrail', () => {
   const root = process.cwd()
+  // TPR-15: de RegelSimSnapshot heeft één client-veilige bouwer; die roept de vangrail
+  // aan, en elke plek die de snapshot naar de browser stuurt gaat via die bouwer.
   it.each([
-    ['lib/dashboard-data-loader.ts'],
-    ['lib/tax-lifetime/varianten-sweep-loader.ts'],
-  ])('%s geeft geen rauwe rawContext door', (pad) => {
+    ['lib/future/regel-sim-snapshot.ts', 'rawContextZonderPartner('],
+    ['lib/dashboard-data-loader.ts', 'buildClientRegelSimSnapshot('],
+    ['app/api/plan-review/editor-context/route.ts', 'buildClientRegelSimSnapshot('],
+    ['lib/tax-lifetime/varianten-sweep-loader.ts', 'rawContextZonderPartner('],
+  ])('%s geeft geen rauwe rawContext door', (pad, vangrail) => {
     const bron = readFileSync(join(root, pad), 'utf8')
-    expect(bron).toContain('rawContextZonderPartner(')
+    expect(bron).toContain(vangrail)
     expect(bron).not.toMatch(/rawContext:\s*(shared|run)\.rawContext\b/)
   })
 })

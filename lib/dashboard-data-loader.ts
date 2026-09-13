@@ -74,7 +74,7 @@ import { buildSimNetWorthRows } from '@/lib/horizon/networth-rows'
 import { buildFactorByAge } from '@/lib/euro-display'
 import { clipRowsToPlanEnd } from '@/lib/horizon/clip-rows-to-plan-end'
 import type { RegelSimSnapshot } from '@/lib/future/regel-sim'
-import { rawContextZonderPartner } from '@/lib/horizon-kernel/convergentie-router'
+import { buildClientRegelSimSnapshot } from '@/lib/future/regel-sim-snapshot'
 import { resolvePotRules, POT_RULES_DEFAULTS, type PotRulesConfig } from '@/lib/pot-rules'
 import { computeRetirementExpenses, computeYearlyMustExpenses, type RetirementExpenseMethod, type BudgetRow, type ChildBudgetRow } from '@/lib/budget-utils'
 import {
@@ -1398,13 +1398,8 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
         const simResult = shared.sim
         // Snapshot voor de /toekomst Voorkeuren-editors: exact de rauwe context die
         // DEZE run voedde, zodat de editor-baseline per constructie de Tijdas-curve is.
-        regelSimSnapshot = {
-          rawContext: rawContextZonderPartner(shared.rawContext),
-          fireStrategy: shared.fireStrategy,
-          withdrawalStrategy: shared.withdrawalStrategy,
-          aowAgeInt: shared.aowAgeInt,
-          aowFractional: shared.aowAgeFractional,
-        }
+        // Client-veilig (TPR-15): zonder partnerblok en zonder *_encrypted/*_hash.
+        regelSimSnapshot = buildClientRegelSimSnapshot(shared)
         // Kernel-eindleeftijd voor het weergavelabel + clip-grens (spiegel van
         // horizon-client.tsx `displaySimRows`).
         simDisplayEndAge = simResult.displayEndAge
