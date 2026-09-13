@@ -17,7 +17,7 @@ vi.mock('./shared', () => ({
   RegelIntro: () => null,
   LiveSimImpact: () => null,
   FireDeltaFooter: () => null,
-  fireDeltaMonths: () => null,
+  fireFooterSleutel: () => null,
 }))
 const mockRun = vi.fn(() => ({ rows: [], fireAgeFractional: null }))
 vi.mock('@/lib/future/regel-sim', () => ({

@@ -18,6 +18,12 @@
 export const PLAN_REVIEW_STAPPEN = ['plan', 'uitgaven', 'inkomsten', 'woning', 'potten'] as const
 export type PlanReviewStap = (typeof PLAN_REVIEW_STAPPEN)[number]
 
+/**
+ * Afronding van euro-bedragen in de effectmaat (trede 3): de overzichten en de live footer
+ * ronden gelijk af, zodat "geen verschil" op beide plekken hetzelfde betekent.
+ */
+export const EFFECT_BEDRAG_AFRONDING = 1000
+
 /** De query-param die de review op /toekomst opent (+ optioneel `stap`). */
 export const PLAN_REVIEW_PARAM = 'planreview'
 export const PLAN_REVIEW_STAP_PARAM = 'stap'

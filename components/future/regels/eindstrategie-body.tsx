@@ -17,7 +17,7 @@ import {
   RegelIntro,
   LiveSimImpact,
   FireDeltaFooter,
-  fireDeltaMonths,
+  fireFooterSleutel,
 } from './shared'
 import type { RegelBodyProps } from './types'
 
@@ -169,7 +169,7 @@ export function EindstrategieBody({
     }
   }, [draft, deficitPct, includeIlliquid, onClose, onSaved])
 
-  const deltaMonths = fireDeltaMonths(baseline, draftProj)
+  const footerSleutel = fireFooterSleutel(baseline, draftProj)
   useEffect(() => {
     onActionsChange({
       canSave,
@@ -178,9 +178,9 @@ export function EindstrategieBody({
       footerInfo: <FireDeltaFooter baseline={baseline} draft={draftProj} />,
       changed,
     })
-    // baseline/draftProj zijn useMemo-stabiel; deltaMonths bewaakt republish.
+    // baseline/draftProj zijn useMemo-stabiel; footerSleutel bewaakt republish.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onActionsChange, canSave, saving, deltaMonths, changed])
+  }, [onActionsChange, canSave, saving, footerSleutel, changed])
 
   return (
     <div className="pb-6">

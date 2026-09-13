@@ -1,7 +1,7 @@
 'use client'
 
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
-import { FireDeltaFooter, RegelOptionCard, fireDeltaMonths } from './regels/shared'
+import { FireDeltaFooter, RegelOptionCard, fireFooterSleutel } from './regels/shared'
 import { runRegelProjection, type RegelSimSnapshot } from '@/lib/future/regel-sim'
 import type { RegelEditActionsState } from './regels/types'
 import type { Box3Method } from '@/lib/bucket-projection'
@@ -132,7 +132,7 @@ export function Box3MethodeBody({
     () => (snapshot && changed ? runRegelProjection(snapshot, { parameters: deferredConcept }) : null),
     [snapshot, changed, deferredConcept],
   )
-  const deltaMonths = baseline && draftProj ? fireDeltaMonths(baseline, draftProj) : null
+  const footerSleutel = baseline && draftProj ? fireFooterSleutel(baseline, draftProj) : null
 
   async function handleSubmit(e?: React.FormEvent) {
     e?.preventDefault()
@@ -200,9 +200,9 @@ export function Box3MethodeBody({
       changed,
       footerInfo: changed && baseline && draftProj ? <FireDeltaFooter baseline={baseline} draft={draftProj} /> : undefined,
     })
-    // baseline/draftProj zijn useMemo-stabiel; deltaMonths bewaakt republish.
+    // baseline/draftProj zijn useMemo-stabiel; footerSleutel bewaakt republish.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onActionsChange, changed, saving, invoerGeldig, deltaMonths])
+  }, [onActionsChange, changed, saving, invoerGeldig, footerSleutel])
 
   const Kop = kop
 

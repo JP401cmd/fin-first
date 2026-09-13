@@ -20,7 +20,7 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { HousingStrategySection } from '@/components/future/strategie/housing-strategy-section'
 import { SaleConfigFields } from '@/components/core/sale-config-fields'
-import { FireDeltaFooter, fireDeltaMonths } from '@/components/future/regels/shared'
+import { FireDeltaFooter, fireFooterSleutel } from '@/components/future/regels/shared'
 import type { RegelEditActionsState } from '@/components/future/regels/types'
 import { runRegelProjection, type RegelSimSnapshot } from '@/lib/future/regel-sim'
 import { draftToSaleConfig, saleConfigToDraft, type SaleConfigDraft } from '@/lib/sale-config-draft'
@@ -206,7 +206,7 @@ function VerkoopinstellingBody({
     }
   })
 
-  const deltaMonths = baseline && draftProj ? fireDeltaMonths(baseline, draftProj) : null
+  const footerSleutel = baseline && draftProj ? fireFooterSleutel(baseline, draftProj) : null
   useEffect(() => {
     onActionsChange({
       canSave,
@@ -215,9 +215,9 @@ function VerkoopinstellingBody({
       footerInfo: baseline && draftProj ? <FireDeltaFooter baseline={baseline} draft={draftProj} /> : undefined,
       changed,
     })
-    // baseline/draftProj zijn useMemo-stabiel; deltaMonths bewaakt republish.
+    // baseline/draftProj zijn useMemo-stabiel; footerSleutel bewaakt republish.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onActionsChange, canSave, saving, deltaMonths, changed])
+  }, [onActionsChange, canSave, saving, footerSleutel, changed])
 
   return (
     <div className="space-y-3">

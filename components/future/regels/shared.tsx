@@ -6,6 +6,9 @@ import { EditorialDeck, SubsectionLabel } from '@/components/editorial'
 import { EventImpactPreview } from '@/components/app/horizon/event-impact-preview'
 import { REGEL_META, type RegelId } from '@/lib/future/regel-registry'
 import type { RegelProjection } from '@/lib/future/regel-sim'
+import { deflate } from '@/lib/euro-display'
+import { formatCurrency } from '@/lib/format'
+import { EFFECT_BEDRAG_AFRONDING } from '@/lib/plan-review/types'
 
 /** Intro-blok bovenaan elke body: uitleg-deck uit de registry. */
 export function RegelIntro({ regelId }: { regelId: RegelId }) {
@@ -106,7 +109,61 @@ export function fireDeltaMonths(baseline: RegelProjection, draft: RegelProjectio
   return Math.round((draft.fireAgeFractional - baseline.fireAgeFractional) * 12)
 }
 
-/** Footer-info node: live FIRE-delta voor de pane-footer. */
+/**
+ * Het live effect in de footer, in dezelfde drie treden als de plan-review-overzichten
+ * (TPR-15, besluit eigenaar 13 sep 2026):
+ *  1. de vrijheidsdatum schuift → maanden eerder/later;
+ *  2. de datum blijft gelijk, maar hoe ver het liquide vermogen reikt verandert;
+ *  3. beide reiken tot het einde → wat er aan het einde meer of minder over is, in euro's van
+ *     vandaag (elk bedrag precies één keer gedeflateerd met de kernelfactor van zijn eigen
+ *     eindrij, ADR 0090), afgerond zoals de overzichten.
+ * Consume, don't recompute: alles komt uit de twee kern-runs.
+ */
+export type FireFooterEffect =
+  | { kind: 'onbekend' }
+  | { kind: 'maanden'; maanden: number }
+  | { kind: 'reikt'; totLeeftijd: number | null; eerder: boolean }
+  | { kind: 'einde'; euro: number }
+  | { kind: 'geen' }
+
+function reiktTot(p: RegelProjection): number | null | undefined {
+  const r = p.reach
+  if (!r) return undefined
+  if (r.kind === 'gedekt') return null
+  if (r.kind === 'reikt-tot') return Math.floor(r.age)
+  if (r.kind === 'nu-op') return p.rows[0]?.age != null ? Math.floor(p.rows[0].age) : undefined
+  return undefined
+}
+
+export function fireFooterEffect(baseline: RegelProjection, draft: RegelProjection): FireFooterEffect {
+  const delta = fireDeltaMonths(baseline, draft)
+  if (delta == null) return { kind: 'onbekend' }
+  if (delta !== 0) return { kind: 'maanden', maanden: delta }
+  const basisTot = reiktTot(baseline)
+  const draftTot = reiktTot(draft)
+  if (basisTot !== undefined && draftTot !== undefined && basisTot !== draftTot) {
+    // null = tot het einde van het plan; dat is altijd verder dan een leeftijd.
+    const eerder = draftTot != null && (basisTot == null || draftTot < basisTot)
+    return { kind: 'reikt', totLeeftijd: draftTot, eerder }
+  }
+  if (basisTot === null && draftTot === null && baseline.eindeLiquide && draft.eindeLiquide) {
+    const vandaag = (e: NonNullable<RegelProjection['eindeLiquide']>) => deflate(e.nominaal, e.inflationFactor, 'real')
+    const verschil = vandaag(draft.eindeLiquide) - vandaag(baseline.eindeLiquide)
+    const euro = Math.round(verschil / EFFECT_BEDRAG_AFRONDING) * EFFECT_BEDRAG_AFRONDING
+    if (euro !== 0) return { kind: 'einde', euro }
+  }
+  return { kind: 'geen' }
+}
+
+/**
+ * Stabiele sleutel van het footer-effect: bodies publiceren hun footer opnieuw zodra deze
+ * verandert (niet op elke render, en niet alleen op de maanden — anders bleef trede 2/3 staan).
+ */
+export function fireFooterSleutel(baseline: RegelProjection, draft: RegelProjection): string {
+  return JSON.stringify(fireFooterEffect(baseline, draft))
+}
+
+/** Footer-info node: live effect voor de pane-footer (zie `fireFooterEffect`). */
 export function FireDeltaFooter({
   baseline,
   draft,
@@ -114,25 +171,44 @@ export function FireDeltaFooter({
   baseline: RegelProjection
   draft: RegelProjection
 }) {
-  const delta = fireDeltaMonths(baseline, draft)
-  if (delta == null) {
-    return <span className="text-[11px] text-[var(--ink-3)]">Geen vergelijking</span>
+  const effect = fireFooterEffect(baseline, draft)
+  switch (effect.kind) {
+    case 'onbekend':
+      return <span className="text-[11px] text-[var(--ink-3)]">Geen vergelijking</span>
+    case 'geen':
+      return <span className="text-[11px] text-[var(--ink-3)]">Geen verschil in je plan</span>
+    case 'maanden': {
+      const earlier = effect.maanden < 0
+      return (
+        <span className="text-[12px]">
+          <span className="text-[var(--ink-3)]">Vrijheid </span>
+          <span className="font-semibold" style={{ color: earlier ? 'var(--positive)' : 'var(--negative)' }}>
+            {earlier ? `${Math.abs(effect.maanden)} mnd eerder` : `${effect.maanden} mnd later`}
+          </span>
+        </span>
+      )
+    }
+    case 'reikt':
+      return (
+        <span className="text-[12px]">
+          <span className="text-[var(--ink-3)]">Geld reikt dan </span>
+          <span className="font-semibold" style={{ color: effect.eerder ? 'var(--negative)' : 'var(--positive)' }}>
+            {effect.totLeeftijd == null ? 'tot het einde' : `tot je ${effect.totLeeftijd}e`}
+          </span>
+        </span>
+      )
+    case 'einde': {
+      const meer = effect.euro > 0
+      return (
+        <span className="text-[12px]" title="In euro's van vandaag">
+          <span className="font-semibold" style={{ color: meer ? 'var(--positive)' : 'var(--negative)' }}>
+            {formatCurrency(Math.abs(effect.euro))} {meer ? 'meer' : 'minder'}
+          </span>
+          <span className="text-[var(--ink-3)]"> over aan het einde</span>
+        </span>
+      )
+    }
   }
-  if (delta === 0) {
-    return <span className="text-[11px] text-[var(--ink-3)]">Geen verschil in vrijheidsdatum</span>
-  }
-  const earlier = delta < 0
-  return (
-    <span className="text-[12px]">
-      <span className="text-[var(--ink-3)]">Vrijheid </span>
-      <span
-        className="font-semibold"
-        style={{ color: earlier ? 'var(--positive)' : 'var(--negative)' }}
-      >
-        {earlier ? `${Math.abs(delta)} mnd eerder` : `${delta} mnd later`}
-      </span>
-    </span>
-  )
 }
 
 /**

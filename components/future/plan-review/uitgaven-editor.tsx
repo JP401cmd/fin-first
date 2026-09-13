@@ -24,7 +24,7 @@ import {
   UitgavenMethodeKeuze,
   useUitgavenKeuze,
 } from '@/components/app/horizon/uitgaven-keuze'
-import { FireDeltaFooter, LiveSimImpact, fireDeltaMonths } from '@/components/future/regels/shared'
+import { FireDeltaFooter, LiveSimImpact, fireFooterSleutel } from '@/components/future/regels/shared'
 import { SubsectionLabel } from '@/components/editorial'
 import type { PlanReviewEditorProps } from './editors'
 
@@ -103,7 +103,7 @@ function UitgavenEditorInhoud({
     saveRef.current = keuze.slaConceptOp
   })
 
-  const deltaMonths = fireDeltaMonths(baseline, draftProj)
+  const footerSleutel = fireFooterSleutel(baseline, draftProj)
   useEffect(() => {
     onActionsChange({
       canSave,
@@ -122,9 +122,9 @@ function UitgavenEditorInhoud({
       ),
       changed: keuze.changed,
     })
-    // baseline/draftProj zijn useMemo-stabiel; deltaMonths bewaakt republish.
+    // baseline/draftProj zijn useMemo-stabiel; footerSleutel bewaakt republish.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onActionsChange, canSave, keuze.saving, keuze.changed, deltaMonths, keuze.method, keuze.finalAmount, masked])
+  }, [onActionsChange, canSave, keuze.saving, keuze.changed, footerSleutel, keuze.method, keuze.finalAmount, masked])
 
   return (
     <div className="pb-2">

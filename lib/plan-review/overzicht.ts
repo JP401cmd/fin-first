@@ -62,7 +62,7 @@ import {
 import type { RetirementExpenseMethod } from '@/lib/budget-utils'
 import { bouwStrategieRij } from '@/lib/life-events/strategie-write'
 import { NIET_LIQUIDE_ASSET_TYPES } from './niet-liquide'
-import { PLAN_REVIEW_STAP_TITELS, type PlanReviewFacts, type PlanReviewStap } from './types'
+import { EFFECT_BEDRAG_AFRONDING, PLAN_REVIEW_STAP_TITELS, type PlanReviewFacts, type PlanReviewStap } from './types'
 
 // ── Contract naar de pane ────────────────────────────────────────────────────
 
@@ -154,8 +154,8 @@ type Uitkomst = Pick<RegelProjection, 'fireAgeFractional' | 'reach' | 'eindeLiqu
 
 const ONBEKEND = 'nog niet te bepalen'
 
-/** Bedragen in de vergelijking afgerond op duizenden: een weergavekeuze, geen aanname. */
-const BEDRAG_AFRONDING = 1000
+// Bedragen in de vergelijking afgerond op duizenden (`EFFECT_BEDRAG_AFRONDING`, gedeeld met de
+// live footer): een weergavekeuze, geen aanname.
 
 function isVastAnker(plan: FirePlan): boolean {
   return plan.anchor.kind !== 'solved'
@@ -229,7 +229,7 @@ function bedragOverFrase(u: Uitkomst): string | null {
   if (reach?.kind !== 'gedekt' || !u.eindeLiquide) return null
   // Precies één keer deflateren, met de kernel-factor van dezelfde eindrij (ADR 0090).
   const vandaag = deflate(u.eindeLiquide.nominaal, u.eindeLiquide.inflationFactor, 'real')
-  const bedrag = formatCurrency(Math.round(vandaag / BEDRAG_AFRONDING) * BEDRAG_AFRONDING)
+  const bedrag = formatCurrency(Math.round(vandaag / EFFECT_BEDRAG_AFRONDING) * EFFECT_BEDRAG_AFRONDING)
   // Label = de leeftijd van DEZELFDE rij als het bedrag (de laatste weergaverij, eindleeftijd
   // − 1), niet de eindleeftijd zelf: onder "opmaken" is die per constructie ≈ € 0.
   return `${bedrag} liquide vermogen over in het laatste jaar van je plan (je ${leeftijdJaar(u.eindeLiquide.leeftijd)}e), in euro's van vandaag`
@@ -281,7 +281,7 @@ function uitkomstSleutel(u: Uitkomst | null, maat: EffectMaat): number | null {
   if (maat.kind === 'over-aan-einde') {
     if (r?.kind !== 'gedekt' || !u.eindeLiquide) return null
     const vandaag = deflate(u.eindeLiquide.nominaal, u.eindeLiquide.inflationFactor, 'real')
-    return Math.round(vandaag / BEDRAG_AFRONDING) * BEDRAG_AFRONDING
+    return Math.round(vandaag / EFFECT_BEDRAG_AFRONDING) * EFFECT_BEDRAG_AFRONDING
   }
   if (!r) return null
   if (r.kind === 'reikt-tot') return leeftijdJaar(r.age)

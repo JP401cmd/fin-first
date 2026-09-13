@@ -3,7 +3,7 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import type { RegelEditActionsState } from '@/components/future/regels/types'
-import { FireDeltaFooter, fireDeltaMonths } from '@/components/future/regels/shared'
+import { FireDeltaFooter, fireFooterSleutel } from '@/components/future/regels/shared'
 import { runRegelProjection, type RegelSimSnapshot } from '@/lib/future/regel-sim'
 import { bandPct } from '@/lib/parameters-band'
 
@@ -144,7 +144,7 @@ export function VoorkeurBewerkenBody({
         : null,
     [snapshot, column, deferredPct, deferredChanged, min, max],
   )
-  const deltaMonths = baseline && draftProj ? fireDeltaMonths(baseline, draftProj) : null
+  const footerSleutel = baseline && draftProj ? fireFooterSleutel(baseline, draftProj) : null
 
   async function handleSubmit(e?: React.FormEvent) {
     e?.preventDefault()
@@ -205,9 +205,9 @@ export function VoorkeurBewerkenBody({
       // Zonder wijziging geen effect (er verandert niets); zonder snapshot geen live effect.
       footerInfo: changed && baseline && draftProj ? <FireDeltaFooter baseline={baseline} draft={draftProj} /> : undefined,
     })
-    // baseline/draftProj zijn useMemo-stabiel; deltaMonths bewaakt republish.
+    // baseline/draftProj zijn useMemo-stabiel; footerSleutel bewaakt republish.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onActionsChange, saving, invoerFout, changed, deltaMonths])
+  }, [onActionsChange, saving, invoerFout, changed, footerSleutel])
 
   const Kop = kop
   const foutId = `voorkeur-${column}-fout`

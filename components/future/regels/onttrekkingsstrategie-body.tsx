@@ -12,7 +12,7 @@ import {
   RegelOptionCard,
   LiveSimImpact,
   FireDeltaFooter,
-  fireDeltaMonths,
+  fireFooterSleutel,
 } from './shared'
 import type { RegelBodyProps } from './types'
 
@@ -394,7 +394,7 @@ export function OnttrekkingsstrategieBody({
     onSaved,
   ])
 
-  const deltaMonths = fireDeltaMonths(baseline, draftProj)
+  const footerSleutel = fireFooterSleutel(baseline, draftProj)
   useEffect(() => {
     onActionsChange({
       canSave,
@@ -405,7 +405,7 @@ export function OnttrekkingsstrategieBody({
       changed,
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onActionsChange, canSave, saving, deltaMonths, changed])
+  }, [onActionsChange, canSave, saving, footerSleutel, changed])
 
   return (
     <div

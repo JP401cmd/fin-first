@@ -24,7 +24,7 @@ import {
   type RegelSimSnapshot,
 } from '@/lib/future/regel-sim'
 import type { StrategieBody } from '@/lib/life-events/strategie-write'
-import { FireDeltaFooter, fireDeltaMonths } from '@/components/future/regels/shared'
+import { FireDeltaFooter, fireFooterSleutel } from '@/components/future/regels/shared'
 
 export type StrategieImpactBron =
   | { kind: 'preview'; baseline: PreviewBaseline | null; allEvents: LifeEvent[] }
@@ -42,7 +42,7 @@ export interface StrategieImpact {
   /** Voor de footer van de host (alleen `kern`). */
   footerInfo?: ReactNode
   /** Verandert wanneer de footer-info verandert; voor het publiceer-effect. */
-  footerKey: number | null
+  footerKey: string | null
 }
 
 /**
@@ -90,7 +90,7 @@ export function useStrategieImpact(
     draftAge: kernConcept?.fireAgeFractional ?? null,
     inline: false,
     footerInfo: kernBasis && kernConcept ? <FireDeltaFooter baseline={kernBasis} draft={kernConcept} /> : undefined,
-    footerKey: kernBasis && kernConcept ? fireDeltaMonths(kernBasis, kernConcept) : null,
+    footerKey: kernBasis && kernConcept ? fireFooterSleutel(kernBasis, kernConcept) : null,
   }
 }
 

@@ -19,7 +19,7 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type ComponentType } from 'react'
 import { VoorkeurBewerkenBody, VOORKEUR_UITLEG } from '@/components/future/voorkeur-bewerken-body'
 import { Box3MethodeBody } from '@/components/future/box3-methode-body'
-import { FireDeltaFooter, fireDeltaMonths } from '@/components/future/regels/shared'
+import { FireDeltaFooter, fireFooterSleutel } from '@/components/future/regels/shared'
 import type { RegelEditActionsState } from '@/components/future/regels/types'
 import { runRegelProjection, type RegelSimSnapshot } from '@/lib/future/regel-sim'
 import { BOX3_METHOD_LABELS } from '@/lib/box3-method'
@@ -252,7 +252,7 @@ function BezittingRendementBody({
         : null,
     [snapshot, deferredChanged, bezit.id, bezit.asset_type, deferredPct],
   )
-  const deltaMonths = baseline && draftProj ? fireDeltaMonths(baseline, draftProj) : null
+  const footerSleutel = baseline && draftProj ? fireFooterSleutel(baseline, draftProj) : null
 
   const saveRef = useRef(async () => {})
   useEffect(() => {
@@ -289,9 +289,9 @@ function BezittingRendementBody({
       changed,
       footerInfo: changed && baseline && draftProj ? <FireDeltaFooter baseline={baseline} draft={draftProj} /> : undefined,
     })
-    // baseline/draftProj zijn useMemo-stabiel; deltaMonths bewaakt republish.
+    // baseline/draftProj zijn useMemo-stabiel; footerSleutel bewaakt republish.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onActionsChange, canSave, saving, changed, deltaMonths])
+  }, [onActionsChange, canSave, saving, changed, footerSleutel])
 
   if (bezit.afschrijvend) {
     return (
