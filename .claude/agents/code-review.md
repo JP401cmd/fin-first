@@ -148,6 +148,7 @@ Structure your review as follows:
 - Prioritize issues that have the highest impact
 - Never approve code that has critical or high-priority issues
 - If the code is excellent, say so - but still look for any possible improvements
+- **Toets `changed`/dirty-afleidingen tegen wat er écht opgeslagen staat.** Leidt een formulier of editor-body af of er iets gewijzigd is (knop "Opslaan" vs. "Bevestigen", een footer-effect, een dirty-guard, Enter-submit), controleer dan waartegen vergeleken wordt: de opgeslagen rij, niet een onboarding-default, een resolver-fallback of een geshadowde jaarlaag-waarde. Loop minstens na: kolom NULL met een getoonde default (telt die als wijziging, schrijft Enter hem stil vast?), float-ruis (`0.07 * 100`), en "leeg = standaard" tegenover een ingevulde waarde. Precedent: TPR-15 laag 2, review M1 (14 sep 2026).
 
 ## Standards Alignment
 
