@@ -81,8 +81,8 @@ export function OnttrekkingsvolgordeBody({
       </div>
 
       <p className="mt-5 text-[11px] text-[var(--ink-3)] italic leading-snug">
-        Cash eerst leegtrekken geeft maximale liquiditeit, maar je laat rendement liggen.
-        Beleggingen eerst is fiscaal vaak gunstiger (Box 3) maar vergroot je sequence-risk in
+        Cash eerst: je beleggingen blijven langer staan en je houdt minder liquide geld over.
+        Beleggingen eerst: je spaargeld blijft als buffer staan, maar je verkoopt dan ook in
         slechte beursjaren. Je keuze wordt opgeslagen en hierboven illustratief getoond op je
         huidige potten; de volledige doorrekening in de tijdas-grafiek volgt later.
       </p>

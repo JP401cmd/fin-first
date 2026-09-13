@@ -117,7 +117,7 @@ const PROFIEL_INFO: Record<WithdrawalProfiel, ProfielInfo> = {
   },
   guardrails: {
     label: 'Guardrails',
-    description: 'Dynamische bandbreedte: verlaagt je opname na een slecht beursjaar, verhoogt na een goed jaar. Robuust tegen sequence-risk.',
+    description: 'Dynamische bandbreedte: verlaagt je opname na een slecht beursjaar en verhoogt die na een goed jaar; je jaarbudget beweegt mee.',
     color: '#3b82f6',
     cardBg: 'bg-blue-50',
     cardBorder: 'border-blue-300',

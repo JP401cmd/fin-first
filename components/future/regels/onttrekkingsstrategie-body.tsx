@@ -28,7 +28,7 @@ const EMPTY_PROJ: RegelProjection = { rows: [], fireAgeFractional: null }
  * curve rechtstreeks; de enum-kolom opruimen vergt nog een DB-migratie.
  * vpw/bucket zijn geen keuze meer (bestaande waarden tonen 'Vast').
  */
-const PROFIEL_INFO: Record<WithdrawalProfiel, { label: string; description: string }> = {
+export const PROFIEL_INFO: Record<WithdrawalProfiel, { label: string; description: string }> = {
   vast: {
     label: 'Vast',
     description:
@@ -47,7 +47,7 @@ const PROFIEL_INFO: Record<WithdrawalProfiel, { label: string; description: stri
   guardrails: {
     label: 'Guardrails',
     description:
-      'Dynamische bandbreedte: verlaagt je opname na een slecht beursjaar, verhoogt na een goed jaar. Robuust tegen sequence-risk.',
+      'Dynamische bandbreedte: verlaagt je opname na een slecht beursjaar en verhoogt die na een goed jaar; je jaarbudget beweegt mee.',
   },
 }
 

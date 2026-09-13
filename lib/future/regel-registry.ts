@@ -48,8 +48,8 @@ export const REGEL_META: Record<RegelId, RegelMeta> = {
     kicker: 'Regel · hele tijdas',
     intro:
       'Hoeveel haal je elk jaar uit je vermogen tijdens je vrije jaren? Een vast bedrag, ' +
-      'of dynamisch meebewegend met de markt? Dynamische strategieën beschermen je tegen slechte beursjaren, ' +
-      'maar maken je jaarlijkse budget minder voorspelbaar.',
+      'of dynamisch meebewegend met de markt? Een dynamische strategie haalt na slechte beursjaren minder uit je ' +
+      'vermogen en na goede jaren meer; je jaarlijkse budget beweegt dan mee en is minder voorspelbaar.',
     impactKind: 'live-sim',
   },
   onttrekkingsvolgorde: {
@@ -67,7 +67,7 @@ export const REGEL_META: Record<RegelId, RegelMeta> = {
     kicker: 'Regel · potten',
     intro:
       'Waar gaat extra geld heen — een maandelijks overschot, een bonus of een erfenis? Naar je ' +
-      'lange-termijn portfolio (meer rendement), je cash-buffer (meer rust), of het aflossen van schulden.',
+      'beleggingen, je spaargeld of het aflossen van schulden. Waar het heen gaat, bepaalt met welk rendement of welke rente het verder telt.',
     impactKind: 'illustratief',
   },
   'onttrekking-afname': {
@@ -76,7 +76,7 @@ export const REGEL_META: Record<RegelId, RegelMeta> = {
     kicker: 'Regel · potten',
     intro:
       'Waar haal je geld vandaan bij een grote eenmalige uitgave of een tegenvaller? Eerst uit de ' +
-      'liquide pot (beschermt je beleggingen) of proportioneel uit alles (houdt je verdeling in balans).',
+      'liquide pot (je beleggingen blijven dan staan) of naar verhouding uit alles (je verdeling blijft gelijk).',
     impactKind: 'illustratief',
   },
 }

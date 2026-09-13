@@ -31,7 +31,7 @@ const WERK = 'werk'
 const NIEUWE_POT = 'nieuwe-pot'
 
 /** Keuze · effect · waarom per onderdeel (norm formulier-uitleg). */
-const UITLEG: Record<typeof AOW | typeof WERK | 'pensioen', string> = {
+export const INKOMSTEN_UITLEG: Record<typeof AOW | typeof WERK | 'pensioen', string> = {
   aow:
     'Je AOW hangt af van je leefsituatie en van de jaren dat je tussen je 15e en je AOW-leeftijd buiten Nederland woonde. ' +
     'Wat de AOW uitkeert, hoeft je eigen vermogen vanaf je AOW-leeftijd niet op te brengen.',
@@ -96,7 +96,7 @@ export function InkomstenEditor({ context, onActionsChange, onSaved }: PlanRevie
     { key: NIEUWE_POT, label: 'Nieuwe pensioenpot' },
   ]
   const pot = inkomsten.pensioenen.find((p) => p.id === actief) ?? null
-  const uitleg = actief === AOW ? UITLEG.aow : actief === WERK ? UITLEG.werk : UITLEG.pensioen
+  const uitleg = actief === AOW ? INKOMSTEN_UITLEG.aow : actief === WERK ? INKOMSTEN_UITLEG.werk : INKOMSTEN_UITLEG.pensioen
 
   return (
     <div className="space-y-4">

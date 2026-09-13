@@ -197,7 +197,7 @@ export function Box3OptimizerClient({
           column="expected_return"
           currentValuePct={expectedReturn * 100}
           stepPct={0.1}
-          helperText="Dezelfde aanname voedt je projectie op Toekomst: pas je 'm hier aan, dan verschuift daar ook je FIRE-datum en je vrijheidstijd. Wereldwijde aandelen-historie: ~6-8%. Conservatief: 4-5%."
+          helperText="Dezelfde aanname voedt je projectie op Toekomst: pas je 'm hier aan, dan verschuift daar ook je FIRE-datum en je vrijheidstijd. Ter referentie: wereldwijde aandelen deden historisch zo'n 6 tot 8% per jaar; een lagere aanname geeft een later vrijheidsmoment."
           secondaryLink={{
             href: RENDEMENT_INSTELLING_HREF,
             label: 'Beheer al je aannames op Toekomst › Voorkeuren',

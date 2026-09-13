@@ -84,7 +84,7 @@ export function OnttrekkingAfnameBody({
       </div>
 
       <p className="mt-5 text-[11px] text-[var(--ink-3)] italic leading-snug">
-        Eerst uit de liquide pot halen beschermt je beleggingen tegen verkopen op een dieptepunt.
+        Eerst uit de liquide pot halen: je beleggingen blijven dan staan, ook als de koersen net laag zijn.
         We leggen je keuze vast en tonen hem hierboven op je huidige potten; de volledige
         doorrekening volgt later.
       </p>

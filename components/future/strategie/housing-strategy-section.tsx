@@ -33,23 +33,29 @@ interface HousingStrategyContext {
   estimated_equity: number
 }
 
-const MODE_META: Record<
+/**
+ * Kopij per woonstrategie — beschrijft wat de kern doet, zonder oordeel of rangorde (Wft,
+ * compliance-check TPR-15 14 sep 2026: "onrealistisch" en "past bij internationale standaard"
+ * waren waardeoordelen over een woonkeuze). Geëxporteerd voor de A8-toets in
+ * `lib/plan-review/overzicht.test.ts`: deze sectie rendert ook in de plan-review.
+ */
+export const WOONSTRATEGIE_MODE_META: Record<
   HousingStrategyMode,
   { label: string; description: string; Icon: typeof Home; tag: string }
 > = {
   include_full: {
     label: 'Volledig meetellen',
     description:
-      'Je eigen woning telt 100% mee in de vrijheidsberekening. Eenvoudig, maar onrealistisch: het geld is niet liquide.',
+      'Je eigen woning telt 100% mee in de vrijheidsberekening, alsof de waarde vrij te besteden is. Het huis zelf is niet liquide: om van de waarde te leven moet je verkopen of verzilveren.',
     Icon: Home,
-    tag: 'Huidig gedrag',
+    tag: 'Telt mee',
   },
   exclude_from_fire: {
     label: 'Uitsluiten',
     description:
-      'Eigen woning blijft buiten de vrijheidspot. Conservatief — past bij internationale standaard. Je blijft wonen, kosten ongewijzigd.',
+      'Je eigen woning blijft buiten de vrijheidspot. Je blijft wonen en je woonlasten lopen door; de waarde van het huis telt niet mee om van te leven.',
     Icon: Sprout,
-    tag: 'Internationale standaard',
+    tag: 'Telt niet mee',
   },
   downsize: {
     label: 'Verkopen',
@@ -268,7 +274,7 @@ export function HousingStrategySection({
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {MODES.map((mode) => {
-          const meta = MODE_META[mode]
+          const meta = WOONSTRATEGIE_MODE_META[mode]
           const isSelected = config.mode === mode
           return (
             <button

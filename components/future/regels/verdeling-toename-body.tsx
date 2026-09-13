@@ -13,11 +13,13 @@ const EMPTY_BALANCES: Record<WealthGroup, number> = {
   spaargeld: 0, beleggingen: 0, pensioen: 0, vastgoed: 0, overig: 0,
 }
 
-const SURPLUS_OPTIONS: { value: SurplusGroup; title: string; description: string }[] = [
-  { value: 'beleggingen', title: 'Naar beleggingen', description: 'Lange-termijn groei — meer rendement, hoger risico op korte termijn.' },
-  { value: 'spaargeld', title: 'Naar spaargeld', description: 'Bouwt je liquide buffer op. Veilig en direct beschikbaar, maar laat rendement liggen.' },
-  { value: 'schuld_aflossen', title: 'Schulden aflossen', description: 'Eerst je schulden verlagen — een gegarandeerd rendement gelijk aan je rente.' },
-  { value: 'pensioen', title: 'Naar pensioen', description: 'Fiscaal vriendelijk opbouwen voor later.' },
+export const SURPLUS_OPTIONS: { value: SurplusGroup; title: string; description: string }[] = [
+  // Beschrijvend, zonder oordeel of belofte (Wft; compliance-check TPR-15 14 sep 2026 verving
+  // o.a. "gegarandeerd rendement", "veilig" en "fiscaal vriendelijk").
+  { value: 'beleggingen', title: 'Naar beleggingen', description: 'Het overschot gaat naar je beleggingen en groeit mee met hun rendement, dat van jaar tot jaar kan schommelen.' },
+  { value: 'spaargeld', title: 'Naar spaargeld', description: 'Het overschot gaat naar je spaargeld: direct opneembaar, en het groeit mee met de spaarrente.' },
+  { value: 'schuld_aflossen', title: 'Schulden aflossen', description: 'Het overschot lost eerst schulden af. Elke afgeloste euro scheelt de rente over die schuld.' },
+  { value: 'pensioen', title: 'Naar pensioen', description: 'Het overschot gaat naar je pensioenpot, die pas vanaf de ingangsleeftijd uitkeert.' },
   { value: 'vastgoed', title: 'Naar vastgoed', description: 'Aflossen op of uitbreiden van vastgoed.' },
   { value: 'overig', title: 'Naar overig', description: 'Crypto, voertuigen en andere bezittingen.' },
 ]
@@ -93,8 +95,8 @@ export function VerdelingToenameBody({
       />
 
       <p className="mt-5 text-[11px] text-[var(--ink-3)] italic leading-snug">
-        Naar beleggingen maximaliseert je groei op lange termijn. Een cash-buffer geeft rust en
-        flexibiliteit. Schulden aflossen levert een gegarandeerd rendement op. We leggen deze
+        Naar beleggingen: het overschot groeit mee met een rendement dat schommelt. Naar spaargeld:
+        het blijft direct opneembaar. Schulden aflossen: je betaalt minder rente. We leggen deze
         verdeel-voorkeur vast voor je vermogensopbouw.
       </p>
     </div>
