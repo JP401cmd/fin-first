@@ -12,7 +12,9 @@
       "Bash(git check-ignore *)",
       "Bash(echo \"exit=$?\")",
       "mcp__notion__notion-create-pages",
-      "Bash(git rev-list *)"
+      "Bash(git rev-list *)",
+      "Skill(update-config)",
+      "Skill(update-config:*)"
     ]
   }
 }
