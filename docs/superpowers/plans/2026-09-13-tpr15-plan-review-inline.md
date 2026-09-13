@@ -49,7 +49,9 @@ De kaart zette "alle body-extracties" als losse eerste fase. Twee bodies bestaan
 - [x] 3 — pure move AOW/werk/pot-bodies + `lib/pension/pot-draft.ts` — 62399cf81
 - [x] 3 — `PUT/DELETE /api/life-events/strategie` (+ security-specialist: geen blokkade; 🟢 fail-closed/tiebreaker/assert/foutteksten verwerkt), beide hosts schrijven via de route, `InkomstenEditor` (AOW pas bij opslaan, werk, pot per id/nieuw), override `lifeEvent`, eigen rijen via `loadEigenStrategieEvents` (voortgang, stap 3, editor-context), vergelijking stap 3, `aowGeschreven` in de pane — 310f38ce3 (incl. reviewfixes M1–M4, L6–L10)
 - [x] Visuele check 13 sep (jochen@/Tessa): stap 3 vergelijking trede 3 (€1,115M / zonder AOW €823k / zonder pensioen €790k), bewerkstand AOW/Werk/pot/nieuwe pot, wijziging → "Opslaan en bevestigen"; modal op /toekomst/gebeurtenissen ongewijzigd; niets opgeslagen
-- [ ] L2 — inflatie, terugvalrendement, Box 3, rendement per bezitting inline; RegelSimOverride uitbreiden; `/api/parameters`-retry
+- [x] L2 — pure move `VoorkeurBewerkenBody` + `Box3MethodeBody` — 6a0ea94be
+- [x] L2 — afsluitscherm "Voor wie wil" als host (vier onderdelen, pill in de stappenbalk, geen markering), `PATCH /api/assets/[id]/expected-return` (+ security-specialist: geen blokkade; 🟢 teller over eigen rijen verwerkt), `RegelSimOverride.parameters`/`assetExpectedReturns`, editor-context `laag2`, `/api/parameters`-retry alleen bij ontbrekende kolom, register — c7bd25316 (incl. reviewfixes M1–M3 + L's)
+- [x] Visuele check 14 sep (jochen@/Tessa): lijst met waarden (2,0% · 7,0% · Forfaitair · 16 bezittingen), inflatie- en bezitting-bewerkstand, validatie houdt Opslaan dicht, footer; niets opgeslagen
 - [ ] Slot — meebeweeg-check laag c, ADR 0142-aanvulling, CLAUDE.md-regel, register.ts `partner`, UAT WF-TOEK-44, will-tests `toBe(30)`, uat-plan.md:6432, compliance-check nieuwe kopij, arch:diagram, parity-rebaseline, merkstem:scan
 
 ## Restpunten uit review/visuele check (nog open)
@@ -74,3 +76,12 @@ De kaart zette "alle body-extracties" als losse eerste fase. Twee bodies bestaan
 - `strategie-impact.tsx` draait de basis-run opnieuw per onderdeelwissel (perf, L11); de body-foutbanners zijn amber, de pane-meldingen `text-negative`.
 - Wft/compliance-check: nieuwe kopij stap 3 (UITLEG in `inkomsten-editor.tsx`, vergelijkingslabels, beperkingstekst) meenemen in de slot-compliance-check.
 - `lib/pension/apply-parse-result.ts` r.7 verwijst nog naar de oude plek van `eventFromPot`/`potFromEvent`.
+
+### Restpunten laag 2 (c7bd25316)
+- Het terugvalrendement (`profiles.expected_return`) verandert het plan van echte gebruikers nu niet: `assets.expected_return` is NOT NULL, dus de kern valt nooit terug. De wizard zegt dat eerlijk. Wordt pas betekenisvol met TPR-02 fase 2 (kolom nullable = schemawijziging); dan telt `zonderEigenRendement` al over eigen rijen.
+- De Voorkeuren-sheet en de optimizer-chip tonen nu óók live validatie per veld en de nieuwe inflatie-uitleg (de oude noemde 2,5% terwijl de app met 2% rekent) — bewuste verbetering, geen identiek gedrag meer; de pure move zelf (6a0ea94be) was wel identiek.
+- Footer toont bij trede 3 (Tessa) ook hier "Geen verschil in vrijheidsdatum" — het bestaande footer-restpunt.
+- Pill "Voor wie wil" is `min-h-[32px]`, gelijk aan de stap-pills (allemaal onder 44px) — samen oplossen of accepteren.
+- `onOngewijzigd` alleen in de wizard: de sheet op /toekomst/voorkeuren schrijft bij Enter zonder wijziging nog steeds een (mogelijk uit de jaarlaag ingevulde) waarde vast — bestaand gedrag.
+- Geen deeplink `stap=` naar het afsluitscherm (bewust; bereikbaar via de pill).
+- Compliance-check slotfase: VOORKEUR_UITLEG (inflatie, bruto rendement), de bezitting-uitleg in `laag2-editors.tsx`, de bruto-rendement-notitie, en de optimizer-helptekst "Conservatief: 4-5%" (`optimizer-client.tsx`).
