@@ -200,3 +200,12 @@ describe('ASSET_CLIENT_COLUMNS — kolomcontract voor client-lezingen op `assets
     expect(ASSET_CLIENT_COLUMNS).toBe(ASSET_CLIENT_COLUMN_LIST.join(', '))
   })
 })
+
+describe('SALE_CONFIG_ASSET_TYPES — typen met een verkoopinstelling (TPR-15)', () => {
+  it('is precies het niet-liquide bezit zonder het eigen huis (spiegel van de kern-liquidatieset)', async () => {
+    const { SALE_CONFIG_ASSET_TYPES } = await import('./asset-data')
+    const { NIET_LIQUIDE_ASSET_TYPES } = await import('./plan-review/niet-liquide')
+    const verwacht = [...NIET_LIQUIDE_ASSET_TYPES].filter((t) => t !== 'eigen_huis').sort()
+    expect([...SALE_CONFIG_ASSET_TYPES].sort()).toEqual(verwacht)
+  })
+})

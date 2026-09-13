@@ -10,7 +10,12 @@ vi.mock('next/navigation', () => ({
 
 // TPR-15 — een neppe editor voor stap 1, zodat de pane-test niet op de echte body (en
 // de kernel) leunt. Hij publiceert het host-contract en schrijft via een domeinroute.
-const nep = vi.hoisted(() => ({ changed: true, saving: false, onSaved: null as null | (() => void) }))
+const nep = vi.hoisted(() => ({
+  changed: true,
+  saving: false,
+  onSaved: null as null | (() => void),
+  woonstrategieGeschreven: false,
+}))
 vi.mock('./editors', async () => {
   const React = await import('react')
   function NepPlanEditor(props: {
@@ -33,8 +38,24 @@ vi.mock('./editors', async () => {
     }, [onActionsChange, onSaved])
     return React.createElement('p', null, `Editor met eindleeftijd ${props.context.firePlan?.endAge}`)
   }
+  // Stap 4: meldt bij opslaan of de woonstrategie geschreven werd (verkoopinstelling = nee).
+  function NepWoningEditor(props: {
+    onActionsChange: (s: { canSave: boolean; saving: boolean; save: () => void; changed?: boolean }) => void
+    onSaved: (info?: { woonstrategieGeschreven?: boolean }) => void
+  }) {
+    const { onActionsChange, onSaved } = props
+    React.useEffect(() => {
+      onActionsChange({
+        canSave: true,
+        saving: false,
+        changed: true,
+        save: () => onSaved({ woonstrategieGeschreven: nep.woonstrategieGeschreven }),
+      })
+    }, [onActionsChange, onSaved])
+    return React.createElement('p', null, 'Woning-editor')
+  }
   return {
-    PLAN_REVIEW_EDITORS: { plan: NepPlanEditor, uitgaven: null, inkomsten: null, woning: null, potten: null },
+    PLAN_REVIEW_EDITORS: { plan: NepPlanEditor, uitgaven: null, inkomsten: null, woning: NepWoningEditor, potten: null },
   }
 })
 
@@ -89,12 +110,17 @@ function overzicht(stap: PlanReviewStap): PlanReviewStapOverzicht {
 }
 
 let calls: Array<{ url: string; method: string; body: unknown }>
+let facts: PlanReviewFacts = FACTS
+let hangGetVoor: PlanReviewStap | null = null
 let failDomain = false
 let failEditorContext = false
 let failMarkering = false
 
 beforeEach(() => {
   calls = []
+  facts = FACTS
+  hangGetVoor = null
+  nep.woonstrategieGeschreven = false
   failDomain = false
   failEditorContext = false
   nep.changed = true
@@ -115,7 +141,10 @@ beforeEach(() => {
       }
       if (method === 'GET') {
         const stap = new URL(url, 'http://x').searchParams.get('stap') as PlanReviewStap
-        return new Response(JSON.stringify({ overzicht: overzicht(stap), progress: progress([]), facts: FACTS }))
+        // Stap-4-tests: de volgende lezing blijft hangen, zodat de lokaal afgeleide voortgang
+        // niet door het (vaste) antwoord van de mock wordt overschreven.
+        if (hangGetVoor === stap) return new Promise<Response>(() => {})
+        return new Response(JSON.stringify({ overzicht: overzicht(stap), progress: progress([]), facts }))
       }
       if (url === '/api/fire-settings') {
         return failDomain
@@ -124,8 +153,9 @@ beforeEach(() => {
       }
       if (url === '/api/plan-review') {
         if (failMarkering) return new Response(JSON.stringify({ error: 'Markering mislukt' }), { status: 500 })
+        const stap = (body as { stap: string }).stap
         return new Response(
-          JSON.stringify({ ok: true, plan_review_state: { plan: { bevestigd_op: '2026-09-13T10:00:00.000Z', bron: 'review' } } }),
+          JSON.stringify({ ok: true, plan_review_state: { [stap]: { bevestigd_op: '2026-09-13T10:00:00.000Z', bron: 'review' } } }),
         )
       }
       return new Response('{}', { status: 404 })
@@ -296,6 +326,46 @@ describe('PlanReviewPane — bewerkstand (TPR-15)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Plan aanpassen' }))
     await screen.findByText('Editor met eindleeftijd 90')
     expect(calls.filter((c) => c.url === '/api/plan-review/editor-context')).toHaveLength(2)
+  })
+})
+
+describe('PlanReviewPane — stap 4 inline (TPR-15)', () => {
+  // Eigen huis zonder woonstrategie: de stap blijft open tot er een woonstrategie is (A10).
+  const MET_HUIS: PlanReviewFacts = { hasAowEvent: true, hasEigenHuis: true, hasNietLiquideBezit: true, housingConfigured: false }
+
+  async function slaWoningOp() {
+    facts = MET_HUIS
+    // De herlezing na de save blijft hangen, zodat de lokaal afgeleide voortgang niet door
+    // het (vaste) antwoord van de mock wordt overschreven.
+    hangGetVoor = 'potten'
+    renderPane('woning')
+    await screen.findByText('De app rekent nu met woning.')
+    fireEvent.click(screen.getByRole('button', { name: 'Plan aanpassen' }))
+    await screen.findByText('Woning-editor')
+    const knop = () => screen.getAllByRole('button', { name: 'Opslaan en bevestigen' })[0]
+    await waitFor(() => expect(knop()).toBeEnabled())
+    fireEvent.click(knop())
+  }
+
+  it('een verkoopinstelling zonder woonstrategie: markering gezet, maar de wizard blijft in de stap en zegt waarom (review M1)', async () => {
+    nep.woonstrategieGeschreven = false
+    await slaWoningOp()
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Je instelling is opgeslagen. Deze stap blijft open tot er een woonstrategie voor je huis is opgeslagen.',
+    )
+    expect(calls.find((c) => c.url === '/api/plan-review' && c.method === 'PUT')?.body).toEqual({ stap: 'woning', bevestigd: true })
+    // Terug in het overzicht van stap 4, niet door naar stap 5.
+    expect(await screen.findByText('De app rekent nu met woning.')).toBeInTheDocument()
+    expect(screen.queryByText('Woning-editor')).not.toBeInTheDocument()
+    expect(calls.some((c) => c.url === '/api/plan-review?stap=potten')).toBe(false)
+  })
+
+  it('de woonstrategie opslaan telt de woning lokaal als ingesteld en gaat door', async () => {
+    nep.woonstrategieGeschreven = true
+    await slaWoningOp()
+    await screen.findByText('De app rekent deze stap door…')
+    expect(screen.getByRole('button', { name: /4\. .*\(bevestigd\)/ })).toBeInTheDocument()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
 })
 

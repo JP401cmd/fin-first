@@ -7,7 +7,9 @@ import { buildClientRegelSimSnapshot } from '@/lib/future/regel-sim-snapshot'
 import { buildPotBalances } from '@/lib/future/pot-balances'
 import { loadHorizonRaw } from '@/lib/horizon/raw-data-loader'
 import { resolvePotRules } from '@/lib/pot-rules'
-import type { PlanReviewEditorContext } from '@/lib/plan-review/editor-context'
+import { SALE_CONFIG_ASSET_TYPES } from '@/lib/asset-data'
+import { getHouseholdIdForUser, selectAflosbareSchulden } from '@/lib/sale-config-debts'
+import type { PlanReviewEditorContext, PlanReviewVastBezit, PlanReviewWoningContext } from '@/lib/plan-review/editor-context'
 
 /**
  * GET /api/plan-review/editor-context — wat de inline editors van de plan-review nodig
@@ -22,9 +24,55 @@ import type { PlanReviewEditorContext } from '@/lib/plan-review/editor-context'
  * partnerblok en zonder `*_encrypted`/`*_hash`. De editor-baseline is zo per constructie de
  * getoonde curve (consume, don't recompute).
  *
+ * Stap 4 leest het vaste bezit met een EXPLICIETE kolomlijst en een expliciete
+ * `.eq('user_id', …)`: de SELECT-policy op `assets` is huishoud-gedeeld, en de schrijfroute
+ * (`PATCH /api/assets/[id]/sale-config`) wijzigt alleen eigen rijen. Een rij van de partner
+ * hier tonen zou een instelling aanbieden die niet op te slaan is. De schulden voor
+ * "Aflossen bij verkoop" volgen de regel van het formulier (eigen + gedeeld in het
+ * huishouden), met de scope expliciet in de query (`lib/sale-config-debts.ts`).
+ *
  * `snapshot: null` = er is geen run (geen geboortedatum of vermogen) — de editors tonen dan
  * geen live effect, opslaan blijft mogelijk.
  */
+
+const VAST_BEZIT_KOLOMMEN = 'id, name, asset_type, current_value, sale_config'
+
+async function loadWoning(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  raw: Awaited<ReturnType<typeof loadHorizonRaw>>,
+): Promise<PlanReviewWoningContext> {
+  // Zonder leesbaar huishouden: alleen eigen schulden in de lijst (fail-closed). Eerder
+  // opgeslagen gedeelde id's blijven in het concept staan; de schrijfroute toetst ze zelf.
+  const householdId = await getHouseholdIdForUser(supabase, userId).catch((err: unknown) => {
+    console.error('[plan-review:editor-context:household]', err)
+    return null
+  })
+  const [bezit, schulden] = await Promise.all([
+    supabase
+      .from('assets')
+      .select(VAST_BEZIT_KOLOMMEN)
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .in('asset_type', [...SALE_CONFIG_ASSET_TYPES])
+      .order('name', { ascending: true }),
+    // Dezelfde set als het formulier en de schrijfroute: eigen + gedeeld in het huishouden.
+    selectAflosbareSchulden(supabase, userId, householdId).eq('is_active', true).order('name', { ascending: true }),
+  ])
+  if (bezit.error) throw bezit.error
+  if (schulden.error) throw schulden.error
+  const housing = (raw.rawProfile as { housing_strategy_config?: unknown } | null)?.housing_strategy_config
+  return {
+    // Hetzelfde feit als `derivePlanReviewFacts` (progress.ts): een actieve eigen woning.
+    heeftEigenHuis: raw.assets.some((a) => a.asset_type === 'eigen_huis' && a.is_active !== false),
+    woonstrategieIngesteld: housing != null && typeof housing === 'object',
+    vastBezit: ((bezit.data ?? []) as PlanReviewVastBezit[]).map((a) => ({
+      ...a,
+      current_value: Number(a.current_value) || 0,
+    })),
+    schulden: (schulden.data ?? []) as { id: string; name: string }[],
+  }
+}
 
 export async function GET() {
   try {
@@ -40,6 +88,12 @@ export async function GET() {
       // buildPotBalances op de bundelrijen): één bron voor Voorkeuren en wizard.
       potRules: resolvePotRules((raw.rawProfile ?? {}) as { pot_rules?: unknown }),
       potBalances: buildPotBalances(raw.assets, raw.unlinkedCash),
+      // Een fout in stap 4 mag de editors van de andere stappen niet meenemen: `woning: null`
+      // en de woning-editor zegt dat zijn gegevens niet geladen konden worden.
+      woning: await loadWoning(supabase, user.id, raw).catch((err: unknown) => {
+        console.error('[plan-review:editor-context:woning]', err)
+        return null
+      }),
     }
     return NextResponse.json(body)
   } catch (err) {

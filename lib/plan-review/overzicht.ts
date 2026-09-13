@@ -668,12 +668,15 @@ function stapWoning(b: PlanReviewBronnen): PlanReviewStapOverzicht {
     keuzeVerplicht: heeftHuis && huidig == null,
     schrijf: huidig ? [{ url: '/api/housing-strategy', body: { config: huidig } }] : [],
     blokkade: null,
+    // TPR-15 — de eerste regel is ook het label van de inline bewerkstand (stap 4 heeft een editor).
     aanpassen: [
-      ...(heeftHuis ? [{ href: '/toekomst/gebeurtenissen?strategie=huis', label: 'Woonstrategie in detail' }] : []),
-      { href: '/overzicht/bezittingen', label: 'Bezittingen bekijken' },
+      ...(heeftHuis
+        ? [{ href: '/toekomst/gebeurtenissen?strategie=huis', label: overig.length > 0 ? 'Woonstrategie en verkoop aanpassen' : 'Woonstrategie aanpassen' }]
+        : []),
+      ...(overig.length > 0 ? [{ href: '/overzicht/bezittingen', label: 'Verkoopinstellingen aanpassen' }] : []),
     ],
     beperking: heeftHuis
-      ? 'Verkopen en opeethypotheek rekenen hier met de standaardinstellingen (moment, kosten, rente), tenzij je die al eerder koos. In het woonstrategie-scherm stel je ze in.'
+      ? 'Verkopen en opeethypotheek rekenen in de keuzes hierboven met de standaardinstellingen (moment, kosten, rente), tenzij je die al eerder koos. Via aanpassen stel je ze zelf in.'
       : null,
   }
 }

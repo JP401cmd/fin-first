@@ -46,6 +46,7 @@ import {
   PLAN_REVIEW_STAP_TITELS,
   parsePlanReviewState,
   type PlanReviewFacts,
+  type PlanReviewOpenReden,
   PLAN_REVIEW_NAAM,
   type PlanReviewProgress,
   type PlanReviewStap,
@@ -54,6 +55,12 @@ import {
 import type { PlanReviewSchrijfActie, PlanReviewStapOverzicht } from '@/lib/plan-review/overzicht'
 
 type Scherm = PlanReviewStap | 'afsluiten'
+
+/** Waarom een stap open blijft ondanks een markering (`derivePlanReviewProgress`). */
+const OPEN_REDEN_TEKST: Record<Exclude<PlanReviewOpenReden, null>, string> = {
+  woning_zonder_strategie: 'Deze stap blijft open tot er een woonstrategie voor je huis is opgeslagen.',
+  aow_ontbreekt: 'Deze stap blijft open tot er AOW-gegevens zijn.',
+}
 
 interface StapAntwoord {
   overzicht: PlanReviewStapOverzicht
@@ -108,6 +115,8 @@ export function PlanReviewPane({
   const [editorActions, setEditorActions] = useState<RegelEditActionsState | null>(null)
   /** Fout van een markering ná een geslaagde editor-write; overleeft de herlezing van de stap. */
   const [markeerFout, setMarkeerFout] = useState<string | null>(null)
+  /** Opgeslagen via de editor, maar de stap blijft open (met de reden); overleeft de herlezing. */
+  const [openMelding, setOpenMelding] = useState<string | null>(null)
   /** De stap waarin de bewerkstand geopend werd — daar hoort een editor-write bij. */
   const bewerkStapRef = useRef<PlanReviewStap | null>(null)
 
@@ -159,6 +168,7 @@ export function PlanReviewPane({
     setEditorActions(null)
     setEditorLaadFout(null)
     setMarkeerFout(null)
+    setOpenMelding(null)
   }, [scherm])
 
   const gaNaar = (s: Scherm) => setScherm(s)
@@ -173,7 +183,7 @@ export function PlanReviewPane({
   async function markeerEnGaDoor(
     stap: PlanReviewStap,
     facts: PlanReviewFacts,
-    opties: { geschreven: boolean; woonstrategieGeschreven: boolean },
+    opties: { geschreven: boolean; woonstrategieGeschreven: boolean; blijfBijOpenStap?: boolean },
   ): Promise<string | null> {
     // Is er geschreven, dan zijn andere stappen en de editor-context verouderd — ook als
     // de markering hierna faalt (anders neemt een volgende bewerkstand het oude plan
@@ -193,6 +203,16 @@ export function PlanReviewPane({
     setProgress(nieuw)
     if (opties.geschreven) setCache({})
     onChanged()
+    // TPR-15 — een editor-save die de stap níet bevestigd maakt (bv. een verkoopinstelling
+    // terwijl het huis nog geen woonstrategie heeft, A10): niet stil doorgaan, maar in de
+    // stap blijven en zeggen waarom hij open blijft.
+    const reden = nieuw.stappen.find((s) => s.stap === stap)?.reden ?? null
+    if (opties.blijfBijOpenStap && reden) {
+      setBewerken(false)
+      setEditorActions(null)
+      setOpenMelding(`Je instelling is opgeslagen. ${OPEN_REDEN_TEKST[reden]}`)
+      return null
+    }
     gaNaar(volgendScherm(nieuw, stap))
     return null
   }
@@ -239,6 +259,7 @@ export function PlanReviewPane({
         firePlan: data.firePlan ?? null,
         potRules: data.potRules ?? null,
         potBalances: data.potBalances ?? null,
+        woning: data.woning ?? null,
       })
     } catch {
       setEditorLaadFout('Aanpassen kon niet geladen worden.')
@@ -251,6 +272,7 @@ export function PlanReviewPane({
     setMarkeerFout(null)
     setEditorActions(null)
     bewerkStapRef.current = scherm
+    setOpenMelding(null)
     setBewerken(true)
     if (!editorContext) void laadEditorContext()
   }
@@ -268,18 +290,19 @@ export function PlanReviewPane({
   // Ook `onSaved` krijgt een stabiele identiteit (via een ref naar de laatste closure): een
   // body die hem in een publiceer-effect meeneemt, zou anders elke render opnieuw
   // publiceren → state-update → render → eindeloze lus.
-  const naOpslaanRef = useRef<() => void>(() => {})
+  type OpslaanInfo = { woonstrategieGeschreven?: boolean }
+  const naOpslaanRef = useRef<(info?: OpslaanInfo) => void>(() => {})
   useEffect(() => {
-    naOpslaanRef.current = () => void naOpslaanInEditor()
+    naOpslaanRef.current = (info) => void naOpslaanInEditor(info)
   })
-  const handleEditorSaved = useCallback(() => naOpslaanRef.current(), [])
+  const handleEditorSaved = useCallback((info?: OpslaanInfo) => naOpslaanRef.current(info), [])
 
   /**
    * De body heeft via zijn bestaande route geschreven: opslaan = bevestigen. De markering
    * gaat naar de stap waarin de bewerkstand geopend werd (`bewerkStapRef`), nooit naar
    * een stap die intussen open staat.
    */
-  async function naOpslaanInEditor() {
+  async function naOpslaanInEditor(info?: { woonstrategieGeschreven?: boolean }) {
     const stap = bewerkStapRef.current
     const antwoord = stap ? cache[stap] : undefined
     if (!stap || stap !== schermRef.current || !antwoord) {
@@ -296,7 +319,8 @@ export function PlanReviewPane({
     try {
       const fout = await markeerEnGaDoor(stap, antwoord.facts, {
         geschreven: true,
-        woonstrategieGeschreven: stap === 'woning',
+        woonstrategieGeschreven: info?.woonstrategieGeschreven ?? stap === 'woning',
+        blijfBijOpenStap: true,
       })
       if (fout) {
         // De instelling staat opgeslagen, alleen de markering niet: terug naar het overzicht
@@ -458,6 +482,11 @@ export function PlanReviewPane({
           />
         )}
 
+        {openMelding && (
+          <p role="status" className="text-sm text-[var(--ink)]">
+            {openMelding}
+          </p>
+        )}
         {markeerFout && (
           <p role="alert" className="text-sm text-negative">
             {markeerFout}

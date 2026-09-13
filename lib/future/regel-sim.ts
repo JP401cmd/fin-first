@@ -21,6 +21,7 @@ import { ankerReachFromSim, type AnkerReach } from '@/lib/horizon/anker-copy'
 import { clipRowsToPlanEnd } from '@/lib/horizon/clip-rows-to-plan-end'
 import type { PlanDraft } from '@/lib/horizon/plan-draft'
 import type { WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
+import type { SaleConfig } from '@/lib/sale-config'
 
 /**
  * Serialiseerbare momentopname van alle simulatie-inputs voor de Voorkeuren-editors.
@@ -112,6 +113,13 @@ export interface RegelSimOverride {
    * het bedrag zelf door. `undefined` = kolommen ongewijzigd.
    */
   retirementExpense?: { method: string; customAmount: number | null }
+  /**
+   * TPR-15 — kandidaat-verkoopinstellingen per bezitting-id (`assets.sale_config`, dezelfde
+   * vorm als de PATCH-body van `/api/assets/[id]/sale-config`). De kern leest de kolom zelf
+   * (`buildPotLiquidaties`); hier wordt alleen de rij in de rauwe context vervangen. Een id
+   * dat niet in de context staat, verandert niets. `undefined` = rijen ongewijzigd.
+   */
+  assetSaleConfigs?: Readonly<Record<string, SaleConfig>>
 }
 
 /**
@@ -163,11 +171,18 @@ function applyDraftToRawContext(
     override?.withdrawalProfileConfig === undefined &&
     override?.legacyIncludeIlliquid === undefined &&
     override?.housingStrategyConfig === undefined &&
-    override?.retirementExpense === undefined
+    override?.retirementExpense === undefined &&
+    override?.assetSaleConfigs === undefined
   ) {
     return base
   }
   const profile = { ...base.profile }
+  const saleConfigs = override.assetSaleConfigs
+  const assets = saleConfigs
+    ? base.assets.map((a) =>
+        Object.prototype.hasOwnProperty.call(saleConfigs, a.id) ? { ...a, sale_config: saleConfigs[a.id] } : a,
+      )
+    : base.assets
   // TPR-01 — kandidaat-uitgavengrondslag na stoppen (de kern leidt het jaarbedrag af).
   if (override.retirementExpense !== undefined) {
     profile.retirement_expense_method = override.retirementExpense.method
@@ -203,5 +218,5 @@ function applyDraftToRawContext(
   if (override.withdrawalProfileConfig !== undefined) {
     profile.withdrawal_profile_config = override.withdrawalProfileConfig
   }
-  return { ...base, profile }
+  return { ...base, profile, assets }
 }

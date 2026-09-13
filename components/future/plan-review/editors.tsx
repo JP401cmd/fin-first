@@ -23,12 +23,18 @@ import { EindstrategieBody } from '@/components/future/regels/eindstrategie-body
 import type { RegelEditActionsState } from '@/components/future/regels/types'
 import { UitgavenEditor } from './uitgaven-editor'
 import { PottenEditor } from './potten-editor'
+import { WoningEditor } from './woning-editor'
 
 export interface PlanReviewEditorProps {
   context: PlanReviewEditorContext
   onActionsChange: (s: RegelEditActionsState) => void
-  /** Na een geslaagde write via de bestaande route — de wizard zet dan de markering. */
-  onSaved: () => void
+  /**
+   * Na een geslaagde write via de bestaande route — de wizard zet dan de markering.
+   * `woonstrategieGeschreven` (stap 4): schreef deze save de woonstrategie? Alleen dan telt
+   * de woning lokaal als ingesteld; een verkoopinstelling van een auto doet dat niet.
+   * Zonder argument geldt de stap-default van de pane.
+   */
+  onSaved: (info?: { woonstrategieGeschreven?: boolean }) => void
 }
 
 /** De wizard sluit niet bij opslaan: de host beslist wat er daarna gebeurt. */
@@ -51,6 +57,6 @@ export const PLAN_REVIEW_EDITORS: Record<PlanReviewStap, ComponentType<PlanRevie
   plan: PlanEditor,
   uitgaven: UitgavenEditor,
   inkomsten: null,
-  woning: null,
+  woning: WoningEditor,
   potten: PottenEditor,
 }

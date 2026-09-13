@@ -13,7 +13,30 @@ let shared: unknown
 let runFout: Error | null
 const runAanroepen = vi.fn()
 
-vi.mock('@/lib/supabase/server', () => ({ createClient: () => Promise.resolve({}) }))
+type Calls = Record<string, unknown[][]>
+let calls: Record<string, Calls> = {}
+let tabelRijen: Record<string, { data: unknown; error: unknown }> = {}
+
+vi.mock('@/lib/supabase/server', () => ({
+  createClient: () =>
+    Promise.resolve({
+      from: (table: string) => {
+        const tableCalls: Calls = (calls[table] ||= {})
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const c: any = {}
+        for (const m of ['select', 'eq', 'in', 'or', 'order']) {
+          c[m] = (...args: unknown[]) => {
+            ;(tableCalls[m] ||= []).push(args)
+            return c
+          }
+        }
+        c.maybeSingle = () => Promise.resolve(tabelRijen[table])
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        c.then = (onF: any, onR: any) => Promise.resolve(tabelRijen[table]).then(onF, onR)
+        return c
+      },
+    }),
+}))
 vi.mock('@/lib/supabase/cached-user', () => ({ getCachedUser: () => Promise.resolve(user) }))
 vi.mock('@/lib/fire-target-shared', () => ({
   computeHorizonFireSim: () => {
@@ -25,8 +48,11 @@ vi.mock('@/lib/fire-target-shared', () => ({
 vi.mock('@/lib/horizon/raw-data-loader', () => ({
   loadHorizonRaw: () =>
     Promise.resolve({
-      rawProfile: { pot_rules: { surplus_group: 'beleggingen' }, full_name: 'Voor Naam' },
-      assets: [{ asset_type: 'savings', current_value: 1000, is_active: true }],
+      rawProfile: { pot_rules: { surplus_group: 'beleggingen' }, full_name: 'Voor Naam', housing_strategy_config: null },
+      assets: [
+        { asset_type: 'savings', current_value: 1000, is_active: true },
+        { asset_type: 'eigen_huis', current_value: 400000, is_active: true },
+      ],
       unlinkedCash: 250,
     }),
 }))
@@ -39,6 +65,12 @@ beforeEach(() => {
   user = { id: 'u1' }
   runFout = null
   runAanroepen.mockClear()
+  calls = {}
+  tabelRijen = {
+    assets: { data: [{ id: 'a9', name: 'Auto', asset_type: 'vehicle', current_value: '12000', sale_config: null }], error: null },
+    debts: { data: [{ id: 'd1', name: 'Autolening' }], error: null },
+    household_members: { data: null, error: null },
+  }
   shared = {
     rawContext: {
       profile: { id: 'u1' },
@@ -76,6 +108,53 @@ describe('GET /api/plan-review/editor-context', () => {
     // Stap 5: dezelfde lezingen als /toekomst/voorkeuren.
     expect(body.potRules.surplusGroup).toBe('beleggingen')
     expect(body.potBalances.spaargeld).toBe(1250)
+  })
+
+  it('stap 4: alleen eigen vast bezit en eigen schulden, met expliciete kolommen', async () => {
+    const res = await GET()
+    const body = await res.json()
+    expect(body.woning).toEqual({
+      heeftEigenHuis: true,
+      woonstrategieIngesteld: false,
+      vastBezit: [{ id: 'a9', name: 'Auto', asset_type: 'vehicle', current_value: 12000, sale_config: null }],
+      schulden: [{ id: 'd1', name: 'Autolening' }],
+    })
+    expect(calls.assets.select).toEqual([['id, name, asset_type, current_value, sale_config']])
+    expect(calls.assets.eq).toEqual([
+      ['user_id', 'u1'],
+      ['is_active', true],
+    ])
+    const [[kolom, typen]] = calls.assets.in as [[string, string[]]]
+    expect(kolom).toBe('asset_type')
+    expect(typen).not.toContain('eigen_huis')
+    expect(calls.debts.select).toEqual([['id, name']])
+    expect(calls.debts.eq).toEqual([
+      ['user_id', 'u1'],
+      ['is_active', true],
+    ])
+  })
+
+  it('stap 4: een DB-fout maakt alleen woning null; de andere editors blijven werken (review M3)', async () => {
+    tabelRijen.debts = { data: null, error: { message: 'pg: secret_debts kapot' } }
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const res = await GET()
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.woning).toBeNull()
+    expect(body.potRules.surplusGroup).toBe('beleggingen')
+    expect(JSON.stringify(body)).not.toContain('secret_debts')
+    spy.mockRestore()
+  })
+
+  it('stap 4: een onleesbaar huishouden valt terug op alleen eigen schulden', async () => {
+    tabelRijen.household_members = { data: null, error: { message: 'meer dan één rij' } }
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const res = await GET()
+    const body = await res.json()
+    expect(body.woning.schulden).toEqual([{ id: 'd1', name: 'Autolening' }])
+    expect(calls.debts.eq?.[0]).toEqual(['user_id', 'u1'])
+    expect(calls.debts.or).toBeUndefined()
+    spy.mockRestore()
   })
 
   it('zonder run: snapshot null, geen fout', async () => {

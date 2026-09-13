@@ -73,7 +73,7 @@ export const PLAN_REVIEW_LAAG2: ReadonlyArray<{ href: string; label: string; uit
   {
     href: '/overzicht/bezittingen',
     label: 'Bezittingen',
-    uitleg: 'Rendement en verkoopinstelling per bezitting.',
+    uitleg: 'Rendement per bezitting. De verkoopinstelling stel je ook in stap 4 in.',
   },
 ]
 

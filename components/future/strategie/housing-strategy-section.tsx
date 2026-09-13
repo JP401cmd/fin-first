@@ -1,6 +1,6 @@
 'use client'
 
-import { useDeferredValue, useEffect, useMemo, useState } from 'react'
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { Home, Sprout, Scissors, KeyRound } from 'lucide-react'
 import {
@@ -21,6 +21,8 @@ import {
 import { runHousingScenarioPreview } from '@/lib/housing-preview'
 import { formatCurrency } from '@/lib/format'
 import { LabeledNumber, TriggerButton } from '@/components/future/strategie/fields'
+import type { RegelEditActionsState } from '@/components/future/regels/types'
+import type { ConvergentieRawContext } from '@/lib/horizon-kernel/convergentie-router'
 
 interface HousingStrategyContext {
   has_eigen_huis: boolean
@@ -85,12 +87,25 @@ const MODES: HousingStrategyMode[] = [
 export function HousingStrategySection({
   showHeader = true,
   preview = null,
+  kernelRawContext = null,
   onSaved,
+  onActionsChange,
 }: {
   showHeader?: boolean
   /** Live-preview-basis (zelfde engine-input als de grafiek); null = geen preview. */
   preview?: HousingPreviewData | null
+  /**
+   * TPR-15 — alternatieve preview-basis: alleen de rauwe kernel-context (de client-veilige
+   * snapshot van de plan-review). Genegeerd wanneer `preview` gezet is.
+   */
+  kernelRawContext?: ConvergentieRawContext | null
   onSaved?: () => void
+  /**
+   * TPR-15 — host-contract van de plan-review (`RegelEditActionsState`). Gezet = de host
+   * rendert de opslaanknop in zijn footer; de sectie verbergt dan haar eigen knop en
+   * succesmelding (fouten blijven zichtbaar). Niet gezet = het bestaande gedrag.
+   */
+  onActionsChange?: (s: RegelEditActionsState) => void
 } = {}) {
   const [config, setConfig] = useState<HousingStrategyConfig>({ mode: 'include_full' })
   const [savedConfig, setSavedConfig] = useState<HousingStrategyConfig | null>(null)
@@ -132,26 +147,31 @@ export function HousingStrategySection({
   // hier staat verschijnt na opslaan 1-op-1 op de tijdas. useDeferredValue
   // houdt het typen in de invoervelden vloeiend (de engine-runs volgen).
   const deferredConfig = useDeferredValue(config)
-  const canPreview = preview != null && preview.context.hasEigenHuis && !loading
+  const previewBasis = useMemo(
+    () => preview ?? (kernelRawContext ? { kernelRawContext } : null),
+    [preview, kernelRawContext],
+  )
+  const previewHeeftHuis = preview ? preview.context.hasEigenHuis : hasEigenHuis
+  const canPreview = previewBasis != null && previewHeeftHuis && !loading
   // Dezelfde motor als de grafiek via `runHousingScenarioPreview`: de horizon-kernel
   // (de enige motor). Beide scenario-kaarten (concept + opgeslagen) draaien door dezelfde
   // helper op dezelfde bundel, dus nooit een engine-mix.
   const draftScenario = useMemo<HousingScenarioResult | null>(() => {
-    if (!canPreview || !preview) return null
+    if (!canPreview || !previewBasis) return null
     try {
-      return runHousingScenarioPreview(deferredConfig, preview)
+      return runHousingScenarioPreview(deferredConfig, previewBasis)
     } catch {
       return null
     }
-  }, [canPreview, preview, deferredConfig])
+  }, [canPreview, previewBasis, deferredConfig])
   const savedScenario = useMemo<HousingScenarioResult | null>(() => {
-    if (!canPreview || !preview || !savedConfig) return null
+    if (!canPreview || !previewBasis || !savedConfig) return null
     try {
-      return runHousingScenarioPreview(savedConfig, preview)
+      return runHousingScenarioPreview(savedConfig, previewBasis)
     } catch {
       return null
     }
-  }, [canPreview, preview, savedConfig])
+  }, [canPreview, previewBasis, savedConfig])
 
   const setMode = (mode: HousingStrategyMode) => {
     setMessage(null)
@@ -189,6 +209,23 @@ export function HousingStrategySection({
       setSaving(false)
     }
   }
+
+  // TPR-15 — host-contract. `save` via een ref: de host bewaart de state, dus een nieuwe
+  // functie-identiteit per render zou elke render opnieuw publiceren (eindeloze lus).
+  const hostMode = onActionsChange != null
+  const saveRef = useRef(save)
+  useEffect(() => {
+    saveRef.current = save
+  })
+  const isDirty = savedConfig != null && JSON.stringify(config) !== JSON.stringify(savedConfig)
+  useEffect(() => {
+    onActionsChange?.({
+      canSave: !saving && !loading,
+      saving,
+      save: () => void saveRef.current(),
+      changed: isDirty,
+    })
+  }, [onActionsChange, saving, loading, isDirty])
 
   return (
     <div id="housing-strategy" className="mb-6">
@@ -276,27 +313,35 @@ export function HousingStrategySection({
           config={config}
           draft={draftScenario}
           saved={savedScenario}
-          isDirty={savedConfig != null && JSON.stringify(config) !== JSON.stringify(savedConfig)}
+          isDirty={isDirty}
         />
       )}
 
-      <div className="mt-5 flex items-center gap-3">
-        <button
-          type="button"
-          onClick={save}
-          disabled={saving || loading}
-          className="rounded-lg bg-[var(--ink)] px-5 py-2 text-sm font-medium text-[var(--paper)] transition-colors hover:opacity-90 disabled:opacity-50"
-        >
-          {saving ? 'Opslaan…' : 'Eigen-woning-strategie opslaan'}
-        </button>
-        {message && (
-          <span
-            className={`text-sm ${message.type === 'success' ? 'text-emerald-600' : 'text-red-600'}`}
-          >
+      {hostMode ? (
+        message?.type === 'error' && (
+          <p role="alert" className="mt-5 text-sm text-red-600">
             {message.text}
-          </span>
-        )}
-      </div>
+          </p>
+        )
+      ) : (
+        <div className="mt-5 flex items-center gap-3">
+          <button
+            type="button"
+            onClick={save}
+            disabled={saving || loading}
+            className="rounded-lg bg-[var(--ink)] px-5 py-2 text-sm font-medium text-[var(--paper)] transition-colors hover:opacity-90 disabled:opacity-50"
+          >
+            {saving ? 'Opslaan…' : 'Eigen-woning-strategie opslaan'}
+          </button>
+          {message && (
+            <span
+              className={`text-sm ${message.type === 'success' ? 'text-emerald-600' : 'text-red-600'}`}
+            >
+              {message.text}
+            </span>
+          )}
+        </div>
+      )}
 
       <p className="mt-3 font-sans text-[11px] text-[var(--ink-3)]">
         Deze keuze beïnvloedt zowel de FIRE-leeftijd op je dashboard als de prognose-grafieken in

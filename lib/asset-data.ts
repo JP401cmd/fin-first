@@ -528,6 +528,15 @@ export const ASSET_TYPE_FIELDS: Record<AssetType, string[]> = {
   other: ['sale_config'],
 }
 
+/**
+ * Typen met een verkoopinstelling (`sale_config`) — afgeleid uit `ASSET_TYPE_FIELDS`, dus
+ * dezelfde set als het bezittingenformulier toont. Gebruikt door de smalle schrijfroute
+ * `PATCH /api/assets/[id]/sale-config` en stap 4 van de plan-review (TPR-15).
+ */
+export const SALE_CONFIG_ASSET_TYPES: readonly AssetType[] = (
+  Object.keys(ASSET_TYPE_FIELDS) as AssetType[]
+).filter((type) => ASSET_TYPE_FIELDS[type].includes('sale_config'))
+
 // ── Projection calculations ──────────────────────────────────
 
 export interface ProjectionMonth {

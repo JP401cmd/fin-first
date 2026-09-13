@@ -46,7 +46,9 @@ export function isHousingPreviewKernelEnabled(preview: HousingPreviewData): bool
  */
 export function runHousingScenarioPreview(
   config: HousingStrategyConfig,
-  preview: HousingPreviewData,
+  // Alleen de rauwe context wordt gelezen; de plan-review geeft die uit de client-veilige
+  // snapshot door zonder de rest van de modal-bundel (TPR-15).
+  preview: Pick<HousingPreviewData, 'kernelRawContext'>,
 ): HousingScenarioResult {
   const raw = preview.kernelRawContext
   if (!raw) return EMPTY_SCENARIO
