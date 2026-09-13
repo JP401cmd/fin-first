@@ -4,6 +4,9 @@ import { getCachedUser } from '@/lib/supabase/cached-user'
 import { serverError, unauthorized } from '@/lib/api/respond'
 import { computeHorizonFireSim } from '@/lib/fire-target-shared'
 import { buildClientRegelSimSnapshot } from '@/lib/future/regel-sim-snapshot'
+import { buildPotBalances } from '@/lib/future/pot-balances'
+import { loadHorizonRaw } from '@/lib/horizon/raw-data-loader'
+import { resolvePotRules } from '@/lib/pot-rules'
 import type { PlanReviewEditorContext } from '@/lib/plan-review/editor-context'
 
 /**
@@ -29,10 +32,14 @@ export async function GET() {
     const user = await getCachedUser(supabase)
     if (!user) return unauthorized()
 
-    const shared = await computeHorizonFireSim(supabase)
+    const [shared, raw] = await Promise.all([computeHorizonFireSim(supabase), loadHorizonRaw(supabase)])
     const body: PlanReviewEditorContext = {
       snapshot: shared ? buildClientRegelSimSnapshot(shared) : null,
       firePlan: shared?.firePlan ?? null,
+      // Stap 5 — dezelfde lezingen als /toekomst/voorkeuren (resolvePotRules op de profielrij,
+      // buildPotBalances op de bundelrijen): één bron voor Voorkeuren en wizard.
+      potRules: resolvePotRules((raw.rawProfile ?? {}) as { pot_rules?: unknown }),
+      potBalances: buildPotBalances(raw.assets, raw.unlinkedCash),
     }
     return NextResponse.json(body)
   } catch (err) {

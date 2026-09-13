@@ -22,6 +22,7 @@ import type { PlanReviewEditorContext } from '@/lib/plan-review/editor-context'
 import { EindstrategieBody } from '@/components/future/regels/eindstrategie-body'
 import type { RegelEditActionsState } from '@/components/future/regels/types'
 import { UitgavenEditor } from './uitgaven-editor'
+import { PottenEditor } from './potten-editor'
 
 export interface PlanReviewEditorProps {
   context: PlanReviewEditorContext
@@ -51,5 +52,5 @@ export const PLAN_REVIEW_EDITORS: Record<PlanReviewStap, ComponentType<PlanRevie
   uitgaven: UitgavenEditor,
   inkomsten: null,
   woning: null,
-  potten: null,
+  potten: PottenEditor,
 }

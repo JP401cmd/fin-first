@@ -234,7 +234,12 @@ export function PlanReviewPane({
         setEditorLaadFout(typeof data.error === 'string' ? data.error : 'Aanpassen kon niet geladen worden.')
         return
       }
-      setEditorContext({ snapshot: data.snapshot ?? null, firePlan: data.firePlan ?? null })
+      setEditorContext({
+        snapshot: data.snapshot ?? null,
+        firePlan: data.firePlan ?? null,
+        potRules: data.potRules ?? null,
+        potBalances: data.potBalances ?? null,
+      })
     } catch {
       setEditorLaadFout('Aanpassen kon niet geladen worden.')
     }

@@ -22,6 +22,15 @@ vi.mock('@/lib/fire-target-shared', () => ({
   },
 }))
 
+vi.mock('@/lib/horizon/raw-data-loader', () => ({
+  loadHorizonRaw: () =>
+    Promise.resolve({
+      rawProfile: { pot_rules: { surplus_group: 'beleggingen' }, full_name: 'Voor Naam' },
+      assets: [{ asset_type: 'savings', current_value: 1000, is_active: true }],
+      unlinkedCash: 250,
+    }),
+}))
+
 import { GET } from './route'
 
 const FIRE_PLAN = { anchor: { kind: 'solved' }, endForm: 'deplete', endAge: 90, legacyAmount: 0 }
@@ -63,14 +72,21 @@ describe('GET /api/plan-review/editor-context', () => {
     expect(body.snapshot.aowFractional).toBe(67.5)
     expect(body.snapshot.rawContext.partner).toBeUndefined()
     const tekst = JSON.stringify(body)
-    expect(tekst).not.toMatch(/CIPHER|IDX|_encrypted|_hash|netMonthlyIncome/)
+    expect(tekst).not.toMatch(/CIPHER|IDX|_encrypted|_hash|netMonthlyIncome|Voor Naam/)
+    // Stap 5: dezelfde lezingen als /toekomst/voorkeuren.
+    expect(body.potRules.surplusGroup).toBe('beleggingen')
+    expect(body.potBalances.spaargeld).toBe(1250)
   })
 
   it('zonder run: snapshot null, geen fout', async () => {
     shared = null
     const res = await GET()
     expect(res.status).toBe(200)
-    expect(await res.json()).toEqual({ snapshot: null, firePlan: null })
+    const body = await res.json()
+    expect(body.snapshot).toBeNull()
+    expect(body.firePlan).toBeNull()
+    // De pot-regels en saldi hangen niet aan de kernel-run.
+    expect(body.potRules.surplusGroup).toBe('beleggingen')
   })
 
   it('run-fout: generieke 500 zonder interne tekst', async () => {

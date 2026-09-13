@@ -46,8 +46,9 @@ export function OnttrekkingAfnameBody({
       })
   }, [save, rules, order, prio])
   useEffect(() => {
-    onActionsChange({ canSave, saving, save: () => saveRef.current() })
-  }, [onActionsChange, canSave, saving])
+    // TPR-15 — `changed` voor de plan-review (zonder wijziging "Bevestigen").
+    onActionsChange({ canSave, saving, save: () => saveRef.current(), changed })
+  }, [onActionsChange, canSave, saving, changed])
 
   return (
     <div className="pb-6">

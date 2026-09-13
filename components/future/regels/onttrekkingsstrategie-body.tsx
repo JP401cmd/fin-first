@@ -401,9 +401,11 @@ export function OnttrekkingsstrategieBody({
       saving,
       save: () => saveRef.current(),
       footerInfo: <FireDeltaFooter baseline={baseline} draft={draftProj} />,
+      // TPR-15 — de plan-review toont zonder wijziging "Bevestigen"; RegelBewerkenPane negeert dit.
+      changed,
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onActionsChange, canSave, saving, deltaMonths])
+  }, [onActionsChange, canSave, saving, deltaMonths, changed])
 
   return (
     <div
