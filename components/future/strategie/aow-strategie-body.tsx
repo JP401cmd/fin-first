@@ -1,30 +1,35 @@
 'use client'
 
 /**
- * AowStrategieBody — de velden, live readout en opslagroute van de AOW-strategie, los
- * van de modal-chrome (TPR-15). `AowStrategieEditor` host 'm in de strategie-modal; de
- * plan-review kan dezelfde body inline renderen. De host tekent de opslaanknop uit wat
- * de body via `onActionsChange` publiceert (contract `RegelEditActionsState`).
+ * AowStrategieBody — de velden, live readout en opslag van de AOW-strategie, los van de
+ * modal-chrome (TPR-15). `AowStrategieEditor` host 'm in de strategie-modal; de
+ * plan-review-wizard rendert dezelfde body inline (stap 3). De host tekent de opslaanknop
+ * uit wat de body via `onActionsChange` publiceert (contract `RegelEditActionsState`).
+ *
+ * Opslaan gaat via `PUT /api/life-events/strategie`. Bestaat er nog geen AOW-rij, dan maakt
+ * pas opslaan hem aan (besluit eigenaar 13 sep 2026): tot dan is het formulier vooringevuld
+ * en telt het concept als gewijzigd.
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { RotateCcw } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
-import { computeAowMonthly, type LifeEvent } from '@/lib/horizon-data'
+import type { LifeEvent } from '@/lib/horizon-data'
 import { NL_AOW_MONTHLY, NL_AOW_MONTHLY_SAMENWONEND } from '@/lib/constants'
 import { lookupAowAge, formatAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import { formatCurrency, formatWithFreedom } from '@/lib/format'
 import { ScenarioCallout } from '@/components/editorial'
-import { previewFireAge, type PreviewBaseline } from '@/lib/strategy-preview'
+import { bouwStrategieRij, strategieInvoerFout, type StrategieBody } from '@/lib/life-events/strategie-write'
 import type { RegelEditActionsState } from '@/components/future/regels/types'
 import { LabeledNumber, TriggerButton } from './fields'
+import { slaStrategieOp, useStrategieImpact, type StrategieImpactBron } from './strategie-impact'
+
+const VERVANG_AOW = { eventType: 'aow' } as const
 
 export interface AowStrategieBodyProps {
   /** Bestaande AOW-rij (event_type='aow') of null wanneer nog niet aangemaakt. */
   event: LifeEvent | null
-  /** Alle huidige events (voor de live vrijheidsleeftijd-preview). */
-  allEvents: LifeEvent[]
-  baseline: PreviewBaseline | null
+  /** Waarmee het live effect gerekend wordt (zie `strategie-impact.tsx`). */
+  impact: StrategieImpactBron
   /** Dagelijkse must-uitgaven, voor vrijheid-tijd framing. */
   dailyExpenses: number
   aowRows: AowLeeftijdRow[]
@@ -38,8 +43,7 @@ export interface AowStrategieBodyProps {
 
 export function AowStrategieBody({
   event,
-  allEvents,
-  baseline,
+  impact,
   dailyExpenses,
   aowRows,
   dateOfBirth,
@@ -72,79 +76,41 @@ export function AowStrategieBody({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const monthly = computeAowMonthly(leefsituatie, jarenBuitenNL)
+  const body: StrategieBody = useMemo(
+    () => ({ event_type: 'aow', target_age: targetAge, leefsituatie, jarenBuitenNL }),
+    [targetAge, leefsituatie, jarenBuitenNL],
+  )
+  const invoerFout = strategieInvoerFout(body)
+  // Het concept als rij, via dezelfde opbouw als de route (maandbedrag incl.).
+  const draft: LifeEvent | null = useMemo(
+    () =>
+      invoerFout == null
+        ? { ...bouwStrategieRij(body, event?.metadata), id: event?.id ?? 'aow-draft', sort_order: 0 }
+        : null,
+    [body, invoerFout, event?.id, event?.metadata],
+  )
+  const monthly = draft?.monthly_income_change ?? 0
 
   // Live vrijheidsleeftijd: huidige (opgeslagen) staat → concept-staat.
-  const { savedAge, draftAge } = useMemo(() => {
-    if (!baseline) return { savedAge: null as number | null, draftAge: null as number | null }
-    const others = allEvents.filter((e) => e.event_type !== 'aow')
-    const draft: LifeEvent = {
-      id: event?.id ?? 'aow-draft',
-      name: 'AOW',
-      event_type: 'aow',
-      target_age: targetAge,
-      target_date: null,
-      one_time_cost: 0,
-      monthly_cost_change: 0,
-      monthly_income_change: monthly,
-      duration_months: 0,
-      icon: 'Landmark',
-      is_active: true,
-      sort_order: 0,
-      is_indexed: true,
-      metadata: { leefsituatie, jarenBuitenNL },
-    }
-    return {
-      savedAge: previewFireAge(baseline, allEvents),
-      draftAge: previewFireAge(baseline, [...others, draft]),
-    }
-  }, [baseline, allEvents, event?.id, targetAge, monthly, leefsituatie, jarenBuitenNL])
+  const { savedAge, draftAge, inline, footerInfo, footerKey } = useStrategieImpact(impact, draft, VERVANG_AOW)
+
+  // Wat staat er opgeslagen? Zonder AOW-rij is er niets: opslaan maakt 'm aan.
+  const [opgeslagen, setOpgeslagen] = useState<string | null>(() => (event ? JSON.stringify(body) : null))
+  const changed = opgeslagen !== JSON.stringify(body)
 
   const kortingPct = Math.round(Math.min(50, Math.max(0, jarenBuitenNL)) * 2)
 
   async function handleSave() {
+    if (invoerFout != null) return
     setSaving(true)
     setError(null)
-    const supabase = createClient()
-    const payload = {
-      name: 'AOW',
-      event_type: 'aow',
-      target_age: targetAge,
-      target_date: null,
-      one_time_cost: 0,
-      monthly_cost_change: 0,
-      monthly_income_change: monthly,
-      duration_months: 0,
-      icon: 'Landmark',
-      is_active: true,
-      sort_order: 0,
-      is_indexed: true,
-      metadata: { leefsituatie, jarenBuitenNL },
-    }
-    let dbError: { message: string } | null = null
-    if (event) {
-      const { error: e } = await supabase.from('life_events').update(payload).eq('id', event.id)
-      dbError = e
-    } else {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (!user) {
-        setError('Niet ingelogd — kan AOW niet opslaan.')
-        setSaving(false)
-        return
-      }
-      const { error: e } = await supabase
-        .from('life_events')
-        .insert({ ...payload, user_id: user.id })
-      dbError = e
-    }
-    if (dbError) {
-      setError(`Opslaan mislukt: ${dbError.message}`)
-      setSaving(false)
+    const uitkomst = await slaStrategieOp(body)
+    setSaving(false)
+    if (!uitkomst.ok) {
+      setError(`Opslaan mislukt: ${uitkomst.fout}`)
       return
     }
-    setSaving(false)
+    setOpgeslagen(JSON.stringify(body))
     onSaved()
   }
 
@@ -155,10 +121,14 @@ export function AowStrategieBody({
     saveRef.current = handleSave
   })
 
-  const canSave = !readOnly && !saving
+  const canSave = !readOnly && !saving && invoerFout == null
   useEffect(() => {
-    onActionsChange({ canSave, saving, save: () => void saveRef.current() })
-  }, [onActionsChange, canSave, saving])
+    // Zonder wijziging schrijft bevestigen niets: dan ook geen effect in de footer (dat zou
+    // een concept tonen dat nergens doorkomt).
+    onActionsChange({ canSave, saving, save: () => void saveRef.current(), changed, footerInfo: changed ? footerInfo : undefined })
+    // footerInfo volgt footerKey (de delta); zo publiceert niet elke render opnieuw.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onActionsChange, canSave, saving, changed, footerKey])
 
   const draftRounded = draftAge != null ? Math.round(draftAge) : null
   const savedRounded = savedAge != null ? Math.round(savedAge) : null
@@ -260,7 +230,12 @@ export function AowStrategieBody({
           {monthly === 0 && (
             <div className="mt-0.5 text-xs text-amber-700">Geen AOW-opbouw bij 50 jaar buiten NL.</div>
           )}
-          {baseline && savedRounded != null && draftRounded != null && (
+          {invoerFout && (
+            <div role="alert" className="mt-0.5 text-xs text-negative">
+              {invoerFout}
+            </div>
+          )}
+          {inline && savedRounded != null && draftRounded != null && (
             <div className="mt-3 border-t border-[var(--border-ed)] pt-3 text-sm text-[var(--ink-2)]">
               Vrijheidsleeftijd:{' '}
               <span className="font-mono tabular-nums">{savedRounded}</span>

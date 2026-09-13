@@ -24,6 +24,7 @@ import { AOW_NOTICE_MINIMIZE_KEY, asAowMinimizedFlag } from '@/lib/horizon/aow-n
 import { PlanReviewProvider } from '@/components/future/plan-review/plan-review-provider'
 import { readPlanReviewState } from '@/lib/plan-review/read-state'
 import { buildPlanReviewFacts, derivePlanReviewProgress } from '@/lib/plan-review/progress'
+import { loadEigenStrategieEvents } from '@/lib/plan-review/eigen-strategie-events'
 
 export const metadata: Metadata = {
   title: 'Toekomst — TriFinity',
@@ -104,7 +105,7 @@ export default async function ToekomstPage({
     data: { user },
   } = await supabase.auth.getUser()
 
-  const [horizonData, finData, calcCountRes, minimizedMap, planReviewState] = await Promise.all([
+  const [horizonData, finData, calcCountRes, minimizedMap, planReviewState, eigenStrategieEvents] = await Promise.all([
     loadHorizonData(supabase),
     loadFinData(supabase),
     user
@@ -122,16 +123,25 @@ export default async function ToekomstPage({
     // TPR-01 — de plan-review-markering (own-row jsonb-pref). `null` = kolom nog niet
     // uitgerold → geen review-ingang.
     user ? readPlanReviewState(supabase, user.id) : Promise.resolve(null),
+    // TPR-15 — de EIGEN AOW/werk/pensioen-rijen: de life_events-policy is huishoud-gedeeld,
+    // en een gedeeld partner-AOW-event mag de AOW-stap niet dichtzetten. Faalt de lezing,
+    // dan fail-closed: geen rijen (de AOW-stap toont dan open), nooit de gedeelde bundelrijen.
+    user
+      ? loadEigenStrategieEvents(supabase, user.id).catch((err: unknown) => {
+          console.error('[toekomst:plan-review:eigen-events]', err)
+          return []
+        })
+      : Promise.resolve([]),
   ])
-  // TPR-01 — voortgang AFGELEID uit markering + profielstaat (A9/A10), op de al-geladen
-  // bundelrijen (geen extra query). Alleen de eigen bezittingen: de assets-policy is
-  // huishoud-gedeeld en de woonstrategie is per profiel.
+  // TPR-01 — voortgang AFGELEID uit markering + profielstaat (A9/A10). Alleen de eigen
+  // bezittingen en gebeurtenissen: de policies zijn huishoud-gedeeld en de review gaat over
+  // de eigen keuzes.
   const planReviewProgress =
     user && planReviewState
       ? derivePlanReviewProgress(
           planReviewState,
           buildPlanReviewFacts({
-            events: horizonData.events,
+            events: eigenStrategieEvents,
             assets: horizonData.assets,
             housingStrategyRaw: horizonData.rawProfile?.housing_strategy_config,
             ownerId: user.id,

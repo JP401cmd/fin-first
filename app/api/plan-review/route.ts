@@ -12,6 +12,7 @@ import { loadHorizonRaw } from '@/lib/horizon/raw-data-loader'
 import { runRegelProjection, type RegelSimSnapshot } from '@/lib/future/regel-sim'
 import { buildConvergentieAdapterInput } from '@/lib/horizon-kernel/convergentie-router'
 import { buildKernelInputFromAppWithNotices } from '@/lib/horizon-kernel/adapter'
+import { loadEigenStrategieEvents } from '@/lib/plan-review/eigen-strategie-events'
 
 /**
  * /api/plan-review — de plan-review Toekomst (TPR-01, ADR 0142).
@@ -46,24 +47,27 @@ export async function GET(request: NextRequest) {
     const stap = request.nextUrl.searchParams.get('stap')
     if (!isPlanReviewStap(stap)) return badRequest('Onbekende stap')
 
-    const [shared, raw, stateRes] = await Promise.all([
+    const [shared, raw, stateRes, eigenEvents] = await Promise.all([
       computeHorizonFireSim(supabase).catch(() => null),
       loadHorizonRaw(supabase),
       supabase.from('profiles').select('plan_review_state').eq('id', user.id).single(),
+      // Fail-closed en per stap: een mislukte lezing maakt alleen de AOW-stap open, niet elke stap een 500.
+      loadEigenStrategieEvents(supabase, user.id).catch((err: unknown) => {
+        console.error('[plan-review:GET:eigen-events]', err)
+        return []
+      }),
     ])
     if (stateRes.error) return serverError(stateRes.error, 'plan-review:GET:state')
 
-    // De SELECT-policy op `assets` is huishoud-gedeeld: de review gaat over de EIGEN
-    // keuzes, dus alleen de eigen bezittingen tellen (datapad-conventie). Bewuste
-    // divergentie, dezelfde als in /api/housing-strategy: de kernel-run (personal) kan
-    // een gedeelde partner-woning naar aandeel meetellen terwijl stap 4 dan n.v.t. is.
-    // Bekende rest (latent): `raw.events` draagt geen `user_id`/`ownership` in de
-    // projectie; een gedeeld partner-AOW-event zou meetellen. Geen schrijver zet
-    // `ownership='shared'` op een gebeurtenis — opvolging in de vervolgfase.
+    // De SELECT-policies op `assets` en `life_events` zijn huishoud-gedeeld: de review gaat
+    // over de EIGEN keuzes, dus alleen de eigen bezittingen en de eigen AOW/werk/pensioen-
+    // rijen tellen (datapad-conventie; een gedeeld partner-AOW-event maakt de AOW-stap niet
+    // dicht). Bewuste divergentie, dezelfde als in /api/housing-strategy: de kernel-run
+    // (personal) kan gedeelde partnerrijen meetellen terwijl de stap ze niet toont.
     const eigenAssets = (raw.assets ?? []).filter((a) => a.user_id === user.id)
     const profile = (raw.rawProfile ?? null) as Record<string, unknown> | null
     const facts = buildPlanReviewFacts({
-      events: raw.events ?? [],
+      events: eigenEvents,
       assets: eigenAssets,
       housingStrategyRaw: profile?.housing_strategy_config,
     })
@@ -96,7 +100,7 @@ export async function GET(request: NextRequest) {
       firePlan: shared?.firePlan ?? raw.firePlan,
       aowAge: shared?.aowAgeFractional ?? null,
       profile,
-      events: raw.events ?? [],
+      events: eigenEvents,
       assets: eigenAssets,
       uitgaveNaPensioenPerJaar,
       facts,

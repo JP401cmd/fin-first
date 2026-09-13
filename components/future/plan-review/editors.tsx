@@ -24,6 +24,7 @@ import type { RegelEditActionsState } from '@/components/future/regels/types'
 import { UitgavenEditor } from './uitgaven-editor'
 import { PottenEditor } from './potten-editor'
 import { WoningEditor } from './woning-editor'
+import { InkomstenEditor } from './inkomsten-editor'
 
 export interface PlanReviewEditorProps {
   context: PlanReviewEditorContext
@@ -32,9 +33,11 @@ export interface PlanReviewEditorProps {
    * Na een geslaagde write via de bestaande route — de wizard zet dan de markering.
    * `woonstrategieGeschreven` (stap 4): schreef deze save de woonstrategie? Alleen dan telt
    * de woning lokaal als ingesteld; een verkoopinstelling van een auto doet dat niet.
+   * `aowGeschreven` (stap 3): schreef deze save de eigen AOW-rij? Dan telt de AOW lokaal als
+   * aanwezig (A10) en kan de stap bevestigd raken.
    * Zonder argument geldt de stap-default van de pane.
    */
-  onSaved: (info?: { woonstrategieGeschreven?: boolean }) => void
+  onSaved: (info?: { woonstrategieGeschreven?: boolean; aowGeschreven?: boolean }) => void
 }
 
 /** De wizard sluit niet bij opslaan: de host beslist wat er daarna gebeurt. */
@@ -56,7 +59,7 @@ function PlanEditor({ context, onActionsChange, onSaved }: PlanReviewEditorProps
 export const PLAN_REVIEW_EDITORS: Record<PlanReviewStap, ComponentType<PlanReviewEditorProps> | null> = {
   plan: PlanEditor,
   uitgaven: UitgavenEditor,
-  inkomsten: null,
+  inkomsten: InkomstenEditor,
   woning: WoningEditor,
   potten: PottenEditor,
 }

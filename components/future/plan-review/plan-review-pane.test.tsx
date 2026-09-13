@@ -15,6 +15,7 @@ const nep = vi.hoisted(() => ({
   saving: false,
   onSaved: null as null | (() => void),
   woonstrategieGeschreven: false,
+  aowGeschreven: false,
 }))
 vi.mock('./editors', async () => {
   const React = await import('react')
@@ -54,8 +55,30 @@ vi.mock('./editors', async () => {
     }, [onActionsChange, onSaved])
     return React.createElement('p', null, 'Woning-editor')
   }
+  // Stap 3: meldt bij opslaan of de eigen AOW-rij geschreven werd (werk/pensioen = nee).
+  function NepInkomstenEditor(props: {
+    onActionsChange: (s: { canSave: boolean; saving: boolean; save: () => void; changed?: boolean }) => void
+    onSaved: (info?: { aowGeschreven?: boolean }) => void
+  }) {
+    const { onActionsChange, onSaved } = props
+    React.useEffect(() => {
+      onActionsChange({
+        canSave: true,
+        saving: false,
+        changed: true,
+        save: () => onSaved({ aowGeschreven: nep.aowGeschreven }),
+      })
+    }, [onActionsChange, onSaved])
+    return React.createElement('p', null, 'Inkomsten-editor')
+  }
   return {
-    PLAN_REVIEW_EDITORS: { plan: NepPlanEditor, uitgaven: null, inkomsten: null, woning: NepWoningEditor, potten: null },
+    PLAN_REVIEW_EDITORS: {
+      plan: NepPlanEditor,
+      uitgaven: null,
+      inkomsten: NepInkomstenEditor,
+      woning: NepWoningEditor,
+      potten: null,
+    },
   }
 })
 
@@ -121,6 +144,7 @@ beforeEach(() => {
   facts = FACTS
   hangGetVoor = null
   nep.woonstrategieGeschreven = false
+  nep.aowGeschreven = false
   failDomain = false
   failEditorContext = false
   nep.changed = true
@@ -220,8 +244,8 @@ describe('PlanReviewPane', () => {
   })
 
   it('een stap zónder inline editor: Aanpassen sluit de pane en navigeert naar het bestaande scherm', async () => {
-    const { onClose } = renderPane('inkomsten')
-    await screen.findByText('De app rekent nu met inkomsten.')
+    const { onClose } = renderPane('uitgaven')
+    await screen.findByText('De app rekent nu met uitgaven.')
     fireEvent.click(screen.getByRole('button', { name: /Plan aanpassen/ }))
     await waitFor(() => expect(push).toHaveBeenCalledWith('/toekomst/voorkeuren?regel=eindstrategie'))
     expect(onClose).toHaveBeenCalled()
@@ -366,6 +390,35 @@ describe('PlanReviewPane — stap 4 inline (TPR-15)', () => {
     await screen.findByText('De app rekent deze stap door…')
     expect(screen.getByRole('button', { name: /4\. .*\(bevestigd\)/ })).toBeInTheDocument()
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
+
+  async function slaInkomstenOp() {
+    facts = { ...FACTS, hasAowEvent: false }
+    // Stap 4 is hier n.v.t.: de wizard gaat door naar stap 5, en díe lezing blijft hangen.
+    hangGetVoor = 'potten'
+    renderPane('inkomsten')
+    await screen.findByText('De app rekent nu met inkomsten.')
+    fireEvent.click(screen.getByRole('button', { name: 'Plan aanpassen' }))
+    await screen.findByText('Inkomsten-editor')
+    const knop = () => screen.getAllByRole('button', { name: 'Opslaan en bevestigen' })[0]
+    await waitFor(() => expect(knop()).toBeEnabled())
+    fireEvent.click(knop())
+  }
+
+  it('TPR-15 stap 3 — AOW opgeslagen: de AOW telt lokaal als aanwezig en de wizard gaat door', async () => {
+    nep.aowGeschreven = true
+    await slaInkomstenOp()
+    await screen.findByText('De app rekent deze stap door…')
+    expect(screen.getByRole('button', { name: /3\. .*\(bevestigd\)/ })).toBeInTheDocument()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
+
+  it('TPR-15 stap 3 — een pensioenpot zonder AOW: opgeslagen, maar de wizard blijft in de stap en zegt waarom', async () => {
+    nep.aowGeschreven = false
+    await slaInkomstenOp()
+    expect(await screen.findByRole('status')).toHaveTextContent('Je instelling is opgeslagen.')
+    expect(await screen.findByText('De app rekent nu met inkomsten.')).toBeInTheDocument()
+    expect(screen.queryByText('Inkomsten-editor')).not.toBeInTheDocument()
   })
 })
 

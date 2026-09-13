@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { LifeEvent } from '@/lib/horizon-data'
 import type { AowLeeftijdRow } from '@/lib/aow-leeftijd'
@@ -8,6 +8,7 @@ import type { PreviewBaseline } from '@/lib/strategy-preview'
 import type { RegelEditActionsState } from '@/components/future/regels/types'
 import { StrategieModalShell, StrategieFooter } from './strategie-modal-shell'
 import { AowStrategieBody } from './aow-strategie-body'
+import type { StrategieImpactBron } from './strategie-impact'
 
 interface Props {
   /** Bestaande AOW-rij (event_type='aow') of null wanneer nog niet aangemaakt. */
@@ -37,6 +38,8 @@ export function AowStrategieEditor({
   const router = useRouter()
   const [actions, setActions] = useState<RegelEditActionsState | null>(null)
 
+  const impact = useMemo<StrategieImpactBron>(() => ({ kind: 'preview', baseline, allEvents }), [baseline, allEvents])
+
   const handleSaved = useCallback(() => {
     onClose()
     router.refresh()
@@ -63,8 +66,7 @@ export function AowStrategieEditor({
     >
       <AowStrategieBody
         event={event}
-        allEvents={allEvents}
-        baseline={baseline}
+        impact={impact}
         dailyExpenses={dailyExpenses}
         aowRows={aowRows}
         dateOfBirth={dateOfBirth}

@@ -1,14 +1,14 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Trash2 } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
 import type { LifeEvent } from '@/lib/horizon-data'
 import type { PreviewBaseline } from '@/lib/strategy-preview'
 import type { RegelEditActionsState } from '@/components/future/regels/types'
 import { StrategieModalShell, StrategieFooter } from './strategie-modal-shell'
 import { WerkStrategieBody } from './werk-strategie-body'
+import { verwijderStrategie, type StrategieImpactBron } from './strategie-impact'
 
 interface Props {
   /** Bestaande werk-rij (event_type='werk') of null wanneer nog niet aangemaakt. */
@@ -50,6 +50,8 @@ export function WerkStrategieEditor({
   // Opslaan en verwijderen sluiten elkaar uit, zoals toen ze één `saving`-vlag deelden.
   const busy = deleting || (actions?.saving ?? false)
 
+  const impact = useMemo<StrategieImpactBron>(() => ({ kind: 'preview', baseline, allEvents }), [baseline, allEvents])
+
   const handleSaved = useCallback(() => {
     onClose()
     router.refresh()
@@ -59,10 +61,9 @@ export function WerkStrategieEditor({
     if (!event) return
     setDeleting(true)
     setError(null)
-    const supabase = createClient()
-    const { error: e } = await supabase.from('life_events').delete().eq('id', event.id)
-    if (e) {
-      setError(`Verwijderen mislukt: ${e.message}`)
+    const fout = await verwijderStrategie(event.id)
+    if (fout) {
+      setError(`Verwijderen mislukt: ${fout}`)
       setDeleting(false)
       return
     }
@@ -108,8 +109,7 @@ export function WerkStrategieEditor({
     >
       <WerkStrategieBody
         event={event}
-        allEvents={allEvents}
-        baseline={baseline}
+        impact={impact}
         dailyExpenses={dailyExpenses}
         currentAge={currentAge}
         currentNetMonthly={currentNetMonthly}

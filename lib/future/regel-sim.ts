@@ -22,6 +22,7 @@ import { clipRowsToPlanEnd } from '@/lib/horizon/clip-rows-to-plan-end'
 import type { PlanDraft } from '@/lib/horizon/plan-draft'
 import type { WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
 import type { SaleConfig } from '@/lib/sale-config'
+import type { LifeEvent } from '@/lib/horizon-data'
 
 /**
  * Serialiseerbare momentopname van alle simulatie-inputs voor de Voorkeuren-editors.
@@ -120,6 +121,20 @@ export interface RegelSimOverride {
    * dat niet in de context staat, verandert niets. `undefined` = rijen ongewijzigd.
    */
   assetSaleConfigs?: Readonly<Record<string, SaleConfig>>
+  /**
+   * TPR-15 stap 3 — een kandidaat voor een beheerde strategie-gebeurtenis (AOW, werk of één
+   * pensioenpot), in dezelfde rijvorm als `life_events`. De kern routeert die typen zelf naar
+   * hun param-blokken; hier wordt alleen de lijst in de rauwe context aangepast.
+   *  - `vervang: { eventType }` — alle rijen van dat type wijken (AOW en werk zijn één rij per
+   *    gebruiker; zo rekenden de strategie-editors hun preview al).
+   *  - `vervang: { id }` — alleen die rij wijkt; `id: null` = een nieuwe pot, er wijkt niets.
+   *  - `event: null` — alleen weglaten (de vergelijking "zonder …").
+   * `undefined` = gebeurtenissen ongewijzigd.
+   */
+  lifeEvent?: {
+    vervang: { eventType: string } | { id: string | null }
+    event: LifeEvent | null
+  }
 }
 
 /**
@@ -172,7 +187,8 @@ function applyDraftToRawContext(
     override?.legacyIncludeIlliquid === undefined &&
     override?.housingStrategyConfig === undefined &&
     override?.retirementExpense === undefined &&
-    override?.assetSaleConfigs === undefined
+    override?.assetSaleConfigs === undefined &&
+    override?.lifeEvent === undefined
   ) {
     return base
   }
@@ -183,6 +199,7 @@ function applyDraftToRawContext(
         Object.prototype.hasOwnProperty.call(saleConfigs, a.id) ? { ...a, sale_config: saleConfigs[a.id] } : a,
       )
     : base.assets
+  const lifeEvents = override.lifeEvent ? vervangLifeEvent(base.lifeEvents, override.lifeEvent) : base.lifeEvents
   // TPR-01 — kandidaat-uitgavengrondslag na stoppen (de kern leidt het jaarbedrag af).
   if (override.retirementExpense !== undefined) {
     profile.retirement_expense_method = override.retirementExpense.method
@@ -218,5 +235,24 @@ function applyDraftToRawContext(
   if (override.withdrawalProfileConfig !== undefined) {
     profile.withdrawal_profile_config = override.withdrawalProfileConfig
   }
-  return { ...base, profile, assets }
+  return { ...base, profile, assets, lifeEvents }
+}
+
+/**
+ * De gebeurtenissenlijst met één beheerde strategie-rij vervangen (zie `RegelSimOverride.lifeEvent`).
+ * Geëxporteerd zodat de strategie-editors op /toekomst/gebeurtenissen hun preview met
+ * dezelfde vervangregel opbouwen als de kern-override in de wizard.
+ */
+export function vervangLifeEvent(
+  events: readonly LifeEvent[],
+  draft: NonNullable<RegelSimOverride['lifeEvent']>,
+): readonly LifeEvent[] {
+  const { vervang } = draft
+  const blijft =
+    'eventType' in vervang
+      ? events.filter((e) => e.event_type !== vervang.eventType)
+      : vervang.id == null
+        ? [...events]
+        : events.filter((e) => e.id !== vervang.id)
+  return draft.event ? [...blijft, draft.event] : blijft
 }

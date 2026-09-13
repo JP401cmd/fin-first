@@ -8,6 +8,9 @@ import type { FirePlan } from '@/lib/fire-strategy'
 import type { PotRulesConfig } from '@/lib/pot-rules'
 import type { WealthGroup } from '@/lib/wealth-composition'
 import type { AssetType } from '@/lib/asset-data'
+import type { LifeEvent } from '@/lib/horizon-data'
+import type { AowLeeftijdRow } from '@/lib/aow-leeftijd'
+import type { StrategieEditorBasis } from '@/lib/horizon/strategie-editor-basis'
 
 /** Eén eigen, niet-liquide bezitting met een verkoopinstelling (stap 4). */
 export interface PlanReviewVastBezit {
@@ -34,6 +37,16 @@ export interface PlanReviewWoningContext {
   schulden: { id: string; name: string }[]
 }
 
+/** Stap 3 — "Wat er binnenkomt": de eigen AOW-, werk- en pensioenrijen plus de formulierbasis. */
+export interface PlanReviewInkomstenContext {
+  /** Alleen EIGEN rijen (`loadEigenStrategieEvents`): alleen die wijzigt de schrijfroute. */
+  aow: LifeEvent | null
+  werk: LifeEvent | null
+  pensioenen: LifeEvent[]
+  aowRows: AowLeeftijdRow[]
+  basis: StrategieEditorBasis
+}
+
 export interface PlanReviewEditorContext {
   /** Client-veilig (`buildClientRegelSimSnapshot`); `null` = geen run → geen live effect. */
   snapshot: RegelSimSnapshot | null
@@ -44,6 +57,8 @@ export interface PlanReviewEditorContext {
   potBalances: Record<WealthGroup, number> | null
   /** Stap 4 — woonstrategie en verkoopinstellingen. */
   woning: PlanReviewWoningContext | null
+  /** Stap 3 — AOW, werk en pensioen; `null` = niet geladen (alleen die editor meldt het). */
+  inkomsten: PlanReviewInkomstenContext | null
 }
 
 export const PLAN_REVIEW_EDITOR_CONTEXT_URL = '/api/plan-review/editor-context'

@@ -256,6 +256,42 @@ describe('stap 3 — Wat er binnenkomt', () => {
     expect(o.schrijf).toEqual([])
     expect(o.blokkade).toBeNull()
   })
+
+  it('TPR-15 — vergelijking uit dezelfde snapshot: zonder AOW en zonder pensioen (bijt-proef)', () => {
+    let n = 60
+    const overrides: RegelSimOverride[] = []
+    const run = vi.fn((o: RegelSimOverride): RegelProjection => {
+      overrides.push(o)
+      return { rows: [], fireAgeFractional: ++n + 0.2, reach: { kind: 'onbekend' } }
+    })
+    const o = buildPlanReviewStap('inkomsten', bronnen({ run }))
+    expect(overrides).toEqual([
+      { lifeEvent: { vervang: { eventType: 'aow' }, event: null } },
+      { lifeEvent: { vervang: { eventType: 'pension' }, event: null } },
+    ])
+    expect(o.vergelijking).toEqual([
+      { label: 'Met je AOW-gegevens (nu)', waarde: 'vrijheidsleeftijd 55' },
+      { label: 'Zonder AOW', waarde: 'vrijheidsleeftijd 61' },
+      { label: 'Zonder je pensioenregeling', waarde: 'vrijheidsleeftijd 62' },
+    ])
+  })
+
+  it('TPR-15 — zonder AOW-gegevens rekent de vergelijking de AOW die opslaan zou aanmaken (alleenstaand, 0 jaar)', () => {
+    const overrides: RegelSimOverride[] = []
+    const run = vi.fn((o: RegelSimOverride): RegelProjection => {
+      overrides.push(o)
+      return { rows: [], fireAgeFractional: 52.4, reach: { kind: 'onbekend' } }
+    })
+    const o = buildPlanReviewStap('inkomsten', bronnen({ run, facts: { ...FACTS_ALLES, hasAowEvent: false }, events: [] }))
+    const event = overrides[0]?.lifeEvent?.event
+    expect(overrides[0]?.lifeEvent?.vervang).toEqual({ eventType: 'aow' })
+    expect(event).toMatchObject({
+      event_type: 'aow',
+      target_age: 68,
+      metadata: { leefsituatie: 'alleenstaand', jarenBuitenNL: 0 },
+    })
+    expect(o.vergelijking.at(-1)).toEqual({ label: 'Met AOW als alleenstaande', waarde: 'vrijheidsleeftijd 52' })
+  })
 })
 
 describe('stap 4 — Je huis en ander vast bezit', () => {

@@ -183,7 +183,7 @@ export function PlanReviewPane({
   async function markeerEnGaDoor(
     stap: PlanReviewStap,
     facts: PlanReviewFacts,
-    opties: { geschreven: boolean; woonstrategieGeschreven: boolean; blijfBijOpenStap?: boolean },
+    opties: { geschreven: boolean; woonstrategieGeschreven: boolean; aowGeschreven?: boolean; blijfBijOpenStap?: boolean },
   ): Promise<string | null> {
     // Is er geschreven, dan zijn andere stappen en de editor-context verouderd — ook als
     // de markering hierna faalt (anders neemt een volgende bewerkstand het oude plan
@@ -198,7 +198,12 @@ export function PlanReviewPane({
     if (!res.ok) {
       return typeof data.error === 'string' ? data.error : 'Bevestigen is niet gelukt.'
     }
-    const nieuweFacts: PlanReviewFacts = opties.woonstrategieGeschreven ? { ...facts, housingConfigured: true } : facts
+    const nieuweFacts: PlanReviewFacts = {
+      ...facts,
+      ...(opties.woonstrategieGeschreven ? { housingConfigured: true } : {}),
+      // Stap 3: een geslaagde AOW-save heeft de eigen AOW-rij aangemaakt of bijgewerkt (A10).
+      ...(opties.aowGeschreven ? { hasAowEvent: true } : {}),
+    }
     const nieuw = derivePlanReviewProgress(parsePlanReviewState(data.plan_review_state), nieuweFacts)
     setProgress(nieuw)
     if (opties.geschreven) setCache({})
@@ -260,6 +265,7 @@ export function PlanReviewPane({
         potRules: data.potRules ?? null,
         potBalances: data.potBalances ?? null,
         woning: data.woning ?? null,
+        inkomsten: data.inkomsten ?? null,
       })
     } catch {
       setEditorLaadFout('Aanpassen kon niet geladen worden.')
@@ -290,7 +296,7 @@ export function PlanReviewPane({
   // Ook `onSaved` krijgt een stabiele identiteit (via een ref naar de laatste closure): een
   // body die hem in een publiceer-effect meeneemt, zou anders elke render opnieuw
   // publiceren → state-update → render → eindeloze lus.
-  type OpslaanInfo = { woonstrategieGeschreven?: boolean }
+  type OpslaanInfo = { woonstrategieGeschreven?: boolean; aowGeschreven?: boolean }
   const naOpslaanRef = useRef<(info?: OpslaanInfo) => void>(() => {})
   useEffect(() => {
     naOpslaanRef.current = (info) => void naOpslaanInEditor(info)
@@ -302,7 +308,7 @@ export function PlanReviewPane({
    * gaat naar de stap waarin de bewerkstand geopend werd (`bewerkStapRef`), nooit naar
    * een stap die intussen open staat.
    */
-  async function naOpslaanInEditor(info?: { woonstrategieGeschreven?: boolean }) {
+  async function naOpslaanInEditor(info?: OpslaanInfo) {
     const stap = bewerkStapRef.current
     const antwoord = stap ? cache[stap] : undefined
     if (!stap || stap !== schermRef.current || !antwoord) {
@@ -320,6 +326,7 @@ export function PlanReviewPane({
       const fout = await markeerEnGaDoor(stap, antwoord.facts, {
         geschreven: true,
         woonstrategieGeschreven: info?.woonstrategieGeschreven ?? stap === 'woning',
+        aowGeschreven: info?.aowGeschreven === true,
         blijfBijOpenStap: true,
       })
       if (fout) {

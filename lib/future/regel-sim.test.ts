@@ -50,3 +50,37 @@ describe('runRegelProjection — assetSaleConfigs', () => {
     expect(ctx.assets).toEqual([AUTO, KUNST])
   })
 })
+
+describe('runRegelProjection — lifeEvent (TPR-15 stap 3)', () => {
+  const ev = (id: string, event_type: string) => ({ id, event_type, name: id }) as never
+  const AOW = ev('e-aow', 'aow')
+  const POT1 = ev('p1', 'pension')
+  const POT2 = ev('p2', 'pension')
+  const KIND = ev('k1', 'children')
+  const metEvents = {
+    rawContext: { ...snapshot.rawContext, lifeEvents: [AOW, POT1, POT2, KIND] },
+  } as unknown as RegelSimSnapshot
+  const lifeEvents = () => (ontvangen.contexts[0] as { lifeEvents: unknown[] }).lifeEvents
+
+  it('vervangt per type alle rijen van dat type en laat de rest staan', () => {
+    const draft = ev('aow-draft', 'aow')
+    runRegelProjection(metEvents, { lifeEvent: { vervang: { eventType: 'aow' }, event: draft } })
+    expect(lifeEvents()).toEqual([POT1, POT2, KIND, draft])
+  })
+
+  it('vervangt per id alleen die pot; id null voegt toe', () => {
+    const nieuw = ev('p1', 'pension')
+    runRegelProjection(metEvents, { lifeEvent: { vervang: { id: 'p1' }, event: nieuw } })
+    expect(lifeEvents()).toEqual([AOW, POT2, KIND, nieuw])
+    ontvangen.contexts = []
+    const extra = ev('pension-draft', 'pension')
+    runRegelProjection(metEvents, { lifeEvent: { vervang: { id: null }, event: extra } })
+    expect(lifeEvents()).toEqual([AOW, POT1, POT2, KIND, extra])
+  })
+
+  it('event null laat alleen weg (vergelijking "zonder"), zonder de snapshot te muteren', () => {
+    runRegelProjection(metEvents, { lifeEvent: { vervang: { eventType: 'pension' }, event: null } })
+    expect(lifeEvents()).toEqual([AOW, KIND])
+    expect((metEvents.rawContext.lifeEvents as unknown[]).length).toBe(4)
+  })
+})

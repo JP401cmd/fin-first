@@ -75,28 +75,36 @@ export interface PotDraft {
 
 export function potFromEvent(ev: LifeEvent): PotDraft {
   const m = (ev.metadata ?? {}) as Record<string, unknown>
+  const pensioenType = normalizePensionType(m.pensioenType as string | undefined)
+  // Een duur die niet bij het type past (legacy `banksparen` zonder duur → levenslang) is in
+  // het formulier niet te kiezen: begin dan op de eerste toegestane duur van het type.
+  const toegestaan = allowedDuur(pensioenType)
+  const duur = m.uitkeringsduur as Duur | undefined
   return {
     id: ev.id,
     name: ev.name,
-    pensioenType: normalizePensionType(m.pensioenType as string | undefined),
+    pensioenType,
     ingangLeeftijd: Number(m.ingangLeeftijd ?? ev.target_age ?? 67),
     invoermodus: Number(m.inlegBedrag ?? 0) > 0 ? 'pot' : 'maand',
     brutoBedrag: Number(m.brutoBedrag ?? ev.monthly_income_change ?? 0),
     inlegBedrag: Number(m.inlegBedrag ?? 0),
-    uitkeringsduur: (m.uitkeringsduur as Duur) ?? 'levenslang',
-    isGeindexeerd: Boolean(m.isGeindexeerd ?? false),
+    uitkeringsduur: duur && toegestaan.includes(duur) ? duur : toegestaan[0]!,
+    // Zelfde terugval als de kern (`m.isGeindexeerd ?? ev.is_indexed`): een UPO-pot zonder
+    // die sleutel is geïndexeerd; zonder deze terugval zette opslaan dat stil op "nee".
+    isGeindexeerd: Boolean(m.isGeindexeerd ?? ev.is_indexed ?? false),
     partnerUitkeringPct: Number(m.partnerUitkeringPct ?? 70),
   }
 }
 
-export function newPot(ingang: number): PotDraft {
+/** Beginstand van een nieuwe pot. `brutoBedrag` = het voorbeeldbedrag (de modal: 675). */
+export function newPot(ingang: number, brutoBedrag = 675): PotDraft {
   return {
     id: null,
     name: 'Bedrijfspensioen',
     pensioenType: 'bedrijf',
     ingangLeeftijd: ingang,
     invoermodus: 'maand',
-    brutoBedrag: 675,
+    brutoBedrag,
     inlegBedrag: 0,
     uitkeringsduur: 'levenslang',
     isGeindexeerd: false,

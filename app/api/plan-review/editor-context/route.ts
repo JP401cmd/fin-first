@@ -9,7 +9,15 @@ import { loadHorizonRaw } from '@/lib/horizon/raw-data-loader'
 import { resolvePotRules } from '@/lib/pot-rules'
 import { SALE_CONFIG_ASSET_TYPES } from '@/lib/asset-data'
 import { getHouseholdIdForUser, selectAflosbareSchulden } from '@/lib/sale-config-debts'
-import type { PlanReviewEditorContext, PlanReviewVastBezit, PlanReviewWoningContext } from '@/lib/plan-review/editor-context'
+import { loadEigenStrategieEvents } from '@/lib/plan-review/eigen-strategie-events'
+import { AOW_LEEFTIJD_KOLOMMEN, strategieEditorBasis } from '@/lib/horizon/strategie-editor-basis'
+import type { AowLeeftijdRow } from '@/lib/aow-leeftijd'
+import type {
+  PlanReviewEditorContext,
+  PlanReviewInkomstenContext,
+  PlanReviewVastBezit,
+  PlanReviewWoningContext,
+} from '@/lib/plan-review/editor-context'
 
 /**
  * GET /api/plan-review/editor-context — wat de inline editors van de plan-review nodig
@@ -74,6 +82,30 @@ async function loadWoning(
   }
 }
 
+/**
+ * Stap 3 — de eigen AOW/werk/pensioen-rijen (expliciete `user_id`-lezing: de policy is
+ * huishoud-gedeeld) en de formulierbasis van /toekomst/gebeurtenissen (`strategieEditorBasis`),
+ * zodat het formulier in de wizard dezelfde prefill en leeftijd toont.
+ */
+async function loadInkomsten(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  raw: Awaited<ReturnType<typeof loadHorizonRaw>>,
+): Promise<PlanReviewInkomstenContext> {
+  const [events, aowRes] = await Promise.all([
+    loadEigenStrategieEvents(supabase, userId),
+    supabase.from('aow_leeftijd').select(AOW_LEEFTIJD_KOLOMMEN).order('birth_date_from', { ascending: true }),
+  ])
+  if (aowRes.error) throw aowRes.error
+  return {
+    aow: events.find((e) => e.event_type === 'aow') ?? null,
+    werk: events.find((e) => e.event_type === 'werk') ?? null,
+    pensioenen: events.filter((e) => e.event_type === 'pension'),
+    aowRows: (aowRes.data ?? []) as AowLeeftijdRow[],
+    basis: strategieEditorBasis(raw),
+  }
+}
+
 export async function GET() {
   try {
     const supabase = await createClient()
@@ -92,6 +124,10 @@ export async function GET() {
       // en de woning-editor zegt dat zijn gegevens niet geladen konden worden.
       woning: await loadWoning(supabase, user.id, raw).catch((err: unknown) => {
         console.error('[plan-review:editor-context:woning]', err)
+        return null
+      }),
+      inkomsten: await loadInkomsten(supabase, user.id, raw).catch((err: unknown) => {
+        console.error('[plan-review:editor-context:inkomsten]', err)
         return null
       }),
     }

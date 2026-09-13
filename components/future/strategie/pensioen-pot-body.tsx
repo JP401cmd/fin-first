@@ -11,14 +11,12 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronLeft } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
 import type { CanonicalPensionType, LifeEvent } from '@/lib/horizon-data'
 import { formatCurrency, formatWithFreedom } from '@/lib/format'
-import { previewFireAge, type PreviewBaseline } from '@/lib/strategy-preview'
+import { bouwStrategieRij, strategieInvoerFout, type StrategieBody } from '@/lib/life-events/strategie-write'
 import {
   allowedDuur,
   effectiveMonthly,
-  eventFromPot,
   DUUR_LABEL,
   TIJDELIJKE_PLAFOND,
   TYPE_LABEL,
@@ -29,15 +27,18 @@ import {
 } from '@/lib/pension/pot-draft'
 import type { RegelEditActionsState } from '@/components/future/regels/types'
 import { LabeledNumber, TriggerButton } from './fields'
+import { slaStrategieOp, useStrategieImpact, type StrategieImpactBron } from './strategie-impact'
 
 export interface PensioenPotBodyProps {
   /** Beginstand van het concept (bestaande pot via `potFromEvent`, of `newPot`). */
   initialPot: PotDraft
-  /** Alle pension-events — voor de sort_order van een nieuwe pot. */
-  pensionEvents: LifeEvent[]
-  /** Alle huidige events (voor de live vrijheidsleeftijd-preview). */
-  allEvents: LifeEvent[]
-  baseline: PreviewBaseline | null
+  /**
+   * Metadata van de bestaande pot (bv. `mijnpensioenBron` van de UPO-import) — de route
+   * bewaart die bij het bijwerken; de preview rekent met dezelfde rij.
+   */
+  bestaandeMetadata?: Record<string, unknown>
+  /** Waarmee het live effect gerekend wordt (zie `strategie-impact.tsx`). */
+  impact: StrategieImpactBron
   /** Dagelijkse must-uitgaven, voor vrijheid-tijd framing. */
   dailyExpenses: number
   /** Wettelijke AOW-leeftijd voor validatie-waarschuwingen. */
@@ -47,15 +48,14 @@ export interface PensioenPotBodyProps {
   onActionsChange: (s: RegelEditActionsState) => void
   /** Aanroepen na een geslaagde save; de host keert terug en ververst. */
   onSaved: () => void
-  /** De "Alle potten"-knop bovenaan: terug naar de lijst van de host. */
-  onTerug: () => void
+  /** De "Alle potten"-knop bovenaan: terug naar de lijst van de host (weglaten = geen knop). */
+  onTerug?: () => void
 }
 
 export function PensioenPotBody({
   initialPot,
-  pensionEvents,
-  allEvents,
-  baseline,
+  bestaandeMetadata,
+  impact,
   dailyExpenses,
   aowAge,
   readOnly,
@@ -67,15 +67,28 @@ export function PensioenPotBody({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const body: StrategieBody = useMemo(() => {
+    const { id, ...pot } = draft
+    return { event_type: 'pension', ...(id ? { id } : {}), pot }
+  }, [draft])
+  const invoerFout = strategieInvoerFout(body)
+  // Het concept als rij: `eventFromPot` (dezelfde opbouw als de route), bestaande metadata erbij.
+  const draftEvent: LifeEvent | null = useMemo(
+    () =>
+      invoerFout == null
+        ? { ...bouwStrategieRij(body, bestaandeMetadata), id: draft.id ?? 'pension-draft', sort_order: 0 }
+        : null,
+    [body, invoerFout, bestaandeMetadata, draft.id],
+  )
+  const vervang = useMemo(() => ({ id: initialPot.id }), [initialPot.id])
+
   // Live vrijheidsleeftijd voor de pot-editor.
-  const { savedAge, draftAge } = useMemo(() => {
-    if (!baseline) return { savedAge: null as number | null, draftAge: null as number | null }
-    const others = allEvents.filter((e) => e.id !== draft.id)
-    return {
-      savedAge: previewFireAge(baseline, allEvents),
-      draftAge: previewFireAge(baseline, [...others, eventFromPot(draft)]),
-    }
-  }, [baseline, allEvents, draft])
+  const { savedAge, draftAge, inline, footerInfo, footerKey } = useStrategieImpact(impact, draftEvent, vervang)
+
+  // Gewijzigd = anders dan de beginstand. Ook bij een nieuwe pot: de vooringevulde stand alleen
+  // maakt nog geen pensioen aan (in de wizard begint die op € 0).
+  const [opgeslagen, setOpgeslagen] = useState<string>(() => JSON.stringify(body))
+  const changed = opgeslagen !== JSON.stringify(body)
 
   function setType(t: CanonicalPensionType) {
     setDraft((d) => {
@@ -88,53 +101,22 @@ export function PensioenPotBody({
   }
 
   async function savePot() {
-    if (!draft.name.trim()) {
-      setError('Geef de pot een naam.')
+    if (invoerFout != null) {
+      setError(invoerFout)
       return
     }
     setSaving(true)
     setError(null)
-    const supabase = createClient()
-    const ev = eventFromPot(draft)
-    const payload = {
-      name: ev.name.trim(),
-      event_type: 'pension',
-      target_age: ev.target_age,
-      target_date: null,
-      one_time_cost: 0,
-      monthly_cost_change: 0,
-      monthly_income_change: ev.monthly_income_change,
-      duration_months: ev.duration_months,
-      icon: ev.icon,
-      is_active: true,
-      is_indexed: ev.is_indexed,
-      metadata: ev.metadata,
-    }
-    let dbError: { message: string } | null = null
-    if (draft.id) {
-      const { error: e } = await supabase.from('life_events').update(payload).eq('id', draft.id)
-      dbError = e
-    } else {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (!user) {
-        setError('Niet ingelogd — kan pensioenpot niet opslaan.')
-        setSaving(false)
-        return
-      }
-      const maxSort = pensionEvents.reduce((m, e) => Math.max(m, e.sort_order ?? 0), 1000)
-      const { error: e } = await supabase
-        .from('life_events')
-        .insert({ ...payload, user_id: user.id, sort_order: maxSort + 1 })
-      dbError = e
-    }
-    if (dbError) {
-      setError(`Opslaan mislukt: ${dbError.message}`)
-      setSaving(false)
+    const uitkomst = await slaStrategieOp(body)
+    setSaving(false)
+    if (!uitkomst.ok) {
+      setError(`Opslaan mislukt: ${uitkomst.fout}`)
       return
     }
-    setSaving(false)
+    // Een nieuwe pot heeft nu een id; een volgende save werkt díe bij in plaats van een
+    // tweede pot aan te maken.
+    setDraft((d) => ({ ...d, id: uitkomst.id }))
+    setOpgeslagen(JSON.stringify({ ...body, id: uitkomst.id }))
     onSaved()
   }
 
@@ -145,10 +127,14 @@ export function PensioenPotBody({
     saveRef.current = savePot
   })
 
-  const canSave = !readOnly && !saving
+  const canSave = !readOnly && !saving && invoerFout == null
   useEffect(() => {
-    onActionsChange({ canSave, saving, save: () => void saveRef.current() })
-  }, [onActionsChange, canSave, saving])
+    // Zonder wijziging schrijft bevestigen niets: dan ook geen effect in de footer (dat zou
+    // een concept tonen dat nergens doorkomt).
+    onActionsChange({ canSave, saving, save: () => void saveRef.current(), changed, footerInfo: changed ? footerInfo : undefined })
+    // footerInfo volgt footerKey (de delta); zo publiceert niet elke render opnieuw.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onActionsChange, canSave, saving, changed, footerKey])
 
   const allowed = allowedDuur(draft.pensioenType)
   const duurLocked = allowed.length === 1
@@ -173,13 +159,15 @@ export function PensioenPotBody({
       )}
 
       <div className="space-y-5">
-        <button
-          type="button"
-          onClick={onTerug}
-          className="inline-flex items-center gap-1 text-xs text-[var(--ink-3)] hover:text-[var(--ink-2)]"
-        >
-          <ChevronLeft className="h-3.5 w-3.5" aria-hidden /> Alle potten
-        </button>
+        {onTerug && (
+          <button
+            type="button"
+            onClick={onTerug}
+            className="inline-flex items-center gap-1 text-xs text-[var(--ink-3)] hover:text-[var(--ink-2)]"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" aria-hidden /> Alle potten
+          </button>
+        )}
 
         {/* Type */}
         <div>
@@ -355,7 +343,12 @@ export function PensioenPotBody({
             Bruto: <span className="font-mono tabular-nums">{formatCurrency(effMonthly)}</span>/mnd vanaf{' '}
             {draft.ingangLeeftijd}
           </div>
-          {baseline && savedRounded != null && draftRounded != null && (
+          {invoerFout && (
+            <div role="alert" className="mt-1 text-xs text-negative">
+              {invoerFout}
+            </div>
+          )}
+          {inline && savedRounded != null && draftRounded != null && (
             <div className="mt-1 text-sm text-[var(--ink-2)]">
               Vrijheidsleeftijd:{' '}
               <span className="font-mono tabular-nums">{savedRounded}</span>

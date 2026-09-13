@@ -10,21 +10,22 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Plus, Trash2, TrendingUp, Clock } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
 import type { LifeEvent, WerkMetadata, WerkFase, WerkSprong } from '@/lib/horizon-data'
 import { formatCurrency, formatWithFreedom } from '@/lib/format'
 import { salaryAt } from '@/lib/werk-strategie'
-import { previewFireAge, type PreviewBaseline } from '@/lib/strategy-preview'
 import { ScenarioCallout } from '@/components/editorial'
+import { bouwStrategieRij, strategieInvoerFout, type StrategieBody } from '@/lib/life-events/strategie-write'
 import type { RegelEditActionsState } from '@/components/future/regels/types'
 import { LabeledNumber } from './fields'
+import { slaStrategieOp, useStrategieImpact, type StrategieImpactBron } from './strategie-impact'
+
+const VERVANG_WERK = { eventType: 'werk' } as const
 
 export interface WerkStrategieBodyProps {
   /** Bestaande werk-rij (event_type='werk') of null wanneer nog niet aangemaakt. */
   event: LifeEvent | null
-  /** Alle huidige events (voor de live vrijheidsleeftijd-preview). */
-  allEvents: LifeEvent[]
-  baseline: PreviewBaseline | null
+  /** Waarmee het live effect gerekend wordt (zie `strategie-impact.tsx`). */
+  impact: StrategieImpactBron
   /** Dagelijkse must-uitgaven, voor vrijheid-tijd framing. */
   dailyExpenses: number
   /** Huidige leeftijd uit DOB (null = onbekend → editor defaultet naar 40 + waarschuwing). */
@@ -48,8 +49,7 @@ const DEELTIJD_PRESETS = [
 
 export function WerkStrategieBody({
   event,
-  allEvents,
-  baseline,
+  impact,
   dailyExpenses,
   currentAge,
   currentNetMonthly,
@@ -92,35 +92,37 @@ export function WerkStrategieBody({
     [huidigNettoMaand, groeiPct, groeiStop, groeiTotLeeftijd, plafond, faseStappen, sprongen],
   )
 
-  function buildDraftEvent(): LifeEvent {
-    return {
-      id: event?.id ?? 'werk-draft',
-      name: 'Werk & inkomen',
+  // De invoer zoals de route 'm valideert; de rij (incl. bron/schemaversie) bouwt de server.
+  const body: StrategieBody = useMemo(
+    () => ({
       event_type: 'werk',
       target_age: effectiveAge,
-      target_date: null,
-      one_time_cost: 0,
-      monthly_cost_change: 0,
-      monthly_income_change: 0,
-      duration_months: 0,
-      icon: 'Briefcase',
-      is_active: true,
-      sort_order: event?.sort_order ?? 0,
-      is_indexed: true,
-      metadata: draftMeta as unknown as Record<string, unknown>,
-    }
-  }
+      metadata: {
+        huidigNettoMaand,
+        reeleGroeiPct: groeiPct / 100,
+        ...(groeiStop ? { groeiTotLeeftijd } : {}),
+        ...(plafond > 0 ? { plafondNettoMaand: plafond } : {}),
+        faseStappen,
+        sprongen,
+      },
+    }),
+    [effectiveAge, huidigNettoMaand, groeiPct, groeiStop, groeiTotLeeftijd, plafond, faseStappen, sprongen],
+  )
+  const invoerFout = strategieInvoerFout(body)
+  const draft: LifeEvent | null = useMemo(
+    () =>
+      invoerFout == null
+        ? { ...bouwStrategieRij(body, event?.metadata), id: event?.id ?? 'werk-draft', sort_order: event?.sort_order ?? 0 }
+        : null,
+    [body, invoerFout, event?.id, event?.sort_order, event?.metadata],
+  )
 
   // Live vrijheidsleeftijd: huidige (opgeslagen) staat → concept-staat.
-  const { savedAge, draftAge } = useMemo(() => {
-    if (!baseline) return { savedAge: null as number | null, draftAge: null as number | null }
-    const others = allEvents.filter((e) => e.event_type !== 'werk')
-    return {
-      savedAge: previewFireAge(baseline, allEvents),
-      draftAge: previewFireAge(baseline, [...others, buildDraftEvent()]),
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [baseline, allEvents, draftMeta, effectiveAge, event?.id])
+  const { savedAge, draftAge, inline, footerInfo, footerKey } = useStrategieImpact(impact, draft, VERVANG_WERK)
+
+  // Zonder werk-rij is de vooringevulde stand "niets gewijzigd": dan schrijft bevestigen niets.
+  const [opgeslagen, setOpgeslagen] = useState(() => JSON.stringify(body))
+  const changed = opgeslagen !== JSON.stringify(body)
 
   // Inkomenslijn-mijlpalen (reëel, huidige euro's).
   const nu = Math.round(salaryAt(draftMeta, effectiveAge, effectiveAge))
@@ -153,47 +155,16 @@ export function WerkStrategieBody({
   }
 
   async function handleSave() {
+    if (invoerFout != null) return
     setSaving(true)
     setError(null)
-    const supabase = createClient()
-    const payload = {
-      name: 'Werk & inkomen',
-      event_type: 'werk',
-      target_age: effectiveAge,
-      target_date: null,
-      one_time_cost: 0,
-      monthly_cost_change: 0,
-      monthly_income_change: 0,
-      duration_months: 0,
-      icon: 'Briefcase',
-      is_active: true,
-      is_indexed: true,
-      metadata: draftMeta,
-    }
-    let dbError: { message: string } | null = null
-    if (event) {
-      const { error: e } = await supabase.from('life_events').update(payload).eq('id', event.id)
-      dbError = e
-    } else {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (!user) {
-        setError('Niet ingelogd — kan Werk-strategie niet opslaan.')
-        setSaving(false)
-        return
-      }
-      const { error: e } = await supabase
-        .from('life_events')
-        .insert({ ...payload, user_id: user.id, sort_order: 0 })
-      dbError = e
-    }
-    if (dbError) {
-      setError(`Opslaan mislukt: ${dbError.message}`)
-      setSaving(false)
+    const uitkomst = await slaStrategieOp(body)
+    setSaving(false)
+    if (!uitkomst.ok) {
+      setError(`Opslaan mislukt: ${uitkomst.fout}`)
       return
     }
-    setSaving(false)
+    setOpgeslagen(JSON.stringify(body))
     onSaved()
   }
 
@@ -204,10 +175,14 @@ export function WerkStrategieBody({
     saveRef.current = handleSave
   })
 
-  const canSave = !readOnly && !saving
+  const canSave = !readOnly && !saving && invoerFout == null
   useEffect(() => {
-    onActionsChange({ canSave, saving, save: () => void saveRef.current() })
-  }, [onActionsChange, canSave, saving])
+    // Zonder wijziging schrijft bevestigen niets: dan ook geen effect in de footer (dat zou
+    // een concept tonen dat nergens doorkomt).
+    onActionsChange({ canSave, saving, save: () => void saveRef.current(), changed, footerInfo: changed ? footerInfo : undefined })
+    // footerInfo volgt footerKey (de delta); zo publiceert niet elke render opnieuw.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onActionsChange, canSave, saving, changed, footerKey])
 
   return (
     <>
@@ -444,7 +419,12 @@ export function WerkStrategieBody({
               vrijheid per jaar — volledig gespaard.
             </div>
           )}
-          {baseline && savedRounded != null && draftRounded != null && (
+          {invoerFout && (
+            <div role="alert" className="mt-1 text-xs text-negative">
+              {invoerFout}
+            </div>
+          )}
+          {inline && savedRounded != null && draftRounded != null && (
             <div className="mt-3 border-t border-[var(--border-ed)] pt-3 text-sm text-[var(--ink-2)]">
               Vrijheidsleeftijd:{' '}
               <span className="font-mono tabular-nums">{savedRounded}</span>

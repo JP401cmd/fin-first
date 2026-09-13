@@ -76,6 +76,17 @@ vi.mock('@/lib/horizon/raw-data-loader', () => ({
     }),
 }))
 
+// TPR-15 — de eigen AOW/werk/pensioen-rijen (expliciete user_id-lezing). De rauwe laag
+// hierboven levert een AOW-event dat van de partner kan zijn; dat telt niet.
+let eigenEvents: Array<Record<string, unknown>> = []
+const eigenLezingen: string[] = []
+vi.mock('@/lib/plan-review/eigen-strategie-events', () => ({
+  loadEigenStrategieEvents: (_s: unknown, userId: string) => {
+    eigenLezingen.push(userId)
+    return Promise.resolve(eigenEvents)
+  },
+}))
+
 import { GET, PUT } from './route'
 
 const get = (stap: string) => GET(new NextRequest(`http://localhost/api/plan-review?stap=${stap}`))
@@ -171,6 +182,29 @@ describe('GET /api/plan-review', () => {
     expect(body.facts.hasNietLiquideBezit).toBe(false)
     expect(body.progress.stappen.find((s) => s.stap === 'woning')?.status).toBe('nvt')
     expect(body.overzicht.keuzes).toEqual([])
+  })
+
+  it('een AOW-event dat niet van de gebruiker is, zet de AOW-stap niet dicht (eigen gebeurtenissen)', async () => {
+    eigenEvents = []
+    const res = await get('inkomsten')
+    const body = (await res.json()) as {
+      facts: { hasAowEvent: boolean }
+      overzicht: { blokkade: string | null }
+    }
+    expect(eigenLezingen.at(-1)).toBe('u1')
+    expect(body.facts.hasAowEvent).toBe(false)
+    expect(body.overzicht.blokkade).not.toBeNull()
+
+    eigenEvents = [
+      { id: 'geheim-event-id', user_id: 'u1', event_type: 'aow', is_active: true, metadata: { bron: 'geheim-meta' } },
+    ]
+    const res2 = await get('inkomsten')
+    const tekst = await res2.text()
+    expect((JSON.parse(tekst) as { facts: { hasAowEvent: boolean } }).facts.hasAowEvent).toBe(true)
+    // Alleen afgeleide weergave: geen rij-id, user_id of metadata van gebeurtenissen.
+    expect(tekst).not.toContain('geheim-event-id')
+    expect(tekst).not.toContain('geheim-meta')
+    expect(tekst).not.toContain('user_id')
   })
 
   it('levert alleen afgeleide weergave — geen rauwe rijen of versleutelde kolommen', async () => {

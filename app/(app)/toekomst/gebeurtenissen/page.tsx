@@ -10,6 +10,7 @@ import { resolveDeficitLoanRate } from '@/lib/horizon-kernel/adapter/params'
 import type { PreviewBaseline } from '@/lib/strategy-preview'
 import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import { buildHorizonInput } from '@/lib/horizon/build-input'
+import { AOW_LEEFTIJD_KOLOMMEN, strategieEditorBasis } from '@/lib/horizon/strategie-editor-basis'
 
 export const metadata: Metadata = {
   title: 'Gebeurtenissen — TriFinity',
@@ -34,7 +35,7 @@ export default async function ToekomstGebeurtenissenPage() {
     loadHorizonRaw(supabase),
     supabase
       .from('aow_leeftijd')
-      .select('id, birth_date_from, birth_date_through, aow_years, aow_months, is_definitive, source')
+      .select(AOW_LEEFTIJD_KOLOMMEN)
       .order('birth_date_from', { ascending: true }),
   ])
 
@@ -82,14 +83,12 @@ export default async function ToekomstGebeurtenissenPage() {
           },
         }
       : null
-  // Netto maandinkomen voor de Werk-strategie: 6-maands transactie-inkomen
-  // (zelfde grondslag als de spaarquote); fallback ~65% van het bruto-profiel.
-  const currentNetMonthly = Math.round(
-    horizonData.avgIncome6m > 0 ? horizonData.avgIncome6m : (ei.monthlyIncome ?? 0) * 0.65,
-  )
+  // Netto maandinkomen (werk-prefill) en dagtarief: dezelfde basis als de plan-review-wizard
+  // (`strategieEditorBasis`), zodat hetzelfde formulier op beide plekken hetzelfde toont.
+  const { currentNetMonthly, dailyExpenses } = strategieEditorBasis(horizonData)
   const strategieData = {
     baseline: strategieBaseline,
-    dailyExpenses: ei.yearlyMustExpenses > 0 ? ei.yearlyMustExpenses / 365 : 0,
+    dailyExpenses,
     aowRows,
     dateOfBirth: dob,
     grossYearlyIncome: (ei.monthlyIncome ?? 0) * 12,

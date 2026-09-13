@@ -63,7 +63,7 @@ function renderEditor() {
   const onSaved = vi.fn()
   render(
     <UitgavenEditor
-      context={{ snapshot: { rawContext: {} } as never, firePlan: null, potRules: null, potBalances: null, woning: null }}
+      context={{ snapshot: { rawContext: {} } as never, firePlan: null, potRules: null, potBalances: null, woning: null, inkomsten: null }}
       onActionsChange={(s) => {
         actions = s
       }}

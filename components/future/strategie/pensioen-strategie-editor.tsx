@@ -31,6 +31,7 @@ import {
 import { StrategieModalShell, StrategieFooter } from './strategie-modal-shell'
 import { PensioenProjectieChart } from './pensioen-projectie-chart'
 import { PensioenPotBody } from './pensioen-pot-body'
+import { verwijderStrategie, type StrategieImpactBron } from './strategie-impact'
 
 interface Props {
   pensionEvents: LifeEvent[]
@@ -297,6 +298,9 @@ export function PensioenStrategieEditor({
     router.refresh()
   }, [router])
 
+  // Vóór de view-splitsing: de hook-volgorde blijft gelijk tussen lijst en pot.
+  const impact = useMemo<StrategieImpactBron>(() => ({ kind: 'preview', baseline, allEvents }), [baseline, allEvents])
+
   async function deletePot() {
     if (!draft?.id) {
       setDraft(null)
@@ -304,10 +308,9 @@ export function PensioenStrategieEditor({
     }
     setSaving(true)
     setError(null)
-    const supabase = createClient()
-    const { error: e } = await supabase.from('life_events').delete().eq('id', draft.id)
-    if (e) {
-      setError(`Verwijderen mislukt: ${e.message}`)
+    const fout = await verwijderStrategie(draft.id)
+    if (fout) {
+      setError(`Verwijderen mislukt: ${fout}`)
       setSaving(false)
       return
     }
@@ -927,9 +930,8 @@ export function PensioenStrategieEditor({
       <PensioenPotBody
         key={draft.id ?? 'nieuw'}
         initialPot={draft}
-        pensionEvents={pensionEvents}
-        allEvents={allEvents}
-        baseline={baseline}
+        bestaandeMetadata={pensionEvents.find((e) => e.id === draft.id)?.metadata}
+        impact={impact}
         dailyExpenses={dailyExpenses}
         aowAge={aowAge}
         readOnly={readOnly}

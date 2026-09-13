@@ -60,6 +60,7 @@ import {
   type WithdrawalProfiel,
 } from '@/lib/withdrawal-strategy'
 import type { RetirementExpenseMethod } from '@/lib/budget-utils'
+import { bouwStrategieRij } from '@/lib/life-events/strategie-write'
 import { NIET_LIQUIDE_ASSET_TYPES } from './niet-liquide'
 import { PLAN_REVIEW_STAP_TITELS, type PlanReviewFacts, type PlanReviewStap } from './types'
 
@@ -444,7 +445,7 @@ function stapInkomsten(b: PlanReviewBronnen): PlanReviewStapOverzicht {
 
   const meta = (aowEvent?.metadata ?? {}) as Record<string, unknown>
   const leefsituatie = meta.leefsituatie === 'samenwonend' ? 'Samenwonend' : 'Alleenstaand'
-  const jarenBuitenNL = Number(meta.jarenBuitenNL ?? 0)
+  const jarenBuitenNL = Number(meta.jarenBuitenNL ?? meta.jarenInNL ?? 0) // zelfde terugval als het formulier
 
   const details: PlanReviewRegel[] = []
   if (heeftAow) {
@@ -461,6 +462,42 @@ function stapInkomsten(b: PlanReviewBronnen): PlanReviewStapOverzicht {
   details.push({ label: 'Werkplan tot stoppen', waarde: werkplan ? 'ja' : 'geen' })
 
   const effect = [`Met deze inkomsten: ${uitkomstFrase(basis, maat)}.`]
+
+  // TPR-15 — wat AOW en pensioen aan de uitkomst bijdragen, uit dezelfde snapshot: de
+  // bestaande rijen weggelaten, of (zonder AOW-gegevens) de AOW die opslaan zou aanmaken
+  // met de vooringevulde waarden van het formulier (alleenstaand, 0 jaar buiten Nederland).
+  const vergelijking: PlanReviewRegel[] = []
+  if (b.run && basis) {
+    if (heeftAow) {
+      const zonderAow = b.run({ lifeEvent: { vervang: { eventType: 'aow' }, event: null } })
+      vergelijking.push(
+        { label: 'Met je AOW-gegevens (nu)', waarde: uitkomstFrase(basis, maat) },
+        { label: 'Zonder AOW', waarde: uitkomstFrase(zonderAow, maat) },
+      )
+    } else if (b.aowAge != null) {
+      const rij = bouwStrategieRij({
+        event_type: 'aow',
+        target_age: Math.min(75, Math.max(60, Math.ceil(b.aowAge))),
+        leefsituatie: 'alleenstaand',
+        jarenBuitenNL: 0,
+      })
+      const metAow = b.run({
+        lifeEvent: { vervang: { eventType: 'aow' }, event: { ...rij, id: 'aow-vergelijking', sort_order: 0 } },
+      })
+      vergelijking.push(
+        { label: 'Zonder AOW (nu)', waarde: uitkomstFrase(basis, maat) },
+        { label: 'Met AOW als alleenstaande', waarde: uitkomstFrase(metAow, maat) },
+      )
+    }
+    if (pensioenen > 0) {
+      const zonderPensioen = b.run({ lifeEvent: { vervang: { eventType: 'pension' }, event: null } })
+      vergelijking.push({
+        label: pensioenen === 1 ? 'Zonder je pensioenregeling' : `Zonder je ${pensioenen} pensioenregelingen`,
+        waarde: uitkomstFrase(zonderPensioen, maat),
+      })
+    }
+  }
+
   if (!heeftAow) {
     effect.push(
       'Zonder AOW-gegevens telt de app geen AOW mee. Je vermogen draagt dan ook na je AOW-leeftijd alle uitgaven.',
@@ -484,7 +521,7 @@ function stapInkomsten(b: PlanReviewBronnen): PlanReviewStapOverzicht {
       : 'De app rekent nu met € 0 AOW: er staan geen AOW-gegevens in je plan.',
     details,
     effect,
-    vergelijking: [],
+    vergelijking,
     waarom:
       'AOW en pensioen zijn het inkomen dat na stoppen binnenkomt. Wat zij dekken, hoeft je eigen vermogen niet op te brengen, ' +
       'dus ontbrekende of verouderde gegevens verschuiven je uitkomst.',
@@ -494,11 +531,17 @@ function stapInkomsten(b: PlanReviewBronnen): PlanReviewStapOverzicht {
     // Bevestigen zet alleen de markering.
     schrijf: [],
     blokkade: heeftAow ? null : 'Deze stap telt pas als bevestigd wanneer je AOW-gegevens in je plan staan.',
+    // Het eerste label is ook de knop van de inline bewerkstand (TPR-15).
     aanpassen: [
-      { href: '/toekomst/gebeurtenissen?strategie=aow', label: heeftAow ? 'AOW-gegevens bekijken' : 'AOW-gegevens toevoegen' },
+      {
+        href: '/toekomst/gebeurtenissen?strategie=aow',
+        label: heeftAow ? 'AOW, pensioen en werk aanpassen' : 'AOW-gegevens toevoegen',
+      },
       { href: '/toekomst/gebeurtenissen?strategie=pensioen', label: 'Pensioen bekijken' },
     ],
-    beperking: 'De review rekent hier geen andere AOW- of pensioengegevens door. Het AOW-scherm laat het effect van een wijziging live zien.',
+    // De upload van je pensioenoverzicht en de jaarruimte blijven op het pensioenscherm.
+    beperking:
+      'Je pensioenoverzicht uploaden, een pot of werkplan verwijderen en je jaarruimte berekenen doe je op het pensioenscherm onder Gebeurtenissen.',
   }
 }
 
