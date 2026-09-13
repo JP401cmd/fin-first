@@ -4,7 +4,8 @@
  *
  * Gedeeld door de PDF- én JSON-upload in de pensioen-strategie-editor zodat upload
  * en handmatige invoer EXACT dezelfde life_events-conventie volgen als
- * `eventFromPot`/`potFromEvent` (components/future/strategie/pensioen-strategie-editor.tsx).
+ * `eventFromPot`/`potFromEvent` (lib/pension/pot-draft.ts, sinds TPR-15 gedeeld door de
+ * pensioen-editor en de plan-review).
  *
  * - `applyPensionParseResult` doet ALLEEN de pensioenpotten (ouderdomspensioen).
  *   Alleen `type: 'ouderdomspensioen'`-regelingen worden omgezet naar potten

@@ -46,11 +46,11 @@ function criterion(workflow: string): AcceptanceCriterion {
 }
 
 describe('UAT Fin — acceptatiecriteria dekking', () => {
-  it('heeft precies één criterium per catalogus-WILL-scenario (30 stuks: 01..20 + 23 t/m 32, WF-WILL-21/22 bestaan niet in de catalogus)', () => {
+  it('heeft precies één criterium per catalogus-WILL-scenario (aantal afgeleid uit de catalogus)', () => {
     const workflows = WILL_ACCEPTANCE.criteria.map((c) => c.workflow).sort()
     expect(workflows).toEqual(catalogWillWorkflows)
     expect(new Set(workflows).size).toBe(catalogWillWorkflows.length)
-    expect(workflows.length).toBe(30)
+    expect(workflows.length).toBeGreaterThan(0)
   })
 
   it('elk criterium heeft een geldige assertion.kind', () => {

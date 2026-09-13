@@ -47,27 +47,18 @@ describe('WILL_FLOW — curatie-integriteit', () => {
     }
   })
 
-  it('dekt alle 30 WF-WILL-scenario\'s (01..20 + 23 t/m 32— WF-WILL-21/22 bestaan niet in de catalogus)', () => {
+  it('dekt elk WILL-scenario uit de catalogus, en geen scenario daarbuiten', () => {
+    // Afgeleid uit UAT_SCENARIOS i.p.v. een vast aantal: een nieuw catalogus-scenario zonder
+    // flow-knoop maakt deze test rood, zonder dat iemand hier een getal hoeft bij te werken.
     const covered = new Set(
       WILL_FLOW.nodes.map((n) => n.scenarioId).filter((id): id is string => Boolean(id)),
     )
-    const expected = [
-      ...Array.from({ length: 20 }, (_, i) => `UAT-WILL-${String(i + 1).padStart(2, '0')}`),
-      'UAT-WILL-23',
-      'UAT-WILL-24',
-      'UAT-WILL-25',
-      'UAT-WILL-26',
-      'UAT-WILL-27',
-      'UAT-WILL-28',
-      'UAT-WILL-29',
-      'UAT-WILL-30',
-      'UAT-WILL-31',
-      'UAT-WILL-32',
-    ]
+    const expected = UAT_SCENARIOS.filter((s) => s.zone === 'WILL').map((s) => s.id)
+    expect(expected.length).toBeGreaterThan(0)
     for (const id of expected) {
       expect(covered.has(id), `${id} moet als flow-knoop voorkomen`).toBe(true)
     }
-    expect(covered.size).toBe(30)
+    expect([...covered].sort()).toEqual([...expected].sort())
   })
 
   it('de domeinoverschrijdende cross-knopen dekken OVZ/MIJN/BEZIT/TOEK', () => {

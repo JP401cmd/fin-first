@@ -54,7 +54,7 @@ export const KERNEL_INPUT_REVIEW_REGISTER: Record<keyof KernelInput, { dekking: 
   ts: { dekking: 'potten', toelichting: 'pot_rules: onttrekkingsvolgorde, verdeling bij toename, afname-volgorde, categorie-prio’s.' },
   gebeurtenissen: { dekking: 'brondata', toelichting: 'Handmatige life-events op /toekomst/gebeurtenissen.' },
   autoGebeurtenissen: { dekking: 'inkomsten', toelichting: 'AOW-event (leefsituatie, jaren buiten NL) en pensioenpotten — inline instelbaar in stap 3 (TPR-15).' },
-  partner: { dekking: 'brondata', toelichting: 'Huishoudtype/partnerkoppeling (/mijn/profiel); hoofdgrafiek draait solo.' },
+  partner: { dekking: 'brondata', toelichting: 'Huishoudtype/partnerkoppeling (/mijn/profiel). In het gecombineerde perspectief rekent de hoofdgrafiek als huishouden via de partner-parameterlaag (TPR-07); de review en de wizard rekenen op het eigen perspectief (snapshot zonder partnerblok).' },
   werkStrategie: { dekking: 'inkomsten', toelichting: 'Optionele werk-strategie (life_event werk) — inline instelbaar in stap 3 (TPR-15).' },
   potMutaties: { dekking: 'kern-intern', toelichting: 'Generieke pot-mutaties (V9) — geen app-veld.' },
   potLiquidaties: { dekking: 'woning', toelichting: 'sale_config per eigen niet-liquide bezitting — stap 4 inline (PATCH /api/assets/[id]/sale-config, TPR-15); ook in het bezittingenformulier.' },
