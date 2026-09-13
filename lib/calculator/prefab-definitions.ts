@@ -123,7 +123,7 @@ const eerderMetPensioen: CalculatorDefinition = {
     { key: 'leeftijd', label: 'Huidige leeftijd', kind: 'years', default: 40, min: 18, max: 70, prefill: 'current_age' },
   ],
   scenarios: [
-    { key: 'regel_25', label: '25× (4% regel)', description: 'Stoppen bij 25× je jaaruitgaven — onttrek 4% per jaar.' },
+    { key: 'regel_25', label: '25× jaaruitgaven', description: 'Stoppen bij 25× je jaaruitgaven.' },
     { key: 'regel_30', label: '30× (3,3% regel)', description: 'Voorzichtiger: 30× je jaaruitgaven, lagere onttrekking.' },
     { key: 'regel_33', label: '33× (3% regel)', description: 'Zeer behoudend: 33× je jaaruitgaven voor maximale zekerheid.' },
   ],

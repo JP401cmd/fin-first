@@ -1447,7 +1447,7 @@ const willemData: PersonaData = {
     },
     {
       title: 'Bereken je exacte FIRE-getal',
-      description: 'Met 3.000/mnd uitgaven en de 4%-regel heb je 900.000 nodig. Je beleggingen staan op 570.000 plus 285.000 pensioen. Je bent dichterbij dan je denkt.',
+      description: 'Met 3.000/mnd uitgaven en 25× je jaaruitgaven als doel heb je 900.000 nodig. Je beleggingen staan op 570.000 plus 285.000 pensioen. Je bent dichterbij dan je denkt.',
       recommendation_type: 'savings_boost',
       euro_impact_monthly: 0,
       euro_impact_yearly: 0,

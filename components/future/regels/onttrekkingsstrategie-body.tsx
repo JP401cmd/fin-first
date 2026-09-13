@@ -32,7 +32,7 @@ const PROFIEL_INFO: Record<WithdrawalProfiel, { label: string; description: stri
   vast: {
     label: 'Vast',
     description:
-      'Elk jaar hetzelfde bedrag, inflatie-geïndexeerd (de klassieke 4%-regel). Voorspelbaar; reageert niet op de markt.',
+      'Elk jaar hetzelfde bedrag, inflatie-geïndexeerd. Voorspelbaar; reageert niet op de markt.',
   },
   afnemend: {
     label: 'Afnemend',

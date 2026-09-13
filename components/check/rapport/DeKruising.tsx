@@ -114,7 +114,7 @@ export function DeKruising({
         De kruising — wanneer je opbouw je doel raakt
       </h3>
       <p className="lede">
-        Geen vaste 4%-regel. We laten je vermogen groeien en markeren het punt
+        We laten je vermogen groeien en markeren het punt
         waarop het je <em>vrijheidsniveau</em> raakt — dáár wordt werken een
         keuze. De grafiek toont je{' '}
         <span className="vt">besteedbare, vrij inzetbare</span> vermogen.

@@ -93,7 +93,7 @@ interface ProfielInfo {
 const PROFIEL_INFO: Record<WithdrawalProfiel, ProfielInfo> = {
   vast: {
     label: 'Vast',
-    description: 'Elk jaar hetzelfde bedrag, inflatie-geïndexeerd (de klassieke 4%-regel). Voorspelbaar; reageert niet op de markt.',
+    description: 'Elk jaar hetzelfde bedrag, inflatie-geïndexeerd. Voorspelbaar; reageert niet op de markt.',
     color: 'var(--ink-3)',
     cardBg: 'bg-[var(--subtle)]',
     cardBorder: 'border-[var(--border-ed)]',

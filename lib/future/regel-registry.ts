@@ -47,7 +47,7 @@ export const REGEL_META: Record<RegelId, RegelMeta> = {
     title: 'Onttrekkingsstrategie',
     kicker: 'Regel · hele tijdas',
     intro:
-      'Hoeveel haal je elk jaar uit je vermogen tijdens je vrije jaren? Een vast bedrag (de 4%-regel), ' +
+      'Hoeveel haal je elk jaar uit je vermogen tijdens je vrije jaren? Een vast bedrag, ' +
       'of dynamisch meebewegend met de markt? Dynamische strategieën beschermen je tegen slechte beursjaren, ' +
       'maar maken je jaarlijkse budget minder voorspelbaar.',
     impactKind: 'live-sim',

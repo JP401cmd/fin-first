@@ -484,7 +484,7 @@ export const FISCALE_KERNGETALLEN: FiscaalKerngetal[] = [
           { label: 'Volatiliteit — Monte Carlo (fallback-default)', value: pct(DEFAULT_VOLATILITY) },
           { label: 'SWR = rendement − Box 3-drag − inflatie (afgeleid)', value: pct(NL_SWR) },
           { label: 'Box 3-drag (afgeleid)', value: pct(BOX3_DRAG) },
-          { label: 'Klassieke SWR (referentie, 4%-regel)', value: pct(SWR) },
+          { label: 'Klassieke SWR (referentie)', value: pct(SWR) },
         ],
       },
     ],

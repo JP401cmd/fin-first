@@ -223,7 +223,7 @@ export interface PersoonlijkPlanData {
 export const WITHDRAWAL_LABELS: Record<WithdrawalProfiel, { name: string; subtitle: string }> = {
   vast: {
     name: 'Vaste onttrekking (SWR)',
-    subtitle: 'Klassieke 4%-regel — vast bedrag, geïndexeerd voor inflatie.',
+    subtitle: 'Vast bedrag, geïndexeerd voor inflatie.',
   },
   afnemend: {
     name: 'Afnemende onttrekking',

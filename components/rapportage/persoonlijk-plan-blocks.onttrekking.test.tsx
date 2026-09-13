@@ -25,25 +25,25 @@ describe('OnttrekkingBlock — SWR-tekst alleen bij het vaste profiel (B-042)', 
   it('vast → label + de 4%-regel-duiding', () => {
     render(<OnttrekkingBlock data={data('vast')} />)
     expect(screen.getByText('Vaste onttrekking (SWR)')).toBeTruthy()
-    expect(screen.getByText(/klassieke 4%-regel is in NL/i)).toBeTruthy()
+    expect(screen.getByText(/in NL\s+door Box 3 lager/i)).toBeTruthy()
   })
 
   it('afnemend → Afnemend-label, géén 4%-regel-duiding en géén guardrail-parameters', () => {
     render(<OnttrekkingBlock data={data('afnemend')} />)
     expect(screen.getByText(/Afnemende onttrekking/)).toBeTruthy()
-    expect(screen.queryByText(/klassieke 4%-regel is in NL/i)).toBeNull()
+    expect(screen.queryByText(/in NL\s+door Box 3 lager/i)).toBeNull()
     expect(screen.queryByText(/Floor \(ondergrens\)/)).toBeNull()
   })
 
   it('oplopend → Oplopend-label zonder SWR-duiding', () => {
     render(<OnttrekkingBlock data={data('oplopend')} />)
     expect(screen.getByText(/Oplopende onttrekking/)).toBeTruthy()
-    expect(screen.queryByText(/klassieke 4%-regel is in NL/i)).toBeNull()
+    expect(screen.queryByText(/in NL\s+door Box 3 lager/i)).toBeNull()
   })
 
   it('guardrails → de vier guardrail-parameters, geen SWR-duiding', () => {
     render(<OnttrekkingBlock data={data('guardrails')} />)
     expect(screen.getByText(/Floor \(ondergrens\)/)).toBeTruthy()
-    expect(screen.queryByText(/klassieke 4%-regel is in NL/i)).toBeNull()
+    expect(screen.queryByText(/in NL\s+door Box 3 lager/i)).toBeNull()
   })
 })

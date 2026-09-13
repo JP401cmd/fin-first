@@ -343,8 +343,8 @@ export function OnttrekkingBlock({ data }: { data: PersoonlijkPlanOnttrekking })
             className="mt-3 text-[12px] italic text-[var(--ink-3)]"
             style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
           >
-            Default voor de meeste plannen. De klassieke 4%-regel is in NL door Box 3 effectief lager — de
-            simulator gebruikt de geconfigureerde effectieve SWR (zie sectie vii).
+            Default voor de meeste plannen. De simulator gebruikt de geconfigureerde effectieve SWR — in NL
+            door Box 3 lager dan internationaal vaak wordt aangenomen (zie sectie vii).
           </p>
         )}
       </div>
