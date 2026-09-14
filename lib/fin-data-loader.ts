@@ -13,16 +13,13 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { getCachedUser } from '@/lib/supabase/cached-user'
 import type { Recommendation, Action } from '@/lib/recommendation-data'
 import { applyActionPriorityOrder } from '@/lib/action-sort'
-import { computeGoalProgress, type Goal, type GoalProgress } from '@/lib/goal-data'
+import type { Goal, GoalProgress } from '@/lib/goal-data'
 import { resolveEffectiveIncomeExpenses, type IncomeExpenseSources } from '@/lib/effective-financials'
 import { localMonthBounds } from '@/lib/month-range'
 import { getActiveAssets, getActiveDebts, getOwnProfile, getBudgets } from '@/lib/server-data/base'
 import { loadBudgetBasis } from '@/lib/household/budget-share'
 import type { BudgetBasisRow } from '@/lib/budget-basis'
-import { syncActiveGoalValues } from '@/lib/goal-current-value'
-import { isVrijheidsgetalGoal } from '@/lib/goals/vrijheidsgetal-goal'
-import { loadVrijheidsgetalSnapshot } from '@/lib/goals/vrijheidsgetal-source'
-import { buildGoalMetricSources, loadGoalLinks } from '@/lib/goals/metric-sources'
+import { syncGoalsFromCanonicalSources } from '@/lib/goals/canonical-goal-sync'
 import { isRecommendationOpen } from '@/lib/recommendation-status'
 import {
   linkedGoalIdSet,
@@ -345,20 +342,21 @@ export async function loadFinData(
   //    ook de dashboard-widget doorgeeft. Bewust niet per loader samengesteld:
   //    twee assemblages van hetzelfde cijfer is exact de drift die deze gedeelde
   //    sync-laag moet uitsluiten. Elke thunk is lazy en per doel-type gegated.
-  const goalLinks = await loadGoalLinks(
-    supabase,
-    allGoals.map(g => g.id).filter((id): id is string => !!id),
-  )
-  const { goals, fireSnapshot, vrijheidsgetalSynced, debtFreeBasis } = await syncActiveGoalValues(
-    supabase,
-    allGoals,
-    loadedAssets,
-    loadedDebts,
-    currentUserId,
-    () => loadVrijheidsgetalSnapshot(supabase),
+  //
+  // De bedrading zelf (koppelrijen → sync → voortgang) woont sinds 14 sep 2026 in
+  // `lib/goals/canonical-goal-sync.ts`, zodat de Fin-chatcontext letterlijk
+  // dezelfde aanroep doet als dit scherm.
+  const {
+    goals,
+    fireSnapshot,
+    vrijheidsgetalSynced,
+    debtFreeBasis,
     goalLinks,
-    buildGoalMetricSources(supabase),
-  )
+    goalProgresses,
+  } = await syncGoalsFromCanonicalSources(supabase, allGoals, currentUserId, {
+    assets: loadedAssets,
+    debts: loadedDebts,
+  })
 
   // Machine-bijgehouden-signaal + vieringslijst. Bewust AFLEIDEN uit wat er al
   // geladen is (geen extra query) en bewust GEEN write hier: `loadFinData` is
@@ -370,13 +368,9 @@ export async function loadFinData(
   const linkedIds = linkedGoalIdSet(goalLinks)
   const autoCompletedGoals = selectAutoCompletedNotices(allGoals, currentUserId, linkedIds)
 
-  // 7. Compute goal progresses
-  // De geprojecteerde FIRE-datum vervangt de opgeslagen streefdatum als `eta`;
-  // alleen bij het vrijheidsgetal-doel, en alleen als de sync daadwerkelijk sloeg.
-  const fireEta = vrijheidsgetalSynced > 0 ? (fireSnapshot?.eta ?? null) : null
-  const goalProgresses = goals.map(g =>
-    computeGoalProgress(g, isVrijheidsgetalGoal(g) ? { etaOverride: fireEta } : undefined),
-  )
+  // 7. Goal progresses komen uit `syncGoalsFromCanonicalSources` hierboven: de
+  // geprojecteerde FIRE-datum vervangt de opgeslagen streefdatum als `eta`, alleen
+  // bij het vrijheidsgetal-doel en alleen als de sync daadwerkelijk sloeg.
 
   // 8. Enrich actions with assigner display names
   let enrichedActions = enrichedActionsRaw

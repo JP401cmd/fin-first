@@ -28,6 +28,13 @@
 /**
  * De deeplink-params die het mount-effect van `horizon-client.tsx` consumeert.
  * Alles wat hier NIET in staat, hoort na de opschoning nog in de URL te staan.
+ *
+ * `via` is de uitzondering die niets opent: een restant van oude bladwijzers
+ * (`/toekomst/whatif?via=dreamgate`). De redirect in `next.config.ts` geeft de
+ * query door, dus zonder deze regel bleef `via=dreamgate` na het openen van het
+ * lab in de URL staan (ADR 0144). Veilig om hier weg te poetsen: op /toekomst
+ * leest niets `via` — de enige lezers zijn de bezittingen-/schulden-panes
+ * (`?asset=…&via=revalue`), op andere routes.
  */
 export const CONSUMED_DEEPLINK_PARAMS = [
   'modal',
@@ -36,6 +43,7 @@ export const CONSUMED_DEEPLINK_PARAMS = [
   'event',
   'edit',
   'whatif',
+  'via',
 ] as const
 
 /**

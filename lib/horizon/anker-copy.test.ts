@@ -40,6 +40,7 @@ import {
 } from './nu-stoppen-copy'
 import type { RunwayResult } from './runway'
 import { HORIZON_PLAFOND_LEEFTIJD } from '@/lib/constants'
+import { MASKED_AMOUNT_PLACEHOLDER } from '@/lib/format'
 
 /**
  * ADR 0129 F3a — de anker-generieke opvolger van `nu-stoppen-copy.test.ts`. De
@@ -274,6 +275,35 @@ describe('dekking-zinnen — de vastgestelde kopij', () => {
     expect(dekkingTekortHintKnop(1250.4)).not.toMatch(/^Zet /)
   })
 
+  it('11 · onder één dag: "minder dan een dag", nooit "0 dagen"', () => {
+    for (const dagen of [0, 0.3, 0.49]) {
+      const zin = dekkingTekortHintZin({ stop: AGE, endAge: 90, hint: 40, dagen })
+      expect(zin).toBe(
+        "Om je plan tot je 90e te laten reiken als je op 58,5 stopt, hoort daar zo'n €40 per maand extra sparen bij, bovenop wat je nu opzij zet — omgerekend minder dan een dag vrijheid per maand.",
+      )
+      expect(zin).not.toMatch(/\b0 dagen\b/)
+    }
+    // 0,5 rondt naar 1: dan gewoon enkelvoud.
+    expect(dekkingTekortHintZin({ stop: AGE, endAge: 90, hint: 60, dagen: 0.5 })).toMatch(/omgerekend 1 dag vrijheid per maand\.$/)
+  })
+
+  it('11 · zonder dagbasis (dagen null) valt de omrekening weg', () => {
+    expect(dekkingTekortHintZin({ stop: AOW, endAge: 90, hint: 1250, dagen: null })).toBe(
+      "Om je plan tot je 90e te laten reiken als je op 67 stopt, hoort daar zo'n €1.250 per maand extra sparen bij, bovenop wat je nu opzij zet.",
+    )
+  })
+
+  it('11 · privacy-weergave: bedrag als placeholder in zin én knop, geen dagen (spiegel van het stop-pad-blok)', () => {
+    const zin = dekkingTekortHintZin({ stop: AOW, endAge: 90, hint: 1250.4, dagen: 6.6, masked: true })
+    expect(zin).toBe(
+      `Om je plan tot je 90e te laten reiken als je op 67 stopt, hoort daar ${MASKED_AMOUNT_PLACEHOLDER} per maand extra sparen bij, bovenop wat je nu opzij zet.`,
+    )
+    expect(zin).not.toMatch(/1\.250|€|dag/)
+    const knop = dekkingTekortHintKnop(1250.4, true)
+    expect(knop).toBe(`Reken met ${MASKED_AMOUNT_PLACEHOLDER} extra inleg`)
+    expect(knop).not.toMatch(/1\.250|€/)
+  })
+
   it('12 · toast', () => {
     expect(dekkingVastgelegdToast(90)).toBe('Je verkenning is nu je doel — de app volgt of je plan tot je 90e reikt.')
   })
@@ -296,7 +326,10 @@ describe('dekking-zinnen — toon-invarianten over alle ankers', () => {
       const zinnen = [
         dekkingSheetToelichting(stop, 90),
         dekkingTekortHintZin({ stop, endAge: 90, hint: 300, dagen: 2 }),
+        dekkingTekortHintZin({ stop, endAge: 90, hint: 30, dagen: 0.2 }),
+        dekkingTekortHintZin({ stop, endAge: 90, hint: 300, dagen: 2, masked: true }),
         dekkingTekortHintKnop(300),
+        dekkingTekortHintKnop(300, true),
         radarSubtitel({ stop, verkendStopAge: null }) ?? '',
         radarSubtitel({ stop, verkendStopAge: 62 }) ?? '',
         ...TEKORT_REACHES.map((r) => dekkingAsNotitie(r, 40, 90) ?? ''),

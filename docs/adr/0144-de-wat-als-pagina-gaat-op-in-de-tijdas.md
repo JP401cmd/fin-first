@@ -79,3 +79,21 @@ volledige plan-kopieën, nooit een aparte pagina met een eigen persona.
 - **Geen productiecijfers in deze ADR** (ADR 0111, publieke repo): de gebruikssignalen
   hierboven staan bewust relatief — "een handvol gebruikers", niet de exacte telling uit
   de database.
+
+## Aanvulling 14 sep 2026 — restpunten afgerond
+
+De restpunten uit "Gevolgen" en besluit 4 zijn in een vervolgronde uitgevoerd:
+
+- `WhatIfSliders` is alleen nog de grid-variant; de kaartvariant (met reset-knop en
+  hint) is weg.
+- `buildBreakdownFromSimRows` en de regressiesuite `inkomen-uitgaven-analyse` zijn
+  verwijderd.
+- De chatcontext `'whatif'` heet `'gebeurtenis'` (`ChatContext`, tools, chat-route,
+  admin-prompt-id, `GEBEURTENIS_PROMPT`). Dit wijzigt besluit 4: het hernoemen bleek een
+  identifier-wijziging zonder woordkeuze — de prompttekst is byte-identiek gebleven, dus
+  geen `/ai-gedrag`-besluit. De chat-route accepteert `'whatif'` nog tijdelijk, zodat een
+  open browsertab van vóór de deploy de juiste persona houdt.
+- De welkomstgids-stap heet "Speel met je aannames".
+- `?via=dreamgate` uit een oude bladwijzer wordt na het openen van het lab uit de URL
+  opgeschoond.
+

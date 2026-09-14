@@ -124,7 +124,7 @@ export function buildSliderEvent(
     case 'savings': {
       // Spaarquote-slider. Het bedrag blijft bewust op `monthly_cost_change` staan (negatief
       // = minder besteden = meer sparen): dat is het SHAPE waarop de round-trip
-      // (`readSliderValueFromEvents`/`deriveOverridesFromEvents`) én eerder OPGESLAGEN
+      // (`readSliderValueFromEvents`) én eerder OPGESLAGEN
       // scenario's de sliderstand reconstrueren. Het is dus GEEN permanente lifestyle-keuze:
       // de adapter-guard (`SLIDER_WORK_ORIGINS`, guard.ts) routeert dit event per 29-jul via
       // het FIRE-gegate salaris-kanaal — spaarquote is inkomensgebonden en vervalt met het
@@ -163,61 +163,6 @@ export function buildSliderEvent(
 function formatDelta(v: number): string {
   const sign = v >= 0 ? '+' : ''
   return `${sign}€${Math.round(v)}`
-}
-
-// ── Derive WhatIfOverrides shape from events (backward compat) ───────────────
-
-/**
- * Reconstruct a WhatIfOverrides snapshot from scenario events.
- */
-export function deriveOverridesFromEvents(
-  scenarioEvents: WhatIfEvent[],
-  baseline: WhatIfOverrides,
-  expectedReturnOverride: number | null,
-): WhatIfOverrides {
-  let monthlyIncome = baseline.monthlyIncome
-  let workDaysPerWeek = baseline.workDaysPerWeek
-  let extraContribution = 0
-  let savingsRateAdjustment = 0
-  const baselineEffectiveIncome = baseline.monthlyIncome * (baseline.workDaysPerWeek / 5)
-
-  for (const e of scenarioEvents) {
-    if (!e.is_scenario_only) continue
-    switch (e.event_type) {
-      case 'part_time': {
-        const meta = e.metadata as { nieuwUren?: number } | undefined
-        if (typeof meta?.nieuwUren === 'number' && meta.nieuwUren > 0) {
-          workDaysPerWeek = Math.max(1, Math.min(5, Math.round(meta.nieuwUren / 8)))
-        } else if (baseline.monthlyIncome > 0) {
-          const ratio = 1 + e.monthly_income_change / baseline.monthlyIncome
-          workDaysPerWeek = Math.max(1, Math.min(5, Math.round(5 * ratio)))
-        }
-        break
-      }
-      case 'income_change': {
-        monthlyIncome += e.monthly_income_change
-        break
-      }
-      case 'extra_inleg': {
-        extraContribution += e.monthly_income_change
-        break
-      }
-      case 'lifestyle_adjustment': {
-        if (baselineEffectiveIncome > 0) {
-          savingsRateAdjustment += -e.monthly_cost_change / baselineEffectiveIncome * 100
-        }
-        break
-      }
-    }
-  }
-
-  return {
-    monthlyIncome: Math.max(0, Math.round(monthlyIncome)),
-    workDaysPerWeek,
-    savingsRate: Math.max(0, Math.min(80, baseline.savingsRate + savingsRateAdjustment)),
-    expectedReturn: expectedReturnOverride ?? baseline.expectedReturn,
-    extraContribution: Math.max(0, Math.round(extraContribution)),
-  }
 }
 
 /**

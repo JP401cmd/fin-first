@@ -15,6 +15,8 @@ import {
 } from '@/lib/horizon/toekomst-doel'
 import { FIRE_PLAN_COLUMNS, isFixedAnchor, PERPETUAL_END_AGE, resolveFirePlanWithOverride, type FirePlan } from '@/lib/fire-strategy'
 import { badRequest, serverError } from '@/lib/api/respond'
+import { parseBody } from '@/lib/api/parse-body'
+import { ToekomstDoelBodySchema, type VastleggenBody } from './schema'
 
 /**
  * PUT /api/toekomst-doel
@@ -30,7 +32,8 @@ import { badRequest, serverError } from '@/lib/api/respond'
  *   - authz via `supabase.auth.getUser()` (401 zonder sessie);
  *   - anon RLS-client via de server-helper — NOOIT service-role; elke query expliciet
  *     `.eq('user_id', user.id)` resp. `.eq('id', user.id)` (own-row) naast de RLS-policies;
- *   - body-grootte begrensd (8 KB) vóór parsen; malformed/ongeldig → 400;
+ *   - body-grootte begrensd (8 KB) vóór parsen; daarna de vorm via zod (`./schema`,
+ *     `parseBody`) — malformed/ongeldig → 400;
  *   - `parseToekomstScenarioPrefs` blijft de ENIGE schrijfpoort op de pref (saneert de
  *     doelstand met de canonieke clamps); een ongeldige stand ⇒ 400 (nooit rauwe JSON);
  *   - alleen `error.code` gelogd, geen PII/kolominhoud. Geen GET.
@@ -63,12 +66,6 @@ type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v)
-}
-
-/** Interpreteer een onbekende waarde als eindig getal, anders `undefined` (boundary-sanitize). */
-function numOrUndef(v: unknown): number | undefined {
-  const n = Number(v)
-  return Number.isFinite(n) ? n : undefined
 }
 
 /**
@@ -108,23 +105,19 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: 'Verzoek te groot' }, { status: 413 })
   }
 
-  let body: unknown
-  try {
-    body = JSON.parse(raw)
-  } catch {
-    return NextResponse.json({ error: 'Ongeldig verzoek' }, { status: 400 })
-  }
-  if (!isPlainObject(body)) {
-    return NextResponse.json({ error: 'Ongeldig verzoek' }, { status: 400 })
-  }
+  // De stream is na `.text()` verbruikt; `parseBody` krijgt een verse Request met de
+  // al begrensde tekst (zelfde reconstructie als `readCappedRequest` in /api/goals).
+  const parsed = await parseBody(
+    ToekomstDoelBodySchema,
+    new Request(request.url, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: raw }),
+  )
+  if (!parsed.ok) return parsed.response
+  const body = parsed.data
 
-  if (body.action === 'vastleggen') {
-    return handleVastleggen(supabase, user.id, body)
-  }
   if (body.action === 'loslaten') {
     return handleLoslaten(supabase, user.id)
   }
-  return NextResponse.json({ error: 'Ongeldige actie' }, { status: 400 })
+  return handleVastleggen(supabase, user.id, body)
 }
 
 // ── vastleggen ─────────────────────────────────────────────────────────────────
@@ -151,7 +144,7 @@ async function readFirePlan(supabase: SupabaseServerClient, userId: string): Pro
 async function handleVastleggen(
   supabase: SupabaseServerClient,
   userId: string,
-  body: Record<string, unknown>,
+  body: VastleggenBody,
 ) {
   // Het anker eerst: het bepaalt welk uitkomstdoel hier überhaupt mag (ADR 0145 D3).
   const plan = await readFirePlan(supabase, userId)
@@ -164,14 +157,14 @@ async function handleVastleggen(
     return badRequest('Onder dit stopmoment legt het lab geen doel vast', 'anchor_now')
   }
 
-  // Parameters: whitelist tegen de bekende keys; alleen `true` telt (nooit
-  // client-waarden vertrouwen). Zonder geldige parameter is er niets te promoveren.
+  // Parameters: het schema liet alleen bekende keys met `true` door; hier alleen
+  // overnemen wat daadwerkelijk gekozen is (een optionele sleutel kan leeg meekomen).
+  // Zonder geldige parameter is er niets te promoveren.
   const parameters: Partial<Record<DoelParameter, true>> = {}
-  if (isPlainObject(body.parameters)) {
-    for (const p of DOEL_PARAMETERS) {
-      if (body.parameters[p] === true) parameters[p] = true
-    }
+  for (const p of DOEL_PARAMETERS) {
+    if (body.parameters[p] === true) parameters[p] = true
   }
+  const hadParameters = Object.keys(parameters).length > 0
   if (anchorFixed) {
     // Onder aow/age is er geen vrijheidsleeftijd om vast te leggen: een client die
     // `fire: true` stuurt (oude client, of een verkende stop) krijgt géén fire_age-rij.
@@ -180,20 +173,26 @@ async function handleVastleggen(
     return badRequest('Een dekkingsdoel hoort bij een vast stopmoment', 'dekking_vereist_vast_anker')
   }
   if (Object.keys(parameters).length === 0) {
-    return NextResponse.json({ error: 'Geen doelparameters' }, { status: 400 })
+    // Leeg ná het strippen onder een vast anker is een ander geval dan een lege keuze:
+    // de client koos alleen `fire`, en die hoort niet bij dit plan. De `code` laat de
+    // client dat onderscheiden (en de tekst tonen); de tekst zelf blijft gelijk.
+    return hadParameters
+      ? badRequest('Geen doelparameters', 'geen_parameters_na_plan')
+      : NextResponse.json({ error: 'Geen doelparameters' }, { status: 400 })
   }
 
-  // Doelwaarden: boundary-sanitize naar eindige getallen; de pure builder clampt verder.
-  // De PLAN-velden van het dekkingsdoel komen uit het profiel, nooit uit de body.
-  const dw = isPlainObject(body.doelwaarden) ? body.doelwaarden : {}
+  // Doelwaarden: het schema liet alleen eindige getallen door; de pure builder clampt
+  // verder. De PLAN-velden van het dekkingsdoel komen uit het profiel, nooit uit de body
+  // (het schema stript ze).
+  const dw = body.doelwaarden
   const { rows } = buildParameterGoalRows({
     parameters,
     doelwaarden: {
-      spaarquotePct: numOrUndef(dw.spaarquotePct),
-      salarisMnd: numOrUndef(dw.salarisMnd),
-      rendementPct: numOrUndef(dw.rendementPct),
-      fireLeeftijd: numOrUndef(dw.fireLeeftijd),
-      margeJaren: numOrUndef(dw.margeJaren),
+      spaarquotePct: dw.spaarquotePct,
+      salarisMnd: dw.salarisMnd,
+      rendementPct: dw.rendementPct,
+      fireLeeftijd: dw.fireLeeftijd,
+      margeJaren: dw.margeJaren,
       ...(anchorFixed && plan.anchor.kind !== 'solved'
         ? {
             // Zelfde eindleeftijd als de kernel (`eindleeftijdVan`): onder `perpetual`
@@ -217,8 +216,7 @@ async function handleVastleggen(
   const gezetOp = new Date().toISOString()
   // Onder een vast anker is de stopkeuze geen doelstand (D4): de slider verkent daar
   // alleen, dus `stopAge`/`stopKoppel`/`stopMarge` verdwijnen vóór de pref-write.
-  const rawStand = isPlainObject(body.stand) ? body.stand : {}
-  const stand = anchorFixed ? stripStopKeuze(rawStand) : rawStand
+  const stand = anchorFixed ? stripStopKeuze(body.stand) : body.stand
 
   // Valideer de doelstand VÓÓR we goals schrijven: een ongeldige stand mag geen
   // wees-goals achterlaten. De parser is de enige poort en saneert de stand.

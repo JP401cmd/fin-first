@@ -265,8 +265,11 @@ export const NAV_ENGINE_CHECKS: NavEngineCheck[] = [
         // vertaalt — een statische config-regel zou die vertaling
         // onbereikbaar maken (config-redirects draaien vóór de middleware).
         // 31 -> 30 (14 sep 2026, ADR 0144): /horizon/whatif en /toekomst/whatif
-        // zijn elk nu één kale redirect naar /toekomst?whatif=open (geen
-        // ?via=dreamgate-tak meer) — één regel minder dan voorheen.
+        // zijn elk nu één ONVOORWAARDELIJKE redirect naar /toekomst?whatif=open
+        // (geen ?via=dreamgate-vertakking meer) — één regel minder dan voorheen.
+        // De regel zelf geeft een meegegeven ?via=dreamgate gewoon door (geen
+        // eigen '?' op de bestemming); een losse client-side opschoonstap
+        // (lib/horizon/deeplink-cleanup.ts) haalt `via` daarna uit de URL.
         expected: 'aantalRedirects=30; coreNaarOverzicht=true; dashboardGeenConfigRedirect=true; coreAssetsGeenRedirect=true; cashflowRedirects=5; cashflowBestemmingZonderQuery=true',
         actual: `aantalRedirects=${redirects.length}; coreNaarOverzicht=${coreNaarOverzicht}; dashboardGeenConfigRedirect=${dashboardGeenConfigRedirect}; coreAssetsGeenRedirect=${coreAssetsGeenRedirect}; cashflowRedirects=${cashflowRegels.length}; cashflowBestemmingZonderQuery=${cashflowBestemmingZonderQuery}`,
       }

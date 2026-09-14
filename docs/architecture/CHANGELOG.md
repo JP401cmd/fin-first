@@ -1010,3 +1010,7 @@
 - **Schermen** verwijderd: /toekomst/whatif
 - **API-routes** verwijderd: /api/scenarios, /api/whatif/suggest
 - **Componenten (aantal)** verwijderd: -16
+
+## 2026-09-14
+
+- Geen wijzigingen.

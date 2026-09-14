@@ -18,7 +18,7 @@ import { MaskedAmount } from '@/components/app/masked-amount'
 
 /**
  * Fin-chat binnen de levensgebeurtenis-pane. Hergebruikt `/api/ai/chat` met
- * `context: 'whatif'` zodat de bestaande WHATIF_PROMPT (droomgids → planner)
+ * `context: 'gebeurtenis'` zodat de GEBEURTENIS_PROMPT (droomgids → planner)
  * actief wordt en de `suggestLifeEvent` tool kan gebruiken.
  *
  * Tool-output wordt gerenderd als kaart met "Open in editor"-actie die de
@@ -89,7 +89,7 @@ export function EventChatPane({ events, onAcceptSuggestion }: Props) {
         api: '/api/ai/chat',
         body: {
           domain: 'wil',
-          context: 'whatif',
+          context: 'gebeurtenis',
           scenarioContext: JSON.parse(scenarioJSON),
         },
       }),

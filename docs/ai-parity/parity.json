@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-14T17:21:51.001Z",
+  "generatedAt": "2026-09-14T18:54:28.444Z",
   "manifestGeneratedAt": "2026-09-07T16:29:38.925Z",
   "inSync": false,
   "budgetsOk": true,
@@ -17,7 +17,7 @@
     {
       "file": "lib/ai/dna/wil.ts",
       "storedSha256": "db0a1336f20b520e46d320bc45eacefc81f994ccce54fd29cc8823fd39d3aa8f",
-      "liveSha256": "247f68daabe9cdcbb8bfad733529795bfd8594e502a7bdb6671f8e6d189ee002",
+      "liveSha256": "b3c376de2f17c43e845bdf8b0c517f96767a9ce0a9dc7296887e29f909112d90",
       "inSync": false,
       "driftSince": "2026-09-07T18:33:01.081Z"
     }
@@ -44,7 +44,7 @@
         {
           "file": "lib/ai/dna/wil.ts",
           "storedSha256": "db0a1336f20b520e46d320bc45eacefc81f994ccce54fd29cc8823fd39d3aa8f",
-          "liveSha256": "247f68daabe9cdcbb8bfad733529795bfd8594e502a7bdb6671f8e6d189ee002",
+          "liveSha256": "b3c376de2f17c43e845bdf8b0c517f96767a9ce0a9dc7296887e29f909112d90",
           "inSync": false,
           "driftSince": "2026-09-07T18:33:01.081Z"
         }

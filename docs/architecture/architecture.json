@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-14T18:15:51.099Z",
+  "generatedAt": "2026-09-14T19:15:36.700Z",
   "generatedDate": "2026-09-14",
   "repo": {
     "name": "fin",
@@ -17650,7 +17650,7 @@
       },
       {
         "path": "lib/ai",
-        "commits": 51
+        "commits": 52
       },
       {
         "path": "app/(app)/toekomst",
@@ -17688,8 +17688,8 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 10378,
-        "commits": 76
+        "loc": 10388,
+        "commits": 77
       },
       {
         "file": "components/app/budgets-client.tsx",
@@ -17709,7 +17709,7 @@
       {
         "file": "lib/dashboard-data-loader.ts",
         "loc": 3113,
-        "commits": 58
+        "commits": 59
       },
       {
         "file": "lib/release-notes.ts",
@@ -18870,32 +18870,9 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-09-13",
-    "hasChanges": true,
-    "sections": [
-      {
-        "label": "Schermen",
-        "added": [],
-        "removed": [
-          "/toekomst/whatif"
-        ]
-      },
-      {
-        "label": "API-routes",
-        "added": [],
-        "removed": [
-          "/api/scenarios",
-          "/api/whatif/suggest"
-        ]
-      },
-      {
-        "label": "Componenten (aantal)",
-        "added": [],
-        "removed": [
-          "-16"
-        ]
-      }
-    ]
+    "previousDate": "2026-09-14",
+    "hasChanges": false,
+    "sections": []
   },
   "statsHistory": [
     {

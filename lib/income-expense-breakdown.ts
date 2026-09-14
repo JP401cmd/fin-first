@@ -7,8 +7,8 @@
  * Inflows (aanvulling): Besparingen, Rendement, positive life events
  * Outflows (onttrekking): Box 3, Rente per schuld, Levensonderhoud, negative life events
  *
- * Uses UnifiedProjectionRow for rich data (debt interest, Box 3 per type).
- * Falls back to SimRow when unified data is not available.
+ * Uses UnifiedProjectionRow for rich data (debt interest, Box 3 per type); SimRows
+ * only contribute the per-cashflow life-event names.
  */
 
 import type { SimRow } from '@/lib/fire-simulation'
@@ -332,117 +332,6 @@ export function buildBreakdown(
   })
 
   // Filter layers to only those with data
-  const incomeLayers = candidateIncomeLayers.filter(l => incomeIdsWithData.has(l.id))
-  const expenseLayers = candidateExpenseLayers.filter(l => expenseIdsWithData.has(l.id))
-
-  return { rows: breakdownRows, incomeLayers, expenseLayers }
-}
-
-// ── Fallback: SimRow-only (for regression tests / legacy paths) ─────────
-
-/**
- * Simplified breakdown using only SimRow data (no debt interest detail).
- * Used when UnifiedProjectionRow data is not available.
- *
- * GRONDSLAG-NOTE (bekende afwijking t.o.v. `buildBreakdown`). De 'growth'-instroom
- * komt hier uit `SimRow.growth` = de TOTALE `totalGrowth`, inclusief de
- * waardestijging van een niet-liquide eigen woning. De rijke route hierboven
- * consumeert sinds 2026-08-05 het besteedbare `totalGrowthLiquide`. `SimRow` draagt
- * dat veld bewust niet (het is het vermogens-/compositiecontract, dat op de
- * netWorth-grondslag incl. woning staat), dus de enige consument van dit pad — de
- * wat-als-pagina, die alleen `SimRow[]` heeft — toont het rendement nog op het
- * totaal. Structureel op te lossen door `SimRow` het liquide veld te laten dragen;
- * dat raakt het bredere simulatie-contract en valt buiten deze fix.
- */
-export function buildBreakdownFromSimRows(rows: SimRow[]): BreakdownResult {
-  if (!rows.length) {
-    return { rows: [], incomeLayers: [], expenseLayers: [] }
-  }
-
-  const incomeEventIds: string[] = []
-  const expenseEventIds: string[] = []
-  const incomeLabels = new Map<string, string>()
-  const expenseLabels = new Map<string, string>()
-
-  for (const row of rows) {
-    if (row.incomeBreakdown) {
-      for (const item of row.incomeBreakdown) {
-        if (!FIXED_INCOME_IDS.has(item.id) && !incomeLabels.has(item.id)) {
-          incomeEventIds.push(item.id)
-        }
-        incomeLabels.set(item.id, item.label)
-      }
-    }
-    if (row.expenseBreakdown) {
-      for (const item of row.expenseBreakdown) {
-        if (!FIXED_EXPENSE_IDS.has(item.id) && !expenseLabels.has(item.id)) {
-          expenseEventIds.push(item.id)
-        }
-        expenseLabels.set(item.id, item.label)
-      }
-    }
-  }
-
-  const candidateIncomeLayers: BreakdownLayer[] = [
-    buildLayer('savings', FIXED_LABELS.savings, FIXED_COLORS.savings, true),
-    buildLayer('growth', FIXED_LABELS.growth, FIXED_COLORS.growth, true),
-    ...incomeEventIds.map((id, i) =>
-      buildLayer(id, incomeLabels.get(id)!, pickEventColor(INCOME_EVENT_PALETTE, i), false),
-    ),
-  ]
-  const candidateExpenseLayers: BreakdownLayer[] = [
-    buildLayer('withdrawal', FIXED_LABELS.withdrawal, FIXED_COLORS.withdrawal, true),
-    buildLayer('box3', FIXED_LABELS.box3, FIXED_COLORS.box3, true),
-    ...expenseEventIds.map((id, i) =>
-      buildLayer(id, expenseLabels.get(id)!, pickEventColor(EXPENSE_EVENT_PALETTE, i), false),
-    ),
-  ]
-
-  const incomeIdsWithData = new Set<string>()
-  const expenseIdsWithData = new Set<string>()
-
-  const breakdownRows: BreakdownRow[] = rows.map((row) => {
-    const incomeBySource: Record<string, number> = {}
-    const expenseBySource: Record<string, number> = {}
-
-    if (row.incomeBreakdown && row.incomeBreakdown.length > 0) {
-      for (const item of row.incomeBreakdown) {
-        incomeBySource[item.id] = (incomeBySource[item.id] ?? 0) + item.amount
-      }
-    } else {
-      if (row.savings > 0) incomeBySource['savings'] = row.savings
-      if (row.growth > 0) incomeBySource['growth'] = row.growth
-    }
-
-    if (row.expenseBreakdown && row.expenseBreakdown.length > 0) {
-      for (const item of row.expenseBreakdown) {
-        expenseBySource[item.id] = (expenseBySource[item.id] ?? 0) + item.amount
-      }
-    } else {
-      if (row.withdrawal > 0) expenseBySource['withdrawal'] = row.withdrawal
-    }
-
-    for (const [id, val] of Object.entries(incomeBySource)) {
-      if (val > 0) incomeIdsWithData.add(id)
-    }
-    for (const [id, val] of Object.entries(expenseBySource)) {
-      if (val > 0) expenseIdsWithData.add(id)
-    }
-
-    const totalIncome = Object.values(incomeBySource).reduce((s, v) => s + v, 0)
-    const totalExpenses = Object.values(expenseBySource).reduce((s, v) => s + v, 0)
-
-    return {
-      age: row.age,
-      phase: row.phase,
-      incomeBySource,
-      expenseBySource,
-      totalIncome,
-      totalExpenses,
-      surplus: totalIncome - totalExpenses,
-    }
-  })
-
   const incomeLayers = candidateIncomeLayers.filter(l => incomeIdsWithData.has(l.id))
   const expenseLayers = candidateExpenseLayers.filter(l => expenseIdsWithData.has(l.id))
 

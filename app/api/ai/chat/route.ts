@@ -5,7 +5,7 @@ import { getModel, AIConfigError } from '@/lib/ai/config'
 import { buildSystemPrompt, type AIDomain, type ChatContext } from '@/lib/ai/dna'
 import { buildContext } from '@/lib/ai/context/builder'
 import { getTools } from '@/lib/ai/tools'
-import { WHATIF_PROMPT } from '@/lib/ai/dna/wil'
+import { GEBEURTENIS_PROMPT } from '@/lib/ai/dna/wil'
 import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
 import { createChatOutputFilter } from '@/lib/ai/chat-output-filter'
 import { checkTierGate } from '@/lib/require-tier'
@@ -74,10 +74,10 @@ export async function POST(req: Request) {
     return res
   }
 
-  const { messages, domain = 'wil', context: chatContext, scenarioContext } = await req.json() as {
+  const { messages, domain = 'wil', context: rawChatContext, scenarioContext } = await req.json() as {
     messages: UIMessage[]
     domain?: AIDomain
-    context?: ChatContext
+    context?: string
     scenarioContext?: {
       sliders: Record<string, number>
       baselineFireAge: number | null
@@ -97,6 +97,14 @@ export async function POST(req: Request) {
 
   const validDomains: AIDomain[] = ['kern', 'wil', 'horizon']
   const safeDomain = validDomains.includes(domain) ? domain : 'wil'
+
+  // De chat-context heette tot ADR 0144 'whatif'. Een browsertab die nog op de
+  // vorige bundle draait, stuurt die oude waarde; die mappen we op 'gebeurtenis'
+  // zodat zo'n tab tijdens de deploy-overgang dezelfde persona en tools houdt.
+  // De waarde wordt nergens opgeslagen, dus deze tolerantie mag weg zodra geen
+  // oude bundle meer in omloop is. Elke andere waarde = de gewone Fin-chat.
+  const chatContext: ChatContext | undefined =
+    rawChatContext === 'gebeurtenis' || rawChatContext === 'whatif' ? 'gebeurtenis' : undefined
 
   let model
   try {
@@ -118,9 +126,9 @@ export async function POST(req: Request) {
   let systemPrompt: string
   let financialContext: string
   try {
-    if (chatContext === 'whatif') {
-      // What-if mode uses a dedicated prompt — skip the DB-backed prompt builder
-      systemPrompt = WHATIF_PROMPT
+    if (chatContext === 'gebeurtenis') {
+      // Life-event chat uses a dedicated prompt — skip the DB-backed prompt builder
+      systemPrompt = GEBEURTENIS_PROMPT
 
       // Append scenario context if provided
       if (scenarioContext) {

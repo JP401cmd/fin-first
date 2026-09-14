@@ -15,6 +15,8 @@ import {
   PATCHABLE_GOAL_COLUMNS,
   MAX_GOAL_BODY_BYTES,
   isAutoSyncGoalType,
+  isLabOnlyGoalType,
+  LAB_ONLY_GOAL_TYPE_MESSAGE,
   type GoalLinksInput,
 } from './schema'
 
@@ -517,8 +519,8 @@ export async function POST(request: Request) {
 
 /** Op welke titel de gebruiker dit doel mag muteren. */
 type GoalAccess =
-  | { scope: 'own'; isAuto: boolean }
-  | { scope: 'shared'; householdId: string; isAuto: boolean }
+  | { scope: 'own'; isAuto: boolean; goalType: unknown }
+  | { scope: 'shared'; householdId: string; isAuto: boolean; goalType: unknown }
 
 /**
  * Bepaalt of (en hoe) de gebruiker dit doel mag muteren, vóór er geschreven wordt.
@@ -536,7 +538,7 @@ async function resolveGoalAccess(
 ): Promise<{ ok: true; access: GoalAccess } | { ok: false; response: NextResponse }> {
   const { data, error } = await supabase
     .from('goals')
-    .select('id, user_id, ownership, household_id, metadata')
+    .select('id, user_id, ownership, household_id, metadata, goal_type')
     .eq('id', goalId)
     .maybeSingle()
 
@@ -547,13 +549,15 @@ async function resolveGoalAccess(
     typeof data.metadata === 'object' &&
     data.metadata !== null &&
     (data.metadata as Record<string, unknown>).sync === 'auto'
+  // Het huidige type — `unknown`, want de kolom heeft geen CHECK (migratie 20260901140000).
+  const goalType: unknown = data.goal_type
 
-  if (data.user_id === userId) return { ok: true, access: { scope: 'own', isAuto } }
+  if (data.user_id === userId) return { ok: true, access: { scope: 'own', isAuto, goalType } }
 
   if (data.ownership === 'shared' && data.household_id) {
     const mine = await getUserHouseholdId(supabase, userId)
     if (mine && mine === data.household_id) {
-      return { ok: true, access: { scope: 'shared', householdId: mine, isAuto } }
+      return { ok: true, access: { scope: 'shared', householdId: mine, isAuto, goalType } }
     }
   }
 
@@ -601,6 +605,13 @@ export async function PATCH(request: Request) {
       'Dit doel loopt automatisch mee met een kengetal; van type wisselen kan niet. Maak een nieuw doel aan.',
       'sync_unsupported',
     )
+  }
+
+  // Een bestaand doel omzetten NÁÁR een lab-type is dezelfde omweg als het via POST
+  // aanmaken (zie `isLabOnlyGoalType`). Het ongewijzigde type meesturen blijft wél
+  // mogen: GoalForm doet dat bij elke bewerking van een lab-doel.
+  if (body.goal_type !== undefined && body.goal_type !== access.goalType && isLabOnlyGoalType(body.goal_type)) {
+    return badRequest(LAB_ONLY_GOAL_TYPE_MESSAGE, 'lab_only_goal_type')
   }
 
   // Expliciete veld-whitelist. Alles wat hier niet in staat — `user_id`,

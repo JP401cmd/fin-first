@@ -110,9 +110,10 @@ function builder(table: string) {
   return b
 }
 
-/** Minimal NextRequest-dubbel: alleen text() + headers.get() worden gebruikt. */
+/** Minimal NextRequest-dubbel: alleen url + text() + headers.get() worden gebruikt. */
 function putRequest(rawBody: string, contentLength?: string) {
   return {
+    url: 'http://localhost/api/toekomst-doel',
     headers: {
       get: (k: string) => (k === 'content-length' ? (contentLength ?? String(rawBody.length)) : null),
     },
@@ -163,6 +164,43 @@ describe('PUT /api/toekomst-doel — guards', () => {
   it('400 bij een onbekende actie', async () => {
     const res = await PUT(putRequest(JSON.stringify({ action: 'iets-anders' })))
     expect(res.status).toBe(400)
+    // parseBody zet het veldpad ervoor ("action: …"); de tekst zelf blijft de oude.
+    expect((await res.json()).error).toContain('Ongeldige actie')
+    expect(mockFrom).not.toHaveBeenCalled()
+  })
+
+  it('400 bij een body die geen object is (zod-poort vóór elke DB-aanraking)', async () => {
+    const res = await PUT(putRequest(JSON.stringify(['vastleggen'])))
+    expect(res.status).toBe(400)
+    expect(mockFrom).not.toHaveBeenCalled()
+  })
+
+  it('400 bij een parameter die niet `true` is of een doelwaarde die geen getal is — geen DB', async () => {
+    for (const body of [
+      { action: 'vastleggen', parameters: { spaarquote: 'ja' }, doelwaarden: { spaarquotePct: 45 }, stand: { sliders: { savings: 45 } } },
+      { action: 'vastleggen', parameters: { spaarquote: true }, doelwaarden: { spaarquotePct: 'veel' }, stand: { sliders: { savings: 45 } } },
+      { action: 'vastleggen', parameters: { spaarquote: true }, doelwaarden: { spaarquotePct: 45 }, stand: 'kapot' },
+    ]) {
+      const res = await PUT(putRequest(JSON.stringify(body)))
+      expect(res.status).toBe(400)
+      expect((await res.json()).code).toBe('validation_error')
+    }
+    expect(mockFrom).not.toHaveBeenCalled()
+  })
+
+  it('onbekende parameter-sleutels worden gestript, zoals de oude whitelist deed', async () => {
+    const res = await PUT(
+      putRequest(
+        JSON.stringify({
+          action: 'vastleggen',
+          parameters: { spaarquote: true, onbekend: true },
+          doelwaarden: { spaarquotePct: 45 },
+          stand: { sliders: { savings: 45 } },
+        }),
+      ),
+    )
+    expect(res.status).toBe(200)
+    expect(inserted.map((i) => i.row.goal_type)).toEqual(['savings_rate'])
   })
 
   it('400 als geen enkele parameter is aangevinkt', async () => {
@@ -518,7 +556,7 @@ describe('PUT /api/toekomst-doel — vastleggen volgt het anker (ADR 0145)', () 
     expect(deleted).toEqual([])
   })
 
-  it('aow + alleen {fire} → na strippen niets over → 400 "Geen doelparameters"', async () => {
+  it('aow + alleen {fire} → na strippen niets over → 400 "Geen doelparameters" mét code geen_parameters_na_plan', async () => {
     results.profilesSelect.mockReturnValueOnce(planRow({ fire_stop_anchor: 'aow' }))
     const res = await PUT(
       putRequest(
@@ -531,8 +569,17 @@ describe('PUT /api/toekomst-doel — vastleggen volgt het anker (ADR 0145)', () 
       ),
     )
     expect(res.status).toBe(400)
-    expect((await res.json()).error).toBe('Geen doelparameters')
+    expect(await res.json()).toEqual({ error: 'Geen doelparameters', code: 'geen_parameters_na_plan' })
     expect(inserted).toEqual([])
+  })
+
+  it('een lege keuze (niets aangevinkt) houdt "Geen doelparameters" zónder code — de generieke client-melding', async () => {
+    results.profilesSelect.mockReturnValueOnce(planRow({ fire_stop_anchor: 'aow' }))
+    const res = await PUT(
+      putRequest(JSON.stringify({ action: 'vastleggen', parameters: {}, doelwaarden: {}, stand: { sliders: { savings: 45 } } })),
+    )
+    expect(res.status).toBe(400)
+    expect(await res.json()).toEqual({ error: 'Geen doelparameters' })
   })
 
   it('aow + dekking met alléén een stopkeuze als stand → na strippen leeg → 400 "Ongeldige doelstand", geen wees-goals', async () => {

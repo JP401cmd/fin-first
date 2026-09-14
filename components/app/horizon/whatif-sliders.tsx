@@ -1,23 +1,18 @@
 'use client'
 
 import { formatCurrency } from '@/lib/format'
-import { ChevronDown, ChevronUp } from 'lucide-react'
-import { useState } from 'react'
 import {
   buildSliderEvent,
   applySliderEvent,
   readSliderValueFromEvents,
-  clearScenarioEvents,
   type SliderKey,
 } from '@/lib/scenario-events'
 import type { WhatIfEvent } from '@/lib/types/horizon-whatif'
-import { useOptionalToast } from '@/components/app/toast-provider'
 import { rangeTouchSeekProps } from '@/lib/range-touch-seek'
 
 /**
- * WhatIfOverrides is now a derived view, but kept as a public type for
- * components that still consume the snapshot shape (WhatIfActions / Chat /
- * Scenarios). Pages compute it via deriveOverridesFromEvents.
+ * WhatIfOverrides is de baseline-snapshot waartegen de sliders hun events opbouwen
+ * en teruglezen (`buildSliderEvent`/`readSliderValueFromEvents`).
  */
 // Datacontract(en) wonen nu in @/lib/types/horizon-whatif (import-richting UI→lib).
 import type { WhatIfOverrides } from '@/lib/types/horizon-whatif'
@@ -28,8 +23,6 @@ interface SlidersProps {
   events: WhatIfEvent[]
   setEvents: (updater: (prev: WhatIfEvent[]) => WhatIfEvent[]) => void
   currentAge: number
-  /** When true, render only the slider grid — no card wrapper, no headers. */
-  bare?: boolean
 }
 
 /**
@@ -184,13 +177,7 @@ function SliderGrid({
   events,
   setEvents,
   currentAge,
-  hideResetAndHint = false,
-}: SlidersProps & {
-  /** Verbergt de interne "Verfijn-events wissen"-knop + hint. Gebruikt door de
-   *  /toekomst-sectie "Verken je aannames" waar een globale reset + eigen tekst leeft. */
-  hideResetAndHint?: boolean
-}) {
-  const { addToast } = useOptionalToast()
+}: SlidersProps) {
   const incomeValue = readSliderValueFromEvents('income', events, baseline)
   const workdaysValue = readSliderValueFromEvents('workdays', events, baseline)
   const savingsValue = readSliderValueFromEvents('savings', events, baseline)
@@ -210,173 +197,91 @@ function SliderGrid({
     setEvents(prev => applySliderEvent(prev, key, newEvent))
   }
 
-  const hasSliderEvent = events.some(e => e.scenario_origin?.startsWith('slider:'))
-
-  const resetAll = () => {
-    // Snapshot van alléén de slider-events (dat is wat de reset wist) zodat
-    // "Ongedaan maken" (5s) ze exact terugzet zónder events te overschrijven
-    // die binnen het venster via een ander pad zijn toegevoegd.
-    const snapshot = events.filter(e => e.scenario_origin?.startsWith('slider:'))
-    setEvents(prev => clearScenarioEvents(prev, 'slider:'))
-    if (!hasSliderEvent) return
-    addToast({
-      type: 'info',
-      title: 'Verfijn-events gewist',
-      duration: 5000,
-      action: {
-        label: 'Ongedaan maken',
-        onClick: () =>
-          setEvents(prev => [
-            ...prev.filter(e => !e.scenario_origin?.startsWith('slider:')),
-            ...snapshot,
-          ]),
-      },
-    })
-  }
-
   return (
-    <>
-      <div className="xl:grid xl:grid-cols-2 xl:gap-x-6">
-        <div className="border-b border-dashed border-[var(--border-ed)] xl:border-b-0">
-          <SliderRow
-            label="Maandinkomen"
-            hint="→ Inkomenswijziging-event"
-            value={incomeValue}
-            baseValue={baseline.monthlyIncome}
-            min={incomeRange.min}
-            max={incomeRange.max}
-            step={100}
-            formatValue={formatCurrency}
-            formatDelta={v => formatCurrency(v) + '/mnd'}
-            onChange={v => setSliderValue('income', v)}
-            minLabel={formatCurrency(incomeRange.min)}
-            maxLabel={formatCurrency(incomeRange.max)}
-          />
-        </div>
-
-        <div className="border-b border-dashed border-[var(--border-ed)] xl:border-b-0">
-          <SliderRow
-            label="Werkdagen per week"
-            hint="→ Part-time-event"
-            value={workdaysValue}
-            baseValue={baseline.workDaysPerWeek}
-            min={workdaysRange.min}
-            max={workdaysRange.max}
-            step={1}
-            formatValue={v => `${v} dagen`}
-            formatDelta={v => `${v} dag${Math.abs(v) !== 1 ? 'en' : ''}`}
-            onChange={v => setSliderValue('workdays', v)}
-            minLabel={dayLabel(workdaysRange.min)}
-            maxLabel={dayLabel(workdaysRange.max)}
-          />
-        </div>
-
-        <div className="border-b border-dashed border-[var(--border-ed)] xl:border-b-0">
-          <SliderRow
-            label="Spaarquote"
-            hint="→ Spaarquote-event"
-            value={savingsValue}
-            baseValue={baseline.savingsRate}
-            min={savingsRange.min}
-            max={savingsRange.max}
-            step={1}
-            formatValue={v => `${Math.round(v)}%`}
-            formatDelta={v => `${Math.round(v)}%`}
-            onChange={v => setSliderValue('savings', v)}
-            minLabel={`${savingsRange.min}%`}
-            maxLabel={`${savingsRange.max}%`}
-          />
-        </div>
-
-        <div className="border-b border-dashed border-[var(--border-ed)] xl:border-b-0">
-          <SliderRow
-            label="Extra inleg"
-            hint="→ Extra-inleg-event"
-            value={extraValue}
-            baseValue={0}
-            min={extraRange.min}
-            max={extraRange.max}
-            step={50}
-            formatValue={formatCurrency}
-            formatDelta={v => formatCurrency(v) + '/mnd'}
-            onChange={v => setSliderValue('extra_inleg', v)}
-            minLabel={formatCurrency(extraRange.min)}
-            maxLabel={formatCurrency(extraRange.max)}
-          />
-        </div>
+    <div className="xl:grid xl:grid-cols-2 xl:gap-x-6">
+      <div className="border-b border-dashed border-[var(--border-ed)] xl:border-b-0">
+        <SliderRow
+          label="Maandinkomen"
+          hint="→ Inkomenswijziging-event"
+          value={incomeValue}
+          baseValue={baseline.monthlyIncome}
+          min={incomeRange.min}
+          max={incomeRange.max}
+          step={100}
+          formatValue={formatCurrency}
+          formatDelta={v => formatCurrency(v) + '/mnd'}
+          onChange={v => setSliderValue('income', v)}
+          minLabel={formatCurrency(incomeRange.min)}
+          maxLabel={formatCurrency(incomeRange.max)}
+        />
       </div>
 
-      {!hideResetAndHint && hasSliderEvent && (
-        <button
-          type="button"
-          onClick={resetAll}
-          className="mt-3 w-full rounded-[var(--r)] border border-dashed border-[var(--border-md)] px-3 py-2 font-sans text-xs font-medium text-[var(--ink-3)] transition-colors hover:border-horizon-300 hover:text-horizon-700"
-        >
-          Verfijn-events wissen
-        </button>
-      )}
+      <div className="border-b border-dashed border-[var(--border-ed)] xl:border-b-0">
+        <SliderRow
+          label="Werkdagen per week"
+          hint="→ Part-time-event"
+          value={workdaysValue}
+          baseValue={baseline.workDaysPerWeek}
+          min={workdaysRange.min}
+          max={workdaysRange.max}
+          step={1}
+          formatValue={v => `${v} dagen`}
+          formatDelta={v => `${v} dag${Math.abs(v) !== 1 ? 'en' : ''}`}
+          onChange={v => setSliderValue('workdays', v)}
+          minLabel={dayLabel(workdaysRange.min)}
+          maxLabel={dayLabel(workdaysRange.max)}
+        />
+      </div>
 
-      {!hideResetAndHint && (
-        <p className="mt-3 font-sans text-[10px] leading-snug text-[var(--ink-4)]">
-          Elke slider maakt of bewerkt een levensgebeurtenis in je scenario. Open
-          het paneel Levensgebeurtenissen onderaan om ze handmatig aan te passen.
-        </p>
-      )}
-    </>
+      <div className="border-b border-dashed border-[var(--border-ed)] xl:border-b-0">
+        <SliderRow
+          label="Spaarquote"
+          hint="→ Spaarquote-event"
+          value={savingsValue}
+          baseValue={baseline.savingsRate}
+          min={savingsRange.min}
+          max={savingsRange.max}
+          step={1}
+          formatValue={v => `${Math.round(v)}%`}
+          formatDelta={v => `${Math.round(v)}%`}
+          onChange={v => setSliderValue('savings', v)}
+          minLabel={`${savingsRange.min}%`}
+          maxLabel={`${savingsRange.max}%`}
+        />
+      </div>
+
+      <div className="border-b border-dashed border-[var(--border-ed)] xl:border-b-0">
+        <SliderRow
+          label="Extra inleg"
+          hint="→ Extra-inleg-event"
+          value={extraValue}
+          baseValue={0}
+          min={extraRange.min}
+          max={extraRange.max}
+          step={50}
+          formatValue={formatCurrency}
+          formatDelta={v => formatCurrency(v) + '/mnd'}
+          onChange={v => setSliderValue('extra_inleg', v)}
+          minLabel={formatCurrency(extraRange.min)}
+          maxLabel={formatCurrency(extraRange.max)}
+        />
+      </div>
+    </div>
   )
 }
 
-export function WhatIfSliders({ baseline, events, setEvents, currentAge, bare = false }: SlidersProps) {
-  const [expanded, setExpanded] = useState(true)
-
-  if (bare) {
-    return (
-      <SliderGrid
-        baseline={baseline}
-        events={events}
-        setEvents={setEvents}
-        currentAge={currentAge}
-        hideResetAndHint
-      />
-    )
-  }
-
-  const incomeValue = readSliderValueFromEvents('income', events, baseline)
-  const workdaysValue = readSliderValueFromEvents('workdays', events, baseline)
-  const savingsValue = readSliderValueFromEvents('savings', events, baseline)
-  const summary = `${formatCurrency(incomeValue)} · ${workdaysValue} dagen · ${Math.round(savingsValue)}%`
-
+/**
+ * De scenario-sliders op de tijdas van /toekomst ("Verken je aannames"). Rendert
+ * alleen het slidergrid — geen kaart, geen kop, geen eigen reset: die leven in de
+ * host-sectie. De losse kaartvariant verviel met de Wat-Als-pagina (ADR 0144).
+ */
+export function WhatIfSliders({ baseline, events, setEvents, currentAge }: SlidersProps) {
   return (
-    <div className="card-editorial overflow-hidden">
-      <button
-        type="button"
-        onClick={() => setExpanded(!expanded)}
-        className="flex w-full items-center justify-between px-4 py-2.5 text-left md:hidden"
-      >
-        <div>
-          <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">
-            Scenario-parameters
-          </p>
-          {!expanded && (
-            <p className="mt-0.5 font-mono text-xs text-[var(--ink-3)]">{summary}</p>
-          )}
-        </div>
-        {expanded ? (
-          <ChevronUp className="h-4 w-4 text-[var(--ink-3)]" />
-        ) : (
-          <ChevronDown className="h-4 w-4 text-[var(--ink-3)]" />
-        )}
-      </button>
-
-      <div className="hidden px-4 pb-3 pt-3 md:block">
-        <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">
-          Scenario-parameters
-        </p>
-      </div>
-
-      <div className={`px-4 pb-4 ${expanded ? 'block' : 'hidden'} md:block`}>
-        <SliderGrid baseline={baseline} events={events} setEvents={setEvents} currentAge={currentAge} />
-      </div>
-    </div>
+    <SliderGrid
+      baseline={baseline}
+      events={events}
+      setEvents={setEvents}
+      currentAge={currentAge}
+    />
   )
 }

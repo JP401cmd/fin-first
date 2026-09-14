@@ -181,7 +181,7 @@ export function buildEventInputs(
  *  - `slider:savings` (spaarquote, per 29-jul mee-gegate) draagt 'm op `monthly_cost_change`
  *    (negatief = minder besteden = meer sparen) → `−monthly_cost_change` is de positieve
  *    spaarruimte-delta. Het event-SHAPE blijft bewust ongewijzigd, zodat de round-trip
- *    (`readSliderValueFromEvents`/`deriveOverridesFromEvents`) en eerder OPGESLAGEN
+ *    (`readSliderValueFromEvents`) en eerder OPGESLAGEN
  *    scenario's de sliderstand onveranderd reconstrueren.
  *
  * Sliders zetten `target_age = currentAge` (= maand 0), dus de delta start synchroon met het

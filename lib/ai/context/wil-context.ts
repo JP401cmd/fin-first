@@ -1,3 +1,7 @@
+import { splitActiveGoals } from '@/lib/goal-current-value'
+
+/** Hoe lang de Fin-context maximaal wacht op de live doelwaarden (ms). Geen financiële constante. */
+const GOAL_SYNC_TIMEOUT_MS = 2500
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { section, formatCurrency, bulletList } from './formatter'
 import { getNibudHouseholdType, getNibudReferences, calculateBenchmarks } from '@/lib/nibud/reference-data'
@@ -7,7 +11,9 @@ import { applyActionPriorityOrder } from '@/lib/action-sort'
 import type { ModuleId } from '@/lib/module-registry'
 import { buildBudgetSpendingMap, type SpendingTxRow } from '@/lib/budget-spending'
 import { buildAiBudgetTypeMap, loadSplitRows } from './budget-spending-source'
-import { formatGoalValue, GOAL_TYPE_META, type GoalType } from '@/lib/goal-data'
+import { formatGoalValue, GOAL_TYPE_META, type GoalProgress, type GoalType } from '@/lib/goal-data'
+import { syncGoalsFromCanonicalSources, type GoalSyncRows } from '@/lib/goals/canonical-goal-sync'
+import { getActiveAssets, getActiveDebts } from '@/lib/server-data/base'
 
 /**
  * Doelwaarde in de EENHEID van het doeltype (ADR 0145, context-formattering): een
@@ -21,6 +27,114 @@ export function formatGoalAmount(value: number, goalType: string | null | undefi
     return formatGoalValue(value, goalType as GoalType)
   }
   return formatCurrency(value)
+}
+
+/**
+ * Korte, neutrale markering voor een doel zonder meetbare uitkomst onder het plan
+ * (`notApplicableReason`, ADR 0129 F3a / ADR 0145). Bewust NIET de lange
+ * doelkaart-zin: Fin moet weten dát er geen getal is, zodat hij geen "0%" citeert
+ * of voortgang verzint — de uitleg van het anker staat al in het financieel overzicht.
+ */
+export const GOAL_NOT_APPLICABLE_MARKER = 'n.v.t. — geen uitkomst onder het gekozen stopmoment'
+
+/** Doelrij zoals de Wil-context 'm ophaalt (kolom-scoped, zie de query hieronder). */
+export type GoalContextRow = {
+  id: string
+  user_id: string | null
+  name: string
+  goal_type: GoalType
+  target_value: number | string
+  current_value: number | string
+  target_date: string | null
+  is_completed: boolean
+  metadata: Record<string, unknown> | null
+  linked_asset_id: string | null
+  linked_debt_id: string | null
+  created_at?: string
+}
+
+type SyncedGoalContextRow = Omit<GoalContextRow, 'current_value' | 'target_value'> & {
+  current_value: number
+  target_value: number
+  notApplicableReason?: string | null
+}
+
+/**
+ * Pure opmaak van de DOELEN-regels uit GESYNCHRONISEERDE doelen + hun canonieke
+ * voortgang (index-gekoppeld). Standen in de eenheid van het doeltype; het
+ * percentage komt uit `computeGoalProgress` (richting-bewust, geklemd) en wordt
+ * hier niet opnieuw als `current/target` uitgerekend.
+ */
+export function formatGoalContextLines(
+  goals: readonly SyncedGoalContextRow[],
+  progresses: readonly GoalProgress[],
+): string[] {
+  return goals.map((g, i) => {
+    const p = progresses[i]
+    const dateInfo = g.target_date ? ` — deadline ${g.target_date}` : ''
+    if (p?.notApplicableReason || g.notApplicableReason) {
+      return `${g.name}: ${GOAL_NOT_APPLICABLE_MARKER}${dateInfo}`
+    }
+    const current = p ? p.current : Number(g.current_value)
+    const target = p ? p.target : Number(g.target_value)
+    const pct = p ? p.pct : 0
+    return `${g.name}: ${formatGoalAmount(current, g.goal_type)}/${formatGoalAmount(target, g.goal_type)} (${pct}%)${dateInfo}`
+  })
+}
+
+/**
+ * De DOELEN-regels voor Fin, op DEZELFDE standen als /toekomst/doelen.
+ *
+ * Consume, don't recompute: de ruwe `goals.current_value` is voor parameter-,
+ * auto-sync-, gekoppelde en vrijheidsgetal-doelen niet de stand (vaak 0) — die
+ * wordt bij het lezen geïnjecteerd. Deze functie roept daarom exact de bedrading
+ * van het doelen-scherm aan (`syncGoalsFromCanonicalSources`), met dezelfde
+ * volgorde en afkap.
+ *
+ * Kosten per chatbericht, alleen bij ≥1 actief doel: één `goal_links`-query. De
+ * bezittingen/schulden worden alleen opgehaald als er een koppeling is; de
+ * FIRE-snapshot en elke metric-bron alleen bij een doeltype dat ze nodig heeft.
+ *
+ * Faalt de sync onverwacht, dan krijgt Fin de doelnamen zónder getallen — nooit
+ * de ruwe opgeslagen waarde, want dat is precies de 0 die dit moest voorkomen.
+ */
+export async function buildGoalContextLines(
+  supabase: SupabaseClient,
+  rawGoals: readonly GoalContextRow[],
+  userId: string | null,
+): Promise<string[]> {
+  if (rawGoals.length === 0) return []
+  // Klonen + NUMERIC-strings naar getallen: de sync muteert in-place.
+  const goals: SyncedGoalContextRow[] = rawGoals.map(g => ({
+    ...g,
+    current_value: Number(g.current_value ?? 0),
+    target_value: Number(g.target_value ?? 0),
+  }))
+  try {
+    const loadRows = async (): Promise<GoalSyncRows> => {
+      const [assetsRes, debtsRes] = await Promise.all([getActiveAssets(supabase), getActiveDebts(supabase)])
+      return {
+        assets: (assetsRes.data ?? []) as unknown as GoalSyncRows['assets'],
+        debts: (debtsRes.data ?? []) as unknown as GoalSyncRows['debts'],
+      }
+    }
+    // Tijdslimiet: de sync kan een horizon-load + kernel-run doen (vrijheidsgetal-,
+    // fire_age-, end_balance-, plan_coverage-doel). Een chatbericht wacht daar nooit
+    // langer dan GOAL_SYNC_TIMEOUT_MS op; daarna meldt de context "niet beschikbaar".
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const { goals: synced, goalProgresses } = await Promise.race([
+      syncGoalsFromCanonicalSources(supabase, goals, userId, loadRows),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error('doel-sync time-out')), GOAL_SYNC_TIMEOUT_MS)
+      }),
+    ]).finally(() => clearTimeout(timer))
+    return formatGoalContextLines(synced, goalProgresses)
+  } catch (err) {
+    console.error('[ai:wil-context] doel-sync mislukt', err instanceof Error ? err.message : err)
+    // Zelfde begrenzing als het normale pad (lab-doelen + max. 5 eigen), zodat een
+    // mislukte sync de context niet laat uitdijen.
+    return splitActiveGoals(goals).goals.map(g => `${g.name}: actuele stand niet beschikbaar`)
+  }
 }
 
 /**
@@ -56,13 +170,19 @@ export async function buildWilContext(supabase: SupabaseClient, budgetingActive 
       .gte('date', monthStart)
       .lt('date', monthEnd),
     // Goals, recommendations, actions belong to inzicht_acties module — skip when inactive
+    // Kolommen ná `is_completed` voeden de canonieke doel-sync
+    // (`syncGoalsFromCanonicalSources`): id → koppelrijen, metadata → parameter-/
+    // auto-sync-/vrijheidsgetal-herkenning, user_id → de eigen-doel-toets van de
+    // anker-notitie, created_at → de tempo-toets van `computeGoalProgress`. Geen
+    // `.limit()`: de sync kapt zelf af op dezelfde lijst als het doelen-scherm
+    // (parameterdoelen + max 5 eigen doelen); een DB-limiet ervóór kon een
+    // parameterdoel wegknippen dat het scherm wél toont.
     inzichtActiesActive
       ? supabase
           .from('goals')
-          .select('name, goal_type, target_value, current_value, target_date, is_completed')
+          .select('id, user_id, name, goal_type, target_value, current_value, target_date, is_completed, metadata, linked_asset_id, linked_debt_id, created_at')
           .eq('is_completed', false)
           .order('sort_order', { ascending: true })
-          .limit(10)
       : noData,
     inzichtActiesActive
       ? supabase
@@ -128,6 +248,12 @@ export async function buildWilContext(supabase: SupabaseClient, budgetingActive 
 
   // NIBUD benchmark for Wil context — fetch profile for household type and expense fallback
   const { data: { user } } = await supabase.auth.getUser()
+
+  // Doelen: gestart zodra de user-id er is, zodat de sync parallel loopt met de
+  // NIBUD-queries hieronder. `buildGoalContextLines` vangt zijn eigen fouten af
+  // (geen unhandled rejection als het NIBUD-blok eerder gooit).
+  const goalLinesPromise = buildGoalContextLines(supabase, goals as GoalContextRow[], user?.id ?? null)
+
   let profileEstExpenses = 0
   if (user) {
     const { data: profile } = await supabase
@@ -189,15 +315,9 @@ export async function buildWilContext(supabase: SupabaseClient, budgetingActive 
     }
   }
 
-  // Real goals summary from database
-  if (goals.length > 0) {
-    const goalLines = goals.map(g => {
-      const current = Number(g.current_value)
-      const target = Number(g.target_value)
-      const pct = target > 0 ? Math.round((current / target) * 100) : 0
-      const dateInfo = g.target_date ? ` — deadline ${g.target_date}` : ''
-      return `${g.name}: ${formatGoalAmount(current, g.goal_type)}/${formatGoalAmount(target, g.goal_type)} (${pct}%)${dateInfo}`
-    })
+  // Doelen — met de LIVE-gesynchroniseerde standen van het doelen-scherm.
+  const goalLines = await goalLinesPromise
+  if (goalLines.length > 0) {
     parts.push(section('DOELEN', bulletList(goalLines)))
   }
 

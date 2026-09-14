@@ -12,9 +12,9 @@ import { createSuggestRecommendationTool } from './suggest-recommendation'
  * Get the tool set for a given domain.
  * Standaard tools krijgen alle domeinen — Fin is de enige assistent.
  *
- * Voor de whatif-context wisselen we suggestAction in voor suggestLifeEvent
- * en LATEN we suggestRecommendation weg: voorstellen horen in de hoofdchat,
- * niet in de what-if-sandbox waar de gebruiker scenario's bouwt.
+ * Voor de gebeurtenis-context (de Fin-chat in de levensgebeurtenis-pane) voegen
+ * we suggestLifeEvent toe en LATEN we suggestRecommendation weg: voorstellen horen
+ * in de hoofdchat, niet in de pane waar de gebruiker een gebeurtenis uitwerkt.
  */
 export function getTools(
   _domain: AIDomain,
@@ -29,7 +29,7 @@ export function getTools(
     showVisualization: showVisualizationTool,
   }
 
-  if (context === 'whatif') {
+  if (context === 'gebeurtenis') {
     return { ...base, suggestLifeEvent: suggestLifeEventTool, suggestAction: suggestActionTool }
   }
 

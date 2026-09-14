@@ -1,6 +1,14 @@
 import { describe, it, expect } from 'vitest'
 import { randomUUID } from 'node:crypto'
-import { CreateGoalSchema, UpdateGoalSchema, GOAL_TYPES, isAutoSyncGoalType } from './schema'
+import {
+  CreateGoalSchema,
+  UpdateGoalSchema,
+  GOAL_TYPES,
+  isAutoSyncGoalType,
+  isLabOnlyGoalType,
+  LAB_ONLY_GOAL_TYPE_MESSAGE,
+} from './schema'
+import { GOAL_TYPE_META } from '@/lib/goal-data'
 
 /**
  * De schrijfpoort van `/api/goals`. Deze suite bewaakt vooral de eigenschap
@@ -115,6 +123,35 @@ describe('goals-schema — doeltypen', () => {
     expect(GOAL_TYPES).toContain('savings')
     expect(GOAL_TYPES).toContain('fire_age')
     expect(GOAL_TYPES).toContain('custom')
+  })
+
+  it('POST weigert elk lab-type (viaLab) met de lab-tekst, zonder veldprefix', () => {
+    const labTypes = GOAL_TYPES.filter((t) => GOAL_TYPE_META[t].viaLab === true)
+    expect([...labTypes].sort()).toEqual(['expected_return', 'fire_age', 'plan_coverage'])
+    for (const t of labTypes) {
+      expect(isLabOnlyGoalType(t)).toBe(true)
+      const parsed = CreateGoalSchema.safeParse({ name: 'x', goal_type: t, target_value: 50 })
+      expect(parsed.success, t).toBe(false)
+      if (parsed.success) continue
+      expect(parsed.error.issues[0].message).toBe(LAB_ONLY_GOAL_TYPE_MESSAGE)
+      expect(parsed.error.issues[0].path).toEqual([])
+    }
+  })
+
+  it('POST laat fire_age wél door als MEELOPENDE doelbasis (sync: auto, ADR 0125); plan_coverage/expected_return niet', () => {
+    expect(CreateGoalSchema.safeParse({ name: 'Vrij op 55', goal_type: 'fire_age', target_value: 55, sync: 'auto' }).success).toBe(true)
+    expect(CreateGoalSchema.safeParse({ name: 'x', goal_type: 'plan_coverage', target_value: 100, sync: 'auto' }).success).toBe(false)
+    expect(CreateGoalSchema.safeParse({ name: 'x', goal_type: 'expected_return', target_value: 7, sync: 'auto' }).success).toBe(false)
+  })
+
+  it('POST laat de vrij aanmaakbare parameter-typen (savings_rate, salary) door', () => {
+    expect(isLabOnlyGoalType('savings_rate')).toBe(false)
+    expect(CreateGoalSchema.safeParse({ name: 'x', goal_type: 'savings_rate' }).success).toBe(true)
+    expect(CreateGoalSchema.safeParse({ name: 'x', goal_type: 'salary' }).success).toBe(true)
+  })
+
+  it('PATCH-schema laat een lab-type staan (de route toetst of het type wisselt)', () => {
+    expect(UpdateGoalSchema.safeParse({ id: randomUUID(), goal_type: 'fire_age', name: 'Vrij op 58' }).success).toBe(true)
   })
 
   it('kent auto-sync alleen toe aan typen met metricBasis', () => {

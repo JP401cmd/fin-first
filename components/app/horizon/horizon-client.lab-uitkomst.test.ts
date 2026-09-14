@@ -109,4 +109,19 @@ describe('horizon-client consumeert ÉÉN lab-uitkomst (ADR 0145)', () => {
     expect(src).toContain('onClick={handlePlanTekortHintSeed}')
     expect(src.match(/handlePlanTekortHintSeed\(/g) ?? []).toEqual([])
   })
+
+  it('de plan-tekort-hint blijft zichtbaar in de privacy-weergave en geeft `masked` door aan zin én knop', () => {
+    const code = codeRegels().join('\n')
+    const start = code.indexOf('data-testid="lab-plan-tekort-hint"')
+    expect(start).toBeGreaterThan(-1)
+    // De render-gate direct vóór het blok: geen `!masked` en geen dagen-drempel meer
+    // (de zin kent zelf "minder dan een dag").
+    const gate = code.slice(code.lastIndexOf('{planTekortHint !== null', start), start)
+    expect(gate).toContain('!isNuStoppenMode')
+    expect(gate).not.toContain('!masked')
+    expect(gate).not.toMatch(/dagen\s*>=\s*1/)
+    const blok = code.slice(start, code.indexOf('Indicatie, geen advies', start))
+    expect(blok).toMatch(/dekkingTekortHintZin\(\{[\s\S]*?\bmasked,[\s\S]*?\}\)/)
+    expect(blok).toContain('dekkingTekortHintKnop(planTekortHint.seed, masked)')
+  })
 })

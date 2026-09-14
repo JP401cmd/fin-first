@@ -14,9 +14,8 @@ export interface WhatIfEvent extends LifeEvent {
 }
 
 /**
- * WhatIfOverrides is now a derived view, but kept as a public type for
- * components that still consume the snapshot shape (WhatIfActions / Chat /
- * Scenarios). Pages compute it via deriveOverridesFromEvents.
+ * WhatIfOverrides is de baseline-snapshot waartegen de scenario-sliders hun
+ * events opbouwen en teruglezen (`buildSliderEvent`/`readSliderValueFromEvents`).
  */
 export interface WhatIfOverrides {
   monthlyIncome: number

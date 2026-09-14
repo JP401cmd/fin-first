@@ -245,7 +245,7 @@ export const DEFAULT_WELCOME_GUIDE: WelcomeGuideConfig = {
       steps: [
         {
           id: 's4-whatif',
-          title: 'Speel met een what-if scenario',
+          title: 'Speel met je aannames',
           description: 'Zie direct het effect van keuzes op je vrijheid.',
           href: '/toekomst?whatif=open',
           icon: 'Compass',

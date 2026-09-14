@@ -3,7 +3,7 @@ import { forbidden } from '@/lib/api/respond'
 import { createClient } from '@/lib/supabase/server'
 import { isSuperAdmin } from '@/lib/admin'
 import { BASE_SYSTEM_PROMPT } from '@/lib/ai/dna/base'
-import { WIL_PROMPT, WHATIF_PROMPT, VASTE_KOSTEN_ANALYSE_PROMPT } from '@/lib/ai/dna/wil'
+import { WIL_PROMPT, GEBEURTENIS_PROMPT, VASTE_KOSTEN_ANALYSE_PROMPT } from '@/lib/ai/dna/wil'
 import { KERN_PROMPT } from '@/lib/ai/dna/kern'
 import { HORIZON_PROMPT } from '@/lib/ai/dna/horizon'
 import { RECOMMENDATIONS_SYSTEM_PROMPT } from '@/lib/ai/dna/recommendations'
@@ -56,14 +56,14 @@ export async function GET() {
       charCount: WIL_PROMPT.length,
     },
     {
-      id: 'whatif',
-      label: 'Fin Droomscenario',
-      description: 'Standalone prompt voor de Wat-Als droomgids modus. Vervangt het normale Fin-prompt volledig.',
-      content: WHATIF_PROMPT,
+      id: 'gebeurtenis',
+      label: 'Fin Levensgebeurtenis (chat)',
+      description: 'Standalone prompt voor de Fin-chat in de levensgebeurtenis-pane op Toekomst (droomgids → planner). Vervangt het normale Fin-prompt volledig.',
+      content: GEBEURTENIS_PROMPT,
       source: 'lib/ai/dna/wil.ts',
       domain: 'wil',
       dynamic: false,
-      charCount: WHATIF_PROMPT.length,
+      charCount: GEBEURTENIS_PROMPT.length,
     },
     {
       id: 'vaste-kosten-analyse',

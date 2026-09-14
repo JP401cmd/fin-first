@@ -57,6 +57,22 @@ export function isAutoSyncGoalType(goalType: GoalType): boolean {
   return GOAL_TYPE_META[goalType]?.metricBasis === true
 }
 
+/**
+ * Is dit een lab-type (`viaLab`: `fire_age`, `expected_return`, `plan_coverage`)?
+ *
+ * Die doelen ontstaan uitsluitend via `/api/toekomst-doel`, dat het anker server-side
+ * leest en `metadata.bron = 'parameter'` zet (ADR 0145 D3). GoalForm verbergt ze al,
+ * maar een verborgen optie is geen poort: zonder deze toets kon een directe POST een
+ * `plan_coverage`-doel zonder plan-velden aanmaken, dat de loader dan niet kan duiden.
+ * Leest de canonieke vlag — geen eigen typelijst.
+ */
+export function isLabOnlyGoalType(goalType: GoalType): boolean {
+  return GOAL_TYPE_META[goalType]?.viaLab === true
+}
+
+/** De client-veilige weigertekst voor een lab-type buiten het lab (POST én PATCH). */
+export const LAB_ONLY_GOAL_TYPE_MESSAGE = 'Dit doeltype leg je vast in het lab op /toekomst'
+
 // ── Grenzen ──────────────────────────────────────────────────────────────────
 
 /**
@@ -163,6 +179,14 @@ export const CreateGoalSchema = z.object({
 
   links: GoalLinksSchema.optional(),
 })
+  // Object-niveau (zonder `path`), zodat `parseBody` de tekst zonder veldprefix
+  // teruggeeft — GoalForm toont `data.error` letterlijk.
+  // Uitzondering: een lab-type dat óók een kengetal-doelbasis is (`fire_age`, ADR 0125)
+  // mag als MEELOPEND doel (`sync: 'auto'`) — dat is de "Vrijheidsleeftijd"-doelbasis in
+  // GoalForm. Handmatig of zonder kengetal-basis (`plan_coverage`, `expected_return`) niet.
+  .refine((v) => !isLabOnlyGoalType(v.goal_type) || (v.sync === 'auto' && isAutoSyncGoalType(v.goal_type)), {
+    message: LAB_ONLY_GOAL_TYPE_MESSAGE,
+  })
 
 export type CreateGoalInput = z.infer<typeof CreateGoalSchema>
 
@@ -186,6 +210,9 @@ export const UpdateGoalSchema = z.object({
     .optional()
     .transform((v) => (v === '' ? null : v)),
 
+  // Een lab-type mag hier blijven staan (GoalForm stuurt bij het bewerken van een
+  // lab-doel het ongewijzigde type mee); wisselen NÁÁR een lab-type weigert de
+  // route, want alleen die kent het huidige type van de rij.
   goal_type: z.enum(GOAL_TYPES).optional(),
 
   target_value: goalNumber.optional(),

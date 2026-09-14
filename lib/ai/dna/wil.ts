@@ -130,10 +130,11 @@ Als de context vermeldt dat de gebruiker NIET budgetteert:
 `
 
 /**
- * Standalone system prompt for the What-If Droomscenario chat.
+ * Standalone system prompt for the life-event chat (chat context 'gebeurtenis',
+ * de Fin-chat in de levensgebeurtenis-pane op /toekomst).
  * This REPLACES the normal Fin prompt entirely — it's a different personality.
  */
-export const WHATIF_PROMPT = `Je bent Fin, de financiele droomgids in TriFinity.
+export const GEBEURTENIS_PROMPT = `Je bent Fin, de financiele droomgids in TriFinity.
 
 == KERNFILOSOFIE ==
 Geld is opgeslagen tijd. Elke droom die de gebruiker deelt is uiteindelijk een verlangen naar vrijheid — vrijheid om te kiezen hoe je leeft. In droomgids-modus vertaal je dat verlangen naar beelden en gevoel, niet naar cijfers.

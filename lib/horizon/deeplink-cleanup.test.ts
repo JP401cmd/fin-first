@@ -73,7 +73,14 @@ describe('buildDeeplinkCleanupUrl — blijft op de huidige route', () => {
       'event',
       'edit',
       'whatif',
+      'via',
     ])
+  })
+
+  it('poetst het restant ?via=dreamgate van een oude bladwijzer mee weg (ADR 0144)', () => {
+    // /toekomst/whatif?via=dreamgate → redirect → /toekomst?whatif=open&via=dreamgate
+    expect(buildDeeplinkCleanupUrl('/toekomst', 'whatif=open&via=dreamgate')).toBe('/toekomst')
+    expect(buildDeeplinkCleanupUrl('/toekomst', 'whatif=open&via=dreamgate&view=jaren')).toBe('/toekomst?view=jaren')
   })
 })
 

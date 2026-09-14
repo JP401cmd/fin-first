@@ -21,7 +21,7 @@ vi.mock('@/lib/supabase/server', () => ({
   getAuthClaims: vi.fn(),
 }))
 
-import { PATCH } from './route'
+import { PATCH, POST } from './route'
 
 const USER = { id: 'user-1' }
 const GOAL_ID = randomUUID()
@@ -161,6 +161,38 @@ describe('PATCH /api/goals — whitelist: verboden velden bereiken de update-pay
     expect(res.status).toBe(200)
     const payload = updateCalls.find((u) => u.table === 'goals')!.payload as Record<string, unknown>
     expect(Object.keys(payload)).toEqual(['updated_at'])
+  })
+})
+
+describe('/api/goals — lab-typen horen bij het lab (ADR 0145)', () => {
+  it('POST met plan_coverage → 400 met de lab-tekst, geen insert', async () => {
+    const res = await POST(patchRequest({ name: 'Plan gedekt', goal_type: 'plan_coverage', target_value: 100 }))
+    expect(res.status).toBe(400)
+    expect(await res.json()).toEqual({ error: 'Dit doeltype leg je vast in het lab op /toekomst', code: 'validation_error' })
+    expect(insertCalls).toEqual([])
+  })
+
+  it('PATCH die een savings-doel naar fire_age omzet → 400 lab_only_goal_type, geen update', async () => {
+    results.goalsSelect.mockReturnValue({
+      data: { id: GOAL_ID, user_id: USER.id, ownership: 'personal', household_id: null, goal_type: 'savings' },
+      error: null,
+    })
+    const res = await PATCH(patchRequest({ id: GOAL_ID, goal_type: 'fire_age' }))
+    expect(res.status).toBe(400)
+    expect(await res.json()).toEqual({ error: 'Dit doeltype leg je vast in het lab op /toekomst', code: 'lab_only_goal_type' })
+    expect(updateCalls).toEqual([])
+  })
+
+  it('PATCH op een bestaand lab-doel met het ongewijzigde type blijft werken (GoalForm-bewerking)', async () => {
+    results.goalsSelect.mockReturnValue({
+      data: { id: GOAL_ID, user_id: USER.id, ownership: 'personal', household_id: null, goal_type: 'fire_age' },
+      error: null,
+    })
+    const res = await PATCH(patchRequest({ id: GOAL_ID, goal_type: 'fire_age', name: 'Vrij op 58' }))
+    expect(res.status).toBe(200)
+    const payload = updateCalls.find((u) => u.table === 'goals')!.payload as Record<string, unknown>
+    expect(payload.goal_type).toBe('fire_age')
+    expect(payload.name).toBe('Vrij op 58')
   })
 })
 

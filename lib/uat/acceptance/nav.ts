@@ -248,7 +248,7 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'OVERIG',
     given: 'De redirect-lijst in `next.config.ts`.',
     when: '`nextConfig.redirects()` wordt aangeroepen.',
-    then: '/core → /overzicht, /horizon → /toekomst, /identity → /mijn, /will → /overzicht, /core/budgets → /overzicht/budget, /core/cash → /overzicht/bezittingen/cash (de rekeningen zijn sinds ADR 0135 een bezitgroep, niet de budgetpagina), de vijf ADR 0135-redirects /overzicht/cashflow{,/budget,/transacties,/vaste-lasten,/forecast} → hun nieuwe plek (de hub zelf staat bewust als laatste: Next matcht exact, maar de volgorde is expliciet zodat herordenen opvalt), sinds 14 sep 2026 (ADR 0144) zijn /horizon/whatif ÉN /toekomst/whatif elk een KALE redirect naar /toekomst?whatif=open — de ?via=dreamgate-tak en de bijbehorende dream-gate-animatie zijn vervallen samen met de standalone Wat-Als-pagina, dus geen enkele /toekomst/whatif-aanroep rendert nog een eigen pagina, /horizon/strategie → /toekomst?strategie=open, /horizon/uitgaven-na-pensioen en /toekomst/uitgaven-na-pensioen → /toekomst?uitgaven=open, /toekomst/strategie (twee takken: met/zonder ?focus=aow|pensioen|huis), /overzicht/acties → /overzicht/tips, en sinds UR3-26 /toekomst/samengestelde-interest → /toekomst/rekenhulp (én /horizon/samengestelde-interest rechtstreeks daarheen, geen keten) plus /core/checkin/historie → /mijn/checkins zitten allemaal in de lijst; een diepere legacy-subroute zonder regel (bv. /core/assets) heeft GEEN redirect-entry (blijft live backing-UI). /dashboard heeft sinds 1 sep 2026 (kiesbaar homescherm) bewust GEEN config-regel meer: de edge-middleware vertaalt hem naar het gekozen homescherm (profiles.home_screen); een statische regel zou die vertaling onbereikbaar maken.',
+    then: '/core → /overzicht, /horizon → /toekomst, /identity → /mijn, /will → /overzicht, /core/budgets → /overzicht/budget, /core/cash → /overzicht/bezittingen/cash (de rekeningen zijn sinds ADR 0135 een bezitgroep, niet de budgetpagina), de vijf ADR 0135-redirects /overzicht/cashflow{,/budget,/transacties,/vaste-lasten,/forecast} → hun nieuwe plek (de hub zelf staat bewust als laatste: Next matcht exact, maar de volgorde is expliciet zodat herordenen opvalt), sinds 14 sep 2026 (ADR 0144) hebben /horizon/whatif ÉN /toekomst/whatif elk nog maar ÉÉN, ONVOORWAARDELIJKE redirect-regel naar /toekomst?whatif=open (de ?via=dreamgate-vertakking en de bijbehorende dream-gate-animatie zijn vervallen samen met de standalone Wat-Als-pagina, dus geen enkele aanroep rendert nog een eigen pagina) — de regel zelf geeft een meegegeven query gewoon door (Next voegt `?via=dreamgate` aan de bestemming toe, die zelf geen `?` draagt), dus die vertaalt naar `/toekomst?whatif=open&via=dreamgate`; een losse opschoonstap op de tijdas (`CONSUMED_DEEPLINK_PARAMS`, lib/horizon/deeplink-cleanup.ts) poetst `via` daarna uit de URL, /horizon/strategie → /toekomst?strategie=open, /horizon/uitgaven-na-pensioen en /toekomst/uitgaven-na-pensioen → /toekomst?uitgaven=open, /toekomst/strategie (twee takken: met/zonder ?focus=aow|pensioen|huis), /overzicht/acties → /overzicht/tips, en sinds UR3-26 /toekomst/samengestelde-interest → /toekomst/rekenhulp (én /horizon/samengestelde-interest rechtstreeks daarheen, geen keten) plus /core/checkin/historie → /mijn/checkins zitten allemaal in de lijst; een diepere legacy-subroute zonder regel (bv. /core/assets) heeft GEEN redirect-entry (blijft live backing-UI). /dashboard heeft sinds 1 sep 2026 (kiesbaar homescherm) bewust GEEN config-regel meer: de edge-middleware vertaalt hem naar het gekozen homescherm (profiles.home_screen); een statische regel zou die vertaling onbereikbaar maken.',
     assertion: {
       kind: 'exact',
       // 24 = de eerdere 25 (16 + React #310-lichtingen, zie het redirect-blok
@@ -270,10 +270,15 @@ const criteria: AcceptanceCriterion[] = [
       // /toekomst-variant en wijst nu rechtstreeks naar het einddoel: geen
       // keten, en dus ook geen extra regel.
       // 31 -> 30 (14 sep 2026, ADR 0144): de wat-als-pagina verliest haar
-      // ?via=dreamgate-tak — /horizon/whatif en /toekomst/whatif zijn elk nu
-      // ÉÉN kale regel naar /toekomst?whatif=open in plaats van twee takken
-      // (met/zonder dreamgate) voor /horizon/whatif plus één voorwaardelijke
-      // regel voor /toekomst/whatif; per saldo één regel minder.
+      // ?via=dreamgate-vertakking — /horizon/whatif en /toekomst/whatif zijn
+      // elk nu ÉÉN ONVOORWAARDELIJKE regel naar /toekomst?whatif=open in
+      // plaats van twee takken (met/zonder dreamgate) voor /horizon/whatif
+      // plus één voorwaardelijke regel voor /toekomst/whatif; per saldo één
+      // regel minder. De regel is niet "kaal": Next geeft een meegegeven
+      // ?via=dreamgate gewoon door (destination draagt zelf geen '?'), dus
+      // die landt eerst als /toekomst?whatif=open&via=dreamgate — pas de
+      // client-side opschoonstap (lib/horizon/deeplink-cleanup.ts) haalt
+      // `via` daarna uit de URL.
       // QUERY-BEHOUD (toegevoegd 07-09-2026): de ADR 0135-deeplinks met
       // ?budget=/?maand=/?limit=/?rekening= stonden alleen in deze
       // commentaarregel en werden dus nergens getoetst. Next voegt de

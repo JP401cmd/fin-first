@@ -21,7 +21,7 @@ const API_KEY_FIELDS = ['anthropic_api_key', 'openai_api_key', 'mistral_api_key'
 // ── Prompt domains expected from /api/admin/ai-prompts ───────────────────────
 
 const EXPECTED_DOMAINS = ['kern', 'wil', 'horizon']
-const EXPECTED_PROMPT_IDS = ['base', 'wil', 'whatif', 'kern', 'horizon', 'recommendations', 'briefing']
+const EXPECTED_PROMPT_IDS = ['base', 'wil', 'gebeurtenis', 'kern', 'horizon', 'recommendations', 'briefing']
 
 const tests: TestCase[] = [
   // ── Step 1: AI provider selectie ────────────────────────────────────

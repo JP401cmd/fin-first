@@ -4780,7 +4780,7 @@ Scope: /toekomst (tijdas-landing), /toekomst/doelen, /toekomst/gebeurtenissen, /
   1. Klik de scenario-picker → lijst met opgeslagen scenario's (naam + FIRE-leeftijd + kleur).
   2. Vink één of meer scenario's aan → de lijnen verschijnen direct; klik "Alles wissen" om ze te verwijderen.
   3. Klik "Nieuw scenario maken →" om naar de wat-als-omgeving te gaan.
-- **Schermen/componenten:** components/app/horizon/scenario-overlay-picker.tsx; horizon-client.tsx (savedScenarios/selectedScenarioIds); lib/scenario-types.ts (WHATIF_SCENARIO_COLORS).
+- **Schermen/componenten:** was de scenario-overlay-picker-component + `savedScenarios`/`selectedScenarioIds`-state in horizon-client.tsx + de scenario-kleurenpalet-constante — alle drie verwijderd met de standalone Wat-Als-pagina (ADR 0144, 14 sep 2026).
 - **Kriticiteit:** BELANGRIJK
 - **Rekenend:** ja — per scenario de FIRE-leeftijd en de scenario-rijen (opgeslagen projectie); het eerste geselecteerde scenario levert ook de ghost-lijn in de Inkomen & Uitgaven-grafiek.
 - **Varianten & randgevallen:**
@@ -5464,7 +5464,7 @@ Vooraf, over bereikbaarheid: sinds ADR 0144 staat alléén nog `/toekomst/rekenh
   2. Verschuif een inline slider (inkomen, werkdagen, spaarquote, extra inleg) — er verschijnt een gestippelde wat-als-lijn naast de onveranderde basislijn (diepte-toets: WF-TOEK-10).
   3. Klik in de sectie-footer "Scenario's vergelijken →" — na de overgangsanimatie opent de volledige Wat-Als-pagina met kop "Jouw toekomst, jouw keuze".
   4. Controleer dat "Terug naar Toekomst" (linksboven) naar /toekomst gaat.
-- **Schermen/componenten:** `app/(app)/toekomst/whatif/page.tsx` (redirect-guard op ?via=dreamgate), `components/app/horizon/horizon-client.tsx` (param-handling ?whatif=open → scroll, sectie "Verken je aannames", triggerDream via footer-link), `app/(app)/horizon/whatif/whatif-page-client.tsx`, `components/app/horizon/whatif-header.tsx`.
+- **Schermen/componenten:** was de redirect-guard-server-page op ?via=dreamgate + `components/app/horizon/horizon-client.tsx` (param-handling ?whatif=open → scroll, sectie "Verken je aannames", triggerDream via footer-link) + de volledige Wat-Als-pagina met haar header-component — de laatste twee verwijderd met ADR 0144 (14 sep 2026).
 - **Kriticiteit:** BELANGRIJK
 - **Rekenend:** ja — de inline sliders sturen de tijdas-projectie (horizon-kernel via `lib/horizon-kernel`), zelfde motor als de hoofd-grafiek.
 - **Varianten & randgevallen:**
@@ -5485,7 +5485,7 @@ Vooraf, over bereikbaarheid: sinds ADR 0144 staat alléén nog `/toekomst/rekenh
   4. Lees de "Verschil-analyse" (FIRE-leeftijd, doelbedrag, jaarlijks sparen: werkelijkheid → wat-als met delta-chips) en de strategie-regel.
   5. Klik een KPI of "Volledige kassabon" voor de Scenariovergelijking-BottomSheet (kassabon-weergave).
   6. Klik de preset nogmaals om hem uit te zetten (terug naar baseline).
-- **Schermen/componenten:** /toekomst/whatif — `app/(app)/horizon/whatif/whatif-page-client.tsx` (KPI-strip, ComparisonRow, BottomSheet-kassabon), `components/app/horizon/whatif-presets.tsx`, presets/uitleg in `lib/scenario-events.ts` (PRESETS, PRESET_EXPLAINERS), `components/app/horizon/chart-overlay-explainer.tsx`.
+- **Schermen/componenten:** was /toekomst/whatif — de volledige-pagina-client (KPI-strip, ComparisonRow, BottomSheet-kassabon) + het presets-blok, beide verwijderd met ADR 0144; presets/uitleg in `lib/scenario-events.ts` (PRESETS, PRESET_EXPLAINERS, blijft bestaan als slider-helper) + `components/app/horizon/chart-overlay-explainer.tsx`.
 - **Kriticiteit:** KERN
 - **Rekenend:** ja — baseline- én scenario-FIRE-leeftijd, doelbedrag (requiredFirePortfolio) en jaarlijks sparen; bron: `lib/horizon-kernel/whatif-router.ts#computeWhatifProjection` (kernel-only, zelfde motor als /toekomst) + `lib/unified-projection.ts#toSimResult`; jaarlijks sparen via `lib/savings-source.ts#resolveSavingsSource`/`savingsRateFromAggregates`.
 - **Varianten & randgevallen:**
@@ -5504,7 +5504,7 @@ Vooraf, over bereikbaarheid: sinds ADR 0144 staat alléén nog `/toekomst/rekenh
   2. Verschuif "inkomen", "werkdagen", "spaarquote" of "extra inleg" en zie KPI's en grafiek meebewegen.
   3. Open "Marktbias": verschuif de master-slider (alle groepen tegelijk) of stel per vermogenscategorie (beleggingen, cash, …) een eigen afwijking in.
   4. Zet een slider terug op de baseline — de delta-badge verdwijnt en het bijbehorende scenario-event wordt opgeruimd.
-- **Schermen/componenten:** `components/app/horizon/whatif-sliders.tsx` (WhatIfSlidersCollapsible; slider↔event-vertaling via `lib/scenario-events.ts#buildSliderEvent/applySliderEvent`), `components/app/horizon/whatif-market-assumptions.tsx` (returnDeltaByAssetType).
+- **Schermen/componenten:** het inklapbare verfijn-sliders-blok (slider↔event-vertaling via `lib/scenario-events.ts#buildSliderEvent/applySliderEvent`, blijft bestaan) + het Marktbias-blok — beide inklapbare varianten zijn verwijderd met ADR 0144; de kale grid-variant van de sliders blijft bestaan in het inline lab (zie WF-TOEK-10).
 - **Kriticiteit:** KERN
 - **Rekenend:** ja — FIRE-leeftijd/doelbedrag herberekening per slider-tick via `lib/horizon-kernel/whatif-router.ts#computeWhatifProjection` (rendement-delta's past de kernel zelf toe op de assets); spaarquote-baseline = canonieke 6-maands-spaarquote (`lib/savings-source.ts#savingsRateFromAggregates`, aflossing telt mee).
 - **Varianten & randgevallen:**
@@ -5523,7 +5523,7 @@ Vooraf, over bereikbaarheid: sinds ADR 0144 staat alléén nog `/toekomst/rekenh
   3. Klik "+" / de catalogus om een nieuwe hypothetische gebeurtenis toe te voegen: kies type uit de catalogus, vul naam, leeftijd, eenmalige kosten en/of maandbedragen en duur in.
   4. Open de impact van een gebeurtenis: FIRE-leeftijd met vs. zonder, delta in maanden, totale kosten en (indien beschikbaar) vrijheidstijd-vertaling.
   5. Bewerk of verwijder een scenario-gebeurtenis.
-- **Schermen/componenten:** `components/app/horizon/whatif-events.tsx` (WhatIfEventsPanel, catalogus uit `lib/horizon-data.ts#LIFE_EVENT_CATALOG`), impact-berekening in `whatif-page-client.tsx#computeImpact`, tijdlijn `components/app/horizon/events-timeline.tsx`.
+- **Schermen/componenten:** was het levensgebeurtenissen-paneel op de volledige Wat-Als-pagina (catalogus uit `lib/horizon-data.ts#LIFE_EVENT_CATALOG`, blijft bestaan) + de impact-berekening op diezelfde pagina — beide verwijderd met ADR 0144; tijdlijn `components/app/horizon/events-timeline.tsx` blijft bestaan.
 - **Kriticiteit:** KERN
 - **Rekenend:** ja — per-event FIRE-delta in maanden = verschil tussen twee volledige kernel-runs (mét/zónder event) via `computeWhatifProjection`; totale kosten = eenmalig + (maandkosten − maandinkomen) × duur; vrijheidstijd via `lib/format.ts#calculateFreedomTime`.
 - **Varianten & randgevallen:**
@@ -5541,7 +5541,7 @@ Vooraf, over bereikbaarheid: sinds ADR 0144 staat alléén nog `/toekomst/rekenh
   1. Stel het extra maandbedrag in.
   2. Vergelijk de drie kaarten: Beleggen (compound op verwacht rendement via de echte motor), Aflossen (gegarandeerd schuldrente-rendement, Box 3-vrij), Noodfonds (bewust ~vlak: veiligheid, geen snelheid).
   3. Klik bij een optie "maak levensgebeurtenis" — het bekende sheet opent met passend impact-type voorgevuld.
-- **Schermen/componenten:** `components/app/horizon/whatif-beslishulp.tsx` + `whatif-beslishulp.model.ts` (weightedDebtRate, aflossenFireAge, fireAgeFromSim), kernel-runs via `lib/horizon-kernel/whatif-router.ts`, export via `components/future/calculator-to-life-event-sheet.tsx`.
+- **Schermen/componenten:** was het Beslishulp-blok op de volledige Wat-Als-pagina + zijn model (weightedDebtRate, aflossenFireAge, fireAgeFromSim) + de whatif-only kernel-router — alle drie verwijderd met ADR 0144; export via `components/future/calculator-to-life-event-sheet.tsx` blijft bestaan (nu vanuit WF-REKEN-01/03).
 - **Kriticiteit:** KERN
 - **Rekenend:** ja — FIRE-leeftijd per optie: beleggen = kernel-run met extra_inleg-event; aflossen = basispad + aparte "aflossen-pot" die groeit op saldo-gewogen schuldrente tot basispad+pot ≥ requiredFirePortfolio (`whatif-beslishulp.model.ts#aflossenFireAge`); noodfonds ≈ baseline.
 - **Varianten & randgevallen:**
@@ -5559,7 +5559,7 @@ Vooraf, over bereikbaarheid: sinds ADR 0144 staat alléén nog `/toekomst/rekenh
   2. Open de lijst met bewaarde scenario's; laad er één — sliders en events worden teruggezet (slider-waarden worden weer scenario-events; rendement-afwijking wordt uniform teruggezet).
   3. Pin een scenario (pin-icoon) — de lijn verschijnt in de grafiek; maximaal 2 pins, een derde pin-poging doet niets.
   4. Verwijder een scenario; een gepind scenario wordt daarbij automatisch ontpind.
-- **Schermen/componenten:** `components/app/horizon/whatif-scenarios.tsx` (GET/POST/DELETE /api/scenarios), overlays in `whatif-page-client.tsx#pinnedOverlays` (kleuren uit `lib/scenario-types.ts#WHATIF_SCENARIO_COLORS`).
+- **Schermen/componenten:** VERVALLEN (14 sep 2026, ADR 0144) — was het bewaarde-scenario's-blok (GET/POST/DELETE /api/scenarios) + de gepinde overlays op de volledige Wat-Als-pagina; bewaarde scenario's en de spooklijn-kiezer bestaan sindsdien niet meer (E2), zie ook WF-TOEK-09 hierboven.
 - **Kriticiteit:** KERN
 - **Rekenend:** ja — elke gepinde overlay wordt opnieuw doorgerekend met de kernel (`computeWhatifProjection` met uniformReturnDelta); getoonde FIRE-leeftijd per bewaard scenario.
 - **Varianten & randgevallen:**
@@ -5578,7 +5578,7 @@ Vooraf, over bereikbaarheid: sinds ADR 0144 staat alléén nog `/toekomst/rekenh
   2. Wissel naar "Opbouw" en terug naar "Pad".
   3. Klap "Inkomen & Uitgaven" open; wissel tussen "Lijnen" en "Bronnen".
   4. Gebruik de zoom (leeftijdsbereik) en de ChartTips-"i" voor uitleg.
-- **Schermen/componenten:** `whatif-page-client.tsx` (mcEnabled/chartMode/ieViewMode), `lib/horizon-data.ts#runMonteCarlo`, `components/app/horizon/sim-chart.tsx`, `wealth-composition-chart.tsx`, `income-expense-chart.tsx` (+ `lib/income-expense-breakdown.ts#buildBreakdownFromSimRows`), `zoomable-chart-container.tsx`, `components/editorial/chart-tips.tsx`.
+- **Schermen/componenten:** was de mode-state (mcEnabled/chartMode/ieViewMode) op de volledige Wat-Als-pagina, verwijderd met ADR 0144; `lib/horizon-data.ts#runMonteCarlo`, `components/app/horizon/sim-chart.tsx`, `wealth-composition-chart.tsx`, `income-expense-chart.tsx`, `zoomable-chart-container.tsx` en `components/editorial/chart-tips.tsx` blijven bestaan (elders in de app). De destijds gebruikte inkomen/uitgaven-uitsplitsingsfunctie (`buildBreakdownFromSimRows`) is zelf sindsdien ook verwijderd (restpuntenronde) — geen consument meer.
 - **Kriticiteit:** BELANGRIJK
 - **Rekenend:** ja — Monte Carlo-percentielen (p10–p90 over 1000 runs, `lib/horizon-data.ts#runMonteCarlo`); opbouw-splitsing = cumulatieve inleg vs. groei uit de kernel-rijen (proportionele verdeling in `whatif-page-client.tsx#wealthCompositionRows`).
 - **Varianten & randgevallen:**
@@ -5595,7 +5595,7 @@ Vooraf, over bereikbaarheid: sinds ADR 0144 staat alléén nog `/toekomst/rekenh
   1. Scroll naar het chat-blok (laadt pas bij bereiken — korte spinner).
   2. Stel een vraag over je scenario en verstuur.
   3. Klik op een voorgestelde levensgebeurtenis-kaart om hem aan het scenario toe te voegen; de projectie past zich aan.
-- **Schermen/componenten:** `components/app/horizon/whatif-chat.tsx` (useChat + suggest_life_event/suggest_action-toolresultaten), context uit `whatif-page-client.tsx#chatScenarioContext`; globale chat via `components/app/chat/chat-provider.tsx#setAutoOpenMessage`.
+- **Schermen/componenten:** was het chat-blok op de volledige Wat-Als-pagina (useChat + suggest_life_event/suggest_action-toolresultaten) + de scenario-context daarvan — beide verwijderd met ADR 0144; de globale chat-auto-open-koppeling (`setAutoOpenMessage`) die deze pagina als enige aanroeper had, is in de restpuntenronde eveneens verwijderd (geen consument meer).
 - **Kriticiteit:** BELANGRIJK
 - **Rekenend:** nee (de toegevoegde events worden vervolgens wél door de kernel doorgerekend — zie WF-REKEN-15).
 - **Varianten & randgevallen:**
@@ -5611,7 +5611,7 @@ Vooraf, over bereikbaarheid: sinds ADR 0144 staat alléén nog `/toekomst/rekenh
   1. Wijzig het scenario (bv. +€500 inkomen) en bekijk de verschenen actiekaarten.
   2. Open eventueel de samenvattings-kassabon (BottomSheet).
   3. Gebruik de chat-doorklik ("bespreek met Will") bij een actie.
-- **Schermen/componenten:** `components/app/horizon/whatif-actions.tsx` (deterministische suggesties op delta's; FreedomTimeBadge; openWithMessage via chat-provider).
+- **Schermen/componenten:** was het actie-suggesties-blok op de volledige Wat-Als-pagina (deterministische suggesties op delta's; FreedomTimeBadge; doorklik naar de chat) — verwijderd met ADR 0144.
 - **Kriticiteit:** OVERIG
 - **Rekenend:** ja — impactbedragen zijn de slider-delta's zelf (geen aparte motor); vrijheidstijd via `components/app/freedom-time-label.tsx`.
 - **Varianten & randgevallen:**

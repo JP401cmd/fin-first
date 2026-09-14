@@ -21,8 +21,13 @@
  * `toek.ts`). Het INLINE-slider-gedrag op de tijdas ("Verken je aannames",
  * /toekomst?whatif=open) blijft ongewijzigd en zit als vanouds in
  * WF-TOEK-10/UAT-TOEK-10 (`toek.ts`). `/toekomst/whatif` en `/horizon/whatif`
- * zijn nu een kale redirect naar /toekomst?whatif=open (geen ?via=dreamgate-
- * tak meer) — zie WF-NAV-16 (`nav.ts`).
+ * hebben nu elk maar ÉÉN, ONVOORWAARDELIJKE redirect-regel naar
+ * /toekomst?whatif=open (geen ?via=dreamgate-vertakking meer in next.config.ts)
+ * — maar de regel zelf is niet "kaal": Next geeft een meegegeven `?via=
+ * dreamgate` gewoon door (de bestemming draagt zelf geen `?`), dus die landt
+ * eerst als `/toekomst?whatif=open&via=dreamgate`. Een losse client-side
+ * opschoonstap (restpuntenronde, zie WF-NAV-16) haalt `via` daarna uit de URL.
+ * Zie WF-NAV-16 (`nav.ts`).
  *
  * De overige 15 WF-REKEN-nummers (01..11, 21..24) hebben elk een eigen
  * criterium hieronder.

@@ -37,6 +37,7 @@
 // de AOW vallen — het aow-anker noemt zijn stopmoment daarom als getal ("op 67").
 
 import { HORIZON_PLAFOND_LEEFTIJD } from '@/lib/constants'
+import { MASKED_AMOUNT_PLACEHOLDER } from '@/lib/format'
 import type { KernelStopAnker } from '@/lib/horizon-kernel/types'
 // Dezelfde afrondingsregel als het hero-kopgetal (`heroFireAgeYear`), via het
 // import-vrije blad — hero-fire-age.ts importeert dít bestand, niet andersom.
@@ -509,21 +510,39 @@ export function radarEindstrategieAnkerReden(): string {
  * Zin 11 — de tekort-hint in de plan-variant (zonder slider-beweging): wat hoort er
  * bij het plan-anker bij om tot de eindleeftijd te reiken. `hint` = `maandHint` (P!B96,
  * > 0 ⟺ tekort), `dagen` = het vrijheidstijd-equivalent uit `calculateFreedomTime`
- * (de aanroeper rekent dat op de canonieke dagbasis; hier alleen woorden).
+ * (de aanroeper rekent dat op de canonieke dagbasis; hier alleen woorden). `dagen: null`
+ * = geen dagbasis beschikbaar → de omrekening valt weg.
+ *
+ * PRIVACY-WEERGAVE (`masked`). Het bedrag wordt de vaste placeholder — dezelfde als het
+ * stop-pad-blok via `formatMaskedApproxCurrency` — zónder "zo'n €", en de omrekening naar
+ * dagen valt weg: naast de dagbasis verraadt het aantal dagen het bedrag alsnog (zelfde
+ * keuze als het stop-pad-blok).
+ *
+ * ONDER ÉÉN DAG. `Math.round(dagen) < 1` zegt "minder dan een dag" — nooit "0 dagen",
+ * want een tekort > 0 kost wel degelijk vrijheid (eigenaarsbesluit 14 sep 2026).
  */
 export function dekkingTekortHintZin(input: {
   stop: AnkerStop
   endAge: number | null
   hint: number
-  dagen: number
+  dagen: number | null
+  masked?: boolean
 }): string {
   const bijStop = input.stop.kind === 'now' ? 'als je nu stopt' : `als je op ${formatStopAge(input.stop.stopAge)} stopt`
-  return `Om je plan ${totJeEind(input.endAge)} te laten reiken ${bijStop}, hoort daar zo'n €${fmtHint(input.hint)} per maand extra sparen bij, bovenop wat je nu opzij zet — omgerekend ${Math.round(input.dagen)} ${Math.round(input.dagen) === 1 ? 'dag' : 'dagen'} vrijheid per maand.`
+  const bedrag = input.masked ? MASKED_AMOUNT_PLACEHOLDER : `zo'n €${fmtHint(input.hint)}`
+  const kern = `Om je plan ${totJeEind(input.endAge)} te laten reiken ${bijStop}, hoort daar ${bedrag} per maand extra sparen bij, bovenop wat je nu opzij zet`
+  if (input.masked || input.dagen == null || !Number.isFinite(input.dagen)) return `${kern}.`
+  const dagen = Math.round(input.dagen)
+  if (dagen < 1) return `${kern} — omgerekend minder dan een dag vrijheid per maand.`
+  return `${kern} — omgerekend ${dagen} ${dagen === 1 ? 'dag' : 'dagen'} vrijheid per maand.`
 }
 
-/** Zin 11 — het knoplabel dat de hint als extra inleg in het lab zet (compliance 14 sep: geen "Zet als …"). */
-export function dekkingTekortHintKnop(hint: number): string {
-  return `Reken met € ${fmtHint(hint)} extra inleg`
+/**
+ * Zin 11 — het knoplabel dat de hint als extra inleg in het lab zet (compliance 14 sep: geen
+ * "Zet als …"). In de privacy-weergave draagt ook het label de placeholder.
+ */
+export function dekkingTekortHintKnop(hint: number, masked = false): string {
+  return `Reken met ${masked ? MASKED_AMOUNT_PLACEHOLDER : `€ ${fmtHint(hint)}`} extra inleg`
 }
 
 /** Zin 12 — de toast na het vastleggen van een dekkingsdoel. */

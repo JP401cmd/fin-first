@@ -1092,7 +1092,7 @@ export default function HorizonPage({
   }, [])
   const dismissFirstDragHint = useCallback(() => setFirstDragHintVisible(false), [])
   // Wrapper om de scenario-slider-setter: markeert de eerste sleep zonder het setEvents-contract
-  // te wijzigen (WhatIfSliders bare krijgt deze i.p.v. de kale setter).
+  // te wijzigen (WhatIfSliders krijgt deze i.p.v. de kale setter).
   const handleScenarioSliderEvents = useCallback(
     (updater: (prev: WhatIfEvent[]) => WhatIfEvent[]) => {
       markFirstSliderDrag()
@@ -2823,9 +2823,10 @@ export default function HorizonPage({
     // met de plan-woorden tonen.
     if (stopPad != null && Number.isFinite(stopPad.maandHint) && stopPad.maandHint > 0) return null
     const hint = labDekking.maandHint
+    // `null` = geen dagbasis: dan valt de omrekening uit de zin (nooit een gegokte "0").
     const dagen = canonicalDailyRate > 0
       ? Math.round(calculateFreedomTime(hint, canonicalDailyRate).totalDays)
-      : 0
+      : null
     // Het seed-bedrag is geklemd op het zichtbare extra-inleg-bereik; het knoplabel noemt
     // wat er daadwerkelijk gezet wordt.
     const range = whatIfBaseline ? computeSliderUiRange('extra_inleg', whatIfBaseline.monthlyIncome, 0) : null
@@ -6773,7 +6774,7 @@ export default function HorizonPage({
 
           S6 (tier 1) — ÉN wanneer er expliciet naartoe gedeeplinkt is:
           `?whatif=open` zet `whatIfInlineOpen` (de welkomstgids-stap "Speel met
-          een what-if scenario" gebruikt dat pad). Zonder deze derde tak zette
+          je aannames" gebruikt dat pad). Zonder deze derde tak zette
           die deeplink in Eenvoudig zónder vastgelegd doel state op een sectie
           die niet gemonteerd is en no-opte de scroll stil: een dode
           verwijzing op precies het beginnersoppervlak waar Eenvoudig voor is.
@@ -7029,7 +7030,7 @@ export default function HorizonPage({
                   planIsDezeStop={planAnchor.kind === 'age' && planAnchor.age === effectiveStopAge}
                   draaiknoppen={
                     <>
-                      {/* De vier bestaande sliders (platgeslagen via `bare`) */}
+                      {/* De vier bestaande sliders (alleen de grid-variant) */}
                       {whatIfBaseline && (
                         <div>
                           <p className="mb-2 label-editorial text-[var(--ink-3)]">Draaiknoppen</p>
@@ -7053,7 +7054,6 @@ export default function HorizonPage({
                             </div>
                           )}
                           <WhatIfSliders
-                            bare
                             baseline={whatIfBaseline}
                             events={scenarioSliderEvents}
                             setEvents={handleScenarioSliderEvents}
@@ -7108,9 +7108,12 @@ export default function HorizonPage({
                     plan-stopmoment om tot de eindleeftijd te reiken. De knop zet het
                     bedrag als extra inleg in het lab — alleen op klik, nooit bij laden
                     (dat zou `hasScenario` omzetten en het persist-effect laten schrijven).
-                    De zin noemt het bedrag onversluierd, dus niet in de privacy-weergave;
-                    en zonder vrijheidstijd-equivalent (< 1 dag) geen zin met "0 dagen". */}
-                {planTekortHint !== null && !isNuStoppenMode && !masked && planTekortHint.dagen >= 1 && (
+                    Privacy-weergave: zin én knop krijgen `masked` — bedrag als placeholder,
+                    geen dagen (zelfde als het stop-pad-blok hierboven). Onder één dag zegt
+                    de zin "minder dan een dag" (in `dekkingTekortHintZin`).
+                    Onder het `now`-anker bewust verborgen (`!isNuStoppenMode`): daar is geen
+                    stopmoment om naartoe te sparen en legt het lab geen doel vast (ADR 0145 E6). */}
+                {planTekortHint !== null && !isNuStoppenMode && (
                   <div
                     data-testid="lab-plan-tekort-hint"
                     className="mt-4 border border-[var(--ink-2)] border-l-4 border-l-horizon-500 bg-[var(--paper)] px-3 py-2.5"
@@ -7122,15 +7125,17 @@ export default function HorizonPage({
                         endAge: planTekortHint.eind,
                         hint: planTekortHint.hint,
                         dagen: planTekortHint.dagen,
+                        masked,
                       })}
                     </p>
-                    {planTekortHint.seed != null && planTekortHint.seed > 0 && (
+                    {/* In privacymodus geen seed-knop: de slider toont na het zetten het echte bedrag. */}
+                    {!masked && planTekortHint.seed != null && planTekortHint.seed > 0 && (
                       <button
                         type="button"
                         onClick={handlePlanTekortHintSeed}
                         className="mt-2 inline-flex min-h-[44px] items-center font-sans text-[11px] font-semibold text-horizon-700 underline underline-offset-2 transition-colors hover:text-horizon-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
                       >
-                        {dekkingTekortHintKnop(planTekortHint.seed)}
+                        {dekkingTekortHintKnop(planTekortHint.seed, masked)}
                       </button>
                     )}
                     <p className="mt-1.5 font-sans text-[11px] leading-snug text-[var(--ink-3)]">
