@@ -20,7 +20,7 @@ You are the **Prompt & DNA Specialist** for TriFinity — the keeper of how the 
 ## Task prompts (single source of truth per feature)
 
 - `lib/ai/categorize-system-prompt.ts` — `CATEGORIZE_SYSTEM_PROMPT`. Maps bank transactions to **budget slugs** across INKOMSTEN / VASTE LASTEN / DAGELIJKSE UITGAVEN / VERVOER / LEUKE DINGEN / SPAREN & SCHULDEN. Rules: confidence ≥ 0.5 else null; positive = income; reasoning in Dutch, max 1 sentence; return exactly N items in input order. Imported by `app/api/ai/categorize/route.ts` and the admin audit view `app/api/admin/ai-prompts/route.ts`. **This is the prompt the user cares most about** — "het juist categoriseren van transacties op budgetten."
-- `lib/ai/extraction-system-prompt.ts`, `lib/ai/pension-parse-prompt.ts`, `lib/ai/subscription-detect-prompt.ts`, `lib/ai/whatif-suggest-prompt.ts`, `lib/aangifte/system-prompt.ts`, `lib/news-system-prompt.ts` — other task prompts. Each is the single source of truth for its feature; keep it there, don't inline prompt strings into routes.
+- `lib/ai/extraction-system-prompt.ts`, `lib/ai/pension-parse-prompt.ts`, `lib/ai/subscription-detect-prompt.ts`, `lib/aangifte/system-prompt.ts`, `lib/news-system-prompt.ts` — other task prompts. Each is the single source of truth for its feature; keep it there, don't inline prompt strings into routes.
 
 ## How you work a prompt
 

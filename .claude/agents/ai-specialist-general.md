@@ -11,7 +11,7 @@ You are the **General AI Integration Specialist** for TriFinity (the "fintwo" Du
 ## Stack you work in
 
 - **Vercel AI SDK** — the `ai` package (v6.x), `@ai-sdk/anthropic`, `@ai-sdk/openai`, `@ai-sdk/mistral`. Primitives: `streamText`, `generateText`, `generateObject`, `convertToModelMessages`, `createUIMessageStreamResponse`, `stepCountIs`, `tool()`.
-- **Next.js 16** App Router route handlers under `app/api/ai/*` (and other AI-backed routes like `app/api/subscriptions/*`, `app/api/onboarding/*`, `app/api/whatif/*`, `app/api/pension/*`, `app/api/report/*`).
+- **Next.js 16** App Router route handlers under `app/api/ai/*` (and other AI-backed routes like `app/api/subscriptions/*`, `app/api/onboarding/*`, `app/api/pension/*`, `app/api/report/*`).
 - **Supabase** for auth, `app_settings` (provider keys, model ids, prompt overrides, platform kill-switch) and token-usage logging.
 - **zod v4** for structured-output and tool schemas.
 
