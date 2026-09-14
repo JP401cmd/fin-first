@@ -80,6 +80,28 @@ const SLIDER_EVENT_ID: Record<SliderKey, string> = {
 }
 
 /**
+ * Basisinkomen waartegen de spaarquote-knop rekent: maandinkomen geschaald met de
+ * werkdagen (4 van 5 dagen = 80%). ÉÉN home voor `buildSliderEvent('savings')`,
+ * `readSliderValueFromEvents('savings')`, de euro-weergave van de knop "Minder
+ * uitgeven" en het antwoordenblok (spec §2/§3, 15 sep 2026).
+ */
+export function savingsBaselineIncome(baseline: WhatIfOverrides): number {
+  return baseline.monthlyIncome * (baseline.workDaysPerWeek / 5)
+}
+
+/** Euro per maand minder uitgeven die een spaarquote van `pp` procentpunt betekent t.o.v. nu (0 op de basis). */
+export function savingsEuroForPp(baseline: WhatIfOverrides, pp: number): number {
+  return Math.round(savingsBaselineIncome(baseline) * ((pp - baseline.savingsRate) / 100))
+}
+
+/** Inverse: welke spaarquote (pp, ongeclampt) hoort bij `euroPerMaand` minder uitgeven; `null` zonder basisinkomen. */
+export function savingsPpForMonthlyAmount(baseline: WhatIfOverrides, euroPerMaand: number): number | null {
+  const basis = savingsBaselineIncome(baseline)
+  if (basis <= 0) return null
+  return baseline.savingsRate + (euroPerMaand / basis) * 100
+}
+
+/**
  * Build a single scenario event for a slider value, or null if the value
  * matches the baseline (no event needed).
  */
@@ -130,7 +152,7 @@ export function buildSliderEvent(
       // het FIRE-gegate salaris-kanaal — spaarquote is inkomensgebonden en vervalt met het
       // inkomen. Een `lifestyle_adjustment` ZONDER slider-origin blijft wél permanent.
       if (Math.round(value) === Math.round(baseline.savingsRate)) return null
-      const baselineIncome = baseline.monthlyIncome * (baseline.workDaysPerWeek / 5)
+      const baselineIncome = savingsBaselineIncome(baseline)
       const deltaPp = value - baseline.savingsRate
       const deltaCost = -Math.round(baselineIncome * (deltaPp / 100))
       return buildScenarioEvent({
@@ -193,7 +215,7 @@ export function readSliderValueFromEvents(
       return baseline.workDaysPerWeek
     }
     case 'savings': {
-      const baselineIncome = baseline.monthlyIncome * (baseline.workDaysPerWeek / 5)
+      const baselineIncome = savingsBaselineIncome(baseline)
       if (baselineIncome <= 0) return baseline.savingsRate
       const deltaPp = -ev.monthly_cost_change / baselineIncome * 100
       return Math.max(0, Math.min(80, baseline.savingsRate + deltaPp))
@@ -201,6 +223,53 @@ export function readSliderValueFromEvents(
     case 'extra_inleg':
       return ev.monthly_income_change
   }
+}
+
+/**
+ * Zichtbaar (UI-)bereik per slidertype — puur & geëxporteerd zodat de tester 'm kan pinnen.
+ * Dit is UITSLUITEND de zichtbare schaal; de validatie-clamps (`SLIDER_RANGES` in
+ * lib/horizon/toekomst-scenario.ts), de parser en de API blijven ongewijzigd.
+ *
+ * De marge is ±20% rond de huidige basisstand (`base`), per type afgerond/geclampt:
+ *  - `income`     : [base×0,8 op €100 omlaag, base×1,2 op €100 omhoog]; base 0 ⇒ [0, 1000].
+ *  - `workdays`   : [floor(base×0,8), ceil(base×1,2)], geclampt op domein 1–5.
+ *  - `savings`    : [round(base×0,8), round(base×1,2)] procentpunten, geclampt 0–80;
+ *                   base < 10 ⇒ [0, max(10, round(base×1,2))] zodat het bereik nooit degenereert.
+ *  - `extra_inleg`: basis is per definitie 0 (extra bóvenop je inleg); `base` = basis-maandinkomen ⇒
+ *                   [0, 20% daarvan op €50]; zonder inkomen ⇒ [0, 500].
+ *
+ * Verbreding-vangnet (overal): ligt de opgeslagen waarde buiten [min,max], dan verbreedt de band
+ * tot die waarde (min omlaag óf max omhoog) — niets clampt.
+ */
+export function computeSliderUiRange(
+  type: 'income' | 'workdays' | 'savings' | 'extra_inleg',
+  base: number,
+  saved: number,
+): { min: number; max: number } {
+  let min: number
+  let max: number
+  switch (type) {
+    case 'income':
+      if (base <= 0) { min = 0; max = 1000 }
+      else { min = Math.floor((base * 0.8) / 100) * 100; max = Math.ceil((base * 1.2) / 100) * 100 }
+      break
+    case 'workdays':
+      min = Math.max(1, Math.min(5, Math.floor(base * 0.8)))
+      max = Math.max(1, Math.min(5, Math.ceil(base * 1.2)))
+      break
+    case 'savings':
+      if (base < 10) { min = 0; max = Math.max(10, Math.round(base * 1.2)) }
+      else { min = Math.round(base * 0.8); max = Math.round(base * 1.2) }
+      min = Math.max(0, Math.min(80, min))
+      max = Math.max(0, Math.min(80, max))
+      break
+    case 'extra_inleg':
+      min = 0
+      max = base > 0 ? Math.round((base * 0.2) / 50) * 50 : 500
+      break
+  }
+  // Vangnet: een opgeslagen waarde buiten [min,max] verbreedt de band tot die waarde.
+  return { min: Math.min(min, saved), max: Math.max(max, saved) }
 }
 
 /**

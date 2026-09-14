@@ -1942,8 +1942,10 @@ export default function HorizonPage({
     scenarioHydratedRef.current = true
     const prefs = initialData.toekomstScenarioPrefs
     if (!prefs?.sliders) return
+    // income is geen lab-parameter meer (spec §2, 15 sep 2026) — een legacy pref met
+    // sliders.income wordt hier bewust genegeerd (de parser leest 'm tolerant, deze
+    // hydratie bouwt er geen event meer voor).
     const KEY_MAP: Record<string, SliderKey> = {
-      income: 'income',
       workdays: 'workdays',
       savings: 'savings',
       extraInleg: 'extra_inleg',
@@ -3615,10 +3617,6 @@ export default function HorizonPage({
       const savings = readSliderValueFromEvents('savings', scenarioSliderEvents, whatIfBaseline)
       previews.push({ parameter: 'spaarquote', label: 'Spaarquote', waarde: `${Math.round(savings)}%` })
     }
-    if (whatIfBaseline && stand.sliders?.income !== undefined) {
-      const income = readSliderValueFromEvents('income', scenarioSliderEvents, whatIfBaseline)
-      previews.push({ parameter: 'salaris', label: 'Salaris', waarde: `${formatCurrency(income)}/mnd` })
-    }
     if (stand.returnDeltaByCategorie !== undefined && doelRendementPct !== null) {
       previews.push({
         parameter: 'rendement',
@@ -3671,10 +3669,6 @@ export default function HorizonPage({
         spaarquotePct:
           gekozen.spaarquote && whatIfBaseline
             ? readSliderValueFromEvents('savings', scenarioSliderEvents, whatIfBaseline)
-            : undefined,
-        salarisMnd:
-          gekozen.salaris && whatIfBaseline
-            ? readSliderValueFromEvents('income', scenarioSliderEvents, whatIfBaseline)
             : undefined,
         rendementPct: gekozen.rendement ? doelRendementPct ?? undefined : undefined,
         fireLeeftijd: gekozen.fire ? doelFireLeeftijd ?? undefined : undefined,
@@ -3824,8 +3818,9 @@ export default function HorizonPage({
     const stand = doelBlok?.stand
     if (!stand) return
     if (whatIfBaseline && currentAge !== null) {
+      // income is geen lab-parameter meer (spec §2) — een legacy doel.stand met
+      // sliders.income wordt hier genegeerd, net als bij de pref-hydratie.
       const KEY_MAP: Record<string, SliderKey> = {
-        income: 'income',
         workdays: 'workdays',
         savings: 'savings',
         extraInleg: 'extra_inleg',

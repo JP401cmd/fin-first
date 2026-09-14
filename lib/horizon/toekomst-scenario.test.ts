@@ -8,6 +8,7 @@ import {
   expandCategorieReturnDeltas,
   buildCategorieReturnGroups,
   scenarioMonthlySpendDelta,
+  DOEL_PARAMETERS,
   type ToekomstScenarioStand,
 } from './toekomst-scenario'
 
@@ -348,17 +349,12 @@ describe('isDoelConceptGewijzigd', () => {
     expect(isDoelConceptGewijzigd({ ...stand }, stand)).toBe(false)
   })
 
-  it('sub-euro income/savings-verschil rondt weg → niet gewijzigd (spiegelt persist Math.round)', () => {
+  it('sub-euro savings-verschil rondt weg → niet gewijzigd (spiegelt persist Math.round); income telt sowieso niet meer mee', () => {
     const live: ToekomstScenarioStand = {
       ...stand,
       sliders: { income: 4000.4, workdays: 4, savings: 30.3, extraInleg: 500 },
     }
     expect(isDoelConceptGewijzigd(live, stand)).toBe(false)
-  })
-
-  it('income ≥ €1 verschil (andere afronding) → gewijzigd', () => {
-    const live = { ...stand, sliders: { ...stand.sliders!, income: 4001 } }
-    expect(isDoelConceptGewijzigd(live, stand)).toBe(true)
   })
 
   it('savings ≥ 1 verschil → gewijzigd', () => {
@@ -430,6 +426,11 @@ describe('isDoelConceptGewijzigd', () => {
     expect(isDoelConceptGewijzigd({}, stand)).toBe(true)
   })
 
+  it('een income-verschil telt niet meer mee: de knop bestaat niet meer, een legacy-stand met income mag geen eeuwige banner geven', () => {
+    expect(isDoelConceptGewijzigd({ sliders: { savings: 30 } }, { sliders: { savings: 30, income: 5000 } })).toBe(false)
+    expect(isDoelConceptGewijzigd({ sliders: { savings: 31 } }, { sliders: { savings: 30, income: 5000 } })).toBe(true)
+  })
+
   // ── ADR 0145 D4: onder een vast anker telt de stopkeuze niet als doelstand ──
   it('stopKeuzeTelt: false — een stopAge-/koppel-/margeverschil is dan géén wijziging', () => {
     const live = { ...stand, stopAge: 62, stopKoppel: true, stopMarge: 4 }
@@ -477,19 +478,15 @@ describe('stripStopKeuze (ADR 0145 D4)', () => {
   })
 })
 
-describe('parseToekomstScenarioPrefs — dekking als vijfde parameter (ADR 0145)', () => {
-  it('accepteert `dekking` in doel.parameters en doel.goalIds', () => {
-    const parsed = parseToekomstScenarioPrefs({
-      v: 2,
-      doel: {
-        gezetOp: '2026-09-14T10:00:00.000Z',
-        parameters: { dekking: true, spaarquote: true },
-        stand: { sliders: { savings: 45 } },
-        goalIds: { dekking: 'goal-d', spaarquote: 'goal-s' },
-      },
-    })
-    expect(parsed?.doel?.parameters).toEqual({ dekking: true, spaarquote: true })
-    expect(parsed?.doel?.goalIds).toEqual({ dekking: 'goal-d', spaarquote: 'goal-s' })
+describe('DOEL_PARAMETERS — vier parameters: spaarquote, rendement, fire, dekking (spec §2: salaris vervalt)', () => {
+  it('bevat geen salaris meer en houdt de volgorde spaarquote → rendement → fire → dekking', () => {
+    expect([...DOEL_PARAMETERS]).toEqual(['spaarquote', 'rendement', 'fire', 'dekking'])
+  })
+
+  it('parseToekomstScenarioPrefs blijft sliders.income tolerant lezen (legacy-prefs breken niet)', () => {
+    const p = parseToekomstScenarioPrefs({ v: 2, sliders: { income: 5000, savings: 30 } })
+    expect(p?.sliders?.income).toBe(5000)
+    expect(p?.sliders?.savings).toBe(30)
   })
 })
 

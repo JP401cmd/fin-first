@@ -65,13 +65,16 @@ const VALID_CATEGORIES: readonly AssetCategorie[] = [
 // ── Pref-shape (v2) ──────────────────────────────────────────────────────────
 
 /**
- * De vijf promoveerbare parameter-doelen die één doelscenario kan genereren.
+ * De parameters die het lab als doel kan vastleggen. `salaris` verviel op 15 sep 2026
+ * (spec lab-haalbaarheid §2): een salarisverhoging is rekenkundig dezelfde hefboom als
+ * extra inleg. Bestaande `salary`-doelrijen blijven bestaan (LEGACY_PARAMETER_GOAL_TYPES
+ * in toekomst-doel.ts); de pref-parser leest `sliders.income` tolerant en negeert 'm.
  * `fire` (vrijheidsleeftijd) is het uitkomstdoel onder `solved`; `dekking` ("Plan
  * gedekt", ADR 0145) is de spiegel daarvan onder een vast stopmoment (aow/age). De
  * route bepaalt server-side welke van de twee bij het anker hoort — de client kiest
  * dat nooit.
  */
-export const DOEL_PARAMETERS = ['spaarquote', 'salaris', 'rendement', 'fire', 'dekking'] as const
+export const DOEL_PARAMETERS = ['spaarquote', 'rendement', 'fire', 'dekking'] as const
 export type DoelParameter = (typeof DOEL_PARAMETERS)[number]
 
 /**
@@ -303,9 +306,10 @@ function slidersGelijk(
   a: ToekomstScenarioStand['sliders'],
   b: ToekomstScenarioStand['sliders'],
 ): boolean {
-  // income & savings: het persist-effect bepaalt inclusie via `Math.round` — spiegel dat, zodat
+  // income telt niet meer (knop vervallen, spec §2) — een legacy-stand met income mag geen
+  // "gewijzigd" geven.
+  // savings: het persist-effect bepaalt inclusie via `Math.round` — spiegel dat, zodat
   // een sub-euro drag-en-terug (rondt naar hetzelfde geheel getal) géén "gewijzigd" oplevert.
-  if (roundOrUndef(a?.income) !== roundOrUndef(b?.income)) return false
   if (roundOrUndef(a?.savings) !== roundOrUndef(b?.savings)) return false
   // workdays & extraInleg: het persist-effect vergelijkt exact (`!==` resp. `!== 0`) — spiegel exact.
   if (a?.workdays !== b?.workdays) return false
@@ -358,7 +362,9 @@ export interface DoelConceptOpties {
  * Voedt de "je draait aan je doel"-banner (stap 5). Spiegelt de afronding/normalisatie van het
  * persist-effect in horizon-client zodat een no-op géén valse "gewijzigd" geeft. Vergelijkingsregel
  * per veld:
- *   - `sliders.income` / `sliders.savings` : AFGEROND vergeleken (persist bepaalt inclusie via
+ *   - `sliders.income` telt niet meer mee (knop vervallen, spec §2) — een legacy-stand met
+ *     income mag geen eeuwige "gewijzigd" geven.
+ *   - `sliders.savings` : AFGEROND vergeleken (persist bepaalt inclusie via
  *     `Math.round(x) !== Math.round(baseline)`); een sub-euro drag-en-terug telt dus als gelijk.
  *   - `sliders.workdays` / `sliders.extraInleg` : EXACT (persist vergelijkt exact).
  *   - `returnDeltaByCategorie` : per-categorie binnen 1e-9, zelfde effectieve key-set (de parser

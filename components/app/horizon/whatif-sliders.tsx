@@ -5,6 +5,7 @@ import {
   buildSliderEvent,
   applySliderEvent,
   readSliderValueFromEvents,
+  computeSliderUiRange,
   type SliderKey,
 } from '@/lib/scenario-events'
 import type { WhatIfEvent } from '@/lib/types/horizon-whatif'
@@ -25,52 +26,7 @@ interface SlidersProps {
   currentAge: number
 }
 
-/**
- * Zichtbaar (UI-)bereik per slidertype — puur & geëxporteerd zodat de tester 'm kan pinnen.
- * Dit is UITSLUITEND de zichtbare schaal; de validatie-clamps (`SLIDER_RANGES` in
- * lib/horizon/toekomst-scenario.ts), de parser en de API blijven ongewijzigd.
- *
- * De marge is ±20% rond de huidige basisstand (`base`), per type afgerond/geclampt:
- *  - `income`     : [base×0,8 op €100 omlaag, base×1,2 op €100 omhoog]; base 0 ⇒ [0, 1000].
- *  - `workdays`   : [floor(base×0,8), ceil(base×1,2)], geclampt op domein 1–5.
- *  - `savings`    : [round(base×0,8), round(base×1,2)] procentpunten, geclampt 0–80;
- *                   base < 10 ⇒ [0, max(10, round(base×1,2))] zodat het bereik nooit degenereert.
- *  - `extra_inleg`: basis is per definitie 0 (extra bóvenop je inleg); `base` = basis-maandinkomen ⇒
- *                   [0, 20% daarvan op €50]; zonder inkomen ⇒ [0, 500].
- *
- * Verbreding-vangnet (overal): ligt de opgeslagen waarde buiten [min,max], dan verbreedt de band
- * tot die waarde (min omlaag óf max omhoog) — niets clampt.
- */
-export function computeSliderUiRange(
-  type: 'income' | 'workdays' | 'savings' | 'extra_inleg',
-  base: number,
-  saved: number,
-): { min: number; max: number } {
-  let min: number
-  let max: number
-  switch (type) {
-    case 'income':
-      if (base <= 0) { min = 0; max = 1000 }
-      else { min = Math.floor((base * 0.8) / 100) * 100; max = Math.ceil((base * 1.2) / 100) * 100 }
-      break
-    case 'workdays':
-      min = Math.max(1, Math.min(5, Math.floor(base * 0.8)))
-      max = Math.max(1, Math.min(5, Math.ceil(base * 1.2)))
-      break
-    case 'savings':
-      if (base < 10) { min = 0; max = Math.max(10, Math.round(base * 1.2)) }
-      else { min = Math.round(base * 0.8); max = Math.round(base * 1.2) }
-      min = Math.max(0, Math.min(80, min))
-      max = Math.max(0, Math.min(80, max))
-      break
-    case 'extra_inleg':
-      min = 0
-      max = base > 0 ? Math.round((base * 0.2) / 50) * 50 : 500
-      break
-  }
-  // Vangnet: een opgeslagen waarde buiten [min,max] verbreedt de band tot die waarde.
-  return { min: Math.min(min, saved), max: Math.max(max, saved) }
-}
+export { computeSliderUiRange }
 
 export function DeltaBadge({ current, base, format }: { current: number; base: number; format: (v: number) => string }) {
   const diff = current - base

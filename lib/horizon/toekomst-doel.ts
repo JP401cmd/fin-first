@@ -22,23 +22,29 @@ import { DOEL_PARAMETERS, type DoelParameter } from '@/lib/horizon/toekomst-scen
 // ── Parameter → goal_type (één bron, ook voor de route + loader) ──────────────
 
 /**
- * Vaste koppeling van de vijf promoveerbare lab-parameters naar hun `goal_type`.
+ * Vaste koppeling van de promoveerbare lab-parameters naar hun `goal_type`.
  * De route gebruikt `PARAMETER_GOAL_TYPES` om exact deze typen te verwijderen
  * bij "loslaten"; de loader (stap 4) mapt terug via dezelfde bron. `fire` en
  * `dekking` zijn elkaars spiegel per anker (ADR 0145): nooit allebei tegelijk.
  */
 export const PARAM_TO_GOAL_TYPE: Record<DoelParameter, GoalType> = {
   spaarquote: 'savings_rate',
-  salaris: 'salary',
   rendement: 'expected_return',
   fire: 'fire_age',
   dekking: 'plan_coverage',
 }
 
-/** De vijf goal-typen die door het lab-doelscenario worden beheerd (in DOEL_PARAMETERS-volgorde). */
+/** De goal-typen die door het lab-doelscenario worden beheerd (in DOEL_PARAMETERS-volgorde). */
 export const PARAMETER_GOAL_TYPES: readonly GoalType[] = DOEL_PARAMETERS.map(
   (p) => PARAM_TO_GOAL_TYPE[p],
 )
+
+/**
+ * Doeltypen die het lab NIET meer aanmaakt maar die als rij nog bestaan (spec §2, 15 sep
+ * 2026: de knop Maandinkomen verviel). Ze syncen zoals altijd; "Doelsituatie loslaten"
+ * ruimt ze mee op.
+ */
+export const LEGACY_PARAMETER_GOAL_TYPES: readonly GoalType[] = ['salary']
 
 /**
  * Kleurfamilie voor álle parameter-doelen: één familie ('purple' = de Toekomst/
@@ -102,8 +108,6 @@ export interface ParameterGoalInput {
   doelwaarden: {
     /** Spaarquote-doel in procenten (0–100). */
     spaarquotePct?: number
-    /** Salaris-doel in €/maand (target_value van het `salary`-doel is dit maandbedrag). */
-    salarisMnd?: number
     /** Rendement-doel in procenten (0–20) — doel-gewogen totaalrendement uit de live-sim. */
     rendementPct?: number
     /** Vrijheidsleeftijd-doel in jaren (18–100). Fractioneel → afgerond op halve stap (naar boven). */
@@ -189,10 +193,6 @@ function fmtNum1(v: number): string {
 function fmtPct1(v: number): string {
   return v.toLocaleString('nl-NL', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 }
-/** Euro-bedrag zonder decimalen (nl-NL duizendtal-scheiding): `6.000`. */
-function fmtEur0(v: number): string {
-  return Math.round(v).toLocaleString('nl-NL', { maximumFractionDigits: 0 })
-}
 
 const BASE_METADATA = { bron: 'parameter', oorsprong: 'lab' } as const
 
@@ -212,19 +212,6 @@ function buildRow(parameter: DoelParameter, dw: ParameterGoalInput['doelwaarden'
         name: `Spaarquote naar ${fmtNum1(value)}%`,
         target_value: value,
         icon: GOAL_TYPE_ICONS.savings_rate,
-        color: PARAMETER_GOAL_COLOR,
-        metadata: { ...BASE_METADATA },
-      }
-    }
-    case 'salaris': {
-      if (!isFiniteNumber(dw.salarisMnd)) return null
-      const value = clampToMeta(dw.salarisMnd, 'salary')
-      return {
-        parameter,
-        goal_type: 'salary',
-        name: `Salaris naar €${fmtEur0(value)}/mnd`,
-        target_value: value,
-        icon: GOAL_TYPE_ICONS.salary,
         color: PARAMETER_GOAL_COLOR,
         metadata: { ...BASE_METADATA },
       }

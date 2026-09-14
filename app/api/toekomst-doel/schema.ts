@@ -18,6 +18,9 @@ import type { DoelParameter } from '@/lib/horizon/toekomst-scenario'
  * whitelist vóór dit schema deed. Belangrijk voor `doelwaarden`: de plan-velden van het
  * dekkingsdoel (`planEindleeftijd`, `planStopAnker`, `planStopLeeftijd`) staan hier bewust
  * NIET in — die komen uit het profiel, en een client die ze meestuurt raakt ze hier kwijt.
+ * `salaris`/`salarisMnd` worden sinds 15 sep 2026 genegeerd (spec lab-haalbaarheid §2, de
+ * knop Maandinkomen verviel) — een oudere client die ze meestuurt breekt niet, ze stripten
+ * stil weg.
  */
 
 /** Eén aangevinkte parameter: alleen `true` bestaat (afwezig = niet gekozen). */
@@ -29,7 +32,6 @@ const gekozen = z.literal(true, { error: 'Ongeldige doelparameter' }).optional()
  */
 const ParametersSchema = z.object({
   spaarquote: gekozen,
-  salaris: gekozen,
   rendement: gekozen,
   fire: gekozen,
   dekking: gekozen,
@@ -47,7 +49,6 @@ const doelwaarde = z
 
 const DoelwaardenSchema = z.object({
   spaarquotePct: doelwaarde,
-  salarisMnd: doelwaarde,
   rendementPct: doelwaarde,
   fireLeeftijd: doelwaarde,
   margeJaren: doelwaarde,

@@ -5,6 +5,7 @@ import {
   doelGewogenRendement,
   PARAM_TO_GOAL_TYPE,
   PARAMETER_GOAL_TYPES,
+  LEGACY_PARAMETER_GOAL_TYPES,
   type ParameterGoalInput,
 } from './toekomst-doel'
 
@@ -44,15 +45,14 @@ describe('buildParameterGoalRows', () => {
   it('bouwt één rij per aangevinkte parameter, in DOEL_PARAMETERS-volgorde', () => {
     const { rows, overgeslagen } = buildParameterGoalRows(
       input(
-        { spaarquote: true, salaris: true, rendement: true, fire: true },
-        { spaarquotePct: 45, salarisMnd: 6000, rendementPct: 6.3, fireLeeftijd: 58, margeJaren: 3 },
+        { spaarquote: true, rendement: true, fire: true },
+        { spaarquotePct: 45, rendementPct: 6.3, fireLeeftijd: 58, margeJaren: 3 },
       ),
     )
     expect(overgeslagen).toEqual([])
-    expect(rows.map((r) => r.parameter)).toEqual(['spaarquote', 'salaris', 'rendement', 'fire'])
+    expect(rows.map((r) => r.parameter)).toEqual(['spaarquote', 'rendement', 'fire'])
     expect(rows.map((r) => r.goal_type)).toEqual([
       'savings_rate',
-      'salary',
       'expected_return',
       'fire_age',
     ])
@@ -61,8 +61,8 @@ describe('buildParameterGoalRows', () => {
   it('elke rij draagt server-side metadata (bron/oorsprong), één kleurfamilie en META-iconen', () => {
     const { rows } = buildParameterGoalRows(
       input(
-        { spaarquote: true, salaris: true, rendement: true, fire: true },
-        { spaarquotePct: 45, salarisMnd: 6000, rendementPct: 6.3, fireLeeftijd: 58, margeJaren: 3 },
+        { spaarquote: true, rendement: true, fire: true },
+        { spaarquotePct: 45, rendementPct: 6.3, fireLeeftijd: 58, margeJaren: 3 },
       ),
     )
     for (const r of rows) {
@@ -72,7 +72,6 @@ describe('buildParameterGoalRows', () => {
     }
     const byType = Object.fromEntries(rows.map((r) => [r.goal_type, r]))
     expect(byType.savings_rate.icon).toBe('Activity')
-    expect(byType.salary.icon).toBe('Briefcase')
     expect(byType.expected_return.icon).toBe('Coins')
     expect(byType.fire_age.icon).toBe('Hourglass')
     // Alleen het FIRE-doel draagt de marge; de andere niet.
@@ -80,17 +79,15 @@ describe('buildParameterGoalRows', () => {
     expect(byType.savings_rate.metadata.margeDoelJaren).toBeUndefined()
   })
 
-  it('formatteert de namen (nl-NL, salaris-bedrag zonder decimalen, rendement met 1 decimaal)', () => {
+  it('formatteert de namen (nl-NL, rendement met 1 decimaal)', () => {
     const { rows } = buildParameterGoalRows(
       input(
-        { spaarquote: true, salaris: true, rendement: true, fire: true },
-        { spaarquotePct: 45, salarisMnd: 6250, rendementPct: 6.3, fireLeeftijd: 58, margeJaren: 3 },
+        { spaarquote: true, rendement: true, fire: true },
+        { spaarquotePct: 45, rendementPct: 6.3, fireLeeftijd: 58, margeJaren: 3 },
       ),
     )
     const byType = Object.fromEntries(rows.map((r) => [r.goal_type, r]))
     expect(byType.savings_rate.name).toBe('Spaarquote naar 45%')
-    expect(byType.salary.name).toBe('Salaris naar €6.250/mnd')
-    expect(byType.salary.target_value).toBe(6250)
     expect(byType.expected_return.name).toBe('Rendement naar 6,3%')
     expect(byType.fire_age.name).toBe('Vrij op 58 jaar')
   })
@@ -150,10 +147,10 @@ describe('buildParameterGoalRows', () => {
 
   it('slaat een aangevinkte parameter zonder (eindige) doelwaarde tolerant over en meldt dat', () => {
     const { rows, overgeslagen } = buildParameterGoalRows(
-      input({ spaarquote: true, salaris: true }, { spaarquotePct: 45 }),
+      input({ rendement: true }, {}),
     )
-    expect(rows.map((r) => r.parameter)).toEqual(['spaarquote'])
-    expect(overgeslagen).toEqual(['salaris'])
+    expect(rows).toEqual([])
+    expect(overgeslagen).toEqual(['rendement'])
 
     // Niet-eindige waarden tellen als "ontbrekend".
     const nan = buildParameterGoalRows(input({ rendement: true }, { rendementPct: Number.NaN }))
@@ -164,7 +161,7 @@ describe('buildParameterGoalRows', () => {
   it('negeert parameters die niet expliciet true zijn', () => {
     const { rows, overgeslagen } = buildParameterGoalRows(
       // @ts-expect-error — bewust een niet-true waarde om de whitelist te testen.
-      input({ spaarquote: false, salaris: undefined }, { spaarquotePct: 45, salarisMnd: 6000 }),
+      input({ spaarquote: false, rendement: undefined }, { spaarquotePct: 45, rendementPct: 6.3 }),
     )
     expect(rows).toEqual([])
     expect(overgeslagen).toEqual([])
@@ -172,16 +169,16 @@ describe('buildParameterGoalRows', () => {
 })
 
 describe('PARAM_TO_GOAL_TYPE / PARAMETER_GOAL_TYPES', () => {
-  it('koppelt elke parameter aan het juiste goal_type (vijf, incl. het dekkingsdoel — ADR 0145)', () => {
+  it('koppelt elke parameter aan het juiste goal_type (vier, incl. het dekkingsdoel — ADR 0145); salaris blijft als legacy-type bestaan', () => {
     expect(PARAM_TO_GOAL_TYPE).toEqual({
       spaarquote: 'savings_rate',
-      salaris: 'salary',
       rendement: 'expected_return',
       fire: 'fire_age',
       dekking: 'plan_coverage',
     })
-    expect(PARAMETER_GOAL_TYPES).toEqual(['savings_rate', 'salary', 'expected_return', 'fire_age', 'plan_coverage'])
-    expect(PARAMETER_GOAL_TYPES).toHaveLength(5)
+    expect(PARAMETER_GOAL_TYPES).toEqual(['savings_rate', 'expected_return', 'fire_age', 'plan_coverage'])
+    expect(PARAMETER_GOAL_TYPES).toHaveLength(4)
+    expect(LEGACY_PARAMETER_GOAL_TYPES).toEqual(['salary'])
   })
 })
 

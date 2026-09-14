@@ -10,6 +10,7 @@ import {
 import {
   buildParameterGoalRows,
   PARAMETER_GOAL_TYPES,
+  LEGACY_PARAMETER_GOAL_TYPES,
   PARAM_TO_GOAL_TYPE,
   type ParameterGoalRow,
 } from '@/lib/horizon/toekomst-doel'
@@ -23,8 +24,8 @@ import { ToekomstDoelBodySchema, type VastleggenBody } from './schema'
  *
  * Promotie-route van "verkennen wordt richten": legt de actuele lab-stand vast als
  * persistent doelscenario (`vastleggen`) of maakt het weer los (`loslaten`). Een
- * doelscenario GENEREERT parameter-doel-rijen in `goals` (spaarquote/salaris/rendement/
- * fire) én schrijft een `doel`-blok in `profiles.toekomst_scenario_prefs` — twee stores
+ * doelscenario GENEREERT parameter-doel-rijen in `goals` (spaarquote/rendement/fire/
+ * dekking) én schrijft een `doel`-blok in `profiles.toekomst_scenario_prefs` — twee stores
  * die consistent moeten blijven. Daarom een dunne server-route i.p.v. de generieke
  * goals-API (metadata wordt UITSLUITEND server-side gezet — kleiner security-oppervlak).
  *
@@ -189,7 +190,6 @@ async function handleVastleggen(
     parameters,
     doelwaarden: {
       spaarquotePct: dw.spaarquotePct,
-      salarisMnd: dw.salarisMnd,
       rendementPct: dw.rendementPct,
       fireLeeftijd: dw.fireLeeftijd,
       margeJaren: dw.margeJaren,
@@ -395,13 +395,15 @@ function buildInsertRow(userId: string, row: ParameterGoalRow) {
 
 async function handleLoslaten(supabase: SupabaseServerClient, userId: string) {
   // 1. Verwijder alle parameter-typen (`PARAMETER_GOAL_TYPES`, incl. fire_age én
-  //    plan_coverage — own-row, alleen bron='parameter'; handmatige savings_rate/salary-
-  //    doelen blijven ongemoeid). Werkt onder élk anker, ook `now`.
+  //    plan_coverage, plus `LEGACY_PARAMETER_GOAL_TYPES` — de `salary`-rijen die het lab
+  //    vóór 15 sep 2026 nog aanmaakte — own-row, alleen bron='parameter'; handmatige
+  //    savings_rate/salary-doelen die de gebruiker zelf aanmaakte blijven ongemoeid).
+  //    Werkt onder élk anker, ook `now`.
   const { error: deleteError } = await supabase
     .from('goals')
     .delete()
     .eq('user_id', userId)
-    .in('goal_type', [...PARAMETER_GOAL_TYPES])
+    .in('goal_type', [...PARAMETER_GOAL_TYPES, ...LEGACY_PARAMETER_GOAL_TYPES])
     .filter('metadata->>bron', 'eq', 'parameter')
   if (deleteError) {
     console.error('[/api/toekomst-doel PUT] goals delete mislukt:', deleteError.code)

@@ -26,8 +26,13 @@ const BASELINE: WhatIfOverrides = {
   extraContribution: 0,
 }
 
-// Eén income-slider-event dat afwijkt van de baseline (3000 → 4000).
+// Eén income-slider-event: bestaat nog op event-niveau (de sliderknop leeft voort, Task 2),
+// maar telt sinds 15 sep 2026 niet meer mee in de doel-laag (buildLiveStand/
+// isDoelConceptGewijzigd, spec lab-haalbaarheid §2) — gebruikt hieronder om dat te bewijzen.
 const incomeEvent = buildSliderEvent('income', 4000, BASELINE, 40)!
+// Eén savings-slider-event dat wél afwijkt van de baseline (20% → 30%) — de vervanger voor
+// de income-events in de "iets is gewijzigd"-demonstraties hieronder.
+const savingsEvent = buildSliderEvent('savings', 30, BASELINE, 40)!
 
 describe('buildLiveStand (persist-inclusieregels)', () => {
   it('zonder baseline: geen slider-velden, wél stopAge/stopKoppel', () => {
@@ -44,7 +49,7 @@ describe('buildLiveStand (persist-inclusieregels)', () => {
     expect(stand.stopKoppel).toBe(false)
   })
 
-  it('income-slider-afwijking landt in stand.sliders.income', () => {
+  it('income-slider-afwijking landt niet meer in de stand (knop vervallen, spec §2)', () => {
     const stand = buildLiveStand({
       baseline: BASELINE,
       sliderEvents: [incomeEvent],
@@ -53,7 +58,19 @@ describe('buildLiveStand (persist-inclusieregels)', () => {
       stopKoppel: false,
       lockedMarge: null,
     })
-    expect(stand.sliders?.income).toBe(4000)
+    expect(stand.sliders).toBeUndefined()
+  })
+
+  it('savings-slider-afwijking landt wél in stand.sliders.savings', () => {
+    const stand = buildLiveStand({
+      baseline: BASELINE,
+      sliderEvents: [savingsEvent],
+      returnDeltas: {},
+      stopAge: null,
+      stopKoppel: false,
+      lockedMarge: null,
+    })
+    expect(stand.sliders?.savings).toBe(30)
   })
 
   it('rendement-delta landt in stand.returnDeltaByCategorie', () => {
@@ -85,7 +102,9 @@ describe('buildLiveStand (persist-inclusieregels)', () => {
 describe('buildScenarioPersistPayload (doel in ELKE PUT — VERPLICHT)', () => {
   const doel: ToekomstScenarioDoel = {
     gezetOp: '2026-07-11T10:00:00.000Z',
-    parameters: { salaris: true },
+    parameters: { spaarquote: true },
+    // Legacy-vastgelegde stand met sliders.income: de parser leest dat veld tolerant
+    // (spec §2), en het doel-blok mag zo'n oude stand gewoon dragen.
     stand: { stopAge: null, stopKoppel: false, sliders: { income: 4000 } },
   }
 
@@ -93,7 +112,7 @@ describe('buildScenarioPersistPayload (doel in ELKE PUT — VERPLICHT)', () => {
     // De live-stand ná de sliderbeweging.
     const stand = buildLiveStand({
       baseline: BASELINE,
-      sliderEvents: [incomeEvent],
+      sliderEvents: [savingsEvent],
       returnDeltas: {},
       stopAge: null,
       stopKoppel: false,
@@ -101,7 +120,7 @@ describe('buildScenarioPersistPayload (doel in ELKE PUT — VERPLICHT)', () => {
     })
     const payload = buildScenarioPersistPayload({ stand, showScenarioLine: true, doel })
     expect(payload.v).toBe(2)
-    expect(payload.sliders?.income).toBe(4000)
+    expect(payload.sliders?.savings).toBe(30)
     expect(payload.doel).toEqual(doel) // ← het doel overleeft de sliderbeweging
   })
 
@@ -131,10 +150,10 @@ describe('conceptGewijzigd-flow (buildLiveStand + isDoelConceptGewijzigd)', () =
       stopKoppel: false,
       lockedMarge: null,
     })
-    // Live draait de income-slider → concept wijkt af.
+    // Live draait de savings-slider → concept wijkt af.
     const gedraaid = buildLiveStand({
       baseline: BASELINE,
-      sliderEvents: [incomeEvent],
+      sliderEvents: [savingsEvent],
       returnDeltas: {},
       stopAge: null,
       stopKoppel: false,

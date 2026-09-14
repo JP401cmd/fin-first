@@ -4,7 +4,7 @@
  * DoelVastlegSheet — promotie-sheet "verkennen wordt richten" (ronde 4 stap 5).
  *
  * Presentational BottomSheet die de actuele lab-stand promoveert tot een vastgelegd
- * doelscenario. Per AFWIJKENDE parameter (spaarquote / salaris / rendement / FIRE) toont
+ * doelscenario. Per AFWIJKENDE parameter (spaarquote / rendement / FIRE) toont
  * hij een aanvinkbare rij (default aan) met de doelwaarde-preview; de gebruiker kiest welke
  * parameters een doel worden. De sheet REKENT NIETS — de parent (`horizon-client`) levert de
  * previews (label + waarde-string) én weet de numerieke doelwaarden; de sheet geeft enkel de
@@ -55,11 +55,9 @@ export function buildLiveStand(args: {
 
   if (baseline) {
     const sliders: NonNullable<ToekomstScenarioStand['sliders']> = {}
-    const income = readSliderValueFromEvents('income', sliderEvents, baseline)
     const workdays = readSliderValueFromEvents('workdays', sliderEvents, baseline)
     const savings = readSliderValueFromEvents('savings', sliderEvents, baseline)
     const extraInleg = readSliderValueFromEvents('extra_inleg', sliderEvents, baseline)
-    if (Math.round(income) !== Math.round(baseline.monthlyIncome)) sliders.income = income
     if (workdays !== baseline.workDaysPerWeek) sliders.workdays = workdays
     if (Math.round(savings) !== Math.round(baseline.savingsRate)) sliders.savings = savings
     if (extraInleg !== 0) sliders.extraInleg = extraInleg

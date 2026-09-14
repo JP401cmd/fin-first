@@ -203,6 +203,22 @@ describe('PUT /api/toekomst-doel — guards', () => {
     expect(inserted.map((i) => i.row.goal_type)).toEqual(['savings_rate'])
   })
 
+  it('vastleggen met parameters.salaris wordt genegeerd (geen 400, geen salary-rij)', async () => {
+    const res = await PUT(
+      putRequest(
+        JSON.stringify({
+          action: 'vastleggen',
+          parameters: { spaarquote: true, salaris: true },
+          doelwaarden: { spaarquotePct: 30, salarisMnd: 5000 },
+          stand: { sliders: { savings: 45 } },
+        }),
+      ),
+    )
+    expect(res.status).toBe(200)
+    expect(inserted.map((i) => i.row.goal_type)).toEqual(['savings_rate'])
+    expect(inserted.some((i) => i.row.goal_type === 'salary')).toBe(false)
+  })
+
   it('400 als geen enkele parameter is aangevinkt', async () => {
     const res = await PUT(
       putRequest(
@@ -394,8 +410,17 @@ describe('PUT /api/toekomst-doel — loslaten', () => {
     expect(res.status).toBe(200)
     const del = deleted.find((d) => d.table === 'goals')
     expect(del).toBeTruthy()
-    expect(del!.filters.goal_type).toEqual(['savings_rate', 'salary', 'expected_return', 'fire_age', 'plan_coverage'])
+    expect(del!.filters.goal_type).toEqual(['savings_rate', 'expected_return', 'fire_age', 'plan_coverage', 'salary'])
     expect(del!.filters.user_id).toBe('user-1')
+  })
+
+  it('loslaten verwijdert óók legacy salary-rijen (bron parameter), hoewel het lab die niet meer aanmaakt', async () => {
+    const res = await PUT(putRequest(JSON.stringify({ action: 'loslaten' })))
+    expect(res.status).toBe(200)
+    const del = deleted.find((d) => d.table === 'goals')
+    expect(del).toBeTruthy()
+    expect(del!.filters.goal_type).toContain('salary')
+    expect(del!.filters.goal_type).toContain('plan_coverage')
   })
 })
 
