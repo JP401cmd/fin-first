@@ -16,7 +16,7 @@ import { lookupAowAge } from '@/lib/aow-leeftijd'
 import { useDebouncedValue } from '@/lib/hooks/use-debounced-value'
 import { StopPlanVragen } from '@/components/horizon/stop-plan-vragen'
 import {
-  planDraftEquals,
+  shouldAutosavePlanDraft,
   planDraftFromSettings,
   planDraftToFireSettingsBody,
   validatePlanDraft,
@@ -348,6 +348,11 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
   }, [])
 
   useEffect(() => { loadData() }, [loadData])
+  // De modal blijft gemount terwijl andere oppervlakken op /toekomst het plan kunnen
+  // schrijven (plan-review, Voorkeuren-body). Herlaad bij openen, anders toont hij een
+  // verouderd plan en schrijft een bewerking dat oude plan terug. Veilig sinds de
+  // autosave-poort (`shouldAutosavePlanDraft`): een herlaad kan geen schrijf uitlokken.
+  useEffect(() => { if (open) loadData() }, [open, loadData])
 
   // ── Save end strategy changes ────────────────────────────────────────────
 
@@ -389,13 +394,15 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
   // Autosave (600 ms rust) zodra het concept geldig én gewijzigd is. De modal
   // bewaarde vóór F3b per klik/blur; met een leeftijd-invoer erbij is "bewaar als
   // het klopt" de enige vorm die geen half plan wegschrijft.
+  // Poort in `shouldAutosavePlanDraft`: pas opslaan als de debounce de live-invoer
+  // heeft ingehaald — anders schreef de beginwaarde (solved) het zojuist geladen
+  // plan over bij élke /toekomst-lading (bug 14 sep 2026).
   useEffect(() => {
-    if (loading || savedPlan === null) return
-    if (planDraftEquals(debouncedPlan, savedPlan)) return
-    if (!validatePlanDraft(debouncedPlan, { aowAge: aowAgeFractional }).ok) return
+    const valid = validatePlanDraft(debouncedPlan, { aowAge: aowAgeFractional }).ok
+    if (!shouldAutosavePlanDraft({ loading, savedPlan, planDraft, debouncedPlan, valid })) return
     void savePlan(debouncedPlan)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedPlan, savedPlan, loading])
+  }, [debouncedPlan, planDraft, savedPlan, loading])
   const yearlyExpenses = input?.yearlyMustExpenses ?? 0
   const strategyForSim = useMemo<FireStrategyConfig>(
     () => fireStrategy ?? { strategy: 'deplete' as const, endAge: 90, legacyAmount: 0 },

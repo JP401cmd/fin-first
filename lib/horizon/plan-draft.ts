@@ -308,6 +308,31 @@ export function planDraftEquals(a: PlanDraft, b: PlanDraft): boolean {
 }
 
 /**
+ * De autosave-poort van de strategie-modal (bug 14 sep 2026).
+ *
+ * De modal is altijd gemount en bewaart een geldig, gewijzigd concept na 600 ms rust.
+ * Het concept begint op een vaste beginwaarde (solved · deplete · 90); `loadData` zet
+ * daarna `planDraft` én `savedPlan` op het echte plan. Op dat moment draagt de
+ * gedebouncede kopie nog de beginwaarde — ongelijk aan `savedPlan`, dus zonder deze
+ * poort werd de beginwaarde als gebruikerswijziging opgeslagen en verloor elke
+ * gebruiker met een vast anker zijn stopkeuze bij het openen van /toekomst.
+ *
+ * Regel: pas opslaan wanneer de debounce de live-invoer heeft INGEHAALD
+ * (`debouncedPlan` ≡ `planDraft`) én die afwijkt van wat er is opgeslagen.
+ */
+export function shouldAutosavePlanDraft(input: {
+  loading: boolean
+  savedPlan: PlanDraft | null
+  planDraft: PlanDraft
+  debouncedPlan: PlanDraft
+  valid: boolean
+}): boolean {
+  if (input.loading || input.savedPlan === null || !input.valid) return false
+  if (!planDraftEquals(input.debouncedPlan, input.planDraft)) return false
+  return !planDraftEquals(input.debouncedPlan, input.savedPlan)
+}
+
+/**
  * Bijschrift onder het eindleeftijd-veld — beschrijvend per eind-vorm (dezelfde drie
  * zinnen die Voorkeuren al droeg), zonder anker-woorden: de eind-vorm is de andere as.
  */
