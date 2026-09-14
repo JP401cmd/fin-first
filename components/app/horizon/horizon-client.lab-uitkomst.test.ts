@@ -124,4 +124,15 @@ describe('horizon-client consumeert ÉÉN lab-uitkomst (ADR 0145)', () => {
     expect(blok).toMatch(/dekkingTekortHintZin\(\{[\s\S]*?\bmasked,[\s\S]*?\}\)/)
     expect(blok).toContain('dekkingTekortHintKnop(planTekortHint.seed, masked)')
   })
+
+  it('de dekkingsas krijgt zijn data uit labDekking (geen eigen som)', () => {
+    const src = bron()
+    const start = src.indexOf('const dekkingsasData = useMemo')
+    expect(start).toBeGreaterThan(-1)
+    const blok = src.slice(start, src.indexOf('}, [labDekking', start))
+    expect(blok).toContain('basisReach: labDekking.basisReach')
+    expect(blok).toContain('basisPct: labDekking.basisPct')
+    expect(blok).not.toMatch(/\/ 12|eindMaand|computeRunwayCoveragePct/)
+    expect(src).toContain('dekking={dekkingsasData}')
+  })
 })

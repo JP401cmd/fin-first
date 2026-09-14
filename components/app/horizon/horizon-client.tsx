@@ -122,6 +122,7 @@ import { PensionParseSummaryCard, PensionInstructionPanel, computeCumulativeImpa
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { PageInfoButton, GlossaryTerm, SectionLabel, Kicker } from '@/components/editorial'
 import { Vrijheidsas, computeCoupledStopAge, formatAge, formatMargeShort } from '@/components/app/horizon/vrijheidsas'
+import type { DekkingsasData } from '@/components/app/horizon/dekkingsbalk'
 import { ScenarioChip, VERKEN_SECTION_ID } from '@/components/app/horizon/scenario-chip'
 import { Dekkingsradar } from '@/components/app/horizon/dekkingsradar'
 import { ScenarioKaarten } from '@/components/app/horizon/scenario-kaarten'
@@ -2832,6 +2833,21 @@ export default function HorizonPage({
   // De dekking-uitkomst als losse afleiding (null onder `solved`) — alle dekking-
   // oppervlakken hieronder lezen deze ene waarde.
   const labDekking = labUitkomst.kind === 'dekking' ? labUitkomst : null
+  // Spec lab-haalbaarheid §1 — de dekkingsas leest uitsluitend de lab-uitkomst (ADR 0145).
+  const dekkingsasData = useMemo<DekkingsasData | null>(() => {
+    if (labDekking == null) return null
+    const stopAge = labDekking.stop == null ? null : labDekking.stop.kind === 'now' ? currentAge : labDekking.stop.stopAge
+    return {
+      stopAge,
+      eindAge: labDekking.eind,
+      basisReach: labDekking.basisReach,
+      basisPct: labDekking.basisPct,
+      scenarioReach: labDekking.scenarioReach,
+      scenarioPct: labDekking.scenarioPct,
+      verkendReach: labDekking.verkendReach,
+      verkendStopAge: labDekking.verkendStopAge,
+    }
+  }, [labDekking, currentAge])
   // "Wat hoort daarbij?" — PLAN-variant (zonder slider-beweging). Het verkende stop-pad
   // wint (blok hierboven); zonder tekort-hint op dat pad valt het plan-antwoord terug op
   // de maandhint van de lab-uitkomst. €→vrijheidstijd via dezelfde canonieke helper.
@@ -7014,6 +7030,8 @@ export default function HorizonPage({
                     ) : null
                   }
                   ankerVast={isFixedAnchorMode}
+                  // Spec lab-haalbaarheid §1 — onder een vast anker is sectie 2 de dekkingsas.
+                  dekking={dekkingsasData}
                   // ADR 0145 — onder aow/age de uitkomst van het plan: reikt het, voor
                   // hoeveel procent, en of er iets vast te leggen valt.
                   uitkomstNotitie={(() => {

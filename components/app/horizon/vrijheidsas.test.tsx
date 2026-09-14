@@ -10,6 +10,7 @@ import {
   clampLabelPct,
 } from './vrijheidsas'
 import { computeStopMarge } from '@/lib/horizon/stop-marge'
+import type { DekkingsasData } from './dekkingsbalk'
 
 /**
  * Unit-tests voor de Vrijheidsas (mockup-blok ⑤ van de wat-als-scenariolaag — twee
@@ -431,6 +432,54 @@ describe('Vrijheidsas — vast anker (ADR 0129 F3b, B-038, TPR-09)', () => {
     render(<Vrijheidsas {...baseProps} stopKeuzeVerborgen aowAge={67} onKeuzesOpenen={vi.fn()} />)
     expect(screen.queryByRole('button', { name: /plan-keuzes/ })).toBeNull()
     expect(screen.queryByLabelText('Gewenste stopleeftijd')).toBeNull()
+  })
+
+  // ── Spec lab-haalbaarheid §1 — sectie 2 is onder een vast anker de dekkingsas ──
+  const dekking: DekkingsasData = {
+    stopAge: 58.5, eindAge: 90,
+    basisReach: { kind: 'reikt-tot', age: 82, endAge: 90 }, basisPct: 65,
+    scenarioReach: null, scenarioPct: null, verkendReach: null, verkendStopAge: null,
+  }
+
+  it('sectie 2 wordt de dekkingsas: kop "Reikt je plan?", slider "Doorwerken tot", tegels Reikt tot · Plan tot · Gedekt', () => {
+    render(<Vrijheidsas {...baseProps} ankerVast planStopAge={58.5} dekking={dekking} onMaakPlan={() => {}} />)
+    expect(screen.getByText('Reikt je plan?')).toBeInTheDocument()
+    expect(screen.getByRole('slider', { name: 'Doorwerken tot' })).toBeInTheDocument()
+    expect(screen.getByText('Reikt tot')).toBeInTheDocument()
+    expect(screen.getByText('Plan tot')).toBeInTheDocument()
+    expect(screen.getByText('Gedekt')).toBeInTheDocument()
+  })
+
+  it('onder een vast anker verdwijnen marge-band, verwacht-streep, koppel-checkbox en de FIRE-tegels', () => {
+    const { container } = render(<Vrijheidsas {...baseProps} ankerVast planStopAge={58.5} dekking={dekking} />)
+    expect(screen.queryByRole('checkbox')).toBeNull()
+    expect(screen.queryByText('verwacht')).toBeNull()
+    expect(screen.queryByText(/^marge/)).toBeNull()
+    expect(screen.queryByText('Basis-vrijheid')).toBeNull()
+    expect(screen.queryByText('Verwacht vrij')).toBeNull()
+    expect(screen.queryByText('Verkend stopmoment')).toBeNull()
+    expect(container.querySelector('.bg-emerald-500')).toBeNull()
+  })
+
+  it('de knoppen "Maak dit mijn plan" en "Je plan-keuzes" blijven onder de dekkingsas', () => {
+    const onMaakPlan = vi.fn()
+    render(<Vrijheidsas {...baseProps} ankerVast planStopAge={58.5} dekking={dekking} onMaakPlan={onMaakPlan} onKeuzesOpenen={() => {}} stopAge={61} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Maak dit mijn plan' }))
+    expect(onMaakPlan).toHaveBeenCalledWith(61)
+    expect(screen.getByRole('button', { name: /plan-keuzes/ })).toBeInTheDocument()
+  })
+
+  it('onder het nu-anker: geen slider, wél de balk met alleen het plan', () => {
+    render(<Vrijheidsas {...baseProps} ankerVast stopKeuzeVerborgen dekking={{ ...dekking, stopAge: 40 }} />)
+    expect(screen.queryByRole('slider')).toBeNull()
+    expect(screen.getByRole('meter', { name: /dekking/i })).toBeInTheDocument()
+  })
+
+  it('solved zonder dekking-prop: sectie 2 is byte-identiek aan vandaag (marge-band + tegels)', () => {
+    render(<Vrijheidsas {...baseProps} />)
+    expect(screen.getByText('Hoe stevig is dat?')).toBeInTheDocument()
+    expect(screen.getByRole('checkbox')).toBeInTheDocument()
+    expect(screen.getByText('Basis-vrijheid')).toBeInTheDocument()
   })
 })
 

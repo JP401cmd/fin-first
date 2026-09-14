@@ -25,6 +25,11 @@
  *   afwijking t.o.v. de basislijn ("nu"). De afwijking staat hiér — en dus bewust NIET óók
  *   als sub onder de cijferrij: één duiding, op de plek waar je je keuze maakt.
  *
+ * Twee gezichten van sectie 2 (spec lab-haalbaarheid §1, 15 sep 2026): zonder vast anker
+ * (solved) is het de marge hierboven; onder een vast anker mét `dekking` is het de
+ * DEKKINGSAS ("Reikt je plan?" — slider "Doorwerken tot" + `Dekkingsbalk` met de tegels
+ * Reikt tot · Plan tot · Gedekt), zonder marge-band, koppel-checkbox of FIRE-cijferrij.
+ *
  * Kleur-conventie:
  *   - module-identiteit (paneel-badges, stop-slider, accentwaarden) via horizon-tokens;
  *   - de driezone-marge-band + marge-bracket (tekort · krap · stevig) in STOPLICHT-status
@@ -36,6 +41,8 @@ import type { StopMargeZone } from '@/lib/horizon/stop-marge'
 import { resolveVoorzichtigeRand, TERUGVAL_RAND_JAREN } from '@/lib/horizon/stop-marge'
 import { InlineInfoDisclosure } from '@/components/editorial'
 import { rangeTouchSeekProps } from '@/lib/range-touch-seek'
+import { DEKKINGSAS_COPY, HEFBOOM_COPY } from '@/lib/horizon/anker-copy'
+import { Dekkingsbalk, type DekkingsasData } from './dekkingsbalk'
 
 const PLAYFAIR = 'var(--font-playfair, Georgia, serif)'
 
@@ -242,7 +249,8 @@ export interface VrijheidsasProps {
    * ADR 0129 F3b — het plan heeft een VAST stopmoment (aow/age). De slider is dan een
    * VERKENNING tegen het plan (default = `planStopAge`); verkennen is nooit destructief.
    * Het plan verandert alleen via `onMaakPlan` (TPR-09: bevestiging, dan het VOLLEDIGE
-   * plan) of via de plan-keuzes (`onKeuzesOpenen`) — zie die props.
+   * plan) of via de plan-keuzes (`onKeuzesOpenen`) — zie die props. Mét `dekking`
+   * wordt sectie 2 de dekkingsas (reikt het plan tot de eindleeftijd?) i.p.v. de marge.
    */
   ankerVast?: boolean
   /**
@@ -251,6 +259,14 @@ export interface VrijheidsasProps {
    * met zichtbare stopkeuze; de parent levert de zin (`dekkingAsNotitie`).
    */
   uitkomstNotitie?: ReactNode
+  /**
+   * Spec lab-haalbaarheid §1 (15 sep 2026): onder een vast anker is sectie 2 de
+   * DEKKINGSAS — schaal stop→eind, slider "Doorwerken tot", tegels Reikt tot · Plan tot ·
+   * Gedekt. Geen marge-band/verwacht-streep/koppel-checkbox/FIRE-tegels: die meten een
+   * grootheid die de gebruiker onder een vast anker niet gekozen heeft. `null` ⇒ het
+   * solved-gezicht (ongewijzigd).
+   */
+  dekking?: DekkingsasData | null
   /** Het stopmoment van het plan (fractioneel) — de referentie voor "nu rekent het met stoppen op …". */
   planStopAge?: number | null
   /**
@@ -321,6 +337,7 @@ export function Vrijheidsas({
   draaiknoppen,
   ankerVast = false,
   uitkomstNotitie = null,
+  dekking = null,
   planStopAge = null,
   aowAge = null,
   onKeuzesOpenen,
@@ -408,6 +425,11 @@ export function Vrijheidsas({
   // TPR-09 — de verkenning tot plan maken. Alleen wanneer de consumer het schrijfpad
   // aanbiedt; onder het nu-anker is er geen schuif en dus niets te verankeren.
   const toonMaakPlan = onMaakPlan != null && !stopKeuzeVerborgen
+  // Spec lab-haalbaarheid §1 — onder een vast anker (mét dekking-data) is sectie 2 de
+  // dekkingsas. Onder het nu-anker blijft die sectie dan staan (zonder slider): de balk
+  // toont hoe ver het plan reikt.
+  const dekkingsas = ankerVast && dekking != null
+  const toonSectie2 = !stopKeuzeVerborgen || dekkingsas
 
   return (
     <div>
@@ -482,11 +504,11 @@ export function Vrijheidsas({
 
       {/* ── Twee vlakken naast elkaar (mobiel gestapeld) ── */}
       <div
-        className={`mt-4 grid grid-cols-1 gap-6 sm:gap-5 ${stopKeuzeVerborgen ? '' : 'sm:grid-cols-2'}`}
+        className={`mt-4 grid grid-cols-1 gap-6 sm:gap-5 ${toonSectie2 ? 'sm:grid-cols-2' : ''}`}
       >
         {/* LINKS — Wanneer kun je stoppen? (de streep) */}
         <section
-          className={`min-w-0 ${stopKeuzeVerborgen ? '' : 'sm:border-r sm:border-[var(--border-ed)] sm:pr-5'}`}
+          className={`min-w-0 ${toonSectie2 ? 'sm:border-r sm:border-[var(--border-ed)] sm:pr-5' : ''}`}
         >
           {stopKeuzeVerborgen || ankerVast ? (
             <PanelHeader num="1" title="Waar draai je aan?" tag="je aannames" />
@@ -504,11 +526,18 @@ export function Vrijheidsas({
         </section>
 
         {/* RECHTS — Hoe stevig is dat? (de marge). Verborgen onder 'Nu stoppen'
-            (ADR 0127): het stopmoment is daar een instelling, geen schuif. */}
-        {!stopKeuzeVerborgen && (
+            (ADR 0127): het stopmoment is daar een instelling, geen schuif — behalve als
+            dekkingsas (spec lab-haalbaarheid §1): dan blijft de balk, zonder slider. */}
+        {toonSectie2 && (
         <section className="min-w-0">
-          <PanelHeader num="2" title={ankerVast ? 'Kun je dan stoppen?' : 'Hoe stevig is dat?'} tag="de marge" />
+          <PanelHeader
+            num="2"
+            title={dekkingsas ? DEKKINGSAS_COPY.kop : ankerVast ? 'Kun je dan stoppen?' : 'Hoe stevig is dat?'}
+            tag={dekkingsas ? DEKKINGSAS_COPY.tag : 'de marge'}
+          />
 
+          {!stopKeuzeVerborgen && (
+          <>
           {/* Gewenste stopleeftijd · berekende (verwacht-)leeftijd · afwijking t.o.v. de
               basislijn — alle drie op ÉÉN regel, zodat je je ambitie, de uitkomst en het
               effect van je wat-als in één oogopslag naast elkaar leest. De duiding staat
@@ -516,7 +545,7 @@ export function Vrijheidsas({
               schermen; de gekozen leeftijd blijft dan de eerste, zwaarste waarde. */}
           <div className="mt-4 mb-1.5 flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
             <span className="font-sans text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">
-              Gewenste stopleeftijd
+              {dekkingsas ? DEKKINGSAS_COPY.sliderLabel : 'Gewenste stopleeftijd'}
             </span>
             {/* TPR-09 — de marker is een VERKENNING, geen plan: dat staat er nu bij. */}
             <span className="rounded-full border border-horizon-300 px-1.5 py-px font-mono text-[9px] uppercase tracking-[0.08em] text-horizon-700">
@@ -526,7 +555,7 @@ export function Vrijheidsas({
               <span className="font-mono text-sm tabular-nums text-[var(--ink)]">
                 {formatAge(stopAge)}
               </span>
-              {verwachtFireAge !== null && (
+              {!dekkingsas && verwachtFireAge !== null && (
                 <>
                   <span aria-hidden className="font-mono text-[10px] text-[var(--ink-4)]">
                     ·
@@ -536,7 +565,7 @@ export function Vrijheidsas({
                   </span>
                 </>
               )}
-              {showStopDelta && (
+              {!dekkingsas && showStopDelta && (
                 <>
                   <span aria-hidden className="font-mono text-[10px] text-[var(--ink-4)]">
                     ·
@@ -560,12 +589,16 @@ export function Vrijheidsas({
             onChange={e => onStopAgeChange(Number(e.target.value))}
             className="slider-module w-full"
             {...rangeTouchSeekProps}
-            aria-label="Gewenste stopleeftijd"
-            aria-valuetext={`${formatAge(stopAge)} jaar${
-              margeJaren !== null
-                ? `, marge ${formatMargeShort(margeJaren)}${zone ? ` (${zone})` : ''}`
-                : ''
-            }`}
+            aria-label={dekkingsas ? DEKKINGSAS_COPY.sliderLabel : 'Gewenste stopleeftijd'}
+            aria-valuetext={
+              dekkingsas
+                ? `${formatAge(stopAge)} jaar`
+                : `${formatAge(stopAge)} jaar${
+                    margeJaren !== null
+                      ? `, marge ${formatMargeShort(margeJaren)}${zone ? ` (${zone})` : ''}`
+                      : ''
+                  }`
+            }
           />
 
           {/* Verkenning vs. plan (TPR-09, bovenop melding B-038).
@@ -586,7 +619,9 @@ export function Vrijheidsas({
             // precies die ene tekstregel op, wat de alinea scheef laat ogen.
             <div className="mt-2 flex flex-col items-start">
               <p className="font-sans text-[11px] leading-snug text-[var(--ink-3)]">
-                Dit is een verkenning: de lijn verschuift alleen hier.
+                {dekkingsas
+                  ? `${HEFBOOM_COPY.laterEerder}: dit is een verkenning — je plan verandert er niet van.`
+                  : 'Dit is een verkenning: de lijn verschuift alleen hier.'}
                 {toonMaakPlan && (
                   <> Maak je het je plan, dan rekent de hele app met deze stopleeftijd. Relevant omdat je
                   plan je vrijheidsleeftijd en je doelen bepaalt.</>
@@ -620,7 +655,13 @@ export function Vrijheidsas({
               </div>
             </div>
           )}
+          </>
+          )}
 
+          {dekkingsas ? (
+            <Dekkingsbalk data={dekking} />
+          ) : (
+          <>
           {/* driezone-band (stoplicht) met basis/verwacht/laatst-markers, stop-marker
               (ambitie) en de marge als overspanning. */}
           <div className="relative mt-12">
@@ -760,14 +801,17 @@ export function Vrijheidsas({
               <span className="text-[var(--ink-4)]">(dan blijft je marge gelijk)</span>
             </span>
           </label>
+          </>
+          )}
         </section>
         )}
       </div>
 
       {/* ── Cijferrij (volle breedte, onder de twee vlakken) — de drieslag ──
           Weggelaten onder 'Nu stoppen': basis, verwacht én geambieerd vallen daar
-          per constructie samen met je huidige leeftijd (ADR 0127 D1). */}
-      {!stopKeuzeVerborgen && (
+          per constructie samen met je huidige leeftijd (ADR 0127 D1). Ook weggelaten onder de
+          dekkingsas: de tegels Reikt tot · Plan tot · Gedekt zitten dan in de balk zelf. */}
+      {!stopKeuzeVerborgen && !dekkingsas && (
       <div className="mt-6 grid grid-cols-3 gap-3 border-t border-[var(--border-ed)] pt-4">
         <Figure kicker="Basis-vrijheid" value={formatAge(baseFireAge)} unit="jr" />
         {/* Geen delta-sub meer: de "X mnd eerder/later vrij"-duiding staat één keer, op de
