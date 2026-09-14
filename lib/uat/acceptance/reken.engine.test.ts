@@ -9,9 +9,11 @@
  *
  * REKEN is — net als SCHULD/TOEK/WILL/OVZ/NAV — NIET aaneengesloten op
  * WF-nummer: WF-REKEN-17 (bewaarde wat-als-scenario's) heeft geen eigen
- * UAT-REKEN-scenario (→ gedekt door UAT-TOEK-09) en ontbreekt dus terecht in
- * de catalogus voor zone REKEN. De 23 criteria hier zijn 1-op-1 met de 23
- * catalogus-scenario's (UAT-REKEN-01..16, 18..24).
+ * UAT-REKEN-scenario en ontbreekt dus terecht in de catalogus voor zone
+ * REKEN. VERVALLEN (14 sep 2026, ADR 0144): WF-REKEN-12..16 en 18..20
+ * (de standalone Wat-Als-pagina) zijn verwijderd — zie de vervallen-notitie
+ * bovenaan `reken.ts`. De 15 resterende criteria hier zijn 1-op-1 met de 15
+ * catalogus-scenario's (UAT-REKEN-01..11, 21..24).
  */
 
 import { describe, it, expect } from 'vitest'
@@ -34,11 +36,11 @@ function criterion(workflow: string): AcceptanceCriterion {
 }
 
 describe('UAT Reken — acceptatiecriteria dekking', () => {
-  it('heeft precies één criterium per catalogus-REKEN-scenario (23 stuks, WF-REKEN-17 bestaat niet in de catalogus)', () => {
+  it('heeft precies één criterium per catalogus-REKEN-scenario (15 stuks, WF-REKEN-12..20 vervallen ADR 0144)', () => {
     const workflows = REKEN_ACCEPTANCE.criteria.map((c) => c.workflow).sort()
     expect(workflows).toEqual(catalogRekenWorkflows)
     expect(new Set(workflows).size).toBe(catalogRekenWorkflows.length)
-    expect(workflows.length).toBe(23)
+    expect(workflows.length).toBe(15)
   })
 
   it('elk criterium heeft een geldige assertion.kind', () => {
@@ -64,25 +66,18 @@ describe('UAT Reken — acceptatiecriteria dekking', () => {
       .sort()
     const checkWorkflows = REKEN_ENGINE_CHECKS.map((c) => c.workflow).sort()
     expect(checkWorkflows).toEqual(exactWorkflows)
-    expect(exactWorkflows.length).toBe(8)
+    expect(exactWorkflows.length).toBe(6)
   })
 
-  it('markeert de kernel-afhankelijke richting-workflows en de proces-/ui-only-workflows met de juiste kind', () => {
-    const direction = ['WF-REKEN-13', 'WF-REKEN-14', 'WF-REKEN-15', 'WF-REKEN-18']
-    for (const wf of direction) {
-      expect(criterion(wf).assertion.kind, `${wf} moet direction zijn`).toBe('direction')
-    }
-    expect(direction.length).toBe(4)
-
+  it('markeert de proces-/ui-only-workflows met de juiste kind (de kernel-afhankelijke direction-workflows zijn vervallen, ADR 0144)', () => {
     const uiOnly = [
       'WF-REKEN-02', 'WF-REKEN-04', 'WF-REKEN-05', 'WF-REKEN-06', 'WF-REKEN-07',
-      'WF-REKEN-08', 'WF-REKEN-09', 'WF-REKEN-10', 'WF-REKEN-11', 'WF-REKEN-12',
-      'WF-REKEN-19',
+      'WF-REKEN-08', 'WF-REKEN-09', 'WF-REKEN-10', 'WF-REKEN-11',
     ]
     for (const wf of uiOnly) {
       expect(criterion(wf).assertion.kind, `${wf} moet ui-only zijn`).toBe('ui-only')
     }
-    expect(uiOnly.length).toBe(11)
+    expect(uiOnly.length).toBe(9)
   })
 })
 

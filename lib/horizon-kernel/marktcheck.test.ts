@@ -10,21 +10,13 @@ import {
 import { MARKTCHECK_MAX_RUNS, marktcheckSigma } from '@/lib/horizon-kernel/marktcheck'
 import { runMonteCarlo } from '@/lib/horizon-kernel/wrappers/mc'
 import { buildTotaalplanKernelInput } from '@/lib/totaalplan-data'
-import {
-  computeWhatifMarktcheck,
-  computeWhatifProjection,
-  type WhatifRawContext,
-} from '@/lib/horizon-kernel/whatif-router'
 import { runMonteCarlo as runLegacyMonteCarlo } from '@/lib/horizon-data'
 import {
   buildFactorByAge,
   buildFactorByOffset,
   deflateSeriesByOffset,
 } from '@/lib/euro-display'
-import {
-  runMarktcheckAsync,
-  runWhatifMarktcheckAsync,
-} from '@/lib/horizon-kernel/worker/run-in-worker'
+import { runMarktcheckAsync } from '@/lib/horizon-kernel/worker/run-in-worker'
 
 /**
  * De Monte-Carlo-overlay op /toekomst (de "Marktcheck"-pil).
@@ -357,64 +349,6 @@ describe('Marktcheck — de marge zegt iets over dit plan (en het percentage dee
   })
 })
 
-describe('Marktcheck — /toekomst/whatif draait op dezelfde motor én dezelfde context', () => {
-  // Het zusteroppervlak had exact hetzelfde defect (`runMonteCarlo` uit
-  // fire-sim-legacy op een kernel-hoofdlijn). Hier is de extra eis dat de band
-  // de RENDEMENT-SLIDER meeneemt: een band op de baseline zou onder een
-  // verschoven scenariolijn liggen.
-  const returnDeltaByAssetType = { investment: 0.02 }
-
-  function whatifCtx(): WhatifRawContext {
-    const base = makeKernelContext()
-    return {
-      profile: base.profile,
-      assets: [...base.assets],
-      debts: [...base.debts],
-      lifeEvents: [...base.lifeEvents],
-      aowRows: [...(base.aowRows ?? [])],
-      returnDeltaByAssetType,
-      yearlyExpenses: base.yearlyExpenses,
-    }
-  }
-
-  it('Given de rendement-slider op +2pp staat, When band en hoofdlijn worden vergeleken, Then ligt de hoofdlijn op elke leeftijd binnen p10–p90', () => {
-    const ctx = whatifCtx()
-    const outcome = computeWhatifProjection({ rawContext: ctx })
-    expect(outcome.ok).toBe(true)
-    if (!outcome.ok) return
-    const sim = toSimResult(outcome.result)
-    const byAge = new Map<number, number>([[sim.rows[0].age, sim.rows[0].startPortfolio]])
-    for (const r of sim.rows) byAge.set(r.age + 1, r.endPortfolio)
-
-    // `maxRuns: 20` — de containment-invariant is schaal-vrij (nearest-rank
-    // houdt de 10%/90%-positie), en dit blok moet binnen de 30s-testtimeout
-    // blijven wanneer de hele suite parallel draait.
-    const check = computeWhatifMarktcheck({ rawContext: ctx, maxRuns: 20 })
-    expect(check.ok).toBe(true)
-    if (!check.ok) return
-
-    expect(check.band.startAge).toBe(sim.rows[0].age)
-    for (const [age, waarde] of byAge) {
-      const i = age - check.band.startAge
-      if (i < 0 || i >= check.band.p50.length) continue
-      expect(check.band.p10[i], `p10 op leeftijd ${age}`).toBeLessThanOrEqual(waarde)
-      expect(check.band.p90[i], `p90 op leeftijd ${age}`).toBeGreaterThanOrEqual(waarde)
-    }
-  })
-
-  it('Given de slider het plan verschuift, When de band met en zonder delta wordt vergeleken, Then verschuift de band mee (band ≠ baseline-band)', () => {
-    const metDelta = computeWhatifMarktcheck({ rawContext: whatifCtx(), maxRuns: 20 })
-    const zonderDelta = computeWhatifMarktcheck({
-      rawContext: { ...whatifCtx(), returnDeltaByAssetType: undefined },
-      maxRuns: 20,
-    })
-    expect(metDelta.ok && zonderDelta.ok).toBe(true)
-    if (!metDelta.ok || !zonderDelta.ok) return
-    const laatste = metDelta.band.p50.length - 1
-    expect(metDelta.band.p50[laatste]).not.toBe(zonderDelta.band.p50[laatste])
-  })
-})
-
 describe('Marktcheck — de spreiding is een JAARvolatiliteit, geen levenslange shift', () => {
   /**
    * De casus uit de melding: leeftijd 40, vermogen €595.200, inleg €1.296/mnd,
@@ -703,16 +637,6 @@ describe('Marktcheck — nooit op de main thread', () => {
     // kernel-projecties (2,6–5,1 s) die de UI zouden bevriezen.
     expect(typeof Worker).toBe('undefined')
     await expect(runMarktcheckAsync(makeKernelContext())).resolves.toBeNull()
-    await expect(
-      runWhatifMarktcheckAsync({
-        profile: makeKernelContext().profile,
-        assets: [...makeKernelContext().assets],
-        debts: [],
-        lifeEvents: [],
-        aowRows: [],
-        yearlyExpenses: 30_000,
-      }),
-    ).resolves.toBeNull()
   })
 })
 

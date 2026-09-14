@@ -16,8 +16,8 @@
  * (`sim-chart-geometry.ts`); de overlays plotten `[r.age, r.endPortfolio]` en lagen
  * daardoor structureel één jaar links van de lijn waar ze tegen afgezet worden.
  *
- * Given  de overlay-reeksen in horizon-client (huishoud-partnerlijn, wat-als-
- *        scenario's, de doel-/wat-als-lijn).
+ * Given  de overlay-reeksen in horizon-client (huishoud-partnerlijn en de
+ *        doel-/wat-als-lijn).
  * When   we de bron lezen.
  * Then   geen enkele bouwt zijn punten nog met de rauwe `[r.age, r.endPortfolio]`-
  *        vorm; ze lopen allemaal door de gedeelde helper.
@@ -40,8 +40,9 @@ describe('horizon-client — chart-punten volgen de tijdstip-conventie', () => {
   })
 
   it('bouwt elke rijen-gebaseerde overlay via de gedeelde helper', () => {
-    // Drie overlay-reeksen leiden punten af uit SimRows: de huishoud-partnerlijn,
-    // de wat-als-scenario's en de doel-/wat-als-lijn. De overige `points:`-regels
+    // Twee overlay-reeksen leiden punten af uit SimRows: de huishoud-partnerlijn
+    // en de doel-/wat-als-lijn (de spooklijnen van opgeslagen wat-als-scenario's
+    // vervielen met ADR 0144). De overige `points:`-regels
     // deflateren een al-gebouwde reeks (`deflatePoints`) en bouwen dus zelf geen
     // punten — ze tellen hier niet mee. Let op: "geen punten bouwen" betekent NIET
     // "niets te verifiëren": die regels dragen de tijd-SLEUTEL (`x - 1` resp. het
@@ -49,7 +50,7 @@ describe('horizon-client — chart-punten volgen de tijdstip-conventie', () => {
     // `simRowsToChartPoints` doorwerkt. Die sleutels staan gepind in
     // `horizon-client.euro-view.test.ts`, niet hier.
     const helperAanroepen = (SRC.match(/simRowsToChartPoints\(/g) ?? []).length
-    expect(helperAanroepen).toBeGreaterThanOrEqual(3)
+    expect(helperAanroepen).toBeGreaterThanOrEqual(2)
 
     const puntReeksen = SRC.match(/^[ 	]*points:[ 	]*(.*)$/gm) ?? []
     const eigenBouw = puntReeksen.filter(

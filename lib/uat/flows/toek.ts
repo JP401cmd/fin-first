@@ -61,8 +61,10 @@ export const TOEK_FLOW: UatFlow = {
 
     // ── 3 · simuleren (niet-persistent over de grafiek) ───────────────────
     { id: 'scenarios', scenarioId: 'UAT-TOEK-08', label: "WF-TOEK-08 · Scenario's & Monte Carlo", kind: 'action', stage: 3, lane: 'simuleren' },
-    { id: 'ghost', scenarioId: 'UAT-TOEK-09', label: 'WF-TOEK-09 · Opgeslagen wat-als (spooklijn)', kind: 'action', stage: 3, lane: 'simuleren' },
-    { id: 'sliders', scenarioId: 'UAT-TOEK-10', label: 'WF-TOEK-10 · Wat-als-sliders inline', kind: 'action', stage: 3, lane: 'simuleren' },
+    // WF-TOEK-09 (opgeslagen wat-als als spooklijn) is VERVALLEN op 14 sep
+    // 2026 (ADR 0144) — de bewaarde wat-als-scenario's en de spooklijn-
+    // overlay-picker zijn met de standalone Wat-Als-pagina verwijderd.
+    { id: 'sliders', scenarioId: 'UAT-TOEK-10', label: 'WF-TOEK-10 · Wat-als-sliders inline ("Verken je aannames", enige wat-als-ervaring sinds ADR 0144)', kind: 'action', stage: 3, lane: 'simuleren' },
     { id: 'aowbeslis', label: 'Shortfall — FIRE pas ná AOW?', kind: 'decision', stage: 3, lane: 'simuleren' },
     { id: 'aowstop', scenarioId: 'UAT-TOEK-11', label: 'WF-TOEK-11 · AOW-stop-simulatie (doorwerken)', kind: 'action', stage: 3, lane: 'simuleren', subOf: 'aowbeslis' },
     // TPR-09 — de verkende stopleeftijd op de vrijheidsas tot plan maken (schrijft het volledige plan).
@@ -118,7 +120,7 @@ export const TOEK_FLOW: UatFlow = {
 
     // ── 6 · cross-doorwerking (OUTPUT) ────────────────────────────────────
     { id: 'x-ovz', label: 'Overzicht-hero · netto vermogen + FIRE-countdown', kind: 'cross', stage: 6, crossZone: 'OVZ' },
-    { id: 'x-reken', label: 'Rekenhulp / wat-als (zelfde horizon-kernel)', kind: 'cross', stage: 6, crossZone: 'REKEN' },
+    { id: 'x-reken', label: 'Rekenhulp (zelfde horizon-kernel bij levensgebeurtenis-export)', kind: 'cross', stage: 6, crossZone: 'REKEN' },
   ],
   edges: [
     // instap → hub
@@ -152,7 +154,6 @@ export const TOEK_FLOW: UatFlow = {
 
     // hub → simuleren
     { from: 'tijdas', to: 'scenarios' },
-    { from: 'tijdas', to: 'ghost' },
     { from: 'tijdas', to: 'sliders' },
     { from: 'sliders', to: 'maakplan', kind: 'branch', label: 'verkenning → plan' },
     { from: 'maakplan', to: 'eindstrat', label: 'zelfde plan-contract' },
@@ -161,7 +162,7 @@ export const TOEK_FLOW: UatFlow = {
     { from: 'aowmelding', to: 'aowstrat', label: 'Naar je AOW-gebeurtenis' },
     { from: 'tijdas', to: 'aowbeslis' },
     { from: 'aowbeslis', to: 'aowstop', kind: 'branch', label: 'ja: doorwerken tot AOW' },
-    { from: 'sliders', to: 'x-reken', kind: 'cross', label: 'volledige wat-als → Rekenhulp' },
+    { from: 'sliders', to: 'x-reken', kind: 'cross', label: 'levensgebeurtenis-export → Rekenhulp (zelfde horizon-kernel)' },
 
     // hub/navkaarten → gebeurtenissen
     { from: 'tijdas', to: 'eventadd' },

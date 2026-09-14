@@ -37,8 +37,6 @@ export function EventsTimeline({
   endAge,
   visibleMinAge,
   visibleMaxAge,
-  scenarioEvents,
-  scenarioColor,
   onViewEvent,
   onEditEvent,
   onClusterOpen,
@@ -50,8 +48,6 @@ export function EventsTimeline({
   /** Zoomed visible range (optional — defaults to full range) */
   visibleMinAge?: number
   visibleMaxAge?: number
-  scenarioEvents?: Array<{ name: string; target_age: number | null; event_type: string }>
-  scenarioColor?: string
   /** Klik op event-marker → opent view-pane */
   onViewEvent?: (eventId: string) => void
   /** Klik op bewerk-knopje in tooltip → opent edit-pane direct */
@@ -183,11 +179,7 @@ export function EventsTimeline({
     .filter(e => e.target_age != null && e.target_age >= rangeMin && e.target_age <= rangeMax)
     .sort((a, b) => (a.target_age ?? 0) - (b.target_age ?? 0))
 
-  const hasScenarioEvents = scenarioEvents?.some(
-    e => e.target_age != null && e.target_age >= rangeMin && e.target_age <= rangeMax
-  ) ?? false
-
-  if (visibleEvents.length === 0 && !hasScenarioEvents) return null
+  if (visibleEvents.length === 0) return null
 
   // Uses shared CHART_PAD to match SimChart's padding exactly
   const W = containerW
@@ -750,44 +742,6 @@ export function EventsTimeline({
             </g>
           )
         })}
-
-        {/* Scenario overlay events (ghost markers) */}
-        {scenarioEvents && scenarioColor && scenarioEvents
-          .filter(e => e.target_age != null && e.target_age >= rangeMin && e.target_age <= rangeMax)
-          .map((ev, i) => {
-            const cx = xScale(ev.target_age!)
-            // Offset vertically if overlapping with a real event at same age
-            const hasRealOverlap = visibleEvents.some(
-              re => re.target_age != null && Math.abs(re.target_age - ev.target_age!) < 1
-            )
-            const cy = hasRealOverlap ? Y_LINE - 14 : Y_LINE
-
-            return (
-              <g key={`scenario-${i}`} opacity={0.6}>
-                <circle
-                  cx={cx} cy={cy} r={6}
-                  fill={scenarioColor} fillOpacity={0.3}
-                  stroke={scenarioColor} strokeWidth={1.5}
-                  strokeDasharray="3 2"
-                />
-                <rect
-                  x={cx + 8} y={cy - 3} width={6} height={6}
-                  fill={scenarioColor}
-                />
-                <text
-                  x={cx} y={cy + 18}
-                  textAnchor="middle"
-                  fontSize={9}
-                  fill="var(--ink-4)"
-                  fontFamily="var(--font-inter, sans-serif)"
-                  fontStyle="italic"
-                >
-                  {ev.name}
-                </text>
-              </g>
-            )
-          })
-        }
       </svg>
     </div>
   )

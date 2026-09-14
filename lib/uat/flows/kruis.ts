@@ -77,7 +77,7 @@ export const KRUIS_FLOW: UatFlow = {
 
     // ── 4 · AI-tier-gate over álle AI-oppervlakken ─────────────────────────
     { id: 'k25', scenarioId: 'UAT-KRUIS-25', label: 'WF-KRUIS-25 · Tier-gate zonder AI-add-on (alle AI-oppervlakken)', kind: 'screen', stage: 4, lane: 'gate' },
-    { id: 'x-reken', label: 'Rekentools & wat-als', kind: 'cross', stage: 4, lane: 'gate', crossZone: 'REKEN' },
+    { id: 'x-reken', label: 'Rekentools', kind: 'cross', stage: 4, lane: 'gate', crossZone: 'REKEN' },
 
     // ── 5 · volledige gebruikersreis (som van de keten) ────────────────────
     { id: 'k26', scenarioId: 'UAT-KRUIS-26', label: 'UAT-KRUIS-26 · Volledige gebruikersreis (registratie → vrijheidsinzicht)', kind: 'screen', stage: 5, lane: 'reis' },

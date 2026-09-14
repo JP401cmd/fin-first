@@ -3,7 +3,6 @@
 /**
  * Fase 2.2 — onderdeel van new-navigation-shell migratie.
  * Plan: docs/navigatie-redesign-plan.md §5.2 (sheet)
- * DreamTransitionContext (plan §8.1) blijft als per-module override actief.
  *
  * SimChartModal is een full-screen sheet (size="full") — chart-zoom is
  * inspectie ("even iets snel doen — terug naar overzicht"); past bij §5.2.

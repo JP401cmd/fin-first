@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback, useRef, useMemo, useDeferredValue, type RefObject } from 'react'
 import Link from 'next/link'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
-import { useDreamTransition } from '@/components/app/horizon/dream-transition-context'
 import type { HorizonPageData } from '@/lib/horizon-data-loader'
 import { HORIZON_EXIT_NOTICE_DISMISSED_SLUG } from '@/lib/horizon-data-loader'
 import { useHorizonFireSim } from '@/lib/hooks/use-horizon-fire-sim'
@@ -47,7 +46,7 @@ import {
   werkloosheidNaFireWaarschuwing,
 } from '@/lib/horizon/risico-event-regels'
 import { isKernelReachedNowDisplay } from '@/lib/horizon-kernel/bridge'
-import { computeConvergentieProjection, type ConvergentieRawContext, type ConvergentieRawProfileRow } from '@/lib/horizon-kernel/convergentie-router'
+import { type ConvergentieRawContext, type ConvergentieRawProfileRow } from '@/lib/horizon-kernel/convergentie-router'
 import { resolveFireParams, type FireParams } from '@/lib/fire-params'
 import { deriveMarginaalTarief } from '@/lib/box1-tax'
 import { type WithdrawalStrategyType, type WithdrawalStrategyConfig, WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
@@ -288,16 +287,12 @@ import {
 import { useEuroView } from '@/lib/hooks/use-euro-view'
 import { PillRow } from '@/components/app/pill-row'
 import { FIRE_PLAN_COLUMNS, parseFireStrategy, DEFAULT_FIRE_STRATEGY, type FireStrategyConfig, type StopAnchor, STRATEGY_LABELS, resolveFreedomFraming, fireAgeForDisplay, isAtOrPastAow, isFixedAnchor, stopAnchorFromKernel } from '@/lib/fire-strategy'
-import { toSimResult } from '@/lib/unified-projection'
 import { buildHorizonInput } from '@/lib/horizon/build-input'
 import { buildDeeplinkCleanupUrl } from '@/lib/horizon/deeplink-cleanup'
 import type { PreviewBaseline } from '@/lib/strategy-preview'
-import { ScenarioOverlayPicker } from '@/components/app/horizon/scenario-overlay-picker'
-import { WHATIF_SCENARIO_COLORS, type SavedScenario } from '@/lib/scenario-types'
-import { inflight } from '@/lib/inflight'
-import { applyWhatIfOverrides, buildBaselineOverrides } from '@/lib/whatif-overrides'
+import { buildBaselineOverrides } from '@/lib/whatif-overrides'
 import { WhatIfSliders, DeltaBadge, type WhatIfOverrides } from '@/components/app/horizon/whatif-sliders'
-import type { WhatIfEvent } from '@/components/app/horizon/whatif-events'
+import type { WhatIfEvent } from '@/lib/types/horizon-whatif'
 import { ChartOverlayExplainer } from '@/components/app/horizon/chart-overlay-explainer'
 import { ChartTips } from '@/components/editorial/chart-tips'
 import {
@@ -555,7 +550,6 @@ export default function HorizonPage({
    */
   goals?: readonly GoalMarkerInput[]
 }) {
-  const { triggerDream } = useDreamTransition()
   const { masked } = useMaskedAmounts()
   const { addToast } = useToast()
   const { perspective, partnerName, perspectiveVersion, refreshData } = usePerspective()
@@ -954,23 +948,6 @@ export default function HorizonPage({
   const duidingSectionRef = useRef<HTMLElement | null>(null)
   const duidingInView = useInViewOnce(duidingSectionRef, '600px', verkenOpen)
 
-  // Saved scenario overlay state (multi-select)
-  const [savedScenarios, setSavedScenarios] = useState<SavedScenario[]>([])
-  const [selectedScenarioIds, setSelectedScenarioIds] = useState<Set<string>>(new Set())
-
-  const toggleScenarioId = useCallback((id: string) => {
-    setSelectedScenarioIds(prev => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }, [])
-
-  const clearAllScenarioIds = useCallback(() => {
-    setSelectedScenarioIds(new Set())
-  }, [])
-
   // ── Toekomst-overlay (ballonnen) ─────────────────────────────────
   // De grafiek wordt sinds juni 2026 altijd getoond (de oude setup-pane is
   // verwijderd). In plaats daarvan een toggle-bare ballonnen-overlay die wijst
@@ -1049,7 +1026,7 @@ export default function HorizonPage({
       router.replace(buildDeeplinkCleanupUrl(pathname, searchParams), { scroll: false })
     }
 
-  }, [searchParams, router, pathname, triggerDream])
+  }, [searchParams, router, pathname])
 
   // Event form state
   const [showForm, setShowForm] = useState(false)
@@ -1259,8 +1236,7 @@ export default function HorizonPage({
   }, [eventPanePreviewBaseline, events])
   // De marktcheck is ~200× zwaarder dan de hoofdprojectie en deelt met haar één
   // seriële worker. Hij draait daarom op de UITGESTELDE context — dezelfde keuze
-  // die `use-horizon-fire-sim` voor de (lichtere) hoofdlijn al maakt, en die
-  // /toekomst/whatif via `deferredWhatIfSimInput` ook al toepaste.
+  // die `use-horizon-fire-sim` voor de (lichtere) hoofdlijn al maakt.
   const deferredMarktcheckContext = useDeferredValue(marktcheckContext)
   // Het ANKER van de rendement-marge: de gekozen stopleeftijd. Bewust de RAUWE
   // keuze (`scenarioStopAge`, `null` = geen keuze) en niet `effectiveStopAge` —
@@ -1269,30 +1245,6 @@ export default function HorizonPage({
   // keuze ankert de motor zelf op de AOW-leeftijd; de copy zegt dat ook.
   // Uitgesteld om dezelfde reden als de context: één job per gebaar.
   const deferredMarktcheckStopAge = useDeferredValue(scenarioStopAge)
-
-  // Opgeslagen wat-als-scenario's voor de overlay-picker — deferred na first paint.
-  // De picker rendert null bij een lege lijst en is zélf de open-trigger (bewezen
-  // in review 1.3: lazy-op-open breekt 'm). Daarom niet lazy, maar uitgesteld tot
-  // idle (setTimeout-fallback voor Safari) zodat de fetch niet met hydration/LCP
-  // concurreert maar de picker wél verschijnt zodra de data er is. Dubbele mounts
-  // delen één roundtrip via de inflight-dedupe.
-  useEffect(() => {
-    let cancelled = false
-    const run = () => {
-      inflight<{ scenarios?: SavedScenario[] }>('horizon-scenarios', () =>
-        fetch('/api/scenarios').then(r => (r.ok ? r.json() : { scenarios: [] })),
-      )
-        .then(data => { if (!cancelled) setSavedScenarios(data.scenarios ?? []) })
-        .catch(() => {})
-    }
-    const ric = typeof requestIdleCallback === 'function' ? requestIdleCallback(run) : null
-    const timer = ric === null ? setTimeout(run, 1) : null
-    return () => {
-      cancelled = true
-      if (ric !== null && typeof cancelIdleCallback === 'function') cancelIdleCallback(ric)
-      if (timer !== null) clearTimeout(timer)
-    }
-  }, [])
 
   // ── Kernel-context laden op mount ─────────────────────────────────────────
   // De kernel-context (`kernelRawProfile` + `aowRows`) is server-side voorgeladen
@@ -1910,8 +1862,8 @@ export default function HorizonPage({
   //
   // DRIE REMMEN, want één marktcheck is ~200× duurder dan de hoofdprojectie en
   // deelt met haar één seriële worker:
-  //  1. DEFERRED context — spiegel van `deferredKernelInput` in de hoofd-hook (en
-  //     van `deferredWhatIfSimInput` op /toekomst/whatif). Zonder dit draait de
+  //  1. DEFERRED context — spiegel van `deferredKernelInput` in de hoofd-hook.
+  //     Zonder dit draait de
   //     zwaarste run op de rauwste waarde.
   //  2. DEBOUNCE — een marker-drag muteert `events` per hele jaarstap. De
   //     `cancelled`-closure negeert alleen het ANTWOORD; de worker rekent een
@@ -3290,106 +3242,6 @@ export default function HorizonPage({
     return buildBreakdown(displayUnifiedRows, displaySimRows, debts)
   }, [ieViewMode, displayUnifiedRows, displaySimRows, debts])
 
-  // Saved scenario ghost overlays — re-runs simulation for each selected scenario's overrides
-  // applied to the current financial data, then renders as ghost lines over the main chart.
-  const scenarioOverlayDataList = useMemo(() => {
-    if (selectedScenarioIds.size === 0) return []
-
-    const { effectiveInput: initialEffectiveInput, fireParams: initialFireParams } = initialData
-    const currentAgeVal = initialEffectiveInput.dateOfBirth ? ageAtDate(initialEffectiveInput.dateOfBirth) : null
-    if (currentAgeVal === null) return []
-    // Kernel-only: zonder rauwe kernel-context is er geen doorrekening → geen ghosts
-    // (ze verschijnen zodra de mount-fetch de kern-context heeft geladen).
-    if (!kernelRawProfile) return []
-
-    const results: Array<{
-      overlay: ScenarioOverlay
-      rows: SimRow[]
-      events: Array<{ id: string; name: string; event_type: string; target_age: number | null; one_time_cost: number; monthly_cost_change: number; monthly_income_change: number; duration_months: number; is_active: boolean; sort_order: number; is_indexed: boolean; icon: string; metadata?: Record<string, unknown> }>
-      color: string
-      scenarioName: string
-    }> = []
-
-    for (const scenarioId of selectedScenarioIds) {
-      const scenario = savedScenarios.find(s => s.id === scenarioId)
-      if (!scenario) continue
-
-      const baselineOvr = buildBaselineOverrides(initialEffectiveInput, initialFireParams.grossReturn, initialData.healthScoreInput.effectiveSavingsRatePct)
-      const { adjustedInput, annualSavings } = applyWhatIfOverrides(initialEffectiveInput, scenario.overrides, baselineOvr)
-
-      // Scenario-events → LifeEvent-vorm (numerieke velden normaliseren; sommige kunnen
-      // als string zijn opgeslagen). Deze gaan als rauwe events de kernel-context in.
-      const scenarioEvents: LifeEvent[] = (scenario.events ?? [])
-        .filter(e => !e.whatIfDisabled)
-        .map(e => ({
-          id: e.id,
-          name: e.name,
-          event_type: e.event_type,
-          target_age: e.target_age,
-          target_date: null as string | null,
-          one_time_cost: Number(e.one_time_cost ?? 0),
-          monthly_cost_change: Number(e.monthly_cost_change ?? 0),
-          monthly_income_change: Number(e.monthly_income_change ?? 0),
-          duration_months: Number(e.duration_months ?? 0),
-          is_active: true,
-          sort_order: 0,
-          is_indexed: false,
-          icon: '',
-          metadata: e.metadata,
-        }))
-
-      const yearlyExpenses = adjustedInput.yearlyMustExpenses > 0 ? adjustedInput.yearlyMustExpenses : 0
-      if (yearlyExpenses <= 0) continue
-
-      // Kernel-pad (geen tweede motor): het opgeslagen what-if-scenario muteert een
-      // SCALAIR spaarbedrag (`annualSavings`, uit de inkomen-/spaarquote-sliders) plus
-      // rendement en uitgaven. We drukken dat uit als een profiel-override op de RAUWE
-      // kernel-context (inkomen − uitgaven = spaarbedrag; scenario-rendement; scenario-
-      // uitgavengrondslag) en draaien via de convergentie-router — dezelfde per-asset-
-      // context/motor als de hoofdlijn, zodat de ghost consistent is met de kernel-
-      // grafiek. Bekende beperking: de scenario-overrides op het AGGREGAAT-vermogen mappen
-      // niet per-asset; het startvermogen blijft de echte per-asset-context (zoals de hoofdlijn).
-      const monthlyExpenses = adjustedInput.monthlyExpenses
-      const overriddenProfile: ConvergentieRawProfileRow = {
-        ...kernelRawProfile,
-        estimated_monthly_expenses: monthlyExpenses,
-        net_monthly_income: monthlyExpenses + annualSavings / 12,
-        yearly_essential_expenses: yearlyExpenses,
-        expected_return: adjustedInput.expectedReturn ?? kernelRawProfile.expected_return ?? null,
-      }
-      const outcome = computeConvergentieProjection({
-        rawContext: {
-          profile: overriddenProfile,
-          assets: initialData.assets ?? [],
-          debts,
-          lifeEvents: scenarioEvents,
-          aowRows,
-          yearlyExpenses,
-          marktVolatiliteit: initialData.marktVolatiliteit,
-        },
-      })
-      if (!outcome.ok) continue
-      const result = toSimResult(outcome.result)
-
-      const color = WHATIF_SCENARIO_COLORS[scenario.colorIndex ?? 0]
-
-      results.push({
-        overlay: {
-          name: scenario.name,
-          label: scenario.name,
-          color: color.hex,
-          points: simRowsToChartPoints(result.rows),
-        },
-        rows: result.rows,
-        events: scenarioEvents,
-        color: color.hex,
-        scenarioName: scenario.name,
-      })
-    }
-
-    return results
-  }, [selectedScenarioIds, savedScenarios, initialData, kernelRawProfile, debts, aowRows])
-
   // ── Doel-/wat-als-lijn (2e projectielijn, plan §E + ADR 0085) ───────────────
   // De BRON kiest `selectDoelLijnBron`: het geforceerde stop-pad wanneer er een
   // (betekenisvolle) stopleeftijd staat — opbouw tot je stopleeftijd, daarna
@@ -3438,12 +3290,11 @@ export default function HorizonPage({
   // Gememoized samenstelling voor de SimChart-prop: een inline spread op de
   // callsite gaf per render een verse array-identiteit, waardoor de memo() van
   // SimChart bij élke monoliet-setState bail-de en de volledige SVG herbouwde.
-  // De wat-als-lijn staat vooraan (bovenop de saved-ghosts).
+  // De wat-als-lijn staat vooraan.
   const combinedScenarioOverlays = useMemo(() => [
     ...(scenarioLineOverlay ? [scenarioLineOverlay] : []),
     ...(scenarioOverlays ?? []),
-    ...scenarioOverlayDataList.map(d => d.overlay),
-  ], [scenarioLineOverlay, scenarioOverlays, scenarioOverlayDataList])
+  ], [scenarioLineOverlay, scenarioOverlays])
 
   // Gewogen baseline-rendement per bezeten categorie (Marktbias-UI). Gememoized zodat
   // de inline-call in de JSX niet elke render een verse array-identiteit oplevert.
@@ -4616,13 +4467,6 @@ export default function HorizonPage({
           })),
     [combinedScenarioOverlays, factorByAge, euroView],
   )
-  // Spookrand van het eerste opgeslagen scenario in de Inkomsten&Uitgaven-strook:
-  // eigen leeftijd-as, `SimRow[]` ⇒ leeftijd-sleutel.
-  const viewGhostOverlayRows = useMemo(() => {
-    const rows = scenarioOverlayDataList[0]?.rows
-    return rows == null ? undefined : deflateRowsByAge(rows, factorByAge, SIM_ROW_MONEY_FIELDS, euroView)
-  }, [scenarioOverlayDataList, factorByAge, euroView])
-
   // Huishoud-/partner-overlays: vreemde leeftijd-as ⇒ positie-sleutel (K4).
   const viewHouseholdOverlays = useMemo(
     () =>
@@ -6209,16 +6053,6 @@ export default function HorizonPage({
                   )}
                 </button>
 
-                {/* ── Saved scenario overlay picker — ghost-lijnen alleen op line-chart ── */}
-                {chartMode === 'vermogenspad' && (
-                  <ScenarioOverlayPicker
-                    scenarios={savedScenarios}
-                    selectedIds={selectedScenarioIds}
-                    onToggle={toggleScenarioId}
-                    onClearAll={clearAllScenarioIds}
-                  />
-                )}
-
                 {/* ── Chart mode toggle (compact pill, right-aligned) ──
                     Op mobiel: alleen icon. Op desktop: icon + label.
                     TrendingUp = pad/line; BarChart3 = opbouw/stack. */}
@@ -6280,7 +6114,6 @@ export default function HorizonPage({
                           aowAge: userAowAge.fractional,
                           currentAge: currentAge ?? 30,
                           hasMonteCarlo: !!monteCarloOverlay,
-                          hasScenario: scenarioOverlayDataList.length > 0,
                           hasBaseline: false,
                           planningMode,
                           // ADR 0129 — onder een vast anker noemt de spotlight het
@@ -6334,17 +6167,6 @@ export default function HorizonPage({
                 De <em>marktcheck</em> kon niet worden doorgerekend — er is nu geen band en geen
                 percentage. Je plan-lijn zelf klopt gewoon; alleen de doorrekening met wisselende
                 markten ontbreekt. Zet de pil uit en weer aan om het opnieuw te proberen.
-              </ChartOverlayExplainer>
-
-              <ChartOverlayExplainer active={scenarioOverlayDataList.length > 0}>
-                {scenarioOverlayDataList.length === 1
-                  ? <>Het <em>opgeslagen scenario</em> verschijnt als spookrand naast
-                    je huidige pad — zo vergelijk je in één oogopslag hoe een eerder
-                    doorgerekend wat-als zich verhoudt tot je actuele plan.</>
-                  : <><em>{scenarioOverlayDataList.length} opgeslagen scenario&apos;s</em> verschijnen
-                    als gekleurde lijnen naast je huidige pad — zo vergelijk je meerdere
-                    toekomstpaden tegelijk.</>
-                }
               </ChartOverlayExplainer>
 
               {/* Waarom de twee lijnen uit elkaar lopen — feitelijk, geen advies.
@@ -6633,8 +6455,6 @@ export default function HorizonPage({
                           aowAgeFractional={userAowAge.fractional}
                           viewMode={ieViewMode}
                           breakdownResult={viewIeBreakdownResult}
-                          ghostOverlayRows={viewGhostOverlayRows}
-                          ghostColor={scenarioOverlayDataList[0]?.color}
                         />
                       </div>
 
@@ -6650,8 +6470,6 @@ export default function HorizonPage({
                           endAge={chartEndAge!}
                           visibleMinAge={visibleMin}
                           visibleMaxAge={visibleMax}
-                          scenarioEvents={scenarioOverlayDataList[0]?.events}
-                          scenarioColor={scenarioOverlayDataList[0]?.color}
                           onClusterOpen={(clusterEvents, centerAge) => setClusterSheet({ events: clusterEvents, centerAge })}
                           onViewEvent={id => {
                             // Natuurlijke mijlpalen hebben geen edit-pane; deeplink
@@ -7124,22 +6942,6 @@ export default function HorizonPage({
                 )}
               </div>
             )}
-
-            {/* Footer — draaien hier, archiveren daar.
-                De dream-gate stuurt naar de CANONIEKE route, niet de legacy
-                `/horizon/whatif`: die redirect op de routing-laag, en een
-                client-push náár een redirect-only pad is de gedocumenteerde
-                React #310-trigger (zie het redirect-blok in next.config.ts en
-                de comment in whatif-page-client.tsx). */}
-            <div className="border-t border-[var(--border-ed)] pt-3">
-              <button
-                type="button"
-                onClick={() => triggerDream('/toekomst/whatif')}
-                className="font-serif text-[11px] italic text-horizon-600 transition-colors hover:text-horizon-700"
-              >
-                Scenario&apos;s vergelijken &rarr;
-              </button>
-            </div>
           </div>
           </>
           )}

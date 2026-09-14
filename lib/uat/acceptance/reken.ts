@@ -1,40 +1,42 @@
 /**
- * Acceptatiecriteria — domein Rekentools & wat-als (WF-REKEN-01..24 /
- * UAT-REKEN-01..16, 18..24).
+ * Acceptatiecriteria — domein Rekentools (WF-REKEN-01..11, 21..24 /
+ * UAT-REKEN-01..11, 21..24).
  *
  * Spiegelt exact de aanpak van `budget.ts`/`start.ts`/`will.ts`/`cash.ts`/
  * `ovz.ts`/`nav.ts`/`rapp.ts`. Bron: `docs/uat/uat-plan.md` Deel 1
  * (workflow-definities WF-REKEN-01..24) + Deel 2 §"UAT-scenario's —
- * Rekentools & wat-als" (UAT-REKEN-01..16, 18..24).
+ * Rekentools" (UAT-REKEN-01..11, 21..24).
  *
- * WF-REKEN-17 (bewaarde wat-als-scenario's: opslaan/laden/pinnen/verwijderen)
- * heeft GEEN eigen UAT-REKEN-scenario — het plan wijst expliciet door naar
- * UAT-TOEK-09 (spooklijn-overlay-gedrag zit daar al diepgaand getoetst). De
- * overige 23 WF-REKEN-nummers hebben elk een eigen criterium hieronder.
+ * VERVALLEN (14 sep 2026, ADR 0144 "De Wat-Als-pagina gaat op in de
+ * tijdas"): de standalone Wat-Als-pagina (`/toekomst/whatif`), bewaarde
+ * wat-als-scenario's + de spooklijn-overlay-picker en de what-if-AI-
+ * suggestiepad zijn verwijderd. Daarmee vervallen WF-REKEN-12 (Wat-Als
+ * bereiken/dream gate), WF-REKEN-13 (preset kiezen), WF-REKEN-14 (sliders
+ * en marktbias), WF-REKEN-15 (levensgebeurtenissen in het scenario),
+ * WF-REKEN-16 (beslishulp), WF-REKEN-18 (Monte Carlo/onzekerheidsband op de
+ * Wat-Als-pagina), WF-REKEN-19 (met Fin over het scenario chatten) en
+ * WF-REKEN-20 (acties uit het scenario) — geen van deze acht heeft nog een
+ * criterium hieronder. WF-REKEN-17 (bewaarde wat-als-scenario's) had al geen
+ * eigen UAT-REKEN-scenario en verviel eerder samen met UAT-TOEK-09 (zie
+ * `toek.ts`). Het INLINE-slider-gedrag op de tijdas ("Verken je aannames",
+ * /toekomst?whatif=open) blijft ongewijzigd en zit als vanouds in
+ * WF-TOEK-10/UAT-TOEK-10 (`toek.ts`). `/toekomst/whatif` en `/horizon/whatif`
+ * zijn nu een kale redirect naar /toekomst?whatif=open (geen ?via=dreamgate-
+ * tak meer) — zie WF-NAV-16 (`nav.ts`).
+ *
+ * De overige 15 WF-REKEN-nummers (01..11, 21..24) hebben elk een eigen
+ * criterium hieronder.
  *
  * ZONE-SPECIFIEKE NUANCE (kaart-instructie): de losse rekentools (inflatie &
  * koopkracht, samengestelde interest, uitgaven na pensioen) zijn wiskundig
  * EXACT — die criteria zijn 'exact' met de uitgeschreven formule + het
  * onafhankelijk narekende getal, geverifieerd met Node.js tegen de échte
- * productiefunctie (zie rekenreeks in `reken-checks.ts`). De horizon-kernel-
- * afhankelijke wat-als-scenario's (WF-REKEN-12 t/m 20) zijn grotendeels
- * 'direction' (richting/orde-grootte, oracle-referentie = /beheer/horizon-
- * kernel) — met twee uitzonderingen die ZELF geen kernel-run nodig hebben:
- * WF-REKEN-16 (saldo-gewogen schuldrente, `weightedDebtRate`, op een schone
- * synthetische fixture — spiegelt OVZ's aanpak: een hand-narekenbaar eigen
- * voorbeeld i.p.v. Tessa's ongespecificeerde 12-schuldenmix) en WF-REKEN-20
- * (impact-badge = de sliderwijziging zelf, "géén aparte motor" — het plan
- * noemt dit expliciet exact narekenbaar).
+ * productiefunctie (zie rekenreeks in `reken-checks.ts`).
  *
  * AL-GEDOCUMENTEERDE BUGS: geen bekend vanuit deze zone bij aanvang van deze
- * sessie (in tegenstelling tot RAPP). Twee al-genoemde randgevallen uit het
- * plan zelf worden narratief meegenomen: de prefab-formule-whitelist kent
- * GEEN `log`-functie (WF-REKEN-01/02, `evaluate.ts#WHITELIST_FNS`). Het tweede
- * randgeval — "de onzekerheidsband (WF-REKEN-18) draait op een losstaande
- * legacy `runMonteCarlo`, niet op de horizon-kernel" — is OPGELOST op
- * 2026-08-08: de band is sindsdien de kernel-marktcheck
- * (`computeWhatifMarktcheck`). Sinds 2026-08-09 tekent hij p25–p75 i.p.v.
- * p10–p90 en bepaalt p75 de Y-as; zie het criterium hieronder.
+ * sessie (in tegenstelling tot RAPP). Eén al-genoemd randgeval uit het plan
+ * zelf wordt narratief meegenomen: de prefab-formule-whitelist kent GEEN
+ * `log`-functie (WF-REKEN-01/02, `evaluate.ts#WHITELIST_FNS`).
  *
  * GRONDSLAG-REGEL (CLAUDE.md): rekenhulpen zijn losgekoppeld van de FIRE-
  * projectie (WF-REKEN-01) totdat een uitkomst expliciet als levensgebeurtenis
@@ -201,122 +203,6 @@ const criteria: AcceptanceCriterion[] = [
     assertion: {
       kind: 'ui-only',
       source: 'components/future/report-sheet.tsx (POST /api/calculators/[id]/report)',
-    },
-  },
-  {
-    workflow: 'WF-REKEN-12',
-    scenarioId: 'UAT-REKEN-12',
-    titel: 'De Wat-Als bereiken: deeplink, inline sliders en dream gate',
-    kriticiteit: 'BELANGRIJK',
-    persona: 'tessa',
-    given: 'Persona Tessa Compleet. Het inline-slider-gedrag zelf op de tijdas is diepgetest in UAT-TOEK-10 — hier alleen de drie ingangen en de dream-transitie.',
-    when: 'De gebruiker navigeert naar /toekomst/whatif (direct of via /horizon/whatif-legacy) en klikt "Scenario\'s vergelijken →".',
-    then: 'Redirect naar /toekomst?whatif=open (gescrold naar "Verken je aannames", URL opgeschoond); dream-transitie opent /toekomst/whatif?via=dreamgate. Eenvoudig-weergave verbergt beide routes uit de nav (SIMPLE_HIDDEN_NAV_HREFS) maar de deeplink werkt. Geen basisgegevens → lege staat met CTA naar /overzicht/bezittingen.',
-    assertion: {
-      kind: 'ui-only',
-      source: 'next.config.ts#redirects (routing-laag-guard op /toekomst/whatif, `missing: via=dreamgate`) + components/app/horizon/horizon-client.tsx (?whatif=open-scroll) + lib/horizon/deeplink-cleanup.ts (URL-opschoning blijft op dezelfde route) — routing/interactie, geen eigen berekening',
-    },
-  },
-  {
-    workflow: 'WF-REKEN-13',
-    scenarioId: 'UAT-REKEN-13',
-    titel: 'Een wat-als-preset kiezen en het effect aflezen',
-    kriticiteit: 'KERN',
-    persona: 'tessa',
-    given: 'Persona Tessa Compleet, volledige Wat-Als-pagina. Preset "Salarisverhoging" (+10% inkomen).',
-    when: 'De gebruiker activeert de preset en leest de KPI-strip (vrijheidsleeftijd, doelbedrag, jaarlijks sparen, verschil).',
-    then: 'Vrijheidsleeftijd (scenario) < baseline met groene delta; jaarlijks sparen stijgt (richting: positief effect van +10% inkomen); doelbedrag blijft ~gelijk. Onbereikbaar scenario → waarschuwing; delta < drempel (±0,1jr/±€100) → "–". Oracle-referentie: /beheer/horizon-kernel (tab Verificatie).',
-    assertion: {
-      kind: 'direction',
-      source: 'lib/horizon-kernel/whatif-router.ts#computeWhatifProjection (kernel-only) — richting/orde-grootte-toets, exacte cijfers alleen via de oracle-UI',
-    },
-  },
-  {
-    workflow: 'WF-REKEN-14',
-    scenarioId: 'UAT-REKEN-14',
-    titel: 'Het scenario verfijnen met sliders en marktbias',
-    kriticiteit: 'KERN',
-    persona: 'tessa',
-    given: 'Persona Tessa Compleet, volledige Wat-Als-pagina (netto maandinkomen €7.600, `expected_return` 7%).',
-    when: 'De gebruiker verschuift spaarquote/marktbias-sliders.',
-    then: 'Hogere spaarquote/marktbias → lagere FIRE-leeftijd (richting); gemengde per-categorie marktbias → master-slider toont "gemengd" (staat op 0); spaarquote 0% + marktbias −5pp → FIRE-onbereikbaar-waarschuwing; slider terug op baseline → delta-badge en scenario-event verdwijnen. Mobiel (iOS Safari): een tik of veeg op de BAAN verschuift de slider naar de vingerpositie, niet alleen een aanraking op het bolletje (sinds 13 sep 2026 via `lib/range-touch-seek.ts`, dezelfde onChange-route); op Android/desktop blijft het native gedrag.',
-    assertion: {
-      kind: 'direction',
-      source: 'components/app/horizon/whatif-sliders.tsx + lib/horizon-kernel/whatif-router.ts#computeWhatifProjection — richting-toets, cel-voor-cel oracle op /beheer/horizon-kernel bij twijfel',
-    },
-  },
-  {
-    workflow: 'WF-REKEN-15',
-    scenarioId: 'UAT-REKEN-15',
-    titel: 'Levensgebeurtenissen in het scenario beheren en hun impact zien',
-    kriticiteit: 'KERN',
-    persona: 'tessa',
-    given: 'Persona Tessa Compleet, 5 echte levensgebeurtenissen (o.a. "Verbouwing eigen woning" eenmalig €45.000 op leeftijd 50).',
-    when: 'De gebruiker zet een gebeurtenis tijdelijk uit (oog-icoon) of voegt een hypothetische toe (bv. "Wereldreis" €15.000 op leeftijd 45).',
-    then: 'Projectie verschuift in de verwachte richting (uitzetten van een kostenpost → vroegere/hogere uitkomst); uitzetten is NIET gepersisteerd (herladen zet hem weer aan); duur-loos event → aanname 240 maanden (20 jaar); verwijderen uit het scenario laat de echte `life_events`-rij ongemoeid.',
-    assertion: {
-      kind: 'direction',
-      source: 'components/app/horizon/whatif-events.tsx#computeImpact (twee volledige kernel-runs, mét/zonder event) — richting/delta-toets, geen los narekenbaar cijfer buiten de kernel',
-    },
-  },
-  {
-    workflow: 'WF-REKEN-16',
-    scenarioId: 'UAT-REKEN-16',
-    titel: 'Beslishulp: wat doe je met €X per maand extra?',
-    kriticiteit: 'KERN',
-    persona: 'tessa',
-    given: 'Synthetische, hand-narekenbare schuldenset (2 schulden: €100.000 @ 4% + €50.000 @ 2%) — Tessa\'s échte 12-schuldenmix is niet exact gespecificeerd in het plan (alleen een orde-grootte-band "3,2–3,3%"), dus wordt de échte functie hier op een schone eigen fixture getoetst i.p.v. op ongespecificeerde persona-cijfers (spiegelt OVZ WF-OVZ-01).',
-    when: 'De saldo-gewogen schuldrente wordt berekend.',
-    then: 'Gewogen rente = (100.000×4% + 50.000×2%) / 150.000 = 3,33%. Op de échte Tessa-mix (2 hypotheken €410k @ 3,1–3,6%, plus 10 kleinere leningen tot 14%) hoort dit rond 3,2–3,3% te liggen — omdat Tessa\'s `expected_return` (7%) hierboven ligt, wint de kaart Beleggen de vroegste FIRE-leeftijd. Geen actieve schuld (bv. Marijke) → de Aflossen-kaart is verborgen. €0 extra → alle drie kaarten identiek aan de baseline.',
-    assertion: {
-      kind: 'exact',
-      expected: 'weightedDebtRate=3.33',
-      source: 'components/app/horizon/whatif-beslishulp.model.ts#weightedDebtRate (échte productiefunctie) op een schone synthetische fixture — zie reken-checks.ts',
-    },
-  },
-  {
-    workflow: 'WF-REKEN-18',
-    scenarioId: 'UAT-REKEN-18',
-    titel: 'Onzekerheid (Monte Carlo) en grafiekweergaven verkennen',
-    kriticiteit: 'BELANGRIJK',
-    persona: 'tessa',
-    given: 'Persona Tessa Compleet, volledige Wat-Als-pagina. Scope: uitsluitend het Wat-Als-oppervlak (tijdas-variant = UAT-TOEK-08).',
-    when: 'De gebruiker zet "Onzekerheid" aan in Pad-modus en wisselt naar Opbouw.',
-    then: 'p25–p75-band rond de deterministische lijn, breder op langere termijn. GETEKEND is sinds 2026-08-09 alléén de middelste helft (p25–p75, met p50 als lijn) en de Y-as schaalt daar ook op; p10–p90 bestaat nog in de data (tooltip, invariant) maar wordt niet meer getekend — die rand drukte de plan-lijn tot ~9% van de ashoogte plat. De pil-titel noemt daarom p25–p75. De band draait sinds 2026-08-08 op de MARKTCHECK (horizon-kernel): tot 200 VOLLEDIGE kernel-projecties op exact dezelfde what-if-context als de hoofdlijn (incl. rendement-slider), dus de band volgt óók de onttrekkingsfase i.p.v. de opbouw door te zetten. Grondslag = netto vermogen (Prognose!I), gelijk aan de hoofdlijn. SINDS ADR 0117 (29-08-2026, allocatie snede 1) wordt élke ruisterm (gedeelde marktschok + idiosyncratische ruis) bovendien geschaald met de markt-risicofactor van de pot (laag/obligaties ≈0,3×, middel/gespreid 1×, hoog/individuele aandelen-crypto ≈1,4×) i.p.v. de vroegere binaire "investeringspot ja/nee" — een premieregeling-pensioenpot beweegt daardoor voor het eerst mee, en een obligatiepot beweegt minder hard dan voorheen. Zonder risk_profile-invoer is de factor `investering ? 1 : 0` (ongewijzigd gedrag). De wrapper draagt sindsdien ook `bandLiquide` (Prognose!J-spiegel) voor het oppervlak dat zijn hoofdlijn op J tekent (Uitsluiten, WF-TOEK-36/37) — dat oppervlak toont dus NOOIT een I-band om een J-lijn. Draait in de web worker; de band verschijnt met enkele seconden vertraging. "Onzekerheid"-knop verdwijnt in Opbouw-modus. Mobiel (<768px) → "Inkomen & Uitgaven" standaard dicht.',
-    assertion: {
-      kind: 'direction',
-      source: 'lib/horizon-kernel/whatif-router.ts#computeWhatifMarktcheck → lib/horizon-kernel/wrappers/mc.ts#runMonteCarlo (band + bandLiquide) → lib/horizon-kernel/wrappers/risico.ts#potRisicoFactor (ADR 0117) — statistische sanity-check (band niet triviaal smal/breed) plus de invariant "hoofdlijn binnen p10–p90"; de Y-as-keuze (mcMax op p75) is gepind in lib/horizon/sim-chart-geometry.test.ts',
-    },
-  },
-  {
-    workflow: 'WF-REKEN-19',
-    scenarioId: 'UAT-REKEN-19',
-    titel: 'Met Fin over je scenario chatten en suggesties overnemen',
-    kriticiteit: 'BELANGRIJK',
-    persona: 'tessa',
-    given: 'Persona Tessa Compleet, volledige Wat-Als-pagina met een actief scenario.',
-    when: 'De gebruiker chat met Fin over het scenario en klikt een voorgestelde levensgebeurtenis-kaart aan.',
-    then: 'AI-antwoordinhoud is niet-deterministisch (alleen het toevoeg-mechanisme is deterministisch testbaar); toegevoegde gebeurtenis wordt daadwerkelijk in het scenario opgenomen (projectie past zich meetbaar aan, richting-toets, zie WF-REKEN-15). Netwerkonderbreking bij laden → skeleton blijft staan (geen crash).',
-    assertion: {
-      kind: 'ui-only',
-      source: 'components/app/horizon/whatif-chat.tsx (useChat + suggest_life_event-tool) — AI-inhoud niet statisch toetsbaar, alleen het toevoeg-mechanisme',
-    },
-  },
-  {
-    workflow: 'WF-REKEN-20',
-    scenarioId: 'UAT-REKEN-20',
-    titel: 'Concrete acties uit je scenario halen',
-    kriticiteit: 'OVERIG',
-    persona: 'tessa',
-    given: 'Persona Tessa Compleet, volledige Wat-Als-pagina, scenario = baseline (geen wijzigingen) — actieblok leeg/afwezig. Vervolgens wijzigt de gebruiker de inkomen-slider met exact +€500/mnd.',
-    when: 'De impact-badge van de verschenen actiekaart wordt getoond.',
-    then: 'Impactbedragen zijn de slider-delta\'s zelf (géén aparte motor) — de badge toont letterlijk "+€500/mnd", cijfermatig gelijk aan de getypte sliderwijziging.',
-    assertion: {
-      kind: 'exact',
-      // Intl.NumberFormat('nl-NL', {style:'currency'}) plaatst een non-breaking
-      // space (U+00A0) tussen € en het bedrag — zie reken-checks.ts.
-      expected: '+€ 500/mnd',
-      source: 'components/app/horizon/whatif-actions.tsx (impact: `+${formatMaskedCurrency(monthlyDelta, masked)}/mnd`) — formatMaskedCurrency is een échte productiefunctie (lib/format.ts) — zie reken-checks.ts',
     },
   },
   {

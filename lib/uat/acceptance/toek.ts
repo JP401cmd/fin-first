@@ -162,20 +162,6 @@ const criteria: AcceptanceCriterion[] = [
     },
   },
   {
-    workflow: 'WF-TOEK-09',
-    scenarioId: 'UAT-TOEK-09',
-    titel: 'Opgeslagen wat-als-scenario\'s als spooklijn vergelijken',
-    kriticiteit: 'BELANGRIJK',
-    persona: 'willem',
-    given: 'Persona Willem geladen — heeft een opgeslagen wat-als-scenario "Vroeg stoppen op 50" (fireAge 50, kleurindex 1).',
-    when: 'De gebruiker opent de scenario-overlay-picker en vinkt "Vroeg stoppen op 50" aan.',
-    then: 'De picker toont FIRE-leeftijd 50 (= opgeslagen fireAge-veld in appSettings.whatif_scenarios, consistentie bij het tonen). De GHOST-LIJN zelf is een verse kernel-run met de scenario-parameters → de vorm ervan verifieer je via de oracle (/beheer/horizon-kernel of /toekomst/whatif). Geen persona-seed levert dit cijfer; whatif_scenarios leeft in appSettings, niet in test-personas → geen pure engine-check.',
-    assertion: {
-      kind: 'oracle',
-      source: 'oracle: ghost-lijn = kernel-run met scenario-parameters (/beheer/horizon-kernel / /toekomst/whatif); picker-fireAge = echo van opgeslagen appSettings-veld.',
-    },
-  },
-  {
     workflow: 'WF-TOEK-10',
     scenarioId: 'UAT-TOEK-10',
     titel: 'Wat-als-sliders inline op de tijdas',
@@ -766,10 +752,15 @@ export const TOEK_ACCEPTANCE: AcceptanceSet = {
 
 /**
  * De TOEK-scenario-nummers die een acceptatiecriterium HOREN te hebben — de
- * catalogus dekt 01..26, 28, 29, 30, 32 (27 en 31 zijn verwijsregels naar
- * REKEN/NAV en horen NIET in deze set). Gebruikt door de dekkings-meta-test.
+ * catalogus dekt 01..08, 10..26, 28, 29, 30, 32..48 (27 en 31 zijn
+ * verwijsregels naar REKEN/NAV en horen NIET in deze set). WF-TOEK-09
+ * (opgeslagen wat-als-scenario's als spooklijn) is VERVALLEN op 14 sep 2026
+ * (ADR 0144 "De Wat-Als-pagina gaat op in de tijdas") — de bewaarde
+ * wat-als-scenario's en de spooklijn-overlay-picker bestaan niet meer.
+ * Gebruikt door de dekkings-meta-test.
  */
 export const TOEK_EXPECTED_WORKFLOW_NUMBERS: number[] = [
-  ...Array.from({ length: 26 }, (_, i) => i + 1), // 1..26
+  ...Array.from({ length: 8 }, (_, i) => i + 1), // 1..8
+  ...Array.from({ length: 17 }, (_, i) => i + 10), // 10..26
   28, 29, 30, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48,
 ]

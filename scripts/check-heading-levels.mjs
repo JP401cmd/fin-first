@@ -112,7 +112,6 @@ const RESIDUE_ENTRIES = [
   'app/(app)/rapportages/vermogen/page.tsx',
   'components/app/cash-account-view.tsx',
   'components/app/horizon/horizon-client.tsx',
-  'components/app/horizon/whatif-header.tsx',
   'components/mijn/local-chat-panel.tsx',
 ]
 

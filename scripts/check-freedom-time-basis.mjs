@@ -335,12 +335,6 @@ const ALLOWED_FILES = new Map([
   // tarief via getRecentDailyExpenseRate en roept dailyExpenseRate() niet meer
   // aan — zet hem hier NIET terug.
   [
-    'app/(app)/horizon/whatif/whatif-page-client.tsx',
-    'WHAT-IF-grondslag: het scenariobedrag dat de gebruiker in de schuifjes zet is ' +
-      'hier de hele vraag ("wat als ik €X/mnd uitgeef"). ' +
-      'De CONVERSIE is wél canoniek — dit verving een ÷30 (M22).',
-  ],
-  [
     'lib/briefing/engine.ts',
     'TERUGVAL achter het canonieke bundelveld via de geloofwaardigheidsvloer ' +
       '(`credibleDailyExpense(finance.dailyExpenseRate) || dailyExpenseRate(…)`, UR2-03): ' +

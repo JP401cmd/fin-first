@@ -715,7 +715,7 @@ function versGesprek(origin: ChatOrigin, notitie: string | null = null): Gesprek
 /* ── Main ChatPanel ────────────────────────────────────────────────── */
 
 export function ChatPanel() {
-  const { isOpen, close, pendingMessage, clearPendingMessage, resolvePendingAnswer, dropPendingAnswer, isPinned, togglePin, autoOpenMessage, setAutoOpenMessage, meldingRequested, clearMeldingRequest, gidsRequested, clearGidsRequest, userId, chatHistoryMode, setChatHistoryMode, dataGaps } = useChatContext()
+  const { isOpen, close, pendingMessage, clearPendingMessage, resolvePendingAnswer, dropPendingAnswer, isPinned, togglePin, meldingRequested, clearMeldingRequest, gidsRequested, clearGidsRequest, userId, chatHistoryMode, setChatHistoryMode, dataGaps } = useChatContext()
   const router = useRouter()
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -1013,7 +1013,7 @@ export function ChatPanel() {
   })
 
   // Deduplicate messages by ID — the useChat store can produce transient
-  // duplicates during rapid re-renders (e.g. dreamgate page transition).
+  // duplicates during rapid re-renders.
   const messages = useMemo(() => {
     const seen = new Set<string>()
     return rawMessages.filter(msg => {
@@ -1403,17 +1403,6 @@ export function ChatPanel() {
     wachtOpAntwoordRef.current = false
     dropPendingAnswer()
   }, [isOpen, dropPendingAnswer])
-
-  // Auto-send scenario context message when chat opens from whatif page (first open only).
-  // Zelfde Wft-gate als het pendingMessage-effect: pas versturen ná acceptatie.
-  const autoSentRef = useRef(false)
-  useEffect(() => {
-    if (isOpen && hasAi && chatReady && wftAccepted === true && autoOpenMessage && !isStreaming && messages.length === 0 && !autoSentRef.current) {
-      autoSentRef.current = true
-      sendMessage({ text: autoOpenMessage })
-      setAutoOpenMessage(null)
-    }
-  }, [isOpen, hasAi, chatReady, wftAccepted, autoOpenMessage, isStreaming, messages.length, sendMessage, setAutoOpenMessage])
 
   const submit = () => {
     const text = input.trim()

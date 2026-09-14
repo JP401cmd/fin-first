@@ -26,18 +26,6 @@ export interface WhatIfOverrides {
   extraContribution: number
 }
 
-/** Mirrors the shape returned by the /api/whatif/suggest route. */
-export interface SuggestedEvent {
-  event_type: string
-  name: string
-  target_age: number | null
-  one_time_cost: number
-  monthly_cost_change: number
-  monthly_income_change: number
-  duration_months: number
-  explanation: string
-}
-
 export interface AssetGroupReturn {
   assetType: string
   label: string

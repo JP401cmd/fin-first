@@ -149,7 +149,7 @@ export const BLUEPRINTS: BlueprintMeta[] = [
     description:
       'Volledig WOZ-blueprint: masthead + 2-koloms grid + comparison + footer-notes.',
     module: 'horizon',
-    routeExample: '/horizon/whatif',
+    routeExample: '/toekomst/rekenhulp',
     group: 'page-type',
   },
   {

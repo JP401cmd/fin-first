@@ -45,7 +45,6 @@ const KNOWN_GETMODEL_CONSUMERS = [
   'app/api/subscriptions/advice/route.ts',
   'app/api/subscriptions/analyse-ai/route.ts',
   'app/api/subscriptions/detect-ai/route.ts',
-  'app/api/whatif/suggest/route.ts',
   'lib/aangifte/extract-aangifte-data.ts',
   'lib/ai/build-calculator.ts',
   'lib/ai/extract-financial-data.ts',

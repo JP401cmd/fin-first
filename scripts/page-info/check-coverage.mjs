@@ -42,8 +42,8 @@
  * gedekte app-route (inclusief via een dynamisch segment, bv.
  * `/overzicht/schulden/mortgage` ↔ `/overzicht/schulden/[type]`) is bereikbaar
  * via de runtime `getPageInfo(pathname, 'fallback')`-match en wordt daarom NIET
- * als wees gemeld. Dat haalt de vroegere blinde vlek weg (`/toekomst/whatif`
- * meldde als wees terwijl hij prima live was) zonder dode entries te maskeren:
+ * als wees gemeld. Dat haalt de vroegere blinde vlek weg (een live route
+ * meldde als wees terwijl hij prima bereikbaar was) zonder dode entries te maskeren:
  * verdwijnt de route, dan valt de key vanzelf terug in `orphaned`.
  *
  * Exit 0 = geen treffers. Exit 1 = missing, inlineLiterals, uncoveredRoutes of

@@ -25,21 +25,19 @@ function renderSheet(mode: DisplayMode, activeAppKeys: string[] = []) {
   )
 }
 
-describe('NavMenuSheet — Eenvoudig-weergave verbergt Rekenhulp/Wat-Als', () => {
+describe('NavMenuSheet — Eenvoudig-weergave verbergt Rekenhulp', () => {
   afterEach(cleanup)
 
-  it("toont in 'full' wél Rekenhulp en Wat-Als", () => {
+  it("toont in 'full' wél Rekenhulp", () => {
     renderSheet('full')
     expect(screen.getByText('Rekenhulp')).toBeInTheDocument()
-    expect(screen.getByText('Wat-Als')).toBeInTheDocument()
   })
 
-  it("verbergt in 'simple' Rekenhulp en Wat-Als (overige toekomst-ingangen blijven)", () => {
+  it("verbergt in 'simple' Rekenhulp (overige toekomst-ingangen blijven)", () => {
     renderSheet('simple')
     expect(screen.queryByText('Rekenhulp')).not.toBeInTheDocument()
-    expect(screen.queryByText('Wat-Als')).not.toBeInTheDocument()
-    // Overige Toekomst-subroutes blijven zichtbaar — alleen de twee aangewezen
-    // ingangen worden verborgen.
+    // Overige Toekomst-subroutes blijven zichtbaar — alleen de aangewezen
+    // ingang wordt verborgen.
     expect(screen.getByText('Doelen')).toBeInTheDocument()
     expect(screen.getByText('Gebeurtenissen')).toBeInTheDocument()
   })

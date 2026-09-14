@@ -236,37 +236,13 @@ const nextConfig: NextConfig = {
       // te gooien, en het scheelt bovendien een RSC-round-trip.
       { source: '/core/cash', destination: '/overzicht/bezittingen/cash', permanent: false },
 
-      // Volgorde is functioneel: de dreamgate-variant moet vóór de
-      // catch-all staan, anders vangt de tweede regel hem af. Spiegelt de
-      // twee takken van de oude server-component 1-op-1 — met `via=dreamgate`
-      // toont /toekomst/whatif de volledige ervaring, zonder valt hij terug
-      // op de tijdas met de what-if-modal open.
-      {
-        source: '/horizon/whatif',
-        has: [{ type: 'query', key: 'via', value: 'dreamgate' }],
-        destination: '/toekomst/whatif?via=dreamgate',
-        permanent: false,
-      },
+      // De losse Wat-Als-pagina is vervallen (ADR 0144): het inline lab op de
+      // tijdas is de enige wat-als-ervaring. Beide oude routes — ook met een
+      // oude `?via=dreamgate` — landen op de tijdas met het lab open. Op de
+      // routing-laag, om dezelfde React #310-reden als /core/cash hierboven
+      // (UR2-11: /toekomst/whatif deed zijn redirect eerst op render-tijd).
       { source: '/horizon/whatif', destination: '/toekomst?whatif=open', permanent: false },
-
-      // Derde lichting (31 aug 2026, UR2-11) — /toekomst/whatif was de LAATSTE
-      // route van deze familie die zijn redirect nog op render-tijd deed: de
-      // server-component riep zonder `?via=dreamgate` meteen
-      // `redirect('/toekomst?whatif=open')` aan. Dat is exact de trigger
-      // hierboven (harde-navigatie-pad → React #310), en verklaart de transiënte
-      // HTTP 500 die de UAT op /toekomst/whatif zag. De redirect verhuist
-      // daarom naar de routing-laag; de dreamgate-tak blijft een échte pagina.
-      //
-      // `missing` i.p.v. `has`: de regel matcht wanneer `via` afwezig is ÓF een
-      // andere waarde heeft (Next: `!missing.some(hasMatch)`), zodat alleen
-      // `?via=dreamgate` de volledige what-if-ervaring bereikt — precies de
-      // twee takken van de oude server-component.
-      {
-        source: '/toekomst/whatif',
-        missing: [{ type: 'query', key: 'via', value: 'dreamgate' }],
-        destination: '/toekomst?whatif=open',
-        permanent: false,
-      },
+      { source: '/toekomst/whatif', destination: '/toekomst?whatif=open', permanent: false },
 
       // Tweede lichting (11 aug 2026) — dezelfde behandeling voor de vier
       // resterende redirect-only server-componenten. Ze waren latent: geen
@@ -287,8 +263,8 @@ const nextConfig: NextConfig = {
 
       // /toekomst/strategie?focus=aow|pensioen|huis opende de bijbehorende
       // levensstrategie op de Gebeurtenissen-tab. Die vertakking gaat mee naar
-      // de routing-laag via een named capture group in `has` — dezelfde
-      // volgorde-eis als bij /horizon/whatif: de gerichte variant MOET vóór de
+      // de routing-laag via een named capture group in `has` — met een
+      // volgorde-eis: de gerichte variant MOET vóór de
       // catch-all staan, anders landt elke deeplink op `aow`. Een onbekende
       // (of ontbrekende) focus valt bewust terug op `aow`, precies zoals de
       // oude server-component deed.

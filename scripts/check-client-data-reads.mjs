@@ -127,7 +127,6 @@ const ALLOWLIST = new Set([
   'components/app/horizon/strategie-modal.tsx',
   'components/future/doel-toevoegen-sheet.tsx',
   'components/future/doel-bewerken-sheet.tsx',
-  'app/(app)/horizon/whatif/whatif-page-client.tsx',
   // — Fase b, slice 5: debts + belasting —
   'app/(app)/core/debts/debts-client.tsx',
   'components/core/debt-category-page.tsx',

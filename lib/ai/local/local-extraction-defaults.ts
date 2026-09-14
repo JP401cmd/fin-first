@@ -232,7 +232,7 @@ export function completeDebt(draft: DebtDraft): ExtractionDebt {
 // slugs uit de cloud-prompt ('huis_kopen', 'kind', 'pensioen'). Reden: de
 // catalogus is de bron van de bedragen, dus elke soort die er niet in staat
 // levert per definitie een gebeurtenis zonder cijfers. `custom` valt om dezelfde
-// reden af (alle defaults 0). Dit spiegelt de keuze in local-whatif-prompt.ts.
+// reden af (alle defaults 0).
 
 export const LOCAL_EXTRACTION_EVENT_TYPES = [
   'children',

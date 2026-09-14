@@ -77,8 +77,8 @@
  * **Geen `overflow-x-auto`.** Voor de hand liggend als vangnet, maar fout hier:
  * `overflow-x: auto` met `overflow-y: visible` laat de y-as meecomputeren naar
  * `auto` (CSS Overflow L3), waardoor de ~30px hoge rij in béíde richtingen een
- * clipbox wordt. Twee kinderen openen een popover ín die rij — de
- * scenario-overlay-picker en de ChartTips-"i" — en die zouden tot een sliver
+ * clipbox wordt. Kinderen die een popover ín die rij openen — zoals de
+ * ChartTips-"i" — zouden tot een sliver
  * geknipt worden; `z-index` ontsnapt niet aan een clipbox. In de uiterste staart
  * is zichtbaar overlopen beter dan de popovers slopen.
  *

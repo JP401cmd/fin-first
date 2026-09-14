@@ -30,10 +30,6 @@ import {
   type ConvergentieRawContext,
   type ConvergentieProjectionOutcome,
 } from '@/lib/horizon-kernel/convergentie-router'
-import {
-  computeWhatifMarktcheck,
-  type WhatifRawContext,
-} from '@/lib/horizon-kernel/whatif-router'
 import type { MarktcheckOutcome } from '@/lib/horizon-kernel/marktcheck'
 import {
   runForcedStopPath,
@@ -97,14 +93,6 @@ export type KernelWorkerRequest =
       /** Anker van de rendement-marge (de stop-slider); zie `marktcheck.ts`. */
       readonly stopAge?: number | null
     }
-  /** Dezelfde marktcheck op de what-if-context (mét rendement-slider). */
-  | {
-      readonly id: number
-      readonly kind: 'whatif-marktcheck'
-      readonly rawContext: WhatifRawContext
-      readonly maxRuns?: number
-      readonly stopAge?: number | null
-    }
 
 /** Antwoord van de kernel-worker; `kind` spiegelt de request zodat de client typed uitpakt. */
 export type KernelWorkerResponse =
@@ -114,7 +102,6 @@ export type KernelWorkerResponse =
   | { readonly id: number; readonly ok: true; readonly kind: 'taxvarianten'; readonly result: VariantenSweepResultaat }
   | { readonly id: number; readonly ok: true; readonly kind: 'mc'; readonly result: MonteCarloResult }
   | { readonly id: number; readonly ok: true; readonly kind: 'marktcheck'; readonly result: MarktcheckOutcome }
-  | { readonly id: number; readonly ok: true; readonly kind: 'whatif-marktcheck'; readonly result: MarktcheckOutcome }
   | { readonly id: number; readonly ok: false; readonly error: string }
 
 /**
@@ -168,17 +155,6 @@ export function executeKernelRequest(req: KernelWorkerRequest): KernelWorkerResp
           ok: true,
           kind: 'marktcheck',
           result: computeMarktcheck({
-            rawContext: req.rawContext,
-            maxRuns: req.maxRuns,
-            stopAge: req.stopAge,
-          }),
-        }
-      case 'whatif-marktcheck':
-        return {
-          id: req.id,
-          ok: true,
-          kind: 'whatif-marktcheck',
-          result: computeWhatifMarktcheck({
             rawContext: req.rawContext,
             maxRuns: req.maxRuns,
             stopAge: req.stopAge,

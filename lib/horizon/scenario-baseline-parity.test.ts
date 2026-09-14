@@ -4,7 +4,6 @@ import {
   type ConvergentieRawContext,
   type ConvergentieRawProfileRow,
 } from '@/lib/horizon-kernel/convergentie-router'
-import { computeWhatifProjection } from '@/lib/horizon-kernel/whatif-router'
 import { applyReturnDeltasToAssets } from '@/lib/horizon-kernel/adapter/whatif-varianten'
 import { expandCategorieReturnDeltas } from './toekomst-scenario'
 import {
@@ -16,14 +15,11 @@ import {
  * GOLDEN — baseline-consistentie van de /toekomst wat-als-scenariolaag (plan §A).
  *
  * De scenario-run MOET via `computeConvergentieProjection` (zelfde motorpad als de
- * hoofdlijn) lopen en NIET via `computeWhatifProjection`: de what-if-adapter
- * (`whatif-varianten.ts:132-161`) laat `yearly_essential_expenses`,
- * `deficit_loan_rate` en `withdrawal_profile_config` bewust weg. Deze test pint dat besluit
- * vast met een REALISTISCHE `ConvergentieRawContext` mét juist die velden gezet:
- *   (a) een nul-override-scenario (assets door `applyReturnDeltasToAssets` met lege delta +
- *       identieke events) ≡ de basislijn — deepEqual op rows + fireAgeFractional;
- *   (b) diezélfde fixture via `computeWhatifProjection` wijkt WÉL af (de weggelaten velden
- *       veranderen de uitkomst) — bewijst dat het routerbesluit ertoe doet.
+ * hoofdlijn) lopen. Deze test pint dat vast met een REALISTISCHE
+ * `ConvergentieRawContext` mét `yearly_essential_expenses`, `deficit_loan_rate` en
+ * `withdrawal_profile_config` gezet: een nul-override-scenario (assets door
+ * `applyReturnDeltasToAssets` met lege delta + identieke events) ≡ de basislijn —
+ * deepEqual op rows + fireAgeFractional.
  */
 
 const PINNED_AGE = 42
@@ -31,11 +27,9 @@ const fx = buildCompleetHorizonFixture(PINNED_AGE)
 
 /**
  * Realistisch convergentie-profiel: de persona-basis + alle "convergentie-only"-velden
- * expliciet gezet — precies de velden die de what-if-adapter laat vallen. `essential_budgets`
- * mét een `yearly_essential_expenses` (30k) dat duidelijk lager is dan de geschatte
- * jaaruitgaven (~49k) maakt de what-if-divergentie ondubbelzinnig. Perpetual-eindstrategie
- * zodat FIRE op een echte toekomst-datum valt (niet "reached now") en de divergentie
- * meetbaar doorwerkt in fireAge/doelbedrag.
+ * expliciet gezet. `essential_budgets` mét een `yearly_essential_expenses` (30k) dat
+ * duidelijk lager is dan de geschatte jaaruitgaven (~49k). Perpetual-eindstrategie
+ * zodat FIRE op een echte toekomst-datum valt (niet "reached now").
  */
 const profile: ConvergentieRawProfileRow = {
   ...buildCompleetKernelProfileBase(PINNED_AGE),
@@ -83,28 +77,5 @@ describe('scenario-baseline-pariteit', () => {
     expect(scenario.result.requiredFirePortfolio).toEqual(baseline.result.requiredFirePortfolio)
     // Volledige uitkomst voor de zekerheid.
     expect(scenario.result).toEqual(baseline.result)
-  })
-
-  it('dezelfde fixture via computeWhatifProjection wijkt WÉL af (pint routerbesluit vast)', () => {
-    const conv = computeConvergentieProjection({ rawContext: baseContext })
-    const whatif = computeWhatifProjection({
-      rawContext: {
-        profile,
-        assets: [...fx.assets],
-        debts: [...fx.debts],
-        lifeEvents: [...fx.lifeEvents],
-        aowRows: [],
-        yearlyExpenses: fx.financialInput.yearlyMustExpenses,
-      },
-    })
-    expect(conv.ok).toBe(true)
-    expect(whatif.ok).toBe(true)
-    if (!conv.ok || !whatif.ok) return
-
-    // De what-if-adapter laat yearly_essential_expenses (+ deficit_loan_rate,
-    // withdrawal_profile_config) vallen → essential_budgets valt terug op de geschatte
-    // jaaruitgaven → ander doelbedrag én andere FIRE-leeftijd.
-    expect(whatif.result.requiredFirePortfolio).not.toEqual(conv.result.requiredFirePortfolio)
-    expect(whatif.result).not.toEqual(conv.result)
   })
 })

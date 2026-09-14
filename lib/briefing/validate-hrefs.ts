@@ -36,7 +36,6 @@ const VALID_ROUTES = new Set([
   '/toekomst/doelen',
   '/toekomst/gebeurtenissen',
   '/toekomst/voorkeuren',
-  '/toekomst/whatif',
   '/mijn',
   '/mijn/profiel',
   '/mijn/koppelingen',

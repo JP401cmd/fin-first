@@ -1,11 +1,11 @@
 /**
  * Horizon-kernel adapter — **what-if-varianten-mapping** (FASE 5, stap 2a).
  *
- * Zet de rauwe what-if-scenariotoestand (profiel-DB-rij, bezittingen, schulden,
- * event-set, rendement-deltas) om naar een `KernelAdapterInput` die de kernel
- * consumeert. Pure, app-zijdige module — géén React, géén Supabase, géén Date/
- * Math.random. Consumeert de bestaande adapter (`buildKernelInputFromApp`) via de
- * router; deze module levert alleen de INVOER-samenstelling per variant.
+ * Levert de invoer-bouwstenen voor een scenario-run: de rendement-delta-mutatie op
+ * bezittingen (`applyReturnDeltasToAssets`), de rauwe profiel-rij
+ * (`WhatifRawProfileRow`, basis van `ConvergentieRawProfileRow`) en de eigen-huis-ids.
+ * Pure, app-zijdige module — géén React, géén Supabase, géén Date/Math.random. De
+ * KernelAdapterInput zelf bouwt de convergentie-router.
  *
  * ## Variant → rauwe kern-expressie (bouwtabel)
  *  - income_change / part_time / lifestyle_adjustment / extra_inleg / sabbatical /
@@ -70,11 +70,6 @@
  */
 
 import type { Asset } from '@/lib/asset-data'
-import type { Debt } from '@/lib/debt-data'
-import type { LifeEvent } from '@/lib/horizon-data'
-import type { AowLeeftijdRow } from '@/lib/aow-leeftijd'
-import type { TaxYear } from '@/lib/box3-data'
-import type { KernelAdapterInput, KernelAdapterProfile } from './index'
 
 // ── Rendement-deltas → asset-`expected_return`-mutatie ───────────────────────
 
@@ -154,82 +149,6 @@ export interface WhatifRawProfileRow {
   retirement_expense_method?: string | null
   /** DB-kolom `retirement_expense_custom_amount` — hernoemd naar `retirement_custom_amount`. */
   retirement_expense_custom_amount?: number | null
-}
-
-/** Parameters voor `buildWhatifKernelAdapterInput`. */
-export interface BuildWhatifKernelAdapterInputParams {
-  readonly profile: WhatifRawProfileRow
-  /** Bezittingen — reeds door `applyReturnDeltasToAssets` gemuteerd voor de rendement-slider. */
-  readonly assets: readonly Asset[]
-  readonly debts: readonly Debt[]
-  /** De event-set van deze run (baseline = alleen DB-events; scenario = DB + scenario-only). */
-  readonly lifeEvents: readonly LifeEvent[]
-  readonly aowRows?: readonly AowLeeftijdRow[]
-  readonly taxYear?: TaxYear
-  /**
-   * ADR 0117 — jaargelaagde markt-volatiliteit (`fire_assumptions.volatility`,
-   * decimaal) voor MC!B3. Weglaten → de kernel-default (`DEFAULT_VOLATILITY`).
-   */
-  readonly marktVolatiliteit?: number
-}
-
-/**
- * Bouw de `KernelAdapterInput` uit de rauwe what-if-toestand. Mapt alleen de op de
- * client beschikbare profiel-velden; de rest blijft undefined (adapter-defaults, zie
- * de module-doc, punt 3). De event-set gaat ONGEWIJZIGD als `lifeEvents` mee — de
- * adapter-guard doet de per-type-routering.
- */
-export function buildWhatifKernelAdapterInput(
-  params: BuildWhatifKernelAdapterInputParams,
-): KernelAdapterInput {
-  const p = params.profile
-  const profile: KernelAdapterProfile = {
-    date_of_birth: p.date_of_birth ?? null,
-    net_monthly_income: p.net_monthly_income ?? null,
-    estimated_monthly_expenses: p.estimated_monthly_expenses ?? null,
-    // yearly_essential_expenses: BEDRADINGS­GAT — niet op de client → adapter valt terug
-    //   op geschatte_jaaruitgaven (module-doc punt 3).
-    expected_return: p.expected_return ?? null,
-    inflation_rate: p.inflation_rate ?? null,
-    box3_method: p.box3_method ?? null,
-    // TPR-12 — beide instelbare kernel-defaults reizen mee (zelfde eis als het
-    // stop-anker: what-if rekent hetzelfde plan als /toekomst).
-    box3_heffingvrij_inkomen: p.box3_heffingvrij_inkomen ?? null,
-    fire_end_strategy: p.fire_end_strategy ?? null,
-    fire_end_age: p.fire_end_age ?? null,
-    fire_legacy_amount: p.fire_legacy_amount ?? null,
-    fire_legacy_include_illiquid: p.fire_legacy_include_illiquid ?? null,
-    // ADR 0129 D3 — het stop-anker moet ook op het what-if-pad meereizen; zonder deze
-    // twee regels zou een vast stopmoment in een what-if-run stil terugvallen op de
-    // bisectie en een ánder plan tonen dan de hoofdlijn.
-    fire_stop_anchor: p.fire_stop_anchor ?? null,
-    fire_stop_age: p.fire_stop_age ?? null,
-    feature_preferences: p.feature_preferences ?? null,
-    withdrawal_strategy: p.withdrawal_strategy ?? null,
-    guardrail_floor: p.guardrail_floor ?? null,
-    guardrail_ceiling: p.guardrail_ceiling ?? null,
-    guardrail_cut_step: p.guardrail_cut_step ?? null,
-    // Het gekozen profiel reist mee (B-042-vervolg): profiel, fasecurve én
-    // flex-spending-config komen hier vandaan, zodat what-if hetzelfde plan rekent
-    // als /toekomst. Ontbreekt de kolom, dan vallen de velden per stuk terug op de
-    // Excel-defaults — byte-identiek aan hiervoor.
-    withdrawal_profile_config: p.withdrawal_profile_config ?? null,
-    // deficit_loan_rate: BEDRADINGS­GAT — Excel-default.
-    housing_strategy_config: p.housing_strategy_config,
-    pot_rules: p.pot_rules,
-    retirement_expense_method: p.retirement_expense_method ?? null,
-    // Kolom-hernoeming: DB `retirement_expense_custom_amount` → kern `retirement_custom_amount`.
-    retirement_custom_amount: p.retirement_expense_custom_amount ?? null,
-  }
-  return {
-    profile,
-    assets: params.assets,
-    debts: params.debts,
-    lifeEvents: params.lifeEvents,
-    aowRows: params.aowRows,
-    taxYear: params.taxYear,
-    marktVolatiliteit: params.marktVolatiliteit,
-  }
 }
 
 // ── Eigen-huis-ids (voor buildKernelSlotMeta) ────────────────────────────────

@@ -170,7 +170,6 @@ export const FEATURE_GROUP: Record<AiTokenFeature, AiExecutionScope> = {
 
   aanbevelingen: 'tips',
   aanbevelingen_initieel: 'tips',
-  whatif_suggesties: 'tips',
 
   rapport: 'rapporten',
   rekenhulp_bouwen: 'rapporten',
@@ -274,13 +273,6 @@ export const AI_ROUTE_BINDINGS: readonly AiRouteBinding[] = [
     feature: 'aanbevelingen_initieel',
     scope: 'tips',
     modelCallIn: 'app/api/ai/recommendations/initial/route.ts',
-    gated: true,
-  },
-  {
-    route: 'app/api/whatif/suggest/route.ts',
-    feature: 'whatif_suggesties',
-    scope: 'tips',
-    modelCallIn: 'app/api/whatif/suggest/route.ts',
     gated: true,
   },
 

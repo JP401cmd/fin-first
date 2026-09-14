@@ -47,8 +47,6 @@ export const IncomeExpenseChart = memo(function IncomeExpenseChart({
   viewMode = 'lines',
   breakdownResult,
   baselineRows,
-  ghostOverlayRows,
-  ghostColor,
 }: {
   rows: SimRow[]
   currentAge: number
@@ -61,8 +59,6 @@ export const IncomeExpenseChart = memo(function IncomeExpenseChart({
   viewMode?: 'lines' | 'breakdown'
   breakdownResult?: BreakdownResult | null
   baselineRows?: SimRow[]
-  ghostOverlayRows?: SimRow[]
-  ghostColor?: string
 }) {
   const { ref, hasEntered, animationComplete } = useInViewAnimation({ duration: 1200 })
   // Bedragmaskering (ADR 0091) komt uit de hook, NIET uit een prop: de hook
@@ -166,8 +162,6 @@ export const IncomeExpenseChart = memo(function IncomeExpenseChart({
         isPensioenMode={isPensioenMode}
         aowAgeFractional={aowAgeFractional}
         baselineRows={baselineRows}
-        ghostOverlayRows={ghostOverlayRows}
-        ghostColor={ghostColor}
         masked={masked}
       />
     </div>
@@ -189,7 +183,7 @@ function LinesView({
   rows, W, H, innerW, innerH, minAge, maxAge, xScale, hasEntered,
   hoveredAge, svgHandlers,
   fireAge, isPensioenMode, aowAgeFractional,
-  baselineRows, ghostOverlayRows, ghostColor, masked,
+  baselineRows, masked,
 }: {
   rows: SimRow[]
   W: number; H: number; innerW: number; innerH: number
@@ -202,19 +196,17 @@ function LinesView({
   isPensioenMode: boolean
   aowAgeFractional?: number
   baselineRows?: SimRow[]
-  ghostOverlayRows?: SimRow[]
-  ghostColor?: string
   /** Bedragmaskering (ADR 0091) — geometrie blijft, euro-LABELS verdwijnen. */
   masked: boolean
 }) {
   const visibleRows = rows.filter(r => r.age >= minAge && r.age < maxAge)
-  // EURO-WEERGAVE: `rows` (en `breakdownResult`/`ghostOverlayRows`) komen al omgezet
+  // EURO-WEERGAVE: `rows` (en `breakdownResult`) komen al omgezet
   // binnen uit het render-grensblok van `horizon-client.tsx` — chart-feed-regime (D4).
   // Dit component blijft euro-weergave-onwetend: het is een tekenmachine.
   const incomePts: [number, number][] = visibleRows.map(r => [r.age, r.flowIn])
   const expensePts: [number, number][] = visibleRows.map(r => [r.age, r.flowOut])
 
-  const ghostInVals = (baselineRows ?? ghostOverlayRows ?? [])
+  const ghostInVals = (baselineRows ?? [])
     .filter(r => r.age >= minAge && r.age < maxAge)
     .flatMap(r => [r.flowIn, r.flowOut])
   const allVals = [
@@ -336,25 +328,6 @@ function LinesView({
               {ghostExpense.length > 1 && (
                 <path d={pointsToPath(ghostExpense)} fill="none" stroke="var(--ink-4)" strokeWidth={1.5}
                   strokeDasharray="6 4" opacity={0.35} strokeLinecap="round" strokeLinejoin="round" />
-              )}
-            </>
-          )
-        })()}
-
-        {/* Scenario overlay ghost lines */}
-        {ghostOverlayRows && ghostColor && ghostOverlayRows.length > 1 && (() => {
-          const ghostVisible = ghostOverlayRows.filter(r => r.age >= minAge && r.age < maxAge)
-          const ghostIncome = ghostVisible.map(r => [r.age, r.flowIn] as [number, number])
-          const ghostExpense = ghostVisible.map(r => [r.age, r.flowOut] as [number, number])
-          return (
-            <>
-              {ghostIncome.length > 1 && (
-                <path d={pointsToPath(ghostIncome)} fill="none" stroke={ghostColor} strokeWidth={1.5}
-                  strokeDasharray="6 4" opacity={0.4} strokeLinecap="round" strokeLinejoin="round" />
-              )}
-              {ghostExpense.length > 1 && (
-                <path d={pointsToPath(ghostExpense)} fill="none" stroke={ghostColor} strokeWidth={1.5}
-                  strokeDasharray="6 4" opacity={0.4} strokeLinecap="round" strokeLinejoin="round" />
               )}
             </>
           )

@@ -38,13 +38,15 @@ Kriticiteit: **KERN** = raakt financiële uitkomsten of gebruikersdata · **BELA
 | Budgetteren (WF-BUDGET) | 24 | 15 | 6 | 3 | 16 |
 | Belasting (Box 1/2/3) (WF-BELAST) | 22 | 12 | 6 | 4 | 19 |
 | Toekomst: tijdas, doelen, gebeurtenissen, voorkeuren & strategie (WF-TOEK) | 32 | 19 | 10 | 3 | 30 |
-| Rekentools & wat-als (WF-REKEN) | 24 | 13 | 8 | 3 | 16 |
+| Rekentools (WF-REKEN)¹ | 24 | 13 | 8 | 3 | 16 |
 | Mijn: profiel, huishouden, account & voorkeuren (WF-MIJN) | 29 | 14 | 12 | 3 | 8 |
 | Will (AI-coach), berichten & krant (WF-WILL) | 22 | 5 | 14 | 3 | 11 |
 | Rapportages (WF-RAPP) | 13 | 7 | 6 | 0 | 7 |
 | Cross-module consistentie & doorwerking (WF-KRUIS) | 25 | 24 | 1 | 0 | 24 |
 | Beheer (admin) (WF-BEHEER) | 33 | 9 | 16 | 8 | 9 |
 | **Totaal** | **374** | **195** | **132** | **47** | **232** |
+
+¹ VERVALLEN (14 sep 2026, ADR 0144 "De Wat-Als-pagina gaat op in de tijdas"): WF-REKEN-12, 13, 14, 15, 16, 18, 19, 20 (8 van de 24) zijn met de standalone Wat-Als-pagina (`/toekomst/whatif`), de bewaarde wat-als-scenario's en het what-if-AI-suggestiepad verwijderd. De tellingen in deze tabel zijn niet herrekend (narratieve stand, geen generator — zie de opmerking bovenaan dit document); de code-artefacten (`lib/uat/catalog.ts`, `lib/uat/acceptance/reken.ts`) zijn wél bijgewerkt. Zie ook de vervallen-markering bij WF-TOEK-09 verderop.
 
 ## 1.2 Workflowtabellen per deelgebied
 
@@ -299,7 +301,7 @@ Kriticiteit: **KERN** = raakt financiële uitkomsten of gebruikersdata · **BELA
 | WF-TOEK-06 | Details: 'Zo werkt jouw grafiek'-walkthrough en jaar-op-jaar tabel | De volledige rekenroute achter de grafiek begrijpen en het jaar-op-jaar verloop als tabel controleren. | BELANGRIJK | ja | 3 |
 | WF-TOEK-07 | Eerste gebruik: Tips-modus (ballonnen-overlay) | Als nieuwe gebruiker de wijzende tips-ballonnen over de grafiek aan-/uitzetten (de eenmalige welkomstkaart is per ADR 0130 vervangen door de rondleiding op /overzicht, zie WF-OVZ-26). | OVERIG | ja | 4 |
 | WF-TOEK-08 | Rendement-scenario's en Monte Carlo over de grafiek leggen | Zien hoe gevoelig het pad is voor markten via scenario-lijnen (±2pp) en een Monte Carlo-waaier met slaagkans. | BELANGRIJK | ja | 2 |
-| WF-TOEK-09 | Opgeslagen wat-als-scenario's als spooklijn vergelijken | Eerder opgeslagen scenario's als ghost-lijnen naast het actuele plan leggen. | BELANGRIJK | ja | 2 |
+| WF-TOEK-09 | *VERVALLEN (14 sep 2026, ADR 0144)* — Opgeslagen wat-als-scenario's als spooklijn vergelijken | Eerder opgeslagen scenario's als ghost-lijnen naast het actuele plan leggen. Verwijderd met de standalone Wat-Als-pagina; geen acceptatiecriterium meer in `lib/uat/acceptance/toek.ts`. | BELANGRIJK | ja | 2 |
 | WF-TOEK-10 | Wat-als-sliders: inkomen, werkdagen, spaarquote en extra inleg live aanpassen | Direct op de tijdas verkennen wat sliderwijzigingen met de vrijheidsleeftijd doen. | KERN | ja | 3 |
 | WF-TOEK-11 | AOW-stop-simulatie: doorwerken tot AOW vergelijken | Bij een shortfall zien wat er gebeurt als je tot AOW doorwerkt en daarna pas onttrekt. | BELANGRIJK | ja | 3 |
 | WF-TOEK-12 | Fase-balk: de drie levensfasen verdiepen | Per fase (Opbouw/Overgang/Onttrekking) begrijpen wat er financieel gebeurt, met eigen cijfers. | BELANGRIJK | ja | 3 |
@@ -324,7 +326,9 @@ Kriticiteit: **KERN** = raakt financiële uitkomsten of gebruikersdata · **BELA
 | WF-TOEK-31 | Tijdas in huishoud- of partnerperspectief bekijken | De gezamenlijke of partner-vrijheidshorizon bekijken met gecombineerde FIRE-cijfers en partner-markers. | BELANGRIJK | ja | 3 |
 | WF-TOEK-32 | Verdieping onder de grafiek: trends en geplande acties | Het verloop van gezondheid en FIRE-leeftijd volgen en geplande acties afwerken. | OVERIG | ja | 2 |
 
-### Rekentools & wat-als (WF-REKEN)
+### Rekentools (WF-REKEN)
+
+VERVALLEN (14 sep 2026, ADR 0144 "De Wat-Als-pagina gaat op in de tijdas"): WF-REKEN-12, 13, 14, 15, 16, 18, 19, 20 zijn met de standalone Wat-Als-pagina (`/toekomst/whatif`) verwijderd — zie de markering per rij hieronder. Het inline-slider-gedrag op de tijdas zelf ("Verken je aannames") blijft bestaan als WF-TOEK-10.
 
 | ID | Naam | Doel | Kriticiteit | Rekenend | Varianten |
 |---|---|---|---|---|---|
@@ -339,15 +343,15 @@ Kriticiteit: **KERN** = raakt financiële uitkomsten of gebruikersdata · **BELA
 | WF-REKEN-09 | Bibliotheek-rekenhulp dupliceren naar eigen collectie | Een gedeelde rekenhulp kopiëren naar de eigen rekenhulpen om te bewaren en aan te passen. | KERN | nee | 3 |
 | WF-REKEN-10 | Publieke rekenhulp liken of unliken | Waardering uitspreken voor een gedeelde rekenhulp met optimistische UI en rollback. | OVERIG | nee | 2 |
 | WF-REKEN-11 | Publieke rekenhulp melden | Een misleidende of foutieve gedeelde rekenhulp rapporteren aan beheer. | OVERIG | nee | 3 |
-| WF-REKEN-12 | De Wat-Als bereiken: deeplink, inline sliders en dream gate | Vanaf de tijdas snel wat-als-aanpassingen doen en doorklikken naar de volledige Wat-Als-ervaring. | BELANGRIJK | ja | 4 |
-| WF-REKEN-13 | Wat-als-preset kiezen en effect aflezen | Met één klik een scenario activeren en het effect op vrijheidsleeftijd, doelbedrag en sparen zien. | KERN | ja | 4 |
-| WF-REKEN-14 | Scenario verfijnen met sliders en marktbias | Gedetailleerd schuiven aan inkomen, werkdagen, spaarquote, extra inleg en rendementen per vermogenscategorie. | KERN | ja | 3 |
-| WF-REKEN-15 | Levensgebeurtenissen in het scenario beheren met impact per event | Gebeurtenissen aan/uit zetten, toevoegen en bewerken en per gebeurtenis de FIRE-impact in maanden zien. | KERN | ja | 4 |
-| WF-REKEN-16 | Beslishulp: wat doe je met €X per maand extra? | Beleggen, aflossen en noodfonds vergelijken op vrijheidsleeftijd-impact en de keuze naar de tijdas exporteren. | KERN | ja | 3 |
+| WF-REKEN-12 | *VERVALLEN (14 sep 2026, ADR 0144)* — De Wat-Als bereiken: deeplink, inline sliders en dream gate | Vanaf de tijdas snel wat-als-aanpassingen doen en doorklikken naar de volledige Wat-Als-ervaring. | BELANGRIJK | ja | 4 |
+| WF-REKEN-13 | *VERVALLEN (14 sep 2026, ADR 0144)* — Wat-als-preset kiezen en effect aflezen | Met één klik een scenario activeren en het effect op vrijheidsleeftijd, doelbedrag en sparen zien. | KERN | ja | 4 |
+| WF-REKEN-14 | *VERVALLEN (14 sep 2026, ADR 0144)* — Scenario verfijnen met sliders en marktbias | Gedetailleerd schuiven aan inkomen, werkdagen, spaarquote, extra inleg en rendementen per vermogenscategorie. | KERN | ja | 3 |
+| WF-REKEN-15 | *VERVALLEN (14 sep 2026, ADR 0144)* — Levensgebeurtenissen in het scenario beheren met impact per event | Gebeurtenissen aan/uit zetten, toevoegen en bewerken en per gebeurtenis de FIRE-impact in maanden zien. | KERN | ja | 4 |
+| WF-REKEN-16 | *VERVALLEN (14 sep 2026, ADR 0144)* — Beslishulp: wat doe je met €X per maand extra? | Beleggen, aflossen en noodfonds vergelijken op vrijheidsleeftijd-impact en de keuze naar de tijdas exporteren. | KERN | ja | 3 |
 | WF-REKEN-17 | Wat-als-scenario's bewaren, laden, pinnen en verwijderen | Een samengesteld scenario onder een naam bewaren, terugladen en tot twee scenario's als grafiek-overlay pinnen. | KERN | ja | 4 |
-| WF-REKEN-18 | Onzekerheid (Monte Carlo) en grafiekweergaven verkennen | De p10-p90-onzekerheidsband tonen en wisselen tussen vermogenspad, opbouw en inkomsten/uitgaven-stromen. | BELANGRIJK | ja | 3 |
-| WF-REKEN-19 | Met Will over het scenario chatten en suggesties overnemen | Het scenario met Will bespreken en voorgestelde levensgebeurtenissen met één klik toevoegen. | BELANGRIJK | nee | 2 |
-| WF-REKEN-20 | Concrete acties uit het scenario halen | Na het schuiven deterministische actiesuggesties zien die het scenario dichterbij brengen. | OVERIG | ja | 2 |
+| WF-REKEN-18 | *VERVALLEN (14 sep 2026, ADR 0144)* — Onzekerheid (Monte Carlo) en grafiekweergaven verkennen | De p10-p90-onzekerheidsband tonen en wisselen tussen vermogenspad, opbouw en inkomsten/uitgaven-stromen. | BELANGRIJK | ja | 3 |
+| WF-REKEN-19 | *VERVALLEN (14 sep 2026, ADR 0144)* — Met Will over het scenario chatten en suggesties overnemen | Het scenario met Will bespreken en voorgestelde levensgebeurtenissen met één klik toevoegen. | BELANGRIJK | nee | 2 |
+| WF-REKEN-20 | *VERVALLEN (14 sep 2026, ADR 0144)* — Concrete acties uit het scenario halen | Na het schuiven deterministische actiesuggesties zien die het scenario dichterbij brengen. | OVERIG | ja | 2 |
 | WF-REKEN-21 | Inflatie & koopkracht doorrekenen | Zien hoeveel koopkracht en vrijheidsdagen een bedrag verliest door inflatie over 10/20/30 jaar. | BELANGRIJK | ja | 4 |
 | WF-REKEN-22 | Samengestelde interest doorrekenen | Zien hoe een maandelijkse inleg exponentieel groeit en welk deel rendement is. | BELANGRIJK | ja | 3 |
 | WF-REKEN-23 | Uitgave na pensioen: methode kiezen (pane) | De uitgavengrondslag van de pensioen-/FIRE-projectie kiezen: essentiële budgetten, behoud van inkomen of zelf samenstellen. | KERN | ja | 3 |
@@ -4764,7 +4768,7 @@ Scope: /toekomst (tijdas-landing), /toekomst/doelen, /toekomst/gebeurtenissen, /
   - Eenvoudig-modus: beide toggles verborgen.
 - **Cross-module effecten:** geen.
 
-#### WF-TOEK-09 — Opgeslagen wat-als-scenario's als spooklijn vergelijken
+#### WF-TOEK-09 — VERVALLEN (14 sep 2026, ADR 0144) — Opgeslagen wat-als-scenario's als spooklijn vergelijken
 - **Doel:** De gebruiker vergelijkt eerder opgeslagen wat-als-scenario's met zijn actuele plan als ghost-lijnen over de hoofdgrafiek.
 - **Trigger/startpunt:** De scenario-overlay-picker in de toggle-rij boven de grafiek (alleen zichtbaar als er opgeslagen scenario's bestaan).
 - **Eindresultaat:** Eén of meer gekleurde scenario-lijnen liggen naast het huidige pad; per scenario is de FIRE-leeftijd zichtbaar in de picker; ook de scenario-events verschijnen op de tijdlijn.
@@ -5158,7 +5162,7 @@ Scope: /toekomst (tijdas-landing), /toekomst/doelen, /toekomst/gebeurtenissen, /
 - **Varianten & randgevallen:**
   - ?strategie=open blijft op /toekomst (geen tab-redirect) en opent daar de modal.
   - Onbekende tab-waarde: geen redirect, gewone landing.
-  - /horizon/whatif → /toekomst/whatif (dreamgate) of /toekomst?whatif=open; /horizon/uitgaven-na-pensioen → /toekomst?uitgaven=open.
+  - /horizon/whatif → sinds ADR 0144 (14 sep 2026) altijd /toekomst?whatif=open (geen dreamgate-tak meer); /horizon/uitgaven-na-pensioen → /toekomst?uitgaven=open.
 - **Cross-module effecten:** dashboard-widgets en meldingen elders in de app gebruiken deze deeplinks.
 
 #### WF-TOEK-31 — Tijdas in huishoud- of partnerperspectief bekijken
@@ -5202,7 +5206,7 @@ Scope: /toekomst (tijdas-landing), /toekomst/doelen, /toekomst/gebeurtenissen, /
 - **/horizon (legacy) — LIVE, geen redirect.** Rendert dezelfde `HorizonPage` (tijdas + alle modals) maar zónder de landing-header, navigatiekaarten en colophon van /toekomst. Niet meer bereikbaar via de navigatie (lib/nav-config.ts verwijst uitsluitend naar /toekomst); alleen via oude links/bladwijzers. Alle tijdas-workflows hierboven gelden ook daar. (app/(app)/horizon/page.tsx)
 - **/horizon/strategie — redirect** naar /toekomst?strategie=open (single-hop). Alleen deeplink-doel. (app/(app)/horizon/strategie/page.tsx)
 - **/toekomst/strategie — pure redirect-route** naar /toekomst/gebeurtenissen?strategie=<focus>; heeft geen eigen UI. Alleen deeplink-doel. (app/(app)/toekomst/strategie/page.tsx)
-- **/horizon/whatif en /horizon/uitgaven-na-pensioen — redirects** naar respectievelijk /toekomst/whatif of /toekomst?whatif=open, en /toekomst?uitgaven=open. Alleen deeplink-doel. (beide page.tsx-bestanden bekeken)
+- **/horizon/whatif en /horizon/uitgaven-na-pensioen — redirects** naar respectievelijk /toekomst?whatif=open (sinds ADR 0144, 14 sep 2026 — geen dreamgate-tak meer) en /toekomst?uitgaven=open. Alleen deeplink-doel. (beide page.tsx-bestanden bekeken)
 - **/horizon/inflatie-koopkracht en /horizon/samengestelde-interest** — bestaan met eigen client-componenten in de map; niet geïnspecteerd (rekenhulp-onderwerpen vallen buiten dit deelgebied). Status live-of-redirect onbevestigd.
 - **Legacy event-formulier in horizon-client** (`showForm`, geopend via deeplink ?modal=life_events): een ouder, uitgebreid event-formulier met catalogusvelden en pensioen-PDF-upload dat parallel aan de nieuwe EventPane bestaat. Alleen via die deeplink bereikbaar — geen knop in de huidige UI leidt ernaartoe. (horizon-client.tsx regel 4218 e.v.)
 - **Modals BacktestingModal en WithdrawalModal** worden gemount en zijn via ?modal=backtesting / ?modal=withdrawal te openen, maar in de gelezen render is er géén zichtbare knop op /toekomst die ze opent (Scenario's/Monte Carlo verdiepen naar scenarios/simulations). Alleen deeplink-doel vanuit dashboard-widgets.
@@ -5222,9 +5226,11 @@ Scope: /toekomst (tijdas-landing), /toekomst/doelen, /toekomst/gebeurtenissen, /
 ---
 
 
-### Rekentools & wat-als (WF-REKEN)
+### Rekentools (WF-REKEN)
 
-Vooraf, over bereikbaarheid: `/toekomst/rekenhulp` en `/toekomst/whatif` staan in `SIMPLE_HIDDEN_NAV_HREFS` (`lib/nav-config.ts` r.136-139) en zijn in de Eenvoudig-weergave uit de navigatie verborgen, maar blijven via deeplink volledig bereikbaar — dat is bewust en testbaar gedrag. De bibliotheek is bereikbaar via de tekstlink "Open bibliotheek →" op de rekenhulp-pagina (niet via de hoofdnavigatie).
+VERVALLEN (14 sep 2026, ADR 0144 "De Wat-Als-pagina gaat op in de tijdas"): WF-REKEN-12, 13, 14, 15, 16, 18, 19, 20 (de standalone Wat-Als-pagina, `/toekomst/whatif`) zijn verwijderd — zie de markering per sectie hieronder. Het inline-slider-gedrag op de tijdas ("Verken je aannames") blijft bestaan als WF-TOEK-10.
+
+Vooraf, over bereikbaarheid: sinds ADR 0144 staat alléén nog `/toekomst/rekenhulp` in `SIMPLE_HIDDEN_NAV_HREFS` (`lib/nav-config.ts`) — `/toekomst/whatif` is met de standalone pagina vervallen en is nu zelf een kale redirect naar `/toekomst?whatif=open`, dus er is niets meer te verbergen. `/toekomst/rekenhulp` blijft in de Eenvoudig-weergave uit de navigatie verborgen, maar blijft via deeplink volledig bereikbaar — dat is bewust en testbaar gedrag. De bibliotheek is bereikbaar via de tekstlink "Open bibliotheek →" op de rekenhulp-pagina (niet via de hoofdnavigatie).
 
 #### WF-REKEN-01 — Een opgeslagen rekenhulp openen en doorrekenen
 - **Doel:** Als gebruiker wil ik een eerder bewaarde rekenhulp openen en met sliders/keuzes zien welk scenario voor mij het gunstigst uitpakt.
@@ -5425,7 +5431,7 @@ Vooraf, over bereikbaarheid: `/toekomst/rekenhulp` en `/toekomst/whatif` staan i
   - Heropenen reset de eerdere staat (geen "blijvende" bedanktekst).
 - **Cross-module effecten:** melding komt bij beheer terecht (admin-zijde buiten deze scope).
 
-#### WF-REKEN-12 — De Wat-Als bereiken: deeplink, inline sliders en dream gate
+#### WF-REKEN-12 — VERVALLEN (14 sep 2026, ADR 0144) — De Wat-Als bereiken: deeplink, inline sliders en dream gate
 - **Doel:** Als gebruiker wil ik vanaf de tijdas snel "wat als"-aanpassingen doen, en desgewenst doorklikken naar de volledige Wat-Als-ervaring.
 - **Trigger/startpunt:** Drie ingangen: (a) deeplink /toekomst/whatif zónder ?via=dreamgate, (b) deeplink /toekomst?whatif=open, (c) op de tijdas (/toekomst) de sectie "Verken je aannames".
 - **Eindresultaat:** (a) en (b) landen op de tijdas, gescrold naar de sectie "Verken je aannames"; vanuit de sectie-footer voert "Scenario's vergelijken →" een dream-transitie uit naar de volledige Wat-Als-pagina (/toekomst/whatif?via=dreamgate).
@@ -5444,7 +5450,7 @@ Vooraf, over bereikbaarheid: `/toekomst/rekenhulp` en `/toekomst/whatif` staan i
   - Laadfout: foutkaart met "Opnieuw laden".
 - **Cross-module effecten:** lege-staat-CTA leidt naar Overzicht › Bezittingen.
 
-#### WF-REKEN-13 — Een wat-als-preset kiezen en het effect aflezen
+#### WF-REKEN-13 — VERVALLEN (14 sep 2026, ADR 0144) — Een wat-als-preset kiezen en het effect aflezen
 - **Doel:** Als gebruiker wil ik met één klik een herkenbaar scenario ("Wat als ik...") activeren en direct zien wat dat doet met mijn vrijheidsleeftijd, doelbedrag en spaarbedrag.
 - **Trigger/startpunt:** Volledige Wat-Als-pagina (via WF-REKEN-12), blok "Wat als ik..." bovenin de controls.
 - **Eindresultaat:** De gekozen preset-kaart is actief (met samenvattingsgetal), de grafiek toont scenario- vs. werkelijkheidslijn met een uitleg-overlay, en de KPI-strip toont scenario-waarden + gekleurde delta's.
@@ -5465,7 +5471,7 @@ Vooraf, over bereikbaarheid: `/toekomst/rekenhulp` en `/toekomst/whatif` staan i
   - Privacy-masking: bedragen gemaskeerd wanneer de toggle aan staat.
 - **Cross-module effecten:** presets voegen alleen scenario-only events toe (niet in DB) — de echte tijdas verandert niet.
 
-#### WF-REKEN-14 — Het scenario verfijnen met sliders en marktbias
+#### WF-REKEN-14 — VERVALLEN (14 sep 2026, ADR 0144) — Het scenario verfijnen met sliders en marktbias
 - **Doel:** Als gebruiker wil ik gedetailleerd schuiven aan inkomen, werkdagen, spaarquote en extra inleg, en de verwachte marktrendementen per vermogenscategorie bijstellen.
 - **Trigger/startpunt:** Volledige Wat-Als-pagina: inklapbaar sliders-blok ("verfijn-niveau", standaard dicht) en het blok "Marktbias".
 - **Eindresultaat:** Elke slider-wijziging wordt een scenario-event; de grafiek en KPI's rekenen live mee (met korte vertraging bij snel schuiven — deferred rendering); marktbias verschuift rendementen per asset-groep met −5 tot +5 procentpunt.
@@ -5483,7 +5489,7 @@ Vooraf, over bereikbaarheid: `/toekomst/rekenhulp` en `/toekomst/whatif` staan i
   - Sliderbaseline zonder transactiedata: terugval op maand-surplus.
 - **Cross-module effecten:** geen persistentie — alles is client-side scenario-state totdat het als scenario wordt opgeslagen (WF-REKEN-17).
 
-#### WF-REKEN-15 — Levensgebeurtenissen in het scenario beheren en hun impact zien
+#### WF-REKEN-15 — VERVALLEN (14 sep 2026, ADR 0144) — Levensgebeurtenissen in het scenario beheren en hun impact zien
 - **Doel:** Als gebruiker wil ik echte en hypothetische levensgebeurtenissen in mijn wat-als-scenario aan/uit zetten, toevoegen, bewerken en per gebeurtenis zien hoeveel maanden vrijheid die kost of oplevert.
 - **Trigger/startpunt:** Volledige Wat-Als-pagina, blok "Levensgebeurtenissen".
 - **Eindresultaat:** De gebeurtenissenlijst toont per item een aan/uit-oog; de tijdlijn onder de grafiek toont actieve events; een impact-weergave toont FIRE-leeftijd mét/zonder de gebeurtenis en het verschil in maanden plus totale kosten.
@@ -5503,7 +5509,7 @@ Vooraf, over bereikbaarheid: `/toekomst/rekenhulp` en `/toekomst/whatif` staan i
   - Verwijderen van een DB-event verwijdert hem alleen uit het scénario, niet uit de database.
 - **Cross-module effecten:** leest de echte life_events van /toekomst/gebeurtenissen; schrijft er niets naar terug.
 
-#### WF-REKEN-16 — Beslishulp: wat doe je met €X per maand extra?
+#### WF-REKEN-16 — VERVALLEN (14 sep 2026, ADR 0144) — Beslishulp: wat doe je met €X per maand extra?
 - **Doel:** Als gebruiker wil ik voor een extra maandbedrag zien wat beleggen, aflossen of een noodfonds doet met mijn vrijheidsleeftijd, en de winnende optie eventueel op mijn tijdas zetten.
 - **Trigger/startpunt:** Volledige Wat-Als-pagina, blok Beslishulp ("Wat doe je met €X/mnd extra?").
 - **Eindresultaat:** Drie optiekaarten (Beleggen / Aflossen / Noodfonds) met per optie de FIRE-leeftijd en delta in maanden; de vroegst-vrije optie is als winnaar gemarkeerd; via een knop kan de keuze als levensgebeurtenis worden opgeslagen.
@@ -5539,7 +5545,7 @@ Vooraf, over bereikbaarheid: `/toekomst/rekenhulp` en `/toekomst/whatif` staan i
   - Fetch-fout bij laden van de lijst: stil falen (lijst blijft leeg).
 - **Cross-module effecten:** scenario's staan in een eigen tabel (via /api/scenarios); geen effect op de echte tijdas.
 
-#### WF-REKEN-18 — Onzekerheid (Monte Carlo) en grafiekweergaven verkennen
+#### WF-REKEN-18 — VERVALLEN (14 sep 2026, ADR 0144) — Onzekerheid (Monte Carlo) en grafiekweergaven verkennen
 - **Doel:** Als gebruiker wil ik de onzekerheidsband rond mijn projectie zien en kunnen wisselen tussen vermogenspad, vermogensopbouw en de inkomsten/uitgaven-stromen.
 - **Trigger/startpunt:** Volledige Wat-Als-pagina, knoppenrij boven de grafiek ("Onzekerheid", "Pad"/"Opbouw") en de uitklap "Inkomen & Uitgaven" onder de grafiek.
 - **Eindresultaat:** Met "Onzekerheid" aan toont de grafiek p10–p90-banden (1000 simulaties); "Opbouw" toont de gestapelde splitsing spaargeld vs. beleggingsgroei; "Inkomen & Uitgaven" toont in- en uitstroomlijnen of een bronnen-uitsplitsing; in- en uitzoomen kan via de zoombare container.
@@ -5557,7 +5563,7 @@ Vooraf, over bereikbaarheid: `/toekomst/rekenhulp` en `/toekomst/whatif` staan i
   - Mobiel: Inkomen & Uitgaven standaard dichtgeklapt (open op ≥768 px).
 - **Cross-module effecten:** geen.
 
-#### WF-REKEN-19 — Met Will over je scenario chatten en suggesties overnemen
+#### WF-REKEN-19 — VERVALLEN (14 sep 2026, ADR 0144) — Met Will over je scenario chatten en suggesties overnemen
 - **Doel:** Als gebruiker wil ik mijn wat-als-scenario met Will bespreken en voorgestelde levensgebeurtenissen met één klik aan het scenario toevoegen.
 - **Trigger/startpunt:** Volledige Wat-Als-pagina, chat-blok onderaan (lazy geladen); daarnaast krijgt de globale chat-knop automatisch een scenario-samenvatting als openingsbericht mee (na 500 ms slider-rust).
 - **Eindresultaat:** Chatgesprek met scenario-context (sliders-delta's, FIRE-leeftijden, actieve events); door Will voorgestelde levensgebeurtenissen verschijnen als kaartjes met een toevoegen-knop die ze in het scenario zet.
@@ -5573,7 +5579,7 @@ Vooraf, over bereikbaarheid: `/toekomst/rekenhulp` en `/toekomst/whatif` staan i
   - AI-antwoorden variëren; alleen de toevoeg-interactie is deterministisch testbaar.
 - **Cross-module effecten:** deelt de globale Will-chat-infrastructuur (AI-tokenverbruik).
 
-#### WF-REKEN-20 — Concrete acties uit je scenario halen
+#### WF-REKEN-20 — VERVALLEN (14 sep 2026, ADR 0144) — Concrete acties uit je scenario halen
 - **Doel:** Als gebruiker wil ik na het schuiven zien welke concrete stappen (bv. salarisonderhandeling, spaaropdracht) mijn scenario dichterbij brengen.
 - **Trigger/startpunt:** Volledige Wat-Als-pagina, blok met actie-suggesties (WhatIfActions), zichtbaar zodra het scenario van de baseline afwijkt.
 - **Eindresultaat:** Deterministische actiekaarten op basis van de slider-delta's, met impact-badge (bv. "+€500/mnd") en vrijheidstijd-vertaling; met een doorklik naar Will om de actie te bespreken.
@@ -5670,21 +5676,21 @@ Vooraf, over bereikbaarheid: `/toekomst/rekenhulp` en `/toekomst/whatif` staan i
 
 - **Legacy-routes — status per route:**
   - `/horizon` (exact) → config-redirect naar `/toekomst` (`next.config.ts` r.40). Geen eigen UI.
-  - `/horizon/whatif` → in-page redirect (`app/(app)/horizon/whatif/page.tsx`): mét `?via=dreamgate` naar `/toekomst/whatif?via=dreamgate`, anders naar `/toekomst?whatif=open`. Geen eigen UI meer; het client-bestand `whatif-page-client.tsx` in deze map is de implementatie die door /toekomst/whatif wordt geïmporteerd.
+  - `/horizon/whatif` → sinds 14 sep 2026 (ADR 0144) een KALE redirect naar `/toekomst?whatif=open` — de vroegere `?via=dreamgate`-tak en de standalone Wat-Als-pagina (`whatif-page-client.tsx`) bestaan niet meer.
   - `/horizon/inflatie-koopkracht` → config-redirect naar `/toekomst/inflatie-koopkracht` (`next.config.ts` r.53). Het page-bestand onder /horizon is de implementatiebron (re-export door de /toekomst-route) maar wordt zelf nooit meer als URL geserveerd.
   - `/horizon/samengestelde-interest` → config-redirect naar `/toekomst/samengestelde-interest` (r.52); zelfde re-export-constructie.
   - `/horizon/uitgaven-na-pensioen` → in-page redirect naar `/toekomst?uitgaven=open`. Geen eigen UI.
   - `/toekomst/uitgaven-na-pensioen` → in-page redirect naar `/toekomst?uitgaven=open` — deze route rendert dus zelf nóóit een pagina; hij bestaat alleen als deeplink-doel.
 - **Standalone-weergave van de uitgaven-client is dode UI:** `app/(app)/horizon/uitgaven-na-pensioen/uitgaven-client.tsx` bevat een niet-pane-modus (eigen back-link, inline save-blok met "Klaar ✓"-flash) die door geen enkele route meer gerenderd wordt — de enige consument is `components/app/horizon/uitgaven-pane.tsx` met `inPane`. De inline save-flash-tak is daarmee onbereikbaar.
 - **`/horizon`-fallback-takken in de tool-clients zijn onbereikbaar:** `inflatie-client.tsx` en `compound-interest-client.tsx` bevatten back-link-logica die op een `/horizon/...`-pathname terugvalt ("Toekomst" i.p.v. "De Toekomst"), maar door de config-redirects wordt dat pad nooit meer bediend.
-- **`SIMPLE_HIDDEN_NAV_HREFS`-gedrag:** /toekomst/rekenhulp en /toekomst/whatif ontbreken in de navigatie in Eenvoudig-weergave maar zijn via deeplink bereikbaar; hun TopBar-titels blijven werken (resolveRouteTitle). Testbaar, gedekt als randgeval in WF-REKEN-12 en via deeplink in WF-REKEN-01.
+- **`SIMPLE_HIDDEN_NAV_HREFS`-gedrag:** sinds ADR 0144 (14 sep 2026) staat alléén nog /toekomst/rekenhulp in deze lijst — /toekomst/whatif is met de standalone pagina vervallen (nu een kale redirect naar /toekomst?whatif=open) en heeft dus niets meer te verbergen. /toekomst/rekenhulp ontbreekt in de navigatie in Eenvoudig-weergave maar is via deeplink bereikbaar; de TopBar-titel blijft werken (resolveRouteTitle). Testbaar, gedekt via deeplink in WF-REKEN-01.
 
 #### Onbevestigd
 
 - **Kwaliteit/vorm van AI-gegenereerde rekenhulp-definities:** de generate/refine-flow (WF-REKEN-02) is structureel geverifieerd (route, validatie, limieten), maar wat Will inhoudelijk teruggeeft is LLM-runtime-gedrag en niet statisch te verifiëren.
 - **Prefab-seed in de database:** `lib/calculator/prefab-definitions.ts` beschrijft 12 gecureerde rekenhulpen die via een seed-migratie als publieke rijen in de bibliotheek zouden staan; of die rijen daadwerkelijk in de remote database aanwezig zijn (en dus de tier-secties Starters/Verdieping/Specialist vullen) is een datastand die ik niet uit de code kan bevestigen.
 - **Tier-gate 'ai' per account:** of een testaccount de AI-generatie mag gebruiken hangt af van abonnement/feature-flags (checkTierGate) — datastand.
-- **Dream-gate-animatie:** `useDreamTransition`/`triggerDream` wordt aangeroepen (horizon-client r.4146) en de `?via=dreamgate`-routing is geverifieerd, maar de animatie-implementatie zelf heb ik niet geïnspecteerd.
+- **Dream-gate-animatie:** VERVALLEN (14 sep 2026, ADR 0144) — `useDreamTransition`/`triggerDream` en de `?via=dreamgate`-routing bestonden op de standalone Wat-Als-pagina en zijn met haar verwijderd.
 - **Wat-als-chat-backend:** het server-endpoint achter `whatif-chat.tsx` (DefaultChatTransport) en de tool-afhandeling (suggest_life_event/suggest_action) heb ik niet gelezen; alleen de client-kant is geverifieerd.
 - **Bibliotheek-detail voor uitgelogde bezoekers:** de code kent een `canInteract=false`-pad (disabled Like/Dupliceer, "Log in om te liken"), maar of een niet-ingelogde bezoeker de (app)-route überhaupt bereikt hangt af van de auth-middleware, die buiten deze scope valt.
 - **Scenario-opslag-limieten:** of /api/scenarios een maximum aantal bewaarde scenario's hanteert heb ik niet geverifieerd (route niet gelezen).
@@ -8384,14 +8390,14 @@ Deze onderdelen bestaan in de code maar worden door geen enkele gebruikersworkfl
 - BacktestingModal en WithdrawalModal alleen via ?modal=backtesting|withdrawal (geen zichtbare knop op /toekomst)
 - Rekenhulp-navkaart linkt naar /toekomst/rekenhulp (buiten dit deelgebied)
 
-**Rekentools & wat-als:**
+**Rekentools:**
 - /horizon (exact) → config-redirect naar /toekomst — geen eigen UI
-- /horizon/whatif → in-page redirect (met ?via=dreamgate naar /toekomst/whatif?via=dreamgate, anders /toekomst?whatif=open); whatif-page-client.tsx in die map is de gedeelde implementatie
+- /horizon/whatif → sinds ADR 0144 (14 sep 2026) een kale redirect naar /toekomst?whatif=open; geen dreamgate-tak meer
 - /horizon/inflatie-koopkracht en /horizon/samengestelde-interest → config-redirects (next.config.ts) naar de /toekomst-tegenhangers; de page-bestanden onder /horizon zijn re-export-bronnen, nooit meer als URL geserveerd
 - /horizon/uitgaven-na-pensioen en /toekomst/uitgaven-na-pensioen → beide in-page redirect naar /toekomst?uitgaven=open; renderen zelf nooit een pagina
 - Standalone (niet-pane) weergave van uitgaven-client.tsx (eigen back-link + inline save-flash) is dode UI — enige consument is de UitgavenPane met inPane
 - /horizon-fallback-takken in inflatie-client.tsx en compound-interest-client.tsx (backHref '/horizon', label 'Toekomst') zijn onbereikbaar door de config-redirects
-- SIMPLE_HIDDEN_NAV_HREFS verbergt /toekomst/rekenhulp en /toekomst/whatif in Eenvoudig-weergave uit de nav; deeplinks blijven werken (testbaar gedrag, gedekt in WF-REKEN-01/12)
+- SIMPLE_HIDDEN_NAV_HREFS verbergt sinds ADR 0144 alléén nog /toekomst/rekenhulp in Eenvoudig-weergave uit de nav; deeplink blijft werken (testbaar gedrag, gedekt in WF-REKEN-01)
 
 **Mijn: profiel, huishouden, account & voorkeuren:**
 - /core/checkin is live UI (geen redirect) — enige nav-ingangen: check-in-banner op /overzicht (alleen eerste week vd maand, mits ingeschakeld en onvoltooid), MonthlyCheckinCard en de lege-staat-link op de historie-pagina; buiten die week geen zichtbare ingang voor een nieuwe check-in
@@ -8519,11 +8525,11 @@ Vermoedens die niet (volledig) in de code geverifieerd konden worden. Ze zijn be
 - EventChatPane 'Brainstormen met Will': AI-afhankelijk, alleen het accepteer-pad uit code bevestigd
 - SimChartModal-kassabon toont Bruto rendement uit DEFAULT_RETURN en vaste '2% inflatie'-tekst — wijkt vermoedelijk af van de gebruikersinstelling (fireParams); testwaardig in fase 2
 
-**Rekentools & wat-als:**
+**Rekentools:**
 - Inhoudelijke kwaliteit van AI-gegenereerde rekenhulp-definities (LLM-runtime, niet statisch verifieerbaar)
 - Of de 12 prefab-rekenhulpen (prefab-definitions.ts) daadwerkelijk als publieke seed-rijen in de remote database staan en de tier-secties vullen
 - Tier-gate 'ai' per testaccount (abonnement/feature-flags bepalen of AI-generatie mag)
-- Implementatie van de dream-gate-animatie (useDreamTransition) — alleen de aanroep en ?via=dreamgate-routing geverifieerd
+- VERVALLEN: de dream-gate-animatie (useDreamTransition) is met de standalone Wat-Als-pagina verwijderd (14 sep 2026, ADR 0144)
 - Server-endpoint en tool-afhandeling achter de wat-als-chat (whatif-chat.tsx) — alleen client-kant gelezen
 - Of niet-ingelogde bezoekers de bibliotheek-detailpagina bereiken (canInteract=false-pad met disabled Like/Dupliceer) — hangt af van auth-middleware
 - Eventuele limiet op het aantal bewaarde wat-als-scenario's (/api/scenarios-route niet gelezen)
@@ -8598,9 +8604,9 @@ Zestien plekken beschrijven twee deelgebieden (deels) dezelfde flow. Dat is bewu
 | WF-MIJN-17 ≡ WF-NAV-11 (privacy-masking app-breed) | NAV | RAPP-13 blijft als rapport-specifieke toepassing |
 | WF-MIJN-23 ≡ WF-NAV-10 (weergavemodus Eenvoudig⇄Volledig) | NAV | OVZ-18 en SCHULD-19 als oppervlak-steekproeven |
 | WF-START-15 ≡ WF-NAV-13 (uitloggen) | START | START-25 (uitloggen vanuit onboarding) blijft apart |
-| WF-TOEK-10 ≡ WF-REKEN-12/13/14 (wat-als-sliders) | verdeeld | TOEK: inline-gedrag op de tijdas; REKEN: volledige whatif-pagina |
+| WF-TOEK-10 (wat-als-sliders) | TOEK | VERVALLEN (14 sep 2026, ADR 0144): WF-REKEN-12/13/14 (de volledige whatif-pagina) bestaan niet meer — WF-TOEK-10 is sindsdien de enige wat-als-ervaring, geen overlap meer |
 | WF-TOEK-27 ≡ WF-REKEN-23/24 (uitgaven na pensioen, zelfde UitgavenPane) | REKEN | TOEK verwijst |
-| WF-TOEK-09 ≡ WF-REKEN-17 (opgeslagen wat-als als grafiek-overlay/spooklijn) | TOEK | REKEN verwijst |
+| WF-TOEK-09 / WF-REKEN-17 | — | BEIDE VERVALLEN: WF-TOEK-09 (opgeslagen wat-als als spooklijn) op 14 sep 2026 (ADR 0144); WF-REKEN-17 (bewaarde wat-als-scenario's) had al geen eigen UAT-scenario |
 | WF-TOEK-08 ~ WF-REKEN-18 (Monte Carlo/onzekerheidsband) | verdeeld | zelfde motor, twee oppervlakken — beide toetsen hun eigen oppervlak, cijfer-gelijkheid via KRUIS |
 | WF-BUDGET-13 ≡ WF-CASH-25/26/28 (transacties categoriseren: AI, handmatig, bulk, regels, sleepmodus) | CASH | BUDGET toetst alleen de doorwerking op budget-realisatie |
 | WF-BUDGET-24 ⊂ WF-RAPP-07 (maandelijks budgetrapport) | RAPP | BUDGET toetst alleen de ingang vanaf de budgetpagina |
@@ -11164,7 +11170,7 @@ Wél altijd exact narekenbaar, ook in dit deelgebied: invoer-echo's (een gebeurt
   **Berekening verwachting (toetsvorm a — delta/richting):** de optimistische scenario-lijn (8%) moet op elk toekomstig jaar een gelijk-of-hoger vermogen tonen dan de basislijn (6%); de pessimistische (4%) gelijk-of-lager.
 - **c. Randgeval:** zet de grafiek in "Opbouw"-modus → *verwacht:* beide toggles verdwijnen; zet weergavemodus op "Eenvoudig" → *verwacht:* zelfde.
 
-#### UAT-TOEK-09 — Opgeslagen wat-als-scenario's als spooklijn vergelijken (LEIDEND, dekt WF-TOEK-09)
+#### UAT-TOEK-09 — VERVALLEN (14 sep 2026, ADR 0144) — Opgeslagen wat-als-scenario's als spooklijn vergelijken (dekte WF-TOEK-09)
 - **Kriticiteit:** BELANGRIJK · **Platform:** webapp · **Rooktest:** nee · **Duur:** ~5 min
 - **Preconditie:** persona `willem` geladen — heeft al een opgeslagen wat-af-scenario **"Vroeg stoppen op 50"** (seed: maandinkomen €6.500, spaarquote 55%, rendement 6,5%, extra inleg €500, vroegpensioen-event op leeftijd 50, kleurindex 1, `fireAge: 50`).
 - **a. Happy path:** open `/toekomst` → klik de scenario-overlay-picker boven de grafiek → *verwacht:* lijst toont **"Vroeg stoppen op 50"** met FIRE-leeftijd **50** en een kleur (kleurindex 1 uit `WHATIF_SCENARIO_COLORS`) → vink aan → *verwacht:* een gekleurde ghost-lijn verschijnt naast Willems echte pad; de scenario-events (het vroegpensioen-event op leeftijd 50) verschijnt ook als marker op de tijdlijn.
@@ -11172,7 +11178,7 @@ Wél altijd exact narekenbaar, ook in dit deelgebied: invoer-echo's (een gebeurt
 - **b. Randgeval — meerdere scenario's:** maak via `/toekomst/whatif` een tweede scenario op (bv. "Later stoppen op 62") en sla op → *verwacht:* de picker toont nu 2 rijen, elk met eigen kleur; vink beide aan → *verwacht:* 2 ghost-lijnen tegelijk, explainer-tekst wisselt van enkelvoud naar meervoud.
 - **c. Foutpad — geen scenario's:** verwijder (of laad een verse persona zonder) opgeslagen scenario's → *verwacht:* de picker rendert helemaal niet (geen lege staat, geen knop).
 
-#### UAT-TOEK-10 — Wat-als-sliders inline op de tijdas (scope: alléén het inline-gedrag; de volledige pagina → UAT-REKEN-12/13/14) (dekt WF-TOEK-10)
+#### UAT-TOEK-10 — Wat-als-sliders inline op de tijdas ("Verken je aannames" — sinds ADR 0144, 14 sep 2026, de enige wat-als-ervaring; de standalone Wat-Als-pagina is vervallen) (dekt WF-TOEK-10)
 - **Kriticiteit:** KERN · **Platform:** webapp · **Rooktest:** nee · **Duur:** ~6 min
 - **Preconditie:** persona `willem` geladen (huidig maandinkomen €6.500)
 - **a. Happy path:** scroll naar de sectie "Verken je aannames" (katern II) onder de grafiek → *verwacht:* Vrijheidsas + vier sliders zichtbaar, "Rendement"-blok ingeklapt → verschuif "Spaarquote" omhoog → *verwacht:* de **basislijn blijft exact staan**; er verschijnt een gestippelde inkt-lijn "Jouw wat-als" mét FIRE-stip, de "Wat-als"-pill boven de grafiek toont een FIRE-delta (bv. "−X mnd"), de Vrijheidsas-cijferrij toont basis → wat-als, en levensinkomenstrook + guardrail-kompas dragen een "Jouw wat-als"-chip en tonen scenario-cijfers.
@@ -11187,7 +11193,7 @@ Wél altijd exact narekenbaar, ook in dit deelgebied: invoer-echo's (een gebeurt
   2. **Herstel:** klik de herstel-actie in de banner → *verwacht:* de doelwaarden op `/toekomst/doelen` keren terug naar de eerder vastgelegde stand; de banner verdwijnt.
   3. **Loslaten:** klik "Doelsituatie loslaten" → *verwacht:* de vier parameter-doelen verdwijnen uit `/toekomst/doelen`, de wat-als-sectie keert terug naar de gewone verken-stand (geen "vastgelegd"-indicator meer).
   **Berekening verwachting (toetsvorm b — consistentie):** elk vastgelegd parameter-doel moet dezelfde waarde tonen als de bijbehorende slider/uitkomst had op het moment van vastleggen (spaarquote/salaris/rendement = sliderwaarde; vrijheidsleeftijd = de wat-als-FIRE-leeftijd + marge) — geen losse herberekening op de doelenpagina.
-- *Verwijzing: de volledige wat-als-omgeving (via footer-link "Scenario's vergelijken →") wordt getoetst onder UAT-REKEN-12/13/14; het handmatig toevoegen/bewerken van doelen wordt getoetst onder UAT-TOEK-22/23.*
+- *Verwijzing: de standalone Wat-Als-omgeving (voorheen bereikbaar via footer-link "Scenario's vergelijken →") is VERVALLEN (14 sep 2026, ADR 0144) — dit inline-gedrag is sindsdien de enige wat-als-ervaring; het handmatig toevoegen/bewerken van doelen wordt getoetst onder UAT-TOEK-22/23.*
 
 #### UAT-TOEK-11 — AOW-stop-simulatie: doorwerken tot AOW vergelijken (dekt WF-TOEK-11)
 - **Kriticiteit:** BELANGRIJK · **Platform:** webapp · **Rooktest:** nee · **Duur:** ~4 min
@@ -11363,7 +11369,7 @@ WF-TOEK-27 (uitgave na pensioen verfijnen) → gedekt door UAT-REKEN-23/24.
   1. Open `/toekomst?tab=gebeurtenissen&strategie=aow` → *verwacht:* redirect naar `/toekomst/gebeurtenissen?strategie=aow`, met de AOW-strategie-editor open.
   2. Open `/toekomst/strategie?focus=huis` → *verwacht:* redirect naar `/toekomst/gebeurtenissen?strategie=huis`.
   3. Open `/horizon/strategie` → *verwacht:* redirect naar `/toekomst?strategie=open` → Strategie-modal opent op de tijdas.
-  4. Open `/horizon/whatif` → *verwacht:* redirect naar `/toekomst/whatif` (of `?whatif=open`); open `/horizon/uitgaven-na-pensioen` → *verwacht:* redirect naar `/toekomst?uitgaven=open`.
+  4. Open `/horizon/whatif` → *verwacht:* redirect naar `/toekomst?whatif=open` (sinds ADR 0144, 14 sep 2026, altijd deze bestemming — geen dreamgate-tak meer); open `/horizon/uitgaven-na-pensioen` → *verwacht:* redirect naar `/toekomst?uitgaven=open`.
   5. Open `/horizon` zonder parameters → *verwacht:* dezelfde tijdas (HorizonPage) rendert LIVE, maar zonder landing-header en navigatiekaarten.
 - **b. Bevestigd randgeval — URL-vervanging naar /horizon:** open `/toekomst?strategie=open` (dus vanaf `/toekomst`, niet vanaf `/horizon`) → wacht tot de modal opent → *verwacht (expliciete verwachting/bevinding, per code-onderzoek in `horizon-client.tsx` regel ~494):* de adresbalk verandert naar **`/horizon`** (het searchParams-effect doet altijd `router.replace('/horizon')` na verwerking, ook al was je op `/toekomst` gestart) — de modal blijft wel gewoon open. Bevestig dit gedrag expliciet als bevinding; het is een verrassend maar volgens de code bedoeld/onvermeden neveneffect, geen crash.
 - **c. Foutpad — onbekende tab-waarde:** open `/toekomst?tab=onzin` → *verwacht:* geen redirect, gewone landing (parameter wordt genegeerd).
@@ -11386,7 +11392,7 @@ WF-TOEK-31 (tijdas in huishoud-/partnerperspectief) → gedekt door UAT-NAV-19 (
 
 ---
 
-### UAT-scenario's — Rekentools & wat-als (UAT-REKEN)
+### UAT-scenario's — Rekentools (UAT-REKEN)
 
 **Strategie.** Dit document werkt de 24 workflows uit `reken.md` (fase 1) uit tot uitvoerbare UAT-scenario's, in UI-taal, met synthetische testdata uit de vijf superadmin-persona's (`lib/test-personas.ts`). Als vaste testpersona's gebruik ik: **Marijke Vermeer** ("De gepensioneerde", DOB 1957-06-20, `estimated_monthly_expenses`=€2.800, `net_monthly_income`=€3.400, `expected_return`=5%, geen schulden) voor de drie exact-narekenbare rekentools (inflatie, samengestelde interest, uitgaven na pensioen) omdat haar profiel géén afhankelijkheid heeft van gerandomiseerde transactiedata; en **Tessa Compleet** ("De complete tester", 42 jaar, huishouden, 12 assets + 12 schulden incl. twee hypotheken) voor de rekenhulp-bibliotheek en de volledige Wat-Als-pagina, omdat zij als enige persona alle vereisten (hypotheek, huishouden, brede assetmix) tegelijk vervult.
 
@@ -11504,7 +11510,7 @@ Dekking volgt de kriticiteit uit fase 1: **KERN** = a+b+c+d, **BELANGRIJK** = a+
 
 ---
 
-#### UAT-REKEN-12 — De Wat-Als bereiken: deeplink, inline sliders en dream gate (dekt WF-REKEN-12)
+#### UAT-REKEN-12 — VERVALLEN (14 sep 2026, ADR 0144) — De Wat-Als bereiken: deeplink, inline sliders en dream gate (dekte WF-REKEN-12)
 - **Kriticiteit:** BELANGRIJK · **Platform:** webapp · **Rooktest:** nee · **Duur:** ~6 min
 - **Preconditie:** persona **Tessa Compleet**. Het inline-slider-gedrag zélf (op de tijdas) is diepgetest in **UAT-TOEK-10** — hier toets ik alleen de drie ingangen en de dream-transitie.
 - **a. Happy path:** typ `/toekomst/whatif` rechtstreeks in de adresbalk → *verwacht:* redirect naar `/toekomst?whatif=open`, de pagina scrollt naar de sectie "Verken je aannames", de URL wordt daarna opgeschoond. Verschuif één slider kort (bv. inkomen) → *verwacht:* er verschijnt een gestippelde wat-als-lijn naast de onveranderde basislijn (richting: hoger inkomen → wat-als eerder FIRE — zie UAT-TOEK-10 voor de diepte-toets). Klik in de sectie-footer "Scenario's vergelijken →" → *verwacht:* na de overgangsanimatie opent `/toekomst/whatif?via=dreamgate` met kop "Jouw toekomst, jouw keuze". Klik "Terug naar Toekomst" linksboven → *verwacht:* je landt op /toekomst.
@@ -11512,7 +11518,7 @@ Dekking volgt de kriticiteit uit fase 1: **KERN** = a+b+c+d, **BELANGRIJK** = a+
 
 ---
 
-#### UAT-REKEN-13 — Een wat-als-preset kiezen en het effect aflezen (dekt WF-REKEN-13)
+#### UAT-REKEN-13 — VERVALLEN (14 sep 2026, ADR 0144) — Een wat-als-preset kiezen en het effect aflezen (dekte WF-REKEN-13)
 - **Kriticiteit:** KERN · **Platform:** webapp · **Rooktest:** nee · **Duur:** ~10 min
 - **Preconditie:** persona **Tessa Compleet**, op de volledige Wat-Als-pagina (via UAT-REKEN-12).
 - **a. Happy path:** kies categorie "werk", klik de preset **"Salarisverhoging"** (+10% inkomen) → *verwacht:* kaart licht op met samenvatting ("+10% inkomen"); KPI-strip toont: Vrijheidsleeftijd (scenario) lager dan de baseline-leeftijd met een groene delta-badge ("X jaar eerder vrij"); Jaarlijks sparen hoger dan baseline met een groene delta (positief, van dezelfde orde grootte als 10% van Tessa's netto maandinkomen ≈ €7.600 → richting: delta ruwweg in de buurt van +€760/mnd bruto-effect, geen exact getal want kernel-afhankelijk); Doelbedrag blijft ongeveer gelijk aan de baseline (inkomen raakt het FIRE-doelbedrag niet direct). Klik "Volledige kassabon" → *verwacht:* BottomSheet met de Scenariovergelijking (kassabon-weergave, werkelijkheid vs. scenario per regel). Klik de preset nogmaals uit → *verwacht:* terug naar baseline, alle delta's verdwijnen.
@@ -11522,7 +11528,7 @@ Dekking volgt de kriticiteit uit fase 1: **KERN** = a+b+c+d, **BELANGRIJK** = a+
 
 ---
 
-#### UAT-REKEN-14 — Het scenario verfijnen met sliders en marktbias (dekt WF-REKEN-14)
+#### UAT-REKEN-14 — VERVALLEN (14 sep 2026, ADR 0144) — Het scenario verfijnen met sliders en marktbias (dekte WF-REKEN-14)
 - **Kriticiteit:** KERN · **Platform:** webapp+mobiel (sliders zijn aanraak-relevant) · **Rooktest:** nee · **Duur:** ~12 min
 - **Preconditie:** persona **Tessa Compleet**, volledige Wat-Als-pagina.
 - **a. Happy path:** klap het sliders-blok open → *verwacht:* elke slider toont de baselinewaarde; verschuif "spaarquote" omhoog → *verwacht:* delta-badge (+X%-punt) verschijnt, KPI's en grafiek passen zich direct (met korte vertraging bij snel schuiven) aan in de richting van een lagere FIRE-leeftijd. Open "Marktbias", verschuif de master-slider naar +2 procentpunt → *verwacht:* alle vermogenscategorieën verschuiven gelijk mee, FIRE-leeftijd daalt verder (hoger verwacht rendement). Zet de spaarquote-slider terug op de baseline → *verwacht:* de delta-badge verdwijnt en het bijbehorende scenario-event wordt opgeruimd (grafiek keert terug naar de preset-baseline).
@@ -11532,7 +11538,7 @@ Dekking volgt de kriticiteit uit fase 1: **KERN** = a+b+c+d, **BELANGRIJK** = a+
 
 ---
 
-#### UAT-REKEN-15 — Levensgebeurtenissen in het scenario beheren en hun impact zien (dekt WF-REKEN-15)
+#### UAT-REKEN-15 — VERVALLEN (14 sep 2026, ADR 0144) — Levensgebeurtenissen in het scenario beheren en hun impact zien (dekte WF-REKEN-15)
 - **Kriticiteit:** KERN · **Platform:** webapp · **Rooktest:** nee · **Duur:** ~10 min
 - **Preconditie:** persona **Tessa Compleet** — heeft al 5 echte levensgebeurtenissen (Kinderen naar middelbare school, Verbouwing eigen woning, Schenking aan kinderen, Aanvullend pensioen, AOW).
 - **a. Happy path:** bekijk de gebeurtenissenlijst (geladen uit haar echte tijdas) → klik het oog-icoon op "Schenking aan kinderen" (eenmalige kosten €30.000 op leeftijd 60) om hem tijdelijk uit het scenario te halen → *verwacht:* de projectie schuift naar een iets vroegere/hogere uitkomst (minder eenmalige uitgave); herlaad de pagina → *verwacht:* de gebeurtenis staat weer aan (niet gepersisteerd). Open de impact van "Verbouwing eigen woning" (eenmalig €45.000 op leeftijd 50) → *verwacht:* FIRE-leeftijd met vs. zonder de gebeurtenis, het verschil in maanden, en de totale kosten (€45.000 eenmalig, geen maandcomponent) worden getoond.
@@ -11542,7 +11548,7 @@ Dekking volgt de kriticiteit uit fase 1: **KERN** = a+b+c+d, **BELANGRIJK** = a+
 
 ---
 
-#### UAT-REKEN-16 — Beslishulp: wat doe je met €X per maand extra? (dekt WF-REKEN-16)
+#### UAT-REKEN-16 — VERVALLEN (14 sep 2026, ADR 0144) — Beslishulp: wat doe je met €X per maand extra? (dekte WF-REKEN-16)
 - **Kriticiteit:** KERN · **Platform:** webapp+mobiel (bedrag-slider is aanraak-relevant) · **Rooktest:** nee · **Duur:** ~10 min
 - **Preconditie:** persona **Tessa Compleet** — heeft 12 actieve schulden (twee hypotheken @ 3,1%/3,6%, plus 10 kleinere leningen tussen 0%–14%).
 - **a. Happy path:** stel het extra maandbedrag in op €500 → *verwacht:* drie kaarten (Beleggen / Aflossen / Noodfonds), elk met een eigen FIRE-leeftijd en delta t.o.v. baseline; de vroegst-vrije optie is gemarkeerd als winnaar. **Consistentie-verwachting:** de gewogen gemiddelde schuldrente van Tessa (saldo-gewogen over alle 12 schulden) ligt rekenkundig rond **3,2–3,3%** (gedomineerd door de twee hypotheken van samen €410.000 tegen 3,1–3,6%, tegenover kleinere posten tot 14%) — omdat haar `expected_return` (7%) hoger ligt dan deze gewogen schuldrente, hoort de kaart **Beleggen** de vroegste FIRE-leeftijd te tonen (hoger verwacht rendement, ook al draagt beleggen Box-3-belastingdruk terwijl aflossen belastingvrij is). Bij twijfel: vergelijk met de oracle-tabellen op /beheer/horizon-kernel.
@@ -11557,7 +11563,7 @@ Dekking volgt de kriticiteit uit fase 1: **KERN** = a+b+c+d, **BELANGRIJK** = a+
 
 ---
 
-#### UAT-REKEN-18 — Onzekerheid (Monte Carlo) en grafiekweergaven verkennen (dekt WF-REKEN-18)
+#### UAT-REKEN-18 — VERVALLEN (14 sep 2026, ADR 0144) — Onzekerheid (Monte Carlo) en grafiekweergaven verkennen (dekte WF-REKEN-18)
 - **Kriticiteit:** BELANGRIJK · **Platform:** webapp · **Rooktest:** nee · **Duur:** ~8 min
 - **Preconditie:** persona **Tessa Compleet**, volledige Wat-Als-pagina. **Scope:** uitsluitend het Wat-Als-oppervlak — de tijdas-variant van Monte Carlo is UAT-TOEK-08.
 - **a. Happy path:** in "Pad"-modus, klik "Onzekerheid" → *verwacht:* p10–p90-onzekerheidsband rond de deterministische lijn, band wordt breder naarmate verder in de tijd (grotere spreiding op lange termijn); legenda toont de percentiel-duiding. **Let op:** deze band gebruikt de losstaande, legacy `runMonteCarlo`-engine (1.000 simulaties, verwacht rendement 7%, volatiliteit 15% — géén horizon-kernel) — er is dus GEEN oracle-vergelijking van toepassing, wel de statistische sanity-check dat de band symmetrisch-achtig rond de deterministische lijn ligt en niet triviaal smal/breed is. Wissel naar "Opbouw" → *verwacht:* de "Onzekerheid"-knop verdwijnt (niet beschikbaar in Opbouw-modus); grafiek toont een gestapelde splitsing spaargeld vs. beleggingsgroei. Wissel terug naar "Pad".
@@ -11565,7 +11571,7 @@ Dekking volgt de kriticiteit uit fase 1: **KERN** = a+b+c+d, **BELANGRIJK** = a+
 
 ---
 
-#### UAT-REKEN-19 — Met Will over je scenario chatten en suggesties overnemen (dekt WF-REKEN-19)
+#### UAT-REKEN-19 — VERVALLEN (14 sep 2026, ADR 0144) — Met Will over je scenario chatten en suggesties overnemen (dekte WF-REKEN-19)
 - **Kriticiteit:** BELANGRIJK · **Platform:** webapp · **Rooktest:** nee · **Duur:** ~6 min
 - **Preconditie:** persona **Tessa Compleet**, volledige Wat-Als-pagina met een actief scenario (bv. de preset uit UAT-REKEN-13).
 - **a. Happy path:** scroll naar het chat-blok (laadt lazy, korte spinner) → stel een vraag over het scenario → *verwacht:* Will antwoordt met scenario-context (sliders-delta's, FIRE-leeftijden, actieve events zijn meegestuurd — **AI-antwoordinhoud is niet-deterministisch, alleen het toevoeg-mechanisme is deterministisch testbaar**). Als Will een levensgebeurtenis-kaart voorstelt, klik de toevoegen-knop → *verwacht:* de gebeurtenis wordt aan het scenario toegevoegd en de projectie past zich meetbaar aan (richting-toets, geen exact getal).
@@ -11573,7 +11579,7 @@ Dekking volgt de kriticiteit uit fase 1: **KERN** = a+b+c+d, **BELANGRIJK** = a+
 
 ---
 
-#### UAT-REKEN-20 — Concrete acties uit je scenario halen (dekt WF-REKEN-20)
+#### UAT-REKEN-20 — VERVALLEN (14 sep 2026, ADR 0144) — Concrete acties uit je scenario halen (dekte WF-REKEN-20)
 - **Kriticiteit:** OVERIG · **Platform:** webapp · **Rooktest:** nee · **Duur:** ~3 min
 - **Preconditie:** persona **Tessa Compleet**, volledige Wat-Als-pagina, scenario gelijk aan baseline (geen wijzigingen).
 - **a. Happy path:** controleer eerst dat het actieblok leeg/afwezig is (scenario = baseline). Wijzig vervolgens de inkomen-slider met exact **+€500/mnd** → *verwacht:* er verschijnt een actiekaart met impact-badge die letterlijk **"+€500/mnd"** toont (impactbedragen zijn de slider-delta's zelf, géén aparte motor — dus dit ís exact narekenbaar: de badge moet cijfermatig overeenkomen met de getypte sliderwijziging) plus een vrijheidstijd-vertaling. Klik "bespreek met Will" → *verwacht:* de globale chat opent met deze actie als context.
@@ -13527,17 +13533,17 @@ Elke fase-1-workflow is gedekt: 1-op-1 door het gelijk genummerde UAT-scenario, 
 
 | Workflow | Gedekt door | Toelichting |
 |---|---|---|
-| WF-TOEK-10 | UAT-TOEK-10 | alleen inline tijdas-gedrag; whatif-pagina → UAT-REKEN-12/13/14 |
+| WF-TOEK-10 | UAT-TOEK-10 | sinds ADR 0144 (14 sep 2026) de enige wat-als-ervaring; de standalone whatif-pagina (voorheen UAT-REKEN-12/13/14) is vervallen |
 | WF-TOEK-27 | UAT-REKEN-23/24 | afbakening 1.4 — geen eigen scenario |
 | WF-TOEK-31 | UAT-NAV-19 | afbakening 1.4 — geen eigen scenario |
 
-### Rekentools & wat-als (WF-REKEN)
+### Rekentools (WF-REKEN)
 
 1-op-1 gedekt (WF-REKEN-NN → UAT-REKEN-NN): nrs. 01, 02, 03, 04, 05, 06, 07, 08, 09, 10, 11, 12, 13, 14, 15, 16, 18, 19, 20, 21, 22, 23, 24.
 
 | Workflow | Gedekt door | Toelichting |
 |---|---|---|
-| WF-REKEN-17 | UAT-TOEK-09 | afbakening 1.4 — geen eigen scenario |
+| WF-REKEN-17 | — | BEIDE VERVALLEN (14 sep 2026, ADR 0144): WF-REKEN-17 had al geen eigen scenario (verwees naar UAT-TOEK-09); UAT-TOEK-09 zelf is sindsdien ook vervallen |
 
 ### Mijn: profiel, huishouden, account & voorkeuren (WF-MIJN)
 

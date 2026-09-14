@@ -20,7 +20,7 @@
 import { useState, useEffect } from 'react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { readSliderValueFromEvents } from '@/lib/scenario-events'
-import type { WhatIfEvent } from '@/components/app/horizon/whatif-events'
+import type { WhatIfEvent } from '@/lib/types/horizon-whatif'
 import type { WhatIfOverrides } from '@/components/app/horizon/whatif-sliders'
 import type { AssetCategorie } from '@/lib/horizon-kernel/types'
 import {

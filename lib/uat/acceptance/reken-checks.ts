@@ -6,23 +6,24 @@
  *  1. `reken.engine.test.ts` (vitest/CI): `expect(actual).toBe(expected)`.
  *  2. de in-app regressietest-pagina (`lib/regression-tests/suites/uat-reken.ts`).
  *
- * Alle 8 checks roepen ÉCHTE productiefuncties aan — geen mirrors nodig in
+ * Alle 6 checks roepen ÉCHTE productiefuncties aan — geen mirrors nodig in
  * deze zone (in tegenstelling tot RAPP/NAV, waar server-only routes/pages een
  * mirror afdwongen). De rekenhulp-evaluator, de twee standalone-tool-grafiek-
- * functies, de aspiraties-optelsom en de budget-/schuldrente-helpers zijn
- * allemaal pure, client-bundelbare functies met injecteerbare invoer.
+ * functies, de aspiraties-optelsom en de budget-helpers zijn allemaal pure,
+ * client-bundelbare functies met injecteerbare invoer.
+ *
+ * VERVALLEN (14 sep 2026, ADR 0144): de checks voor WF-REKEN-16
+ * (`weightedDebtRate`) en WF-REKEN-20 zijn verwijderd samen met de
+ * standalone Wat-Als-pagina — zie de vervallen-notitie bovenaan `reken.ts`.
  */
 
 import { evaluateCalculator } from '@/lib/calculator/evaluate'
 import { PREFAB_CALCULATORS } from '@/lib/calculator/prefab-definitions'
 import { buildLifeEventDraft } from '@/lib/calculator/to-life-event'
-import { weightedDebtRate } from '@/lib/horizon/whatif-beslishulp.model'
-import type { Debt } from '@/lib/debt-data'
 import { computeInflationErosion } from '@/lib/horizon/inflation-erosion'
 import { computeCompoundInterest } from '@/lib/horizon/compound-interest'
 import { computeYearlyMustExpenses, computeRetirementExpenses, type BudgetRow } from '@/lib/budget-utils'
 import { computeAspirationTotal, type AspirationAnswers } from '@/lib/retirement-aspirations'
-import { formatMaskedCurrency } from '@/lib/format'
 import { REKEN_ACCEPTANCE } from './reken'
 import type { AcceptanceCriterion } from './types'
 
@@ -51,48 +52,6 @@ function criterion(workflow: string): AcceptanceCriterion {
 
 function fx(n: number, decimals: number): string {
   return n.toFixed(decimals)
-}
-
-/** Minimale, geldige synthetische Debt-rij — alleen de velden die
- *  `weightedDebtRate` daadwerkelijk leest (`is_active`, `current_balance`,
- *  `interest_rate`) zijn betekenisvol; de rest is neutrale opvulling. */
-function makeDebt(overrides: Partial<Debt> & Pick<Debt, 'current_balance' | 'interest_rate'>): Debt {
-  return {
-    id: 'debt-test',
-    user_id: 'user-test',
-    name: 'Test-schuld',
-    debt_type: 'mortgage',
-    original_amount: overrides.current_balance,
-    minimum_payment: 0,
-    monthly_payment: 0,
-    start_date: '2020-01-01',
-    end_date: null,
-    creditor: null,
-    notes: null,
-    is_active: true,
-    sort_order: 0,
-    created_at: '2020-01-01T00:00:00Z',
-    updated_at: '2020-01-01T00:00:00Z',
-    subtype: null,
-    is_tax_deductible: null,
-    fixed_rate_end_date: null,
-    nhg: null,
-    linked_asset_id: null,
-    credit_limit: null,
-    repayment_type: null,
-    draagkrachtmeting_date: null,
-    tax_year: null,
-    has_payment_plan: false,
-    has_written_agreement: false,
-    ownership: 'personal',
-    household_id: null,
-    partner_split_pct: null,
-    net_worth_inclusion_pct: 100,
-    include_aflossing_in_savings: false,
-    custom_aflossing_amount: null,
-    has_hypotheekplanner_tracking: false,
-    ...overrides,
-  }
 }
 
 // ── Checks — één per 'exact'-workflow in REKEN_ACCEPTANCE ──────────────────
@@ -132,42 +91,6 @@ export const REKEN_ENGINE_CHECKS: RekenEngineCheck[] = [
       return {
         expected: 'one_time_cost=173019; target_age=42; monthly_cost_change=0; monthly_income_change=0',
         actual: `one_time_cost=${draft.one_time_cost}; target_age=${draft.target_age}; monthly_cost_change=${draft.monthly_cost_change}; monthly_income_change=${draft.monthly_income_change}`,
-      }
-    },
-  },
-  {
-    workflow: 'WF-REKEN-16',
-    scenarioId: 'UAT-REKEN-16',
-    label: 'Saldo-gewogen schuldrente (weightedDebtRate) op een schone synthetische 2-schuldenfixture',
-    run: () => {
-      criterion('WF-REKEN-16')
-      const debts: Debt[] = [
-        makeDebt({ id: 'd1', current_balance: 100000, interest_rate: 4 }),
-        makeDebt({ id: 'd2', current_balance: 50000, interest_rate: 2 }),
-        // Inactieve/lege schuld — moet genegeerd worden.
-        makeDebt({ id: 'd3', current_balance: 0, interest_rate: 14 }),
-        makeDebt({ id: 'd4', current_balance: 25000, interest_rate: 9, is_active: false }),
-      ]
-      const rate = weightedDebtRate(debts)
-      return {
-        expected: 'weightedDebtRate=3.33',
-        actual: `weightedDebtRate=${fx((rate ?? 0) * 100, 2)}`,
-      }
-    },
-  },
-  {
-    workflow: 'WF-REKEN-20',
-    scenarioId: 'UAT-REKEN-20',
-    label: 'Actie-impact-badge = de sliderdelta zelf (formatMaskedCurrency, geen aparte motor)',
-    run: () => {
-      criterion('WF-REKEN-20')
-      const monthlyDelta = 500
-      const impact = `+${formatMaskedCurrency(monthlyDelta, false)}/mnd`
-      return {
-        // Intl.NumberFormat('nl-NL', {style:'currency'}) plaatst een
-        // non-breaking space (U+00A0) tussen het valutasymbool en het bedrag.
-        expected: '+€ 500/mnd',
-        actual: impact,
       }
     },
   },

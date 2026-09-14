@@ -3,7 +3,6 @@
 /**
  * Fase 2.2 — onderdeel van new-navigation-shell migratie.
  * Plan: docs/navigatie-redesign-plan.md §5.1 (pane)
- * DreamTransitionContext (plan §8.1) blijft als per-module override actief.
  */
 
 import { memo, useState } from 'react'

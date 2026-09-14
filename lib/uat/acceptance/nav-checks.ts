@@ -202,11 +202,10 @@ export const NAV_ENGINE_CHECKS: NavEngineCheck[] = [
     run: () => {
       criterion('WF-NAV-10')
       const rekenhulpVerborgen = SIMPLE_HIDDEN_NAV_HREFS.includes('/toekomst/rekenhulp')
-      const whatifVerborgen = SIMPLE_HIDDEN_NAV_HREFS.includes('/toekomst/whatif')
       const doelenZichtbaar = !SIMPLE_HIDDEN_NAV_HREFS.includes('/toekomst/doelen')
       return {
-        expected: 'rekenhulpVerborgen=true; whatifVerborgen=true; doelenZichtbaar=true',
-        actual: `rekenhulpVerborgen=${rekenhulpVerborgen}; whatifVerborgen=${whatifVerborgen}; doelenZichtbaar=${doelenZichtbaar}`,
+        expected: 'rekenhulpVerborgen=true; doelenZichtbaar=true',
+        actual: `rekenhulpVerborgen=${rekenhulpVerborgen}; doelenZichtbaar=${doelenZichtbaar}`,
       }
     },
   },
@@ -265,7 +264,10 @@ export const NAV_ENGINE_CHECKS: NavEngineCheck[] = [
         // edge-middleware (lib/supabase/proxy.ts) naar profiles.home_screen
         // vertaalt — een statische config-regel zou die vertaling
         // onbereikbaar maken (config-redirects draaien vóór de middleware).
-        expected: 'aantalRedirects=31; coreNaarOverzicht=true; dashboardGeenConfigRedirect=true; coreAssetsGeenRedirect=true; cashflowRedirects=5; cashflowBestemmingZonderQuery=true',
+        // 31 -> 30 (14 sep 2026, ADR 0144): /horizon/whatif en /toekomst/whatif
+        // zijn elk nu één kale redirect naar /toekomst?whatif=open (geen
+        // ?via=dreamgate-tak meer) — één regel minder dan voorheen.
+        expected: 'aantalRedirects=30; coreNaarOverzicht=true; dashboardGeenConfigRedirect=true; coreAssetsGeenRedirect=true; cashflowRedirects=5; cashflowBestemmingZonderQuery=true',
         actual: `aantalRedirects=${redirects.length}; coreNaarOverzicht=${coreNaarOverzicht}; dashboardGeenConfigRedirect=${dashboardGeenConfigRedirect}; coreAssetsGeenRedirect=${coreAssetsGeenRedirect}; cashflowRedirects=${cashflowRegels.length}; cashflowBestemmingZonderQuery=${cashflowBestemmingZonderQuery}`,
       }
     },

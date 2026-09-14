@@ -513,35 +513,6 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
       { href: '/toekomst/voorkeuren', label: 'Aannames achter de projectie' },
     ],
   },
-  '/toekomst/whatif': {
-    insight:
-      'Voordat je een knoop doorhakt, wil je weten wat hij oplevert — dit is de plek om dat zonder risico uit te proberen.',
-    grip:
-      'Verander je sparen, rendement of pensioenleeftijd en zie direct hoeveel jaar of maanden vrijheid dat scheelt. Niets hiervan is een toezegging, je verkent alleen.',
-    werking: [
-      {
-        title: 'Schuifjes',
-        text: 'Verander je spaarbedrag, je verwachte rendement, je uitgaven of je pensioenleeftijd; de uitkomst beweegt onder je hand mee.',
-      },
-      {
-        title: 'Naast je huidige pad',
-        text: 'Het scenario wordt getekend náást je bestaande projectie. Je ziet daardoor het verschil, in plaats van twee losse getallen die je zelf moet aftrekken.',
-      },
-      {
-        title: 'Bewaren en vergelijken',
-        text: 'Bewaar een verkenning en leg hem als extra lijn over je pad. Je echte plan verandert er niet door — dat blijft staan tot je het zelf aanpast.',
-      },
-      {
-        title: 'Wat het niet is',
-        text: 'Een verkenning, geen voorspelling en geen toezegging. Markten bewegen anders dan een schuifje; de waarde zit in de richting, niet in de decimaal.',
-      },
-    ],
-    terms: ['rendement', 'inflatie', 'fire'],
-    related: [
-      { href: '/toekomst/bibliotheek', label: 'Je bewaarde scenario’s' },
-      { href: '/toekomst/voorkeuren', label: 'Aannames achter de projectie' },
-    ],
-  },
 
   // NB: /toekomst/strategie en /toekomst/uitgaven-na-pensioen hadden hier een
   // entry, maar renderen sinds de React #310-opruiming (11 aug 2026) geen
@@ -641,7 +612,7 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
     ],
     terms: ['vrijheidstijd', 'compounding', 'annuiteit'],
     related: [
-      { href: '/toekomst/whatif', label: 'Wat-als op je hele plan' },
+      { href: '/toekomst', label: 'Wat-als op je hele plan' },
       { href: '/toekomst/bibliotheek', label: 'Wat je eerder bewaarde' },
     ],
   },
@@ -651,10 +622,6 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
     insight:
       'Deze projectie laat zien wanneer je financieel vrij bent en hoe scenario’s en levensgebeurtenissen dat pad beïnvloeden.',
     grip: 'Voeg gebeurtenissen toe of pas parameters aan om je plan te verkennen.',
-  },
-  '/horizon/whatif': {
-    insight: 'Kleine keuzes nu kunnen je vrijheidsdatum flink verschuiven — hier zie je precies hoeveel.',
-    grip: 'Verschuif sliders voor spaarquote, rendement of extra inleg en vergelijk het resultaat direct naast je huidige pad.',
   },
 
   // ── Toekomst — fase-analyse-modals (widget-brede uitleg, geen route) ─

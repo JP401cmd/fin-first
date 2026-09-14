@@ -31,7 +31,7 @@ export async function POST(req: Request) {
   // toestel en mag de financiële context deze route NOOIT richting een externe
   // AI-provider verlaten. We blokkeren hier — direct ná de auth-check en VÓÓR de
   // tier-/credit-gate, het model laden en de context/prompt-opbouw. Dit is de
-  // beslissende fail-closed-laag: een client-race (bv. autoOpenMessage vuurt
+  // beslissende fail-closed-laag: een client-race (bv. een auto-send vuurt
   // vóór privacyMode/readiness client-side geladen is) of een gemanipuleerd
   // verzoek mag buildContext/buildSystemPrompt (regels verderop) nooit alsnog
   // naar de cloud laten gaan. Spiegelt exact app/api/ai/categorize/route.ts.

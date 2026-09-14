@@ -53,8 +53,6 @@ const chatCtx = {
   clearPendingMessage: vi.fn(),
   isPinned: false,
   togglePin: vi.fn(),
-  autoOpenMessage: null,
-  setAutoOpenMessage: vi.fn(),
 }
 
 vi.mock('./chat-provider', () => ({

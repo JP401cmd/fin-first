@@ -10,7 +10,7 @@
  *  - Active-module via `usePathname()` ipv hardcoded `kern`.
  *  - Module-fallback via `useModuleAccess`: gedimde rij + tooltip-CTA.
  *  - Sub-tag-strip toont alleen *categorieën* (Bezittingen/Schulden,
- *    Wat-Als/Strategieën) — geen apps, conform plan §3.3.
+ *    Strategieën) — geen apps, conform plan §3.3.
  *  - Echte routes (Link) ipv mock-buttons.
  *  - Echte data via props (netto-vermogen, acties, badge).
  */
@@ -239,7 +239,6 @@ const MODULES: ModuleEntry[] = [
       { label: 'Gebeurtenissen', href: '/toekomst/gebeurtenissen' },
       { label: 'Voorkeuren', href: '/toekomst/voorkeuren' },
       { label: 'Rekenhulp', href: '/toekomst/rekenhulp' },
-      { label: 'Wat-Als', href: '/toekomst/whatif' },
     ],
   },
 ]
@@ -628,7 +627,7 @@ function ModuleRow({
   const { mode: displayMode } = useDisplayMode()
 
   // Eenvoudig-weergave: verberg de menu-ingang voor de aangewezen routes
-  // (Rekenhulp/Wat-Als). Filtert ALLEEN de sidebar-ingang — de pagina's
+  // (Rekenhulp). Filtert ALLEEN de sidebar-ingang — de pagina's
   // blijven via deeplink + Volledig bereikbaar.
   const visibleSubTags =
     displayMode === 'simple'

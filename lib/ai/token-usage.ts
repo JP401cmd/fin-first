@@ -42,7 +42,6 @@ export const AI_TOKEN_FEATURE_LABELS = {
   abonnementen_advies: 'Abonnementen-advies',
   rekenhulp_bouwen: 'Rekenhulp bouwen',
   scherm_publicatie: 'Schermpublicatie (beheer)',
-  whatif_suggesties: 'What-if-suggesties',
 } as const satisfies Record<string, string>
 
 /** Elke feature-string die aan `getModel(supabase, feature)` wordt meegegeven. */

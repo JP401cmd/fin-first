@@ -124,7 +124,7 @@ export function NavMenuSheet({ open, onClose, onAction }: NavMenuSheetProps) {
       parentHref === '/overzicht'
         ? OVERVIEW_APP_SUBROUTES.filter((a) => activeAppKeys.includes(a.appKey))
         : []
-    // Eenvoudig-weergave: verberg de aangewezen menu-ingangen (Rekenhulp/Wat-Als).
+    // Eenvoudig-weergave: verberg de aangewezen menu-ingangen (Rekenhulp).
     // Filtert ALLEEN de sheet-ingang — de pagina's blijven via deeplink + Volledig
     // bereikbaar, en navGroups/resolveRouteTitle blijven ongemoeid. Geldt voor
     // beide groepen, zodat een toekomstige app-href op die lijst ook valt.

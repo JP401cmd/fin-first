@@ -13,7 +13,6 @@ import { DEFAULT_EXTRACTION_PROMPT } from '@/lib/ai/extraction-system-prompt'
 import { CATEGORIZE_SYSTEM_PROMPT } from '@/lib/ai/categorize-system-prompt'
 import { SUBSCRIPTION_DETECT_PROMPT } from '@/lib/ai/subscription-detect-prompt'
 import { PENSION_PARSE_PROMPT } from '@/lib/ai/pension-parse-prompt'
-import { WHATIF_SUGGEST_PROMPT } from '@/lib/ai/whatif-suggest-prompt'
 import { buildSystemPrompt as buildCalculatorSystemPrompt } from '@/lib/ai/build-calculator'
 import { DEFAULT_AANGIFTE_EXTRACTION_PROMPT } from '@/lib/aangifte/system-prompt'
 import { buildBudgetSuggestionPrompt } from '@/lib/ai/schemas/budget-suggestion-schema'
@@ -165,16 +164,6 @@ export async function GET() {
       domain: 'wil',
       dynamic: false,
       charCount: SUBSCRIPTION_DETECT_PROMPT.length,
-    },
-    {
-      id: 'whatif-suggest',
-      label: 'Wat-Als gebeurtenis-suggesties',
-      description: 'Systeem prompt dat levensgebeurtenissen suggereert die passen bij een droomscenario-wijziging.',
-      content: WHATIF_SUGGEST_PROMPT,
-      source: 'app/api/whatif/suggest/route.ts',
-      domain: 'wil',
-      dynamic: false,
-      charCount: WHATIF_SUGGEST_PROMPT.length,
     },
     {
       id: 'calculator',

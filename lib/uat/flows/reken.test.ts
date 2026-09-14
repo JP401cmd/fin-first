@@ -47,28 +47,33 @@ describe('REKEN_FLOW — curatie-integriteit', () => {
     }
   })
 
-  it('dekt alle 23 WF-REKEN-scenario\'s (01..16, 18..24 — WF-REKEN-17 bestaat niet in de catalogus)', () => {
+  it('dekt alle 15 WF-REKEN-scenario\'s (01..11, 21..24 — WF-REKEN-12..20 vervallen ADR 0144, WF-REKEN-17 bestond al niet in de catalogus)', () => {
     const covered = new Set(
       REKEN_FLOW.nodes.map((n) => n.scenarioId).filter((id): id is string => Boolean(id)),
     )
     const expected = [
-      ...Array.from({ length: 16 }, (_, i) => i + 1),
-      ...Array.from({ length: 7 }, (_, i) => i + 18),
+      ...Array.from({ length: 11 }, (_, i) => i + 1),
+      ...Array.from({ length: 4 }, (_, i) => i + 21),
     ].map((n) => `UAT-REKEN-${String(n).padStart(2, '0')}`)
     for (const id of expected) {
       expect(covered.has(id), `${id} moet als flow-knoop voorkomen`).toBe(true)
     }
-    expect(covered.size).toBe(23)
+    expect(covered.size).toBe(15)
   })
 
-  it('de domeinoverschrijdende cross-knopen dekken TOEK/OVZ/BEZIT/KRUIS', () => {
+  // OVZ hoorde er tot 14 sep 2026 bij via de "geen basisgegevens"-lege-staat
+  // van de standalone Wat-Als-pagina (WF-REKEN-12) — die pagina is vervallen
+  // (ADR 0144) en met haar de enige waarheidsgetrouwe OVZ-cross in deze zone.
+  // Geen resterende WF-REKEN-knoop heeft een eigen lege-staat-CTA naar OVZ;
+  // het equivalent (geen basisgegevens op de tijdas) zit nu in TOEK.
+  it('de domeinoverschrijdende cross-knopen dekken TOEK/BEZIT/KRUIS', () => {
     const crossZones = new Set(
       REKEN_FLOW.nodes
         .filter((n) => n.kind === 'cross')
         .map((n) => n.crossZone)
         .filter((z): z is UatZone => Boolean(z)),
     )
-    for (const z of ['TOEK', 'OVZ', 'BEZIT', 'KRUIS'] as const) {
+    for (const z of ['TOEK', 'BEZIT', 'KRUIS'] as const) {
       expect(crossZones.has(z), `cross naar ${z} moet aanwezig zijn`).toBe(true)
     }
   })

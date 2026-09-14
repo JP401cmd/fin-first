@@ -1,11 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import type { Asset } from '@/lib/asset-data'
-import type { LifeEvent } from '@/lib/horizon-data'
 import {
   applyReturnDeltasToAssets,
-  buildWhatifKernelAdapterInput,
   deriveEigenHuisIds,
-  type WhatifRawProfileRow,
 } from './whatif-varianten'
 
 /**
@@ -100,65 +97,6 @@ describe('applyReturnDeltasToAssets', () => {
     const assets = [makeAsset({ id: 'inv', expected_return: 7 })]
     applyReturnDeltasToAssets(assets, { investment: 0.02 })
     expect(assets[0].expected_return).toBe(7)
-  })
-})
-
-describe('buildWhatifKernelAdapterInput', () => {
-  const profile: WhatifRawProfileRow = {
-    date_of_birth: '1986-01-01',
-    net_monthly_income: 4000,
-    estimated_monthly_expenses: 2500,
-    expected_return: 6,
-    inflation_rate: 2,
-    box3_method: 'forfaitair',
-    fire_end_strategy: 'perpetual',
-    fire_end_age: 90,
-    fire_legacy_amount: 0,
-    withdrawal_strategy: 'static',
-    housing_strategy_config: { mode: 'include_full' },
-    pot_rules: { surplusGroup: 'beleggingen' },
-    retirement_expense_method: 'custom',
-    retirement_expense_custom_amount: 30_000,
-  }
-
-  const events = [
-    { id: 'e1', event_type: 'income_change', name: 'Loonsverhoging', target_age: 45, is_active: true },
-  ] as unknown as LifeEvent[]
-
-  const assets = [makeAsset({ id: 'inv' })]
-
-  it('mapt de kolom-hernoeming retirement_expense_custom_amount → retirement_custom_amount', () => {
-    const out = buildWhatifKernelAdapterInput({ profile, assets, debts: [], lifeEvents: [] })
-    expect(out.profile.retirement_custom_amount).toBe(30_000)
-    expect(out.profile.retirement_expense_method).toBe('custom')
-  })
-
-  it('geeft de event-set ONgewijzigd door als lifeEvents', () => {
-    const out = buildWhatifKernelAdapterInput({ profile, assets, debts: [], lifeEvents: events })
-    expect(out.lifeEvents).toBe(events)
-  })
-
-  it('geeft de (gemuteerde) assets/debts door en mapt de kernvelden', () => {
-    const out = buildWhatifKernelAdapterInput({
-      profile,
-      assets,
-      debts: [],
-      lifeEvents: [],
-      taxYear: 2026,
-    })
-    expect(out.assets).toBe(assets)
-    expect(out.profile.date_of_birth).toBe('1986-01-01')
-    expect(out.profile.net_monthly_income).toBe(4000)
-    expect(out.profile.box3_method).toBe('forfaitair')
-    expect(out.taxYear).toBe(2026)
-  })
-
-  it('laat bedradingsgat-velden undefined (adapter-defaults)', () => {
-    const out = buildWhatifKernelAdapterInput({ profile, assets, debts: [], lifeEvents: [] })
-    expect(out.profile.yearly_essential_expenses).toBeUndefined()
-    expect(out.profile.deficit_loan_rate).toBeUndefined()
-    // withdrawal_profile_config is GEEN bedradingsgat meer: het gekozen profiel
-    // reist mee (B-042-vervolg, zie whatif-page-client.onttrekkingsprofiel.test.ts).
   })
 })
 

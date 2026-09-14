@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import path from 'node:path'
 import nextConfig from './next.config'
 
@@ -52,21 +52,6 @@ describe('next.config redirects — legacy routes redirecten op de routing-laag 
     expect(rules[0].permanent).toBe(false)
   })
 
-  it('/horizon/whatif houdt beide takken van de oude server-component', async () => {
-    const rules = await rulesFor('/horizon/whatif')
-    expect(rules).toHaveLength(2)
-
-    // De dreamgate-variant MOET eerst staan: Next pakt de eerste match, dus met
-    // de catch-all vooraan zou ?via=dreamgate nooit de volledige what-if-
-    // ervaring bereiken.
-    const [dreamgate, fallback] = rules
-    expect(dreamgate.has).toEqual([{ type: 'query', key: 'via', value: 'dreamgate' }])
-    expect(dreamgate.destination).toBe('/toekomst/whatif?via=dreamgate')
-
-    expect(fallback.has).toBeUndefined()
-    expect(fallback.destination).toBe('/toekomst?whatif=open')
-  })
-
   it('/horizon/strategie en /horizon/uitgaven-na-pensioen landen op de /toekomst-panes', async () => {
     for (const [source, destination] of [
       ['/horizon/strategie', '/toekomst?strategie=open'],
@@ -84,7 +69,7 @@ describe('next.config redirects — legacy routes redirecten op de routing-laag 
     const rules = await rulesFor('/toekomst/strategie')
     expect(rules).toHaveLength(2)
 
-    // Zelfde volgorde-eis als bij /horizon/whatif: de gerichte variant eerst,
+    // Volgorde-eis: de gerichte variant eerst,
     // anders vangt de catch-all elke ?focus= af en landt alles op `aow`.
     const [gericht, fallback] = rules
     expect(gericht.has).toEqual([
@@ -96,44 +81,26 @@ describe('next.config redirects — legacy routes redirecten op de routing-laag 
     expect(fallback.destination).toBe('/toekomst/gebeurtenissen?strategie=aow')
   })
 
-  it('/toekomst/whatif redirect op de routing-laag, behalve de dreamgate-tak', async () => {
-    // DERDE LICHTING (31 aug 2026, UR2-11). Deze route droeg als laatste nog een
-    // runtime-redirect: zonder ?via=dreamgate riep de server-component meteen
-    // `redirect('/toekomst?whatif=open')` aan — dezelfde trigger, en de
-    // verklaring voor de transiënte HTTP 500 die de UAT hier zag.
-    const rules = await rulesFor('/toekomst/whatif')
-    expect(rules).toHaveLength(1)
-
-    // `missing` i.p.v. `has`: de regel matcht als `via` afwezig is óf een andere
-    // waarde heeft, zodat alléén ?via=dreamgate de echte pagina bereikt.
-    expect(rules[0].missing).toEqual([{ type: 'query', key: 'via', value: 'dreamgate' }])
-    expect(rules[0].has).toBeUndefined()
-    expect(rules[0].destination).toBe('/toekomst?whatif=open')
-    expect(rules[0].permanent).toBe(false)
+  it('/horizon/whatif en /toekomst/whatif landen kaal op het inline lab (ADR 0144)', async () => {
+    // Eén regel per route, zonder `has`/`missing`: ook een oude ?via=dreamgate
+    // valt er gewoon onder — er is geen losse Wat-Als-pagina meer.
+    for (const source of ['/horizon/whatif', '/toekomst/whatif']) {
+      const rules = await rulesFor(source)
+      expect(rules, `${source} mist een routing-laag-redirect`).toHaveLength(1)
+      expect(rules[0].has).toBeUndefined()
+      expect(rules[0].missing).toBeUndefined()
+      expect(rules[0].destination).toBe('/toekomst?whatif=open')
+      expect(rules[0].permanent).toBe(false)
+    }
   })
 
-  it('/toekomst/whatif/page.tsx rendert alleen — geen runtime-redirect meer', () => {
-    // De route MOET blijven bestaan (hij is de dreamgate-bestemming), dus de
-    // existsSync-grendel hieronder kan hem niet bewaken. Wat hem wél bewaakt: de
-    // bron mag geen `redirect(` meer bevatten.
-    const source = readFileSync(
-      path.join(process.cwd(), 'app/(app)/toekomst/whatif/page.tsx'),
-      'utf8',
-    )
-    const codeLines = source
-      .split(/\r?\n/)
-      .filter((line) => !/^\s*(\*|\/\/|\/\*)/.test(line))
-      .join('\n')
-    expect(codeLines).not.toMatch(/\bredirect\s*\(/)
-    expect(codeLines).not.toMatch(/from 'next\/navigation'/)
-  })
-
-  it('geen page.tsx meer op de zes routes — anders is de runtime-redirect terug', () => {
+  it('geen page.tsx meer op de zeven routes — anders is de runtime-redirect terug', () => {
     // Een `page.tsx` hier zou opnieuw een React-boom bouwen die zichzelf
     // meteen wegredirect: precies de trigger die deze fix wegnam.
     for (const route of [
       'app/(app)/core/cash/page.tsx',
       'app/(app)/horizon/whatif/page.tsx',
+      'app/(app)/toekomst/whatif/page.tsx',
       'app/(app)/horizon/strategie/page.tsx',
       'app/(app)/horizon/uitgaven-na-pensioen/page.tsx',
       'app/(app)/toekomst/strategie/page.tsx',
@@ -146,10 +113,9 @@ describe('next.config redirects — legacy routes redirecten op de routing-laag 
   })
 
   it('de redirect-doelen zijn zelf geen redirect-only route (geen keten)', () => {
-    // /toekomst/whatif en /toekomst renderen echte pagina's; zou een doel zelf
-    // een runtime-redirect zijn, dan was de trigger alleen verplaatst.
+    // /toekomst en /toekomst/gebeurtenissen renderen echte pagina's; zou een doel
+    // zelf een runtime-redirect zijn, dan was de trigger alleen verplaatst.
     for (const target of [
-      'app/(app)/toekomst/whatif/page.tsx',
       'app/(app)/toekomst/page.tsx',
       'app/(app)/toekomst/gebeurtenissen/page.tsx',
     ]) {

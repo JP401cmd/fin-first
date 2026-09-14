@@ -3,7 +3,6 @@
 /**
  * Fase 2.2 — onderdeel van new-navigation-shell migratie.
  * Plan: docs/navigatie-redesign-plan.md §5.1 (pane) + §5.2 (sheet)
- * DreamTransitionContext (plan §8.1) blijft als per-module override actief.
  *
  * SimulationsModal = pane (Monte Carlo simulatie-flow met instellingen + chart).
  * SimulationDetailModal (sub-overlay) = sheet (drill-down per metric).

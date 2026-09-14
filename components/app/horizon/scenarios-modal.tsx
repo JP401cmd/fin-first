@@ -3,7 +3,6 @@
 /**
  * Fase 2.2 — onderdeel van new-navigation-shell migratie.
  * Plan: docs/navigatie-redesign-plan.md §5.1 (pane) + §5.2 (sheet)
- * DreamTransitionContext (plan §8.1) blijft als per-module override actief.
  *
  * ScenariosModal = pane (full scenario-beheer met lijst + acties).
  * ScenarioDetailModal (sub-overlay) = sheet (inspection van één scenario).

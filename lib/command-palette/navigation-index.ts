@@ -7,7 +7,7 @@ import {
   Home, Wallet, Coins, Banknote, Building2, Car, GraduationCap,
   CreditCard, RefreshCw, PiggyBank, Receipt, Calendar, History,
   TrendingUp, Calculator, Sparkles, FileText, Newspaper, Settings, User, Bell,
-  BookOpen, Compass, Telescope, Activity, ListChecks, Cog, Plug,
+  BookOpen, Telescope, Activity, ListChecks, Cog, Plug,
   Goal, LineChart, MessageSquare, type LucideIcon,
 } from 'lucide-react'
 import type { ModuleId } from '@/lib/module-registry'
@@ -138,7 +138,6 @@ const HORIZON_PAGES: StaticPage[] = [
   // PLAN_REVIEW_HREF: de route-dekkingstest leest dit bestand letterlijk.
   { label: 'Je voorkeuren voor je plan instellen', sublabel: 'Je toekomstkeuzes stap voor stap',   href: '/toekomst?planreview=open',              icon: ListChecks,  module: 'horizon', requiredModule: 'toekomstplannen' },
   { label: 'Rekenhulp',                 sublabel: 'AI-rekenhulpen en bibliotheek',      href: '/toekomst/rekenhulp',                    icon: Calculator,  module: 'horizon', requiredModule: 'toekomstplannen' },
-  { label: 'Wat-als',                   sublabel: 'Scenario builder met sliders',       href: '/toekomst/whatif',                       icon: Compass,     module: 'horizon', requiredModule: 'toekomstplannen' },
 ]
 
 // ── Mijn ─────────────────────────────────────────────────────────────────────
@@ -172,8 +171,7 @@ const GLOBAL_PAGES: StaticPage[] = [
   // Die route heeft nooit bestaan (geen app/tools, geen rewrite) — ⌘K leverde
   // dus een 404. Het was de enige dode nav-href app-breed; de nieuwe toets
   // "elke nav-href bestaat" in lib/nav-config.route-coverage.test.ts vangt een
-  // herhaling. De scenario-tool met sliders die het sublabel beloofde is
-  // /toekomst/whatif, en die staat al in HORIZON_PAGES.
+  // herhaling.
 ]
 
 // ── Beheer (alleen als role === 'admin') ─────────────────────────────────────

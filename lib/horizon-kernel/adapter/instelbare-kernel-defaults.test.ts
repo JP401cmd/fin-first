@@ -7,7 +7,6 @@ import {
 } from './params'
 import { EXCEL_HEFFINGVRIJ_INKOMEN_PP } from './defaults'
 import { buildConvergentieAdapterProfile } from '../convergentie-router'
-import { buildWhatifKernelAdapterInput } from './whatif-varianten'
 import { PARAMETER_BANDS } from '@/lib/parameters-band'
 
 /**
@@ -17,7 +16,7 @@ import { PARAMETER_BANDS } from '@/lib/parameters-band'
  *
  * De invariant die telt: NULL/ontbrekend rekent BYTE-IDENTIEK aan vóór TPR-12 ('Nee' resp.
  * 1800); alleen een expliciete, geldige keuze verandert de kern-invoer. Beide velden reizen
- * mee over de convergentie- én de what-if-mapper (zelfde plan op elk oppervlak).
+ * mee over de convergentie-mapper (zelfde plan op elk oppervlak).
  */
 
 const base: KernelAdapterProfile = {
@@ -81,7 +80,7 @@ describe('resolveHeffingvrijInkomenPP / buildBox3 — heffingvrij inkomen (P!B91
   })
 })
 
-describe('beide velden reizen mee over de convergentie- en de what-if-mapper', () => {
+describe('beide velden reizen mee over de convergentie-mapper', () => {
   const row = {
     date_of_birth: '1980-01-01',
     fire_end_strategy: 'legacy',
@@ -99,11 +98,5 @@ describe('beide velden reizen mee over de convergentie- en de what-if-mapper', (
     const leeg = buildConvergentieAdapterProfile({ date_of_birth: '1980-01-01' })
     expect(leeg.fire_legacy_include_illiquid).toBeNull()
     expect(leeg.box3_heffingvrij_inkomen).toBeNull()
-  })
-
-  it('what-if (zelfde plan als de hoofdlijn)', () => {
-    const out = buildWhatifKernelAdapterInput({ profile: row, assets: [], debts: [], lifeEvents: [] })
-    expect(out.profile.fire_legacy_include_illiquid).toBe(true)
-    expect(out.profile.box3_heffingvrij_inkomen).toBe(2400)
   })
 })

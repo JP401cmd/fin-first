@@ -3,12 +3,11 @@
  * keer opnieuw met verstoorde rendementen en vertel me waar het uitkomt".
  *
  * ## Waarom een eigen module
- * Twee routers voeden dezelfde marktcheck met hún eigen context: de convergentie-
- * router (/toekomst, `ConvergentieRawContext`) en de what-if-router
- * (/toekomst/whatif, `WhatifRawContext` — inclusief de rendement-slider). Alleen de
- * INVOER-assemblage verschilt; de begrenzing, de aanroep van `wrappers/mc.ts` en de
- * uitkomstvorm horen op één plek te leven, anders drijven de twee oppervlakken uit
- * elkaar — precies de foutklasse die deze fix opruimt.
+ * De convergentie-router (/toekomst, `ConvergentieRawContext`) voedt de marktcheck
+ * met zijn eigen context. De begrenzing, de aanroep van `wrappers/mc.ts` en de
+ * uitkomstvorm leven op één plek, los van de invoer-assemblage — zo kan een tweede
+ * oppervlak niet uit de pas lopen (de losse wat-als-pagina, destijds een tweede
+ * router op deze module, is per ADR 0144 vervallen).
  *
  * ## Wat de marktcheck NIET is
  * Geen tweede rekenmotor. De band komt integraal uit
@@ -51,14 +50,14 @@ export const MARKTCHECK_MAX_RUNS = 200
 /**
  * Wachttijd vóór een marktcheck de worker in gaat. Ruim onder de duur van één
  * run (2,6–5,1 s) maar lang genoeg om de tussenstanden van een gebaar op te
- * slokken (een marker-drag op /toekomst, de rendement-slider op /toekomst/whatif),
+ * slokken (een marker-drag op /toekomst),
  * zodat er nooit meer dan één job per gebaar in de seriële worker-wachtrij
  * belandt.
  *
- * Woont hier en niet in een component: **beide** marktcheck-surfaces moeten
- * dezelfde rem hebben. Stond deze constante in de component-body van
- * `horizon-client.tsx`, dan kon de zustersurface hem niet lezen — en precies dat
- * liet de what-if-slider ongeremd jobs versturen.
+ * Woont hier en niet in een component: elke marktcheck-surface moet dezelfde rem
+ * hebben. Stond deze constante in de component-body van `horizon-client.tsx`, dan
+ * kon een zustersurface hem niet lezen — en precies dat liet destijds de
+ * what-if-slider ongeremd jobs versturen.
  */
 export const MARKTCHECK_DEBOUNCE_MS = 400
 

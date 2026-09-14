@@ -2,7 +2,8 @@
  * Regressietest bij UR2-11 — "Wat-Als is onbereikbaar: eigen route opent de
  * overlay nooit".
  *
- * De keten is: nav-link `/toekomst/whatif` → routing-laag-redirect →
+ * De keten is: een deeplink (welkomstgids, next-steps, oud adres `/toekomst/whatif`)
+ * → routing-laag-redirect →
  * `/toekomst?whatif=open` → `horizon-client.tsx` zet `whatIfInlineOpen`, klapt
  * "Verken je aannames" open en scrollt ernaartoe → daarna wordt de URL
  * opgeschoond. Die laatste stap schreef een hardgecodeerd `/horizon` terug, wat
@@ -88,8 +89,8 @@ describe('bron-grendel — de deeplink-opschoning wisselt niet van route', () =>
   })
 
   it('navigeert nergens meer naar een legacy /horizon-route', () => {
-    // `router.replace('/horizon', …)` was de bug, en `triggerDream('/horizon/whatif')`
-    // droeg hetzelfde risico: /horizon** redirect op de routing-laag, dus een
+    // `router.replace('/horizon', …)` was de bug (de droom-poort naar /horizon/whatif,
+    // vervallen met ADR 0144, droeg hetzelfde risico): /horizon** redirect op de routing-laag, dus een
     // client-navigatie daarheen wisselt van route (remount → state weg) én zet
     // de router-URL op een pad dat niets rendert — de React #310-desync.
     // Cross-page-navigatie naar échte routes (/toekomst/doelen, /core/debts)
@@ -98,10 +99,5 @@ describe('bron-grendel — de deeplink-opschoning wisselt niet van route', () =>
       .filter((line) => !/^\s*(\*|\/\/|\/\*)/.test(line))
       .filter((line) => /(router\.(replace|push)|triggerDream)\(\s*['"`]\/horizon/.test(line))
     expect(offenders).toEqual([])
-  })
-
-  it('stuurt de dream-gate naar de canonieke what-if-route', () => {
-    expect(SOURCE).toContain("triggerDream('/toekomst/whatif')")
-    expect(SOURCE).not.toContain("triggerDream('/horizon/whatif')")
   })
 })

@@ -3,7 +3,7 @@
 /**
  * Compacte icon-only actie-knop voor de actie-rij op `<VermogenAssetCard>`
  * en `<VermogenDebtCard>`. Spiegelt het patroon van de bewerk-knop op
- * levensgebeurtenissen (zie `whatif-events.tsx` r283-289): vierkant
+ * levensgebeurtenissen (voorheen `whatif-events.tsx`, vervallen per ADR 0144): vierkant
  * `h-8 w-8` icon-target met `title` als tooltip — geen zichtbare tekst.
  *
  * Houdt de actie-rij visueel licht (geen tekst-ruis op de kaart) en past

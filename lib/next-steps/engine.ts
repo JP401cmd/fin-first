@@ -285,7 +285,7 @@ export function computeNextSteps(input: NextStepInput): NextStep[] {
       'Vrijheid versnellen',
       'Onderzoek wat je vrijheid versnelt',
       'Speel met wat-als-scenario’s en zie direct wat het je aan tijd scheelt.',
-      '/toekomst/whatif',
+      '/toekomst?whatif=open',
       {
         metric: `nog ${nl(input.fireCountdownYears, 0)} ${meervoud(input.fireCountdownYears, 'jaar', 'jaar')} tot volledige vrijheid`,
       },

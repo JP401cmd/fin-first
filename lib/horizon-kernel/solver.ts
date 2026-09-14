@@ -320,7 +320,7 @@ export function solveFire(input: KernelInput): SolveFireResult {
   // ── VAST STOPMOMENT: FIRE = het anker, geen bisectie (ADR 0129 D3) ──────────
   //    Eén resolutie voor alle drie de vaste ankers (AOW · nu · zelfgekozen
   //    leeftijd), i.p.v. een kortsluiting per anker. Zo erft élke solveFire-consument
-  //    (convergentie-, household-, whatif-, scalar-router, Monte-Carlo, marktcheck,
+  //    (convergentie-, household-, scalar-router, Monte-Carlo, marktcheck,
   //    kernel-report, gouden matrix) het anker zonder eigen tak. Bij FIRE-maand 0
   //    regelt de engine het guardrails-anker zelf (T0-stand).
   const vastAnker = resolveVastAnker(input, es)

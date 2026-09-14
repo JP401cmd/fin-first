@@ -117,9 +117,8 @@ describe('globalNav (mobiele nav-sheet + topbar-iconen)', () => {
 })
 
 describe('SIMPLE_HIDDEN_NAV_HREFS', () => {
-  it('bevat Rekenhulp en Wat-Als', () => {
+  it('bevat Rekenhulp', () => {
     expect(SIMPLE_HIDDEN_NAV_HREFS).toContain('/toekomst/rekenhulp')
-    expect(SIMPLE_HIDDEN_NAV_HREFS).toContain('/toekomst/whatif')
   })
 
   it('laat navGroups (bron-integriteit) ongemoeid — hrefs staan er nog steeds in', () => {
@@ -132,6 +131,5 @@ describe('SIMPLE_HIDDEN_NAV_HREFS', () => {
 
   it('laat resolveRouteTitle (TopBar-titel-fallback) intact voor verborgen routes', () => {
     expect(resolveRouteTitle('/toekomst/rekenhulp')).toBe('Rekenhulp')
-    expect(resolveRouteTitle('/toekomst/whatif')).toBe('Wat-Als')
   })
 })

@@ -98,10 +98,8 @@ ANTWOORD: één JSON-array, begin met [ en eindig met ], geen andere tekst:
 
 /**
  * Alleen de SOORT en de leeftijd. Alle bedragen en looptijden komen uit
- * `LIFE_EVENT_CATALOG` — dezelfde bron die het formulier op /toekomst gebruikt.
- * Dat is exact de keuze die de lokale wat-als-suggesties ook maken
- * (local-whatif-prompt.ts): een klein model dat zelf "wat kost een kind"
- * invult, verzint.
+ * `LIFE_EVENT_CATALOG` — dezelfde bron die het formulier op /toekomst gebruikt:
+ * een klein model dat zelf "wat kost een kind" invult, verzint.
  */
 export function buildLifeEventsPrompt(text: string, ctx: LocalExtractionContext = {}): string {
   const leeftijdHint =

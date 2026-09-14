@@ -22,7 +22,7 @@ import type { CoachDataGaps } from '@/lib/coach-suggestions'
  * Regressietest voor de Wft-akkoord-gate in de Fin-chat.
  *
  * Bug (Notion 397f9e8d): bij het openen van de chat MET een vooraf-ingevulde
- * vraag (openWithMessage → pendingMessage, of autoOpenMessage) vuurde het
+ * vraag (openWithMessage → pendingMessage) vuurde het
  * auto-send-effect `sendMessage` af zodra `isOpen && hasAi && !isStreaming`,
  * ZONDER te wachten op Wft-acceptatie. Voor een nieuwe gebruiker (lege
  * localStorage) toonde het akkoordscherm wel de UI-blokkade, maar de AI-aanroep
@@ -230,8 +230,6 @@ function makeCtx(overrides: Record<string, unknown> = {}) {
     clearPendingMessage: mockClearPendingMessage,
     isPinned: false,
     togglePin: vi.fn(),
-    autoOpenMessage: null,
-    setAutoOpenMessage: vi.fn(),
     // M25: de koppeling "pas gelezen bij een echt antwoord". ChatPanel roept
     // deze aan vanuit zijn effecten; hier alleen als spy aanwezig.
     resolvePendingAnswer: vi.fn(),
@@ -367,19 +365,6 @@ describe('ChatPanel — Wft-akkoord-gate', () => {
 
     await waitFor(() => expect(mockSendMessage).toHaveBeenCalledTimes(1))
     expect(mockSendMessage).toHaveBeenCalledWith({ text: 'Doorlicht mijn financiën' })
-  })
-
-  it('verstuurt een autoOpenMessage (whatif-context) pas ná acceptatie', async () => {
-    stubExecutionFetch({ privacyMode: false })
-    ctx = makeCtx({ autoOpenMessage: 'Bespreek dit scenario' })
-    render(<ChatPanel />)
-
-    expect(mockSendMessage).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: 'Ik begrijp het' }))
-
-    await waitFor(() =>
-      expect(mockSendMessage).toHaveBeenCalledWith({ text: 'Bespreek dit scenario' }),
-    )
   })
 
   it('verstuurt de pending-vraag direct wanneer Wft al eerder is geaccepteerd', async () => {

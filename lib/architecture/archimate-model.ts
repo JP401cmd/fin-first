@@ -325,8 +325,8 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
     {
       id: 'as-planning', x: 560, y: row(4), w: 220, h: 66, kind: 'appsvc',
       title: 'Planningsdienst (FIRE)',
-      lead: 'FIRE-doelrekening, unified projection, scenario’s, what-if en opnamestrategie.',
-      items: ['/api/fire-settings', '/api/scenarios', '/api/whatif', 'lib/fire-simulation'],
+      lead: 'FIRE-doelrekening, unified projection en opnamestrategie; wat-als-verkenning via het inline lab op /toekomst (ADR 0144).',
+      items: ['/api/fire-settings', 'lib/fire-simulation'],
     },
     {
       id: 'as-coach', x: 560, y: row(5), w: 220, h: 66, kind: 'appsvc',
@@ -585,7 +585,7 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
     'as-budget->sp-budget': { payload: 'Budgetten, varianties, trends en dagtempo', mechanism: 'rest', cadence: 'on-demand', contractDomains: ['budgets', 'budget-trends', 'budget-variance', 'daily-expense-rate', 'cashflow-forecast'] },
     'as-vermogen->sp-vermogen': { payload: 'Bezittingen, schulden, posities en koersen', mechanism: 'rest', cadence: 'on-demand', contractDomains: ['assets', 'debts', 'holdings', 'crypto', 'prices', 'rebalancing', 'valuations'] },
     'as-belasting->sp-belasting': { payload: 'Box 1/2/3-druk, jaarruimte en tegenbewijs', mechanism: 'compute', cadence: 'on-demand', contractDomains: ['belasting'], note: 'Voornamelijk pure rekenmotoren in lib/; één API-route exposeert box1-inkomen.' },
-    'as-planning->sp-plannen': { payload: 'FIRE-projecties, scenario’s en opnamestrategie', mechanism: 'compute', cadence: 'on-demand', contractDomains: ['scenarios', 'whatif', 'fire-settings', 'withdrawal-strategy', 'pot-rules', 'toekomst-doel'] },
+    'as-planning->sp-plannen': { payload: 'FIRE-projecties, wat-als-verkenning (inline lab) en opnamestrategie', mechanism: 'compute', cadence: 'on-demand', contractDomains: ['fire-settings', 'withdrawal-strategy', 'pot-rules', 'toekomst-doel'] },
     'as-planning->as-belasting': { payload: 'Unified-projectierijen van de canonieke Horizon-run (Box1Streams: AOW netto, pensioenuitkering/-onttrekking bruto; totalBox3/cumulativeBox3) — de invoer voor de levenslange-belastingdruk-rapportagelaag en de variantensweep over de pensioenpot-positie (ADR 0088)', mechanism: 'compute', cadence: 'on-demand', contractDomains: ['belasting'], note: 'GEEN terugkoppeling: de fiscale rapportagelaag (lib/tax-lifetime/) leest de kernel-rijen en berekent bovenop, maar niets vloeit terug in de kernel-cashflow (zie aandachtspunt box1-buiten-kernel-cashflow). De drie kernel-solves van de variantensweep draaien client-side in de bestaande kernel-worker (kind: "taxvarianten"), achter GET /api/belasting/varianten-sweep dat uitsluitend de serialiseerbare invoer levert.' },
     'as-coach->sp-inzicht': { payload: 'Aanbevelingen, volgende stappen, aandachtspunten en — sinds ADR 0137 — de gesprekkenlijst met hervatten/hernoemen/verwijderen plus de suggestievragen in de lege staat', mechanism: 'rest', cadence: 'on-demand', contractDomains: ['ai', 'chat', 'next-steps', 'briefing', 'perspective'], note: 'De suggestievragen komen uit lib/chat/suggesties.ts (105 records) en worden op route en beschikbare data gefilterd; ze zijn geen AI-uitvoer maar gecureerde tekst.' },
     'as-nieuws->sp-nieuws': { payload: 'Nieuwsfeed en meldingen', mechanism: 'rest', cadence: 'daily', contractDomains: ['news', 'notifications'] },

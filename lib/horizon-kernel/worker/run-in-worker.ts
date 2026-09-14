@@ -32,7 +32,6 @@ import type {
   ConvergentieRawContext,
   ConvergentieProjectionOutcome,
 } from '@/lib/horizon-kernel/convergentie-router'
-import type { WhatifRawContext } from '@/lib/horizon-kernel/whatif-router'
 import type { MarktcheckOutcome } from '@/lib/horizon-kernel/marktcheck'
 import type {
   ForcedStopPathInput,
@@ -238,20 +237,6 @@ export async function runMarktcheckAsync(
     { workerOnly: true },
   )
   if (res.ok && res.kind === 'marktcheck') return res.result
-  return null
-}
-
-/** Dezelfde marktcheck op de what-if-context (mét rendement-slider), ook worker-only. */
-export async function runWhatifMarktcheckAsync(
-  rawContext: WhatifRawContext,
-  maxRuns?: number,
-  stopAge?: number | null,
-): Promise<MarktcheckOutcome | null> {
-  const res = await dispatch(
-    { id: claimId(), kind: 'whatif-marktcheck', rawContext, maxRuns, stopAge },
-    { workerOnly: true },
-  )
-  if (res.ok && res.kind === 'whatif-marktcheck') return res.result
   return null
 }
 

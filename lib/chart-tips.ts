@@ -28,7 +28,6 @@ export interface FireProjectionTipContext {
   aowAge: number
   currentAge: number
   hasMonteCarlo: boolean
-  hasScenario: boolean
   hasBaseline: boolean
   planningMode: 'fire' | 'pensioen'
   /**
@@ -68,10 +67,6 @@ export function getFireProjectionTips(ctx: FireProjectionTipContext): string[] {
 
   if (ctx.hasBaseline) {
     tips.push('Spookrand = je baseline (huidige plan), volle lijn = je scenario')
-  }
-
-  if (ctx.hasScenario) {
-    tips.push('Oranje overlay toont een opgeslagen scenario ter vergelijking')
   }
 
   if (ctx.hasMonteCarlo) {

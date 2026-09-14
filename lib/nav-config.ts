@@ -122,14 +122,13 @@ export const navGroups: NavGroup[] = [
     parent: mainNav[1]!,
     items: [
       // Toekomst-subnavigatie: Tijdas (/toekomst) is de landing met
-      // navigatiekaarten; Doelen/Gebeurtenissen/Voorkeuren/Rekenhulp en
-      // Wat-Als hebben elk een eigen subroute.
+      // navigatiekaarten; Doelen/Gebeurtenissen/Voorkeuren/Rekenhulp
+      // hebben elk een eigen subroute.
       { label: 'Tijdas', href: '/toekomst' },
       { label: 'Doelen', href: '/toekomst/doelen' },
       { label: 'Gebeurtenissen', href: '/toekomst/gebeurtenissen' },
       { label: 'Voorkeuren', href: '/toekomst/voorkeuren' },
       { label: 'Rekenhulp', href: '/toekomst/rekenhulp' },
-      { label: 'Wat-Als', href: '/toekomst/whatif' },
     ],
   },
   {
@@ -159,7 +158,6 @@ export const navGroups: NavGroup[] = [
  */
 export const SIMPLE_HIDDEN_NAV_HREFS: readonly string[] = [
   '/toekomst/rekenhulp',
-  '/toekomst/whatif',
 ]
 
 /**

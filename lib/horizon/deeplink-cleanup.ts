@@ -16,8 +16,7 @@
  * gebruiker landde op een kale `/toekomst` zonder paneel — precies wat er in
  * UR2-11 gemeld werd voor de Wat-Als-ingang. Bovendien is een client-navigatie
  * náár een redirect-only route de gedocumenteerde trigger achter React #310
- * (het redirect-blok in `next.config.ts`, en de comment in
- * `app/(app)/horizon/whatif/whatif-page-client.tsx`).
+ * (het redirect-blok in `next.config.ts`).
  *
  * De regel is daarom: opschonen mag NOOIT van route wisselen. Deze helper
  * bouwt de opgeschoonde URL op het HUIDIGE pad en verwijdert alléén de params

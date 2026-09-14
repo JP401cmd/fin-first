@@ -87,7 +87,7 @@ const tests: TestCase[] = [
   },
   {
     id: 'ie-breakdown-box3-visible', name: 'Box 3 belasting NIET zichtbaar (gap-lock)', category: CAT,
-    description: 'ECHTE PRODUCTIEBEVINDING — geen shim-beperking: sinds de kernel-migratie heeft buildBreakdownFromSimRows (lib/income-expense-breakdown.ts) GEEN fallback voor Box 3 (SimRow draagt geen totalBox3-veld, en incomeBreakdown/expenseBreakdown zijn altijd leeg — zie ie-breakdown-acc-savings). Het gebruikte pad in productie is app/(app)/horizon/whatif/whatif-page-client.tsx regel 879 (buildBreakdownFromSimRows(whatIfSim.result.rows)) — de Box 3-laag in die grafiek toont dus geen bedrag meer. Deze test legt die huidige (ongewenste) staat bewust vast in plaats van die stil te laten verdwijnen; wordt rood zodra iemand een box3-fallback toevoegt (dan hoort deze test bijgewerkt te worden, niet de kernel).',
+    description: 'ECHTE PRODUCTIEBEVINDING — geen shim-beperking: sinds de kernel-migratie heeft buildBreakdownFromSimRows (lib/income-expense-breakdown.ts) GEEN fallback voor Box 3 (SimRow draagt geen totalBox3-veld, en incomeBreakdown/expenseBreakdown zijn altijd leeg — zie ie-breakdown-acc-savings). Dit pad had zijn enige productie-consument op de losse Wat-Als-pagina, die per ADR 0144 is vervallen; de functie zelf opruimen is een restpunt. Deze test legt die huidige (ongewenste) staat bewust vast in plaats van die stil te laten verdwijnen; wordt rood zodra iemand een box3-fallback toevoegt (dan hoort deze test bijgewerkt te worden, niet de kernel).',
     priority: 'high', estimatedDurationMs: 100,
     fn() {
       const r = runStd({ returnModel: 'nl_box3' })

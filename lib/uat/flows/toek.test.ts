@@ -47,14 +47,17 @@ describe('TOEK_FLOW — curatie-integriteit', () => {
     }
   })
 
-  it('dekt de verwachte statusdragende WF-TOEK-scenario\'s (01..26,28,29,30,32,33,34)', () => {
+  it('dekt de verwachte statusdragende WF-TOEK-scenario\'s (01..08,10..26,28,29,30,32,33,34)', () => {
     const covered = new Set(
       TOEK_FLOW.nodes.map((n) => n.scenarioId).filter((id): id is string => Boolean(id)),
     )
     // 27 (uitgave-na-pensioen → REKEN) en 31 (huishoudperspectief → NAV) zijn
-    // verwijsregels en hebben bewust geen eigen TOEK-scenario/knoop.
+    // verwijsregels en hebben bewust geen eigen TOEK-scenario/knoop. 09
+    // (opgeslagen wat-als als spooklijn) is VERVALLEN op 14 sep 2026
+    // (ADR 0144) samen met de standalone Wat-Als-pagina.
     const expected = [
-      ...Array.from({ length: 26 }, (_, i) => i + 1), // 1..26
+      ...Array.from({ length: 8 }, (_, i) => i + 1), // 1..8
+      ...Array.from({ length: 17 }, (_, i) => i + 10), // 10..26
       28, 29, 30, 32, 33, 34,
     ].map((n) => `UAT-TOEK-${String(n).padStart(2, '0')}`)
     for (const id of expected) {

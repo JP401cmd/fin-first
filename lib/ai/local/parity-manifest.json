@@ -64,20 +64,6 @@
       ]
     },
     {
-      "id": "whatif",
-      "label": "Lokale wat-als-DNA",
-      "constant": "LOCAL_WHATIF_DNA",
-      "file": "lib/ai/local/local-whatif-prompt.ts",
-      "subBudget": 800,
-      "estimatedTokens": 249,
-      "sources": [
-        {
-          "file": "lib/ai/whatif-suggest-prompt.ts",
-          "sha256": "c97783a6016bd92fd1ffc823d9bb94bd159062823d2c41a9426a175ee6a679db"
-        }
-      ]
-    },
-    {
       "id": "aanbevelingen",
       "label": "Lokale aanbevelingen-DNA",
       "constant": "LOCAL_RECOMMENDATIONS_DNA",

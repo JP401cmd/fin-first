@@ -45,7 +45,6 @@ const PRODUCERS = [
   'lib/goal-current-value.ts',
   'app/api/checkin/overview/route.ts',
   'app/api/checkin/gespreksstarters/route.ts',
-  'app/(app)/horizon/whatif/whatif-page-client.tsx',
   'components/app/horizon/horizon-client.tsx',
 ] as const
 

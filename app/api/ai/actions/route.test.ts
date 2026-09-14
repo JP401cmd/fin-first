@@ -12,7 +12,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
  *  - lib/aandachtspunten.ts            → metadata.{kind,domain,aandachtspunt_id}
  *  - chat-panel.tsx (cloud tool-call)  → source:'chat', geen metadata
  *  - chat-panel.tsx (lokaal-chat pad)  → source:'chat', metadata.origin:'local-chat'
- *  - whatif-chat.tsx                   → source:'chat', geen metadata, description:null
+ *  - chat-payload met description:null  → source:'chat', geen metadata (voorheen whatif-chat.tsx, vervallen per ADR 0144)
  *  - health-score-receipt.tsx          → source:'manual', description:undefined, geen priority_score
  *  - news-components.tsx               → source:'manual', metadata vrij + due_date
  *  - aandachtspunt-actie-button.tsx    → spreidt aandachtspunten-payload + source:'manual'
@@ -190,7 +190,7 @@ describe('POST /api/ai/actions — bestaande callers blijven werken', () => {
     }))
   })
 
-  it('whatif-chat.tsx (source:chat, geen metadata)', async () => {
+  it('chat-payload met description:null (source:chat, geen metadata)', async () => {
     const { from, insertSpy } = buildSupabase()
     mockFrom.mockImplementation(from)
 

@@ -21,8 +21,8 @@ elke tabel wordt cel-voor-cel tegen 19 fixtures bewezen, tolerantie **€0,01**.
 > een halve cent naar 0 (zie solver.ts).
 >
 > Bovenop de rekenlaag draaien **adapter/** (domein → `KernelInput`), de
-> **bridge** (`bridge.ts` / `run-unified.ts`), de **wrappers/** en de vier
-> **routers** (`convergentie-`, `household-`, `scalar-`, `whatif-router.ts`)
+> **bridge** (`bridge.ts` / `run-unified.ts`), de **wrappers/** en de drie
+> **routers** (`convergentie-`, `household-`, `scalar-router.ts`)
 > plus de **worker/**-offload — allemaal live en door de app geconsumeerd via
 > `lib/unified-projection`. De vroegere FASE 3 (adapter) is dus lang geleden
 > geland. De pariteit-/testtelling is bewust **niet** in dit blok hardgecodeerd
@@ -57,7 +57,7 @@ lib/horizon-kernel/
 │                         defaults, guard, whatif-varianten.
 ├─ bridge.ts /            Kernel-uitvoer → SimRow/SimResult voor de app,
 │  run-unified.ts         geconsumeerd via lib/unified-projection.
-├─ *-router.ts            De vier routers (convergentie, household, scalar, whatif)
+├─ *-router.ts            De drie routers (convergentie, household, scalar)
 │                         die de kernel per gebruiksgeval aanroepen.
 ├─ worker/                Off-main-thread-offload (kernel.worker.ts + protocol).
 ├─ parity/                Herbruikbare teacher-forced-runner (TableParitySpec).

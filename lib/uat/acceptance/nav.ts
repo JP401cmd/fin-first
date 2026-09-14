@@ -178,12 +178,12 @@ const criteria: AcceptanceCriterion[] = [
     scenarioId: 'UAT-NAV-10',
     titel: 'Weergavemodus Eenvoudig ↔ Volledig en doorwerking op navigatie en pagina\'s',
     kriticiteit: 'BELANGRIJK',
-    given: '`SIMPLE_HIDDEN_NAV_HREFS` = [\'/toekomst/rekenhulp\', \'/toekomst/whatif\']. De modus is sinds fase 1 van de eenvoudige weergave op TWEE plekken te zetten: het keuzeblok bovenaan /mijn/uiterlijk (`DisplayModePicker`, APP-1) en de ⌘K-actie "action:toggle-display-mode" — beide schrijven via hetzelfde `PUT /api/display-mode`.',
+    given: '`SIMPLE_HIDDEN_NAV_HREFS` = [\'/toekomst/rekenhulp\'] (sinds 14 sep 2026, ADR 0144: /toekomst/whatif bestaat niet meer als eigen route — de pagina is vervallen en /toekomst/whatif is nu een kale redirect naar /toekomst?whatif=open, dus er is niets meer te verbergen). De modus is sinds fase 1 van de eenvoudige weergave op TWEE plekken te zetten: het keuzeblok bovenaan /mijn/uiterlijk (`DisplayModePicker`, APP-1) en de ⌘K-actie "action:toggle-display-mode" — beide schrijven via hetzelfde `PUT /api/display-mode`.',
     when: 'De sidebar/nav-sheet/⌘K filteren hun menu-items op deze lijst in Eenvoudige weergave.',
-    then: '/toekomst/rekenhulp en /toekomst/whatif zitten in de verberg-lijst (worden overal uit de menu-ingangen gefilterd); een niet-gelijste route (bv. /toekomst/doelen) blijft zichtbaar. Direct navigeren naar de URL blijft mogelijk (alleen de menu-ingang is gefilterd). De ⌘K-omschrijving luidt "Meer/minder detail op elke pagina" — niet meer "Diepte-secties standaard tonen of inklappen" (dat gedrag bestaat niet; APP-3). Sinds fase 4 reduceert Eenvoudig de navigatie zelf ook: de nav-sheet klapt alleen de sub-items van de ACTIEVE hoofdpagina uit (NAV-2 — de rest blijft één regel; de desktop-sidebar deed dit structureel al), en naast "Het Overzicht" in de sidebar verdwijnt de netto-vermogen-badge (NAV-5 — een cijfer zonder context dat op de pagina zelf al staat). In Volledig blijven beide ongewijzigd.',
+    then: '/toekomst/rekenhulp zit in de verberg-lijst (wordt overal uit de menu-ingangen gefilterd); een niet-gelijste route (bv. /toekomst/doelen) blijft zichtbaar. Direct navigeren naar de URL blijft mogelijk (alleen de menu-ingang is gefilterd). De ⌘K-omschrijving luidt "Meer/minder detail op elke pagina" — niet meer "Diepte-secties standaard tonen of inklappen" (dat gedrag bestaat niet; APP-3). Sinds fase 4 reduceert Eenvoudig de navigatie zelf ook: de nav-sheet klapt alleen de sub-items van de ACTIEVE hoofdpagina uit (NAV-2 — de rest blijft één regel; de desktop-sidebar deed dit structureel al), en naast "Het Overzicht" in de sidebar verdwijnt de netto-vermogen-badge (NAV-5 — een cijfer zonder context dat op de pagina zelf al staat). In Volledig blijven beide ongewijzigd.',
     assertion: {
       kind: 'exact',
-      expected: 'rekenhulpVerborgen=true; whatifVerborgen=true; doelenZichtbaar=true',
+      expected: 'rekenhulpVerborgen=true; doelenZichtbaar=true',
       source: 'lib/nav-config.ts#SIMPLE_HIDDEN_NAV_HREFS — échte productieconstante, geen mirror',
     },
   },
@@ -248,7 +248,7 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'OVERIG',
     given: 'De redirect-lijst in `next.config.ts`.',
     when: '`nextConfig.redirects()` wordt aangeroepen.',
-    then: '/core → /overzicht, /horizon → /toekomst, /identity → /mijn, /will → /overzicht, /core/budgets → /overzicht/budget, /core/cash → /overzicht/bezittingen/cash (de rekeningen zijn sinds ADR 0135 een bezitgroep, niet de budgetpagina), de vijf ADR 0135-redirects /overzicht/cashflow{,/budget,/transacties,/vaste-lasten,/forecast} → hun nieuwe plek (de hub zelf staat bewust als laatste: Next matcht exact, maar de volgorde is expliciet zodat herordenen opvalt), /horizon/whatif (twee takken: met/zonder ?via=dreamgate), /toekomst/whatif zónder ?via=dreamgate → /toekomst?whatif=open (mét dreamgate valt de regel niet aan en rendert de pagina), /horizon/strategie → /toekomst?strategie=open, /horizon/uitgaven-na-pensioen en /toekomst/uitgaven-na-pensioen → /toekomst?uitgaven=open, /toekomst/strategie (twee takken: met/zonder ?focus=aow|pensioen|huis), /overzicht/acties → /overzicht/tips, en sinds UR3-26 /toekomst/samengestelde-interest → /toekomst/rekenhulp (én /horizon/samengestelde-interest rechtstreeks daarheen, geen keten) plus /core/checkin/historie → /mijn/checkins zitten allemaal in de lijst; een diepere legacy-subroute zonder regel (bv. /core/assets) heeft GEEN redirect-entry (blijft live backing-UI). /dashboard heeft sinds 1 sep 2026 (kiesbaar homescherm) bewust GEEN config-regel meer: de edge-middleware vertaalt hem naar het gekozen homescherm (profiles.home_screen); een statische regel zou die vertaling onbereikbaar maken.',
+    then: '/core → /overzicht, /horizon → /toekomst, /identity → /mijn, /will → /overzicht, /core/budgets → /overzicht/budget, /core/cash → /overzicht/bezittingen/cash (de rekeningen zijn sinds ADR 0135 een bezitgroep, niet de budgetpagina), de vijf ADR 0135-redirects /overzicht/cashflow{,/budget,/transacties,/vaste-lasten,/forecast} → hun nieuwe plek (de hub zelf staat bewust als laatste: Next matcht exact, maar de volgorde is expliciet zodat herordenen opvalt), sinds 14 sep 2026 (ADR 0144) zijn /horizon/whatif ÉN /toekomst/whatif elk een KALE redirect naar /toekomst?whatif=open — de ?via=dreamgate-tak en de bijbehorende dream-gate-animatie zijn vervallen samen met de standalone Wat-Als-pagina, dus geen enkele /toekomst/whatif-aanroep rendert nog een eigen pagina, /horizon/strategie → /toekomst?strategie=open, /horizon/uitgaven-na-pensioen en /toekomst/uitgaven-na-pensioen → /toekomst?uitgaven=open, /toekomst/strategie (twee takken: met/zonder ?focus=aow|pensioen|huis), /overzicht/acties → /overzicht/tips, en sinds UR3-26 /toekomst/samengestelde-interest → /toekomst/rekenhulp (én /horizon/samengestelde-interest rechtstreeks daarheen, geen keten) plus /core/checkin/historie → /mijn/checkins zitten allemaal in de lijst; een diepere legacy-subroute zonder regel (bv. /core/assets) heeft GEEN redirect-entry (blijft live backing-UI). /dashboard heeft sinds 1 sep 2026 (kiesbaar homescherm) bewust GEEN config-regel meer: de edge-middleware vertaalt hem naar het gekozen homescherm (profiles.home_screen); een statische regel zou die vertaling onbereikbaar maken.',
     assertion: {
       kind: 'exact',
       // 24 = de eerdere 25 (16 + React #310-lichtingen, zie het redirect-blok
@@ -269,6 +269,11 @@ const criteria: AcceptanceCriterion[] = [
       // /horizon/samengestelde-interest-regel wees naar de opgeheven
       // /toekomst-variant en wijst nu rechtstreeks naar het einddoel: geen
       // keten, en dus ook geen extra regel.
+      // 31 -> 30 (14 sep 2026, ADR 0144): de wat-als-pagina verliest haar
+      // ?via=dreamgate-tak — /horizon/whatif en /toekomst/whatif zijn elk nu
+      // ÉÉN kale regel naar /toekomst?whatif=open in plaats van twee takken
+      // (met/zonder dreamgate) voor /horizon/whatif plus één voorwaardelijke
+      // regel voor /toekomst/whatif; per saldo één regel minder.
       // QUERY-BEHOUD (toegevoegd 07-09-2026): de ADR 0135-deeplinks met
       // ?budget=/?maand=/?limit=/?rekening= stonden alleen in deze
       // commentaarregel en werden dus nergens getoetst. Next voegt de
@@ -276,7 +281,7 @@ const criteria: AcceptanceCriterion[] = [
       // draagt; een destination met een eigen '?' zou de meegegeven parameters
       // stilzwijgend laten vallen. Dat is nu een assertie: de vijf
       // cashflow-regels bestaan én geen van hun bestemmingen draagt een query.
-      expected: 'aantalRedirects=31; coreNaarOverzicht=true; dashboardGeenConfigRedirect=true; coreAssetsGeenRedirect=true; cashflowRedirects=5; cashflowBestemmingZonderQuery=true',
+      expected: 'aantalRedirects=30; coreNaarOverzicht=true; dashboardGeenConfigRedirect=true; coreAssetsGeenRedirect=true; cashflowRedirects=5; cashflowBestemmingZonderQuery=true',
       source: 'next.config.ts#redirects — échte productieconfiguratie, geen mirror; zie nav-checks.ts',
     },
   },

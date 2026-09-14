@@ -28,9 +28,6 @@ type ChatContextType = {
   isPinned: boolean
   togglePin: () => void
   setIsPinned: (pinned: boolean) => void
-  /** Auto-message to send when chat is opened from a specific page context */
-  autoOpenMessage: string | null
-  setAutoOpenMessage: (msg: string | null) => void
   /**
    * Open de chat rechtstreeks in de MELDMODUS (megafoon) — de enige invoerweg
    * voor bugs, vragen en aanbevelingen sinds ADR 0096. Gebruikt door de
@@ -118,7 +115,6 @@ export function ChatProvider({
   const [chatHistoryMode, setChatHistoryModeState] = useState<ChatHistoryMode>(initialChatHistoryMode)
   const [pendingMessage, setPendingMessage] = useState<string | null>(null)
   const [isPinned, setIsPinnedState] = useState(false)
-  const [autoOpenMessage, setAutoOpenMessageState] = useState<string | null>(null)
   const [meldingRequested, setMeldingRequested] = useState(false)
   const [gidsRequested, setGidsRequested] = useState(false)
 
@@ -204,10 +200,6 @@ export function ChatProvider({
     })
   }, [])
 
-  const setAutoOpenMessage = useCallback((msg: string | null) => {
-    setAutoOpenMessageState(msg)
-  }, [])
-
   const openMelding = useCallback(() => {
     setMeldingRequested(true)
     setIsOpen(true)
@@ -236,7 +228,6 @@ export function ChatProvider({
       pendingMessage, clearPendingMessage,
       resolvePendingAnswer, dropPendingAnswer,
       isPinned, togglePin, setIsPinned,
-      autoOpenMessage, setAutoOpenMessage,
       openMelding, meldingRequested, clearMeldingRequest,
       openGids, gidsRequested, clearGidsRequest,
       userId, chatHistoryMode, setChatHistoryMode, dataGaps,

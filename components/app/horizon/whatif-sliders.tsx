@@ -1,7 +1,7 @@
 'use client'
 
 import { formatCurrency } from '@/lib/format'
-import { ChevronDown, ChevronUp, SlidersHorizontal } from 'lucide-react'
+import { ChevronDown, ChevronUp } from 'lucide-react'
 import { useState } from 'react'
 import {
   buildSliderEvent,
@@ -10,8 +10,7 @@ import {
   clearScenarioEvents,
   type SliderKey,
 } from '@/lib/scenario-events'
-import type { WhatIfEvent } from '@/components/app/horizon/whatif-events'
-import { WhatIfDevelopmentNotice } from '@/components/app/horizon/whatif-development-notice'
+import type { WhatIfEvent } from '@/lib/types/horizon-whatif'
 import { useOptionalToast } from '@/components/app/toast-provider'
 import { rangeTouchSeekProps } from '@/lib/range-touch-seek'
 
@@ -31,13 +30,6 @@ interface SlidersProps {
   currentAge: number
   /** When true, render only the slider grid — no card wrapper, no headers. */
   bare?: boolean
-  /**
-   * Toont de "nog in ontwikkeling"-notice bovenaan de collapsible (default: true).
-   * De inline `?whatif=open`-modal (horizon-client) rendert deze component zonder
-   * prop → notice zichtbaar. De volledige what-if-pagina toont de notice zelf al
-   * bovenaan en zet deze daarom op `false` (voorkomt dubbele weergave).
-   */
-  developmentNotice?: boolean
 }
 
 /**
@@ -386,55 +378,5 @@ export function WhatIfSliders({ baseline, events, setEvents, currentAge, bare = 
         <SliderGrid baseline={baseline} events={events} setEvents={setEvents} currentAge={currentAge} />
       </div>
     </div>
-  )
-}
-
-export function WhatIfSlidersCollapsible({
-  baseline,
-  events,
-  setEvents,
-  currentAge,
-  developmentNotice = true,
-}: SlidersProps) {
-  // Auto-detect manual tuning: any slider-origin event present.
-  const hasSliderEvent = events.some(e => e.is_scenario_only && e.scenario_origin?.startsWith('slider:'))
-  const [userOpen, setUserOpen] = useState(false)
-  const open = userOpen || hasSliderEvent
-
-  return (
-    <>
-      {developmentNotice && <WhatIfDevelopmentNotice className="mb-3" />}
-    <div className="card-editorial overflow-hidden">
-      <button
-        type="button"
-        onClick={() => setUserOpen(prev => !prev)}
-        aria-expanded={open}
-        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-[var(--subtle)]/50 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--ink)]"
-      >
-        <div className="flex items-center gap-3">
-          <SlidersHorizontal className="h-4 w-4 text-[var(--ink-3)]" aria-hidden />
-          <div>
-            <p className="font-sans text-sm font-semibold text-[var(--ink)]">
-              Verfijn handmatig
-            </p>
-            <p className="mt-0.5 font-sans text-xs text-[var(--ink-3)]">
-              Pas inkomen, sparen of extra inleg zelf aan — wordt opgeslagen als events
-            </p>
-          </div>
-        </div>
-        {open ? (
-          <ChevronUp className="h-4 w-4 shrink-0 text-[var(--ink-3)]" />
-        ) : (
-          <ChevronDown className="h-4 w-4 shrink-0 text-[var(--ink-3)]" />
-        )}
-      </button>
-
-      {open && (
-        <div className="border-t border-[var(--border-ed)] px-4 pb-4 pt-3">
-          <SliderGrid baseline={baseline} events={events} setEvents={setEvents} currentAge={currentAge} />
-        </div>
-      )}
-    </div>
-    </>
   )
 }

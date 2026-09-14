@@ -91,11 +91,6 @@ export const AI_CALLSITE_ALLOWLIST: CallsiteAllowlistEntry[] = [
       'On-device rapport-inleiding (Gemma 4 E2B/WebGPU), geen egress; de prompt bevat — net als het cloud-pad in app/api/report/route.ts — uitsluitend geaggregeerde kerncijfers (ADR 0043 §5).',
   },
   {
-    file: 'lib/hooks/use-whatif-suggestions.ts',
-    reason:
-      'On-device wat-als-suggesties (Gemma 4 E2B/WebGPU), geen egress; de prompt bevat alleen scenario-delta’s en gebeurtenisnamen, geen rauwe transactie-/naam-velden (ADR 0043 §5).',
-  },
-  {
     file: 'lib/aangifte/local/extract-aangifte-local.ts',
     reason:
       'On-device aangifte-extractie (Gemma 4 E2B/WebGPU), geen egress — de aangiftetekst verlaat het toestel niet. BSN-/naam-strip blijven upstream als defense-in-depth (ADR 0043 §5).',
@@ -178,10 +173,6 @@ const EXTRA_FILES = [
   // het door de mazen van de directory-sweep — precies het gat dat deze scan
   // hoort te dichten.
   'lib/aangifte/local/extract-aangifte-local.ts',
-  // De lokale wat-als-suggesties draaien vanuit een hook in lib/hooks (de UI-naad
-  // is daar, niet in lib/ai). Zonder deze regel is het een generatie-callsite die
-  // de directory-sweep niet ziet — zelfde gat als bij het aangifte-pad hierboven.
-  'lib/hooks/use-whatif-suggestions.ts',
   'lib/news-enrich.ts',
 ]
 

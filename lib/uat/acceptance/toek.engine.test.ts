@@ -17,7 +17,7 @@ import { TOEK_ACCEPTANCE, TOEK_EXPECTED_WORKFLOW_NUMBERS } from './toek'
 import { TOEK_ENGINE_CHECKS } from './toek-checks'
 
 describe('UAT Toekomst — acceptatiecriteria dekking', () => {
-  it('heeft precies één criterium per verwacht WF-TOEK-scenario (01..26, 28, 29, 30, 32)', () => {
+  it('heeft precies één criterium per verwacht WF-TOEK-scenario (01..08, 10..26, 28, 29, 30, 32..48 — WF-TOEK-09 vervallen ADR 0144)', () => {
     const numbers = TOEK_ACCEPTANCE.criteria.map((c) => {
       const m = /^WF-TOEK-(\d+)$/.exec(c.workflow)
       if (!m) throw new Error(`Onverwacht workflow-id: ${c.workflow}`)
