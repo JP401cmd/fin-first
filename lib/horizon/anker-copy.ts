@@ -174,6 +174,15 @@ export const ANKER_KPI_LABEL = 'Reikt tot'
 /** Dezelfde kop op smal scherm (past al; één constante zodat ze niet uiteenlopen). */
 export const ANKER_KPI_LABEL_KORT = 'Reikt tot'
 
+/** De drie hefbomen + de secundaire knop (spec lab-haalbaarheid §2/§5, 15 sep 2026). */
+export const HEFBOOM_COPY = {
+  meerOpzij: 'Meer opzij',
+  minderUitgeven: 'Minder uitgeven',
+  laterEerder: 'Later of eerder stoppen',
+  minderWerken: 'Minder werken',
+  werkdagen: 'Werkdagen per week',
+} as const
+
 /**
  * Het stopmoment als getal in een zin: hele jaren kaal ("62"), halve jaren met een
  * komma ("58,5" — B6 staat halve jaren toe). Geen ordinaal ("62e"): de leeftijden

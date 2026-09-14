@@ -2,6 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { computeSliderUiRange, WhatIfSliders, type WhatIfOverrides } from './whatif-sliders'
 import { formatCurrency } from '@/lib/format'
+import type { WhatIfEvent } from '@/lib/types/horizon-whatif'
 
 /**
  * Unit-tests voor `computeSliderUiRange` — het ZICHTBARE (UI-)bereik per slidertype
@@ -99,32 +100,32 @@ describe('WhatIfSliders — a11y: slider heeft naam + valuetext', () => {
     )
   }
 
-  it('benoemt elke parameter-slider bij naam (getByRole slider + name)', () => {
+  it('benoemt de drie hefbomen bij naam; werkdagen zit onder "Minder werken" (spec §2)', () => {
     renderSliders()
-    expect(screen.getByRole('slider', { name: 'Maandinkomen' })).toBeInTheDocument()
+    expect(screen.getByRole('slider', { name: 'Meer opzij' })).toBeInTheDocument()
+    expect(screen.getByRole('slider', { name: 'Minder uitgeven' })).toBeInTheDocument()
+    expect(screen.queryByRole('slider', { name: 'Maandinkomen' })).toBeNull()
+    // ingeklapt: de werkdagen-slider is er pas na openklappen
+    expect(screen.queryByRole('slider', { name: 'Werkdagen per week' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /Minder werken/ }))
     expect(screen.getByRole('slider', { name: 'Werkdagen per week' })).toBeInTheDocument()
-    expect(screen.getByRole('slider', { name: 'Spaarquote' })).toBeInTheDocument()
-    expect(screen.getByRole('slider', { name: 'Extra inleg' })).toBeInTheDocument()
   })
 
-  it('zet aria-valuetext op de geformatteerde waarde per slider', () => {
+  it('Minder uitgeven toont euro per maand t.o.v. nu (0 op de basis), Meer opzij euro', () => {
     renderSliders()
-    expect(screen.getByRole('slider', { name: 'Maandinkomen' })).toHaveAttribute(
-      'aria-valuetext',
-      formatCurrency(3000),
-    )
-    expect(screen.getByRole('slider', { name: 'Werkdagen per week' })).toHaveAttribute(
-      'aria-valuetext',
-      '5 dagen',
-    )
-    expect(screen.getByRole('slider', { name: 'Spaarquote' })).toHaveAttribute(
-      'aria-valuetext',
-      '20%',
-    )
-    expect(screen.getByRole('slider', { name: 'Extra inleg' })).toHaveAttribute(
-      'aria-valuetext',
-      formatCurrency(0),
-    )
+    expect(screen.getByRole('slider', { name: 'Minder uitgeven' })).toHaveAttribute('aria-valuetext', formatCurrency(0))
+    expect(screen.getByRole('slider', { name: 'Meer opzij' })).toHaveAttribute('aria-valuetext', formatCurrency(0))
+  })
+
+  it('Minder uitgeven schuift nog steeds in procentpunten onder de motorkap (event-shape ongewijzigd)', () => {
+    const setEvents = vi.fn()
+    render(<WhatIfSliders baseline={baseline} events={[]} setEvents={setEvents} currentAge={40} />)
+    fireEvent.change(screen.getByRole('slider', { name: 'Minder uitgeven' }), { target: { value: '24' } })
+    expect(setEvents).toHaveBeenCalled()
+    const updater = setEvents.mock.calls[0][0] as (prev: WhatIfEvent[]) => WhatIfEvent[]
+    const next = updater([])
+    expect(next[0]?.scenario_origin).toBe('slider:savings')
+    expect(next[0]?.monthly_cost_change).toBe(-120) // 3000 × 5/5 × 4pp (savingsRate 20 → range 16-24, jsdom clamps to max)
   })
 })
 
@@ -157,7 +158,7 @@ describe('WhatIfSliders — iOS: tik op de baan verschuift de slider', () => {
   function renderWithSpy() {
     const setEvents = vi.fn()
     render(<WhatIfSliders baseline={baseline} events={[]} setEvents={setEvents} currentAge={40} />)
-    const slider = screen.getByRole('slider', { name: 'Spaarquote' })
+    const slider = screen.getByRole('slider', { name: 'Minder uitgeven' })
     // Baan van 218px (bruikbaar traject 200px met een 18px-bolletje).
     slider.getBoundingClientRect = () =>
       ({ left: 0, width: 218, top: 0, height: 19, right: 218, bottom: 19, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect

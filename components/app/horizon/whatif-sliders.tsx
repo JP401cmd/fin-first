@@ -1,15 +1,19 @@
 'use client'
 
+import { useState } from 'react'
+import { ChevronDown, ChevronUp } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import {
   buildSliderEvent,
   applySliderEvent,
   readSliderValueFromEvents,
   computeSliderUiRange,
+  savingsEuroForPp,
   type SliderKey,
 } from '@/lib/scenario-events'
 import type { WhatIfEvent } from '@/lib/types/horizon-whatif'
 import { rangeTouchSeekProps } from '@/lib/range-touch-seek'
+import { HEFBOOM_COPY } from '@/lib/horizon/anker-copy'
 
 /**
  * WhatIfOverrides is de baseline-snapshot waartegen de sliders hun events opbouwen
@@ -128,25 +132,22 @@ function SliderRow({
   )
 }
 
-function SliderGrid({
-  baseline,
-  events,
-  setEvents,
-  currentAge,
-}: SlidersProps) {
-  const incomeValue = readSliderValueFromEvents('income', events, baseline)
+function SliderGrid({ baseline, events, setEvents, currentAge }: SlidersProps) {
+  const [minderWerkenOpen, setMinderWerkenOpen] = useState(false)
   const workdaysValue = readSliderValueFromEvents('workdays', events, baseline)
   const savingsValue = readSliderValueFromEvents('savings', events, baseline)
   const extraValue = readSliderValueFromEvents('extra_inleg', events, baseline)
 
   // Zichtbaar UI-bereik (±20% rond de basisstand) — met verbreding-vangnet zodat een opgeslagen
   // waarde buiten de band niet clampt. Validatie-clamps blijven ongewijzigd.
-  const incomeRange = computeSliderUiRange('income', baseline.monthlyIncome, incomeValue)
   const workdaysRange = computeSliderUiRange('workdays', baseline.workDaysPerWeek, workdaysValue)
   const savingsRange = computeSliderUiRange('savings', baseline.savingsRate, savingsValue)
   // Extra inleg = bóvenop je huidige inleg (basis 0); het bereik hangt aan het maandinkomen.
   const extraRange = computeSliderUiRange('extra_inleg', baseline.monthlyIncome, extraValue)
   const dayLabel = (n: number) => `${n} dag${n === 1 ? '' : 'en'}`
+  // Spec §2: de spaarquote-knop schuift onder de motorkap in procentpunten (event-shape en
+  // savings_rate-doel ongewijzigd); alleen de WEERGAVE is euro per maand minder uitgeven.
+  const euroMinder = (pp: number) => formatCurrency(savingsEuroForPp(baseline, pp))
 
   const setSliderValue = (key: SliderKey, value: number) => {
     const newEvent = buildSliderEvent(key, value, baseline, currentAge)
@@ -157,58 +158,7 @@ function SliderGrid({
     <div className="xl:grid xl:grid-cols-2 xl:gap-x-6">
       <div className="border-b border-dashed border-[var(--border-ed)] xl:border-b-0">
         <SliderRow
-          label="Maandinkomen"
-          hint="→ Inkomenswijziging-event"
-          value={incomeValue}
-          baseValue={baseline.monthlyIncome}
-          min={incomeRange.min}
-          max={incomeRange.max}
-          step={100}
-          formatValue={formatCurrency}
-          formatDelta={v => formatCurrency(v) + '/mnd'}
-          onChange={v => setSliderValue('income', v)}
-          minLabel={formatCurrency(incomeRange.min)}
-          maxLabel={formatCurrency(incomeRange.max)}
-        />
-      </div>
-
-      <div className="border-b border-dashed border-[var(--border-ed)] xl:border-b-0">
-        <SliderRow
-          label="Werkdagen per week"
-          hint="→ Part-time-event"
-          value={workdaysValue}
-          baseValue={baseline.workDaysPerWeek}
-          min={workdaysRange.min}
-          max={workdaysRange.max}
-          step={1}
-          formatValue={v => `${v} dagen`}
-          formatDelta={v => `${v} dag${Math.abs(v) !== 1 ? 'en' : ''}`}
-          onChange={v => setSliderValue('workdays', v)}
-          minLabel={dayLabel(workdaysRange.min)}
-          maxLabel={dayLabel(workdaysRange.max)}
-        />
-      </div>
-
-      <div className="border-b border-dashed border-[var(--border-ed)] xl:border-b-0">
-        <SliderRow
-          label="Spaarquote"
-          hint="→ Spaarquote-event"
-          value={savingsValue}
-          baseValue={baseline.savingsRate}
-          min={savingsRange.min}
-          max={savingsRange.max}
-          step={1}
-          formatValue={v => `${Math.round(v)}%`}
-          formatDelta={v => `${Math.round(v)}%`}
-          onChange={v => setSliderValue('savings', v)}
-          minLabel={`${savingsRange.min}%`}
-          maxLabel={`${savingsRange.max}%`}
-        />
-      </div>
-
-      <div className="border-b border-dashed border-[var(--border-ed)] xl:border-b-0">
-        <SliderRow
-          label="Extra inleg"
+          label={HEFBOOM_COPY.meerOpzij}
           hint="→ Extra-inleg-event"
           value={extraValue}
           baseValue={0}
@@ -222,12 +172,71 @@ function SliderGrid({
           maxLabel={formatCurrency(extraRange.max)}
         />
       </div>
+
+      <div className="border-b border-dashed border-[var(--border-ed)] xl:border-b-0">
+        <SliderRow
+          label={HEFBOOM_COPY.minderUitgeven}
+          hint="→ Spaarquote-event"
+          value={savingsValue}
+          baseValue={baseline.savingsRate}
+          min={savingsRange.min}
+          max={savingsRange.max}
+          step={1}
+          formatValue={euroMinder}
+          formatDelta={v => formatCurrency(savingsEuroForPp(baseline, baseline.savingsRate + v)) + '/mnd'}
+          onChange={v => setSliderValue('savings', v)}
+          minLabel={euroMinder(savingsRange.min)}
+          maxLabel={euroMinder(savingsRange.max)}
+        />
+      </div>
+
+      {/* Secundair: parttime is een levenskeuze, geen geldhefboom (spec §2) — ingeklapt. */}
+      <div className="xl:col-span-2">
+        <button
+          type="button"
+          onClick={() => setMinderWerkenOpen(o => !o)}
+          aria-expanded={minderWerkenOpen}
+          className="flex min-h-[44px] w-full items-center justify-between gap-3 py-1.5 text-left focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--ink)]"
+        >
+          <span className="font-sans text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">
+            {HEFBOOM_COPY.minderWerken}
+            {workdaysValue !== baseline.workDaysPerWeek && (
+              <span className="ml-2 font-mono text-[10px] font-normal normal-case tracking-normal text-horizon-700">
+                {dayLabel(workdaysValue)}
+              </span>
+            )}
+          </span>
+          {minderWerkenOpen ? (
+            <ChevronUp className="h-4 w-4 shrink-0 text-[var(--ink-3)]" aria-hidden />
+          ) : (
+            <ChevronDown className="h-4 w-4 shrink-0 text-[var(--ink-3)]" aria-hidden />
+          )}
+        </button>
+        {minderWerkenOpen && (
+          <SliderRow
+            label={HEFBOOM_COPY.werkdagen}
+            hint="→ Part-time-event"
+            value={workdaysValue}
+            baseValue={baseline.workDaysPerWeek}
+            min={workdaysRange.min}
+            max={workdaysRange.max}
+            step={1}
+            formatValue={v => `${v} dagen`}
+            formatDelta={v => `${v} dag${Math.abs(v) !== 1 ? 'en' : ''}`}
+            onChange={v => setSliderValue('workdays', v)}
+            minLabel={dayLabel(workdaysRange.min)}
+            maxLabel={dayLabel(workdaysRange.max)}
+          />
+        )}
+      </div>
     </div>
   )
 }
 
 /**
- * De scenario-sliders op de tijdas van /toekomst ("Verken je aannames"). Rendert
+ * De scenario-sliders op de tijdas van /toekomst ("Verken je aannames"). Drie
+ * hefbomen — Meer opzij, Minder uitgeven, en secundair Minder werken (ingeklapt
+ * achter de werkdagen-slider) — spec lab-haalbaarheid §2, 15 sep 2026. Rendert
  * alleen het slidergrid — geen kaart, geen kop, geen eigen reset: die leven in de
  * host-sectie. De losse kaartvariant verviel met de Wat-Als-pagina (ADR 0144).
  */

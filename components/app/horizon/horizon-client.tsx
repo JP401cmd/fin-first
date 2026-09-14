@@ -197,7 +197,7 @@ import { WhatIfMarketAssumptions } from '@/components/app/horizon/whatif-market-
 import { DoelLoslatenConfirm } from '@/components/future/doel-loslaten-confirm'
 import { StopPlanConfirm } from '@/components/app/horizon/stop-plan-confirm'
 import { planDraftFromSettings, planDraftToFireSettingsBody, validatePlanDraft } from '@/lib/horizon/plan-draft'
-import { applySliderEvent, buildSliderEvent, readSliderValueFromEvents, type SliderKey } from '@/lib/scenario-events'
+import { applySliderEvent, buildSliderEvent, readSliderValueFromEvents, savingsEuroForPp, type SliderKey } from '@/lib/scenario-events'
 import type { HorizonScenarioOverrides } from '@/lib/hooks/use-horizon-fire-sim'
 import type { AssetCategorie } from '@/lib/horizon-kernel/types'
 import { runMarktcheckAsync, runScenarioPresetsAsync } from '@/lib/horizon-kernel/worker/run-in-worker'
@@ -6943,14 +6943,9 @@ export default function HorizonPage({
           {hasScenario && whatIfBaseline && (
             <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1.5">
               <DeltaBadge
-                current={readSliderValueFromEvents('income', scenarioSliderEvents, whatIfBaseline)}
-                base={whatIfBaseline.monthlyIncome}
-                format={v => formatCurrency(v) + '/mnd'}
-              />
-              <DeltaBadge
                 current={readSliderValueFromEvents('savings', scenarioSliderEvents, whatIfBaseline)}
                 base={whatIfBaseline.savingsRate}
-                format={v => `${Math.round(v)}%`}
+                format={v => formatCurrency(savingsEuroForPp(whatIfBaseline, whatIfBaseline.savingsRate + v)) + '/mnd minder uitgeven'}
               />
               <DeltaBadge
                 current={readSliderValueFromEvents('extra_inleg', scenarioSliderEvents, whatIfBaseline)}
