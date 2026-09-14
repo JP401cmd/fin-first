@@ -183,6 +183,16 @@ export const HEFBOOM_COPY = {
   werkdagen: 'Werkdagen per week',
 } as const
 
+/** Sectie 2 van de Vrijheidsas onder een vast anker (spec lab-haalbaarheid §1/§5). */
+export const DEKKINGSAS_COPY = {
+  kop: 'Reikt je plan?',
+  tag: 'de dekking',
+  sliderLabel: 'Doorwerken tot',
+  tegelReikt: 'Reikt tot',
+  tegelPlan: 'Plan tot',
+  tegelGedekt: 'Gedekt',
+} as const
+
 /**
  * Het stopmoment als getal in een zin: hele jaren kaal ("62"), halve jaren met een
  * komma ("58,5" — B6 staat halve jaren toe). Geen ordinaal ("62e"): de leeftijden

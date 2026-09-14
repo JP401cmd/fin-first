@@ -30,6 +30,7 @@ import {
   dekkingTekortHintZin,
   dekkingTekortHintKnop,
   dekkingVastgelegdToast,
+  DEKKINGSAS_COPY,
   type AnkerReach,
   type AnkerStop,
 } from './anker-copy'
@@ -392,5 +393,18 @@ describe('ankerVrijZin — "vrij mogelijk vanaf" als inzicht (D7/B9)', () => {
     const zin = ankerVrijZin({ solvedFireAge: 63, currentAge: 45, stop: { kind: 'age', stopAge: 58.5 }, gedekt: false })
     expect(zin).toBe('Vrij mogelijk vanaf je 63e.')
     expect(zin).not.toMatch(/je kunt (nu )?(al )?stoppen/i)
+  })
+})
+
+describe('dekkingsas-kopij (spec lab-haalbaarheid §5)', () => {
+  it('draagt de vastgestelde woorden letterlijk', () => {
+    expect(DEKKINGSAS_COPY).toEqual({
+      kop: 'Reikt je plan?',
+      tag: 'de dekking',
+      sliderLabel: 'Doorwerken tot',
+      tegelReikt: 'Reikt tot',
+      tegelPlan: 'Plan tot',
+      tegelGedekt: 'Gedekt',
+    })
   })
 })
