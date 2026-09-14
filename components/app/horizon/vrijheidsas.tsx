@@ -56,7 +56,9 @@ export function computeCoupledStopAge(
   return Math.round(raw / step) * step
 }
 
-// ── deltaLabel-conventie (spiegelt whatif-beslishulp.tsx:388-396) ────────────
+// ── deltaLabel-conventie (vrijheidstijd-delta: "X mnd eerder/later vrij") ────
+// De beslishulp waar deze conventie ooit uit gespiegeld werd, verviel met ADR 0144;
+// deze helper is nu zelf de bron.
 
 type DeltaTone = 'earlier' | 'later' | 'flat' | 'none'
 
@@ -238,10 +240,17 @@ export interface VrijheidsasProps {
   draaiknoppen?: ReactNode
   /**
    * ADR 0129 F3b — het plan heeft een VAST stopmoment (aow/age). De slider is dan een
-   * VERKENNING tegen het plan (default = `planStopAge`); pas de CTA "Maak dit mijn
-   * plan" schrijft de sliderwaarde als anker `age`. Verkennen is nooit destructief.
+   * VERKENNING tegen het plan (default = `planStopAge`); verkennen is nooit destructief.
+   * Het plan verandert alleen via `onMaakPlan` (TPR-09: bevestiging, dan het VOLLEDIGE
+   * plan) of via de plan-keuzes (`onKeuzesOpenen`) — zie die props.
    */
   ankerVast?: boolean
+  /**
+   * ADR 0145 — de UITKOMST van het plan onder een vast stopmoment (dekking: reikt het,
+   * voor hoeveel procent, valt er iets vast te leggen). Alleen gerenderd bij `ankerVast`
+   * met zichtbare stopkeuze; de parent levert de zin (`dekkingAsNotitie`).
+   */
+  uitkomstNotitie?: ReactNode
   /** Het stopmoment van het plan (fractioneel) — de referentie voor "nu rekent het met stoppen op …". */
   planStopAge?: number | null
   /**
@@ -311,6 +320,7 @@ export function Vrijheidsas({
   stopKeuzeNotitie,
   draaiknoppen,
   ankerVast = false,
+  uitkomstNotitie = null,
   planStopAge = null,
   aowAge = null,
   onKeuzesOpenen,
@@ -485,6 +495,9 @@ export function Vrijheidsas({
           )}
           {stopKeuzeVerborgen && stopKeuzeNotitie && (
             <div className="mt-3">{stopKeuzeNotitie}</div>
+          )}
+          {ankerVast && !stopKeuzeVerborgen && uitkomstNotitie && (
+            <div className="mt-3">{uitkomstNotitie}</div>
           )}
 
           {draaiknoppen && <div className="mt-4 space-y-5">{draaiknoppen}</div>}

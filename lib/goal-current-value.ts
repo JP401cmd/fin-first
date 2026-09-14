@@ -52,7 +52,11 @@ import {
   isVrijheidsgetalGoal,
   type VrijheidsgetalSnapshot,
 } from '@/lib/goals/vrijheidsgetal-goal'
-import { fireAgeGoalNotApplicableReason } from '@/lib/horizon/anker-copy'
+import {
+  fireAgeGoalNotApplicableReason,
+  planCoverageGoalNotApplicableReason,
+  vrijheidsgetalGoalNotApplicableReason,
+} from '@/lib/horizon/anker-copy'
 
 /**
  * Minimale velden die de doel-`current_value`-sync leest/muteert. Zowel het
@@ -711,12 +715,15 @@ export async function syncActiveGoalValues<T extends SyncableGoal>(
   const injectionSet = [...parameterGoals, ...metricGoals]
 
   // De fire-thunk draait bij ELK doel dat de canonieke FIRE-motor nodig heeft:
-  // het vrijheidsgetal-doel (bevinding C10), het fire_age-doel en het
-  // eindsaldo-doel. Wie er geen heeft betaalt geen kernel-run.
+  // het vrijheidsgetal-doel (bevinding C10), het fire_age-doel, het eindsaldo-doel
+  // en het dekkingsdoel (`plan_coverage`, ADR 0145). Wie er geen heeft betaalt geen
+  // kernel-run.
   const wantsFire =
     Boolean(loadFireSnapshot) &&
     (goals.some(isVrijheidsgetalGoal) ||
-      injectionSet.some(gl => gl.goal_type === 'fire_age' || gl.goal_type === 'end_balance'))
+      injectionSet.some(
+        gl => gl.goal_type === 'fire_age' || gl.goal_type === 'end_balance' || gl.goal_type === 'plan_coverage',
+      ))
 
   // Per-type gating: elke metric-thunk draait alleen bij een actief doel van dat
   // type. `has` kijkt uitsluitend in `metricGoals` — parameter-doelen hebben hun
@@ -762,9 +769,12 @@ export async function syncActiveGoalValues<T extends SyncableGoal>(
   // Geen waarde (0 ⇒ "nog geen meting" in computeGoalProgress) + de reden voor de
   // doelkaart. Ook de snapshotkolom-terugval hierboven wordt zo overschreven: die
   // draagt een scalar-leeftijd die onder een vast anker evenmin iets betekent.
-  if (fireSnapshot?.stopAnchor != null && fireSnapshot.stopAnchor !== 'solved') {
+  const vastAnker: 'aow' | 'now' | 'age' | null =
+    fireSnapshot?.stopAnchor != null && fireSnapshot.stopAnchor !== 'solved' ? fireSnapshot.stopAnchor : null
+  const anchorFixed = vastAnker !== null
+  if (fireSnapshot && vastAnker !== null) {
     const reden = fireAgeGoalNotApplicableReason(
-      fireSnapshot.stopAnchor,
+      vastAnker,
       fireSnapshot.stopAge ?? null,
       fireSnapshot.endAge ?? null,
     )
@@ -772,6 +782,41 @@ export async function syncActiveGoalValues<T extends SyncableGoal>(
       if (gl.goal_type !== 'fire_age') continue
       gl.current_value = 0
       gl.notApplicableReason = reden
+    }
+
+    // ADR 0145 — het VRIJHEIDSGETAL-doel krijgt onder een vast anker óók de reden. De
+    // sync erboven laat het doel bewust ongemoeid (alles-of-niets, geen doelvermogen —
+    // D4), maar zonder notitie viel de kaart stil terug op de opgeslagen waarde en
+    // las als een gewoon doel (defect uit de verkenning van 13 sep 2026).
+    const vgReden = vrijheidsgetalGoalNotApplicableReason(
+      vastAnker,
+      fireSnapshot.stopAge ?? null,
+      fireSnapshot.endAge ?? null,
+    )
+    for (const goal of goals) {
+      // Alleen eigen doelen: een gedeeld doel van de partner draagt niet jouw stopmoment.
+      const eigenaar = (goal as { user_id?: string | null }).user_id
+      if (isVrijheidsgetalGoal(goal) && (eigenaar == null || eigenaar === userId)) {
+        goal.notApplicableReason = vgReden
+      }
+    }
+  }
+
+  // ADR 0145 — het DEKKINGSDOEL (`plan_coverage`): spiegel van het fire_age-blok.
+  // Vast anker → de dekking uit de bundel (`snapshot.planCoveragePct`, alleen een
+  // eindig getal overschrijft; anders blijft de opgeslagen waarde staan). `solved` →
+  // geen uitkomst: waarde 0 + reden, zodat een doel dat onder een eerder anker is
+  // vastgelegd nooit stil een kapitaalratio als "dekking" toont.
+  if (fireSnapshot) {
+    for (const gl of injectionSet) {
+      if (gl.goal_type !== 'plan_coverage') continue
+      if (anchorFixed) {
+        const pct = fireSnapshot.planCoveragePct
+        if (pct != null && Number.isFinite(pct)) gl.current_value = pct
+      } else {
+        gl.current_value = 0
+        gl.notApplicableReason = planCoverageGoalNotApplicableReason()
+      }
     }
   }
 

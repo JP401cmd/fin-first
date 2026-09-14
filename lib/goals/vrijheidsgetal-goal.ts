@@ -125,6 +125,16 @@ export interface VrijheidsgetalSnapshot {
   stopAge?: number | null
   /** Eindleeftijd van het plan (`SimResult.displayEndAge`) — voor de n.v.t.-notitie. */
   endAge?: number | null
+  /**
+   * DEKKING van het plan onder een VAST anker (ADR 0145): het `freedomPct` van de
+   * horizon-bundel, dat daar per ADR 0129 B3/D5 `computeRunwayCoveragePct` is (de
+   * loader kiest via `computeFreedomPctForPlan`). Voedt het `plan_coverage`-doel.
+   * `null` onder `solved` (dan is `freedomPct` een kapitaalratio, geen dekking — en
+   * heeft het dekkingsdoel geen uitkomst). CONSUME: doorgegeven uit de bundel, nooit
+   * hier herrekend. Optioneel/additief: stub-snapshots zonder het veld gedragen zich
+   * als "geen uitspraak" (opgeslagen waarde blijft staan).
+   */
+  planCoveragePct?: number | null
 }
 
 /** Minimale rij-/resultaatvorm die `pickEndBalanceAtEndAge` leest. */
@@ -190,6 +200,8 @@ export interface VrijheidsgetalSnapshotInput {
   stopAge?: number | null
   /** `SimResult.displayEndAge` — de eindleeftijd van het plan. */
   endAge?: number | null
+  /** `HorizonPageData.freedomPct` — alléén betekenisvol als dekking onder een vast anker. */
+  planCoveragePct?: number | null
 }
 
 /**
@@ -244,6 +256,12 @@ export function buildVrijheidsgetalSnapshot(
     stopAnchor: input.stopAnchor ?? 'solved',
     stopAge: anchorFixed && input.stopAge != null && Number.isFinite(input.stopAge) ? input.stopAge : null,
     endAge: input.endAge != null && Number.isFinite(input.endAge) ? input.endAge : null,
+    // Dekking alleen onder een vast anker: onder `solved` is `freedomPct` een
+    // kapitaalratio en zou een dekkingsdoel er een vals percentage uit lezen.
+    planCoveragePct:
+      anchorFixed && input.planCoveragePct != null && Number.isFinite(input.planCoveragePct)
+        ? input.planCoveragePct
+        : null,
     homeExcludedFromFire: input.homeExcludedFromFire,
     endBalanceAtEndAge:
       input.endBalanceAtEndAge != null && Number.isFinite(input.endBalanceAtEndAge)

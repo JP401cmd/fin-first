@@ -64,8 +64,14 @@ const VALID_CATEGORIES: readonly AssetCategorie[] = [
 
 // ── Pref-shape (v2) ──────────────────────────────────────────────────────────
 
-/** De vier promoveerbare parameter-doelen die één doelscenario kan genereren. */
-export const DOEL_PARAMETERS = ['spaarquote', 'salaris', 'rendement', 'fire'] as const
+/**
+ * De vijf promoveerbare parameter-doelen die één doelscenario kan genereren.
+ * `fire` (vrijheidsleeftijd) is het uitkomstdoel onder `solved`; `dekking` ("Plan
+ * gedekt", ADR 0145) is de spiegel daarvan onder een vast stopmoment (aow/age). De
+ * route bepaalt server-side welke van de twee bij het anker hoort — de client kiest
+ * dat nooit.
+ */
+export const DOEL_PARAMETERS = ['spaarquote', 'salaris', 'rendement', 'fire', 'dekking'] as const
 export type DoelParameter = (typeof DOEL_PARAMETERS)[number]
 
 /**
@@ -91,7 +97,8 @@ export interface ToekomstScenarioStand {
 
 /**
  * Vastgelegd doelscenario ("verkennen wordt richten"): de actuele lab-stand is gepromoveerd
- * tot een persistent doel dat parameter-doelen genereert (spaarquote/salaris/rendement/fire).
+ * tot een persistent doel dat parameter-doelen genereert (spaarquote/salaris/rendement +
+ * het uitkomstdoel: fire onder `solved`, dekking onder een vast stopmoment).
  */
 export interface ToekomstScenarioDoel {
   /** ISO-tijdstip van vastleggen. Moet als datum parseren, anders valt het doel-blok weg. */
@@ -209,7 +216,7 @@ function parseScenarioBaseFields(raw: Record<string, unknown>, out: ToekomstScen
  * Parseert het optionele `doel`-blok (v2). Een VERVUILD doel-blok laat alléén het doel
  * vallen (de rest van de pref blijft). Voorwaarden voor een geldig doel:
  *   - `gezetOp` is een string die als datum parseert (anders → doel weg);
- *   - `parameters` bevat minstens één van de vier bekende keys met waarde `true`
+ *   - `parameters` bevat minstens één van de bekende `DOEL_PARAMETERS`-keys met waarde `true`
  *     (leeg parameters-object → doel weg: een doel zonder parameters is betekenisloos);
  *   - `stand` is een plain object dat naar minstens één geldig veld parseert
  *     (ontbrekende/lege/ongeldige stand → doel weg: een doel zonder stand is betekenisloos).
@@ -318,6 +325,35 @@ function deltaMapGelijk(
 }
 
 /**
+ * Laat de STOPKEUZE-velden (`stopAge`/`stopKoppel`/`stopMarge`) weg uit een stand.
+ * Onder een VAST stopmoment (ADR 0145 D4) is de stopkeuze geen doelstand: het plan
+ * rekent met het anker, de slider is daar puur verkenning. De route strips 'm vóór de
+ * pref-write (zodat een verkende stop nooit in `doel.stand` landt) en de client vóór
+ * de concept-vergelijking. Generiek over de getypte stand én de rauwe body-record:
+ * beide zijn plain objects met dezelfde sleutels. Geeft een KOPIE terug, muteert niets.
+ */
+export function stripStopKeuze<T extends object>(
+  stand: T,
+): Omit<T, 'stopAge' | 'stopKoppel' | 'stopMarge'> {
+  const rest = { ...stand }
+  delete (rest as Record<string, unknown>).stopAge
+  delete (rest as Record<string, unknown>).stopKoppel
+  delete (rest as Record<string, unknown>).stopMarge
+  return rest
+}
+
+/** Opties voor `isDoelConceptGewijzigd`. */
+export interface DoelConceptOpties {
+  /**
+   * Telt de stopkeuze (stopAge/stopKoppel/stopMarge) mee in de vergelijking? Default
+   * `true` = het bestaande gedrag onder `solved`. Onder een vast stopmoment zet de client
+   * 'm op `false` (ADR 0145 D4): de slider verkent daar alleen en mag de "je draait aan
+   * je doel"-banner niet laten afgaan.
+   */
+  stopKeuzeTelt?: boolean
+}
+
+/**
  * Pure concept-detectie: wijkt de LIVE goal-relevante stand af van de vastgelegde `doel.stand`?
  * Voedt de "je draait aan je doel"-banner (stap 5). Spiegelt de afronding/normalisatie van het
  * persist-effect in horizon-client zodat een no-op géén valse "gewijzigd" geeft. Vergelijkingsregel
@@ -332,15 +368,19 @@ function deltaMapGelijk(
  *     en schuift met de sim, dus die niet vergelijken). Koppel UIT in beide ⇒ vergelijk de
  *     absolute `stopAge` (undefined ≡ null; beide "geen stop").
  * Ontbrekende `stand` (geen doel) ⇒ `false` (er is niets om van af te wijken).
+ * `opts.stopKeuzeTelt: false` ⇒ de stop-velden worden overgeslagen (vast anker, ADR 0145).
  */
 export function isDoelConceptGewijzigd(
   live: ToekomstScenarioStand,
   stand: ToekomstScenarioStand | null | undefined,
+  opts?: DoelConceptOpties,
 ): boolean {
   if (!stand) return false
 
   if (!slidersGelijk(live.sliders, stand.sliders)) return true
   if (!deltaMapGelijk(live.returnDeltaByCategorie, stand.returnDeltaByCategorie)) return true
+
+  if (opts?.stopKeuzeTelt === false) return false
 
   const koppelLive = live.stopKoppel ?? false
   const koppelStand = stand.stopKoppel ?? false

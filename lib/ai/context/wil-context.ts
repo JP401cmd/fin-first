@@ -7,6 +7,21 @@ import { applyActionPriorityOrder } from '@/lib/action-sort'
 import type { ModuleId } from '@/lib/module-registry'
 import { buildBudgetSpendingMap, type SpendingTxRow } from '@/lib/budget-spending'
 import { buildAiBudgetTypeMap, loadSplitRows } from './budget-spending-source'
+import { formatGoalValue, GOAL_TYPE_META, type GoalType } from '@/lib/goal-data'
+
+/**
+ * Doelwaarde in de EENHEID van het doeltype (ADR 0145, context-formattering): een
+ * spaarquote-, dekkings- of vrijheidsleeftijd-doel ging vóór dit punt als euro's de
+ * prompt in ("Plan gedekt: €78/€100"). `formatGoalValue` is de canonieke formatter;
+ * een niet-canoniek `goal_type` uit een oude rij ('wealth', 'debt' — zie migratie
+ * 20260901140000) valt terug op euro's, zoals voorheen.
+ */
+export function formatGoalAmount(value: number, goalType: string | null | undefined): string {
+  if (goalType && Object.prototype.hasOwnProperty.call(GOAL_TYPE_META, goalType)) {
+    return formatGoalValue(value, goalType as GoalType)
+  }
+  return formatCurrency(value)
+}
 
 /**
  * Wil-specific context: goals, budget optimization opportunities,
@@ -181,7 +196,7 @@ export async function buildWilContext(supabase: SupabaseClient, budgetingActive 
       const target = Number(g.target_value)
       const pct = target > 0 ? Math.round((current / target) * 100) : 0
       const dateInfo = g.target_date ? ` — deadline ${g.target_date}` : ''
-      return `${g.name}: ${formatCurrency(current)}/${formatCurrency(target)} (${pct}%)${dateInfo}`
+      return `${g.name}: ${formatGoalAmount(current, g.goal_type)}/${formatGoalAmount(target, g.goal_type)} (${pct}%)${dateInfo}`
     })
     parts.push(section('DOELEN', bulletList(goalLines)))
   }

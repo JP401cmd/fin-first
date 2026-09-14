@@ -235,6 +235,10 @@ vijfde eindstrategie — dat besluit wordt in fase F4 van dit besluit
 gecontraheerd tot het `now`-anker binnen dit tweeassige model; de status van
 0127 blijft `aanvaard` tot die fase.
 
+Zie ADR 0145 voor het hier bewust uitgestelde haalbaarheidsdoel-type: het lab
+op /toekomst volgt sindsdien de dekking (D5 hierboven) als uitkomstmaat onder
+een vast anker, met `plan_coverage` als het bijbehorende, lab-only doeltype.
+
 ## Bijlage — vastgestelde zinnen (merkstem-ronde F0)
 
 Getoetst aan `lib/ai/dna/base.ts` (`== TOON ==` / `== FRAMING ==`) en de

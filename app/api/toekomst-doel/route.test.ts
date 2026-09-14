@@ -42,6 +42,9 @@ const results = {
 let inserted: Array<{ table: string; row: any }> = []
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let updated: Array<{ table: string; payload: any }> = []
+// Delete-filters (kolom → waarde) per delete-keten, zodat de anker-reconciliatie
+// (welk goal_type verdwijnt) en `loslaten` (`.in` op de typen) te asserten zijn.
+let deleted: Array<{ table: string; filters: Record<string, unknown> }> = []
 let insertSeq = 0
 
 function resolveFor(table: string, op: string | undefined): Promise<unknown> {
@@ -66,6 +69,7 @@ function resolveFor(table: string, op: string | undefined): Promise<unknown> {
 
 function builder(table: string) {
   let op: string | undefined
+  let deleteFilters: Record<string, unknown> | null = null
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const b: any = {
     select: () => {
@@ -84,10 +88,18 @@ function builder(table: string) {
     },
     delete: () => {
       op = 'delete'
+      deleteFilters = {}
+      deleted.push({ table, filters: deleteFilters })
       return b
     },
-    eq: () => b,
-    in: () => b,
+    eq: (col: string, val: unknown) => {
+      if (deleteFilters) deleteFilters[col] = val
+      return b
+    },
+    in: (col: string, val: unknown) => {
+      if (deleteFilters) deleteFilters[col] = val
+      return b
+    },
     filter: () => b,
     order: () => b,
     maybeSingle: () => resolveFor(table, op),
@@ -114,6 +126,7 @@ beforeEach(() => {
   mockFrom.mockImplementation((table: string) => builder(table))
   inserted = []
   updated = []
+  deleted = []
   insertSeq = 0
   results.goalsSelect.mockReset().mockReturnValue({ data: null, error: null })
   results.goalsInsert
@@ -334,6 +347,281 @@ describe('PUT /api/toekomst-doel — loslaten', () => {
   it('500 als de goals-delete faalt (pref blijft ongemoeid)', async () => {
     results.goalsDelete.mockReturnValue({ error: { code: 'XX000' } })
     const res = await PUT(putRequest(JSON.stringify({ action: 'loslaten' })))
+    expect(res.status).toBe(500)
+    expect(updated.filter((u) => u.table === 'profiles')).toEqual([])
+  })
+
+  it('verwijdert óók het dekkingsdoel (plan_coverage zit in PARAMETER_GOAL_TYPES) — onder elk anker, ook `now`', async () => {
+    const res = await PUT(putRequest(JSON.stringify({ action: 'loslaten' })))
+    expect(res.status).toBe(200)
+    const del = deleted.find((d) => d.table === 'goals')
+    expect(del).toBeTruthy()
+    expect(del!.filters.goal_type).toEqual(['savings_rate', 'salary', 'expected_return', 'fire_age', 'plan_coverage'])
+    expect(del!.filters.user_id).toBe('user-1')
+  })
+})
+
+// ── ADR 0145 D3: het anker is server-bepaald ────────────────────────────────
+
+/** Een profielrij zoals de plan-select 'm teruggeeft (FIRE_PLAN_COLUMNS + feature_preferences). */
+function planRow(over: Record<string, unknown> = {}) {
+  return {
+    data: {
+      fire_end_strategy: 'deplete',
+      fire_end_age: 90,
+      fire_legacy_amount: 0,
+      fire_stop_anchor: 'solved',
+      fire_stop_age: null,
+      feature_preferences: null,
+      ...over,
+    },
+    error: null,
+  }
+}
+
+describe('PUT /api/toekomst-doel — vastleggen volgt het anker (ADR 0145)', () => {
+  it('aow + {fire, spaarquote}: fire wordt gestript → alleen savings_rate; de stopkeuze verdwijnt uit doel.stand', async () => {
+    // Twee profiel-selects: eerst het plan, dan de pref (default-mock).
+    results.profilesSelect.mockReturnValueOnce(planRow({ fire_stop_anchor: 'aow' }))
+    const res = await PUT(
+      putRequest(
+        JSON.stringify({
+          action: 'vastleggen',
+          parameters: { fire: true, spaarquote: true },
+          doelwaarden: { spaarquotePct: 45, fireLeeftijd: 58, margeJaren: 3 },
+          stand: { sliders: { savings: 45 }, stopAge: 58, stopKoppel: true, stopMarge: 2 },
+        }),
+      ),
+    )
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ ok: true, goalIds: { spaarquote: 'g-1' } })
+    expect(inserted.map((i) => i.row.goal_type)).toEqual(['savings_rate'])
+
+    const doel = updated.find((u) => u.table === 'profiles')!.payload.toekomst_scenario_prefs.doel
+    expect(doel.parameters).toEqual({ spaarquote: true })
+    expect(doel.stand).toEqual({ sliders: { savings: 45 } })
+    expect(doel.stand.stopAge).toBeUndefined()
+    expect(doel.stand.stopKoppel).toBeUndefined()
+  })
+
+  it('aow + dekking: plan_coverage met de SERVER-eindleeftijd; plan-velden uit de body worden genegeerd', async () => {
+    results.profilesSelect.mockReturnValueOnce(planRow({ fire_stop_anchor: 'aow', fire_end_age: 92 }))
+    const res = await PUT(
+      putRequest(
+        JSON.stringify({
+          action: 'vastleggen',
+          parameters: { dekking: true, spaarquote: true },
+          // Een client die zelf plan-velden meestuurt: die tellen niet.
+          doelwaarden: { spaarquotePct: 45, planEindleeftijd: 55, planStopAnker: 'age', planStopLeeftijd: 40 },
+          stand: { sliders: { savings: 45 } },
+        }),
+      ),
+    )
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ ok: true, goalIds: { spaarquote: 'g-1', dekking: 'g-2' } })
+    expect(inserted.map((i) => i.row.goal_type)).toEqual(['savings_rate', 'plan_coverage'])
+    const dekking = inserted.find((i) => i.row.goal_type === 'plan_coverage')!.row
+    expect(dekking.name).toBe('Plan gedekt tot 92 jaar')
+    expect(dekking.target_value).toBe(100)
+    expect(dekking.current_value).toBe(0)
+    expect(dekking.metadata).toEqual({ bron: 'parameter', oorsprong: 'lab', eindleeftijd: 92, stopAnker: 'aow', stopLeeftijd: null })
+
+    const doel = updated.find((u) => u.table === 'profiles')!.payload.toekomst_scenario_prefs.doel
+    expect(doel.parameters).toEqual({ spaarquote: true, dekking: true })
+  })
+
+  it('age 58,5 + dekking: de stopleeftijd van het plan landt in de metadata', async () => {
+    results.profilesSelect.mockReturnValueOnce(planRow({ fire_stop_anchor: 'age', fire_stop_age: 58.5 }))
+    const res = await PUT(
+      putRequest(
+        JSON.stringify({
+          action: 'vastleggen',
+          parameters: { dekking: true },
+          doelwaarden: {},
+          stand: { sliders: { extraInleg: 300 } },
+        }),
+      ),
+    )
+    expect(res.status).toBe(200)
+    expect(inserted[0].row.metadata).toMatchObject({ stopAnker: 'age', stopLeeftijd: 58.5, eindleeftijd: 90 })
+  })
+
+  it('age × perpetual: de eindleeftijd volgt de kernel (100), niet het opgeslagen veld', async () => {
+    results.profilesSelect.mockReturnValueOnce(
+      planRow({ fire_stop_anchor: 'age', fire_stop_age: 58, fire_end_strategy: 'perpetual', fire_end_age: 90 }),
+    )
+    const res = await PUT(
+      putRequest(
+        JSON.stringify({
+          action: 'vastleggen',
+          parameters: { dekking: true },
+          doelwaarden: {},
+          stand: { sliders: { extraInleg: 300 } },
+        }),
+      ),
+    )
+    expect(res.status).toBe(200)
+    expect(inserted[0].row.name).toBe('Plan gedekt tot 100 jaar')
+    expect(inserted[0].row.metadata).toMatchObject({ eindleeftijd: 100 })
+  })
+
+  it('legacy-label `pensioen` in fire_end_strategy telt als aow-anker (D2-lezing van de loaders)', async () => {
+    results.profilesSelect.mockReturnValueOnce(planRow({ fire_end_strategy: 'pensioen', fire_end_age: 100 }))
+    const res = await PUT(
+      putRequest(
+        JSON.stringify({
+          action: 'vastleggen',
+          parameters: { dekking: true },
+          doelwaarden: {},
+          stand: { sliders: { savings: 50 } },
+        }),
+      ),
+    )
+    expect(res.status).toBe(200)
+    expect(inserted[0].row.goal_type).toBe('plan_coverage')
+    expect(inserted[0].row.metadata).toMatchObject({ stopAnker: 'aow', eindleeftijd: 100 })
+  })
+
+  it('solved + dekking → 400 (dekking_vereist_vast_anker), geen goals, geen pref-write', async () => {
+    results.profilesSelect.mockReturnValueOnce(planRow())
+    const res = await PUT(
+      putRequest(
+        JSON.stringify({
+          action: 'vastleggen',
+          parameters: { dekking: true, spaarquote: true },
+          doelwaarden: { spaarquotePct: 45 },
+          stand: { sliders: { savings: 45 } },
+        }),
+      ),
+    )
+    expect(res.status).toBe(400)
+    expect(await res.json()).toEqual({ error: 'Een dekkingsdoel hoort bij een vast stopmoment', code: 'dekking_vereist_vast_anker' })
+    expect(inserted).toEqual([])
+    expect(updated).toEqual([])
+  })
+
+  it('now → 400 (anchor_now): verkennen mag, geen doel uit het lab', async () => {
+    results.profilesSelect.mockReturnValueOnce(planRow({ fire_stop_anchor: 'now' }))
+    const res = await PUT(
+      putRequest(
+        JSON.stringify({
+          action: 'vastleggen',
+          parameters: { spaarquote: true },
+          doelwaarden: { spaarquotePct: 45 },
+          stand: { sliders: { savings: 45 } },
+        }),
+      ),
+    )
+    expect(res.status).toBe(400)
+    expect(await res.json()).toEqual({ error: 'Onder dit stopmoment legt het lab geen doel vast', code: 'anchor_now' })
+    expect(inserted).toEqual([])
+    expect(deleted).toEqual([])
+  })
+
+  it('aow + alleen {fire} → na strippen niets over → 400 "Geen doelparameters"', async () => {
+    results.profilesSelect.mockReturnValueOnce(planRow({ fire_stop_anchor: 'aow' }))
+    const res = await PUT(
+      putRequest(
+        JSON.stringify({
+          action: 'vastleggen',
+          parameters: { fire: true },
+          doelwaarden: { fireLeeftijd: 58 },
+          stand: { stopAge: 58 },
+        }),
+      ),
+    )
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toBe('Geen doelparameters')
+    expect(inserted).toEqual([])
+  })
+
+  it('aow + dekking met alléén een stopkeuze als stand → na strippen leeg → 400 "Ongeldige doelstand", geen wees-goals', async () => {
+    results.profilesSelect.mockReturnValueOnce(planRow({ fire_stop_anchor: 'aow' }))
+    const res = await PUT(
+      putRequest(
+        JSON.stringify({
+          action: 'vastleggen',
+          parameters: { dekking: true },
+          doelwaarden: {},
+          stand: { stopAge: 62, stopKoppel: false },
+        }),
+      ),
+    )
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toBe('Ongeldige doelstand')
+    expect(inserted).toEqual([])
+  })
+
+  it('reconciliatie: onder een vast anker verdwijnt de fire_age-parameterrij; onder solved de plan_coverage-rij', async () => {
+    results.profilesSelect.mockReturnValueOnce(planRow({ fire_stop_anchor: 'age', fire_stop_age: 60 }))
+    await PUT(
+      putRequest(
+        JSON.stringify({
+          action: 'vastleggen',
+          parameters: { dekking: true },
+          doelwaarden: {},
+          stand: { sliders: { savings: 50 } },
+        }),
+      ),
+    )
+    const vast = deleted.filter((d) => d.table === 'goals')
+    expect(vast).toHaveLength(1)
+    expect(vast[0].filters).toEqual({ user_id: 'user-1', goal_type: 'fire_age' })
+
+    deleted = []
+    inserted = []
+    updated = []
+    results.profilesSelect.mockReturnValueOnce(planRow())
+    await PUT(
+      putRequest(
+        JSON.stringify({
+          action: 'vastleggen',
+          parameters: { spaarquote: true },
+          doelwaarden: { spaarquotePct: 45 },
+          stand: { sliders: { savings: 45 } },
+        }),
+      ),
+    )
+    const solved = deleted.filter((d) => d.table === 'goals')
+    expect(solved).toHaveLength(1)
+    expect(solved[0].filters).toEqual({ user_id: 'user-1', goal_type: 'plan_coverage' })
+    // De reconciliatie komt ná de upserts en vóór de pref-write.
+    expect(inserted.map((i) => i.row.goal_type)).toEqual(['savings_rate'])
+    expect(updated.find((u) => u.table === 'profiles')).toBeTruthy()
+  })
+
+  it('500 als de plan-read faalt — geen goals, geen pref-write, geen rauwe DB-tekst', async () => {
+    results.profilesSelect.mockReturnValueOnce({ data: null, error: { code: 'XX000', message: 'geheim detail' } })
+    const res = await PUT(
+      putRequest(
+        JSON.stringify({
+          action: 'vastleggen',
+          parameters: { spaarquote: true },
+          doelwaarden: { spaarquotePct: 45 },
+          stand: { sliders: { savings: 45 } },
+        }),
+      ),
+    )
+    expect(res.status).toBe(500)
+    const json = await res.json()
+    expect(json.error).not.toContain('geheim detail')
+    expect(inserted).toEqual([])
+    expect(updated).toEqual([])
+  })
+
+  it('500 als de reconciliatie-delete faalt (pref blijft ongemoeid)', async () => {
+    results.profilesSelect.mockReturnValueOnce(planRow())
+    results.goalsDelete.mockReturnValue({ error: { code: 'XX000' } })
+    const res = await PUT(
+      putRequest(
+        JSON.stringify({
+          action: 'vastleggen',
+          parameters: { spaarquote: true },
+          doelwaarden: { spaarquotePct: 45 },
+          stand: { sliders: { savings: 45 } },
+        }),
+      ),
+    )
     expect(res.status).toBe(500)
     expect(updated.filter((u) => u.table === 'profiles')).toEqual([])
   })

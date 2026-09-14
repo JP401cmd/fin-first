@@ -503,7 +503,7 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
       },
       {
         title: 'Aannames erachter',
-        text: 'Rendement, inflatie, je uitgaven na pensioen en je eindleeftijd bepalen samen de uitkomst. Je stelt ze zelf in bij Voorkeuren — een kleine bijstelling kan jaren schelen. Je AOW telt alleen mee als er een actieve AOW-gebeurtenis op je tijdas staat; ontbreekt die, dan rekent de projectie met €0 AOW en zegt een melding boven de grafiek dat.',
+        text: 'Rendement, inflatie, je uitgaven na pensioen en je eindleeftijd bepalen samen de uitkomst. Je stelt ze zelf in bij Voorkeuren — een kleine bijstelling kan jaren schelen. Onder de grafiek, bij Verken je aannames, draai je eraan zonder je plan te wijzigen: zoekt de app je stopmoment zelf, dan zie je je vrijheidsleeftijd verschuiven; ligt je stopmoment vast, dan zie je hoeveel van je plan gedekt is. Je AOW telt alleen mee als er een actieve AOW-gebeurtenis op je tijdas staat; ontbreekt die, dan rekent de projectie met €0 AOW en zegt een melding boven de grafiek dat.',
       },
     ],
     terms: ['fire', 'vrijheidstijd', 'swr', 'inflatie', 'omslagpunt', 'stopmoment', 'bandbreedte'],
@@ -534,7 +534,7 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
     insight:
       'Elk doel hier is een stuk vrijheid dat je opbouwt — zie in één oogopslag hoeveel je al hebt, wat er nog te gaan is en of je op koers ligt, loopt achter of aandacht nodig hebt.',
     grip:
-      'Voeg een doel toe als bedrag, of koppel het aan één of meer bezittingen en schulden zodat het netto meerekent met wat je opbouwt en aflost — of zet het op een kengetal dat de app al bijhoudt (spaarquote, netto vermogen, vrijheidsleeftijd, noodfonds, passief inkomen, belastingdruk, schuldenvrij-moment, eindkapitaal), dan werkt het vanzelf mee. Doelen van twee jaar of verder krijgen automatisch een seintje bij 25%, 50% en 75%; is een doel behaald, dan wordt dat gevierd en verhuist het naar het archief onderaan, met meteen een suggestie voor de volgende stap. Je eigen doelen staan bovenaan; doelen uit je doelsituatie pas je aan in het Toekomst-lab.',
+      'Voeg een doel toe als bedrag, of koppel het aan één of meer bezittingen en schulden zodat het netto meerekent met wat je opbouwt en aflost — of zet het op een kengetal dat de app al bijhoudt (spaarquote, netto vermogen, vrijheidsleeftijd, noodfonds, passief inkomen, belastingdruk, schuldenvrij-moment, eindkapitaal), dan werkt het vanzelf mee. Doelen van twee jaar of verder krijgen automatisch een seintje bij 25%, 50% en 75%; is een doel behaald, dan wordt dat gevierd en verhuist het naar het archief onderaan, met meteen een suggestie voor de volgende stap. Je eigen doelen staan bovenaan; doelen uit je doelsituatie pas je aan in het Toekomst-lab. Ligt je stopmoment vast, dan volgt het doel "Plan gedekt" daar of je plan tot je eindleeftijd reikt.',
     werking: [
       {
         title: 'Doel als bedrag',

@@ -138,3 +138,6 @@ wijziging zonder gedraaide knoppen; zonder stopkeuze blijft de bestaande
   inherit-run op de gesolvede FIRE-leeftijd zonder overrides identiek is aan
   de hoofdrun. `test/horizon-oracle/*` blijft ongemoeid — de solver zelf is
   niet aangeraakt.
+- Zie ADR 0145: onder een vast anker (waar dit besluit de doel-/wat-als-lijn
+  op de stop-run laat verankeren) leest het lab de uitkomst sindsdien als
+  dekking, niet als vrijheidsleeftijd — de doel-lijn zelf blijft ongewijzigd.

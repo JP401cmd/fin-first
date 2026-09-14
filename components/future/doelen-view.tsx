@@ -13,6 +13,7 @@ import {
   type GoalType,
 } from '@/lib/goal-data'
 import { getGoalSuggestions } from '@/lib/goal-suggestions'
+import { planCoverageKaartSubregel } from '@/lib/horizon/anker-copy'
 import type { GoalWithBudget } from '@/lib/fin-data-loader'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import { DoelToevoegenSheet } from './doel-toevoegen-sheet'
@@ -170,6 +171,16 @@ function statusFor(progress: GoalDisplay['progress'], goalType?: GoalType): {
   return { label: 'Achter op planning', color: 'text-negative', bg: 'bg-negative/10' }
 }
 
+/** Eindig getal uit vrije JSONB-metadata, anders `null` (tolerant voor legacy-rijen). */
+function metaNumber(v: unknown): number | null {
+  return typeof v === 'number' && Number.isFinite(v) ? v : null
+}
+
+/** Het stop-anker uit de metadata van een `plan_coverage`-doel, anders `null`. */
+function metaStopAnker(v: unknown): 'aow' | 'age' | 'now' | null {
+  return v === 'aow' || v === 'age' || v === 'now' ? v : null
+}
+
 /**
  * Kaart voor een parameter-doel (doelsituatie uit het lab). Read-only: klik
  * opent het lab i.p.v. een bewerk-sheet. Bewust een los component zodat zowel
@@ -178,11 +189,22 @@ function statusFor(progress: GoalDisplay['progress'], goalType?: GoalType): {
  */
 function ParameterGoalCard({ goal, progress }: GoalDisplay) {
   const isFire = goal.goal_type === 'fire_age'
+  // ADR 0145 — "Plan gedekt": het uitkomstdoel onder een vast stopmoment.
+  const isCoverage = goal.goal_type === 'plan_coverage'
   const current = progress.current
   // "Nog geen meting": de consume-only bron kon (nog) geen actuele
   // stand leveren (0/null op dag 0). Toon dat eerlijk i.p.v. een
-  // misleidende rood-status/0%.
-  const measured = Number.isFinite(current) && current > 0
+  // misleidende rood-status/0%. Ook voor `plan_coverage`: 0% dekking ("vandaag
+  // al op") is niet te onderscheiden van een bron zonder run — bekende edge
+  // (ADR 0145, open punt 4).
+  const measured = Number.isFinite(current) && current > 0 && !goal.notApplicableReason
+  const coverageSubregel = isCoverage
+    ? planCoverageKaartSubregel(
+        metaNumber(goal.metadata?.eindleeftijd),
+        metaStopAnker(goal.metadata?.stopAnker),
+        metaNumber(goal.metadata?.stopLeeftijd),
+      )
+    : null
   const marge =
     typeof goal.metadata?.margeDoelJaren === 'number'
       ? (goal.metadata.margeDoelJaren as number)
@@ -190,7 +212,9 @@ function ParameterGoalCard({ goal, progress }: GoalDisplay) {
   // Marge-status blijft bewust BUITEN deze lijst (live op /toekomst);
   // FIRE-kaart toont dus geen stoplicht-pill. Overige parameter-doelen
   // hergebruiken de bestaande statusweergave zodra er een meting is.
-  const status = !isFire && measured ? statusFor(progress) : null
+  // Ook de dekking-kaart krijgt geen tempo-pill: "Op koers" zou een oordeel claimen
+  // over een uitkomst die geen tempo heeft. De balk draagt gedekt/tekort in stoplicht.
+  const status = !isFire && !isCoverage && measured ? statusFor(progress) : null
   const pct = Math.min(100, Math.max(0, Math.round(progress.pct)))
   return (
     <Link
@@ -215,17 +239,20 @@ function ParameterGoalCard({ goal, progress }: GoalDisplay) {
         )}
       </header>
 
-      {isFire && goal.notApplicableReason ? (
-        /* ADR 0129 (bijlage "Doelen") — onder een VAST stopmoment heeft een
-           vrijheidsleeftijd-doel geen uitkomst; de notitie komt uit
-           `fireAgeGoalNotApplicableReason` via de goal-loader (consume-only). */
+      {goal.notApplicableReason ? (
+        /* ADR 0129 (bijlage "Doelen") / ADR 0145 — een parameter-doel zonder uitkomst
+           onder het huidige anker (fire_age onder een vast stopmoment, plan_coverage
+           onder solved). De notitie komt uit de goal-loader (consume-only). */
         <>
           <div className="flex items-baseline gap-1.5 mb-1">
             <span className="font-serif text-lg font-semibold text-[var(--ink)] tabular-nums">
-              {`Doel: ${formatGoalValue(progress.target, 'fire_age')}`}
+              {`Doel: ${formatGoalValue(progress.target, goal.goal_type)}`}
             </span>
           </div>
-          <p data-testid="fire-age-doel-nvt" className="text-[11px] italic text-[var(--ink-3)] leading-snug">
+          <p
+            data-testid={isFire ? 'fire-age-doel-nvt' : 'parameter-doel-nvt'}
+            className="text-[11px] italic text-[var(--ink-3)] leading-snug"
+          >
             {goal.notApplicableReason}
           </p>
         </>
@@ -287,13 +314,15 @@ function ParameterGoalCard({ goal, progress }: GoalDisplay) {
               className={`h-full ${
                 pct >= 100
                   ? 'bg-positive'
-                  : progress.paceSkipped
-                    ? 'bg-[var(--ink-4)]'
-                    : progress.onTrack
-                      ? 'bg-positive'
-                      : pct >= 50
-                        ? 'bg-amber-500'
-                        : 'bg-negative'
+                  : isCoverage
+                    ? 'bg-amber-500'
+                    : progress.paceSkipped
+                      ? 'bg-[var(--ink-4)]'
+                      : progress.onTrack
+                        ? 'bg-positive'
+                        : pct >= 50
+                          ? 'bg-amber-500'
+                          : 'bg-negative'
               } transition-all duration-700`}
               style={{ width: `${pct}%` }}
             />
@@ -302,6 +331,11 @@ function ParameterGoalCard({ goal, progress }: GoalDisplay) {
           <div className="flex items-center justify-between gap-2 text-[11px]">
             <span className="text-[var(--ink-3)] tabular-nums">{pct}%</span>
           </div>
+          {coverageSubregel && (
+            <p data-testid="plan-coverage-subregel" className="mt-1 text-[11px] italic text-[var(--ink-3)]">
+              {coverageSubregel}
+            </p>
+          )}
         </>
       )}
     </Link>
@@ -346,6 +380,11 @@ function ManualGoalCard({
       ? formatGoalValue(v, goal.goal_type, goal.custom_unit)
       : formatCurrency(v)
   const status = statusFor(progress, goal.goal_type)
+  // ADR 0145 — een doel zonder uitkomst (bv. het vrijheidsgetal onder een vast
+  // stopmoment) toont geen oordeel, geen balk en geen tempo: alleen het doel en
+  // de reden. Anders staat "Net begonnen" naast een zin die zegt dat er niets
+  // te meten valt.
+  const nvt = Boolean(goal.notApplicableReason)
   const behaald = goalReachedFromProgress(goal.goal_type, progress)
   const pct = Math.min(100, Math.max(0, Math.round(progress.pct)))
   // Bevinding M32: het stoplicht rust voortaan op het benodigde maandbedrag tot
@@ -372,17 +411,21 @@ function ManualGoalCard({
           {goal.name}
           <Pencil className="w-3 h-3 text-[var(--ink-4)] shrink-0" aria-hidden="true" />
         </h3>
-        <span
-          className={`text-[10px] uppercase tracking-[0.08em] font-semibold px-2 py-0.5 rounded-full ${status.bg} ${status.color} shrink-0`}
-        >
-          {status.label}
-        </span>
+        {!nvt && (
+          <span
+            className={`text-[10px] uppercase tracking-[0.08em] font-semibold px-2 py-0.5 rounded-full ${status.bg} ${status.color} shrink-0`}
+          >
+            {status.label}
+          </span>
+        )}
       </header>
       {/* Eenheid-bewust formatteren: `formatCurrency` maakte van een
           schuldenvrij-datum "€ 2.035 van € 2.031" en van een vrijheidsleeftijd
           "€ 46 van € 55". `formatGoalValue` kent de eenheid van het type
           (euro's, procenten, maanden, jaren, datum) — zelfde bron als
           ParameterGoalCard. */}
+      {nvt ? null : (
+      <>
       <div className="flex items-baseline gap-1.5 mb-2">
         <span className="font-serif text-lg font-semibold text-[var(--ink)] tabular-nums">
           {fmtValue(progress.current)}
@@ -426,10 +469,19 @@ function ManualGoalCard({
           {formatCurrency(Math.round(requiredMonthly))} per maand nodig
         </p>
       )}
+      </>
+      )}
       {/* Bevinding C10: dit doel toont niet je ingevoerde bedragen maar een
           canonieke stand. Zonder dit regeltje lijkt de kaart handmatig bij te
           werken terwijl invoer genegeerd wordt. Eén regel, meest specifieke
           eerst — het vrijheidsgetal noemt zijn bron bij naam. */}
+      {/* ADR 0145 — onder een vast stopmoment heeft het vrijheidsgetal-doel geen
+          doelvermogen; de reden (uit de goal-loader) staat vóór de meeloop-regel. */}
+      {goal.notApplicableReason && (
+        <p data-testid="vrijheidsgetal-doel-nvt" className="mt-1.5 text-[11px] italic leading-snug text-[var(--ink-3)]">
+          {goal.notApplicableReason}
+        </p>
+      )}
       {live ? (
         /* UR2-17: dit doelbedrag en het doelbedrag op /toekomst kunnen honderd-
            duizenden euro's schelen zonder dat er iets fout is — het ene telt de

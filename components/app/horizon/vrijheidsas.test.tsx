@@ -433,3 +433,22 @@ describe('Vrijheidsas — vast anker (ADR 0129 F3b, B-038, TPR-09)', () => {
     expect(screen.queryByLabelText('Gewenste stopleeftijd')).toBeNull()
   })
 })
+
+describe('Vrijheidsas — uitkomstNotitie (ADR 0145)', () => {
+  const notitie = <p>Je plan reikt nu tot je 82e — 78% gedekt. Draai aan de knoppen om te zien wat dat verandert.</p>
+
+  it('rendert de notitie onder een vast anker met zichtbare stopkeuze', () => {
+    render(<Vrijheidsas {...baseProps} ankerVast planStopAge={62} stopAge={62} uitkomstNotitie={notitie} />)
+    expect(screen.getByText(/78% gedekt/)).toBeInTheDocument()
+  })
+
+  it('toont de notitie niet onder solved (geen ankerVast)', () => {
+    render(<Vrijheidsas {...baseProps} uitkomstNotitie={notitie} />)
+    expect(screen.queryByText(/78% gedekt/)).not.toBeInTheDocument()
+  })
+
+  it('toont de notitie niet wanneer de stopkeuze verborgen is (nu-anker draagt stopKeuzeNotitie)', () => {
+    render(<Vrijheidsas {...baseProps} ankerVast stopKeuzeVerborgen uitkomstNotitie={notitie} />)
+    expect(screen.queryByText(/78% gedekt/)).not.toBeInTheDocument()
+  })
+})

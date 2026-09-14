@@ -236,3 +236,49 @@ describe('DoelVastlegSheet — vast anker: geen fire_age-doel', () => {
     expect(onSubmit).toHaveBeenCalledWith({ spaarquote: true, fire: true })
   })
 })
+
+/**
+ * ADR 0145 — de VASTE rij "Plan gedekt": het uitkomstdoel onder een vast stopmoment.
+ * Geen (uitgeschakelde) checkbox, altijd in de submit-set, telt mee in het aantal.
+ */
+describe('DoelVastlegSheet — vaste rij (plan_coverage)', () => {
+  const previews: DoelParameterPreview[] = [
+    { parameter: 'spaarquote', label: 'Spaarquote', waarde: '45%' },
+    { parameter: 'dekking', label: 'Plan gedekt', waarde: 'nu 78% → 92% · doel 100% tot je 90e', vast: true },
+  ]
+  const toelichting =
+    'Je stopmoment ligt vast op 62. Het lab legt daarom geen vrijheidsleeftijd vast, maar of je plan tot je 90e reikt.'
+
+  it('rendert de vaste rij zonder checkbox, met een schermlezertekst dat hij altijd meegaat', () => {
+    render(
+      <DoelVastlegSheet open onClose={vi.fn()} previews={previews} onSubmit={vi.fn()} fireAgeNietVanToepassing={toelichting} />,
+    )
+    const rij = screen.getByTestId('doel-preview-vast-dekking')
+    expect(rij).toHaveTextContent('Plan gedekt')
+    expect(rij).toHaveTextContent('altijd inbegrepen')
+    expect(rij.querySelector('input')).toBeNull()
+    // Alleen de gewone rij heeft een vinkje.
+    expect(screen.getAllByRole('checkbox')).toHaveLength(1)
+    expect(screen.getByTestId('doel-fire-age-nvt')).toHaveTextContent(toelichting)
+  })
+
+  it('de vaste rij zit altijd in de submit-set, ook als de gewone rij uitgevinkt is', () => {
+    const onSubmit = vi.fn()
+    render(<DoelVastlegSheet open onClose={vi.fn()} previews={previews} onSubmit={onSubmit} />)
+    fireEvent.click(screen.getByRole('checkbox'))
+    const cta = screen.getByRole('button', { name: 'Leg vast als mijn doel' })
+    // Telt mee: met alleen de vaste rij blijft vastleggen mogelijk en verschijnt de
+    // "vink minstens één aan"-hint niet.
+    expect(cta).not.toBeDisabled()
+    expect(screen.queryByText(/Vink minstens één parameter aan/)).not.toBeInTheDocument()
+    fireEvent.click(cta)
+    expect(onSubmit).toHaveBeenCalledWith({ dekking: true })
+  })
+
+  it('met beide rijen gekozen gaan beide mee', () => {
+    const onSubmit = vi.fn()
+    render(<DoelVastlegSheet open onClose={vi.fn()} previews={previews} onSubmit={onSubmit} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Leg vast als mijn doel' }))
+    expect(onSubmit).toHaveBeenCalledWith({ spaarquote: true, dekking: true })
+  })
+})

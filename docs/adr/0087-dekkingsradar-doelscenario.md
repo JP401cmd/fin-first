@@ -59,3 +59,6 @@ run die ook de rijen levert; de UI benoemt de grondslag expliciet.
   parity-suite dekt beide paden.
 - Curatie bijgewerkt: `lib/architecture/calculations.ts#dekkingsradar` en de
   HLD-capability "Zien hoe stevig je plan staat".
+- Zie ADR 0145: hetzelfde principe — niet delen door een stand die geen doel
+  is — sluit sindsdien ook radar-as 4 (eindstrategie, behoud-tak) af zodra de
+  rijen van een geprojecteerde ankerstand komen (`requiredFireIsAnchorPortfolio`).

@@ -259,4 +259,44 @@ describe('as: eindstrategie', () => {
     const a = ax(computeDekkingsradar(baseInput({ rows: [] })), 'eindstrategie')
     expect(a.pct).toBeNull()
   })
+
+  // ── ADR 0145 D5: onder een vast stopmoment is requiredFirePortfolio geen doel ──
+  describe('anchorPortfolio (bridge-vlag requiredFireIsAnchorPortfolio)', () => {
+    const rows = [makeRow(90, { netWorth: 250_000 })]
+
+    it('perpetual + anchorPortfolio → pct null, status null, de vaste reden', () => {
+      const a = ax(computeDekkingsradar(baseInput({ rows, endStrategy: 'perpetual', targetEndPortfolio: null, requiredFirePortfolio: 250_000, anchorPortfolio: true })), 'eindstrategie')
+      expect(a.pct).toBeNull()
+      expect(a.status).toBeNull()
+      expect(a.detail).toBe('Onder een vast stopmoment is er geen doelvermogen om het eindvermogen tegen af te zetten — de dekking hiernaast zegt of je plan reikt.')
+    })
+
+    it('endForm perpetual (eigen veld) + anchorPortfolio → idem, ongeacht de legacy-label', () => {
+      const a = ax(computeDekkingsradar(baseInput({ rows, endStrategy: 'pensioen', endForm: 'perpetual', targetEndPortfolio: null, anchorPortfolio: true })), 'eindstrategie')
+      expect(a.pct).toBeNull()
+    })
+
+    it('perpetual zónder de vlag (of false) → ongewijzigd behoud-t.o.v.-FIRE-pot', () => {
+      for (const anchorPortfolio of [undefined, false]) {
+        const a = ax(computeDekkingsradar(baseInput({ rows, endStrategy: 'perpetual', targetEndPortfolio: null, requiredFirePortfolio: 250_000, anchorPortfolio })), 'eindstrategie')
+        expect(a.pct).toBe(100)
+        expect(a.status).toBe('groen')
+      }
+    })
+
+    it('deplete en legacy-met-doel blijven onaangeraakt door de vlag (daar is geen FIRE-pot-noemer)', () => {
+      const deplete = ax(computeDekkingsradar(baseInput({ rows: [makeRow(90, { netWorth: 50_000 })], endStrategy: 'deplete', jaarBesteding: 40_000, anchorPortfolio: true })), 'eindstrategie')
+      expect(deplete.pct).toBe(113)
+      const legacy = ax(computeDekkingsradar(baseInput({ rows: [makeRow(90, { netWorth: 120_000 })], endStrategy: 'legacy', targetEndPortfolio: 100_000, anchorPortfolio: true })), 'eindstrategie')
+      expect(legacy.pct).toBe(120)
+    })
+
+    it('de andere drie assen lezen de vlag niet', () => {
+      const met = computeDekkingsradar(baseInput({ rows: [makeRow(60, { withdrawalNeed: need(40_000), nettoLiquide: 400_000, netWorth: 400_000 })], anchorPortfolio: true }))
+      const zonder = computeDekkingsradar(baseInput({ rows: [makeRow(60, { withdrawalNeed: need(40_000), nettoLiquide: 400_000, netWorth: 400_000 })] }))
+      for (const key of ['brug-tot-aow', 'pensioeninkomen', 'wonen'] as const) {
+        expect(ax(met, key)).toEqual(ax(zonder, key))
+      }
+    })
+  })
 })

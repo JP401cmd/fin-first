@@ -18,6 +18,7 @@
  */
 
 import { useState, useEffect } from 'react'
+import { ShieldCheck } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { readSliderValueFromEvents } from '@/lib/scenario-events'
 import type { WhatIfEvent } from '@/lib/types/horizon-whatif'
@@ -111,6 +112,12 @@ export interface DoelParameterPreview {
   label: string
   /** Doelwaarde als leesbare string ("45%", "€6.000/mnd", "6,3%", "Vrij op 58,5 jr · ≥ 2,0 jr marge"). */
   waarde: string
+  /**
+   * ADR 0145 — een VASTE rij: het uitkomstdoel dat bij het anker hoort ("Plan gedekt"
+   * onder een vast stopmoment). Geen vinkje: de rij zit altijd in de submit-set en telt
+   * mee in het aantal gekozen parameters. Afwezig/false = gewone aanvinkbare rij.
+   */
+  vast?: boolean
 }
 
 export interface DoelVastlegSheetProps {
@@ -158,14 +165,16 @@ export function DoelVastlegSheet({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, previewKey])
 
-  const gekozenAantal = previews.filter((p) => checked[p.parameter]).length
+  // Vaste rijen tellen altijd mee (ADR 0145) — ze hebben geen vinkje om uit te zetten.
+  const isGekozen = (p: DoelParameterPreview) => p.vast === true || checked[p.parameter] === true
+  const gekozenAantal = previews.filter(isGekozen).length
   const kanVastleggen = gekozenAantal > 0 && !saving
 
   const submit = () => {
     if (!kanVastleggen) return
     const gekozen: Partial<Record<DoelParameter, true>> = {}
     for (const p of DOEL_PARAMETERS) {
-      if (previews.some((pr) => pr.parameter === p) && checked[p]) gekozen[p] = true
+      if (previews.some((pr) => pr.parameter === p && isGekozen(pr))) gekozen[p] = true
     }
     onSubmit(gekozen)
   }
@@ -218,6 +227,21 @@ export function DoelVastlegSheet({
         <ul className="space-y-0 border-t border-[var(--border-ed)]">
           {previews.map((p) => (
             <li key={p.parameter} className="border-b border-[var(--border-ed)]">
+              {p.vast ? (
+                /* Vaste rij: geen (uitgeschakelde) checkbox, maar een zichtbaar merkteken +
+                   een schermlezertekst die zegt dat deze rij altijd meegaat. */
+                <div data-testid={`doel-preview-vast-${p.parameter}`} className="flex min-h-[52px] items-center gap-3 py-2.5">
+                  <ShieldCheck aria-hidden="true" className="h-4 w-4 shrink-0 text-[var(--ink-2)]" />
+                  <span className="shrink-0 font-sans text-sm text-[var(--ink)]">
+                    {p.label}
+                    <span className="sr-only"> (altijd inbegrepen)</span>
+                  </span>
+                  {/* De dekking-waarde is langer dan een knopwaarde: mag wrappen, rechts uitgelijnd. */}
+                  <span className="min-w-0 flex-1 text-right font-mono text-[13px] tabular-nums text-[var(--ink-2)]">
+                    {p.waarde}
+                  </span>
+                </div>
+              ) : (
               <label className="flex min-h-[52px] cursor-pointer items-center gap-3 py-2.5">
                 <input
                   type="checkbox"
@@ -232,6 +256,7 @@ export function DoelVastlegSheet({
                   {p.waarde}
                 </span>
               </label>
+              )}
             </li>
           ))}
         </ul>

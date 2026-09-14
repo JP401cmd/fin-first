@@ -859,7 +859,7 @@ describe('DoelenView — fire_age-doel onder een vast anker', () => {
           } as Partial<GoalWithBudget>)
         ]}
         goalProgresses={[
-          { current: 0, target: 58, pct: 0, onTrack: false, measured: false, requiredMonthly: null, eta: null, paceSkipped: false, notApplicableReason: reden },
+          { current: 0, target: 58, pct: 0, onTrack: true, measured: false, requiredMonthly: null, eta: null, paceSkipped: true, notApplicableReason: reden },
         ]}
       />,
     )
@@ -907,5 +907,97 @@ describe('DoelenView — fire_age-doel onder een vast anker', () => {
       />,
     )
     expect(container.querySelector('.bg-positive')).toBeTruthy()
+  })
+})
+
+/**
+ * ADR 0145 — "Plan gedekt" (`plan_coverage`): het uitkomstdoel van het lab onder een
+ * vast stopmoment. De kaart consumeert `computeGoalProgress` (canonieke voortgang) en de
+ * sub-regel uit `planCoverageKaartSubregel` — de test pint beide tegen die bronnen.
+ */
+describe('DoelenView — plan_coverage-doel (ADR 0145)', () => {
+  const dekkingDoel = (overrides: Partial<GoalWithBudget> = {}) =>
+    paramGoal({
+      id: 'pc1',
+      name: 'Plan gedekt tot 90 jaar',
+      goal_type: 'plan_coverage',
+      target_value: 100,
+      current_value: 75,
+      target_date: null,
+      metadata: { bron: 'parameter', oorsprong: 'lab', eindleeftijd: 90, stopAnker: 'age', stopLeeftijd: 62 },
+      ...overrides,
+    } as Partial<GoalWithBudget>)
+
+  it('toont de gemeten dekking (75% van 100%) met balk en sub-regel, zonder tempo-pill', async () => {
+    const { computeGoalProgress, formatGoalValue } = await import('@/lib/goal-data')
+    const { planCoverageKaartSubregel } = await import('@/lib/horizon/anker-copy')
+    const doel = dekkingDoel()
+    const progress = computeGoalProgress(doel)
+    render(<DoelenView goals={[doel]} goalProgresses={[progress]} />)
+
+    expect(screen.getByText(formatGoalValue(75, 'plan_coverage'))).toBeTruthy()
+    expect(screen.getByText(`van ${formatGoalValue(100, 'plan_coverage')}`)).toBeTruthy()
+    expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe(String(Math.round(progress.pct)))
+    expect(screen.getByTestId('plan-coverage-subregel')).toHaveTextContent(planCoverageKaartSubregel(90, 'age', 62))
+    expect(screen.queryByText('Op koers')).toBeNull()
+    expect(screen.queryByText(/nog geen meting/)).toBeNull()
+  })
+
+  it('0% dekking leest als "nog geen meting" — niet te onderscheiden van een bron zonder run (ADR 0145, open punt 4)', async () => {
+    const { computeGoalProgress } = await import('@/lib/goal-data')
+    const doel = dekkingDoel({ current_value: 0 })
+    render(<DoelenView goals={[doel]} goalProgresses={[computeGoalProgress(doel)]} />)
+    expect(screen.getByText(/nog geen meting/i)).toBeInTheDocument()
+  })
+
+  it('aow-anker: de sub-regel noemt "je AOW-leeftijd"', async () => {
+    const { computeGoalProgress } = await import('@/lib/goal-data')
+    const doel = dekkingDoel({
+      metadata: { bron: 'parameter', oorsprong: 'lab', eindleeftijd: 90, stopAnker: 'aow', stopLeeftijd: null },
+    } as Partial<GoalWithBudget>)
+    render(<DoelenView goals={[doel]} goalProgresses={[computeGoalProgress(doel)]} />)
+    expect(screen.getByTestId('plan-coverage-subregel')).toHaveTextContent('stopmoment je AOW-leeftijd')
+  })
+
+  it('n.v.t. onder solved: generieke notitie, geen balk, fire-testid niet gebruikt', async () => {
+    const { computeGoalProgress } = await import('@/lib/goal-data')
+    const { planCoverageGoalNotApplicableReason } = await import('@/lib/horizon/anker-copy')
+    const reden = planCoverageGoalNotApplicableReason()
+    const doel = dekkingDoel({ current_value: 0, notApplicableReason: reden } as Partial<GoalWithBudget>)
+    render(<DoelenView goals={[doel]} goalProgresses={[computeGoalProgress(doel)]} />)
+    expect(screen.getByTestId('parameter-doel-nvt')).toHaveTextContent(reden)
+    expect(screen.queryByTestId('fire-age-doel-nvt')).toBeNull()
+    expect(screen.queryByRole('progressbar')).toBeNull()
+    expect(screen.queryByTestId('plan-coverage-subregel')).toBeNull()
+  })
+})
+
+describe('DoelenView — vrijheidsgetal-doel onder een vast anker (ADR 0145)', () => {
+  it('toont de n.v.t.-reden vóór de meeloop-regel', async () => {
+    const { vrijheidsgetalGoalNotApplicableReason } = await import('@/lib/horizon/anker-copy')
+    const reden = vrijheidsgetalGoalNotApplicableReason('age', 62, 90)
+    const { container } = render(
+      <DoelenView
+        goals={[
+          mockGoal({
+            name: 'Volledige vrijheid (FIRE)',
+            target_value: 1650000,
+            current_value: 960000,
+            metadata: { standaardDoel: 'vrijheidsgetal' },
+            notApplicableReason: reden,
+          } as Partial<GoalWithBudget>),
+        ]}
+        goalProgresses={[
+          { current: 960000, target: 1650000, pct: 0, onTrack: true, measured: false, requiredMonthly: null, eta: null, paceSkipped: true, notApplicableReason: reden },
+        ]}
+        vrijheidsgetalLive
+      />,
+    )
+    const notitie = screen.getByTestId('vrijheidsgetal-doel-nvt')
+    expect(notitie).toHaveTextContent(reden)
+    const live = screen.getByText('Volgt automatisch je vrijheidsgetal')
+    // Documentvolgorde: de reden staat vóór de live-regel.
+    expect(notitie.compareDocumentPosition(live) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(container).toBeTruthy()
   })
 })

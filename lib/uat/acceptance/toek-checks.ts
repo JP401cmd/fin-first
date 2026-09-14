@@ -44,6 +44,9 @@
  *   - `lib/goals/auto-complete.ts` — pure `isMachineTrackedGoal`/
  *                                `selectReachedAutoGoals` (WF-TOEK-40, ADR 0125);
  *                                importeert alleen goal-data + goal-current-value.
+ *   - `lib/horizon/lab-uitkomst.ts` + `lib/horizon/toekomst-doel.ts` — pure
+ *                                uitkomst-switch + parameter-doel-bouwer (WF-TOEK-49,
+ *                                ADR 0145); geen `'use client'`/Supabase/kernel-run.
  */
 
 import { PERSONAS } from '@/lib/test-personas'
@@ -77,6 +80,9 @@ import {
   type HousingContext,
   type HousingStrategyConfig,
 } from '@/lib/housing-strategy'
+import type { SimResult } from '@/lib/fire-simulation'
+import { resolveLabUitkomst, type LabUitkomst } from '@/lib/horizon/lab-uitkomst'
+import { buildParameterGoalRows } from '@/lib/horizon/toekomst-doel'
 import { TOEK_ACCEPTANCE } from './toek'
 import type { AcceptanceCriterion } from './types'
 
@@ -483,6 +489,114 @@ export const TOEK_ENGINE_CHECKS: ToekEngineCheck[] = [
           'fireAgeReached_46_v_55=true; taxBurdenReached_35_v_30=false; fireAgeKaleVergelijkingZou=false; taxBurdenKaleVergelijkingZou=true; autoSyncMachineTracked=true; parameterGoalMachineTracked=false; manualGoalMachineTracked=false; reachedAutoGoalSelected=true',
         actual:
           `fireAgeReached_46_v_55=${fireAgeReached}; taxBurdenReached_35_v_30=${taxBurdenReached}; fireAgeKaleVergelijkingZou=${fireAgeKaleVergelijkingZou}; taxBurdenKaleVergelijkingZou=${taxBurdenKaleVergelijkingZou}; autoSyncMachineTracked=${autoSyncMachineTracked}; parameterGoalMachineTracked=${parameterGoalMachineTracked}; manualGoalMachineTracked=${manualGoalMachineTracked}; reachedAutoGoalSelected=${reachedAutoGoalSelected}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-TOEK-49',
+    scenarioId: 'UAT-TOEK-49',
+    label: 'Lab-uitkomst-gate (resolveLabUitkomst) + dekkingsdoel-rij (buildParameterGoalRows) op een AOW-tekort-fixture (ADR 0145)',
+    run: () => {
+      criterion('WF-TOEK-49')
+
+      // Spiegelt de committed fixture `AOW_TEKORT` in lib/horizon/lab-uitkomst.test.ts:
+      // leeftijd 42, stop op 67 (maand 300), uitputting op maand 480 (leeftijd 82) — een
+      // tekort vóór de eindleeftijd 90.
+      const sim = (over: Partial<SimResult> = {}): SimResult => ({
+        rows: [],
+        fireAge: 67,
+        fireAgeFractional: 67,
+        firePortfolioAtFire: 0,
+        requiredFirePortfolio: 0,
+        fireReachable: true,
+        implicitWithdrawalRate: 0.04,
+        classic25xTarget: 0,
+        strategy: 'deplete',
+        targetEndPortfolio: 0,
+        displayEndAge: 90,
+        ...over,
+      })
+      const AOW_TEKORT = sim({
+        stopAnker: { soort: 'aow' },
+        vastStopLeeftijd: 67,
+        ankerMaand: 300,
+        kernelDepletionMonth: 480,
+      })
+      const AOW_GEDEKT = sim({ ...AOW_TEKORT, kernelDepletionMonth: null })
+      const scenarioBeter = sim({ ...AOW_TEKORT, kernelDepletionMonth: 552 })
+
+      const promotieLabel = (u: LabUitkomst): string =>
+        u.promotie.kind === 'geen' ? `geen/${u.promotie.reden}` : u.promotie.kind
+
+      // (1) solved met een verkend scenario — ongewijzigd gedrag.
+      const solved = resolveLabUitkomst({
+        planAnchor: { kind: 'solved' },
+        currentAge: 42,
+        basis: sim({ fireAgeFractional: 58 }),
+        scenario: sim({ fireAgeFractional: 55 }),
+        stopPad: null,
+        kernelMaandHint: null,
+        hasScenario: true,
+        hasStopKeuze: false,
+      })
+      // (2) aow-tekort MET een verkend scenario → promotie 'dekking'.
+      const aowTekortMetScenario = resolveLabUitkomst({
+        planAnchor: { kind: 'aow' },
+        currentAge: 42,
+        basis: AOW_TEKORT,
+        scenario: scenarioBeter,
+        stopPad: null,
+        kernelMaandHint: null,
+        hasScenario: true,
+        hasStopKeuze: false,
+      })
+      // (3) aow-tekort ZONDER verkenning (alleen een stopkeuze) → geen/geen-verkenning (D4).
+      const aowTekortZonderScenario = resolveLabUitkomst({
+        planAnchor: { kind: 'aow' },
+        currentAge: 42,
+        basis: AOW_TEKORT,
+        scenario: null,
+        stopPad: null,
+        kernelMaandHint: null,
+        hasScenario: false,
+        hasStopKeuze: true,
+      })
+      // (4) aow volledig gedekt, óók met scenario → geen/gedekt (E5).
+      const aowGedekt = resolveLabUitkomst({
+        planAnchor: { kind: 'aow' },
+        currentAge: 42,
+        basis: AOW_GEDEKT,
+        scenario: AOW_GEDEKT,
+        stopPad: null,
+        kernelMaandHint: null,
+        hasScenario: true,
+        hasStopKeuze: false,
+      })
+      // (5) het nu-anker, óók met scenario → geen/nu-anker (E6).
+      const nu = resolveLabUitkomst({
+        planAnchor: { kind: 'now' },
+        currentAge: 42,
+        basis: sim({ stopAnker: { soort: 'nu' }, vastStopLeeftijd: 42, ankerMaand: 0, kernelDepletionMonth: 240 }),
+        scenario: sim({ stopAnker: { soort: 'nu' }, vastStopLeeftijd: 42, ankerMaand: 0, kernelDepletionMonth: 240 }),
+        stopPad: null,
+        kernelMaandHint: null,
+        hasScenario: true,
+        hasStopKeuze: false,
+      })
+
+      // Toestand (2) vastgelegd: de dekkingsrij — server-bepaalde plan-velden
+      // (eindleeftijd/anker/stopleeftijd komen nooit uit de client-body).
+      const { rows } = buildParameterGoalRows({
+        parameters: { dekking: true },
+        doelwaarden: { planEindleeftijd: 90, planStopAnker: 'aow', planStopLeeftijd: null },
+      })
+      const dekkingRow = rows[0]
+
+      return {
+        expected:
+          'solved=vrijheidsleeftijd:vrijheidsleeftijd; aowTekortMetScenario=dekking:dekking; aowTekortZonderScenario=dekking:geen/geen-verkenning; aowGedekt=dekking:geen/gedekt; nu=dekking:geen/nu-anker; dekkingGoalType=plan_coverage; dekkingNaam=Plan gedekt tot 90 jaar; dekkingTarget=100',
+        actual:
+          `solved=${solved.kind}:${promotieLabel(solved)}; aowTekortMetScenario=${aowTekortMetScenario.kind}:${promotieLabel(aowTekortMetScenario)}; aowTekortZonderScenario=${aowTekortZonderScenario.kind}:${promotieLabel(aowTekortZonderScenario)}; aowGedekt=${aowGedekt.kind}:${promotieLabel(aowGedekt)}; nu=${nu.kind}:${promotieLabel(nu)}; dekkingGoalType=${dekkingRow?.goal_type}; dekkingNaam=${dekkingRow?.name}; dekkingTarget=${dekkingRow?.target_value}`,
       }
     },
   },

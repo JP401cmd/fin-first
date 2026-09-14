@@ -108,6 +108,12 @@ export const TOEK_FLOW: UatFlow = {
     { id: 'doelpace', scenarioId: 'UAT-TOEK-35', label: 'WF-TOEK-35 · Pace-toets ("op koers") & live vrijheidsgetal-doel', kind: 'screen', stage: 4, lane: 'doelen', subOf: 'doelen' },
     { id: 'doelkoppelen', scenarioId: 'UAT-TOEK-39', label: 'WF-TOEK-39 · Meervoudig koppelen (bezittingen + schulden, netto)', kind: 'screen', stage: 4, lane: 'doelen', subOf: 'doelen' },
     { id: 'doelbasis', scenarioId: 'UAT-TOEK-40', label: 'WF-TOEK-40 · Doelbasis: live meesyncen & richting-bewust afsluiten', kind: 'screen', stage: 4, lane: 'doelen', subOf: 'doelen' },
+    // ADR 0145 — het lab volgt het anker: onder solved is de uitkomst de
+    // vrijheidsleeftijd (ongewijzigd); onder een vast stopmoment (aow/age/now)
+    // is het de dekking. `labuitkomst` bepaalt de doel-soort (fire_age vs.
+    // plan_coverage) die vanuit het lab (`sliders`, WF-TOEK-10) vastgelegd kan
+    // worden — vandaar de cross-lane edge vanuit `sliders` hieronder.
+    { id: 'labuitkomst', scenarioId: 'UAT-TOEK-49', label: 'WF-TOEK-49 · Lab volgt het anker: dekking als uitkomst onder een vast stopmoment', kind: 'action', stage: 4, lane: 'doelen', subOf: 'doelen' },
 
     { id: 'pillenrij', scenarioId: 'UAT-TOEK-41', label: 'WF-TOEK-41 · Pillenrij-invariant (label + badge samen) & het md-breekpunt van de cijferstrip', kind: 'screen', stage: 2, lane: 'aflezen', subOf: 'grafiek' },
     { id: 'strategiekaarten', scenarioId: 'UAT-TOEK-42', label: 'WF-TOEK-42 · Vier levensstrategieën in beide weergavemodi', kind: 'screen', stage: 4, lane: 'strategie', subOf: 'strategiebeslis' },
@@ -196,6 +202,9 @@ export const TOEK_FLOW: UatFlow = {
     { from: 'doelen', to: 'doelkoppelen' },
     { from: 'doelen', to: 'doelbasis' },
     { from: 'doelen', to: 'doelloslaten' },
+    { from: 'doelen', to: 'labuitkomst' },
+    // Cross-lane: de gate/uitkomst-soort wordt in het lab bepaald (ADR 0145).
+    { from: 'sliders', to: 'labuitkomst', label: 'anker bepaalt uitkomst-soort' },
 
     // samenvloeien → uitkomst
     { from: 'sliders', to: 'fire' },
@@ -215,6 +224,7 @@ export const TOEK_FLOW: UatFlow = {
     { from: 'doelkoppelen', to: 'fire' },
     { from: 'doelbasis', to: 'fire' },
     { from: 'doelloslaten', to: 'fire' },
+    { from: 'labuitkomst', to: 'fire' },
     { from: 'grafiek', to: 'pillenrij' },
     { from: 'strategiebeslis', to: 'strategiekaarten' },
     { from: 'pillenrij', to: 'fire' },

@@ -95,5 +95,15 @@ export const loadVrijheidsgetalSnapshot = cache(async function loadVrijheidsgeta
     stopAnchor: horizon.firePlan.anchor.kind,
     stopAge: run?.sim.vastStopLeeftijd ?? (horizon.firePlan.anchor.kind === 'age' ? horizon.firePlan.anchor.age : null),
     endAge: run?.sim.displayEndAge ?? horizon.firePlan.endAge,
+    // ADR 0145 — de dekking voor het `plan_coverage`-doel: het bundel-`freedomPct`, dat
+    // de horizon-loader onder een vast anker via `computeFreedomPctForPlan` als
+    // `computeRunwayCoveragePct` bepaalt (zelfde `anchorFixed`-gate als hierboven).
+    // Onder `solved` is dat getal een kapitaalratio → bewust `null`.
+    // Alleen met een run mét kernel-antwoord en een geboortedatum: zonder die twee
+    // levert de loader 0 (geen dekking bepaalbaar) en dat is geen meting.
+    planCoveragePct:
+      anchorFixed && run != null && dob != null && run.sim.kernelDepletionMonth !== undefined
+        ? horizon.freedomPct
+        : null,
   })
 })

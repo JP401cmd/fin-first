@@ -346,6 +346,191 @@ export function fireAgeGoalNotApplicableReason(
   return `Je stopmoment ligt vast${stop}, dus dit doel heeft geen uitkomst om naar te kijken.${reikt}`
 }
 
+// ── Dekking als uitkomst van het lab (ADR 0145, zinnen B6 — compliance-check 14 sep 2026) ──
+//
+// Onder een vast stopmoment beweegt het lab niet de vrijheidsleeftijd maar de DEKKING
+// (`computeRunwayCoveragePct`). Elke zin hieronder is een rekensom op eigen data —
+// inzicht, geen advies. Dezelfde toon-invarianten als hierboven: geen "je kunt stoppen",
+// geen "oneindig", geen woord AOW in een tekortzin (het aow-anker noemt zijn getal).
+// De `{hint}` is een som ("hoort daar … bij"), geen instructie; de knop leest als een
+// rekenopdracht aan de app ("Reken met …"), niet als een opdracht aan de gebruiker.
+
+/** Percentage voor de zinnen: heel getal, geen decimalen. */
+function fmtPct(pct: number): string {
+  // Nooit "100%" zolang er een tekort is: 99,6 rondt naar 99, anders zegt de zin
+  // "100% gedekt" naast een aanbod om het plan haalbaar te maken.
+  return pct >= 100 ? '100' : String(Math.min(99, Math.round(pct)))
+}
+
+/** Maandbedrag in een zin: afgerond, nl-NL duizendtal (`1.250`). */
+function fmtHint(hint: number): string {
+  return Math.round(hint).toLocaleString('nl-NL')
+}
+
+/** "tot je 90e" of, zonder plan-einde, "tot je eindleeftijd". */
+function totJeEind(endAge: number | null): string {
+  return endAge != null ? `tot je ${heroFireAgeYear(endAge)}e` : 'tot je eindleeftijd'
+}
+
+/**
+ * Zin 1 — toelichting bovenaan het vastleg-venster onder aow/age: het lab legt geen
+ * vrijheidsleeftijd vast, maar of het plan reikt.
+ */
+export function dekkingSheetToelichting(stop: AnkerStop, endAge: number | null): string {
+  const aanhef = stop.kind === 'now'
+    ? 'Je rekent alsof je nu stopt.'
+    : `Je stopmoment ligt vast op ${formatStopAge(stop.stopAge)}.`
+  return `${aanhef} Het lab legt daarom geen vrijheidsleeftijd vast, maar of je plan ${totJeEind(endAge)} reikt.`
+}
+
+/** Zin 2 — de waarde-string van de vaste preview-rij "Plan gedekt" in het vastleg-venster. */
+export function dekkingPreviewWaarde(basisPct: number, scenarioPct: number, endAge: number | null): string {
+  return `nu ${fmtPct(basisPct)}% → ${fmtPct(scenarioPct)}% · doel 100% ${totJeEind(endAge)}`
+}
+
+/**
+ * Zin 3 — de sub-regel op de "Plan gedekt"-doelkaart: eindleeftijd + stopmoment. Het
+ * aow-anker zegt hier wél "je AOW-leeftijd": dit is geen tekortzin maar een
+ * instellingslabel (zelfde woordkeuze als tegel 2 van de hero, ADR 0129 bijlage).
+ */
+export function planCoverageKaartSubregel(
+  endAge: number | null,
+  stopAnker: 'aow' | 'age' | 'now' | null,
+  stopLeeftijd: number | null,
+): string {
+  const eind = totJeEind(endAge)
+  const stop =
+    stopAnker === 'aow'
+      ? 'je AOW-leeftijd'
+      : stopAnker === 'now'
+        ? 'nu'
+        : stopLeeftijd != null
+          ? formatStopAge(stopLeeftijd)
+          : null
+  return stop ? `${eind} · stopmoment ${stop}` : eind
+}
+
+/**
+ * Zin 4 — de notitie op een `plan_coverage`-doelkaart onder `solved`: de app zoekt het
+ * stopmoment zelf, dus een dekkingsdoel heeft geen uitkomst (spiegel van
+ * `fireAgeGoalNotApplicableReason` onder een vast anker).
+ */
+export function planCoverageGoalNotApplicableReason(): string {
+  return 'De app zoekt je stopmoment zelf, dus dit doel heeft geen uitkomst om naar te kijken. Wat telt, is vanaf welke leeftijd werken een keuze wordt.'
+}
+
+/**
+ * Zin 5 — de notitie op het VRIJHEIDSGETAL-doel onder een vast anker: er is geen
+ * doelvermogen om naartoe te sparen (bridge-vlag `requiredFireIsAnchorPortfolio`, D4).
+ * Vóór ADR 0145 viel dit doel stil terug op de opgeslagen waarde zonder notitie.
+ */
+export function vrijheidsgetalGoalNotApplicableReason(
+  anchor: 'aow' | 'now' | 'age',
+  stopAge: number | null,
+  endAge: number | null,
+): string {
+  const reikt = ` Wat telt, is of je plan ${totJeEind(endAge)} reikt.`
+  if (anchor === 'now') {
+    return `Je rekent alsof je nu stopt, dus er is geen doelvermogen om naartoe te sparen.${reikt}`
+  }
+  const stop = stopAge != null ? ` op ${formatStopAge(stopAge)}` : ''
+  return `Je stopmoment ligt vast${stop}, dus er is geen doelvermogen om naartoe te sparen.${reikt}`
+}
+
+/**
+ * Zin 6 — de verken-samenvatting onder een vast anker: dekking basis → scenario, en tot
+ * waar het scenario reikt (`reikt` = `ankerReachYear(scenarioReach)`; zonder jaar valt
+ * de staart weg).
+ */
+export function dekkingVerkenZin(input: { basisPct: number; scenarioPct: number; reikt: number | null }): string {
+  const kern = `Wat-als actief — plan gedekt ${fmtPct(input.basisPct)}% → ${fmtPct(input.scenarioPct)}%`
+  return input.reikt != null ? `${kern}, reikt tot je ${input.reikt}e` : kern
+}
+
+/** Zin 7a — de badge/pil met de dekking zelf: "78% gedekt". */
+export function dekkingBadge(pct: number): string {
+  return `${fmtPct(pct)}% gedekt`
+}
+
+/**
+ * Zin 7b — de delta-badge: "+12% gedekt" / "−4% gedekt"; onder één procentpunt
+ * "gelijk" (zelfde conventie als de FIRE-delta-pil "gelijk").
+ */
+export function dekkingDeltaBadge(deltaPct: number): string {
+  const n = Math.round(deltaPct)
+  if (Math.abs(n) < 1) return 'gelijk'
+  return `${n > 0 ? '+' : '−'}${Math.abs(n)}% gedekt`
+}
+
+/**
+ * Zin 8 — de notitie op de Vrijheidsas in de `ankerVast`-tak: tekort (met dekking) of
+ * gedekt (niets vast te leggen). 'nu-op' is de 0%-variant van het tekort; 'onbekend'
+ * geeft `null` (dan toont de as niets — liever niets dan een gegokte zin).
+ */
+export function dekkingAsNotitie(reach: AnkerReach, pct: number | null, endAge: number | null): string | null {
+  switch (reach.kind) {
+    case 'gedekt':
+      return `Je plan is gedekt ${totJeEind(reach.endAge ?? endAge)}. Verkennen kan; er is niets vast te leggen.`
+    case 'reikt-tot':
+      return `Je plan reikt nu tot je ${heroFireAgeYear(reach.age)}e — ${fmtPct(pct ?? 0)}% gedekt. Draai aan de knoppen om te zien wat dat verandert.`
+    case 'nu-op':
+      return `Je plan reikt nu niet verder dan vandaag — ${fmtPct(pct ?? 0)}% gedekt. Draai aan de knoppen om te zien wat dat verandert.`
+    case 'onbekend':
+      return null
+  }
+}
+
+/**
+ * Zin 9 — de radar-subtitel. `null` onder `solved` (de UI houdt dan haar bestaande
+ * tekst); onder een vast anker "gerekend op je plan" resp. "op een verkend stopmoment"
+ * wanneer de stop-slider (stop-pad) de rijen levert. Onder `now` is er geen slider.
+ */
+export function radarSubtitel(input: { stop: AnkerStop | null; verkendStopAge: number | null }): string | null {
+  const { stop, verkendStopAge } = input
+  if (stop == null) return null
+  if (stop.kind === 'now') return "Vier dekkingsratio's — je rekent alsof je nu stopt."
+  const plan = formatStopAge(stop.stopAge)
+  if (verkendStopAge != null && Number.isFinite(verkendStopAge)) {
+    return `Vier dekkingsratio's — gerekend op een verkend stopmoment: stoppen op ${formatStopAge(verkendStopAge)} jr; je plan rekent met ${plan}.`
+  }
+  return `Vier dekkingsratio's — gerekend op je plan: stoppen op ${plan}.`
+}
+
+/**
+ * Zin 10 — de reden waarom radar-as 4 (eindstrategie, behoud-tak) onder een vast
+ * stopmoment `null` is: `requiredFirePortfolio` is daar de stand op het anker, geen doel
+ * (ADR 0087-principe, ADR 0145 D5).
+ */
+export function radarEindstrategieAnkerReden(): string {
+  return 'Onder een vast stopmoment is er geen doelvermogen om het eindvermogen tegen af te zetten — de dekking hiernaast zegt of je plan reikt.'
+}
+
+/**
+ * Zin 11 — de tekort-hint in de plan-variant (zonder slider-beweging): wat hoort er
+ * bij het plan-anker bij om tot de eindleeftijd te reiken. `hint` = `maandHint` (P!B96,
+ * > 0 ⟺ tekort), `dagen` = het vrijheidstijd-equivalent uit `calculateFreedomTime`
+ * (de aanroeper rekent dat op de canonieke dagbasis; hier alleen woorden).
+ */
+export function dekkingTekortHintZin(input: {
+  stop: AnkerStop
+  endAge: number | null
+  hint: number
+  dagen: number
+}): string {
+  const bijStop = input.stop.kind === 'now' ? 'als je nu stopt' : `als je op ${formatStopAge(input.stop.stopAge)} stopt`
+  return `Om je plan ${totJeEind(input.endAge)} te laten reiken ${bijStop}, hoort daar zo'n €${fmtHint(input.hint)} per maand extra sparen bij, bovenop wat je nu opzij zet — omgerekend ${Math.round(input.dagen)} ${Math.round(input.dagen) === 1 ? 'dag' : 'dagen'} vrijheid per maand.`
+}
+
+/** Zin 11 — het knoplabel dat de hint als extra inleg in het lab zet (compliance 14 sep: geen "Zet als …"). */
+export function dekkingTekortHintKnop(hint: number): string {
+  return `Reken met € ${fmtHint(hint)} extra inleg`
+}
+
+/** Zin 12 — de toast na het vastleggen van een dekkingsdoel. */
+export function dekkingVastgelegdToast(endAge: number | null): string {
+  return `Je verkenning is nu je doel — de app volgt of je plan ${totJeEind(endAge)} reikt.`
+}
+
 /**
  * De afsluitende zin voor het onttrekking-hoofdstuk van de grafiek-uitleg —
  * beschrijvend, en bij een tekort NIET de deplete-belofte ("bouwt af naar nul

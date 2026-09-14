@@ -172,14 +172,53 @@ describe('buildParameterGoalRows', () => {
 })
 
 describe('PARAM_TO_GOAL_TYPE / PARAMETER_GOAL_TYPES', () => {
-  it('koppelt elke parameter aan het juiste goal_type', () => {
+  it('koppelt elke parameter aan het juiste goal_type (vijf, incl. het dekkingsdoel — ADR 0145)', () => {
     expect(PARAM_TO_GOAL_TYPE).toEqual({
       spaarquote: 'savings_rate',
       salaris: 'salary',
       rendement: 'expected_return',
       fire: 'fire_age',
+      dekking: 'plan_coverage',
     })
-    expect(PARAMETER_GOAL_TYPES).toEqual(['savings_rate', 'salary', 'expected_return', 'fire_age'])
+    expect(PARAMETER_GOAL_TYPES).toEqual(['savings_rate', 'salary', 'expected_return', 'fire_age', 'plan_coverage'])
+    expect(PARAMETER_GOAL_TYPES).toHaveLength(5)
+  })
+})
+
+describe('buildParameterGoalRows — dekking ("Plan gedekt", ADR 0145)', () => {
+  it('bouwt de rij uit de SERVER-plan-velden: naam met eindleeftijd, doel = META-max (100), metadata met anker', () => {
+    const { rows, overgeslagen } = buildParameterGoalRows(
+      input({ dekking: true }, { planEindleeftijd: 90, planStopAnker: 'age', planStopLeeftijd: 58.5 }),
+    )
+    expect(overgeslagen).toEqual([])
+    expect(rows).toHaveLength(1)
+    const row = rows[0]
+    expect(row.parameter).toBe('dekking')
+    expect(row.goal_type).toBe('plan_coverage')
+    expect(row.name).toBe('Plan gedekt tot 90 jaar')
+    expect(row.target_value).toBe(100)
+    expect(row.icon).toBe('ShieldCheck')
+    expect(row.color).toBe('purple')
+    expect(row.metadata).toEqual({ bron: 'parameter', oorsprong: 'lab', eindleeftijd: 90, stopAnker: 'age', stopLeeftijd: 58.5 })
+  })
+
+  it('aow: stopLeeftijd null (de kaart zegt dan "je AOW-leeftijd"); fractionele eindleeftijd met komma', () => {
+    const { rows } = buildParameterGoalRows(input({ dekking: true }, { planEindleeftijd: 92.5, planStopAnker: 'aow', planStopLeeftijd: null }))
+    expect(rows[0].name).toBe('Plan gedekt tot 92,5 jaar')
+    expect(rows[0].metadata).toMatchObject({ stopAnker: 'aow', stopLeeftijd: null, eindleeftijd: 92.5 })
+  })
+
+  it('zonder plan-eindleeftijd wordt de rij tolerant overgeslagen (geen doel zonder plan-einde)', () => {
+    const { rows, overgeslagen } = buildParameterGoalRows(input({ dekking: true, spaarquote: true }, { spaarquotePct: 45 }))
+    expect(rows.map((r) => r.parameter)).toEqual(['spaarquote'])
+    expect(overgeslagen).toEqual(['dekking'])
+  })
+
+  it('dekking staat ná fire in de DOEL_PARAMETERS-volgorde', () => {
+    const { rows } = buildParameterGoalRows(
+      input({ fire: true, dekking: true }, { fireLeeftijd: 58, planEindleeftijd: 90, planStopAnker: 'age', planStopLeeftijd: 58 }),
+    )
+    expect(rows.map((r) => r.goal_type)).toEqual(['fire_age', 'plan_coverage'])
   })
 })
 

@@ -16,8 +16,8 @@ aannames"): vier draaiknoppen, marktbias, een stop-slider en "Maak dit mijn doel
 losse pagina `app/(app)/horizon/whatif/whatif-page-client.tsx` (1.941 regels, alleen
 bereikbaar via `/toekomst/whatif?via=dreamgate`): presets, dezelfde sliders, een
 beslishulp, levensgebeurtenissen in het geheugen, tot vijf bewaarde scenario's
-(`app_settings` sleutel `whatif_scenarios:<uid>` — de tabel is authenticated-breed,
-isolatie liep alleen via de sleutel) en een eigen Fin-persona ("droomgids zonder rem").
+(`app_settings` sleutel `whatif_scenarios:<uid>`; de SELECT-policy schermt sleutels met
+een gebruikers-id per eigenaar af, dus de restrijen zijn hygiëne, geen lek) en een eigen Fin-persona ("droomgids zonder rem").
 De pagina droeg zelf al de melding "Nog in ontwikkeling".
 
 De twee oppervlakken draaiden niet identiek: de losse pagina ging via een eigen adapter

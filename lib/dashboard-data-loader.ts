@@ -372,7 +372,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       .limit(1000),
     supabase.from('life_events').select('id, name, event_type, target_age, target_date, one_time_cost, monthly_cost_change, monthly_income_change, duration_months, icon, is_active, sort_order, is_indexed, linked_asset_id, metadata').eq('is_active', true).order('sort_order', { ascending: true }).limit(50),
     supabase.from('recommendations').select('id, title, freedom_days_per_year, priority_score, recommendation_type, status').in('status', ['pending', 'postponed']),
-    supabase.from('goals').select('id, name, goal_type, current_value, target_value, target_date, color, icon, metadata, linked_asset_id, linked_debt_id').eq('is_completed', false).order('sort_order', { ascending: true }),
+    supabase.from('goals').select('id, user_id, name, goal_type, current_value, target_value, target_date, color, icon, metadata, linked_asset_id, linked_debt_id').eq('is_completed', false).order('sort_order', { ascending: true }),
     // Gedeelde `cache()`-fetcher (lib/server-data/base.ts): exact hetzelfde
     // venster/kolomset/limiet als de vroegere inline-query — de ondergrens komt
     // alleen niet meer uit het TZ-onveilige `Date.UTC(...).toISOString()` maar

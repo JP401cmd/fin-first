@@ -499,8 +499,29 @@ describe('GOAL_TYPE_META — vlaggen op bestaande types (regressie)', () => {
     }
   })
 
-  it('viaLab alleen op de twee lab-types; savings_rate/salary blijven vrij aanmaakbaar', () => {
-    const labTypes: GoalType[] = ['expected_return', 'fire_age']
+  it('plan_coverage (ADR 0145): %/1/0–100, up (default), viaLab, GEEN doelbasis (eigenaarsbesluit), bron horizon-kernel', () => {
+    const m = GOAL_TYPE_META.plan_coverage
+    expect(m.unit).toBe('%')
+    expect(m.step).toBe('1')
+    expect(m.min).toBe(0)
+    expect(m.max).toBe(100)
+    expect(m.direction).toBeUndefined() // default 'up': meer dekking is beter
+    expect(m.viaLab).toBe(true)
+    expect(m.metricBasis).toBe(false)
+    expect(m.metricSource).toBe('horizon-kernel')
+    expect(m.supportsAssetLink).toBe(false)
+    expect(m.supportsDebtLink).toBe(false)
+    expect(GOAL_TYPE_LABELS.plan_coverage).toBe('Plan gedekt')
+    expect(GOAL_TYPE_ICONS.plan_coverage).toBe('ShieldCheck')
+    expect(formatGoalValue(78.4, 'plan_coverage')).toBe('78,4%')
+    expect(goalValueLabels('plan_coverage')).toEqual({ target: 'Doel-dekking (%)', current: 'Huidige dekking (%)' })
+    // Bereikt-toets: richting up, 100 van 100.
+    expect(isGoalReached('plan_coverage', 100, 100)).toBe(true)
+    expect(isGoalReached('plan_coverage', 78, 100)).toBe(false)
+  })
+
+  it('viaLab alleen op de drie lab-types; savings_rate/salary blijven vrij aanmaakbaar', () => {
+    const labTypes: GoalType[] = ['expected_return', 'fire_age', 'plan_coverage']
     for (const type of Object.keys(GOAL_TYPE_META) as GoalType[]) {
       const expected = labTypes.includes(type)
       expect(Boolean(GOAL_TYPE_META[type].viaLab)).toBe(expected)

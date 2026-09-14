@@ -76,15 +76,31 @@ describe('KATERN II blijft bereikbaar na "Doel loslaten" (B-031)', () => {
     expect(vastleggen).toContain('setDoelLosgelatenDezeSessie(false)')
   })
 
-  it('"Maak dit mijn doel" verschijnt óók bij een kale stopkeuze, niet alleen bij sliders', () => {
-    // Op de CODE-regels, niet op de rauwe bron: de uitleg hierboven in het
-    // component noemt de knop bij naam, en die zin is geen renderconditie.
+  it('"Maak dit mijn doel" verschijnt óók bij een kale stopkeuze, niet alleen bij sliders', async () => {
+    // ADR 0145 — de promotie-gate woont sinds de lab-uitkomst in ÉÉN pure helper. De
+    // B-031-eis (sliders ÓF een kale stopkeuze) staat daar in de `solved`-tak; de
+    // component leest de gate uitsluitend via `doelVastleggenMogelijk`.
     const code = codeRegels().join('\n')
-    // De knop hangt aan hetzelfde "er is iets vast te leggen"-oordeel als de
-    // ScenarioChip verderop in dit bestand: hasScenario OF hasStopKeuze. Met
-    // alleen `hasScenario` blijft een doel dat puur een stopmoment was na
-    // loslaten onherstelbaar.
     const knopBlok = code.slice(code.indexOf('Maak dit mijn doel') - 700, code.indexOf('Maak dit mijn doel'))
-    expect(knopBlok).toContain('hasScenario || hasStopKeuze')
+    expect(knopBlok).toContain('doelVastleggenMogelijk')
+
+    const { resolveLabUitkomst } = await import('@/lib/horizon/lab-uitkomst')
+    const basis = { fireAgeFractional: 58 } as unknown as Parameters<typeof resolveLabUitkomst>[0]['basis']
+    const solved = (hasScenario: boolean, hasStopKeuze: boolean) =>
+      resolveLabUitkomst({
+        planAnchor: { kind: 'solved' },
+        currentAge: 40,
+        basis,
+        scenario: null,
+        stopPad: null,
+        kernelMaandHint: null,
+        hasScenario,
+        hasStopKeuze,
+      }).promotie.kind
+    // Een kale stopkeuze volstaat onder solved — het doel dat puur een stopmoment was
+    // blijft zo na loslaten herstelbaar.
+    expect(solved(false, true)).toBe('vrijheidsleeftijd')
+    expect(solved(true, false)).toBe('vrijheidsleeftijd')
+    expect(solved(false, false)).toBe('geen')
   })
 })

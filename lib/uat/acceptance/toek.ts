@@ -158,7 +158,7 @@ const criteria: AcceptanceCriterion[] = [
     then: 'De optimistische lijn (8%) toont op elk toekomstig jaar een gelijk-of-hoger vermogen dan de basislijn (6%); de pessimistische (4%) gelijk-of-lager. Richtingstoets, geen exact cijfer. De marktcheck-band toont p25–p75 (niet p10–p90) en de marge beweegt zichtbaar mee met de stop-slider: later stoppen = meer speling. Pil, legenda, explainer en aria-label zeggen alle vier hetzelfde (één copy-bron). SINDS ADR 0117 (29-08-2026, allocatie snede 1) loopt de verstoring achter de band/marge niet meer als één uniforme schuif over alle investeringspotten, maar PER POT geschaald met een markt-risicofactor (laag/obligaties ≈0,3×, middel/gespreid 1×, hoog/individuele aandelen-crypto ≈1,4×) — een premieregeling-pensioenpot beweegt daardoor voor het eerst mee. De richting van deze toets verandert daar niet door (hij toetst de I-grondslag-scenariolijnen), maar de breedte van de band/marge kan bij een gemengde portefeuille smaller of breder uitvallen dan vóór ADR 0117.',
     assertion: {
       kind: 'direction',
-      source: 'richtingstoets: 8%-lijn ≥ 6%-basislijn ≥ 4%-lijn per jaar (kernel-scenariolijnen). Marge: lib/horizon-kernel/rendement-marge.ts#computeRendementMarge — monotoon in de stopleeftijd en in de uitgaven, gepind in lib/horizon-kernel/marktcheck.test.ts + rendement-marge.test.ts. Per-pot risicofactor: lib/horizon-kernel/wrappers/risico.ts#potRisicoFactor (ADR 0117) — geraakt WF-TOEK-08/WF-REKEN-18/WF-REKEN-13/14 gelijkelijk, geen apart engine-check hier (geen exact-criterium).',
+      source: 'richtingstoets: 8%-lijn ≥ 6%-basislijn ≥ 4%-lijn per jaar (kernel-scenariolijnen). Marge: lib/horizon-kernel/rendement-marge.ts#computeRendementMarge — monotoon in de stopleeftijd en in de uitgaven, gepind in lib/horizon-kernel/marktcheck.test.ts + rendement-marge.test.ts. Per-pot risicofactor: lib/horizon-kernel/wrappers/risico.ts#potRisicoFactor (ADR 0117) — geen apart engine-check hier (geen exact-criterium). VERVALLEN (14 sep 2026, ADR 0144): WF-REKEN-18/13/14 (dezelfde risicofactor op de standalone Wat-Als-pagina) bestaan niet meer — dit is sindsdien de enige plek waar de per-pot-risicofactor nog getoetst wordt.',
     },
   },
   {
@@ -743,6 +743,26 @@ const criteria: AcceptanceCriterion[] = [
         'components/app/horizon/event-pane-edit.tsx (`UntilToggle`) + lib/horizon/event-pane-edit-form.ts (`contUntilStop`, `buildDraftEvent`) + components/app/horizon/event-pane-view.tsx + components/future/calculator-to-life-event-sheet.tsx (`defaultUntilStop`) + lib/income-expense-breakdown.ts (`FIXED_LABELS`); het rekengedrag (afkap op fireMonth − 1, inert zonder vlag) is exact getoetst in lib/horizon-kernel/geb-eind-bij-stopmoment.test.ts.',
     },
   },
+  {
+    workflow: 'WF-TOEK-49',
+    scenarioId: 'UAT-TOEK-49',
+    titel: 'Het lab onder een vast stopmoment: dekking als uitkomst, "Plan gedekt" i.p.v. vrijheidsleeftijd, geen promotie onder "nu" of bij een gedekt plan (ADR 0145)',
+    kriticiteit: 'KERN',
+    persona: 'willem',
+    given:
+      'Persona Willem met een AOW-anker en eindleeftijd 90 (zoals WF-TOEK-46) — hier een synthetische, hand-narekenbare AOW-TEKORT-toestand (spiegelt exact de committed fixture `AOW_TEKORT` in lib/horizon/lab-uitkomst.test.ts, i.p.v. Willems eigen ongespecificeerde dekkingscijfer): leeftijd 42, stop op 67 (maand 300), uitputting op maand 480 (leeftijd 82, vóór de eindleeftijd 90) → een tekort. Vier afgeleide toestanden op dezelfde basis: (1) `solved` met een verkend scenario (ter referentie — het bestaande gedrag), (2) AOW-tekort MÉT een verkend scenario (knop-beweging), (3) AOW-tekort ZONDER verkenning (alleen een kale stopkeuze op de slider), (4) AOW volledig GEDEKT (geen uitputting binnen de horizon, óók met scenario), (5) het `now`-anker (óók met scenario).',
+    when:
+      'De uitkomst-switch `resolveLabUitkomst` wordt op de vijf toestanden aangeroepen; bij toestand (2) legt de gebruiker het scenario vervolgens vast als doel via `buildParameterGoalRows` met parameter `dekking`.',
+    then:
+      'Gate-tabel (E4/E5/E6/D4): (1) `solved` + verkenning → `kind:\'vrijheidsleeftijd\'`, promotie `vrijheidsleeftijd` (ongewijzigd gedrag). (2) aow/age MET tekort en een verkend scenario → `kind:\'dekking\'`, promotie `dekking` — "Maak dit mijn doel" wordt aangeboden, de sheet toont de preview-rij "Plan gedekt" i.p.v. een vrijheidsleeftijd-rij. (3) aow/age MET tekort maar ZONDER verkenning (alleen een stopkeuze) → promotie `geen/geen-verkenning` — een stopkeuze alleen is onder een vast anker geen doelstand (D4), de knop blijft verborgen. (4) een VOLLEDIG GEDEKT plan → promotie `geen/gedekt`, óók met een verkend scenario — de losse doelen volstaan (E5), geen promotieknop. (5) het `nu`-anker → promotie `geen/nu-anker`, ongeacht verkenning (E6) — verkennen mag, er komt nooit een doel uit. Legt de gebruiker toestand (2) vast, dan bouwt `buildParameterGoalRows` voor parameter `dekking` een `plan_coverage`-rij met naam "Plan gedekt tot 90 jaar" en `target_value = 100` (de META-max — nooit een client-waarde, spiegel van "Vrij op X jaar" onder `solved`).',
+    assertion: {
+      kind: 'exact',
+      expected:
+        'solved=vrijheidsleeftijd:vrijheidsleeftijd; aowTekortMetScenario=dekking:dekking; aowTekortZonderScenario=dekking:geen/geen-verkenning; aowGedekt=dekking:geen/gedekt; nu=dekking:geen/nu-anker; dekkingGoalType=plan_coverage; dekkingNaam=Plan gedekt tot 90 jaar; dekkingTarget=100',
+      source:
+        'lib/horizon/lab-uitkomst.ts#resolveLabUitkomst (échte productiefunctie, gate-tabel) + lib/horizon/toekomst-doel.ts#buildParameterGoalRows (dekking → plan_coverage-rij) op een synthetische AOW-tekort-fixture die de committed lib/horizon/lab-uitkomst.test.ts spiegelt — zie toek-checks.ts',
+    },
+  },
 ]
 
 export const TOEK_ACCEPTANCE: AcceptanceSet = {
@@ -752,15 +772,17 @@ export const TOEK_ACCEPTANCE: AcceptanceSet = {
 
 /**
  * De TOEK-scenario-nummers die een acceptatiecriterium HOREN te hebben — de
- * catalogus dekt 01..08, 10..26, 28, 29, 30, 32..48 (27 en 31 zijn
+ * catalogus dekt 01..08, 10..26, 28, 29, 30, 32..49 (27 en 31 zijn
  * verwijsregels naar REKEN/NAV en horen NIET in deze set). WF-TOEK-09
  * (opgeslagen wat-als-scenario's als spooklijn) is VERVALLEN op 14 sep 2026
  * (ADR 0144 "De Wat-Als-pagina gaat op in de tijdas") — de bewaarde
  * wat-als-scenario's en de spooklijn-overlay-picker bestaan niet meer.
- * Gebruikt door de dekkings-meta-test.
+ * WF-TOEK-49 (14 sep 2026, ADR 0145 "Het doelscenario volgt het anker: dekking
+ * als uitkomst") is NIEUW — het eerstvolgende vrije nummer (44 is TPR-15,
+ * 45-48 zijn eerder al bezet). Gebruikt door de dekkings-meta-test.
  */
 export const TOEK_EXPECTED_WORKFLOW_NUMBERS: number[] = [
   ...Array.from({ length: 8 }, (_, i) => i + 1), // 1..8
   ...Array.from({ length: 17 }, (_, i) => i + 10), // 10..26
-  28, 29, 30, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48,
+  28, 29, 30, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49,
 ]

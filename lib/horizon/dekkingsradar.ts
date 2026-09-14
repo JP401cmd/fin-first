@@ -28,6 +28,7 @@ import type { HousingStrategyConfig, HousingStrategyTrigger } from '@/lib/housin
 import type { KernelHousingSale } from '@/lib/horizon-kernel/bridge'
 import { isFireEndForm, type FireEndForm, type FireEndStrategy } from '@/lib/fire-strategy'
 import { spendablePortfolio, coveragePctForRow } from '@/lib/horizon/coverage-strip'
+import { radarEindstrategieAnkerReden } from '@/lib/horizon/anker-copy'
 
 // ── Presentatiedrempels (GEEN financiële aannames) ──────────────────────────
 // Spiegelt de dekkingsgraad-strook (coverage-strip.ts): volledig gedekt (≥100) /
@@ -92,6 +93,17 @@ export interface DekkingsradarInput {
   kernelHousingSale: KernelHousingSale | null
   /** Jaarlijkse besteding (reëel/koopkracht-nu) — schaal voor de eindstrategie-as. */
   jaarBesteding: number
+  /**
+   * `SimResult.requiredFireIsAnchorPortfolio` van de run die de RIJEN levert (ADR 0129
+   * D4 / ADR 0145 D5): `true` ⇒ het stopmoment lag in die run vast en
+   * `requiredFirePortfolio` is de geprojecteerde stand op het anker, géén doel. De
+   * behoud-tak van as 4 deelt er dan niet door (`pct: null` + reden). Bewust ALLEEN
+   * aan de bridge-vlag gekoppeld — nooit aan de strategienaam of een eigen anker-
+   * afleiding: op een geforceerd stop-pad onder `solved` staat de vlag `false`
+   * (`input.stopAnker === undefined`) en blijft het gedrag exact als voorheen.
+   * Optioneel/additief: weggelaten ⇒ `false` (bestaand gedrag).
+   */
+  anchorPortfolio?: boolean
 }
 
 function clamp(v: number, lo: number, hi: number): number {
@@ -291,7 +303,13 @@ function axisEindstrategie(input: DekkingsradarInput): RadarAs {
     )
   }
 
-  // Perpetual/behoud (of geen positief doel): pot moet behouden blijven.
+  // Perpetual/behoud (of geen positief doel): pot moet behouden blijven — maar alleen
+  // wanneer `requiredFirePortfolio` een DOEL is. Onder een vast stopmoment is het de
+  // stand op het anker (bridge-vlag), en delen door een stand is de fout waarvoor ADR
+  // 0087 de marktrisico-as schrapte: dan bewust n.v.t. mét reden (ADR 0145 D5).
+  if (input.anchorPortfolio === true) {
+    return as('eindstrategie', label, null, radarEindstrategieAnkerReden())
+  }
   const base = Math.max(input.requiredFirePortfolio, 1)
   const pct = clamp((eind / base) * 100, 0, RADAR_PCT_MAX)
   return as(

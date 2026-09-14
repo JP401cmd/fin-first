@@ -3,14 +3,18 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import {
   parseToekomstScenarioPrefs,
+  stripStopKeuze,
   DOEL_PARAMETERS,
   type DoelParameter,
 } from '@/lib/horizon/toekomst-scenario'
 import {
   buildParameterGoalRows,
   PARAMETER_GOAL_TYPES,
+  PARAM_TO_GOAL_TYPE,
   type ParameterGoalRow,
 } from '@/lib/horizon/toekomst-doel'
+import { FIRE_PLAN_COLUMNS, isFixedAnchor, PERPETUAL_END_AGE, resolveFirePlanWithOverride, type FirePlan } from '@/lib/fire-strategy'
+import { badRequest, serverError } from '@/lib/api/respond'
 
 /**
  * PUT /api/toekomst-doel
@@ -34,6 +38,19 @@ import {
  * Volgorde bij vastleggen: eerst de goals (idempotent per type via select-then-
  * update/insert op het `(user_id, goal_type, bron='parameter')`-anker), dan de pref —
  * zodat een herhaalde vastlegging geen dubbele rijen maakt.
+ *
+ * HET ANKER IS SERVER-BEPAALD (ADR 0145 D3). De route leest het plan (stop-anker ×
+ * eind-vorm) uit het eigen profiel met exact dezelfde lezing als de loaders en de
+ * kernel-adapter (`resolveFirePlanWithOverride` op `FIRE_PLAN_COLUMNS` +
+ * `feature_preferences`) en beslist zélf welk uitkomstdoel bij het anker hoort:
+ *   - `solved`  → `fire` mag, `dekking` niet (400);
+ *   - `aow`/`age` → `fire` wordt gestript (geen vrijheidsleeftijd om vast te leggen),
+ *     `dekking` krijgt de plan-velden (eindleeftijd/anker/stopleeftijd) uit het profiel
+ *     — nooit uit de body — en de stopkeuze verdwijnt uit `doel.stand` (D4);
+ *   - `now` → geen doel uit het lab (400; `loslaten` blijft).
+ * Ná de upserts wordt de anker-onverenigbare rij verwijderd (`fire_age` onder een vast
+ * anker, `plan_coverage` onder `solved`): de anker-wissel-reconciliatie, bewust hier en
+ * niet in /api/fire-settings.
  */
 
 // De payload is klein (≤ 4 vinkjes + doelwaarden + een compacte stand). 8 KB is ruim.
@@ -112,12 +129,42 @@ export async function PUT(request: NextRequest) {
 
 // ── vastleggen ─────────────────────────────────────────────────────────────────
 
+/**
+ * Het plan van de ingelogde gebruiker — eigen rij, dezelfde kolommen en dezelfde
+ * resolver als de loaders/kernel-adapter (L1: `FIRE_PLAN_COLUMNS`, nooit drie van de
+ * vijf). `null` bij een DB-fout (de caller antwoordt 500).
+ */
+async function readFirePlan(supabase: SupabaseServerClient, userId: string): Promise<FirePlan | null> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select(`${FIRE_PLAN_COLUMNS}, feature_preferences`)
+    .eq('id', userId)
+    .maybeSingle()
+  if (error) {
+    console.error('[/api/toekomst-doel PUT] plan read mislukt:', error.code)
+    return null
+  }
+  // Een ontbrekende rij gedraagt zich als `solved` (zelfde tolerantie als de loaders).
+  return resolveFirePlanWithOverride((data ?? {}) as Parameters<typeof resolveFirePlanWithOverride>[0])
+}
+
 async function handleVastleggen(
   supabase: SupabaseServerClient,
   userId: string,
   body: Record<string, unknown>,
 ) {
-  // Parameters: whitelist tegen de vier bekende keys; alleen `true` telt (nooit
+  // Het anker eerst: het bepaalt welk uitkomstdoel hier überhaupt mag (ADR 0145 D3).
+  const plan = await readFirePlan(supabase, userId)
+  if (plan === null) {
+    return serverError(new Error('plan read mislukt'), 'toekomst-doel:PUT:plan')
+  }
+  const anchorFixed = isFixedAnchor(plan)
+  if (plan.anchor.kind === 'now') {
+    // E6: verkennen mag, geen doel uit het lab. `loslaten` blijft beschikbaar.
+    return badRequest('Onder dit stopmoment legt het lab geen doel vast', 'anchor_now')
+  }
+
+  // Parameters: whitelist tegen de bekende keys; alleen `true` telt (nooit
   // client-waarden vertrouwen). Zonder geldige parameter is er niets te promoveren.
   const parameters: Partial<Record<DoelParameter, true>> = {}
   if (isPlainObject(body.parameters)) {
@@ -125,11 +172,19 @@ async function handleVastleggen(
       if (body.parameters[p] === true) parameters[p] = true
     }
   }
+  if (anchorFixed) {
+    // Onder aow/age is er geen vrijheidsleeftijd om vast te leggen: een client die
+    // `fire: true` stuurt (oude client, of een verkende stop) krijgt géén fire_age-rij.
+    delete parameters.fire
+  } else if (parameters.dekking) {
+    return badRequest('Een dekkingsdoel hoort bij een vast stopmoment', 'dekking_vereist_vast_anker')
+  }
   if (Object.keys(parameters).length === 0) {
     return NextResponse.json({ error: 'Geen doelparameters' }, { status: 400 })
   }
 
   // Doelwaarden: boundary-sanitize naar eindige getallen; de pure builder clampt verder.
+  // De PLAN-velden van het dekkingsdoel komen uit het profiel, nooit uit de body.
   const dw = isPlainObject(body.doelwaarden) ? body.doelwaarden : {}
   const { rows } = buildParameterGoalRows({
     parameters,
@@ -139,6 +194,15 @@ async function handleVastleggen(
       rendementPct: numOrUndef(dw.rendementPct),
       fireLeeftijd: numOrUndef(dw.fireLeeftijd),
       margeJaren: numOrUndef(dw.margeJaren),
+      ...(anchorFixed && plan.anchor.kind !== 'solved'
+        ? {
+            // Zelfde eindleeftijd als de kernel (`eindleeftijdVan`): onder `perpetual`
+            // rekent die tot PERPETUAL_END_AGE, niet tot het opgeslagen veld.
+            planEindleeftijd: plan.endForm === 'perpetual' ? PERPETUAL_END_AGE : plan.endAge,
+            planStopAnker: plan.anchor.kind,
+            planStopLeeftijd: plan.anchor.kind === 'age' ? plan.anchor.age : null,
+          }
+        : {}),
     },
   })
   if (rows.length === 0) {
@@ -151,7 +215,10 @@ async function handleVastleggen(
   for (const row of rows) doelParameters[row.parameter] = true
 
   const gezetOp = new Date().toISOString()
-  const stand = isPlainObject(body.stand) ? body.stand : {}
+  // Onder een vast anker is de stopkeuze geen doelstand (D4): de slider verkent daar
+  // alleen, dus `stopAge`/`stopKoppel`/`stopMarge` verdwijnen vóór de pref-write.
+  const rawStand = isPlainObject(body.stand) ? body.stand : {}
+  const stand = anchorFixed ? stripStopKeuze(rawStand) : rawStand
 
   // Valideer de doelstand VÓÓR we goals schrijven: een ongeldige stand mag geen
   // wees-goals achterlaten. De parser is de enige poort en saneert de stand.
@@ -168,6 +235,20 @@ async function handleVastleggen(
       return NextResponse.json({ error: 'Fout bij opslaan' }, { status: 500 })
     }
     goalIds[row.parameter] = id
+  }
+
+  // Anker-wissel-reconciliatie: de rij van het uitkomstdoel dat NIET bij dit anker hoort
+  // (fire_age onder een vast anker, plan_coverage onder solved) gaat weg — own-row, alleen
+  // bron='parameter', zodat een handmatig doel van hetzelfde type ongemoeid blijft.
+  const onverenigbaar = anchorFixed ? PARAM_TO_GOAL_TYPE.fire : PARAM_TO_GOAL_TYPE.dekking
+  const { error: reconcileError } = await supabase
+    .from('goals')
+    .delete()
+    .eq('user_id', userId)
+    .eq('goal_type', onverenigbaar)
+    .filter('metadata->>bron', 'eq', 'parameter')
+  if (reconcileError) {
+    return serverError(reconcileError, 'toekomst-doel:PUT:reconcile')
   }
 
   // Pref daarna: read → merge doel-blok (mét goalIds) → parse → own-row write.
@@ -315,8 +396,9 @@ function buildInsertRow(userId: string, row: ParameterGoalRow) {
 // ── loslaten ─────────────────────────────────────────────────────────────────
 
 async function handleLoslaten(supabase: SupabaseServerClient, userId: string) {
-  // 1. Verwijder alle vier parameter-typen (own-row, alleen bron='parameter' — handmatige
-  //    savings_rate/salary-doelen blijven ongemoeid).
+  // 1. Verwijder alle parameter-typen (`PARAMETER_GOAL_TYPES`, incl. fire_age én
+  //    plan_coverage — own-row, alleen bron='parameter'; handmatige savings_rate/salary-
+  //    doelen blijven ongemoeid). Werkt onder élk anker, ook `now`.
   const { error: deleteError } = await supabase
     .from('goals')
     .delete()

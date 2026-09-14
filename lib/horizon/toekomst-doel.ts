@@ -22,18 +22,20 @@ import { DOEL_PARAMETERS, type DoelParameter } from '@/lib/horizon/toekomst-scen
 // ── Parameter → goal_type (één bron, ook voor de route + loader) ──────────────
 
 /**
- * Vaste koppeling van de vier promoveerbare lab-parameters naar hun `goal_type`.
- * De route gebruikt `PARAMETER_GOAL_TYPES` om exact deze vier typen te verwijderen
- * bij "loslaten"; de loader (stap 4) mapt terug via dezelfde bron.
+ * Vaste koppeling van de vijf promoveerbare lab-parameters naar hun `goal_type`.
+ * De route gebruikt `PARAMETER_GOAL_TYPES` om exact deze typen te verwijderen
+ * bij "loslaten"; de loader (stap 4) mapt terug via dezelfde bron. `fire` en
+ * `dekking` zijn elkaars spiegel per anker (ADR 0145): nooit allebei tegelijk.
  */
 export const PARAM_TO_GOAL_TYPE: Record<DoelParameter, GoalType> = {
   spaarquote: 'savings_rate',
   salaris: 'salary',
   rendement: 'expected_return',
   fire: 'fire_age',
+  dekking: 'plan_coverage',
 }
 
-/** De vier goal-typen die door het lab-doelscenario worden beheerd (in DOEL_PARAMETERS-volgorde). */
+/** De vijf goal-typen die door het lab-doelscenario worden beheerd (in DOEL_PARAMETERS-volgorde). */
 export const PARAMETER_GOAL_TYPES: readonly GoalType[] = DOEL_PARAMETERS.map(
   (p) => PARAM_TO_GOAL_TYPE[p],
 )
@@ -108,6 +110,17 @@ export interface ParameterGoalInput {
     fireLeeftijd?: number
     /** Marge in jaren t.o.v. de vrijheidsleeftijd (criterium van het FIRE-doel; floor op halve stap, ≥ 0). */
     margeJaren?: number
+    /**
+     * PLAN-VELDEN voor het dekkingsdoel (ADR 0145 D3) — komen van de SERVER (het
+     * profiel via `resolveFirePlanWithOverride`), nooit uit de client-body. De route
+     * zet ze; de builder schrijft ze in de metadata en de doelnaam. Ontbreekt de
+     * eindleeftijd, dan wordt de `dekking`-rij tolerant overgeslagen.
+     */
+    planEindleeftijd?: number
+    /** Het stop-anker van het plan (`aow`/`age`/`now`); `solved` levert nooit een dekkingsrij. */
+    planStopAnker?: 'aow' | 'age' | 'now'
+    /** De stopleeftijd bij het `age`-anker; `null` bij `aow`/`now` (de kaart zegt dan "je AOW-leeftijd"). */
+    planStopLeeftijd?: number | null
   }
 }
 
@@ -244,6 +257,24 @@ function buildRow(parameter: DoelParameter, dw: ParameterGoalInput['doelwaarden'
         icon: GOAL_TYPE_ICONS.fire_age,
         color: PARAMETER_GOAL_COLOR,
         metadata: { ...BASE_METADATA, margeDoelJaren: marge },
+      }
+    }
+    case 'dekking': {
+      // "Plan gedekt" (ADR 0145): doel = 100% dekking tot de eindleeftijd van het plan.
+      // De doelwaarde is GEEN client-waarde maar de META-max; de plan-velden komen van
+      // de server. Zonder eindleeftijd is er geen plan-einde om naar te wijzen → overslaan.
+      if (!isFiniteNumber(dw.planEindleeftijd)) return null
+      const eindleeftijd = dw.planEindleeftijd
+      const stopAnker = dw.planStopAnker ?? null
+      const stopLeeftijd = isFiniteNumber(dw.planStopLeeftijd) ? dw.planStopLeeftijd : null
+      return {
+        parameter,
+        goal_type: 'plan_coverage',
+        name: `Plan gedekt tot ${fmtNum1(eindleeftijd)} jaar`,
+        target_value: GOAL_TYPE_META.plan_coverage.max ?? 100,
+        icon: GOAL_TYPE_ICONS.plan_coverage,
+        color: PARAMETER_GOAL_COLOR,
+        metadata: { ...BASE_METADATA, eindleeftijd, stopAnker, stopLeeftijd },
       }
     }
   }

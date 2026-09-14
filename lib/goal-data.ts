@@ -24,6 +24,14 @@ export type GoalType =
   | 'end_balance'
   | 'debt_free_date'
   | 'tax_burden'
+  /**
+   * "Plan gedekt" (ADR 0145): het UITKOMSTDOEL van het lab onder een VAST stopmoment
+   * (aow/age) — de spiegel van `fire_age` onder `solved`. Voortgang = de dekking
+   * (`computeRunwayCoveragePct`, 0–100) uit de canonieke kernel-run; doel altijd 100.
+   * Lab-only (`viaLab`), geen doelbasis (`metricBasis: false`), alleen via
+   * PUT /api/toekomst-doel geschreven.
+   */
+  | 'plan_coverage'
   | 'custom'
 
 export type GoalOwnership = 'personal' | 'shared'
@@ -104,6 +112,7 @@ export const GOAL_TYPE_LABELS: Record<GoalType, string> = {
   end_balance: 'Eindsaldo',
   debt_free_date: 'Schuldenvrij',
   tax_burden: 'Belastingdruk',
+  plan_coverage: 'Plan gedekt',
   custom: 'Vrij doel',
 }
 
@@ -124,6 +133,8 @@ export const GOAL_TYPE_ICONS: Record<GoalType, string> = {
   end_balance: 'Vault',
   debt_free_date: 'CalendarCheck',
   tax_burden: 'Receipt',
+  // Bestaat in de gedeelde `iconMap` (zelfde icoon als emergency_fund — "geborgd").
+  plan_coverage: 'ShieldCheck',
   custom: 'Target',
 }
 
@@ -215,6 +226,14 @@ export const GOAL_TYPE_META: Record<GoalType, GoalTypeMeta> = {
   // Belastingdruk in %: het EFFECTIEVE tarief over het inkomen uit
   // `buildTaxOverview(...).effectiveRate`. 'down' omdat lager beter is.
   tax_burden:      { unit: '%', group: 'Financieel', step: '0.1', min: 0, max: 100, supportsAssetLink: false, supportsDebtLink: false, freedomTimeRelevant: false, direction: 'down', metricBasis: true, metricSource: 'belastingdruk' },
+  // Plan gedekt (ADR 0145): dekking in % uit de kernel-run (`computeRunwayCoveragePct`),
+  // doel altijd 100 (`max`). LAB-ONLY zoals `expected_return` — `metricBasis: false` is een
+  // eigenaarsbesluit (kleinste oppervlak; later te openen), dus NIET kiesbaar als doelbasis.
+  // `metricSource` staat er wél bij: de live waarde komt uit dezelfde kernel-thunk als
+  // fire_age/end_balance (`syncActiveGoalValues`), alleen niet via de doelbasis-kiezer.
+  // Richting 'up' = de default (bewust niet expliciet: de regressietest pint `direction`
+  // op undefined voor elk niet-'down'-type).
+  plan_coverage:   { unit: '%', group: 'Financieel', step: '1', min: 0, max: 100, supportsAssetLink: false, supportsDebtLink: false, freedomTimeRelevant: false, viaLab: true, metricBasis: false, metricSource: 'horizon-kernel' },
   custom:          { unit: 'custom', group: 'Persoonlijk', step: '1',  supportsAssetLink: true, supportsDebtLink: true, allowsMixedLinks: true, freedomTimeRelevant: false },
 }
 
@@ -312,6 +331,8 @@ export function goalValueLabels(goalType: GoalType): { target: string; current: 
       return { target: 'Schuldenvrij uiterlijk', current: 'Nu verwacht schuldenvrij' }
     case 'tax_burden':
       return { target: 'Doel-belastingdruk (%)', current: 'Huidige belastingdruk (%)' }
+    case 'plan_coverage':
+      return { target: 'Doel-dekking (%)', current: 'Huidige dekking (%)' }
     case 'custom':
       return { target: 'Doelwaarde', current: 'Huidige waarde' }
     default:
@@ -557,11 +578,14 @@ export function computeGoalProgress(goal: GoalProgressInput, options?: GoalProgr
       current,
       target,
       pct: 0,
-      onTrack: false,
+      // ADR 0145 — géén oordeel: `onTrack: false` las in "vraagt aandacht" (/overzicht)
+      // en de Doelen-status als een doel dat achterloopt. R5-conventie: `paceSkipped`
+      // = geen oordeel, `onTrack` blijft dan waar.
+      onTrack: true,
       measured: false,
       requiredMonthly: null,
       eta: null,
-      paceSkipped: false,
+      paceSkipped: true,
       notApplicableReason: goal.notApplicableReason,
     }
   }

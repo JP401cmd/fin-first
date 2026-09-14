@@ -4,6 +4,7 @@ import type { WhatIfEvent } from '@/lib/types/horizon-whatif'
 import {
   parseToekomstScenarioPrefs,
   isDoelConceptGewijzigd,
+  stripStopKeuze,
   expandCategorieReturnDeltas,
   buildCategorieReturnGroups,
   scenarioMonthlySpendDelta,
@@ -427,6 +428,68 @@ describe('isDoelConceptGewijzigd', () => {
 
   it('lege live-stand vs stand mét velden → gewijzigd', () => {
     expect(isDoelConceptGewijzigd({}, stand)).toBe(true)
+  })
+
+  // ── ADR 0145 D4: onder een vast anker telt de stopkeuze niet als doelstand ──
+  it('stopKeuzeTelt: false — een stopAge-/koppel-/margeverschil is dan géén wijziging', () => {
+    const live = { ...stand, stopAge: 62, stopKoppel: true, stopMarge: 4 }
+    expect(isDoelConceptGewijzigd(live, stand, { stopKeuzeTelt: false })).toBe(false)
+    // Default (weggelaten of true) = het bestaande gedrag: wél gewijzigd.
+    expect(isDoelConceptGewijzigd(live, stand)).toBe(true)
+    expect(isDoelConceptGewijzigd(live, stand, { stopKeuzeTelt: true })).toBe(true)
+  })
+
+  it('stopKeuzeTelt: false — sliders en marktbias tellen nog gewoon mee', () => {
+    const live = { ...stand, sliders: { ...stand.sliders!, savings: 40 } }
+    expect(isDoelConceptGewijzigd(live, stand, { stopKeuzeTelt: false })).toBe(true)
+    const delta = { ...stand, returnDeltaByCategorie: { Beleggingen: 0.03 } }
+    expect(isDoelConceptGewijzigd(delta, stand, { stopKeuzeTelt: false })).toBe(true)
+  })
+})
+
+describe('stripStopKeuze (ADR 0145 D4)', () => {
+  it('laat stopAge/stopKoppel/stopMarge weg en houdt de rest; muteert de invoer niet', () => {
+    const stand: ToekomstScenarioStand = {
+      sliders: { savings: 45 },
+      returnDeltaByCategorie: { Beleggingen: 0.02 },
+      stopAge: 58,
+      stopKoppel: true,
+      stopMarge: 2,
+    }
+    const gestript = stripStopKeuze(stand)
+    expect(gestript).toEqual({ sliders: { savings: 45 }, returnDeltaByCategorie: { Beleggingen: 0.02 } })
+    expect('stopAge' in gestript).toBe(false)
+    expect(stand.stopAge).toBe(58)
+  })
+
+  it('werkt ook op een rauwe body-record (de route stript vóór de pref-parser)', () => {
+    const raw: Record<string, unknown> = { sliders: { income: 4000 }, stopAge: 60, onzin: 1 }
+    expect(stripStopKeuze(raw)).toEqual({ sliders: { income: 4000 }, onzin: 1 })
+  })
+
+  it('een stand met alléén een stopkeuze wordt leeg — de parser laat zo\'n doel dan vallen', () => {
+    expect(stripStopKeuze({ stopAge: 58, stopKoppel: false })).toEqual({})
+    const parsed = parseToekomstScenarioPrefs({
+      v: 2,
+      doel: { gezetOp: '2026-09-14T10:00:00.000Z', parameters: { dekking: true }, stand: stripStopKeuze({ stopAge: 58 }) },
+    })
+    expect(parsed?.doel).toBeUndefined()
+  })
+})
+
+describe('parseToekomstScenarioPrefs — dekking als vijfde parameter (ADR 0145)', () => {
+  it('accepteert `dekking` in doel.parameters en doel.goalIds', () => {
+    const parsed = parseToekomstScenarioPrefs({
+      v: 2,
+      doel: {
+        gezetOp: '2026-09-14T10:00:00.000Z',
+        parameters: { dekking: true, spaarquote: true },
+        stand: { sliders: { savings: 45 } },
+        goalIds: { dekking: 'goal-d', spaarquote: 'goal-s' },
+      },
+    })
+    expect(parsed?.doel?.parameters).toEqual({ dekking: true, spaarquote: true })
+    expect(parsed?.doel?.goalIds).toEqual({ dekking: 'goal-d', spaarquote: 'goal-s' })
   })
 })
 

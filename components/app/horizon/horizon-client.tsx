@@ -152,11 +152,23 @@ import {
   ankerVraag,
   ankerZin,
   ankerZinKort,
-  fireAgeGoalNotApplicableReason,
+  ankerReachYear,
+  dekkingAsNotitie,
+  dekkingBadge,
+  dekkingDeltaBadge,
+  dekkingPreviewWaarde,
+  dekkingSheetToelichting,
+  dekkingTekortHintKnop,
+  dekkingTekortHintZin,
+  dekkingVastgelegdToast,
+  dekkingVerkenZin,
   formatStopAge,
+  radarSubtitel,
   type AnkerReach,
   type AnkerStop,
 } from '@/lib/horizon/anker-copy'
+import { resolveLabUitkomst, type LabUitkomst } from '@/lib/horizon/lab-uitkomst'
+import { GOAL_TYPE_LABELS } from '@/lib/goal-data'
 import { AnkerDrieslag } from '@/components/app/horizon/anker-drieslag'
 import {
   guardFireTarget,
@@ -169,6 +181,7 @@ import {
   scenarioMonthlySpendDelta,
   buildCategorieReturnGroups,
   isDoelConceptGewijzigd,
+  stripStopKeuze,
   type DoelParameter,
   type ToekomstScenarioDoel,
 } from '@/lib/horizon/toekomst-scenario'
@@ -183,7 +196,7 @@ import { WhatIfMarketAssumptions } from '@/components/app/horizon/whatif-market-
 import { DoelLoslatenConfirm } from '@/components/future/doel-loslaten-confirm'
 import { StopPlanConfirm } from '@/components/app/horizon/stop-plan-confirm'
 import { planDraftFromSettings, planDraftToFireSettingsBody, validatePlanDraft } from '@/lib/horizon/plan-draft'
-import { buildSliderEvent, readSliderValueFromEvents, type SliderKey } from '@/lib/scenario-events'
+import { applySliderEvent, buildSliderEvent, readSliderValueFromEvents, type SliderKey } from '@/lib/scenario-events'
 import type { HorizonScenarioOverrides } from '@/lib/hooks/use-horizon-fire-sim'
 import type { AssetCategorie } from '@/lib/horizon-kernel/types'
 import { runMarktcheckAsync, runScenarioPresetsAsync } from '@/lib/horizon-kernel/worker/run-in-worker'
@@ -291,7 +304,7 @@ import { buildHorizonInput } from '@/lib/horizon/build-input'
 import { buildDeeplinkCleanupUrl } from '@/lib/horizon/deeplink-cleanup'
 import type { PreviewBaseline } from '@/lib/strategy-preview'
 import { buildBaselineOverrides } from '@/lib/whatif-overrides'
-import { WhatIfSliders, DeltaBadge, type WhatIfOverrides } from '@/components/app/horizon/whatif-sliders'
+import { WhatIfSliders, DeltaBadge, computeSliderUiRange, type WhatIfOverrides } from '@/components/app/horizon/whatif-sliders'
 import type { WhatIfEvent } from '@/lib/types/horizon-whatif'
 import { ChartOverlayExplainer } from '@/components/app/horizon/chart-overlay-explainer'
 import { ChartTips } from '@/components/editorial/chart-tips'
@@ -2769,6 +2782,61 @@ export default function HorizonPage({
       : 0
     return { stopAge: duidingStopAge, perMaand, dagen }
   }, [stopPad, duidingStopAge, canonicalDailyRate])
+  // ── Lab-uitkomst — ÉÉN uitkomst-switch per anker (ADR 0145) ─────────────────────────
+  // Onder `solved` bewegen de knoppen de vrijheidsleeftijd (passthrough van vandaag);
+  // onder een vast stopmoment de DEKKING. De switch bepaalt óók de promotie-gate
+  // ("mag hier een doel uit het lab komen?"). Consume-only: de dekking komt uit
+  // `computeRunwayCoveragePct` binnen de helper, op dezelfde runs die hier al draaien.
+  const labUitkomst: LabUitkomst = useMemo(
+    () =>
+      resolveLabUitkomst({
+        planAnchor,
+        currentAge,
+        basis: simResult,
+        scenario: hasScenario && scenario != null ? scenario.result : null,
+        stopPad: stopPad ?? null,
+        kernelMaandHint,
+        hasScenario,
+        hasStopKeuze,
+      }),
+    [planAnchor, currentAge, simResult, hasScenario, scenario, stopPad, kernelMaandHint, hasStopKeuze],
+  )
+  const labPromotie = labUitkomst.promotie
+  const doelVastleggenMogelijk = labPromotie.kind !== 'geen'
+  // Onder solved: als vóór ADR 0145 (altijd bij een doel). Onder een vast anker alleen
+  // wanneer er iets vast te leggen is — anders opent het venster zonder rijen.
+  const doelBijwerkenMogelijk = doelActief && (labUitkomst.kind === 'vrijheidsleeftijd' || labPromotie.kind === 'dekking')
+  // De dekking-uitkomst als losse afleiding (null onder `solved`) — alle dekking-
+  // oppervlakken hieronder lezen deze ene waarde.
+  const labDekking = labUitkomst.kind === 'dekking' ? labUitkomst : null
+  // "Wat hoort daarbij?" — PLAN-variant (zonder slider-beweging). Het verkende stop-pad
+  // wint (blok hierboven); zonder tekort-hint op dat pad valt het plan-antwoord terug op
+  // de maandhint van de lab-uitkomst. €→vrijheidstijd via dezelfde canonieke helper.
+  const planTekortHint = useMemo(() => {
+    if (labDekking == null || labDekking.stop == null || labDekking.maandHint == null) return null
+    // Alleen bij een tekort in DEKKING (reikt het geld tot de eindleeftijd?). De kernel-
+    // maandhint telt ook het eind-doel mee (bv. een nalatenschap); dan reikt het plan wél
+    // en zegt de as "gedekt" — een hint ernaast sprak dat tegen (smoke 14 sep 2026).
+    if (!labDekking.tekort) return null
+    if (stopPadTekortHint !== null) return null
+    // Draagt het stop-pad zélf een hint, dan hoort die bij het verkende stopmoment — nooit
+    // met de plan-woorden tonen.
+    if (stopPad != null && Number.isFinite(stopPad.maandHint) && stopPad.maandHint > 0) return null
+    const hint = labDekking.maandHint
+    const dagen = canonicalDailyRate > 0
+      ? Math.round(calculateFreedomTime(hint, canonicalDailyRate).totalDays)
+      : 0
+    // Het seed-bedrag is geklemd op het zichtbare extra-inleg-bereik; het knoplabel noemt
+    // wat er daadwerkelijk gezet wordt.
+    const range = whatIfBaseline ? computeSliderUiRange('extra_inleg', whatIfBaseline.monthlyIncome, 0) : null
+    const seed = range ? Math.min(Math.max(Math.round(hint), range.min), range.max) : null
+    return { stop: labDekking.stop, eind: labDekking.eind, hint, dagen, seed }
+  }, [labDekking, stopPadTekortHint, stopPad, canonicalDailyRate, whatIfBaseline])
+  const handlePlanTekortHintSeed = useCallback(() => {
+    if (planTekortHint?.seed == null || planTekortHint.seed <= 0 || !whatIfBaseline || currentAge === null) return
+    const ev = buildSliderEvent('extra_inleg', planTekortHint.seed, whatIfBaseline, currentAge)
+    setScenarioSliderEvents((prev) => applySliderEvent(prev, 'extra_inleg', ev))
+  }, [planTekortHint, whatIfBaseline, currentAge])
   // ── Dekkingsradar-assen — pure consume-laag over de duiding-rijen ──────
   // Alle grootheden komen elders vandaan: de duiding-rijen (stop-pad wint), de actieve-pad
   // FIRE/benodigd-vermogen/doel-eindvermogen en de canonieke bestedingsgrondslag
@@ -2810,6 +2878,16 @@ export default function HorizonPage({
       hasEigenHuis: initialData.housingContext.hasEigenHuis,
       kernelHousingSale: radarHousingSale,
       jaarBesteding: activeMonthlySpend * 12,
+      // ADR 0145 D5 — de bridge-vlag van de run die de RIJEN levert (zelfde volgorde:
+      // stop-pad → scenario → hoofd-run). `true` ⇒ requiredFirePortfolio is de stand op
+      // het anker, geen doel; as 4 (behoud-tak) wordt dan n.v.t.
+      anchorPortfolio:
+        (stopPad != null
+          ? stopPad.result
+          : hasScenario && scenario != null
+            ? scenario.result
+            : simResult
+        )?.requiredFireIsAnchorPortfolio === true,
     })
   }, [duidingUnifiedRows, currentAge, scenarioVerwachtFireAge, stopPad, duidingStopAge, userAowAge.fractional, hasScenario, scenario, simResult, fireStrategy, initialData.housingStrategy, initialData.housingContext.hasEigenHuis, kernelHousingSale, activeMonthlySpend])
   // Cijferbar-waarden bij de actieve leeftijd (hover/playback); consumeert de
@@ -3372,11 +3450,16 @@ export default function HorizonPage({
     if (isFixedAnchorMode) {
       const reikwijdte =
         ankerReach != null ? ankerZinKort(ankerReach, ankerStop ?? { kind: 'now' }) : 'je bereik'
-      return doelActief
-        ? `Vastgelegd doel — ${reikwijdte}`
-        : hasScenario
-          ? `Wat-als actief — ${reikwijdte}`
-          : `Verken je pad — ${reikwijdte}`
+      if (doelActief) return `Vastgelegd doel — ${reikwijdte}`
+      // ADR 0145 — met een actieve verkenning is de uitkomstmaat de DEKKING (basis → scenario).
+      if (hasScenario && labDekking != null && labDekking.basisPct != null && labDekking.scenarioPct != null) {
+        return dekkingVerkenZin({
+          basisPct: labDekking.basisPct,
+          scenarioPct: labDekking.scenarioPct,
+          reikt: labDekking.scenarioReach != null ? ankerReachYear(labDekking.scenarioReach) : null,
+        })
+      }
+      return hasScenario ? `Wat-als actief — ${reikwijdte}` : `Verken je pad — ${reikwijdte}`
     }
     if (scenarioVerwachtFireAge !== null) delen.push(`vrij op ${formatAge(scenarioVerwachtFireAge)} jr`)
     delen.push(`stop ${effectiveStopAge}`)
@@ -3384,7 +3467,7 @@ export default function HorizonPage({
     const cijfers = delen.join(' · ')
     if (doelActief) return `Vastgelegd doel — ${cijfers}`
     return hasScenario ? `Wat-als actief — ${cijfers}` : `Verken je pad — ${cijfers}`
-  }, [currentAge, doelActief, hasScenario, scenarioVerwachtFireAge, effectiveStopAge, stopMarge, isFixedAnchorMode, ankerReach, ankerStop])
+  }, [currentAge, doelActief, hasScenario, scenarioVerwachtFireAge, effectiveStopAge, stopMarge, isFixedAnchorMode, ankerReach, ankerStop, labDekking])
 
   // Slepen aan de stop-slider legt (bij koppel aan) een nieuwe vast te houden marge vast.
   // Vergrendelen alléén tegen de bezonken verwacht-waarde (nooit de basis-fallback).
@@ -3475,9 +3558,13 @@ export default function HorizonPage({
   )
 
   // "Je draait aan je doel"-banner: wijkt de live-stand af van het vastgelegde doel?
+  // Onder een vast stopmoment telt de stopkeuze niet mee (ADR 0145 D4): de slider
+  // verkent daar alleen en mag de banner niet laten afgaan.
   const conceptGewijzigd = useMemo(
-    () => doelActief && isDoelConceptGewijzigd(buildLiveStandNow(), doelBlok?.stand),
-    [doelActief, doelBlok, buildLiveStandNow],
+    () =>
+      doelActief &&
+      isDoelConceptGewijzigd(buildLiveStandNow(), doelBlok?.stand, { stopKeuzeTelt: !isFixedAnchorMode }),
+    [doelActief, doelBlok, buildLiveStandNow, isFixedAnchorMode],
   )
 
   // Doel-gewogen totaalrendement (%) uit de live rendement-delta's; null → geen rendement-doel.
@@ -3517,12 +3604,26 @@ export default function HorizonPage({
         waarde: `${doelRendementPct.toLocaleString('nl-NL', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`,
       })
     }
-    if ((stand.stopAge != null || stand.stopKoppel) && doelFireLeeftijd !== null) {
+    // Onder een vast stopmoment is er geen vrijheidsleeftijd om vast te leggen (ADR 0145).
+    if (!isFixedAnchorMode && (stand.stopAge != null || stand.stopKoppel) && doelFireLeeftijd !== null) {
       const fmt = (v: number) => v.toLocaleString('nl-NL', { maximumFractionDigits: 1 })
       previews.push({
         parameter: 'fire',
         label: 'Vrijheidsleeftijd',
         waarde: `Vrij op ${fmt(doelFireLeeftijd)} jr · ≥ ${fmt(doelMargeJaren)} jr marge`,
+      })
+    }
+    // ADR 0145 — het uitkomstdoel onder een vast stopmoment: altijd inbegrepen (`vast`).
+    if (
+      labPromotie.kind === 'dekking' &&
+      labDekking != null &&
+      labDekking.basisPct != null
+    ) {
+      previews.push({
+        parameter: 'dekking',
+        label: GOAL_TYPE_LABELS.plan_coverage,
+        waarde: dekkingPreviewWaarde(labDekking.basisPct, labDekking.scenarioPct ?? labDekking.basisPct, labDekking.eind),
+        vast: true,
       })
     }
     return previews
@@ -3533,6 +3634,9 @@ export default function HorizonPage({
     doelRendementPct,
     doelFireLeeftijd,
     doelMargeJaren,
+    isFixedAnchorMode,
+    labPromotie,
+    labDekking,
   ])
 
   // Vastleggen/bijwerken: bouw de doelwaarden voor de aangevinkte parameters en promoveer via
@@ -3561,15 +3665,26 @@ export default function HorizonPage({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'vastleggen', parameters: gekozen, stand, doelwaarden }),
         })
-        const json = (await res.json().catch(() => null)) as { ok?: boolean; goalIds?: Partial<Record<DoelParameter, string>> } | null
+        const json = (await res.json().catch(() => null)) as {
+          ok?: boolean
+          goalIds?: Partial<Record<DoelParameter, string>>
+          error?: unknown
+          code?: unknown
+        } | null
         if (!res.ok || !json?.ok) {
-          addToast({ type: 'error', title: 'Doel niet vastgelegd', message: 'Probeer het zo nog eens.' })
+          // ADR 0145 — de route bepaalt het anker server-side; een anker-weigering
+          // (`anchor_now`, `dekking_vereist_vast_anker`) draagt een eigen, client-veilige
+          // tekst. Zonder `code` blijft de generieke melding van vandaag staan.
+          const ankerFout = typeof json?.code === 'string' && typeof json?.error === 'string' ? json.error : null
+          addToast({ type: 'error', title: 'Doel niet vastgelegd', message: ankerFout ?? 'Probeer het zo nog eens.' })
           return
         }
         setDoelBlok({
           gezetOp: new Date().toISOString(),
           parameters: gekozen,
-          stand,
+          // Onder een vast stopmoment is de stopkeuze geen doelstand (D4) — de server strips
+          // 'm óók; lokaal gelijk trekken zodat banner en herstel geen stopvelden vergelijken.
+          stand: isFixedAnchorMode ? stripStopKeuze(stand) : stand,
           ...(json.goalIds ? { goalIds: json.goalIds } : {}),
         })
         setShowScenarioLine(true)
@@ -3580,7 +3695,9 @@ export default function HorizonPage({
         addToast({
           type: 'success',
           title: doelActief ? 'Doel bijgewerkt' : 'Doel vastgelegd',
-          message: 'Je verkenning is nu je doel.',
+          message: gekozen.dekking
+            ? dekkingVastgelegdToast(labDekking?.eind ?? null)
+            : 'Je verkenning is nu je doel.',
         })
       } catch {
         addToast({ type: 'error', title: 'Doel niet vastgelegd', message: 'Probeer het zo nog eens.' })
@@ -3588,7 +3705,7 @@ export default function HorizonPage({
         setDoelSaving(false)
       }
     },
-    [buildLiveStandNow, whatIfBaseline, scenarioSliderEvents, doelRendementPct, doelFireLeeftijd, doelMargeJaren, doelActief, addToast],
+    [buildLiveStandNow, whatIfBaseline, scenarioSliderEvents, doelRendementPct, doelFireLeeftijd, doelMargeJaren, doelActief, addToast, isFixedAnchorMode, labDekking],
   )
 
   // Loslaten: verwijder de parameter-doelen + het doel-blok (server-route) en wis de client-state.
@@ -3703,22 +3820,35 @@ export default function HorizonPage({
       setScenarioSliderEvents([])
     }
     setScenarioReturnDeltas({ ...(stand.returnDeltaByCategorie ?? {}) })
-    setScenarioStopAge(stand.stopAge ?? null)
-    setScenarioStopKoppel(stand.stopKoppel ?? false)
-    lockedMargeRef.current = stand.stopMarge ?? null
-  }, [doelBlok, whatIfBaseline, currentAge])
+    // Onder een vast stopmoment is de stopkeuze geen doelstand (ADR 0145 D4): de
+    // verkende stop blijft staan waar hij staat.
+    if (!isFixedAnchorMode) {
+      setScenarioStopAge(stand.stopAge ?? null)
+      setScenarioStopKoppel(stand.stopKoppel ?? false)
+      lockedMargeRef.current = stand.stopMarge ?? null
+    }
+  }, [doelBlok, whatIfBaseline, currentAge, isFixedAnchorMode])
 
   // Compacte FIRE-delta voor de toggle-pill ("−30 mnd" = eerder vrij; beslishulp-conventie).
   const scenarioFireDeltaMonths =
     scenarioVerwachtFireAge !== null && scenarioBaseFireAge !== null
       ? Math.round((scenarioVerwachtFireAge - scenarioBaseFireAge) * 12)
       : null
+  // ADR 0145 — onder een vast stopmoment is de uitkomstmaat de dekking: de pil en de
+  // afwijkings-badges tonen dan de dekking-delta (scenario − basis, beide uit de
+  // lab-uitkomst). Onder `solved` blijft de vrijheidsleeftijd-delta ongewijzigd.
+  const labDekkingDelta =
+    isFixedAnchorMode && labDekking != null && labDekking.basisPct != null && labDekking.scenarioPct != null
+      ? { scenarioPct: labDekking.scenarioPct, label: dekkingDeltaBadge(labDekking.scenarioPct - labDekking.basisPct) }
+      : null
   const scenarioFireDeltaLabel =
-    scenarioFireDeltaMonths === null
-      ? null
-      : Math.abs(scenarioFireDeltaMonths) < 1
-        ? 'gelijk'
-        : `${scenarioFireDeltaMonths > 0 ? '+' : '−'}${Math.abs(scenarioFireDeltaMonths)} mnd`
+    isFixedAnchorMode
+      ? (labDekkingDelta?.label ?? null)
+      : scenarioFireDeltaMonths === null
+        ? null
+        : Math.abs(scenarioFireDeltaMonths) < 1
+          ? 'gelijk'
+          : `${scenarioFireDeltaMonths > 0 ? '+' : '−'}${Math.abs(scenarioFireDeltaMonths)} mnd`
 
   // ── Persistentie (plan §H): debounced fire-and-forget PUT; eerste render overslaan ──
   const scenarioSaveSkipRef = useRef(true)
@@ -6680,6 +6810,9 @@ export default function HorizonPage({
             <div className="flex shrink-0 flex-wrap items-center gap-1.5">
               {doelActief ? (
                 <>
+                  {/* ADR 0145 — bijwerken niet onder het nu-anker of een gedekt plan;
+                      loslaten blijft in élke ankertoestand beschikbaar. */}
+                  {doelBijwerkenMogelijk && (
                   <button
                     type="button"
                     onClick={() => setDoelSheetOpen(true)}
@@ -6688,6 +6821,7 @@ export default function HorizonPage({
                   >
                     Doel bijwerken
                   </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => setDoelLoslatenOpen(true)}
@@ -6699,13 +6833,13 @@ export default function HorizonPage({
                 </>
               ) : (
                 <>
-                  {/* Zelfde "er is iets vast te leggen"-oordeel als de
-                      ScenarioChip verderop: sliders ÓF een kale stopkeuze. Met
-                      alleen `hasScenario` bleef een doel dat puur een
-                      stopmoment was na loslaten onherstelbaar — de
-                      doelvastleg-sheet kent die vorm wél (de fire-preview hangt
-                      aan `stand.stopAge`/`stopKoppel`). Melding B-031. */}
-                  {(hasScenario || hasStopKeuze) && (
+                  {/* De promotie-gate komt uit de lab-uitkomst (ADR 0145). Onder
+                      `solved` is dat het oude "er is iets vast te leggen"-oordeel:
+                      sliders ÓF een kale stopkeuze (melding B-031 — een doel dat puur
+                      een stopmoment was bleef anders na loslaten onherstelbaar).
+                      Onder aow/age alleen bij een tekort mét verkenning; onder het
+                      nu-anker nooit. */}
+                  {doelVastleggenMogelijk && (
                     <button
                       type="button"
                       onClick={() => setDoelSheetOpen(true)}
@@ -6756,9 +6890,12 @@ export default function HorizonPage({
               className="mb-3 flex flex-wrap items-center justify-between gap-2 border border-[var(--ink-2)] border-l-4 border-l-horizon-500 bg-[var(--paper)] px-3 py-2"
             >
               <p className="font-serif text-[12px] leading-snug text-[var(--ink-2)]">
-                Je draait aan je doel — leg opnieuw vast of herstel je doel.
+                {doelBijwerkenMogelijk
+                  ? 'Je draait aan je doel — leg opnieuw vast of herstel je doel.'
+                  : 'Je draait aan je doel — herstel je doel wanneer je klaar bent met verkennen.'}
               </p>
               <div className="flex shrink-0 items-center gap-1.5">
+                {doelBijwerkenMogelijk && (
                 <button
                   type="button"
                   onClick={() => setDoelSheetOpen(true)}
@@ -6767,6 +6904,7 @@ export default function HorizonPage({
                 >
                   Leg opnieuw vast
                 </button>
+                )}
                 <button
                   type="button"
                   onClick={handleDoelHerstellen}
@@ -6801,6 +6939,20 @@ export default function HorizonPage({
                 base={0}
                 format={v => formatCurrency(v) + '/mnd'}
               />
+              {/* ADR 0145 — onder een vast stopmoment de uitkomst zelf: dekking van de
+                  verkenning + de delta t.o.v. de basis. Stoplichtkleur (gedekt/tekort),
+                  nooit het module-accent. */}
+              {labDekkingDelta && (
+                <span
+                  data-testid="lab-dekking-badge"
+                  className={`rounded-full px-1.5 py-0.5 font-mono text-[10px] font-medium tabular-nums ${
+                    labDekkingDelta.scenarioPct >= 100 ? 'bg-positive-bg text-positive' : 'bg-warning-bg text-warning'
+                  }`}
+                >
+                  {dekkingBadge(labDekkingDelta.scenarioPct)}
+                  {labDekkingDelta.label !== 'gelijk' && <> · {labDekkingDelta.label}</>}
+                </span>
+              )}
             </div>
           )}
 
@@ -6849,6 +7001,17 @@ export default function HorizonPage({
                     ) : null
                   }
                   ankerVast={isFixedAnchorMode}
+                  // ADR 0145 — onder aow/age de uitkomst van het plan: reikt het, voor
+                  // hoeveel procent, en of er iets vast te leggen valt.
+                  uitkomstNotitie={(() => {
+                    if (labDekking == null || planAnchor.kind === 'now') return null
+                    const notitie = dekkingAsNotitie(labDekking.basisReach, labDekking.basisPct, labDekking.eind)
+                    return notitie != null ? (
+                      <p data-testid="vrijheidsas-dekking-notitie" className="font-sans text-[12px] leading-snug text-[var(--ink-2)]">
+                        {notitie}
+                      </p>
+                    ) : null
+                  })()}
                   planStopAge={simResult?.vastStopLeeftijd ?? (planAnchor.kind === 'age' ? planAnchor.age : null)}
                   aowAge={userAowAge.fractional}
                   // B-038 — de sectie wijst naar de plek waar het stopmoment én
@@ -6940,6 +7103,41 @@ export default function HorizonPage({
                     </p>
                   </div>
                 )}
+                {/* ── Wat hoort daarbij? — PLAN-variant (ADR 0145) ──────────────────
+                    Onder aow/age zichtbaar zónder slider-beweging: wat hoort er bij het
+                    plan-stopmoment om tot de eindleeftijd te reiken. De knop zet het
+                    bedrag als extra inleg in het lab — alleen op klik, nooit bij laden
+                    (dat zou `hasScenario` omzetten en het persist-effect laten schrijven).
+                    De zin noemt het bedrag onversluierd, dus niet in de privacy-weergave;
+                    en zonder vrijheidstijd-equivalent (< 1 dag) geen zin met "0 dagen". */}
+                {planTekortHint !== null && !isNuStoppenMode && !masked && planTekortHint.dagen >= 1 && (
+                  <div
+                    data-testid="lab-plan-tekort-hint"
+                    className="mt-4 border border-[var(--ink-2)] border-l-4 border-l-horizon-500 bg-[var(--paper)] px-3 py-2.5"
+                  >
+                    <p className="mb-1 label-editorial text-[var(--ink-3)]">Wat hoort daarbij?</p>
+                    <p className="font-sans text-[12px] leading-snug text-[var(--ink-2)]">
+                      {dekkingTekortHintZin({
+                        stop: planTekortHint.stop,
+                        endAge: planTekortHint.eind,
+                        hint: planTekortHint.hint,
+                        dagen: planTekortHint.dagen,
+                      })}
+                    </p>
+                    {planTekortHint.seed != null && planTekortHint.seed > 0 && (
+                      <button
+                        type="button"
+                        onClick={handlePlanTekortHintSeed}
+                        className="mt-2 inline-flex min-h-[44px] items-center font-sans text-[11px] font-semibold text-horizon-700 underline underline-offset-2 transition-colors hover:text-horizon-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+                      >
+                        {dekkingTekortHintKnop(planTekortHint.seed)}
+                      </button>
+                    )}
+                    <p className="mt-1.5 font-sans text-[11px] leading-snug text-[var(--ink-3)]">
+                      Indicatie, geen advies — een rekenuitkomst bij je huidige aannames, uitgesmeerd over de maanden tot je eindleeftijd.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -6955,12 +7153,13 @@ export default function HorizonPage({
           bijwerken={doelActief}
           saving={doelSaving}
           onSubmit={handleDoelVastleggen}
-          // ADR 0129 — onder een vast stopmoment schrijft het lab geen fire_age-doel.
+          // ADR 0129/0145 — onder een vast stopmoment schrijft het lab geen fire_age-doel
+          // (de sheet filtert de fire-rij als vangnet); de toelichting zegt wat het lab
+          // dáár wél vastlegt: of het plan reikt.
           fireAgeNietVanToepassing={
             isFixedAnchorMode && planAnchor.kind !== 'solved'
-              ? fireAgeGoalNotApplicableReason(
-                  planAnchor.kind,
-                  ankerStop != null && ankerStop.kind !== 'now' ? ankerStop.stopAge : null,
+              ? dekkingSheetToelichting(
+                  ankerStop ?? (planAnchor.kind === 'age' ? { kind: 'age', stopAge: planAnchor.age } : { kind: 'now' }),
                   simResult?.displayEndAge ?? initialData.firePlan?.endAge ?? null,
                 )
               : null
@@ -7076,11 +7275,16 @@ export default function HorizonPage({
                       {/* De grondslag hoort in beeld: op wélk scenario (en welke stopleeftijd) rekenen
                           deze assen? Zelfde gelande bron als de assen zelf (duidingStopAge). */}
                       <p className="mb-3 font-sans text-[12px] text-[var(--ink-3)]">
-                        {stopPad != null && duidingStopAge != null
+                        {/* ADR 0145 — onder een vast stopmoment rekent de radar op het plan
+                            (of op een verkend stopmoment); onder `solved` blijft de tekst van vandaag. */}
+                        {(isFixedAnchorMode
+                          ? radarSubtitel({ stop: ankerStop, verkendStopAge: stopPad != null ? duidingStopAge : null })
+                          : null) ??
+                          (stopPad != null && duidingStopAge != null
                           ? `Vier dekkingsratio’s — gerekend op je doelscenario: stoppen op ${formatAge(duidingStopAge)} jr.`
                           : scenarioVerwachtFireAge != null
                             ? `Vier dekkingsratio’s — gerekend op je verwachte pad (vrij rond ${formatAge(scenarioVerwachtFireAge)} jr).`
-                            : 'Vier dekkingsratio’s — op elk front.'}
+                            : 'Vier dekkingsratio’s — op elk front.')}
                       </p>
                       <Dekkingsradar assen={radarAssen} />
                     </div>

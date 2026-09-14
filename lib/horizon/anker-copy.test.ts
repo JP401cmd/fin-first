@@ -16,6 +16,20 @@ import {
   ankerZinKort,
   fireAgeGoalNotApplicableReason,
   formatStopAge,
+  dekkingSheetToelichting,
+  dekkingPreviewWaarde,
+  planCoverageKaartSubregel,
+  planCoverageGoalNotApplicableReason,
+  vrijheidsgetalGoalNotApplicableReason,
+  dekkingVerkenZin,
+  dekkingBadge,
+  dekkingDeltaBadge,
+  dekkingAsNotitie,
+  radarSubtitel,
+  radarEindstrategieAnkerReden,
+  dekkingTekortHintZin,
+  dekkingTekortHintKnop,
+  dekkingVastgelegdToast,
   type AnkerReach,
   type AnkerStop,
 } from './anker-copy'
@@ -172,6 +186,145 @@ describe('toon — de harde randvoorwaarden, over ALLE ankers gedraaid', () => {
       const n = fireAgeGoalNotApplicableReason(a, 62, 90)
       expect(n).not.toMatch(/je kunt (nu )?(al )?stoppen|oneindig|\bAOW\b/i)
     }
+  })
+})
+
+// ── ADR 0145 — dekking als uitkomst van het lab (zinnen B6, compliance 14 sep 2026) ──
+
+describe('dekking-zinnen — de vastgestelde kopij', () => {
+  const AGE: AnkerStop = { kind: 'age', stopAge: 58.5 }
+  const AOW: AnkerStop = { kind: 'aow', stopAge: 67 }
+
+  it('1 · sheet-toelichting', () => {
+    expect(dekkingSheetToelichting(AGE, 90)).toBe(
+      'Je stopmoment ligt vast op 58,5. Het lab legt daarom geen vrijheidsleeftijd vast, maar of je plan tot je 90e reikt.',
+    )
+    expect(dekkingSheetToelichting(AOW, null)).toBe(
+      'Je stopmoment ligt vast op 67. Het lab legt daarom geen vrijheidsleeftijd vast, maar of je plan tot je eindleeftijd reikt.',
+    )
+  })
+
+  it('2 · preview-rij "Plan gedekt"', () => {
+    expect(dekkingPreviewWaarde(78.4, 100, 90)).toBe('nu 78% → 100% · doel 100% tot je 90e')
+  })
+
+  it('3 · kaart-subregel: age met getal, aow met "je AOW-leeftijd" (instellingslabel, geen tekortzin)', () => {
+    expect(planCoverageKaartSubregel(90, 'age', 58.5)).toBe('tot je 90e · stopmoment 58,5')
+    expect(planCoverageKaartSubregel(90, 'aow', null)).toBe('tot je 90e · stopmoment je AOW-leeftijd')
+    expect(planCoverageKaartSubregel(90, null, null)).toBe('tot je 90e')
+  })
+
+  it('4 · plan_coverage n.v.t. onder solved', () => {
+    expect(planCoverageGoalNotApplicableReason()).toBe(
+      'De app zoekt je stopmoment zelf, dus dit doel heeft geen uitkomst om naar te kijken. Wat telt, is vanaf welke leeftijd werken een keuze wordt.',
+    )
+  })
+
+  it('5 · vrijheidsgetal n.v.t. onder een vast anker', () => {
+    expect(vrijheidsgetalGoalNotApplicableReason('age', 62, 90)).toBe(
+      'Je stopmoment ligt vast op 62, dus er is geen doelvermogen om naartoe te sparen. Wat telt, is of je plan tot je 90e reikt.',
+    )
+    expect(vrijheidsgetalGoalNotApplicableReason('now', null, 90)).toMatch(/^Je rekent alsof je nu stopt, dus er is geen doelvermogen/)
+    expect(vrijheidsgetalGoalNotApplicableReason('aow', 67, null)).toContain('tot je eindleeftijd reikt')
+  })
+
+  it('6 · verken-samenvatting', () => {
+    expect(dekkingVerkenZin({ basisPct: 65.2, scenarioPct: 100, reikt: 90 })).toBe('Wat-als actief — plan gedekt 65% → 100%, reikt tot je 90e')
+    expect(dekkingVerkenZin({ basisPct: 65.2, scenarioPct: 80, reikt: null })).toBe('Wat-als actief — plan gedekt 65% → 80%')
+  })
+
+  it('7 · badge en delta-badge', () => {
+    expect(dekkingBadge(65.2)).toBe('65% gedekt')
+    expect(dekkingDeltaBadge(12.4)).toBe('+12% gedekt')
+    expect(dekkingDeltaBadge(-3.6)).toBe('−4% gedekt')
+    expect(dekkingDeltaBadge(0.3)).toBe('gelijk')
+  })
+
+  it('8 · Vrijheidsas-notitie: tekort met dekking, gedekt zonder iets vast te leggen, onbekend → null', () => {
+    expect(dekkingAsNotitie({ kind: 'reikt-tot', age: 82, endAge: 90 }, 65.2, 90)).toBe(
+      'Je plan reikt nu tot je 82e — 65% gedekt. Draai aan de knoppen om te zien wat dat verandert.',
+    )
+    expect(dekkingAsNotitie({ kind: 'gedekt', endAge: 90 }, 100, 90)).toBe(
+      'Je plan is gedekt tot je 90e. Verkennen kan; er is niets vast te leggen.',
+    )
+    expect(dekkingAsNotitie({ kind: 'nu-op' }, 0, 90)).toContain('0% gedekt')
+    expect(dekkingAsNotitie({ kind: 'onbekend' }, null, 90)).toBeNull()
+  })
+
+  it('9 · radar-subtitel: plan · verkend · nu · solved (null = UI houdt haar tekst)', () => {
+    expect(radarSubtitel({ stop: AGE, verkendStopAge: null })).toBe("Vier dekkingsratio's — gerekend op je plan: stoppen op 58,5.")
+    expect(radarSubtitel({ stop: AOW, verkendStopAge: 62 })).toBe(
+      "Vier dekkingsratio's — gerekend op een verkend stopmoment: stoppen op 62 jr; je plan rekent met 67.",
+    )
+    expect(radarSubtitel({ stop: { kind: 'now' }, verkendStopAge: null })).toBe("Vier dekkingsratio's — je rekent alsof je nu stopt.")
+    expect(radarSubtitel({ stop: null, verkendStopAge: 60 })).toBeNull()
+  })
+
+  it('10 · radar-as 4 reden', () => {
+    expect(radarEindstrategieAnkerReden()).toBe(
+      'Onder een vast stopmoment is er geen doelvermogen om het eindvermogen tegen af te zetten — de dekking hiernaast zegt of je plan reikt.',
+    )
+  })
+
+  it('11 · tekort-hint (plan-variant) + knop "Reken met € {hint} extra inleg"', () => {
+    expect(dekkingTekortHintZin({ stop: AOW, endAge: 90, hint: 1250.4, dagen: 6.6 })).toBe(
+      "Om je plan tot je 90e te laten reiken als je op 67 stopt, hoort daar zo'n €1.250 per maand extra sparen bij, bovenop wat je nu opzij zet — omgerekend 7 dagen vrijheid per maand.",
+    )
+    expect(dekkingTekortHintKnop(1250.4)).toBe('Reken met € 1.250 extra inleg')
+    expect(dekkingTekortHintKnop(1250.4)).not.toMatch(/^Zet /)
+  })
+
+  it('12 · toast', () => {
+    expect(dekkingVastgelegdToast(90)).toBe('Je verkenning is nu je doel — de app volgt of je plan tot je 90e reikt.')
+  })
+})
+
+describe('dekking-zinnen — toon-invarianten over alle ankers', () => {
+  const STOPS_VAST: readonly AnkerStop[] = [
+    { kind: 'aow', stopAge: 67 },
+    { kind: 'age', stopAge: 58.5 },
+    { kind: 'now' },
+  ]
+  const TEKORT_REACHES: readonly AnkerReach[] = [
+    { kind: 'reikt-tot', age: 82, endAge: 90 },
+    { kind: 'reikt-tot', age: 82, endAge: null },
+    { kind: 'nu-op' },
+  ]
+
+  it('tekortzinnen: beschrijvend, nooit aansporend, nooit oneindig, nooit AOW', () => {
+    for (const stop of STOPS_VAST) {
+      const zinnen = [
+        dekkingSheetToelichting(stop, 90),
+        dekkingTekortHintZin({ stop, endAge: 90, hint: 300, dagen: 2 }),
+        dekkingTekortHintKnop(300),
+        radarSubtitel({ stop, verkendStopAge: null }) ?? '',
+        radarSubtitel({ stop, verkendStopAge: 62 }) ?? '',
+        ...TEKORT_REACHES.map((r) => dekkingAsNotitie(r, 40, 90) ?? ''),
+        dekkingVerkenZin({ basisPct: 40, scenarioPct: 60, reikt: 84 }),
+        dekkingBadge(40),
+        dekkingDeltaBadge(20),
+        radarEindstrategieAnkerReden(),
+        dekkingVastgelegdToast(90),
+        planCoverageGoalNotApplicableReason(),
+      ]
+      for (const zin of zinnen) {
+        expect(zin).not.toMatch(/je kunt (nu )?(al )?stoppen/i)
+        expect(zin).not.toMatch(/stop met werken/i)
+        expect(zin).not.toMatch(/oneindig|eeuwig|voorgoed|voor altijd/i)
+        expect(zin).not.toMatch(/\bAOW\b/i)
+        expect(zin).not.toMatch(/\bmoet\b/i)
+      }
+    }
+    for (const a of ['aow', 'now', 'age'] as const) {
+      expect(vrijheidsgetalGoalNotApplicableReason(a, 62, 90)).not.toMatch(/je kunt (nu )?(al )?stoppen|oneindig|\bAOW\b/i)
+    }
+  })
+
+  it('de hint is een som, geen instructie: "hoort daar … bij", en het vrijheidstijd-equivalent staat erbij', () => {
+    const zin = dekkingTekortHintZin({ stop: { kind: 'age', stopAge: 60 }, endAge: 90, hint: 300, dagen: 2 })
+    expect(zin).toContain('hoort daar')
+    expect(zin).toMatch(/dagen vrijheid per maand/)
+    expect(zin).not.toMatch(/\bleg\b|\bspaar\b/i)
   })
 })
 

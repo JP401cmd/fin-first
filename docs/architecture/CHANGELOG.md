@@ -1004,3 +1004,9 @@
 
 - **API-routes** toegevoegd: /api/assets/[id]/expected-return, /api/life-events/strategie
 - **Componenten (aantal)** toegevoegd: +11
+
+## 2026-09-14
+
+- **Schermen** verwijderd: /toekomst/whatif
+- **API-routes** verwijderd: /api/scenarios, /api/whatif/suggest
+- **Componenten (aantal)** verwijderd: -16

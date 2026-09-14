@@ -1,8 +1,28 @@
 import { describe, it, expect } from 'vitest'
 import {
+  formatGoalAmount,
   selectOptimizationOpportunities,
   type OptimizationBudgetRow,
 } from './wil-context'
+
+// ADR 0145 (context-formattering): doelwaarden gaan in de EENHEID van het doeltype de
+// prompt in — een dekkings- of spaarquote-doel niet meer als "€78/€100".
+describe('formatGoalAmount', () => {
+  it('formatteert per doeltype: %, jaar, EUR/mnd', () => {
+    expect(formatGoalAmount(78.4, 'plan_coverage')).toBe('78,4%')
+    expect(formatGoalAmount(100, 'plan_coverage')).toBe('100,0%')
+    expect(formatGoalAmount(45, 'savings_rate')).toBe('45,0%')
+    expect(formatGoalAmount(58.5, 'fire_age')).toBe('58,5 jaar')
+    expect(formatGoalAmount(1500, 'passive_income')).toBe('€1.500/mnd')
+  })
+
+  it('euro-doelen ongewijzigd; een niet-canoniek of ontbrekend type valt terug op euro', () => {
+    expect(formatGoalAmount(25000, 'savings')).toBe('€25.000')
+    expect(formatGoalAmount(25000, 'wealth')).toBe('€25.000')
+    expect(formatGoalAmount(25000, null)).toBe('€25.000')
+    expect(formatGoalAmount(25000, undefined)).toBe('€25.000')
+  })
+})
 
 /**
  * De optimalisatiekansen die De Wil in zijn prompt krijgt. Sinds de norm van

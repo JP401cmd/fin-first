@@ -326,6 +326,10 @@ Kriticiteit: **KERN** = raakt financiële uitkomsten of gebruikersdata · **BELA
 | WF-TOEK-31 | Tijdas in huishoud- of partnerperspectief bekijken | De gezamenlijke of partner-vrijheidshorizon bekijken met gecombineerde FIRE-cijfers en partner-markers. | BELANGRIJK | ja | 3 |
 | WF-TOEK-32 | Verdieping onder de grafiek: trends en geplande acties | Het verloop van gezondheid en FIRE-leeftijd volgen en geplande acties afwerken. | OVERIG | ja | 2 |
 
+*(WF-TOEK-33 t/m 48 zijn later toegevoegd rechtstreeks in de code — `lib/uat/catalog.ts` + `lib/uat/acceptance/toek.ts` — en nooit in deze tabel teruggeschreven; bestaande drift, hier niet met terugwerkende kracht gedicht. WF-TOEK-49 hieronder is nieuw op 14 sep 2026.)*
+
+| WF-TOEK-49 | Het lab volgt het anker: dekking als uitkomst onder een vast stopmoment | Onder `solved` blijft het lab de vrijheidsleeftijd bewegen; onder een vast stopmoment (aow/age/now) beweegt het de DEKKING ("reikt tot je 82e → 90e") — "Plan gedekt" is daar de spiegel van "Vrij op X jaar", met dezelfde gate (nooit onder `nu`, nooit bij een al-gedekt plan, nooit op een kale stopkeuze alleen). | KERN | ja | 3 |
+
 ### Rekentools (WF-REKEN)
 
 VERVALLEN (14 sep 2026, ADR 0144 "De Wat-Als-pagina gaat op in de tijdas"): WF-REKEN-12, 13, 14, 15, 16, 18, 19, 20 zijn met de standalone Wat-Als-pagina (`/toekomst/whatif`) verwijderd — zie de markering per rij hieronder. Het inline-slider-gedrag op de tijdas zelf ("Verken je aannames") blijft bestaan als WF-TOEK-10.
@@ -5198,6 +5202,26 @@ Scope: /toekomst (tijdas-landing), /toekomst/doelen, /toekomst/gebeurtenissen, /
   - Geen acties: sectie verschijnt niet.
   - Eenvoudig-modus: beide blokken verborgen.
 - **Cross-module effecten:** acties zijn gedeeld met De Wil (recommendation/actions-domein).
+
+*(WF-TOEK-33 t/m 48 ontbreken hier — zie de tabel-noot hierboven. WF-TOEK-49 sluit hier rechtstreeks op aan omdat hij nieuw is.)*
+
+#### WF-TOEK-49 — Het lab volgt het anker: dekking als uitkomst onder een vast stopmoment (ADR 0145)
+- **Doel:** De gebruiker die stopt op een vast stopmoment (AOW, een zelfgekozen leeftijd, of "nu") krijgt uit hetzelfde lab een uitkomst die bij dat anker past — niet een vrijheidsleeftijd die per constructie al vaststaat, maar of en hoezeer zijn plan tot de eindleeftijd reikt.
+- **Trigger/startpunt:** Katern II "Verken je aannames" op /toekomst (hetzelfde lab als WF-TOEK-10), onder een plan met anker `aow`/`age`/`now`.
+- **Eindresultaat:** Onder een tekort en een verkend scenario toont het lab de dekking (basis% → scenario%, "reikt tot je …e") i.p.v. een vrijheidsleeftijd-delta; "Maak dit mijn doel" legt — waar aangeboden — een `plan_coverage`-doel "Plan gedekt tot {eind} jaar" vast i.p.v. een `fire_age`-doel.
+- **Stappen:**
+  1. Onder `solved`: verschuif een knop → ongewijzigd gedrag, uitkomst blijft de vrijheidsleeftijd-delta.
+  2. Onder aow/age met een TEKORT: verschuif een knop (of alleen de stopleeftijd-slider) → de sectie leest "Wat-als actief — plan gedekt {basis}% → {scenario}%"; bij een kale stopkeuze (geen knop-beweging) blijft "Maak dit mijn doel" verborgen.
+  3. Onder aow/age zonder tekort (volledig gedekt): verken vrij → geen promotieknop, wel "Doel loslaten" als er al een doel ligt.
+  4. Onder `now`: verken vrij → dekking zichtbaar, nooit een promotieknop; vastleggen via de route geeft 400.
+  5. Leg (bij 2) het scenario vast → de sheet toont de vaste rij "Plan gedekt" (geen vrijheidsleeftijd-rij); na opslaan toont `/toekomst/doelen` "Plan gedekt tot {eind} jaar — nu X% van 100%".
+- **Schermen/componenten:** lib/horizon/lab-uitkomst.ts (`resolveLabUitkomst`, de uitkomst-switch + gate); lib/horizon/anker-copy.ts (de dekkingszinnen); lib/horizon/toekomst-doel.ts (`buildParameterGoalRows`, parameter `dekking` → `plan_coverage`); app/api/toekomst-doel/route.ts (het anker is server-bepaald: `now` → 400, `solved`+dekking → 400, een vast anker stript `fire` en de stopkeuze uit de doelstand); lib/goal-current-value.ts (dekking als `current_value` onder een vast anker; `n.v.t.` onder `solved`); lib/horizon/dekkingsradar.ts (as 4 `n.v.t.` onder een vast anker bij behoud); components/app/horizon/horizon-client.tsx + vrijheidsas.tsx (de UI-wiring).
+- **Kriticiteit:** KERN
+- **Rekenend:** ja — dekking = `computeRunwayCoveragePct` (lib/core-metrics.ts), letterlijk de loader-formule; geen tweede berekening.
+- **Varianten & randgevallen:**
+  - Anker-wissel (solved → age bij een bestaand `fire_age`-parameterdoel): de kaart wordt `n.v.t.`; de eerstvolgende "Doel bijwerken" verwijdert de `fire_age`-rij en schrijft `plan_coverage`.
+  - Het vrijheidsgetal-doel krijgt onder een vast anker een `n.v.t.`-reden (voorheen viel het stil terug op de opgeslagen waarde).
+- **Cross-module effecten:** /toekomst/doelen (nieuw doeltype `plan_coverage`); de Dekkingsradar (katern III, as 4).
 
 ---
 
@@ -11380,6 +11404,17 @@ WF-TOEK-31 (tijdas in huishoud-/partnerperspectief) → gedekt door UAT-NAV-19 (
 - **Kriticiteit:** OVERIG · **Platform:** webapp · **Rooktest:** nee · **Duur:** ~3 min
 - **Preconditie:** persona `willem` geladen
 - **a. Happy path:** klap "Gezondheid" open in het verloop-grid → *verwacht:* trendlijn o.b.v. snapshots; open de kassabon "Financiële Gezondheid" → *verwacht:* uitsplitsing van het gezondheidsgetal (consume-only, zelfde bron als elders in de app); scroll naar "Geplande acties (komend jaar)" → wijzig de status van een actie op een ActionCard → *verwacht:* status-wijziging wordt direct zichtbaar en is ook zichtbaar in De Wil (gedeeld domein). Zet weergavemodus op "Eenvoudig" → *verwacht:* beide blokken verborgen.
+
+*(UAT-TOEK-33 t/m 48 ontbreken hier — zie de tabel-noot in Deel 1. UAT-TOEK-49 sluit hier rechtstreeks op aan omdat hij nieuw is.)*
+
+#### UAT-TOEK-49 — Het lab volgt het anker: dekking als uitkomst onder een vast stopmoment (dekt WF-TOEK-49, ADR 0145)
+- **Kriticiteit:** KERN · **Platform:** webapp, mobiel · **Rooktest:** nee · **Duur:** ~8 min
+- **Preconditie:** een plan met een vast stopmoment (`aow` of `age`) en een tekort (het liquide vermogen raakt op vóór de eindleeftijd) — bv. persona `willem` met een AOW-anker en eindleeftijd 90 (zie UAT-TOEK-46), maar dan met een uitputtingsmaand vóór het plan-einde i.p.v. Willems eigen (ongespecificeerde) dekkingscijfer. Zie de synthetische fixture in `lib/horizon/lab-uitkomst.test.ts` (`AOW_TEKORT`) voor de exacte, hand-narekenbare getallen.
+- **a. Happy path (tekort, verkend):** open katern II "Verken je aannames" → *verwacht:* de sectie leest "Wat-als actief — plan gedekt {basis}% → {scenario}%, reikt tot je {reikt}e" i.p.v. een vrijheidsleeftijd-delta; verschuif een knop → het percentage beweegt mee; klik "Maak dit mijn doel" → *verwacht:* de sheet toont de vaste rij "Plan gedekt" ("nu {basis}% → {scenario}% · doel 100% tot je {eind}e"), GEEN vrijheidsleeftijd-rij; na bevestigen toont `/toekomst/doelen` "Plan gedekt tot {eind} jaar — nu X% van 100%".
+- **b. Randgeval (tekort, alleen een stopkeuze):** verschuif uitsluitend de stopleeftijd-slider (geen knop) → *verwacht:* "Maak dit mijn doel" blijft verborgen — een kale stopkeuze is onder een vast anker geen doelstand (D4); de Vrijheidsas-notitie leest wel "Je plan reikt nu tot je {reikt}e — {pct}% gedekt. Draai aan de knoppen om te zien wat dat verandert."
+- **c. Randgeval (volledig gedekt):** hetzelfde plan zonder tekort → *verwacht:* geen promotieknop, ook niet met een verkend scenario; de Vrijheidsas-notitie leest "Je plan is gedekt tot je {eind}e. Verkennen kan; er is niets vast te leggen."; "Doel loslaten" blijft beschikbaar als er al een doel ligt.
+- **d. Foutpad (`now`-anker):** open het lab onder een plan dat rekent alsof je nu stopt → *verwacht:* dekking zichtbaar, geen promotieknop; een handmatige `PUT /api/toekomst-doel` met een doel → 400 (`anchor_now`); een bestaand doel toont alleen "Doel loslaten". Test ook `solved` + `dekking` in de body → 400 (`dekking_vereist_vast_anker`).
+  **Berekening verwachting (toetsvorm a — exact):** `resolveLabUitkomst` levert op de AOW-tekort-fixture `basisPct` identiek aan `computeRunwayCoveragePct` op dezelfde kernel-velden (identiteitstoets, geen tweede formule); de gate-uitkomst per toestand (solved/tekort-met-scenario/tekort-zonder-scenario/gedekt/nu) is exact vastgelegd in `lib/uat/acceptance/toek-checks.ts` (WF-TOEK-49) en in het committed `lib/horizon/lab-uitkomst.test.ts`.
 
 ---
 
