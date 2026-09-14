@@ -539,7 +539,11 @@ describe('solveFireAgeWithoutAnchor — "vrij mogelijk vanaf" (D7/B9)', () => {
 
     const rauw: ConvergentieRawProfileRow = { ...zwaar, fire_stop_anchor: 'age', fire_stop_age: 62, net_monthly_income: 0 }
     const ctx = (p: ConvergentieRawProfileRow) => makeCtx({ profile: p, yearlyExpenses: uitgaven, verwachtFireAge: verwacht })
-    expect(solveFireAgeWithoutAnchor(ctx(rauw))).not.toBe(verwacht)
+    const rauwLeeftijd = solveFireAgeWithoutAnchor(ctx(rauw))
+    // Niet-null eerst: anders zou een terugval naar het oorspronkelijke defect (null)
+    // de ongelijkheid hieronder triviaal groen laten.
+    expect(rauwLeeftijd).not.toBeNull()
+    expect(rauwLeeftijd).not.toBe(verwacht)
 
     const geinjecteerd = withResolvedKernelBedragen(rauw, {
       monthlyIncome: profile.net_monthly_income as number,
