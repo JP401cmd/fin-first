@@ -127,6 +127,7 @@ import { Dekkingsradar } from '@/components/app/horizon/dekkingsradar'
 import { ScenarioKaarten } from '@/components/app/horizon/scenario-kaarten'
 import { computeDekkingsradar, type RadarAs } from '@/lib/horizon/dekkingsradar'
 import { type ScenarioPresetResult } from '@/lib/horizon/scenario-presets'
+import { withResolvedKernelBedragen } from '@/lib/horizon/kernel-profile-basis'
 import { computeStopMarge } from '@/lib/horizon/stop-marge'
 import { buildVrijheidsleeftijdZin } from '@/lib/horizon/vrijheidsleeftijd-zin'
 import { selectDoelLijnBron } from '@/lib/horizon/doel-lijn-bron'
@@ -1985,18 +1986,41 @@ export default function HorizonPage({
   // duiding-sectie (bijna) in beeld komt (`duidingInView`) én via de web worker (of synchrone
   // fallback) — niet meer eager in idle op de main thread. Leunt erop dat de sliders de
   // hoofd-input niet muteren (het scenario loopt via het gescheiden scenario-veld).
+  //
+  // ── Het STOP-ANKER van het plan — de énige sleutel (ADR 0129, ontwerpprincipe 1) ──
+  // Uit de kernel-echo van de run (`simResult.stopAnker`); vóór de run het plan-anker
+  // uit de bundel. `isFixedAnchor` is DE toets op "het stopmoment ligt vast"; nooit
+  // meer een string-vergelijking op de strategienaam ('pensioen'/'nu-stoppen').
+  // Hier gedeclareerd (vóór het effect hieronder) omdat de dependency-array tijdens
+  // de render wordt geëvalueerd — een latere `const` zou daar in de TDZ vallen.
+  const planAnchor: StopAnchor = simResult
+    ? stopAnchorFromKernel(simResult.stopAnker)
+    : (initialData.firePlan?.anchor ?? { kind: 'solved' })
+  const isFixedAnchorMode = isFixedAnchor({ anchor: planAnchor })
   useEffect(() => {
-    if (displayMode !== 'full' || !duidingInView) { setScenarioPresets(null); setScenarioPresetsLoading(false); return }
+    // Onder een VAST anker draagt de batch de tweede run ("vrij mogelijk vanaf", ADR 0129
+    // D7) die de hero-tegel bovenaan voedt — die mag niet wachten tot de gebruiker naar de
+    // duiding scrolt (lab-haalbaarheid Task 0, 15 sep 2026: tegel bleef "—", en met
+    // `?whatif=open` haakte de observer soms nooit aan). Onder `solved` blijft het lui.
+    const presetBatchNodig = isFixedAnchorMode || (displayMode === 'full' && duidingInView)
+    if (!presetBatchNodig) { setScenarioPresets(null); setScenarioPresetsLoading(false); return }
     if (!kernelRawProfile || !effectiveInput || currentAge == null) return
     const yearlyExp = effectiveInput.yearlyMustExpenses > 0 ? effectiveInput.yearlyMustExpenses : 0
-    if (yearlyExp <= 0) return
+    // Zonder uitgaven-grondslag draait er geen batch — ook dan geen eindeloze rekenstand.
+    if (yearlyExp <= 0) { setSolvedRun({ fireAge: null, endAge: null }); return }
     const strat = fireStrategy ?? DEFAULT_FIRE_STRATEGY
     const downsizeActief =
       initialData.housingStrategy.mode === 'downsize' || initialData.housingStrategy.mode === 'reverse_mortgage'
     setScenarioPresetsLoading(true)
     let cancelled = false
     runScenarioPresetsAsync({
-      profile: kernelRawProfile,
+      // ADR 0103 × ADR 0129 D7 — dezelfde grondslag-injectie als elke andere kernel-run
+      // (use-horizon-fire-sim.ts#kernelProfileWithBasis): onder een budget-/transactie-
+      // grondslag is de rauwe `net_monthly_income` 0/null.
+      profile: withResolvedKernelBedragen(kernelRawProfile, {
+        monthlyIncome: effectiveInput.monthlyIncome,
+        monthlyExpenses: effectiveInput.monthlyExpenses,
+      }),
       assets: initialData.assets ?? [],
       debts,
       lifeEvents: events,
@@ -2019,11 +2043,15 @@ export default function HorizonPage({
       })
       .catch((err) => {
         console.warn('[horizon-worker] preset-run faalde', err)
-        if (!cancelled) setScenarioPresetsLoading(false)
+        if (cancelled) return
+        setScenarioPresetsLoading(false)
+        // Een gefaalde batch beëindigt de rekenstand van de hero-tegel ("wordt berekend"):
+        // géén leeftijd, maar ook geen eindeloos wachten.
+        setSolvedRun({ fireAge: null, endAge: null })
       })
     return () => { cancelled = true }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [displayMode, duidingInView, kernelRawProfile, simResult?.fireAgeFractional, currentAge, debts, events, aowRows, fireStrategy, initialData])
+  }, [displayMode, duidingInView, isFixedAnchorMode, kernelRawProfile, effectiveInput?.monthlyIncome, effectiveInput?.monthlyExpenses, simResult?.fireAgeFractional, currentAge, debts, events, aowRows, fireStrategy, initialData])
 
   // Deeplink `?whatif=open` (en ScenarioChip-klik) → scroll naar de slider-lab.
   // De sectie start ingeklapt — eerst openklappen, dan scrollen, anders landt
@@ -2443,14 +2471,7 @@ export default function HorizonPage({
       })
     : (firstPaintFreedomPct ?? fire?.freedomPercentage ?? 0)
 
-  // ── Het STOP-ANKER van het plan — de énige sleutel (ADR 0129, ontwerpprincipe 1) ──
-  // Uit de kernel-echo van de run (`simResult.stopAnker`); vóór de run het plan-anker
-  // uit de bundel. `isFixedAnchor` is DE toets op "het stopmoment ligt vast"; nooit
-  // meer een string-vergelijking op de strategienaam ('pensioen'/'nu-stoppen').
-  const planAnchor: StopAnchor = simResult
-    ? stopAnchorFromKernel(simResult.stopAnker)
-    : (initialData.firePlan?.anchor ?? { kind: 'solved' })
-  const isFixedAnchorMode = isFixedAnchor({ anchor: planAnchor })
+  // (`planAnchor` / `isFixedAnchorMode` staan hoger, vóór het preset-batch-effect dat ze leest.)
   // Pensioen-WEERGAVE: alleen het aow-anker splitst de grafiek en de fasebalk op de
   // AOW-leeftijd (`planningMode: 'pensioen'`); `now`/`age` splitsen op het anker via
   // de gewone FIRE-weergave. Het is een grafiek-keuze, geen modus-label.
@@ -5382,6 +5403,7 @@ export default function HorizonPage({
               currentAge={currentAge}
               solvedFireEndAge={solvedRun?.endAge ?? null}
               planEndAge={simResult?.displayEndAge ?? null}
+              solvedPending={isFixedAnchorMode && solvedRun === null}
             />
           )}
 

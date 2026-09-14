@@ -32,6 +32,12 @@ export interface AnkerDrieslagProps {
   solvedFireEndAge?: number | null
   /** De eindleeftijd van het plan zelf (`SimResult.displayEndAge`). */
   planEndAge?: number | null
+  /**
+   * De tweede run is nog onderweg (horizon-client: vast anker én nog geen batch-antwoord).
+   * Zonder leeftijd toont tegel 1 dan "…" / "wordt berekend" in plaats van de
+   * onbereikbaar-kopij — "nog niet berekend" is iets anders dan "niet gevonden".
+   */
+  solvedPending?: boolean
 }
 
 function Tegel({
@@ -66,12 +72,15 @@ export function ankerStopFromView(anker: HeroAnkerView): AnkerStop | null {
   return { kind: anker.soort === 'aow' ? 'aow' : 'age', stopAge: anker.stopAge }
 }
 
-export function AnkerDrieslag({ anker, currentAge, solvedFireEndAge = null, planEndAge = null }: AnkerDrieslagProps) {
+export function AnkerDrieslag({ anker, currentAge, solvedFireEndAge = null, planEndAge = null, solvedPending = false }: AnkerDrieslagProps) {
   const stop = ankerStopFromView(anker)
   const isNow = anker.soort === 'nu'
 
   // Tegel 1 — VRIJ MOGELIJK VANAF
-  const vrijValue = anker.solvedFireAge != null ? String(heroFireAgeYear(anker.solvedFireAge)) : '—'
+  const vrijBerekenen = solvedPending && anker.solvedFireAge == null
+  const vrijValue = anker.solvedFireAge != null
+    ? String(heroFireAgeYear(anker.solvedFireAge))
+    : vrijBerekenen ? '…' : '—'
   const vrijVerleden =
     anker.solvedFireAge != null && currentAge != null && anker.solvedFireAge < currentAge
   const vrijLabel = vrijVerleden ? 'Vrij was mogelijk vanaf' : 'Vrij mogelijk vanaf'
@@ -79,7 +88,7 @@ export function AnkerDrieslag({ anker, currentAge, solvedFireEndAge = null, plan
     solvedFireEndAge != null && planEndAge != null && Math.round(solvedFireEndAge) !== Math.round(planEndAge)
   const vrijCaption =
     anker.solvedFireAge == null
-      ? 'nog geen leeftijd gevonden binnen dit plan'
+      ? vrijBerekenen ? 'wordt berekend' : 'nog geen leeftijd gevonden binnen dit plan'
       : totHonderd
         ? `als je de app had laten rekenen, tot ${Math.round(solvedFireEndAge)}`
         : 'als je de app had laten rekenen'
@@ -109,8 +118,9 @@ export function AnkerDrieslag({ anker, currentAge, solvedFireEndAge = null, plan
           ? 'vanaf vandaag niet gedekt'
           : 'nog niet te bepalen'
 
+  // Tijdens het rekenen geen bijlage-zin: die zou "nog geen leeftijd" beweren.
   const vrijZin =
-    stop != null
+    stop != null && !vrijBerekenen
       ? ankerVrijZin({ solvedFireAge: anker.solvedFireAge, currentAge, stop, gedekt: anker.gedekt })
       : null
 

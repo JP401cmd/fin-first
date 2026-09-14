@@ -54,6 +54,33 @@ describe('AnkerDrieslag — age-anker', () => {
   })
 })
 
+describe('AnkerDrieslag — rekenstand van de tweede run (lab-haalbaarheid Task 0)', () => {
+  it('pending + nog geen leeftijd: "…" met "wordt berekend", niet de onbereikbaar-kopij', () => {
+    const a = anker({ solvedFireAge: null })
+    const { container } = render(<AnkerDrieslag anker={a} currentAge={45} planEndAge={90} solvedPending />)
+    expect(screen.getByTestId('anker-tegel-vrij')).toHaveTextContent('…')
+    expect(screen.getByTestId('anker-tegel-vrij')).toHaveTextContent('wordt berekend')
+    expect(screen.getByTestId('anker-tegel-vrij')).not.toHaveTextContent('—')
+    expect(container.textContent).not.toContain('nog geen leeftijd gevonden binnen dit plan')
+    // De bijlage-zin zou anders "De app vindt binnen dit plan nog geen leeftijd…" zeggen.
+    expect(screen.queryByTestId('anker-vrij-zin')).toBeNull()
+  })
+
+  it('niet pending + geen leeftijd: de bestaande kopij "nog geen leeftijd gevonden binnen dit plan"', () => {
+    const a = anker({ solvedFireAge: null })
+    render(<AnkerDrieslag anker={a} currentAge={45} planEndAge={90} />)
+    expect(screen.getByTestId('anker-tegel-vrij')).toHaveTextContent('—')
+    expect(screen.getByTestId('anker-tegel-vrij')).toHaveTextContent('nog geen leeftijd gevonden binnen dit plan')
+    expect(screen.getByTestId('anker-vrij-zin')).toBeInTheDocument()
+  })
+
+  it('pending maar de leeftijd is er al: het getal wint', () => {
+    render(<AnkerDrieslag anker={anker({})} currentAge={45} planEndAge={90} solvedPending />)
+    expect(screen.getByTestId('anker-tegel-vrij')).toHaveTextContent('55')
+    expect(screen.getByTestId('anker-tegel-vrij')).not.toHaveTextContent('wordt berekend')
+  })
+})
+
 describe('AnkerDrieslag — aow-anker', () => {
   it('caption van het stopmoment is "je AOW-leeftijd"; gemigreerde pensioen-rij krijgt "tot 100" bij de tweede run', () => {
     const a = anker({ soort: 'aow', stopAge: 67.25, reach: { kind: 'gedekt', endAge: 100 }, reachesAge: 100 })

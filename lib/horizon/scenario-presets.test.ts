@@ -14,6 +14,7 @@ import { buildKernelSlotMeta, kernelToUnifiedResult } from '@/lib/horizon-kernel
 import { startNettoLiquide } from '@/lib/horizon-kernel/jaarrand'
 import { depletionMonth } from '@/lib/horizon-kernel/runway'
 import { toSimResult } from '@/lib/unified-projection'
+import { withResolvedKernelBedragen } from '@/lib/horizon/kernel-profile-basis'
 import {
   bridgeForcedStop,
   buildForcedStopSolve,
@@ -513,6 +514,38 @@ describe('solveFireAgeWithoutAnchor — "vrij mogelijk vanaf" (D7/B9)', () => {
   it('AOW-anker: hetzelfde patroon (de opgeloste leeftijd ligt vóór de AOW)', () => {
     const solved = solveFireAgeWithoutAnchor(makeCtx({ profile: { ...profile, fire_stop_anchor: 'aow' } }))
     expect(solved).toBe(VERWACHT_FIRE)
+  })
+
+  // Bijvangst 1 uit de lab-haalbaarheid-spec (15 sep 2026): de batch kreeg in de
+  // client de RAUWE profielrij, waar net_monthly_income onder een budget-/
+  // transactiegrondslag 0/null is. Zonder inkomen vindt de bisectie geen maand
+  // met gap ≥ 0 → null → hero-tegel "—". Met de ADR 0103-injectie (dezelfde als
+  // de hoofdrun) is de leeftijd er wél.
+  //
+  // De standaardfixture (30k) is vandaag al vrij (VERWACHT_FIRE = de huidige leeftijd),
+  // waar inkomen niets verschuift; daarom hier 60k pensioenuitgaven, zodat de
+  // opgeloste leeftijd in de toekomst ligt. In deze fixture draagt de portefeuille
+  // zich zonder inkomen nog wel, dus de rauwe rij solvet niet naar null maar naar een
+  // LATERE leeftijd — hetzelfde defect: de tweede run rekent op de verkeerde grondslag.
+  it('een rauwe rij zonder net_monthly_income solvet naar een verkeerde leeftijd; de ADR 0103-injectie herstelt de leeftijd', () => {
+    const uitgaven = 60_000
+    const zwaar: ConvergentieRawProfileRow = { ...profile, yearly_essential_expenses: uitgaven }
+    const baseline = computeConvergentieProjection({
+      rawContext: { profile: zwaar, assets: fx.assets, debts: fx.debts, lifeEvents: fx.lifeEvents, aowRows: [], yearlyExpenses: uitgaven },
+    })
+    const verwacht = baseline.ok ? baseline.result.fireAgeFractional : null
+    expect(verwacht).not.toBeNull()
+    expect(verwacht as number).toBeGreaterThan(PINNED_AGE + 1)
+
+    const rauw: ConvergentieRawProfileRow = { ...zwaar, fire_stop_anchor: 'age', fire_stop_age: 62, net_monthly_income: 0 }
+    const ctx = (p: ConvergentieRawProfileRow) => makeCtx({ profile: p, yearlyExpenses: uitgaven, verwachtFireAge: verwacht })
+    expect(solveFireAgeWithoutAnchor(ctx(rauw))).not.toBe(verwacht)
+
+    const geinjecteerd = withResolvedKernelBedragen(rauw, {
+      monthlyIncome: profile.net_monthly_income as number,
+      monthlyExpenses: (profile.estimated_monthly_expenses as number | null) ?? 0,
+    })
+    expect(solveFireAgeWithoutAnchor(ctx(geinjecteerd))).toBe(verwacht)
   })
 
   it('een onbruikbaar profiel degradeert zichtbaar naar null (geen throw, geen verzonnen leeftijd)', () => {
