@@ -37,6 +37,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { Check, Circle, Minus } from 'lucide-react'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
+import { FinDots } from '@/components/app/fin-dots'
 import type { RegelEditActionsState } from '@/components/future/regels/types'
 import { PLAN_REVIEW_EDITOR_CONTEXT_URL, type PlanReviewEditorContext } from '@/lib/plan-review/editor-context'
 import { PLAN_REVIEW_EDITORS } from './editors'
@@ -457,9 +458,7 @@ export function PlanReviewPane({
         </button>
       </div>
     ) : !editorContext ? (
-      <p className="text-[var(--ink-3)]" aria-live="polite">
-        Je instellingen worden geladen…
-      </p>
+      <FinLaden>Je instellingen worden geladen…</FinLaden>
     ) : (
       <Editor context={editorContext} onActionsChange={handleEditorActions} onSaved={handleEditorSaved} />
     )
@@ -583,9 +582,7 @@ export function PlanReviewPane({
             </button>
           </div>
         ) : !overzicht ? (
-          <p className="text-sm text-[var(--ink-3)]" aria-live="polite">
-            De app rekent deze stap door…
-          </p>
+          <FinLaden>De app rekent deze stap door…</FinLaden>
         ) : (
           <StapInhoud
             overzicht={overzicht}
@@ -620,9 +617,30 @@ export function PlanReviewPane({
   )
 }
 
+/**
+ * Sectiekop met een kort accentstreepje in de Toekomst-kleur, zodat je in één oogopslag ziet
+ * welk blok je leest. Bewust `horizon-*` en niet `--module-active-*`: op mobiel portalt de pane
+ * naar `document.body`, buiten de /toekomst-layout die die var zet.
+ */
 function Kicker({ children }: { children: React.ReactNode }) {
   return (
-    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--ink-3)]">{children}</p>
+    <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-horizon-700">
+      <span aria-hidden="true" className="inline-block h-px w-5 shrink-0 bg-horizon-500" />
+      {children}
+    </p>
+  )
+}
+
+/** Wachten heeft app-breed één gezicht: Fin in zijn wacht-stand, zoals bij pagina verversen. */
+function FinLaden({ children }: { children: string }) {
+  return (
+    // Alleen aria-live, geen role="status": die rol is gereserveerd voor de opslaan-melding.
+    <div className="flex flex-col items-center gap-2 py-8" aria-live="polite">
+      <span aria-hidden="true">
+        <FinDots size={22} state="thinking" />
+      </span>
+      <p className="font-serif text-[11px] italic leading-none text-horizon-700">{children}</p>
+    </div>
   )
 }
 
@@ -902,9 +920,7 @@ function VoorWieWil({
                 Deze aannames konden niet geladen worden. Sluit de review en probeer het later opnieuw.
               </p>
             ) : (
-              <p className="text-xs text-[var(--ink-3)]" aria-live="polite">
-                Je instellingen worden geladen…
-              </p>
+              <FinLaden>Je instellingen worden geladen…</FinLaden>
             ))}
         </>
       )}
