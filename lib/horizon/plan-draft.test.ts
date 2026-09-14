@@ -12,6 +12,7 @@ import {
   planDraftFromPlan,
   planDraftFromSettings,
   planDraftToFireSettingsBody,
+  shouldAutosavePlanDraft,
   validatePlanDraft,
   type PlanDraft,
   withEndForm,
@@ -173,3 +174,28 @@ describe('withEndForm — perpetual zet de verborgen eindleeftijd op 100 (eigena
     expect(withEndForm({ ...basis, endForm: 'deplete', endAge: 85 }, 'legacy').endAge).toBe(85)
   })
 })
+
+describe('shouldAutosavePlanDraft — de autosave-poort van de strategie-modal (bug 14 sep 2026)', () => {
+  const age55: PlanDraft = { ...basis, anchor: 'age', stopAge: 55 }
+  it('REGRESSIE: direct na hydratie loopt de gedebouncede kopie nog achter op de beginwaarde — dan NIET opslaan', () => {
+    // Given: loadData zette planDraft én savedPlan op het echte plan (age 55); de
+    // 600 ms-debounce draagt nog de beginwaarde (solved). When: het effect vuurt.
+    // Then: geen PUT — anders schrijft de modal de beginwaarde over het echte plan.
+    expect(shouldAutosavePlanDraft({ loading: false, savedPlan: age55, planDraft: age55, debouncedPlan: basis, valid: true })).toBe(false)
+  })
+  it('zodra de debounce de live-invoer heeft ingehaald en die gelijk is aan het opgeslagen plan: niets te doen', () => {
+    expect(shouldAutosavePlanDraft({ loading: false, savedPlan: age55, planDraft: age55, debouncedPlan: age55, valid: true })).toBe(false)
+  })
+  it('een echte wijziging door de gebruiker slaat wél op, pas nadat de debounce is ingehaald', () => {
+    const age58: PlanDraft = { ...basis, anchor: 'age', stopAge: 58 }
+    expect(shouldAutosavePlanDraft({ loading: false, savedPlan: age55, planDraft: age58, debouncedPlan: age55, valid: true })).toBe(false)
+    expect(shouldAutosavePlanDraft({ loading: false, savedPlan: age55, planDraft: age58, debouncedPlan: age58, valid: true })).toBe(true)
+  })
+  it('nooit tijdens laden, zonder opgeslagen plan of met een ongeldig concept', () => {
+    const age58: PlanDraft = { ...basis, anchor: 'age', stopAge: 58 }
+    expect(shouldAutosavePlanDraft({ loading: true, savedPlan: age55, planDraft: age58, debouncedPlan: age58, valid: true })).toBe(false)
+    expect(shouldAutosavePlanDraft({ loading: false, savedPlan: null, planDraft: age58, debouncedPlan: age58, valid: true })).toBe(false)
+    expect(shouldAutosavePlanDraft({ loading: false, savedPlan: age55, planDraft: age58, debouncedPlan: age58, valid: false })).toBe(false)
+  })
+})
+
