@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-13T14:39:42.746Z",
+  "generatedAt": "2026-09-13T22:22:58.834Z",
   "generatedDate": "2026-09-13",
   "repo": {
     "name": "fin",
@@ -191,11 +191,11 @@
   "stats": {
     "routes": 134,
     "routesProduction": 91,
-    "api": 314,
+    "api": 318,
     "tables": 96,
     "migrations": 239,
     "integrations": 25,
-    "components": 1081,
+    "components": 1103,
     "providers": 17,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -2377,6 +2377,22 @@
       ]
     },
     {
+      "url": "/api/assets/[id]/expected-return",
+      "file": "app/api/assets/[id]/expected-return/route.ts",
+      "domain": "assets",
+      "methods": [
+        "PATCH"
+      ]
+    },
+    {
+      "url": "/api/assets/[id]/sale-config",
+      "file": "app/api/assets/[id]/sale-config/route.ts",
+      "domain": "assets",
+      "methods": [
+        "PATCH"
+      ]
+    },
+    {
       "url": "/api/assets/account-number",
       "file": "app/api/assets/account-number/route.ts",
       "domain": "assets",
@@ -3493,6 +3509,15 @@
       ]
     },
     {
+      "url": "/api/life-events/strategie",
+      "file": "app/api/life-events/strategie/route.ts",
+      "domain": "life-events",
+      "methods": [
+        "PUT",
+        "DELETE"
+      ]
+    },
+    {
       "url": "/api/local-ai-gate",
       "file": "app/api/local-ai-gate/route.ts",
       "domain": "local-ai-gate",
@@ -3870,6 +3895,14 @@
       "methods": [
         "GET",
         "PUT"
+      ]
+    },
+    {
+      "url": "/api/plan-review/editor-context",
+      "file": "app/api/plan-review/editor-context/route.ts",
+      "domain": "plan-review",
+      "methods": [
+        "GET"
       ]
     },
     {
@@ -5190,6 +5223,103 @@
       ]
     },
     {
+      "domain": "assets",
+      "label": "Bezittingen",
+      "count": 11,
+      "routes": [
+        {
+          "url": "/api/assets",
+          "file": "app/api/assets/route.ts",
+          "domain": "assets",
+          "methods": [
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/assets/[id]",
+          "file": "app/api/assets/[id]/route.ts",
+          "domain": "assets",
+          "methods": [
+            "PATCH",
+            "DELETE"
+          ]
+        },
+        {
+          "url": "/api/assets/[id]/expected-return",
+          "file": "app/api/assets/[id]/expected-return/route.ts",
+          "domain": "assets",
+          "methods": [
+            "PATCH"
+          ]
+        },
+        {
+          "url": "/api/assets/[id]/sale-config",
+          "file": "app/api/assets/[id]/sale-config/route.ts",
+          "domain": "assets",
+          "methods": [
+            "PATCH"
+          ]
+        },
+        {
+          "url": "/api/assets/account-number",
+          "file": "app/api/assets/account-number/route.ts",
+          "domain": "assets",
+          "methods": [
+            "GET",
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/assets/has-holdings",
+          "file": "app/api/assets/has-holdings/route.ts",
+          "domain": "assets",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/assets/linkable",
+          "file": "app/api/assets/linkable/route.ts",
+          "domain": "assets",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/assets/toggle-budget",
+          "file": "app/api/assets/toggle-budget/route.ts",
+          "domain": "assets",
+          "methods": [
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/assets/toggle-holdings",
+          "file": "app/api/assets/toggle-holdings/route.ts",
+          "domain": "assets",
+          "methods": [
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/assets/toggle-rental",
+          "file": "app/api/assets/toggle-rental/route.ts",
+          "domain": "assets",
+          "methods": [
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/assets/toggle-woonbalans",
+          "file": "app/api/assets/toggle-woonbalans/route.ts",
+          "domain": "assets",
+          "methods": [
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "bank-connect",
       "label": "Bank-connect",
       "count": 10,
@@ -5351,87 +5481,6 @@
           "domain": "ai",
           "methods": [
             "GET",
-            "POST"
-          ]
-        }
-      ]
-    },
-    {
-      "domain": "assets",
-      "label": "Bezittingen",
-      "count": 9,
-      "routes": [
-        {
-          "url": "/api/assets",
-          "file": "app/api/assets/route.ts",
-          "domain": "assets",
-          "methods": [
-            "POST"
-          ]
-        },
-        {
-          "url": "/api/assets/[id]",
-          "file": "app/api/assets/[id]/route.ts",
-          "domain": "assets",
-          "methods": [
-            "PATCH",
-            "DELETE"
-          ]
-        },
-        {
-          "url": "/api/assets/account-number",
-          "file": "app/api/assets/account-number/route.ts",
-          "domain": "assets",
-          "methods": [
-            "GET",
-            "POST"
-          ]
-        },
-        {
-          "url": "/api/assets/has-holdings",
-          "file": "app/api/assets/has-holdings/route.ts",
-          "domain": "assets",
-          "methods": [
-            "GET"
-          ]
-        },
-        {
-          "url": "/api/assets/linkable",
-          "file": "app/api/assets/linkable/route.ts",
-          "domain": "assets",
-          "methods": [
-            "GET"
-          ]
-        },
-        {
-          "url": "/api/assets/toggle-budget",
-          "file": "app/api/assets/toggle-budget/route.ts",
-          "domain": "assets",
-          "methods": [
-            "POST"
-          ]
-        },
-        {
-          "url": "/api/assets/toggle-holdings",
-          "file": "app/api/assets/toggle-holdings/route.ts",
-          "domain": "assets",
-          "methods": [
-            "POST"
-          ]
-        },
-        {
-          "url": "/api/assets/toggle-rental",
-          "file": "app/api/assets/toggle-rental/route.ts",
-          "domain": "assets",
-          "methods": [
-            "POST"
-          ]
-        },
-        {
-          "url": "/api/assets/toggle-woonbalans",
-          "file": "app/api/assets/toggle-woonbalans/route.ts",
-          "domain": "assets",
-          "methods": [
             "POST"
           ]
         }
@@ -6611,6 +6660,30 @@
       ]
     },
     {
+      "domain": "plan-review",
+      "label": "plan-review",
+      "count": 2,
+      "routes": [
+        {
+          "url": "/api/plan-review",
+          "file": "app/api/plan-review/route.ts",
+          "domain": "plan-review",
+          "methods": [
+            "GET",
+            "PUT"
+          ]
+        },
+        {
+          "url": "/api/plan-review/editor-context",
+          "file": "app/api/plan-review/editor-context/route.ts",
+          "domain": "plan-review",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "regression",
       "label": "regression",
       "count": 2,
@@ -7234,6 +7307,22 @@
       ]
     },
     {
+      "domain": "life-events",
+      "label": "life-events",
+      "count": 1,
+      "routes": [
+        {
+          "url": "/api/life-events/strategie",
+          "file": "app/api/life-events/strategie/route.ts",
+          "domain": "life-events",
+          "methods": [
+            "PUT",
+            "DELETE"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "local-ai-gate",
       "label": "local-ai-gate",
       "count": 1,
@@ -7493,22 +7582,6 @@
           "methods": [
             "GET",
             "PATCH"
-          ]
-        }
-      ]
-    },
-    {
-      "domain": "plan-review",
-      "label": "plan-review",
-      "count": 1,
-      "routes": [
-        {
-          "url": "/api/plan-review",
-          "file": "app/api/plan-review/route.ts",
-          "domain": "plan-review",
-          "methods": [
-            "GET",
-            "PUT"
           ]
         }
       ]
@@ -8847,11 +8920,11 @@
     }
   ],
   "components": {
-    "total": 1081,
+    "total": 1103,
     "groups": [
       {
         "group": "app",
-        "count": 428,
+        "count": 430,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -9249,6 +9322,8 @@
           "transaction-form.test",
           "transfer-confirm-sheet",
           "trend-chart",
+          "uitgaven-keuze",
+          "uitgaven-keuze.test",
           "uitgaven-pane",
           "uitleg-chapter",
           "uncategorized-transactions-banner",
@@ -9592,8 +9667,98 @@
         ]
       },
       {
+        "group": "future",
+        "count": 84,
+        "items": [
+          "afbouw-overzicht-card",
+          "afbouw-overzicht-card.test",
+          "aow-strategie-body",
+          "aow-strategie-editor",
+          "box3-methode-body",
+          "box3-methode-sheet",
+          "box3-methode-sheet.test",
+          "calculator-runner",
+          "calculator-to-life-event-sheet",
+          "calculator-to-life-event-sheet.test",
+          "categorie-prio-editor",
+          "categorie-prio-editor.test",
+          "disclaimer-strip",
+          "doel-bewerken-sheet",
+          "doel-bewerken-sheet.test",
+          "doel-loslaten-confirm",
+          "doel-toevoegen-sheet",
+          "doel-toevoegen-sheet.test",
+          "doelen-view",
+          "doelen-view.test",
+          "duplicate-confirm-sheet",
+          "editors",
+          "eindstrategie-body",
+          "eindstrategie-body.nalatenschap.test",
+          "event-bewerken-sheet",
+          "event-bewerken-sheet.test",
+          "fields",
+          "gebeurtenissen-view",
+          "gebeurtenissen-view.test",
+          "housing-strategy-section",
+          "housing-strategy-section.test",
+          "inkomsten-editor",
+          "inkomsten-editor.test",
+          "laag2-editors",
+          "laag2-editors.test",
+          "library-card",
+          "library-filter",
+          "like-button",
+          "onttrekking-afname-body",
+          "onttrekkingsstrategie-body",
+          "onttrekkingsstrategie-body.test",
+          "onttrekkingsvolgorde-body",
+          "onttrekkingsvolgorde-body.test",
+          "order-preset-picker",
+          "order-preset-picker.test",
+          "owner-stats-badge",
+          "pensioen-pot-body",
+          "pensioen-projectie-chart",
+          "pensioen-strategie-editor",
+          "pensioen-strategie-editor.test",
+          "plan-review-pane",
+          "plan-review-pane.test",
+          "plan-review-provider",
+          "pot-flow-diagram",
+          "potten-editor",
+          "potten-editor.test",
+          "publish-curation-sheet",
+          "rate-limit-badge",
+          "regel-bewerken-pane",
+          "rekenhulp-view",
+          "report-sheet",
+          "requirements-checklist",
+          "requirements-chips",
+          "scenario-bibliotheek",
+          "scenario-bibliotheek.test",
+          "shared",
+          "strategie-editors",
+          "strategie-impact",
+          "strategie-modal-shell",
+          "toekomst-nav-cards",
+          "toekomst-nav-cards.test",
+          "toekomst-subpage-shell",
+          "uitgaven-editor",
+          "uitgaven-editor.test",
+          "verdeling-toename-body",
+          "voorkeur-bewerken-body",
+          "voorkeur-bewerken-sheet",
+          "voorkeur-bewerken-sheet.test",
+          "voorkeuren-view",
+          "voorkeuren-view.test",
+          "werk-strategie-body",
+          "werk-strategie-editor",
+          "woning-editor",
+          "woning-editor.test"
+        ]
+      },
+      {
         "group": "core",
-        "count": 80,
+        "count": 82,
         "items": [
           "account-source-icon",
           "account-source-icon.test",
@@ -9666,6 +9831,8 @@
           "rebalancing-settings-section",
           "rental-alternative-comparison",
           "rental-roi-card",
+          "sale-config-fields",
+          "sale-config-fields.test",
           "section-header",
           "vacancy-timeline",
           "verhuurrendement-tab",
@@ -9675,78 +9842,6 @@
           "vermogen-debt-card",
           "vermogen-wealth-group",
           "waardestijging-slider"
-        ]
-      },
-      {
-        "group": "future",
-        "count": 66,
-        "items": [
-          "afbouw-overzicht-card",
-          "afbouw-overzicht-card.test",
-          "aow-strategie-editor",
-          "box3-methode-sheet",
-          "box3-methode-sheet.test",
-          "calculator-runner",
-          "calculator-to-life-event-sheet",
-          "calculator-to-life-event-sheet.test",
-          "categorie-prio-editor",
-          "categorie-prio-editor.test",
-          "disclaimer-strip",
-          "doel-bewerken-sheet",
-          "doel-bewerken-sheet.test",
-          "doel-loslaten-confirm",
-          "doel-toevoegen-sheet",
-          "doel-toevoegen-sheet.test",
-          "doelen-view",
-          "doelen-view.test",
-          "duplicate-confirm-sheet",
-          "eindstrategie-body",
-          "eindstrategie-body.nalatenschap.test",
-          "event-bewerken-sheet",
-          "event-bewerken-sheet.test",
-          "fields",
-          "gebeurtenissen-view",
-          "gebeurtenissen-view.test",
-          "housing-strategy-section",
-          "library-card",
-          "library-filter",
-          "like-button",
-          "onttrekking-afname-body",
-          "onttrekkingsstrategie-body",
-          "onttrekkingsstrategie-body.test",
-          "onttrekkingsvolgorde-body",
-          "onttrekkingsvolgorde-body.test",
-          "order-preset-picker",
-          "order-preset-picker.test",
-          "owner-stats-badge",
-          "pensioen-projectie-chart",
-          "pensioen-strategie-editor",
-          "pensioen-strategie-editor.test",
-          "plan-review-pane",
-          "plan-review-pane.test",
-          "plan-review-provider",
-          "pot-flow-diagram",
-          "publish-curation-sheet",
-          "rate-limit-badge",
-          "regel-bewerken-pane",
-          "rekenhulp-view",
-          "report-sheet",
-          "requirements-checklist",
-          "requirements-chips",
-          "scenario-bibliotheek",
-          "scenario-bibliotheek.test",
-          "shared",
-          "strategie-editors",
-          "strategie-modal-shell",
-          "toekomst-nav-cards",
-          "toekomst-nav-cards.test",
-          "toekomst-subpage-shell",
-          "verdeling-toename-body",
-          "voorkeur-bewerken-sheet",
-          "voorkeur-bewerken-sheet.test",
-          "voorkeuren-view",
-          "voorkeuren-view.test",
-          "werk-strategie-editor"
         ]
       },
       {
@@ -11149,6 +11244,12 @@
           "write": false
         }
       ],
+      "life-events": [
+        {
+          "name": "life_events",
+          "write": true
+        }
+      ],
       "local-ai-gate": [
         {
           "name": "app_settings",
@@ -11464,6 +11565,14 @@
         }
       ],
       "plan-review": [
+        {
+          "name": "aow_leeftijd",
+          "write": false
+        },
+        {
+          "name": "assets",
+          "write": false
+        },
         {
           "name": "profiles",
           "write": true
@@ -12448,6 +12557,8 @@
           "routes": [
             "/api/assets",
             "/api/assets/[id]",
+            "/api/assets/[id]/expected-return",
+            "/api/assets/[id]/sale-config",
             "/api/assets/account-number",
             "/api/assets/linkable",
             "/api/assets/toggle-holdings",
@@ -12596,6 +12707,14 @@
           "write": false,
           "routes": [
             "/api/notifications"
+          ]
+        },
+        {
+          "domain": "plan-review",
+          "label": "plan-review",
+          "write": false,
+          "routes": [
+            "/api/plan-review/editor-context"
           ]
         },
         {
@@ -13213,6 +13332,14 @@
           "write": false,
           "routes": [
             "/api/onboarding/save-own-data"
+          ]
+        },
+        {
+          "domain": "plan-review",
+          "label": "plan-review",
+          "write": false,
+          "routes": [
+            "/api/plan-review/editor-context"
           ]
         },
         {
@@ -14447,6 +14574,14 @@
         }
       ],
       "life_events": [
+        {
+          "domain": "life-events",
+          "label": "life-events",
+          "write": true,
+          "routes": [
+            "/api/life-events/strategie"
+          ]
+        },
         {
           "domain": "onboarding",
           "label": "Onboarding",
@@ -17570,6 +17705,17 @@
       ],
       "summary": "De Toekomst-grafiek rekent, naast bezittingen, schulden en spaarquote, met zo'n veertig keuzes die verspreid staan over acht schermen. Negen daarvan hebben een stille default met groot effect (AOW €0 zonder gebeurtenis, eindleeftijd 90, onttrekkingsprofiel, verdeling bij toename,",
       "file": "docs/adr/0142-plan-review-toekomst-registerplicht.md"
+    },
+    {
+      "id": "0143-een-gebeurtenis-zegt-zelf-tot-wanneer-hij-loopt",
+      "title": "Een blijvende gebeurtenis zegt zelf tot wanneer hij loopt: doorlopend of tot het stopmoment",
+      "status": "aanvaard",
+      "date": "2026-09-13",
+      "elements": [
+        "as-planning"
+      ],
+      "summary": "De keuzehulp \"Wat doe je met extra geld?\" slaat de keuze *beleggen*, *aflossen* of *noodfonds* op als levensgebeurtenis met een maandbedrag en duur 0 (doorlopend). Voor de horizon-kernel is een doorlopende maandbate een Geb-post zonder eind: hij telt in CF!H tot leeftijd 100 — óó",
+      "file": "docs/adr/0143-een-gebeurtenis-zegt-zelf-tot-wanneer-hij-loopt.md"
     }
   ],
   "churn": {
@@ -17585,26 +17731,26 @@
       },
       {
         "path": "app/(app)/toekomst",
-        "commits": 28
+        "commits": 30
       },
       {
         "path": "app/api/ai",
-        "commits": 15
+        "commits": 16
       },
       {
         "path": "app/api/assets",
-        "commits": 13
+        "commits": 15
       },
       {
         "path": "app/api/household",
-        "commits": 12
-      },
-      {
-        "path": "lib/horizon-data.ts",
-        "commits": 8
+        "commits": 13
       },
       {
         "path": "lib/fire-simulation.ts",
+        "commits": 7
+      },
+      {
+        "path": "lib/horizon-data.ts",
         "commits": 7
       },
       {
@@ -17613,7 +17759,7 @@
       },
       {
         "path": "components/horizon",
-        "commits": 4
+        "commits": 5
       }
     ],
     "hotFiles": [
@@ -17625,12 +17771,12 @@
       {
         "file": "components/app/budgets-client.tsx",
         "loc": 5635,
-        "commits": 33
+        "commits": 32
       },
       {
         "file": "components/core/assets-client.tsx",
-        "loc": 4978,
-        "commits": 39
+        "loc": 4742,
+        "commits": 41
       },
       {
         "file": "components/app/cash-account-view.tsx",
@@ -17639,8 +17785,8 @@
       },
       {
         "file": "lib/dashboard-data-loader.ts",
-        "loc": 3118,
-        "commits": 57
+        "loc": 3113,
+        "commits": 59
       },
       {
         "file": "lib/release-notes.ts",
@@ -18807,15 +18953,15 @@
       {
         "label": "API-routes",
         "added": [
-          "/api/plan-review",
-          "/api/profile"
+          "/api/assets/[id]/expected-return",
+          "/api/life-events/strategie"
         ],
         "removed": []
       },
       {
         "label": "Componenten (aantal)",
         "added": [
-          "+10"
+          "+11"
         ],
         "removed": []
       }
@@ -19216,8 +19362,8 @@
     },
     {
       "date": "2026-09-13",
-      "api": 314,
-      "components": 1081,
+      "api": 318,
+      "components": 1103,
       "tables": 96,
       "routesProduction": 91
     }

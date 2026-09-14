@@ -994,3 +994,13 @@
 
 - **API-routes** toegevoegd: /api/plan-review, /api/profile
 - **Componenten (aantal)** toegevoegd: +10
+
+## 2026-09-13
+
+- **API-routes** toegevoegd: /api/assets/[id]/sale-config, /api/plan-review/editor-context
+- **Componenten (aantal)** toegevoegd: +11
+
+## 2026-09-13
+
+- **API-routes** toegevoegd: /api/assets/[id]/expected-return, /api/life-events/strategie
+- **Componenten (aantal)** toegevoegd: +11
