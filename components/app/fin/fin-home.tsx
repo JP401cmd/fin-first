@@ -9,6 +9,7 @@ import { AlertTriangle } from 'lucide-react'
 import { useExecutionMode } from '@/lib/ai/local/use-execution-mode'
 import { usePrivacyMode } from '@/components/app/use-privacy-mode'
 import { AiPrivacyIndicator } from '@/components/app/ai-privacy-indicator'
+import { VragenlijstBadge } from '@/components/app/vragenlijst/vragenlijst-badge'
 import { useChatContext } from '@/components/app/chat/chat-provider'
 import { useOverlayOpen } from '@/lib/hooks/use-scroll-lock'
 import { useOverlayOpen as useOverlaySignalOpen } from '@/lib/overlay-signal'
@@ -293,6 +294,13 @@ export function FinHome({
       <div className="wh-avatar wh-avatar--bubble" aria-hidden>
         <FinDots size={variant === 'slot' ? 28 : 36} state={finState} />
       </div>
+
+      {/* Linksboven: het aantal vragenlijsten dat je nú kunt invullen (ADR
+          0147). Bewuste, door de eigenaar besloten uitzondering op ADR 0130 D2
+          / ADR 0095 ("geen tellers op Fins bubbel") — ADR 0147 legt de
+          betekenis van N eerst vast en de teller daalt alleen door handelen.
+          Rendert niets bij 0 of buiten de VragenlijstSignaalProvider. */}
+      <VragenlijstBadge className="wh-badge" />
 
       {/* Eén plek rechtsboven: normaal het privacy-schildje, maar zodra lokaal
           hier niet kán, wint de waarschuwing — dat is het dringender bericht. */}

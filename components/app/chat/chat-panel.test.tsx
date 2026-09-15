@@ -135,9 +135,21 @@ vi.mock('./melding/melding-view', () => ({
 
 // Vragenlijstmodus: de lijst wordt per test gestuurd, zodat de fetch-stubs van
 // de overige tests niet ook /api/questionnaires hoeven te kennen.
-const vragenlijstenMock = vi.hoisted(() => ({ lijsten: [] as { id: string }[] }))
-vi.mock('./vragenlijst/use-actieve-vragenlijsten', () => ({
-  useActieveVragenlijsten: () => ({ lijsten: vragenlijstenMock.lijsten, geladen: true, herlaad: () => {} }),
+// Sinds ADR 0147 leest ChatPanel het GEDEELDE signaal (één fetch voor chat-kop,
+// teller en popup) i.p.v. zijn eigen hook — dus mocken we de provider-hook.
+const vragenlijstenMock = vi.hoisted(() => ({
+  lijsten: [] as { id: string }[],
+  // Stabiele referentie: ChatPanel hangt `herlaad` aan een effect-dep.
+  herlaad: () => {},
+}))
+vi.mock('@/components/app/vragenlijst/vragenlijst-signaal-provider', () => ({
+  useVragenlijstSignaalOptional: () => ({
+    lijsten: vragenlijstenMock.lijsten,
+    openCount: vragenlijstenMock.lijsten.length,
+    popupKandidaatId: null,
+    geladen: true,
+    herlaad: vragenlijstenMock.herlaad,
+  }),
 }))
 vi.mock('./vragenlijst/vragenlijst-view', () => ({
   VragenlijstView: () => <div>vragenlijst-weergave</div>,

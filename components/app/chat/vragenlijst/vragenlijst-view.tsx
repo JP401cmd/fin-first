@@ -51,6 +51,13 @@ interface VragenlijstViewProps {
   onClose: () => void
   /** Na afronden: laat de container de lijst (en daarmee het icoon) verversen. */
   onVeranderd: () => void
+  /**
+   * Meteen ÉÉN specifieke lijst openen (ADR 0147): wie op "Nu invullen" in de
+   * uitnodigings-popup klikt heeft zijn keuze al gemaakt en hoort niet alsnog
+   * in een keuzescherm te landen. Staat de id niet (meer) in `lijsten` — lijst
+   * ingetrokken, al afgerond — dan valt de view terug op het normale gedrag.
+   */
+  initieelId?: string | null
 }
 
 async function leesFout(res: Response, standaard: string): Promise<string> {
@@ -60,12 +67,14 @@ async function leesFout(res: Response, standaard: string): Promise<string> {
     : standaard
 }
 
-export function VragenlijstView({ lijsten, onClose, onVeranderd }: VragenlijstViewProps) {
+export function VragenlijstView({ lijsten, onClose, onVeranderd, initieelId = null }: VragenlijstViewProps) {
   // Staat er precies één lijst open, dan meteen beginnen: een keuzescherm met
-  // één optie is een extra tik zonder keuze.
-  const [gekozenId, setGekozenId] = useState<string | null>(() =>
-    lijsten.length === 1 && !lijsten[0].has_completed ? lijsten[0].id : null,
-  )
+  // één optie is een extra tik zonder keuze. Een via de popup aangewezen lijst
+  // (`initieelId`) gaat daar nog vóór — mits hij er nog is.
+  const [gekozenId, setGekozenId] = useState<string | null>(() => {
+    if (initieelId && lijsten.some((l) => l.id === initieelId)) return initieelId
+    return lijsten.length === 1 && !lijsten[0].has_completed ? lijsten[0].id : null
+  })
 
   return gekozenId ? (
     <Invullen

@@ -3,9 +3,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
   Plus, Pencil, BarChart3, ChevronUp, ChevronDown, Trash2,
-  AlertTriangle, ToggleLeft, ToggleRight, X,
+  AlertTriangle, ToggleLeft, ToggleRight, X, Send,
 } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
+import { VerspreidingSheet } from '@/components/app/beheer/vragenlijsten/verspreiding-sheet'
 // Amsterdamse tijd i.p.v. de runtime-tijdzone (#418-klasse, sweep fase 1).
 import { formatAmsterdamDayMonthYear } from '@/lib/tz'
 
@@ -54,6 +55,8 @@ interface QuestionnaireSummary {
   question_count: number
   response_count: number
   completed_count: number
+  /** Korte samenvatting van de verspreiding ("iedereen", "3 regels") — ADR 0147. */
+  verspreiding_samenvatting?: string
 }
 
 interface QuestionnaireDetail {
@@ -118,6 +121,8 @@ export default function BeheerVragenlijsten() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [viewingResponsesId, setViewingResponsesId] = useState<string | null>(null)
+  // ADR 0147 — wie krijgt deze lijst te zien? Eigen sheet, eigen bestand.
+  const [verspreidingVoor, setVerspreidingVoor] = useState<QuestionnaireSummary | null>(null)
 
   const [listError, setListError] = useState<string | null>(null)
 
@@ -197,6 +202,9 @@ export default function BeheerVragenlijsten() {
                   <span className="font-mono tabular-nums">{q.question_count} vragen</span>
                   <span className="font-mono tabular-nums">{q.response_count} invullingen</span>
                   <span className="font-mono tabular-nums">{q.completed_count} voltooid</span>
+                  {q.verspreiding_samenvatting && (
+                    <span>verspreiding: {q.verspreiding_samenvatting}</span>
+                  )}
                 </p>
               </div>
               <button type="button" onClick={() => toggleActive(q.id, q.is_active)} title={q.is_active ? 'Deactiveren' : 'Activeren'}>
@@ -211,6 +219,9 @@ export default function BeheerVragenlijsten() {
               <button type="button" onClick={() => setViewingResponsesId(q.id)} className="text-[var(--ink-3)] hover:text-[var(--ink-2)]">
                 <BarChart3 className="h-4 w-4" />
               </button>
+              <button type="button" onClick={() => setVerspreidingVoor(q)} title="Verspreiding" className="text-[var(--ink-3)] hover:text-[var(--ink-2)]">
+                <Send className="h-4 w-4" />
+              </button>
             </div>
           ))}
         </div>
@@ -221,6 +232,15 @@ export default function BeheerVragenlijsten() {
           questionnaireId={editingId}
           onClose={() => { setEditingId(null); setCreating(false) }}
           onSaved={() => { setEditingId(null); setCreating(false); loadList() }}
+        />
+      )}
+
+      {verspreidingVoor && (
+        <VerspreidingSheet
+          questionnaireId={verspreidingVoor.id}
+          titel={verspreidingVoor.title}
+          onClose={() => setVerspreidingVoor(null)}
+          onSaved={() => { setVerspreidingVoor(null); loadList() }}
         />
       )}
 

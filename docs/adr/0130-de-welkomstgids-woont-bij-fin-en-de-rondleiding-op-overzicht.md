@@ -8,6 +8,8 @@ elements: [as-coach, sp-registreren, sp-inzicht, app-comp]
 
 # 0130 — De welkomstgids woont bij Fin; het welkom is een rondleiding op /overzicht
 
+> **Geamendeerd door ADR 0147 (15 sep 2026):** er bestaat sindsdien één tweede numerieke teller in de shell, bij Fin (nav-pill-segment en desktop-bubbel), voor "vragenlijsten die je nu kunt invullen". Die N is scherp gedefinieerd en daalt alleen door handelen; de regel "geen badge op Fins bubbel/icoon" geldt voor al het overige onverkort.
+
 ## Context
 
 Na de onboarding landde een nieuwe gebruiker hard op `/toekomst`, kreeg daar een

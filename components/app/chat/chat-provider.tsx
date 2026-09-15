@@ -54,6 +54,19 @@ type ChatContextType = {
   gidsRequested: boolean
   clearGidsRequest: () => void
   /**
+   * Open de chat rechtstreeks in de VRAGENLIJSTMODUS, op één specifieke lijst —
+   * de "Nu invullen"-knop van de uitnodigings-popup (ADR 0147). Zonder de id
+   * zou je na het accepteren van een uitnodiging alsnog in een keuzelijst
+   * landen en de lijst nog eens moeten aanwijzen.
+   *
+   * Zelfde drieslag als `openMelding`/`openGids`, alleen draagt de vlag hier
+   * een waarde (de questionnaire-id) in plaats van een boolean.
+   */
+  openVragenlijst: (id: string) => void
+  /** De gevraagde lijst zolang ChatPanel de intent nog moet oppakken. */
+  vragenlijstRequested: string | null
+  clearVragenlijstRequest: () => void
+  /**
    * De ingelogde gebruiker. Alleen nodig voor de apparaatrug van de
    * gespreksgeschiedenis (IndexedDB): daar is géén RLS, dus de scoping op
    * `userId` moet de clientlaag zelf doen — zie `device-store.ts`.
@@ -117,6 +130,7 @@ export function ChatProvider({
   const [isPinned, setIsPinnedState] = useState(false)
   const [meldingRequested, setMeldingRequested] = useState(false)
   const [gidsRequested, setGidsRequested] = useState(false)
+  const [vragenlijstRequested, setVragenlijstRequested] = useState<string | null>(null)
 
   // Restore pin state from localStorage on mount
   useEffect(() => {
@@ -152,6 +166,10 @@ export function ChatProvider({
     // Idem voor de gidsmodus-intent: een niet-opgepikte vlag zou de volgende
     // gewone chat-opening ongevraagd in de welkomstgids laten landen.
     setGidsRequested(false)
+    // Idem voor de vragenlijst-intent (ADR 0147): een blijven-hangende id zou
+    // de volgende gewone chat-opening ongevraagd in een vragenlijst laten
+    // landen.
+    setVragenlijstRequested(null)
     // Unpin when closing
     setIsPinnedState(false)
     try { localStorage.setItem(PIN_STORAGE_KEY, 'false') } catch {}
@@ -218,6 +236,15 @@ export function ChatProvider({
     setGidsRequested(false)
   }, [])
 
+  const openVragenlijst = useCallback((id: string) => {
+    setVragenlijstRequested(id)
+    setIsOpen(true)
+  }, [])
+
+  const clearVragenlijstRequest = useCallback(() => {
+    setVragenlijstRequested(null)
+  }, [])
+
   const setChatHistoryMode = useCallback((mode: ChatHistoryMode) => {
     setChatHistoryModeState(mode)
   }, [])
@@ -230,6 +257,7 @@ export function ChatProvider({
       isPinned, togglePin, setIsPinned,
       openMelding, meldingRequested, clearMeldingRequest,
       openGids, gidsRequested, clearGidsRequest,
+      openVragenlijst, vragenlijstRequested, clearVragenlijstRequest,
       userId, chatHistoryMode, setChatHistoryMode, dataGaps,
     }}>
       {children}

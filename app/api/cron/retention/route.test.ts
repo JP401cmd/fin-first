@@ -116,7 +116,9 @@ describe('cron verwerking', () => {
     expect(deletedTables).toContain('error_log_resolutions')
     // Plus user_activity_days: 400 dagen op de `date`-kolom `day` (ADR 0146).
     expect(deletedTables).toContain('user_activity_days')
-    expect(deletedTables).toHaveLength(Object.keys(RETENTION_MONTHS).length + 2)
+    // Plus user_activity_modules: dezelfde 400 dagen op `day` (ADR 0147, fase 2).
+    expect(deletedTables).toContain('user_activity_modules')
+    expect(deletedTables).toHaveLength(Object.keys(RETENTION_MONTHS).length + 3)
 
     // lead_intakes via de bestaande SECURITY DEFINER-functie.
     expect(rpcCalls).toContain('purge_expired_lead_intakes')
@@ -150,6 +152,21 @@ describe('cron verwerking', () => {
       expect.anything(),
       expect.objectContaining({ job: 'retention', status: 'success' }),
     )
+  })
+
+  it('een nog niet uitgerolde user_activity_modules is ook geen storing (ADR 0147, fase 2)', async () => {
+    cfg.ontbrekendeTabel = 'user_activity_modules'
+    const res = await GET(req('cron-secret'))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.success).toBe(true)
+    expect(body.overgeslagen).toContain('user_activity_modules')
+  })
+
+  it('een ándere fout op user_activity_modules blijft wél een storing', async () => {
+    cfg.deleteErrorTable = 'user_activity_modules'
+    const res = await GET(req('cron-secret'))
+    expect(res.status).toBe(500)
   })
 
   it('een ándere fout op user_activity_days blijft wél een storing', async () => {

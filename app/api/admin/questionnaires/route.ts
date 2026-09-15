@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/supabase/service'
 import { isSuperAdmin } from '@/lib/admin'
 import { VragenlijstAanmaakSchema, vraagNaarRij } from '@/lib/questionnaires/vraag-invoer'
+import { parseVerspreiding, verspreidingSamenvatting } from '@/lib/questionnaires/verspreiding'
 
 export async function GET() {
   const supabase = await createClient()
@@ -28,6 +29,21 @@ export async function GET() {
 
   if (error) return serverError(error, 'admin-questionnaires:GET')
 
+  // Handmatig toegewezen personen per lijst (ADR 0147) — één query, in-memory
+  // gegroepeerd. `verspreiding` komt al mee in de `*` hierboven; ontbreekt de
+  // kolom (migratie nog niet uitgerold) dan leest parseVerspreiding 'm als
+  // "niets ingesteld" en blijft de samenvatting "iedereen". Tolerant idem voor
+  // de uitnodigingstabel: geen tabel → nul personen, geen 500 in beheer.
+  const { data: handmatigeRijen } = await service
+    .from('questionnaire_invitations')
+    .select('questionnaire_id, bron')
+    .eq('bron', 'handmatig')
+
+  const handmatigPerLijst = new Map<string, number>()
+  for (const rij of (handmatigeRijen ?? []) as { questionnaire_id: string }[]) {
+    handmatigPerLijst.set(rij.questionnaire_id, (handmatigPerLijst.get(rij.questionnaire_id) ?? 0) + 1)
+  }
+
   const result = (questionnaires ?? []).map(q => ({
     id: q.id,
     title: q.title,
@@ -38,6 +54,10 @@ export async function GET() {
     question_count: q.questionnaire_questions?.length ?? 0,
     response_count: q.questionnaire_sessions?.length ?? 0,
     completed_count: q.questionnaire_sessions?.filter((s: { completed_at: string | null }) => s.completed_at).length ?? 0,
+    verspreiding_samenvatting: verspreidingSamenvatting(
+      parseVerspreiding(q.verspreiding),
+      handmatigPerLijst.get(q.id) ?? 0,
+    ),
   }))
 
   return NextResponse.json({ questionnaires: result })

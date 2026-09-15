@@ -1,52 +1,41 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+/**
+ * @deprecated Sinds ADR 0147 leeft de vragenlijst-staat in
+ * `components/app/vragenlijst/vragenlijst-signaal-provider.tsx` — één fetch voor
+ * de chat-kop, de teller op Fins bubbel én de uitnodigings-popup. Deze hook is
+ * nog slechts een dunne doorgeefluik voor bestaande aanroepers; gebruik in
+ * nieuwe code rechtstreeks `useVragenlijstSignaal()` of
+ * `useVragenlijstSignaalOptional()`.
+ *
+ * Het type `ActieveVragenlijst` woont sindsdien óók in de provider en wordt hier
+ * alleen nog doorgegeven, zodat bestaande imports (o.a. `vragenlijst-view.tsx`)
+ * ongewijzigd blijven werken.
+ */
 
-/** Eén actieve vragenlijst met je eigen voortgang, zoals GET /api/questionnaires 'm levert. */
-export interface ActieveVragenlijst {
-  id: string
-  title: string
-  description: string | null
-  question_count: number
-  answered_count: number
-  has_open_session: boolean
-  has_completed: boolean
-}
+import {
+  useVragenlijstSignaalOptional,
+  type ActieveVragenlijst,
+} from '@/components/app/vragenlijst/vragenlijst-signaal-provider'
+
+export type { ActieveVragenlijst } from '@/components/app/vragenlijst/vragenlijst-signaal-provider'
+
+/** Stabiele fallbacks: een verse `[]`/`() => {}` per render zou effect-deps laten stuiteren. */
+const LEEG: ActieveVragenlijst[] = []
+const NIETS = () => {}
 
 /**
- * Welke vragenlijsten staan er open voor deze gebruiker? Opgehaald zodra het
- * chatvenster opengaat — niet bij elke paginawissel — zodat een vragenlijst die
- * de beheerder net live zette bij de volgende opening verschijnt.
+ * @deprecated Zie de module-toelichting hierboven.
  *
- * Faalt het ophalen, dan is de lijst leeg en verschijnt het icoon niet: een
- * vragenlijst is een uitnodiging, geen functie die de chat mag blokkeren.
+ * `ingeschakeld` heeft geen effect meer: de provider haalt zelf op bij mount en
+ * bij terugkeer naar de tab. De parameter blijft staan zodat bestaande
+ * aanroepen compileren.
  */
-export function useActieveVragenlijsten(ingeschakeld: boolean) {
-  const [lijsten, setLijsten] = useState<ActieveVragenlijst[]>([])
-  const [geladen, setGeladen] = useState(false)
-  const [versie, setVersie] = useState(0)
-
-  useEffect(() => {
-    if (!ingeschakeld) return
-    let afgebroken = false
-    fetch('/api/questionnaires')
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data: { questionnaires?: ActieveVragenlijst[] } | null) => {
-        if (afgebroken) return
-        setLijsten(Array.isArray(data?.questionnaires) ? data.questionnaires : [])
-        setGeladen(true)
-      })
-      .catch(() => {
-        if (afgebroken) return
-        setLijsten([])
-        setGeladen(true)
-      })
-    return () => {
-      afgebroken = true
-    }
-  }, [ingeschakeld, versie])
-
-  const herlaad = useCallback(() => setVersie((v) => v + 1), [])
-
-  return { lijsten, geladen, herlaad }
+export function useActieveVragenlijsten(_ingeschakeld?: boolean) {
+  const signaal = useVragenlijstSignaalOptional()
+  return {
+    lijsten: signaal?.lijsten ?? LEEG,
+    geladen: signaal?.geladen ?? false,
+    herlaad: signaal?.herlaad ?? NIETS,
+  }
 }

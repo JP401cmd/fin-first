@@ -8,6 +8,11 @@ export type AdminActionName =
   | 'user.unblock'
   | 'user.activity'
   | 'config.update'
+  | 'questionnaire.verspreiding'
+  | 'group.create'
+  | 'group.update'
+  | 'group.delete'
+  | 'group.leden'
   | 'allowlist.add'
   | 'allowlist.remove'
 

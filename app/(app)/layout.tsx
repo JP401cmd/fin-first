@@ -31,6 +31,8 @@ import { ResponsiveShell } from '@/components/app/shell/responsive-shell'
 import { CashflowStatusProvider } from '@/components/app/cashflow-status-provider'
 import type { SidebarSignals } from '@/components/app/shell/shell-contexts'
 import { PlatformBanner } from '@/components/app/platform-banner'
+import { VragenlijstSignaalProvider } from '@/components/app/vragenlijst/vragenlijst-signaal-provider'
+import { VragenlijstUitnodiging } from '@/components/app/vragenlijst/vragenlijst-uitnodiging'
 import { parsePlatformStatus } from '@/lib/platform-status'
 import { CommandPaletteProvider } from '@/components/command-palette/command-palette-provider'
 import { computeFeatureAccess } from '@/lib/compute-feature-access'
@@ -55,6 +57,7 @@ import {
 import { COACH_STATE_KEY, parseCoachState } from '@/lib/coach-state'
 import { loadAccountStatusCore, toCoachDataGaps } from '@/lib/account-status'
 import { GuideVisitTracker } from '@/components/app/guide-visit-tracker'
+import { ActivityModuleTracker } from '@/components/app/activity-module-tracker'
 import { ModuleColorProvider } from '@/components/app/module-color-provider'
 import { FinSlotProvider } from '@/lib/shell/fin-slot'
 import { WelcomeGuideProvider } from '@/components/app/chat/gids/welcome-guide-provider'
@@ -604,6 +607,11 @@ export default async function AppLayout({
               }
               dataGaps={coachDataGaps}
             >
+              {/* ADR 0147 — één bron voor "welke vragenlijsten staan er voor
+                  mij klaar?". Staat hier, binnen ChatProvider, omdat drie
+                  oppervlakken hem lezen: het icoon in ChatPanel, de teller op
+                  Fins bubbel en de uitnodigings-popup verderop. */}
+              <VragenlijstSignaalProvider>
               <NotificationProvider>
               <GlobalSyncProvider>
                 <ModuleColorProvider initialConfig={moduleColors} initialBudgetConfig={budgetColors} initialPhaseConfig={phaseColors} initialFontTheme={(profile?.typography_theme as FontTheme) ?? 'editorial'}>
@@ -652,6 +660,11 @@ export default async function AppLayout({
                               }}
                             >
                               <PlatformBanner status={platformStatus} />
+                              {/* Uitnodiging voor een vragenlijst (ADR 0147).
+                                  Rendert niets tot de server een kandidaat
+                                  aanwijst én het ~2,5 s stil is; op /beheer en
+                                  in immersieve taakflows zwijgt hij helemaal. */}
+                              <VragenlijstUitnodiging />
                               {children}
                             </ResponsiveShell>
                           </CashflowStatusProvider>
@@ -671,6 +684,11 @@ export default async function AppLayout({
                           Suspense-grens vanwege useSearchParams. */}
                       <Suspense fallback={null}>
                         <GuideVisitTracker />
+                      </Suspense>
+                      {/* Gebruiksmeting per app-deel (ADR 0147 fase 2): één POST
+                          per dag per module, alleen dát, nooit de route. */}
+                      <Suspense fallback={null}>
+                        <ActivityModuleTracker />
                       </Suspense>
                       <Suspense fallback={null}>
                         <FinHome
@@ -692,6 +710,7 @@ export default async function AppLayout({
                 <NotificationModal />
               </GlobalSyncProvider>
               </NotificationProvider>
+              </VragenlijstSignaalProvider>
             </ChatProvider>
           </PerspectiveProvider>
         </ToastProvider>

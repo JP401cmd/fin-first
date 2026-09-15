@@ -81,17 +81,17 @@ describe('deleteAllUserData — fail-fast bij delete-fouten', () => {
   })
 
   it('slaat een nog niet uitgerolde tabel over (PGRST205) en wist de rest gewoon — AVG-verwijderen mag daar niet op breken', async () => {
-    // user_activity_days wacht bewust op de /privacy-aanpassing
-    // (ADR 0146); de code staat er al. Een ontbrekende tabel bevat niets.
-    const { client, deletedTables } = makeSupabaseMock([], ['user_activity_days'])
+    // user_activity_days/-modules wachten bewust op de /privacy-aanpassing
+    // (ADR 0146/0147); de code staat er al. Een ontbrekende tabel bevat niets.
+    const { client, deletedTables } = makeSupabaseMock([], ['user_activity_days', 'user_activity_modules'])
     const summary = await deleteAllUserData(client, 'user-123')
-    expect(summary).toMatchObject({ user_activity_days: 0, bank_accounts: 2, assets: 2 })
+    expect(summary).toMatchObject({ user_activity_days: 0, user_activity_modules: 0, bank_accounts: 2, assets: 2 })
     expect(deletedTables).toContain('assets')
   })
 
   it('een ándere fout op diezelfde tabel blijft een harde stop', async () => {
-    const { client } = makeSupabaseMock(['user_activity_days'])
-    await expect(deleteAllUserData(client, 'user-123')).rejects.toThrow(/user_activity_days/)
+    const { client } = makeSupabaseMock(['user_activity_modules'])
+    await expect(deleteAllUserData(client, 'user-123')).rejects.toThrow(/user_activity_modules/)
   })
 
   it('stopt vóór de parent-batch wanneer een eerdere batch faalt (geen halve wipe verder)', async () => {

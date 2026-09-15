@@ -89,6 +89,16 @@
 .wh-slot .wh-privacy, .wh-slot .wh-warning { top: -0.1875rem; right: -0.1875rem; }
 .wh-privacy { position: absolute; top: -0.25rem; right: -0.25rem; }
 
+/* Vragenlijst-teller (ADR 0147). LINKSboven, want rechtsboven is al bezet door
+   het privacy-schildje/de waarschuwing — twee tekens in dezelfde hoek botsen
+   (zie de patroon-kaart "Hoek-anker-element naast sluitknop"). In de zwevende
+   bubbel hangt hij aan de 56px-cirkel; in het nav-pill-slot is het segment veel
+   breder dan de avatar, dus ankeren we daar aan de AVATAR (28px op
+   right:0.9375rem → linkerrand ligt op 2.6875rem) in plaats van aan de
+   linkerrand van het segment. */
+.wh-badge { position: absolute; top: -0.25rem; left: -0.25rem; }
+.wh-slot .wh-badge { top: -0.1875rem; left: auto; right: 2.5rem; }
+
 /* Waarschuwing op de FAB: lokaal gekozen, maar op dít toestel niet bruikbaar.
    Zonder dit signaal ontdek je pas ná het openen van de chat dat er niets kan —
    en op een toestel waar het model ontbreekt voelde dat als "geen reactie".

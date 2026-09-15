@@ -8,6 +8,8 @@ elements: [sp-inzicht, as-coach]
 
 Het audit-voorstel NAV-4 wilde "Tips & acties" en "Berichten" samenvoegen tot één ingang "Voor jou · N". Verificatie in de code laat zien dat de dubbeling alleen op de desktop-sidebar bestaat, dat er nooit twee badges waren, en dat één gedeelde teller twee onverenigbare datamodellen zou moeten optellen. Voorstel: de twee ingangen blijven bestaan; in plaats daarvan repareren we het werkelijke gat — "Tips & acties" ontbreekt volledig in de mobiele navigatie.
 
+> **Geamendeerd door ADR 0147 (15 sep 2026):** er bestaat sindsdien één tweede numerieke teller in de shell, bij Fin (nav-pill-segment en desktop-bubbel), voor "vragenlijsten die je nu kunt invullen". Die N is scherp gedefinieerd en daalt alleen door handelen; de regel "geen badge op Fins bubbel/icoon" geldt voor al het overige onverkort.
+
 ## Context
 
 `/overzicht/tips` en `/berichten` staan allebei in `OVERIGE_BASE` van de desktop-sidebar en lijken daar op elkaar. Drie feiten uit de verkenning (`docs/verkenning-voor-jou-ingang.md`) sturen het besluit bij:

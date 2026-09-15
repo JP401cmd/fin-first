@@ -42,6 +42,8 @@ import {
   Sparkles,
   UserCheck,
   Users,
+  UsersRound,
+  Waypoints,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -195,6 +197,18 @@ export const BEHEER_GROUPS: BeheerGroup[] = [
         href: '/beheer/vragenlijsten',
         description: 'Vragenlijsten opstellen en respons bekijken.',
         icon: ClipboardList,
+      },
+      {
+        label: 'Waardestromen',
+        href: '/beheer/waardestromen',
+        description: 'Gebruikstypen voor gerichte vragenlijsten.',
+        icon: Waypoints,
+      },
+      {
+        label: 'Gebruikersgroepen',
+        href: '/beheer/gebruikersgroepen',
+        description: 'Vaste of regelgebaseerde doelgroepen.',
+        icon: UsersRound,
       },
       {
         label: 'AOW-leeftijd',

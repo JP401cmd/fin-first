@@ -58,6 +58,19 @@ const VRIJ_LEESBAAR = new Set([
   'ai_token_usage',
   'ai_usage',
   'user_activity_days',
+  // Uitnodigingen voor vragenlijsten (ADR 0147). Beheer kiest zelf wie er een
+  // krijgt en moet kunnen zien hoe de uitnodiging loopt (uitgenodigd, gezien,
+  // uitgesteld, geweigerd). Draagt geen enkel antwoord — alleen tijdstempels,
+  // de herkomst en het e-mailadres dat beheer er zélf in heeft gezet.
+  'questionnaire_invitations',
+  // Gebruikersgroepen (ADR 0147, fase 3). `user_groups` is configuratie die
+  // beheer zelf maakt: een naam, een omschrijving, statisch/dynamisch en een
+  // regelset op gebruiksmeta — geen user_id, geen antwoorden, geen bedragen.
+  'user_groups',
+  // `user_group_members` is lidmaatschap dat beheer zélf koos (group_id,
+  // user_id, added_at). Beheer ziet dus alleen wie het er zelf in zette en
+  // wanneer — dezelfde grens als handmatige uitnodigingen hierboven.
+  'user_group_members',
   'user_feature_visits',
   'household_members',
   'news_feedback',
@@ -100,6 +113,13 @@ const TOEGESTANE_RPCS = new Set([
   'admin_lookup_users_by_emails',
   'applied_migration_versions',
   'admin_activity_counts',
+  // ADR 0147 fase 2: per app-deel een aantal gebruikers — geen namen, geen
+  // dagen, geen routes (service-role-only).
+  'admin_module_activity_counts',
+  // ADR 0147 fase 3: e-mailadres bij door beheer zelf gekozen groepsleden, zodat
+  // beheer ze herkent — account-lookup, zelfde soort als de twee lookups
+  // hierboven, geen inhoud (service-role-only).
+  'admin_emails_for_user_ids',
   'web_vitals_p75_summary',
   'web_vitals_p75_daily',
   'web_vitals_p75_by_route',

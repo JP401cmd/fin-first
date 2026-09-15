@@ -131,6 +131,13 @@ export const SESSION_WIPE_TABLES: readonly string[] = [
   // `user_id = (select auth.uid())`, TO authenticated) en een eigen-rij SELECT
   // voor de export. Retentie 400 dagen via de retentie-cron (lib/retention.ts).
   'user_activity_days',
+  // Gebruikte app-delen per dag (migratie 20260915*, ADR 0147 fase 2 —
+  // waardestromen). Eén niveau fijner dan user_activity_days: user_id + dag +
+  // een module-sleutel uit een gesloten lijst (CHECK). Geen route, geen tijd,
+  // geen inhoud — wel een persoonsgegeven, dus in de wis én in de zelf-export.
+  // SESSIE-partitie: eigen-rij DELETE-policy en eigen-rij SELECT, net als
+  // user_activity_days. Retentie 400 dagen via de retentie-cron.
+  'user_activity_modules',
 ] as const
 
 /**
@@ -150,6 +157,22 @@ export const SERVICE_WIPE_TABLES: readonly string[] = [
   // `user-report-screenshots` en een reeds gepusht Notion-kaartje volgen deze wis
   // NIET (geen FK op storage.objects) — dat blijven aparte opruimstappen.
   'user_reports',
+  // Uitnodigingen voor vragenlijsten (migratie 20260915*, ADR 0147). Draagt
+  // `user_id` + wanneer iemand is uitgenodigd, de popup zag, 'm uitstelde of
+  // definitief weigerde — gebruiksdata zonder inhoud, maar wel persoonlijk, dus
+  // in de wis én in de zelf-export. SERVICE-partitie: de RLS geeft de gebruiker
+  // bewust GEEN eigen-rij DELETE (een geweigerde uitnodiging moet blijven staan,
+  // anders is "niet meer vragen" met één refresh ongedaan gemaakt). Via de
+  // sessie-client zou een delete dus een stille no-op zijn, net als bij
+  // `user_reports`; de service-role wist 'm.
+  'questionnaire_invitations',
+  // Lidmaatschap van statische gebruikersgroepen (migratie 20260915*, ADR 0147
+  // fase 3). Door beheer gekozen, maar het is wél een persoonsgegeven van het
+  // lid (in welke groep iemand zit), dus in de wis én in de zelf-export.
+  // SERVICE-partitie: de gebruiker heeft alleen een eigen-rij SELECT, geen
+  // DELETE — anders kon hij zich uit een interviewgroep schrijven. De
+  // service-role wist 'm; een accountverwijdering ook via de FK-cascade.
+  'user_group_members',
 ] as const
 
 /**
@@ -264,6 +287,11 @@ export const ALL_USER_SCOPED_TABLES: readonly string[] = [
   'news_editions',
   'news_feedback',
   'next_step_completions',
+  // Nieuw in migratie 20260915* (ADR 0147). LET OP — net als chat_* en
+  // user_activity_days NIET tegen information_schema gemeten: de migratie was op
+  // 15-09-2026 geschreven maar nog niet uitgerold. Meten bij de eerstvolgende
+  // regeneratie.
+  'questionnaire_invitations',
   'questionnaire_sessions',
   'recommendation_feedback',
   'recommendations',
@@ -276,7 +304,14 @@ export const ALL_USER_SCOPED_TABLES: readonly string[] = [
   // tegen information_schema gemeten: de migratie was op 15-09-2026 geschreven
   // maar nog niet uitgerold. Meten bij de eerstvolgende regeneratie.
   'user_activity_days',
+  // Nieuw in migratie 20260915* (ADR 0147, fase 2 en 3). LET OP — net als
+  // user_activity_days NIET tegen information_schema gemeten: de migraties waren
+  // op 15-09-2026 geschreven maar nog niet uitgerold. Meten bij de
+  // eerstvolgende regeneratie. (`user_groups` zelf heeft geen user_id en hoort
+  // hier dus niet.)
+  'user_activity_modules',
   'user_feature_visits',
+  'user_group_members',
   'user_own_ibans',
   'user_reports',
   'valuations',

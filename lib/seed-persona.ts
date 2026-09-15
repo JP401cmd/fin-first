@@ -274,8 +274,8 @@ async function deleteTable(supabase: SupabaseClient, table: string, userId: stri
     // Uitzondering op fail-fast: een tabel die nog niet is uitgerold bevat per
     // definitie niets van deze gebruiker. Zonder deze tak breekt elke
     // accountverwijdering en onboarding-reset zolang een migratie bewust op
-    // een poort wacht (user_activity_days wacht op /privacy — ADR 0146).
-    // Alleen precies "bestaat niet"; elke andere fout blijft een
+    // een poort wacht (user_activity_days/-modules wachten op /privacy — ADR
+    // 0146/0147). Alleen precies "bestaat niet"; elke andere fout blijft een
     // harde stop.
     if (isOntbrekendSchema(error)) {
       console.warn(`[seed] ${table} bestaat (nog) niet — overgeslagen bij wissen`)
@@ -358,8 +358,10 @@ export async function deleteAllUserData(
     deleteTable(supabase, 'next_step_completions', userId),
     // Actieve dagen (ADR 0146): blad-tabel, alleen FK naar auth.users.
     deleteTable(supabase, 'user_activity_days', userId),
+    // Gebruikte app-delen per dag (ADR 0147, fase 2): blad-tabel, eigen-rij DELETE.
+    deleteTable(supabase, 'user_activity_modules', userId),
   ])
-  const batch0Tables = ['investment_transactions', 'crypto_transactions', 'holding_alerts', 'target_allocations', 'user_feature_visits', 'next_step_completions', 'user_activity_days']
+  const batch0Tables = ['investment_transactions', 'crypto_transactions', 'holding_alerts', 'target_allocations', 'user_feature_visits', 'next_step_completions', 'user_activity_days', 'user_activity_modules']
   for (let i = 0; i < batch0Tables.length; i++) {
     summary[batch0Tables[i]] = batch0Results[i]
   }
@@ -482,6 +484,9 @@ export async function deleteAllUserData(
   if (opts?.service) {
     summary.questionnaire_sessions =
       (summary.questionnaire_sessions ?? 0) + (await serviceWipeTable(opts.service, 'questionnaire_sessions', userId))
+    // `questionnaire_invitations` en `user_group_members` (ADR 0147) hebben geen
+    // eigen-rij DELETE-policy en staan daarom in SERVICE_WIPE_TABLES: batch 5
+    // hieronder wist ze. Een tweede, losse wis hier overschreef de telling met 0.
   }
 
   // Batch 3: parent tables

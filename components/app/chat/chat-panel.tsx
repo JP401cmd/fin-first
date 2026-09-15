@@ -15,6 +15,7 @@ import type { LocalKnowledgeItem } from '@/lib/ai/local/knowledge-context'
 import { useModuleAccess } from '@/components/app/feature-access-provider'
 import { useSwipeToDismiss } from '@/lib/hooks/use-swipe-to-dismiss'
 import { acquireOverlay } from '@/lib/overlay-signal'
+import { meldModuleGebruik } from '@/lib/activity/meld-module'
 import { pushOverlayHistory } from '@/lib/overlay-history'
 import { hasSubscription } from '@/lib/feature-registry'
 import { AiSubscriptionUpsell } from '@/components/app/ai-subscription-upsell'
@@ -25,7 +26,10 @@ import { renderMarkdown, findToolInvocation, TOOL_LOADING_STATES, TOOL_OUTPUT_ST
 import { X, Send, Loader2, Zap, Check, AlertTriangle, RefreshCw, Pin, PinOff, ShieldCheck, Sparkles, Clock, ThumbsDown, Cpu, Megaphone, ListChecks, History, RotateCw, ClipboardList } from 'lucide-react'
 import { MeldingView } from './melding/melding-view'
 import { VragenlijstView } from './vragenlijst/vragenlijst-view'
-import { useActieveVragenlijsten } from './vragenlijst/use-actieve-vragenlijsten'
+import {
+  useVragenlijstSignaalOptional,
+  type ActieveVragenlijst,
+} from '@/components/app/vragenlijst/vragenlijst-signaal-provider'
 import { GidsView } from './gids/gids-view'
 import { GesprekkenLijst } from './gesprekken/gesprekken-lijst'
 import {
@@ -53,6 +57,14 @@ import type { VisualizationOutput } from '@/lib/ai/tools/show-visualization'
 /* ── Wft Disclaimer ───────────────────────────────────────────────── */
 
 const WFT_ACCEPTED_KEY = 'trifinity-chat-wft-accepted'
+
+/**
+ * Stabiele fallbacks voor het vragenlijst-signaal buiten zijn provider. Een
+ * verse `[]`/`() => {}` per render zou de effect-deps hieronder laten stuiteren
+ * (en daarmee bij elke render opnieuw ophalen).
+ */
+const LEGE_VRAGENLIJSTEN: ActieveVragenlijst[] = []
+const NOOP = () => {}
 
 function WftDisclaimer({ onAccept }: { onAccept: () => void }) {
   return (
@@ -715,7 +727,7 @@ function versGesprek(origin: ChatOrigin, notitie: string | null = null): Gesprek
 /* ── Main ChatPanel ────────────────────────────────────────────────── */
 
 export function ChatPanel() {
-  const { isOpen, close, pendingMessage, clearPendingMessage, resolvePendingAnswer, dropPendingAnswer, isPinned, togglePin, meldingRequested, clearMeldingRequest, gidsRequested, clearGidsRequest, userId, chatHistoryMode, setChatHistoryMode, dataGaps } = useChatContext()
+  const { isOpen, close, pendingMessage, clearPendingMessage, resolvePendingAnswer, dropPendingAnswer, isPinned, togglePin, meldingRequested, clearMeldingRequest, gidsRequested, clearGidsRequest, vragenlijstRequested, clearVragenlijstRequest, userId, chatHistoryMode, setChatHistoryMode, dataGaps } = useChatContext()
   const router = useRouter()
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -828,9 +840,38 @@ export function ChatPanel() {
   const gidsActief = mode === 'gids' && guideDisplay !== 'none'
 
   // Actieve vragenlijsten (beheer zet ze live op /beheer/vragenlijsten). Het
-  // icoon verschijnt alleen als er iets in te vullen is; opgehaald bij openen.
-  const { lijsten: vragenlijsten, herlaad: herlaadVragenlijsten } = useActieveVragenlijsten(isOpen)
+  // icoon verschijnt alleen als er iets in te vullen is. Sinds ADR 0147 komt de
+  // lijst uit het gedeelde signaal (één fetch voor chat-kop, teller én popup);
+  // buiten de provider (unit-tests, losse fragmenten) blijft het stil.
+  const vragenlijstSignaal = useVragenlijstSignaalOptional()
+  const vragenlijsten = vragenlijstSignaal?.lijsten ?? LEGE_VRAGENLIJSTEN
+  const herlaadVragenlijsten = vragenlijstSignaal?.herlaad ?? NOOP
   const toonVragenlijstKnop = vragenlijsten.length > 0 || mode === 'vragenlijst'
+
+  // Het oude gedrag: bij het OPENEN van de chat één verse ophaal, zodat een
+  // lijst die de beheerder net live zette meteen verschijnt.
+  useEffect(() => {
+    if (!isOpen) return
+    herlaadVragenlijsten()
+  }, [isOpen, herlaadVragenlijsten])
+
+  // Gebruiksmeting per app-deel (ADR 0147 fase 2): Fin heeft geen route, dus
+  // het chatvenster meldt zelf "vandaag Fin gebruikt" — hooguit één POST per
+  // dag per browsersessie, nooit wat er gevraagd wordt.
+  useEffect(() => {
+    if (isOpen) meldModuleGebruik('fin')
+  }, [isOpen])
+
+  // Vragenlijst-intent van buiten (de uitnodigings-popup, ADR 0147). Zelfde
+  // drieslag als meld- en gidsmodus, maar de vlag draagt een id: we onthouden
+  // 'm lokaal zodat VragenlijstView direct die lijst opent i.p.v. de keuzelijst.
+  const [vragenlijstInitieelId, setVragenlijstInitieelId] = useState<string | null>(null)
+  useEffect(() => {
+    if (!vragenlijstRequested) return
+    setVragenlijstInitieelId(vragenlijstRequested)
+    setMode('vragenlijst')
+    clearVragenlijstRequest()
+  }, [vragenlijstRequested, clearVragenlijstRequest])
 
   // Dynamic domain: route-aware and gated by active modules
   const pathname = usePathname()
@@ -1296,7 +1337,13 @@ export function ChatPanel() {
   // ingevulde tekst tóch bewaren, dan is het juiste antwoord een bewaard concept
   // (formulierstate omhoog tillen), niet een waarschuwingsvenster.
   useEffect(() => {
-    if (!isOpen) setMode('chat')
+    if (!isOpen) {
+      setMode('chat')
+      // De popup-intent ("open direct díe lijst") is eenmalig: blijft hij
+      // staan, dan slaat élke latere tik op het klembord-icoon de keuzelijst
+      // over (eindreview 15-09-2026, #2).
+      setVragenlijstInitieelId(null)
+    }
   }, [isOpen])
 
   // Auto-send pending message (notificatie "Vraag AI" + "Vraag Fin"-knoppen).
@@ -2057,7 +2104,8 @@ export function ChatPanel() {
         ) : mode === 'vragenlijst' ? (
           <VragenlijstView
             lijsten={vragenlijsten}
-            onClose={() => setMode('chat')}
+            initieelId={vragenlijstInitieelId}
+            onClose={() => { setMode('chat'); setVragenlijstInitieelId(null) }}
             onVeranderd={herlaadVragenlijsten}
           />
         ) : (

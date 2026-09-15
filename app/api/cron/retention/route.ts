@@ -119,6 +119,27 @@ export async function GET(request: Request) {
     }
   }
 
+  // user_activity_modules: dezelfde 400 dagen op dezelfde `date`-kolom `day`
+  // (ADR 0147, fase 2 — gebruik per app-deel). Tabel nog niet uitgerold (de
+  // migratie wacht op /privacy) = overgeslagen, geen storing — net als bij
+  // user_activity_days hierboven. Elke ándere fout blijft een storing.
+  {
+    const cutoff = retentionCutoffDate(USER_ACTIVITY_RETENTION_DAYS, now)
+    const { count, error } = await supabase
+      .from('user_activity_modules')
+      .delete({ count: 'exact' })
+      .lt('day', cutoff)
+    if (error && isOntbrekendSchema(error)) {
+      overgeslagen.push('user_activity_modules')
+    } else if (error) {
+      console.error(`[cron:retention] user_activity_modules: ${error.message}`)
+      errors.push('user_activity_modules')
+      deleted.user_activity_modules = 0
+    } else {
+      deleted.user_activity_modules = count ?? 0
+    }
+  }
+
   // lead_intakes (90d, ADR 0022) via de bestaande SECURITY DEFINER-functie.
   const { error: leadErr } = await supabase.rpc('purge_expired_lead_intakes')
   if (leadErr) {

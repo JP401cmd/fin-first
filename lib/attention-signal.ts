@@ -41,6 +41,9 @@ import { useSyncExternalStore } from 'react'
  *
  * - `rondleiding` — de spotlight-tour op /overzicht (ADR 0130).
  * - `fin-melding` — Fins proactieve meldkaart (`FinHome`, mode `melding`).
+ * - `vragenlijst-uitnodiging` — de popup die vraagt of je een vragenlijst wilt
+ *   invullen (ADR 0147). Claimt ZOLANG hij openstaat: hij is een echte overlay
+ *   met scrim en focus-trap, dus er hoort niets anders doorheen te praten.
  *
  * DE EURO-COACHMARK CLAIMT BEWUST NIETS. Hij LEEST het register (via
  * `useAttentionQuiet`) en zwijgt zolang een ander spreekt, maar meldt zich niet
@@ -49,7 +52,7 @@ import { useSyncExternalStore } from 'react'
  * pagina lang stil — precies omgekeerd aan de bedoelde volgorde
  * (rondleiding > Fin-melding > coachmark).
  */
-export type AttentionClaimId = 'rondleiding' | 'fin-melding'
+export type AttentionClaimId = 'rondleiding' | 'fin-melding' | 'vragenlijst-uitnodiging'
 
 const EVENT_NAME = 'trifinity:attention-change'
 

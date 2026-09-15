@@ -218,6 +218,34 @@ describe('VragenlijstView', () => {
     await screen.findByText('Hoe vind je de app?')
     expect(aanroepen[0].url).toBe('/api/questionnaires/q-2/session')
   })
+
+  it('slaat de keuzelijst over als de popup al een lijst aanwees (initieelId)', async () => {
+    // ADR 0147: wie op "Nu invullen" klikt heeft zijn keuze al gemaakt en hoort
+    // niet alsnog in een keuzescherm te landen.
+    render(
+      <VragenlijstView
+        lijsten={[LIJST, { ...LIJST, id: 'q-2', title: 'Tweede ronde' }]}
+        initieelId="q-2"
+        onClose={() => {}}
+        onVeranderd={() => {}}
+      />,
+    )
+    expect(screen.queryByTestId('vragenlijst-keuze')).not.toBeInTheDocument()
+    await screen.findByText('Hoe vind je de app?')
+    expect(aanroepen[0].url).toBe('/api/questionnaires/q-2/session')
+  })
+
+  it('valt terug op de keuzelijst als de aangewezen lijst er niet meer is', () => {
+    render(
+      <VragenlijstView
+        lijsten={[LIJST, { ...LIJST, id: 'q-2', title: 'Tweede ronde' }]}
+        initieelId="q-weg"
+        onClose={() => {}}
+        onVeranderd={() => {}}
+      />,
+    )
+    expect(screen.getByTestId('vragenlijst-keuze')).toBeInTheDocument()
+  })
 })
 
 /**

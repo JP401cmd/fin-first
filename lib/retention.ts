@@ -23,6 +23,8 @@
  *    {@link ERROR_RESOLUTIONS_RETENTION_MONTHS}.
  *  - user_activity_days 400 dgn op `day` (ADR 0146) — zie
  *    {@link USER_ACTIVITY_RETENTION_DAYS}.
+ *  - user_activity_modules 400 dgn op `day` (ADR 0147, fase 2) — dezelfde
+ *    termijn en kolom als user_activity_days, dus dezelfde constante.
  */
 
 /** Retentie in MAANDEN per log-/usage-tabel (op basis van `created_at`). */
