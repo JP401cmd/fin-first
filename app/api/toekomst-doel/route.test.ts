@@ -590,7 +590,7 @@ describe('PUT /api/toekomst-doel — vastleggen volgt het anker (ADR 0145)', () 
     expect(doel.parameters).toEqual({ eindvermogen: true })
   })
 
-  it('eindvermogen: de reconciliatie ruimt alléén fire_age op — een lab-end_balance meet onder elk anker', async () => {
+  it('M8 · eindvermogen vastleggen onder een vast anker ruimt fire_age én de lab-plan_coverage-rij op (één uitkomstdoel)', async () => {
     results.profilesSelect.mockReturnValueOnce(planRow({ fire_stop_anchor: 'aow' }))
     const res = await PUT(
       putRequest(
@@ -604,7 +604,51 @@ describe('PUT /api/toekomst-doel — vastleggen volgt het anker (ADR 0145)', () 
     )
     expect(res.status).toBe(200)
     const goalDeletes = deleted.filter((d) => d.table === 'goals')
-    expect(goalDeletes.map((d) => d.filters.goal_type)).toEqual(['fire_age'])
+    expect(goalDeletes).toHaveLength(1)
+    expect(goalDeletes[0].filters).toEqual({ user_id: 'user-1', goal_type: ['fire_age', 'plan_coverage'] })
+  })
+
+  it('M8 · dekking vastleggen onder een vast anker ruimt de lab-end_balance-rij op', async () => {
+    results.profilesSelect.mockReturnValueOnce(planRow({ fire_stop_anchor: 'age', fire_stop_age: 60 }))
+    const res = await PUT(
+      putRequest(JSON.stringify({ action: 'vastleggen', parameters: { dekking: true }, doelwaarden: {}, stand: { sliders: { savings: 50 } } })),
+    )
+    expect(res.status).toBe(200)
+    expect(inserted.map((i) => i.row.goal_type)).toEqual(['plan_coverage'])
+    const goalDeletes = deleted.filter((d) => d.table === 'goals')
+    expect(goalDeletes.map((d) => d.filters.goal_type)).toEqual([['fire_age', 'end_balance']])
+  })
+
+  it('M8 · worden dekking én eindvermogen in één keer geschreven, dan ruimt de route geen van beide op', async () => {
+    results.profilesSelect.mockReturnValueOnce(planRow({ fire_stop_anchor: 'aow' }))
+    const res = await PUT(
+      putRequest(
+        JSON.stringify({
+          action: 'vastleggen',
+          parameters: { dekking: true, eindvermogen: true },
+          doelwaarden: { eindvermogen: 100_000 },
+          stand: { sliders: { savings: 40 } },
+        }),
+      ),
+    )
+    expect(res.status).toBe(200)
+    expect(deleted.filter((d) => d.table === 'goals').map((d) => d.filters.goal_type)).toEqual([['fire_age']])
+  })
+
+  it('M9 · een eindvermogen-doelwaarde boven € 10 mld → 400 (zod), geen DB', async () => {
+    const res = await PUT(
+      putRequest(
+        JSON.stringify({
+          action: 'vastleggen',
+          parameters: { eindvermogen: true },
+          doelwaarden: { eindvermogen: 1e11 },
+          stand: { sliders: { savings: 40 } },
+        }),
+      ),
+    )
+    expect(res.status).toBe(400)
+    expect((await res.json()).code).toBe('validation_error')
+    expect(mockFrom).not.toHaveBeenCalled()
   })
 
   it('eindvermogen zonder (of met een negatief) bedrag → overgeslagen → 400 "Geen geldige doelwaarden", geen goals', async () => {
@@ -719,7 +763,8 @@ describe('PUT /api/toekomst-doel — vastleggen volgt het anker (ADR 0145)', () 
     )
     const vast = deleted.filter((d) => d.table === 'goals')
     expect(vast).toHaveLength(1)
-    expect(vast[0].filters).toEqual({ user_id: 'user-1', goal_type: 'fire_age' })
+    // M8: met `dekking` gaat óók de lab-end_balance-rij weg.
+    expect(vast[0].filters).toEqual({ user_id: 'user-1', goal_type: ['fire_age', 'end_balance'] })
 
     deleted = []
     inserted = []
@@ -737,7 +782,7 @@ describe('PUT /api/toekomst-doel — vastleggen volgt het anker (ADR 0145)', () 
     )
     const solved = deleted.filter((d) => d.table === 'goals')
     expect(solved).toHaveLength(1)
-    expect(solved[0].filters).toEqual({ user_id: 'user-1', goal_type: 'plan_coverage' })
+    expect(solved[0].filters).toEqual({ user_id: 'user-1', goal_type: ['plan_coverage'] })
     // De reconciliatie komt ná de upserts en vóór de pref-write.
     expect(inserted.map((i) => i.row.goal_type)).toEqual(['savings_rate'])
     expect(updated.find((u) => u.table === 'profiles')).toBeTruthy()

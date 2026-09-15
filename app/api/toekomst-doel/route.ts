@@ -55,7 +55,8 @@ import { ToekomstDoelBodySchema, type VastleggenBody } from './schema'
  *   - `now` → geen doel uit het lab (400; `loslaten` blijft).
  * Ná de upserts wordt de anker-onverenigbare rij verwijderd (`fire_age` onder een vast
  * anker, `plan_coverage` onder `solved`): de anker-wissel-reconciliatie, bewust hier en
- * niet in /api/fire-settings.
+ * niet in /api/fire-settings. Onder een vast anker ruimt het vastleggen van `dekking` de
+ * lab-`end_balance`-rij op en omgekeerd (eindreview M8: één uitkomstdoel per stand).
  */
 
 // De payload is klein (≤ 4 vinkjes + doelwaarden + een compacte stand). 8 KB is ruim.
@@ -246,16 +247,27 @@ async function handleVastleggen(
   // Anker-wissel-reconciliatie: de rij van het uitkomstdoel dat NIET bij dit anker hoort
   // (fire_age onder een vast anker, plan_coverage onder solved) gaat weg — own-row, alleen
   // bron='parameter', zodat een handmatig doel van hetzelfde type ongemoeid blijft.
-  // Een `end_balance`-rij uit het lab (D12) valt hier bewust BUITEN: anders dan fire_age en
-  // plan_coverage heeft een eindvermogen onder élk anker een uitkomst (de sync meet het
-  // live via `pickEndBalanceAtEndAge`), dus er is niets onverenigbaars om op te ruimen.
-  // "Doel loslaten" ruimt 'm op (PARAMETER_GOAL_TYPES).
-  const onverenigbaar = anchorFixed ? PARAM_TO_GOAL_TYPE.fire : PARAM_TO_GOAL_TYPE.dekking
+  // Eindreview M8 — onder een vast anker zijn de twee UITKOMSTdoelen `dekking` (plan_coverage)
+  // en `eindvermogen` (end_balance) onderling uitsluitend: het lab legt er per stand één vast
+  // (de promotie volgt de scenario-stand), dus wie de één vastlegt ruimt de lab-rij van de ander
+  // op — anders noemt de pref één doel en toont de pagina er twee. Alleen als de ander in DEZE
+  // vastlegging niet zelf wordt geschreven. Onder `solved` blijft een lab-`end_balance` staan
+  // (hij meet daar door; "Doel loslaten" ruimt 'm op via PARAMETER_GOAL_TYPES).
+  const geschreven = new Set(rows.map((r) => r.goal_type))
+  const onverenigbaar: string[] = anchorFixed ? [PARAM_TO_GOAL_TYPE.fire] : [PARAM_TO_GOAL_TYPE.dekking]
+  if (anchorFixed) {
+    if (geschreven.has(PARAM_TO_GOAL_TYPE.dekking) && !geschreven.has(PARAM_TO_GOAL_TYPE.eindvermogen)) {
+      onverenigbaar.push(PARAM_TO_GOAL_TYPE.eindvermogen)
+    }
+    if (geschreven.has(PARAM_TO_GOAL_TYPE.eindvermogen) && !geschreven.has(PARAM_TO_GOAL_TYPE.dekking)) {
+      onverenigbaar.push(PARAM_TO_GOAL_TYPE.dekking)
+    }
+  }
   const { error: reconcileError } = await supabase
     .from('goals')
     .delete()
     .eq('user_id', userId)
-    .eq('goal_type', onverenigbaar)
+    .in('goal_type', onverenigbaar)
     .filter('metadata->>bron', 'eq', 'parameter')
   if (reconcileError) {
     return serverError(reconcileError, 'toekomst-doel:PUT:reconcile')

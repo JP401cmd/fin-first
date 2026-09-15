@@ -49,6 +49,9 @@ const doelwaarde = z
   .nullish()
   .transform((v) => v ?? undefined)
 
+/** Bovengrens voor het eindvermogen-doelbedrag (€ 10 mld, nominaal) — eindreview M9. */
+export const EINDVERMOGEN_DOELWAARDE_MAX = 1e10
+
 const DoelwaardenSchema = z.object({
   spaarquotePct: doelwaarde,
   rendementPct: doelwaarde,
@@ -56,7 +59,14 @@ const DoelwaardenSchema = z.object({
   margeJaren: doelwaarde,
   // ADR 0145 D12 — het NOMINALE eindvermogen van de verkenning (een client-waarde: alleen de
   // live-sim kent 'm). Negatief wordt in de builder overgeslagen, niet hier geweigerd.
-  eindvermogen: doelwaarde,
+  // Eindreview M9 — wél een bovengrens: een eigen rij, dus geen lek, maar onzin (1e300) hoort
+  // niet in `goals.target_value`.
+  eindvermogen: z
+    .number({ error: 'Ongeldige doelwaarde' })
+    .finite()
+    .max(EINDVERMOGEN_DOELWAARDE_MAX, { error: 'Ongeldige doelwaarde' })
+    .nullish()
+    .transform((v) => v ?? undefined),
 })
 
 const VastleggenSchema = z.object({
