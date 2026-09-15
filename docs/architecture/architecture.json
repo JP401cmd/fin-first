@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-15T12:55:35.786Z",
+  "generatedAt": "2026-09-15T16:30:17.732Z",
   "generatedDate": "2026-09-15",
   "repo": {
     "name": "fin",
@@ -195,8 +195,8 @@
     "tables": 101,
     "migrations": 246,
     "integrations": 25,
-    "components": 1107,
-    "providers": 18,
+    "components": 1111,
+    "providers": 19,
     "contextBuilders": 9,
     "briefingTools": 0,
     "coachLayers": 5,
@@ -9018,6 +9018,10 @@
       "source": "@/components/app/perspective-provider"
     },
     {
+      "name": "PlanStatusProvider",
+      "source": "@/components/app/plan-status-provider"
+    },
+    {
       "name": "PrivacyProvider",
       "source": "@/lib/hooks/use-privacy"
     },
@@ -9039,11 +9043,11 @@
     }
   ],
   "components": {
-    "total": 1107,
+    "total": 1111,
     "groups": [
       {
         "group": "app",
-        "count": 438,
+        "count": 441,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -9352,6 +9356,9 @@
           "phase-modal-vrijheidsdagen.test",
           "pill-row",
           "pill-row.test",
+          "plan-status-menu.test",
+          "plan-status-provider",
+          "plan-status-signal",
           "platform-banner",
           "portfolio-allocation-chart",
           "postpone-form",
@@ -9487,7 +9494,7 @@
       },
       {
         "group": "overview",
-        "count": 198,
+        "count": 199,
         "items": [
           "aandachtspunt-actie-button",
           "atomic-cards",
@@ -9610,6 +9617,7 @@
           "mini-networth-chart.test",
           "mini-timeline-strip",
           "mini-timeline-strip.test",
+          "netto-vermogen-venster",
           "networth-groups-chart",
           "networth-groups-chart.test",
           "networth-history-sheet",
@@ -18063,7 +18071,7 @@
       },
       {
         "file": "lib/dashboard-data-loader.ts",
-        "loc": 3113,
+        "loc": 3126,
         "commits": 59
       },
       {
@@ -18072,14 +18080,14 @@
         "commits": 1
       },
       {
+        "file": "components/app/chat/chat-panel.tsx",
+        "loc": 2439,
+        "commits": 24
+      },
+      {
         "file": "app/(app)/core/cash/import/page.tsx",
         "loc": 2436,
         "commits": 15
-      },
-      {
-        "file": "app/(app)/core/checkin/page.tsx",
-        "loc": 2419,
-        "commits": 13
       }
     ]
   },
@@ -19229,40 +19237,9 @@
     "hasChanges": true,
     "sections": [
       {
-        "label": "Schermen",
-        "added": [
-          "/beheer/gebruikersgroepen",
-          "/beheer/waardestromen"
-        ],
-        "removed": []
-      },
-      {
-        "label": "API-routes",
-        "added": [
-          "/api/activity/module",
-          "/api/admin/questionnaires/[id]/verspreiding",
-          "/api/admin/user-groups",
-          "/api/admin/user-groups/[id]",
-          "/api/admin/user-groups/[id]/leden",
-          "/api/admin/waardestromen",
-          "/api/questionnaires/[id]/uitnodiging"
-        ],
-        "removed": []
-      },
-      {
-        "label": "Tabellen",
-        "added": [
-          "questionnaire_invitations",
-          "user_activity_modules",
-          "user_group_members",
-          "user_groups"
-        ],
-        "removed": []
-      },
-      {
         "label": "Componenten (aantal)",
         "added": [
-          "+18"
+          "+4"
         ],
         "removed": []
       }
@@ -19678,7 +19655,7 @@
     {
       "date": "2026-09-15",
       "api": 322,
-      "components": 1107,
+      "components": 1111,
       "tables": 101,
       "routesProduction": 90
     }

@@ -1043,3 +1043,7 @@
 - **API-routes** toegevoegd: /api/activity/module, /api/admin/questionnaires/[id]/verspreiding, /api/admin/user-groups, /api/admin/user-groups/[id], /api/admin/user-groups/[id]/leden, /api/admin/waardestromen, /api/questionnaires/[id]/uitnodiging
 - **Tabellen** toegevoegd: questionnaire_invitations, user_activity_modules, user_group_members, user_groups
 - **Componenten (aantal)** toegevoegd: +18
+
+## 2026-09-15
+
+- **Componenten (aantal)** toegevoegd: +4
