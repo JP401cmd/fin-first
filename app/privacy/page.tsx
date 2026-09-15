@@ -201,6 +201,21 @@ export default function PrivacyPage() {
             cijfers van nu zetten.
           </li>
           <li className="border-l-2 border-[var(--border-md)] pl-4">
+            <strong className="font-semibold text-[var(--ink)]">Gebruik van de app</strong>{' '}
+            — op welke dagen je de app opent, en welke onderdelen je die dag
+            gebruikte, zoals Toekomst, Budget of Fin. Per dag staan er alleen
+            jij, de datum en die onderdelen: geen tijdstip, geen losse schermen
+            en geen inhoud. Bij vragenlijsten leggen we vast of we je een
+            uitnodiging lieten zien, of je die uitstelde of wegklikte, en op
+            grond van welke gebruiksregel of groep je hem kreeg. Zet ons team
+            je in een onderzoeksgroep, dan leggen we dat lidmaatschap ook vast.
+            Ons team ziet wie het zelf uitnodigde of in een groep zette, en
+            verder alleen tellingen, zoals hoeveel mensen de app en de
+            onderdelen gebruiken en op hoeveel dagen iemand actief was. Je
+            bedragen en de gegevens die je in de app bijhoudt ziet het nooit.
+            Antwoorden op een vragenlijst leest het team zonder je naam.
+          </li>
+          <li className="border-l-2 border-[var(--border-md)] pl-4">
             <strong className="font-semibold text-[var(--ink)]">Technische en beveiligingsgegevens</strong>{' '}
             — geanonimiseerde performance-signalen (Vercel Speed Insights),
             een log van verzonden e-mails, een audit-log van
@@ -228,7 +243,13 @@ export default function PrivacyPage() {
             <strong className="font-semibold text-[var(--ink)]">Gerechtvaardigd belang</strong>{' '}
             (AVG art. 6 lid 1 sub f) — beveiliging en misbruikpreventie: het
             e-mail-log, het audit-log van beheerdershandelingen en de
-            bot-bescherming op publieke pagina&apos;s.
+            bot-bescherming op publieke pagina&apos;s. En productonderzoek:
+            tellen hoeveel mensen de app gebruiken, en vragenlijsten richten
+            aan wie er iets over kan zeggen. Dat richten gebeurt alleen op
+            gebruiksgegevens — hoe lang je een account hebt, op hoeveel dagen
+            je de app opende, welk onderdeel je het meest gebruikt, of een groep
+            waarin ons team je zette — nooit op je financiële gegevens. Met
+            &ldquo;Niet meer vragen&rdquo; stop je een uitnodiging.
           </li>
         </ul>
         <p>
@@ -380,6 +401,15 @@ export default function PrivacyPage() {
             lang ze blijven (zie sectie 5).
           </li>
           <li className="border-l-2 border-[var(--border-md)] pl-4">
+            <strong className="font-semibold text-[var(--ink)]">Gebruik van de app</strong>{' '}
+            — de dagen waarop je de app opende en de onderdelen die je die dag
+            gebruikte bewaren we 400 dagen; daarna verdwijnen ze automatisch.
+            Uitnodigingen voor vragenlijsten bewaren we zolang je account
+            bestaat, en het lidmaatschap van een onderzoeksgroep tot ons team je
+            eruit haalt. Verwijder je je account, dan gaat dit allemaal direct
+            mee.
+          </li>
+          <li className="border-l-2 border-[var(--border-md)] pl-4">
             <strong className="font-semibold text-[var(--ink)]">AI-aanbieders</strong>{' '}
             — hanteren hun eigen korte bewaartermijnen voor verwerkte
             verzoeken volgens hun voorwaarden (zie sectie 5).
@@ -453,7 +483,7 @@ export default function PrivacyPage() {
           abonnement — niet je data.
         </p>
         <p className="font-serif text-sm italic text-[var(--ink-3)]">
-          Versie 2.2 — concept, 8 september 2026. Vragen? Gebruik de{' '}
+          Versie 2.3 — concept, 15 september 2026. Vragen? Gebruik de{' '}
           <a
             href="/contact"
             className="font-semibold not-italic text-kern-700 underline hover:text-kern-800"
