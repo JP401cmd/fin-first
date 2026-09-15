@@ -4,7 +4,7 @@
 // ───────────────────────────────────────────────────────────────────────────
 // Bij een tekort (dekking < 100%) geeft het lab de drie hefbomen als antwoord, elk met
 // een getal dat al bestaat: "doorwerken tot X" = de opgeloste leeftijd zonder anker
-// (tweede run, ADR 0129 D7); "€X extra opzij" en "€X minder uitgeven" = `planMaandHint`
+// (tweede run, ADR 0129 D7); "€X meer salaris" en "€X minder uitgeven" = `planMaandHint`
 // (P!B96 van de hoofd-run, dus van het PLAN-stopmoment — nooit de stop-pad-hint) — één
 // bedrag, twee hefbomen, want beide zijn dezelfde maandelijkse stroom.
 // Elke regel is één klik die de betreffende hefboom als VERKENNING zet, nooit als plan.
@@ -13,7 +13,7 @@
 import { computeSliderUiRange, savingsPpForMonthlyAmount } from '@/lib/scenario-events'
 import type { WhatIfOverrides } from '@/lib/types/horizon-whatif'
 import type { LabUitkomstDekking } from './lab-uitkomst'
-import { antwoordDoorwerken, antwoordExtraOpzij, antwoordMinderUitgeven } from './anker-copy'
+import { antwoordDoorwerken, antwoordMeerSalaris, antwoordMinderUitgeven } from './anker-copy'
 
 export type LabAntwoordActie =
   | { readonly kind: 'stop'; readonly stopAge: number }
@@ -61,7 +61,7 @@ export function resolveLabAntwoorden(input: LabAntwoordenInput): LabAntwoord[] {
     const extra = Math.round(hint)
     out.push({
       kind: 'extra_opzij',
-      zin: antwoordExtraOpzij(hint, masked),
+      zin: antwoordMeerSalaris(hint, masked),
       bovenBereik: extra > extraRange.max,
       actie: { kind: 'slider', key: 'extra_inleg', value: Math.min(extra, extraRange.max) },
     })

@@ -28,7 +28,9 @@ import {
   radarSubtitel,
   radarEindstrategieAnkerReden,
   antwoordDoorwerken,
-  antwoordExtraOpzij,
+  antwoordMeerSalaris,
+  HEFBOOM_COPY,
+  spaarquoteEuroRegel,
   antwoordMinderUitgeven,
   ANTWOORDEN_KOP,
   ANTWOORD_KNOP,
@@ -287,19 +289,33 @@ describe('dekking-zinnen — de vastgestelde kopij', () => {
     )
   })
 
+  it('draaiknoppen: vaste namen en de euro-regel onder de spaarquote (eigenaarskeuze 15 sep)', () => {
+    expect(HEFBOOM_COPY).toEqual({
+      meerSalaris: 'Meer salaris',
+      spaarquote: 'Spaarquote',
+      minderWerken: 'Minder werken',
+      laterEerder: 'Later of eerder stoppen',
+    })
+    expect(spaarquoteEuroRegel(0)).toBeNull()
+    expect(spaarquoteEuroRegel(0.4)).toBeNull()
+    expect(spaarquoteEuroRegel(1290.2)).toBe('+€ 1.290/mnd minder uitgeven')
+    expect(spaarquoteEuroRegel(-160)).toBe('−€ 160/mnd meer uitgeven')
+    expect(spaarquoteEuroRegel(1290, true)).toBe(`+${MASKED_AMOUNT_PLACEHOLDER}/mnd minder uitgeven`)
+  })
+
   // Apostrof: hetzelfde rechte teken (') als de rest van dit bestand ("zo'n", "ratio's").
   it('11 · antwoordenblok — drie beschrijvende zinnen, één knop, boven-bereik-zin (spec §3/§5)', () => {
     expect(ANTWOORDEN_KOP).toBe('Wat maakt het haalbaar?')
     expect(ANTWOORD_KNOP).toBe('Reken hiermee')
     expect(antwoordDoorwerken(61)).toBe('Doorwerken tot 61 dekt je plan.')
     expect(antwoordDoorwerken(61.5)).toBe('Doorwerken tot 61,5 dekt je plan.')
-    expect(antwoordExtraOpzij(2100.4)).toBe("Zo'n €2.100 per maand extra opzij, uitgesmeerd tot je eindleeftijd, hoort bij een gedekt plan.")
+    expect(antwoordMeerSalaris(2100.4)).toBe("Zo'n €2.100 per maand meer salaris, uitgesmeerd tot je eindleeftijd, hoort bij een gedekt plan.")
     expect(antwoordMinderUitgeven(2100.4)).toBe("Zo'n €2.100 per maand minder uitgeven, uitgesmeerd tot je eindleeftijd, hoort bij een gedekt plan.")
     expect(ANTWOORD_BOVEN_BEREIK).toBe('Dat is meer dan de knop toelaat — de knop zet het hoogste bedrag.')
   })
 
   it('11 · privacy: de bedragen worden gemaskeerd, de zin blijft beschrijvend', () => {
-    expect(antwoordExtraOpzij(2100, true)).toBe(`Zo'n ${MASKED_AMOUNT_PLACEHOLDER} per maand extra opzij, uitgesmeerd tot je eindleeftijd, hoort bij een gedekt plan.`)
+    expect(antwoordMeerSalaris(2100, true)).toBe(`Zo'n ${MASKED_AMOUNT_PLACEHOLDER} per maand meer salaris, uitgesmeerd tot je eindleeftijd, hoort bij een gedekt plan.`)
     expect(antwoordMinderUitgeven(2100, true)).toContain(MASKED_AMOUNT_PLACEHOLDER)
     expect(antwoordMinderUitgeven(2100, true)).not.toMatch(/2\.100|€/)
   })
@@ -309,8 +325,8 @@ describe('dekking-zinnen — de vastgestelde kopij', () => {
     for (const z of [
       antwoordDoorwerken(61),
       antwoordDoorwerken(61.5),
-      antwoordExtraOpzij(500),
-      antwoordExtraOpzij(500, true),
+      antwoordMeerSalaris(500),
+      antwoordMeerSalaris(500, true),
       antwoordMinderUitgeven(500),
       antwoordMinderUitgeven(500, true),
       ANTWOORD_KNOP,
@@ -345,8 +361,8 @@ describe('dekking-zinnen — toon-invarianten over alle ankers', () => {
       const zinnen = [
         dekkingSheetToelichting(stop, 90),
         antwoordDoorwerken(61.5),
-        antwoordExtraOpzij(300),
-        antwoordExtraOpzij(300, true),
+        antwoordMeerSalaris(300),
+        antwoordMeerSalaris(300, true),
         antwoordMinderUitgeven(300),
         antwoordMinderUitgeven(300, true),
         ANTWOORD_BOVEN_BEREIK,
@@ -375,13 +391,13 @@ describe('dekking-zinnen — toon-invarianten over alle ankers', () => {
   })
 
   it('de antwoorden beschrijven, geen instructie: nooit "leg"/"spaar"', () => {
-    for (const zin of [antwoordDoorwerken(60), antwoordExtraOpzij(300), antwoordMinderUitgeven(300)]) {
+    for (const zin of [antwoordDoorwerken(60), antwoordMeerSalaris(300), antwoordMinderUitgeven(300)]) {
       expect(zin).not.toMatch(/\bleg\b|\bspaar\b/i)
     }
     // Alleen "doorwerken" claimt de uitkomst (kernel-bewezen, lab-antwoorden.kernel.test.ts);
     // de €-hefbomen stoppen op het stopmoment en dekken het plan niet → "hoort bij" (eindreview I2).
     expect(antwoordDoorwerken(60)).toMatch(/dekt je plan\.$/)
-    for (const zin of [antwoordExtraOpzij(300), antwoordMinderUitgeven(300), antwoordExtraOpzij(300, true), antwoordMinderUitgeven(300, true)]) {
+    for (const zin of [antwoordMeerSalaris(300), antwoordMinderUitgeven(300), antwoordMeerSalaris(300, true), antwoordMinderUitgeven(300, true)]) {
       expect(zin).toMatch(/uitgesmeerd tot je eindleeftijd, hoort bij een gedekt plan\.$/)
       expect(zin).not.toMatch(/dekt je plan/)
     }

@@ -144,11 +144,14 @@ spec lab-haalbaarheid §1). Schaal van stopmoment tot eindleeftijd, slider "Door
 tegels Reikt tot · Plan tot · Gedekt. Marge-band, verwacht-streep, koppel-checkbox en de
 FIRE-tegels verdwijnen daar: ze meten een grootheid die de gebruiker niet gekozen heeft.
 
-**D9 — Drie hefbomen in beide invalshoeken** (§2). Meer opzij (`extra_inleg`), Minder
-uitgeven (de spaarquote-knop, weergave in euro, event-shape ongewijzigd), Later of eerder
-stoppen (de stop-slider). Maandinkomen vervalt als knop en als `DOEL_PARAMETERS`-lid;
-bestaande `salary`-rijen blijven (`LEGACY_PARAMETER_GOAL_TYPES`). Werkdagen wordt de
-ingeklapte knop "Minder werken".
+**D9 — Drie draaiknoppen in beide invalshoeken** (§2, bijgesteld door de eigenaar op 15 sep
+2026). In vaste volgorde en alle drie zichtbaar: 1 **Meer salaris** (het `extra_inleg`-event —
+een salarisverhoging is rekenkundig dezelfde hefboom, dus de oude Maandinkomen-knop verviel
+als knop en als `DOEL_PARAMETERS`-lid; bestaande `salary`-rijen blijven,
+`LEGACY_PARAMETER_GOAL_TYPES`), 2 **Spaarquote** (hele procenten, met eronder het bedrag
+minder uitgeven via `spaarquoteEuroRegel`; het event blijft in procentpunten), 3 **Minder
+werken** (werkdagen per week). "Later of eerder stoppen" is de stop-slider in sectie 2. Het
+antwoordenblok (D10) noemt de tweede hefboom dan ook "meer salaris".
 
 **D10 — Bij een tekort: de drie hefbomen als antwoorden** (§3). `resolveLabAntwoorden`
 geeft "doorwerken tot X" (tweede run), "€X extra opzij" en "€X minder uitgeven"

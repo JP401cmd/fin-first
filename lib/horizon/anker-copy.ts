@@ -174,14 +174,27 @@ export const ANKER_KPI_LABEL = 'Reikt tot'
 /** Dezelfde kop op smal scherm (past al; één constante zodat ze niet uiteenlopen). */
 export const ANKER_KPI_LABEL_KORT = 'Reikt tot'
 
-/** De drie hefbomen + de secundaire knop (spec lab-haalbaarheid §2/§5, 15 sep 2026). */
+/**
+ * De draaiknoppen van het lab, in deze volgorde (eigenaarskeuze 15 sep 2026, bijstelling van
+ * spec lab-haalbaarheid §2): 1 Meer salaris (het extra-inleg-event — rekenkundig dezelfde
+ * hefboom), 2 Spaarquote (in % met het bedrag minder uitgeven eronder), 3 Minder werken.
+ * "Later of eerder stoppen" is de stop-schuif in sectie 2 van de Vrijheidsas.
+ */
 export const HEFBOOM_COPY = {
-  meerOpzij: 'Meer opzij',
-  minderUitgeven: 'Minder uitgeven',
-  laterEerder: 'Later of eerder stoppen',
+  meerSalaris: 'Meer salaris',
+  spaarquote: 'Spaarquote',
   minderWerken: 'Minder werken',
-  werkdagen: 'Werkdagen per week',
+  laterEerder: 'Later of eerder stoppen',
 } as const
+
+/** De euro-regel onder de spaarquote-knop: "+€ 1.290/mnd minder uitgeven" (0 op de basis → leeg). */
+export function spaarquoteEuroRegel(euroPerMaand: number, masked = false): string | null {
+  const bedrag = Math.round(euroPerMaand)
+  if (bedrag === 0) return null
+  const teken = bedrag > 0 ? '+' : '−'
+  const waarde = masked ? MASKED_AMOUNT_PLACEHOLDER : `€ ${Math.abs(bedrag).toLocaleString('nl-NL')}`
+  return `${teken}${waarde}/mnd ${bedrag > 0 ? 'minder uitgeven' : 'meer uitgeven'}`
+}
 
 /** Sectie 2 van de Vrijheidsas onder een vast anker (spec lab-haalbaarheid §1/§5). */
 export const DEKKINGSAS_COPY = {
@@ -565,9 +578,9 @@ function maandBedrag(hint: number, masked: boolean): string {
 // Gemeten in lib/horizon/lab-antwoorden.kernel.test.ts: hint-bedrag gezet → 94% resp. 87%
 // dekking, niet 100% (eindreview I2). "Doorwerken tot X dekt je plan." is daar wél bewezen.
 
-/** Antwoord 2 — `planMaandHint` (P!B96 van de hoofd-run) als extra inleg. */
-export function antwoordExtraOpzij(hint: number, masked = false): string {
-  return `Zo'n ${maandBedrag(hint, masked)} per maand extra opzij, uitgesmeerd tot je eindleeftijd, hoort bij een gedekt plan.`
+/** Antwoord 2 — `planMaandHint` (P!B96 van de hoofd-run) als meer salaris (het extra-inleg-event). */
+export function antwoordMeerSalaris(hint: number, masked = false): string {
+  return `Zo'n ${maandBedrag(hint, masked)} per maand meer salaris, uitgesmeerd tot je eindleeftijd, hoort bij een gedekt plan.`
 }
 
 /** Antwoord 3 — hetzelfde bedrag als minder uitgeven (dezelfde maandelijkse stroom). */

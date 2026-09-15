@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { computeSliderUiRange, WhatIfSliders, type WhatIfOverrides } from './whatif-sliders'
 import { formatCurrency } from '@/lib/format'
 import type { WhatIfEvent } from '@/lib/types/horizon-whatif'
+import { buildSliderEvent } from '@/lib/scenario-events'
 
 /**
  * Unit-tests voor `computeSliderUiRange` — het ZICHTBARE (UI-)bereik per slidertype
@@ -100,27 +101,41 @@ describe('WhatIfSliders — a11y: slider heeft naam + valuetext', () => {
     )
   }
 
-  it('benoemt de drie hefbomen bij naam; werkdagen zit onder "Minder werken" (spec §2)', () => {
+  it('drie draaiknoppen in vaste volgorde: 1 Meer salaris, 2 Spaarquote, 3 Minder werken — alle drie zichtbaar', () => {
     renderSliders()
-    expect(screen.getByRole('slider', { name: 'Meer opzij' })).toBeInTheDocument()
-    expect(screen.getByRole('slider', { name: 'Minder uitgeven' })).toBeInTheDocument()
+    const namen = screen.getAllByRole('slider').map((s) => s.getAttribute('aria-label'))
+    expect(namen).toEqual(['Meer salaris', 'Spaarquote', 'Minder werken'])
     expect(screen.queryByRole('slider', { name: 'Maandinkomen' })).toBeNull()
-    // ingeklapt: de werkdagen-slider is er pas na openklappen
-    expect(screen.queryByRole('slider', { name: 'Werkdagen per week' })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: /Minder werken/ }))
-    expect(screen.getByRole('slider', { name: 'Werkdagen per week' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Minder werken/ })).toBeNull()
   })
 
-  it('Minder uitgeven toont euro per maand t.o.v. nu (0 op de basis), Meer opzij euro', () => {
+  it('Meer salaris toont euro, Spaarquote procenten, Minder werken dagen', () => {
     renderSliders()
-    expect(screen.getByRole('slider', { name: 'Minder uitgeven' })).toHaveAttribute('aria-valuetext', formatCurrency(0))
-    expect(screen.getByRole('slider', { name: 'Meer opzij' })).toHaveAttribute('aria-valuetext', formatCurrency(0))
+    expect(screen.getByRole('slider', { name: 'Meer salaris' })).toHaveAttribute('aria-valuetext', formatCurrency(0))
+    expect(screen.getByRole('slider', { name: 'Spaarquote' })).toHaveAttribute('aria-valuetext', '20%')
+    expect(screen.getByRole('slider', { name: 'Minder werken' })).toHaveAttribute('aria-valuetext', '5 dagen')
   })
 
-  it('Minder uitgeven schuift nog steeds in procentpunten onder de motorkap (event-shape ongewijzigd)', () => {
+  it('Spaarquote zet het bedrag minder uitgeven eronder zodra de knop afwijkt (0 op de basis → geen regel)', () => {
+    const { rerender } = render(<WhatIfSliders baseline={baseline} events={[]} setEvents={() => {}} currentAge={40} />)
+    expect(screen.queryByText(/minder uitgeven/)).toBeNull()
+    const ev = buildSliderEvent('savings', 24, baseline, 40)
+    rerender(<WhatIfSliders baseline={baseline} events={ev ? [ev] : []} setEvents={() => {}} currentAge={40} />)
+    // 3000 × 5/5 × 4pp = €120
+    expect(screen.getByText('+€ 120/mnd minder uitgeven')).toBeInTheDocument()
+  })
+
+  it('de randlabels van Spaarquote zijn hele procenten, ook als een opgeslagen stand de band verbreedt', () => {
+    const ev = buildSliderEvent('savings', 52.008244023083265, baseline, 40)
+    render(<WhatIfSliders baseline={baseline} events={ev ? [ev] : []} setEvents={() => {}} currentAge={40} />)
+    expect(screen.getAllByText('52%').length).toBeGreaterThan(0)
+    expect(screen.queryByText(/52\.00/)).toBeNull()
+  })
+
+  it('Spaarquote schuift in procentpunten onder de motorkap (event-shape ongewijzigd)', () => {
     const setEvents = vi.fn()
     render(<WhatIfSliders baseline={baseline} events={[]} setEvents={setEvents} currentAge={40} />)
-    fireEvent.change(screen.getByRole('slider', { name: 'Minder uitgeven' }), { target: { value: '24' } })
+    fireEvent.change(screen.getByRole('slider', { name: 'Spaarquote' }), { target: { value: '24' } })
     expect(setEvents).toHaveBeenCalled()
     const updater = setEvents.mock.calls[0][0] as (prev: WhatIfEvent[]) => WhatIfEvent[]
     const next = updater([])
@@ -158,7 +173,7 @@ describe('WhatIfSliders — iOS: tik op de baan verschuift de slider', () => {
   function renderWithSpy() {
     const setEvents = vi.fn()
     render(<WhatIfSliders baseline={baseline} events={[]} setEvents={setEvents} currentAge={40} />)
-    const slider = screen.getByRole('slider', { name: 'Minder uitgeven' })
+    const slider = screen.getByRole('slider', { name: 'Spaarquote' })
     // Baan van 218px (bruikbaar traject 200px met een 18px-bolletje).
     slider.getBoundingClientRect = () =>
       ({ left: 0, width: 218, top: 0, height: 19, right: 218, bottom: 19, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect

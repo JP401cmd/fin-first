@@ -200,7 +200,7 @@ import { WhatIfMarketAssumptions } from '@/components/app/horizon/whatif-market-
 import { DoelLoslatenConfirm } from '@/components/future/doel-loslaten-confirm'
 import { StopPlanConfirm } from '@/components/app/horizon/stop-plan-confirm'
 import { planDraftFromSettings, planDraftToFireSettingsBody, validatePlanDraft } from '@/lib/horizon/plan-draft'
-import { applySliderEvent, buildSliderEvent, readSliderValueFromEvents, savingsEuroForPp, type SliderKey } from '@/lib/scenario-events'
+import { applySliderEvent, buildSliderEvent, readSliderValueFromEvents, type SliderKey } from '@/lib/scenario-events'
 import type { HorizonScenarioOverrides } from '@/lib/hooks/use-horizon-fire-sim'
 import type { AssetCategorie } from '@/lib/horizon-kernel/types'
 import { runMarktcheckAsync, runScenarioPresetsAsync } from '@/lib/horizon-kernel/worker/run-in-worker'
@@ -6958,12 +6958,12 @@ export default function HorizonPage({
               <DeltaBadge
                 current={readSliderValueFromEvents('savings', scenarioSliderEvents, whatIfBaseline)}
                 base={whatIfBaseline.savingsRate}
-                format={v => formatCurrency(savingsEuroForPp(whatIfBaseline, whatIfBaseline.savingsRate + v)) + '/mnd minder uitgeven'}
+                format={v => `${Math.round(v)}% spaarquote`}
               />
               <DeltaBadge
                 current={readSliderValueFromEvents('extra_inleg', scenarioSliderEvents, whatIfBaseline)}
                 base={0}
-                format={v => formatCurrency(v) + '/mnd'}
+                format={v => formatCurrency(v) + '/mnd meer salaris'}
               />
               {/* ADR 0145 — onder een vast stopmoment de uitkomst zelf: dekking van de
                   verkenning + de delta t.o.v. de basis. Stoplichtkleur (gedekt/tekort),
