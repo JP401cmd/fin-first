@@ -45,32 +45,34 @@ describe('computeSliderUiRange — werkdagen (geclampt 1–5)', () => {
   })
 })
 
-describe('computeSliderUiRange — spaarquote (procentpunten, geclampt 0–80)', () => {
-  it('basis 50% ⇒ [40, 60]', () => {
-    expect(computeSliderUiRange('savings', 50, 50)).toEqual({ min: 40, max: 60 })
+describe('computeSliderUiRange — spaarquote (±15 procentpunt, geclampt 0–80; eigenaarskeuze 15 sep 2026)', () => {
+  it('basis 50% ⇒ [35, 65]', () => {
+    expect(computeSliderUiRange('savings', 50, 50)).toEqual({ min: 35, max: 65 })
   })
-  it('basis < 10 degenereert niet ⇒ [0, max(10, round(base×1,2))]', () => {
-    expect(computeSliderUiRange('savings', 5, 5)).toEqual({ min: 0, max: 10 })
-    expect(computeSliderUiRange('savings', 0, 0)).toEqual({ min: 0, max: 10 })
+  it('klemt onderaan op 0 (basis 5 ⇒ [0, 20]; basis 0 ⇒ [0, 15])', () => {
+    expect(computeSliderUiRange('savings', 5, 5)).toEqual({ min: 0, max: 20 })
+    expect(computeSliderUiRange('savings', 0, 0)).toEqual({ min: 0, max: 15 })
   })
-  it('clampt de max op 80 (basis 80 ⇒ [64, 80])', () => {
-    expect(computeSliderUiRange('savings', 80, 80)).toEqual({ min: 64, max: 80 })
+  it('klemt bovenaan op 80 (basis 80 ⇒ [65, 80]); een niet-afgeronde basis rondt eerst', () => {
+    expect(computeSliderUiRange('savings', 80, 80)).toEqual({ min: 65, max: 80 })
+    expect(computeSliderUiRange('savings', 46.4, 46.4)).toEqual({ min: 31, max: 61 })
   })
   it('verbreedt tot een opgeslagen waarde buiten de band', () => {
-    expect(computeSliderUiRange('savings', 50, 75)).toEqual({ min: 40, max: 75 })
-    expect(computeSliderUiRange('savings', 50, 30)).toEqual({ min: 30, max: 60 })
+    expect(computeSliderUiRange('savings', 50, 75)).toEqual({ min: 35, max: 75 })
+    expect(computeSliderUiRange('savings', 50, 10)).toEqual({ min: 10, max: 65 })
   })
 })
 
-describe('computeSliderUiRange — extra inleg (20% van het basis-maandinkomen)', () => {
-  it('inkomen €7.600 ⇒ [0, 1500] (20% op €50)', () => {
-    expect(computeSliderUiRange('extra_inleg', 7600, 0)).toEqual({ min: 0, max: 1500 })
+describe('computeSliderUiRange — meer salaris (±30% van het basis-maandinkomen, ook omlaag)', () => {
+  it('inkomen €7.600 ⇒ [−2300, 2300] (30% op €50)', () => {
+    expect(computeSliderUiRange('extra_inleg', 7600, 0)).toEqual({ min: -2300, max: 2300 })
   })
-  it('geen inkomen ⇒ vangnet [0, 500]', () => {
-    expect(computeSliderUiRange('extra_inleg', 0, 0)).toEqual({ min: 0, max: 500 })
+  it('geen inkomen ⇒ vangnet [−500, 500]', () => {
+    expect(computeSliderUiRange('extra_inleg', 0, 0)).toEqual({ min: -500, max: 500 })
   })
-  it('verbreedt tot een opgeslagen waarde boven de max', () => {
-    expect(computeSliderUiRange('extra_inleg', 7600, 2000)).toEqual({ min: 0, max: 2000 })
+  it('verbreedt tot een opgeslagen waarde buiten de band, aan beide kanten', () => {
+    expect(computeSliderUiRange('extra_inleg', 7600, 3000)).toEqual({ min: -2300, max: 3000 })
+    expect(computeSliderUiRange('extra_inleg', 7600, -3000)).toEqual({ min: -3000, max: 2300 })
   })
 })
 

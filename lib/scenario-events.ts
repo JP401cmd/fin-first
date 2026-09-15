@@ -167,10 +167,13 @@ export function buildSliderEvent(
       })
     }
     case 'extra_inleg': {
+      // De knop "Meer salaris": een delta op het salaris, óók negatief (verlaging). Landt via
+      // `salarisDeltaPerMaand` op het FIRE-gegate salaris-kanaal — negatief werkt daar net als
+      // `slider:workdays` (guard.ts), dus geen apart event-type nodig.
       if (value === 0) return null
       return buildScenarioEvent({
         id,
-        name: `Extra inleg`,
+        name: value > 0 ? `Meer salaris (+${formatDelta(value)})` : `Minder salaris (${formatDelta(value)})`,
         event_type: 'extra_inleg',
         target_age: currentAge,
         monthly_income_change: Math.round(value),
@@ -230,13 +233,13 @@ export function readSliderValueFromEvents(
  * Dit is UITSLUITEND de zichtbare schaal; de validatie-clamps (`SLIDER_RANGES` in
  * lib/horizon/toekomst-scenario.ts), de parser en de API blijven ongewijzigd.
  *
- * De marge is ±20% rond de huidige basisstand (`base`), per type afgerond/geclampt:
- *  - `income`     : [base×0,8 op €100 omlaag, base×1,2 op €100 omhoog]; base 0 ⇒ [0, 1000].
+ * De marge per type (eigenaarskeuze 15 sep 2026 voor salaris en spaarquote):
+ *  - `income`     : ±20% — [base×0,8 op €100 omlaag, base×1,2 op €100 omhoog]; base 0 ⇒ [0, 1000].
  *  - `workdays`   : [floor(base×0,8), ceil(base×1,2)], geclampt op domein 1–5.
- *  - `savings`    : [round(base×0,8), round(base×1,2)] procentpunten, geclampt 0–80;
- *                   base < 10 ⇒ [0, max(10, round(base×1,2))] zodat het bereik nooit degenereert.
- *  - `extra_inleg`: basis is per definitie 0 (extra bóvenop je inleg); `base` = basis-maandinkomen ⇒
- *                   [0, 20% daarvan op €50]; zonder inkomen ⇒ [0, 500].
+ *  - `savings`    : ±15 PROCENTPUNT rond de basis — [round(base)−15, round(base)+15], geclampt 0–80.
+ *  - `extra_inleg`: de knop "Meer salaris" — basis is per definitie 0 (delta op je salaris);
+ *                   `base` = basis-maandinkomen ⇒ [−30%, +30%] daarvan op €50, dus óók een
+ *                   verlaging is te verkennen; zonder inkomen ⇒ [−500, 500].
  *
  * Verbreding-vangnet (overal): ligt de opgeslagen waarde buiten [min,max], dan verbreedt de band
  * tot die waarde (min omlaag óf max omhoog) — niets clampt.
@@ -258,15 +261,15 @@ export function computeSliderUiRange(
       max = Math.max(1, Math.min(5, Math.ceil(base * 1.2)))
       break
     case 'savings':
-      if (base < 10) { min = 0; max = Math.max(10, Math.round(base * 1.2)) }
-      else { min = Math.round(base * 0.8); max = Math.round(base * 1.2) }
-      min = Math.max(0, Math.min(80, min))
-      max = Math.max(0, Math.min(80, max))
+      min = Math.max(0, Math.min(80, Math.round(base) - 15))
+      max = Math.max(0, Math.min(80, Math.round(base) + 15))
       break
-    case 'extra_inleg':
-      min = 0
-      max = base > 0 ? Math.round((base * 0.2) / 50) * 50 : 500
+    case 'extra_inleg': {
+      const span = base > 0 ? Math.round((base * 0.3) / 50) * 50 : 500
+      min = -span
+      max = span
       break
+    }
   }
   // Vangnet: een opgeslagen waarde buiten [min,max] verbreedt de band tot die waarde.
   return { min: Math.min(min, saved), max: Math.max(max, saved) }

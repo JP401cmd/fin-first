@@ -40,7 +40,7 @@ describe('spaarquote in euro — één som voor event, weergave en antwoorden (s
   })
 
   it('computeSliderUiRange woont in lib (importeerbaar zonder component)', () => {
-    expect(computeSliderUiRange('extra_inleg', 7600, 0)).toEqual({ min: 0, max: 1500 })
-    expect(computeSliderUiRange('savings', 50, 50)).toEqual({ min: 40, max: 60 })
+    expect(computeSliderUiRange('extra_inleg', 7600, 0)).toEqual({ min: -2300, max: 2300 })
+    expect(computeSliderUiRange('savings', 50, 50)).toEqual({ min: 35, max: 65 })
   })
 })

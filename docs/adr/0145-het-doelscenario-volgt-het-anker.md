@@ -151,7 +151,9 @@ als knop en als `DOEL_PARAMETERS`-lid; bestaande `salary`-rijen blijven,
 `LEGACY_PARAMETER_GOAL_TYPES`), 2 **Spaarquote** (hele procenten, met eronder het bedrag
 minder uitgeven via `spaarquoteEuroRegel`; het event blijft in procentpunten), 3 **Minder
 werken** (werkdagen per week). "Later of eerder stoppen" is de stop-slider in sectie 2. Het
-antwoordenblok (D10) noemt de tweede hefboom dan ook "meer salaris".
+antwoordenblok (D10) noemt de tweede hefboom dan ook "meer salaris". Bereiken: salaris ±30% van
+het maandinkomen (ook omlaag — een negatieve delta loopt via hetzelfde salaris-kanaal als
+`slider:workdays`), spaarquote ±15 procentpunt, werkdagen 1–5.
 
 **D10 — Bij een tekort: de drie hefbomen als antwoorden** (§3). `resolveLabAntwoorden`
 geeft "doorwerken tot X" (tweede run), "€X extra opzij" en "€X minder uitgeven"

@@ -121,14 +121,15 @@ describe('parseToekomstScenarioPrefs', () => {
   it('clampt sliderwaarden op de echte ranges', () => {
     const parsed = parseToekomstScenarioPrefs({
       v: 1,
-      sliders: { income: 99_999, workdays: 9, savings: 200, extraInleg: -100 },
+      sliders: { income: 99_999, workdays: 9, savings: 200, extraInleg: -99_999 },
     })
     expect(parsed?.sliders).toEqual({
       income: 15_000, // max
       workdays: 5, // max
       savings: 80, // max
-      extraInleg: 0, // min
+      extraInleg: -5_000, // min — negatief mag (salarisverlaging, 15 sep 2026)
     })
+    expect(parseToekomstScenarioPrefs({ v: 2, sliders: { extraInleg: -100 } })?.sliders).toEqual({ extraInleg: -100 })
   })
 
   it('gooit onbekende slider-keys en niet-eindige waarden weg', () => {
@@ -241,7 +242,7 @@ describe('parseToekomstScenarioPrefs — doel-blok', () => {
         gezetOp: GEZET_OP,
         parameters: { spaarquote: true },
         stand: {
-          sliders: { income: 99999, savings: 200, extraInleg: -100 },
+          sliders: { income: 99999, savings: 200, extraInleg: -99999 },
           returnDeltaByCategorie: { Beleggingen: 0.9, Onzin: 0.03 },
           stopAge: 250,
           stopMarge: 80,
@@ -249,7 +250,7 @@ describe('parseToekomstScenarioPrefs — doel-blok', () => {
       },
     })
     expect(parsed?.doel?.stand).toEqual({
-      sliders: { income: 15000, savings: 80, extraInleg: 0 },
+      sliders: { income: 15000, savings: 80, extraInleg: -5000 },
       returnDeltaByCategorie: { Beleggingen: 0.05 },
       stopAge: 100,
       stopMarge: 30,

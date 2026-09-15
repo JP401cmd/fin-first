@@ -26,9 +26,9 @@ describe('resolveLabAntwoorden — de drie hefbomen als antwoorden (spec §3)', 
     expect(a[0].actie).toEqual({ kind: 'stop', stopAge: 61.5 })
     expect(a[1].actie).toEqual({ kind: 'slider', key: 'extra_inleg', value: 500 })
     expect(a[1].bovenBereik).toBe(false)
-    // €500 minder uitgeven op €4.000 = +12,5 pp → 32,5 → afgerond 33; range 16–24 → geklemd op 24
-    expect(a[2].actie).toEqual({ kind: 'slider', key: 'savings', value: 24 })
-    expect(a[2].bovenBereik).toBe(true)
+    // €500 minder uitgeven op €4.000 = +12,5 pp → 32,5 → afgerond 33; range ±15 pp (5–35) → past
+    expect(a[2].actie).toEqual({ kind: 'slider', key: 'savings', value: 33 })
+    expect(a[2].bovenBereik).toBe(false)
   })
 
   it('een hele opgeloste leeftijd blijft heel ("61"), een fractie gaat naar het volgende halve jaar', () => {
@@ -61,7 +61,10 @@ describe('resolveLabAntwoorden — de drie hefbomen als antwoorden (spec §3)', 
   it('boven het slider-bereik zegt het antwoord dat eerlijk en klemt de actie op het maximum', () => {
     const a = resolveLabAntwoorden({ dekking: tekort, solvedFireAge: null, planMaandHint: 22_695, baseline })
     expect(a[0].bovenBereik).toBe(true)
-    expect(a[0].actie).toEqual({ kind: 'slider', key: 'extra_inleg', value: 800 }) // 20% van 4000
+    expect(a[0].actie).toEqual({ kind: 'slider', key: 'extra_inleg', value: 1200 }) // 30% van 4000
+    // en de spaarquote-regel klemt op basis + 15 pp
+    expect(a[1].bovenBereik).toBe(true)
+    expect(a[1].actie).toEqual({ kind: 'slider', key: 'savings', value: 35 })
   })
 
   it('geen antwoorden zonder tekort, onder now, of zonder stopmoment', () => {

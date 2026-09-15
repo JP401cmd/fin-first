@@ -41,7 +41,8 @@ const SLIDER_RANGES = {
   income: { min: 0, max: 15_000 },
   workdays: { min: 1, max: 5 },
   savings: { min: 0, max: 80 },
-  extraInleg: { min: 0, max: 5_000 },
+  // Negatief = een salarisverlaging verkennen (knop "Meer salaris", ±30% — 15 sep 2026).
+  extraInleg: { min: -5_000, max: 5_000 },
 } as const
 
 /** Rendement-delta-bereik (decimaal) — spiegelt de Marktbias-slider (`whatif-market-assumptions.tsx`, ±0,05 = ±5 pp). */
