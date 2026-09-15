@@ -97,7 +97,7 @@ describe('labAntwoordenPerSlider — elk antwoord onder zijn eigen knop (spec an
     const a = resolveLabAntwoorden({ dekking: tekort, solvedFireAge: 61.2, planMaandHint: 500, baseline })
     const per = labAntwoordenPerSlider(a, () => {})
     expect(per.stop?.tekst).toBe('Doorwerken tot 61,5 dekt je plan.')
-    expect(per.sliders.extra_inleg?.tekst).toBe("Zo'n €500/mnd meer hoort bij een gedekt plan.")
+    expect(per.sliders.extra_inleg?.tekst).toBe("Zo'n €500/mnd meer salaris hoort bij een gedekt plan.")
     expect(per.sliders.savings?.tekst).toBe("Zo'n €500/mnd minder uitgeven hoort bij een gedekt plan.")
     expect(Object.keys(per.sliders).sort()).toEqual(['extra_inleg', 'savings'])
     expect(per.sliders.extra_inleg?.knop?.label).toBe('Reken hiermee')

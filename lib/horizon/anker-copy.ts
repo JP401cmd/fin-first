@@ -616,7 +616,7 @@ function maandBedrag(hint: number, masked: boolean): string {
 
 /** Antwoord 2 — `planMaandHint` (P!B96 van de hoofd-run) als meer salaris (het extra-inleg-event). */
 export function antwoordMeerSalaris(hint: number, masked = false): string {
-  return `Zo'n ${maandBedrag(hint, masked)}/mnd meer hoort bij een gedekt plan.`
+  return `Zo'n ${maandBedrag(hint, masked)}/mnd meer salaris hoort bij een gedekt plan.`
 }
 
 /** Antwoord 3 — hetzelfde bedrag als minder uitgeven (dezelfde maandelijkse stroom). */

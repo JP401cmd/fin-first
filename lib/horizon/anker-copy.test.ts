@@ -321,13 +321,13 @@ describe('dekking-zinnen — de vastgestelde kopij', () => {
     expect(ANTWOORD_KNOP_MAX).toBe('Reken met maximum')
     expect(antwoordDoorwerken(61)).toBe('Doorwerken tot 61 dekt je plan.')
     expect(antwoordDoorwerken(61.5)).toBe('Doorwerken tot 61,5 dekt je plan.')
-    expect(antwoordMeerSalaris(2100.4)).toBe("Zo'n €2.100/mnd meer hoort bij een gedekt plan.")
+    expect(antwoordMeerSalaris(2100.4)).toBe("Zo'n €2.100/mnd meer salaris hoort bij een gedekt plan.")
     expect(antwoordMinderUitgeven(2100.4)).toBe("Zo'n €2.100/mnd minder uitgeven hoort bij een gedekt plan.")
     expect(ANTWOORD_BOVEN_BEREIK).toBe('Meer dan deze knop toelaat.')
   })
 
   it('11 · privacy: de bedragen worden gemaskeerd, de zin blijft beschrijvend', () => {
-    expect(antwoordMeerSalaris(2100, true)).toBe(`Zo'n ${MASKED_AMOUNT_PLACEHOLDER}/mnd meer hoort bij een gedekt plan.`)
+    expect(antwoordMeerSalaris(2100, true)).toBe(`Zo'n ${MASKED_AMOUNT_PLACEHOLDER}/mnd meer salaris hoort bij een gedekt plan.`)
     expect(antwoordMinderUitgeven(2100, true)).toContain(MASKED_AMOUNT_PLACEHOLDER)
     expect(antwoordMinderUitgeven(2100, true)).not.toMatch(/2\.100|€/)
   })
@@ -411,7 +411,7 @@ describe('dekking-zinnen — toon-invarianten over alle ankers', () => {
     // de €-hefbomen stoppen op het stopmoment en dekken het plan niet → "hoort bij" (eindreview I2).
     expect(antwoordDoorwerken(60)).toMatch(/dekt je plan\.$/)
     for (const zin of [antwoordMeerSalaris(300), antwoordMinderUitgeven(300), antwoordMeerSalaris(300, true), antwoordMinderUitgeven(300, true)]) {
-      expect(zin).toMatch(/\/mnd (meer|minder uitgeven) hoort bij een gedekt plan\.$/)
+      expect(zin).toMatch(/\/mnd (meer salaris|minder uitgeven) hoort bij een gedekt plan\.$/)
       expect(zin).not.toMatch(/dekt je plan/)
     }
   })

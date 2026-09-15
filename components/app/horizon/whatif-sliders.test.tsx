@@ -169,13 +169,13 @@ describe('WhatIfSliders — antwoorden naast de knoppen', () => {
         setEvents={() => {}}
         currentAge={40}
         antwoorden={{
-          extra_inleg: { tekst: "Zo'n €500/mnd meer hoort bij een gedekt plan.", bovenBereik: false, knop: { label: 'Reken hiermee', onClick } },
+          extra_inleg: { tekst: "Zo'n €500/mnd meer salaris hoort bij een gedekt plan.", bovenBereik: false, knop: { label: 'Reken hiermee', onClick } },
           savings: { tekst: "Zo'n €500/mnd minder uitgeven hoort bij een gedekt plan.", bovenBereik: true, knop: { label: 'Reken met maximum', onClick: () => {} } },
         }}
       />,
     )
     const salaris = screen.getByRole('slider', { name: 'Meer salaris' })
-    const salarisRegel = screen.getByText("Zo'n €500/mnd meer hoort bij een gedekt plan.")
+    const salarisRegel = screen.getByText("Zo'n €500/mnd meer salaris hoort bij een gedekt plan.")
     expect(salaris).toHaveAttribute('aria-describedby', salarisRegel.id)
     const spaar = screen.getByRole('slider', { name: 'Spaarquote' })
     const spaarRegel = document.getElementById(spaar.getAttribute('aria-describedby') ?? '')
@@ -197,7 +197,7 @@ describe('WhatIfSliders — antwoorden naast de knoppen', () => {
         events={[]}
         setEvents={() => {}}
         currentAge={40}
-        antwoorden={{ extra_inleg: { tekst: "Zo'n ••••••/mnd meer hoort bij een gedekt plan.", bovenBereik: false, knop: null } }}
+        antwoorden={{ extra_inleg: { tekst: "Zo'n ••••••/mnd meer salaris hoort bij een gedekt plan.", bovenBereik: false, knop: null } }}
       />,
     )
     expect(screen.getByText(/hoort bij een gedekt plan/)).toBeInTheDocument()
