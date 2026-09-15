@@ -10,9 +10,31 @@ import { dekkingVanRun, resolveLabUitkomst, type LabStopPad, type LabUitkomstInp
  *    (`hasScenario || hasStopKeuze`);
  *  - `aow`/`age`: dekking als uitkomst, `basisPct` ≡ `computeRunwayCoveragePct` op
  *    exact de loader-invoer (identiteit — geen tweede formule);
- *  - de gate per anker (nu-anker · gedekt · geen-verkenning · geen-run);
+ *  - de gate per anker (nu-anker · eindvermogen · geen-verkenning · geen-run);
+ *  - het EINDVERMOGEN als derde component (ADR 0145 D12, 15 sep 2026): basis/scenario/
+ *    verkend uit `pickEndBalanceAtEndAge` op de rijen van díé run, en de nieuwe gate-tak
+ *    "gedekt + verkenning → promotie eindvermogen" (die `geen/gedekt` vervangt);
  *  - de maandHint-prioriteit (stop-pad ▸ kernel ▸ null), nooit een eigen som.
  */
+
+/** Rijen met een oplopende leeftijd-as; alleen `age`/`endPortfolio` doen ertoe voor D12. */
+function rows(entries: readonly (readonly [age: number, endPortfolio: number])[]): SimResult['rows'] {
+  return entries.map(([age, endPortfolio]) => ({
+    age,
+    phase: 'retirement' as const,
+    startPortfolio: 0,
+    growth: 0,
+    savings: 0,
+    withdrawal: 0,
+    cashflowNet: 0,
+    oneTimeNet: 0,
+    endPortfolio,
+    grossIncome: 0,
+    grossExpenses: 0,
+    flowIn: 0,
+    flowOut: 0,
+  }))
+}
 
 function sim(over: Partial<SimResult> = {}): SimResult {
   return {
@@ -133,14 +155,22 @@ describe('resolveLabUitkomst — aow/age: dekking als uitkomst', () => {
     expect(resolveLabUitkomst(input({ hasStopKeuze: true })).promotie).toEqual({ kind: 'geen', reden: 'geen-verkenning' })
   })
 
-  it('age gedekt (geen uitputting binnen de horizon) → 100% en promotie geen/gedekt, óók met scenario', () => {
+  it('age gedekt (geen uitputting binnen de horizon) → 100% en promotie eindvermogen (D12), óók met scenario', () => {
     const gedekt = sim({ ...AOW_TEKORT, stopAnker: { soort: 'leeftijd', leeftijd: 58 }, vastStopLeeftijd: 58, ankerMaand: 192, kernelDepletionMonth: null })
     const u = resolveLabUitkomst(input({ planAnchor: { kind: 'age', age: 58 }, basis: gedekt, scenario: gedekt, hasScenario: true }))
     if (u.kind !== 'dekking') throw new Error('unreachable')
     expect(u.basisPct).toBe(100)
     expect(u.tekort).toBe(false)
     expect(u.basisReach).toEqual({ kind: 'gedekt', endAge: 90 })
-    expect(u.promotie).toEqual({ kind: 'geen', reden: 'gedekt' })
+    // ADR 0145 D12 — dit was `geen/gedekt` (E5); het eindvermogen is wat nog beweegt.
+    expect(u.promotie).toEqual({ kind: 'eindvermogen' })
+  })
+
+  it('gedekt ZONDER verkenning → geen-verkenning (er is geen lab-stand om vast te leggen)', () => {
+    const gedekt = sim({ ...AOW_TEKORT, kernelDepletionMonth: null })
+    expect(resolveLabUitkomst(input({ basis: gedekt })).promotie).toEqual({ kind: 'geen', reden: 'geen-verkenning' })
+    // Een kale stopkeuze is onder een vast anker géén doelstand (D4) — ook bij gedekt.
+    expect(resolveLabUitkomst(input({ basis: gedekt, hasStopKeuze: true })).promotie).toEqual({ kind: 'geen', reden: 'geen-verkenning' })
   })
 
   it('now → dekking als uitkomst, maar nooit een doel (nu-anker)', () => {
@@ -183,6 +213,47 @@ describe('resolveLabUitkomst — aow/age: dekking als uitkomst', () => {
     expect(u.verkendReach).toEqual({ kind: 'reikt-tot', age: 77, endAge: 90 })
     // De basis blijft de plan-run: het stop-pad verandert niets aan basisPct.
     expect(u.basisPct).toBeCloseTo((180 / 276) * 100, 9)
+  })
+})
+
+describe('resolveLabUitkomst — eindvermogen als derde component (ADR 0145 D12)', () => {
+  // Rijen t/m de eindleeftijd 90; de laatste rij met `age <= 90` telt (`pickEndBalanceAtEndAge`).
+  const basisRijen = rows([[88, 120_000], [89, 110_000], [90, 100_000], [91, 90_000]])
+  const scenarioRijen = rows([[89, 200_000], [90, 180_000]])
+  const verkendRijen = rows([[89, 160_000], [90, 150_000]])
+
+  it('leest basis/scenario/verkend elk uit de rijen van díé run — nominaal, laatste rij ≤ eindleeftijd', () => {
+    const basis = sim({ ...AOW_TEKORT, kernelDepletionMonth: null, rows: basisRijen })
+    const u = resolveLabUitkomst(
+      input({
+        basis,
+        scenario: sim({ ...basis, rows: scenarioRijen }),
+        hasScenario: true,
+        stopPad: stopPad({ result: sim({ ...basis, vastStopLeeftijd: 62, ankerMaand: 240, rows: verkendRijen }) }),
+        hasStopKeuze: true,
+      }),
+    )
+    if (u.kind !== 'dekking') throw new Error('unreachable')
+    // 100.000 en niet 90.000: rij 91 ligt vóórbij de eindleeftijd.
+    expect(u.basisEindvermogen).toBe(100_000)
+    expect(u.scenarioEindvermogen).toBe(180_000)
+    expect(u.verkendEindvermogen).toBe(150_000)
+    expect(u.promotie).toEqual({ kind: 'eindvermogen' })
+  })
+
+  it('zonder scenario/stop-pad blijven de bijbehorende eindvermogens null (geen terugval op de basis)', () => {
+    const u = resolveLabUitkomst(input({ basis: sim({ ...AOW_TEKORT, rows: basisRijen }) }))
+    if (u.kind !== 'dekking') throw new Error('unreachable')
+    expect(u.basisEindvermogen).toBe(100_000)
+    expect(u.scenarioEindvermogen).toBeNull()
+    expect(u.verkendEindvermogen).toBeNull()
+  })
+
+  it('een run zonder rijen (stub) levert null — nooit 0 uit een gat', () => {
+    const u = resolveLabUitkomst(input({ scenario: sim(AOW_TEKORT), hasScenario: true }))
+    if (u.kind !== 'dekking') throw new Error('unreachable')
+    expect(u.basisEindvermogen).toBeNull()
+    expect(u.scenarioEindvermogen).toBeNull()
   })
 })
 

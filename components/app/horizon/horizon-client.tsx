@@ -165,6 +165,10 @@ import {
   ANTWOORD_KNOP,
   dekkingVastgelegdToast,
   dekkingVerkenZin,
+  eindvermogenDeltaBadge,
+  eindvermogenPreviewWaarde,
+  eindvermogenSheetToelichting,
+  eindvermogenVastgelegdToast,
   formatStopAge,
   radarSubtitel,
   type AnkerReach,
@@ -2830,13 +2834,18 @@ export default function HorizonPage({
   const labPromotie = labUitkomst.promotie
   const doelVastleggenMogelijk = labPromotie.kind !== 'geen'
   // Onder solved: als vóór ADR 0145 (altijd bij een doel). Onder een vast anker alleen
-  // wanneer er iets vast te leggen is — anders opent het venster zonder rijen.
-  const doelBijwerkenMogelijk = doelActief && (labUitkomst.kind === 'vrijheidsleeftijd' || labPromotie.kind === 'dekking')
+  // wanneer er iets vast te leggen is — anders opent het venster zonder rijen. D12: bij een
+  // gedekt plan is dat het eindvermogen.
+  const doelBijwerkenMogelijk =
+    doelActief &&
+    (labUitkomst.kind === 'vrijheidsleeftijd' || labPromotie.kind === 'dekking' || labPromotie.kind === 'eindvermogen')
   // De dekking-uitkomst als losse afleiding (null onder `solved`) — alle dekking-
   // oppervlakken hieronder lezen deze ene waarde.
   const labDekking = labUitkomst.kind === 'dekking' ? labUitkomst : null
   // Spec lab-haalbaarheid §1 — de dekkingsas leest uitsluitend de lab-uitkomst (ADR 0145).
-  const dekkingsasData = useMemo<DekkingsasData | null>(() => {
+  // NOMINAAL en zonder eindvermogen: de euro-kolom (D12) wordt in het euro-weergave-blok
+  // hieronder gedeflateerd en daar aan `viewDekkingsasData` toegevoegd.
+  const dekkingsasData = useMemo<Omit<DekkingsasData, 'basisEindvermogen' | 'scenarioEindvermogen'> | null>(() => {
     if (labDekking == null) return null
     const stopAge = labDekking.stop == null ? null : labDekking.stop.kind === 'now' ? currentAge : labDekking.stop.stopAge
     return {
@@ -3686,6 +3695,10 @@ export default function HorizonPage({
         rendementPct: gekozen.rendement ? doelRendementPct ?? undefined : undefined,
         fireLeeftijd: gekozen.fire ? doelFireLeeftijd ?? undefined : undefined,
         margeJaren: gekozen.fire ? doelMargeJaren : undefined,
+        // ADR 0145 D12 — het doelbedrag is NOMINAAL (zoals `end_balance` het live meet via
+        // `pickEndBalanceAtEndAge`), dus uit de lab-uitkomst zelf en NIET de gedeflateerde
+        // lab-weergave. De server voegt de plan-velden toe.
+        eindvermogen: gekozen.eindvermogen ? labDekking?.scenarioEindvermogen ?? undefined : undefined,
       }
       setDoelSaving(true)
       try {
@@ -3726,7 +3739,9 @@ export default function HorizonPage({
           title: doelActief ? 'Doel bijgewerkt' : 'Doel vastgelegd',
           message: gekozen.dekking
             ? dekkingVastgelegdToast(labDekking?.eind ?? null)
-            : 'Je verkenning is nu je doel.',
+            : gekozen.eindvermogen
+              ? eindvermogenVastgelegdToast(labDekking?.eind ?? null)
+              : 'Je verkenning is nu je doel.',
         })
       } catch {
         addToast({ type: 'error', title: 'Doel niet vastgelegd', message: 'Probeer het zo nog eens.' })
@@ -4761,6 +4776,57 @@ export default function HorizonPage({
   const viewPortfolioAtAow = portfolioAtAow == null ? null : deflate(portfolioAtAow, aowFactor, euroView)
   const viewMonthlyWithdrawalAtAow =
     monthlyWithdrawalAtAow == null ? null : deflate(monthlyWithdrawalAtAow, aowFactor, euroView)
+
+  // ── Lab-dekkingsas: eindvermogen als derde component (ADR 0145 D12) ───────
+  // Klasse S — één bedrag op de EINDLEEFTIJD van het plan, dus de factor van díé leeftijd
+  // (zelfde patroon als `viewTargetEndPortfolio`/`viewEffectiveFireTarget`). Basis en wat-als
+  // delen die ene factor: `displayUnifiedRows` volgt de wat-als-rijen, en twee deflatoren
+  // zouden de delta-badge een inflatie-artefact laten tonen i.p.v. het effect van de knoppen.
+  // `labDekking.*Eindvermogen` blijft NOMINAAL (dat is ook het doelbedrag dat de sheet
+  // schrijft); alleen de weergave hieronder is gedeflateerd.
+  const eindvermogenFactor = useMemo(
+    () => factorAtAge(displayUnifiedRows, labDekking?.eind ?? chartEndAge),
+    [displayUnifiedRows, labDekking, chartEndAge],
+  )
+  const viewBasisEindvermogen =
+    labDekking?.basisEindvermogen == null ? null : deflate(labDekking.basisEindvermogen, eindvermogenFactor, euroView)
+  const viewScenarioEindvermogen =
+    labDekking?.scenarioEindvermogen == null ? null : deflate(labDekking.scenarioEindvermogen, eindvermogenFactor, euroView)
+  // De dekkingsas krijgt de euro-kolom erbij. Gemaskeerd ⇒ `null`: de tegel toont puntjes,
+  // zodat er geen tweede maskeer-pad in het component ontstaat.
+  const viewDekkingsasData = useMemo<DekkingsasData | null>(
+    () =>
+      dekkingsasData == null
+        ? null
+        : {
+            ...dekkingsasData,
+            basisEindvermogen: masked ? null : viewBasisEindvermogen,
+            scenarioEindvermogen: masked ? null : viewScenarioEindvermogen,
+          },
+    [dekkingsasData, masked, viewBasisEindvermogen, viewScenarioEindvermogen],
+  )
+  // De delta-badge naast `lab-dekking-badge`: weg bij maskeren of een verschil van € 0.
+  const viewLabEindvermogenDelta =
+    !masked && viewBasisEindvermogen != null && viewScenarioEindvermogen != null
+      ? Math.round(viewScenarioEindvermogen - viewBasisEindvermogen)
+      : 0
+  // De vaste preview-rij "Eindvermogen" in het vastleg-venster (promotie `eindvermogen`):
+  // toont de gedeflateerde bedragen — de doelwaarde die de sheet schrijft blijft nominaal
+  // (`handleDoelVastleggen`). Aan de overige rijen (`doelPreviews`) verandert niets.
+  const viewDoelPreviews = useMemo<DoelParameterPreview[]>(() => {
+    if (labPromotie.kind !== 'eindvermogen' || viewBasisEindvermogen == null || viewScenarioEindvermogen == null) {
+      return doelPreviews
+    }
+    return [
+      ...doelPreviews,
+      {
+        parameter: 'eindvermogen',
+        label: 'Eindvermogen',
+        waarde: eindvermogenPreviewWaarde(viewBasisEindvermogen, viewScenarioEindvermogen, labDekking?.eind ?? null, masked),
+        vast: true,
+      },
+    ]
+  }, [doelPreviews, labPromotie, viewBasisEindvermogen, viewScenarioEindvermogen, labDekking, masked])
 
   // ── Cijferbar (LifelineReadout) ───────────────────────────────────────────
   // `netWorth` is klasse S op de gehoverde leeftijd, `monthlyAmount` klasse F in
@@ -6868,8 +6934,8 @@ export default function HorizonPage({
                       `solved` is dat het oude "er is iets vast te leggen"-oordeel:
                       sliders ÓF een kale stopkeuze (melding B-031 — een doel dat puur
                       een stopmoment was bleef anders na loslaten onherstelbaar).
-                      Onder aow/age alleen bij een tekort mét verkenning; onder het
-                      nu-anker nooit. */}
+                      Onder aow/age alleen mét verkenning — bij een tekort de dekking,
+                      bij een gedekt plan het eindvermogen (D12); onder het nu-anker nooit. */}
                   {doelVastleggenMogelijk && (
                     <button
                       type="button"
@@ -6979,6 +7045,17 @@ export default function HorizonPage({
                   {labDekkingDelta.label !== 'gelijk' && <> · {labDekkingDelta.label}</>}
                 </span>
               )}
+              {/* ADR 0145 D12 — het derde component: wat de verkenning met het eindvermogen
+                  doet (gedeflateerd, zie het euro-weergave-blok). Neutraal, geen stoplicht:
+                  meer of minder eindvermogen is geen oordeel over het plan. */}
+              {labDekkingDelta && viewLabEindvermogenDelta !== 0 && (
+                <span
+                  data-testid="lab-eindvermogen-badge"
+                  className="rounded-full bg-[var(--subtle)] px-1.5 py-0.5 font-mono text-[10px] font-medium tabular-nums text-[var(--ink-2)]"
+                >
+                  {eindvermogenDeltaBadge(viewLabEindvermogenDelta)}
+                </span>
+              )}
             </div>
           )}
 
@@ -7028,7 +7105,7 @@ export default function HorizonPage({
                   }
                   ankerVast={isFixedAnchorMode}
                   // Spec lab-haalbaarheid §1 — onder een vast anker is sectie 2 de dekkingsas.
-                  dekking={dekkingsasData}
+                  dekking={viewDekkingsasData}
                   // ADR 0145 — onder aow/age de uitkomst van het plan: reikt het, voor
                   // hoeveel procent, en of er iets vast te leggen valt.
                   uitkomstNotitie={(() => {
@@ -7182,16 +7259,17 @@ export default function HorizonPage({
         <DoelVastlegSheet
           open={doelSheetOpen}
           onClose={() => setDoelSheetOpen(false)}
-          previews={doelPreviews}
+          previews={viewDoelPreviews}
           bijwerken={doelActief}
           saving={doelSaving}
           onSubmit={handleDoelVastleggen}
           // ADR 0129/0145 — onder een vast stopmoment schrijft het lab geen fire_age-doel
           // (de sheet filtert de fire-rij als vangnet); de toelichting zegt wat het lab
           // dáár wél vastlegt: of het plan reikt.
+          // D12 — bij een GEDEKT plan legt het lab het eindvermogen vast; de toelichting zegt dat.
           fireAgeNietVanToepassing={
             isFixedAnchorMode && planAnchor.kind !== 'solved'
-              ? dekkingSheetToelichting(
+              ? (labPromotie.kind === 'eindvermogen' ? eindvermogenSheetToelichting : dekkingSheetToelichting)(
                   ankerStop ?? (planAnchor.kind === 'age' ? { kind: 'age', stopAge: planAnchor.age } : { kind: 'now' }),
                   simResult?.displayEndAge ?? initialData.firePlan?.endAge ?? null,
                 )

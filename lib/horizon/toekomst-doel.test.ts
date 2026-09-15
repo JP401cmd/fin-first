@@ -169,16 +169,43 @@ describe('buildParameterGoalRows', () => {
 })
 
 describe('PARAM_TO_GOAL_TYPE / PARAMETER_GOAL_TYPES', () => {
-  it('koppelt elke parameter aan het juiste goal_type (vier, incl. het dekkingsdoel — ADR 0145); salaris blijft als legacy-type bestaan', () => {
+  it('koppelt elke parameter aan het juiste goal_type (vijf, incl. dekking en eindvermogen — ADR 0145/D12); salaris blijft als legacy-type bestaan', () => {
     expect(PARAM_TO_GOAL_TYPE).toEqual({
       spaarquote: 'savings_rate',
       rendement: 'expected_return',
       fire: 'fire_age',
       dekking: 'plan_coverage',
+      eindvermogen: 'end_balance',
     })
-    expect(PARAMETER_GOAL_TYPES).toEqual(['savings_rate', 'expected_return', 'fire_age', 'plan_coverage'])
-    expect(PARAMETER_GOAL_TYPES).toHaveLength(4)
+    expect(PARAMETER_GOAL_TYPES).toEqual(['savings_rate', 'expected_return', 'fire_age', 'plan_coverage', 'end_balance'])
+    expect(PARAMETER_GOAL_TYPES).toHaveLength(5)
     expect(LEGACY_PARAMETER_GOAL_TYPES).toEqual(['salary'])
+  })
+})
+
+describe('buildParameterGoalRows — eindvermogen (ADR 0145 D12)', () => {
+  it('bouwt een end_balance-rij: doel = het NOMINALE client-bedrag, naam met eindleeftijd, plan-velden in de metadata', () => {
+    const { rows, overgeslagen } = buildParameterGoalRows(
+      input({ eindvermogen: true }, { eindvermogen: 250_000, planEindleeftijd: 90, planStopAnker: 'age', planStopLeeftijd: 60 }),
+    )
+    expect(overgeslagen).toEqual([])
+    expect(rows).toHaveLength(1)
+    const row = rows[0]
+    expect(row.parameter).toBe('eindvermogen')
+    expect(row.goal_type).toBe('end_balance')
+    expect(row.name).toBe('Eindvermogen op je 90e')
+    expect(row.target_value).toBe(250_000)
+    expect(row.icon).toBe('Vault')
+    expect(row.color).toBe('purple')
+    expect(row.metadata).toEqual({ bron: 'parameter', oorsprong: 'lab', eindleeftijd: 90, stopAnker: 'age', stopLeeftijd: 60 })
+  })
+
+  it('nul is een geldig doel; negatief, ontbrekend of zonder eindleeftijd wordt tolerant overgeslagen', () => {
+    const plan = { planEindleeftijd: 90, planStopAnker: 'aow' as const, planStopLeeftijd: null }
+    expect(buildParameterGoalRows(input({ eindvermogen: true }, { ...plan, eindvermogen: 0 })).rows[0]?.target_value).toBe(0)
+    expect(buildParameterGoalRows(input({ eindvermogen: true }, { ...plan, eindvermogen: -1 })).overgeslagen).toEqual(['eindvermogen'])
+    expect(buildParameterGoalRows(input({ eindvermogen: true }, plan)).overgeslagen).toEqual(['eindvermogen'])
+    expect(buildParameterGoalRows(input({ eindvermogen: true }, { eindvermogen: 1000 })).overgeslagen).toEqual(['eindvermogen'])
   })
 })
 

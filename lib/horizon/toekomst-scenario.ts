@@ -73,9 +73,12 @@ const VALID_CATEGORIES: readonly AssetCategorie[] = [
  * `fire` (vrijheidsleeftijd) is het uitkomstdoel onder `solved`; `dekking` ("Plan
  * gedekt", ADR 0145) is de spiegel daarvan onder een vast stopmoment (aow/age). De
  * route bepaalt server-side welke van de twee bij het anker hoort — de client kiest
- * dat nooit.
+ * dat nooit. `eindvermogen` (ADR 0145 D12, 15 sep 2026) is het uitkomstdoel onder een vast
+ * stopmoment wanneer het plan GEDEKT is: dekking en bereik bewegen dan niet meer, wat er op
+ * je eindleeftijd over is wél. Ook die vereist een vast anker (de route weigert 'm onder
+ * `solved`).
  */
-export const DOEL_PARAMETERS = ['spaarquote', 'rendement', 'fire', 'dekking'] as const
+export const DOEL_PARAMETERS = ['spaarquote', 'rendement', 'fire', 'dekking', 'eindvermogen'] as const
 export type DoelParameter = (typeof DOEL_PARAMETERS)[number]
 
 /**

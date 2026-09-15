@@ -170,6 +170,28 @@ describe('syncActiveGoalValues — plan_coverage ("Plan gedekt", ADR 0145)', () 
   })
 })
 
+describe('syncActiveGoalValues — eindvermogen uit het lab (end_balance, ADR 0145 D12)', () => {
+  const labEindGoal = () =>
+    g({ goal_type: 'end_balance', target_value: 250_000, current_value: 0, metadata: { bron: 'parameter', oorsprong: 'lab', eindleeftijd: 90, stopAnker: 'age', stopLeeftijd: 60 } })
+
+  it('vast anker: het lab-doel meet live het eindsaldo uit de kernel-run — geen notitie', async () => {
+    const { goals } = await syncActiveGoalValues(makeSupabase([]), [labEindGoal()], [], [], 'u1', async () => ({
+      currentValue: 500_000, targetValue: null, eta: null, fireAgeFractional: null, stopAnchor: 'age' as const, stopAge: 60, endAge: 90, endBalanceAtEndAge: 180_000,
+    }))
+    expect(goals[0].current_value).toBe(180_000)
+    expect(goals[0].notApplicableReason).toBeUndefined()
+    expect(computeGoalProgress({ ...goals[0], target_date: null }).pct).toBe(72)
+  })
+
+  it('solved: blijft meten (een eindvermogen heeft onder élk anker een uitkomst) — geen n.v.t.', async () => {
+    const { goals } = await syncActiveGoalValues(makeSupabase([]), [labEindGoal()], [], [], 'u1', async () => ({
+      currentValue: 500_000, targetValue: 900_000, eta: 'mrt 2039', fireAgeFractional: 52.1, stopAnchor: 'solved' as const, endBalanceAtEndAge: 90_000,
+    }))
+    expect(goals[0].current_value).toBe(90_000)
+    expect(goals[0].notApplicableReason).toBeUndefined()
+  })
+})
+
 describe('buildVrijheidsgetalSnapshot — planCoveragePct reist alleen onder een vast anker mee', () => {
   it('vast anker: doorgegeven; solved: null (freedomPct is daar een kapitaalratio)', () => {
     expect(buildVrijheidsgetalSnapshot({ ...basis, fireAgeFractional: 58, stopAnchor: 'age', stopAge: 58, endAge: 90, planCoveragePct: 64.2 }).planCoveragePct).toBe(64.2)

@@ -47,10 +47,11 @@ import { ToekomstDoelBodySchema, type VastleggenBody } from './schema'
  * eind-vorm) uit het eigen profiel met exact dezelfde lezing als de loaders en de
  * kernel-adapter (`resolveFirePlanWithOverride` op `FIRE_PLAN_COLUMNS` +
  * `feature_preferences`) en beslist zélf welk uitkomstdoel bij het anker hoort:
- *   - `solved`  → `fire` mag, `dekking` niet (400);
+ *   - `solved`  → `fire` mag, `dekking` en `eindvermogen` niet (400);
  *   - `aow`/`age` → `fire` wordt gestript (geen vrijheidsleeftijd om vast te leggen),
- *     `dekking` krijgt de plan-velden (eindleeftijd/anker/stopleeftijd) uit het profiel
- *     — nooit uit de body — en de stopkeuze verdwijnt uit `doel.stand` (D4);
+ *     `dekking` en `eindvermogen` (D12) krijgen de plan-velden (eindleeftijd/anker/
+ *     stopleeftijd) uit het profiel — nooit uit de body — en de stopkeuze verdwijnt uit
+ *     `doel.stand` (D4). Het bedrag van `eindvermogen` is wél een client-waarde (nominaal);
  *   - `now` → geen doel uit het lab (400; `loslaten` blijft).
  * Ná de upserts wordt de anker-onverenigbare rij verwijderd (`fire_age` onder een vast
  * anker, `plan_coverage` onder `solved`): de anker-wissel-reconciliatie, bewust hier en
@@ -172,6 +173,11 @@ async function handleVastleggen(
     delete parameters.fire
   } else if (parameters.dekking) {
     return badRequest('Een dekkingsdoel hoort bij een vast stopmoment', 'dekking_vereist_vast_anker')
+  } else if (parameters.eindvermogen) {
+    // ADR 0145 D12 — het eindvermogen-doel meet wat er op de eindleeftijd van een plan met
+    // een VAST stopmoment over is; onder `solved` zoekt de app het stopmoment zelf en is
+    // er geen gedekt plan om dat doel uit te promoveren.
+    return badRequest('Een eindvermogen-doel hoort bij een vast stopmoment', 'eindvermogen_vereist_vast_anker')
   }
   if (Object.keys(parameters).length === 0) {
     // Leeg ná het strippen onder een vast anker is een ander geval dan een lege keuze:
@@ -193,6 +199,8 @@ async function handleVastleggen(
       rendementPct: dw.rendementPct,
       fireLeeftijd: dw.fireLeeftijd,
       margeJaren: dw.margeJaren,
+      // D12 — NOMINAAL eindvermogen van de verkenning (client-waarde; de builder weigert < 0).
+      eindvermogen: dw.eindvermogen,
       ...(anchorFixed && plan.anchor.kind !== 'solved'
         ? {
             // Zelfde eindleeftijd als de kernel (`eindleeftijdVan`): onder `perpetual`
@@ -238,6 +246,10 @@ async function handleVastleggen(
   // Anker-wissel-reconciliatie: de rij van het uitkomstdoel dat NIET bij dit anker hoort
   // (fire_age onder een vast anker, plan_coverage onder solved) gaat weg — own-row, alleen
   // bron='parameter', zodat een handmatig doel van hetzelfde type ongemoeid blijft.
+  // Een `end_balance`-rij uit het lab (D12) valt hier bewust BUITEN: anders dan fire_age en
+  // plan_coverage heeft een eindvermogen onder élk anker een uitkomst (de sync meet het
+  // live via `pickEndBalanceAtEndAge`), dus er is niets onverenigbaars om op te ruimen.
+  // "Doel loslaten" ruimt 'm op (PARAMETER_GOAL_TYPES).
   const onverenigbaar = anchorFixed ? PARAM_TO_GOAL_TYPE.fire : PARAM_TO_GOAL_TYPE.dekking
   const { error: reconcileError } = await supabase
     .from('goals')

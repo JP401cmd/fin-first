@@ -995,6 +995,37 @@ describe('DoelenView — plan_coverage-doel (ADR 0145)', () => {
   })
 })
 
+/**
+ * ADR 0145 D12 — "Eindvermogen op je {eind}e" (`end_balance`, bron parameter): het
+ * uitkomstdoel bij een gedekt plan onder een vast stopmoment. Meet onder élk anker, dus de
+ * gewone gemeten kaart (nominaal nu vs. doel) — plus naam/subregel die het plan volgen.
+ */
+describe('DoelenView — eindvermogen-doel uit het lab (ADR 0145 D12)', () => {
+  it('toont nu vs. doel in euro\'s met balk, de plan-naam en de subregel — zonder tempo-pill', async () => {
+    const { computeGoalProgress, formatGoalValue } = await import('@/lib/goal-data')
+    const { planCoverageKaartSubregel } = await import('@/lib/horizon/anker-copy')
+    const doel = paramGoal({
+      id: 'eb1',
+      name: 'Eindvermogen op je 90e',
+      goal_type: 'end_balance',
+      target_value: 250_000,
+      current_value: 180_000,
+      target_date: null,
+      metadata: { bron: 'parameter', oorsprong: 'lab', eindleeftijd: 90, stopAnker: 'age', stopLeeftijd: 60 },
+    } as Partial<GoalWithBudget>)
+    const progress = computeGoalProgress(doel)
+    render(<DoelenView goals={[doel]} goalProgresses={[progress]} labPlan={{ stopAnker: 'age', stopLeeftijd: 60, eindleeftijd: 90 }} />)
+
+    expect(screen.getByText('Eindvermogen op je 90e')).toBeInTheDocument()
+    expect(screen.getByText(formatGoalValue(180_000, 'end_balance'))).toBeTruthy()
+    expect(screen.getByText(`van ${formatGoalValue(250_000, 'end_balance')}`)).toBeTruthy()
+    expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe('72')
+    expect(screen.getByTestId('plan-coverage-subregel')).toHaveTextContent(planCoverageKaartSubregel(90, 'age', 60))
+    expect(screen.queryByText('Op koers')).toBeNull()
+    expect(screen.queryByTestId('parameter-doel-nvt')).toBeNull()
+  })
+})
+
 describe('DoelenView — melding wanneer lab-doelen niet meer bij het plan passen (spec §4.2)', () => {
   const reden = 'Je stopmoment ligt vast op 62.'
   const fireAgeNvt = () =>

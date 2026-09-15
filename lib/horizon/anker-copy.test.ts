@@ -40,6 +40,12 @@ import {
   doelenPlanGewijzigdMelding,
   DOELEN_MELDING_ACTIES,
   planCoverageGoalName,
+  eindvermogenTegelCaption,
+  eindvermogenPreviewWaarde,
+  eindvermogenDeltaBadge,
+  eindvermogenSheetToelichting,
+  eindvermogenGoalName,
+  eindvermogenVastgelegdToast,
   type AnkerReach,
   type AnkerStop,
 } from './anker-copy'
@@ -263,13 +269,15 @@ describe('dekking-zinnen — de vastgestelde kopij', () => {
     expect(dekkingDeltaBadge(0.3)).toBe('gelijk')
   })
 
-  it('8 · Vrijheidsas-notitie: tekort met dekking, gedekt zonder iets vast te leggen, onbekend → null', () => {
+  it('8 · Vrijheidsas-notitie: tekort met dekking, gedekt wijst naar het eindvermogen (D12), onbekend → null', () => {
     expect(dekkingAsNotitie({ kind: 'reikt-tot', age: 82, endAge: 90 }, 65.2, 90)).toBe(
       'Je plan reikt nu tot je 82e — 65% gedekt. Draai aan de knoppen om te zien wat dat verandert.',
     )
+    // ADR 0145 D12 — "er is niets vast te leggen" is niet meer waar: het lab legt dan het eindvermogen vast.
     expect(dekkingAsNotitie({ kind: 'gedekt', endAge: 90 }, 100, 90)).toBe(
-      'Je plan is gedekt tot je 90e. Verkennen kan; er is niets vast te leggen.',
+      'Je plan is gedekt tot je 90e. Draai aan de knoppen om te zien wat er op je 90e over is.',
     )
+    expect(dekkingAsNotitie({ kind: 'gedekt', endAge: 90 }, 100, 90)).not.toMatch(/niets vast te leggen/)
     expect(dekkingAsNotitie({ kind: 'nu-op' }, 0, 90)).toContain('0% gedekt')
     expect(dekkingAsNotitie({ kind: 'onbekend' }, null, 90)).toBeNull()
   })
@@ -445,8 +453,49 @@ describe('dekkingsas-kopij (spec lab-haalbaarheid §5)', () => {
       tag: 'de dekking',
       sliderLabel: 'Doorwerken tot',
       tegelReikt: 'Reikt tot',
-      tegelPlan: 'Plan tot',
+      // ADR 0145 D12 (15 sep 2026) — tegel 2 is het eindvermogen; "Plan tot" is vervallen.
+      tegelEindvermogen: 'Eindvermogen',
       tegelGedekt: 'Gedekt',
     })
+  })
+})
+
+describe('eindvermogen-kopij (ADR 0145 D12, eigenaarsbesluit 15 sep 2026)', () => {
+  const euro = (s: string) => s.replace(/ /g, ' ')
+
+  it('tegel-onderschrift benoemt de eindleeftijd én de euro-grondslag', () => {
+    expect(eindvermogenTegelCaption(90)).toBe("op je 90e, in euro's van nu")
+    expect(eindvermogenTegelCaption(null)).toBe("op je eindleeftijd, in euro's van nu")
+  })
+
+  it('preview-waarde: nu € X → € Y op je 90e; gemaskeerd verdwijnen beide bedragen', () => {
+    expect(euro(eindvermogenPreviewWaarde(120_000, 210_000, 90))).toBe('nu € 120.000 → € 210.000 op je 90e')
+    expect(eindvermogenPreviewWaarde(120_000, 210_000, 90, true)).toBe(
+      `nu ${MASKED_AMOUNT_PLACEHOLDER} → ${MASKED_AMOUNT_PLACEHOLDER} op je 90e`,
+    )
+  })
+
+  it('delta-badge draagt teken + bedrag + het woord eindvermogen', () => {
+    expect(euro(eindvermogenDeltaBadge(12_000))).toBe('+€ 12.000 eindvermogen')
+    expect(euro(eindvermogenDeltaBadge(-3_000))).toBe('−€ 3.000 eindvermogen')
+  })
+
+  it('sheet-toelichting: stopmoment vast + gedekt → het lab legt het eindvermogen vast (geen woord AOW)', () => {
+    const zin = eindvermogenSheetToelichting({ kind: 'aow', stopAge: 67 }, 90)
+    expect(zin).toBe('Je stopmoment ligt vast op 67 en je plan is gedekt. Het lab legt daarom vast wat er op je 90e over is.')
+    expect(zin).not.toMatch(/AOW/)
+    expect(zin).not.toMatch(/je kunt (nu )?(al )?stoppen/i)
+    expect(eindvermogenSheetToelichting({ kind: 'now' }, null)).toBe(
+      'Je rekent alsof je nu stopt en je plan is gedekt. Het lab legt daarom vast wat er op je eindleeftijd over is.',
+    )
+  })
+
+  it('doelnaam en toast noemen de eindleeftijd', () => {
+    expect(eindvermogenGoalName(90)).toBe('Eindvermogen op je 90e')
+    expect(eindvermogenGoalName(92.5)).toBe('Eindvermogen op je 92,5e')
+    expect(eindvermogenGoalName(null)).toBe('Eindvermogen')
+    expect(eindvermogenVastgelegdToast(90)).toBe(
+      'Je verkenning is nu je doel — de app volgt wat er op je 90e over is.',
+    )
   })
 })

@@ -18,8 +18,9 @@ import type { AssetCategorie } from '@/lib/horizon-kernel/types'
 import { ASSET_TYPE_TO_CATEGORIE, potRendement } from '@/lib/horizon-kernel/adapter/potten'
 import { GOAL_TYPE_META, GOAL_TYPE_ICONS, type GoalType } from '@/lib/goal-data'
 import { DOEL_PARAMETERS, type DoelParameter } from '@/lib/horizon/toekomst-scenario'
-// De "Plan gedekt"-naam is gedeeld met de (client-)doelkaart en woont daarom in anker-copy.
-import { planCoverageGoalName } from '@/lib/horizon/anker-copy'
+// De "Plan gedekt"- en "Eindvermogen"-namen zijn gedeeld met de (client-)doelkaart en wonen
+// daarom in anker-copy.
+import { planCoverageGoalName, eindvermogenGoalName } from '@/lib/horizon/anker-copy'
 
 // ── Parameter → goal_type (één bron, ook voor de route + loader) ──────────────
 
@@ -28,12 +29,16 @@ import { planCoverageGoalName } from '@/lib/horizon/anker-copy'
  * De route gebruikt `PARAMETER_GOAL_TYPES` om exact deze typen te verwijderen
  * bij "loslaten"; de loader (stap 4) mapt terug via dezelfde bron. `fire` en
  * `dekking` zijn elkaars spiegel per anker (ADR 0145): nooit allebei tegelijk.
+ * `eindvermogen` → `end_balance` (ADR 0145 D12) is het uitkomstdoel onder een vast anker
+ * bij een GEDEKT plan. Dat doeltype bestond al als handmatig/doelbasis-doel en houdt dus
+ * bewust zijn `viaLab`-loze META: het lab is er niet de enige schrijver van.
  */
 export const PARAM_TO_GOAL_TYPE: Record<DoelParameter, GoalType> = {
   spaarquote: 'savings_rate',
   rendement: 'expected_return',
   fire: 'fire_age',
   dekking: 'plan_coverage',
+  eindvermogen: 'end_balance',
 }
 
 /** De goal-typen die door het lab-doelscenario worden beheerd (in DOEL_PARAMETERS-volgorde). */
@@ -127,6 +132,14 @@ export interface ParameterGoalInput {
     planStopAnker?: 'aow' | 'age' | 'now'
     /** De stopleeftijd bij het `age`-anker; `null` bij `aow`/`now` (de kaart zegt dan "je AOW-leeftijd"). */
     planStopLeeftijd?: number | null
+    /**
+     * EINDVERMOGEN-doel (ADR 0145 D12): het geprojecteerde eindvermogen van de verkenning op
+     * de eindleeftijd van het plan. Anders dan het dekkingsdoel is dit wél een CLIENT-waarde
+     * — de live-sim heeft 'm, de server niet — en NOMINAAL, gelijk aan `GOAL_TYPE_META
+     * .end_balance` en aan `pickEndBalanceAtEndAge` die de kaart live meet. Het lab toont
+     * 'm gedeflateerd; dat verschil is bewust (zie ADR 0145 D12).
+     */
+    eindvermogen?: number
   }
 }
 
@@ -262,6 +275,27 @@ function buildRow(parameter: DoelParameter, dw: ParameterGoalInput['doelwaarden'
         name: planCoverageGoalName(eindleeftijd),
         target_value: GOAL_TYPE_META.plan_coverage.max ?? 100,
         icon: GOAL_TYPE_ICONS.plan_coverage,
+        color: PARAMETER_GOAL_COLOR,
+        metadata: { ...BASE_METADATA, eindleeftijd, stopAnker, stopLeeftijd },
+      }
+    }
+    case 'eindvermogen': {
+      // "Eindvermogen op je {eind}e" (ADR 0145 D12): doel = het eindvermogen van de
+      // verkenning, NOMINAAL. De doelwaarde komt van de client (de live-sim); de plan-velden
+      // van de server, net als bij `dekking`. Een negatief of niet-eindig bedrag is geen
+      // doel; zonder eindleeftijd is er geen moment om naar te wijzen → beide overslaan.
+      if (!isFiniteNumber(dw.eindvermogen) || dw.eindvermogen < 0) return null
+      if (!isFiniteNumber(dw.planEindleeftijd)) return null
+      const eindleeftijd = dw.planEindleeftijd
+      const stopAnker = dw.planStopAnker ?? null
+      const stopLeeftijd = isFiniteNumber(dw.planStopLeeftijd) ? dw.planStopLeeftijd : null
+      return {
+        parameter,
+        goal_type: 'end_balance',
+        name: eindvermogenGoalName(eindleeftijd),
+        // Geen META-clamp: `end_balance` heeft geen min/max (euro's).
+        target_value: dw.eindvermogen,
+        icon: GOAL_TYPE_ICONS.end_balance,
         color: PARAMETER_GOAL_COLOR,
         metadata: { ...BASE_METADATA, eindleeftijd, stopAnker, stopLeeftijd },
       }

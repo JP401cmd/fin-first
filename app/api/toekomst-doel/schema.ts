@@ -35,6 +35,8 @@ const ParametersSchema = z.object({
   rendement: gekozen,
   fire: gekozen,
   dekking: gekozen,
+  // ADR 0145 D12 — het eindvermogen-doel bij een gedekt plan onder een vast stopmoment.
+  eindvermogen: gekozen,
 } satisfies Record<DoelParameter, typeof gekozen>)
 
 /**
@@ -52,6 +54,9 @@ const DoelwaardenSchema = z.object({
   rendementPct: doelwaarde,
   fireLeeftijd: doelwaarde,
   margeJaren: doelwaarde,
+  // ADR 0145 D12 — het NOMINALE eindvermogen van de verkenning (een client-waarde: alleen de
+  // live-sim kent 'm). Negatief wordt in de builder overgeslagen, niet hier geweigerd.
+  eindvermogen: doelwaarde,
 })
 
 const VastleggenSchema = z.object({

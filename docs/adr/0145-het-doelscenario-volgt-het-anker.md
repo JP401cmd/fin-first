@@ -106,7 +106,7 @@ onaangeroerd: die rekenen op de behoefte, niet op het doelvermogen.
 |---|---|---|
 | `solved` | — | `vrijheidsleeftijd` bij `hasScenario \|\| hasStopKeuze` (ongewijzigd) |
 | `now` | — | nooit (`nu-anker`) — verkennen mag, geen doel uit het lab |
-| `aow`/`age` | gedekt | nooit (`gedekt`) — de losse doelen volstaan |
+| `aow`/`age` | gedekt | ~~nooit (`gedekt`) — de losse doelen volstaan~~ **herzien door D12 (15 sep 2026):** `eindvermogen`, alléén bij `hasScenario` |
 | `aow`/`age` | tekort | `dekking`, alléén bij `hasScenario` (D4) |
 | aow · age · now | geen run | nooit (`geen-run`); onder solved geldt geen run-eis, zoals vóór dit besluit |
 
@@ -141,7 +141,7 @@ die draaide al op deze grondslag — nu staan beide op dezelfde (eindreview I3, 
 
 **D8 — Sectie 2 van de Vrijheidsas is onder een vast anker de dekkingsas** (15 sep 2026,
 spec lab-haalbaarheid §1). Schaal van stopmoment tot eindleeftijd, slider "Doorwerken tot",
-tegels Reikt tot · Plan tot · Gedekt. Marge-band, verwacht-streep, koppel-checkbox en de
+tegels Reikt tot · Plan tot · Gedekt (D12: "Plan tot" werd "Eindvermogen"). Marge-band, verwacht-streep, koppel-checkbox en de
 FIRE-tegels verdwijnen daar: ze meten een grootheid die de gebruiker niet gekozen heeft.
 
 **D9 — Drie draaiknoppen in beide invalshoeken** (§2, bijgesteld door de eigenaar op 15 sep
@@ -182,6 +182,57 @@ zelfde markup in beide weergavemodi (Eenvoudig/Uitgebreid) — telt lab-doelen m
 n.v.t.-reden (`selectLabDoelenBuitenPlan`) met de acties Bijwerken (opent het lab via de
 canonieke deeplink `/toekomst?whatif=open`) · Loslaten (de bestaande confirm-flow); niets
 verdwijnt automatisch. Knop-doelen krijgen nooit een n.v.t.-reden.
+
+**D12 — Eindvermogen als derde verandercomponent; een gedekt plan levert een
+`end_balance`-doel uit het lab** (eigenaarsbesluit 15 sep 2026). Onder een vast stopmoment
+toonde het lab twee componenten: dekking (%) en bereik ("reikt tot"). Bij een **gedekt** plan
+bewegen die niet meer (100 % blijft 100 %, het bereik is het plan-einde), dus draaide de
+gebruiker aan knoppen zonder zichtbaar effect en viel er niets vast te leggen. Wat wél
+beweegt, is wat er op de eindleeftijd **over** is. Daarom:
+
+1. **Derde component.** `LabUitkomstDekking` draagt `basisEindvermogen`,
+   `scenarioEindvermogen` en `verkendEindvermogen` = `pickEndBalanceAtEndAge(run)`
+   (`lib/goals/vrijheidsgetal-goal.ts`) op de reeds gedraaide run — de liquide portefeuille
+   (`SimRow.endPortfolio`) op `displayEndAge`, **nominaal**. Hergebruik, geen tweede
+   selectie: dit is exact de bron waarmee het `end_balance`-doel al meet. De dekkingsas
+   toont tegel 2 als **Eindvermogen** (basis → wat-als, in euro's van nu; "Plan tot" verviel —
+   de eindleeftijd staat al als as-label onder de balk), met het onderschrift "op je {eind}e,
+   in euro's van nu". Naast `lab-dekking-badge` staat een delta-badge
+   "+€ X / −€ X eindvermogen". De deflatie gebeurt uitsluitend in het euro-weergave-blok van
+   `horizon-client.tsx` (`factorAtAge(displayUnifiedRows, eind)` + `deflate`, zelfde patroon
+   als `viewTargetEndPortfolio`); `Dekkingsbalk` formatteert alleen. De privacy-weergave levert
+   `null` (tegel "···", badge weg).
+2. **Gate.** `aow`/`age` + gedekt + `hasScenario` → promotie `eindvermogen`; zonder verkenning
+   `geen/geen-verkenning` (D4 geldt onverkort). De reden `geen/gedekt` bestaat niet meer.
+   **Dit overschrijft eigenaarsbesluit E5** ("gedekt → geen doel uit het lab").
+3. **Doel.** "Maak dit mijn doel" schrijft een `end_balance`-parameterrij
+   (`DOEL_PARAMETERS` + `eindvermogen`, `PARAM_TO_GOAL_TYPE.eindvermogen = 'end_balance'`),
+   naam "Eindvermogen op je {eind}e" (`eindvermogenGoalName`), doelwaarde = het
+   **nominale** scenario-eindvermogen uit de client (alleen de live-sim kent 'm; ≥ 0, anders
+   tolerant overgeslagen), plan-velden (eindleeftijd/anker/stopleeftijd) server-side zoals bij
+   `dekking` (D3). `solved` + `eindvermogen` → 400 `eindvermogen_vereist_vast_anker`. Een
+   lab-`end_balance`-rij valt bewust **buiten** de anker-reconciliatie: een eindvermogen heeft
+   onder élk anker een uitkomst, dus er is niets onverenigbaars op te ruimen; "Doel loslaten"
+   ruimt 'm op (`PARAMETER_GOAL_TYPES`, nu vijf typen). `GOAL_TYPE_META.end_balance` blijft
+   ongewijzigd (géén `viaLab`): het handmatige/doelbasis-pad mag dit type blijven aanmaken.
+4. **Meten.** `syncActiveGoalValues` (`lib/goal-current-value.ts`) past het eindsaldo nu toe
+   over `injectionSet` in plaats van alleen `metricGoals` — zonder die wijziging bleef een
+   lab-`end_balance`-kaart eeuwig op "nog geen meting" staan, want parameter-doelen zitten
+   niet in `metricGoals`. Voor het ongekoppelde auto-sync-doel verandert niets (het zit in
+   beide sets). De doelkaart volgt naam en subregel van het plan zoals "Plan gedekt" (D11),
+   zonder tempo-pill.
+5. **Kopij.** De gedekt-tak van zin 8 zei "Verkennen kan; er is niets vast te leggen." — onder
+   D12 onwaar. Nieuw: "Draai aan de knoppen om te zien wat er op je {eind}e over is." De
+   nieuwe zinnen (13–18 in de bijlage) zijn beschrijvend en noemen het woord AOW niet, maar
+   zijn **nog niet door de compliance-check/merkstem** gegaan — open punt vóór release.
+
+**Open punt voor de eigenaar — twee euro-grondslagen voor hetzelfde doel.** Het lab toont
+het eindvermogen **gedeflateerd** (euro's van nu, via de euro-weergave), maar het doel wordt
+**nominaal** vastgelegd en de doelenpagina meet nominaal (`GOAL_TYPE_META.end_balance`,
+`pickEndBalanceAtEndAge`). Het getal op de doelkaart ligt dus hoger dan het getal dat de
+gebruiker in het lab koos — bij ~2 % inflatie over 45 jaar ruwweg een factor 2,4. Dat is geen
+rekenfout maar een bekend cross-surface-verschil; oplossen (doelkaart deflateren óf het doel
+reëel opslaan) is een aparte keuze.
 
 ## Verworpen alternatieven
 
@@ -252,8 +303,10 @@ verdwijnt automatisch. Knop-doelen krijgen nooit een n.v.t.-reden.
 8. Vrijheidsas-notitie: tekort "Je plan reikt nu tot je {reikt}e — {pct}% gedekt. Draai
    aan de knoppen om te zien wat dat verandert." · nu-op (nagekomen) "Je plan reikt nu
    niet verder dan vandaag — {pct}% gedekt. Draai aan de knoppen om te zien wat dat
-   verandert." · gedekt "Je plan is gedekt {tot je eind'e}. Verkennen kan; er is niets
-   vast te leggen."
+   verandert." · gedekt ~~"Je plan is gedekt {tot je eind'e}. Verkennen kan; er is niets
+   vast te leggen."~~ → sinds D12 (15 sep 2026, nog NIET door de compliance-check):
+   "Je plan is gedekt {tot je eind'e}. Draai aan de knoppen om te zien wat er op je {eind}e
+   over is."
 9. Radar-subtitel: "Vier dekkingsratio's — gerekend op je plan: stoppen op {stop}." ·
    `now`: "… je rekent alsof je nu stopt." · verkend: "… gerekend op een verkend
    stopmoment: stoppen op {X} jr; je plan rekent met {stop}."
@@ -264,6 +317,18 @@ verdwijnt automatisch. Knop-doelen krijgen nooit een n.v.t.-reden.
     omgerekend {dagen} dagen vrijheid per maand." + knop "Reken met € {hint} extra
     inleg" (compliance 14 sep: geen "Zet als …").
 12. Toast: "Je verkenning is nu je doel — de app volgt of je plan {tot je eind'e} reikt."
+
+**Aanvulling D12 (15 sep 2026) — nog NIET door de compliance-check/merkstem** (beschrijvend,
+geen aansporing, geen woord AOW, maar de poort is niet gelopen):
+
+13. Tegel "Eindvermogen" met onderschrift "op je {eind}e, in euro's van nu".
+14. Delta-badge "+€ {X} eindvermogen" / "−€ {X} eindvermogen".
+15. Sheet-toelichting (gedekt): "Je stopmoment ligt vast op {stop} en je plan is gedekt. Het
+    lab legt daarom vast wat er op je {eind}e over is." (`now`: "Je rekent alsof je nu stopt
+    en je plan is gedekt. …").
+16. Preview-rij **Eindvermogen**: "nu € {basis} → € {wat-als} op je {eind}e".
+17. Doelnaam: "Eindvermogen op je {eind}e".
+18. Toast: "Je verkenning is nu je doel — de app volgt wat er op je {eind}e over is."
 
 Toon-invarianten over alle zinnen: nooit "je kunt stoppen" (beschrijvend, niet
 aansporend), nooit "oneindig" (het model stopt bij leeftijd 100 en claimt niets

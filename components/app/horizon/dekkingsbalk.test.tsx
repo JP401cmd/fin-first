@@ -11,6 +11,8 @@ const basis: DekkingsasData = {
   scenarioPct: null,
   verkendReach: null,
   verkendStopAge: null,
+  basisEindvermogen: 120_000,
+  scenarioEindvermogen: null,
 }
 
 describe('dekkingsbalkPosities — één schaal van stop tot eind', () => {
@@ -32,14 +34,35 @@ describe('dekkingsbalkPosities — één schaal van stop tot eind', () => {
 })
 
 describe('Dekkingsbalk — rendering', () => {
-  it('toont de drie tegels Reikt tot · Plan tot · Gedekt met basis → wat-als', () => {
-    render(<Dekkingsbalk data={{ ...basis, scenarioReach: { kind: 'reikt-tot', age: 84, endAge: 90 }, scenarioPct: 80 }} />)
+  it('toont de drie tegels Reikt tot · Eindvermogen · Gedekt met basis → wat-als (ADR 0145 D12)', () => {
+    render(
+      <Dekkingsbalk
+        data={{
+          ...basis,
+          scenarioReach: { kind: 'reikt-tot', age: 84, endAge: 90 },
+          scenarioPct: 80,
+          scenarioEindvermogen: 210_000,
+        }}
+      />,
+    )
     expect(screen.getByText('Reikt tot')).toBeInTheDocument()
-    expect(screen.getByText('Plan tot')).toBeInTheDocument()
+    expect(screen.getByText('Eindvermogen')).toBeInTheDocument()
     expect(screen.getByText('Gedekt')).toBeInTheDocument()
     expect(screen.getByTestId('dekkingsbalk-reikt')).toHaveTextContent('75 → 84')
     expect(screen.getByTestId('dekkingsbalk-gedekt')).toHaveTextContent('50% → 80%')
-    expect(screen.getByTestId('dekkingsbalk-plan')).toHaveTextContent('90')
+    // Bedragen komen AL GEDEFLATEERD binnen; de tegel formatteert alleen.
+    expect(screen.getByTestId('dekkingsbalk-eindvermogen').textContent?.replace(/ /g, ' ')).toBe(
+      '€ 120.000 → € 210.000',
+    )
+    // "Plan tot" is vervallen: de eindleeftijd staat al als as-label onder de balk.
+    expect(screen.queryByTestId('dekkingsbalk-plan')).toBeNull()
+    expect(screen.getByText('plan tot 90')).toBeInTheDocument()
+    expect(screen.getByText("op je 90e, in euro's van nu")).toBeInTheDocument()
+  })
+
+  it('toont drie puntjes wanneer het eindvermogen ontbreekt (geen run) of gemaskeerd is', () => {
+    render(<Dekkingsbalk data={{ ...basis, basisEindvermogen: null, scenarioEindvermogen: null }} />)
+    expect(screen.getByTestId('dekkingsbalk-eindvermogen')).toHaveTextContent('···')
   })
   it('kleurt de vulling met het stoplicht: tekort = warning, gedekt = positive — nooit een module-accent', () => {
     const { container, rerender } = render(<Dekkingsbalk data={basis} />)

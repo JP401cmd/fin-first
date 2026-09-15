@@ -13,6 +13,7 @@ const tekort: LabUitkomstDekking = {
   basisReach: { kind: 'reikt-tot', age: 82, endAge: 90 },
   scenarioPct: null, scenarioReach: null,
   verkendPct: null, verkendReach: null, verkendStopAge: null,
+  basisEindvermogen: null, scenarioEindvermogen: null, verkendEindvermogen: null,
   tekort: true,
   maandHint: 500,
   promotie: { kind: 'geen', reden: 'geen-verkenning' },

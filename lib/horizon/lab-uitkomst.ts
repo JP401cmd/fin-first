@@ -48,14 +48,28 @@
  * variant zónder slider-beweging) ▸ anders `null`. `> 0 ⟺ tekort` per constructie
  * (teken van −gap). NOOIT een lokale formule.
  *
- * ## Gate (`promotie`) — eigenaarsbesluiten E4/E5/E6 (13 sep 2026)
+ * ## Gate (`promotie`) — eigenaarsbesluiten E4/E5/E6 (13 sep 2026), D12 (15 sep 2026)
  *  - geen run (alleen aow/age/now) → `geen/geen-run`; onder solved geen run-eis (gedrag van vóór ADR 0145)
  *  - `solved`                     → `vrijheidsleeftijd` bij `hasScenario || hasStopKeuze` (als vandaag), anders `geen/geen-verkenning`
  *  - `now`                        → nooit (`geen/nu-anker`) — verkennen mag, geen doel uit het lab
- *  - `aow`/`age`, gedekt          → nooit (`geen/gedekt`) — de losse doelen volstaan
  *  - `aow`/`age`, tekort          → `dekking` alleen bij `hasScenario` (een stopkeuze alleen
  *                                   is onder een vast anker geen doelstand, D4), anders `geen/geen-verkenning`
+ *  - `aow`/`age`, gedekt          → `eindvermogen` bij `hasScenario`, anders `geen/geen-verkenning`
  * "Doel loslaten" blijft in élke toestand beschikbaar — dat is UI, geen gate.
+ *
+ * ## D12 (eigenaarsbesluit 15 sep 2026) — eindvermogen als derde verandercomponent
+ * Onder een vast anker was "gedekt" een doodlopend eind: 100 % blijft 100 %, dus de knoppen
+ * lieten niets meer bewegen en er viel niets vast te leggen (`geen/gedekt`). Wat wél beweegt
+ * is wat er op de eindleeftijd ÓVER is. Dat eindvermogen staat daarom naast dekking (%) en
+ * bereik (leeftijd) als derde component, en bij een gedekt plan is het het doel dat het lab
+ * schrijft (`end_balance`) — dit OVERSCHRIJFT eigenaarsbesluit E5 ("gedekt → geen doel uit
+ * het lab"). De reden `geen/gedekt` bestaat daarmee niet meer.
+ *
+ * GRONDSLAG van het eindvermogen: `pickEndBalanceAtEndAge` (lib/goals/vrijheidsgetal-goal.ts)
+ * op de reeds gedraaide run — de LIQUIDE FIRE-portefeuille (`SimRow.endPortfolio`) op
+ * `displayEndAge`, NOMINAAL (kernel-native). Bewust hergebruikt en geen tweede selectie: dit
+ * is exact de bron die het `end_balance`-doel al meet. Wil een oppervlak "geld van vandaag"
+ * tonen, dan deflateert het via `factorAtAge`/`deflate` (ADR 0090/0093) — nooit hier.
  */
 
 import { computeRunwayCoveragePct } from '@/lib/core-metrics'
@@ -65,13 +79,18 @@ import type { StopAnchor } from '@/lib/fire-strategy'
 // produceert; het type zelf woont in lib/fire-simulation.ts.
 import type { SimResult } from '@/lib/fire-simulation'
 import type { ForcedStopPathResult } from '@/lib/horizon/scenario-presets'
+// De ENE eindsaldo-selectie (grondslag: liquide portefeuille op displayEndAge, nominaal) —
+// dezelfde die het `end_balance`-doel voedt. Geen tweede selectie (D12).
+import { pickEndBalanceAtEndAge } from '@/lib/goals/vrijheidsgetal-goal'
 import { ankerReachFromSim, ankerStopFromSim, type AnkerReach, type AnkerStop } from './anker-copy'
 
 /** Mag er uit de huidige lab-stand een doel worden vastgelegd, en van welke soort? */
 export type LabPromotie =
   | { readonly kind: 'vrijheidsleeftijd' }
   | { readonly kind: 'dekking' }
-  | { readonly kind: 'geen'; readonly reden: 'nu-anker' | 'gedekt' | 'geen-verkenning' | 'geen-run' }
+  /** ADR 0145 D12 — een GEDEKT plan onder een vast anker: het eindvermogen is wat nog beweegt. */
+  | { readonly kind: 'eindvermogen' }
+  | { readonly kind: 'geen'; readonly reden: 'nu-anker' | 'geen-verkenning' | 'geen-run' }
 
 /** De minimale vorm van het stop-pad die deze switch leest (`HorizonStopPadResult`). */
 export type LabStopPad = Pick<ForcedStopPathResult, 'result' | 'maandHint' | 'stopAge'>
@@ -124,6 +143,17 @@ export interface LabUitkomstDekking {
   readonly verkendPct: number | null
   readonly verkendReach: AnkerReach | null
   readonly verkendStopAge: number | null
+  /**
+   * EINDVERMOGEN op de eindleeftijd van het plan (ADR 0145 D12) — de derde component
+   * naast dekking (%) en bereik (leeftijd). NOMINAAL en op de LIQUIDE portefeuille
+   * (`pickEndBalanceAtEndAge`, zie module-doc); een oppervlak dat "geld van nu" toont
+   * deflateert zelf. `null` wanneer de run geen rijen draagt (stub/mock/geen run).
+   */
+  readonly basisEindvermogen: number | null
+  /** Idem voor de scenario-run; `null` zonder scenario. */
+  readonly scenarioEindvermogen: number | null
+  /** Idem voor het stop-pad (verkend stopmoment); `null` zonder stopkeuze. */
+  readonly verkendEindvermogen: number | null
   /** `basisPct < 100`: het plan reikt niet tot de eindleeftijd. */
   readonly tekort: boolean
   /** €/mnd-extra-sparen-hint (P!B96), zie module-doc; `null` = geen tekort of onbekend. */
@@ -156,6 +186,15 @@ export function dekkingVanRun(
     eindMaand: eindMaandVan(run.displayEndAge, currentAge),
     ankerMaand: run.ankerMaand ?? null,
   })
+}
+
+/**
+ * Eindvermogen van één REEDS GEDRAAIDE run (ADR 0145 D12) — puur een rij-selectie via
+ * `pickEndBalanceAtEndAge`: de laatste rij met `age <= displayEndAge`, veld `endPortfolio`.
+ * `null` zonder rijen (stub/mock) of zonder bruikbare eindleeftijd.
+ */
+function eindvermogenVanRun(run: SimResult | null): number | null {
+  return run == null ? null : pickEndBalanceAtEndAge(run)
 }
 
 function reachVanRun(run: SimResult, currentAge: number | null): AnkerReach {
@@ -219,19 +258,25 @@ export function resolveLabUitkomst(input: LabUitkomstInput): LabUitkomst {
   const verkendPct = stopPad != null ? dekkingVanRun(stopPad.result, currentAge) : null
   const verkendReach = stopPad != null ? reachVanRun(stopPad.result, currentAge) : null
   const verkendStopAge = stopPad != null ? (finiteOrNull(stopPad.result.fireAgeFractional) ?? finiteOrNull(stopPad.stopAge)) : null
+  const basisEindvermogen = eindvermogenVanRun(basis)
+  const scenarioEindvermogen = eindvermogenVanRun(scenario)
+  const verkendEindvermogen = eindvermogenVanRun(stopPad?.result ?? null)
   const tekort = basisPct != null && basisPct < 100
   const maandHint = maandHintVan(stopPad, input.kernelMaandHint)
 
+  // D12: bij een GEDEKT plan promoveert het lab het eindvermogen (`end_balance`) i.p.v.
+  // niets — dekking blijft het doel bij een tekort. Beide eisen een verkenning
+  // (`hasScenario`): zonder knopbeweging is er geen lab-stand om vast te leggen (D4).
   const promotie: LabPromotie =
     basis == null || basisPct == null
       ? { kind: 'geen', reden: 'geen-run' }
       : planAnchor.kind === 'now'
         ? { kind: 'geen', reden: 'nu-anker' }
-        : !tekort
-          ? { kind: 'geen', reden: 'gedekt' }
-          : hasScenario
+        : !hasScenario
+          ? { kind: 'geen', reden: 'geen-verkenning' }
+          : tekort
             ? { kind: 'dekking' }
-            : { kind: 'geen', reden: 'geen-verkenning' }
+            : { kind: 'eindvermogen' }
 
   return {
     kind: 'dekking',
@@ -244,6 +289,9 @@ export function resolveLabUitkomst(input: LabUitkomstInput): LabUitkomst {
     verkendPct,
     verkendReach,
     verkendStopAge,
+    basisEindvermogen,
+    scenarioEindvermogen,
+    verkendEindvermogen,
     tekort,
     maandHint,
     promotie,

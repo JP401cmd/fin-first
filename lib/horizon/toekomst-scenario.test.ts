@@ -479,9 +479,23 @@ describe('stripStopKeuze (ADR 0145 D4)', () => {
   })
 })
 
-describe('DOEL_PARAMETERS — vier parameters: spaarquote, rendement, fire, dekking (spec §2: salaris vervalt)', () => {
-  it('bevat geen salaris meer en houdt de volgorde spaarquote → rendement → fire → dekking', () => {
-    expect([...DOEL_PARAMETERS]).toEqual(['spaarquote', 'rendement', 'fire', 'dekking'])
+describe('DOEL_PARAMETERS — vijf parameters: spaarquote, rendement, fire, dekking, eindvermogen (spec §2: salaris vervalt; ADR 0145 D12)', () => {
+  it('bevat geen salaris meer en houdt de volgorde spaarquote → rendement → fire → dekking → eindvermogen', () => {
+    expect([...DOEL_PARAMETERS]).toEqual(['spaarquote', 'rendement', 'fire', 'dekking', 'eindvermogen'])
+  })
+
+  it('een vastgelegd eindvermogen-doel overleeft de pref-parser (parameters + goalIds)', () => {
+    const p = parseToekomstScenarioPrefs({
+      v: 2,
+      doel: {
+        gezetOp: '2026-09-15T10:00:00.000Z',
+        parameters: { eindvermogen: true },
+        stand: { sliders: { savings: 30 } },
+        goalIds: { eindvermogen: 'g-1' },
+      },
+    })
+    expect(p?.doel?.parameters).toEqual({ eindvermogen: true })
+    expect(p?.doel?.goalIds).toEqual({ eindvermogen: 'g-1' })
   })
 
   it('parseToekomstScenarioPrefs blijft sliders.income tolerant lezen (legacy-prefs breken niet)', () => {

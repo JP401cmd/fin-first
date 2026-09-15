@@ -831,7 +831,15 @@ export async function syncActiveGoalValues<T extends SyncableGoal>(
     if (Number.isFinite(n)) goal.current_value = n
   }
 
+  // Eindsaldo (`end_balance`): over `injectionSet`, niet alleen `metricGoals`. Sinds ADR 0145
+  // D12 schrijft het lab dit doeltype óók als PARAMETER-doel (bron='parameter'), en die rij zit
+  // niet in `metricGoals` — zonder deze lus bleef de lab-kaart eeuwig "nog geen meting". Het
+  // ongekoppelde auto-sync-doel zit in beide sets, dus voor dat doel verandert er niets.
+  // Geen n.v.t.-tak: een eindvermogen heeft onder élk anker een uitkomst.
   const endBalance = fireSnapshot?.endBalanceAtEndAge
+  for (const goal of injectionSet) {
+    if (goal.goal_type === 'end_balance') apply(goal, endBalance)
+  }
   for (const goal of metricGoals) {
     switch (goal.goal_type) {
       case 'net_worth':
@@ -845,9 +853,6 @@ export async function syncActiveGoalValues<T extends SyncableGoal>(
         break
       case 'tax_burden':
         apply(goal, taxValue)
-        break
-      case 'end_balance':
-        apply(goal, endBalance)
         break
       case 'debt_free_date':
         apply(goal, debtFree?.decimalYear)

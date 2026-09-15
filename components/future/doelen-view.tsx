@@ -18,6 +18,7 @@ import {
   doelenPlanGewijzigdMelding,
   DOELEN_MELDING_ACTIES,
   planCoverageGoalName,
+  eindvermogenGoalName,
 } from '@/lib/horizon/anker-copy'
 import { selectLabDoelenBuitenPlan, type LabPlanContext } from '@/lib/goals/lab-doelen-buiten-plan'
 import type { GoalWithBudget } from '@/lib/fin-data-loader'
@@ -197,6 +198,11 @@ function ParameterGoalCard({ goal, progress, labPlan }: GoalDisplay & { labPlan:
   const isFire = goal.goal_type === 'fire_age'
   // ADR 0145 — "Plan gedekt": het uitkomstdoel onder een vast stopmoment.
   const isCoverage = goal.goal_type === 'plan_coverage'
+  // ADR 0145 D12 — "Eindvermogen op je {eind}e": het uitkomstdoel bij een gedekt plan. Meet
+  // onder élk anker (geen n.v.t.), dus de gewone gemeten kaart (nominaal nu vs. doel) volstaat;
+  // naam en subregel volgen het plan zoals bij "Plan gedekt".
+  const isEindvermogen = goal.goal_type === 'end_balance'
+  const volgtPlan = isCoverage || isEindvermogen
   const current = progress.current
   // "Nog geen meting": de consume-only bron kon (nog) geen actuele
   // stand leveren (0/null op dag 0). Toon dat eerlijk i.p.v. een
@@ -207,10 +213,14 @@ function ParameterGoalCard({ goal, progress, labPlan }: GoalDisplay & { labPlan:
   // Spec lab-haalbaarheid §4.1: naam en subregel van "Plan gedekt" volgen het huidige
   // plan; de metadata is de historie van het vastleggen (terugval zonder plan-context of
   // onder solved — dan is de kaart n.v.t. en toont hij geen subregel).
-  const liveAnker = isCoverage && labPlan && labPlan.stopAnker !== 'solved' ? labPlan.stopAnker : null
+  const liveAnker = volgtPlan && labPlan && labPlan.stopAnker !== 'solved' ? labPlan.stopAnker : null
   const eindleeftijd = liveAnker && labPlan ? labPlan.eindleeftijd : metaNumber(goal.metadata?.eindleeftijd)
-  const cardName = isCoverage ? planCoverageGoalName(eindleeftijd) : goal.name
-  const coverageSubregel = isCoverage
+  const cardName = isCoverage
+    ? planCoverageGoalName(eindleeftijd)
+    : isEindvermogen
+      ? eindvermogenGoalName(eindleeftijd)
+      : goal.name
+  const coverageSubregel = volgtPlan
     ? planCoverageKaartSubregel(
         eindleeftijd,
         liveAnker ?? metaStopAnker(goal.metadata?.stopAnker),
@@ -226,7 +236,8 @@ function ParameterGoalCard({ goal, progress, labPlan }: GoalDisplay & { labPlan:
   // hergebruiken de bestaande statusweergave zodra er een meting is.
   // Ook de dekking-kaart krijgt geen tempo-pill: "Op koers" zou een oordeel claimen
   // over een uitkomst die geen tempo heeft. De balk draagt gedekt/tekort in stoplicht.
-  const status = !isFire && !isCoverage && measured ? statusFor(progress) : null
+  // Idem voor het eindvermogen (D12): een uitkomst op je eindleeftijd, geen tempo.
+  const status = !isFire && !volgtPlan && measured ? statusFor(progress) : null
   const pct = Math.min(100, Math.max(0, Math.round(progress.pct)))
   return (
     <Link

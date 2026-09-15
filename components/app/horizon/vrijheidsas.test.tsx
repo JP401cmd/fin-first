@@ -439,14 +439,16 @@ describe('Vrijheidsas — vast anker (ADR 0129 F3b, B-038, TPR-09)', () => {
     stopAge: 58.5, eindAge: 90,
     basisReach: { kind: 'reikt-tot', age: 82, endAge: 90 }, basisPct: 65,
     scenarioReach: null, scenarioPct: null, verkendReach: null, verkendStopAge: null,
+    basisEindvermogen: 150_000, scenarioEindvermogen: null,
   }
 
-  it('sectie 2 wordt de dekkingsas: kop "Reikt je plan?", slider "Doorwerken tot", tegels Reikt tot · Plan tot · Gedekt', () => {
+  it('sectie 2 wordt de dekkingsas: kop "Reikt je plan?", slider "Doorwerken tot", tegels Reikt tot · Eindvermogen · Gedekt', () => {
     render(<Vrijheidsas {...baseProps} ankerVast planStopAge={58.5} dekking={dekking} onMaakPlan={() => {}} />)
     expect(screen.getByText('Reikt je plan?')).toBeInTheDocument()
     expect(screen.getByRole('slider', { name: 'Doorwerken tot' })).toBeInTheDocument()
     expect(screen.getByText('Reikt tot')).toBeInTheDocument()
-    expect(screen.getByText('Plan tot')).toBeInTheDocument()
+    // ADR 0145 D12 — "Plan tot" maakte plaats voor het eindvermogen.
+    expect(screen.getByText('Eindvermogen')).toBeInTheDocument()
     expect(screen.getByText('Gedekt')).toBeInTheDocument()
   })
 

@@ -1,7 +1,8 @@
 'use client'
 
-import { ankerReachesAge, DEKKINGSAS_COPY, type AnkerReach } from '@/lib/horizon/anker-copy'
+import { ankerReachesAge, DEKKINGSAS_COPY, eindvermogenTegelCaption, type AnkerReach } from '@/lib/horizon/anker-copy'
 import { leeftijdJaar } from '@/lib/horizon/leeftijd-jaar'
+import { formatCurrency } from '@/lib/format'
 
 /**
  * De DEKKINGSAS (spec lab-haalbaarheid §1, 15 sep 2026): één horizontale schaal van het
@@ -23,6 +24,16 @@ export interface DekkingsasData {
   /** Verkend stopmoment (stop-pad); `null` zonder stopkeuze. */
   verkendReach: AnkerReach | null
   verkendStopAge: number | null
+  /**
+   * EINDVERMOGEN op de eindleeftijd (ADR 0145 D12) — in euro's van nu, GEDEFLATEERD DOOR DE
+   * AANROEPER. Dit component formatteert alleen; het kent de euro-weergave niet en deelt
+   * nooit zelf door een inflatiefactor (ADR 0090/0093: één omzetting, in de render-grens van
+   * horizon-client). `null` = niets te tonen — óók de privacy-weergave levert `null`, zodat
+   * er geen tweede maskeer-pad naast de bestaande ontstaat.
+   */
+  basisEindvermogen: number | null
+  /** Idem voor de wat-als-run; `null` zonder scenario (of gemaskeerd). */
+  scenarioEindvermogen: number | null
 }
 
 function posOf(reach: AnkerReach, stopAge: number, eindAge: number): number {
@@ -58,6 +69,16 @@ function reachLabel(reach: AnkerReach | null, eindAge: number | null): string {
 function pctLabel(pct: number | null): string {
   if (pct == null) return '—'
   return `${pct >= 100 ? 100 : Math.min(99, Math.round(pct))}%`
+}
+
+/**
+ * Het eindvermogen als tegelwaarde. `null` (geen run, of de privacy-weergave) geeft de
+ * drie puntjes — bewust geen "—": daar leest een lezer "niet van toepassing", terwijl het
+ * hier "niet getoond/nog niet bekend" is.
+ */
+const GEEN_BEDRAG = '···'
+function euroLabel(value: number | null): string {
+  return value == null ? GEEN_BEDRAG : formatCurrency(value)
 }
 
 function Tegel({ kicker, value, testId }: { kicker: string; value: string; testId: string }) {
@@ -104,9 +125,21 @@ export function Dekkingsbalk({ data }: { data: DekkingsasData }) {
       </div>
       <div className="mt-4 grid grid-cols-3 gap-3 border-t border-[var(--border-ed)] pt-4">
         <Tegel kicker={DEKKINGSAS_COPY.tegelReikt} testId="dekkingsbalk-reikt" value={arrow(reachLabel(data.basisReach, data.eindAge), data.scenarioReach ? reachLabel(data.scenarioReach, data.eindAge) : null)} />
-        <Tegel kicker={DEKKINGSAS_COPY.tegelPlan} testId="dekkingsbalk-plan" value={data.eindAge != null ? String(leeftijdJaar(data.eindAge)) : '—'} />
+        {/* ADR 0145 D12 — het derde component: wat er op de eindleeftijd over is. Staat waar
+            "Plan tot" stond; die eindleeftijd noemt de as onder de balk al ("plan tot 90"). */}
+        <Tegel
+          kicker={DEKKINGSAS_COPY.tegelEindvermogen}
+          testId="dekkingsbalk-eindvermogen"
+          value={arrow(
+            euroLabel(data.basisEindvermogen),
+            data.scenarioEindvermogen != null ? euroLabel(data.scenarioEindvermogen) : null,
+          )}
+        />
         <Tegel kicker={DEKKINGSAS_COPY.tegelGedekt} testId="dekkingsbalk-gedekt" value={arrow(pctLabel(data.basisPct), data.scenarioPct != null ? pctLabel(data.scenarioPct) : null)} />
       </div>
+      <p className="mt-1 font-sans text-[10px] leading-snug text-[var(--ink-4)]">
+        {eindvermogenTegelCaption(data.eindAge)}
+      </p>
     </div>
   )
 }

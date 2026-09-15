@@ -410,7 +410,8 @@ describe('PUT /api/toekomst-doel — loslaten', () => {
     expect(res.status).toBe(200)
     const del = deleted.find((d) => d.table === 'goals')
     expect(del).toBeTruthy()
-    expect(del!.filters.goal_type).toEqual(['savings_rate', 'expected_return', 'fire_age', 'plan_coverage', 'salary'])
+    // ADR 0145 D12 — het lab-eindvermogen (end_balance) hoort er óók bij.
+    expect(del!.filters.goal_type).toEqual(['savings_rate', 'expected_return', 'fire_age', 'plan_coverage', 'end_balance', 'salary'])
     expect(del!.filters.user_id).toBe('user-1')
   })
 
@@ -559,6 +560,86 @@ describe('PUT /api/toekomst-doel — vastleggen volgt het anker (ADR 0145)', () 
     )
     expect(res.status).toBe(400)
     expect(await res.json()).toEqual({ error: 'Een dekkingsdoel hoort bij een vast stopmoment', code: 'dekking_vereist_vast_anker' })
+    expect(inserted).toEqual([])
+    expect(updated).toEqual([])
+  })
+
+  it('age + gedekt + eindvermogen (D12): end_balance-rij met het NOMINALE bedrag uit de body en de plan-velden van de server', async () => {
+    results.profilesSelect.mockReturnValueOnce(planRow({ fire_stop_anchor: 'age', fire_stop_age: 60, fire_end_age: 90 }))
+    const res = await PUT(
+      putRequest(
+        JSON.stringify({
+          action: 'vastleggen',
+          parameters: { eindvermogen: true },
+          // Plan-velden uit de body tellen niet; het bedrag wél (alleen de live-sim kent 'm).
+          doelwaarden: { eindvermogen: 412_345.67, planEindleeftijd: 55, planStopAnker: 'aow' },
+          stand: { sliders: { extraInleg: 300 } },
+        }),
+      ),
+    )
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ ok: true, goalIds: { eindvermogen: 'g-1' } })
+    expect(inserted).toHaveLength(1)
+    const row = inserted[0].row
+    expect(row.goal_type).toBe('end_balance')
+    expect(row.name).toBe('Eindvermogen op je 90e')
+    expect(row.target_value).toBe(412_345.67)
+    expect(row.icon).toBe('Vault')
+    expect(row.metadata).toEqual({ bron: 'parameter', oorsprong: 'lab', eindleeftijd: 90, stopAnker: 'age', stopLeeftijd: 60 })
+    const doel = updated.find((u) => u.table === 'profiles')!.payload.toekomst_scenario_prefs.doel
+    expect(doel.parameters).toEqual({ eindvermogen: true })
+  })
+
+  it('eindvermogen: de reconciliatie ruimt alléén fire_age op — een lab-end_balance meet onder elk anker', async () => {
+    results.profilesSelect.mockReturnValueOnce(planRow({ fire_stop_anchor: 'aow' }))
+    const res = await PUT(
+      putRequest(
+        JSON.stringify({
+          action: 'vastleggen',
+          parameters: { eindvermogen: true },
+          doelwaarden: { eindvermogen: 100_000 },
+          stand: { sliders: { savings: 40 } },
+        }),
+      ),
+    )
+    expect(res.status).toBe(200)
+    const goalDeletes = deleted.filter((d) => d.table === 'goals')
+    expect(goalDeletes.map((d) => d.filters.goal_type)).toEqual(['fire_age'])
+  })
+
+  it('eindvermogen zonder (of met een negatief) bedrag → overgeslagen → 400 "Geen geldige doelwaarden", geen goals', async () => {
+    results.profilesSelect.mockReturnValueOnce(planRow({ fire_stop_anchor: 'aow' }))
+    const res = await PUT(
+      putRequest(
+        JSON.stringify({
+          action: 'vastleggen',
+          parameters: { eindvermogen: true },
+          doelwaarden: { eindvermogen: -5 },
+          stand: { sliders: { savings: 40 } },
+        }),
+      ),
+    )
+    expect(res.status).toBe(400)
+    expect(inserted).toEqual([])
+  })
+
+  it('solved + eindvermogen → 400 (eindvermogen_vereist_vast_anker), geen goals, geen pref-write', async () => {
+    results.profilesSelect.mockReturnValueOnce(planRow())
+    const res = await PUT(
+      putRequest(
+        JSON.stringify({
+          action: 'vastleggen',
+          parameters: { eindvermogen: true, spaarquote: true },
+          doelwaarden: { spaarquotePct: 45, eindvermogen: 100_000 },
+          stand: { sliders: { savings: 45 } },
+        }),
+      ),
+    )
+    expect(res.status).toBe(400)
+    expect(await res.json()).toEqual({
+      error: 'Een eindvermogen-doel hoort bij een vast stopmoment',
+      code: 'eindvermogen_vereist_vast_anker',
+    })
     expect(inserted).toEqual([])
     expect(updated).toEqual([])
   })

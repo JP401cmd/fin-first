@@ -153,6 +153,31 @@ describe('horizon-client consumeert ÉÉN lab-uitkomst (ADR 0145)', () => {
     expect(blok).toContain('basisReach: labDekking.basisReach')
     expect(blok).toContain('basisPct: labDekking.basisPct')
     expect(blok).not.toMatch(/\/ 12|eindMaand|computeRunwayCoveragePct/)
-    expect(src).toContain('dekking={dekkingsasData}')
+    // ADR 0145 D12 — de as krijgt de GEDEFLATEERDE euro-kolom erbij in het euro-weergave-blok.
+    expect(src).toContain('dekking={viewDekkingsasData}')
+    expect(src).not.toContain('dekking={dekkingsasData}')
+  })
+
+  it('eindvermogen (D12): weergave gedeflateerd IN het euro-weergave-blok, doelbedrag NOMINAAL uit labDekking', () => {
+    const src = bron()
+    const blokStart = src.indexOf('EURO-WEERGAVE: DE RENDER-GRENS')
+    const blokEind = src.indexOf('EINDE EURO-WEERGAVE')
+    const euroBlok = src.slice(blokStart, blokEind)
+    // Eén factor op de eindleeftijd, via de canonieke helpers — nooit een eigen machtsverheffing.
+    expect(euroBlok).toContain('factorAtAge(displayUnifiedRows, labDekking?.eind ?? chartEndAge)')
+    expect(euroBlok).toMatch(/const viewBasisEindvermogen =[\s\S]*?deflate\(labDekking\.basisEindvermogen, eindvermogenFactor, euroView\)/)
+    expect(euroBlok).toMatch(/const viewScenarioEindvermogen =[\s\S]*?deflate\(labDekking\.scenarioEindvermogen, eindvermogenFactor, euroView\)/)
+    expect(euroBlok).toContain('const viewDekkingsasData = useMemo')
+    expect(euroBlok).toContain('basisEindvermogen: masked ? null : viewBasisEindvermogen')
+    expect(euroBlok).toContain('const viewDoelPreviews = useMemo')
+    // Het doelbedrag is nominaal: rechtstreeks uit de lab-uitkomst, nooit een view*-waarde.
+    const handler = src.slice(src.indexOf('const handleDoelVastleggen = useCallback'), src.indexOf('const handleDoelLoslaten'))
+    expect(handler).toContain('eindvermogen: gekozen.eindvermogen ? labDekking?.scenarioEindvermogen ?? undefined : undefined')
+    expect(handler).not.toMatch(/eindvermogen:[^\n]*view/)
+    // De badge en de sheet consumeren de view-waarden.
+    expect(src).toContain('data-testid="lab-eindvermogen-badge"')
+    expect(src).toContain('eindvermogenDeltaBadge(viewLabEindvermogenDelta)')
+    expect(src).toContain('previews={viewDoelPreviews}')
+    expect(src).toContain("labPromotie.kind === 'eindvermogen'")
   })
 })

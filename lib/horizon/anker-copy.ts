@@ -37,7 +37,7 @@
 // de AOW vallen — het aow-anker noemt zijn stopmoment daarom als getal ("op 67").
 
 import { HORIZON_PLAFOND_LEEFTIJD } from '@/lib/constants'
-import { MASKED_AMOUNT_PLACEHOLDER } from '@/lib/format'
+import { formatCurrency, MASKED_AMOUNT_PLACEHOLDER } from '@/lib/format'
 import type { KernelStopAnker } from '@/lib/horizon-kernel/types'
 // Dezelfde afrondingsregel als het hero-kopgetal (`heroFireAgeYear`), via het
 // import-vrije blad — hero-fire-age.ts importeert dít bestand, niet andersom.
@@ -202,9 +202,21 @@ export const DEKKINGSAS_COPY = {
   tag: 'de dekking',
   sliderLabel: 'Doorwerken tot',
   tegelReikt: 'Reikt tot',
-  tegelPlan: 'Plan tot',
+  /**
+   * ADR 0145 D12 (15 sep 2026) — tegel 2 toont het EINDVERMOGEN i.p.v. "Plan tot".
+   * Die eindleeftijd stond al onder de balk ("plan tot 90"); wat ontbrak was het derde
+   * component dat onder een gedekt plan nog beweegt: wat er op je eindleeftijd over is.
+   */
+  tegelEindvermogen: 'Eindvermogen',
   tegelGedekt: 'Gedekt',
 } as const
+
+/** Onderschrift onder de drie tegels: de eindvermogen-kolom is een bedrag van vandaag. */
+export function eindvermogenTegelCaption(endAge: number | null): string {
+  return endAge != null
+    ? `op je ${heroFireAgeYear(endAge)}e, in euro's van nu`
+    : "op je eindleeftijd, in euro's van nu"
+}
 
 /**
  * Het stopmoment als getal in een zin: hele jaren kaal ("62"), halve jaren met een
@@ -515,7 +527,10 @@ export function dekkingDeltaBadge(deltaPct: number): string {
 export function dekkingAsNotitie(reach: AnkerReach, pct: number | null, endAge: number | null): string | null {
   switch (reach.kind) {
     case 'gedekt':
-      return `Je plan is gedekt ${totJeEind(reach.endAge ?? endAge)}. Verkennen kan; er is niets vast te leggen.`
+      // ADR 0145 D12 — vóór 15 sep 2026: "Verkennen kan; er is niets vast te leggen." Dat is
+      // niet meer waar: bij een gedekt plan legt het lab het eindvermogen vast. De staart spiegelt
+      // de goedgekeurde tekortzin ("Draai aan de knoppen om te zien wat dat verandert.").
+      return `Je plan is gedekt ${totJeEind(reach.endAge ?? endAge)}. Draai aan de knoppen om te zien wat er ${opJeEind(reach.endAge ?? endAge)} over is.`
     case 'reikt-tot':
       return `Je plan reikt nu tot je ${heroFireAgeYear(reach.age)}e — ${fmtPct(pct ?? 0)}% gedekt. Draai aan de knoppen om te zien wat dat verandert.`
     case 'nu-op':
@@ -597,6 +612,76 @@ export const DOELEN_MELDING_ACTIES = { bijwerken: 'Bijwerken', loslaten: 'Loslat
 /** Zin 12 — de toast na het vastleggen van een dekkingsdoel. */
 export function dekkingVastgelegdToast(endAge: number | null): string {
   return `Je verkenning is nu je doel — de app volgt of je plan ${totJeEind(endAge)} reikt.`
+}
+
+// ── Eindvermogen als derde verandercomponent (ADR 0145 D12, eigenaarsbesluit 15 sep 2026) ──
+//
+// Onder een GEDEKT plan bewegen de dekking (100 %) en het bereik (het plan-einde) niet meer;
+// wat er op je eindleeftijd óverblijft wél. Die grootheid staat daarom als derde component in
+// het lab, en is daar ook het doel dat het lab schrijft (`end_balance`) — dat overschrijft
+// eigenaarsbesluit E5 ("gedekt → geen doel uit het lab").
+//
+// TOON: dezelfde invarianten als hierboven — beschrijvend ("wat er over is"), nooit
+// aansporend, nooit "oneindig". Het woord AOW komt hier niet voor: de aanhef noemt het
+// stopmoment als getal, net als de dekkings-zinnen.
+//
+// GRONDSLAG: het eindvermogen is de LIQUIDE portefeuille op de eindleeftijd
+// (`pickEndBalanceAtEndAge`), en de bedragen die hier binnenkomen zijn AL GEDEFLATEERD door
+// de aanroeper (de euro-weergave-render-grens in horizon-client). Dit bestand rekent niets om.
+
+/** Een eindvermogen-bedrag in een zin; de vaste placeholder in de privacy-weergave. */
+function eindBedrag(euro: number, masked: boolean): string {
+  return masked ? MASKED_AMOUNT_PLACEHOLDER : formatCurrency(euro)
+}
+
+/** "op je 90e" / "op je eindleeftijd" — het moment waar het eindvermogen bij hoort. */
+function opJeEind(endAge: number | null): string {
+  return endAge != null ? `op je ${heroFireAgeYear(endAge)}e` : 'op je eindleeftijd'
+}
+
+/** De waarde-string van de vaste preview-rij "Eindvermogen": `nu € X → € Y op je 90e`. */
+export function eindvermogenPreviewWaarde(
+  basis: number,
+  scenario: number,
+  endAge: number | null,
+  masked = false,
+): string {
+  return `nu ${eindBedrag(basis, masked)} → ${eindBedrag(scenario, masked)} ${opJeEind(endAge)}`
+}
+
+/**
+ * De delta-badge naast de dekkings-badge: "+€ 12.000 eindvermogen" / "−€ 3.000 eindvermogen".
+ * Spiegelt `dekkingDeltaBadge`; het minteken is het typografische − (U+2212), zoals overal.
+ */
+export function eindvermogenDeltaBadge(delta: number): string {
+  return `${delta >= 0 ? '+' : '−'}${formatCurrency(Math.abs(delta))} eindvermogen`
+}
+
+/**
+ * Toelichting bovenaan het vastleg-venster bij een GEDEKT plan onder een vast stopmoment —
+ * de spiegel van `dekkingSheetToelichting` (die gaat over een plan dat nog niet reikt).
+ */
+export function eindvermogenSheetToelichting(stop: AnkerStop, endAge: number | null): string {
+  const aanhef =
+    stop.kind === 'now'
+      ? 'Je rekent alsof je nu stopt en je plan is gedekt.'
+      : `Je stopmoment ligt vast op ${formatStopAge(stop.stopAge)} en je plan is gedekt.`
+  return `${aanhef} Het lab legt daarom vast wat er ${opJeEind(endAge)} over is.`
+}
+
+/**
+ * De naam van het eindvermogen-doel — één bron voor de DB-rij (`buildRow('eindvermogen')` in
+ * toekomst-doel.ts) én de live kaart, net als `planCoverageGoalName`.
+ */
+export function eindvermogenGoalName(eindleeftijd: number | null): string {
+  return bruikbaar(eindleeftijd)
+    ? `Eindvermogen op je ${eindleeftijd.toLocaleString('nl-NL', { maximumFractionDigits: 1 })}e`
+    : 'Eindvermogen'
+}
+
+/** De toast na het vastleggen van een eindvermogen-doel. */
+export function eindvermogenVastgelegdToast(endAge: number | null): string {
+  return `Je verkenning is nu je doel — de app volgt wat er ${opJeEind(endAge)} over is.`
 }
 
 /**
