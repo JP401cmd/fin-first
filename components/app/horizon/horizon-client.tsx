@@ -160,8 +160,9 @@ import {
   dekkingDeltaBadge,
   dekkingPreviewWaarde,
   dekkingSheetToelichting,
-  dekkingTekortHintKnop,
-  dekkingTekortHintZin,
+  ANTWOORDEN_KOP,
+  ANTWOORD_BOVEN_BEREIK,
+  ANTWOORD_KNOP,
   dekkingVastgelegdToast,
   dekkingVerkenZin,
   formatStopAge,
@@ -170,6 +171,7 @@ import {
   type AnkerStop,
 } from '@/lib/horizon/anker-copy'
 import { resolveLabUitkomst, type LabUitkomst } from '@/lib/horizon/lab-uitkomst'
+import { resolveLabAntwoorden, type LabAntwoordActie } from '@/lib/horizon/lab-antwoorden'
 import { GOAL_TYPE_LABELS } from '@/lib/goal-data'
 import { AnkerDrieslag } from '@/components/app/horizon/anker-drieslag'
 import {
@@ -306,7 +308,7 @@ import { buildHorizonInput } from '@/lib/horizon/build-input'
 import { buildDeeplinkCleanupUrl } from '@/lib/horizon/deeplink-cleanup'
 import type { PreviewBaseline } from '@/lib/strategy-preview'
 import { buildBaselineOverrides } from '@/lib/whatif-overrides'
-import { WhatIfSliders, DeltaBadge, computeSliderUiRange, type WhatIfOverrides } from '@/components/app/horizon/whatif-sliders'
+import { WhatIfSliders, DeltaBadge, type WhatIfOverrides } from '@/components/app/horizon/whatif-sliders'
 import type { WhatIfEvent } from '@/lib/types/horizon-whatif'
 import { ChartOverlayExplainer } from '@/components/app/horizon/chart-overlay-explainer'
 import { ChartTips } from '@/components/editorial/chart-tips'
@@ -2848,35 +2850,13 @@ export default function HorizonPage({
       verkendStopAge: labDekking.verkendStopAge,
     }
   }, [labDekking, currentAge])
-  // "Wat hoort daarbij?" — PLAN-variant (zonder slider-beweging). Het verkende stop-pad
-  // wint (blok hierboven); zonder tekort-hint op dat pad valt het plan-antwoord terug op
-  // de maandhint van de lab-uitkomst. €→vrijheidstijd via dezelfde canonieke helper.
-  const planTekortHint = useMemo(() => {
-    if (labDekking == null || labDekking.stop == null || labDekking.maandHint == null) return null
-    // Alleen bij een tekort in DEKKING (reikt het geld tot de eindleeftijd?). De kernel-
-    // maandhint telt ook het eind-doel mee (bv. een nalatenschap); dan reikt het plan wél
-    // en zegt de as "gedekt" — een hint ernaast sprak dat tegen (smoke 14 sep 2026).
-    if (!labDekking.tekort) return null
-    if (stopPadTekortHint !== null) return null
-    // Draagt het stop-pad zélf een hint, dan hoort die bij het verkende stopmoment — nooit
-    // met de plan-woorden tonen.
-    if (stopPad != null && Number.isFinite(stopPad.maandHint) && stopPad.maandHint > 0) return null
-    const hint = labDekking.maandHint
-    // `null` = geen dagbasis: dan valt de omrekening uit de zin (nooit een gegokte "0").
-    const dagen = canonicalDailyRate > 0
-      ? Math.round(calculateFreedomTime(hint, canonicalDailyRate).totalDays)
-      : null
-    // Het seed-bedrag is geklemd op het zichtbare extra-inleg-bereik; het knoplabel noemt
-    // wat er daadwerkelijk gezet wordt.
-    const range = whatIfBaseline ? computeSliderUiRange('extra_inleg', whatIfBaseline.monthlyIncome, 0) : null
-    const seed = range ? Math.min(Math.max(Math.round(hint), range.min), range.max) : null
-    return { stop: labDekking.stop, eind: labDekking.eind, hint, dagen, seed }
-  }, [labDekking, stopPadTekortHint, stopPad, canonicalDailyRate, whatIfBaseline])
-  const handlePlanTekortHintSeed = useCallback(() => {
-    if (planTekortHint?.seed == null || planTekortHint.seed <= 0 || !whatIfBaseline || currentAge === null) return
-    const ev = buildSliderEvent('extra_inleg', planTekortHint.seed, whatIfBaseline, currentAge)
-    setScenarioSliderEvents((prev) => applySliderEvent(prev, 'extra_inleg', ev))
-  }, [planTekortHint, whatIfBaseline, currentAge])
+  // Spec lab-haalbaarheid §3 — de drie hefbomen als antwoorden bij een tekort. Consumeert
+  // labDekking (ADR 0145) en de tweede run (solvedRun, ADR 0129 D7); klemt alleen op het
+  // slider-bereik. De klik-handler (`handleLabAntwoord`) staat ná `handleStopAgeChange`.
+  const labAntwoorden = useMemo(
+    () => resolveLabAntwoorden({ dekking: labDekking, solvedFireAge: solvedRun?.fireAge ?? null, baseline: whatIfBaseline, masked }),
+    [labDekking, solvedRun, whatIfBaseline, masked],
+  )
   // ── Dekkingsradar-assen — pure consume-laag over de duiding-rijen ──────
   // Alle grootheden komen elders vandaan: de duiding-rijen (stop-pad wint), de actieve-pad
   // FIRE/benodigd-vermogen/doel-eindvermogen en de canonieke bestedingsgrondslag
@@ -3531,6 +3511,22 @@ export default function HorizonPage({
       }
     },
     [scenarioStopKoppel, scenarioVerwachtSettled],
+  )
+  // "Reken hiermee" (antwoordenblok, spec lab-haalbaarheid §3): zet de hefboom als
+  // VERKENNING — nooit het plan, en alleen op klik (ADR 0145 D7: een seed bij laden zou
+  // `hasScenario` omzetten en het persist-effect laten schrijven). De stop gaat via
+  // `handleStopAgeChange`, zodat een gekoppelde marge meebeweegt zoals bij de slider.
+  const handleLabAntwoord = useCallback(
+    (actie: LabAntwoordActie) => {
+      if (actie.kind === 'stop') {
+        handleStopAgeChange(actie.stopAge)
+        return
+      }
+      if (!whatIfBaseline || currentAge === null) return
+      const ev = buildSliderEvent(actie.key, actie.value, whatIfBaseline, currentAge)
+      setScenarioSliderEvents((prev) => applySliderEvent(prev, actie.key, ev))
+    },
+    [whatIfBaseline, currentAge, handleStopAgeChange],
   )
   // Aanzetten van de koppeling legt de HUIDIGE marge vast; uitzetten laat de stop staan.
   const handleStopKoppelChange = useCallback(
@@ -7114,8 +7110,10 @@ export default function HorizonPage({
                     geen belofte dat het doel dan gehaald wordt. Sluitregel volgt de
                     bestaande app-conventie ("Indicatie, geen advies — …"). */}
                 {/* ADR 0127 — een "om op X te stoppen"-hint hoort niet bij een plan
-                    waarin het stopmoment al vastligt op vandaag. */}
-                {stopPadTekortHint !== null && !isNuStoppenMode && (
+                    waarin het stopmoment al vastligt op vandaag. Onder een vast anker
+                    (aow/age) vervangt het antwoordenblok hieronder dit blok (spec
+                    lab-haalbaarheid §7.3): alleen onder solved blijft het staan. */}
+                {stopPadTekortHint !== null && !isNuStoppenMode && !isFixedAnchorMode && (
                   <div className="mt-4 border border-[var(--ink-2)] border-l-4 border-l-horizon-500 bg-[var(--paper)] px-3 py-2.5">
                     <p className="mb-1 label-editorial text-[var(--ink-3)]">Wat hoort daarbij?</p>
                     <p className="font-sans text-[12px] leading-snug text-[var(--ink-2)]">
@@ -7133,41 +7131,40 @@ export default function HorizonPage({
                     </p>
                   </div>
                 )}
-                {/* ── Wat hoort daarbij? — PLAN-variant (ADR 0145) ──────────────────
-                    Onder aow/age zichtbaar zónder slider-beweging: wat hoort er bij het
-                    plan-stopmoment om tot de eindleeftijd te reiken. De knop zet het
-                    bedrag als extra inleg in het lab — alleen op klik, nooit bij laden
-                    (dat zou `hasScenario` omzetten en het persist-effect laten schrijven).
-                    Privacy-weergave: zin én knop krijgen `masked` — bedrag als placeholder,
-                    geen dagen (zelfde als het stop-pad-blok hierboven). Onder één dag zegt
-                    de zin "minder dan een dag" (in `dekkingTekortHintZin`).
-                    Onder het `now`-anker bewust verborgen (`!isNuStoppenMode`): daar is geen
-                    stopmoment om naartoe te sparen en legt het lab geen doel vast (ADR 0145 E6). */}
-                {planTekortHint !== null && !isNuStoppenMode && (
+                {/* ── Wat maakt het haalbaar? — antwoordenblok (spec lab-haalbaarheid §3) ──
+                    Onder aow/age met een tekort: de drie hefbomen mét getal. Elke regel
+                    zet de hefboom als verkenning (nooit het plan), alleen op klik. Onder
+                    `now` en zonder tekort leeg. Kopij uit anker-copy.ts (merkstem/compliance).
+                    Privacy-weergave: bedragen als placeholder en géén knop — de slider
+                    zou na het zetten het echte bedrag tonen. */}
+                {labAntwoorden.length > 0 && !isNuStoppenMode && (
                   <div
-                    data-testid="lab-plan-tekort-hint"
+                    data-testid="lab-antwoorden"
                     className="mt-4 border border-[var(--ink-2)] border-l-4 border-l-horizon-500 bg-[var(--paper)] px-3 py-2.5"
                   >
-                    <p className="mb-1 label-editorial text-[var(--ink-3)]">Wat hoort daarbij?</p>
-                    <p className="font-sans text-[12px] leading-snug text-[var(--ink-2)]">
-                      {dekkingTekortHintZin({
-                        stop: planTekortHint.stop,
-                        endAge: planTekortHint.eind,
-                        hint: planTekortHint.hint,
-                        dagen: planTekortHint.dagen,
-                        masked,
-                      })}
-                    </p>
-                    {/* In privacymodus geen seed-knop: de slider toont na het zetten het echte bedrag. */}
-                    {!masked && planTekortHint.seed != null && planTekortHint.seed > 0 && (
-                      <button
-                        type="button"
-                        onClick={handlePlanTekortHintSeed}
-                        className="mt-2 inline-flex min-h-[44px] items-center font-sans text-[11px] font-semibold text-horizon-700 underline underline-offset-2 transition-colors hover:text-horizon-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
-                      >
-                        {dekkingTekortHintKnop(planTekortHint.seed, masked)}
-                      </button>
-                    )}
+                    <p className="mb-1 label-editorial text-[var(--ink-3)]">{ANTWOORDEN_KOP}</p>
+                    <ul className="space-y-1.5">
+                      {labAntwoorden.map((a) => (
+                        <li
+                          key={a.kind}
+                          className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 font-sans text-[12px] leading-snug text-[var(--ink-2)]"
+                        >
+                          <span>
+                            {a.zin}
+                            {a.bovenBereik && <span className="text-[var(--ink-3)]"> {ANTWOORD_BOVEN_BEREIK}</span>}
+                          </span>
+                          {!masked && (
+                            <button
+                              type="button"
+                              onClick={() => handleLabAntwoord(a.actie)}
+                              className="inline-flex min-h-[44px] items-center font-sans text-[11px] font-semibold text-horizon-700 underline underline-offset-2 transition-colors hover:text-horizon-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+                            >
+                              {ANTWOORD_KNOP}
+                            </button>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
                     <p className="mt-1.5 font-sans text-[11px] leading-snug text-[var(--ink-3)]">
                       Indicatie, geen advies — een rekenuitkomst bij je huidige aannames, uitgesmeerd over de maanden tot je eindleeftijd.
                     </p>

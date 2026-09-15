@@ -525,43 +525,37 @@ export function radarEindstrategieAnkerReden(): string {
   return 'Onder een vast stopmoment is er geen doelvermogen om het eindvermogen tegen af te zetten — de dekking hiernaast zegt of je plan reikt.'
 }
 
-/**
- * Zin 11 — de tekort-hint in de plan-variant (zonder slider-beweging): wat hoort er
- * bij het plan-anker bij om tot de eindleeftijd te reiken. `hint` = `maandHint` (P!B96,
- * > 0 ⟺ tekort), `dagen` = het vrijheidstijd-equivalent uit `calculateFreedomTime`
- * (de aanroeper rekent dat op de canonieke dagbasis; hier alleen woorden). `dagen: null`
- * = geen dagbasis beschikbaar → de omrekening valt weg.
- *
- * PRIVACY-WEERGAVE (`masked`). Het bedrag wordt de vaste placeholder — dezelfde als het
- * stop-pad-blok via `formatMaskedApproxCurrency` — zónder "zo'n €", en de omrekening naar
- * dagen valt weg: naast de dagbasis verraadt het aantal dagen het bedrag alsnog (zelfde
- * keuze als het stop-pad-blok).
- *
- * ONDER ÉÉN DAG. `Math.round(dagen) < 1` zegt "minder dan een dag" — nooit "0 dagen",
- * want een tekort > 0 kost wel degelijk vrijheid (eigenaarsbesluit 14 sep 2026).
- */
-export function dekkingTekortHintZin(input: {
-  stop: AnkerStop
-  endAge: number | null
-  hint: number
-  dagen: number | null
-  masked?: boolean
-}): string {
-  const bijStop = input.stop.kind === 'now' ? 'als je nu stopt' : `als je op ${formatStopAge(input.stop.stopAge)} stopt`
-  const bedrag = input.masked ? MASKED_AMOUNT_PLACEHOLDER : `zo'n €${fmtHint(input.hint)}`
-  const kern = `Om je plan ${totJeEind(input.endAge)} te laten reiken ${bijStop}, hoort daar ${bedrag} per maand extra sparen bij, bovenop wat je nu opzij zet`
-  if (input.masked || input.dagen == null || !Number.isFinite(input.dagen)) return `${kern}.`
-  const dagen = Math.round(input.dagen)
-  if (dagen < 1) return `${kern} — omgerekend minder dan een dag vrijheid per maand.`
-  return `${kern} — omgerekend ${dagen} ${dagen === 1 ? 'dag' : 'dagen'} vrijheid per maand.`
-}
+// ── Zin 11 — antwoordenblok "Wat maakt het haalbaar?" (spec lab-haalbaarheid §3/§5, 15 sep 2026) ──
+// Beschrijvend ("dekt je plan"), nooit een instructie; geen "AOW" in een tekortzin.
+// Vervangt de plan-hint ("Reken met € X extra inleg", ADR 0145 D7) onder een vast anker.
+// De knop is generiek ("Reken hiermee"): het bedrag staat al in de zin, en in de
+// privacy-weergave toont de UI geen knop (de slider zou het echte bedrag verraden).
+
+export const ANTWOORDEN_KOP = 'Wat maakt het haalbaar?'
+export const ANTWOORD_KNOP = 'Reken hiermee'
+export const ANTWOORD_BOVEN_BEREIK = 'Dat is meer dan de knop toelaat — de knop zet het hoogste bedrag.'
 
 /**
- * Zin 11 — het knoplabel dat de hint als extra inleg in het lab zet (compliance 14 sep: geen
- * "Zet als …"). In de privacy-weergave draagt ook het label de placeholder.
+ * Antwoord 1 — de opgeloste leeftijd zonder anker (tweede run, ADR 0129 D7), op halve
+ * jaren. Het getal gaat via `formatStopAge` ("61", "61,5"): het is een stopmoment.
  */
-export function dekkingTekortHintKnop(hint: number, masked = false): string {
-  return `Reken met ${masked ? MASKED_AMOUNT_PLACEHOLDER : `€ ${fmtHint(hint)}`} extra inleg`
+export function antwoordDoorwerken(stopAge: number): string {
+  return `Doorwerken tot ${formatStopAge(stopAge)} dekt je plan.`
+}
+
+/** Het maandbedrag in een antwoordzin — de vaste placeholder in de privacy-weergave. */
+function maandBedrag(hint: number, masked: boolean): string {
+  return masked ? MASKED_AMOUNT_PLACEHOLDER : `€${fmtHint(hint)}`
+}
+
+/** Antwoord 2 — `maandHint` (P!B96) als extra inleg. */
+export function antwoordExtraOpzij(hint: number, masked = false): string {
+  return `Zo'n ${maandBedrag(hint, masked)} per maand extra opzij dekt je plan.`
+}
+
+/** Antwoord 3 — hetzelfde bedrag als minder uitgeven (dezelfde maandelijkse stroom). */
+export function antwoordMinderUitgeven(hint: number, masked = false): string {
+  return `Zo'n ${maandBedrag(hint, masked)} per maand minder uitgeven dekt je plan.`
 }
 
 /** Zin 12 — de toast na het vastleggen van een dekkingsdoel. */

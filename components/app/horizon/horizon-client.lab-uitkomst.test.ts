@@ -91,38 +91,54 @@ describe('horizon-client consumeert ÉÉN lab-uitkomst (ADR 0145)', () => {
     const blok = src.slice(src.indexOf('const labUitkomst: LabUitkomst'), src.indexOf('const radarAssen'))
     expect(blok.length).toBeGreaterThan(0)
     expect(blok).not.toMatch(/\/\s*12\b/)
-    const dekkingRegels = code.filter((l) => /labDekking|labUitkomst|planTekortHint|dekking/i.test(l))
+    const dekkingRegels = code.filter((l) => /labDekking|labUitkomst|labAntwoorden|dekking/i.test(l))
     expect(dekkingRegels.length).toBeGreaterThan(0)
     expect(dekkingRegels.filter((l) => /\/\s*12\b|computeRunwayCoveragePct/.test(l))).toEqual([])
   })
 
-  it('de plan-tekort-hint zet de extra inleg alléén op klik, via de slider-helpers', () => {
+  it('het antwoordenblok consumeert resolveLabAntwoorden op labDekking + solvedRun; acties alleen op klik', () => {
     const src = bron()
-    const start = src.indexOf('const handlePlanTekortHintSeed')
+    const start = src.indexOf('resolveLabAntwoorden({')
     expect(start).toBeGreaterThan(-1)
-    const handler = src.slice(start, src.indexOf('}, [', start))
-    expect(handler).toContain("buildSliderEvent('extra_inleg'")
-    expect(handler).toContain('setScenarioSliderEvents(')
-    // Geklemd op het zichtbare bereik van de extra-inleg-slider, geen eigen literal.
-    expect(src).toContain("computeSliderUiRange('extra_inleg'")
-    // Nooit auto-seeden: de handler hangt alleen aan een onClick.
-    expect(src).toContain('onClick={handlePlanTekortHintSeed}')
-    expect(src.match(/handlePlanTekortHintSeed\(/g) ?? []).toEqual([])
+    const call = src.slice(start, src.indexOf('})', start))
+    expect(call).toContain('dekking: labDekking')
+    expect(call).toContain('solvedFireAge: solvedRun?.fireAge ?? null')
+    expect(call).toContain('masked')
+    const code = codeRegels().join('\n')
+    expect(code).toContain('onClick={() => handleLabAntwoord(a.actie)}')
+    // nooit auto-seeden: geen useEffect dat handleLabAntwoord aanroept, en de enige
+    // aanroep is die ene onClick (ADR 0145 D7).
+    expect(code).not.toMatch(/useEffect\([^)]*handleLabAntwoord/)
+    expect(code.match(/handleLabAntwoord\(/g) ?? []).toHaveLength(1)
+    // in privacymodus geen knop
+    const blokStart = code.indexOf('data-testid="lab-antwoorden"')
+    expect(blokStart).toBeGreaterThan(-1)
+    const blok = code.slice(blokStart, code.indexOf('Indicatie, geen advies', blokStart))
+    expect(blok).toContain('{!masked && (')
+    expect(blok).toContain('ANTWOORD_KNOP')
+    // de oude plan-hint is weg
+    expect(src).not.toContain('lab-plan-tekort-hint')
+    expect(src).not.toMatch(/dekkingTekortHint(Zin|Knop)/)
   })
 
-  it('de plan-tekort-hint blijft zichtbaar in de privacy-weergave en geeft `masked` door aan zin én knop', () => {
-    const code = codeRegels().join('\n')
-    const start = code.indexOf('data-testid="lab-plan-tekort-hint"')
+  it('"Reken hiermee" zet de hefboom via de bestaande lab-handlers, niet via het plan', () => {
+    const src = bron()
+    const start = src.indexOf('const handleLabAntwoord = useCallback')
     expect(start).toBeGreaterThan(-1)
-    // De render-gate direct vóór het blok: geen `!masked` en geen dagen-drempel meer
-    // (de zin kent zelf "minder dan een dag").
-    const gate = code.slice(code.lastIndexOf('{planTekortHint !== null', start), start)
-    expect(gate).toContain('!isNuStoppenMode')
-    expect(gate).not.toContain('!masked')
-    expect(gate).not.toMatch(/dagen\s*>=\s*1/)
-    const blok = code.slice(start, code.indexOf('Indicatie, geen advies', start))
-    expect(blok).toMatch(/dekkingTekortHintZin\(\{[\s\S]*?\bmasked,[\s\S]*?\}\)/)
-    expect(blok).toContain('dekkingTekortHintKnop(planTekortHint.seed, masked)')
+    // Ná handleStopAgeChange gedeclareerd (geen TDZ in de deps-array).
+    expect(start).toBeGreaterThan(src.indexOf('const handleStopAgeChange = useCallback'))
+    const eind = src.indexOf('[whatIfBaseline, currentAge, handleStopAgeChange]', start)
+    expect(eind).toBeGreaterThan(start)
+    const handler = src.slice(start, eind)
+    expect(handler).toContain('handleStopAgeChange(actie.stopAge)')
+    expect(handler).toContain('buildSliderEvent(actie.key, actie.value, whatIfBaseline, currentAge)')
+    expect(handler).toContain('setScenarioSliderEvents(')
+    expect(handler).not.toMatch(/fetch\(|\/api\/fire-settings/)
+  })
+
+  it('het stop-pad-blok "Wat hoort daarbij?" blijft alleen onder solved', () => {
+    const code = codeRegels().join('\n')
+    expect(code).toContain('stopPadTekortHint !== null && !isNuStoppenMode && !isFixedAnchorMode')
   })
 
   it('de dekkingsas krijgt zijn data uit labDekking (geen eigen som)', () => {

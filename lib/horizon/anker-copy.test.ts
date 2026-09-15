@@ -27,8 +27,12 @@ import {
   dekkingAsNotitie,
   radarSubtitel,
   radarEindstrategieAnkerReden,
-  dekkingTekortHintZin,
-  dekkingTekortHintKnop,
+  antwoordDoorwerken,
+  antwoordExtraOpzij,
+  antwoordMinderUitgeven,
+  ANTWOORDEN_KOP,
+  ANTWOORD_KNOP,
+  ANTWOORD_BOVEN_BEREIK,
   dekkingVastgelegdToast,
   DEKKINGSAS_COPY,
   type AnkerReach,
@@ -268,41 +272,29 @@ describe('dekking-zinnen — de vastgestelde kopij', () => {
     )
   })
 
-  it('11 · tekort-hint (plan-variant) + knop "Reken met € {hint} extra inleg"', () => {
-    expect(dekkingTekortHintZin({ stop: AOW, endAge: 90, hint: 1250.4, dagen: 6.6 })).toBe(
-      "Om je plan tot je 90e te laten reiken als je op 67 stopt, hoort daar zo'n €1.250 per maand extra sparen bij, bovenop wat je nu opzij zet — omgerekend 7 dagen vrijheid per maand.",
-    )
-    expect(dekkingTekortHintKnop(1250.4)).toBe('Reken met € 1.250 extra inleg')
-    expect(dekkingTekortHintKnop(1250.4)).not.toMatch(/^Zet /)
+  // Apostrof: hetzelfde rechte teken (') als de rest van dit bestand ("zo'n", "ratio's").
+  it('11 · antwoordenblok — drie beschrijvende zinnen, één knop, boven-bereik-zin (spec §3/§5)', () => {
+    expect(ANTWOORDEN_KOP).toBe('Wat maakt het haalbaar?')
+    expect(ANTWOORD_KNOP).toBe('Reken hiermee')
+    expect(antwoordDoorwerken(61)).toBe('Doorwerken tot 61 dekt je plan.')
+    expect(antwoordDoorwerken(61.5)).toBe('Doorwerken tot 61,5 dekt je plan.')
+    expect(antwoordExtraOpzij(2100.4)).toBe("Zo'n €2.100 per maand extra opzij dekt je plan.")
+    expect(antwoordMinderUitgeven(2100.4)).toBe("Zo'n €2.100 per maand minder uitgeven dekt je plan.")
+    expect(ANTWOORD_BOVEN_BEREIK).toBe('Dat is meer dan de knop toelaat — de knop zet het hoogste bedrag.')
   })
 
-  it('11 · onder één dag: "minder dan een dag", nooit "0 dagen"', () => {
-    for (const dagen of [0, 0.3, 0.49]) {
-      const zin = dekkingTekortHintZin({ stop: AGE, endAge: 90, hint: 40, dagen })
-      expect(zin).toBe(
-        "Om je plan tot je 90e te laten reiken als je op 58,5 stopt, hoort daar zo'n €40 per maand extra sparen bij, bovenop wat je nu opzij zet — omgerekend minder dan een dag vrijheid per maand.",
-      )
-      expect(zin).not.toMatch(/\b0 dagen\b/)
+  it('11 · privacy: de bedragen worden gemaskeerd, de zin blijft beschrijvend', () => {
+    expect(antwoordExtraOpzij(2100, true)).toBe(`Zo'n ${MASKED_AMOUNT_PLACEHOLDER} per maand extra opzij dekt je plan.`)
+    expect(antwoordMinderUitgeven(2100, true)).toContain(MASKED_AMOUNT_PLACEHOLDER)
+    expect(antwoordMinderUitgeven(2100, true)).not.toMatch(/2\.100|€/)
+  })
+
+  it('11 · toon: geen instructie, geen AOW in de tekortzinnen', () => {
+    // "de knop zet het hoogste bedrag" beschrijft de knop (vastgestelde kopij, spec §5) —
+    // verboden is een zin die de LEZER iets laat zetten: een aanhef "Zet …".
+    for (const z of [antwoordDoorwerken(61), antwoordExtraOpzij(500), antwoordMinderUitgeven(500), ANTWOORD_BOVEN_BEREIK, ANTWOORD_KNOP]) {
+      expect(z).not.toMatch(/je moet|^zet |\bzet je\b|verhoog|\bAOW\b/i)
     }
-    // 0,5 rondt naar 1: dan gewoon enkelvoud.
-    expect(dekkingTekortHintZin({ stop: AGE, endAge: 90, hint: 60, dagen: 0.5 })).toMatch(/omgerekend 1 dag vrijheid per maand\.$/)
-  })
-
-  it('11 · zonder dagbasis (dagen null) valt de omrekening weg', () => {
-    expect(dekkingTekortHintZin({ stop: AOW, endAge: 90, hint: 1250, dagen: null })).toBe(
-      "Om je plan tot je 90e te laten reiken als je op 67 stopt, hoort daar zo'n €1.250 per maand extra sparen bij, bovenop wat je nu opzij zet.",
-    )
-  })
-
-  it('11 · privacy-weergave: bedrag als placeholder in zin én knop, geen dagen (spiegel van het stop-pad-blok)', () => {
-    const zin = dekkingTekortHintZin({ stop: AOW, endAge: 90, hint: 1250.4, dagen: 6.6, masked: true })
-    expect(zin).toBe(
-      `Om je plan tot je 90e te laten reiken als je op 67 stopt, hoort daar ${MASKED_AMOUNT_PLACEHOLDER} per maand extra sparen bij, bovenop wat je nu opzij zet.`,
-    )
-    expect(zin).not.toMatch(/1\.250|€|dag/)
-    const knop = dekkingTekortHintKnop(1250.4, true)
-    expect(knop).toBe(`Reken met ${MASKED_AMOUNT_PLACEHOLDER} extra inleg`)
-    expect(knop).not.toMatch(/1\.250|€/)
   })
 
   it('12 · toast', () => {
@@ -326,11 +318,13 @@ describe('dekking-zinnen — toon-invarianten over alle ankers', () => {
     for (const stop of STOPS_VAST) {
       const zinnen = [
         dekkingSheetToelichting(stop, 90),
-        dekkingTekortHintZin({ stop, endAge: 90, hint: 300, dagen: 2 }),
-        dekkingTekortHintZin({ stop, endAge: 90, hint: 30, dagen: 0.2 }),
-        dekkingTekortHintZin({ stop, endAge: 90, hint: 300, dagen: 2, masked: true }),
-        dekkingTekortHintKnop(300),
-        dekkingTekortHintKnop(300, true),
+        antwoordDoorwerken(61.5),
+        antwoordExtraOpzij(300),
+        antwoordExtraOpzij(300, true),
+        antwoordMinderUitgeven(300),
+        antwoordMinderUitgeven(300, true),
+        ANTWOORD_BOVEN_BEREIK,
+        ANTWOORD_KNOP,
         radarSubtitel({ stop, verkendStopAge: null }) ?? '',
         radarSubtitel({ stop, verkendStopAge: 62 }) ?? '',
         ...TEKORT_REACHES.map((r) => dekkingAsNotitie(r, 40, 90) ?? ''),
@@ -354,11 +348,11 @@ describe('dekking-zinnen — toon-invarianten over alle ankers', () => {
     }
   })
 
-  it('de hint is een som, geen instructie: "hoort daar … bij", en het vrijheidstijd-equivalent staat erbij', () => {
-    const zin = dekkingTekortHintZin({ stop: { kind: 'age', stopAge: 60 }, endAge: 90, hint: 300, dagen: 2 })
-    expect(zin).toContain('hoort daar')
-    expect(zin).toMatch(/dagen vrijheid per maand/)
-    expect(zin).not.toMatch(/\bleg\b|\bspaar\b/i)
+  it('de antwoorden zijn een uitkomst, geen instructie: "dekt je plan", nooit "leg"/"spaar"', () => {
+    for (const zin of [antwoordDoorwerken(60), antwoordExtraOpzij(300), antwoordMinderUitgeven(300)]) {
+      expect(zin).toMatch(/dekt je plan\.$/)
+      expect(zin).not.toMatch(/\bleg\b|\bspaar\b/i)
+    }
   })
 })
 

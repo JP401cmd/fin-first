@@ -71,6 +71,14 @@ describe('horizon-client — "Wat hoort daarbij?" blijft binnen de Wft-grens', (
     expect(source()).toContain('Indicatie, geen advies —')
   })
 
+  it('onder een vast anker vervangt het antwoordenblok dit blok (spec lab-haalbaarheid §3/§7.3)', () => {
+    const src = source()
+    expect(src).toContain('stopPadTekortHint !== null && !isNuStoppenMode && !isFixedAnchorMode')
+    // Eén "Wat hoort daarbij?"-kicker: de plan-variant bestaat niet meer.
+    expect(src.split('>Wat hoort daarbij?</p>').length - 1).toBe(1)
+    expect(src).toContain('data-testid="lab-antwoorden"')
+  })
+
   it('bevat geen aanbevelende of belovende formuleringen', () => {
     const copy = blokCopy()
     for (const verboden of [
