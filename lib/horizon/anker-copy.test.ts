@@ -35,6 +35,8 @@ import {
   ANTWOORD_BOVEN_BEREIK,
   dekkingVastgelegdToast,
   DEKKINGSAS_COPY,
+  doelenPlanGewijzigdMelding,
+  DOELEN_MELDING_ACTIES,
   type AnkerReach,
   type AnkerStop,
 } from './anker-copy'
@@ -218,6 +220,12 @@ describe('dekking-zinnen — de vastgestelde kopij', () => {
     expect(planCoverageKaartSubregel(90, 'age', 58.5)).toBe('tot je 90e · stopmoment 58,5')
     expect(planCoverageKaartSubregel(90, 'aow', null)).toBe('tot je 90e · stopmoment je AOW-leeftijd')
     expect(planCoverageKaartSubregel(90, null, null)).toBe('tot je 90e')
+  })
+
+  it('doelen-melding: enkelvoud/meervoud, acties Bijwerken · Loslaten (spec §4/§5)', () => {
+    expect(doelenPlanGewijzigdMelding(1)).toBe('Je plan is veranderd. 1 doel uit het lab past er niet meer bij.')
+    expect(doelenPlanGewijzigdMelding(2)).toBe('Je plan is veranderd. 2 doelen uit het lab passen er niet meer bij.')
+    expect(DOELEN_MELDING_ACTIES).toEqual({ bijwerken: 'Bijwerken', loslaten: 'Loslaten' })
   })
 
   it('4 · plan_coverage n.v.t. onder solved', () => {

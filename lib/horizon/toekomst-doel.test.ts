@@ -6,6 +6,7 @@ import {
   PARAM_TO_GOAL_TYPE,
   PARAMETER_GOAL_TYPES,
   LEGACY_PARAMETER_GOAL_TYPES,
+  planCoverageGoalName,
   type ParameterGoalInput,
 } from './toekomst-doel'
 
@@ -209,6 +210,12 @@ describe('buildParameterGoalRows — dekking ("Plan gedekt", ADR 0145)', () => {
     const { rows, overgeslagen } = buildParameterGoalRows(input({ dekking: true, spaarquote: true }, { spaarquotePct: 45 }))
     expect(rows.map((r) => r.parameter)).toEqual(['spaarquote'])
     expect(overgeslagen).toEqual(['dekking'])
+  })
+
+  it('planCoverageGoalName is de ene bron voor de kaartnaam (rij én live)', () => {
+    expect(planCoverageGoalName(90)).toBe('Plan gedekt tot 90 jaar')
+    expect(planCoverageGoalName(92.5)).toBe('Plan gedekt tot 92,5 jaar')
+    expect(planCoverageGoalName(null)).toBe('Plan gedekt')
   })
 
   it('dekking staat ná fire in de DOEL_PARAMETERS-volgorde', () => {

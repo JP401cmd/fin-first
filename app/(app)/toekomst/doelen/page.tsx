@@ -48,6 +48,7 @@ export default async function ToekomstDoelenPage() {
         vrijheidsgetalHomeExcluded={finData.vrijheidsgetalHomeExcluded}
         linkedGoalIds={finData.linkedGoalIds}
         autoCompletedGoals={finData.autoCompletedGoals}
+        labPlan={finData.labPlan}
       />
     </>
   )

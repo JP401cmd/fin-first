@@ -41,8 +41,8 @@ export function DoelLoslatenConfirm({
       <div className="p-6">
         <p className="text-sm text-[var(--ink-2)] leading-relaxed">
           Je laat je vastgelegde doelsituatie los. Alle parameter-doelen
-          (spaarquote, salaris, rendement en je vrijheidsleeftijd) verdwijnen
-          uit deze lijst. Je aannames blijven bewaard in het lab — je kunt ze
+          (spaarquote, rendement, je vrijheidsleeftijd en &ldquo;Plan gedekt&rdquo;)
+          verdwijnen uit deze lijst. Je aannames blijven bewaard in het lab — je kunt ze
           later opnieuw vastleggen.
         </p>
         {error && (

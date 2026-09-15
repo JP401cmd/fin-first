@@ -194,6 +194,11 @@ function fmtPct1(v: number): string {
   return v.toLocaleString('nl-NL', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 }
 
+/** De naam van het "Plan gedekt"-doel — één bron voor de DB-rij én de live kaart (spec §4.1). */
+export function planCoverageGoalName(eindleeftijd: number | null): string {
+  return isFiniteNumber(eindleeftijd) ? `Plan gedekt tot ${fmtNum1(eindleeftijd)} jaar` : 'Plan gedekt'
+}
+
 const BASE_METADATA = { bron: 'parameter', oorsprong: 'lab' } as const
 
 /**
@@ -257,7 +262,7 @@ function buildRow(parameter: DoelParameter, dw: ParameterGoalInput['doelwaarden'
       return {
         parameter,
         goal_type: 'plan_coverage',
-        name: `Plan gedekt tot ${fmtNum1(eindleeftijd)} jaar`,
+        name: planCoverageGoalName(eindleeftijd),
         target_value: GOAL_TYPE_META.plan_coverage.max ?? 100,
         icon: GOAL_TYPE_ICONS.plan_coverage,
         color: PARAMETER_GOAL_COLOR,

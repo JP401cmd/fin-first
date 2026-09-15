@@ -27,6 +27,7 @@ import {
   type AutoCompletedGoal,
 } from '@/lib/goals/auto-complete'
 import type { DebtTermBasis } from '@/lib/debt-term-basis'
+import type { LabPlanContext } from '@/lib/goals/lab-doelen-buiten-plan'
 // Doel-`current_value`-sync + cap-splitsing wonen nu in de gedeelde
 // `lib/goal-current-value.ts` (ÉNE bron voor scherm + dashboard-widget). Deze
 // re-export houdt de bestaande import-paden (o.a. lib/fin-data-loader.test.ts)
@@ -158,6 +159,15 @@ export interface FinPageData {
    * uitsluit.
    */
   autoCompletedGoals: AutoCompletedGoal[]
+  /**
+   * Het HUIDIGE plan-anker voor de lab-doelkaarten (spec lab-haalbaarheid §4.1): naam en
+   * subregel van "Plan gedekt" volgen het plan, niet de metadata van het moment van
+   * vastleggen. Puur doorgegeven uit `VrijheidsgetalSnapshot` (dezelfde run als de
+   * meting); `null` zonder snapshot — dan valt de kaart terug op zijn metadata.
+   * Het type woont in de pure module `lib/goals/lab-doelen-buiten-plan.ts`, zodat de
+   * client-component het kan importeren zonder dit server-loaderpad aan te raken.
+   */
+  labPlan: LabPlanContext | null
 }
 
 // ---------------------------------------------------------------------------
@@ -434,6 +444,13 @@ export async function loadFinData(
     debtFreeBasis,
     linkedGoalIds: [...linkedIds],
     autoCompletedGoals,
+    labPlan: fireSnapshot?.stopAnchor
+      ? {
+          stopAnker: fireSnapshot.stopAnchor,
+          stopLeeftijd: fireSnapshot.stopAge ?? null,
+          eindleeftijd: fireSnapshot.endAge ?? null,
+        }
+      : null,
   }
 }
 

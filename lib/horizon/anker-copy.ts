@@ -558,6 +558,12 @@ export function antwoordMinderUitgeven(hint: number, masked = false): string {
   return `Zo'n ${maandBedrag(hint, masked)} per maand minder uitgeven dekt je plan.`
 }
 
+/** Doelenpagina: één regel wanneer lab-doelen niet meer bij het plan passen (spec §4.2). */
+export function doelenPlanGewijzigdMelding(n: number): string {
+  return `Je plan is veranderd. ${n} ${n === 1 ? 'doel' : 'doelen'} uit het lab ${n === 1 ? 'past' : 'passen'} er niet meer bij.`
+}
+export const DOELEN_MELDING_ACTIES = { bijwerken: 'Bijwerken', loslaten: 'Loslaten' } as const
+
 /** Zin 12 — de toast na het vastleggen van een dekkingsdoel. */
 export function dekkingVastgelegdToast(endAge: number | null): string {
   return `Je verkenning is nu je doel — de app volgt of je plan ${totJeEind(endAge)} reikt.`

@@ -943,6 +943,29 @@ describe('DoelenView — plan_coverage-doel (ADR 0145)', () => {
     expect(screen.queryByText(/nog geen meting/)).toBeNull()
   })
 
+  it('naam en subregel volgen het HUIDIGE plan, niet de metadata van het vastleggen (spec §4.1)', async () => {
+    const { computeGoalProgress } = await import('@/lib/goal-data')
+    // metadata: eindleeftijd 90, stopAnker age, stopLeeftijd 62 — het plan staat nu op 95.
+    const doel = dekkingDoel()
+    render(
+      <DoelenView
+        goals={[doel]}
+        goalProgresses={[computeGoalProgress(doel)]}
+        labPlan={{ stopAnker: 'age', stopLeeftijd: 62, eindleeftijd: 95 }}
+      />,
+    )
+    expect(screen.getByText('Plan gedekt tot 95 jaar')).toBeInTheDocument()
+    expect(screen.queryByText('Plan gedekt tot 90 jaar')).toBeNull()
+    expect(screen.getByTestId('plan-coverage-subregel')).toHaveTextContent('tot je 95e · stopmoment 62')
+  })
+
+  it('zonder labPlan valt de kaart terug op de metadata (historie)', async () => {
+    const { computeGoalProgress } = await import('@/lib/goal-data')
+    const doel = dekkingDoel()
+    render(<DoelenView goals={[doel]} goalProgresses={[computeGoalProgress(doel)]} />)
+    expect(screen.getByText('Plan gedekt tot 90 jaar')).toBeInTheDocument()
+  })
+
   it('0% dekking leest als "nog geen meting" — niet te onderscheiden van een bron zonder run (ADR 0145, open punt 4)', async () => {
     const { computeGoalProgress } = await import('@/lib/goal-data')
     const doel = dekkingDoel({ current_value: 0 })
@@ -969,6 +992,57 @@ describe('DoelenView — plan_coverage-doel (ADR 0145)', () => {
     expect(screen.queryByTestId('fire-age-doel-nvt')).toBeNull()
     expect(screen.queryByRole('progressbar')).toBeNull()
     expect(screen.queryByTestId('plan-coverage-subregel')).toBeNull()
+  })
+})
+
+describe('DoelenView — melding wanneer lab-doelen niet meer bij het plan passen (spec §4.2)', () => {
+  const reden = 'Je stopmoment ligt vast op 62.'
+  const fireAgeNvt = () =>
+    paramGoal({
+      id: 'fire-nvt',
+      name: 'Vrij op 58 jaar',
+      goal_type: 'fire_age',
+      target_value: 58,
+      current_value: 0,
+      notApplicableReason: reden,
+    } as Partial<GoalWithBudget>)
+  const fireAgeProgress = { current: 0, target: 58, pct: 0, onTrack: true, measured: false, requiredMonthly: null, eta: null, paceSkipped: true, notApplicableReason: reden }
+  const spaarquoteDoel = () => paramGoal({ id: 'sq', name: 'Spaarquote naar 45%', goal_type: 'savings_rate' })
+  const spaarquoteProgress = { current: 38, target: 45, pct: 84, onTrack: true, measured: true, requiredMonthly: null, eta: null, paceSkipped: false }
+
+  it('toont één regel met de telling en de acties Bijwerken · Loslaten; Loslaten opent de bestaande confirm', () => {
+    render(<DoelenView goals={[fireAgeNvt(), spaarquoteDoel()]} goalProgresses={[fireAgeProgress, spaarquoteProgress]} />)
+    const melding = screen.getByTestId('doelen-plan-melding')
+    expect(melding).toHaveAttribute('role', 'status')
+    expect(melding).toHaveTextContent('Je plan is veranderd. 1 doel uit het lab past er niet meer bij.')
+    expect(screen.getByRole('link', { name: 'Bijwerken' })).toHaveAttribute('href', '/toekomst#verken-je-aannames')
+    expect(screen.queryByText('Doelsituatie loslaten')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Loslaten' }))
+    expect(screen.getByText('Doelsituatie loslaten')).toBeInTheDocument()
+    // De confirm noemt de huidige lab-doelen: "Plan gedekt" wél, het vervallen salaris niet.
+    const uitleg = screen.getByText(/Je laat je vastgelegde doelsituatie los/)
+    expect(uitleg).toHaveTextContent('Plan gedekt')
+    expect(uitleg.textContent ?? '').not.toMatch(/salaris/i)
+  })
+
+  it('geen melding zonder n.v.t.-lab-doelen; het vrijheidsgetal-doel met reden telt niet', () => {
+    const vg = mockGoal({
+      id: 'vg',
+      name: 'Volledige vrijheid (FIRE)',
+      target_value: 1650000,
+      current_value: 960000,
+      metadata: { standaardDoel: 'vrijheidsgetal' },
+      notApplicableReason: 'n.v.t.',
+    } as Partial<GoalWithBudget>)
+    const vgProgress = { current: 960000, target: 1650000, pct: 0, onTrack: true, measured: false, requiredMonthly: null, eta: null, paceSkipped: true, notApplicableReason: 'n.v.t.' }
+    render(<DoelenView goals={[spaarquoteDoel(), vg]} goalProgresses={[spaarquoteProgress, vgProgress]} />)
+    expect(screen.queryByTestId('doelen-plan-melding')).toBeNull()
+    expect(screen.queryByText(/Je plan is veranderd/)).toBeNull()
+  })
+
+  it('in Eenvoudig geen melding (de doelsituatie-groep bestaat daar niet)', () => {
+    render(<DoelenView goals={[fireAgeNvt()]} goalProgresses={[fireAgeProgress]} />, 'simple')
+    expect(screen.queryByTestId('doelen-plan-melding')).toBeNull()
   })
 })
 

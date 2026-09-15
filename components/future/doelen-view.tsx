@@ -13,7 +13,13 @@ import {
   type GoalType,
 } from '@/lib/goal-data'
 import { getGoalSuggestions } from '@/lib/goal-suggestions'
-import { planCoverageKaartSubregel } from '@/lib/horizon/anker-copy'
+import {
+  planCoverageKaartSubregel,
+  doelenPlanGewijzigdMelding,
+  DOELEN_MELDING_ACTIES,
+} from '@/lib/horizon/anker-copy'
+import { planCoverageGoalName } from '@/lib/horizon/toekomst-doel'
+import { selectLabDoelenBuitenPlan, type LabPlanContext } from '@/lib/goals/lab-doelen-buiten-plan'
 import type { GoalWithBudget } from '@/lib/fin-data-loader'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import { DoelToevoegenSheet } from './doel-toevoegen-sheet'
@@ -31,7 +37,7 @@ import { MilestoneCelebration, hasCelebrated } from '@/components/app/milestone-
  *  - off-track (rood): te ver achter op planning
  *
  * Ronde 4 (§G) — "verkennen wordt richten": lab-gegenereerde parameter-doelen
- * (metadata.bron === 'parameter': spaarquote/salaris/rendement/vrijheidsleeftijd)
+ * (metadata.bron === 'parameter': spaarquote/rendement/vrijheidsleeftijd/"Plan gedekt")
  * staan als eigen groep "Jouw doelsituatie" bovenaan. Ze zijn read-only in deze
  * lijst — klik opent het /toekomst-lab i.p.v. GoalForm — en de hele groep is in
  * één keer los te laten via de server-route. Handmatige doelen behouden hun
@@ -187,7 +193,7 @@ function metaStopAnker(v: unknown): 'aow' | 'age' | 'now' | null {
  * de gegroepeerde weergave (Volledig) als de samengevoegde lijst (Eenvoudig)
  * exact dezelfde kaart rendert.
  */
-function ParameterGoalCard({ goal, progress }: GoalDisplay) {
+function ParameterGoalCard({ goal, progress, labPlan }: GoalDisplay & { labPlan: LabPlanContext | null }) {
   const isFire = goal.goal_type === 'fire_age'
   // ADR 0145 — "Plan gedekt": het uitkomstdoel onder een vast stopmoment.
   const isCoverage = goal.goal_type === 'plan_coverage'
@@ -198,11 +204,17 @@ function ParameterGoalCard({ goal, progress }: GoalDisplay) {
   // al op") is niet te onderscheiden van een bron zonder run — bekende edge
   // (ADR 0145, open punt 4).
   const measured = Number.isFinite(current) && current > 0 && !goal.notApplicableReason
+  // Spec lab-haalbaarheid §4.1: naam en subregel van "Plan gedekt" volgen het huidige
+  // plan; de metadata is de historie van het vastleggen (terugval zonder plan-context of
+  // onder solved — dan is de kaart n.v.t. en toont hij geen subregel).
+  const liveAnker = isCoverage && labPlan && labPlan.stopAnker !== 'solved' ? labPlan.stopAnker : null
+  const eindleeftijd = liveAnker && labPlan ? labPlan.eindleeftijd : metaNumber(goal.metadata?.eindleeftijd)
+  const cardName = isCoverage ? planCoverageGoalName(eindleeftijd) : goal.name
   const coverageSubregel = isCoverage
     ? planCoverageKaartSubregel(
-        metaNumber(goal.metadata?.eindleeftijd),
-        metaStopAnker(goal.metadata?.stopAnker),
-        metaNumber(goal.metadata?.stopLeeftijd),
+        eindleeftijd,
+        liveAnker ?? metaStopAnker(goal.metadata?.stopAnker),
+        liveAnker && labPlan ? labPlan.stopLeeftijd : metaNumber(goal.metadata?.stopLeeftijd),
       )
     : null
   const marge =
@@ -219,12 +231,12 @@ function ParameterGoalCard({ goal, progress }: GoalDisplay) {
   return (
     <Link
       href="/toekomst#verken-je-aannames"
-      aria-label={`Bekijk ${goal.name} in het lab`}
+      aria-label={`Bekijk ${cardName} in het lab`}
       className="block rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-5 hover:border-[var(--ink-3)] hover:shadow-sm transition-all"
     >
       <header className="flex items-start justify-between gap-2 mb-2">
         <h3 className="text-sm font-semibold text-[var(--ink)] leading-tight flex-1 min-w-0 truncate inline-flex items-center gap-1.5">
-          {goal.name}
+          {cardName}
           <ArrowUpRight
             className="w-3 h-3 text-[var(--ink-4)] shrink-0"
             aria-hidden="true"
@@ -301,7 +313,7 @@ function ParameterGoalCard({ goal, progress }: GoalDisplay) {
             aria-valuenow={pct}
             aria-valuemin={0}
             aria-valuemax={100}
-            aria-label={`Voortgang ${goal.name}: ${pct}%`}
+            aria-label={`Voortgang ${cardName}: ${pct}%`}
           >
             {/*
               De balkKLEUR is net zo goed een oordeel als het label hierboven:
@@ -588,6 +600,7 @@ export function DoelenView({
   vrijheidsgetalHomeExcluded = null,
   linkedGoalIds,
   autoCompletedGoals,
+  labPlan = null,
 }: {
   goals: GoalWithBudget[]
   goalProgresses: GoalDisplay['progress'][]
@@ -632,6 +645,12 @@ export function DoelenView({
    * maar één keer gevierd wordt, ook als beide paden hetzelfde doel aandragen.
    */
   autoCompletedGoals?: { id: string; name: string; goalType: string | null }[]
+  /**
+   * Het HUIDIGE plan-anker (`FinPageData.labPlan`, spec lab-haalbaarheid §4.1): naam en
+   * subregel van de "Plan gedekt"-kaart volgen het plan i.p.v. de metadata van het
+   * vastleggen. Zonder (null) valt de kaart terug op die metadata.
+   */
+  labPlan?: LabPlanContext | null
 }) {
   const router = useRouter()
   const linkedIds = new Set(linkedGoalIds ?? [])
@@ -702,6 +721,8 @@ export function DoelenView({
     .filter((d): d is GoalDisplay => d.progress != null)
 
   const parameterDisplay = all.filter((d) => isParameterGoal(d.goal))
+  // Spec §4.2: lab-doelen die de sync n.v.t. verklaarde passen niet meer bij het plan.
+  const labDoelenBuitenPlan = selectLabDoelenBuitenPlan(parameterDisplay.map((d) => d.goal))
 
   /**
    * Behaald-archief (voorstel 3a): behaalde handmatige doelen verlaten de
@@ -826,6 +847,33 @@ export function DoelenView({
               )}
             </div>
           </header>
+          {labDoelenBuitenPlan.length > 0 && (
+            /* Spec lab-haalbaarheid §4.2: één regel wanneer de plankeuze lab-doelen
+               n.v.t. maakte. Bijwerken landt in het lab; Loslaten opent de bestaande
+               confirm (dezelfde flow als het overflow-menu). */
+            <div
+              role="status"
+              data-testid="doelen-plan-melding"
+              className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 border border-[var(--ink-2)] border-l-4 border-l-warning bg-[var(--paper)] px-3 py-2 font-sans text-[12px] text-[var(--ink-2)]"
+            >
+              <span>{doelenPlanGewijzigdMelding(labDoelenBuitenPlan.length)}</span>
+              <span className="flex items-center gap-x-4">
+                <Link
+                  href="/toekomst#verken-je-aannames"
+                  className="inline-flex min-h-[44px] items-center font-semibold text-horizon-700 underline underline-offset-2"
+                >
+                  {DOELEN_MELDING_ACTIES.bijwerken}
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setConfirmOpen(true)}
+                  className="inline-flex min-h-[44px] items-center font-semibold text-negative underline underline-offset-2"
+                >
+                  {DOELEN_MELDING_ACTIES.loslaten}
+                </button>
+              </span>
+            </div>
+          )}
           <p className="mb-4 text-[11px] italic text-[var(--ink-3)]">
             Je vastgelegde aannames uit het lab. Klik een kaart om ze live te
             verkennen op de tijdas.
@@ -833,7 +881,7 @@ export function DoelenView({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             {parameterDisplay.map((d) => (
-              <ParameterGoalCard key={d.goal.id} goal={d.goal} progress={d.progress} />
+              <ParameterGoalCard key={d.goal.id} goal={d.goal} progress={d.progress} labPlan={labPlan} />
             ))}
           </div>
         </div>
@@ -865,7 +913,7 @@ export function DoelenView({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           {mergedDisplay.map((d) =>
             isParameterGoal(d.goal) ? (
-              <ParameterGoalCard key={d.goal.id} goal={d.goal} progress={d.progress} />
+              <ParameterGoalCard key={d.goal.id} goal={d.goal} progress={d.progress} labPlan={labPlan} />
             ) : (
               <ManualGoalCard
                 key={d.goal.id}

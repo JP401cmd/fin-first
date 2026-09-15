@@ -357,11 +357,14 @@ describe('loadFinData — cap-split + lazy injectie (integratie)', () => {
   it('LAZY: zonder parameter-doelen draaien de injectie-queries NIET', async () => {
     const goals = [goal({ goal_type: 'savings' }), goal({ goal_type: 'debt_payoff' })]
     const { supabase, called } = makeSupabase({ goals })
-    await loadFinData(supabase)
+    const data = await loadFinData(supabase)
 
     expect(called).not.toContain('transactions')
     expect(called).not.toContain('budgets')
     expect(called).not.toContain('net_worth_snapshots')
+    // Geen FIRE-snapshot (geen doel dat de motor nodig heeft) ⇒ geen plan-context
+    // voor de lab-doelkaarten (spec lab-haalbaarheid §4.1): de kaart valt terug op metadata.
+    expect(data.labPlan).toBeNull()
   })
 
   it('savings_rate-parameterdoel consumeert de EFFECTIEVE spaarquote uit de gedeelde laag', async () => {
