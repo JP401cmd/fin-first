@@ -290,11 +290,22 @@ describe('dekking-zinnen — de vastgestelde kopij', () => {
   })
 
   it('11 · toon: geen instructie, geen AOW in de tekortzinnen', () => {
-    // "de knop zet het hoogste bedrag" beschrijft de knop (vastgestelde kopij, spec §5) —
-    // verboden is een zin die de LEZER iets laat zetten: een aanhef "Zet …".
-    for (const z of [antwoordDoorwerken(61), antwoordExtraOpzij(500), antwoordMinderUitgeven(500), ANTWOORD_BOVEN_BEREIK, ANTWOORD_KNOP]) {
-      expect(z).not.toMatch(/je moet|^zet |\bzet je\b|verhoog|\bAOW\b/i)
+    const VERBODEN = /je moet|\bzet\b|verhoog|\bAOW\b/i
+    for (const z of [
+      antwoordDoorwerken(61),
+      antwoordDoorwerken(61.5),
+      antwoordExtraOpzij(500),
+      antwoordExtraOpzij(500, true),
+      antwoordMinderUitgeven(500),
+      antwoordMinderUitgeven(500, true),
+      ANTWOORD_KNOP,
+    ]) {
+      expect(z).not.toMatch(VERBODEN)
     }
+    // Smalle uitzondering: "de knop zet het hoogste bedrag" beschrijft de knop (vastgestelde
+    // kopij, spec §5). Alleen die letterlijke frase valt weg; elke andere "zet" blijft verboden.
+    expect(ANTWOORD_BOVEN_BEREIK).toContain('de knop zet')
+    expect(ANTWOORD_BOVEN_BEREIK.replace('de knop zet', '')).not.toMatch(VERBODEN)
   })
 
   it('12 · toast', () => {
