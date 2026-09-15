@@ -538,7 +538,7 @@ export function radarEindstrategieAnkerReden(): string {
 }
 
 // ── Zin 11 — antwoordenblok "Wat maakt het haalbaar?" (spec lab-haalbaarheid §3/§5, 15 sep 2026) ──
-// Beschrijvend ("dekt je plan"), nooit een instructie; geen "AOW" in een tekortzin.
+// Beschrijvend ("dekt je plan" / "hoort bij een gedekt plan"), nooit een instructie; geen "AOW" in een tekortzin.
 // Vervangt de plan-hint ("Reken met € X extra inleg", ADR 0145 D7) onder een vast anker.
 // De knop is generiek ("Reken hiermee"): het bedrag staat al in de zin, en in de
 // privacy-weergave toont de UI geen knop (de slider zou het echte bedrag verraden).
@@ -560,14 +560,19 @@ function maandBedrag(hint: number, masked: boolean): string {
   return masked ? MASKED_AMOUNT_PLACEHOLDER : `€${fmtHint(hint)}`
 }
 
-/** Antwoord 2 — `maandHint` (P!B96) als extra inleg. */
+// De twee €-antwoorden claimen bewust GEEN uitkomst ("hoort bij", niet "dekt"): P!B96 is
+// uitgesmeerd tot de eindleeftijd, maar de slider-hefbomen stoppen op het stopmoment.
+// Gemeten in lib/horizon/lab-antwoorden.kernel.test.ts: hint-bedrag gezet → 94% resp. 87%
+// dekking, niet 100% (eindreview I2). "Doorwerken tot X dekt je plan." is daar wél bewezen.
+
+/** Antwoord 2 — `planMaandHint` (P!B96 van de hoofd-run) als extra inleg. */
 export function antwoordExtraOpzij(hint: number, masked = false): string {
-  return `Zo'n ${maandBedrag(hint, masked)} per maand extra opzij dekt je plan.`
+  return `Zo'n ${maandBedrag(hint, masked)} per maand extra opzij, uitgesmeerd tot je eindleeftijd, hoort bij een gedekt plan.`
 }
 
 /** Antwoord 3 — hetzelfde bedrag als minder uitgeven (dezelfde maandelijkse stroom). */
 export function antwoordMinderUitgeven(hint: number, masked = false): string {
-  return `Zo'n ${maandBedrag(hint, masked)} per maand minder uitgeven dekt je plan.`
+  return `Zo'n ${maandBedrag(hint, masked)} per maand minder uitgeven, uitgesmeerd tot je eindleeftijd, hoort bij een gedekt plan.`
 }
 
 /** Doelenpagina: één regel wanneer lab-doelen niet meer bij het plan passen (spec §4.2). */
