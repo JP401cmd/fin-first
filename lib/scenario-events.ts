@@ -118,7 +118,7 @@ export function buildSliderEvent(
       if (Math.round(value) === Math.round(baseline.monthlyIncome)) return null
       return buildScenarioEvent({
         id,
-        name: `Inkomenswijziging (${value > baseline.monthlyIncome ? '+' : ''}${formatDelta(value - baseline.monthlyIncome)})`,
+        name: `Inkomenswijziging (${formatDelta(value - baseline.monthlyIncome)})`,
         event_type: 'income_change',
         target_age: currentAge,
         monthly_income_change: Math.round(value - baseline.monthlyIncome),
@@ -173,7 +173,7 @@ export function buildSliderEvent(
       if (value === 0) return null
       return buildScenarioEvent({
         id,
-        name: value > 0 ? `Meer salaris (+${formatDelta(value)})` : `Minder salaris (${formatDelta(value)})`,
+        name: value > 0 ? `Meer salaris (${formatDelta(value)})` : `Minder salaris (${formatDelta(value)})`,
         event_type: 'extra_inleg',
         target_age: currentAge,
         monthly_income_change: Math.round(value),
@@ -185,9 +185,14 @@ export function buildSliderEvent(
   }
 }
 
+/**
+ * Getekende euro-delta voor een event-naam: "+€500" / "−€500" (typografisch minteken, zoals de
+ * badges). Draagt zelf het teken — de aanroeper zet er niets voor (eindreview M1: vóór 15 sep
+ * 2026 gaf dat "++€500" en "€-500").
+ */
 function formatDelta(v: number): string {
-  const sign = v >= 0 ? '+' : ''
-  return `${sign}€${Math.round(v)}`
+  const n = Math.round(v)
+  return `${n < 0 ? '−' : '+'}€${Math.abs(n)}`
 }
 
 /**

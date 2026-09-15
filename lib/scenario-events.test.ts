@@ -17,6 +17,18 @@ const baseline: WhatIfOverrides = {
   extraContribution: 0,
 }
 
+describe('event-namen dragen één teken (eindreview M1)', () => {
+  it('Meer salaris (+€500) / Minder salaris (−€500) — geen "++" en geen "€-"', () => {
+    expect(buildSliderEvent('extra_inleg', 500, baseline, 40)?.name).toBe('Meer salaris (+€500)')
+    expect(buildSliderEvent('extra_inleg', -500.4, baseline, 40)?.name).toBe('Minder salaris (−€500)')
+  })
+
+  it('Inkomenswijziging (+€250) / (−€250)', () => {
+    expect(buildSliderEvent('income', 4250, baseline, 40)?.name).toBe('Inkomenswijziging (+€250)')
+    expect(buildSliderEvent('income', 3750, baseline, 40)?.name).toBe('Inkomenswijziging (−€250)')
+  })
+})
+
 describe('spaarquote in euro — één som voor event, weergave en antwoorden (spec §2)', () => {
   it('savingsBaselineIncome = maandinkomen × werkdagen/5 (de bestaande som van buildSliderEvent)', () => {
     expect(savingsBaselineIncome(baseline)).toBe(3200)

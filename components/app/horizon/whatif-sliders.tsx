@@ -52,7 +52,10 @@ export { computeSliderUiRange }
  */
 export function SliderAntwoordRegel({ id, antwoord }: { id: string; antwoord: SliderAntwoord }) {
   return (
-    <div data-testid="slider-antwoord" className="mt-1.5 border-t border-dashed border-[var(--border-ed)] pt-1.5">
+    // `pb-3` (eindreview M2): het extend-block-raakgebied van de knop steekt ~14px onder de knop
+    // uit; zonder deze bodemruimte lag die ::after (gepositioneerd, dus bovenop) over het label
+    // van de volgende sliderrij en activeerde een tik daar "Reken hiermee".
+    <div data-testid="slider-antwoord" className="mt-1.5 border-t border-dashed border-[var(--border-ed)] pt-1.5 pb-3">
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 border-l-2 border-[var(--module-active-500)] pl-2">
         <p id={id} className="font-sans text-[11px] leading-snug text-[var(--ink-2)]">
           {antwoord.tekst}
