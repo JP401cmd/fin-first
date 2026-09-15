@@ -600,13 +600,15 @@ export const TOEK_ENGINE_CHECKS: ToekEngineCheck[] = [
       })
       const dekkingRow = rows[0]
 
-      // Antwoordenblok op toestand (2): tweede run solvedFireAge 70, maandHint €500 op
+      // Antwoordenblok op toestand (2): tweede run solvedFireAge 70, planMaandHint €500 op
       // een basis van €4.000/mnd (aowTekortMetScenario.kind is 'dekking' — de fixture
       // draagt al vastStopLeeftijd:67, dus `.stop` is `{kind:'aow', stopAge:67}`, geen
       // gok nodig vóór de spread).
       const antwoorden = resolveLabAntwoorden({
-        dekking: aowTekortMetScenario.kind === 'dekking' ? { ...aowTekortMetScenario, maandHint: 500 } : null,
+        dekking: aowTekortMetScenario.kind === 'dekking' ? aowTekortMetScenario : null,
         solvedFireAge: 70,
+        // De plan-hint (P!B96 van de hoofd-run) — niet labDekking.maandHint (eindreview I1).
+        planMaandHint: 500,
         baseline: { monthlyIncome: 4000, workDaysPerWeek: 5, savingsRate: 20, expectedReturn: 6, extraContribution: 0 },
       })
       const antwoordKinds = antwoorden.map((a) => a.kind).join(',')

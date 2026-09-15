@@ -4,8 +4,9 @@
 // ───────────────────────────────────────────────────────────────────────────
 // Bij een tekort (dekking < 100%) geeft het lab de drie hefbomen als antwoord, elk met
 // een getal dat al bestaat: "doorwerken tot X" = de opgeloste leeftijd zonder anker
-// (tweede run, ADR 0129 D7); "€X extra opzij" en "€X minder uitgeven" = `maandHint`
-// (P!B96) — één bedrag, twee hefbomen, want beide zijn dezelfde maandelijkse stroom.
+// (tweede run, ADR 0129 D7); "€X extra opzij" en "€X minder uitgeven" = `planMaandHint`
+// (P!B96 van de hoofd-run, dus van het PLAN-stopmoment — nooit de stop-pad-hint) — één
+// bedrag, twee hefbomen, want beide zijn dezelfde maandelijkse stroom.
 // Elke regel is één klik die de betreffende hefboom als VERKENNING zet, nooit als plan.
 // Puur: geen kernel-run, geen eigen som — alleen klemmen op het slider-bereik.
 
@@ -30,12 +31,19 @@ export interface LabAntwoordenInput {
   dekking: LabUitkomstDekking | null
   /** `solvedRun.fireAge` — de tweede run; `null` = niet gevonden/nog niet gedraaid. */
   solvedFireAge: number | null
+  /**
+   * P!B96 van de HOOFD-run (`kernelMaandHint` uit de hook) — het plan-stopmoment.
+   * Bewust NIET `dekking.maandHint`: dat veld laat het verkende stop-pad (met de
+   * scenario-overrides) voorgaan, en dat bedrag hoort bij een ánder stopmoment dan
+   * het plan waarover dit blok spreekt (eindreview I1, 15 sep 2026).
+   */
+  planMaandHint: number | null
   baseline: WhatIfOverrides | null
   masked?: boolean
 }
 
 export function resolveLabAntwoorden(input: LabAntwoordenInput): LabAntwoord[] {
-  const { dekking, solvedFireAge, baseline, masked = false } = input
+  const { dekking, solvedFireAge, planMaandHint, baseline, masked = false } = input
   if (!dekking || !dekking.tekort || !dekking.stop || dekking.stop.kind === 'now') return []
   const stopAge = dekking.stop.stopAge
   const out: LabAntwoord[] = []
@@ -47,7 +55,7 @@ export function resolveLabAntwoorden(input: LabAntwoordenInput): LabAntwoord[] {
     out.push({ kind: 'doorwerken', zin: antwoordDoorwerken(tot), bovenBereik: false, actie: { kind: 'stop', stopAge: tot } })
   }
 
-  const hint = dekking.maandHint
+  const hint = planMaandHint
   if (hint != null && Number.isFinite(hint) && hint > 0 && baseline) {
     const extraRange = computeSliderUiRange('extra_inleg', baseline.monthlyIncome, 0)
     const extra = Math.round(hint)

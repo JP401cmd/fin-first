@@ -2852,10 +2852,11 @@ export default function HorizonPage({
   }, [labDekking, currentAge])
   // Spec lab-haalbaarheid §3 — de drie hefbomen als antwoorden bij een tekort. Consumeert
   // labDekking (ADR 0145) en de tweede run (solvedRun, ADR 0129 D7); klemt alleen op het
-  // slider-bereik. De klik-handler (`handleLabAntwoord`) staat ná `handleStopAgeChange`.
+  // slider-bereik. Het bedrag is de PLAN-hint (`kernelMaandHint`), nooit `labDekking.maandHint`
+  // — dat laat het verkende stop-pad voorgaan (eindreview I1). De klik-handler (`handleLabAntwoord`) staat ná `handleStopAgeChange`.
   const labAntwoorden = useMemo(
-    () => resolveLabAntwoorden({ dekking: labDekking, solvedFireAge: solvedRun?.fireAge ?? null, baseline: whatIfBaseline, masked }),
-    [labDekking, solvedRun, whatIfBaseline, masked],
+    () => resolveLabAntwoorden({ dekking: labDekking, solvedFireAge: solvedRun?.fireAge ?? null, planMaandHint: kernelMaandHint, baseline: whatIfBaseline, masked }),
+    [labDekking, solvedRun, kernelMaandHint, whatIfBaseline, masked],
   )
   // ── Dekkingsradar-assen — pure consume-laag over de duiding-rijen ──────
   // Alle grootheden komen elders vandaan: de duiding-rijen (stop-pad wint), de actieve-pad

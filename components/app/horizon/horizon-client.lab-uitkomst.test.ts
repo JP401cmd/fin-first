@@ -103,6 +103,10 @@ describe('horizon-client consumeert ÉÉN lab-uitkomst (ADR 0145)', () => {
     const call = src.slice(start, src.indexOf('})', start))
     expect(call).toContain('dekking: labDekking')
     expect(call).toContain('solvedFireAge: solvedRun?.fireAge ?? null')
+    // De bedragen horen bij het PLAN-stopmoment: de hint van de hoofd-run, nooit
+    // labDekking.maandHint (die laat het verkende stop-pad voorgaan — eindreview I1).
+    expect(call).toContain('planMaandHint: kernelMaandHint')
+    expect(call).not.toMatch(/maandHint:\s*labDekking/)
     expect(call).toContain('masked')
     const code = codeRegels().join('\n')
     expect(code).toContain('onClick={() => handleLabAntwoord(a.actie)}')
