@@ -5,9 +5,12 @@ import { recordJobRun } from '@/lib/job-runs'
 import {
   ERROR_RESOLUTIONS_RETENTION_MONTHS,
   RETENTION_MONTHS,
+  USER_ACTIVITY_RETENTION_DAYS,
+  retentionCutoffDate,
   retentionCutoffIso,
   type RetentionTable,
 } from '@/lib/retention'
+import { isOntbrekendSchema } from '@/lib/supabase/ontbrekend-schema'
 
 // Node-runtime: we lezen de service-role-key server-side.
 export const runtime = 'nodejs'
@@ -57,6 +60,10 @@ export async function GET(request: Request) {
 
   const deleted: Record<string, number> = {}
   const errors: string[] = []
+  // Tabellen die bewust nog op hun migratie wachten (ADR 0146: user_activity_days
+  // pas ná de /privacy-tekst). Niets te purgen en geen storing — een rode
+  // job_run elke nacht zou echte retentiefouten in de ruis laten verdwijnen.
+  const overgeslagen: string[] = []
 
   // Retentie-deletes op `created_at` per tabel (termijnen uit lib/retention.ts).
   for (const [table, months] of Object.entries(RETENTION_MONTHS) as [RetentionTable, number][]) {
@@ -93,6 +100,25 @@ export async function GET(request: Request) {
     }
   }
 
+  // user_activity_days: 400 dagen op de kolom `day` (een `date`, geen
+  // created_at-timestamp) — daarom buiten de lus (ADR 0146).
+  {
+    const cutoff = retentionCutoffDate(USER_ACTIVITY_RETENTION_DAYS, now)
+    const { count, error } = await supabase
+      .from('user_activity_days')
+      .delete({ count: 'exact' })
+      .lt('day', cutoff)
+    if (error && isOntbrekendSchema(error)) {
+      overgeslagen.push('user_activity_days')
+    } else if (error) {
+      console.error(`[cron:retention] user_activity_days: ${error.message}`)
+      errors.push('user_activity_days')
+      deleted.user_activity_days = 0
+    } else {
+      deleted.user_activity_days = count ?? 0
+    }
+  }
+
   // lead_intakes (90d, ADR 0022) via de bestaande SECURITY DEFINER-functie.
   const { error: leadErr } = await supabase.rpc('purge_expired_lead_intakes')
   if (leadErr) {
@@ -104,6 +130,7 @@ export async function GET(request: Request) {
     deleted,
     lead_intakes_purged: !leadErr,
     errors: errors.length,
+    ...(overgeslagen.length > 0 ? { overgeslagen } : {}),
   }
 
   await recordJobRun(supabase, {

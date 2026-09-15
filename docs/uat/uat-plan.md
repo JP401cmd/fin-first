@@ -484,7 +484,7 @@ VERVALLEN (14 sep 2026, ADR 0144 "De Wat-Als-pagina gaat op in de tijdas"): WF-R
 | WF-BEHEER-05 | TrueLayer-bankkoppeling configureren en testen | TrueLayer aan/uit, credentials en omgeving instellen en de verbinding live testen. | BELANGRIJK | nee | 3 |
 | WF-BEHEER-06 | Platform-status beheren | Onderhoudsmodus, in-app aankondiging en de AI-kill-switch platformbreed zetten. | BELANGRIJK | nee | 3 |
 | WF-BEHEER-07 | Gebruiker zoeken en account beheren | Gebruiker op e-mail vinden en abonnementen, rol en blokkade beheren met audit-logging. | KERN | nee | 4 |
-| WF-BEHEER-08 | Supportview-diagnose en account verwijderen | Financiële kernstand van een gebruiker inzien en het account met getypte e-mailbevestiging definitief verwijderen. | KERN | ja | 3 |
+| WF-BEHEER-08 | Gebruik bekijken en account verwijderen | Het gebruik van een account zien (zonder inhoud, ADR 0146) en het account met getypte e-mailbevestiging definitief verwijderen. | KERN | ja | 3 |
 | WF-BEHEER-09 | Coach-suggestieregels en timing bijstellen | Teksten, CTA's, aan/uit en timing van Wills coach-suggesties per laag overriden en resetten. | BELANGRIJK | nee | 3 |
 | WF-BEHEER-10 | Welkomstgids samenstellen met live-preview | Schermen en stappen van de welkomstgids toevoegen, herordenen, bewerken en previewen. | BELANGRIJK | nee | 3 |
 | WF-BEHEER-11 | Briefing-directieven beheren | Temporele (maandgebonden) en functionele redactieregels voor de briefing toevoegen, prioriteren en aan/uit zetten. | BELANGRIJK | nee | 2 |
@@ -7751,24 +7751,24 @@ Alle routes onder /beheer zijn afgeschermd in één centrale layout: `app/(app)/
   - Statusmeldingen (succes/fout) verschijnen boven de kaart met aria-live.
 - **Cross-module effecten:** Abonnementen sturen feature-gating (AI-functies, koppelingen) voor die gebruiker in de hele app; blokkade sluit de gebruiker overal uit; elke actie wordt gelogd in de audit-trail (WF-BEHEER-31).
 
-#### WF-BEHEER-08 — Supportview-diagnose bekijken en account definitief verwijderen
-- **Doel:** Als beheerder de financiële kernstand van een gebruiker inzien (support) en, in het uiterste geval, het account met alle data definitief verwijderen.
+#### WF-BEHEER-08 — Gebruik van een account bekijken (zonder inhoud) en account definitief verwijderen
+- **Doel:** Als beheerder zien hoe een gebruiker de app gebruikt — nooit wat hij erin vastlegt (ADR 0146) — en, in het uiterste geval, het account met alle data definitief verwijderen.
 - **Trigger/startpunt:** Op /beheer/gebruikers, na het vinden van een gebruiker (WF-BEHEER-07).
-- **Eindresultaat:** De diagnose toont tellingen en bedragen van de gebruiker; na verwijdering bestaan account en data niet meer en meldt de pagina dit.
+- **Eindresultaat:** Het gebruiksblok toont activiteit en tellingen, nergens een bedrag of naam; na verwijdering bestaan account en data niet meer en meldt de pagina dit.
 - **Stappen:**
-  1. Klik in de sectie "Supportview" op de diagnose-knop.
-  2. Bekijk de diagnose: aantal bezittingen + totaalwaarde, aantal schulden + totaal, netto vermogen, rekeningen met saldo, transactie-aantal en laatste transactiedatum.
+  1. Klik in de sectie "Gebruik" op "Gebruik tonen".
+  2. Bekijk: actieve dagen (30 d), laatst actief, AI-aanroepen (per functie), meldingen, aantallen bezittingen · schulden, transacties, laatste transactie toegevoegd, bankkoppelingen + laatste sync, ingerichte apps, check-in-maanden. Controleer dat er géén bedrag, rekeningnaam, omschrijving of exportknop is.
   3. Scroll naar "Gevarenzone" en klik op de verwijder-knop; een bevestigingsvak verschijnt.
   4. Typ ter bevestiging exact het e-mailadres van de gebruiker (de verwijderknop blijft anders uitgeschakeld) en bevestig.
   5. Controleer de melding "… en alle bijbehorende data zijn verwijderd" en dat de gebruiker niet meer vindbaar is.
-- **Schermen/componenten:** /beheer/gebruikers — `app/(app)/beheer/gebruikers/page.tsx`; API `/api/admin/user-diagnose` (GET), `/api/admin/user-delete` (POST met confirm-veld).
+- **Schermen/componenten:** /beheer/gebruikers — `app/(app)/beheer/gebruikers/page.tsx`; API `/api/admin/users/activity` (GET), `/api/admin/user-delete` (POST met confirm-veld).
 - **Kriticiteit:** KERN
-- **Rekenend:** ja — netto vermogen, totaal bezittingen, totaal schulden en rekeningsaldi van de doelgebruiker, geleverd door `/api/admin/user-diagnose` (route `app/api/admin/user-diagnose/route.ts`); toetsbaar tegen de eigen schermen van die gebruiker.
+- **Rekenend:** nee — alleen tellingen (aantal rijen van de doelgebruiker) uit `lib/beheer/gebruik.ts`; toetsbaar tegen het aantal records op diens schermen.
 - **Varianten & randgevallen:**
   - Verkeerd of onvolledig getypt e-mailadres → verwijderknop blijft disabled.
   - Annuleren van de gevarenzone-flow → geen wijziging.
-  - Diagnose van een gebruiker zonder data → nullen/lege lijsten.
-- **Cross-module effecten:** Verwijdering is onomkeerbaar en raakt alle data van de gebruiker; inzage (support.view) en verwijdering (user.delete) worden gelogd in de audit-trail.
+  - Gebruiker zonder data → nullen/lege lijsten; activiteitsregistratie nog niet uitgerold → "nog niet gemeten"; een telling die niet te laden is → "?".
+- **Cross-module effecten:** Verwijdering is onomkeerbaar en raakt alle data van de gebruiker; inzage ("Gebruik bekeken", `user.activity`) en verwijdering (`user.delete`) worden gelogd in de audit-trail.
 
 #### WF-BEHEER-09 — Coach-suggestieregels, timing en kopregel van Will bijstellen
 - **Doel:** De teksten, CTA's, in-/uitschakeling en timing van Wills coach-suggesties aanpassen zonder code-wijziging.
@@ -13284,13 +13284,13 @@ UAT-BEHEER-07 (gebruikersbeheer) krijgt naast zijn eigen KERN-behandeling drie g
   - **07.2 — Testaccount 1 wordt geweerd bij de eerstvolgende paginalaad.** Log in (of was al ingelogd) als testaccount 1 in een aparte/incognito-sessie en navigeer naar een pagina onder `/overzicht/**` (harde reload, geen client-side soft-navigatie) → *verwacht:* de server-layout (`app/(app)/layout.tsx`) leest `blocked_at`, stuurt door naar `/logout?reason=blocked`, die route logt uit (`supabase.auth.signOut()`) en stuurt door naar **`/login?blocked=1`** met banner **"Je account is geblokkeerd"** / **"Neem contact op met de beheerder als je denkt dat dit niet klopt."** **Let op (exact mechanisme, niet aannemen):** dit is géén achtergrond-poll en géén check bij losse API-aanroepen — het wordt uitsluitend gecontroleerd wanneer de `(app)`-server-layout daadwerkelijk opnieuw rendert. Een pure client-side soft-navigatie kan de check missen tot een harde reload/nieuwe route-segment-fetch; test daarom expliciet met een volledige paginaherlading.
   - **07.3 — Admin deblokkeert testaccount 1; her-inloggen herstelt toegang.** Klik "Deblokkeren" op `/beheer/gebruikers` → *verwacht:* melding "{naam/e-mail} gedeblokkeerd", `blocked_at` terug naar `null`. Log opnieuw in als testaccount 1 (een verse login is vereist — de sessie van 07.2 is al serverside beëindigd, deblokkeren herstelt geen lopende sessie) → *verwacht:* normale toegang tot de app, geen banner. **Herstel:** laat testaccount 1 gedeblokkeerd achter voor hergebruik door andere UAT-scenario's.
 
-#### UAT-BEHEER-08 — Supportview-diagnose bekijken en account definitief verwijderen (dekt WF-BEHEER-08)
+#### UAT-BEHEER-08 — Gebruik van een account bekijken (zonder inhoud) en account definitief verwijderen (dekt WF-BEHEER-08)
 - **Kriticiteit:** KERN · **Platform:** webapp · **Rooktest:** nee · **Duur:** ~12 min
-- **Preconditie:** admin-account + een wegwerp-testaccount met bekende financiële data (bv. via UAT-BEHEER-23 aangemaakt en met UAT-BEHEER-20 geseed, zodat de diagnosecijfers narekenbaar zijn).
-- **a. Happy path:** zoek het testaccount op `/beheer/gebruikers`, klik de diagnose-knop → *verwacht:* aantal bezittingen + totaalwaarde, aantal schulden + totaal, netto vermogen, rekeningsaldi, transactie-aantal, laatste transactiedatum. **Berekening verwachting:** als het testaccount de persona "Daan" draagt (UAT-BEHEER-20), verwacht exact: 4 bezittingen, 1 schuld, netto vermogen **−€4.200**, 420 transacties. Scroll naar "Gevarenzone", typ het e-mailadres exact ter bevestiging (verwijderknop blijft disabled bij afwijkende spelling) en bevestig → *verwacht:* melding *"{e-mail} en alle bijbehorende data zijn verwijderd."*, gebruiker niet meer vindbaar bij hernieuwd zoeken. **Eindresultaat:** account + alle data onomkeerbaar weg.
-- **b. Varianten & randgevallen:** verkeerd/onvolledig e-mailadres → knop blijft disabled; annuleren → geen wijziging; diagnose van een lege gebruiker → nullen/lege lijsten.
+- **Preconditie:** admin-account + een wegwerp-testaccount met bekende data (bv. via UAT-BEHEER-23 aangemaakt en met UAT-BEHEER-20 geseed, zodat de tellingen narekenbaar zijn).
+- **a. Happy path:** zoek het testaccount op `/beheer/gebruikers`, klik "Gebruik tonen" → *verwacht:* actieve dagen, laatst actief, AI-aanroepen, meldingen, aantallen bezittingen · schulden, transacties, bankkoppelingen, ingerichte apps en check-in-maanden — en **nergens** een bedrag, rekeningnaam, omschrijving of exportknop. **Verwachting:** als het testaccount de persona "Daan" draagt (UAT-BEHEER-20), verwacht exact: 4 bezittingen · 1 schuld, 420 transacties. Scroll naar "Gevarenzone", typ het e-mailadres exact ter bevestiging (verwijderknop blijft disabled bij afwijkende spelling) en bevestig → *verwacht:* melding *"{e-mail} en alle bijbehorende data zijn verwijderd."*, gebruiker niet meer vindbaar bij hernieuwd zoeken. **Eindresultaat:** account + alle data onomkeerbaar weg.
+- **b. Varianten & randgevallen:** verkeerd/onvolledig e-mailadres → knop blijft disabled; annuleren → geen wijziging; lege gebruiker → nullen/lege lijsten; `/api/admin/user-diagnose` en `/api/admin/user-export` geven 404.
 - **c. Cross-module effecten:** onomkeerbaar, raakt alle data van de gebruiker.
-- **d. Aanvullende verificatie:** controleer op `/beheer/audit` dat zowel de diagnose-inzage (`support.view`) als de verwijdering (`user.delete`) als losse regels gelogd staan.
+- **d. Aanvullende verificatie:** controleer op `/beheer/audit` dat zowel de inzage ("Gebruik bekeken") als de verwijdering (`user.delete`) als losse regels gelogd staan.
 
 #### UAT-BEHEER-09 — Coach-suggestieregels, timing en kopregel van Will bijstellen (dekt WF-BEHEER-09)
 - **Kriticiteit:** BELANGRIJK · **Platform:** webapp · **Rooktest:** nee · **Duur:** ~7 min

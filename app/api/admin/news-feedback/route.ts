@@ -23,7 +23,7 @@ import { summarizeNewsFeedback, type NewsFeedbackRow } from '@/lib/news-feedback
  * De prijs van service-role is dat RLS hier géén tweede slot is. Daarom:
  *  - `isSuperAdmin()` op de INGELOGDE client (niet de service-client) vóór er
  *    ook maar iets gelezen wordt;
- *  - `logAdminAction` bij elke geslaagde inzage, zoals de supportview;
+ *  - `logAdminAction` bij elke geslaagde inzage, zoals het gebruiksprofiel;
  *  - de service-client leest een expliciete kolomlijst, nooit `select('*')`.
  *
  * PRIVACY. `user_id` wordt wél gelezen — de demotieregel van `/api/news` is per

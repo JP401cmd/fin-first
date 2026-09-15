@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-15T01:16:01.841Z",
+  "generatedAt": "2026-09-15T12:18:12.321Z",
   "generatedDate": "2026-09-15",
   "repo": {
     "name": "fin",
@@ -191,9 +191,9 @@
   "stats": {
     "routes": 133,
     "routesProduction": 90,
-    "api": 316,
-    "tables": 96,
-    "migrations": 239,
+    "api": 315,
+    "tables": 97,
+    "migrations": 242,
     "integrations": 25,
     "components": 1089,
     "providers": 17,
@@ -2200,16 +2200,8 @@
       ]
     },
     {
-      "url": "/api/admin/user-diagnose",
-      "file": "app/api/admin/user-diagnose/route.ts",
-      "domain": "admin",
-      "methods": [
-        "GET"
-      ]
-    },
-    {
-      "url": "/api/admin/user-export",
-      "file": "app/api/admin/user-export/route.ts",
+      "url": "/api/admin/users/activity",
+      "file": "app/api/admin/users/activity/route.ts",
       "domain": "admin",
       "methods": [
         "GET"
@@ -4479,7 +4471,7 @@
     {
       "domain": "admin",
       "label": "Beheer",
-      "count": 45,
+      "count": 44,
       "routes": [
         {
           "url": "/api/admin/ai-features",
@@ -4829,16 +4821,8 @@
           ]
         },
         {
-          "url": "/api/admin/user-diagnose",
-          "file": "app/api/admin/user-diagnose/route.ts",
-          "domain": "admin",
-          "methods": [
-            "GET"
-          ]
-        },
-        {
-          "url": "/api/admin/user-export",
-          "file": "app/api/admin/user-export/route.ts",
+          "url": "/api/admin/users/activity",
+          "file": "app/api/admin/users/activity/route.ts",
           "domain": "admin",
           "methods": [
             "GET"
@@ -8312,6 +8296,10 @@
         "migration": "supabase/migrations/20260705120000_create_uat_tables.sql"
       },
       {
+        "name": "user_activity_days",
+        "migration": "supabase/migrations/20260915121000_create_user_activity_days.sql"
+      },
+      {
         "name": "user_badges",
         "migration": "supabase/migrations/20260215000001_create_new_tables.sql"
       },
@@ -8344,7 +8332,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 239
+    "migrationCount": 242
   },
   "tablesByDomain": [
     {
@@ -8505,6 +8493,10 @@
         {
           "name": "uat_rounds",
           "migration": "supabase/migrations/20260705120000_create_uat_tables.sql"
+        },
+        {
+          "name": "user_activity_days",
+          "migration": "supabase/migrations/20260915121000_create_user_activity_days.sql"
         },
         {
           "name": "user_own_ibans",
@@ -10416,14 +10408,6 @@
           "write": true
         },
         {
-          "name": "assets",
-          "write": false
-        },
-        {
-          "name": "debts",
-          "write": false
-        },
-        {
           "name": "error_log_resolutions",
           "write": true
         },
@@ -10474,10 +10458,6 @@
         {
           "name": "tier_assignments_log",
           "write": true
-        },
-        {
-          "name": "transactions",
-          "write": false
         },
         {
           "name": "uat_results",
@@ -10874,6 +10854,10 @@
         {
           "name": "job_runs",
           "write": false
+        },
+        {
+          "name": "user_activity_days",
+          "write": true
         },
         {
           "name": "user_reports",
@@ -11934,12 +11918,10 @@
           "write": true,
           "routes": [
             "/api/admin/ai-features",
-            "/api/admin/questionnaires/[id]/responses",
             "/api/admin/seed",
             "/api/admin/tier-assign",
             "/api/admin/tier-config",
             "/api/admin/user-delete",
-            "/api/admin/user-export",
             "/api/admin/users/block",
             "/api/admin/users/role"
           ]
@@ -12530,14 +12512,6 @@
           ]
         },
         {
-          "domain": "admin",
-          "label": "Beheer",
-          "write": false,
-          "routes": [
-            "/api/admin/user-diagnose"
-          ]
-        },
-        {
           "domain": "check",
           "label": "check",
           "write": false,
@@ -12752,14 +12726,6 @@
           ]
         },
         {
-          "domain": "admin",
-          "label": "Beheer",
-          "write": false,
-          "routes": [
-            "/api/admin/user-diagnose"
-          ]
-        },
-        {
           "domain": "checkin",
           "label": "checkin",
           "write": false,
@@ -12890,14 +12856,6 @@
           "write": false,
           "routes": [
             "/api/activate"
-          ]
-        },
-        {
-          "domain": "admin",
-          "label": "Beheer",
-          "write": false,
-          "routes": [
-            "/api/admin/user-diagnose"
           ]
         },
         {
@@ -14566,6 +14524,16 @@
           ]
         }
       ],
+      "user_activity_days": [
+        {
+          "domain": "cron",
+          "label": "cron",
+          "write": true,
+          "routes": [
+            "/api/cron/retention"
+          ]
+        }
+      ],
       "user_reports": [
         {
           "domain": "cron",
@@ -15799,6 +15767,11 @@
         "rls": true
       },
       "chat_messages": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "user_activity_days": {
         "user": true,
         "household": false,
         "rls": true
@@ -17641,6 +17614,17 @@
       ],
       "summary": "Het lab onder de Toekomst-grafiek (katern II \"Verken je aannames\") is sinds ADR 0144 de enige wat-als-verkenning. Onder `solved` is dat een `solved`-constructie: de vier draaiknoppen bewegen de vrijheidsleeftijd, en \"Maak dit mijn doel\" legt die leeftijd vast. ADR 0129 (stop-anke",
       "file": "docs/adr/0145-het-doelscenario-volgt-het-anker.md"
+    },
+    {
+      "id": "0146-beheer-ziet-gebruik-geen-inhoud",
+      "title": "Beheer ziet gebruik, geen inhoud: geen supportview, geen admin-export, wel een activiteitsprofiel",
+      "status": "aanvaard",
+      "date": "2026-09-15",
+      "elements": [
+        "do-meta"
+      ],
+      "summary": "Sinds beheer 2.0 (juni 2026) kon een superadmin op `/beheer/gebruikers`:",
+      "file": "docs/adr/0146-beheer-ziet-gebruik-geen-inhoud.md"
     }
   ],
   "churn": {
@@ -18873,8 +18857,26 @@
   "diff": {
     "baseline": false,
     "previousDate": "2026-09-15",
-    "hasChanges": false,
-    "sections": []
+    "hasChanges": true,
+    "sections": [
+      {
+        "label": "API-routes",
+        "added": [
+          "/api/admin/users/activity"
+        ],
+        "removed": [
+          "/api/admin/user-diagnose",
+          "/api/admin/user-export"
+        ]
+      },
+      {
+        "label": "Tabellen",
+        "added": [
+          "user_activity_days"
+        ],
+        "removed": []
+      }
+    ]
   },
   "statsHistory": [
     {
@@ -19285,9 +19287,9 @@
     },
     {
       "date": "2026-09-15",
-      "api": 316,
+      "api": 315,
       "components": 1089,
-      "tables": 96,
+      "tables": 97,
       "routesProduction": 90
     }
   ]

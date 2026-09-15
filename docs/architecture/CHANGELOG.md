@@ -1026,3 +1026,9 @@
 ## 2026-09-15
 
 - Geen wijzigingen.
+
+## 2026-09-15
+
+- **API-routes** toegevoegd: /api/admin/users/activity
+- **API-routes** verwijderd: /api/admin/user-diagnose, /api/admin/user-export
+- **Tabellen** toegevoegd: user_activity_days

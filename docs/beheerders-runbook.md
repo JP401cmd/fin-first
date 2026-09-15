@@ -26,23 +26,36 @@ ingedeeld in vier groepen: **Technisch beheer**, **Functioneel beheer**, **Test 
   uitgelogd en kan niet meer inloggen; deblokkeren herstelt de toegang.
 - Je kunt jezelf niet blokkeren en een superadmin niet (zet eerst de rol op gebruiker).
 
+### Zien hoe iemand de app gebruikt
+- Op de gebruikerskaart: **Gebruik tonen**. Je ziet actieve dagen, laatst actief,
+  AI-aanroepen per functie, ingerichte apps, check-in-maanden, meldingen en
+  **aantallen** (bezittingen, schulden, transacties, bankkoppelingen).
+- Je ziet **nooit inhoud**: geen bedragen, rekeningnamen, omschrijvingen,
+  check-in-cijfers of chat. Dat is een besluit (ADR 0146), geen ontbrekende
+  functie. De inzage wordt gelogd als *Gebruik bekeken*.
+- Platformbreed actief gebruik (vandaag / 7 / 30 dagen) staat op **Kerngetallen**
+  (`/beheer/kpi`).
+
 ---
 
 ## AVG / privacy
 
 ### Inzageverzoek (recht op inzage)
-- **Admin-export:** zoek de gebruiker op **Functioneel beheer → Gebruikers** (`/beheer/gebruikers`),
-  open **Supportview** en klik **Exporteer data (AVG)**. Levert profiel + bezittingen + schulden +
-  transacties als JSON. De export wordt gelogd in de audit-trail.
-- **Self-service:** de gebruiker kan z'n data ook zelf downloaden (`/api/export`, CSV/JSON).
+- **Alleen self-service.** De gebruiker downloadt z'n volledige data zelf via
+  **Mijn → Geavanceerd** (`/api/account/export`, JSON; losse CSV's via `/api/export`).
+  Wijs daar in je antwoord naar. Beheer heeft bewust **geen** export van andermans
+  data meer (ADR 0146).
+- **Kan de gebruiker niet meer inloggen** (geblokkeerd, e-mail kwijt)? Dan handelt de
+  eigenaar het verzoek met de hand af: herstel eerst de toegang (deblokkeren of
+  wachtwoordreset naar het accountadres). Lukt dat niet, dan pas een export op
+  databaseniveau, met een aantekening in het AVG-register waarom en door wie.
 
 ### Verwijderverzoek (recht op vergetelheid)
 - **Self-service (voorkeur):** de gebruiker verwijdert z'n account via de account-pagina
   (`/api/account/delete`, modus *delete*).
-- **Admin-gestuurd:** een één-klik admin-verwijdering is bewust nog niet gebouwd (destructief,
-  vereist de service-role-key). Voer een admin-verzoek uit op database-niveau met
-  `deleteAllUserData(serviceClient, userId)` + `auth.admin.deleteUser(userId)`, en noteer het
-  verzoek. Dit is de enige actie in dit runbook die niet via een knop loopt.
+- **Admin-gestuurd:** op de gebruikerskaart onder **Gevarenzone → Verwijder alle data (AVG)**,
+  bevestigen door het e-mailadres over te typen. Onomkeerbaar en gelogd in de audit-trail.
+  Noteer het verzoek in het AVG-register.
 
 ---
 
@@ -50,8 +63,12 @@ ingedeeld in vier groepen: **Technisch beheer**, **Functioneel beheer**, **Test 
 1. Vraag de gebruiker om het e-mailadres en het tijdstip van de import.
 2. **Foutmeldingen** (`/beheer/errors`, Technisch beheer): kijk of er rond dat tijdstip een
    client-fout van die gebruiker staat.
-3. Een volledige per-gebruiker datadiagnose (rekeningen / laatste sync / importfouten) is nog
-   een open backlog-item (*supportview*). Tot die tijd: directe DB-inspectie.
+3. **Gebruik tonen** op de gebruikerskaart (`/beheer/gebruikers`) laat het aantal transacties,
+   het moment van de laatste toevoeging en de laatste bank-sync met status zien — niet de
+   transacties zelf (ADR 0146).
+4. Moet je de inhoud zien, vraag de gebruiker dan om een melding met screenshot, of bouw de
+   situatie na op een testaccount. DB-inspectie van echte gebruikersdata alleen als laatste
+   redmiddel, met een aantekening (wie, wanneer, waarom) in het AVG-register.
 
 ---
 

@@ -14,6 +14,7 @@ vi.mock('@/lib/job-runs', () => ({ recordJobRun: (...a: unknown[]) => mockRecord
 
 interface Cfg {
   deleteErrorTable: string | null
+  ontbrekendeTabel: string | null
   rpcError: boolean
 }
 let cfg: Cfg
@@ -30,7 +31,9 @@ function makeService() {
         return Promise.resolve(
           cfg.deleteErrorTable === table
             ? { count: null, error: { message: `mock-fout ${table}` } }
-            : { count: 5, error: null },
+            : cfg.ontbrekendeTabel === table
+              ? { count: null, error: { message: `Could not find the table 'public.${table}'`, code: 'PGRST205' } }
+              : { count: 5, error: null },
         )
       },
     }
@@ -60,7 +63,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   deletedTables = []
   rpcCalls = []
-  cfg = { deleteErrorTable: null, rpcError: false }
+  cfg = { deleteErrorTable: null, ontbrekendeTabel: null, rpcError: false }
   process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://db.test'
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-key'
   delete process.env.VERCEL_ENV
@@ -111,7 +114,9 @@ describe('cron verwerking', () => {
     // Plus error_log_resolutions: zelfde termijn als error_logs, maar op
     // `last_seen_at` en dus buiten de created_at-lus (ADR 0113).
     expect(deletedTables).toContain('error_log_resolutions')
-    expect(deletedTables).toHaveLength(Object.keys(RETENTION_MONTHS).length + 1)
+    // Plus user_activity_days: 400 dagen op de `date`-kolom `day` (ADR 0146).
+    expect(deletedTables).toContain('user_activity_days')
+    expect(deletedTables).toHaveLength(Object.keys(RETENTION_MONTHS).length + 2)
 
     // lead_intakes via de bestaande SECURITY DEFINER-functie.
     expect(rpcCalls).toContain('purge_expired_lead_intakes')
@@ -132,6 +137,25 @@ describe('cron verwerking', () => {
       expect.anything(),
       expect.objectContaining({ job: 'retention', status: 'error' }),
     )
+  })
+
+  it('een nog niet uitgerolde user_activity_days is geen storing: 200 + success + overgeslagen (ADR 0146)', async () => {
+    cfg.ontbrekendeTabel = 'user_activity_days'
+    const res = await GET(req('cron-secret'))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.success).toBe(true)
+    expect(body.overgeslagen).toContain('user_activity_days')
+    expect(mockRecordJobRun).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ job: 'retention', status: 'success' }),
+    )
+  })
+
+  it('een ándere fout op user_activity_days blijft wél een storing', async () => {
+    cfg.deleteErrorTable = 'user_activity_days'
+    const res = await GET(req('cron-secret'))
+    expect(res.status).toBe(500)
   })
 
   it('nooit een rauwe error.message in de response-body', async () => {

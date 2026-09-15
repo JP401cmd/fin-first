@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Users, Search, Check, AlertCircle, Clock, CalendarDays, Ban, RotateCcw } from 'lucide-react'
 import { ADDON_PLANS, formatPlanPrice, type AddonPlan } from '@/lib/subscription-catalog'
+import type { GebruikersActiviteit } from '@/lib/beheer/gebruik'
 
 interface AdminUser {
   id: string
@@ -14,17 +15,6 @@ interface AdminUser {
   lastSignInAt: string | null
   subscriptions: string[]
   currentTier: string | null
-}
-
-interface Diagnose {
-  assetCount: number
-  assetTotal: number
-  debtCount: number
-  debtTotal: number
-  netWorth: number
-  cashAccounts: { name: string; value: number }[]
-  txCount: number
-  lastTxDate: string | null
 }
 
 interface LogEntry {
@@ -45,15 +35,28 @@ const dateTimeFmt = new Intl.DateTimeFormat('nl-NL', {
   minute: '2-digit',
 })
 
-const eurFmt = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
-function eur(n: number): string {
-  return eurFmt.format(n)
+const monthFmt = new Intl.DateTimeFormat('nl-NL', { month: 'short', year: '2-digit' })
+function fmtMonth(yyyyMm: string): string {
+  const d = new Date(`${yyyyMm}-01T12:00:00Z`)
+  return Number.isNaN(d.getTime()) ? yyyyMm : monthFmt.format(d)
 }
 
 function fmtDate(iso: string | null): string {
   if (!iso) return '—'
   const d = new Date(iso)
   return Number.isNaN(d.getTime()) ? '—' : dateFmt.format(d)
+}
+
+/** Kalenderdag (YYYY-MM-DD) zonder tijdzoneverschuiving: parse als middag UTC. */
+function fmtDay(dag: string | null): string {
+  if (!dag) return '—'
+  const d = new Date(`${dag.slice(0, 10)}T12:00:00Z`)
+  return Number.isNaN(d.getTime()) ? '—' : dateFmt.format(d)
+}
+
+/** Telling of "?" als die niet op te halen was. */
+function tel(n: number | null): string {
+  return n === null ? '?' : String(n)
 }
 
 function fmtDateTime(iso: string | null): string {
@@ -80,8 +83,8 @@ export default function BeheerGebruikersPage() {
   const [user, setUser] = useState<AdminUser | null>(null)
   const [busyTier, setBusyTier] = useState<string | null>(null)
   const [busyAction, setBusyAction] = useState<'role' | 'block' | null>(null)
-  const [diagnose, setDiagnose] = useState<Diagnose | null>(null)
-  const [busyDiagnose, setBusyDiagnose] = useState(false)
+  const [activiteit, setActiviteit] = useState<GebruikersActiviteit | null>(null)
+  const [busyActiviteit, setBusyActiviteit] = useState(false)
   const [showDelete, setShowDelete] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState('')
   const [deleting, setDeleting] = useState(false)
@@ -127,7 +130,7 @@ export default function BeheerGebruikersPage() {
       }
       const data = await res.json()
       setUser(data.user ?? null)
-      setDiagnose(null)
+      setActiviteit(null)
       setShowDelete(false)
       setDeleteConfirm('')
       setSearched(true)
@@ -233,21 +236,21 @@ export default function BeheerGebruikersPage() {
     }
   }
 
-  async function handleDiagnose() {
+  async function handleActiviteit() {
     if (!user) return
-    setBusyDiagnose(true)
+    setBusyActiviteit(true)
     setStatus(null)
     try {
       const res = await fetch(
-        `/api/admin/user-diagnose?userId=${encodeURIComponent(user.id)}&label=${encodeURIComponent(user.email ?? user.id)}`,
+        `/api/admin/users/activity?userId=${encodeURIComponent(user.id)}`,
       )
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data.error || 'Diagnose mislukt')
-      setDiagnose(data as Diagnose)
+      if (!res.ok) throw new Error(data.error || 'Gebruik laden mislukt')
+      setActiviteit(data as GebruikersActiviteit)
     } catch (err) {
-      setStatus({ type: 'error', message: err instanceof Error ? err.message : 'Diagnose mislukt' })
+      setStatus({ type: 'error', message: err instanceof Error ? err.message : 'Gebruik laden mislukt' })
     } finally {
-      setBusyDiagnose(false)
+      setBusyActiviteit(false)
     }
   }
 
@@ -265,7 +268,7 @@ export default function BeheerGebruikersPage() {
       if (!res.ok) throw new Error(data.error || 'Verwijderen mislukt')
       setStatus({ type: 'success', message: `${user.email} en alle bijbehorende data zijn verwijderd.` })
       setUser(null)
-      setDiagnose(null)
+      setActiviteit(null)
       setShowDelete(false)
       setDeleteConfirm('')
     } catch (err) {
@@ -283,7 +286,7 @@ export default function BeheerGebruikersPage() {
           <h2 className="text-xl font-bold text-[var(--ink)]">Gebruikers</h2>
         </div>
         <p className="mt-1 text-sm text-[var(--ink-3)]">
-          Zoek een gebruiker op e-mailadres en beheer hun abonnementen.
+          Zoek een gebruiker op e-mailadres, beheer abonnementen en zie hoe de app gebruikt wordt.
         </p>
       </div>
 
@@ -457,71 +460,91 @@ export default function BeheerGebruikersPage() {
             </p>
           </div>
 
-          {/* Supportview — financiële diagnose (audit-gelogd) */}
+          {/* Gebruik — activiteit zonder inhoud (ADR 0146) */}
           <div className="mt-5">
-            <SectionLabel>Supportview</SectionLabel>
-            {!diagnose ? (
+            <SectionLabel>Gebruik</SectionLabel>
+            {!activiteit ? (
               <button
-                onClick={handleDiagnose}
-                disabled={busyDiagnose}
+                onClick={handleActiviteit}
+                disabled={busyActiviteit}
                 className="min-h-[40px] border border-[var(--ink)] px-4 py-2 text-sm font-medium text-[var(--ink)] transition-opacity hover:opacity-90 disabled:opacity-40"
               >
-                {busyDiagnose ? 'Laden…' : 'Financiële diagnose tonen'}
+                {busyActiviteit ? 'Laden…' : 'Gebruik tonen'}
               </button>
             ) : (
               <div className="border border-[var(--border-ed)] p-4">
-                <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
-                  <div className="flex items-baseline justify-between">
-                    <dt className="text-[var(--ink-3)]">Netto vermogen</dt>
-                    <dd className="font-mono tabular-nums text-[var(--ink)]">{eur(diagnose.netWorth)}</dd>
+                <dl className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <dt className="text-[var(--ink-3)]">Actieve dagen (30 d)</dt>
+                    <dd className="font-mono tabular-nums text-[var(--ink)]">
+                      {activiteit.actieveDagen30 ?? 'nog niet gemeten'}
+                    </dd>
                   </div>
-                  <div className="flex items-baseline justify-between">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <dt className="text-[var(--ink-3)]">Laatst actief</dt>
+                    <dd className="font-mono tabular-nums text-[var(--ink-2)]">{fmtDay(activiteit.laatsteActieveDag)}</dd>
+                  </div>
+                  <div className="flex items-baseline justify-between gap-3">
+                    <dt className="text-[var(--ink-3)]">AI-aanroepen (30 d)</dt>
+                    <dd className="font-mono tabular-nums text-[var(--ink)]">{tel(activiteit.aiAanroepen30)}</dd>
+                  </div>
+                  <div className="flex items-baseline justify-between gap-3">
+                    <dt className="text-[var(--ink-3)]">Meldingen gestuurd</dt>
+                    <dd className="font-mono tabular-nums text-[var(--ink)]">{tel(activiteit.meldingen)}</dd>
+                  </div>
+                  <div className="flex items-baseline justify-between gap-3">
+                    <dt className="text-[var(--ink-3)]">Bezittingen · schulden</dt>
+                    <dd className="font-mono tabular-nums text-[var(--ink)]">
+                      {tel(activiteit.aantallen.bezittingen)} · {tel(activiteit.aantallen.schulden)}
+                    </dd>
+                  </div>
+                  <div className="flex items-baseline justify-between gap-3">
                     <dt className="text-[var(--ink-3)]">Transacties</dt>
-                    <dd className="font-mono tabular-nums text-[var(--ink)]">{diagnose.txCount}</dd>
+                    <dd className="font-mono tabular-nums text-[var(--ink)]">{tel(activiteit.aantallen.transacties)}</dd>
                   </div>
-                  <div className="flex items-baseline justify-between">
-                    <dt className="text-[var(--ink-3)]">Bezittingen</dt>
-                    <dd className="font-mono tabular-nums text-[var(--ink)]">
-                      {diagnose.assetCount} · {eur(diagnose.assetTotal)}
+                  <div className="flex items-baseline justify-between gap-3">
+                    <dt className="text-[var(--ink-3)]">Laatste transactie toegevoegd</dt>
+                    <dd className="font-mono tabular-nums text-[var(--ink-2)]">
+                      {fmtDateTime(activiteit.aantallen.laatsteTransactieToegevoegd)}
                     </dd>
                   </div>
-                  <div className="flex items-baseline justify-between">
-                    <dt className="text-[var(--ink-3)]">Schulden</dt>
+                  <div className="flex items-baseline justify-between gap-3">
+                    <dt className="text-[var(--ink-3)]">Bankkoppelingen</dt>
                     <dd className="font-mono tabular-nums text-[var(--ink)]">
-                      {diagnose.debtCount} · {eur(diagnose.debtTotal)}
+                      {tel(activiteit.bank.koppelingen)}
+                      {activiteit.bank.laatsteSync &&
+                        ` · ${fmtDateTime(activiteit.bank.laatsteSync)} (${activiteit.bank.laatsteSyncStatus ?? '—'})`}
                     </dd>
-                  </div>
-                  <div className="flex items-baseline justify-between">
-                    <dt className="text-[var(--ink-3)]">Laatste transactie</dt>
-                    <dd className="font-mono tabular-nums text-[var(--ink-2)]">{fmtDate(diagnose.lastTxDate)}</dd>
-                  </div>
-                  <div className="flex items-baseline justify-between">
-                    <dt className="text-[var(--ink-3)]">Rekeningen</dt>
-                    <dd className="font-mono tabular-nums text-[var(--ink)]">{diagnose.cashAccounts.length}</dd>
                   </div>
                 </dl>
-                {diagnose.cashAccounts.length > 0 && (
-                  <ul className="mt-3 space-y-1 border-t border-dotted border-[var(--border-ed)] pt-3 text-xs">
-                    {diagnose.cashAccounts.map((a, i) => (
-                      <li key={i} className="flex items-center justify-between">
-                        <span className="text-[var(--ink-2)]">{a.name}</span>
-                        <span className="font-mono tabular-nums text-[var(--ink-3)]">{eur(a.value)}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
+                <div className="mt-3 space-y-1.5 border-t border-dotted border-[var(--border-ed)] pt-3 text-xs text-[var(--ink-3)]">
+                  <p>
+                    <span className="text-[var(--ink-4)]">AI per functie: </span>
+                    {activiteit.aiPerFunctie.length === 0
+                      ? '—'
+                      : activiteit.aiPerFunctie.map((f) => `${f.feature} (${f.aanroepen})`).join(', ')}
+                    {activiteit.aiPerFunctieSteekproef && (
+                      <span className="text-[var(--ink-4)]"> — over de nieuwste 1000 aanroepen</span>
+                    )}
+                  </p>
+                  <p>
+                    <span className="text-[var(--ink-4)]">Apps ingericht: </span>
+                    {activiteit.appsIngericht.length === 0 ? '—' : activiteit.appsIngericht.join(', ')}
+                    <span className="text-[var(--ink-4)]"> · gidsstappen bekeken: </span>
+                    {activiteit.gidsStappenBekeken}
+                  </p>
+                  <p>
+                    <span className="text-[var(--ink-4)]">Check-ins: </span>
+                    {activiteit.checkinMaanden.length === 0
+                      ? '—'
+                      : activiteit.checkinMaanden.slice(0, 12).map(fmtMonth).join(', ')}
+                  </p>
+                </div>
               </div>
             )}
-            <div className="mt-3">
-              <a
-                href={`/api/admin/user-export?userId=${encodeURIComponent(user.id)}&label=${encodeURIComponent(user.email ?? user.id)}`}
-                className="inline-flex min-h-[40px] items-center gap-1.5 border border-[var(--border-ed)] px-4 py-2 text-sm text-[var(--ink-2)] transition-colors hover:border-[var(--border-md)]"
-              >
-                Exporteer data (AVG)
-              </a>
-            </div>
             <p className="mt-2 text-xs text-[var(--ink-4)]">
-              Elke inzage en export van financiële data wordt gelogd in de audit-trail.
+              Alleen gebruik, nooit inhoud: geen bedragen, rekeningen of omschrijvingen. Een
+              inzage- of exportverzoek doet de gebruiker zelf via <span className="font-mono">/mijn/geavanceerd</span>.
             </p>
           </div>
 

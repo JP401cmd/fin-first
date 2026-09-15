@@ -21,6 +21,8 @@
  * Daarnaast, buiten de created_at-lus omdat hij een andere cutoff-kolom heeft:
  *  - error_log_resolutions 12 mnd op `last_seen_at` — zie
  *    {@link ERROR_RESOLUTIONS_RETENTION_MONTHS}.
+ *  - user_activity_days 400 dgn op `day` (ADR 0146) — zie
+ *    {@link USER_ACTIVITY_RETENTION_DAYS}.
  */
 
 /** Retentie in MAANDEN per log-/usage-tabel (op basis van `created_at`). */
@@ -53,6 +55,26 @@ export const ERROR_RESOLUTIONS_RETENTION_MONTHS = 12
  * hier, maar via de DB-functie purge_expired_lead_intakes() (expires_at-gedreven).
  */
 export const LEAD_INTAKES_RETENTION_DAYS = 90
+
+/**
+ * user_activity_days: 400 dagen (ADR 0146, migratie 20260915121000). Ruim een
+ * jaar, zodat MAU jaar-op-jaar te vergelijken blijft. Buiten de created_at-lus
+ * omdat de cutoff op de kolom `day` (een `date`) staat — zie
+ * {@link retentionCutoffDate}.
+ */
+export const USER_ACTIVITY_RETENTION_DAYS = 400
+
+/**
+ * Cutoff als `YYYY-MM-DD` voor een `date`-kolom: rijen met een dag vóór deze
+ * datum worden gepurged. `days` dagen terug vanaf `now`, in UTC gerekend — een
+ * afwijking van hooguit een dag ten opzichte van de Amsterdamse kalenderdag is
+ * bij een termijn van 400 dagen zonder betekenis.
+ */
+export function retentionCutoffDate(days: number, now: Date = new Date()): string {
+  const d = new Date(now)
+  d.setUTCDate(d.getUTCDate() - days)
+  return d.toISOString().slice(0, 10)
+}
 
 /**
  * ISO-timestamp van de cutoff: rijen met `created_at` ouder dan dit worden

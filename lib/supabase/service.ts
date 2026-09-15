@@ -1,9 +1,14 @@
 // lib/supabase/service.ts
 //
 // Service-role-client voor server-side admin-leesacties die bewust RLS
-// passeren (supportview, AVG-export, platform-KPI's). Gebruik ALTIJD samen
-// met een expliciete isSuperAdmin-check én een audit-log-entry; geef deze
-// client nooit door aan code die met gebruikersinput query't zonder filter.
+// passeren (gebruiksprofiel, platform-KPI's). Gebruik ALTIJD samen met een
+// expliciete isSuperAdmin-check; geef deze client nooit door aan code die met
+// gebruikersinput query't zonder filter.
+//
+// Grens (ADR 0146): beheer leest hiermee GEBRUIK, nooit inhoud — geen bedragen,
+// omschrijvingen of rekeningnamen van gebruikers. De financiële supportview en
+// de admin-export zijn om die reden verwijderd; lib/beheer/geen-inhoud.test.ts
+// bewaakt de beheer-bronnen.
 //
 // Achtergrond: superadmin-inzage liep eerst via brede RLS-SELECT-policies
 // ("assets superadmin select" e.d.). Die lekten alle gebruikersdata in elke

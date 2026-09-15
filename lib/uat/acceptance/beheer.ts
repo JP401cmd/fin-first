@@ -25,8 +25,8 @@
  *  - 0  'exact'       — BEHEER heeft geen eigen hand-narekenbare rekenformule.
  *  - 12 'consistency' — een getoond getal komt aantoonbaar ergens anders vandaan
  *                        (A=B): AI-credit-/token-/KPI-aggregaten = som van de
- *                        usage-/DB-rijen (03/04), supportview-diagnose = de
- *                        eigen schermen van de doelgebruiker (08), AOW-tabel =
+ *                        usage-/DB-rijen (03/04), gebruiksprofiel-tellingen =
+ *                        de rijen van de doelgebruiker (08), AOW-tabel =
  *                        SVB-bron/kernel-consumptie (15), fiscale kerngetallen =
  *                        de canonieke bronconstanten (16, consume-don't-recompute),
  *                        persona-seed = de dataset + schermen (20),
@@ -180,17 +180,17 @@ const criteria: AcceptanceCriterion[] = [
   {
     workflow: 'WF-BEHEER-08',
     scenarioId: 'UAT-BEHEER-08',
-    titel: 'Supportview-diagnose bekijken en account definitief verwijderen',
+    titel: 'Gebruik van een account bekijken (zonder inhoud) en account definitief verwijderen',
     kriticiteit: 'KERN',
-    given: 'Een gevonden gebruiker op /beheer/gebruikers (WF-BEHEER-07), met eigen financiële data.',
+    given: 'Een gevonden gebruiker op /beheer/gebruikers (WF-BEHEER-07), met eigen financiële data en enige app-activiteit.',
     when:
-      'De beheerder opent de Supportview-diagnose en verwijdert (uiterst geval) het account nadat het e-mailadres exact is overgetypt (de verwijderknop blijft anders disabled).',
+      'De beheerder klikt "Gebruik tonen" en verwijdert (uiterst geval) het account nadat het e-mailadres exact is overgetypt (de verwijderknop blijft anders disabled).',
     then:
-      'De diagnose (aantal bezittingen + totaalwaarde, aantal schulden + totaal, netto vermogen, rekeningsaldi, transactie-aantal/-datum) moet EXACT gelijk zijn aan wat de eigen schermen van die gebruiker tonen — een A=B-consistentietoets op dezelfde bronrijen, geen los na te rekenen cijfer; verwijdering is onomkeerbaar en wordt (net als inzage) gelogd in de audit-trail.',
+      'Het gebruiksblok toont actieve dagen (30 d), laatst actief, AI-aanroepen per functie, ingerichte apps, check-in-maanden, meldingen en AANTALLEN bezittingen/schulden/transacties/bankkoppelingen — die tellingen zijn gelijk aan het aantal rijen van die gebruiker. Er staat NERGENS een bedrag, rekeningnaam, omschrijving, check-in-cijfer of chattitel (ADR 0146), en er is geen knop om de data van de gebruiker te exporteren. Inzage ("Gebruik bekeken") en verwijdering staan in de audit-trail; verwijdering is onomkeerbaar.',
     assertion: {
       kind: 'consistency',
       source:
-        'app/api/admin/user-diagnose/route.ts + user-delete/route.ts — diagnose-cijfers = de eigen bezittingen/schulden/rekeningen van de doelgebruiker (A=B met diens schermen), consistentietoets',
+        'app/api/admin/users/activity/route.ts + lib/beheer/gebruik.ts + user-delete/route.ts — tellingen = rijen van de doelgebruiker (A=B), afwezigheid van inhoud bewaakt door lib/beheer/geen-inhoud.test.ts',
     },
   },
   {

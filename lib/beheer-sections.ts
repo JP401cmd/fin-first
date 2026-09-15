@@ -150,7 +150,7 @@ export const BEHEER_GROUPS: BeheerGroup[] = [
       {
         label: 'Gebruikers',
         href: '/beheer/gebruikers',
-        description: 'Zoek een gebruiker en ken AI- of Connected-abonnementen toe.',
+        description: 'Zoek een gebruiker, ken abonnementen toe en zie het gebruik — nooit de inhoud.',
         icon: Users,
       },
       {
@@ -313,7 +313,7 @@ export const BEHEER_GROUPS: BeheerGroup[] = [
       {
         label: 'Kerngetallen',
         href: '/beheer/kpi',
-        description: 'Platform-KPI’s: gebruikers, tiers, verbruik en fouten deze maand.',
+        description: 'Platform-KPI’s: gebruikers, actief gebruik, tiers, verbruik en fouten deze maand.',
         icon: BarChart3,
       },
       {

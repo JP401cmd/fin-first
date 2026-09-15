@@ -47,11 +47,14 @@ export default async function BeheerKpiPage() {
   // Profielen van álle gebruikers: via de service-role-client (de brede
   // superadmin-RLS op profiles is verwijderd — zie lib/supabase/service.ts).
   const service = getServiceClient()
-  const [profilesRes, aiRes, errRes, mailRes] = await Promise.all([
+  const [profilesRes, aiRes, errRes, mailRes, activeRes] = await Promise.all([
     service.from('profiles').select('created_at, onboarding_completed, active_subscriptions, blocked_at, role'),
     supabase.from('ai_usage').select('credits').gte('created_at', monthStart),
     supabase.from('error_logs').select('id', { count: 'exact', head: true }).gte('created_at', monthStart),
     supabase.from('mail_log').select('id', { count: 'exact', head: true }).gte('created_at', monthStart),
+    // Actieve gebruikers uit user_activity_days (ADR 0146) — alleen tellingen,
+    // service-role-only RPC. Faalt stil (null) zolang de migratie niet draait.
+    service.rpc('admin_activity_counts'),
   ])
 
   const profiles = (profilesRes.data ?? []) as ProfileRow[]
@@ -69,6 +72,15 @@ export default async function BeheerKpiPage() {
   const aiCreditsMonth = ((aiRes.data ?? []) as { credits: number }[]).reduce((s, r) => s + r.credits, 0)
   const errorsMonth = errRes.count ?? 0
   const mailMonth = mailRes.count ?? 0
+  const active = activeRes.error
+    ? null
+    : ((Array.isArray(activeRes.data) ? activeRes.data[0] : activeRes.data) as
+        | { dau: number; wau: number; mau: number }
+        | undefined) ?? null
+  // Functie bestaat nog niet (42883 in Postgres, PGRST202 in PostgREST) ⇒ de
+  // migratie is nog niet uitgerold. Elke andere fout is een echte storing.
+  const activeNietUitgerold = ['42883', 'PGRST202'].includes(activeRes.error?.code ?? '')
+  const pct = (n: number) => (total > 0 ? `${Math.round((n / total) * 100)}% van totaal` : undefined)
 
   return (
     <div>
@@ -91,6 +103,23 @@ export default async function BeheerKpiPage() {
           <Kpi label="Connected" value={connectedUsers} />
           <Kpi label="Gratis" value={gratis} />
         </div>
+      </section>
+
+      <section className="mb-8">
+        <SectionLabel>Actief gebruik</SectionLabel>
+        {active ? (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <Kpi label="Vandaag" value={active.dau} sub={pct(active.dau)} />
+            <Kpi label="Laatste 7 dagen" value={active.wau} sub={pct(active.wau)} />
+            <Kpi label="Laatste 30 dagen" value={active.mau} sub={pct(active.mau)} />
+          </div>
+        ) : (
+          <p className="text-sm italic text-[var(--ink-4)]">
+            {activeNietUitgerold
+              ? 'Nog niet gemeten — de activiteitsregistratie is nog niet uitgerold.'
+              : 'Actief gebruik kon niet worden geladen.'}
+          </p>
+        )}
       </section>
 
       <section>

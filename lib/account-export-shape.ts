@@ -2,7 +2,7 @@
  * Wat een AVG-export van een tabel WEL en NIET mag bevatten — [Arch F3], AVG
  * art. 15 (inzage) en art. 20 (dataportabiliteit).
  *
- * `/api/account/export` en `/api/admin/user-export` deden allebei `select('*')`.
+ * `/api/account/export` en de (sinds ADR 0146 verwijderde) `/api/admin/user-export` deden allebei `select('*')`.
  * Dat leverde tot nu toe een leesbaar rekeningnummer omdat `bank_accounts.iban`
  * nog bestaat — maar Stage B laat die kolom vallen, en dan levert de export
  * `iban_encrypted` + `iban_hash` in plaats van een rekeningnummer. Dat is géén
@@ -81,6 +81,10 @@ export const EXPORT_REDACTED_COLUMNS: Readonly<Record<string, readonly string[]>
   ],
   exchange_connections: ['api_key_encrypted', 'api_key_hash', 'api_secret_encrypted'],
   broker_connections: ['api_key_encrypted', 'api_key_hash', 'api_secret_encrypted'],
+  // Server-interne verwerkingsstatus van de doorzet naar de Notion-queue — geen
+  // persoonsgegeven, en `notion_last_error` kan interne API-fouttekst dragen.
+  // Relevant sinds de zelf-export deze tabel meeneemt (ADR 0146).
+  user_reports: ['notion_page_id', 'notion_sync_status', 'notion_sync_attempts', 'notion_last_error'],
 }
 
 /** Eén versleutelde kolom en de leesbare kolom waarin haar waarde hoort te landen. */

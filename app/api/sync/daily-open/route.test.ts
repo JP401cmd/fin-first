@@ -23,6 +23,11 @@ vi.mock('@/lib/supabase/server', () => ({
   })),
 }))
 
+const mockRecordActivityDay = vi.fn()
+vi.mock('@/lib/activity/record-activity-day', () => ({
+  recordActivityDay: (...args: unknown[]) => mockRecordActivityDay(...args),
+}))
+
 import { POST } from './route'
 
 const USER = { id: 'user-1' }
@@ -39,6 +44,8 @@ function mockUpdateChain(result: { count?: number | null; error?: unknown }) {
 beforeEach(() => {
   mockGetUser.mockReset()
   mockFrom.mockReset()
+  mockRecordActivityDay.mockReset()
+  mockRecordActivityDay.mockResolvedValue(undefined)
 })
 
 describe('POST /api/sync/daily-open', () => {
@@ -72,6 +79,19 @@ describe('POST /api/sync/daily-open', () => {
     const res = await POST()
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual({ due: false })
+  })
+
+  it('registreert de dag-activiteit van de ingelogde gebruiker (ADR 0146)', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: USER } })
+    mockUpdateChain({ count: 0 })
+    await POST()
+    expect(mockRecordActivityDay).toHaveBeenCalledWith(expect.anything(), USER.id)
+  })
+
+  it('zonder sessie wordt er geen activiteit geregistreerd', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: null } })
+    await POST()
+    expect(mockRecordActivityDay).not.toHaveBeenCalled()
   })
 
   it('500 bij DB-fout', async () => {

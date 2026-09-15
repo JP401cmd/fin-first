@@ -1,6 +1,7 @@
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { unauthorized, serverError } from '@/lib/api/respond'
-import { EXPORT_SESSION_TABLES } from '@/lib/user-data-tables'
+import { getServiceClient } from '@/lib/supabase/service'
+import { EXPORT_SESSION_TABLES, EXPORT_SERVICE_TABLES } from '@/lib/user-data-tables'
 import { decryptField } from '@/lib/crypto/field-encryption'
 import { shapeExportRows, shapeExportRow, type ExportRow } from '@/lib/account-export-shape'
 
@@ -15,9 +16,14 @@ import { shapeExportRows, shapeExportRow, type ExportRow } from '@/lib/account-e
  * "wat wordt gewist".
  *
  * De CSV-per-type-export (/api/export) blijft bestaan voor Excel-gebruikers; dit
- * is de volledige alles-in-één variant. Enkele operationele/afgeschermde tabellen
- * (logs, net_worth_history) vallen buiten de zelf-service-export en zitten in de
- * superadmin-inzage-export (/api/admin/user-export, service-role, audit-gelogd).
+ * is de volledige alles-in-één variant.
+ *
+ * Sinds ADR 0146 is dit de ENIGE route voor een inzageverzoek — beheer heeft geen
+ * export van andermans data meer. Daarom leest deze route ook de persoonlijke
+ * tabellen zónder eigen-rij leesrecht ({@link EXPORT_SERVICE_TABLES}:
+ * net_worth_history, feedback, user_reports) die voorheen alleen in de
+ * admin-export zaten. Dat gaat via de service-role, strikt op de vers
+ * geverifieerde eigen id (`getUser()`, niet de JWT-claims — service-role-pad).
  */
 /**
  * Kindtabellen zónder eigen `user_id` vallen buiten de generieke
@@ -81,9 +87,37 @@ export async function GET() {
       tables[table] = rows
     }
 
+    // Persoonlijke tabellen zonder eigen-rij SELECT: service-role, maar alléén
+    // op de vers geverifieerde eigen id. Faalt de verificatie, dan blijven deze
+    // tabellen weg (de rest van de export gaat door) — nooit een claim-id aan de
+    // service-client geven.
+    const onvolledig: string[] = []
+    const {
+      data: { user: verified },
+    } = await supabase.auth.getUser()
+    if (!verified || verified.id !== claims.sub) {
+      onvolledig.push(...EXPORT_SERVICE_TABLES)
+    } else {
+      const service = getServiceClient()
+      const serviceResults = await Promise.all(
+        EXPORT_SERVICE_TABLES.map(async (table) => {
+          const { data, error } = await service.from(table).select('*').eq('user_id', verified.id)
+          if (error) onvolledig.push(table)
+          const rows = error ? [] : ((data ?? []) as unknown as ExportRow[])
+          return [table, shapeExportRows(table, rows, decryptField)] as const
+        }),
+      )
+      for (const [table, rows] of serviceResults) {
+        tables[table] = rows
+      }
+    }
+
     const payload = {
       exported_at: new Date().toISOString(),
       user_id: claims.sub,
+      // AVG: een inzage-export die stil gaten heeft is erger dan één die ze
+      // benoemt. Leeg = volledig voor de tabellen zonder eigen-rij leesrecht.
+      ...(onvolledig.length > 0 ? { onvolledig } : {}),
       tables,
     }
 

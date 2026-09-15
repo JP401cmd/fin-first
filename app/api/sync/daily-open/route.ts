@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { unauthorized, serverError } from '@/lib/api/respond'
+import { recordActivityDay } from '@/lib/activity/record-activity-day'
 
 /**
  * POST /api/sync/daily-open
@@ -45,11 +46,20 @@ export async function POST() {
 
   // Atomische claim: zet last_price_sync_at alleen als 'ie null is of vóór
   // vandaag ligt. count > 0 ⇒ wij raakten de rij ⇒ wij claimden de dag ⇒ due.
-  const { count, error } = await supabase
-    .from('profiles')
-    .update({ last_price_sync_at: now.toISOString() }, { count: 'exact' })
-    .eq('id', user.id)
-    .or(`last_price_sync_at.is.null,last_price_sync_at.lt.${todayStart}`)
+  //
+  // Parallel daaraan: dag-activiteit registreren op dezelfde eerste-open-aanroep
+  // (ADR 0146) — geen extra request, geen extra roundtrip-wachttijd, en de
+  // fout-inslikkende helper kan de claim niet breken. Telt alleen bij een
+  // volledige app-load: een tab die over middernacht open blijft, meldt de
+  // nieuwe dag pas bij de volgende load.
+  const [, { count, error }] = await Promise.all([
+    recordActivityDay(supabase, user.id),
+    supabase
+      .from('profiles')
+      .update({ last_price_sync_at: now.toISOString() }, { count: 'exact' })
+      .eq('id', user.id)
+      .or(`last_price_sync_at.is.null,last_price_sync_at.lt.${todayStart}`),
+  ])
 
   if (error) {
     return serverError(error, 'sync-daily-open:POST')

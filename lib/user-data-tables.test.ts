@@ -5,8 +5,7 @@ import {
   SERVICE_WIPE_TABLES,
   RETENTION_ALLOWLIST,
   FULL_ERASE_SERVICE_TABLES,
-  ADMIN_EXPORT_TABLES,
-  ADMIN_EXPORT_UITGESLOTEN,
+  EXPORT_SERVICE_TABLES,
   EXPORT_SESSION_TABLES,
 } from './user-data-tables'
 
@@ -82,48 +81,24 @@ describe('user-data-tables — AVG-partitie dekt de volledige schema-inventaris'
   })
 
   it('export-lijsten stammen uit dezelfde bron (geen drift wipe↔export)', () => {
-    // Gebruikers-export = de sessie-wisbare tabellen.
+    // Gebruikers-export = de sessie-wisbare tabellen (eigen-rij RLS) …
     expect([...EXPORT_SESSION_TABLES]).toEqual([...SESSION_WIPE_TABLES])
-    // Admin-export = alle persoonlijke tabellen (sessie + service) MINUS de
-    // expliciet uitgesloten. Afgeleid en niet overgetypt: een nieuwe tabel valt
-    // er automatisch in, tenzij iemand hem bewust uitsluit.
-    expect(ADMIN_EXPORT_TABLES).toEqual(
-      [...SESSION_WIPE_TABLES, ...SERVICE_WIPE_TABLES].filter(
-        (t) => !ADMIN_EXPORT_UITGESLOTEN.includes(t),
-      ),
-    )
+    // … plus de service-wisbare tabellen, via de service-role op de eigen id.
+    // Samen = álle persoonlijke tabellen: sinds ADR 0146 is er geen admin-export
+    // meer die een gat zou dichten.
+    expect([...EXPORT_SERVICE_TABLES]).toEqual([...SERVICE_WIPE_TABLES])
   })
 
   /**
-   * Eigenaarsbesluit bij ADR 0137: BEHEER KRIJGT GEEN INZAGE IN DE CHATTEKST.
-   *
-   * `/api/admin/user-export` loopt ADMIN_EXPORT_TABLES af met de service-role en
-   * `select('*')`. Omdat die lijst SESSION_WIPE_TABLES mee-spreidt, opende het
-   * (terecht) toevoegen van de chattabellen aan de AVG-wislijst stilzwijgend een
-   * beheerlees-pad op het volledige, verbatim transcript van elke gebruiker —
-   * en sprak daarmee de kop van de migratie tegen, die belooft dat er geen
-   * service-role-leespad is. Deze test legt de uitsluiting vast zodat dat
-   * besluit niet nóg een keer per ongeluk kan sneuvelen.
-   *
-   * Het pad is ook niet nodig voor art. 15/20: EXPORT_SESSION_TABLES (eigen
-   * rijen, sessieclient) dekt de betrokkene al volledig.
+   * ADR 0137: de gespreksgeschiedenis heeft GEEN service-role-leespad. De
+   * eigenaar leest haar via de sessie-client in de export; de service-lijst
+   * mag haar nooit bevatten, anders spreekt de code de migratiekop tegen.
    */
-  it('beheer-export bevat de gespreksgeschiedenis NIET (ADR 0137, geen inzage in transcripten)', () => {
+  it('de gespreksgeschiedenis zit in de export via de sessie, nooit via de service-role (ADR 0137)', () => {
     for (const table of ['chat_conversations', 'chat_messages']) {
-      // Wel gewist (AVG) …
       expect(SESSION_WIPE_TABLES).toContain(table)
-      // … wel in de zelf-service-export (art. 15/20, eigen rijen) …
       expect(EXPORT_SESSION_TABLES).toContain(table)
-      // … maar nooit leesbaar via het service-role-pad van beheer.
-      expect(ADMIN_EXPORT_TABLES).not.toContain(table)
-      expect(ADMIN_EXPORT_UITGESLOTEN).toContain(table)
-    }
-  })
-
-  it('de uitsluitingslijst bevat geen dode entries (elke uitsluiting sluit echt iets uit)', () => {
-    const bron = new Set([...SESSION_WIPE_TABLES, ...SERVICE_WIPE_TABLES])
-    for (const table of ADMIN_EXPORT_UITGESLOTEN) {
-      expect(bron.has(table), `${table} staat in geen enkele wislijst — de uitsluiting is een no-op`).toBe(true)
+      expect(EXPORT_SERVICE_TABLES).not.toContain(table)
     }
   })
 })

@@ -6,6 +6,7 @@ export type AdminActionName =
   | 'user.role'
   | 'user.block'
   | 'user.unblock'
+  | 'user.activity'
   | 'config.update'
   | 'allowlist.add'
   | 'allowlist.remove'

@@ -15,4 +15,6 @@ Voor beheer 2.0 (2026-06-10) kregen `assets`, `debts`, `transactions`, `profiles
 De vijf policies zijn verwijderd (migratie `20260611120000_drop_superadmin_personal_data_select`). Supportview en AVG-export lezen via `getServiceClient()` (`lib/supabase/service.ts`) ná `isSuperAdmin()`-check, mét `logAdminAction`-audit. RLS-policies op persoonlijke financiële tabellen mogen een interactieve sessie nooit meer cross-user leesrecht geven; uitzonderingen zijn alleen de privacy-gated huishouden-RPC's (ADR 0004).
 
 ## Gevolgen
+> **Aangevuld door ADR 0146 (15-09-2026).** Het service-role-pad blijft de enige route voor cross-user lezen, maar wát beheer ermee leest is begrensd: gebruik, geen inhoud. De supportview en de AVG-admin-export zijn verwijderd; inzageverzoeken lopen via de zelf-export.
+
 Nieuwe beheer-features die andermans data tonen gebruiken dit service-role-pad. Operationele tabellen zonder persoonlijke financiën (`feedback`, `error_logs`, `mail_log`, `job_runs`, `ai_usage`) behouden hun superadmin-policies. Een toekomstige RLS-leaktest hoort te asserten dat een superadmin-sessie op persoonlijke tabellen alleen eigen + huishouden-gedeelde rijen ziet.

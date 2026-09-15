@@ -7,7 +7,13 @@ import {
 } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 // Amsterdamse tijd i.p.v. de runtime-tijdzone (#418-klasse, sweep fase 1).
-import { formatAmsterdamLongDateTime } from '@/lib/tz'
+import { formatAmsterdamDayMonthYear } from '@/lib/tz'
+
+/** De route levert alleen een kalenderdag (YYYY-MM-DD) — ADR 0146, geen tijdstip. */
+function fmtDag(dag: string): string {
+  const d = new Date(`${dag.slice(0, 10)}T12:00:00Z`)
+  return Number.isNaN(d.getTime()) ? dag : formatAmsterdamDayMonthYear(d)
+}
 import {
   antwoordAlsTekst,
   ANDERS_LABEL,
@@ -73,8 +79,7 @@ interface QuestionnaireDetail {
 
 interface SessionResponse {
   id: string
-  user_email: string
-  user_id: string
+  invuller: string
   started_at: string
   completed_at: string | null
   questionnaire_responses: {
@@ -599,8 +604,8 @@ function ResponsesSheet({ questionnaireId, onClose }: {
                 <div key={s.id} className="flex items-center gap-2 rounded border border-[var(--border-ed)] bg-[var(--paper)] transition-colors hover:bg-[var(--subtle)]">
                   <button type="button" onClick={() => setSelectedSessionId(s.id)} className="flex min-w-0 flex-1 items-center justify-between px-4 py-3 text-left">
                     <div>
-                      <p className="text-sm font-medium text-[var(--ink)]">{s.user_email}</p>
-                      <p className="mt-0.5 text-xs text-[var(--ink-4)]">{formatAmsterdamLongDateTime(new Date(s.started_at))}</p>
+                      <p className="text-sm font-medium text-[var(--ink)]">{s.invuller}</p>
+                      <p className="mt-0.5 text-xs text-[var(--ink-4)]">{fmtDag(s.started_at)}</p>
                     </div>
                     <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${s.completed_at ? 'bg-kern-500/10 text-kern-700' : 'bg-amber-100 text-amber-700'}`}>{s.completed_at ? 'Voltooid' : 'Onvolledig'}</span>
                   </button>
@@ -625,8 +630,8 @@ function ResponsesSheet({ questionnaireId, onClose }: {
           {view === 'sessions' && selectedSession && (
             <div>
               <button type="button" onClick={() => setSelectedSessionId(null)} className="mb-4 text-xs text-[var(--ink-3)] hover:text-[var(--ink-2)]">&larr; Terug naar overzicht</button>
-              <p className="text-sm font-medium text-[var(--ink)]">{selectedSession.user_email}</p>
-              <p className="mb-4 text-xs text-[var(--ink-4)]">{formatAmsterdamLongDateTime(new Date(selectedSession.started_at))}</p>
+              <p className="text-sm font-medium text-[var(--ink)]">{selectedSession.invuller}</p>
+              <p className="mb-4 text-xs text-[var(--ink-4)]">{fmtDag(selectedSession.started_at)}</p>
               <div className="space-y-3">
                 {selectedSession.questionnaire_responses
                   .sort((a, b) => {
@@ -736,7 +741,7 @@ function ResponsesSheet({ questionnaireId, onClose }: {
                     const session = sessions.find(s => s.questionnaire_responses.some(sr => sr.id === r.id))
                     return (
                       <div key={r.id} className="rounded border border-[var(--border-ed)] px-4 py-3">
-                        <p className="text-xs text-[var(--ink-4)]">{session?.user_email ?? '?'} &mdash; {new Date(r.created_at).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}</p>
+                        <p className="text-xs text-[var(--ink-4)]">{session?.invuller ?? '?'} &mdash; {fmtDag(r.created_at)}</p>
                         <p className="mt-1 text-sm text-[var(--ink)]">{antwoordAlsTekst(r, q) || '\u2014'}</p>
                       </div>
                     )

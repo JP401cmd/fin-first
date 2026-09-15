@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { forbidden, serverError } from '@/lib/api/respond'
 import { parseBody } from '@/lib/api/parse-body'
 import { createClient } from '@/lib/supabase/server'
+import { getServiceClient } from '@/lib/supabase/service'
 import { isSuperAdmin } from '@/lib/admin'
 import { VragenlijstAanmaakSchema, vraagNaarRij } from '@/lib/questionnaires/vraag-invoer'
 
@@ -11,7 +12,12 @@ export async function GET() {
     return forbidden()
   }
 
-  const { data: questionnaires, error } = await supabase
+  const service = getServiceClient()
+
+  // Service-role (ná de superadmin-check): de invullingen hebben sinds
+  // migratie 20260915122000 geen superadmin-leestak meer in RLS (ADR 0146).
+  // Hier alleen id + completed_at voor de tellingen — nooit user_id.
+  const { data: questionnaires, error } = await service
     .from('questionnaires')
     .select(`
       *,

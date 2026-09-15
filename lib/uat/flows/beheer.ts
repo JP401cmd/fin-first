@@ -39,7 +39,7 @@ export const BEHEER_FLOW: UatFlow = {
     { id: 'truelayer', scenarioId: 'UAT-BEHEER-05', label: 'WF-BEHEER-05 · TrueLayer-bankkoppeling configureren en testen', kind: 'screen', stage: 3, lane: 'technisch', subOf: 'sectie-tech' },
     { id: 'platform-status', scenarioId: 'UAT-BEHEER-06', label: 'WF-BEHEER-06 · Platform-status: onderhoud/aankondiging/AI-kill-switch', kind: 'action', stage: 3, lane: 'technisch', subOf: 'sectie-tech' },
     { id: 'gebruikers', scenarioId: 'UAT-BEHEER-07', label: 'WF-BEHEER-07 · Gebruiker zoeken + account/blokkade beheren', kind: 'screen', stage: 3, lane: 'technisch', subOf: 'sectie-tech' },
-    { id: 'supportview', scenarioId: 'UAT-BEHEER-08', label: 'WF-BEHEER-08 · Supportview-diagnose + account definitief verwijderen', kind: 'action', stage: 3, lane: 'technisch', subOf: 'sectie-tech' },
+    { id: 'supportview', scenarioId: 'UAT-BEHEER-08', label: 'WF-BEHEER-08 · Gebruik bekijken (zonder inhoud) + account definitief verwijderen', kind: 'action', stage: 3, lane: 'technisch', subOf: 'sectie-tech' },
     { id: 'logboeken', scenarioId: 'UAT-BEHEER-31', label: 'WF-BEHEER-31 · Logboeken (audit, fouten, e-mail, achtergrondtaken)', kind: 'screen', stage: 3, lane: 'technisch', subOf: 'sectie-tech' },
     { id: 'integraties', scenarioId: 'UAT-BEHEER-32', label: 'WF-BEHEER-32 · Integraties: inventaris, liveness-probe, contractbewaking', kind: 'screen', stage: 3, lane: 'technisch', subOf: 'sectie-tech' },
 

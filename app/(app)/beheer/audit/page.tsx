@@ -18,6 +18,9 @@ const ACTION_LABELS: Record<string, string> = {
   'user.block': 'Account geblokkeerd',
   'user.unblock': 'Account gedeblokkeerd',
   'config.update': 'Configuratie gewijzigd',
+  'user.activity': 'Gebruik bekeken',
+  // Historische acties van vóór ADR 0146 (supportview en admin-export bestaan
+  // niet meer); de labels blijven zodat oude auditregels leesbaar blijven.
   'support.view': 'Gegevens ingezien',
   'data.export': 'Gegevens geëxporteerd',
   'user.delete': 'Account verwijderd',

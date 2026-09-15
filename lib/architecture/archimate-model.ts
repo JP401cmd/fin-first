@@ -331,7 +331,7 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
     {
       id: 'as-coach', x: 560, y: row(5), w: 220, h: 66, kind: 'appsvc',
       title: 'Inzicht- & coachingsdienst',
-      lead: 'Fin (AI-coach), aanbevelingen, volgende stappen, aandachtspunten-bus en de briefing-kaarten. Elk van deze diensten kan on-device draaien via t-lokale-ai in plaats van via de AI-gateway — dezelfde functie, ander transport. De gebruiker kiest dat per uitvoergroep op /mijn/privacy (ADR 0056, 0078). Draagt ook de gebruikersmelding (bug/vraag/aanbeveling) die vanuit het gesprek met Fin te openen is — Supabase blijft de bron, een dagelijkse cron duwt onverstuurde meldingen best-effort door naar de Trifinity-queue in Notion. Sinds ADR 0137 bewaart de dienst het gesprek zelf ook: een gesprekkenlijst met hervatten, hernoemen en verwijderen, plus route- en datagefilterde suggestievragen in de lege staat. Waar dat transcript landt kiest de gebruiker (profiles.chat_history_mode: account / apparaat / uit, default account), met één vloer boven die keuze — een beurt die via t-lokale-ai is gevoerd gaat nooit naar de server, ook niet bij "account", en die vloer wordt bij het HERVATTEN opnieuw getoetst en niet uit het opgeslagen record overgenomen. Beheer heeft geen inzage: dat is applicatielaag (ADMIN_EXPORT_UITGESLOTEN in lib/user-data-tables.ts), niet RLS.',
+      lead: 'Fin (AI-coach), aanbevelingen, volgende stappen, aandachtspunten-bus en de briefing-kaarten. Elk van deze diensten kan on-device draaien via t-lokale-ai in plaats van via de AI-gateway — dezelfde functie, ander transport. De gebruiker kiest dat per uitvoergroep op /mijn/privacy (ADR 0056, 0078). Draagt ook de gebruikersmelding (bug/vraag/aanbeveling) die vanuit het gesprek met Fin te openen is — Supabase blijft de bron, een dagelijkse cron duwt onverstuurde meldingen best-effort door naar de Trifinity-queue in Notion. Sinds ADR 0137 bewaart de dienst het gesprek zelf ook: een gesprekkenlijst met hervatten, hernoemen en verwijderen, plus route- en datagefilterde suggestievragen in de lege staat. Waar dat transcript landt kiest de gebruiker (profiles.chat_history_mode: account / apparaat / uit, default account), met één vloer boven die keuze — een beurt die via t-lokale-ai is gevoerd gaat nooit naar de server, ook niet bij "account", en die vloer wordt bij het HERVATTEN opnieuw getoetst en niet uit het opgeslagen record overgenomen. Beheer heeft geen inzage: dat is applicatielaag (geen service-role-leespad; bewaakt door lib/beheer/geen-inhoud.test.ts, ADR 0146), niet RLS.',
       items: ['/api/ai/*', '/api/briefing', '/api/next-steps', '/api/user-reports', '/api/questionnaires', '/api/chat/*', 'lib/coach-suggestions'],
     },
     {
@@ -480,8 +480,8 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
     {
       id: 'do-meta', x: 1081, y: 1186 + DATA_Y_SHIFT, w: 138, h: 56, kind: 'data',
       title: 'Profiel & snapshots',
-      lead: 'Profielen, vermogens-snapshots (dag-cadans) en de tijdstempel-vermogenshistorie per sync.',
-      items: ['profiles', 'net_worth_snapshots', 'net_worth_history', 'app_settings'],
+      lead: 'Profielen, vermogens-snapshots (dag-cadans), de tijdstempel-vermogenshistorie per sync en de actieve dagen per gebruiker (gebruik zonder inhoud, ADR 0146).',
+      items: ['profiles', 'net_worth_snapshots', 'net_worth_history', 'app_settings', 'user_activity_days'],
     },
     {
       id: 'do-lead', x: 716, y: 1252 + DATA_Y_SHIFT, w: 180, h: 56, kind: 'data',
@@ -504,7 +504,7 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
     {
       id: 'do-gesprek', x: 716, y: 1318 + DATA_Y_SHIFT, w: 180, h: 56, kind: 'data',
       title: 'Bewaard gesprek',
-      lead: 'Het transcript van een gesprek met Fin — uitsluitend tekst, geen grafieken of actievoorstellen (die zouden bevroren cijfers naast de actuele zetten). Eigen-rij RLS, géén huishoud-deling; `chat_messages` is onveranderlijk en heeft geen INSERT-recht: de RPC `append_chat_turn` is de enige schrijver en bepaalt ook het volgnummer van de beurt. De gebruiker kiest de bestemming (`profiles.chat_history_mode`: account / apparaat / uit); bij "apparaat" staat het transcript in IndexedDB en raken deze tabellen niet. Beheer heeft geen inzage — afgedwongen in de applicatielaag via ADMIN_EXPORT_UITGESLOTEN, want een service-role omzeilt RLS per definitie (ADR 0137).',
+      lead: 'Het transcript van een gesprek met Fin — uitsluitend tekst, geen grafieken of actievoorstellen (die zouden bevroren cijfers naast de actuele zetten). Eigen-rij RLS, géén huishoud-deling; `chat_messages` is onveranderlijk en heeft geen INSERT-recht: de RPC `append_chat_turn` is de enige schrijver en bepaalt ook het volgnummer van de beurt. De gebruiker kiest de bestemming (`profiles.chat_history_mode`: account / apparaat / uit); bij "apparaat" staat het transcript in IndexedDB en raken deze tabellen niet. Beheer heeft geen inzage — afgedwongen in de applicatielaag: er bestaat geen service-role-leespad, en de beheer-bron-gate (lib/beheer/geen-inhoud.test.ts) verbiedt elke chat-lezing, want een service-role omzeilt RLS per definitie (ADR 0137, 0146).',
       items: ['chat_conversations', 'chat_messages'],
     },
 

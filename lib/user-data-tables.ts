@@ -112,9 +112,9 @@ export const SESSION_WIPE_TABLES: readonly string[] = [
   // gedenormaliseerde `user_id`, dus de generieke `.eq('user_id', …)` in
   // app/api/account/export/route.ts werkt hier zonder uitzondering.
   //
-  // MAAR NIET IN DE ADMIN-EXPORT. Deze lijst wordt door ADMIN_EXPORT_TABLES
-  // mee-gespreid en die route leest met de service-role; beide tabellen staan
-  // daarom in ADMIN_EXPORT_UITGESLOTEN. Beheer krijgt geen inzage in
+  // MAAR NOOIT VIA DE SERVICE-ROLE. De admin-export bestaat sinds ADR 0146 niet
+  // meer, en EXPORT_SERVICE_TABLES mag deze tabellen niet bevatten (test); de
+  // beheer-bron-gate verbiedt elke chat-lezing. Beheer krijgt geen inzage in
   // transcripten (ADR 0137) — lees de motivering daar vóór je hier iets
   // verandert, want de twee lijsten hangen samen.
   //
@@ -123,6 +123,14 @@ export const SESSION_WIPE_TABLES: readonly string[] = [
   // de hand nagelopen en dan is die volgorde de leesbare.
   'chat_messages',
   'chat_conversations',
+  // Actieve dagen per gebruiker (migratie 20260915121000, ADR 0146 "Beheer ziet
+  // gebruik, geen inhoud"). Gebruiksdata ZONDER inhoud — alleen user_id + een
+  // Amsterdamse kalenderdag — maar wel een persoonsgegeven (wanneer iemand de
+  // app gebruikte), dus in de wis én in de zelf-export. SESSIE-partitie: de
+  // tabel heeft een eigen-rij DELETE-policy ("user_activity_days own delete",
+  // `user_id = (select auth.uid())`, TO authenticated) en een eigen-rij SELECT
+  // voor de export. Retentie 400 dagen via de retentie-cron (lib/retention.ts).
+  'user_activity_days',
 ] as const
 
 /**
@@ -183,47 +191,18 @@ export const FULL_ERASE_SERVICE_TABLES: readonly string[] = [
 export const EXPORT_SESSION_TABLES: readonly string[] = SESSION_WIPE_TABLES
 
 /**
- * Tabellen die NOOIT in de admin-export mogen belanden, ook al staan ze in de
- * wislijsten. Dit is de enige plek waar dat afdwingbaar is.
+ * Persoonlijke tabellen zonder eigen-rij SELECT die de gebruikers-export via de
+ * service-role leest, strikt op de vers geverifieerde eigen id
+ * (app/api/account/export). Sinds ADR 0146 is die route de enige weg voor een
+ * inzageverzoek — de admin-export (die deze tabellen voorheen als enige
+ * meenam) bestaat niet meer.
  *
- * De gespreksgeschiedenis met Fin hoort in de WIS (AVG-wissing van de
- * gevoeligste vrije tekst in de app) maar nadrukkelijk NIET in een
- * service-role-leespad: eigenaarsbesluit bij ADR 0137 — beheer krijgt geen
- * inzage in transcripten, en de migratie
- * 20260908120000_chat_gespreksgeschiedenis.sql belooft in haar kop letterlijk
- * dat er geen service-role-leespad is. Zonder deze uitsluiting zou het correct
- * toevoegen van beide tabellen aan {@link SESSION_WIPE_TABLES} stilzwijgend
- * dat besluit terugdraaien, want `/api/admin/user-export` loopt
- * {@link ADMIN_EXPORT_TABLES} af met `getServiceClient()` + `select('*')` — een
- * superadmin zou dan het volledige, verbatim transcript van elke gebruiker
- * kunnen downloaden.
- *
- * Het pad is ook niet nodig voor art. 15/20: de zelf-service-export
- * ({@link EXPORT_SESSION_TABLES}, sessieclient, eigen rijen) dekt de betrokkene
- * al volledig. Wil beheer ooit wél meekijken, dan is dat een nieuw
- * ADR-gesprek mét audit-eis en een regel in /privacy — geen stille regel hier.
- *
- * Vastgelegd in lib/user-data-tables.test.ts.
+ * De gespreksgeschiedenis met Fin staat hier NOOIT in: die is via de
+ * sessie-client al volledig leesbaar voor de eigenaar, en de migratie
+ * 20260908120000_chat_gespreksgeschiedenis.sql belooft dat er geen
+ * service-role-leespad op bestaat (ADR 0137). Vastgelegd in de test.
  */
-export const ADMIN_EXPORT_UITGESLOTEN: readonly string[] = [
-  'chat_conversations',
-  'chat_messages',
-] as const
-
-/**
- * Volledige persoonlijke tabellen-set voor de ADMIN-export (service-role,
- * audit-gelogd): alles wat bij een inzageverzoek hoort, inclusief de tabellen
- * zonder eigen-rij leesrecht — MINUS {@link ADMIN_EXPORT_UITGESLOTEN}.
- *
- * Bewust een expliciete aftrek en geen met de hand overgetypte lijst: een
- * tweede opsomming zou wegdrijven van de wislijsten, en dan zou een nieuwe
- * tabel juist stil buiten de export vallen. Nu is het omgekeerd — nieuw ⇒
- * inbegrepen, tenzij iemand hem bewust uitsluit.
- */
-export const ADMIN_EXPORT_TABLES: readonly string[] = [
-  ...SESSION_WIPE_TABLES,
-  ...SERVICE_WIPE_TABLES,
-].filter((table) => !ADMIN_EXPORT_UITGESLOTEN.includes(table))
+export const EXPORT_SERVICE_TABLES: readonly string[] = SERVICE_WIPE_TABLES
 
 /**
  * Canonieke inventaris: álle public-tabellen met een `user_id`-kolom
@@ -293,6 +272,10 @@ export const ALL_USER_SCOPED_TABLES: readonly string[] = [
   'spend_limits',
   'target_allocations',
   'transactions',
+  // Nieuw in migratie 20260915121000 (ADR 0146). LET OP — net als chat_* NIET
+  // tegen information_schema gemeten: de migratie was op 15-09-2026 geschreven
+  // maar nog niet uitgerold. Meten bij de eerstvolgende regeneratie.
+  'user_activity_days',
   'user_feature_visits',
   'user_own_ibans',
   'user_reports',

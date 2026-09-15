@@ -15,6 +15,7 @@ import {
   isFieldEncryptionConfigured,
 } from '@/lib/crypto/field-encryption'
 import { SERVICE_WIPE_TABLES, FULL_ERASE_SERVICE_TABLES } from '@/lib/user-data-tables'
+import { isOntbrekendSchema } from '@/lib/supabase/ontbrekend-schema'
 
 type ProgressCallback = (step: string, table: string, action: string, count?: number) => void
 
@@ -270,6 +271,16 @@ async function deleteTable(supabase: SupabaseClient, table: string, userId: stri
     .delete({ count: 'exact' })
     .eq('user_id', userId)
   if (error) {
+    // Uitzondering op fail-fast: een tabel die nog niet is uitgerold bevat per
+    // definitie niets van deze gebruiker. Zonder deze tak breekt elke
+    // accountverwijdering en onboarding-reset zolang een migratie bewust op
+    // een poort wacht (user_activity_days wacht op /privacy — ADR 0146).
+    // Alleen precies "bestaat niet"; elke andere fout blijft een
+    // harde stop.
+    if (isOntbrekendSchema(error)) {
+      console.warn(`[seed] ${table} bestaat (nog) niet — overgeslagen bij wissen`)
+      return 0
+    }
     throw new Error(`[seed] Wissen van ${table} mislukt: ${error.message}`)
   }
   return count ?? 0
@@ -345,8 +356,10 @@ export async function deleteAllUserData(
     deleteTable(supabase, 'target_allocations', userId),
     deleteTable(supabase, 'user_feature_visits', userId),
     deleteTable(supabase, 'next_step_completions', userId),
+    // Actieve dagen (ADR 0146): blad-tabel, alleen FK naar auth.users.
+    deleteTable(supabase, 'user_activity_days', userId),
   ])
-  const batch0Tables = ['investment_transactions', 'crypto_transactions', 'holding_alerts', 'target_allocations', 'user_feature_visits', 'next_step_completions']
+  const batch0Tables = ['investment_transactions', 'crypto_transactions', 'holding_alerts', 'target_allocations', 'user_feature_visits', 'next_step_completions', 'user_activity_days']
   for (let i = 0; i < batch0Tables.length; i++) {
     summary[batch0Tables[i]] = batch0Results[i]
   }

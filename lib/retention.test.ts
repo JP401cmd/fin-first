@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { RETENTION_MONTHS, LEAD_INTAKES_RETENTION_DAYS, retentionCutoffIso } from './retention'
+import {
+  RETENTION_MONTHS,
+  LEAD_INTAKES_RETENTION_DAYS,
+  USER_ACTIVITY_RETENTION_DAYS,
+  retentionCutoffDate,
+  retentionCutoffIso,
+} from './retention'
 
 /**
  * [Arch F3] Recht 4 — bewaartermijnen (ADR 0059). Borgt de goedgekeurde termijnen
@@ -16,6 +22,13 @@ describe('retention — bewaartermijnen (single source)', () => {
       ai_usage: 24,
     })
     expect(LEAD_INTAKES_RETENTION_DAYS).toBe(90)
+    expect(USER_ACTIVITY_RETENTION_DAYS).toBe(400)
+  })
+
+  it('retentionCutoffDate rekent `days` dagen terug als YYYY-MM-DD', () => {
+    const now = new Date('2026-09-15T22:30:00.000Z')
+    expect(retentionCutoffDate(400, now)).toBe('2025-08-11')
+    expect(retentionCutoffDate(0, now)).toBe('2026-09-15')
   })
 
   it('retentionCutoffIso rekent `months` maanden terug', () => {

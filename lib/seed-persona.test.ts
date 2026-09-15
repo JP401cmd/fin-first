@@ -24,15 +24,17 @@ import { RETIREMENT_PROVIDER_LABELS } from './asset-data'
  * een gefaalde delete moet de hele operatie hard laten stoppen.
  */
 
-type MockResult = { count: number | null; error: { message: string } | null; data?: unknown[] }
+type MockResult = { count: number | null; error: { message: string; code?: string } | null; data?: unknown[] }
 
-function makeSupabaseMock(failTables: string[] = []) {
+function makeSupabaseMock(failTables: string[] = [], ontbrekendeTabellen: string[] = []) {
   const deletedTables: string[] = []
   const client = {
     from(table: string) {
       const result: MockResult = failTables.includes(table)
         ? { count: null, error: { message: `mock-fout op ${table}` }, data: [] }
-        : { count: 2, error: null, data: [] }
+        : ontbrekendeTabellen.includes(table)
+          ? { count: null, error: { message: `Could not find the table 'public.${table}'`, code: 'PGRST205' }, data: [] }
+          : { count: 2, error: null, data: [] }
       const terminal = () => {
         deletedTables.push(table)
         return Promise.resolve(result)
@@ -76,6 +78,20 @@ describe('deleteAllUserData — fail-fast bij delete-fouten', () => {
     expect(summary).toMatchObject({ bank_accounts: 2, transactions: 2, assets: 2 })
     expect(deletedTables).toContain('bank_accounts')
     expect(deletedTables).toContain('app_settings')
+  })
+
+  it('slaat een nog niet uitgerolde tabel over (PGRST205) en wist de rest gewoon — AVG-verwijderen mag daar niet op breken', async () => {
+    // user_activity_days wacht bewust op de /privacy-aanpassing
+    // (ADR 0146); de code staat er al. Een ontbrekende tabel bevat niets.
+    const { client, deletedTables } = makeSupabaseMock([], ['user_activity_days'])
+    const summary = await deleteAllUserData(client, 'user-123')
+    expect(summary).toMatchObject({ user_activity_days: 0, bank_accounts: 2, assets: 2 })
+    expect(deletedTables).toContain('assets')
+  })
+
+  it('een ándere fout op diezelfde tabel blijft een harde stop', async () => {
+    const { client } = makeSupabaseMock(['user_activity_days'])
+    await expect(deleteAllUserData(client, 'user-123')).rejects.toThrow(/user_activity_days/)
   })
 
   it('stopt vóór de parent-batch wanneer een eerdere batch faalt (geen halve wipe verder)', async () => {
