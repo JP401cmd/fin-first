@@ -7029,7 +7029,7 @@ export default function HorizonPage({
               <DeltaBadge
                 current={readSliderValueFromEvents('extra_inleg', scenarioSliderEvents, whatIfBaseline)}
                 base={0}
-                format={v => formatCurrency(v) + '/mnd meer salaris'}
+                format={v => `${formatCurrency(Math.abs(v))}/mnd ${v > 0 ? 'meer' : 'minder'} salaris`}
               />
               {/* ADR 0145 — onder een vast stopmoment de uitkomst zelf: dekking van de
                   verkenning + de delta t.o.v. de basis. Stoplichtkleur (gedekt/tekort),
