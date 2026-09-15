@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-15T12:18:12.321Z",
+  "generatedAt": "2026-09-15T12:55:35.786Z",
   "generatedDate": "2026-09-15",
   "repo": {
     "name": "fin",
@@ -189,14 +189,14 @@
     }
   },
   "stats": {
-    "routes": 133,
+    "routes": 135,
     "routesProduction": 90,
-    "api": 315,
-    "tables": 97,
-    "migrations": 242,
+    "api": 322,
+    "tables": 101,
+    "migrations": 246,
     "integrations": 25,
-    "components": 1089,
-    "providers": 17,
+    "components": 1107,
+    "providers": 18,
     "contextBuilders": 9,
     "briefingTools": 0,
     "coachLayers": 5,
@@ -325,6 +325,12 @@
       "isTest": false
     },
     {
+      "url": "/beheer/gebruikersgroepen",
+      "file": "app/(app)/beheer/gebruikersgroepen/page.tsx",
+      "group": "beheer",
+      "isTest": false
+    },
+    {
       "url": "/beheer/grafiek-werking",
       "file": "app/(app)/beheer/grafiek-werking/page.tsx",
       "group": "beheer",
@@ -429,6 +435,12 @@
     {
       "url": "/beheer/vragenlijsten",
       "file": "app/(app)/beheer/vragenlijsten/page.tsx",
+      "group": "beheer",
+      "isTest": false
+    },
+    {
+      "url": "/beheer/waardestromen",
+      "file": "app/(app)/beheer/waardestromen/page.tsx",
       "group": "beheer",
       "isTest": false
     },
@@ -1126,6 +1138,12 @@
         "isTest": false
       },
       {
+        "url": "/beheer/gebruikersgroepen",
+        "file": "app/(app)/beheer/gebruikersgroepen/page.tsx",
+        "group": "beheer",
+        "isTest": false
+      },
+      {
         "url": "/beheer/grafiek-werking",
         "file": "app/(app)/beheer/grafiek-werking/page.tsx",
         "group": "beheer",
@@ -1230,6 +1248,12 @@
       {
         "url": "/beheer/vragenlijsten",
         "file": "app/(app)/beheer/vragenlijsten/page.tsx",
+        "group": "beheer",
+        "isTest": false
+      },
+      {
+        "url": "/beheer/waardestromen",
+        "file": "app/(app)/beheer/waardestromen/page.tsx",
         "group": "beheer",
         "isTest": false
       },
@@ -1853,6 +1877,14 @@
       ]
     },
     {
+      "url": "/api/activity/module",
+      "file": "app/api/activity/module/route.ts",
+      "domain": "activity",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
       "url": "/api/admin/ai-features",
       "file": "app/api/admin/ai-features/route.ts",
       "domain": "admin",
@@ -2088,6 +2120,15 @@
       ]
     },
     {
+      "url": "/api/admin/questionnaires/[id]/verspreiding",
+      "file": "app/api/admin/questionnaires/[id]/verspreiding/route.ts",
+      "domain": "admin",
+      "methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    {
       "url": "/api/admin/seed",
       "file": "app/api/admin/seed/route.ts",
       "domain": "admin",
@@ -2200,6 +2241,33 @@
       ]
     },
     {
+      "url": "/api/admin/user-groups",
+      "file": "app/api/admin/user-groups/route.ts",
+      "domain": "admin",
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "url": "/api/admin/user-groups/[id]",
+      "file": "app/api/admin/user-groups/[id]/route.ts",
+      "domain": "admin",
+      "methods": [
+        "GET",
+        "PUT",
+        "DELETE"
+      ]
+    },
+    {
+      "url": "/api/admin/user-groups/[id]/leden",
+      "file": "app/api/admin/user-groups/[id]/leden/route.ts",
+      "domain": "admin",
+      "methods": [
+        "PUT"
+      ]
+    },
+    {
       "url": "/api/admin/users/activity",
       "file": "app/api/admin/users/activity/route.ts",
       "domain": "admin",
@@ -2229,6 +2297,15 @@
       "domain": "admin",
       "methods": [
         "GET"
+      ]
+    },
+    {
+      "url": "/api/admin/waardestromen",
+      "file": "app/api/admin/waardestromen/route.ts",
+      "domain": "admin",
+      "methods": [
+        "GET",
+        "PUT"
       ]
     },
     {
@@ -3956,6 +4033,14 @@
       ]
     },
     {
+      "url": "/api/questionnaires/[id]/uitnodiging",
+      "file": "app/api/questionnaires/[id]/uitnodiging/route.ts",
+      "domain": "questionnaires",
+      "methods": [
+        "PATCH"
+      ]
+    },
+    {
       "url": "/api/rebalancing/check",
       "file": "app/api/rebalancing/check/route.ts",
       "domain": "rebalancing",
@@ -4471,7 +4556,7 @@
     {
       "domain": "admin",
       "label": "Beheer",
-      "count": 44,
+      "count": 49,
       "routes": [
         {
           "url": "/api/admin/ai-features",
@@ -4709,6 +4794,15 @@
           ]
         },
         {
+          "url": "/api/admin/questionnaires/[id]/verspreiding",
+          "file": "app/api/admin/questionnaires/[id]/verspreiding/route.ts",
+          "domain": "admin",
+          "methods": [
+            "GET",
+            "PUT"
+          ]
+        },
+        {
           "url": "/api/admin/seed",
           "file": "app/api/admin/seed/route.ts",
           "domain": "admin",
@@ -4821,6 +4915,33 @@
           ]
         },
         {
+          "url": "/api/admin/user-groups",
+          "file": "app/api/admin/user-groups/route.ts",
+          "domain": "admin",
+          "methods": [
+            "GET",
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/admin/user-groups/[id]",
+          "file": "app/api/admin/user-groups/[id]/route.ts",
+          "domain": "admin",
+          "methods": [
+            "GET",
+            "PUT",
+            "DELETE"
+          ]
+        },
+        {
+          "url": "/api/admin/user-groups/[id]/leden",
+          "file": "app/api/admin/user-groups/[id]/leden/route.ts",
+          "domain": "admin",
+          "methods": [
+            "PUT"
+          ]
+        },
+        {
           "url": "/api/admin/users/activity",
           "file": "app/api/admin/users/activity/route.ts",
           "domain": "admin",
@@ -4850,6 +4971,15 @@
           "domain": "admin",
           "methods": [
             "GET"
+          ]
+        },
+        {
+          "url": "/api/admin/waardestromen",
+          "file": "app/api/admin/waardestromen/route.ts",
+          "domain": "admin",
+          "methods": [
+            "GET",
+            "PUT"
           ]
         },
         {
@@ -6224,6 +6354,47 @@
       ]
     },
     {
+      "domain": "questionnaires",
+      "label": "Vragenlijsten",
+      "count": 4,
+      "routes": [
+        {
+          "url": "/api/questionnaires",
+          "file": "app/api/questionnaires/route.ts",
+          "domain": "questionnaires",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/questionnaires/[id]/respond",
+          "file": "app/api/questionnaires/[id]/respond/route.ts",
+          "domain": "questionnaires",
+          "methods": [
+            "POST",
+            "PATCH"
+          ]
+        },
+        {
+          "url": "/api/questionnaires/[id]/session",
+          "file": "app/api/questionnaires/[id]/session/route.ts",
+          "domain": "questionnaires",
+          "methods": [
+            "GET",
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/questionnaires/[id]/uitnodiging",
+          "file": "app/api/questionnaires/[id]/uitnodiging/route.ts",
+          "domain": "questionnaires",
+          "methods": [
+            "PATCH"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "budgets",
       "label": "Budgetten",
       "count": 3,
@@ -6376,39 +6547,6 @@
           "methods": [
             "GET",
             "PUT"
-          ]
-        }
-      ]
-    },
-    {
-      "domain": "questionnaires",
-      "label": "Vragenlijsten",
-      "count": 3,
-      "routes": [
-        {
-          "url": "/api/questionnaires",
-          "file": "app/api/questionnaires/route.ts",
-          "domain": "questionnaires",
-          "methods": [
-            "GET"
-          ]
-        },
-        {
-          "url": "/api/questionnaires/[id]/respond",
-          "file": "app/api/questionnaires/[id]/respond/route.ts",
-          "domain": "questionnaires",
-          "methods": [
-            "POST",
-            "PATCH"
-          ]
-        },
-        {
-          "url": "/api/questionnaires/[id]/session",
-          "file": "app/api/questionnaires/[id]/session/route.ts",
-          "domain": "questionnaires",
-          "methods": [
-            "GET",
-            "POST"
           ]
         }
       ]
@@ -6731,6 +6869,21 @@
           "url": "/api/activate",
           "file": "app/api/activate/route.ts",
           "domain": "activate",
+          "methods": [
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
+      "domain": "activity",
+      "label": "activity",
+      "count": 1,
+      "routes": [
+        {
+          "url": "/api/activity/module",
+          "file": "app/api/activity/module/route.ts",
+          "domain": "activity",
           "methods": [
             "POST"
           ]
@@ -8216,6 +8369,10 @@
         "migration": "supabase/migrations/20260215000000_create_base_tables.sql"
       },
       {
+        "name": "questionnaire_invitations",
+        "migration": "supabase/migrations/20260915131000_questionnaire_invitations.sql"
+      },
+      {
         "name": "questionnaire_questions",
         "migration": "supabase/migrations/20260326000001_create_questionnaire_tables.sql"
       },
@@ -8300,12 +8457,24 @@
         "migration": "supabase/migrations/20260915121000_create_user_activity_days.sql"
       },
       {
+        "name": "user_activity_modules",
+        "migration": "supabase/migrations/20260915140000_user_activity_modules.sql"
+      },
+      {
         "name": "user_badges",
         "migration": "supabase/migrations/20260215000001_create_new_tables.sql"
       },
       {
         "name": "user_feature_visits",
         "migration": "supabase/migrations/20260215000001_create_new_tables.sql"
+      },
+      {
+        "name": "user_group_members",
+        "migration": "supabase/migrations/20260915141000_user_groups.sql"
+      },
+      {
+        "name": "user_groups",
+        "migration": "supabase/migrations/20260915141000_user_groups.sql"
       },
       {
         "name": "user_own_ibans",
@@ -8332,7 +8501,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 242
+    "migrationCount": 246
   },
   "tablesByDomain": [
     {
@@ -8497,6 +8666,18 @@
         {
           "name": "user_activity_days",
           "migration": "supabase/migrations/20260915121000_create_user_activity_days.sql"
+        },
+        {
+          "name": "user_activity_modules",
+          "migration": "supabase/migrations/20260915140000_user_activity_modules.sql"
+        },
+        {
+          "name": "user_group_members",
+          "migration": "supabase/migrations/20260915141000_user_groups.sql"
+        },
+        {
+          "name": "user_groups",
+          "migration": "supabase/migrations/20260915141000_user_groups.sql"
         },
         {
           "name": "user_own_ibans",
@@ -8686,6 +8867,31 @@
       ]
     },
     {
+      "domain": "Vragenlijsten",
+      "tables": [
+        {
+          "name": "questionnaire_invitations",
+          "migration": "supabase/migrations/20260915131000_questionnaire_invitations.sql"
+        },
+        {
+          "name": "questionnaire_questions",
+          "migration": "supabase/migrations/20260326000001_create_questionnaire_tables.sql"
+        },
+        {
+          "name": "questionnaire_responses",
+          "migration": "supabase/migrations/20260326000001_create_questionnaire_tables.sql"
+        },
+        {
+          "name": "questionnaire_sessions",
+          "migration": "supabase/migrations/20260326000001_create_questionnaire_tables.sql"
+        },
+        {
+          "name": "questionnaires",
+          "migration": "supabase/migrations/20260326000001_create_questionnaire_tables.sql"
+        }
+      ]
+    },
+    {
       "domain": "Nieuws & briefing",
       "tables": [
         {
@@ -8703,27 +8909,6 @@
         {
           "name": "news_feedback",
           "migration": "supabase/migrations/20260611140001_create_news_feedback.sql"
-        }
-      ]
-    },
-    {
-      "domain": "Vragenlijsten",
-      "tables": [
-        {
-          "name": "questionnaire_questions",
-          "migration": "supabase/migrations/20260326000001_create_questionnaire_tables.sql"
-        },
-        {
-          "name": "questionnaire_responses",
-          "migration": "supabase/migrations/20260326000001_create_questionnaire_tables.sql"
-        },
-        {
-          "name": "questionnaire_sessions",
-          "migration": "supabase/migrations/20260326000001_create_questionnaire_tables.sql"
-        },
-        {
-          "name": "questionnaires",
-          "migration": "supabase/migrations/20260326000001_create_questionnaire_tables.sql"
         }
       ]
     },
@@ -8845,16 +9030,20 @@
       "source": "@/components/app/toast-provider"
     },
     {
+      "name": "VragenlijstSignaalProvider",
+      "source": "@/components/app/vragenlijst/vragenlijst-signaal-provider"
+    },
+    {
       "name": "WelcomeGuideProvider",
       "source": "@/components/app/chat/gids/welcome-guide-provider"
     }
   ],
   "components": {
-    "total": 1089,
+    "total": 1107,
     "groups": [
       {
         "group": "app",
-        "count": 420,
+        "count": 438,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -8868,6 +9057,8 @@
           "action-form",
           "action-list-modal",
           "action-list-modal.test",
+          "activity-module-tracker",
+          "activity-module-tracker.test",
           "add-item-cta",
           "ai-categorize-sheet",
           "ai-categorize-sheet.test",
@@ -9032,6 +9223,10 @@
           "freshness-label",
           "freshness-label.test",
           "gap-analyse",
+          "gebruiker-zoeker",
+          "gebruiker-zoeker.test",
+          "gebruikersgroepen-beheer",
+          "gebruikersgroepen-beheer.test",
           "gekoppeld-bezit-label.test",
           "gesprekken-lijst",
           "gesprekken-lijst.test",
@@ -9040,6 +9235,7 @@
           "goal-form",
           "goal-form.test",
           "grafiek-uitleg-walkthrough",
+          "groep-sheet",
           "guide-visit-tracker",
           "head-scripts",
           "health-score-receipt",
@@ -9169,6 +9365,8 @@
           "receipt-row",
           "recurring-classify-sheet",
           "recurring-edit-sheet",
+          "regel-editor",
+          "regel-editor.test",
           "regime-kaart",
           "regime-kaart.test",
           "responsive-shell",
@@ -9260,12 +9458,21 @@
           "use-app-setup-state",
           "use-is-setup-completed",
           "verhuurrendement.config",
+          "verspreiding-sheet",
+          "verspreiding-sheet.test",
+          "vragenlijst-badge",
+          "vragenlijst-badge.test",
+          "vragenlijst-signaal-provider",
+          "vragenlijst-uitnodiging",
+          "vragenlijst-uitnodiging.test",
           "vragenlijst-view",
           "vragenlijst-view.test",
           "vrijheidsas",
           "vrijheidsas.test",
           "vrijheidstijd-voetnoot",
           "vrijheidstijd-voetnoot.test",
+          "waardestromen-editor",
+          "waardestromen-editor.test",
           "wealth-composition-chart",
           "wealth-composition-chart.test",
           "web-vitals-reporter",
@@ -10394,6 +10601,12 @@
           "write": false
         }
       ],
+      "activity": [
+        {
+          "name": "user_activity_modules",
+          "write": true
+        }
+      ],
       "admin": [
         {
           "name": "ai_usage",
@@ -10440,6 +10653,10 @@
           "write": true
         },
         {
+          "name": "questionnaire_invitations",
+          "write": true
+        },
+        {
           "name": "questionnaire_questions",
           "write": true
         },
@@ -10465,6 +10682,14 @@
         },
         {
           "name": "uat_rounds",
+          "write": true
+        },
+        {
+          "name": "user_group_members",
+          "write": true
+        },
+        {
+          "name": "user_groups",
           "write": true
         }
       ],
@@ -10857,6 +11082,10 @@
         },
         {
           "name": "user_activity_days",
+          "write": true
+        },
+        {
+          "name": "user_activity_modules",
           "write": true
         },
         {
@@ -11516,6 +11745,10 @@
       ],
       "questionnaires": [
         {
+          "name": "questionnaire_invitations",
+          "write": true
+        },
+        {
           "name": "questionnaire_questions",
           "write": false
         },
@@ -11529,6 +11762,14 @@
         },
         {
           "name": "questionnaires",
+          "write": false
+        },
+        {
+          "name": "user_group_members",
+          "write": false
+        },
+        {
+          "name": "user_groups",
           "write": false
         }
       ],
@@ -12996,6 +13237,24 @@
           ]
         }
       ],
+      "user_activity_modules": [
+        {
+          "domain": "activity",
+          "label": "activity",
+          "write": true,
+          "routes": [
+            "/api/activity/module"
+          ]
+        },
+        {
+          "domain": "cron",
+          "label": "cron",
+          "write": true,
+          "routes": [
+            "/api/cron/retention"
+          ]
+        }
+      ],
       "app_settings": [
         {
           "domain": "admin",
@@ -13015,6 +13274,7 @@
             "/api/admin/platform",
             "/api/admin/settings",
             "/api/admin/tier-config",
+            "/api/admin/waardestromen",
             "/api/admin/welcome-guide"
           ]
         },
@@ -13382,7 +13642,8 @@
           "write": true,
           "routes": [
             "/api/admin/questionnaires",
-            "/api/admin/questionnaires/[id]"
+            "/api/admin/questionnaires/[id]",
+            "/api/admin/questionnaires/[id]/verspreiding"
           ]
         },
         {
@@ -13392,7 +13653,28 @@
           "routes": [
             "/api/questionnaires",
             "/api/questionnaires/[id]/respond",
-            "/api/questionnaires/[id]/session"
+            "/api/questionnaires/[id]/session",
+            "/api/questionnaires/[id]/uitnodiging"
+          ]
+        }
+      ],
+      "questionnaire_invitations": [
+        {
+          "domain": "admin",
+          "label": "Beheer",
+          "write": true,
+          "routes": [
+            "/api/admin/questionnaires",
+            "/api/admin/questionnaires/[id]/verspreiding"
+          ]
+        },
+        {
+          "domain": "questionnaires",
+          "label": "Vragenlijsten",
+          "write": true,
+          "routes": [
+            "/api/questionnaires",
+            "/api/questionnaires/[id]/uitnodiging"
           ]
         }
       ],
@@ -13422,7 +13704,8 @@
           "label": "Beheer",
           "write": true,
           "routes": [
-            "/api/admin/questionnaires/[id]/responses"
+            "/api/admin/questionnaires/[id]/responses",
+            "/api/admin/questionnaires/[id]/verspreiding"
           ]
         },
         {
@@ -13433,6 +13716,27 @@
             "/api/questionnaires",
             "/api/questionnaires/[id]/respond",
             "/api/questionnaires/[id]/session"
+          ]
+        }
+      ],
+      "user_groups": [
+        {
+          "domain": "admin",
+          "label": "Beheer",
+          "write": true,
+          "routes": [
+            "/api/admin/questionnaires/[id]/verspreiding",
+            "/api/admin/user-groups",
+            "/api/admin/user-groups/[id]",
+            "/api/admin/user-groups/[id]/leden"
+          ]
+        },
+        {
+          "domain": "questionnaires",
+          "label": "Vragenlijsten",
+          "write": false,
+          "routes": [
+            "/api/questionnaires"
           ]
         }
       ],
@@ -13477,6 +13781,26 @@
             "/api/admin/uat/results",
             "/api/admin/uat/rounds",
             "/api/admin/uat/rounds/[id]"
+          ]
+        }
+      ],
+      "user_group_members": [
+        {
+          "domain": "admin",
+          "label": "Beheer",
+          "write": true,
+          "routes": [
+            "/api/admin/user-groups",
+            "/api/admin/user-groups/[id]",
+            "/api/admin/user-groups/[id]/leden"
+          ]
+        },
+        {
+          "domain": "questionnaires",
+          "label": "Vragenlijsten",
+          "write": false,
+          "routes": [
+            "/api/questionnaires"
           ]
         }
       ],
@@ -14914,9 +15238,11 @@
       "investment_holdings",
       "life_events",
       "profiles",
+      "questionnaire_invitations",
       "questionnaire_sessions",
       "recommendations",
       "transactions",
+      "user_activity_modules",
       "user_feature_visits",
       "user_own_ibans",
       "valuations"
@@ -15165,6 +15491,11 @@
         "column": "household_id"
       },
       {
+        "from": "questionnaire_invitations",
+        "to": "questionnaires",
+        "column": "questionnaire_id"
+      },
+      {
         "from": "questionnaire_questions",
         "to": "questionnaires",
         "column": "questionnaire_id"
@@ -15278,6 +15609,11 @@
         "from": "user_badges",
         "to": "badges",
         "column": "badge_id"
+      },
+      {
+        "from": "user_group_members",
+        "to": "user_groups",
+        "column": "group_id"
       },
       {
         "from": "valuations",
@@ -15772,6 +16108,26 @@
         "rls": true
       },
       "user_activity_days": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "questionnaire_invitations": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "user_activity_modules": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "user_groups": {
+        "user": false,
+        "household": false,
+        "rls": true
+      },
+      "user_group_members": {
         "user": true,
         "household": false,
         "rls": true
@@ -17409,7 +17765,7 @@
         "sp-inzicht",
         "app-comp"
       ],
-      "summary": "Na de onboarding landde een nieuwe gebruiker hard op `/toekomst`, kreeg daar een full-page welkomstmodal (`ToekomstWelcome`) die tekstueel naar \"het stappenplan op je Overzicht\" verwees, en daarna drie tips-ballonnen rond de vervaagde grafiek. Op `/overzicht` stond de welkomstgid",
+      "summary": "> **Geamendeerd door ADR 0147 (15 sep 2026):** er bestaat sindsdien één tweede numerieke teller in de shell, bij Fin (nav-pill-segment en desktop-bubbel), voor \"vragenlijsten die je nu kunt invullen\". Die N is scherp gedefinieerd en daalt alleen door handelen; de regel \"geen badg",
       "file": "docs/adr/0130-de-welkomstgids-woont-bij-fin-en-de-rondleiding-op-overzicht.md"
     },
     {
@@ -17625,6 +17981,19 @@
       ],
       "summary": "Sinds beheer 2.0 (juni 2026) kon een superadmin op `/beheer/gebruikers`:",
       "file": "docs/adr/0146-beheer-ziet-gebruik-geen-inhoud.md"
+    },
+    {
+      "id": "0147-vragenlijsten-worden-gericht-verspreid",
+      "title": "Vragenlijsten worden gericht verspreid: regels op gebruiksmeta, handmatige lijst, één teller bij Fin en een popup bij eerstvolgend gebruik",
+      "status": "aanvaard",
+      "date": "2026-09-15",
+      "elements": [
+        "as-coach",
+        "do-meta",
+        "sp-inzicht"
+      ],
+      "summary": "Een vragenlijst was alles-of-niets: beheer zette 'm op \"actief\" en iedere ingelogde gebruiker zag 'm, alleen via het klembord-icoon in Fins chat en pas als hij de chat opende. Dit besluit voegt drie dingen toe zonder de zojuist geharde vragenlijst-RLS aan te raken: een **versprei",
+      "file": "docs/adr/0147-vragenlijsten-worden-gericht-verspreid.md"
     }
   ],
   "churn": {
@@ -17674,8 +18043,8 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 10416,
-        "commits": 84
+        "loc": 10536,
+        "commits": 89
       },
       {
         "file": "components/app/budgets-client.tsx",
@@ -18860,19 +19229,40 @@
     "hasChanges": true,
     "sections": [
       {
+        "label": "Schermen",
+        "added": [
+          "/beheer/gebruikersgroepen",
+          "/beheer/waardestromen"
+        ],
+        "removed": []
+      },
+      {
         "label": "API-routes",
         "added": [
-          "/api/admin/users/activity"
+          "/api/activity/module",
+          "/api/admin/questionnaires/[id]/verspreiding",
+          "/api/admin/user-groups",
+          "/api/admin/user-groups/[id]",
+          "/api/admin/user-groups/[id]/leden",
+          "/api/admin/waardestromen",
+          "/api/questionnaires/[id]/uitnodiging"
         ],
-        "removed": [
-          "/api/admin/user-diagnose",
-          "/api/admin/user-export"
-        ]
+        "removed": []
       },
       {
         "label": "Tabellen",
         "added": [
-          "user_activity_days"
+          "questionnaire_invitations",
+          "user_activity_modules",
+          "user_group_members",
+          "user_groups"
+        ],
+        "removed": []
+      },
+      {
+        "label": "Componenten (aantal)",
+        "added": [
+          "+18"
         ],
         "removed": []
       }
@@ -19287,9 +19677,9 @@
     },
     {
       "date": "2026-09-15",
-      "api": 315,
-      "components": 1089,
-      "tables": 97,
+      "api": 322,
+      "components": 1107,
+      "tables": 101,
       "routesProduction": 90
     }
   ]

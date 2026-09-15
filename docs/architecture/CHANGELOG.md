@@ -1032,3 +1032,14 @@
 - **API-routes** toegevoegd: /api/admin/users/activity
 - **API-routes** verwijderd: /api/admin/user-diagnose, /api/admin/user-export
 - **Tabellen** toegevoegd: user_activity_days
+
+## 2026-09-15
+
+- Geen wijzigingen.
+
+## 2026-09-15
+
+- **Schermen** toegevoegd: /beheer/gebruikersgroepen, /beheer/waardestromen
+- **API-routes** toegevoegd: /api/activity/module, /api/admin/questionnaires/[id]/verspreiding, /api/admin/user-groups, /api/admin/user-groups/[id], /api/admin/user-groups/[id]/leden, /api/admin/waardestromen, /api/questionnaires/[id]/uitnodiging
+- **Tabellen** toegevoegd: questionnaire_invitations, user_activity_modules, user_group_members, user_groups
+- **Componenten (aantal)** toegevoegd: +18
