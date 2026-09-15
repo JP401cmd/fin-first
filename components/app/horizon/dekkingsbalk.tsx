@@ -1,8 +1,23 @@
 'use client'
 
-import { ankerReachesAge, DEKKINGSAS_COPY, eindvermogenTegelCaption, type AnkerReach } from '@/lib/horizon/anker-copy'
+import {
+  ankerReachesAge,
+  DEKKINGSAS_COPY,
+  eindvermogenOpTegel,
+  eindvermogenTegelCaption,
+  type AnkerReach,
+} from '@/lib/horizon/anker-copy'
 import { leeftijdJaar } from '@/lib/horizon/leeftijd-jaar'
 import { formatCurrency } from '@/lib/format'
+import type { EuroView } from '@/lib/euro-display'
+
+/**
+ * Eén kant (basis of wat-als) van de Eindvermogen-tegel, AL IN WEERGAVE-EURO'S:
+ *  - `bedrag` — de run haalt de eindleeftijd; `euro` is gedeflateerd door de aanroeper;
+ *  - `op`     — de run raakt eerder op: geen bedrag, de tegel zegt "op vóór je 90e" (I1);
+ *  - `null`   — onbekend, of de privacy-weergave ("···").
+ */
+export type EindvermogenTegelWaarde = { readonly kind: 'bedrag'; readonly euro: number } | { readonly kind: 'op' } | null
 
 /**
  * De DEKKINGSAS (spec lab-haalbaarheid §1, 15 sep 2026): één horizontale schaal van het
@@ -25,15 +40,20 @@ export interface DekkingsasData {
   verkendReach: AnkerReach | null
   verkendStopAge: number | null
   /**
-   * EINDVERMOGEN op de eindleeftijd (ADR 0145 D12) — in euro's van nu, GEDEFLATEERD DOOR DE
-   * AANROEPER. Dit component formatteert alleen; het kent de euro-weergave niet en deelt
-   * nooit zelf door een inflatiefactor (ADR 0090/0093: één omzetting, in de render-grens van
-   * horizon-client). `null` = niets te tonen — óók de privacy-weergave levert `null`, zodat
-   * er geen tweede maskeer-pad naast de bestaande ontstaat.
+   * EINDVERMOGEN op de eindleeftijd (ADR 0145 D12) — in de actieve euro-weergave,
+   * GEDEFLATEERD DOOR DE AANROEPER. Dit component formatteert alleen en deelt nooit zelf door
+   * een inflatiefactor (ADR 0090/0093: één omzetting, in de render-grens van horizon-client).
+   * `null` = niets te tonen — óók de privacy-weergave levert `null` voor een bedrag, zodat er
+   * geen tweede maskeer-pad naast de bestaande ontstaat. `op` = de run haalt de eindleeftijd niet.
    */
-  basisEindvermogen: number | null
+  basisEindvermogen: EindvermogenTegelWaarde
   /** Idem voor de wat-als-run; `null` zonder scenario (of gemaskeerd). */
-  scenarioEindvermogen: number | null
+  scenarioEindvermogen: EindvermogenTegelWaarde
+  /**
+   * De actieve euro-weergave — ALLEEN voor het onderschrift ("in huidige/toekomstige euro's",
+   * eindreview I3). Een label, geen omrekening: de bedragen hierboven zijn al omgezet.
+   */
+  euroView: EuroView
 }
 
 function posOf(reach: AnkerReach, stopAge: number, eindAge: number): number {
@@ -77,8 +97,9 @@ function pctLabel(pct: number | null): string {
  * hier "niet getoond/nog niet bekend" is.
  */
 const GEEN_BEDRAG = '···'
-function euroLabel(value: number | null): string {
-  return value == null ? GEEN_BEDRAG : formatCurrency(value)
+function euroLabel(value: EindvermogenTegelWaarde, eindAge: number | null): string {
+  if (value == null) return GEEN_BEDRAG
+  return value.kind === 'op' ? eindvermogenOpTegel(eindAge) : formatCurrency(value.euro)
 }
 
 function Tegel({ kicker, value, testId, sub }: { kicker: string; value: string; testId: string; sub?: string }) {
@@ -137,10 +158,17 @@ export function Dekkingsbalk({ data }: { data: DekkingsasData }) {
           kicker={DEKKINGSAS_COPY.tegelEindvermogen}
           testId="dekkingsbalk-eindvermogen"
           value={arrow(
-            euroLabel(data.basisEindvermogen),
-            data.scenarioEindvermogen != null ? euroLabel(data.scenarioEindvermogen) : null,
+            euroLabel(data.basisEindvermogen, data.eindAge),
+            data.scenarioEindvermogen != null ? euroLabel(data.scenarioEindvermogen, data.eindAge) : null,
           )}
-          sub={eindvermogenTegelCaption(data.eindAge)}
+          // I1 — het onderschrift noemt een euro-weergave, dus niet wanneer er alleen "op vóór
+          // je 90e" staat (geen euro om te duiden). Een gemaskeerd/onbekend bedrag ("···")
+          // houdt het onderschrift, zoals vóór deze regel.
+          sub={
+            data.basisEindvermogen?.kind !== 'op' || data.scenarioEindvermogen?.kind === 'bedrag'
+              ? eindvermogenTegelCaption(data.eindAge, data.euroView)
+              : undefined
+          }
         />
       </div>
     </div>

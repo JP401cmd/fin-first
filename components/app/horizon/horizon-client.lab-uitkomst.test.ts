@@ -132,7 +132,8 @@ describe('horizon-client consumeert ÉÉN lab-uitkomst (ADR 0145)', () => {
     expect(src).not.toContain('Wat maakt het haalbaar?')
     const sluit = code.indexOf('data-testid="lab-antwoorden-sluitregel"')
     expect(sluit).toBeGreaterThan(-1)
-    expect(code.slice(sluit - 200, sluit)).toContain('labAntwoorden.length > 0 && !isNuStoppenMode')
+    // Eindreview M4 — alleen bij een €-antwoord: "doorwerken tot" alleen smeert niets uit.
+    expect(code.slice(sluit - 200, sluit)).toContain("labAntwoorden.some((a) => a.kind !== 'doorwerken') && !isNuStoppenMode")
     expect(code.slice(sluit, sluit + 400)).toContain('Indicatie, geen advies')
     // de oude plan-hint is weg
     expect(src).not.toContain('lab-plan-tekort-hint')
@@ -179,19 +180,46 @@ describe('horizon-client consumeert ÉÉN lab-uitkomst (ADR 0145)', () => {
     const euroBlok = src.slice(blokStart, blokEind)
     // Eén factor op de eindleeftijd, via de canonieke helpers — nooit een eigen machtsverheffing.
     expect(euroBlok).toContain('factorAtAge(displayUnifiedRows, labDekking?.eind ?? chartEndAge)')
-    expect(euroBlok).toMatch(/const viewBasisEindvermogen =[\s\S]*?deflate\(labDekking\.basisEindvermogen, eindvermogenFactor, euroView\)/)
-    expect(euroBlok).toMatch(/const viewScenarioEindvermogen =[\s\S]*?deflate\(labDekking\.scenarioEindvermogen, eindvermogenFactor, euroView\)/)
+    // Eindreview I1 — alleen een `bedrag` wordt gedeflateerd; `op` heeft geen bedrag.
+    expect(euroBlok).toMatch(
+      /const viewBasisEindvermogen =[\s\S]*?basisEindvermogenUitkomst\?\.kind === 'bedrag'[\s\S]*?deflate\(basisEindvermogenUitkomst\.nominaal, eindvermogenFactor, euroView\)/,
+    )
+    expect(euroBlok).toMatch(
+      /const viewScenarioEindvermogen =[\s\S]*?scenarioEindvermogenUitkomst\?\.kind === 'bedrag'[\s\S]*?deflate\(scenarioEindvermogenUitkomst\.nominaal, eindvermogenFactor, euroView\)/,
+    )
     expect(euroBlok).toContain('const viewDekkingsasData = useMemo')
-    expect(euroBlok).toContain('basisEindvermogen: masked ? null : viewBasisEindvermogen')
+    // Gemaskeerd ⇒ geen bedrag in de tegel; `op` blijft `op`; de weergave reist mee als label (I3).
+    expect(euroBlok).toContain("uitkomst.kind === 'op' ? { kind: 'op' } : masked || view == null ? null : { kind: 'bedrag', euro: view }")
+    expect(euroBlok).toMatch(/const viewDekkingsasData = useMemo[\s\S]*?euroView,\r?\n/)
     expect(euroBlok).toContain('const viewDoelPreviews = useMemo')
+    // I4 — de preview noemt het opgeslagen (nominale) bedrag alleen onder huidige euro's en bij ≥ 1 % verschil.
+    expect(euroBlok).toContain("euroView === 'real' && !masked && Math.abs(opgeslagen - viewScenarioEindvermogen) >= 0.01 * Math.abs(opgeslagen)")
+    expect(euroBlok).toContain('eindvermogenOpgeslagenNoot(opgeslagen)')
+    // M5 — de badge-delta valt onder de drempel weg; I1 — alleen bij twee bedragen.
+    expect(euroBlok).toContain('!masked && viewBasisEindvermogen != null && viewScenarioEindvermogen != null')
+    expect(euroBlok).toContain('Math.abs(viewLabEindvermogenVerschil) >= EINDVERMOGEN_DELTA_DREMPEL ? viewLabEindvermogenVerschil : 0')
     // Het doelbedrag is nominaal: rechtstreeks uit de lab-uitkomst, nooit een view*-waarde.
     const handler = src.slice(src.indexOf('const handleDoelVastleggen = useCallback'), src.indexOf('const handleDoelLoslaten'))
-    expect(handler).toContain('eindvermogen: gekozen.eindvermogen ? labDekking?.scenarioEindvermogen ?? undefined : undefined')
+    expect(handler).toMatch(
+      /eindvermogen:\s*gekozen\.eindvermogen && labDekking\?\.scenarioEindvermogen\?\.kind === 'bedrag'\s*\?\s*labDekking\.scenarioEindvermogen\.nominaal\s*:\s*undefined/,
+    )
     expect(handler).not.toMatch(/eindvermogen:[^\n]*view/)
     // De badge en de sheet consumeren de view-waarden.
     expect(src).toContain('data-testid="lab-eindvermogen-badge"')
     expect(src).toContain('eindvermogenDeltaBadge(viewLabEindvermogenDelta)')
     expect(src).toContain('previews={viewDoelPreviews}')
     expect(src).toContain("labPromotie.kind === 'eindvermogen'")
+  })
+
+  it('M10 · "Maak dit mijn doel" bij eindvermogen wacht op een bekend scenario-bedrag', () => {
+    const src = bron()
+    expect(src).toMatch(/const eindvermogenDoelBekend =\s*labUitkomst\.kind === 'dekking' && labUitkomst\.scenarioEindvermogen\?\.kind === 'bedrag'/)
+    expect(src).toMatch(/const doelVastleggenMogelijk =\s*labPromotie\.kind !== 'geen' && \(labPromotie\.kind !== 'eindvermogen' \|\| eindvermogenDoelBekend\)/)
+  })
+
+  it('M11 · de live-regio mount de meldingstekst opnieuw per klik (teller als key)', () => {
+    const src = bron()
+    expect(src).toContain('<span key={labAntwoordMelding.n}>{labAntwoordMelding.tekst}</span>')
+    expect(src).toContain('n: prev.n + 1')
   })
 })

@@ -137,7 +137,10 @@ export interface ParameterGoalInput {
      * de eindleeftijd van het plan. Anders dan het dekkingsdoel is dit wél een CLIENT-waarde
      * — de live-sim heeft 'm, de server niet — en NOMINAAL, gelijk aan `GOAL_TYPE_META
      * .end_balance` en aan `pickEndBalanceAtEndAge` die de kaart live meet. Het lab toont
-     * 'm gedeflateerd; dat verschil is bewust (zie ADR 0145 D12).
+     * 'm gedeflateerd; dat verschil is bewust (zie ADR 0145 D12). GRONDSLAG: netto vermogen
+     * (Prognose!I via `SimRow.endPortfolio = netWorth`; bij een woonstrategie anders dan
+     * meerekenen telt de eigen woning mee) — niet het liquide vermogen. Alleen een run die de
+     * eindleeftijd haalt levert dit bedrag (eindreview I1).
      */
     eindvermogen?: number
   }

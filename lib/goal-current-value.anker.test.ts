@@ -190,6 +190,36 @@ describe('syncActiveGoalValues — eindvermogen uit het lab (end_balance, ADR 01
     expect(goals[0].current_value).toBe(90_000)
     expect(goals[0].notApplicableReason).toBeUndefined()
   })
+
+  it('I1 · vast anker + plan reikt niet (planCoveragePct < 100): nooit het negatieve tekort-bedrag — waarde 0 + de reden', async () => {
+    const { goals } = await syncActiveGoalValues(makeSupabase([]), [labEindGoal()], [], [], 'u1', async () => ({
+      currentValue: 500_000, targetValue: null, eta: null, fireAgeFractional: null, stopAnchor: 'age' as const, stopAge: 45, endAge: 90,
+      planCoveragePct: 17, endBalanceAtEndAge: -34_388_335,
+    }))
+    expect(goals[0].current_value).toBe(0)
+    expect(goals[0].notApplicableReason).toBe(
+      'Je plan reikt nu niet tot je 90e, dus er is op dat moment niets over om te meten. Wat telt, is of je plan weer gedekt raakt.',
+    )
+    expect(computeGoalProgress({ ...goals[0], target_date: null })).toMatchObject({ measured: false, paceSkipped: true })
+  })
+
+  it('I1 · vast anker + gedekt plan (100 %): meet gewoon, geen reden', async () => {
+    const { goals } = await syncActiveGoalValues(makeSupabase([]), [labEindGoal()], [], [], 'u1', async () => ({
+      currentValue: 500_000, targetValue: null, eta: null, fireAgeFractional: null, stopAnchor: 'age' as const, stopAge: 60, endAge: 90,
+      planCoveragePct: 100, endBalanceAtEndAge: 180_000,
+    }))
+    expect(goals[0].current_value).toBe(180_000)
+    expect(goals[0].notApplicableReason).toBeUndefined()
+  })
+
+  it('I1 · een HANDMATIG end_balance-doel (geen bron parameter) wordt nooit n.v.t. gemaakt', async () => {
+    const handmatig = g({ goal_type: 'end_balance', target_value: 250_000, current_value: 12_345, metadata: null })
+    const { goals } = await syncActiveGoalValues(makeSupabase([]), [handmatig], [], [], 'u1', async () => ({
+      currentValue: 500_000, targetValue: null, eta: null, fireAgeFractional: null, stopAnchor: 'age' as const, stopAge: 45, endAge: 90,
+      planCoveragePct: 17, endBalanceAtEndAge: -34_388_335,
+    }))
+    expect(goals[0].notApplicableReason).toBeUndefined()
+  })
 })
 
 describe('buildVrijheidsgetalSnapshot — planCoveragePct reist alleen onder een vast anker mee', () => {

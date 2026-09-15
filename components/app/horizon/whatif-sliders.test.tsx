@@ -170,7 +170,7 @@ describe('WhatIfSliders — antwoorden naast de knoppen', () => {
         currentAge={40}
         antwoorden={{
           extra_inleg: { tekst: "Zo'n €500/mnd meer hoort bij een gedekt plan.", bovenBereik: false, knop: { label: 'Reken hiermee', onClick } },
-          savings: { tekst: "Zo'n €500/mnd minder uitgeven hoort bij een gedekt plan.", bovenBereik: true, knop: { label: 'Zet op maximum', onClick: () => {} } },
+          savings: { tekst: "Zo'n €500/mnd minder uitgeven hoort bij een gedekt plan.", bovenBereik: true, knop: { label: 'Reken met maximum', onClick: () => {} } },
         }}
       />,
     )
@@ -184,7 +184,7 @@ describe('WhatIfSliders — antwoorden naast de knoppen', () => {
     expect(screen.getByRole('slider', { name: 'Minder werken' })).not.toHaveAttribute('aria-describedby')
     expect(screen.getAllByTestId('slider-antwoord')).toHaveLength(2)
     // accessible name begint met het zichtbare label (WCAG 2.5.3)
-    expect(screen.getByRole('button', { name: /^Zet op maximum: / })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Reken met maximum: / })).toBeInTheDocument()
     expect(onClick).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: /^Reken hiermee: Zo'n €500\/mnd meer/ }))
     expect(onClick).toHaveBeenCalledTimes(1)

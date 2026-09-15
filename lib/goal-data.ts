@@ -217,8 +217,9 @@ export const GOAL_TYPE_META: Record<GoalType, GoalTypeMeta> = {
   expected_return: { unit: '%',   group: 'Financieel', step: '0.1', min: 0,  max: 20,  supportsAssetLink: false, supportsDebtLink: false, freedomTimeRelevant: false, viaLab: true },
   fire_age:        { unit: 'jaar', group: 'Financieel', step: '0.5', min: 18, max: 100, supportsAssetLink: false, supportsDebtLink: false, freedomTimeRelevant: false, direction: 'down', viaLab: true, metricBasis: true, metricSource: 'horizon-kernel' },
   // Eindsaldo bij levensverwachting (`profiles.fire_end_age`, default 90). Grondslag
-  // = de LIQUIDE FIRE-portefeuille (`SimRow.endPortfolio`), NOMINAAL — zie
-  // lib/goals/vrijheidsgetal-goal.ts#pickEndBalanceAtEndAge.
+  // = het NETTO VERMOGEN (Prognose!I via `SimRow.endPortfolio = netWorth`; bij een
+  // woonstrategie anders dan meerekenen telt de eigen woning mee), NOMINAAL — zie
+  // lib/goals/vrijheidsgetal-goal.ts#pickEndBalanceAtEndAge. Niet de liquide portefeuille.
   end_balance:     { unit: 'EUR', group: 'Financieel', step: '0.01', supportsAssetLink: false, supportsDebtLink: false, freedomTimeRelevant: true, metricBasis: true, metricSource: 'horizon-kernel' },
   // Schuldenvrij-datum: opgeslagen als DECIMAAL JAAR (2031.5 = medio 2031), en
   // 'down' omdat eerder schuldenvrij beter is.

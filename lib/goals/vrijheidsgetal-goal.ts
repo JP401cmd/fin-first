@@ -93,12 +93,17 @@ export interface VrijheidsgetalSnapshot {
    * — zie lib/persoonlijk-plan-assembly.ts:147-158): de stand in de laatste
    * projectierij op `SimResult.displayEndAge`. Voedt het `end_balance`-doel.
    *
-   * GRONDSLAG (bewust, CLAUDE.md-waarschuwing): dit is de LIQUIDE FIRE-
-   * portefeuille (`SimRow.endPortfolio`), NIET het netto vermogen incl. eigen
-   * woning. Reden: de kernelrijen dragen alleen de portefeuille, en dit is
-   * dezelfde grondslag als `requiredFirePortfolio` — de noemer waar de rest van
-   * de FIRE-kaart al op staat. Een incl.-woning eindsaldo zou een tweede
-   * grondslag op dezelfde kaart zetten, precies de menging die verboden is.
+   * GRONDSLAG (gecorrigeerd 15 sep 2026, eindreview I2 — CLAUDE.md-waarschuwing):
+   * dit is het NETTO VERMOGEN op de eindleeftijd, Prognose!I via
+   * `SimRow.endPortfolio = UnifiedProjectionRow.netWorth` (lib/unified-projection.ts),
+   * NIET de liquide portefeuille (Prognose!J, `nettoLiquide`). Bij een woonstrategie
+   * anders dan meerekenen telt de eigen woning dus mee. Eerder stond hier "liquide",
+   * maar de rij-mapping zegt anders. `requiredFirePortfolio` staat op J — dit getal
+   * is dus een ándere grondslag dan de noemer van de FIRE-kaart; niet mengen op één
+   * as. Open besluit I vs J ligt bij de eigenaar (ADR 0145 D12).
+   * Raakt de run vóór de eindleeftijd op, dan is I hier de tekort-lening (negatief)
+   * en geen vermogen: consumenten die een eindvermogen tonen, tonen alleen een run
+   * die de eindleeftijd haalt (lib/horizon/lab-uitkomst.ts).
    *
    * EENHEID: NOMINAAL (kernel-native), gelijk aan `targetValue` hierboven, die
    * óók nominaal uit de kernel komt. Wil een oppervlak "geld van vandaag" tonen,

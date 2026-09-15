@@ -41,6 +41,10 @@ import {
   DOELEN_MELDING_ACTIES,
   planCoverageGoalName,
   eindvermogenTegelCaption,
+  eindvermogenOpTegel,
+  eindvermogenOpgeslagenNoot,
+  eindvermogenGoalNotApplicableReason,
+  EINDVERMOGEN_DELTA_DREMPEL,
   eindvermogenPreviewWaarde,
   eindvermogenDeltaBadge,
   eindvermogenSheetToelichting,
@@ -314,7 +318,7 @@ describe('dekking-zinnen — de vastgestelde kopij', () => {
   // Apostrof: hetzelfde rechte teken (') als de rest van dit bestand ("zo'n", "ratio's").
   it('11 · antwoorden naast de knoppen — korte beschrijvende zinnen, twee knoplabels, boven-bereik-regel', () => {
     expect(ANTWOORD_KNOP).toBe('Reken hiermee')
-    expect(ANTWOORD_KNOP_MAX).toBe('Zet op maximum')
+    expect(ANTWOORD_KNOP_MAX).toBe('Reken met maximum')
     expect(antwoordDoorwerken(61)).toBe('Doorwerken tot 61 dekt je plan.')
     expect(antwoordDoorwerken(61.5)).toBe('Doorwerken tot 61,5 dekt je plan.')
     expect(antwoordMeerSalaris(2100.4)).toBe("Zo'n €2.100/mnd meer hoort bij een gedekt plan.")
@@ -328,9 +332,10 @@ describe('dekking-zinnen — de vastgestelde kopij', () => {
     expect(antwoordMinderUitgeven(2100, true)).not.toMatch(/2\.100|€/)
   })
 
-  it('11 · toon: geen instructie, geen AOW in de tekortzinnen', () => {
+  it('11 · toon: geen instructie, geen AOW — STRIKT over zinnen én knoplabels (eindreview I5)', () => {
     const VERBODEN = /je moet|\bzet\b|verhoog|\bAOW\b/i
-    // ZINNEN strikt — elke zin die de gebruiker leest als uitspraak.
+    // Geen uitzondering voor knoplabels meer: een gebiedend "Zet …" ging er in de compliance-
+    // ronde van 14 sep bewust uit, dus elk label valt onder dezelfde regel als elke zin.
     for (const z of [
       antwoordDoorwerken(61),
       antwoordDoorwerken(61.5),
@@ -339,15 +344,10 @@ describe('dekking-zinnen — de vastgestelde kopij', () => {
       antwoordMinderUitgeven(500),
       antwoordMinderUitgeven(500, true),
       ANTWOORD_BOVEN_BEREIK,
+      ANTWOORD_KNOP,
+      ANTWOORD_KNOP_MAX,
     ]) {
       expect(z).not.toMatch(VERBODEN)
-    }
-    // KNOPLABELS zijn een bediening, geen zin: "Zet op maximum" beschrijft wat de knop doet
-    // (spec antwoorden-naast-sliders). Alleen de labels vallen buiten de \bzet\b-regel; de
-    // overige verboden patronen gelden er onverkort.
-    const VERBODEN_KNOP = /je moet|verhoog|\bAOW\b/i
-    for (const label of [ANTWOORD_KNOP, ANTWOORD_KNOP_MAX]) {
-      expect(label).not.toMatch(VERBODEN_KNOP)
     }
   })
 
@@ -468,9 +468,32 @@ describe('dekkingsas-kopij (spec lab-haalbaarheid §5)', () => {
 describe('eindvermogen-kopij (ADR 0145 D12, eigenaarsbesluit 15 sep 2026)', () => {
   const euro = (s: string) => s.replace(/ /g, ' ')
 
-  it('tegel-onderschrift benoemt de eindleeftijd én de euro-grondslag', () => {
-    expect(eindvermogenTegelCaption(90)).toBe("op je 90e, in euro's van nu")
-    expect(eindvermogenTegelCaption(null)).toBe("op je eindleeftijd, in euro's van nu")
+  it('tegel-onderschrift benoemt de eindleeftijd én de ACTIEVE euro-weergave (eindreview I3)', () => {
+    expect(eindvermogenTegelCaption(90, 'real')).toBe("op je 90e, in huidige euro's")
+    expect(eindvermogenTegelCaption(90, 'nominal')).toBe("op je 90e, in toekomstige euro's")
+    expect(eindvermogenTegelCaption(null, 'real')).toBe("op je eindleeftijd, in huidige euro's")
+    expect(eindvermogenTegelCaption(null, 'nominal')).not.toMatch(/van nu/)
+  })
+
+  it('I1 · tegel zonder eindvermogen: "op vóór je 90e" — geen bedrag, geen nul', () => {
+    expect(eindvermogenOpTegel(90)).toBe('op vóór je 90e')
+    expect(eindvermogenOpTegel(null)).toBe('op vóór je eindleeftijd')
+  })
+
+  it('I1 · n.v.t.-notitie op een lab-eindvermogen-doel bij een plan dat niet meer reikt', () => {
+    expect(eindvermogenGoalNotApplicableReason(90)).toBe(
+      'Je plan reikt nu niet tot je 90e, dus er is op dat moment niets over om te meten. Wat telt, is of je plan weer gedekt raakt.',
+    )
+    expect(eindvermogenGoalNotApplicableReason(null)).toContain('tot je eindleeftijd')
+    expect(eindvermogenGoalNotApplicableReason(90)).not.toMatch(/\bAOW\b|\bmoet\b|je kunt (nu )?(al )?stoppen/i)
+  })
+
+  it("I4 · de opgeslagen-noot noemt het nominale bedrag in toekomstige euro's", () => {
+    expect(euro(eindvermogenOpgeslagenNoot(480_000))).toBe("(opgeslagen als € 480.000 in toekomstige euro's)")
+  })
+
+  it('M5 · de delta-drempel is € 500', () => {
+    expect(EINDVERMOGEN_DELTA_DREMPEL).toBe(500)
   })
 
   it('preview-waarde: nu € X → € Y op je 90e; gemaskeerd verdwijnen beide bedragen', () => {

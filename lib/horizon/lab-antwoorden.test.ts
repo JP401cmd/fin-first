@@ -115,11 +115,11 @@ describe('labAntwoordenPerSlider — elk antwoord onder zijn eigen knop (spec an
     expect(onActie).toHaveBeenLastCalledWith({ kind: 'stop', stopAge: 61.5 })
   })
 
-  it('boven bereik: vlag aan en de knop heet "Zet op maximum"', () => {
+  it('boven bereik: vlag aan en de knop heet "Reken met maximum"', () => {
     const a = resolveLabAntwoorden({ dekking: tekort, solvedFireAge: null, planMaandHint: 22_695, baseline })
     const per = labAntwoordenPerSlider(a, () => {})
-    expect(per.sliders.extra_inleg).toMatchObject({ bovenBereik: true, knop: { label: 'Zet op maximum' } })
-    expect(per.sliders.savings).toMatchObject({ bovenBereik: true, knop: { label: 'Zet op maximum' } })
+    expect(per.sliders.extra_inleg).toMatchObject({ bovenBereik: true, knop: { label: 'Reken met maximum' } })
+    expect(per.sliders.savings).toMatchObject({ bovenBereik: true, knop: { label: 'Reken met maximum' } })
     expect(per.stop).toBeNull()
   })
 

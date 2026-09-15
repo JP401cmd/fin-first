@@ -86,7 +86,7 @@ import {
   type HousingStrategyConfig,
 } from '@/lib/housing-strategy'
 import type { SimResult } from '@/lib/fire-simulation'
-import { resolveLabUitkomst, type LabUitkomst } from '@/lib/horizon/lab-uitkomst'
+import { resolveLabUitkomst, type LabEindvermogen, type LabUitkomst } from '@/lib/horizon/lab-uitkomst'
 import { buildParameterGoalRows } from '@/lib/horizon/toekomst-doel'
 import { resolveLabAntwoorden } from '@/lib/horizon/lab-antwoorden'
 import { selectLabDoelenBuitenPlan } from '@/lib/goals/lab-doelen-buiten-plan'
@@ -539,9 +539,14 @@ export const TOEK_ENGINE_CHECKS: ToekEngineCheck[] = [
       const AOW_GEDEKT = sim({ ...AOW_TEKORT, kernelDepletionMonth: null, rows: [eindRij(89, 110_000), eindRij(90, 100_000)] })
       const scenarioGedektBeter = sim({ ...AOW_GEDEKT, rows: [eindRij(89, 190_000), eindRij(90, 180_000)] })
       const scenarioBeter = sim({ ...AOW_TEKORT, kernelDepletionMonth: 552 })
+      // Eindreview I1 — een verkenning die het gedekte plan KRAP maakt (salaris −30 %): de run
+      // raakt op 88 op, dus op 90 is Prognose!I de tekort-lening (negatief), geen vermogen.
+      const scenarioGedektNaarTekort = sim({ ...AOW_TEKORT, kernelDepletionMonth: 552, rows: [eindRij(89, -60_000), eindRij(90, -80_000)] })
 
       const promotieLabel = (u: LabUitkomst): string =>
         u.promotie.kind === 'geen' ? `geen/${u.promotie.reden}` : u.promotie.kind
+      const evLabel = (e: LabEindvermogen | null | undefined): string =>
+        e == null ? 'null' : e.kind === 'op' ? 'op' : String(e.nominaal)
 
       // (1) solved met een verkend scenario — ongewijzigd gedrag.
       const solved = resolveLabUitkomst({
@@ -587,6 +592,18 @@ export const TOEK_ENGINE_CHECKS: ToekEngineCheck[] = [
         hasScenario: true,
         hasStopKeuze: false,
       })
+      // (4b) GEDEKTE basis + een verkenning met een TEKORT → promotie volgt het scenario: `dekking`
+      // (eindreview I1), en het scenario-eindvermogen is `op` — nooit een negatief bedrag.
+      const aowGedektScenarioTekort = resolveLabUitkomst({
+        planAnchor: { kind: 'aow' },
+        currentAge: 42,
+        basis: AOW_GEDEKT,
+        scenario: scenarioGedektNaarTekort,
+        stopPad: null,
+        kernelMaandHint: null,
+        hasScenario: true,
+        hasStopKeuze: false,
+      })
       // (5) het nu-anker, óók met scenario → geen/nu-anker (E6).
       const nu = resolveLabUitkomst({
         planAnchor: { kind: 'now' },
@@ -610,10 +627,12 @@ export const TOEK_ENGINE_CHECKS: ToekEngineCheck[] = [
       // Toestand (4) vastgelegd: de eindvermogen-rij — NOMINAAL scenario-bedrag uit de lab-uitkomst,
       // plan-velden van de server (D12).
       const aowGedektDekking = aowGedekt.kind === 'dekking' ? aowGedekt : null
+      const aowGedektScenarioTekortDekking = aowGedektScenarioTekort.kind === 'dekking' ? aowGedektScenarioTekort : null
       const eindvermogenRow = buildParameterGoalRows({
         parameters: { eindvermogen: true },
         doelwaarden: {
-          eindvermogen: aowGedektDekking?.scenarioEindvermogen ?? undefined,
+          eindvermogen:
+            aowGedektDekking?.scenarioEindvermogen?.kind === 'bedrag' ? aowGedektDekking.scenarioEindvermogen.nominaal : undefined,
           planEindleeftijd: 90,
           planStopAnker: 'aow',
           planStopLeeftijd: null,
@@ -637,9 +656,9 @@ export const TOEK_ENGINE_CHECKS: ToekEngineCheck[] = [
 
       return {
         expected:
-          'solved=vrijheidsleeftijd:vrijheidsleeftijd; aowTekortMetScenario=dekking:dekking; aowTekortZonderScenario=dekking:geen/geen-verkenning; aowGedekt=dekking:eindvermogen; aowGedektEindvermogen=100000→180000; nu=dekking:geen/nu-anker; dekkingGoalType=plan_coverage; dekkingNaam=Plan gedekt tot 90 jaar; dekkingTarget=100; eindvermogenGoalType=end_balance; eindvermogenNaam=Eindvermogen op je 90e; eindvermogenTarget=180000; antwoorden=doorwerken,extra_opzij,minder_uitgeven; doorwerkenTot=70; extraOpzijActie=slider:extra_inleg:500',
+          'solved=vrijheidsleeftijd:vrijheidsleeftijd; aowTekortMetScenario=dekking:dekking; aowTekortZonderScenario=dekking:geen/geen-verkenning; aowGedekt=dekking:eindvermogen; aowGedektEindvermogen=100000→180000; aowGedektScenarioTekort=dekking:dekking; aowGedektScenarioTekortEindvermogen=100000→op; nu=dekking:geen/nu-anker; dekkingGoalType=plan_coverage; dekkingNaam=Plan gedekt tot 90 jaar; dekkingTarget=100; eindvermogenGoalType=end_balance; eindvermogenNaam=Eindvermogen op je 90e; eindvermogenTarget=180000; antwoorden=doorwerken,extra_opzij,minder_uitgeven; doorwerkenTot=70; extraOpzijActie=slider:extra_inleg:500',
         actual:
-          `solved=${solved.kind}:${promotieLabel(solved)}; aowTekortMetScenario=${aowTekortMetScenario.kind}:${promotieLabel(aowTekortMetScenario)}; aowTekortZonderScenario=${aowTekortZonderScenario.kind}:${promotieLabel(aowTekortZonderScenario)}; aowGedekt=${aowGedekt.kind}:${promotieLabel(aowGedekt)}; aowGedektEindvermogen=${aowGedektDekking?.basisEindvermogen}→${aowGedektDekking?.scenarioEindvermogen}; nu=${nu.kind}:${promotieLabel(nu)}; dekkingGoalType=${dekkingRow?.goal_type}; dekkingNaam=${dekkingRow?.name}; dekkingTarget=${dekkingRow?.target_value}; eindvermogenGoalType=${eindvermogenRow?.goal_type}; eindvermogenNaam=${eindvermogenRow?.name}; eindvermogenTarget=${eindvermogenRow?.target_value}; antwoorden=${antwoordKinds}; doorwerkenTot=${doorwerkenTot}; extraOpzijActie=${extraActie}`,
+          `solved=${solved.kind}:${promotieLabel(solved)}; aowTekortMetScenario=${aowTekortMetScenario.kind}:${promotieLabel(aowTekortMetScenario)}; aowTekortZonderScenario=${aowTekortZonderScenario.kind}:${promotieLabel(aowTekortZonderScenario)}; aowGedekt=${aowGedekt.kind}:${promotieLabel(aowGedekt)}; aowGedektEindvermogen=${evLabel(aowGedektDekking?.basisEindvermogen)}→${evLabel(aowGedektDekking?.scenarioEindvermogen)}; aowGedektScenarioTekort=${aowGedektScenarioTekort.kind}:${promotieLabel(aowGedektScenarioTekort)}; aowGedektScenarioTekortEindvermogen=${evLabel(aowGedektScenarioTekortDekking?.basisEindvermogen)}→${evLabel(aowGedektScenarioTekortDekking?.scenarioEindvermogen)}; nu=${nu.kind}:${promotieLabel(nu)}; dekkingGoalType=${dekkingRow?.goal_type}; dekkingNaam=${dekkingRow?.name}; dekkingTarget=${dekkingRow?.target_value}; eindvermogenGoalType=${eindvermogenRow?.goal_type}; eindvermogenNaam=${eindvermogenRow?.name}; eindvermogenTarget=${eindvermogenRow?.target_value}; antwoorden=${antwoordKinds}; doorwerkenTot=${doorwerkenTot}; extraOpzijActie=${extraActie}`,
       }
     },
   },

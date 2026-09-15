@@ -52,9 +52,17 @@
  *  - geen run (alleen aow/age/now) → `geen/geen-run`; onder solved geen run-eis (gedrag van vóór ADR 0145)
  *  - `solved`                     → `vrijheidsleeftijd` bij `hasScenario || hasStopKeuze` (als vandaag), anders `geen/geen-verkenning`
  *  - `now`                        → nooit (`geen/nu-anker`) — verkennen mag, geen doel uit het lab
- *  - `aow`/`age`, tekort          → `dekking` alleen bij `hasScenario` (een stopkeuze alleen
- *                                   is onder een vast anker geen doelstand, D4), anders `geen/geen-verkenning`
- *  - `aow`/`age`, gedekt          → `eindvermogen` bij `hasScenario`, anders `geen/geen-verkenning`
+ *  - `aow`/`age`, zonder `hasScenario` → `geen/geen-verkenning` (een stopkeuze alleen is onder
+ *                                   een vast anker geen doelstand, D4)
+ *  - `aow`/`age`, met `hasScenario` → beslist door de stand die je VASTLEGT, dus de SCENARIO-run
+ *                                   (eindreview I1, 15 sep 2026):
+ *        scenario gedekt (bereik `gedekt`, eindvermogen geen negatief bedrag) → `eindvermogen`
+ *        scenario met tekort                                               → `dekking`
+ *        scenario-run nog onbekend (worker loopt)                          → terugval op de basis
+ *                                   (tekort ? `dekking` : `eindvermogen`); de knop wacht dan op een
+ *                                   bekend scenario-bedrag (`doelVastleggenMogelijk`, M10)
+ *   Zo biedt de sheet nooit een negatief of opgeraakt eindvermogen als doel aan: een gedekte basis
+ *   met een verkenning die het plan krap maakt (salaris −30 %, spaarquote −15 pp) wordt `dekking`.
  * "Doel loslaten" blijft in élke toestand beschikbaar — dat is UI, geen gate.
  *
  * ## D12 (eigenaarsbesluit 15 sep 2026) — eindvermogen als derde verandercomponent
@@ -66,10 +74,19 @@
  * het lab"). De reden `geen/gedekt` bestaat daarmee niet meer.
  *
  * GRONDSLAG van het eindvermogen: `pickEndBalanceAtEndAge` (lib/goals/vrijheidsgetal-goal.ts)
- * op de reeds gedraaide run — de LIQUIDE FIRE-portefeuille (`SimRow.endPortfolio`) op
- * `displayEndAge`, NOMINAAL (kernel-native). Bewust hergebruikt en geen tweede selectie: dit
- * is exact de bron die het `end_balance`-doel al meet. Wil een oppervlak "geld van vandaag"
- * tonen, dan deflateert het via `factorAtAge`/`deflate` (ADR 0090/0093) — nooit hier.
+ * op de reeds gedraaide run — het NETTO VERMOGEN (Prognose!I via `SimRow.endPortfolio =
+ * netWorth`; bij een woonstrategie anders dan meerekenen telt de eigen woning mee) op
+ * `displayEndAge`, NOMINAAL (kernel-native). Dus NIET het liquide vermogen (Prognose!J,
+ * `nettoLiquide`) waarop de dekking staat — open besluit I vs J bij de eigenaar (ADR 0145 D12).
+ * Bewust hergebruikt en geen tweede selectie: dit is exact de bron die het `end_balance`-doel al
+ * meet. Wil een oppervlak "geld van vandaag" tonen, dan deflateert het via `factorAtAge`/`deflate`
+ * (ADR 0090/0093) — nooit hier.
+ *
+ * WEERGAVEREGEL (eindreview I1): een eindvermogen BESTAAT alleen als de run de eindleeftijd haalt
+ * (bereik `gedekt`). Raakt de run eerder op, dan financiert de kernel het tekort met de
+ * synthetische tekort-lening en is Prognose!I op de eindleeftijd die lening (negatief, of positief
+ * door een woning min die lening) — geen vermogen. `LabEindvermogen` is daarom een tagged union:
+ * `bedrag` bij een gedekte run, `op` anders. Niet klemmen op € 0: dat verzwijgt dat het model leent.
  */
 
 import { computeRunwayCoveragePct } from '@/lib/core-metrics'
@@ -79,7 +96,7 @@ import type { StopAnchor } from '@/lib/fire-strategy'
 // produceert; het type zelf woont in lib/fire-simulation.ts.
 import type { SimResult } from '@/lib/fire-simulation'
 import type { ForcedStopPathResult } from '@/lib/horizon/scenario-presets'
-// De ENE eindsaldo-selectie (grondslag: liquide portefeuille op displayEndAge, nominaal) —
+// De ENE eindsaldo-selectie (grondslag: netto vermogen, Prognose!I, op displayEndAge, nominaal) —
 // dezelfde die het `end_balance`-doel voedt. Geen tweede selectie (D12).
 import { pickEndBalanceAtEndAge } from '@/lib/goals/vrijheidsgetal-goal'
 import { ankerReachFromSim, ankerStopFromSim, type AnkerReach, type AnkerStop } from './anker-copy'
@@ -91,6 +108,16 @@ export type LabPromotie =
   /** ADR 0145 D12 — een GEDEKT plan onder een vast anker: het eindvermogen is wat nog beweegt. */
   | { readonly kind: 'eindvermogen' }
   | { readonly kind: 'geen'; readonly reden: 'nu-anker' | 'geen-verkenning' | 'geen-run' }
+
+/**
+ * Het eindvermogen van één run (ADR 0145 D12 + eindreview I1):
+ *  - `bedrag` — de run haalt de eindleeftijd; `nominaal` is `pickEndBalanceAtEndAge(run)`;
+ *  - `op`     — de run raakt vóór de eindleeftijd op: er is geen eindvermogen om te tonen.
+ * `null` (op het veld) = niet bepaalbaar: geen run, geen rijen, of geen kernel-antwoord.
+ */
+export type LabEindvermogen =
+  | { readonly kind: 'bedrag'; readonly nominaal: number }
+  | { readonly kind: 'op' }
 
 /** De minimale vorm van het stop-pad die deze switch leest (`HorizonStopPadResult`). */
 export type LabStopPad = Pick<ForcedStopPathResult, 'result' | 'maandHint' | 'stopAge'>
@@ -145,15 +172,16 @@ export interface LabUitkomstDekking {
   readonly verkendStopAge: number | null
   /**
    * EINDVERMOGEN op de eindleeftijd van het plan (ADR 0145 D12) — de derde component
-   * naast dekking (%) en bereik (leeftijd). NOMINAAL en op de LIQUIDE portefeuille
-   * (`pickEndBalanceAtEndAge`, zie module-doc); een oppervlak dat "geld van nu" toont
-   * deflateert zelf. `null` wanneer de run geen rijen draagt (stub/mock/geen run).
+   * naast dekking (%) en bereik (leeftijd). NOMINAAL en op het NETTO VERMOGEN (Prognose!I,
+   * `pickEndBalanceAtEndAge`, zie module-doc); een oppervlak dat "geld van nu" toont
+   * deflateert zelf. `op` wanneer de run vóór de eindleeftijd opraakt (I1); `null` wanneer
+   * de run geen rijen of geen kernel-antwoord draagt (stub/mock/geen run).
    */
-  readonly basisEindvermogen: number | null
+  readonly basisEindvermogen: LabEindvermogen | null
   /** Idem voor de scenario-run; `null` zonder scenario. */
-  readonly scenarioEindvermogen: number | null
+  readonly scenarioEindvermogen: LabEindvermogen | null
   /** Idem voor het stop-pad (verkend stopmoment); `null` zonder stopkeuze. */
-  readonly verkendEindvermogen: number | null
+  readonly verkendEindvermogen: LabEindvermogen | null
   /** `basisPct < 100`: het plan reikt niet tot de eindleeftijd. */
   readonly tekort: boolean
   /** €/mnd-extra-sparen-hint (P!B96), zie module-doc; `null` = geen tekort of onbekend. */
@@ -191,10 +219,16 @@ export function dekkingVanRun(
 /**
  * Eindvermogen van één REEDS GEDRAAIDE run (ADR 0145 D12) — puur een rij-selectie via
  * `pickEndBalanceAtEndAge`: de laatste rij met `age <= displayEndAge`, veld `endPortfolio`.
- * `null` zonder rijen (stub/mock) of zonder bruikbare eindleeftijd.
+ * Alleen een run die de eindleeftijd haalt (`reach.kind === 'gedekt'`) heeft een bedrag
+ * (eindreview I1); een run die eerder opraakt is `op`. `null` zonder bruikbaar bereik
+ * (stub/mock zonder kernel-antwoord) of — bij een gedekte run — zonder rijen.
  */
-function eindvermogenVanRun(run: SimResult | null): number | null {
-  return run == null ? null : pickEndBalanceAtEndAge(run)
+function eindvermogenVanRun(run: SimResult | null, reach: AnkerReach | null): LabEindvermogen | null {
+  if (run == null || reach == null) return null
+  if (reach.kind === 'onbekend') return null
+  if (reach.kind !== 'gedekt') return { kind: 'op' }
+  const nominaal = pickEndBalanceAtEndAge(run)
+  return nominaal == null ? null : { kind: 'bedrag', nominaal }
 }
 
 function reachVanRun(run: SimResult, currentAge: number | null): AnkerReach {
@@ -258,15 +292,24 @@ export function resolveLabUitkomst(input: LabUitkomstInput): LabUitkomst {
   const verkendPct = stopPad != null ? dekkingVanRun(stopPad.result, currentAge) : null
   const verkendReach = stopPad != null ? reachVanRun(stopPad.result, currentAge) : null
   const verkendStopAge = stopPad != null ? (finiteOrNull(stopPad.result.fireAgeFractional) ?? finiteOrNull(stopPad.stopAge)) : null
-  const basisEindvermogen = eindvermogenVanRun(basis)
-  const scenarioEindvermogen = eindvermogenVanRun(scenario)
-  const verkendEindvermogen = eindvermogenVanRun(stopPad?.result ?? null)
+  const basisEindvermogen = basis != null ? eindvermogenVanRun(basis, basisReach) : null
+  const scenarioEindvermogen = eindvermogenVanRun(scenario, scenarioReach)
+  const verkendEindvermogen = eindvermogenVanRun(stopPad?.result ?? null, verkendReach)
   const tekort = basisPct != null && basisPct < 100
   const maandHint = maandHintVan(stopPad, input.kernelMaandHint)
 
-  // D12: bij een GEDEKT plan promoveert het lab het eindvermogen (`end_balance`) i.p.v.
-  // niets — dekking blijft het doel bij een tekort. Beide eisen een verkenning
+  // D12 + eindreview I1: de promotie volgt de stand die je VASTLEGT — de scenario-run. Is die
+  // gedekt (met een eindvermogen dat geen negatief bedrag is), dan legt het lab het
+  // eindvermogen (`end_balance`) vast; heeft die een tekort, dan de dekking. Zolang de
+  // scenario-run nog niet bekend is (worker), valt de keuze terug op de basis — de knop wacht
+  // dan in horizon-client op een bekend scenario-bedrag (M10). Beide eisen een verkenning
   // (`hasScenario`): zonder knopbeweging is er geen lab-stand om vast te leggen (D4).
+  const scenarioBekend = scenarioReach != null && scenarioReach.kind !== 'onbekend'
+  const scenarioGedekt =
+    scenarioReach?.kind === 'gedekt' && !(scenarioEindvermogen?.kind === 'bedrag' && scenarioEindvermogen.nominaal < 0)
+  const vastTeLeggen: LabPromotie = scenarioBekend
+    ? scenarioGedekt ? { kind: 'eindvermogen' } : { kind: 'dekking' }
+    : tekort ? { kind: 'dekking' } : { kind: 'eindvermogen' }
   const promotie: LabPromotie =
     basis == null || basisPct == null
       ? { kind: 'geen', reden: 'geen-run' }
@@ -274,9 +317,7 @@ export function resolveLabUitkomst(input: LabUitkomstInput): LabUitkomst {
         ? { kind: 'geen', reden: 'nu-anker' }
         : !hasScenario
           ? { kind: 'geen', reden: 'geen-verkenning' }
-          : tekort
-            ? { kind: 'dekking' }
-            : { kind: 'eindvermogen' }
+          : vastTeLeggen
 
   return {
     kind: 'dekking',

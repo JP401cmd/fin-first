@@ -37,6 +37,7 @@
 // de AOW vallen — het aow-anker noemt zijn stopmoment daarom als getal ("op 67").
 
 import { HORIZON_PLAFOND_LEEFTIJD } from '@/lib/constants'
+import { euroViewLabel, type EuroView } from '@/lib/euro-display'
 import { formatCurrency, MASKED_AMOUNT_PLACEHOLDER } from '@/lib/format'
 import type { KernelStopAnker } from '@/lib/horizon-kernel/types'
 // Dezelfde afrondingsregel als het hero-kopgetal (`heroFireAgeYear`), via het
@@ -211,11 +212,25 @@ export const DEKKINGSAS_COPY = {
   tegelGedekt: 'Gedekt',
 } as const
 
-/** Onderschrift onder de drie tegels: de eindvermogen-kolom is een bedrag van vandaag. */
-export function eindvermogenTegelCaption(endAge: number | null): string {
-  return endAge != null
-    ? `op je ${heroFireAgeYear(endAge)}e, in euro's van nu`
-    : "op je eindleeftijd, in euro's van nu"
+/**
+ * Onderschrift onder de Eindvermogen-tegel: het moment én de euro-weergave waarin het bedrag
+ * staat. De weergave-naam komt uit de ene app-bron (`euroViewLabel`: "huidige euro's" /
+ * "toekomstige euro's", zoals de schakelaar zelf heet) — nooit een eigen woord, want onder
+ * `nominal` staat het bedrag NIET in euro's van nu (eindreview I3, 15 sep 2026).
+ */
+export function eindvermogenTegelCaption(endAge: number | null, view: EuroView): string {
+  const weergave = euroViewLabel(view).toLowerCase()
+  return endAge != null ? `op je ${heroFireAgeYear(endAge)}e, in ${weergave}` : `op je eindleeftijd, in ${weergave}`
+}
+
+/**
+ * De tegelwaarde wanneer een run de eindleeftijd NIET haalt (eindreview I1): dan bestaat er
+ * geen eindvermogen. Het kernel-netto-vermogen op die leeftijd is dan de tekort-lening
+ * (negatief, of positief door een woning min die lening) — dat is geen vermogen, en klemmen op
+ * € 0 zou verzwijgen dat het model leent. Dus geen bedrag, maar waar het plan ophoudt.
+ */
+export function eindvermogenOpTegel(endAge: number | null): string {
+  return endAge != null ? `op vóór je ${heroFireAgeYear(endAge)}e` : 'op vóór je eindleeftijd'
 }
 
 /**
@@ -571,12 +586,14 @@ export function radarEindstrategieAnkerReden(): string {
 // Elk antwoord staat onder zijn eigen knop; het losse blok "Wat maakt het haalbaar?" is weg.
 // De knop is generiek ("Reken hiermee"): het bedrag staat al in de zin, en in de
 // privacy-weergave toont de UI geen knop (de slider zou het echte bedrag verraden). Boven
-// het slider-bereik heet de knop "Zet op maximum" — zo belooft hij niet wat hij niet doet.
+// het slider-bereik heet de knop "Reken met maximum" — zo belooft hij niet wat hij niet doet.
+// Geen gebiedend "Zet …" (compliance-lijn 14 sep 2026, eindreview I5): het label sluit aan op
+// "Reken hiermee" en valt dus onder dezelfde strikte toon-invariant als de zinnen.
 // "Uitgesmeerd tot je eindleeftijd" staat niet meer in elke zin: de ene sluitregel onder de
 // twee kolommen zegt het ("Indicatie, geen advies — …").
 
 export const ANTWOORD_KNOP = 'Reken hiermee'
-export const ANTWOORD_KNOP_MAX = 'Zet op maximum'
+export const ANTWOORD_KNOP_MAX = 'Reken met maximum'
 export const ANTWOORD_BOVEN_BEREIK = 'Meer dan deze knop toelaat.'
 
 /**
@@ -629,9 +646,12 @@ export function dekkingVastgelegdToast(endAge: number | null): string {
 // aansporend, nooit "oneindig". Het woord AOW komt hier niet voor: de aanhef noemt het
 // stopmoment als getal, net als de dekkings-zinnen.
 //
-// GRONDSLAG: het eindvermogen is de LIQUIDE portefeuille op de eindleeftijd
-// (`pickEndBalanceAtEndAge`), en de bedragen die hier binnenkomen zijn AL GEDEFLATEERD door
-// de aanroeper (de euro-weergave-render-grens in horizon-client). Dit bestand rekent niets om.
+// GRONDSLAG: het eindvermogen is het NETTO VERMOGEN op de eindleeftijd (Prognose!I via
+// `SimRow.endPortfolio = netWorth`, `pickEndBalanceAtEndAge`; bij een woonstrategie anders dan
+// meerekenen telt de eigen woning mee) — NIET het liquide vermogen waar de zinnen hierboven over
+// gaan (Prognose!J). Open besluit I vs J ligt bij de eigenaar (ADR 0145 D12). De bedragen die
+// hier binnenkomen zijn AL GEDEFLATEERD door de aanroeper (de euro-weergave-render-grens in
+// horizon-client). Dit bestand rekent niets om.
 
 /** Een eindvermogen-bedrag in een zin; de vaste placeholder in de privacy-weergave. */
 function eindBedrag(euro: number, masked: boolean): string {
@@ -652,6 +672,23 @@ export function eindvermogenPreviewWaarde(
 ): string {
   return `nu ${eindBedrag(basis, masked)} → ${eindBedrag(scenario, masked)} ${opJeEind(endAge)}`
 }
+
+/**
+ * De duiding achter de preview-rij wanneer het getoonde bedrag niet het opgeslagen bedrag is
+ * (eindreview I4): de sheet toont in huidige euro's, het doel wordt NOMINAAL vastgelegd en de
+ * doelkaart meet nominaal. Zo ziet de gebruiker vóór de klik welk getal er op de kaart komt.
+ * De weergave-naam komt uit `euroViewLabel('nominal')`; de aanroeper beslist óf de noot nodig is.
+ */
+export function eindvermogenOpgeslagenNoot(nominaal: number): string {
+  return `(opgeslagen als ${formatCurrency(nominaal)} in ${euroViewLabel('nominal').toLowerCase()})`
+}
+
+/**
+ * Onder welk verschil (in weergave-euro's) de eindvermogen-delta-badge niets zegt (eindreview
+ * M5): een paar euro verschil is ruis in een projectie over tientallen jaren, net zoals de
+ * dekkings-delta onder één procentpunt "gelijk" heet.
+ */
+export const EINDVERMOGEN_DELTA_DREMPEL = 500
 
 /**
  * De delta-badge naast de dekkings-badge: "+€ 12.000 eindvermogen" / "−€ 3.000 eindvermogen".
@@ -681,6 +718,15 @@ export function eindvermogenGoalName(eindleeftijd: number | null): string {
   return bruikbaar(eindleeftijd)
     ? `Eindvermogen op je ${eindleeftijd.toLocaleString('nl-NL', { maximumFractionDigits: 1 })}e`
     : 'Eindvermogen'
+}
+
+/**
+ * De n.v.t.-notitie op een lab-eindvermogen-doel wanneer het plan onder een vast stopmoment
+ * NIET meer tot de eindleeftijd reikt (eindreview I1): dan is er op dat moment niets over om te
+ * meten — het kernel-bedrag zou de tekort-lening zijn. Spiegel van de fire_age-notitie.
+ */
+export function eindvermogenGoalNotApplicableReason(endAge: number | null): string {
+  return `Je plan reikt nu niet ${totJeEind(endAge)}, dus er is op dat moment niets over om te meten. Wat telt, is of je plan weer gedekt raakt.`
 }
 
 /** De toast na het vastleggen van een eindvermogen-doel. */

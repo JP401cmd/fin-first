@@ -235,25 +235,79 @@ describe('resolveLabUitkomst — eindvermogen als derde component (ADR 0145 D12)
     )
     if (u.kind !== 'dekking') throw new Error('unreachable')
     // 100.000 en niet 90.000: rij 91 ligt vóórbij de eindleeftijd.
-    expect(u.basisEindvermogen).toBe(100_000)
-    expect(u.scenarioEindvermogen).toBe(180_000)
-    expect(u.verkendEindvermogen).toBe(150_000)
+    expect(u.basisEindvermogen).toEqual({ kind: 'bedrag', nominaal: 100_000 })
+    expect(u.scenarioEindvermogen).toEqual({ kind: 'bedrag', nominaal: 180_000 })
+    expect(u.verkendEindvermogen).toEqual({ kind: 'bedrag', nominaal: 150_000 })
     expect(u.promotie).toEqual({ kind: 'eindvermogen' })
   })
 
   it('zonder scenario/stop-pad blijven de bijbehorende eindvermogens null (geen terugval op de basis)', () => {
-    const u = resolveLabUitkomst(input({ basis: sim({ ...AOW_TEKORT, rows: basisRijen }) }))
+    const u = resolveLabUitkomst(input({ basis: sim({ ...AOW_TEKORT, kernelDepletionMonth: null, rows: basisRijen }) }))
     if (u.kind !== 'dekking') throw new Error('unreachable')
-    expect(u.basisEindvermogen).toBe(100_000)
+    expect(u.basisEindvermogen).toEqual({ kind: 'bedrag', nominaal: 100_000 })
     expect(u.scenarioEindvermogen).toBeNull()
     expect(u.verkendEindvermogen).toBeNull()
   })
 
-  it('een run zonder rijen (stub) levert null — nooit 0 uit een gat', () => {
-    const u = resolveLabUitkomst(input({ scenario: sim(AOW_TEKORT), hasScenario: true }))
+  it('een gedekte run zonder rijen (stub) levert null — nooit 0 uit een gat', () => {
+    const gedektStub = sim({ ...AOW_TEKORT, kernelDepletionMonth: null })
+    const u = resolveLabUitkomst(input({ basis: gedektStub, scenario: gedektStub, hasScenario: true }))
     if (u.kind !== 'dekking') throw new Error('unreachable')
     expect(u.basisEindvermogen).toBeNull()
     expect(u.scenarioEindvermogen).toBeNull()
+  })
+
+  it('I1 · een run die vóór de eindleeftijd opraakt heeft GEEN eindvermogen: `op`, nooit het (negatieve) tekort-lening-bedrag', () => {
+    // Rijen met een negatief netto vermogen op 90: de tekort-lening, geen vermogen.
+    const tekortRijen = rows([[89, -30_000_000], [90, -34_388_335]])
+    const basis = sim({ ...AOW_TEKORT, rows: tekortRijen })
+    const u = resolveLabUitkomst(input({ basis, scenario: sim({ ...basis }), hasScenario: true }))
+    if (u.kind !== 'dekking') throw new Error('unreachable')
+    expect(u.basisEindvermogen).toEqual({ kind: 'op' })
+    expect(u.scenarioEindvermogen).toEqual({ kind: 'op' })
+    // Óók een positief bedrag (woning min tekort-lening) telt niet als eindvermogen bij een tekort.
+    const woningRijen = rows([[90, 250_000]])
+    const w = resolveLabUitkomst(input({ basis: sim({ ...AOW_TEKORT, rows: woningRijen }) }))
+    if (w.kind !== 'dekking') throw new Error('unreachable')
+    expect(w.basisEindvermogen).toEqual({ kind: 'op' })
+  })
+
+  it('I1 · een stub zonder kernel-antwoord (bereik onbekend) levert null, geen `op`', () => {
+    const stub = sim({ stopAnker: { soort: 'aow' }, vastStopLeeftijd: 67, rows: basisRijen })
+    const u = resolveLabUitkomst(input({ basis: stub }))
+    if (u.kind !== 'dekking') throw new Error('unreachable')
+    expect(u.basisEindvermogen).toBeNull()
+  })
+})
+
+describe('resolveLabUitkomst — de promotie volgt de SCENARIO-stand die je vastlegt (eindreview I1)', () => {
+  const gedektRijen = rows([[90, 120_000]])
+  const GEDEKT = sim({ ...AOW_TEKORT, kernelDepletionMonth: null, rows: gedektRijen })
+  const KRAP = sim({ ...AOW_TEKORT, kernelDepletionMonth: 552, rows: rows([[90, -80_000]]) }) // op op 88
+
+  it('gedekte basis + scenario met tekort (salaris −30 %) → `dekking`, nooit een negatief eindvermogen-doel', () => {
+    const u = resolveLabUitkomst(input({ planAnchor: { kind: 'age', age: 60 }, basis: GEDEKT, scenario: KRAP, hasScenario: true }))
+    if (u.kind !== 'dekking') throw new Error('unreachable')
+    expect(u.tekort).toBe(false)
+    expect(u.scenarioEindvermogen).toEqual({ kind: 'op' })
+    expect(u.promotie).toEqual({ kind: 'dekking' })
+  })
+
+  it('basis met tekort + scenario gedekt → `eindvermogen` (de vastgelegde stand reikt)', () => {
+    const u = resolveLabUitkomst(input({ basis: AOW_TEKORT, scenario: GEDEKT, hasScenario: true }))
+    if (u.kind !== 'dekking') throw new Error('unreachable')
+    expect(u.tekort).toBe(true)
+    expect(u.promotie).toEqual({ kind: 'eindvermogen' })
+  })
+
+  it('scenario gedekt maar met een negatief netto vermogen op de eindleeftijd → `dekking` (geen negatief doel)', () => {
+    const negatief = sim({ ...GEDEKT, rows: rows([[90, -5_000]]) })
+    expect(resolveLabUitkomst(input({ basis: GEDEKT, scenario: negatief, hasScenario: true })).promotie).toEqual({ kind: 'dekking' })
+  })
+
+  it('scenario-run nog onbekend (worker loopt) → terugval op de basis: gedekt → eindvermogen, tekort → dekking', () => {
+    expect(resolveLabUitkomst(input({ basis: GEDEKT, scenario: null, hasScenario: true })).promotie).toEqual({ kind: 'eindvermogen' })
+    expect(resolveLabUitkomst(input({ basis: AOW_TEKORT, scenario: null, hasScenario: true })).promotie).toEqual({ kind: 'dekking' })
   })
 })
 

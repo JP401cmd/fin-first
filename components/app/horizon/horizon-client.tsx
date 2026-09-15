@@ -122,7 +122,7 @@ import { PensionParseSummaryCard, PensionInstructionPanel, computeCumulativeImpa
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { PageInfoButton, GlossaryTerm, SectionLabel, Kicker } from '@/components/editorial'
 import { Vrijheidsas, computeCoupledStopAge, formatAge, formatMargeShort } from '@/components/app/horizon/vrijheidsas'
-import type { DekkingsasData } from '@/components/app/horizon/dekkingsbalk'
+import type { DekkingsasData, EindvermogenTegelWaarde } from '@/components/app/horizon/dekkingsbalk'
 import { ScenarioChip, VERKEN_SECTION_ID } from '@/components/app/horizon/scenario-chip'
 import { Dekkingsradar } from '@/components/app/horizon/dekkingsradar'
 import { ScenarioKaarten } from '@/components/app/horizon/scenario-kaarten'
@@ -162,7 +162,9 @@ import {
   dekkingSheetToelichting,
   dekkingVastgelegdToast,
   dekkingVerkenZin,
+  EINDVERMOGEN_DELTA_DREMPEL,
   eindvermogenDeltaBadge,
+  eindvermogenOpgeslagenNoot,
   eindvermogenPreviewWaarde,
   eindvermogenSheetToelichting,
   eindvermogenVastgelegdToast,
@@ -2834,20 +2836,28 @@ export default function HorizonPage({
     [planAnchor, currentAge, simResult, hasScenario, scenario, stopPad, kernelMaandHint, hasStopKeuze],
   )
   const labPromotie = labUitkomst.promotie
-  const doelVastleggenMogelijk = labPromotie.kind !== 'geen'
+  // Eindreview M10 — een eindvermogen-doel pas aanbieden als het scenario-BEDRAG bekend is
+  // (de worker kan nog lopen): anders opent de sheet zonder de vaste rij en stuurt de klik
+  // geen doelwaarde mee.
+  const eindvermogenDoelBekend =
+    labUitkomst.kind === 'dekking' && labUitkomst.scenarioEindvermogen?.kind === 'bedrag'
+  const doelVastleggenMogelijk =
+    labPromotie.kind !== 'geen' && (labPromotie.kind !== 'eindvermogen' || eindvermogenDoelBekend)
   // Onder solved: als vóór ADR 0145 (altijd bij een doel). Onder een vast anker alleen
   // wanneer er iets vast te leggen is — anders opent het venster zonder rijen. D12: bij een
   // gedekt plan is dat het eindvermogen.
   const doelBijwerkenMogelijk =
     doelActief &&
-    (labUitkomst.kind === 'vrijheidsleeftijd' || labPromotie.kind === 'dekking' || labPromotie.kind === 'eindvermogen')
+    (labUitkomst.kind === 'vrijheidsleeftijd' ||
+      labPromotie.kind === 'dekking' ||
+      (labPromotie.kind === 'eindvermogen' && eindvermogenDoelBekend))
   // De dekking-uitkomst als losse afleiding (null onder `solved`) — alle dekking-
   // oppervlakken hieronder lezen deze ene waarde.
   const labDekking = labUitkomst.kind === 'dekking' ? labUitkomst : null
   // Spec lab-haalbaarheid §1 — de dekkingsas leest uitsluitend de lab-uitkomst (ADR 0145).
   // NOMINAAL en zonder eindvermogen: de euro-kolom (D12) wordt in het euro-weergave-blok
   // hieronder gedeflateerd en daar aan `viewDekkingsasData` toegevoegd.
-  const dekkingsasData = useMemo<Omit<DekkingsasData, 'basisEindvermogen' | 'scenarioEindvermogen'> | null>(() => {
+  const dekkingsasData = useMemo<Omit<DekkingsasData, 'basisEindvermogen' | 'scenarioEindvermogen' | 'euroView'> | null>(() => {
     if (labDekking == null) return null
     const stopAge = labDekking.stop == null ? null : labDekking.stop.kind === 'now' ? currentAge : labDekking.stop.stopAge
     return {
@@ -3524,24 +3534,27 @@ export default function HorizonPage({
     },
     [scenarioStopKoppel, scenarioVerwachtSettled],
   )
-  // "Reken hiermee" / "Zet op maximum" (antwoorden naast de knoppen, spec lab-haalbaarheid
+  // "Reken hiermee" / "Reken met maximum" (antwoorden naast de knoppen, spec lab-haalbaarheid
   // §3 + antwoorden-naast-sliders): zet de hefboom als VERKENNING — nooit het plan, en alleen
   // op klik (ADR 0145 D7: een seed bij laden zou `hasScenario` omzetten en het
   // persist-effect laten schrijven). De stop gaat via `handleStopAgeChange`, zodat een
   // gekoppelde marge meebeweegt zoals bij de slider. De sr-only melding kondigt de nieuwe
-  // stand aan (de focus blijft op de knop).
-  const [labAntwoordMelding, setLabAntwoordMelding] = useState('')
+  // stand aan (de focus blijft op de knop). Eindreview M11: een teller per klik draagt de
+  // `key` van de meldingstekst, zodat een tweede klik op dezelfde knop (zelfde tekst) de
+  // tekst opnieuw mount en de live-regio 'm opnieuw voorleest.
+  const [labAntwoordMelding, setLabAntwoordMelding] = useState<{ tekst: string; n: number }>({ tekst: '', n: 0 })
   const handleLabAntwoord = useCallback(
     (actie: LabAntwoordActie) => {
+      const meld = () => setLabAntwoordMelding((prev) => ({ tekst: labAntwoordGezetMelding(actie), n: prev.n + 1 }))
       if (actie.kind === 'stop') {
         handleStopAgeChange(actie.stopAge)
-        setLabAntwoordMelding(labAntwoordGezetMelding(actie))
+        meld()
         return
       }
       if (!whatIfBaseline || currentAge === null) return
       const ev = buildSliderEvent(actie.key, actie.value, whatIfBaseline, currentAge)
       setScenarioSliderEvents((prev) => applySliderEvent(prev, actie.key, ev))
-      setLabAntwoordMelding(labAntwoordGezetMelding(actie))
+      meld()
     },
     [whatIfBaseline, currentAge, handleStopAgeChange],
   )
@@ -3711,7 +3724,12 @@ export default function HorizonPage({
         // ADR 0145 D12 — het doelbedrag is NOMINAAL (zoals `end_balance` het live meet via
         // `pickEndBalanceAtEndAge`), dus uit de lab-uitkomst zelf en NIET de gedeflateerde
         // lab-weergave. De server voegt de plan-velden toe.
-        eindvermogen: gekozen.eindvermogen ? labDekking?.scenarioEindvermogen ?? undefined : undefined,
+        // Alleen een `bedrag` (de scenario-run haalt de eindleeftijd, eindreview I1) — een
+        // opgeraakte run heeft geen eindvermogen om vast te leggen.
+        eindvermogen:
+          gekozen.eindvermogen && labDekking?.scenarioEindvermogen?.kind === 'bedrag'
+            ? labDekking.scenarioEindvermogen.nominaal
+            : undefined,
       }
       setDoelSaving(true)
       try {
@@ -4801,45 +4819,72 @@ export default function HorizonPage({
     () => factorAtAge(displayUnifiedRows, labDekking?.eind ?? chartEndAge),
     [displayUnifiedRows, labDekking, chartEndAge],
   )
+  // Eindreview I1 — alleen een `bedrag` (de run haalt de eindleeftijd) wordt omgezet; een
+  // opgeraakte run (`op`) heeft geen bedrag en dus niets om te deflateren.
+  const basisEindvermogenUitkomst = labDekking?.basisEindvermogen ?? null
+  const scenarioEindvermogenUitkomst = labDekking?.scenarioEindvermogen ?? null
   const viewBasisEindvermogen =
-    labDekking?.basisEindvermogen == null ? null : deflate(labDekking.basisEindvermogen, eindvermogenFactor, euroView)
+    basisEindvermogenUitkomst?.kind === 'bedrag'
+      ? deflate(basisEindvermogenUitkomst.nominaal, eindvermogenFactor, euroView)
+      : null
   const viewScenarioEindvermogen =
-    labDekking?.scenarioEindvermogen == null ? null : deflate(labDekking.scenarioEindvermogen, eindvermogenFactor, euroView)
-  // De dekkingsas krijgt de euro-kolom erbij. Gemaskeerd ⇒ `null`: de tegel toont puntjes,
-  // zodat er geen tweede maskeer-pad in het component ontstaat.
-  const viewDekkingsasData = useMemo<DekkingsasData | null>(
-    () =>
-      dekkingsasData == null
-        ? null
-        : {
-            ...dekkingsasData,
-            basisEindvermogen: masked ? null : viewBasisEindvermogen,
-            scenarioEindvermogen: masked ? null : viewScenarioEindvermogen,
-          },
-    [dekkingsasData, masked, viewBasisEindvermogen, viewScenarioEindvermogen],
-  )
-  // De delta-badge naast `lab-dekking-badge`: weg bij maskeren of een verschil van € 0.
-  const viewLabEindvermogenDelta =
+    scenarioEindvermogenUitkomst?.kind === 'bedrag'
+      ? deflate(scenarioEindvermogenUitkomst.nominaal, eindvermogenFactor, euroView)
+      : null
+  // De dekkingsas krijgt de euro-kolom erbij. Gemaskeerd ⇒ `null` voor een bedrag: de tegel
+  // toont puntjes, zodat er geen tweede maskeer-pad in het component ontstaat. `op` draagt geen
+  // bedrag en blijft dus ook gemaskeerd staan. De euro-weergave reist mee als LABEL voor het
+  // onderschrift (I3) — geen tweede omzetting.
+  const viewDekkingsasData = useMemo<DekkingsasData | null>(() => {
+    if (dekkingsasData == null) return null
+    const tegel = (uitkomst: typeof basisEindvermogenUitkomst, view: number | null): EindvermogenTegelWaarde =>
+      uitkomst == null ? null : uitkomst.kind === 'op' ? { kind: 'op' } : masked || view == null ? null : { kind: 'bedrag', euro: view }
+    return {
+      ...dekkingsasData,
+      basisEindvermogen: tegel(basisEindvermogenUitkomst, viewBasisEindvermogen),
+      scenarioEindvermogen: tegel(scenarioEindvermogenUitkomst, viewScenarioEindvermogen),
+      euroView,
+    }
+  }, [dekkingsasData, masked, basisEindvermogenUitkomst, scenarioEindvermogenUitkomst, viewBasisEindvermogen, viewScenarioEindvermogen, euroView])
+  // De delta-badge naast `lab-dekking-badge`: alleen als basis ÉN wat-als allebei een bedrag
+  // hebben (I1 — bij een (dreigend) tekort draagt de dekkings-badge de beweging al), weg bij
+  // maskeren, en weg onder de drempel (M5: een paar euro verschil is ruis).
+  const viewLabEindvermogenVerschil =
     !masked && viewBasisEindvermogen != null && viewScenarioEindvermogen != null
       ? Math.round(viewScenarioEindvermogen - viewBasisEindvermogen)
       : 0
+  const viewLabEindvermogenDelta =
+    Math.abs(viewLabEindvermogenVerschil) >= EINDVERMOGEN_DELTA_DREMPEL ? viewLabEindvermogenVerschil : 0
   // De vaste preview-rij "Eindvermogen" in het vastleg-venster (promotie `eindvermogen`):
-  // toont de gedeflateerde bedragen — de doelwaarde die de sheet schrijft blijft nominaal
-  // (`handleDoelVastleggen`). Aan de overige rijen (`doelPreviews`) verandert niets.
+  // toont de bedragen in de actieve weergave — de doelwaarde die de sheet schrijft blijft
+  // nominaal (`handleDoelVastleggen`). Eindreview I4: staat de weergave op huidige euro's en
+  // wijkt het opgeslagen (nominale) bedrag ≥ 1 % af, dan noemt de rij dat bedrag erbij, zodat
+  // de doelkaart na de klik geen onverklaard ander getal toont. Aan de overige rijen
+  // (`doelPreviews`) verandert niets.
   const viewDoelPreviews = useMemo<DoelParameterPreview[]>(() => {
-    if (labPromotie.kind !== 'eindvermogen' || viewBasisEindvermogen == null || viewScenarioEindvermogen == null) {
+    if (
+      labPromotie.kind !== 'eindvermogen' ||
+      viewBasisEindvermogen == null ||
+      viewScenarioEindvermogen == null ||
+      scenarioEindvermogenUitkomst?.kind !== 'bedrag'
+    ) {
       return doelPreviews
     }
+    const opgeslagen = scenarioEindvermogenUitkomst.nominaal
+    const noot =
+      euroView === 'real' && !masked && Math.abs(opgeslagen - viewScenarioEindvermogen) >= 0.01 * Math.abs(opgeslagen)
+        ? ` ${eindvermogenOpgeslagenNoot(opgeslagen)}`
+        : ''
     return [
       ...doelPreviews,
       {
         parameter: 'eindvermogen',
         label: 'Eindvermogen',
-        waarde: eindvermogenPreviewWaarde(viewBasisEindvermogen, viewScenarioEindvermogen, labDekking?.eind ?? null, masked),
+        waarde: `${eindvermogenPreviewWaarde(viewBasisEindvermogen, viewScenarioEindvermogen, labDekking?.eind ?? null, masked)}${noot}`,
         vast: true,
       },
     ]
-  }, [doelPreviews, labPromotie, viewBasisEindvermogen, viewScenarioEindvermogen, labDekking, masked])
+  }, [doelPreviews, labPromotie, viewBasisEindvermogen, viewScenarioEindvermogen, scenarioEindvermogenUitkomst, euroView, labDekking, masked])
 
   // ── Cijferbar (LifelineReadout) ───────────────────────────────────────────
   // `netWorth` is klasse S op de gehoverde leeftijd, `monthlyAmount` klasse F in
@@ -7184,7 +7229,7 @@ export default function HorizonPage({
                       {/* Eén gedeelde live-regio voor de antwoordknoppen (ook die onder de
                           stop-slider): altijd gemount, anders mist de eerste melding. */}
                       <p aria-live="polite" className="sr-only" data-testid="lab-antwoord-melding">
-                        {labAntwoordMelding}
+                        {labAntwoordMelding.tekst !== '' && <span key={labAntwoordMelding.n}>{labAntwoordMelding.tekst}</span>}
                       </p>
 
                       {/* Rendement per groep (genest collapsible; default dicht) */}
@@ -7233,9 +7278,11 @@ export default function HorizonPage({
                 {/* ── Sluitregel bij de antwoorden (spec antwoorden-naast-sliders §3) ──
                     De antwoorden zelf staan onder hun knop (WhatIfSliders `antwoorden`,
                     Vrijheidsas `stopAntwoord`); het losse antwoordenblok met kop is
-                    weg. Eén regel volle breedte, alleen bij ≥1 antwoord: hier staat één
-                    keer dat de bedragen uitgesmeerd zijn tot de eindleeftijd. */}
-                {labAntwoorden.length > 0 && !isNuStoppenMode && (
+                    weg. Eén regel volle breedte, alleen bij ≥1 €-antwoord (meer salaris /
+                    minder uitgeven; eindreview M4 — "doorwerken tot" alleen smeert niets
+                    uit): hier staat één keer dat de bedragen uitgesmeerd zijn tot de
+                    eindleeftijd. */}
+                {labAntwoorden.some((a) => a.kind !== 'doorwerken') && !isNuStoppenMode && (
                   <p
                     data-testid="lab-antwoorden-sluitregel"
                     className="mt-4 border-t border-[var(--border-ed)] pt-2 font-sans text-[11px] leading-snug text-[var(--ink-3)]"

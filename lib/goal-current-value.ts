@@ -53,6 +53,7 @@ import {
   type VrijheidsgetalSnapshot,
 } from '@/lib/goals/vrijheidsgetal-goal'
 import {
+  eindvermogenGoalNotApplicableReason,
   fireAgeGoalNotApplicableReason,
   planCoverageGoalNotApplicableReason,
   vrijheidsgetalGoalNotApplicableReason,
@@ -835,10 +836,24 @@ export async function syncActiveGoalValues<T extends SyncableGoal>(
   // D12 schrijft het lab dit doeltype óók als PARAMETER-doel (bron='parameter'), en die rij zit
   // niet in `metricGoals` — zonder deze lus bleef de lab-kaart eeuwig "nog geen meting". Het
   // ongekoppelde auto-sync-doel zit in beide sets, dus voor dat doel verandert er niets.
-  // Geen n.v.t.-tak: een eindvermogen heeft onder élk anker een uitkomst.
   const endBalance = fireSnapshot?.endBalanceAtEndAge
   for (const goal of injectionSet) {
     if (goal.goal_type === 'end_balance') apply(goal, endBalance)
+  }
+  // Eindreview I1 — n.v.t.-tak voor het LAB-eindvermogen (alleen `bron='parameter'`, dus
+  // `parameterGoals`; een handmatig of auto-sync `end_balance`-doel blijft ongemoeid): onder een
+  // vast stopmoment met een plan dat NIET tot de eindleeftijd reikt (`planCoveragePct < 100`)
+  // is het kernel-bedrag op de eindleeftijd de tekort-lening, geen vermogen. Waarde 0 (nooit
+  // negatief) + de reden, zodat de D11-melding "past niet meer bij je plan" het doel telt in
+  // plaats van "nog geen meting".
+  const planPct = fireSnapshot?.planCoveragePct
+  if (anchorFixed && planPct != null && Number.isFinite(planPct) && planPct < 100) {
+    const reden = eindvermogenGoalNotApplicableReason(fireSnapshot?.endAge ?? null)
+    for (const goal of parameterGoals) {
+      if (goal.goal_type !== 'end_balance') continue
+      goal.current_value = 0
+      goal.notApplicableReason = reden
+    }
   }
   for (const goal of metricGoals) {
     switch (goal.goal_type) {

@@ -439,7 +439,8 @@ describe('Vrijheidsas — vast anker (ADR 0129 F3b, B-038, TPR-09)', () => {
     stopAge: 58.5, eindAge: 90,
     basisReach: { kind: 'reikt-tot', age: 82, endAge: 90 }, basisPct: 65,
     scenarioReach: null, scenarioPct: null, verkendReach: null, verkendStopAge: null,
-    basisEindvermogen: 150_000, scenarioEindvermogen: null,
+    // Tekort-fixture (reikt tot 82): geen eindvermogen-bedrag, maar "op" (eindreview I1).
+    basisEindvermogen: { kind: 'op' }, scenarioEindvermogen: null, euroView: 'real',
   }
 
   // Spec antwoorden-naast-sliders — "Doorwerken tot X dekt je plan." onder de stop-slider,
