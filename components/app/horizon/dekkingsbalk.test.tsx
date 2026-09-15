@@ -34,7 +34,7 @@ describe('dekkingsbalkPosities — één schaal van stop tot eind', () => {
 })
 
 describe('Dekkingsbalk — rendering', () => {
-  it('toont de drie tegels Reikt tot · Eindvermogen · Gedekt met basis → wat-als (ADR 0145 D12)', () => {
+  it('toont de drie tegels Gedekt · Reikt tot · Eindvermogen met basis → wat-als (ADR 0145 D12)', () => {
     render(
       <Dekkingsbalk
         data={{
@@ -45,6 +45,9 @@ describe('Dekkingsbalk — rendering', () => {
         }}
       />,
     )
+    // Spec antwoorden-naast-sliders §4 — de uitkomst eerst: Gedekt · Reikt tot · Eindvermogen.
+    const volgorde = screen.getAllByTestId(/^dekkingsbalk-(gedekt|reikt|eindvermogen)$/).map((el) => el.getAttribute('data-testid'))
+    expect(volgorde).toEqual(['dekkingsbalk-gedekt', 'dekkingsbalk-reikt', 'dekkingsbalk-eindvermogen'])
     expect(screen.getByText('Reikt tot')).toBeInTheDocument()
     expect(screen.getByText('Eindvermogen')).toBeInTheDocument()
     expect(screen.getByText('Gedekt')).toBeInTheDocument()

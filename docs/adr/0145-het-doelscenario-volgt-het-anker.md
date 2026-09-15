@@ -159,21 +159,30 @@ het maandinkomen (ook omlaag — een negatieve delta loopt via hetzelfde salaris
 geeft "doorwerken tot X" (tweede run), "€X extra opzij" en "€X minder uitgeven"
 (`planMaandHint` = P!B96 van de hoofd-run, dus het plan-stopmoment — nooit de hint van het
 verkende stop-pad, die bij een ander stopmoment hoort; eindreview I1); elke regel zet een
-verkenning, nooit het plan (D7 blijft: alleen op klik). Alleen "Doorwerken tot X **dekt je
-plan**." claimt een uitkomst. De twee €-regels zeggen "Zo'n €X per maand extra opzij /
-minder uitgeven, uitgesmeerd tot je eindleeftijd, **hoort bij een gedekt plan**.": P!B96 is
+verkenning, nooit het plan (D7 blijft: alleen op klik). **Elk antwoord staat naast zijn
+knop** (bijstelling 15 sep 2026, spec antwoorden-naast-sliders): "meer salaris" onder Meer
+salaris, "minder uitgeven" onder Spaarquote, "doorwerken tot" onder de stop-slider van de
+dekkingsas; de verdeling doet de pure `labAntwoordenPerSlider`, de regel is één
+`SliderAntwoordRegel` in beide hosts. Het losse blok met kop verviel; er blijft **één
+sluitregel** volle breedte onder de twee kolommen ("Indicatie, geen advies — …, uitgesmeerd
+over de maanden tot je eindleeftijd."), alleen bij ≥1 antwoord. Alleen "Doorwerken tot X
+**dekt je plan**." claimt een uitkomst. De twee €-regels zeggen kort "Zo'n €X/mnd meer" resp.
+"Zo'n €X/mnd minder uitgeven **hoort bij een gedekt plan**." — het "uitgesmeerd" staat één
+keer, in de sluitregel: P!B96 is
 uitgesmeerd over de maanden tot de eindleeftijd, terwijl de slider-hefbomen via het
 FIRE-gegate salariskanaal op het stopmoment stoppen. Gemeten met de echte motor
 (`lib/horizon/lab-antwoorden.kernel.test.ts`, eindreview I2): leeftijd 42 · stop 50 · basis
 77% → hint gezet 94%; leeftijd 55 · stop 58 · basis 82% → hint gezet 87%; doorwerken tot het
 antwoord → 100% (plan-anker én stop-pad). Een hint die over de maanden tot het stopmoment
 deelt, is een kernel-/fase-2-vraag.
-Boven het slider-bereik zegt de regel dat; de knop zet het maximum. Vervangt, onder een
+Boven het slider-bereik zegt een tweede regel "Meer dan deze knop toelaat." en heet de knop
+"Zet op maximum" (anders "Reken hiermee"); in de privacy-weergave geen knop. Na een klik meldt
+één gedeelde sr-only live-regio de nieuwe stand. Vervangt, onder een
 vast anker, zowel de oude plan-hint ("Reken met € X extra inleg", die tekst en knop
 bestaan niet meer) als het stop-pad-blok "Wat hoort daarbij?" — dat blok blijft alleen
 staan onder `solved` (`!isFixedAnchorMode`-gate in `horizon-client.tsx`); onder een vast
-anker toont het antwoordenblok hetzelfde inzicht in de vaste volgorde doorwerken · extra
-opzij · minder uitgeven.
+anker tonen de antwoorden naast de knoppen hetzelfde inzicht. De tegels van de dekkingsas
+staan in de volgorde Gedekt · Reikt tot · Eindvermogen.
 
 **D11 — Doelen volgen het plan** (§4). De "Plan gedekt"-kaart leest naam en subregel uit
 het huidige plan (`FinPageData.labPlan`); de metadata blijft historie

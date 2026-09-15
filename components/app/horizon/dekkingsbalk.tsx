@@ -81,11 +81,12 @@ function euroLabel(value: number | null): string {
   return value == null ? GEEN_BEDRAG : formatCurrency(value)
 }
 
-function Tegel({ kicker, value, testId }: { kicker: string; value: string; testId: string }) {
+function Tegel({ kicker, value, testId, sub }: { kicker: string; value: string; testId: string; sub?: string }) {
   return (
-    <div>
+    <div className="min-w-0">
       <div className="font-sans text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">{kicker}</div>
       <div data-testid={testId} className="mt-0.5 font-mono text-sm tabular-nums text-[var(--ink)]">{value}</div>
+      {sub && <p className="mt-0.5 font-sans text-[10px] leading-snug text-[var(--ink-4)]">{sub}</p>}
     </div>
   )
 }
@@ -123,10 +124,15 @@ export function Dekkingsbalk({ data }: { data: DekkingsasData }) {
         <span>{data.stopAge != null ? `stop ${leeftijdJaar(data.stopAge)}` : 'stop'}</span>
         <span>{data.eindAge != null ? `plan tot ${leeftijdJaar(data.eindAge)}` : 'eind'}</span>
       </div>
+      {/* Drie verandercomponenten, basis → wat-als (spec antwoorden-naast-sliders §4):
+          Gedekt · Reikt tot · Eindvermogen — de uitkomst eerst, dan waar het reikt, dan
+          wat er over is. */}
       <div className="mt-4 grid grid-cols-3 gap-3 border-t border-[var(--border-ed)] pt-4">
+        <Tegel kicker={DEKKINGSAS_COPY.tegelGedekt} testId="dekkingsbalk-gedekt" value={arrow(pctLabel(data.basisPct), data.scenarioPct != null ? pctLabel(data.scenarioPct) : null)} />
         <Tegel kicker={DEKKINGSAS_COPY.tegelReikt} testId="dekkingsbalk-reikt" value={arrow(reachLabel(data.basisReach, data.eindAge), data.scenarioReach ? reachLabel(data.scenarioReach, data.eindAge) : null)} />
-        {/* ADR 0145 D12 — het derde component: wat er op de eindleeftijd over is. Staat waar
-            "Plan tot" stond; die eindleeftijd noemt de as onder de balk al ("plan tot 90"). */}
+        {/* ADR 0145 D12 — wat er op de eindleeftijd over is. Staat waar "Plan tot" stond; die
+            eindleeftijd noemt de as onder de balk al ("plan tot 90"). Het sub-label hoort bij
+            déze tegel, dus staat het eronder i.p.v. onder de hele rij. */}
         <Tegel
           kicker={DEKKINGSAS_COPY.tegelEindvermogen}
           testId="dekkingsbalk-eindvermogen"
@@ -134,12 +140,9 @@ export function Dekkingsbalk({ data }: { data: DekkingsasData }) {
             euroLabel(data.basisEindvermogen),
             data.scenarioEindvermogen != null ? euroLabel(data.scenarioEindvermogen) : null,
           )}
+          sub={eindvermogenTegelCaption(data.eindAge)}
         />
-        <Tegel kicker={DEKKINGSAS_COPY.tegelGedekt} testId="dekkingsbalk-gedekt" value={arrow(pctLabel(data.basisPct), data.scenarioPct != null ? pctLabel(data.scenarioPct) : null)} />
       </div>
-      <p className="mt-1 font-sans text-[10px] leading-snug text-[var(--ink-4)]">
-        {eindvermogenTegelCaption(data.eindAge)}
-      </p>
     </div>
   )
 }

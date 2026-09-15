@@ -442,7 +442,39 @@ describe('Vrijheidsas — vast anker (ADR 0129 F3b, B-038, TPR-09)', () => {
     basisEindvermogen: 150_000, scenarioEindvermogen: null,
   }
 
-  it('sectie 2 wordt de dekkingsas: kop "Reikt je plan?", slider "Doorwerken tot", tegels Reikt tot · Eindvermogen · Gedekt', () => {
+  // Spec antwoorden-naast-sliders — "Doorwerken tot X dekt je plan." onder de stop-slider,
+  // boven de verkenning-alinea, gekoppeld via aria-describedby; alleen op klik.
+  it('stopAntwoord: regel onder de stop-slider, beschreven door de range, knop roept alleen op klik', () => {
+    const onClick = vi.fn()
+    render(
+      <Vrijheidsas
+        {...baseProps}
+        ankerVast
+        planStopAge={58.5}
+        dekking={dekking}
+        onMaakPlan={() => {}}
+        stopAntwoord={{ tekst: 'Doorwerken tot 65 dekt je plan.', bovenBereik: false, knop: { label: 'Reken hiermee', onClick } }}
+      />,
+    )
+    const regel = screen.getByText('Doorwerken tot 65 dekt je plan.')
+    const slider = screen.getByRole('slider', { name: 'Doorwerken tot' })
+    expect(slider).toHaveAttribute('aria-describedby', regel.id)
+    // boven de verkenning-alinea
+    const alinea = screen.getByText(/dit is een verkenning/)
+    expect(regel.compareDocumentPosition(alinea) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(onClick).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: /^Reken hiermee: Doorwerken tot 65/ }))
+    expect(onClick).toHaveBeenCalledTimes(1)
+  })
+
+  it('stopAntwoord zonder dekkingsas (solved) rendert niets', () => {
+    render(
+      <Vrijheidsas {...baseProps} stopAntwoord={{ tekst: 'Doorwerken tot 65 dekt je plan.', bovenBereik: false, knop: null }} />,
+    )
+    expect(screen.queryByText('Doorwerken tot 65 dekt je plan.')).toBeNull()
+  })
+
+  it('sectie 2 wordt de dekkingsas: kop "Reikt je plan?", slider "Doorwerken tot", tegels Gedekt · Reikt tot · Eindvermogen', () => {
     render(<Vrijheidsas {...baseProps} ankerVast planStopAge={58.5} dekking={dekking} onMaakPlan={() => {}} />)
     expect(screen.getByText('Reikt je plan?')).toBeInTheDocument()
     expect(screen.getByRole('slider', { name: 'Doorwerken tot' })).toBeInTheDocument()

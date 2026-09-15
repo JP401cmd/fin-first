@@ -32,8 +32,8 @@ import {
   HEFBOOM_COPY,
   spaarquoteEuroRegel,
   antwoordMinderUitgeven,
-  ANTWOORDEN_KOP,
   ANTWOORD_KNOP,
+  ANTWOORD_KNOP_MAX,
   ANTWOORD_BOVEN_BEREIK,
   dekkingVastgelegdToast,
   DEKKINGSAS_COPY,
@@ -312,24 +312,25 @@ describe('dekking-zinnen — de vastgestelde kopij', () => {
   })
 
   // Apostrof: hetzelfde rechte teken (') als de rest van dit bestand ("zo'n", "ratio's").
-  it('11 · antwoordenblok — drie beschrijvende zinnen, één knop, boven-bereik-zin (spec §3/§5)', () => {
-    expect(ANTWOORDEN_KOP).toBe('Wat maakt het haalbaar?')
+  it('11 · antwoorden naast de knoppen — korte beschrijvende zinnen, twee knoplabels, boven-bereik-regel', () => {
     expect(ANTWOORD_KNOP).toBe('Reken hiermee')
+    expect(ANTWOORD_KNOP_MAX).toBe('Zet op maximum')
     expect(antwoordDoorwerken(61)).toBe('Doorwerken tot 61 dekt je plan.')
     expect(antwoordDoorwerken(61.5)).toBe('Doorwerken tot 61,5 dekt je plan.')
-    expect(antwoordMeerSalaris(2100.4)).toBe("Zo'n €2.100 per maand meer salaris, uitgesmeerd tot je eindleeftijd, hoort bij een gedekt plan.")
-    expect(antwoordMinderUitgeven(2100.4)).toBe("Zo'n €2.100 per maand minder uitgeven, uitgesmeerd tot je eindleeftijd, hoort bij een gedekt plan.")
-    expect(ANTWOORD_BOVEN_BEREIK).toBe('Dat is meer dan de knop toelaat — de knop zet het hoogste bedrag.')
+    expect(antwoordMeerSalaris(2100.4)).toBe("Zo'n €2.100/mnd meer hoort bij een gedekt plan.")
+    expect(antwoordMinderUitgeven(2100.4)).toBe("Zo'n €2.100/mnd minder uitgeven hoort bij een gedekt plan.")
+    expect(ANTWOORD_BOVEN_BEREIK).toBe('Meer dan deze knop toelaat.')
   })
 
   it('11 · privacy: de bedragen worden gemaskeerd, de zin blijft beschrijvend', () => {
-    expect(antwoordMeerSalaris(2100, true)).toBe(`Zo'n ${MASKED_AMOUNT_PLACEHOLDER} per maand meer salaris, uitgesmeerd tot je eindleeftijd, hoort bij een gedekt plan.`)
+    expect(antwoordMeerSalaris(2100, true)).toBe(`Zo'n ${MASKED_AMOUNT_PLACEHOLDER}/mnd meer hoort bij een gedekt plan.`)
     expect(antwoordMinderUitgeven(2100, true)).toContain(MASKED_AMOUNT_PLACEHOLDER)
     expect(antwoordMinderUitgeven(2100, true)).not.toMatch(/2\.100|€/)
   })
 
   it('11 · toon: geen instructie, geen AOW in de tekortzinnen', () => {
     const VERBODEN = /je moet|\bzet\b|verhoog|\bAOW\b/i
+    // ZINNEN strikt — elke zin die de gebruiker leest als uitspraak.
     for (const z of [
       antwoordDoorwerken(61),
       antwoordDoorwerken(61.5),
@@ -337,14 +338,17 @@ describe('dekking-zinnen — de vastgestelde kopij', () => {
       antwoordMeerSalaris(500, true),
       antwoordMinderUitgeven(500),
       antwoordMinderUitgeven(500, true),
-      ANTWOORD_KNOP,
+      ANTWOORD_BOVEN_BEREIK,
     ]) {
       expect(z).not.toMatch(VERBODEN)
     }
-    // Smalle uitzondering: "de knop zet het hoogste bedrag" beschrijft de knop (vastgestelde
-    // kopij, spec §5). Alleen die letterlijke frase valt weg; elke andere "zet" blijft verboden.
-    expect(ANTWOORD_BOVEN_BEREIK).toContain('de knop zet')
-    expect(ANTWOORD_BOVEN_BEREIK.replace('de knop zet', '')).not.toMatch(VERBODEN)
+    // KNOPLABELS zijn een bediening, geen zin: "Zet op maximum" beschrijft wat de knop doet
+    // (spec antwoorden-naast-sliders). Alleen de labels vallen buiten de \bzet\b-regel; de
+    // overige verboden patronen gelden er onverkort.
+    const VERBODEN_KNOP = /je moet|verhoog|\bAOW\b/i
+    for (const label of [ANTWOORD_KNOP, ANTWOORD_KNOP_MAX]) {
+      expect(label).not.toMatch(VERBODEN_KNOP)
+    }
   })
 
   it('12 · toast', () => {
@@ -375,6 +379,7 @@ describe('dekking-zinnen — toon-invarianten over alle ankers', () => {
         antwoordMinderUitgeven(300, true),
         ANTWOORD_BOVEN_BEREIK,
         ANTWOORD_KNOP,
+        ANTWOORD_KNOP_MAX,
         radarSubtitel({ stop, verkendStopAge: null }) ?? '',
         radarSubtitel({ stop, verkendStopAge: 62 }) ?? '',
         ...TEKORT_REACHES.map((r) => dekkingAsNotitie(r, 40, 90) ?? ''),
@@ -406,7 +411,7 @@ describe('dekking-zinnen — toon-invarianten over alle ankers', () => {
     // de €-hefbomen stoppen op het stopmoment en dekken het plan niet → "hoort bij" (eindreview I2).
     expect(antwoordDoorwerken(60)).toMatch(/dekt je plan\.$/)
     for (const zin of [antwoordMeerSalaris(300), antwoordMinderUitgeven(300), antwoordMeerSalaris(300, true), antwoordMinderUitgeven(300, true)]) {
-      expect(zin).toMatch(/uitgesmeerd tot je eindleeftijd, hoort bij een gedekt plan\.$/)
+      expect(zin).toMatch(/\/mnd (meer|minder uitgeven) hoort bij een gedekt plan\.$/)
       expect(zin).not.toMatch(/dekt je plan/)
     }
   })

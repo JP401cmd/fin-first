@@ -147,6 +147,71 @@ describe('WhatIfSliders — a11y: slider heeft naam + valuetext', () => {
 })
 
 /**
+ * Spec antwoorden-naast-sliders (15 sep 2026) — het antwoord staat onder de knop waar het
+ * over gaat, beschreven door die range (aria-describedby), met een knop die alleen op klik
+ * iets doet; zonder antwoord geen regel. Boven bereik: extra regel binnen hetzelfde id.
+ */
+describe('WhatIfSliders — antwoorden naast de knoppen', () => {
+  const baseline: WhatIfOverrides = {
+    monthlyIncome: 3000,
+    workDaysPerWeek: 5,
+    savingsRate: 20,
+    expectedReturn: 6,
+    extraContribution: 0,
+  }
+
+  it('zet elk antwoord onder zijn eigen knop en koppelt het via aria-describedby', () => {
+    const onClick = vi.fn()
+    render(
+      <WhatIfSliders
+        baseline={baseline}
+        events={[]}
+        setEvents={() => {}}
+        currentAge={40}
+        antwoorden={{
+          extra_inleg: { tekst: "Zo'n €500/mnd meer hoort bij een gedekt plan.", bovenBereik: false, knop: { label: 'Reken hiermee', onClick } },
+          savings: { tekst: "Zo'n €500/mnd minder uitgeven hoort bij een gedekt plan.", bovenBereik: true, knop: { label: 'Zet op maximum', onClick: () => {} } },
+        }}
+      />,
+    )
+    const salaris = screen.getByRole('slider', { name: 'Meer salaris' })
+    const salarisRegel = screen.getByText("Zo'n €500/mnd meer hoort bij een gedekt plan.")
+    expect(salaris).toHaveAttribute('aria-describedby', salarisRegel.id)
+    const spaar = screen.getByRole('slider', { name: 'Spaarquote' })
+    const spaarRegel = document.getElementById(spaar.getAttribute('aria-describedby') ?? '')
+    // boven bereik: de extra regel zit binnen het beschreven element
+    expect(spaarRegel?.textContent).toBe("Zo'n €500/mnd minder uitgeven hoort bij een gedekt plan.Meer dan deze knop toelaat.")
+    expect(screen.getByRole('slider', { name: 'Minder werken' })).not.toHaveAttribute('aria-describedby')
+    expect(screen.getAllByTestId('slider-antwoord')).toHaveLength(2)
+    // accessible name begint met het zichtbare label (WCAG 2.5.3)
+    expect(screen.getByRole('button', { name: /^Zet op maximum: / })).toBeInTheDocument()
+    expect(onClick).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: /^Reken hiermee: Zo'n €500\/mnd meer/ }))
+    expect(onClick).toHaveBeenCalledTimes(1)
+  })
+
+  it('privacy-weergave (knop null): de zin blijft, geen knop', () => {
+    render(
+      <WhatIfSliders
+        baseline={baseline}
+        events={[]}
+        setEvents={() => {}}
+        currentAge={40}
+        antwoorden={{ extra_inleg: { tekst: "Zo'n ••••••/mnd meer hoort bij een gedekt plan.", bovenBereik: false, knop: null } }}
+      />,
+    )
+    expect(screen.getByText(/hoort bij een gedekt plan/)).toBeInTheDocument()
+    expect(screen.queryByRole('button')).toBeNull()
+  })
+
+  it('zonder antwoorden: geen regel en geen describedby', () => {
+    render(<WhatIfSliders baseline={baseline} events={[]} setEvents={() => {}} currentAge={40} />)
+    expect(screen.queryByTestId('slider-antwoord')).toBeNull()
+    for (const s of screen.getAllByRole('slider')) expect(s).not.toHaveAttribute('aria-describedby')
+  })
+})
+
+/**
  * iOS (bugmelding 13 sep 2026, "lastig te pakken"): Safari op iOS verschuift een range
  * alléén vanaf het 18px-bolletje. Given een iPhone, When de vinger ergens op de baan
  * tikt of zijwaarts veegt, Then springt de slider naar die plek (zoals Android native

@@ -160,9 +160,6 @@ import {
   dekkingDeltaBadge,
   dekkingPreviewWaarde,
   dekkingSheetToelichting,
-  ANTWOORDEN_KOP,
-  ANTWOORD_BOVEN_BEREIK,
-  ANTWOORD_KNOP,
   dekkingVastgelegdToast,
   dekkingVerkenZin,
   eindvermogenDeltaBadge,
@@ -175,7 +172,12 @@ import {
   type AnkerStop,
 } from '@/lib/horizon/anker-copy'
 import { resolveLabUitkomst, type LabUitkomst } from '@/lib/horizon/lab-uitkomst'
-import { resolveLabAntwoorden, type LabAntwoordActie } from '@/lib/horizon/lab-antwoorden'
+import {
+  labAntwoordenPerSlider,
+  labAntwoordGezetMelding,
+  resolveLabAntwoorden,
+  type LabAntwoordActie,
+} from '@/lib/horizon/lab-antwoorden'
 import { GOAL_TYPE_LABELS } from '@/lib/goal-data'
 import { AnkerDrieslag } from '@/components/app/horizon/anker-drieslag'
 import {
@@ -3522,21 +3524,32 @@ export default function HorizonPage({
     },
     [scenarioStopKoppel, scenarioVerwachtSettled],
   )
-  // "Reken hiermee" (antwoordenblok, spec lab-haalbaarheid §3): zet de hefboom als
-  // VERKENNING — nooit het plan, en alleen op klik (ADR 0145 D7: een seed bij laden zou
-  // `hasScenario` omzetten en het persist-effect laten schrijven). De stop gaat via
-  // `handleStopAgeChange`, zodat een gekoppelde marge meebeweegt zoals bij de slider.
+  // "Reken hiermee" / "Zet op maximum" (antwoorden naast de knoppen, spec lab-haalbaarheid
+  // §3 + antwoorden-naast-sliders): zet de hefboom als VERKENNING — nooit het plan, en alleen
+  // op klik (ADR 0145 D7: een seed bij laden zou `hasScenario` omzetten en het
+  // persist-effect laten schrijven). De stop gaat via `handleStopAgeChange`, zodat een
+  // gekoppelde marge meebeweegt zoals bij de slider. De sr-only melding kondigt de nieuwe
+  // stand aan (de focus blijft op de knop).
+  const [labAntwoordMelding, setLabAntwoordMelding] = useState('')
   const handleLabAntwoord = useCallback(
     (actie: LabAntwoordActie) => {
       if (actie.kind === 'stop') {
         handleStopAgeChange(actie.stopAge)
+        setLabAntwoordMelding(labAntwoordGezetMelding(actie))
         return
       }
       if (!whatIfBaseline || currentAge === null) return
       const ev = buildSliderEvent(actie.key, actie.value, whatIfBaseline, currentAge)
       setScenarioSliderEvents((prev) => applySliderEvent(prev, actie.key, ev))
+      setLabAntwoordMelding(labAntwoordGezetMelding(actie))
     },
     [whatIfBaseline, currentAge, handleStopAgeChange],
+  )
+  // Elk antwoord onder zijn eigen knop (pure verdeling in lib). `handleLabAntwoord` zit
+  // alleen in de onClick van de knop; onder `now` en in de privacy-weergave geen knop.
+  const labAntwoordenPerKnop = useMemo(
+    () => labAntwoordenPerSlider(isNuStoppenMode ? [] : labAntwoorden, (actie) => handleLabAntwoord(actie), { masked }),
+    [isNuStoppenMode, labAntwoorden, handleLabAntwoord, masked],
   )
   // Aanzetten van de koppeling legt de HUIDIGE marge vast; uitzetten laat de stop staan.
   const handleStopKoppelChange = useCallback(
@@ -7106,6 +7119,8 @@ export default function HorizonPage({
                   ankerVast={isFixedAnchorMode}
                   // Spec lab-haalbaarheid §1 — onder een vast anker is sectie 2 de dekkingsas.
                   dekking={viewDekkingsasData}
+                  // Spec antwoorden-naast-sliders — "Doorwerken tot X dekt je plan." onder de stop-slider.
+                  stopAntwoord={labAntwoordenPerKnop.stop}
                   // ADR 0145 — onder aow/age de uitkomst van het plan: reikt het, voor
                   // hoeveel procent, en of er iets vast te leggen valt.
                   uitkomstNotitie={(() => {
@@ -7162,9 +7177,15 @@ export default function HorizonPage({
                             events={scenarioSliderEvents}
                             setEvents={handleScenarioSliderEvents}
                             currentAge={currentAge}
+                            antwoorden={labAntwoordenPerKnop.sliders}
                           />
                         </div>
                       )}
+                      {/* Eén gedeelde live-regio voor de antwoordknoppen (ook die onder de
+                          stop-slider): altijd gemount, anders mist de eerste melding. */}
+                      <p aria-live="polite" className="sr-only" data-testid="lab-antwoord-melding">
+                        {labAntwoordMelding}
+                      </p>
 
                       {/* Rendement per groep (genest collapsible; default dicht) */}
                       <div className="border-t border-[var(--border-ed)] pt-5">
@@ -7209,44 +7230,18 @@ export default function HorizonPage({
                     </p>
                   </div>
                 )}
-                {/* ── Wat maakt het haalbaar? — antwoordenblok (spec lab-haalbaarheid §3) ──
-                    Onder aow/age met een tekort: de drie hefbomen mét getal. Elke regel
-                    zet de hefboom als verkenning (nooit het plan), alleen op klik. Onder
-                    `now` en zonder tekort leeg. Kopij uit anker-copy.ts (merkstem/compliance).
-                    Privacy-weergave: bedragen als placeholder en géén knop — de slider
-                    zou na het zetten het echte bedrag tonen. */}
+                {/* ── Sluitregel bij de antwoorden (spec antwoorden-naast-sliders §3) ──
+                    De antwoorden zelf staan onder hun knop (WhatIfSliders `antwoorden`,
+                    Vrijheidsas `stopAntwoord`); het losse antwoordenblok met kop is
+                    weg. Eén regel volle breedte, alleen bij ≥1 antwoord: hier staat één
+                    keer dat de bedragen uitgesmeerd zijn tot de eindleeftijd. */}
                 {labAntwoorden.length > 0 && !isNuStoppenMode && (
-                  <div
-                    data-testid="lab-antwoorden"
-                    className="mt-4 border border-[var(--ink-2)] border-l-4 border-l-horizon-500 bg-[var(--paper)] px-3 py-2.5"
+                  <p
+                    data-testid="lab-antwoorden-sluitregel"
+                    className="mt-4 border-t border-[var(--border-ed)] pt-2 font-sans text-[11px] leading-snug text-[var(--ink-3)]"
                   >
-                    <p className="mb-1 label-editorial text-[var(--ink-3)]">{ANTWOORDEN_KOP}</p>
-                    <ul className="space-y-1.5">
-                      {labAntwoorden.map((a) => (
-                        <li
-                          key={a.kind}
-                          className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 font-sans text-[12px] leading-snug text-[var(--ink-2)]"
-                        >
-                          <span>
-                            {a.zin}
-                            {a.bovenBereik && <span className="text-[var(--ink-3)]"> {ANTWOORD_BOVEN_BEREIK}</span>}
-                          </span>
-                          {!masked && (
-                            <button
-                              type="button"
-                              onClick={() => handleLabAntwoord(a.actie)}
-                              className="inline-flex min-h-[44px] items-center font-sans text-[11px] font-semibold text-horizon-700 underline underline-offset-2 transition-colors hover:text-horizon-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
-                            >
-                              {ANTWOORD_KNOP}
-                            </button>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                    <p className="mt-1.5 font-sans text-[11px] leading-snug text-[var(--ink-3)]">
-                      Indicatie, geen advies — een rekenuitkomst bij je huidige aannames, uitgesmeerd over de maanden tot je eindleeftijd.
-                    </p>
-                  </div>
+                    Indicatie, geen advies — een rekenuitkomst bij je huidige aannames, uitgesmeerd over de maanden tot je eindleeftijd.
+                  </p>
                 )}
               </div>
             )}

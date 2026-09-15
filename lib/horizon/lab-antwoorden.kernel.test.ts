@@ -40,7 +40,8 @@ import { runForcedStopPath, solveFireAgeWithoutAnchor } from './scenario-presets
  * antwoord haalde overal 100%.
  *
  * Gevolg (controller-ruling I2): de twee €-zinnen claimen geen uitkomst meer ("hoort bij
- * een gedekt plan", met "uitgesmeerd tot je eindleeftijd"); "Doorwerken tot X dekt je
+ * een gedekt plan"; het "uitgesmeerd tot je eindleeftijd" staat sinds de spec
+ * antwoorden-naast-sliders één keer in de sluitregel); "Doorwerken tot X dekt je
  * plan." blijft, want die claim is hier bewezen. Wijzigt de motor zo dat de €-hefboom wél
  * dekt, dan wordt deze test rood — herzie dan de kopij bewust, niet de test.
  */
@@ -150,7 +151,7 @@ describe('lab-antwoorden × kernel — wat "Reken hiermee" werkelijk oplevert (e
         expect(m.extraPct as number).toBeLessThan(99)
         expect(m.savingsPct as number).toBeLessThan(99)
         for (const a of m.antwoorden.filter((x) => x.kind !== 'doorwerken')) {
-          expect(a.zin).toMatch(/uitgesmeerd tot je eindleeftijd, hoort bij een gedekt plan\.$/)
+          expect(a.zin).toMatch(/hoort bij een gedekt plan\.$/)
           expect(a.zin).not.toMatch(/dekt je plan/)
         }
       })

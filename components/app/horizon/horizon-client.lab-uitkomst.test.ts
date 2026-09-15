@@ -96,7 +96,7 @@ describe('horizon-client consumeert ÉÉN lab-uitkomst (ADR 0145)', () => {
     expect(dekkingRegels.filter((l) => /\/\s*12\b|computeRunwayCoveragePct/.test(l))).toEqual([])
   })
 
-  it('het antwoordenblok consumeert resolveLabAntwoorden op labDekking + solvedRun; acties alleen op klik', () => {
+  it('de antwoorden consumeren resolveLabAntwoorden op labDekking + solvedRun; acties alleen op klik', () => {
     const src = bron()
     const start = src.indexOf('resolveLabAntwoorden({')
     expect(start).toBeGreaterThan(-1)
@@ -109,17 +109,31 @@ describe('horizon-client consumeert ÉÉN lab-uitkomst (ADR 0145)', () => {
     expect(call).not.toMatch(/maandHint:\s*labDekking/)
     expect(call).toContain('masked')
     const code = codeRegels().join('\n')
-    expect(code).toContain('onClick={() => handleLabAntwoord(a.actie)}')
+    // Spec antwoorden-naast-sliders: de antwoorden gaan via de pure verdeler naar hun knop.
+    // `handleLabAntwoord` zit alleen in de onClick die `labAntwoordenPerSlider` op het
+    // item zet (geteld in lib/horizon/lab-antwoorden.test.ts: nooit bij het mappen aangeroepen).
+    const perKnop = code.indexOf('labAntwoordenPerSlider(')
+    expect(perKnop).toBeGreaterThan(-1)
+    const perKnopCall = code.slice(perKnop, code.indexOf('\n', perKnop))
+    expect(perKnopCall).toContain('labAntwoorden')
+    expect(perKnopCall).toContain('(actie) => handleLabAntwoord(actie)')
+    // privacymodus → geen knop (de verdeler zet dan `knop: null`)
+    expect(perKnopCall).toContain('{ masked }')
     // nooit auto-seeden: geen useEffect dat handleLabAntwoord aanroept, en de enige
-    // aanroep is die ene onClick (ADR 0145 D7).
+    // aanroep is die ene callback naar de knop (ADR 0145 D7).
     expect(code).not.toMatch(/useEffect\([^)]*handleLabAntwoord/)
+    expect(code).not.toMatch(/useEffect\([^)]*labAntwoordenPerKnop\.\w+\.knop/)
     expect(code.match(/handleLabAntwoord\(/g) ?? []).toHaveLength(1)
-    // in privacymodus geen knop
-    const blokStart = code.indexOf('data-testid="lab-antwoorden"')
-    expect(blokStart).toBeGreaterThan(-1)
-    const blok = code.slice(blokStart, code.indexOf('Indicatie, geen advies', blokStart))
-    expect(blok).toContain('{!masked && (')
-    expect(blok).toContain('ANTWOORD_KNOP')
+    expect(code).not.toMatch(/\.knop\??\.onClick\(\)/)
+    // elk antwoord bij zijn knop; het losse blok met kop is weg, één sluitregel blijft
+    expect(src).toContain('antwoorden={labAntwoordenPerKnop.sliders}')
+    expect(src).toContain('stopAntwoord={labAntwoordenPerKnop.stop}')
+    expect(src).not.toContain('data-testid="lab-antwoorden"')
+    expect(src).not.toContain('Wat maakt het haalbaar?')
+    const sluit = code.indexOf('data-testid="lab-antwoorden-sluitregel"')
+    expect(sluit).toBeGreaterThan(-1)
+    expect(code.slice(sluit - 200, sluit)).toContain('labAntwoorden.length > 0 && !isNuStoppenMode')
+    expect(code.slice(sluit, sluit + 400)).toContain('Indicatie, geen advies')
     // de oude plan-hint is weg
     expect(src).not.toContain('lab-plan-tekort-hint')
     expect(src).not.toMatch(/dekkingTekortHint(Zin|Knop)/)

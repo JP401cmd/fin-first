@@ -1,6 +1,9 @@
 'use client'
 
+import { useId } from 'react'
 import { formatCurrency } from '@/lib/format'
+import { tapTargetClass } from '@/components/editorial/tap-target'
+import type { SliderAntwoordItem } from '@/lib/horizon/lab-antwoorden'
 import {
   buildSliderEvent,
   applySliderEvent,
@@ -11,7 +14,7 @@ import {
 } from '@/lib/scenario-events'
 import type { WhatIfEvent } from '@/lib/types/horizon-whatif'
 import { rangeTouchSeekProps } from '@/lib/range-touch-seek'
-import { HEFBOOM_COPY, spaarquoteEuroRegel } from '@/lib/horizon/anker-copy'
+import { ANTWOORD_BOVEN_BEREIK, HEFBOOM_COPY, spaarquoteEuroRegel } from '@/lib/horizon/anker-copy'
 
 /**
  * WhatIfOverrides is de baseline-snapshot waartegen de sliders hun events opbouwen
@@ -21,14 +24,56 @@ import { HEFBOOM_COPY, spaarquoteEuroRegel } from '@/lib/horizon/anker-copy'
 import type { WhatIfOverrides } from '@/lib/types/horizon-whatif'
 export type { WhatIfOverrides }
 
+/**
+ * Het antwoord onder een knop (spec antwoorden-naast-sliders, 15 sep 2026): "wat hier zou
+ * horen" bij een tekort onder een vast anker. Zelfde vorm als het lib-item uit
+ * `labAntwoordenPerSlider` — lib blijft React-vrij, dit is alleen de UI-naam ervoor.
+ */
+export type SliderAntwoord = SliderAntwoordItem
+
+type SliderAntwoordKey = 'extra_inleg' | 'savings' | 'workdays'
+
 interface SlidersProps {
   baseline: WhatIfOverrides
   events: WhatIfEvent[]
   setEvents: (updater: (prev: WhatIfEvent[]) => WhatIfEvent[]) => void
   currentAge: number
+  /** Antwoord per knop; een ontbrekende key = geen regel en geen lege ruimte. */
+  antwoorden?: Partial<Record<SliderAntwoordKey, SliderAntwoord>>
 }
 
 export { computeSliderUiRange }
+
+/**
+ * De antwoordregel onder een knop — één vorm, twee hosts (`SliderRow` hier en de
+ * stop-slider "Doorwerken tot" in vrijheidsas.tsx). Geen doos: een gestippelde hairline
+ * scheidt 'm van de schaal, een accentstreep links koppelt 'm aan de knop erboven. De
+ * boven-bereik-regel zit BINNEN het `id`-element, zodat `aria-describedby` 'm meeleest.
+ */
+export function SliderAntwoordRegel({ id, antwoord }: { id: string; antwoord: SliderAntwoord }) {
+  return (
+    <div data-testid="slider-antwoord" className="mt-1.5 border-t border-dashed border-[var(--border-ed)] pt-1.5">
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 border-l-2 border-[var(--module-active-500)] pl-2">
+        <p id={id} className="font-sans text-[11px] leading-snug text-[var(--ink-2)]">
+          {antwoord.tekst}
+          {antwoord.bovenBereik && (
+            <span className="block text-[var(--ink-3)]">{ANTWOORD_BOVEN_BEREIK}</span>
+          )}
+        </p>
+        {antwoord.knop && (
+          <button
+            type="button"
+            onClick={antwoord.knop.onClick}
+            aria-label={`${antwoord.knop.label}: ${antwoord.tekst}`}
+            className={`${tapTargetClass('extend-block')} inline-flex items-center font-sans text-[11px] font-semibold text-[var(--module-active-800)] underline underline-offset-2 transition-colors hover:text-[var(--ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]`}
+          >
+            {antwoord.knop.label}
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
 
 export function DeltaBadge({ current, base, format }: { current: number; base: number; format: (v: number) => string }) {
   const diff = current - base
@@ -57,6 +102,7 @@ function SliderRow({
   maxLabel,
   hint,
   detail = null,
+  antwoord = null,
 }: {
   label: string
   value: number
@@ -73,7 +119,10 @@ function SliderRow({
   hint?: string
   /** Optionele tweede regel onder de waarde (bv. de spaarquote in euro's); `null` = geen regel. */
   detail?: string | null
+  /** Het antwoord onder de schaal (tekort onder een vast anker); `null` = geen regel. */
+  antwoord?: SliderAntwoord | null
 }) {
+  const antwoordId = useId()
   // Basislijn-anker "nu": vaste notch op de positie van de werkelijke waarde (baseValue).
   // Decoratief/aria-hidden; het micro-label wordt verborgen als het te dicht bij een
   // rand-label zit (eenvoudige %-drempel) zodat het niet botst met min/max.
@@ -115,6 +164,7 @@ function SliderRow({
           onChange={e => onChange(Number(e.target.value))}
           aria-label={label}
           aria-valuetext={formatValue(value)}
+          aria-describedby={antwoord ? antwoordId : undefined}
           className="slider-module relative z-10 w-full"
           {...rangeTouchSeekProps}
         />
@@ -132,11 +182,12 @@ function SliderRow({
         )}
         <span>{maxLabel}</span>
       </div>
+      {antwoord && <SliderAntwoordRegel id={antwoordId} antwoord={antwoord} />}
     </div>
   )
 }
 
-function SliderGrid({ baseline, events, setEvents, currentAge }: SlidersProps) {
+function SliderGrid({ baseline, events, setEvents, currentAge, antwoorden = {} }: SlidersProps) {
   const workdaysValue = readSliderValueFromEvents('workdays', events, baseline)
   const savingsValue = readSliderValueFromEvents('savings', events, baseline)
   const extraValue = readSliderValueFromEvents('extra_inleg', events, baseline)
@@ -158,7 +209,9 @@ function SliderGrid({ baseline, events, setEvents, currentAge }: SlidersProps) {
   }
 
   return (
-    <div className="xl:grid xl:grid-cols-2 xl:gap-x-6">
+    // `xl:items-start`: een antwoord maakt rijen ongelijk hoog — laat ze raggen, geen
+    // gereserveerde min-hoogte (lege ruimte onder een knop leest als ontbrekende inhoud).
+    <div className="xl:grid xl:grid-cols-2 xl:items-start xl:gap-x-6">
       {/* 1 — Meer salaris: het extra-inleg-event. Rekenkundig is een salarisverhoging dezelfde
           hefboom als extra inleg (elke euro erbij gaat naar sparen, tot je stopmoment). */}
       <div className="border-b border-dashed border-[var(--border-ed)] xl:border-b-0">
@@ -175,6 +228,7 @@ function SliderGrid({ baseline, events, setEvents, currentAge }: SlidersProps) {
           onChange={v => setSliderValue('extra_inleg', v)}
           minLabel={formatCurrency(extraRange.min)}
           maxLabel={formatCurrency(extraRange.max)}
+          antwoord={antwoorden.extra_inleg}
         />
       </div>
 
@@ -196,6 +250,7 @@ function SliderGrid({ baseline, events, setEvents, currentAge }: SlidersProps) {
           onChange={v => setSliderValue('savings', v)}
           minLabel={pct(savingsRange.min)}
           maxLabel={pct(savingsRange.max)}
+          antwoord={antwoorden.savings}
         />
       </div>
 
@@ -215,6 +270,7 @@ function SliderGrid({ baseline, events, setEvents, currentAge }: SlidersProps) {
           onChange={v => setSliderValue('workdays', v)}
           minLabel={dayLabel(workdaysRange.min)}
           maxLabel={dayLabel(workdaysRange.max)}
+          antwoord={antwoorden.workdays}
         />
       </div>
     </div>
@@ -227,14 +283,17 @@ function SliderGrid({ baseline, events, setEvents, currentAge }: SlidersProps) {
  * 3 Minder werken (eigenaarskeuze 15 sep 2026, bijstelling van spec lab-haalbaarheid §2). Rendert
  * alleen het slidergrid — geen kaart, geen kop, geen eigen reset: die leven in de
  * host-sectie. De losse kaartvariant verviel met de Wat-Als-pagina (ADR 0144).
+ * `antwoorden` zet onder een knop wat daar bij een tekort zou horen (spec
+ * antwoorden-naast-sliders); de host levert ze via `labAntwoordenPerSlider`.
  */
-export function WhatIfSliders({ baseline, events, setEvents, currentAge }: SlidersProps) {
+export function WhatIfSliders({ baseline, events, setEvents, currentAge, antwoorden }: SlidersProps) {
   return (
     <SliderGrid
       baseline={baseline}
       events={events}
       setEvents={setEvents}
       currentAge={currentAge}
+      antwoorden={antwoorden}
     />
   )
 }

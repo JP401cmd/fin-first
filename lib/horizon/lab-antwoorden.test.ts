@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest'
-import { resolveLabAntwoorden } from './lab-antwoorden'
+import { describe, it, expect, vi } from 'vitest'
+import { labAntwoordenPerSlider, labAntwoordGezetMelding, resolveLabAntwoorden } from './lab-antwoorden'
+import { formatCurrency } from '@/lib/format'
 import type { LabUitkomstDekking } from './lab-uitkomst'
 import type { WhatIfOverrides } from '@/lib/types/horizon-whatif'
 
@@ -88,5 +89,58 @@ describe('resolveLabAntwoorden — de drie hefbomen als antwoorden (spec §3)', 
     const m = resolveLabAntwoorden({ dekking: tekort, solvedFireAge: 61, planMaandHint: 500, baseline, masked: true })
     expect(m[1].zin).not.toContain('500')
     expect(m[2].zin).not.toContain('500')
+  })
+})
+
+describe('labAntwoordenPerSlider — elk antwoord onder zijn eigen knop (spec antwoorden-naast-sliders)', () => {
+  it('verdeelt: meer salaris → extra_inleg, minder uitgeven → savings, doorwerken → stop; workdays blijft leeg', () => {
+    const a = resolveLabAntwoorden({ dekking: tekort, solvedFireAge: 61.2, planMaandHint: 500, baseline })
+    const per = labAntwoordenPerSlider(a, () => {})
+    expect(per.stop?.tekst).toBe('Doorwerken tot 61,5 dekt je plan.')
+    expect(per.sliders.extra_inleg?.tekst).toBe("Zo'n €500/mnd meer hoort bij een gedekt plan.")
+    expect(per.sliders.savings?.tekst).toBe("Zo'n €500/mnd minder uitgeven hoort bij een gedekt plan.")
+    expect(Object.keys(per.sliders).sort()).toEqual(['extra_inleg', 'savings'])
+    expect(per.sliders.extra_inleg?.knop?.label).toBe('Reken hiermee')
+  })
+
+  it('roept de actie NOOIT bij het mappen aan — alleen op klik, met de eigen actie (ADR 0145 D7)', () => {
+    const onActie = vi.fn()
+    const a = resolveLabAntwoorden({ dekking: tekort, solvedFireAge: 61.2, planMaandHint: 500, baseline })
+    const per = labAntwoordenPerSlider(a, onActie)
+    expect(onActie).not.toHaveBeenCalled()
+    per.sliders.savings?.knop?.onClick()
+    expect(onActie).toHaveBeenCalledTimes(1)
+    expect(onActie).toHaveBeenCalledWith({ kind: 'slider', key: 'savings', value: 33 })
+    per.stop?.knop?.onClick()
+    expect(onActie).toHaveBeenLastCalledWith({ kind: 'stop', stopAge: 61.5 })
+  })
+
+  it('boven bereik: vlag aan en de knop heet "Zet op maximum"', () => {
+    const a = resolveLabAntwoorden({ dekking: tekort, solvedFireAge: null, planMaandHint: 22_695, baseline })
+    const per = labAntwoordenPerSlider(a, () => {})
+    expect(per.sliders.extra_inleg).toMatchObject({ bovenBereik: true, knop: { label: 'Zet op maximum' } })
+    expect(per.sliders.savings).toMatchObject({ bovenBereik: true, knop: { label: 'Zet op maximum' } })
+    expect(per.stop).toBeNull()
+  })
+
+  it('privacy-weergave: zinnen blijven, géén knop', () => {
+    const a = resolveLabAntwoorden({ dekking: tekort, solvedFireAge: 61, planMaandHint: 500, baseline, masked: true })
+    const per = labAntwoordenPerSlider(a, () => {}, { masked: true })
+    expect(per.stop?.knop).toBeNull()
+    expect(per.sliders.extra_inleg?.knop).toBeNull()
+    expect(per.sliders.savings?.knop).toBeNull()
+    expect(per.sliders.extra_inleg?.tekst).not.toContain('500')
+  })
+
+  it('geen antwoorden → niets te verdelen', () => {
+    expect(labAntwoordenPerSlider([], () => {})).toEqual({ sliders: {}, stop: null })
+  })
+})
+
+describe('labAntwoordGezetMelding — de sr-only melding na een klik', () => {
+  it('noemt de knop en de nieuwe stand', () => {
+    expect(labAntwoordGezetMelding({ kind: 'slider', key: 'extra_inleg', value: 1800 })).toBe(`Meer salaris staat nu op ${formatCurrency(1800)}.`)
+    expect(labAntwoordGezetMelding({ kind: 'slider', key: 'savings', value: 33 })).toBe('Spaarquote staat nu op 33%.')
+    expect(labAntwoordGezetMelding({ kind: 'stop', stopAge: 61.5 })).toBe('Doorwerken tot staat nu op 61,5.')
   })
 })

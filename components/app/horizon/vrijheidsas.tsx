@@ -36,13 +36,14 @@
  *     (red/amber/emerald), nooit het module-accent.
  */
 
-import type { ReactNode } from 'react'
+import { useId, type ReactNode } from 'react'
 import type { StopMargeZone } from '@/lib/horizon/stop-marge'
 import { resolveVoorzichtigeRand, TERUGVAL_RAND_JAREN } from '@/lib/horizon/stop-marge'
 import { InlineInfoDisclosure } from '@/components/editorial'
 import { rangeTouchSeekProps } from '@/lib/range-touch-seek'
 import { DEKKINGSAS_COPY, HEFBOOM_COPY } from '@/lib/horizon/anker-copy'
 import { Dekkingsbalk, type DekkingsasData } from './dekkingsbalk'
+import { SliderAntwoordRegel, type SliderAntwoord } from './whatif-sliders'
 
 const PLAYFAIR = 'var(--font-playfair, Georgia, serif)'
 
@@ -261,12 +262,18 @@ export interface VrijheidsasProps {
   uitkomstNotitie?: ReactNode
   /**
    * Spec lab-haalbaarheid §1 (15 sep 2026): onder een vast anker is sectie 2 de
-   * DEKKINGSAS — schaal stop→eind, slider "Doorwerken tot", tegels Reikt tot · Plan tot ·
-   * Gedekt. Geen marge-band/verwacht-streep/koppel-checkbox/FIRE-tegels: die meten een
+   * DEKKINGSAS — schaal stop→eind, slider "Doorwerken tot", tegels Gedekt · Reikt tot ·
+   * Eindvermogen. Geen marge-band/verwacht-streep/koppel-checkbox/FIRE-tegels: die meten een
    * grootheid die de gebruiker onder een vast anker niet gekozen heeft. `null` ⇒ het
    * solved-gezicht (ongewijzigd).
    */
   dekking?: DekkingsasData | null
+  /**
+   * Spec antwoorden-naast-sliders (15 sep 2026) — "Doorwerken tot X dekt je plan." onder de
+   * stop-slider van de dekkingsas, in dezelfde `SliderAntwoordRegel` als de draaiknoppen.
+   * Alleen zichtbaar als dekkingsas; `null` = geen regel.
+   */
+  stopAntwoord?: SliderAntwoord | null
   /** Het stopmoment van het plan (fractioneel) — de referentie voor "nu rekent het met stoppen op …". */
   planStopAge?: number | null
   /**
@@ -338,6 +345,7 @@ export function Vrijheidsas({
   ankerVast = false,
   uitkomstNotitie = null,
   dekking = null,
+  stopAntwoord = null,
   planStopAge = null,
   aowAge = null,
   onKeuzesOpenen,
@@ -345,6 +353,7 @@ export function Vrijheidsas({
   maakPlanBusy = false,
   planIsDezeStop = false,
 }: VrijheidsasProps) {
+  const stopAntwoordId = useId()
   // ── As-schaal (jaren, lineair, min-span 20 jr) — enkel voor de marge-band-posities ──
   const minAge = Math.floor(currentAge)
   const candidates = [baseFireAge, verwachtFireAge, laatstFireAge, stopAge, aowAge].filter(
@@ -430,6 +439,7 @@ export function Vrijheidsas({
   // toont hoe ver het plan reikt.
   const dekkingsas = ankerVast && dekking != null
   const toonSectie2 = !stopKeuzeVerborgen || dekkingsas
+  const toonStopAntwoord = dekkingsas && stopAntwoord != null
 
   return (
     <div>
@@ -604,6 +614,7 @@ export function Vrijheidsas({
             className="slider-module w-full"
             {...rangeTouchSeekProps}
             aria-label={dekkingsas ? DEKKINGSAS_COPY.sliderLabel : 'Gewenste stopleeftijd'}
+            aria-describedby={toonStopAntwoord ? stopAntwoordId : undefined}
             aria-valuetext={
               dekkingsas
                 ? `${formatAge(stopAge)} jaar`
@@ -614,6 +625,13 @@ export function Vrijheidsas({
                   }`
             }
           />
+
+          {/* Spec antwoorden-naast-sliders — "Doorwerken tot X dekt je plan." hoort bij
+              déze knop: onder de range, boven de verkenning-alinea. Zelfde regel als bij
+              de draaiknoppen (één vorm, twee hosts). */}
+          {toonStopAntwoord && stopAntwoord && (
+            <SliderAntwoordRegel id={stopAntwoordId} antwoord={stopAntwoord} />
+          )}
 
           {/* Verkenning vs. plan (TPR-09, bovenop melding B-038).
               B-038 haalde hier twee snelknoppen weg — "Op AOW-leeftijd" (zette
@@ -824,7 +842,7 @@ export function Vrijheidsas({
       {/* ── Cijferrij (volle breedte, onder de twee vlakken) — de drieslag ──
           Weggelaten onder 'Nu stoppen': basis, verwacht én geambieerd vallen daar
           per constructie samen met je huidige leeftijd (ADR 0127 D1). Ook weggelaten onder de
-          dekkingsas: de tegels Reikt tot · Plan tot · Gedekt zitten dan in de balk zelf. */}
+          dekkingsas: de tegels Gedekt · Reikt tot · Eindvermogen zitten dan in de balk zelf. */}
       {!stopKeuzeVerborgen && !dekkingsas && (
       <div className="mt-6 grid grid-cols-3 gap-3 border-t border-[var(--border-ed)] pt-4">
         <Figure kicker="Basis-vrijheid" value={formatAge(baseFireAge)} unit="jr" />

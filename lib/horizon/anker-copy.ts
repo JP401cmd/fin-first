@@ -565,15 +565,19 @@ export function radarEindstrategieAnkerReden(): string {
   return 'Onder een vast stopmoment is er geen doelvermogen om het eindvermogen tegen af te zetten — de dekking hiernaast zegt of je plan reikt.'
 }
 
-// ── Zin 11 — antwoordenblok "Wat maakt het haalbaar?" (spec lab-haalbaarheid §3/§5, 15 sep 2026) ──
+// ── Zin 11 — antwoorden naast de knoppen (spec lab-haalbaarheid §3/§5; spec antwoorden-naast-sliders, 15 sep 2026) ──
 // Beschrijvend ("dekt je plan" / "hoort bij een gedekt plan"), nooit een instructie; geen "AOW" in een tekortzin.
 // Vervangt de plan-hint ("Reken met € X extra inleg", ADR 0145 D7) onder een vast anker.
+// Elk antwoord staat onder zijn eigen knop; het losse blok "Wat maakt het haalbaar?" is weg.
 // De knop is generiek ("Reken hiermee"): het bedrag staat al in de zin, en in de
-// privacy-weergave toont de UI geen knop (de slider zou het echte bedrag verraden).
+// privacy-weergave toont de UI geen knop (de slider zou het echte bedrag verraden). Boven
+// het slider-bereik heet de knop "Zet op maximum" — zo belooft hij niet wat hij niet doet.
+// "Uitgesmeerd tot je eindleeftijd" staat niet meer in elke zin: de ene sluitregel onder de
+// twee kolommen zegt het ("Indicatie, geen advies — …").
 
-export const ANTWOORDEN_KOP = 'Wat maakt het haalbaar?'
 export const ANTWOORD_KNOP = 'Reken hiermee'
-export const ANTWOORD_BOVEN_BEREIK = 'Dat is meer dan de knop toelaat — de knop zet het hoogste bedrag.'
+export const ANTWOORD_KNOP_MAX = 'Zet op maximum'
+export const ANTWOORD_BOVEN_BEREIK = 'Meer dan deze knop toelaat.'
 
 /**
  * Antwoord 1 — de opgeloste leeftijd zonder anker (tweede run, ADR 0129 D7), op halve
@@ -589,18 +593,18 @@ function maandBedrag(hint: number, masked: boolean): string {
 }
 
 // De twee €-antwoorden claimen bewust GEEN uitkomst ("hoort bij", niet "dekt"): P!B96 is
-// uitgesmeerd tot de eindleeftijd, maar de slider-hefbomen stoppen op het stopmoment.
+// uitgesmeerd tot de eindleeftijd (dat zegt de sluitregel), maar de slider-hefbomen stoppen op het stopmoment.
 // Gemeten in lib/horizon/lab-antwoorden.kernel.test.ts: hint-bedrag gezet → 94% resp. 87%
 // dekking, niet 100% (eindreview I2). "Doorwerken tot X dekt je plan." is daar wél bewezen.
 
 /** Antwoord 2 — `planMaandHint` (P!B96 van de hoofd-run) als meer salaris (het extra-inleg-event). */
 export function antwoordMeerSalaris(hint: number, masked = false): string {
-  return `Zo'n ${maandBedrag(hint, masked)} per maand meer salaris, uitgesmeerd tot je eindleeftijd, hoort bij een gedekt plan.`
+  return `Zo'n ${maandBedrag(hint, masked)}/mnd meer hoort bij een gedekt plan.`
 }
 
 /** Antwoord 3 — hetzelfde bedrag als minder uitgeven (dezelfde maandelijkse stroom). */
 export function antwoordMinderUitgeven(hint: number, masked = false): string {
-  return `Zo'n ${maandBedrag(hint, masked)} per maand minder uitgeven, uitgesmeerd tot je eindleeftijd, hoort bij een gedekt plan.`
+  return `Zo'n ${maandBedrag(hint, masked)}/mnd minder uitgeven hoort bij een gedekt plan.`
 }
 
 /** Doelenpagina: één regel wanneer lab-doelen niet meer bij het plan passen (spec §4.2). */
