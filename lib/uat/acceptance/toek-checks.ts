@@ -47,6 +47,11 @@
  *   - `lib/horizon/lab-uitkomst.ts` + `lib/horizon/toekomst-doel.ts` — pure
  *                                uitkomst-switch + parameter-doel-bouwer (WF-TOEK-49,
  *                                ADR 0145); geen `'use client'`/Supabase/kernel-run.
+ *   - `lib/horizon/lab-antwoorden.ts` — pure antwoordenblok (WF-TOEK-49, spec
+ *                                lab-haalbaarheid §3, 15 sep 2026); importeert alleen
+ *                                lib/scenario-events + lib/horizon/anker-copy.
+ *   - `lib/goals/lab-doelen-buiten-plan.ts` — pure filter (WF-TOEK-50, spec
+ *                                lab-haalbaarheid §4); geen imports.
  */
 
 import { PERSONAS } from '@/lib/test-personas'
@@ -83,6 +88,9 @@ import {
 import type { SimResult } from '@/lib/fire-simulation'
 import { resolveLabUitkomst, type LabUitkomst } from '@/lib/horizon/lab-uitkomst'
 import { buildParameterGoalRows } from '@/lib/horizon/toekomst-doel'
+import { resolveLabAntwoorden } from '@/lib/horizon/lab-antwoorden'
+import { selectLabDoelenBuitenPlan } from '@/lib/goals/lab-doelen-buiten-plan'
+import { doelenPlanGewijzigdMelding } from '@/lib/horizon/anker-copy'
 import { TOEK_ACCEPTANCE } from './toek'
 import type { AcceptanceCriterion } from './types'
 
@@ -592,11 +600,42 @@ export const TOEK_ENGINE_CHECKS: ToekEngineCheck[] = [
       })
       const dekkingRow = rows[0]
 
+      // Antwoordenblok op toestand (2): tweede run solvedFireAge 70, maandHint €500 op
+      // een basis van €4.000/mnd (aowTekortMetScenario.kind is 'dekking' — de fixture
+      // draagt al vastStopLeeftijd:67, dus `.stop` is `{kind:'aow', stopAge:67}`, geen
+      // gok nodig vóór de spread).
+      const antwoorden = resolveLabAntwoorden({
+        dekking: aowTekortMetScenario.kind === 'dekking' ? { ...aowTekortMetScenario, maandHint: 500 } : null,
+        solvedFireAge: 70,
+        baseline: { monthlyIncome: 4000, workDaysPerWeek: 5, savingsRate: 20, expectedReturn: 6, extraContribution: 0 },
+      })
+      const antwoordKinds = antwoorden.map((a) => a.kind).join(',')
+      const doorwerkenTot = antwoorden[0]?.actie.kind === 'stop' ? antwoorden[0].actie.stopAge : null
+      const extraActie = antwoorden[1]?.actie.kind === 'slider' ? `slider:${antwoorden[1].actie.key}:${antwoorden[1].actie.value}` : null
+
       return {
         expected:
-          'solved=vrijheidsleeftijd:vrijheidsleeftijd; aowTekortMetScenario=dekking:dekking; aowTekortZonderScenario=dekking:geen/geen-verkenning; aowGedekt=dekking:geen/gedekt; nu=dekking:geen/nu-anker; dekkingGoalType=plan_coverage; dekkingNaam=Plan gedekt tot 90 jaar; dekkingTarget=100',
+          'solved=vrijheidsleeftijd:vrijheidsleeftijd; aowTekortMetScenario=dekking:dekking; aowTekortZonderScenario=dekking:geen/geen-verkenning; aowGedekt=dekking:geen/gedekt; nu=dekking:geen/nu-anker; dekkingGoalType=plan_coverage; dekkingNaam=Plan gedekt tot 90 jaar; dekkingTarget=100; antwoorden=doorwerken,extra_opzij,minder_uitgeven; doorwerkenTot=70; extraOpzijActie=slider:extra_inleg:500',
         actual:
-          `solved=${solved.kind}:${promotieLabel(solved)}; aowTekortMetScenario=${aowTekortMetScenario.kind}:${promotieLabel(aowTekortMetScenario)}; aowTekortZonderScenario=${aowTekortZonderScenario.kind}:${promotieLabel(aowTekortZonderScenario)}; aowGedekt=${aowGedekt.kind}:${promotieLabel(aowGedekt)}; nu=${nu.kind}:${promotieLabel(nu)}; dekkingGoalType=${dekkingRow?.goal_type}; dekkingNaam=${dekkingRow?.name}; dekkingTarget=${dekkingRow?.target_value}`,
+          `solved=${solved.kind}:${promotieLabel(solved)}; aowTekortMetScenario=${aowTekortMetScenario.kind}:${promotieLabel(aowTekortMetScenario)}; aowTekortZonderScenario=${aowTekortZonderScenario.kind}:${promotieLabel(aowTekortZonderScenario)}; aowGedekt=${aowGedekt.kind}:${promotieLabel(aowGedekt)}; nu=${nu.kind}:${promotieLabel(nu)}; dekkingGoalType=${dekkingRow?.goal_type}; dekkingNaam=${dekkingRow?.name}; dekkingTarget=${dekkingRow?.target_value}; antwoorden=${antwoordKinds}; doorwerkenTot=${doorwerkenTot}; extraOpzijActie=${extraActie}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-TOEK-50',
+    scenarioId: 'UAT-TOEK-50',
+    label: 'Lab-doelen buiten het plan (selectLabDoelenBuitenPlan) + melding (spec lab-haalbaarheid §4)',
+    run: () => {
+      criterion('WF-TOEK-50')
+      const goals = [
+        { id: 'fire', metadata: { bron: 'parameter' }, notApplicableReason: 'Je stopmoment ligt vast op 62, dus dit doel heeft geen uitkomst om naar te kijken.' },
+        { id: 'spaarquote', metadata: { bron: 'parameter' }, notApplicableReason: null },
+        { id: 'vrijheidsgetal', metadata: {}, notApplicableReason: 'Je stopmoment ligt vast op 62, dus er is geen doelvermogen om naartoe te sparen.' },
+      ]
+      const buiten = selectLabDoelenBuitenPlan(goals)
+      return {
+        expected: 'buitenPlan=fire; melding=Je plan is veranderd. 1 doel uit het lab past er niet meer bij.',
+        actual: `buitenPlan=${buiten.map((g) => g.id).join(',')}; melding=${doelenPlanGewijzigdMelding(buiten.length)}`,
       }
     },
   },

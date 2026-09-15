@@ -121,6 +121,48 @@ uitsluitend op klik — nooit automatisch bij het laden van de pagina. Een auto-
 `hasScenario` stilzwijgend waar maken, het persist-effect laten schrijven en de
 concept-banner laten afgaan zonder dat de gebruiker iets deed.
 
+**D7a — "Vrij mogelijk vanaf" wacht niet meer op scrollen (15 sep 2026, spec
+lab-haalbaarheid Task 0).** De tweede run die de D7-tegel voedt draaide vóór dit besluit
+alleen wanneer de duiding-sectie in beeld kwam (`duidingInView`, alleen onder `displayMode
+'full'`) — onder een vast anker liet dat de hero-tegel op "—" staan zolang niemand
+scrolde, en de intersection-observer haakte via `?whatif=open` soms nooit aan.
+`presetBatchNodig` (`horizon-client.tsx`) laat die gate onder een vast anker
+(`isFixedAnchorMode`) vallen — de batch draait dan altijd zodra profiel/leeftijd/uitgaven
+bekend zijn; de hero-tegel toont intussen een pending state ("wordt berekend",
+`solvedPending = isFixedAnchorMode && solvedRun === null`) in plaats van een tweede getal.
+De batch-aanroep geeft daarbij ook dezelfde ADR 0103-grondslag-injectie mee als de
+hoofdrun (`withResolvedKernelBedragen`) — een nevenaanpassing voor consistentie, niet de
+oorzaak van het eerdere "—".
+
+**D8 — Sectie 2 van de Vrijheidsas is onder een vast anker de dekkingsas** (15 sep 2026,
+spec lab-haalbaarheid §1). Schaal van stopmoment tot eindleeftijd, slider "Doorwerken tot",
+tegels Reikt tot · Plan tot · Gedekt. Marge-band, verwacht-streep, koppel-checkbox en de
+FIRE-tegels verdwijnen daar: ze meten een grootheid die de gebruiker niet gekozen heeft.
+
+**D9 — Drie hefbomen in beide invalshoeken** (§2). Meer opzij (`extra_inleg`), Minder
+uitgeven (de spaarquote-knop, weergave in euro, event-shape ongewijzigd), Later of eerder
+stoppen (de stop-slider). Maandinkomen vervalt als knop en als `DOEL_PARAMETERS`-lid;
+bestaande `salary`-rijen blijven (`LEGACY_PARAMETER_GOAL_TYPES`). Werkdagen wordt de
+ingeklapte knop "Minder werken".
+
+**D10 — Bij een tekort: de drie hefbomen als antwoorden** (§3). `resolveLabAntwoorden`
+geeft "doorwerken tot X" (tweede run), "€X extra opzij" en "€X minder uitgeven"
+(`maandHint`); elke regel zet een verkenning, nooit het plan (D7 blijft: alleen op klik).
+Boven het slider-bereik zegt de regel dat; de knop zet het maximum. Vervangt, onder een
+vast anker, zowel de oude plan-hint ("Reken met € X extra inleg", die tekst en knop
+bestaan niet meer) als het stop-pad-blok "Wat hoort daarbij?" — dat blok blijft alleen
+staan onder `solved` (`!isFixedAnchorMode`-gate in `horizon-client.tsx`); onder een vast
+anker toont het antwoordenblok hetzelfde inzicht in de vaste volgorde doorwerken · extra
+opzij · minder uitgeven.
+
+**D11 — Doelen volgen het plan** (§4). De "Plan gedekt"-kaart leest naam en subregel uit
+het huidige plan (`FinPageData.labPlan`); de metadata blijft historie
+(`planCoverageGoalName`, `lib/horizon/anker-copy.ts`). Eén melding op de doelenpagina —
+zelfde markup in beide weergavemodi (Eenvoudig/Uitgebreid) — telt lab-doelen met een
+n.v.t.-reden (`selectLabDoelenBuitenPlan`) met de acties Bijwerken (opent het lab via de
+canonieke deeplink `/toekomst?whatif=open`) · Loslaten (de bestaande confirm-flow); niets
+verdwijnt automatisch. Knop-doelen krijgen nooit een n.v.t.-reden.
+
 ## Verworpen alternatieven
 
 - **Auto-seed van de tekort-hint bij het laden van /toekomst.** Verworpen: zie D7 — een

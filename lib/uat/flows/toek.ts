@@ -114,6 +114,7 @@ export const TOEK_FLOW: UatFlow = {
     // plan_coverage) die vanuit het lab (`sliders`, WF-TOEK-10) vastgelegd kan
     // worden — vandaar de cross-lane edge vanuit `sliders` hieronder.
     { id: 'labuitkomst', scenarioId: 'UAT-TOEK-49', label: 'WF-TOEK-49 · Lab volgt het anker: dekking als uitkomst onder een vast stopmoment', kind: 'action', stage: 4, lane: 'doelen', subOf: 'doelen' },
+    { id: 'doelenmelding', scenarioId: 'UAT-TOEK-50', label: 'WF-TOEK-50 · Doelen volgen het plan: melding bij lab-doelen buiten het plan', kind: 'screen', stage: 4, lane: 'doelen', subOf: 'doelen' },
 
     { id: 'pillenrij', scenarioId: 'UAT-TOEK-41', label: 'WF-TOEK-41 · Pillenrij-invariant (label + badge samen) & het md-breekpunt van de cijferstrip', kind: 'screen', stage: 2, lane: 'aflezen', subOf: 'grafiek' },
     { id: 'strategiekaarten', scenarioId: 'UAT-TOEK-42', label: 'WF-TOEK-42 · Vier levensstrategieën in beide weergavemodi', kind: 'screen', stage: 4, lane: 'strategie', subOf: 'strategiebeslis' },
@@ -224,7 +225,9 @@ export const TOEK_FLOW: UatFlow = {
     { from: 'doelkoppelen', to: 'fire' },
     { from: 'doelbasis', to: 'fire' },
     { from: 'doelloslaten', to: 'fire' },
+    { from: 'labuitkomst', to: 'doelenmelding' },
     { from: 'labuitkomst', to: 'fire' },
+    { from: 'doelenmelding', to: 'fire' },
     { from: 'grafiek', to: 'pillenrij' },
     { from: 'strategiebeslis', to: 'strategiekaarten' },
     { from: 'pillenrij', to: 'fire' },

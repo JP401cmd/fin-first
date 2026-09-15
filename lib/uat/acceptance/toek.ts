@@ -752,15 +752,30 @@ const criteria: AcceptanceCriterion[] = [
     given:
       'Persona Willem met een AOW-anker en eindleeftijd 90 (zoals WF-TOEK-46) — hier een synthetische, hand-narekenbare AOW-TEKORT-toestand (spiegelt exact de committed fixture `AOW_TEKORT` in lib/horizon/lab-uitkomst.test.ts, i.p.v. Willems eigen ongespecificeerde dekkingscijfer): leeftijd 42, stop op 67 (maand 300), uitputting op maand 480 (leeftijd 82, vóór de eindleeftijd 90) → een tekort. Vier afgeleide toestanden op dezelfde basis: (1) `solved` met een verkend scenario (ter referentie — het bestaande gedrag), (2) AOW-tekort MÉT een verkend scenario (knop-beweging), (3) AOW-tekort ZONDER verkenning (alleen een kale stopkeuze op de slider), (4) AOW volledig GEDEKT (geen uitputting binnen de horizon, óók met scenario), (5) het `now`-anker (óók met scenario).',
     when:
-      'De uitkomst-switch `resolveLabUitkomst` wordt op de vijf toestanden aangeroepen; bij toestand (2) legt de gebruiker het scenario vervolgens vast als doel via `buildParameterGoalRows` met parameter `dekking`.',
+      'De uitkomst-switch `resolveLabUitkomst` wordt op de vijf toestanden aangeroepen; bij toestand (2) legt de gebruiker het scenario vervolgens vast als doel via `buildParameterGoalRows` met parameter `dekking`; op toestand (2) wordt `resolveLabAntwoorden` aangeroepen met de tweede run (solvedFireAge 70) en maandHint €500 op een basis van €4.000/mnd.',
     then:
-      'Gate-tabel (E4/E5/E6/D4): (1) `solved` + verkenning → `kind:\'vrijheidsleeftijd\'`, promotie `vrijheidsleeftijd` (ongewijzigd gedrag). (2) aow/age MET tekort en een verkend scenario → `kind:\'dekking\'`, promotie `dekking` — "Maak dit mijn doel" wordt aangeboden, de sheet toont de preview-rij "Plan gedekt" i.p.v. een vrijheidsleeftijd-rij. (3) aow/age MET tekort maar ZONDER verkenning (alleen een stopkeuze) → promotie `geen/geen-verkenning` — een stopkeuze alleen is onder een vast anker geen doelstand (D4), de knop blijft verborgen. (4) een VOLLEDIG GEDEKT plan → promotie `geen/gedekt`, óók met een verkend scenario — de losse doelen volstaan (E5), geen promotieknop. (5) het `nu`-anker → promotie `geen/nu-anker`, ongeacht verkenning (E6) — verkennen mag, er komt nooit een doel uit. Legt de gebruiker toestand (2) vast, dan bouwt `buildParameterGoalRows` voor parameter `dekking` een `plan_coverage`-rij met naam "Plan gedekt tot 90 jaar" en `target_value = 100` (de META-max — nooit een client-waarde, spiegel van "Vrij op X jaar" onder `solved`).',
+      'Gate-tabel (E4/E5/E6/D4): (1) `solved` + verkenning → `kind:\'vrijheidsleeftijd\'`, promotie `vrijheidsleeftijd` (ongewijzigd gedrag). (2) aow/age MET tekort en een verkend scenario → `kind:\'dekking\'`, promotie `dekking` — "Maak dit mijn doel" wordt aangeboden, de sheet toont de preview-rij "Plan gedekt" i.p.v. een vrijheidsleeftijd-rij. (3) aow/age MET tekort maar ZONDER verkenning (alleen een stopkeuze) → promotie `geen/geen-verkenning` — een stopkeuze alleen is onder een vast anker geen doelstand (D4), de knop blijft verborgen. (4) een VOLLEDIG GEDEKT plan → promotie `geen/gedekt`, óók met een verkend scenario — de losse doelen volstaan (E5), geen promotieknop. (5) het `nu`-anker → promotie `geen/nu-anker`, ongeacht verkenning (E6) — verkennen mag, er komt nooit een doel uit. Legt de gebruiker toestand (2) vast, dan bouwt `buildParameterGoalRows` voor parameter `dekking` een `plan_coverage`-rij met naam "Plan gedekt tot 90 jaar" en `target_value = 100` (de META-max — nooit een client-waarde, spiegel van "Vrij op X jaar" onder `solved`). Het antwoordenblok geeft drie regels in de volgorde doorwerken · extra opzij · minder uitgeven; "doorwerken tot" is de opgeloste leeftijd op halve jaren (70); de acties zetten een verkenning, nooit het plan.',
     assertion: {
       kind: 'exact',
       expected:
-        'solved=vrijheidsleeftijd:vrijheidsleeftijd; aowTekortMetScenario=dekking:dekking; aowTekortZonderScenario=dekking:geen/geen-verkenning; aowGedekt=dekking:geen/gedekt; nu=dekking:geen/nu-anker; dekkingGoalType=plan_coverage; dekkingNaam=Plan gedekt tot 90 jaar; dekkingTarget=100',
+        'solved=vrijheidsleeftijd:vrijheidsleeftijd; aowTekortMetScenario=dekking:dekking; aowTekortZonderScenario=dekking:geen/geen-verkenning; aowGedekt=dekking:geen/gedekt; nu=dekking:geen/nu-anker; dekkingGoalType=plan_coverage; dekkingNaam=Plan gedekt tot 90 jaar; dekkingTarget=100; antwoorden=doorwerken,extra_opzij,minder_uitgeven; doorwerkenTot=70; extraOpzijActie=slider:extra_inleg:500',
       source:
-        'lib/horizon/lab-uitkomst.ts#resolveLabUitkomst (échte productiefunctie, gate-tabel) + lib/horizon/toekomst-doel.ts#buildParameterGoalRows (dekking → plan_coverage-rij) op een synthetische AOW-tekort-fixture die de committed lib/horizon/lab-uitkomst.test.ts spiegelt — zie toek-checks.ts',
+        'lib/horizon/lab-uitkomst.ts#resolveLabUitkomst (échte productiefunctie, gate-tabel) + lib/horizon/toekomst-doel.ts#buildParameterGoalRows (dekking → plan_coverage-rij) + lib/horizon/lab-antwoorden.ts#resolveLabAntwoorden op een synthetische AOW-tekort-fixture die de committed lib/horizon/lab-uitkomst.test.ts spiegelt — zie toek-checks.ts',
+    },
+  },
+  {
+    workflow: 'WF-TOEK-50',
+    scenarioId: 'UAT-TOEK-50',
+    titel: 'Doelen volgen het plan: één melding wanneer lab-doelen niet meer bij het plan passen; knop-doelen blijven altijd geldig (spec lab-haalbaarheid §4)',
+    kriticiteit: 'KERN',
+    persona: 'willem',
+    given: 'Willem heeft uit het lab drie doelen: een vrijheidsleeftijd-doel (fire_age), een spaarquote-doel (savings_rate) en het vrijheidsgetal-doel (handmatig, geen lab-doel). Hij zet zijn stopmoment van "zo vroeg als het kan" naar leeftijd 62; de sync geeft het fire_age-doel en het vrijheidsgetal-doel een n.v.t.-reden.',
+    when: 'De doelenpagina bepaalt met `selectLabDoelenBuitenPlan` welke LAB-doelen niet meer passen en toont de melding met de telling.',
+    then: 'Precies één lab-doel telt (fire_age); het spaarquote-doel (knop-doel, nooit n.v.t.) en het vrijheidsgetal-doel (geen lab-doel) tellen niet. De melding luidt "Je plan is veranderd. 1 doel uit het lab past er niet meer bij." met de acties Bijwerken · Loslaten; niets wordt automatisch verwijderd — het plan terugdraaien brengt het doel terug.',
+    assertion: {
+      kind: 'exact',
+      expected: 'buitenPlan=fire; melding=Je plan is veranderd. 1 doel uit het lab past er niet meer bij.',
+      source: 'lib/goals/lab-doelen-buiten-plan.ts#selectLabDoelenBuitenPlan + lib/horizon/anker-copy.ts#doelenPlanGewijzigdMelding — zie toek-checks.ts',
     },
   },
 ]
@@ -780,9 +795,11 @@ export const TOEK_ACCEPTANCE: AcceptanceSet = {
  * WF-TOEK-49 (14 sep 2026, ADR 0145 "Het doelscenario volgt het anker: dekking
  * als uitkomst") is NIEUW — het eerstvolgende vrije nummer (44 is TPR-15,
  * 45-48 zijn eerder al bezet). Gebruikt door de dekkings-meta-test.
+ * WF-TOEK-50 (15 sep 2026, spec lab-haalbaarheid §4) is NIEUW — de
+ * doelen-melding wanneer lab-doelen niet meer bij het plan passen.
  */
 export const TOEK_EXPECTED_WORKFLOW_NUMBERS: number[] = [
   ...Array.from({ length: 8 }, (_, i) => i + 1), // 1..8
   ...Array.from({ length: 17 }, (_, i) => i + 10), // 10..26
-  28, 29, 30, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49,
+  28, 29, 30, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50,
 ]

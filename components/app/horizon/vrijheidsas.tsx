@@ -445,6 +445,20 @@ export function Vrijheidsas({
             de vraag is hoe ver je liquide vermogen reikt. Aan de knoppen hieronder verander je je
             aannames (inkomen, sparen, rendement) en zie je dat bereik meebewegen.
           </p>
+        ) : dekkingsas ? (
+          // Spec lab-haalbaarheid §1 — onder een vast anker mét dekking-data is sectie 2 de
+          // dekkingsas, geen marge tot een streep: de marge-uitleg hierboven ("links de streep,
+          // rechts je marge") klopt dan niet meer, want er is geen streep om marge tegen af te
+          // zetten. Beschrijvend, nooit "je moet"; geen "AOW" (een tekort kan ook ná de AOW
+          // vallen, anker-copy.ts-conventie).
+          <p className="m-0">
+            <b className="text-[var(--ink)]">Links</b> draai je aan je aannames — inkomen, sparen,
+            rendement — en zie je hoe die je plan raken. <b className="text-[var(--ink)]">Rechts</b> zie
+            je op de <b className="text-[var(--ink)]">as</b> hoever je plan reikt: vanaf de leeftijd
+            waarop je stopt tot je eindleeftijd. De schuif{' '}
+            <b className="text-[var(--ink)]">"{DEKKINGSAS_COPY.sliderLabel}"</b> verkent een ander
+            stopmoment — je plan verandert er niet van, ook niet wanneer de as een tekort laat zien.
+          </p>
         ) : (
         <>
         <p className="m-0">

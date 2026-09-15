@@ -475,6 +475,17 @@ describe('Vrijheidsas — vast anker (ADR 0129 F3b, B-038, TPR-09)', () => {
     expect(screen.getByRole('meter', { name: /dekking/i })).toBeInTheDocument()
   })
 
+  // Carry-over Task 4 — de i-uitleg bovenaan sprak vóór dit besluit overal over "links de
+  // streep, rechts je marge", ook onder de dekkingsas waar geen streep en geen marge meer
+  // bestaan (spec §1). De uitleg moet dan de as beschrijven, niet de marge.
+  it('de i-uitleg onder de dekkingsas beschrijft de as (niet de marge)', () => {
+    render(<Vrijheidsas {...baseProps} ankerVast planStopAge={58.5} dekking={dekking} onMaakPlan={() => {}} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Uitleg vrijheidsas' }))
+    expect(screen.queryByText(/marge/i)).toBeNull()
+    expect(screen.getByText(/"Doorwerken tot"/)).toBeInTheDocument()
+    expect(screen.getByText(/hoever je plan reikt/)).toBeInTheDocument()
+  })
+
   it('solved zonder dekking-prop: sectie 2 is byte-identiek aan vandaag (marge-band + tegels)', () => {
     render(<Vrijheidsas {...baseProps} />)
     expect(screen.getByText('Hoe stevig is dat?')).toBeInTheDocument()
