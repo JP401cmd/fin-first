@@ -169,6 +169,7 @@ Alle route-handlers onder `app/api/*` gebruiken één gedeelde foutvorm (ADR 004
 - **Nooit een rauwe `error.message`/stack naar de client.** In `catch`-blokken en bij DB-fouten: `return serverError(err, 'domein:METHOD')`. Die logt de echte fout server-side met een grep-bare tag en stuurt een generieke tekst naar de client (AVG/security). `error.message` mag alleen server-side gelezen worden (bv. `error.message?.includes(...)` voor control-flow), nooit in de response-body.
 - **Eén 401-tekst app-breed: `'Niet ingelogd'`** — via `unauthorized()`. Match nooit in frontend/tests op de exacte 401-string.
 - **Zod op nieuwe mutatie-routes.** Nieuwe POST/PUT/PATCH/DELETE-met-body valideert de body met een zod-schema via `parseBody(schema, req)` uit `lib/api/parse-body.ts` (geeft bij falen een client-veilige 400). Bestaande handlers worden niet massaal geretrofit — zod komt erbij waar de migratie er toch al langskomt.
+- **Beheer-routes lezen gebruik, geen inhoud (ADR 0146) — en de gate is fail-closed.** `lib/beheer/geen-inhoud.test.ts` scant `app/api/admin/**` (en elke route met `isSuperAdmin`): een tabel die niet op `VRIJ_LEESBAAR` staat mag daar alleen `META_KOLOMMEN` lezen, ongeacht of het een financiële tabel is. Een nieuwe beheer-tabel vereist dus een bewuste toevoeging mét reden in die test — verruim de gate nooit "even" om een rode run groen te krijgen.
 
 ## Datapad-conventie — lezen via loader, muteren via API, client-direct afgebakend (verplicht bij data-werk)
 
