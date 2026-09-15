@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-09-14T19:15:36.700Z",
-  "generatedDate": "2026-09-14",
+  "generatedAt": "2026-09-15T01:16:01.841Z",
+  "generatedDate": "2026-09-15",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -195,7 +195,7 @@
     "tables": 96,
     "migrations": 239,
     "integrations": 25,
-    "components": 1087,
+    "components": 1089,
     "providers": 17,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -8858,11 +8858,11 @@
     }
   ],
   "components": {
-    "total": 1087,
+    "total": 1089,
     "groups": [
       {
         "group": "app",
-        "count": 418,
+        "count": 420,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -8991,6 +8991,8 @@
           "deeltijdwerk-impact",
           "deficit-notice-provider",
           "deficit-notice-provider.test",
+          "dekkingsbalk",
+          "dekkingsbalk.test",
           "dekkingsradar",
           "dekkingsradar.test",
           "density-toggle",
@@ -17646,19 +17648,19 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 75
+        "commits": 74
       },
       {
         "path": "lib/ai",
-        "commits": 52
+        "commits": 53
       },
       {
         "path": "app/(app)/toekomst",
-        "commits": 31
+        "commits": 32
       },
       {
         "path": "app/api/ai",
-        "commits": 17
+        "commits": 18
       },
       {
         "path": "app/api/assets",
@@ -17688,8 +17690,8 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 10388,
-        "commits": 77
+        "loc": 10416,
+        "commits": 84
       },
       {
         "file": "components/app/budgets-client.tsx",
@@ -18870,7 +18872,7 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-09-14",
+    "previousDate": "2026-09-15",
     "hasChanges": false,
     "sections": []
   },
@@ -19278,6 +19280,13 @@
       "date": "2026-09-14",
       "api": 316,
       "components": 1087,
+      "tables": 96,
+      "routesProduction": 90
+    },
+    {
+      "date": "2026-09-15",
+      "api": 316,
+      "components": 1089,
       "tables": 96,
       "routesProduction": 90
     }

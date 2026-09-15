@@ -132,7 +132,12 @@ bekend zijn; de hero-tegel toont intussen een pending state ("wordt berekend",
 `solvedPending = isFixedAnchorMode && solvedRun === null`) in plaats van een tweede getal.
 De batch-aanroep geeft daarbij ook dezelfde ADR 0103-grondslag-injectie mee als de
 hoofdrun (`withResolvedKernelBedragen`) — een nevenaanpassing voor consistentie, niet de
-oorzaak van het eerdere "—".
+oorzaak van het eerdere "—". Die injectie geldt onder **élk** anker, dus óók onder
+`solved`: voor gebruikers met een budget- of transactiegrondslag voor het inkomen rekenen
+de vijf scenariokaarten voortaan op het geïnjecteerde inkomen in plaats van op de rauwe
+profielrij, en kunnen de kaartdelta's onder `solved` daardoor verschuiven. Dat is een
+correctie, geen regressie: de kaarten vergelijken met `verwachtFireAge` uit de hoofdrun, en
+die draaide al op deze grondslag — nu staan beide op dezelfde (eindreview I3, 15 sep 2026).
 
 **D8 — Sectie 2 van de Vrijheidsas is onder een vast anker de dekkingsas** (15 sep 2026,
 spec lab-haalbaarheid §1). Schaal van stopmoment tot eindleeftijd, slider "Doorwerken tot",
@@ -147,7 +152,17 @@ ingeklapte knop "Minder werken".
 
 **D10 — Bij een tekort: de drie hefbomen als antwoorden** (§3). `resolveLabAntwoorden`
 geeft "doorwerken tot X" (tweede run), "€X extra opzij" en "€X minder uitgeven"
-(`maandHint`); elke regel zet een verkenning, nooit het plan (D7 blijft: alleen op klik).
+(`planMaandHint` = P!B96 van de hoofd-run, dus het plan-stopmoment — nooit de hint van het
+verkende stop-pad, die bij een ander stopmoment hoort; eindreview I1); elke regel zet een
+verkenning, nooit het plan (D7 blijft: alleen op klik). Alleen "Doorwerken tot X **dekt je
+plan**." claimt een uitkomst. De twee €-regels zeggen "Zo'n €X per maand extra opzij /
+minder uitgeven, uitgesmeerd tot je eindleeftijd, **hoort bij een gedekt plan**.": P!B96 is
+uitgesmeerd over de maanden tot de eindleeftijd, terwijl de slider-hefbomen via het
+FIRE-gegate salariskanaal op het stopmoment stoppen. Gemeten met de echte motor
+(`lib/horizon/lab-antwoorden.kernel.test.ts`, eindreview I2): leeftijd 42 · stop 50 · basis
+77% → hint gezet 94%; leeftijd 55 · stop 58 · basis 82% → hint gezet 87%; doorwerken tot het
+antwoord → 100% (plan-anker én stop-pad). Een hint die over de maanden tot het stopmoment
+deelt, is een kernel-/fase-2-vraag.
 Boven het slider-bereik zegt de regel dat; de knop zet het maximum. Vervangt, onder een
 vast anker, zowel de oude plan-hint ("Reken met € X extra inleg", die tekst en knop
 bestaan niet meer) als het stop-pad-blok "Wat hoort daarbij?" — dat blok blijft alleen
