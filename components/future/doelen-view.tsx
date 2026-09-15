@@ -17,8 +17,8 @@ import {
   planCoverageKaartSubregel,
   doelenPlanGewijzigdMelding,
   DOELEN_MELDING_ACTIES,
+  planCoverageGoalName,
 } from '@/lib/horizon/anker-copy'
-import { planCoverageGoalName } from '@/lib/horizon/toekomst-doel'
 import { selectLabDoelenBuitenPlan, type LabPlanContext } from '@/lib/goals/lab-doelen-buiten-plan'
 import type { GoalWithBudget } from '@/lib/fin-data-loader'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
@@ -351,6 +351,39 @@ function ParameterGoalCard({ goal, progress, labPlan }: GoalDisplay & { labPlan:
         </>
       )}
     </Link>
+  )
+}
+
+/**
+ * Eén regel wanneer de plankeuze lab-doelen n.v.t. maakte (spec lab-haalbaarheid §4.2).
+ * Eén markup voor beide weergavemodi. "Bijwerken" opent het lab zelf via de canonieke
+ * deeplink (`?whatif=open` klapt het lab uit en scrolt ernaartoe); "Loslaten" opent de
+ * bestaande confirm — dezelfde flow als het overflow-menu van de doelsituatie.
+ */
+function LabPlanMelding({ count, onLoslaten }: { count: number; onLoslaten: () => void }) {
+  return (
+    <div
+      role="status"
+      data-testid="doelen-plan-melding"
+      className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 border border-[var(--ink-2)] border-l-4 border-l-warning bg-[var(--paper)] px-3 py-2 font-sans text-[12px] text-[var(--ink-2)]"
+    >
+      <span>{doelenPlanGewijzigdMelding(count)}</span>
+      <span className="flex items-center gap-x-4">
+        <Link
+          href="/toekomst?whatif=open"
+          className="inline-flex min-h-[44px] items-center font-semibold text-horizon-700 underline underline-offset-2"
+        >
+          {DOELEN_MELDING_ACTIES.bijwerken}
+        </Link>
+        <button
+          type="button"
+          onClick={onLoslaten}
+          className="inline-flex min-h-[44px] items-center font-semibold text-negative underline underline-offset-2"
+        >
+          {DOELEN_MELDING_ACTIES.loslaten}
+        </button>
+      </span>
+    </div>
   )
 }
 
@@ -848,31 +881,7 @@ export function DoelenView({
             </div>
           </header>
           {labDoelenBuitenPlan.length > 0 && (
-            /* Spec lab-haalbaarheid §4.2: één regel wanneer de plankeuze lab-doelen
-               n.v.t. maakte. Bijwerken landt in het lab; Loslaten opent de bestaande
-               confirm (dezelfde flow als het overflow-menu). */
-            <div
-              role="status"
-              data-testid="doelen-plan-melding"
-              className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 border border-[var(--ink-2)] border-l-4 border-l-warning bg-[var(--paper)] px-3 py-2 font-sans text-[12px] text-[var(--ink-2)]"
-            >
-              <span>{doelenPlanGewijzigdMelding(labDoelenBuitenPlan.length)}</span>
-              <span className="flex items-center gap-x-4">
-                <Link
-                  href="/toekomst#verken-je-aannames"
-                  className="inline-flex min-h-[44px] items-center font-semibold text-horizon-700 underline underline-offset-2"
-                >
-                  {DOELEN_MELDING_ACTIES.bijwerken}
-                </Link>
-                <button
-                  type="button"
-                  onClick={() => setConfirmOpen(true)}
-                  className="inline-flex min-h-[44px] items-center font-semibold text-negative underline underline-offset-2"
-                >
-                  {DOELEN_MELDING_ACTIES.loslaten}
-                </button>
-              </span>
-            </div>
+            <LabPlanMelding count={labDoelenBuitenPlan.length} onLoslaten={() => setConfirmOpen(true)} />
           )}
           <p className="mb-4 text-[11px] italic text-[var(--ink-3)]">
             Je vastgelegde aannames uit het lab. Klik een kaart om ze live te
@@ -910,23 +919,31 @@ export function DoelenView({
           bij Bereikt — kies hierboven je volgende.
         </p>
       ) : simple ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-          {mergedDisplay.map((d) =>
-            isParameterGoal(d.goal) ? (
-              <ParameterGoalCard key={d.goal.id} goal={d.goal} progress={d.progress} labPlan={labPlan} />
-            ) : (
-              <ManualGoalCard
-                key={d.goal.id}
-                goal={d.goal}
-                progress={d.progress}
-                onEdit={() => setEditingGoal(d.goal)}
-                live={vrijheidsgetalLive && isVrijheidsgetalGoal(d.goal)}
-                homeExcluded={vrijheidsgetalHomeExcluded}
-                linked={linkedIds.has(d.goal.id)}
-              />
-            ),
+        <>
+          {/* Spec §4.2 (ruling 15 sep): de melding geldt in beide modi. In Eenvoudig
+              is er geen doelsituatie-groep, dus staat hij boven de samengevoegde lijst.
+              Niet-lege n.v.t.-lijst ⇒ `mergedDisplay` is nooit leeg, dus deze tak volstaat. */}
+          {labDoelenBuitenPlan.length > 0 && (
+            <LabPlanMelding count={labDoelenBuitenPlan.length} onLoslaten={() => setConfirmOpen(true)} />
           )}
-        </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            {mergedDisplay.map((d) =>
+              isParameterGoal(d.goal) ? (
+                <ParameterGoalCard key={d.goal.id} goal={d.goal} progress={d.progress} labPlan={labPlan} />
+              ) : (
+                <ManualGoalCard
+                  key={d.goal.id}
+                  goal={d.goal}
+                  progress={d.progress}
+                  onEdit={() => setEditingGoal(d.goal)}
+                  live={vrijheidsgetalLive && isVrijheidsgetalGoal(d.goal)}
+                  homeExcluded={vrijheidsgetalHomeExcluded}
+                  linked={linkedIds.has(d.goal.id)}
+                />
+              ),
+            )}
+          </div>
+        </>
       ) : manualCount === 0 ? (
         <p className="text-sm text-[var(--ink-2)] leading-relaxed">
           Je hebt nog geen eigen doelen naast je doelsituatie. Formuleer een

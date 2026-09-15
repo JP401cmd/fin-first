@@ -18,6 +18,8 @@ import type { AssetCategorie } from '@/lib/horizon-kernel/types'
 import { ASSET_TYPE_TO_CATEGORIE, potRendement } from '@/lib/horizon-kernel/adapter/potten'
 import { GOAL_TYPE_META, GOAL_TYPE_ICONS, type GoalType } from '@/lib/goal-data'
 import { DOEL_PARAMETERS, type DoelParameter } from '@/lib/horizon/toekomst-scenario'
+// De "Plan gedekt"-naam is gedeeld met de (client-)doelkaart en woont daarom in anker-copy.
+import { planCoverageGoalName } from '@/lib/horizon/anker-copy'
 
 // ── Parameter → goal_type (één bron, ook voor de route + loader) ──────────────
 
@@ -192,11 +194,6 @@ function fmtNum1(v: number): string {
 /** Percentage met exact 1 decimaal (komma): `6,3`. */
 function fmtPct1(v: number): string {
   return v.toLocaleString('nl-NL', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
-}
-
-/** De naam van het "Plan gedekt"-doel — één bron voor de DB-rij én de live kaart (spec §4.1). */
-export function planCoverageGoalName(eindleeftijd: number | null): string {
-  return isFiniteNumber(eindleeftijd) ? `Plan gedekt tot ${fmtNum1(eindleeftijd)} jaar` : 'Plan gedekt'
 }
 
 const BASE_METADATA = { bron: 'parameter', oorsprong: 'lab' } as const

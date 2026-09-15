@@ -37,6 +37,7 @@ import {
   DEKKINGSAS_COPY,
   doelenPlanGewijzigdMelding,
   DOELEN_MELDING_ACTIES,
+  planCoverageGoalName,
   type AnkerReach,
   type AnkerStop,
 } from './anker-copy'
@@ -220,6 +221,12 @@ describe('dekking-zinnen — de vastgestelde kopij', () => {
     expect(planCoverageKaartSubregel(90, 'age', 58.5)).toBe('tot je 90e · stopmoment 58,5')
     expect(planCoverageKaartSubregel(90, 'aow', null)).toBe('tot je 90e · stopmoment je AOW-leeftijd')
     expect(planCoverageKaartSubregel(90, null, null)).toBe('tot je 90e')
+  })
+
+  it('planCoverageGoalName is de ene bron voor de kaartnaam (rij én live)', () => {
+    expect(planCoverageGoalName(90)).toBe('Plan gedekt tot 90 jaar')
+    expect(planCoverageGoalName(92.5)).toBe('Plan gedekt tot 92,5 jaar')
+    expect(planCoverageGoalName(null)).toBe('Plan gedekt')
   })
 
   it('doelen-melding: enkelvoud/meervoud, acties Bijwerken · Loslaten (spec §4/§5)', () => {

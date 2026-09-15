@@ -431,6 +431,18 @@ export function planCoverageKaartSubregel(
 }
 
 /**
+ * De naam van het "Plan gedekt"-doel — één bron voor de DB-rij (`buildRow('dekking')` in
+ * toekomst-doel.ts) én de live kaart (spec lab-haalbaarheid §4.1). Woont hier en niet in
+ * toekomst-doel.ts: die module trekt de kernel-adapter mee, en de doelen-view is een
+ * client-component. Eindleeftijd met max. 1 decimaal en komma (`90` / `92,5`).
+ */
+export function planCoverageGoalName(eindleeftijd: number | null): string {
+  return bruikbaar(eindleeftijd)
+    ? `Plan gedekt tot ${eindleeftijd.toLocaleString('nl-NL', { maximumFractionDigits: 1 })} jaar`
+    : 'Plan gedekt'
+}
+
+/**
  * Zin 4 — de notitie op een `plan_coverage`-doelkaart onder `solved`: de app zoekt het
  * stopmoment zelf, dus een dekkingsdoel heeft geen uitkomst (spiegel van
  * `fireAgeGoalNotApplicableReason` onder een vast anker).

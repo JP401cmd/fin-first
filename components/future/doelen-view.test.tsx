@@ -1015,7 +1015,8 @@ describe('DoelenView — melding wanneer lab-doelen niet meer bij het plan passe
     const melding = screen.getByTestId('doelen-plan-melding')
     expect(melding).toHaveAttribute('role', 'status')
     expect(melding).toHaveTextContent('Je plan is veranderd. 1 doel uit het lab past er niet meer bij.')
-    expect(screen.getByRole('link', { name: 'Bijwerken' })).toHaveAttribute('href', '/toekomst#verken-je-aannames')
+    // Bijwerken opent het lab zelf (canonieke deeplink), niet alleen de landingsanker.
+    expect(screen.getByRole('link', { name: 'Bijwerken' })).toHaveAttribute('href', '/toekomst?whatif=open')
     expect(screen.queryByText('Doelsituatie loslaten')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Loslaten' }))
     expect(screen.getByText('Doelsituatie loslaten')).toBeInTheDocument()
@@ -1040,9 +1041,31 @@ describe('DoelenView — melding wanneer lab-doelen niet meer bij het plan passe
     expect(screen.queryByText(/Je plan is veranderd/)).toBeNull()
   })
 
-  it('in Eenvoudig geen melding (de doelsituatie-groep bestaat daar niet)', () => {
-    render(<DoelenView goals={[fireAgeNvt()]} goalProgresses={[fireAgeProgress]} />, 'simple')
-    expect(screen.queryByTestId('doelen-plan-melding')).toBeNull()
+  it('in Eenvoudig staat dezelfde melding boven de lijst; Loslaten opent daar ook de confirm', () => {
+    render(
+      <DoelenView goals={[fireAgeNvt(), spaarquoteDoel()]} goalProgresses={[fireAgeProgress, spaarquoteProgress]} />,
+      'simple',
+    )
+    // Eenvoudig: geen doelsituatie-groep, wél de melding.
+    expect(screen.queryByText('Jouw doelsituatie')).toBeNull()
+    const meldingen = screen.getAllByTestId('doelen-plan-melding')
+    expect(meldingen).toHaveLength(1)
+    expect(meldingen[0]).toHaveAttribute('role', 'status')
+    expect(meldingen[0]).toHaveTextContent('Je plan is veranderd. 1 doel uit het lab past er niet meer bij.')
+    // Boven de lijst: de melding komt in documentvolgorde vóór de eerste doelkaart.
+    const eersteKaart = screen.getByRole('link', { name: /Bekijk Vrij op 58 jaar in het lab/ })
+    expect(meldingen[0].compareDocumentPosition(eersteKaart) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Bijwerken' })).toHaveAttribute('href', '/toekomst?whatif=open')
+    expect(screen.queryByText('Doelsituatie loslaten')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Loslaten' }))
+    expect(screen.getByText('Doelsituatie loslaten')).toBeInTheDocument()
+  })
+
+  it('doelen-view importeert niets uit lib/horizon/toekomst-doel (bundelgrens: die trekt de kernel-adapter mee)', async () => {
+    const { readFileSync } = await import('node:fs')
+    const { resolve } = await import('node:path')
+    const src = readFileSync(resolve(__dirname, 'doelen-view.tsx'), 'utf8')
+    expect(src).not.toMatch(/from\s+['"]@\/lib\/horizon\/toekomst-doel['"]/)
   })
 })
 
