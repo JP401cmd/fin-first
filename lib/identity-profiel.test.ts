@@ -255,11 +255,13 @@ describe('Profiel — Color preferences (module, budget, phase)', () => {
   // UR3-32: vier accenten, met defaults uit de hefboomfamilies (Bezittingen =
   // kern, Schulden = wil, Budget = horizon) plus Fins eigen accent.
   // 8 sep: opgetrokken van C ~ 0,065 naar C ~ 0,094 — feller, hue ongewijzigd.
+  // 15 sep: L opgetrokken tot tegen de AA-ondergrens (4,5:1 op papier) — hue
+  // ongewijzigd, zie lib/color-palette.ts voor de per-kleur onderbouwing.
   it('DEFAULT_MODULE_COLORS has kern, wil, horizon, fin', () => {
-    expect(DEFAULT_MODULE_COLORS.kern).toBe('#007c5a')
-    expect(DEFAULT_MODULE_COLORS.wil).toBe('#a54c00')
-    expect(DEFAULT_MODULE_COLORS.horizon).toBe('#006ead')
-    expect(DEFAULT_MODULE_COLORS.fin).toBe('#4f0077')
+    expect(DEFAULT_MODULE_COLORS.kern).toBe('#00825f')
+    expect(DEFAULT_MODULE_COLORS.wil).toBe('#b85600')
+    expect(DEFAULT_MODULE_COLORS.horizon).toBe('#0077bb')
+    expect(DEFAULT_MODULE_COLORS.fin).toBe('#af16ff')
   })
 
   it('DEFAULT_BUDGET_COLORS has 5 budget types', () => {

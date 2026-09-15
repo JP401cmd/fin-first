@@ -68,7 +68,8 @@ type OverzichtHeroPrimaryProps = {
   /** Dubbele grondslag incl./excl. eigen woning — bron = horizonData. Null → geen splitsing. */
   housingSplit?: HefbomenHousingSplit | null
   /**
-   * De rechter cel (3/4) van de hero-row: de mini-vermogen-grafiek, GESTREAMD
+   * De rechter cel (3/4) van de hero-row: de mini-vermogen-grafiek (op lg twee
+   * kaarten: verleden 1/4 + toekomst 2/4, zie `networth-chart-layout.ts`), GESTREAMD
    * achter een eigen `<Suspense>` (`OverzichtNetWorthChartLoader`) omdat de
    * per-jaar-projectie de kernel-sim uit `loadDashboardData` nodig heeft. De
    * Health-card links (1/4) rendert wél direct uit de blok-1-`health` — zo komt
@@ -169,7 +170,13 @@ export function OverzichtHeroPrimary({
           de rechter tussen een Suspense-fallback en de echte grafiek. Op de cel
           overleeft het anker beide wissels, dus de rondleiding wijst nooit naar
           een element dat net vervangen is (ADR 0130). */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 sm:gap-4 items-stretch">
+      {/* GAP-UITLIJNING: op lg is de gap 12px (`lg:gap-3`), gelijk aan de
+          hefbomen-rij (`sm:gap-3`) en aan de binnen-grid van de grafiekcel
+          (`networth-chart-layout.ts`). Zelfde `<section>`-breedte + vier kolommen
+          + zelfde gap ⇒ de verleden-kaart staat pixel-gelijk onder Schulden en de
+          toekomst-kaart onder Budget + Belasting; de naad Vandaag valt op de grens
+          Schulden | Budget. Wijzig deze drie gaps alleen samen. */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-3 items-stretch">
         <div data-tour="gezondheid" className="lg:col-span-1">
           {health ? (
             <HealthScoreCard

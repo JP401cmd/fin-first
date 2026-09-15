@@ -26,6 +26,9 @@
  */
 
 import { calculateBox3 } from '@/lib/box3-data'
+import { formatStopAge, type AnkerReach } from '@/lib/horizon/anker-copy'
+import { resolvePlanStatus } from '@/lib/horizon/plan-status'
+import { resolveFreedomBanner } from '@/lib/page-status/freedom'
 import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
 import { scoreDSTI, scoreAssetConcentration, scoreDebtRatio } from '@/lib/financial-health'
@@ -145,6 +148,40 @@ function postponedUntil(nowMs: number, days = 14): number {
  *  vandaag + gekozen weken × 7 dagen. */
 function postponeWeeks(nowMs: number, weeks: number): number {
   return nowMs + weeks * 7 * 24 * 60 * 60 * 1000
+}
+
+/** Mirror van de toekomst-kop-toestandsmachine
+ *  (components/overview/mini-networth-chart.tsx r495-514, regelnummers
+ *  verschoven bij de dubbele-grondslag-toevoeging, formule ongewijzigd):
+ *  welke kop de toekomst-kaart op /overzicht toont, afhankelijk van
+ *  fireReached/stopAnchorFixed/isPensioenMode/Eenvoudig. `kopLeeftijd` is
+ *  zelf de échte productiefunctie `formatStopAge` (geen mirror) onder een
+ *  vast anker, anders de afgeronde eindleeftijd als string — identiek aan
+ *  r497-500. */
+function toekomstKop(opts: {
+  fireReached: boolean
+  stopAnchorFixed: boolean
+  isPensioenMode: boolean
+  simple: boolean
+  endLabel: string
+  finalAgeLabel: number
+  stopAge?: number | null
+}): string {
+  const kopLeeftijd =
+    opts.stopAnchorFixed && opts.stopAge != null && Number.isFinite(opts.stopAge)
+      ? formatStopAge(opts.stopAge)
+      : String(opts.finalAgeLabel)
+  if (opts.fireReached) {
+    if (opts.stopAnchorFixed) {
+      return opts.simple ? 'Plan gedekt' : `Plan gedekt — verloop tot ${opts.finalAgeLabel}`
+    }
+    return opts.simple
+      ? `${opts.endLabel} bereikt`
+      : `${opts.endLabel} bereikt — verloop tot ${opts.finalAgeLabel}`
+  }
+  if (opts.isPensioenMode) return `Pensioen op ${kopLeeftijd}`
+  if (opts.stopAnchorFixed) return `Stoppen op ${kopLeeftijd}`
+  return `Vrij op ${kopLeeftijd}`
 }
 
 /** Mirror van de canonieke actie-volgorde (lib/action-sort.ts#compareActionsByPriority):
@@ -508,6 +545,91 @@ export const OVZ_ENGINE_CHECKS: OvzEngineCheck[] = [
           `total=${lang.total}; count=${lang.count.assets}a/${lang.count.debts}d` +
           `; kortHistorie=${kort.history.length === 0 ? 'leeg' : kort.history.length}` +
           `; langHistorieLengte=${lang.history.length}; langLaatstePunt=${lang.history[lang.history.length - 1]?.value}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-OVZ-27',
+    scenarioId: 'UAT-OVZ-27',
+    label: 'Toekomst-kop-toestandsmachine (mirror): Stoppen/Pensioen/Vrij/bereikt-varianten',
+    run: () => {
+      criterion('WF-OVZ-27')
+      const stop = toekomstKop({
+        fireReached: false,
+        stopAnchorFixed: true,
+        isPensioenMode: false,
+        simple: false,
+        endLabel: 'Vrijheid',
+        finalAgeLabel: 90,
+        stopAge: 45,
+      })
+      const bereiktVast = toekomstKop({
+        fireReached: true,
+        stopAnchorFixed: true,
+        isPensioenMode: false,
+        simple: false,
+        endLabel: 'Vrijheid',
+        finalAgeLabel: 90,
+        stopAge: 45,
+      })
+      const vrij = toekomstKop({
+        fireReached: false,
+        stopAnchorFixed: false,
+        isPensioenMode: false,
+        simple: false,
+        endLabel: 'Vrijheid',
+        finalAgeLabel: 65,
+        stopAge: null,
+      })
+      const pensioen = toekomstKop({
+        fireReached: false,
+        stopAnchorFixed: false,
+        isPensioenMode: true,
+        simple: false,
+        endLabel: 'Vrijheid',
+        finalAgeLabel: 67,
+        stopAge: null,
+      })
+      const bereiktSimple = toekomstKop({
+        fireReached: true,
+        stopAnchorFixed: false,
+        isPensioenMode: false,
+        simple: true,
+        endLabel: 'Vrijheid',
+        finalAgeLabel: 65,
+        stopAge: null,
+      })
+      return {
+        expected:
+          'stop=Stoppen op 45; bereiktVast=Plan gedekt — verloop tot 90; vrij=Vrij op 65; pensioen=Pensioen op 67; bereiktSimple=Vrijheid bereikt',
+        actual: `stop=${stop}; bereiktVast=${bereiktVast}; vrij=${vrij}; pensioen=${pensioen}; bereiktSimple=${bereiktSimple}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-OVZ-28',
+    scenarioId: 'UAT-OVZ-28',
+    label: 'Plan-stoplicht (echte functies): kaartstatus per planmodus + bannerstatus onder een vast stopmoment',
+    run: () => {
+      const c = criterion('WF-OVZ-28')
+      const fixed = (coveragePct: number | null) =>
+        resolvePlanStatus({ anchorFixed: true, coveragePct, solvedReachable: null })
+      const solved = (solvedReachable: boolean) =>
+        resolvePlanStatus({ anchorFixed: false, coveragePct: null, solvedReachable })
+      const stop = { kind: 'age' as const, stopAge: 48 }
+      const banner = (freedomPct: number, reach: AnkerReach) =>
+        resolveFreedomBanner(
+          { freedomPct, currentAge: 46, fireAge: 48, anchor: { kind: 'age', age: 48 }, aowAge: 67 },
+          { reach, stop },
+        )?.status ?? 'geen'
+      const tekort: AnkerReach = { kind: 'reikt-tot', age: 50, endAge: 90 }
+      return {
+        expected: c.assertion.expected ?? '',
+        actual:
+          `fixed5=${fixed(5)}; fixed95=${fixed(95)}; fixed100=${fixed(100)}; fixedGeenDekking=${fixed(null)}` +
+          `; solvedHaalbaar=${solved(true)}; solvedOnhaalbaar=${solved(false)}` +
+          `; banner5=${banner(5, tekort)}; banner95=${banner(95, tekort)}` +
+          `; bannerGedekt=${banner(100, { kind: 'gedekt', endAge: 90 })}`,
       }
     },
   },

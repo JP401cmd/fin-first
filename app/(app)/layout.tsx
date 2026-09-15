@@ -29,6 +29,8 @@ import { NotificationProvider } from '@/components/app/notifications/notificatio
 import { NotificationModal } from '@/components/app/notifications/notification-panel'
 import { ResponsiveShell } from '@/components/app/shell/responsive-shell'
 import { CashflowStatusProvider } from '@/components/app/cashflow-status-provider'
+import { PlanStatusProvider } from '@/components/app/plan-status-provider'
+import { PlanStatusSignal } from '@/components/app/plan-status-signal'
 import type { SidebarSignals } from '@/components/app/shell/shell-contexts'
 import { PlatformBanner } from '@/components/app/platform-banner'
 import { VragenlijstSignaalProvider } from '@/components/app/vragenlijst/vragenlijst-signaal-provider'
@@ -646,6 +648,16 @@ export default async function AppLayout({
                               die alleen via een gedeelde voorouder bij elkaar
                               komen. Zie cashflow-status-provider.tsx. */}
                           <CashflowStatusProvider>
+                          {/* Plan-stoplicht naast "De toekomst" in het menu.
+                              Nagestreamd (eigen Suspense) zodat de canonieke
+                              run shell en navigatie niet ophoudt. PERSOONLIJK,
+                              zoals de hefboompunten: het punt beoordeelt het plan
+                              dat /toekomst toont (die pagina laadt 'personal'),
+                              en daar is de run dan een cache-hit. */}
+                          <PlanStatusProvider>
+                            <Suspense fallback={null}>
+                              <PlanStatusSignal supabase={supabase} perspective="personal" />
+                            </Suspense>
                             <ResponsiveShell
                               email={user.email ?? ''}
                               fullName={(profile?.full_name as string | null) ?? null}
@@ -667,6 +679,7 @@ export default async function AppLayout({
                               <VragenlijstUitnodiging />
                               {children}
                             </ResponsiveShell>
+                          </PlanStatusProvider>
                           </CashflowStatusProvider>
                         </CommandPaletteProvider>
                         {/* ChatPanel MOET binnen FeatureAccessProvider blijven:

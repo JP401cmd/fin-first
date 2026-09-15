@@ -39,8 +39,15 @@ describe('resolveFreedomBanner — de D8-gate', () => {
     )
     expect(tekort?.title).toBe('Je rekent met stoppen op 58,5')
     expect(tekort?.reason).toBe('Als je op 58,5 stopt, reikt je liquide vermogen tot je 83e. Je plan loopt tot je 90e.')
-    expect(tekort?.status).toBe('warn')
+    // Plan-status (15 sep 2026): dekking 62% < 90 ⇒ rood, niet langer elk tekort oranje.
+    expect(tekort?.status).toBe('bad')
     expect(tekort?.reason).not.toMatch(/\bAOW\b/)
+
+    const krap = resolveFreedomBanner(
+      { freedomPct: 95, currentAge: 45, fireAge: 58.5, anchor: { kind: 'age', age: 58.5 }, aowAge: 67 },
+      { reach: { kind: 'reikt-tot', age: 88.5, endAge: 90 }, stop: { kind: 'age', stopAge: 58.5 } },
+    )
+    expect(krap?.status).toBe('warn')
 
     const gedekt = resolveFreedomBanner(
       { freedomPct: 100, currentAge: 30, fireAge: 67, anchor: { kind: 'aow' }, aowAge: 67 },

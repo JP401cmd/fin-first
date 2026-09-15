@@ -37,9 +37,9 @@ export type ModuleColorConfig = {
  * UR3-32 zette ze daarom op C ≈ 0,065. Dat bleek in gebruik té gedempt.
  *
  * **EIGENAARSBESLUIT 8 sep 2026: voor de ACCENTEN is de koppeling met de
- * stoplicht-semantiek losgelaten.** Elk accent staat nu op zijn sRGB-gamutgrens
- * voor zijn eigen hue en lightness: kern 0,108 · wil 0,137 · horizon 0,129 ·
- * fin 0,170. Er is geen chroma-plafond meer op de accenten.
+ * stoplicht-semantiek losgelaten.** Elk accent staat op zijn sRGB-gamutgrens
+ * voor zijn eigen hue en lightness. Er is geen chroma-plafond meer op de
+ * accenten.
  *
  * Wat dat opgeeft, expliciet: acceptatiecriterium 2 van UR3-32 luidde "welke
  * accentkeuze dan ook — een statuskleur blijft te onderscheiden van de
@@ -53,21 +53,27 @@ export type ModuleColorConfig = {
  * gehaald. Verwar die twee niet — de vorige poging om dit via
  * `ACCENT_CHROMA_MAX` te regelen ontwapende juist die andere groepen.
  *
- * **Lightness is bewust niet verhoogd.** Een eerdere poging tilde L van 0,52
- * naar 0,56 ("lichter leest als kleur"); dat kostte contrast met papier — kern
- * zakte van 5,06 naar 4,20, onder de 4,5 die WCAG AA voor normale tekst vraagt.
- * Verzadiging levert de felheid, lichtheid leverde alleen contrastverlies.
- * Huidige waarden: 4,95 / 5,49 / 5,20 / 12,48 — alle boven AA.
- *
- * Groen en teal blijven visueel rustiger dan paars of magenta. Bij L ≈ 0,52
- * laat sRGB daar maar C ≈ 0,09–0,13 toe, tegen ~0,27 in het blauw/paars. Dat is
- * de gamut, geen keuze — en de reden dat Bezittingen nooit zo fel wordt als Fin.
+ * **EIGENAARSBESLUIT 15 sep 2026: lightness omhoog tot tégen de AA-ondergrens
+ * (4,5:1 op papier `#faf9f6`), niet eroverheen.** Op 8 sep werd L bewust niet
+ * verhoogd (een eerdere poging naar L 0,56 liet kern zakken tot 4,20:1). Het
+ * verschil nu: chroma stijgt méé met lightness in dit hele bereik (bij vaste L
+ * zaten alle vier de accenten al op hun gamutgrens — daar was géén ruimte
+ * meer over), dus de enige resterende hendel voor "feller" is L optrekken tot
+ * net vóór het punt waar contrast onder AA zakt. Elke accent is individueel
+ * op zijn eigen hue gezocht naar het hoogste L met contrast ≥ 4,5 op papier
+ * (marge ingebouwd: alle vier landen op 4,55–4,58). Resultaat, chroma t.o.v.
+ * 8 sep: kern 0,108→0,112 (+4%, groen/teal blijft het smalst — dat is gamut,
+ * geen nalatigheid), wil 0,137→0,149 (+9%), horizon 0,129→0,137 (+6%), fin
+ * 0,170→0,294 (+73% — fin had als donkerste accent (L 0,33) verreweg de meeste
+ * contrastmarge liggen, en is nu duidelijk zichtbaar een andere, veel fellere
+ * violet dan voorheen — een bewuste identiteitsverschuiving, niet alleen een
+ * tint feller). Hue is bij alle vier ongewijzigd.
  */
 export const DEFAULT_MODULE_COLORS: ModuleColorConfig = {
-  kern: '#007c5a',
-  wil: '#a54c00',
-  horizon: '#006ead',
-  fin: '#4f0077',
+  kern: '#00825f',
+  wil: '#b85600',
+  horizon: '#0077bb',
+  fin: '#af16ff',
 }
 
 export const SHADES = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950] as const

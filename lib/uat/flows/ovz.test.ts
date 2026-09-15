@@ -47,7 +47,7 @@ describe('OVZ_FLOW — curatie-integriteit', () => {
     }
   })
 
-  it('dekt alle 22 WF-OVZ-scenario\'s (01..14, 19..26 — WF-OVZ-15/16/17/18 bestaan niet (meer) in de catalogus)', () => {
+  it('dekt alle 24 WF-OVZ-scenario\'s (01..14, 19..28 — WF-OVZ-15/16/17/18 bestaan niet (meer) in de catalogus)', () => {
     const covered = new Set(
       OVZ_FLOW.nodes.map((n) => n.scenarioId).filter((id): id is string => Boolean(id)),
     )
@@ -55,14 +55,17 @@ describe('OVZ_FLOW — curatie-integriteit', () => {
     // 12-09-2026): de CompoundInsightCard op /overzicht is uit de app
     // verwijderd, samen met lib/compound-projection.ts. WF-OVZ-16 bestond al
     // niet in de catalogus (bestaande, hier ongewijzigde dekkingsleemte).
+    // WF-OVZ-27 (netto-vermogen-kaart in twee delen) is nieuw sinds de
+    // tweedeling van de vermogenskaart op /overzicht (sep 2026). WF-OVZ-28
+    // (plan-stoplicht op de plankaart) is nieuw sinds 15 sep 2026.
     const expected = [
       ...Array.from({ length: 14 }, (_, i) => i + 1),
-      19, 20, 21, 22, 23, 24, 25, 26,
+      19, 20, 21, 22, 23, 24, 25, 26, 27, 28,
     ].map((n) => `UAT-OVZ-${String(n).padStart(2, '0')}`)
     for (const id of expected) {
       expect(covered.has(id), `${id} moet als flow-knoop voorkomen`).toBe(true)
     }
-    expect(covered.size).toBe(22)
+    expect(covered.size).toBe(24)
   })
 
   it('de domeinoverschrijdende cross-knopen dekken WILL/TOEK/MIJN/NAV/BEZIT', () => {

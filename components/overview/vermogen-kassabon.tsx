@@ -1,12 +1,8 @@
 'use client'
 
-import { useState } from 'react'
-import { calculateFreedomTime, formatFreedomTimeString, formatMaskedCurrency } from '@/lib/format'
-import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
-import { ShellOverlay } from '@/components/app/shell/shell-overlay'
+import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { MaskedAmount } from '@/components/app/masked-amount'
-import { SubtotalLine } from '@/components/editorial/subtotal-line'
 
 /**
  * VermogenOpbouw — de bouwstenen achter het netto-vermogen-kopgetal, zoals
@@ -28,123 +24,18 @@ export type VermogenOpbouw = {
 }
 
 /**
- * NettoVermogenKopgetal — het kopgetal van de vermogensgrafiek op /overzicht,
- * maar dan klikbaar: tikken opent de kassabon met de opbouw (UR3-14 deel D,
- * lichte variant — eigenaarsbesluit 5 sep 2026).
+ * De bon zelf — de opbouw van het netto vermogen (UR3-14 deel D, lichte
+ * variant). Staat sinds de tweedeling van de vermogenskaart bovenaan het
+ * samengevoegde "Netto vermogen"-venster (`NettoVermogenVenster`), dat opent
+ * vanuit de verleden-kaart op /overzicht. Het kopgetal zelf is daar geen eigen
+ * knop meer: de hele kaart is het klikdoel.
  *
- * "Elk getal is klikbaar" is canoniek in de design-taal; dit was één van de
- * drie kerngetallen die dat nog niet waren. De VOLLE bon (per bezitting en per
- * schuld, gewogen naar inclusiepercentage) blijft waar hij staat: op de legacy
- * `/core`-landing, achter de doorklik naar /overzicht/bezittingen. Hier staat
+ * De VOLLE bon (per bezitting en per schuld) blijft waar hij staat; hier staat
  * bewust alleen wat blok 1 al geladen heeft — geen extra query, en geen
  * partnerrijen uit de huishoud-gedeelde `assets`-SELECT.
  *
- * Zonder `opbouw` (mock-/oudere bundels, tests) rendert dit component exact het
- * platte kopgetal dat er altijd stond: geen knop, geen sheet, byte-identiek.
- *
- * euro-view: exempt (D12) — beide bedragen zijn GEREALISEERD vermogen van
- * vandaag; er is hier geen projectierij en dus geen kernelfactor. Ze staan per
- * definitie al in euro's van vandaag en deflateren nooit.
- */
-export function NettoVermogenKopgetal({
-  currentNetWorth,
-  netWorthExclHome = null,
-  showExclHome = false,
-  opbouw = null,
-  eigenHuisValue = null,
-  mortgageBalance = null,
-  dailyExpense,
-}: {
-  /** Netto vermogen (perspectief-correct, blok 1) — het kopgetal zelf. */
-  currentNetWorth: number
-  /** Nettovermogen excl. eigen woning (perspectief-correct) — losse subregel. */
-  netWorthExclHome?: number | null
-  /** Gate voor de excl.-regel ⇔ `showDualHousingBasis`. Default false. */
-  showExclHome?: boolean
-  /** De twee termen achter het kopgetal. `null` → geen kassabon, plat getal. */
-  opbouw?: VermogenOpbouw | null
-  /** `housingSplit.eigenHuisValue` — alleen getoond wanneer `showExclHome`. */
-  eigenHuisValue?: number | null
-  /** `housingSplit.mortgageBalance` — alleen getoond wanneer `showExclHome`. */
-  mortgageBalance?: number | null
-  /**
-   * Canoniek dagtarief (EUR/dag) uit de dashboard-bundel — voedt de
-   * vrijheidstijd-slotregel van de bon. Afwezig/0 → alleen het €-bedrag.
-   * Nooit lokaal herrekenen.
-   */
-  dailyExpense?: number
-}) {
-  const { masked } = useMaskedAmounts()
-  const [open, setOpen] = useState(false)
-
-  const bezittingen = opbouw?.bezittingen ?? null
-  const schulden = opbouw?.schulden ?? null
-  const kanKassabon = bezittingen != null && schulden != null
-
-  const bedrag = (
-    <div className="font-serif text-xl font-semibold text-[var(--ink)] tabular-nums">
-      {formatMaskedCurrency(currentNetWorth, masked)}
-    </div>
-  )
-
-  const exclRegel =
-    showExclHome && netWorthExclHome != null ? (
-      <SubtotalLine
-        label="excl. eigen woning"
-        amount={netWorthExclHome}
-        className="!mt-1 !mb-0"
-      />
-    ) : null
-
-  if (!kanKassabon) {
-    return (
-      <>
-        {bedrag}
-        {exclRegel}
-      </>
-    )
-  }
-
-  return (
-    <>
-      {/* Bewust GEEN aria-label op de knop: die vervángt de naamberekening en
-          dan verliest een schermlezer juist het bedrag — de reden dat deze knop
-          bestaat. De zichtbare inhoud blijft de naam; wat de knop dóét komt er
-          als sr-only staart achteraan. Zelfde keuze als de geldstroom-cellen. */}
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        data-testid="netto-vermogen-kopgetal"
-        className="-mx-1 w-fit cursor-pointer rounded px-1 text-left transition-colors duration-150 hover:bg-[var(--subtle)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
-      >
-        {bedrag}
-        <span className="sr-only">, toon de opbouw van je netto vermogen</span>
-      </button>
-      {exclRegel}
-
-      <ShellOverlay
-        kind="sheet"
-        open={open}
-        onClose={() => setOpen(false)}
-        title="Netto vermogen"
-      >
-        <VermogenKassabon
-          currentNetWorth={currentNetWorth}
-          bezittingen={bezittingen}
-          schulden={schulden}
-          netWorthExclHome={showExclHome ? netWorthExclHome : null}
-          eigenHuisValue={showExclHome ? eigenHuisValue : null}
-          mortgageBalance={showExclHome ? mortgageBalance : null}
-          dailyExpense={dailyExpense}
-        />
-      </ShellOverlay>
-    </>
-  )
-}
-
-/**
- * De bon zelf. Geëxporteerd voor de component-test die de gerenderde regels
- * tegen de bundelwaarden pint.
+ * euro-view: exempt (D12) — alle bedragen zijn GEREALISEERD vermogen van
+ * vandaag; er is hier geen projectierij en dus geen kernelfactor.
  */
 export function VermogenKassabon({
   currentNetWorth,

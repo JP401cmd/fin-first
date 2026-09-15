@@ -20,8 +20,9 @@ import { EntityBackfillEditor } from './entity-backfill-editor'
 /**
  * NetWorthHistorySheet — popup met het netto-vermogen-verloop.
  *
- * Opent vanuit de MiniNetWorthChart wanneer de gebruiker op het
- * verleden-segment (links van "Vandaag") klikt. Toont:
+ * Op /overzicht leeft deze body in het samengevoegde `NettoVermogenVenster`
+ * (via de `render`-prop, onder de kassabon), dat opent vanuit de verleden-kaart
+ * van de MiniNetWorthChart. Zonder `render` is het een eigen sheet. Toont:
  *  1. Hoofdbedrag (huidig netto vermogen) + delta over de periode — inclusief
  *     de vrijheidstijd-equivalent van die delta wanneer een dagtarief bekend is.
  *  2. Weergave-schakelaar Totaal / Groepen: "Totaal" toont de vertrouwde
@@ -131,12 +132,26 @@ function parseAmount(raw: string): number | null {
   return Number.isFinite(n) ? n : null
 }
 
+/**
+ * De onderdelen die een host nodig heeft om dit verloop in een ÁNDER venster
+ * te zetten (het samengevoegde "Netto vermogen"-venster op /overzicht):
+ * de inhoud, de sticky footer van de actieve bewerk-modus, en of er op dit
+ * moment bewerkt wordt (dan hoort de host er niets bóven te zetten).
+ */
+export interface NetWorthHistoryParts {
+  content: ReactNode
+  footer: ReactNode
+  editing: boolean
+}
+
 export function NetWorthHistorySheet({
   open,
   onClose,
   history,
   currentNetWorth,
   dailyExpense,
+  hideHeadlineAmount = false,
+  render,
 }: {
   open: boolean
   onClose: () => void
@@ -149,6 +164,19 @@ export function NetWorthHistorySheet({
    * alleen het €-bedrag (geen vrijheidstijd-regel). Nooit lokaal herrekenen.
    */
   dailyExpense?: number
+  /**
+   * Verberg het grote hoofdbedrag bovenaan (de periode-delta blijft). Voor een
+   * host die het netto vermogen al direct erboven toont (de kassabon in het
+   * samengevoegde venster) — anders staat hetzelfde getal twee keer onder elkaar.
+   */
+  hideHeadlineAmount?: boolean
+  /**
+   * Host-render: zonder deze prop rendert het verloop zijn eigen ShellOverlay
+   * (het gedrag van altijd). Mét deze prop levert het component alleen de
+   * onderdelen en bepaalt de host het venster — zo hergebruikt het
+   * samengevoegde venster deze body in plaats van hem te kopiëren.
+   */
+  render?: (parts: NetWorthHistoryParts) => ReactNode
 }) {
   const { masked } = useMaskedAmounts()
   const router = useRouter()
@@ -496,15 +524,8 @@ export function NetWorthHistorySheet({
         )
       : null
 
-  return (
-    <ShellOverlay
-      open={open}
-      onClose={onClose}
-      kind="sheet"
-      size="lg"
-      title="Netto vermogen — verloop"
-      footer={footerNode}
-    >
+  const content: ReactNode = (
+    <>
       {entityEditing ? (
         /* ── Per-entiteit-editor (regelt eigen padding + footer) ── */
         <EntityBackfillEditor
@@ -578,12 +599,14 @@ export function NetWorthHistorySheet({
             <>
               {/* Hoofdbedrag + periode-delta (+ vrijheidstijd-equivalent) */}
               <div>
-                <div className="font-serif text-2xl font-semibold text-[var(--ink)] tabular-nums">
-                  {formatMaskedCurrency(currentNetWorth, masked)}
-                </div>
+                {!hideHeadlineAmount && (
+                  <div className="font-serif text-2xl font-semibold text-[var(--ink)] tabular-nums">
+                    {formatMaskedCurrency(currentNetWorth, masked)}
+                  </div>
+                )}
                 {first && (
                   <p
-                    className={`mt-1 text-sm font-mono tabular-nums ${
+                    className={`${hideHeadlineAmount ? '' : 'mt-1 '}text-sm font-mono tabular-nums ${
                       periodDelta >= 0 ? 'text-positive' : 'text-negative'
                     }`}
                   >
@@ -820,6 +843,23 @@ export function NetWorthHistorySheet({
           )}
         </div>
       )}
+    </>
+  )
+
+  if (render) {
+    return <>{render({ content, footer: footerNode, editing: editing || entityEditing })}</>
+  }
+
+  return (
+    <ShellOverlay
+      open={open}
+      onClose={onClose}
+      kind="sheet"
+      size="lg"
+      title="Netto vermogen — verloop"
+      footer={footerNode}
+    >
+      {content}
     </ShellOverlay>
   )
 }

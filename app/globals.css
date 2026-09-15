@@ -54,13 +54,13 @@
   --s2: 0 4px 24px rgba(26,25,22,.09), 0 1px 4px rgba(26,25,22,.05);
 
   /* Legacy module colors (kept for backward compat) */
-  --color-kern: #007c5a;
+  --color-kern: #00825f;
   --color-kern-light: #e6e9e7;
-  --color-wil: #a54c00;
+  --color-wil: #b85600;
   --color-wil-light: #eae7e6;
-  --color-horizon: #006ead;
+  --color-horizon: #0077bb;
   --color-horizon-light: #e6e8ea;
-  --color-fin: #4f0077;
+  --color-fin: #af16ff;
   --color-fin-light: #d6d5d7;
 
   /* ── Accent-paletten (overridden by user preferences) ──
@@ -68,77 +68,73 @@
      (die namen dragen ook de AI-DNA, WidgetModule en NavModule — geen
      kleur-scoped rename, besluit UR3-32); wat de gebruiker kiest is opnieuw
      ingedeeld naar de hefboomfamilies. Op 8 sep in twee stappen opgetrokken
-     van C ~ 0,065 naar de praktische bovengrens per kleur (0,088-0,165), ZONDER
-     ACCENT_CHROMA_MAX te verhogen. Hue EN lightness per accent zijn
-     ongewijzigd: alleen verzadiging omhoog. Lichter maken was een eerdere poging
-     en is verworpen — dat kostte contrast met papier (kern zakte van 5,06 naar
-     4,20, onder AA voor tekst). De huidige waarden halen 4,95-12,45, alle boven
-     AA. Acht van de elf tinten zitten op hun sRGB-gamutgrens; de drie die dicht
-     bij een statushue liggen (kern, Bordeaux, Oker) worden door de vangrail op
-     ~0,094 gehouden. Die grens verhogen is geprobeerd en teruggedraaid: bij 0,13
-     stopten budget.debt en phase_recovery met waarschuwen en werd het door UR3-32
-     verboden emerald weer toegestaan. De vangrail is niet van de accenten alleen.
-     Nog steeds onder ACCENT_CHROMA_MAX (0,10), dus de identiteits-accenten
-     blijven onderscheidbaar van de verzadigde stoplicht-status
-     (C = 0,149-0,208) — maar met minder marge dan voorheen. LET OP: door de
-     bell-curve piekt shade 600 ~11% boven de 500 (C ~ 0,105); dat is de
-     donkerste tint van elk accent en dus het punt waar identiteit en status
-     elkaar het dichtst naderen. Deze waarden zijn GEGENEREERD met
-     generatePalette() uit lib/color-palette.ts — nooit met de hand bijstellen;
-     regenereer ze als DEFAULT_MODULE_COLORS wijzigt. */
-  /* Kern = Bezittingen: groen #007c5a (emerald-familie) */
-  --color-kern-50: oklch(0.93 0.0066 165.8);
-  --color-kern-100: oklch(0.89 0.0162 165.8);
-  --color-kern-200: oklch(0.82 0.0325 165.8);
-  --color-kern-300: oklch(0.73 0.0577 165.8);
-  --color-kern-400: oklch(0.617 0.0865 165.8);
-  --color-kern-500: oklch(0.52 0.1082 165.8);
-  --color-kern-600: oklch(0.465 0.0969 165.8);
-  --color-kern-700: oklch(0.409 0.0853 165.8);
-  --color-kern-800: oklch(0.364 0.076 165.8);
-  --color-kern-900: oklch(0.336 0.0702 165.8);
-  --color-kern-950: oklch(0.23 0.0481 165.8);
+     van C ~ 0,065 naar de praktische bovengrens per kleur bij ONGEWIJZIGDE
+     lightness — daarmee zat elke accent al op zijn sRGB-gamutgrens en was er
+     geen chroma-ruimte meer over. 15 sep daarom de resterende hendel gebruikt:
+     lightness omhoog tot vlak vóór de AA-ondergrens (4,5:1 op papier
+     `#faf9f6`), per accent individueel op zijn eigen hue gezocht (marge
+     ingebouwd: alle vier landen op 4,55-4,58:1). Hue ongewijzigd bij alle
+     vier. Chroma-winst t.o.v. 8 sep: kern +4%, wil +9%, horizon +6%, fin +73%
+     (fin was het donkerst en had dus verreweg de meeste contrastmarge — nu een
+     duidelijk andere, veel fellere violet dan voorheen, zie de toelichting bij
+     DEFAULT_MODULE_COLORS in lib/color-palette.ts). ACCENT_CHROMA_MAX gold al
+     sinds 8 sep niet meer voor de accenten (alleen nog voor budget-/fasekleuren,
+     zie color-palette.ts) en is dus niet aangeraakt. Deze waarden zijn
+     GEGENEREERD met generatePalette() uit lib/color-palette.ts — nooit met de
+     hand bijstellen; regenereer ze als DEFAULT_MODULE_COLORS wijzigt. */
+  /* Kern = Bezittingen: groen #00825f (emerald-familie) */
+  --color-kern-50: oklch(0.936 0.0068 166.1);
+  --color-kern-100: oklch(0.897 0.0167 166.1);
+  --color-kern-200: oklch(0.83 0.0335 166.1);
+  --color-kern-300: oklch(0.743 0.0595 166.1);
+  --color-kern-400: oklch(0.632 0.0892 166.1);
+  --color-kern-500: oklch(0.538 0.1115 166.1);
+  --color-kern-600: oklch(0.48 0.0997 166.1);
+  --color-kern-700: oklch(0.422 0.0875 166.1);
+  --color-kern-800: oklch(0.374 0.0777 166.1);
+  --color-kern-900: oklch(0.343 0.0713 166.1);
+  --color-kern-950: oklch(0.236 0.0493 166.1);
 
-  /* Wil = Schulden: terracotta #a54c00 (amber-familie) */
-  --color-wil-50: oklch(0.931 0.0084 50.3);
-  --color-wil-100: oklch(0.891 0.0206 50.3);
-  --color-wil-200: oklch(0.821 0.0412 50.3);
-  --color-wil-300: oklch(0.731 0.0732 50.3);
-  --color-wil-400: oklch(0.618 0.1098 50.3);
-  --color-wil-500: oklch(0.521 0.1373 50.3);
-  --color-wil-600: oklch(0.466 0.123 50.3);
-  --color-wil-700: oklch(0.41 0.1082 50.3);
-  --color-wil-800: oklch(0.365 0.0964 50.3);
-  --color-wil-900: oklch(0.337 0.0891 50.3);
-  --color-wil-950: oklch(0.231 0.061 50.3);
+  /* Wil = Schulden: terracotta #b85600 (amber-familie) */
+  --color-wil-50: oklch(0.944 0.0091 50.5);
+  --color-wil-100: oklch(0.908 0.0223 50.5);
+  --color-wil-200: oklch(0.845 0.0446 50.5);
+  --color-wil-300: oklch(0.762 0.0792 50.5);
+  --color-wil-400: oklch(0.656 0.1188 50.5);
+  --color-wil-500: oklch(0.566 0.1485 50.5);
+  --color-wil-600: oklch(0.504 0.1324 50.5);
+  --color-wil-700: oklch(0.441 0.1159 50.5);
+  --color-wil-800: oklch(0.389 0.1023 50.5);
+  --color-wil-900: oklch(0.354 0.0932 50.5);
+  --color-wil-950: oklch(0.244 0.0648 50.5);
 
-  /* Horizon = Budget: staalsblauw #006ead (sky-familie) */
-  --color-horizon-50: oklch(0.93 0.0079 244.4);
-  --color-horizon-100: oklch(0.89 0.0194 244.4);
-  --color-horizon-200: oklch(0.82 0.0388 244.4);
-  --color-horizon-300: oklch(0.73 0.0689 244.4);
-  --color-horizon-400: oklch(0.616 0.1034 244.4);
-  --color-horizon-500: oklch(0.519 0.1292 244.4);
-  --color-horizon-600: oklch(0.464 0.1157 244.4);
-  --color-horizon-700: oklch(0.409 0.1019 244.4);
-  --color-horizon-800: oklch(0.364 0.0908 244.4);
-  --color-horizon-900: oklch(0.336 0.0839 244.4);
-  --color-horizon-950: oklch(0.23 0.0574 244.4);
+  /* Horizon = Budget: staalsblauw #0077bb (sky-familie) */
+  --color-horizon-50: oklch(0.939 0.0084 244.6);
+  --color-horizon-100: oklch(0.902 0.0206 244.6);
+  --color-horizon-200: oklch(0.836 0.0411 244.6);
+  --color-horizon-300: oklch(0.75 0.0732 244.6);
+  --color-horizon-400: oklch(0.642 0.1097 244.6);
+  --color-horizon-500: oklch(0.549 0.1372 244.6);
+  --color-horizon-600: oklch(0.49 0.1224 244.6);
+  --color-horizon-700: oklch(0.429 0.1074 244.6);
+  --color-horizon-800: oklch(0.38 0.0951 244.6);
+  --color-horizon-900: oklch(0.348 0.087 244.6);
+  --color-horizon-950: oklch(0.239 0.0603 244.6);
 
-  /* Fin: plum #4f0077 — Fins eigen accent (bubbel, chat-header, verzendknop,
+  /* Fin: violet #af16ff — Fins eigen accent (bubbel, chat-header, verzendknop,
      /berichten en /nieuws). Fins avatar blijft driekleurig: linkeroog kern
      (Bezittingen), rechteroog wil (Schulden), onderste stip horizon (Budget). */
-  --color-fin-50: oklch(0.875 0.0104 308.2);
-  --color-fin-100: oklch(0.82 0.0256 308.2);
-  --color-fin-200: oklch(0.721 0.0511 308.2);
-  --color-fin-300: oklch(0.602 0.0909 308.2);
-  --color-fin-400: oklch(0.46 0.1364 308.2);
-  --color-fin-500: oklch(0.334 0.1705 308.2);
-  --color-fin-600: oklch(0.308 0.1576 308.2);
-  --color-fin-700: oklch(0.281 0.144 308.2);
-  --color-fin-800: oklch(0.265 0.1359 308.2);
-  --color-fin-900: oklch(0.266 0.1118 308.2);
-  --color-fin-950: oklch(0.175 0.0758 308.2);
+  --color-fin-50: oklch(0.952 0.018 308.1);
+  --color-fin-100: oklch(0.918 0.0441 308.1);
+  --color-fin-200: oklch(0.859 0.0882 308.1);
+  --color-fin-300: oklch(0.78 0.1463 308.1);
+  --color-fin-400: oklch(0.679 0.2238 308.1);
+  --color-fin-500: oklch(0.593 0.2939 308.1);
+  --color-fin-600: oklch(0.527 0.2691 308.1);
+  --color-fin-700: oklch(0.459 0.2348 308.1);
+  --color-fin-800: oklch(0.403 0.2061 308.1);
+  --color-fin-900: oklch(0.364 0.1862 308.1);
+  --color-fin-950: oklch(0.252 0.1295 308.1);
 
   /* ── Legacy module-alias-tokens ──
      Historische shorthands die in ~25 componenten/charts worden gebruikt maar

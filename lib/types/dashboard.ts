@@ -425,7 +425,16 @@ export interface DashboardData {
   // is de weergave-deflator van diezelfde kernelrij; deel er pas ná de her-ankering mee,
   // dan blijft de naad historie↔projectie knikvrij (jaar 0 draagt factor 1.0).
   // Optioneel/additief om dezelfde reden als bij `simRows` hierboven.
-  simNetWorthRows: { age: number; netWorth: number; inflationFactor?: number }[] | null
+  //
+  // `netWorthExclHome` (dubbele grondslag, ADR 0034): geprojecteerd netto vermogen
+  // EXCL. eigen woning ÓP `age` — NOMINAAL, zelfde tijdstip en zelfde
+  // `inflationFactor` als `netWorth` van die rij; rij 0 is exact het bundelveld
+  // `netWorthExclHome` (netto vermogen − overwaarde, zuiver). Bron = de kernel-J
+  // (Prognose!J = I − eigen-woningblok; verkoop/opeethypotheek zitten er dus al
+  // in, zie lib/horizon/networth-rows.ts). ALLEEN aanwezig wanneer
+  // `showDualHousingBasis` waar is; anders ontbreekt de sleutel. Tweede grootheid
+  // naast `netWorth` — als tekst/label tonen, nooit als tweede lijn op dezelfde as.
+  simNetWorthRows: { age: number; netWorth: number; inflationFactor?: number; netWorthExclHome?: number }[] | null
   // Horizon: requiredFirePortfolio uit runSimulation (null als geen birth_date)
   simRequiredPortfolio: number | null
   // Horizon: FIRE-doel INCL. eigen woning (Prognose!I@FIRE) — spiegelt simRequiredPortfolio

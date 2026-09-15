@@ -40,8 +40,8 @@ global.ResizeObserver = MockResizeObserver as unknown as typeof ResizeObserver
  * Score. Gebruikt nu `simNetWorthRows` uit de loader (geprojecteerd VOLLEDIG
  * netto vermogen, incl. niet-liquide assets) zodat de projectielijn continu
  * doorloopt vanuit het Vandaag-punt (geen dip op huis-filterende modi). Tests
- * valideren render-states + reeks-injectie + Vrijheid-marker + het aparte
- * liquide-vrijheidsdoel-label + de twee klikzones + geschatte historie.
+ * valideren render-states + reeks-injectie + Vrijheid-marker + de twee kaarten
+ * (verleden → samengevoegd venster, toekomst → /toekomst) + geschatte historie.
  */
 
 /**
@@ -257,7 +257,10 @@ describe('MiniNetWorthChart — projectie-render met simRows', () => {
     expect(container.textContent).not.toMatch(/Benadering/)
   })
 
-  it('toont simRequiredPortfolio als APART liquide-vrijheidsdoel-label', () => {
+  it('toont het liquide vrijheidsdoel NIET meer op de kaart (staat op /toekomst)', () => {
+    // Eigenaar-besluit tweedeling vermogenskaart (sep 2026): het label
+    // "Vrijheidsdoel ca. € … liquide" vervalt uit de toekomst-kaart. Was:
+    // "toont simRequiredPortfolio als APART liquide-vrijheidsdoel-label".
     const { container } = render(
       <MiniNetWorthChart
         netWorthHistory={buildHistory([100_000])}
@@ -269,16 +272,16 @@ describe('MiniNetWorthChart — projectie-render met simRows', () => {
         simRequiredPortfolio={915_600}
       />,
     )
-    // Het liquide vrijheidsdoel (€915.600) wordt APART getoond als label, niet
-    // als marker-hoogte op de netto-vermogen-as. Het bedrag blijft zichtbaar.
-    // Het label maakt expliciet dat het om een LIQUIDE doel gaat (B3).
-    // M5: als prognose staat het afgerond op significante cijfers → "920".
-    expect(container.textContent).toContain('920')
-    expect(container.textContent).toMatch(/Vrijheidsdoel/)
-    expect(container.textContent).toMatch(/liquide/)
+    expect(container.textContent).not.toMatch(/Vrijheidsdoel/)
+    expect(container.textContent).not.toMatch(/liquide/)
+    expect(container.textContent).not.toContain('920')
   })
 
-  it('header beschrijft de líjn ("Vermogen bij vrijheid →"), niet een doel (B4)', () => {
+  it('kop beschrijft het plan ("Vrij op 52") met het verwachte bedrag eronder, niet een doel (B4)', () => {
+    // Was: "Vermogen bij vrijheid → €X". Eigenaar-besluit: de toekomst-kaart
+    // opent met de kop van het plan; het bedrag op de knip-leeftijd staat
+    // eronder als "ca. €X". De oude doel-copy "€X bij vrijheid" blijft verboden.
+    const rows = buildSimRows(35, 52, 100_000)
     const { container } = render(
       <MiniNetWorthChart
         netWorthHistory={buildHistory([100_000])}
@@ -286,13 +289,12 @@ describe('MiniNetWorthChart — projectie-render met simRows', () => {
         currentAge={35}
         fireAge={52}
         endAge={67}
-        simNetWorthRows={buildSimRows(35, 52, 100_000)}
+        simNetWorthRows={rows}
       />,
     )
-    // Nieuwe formulering: "Vermogen bij vrijheid → €X" beschrijft het verloop
-    // van de lijn, niet een spaardoel. De oude copy "→ €X bij vrijheid" (die een
-    // leek als doel kon lezen) mag niet meer voorkomen.
-    expect(container.textContent).toMatch(/Vermogen bij vrijheid →/)
+    expect(screen.getByText('Vrij op 52')).toBeTruthy()
+    const eind = rows[rows.length - 1].netWorth + (100_000 - rows[0].netWorth)
+    expect(screen.getByTestId('nw-toekomst-incl').textContent).toBe(formatApproxCurrency(eind))
     expect(container.textContent).not.toMatch(/€[\d.]+ bij vrijheid/)
   })
 
@@ -367,12 +369,15 @@ describe('MiniNetWorthChart — projectie-render met simRows', () => {
     )
     expect(screen.getByText(/Vrijheid bereikt$/)).toBeTruthy()
     expect(screen.queryByText(/verloop tot/i)).toBeNull()
-    // "Tot 90" mag alléén nog als <text>-annotatie ÍN de grafiek staan (dat is
-    // de as-markering bij de eindmarker, net als "Vandaag (45)"); buiten de SVG
-    // — in kop of legenda — hoort het kale leeftijdsgetal niet meer thuis.
+    // "Tot 90" mag alléén nog als annotatie ÍN de grafiek staan (de as-markering
+    // bij de eindmarker, net als "Vandaag (45)"); buiten het grafiekvlak — in
+    // kop of legenda — hoort het kale leeftijdsgetal niet meer thuis. De labels
+    // zijn sinds de tweedeling HTML in het grafiekdeel (geen vervormde svg-tekst
+    // onder preserveAspectRatio="none"), dus de toets is "binnen [data-nw-plot]"
+    // i.p.v. "is een <text>-element".
     const totEindleeftijd = screen.queryAllByText(/Tot 90/)
     expect(totEindleeftijd.length).toBeGreaterThan(0)
-    expect(totEindleeftijd.every((el) => el.tagName.toLowerCase() === 'text')).toBe(true)
+    expect(totEindleeftijd.every((el) => el.closest('[data-nw-plot]') != null)).toBe(true)
     // De horizon-marker houdt wél een legenda-regel — anders zweeft er een
     // gekleurde streep zonder betekenis in de grafiek.
     expect(screen.getByText('Tot je eindleeftijd')).toBeTruthy()
@@ -453,26 +458,29 @@ describe('MiniNetWorthChart — klikzones', () => {
     simNetWorthRows: buildSimRows(35, 52, 100_000),
   }
 
-  it('verleden-zone is een button die de verloop-popup opent', () => {
+  it('verleden-kaart is een button die het netto-vermogen-venster (met verloop) opent', () => {
     render(<MiniNetWorthChart {...props} />)
     const pastZone = screen.getByRole('button', {
       name: /verloop van je netto vermogen/i,
     })
     expect(pastZone).toBeTruthy()
-    // Popup is dicht vóór klik
-    expect(screen.queryByText('Netto vermogen — verloop')).toBeNull()
+    // Venster is dicht vóór klik. Was: titel "Netto vermogen — verloop"; het
+    // verloop leeft nu in het samengevoegde venster "Netto vermogen", dus de
+    // toets kijkt naar de maandtabel-kop van het verloop.
+    expect(screen.queryByText('Stand · verschil')).toBeNull()
     fireEvent.click(pastZone)
-    // Popup toont titel + maandtabel-kop
-    expect(screen.getByText('Netto vermogen — verloop')).toBeTruthy()
+    expect(screen.getByText('Stand · verschil')).toBeTruthy()
     expect(screen.getByText('Vandaag')).toBeTruthy()
   })
 
-  it('toekomst-zone is een link naar /toekomst', () => {
-    const { container } = render(<MiniNetWorthChart {...props} />)
-    const futureZone = container.querySelector(
-      'a[href="/toekomst"][aria-label*="projectie"]',
-    )
-    expect(futureZone).toBeTruthy()
+  it('toekomst-kaart is een link naar /toekomst', () => {
+    // Was: `a[href="/toekomst"][aria-label*="projectie"]`. De naam komt nu uit
+    // de zichtbare kop via aria-labelledby (een aria-label zou de bedragen
+    // wegdrukken), dus de toets gaat via de toegankelijke naam.
+    render(<MiniNetWorthChart {...props} />)
+    const futureCard = screen.getByRole('link', { name: /projectie/i })
+    expect(futureCard.getAttribute('href')).toBe('/toekomst')
+    expect(futureCard.textContent).not.toBe('')
   })
 
   it('popup toont geschatte maanden met "geschat"-label', () => {
@@ -585,6 +593,7 @@ describe('MiniNetWorthChart — privacy-masking voor saldi', () => {
   }
 
   it('toont het netto-vermogen + eindbedrag zichtbaar wanneer NIET gemaskeerd', () => {
+    const rows = buildSimRows(35, 52, 187_400)
     const { container } = render(
       <MiniNetWorthChart
         netWorthHistory={buildHistory([100_000])}
@@ -592,14 +601,16 @@ describe('MiniNetWorthChart — privacy-masking voor saldi', () => {
         currentAge={35}
         fireAge={52}
         endAge={67}
-        simNetWorthRows={buildSimRows(35, 52, 187_400)}
+        simNetWorthRows={rows}
         simRequiredPortfolio={915_600}
       />,
     )
-    // Het huidige vermogen blijft exact (gerealiseerd); het vrijheidsdoel is een
-    // prognose en staat sinds M5 afgerond op het scherm (915.600 → ca. 920.000).
+    // Het huidige vermogen blijft exact (gerealiseerd); het eindbedrag is een
+    // prognose en staat sinds M5 afgerond. Was: '920' (het vrijheidsdoel-label,
+    // dat sinds de tweedeling niet meer op de kaart staat).
     expect(container.textContent).toContain('187')
-    expect(container.textContent).toContain('920')
+    const eind = rows[rows.length - 1].netWorth + (187_400 - rows[0].netWorth)
+    expect(container.textContent).toContain(formatApproxCurrency(eind))
   })
 
   it('maskeert het netto-vermogen-headline en het eindbedrag bij privacy aan', () => {
@@ -732,17 +743,25 @@ describe("MiniNetWorthChart — euro-weergave (huidige euro's)", () => {
       // Het kopgetal is gerealiseerd vermogen → exempt, nooit gedeeld.
       expect(container.textContent).toContain(formatCurrency(EV_CURRENT_NET_WORTH))
 
-      // De projectielijn start exact op de Vandaag-marker: geen knik op de naad.
-      const todayCircle = Array.from(container.querySelectorAll('circle')).find(
-        c => c.getAttribute('cx') === '109' && c.getAttribute('r') === '4',
-      )
-      expect(todayCircle).toBeTruthy()
-      const projPath = Array.from(container.querySelectorAll('path')).find(p =>
-        (p.getAttribute('d') ?? '').startsWith('M109.0,'),
-      )
+      // De naad zonder knik, sinds de tweedeling over TWEE svg's met een
+      // gedeelde Y-schaal (was: één svg met circle cx=109 en een projectiepad
+      // dat op M109.0 begon): het verleden eindigt op x=100 van zijn deel, de
+      // projectie begint op x=0 van het hare, beide op dezelfde y — en de
+      // Vandaag-stip op de naad staat op precies die y.
+      const projPath = container.querySelector('path[data-nw-line="toekomst"]')
+      const pastPath = container.querySelector('path[data-nw-line="verleden"]')
       expect(projPath).toBeTruthy()
-      const firstY = (projPath!.getAttribute('d') ?? '').split(' ')[0].split(',')[1]
-      expect(Number(todayCircle!.getAttribute('cy')).toFixed(1)).toBe(firstY)
+      expect(pastPath).toBeTruthy()
+      const [projFirstX, projFirstY] = (projPath!.getAttribute('d') ?? '')
+        .split(' ')[0]
+        .slice(1)
+        .split(',')
+      const pastPts = (pastPath!.getAttribute('d') ?? '').split(' ')
+      const [pastLastX, pastLastY] = pastPts[pastPts.length - 1].slice(1).split(',')
+      expect(projFirstX).toBe('0.0')
+      expect(pastLastX).toBe('100.0')
+      expect(projFirstY).toBe(pastLastY)
+      expect(screen.getAllByTestId('nw-vandaag-punt')[0].getAttribute('data-y')).toBe(projFirstY)
       unmount()
     }
   })
@@ -794,32 +813,18 @@ describe('KRUIS-consistentie (AC-F4 / UAT-KRUIS-27) — één FIRE-doel, één d
     } as unknown as DashboardData
   }
 
-  it('het LOSSTAANDE vrijheidsdoel van de mini-grafiek deflateert met de FIRE-jaarfactor', () => {
-    const rows = buildFactorRows()
-    // Dezelfde uitdrukking die /toekomst gebruikt voor `fireTarget`:
-    // deflate(requiredFirePortfolio, factorAtAge(kernelrijen, FIRE-leeftijd)).
-    const expected = deflate(
-      EV_REQUIRED_PORTFOLIO,
-      factorAtAge(
-        rows.map(r => ({ age: r.age, inflationFactor: r.inflationFactor })),
-        EV_FIRE_AGE,
-      ),
-      'real',
-    )
-    // Bewijs dat de deflatie iets doet — anders zou de test ook groen zijn
-    // wanneer het oppervlak niet omrekent.
-    expect(Math.round(expected)).not.toBe(EV_REQUIRED_PORTFOLIO)
-
-    const chart = renderMiniChart(rows, 'real')
-    // M5 — het doel is een PROGNOSE-kopgetal en staat dus afgerond op
-    // significante cijfers op het scherm ("ca. €540.000"). De deflatie-eis
-    // blijft onverkort: de assertie loopt door dezelfde weergave-seam als het
-    // oppervlak, dus een verkeerde factor-rij zou nog steeds een ander getal
-    // opleveren (540.000 vs. 550.000 bij één rij verschil).
-    expect(chart.container.textContent).toContain(
-      `Vrijheidsdoel ${formatApproxCurrency(expected)} liquide`,
-    )
-    chart.unmount()
+  // De mini-grafiek toonde tot de tweedeling van de vermogenskaart (sep 2026)
+  // óók een losstaand vrijheidsdoel-label, en drie tests hier pinden dat dat
+  // label met de FIRE-jaarfactor deflateerde. Dat label is per eigenaar-besluit
+  // vervallen (het doel staat op /toekomst); die tests zijn vervangen door deze
+  // ene die bewaakt dat het ook in 'real' niet terugkomt. De widget-kant van
+  // KRUIS-27 blijft hieronder onverkort getoetst.
+  it('de mini-grafiek toont in geen enkele weergave nog een los vrijheidsdoel', () => {
+    for (const view of ['nominal', 'real'] as const) {
+      const chart = renderMiniChart(buildFactorRows(), view)
+      expect(chart.container.textContent).not.toMatch(/Vrijheidsdoel/)
+      chart.unmount()
+    }
   })
 
   it('het voortgangs-PAAR van het widget blijft NOMINAAL (doel-label deelt de noemer van het percentage)', () => {
@@ -851,59 +856,14 @@ describe('KRUIS-consistentie (AC-F4 / UAT-KRUIS-27) — één FIRE-doel, één d
     expect(widget.container.textContent).toContain("in toekomstige euro's")
   })
 
-  it("beide oppervlakken tonen in 'nominal' het onbewerkte doelbedrag", () => {
+  it("het widget toont in 'nominal' het onbewerkte doelbedrag", () => {
     const rows = buildFactorRows()
-    const chart = renderMiniChart(rows, 'nominal')
-    expect(chart.container.textContent).toContain(
-      `Vrijheidsdoel ${formatApproxCurrency(EV_REQUIRED_PORTFOLIO)} liquide`,
-    )
-    chart.unmount()
-
     const widget = render(
       <VrijheidsvoortgangWidget size="full" data={makeWidgetData(rows)} />,
     )
     expect(widget.container.textContent).toContain(formatCurrency(EV_REQUIRED_PORTFOLIO))
     // In de standaardweergave hoort er géén grondslag-noot te staan.
     expect(widget.container.textContent).not.toContain("in toekomstige euro's")
-  })
-
-  it('kiest bij een FIRE-leeftijd exact op .5 dezelfde factor-rij als /toekomst (afronden omhoog)', () => {
-    // Het randgeval uit bevinding 4: `factorAtAge` pakt de dichtstbijzijnde rij
-    // en laat een .5-leeftijd naar BENEDEN vallen (eerste kleinste afstand wint,
-    // rijen oplopend), terwijl de canonieke weergave-seam `fireAgeForDisplay`
-    // (= Math.round) naar BOVEN gaat. Zonder normalisatie hing de deflator dus
-    // af van of de aanroeper fractioneel of afgerond aanleverde — precies het
-    // getal dat UAT-KRUIS-27 belooft gelijk te houden.
-    const rows = buildFactorRows()
-    const factorRows = rows.map(r => ({ age: r.age, inflationFactor: r.inflationFactor }))
-    const halfAge = EV_FIRE_AGE - 0.5 // 59,5 → weergave-leeftijd 60
-
-    const naiefLager = factorAtAge(factorRows, halfAge)          // rij 59
-    const genormaliseerdHoger = factorAtAge(factorRows, EV_FIRE_AGE) // rij 60
-    // De twee rijen moeten echt verschillen, anders bewijst de test niets.
-    expect(naiefLager).not.toBe(genormaliseerdHoger)
-
-    const { container } = render(
-      <EuroViewProvider initialView="real">
-        <MiniNetWorthChart
-          netWorthHistory={buildHistory([230_000, 240_000, EV_CURRENT_NET_WORTH])}
-          currentNetWorth={EV_CURRENT_NET_WORTH}
-          currentAge={EV_CURRENT_AGE}
-          fireAge={halfAge}
-          endAge={90}
-          simNetWorthRows={rows}
-          simRequiredPortfolio={EV_REQUIRED_PORTFOLIO}
-        />
-      </EuroViewProvider>,
-    )
-    const verwacht = deflate(EV_REQUIRED_PORTFOLIO, genormaliseerdHoger, 'real')
-    const nietVerwacht = deflate(EV_REQUIRED_PORTFOLIO, naiefLager, 'real')
-    expect(container.textContent).toContain(`Vrijheidsdoel ${formatApproxCurrency(verwacht)} liquide`)
-    // De twee rijen liggen ver genoeg uit elkaar om ook ná M5-afronding te
-    // verschillen (€540.000 vs. €550.000) — de test bewijst dus nog steeds de
-    // rij-keuze en niet alleen de afronding.
-    expect(formatApproxCurrency(verwacht)).not.toBe(formatApproxCurrency(nietVerwacht))
-    expect(container.textContent).not.toContain(formatApproxCurrency(nietVerwacht))
   })
 })
 
@@ -916,7 +876,7 @@ describe('KRUIS-consistentie (AC-F4 / UAT-KRUIS-27) — één FIRE-doel, één d
  *        de kernelreeks komt uit `buildSimNetWorthRows` op de ECHTE `SimRow`-
  *        vorm (`startPortfolio` = stand ÓP die leeftijd, `endPortfolio` = stand
  *        een jaar later), zoals `dashboard-data-loader` hem aanlevert.
- * When   de mini-vermogensgrafiek de kop "Vermogen bij vrijheid → …" rendert.
+ * When   de toekomst-kaart van de mini-vermogensgrafiek "Vrij op … · ca. €…" rendert.
  * Then   dat bedrag is het geprojecteerde netto vermogen op de afgeronde
  *        vrijheidsleeftijd (51) en valt — na de "ca."-afronding op twee
  *        significante cijfers — samen met het doel-incl-woning dat /toekomst
@@ -981,8 +941,11 @@ describe('MiniNetWorthChart — vermogen bij vrijheid == FIRE-doel incl. woning 
       'real',
     )
 
-    expect(container.textContent).toContain(
-      `Vermogen bij vrijheid → ${formatApproxCurrency(toekomstDoel)}`,
+    // Was: `Vermogen bij vrijheid → ${bedrag}` in de kop. Sinds de tweedeling
+    // staat hetzelfde bedrag onder de plan-kop van de toekomst-kaart.
+    expect(screen.getByText(`Vrij op ${FIRE_DISPLAY_AGE}`)).toBeTruthy()
+    expect(screen.getByTestId('nw-toekomst-incl').textContent).toBe(
+      formatApproxCurrency(toekomstDoel),
     )
     // En het is niet toevallig gelijk doordat álles op dezelfde afronding valt:
     // de eindejaarsstand (de oude, foute grondslag) rondt aantoonbaar ánders af.
@@ -993,5 +956,255 @@ describe('MiniNetWorthChart — vermogen bij vrijheid == FIRE-doel incl. woning 
     )
     expect(formatApproxCurrency(oudeFouteGrondslag)).not.toBe(formatApproxCurrency(toekomstDoel))
     expect(container.textContent).not.toContain(formatApproxCurrency(oudeFouteGrondslag))
+  })
+})
+
+/**
+ * Tweedeling van de vermogenskaart (eigenaar-besluit sep 2026): een
+ * verleden-kaart (button → samengevoegd venster) en een toekomst-kaart
+ * (link → /toekomst), met de plan-kop, de bedragen op de knip-leeftijd en —
+ * onder een vast stopanker — de dekking van het plan.
+ */
+describe('MiniNetWorthChart — tweedeling in verleden- en toekomst-kaart', () => {
+  afterEach(() => {
+    window.localStorage.clear()
+  })
+
+  const baseProps = {
+    netWorthHistory: buildHistory([90_000, 95_000, 100_000]),
+    currentNetWorth: 100_000,
+    currentAge: 35,
+    fireAge: 52,
+    endAge: 67,
+    simNetWorthRows: buildSimRows(35, 52, 100_000),
+  }
+
+  it('heeft precies twee benoemde klikdoelen, zonder geneste interactieve elementen', () => {
+    render(<MiniNetWorthChart {...baseProps} />)
+    const past = screen.getByTestId('nw-kaart-verleden')
+    const future = screen.getByTestId('nw-kaart-toekomst')
+    expect(past.tagName).toBe('BUTTON')
+    expect(future.tagName).toBe('A')
+    expect(future.getAttribute('href')).toBe('/toekomst')
+    // Geen genest klikdoel: het kopgetal is geen eigen knop meer.
+    expect(past.querySelector('a, button')).toBeNull()
+    expect(future.querySelector('a, button')).toBeNull()
+    expect(screen.queryByTestId('netto-vermogen-kopgetal')).toBeNull()
+    // In de a11y-boom: één knop en één link (de mobiele grafiekzones zijn
+    // aria-hidden duplicaten buiten de tabvolgorde).
+    expect(screen.getAllByRole('button')).toHaveLength(1)
+    expect(screen.getAllByRole('link')).toHaveLength(1)
+    expect(screen.getByTestId('nw-zone-verleden').getAttribute('tabindex')).toBe('-1')
+    expect(screen.getByTestId('nw-zone-toekomst').getAttribute('tabindex')).toBe('-1')
+  })
+
+  it('draagt het exacte bedrag in de toegankelijke naam van de verleden-kaart', () => {
+    render(<MiniNetWorthChart {...baseProps} netWorthExclHome={40_000} showExclHome />)
+    const past = screen.getByTestId('nw-kaart-verleden')
+    const naam = (past.getAttribute('aria-labelledby') ?? '')
+      .split(' ')
+      .map((id) => document.getElementById(id)?.textContent ?? '')
+      .join(' ')
+    expect(naam).toContain('Netto vermogen')
+    expect(naam).toContain(formatCurrency(100_000))
+    expect(naam).toContain(formatCurrency(40_000))
+  })
+
+  it('opent ÉÉN venster met eerst de opbouw (kassabon) en daaronder het verloop', () => {
+    render(
+      <MiniNetWorthChart
+        {...baseProps}
+        vermogenOpbouw={{ bezittingen: 160_000, schulden: 60_000 }}
+      />,
+    )
+    expect(screen.queryByTestId('vermogen-kassabon-totaal')).toBeNull()
+    fireEvent.click(screen.getByTestId('nw-kaart-verleden'))
+    const opbouw = screen.getByTestId('netto-vermogen-venster-opbouw')
+    const verloopKop = screen.getByText('Stand · verschil')
+    expect(screen.getByTestId('vermogen-kassabon-totaal').textContent).toContain(
+      formatCurrency(100_000),
+    )
+    // Volgorde: de opbouw staat vóór het verloop in het document.
+    expect(
+      opbouw.compareDocumentPosition(verloopKop) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    // Eén venster, geen tweede "— verloop"-sheet.
+    expect(screen.queryByText('Netto vermogen — verloop')).toBeNull()
+  })
+
+  it('de mobiele grafiekzone opent hetzelfde venster', () => {
+    render(<MiniNetWorthChart {...baseProps} />)
+    fireEvent.click(screen.getByTestId('nw-zone-verleden'))
+    expect(screen.getByText('Stand · verschil')).toBeTruthy()
+  })
+
+  it('kop per modus: vrij · pensioen · vast stopanker · bereikt', () => {
+    const vrij = render(<MiniNetWorthChart {...baseProps} />)
+    expect(screen.getByText('Vrij op 52')).toBeTruthy()
+    vrij.unmount()
+
+    const pensioen = render(
+      <MiniNetWorthChart
+        {...baseProps}
+        fireAge={67}
+        isPensioenMode
+        simNetWorthRows={buildSimRows(35, 67, 100_000)}
+      />,
+    )
+    expect(screen.getByText('Pensioen op 67')).toBeTruthy()
+    pensioen.unmount()
+
+    const stop = render(
+      <MiniNetWorthChart
+        {...baseProps}
+        fireAge={58}
+        endAge={90}
+        stopAnchorFixed
+        stopAge={58}
+        framing="anchored"
+        simNetWorthRows={buildSimRows(35, 90, 100_000)}
+        planCoveragePct={72.4}
+      />,
+    )
+    expect(screen.getByText('Stoppen op 58')).toBeTruthy()
+    expect(screen.getByTestId('nw-toekomst-dekking').textContent).toBe('dekt 72% van je plan')
+    stop.unmount()
+
+    render(
+      <MiniNetWorthChart
+        {...baseProps}
+        currentAge={62}
+        fireAge={55}
+        endAge={90}
+        simNetWorthRows={buildSimRows(62, 90, 100_000)}
+      />,
+    )
+    expect(screen.getByText('Vrijheid bereikt — verloop tot 90')).toBeTruthy()
+    // Bij "bereikt" geen bedragregel (zoals de vroegere kop).
+    expect(screen.queryByTestId('nw-toekomst-incl')).toBeNull()
+  })
+
+  it('toont de dekking alleen onder een vast stopanker', () => {
+    render(<MiniNetWorthChart {...baseProps} planCoveragePct={72} />)
+    expect(screen.queryByTestId('nw-toekomst-dekking')).toBeNull()
+  })
+
+  describe('plan-stoplicht (15 sep 2026)', () => {
+    const stopProps = {
+      ...baseProps,
+      fireAge: 48,
+      endAge: 90,
+      stopAnchorFixed: true,
+      stopAge: 48,
+      framing: 'anchored' as const,
+      simNetWorthRows: buildSimRows(35, 90, 100_000),
+    }
+
+    it('vast stopmoment met een groot tekort: rood punt én rode dekkingsregel', () => {
+      render(<MiniNetWorthChart {...stopProps} planCoveragePct={5} planStatus="bad" />)
+      expect(screen.getByTestId('nw-toekomst-status').getAttribute('data-status')).toBe('bad')
+      expect(screen.getByTestId('nw-toekomst-status').className).toContain('bg-red-500')
+      expect(screen.getByTestId('nw-toekomst-dekking').className).toContain('text-red-700')
+    })
+
+    it('krappe marge kleurt oranje', () => {
+      render(<MiniNetWorthChart {...stopProps} planCoveragePct={95} planStatus="warn" />)
+      expect(screen.getByTestId('nw-toekomst-status').className).toContain('bg-amber-500')
+      expect(screen.getByTestId('nw-toekomst-dekking').className).toContain('text-amber-700')
+    })
+
+    it('zo vroeg mogelijk en haalbaar: groen punt, geen oordeelregel, statuswoord voor de schermlezer', () => {
+      render(<MiniNetWorthChart {...baseProps} planStatus="good" />)
+      expect(screen.getByTestId('nw-toekomst-status').className).toContain('bg-emerald-500')
+      expect(screen.queryByTestId('nw-toekomst-onhaalbaar')).toBeNull()
+      const kaart = screen.getByTestId('nw-kaart-toekomst')
+      const ids = (kaart.getAttribute('aria-labelledby') ?? '').split(' ')
+      const woorden = ids.map((id) => document.getElementById(id)?.textContent ?? '').join(' ')
+      expect(woorden).toContain('Goed op koers')
+    })
+
+    it('zo vroeg mogelijk en niet haalbaar binnen de horizon: rode tekst op de kaart', () => {
+      render(<MiniNetWorthChart {...baseProps} planStatus="bad" />)
+      const regel = screen.getByTestId('nw-toekomst-onhaalbaar')
+      expect(regel.textContent).toBe('niet haalbaar binnen je horizon')
+      expect(regel.className).toContain('text-red-700')
+    })
+
+    it('zonder oordeel (neutral) geen punt en de dekking in inkt — ongewijzigd gedrag', () => {
+      render(<MiniNetWorthChart {...stopProps} planCoveragePct={72} />)
+      expect(screen.queryByTestId('nw-toekomst-status')).toBeNull()
+      expect(screen.getByTestId('nw-toekomst-dekking').className).toContain('text-[var(--ink-3)]')
+    })
+  })
+
+  it('excl.-woning-bedrag: eerst dezelfde nominale anchorOffset, DAARNA de rij-factor (D7)', () => {
+    const rows = buildFactorRows().map((r) => ({
+      ...r,
+      // Fixture: de excl.-grondslag ligt een vast bedrag onder de incl.-reeks.
+      netWorthExclHome: r.netWorth - 150_000,
+    }))
+    const last = rows[rows.length - 1]
+    const verwacht = (last.netWorthExclHome + EV_ANCHOR_OFFSET) / last.inflationFactor
+    const verkeerdeVolgorde = last.netWorthExclHome / last.inflationFactor + EV_ANCHOR_OFFSET
+    // Anders bewijst de test niets.
+    expect(formatApproxCurrency(verwacht)).not.toBe(formatApproxCurrency(verkeerdeVolgorde))
+
+    render(
+      <EuroViewProvider initialView="real">
+        <MiniNetWorthChart
+          netWorthHistory={buildHistory([230_000, 240_000, EV_CURRENT_NET_WORTH])}
+          currentNetWorth={EV_CURRENT_NET_WORTH}
+          currentAge={EV_CURRENT_AGE}
+          fireAge={EV_FIRE_AGE}
+          endAge={90}
+          simNetWorthRows={rows}
+          netWorthExclHome={100_000}
+          showExclHome
+        />
+      </EuroViewProvider>,
+    )
+    const incl = (last.netWorth + EV_ANCHOR_OFFSET) / last.inflationFactor
+    expect(screen.getByTestId('nw-toekomst-incl').textContent).toBe(
+      `${formatApproxCurrency(incl)} incl. woning`,
+    )
+    expect(screen.getByTestId('nw-toekomst-excl').textContent).toBe(
+      `${formatApproxCurrency(verwacht)} excl. woning`,
+    )
+  })
+
+  it('zonder dubbele grondslag één bedrag zonder "incl. woning", en geen excl.-regel', () => {
+    const rows = buildSimRows(35, 52, 100_000).map((r) => ({
+      ...r,
+      netWorthExclHome: r.netWorth - 50_000,
+    }))
+    render(<MiniNetWorthChart {...baseProps} simNetWorthRows={rows} showExclHome={false} />)
+    expect(screen.getByTestId('nw-toekomst-incl').textContent).not.toMatch(/woning/)
+    expect(screen.queryByTestId('nw-toekomst-excl')).toBeNull()
+  })
+
+  it('zonder excl.-veld op de rij geen excl.-bedrag, ook niet bij showExclHome', () => {
+    render(<MiniNetWorthChart {...baseProps} netWorthExclHome={40_000} showExclHome />)
+    expect(screen.queryByTestId('nw-toekomst-excl')).toBeNull()
+    expect(screen.getByTestId('nw-toekomst-incl').textContent).not.toMatch(/woning/)
+  })
+
+  it('maskeert de toekomst-bedragen bij privacy aan', () => {
+    window.localStorage.setItem(PRIVACY_MASKED_STORAGE_KEY, 'true')
+    const rows = buildSimRows(35, 52, 100_000).map((r) => ({
+      ...r,
+      netWorthExclHome: r.netWorth - 50_000,
+    }))
+    render(
+      <PrivacyProvider>
+        <MiniNetWorthChart
+          {...baseProps}
+          simNetWorthRows={rows}
+          netWorthExclHome={50_000}
+          showExclHome
+        />
+      </PrivacyProvider>,
+    )
+    expect(screen.getByTestId('nw-toekomst-incl').textContent).toContain(MASKED_AMOUNT_PLACEHOLDER)
+    expect(screen.getByTestId('nw-toekomst-excl').textContent).toContain(MASKED_AMOUNT_PLACEHOLDER)
   })
 })

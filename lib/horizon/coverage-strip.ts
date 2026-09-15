@@ -90,7 +90,11 @@ const COVERAGE_STATUS_AMBER_MIN_PCT = 90
  */
 const DEFAULT_SAMPLE_EVERY_YEARS = 5
 
-function coverageStatus(coveragePct: number): CoverageNode['status'] {
+/**
+ * Stoplicht bij een dekkingspercentage. Geëxporteerd zodat de plan-status op
+ * /overzicht (`lib/horizon/plan-status.ts`) dezelfde drempels leest — één home.
+ */
+export function coverageStatus(coveragePct: number): CoverageNode['status'] {
   if (coveragePct >= COVERAGE_STATUS_GREEN_MIN_PCT) return 'green'
   if (coveragePct >= COVERAGE_STATUS_AMBER_MIN_PCT) return 'amber'
   return 'red'

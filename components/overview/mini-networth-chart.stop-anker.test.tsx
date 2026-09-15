@@ -18,7 +18,7 @@ global.ResizeObserver = MockResizeObserver as unknown as typeof ResizeObserver
 
 /**
  * ADR 0129 F3b (bevinding 1) — de minigrafiek onder een VAST stopmoment: de knip
- * ligt op het stopmoment ("Vermogen bij stop"), en "bereikt" staat er alleen bij
+ * ligt op het stopmoment (kop "Stoppen op …"), en "bereikt" staat er alleen bij
  * framing 'free' — nooit omdat de kernel-`fireAge` (= het anker) ≤ de huidige
  * leeftijd is. Vóór F3b las een nu-stoppen-gebruiker hier "Vrijheid bereikt".
  */
@@ -45,7 +45,7 @@ function buildSimRows(startAge: number, endAge: number, startValue: number): { a
 }
 
 describe('MiniNetWorthChart — vast stopmoment', () => {
-  it('nu-anker (fireAge = huidige leeftijd), niet gedekt: geen "bereikt", wel "Vermogen bij stop"', () => {
+  it('nu-anker (fireAge = huidige leeftijd), niet gedekt: geen "bereikt", wel "Stoppen op 47"', () => {
     const { container } = render(
       <MiniNetWorthChart
         netWorthHistory={buildHistory([90_000, 95_000, 100_000])}
@@ -60,7 +60,11 @@ describe('MiniNetWorthChart — vast stopmoment', () => {
       />,
     )
     expect(container.textContent).not.toMatch(/bereikt/i)
-    expect(screen.getByText(/Vermogen bij stop/)).toBeTruthy()
+    // Was: /Vermogen bij stop/. Sinds de tweedeling draagt de toekomst-kaart de
+    // plan-kop "Stoppen op {stopAge}"; de knip ligt hier ≤ vandaag, dus de
+    // weergave loopt door tot de eindleeftijd en het bedrag zegt "op 90".
+    expect(screen.getByText('Stoppen op 47')).toBeTruthy()
+    expect(screen.getByTestId('nw-toekomst-incl').textContent).toMatch(/ op 90$/)
     expect(container.textContent).not.toMatch(/Vrijheid \d/)
   })
 

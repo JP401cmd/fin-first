@@ -6,7 +6,8 @@
 //
 // ADR 0129 F3b — onder een VAST stopmoment (aow/now/age) dat nog niet 'free' is,
 // volgt de banner de Vrijheid-strip: kop "Je rekent met stoppen op {stop}" en de
-// bereik-zin uit anker-copy (gedekt ⇒ neutraal, tekort ⇒ aandacht). Het bereik komt
+// bereik-zin uit anker-copy (gedekt ⇒ neutraal, tekort ⇒ oranje/rood op de
+// plan-dekking, zie lib/horizon/plan-status.ts). Het bereik komt
 // uit de plan-runway van hetzelfde request (`computeHorizonRunway`), aangeleverd
 // door `computePageStatusInfo` — geen tweede kernel-run hier.
 
@@ -18,6 +19,7 @@ import {
   type FreedomStateInput,
 } from '@/lib/fire-strategy'
 import type { AnkerReach, AnkerStop } from '@/lib/horizon/anker-copy'
+import { resolvePlanStatus } from '@/lib/horizon/plan-status'
 import { FREEDOM_BANNER_COPY, anchoredBannerCopy } from '@/lib/page-status/copy'
 import type { PageStatusInfo } from '@/lib/page-status/types'
 
@@ -40,7 +42,15 @@ export function resolveFreedomBanner(
       return {
         route: '/overzicht',
         kind: 'freedom',
-        status: anker.reach.kind === 'gedekt' ? 'neutral' : 'warn',
+        // Tekort: het plan-stoplicht (`resolvePlanStatus`) kiest oranje of rood op
+        // de dekking — dezelfde regel als het punt op de plankaart. Een tekort is
+        // nooit groen, ook niet als de dekking afgerond op 100 uitkomt.
+        status:
+          anker.reach.kind === 'gedekt'
+            ? 'neutral'
+            : resolvePlanStatus({ anchorFixed: true, coveragePct: input.freedomPct, solvedReachable: null }) === 'bad'
+              ? 'bad'
+              : 'warn',
         title: copy.title,
         reason: copy.reason,
         remedy: copy.remedy,

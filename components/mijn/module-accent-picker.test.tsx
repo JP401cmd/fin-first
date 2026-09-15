@@ -201,7 +201,7 @@ describe('ModuleAccentPicker — wat een gecureerd palet moet waarmaken', () => 
 
   /**
    * Het besluit zelf, vastgelegd: er ZIJN nu presets die de status-toets laat
-   * waarschuwen (Framboos en Vermiljoen liggen naast "actie"-rood). Wordt deze
+   * waarschuwen (Scharlaken en Karmijn liggen naast "actie"-rood). Wordt deze
    * test rood omdat er geen enkele meer waarschuwt, dan is de oude koppeling
    * stilletjes teruggekropen.
    */

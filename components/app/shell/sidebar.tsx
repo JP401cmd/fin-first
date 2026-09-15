@@ -20,9 +20,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 import {
-  Wallet,
   Zap,
-  Compass,
   Inbox,
   Newspaper,
   BarChart3,
@@ -30,23 +28,27 @@ import {
   ChevronDown,
   ChevronsLeft,
   ChevronsRight,
-  Lock,
   Activity,
   type LucideIcon,
 } from 'lucide-react'
 import { TAP_TARGET_ROW_MIN } from '@/components/editorial/tap-target'
 import { useModuleAccess } from '@/components/app/feature-access-provider'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
-import { SIMPLE_HIDDEN_NAV_HREFS } from '@/lib/nav-config'
 import {
-  getActiveNavModules,
-  type NavModule,
-} from '@/lib/module-registry'
+  SIMPLE_HIDDEN_NAV_HREFS,
+  menuNav,
+  isMenuEntryActive,
+  type MenuEntry,
+  type NavColor,
+  type NavItem,
+} from '@/lib/nav-config'
+import type { NavModule } from '@/lib/module-registry'
 import { useSidebarCollapsed } from '@/lib/hooks/use-sidebar-collapsed'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { formatNetWorthShort } from '@/lib/net-worth-format'
 import { LeverCompassCollapsed, type LeverScores, type LeverStatus } from '@/components/app/shell/lever-compass'
-import { leverStatusLabel } from '@/components/app/shell/lever-scores'
+import { leverStatusLabel, leverageToLeverStatus } from '@/components/app/shell/lever-scores'
+import { usePlanStatus } from '@/components/app/plan-status-provider'
 import { GlobalSyncButton } from '@/components/sync/global-sync-button'
 import { SyncReportModal } from '@/components/sync/sync-report-modal'
 import { useCommandPalette } from '@/components/command-palette/command-palette-provider'
@@ -68,9 +70,9 @@ const SOURCE_SERIF = 'var(--font-source-serif, Georgia, serif)'
 // ── Public API ───────────────────────────────────────────────────────────────
 
 export type SidebarProps = {
-  /** Netto vermogen in EUR — getoond rechts van "Overzicht". */
+  /** Netto vermogen in EUR — getoond rechts van "Home" (alleen Volledig). */
   netWorth: number
-  /** Aantal openstaande acties — getoond als "· {n} acties" rechts van "Overzicht". */
+  /** Aantal openstaande acties. Momenteel niet in het menu getoond. */
   actionCount: number
   /** 1-2 letter avatar-initialen, uppercase. */
   userInitials: string
@@ -81,7 +83,7 @@ export type SidebarProps = {
   /**
    * App-slugs die actief zijn op basis van tracking-flags op assets/debts —
    * de bron van waarheid is `getActiveAppKeys()` uit
-   * `components/core/category-deepening-registry.ts`. Een app uit `MODULES.apps`
+   * `components/core/category-deepening-registry.ts`. Een app uit `menuNav[].apps`
    * verschijnt alleen wanneer haar `appKey` in deze lijst staat.
    */
   activeAppKeys?: string[]
@@ -95,31 +97,35 @@ export type SidebarProps = {
   sidebarSignals?: SidebarSignals
 }
 
-// ── Module-config ────────────────────────────────────────────────────────────
+// ── Menu-config ──────────────────────────────────────────────────────────────
 
-type ModuleEntry = {
-  /** Drives module-active CSS-vars on the row. */
-  key: NavModule
-  /** Plain prefix that comes before the italicEm word. */
-  prefix: string
-  /** Italic emphasis word (Playfair italic-em). */
-  italicEm: string
-  /** Combined plain label, used in aria-label / tooltip. */
-  label: string
-  /** Hoofd-route voor de module. */
-  href: string
-  Icon: LucideIcon
-  /** Inline tag-strip met categorie-routes — alleen op active module. */
-  subTags: SubTag[]
-  /**
-   * Optionele tag-strip met *apps* (verdiepingen) van de module. Alleen
-   * gerenderd voor apps wiens `appKey` voorkomt in `activeAppKeys` — d.w.z.
-   * minstens één gekoppeld asset/debt heeft de tracking-vlag aan staan.
-   * Apps zijn de category-deepening-entries uit
-   * `components/core/category-deepening-registry.ts` (Budgetteren, Holdings,
-   * Hypotheekplanner, Verhuurrendement).
-   */
-  apps?: AppTag[]
+// De menu-structuur zelf komt uit `menuNav` in lib/nav-config.ts — dezelfde
+// lijst die de mobiele nav-sheet leest. Tot 15 sep 2026 hield deze zijbalk een
+// eigen kopie (`MODULES`) bij, gegroepeerd onder "Twee modules"; die liep op
+// labels en subpagina's al uit de pas met de nav-config (Fiscale kansen en de
+// Budget-instellingen ontbraken hier).
+
+/**
+ * Menu-kleur → `--module-active-*`-vars op de rij, zodat icoon, actieve streep
+ * en actieve tint het accent van dát onderdeel dragen (Bezittingen kern,
+ * Schulden wil, Budget en De toekomst horizon). `stone` (Home, Belasting) heeft
+ * geen accent en valt terug op ink — dezelfde neutraliteit als
+ * `HEFBOOM_CONFIG.belasting.tint`.
+ */
+const ACCENT_FOR_COLOR: Record<Exclude<NavColor, 'stone'>, NavModule> = {
+  amber: 'kern',
+  purple: 'horizon',
+  teal: 'wil',
+}
+
+function accentVars(color: NavColor): React.CSSProperties {
+  if (color === 'stone') {
+    return {
+      '--module-active-500': 'var(--ink-3)',
+      '--module-active-700': 'var(--ink)',
+    } as React.CSSProperties
+  }
+  return moduleVars(ACCENT_FOR_COLOR[color])
 }
 
 type AppTag = {
@@ -132,116 +138,6 @@ type AppTag = {
    */
   appKey: string
 }
-
-type SubTag = {
-  label: string
-  href: string
-  /**
-   * Optionele kompas-key — wanneer aanwezig, toont SubTagStrip een gekleurde
-   * status-dot naast de tag-label (uit `leverScores[key]`). Dit voegt de
-   * kompas-functionaliteit samen met de sub-route navigatie zodat er geen
-   * dubbele rij ontstaat (gebruiker-feedback mei 2026).
-   */
-  leverKey?: keyof LeverScores
-  /**
-   * Optionele geneste subroutes — verschijnen ingesprongen ónder deze tag,
-   * maar alléén wanneer de gebruiker op deze tag (of een van zijn kinderen)
-   * staat. Houdt de sidebar rustig: het derde niveau is contextueel. Gebruikt
-   * voor de Box 1/2/3-pagina's onder Belasting.
-   */
-  children?: SubTag[]
-}
-
-// Conform plan §3.3: tag-strip toont *categorieën* (eerste rij). Daaronder
-// optioneel een *apps*-strip met de verdiepende functionaliteit per module —
-// alleen apps die geactiveerd zijn door minstens één gekoppeld asset/debt
-// (zie `getActiveAppKeys()` in category-deepening-registry.ts). Apps
-// deeplinken naar hun categorie-pagina met de juiste `?tab=`-state.
-const MODULES: ModuleEntry[] = [
-  {
-    key: 'kern',
-    prefix: 'Het ',
-    italicEm: 'Overzicht',
-    label: 'Het Overzicht',
-    href: '/overzicht',
-    Icon: Wallet,
-    subTags: [
-      // De vier hefbomen — sub-routes onder "Het Overzicht" mét kompas-
-      // status-indicators. Vervangt de aparte LeverCompassExpanded-mount
-      // (user-feedback mei 2026: "kompas staat los van overzicht, voeg ze
-      // samen zodat er geen duplicatie is").
-      { label: 'Bezittingen', href: '/overzicht/bezittingen', leverKey: 'assets' },
-      { label: 'Schulden', href: '/overzicht/schulden', leverKey: 'debts' },
-      {
-        label: 'Budget',
-        href: '/overzicht/budget',
-        leverKey: 'cashflow',
-        // De drie onderdelen — derde niveau, alleen zichtbaar op een
-        // budget-route (zie SubTagStrip). Bron: app/(app)/overzicht/
-        // budget/{transacties,vaste-lasten,forecast}/page.tsx. "Budget" stond
-        // hier zelf ook nog als kind toen het een sub-pagina was; sinds UR3-28
-        // is het de ouder en zou dat een kind naar zichzelf zijn.
-        children: [
-          { label: 'Transacties', href: '/overzicht/budget/transacties' },
-          { label: 'Vaste lasten', href: '/overzicht/budget/vaste-lasten' },
-          // "Vooruitblik" — leenwoord hernoemd aan de bron (UR3-13 F2, optie C);
-          // spiegelt lib/nav-config.ts. De URL blijft /…/forecast.
-          { label: 'Vooruitblik', href: '/overzicht/budget/forecast' },
-        ],
-      },
-      {
-        label: 'Belasting',
-        href: '/overzicht/belasting',
-        leverKey: 'tax',
-        // Box-subpagina's — derde niveau, alleen zichtbaar op een
-        // belasting-route (zie SubTagStrip). Bron: app/(app)/overzicht/
-        // belasting/box{1,2,3}/page.tsx.
-        children: [
-          { label: 'Box 1 · Werk + woning', href: '/overzicht/belasting/box1' },
-          { label: 'Box 2 · Aanmerkelijk belang', href: '/overzicht/belasting/box2' },
-          { label: 'Box 3 · Sparen + beleggen', href: '/overzicht/belasting/box3' },
-        ],
-      },
-    ],
-    apps: [
-      // Bron: components/core/category-deepening-registry.ts. `appKey` matcht
-      // de slug uit `getDeepeningSlug()` zodat de Sidebar kan filteren op
-      // welke apps daadwerkelijk een gekoppeld asset/debt hebben.
-      // M41: kale categorie-routes, GÉÉN `?tab=`-deeplink — anders landt één
-      // klik in Eenvoudig rechtstreeks in de verdiepingstab die BEZ-4 juist
-      // buiten het standaardpad houdt. Volledige motivering bij
-      // OVERVIEW_APP_SUBROUTES in lib/nav-config.ts; die lijst is de canonieke
-      // bron (deze kopie voedt de desktop-sidebar en moet er gelijk aan blijven).
-      // Budgetteren stond hier tot ADR 0135; het is basisfunctionaliteit en staat
-      // nu als 'Budget' bij de hefbomen hierboven, niet nog eens als app.
-      { label: 'Aandelen holdings', href: '/overzicht/bezittingen/investment',   appKey: 'aandelen-holdings' },
-      { label: 'Crypto holdings',   href: '/overzicht/bezittingen/crypto',       appKey: 'crypto-holdings' },
-      { label: 'Hypotheekplanner',  href: '/overzicht/schulden/mortgage',        appKey: 'hypotheekplanner' },
-      { label: 'Verhuurrendement',  href: '/overzicht/bezittingen/real_estate',  appKey: 'verhuurrendement' },
-    ],
-  },
-  // 'wil'-entry is verwijderd: Fin-coach is een persona overal, geen
-  // route. FinLanding-content (briefing + acties + widget-dashboard)
-  // leeft nu op /overzicht (= 'kern' entry hierboven). Floating
-  // nav-button toont "Vraag Fin" als globaal item in NavMenuSheet.
-  {
-    key: 'horizon',
-    prefix: 'De ',
-    italicEm: 'Toekomst',
-    label: 'De Toekomst',
-    href: '/toekomst',
-    Icon: Compass,
-    subTags: [
-      // Toekomst-subnavigatie: Tijdas (/toekomst) is de landing met
-      // navigatiekaarten; de overige items hebben elk een eigen subroute.
-      { label: 'Tijdas', href: '/toekomst' },
-      { label: 'Doelen', href: '/toekomst/doelen' },
-      { label: 'Gebeurtenissen', href: '/toekomst/gebeurtenissen' },
-      { label: 'Voorkeuren', href: '/toekomst/voorkeuren' },
-      { label: 'Rekenhulp', href: '/toekomst/rekenhulp' },
-    ],
-  },
-]
 
 /**
  * Welke bron de freshness-dot van een "overige"-rij voedt. Dit is een STABIELE
@@ -314,15 +210,12 @@ type FooterLink = {
 }
 
 const FOOTER_LINKS: FooterLink[] = [
+  // Geen losse Account-link meer (15 sep 2026, eigenaar: "dat gaat via Mijn").
+  // Mijn en Account stonden hier onder elkaar; Account is een onderdeel van
+  // Mijn. De ingang zit sindsdien als kaart in het /mijn-grid — let op: haal je
+  // die kaart weg, dan heeft desktop géén Account-ingang meer (de mobiele
+  // nav-pill met `open-account` is `lg:hidden`).
   { label: 'Mijn', href: '/mijn' },
-  // Account staat op mobiel permanent in de zwevende nav-pill (globalNav,
-  // actie `open-account`), maar die pill is `lg:hidden` — op desktop bestond
-  // hij niet. Tegelijk verbergt `/mijn/layout.tsx` de ModuleNav-tabbalk juist
-  // óp `/mijn` (`hideOnBasePath`, MIJN-1). Zonder deze regel zou het schrappen
-  // van de Account-kaart uit het /mijn-grid (bevinding M14, optie b2) de
-  // desktop-gebruiker via de hub geen Account-ingang meer laten zien. Dit is
-  // de desktop-tegenhanger van de mobiele pill, niet een extra duplicaat.
-  { label: 'Account', href: '/mijn/account' },
   { label: 'Uitloggen', href: '/logout' },
 ]
 
@@ -339,22 +232,6 @@ function moduleVars(module: NavModule): React.CSSProperties {
   ) as React.CSSProperties
 }
 
-/**
- * Bepaal welke module actief is op basis van pathname. Match op startsWith
- * — sub-routes zoals `/overzicht/bezittingen` blijven onder Overzicht actief.
- *
- * Match op zowel nieuwe canonieke routes (/overzicht /toekomst /mijn) als
- * oude paden (/core /horizon /identity /will) zodat de sidebar de juiste
- * module markeert ook tijdens redirect-cyclus.
- */
-function detectActiveModule(pathname: string): NavModule | null {
-  if (pathname.startsWith('/overzicht') || pathname.startsWith('/core')) return 'kern'
-  if (pathname.startsWith('/toekomst') || pathname.startsWith('/horizon')) return 'horizon'
-  // /will redirecteert naar /overzicht — als gebruiker pre-redirect /will ziet
-  // markeren we ook 'kern' (= de tab waar FinLanding nu leeft)
-  if (pathname.startsWith('/will')) return 'kern'
-  return null
-}
 
 // ── Main component ───────────────────────────────────────────────────────────
 
@@ -367,7 +244,6 @@ const DEFAULT_LEVER_SCORES: LeverScores = {
 
 export function Sidebar({
   netWorth,
-  actionCount,
   userInitials,
   userName,
   role,
@@ -377,16 +253,6 @@ export function Sidebar({
 }: SidebarProps) {
   const pathname = usePathname() ?? '/'
   const [collapsed, setCollapsed] = useSidebarCollapsed()
-  const { activeModules } = useModuleAccess()
-
-  const activeModule = detectActiveModule(pathname)
-
-  // Module-fallback: welke nav-modules ten minste één actief module hebben.
-  // We gebruiken de echte bron-of-truth (`getActiveNavModules`) i.p.v. zelf
-  // moduleId's matchen — zo blijft de fallback synchroon met de mobile tabs en
-  // widget-gating. App-zichtbaarheid in de strip wordt afzonderlijk
-  // gefilterd op `activeAppKeys` (zie ModuleRow).
-  const activeNavModules = getActiveNavModules(activeModules)
 
   // Width drives both sidebar shell and `<main>`-offset in DesktopSidebarShell
   // via data-collapsed. Hier alleen layout van sidebar zelf.
@@ -408,13 +274,11 @@ export function Sidebar({
       {/* Geen eigen Weergave-sectie meer (perspectief + euro-weergave): beide
           schakelaars zitten in het zoekmenu (⌘K), de SearchTrigger hierboven. */}
 
-      <ModulesSection
+      <MenuSection
         collapsed={collapsed}
-        activeModule={activeModule}
-        activeNavModules={activeNavModules}
+        pathname={pathname}
         activeAppKeys={activeAppKeys}
         netWorth={netWorth}
-        actionCount={actionCount}
         leverScores={leverScores}
         sidebarSignals={sidebarSignals}
       />
@@ -426,12 +290,9 @@ export function Sidebar({
         sidebarSignals={sidebarSignals}
       />
 
-      {/* Kompas-sectie verplaatst onder Het Overzicht (zie ModulesSection).
-          User-feedback (mei 2026): "kompas staat los van overzicht, neem hem
-          op onder overzicht knop". Kompas-status leeft nu naast de module-
-          row waar hij bij hoort. Voor collapsed-state behouden we onderaan
-          een compacte indicator zodat de kleuren ook in collapse zichtbaar
-          zijn. */}
+      {/* De kompas-status staat als stip naast elke hefboom-rij (zie
+          MenuRow). Ingeklapt zijn er geen labels om een stip naast te zetten,
+          dus daar houden we onderaan een compacte indicator. */}
       {collapsed && <LeverCompassCollapsed scores={leverScores} />}
 
       <div className="flex-1" aria-hidden />
@@ -530,285 +391,230 @@ function SearchTrigger() {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Modules-sectie (PRIMAIR)
+// Menu (PRIMAIR)
 // ─────────────────────────────────────────────────────────────────
 
-function ModulesSection({
+function MenuSection({
   collapsed,
-  activeModule,
-  activeNavModules,
+  pathname,
   activeAppKeys,
   netWorth,
-  actionCount,
   leverScores,
   sidebarSignals,
 }: {
   collapsed: boolean
-  activeModule: NavModule | null
-  activeNavModules: NavModule[]
+  pathname: string
   activeAppKeys: string[]
   netWorth: number
-  actionCount: number
   leverScores: LeverScores
   sidebarSignals?: SidebarSignals
 }) {
   // Netto vermogen is een saldo → honoreert de privacy-toggle (Bedragen
   // verbergen). Bij masked toont formatNetWorthShort de bullet-placeholder.
   const { masked } = useMaskedAmounts()
-  // NAV-5 — in Eenvoudig geen netto-vermogen-badge naast "Het Overzicht": een
-  // cijfer zonder context, dat op de pagina zelf al twee keer staat (hero +
+  // NAV-5 — in Eenvoudig geen netto-vermogen-badge naast Home: een cijfer
+  // zonder context, dat op de pagina zelf al twee keer staat (hero +
   // vermogensgrafiek). De navigatie is een wegwijzer, geen tweede dashboard.
   // In Volledig blijft de badge staan.
   const simple = useDisplayMode().mode === 'simple'
-  const metrics: Record<NavModule, string> = {
-    kern: simple ? '·' : formatNetWorthShort(netWorth, masked),
-    wil: actionCount > 0 ? `· ${actionCount}` : '·',
-    horizon: '·',
-  }
+  const homeMetric = simple ? null : formatNetWorthShort(netWorth, masked)
+  // Handmatig open/dicht geklapte takken, per href. Leeg = volg de
+  // begintoestand: alleen de actieve hoofdpagina staat open (NAV-2). Zelfde
+  // patroon als de mobiele nav-sheet (B-048) — bewust géén localStorage: een
+  // kijkje nemen binnen één sessie, geen voorkeur om te onthouden.
+  const [branchOverride, setBranchOverride] = useState<Record<string, boolean>>({})
 
   return (
-    <div className="flex flex-col gap-1 px-2 py-3">
-      {!collapsed && <ModulesSectionLabel />}
-      <div className="flex flex-col gap-0.5">
-        {MODULES.map((mod) => (
-          <ModuleRow
-            key={mod.key}
-            module={mod}
+    <div className="flex flex-col gap-0.5 px-2 py-3">
+      {menuNav.map((entry) => {
+        const isActive = isMenuEntryActive(pathname, entry.href)
+        const expanded = branchOverride[entry.href] ?? isActive
+        return (
+          <MenuRow
+            key={entry.href}
+            entry={entry}
+            pathname={pathname}
             collapsed={collapsed}
-            isActive={mod.key === activeModule}
-            isEnabled={activeNavModules.includes(mod.key)}
-            metric={metrics[mod.key]}
+            isActive={isActive}
+            expanded={expanded}
+            onToggle={() =>
+              setBranchOverride((prev) => ({ ...prev, [entry.href]: !expanded }))
+            }
+            metric={entry.href === '/overzicht' ? homeMetric : null}
             activeAppKeys={activeAppKeys}
             leverScores={leverScores}
             sidebarSignals={sidebarSignals}
           />
-        ))}
-      </div>
+        )
+      })}
     </div>
   )
 }
 
-function ModulesSectionLabel() {
-  return (
-    <div className="flex items-center gap-2.5 px-2 mb-2">
-      <span
-        aria-hidden
-        className="inline-block w-7 h-px"
-        style={{ background: 'var(--color-horizon-500)' }}
-      />
-      <span className="text-[10px] font-mono uppercase tracking-[0.20em] text-[var(--ink-2)]">
-        Twee modules
-      </span>
-    </div>
-  )
-}
-
-function ModuleRow({
-  module,
+function MenuRow({
+  entry,
+  pathname,
   collapsed,
   isActive,
-  isEnabled,
+  expanded,
+  onToggle,
   metric,
   activeAppKeys,
   leverScores,
   sidebarSignals,
 }: {
-  module: ModuleEntry
+  entry: MenuEntry
+  pathname: string
   collapsed: boolean
   isActive: boolean
-  isEnabled: boolean
-  metric: string
+  expanded: boolean
+  onToggle: () => void
+  metric: string | null
   activeAppKeys: string[]
   leverScores: LeverScores
   sidebarSignals?: SidebarSignals
 }) {
-  const Icon = module.Icon
-  const styleVars = moduleVars(module.key)
+  const Icon = entry.icon
+  const styleVars = accentVars(entry.color)
   const { mode: displayMode } = useDisplayMode()
+  const lever = entry.leverKey ? leverScores[entry.leverKey] : null
+  // Plan-stoplicht (De toekomst): alleen een punt zodra er een oordeel is —
+  // tijdens het nastreamen (`neutral`) liever niets dan een grijze flits.
+  const planStatus = usePlanStatus()
+  const planDot: LeverStatus | null =
+    entry.statusSource === 'plan' && planStatus !== 'neutral' ? leverageToLeverStatus(planStatus) : null
+  const dotStatus: LeverStatus | null = lever ? lever.status : planDot
 
   // Eenvoudig-weergave: verberg de menu-ingang voor de aangewezen routes
   // (Rekenhulp). Filtert ALLEEN de sidebar-ingang — de pagina's
   // blijven via deeplink + Volledig bereikbaar.
-  const visibleSubTags =
-    displayMode === 'simple'
-      ? module.subTags.filter((t) => !SIMPLE_HIDDEN_NAV_HREFS.includes(t.href))
-      : module.subTags
+  const subPages = (entry.children ?? []).filter(
+    (page) => displayMode !== 'simple' || !SIMPLE_HIDDEN_NAV_HREFS.includes(page.href),
+  )
+  // Apps (verdiepingen) alleen wanneer minstens één gekoppeld asset/debt de
+  // tracking-vlag aan heeft (activeAppKeys).
+  const apps = (entry.apps ?? []).filter((app) => activeAppKeys.includes(app.appKey))
 
-  // Drie visuele states in volgorde van prioriteit:
-  //  1. !isEnabled (module uit) — gedimd, geen accent, hover toont activeer-CTA
-  //  2. isActive (huidige route) — accent + bg-tint + module-700 tekst
-  //  3. enabled & inactive — neutrale ink-2 tekst met hover
-  const baseRowClass = !isEnabled
-    ? 'text-[var(--ink-4)]'
-    : isActive
-      ? 'bg-[color-mix(in_oklch,var(--module-active-500)_8%,transparent)] text-[var(--module-active-700)]'
-      : 'text-[var(--ink-2)] hover:bg-[var(--subtle)]/50 hover:text-[var(--ink)]'
+  const rowClass = isActive
+    ? 'bg-[color-mix(in_oklch,var(--module-active-500)_8%,transparent)] text-[var(--module-active-700)]'
+    : 'text-[var(--ink-2)] hover:bg-[var(--subtle)]/50 hover:text-[var(--ink)]'
+  const iconStyle = isActive
+    ? { color: 'var(--module-active-700)' }
+    : { color: 'var(--module-active-500)', opacity: 0.7 }
+  const title = lever
+    ? `${entry.label}: ${leverStatusLabel(lever.status)} — ${lever.detail}`
+    : planDot
+      ? `${entry.label}: ${leverStatusLabel(planDot)}`
+      : entry.label
+  const current = pathname === entry.href ? 'page' : undefined
 
-  // Module-toggle is verwijderd uit Trifinity; modules zijn altijd enabled.
-  // De fallback-tak (`!isEnabled`) blijft hieronder bestaan voor het geval
-  // toekomstige module-gating teruggebracht wordt, maar wordt momenteel
-  // niet bereikt. `targetHref` valt terug op de module-route zelf.
-  const targetHref = module.href
-  const tooltip = module.label
+  const activeStripe = isActive && (
+    <span
+      aria-hidden
+      className="absolute left-0 top-1.5 bottom-1.5 w-[3px]"
+      style={{ background: 'var(--module-active-500)' }}
+    />
+  )
 
   if (collapsed) {
     return (
-      <div className="relative" style={isEnabled ? styleVars : undefined}>
-        {isActive && isEnabled && (
-          <span
-            aria-hidden
-            className="absolute left-0 top-1 bottom-1 w-[3px]"
-            style={{ background: 'var(--module-active-500)' }}
-          />
-        )}
+      <div className="relative" style={styleVars}>
+        {activeStripe}
         <Link
-          href={targetHref}
-          aria-label={tooltip}
-          title={tooltip}
-          className={`flex items-center justify-center w-full h-12 transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-[var(--ink)] ${baseRowClass}`}
-          style={isEnabled ? styleVars : undefined}
+          href={entry.href}
+          aria-label={entry.label}
+          aria-current={current}
+          title={title}
+          className={`flex items-center justify-center w-full h-11 transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-[var(--ink)] ${rowClass}`}
         >
-          {/* Module-icon met optionele Lock-overlay voor uitgeschakelde modules.
-              Lock-badge is een visuele markering naast de gedimde tekst-kleur,
-              zodat gebruikers met kleurblindheid of high-contrast modes ook
-              zien dat de module uit staat (WCAG 1.4.1 Use of Color). */}
-          <span className="relative inline-flex">
-            <Icon
-              className="w-5 h-5"
-              style={
-                isEnabled
-                  ? isActive
-                    ? { color: 'var(--module-active-700)' }
-                    : { color: 'var(--module-active-500)', opacity: 0.7 }
-                  : undefined
-              }
-              aria-hidden
-            />
-            {!isEnabled && (
-              <Lock
-                aria-hidden
-                className="absolute -bottom-0.5 -right-1 w-2.5 h-2.5 bg-[var(--paper)] text-[var(--ink-4)] rounded-full p-px"
-              />
-            )}
+          {/* Kleur op de wrapper: `NavIcon` kent geen style-prop, het icoon
+              erft via currentColor. */}
+          <span className="inline-flex" style={iconStyle} aria-hidden>
+            <Icon className="w-5 h-5" />
           </span>
         </Link>
       </div>
     )
   }
 
-  // Expanded — full row met label + sub-tags + metric.
-  // Sub-tag-strip krijgt een eigen klikgebied per tag; door dit BUITEN de
-  // hoofd-link te plaatsen (sibling, niet child) voorkomen we genest-link-warnings.
+  const hasSubs = subPages.length > 0 || apps.length > 0
+  const branchId = `sidebar-branch${entry.href.replace(/\//g, '-')}`
+
+  // Subpagina's en apps staan als sibling ná de hoofdlink (niet als child),
+  // zodat er geen geneste links ontstaan. De chevron is om dezelfde reden een
+  // eigen knop náást de link, niet erin.
   return (
-    <div className="relative" style={isEnabled ? styleVars : undefined}>
-      {isActive && isEnabled && (
-        <span
-          aria-hidden
-          className="absolute left-0 top-1.5 bottom-1.5 w-[3px]"
-          style={{ background: 'var(--module-active-500)' }}
-        />
-      )}
-      <Link
-        href={targetHref}
-        title={tooltip}
-        className={`flex w-full items-start gap-3 px-3 py-3 text-left transition-colors duration-150 min-h-[64px] focus-visible:outline-2 focus-visible:outline-[var(--ink)] ${baseRowClass}`}
-      >
-        {/* Module-icon met optionele Lock-overlay (zie collapsed-variant). */}
-        <span className="relative inline-flex shrink-0 mt-0.5">
-          <Icon
-            className="w-[18px] h-[18px]"
-            style={
-              isEnabled
-                ? isActive
-                  ? { color: 'var(--module-active-700)' }
-                  : { color: 'var(--module-active-500)', opacity: 0.7 }
-                : undefined
-            }
-            aria-hidden
-          />
-          {!isEnabled && (
-            <Lock
-              aria-hidden
-              className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-[var(--paper)] text-[var(--ink-4)] rounded-full p-px"
+    <div className="relative" style={styleVars}>
+      {activeStripe}
+      <div className={`flex items-stretch transition-colors duration-150 ${rowClass}`}>
+        <Link
+          href={entry.href}
+          aria-current={current}
+          title={title}
+          className={`flex flex-1 min-w-0 items-center gap-3 py-2.5 min-h-[44px] text-left focus-visible:outline-2 focus-visible:outline-[var(--ink)] ${hasSubs ? 'pl-3 pr-1' : 'px-3'}`}
+        >
+          <span className="inline-flex shrink-0" style={iconStyle} aria-hidden>
+            <Icon className="w-[18px] h-[18px]" />
+          </span>
+          <span
+            className="flex-1 min-w-0 truncate text-[15px] leading-tight font-bold"
+            style={{ fontFamily: PLAYFAIR }}
+          >
+            {entry.label}
+          </span>
+          {metric && (
+            <span
+              className="font-mono tabular-nums text-[11px] tracking-[0.02em] shrink-0"
+              style={isActive ? { color: 'var(--module-active-700)' } : { color: 'var(--ink-3)' }}
+            >
+              {metric}
+            </span>
+          )}
+          {dotStatus && (
+            <span
+              data-testid={planDot ? 'sidebar-plan-status' : undefined}
+              className={`w-1.5 h-1.5 rounded-full shrink-0 ${SUBTAG_STATUS_DOT[dotStatus]}`}
+              aria-label={`${entry.label}: ${leverStatusLabel(dotStatus)}`}
             />
           )}
-        </span>
-        <div className="flex-1 min-w-0">
-          <ModuleLabel
-            module={module}
-            isActive={isActive && isEnabled}
-          />
-        </div>
-        {!isEnabled ? (
-          <span className="font-mono uppercase text-[10px] tracking-[0.06em] mt-1 shrink-0 text-[var(--ink-4)]">
-            Activeer
-          </span>
-        ) : (
-          <span
-            className="font-mono tabular-nums text-[11px] tracking-[0.02em] mt-0.5 shrink-0"
-            style={
-              isActive && isEnabled
-                ? { color: 'var(--module-active-700)' }
-                : { color: 'var(--ink-3)' }
+        </Link>
+        {hasSubs && (
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-expanded={expanded}
+            // Alleen verwijzen zolang het paneel er ook daadwerkelijk staat;
+            // dicht is het uit de DOM, niet verborgen.
+            aria-controls={expanded ? branchId : undefined}
+            aria-label={
+              expanded
+                ? `Verberg de onderdelen van ${entry.label}`
+                : `Toon de onderdelen van ${entry.label}`
             }
+            title={expanded ? 'Inklappen' : 'Uitklappen'}
+            className="flex w-9 shrink-0 items-center justify-center text-[var(--ink-3)] hover:text-[var(--ink)] focus-visible:outline-2 focus-visible:outline-[var(--ink)]"
           >
-            {metric}
-          </span>
+            <ChevronDown
+              className={`w-3.5 h-3.5 transition-transform duration-150 ${expanded ? 'rotate-180' : ''}`}
+              aria-hidden
+            />
+          </button>
         )}
-      </Link>
+      </div>
 
-      {/* Sub-tag-strip — alleen op active+enabled module met sub-tags. Plan
-          §3.3: sub-pages verschijnen alleen bij de huidige module om de
-          sidebar visueel rustig te houden. leverScores wordt doorgegeven
-          zodat tags met `leverKey` een status-dot tonen. */}
-      {isActive && isEnabled && visibleSubTags.length > 0 && (
-        <SubTagStrip subTags={visibleSubTags} leverScores={leverScores} sidebarSignals={sidebarSignals} />
-      )}
-
-      {/* Apps-strip — alleen op active+enabled module met apps die door
-          minstens één gekoppeld asset/debt geactiveerd zijn (filter via
-          activeAppKeys, gevoed door tracking-flags op assets en debts). */}
-      {isActive && isEnabled && module.apps && module.apps.length > 0 && (
-        <AppTagStrip
-          apps={module.apps.filter((a) => activeAppKeys.includes(a.appKey))}
-          sidebarSignals={sidebarSignals}
-        />
-      )}
-
-      {/* Inactive-module CTA — kleine voet onder de rij die naar Instellingen linkt.
-          Géén tooltip-only: gebruikers moeten zien dat de module bestaat maar uit staat. */}
-      {!isEnabled && (
-        <div
-          className="px-3 pb-2 -mt-1 italic text-[11px] leading-snug text-[var(--ink-3)]"
-          style={{ fontFamily: SOURCE_SERIF }}
-        >
-          Activeer in Instellingen
+      {/* Begintoestand: alleen de actieve hoofdpagina staat open (plan §3.3,
+          NAV-2) — rustig maar scanbaar. De chevron klapt elke tak open of
+          dicht zonder de pagina te openen. */}
+      {expanded && hasSubs && (
+        // Zonder subpagina's erboven zou de "apps"-kop (-mt-1) tegen de rij plakken.
+        <div id={branchId} className={subPages.length === 0 ? 'pt-1.5' : undefined}>
+          {subPages.length > 0 && (
+            <SubPageStrip pages={subPages} sidebarSignals={sidebarSignals} />
+          )}
+          {apps.length > 0 && <AppTagStrip apps={apps} sidebarSignals={sidebarSignals} />}
         </div>
       )}
     </div>
-  )
-}
-
-function ModuleLabel({
-  module,
-  isActive,
-}: {
-  module: ModuleEntry
-  isActive: boolean
-}) {
-  return (
-    <span
-      className="text-[16px] leading-tight font-bold"
-      style={{ fontFamily: PLAYFAIR }}
-    >
-      {module.prefix}
-      <em
-        className="font-normal italic"
-        style={isActive ? { color: 'var(--module-active-700)' } : undefined}
-      >
-        {module.italicEm}
-      </em>
-    </span>
   )
 }
 
@@ -907,99 +713,56 @@ const APP_FRESHNESS: Record<
   },
 }
 
-function SubTagStrip({
-  subTags,
-  dimmed = false,
-  leverScores,
+/**
+ * Subpagina's onder de actieve hoofdpagina (bv. Box 1/2/3 onder Belasting,
+ * Transacties/Vaste lasten/Vooruitblik onder Budget, Doelen onder De toekomst).
+ * Tot 15 sep 2026 was dit een derde niveau onder "Het Overzicht"; nu hangen ze
+ * direct onder hun eigen hoofdpagina. pl-[42px] = px-3 (12) + icon (18) +
+ * gap-3 (12), zodat ze onder het label uitlijnen i.p.v. onder de icoonkolom.
+ */
+function SubPageStrip({
+  pages,
   sidebarSignals,
 }: {
-  subTags: SubTag[]
-  dimmed?: boolean
-  leverScores?: LeverScores
+  pages: NavItem[]
   sidebarSignals?: SidebarSignals
 }) {
   const pathname = usePathname() ?? '/'
-  // Cashflow-kaartstatussen uit de gedeelde CashflowStatusProvider (app-layout):
-  // één bron voor alle vier cashflow-children. Die provider is lazy — op de hub
-  // consumeert hij de server-seed van de pagina (geen request), op de
-  // sub-pagina's fetcht hij /api/overzicht/cashflow-status, en daarbuiten blijven
-  // de statussen neutraal.
+  // Cashflow-kaartstatussen uit de gedeelde CashflowStatusProvider (app-layout).
+  // Die provider is lazy — op de hub consumeert hij de server-seed van de
+  // pagina (geen request), op de sub-pagina's fetcht hij
+  // /api/overzicht/cashflow-status, en daarbuiten blijven de statussen neutraal.
   const cashflowStatuses = useCashflowStatusContext()
-  // Dimmed-state op non-active modules: een toon lichter zodat de actieve
-  // module visueel blijft dominen, maar de sub-pages wel scanbaar zijn.
-  const baseColorClass = dimmed ? 'text-[var(--ink-3)]' : 'text-[var(--ink-2)]'
-  const linkHoverClass = dimmed ? 'hover:text-[var(--ink-2)]' : 'hover:text-[var(--ink)]'
-  // Match op de tag zelf of een dieper kind zodat het derde niveau
-  // (Box 1/2/3) alleen op een belasting-route uitklapt.
-  const isOnTag = (href: string) => pathname === href || pathname.startsWith(href + '/')
-  // Vertical stack: elke sub-tag op eigen rij. pl-[42px] = px-3 (12) + icon (18)
-  // + gap-3 (12) zodat de tags onder de module-label uitlijnen i.p.v. onder de
-  // icon-kolom. Communiceert duidelijker de parent/child-relatie.
+  const isOn = (href: string) => pathname === href || pathname.startsWith(href + '/')
   return (
     <div
-      className={`flex flex-col italic text-[12px] leading-snug pl-[42px] pr-3 pb-2 -mt-1 ${baseColorClass}`}
+      className="flex flex-col italic text-[12px] leading-snug pl-[42px] pr-3 pb-2 -mt-0.5 text-[var(--ink-2)]"
       style={{ fontFamily: SOURCE_SERIF }}
     >
-      {subTags.map((tag) => {
-        const entry = tag.leverKey && leverScores ? leverScores[tag.leverKey] : null
-        const showChildren = tag.children && tag.children.length > 0 && isOnTag(tag.href)
-        return (
-          <div key={tag.href} className="flex flex-col">
-            <Link
-              href={tag.href}
-              // UR3-20/B: py-0.5 gaf ~20px rijen, onder de WCAG 2.5.8-AA-vloer
-              // van 24px. TAP_TARGET_ROW_MIN tilt de rij zelf op (geen
-              // ::after-oprekking — die zou in deze verticale stack de
-              // raakgebieden van buren laten overlappen).
-              className={`flex items-center gap-2 py-1 ${TAP_TARGET_ROW_MIN} ${linkHoverClass} transition-colors duration-150`}
-              title={
-                entry
-                  ? `${tag.label}: ${leverStatusLabel(entry.status)} — ${entry.detail}`
-                  : tag.label
-              }
-            >
-              <span className="flex-1">{tag.label}</span>
-              {entry && (
-                <span
-                  className={`w-1.5 h-1.5 rounded-full shrink-0 ${SUBTAG_STATUS_DOT[entry.status]}`}
-                  aria-label={`${tag.label}: ${leverStatusLabel(entry.status)}`}
-                />
-              )}
-            </Link>
-            {showChildren && (
-              <div className="flex flex-col border-l border-[var(--border-ed)] ml-1 pl-3 mt-0.5 mb-1">
-                {tag.children!.map((child) => (
-                  <SubTagChild
-                    key={child.href}
-                    child={child}
-                    active={isOnTag(child.href)}
-                    linkHoverClass={linkHoverClass}
-                    sidebarSignals={sidebarSignals}
-                    cashflowStatuses={cashflowStatuses}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        )
-      })}
+      {pages.map((page) => (
+        <SubTagChild
+          key={page.href}
+          child={page}
+          active={isOn(page.href)}
+          linkHoverClass="hover:text-[var(--ink)]"
+          sidebarSignals={sidebarSignals}
+          cashflowStatuses={cashflowStatuses}
+        />
+      ))}
     </div>
   )
 }
 
 /**
- * Eén child-rij in SubTagStrip (derde niveau, bv. Box 1/2/3 onder Belasting of
- * Budget/Transacties/Vaste lasten/Forecast onder Cashflow). Krijgt een trailing
- * 4-kleuren status-mirror-dot (LEVERAGE_STATUS_DOT), die EXACT dezelfde
- * LeverageStatus toont als de bijbehorende landingskaart:
+ * Eén subpagina-rij. Krijgt een trailing 4-kleuren status-mirror-dot
+ * (LEVERAGE_STATUS_DOT), die EXACT dezelfde LeverageStatus toont als de
+ * bijbehorende landingskaart:
  *  - Belasting Box 1/2/3 → `sidebarSignals.belasting[boxN]` (server-berekend,
  *    gedeelde helpers met de Belasting-kaart).
- *  - Cashflow Budget/Transacties/Vaste lasten/Forecast → `cashflowStatuses[key]`
+ *  - Budget Transacties/Vaste lasten/Vooruitblik → `cashflowStatuses[key]`
  *    (client-hook → /api/overzicht/cashflow-status → buildCashflowCards, exact
  *    dezelfde bron als de cashflow-kaarten).
- *
- * Geen freshness-dots meer op deze twee surfaces: de gebruiker vroeg dat de
- * sidebar-dots de KAART-statussen spiegelen, dus beide zijn nu status-mirrors.
+ * Overige subpagina's (Fiscale kansen, Doelen…) hebben geen stip.
  */
 function SubTagChild({
   child,
@@ -1008,7 +771,7 @@ function SubTagChild({
   sidebarSignals,
   cashflowStatuses,
 }: {
-  child: SubTag
+  child: NavItem
   active: boolean
   linkHoverClass: string
   sidebarSignals?: SidebarSignals
@@ -1052,7 +815,7 @@ function SubTagChildLink({
   linkHoverClass,
   dot,
 }: {
-  child: SubTag
+  child: NavItem
   active: boolean
   linkHoverClass: string
   dot: React.ReactNode
@@ -1063,7 +826,7 @@ function SubTagChildLink({
       aria-current={active ? 'page' : undefined}
       // UR3-20/B — zie SubTagStrip: rij zelf naar de 24px-vloer.
       className={`flex items-center gap-2 py-1 ${TAP_TARGET_ROW_MIN} transition-colors duration-150 ${
-        active ? 'text-[var(--ink)] font-medium' : `text-[var(--ink-3)] ${linkHoverClass}`
+        active ? 'text-[var(--ink)] font-medium' : `text-[var(--ink-2)] ${linkHoverClass}`
       }`}
     >
       <span className="flex-1">{child.label}</span>

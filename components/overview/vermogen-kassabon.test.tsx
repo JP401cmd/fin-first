@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
-import { NettoVermogenKopgetal, VermogenKassabon } from './vermogen-kassabon'
+import { render, screen } from '@testing-library/react'
+import { VermogenKassabon } from './vermogen-kassabon'
 import { calculateFreedomTime, formatCurrency, formatFreedomTimeString } from '@/lib/format'
 
 /**
@@ -99,31 +99,5 @@ describe('VermogenKassabon — regels komen uit de bundel', () => {
     )
     expect(screen.getByText(eur(340_000))).toBeTruthy()
     expect(screen.getByText(eur(-157_000))).toBeTruthy()
-  })
-})
-
-describe('NettoVermogenKopgetal — de doorklik', () => {
-  it('rendert het kale kopgetal zonder opbouw (geen knop, geen sheet)', () => {
-    render(<NettoVermogenKopgetal currentNetWorth={NETTO_VERMOGEN} />)
-    expect(screen.queryByTestId('netto-vermogen-kopgetal')).toBeNull()
-    expect(screen.getByText(eur(NETTO_VERMOGEN))).toBeTruthy()
-  })
-
-  it('opent de kassabon bij een klik op het kopgetal', () => {
-    render(
-      <NettoVermogenKopgetal
-        currentNetWorth={NETTO_VERMOGEN}
-        opbouw={{ bezittingen: BEZITTINGEN, schulden: SCHULDEN }}
-      />,
-    )
-
-    const knop = screen.getByTestId('netto-vermogen-kopgetal')
-    // Het bedrag blijft de toegankelijke naam van de knop — een aria-label zou
-    // dat juist vervangen en het getal bij de schermlezer weghalen.
-    expect(knop.textContent).toContain(formatCurrency(NETTO_VERMOGEN))
-
-    expect(screen.queryByTestId('vermogen-kassabon-totaal')).toBeNull()
-    fireEvent.click(knop)
-    expect(screen.getByTestId('vermogen-kassabon-totaal')).toBeTruthy()
   })
 })

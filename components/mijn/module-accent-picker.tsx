@@ -38,8 +38,8 @@ type ModuleKey = keyof ModuleColorConfig
 
 /**
  * Gedeelde ring van achttien alternatieven: een raster van 20° over de hele
- * kleurencirkel, elk op zijn **sRGB-gamutgrens** bij L ~ 0,52 — de fysieke
- * bovengrens, niet een gekozen getal.
+ * kleurencirkel, elk op zijn **sRGB-gamutgrens** — de fysieke bovengrens, niet
+ * een gekozen getal.
  *
  * Het raster begint bewust op 17° en niet op 0°. Dat is de offset die de
  * grootste afstand houdt tot de vier standaarden (kern 165,6° · wil 49,9° ·
@@ -53,32 +53,44 @@ type ModuleKey = keyof ModuleColorConfig
  * daardoor bewust naast "actie"-rood, Oker naast "aandacht"-amber en Smaragd
  * naast "op koers"-groen. Dat is geen ongeluk en geen drift.
  *
- * Waarom ze niet allemaal even fel ogen: bij deze lichtheid laat sRGB in het
- * groen/teal maar C ~ 0,09-0,12 toe, tegen ~0,28 in het blauw/paars. Jade en
- * Petrol staan al op hun maximum — dat is de gamut, geen terughoudendheid.
+ * **EIGENAARSBESLUIT 15 sep 2026: elke tint op zijn eigen chroma-optimale
+ * lightness, niet meer allemaal op één vaste L ~ 0,52.** Voorheen was de hele
+ * ring op één lightness geplat (gekozen omdat dat de bovengrens was voor de
+ * meest beperkte hue in de set); dat liet chroma liggen bij elke hue waarvan
+ * de sRGB-piek elders ligt. Per tint gezocht naar de lightness die de chroma
+ * maximaliseert zónder onder de AA-ondergrens (4,5:1 op papier `#faf9f6`,
+ * marge ingebouwd) te zakken: groen/oranje/geel pieken pas ver boven L 0,52
+ * (te donker leesbaar, dus daar geldt de AA-grens als plafond); blauw/paars
+ * (Indigo, Violet) piekt juist ónder of rond L 0,52 — die twee kregen dus
+ * hun eigen, lagere piek-L in plaats van de AA-grens, en werden zo ook
+ * feller. Netto chroma-winst t.o.v. 8 sep: 4-14% op vrijwel alle tinten.
  *
- * Alle achttien halen minimaal 4,94:1 tegen papier (WCAG AA voor tekst = 4,5),
+ * Waarom ze niet allemaal even fel ogen: sRGB laat in het groen/teal nog altijd
+ * maar C ~ 0,10-0,13 toe tegen ~0,29-0,30 in het blauw/paars. Dat is de gamut,
+ * geen terughoudendheid.
+ *
+ * Alle achttien halen minimaal 4,55:1 tegen papier (WCAG AA voor tekst = 4,5),
  * gepind in module-accent-picker.test.tsx.
  */
 const ACCENT_RING: ColorPreset[] = [
-  { name: 'Scharlaken', hex: '#c4003b' },
-  { name: 'Roest', hex: '#b73500' },
-  { name: 'Karamel', hex: '#9d5200' },
-  { name: 'Oker', hex: '#8c5f00' },
-  { name: 'Olijf', hex: '#7b6800' },
-  { name: 'Mos', hex: '#657100' },
-  { name: 'Gras', hex: '#367c00' },
-  { name: 'Smaragd', hex: '#007d4b' },
-  { name: 'Jade', hex: '#007b68' },
-  { name: 'Petrol', hex: '#00787a' },
-  { name: 'Staal', hex: '#00758c' },
-  { name: 'Kobalt', hex: '#0071a2' },
-  { name: 'Ultramarijn', hex: '#0064d0' },
-  { name: 'Indigo', hex: '#5238ff' },
-  { name: 'Violet', hex: '#8200f2' },
-  { name: 'Orchidee', hex: '#9f00c5' },
-  { name: 'Magenta', hex: '#b20097' },
-  { name: 'Karmijn', hex: '#bd006b' },
+  { name: 'Scharlaken', hex: '#e30046' },
+  { name: 'Roest', hex: '#d03e00' },
+  { name: 'Karamel', hex: '#b05c00' },
+  { name: 'Oker', hex: '#996900' },
+  { name: 'Olijf', hex: '#867100' },
+  { name: 'Mos', hex: '#6c7900' },
+  { name: 'Gras', hex: '#398200' },
+  { name: 'Smaragd', hex: '#00834f' },
+  { name: 'Jade', hex: '#00816e' },
+  { name: 'Petrol', hex: '#007f82' },
+  { name: 'Staal', hex: '#007d96' },
+  { name: 'Kobalt', hex: '#0079ae' },
+  { name: 'Ultramarijn', hex: '#006ee5' },
+  { name: 'Indigo', hex: '#4b00fe' },
+  { name: 'Violet', hex: '#8900fe' },
+  { name: 'Orchidee', hex: '#be00ea' },
+  { name: 'Magenta', hex: '#d200b2' },
+  { name: 'Karmijn', hex: '#dd007e' },
 ]
 
 const MODULE_SWATCHES: Record<

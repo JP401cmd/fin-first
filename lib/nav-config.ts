@@ -1,5 +1,6 @@
 import type { ComponentType } from 'react'
-import { Wallet, Compass, User, Newspaper, Bell, MessageCircle, Settings, Zap, BarChart3 } from 'lucide-react'
+import { Wallet, Compass, User, Newspaper, Bell, MessageCircle, Settings, Zap, BarChart3, Home } from 'lucide-react'
+import { HEFBOOM_CONFIG } from '@/lib/hefboom-config'
 
 /**
  * Unified nav-config — single source of truth voor sidebar (desktop) én
@@ -56,7 +57,7 @@ export const mainNav: Array<NavItem & { color: NavColor }> = [
     href: '/toekomst',
     icon: Compass,
     color: 'purple',
-    description: 'Tijdas, doelen, gebeurtenissen, voorkeuren',
+    description: 'Doelen, gebeurtenissen, voorkeuren, rekenhulp',
   },
   {
     label: 'Mijn',
@@ -121,10 +122,9 @@ export const navGroups: NavGroup[] = [
   {
     parent: mainNav[1]!,
     items: [
-      // Toekomst-subnavigatie: Tijdas (/toekomst) is de landing met
-      // navigatiekaarten; Doelen/Gebeurtenissen/Voorkeuren/Rekenhulp
-      // hebben elk een eigen subroute.
-      { label: 'Tijdas', href: '/toekomst' },
+      // Toekomst-subnavigatie. "Tijdas" stond hier tot 15 sep 2026 als eerste
+      // item, maar wees naar /toekomst zelf — dezelfde plek als de hoofdpagina
+      // erboven. Eén ingang per plek: de hoofdpagina ís de tijdas.
       { label: 'Doelen', href: '/toekomst/doelen' },
       { label: 'Gebeurtenissen', href: '/toekomst/gebeurtenissen' },
       { label: 'Voorkeuren', href: '/toekomst/voorkeuren' },
@@ -214,6 +214,109 @@ export const OVERVIEW_APP_SUBROUTES: OverviewAppItem[] = [
   { label: 'Hypotheekplanner', href: '/overzicht/schulden/mortgage', tabHref: '/overzicht/schulden/mortgage?tab=hypotheekplanner', appKey: 'hypotheekplanner' },
   { label: 'Verhuurrendement', href: '/overzicht/bezittingen/real_estate', tabHref: '/overzicht/bezittingen/real_estate?tab=verhuurrendement', appKey: 'verhuurrendement' },
 ]
+
+/** Sleutel in `LeverScores` (components/app/shell/lever-compass) voor de statusstip. */
+export type MenuLeverKey = 'assets' | 'debts' | 'cashflow' | 'tax'
+
+export type MenuEntry = NavItem & {
+  icon: NavIcon
+  color: NavColor
+  /** Hefboom waarvan de statusstip naast deze hoofdpagina staat. */
+  leverKey?: MenuLeverKey
+  /**
+   * `'plan'` → de statusstip is het plan-stoplicht (`usePlanStatus`, nagestreamd
+   * uit de layout) i.p.v. een hefboomscore. Alleen De toekomst.
+   */
+  statusSource?: 'plan'
+  /** Verdiepende apps onder deze hoofdpagina; zichtbaar per `activeAppKeys`. */
+  apps?: OverviewAppItem[]
+}
+
+/**
+ * Het zichtbare menu — desktop-zijbalk én mobiele nav-sheet lezen deze lijst.
+ *
+ * Plat, op één niveau (15 sep 2026): Home, de vier hefbomen en De toekomst.
+ * Tot dan groepeerde het menu onder "Twee modules" (Het Overzicht / De
+ * Toekomst), waardoor de hefbomen sub-items van een startpagina leken en hun
+ * eigen onderdelen (Box 1/2/3, Transacties…) pas op een derde niveau kwamen.
+ * Nu is elke hefboom een hoofdpagina en zijn zijn onderdelen gewone subpagina's.
+ *
+ * `mainNav`/`navGroups` blijven bestaan als titel- en tab-root-register
+ * (resolveRouteTitle, de mobiele TopBar); deze lijst leidt zijn onderdelen
+ * daaruit af, zodat labels en hrefs één bron houden.
+ *
+ * Home = /overzicht, de pagina met de briefing, widgets en het kompas. Die
+ * route blijft de tab-root "Overzicht"; alleen het menu noemt hem Home.
+ *
+ * Kleur per hoofdpagina = het accent van dat onderdeel (kleurconventie in
+ * CLAUDE.md, gespiegeld aan HEFBOOM_CONFIG.tint): Bezittingen `amber`→kern,
+ * Schulden `teal`→wil, Budget `purple`→horizon, De toekomst `purple`→horizon
+ * (route-accent /toekomst). Belasting heeft bewust geen accent (UR3-32) en Home
+ * is geen hefboom: beide `stone`, neutraal ink.
+ */
+function overzichtItem(href: string): NavItem {
+  const item = navGroups[0]!.items.find((i) => i.href === href)
+  if (!item) throw new Error(`nav-config: ${href} ontbreekt in navGroups`)
+  return item
+}
+
+const appsUnder = (prefix: string): OverviewAppItem[] =>
+  OVERVIEW_APP_SUBROUTES.filter((a) => a.href.startsWith(prefix + '/'))
+
+export const menuNav: MenuEntry[] = [
+  {
+    label: 'Home',
+    href: '/overzicht',
+    icon: Home,
+    // Home is geen hefboom en krijgt dus geen hefboom-accent: neutraal.
+    color: 'stone',
+    description: 'Je briefing, widgets en kompas',
+  },
+  {
+    ...overzichtItem('/overzicht/bezittingen'),
+    icon: HEFBOOM_CONFIG.bezittingen.Icon,
+    color: 'amber',
+    leverKey: 'assets',
+    apps: appsUnder('/overzicht/bezittingen'),
+  },
+  {
+    ...overzichtItem('/overzicht/schulden'),
+    icon: HEFBOOM_CONFIG.schulden.Icon,
+    color: 'teal',
+    leverKey: 'debts',
+    apps: appsUnder('/overzicht/schulden'),
+  },
+  {
+    ...overzichtItem('/overzicht/budget'),
+    icon: HEFBOOM_CONFIG.cashflow.Icon,
+    color: 'purple',
+    leverKey: 'cashflow',
+  },
+  {
+    ...overzichtItem('/overzicht/belasting'),
+    icon: HEFBOOM_CONFIG.belasting.Icon,
+    color: 'stone',
+    leverKey: 'tax',
+  },
+  {
+    label: 'De toekomst',
+    href: '/toekomst',
+    icon: Compass,
+    color: 'purple',
+    statusSource: 'plan',
+    description: mainNav[1]!.description,
+    children: navGroups[1]!.items,
+  },
+]
+
+/**
+ * Staat de gebruiker op (of onder) deze hoofdpagina? Home is exact-match:
+ * /overzicht/bezittingen hoort bij Bezittingen, niet ook bij Home.
+ */
+export function isMenuEntryActive(pathname: string, href: string): boolean {
+  if (href === '/overzicht') return pathname === '/overzicht'
+  return pathname === href || pathname.startsWith(href + '/')
+}
 
 /**
  * Globale items — altijd beschikbaar onderaan het menu (tips, krant, berichten,
@@ -328,10 +431,7 @@ function buildRouteTitleMap(): Map<string, string> {
   const add = (href: string | undefined, label: string) => {
     if (!href) return
     const key = normalizePathname(href)
-    // Eerste winnaar behouden — mainNav/navGroups gaan vóór EXTRA's. Zo wint
-    // voor /toekomst bewust de mainNav-titel ("Toekomst") boven het navGroups-
-    // item met hetzelfde href ("Tijdas"): dat item is zichtbare menu-structuur,
-    // de dubbele titel-registratie is onschuldig — de eerste winnaar telt.
+    // Eerste winnaar behouden — mainNav/navGroups gaan vóór EXTRA's.
     if (!map.has(key)) map.set(key, label)
   }
 

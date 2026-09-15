@@ -6,6 +6,8 @@ import {
   globalNav,
   EXTRA_ROUTE_TITLES,
   SIMPLE_HIDDEN_NAV_HREFS,
+  menuNav,
+  isMenuEntryActive,
 } from './nav-config'
 
 describe('resolveRouteTitle', () => {
@@ -113,6 +115,48 @@ describe('globalNav (mobiele nav-sheet + topbar-iconen)', () => {
   it('registreert /overzicht/tips niet dubbel in EXTRA_ROUTE_TITLES', () => {
     // EXTRA_ROUTE_TITLES is per contract voor routes BUITEN de nav-structuur.
     expect(Object.keys(EXTRA_ROUTE_TITLES)).not.toContain('/overzicht/tips')
+  })
+})
+
+describe('menuNav (plat menu, 15 sep 2026)', () => {
+  it('zet Home, de vier hefbomen en De toekomst op één niveau', () => {
+    expect(menuNav.map((e) => e.label)).toEqual([
+      'Home',
+      'Bezittingen',
+      'Schulden',
+      'Budget',
+      'Belasting',
+      'De toekomst',
+    ])
+    expect(menuNav[0]!.href).toBe('/overzicht')
+  })
+
+  it('heeft geen Tijdas-ingang — die wees naar de hoofdpagina zelf', () => {
+    const hrefs = menuNav.flatMap((e) => (e.children ?? []).map((c) => c.href))
+    expect(hrefs).not.toContain('/toekomst')
+    expect(menuNav.flatMap((e) => e.children ?? []).map((c) => c.label)).not.toContain('Tijdas')
+  })
+
+  it('leidt subpagina’s af uit navGroups — één bron voor labels en hrefs', () => {
+    const belasting = menuNav.find((e) => e.href === '/overzicht/belasting')!
+    const bron = navGroups[0]!.items.find((i) => i.href === '/overzicht/belasting')!
+    expect(belasting.children).toBe(bron.children)
+  })
+
+  it('hangt elke app onder de hefboom waar zijn route onder valt', () => {
+    const bezittingen = menuNav.find((e) => e.href === '/overzicht/bezittingen')!
+    const schulden = menuNav.find((e) => e.href === '/overzicht/schulden')!
+    expect(bezittingen.apps!.map((a) => a.appKey)).toEqual(
+      expect.arrayContaining(['aandelen-holdings', 'crypto-holdings', 'verhuurrendement']),
+    )
+    expect(schulden.apps!.map((a) => a.appKey)).toEqual(['hypotheekplanner'])
+  })
+
+  it('isMenuEntryActive: Home alleen exact, hefbomen ook op dieper niveau', () => {
+    expect(isMenuEntryActive('/overzicht', '/overzicht')).toBe(true)
+    expect(isMenuEntryActive('/overzicht/bezittingen', '/overzicht')).toBe(false)
+    expect(isMenuEntryActive('/overzicht/belasting/box3', '/overzicht/belasting')).toBe(true)
+    expect(isMenuEntryActive('/toekomst/doelen', '/toekomst')).toBe(true)
   })
 })
 

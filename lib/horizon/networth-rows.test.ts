@@ -1,10 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import fs from 'node:fs'
+import path from 'node:path'
 import { buildSimNetWorthRows } from './networth-rows'
 import { deflate } from '@/lib/euro-display'
 import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
 import {
   deriveHousingContext,
+  getFireEligibleNetWorth,
+  netWorthExcludingHome,
   type HousingStrategyConfig,
 } from '@/lib/housing-strategy'
 
@@ -608,5 +612,324 @@ describe('buildSimNetWorthRows — ADR 0034 endpoint-invariant (leeftijd-uitlijn
     expect(reeel).toBeGreaterThan(505_000)
     expect(reeel).toBeLessThan(520_000)
     void FIRE_AGE_FRACTIONAL
+  })
+})
+
+/* ───────────────────────────────────────────────────────────────────────────
+ * Dubbele grondslag — `netWorthExclHome` (geprojecteerd netto vermogen EXCL.
+ * eigen woning, kernel-J-grondslag).
+ *
+ * De kernel houdt het huis voor élke modus in het grootboek (houseInLedger) en
+ * levert per rij naast Prognose!I (startPortfolio) ook Prognose!J
+ * (`startNettoLiquide` = I − eigen-woningblok). Deze suite bewijst:
+ *   (a) zonder dubbele grondslag (include_full / geen woning) of zonder J ontbreekt
+ *       de sleutel volledig — bestaande bundels byte-identiek;
+ *   (b) exclude_from_fire: rij 0 == netWorthExcludingHome (exact), latere rijen =
+ *       netWorth − de kernel-overwaarde van dát jaar;
+ *   (c) downsize: ná de kernel-verkoop excl. == incl. (geen dubbele aftrek);
+ *   (d) reverse_mortgage: de ZUIVERE definitie (huis + álle woningschulden weg,
+ *       opnames in de liquide pot), niet de leen-ruimte-variant;
+ *   (e) `netWorth`/`inflationFactor` ongewijzigd (regressie);
+ *   (f) een grondslagverschil op t0 aan de huis-kant vervuilt de excl.-reeks niet;
+ *   (g) grendel op de aanname dat J in de app exact "zonder eigen woning" is.
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+type KernelFixture = {
+  simRows: FixtureRow[]
+  /** Prognose!J ÓP de leeftijd — wat de bridge als `startNettoLiquide` levert. */
+  jByAge: Map<number, number>
+  /** Liquide pot per rij (de "waarheid" waar excl. op moet uitkomen). */
+  liquid: number[]
+  /** Kernel-overwaarde per rij (huis − hypotheek − opeetschuld). */
+  ovw: number[]
+}
+
+const SALE_AGE = 46 // downsize: kernel-verkoopleeftijd (Bez!AY 0→1)
+const OPEET_START_AGE = 46 // reverse_mortgage: opname-startleeftijd (P!B64)
+const SALE_COSTS_PCT = 0.04
+const OPEET_PAYOUT_PER_YEAR = 12_000
+
+/**
+ * Kernel-rijen in de ECHTE vorm: startPortfolio = I ÓP age, J = I − woningblok.
+ * `ovwAt(i)` beschrijft wat de kernel met het woningblok doet; `liquidAt(i)` de
+ * liquide pot (incl. verkoopopbrengst/opeetopnames die de kernel erin stort).
+ */
+function buildKernelFixture(
+  liquidAt: (i: number) => number,
+  ovwAt: (i: number) => number,
+): KernelFixture {
+  const n = fireAge - currentAge + 1
+  const liquid: number[] = []
+  const ovw: number[] = []
+  for (let i = 0; i < n; i++) {
+    liquid.push(liquidAt(i))
+    ovw.push(ovwAt(i))
+  }
+  const simRows: FixtureRow[] = []
+  const jByAge = new Map<number, number>()
+  for (let i = 0; i < n; i++) {
+    const age = currentAge + i
+    const startI = liquid[i] + ovw[i]
+    const endI = i + 1 < n ? liquid[i + 1] + ovw[i + 1] : startI * 1.05
+    simRows.push({ age, startPortfolio: startI, endPortfolio: endI, inflationFactor: factorAt(age) })
+    jByAge.set(age, liquid[i])
+  }
+  return { simRows, jByAge, liquid, ovw }
+}
+
+/** Liquide pot zonder woning-stromen: 100k @ 6% + 15k/jr (zelfde pad als de rest). */
+const liquidPlain = (i: number) => {
+  let v = 100_000
+  for (let k = 0; k < i; k++) v = v * 1.06 + 15_000
+  return v
+}
+/** Meegroeiende overwaarde: t0 = context-overwaarde (huis 400k − hyp 200k). */
+const ovwGrowing = (i: number) => houseEquityNow + 5_000 * i
+
+const DOWNSIZE_CFG: HousingStrategyConfig = {
+  mode: 'downsize',
+  trigger: 'fixed_age',
+  triggerAge: SALE_AGE,
+  depletionThresholdYears: 0,
+  salePricePct: 1,
+  salesCostsPct: SALE_COSTS_PCT,
+  newMonthlyHousingCost: null,
+}
+const REVERSE_CFG: HousingStrategyConfig = {
+  mode: 'reverse_mortgage',
+  trigger: 'fixed_age',
+  triggerAge: OPEET_START_AGE,
+  depletionThresholdYears: 0,
+  maxLoanPct: 0.5,
+  interestRate: 0.055,
+  monthlyPayout: null,
+}
+
+function kernelBase(fx: KernelFixture, cfg: HousingStrategyConfig, currentNw = fx.simRows[0].startPortfolio) {
+  return {
+    simRows: fx.simRows,
+    currentNetWorth: currentNw,
+    housingStrategy: cfg,
+    houseInLedger: true,
+    assets,
+    debts,
+    dateOfBirth: DOB,
+    startNettoLiquideByAge: fx.jByAge,
+  }
+}
+
+describe('buildSimNetWorthRows — netWorthExclHome (a): sleutel ontbreekt zonder dubbele grondslag of zonder J', () => {
+  it('include_full → géén netWorthExclHome-sleutel, uitvoer byte-identiek aan de aanroep zonder J', () => {
+    const fx = buildKernelFixture(liquidPlain, ovwGrowing)
+    const withJ = buildSimNetWorthRows(kernelBase(fx, { mode: 'include_full' }))
+    const withoutJ = buildSimNetWorthRows({ ...kernelBase(fx, { mode: 'include_full' }), startNettoLiquideByAge: undefined })
+    expect(withJ).toEqual(withoutJ)
+    for (const row of withJ) expect('netWorthExclHome' in row).toBe(false)
+  })
+
+  it('geen eigen woning → géén sleutel, ook niet onder exclude_from_fire', () => {
+    const fx = buildKernelFixture(liquidPlain, () => 0)
+    const out = buildSimNetWorthRows({
+      ...kernelBase(fx, { mode: 'exclude_from_fire' }),
+      assets: [assets[1]],
+      debts: [],
+    })
+    for (const row of out) expect('netWorthExclHome' in row).toBe(false)
+  })
+
+  it('exclude_from_fire zónder kernel-J → géén sleutel (geen eigen overwaarde-projectie als terugval)', () => {
+    const fx = buildKernelFixture(liquidPlain, ovwGrowing)
+    const out = buildSimNetWorthRows({ ...kernelBase(fx, { mode: 'exclude_from_fire' }), startNettoLiquideByAge: undefined })
+    for (const row of out) expect('netWorthExclHome' in row).toBe(false)
+  })
+
+  it('J mist voor één leeftijd → de HELE reeks laat de sleutel weg (nooit half gevuld)', () => {
+    const fx = buildKernelFixture(liquidPlain, ovwGrowing)
+    const gappy = new Map(fx.jByAge)
+    gappy.delete(currentAge + 5)
+    const out = buildSimNetWorthRows({ ...kernelBase(fx, { mode: 'exclude_from_fire' }), startNettoLiquideByAge: gappy })
+    for (const row of out) expect('netWorthExclHome' in row).toBe(false)
+  })
+})
+
+describe('buildSimNetWorthRows — netWorthExclHome (b): exclude_from_fire', () => {
+  const fx = buildKernelFixture(liquidPlain, ovwGrowing)
+  const out = buildSimNetWorthRows(kernelBase(fx, { mode: 'exclude_from_fire' }))
+
+  it('rij 0 is EXACT netWorthExcludingHome(currentNetWorth, housingContext) — het getal van de linker kaart', () => {
+    const anker = netWorthExcludingHome(fx.simRows[0].startPortfolio, ctx)
+    expect(out[0].netWorthExclHome).toBe(anker)
+  })
+
+  it('latere rijen: netWorthExclHome = netWorth − kernel-overwaarde van dat jaar (= de liquide pot)', () => {
+    for (let i = 0; i < out.length; i++) {
+      expect(out[i].netWorthExclHome).toBeCloseTo(out[i].netWorth - fx.ovw[i], 6)
+      expect(out[i].netWorthExclHome).toBeCloseTo(fx.liquid[i], 6)
+      expect(out[i].netWorthExclHome!).toBeLessThan(out[i].netWorth)
+    }
+  })
+
+  it('zelfde leeftijd, zelfde deflator: excl. en incl. dragen dezelfde inflationFactor per rij', () => {
+    expect(out.map((r) => r.age)).toEqual(fx.simRows.map((r) => r.age))
+    expect(out.map((r) => r.inflationFactor)).toEqual(fx.simRows.map((r) => r.inflationFactor))
+  })
+})
+
+describe('buildSimNetWorthRows — netWorthExclHome (c): downsize — ná de kernel-verkoop geen dubbele aftrek', () => {
+  // Kernel-waarheid: vóór de verkoop meegroeiende overwaarde; op de verkoopmaand
+  // huis-slot 0, hypotheek 0 en de netto-opbrengst als inleg in de liquide pot.
+  const saleIdx = SALE_AGE - currentAge
+  const proceeds = ovwGrowing(saleIdx) * (1 - SALE_COSTS_PCT)
+  const fx = buildKernelFixture(
+    (i) => liquidPlain(i) + (i >= saleIdx ? proceeds : 0),
+    (i) => (i >= saleIdx ? 0 : ovwGrowing(i)),
+  )
+  const out = buildSimNetWorthRows(kernelBase(fx, DOWNSIZE_CFG))
+
+  it('rij 0 exact het anker', () => {
+    expect(out[0].netWorthExclHome).toBe(netWorthExcludingHome(fx.simRows[0].startPortfolio, ctx))
+  })
+
+  it('vóór de verkoop ligt excl. onder incl.; vanaf de verkoopleeftijd excl. == incl. (huis is al geld)', () => {
+    for (let i = 0; i < out.length; i++) {
+      if (out[i].age < SALE_AGE) {
+        expect(out[i].netWorthExclHome!).toBeLessThan(out[i].netWorth - 1)
+      } else {
+        expect(out[i].netWorthExclHome).toBeCloseTo(out[i].netWorth, 6)
+      }
+    }
+  })
+
+  it('de verkoopopbrengst komt in excl. terecht (springt op de verkoopleeftijd omhoog met de opbrengst)', () => {
+    const before = out[saleIdx - 1].netWorthExclHome!
+    const at = out[saleIdx].netWorthExclHome!
+    // liquide groei van één jaar + de netto-opbrengst; een dubbele aftrek zou dit
+    // ~overwaarde te laag laten uitkomen.
+    expect(at - before).toBeCloseTo(liquidPlain(saleIdx) - liquidPlain(saleIdx - 1) + proceeds, 6)
+  })
+})
+
+describe('buildSimNetWorthRows — netWorthExclHome (d): reverse_mortgage — de zuivere definitie', () => {
+  // Kernel-waarheid: huis groeit, hypotheek loopt af, vanaf de opname-start loopt de
+  // opeetschuld (categorie 'Woning', niet-liquide) op en gaan de opnames naar de
+  // liquide pot. J = I − (huis − hypotheek − opeetschuld) = liquide pot mét opnames.
+  const opeetIdx = OPEET_START_AGE - currentAge
+  const house = (i: number) => HOUSE_VALUE + 8_000 * i
+  const hyp = (i: number) => MORTGAGE_BALANCE - 5_000 * i
+  const opeet = (i: number) => (i >= opeetIdx ? OPEET_PAYOUT_PER_YEAR * (i - opeetIdx + 1) : 0)
+  const fx = buildKernelFixture(
+    (i) => liquidPlain(i) + opeet(i),
+    (i) => house(i) - hyp(i) - opeet(i),
+  )
+  const out = buildSimNetWorthRows(kernelBase(fx, REVERSE_CFG))
+
+  it('rij 0: ZUIVER netWorth − overwaarde (exact), NIET de leen-ruimte-variant (getFireEligibleNetWorth)', () => {
+    const nw0 = fx.simRows[0].startPortfolio
+    expect(out[0].netWorthExclHome).toBe(netWorthExcludingHome(nw0, ctx))
+    expect(out[0].netWorthExclHome).not.toBe(getFireEligibleNetWorth(nw0, ctx, REVERSE_CFG))
+  })
+
+  it('latere rijen: huis én álle woningschulden (hypotheek + opeetschuld) weggestreept = liquide pot mét opnames', () => {
+    for (let i = 0; i < out.length; i++) {
+      expect(out[i].netWorthExclHome).toBeCloseTo(out[i].netWorth - (house(i) - hyp(i) - opeet(i)), 6)
+      expect(out[i].netWorthExclHome).toBeCloseTo(liquidPlain(i) + opeet(i), 6)
+    }
+  })
+
+  it('de opeetopname verhoogt excl. jaar op jaar (het geld is er wél; de schuld ertegenover hoort bij de woning)', () => {
+    const delta = out[opeetIdx + 1].netWorthExclHome! - out[opeetIdx].netWorthExclHome!
+    const liquidGrowth = liquidPlain(opeetIdx + 1) - liquidPlain(opeetIdx)
+    expect(delta).toBeCloseTo(liquidGrowth + OPEET_PAYOUT_PER_YEAR, 6)
+  })
+})
+
+describe('buildSimNetWorthRows — netWorthExclHome (e): regressie — netWorth en inflationFactor ongewijzigd', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(GOLDEN_CLOCK)
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('kernel-tak golden blijft byte-identiek terwijl netWorthExclHome erbij komt', () => {
+    const simRows = buildEndPortfolioFull()
+    const jByAge = new Map(simRows.map((r) => [r.age, r.startPortfolio - houseEquityNow]))
+    const out = buildSimNetWorthRows({
+      simRows,
+      currentNetWorth,
+      housingStrategy: { mode: 'exclude_from_fire' },
+      houseInLedger: true,
+      assets,
+      debts,
+      dateOfBirth: DOB,
+      startNettoLiquideByAge: jByAge,
+    })
+    expect(out.map((r) => r.netWorth)).toEqual(GOLDEN_HOUSE_IN_LEDGER)
+    expect(out.map((r) => r.inflationFactor)).toEqual(simRows.map((r) => r.inflationFactor))
+    expect(out.every((r) => typeof r.netWorthExclHome === 'number')).toBe(true)
+  })
+
+  it('met en zonder J: netWorth/inflationFactor per rij identiek', () => {
+    const fx = buildKernelFixture(liquidPlain, ovwGrowing)
+    const withJ = buildSimNetWorthRows(kernelBase(fx, DOWNSIZE_CFG))
+    const withoutJ = buildSimNetWorthRows({ ...kernelBase(fx, DOWNSIZE_CFG), startNettoLiquideByAge: undefined })
+    expect(withJ.map((r) => r.netWorth)).toEqual(withoutJ.map((r) => r.netWorth))
+    expect(withJ.map((r) => r.inflationFactor)).toEqual(withoutJ.map((r) => r.inflationFactor))
+  })
+
+  it('een ANDERE J-reeks verandert nul euro aan netWorth (J zit in geen enkele incl.-som)', () => {
+    const fx = buildKernelFixture(liquidPlain, ovwGrowing)
+    const doubled = new Map([...fx.jByAge].map(([age, j]) => [age, j * 2] as const))
+    const a = buildSimNetWorthRows(kernelBase(fx, DOWNSIZE_CFG))
+    const b = buildSimNetWorthRows({ ...kernelBase(fx, DOWNSIZE_CFG), startNettoLiquideByAge: doubled })
+    expect(b.map((r) => r.netWorth)).toEqual(a.map((r) => r.netWorth))
+  })
+})
+
+describe('buildSimNetWorthRows — netWorthExclHome (f): eigen reconcile-offset per grondslag', () => {
+  it('grondslagverschil aan de LIQUIDE kant: beide reeksen schuiven evenveel, rij 0 exact', () => {
+    const fx = buildKernelFixture(liquidPlain, ovwGrowing)
+    const delta = 1_000
+    const currentNw = fx.simRows[0].startPortfolio + delta
+    const out = buildSimNetWorthRows(kernelBase(fx, { mode: 'exclude_from_fire' }, currentNw))
+    expect(out[0].netWorthExclHome).toBe(netWorthExcludingHome(currentNw, ctx))
+    for (let i = 0; i < out.length; i++) {
+      expect(out[i].netWorth).toBeCloseTo(fx.simRows[i].startPortfolio + delta, 6)
+      expect(out[i].netWorthExclHome).toBeCloseTo(fx.liquid[i] + delta, 6)
+    }
+  })
+
+  it('grondslagverschil aan de HUIS-kant (kernel start op WOZ, context op marktwaarde): excl.-reeks blijft de liquide pot', () => {
+    const wozPremium = 30_000
+    // Kernel rekende het huis 30k hoger (WOZ-basis); de context (marktwaarde) niet.
+    const fx = buildKernelFixture(liquidPlain, (i) => ovwGrowing(i) + wozPremium)
+    const currentNw = fx.liquid[0] + houseEquityNow // loader-netWorth op marktwaarde
+    const out = buildSimNetWorthRows(kernelBase(fx, DOWNSIZE_CFG, currentNw))
+    // incl. schuift −30k (zoals altijd al); excl. is verankerd op de liquide pot en
+    // draagt dat huis-verschil NIET mee — dezelfde offset op beide zou hier 30k te laag zijn.
+    expect(out[0].netWorthExclHome).toBe(netWorthExcludingHome(currentNw, ctx))
+    for (let i = 0; i < out.length; i++) {
+      expect(out[i].netWorth).toBeCloseTo(fx.simRows[i].startPortfolio - wozPremium, 6)
+      expect(out[i].netWorthExclHome).toBeCloseTo(fx.liquid[i], 6)
+    }
+  })
+})
+
+describe('buildSimNetWorthRows — netWorthExclHome (g): grendel op de J-aanname in de kernel-adapter', () => {
+  // `netWorthExclHome` leest Prognose!J als "netto vermogen zonder eigen woning". Dat
+  // klopt alléén zolang de adapter UITSLUITEND bezitcategorie 'Eigen huis' en
+  // schuldcategorie 'Woning' als niet-liquide vlagt (en alleen bij ≠ Meerekenen).
+  // Vlagt iemand ooit een derde categorie, dan is J "zonder al het niet-liquide"
+  // en moet deze reeks een eigen woningblok-veld uit de bridge gaan lezen.
+  it('adapter/prio-overgang.ts vlagt precies twee categorieën niet-liquide: Eigen huis en Woning', () => {
+    const src = fs.readFileSync(
+      path.join(process.cwd(), 'lib', 'horizon-kernel', 'adapter', 'prio-overgang.ts'),
+      'utf8',
+    )
+    const flags = src.match(/nietLiquide:\s*[^,\n]+/g) ?? []
+    expect(flags).toHaveLength(2)
+    expect(flags[0]).toMatch(/categorie === 'Eigen huis' \? !woningMeerekenen : false/)
+    expect(flags[1]).toMatch(/categorie === 'Woning' \? !woningMeerekenen : false/)
   })
 })

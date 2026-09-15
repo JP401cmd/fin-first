@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-09-07T16:37:21.005Z",
-  "attestedAt": "2026-09-07T16:37:20.964Z",
+  "generatedAt": "2026-09-15T00:59:23.239Z",
+  "attestedAt": "2026-09-15T00:59:23.120Z",
   "toneStatus": "attested",
   "copyStatus": "attested",
   "toneSources": [
@@ -266,14 +266,14 @@
       "label": "/nieuws — chrome",
       "caveat": "Alleen de chrome. De berichten zelf worden door het model geschreven; die stem zit in lib/news-system-prompt.ts en is al bron in het DNA-parity-manifest.",
       "fileCount": 1,
-      "copyLines": 47,
+      "copyLines": 51,
       "files": [
         {
           "file": "components/berichten/nieuws-only-client.tsx",
-          "attestedSha256": "0b63bc9f6d26ea82a9ef4ced8e9e42be695543cfcdba4fa90e1749bcb9e5fc62",
-          "liveSha256": "0b63bc9f6d26ea82a9ef4ced8e9e42be695543cfcdba4fa90e1749bcb9e5fc62",
-          "copyLines": 47,
-          "attestedCopyLines": 47,
+          "attestedSha256": "9b1f24a24dc8c4ce87a1d92e237a34cc11d549f428e414e7770436571487e5e9",
+          "liveSha256": "9b1f24a24dc8c4ce87a1d92e237a34cc11d549f428e414e7770436571487e5e9",
+          "copyLines": 51,
+          "attestedCopyLines": 51,
           "extractionCollapsed": false,
           "status": "attested"
         }

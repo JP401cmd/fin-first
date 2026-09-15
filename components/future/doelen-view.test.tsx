@@ -395,7 +395,7 @@ describe('DoelenView — basis-render', () => {
     expect(positions).toEqual(['25%', '50%', '75%'])
   })
 
-  it('toont aantal doelen in header', () => {
+  it('toont de kop "Vrije doelen" boven de eigen doelen', () => {
     render(
       <DoelenView
         goals={[mockGoal({ id: 'a' }), mockGoal({ id: 'b' })]}
@@ -405,11 +405,11 @@ describe('DoelenView — basis-render', () => {
         ]}
       />,
     )
-    expect(screen.getByText('2 actieve doelen')).toBeTruthy()
+    expect(screen.getByRole('heading', { level: 2, name: 'Vrije doelen' })).toBeTruthy()
   })
 })
 
-// ── Groep "Jouw doelsituatie" (lab-parameter-doelen) ─────────────────────
+// ── Groep "Scenariodoelen" (lab-parameter-doelen) ─────────────────────────
 
 function paramGoal(overrides: Partial<GoalWithBudget> = {}): GoalWithBudget {
   return mockGoal({
@@ -423,7 +423,7 @@ describe('DoelenView — doelsituatie-groep', () => {
     vi.unstubAllGlobals()
   })
 
-  it('toont GEEN doelsituatie-groep zonder parameter-doelen', () => {
+  it('toont GEEN scenariodoelen-groep zonder parameter-doelen', () => {
     render(
       <DoelenView
         goals={[mockGoal()]}
@@ -432,10 +432,10 @@ describe('DoelenView — doelsituatie-groep', () => {
         ]}
       />,
     )
-    expect(screen.queryByText('Jouw doelsituatie')).toBeNull()
+    expect(screen.queryByText('Scenariodoelen')).toBeNull()
   })
 
-  it('toont de doelsituatie-groep zodra er een parameter-doel is', () => {
+  it('toont de scenariodoelen-groep zodra er een parameter-doel is', () => {
     render(
       <DoelenView
         goals={[
@@ -446,7 +446,45 @@ describe('DoelenView — doelsituatie-groep', () => {
         ]}
       />,
     )
-    expect(screen.getByText('Jouw doelsituatie')).toBeTruthy()
+    expect(screen.getByText('Scenariodoelen')).toBeTruthy()
+  })
+
+  it('een behaald scenariodoel kleurt groen met een champagnefles', () => {
+    render(
+      <DoelenView
+        goals={[
+          paramGoal({ id: 'pf', name: 'Vrij op 49 jaar', goal_type: 'fire_age', target_value: 49, current_value: 47.7 }),
+          paramGoal({ id: 'ps', name: 'Spaarquote naar 45%', goal_type: 'savings_rate' }),
+        ]}
+        goalProgresses={[
+          { current: 47.7, target: 49, pct: 100, onTrack: true, measured: true, requiredMonthly: null, eta: null, paceSkipped: false },
+          { current: 30, target: 45, pct: 67, onTrack: false, measured: true, requiredMonthly: null, eta: null, paceSkipped: true },
+        ]}
+      />,
+    )
+    const behaald = screen.getByRole('link', { name: 'Bekijk Vrij op 49 jaar in het lab — behaald' })
+    expect(behaald).toHaveAttribute('data-behaald', 'true')
+    expect(behaald.className).toContain('bg-positive/10')
+    expect(behaald.querySelector('[data-testid="scenariodoel-champagne"]')).toBeTruthy()
+    expect(behaald).toHaveTextContent('Behaald')
+    // Het niet-behaalde doel blijft neutraal, zonder fles.
+    const lopend = screen.getByRole('link', { name: 'Bekijk Spaarquote naar 45% in het lab' })
+    expect(lopend).not.toHaveAttribute('data-behaald')
+    expect(screen.getAllByTestId('scenariodoel-champagne')).toHaveLength(1)
+  })
+
+  it('een n.v.t.-scenariodoel viert niets, ook als de getallen "bereikt" zouden lezen', () => {
+    render(
+      <DoelenView
+        goals={[
+          paramGoal({ id: 'pf', name: 'Vrij op 58', goal_type: 'fire_age', target_value: 58, current_value: 50, notApplicableReason: 'n.v.t.' } as Partial<GoalWithBudget>),
+        ]}
+        goalProgresses={[
+          { current: 50, target: 58, pct: 100, onTrack: true, measured: false, requiredMonthly: null, eta: null, paceSkipped: true, notApplicableReason: 'n.v.t.' },
+        ]}
+      />,
+    )
+    expect(screen.queryByTestId('scenariodoel-champagne')).toBeNull()
   })
 
   it('FIRE-kaart toont richting-bewuste regel + marge-subregel', () => {
@@ -548,20 +586,22 @@ describe('DoelenView — doelsituatie-groep', () => {
         ]}
       />,
     )
-    // Eén handmatig doel → "1 actief doel"; parameter-doel zit in eigen groep.
-    expect(screen.getByText('1 actief doel')).toBeTruthy()
-    expect(screen.getByText('Jouw doelsituatie')).toBeTruthy()
+    // Scenariodoelen staan in hun eigen groep, bovenaan; het handmatige doel onder "Vrije doelen".
+    const koppen = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)
+    expect(koppen).toEqual(['Scenariodoelen', 'Vrije doelen'])
+    const vrijGrid = screen.getByText('Noodfonds').closest('div.grid') as HTMLElement
+    expect(vrijGrid.textContent).not.toContain('Spaarquote-doel')
   })
 })
 
 // ── Weergavemodus: Eenvoudig vs. Volledig (audit TOE-2) ───────────────────
 
 /**
- * TOE-2: in Eenvoudig verdwijnt de tweedeling "Jouw doelsituatie" vs.
- * handmatige doelen en staat alles onder één kop "Je doelen". In Volledig
- * blijft de tweedeling exact zoals hij was.
+ * 15 sep 2026 (eigenaarswens, vervangt TOE-2): in béíde modi staan
+ * "Scenariodoelen" bovenaan en "Vrije doelen" eronder. Alleen de groepsactie
+ * "Doelsituatie loslaten" (overflow-menu) blijft voorbehouden aan Volledig.
  */
-describe('DoelenView — weergavemodus (TOE-2)', () => {
+describe('DoelenView — weergavemodus (scenario/vrij)', () => {
   const gemengd = {
     goals: [
       paramGoal({ id: 'pf', name: 'Vrijheidsleeftijd', goal_type: 'fire_age' }),
@@ -573,33 +613,17 @@ describe('DoelenView — weergavemodus (TOE-2)', () => {
     ],
   }
 
-  it('Eenvoudig: één lijst onder de kop "Je doelen", geen herkomst-scheiding', () => {
-    render(<DoelenView {...gemengd} />, 'simple')
-
-    expect(screen.getByText('Je doelen')).toBeTruthy()
-    expect(screen.queryByText('Jouw doelsituatie')).toBeNull()
-    expect(screen.queryByText('1 actief doel')).toBeNull()
-    // Precies één lijst-kop (h2) → er staat geen tweede groep meer.
-    expect(screen.getAllByRole('heading', { level: 2 }).length).toBe(1)
-    // Beide doelen staan er nog — samenvoegen is presentatie, geen filter.
-    expect(screen.getByText('Vrijheidsleeftijd')).toBeTruthy()
-    expect(screen.getByText('Noodfonds')).toBeTruthy()
-  })
-
-  it('Eenvoudig: beide doelen in één grid, doelsituatie-doel eerst', () => {
-    render(<DoelenView {...gemengd} />, 'simple')
-    const namen = screen
-      .getAllByRole('heading', { level: 3 })
-      .map((h) => h.textContent ?? '')
-    // Gedocumenteerde sorteerkeuze: doelsituatie eerst, dan handmatig.
+  it.each(['simple', 'full'] as const)('%s: Scenariodoelen bovenaan, Vrije doelen eronder', (mode) => {
+    render(<DoelenView {...gemengd} />, mode)
+    const koppen = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)
+    expect(koppen).toEqual(['Scenariodoelen', 'Vrije doelen'])
+    expect(screen.queryByText('Je doelen')).toBeNull()
+    const namen = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent ?? '')
     expect(namen[0]).toContain('Vrijheidsleeftijd')
     expect(namen[1]).toContain('Noodfonds')
-    // ... en ze staan in dezelfde grid-container (in Volledig zijn dat er twee).
-    const eersteGrid = screen
-      .getByText('Vrijheidsleeftijd')
-      .closest('div.grid') as HTMLElement | null
-    expect(eersteGrid).toBeTruthy()
-    expect(eersteGrid?.textContent).toContain('Noodfonds')
+    // Twee aparte grids — de groepen zijn niet samengevoegd.
+    const scenarioGrid = screen.getByText('Vrijheidsleeftijd').closest('div.grid') as HTMLElement
+    expect(scenarioGrid.textContent).not.toContain('Noodfonds')
   })
 
   it('Eenvoudig: beide kaart-typen houden hun gedrag (lab-link én bewerken)', () => {
@@ -616,13 +640,8 @@ describe('DoelenView — weergavemodus (TOE-2)', () => {
     expect(screen.queryByRole('button', { name: 'Doelsituatie-opties' })).toBeNull()
   })
 
-  it('Volledig: de tweedeling blijft ongewijzigd', () => {
+  it('Volledig: de groepsactie "Doelsituatie loslaten" staat in beeld', () => {
     render(<DoelenView {...gemengd} />, 'full')
-    expect(screen.getByText('Jouw doelsituatie')).toBeTruthy()
-    expect(screen.getByText('1 actief doel')).toBeTruthy()
-    expect(screen.queryByText('Je doelen')).toBeNull()
-    // Twee koppen = twee groepen.
-    expect(screen.getAllByRole('heading', { level: 2 }).length).toBe(2)
     expect(screen.getByRole('button', { name: 'Doelsituatie-opties' })).toBeTruthy()
   })
 })
@@ -655,7 +674,7 @@ describe('DoelenView — Bereikt-archief (3a)', () => {
 
     // Niet als actieve doel-kaart (die dragen een h3 met de naam).
     expect(screen.queryByRole('heading', { level: 3, name: /Noodfonds/ })).toBeNull()
-    expect(screen.getByText(/Je hebt nog geen eigen doelen/)).toBeTruthy()
+    expect(screen.getByText(/geen lopend doel/)).toBeTruthy()
 
     // Wel in het archief, met aantal in de summary en de behaald-datum.
     const archief = screen.getByTestId('bereikt-archief')
@@ -701,7 +720,7 @@ describe('DoelenView — Bereikt-archief (3a)', () => {
         completedGoals={[behaaldGoal()]}
       />,
     )
-    expect(screen.getByText('1 actief doel')).toBeTruthy()
+    expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(1)
     expect(screen.getByRole('heading', { level: 3, name: /Vakantiepot/ })).toBeTruthy()
     expect(screen.getByTestId('bereikt-archief').textContent).toContain('Noodfonds')
   })
@@ -1077,8 +1096,8 @@ describe('DoelenView — melding wanneer lab-doelen niet meer bij het plan passe
       <DoelenView goals={[fireAgeNvt(), spaarquoteDoel()]} goalProgresses={[fireAgeProgress, spaarquoteProgress]} />,
       'simple',
     )
-    // Eenvoudig: geen doelsituatie-groep, wél de melding.
-    expect(screen.queryByText('Jouw doelsituatie')).toBeNull()
+    // Eenvoudig: óók de scenariodoelen-groep, met de melding erin.
+    expect(screen.getByText('Scenariodoelen')).toBeTruthy()
     const meldingen = screen.getAllByTestId('doelen-plan-melding')
     expect(meldingen).toHaveLength(1)
     expect(meldingen[0]).toHaveAttribute('role', 'status')

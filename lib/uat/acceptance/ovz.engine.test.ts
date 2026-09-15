@@ -13,8 +13,10 @@
  * WF-OVZ-15 ("Samengestelde-rente-inzicht") is VERVALLEN (B-047, 12-09-2026):
  * de CompoundInsightCard op /overzicht is uit de app verwijderd, samen met
  * `lib/compound-projection.ts` (geen enkele consument meer). WF-OVZ-16 bestond
- * al niet in de catalogus (bestaande dekkingsleemte). De 22 criteria hier zijn
- * wél 1-op-1 met de 22 catalogus-scenario's (UAT-OVZ-01..14, 19..26).
+ * al niet in de catalogus (bestaande dekkingsleemte). De criteria hier zijn
+ * wél 1-op-1 met de catalogus-scenario's (UAT-OVZ-01..14, 19..27) — WF-OVZ-27
+ * (netto-vermogen-kaart in twee delen) is nieuw sinds de tweedeling van de
+ * vermogenskaart op /overzicht (sep 2026).
  */
 
 import { describe, it, expect } from 'vitest'
@@ -37,7 +39,7 @@ function criterion(workflow: string): AcceptanceCriterion {
 }
 
 describe('UAT Ovz — acceptatiecriteria dekking', () => {
-  it('heeft precies één criterium per catalogus-OVZ-scenario (22 stuks, WF-OVZ-15/16/17/18 bestaan niet in de catalogus)', () => {
+  it('heeft precies één criterium per catalogus-OVZ-scenario (WF-OVZ-15/16/17/18 bestaan niet in de catalogus)', () => {
     const workflows = OVZ_ACCEPTANCE.criteria.map((c) => c.workflow).sort()
     expect(workflows).toEqual(catalogOvzWorkflows)
     // Afgeleid van de catalogus — bewust géén hardgecodeerde telling: die

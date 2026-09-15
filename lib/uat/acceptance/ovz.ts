@@ -1,5 +1,11 @@
 /**
- * Acceptatiecriteria — domein Overzicht-hub (WF-OVZ-01..22 / UAT-OVZ-01..16,19..22).
+ * Acceptatiecriteria — domein Overzicht-hub (WF-OVZ-01..27 / UAT-OVZ-01..16,19..27).
+ *
+ * WF-OVZ-27 (netto-vermogen-kaart in twee delen — verleden-venster vs.
+ * /toekomst-link, naad op Schulden|Budget, kop per planmodus) is NIEUW,
+ * toegevoegd bij de tweedeling van de vermogenskaart op /overzicht (sep 2026):
+ * `NettoVermogenKopgetal` is vervallen, het label "Vrijheidsdoel ca. € …
+ * liquide" is uit de kaart verwijderd (staat alleen nog op /toekomst).
  *
  * Spiegelt exact de aanpak van `budget.ts`/`start.ts`/`will.ts`/`cash.ts`. Bron:
  * `docs/uat/uat-plan.md` Deel 1 (workflow-definities WF-OVZ-01..21) + Deel 2
@@ -105,7 +111,7 @@ const criteria: AcceptanceCriterion[] = [
     then: 'Geschatte waarde(15) = ankerwaarde − spaarritme×(15−14) = 1.483.000 − 2.500 = €1.480.500 — een DIRECTIONELE verwachting (dalende lijn, stappen van €2.500); de exacte serverimplementatie van het 24-maands-venster is niet 100% bevestigd identiek aan de mini-grafiek-backcast-formule (expliciete plan-notitie).',
     assertion: {
       kind: 'direction',
-      source: 'components/overview/mini-networth-chart.tsx r214-227 (backcast-formule, gemirrord) — richting + stapgrootte getoetst, geen exact bevestigd servergetal',
+      source: 'components/overview/mini-networth-chart.tsx r269-282 (backcast-formule, gemirrord — regelnummers verschoven bij de tweedeling van de kaart, formule ongewijzigd) — richting + stapgrootte getoetst, geen exact bevestigd servergetal',
     },
   },
   {
@@ -113,9 +119,9 @@ const criteria: AcceptanceCriterion[] = [
     scenarioId: 'UAT-OVZ-05',
     titel: 'Toekomstprojectie vanaf de hub verkennen',
     kriticiteit: 'KERN',
-    given: 'Persona Willem Jansen; `simNetWorthRows`/`simRequiredPortfolio` komen uit de horizon-kernel-solver.',
-    when: 'De projectielijn en het vrijheidsdoel-label op de hub worden vergeleken met de oracle.',
-    then: 'Kernel-cijfers zijn NIET handmatig narekenbaar (solver, geen gesloten formule) — verifieer 1-op-1 tegen `/beheer/horizon-tabellen-mij` voor persona Willem: eindmarker-label, exact vrijheidsdoel-bedrag (`simRequiredPortfolio`) en eindleeftijd. De hub-cijfers moeten exact overeenkomen met /toekomst (zelfde simulatiebron).',
+    given: 'Persona Willem Jansen; `simNetWorthRows` (incl. `netWorthExclHome` per rij) komt uit de horizon-kernel-solver. Sinds de tweedeling van de vermogenskaart toont de toekomst-kaart GEEN liquide vrijheidsdoel-bedrag (`simRequiredPortfolio`) meer — dat label ("Vrijheidsdoel ca. € … liquide") is vervallen; het liquide doel staat alleen nog op /toekomst.',
+    when: 'De projectielijn, het eindmarker-label en het bedrag op de knip-leeftijd op de hub worden vergeleken met de oracle en met /toekomst.',
+    then: 'Kernel-cijfers zijn NIET handmatig narekenbaar (solver, geen gesloten formule) — verifieer 1-op-1 tegen `/beheer/horizon-tabellen-mij` voor persona Willem: het eindmarker-label (bv. "Stop 45"/"Tot 90"), de eindleeftijd, en — vóór "bereikt" en mét projectie — het VOLLEDIGE netto vermogen op de knip-leeftijd (incl. eigen woning; plus een losse excl.-regel bij dubbele grondslag, uit `netWorthExclHome` op dezelfde kernelrij). Dat is een ANDERE grootheid dan het liquide vrijheidsdoel — verwar ze niet: de hub toont sinds de tweedeling uitsluitend het geprojecteerde netto vermogen, nooit meer het losse doelbedrag. De hub-cijfers moeten exact overeenkomen met /toekomst (zelfde simulatiebron).',
     assertion: {
       kind: 'oracle',
       source: '`/beheer/horizon-tabellen-mij` (persona Willem) — horizon-kernel-solver, geen pure vitest-toets mogelijk',
@@ -351,6 +357,36 @@ given: 'Een vers geonboarde gebruiker met `module_guide_state[\'rondleiding:pend
     assertion: {
       kind: 'ui-only',
       source: 'lib/rondleiding/seed.ts#withRondleidingPending (gedeelde seed, getest in seed.test.ts) aangeroepen vanuit app/api/onboarding/save-own-data/route.ts + app/api/check/activate/route.ts (de twee schrijvers van onboarding_completed=true) + lib/rondleiding/steps.ts (stapaantal per platform, woordbudget en Wft-lint getest in steps.test.ts; selectors gepind in targets.source.test.ts) + components/overview/rondleiding/{rondleiding-provider,rondleiding-overlay}.tsx (autostart-voorwaarde, query-param-strip, uitkomst-PUT en z-[70]/aria getest in de bijbehorende .test.tsx) — de visuele spotlight-uitlijning en de tikbaarheid van het gat zijn een handmatige check in de UAT-run. De aandachtsregel zelf staat in lib/attention-signal.ts (register, getest in attention-signal.test.ts) + lib/hooks/use-attention-quiet.ts (de gedeelde unie), met de consumenten gepind in euro-view-badge.test.tsx, fin-home.test.tsx en use-coach-suggestion.test.ts',
+    },
+  },
+  {
+    workflow: 'WF-OVZ-27',
+    scenarioId: 'UAT-OVZ-27',
+    titel: 'Netto-vermogen-kaart in twee delen: verleden-venster vs. /toekomst-link, naad op Schulden|Budget, kop per planmodus',
+    kriticiteit: 'BELANGRIJK',
+    persona: 'willem',
+    given: 'Persona Willem Jansen (stopt onder een VAST stopanker op 45, nog niet "bereikt", `stopAnchorFixed=true`, `isPensioenMode=false`). Op lg (desktop) staat de verleden-kaart in de kolom onder de Schulden-hefboomtegel en de toekomst-kaart onder Budget+Belasting — dezelfde vier-koloms-breedte als de hefbomen-rij, dus de kaartranden lopen pixel-gelijk met Bezittingen | Schulden | Budget | Belasting. Onder lg (mobiel) is het één kaart; de naad ligt op 1/3 van de breedte.',
+    when: 'De gebruiker bekijkt /overzicht en klikt achtereenvolgens op de verleden-kaart (of de linker 1/3 op mobiel) en op de toekomst-kaart (rechter 2/3); apart worden de kop-tekst en het bedrag voor vier planmodi (vrij/pensioen/vast-stopanker/bereikt) vergeleken.',
+    then: 'DE KAART IS TWEE KLIKDOELEN, GEEN ÉÉN (`data-testid="nw-kaart-verleden"`/`"nw-kaart-toekomst"`, met mobiele duplicaten `nw-zone-verleden`/`nw-zone-toekomst`): de verleden-kaart is een `<button>` die het samengevoegde venster `NettoVermogenVenster` opent (kassabon-opbouw bovenaan, verloop eronder) — `NettoVermogenKopgetal` bestaat niet meer als los klikbaar kopgetal, de hele kaart is nu het klikdoel; de toekomst-kaart is een `<Link href="/toekomst">`. DE NAAD ligt exact op de grens Schulden|Budget (lg, via dezelfde `gap-x-3` als de hefbomen-/hero-rij) resp. op 1/3 (mobiel, `--nw-seam-gap:0px`) — CSS-gestuurd (`NW_SEAM_LEFT = calc(var(--nw-seam-gap) / -2)`), niet een vaste viewBox-fractie, zodat de Vandaag-stip (`nw-vandaag-punt`) en de naadbrug (`nw-naad-brug`) op elke breedte exact op de grens vallen. DE KOP VOLGT HET PLAN via een deterministische toestandsmachine op `fireReached`/`stopAnchorFixed`/`isPensioenMode`/Eenvoudig-modus (zie assertion): "Vrij op X", "Pensioen op X", "Stoppen op X" (X = `formatStopAge(stopAge)` onder een vast anker), of een bereikt-variant zonder de "— verloop tot Y"-staart in Eenvoudig. Vóór "bereikt" en mét projectie toont de kaart ook het bedrag op de knip-leeftijd (`nw-toekomst-incl`/`nw-toekomst-excl`, "incl. woning" + een losse excl.-regel bij dubbele grondslag uit `netWorthExclHome`); onder een vast stopanker staat daaronder "dekt Y% van je plan" (`nw-toekomst-dekking`, canoniek `planCoveragePct` uit de bundel — geen eigen deling). HET LABEL "Vrijheidsdoel ca. € … liquide" IS VERVALLEN uit deze kaart — evenals "Vermogen bij vrijheid → …", dat niet meer bestaat; het liquide doelbedrag staat sinds de tweedeling alleen nog op /toekomst.',
+    assertion: {
+      kind: 'exact',
+      expected: 'stop=Stoppen op 45; bereiktVast=Plan gedekt — verloop tot 90; vrij=Vrij op 65; pensioen=Pensioen op 67; bereiktSimple=Vrijheid bereikt',
+      source: 'components/overview/mini-networth-chart.tsx r495-514 (toekomstKop-toestandsmachine, gemirrord — regelnummers verschoven bij de dubbele-grondslag-toevoeging, formule ongewijzigd) — zie ovz-checks.ts',
+    },
+  },
+  {
+    workflow: 'WF-OVZ-28',
+    scenarioId: 'UAT-OVZ-28',
+    titel: 'Plan-stoplicht: statuspunt en oordeel op de plankaart, banner in dezelfde kleur',
+    kriticiteit: 'BELANGRIJK',
+    persona: 'willem',
+    given: 'Vier plansituaties: (1) vast stopmoment op 48 waarbij het liquide vermogen tot 50 reikt en het plan tot 90 loopt (dekking 5%); (2) vast stopmoment met dekking 95%; (3) vast stopmoment dat gedekt is (dekking ≥ 100%); (4) "zo vroeg mogelijk" (solved), één keer haalbaar en één keer niet haalbaar binnen de horizon (`sim.fireReachable === false` van de hoofdrun — NIET het solverStatus van de runway, dat onder solved de stop-vandaag-run beschrijft).',
+    when: 'De gebruiker opent /overzicht en kijkt naar de kaart "Je plan", de statusmelding bovenaan en het statuspunt naast de pagina-`i`.',
+    then: 'Eén regel (`resolvePlanStatus`, eigenaarsbesluit 15 sep 2026) kleurt alle drie. Vast stopmoment: dekking ≥ 100% groen, 90–99% oranje, < 90% rood — dezelfde drempels als de dekkingsstrook op /toekomst (`coverageStatus`), op het afgeronde getal dat de kaart toont. (1) geeft een ROOD punt naast "Je plan", de regel "dekt 5% van je plan" in rode tekst, en een rode banner (streep en punt naast de `i`); (2) oranje punt, oranje regel, oranje banner; (3) groen punt, de banner blijft informatief (neutral). Solved: haalbaar = groen punt zonder oordeelregel (het statuswoord "Goed op koers" bereikt de schermlezer via de kaartnaam); niet haalbaar = rood punt plus de rode regel "niet haalbaar binnen je horizon". Zonder bruikbare dekking of solverstatus: geen punt, dekkingsregel in inkt (ongewijzigd). Een tekort is in de banner nooit groen. Een eerder op oranje geminimaliseerde banner klapt open als het rood wordt (bestaande escalatie). HET MENU volgt dezelfde bron (`loadPlanStatus`), altijd in het PERSOONLIJKE perspectief (zoals de hefboompunten en zoals /toekomst zelf; de kaart op /overzicht volgt het gekozen perspectief en kan in Huishouden dus afwijken): naast "De toekomst" in de desktop-zijbalk én de mobiele nav-sheet staat een punt in dezelfde kleur als de plankaart. Dat punt stroomt na (Suspense in de app-layout): de shell en de pagina verschijnen eerst, het punt komt erbij — zonder oordeel of tijdens het nastreamen staat er géén (grijs) punt. Controleer ook op een pagina buiten /overzicht en /toekomst (bv. /mijn) dat het punt er na laden staat.',
+    assertion: {
+      kind: 'exact',
+      expected: 'fixed5=bad; fixed95=warn; fixed100=good; fixedGeenDekking=neutral; solvedHaalbaar=good; solvedOnhaalbaar=bad; banner5=bad; banner95=warn; bannerGedekt=neutral',
+      source: 'lib/horizon/plan-status.ts#resolvePlanStatus + lib/page-status/freedom.ts#resolveFreedomBanner (echte functies, niet gemirrord) — UI-toets in components/overview/mini-networth-chart.test.tsx ("plan-stoplicht") en components/app/shell/plan-status-menu.test.tsx (menu); server-bron lib/horizon/plan-status-loader.ts',
     },
   },
 ]

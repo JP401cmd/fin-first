@@ -47,9 +47,11 @@ import type { Debt } from '@/lib/debt-data'
 import { ageAtDate } from '@/lib/horizon-data'
 import {
   deriveHousingContext,
+  netWorthExcludingHome,
   projectEigenHuisValuesAt,
   projectMortgageStateAt,
   shouldFilterEigenHuisForFire,
+  shouldShowDualHousingBasis,
   type HousingStrategyConfig,
 } from '@/lib/housing-strategy'
 
@@ -73,6 +75,52 @@ export interface SimNetWorthRow {
    * gebruiker "huidige euro's" kiest — ná de her-ankering, nooit ervoor.
    */
   inflationFactor: number
+  /**
+   * Geprojecteerd netto vermogen EXCL. eigen woning ÓP leeftijd `age` — de
+   * dubbele-grondslag-tegenhanger van `netWorth` (lib/housing-strategy.ts
+   * `netWorthExcludingHome`: netto vermogen − overwaarde, ZUIVER, ook bij
+   * reverse_mortgage). NOMINAAL, zelfde tijdstip en zelfde deflator
+   * (`inflationFactor`) als `netWorth` van deze rij — de consument deflateert
+   * beide exact één keer, nooit hier (ADR 0090/0093).
+   *
+   * ALLEEN AANWEZIG wanneer `shouldShowDualHousingBasis` waar is (eigen woning
+   * én strategie ≠ include_full) ÉN de kernelrijen de J-grondslag droegen
+   * (`startNettoLiquideByAge`). Anders ontbreekt de sleutel volledig, zodat
+   * bestaande bundels byte-identiek blijven.
+   *
+   * BRON = de kernel, geen eigen overwaarde-projectie. `UnifiedProjectionRow
+   * .startNettoLiquide` (Prognose!J ÓP `age` = I − (L − M)) is in de app exact
+   * "netto vermogen zonder het eigen-woningblok": de adapter vlagt UITSLUITEND
+   * bezitcategorie 'Eigen huis' en schuldcategorie 'Woning' als niet-liquide
+   * (`adapter/prio-overgang.ts`, en alleen bij woonstrategie ≠ Meerekenen).
+   * Daardoor volgt dit veld per constructie wat de kernel met de woning doet:
+   *   • exclude_from_fire → huis + hypotheek blijven in het grootboek; J trekt
+   *     de meegroeiende overwaarde (huiswaarde − hypotheeksaldo) er per maand af.
+   *   • downsize → op de kernel-verkoopmaand (Bez!AY 0→1) gaat de huis-slot op 0,
+   *     de hypotheek-slot op 0 en de netto-opbrengst als inleg naar de liquide
+   *     pot; L en M zijn daarna 0 → J ≡ I → excl. == incl. Géén dubbele aftrek,
+   *     en het verkoopmoment komt uit dezelfde bron als de kernel zelf.
+   *   • reverse_mortgage → huis blijft, hypotheek loopt af, de opeethypotheek
+   *     (slot 3, categorie 'Woning', niet-liquide) loopt op terwijl de opnames
+   *     naar de liquide pot gaan; J strijkt huis én álle woningschulden (hypotheek
+   *     + opeetschuld) weg — de liquide pot mét ontvangen opnames. Op rij 0 is de
+   *     opeetschuld 0, dus dat sluit exact aan op de zuivere `netWorth − overwaarde`.
+   *   • include_full → niets is niet-liquide (J ≡ I); veld wordt weggelaten.
+   * NIET verwarren met een generieke "liquide"-grootheid: zodra de adapter ooit
+   * een ándere categorie niet-liquide zou vlaggen, is J niet langer excl.-woning
+   * (grendel in networth-rows.test.ts).
+   *
+   * CONTINUÏTEIT (hard): rij 0 is EXACT `netWorthExcludingHome(currentNetWorth,
+   * housingContext)` — hetzelfde getal als de linker kaart op /overzicht. De reeks
+   * wordt daarop verankerd als `anker + (J(age) − J(rij 0))`: dezelfde vlakke
+   * euro-verschuiving als bij `netWorth`, maar met een EIGEN offset. Die twee
+   * offsets vallen alleen samen als de kernel-overwaarde op t0 gelijk is aan de
+   * context-overwaarde (huiswaarde − gekoppelde hypotheken); ze wijken af bij een
+   * WOZ-verkoopbasis (TPR-03), een ongelinkte hypotheek (conservatief 'Woning')
+   * of afwijkende inclusion-weging — precies de grondslagverschillen die de
+   * her-ankering hoort weg te nemen, per grondslag apart.
+   */
+  netWorthExclHome?: number
 }
 
 export interface BuildSimNetWorthRowsParams {
@@ -123,6 +171,16 @@ export interface BuildSimNetWorthRowsParams {
   debts: Debt[]
   /** Geboortedatum — voor leeftijd → maanden-vooruit projectie van de huiswaarde. */
   dateOfBirth: string | null
+  /**
+   * Kernel-J-grondslag per LEEFTIJD: `UnifiedProjectionRow.startNettoLiquide`
+   * (Prognose!J ÓP `age`, nominaal — de J-spiegel van `startPortfolio`), gejoind
+   * op leeftijd zoals `inflationFactor` (`buildFactorByAge`). Voedt uitsluitend
+   * `netWorthExclHome`; zit in GEEN som voor `netWorth`.
+   *
+   * Weggelaten, of mist er een leeftijd uit `simRows` → `netWorthExclHome` wordt
+   * voor de HELE reeks weggelaten (nooit een half gevulde reeks).
+   */
+  startNettoLiquideByAge?: ReadonlyMap<number, number>
 }
 
 /**
@@ -181,9 +239,34 @@ export function buildSimNetWorthRows(p: BuildSimNetWorthRowsParams): SimNetWorth
   // `netWorth / inflationFactor` in jaar 0 exact `currentNetWorth`.
   const offset = p.currentNetWorth - raw[0].value
 
-  return raw.map((r) => ({
+  const inclRows: SimNetWorthRow[] = raw.map((r) => ({
     age: r.age,
     netWorth: r.value + offset,
     inflationFactor: r.inflationFactor,
+  }))
+
+  // ── Excl.-woning-reeks (dubbele grondslag) ──────────────────────────────────
+  // Alleen wanneer de splitsing getoond wordt (eigen woning + strategie ≠
+  // include_full) én élke rij een kernel-J heeft. Zie de doc op
+  // `SimNetWorthRow.netWorthExclHome` voor waarom J hier de excl.-woning-grootheid
+  // is en hoe verkoop/opeethypotheek daarin al verwerkt zitten.
+  const exclByAge = p.startNettoLiquideByAge
+  if (!exclByAge || !shouldShowDualHousingBasis(housingContext, p.housingStrategy)) return inclRows
+
+  const rawExcl: number[] = []
+  for (const r of rows) {
+    const j = exclByAge.get(r.age)
+    if (j === undefined || !Number.isFinite(j)) return inclRows
+    rawExcl.push(j)
+  }
+
+  // Anker = het getal van de linker kaart (één home: lib/housing-strategy.ts).
+  // Formulering `anker + (J_i − J_0)` i.p.v. `J_i + offset`, zodat rij 0 float-exact
+  // het anker is (x + 0 === x) — een eigen vlakke verschuiving in nominale
+  // ruimte, deflatie pas in de render (ADR 0090 D7), net als bij `netWorth`.
+  const ankerExcl = netWorthExcludingHome(p.currentNetWorth, housingContext)
+  return inclRows.map((row, i) => ({
+    ...row,
+    netWorthExclHome: ankerExcl + (rawExcl[i] - rawExcl[0]),
   }))
 }

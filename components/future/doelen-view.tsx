@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Target, Pencil, ArrowUpRight, MoreHorizontal, ChevronDown } from 'lucide-react'
+import { Target, Pencil, ArrowUpRight, MoreHorizontal, ChevronDown, BottleWine } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import {
   formatGoalValue,
@@ -39,17 +39,17 @@ import { MilestoneCelebration, hasCelebrated } from '@/components/app/milestone-
  *
  * Ronde 4 (§G) — "verkennen wordt richten": lab-gegenereerde parameter-doelen
  * (metadata.bron === 'parameter': spaarquote/rendement/vrijheidsleeftijd/"Plan gedekt")
- * staan als eigen groep "Jouw doelsituatie" bovenaan. Ze zijn read-only in deze
+ * staan als eigen groep "Scenariodoelen" bovenaan. Ze zijn read-only in deze
  * lijst — klik opent het /toekomst-lab i.p.v. GoalForm — en de hele groep is in
- * één keer los te laten via de server-route. Handmatige doelen behouden hun
- * bestaande edit-gedrag (regressie-eis).
+ * één keer los te laten via de server-route (overflow-menu alleen in Volledig).
+ * Handmatige doelen staan eronder als "Vrije doelen" en behouden hun bestaande
+ * edit-gedrag (regressie-eis). Een behaald scenariodoel kleurt groen met een
+ * champagnefles in de kaart.
  *
- * Weergavemodus "Eenvoudig" (audit TOE-2): die tweedeling verdwijnt en alles
- * staat onder één kop "Je doelen" — de technische herkomst (afgeleid uit je
- * doelsituatie vs. handmatig ingevoerd) zegt de gebruiker niets. Dat is puur
- * een PRESENTATIE-keuze: dezelfde doel-objecten uit dezelfde bron, dezelfde
- * voortgang, alleen anders gegroepeerd. In "Volledig" blijft de tweedeling
- * ongewijzigd.
+ * Weergavemodus (15 sep 2026, eigenaarswens): de tweedeling scenario/vrij geldt
+ * in béíde modi — de eerdere samengevoegde "Je doelen"-lijst in Eenvoudig
+ * (audit TOE-2) is daarmee vervallen. Puur presentatie: dezelfde objecten,
+ * dezelfde voortgang.
  *
  * Status-codering is identiek aan vier-hefbomen-kompas (groen/oranje/rood)
  * zodat het visuele verhaal in de app consistent blijft.
@@ -237,14 +237,34 @@ function ParameterGoalCard({ goal, progress, labPlan }: GoalDisplay & { labPlan:
   // Ook de dekking-kaart krijgt geen tempo-pill: "Op koers" zou een oordeel claimen
   // over een uitkomst die geen tempo heeft. De balk draagt gedekt/tekort in stoplicht.
   // Idem voor het eindvermogen (D12): een uitkomst op je eindleeftijd, geen tempo.
-  const status = !isFire && !volgtPlan && measured ? statusFor(progress) : null
+  // Behaald: de canonieke richting-bewuste toets (`goalReachedFromProgress`), alleen
+  // op een echte meting — een n.v.t.-doel of een bron zonder stand viert niets.
+  const behaald = measured && goalReachedFromProgress(goal.goal_type, progress)
+  const status = behaald
+    ? { label: 'Behaald', color: 'text-positive', bg: 'bg-positive/10' }
+    : !isFire && !volgtPlan && measured
+      ? statusFor(progress)
+      : null
   const pct = Math.min(100, Math.max(0, Math.round(progress.pct)))
   return (
     <Link
       href="/toekomst#verken-je-aannames"
-      aria-label={`Bekijk ${cardName} in het lab`}
-      className="block rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-5 hover:border-[var(--ink-3)] hover:shadow-sm transition-all"
+      aria-label={`Bekijk ${cardName} in het lab${behaald ? ' — behaald' : ''}`}
+      data-behaald={behaald || undefined}
+      className={`relative block rounded-2xl border p-4 sm:p-5 hover:shadow-sm transition-all ${
+        behaald
+          ? 'border-positive/40 bg-positive/10 hover:border-positive'
+          : 'border-[var(--border-ed)] bg-[var(--paper)] hover:border-[var(--ink-3)]'
+      }`}
     >
+      {behaald && (
+        <BottleWine
+          data-testid="scenariodoel-champagne"
+          className="pointer-events-none absolute bottom-3 right-3 h-9 w-9 -rotate-12 text-positive"
+          strokeWidth={1.5}
+          aria-hidden="true"
+        />
+      )}
       <header className="flex items-start justify-between gap-2 mb-2">
         <h3 className="text-sm font-semibold text-[var(--ink)] leading-tight flex-1 min-w-0 truncate inline-flex items-center gap-1.5">
           {cardName}
@@ -792,19 +812,6 @@ export function DoelenView({
       return Number(bOff) - Number(aOff)
     })
 
-  /**
-   * Eenvoudig (TOE-2) — één lijst "Je doelen".
-   *
-   * SORTEERKEUZE (bewust, niet toevallig): doelsituatie-doelen eerst, daarna de
-   * handmatige doelen in hun bestaande volgorde (off-track bovenaan). Reden: je
-   * doelsituatie is het anker waar alle andere doelen onder hangen — die hoort
-   * bovenaan te blijven, ook als hij "op koers" staat. Binnen de handmatige
-   * doelen blijft aandacht-eerst gelden, precies zoals in Volledig. Er wordt
-   * hier NIETS herberekend of hersorteerd op waarde: dezelfde objecten,
-   * dezelfde voortgang, alleen zonder de herkomst-scheiding.
-   */
-  const mergedDisplay = [...parameterDisplay, ...manualDisplay]
-
   // Volledig leeg = géén actieve doelen ÉN niets bereikt. Wie alles al haalde
   // krijgt niet de starters-lege-staat maar de gewone lay-out mét het
   // Bereikt-archief (de lege-actieve-lijst-tekst verwijst er dan naar).
@@ -831,25 +838,22 @@ export function DoelenView({
   }
 
   const manualCount = manualDisplay.length
-  const manualHeading =
-    manualCount === 0
-      ? 'Eigen doelen'
-      : `${manualCount} ${manualCount === 1 ? 'actief doel' : 'actieve doelen'}`
 
   return (
     <section className="mx-auto max-w-6xl px-4 sm:px-6 pb-8">
-      {/* ── Groep: Jouw doelsituatie (lab-parameter-doelen) — alleen Volledig ── */}
-      {!simple && parameterDisplay.length > 0 && (
+      {/* ── Groep: Scenariodoelen (lab-parameter-doelen) — bovenaan, beide modi ── */}
+      {parameterDisplay.length > 0 && (
         <div className="mb-8">
           <header className="mb-2 flex items-end justify-between gap-3 flex-wrap">
             <div>
               <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
-                Toekomst — doelsituatie
+                Toekomst — uit je scenario
               </div>
               <h2 className="font-serif text-xl text-[var(--ink)] mt-1">
-                Jouw doelsituatie
+                Scenariodoelen
               </h2>
             </div>
+            {!simple && (
             <div className="relative">
               <button
                 type="button"
@@ -890,12 +894,15 @@ export function DoelenView({
                 </>
               )}
             </div>
+            )}
           </header>
+          {/* Spec §4.2 (ruling 15 sep): de melding geldt in beide modi en staat boven
+              de scenariodoelen waar hij over gaat. */}
           {labDoelenBuitenPlan.length > 0 && (
             <LabPlanMelding count={labDoelenBuitenPlan.length} onLoslaten={() => setConfirmOpen(true)} />
           )}
           <p className="mb-4 text-[11px] italic text-[var(--ink-3)]">
-            Je vastgelegde aannames uit het lab. Klik een kaart om ze live te
+            Doelen uit je scenario in het lab. Klik een kaart om ze live te
             verkennen op de tijdas.
           </p>
 
@@ -907,14 +914,14 @@ export function DoelenView({
         </div>
       )}
 
-      {/* ── Doelen — Eenvoudig: één lijst; Volledig: alleen de handmatige ── */}
+      {/* ── Groep: Vrije doelen (zelf gesteld) — onder de scenariodoelen ── */}
       <header className="mb-4 flex items-end justify-between gap-3 flex-wrap">
         <div>
           <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
-            Toekomst — doelen
+            Toekomst — zelf gesteld
           </div>
           <h2 className="font-serif text-xl text-[var(--ink)] mt-1">
-            {simple ? 'Je doelen' : manualHeading}
+            Vrije doelen
           </h2>
         </div>
         <DoelToevoegenSheet
@@ -924,40 +931,14 @@ export function DoelenView({
         />
       </header>
 
-      {simple && mergedDisplay.length === 0 ? (
+      {manualCount === 0 && parameterDisplay.length === 0 ? (
         <p className="text-sm text-[var(--ink-2)] leading-relaxed">
           Je hebt op dit moment geen lopend doel. Wat je al haalde staat onderaan
           bij Bereikt — kies hierboven je volgende.
         </p>
-      ) : simple ? (
-        <>
-          {/* Spec §4.2 (ruling 15 sep): de melding geldt in beide modi. In Eenvoudig
-              is er geen doelsituatie-groep, dus staat hij boven de samengevoegde lijst.
-              Niet-lege n.v.t.-lijst ⇒ `mergedDisplay` is nooit leeg, dus deze tak volstaat. */}
-          {labDoelenBuitenPlan.length > 0 && (
-            <LabPlanMelding count={labDoelenBuitenPlan.length} onLoslaten={() => setConfirmOpen(true)} />
-          )}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-            {mergedDisplay.map((d) =>
-              isParameterGoal(d.goal) ? (
-                <ParameterGoalCard key={d.goal.id} goal={d.goal} progress={d.progress} labPlan={labPlan} />
-              ) : (
-                <ManualGoalCard
-                  key={d.goal.id}
-                  goal={d.goal}
-                  progress={d.progress}
-                  onEdit={() => setEditingGoal(d.goal)}
-                  live={vrijheidsgetalLive && isVrijheidsgetalGoal(d.goal)}
-                  homeExcluded={vrijheidsgetalHomeExcluded}
-                  linked={linkedIds.has(d.goal.id)}
-                />
-              ),
-            )}
-          </div>
-        </>
       ) : manualCount === 0 ? (
         <p className="text-sm text-[var(--ink-2)] leading-relaxed">
-          Je hebt nog geen eigen doelen naast je doelsituatie. Formuleer een
+          Je hebt nog geen vrije doelen naast je scenariodoelen. Formuleer een
           spaardoel, aflossingsdoel of vermogensgroeidoel om je voortgang hier
           te volgen.
         </p>

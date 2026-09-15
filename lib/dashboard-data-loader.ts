@@ -70,7 +70,7 @@ import { isFixedAnchor, parseFireStrategy, resolveFirePlanWithOverride, resolveF
 import { WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
 import { computeScalarFireProjection, computeScalarFireRange, computeScalarFreedomMilestones, type ScalarFireParams } from '@/lib/horizon-kernel/scalar-router'
 import { computeHorizonFireSim } from '@/lib/fire-target-shared'
-import { buildSimNetWorthRows } from '@/lib/horizon/networth-rows'
+import { buildSimNetWorthRows, type SimNetWorthRow } from '@/lib/horizon/networth-rows'
 import { buildFactorByAge } from '@/lib/euro-display'
 import { clipRowsToPlanEnd } from '@/lib/horizon/clip-rows-to-plan-end'
 import type { RegelSimSnapshot } from '@/lib/future/regel-sim'
@@ -1364,7 +1364,9 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // niet-liquide assets die uit de FIRE-pot gefilterd zijn). Náást endPortfolio,
   // zodat de /overzicht-grafiek de Vandaag→projectie-lijn continu houdt met het
   // Vandaag-punt (= volledig netto vermogen incl. huis). Zie buildSimNetWorthRows.
-  let simNetWorthRows: { age: number; netWorth: number; inflationFactor: number }[] | null = null
+  // Draagt óók `netWorthExclHome` (excl. eigen woning, kernel-J-grondslag) zodra de
+  // dubbele grondslag getoond wordt — zie SimNetWorthRow.
+  let simNetWorthRows: SimNetWorthRow[] | null = null
   let simRequiredPortfolio: number | null = null
   // FIRE-doel INCL. eigen woning (Prognose!I@FIRE) — spiegelt simRequiredPortfolio (liquide,
   // Prognose!J@FIRE). Puur uit de sim (requiredFireNetWorth via de kernel-bridge), geen eigen som.
@@ -1434,6 +1436,16 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
         // (ADR 0015/0032) → `houseInLedger: true`: nooit overwaarde dubbeltellen. Verankerd
         // op netWorth (zelfde "vandaag"-grondslag als het Vandaag-punt). Eén bron: de
         // canonieke huiswaarde-/hypotheek-projectie (geen tweede engine-run).
+        //
+        // Excl.-woning-reeks (`netWorthExclHome`, dubbele grondslag): de kernel-J
+        // (`startNettoLiquide`, Prognose!J ÓP de leeftijd) uit DEZELFDE run, gejoind
+        // op leeftijd zoals de factor hierboven. Géén eigen overwaarde-projectie: de
+        // kernel heeft verkoop (downsize) en opeethypotheek al in J verwerkt. De helper
+        // laat het veld weg zonder dubbele grondslag (showDualHousingBasis) of zonder J.
+        const startNettoLiquideByAge = new Map<number, number>()
+        for (const r of shared.unifiedRows) {
+          if (r.startNettoLiquide !== undefined) startNettoLiquideByAge.set(r.age, r.startNettoLiquide)
+        }
         simNetWorthRows = buildSimNetWorthRows({
           simRows,
           currentNetWorth: netWorth,
@@ -1442,6 +1454,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
           assets: dashboardAssetsArr,
           debts: dashboardDebtsArr,
           dateOfBirth: dob,
+          startNettoLiquideByAge,
         })
         // De kernel verankert de pensioen-eindstrategie ZÉLF op AOW (solver-ES), en de bridge
         // levert per constructie firePortfolioAtFire === requiredFirePortfolio (bisectie stopt

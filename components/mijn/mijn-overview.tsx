@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import {
   User,
+  UserCog,
   Shield,
   Link2,
   Palette,
@@ -25,12 +26,13 @@ import { useDisplayMode } from '@/lib/hooks/use-display-mode'
  * overzichtelijk toont. Plan §6.4: "Mijn vervangt het 2459-regel
  * instellingenscherm. Geen accordions, één pagina per onderwerp."
  *
- * Bevinding M14 (optie b2): Rapportages en Account staan hier bewust NIET
- * meer. Beide hadden al een vaste ingang elders en verschenen dus twee keer:
- * Rapportages permanent in de desktop-zijbalk (`OVERIGE_BASE`), Account in de
- * mobiele nav-pill (`globalNav`, actie `open-account`) en — sinds dezelfde
- * wijziging — in de zijbalk-footer op desktop. Voeg ze hier niet terug: één
+ * Bevinding M14 (optie b2): Rapportages staat hier bewust NIET — die heeft een
+ * vaste ingang in de desktop-zijbalk (`OVERIGE_BASE`). Voeg hem niet terug: één
  * ingang per functie is precies wat de bevinding vroeg.
+ *
+ * Account stond hier om dezelfde reden ook niet, zolang de zijbalk-footer een
+ * losse Account-link had. Die link is op 15 sep 2026 weg ("dat gaat via Mijn"),
+ * dus de kaart is terug: zonder deze kaart heeft desktop géén Account-ingang.
  *
  * Editorial Finance kaart-DNA: 3px accent-streep bovenaan (cross-module
  * → ink-tint via --module-active-fallback), icon op subtle-vlak, serif
@@ -58,10 +60,10 @@ type SubRoute = {
  *    eigen coach-suggestie die hierheen wijst. Dat is de reden dat de eigenaar
  *    optie B koos boven de letterlijke vier van de kaart.
  *
- * De oorspronkelijke kaart noemde ook **Account** als primair. Die staat sinds
- * bevinding M14 bewust niet meer in dit grid (vaste ingang in de nav-pill en de
- * zijbalk-footer); één ingang per functie gaat vóór. Er zijn dus negen
- * kaarten, geen elf — vier vooraan, vijf achter de disclosure.
+ * De oorspronkelijke kaart noemde ook **Account** als primair. Die is sinds
+ * 15 sep 2026 terug in dit grid (zie boven), maar achter de disclosure: de
+ * vier hieronder zijn een bewuste keuze van de eigenaar. Er zijn dus tien
+ * kaarten — vier vooraan, zes achter de disclosure.
  * (Jaaroverzicht en Mijlpalen kwamen er later bij en staan, net als
  * Check-ins, bewust alleen hier en niet ook in `navGroups`.)
  */
@@ -97,6 +99,12 @@ const PRIMARY_ROUTES: SubRoute[] = [
 
 /** De rest: in Volledig gewoon in het grid, in Eenvoudig achter de disclosure. */
 const SECONDARY_ROUTES: SubRoute[] = [
+  {
+    href: '/mijn/account',
+    label: 'Account',
+    description: 'Abonnement, inloggegevens en je account.',
+    Icon: UserCog,
+  },
   {
     href: '/mijn/notificaties',
     label: 'Notificaties',
@@ -185,8 +193,7 @@ export function MijnOverview() {
         deck="Elk onderwerp op een eigen rustige pagina."
       />
 
-      {/* Volledig: één grid met alle negen kaarten — pixelgelijk aan wat er
-          stond. Eenvoudig: vier vooraan, de rest achter één disclosure.
+      {/* Volledig: één grid met alle tien kaarten. Eenvoudig: vier vooraan, de rest achter één disclosure.
 
           `DepthSection` en NIET `HideInSimple`: instellingen zijn geen diepte
           die je mag wegnemen. Hard verbergen zou in de standaardmodus van elk
@@ -208,7 +215,7 @@ export function MijnOverview() {
               // De samenvatting is het duidings-deel: wie de sectie dicht ziet
               // staan, moet zonder klikken weten wát erin zit — anders is dit
               // reductie zonder uitleg.
-              summary="Notificaties, check-ins, je jaaroverzicht, je mijlpalen en geavanceerde opties zoals exports."
+              summary="Je account, notificaties, check-ins, je jaaroverzicht, je mijlpalen en geavanceerde opties zoals exports."
               icon={<Settings2 className="w-4 h-4 text-[var(--ink-3)]" aria-hidden />}
             >
               <div className={GRID_CLASSES}>

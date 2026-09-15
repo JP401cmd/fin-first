@@ -127,7 +127,7 @@ export default async function OverzichtPage() {
   const endAge = horizonData?.fireStrategy?.endAge ?? null
   // ADR 0129 — het STOP-ANKER van het plan is de sleutel, niet de strategienaam:
   // `aow` → pensioen-weergave (marker op AOW); elk vast anker → de minigrafiek knipt op
-  // het stopmoment ("Vermogen bij stop") en zegt nooit "bereikt" tenzij framing 'free'.
+  // het stopmoment ("Stoppen op …") en zegt nooit "bereikt" tenzij framing 'free'.
   const planAnchor = horizonData?.firePlan?.anchor ?? null
   const isPensioenMode = planAnchor?.kind === 'aow'
   const stopAnchorFixed = planAnchor != null && isFixedAnchor({ anchor: planAnchor })
@@ -348,6 +348,10 @@ export default async function OverzichtPage() {
                     ? { bezittingen: totals.bezittingen, schulden: totals.schulden }
                     : null
                 }
+                /* Dekking van het plan onder een vast stopanker — hetzelfde
+                   canonieke getal als de Vrijheid-strip; de loader laat het
+                   alleen door bij `stopAnchorFixed`. */
+                freedomPct={freedomPct}
               />
             </Suspense>
           }

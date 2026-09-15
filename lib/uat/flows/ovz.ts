@@ -54,6 +54,8 @@ export const OVZ_FLOW: UatFlow = {
     { id: 'vermogensverloop', scenarioId: 'UAT-OVZ-04', label: 'WF-OVZ-04 · Vermogensverloop + historie invoeren', kind: 'screen', stage: 1, lane: 'verkennen' },
     { id: 'toekomstprojectie', scenarioId: 'UAT-OVZ-05', label: 'WF-OVZ-05 · Toekomstprojectie vanaf de hub', kind: 'screen', stage: 1, lane: 'verkennen' },
     { id: 'euroweergave', scenarioId: 'UAT-OVZ-22', label: "WF-OVZ-22 · Euro-weergave: widgets & mini-grafiek", kind: 'action', stage: 1, lane: 'verkennen', subOf: 'vermogensverloop' },
+    { id: 'kaarttweedeling', scenarioId: 'UAT-OVZ-27', label: 'WF-OVZ-27 · Netto-vermogen-kaart in twee delen (verleden-venster / toekomst-link)', kind: 'screen', stage: 1, lane: 'verkennen', subOf: 'vermogensverloop' },
+    { id: 'planstoplicht', scenarioId: 'UAT-OVZ-28', label: 'WF-OVZ-28 · Plan-stoplicht op de plankaart (punt + oordeel, banner in dezelfde kleur)', kind: 'screen', stage: 1, lane: 'verkennen', subOf: 'kaarttweedeling' },
 
     // ── 2 · doelen & vrijheid ─────────────────────────────────────────────
     { id: 'widgetbeslis', label: 'Default-blok (doelen+vrijheidsstrip) of eigen widgets?', kind: 'decision', stage: 2 },
@@ -97,6 +99,7 @@ export const OVZ_FLOW: UatFlow = {
     { from: 'hefboom', to: 'gezondheidsscore' },
     { from: 'hefboom', to: 'vermogensverloop' },
     { from: 'vermogensverloop', to: 'euroweergave' },
+    { from: 'vermogensverloop', to: 'kaarttweedeling' },
     { from: 'hefboom', to: 'toekomstprojectie' },
     { from: 'toekomstprojectie', to: 'x-toek', kind: 'cross' },
 
@@ -139,6 +142,7 @@ export const OVZ_FLOW: UatFlow = {
     { from: 'gezondheidsscore', to: 'uitkomst' },
     { from: 'vermogensverloop', to: 'uitkomst' },
     { from: 'euroweergave', to: 'uitkomst' },
+    { from: 'kaarttweedeling', to: 'uitkomst' },
     { from: 'vrijheidsstrip', to: 'uitkomst' },
     { from: 'widgets', to: 'uitkomst' },
     { from: 'vermogenselectie', to: 'uitkomst' },

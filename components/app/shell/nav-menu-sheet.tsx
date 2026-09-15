@@ -9,9 +9,11 @@ import { TapTarget } from '@/components/editorial/tap-target'
 import {
   mainNav,
   navGroups,
+  menuNav,
   globalNav,
-  OVERVIEW_APP_SUBROUTES,
+  isMenuEntryActive,
   SIMPLE_HIDDEN_NAV_HREFS,
+  type MenuEntry,
   type NavColor,
   type NavItem,
 } from '@/lib/nav-config'
@@ -21,6 +23,18 @@ import {
   useActiveAppKeys,
 } from '@/components/app/shell/shell-contexts'
 import type { LeverStatus } from '@/components/app/shell/lever-compass'
+import { leverageToLeverStatus } from '@/components/app/shell/lever-scores'
+import { usePlanStatus } from '@/components/app/plan-status-provider'
+
+/**
+ * De takken van de sheet: het platte menu (Home, de vier hefbomen, De
+ * toekomst) plus Mijn. Mijn staat op desktop in de zijbalk-footer; op mobiel
+ * is deze sheet de enige plek voor zijn onderdelen, dus hij hangt er onder.
+ */
+const SHEET_ENTRIES: MenuEntry[] = [
+  ...menuNav,
+  { ...mainNav[2]!, icon: mainNav[2]!.icon!, children: navGroups[2]!.items },
+]
 
 const statusDotClass: Record<LeverStatus, string> = {
   green: 'bg-emerald-500',
@@ -36,23 +50,6 @@ const statusTitle: Record<LeverStatus, string> = {
   amber: 'Aandacht nodig',
   red: 'Actie vereist',
   neutral: 'Geen meting',
-}
-
-/**
- * Map sub-route href → LeverScore-key. Wanneer een sub-route geen
- * direct-mapping heeft, toont de dot zich niet. Pad-prefix-match zodat
- * deep-routes (bv. /overzicht/bezittingen/cash) dezelfde indicator
- * krijgen als de parent.
- */
-function statusForHref(
-  href: string,
-  scores: ReturnType<typeof useLeverScores>,
-): LeverStatus | null {
-  if (href.startsWith('/overzicht/bezittingen')) return scores.assets.status
-  if (href.startsWith('/overzicht/schulden')) return scores.debts.status
-  if (href.startsWith('/overzicht/budget')) return scores.cashflow.status
-  if (href.startsWith('/overzicht/belasting')) return scores.tax.status
-  return null
 }
 
 // `stripe` = kleur van het streepje vóór de "apps"-kicker; spiegelt de
@@ -105,25 +102,21 @@ export function NavMenuSheet({ open, onClose, onAction }: NavMenuSheetProps) {
   // is een kijkje-nemen binnen één sessie, geen voorkeur die een apparaat moet
   // onthouden — en de begintoestand is al afgestemd op de weergavemodus.
   const [branchOverride, setBranchOverride] = useState<Record<string, boolean>>({})
+  const planStatus = usePlanStatus()
 
   const isActive = (href: string) =>
     href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(href + '/')
 
-  // Per main-nav-item bijbehorende sub-routes lookuppen. Voor Overzicht
-  // voegen we dynamisch de actieve deep-app-tools toe (gefilterd op
-  // activeAppKeys — alleen apps waarvan ten minste één asset/debt de
-  // tracking-flag heeft staan).
+  // Sub-routes per hoofdpagina. De verdiepende apps (Crypto holdings e.d.)
+  // hangen onder hun eigen hefboom en tonen alleen wanneer ten minste één
+  // asset/debt de tracking-flag heeft staan (activeAppKeys).
   //
-  // Hoofdonderdelen (`base`) en apps blijven BEWUST gescheiden — samengeplakt
+  // Onderdelen (`base`) en apps blijven BEWUST gescheiden — samengeplakt
   // in één array las de gebruiker ze als één ongedeelde lijst. Desktop doet
   // dit al zo (SubTagStrip vs. AppTagStrip in sidebar.tsx); dit spiegelt dat.
-  const subRoutesFor = (parentHref: string): { base: NavItem[]; apps: NavItem[] } => {
-    const group = navGroups.find((g) => g.parent.href === parentHref)
-    let base = group?.items ?? []
-    let apps: NavItem[] =
-      parentHref === '/overzicht'
-        ? OVERVIEW_APP_SUBROUTES.filter((a) => activeAppKeys.includes(a.appKey))
-        : []
+  const subRoutesFor = (entry: MenuEntry): { base: NavItem[]; apps: NavItem[] } => {
+    let base = entry.children ?? []
+    let apps: NavItem[] = (entry.apps ?? []).filter((a) => activeAppKeys.includes(a.appKey))
     // Eenvoudig-weergave: verberg de aangewezen menu-ingangen (Rekenhulp).
     // Filtert ALLEEN de sheet-ingang — de pagina's blijven via deeplink + Volledig
     // bereikbaar, en navGroups/resolveRouteTitle blijven ongemoeid. Geldt voor
@@ -151,16 +144,22 @@ export function NavMenuSheet({ open, onClose, onAction }: NavMenuSheetProps) {
           sheet zit) de laatste "Overal beschikbaar"-knoppen niet bedekt. */}
       <div className="space-y-5 pb-24">
         {/* Hoofdpagina's + hun sub-routes als één gestapelde lijst */}
-        {mainNav.map((item) => {
-          const Icon = item.icon!
-          const active = isActive(item.href)
+        {SHEET_ENTRIES.map((item) => {
+          const Icon = item.icon
+          const active = isMenuEntryActive(pathname, item.href)
           const c = colorClasses[item.color]
+          // Hefboomscore, of voor De toekomst het plan-stoplicht (alleen met oordeel).
+          const status: LeverStatus | null = item.leverKey
+            ? leverScores[item.leverKey].status
+            : item.statusSource === 'plan' && planStatus !== 'neutral'
+              ? leverageToLeverStatus(planStatus)
+              : null
           // NAV-2 bepaalt nog steeds de BEGINtoestand: in Eenvoudig staat
           // alleen de actieve tak open, in Volledig staan ze alle open (één
           // blik op de hele boom). Sinds B-048 kan de gebruiker elke tak zelf
           // open- of dichtklappen met de chevron; die keuze wint dan van de
           // begintoestand.
-          const allSubs = subRoutesFor(item.href)
+          const allSubs = subRoutesFor(item)
           const hasSubs = allSubs.base.length > 0 || allSubs.apps.length > 0
           const expandedByDefault = displayMode !== 'simple' || active
           const expanded = branchOverride[item.href] ?? expandedByDefault
@@ -173,50 +172,18 @@ export function NavMenuSheet({ open, onClose, onAction }: NavMenuSheetProps) {
           // dezelfde soort rij; alleen de groepering eromheen verschilt.
           const renderSub = (sub: NavItem) => {
             const subActive = isActive(sub.href)
-            const status = statusForHref(sub.href, leverScores)
-            // Geneste box-subpagina's: alleen tonen wanneer de gebruiker
-            // op dit sub-item (of een kind) staat — contextueel 3e niveau.
-            const showChildren = sub.children && sub.children.length > 0 && subActive
             return (
-              <div key={sub.href}>
-                <Link
-                  href={sub.href}
-                  onClick={onClose}
-                  aria-current={subActive ? 'page' : undefined}
-                  className={`flex items-center justify-between gap-2 px-3 py-2 rounded-lg transition-colors ${
-                    subActive ? c.subActive : c.subIdle
-                  }`}
-                >
-                  <span className="text-[13px] font-medium">{sub.label}</span>
-                  {status && (
-                    <span
-                      className={`w-2 h-2 rounded-full shrink-0 ${statusDotClass[status]}`}
-                      aria-hidden="true"
-                      title={statusTitle[status]}
-                    />
-                  )}
-                </Link>
-                {showChildren && (
-                  <div className="mt-0.5 ml-3 pl-3 border-l border-[var(--border-ed)] grid grid-cols-1 gap-0.5">
-                    {sub.children!.map((child) => {
-                      const childActive = isActive(child.href)
-                      return (
-                        <Link
-                          key={child.href}
-                          href={child.href}
-                          onClick={onClose}
-                          aria-current={childActive ? 'page' : undefined}
-                          className={`px-3 py-1.5 rounded-lg text-[12px] transition-colors ${
-                            childActive ? c.subActive : c.subIdle
-                          }`}
-                        >
-                          {child.label}
-                        </Link>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
+              <Link
+                key={sub.href}
+                href={sub.href}
+                onClick={onClose}
+                aria-current={subActive ? 'page' : undefined}
+                className={`flex items-center justify-between gap-2 px-3 py-2 rounded-lg transition-colors ${
+                  subActive ? c.subActive : c.subIdle
+                }`}
+              >
+                <span className="text-[13px] font-medium">{sub.label}</span>
+              </Link>
             )
           }
           return (
@@ -238,7 +205,19 @@ export function NavMenuSheet({ open, onClose, onAction }: NavMenuSheetProps) {
                     <Icon size={20} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-[15px] leading-tight">{item.label}</div>
+                    <div className="flex items-center gap-2 font-semibold text-[15px] leading-tight">
+                      {item.label}
+                      {/* Hefboomstatus hoort bij de hefboom zelf, niet bij
+                          elk onderdeel eronder. */}
+                      {status && (
+                        <span
+                          data-testid={item.statusSource === 'plan' ? 'nav-sheet-plan-status' : undefined}
+                          className={`w-2 h-2 rounded-full shrink-0 ${statusDotClass[status]}`}
+                          aria-hidden="true"
+                          title={statusTitle[status]}
+                        />
+                      )}
+                    </div>
                     {item.description && (
                       <div className="text-[12px] text-[var(--ink-3)] leading-snug mt-0.5">
                         {item.description}

@@ -25,6 +25,7 @@ function renderIn(mode: DisplayMode) {
 
 const PRIMAIR = ['Profiel', 'Privacy', 'Koppelingen', 'Weergave en uiterlijk']
 const SECUNDAIR = [
+  'Account',
   'Notificaties',
   'Check-ins',
   'Jaaroverzicht',
@@ -53,7 +54,7 @@ describe('MijnOverview — render', () => {
     expect(heading.textContent).toBe('Alles naar jouw hand gezet')
   })
 
-  it('rendert de 9 sub-route cards', () => {
+  it('rendert de 10 sub-route cards', () => {
     renderIn('full')
     for (const label of [...PRIMAIR, ...SECUNDAIR]) {
       expect(screen.getByText(label)).toBeTruthy()
@@ -76,19 +77,23 @@ describe('MijnOverview — render', () => {
     expect(hrefs).toContain('/mijn/geavanceerd')
   })
 
-  // Bevinding M14 (optie b2): Rapportages en Account hebben elk al een vaste
-  // ingang buiten dit grid — Rapportages permanent in de desktop-zijbalk,
-  // Account in de mobiele nav-pill én (sinds dezelfde wijziging) de
-  // zijbalk-footer. Ze horen hier niet nóg een keer te staan.
-  it('toont geen tweede ingang voor Rapportages of Account', () => {
+  // Bevinding M14 (optie b2): Rapportages heeft een vaste ingang buiten dit
+  // grid (de desktop-zijbalk) en hoort hier niet nóg een keer te staan.
+  it('toont geen tweede ingang voor Rapportages', () => {
     const { container } = renderIn('full')
     const hrefs = Array.from(container.querySelectorAll('a')).map((a) =>
       a.getAttribute('href'),
     )
     expect(hrefs).not.toContain('/rapportages')
-    expect(hrefs).not.toContain('/mijn/account')
     expect(screen.queryByText('Rapportages')).toBeNull()
-    expect(screen.queryByText('Account')).toBeNull()
+  })
+
+  // 15 sep 2026: de losse Account-link in de zijbalk-footer is weg ("dat gaat
+  // via Mijn"). Deze kaart is daarmee de énige Account-ingang op desktop — de
+  // mobiele nav-pill is lg:hidden. Verdwijnt hij, dan is Account onvindbaar.
+  it('draagt de Account-ingang (de zijbalk heeft er geen meer)', () => {
+    const { container } = renderIn('full')
+    expect(container.querySelector('a[href="/mijn/account"]')).not.toBeNull()
   })
 
   it('toont beschrijving per card', () => {
@@ -119,12 +124,12 @@ describe('MijnOverview — render', () => {
  * Bijt-proef gedraaid (en teruggedraaid): `simple` hardgecodeerd op `false`,
  * zodat beide modi de volledige boom renderen → vier van de zes tests hieronder
  * lopen rood op de ontbrekende `depth-section`. De twee die groen bleven zijn
- * dat terecht: "alle negen in Volledig" meet het onveranderde pad, en
+ * dat terecht: "alle tien in Volledig" meet het onveranderde pad, en
  * "bereikbaar in Eenvoudig" is bewust modus-agnostisch — bereikbaarheid moet
  * gelden of de kaarten nu gevouwen zijn of niet.
  */
 describe('MijnOverview — curatie per weergavemodus (S8, optie B)', () => {
-  it('toont in Volledig alle negen kaarten in één grid, zonder disclosure', () => {
+  it('toont in Volledig alle tien kaarten in één grid, zonder disclosure', () => {
     renderIn('full')
     expect(screen.queryByTestId('depth-section')).toBeNull()
     for (const label of [...PRIMAIR, ...SECUNDAIR]) {
@@ -163,7 +168,9 @@ describe('MijnOverview — curatie per weergavemodus (S8, optie B)', () => {
 
   it('zegt bij een dichte sectie wát erin zit (duiding boven reductie)', () => {
     renderIn('simple')
-    expect(screen.getByTestId('depth-section-summary').textContent).toContain('Notificaties')
+    const summary = screen.getByTestId('depth-section-summary').textContent
+    expect(summary).toMatch(/notificaties/i)
+    expect(summary).toMatch(/account/i)
   })
 
   it('opent de sectie op één klik', () => {

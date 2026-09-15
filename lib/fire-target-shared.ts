@@ -73,6 +73,20 @@ export const EMPTY_HORIZON_FIRE_TARGETS: HorizonFireTargets = {
 }
 
 /**
+ * Eén compacte kernelrij zoals `HorizonFireSim.unifiedRows` hem draagt: de
+ * weergave-deflator (`FactorRow`) plus de J-grondslag ÓP de leeftijd.
+ *
+ * `startNettoLiquide` = `UnifiedProjectionRow.startNettoLiquide` (Prognose!J aan
+ * het begin van het jaar-blok, nominaal). Optioneel omdat stub-/preview-rijen 'm
+ * mogen weglaten; de bridge zet 'm altijd. Consument: `buildSimNetWorthRows`
+ * (`netWorthExclHome`, dubbele grondslag). Consume-only — nooit met de hand
+ * herleiden uit `netWorth − overwaarde`.
+ */
+export interface HorizonFireSimRow extends FactorRow {
+  startNettoLiquide?: number
+}
+
+/**
  * De VOLLEDIGE kernel-uitkomst uit de canonieke Horizon-run — één bron voor élk
  * oppervlak dat op de FIRE-projectie leunt (ADR 0034, WF-WILL-01).
  *
@@ -116,18 +130,23 @@ export interface HorizonFireSim {
    * AI-context) de factor zelf moeten narekenen met een eigen `Math.pow(1 + i, n)`.
    * Dát is precies de drift die de euro-weergave opheft: CONSUME, DON'T RECOMPUTE.
    *
-   * Bewust COMPACT (`{ age, inflationFactor }`) en niet de volledige
-   * `UnifiedProjectionRow[]`: de rijen reizen mee in de RSC-payload naar de client
-   * en de rest van de rij is daar niet nodig. `SimRow` uitbreiden is verworpen —
-   * dat type wordt óók door niet-kernel-paden (stubs, previews, what-if) gemaakt,
-   * waar de factor verzonnen zou moeten worden.
+   * Bewust COMPACT (`{ age, inflationFactor, startNettoLiquide }`) en niet de
+   * volledige `UnifiedProjectionRow[]`: de rijen reizen mee in de RSC-payload
+   * naar de client en de rest van de rij is daar niet nodig. `SimRow` uitbreiden
+   * is verworpen — dat type wordt óók door niet-kernel-paden (stubs, previews,
+   * what-if) gemaakt, waar de factor verzonnen zou moeten worden.
+   *
+   * `startNettoLiquide` (Prognose!J ÓP de leeftijd) reist om dezelfde reden mee:
+   * de /overzicht-bundel bouwt er `simNetWorthRows[].netWorthExclHome` uit
+   * (dubbele grondslag) en zou anders een eigen overwaarde-projectie náást de
+   * kernel moeten draaien — met dubbeltelling ná een kernel-woningverkoop.
    *
    * CONSUME-ONLY: voer deze rijen aan `buildFactorByAge` / `factorAtAge` /
    * `buildFactorByOffset` (`lib/euro-display.ts`). Deel er nooit met de hand mee.
    * Leeg wanneer de run geen rijen opleverde — de helpers vallen dan terug op
    * factor 1 (= geen deflatie), nooit op een verzonnen getal.
    */
-  unifiedRows: FactorRow[]
+  unifiedRows: HorizonFireSimRow[]
 }
 
 /**
@@ -266,9 +285,11 @@ const computeHorizonFireSimCached = cache(async function computeHorizonFireSimIn
   // zetten — dezelfde tolerantie die `requiredFireNetWorth?` al draagt. Zonder
   // rijen is er geen factor en valt élke consument terug op 1 (= nominaal tonen),
   // wat exact het bestaande `factorAtAge`-gedrag is.
-  const unifiedRows: FactorRow[] = (outcome.result.rows ?? []).map((row) => ({
+  const unifiedRows: HorizonFireSimRow[] = (outcome.result.rows ?? []).map((row) => ({
     age: row.age,
     inflationFactor: row.inflationFactor,
+    // J-grondslag ÓP de leeftijd (bridge zet 'm altijd; stub-rijen mogen 'm missen).
+    ...(row.startNettoLiquide !== undefined ? { startNettoLiquide: row.startNettoLiquide } : {}),
   }))
 
   return {

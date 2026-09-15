@@ -439,15 +439,15 @@ const criteria: AcceptanceCriterion[] = [
   {
     workflow: 'WF-KRUIS-27',
     scenarioId: 'UAT-KRUIS-27',
-    titel: "Consistentie: hetzelfde FIRE-doel identiek gedeflateerd op /toekomst-hero, /overzicht-widget en mini-chart-label",
+    titel: "Consistentie: hetzelfde FIRE-doel identiek gedeflateerd op /toekomst-hero en /overzicht-widget",
     kriticiteit: 'KERN',
     persona: 'willem',
-    given: "Euro-weergave op 'real' (Notion-kaart 39cf9e8d-568a-80fb-8a99-e090c080b964, brok B/F/H). Eén canonieke deflator per leeftijd (`lib/euro-display.ts#buildFactorByAge`, gevoed uit dezelfde kernelrijen — géén tweede bron, D1).",
-    when: 'De gebruiker leest het gedeflateerde FIRE-doelbedrag achtereenvolgens op de /toekomst-hero (brok B, `sim-chart.tsx`-props via `horizon-client.tsx`), op de /overzicht-widget (brok F, o.a. `vrijheidsvoortgang-widget.tsx`) en op het mini-chart-/palette-label-oppervlak (`lib/command-palette/actions.ts#buildActionItems`; de weergave-status zelf hangt sinds ADR 0094 in de sidebar — `EuroViewBadge` — niet meer als badge per grafiek).',
-    then: 'Het getoonde bedrag is op de drie oppervlakken identiek tot op afronding — dezelfde `deflate(fireTarget, factorAtAge(unifiedRows, fireAge), \'real\')`-aanroep op dezelfde kernelrijen, nooit een tweede/eigen herberekening per widget (NFR-X1/X2). Dit is de kern-eis van AC-F4/T13: zonder deze rij kunnen drie oppervlakken elk voor zich "groen" zijn en toch onderling verschillen.',
+    given: "Euro-weergave op 'real' (Notion-kaart 39cf9e8d-568a-80fb-8a99-e090c080b964, brok B/F/H). Eén canonieke deflator per leeftijd (`lib/euro-display.ts#buildFactorByAge`, gevoed uit dezelfde kernelrijen — géén tweede bron, D1). CORRECTIE (sep 2026, tweedeling vermogenskaart): het DERDE oppervlak uit de oorspronkelijke titel — het \"mini-chart-label\" — bestond zo niet: het `lib/command-palette/actions.ts#buildActionItems`-pad berekent en toont geen FIRE-doelbedrag, en de netto-vermogen-kaart op /overzicht toont sinds de tweedeling zelf ook geen liquide vrijheidsdoel-bedrag meer (het label \"Vrijheidsdoel ca. € … liquide\" is uit die kaart verwijderd, WF-OVZ-27). Dit criterium toetst dus TWEE oppervlakken, niet drie.",
+    when: 'De gebruiker leest het gedeflateerde FIRE-doelbedrag achtereenvolgens op de /toekomst-hero (brok B, `sim-chart.tsx`-props via `horizon-client.tsx`) en op de /overzicht-widget (brok F, `vrijheidsvoortgang-widget.tsx`).',
+    then: 'Het getoonde bedrag is op de twee oppervlakken identiek tot op afronding — dezelfde `deflate(fireTarget, factorAtAge(unifiedRows, fireAge), \'real\')`-aanroep op dezelfde kernelrijen, nooit een tweede/eigen herberekening per widget (NFR-X1/X2). Dit is de kern-eis van AC-F4/T13: zonder deze rij kunnen twee oppervlakken elk voor zich "groen" zijn en toch onderling verschillen.',
     assertion: {
       kind: 'consistency',
-      source: 'components/app/horizon/horizon-client.tsx (TOEK-hero, brok B) + components/widgets/vrijheidsvoortgang-widget.tsx (OVZ-widget, brok F) + lib/command-palette/actions.ts#buildActionItems (badge-/label-oppervlak, NAV) — alle drie consumeren lib/euro-display.ts#deflate, geen eigen berekening; kruisZones = TOEK/OVZ/NAV (catalog.ts)',
+      source: 'components/app/horizon/horizon-client.tsx (TOEK-hero, brok B) + components/widgets/vrijheidsvoortgang-widget.tsx (OVZ-widget, brok F, r51/55 — expliciet UAT-KRUIS-27 in commentaar) — beide consumeren lib/euro-display.ts#deflate, geen eigen berekening; kruisZones = TOEK/OVZ (catalog.ts)',
     },
   },
 ]

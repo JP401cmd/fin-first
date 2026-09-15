@@ -21,6 +21,8 @@ import type { Aandachtspunt } from '@/lib/aandachtspunten'
 import { resolveFreedomAgeView, fireAgeForDisplay, isAtOrPastAow, isFixedAnchor, type FreedomFraming } from '@/lib/fire-strategy'
 import { ankerReachFromRunway, ankerStopFromSim, type AnkerReach, type AnkerStop } from '@/lib/horizon/anker-copy'
 import { computeHorizonSolvedFireAge } from '@/lib/fire-target-shared'
+import { getServerPerspective } from '@/lib/household/server-perspective'
+import { loadPlanStatus } from '@/lib/horizon/plan-status-loader'
 import { PageStatusSeed } from '@/components/app/page-status-provider'
 import { RondleidingDataSeed } from '@/components/overview/rondleiding/rondleiding-provider'
 import { computePageStatusInfo, readMinimizedLevel } from '@/lib/page-status/compute'
@@ -518,13 +520,14 @@ export async function OverzichtNetWorthChartLoader({
   netWorthExclHome,
   housingSplit,
   vermogenOpbouw = null,
+  freedomPct = null,
 }: {
   supabase: SupabaseClient
   currentNetWorth: number
   currentAge: number | null
   endAge: number | null
   isPensioenMode: boolean
-  /** ADR 0129 — vast stopmoment: de minigrafiek knipt op het stopmoment ("Vermogen bij stop"). */
+  /** ADR 0129 — vast stopmoment: de minigrafiek knipt op het stopmoment ("Stoppen op …"). */
   stopAnchorFixed?: boolean
   stopAge?: number | null
   /** `resolveFreedomAgeView(...).framing` — "bereikt" alleen bij 'free'. */
@@ -540,8 +543,25 @@ export async function OverzichtNetWorthChartLoader({
    * Huishouden/Partner andere getallen tonen dan het totaal erboven.
    */
   vermogenOpbouw?: VermogenOpbouw | null
+  /**
+   * Het canonieke `freedomPct` uit blok 1 (`horizonData.healthScoreInput`,
+   * perspectief-correct) — dezelfde bron als de Vrijheid-strip. Onder een VAST
+   * stopanker bepaalt de horizon-loader dit als tijdsdekking van het plan
+   * (`computeFreedomPctForPlan`, ADR 0129/0145); de toekomst-kaart toont het dan
+   * als "dekt Y% van je plan". Onder `solved` is het een kapitaalratio en gaat
+   * het bewust NIET door. Geen eigen deling.
+   */
+  freedomPct?: number | null
 }) {
-  const { dashboardData } = await loadDashboardData(supabase)
+  // Plan-stoplicht uit de ÉNE server-bron die ook het menupunt "De toekomst"
+  // voedt (`loadPlanStatus`) — kaart en menu kunnen zo nooit uiteenlopen. Alles
+  // erachter is React-cache()'d en draait op /overzicht toch al (blok 1).
+  const [{ dashboardData }, planStatus] = await Promise.all([
+    loadDashboardData(supabase),
+    getServerPerspective()
+      .then((perspective) => loadPlanStatus(supabase, perspective))
+      .catch(() => 'neutral' as const),
+  ])
 
   // WEERGAVE-only: de grafiekmarker. Via dezelfde seam als de Vrijheid-strip,
   // zodat afronden op één plek gebeurt en nooit een drempel voedt.
@@ -575,6 +595,8 @@ export async function OverzichtNetWorthChartLoader({
       eigenHuisValue={housingSplit?.eigenHuisValue ?? null}
       mortgageBalance={housingSplit?.mortgageBalance ?? null}
       dailyExpense={dailyExpense}
+      planCoveragePct={stopAnchorFixed ? freedomPct : null}
+      planStatus={planStatus}
     />
   )
 }

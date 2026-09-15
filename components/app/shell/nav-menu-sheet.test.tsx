@@ -53,18 +53,41 @@ describe('NavMenuSheet — NAV-2: alleen de actieve tak klapt uit', () => {
 
   it("toont in 'full' óók de sub-items van niet-actieve hoofdpagina's", () => {
     renderSheet('full')
-    expect(screen.getByText('Bezittingen')).toBeInTheDocument()
-    expect(screen.getByText('Schulden')).toBeInTheDocument()
+    expect(screen.getByText('Transacties')).toBeInTheDocument()
+    expect(screen.getByText('Box 1 · Werk + woning')).toBeInTheDocument()
   })
 
   it("verbergt in 'simple' de sub-items van niet-actieve hoofdpagina's", () => {
     renderSheet('simple')
-    expect(screen.queryByText('Bezittingen')).not.toBeInTheDocument()
-    expect(screen.queryByText('Schulden')).not.toBeInTheDocument()
-    // De hoofdpagina zelf blijft één regel — bereikbaar, niet uitgeklapt.
-    expect(screen.getByText('Overzicht')).toBeInTheDocument()
+    expect(screen.queryByText('Transacties')).not.toBeInTheDocument()
+    expect(screen.queryByText('Box 1 · Werk + woning')).not.toBeInTheDocument()
+    // De hoofdpagina's zelf blijven één regel — bereikbaar, niet uitgeklapt.
+    expect(screen.getByText('Budget')).toBeInTheDocument()
+    expect(screen.getByText('Belasting')).toBeInTheDocument()
     // De actieve tak (/toekomst) houdt zijn sub-items.
     expect(screen.getByText('Doelen')).toBeInTheDocument()
+  })
+})
+
+/**
+ * Plat menu (15 sep 2026) — Home, de vier hefbomen en De toekomst op één
+ * niveau; hun onderdelen zijn gewone subpagina's, geen derde niveau meer.
+ * "Tijdas" is weg: die wees naar /toekomst, dezelfde plek als de hoofdpagina.
+ */
+describe('NavMenuSheet — plat menu', () => {
+  afterEach(cleanup)
+
+  it('toont de hoofdpagina’s als eigen takken, met Mijn eronder', () => {
+    renderSheet('simple')
+    for (const label of ['Home', 'Bezittingen', 'Schulden', 'Budget', 'Belasting', 'De toekomst', 'Mijn']) {
+      expect(screen.getByRole('link', { name: new RegExp('^' + label) })).toBeInTheDocument()
+    }
+    expect(screen.queryByText('Overzicht')).not.toBeInTheDocument()
+  })
+
+  it('heeft geen Tijdas-ingang meer', () => {
+    renderSheet('full')
+    expect(screen.queryByText('Tijdas')).not.toBeInTheDocument()
   })
 })
 
@@ -81,36 +104,36 @@ describe('NavMenuSheet — B-048: elke tak is zelf uitklapbaar', () => {
   it("klapt in 'simple' een niet-actieve tak open zonder te navigeren", () => {
     renderSheet('simple')
     // Uitgangspunt = NAV-2: de niet-actieve tak is dicht.
-    expect(screen.queryByText('Bezittingen')).not.toBeInTheDocument()
+    expect(screen.queryByText('Transacties')).not.toBeInTheDocument()
 
-    const toggle = screen.getByRole('button', { name: /Toon de onderdelen van Overzicht/i })
+    const toggle = screen.getByRole('button', { name: /Toon de onderdelen van Budget/i })
     expect(toggle).toHaveAttribute('aria-expanded', 'false')
     fireEvent.click(toggle)
 
     // De sub-items staan er nu — en de sheet is niet gesloten/genavigeerd:
     // de chevron is een knop, geen link.
-    expect(screen.getByText('Bezittingen')).toBeInTheDocument()
-    expect(screen.getByText('Schulden')).toBeInTheDocument()
+    expect(screen.getByText('Transacties')).toBeInTheDocument()
+    expect(screen.getByText('Vaste lasten')).toBeInTheDocument()
     expect(
-      screen.getByRole('button', { name: /Verberg de onderdelen van Overzicht/i }),
+      screen.getByRole('button', { name: /Verberg de onderdelen van Budget/i }),
     ).toHaveAttribute('aria-expanded', 'true')
   })
 
   it("klapt in 'full' een tak juist dicht — de chevron werkt beide kanten op", () => {
     renderSheet('full')
-    expect(screen.getByText('Bezittingen')).toBeInTheDocument()
+    expect(screen.getByText('Transacties')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: /Verberg de onderdelen van Overzicht/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Verberg de onderdelen van Budget/i }))
 
-    expect(screen.queryByText('Bezittingen')).not.toBeInTheDocument()
+    expect(screen.queryByText('Transacties')).not.toBeInTheDocument()
     // De actieve tak blijft ongemoeid: dichtklappen is per tak, niet globaal.
     expect(screen.getByText('Doelen')).toBeInTheDocument()
   })
 
   it('laat de hoofdpagina zelf een link blijven — de chevron kaapt de rij niet', () => {
     renderSheet('simple')
-    const overzicht = screen.getByRole('link', { name: /Overzicht/ })
-    expect(overzicht).toHaveAttribute('href', '/overzicht')
+    const budget = screen.getByRole('link', { name: /^Budget/ })
+    expect(budget).toHaveAttribute('href', '/overzicht/budget')
   })
 })
 
@@ -121,7 +144,7 @@ describe('NavMenuSheet — B-048: elke tak is zelf uitklapbaar', () => {
  * moet dezelfde scheiding tonen als de desktop-sidebar: een aparte
  * apps-groep met eigen kop, en die kop ALLEEN bij >=1 actieve app.
  */
-describe('NavMenuSheet — apps gescheiden van hoofdonderdelen onder Overzicht', () => {
+describe('NavMenuSheet — apps gescheiden van de onderdelen, onder hun eigen hefboom', () => {
   afterEach(cleanup)
 
   it('toont geen apps-kop wanneer er geen app actief is', () => {
@@ -166,8 +189,8 @@ describe('NavMenuSheet — apps gescheiden van hoofdonderdelen onder Overzicht',
     expect(screen.getByText('Budget')).toBeInTheDocument()
   })
 
-  it("verbergt in 'simple' de apps-groep van de niet-actieve Overzicht-tak", () => {
-    // Actieve route in deze suite is /toekomst, dus Overzicht klapt in
+  it("verbergt in 'simple' de apps-groep van de niet-actieve Bezittingen-tak", () => {
+    // Actieve route in deze suite is /toekomst, dus Bezittingen klapt in
     // Eenvoudig niet uit — apps horen dan ook niet te verschijnen.
     renderSheet('simple', ['crypto-holdings'])
     expect(screen.queryByRole('group', { name: /apps/i })).not.toBeInTheDocument()

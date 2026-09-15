@@ -8,9 +8,8 @@
  * nav-config volgt — de assertie leest het verwachte label uit `globalNav`, dus
  * hernoemt iemand de route daar, dan valt de zijbalk mee om (en niet stil uit).
  *
- * Daarnaast: de Account-ingang in de zijbalk-footer. Die is de desktop-
- * tegenhanger van de mobiele nav-pill (`lg:hidden`) en is de voorwaarde
- * waaronder de Account-kaart uit het /mijn-grid mocht verdwijnen.
+ * Daarnaast: de zijbalk-footer draagt Mijn, niet ook nog Account (die gaat
+ * via Mijn).
  */
 
 import { describe, it, expect, afterEach, vi } from 'vitest'
@@ -78,8 +77,12 @@ describe('Sidebar — naamgeving en ingangen (M14)', () => {
     expect(screen.getByText('Krant')).toBeTruthy()
   })
 
-  it('houdt een Account-ingang in de footer (desktop-tegenhanger van de nav-pill)', () => {
+  // 15 sep 2026 (eigenaar): Mijn en Account stonden onder elkaar in de footer;
+  // Account gaat via Mijn. De ingang verhuisde naar het /mijn-grid — dat bewaakt
+  // mijn-overview.test.tsx, want zonder die kaart heeft desktop géén Account.
+  it('heeft geen losse Account-link meer, wel Mijn', () => {
     const { container } = renderSidebar()
-    expect(container.querySelector('a[href="/mijn/account"]')).not.toBeNull()
+    expect(container.querySelector('a[href="/mijn/account"]')).toBeNull()
+    expect(container.querySelector('a[href="/mijn"]')).not.toBeNull()
   })
 })

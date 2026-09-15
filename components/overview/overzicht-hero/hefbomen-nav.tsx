@@ -244,6 +244,9 @@ export function HefbomenNav({
     (typeof totals?.cashflow === 'number' && totals.cashflow > 0)
 
   return (
+    // `sm:gap-3` (12px) is op lg gelijk aan de gap van de hero-rij eronder en
+    // van de netto-vermogen-kaarten (networth-chart-layout.ts) — de kaartranden
+    // lopen daardoor gelijk. Alleen samen wijzigen.
     <nav
       aria-label="Vier hefbomen"
       className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 mb-3"

@@ -631,9 +631,9 @@ const STAPPEN: readonly RondleidingStap[] = [
   // en de kaart één boodschap houdt.
   //
   // De STAART wijst de twee klikzones aan die de grafiek zelf niet verraadt
-  // (`mini-networth-chart.tsx`): links van Vandaag opent het vermogensverloop
-  // (waar je bedragen ook bijwerkt), rechts van Vandaag de volle projectie op
-  // /toekomst. Die affordance stond nergens — de band-uitleg die hier stond
+  // (`mini-networth-chart.tsx`): de verleden-kaart links van Vandaag opent het
+  // venster "Netto vermogen" (opbouw + verloop, waar je bedragen ook bijwerkt),
+  // de toekomst-kaart rechts van Vandaag de volle projectie op /toekomst. Die affordance stond nergens — de band-uitleg die hier stond
   // beschreef een element dat de legenda ("Bandbreedte") al benoemt.
   {
     id: 'grafiek',
