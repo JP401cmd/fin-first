@@ -23,7 +23,7 @@ import { FinDots } from '@/components/app/fin-dots'
 import { ActionEditModal } from '@/components/app/action-edit-modal'
 import type { Action, ActionStatus } from '@/lib/recommendation-data'
 import { renderMarkdown, findToolInvocation, TOOL_LOADING_STATES, TOOL_OUTPUT_STATES, type MessagePart } from './markdown-helpers'
-import { X, Send, Loader2, Zap, Check, AlertTriangle, RefreshCw, Pin, PinOff, ShieldCheck, Sparkles, Clock, ThumbsDown, Cpu, Megaphone, ListChecks, History, RotateCw, ClipboardList } from 'lucide-react'
+import { X, Send, Square, SquarePen, Loader2, Zap, Check, AlertTriangle, RefreshCw, Pin, PinOff, ShieldCheck, Sparkles, Clock, ThumbsDown, Cpu, Megaphone, ListChecks, History, RotateCw, ClipboardList } from 'lucide-react'
 import { MeldingView } from './melding/melding-view'
 import { VragenlijstView } from './vragenlijst/vragenlijst-view'
 import {
@@ -1047,7 +1047,7 @@ export function ChatPanel() {
 
   const [gesprek, setGesprek] = useState<GesprekStand>(() => versGesprek('cloud'))
 
-  const { messages: rawMessages, sendMessage, status, error, clearError, regenerate } = useChat({
+  const { messages: rawMessages, sendMessage, status, error, clearError, regenerate, stop } = useChat({
     id: gesprek.conversationId,
     messages: gesprek.messages,
     transport,
@@ -1187,13 +1187,27 @@ export function ChatPanel() {
   // A1 — bewaren zodra Fin klaar is met antwoorden, niet zodra je verzendt.
   // Bij een fout-einde wordt er niets weggeschreven.
   const vorigeStatusRef = useRef(status)
+  // B-049 — "Gesprek afsluiten" tijdens een antwoord: eerst stoppen en de
+  // afgebroken beurt bewaren, pas dán een vers gesprek. Direct omklappen zou de
+  // statusovergang op de níeuwe chat laten landen (lege berichten) en de beurt
+  // uit de historie laten vallen. Via een ref: `startNieuwGesprek` staat lager.
+  const afsluitenNaStopRef = useRef(false)
+  const startNieuwGesprekRef = useRef<(origin: ChatOrigin) => void>(() => {})
   useEffect(() => {
     const vorige = vorigeStatusRef.current
     vorigeStatusRef.current = status
-    if (status !== 'ready') return
+    if (status !== 'ready' && status !== 'error') return
     if (vorige !== 'streaming' && vorige !== 'submitted') return
-    if (hasError) return
-    void bewaarBeurt()
+    const naAfloop = () => {
+      if (!afsluitenNaStopRef.current) return
+      afsluitenNaStopRef.current = false
+      startNieuwGesprekRef.current(isLocalRef.current ? 'lokaal' : 'cloud')
+    }
+    if (status !== 'ready' || hasError) {
+      naAfloop()
+      return
+    }
+    void bewaarBeurt().finally(naAfloop)
   }, [status, hasError, bewaarBeurt])
 
   /**
@@ -1208,6 +1222,7 @@ export function ChatPanel() {
     },
     [resetLokaleConversatie],
   )
+  startNieuwGesprekRef.current = startNieuwGesprek
 
   /**
    * Hervatten — eerst LADEN, dan pas de id omklappen. Beide in één
@@ -2149,7 +2164,7 @@ export function ChatPanel() {
         {isLocalMode && <LocalModeBanner />}
         <div
           ref={messagesScrollRef}
-          className="flex-1 overflow-y-auto px-4 py-3"
+          className="flex-1 overflow-y-auto overscroll-contain px-4 py-3"
         >
           {/* Polite live-regio alléén om de berichten — de assertive foutbanner
               staat er bewust buiten (geen geneste live-regio's). */}
@@ -2327,6 +2342,35 @@ export function ChatPanel() {
 
         {/* Input */}
         <div className="border-t border-[var(--border-ed)] px-3 py-3 pb-1" style={{ paddingBottom: undefined }}>
+          {/* B-049 — een gesprek afsluiten zonder eerst naar "Je gesprekken" te
+              moeten. Loopt er nog een antwoord, dan stopt dat eerst en wordt de
+              afgebroken beurt bewaard; daarna begint een vers gesprek (het
+              vorige blijft in je gesprekken). Het ✕ in de kop sluit alleen het
+              venster, niet het gesprek. Lokaal tijdens een antwoord uitgeschakeld:
+              het on-device transport breekt een generatie (nog) niet af, en de
+              sessie resetten midden in een generatie kan de engine laten vallen. */}
+          {messages.length > 0 && (
+            <div className="-mt-1.5 mb-1 flex justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setHervatFout(null)
+                  if (isStreaming) {
+                    afsluitenNaStopRef.current = true
+                    void stop()
+                    return
+                  }
+                  startNieuwGesprek(isLocalMode ? 'lokaal' : 'cloud')
+                }}
+                disabled={isStreaming && isLocalMode}
+                aria-label="Gesprek afsluiten en een nieuw gesprek beginnen"
+                className="inline-flex min-h-6 items-center gap-1 px-1.5 text-[11px] text-[var(--ink-3)] transition-colors hover:text-[var(--ink-2)] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fin-500"
+              >
+                <SquarePen className="h-3 w-3" aria-hidden="true" />
+                Gesprek afsluiten
+              </button>
+            </div>
+          )}
           <div className="flex items-end gap-2">
             <textarea
               ref={inputRef}
@@ -2338,14 +2382,32 @@ export function ChatPanel() {
               disabled={!chatReady}
               className="max-h-24 flex-1 resize-none rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2 text-sm outline-none placeholder:text-[var(--ink-3)] focus:border-[var(--border-md)] focus:ring-1 focus:ring-zinc-200 disabled:opacity-60"
             />
-            <button
-              type="button"
-              onClick={submit}
-              disabled={isStreaming || !input.trim() || !chatReady}
-              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--r-lg)] ${config.sendBg} text-white transition-colors ${config.sendHoverBg} disabled:bg-zinc-300 disabled:text-[var(--ink-3)]`}
-            >
-              <Send className="h-4 w-4" />
-            </button>
+            {/* B-049 — tijdens een antwoord wordt de verzendknop een stopknop:
+                een antwoord dat blijft hangen of niet meer nodig is, hoef je niet
+                uit te zitten. Wat al binnen was blijft staan en wordt bewaard.
+                Alleen in de cloud: het on-device transport breekt een generatie
+                (nog) niet af, dus daar zou de knop blijven hangen. */}
+            {isStreaming && !isLocalMode ? (
+              <button
+                type="button"
+                onClick={() => void stop()}
+                aria-label="Antwoord stoppen"
+                title="Antwoord stoppen"
+                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--r-lg)] ${config.sendBg} text-white transition-colors ${config.sendHoverBg}`}
+              >
+                <Square className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={submit}
+                disabled={isStreaming || !input.trim() || !chatReady}
+                aria-label="Versturen"
+                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--r-lg)] ${config.sendBg} text-white transition-colors ${config.sendHoverBg} disabled:bg-zinc-300 disabled:text-[var(--ink-3)]`}
+              >
+                <Send className="h-4 w-4" aria-hidden="true" />
+              </button>
+            )}
           </div>
         </div>
 

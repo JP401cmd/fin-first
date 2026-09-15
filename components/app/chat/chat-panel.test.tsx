@@ -34,6 +34,7 @@ import type { CoachDataGaps } from '@/lib/coach-suggestions'
  */
 
 const mockSendMessage = vi.fn()
+const mockStop = vi.fn()
 let mockClearPendingMessage = vi.fn()
 // Per-test in te stellen useChat-retourwaarden (error-banner + retry-pad).
 let mockError: unknown = undefined
@@ -68,6 +69,7 @@ vi.mock('@ai-sdk/react', () => ({
       error: mockError,
       clearError: mockClearError,
       regenerate: mockRegenerate,
+      stop: mockStop,
     }
   },
 }))
@@ -327,6 +329,7 @@ function stubExecutionFetch(overrides: {
 
 beforeEach(() => {
   mockSendMessage.mockClear()
+  mockStop.mockClear()
   mockClearPendingMessage = vi.fn()
   mockError = undefined
   mockRegenerate = vi.fn()
@@ -871,7 +874,7 @@ describe('ChatPanel — swipe-down-to-dismiss', () => {
     const close = vi.fn()
     ctx = makeCtx({ close })
     const { container } = render(<ChatPanel />)
-    const lijst = await waitFor(() => vindDiv(container, 'overflow-y-auto px-4 py-3')!)
+    const lijst = await waitFor(() => vindDiv(container, 'overflow-y-auto overscroll-contain px-4 py-3')!)
 
     fireEvent.touchStart(lijst, { touches: [{ clientY: 100 }] })
     // Eerste beweging beslist scroll-vs-drag (bovenaan + omlaag = drag).
@@ -886,7 +889,7 @@ describe('ChatPanel — swipe-down-to-dismiss', () => {
     const close = vi.fn()
     ctx = makeCtx({ close })
     const { container } = render(<ChatPanel />)
-    const lijst = await waitFor(() => vindDiv(container, 'overflow-y-auto px-4 py-3')!)
+    const lijst = await waitFor(() => vindDiv(container, 'overflow-y-auto overscroll-contain px-4 py-3')!)
     Object.defineProperty(lijst, 'scrollTop', { configurable: true, value: 120 })
 
     fireEvent.touchStart(lijst, { touches: [{ clientY: 100 }] })
@@ -1395,6 +1398,50 @@ describe('ChatPanel — gesprekkenmodus laat het lopende gesprek intact (R1)', (
     fireEvent.click(screen.getByRole('button', { name: 'Je gesprekken' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Nieuw gesprek' }))
 
+    await waitFor(() => expect(laatsteUseChat().id).not.toBe(idVoor))
+    expect(laatsteUseChat().messages).toEqual([])
+  })
+
+  // B-049 — een gesprek afsluiten kan direct vanuit de chat, niet alleen via de lijst.
+  it('"Gesprek afsluiten" onder het gesprek begint een vers gesprek zonder de lijst te openen (B-049)', async () => {
+    renderMetGeschiedenis()
+    const idVoor = laatsteUseChat().id
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Gesprek afsluiten en een nieuw gesprek beginnen' }))
+
+    await waitFor(() => expect(laatsteUseChat().id).not.toBe(idVoor))
+    expect(laatsteUseChat().messages).toEqual([])
+    expect(mockStop).not.toHaveBeenCalled()
+  })
+
+  it('tijdens een antwoord wordt verzenden "Antwoord stoppen" (B-049)', async () => {
+    mockStatus = 'streaming'
+    renderMetGeschiedenis()
+
+    expect(screen.queryByRole('button', { name: 'Versturen' })).not.toBeInTheDocument()
+    fireEvent.click(await screen.findByRole('button', { name: 'Antwoord stoppen' }))
+    expect(mockStop).toHaveBeenCalledTimes(1)
+  })
+
+  it('afsluiten tijdens een antwoord stopt eerst, bewaart de afgebroken beurt en begint pas dán een vers gesprek (B-049)', async () => {
+    stubExecutionFetch({ privacyMode: false })
+    localStorage.setItem(WFT_KEY, 'true')
+    mockMessages = GESPREK
+    mockStatus = 'streaming'
+    ctx = makeCtx({ userId: 'gebruiker-a', chatHistoryMode: 'account', dataGaps: null })
+    const { rerender } = render(<ChatPanel />)
+    const idVoor = laatsteUseChat().id
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Gesprek afsluiten en een nieuw gesprek beginnen' }))
+    expect(mockStop).toHaveBeenCalledTimes(1)
+    // Nog niet omgeklapt: de statusovergang moet op het óúde gesprek landen.
+    expect(laatsteUseChat().id).toBe(idVoor)
+
+    // De SDK meldt het stoppen als overgang naar 'ready'.
+    mockStatus = 'ready'
+    rerender(<ChatPanel />)
+
+    await waitFor(() => expect(facadeMock.appendTurn).toHaveBeenCalledTimes(1))
     await waitFor(() => expect(laatsteUseChat().id).not.toBe(idVoor))
     expect(laatsteUseChat().messages).toEqual([])
   })
