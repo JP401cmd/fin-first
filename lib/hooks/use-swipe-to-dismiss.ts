@@ -37,6 +37,37 @@ const DECISION_THRESHOLD = 5
 const RUBBER_BAND = 0.15
 const DEFAULT_BACKDROP_OPACITY = SCRIM_OPACITY
 
+/**
+ * Markering voor een vlak binnen het paneel dat zijn aanrakingen zelf houdt:
+ * `data-sheet-gesture="none"`. Voor sleeplijsten (rangschikken) en vergelijkbare
+ * eigen gebaren — daar is een verticale vingerbeweging nooit "paneel wegslepen".
+ */
+export const SHEET_GESTURE_NONE_SELECTOR = '[data-sheet-gesture="none"]'
+
+/**
+ * Het dichtstbijzijnde verticaal scrollbare element tussen het doelwit en het
+ * paneel (paneel zelf niet meegerekend). Een consumer met meerdere weergaven
+ * (ChatPanel: chat, melding, gids, vragenlijst) heeft maar één `contentRef`;
+ * zonder deze terugval gold scrollen in de andere weergaven als greep.
+ *
+ * Let op, bewust breed: een computed `overflow-y: auto` matcht óók wrappers met
+ * alleen `overflow-x-auto` (CSS zet de andere as dan op `auto`) en een
+ * `<textarea>`. Dat is gewenst — een carrousel of tekstveld is geen greep; de
+ * horizontaal-guard in `handleTouchMove` laat zijwaarts vegen daarna los.
+ */
+function nearestScrollable(target: Element, sheetEl: HTMLElement | null): HTMLElement | null {
+  if (typeof window === 'undefined') return null
+  let node: Element | null = target
+  while (node && node !== sheetEl) {
+    if (node instanceof HTMLElement) {
+      const overflowY = window.getComputedStyle(node).overflowY
+      if (overflowY === 'auto' || overflowY === 'scroll' || overflowY === 'overlay') return node
+    }
+    node = node.parentElement
+  }
+  return null
+}
+
 /** Gedeelde spring-curve voor sheet-animaties (ook buiten dit gebaar bruikbaar). */
 export const SPRING_CURVE = 'cubic-bezier(0.32, 0.72, 0, 1)'
 
@@ -111,6 +142,9 @@ export function useSwipeToDismiss({
   const touchSource = useRef<'handle' | 'content'>('handle')
   // Once we decide scroll vs drag for a content touch, lock it in
   const gestureDecision = useRef<'undecided' | 'scroll' | 'drag'>('undecided')
+  // Het scrollvlak waarin de lopende content-touch begon (`contentRef` óf een
+  // ander scrollbaar vlak in het paneel) — daarop valt de "staat bovenaan"-toets.
+  const activeScrollEl = useRef<HTMLElement | null>(null)
   // Bewaakt tegen een tweede overlappende dismiss (bv. een snelle dubbele
   // flick): zonder deze guard herschrijft de tweede aanroep de lopende
   // transition/transform en vuurt `onDismiss` twee keer. Intern, dus elke
@@ -287,7 +321,7 @@ export function useSwipeToDismiss({
     attachGestureListeners()
   }, [enabled, sheetRef, attachGestureListeners])
 
-  const handleContentTouchStart = useCallback((e: React.TouchEvent) => {
+  const startContentTouch = useCallback((e: React.TouchEvent, scrollEl: HTMLElement | null) => {
     if (!enabled) return
     dragStartY.current = e.touches[0].clientY
     // `?? 0`: sommige synthetische touch-events (tests, enkele webviews) dragen
@@ -298,8 +332,14 @@ export function useSwipeToDismiss({
     velocityTracker.current = [{ y: e.touches[0].clientY, t: Date.now() }]
     touchSource.current = 'content'
     gestureDecision.current = 'undecided'
+    activeScrollEl.current = scrollEl
     attachGestureListeners()
   }, [enabled, attachGestureListeners])
+
+  const handleContentTouchStart = useCallback(
+    (e: React.TouchEvent) => startContentTouch(e, contentRef?.current ?? null),
+    [startContentTouch, contentRef],
+  )
 
   /**
    * Eén touchstart voor het hele paneel; routeert op basis van het doelwit.
@@ -314,14 +354,28 @@ export function useSwipeToDismiss({
    * élke `touchmove` `preventDefault()` kreeg en de kind-sheet zich niet meer
    * liet scrollen ("Gevonden patronen" boven de rekeningdetail). Een gebaar dat
    * buiten ONS paneel begint is per definitie niet van ons.
+   *
+   * Daarna, in volgorde: een vlak met `data-sheet-gesture="none"` houdt zijn
+   * aanraking zelf; de `contentRef` en — terugval — elk ánder verticaal
+   * scrollbaar vlak in het paneel krijgen de scroll-vs-sleep-beslissing; alleen
+   * wat overblijft is greep (B-050: in de vragenlijstmodus van de chat bestond
+   * de `contentRef` niet, dus sleepte rangschikken en scrollen het paneel mee).
    */
   const handleSheetTouchStart = useCallback((e: React.TouchEvent) => {
     const sheetEl = sheetRef.current
-    if (sheetEl && !sheetEl.contains(e.target as Node)) return
-    const scrollEl = contentRef?.current ?? null
-    if (scrollEl && scrollEl.contains(e.target as Node)) handleContentTouchStart(e)
+    const target = e.target as Element
+    if (sheetEl && !sheetEl.contains(target)) return
+    const eigenGebaar = typeof target.closest === 'function' ? target.closest(SHEET_GESTURE_NONE_SELECTOR) : null
+    if (eigenGebaar && (!sheetEl || sheetEl.contains(eigenGebaar))) return
+    const contentEl = contentRef?.current ?? null
+    if (contentEl && contentEl.contains(target)) {
+      startContentTouch(e, contentEl)
+      return
+    }
+    const scrollEl = nearestScrollable(target, sheetEl)
+    if (scrollEl) startContentTouch(e, scrollEl)
     else handleTouchStart(e)
-  }, [sheetRef, contentRef, handleContentTouchStart, handleTouchStart])
+  }, [sheetRef, contentRef, startContentTouch, handleTouchStart])
 
   const handleTouchMove = useCallback((e: TouchEvent) => {
     if (!enabled) return
@@ -345,7 +399,7 @@ export function useSwipeToDismiss({
           return
         }
 
-        const scrollEl = contentRef?.current ?? null
+        const scrollEl = activeScrollEl.current
         const atTop = !scrollEl || scrollEl.scrollTop <= 0
         const swipingDown = rawDelta > 0
 
@@ -416,7 +470,7 @@ export function useSwipeToDismiss({
       backdrop.style.backgroundColor = scrimColor(backdropOpacity * (1 - dragPercent))
       backdrop.style.transition = 'none'
     }
-  }, [enabled, sheetRef, backdropRef, contentRef, backdropOpacity, getSheetHeight])
+  }, [enabled, sheetRef, backdropRef, backdropOpacity, getSheetHeight])
 
   const handleTouchEnd = useCallback(() => {
     detachGestureListeners()

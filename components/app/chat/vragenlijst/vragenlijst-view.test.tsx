@@ -313,4 +313,10 @@ describe('VragenlijstView — aanvullende vraagtypes', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Volgorde versturen' }))
     await waitFor(() => expect(posts()).toEqual([{ session_id: 's-1', question_id: 'x1', answer_choices: ['C', 'A', 'B'] }]))
   })
+
+  it('rangschikken: de lijst houdt zijn aanrakingen zelf, zodat slepen het chatpaneel niet meesleept (B-050)', async () => {
+    metVraag({ type: 'ranking', options: ['A', 'B', 'C'] })
+    const lijst = await screen.findByRole('list', { name: 'De vraag' })
+    expect(lijst).toHaveAttribute('data-sheet-gesture', 'none')
+  })
 })

@@ -185,3 +185,96 @@ describe('useSwipeToDismiss — native pull-to-refresh tegenhouden', () => {
     removeSpy.mockRestore()
   })
 })
+
+/**
+ * Regressietests voor B-050 (sep 2026): in de vragenlijst-, meld- en gidsmodus
+ * van de chat bestaat de `contentRef` (de gespreksscroll) niet, dus gold élke
+ * aanraking als greep — scrollen of een antwoord rangschikken sleepte het hele
+ * paneel mee omlaag en omhoog. Norm: een scrollbaar vlak binnen het paneel
+ * krijgt dezelfde scroll-vs-sleep-beslissing als de `contentRef`, en een vlak
+ * met `data-sheet-gesture="none"` (sleeplijsten) start helemaal geen gebaar.
+ */
+describe('useSwipeToDismiss — ander scrollvlak en sleeplijsten (B-050)', () => {
+  function ModusHarness({ onDismiss }: { onDismiss: () => void }) {
+    const sheetRef = useRef<HTMLDivElement>(null)
+    // De contentRef wijst — zoals in ChatPanel buiten de chatmodus — naar niets.
+    const contentRef = useRef<HTMLDivElement>(null)
+    const { handleSheetTouchStart } = useSwipeToDismiss({ sheetRef, contentRef, onDismiss })
+    return (
+      <div ref={sheetRef} data-testid="sheet" onTouchStart={handleSheetTouchStart}>
+        <div data-testid="header">kop</div>
+        <div data-testid="scrollvlak" style={{ overflowY: 'auto' }}>
+          <p data-testid="scrollkind">vraag</p>
+        </div>
+        <ol data-testid="sleeplijst" data-sheet-gesture="none">
+          <li data-testid="sleeprij">optie</li>
+        </ol>
+      </div>
+    )
+  }
+
+  it('Given een scrollvlak buiten de contentRef dat niet bovenaan staat, When je omlaag veegt, Then scrolt het native en blijft het paneel staan', () => {
+    mockSheetHeight(800)
+    const { getByTestId } = render(<ModusHarness onDismiss={vi.fn()} />)
+    Object.defineProperty(getByTestId('scrollvlak'), 'scrollTop', { configurable: true, value: 120 })
+    const kind = getByTestId('scrollkind')
+
+    fireEvent.touchStart(kind, { touches: [{ clientY: 100, clientX: 10 }] })
+    const nietGeannuleerd = fireEvent.touchMove(kind, { touches: [{ clientY: 180, clientX: 10 }] })
+    expect(nietGeannuleerd).toBe(true)
+    expect(getByTestId('sheet').style.transform).toBe('')
+    fireEvent.touchEnd(kind)
+  })
+
+  it('Given een scrollvlak buiten de contentRef, When je omhoog veegt, Then volgt het paneel de vinger niet', () => {
+    mockSheetHeight(800)
+    const { getByTestId } = render(<ModusHarness onDismiss={vi.fn()} />)
+    const kind = getByTestId('scrollkind')
+
+    fireEvent.touchStart(kind, { touches: [{ clientY: 300, clientX: 10 }] })
+    fireEvent.touchMove(kind, { touches: [{ clientY: 200, clientX: 10 }] })
+    expect(getByTestId('sheet').style.transform).toBe('')
+    fireEvent.touchEnd(kind)
+  })
+
+  it('Given een scrollvlak buiten de contentRef dat bovenaan staat, When je ver omlaag veegt, Then sluit het paneel nog steeds', async () => {
+    mockSheetHeight(800)
+    const onDismiss = vi.fn()
+    const { getByTestId } = render(<ModusHarness onDismiss={onDismiss} />)
+    const kind = getByTestId('scrollkind')
+
+    fireEvent.touchStart(kind, { touches: [{ clientY: 100, clientX: 10 }] })
+    fireEvent.touchMove(kind, { touches: [{ clientY: 110, clientX: 10 }] })
+    fireEvent.touchMove(kind, { touches: [{ clientY: 700, clientX: 10 }] })
+    fireEvent.touchEnd(kind)
+
+    await new Promise((r) => setTimeout(r, 450))
+    expect(onDismiss).toHaveBeenCalledTimes(1)
+  })
+
+  it('Given een sleeplijst met data-sheet-gesture="none", When je een rij omlaag en omhoog sleept, Then beweegt het paneel niet en blijft het event van de lijst', () => {
+    mockSheetHeight(800)
+    const onDismiss = vi.fn()
+    const { getByTestId } = render(<ModusHarness onDismiss={onDismiss} />)
+    const rij = getByTestId('sleeprij')
+
+    fireEvent.touchStart(rij, { touches: [{ clientY: 100, clientX: 10 }] })
+    expect(fireEvent.touchMove(rij, { touches: [{ clientY: 300, clientX: 10 }] })).toBe(true)
+    expect(getByTestId('sheet').style.transform).toBe('')
+    fireEvent.touchMove(rij, { touches: [{ clientY: 20, clientX: 10 }] })
+    expect(getByTestId('sheet').style.transform).toBe('')
+    fireEvent.touchEnd(rij)
+    expect(onDismiss).not.toHaveBeenCalled()
+  })
+
+  it('Given de header buiten elk scrollvlak, When je omlaag sleept, Then blijft die gewoon greep', () => {
+    mockSheetHeight(800)
+    const { getByTestId } = render(<ModusHarness onDismiss={vi.fn()} />)
+    const header = getByTestId('header')
+
+    fireEvent.touchStart(header, { touches: [{ clientY: 100, clientX: 10 }] })
+    fireEvent.touchMove(header, { touches: [{ clientY: 180, clientX: 10 }] })
+    expect(getByTestId('sheet').style.transform).not.toBe('')
+    fireEvent.touchEnd(header)
+  })
+})

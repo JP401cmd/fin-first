@@ -383,7 +383,7 @@ function Invullen({ questionnaireId, onTerug, onClose, onVeranderd }: {
             : ''}
       </div>
 
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4">
         {fase === 'laden' && (
           <div className="flex items-center gap-2 text-sm text-[var(--ink-3)]">
             <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
@@ -641,7 +641,15 @@ function AntwoordInvoer({ vraag, vorig, bezig, onVerstuur, onSlaOver, slaOverLab
             scherm, en het gesprek moet zichtbaar blijven. */}
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={naSlepen}>
           <SortableContext items={volgorde} strategy={verticalListSortingStrategy}>
-            <ol aria-label={vraag.question_text} className="max-h-[28vh] space-y-0.5 overflow-y-auto">
+            {/* `data-sheet-gesture="none"`: slepen en scrollen in deze lijst is
+                nooit "het chatpaneel wegslepen" (B-050 — het paneel schoof mee
+                omlaag en omhoog). `overscroll-contain`: aan de rand van de lijst
+                loopt de scroll niet door naar de pagina erachter. */}
+            <ol
+              aria-label={vraag.question_text}
+              data-sheet-gesture="none"
+              className="max-h-[28vh] space-y-0.5 overflow-y-auto overscroll-contain"
+            >
               {volgorde.map((optie, i) => (
                 <RangRij
                   key={optie}
