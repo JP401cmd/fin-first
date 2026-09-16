@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-16T21:59:01.125Z",
+  "generatedAt": "2026-09-16T23:08:08.746Z",
   "generatedDate": "2026-09-16",
   "repo": {
     "name": "fin",
@@ -18030,6 +18030,19 @@
       ],
       "summary": "De horizon-kernel kent één haalbaarheidscriterium voor een stopmoment: `solver.ts#isToereikend`. Zonder de nieuwe instelling is dat exact de Excel-gap (`computeGap ≥ 0`, P!B38). Met de hoofdinstelling **\"Geen tekort-lening in mijn plan\"** (`profiles.fire_no_deficit_loan = true` →",
       "file": "docs/adr/0149-geen-tekort-lening-als-planvoorwaarde.md"
+    },
+    {
+      "id": "0150-opeethypotheek-opname-naar-behoefte",
+      "title": "Opeethypotheek zonder eigen maandbedrag neemt op naar behoefte: per maand het gat, tot het leenplafond",
+      "status": "aanvaard",
+      "date": "2026-09-17",
+      "elements": [
+        "as-planning",
+        "fn-toekomstplannen",
+        "as-vermogen"
+      ],
+      "summary": "Een opeethypotheek zónder eigen maandbedrag (`ReverseMortgageConfig.monthlyPayout === null`) neemt in de horizon-kernel niet langer een vast, over de resterende levensverwachting gespreid bedrag op. Ze neemt per maand op wat je tekortkomt: het gat dat anders de synthetische tekor",
+      "file": "docs/adr/0150-opeethypotheek-opname-naar-behoefte.md"
     }
   ],
   "churn": {
@@ -18079,8 +18092,8 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 10600,
-        "commits": 89
+        "loc": 10601,
+        "commits": 90
       },
       {
         "file": "components/app/budgets-client.tsx",
@@ -19262,16 +19275,8 @@
   "diff": {
     "baseline": false,
     "previousDate": "2026-09-16",
-    "hasChanges": true,
-    "sections": [
-      {
-        "label": "Componenten (aantal)",
-        "added": [
-          "+1"
-        ],
-        "removed": []
-      }
-    ]
+    "hasChanges": false,
+    "sections": []
   },
   "statsHistory": [
     {
