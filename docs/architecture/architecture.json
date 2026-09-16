@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-09-15T16:30:17.732Z",
-  "generatedDate": "2026-09-15",
+  "generatedAt": "2026-09-16T20:51:07.873Z",
+  "generatedDate": "2026-09-16",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -18002,6 +18002,19 @@
       ],
       "summary": "Een vragenlijst was alles-of-niets: beheer zette 'm op \"actief\" en iedere ingelogde gebruiker zag 'm, alleen via het klembord-icoon in Fins chat en pas als hij de chat opende. Dit besluit voegt drie dingen toe zonder de zojuist geharde vragenlijst-RLS aan te raken: een **versprei",
       "file": "docs/adr/0147-vragenlijsten-worden-gericht-verspreid.md"
+    },
+    {
+      "id": "0148-opeethypotheek-volgt-wanneer-nodig",
+      "title": "Opeethypotheek volgt \"Wanneer nodig\": een app-only opeet-trigger naast de verkoop-only Excel-trigger",
+      "status": "aanvaard",
+      "date": "2026-09-16",
+      "elements": [
+        "as-planning",
+        "fn-toekomstplannen",
+        "as-vermogen"
+      ],
+      "summary": "De opeethypotheek start in de horizon-kernel niet langer hard op een vaste leeftijd wanneer de gebruiker \"Wanneer nodig\" kiest. Een apart, app-only veld `WoningStrategieParams.opeetTrigger` laat de opeet-tak starten zodra het liquide vermogen onder de behoefte-drempel zakt, met d",
+      "file": "docs/adr/0148-opeethypotheek-volgt-wanneer-nodig.md"
     }
   ],
   "churn": {
@@ -18013,11 +18026,11 @@
       },
       {
         "path": "lib/ai",
-        "commits": 53
+        "commits": 52
       },
       {
         "path": "app/(app)/toekomst",
-        "commits": 32
+        "commits": 31
       },
       {
         "path": "app/api/ai",
@@ -18051,8 +18064,8 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 10536,
-        "commits": 89
+        "loc": 10578,
+        "commits": 88
       },
       {
         "file": "components/app/budgets-client.tsx",
@@ -18062,7 +18075,7 @@
       {
         "file": "components/core/assets-client.tsx",
         "loc": 4742,
-        "commits": 40
+        "commits": 39
       },
       {
         "file": "components/app/cash-account-view.tsx",
@@ -18072,7 +18085,7 @@
       {
         "file": "lib/dashboard-data-loader.ts",
         "loc": 3126,
-        "commits": 59
+        "commits": 60
       },
       {
         "file": "lib/release-notes.ts",
@@ -18082,7 +18095,7 @@
       {
         "file": "components/app/chat/chat-panel.tsx",
         "loc": 2439,
-        "commits": 24
+        "commits": 23
       },
       {
         "file": "app/(app)/core/cash/import/page.tsx",
@@ -19234,16 +19247,8 @@
   "diff": {
     "baseline": false,
     "previousDate": "2026-09-15",
-    "hasChanges": true,
-    "sections": [
-      {
-        "label": "Componenten (aantal)",
-        "added": [
-          "+4"
-        ],
-        "removed": []
-      }
-    ]
+    "hasChanges": false,
+    "sections": []
   },
   "statsHistory": [
     {
@@ -19654,6 +19659,13 @@
     },
     {
       "date": "2026-09-15",
+      "api": 322,
+      "components": 1111,
+      "tables": 101,
+      "routesProduction": 90
+    },
+    {
+      "date": "2026-09-16",
       "api": 322,
       "components": 1111,
       "tables": 101,
