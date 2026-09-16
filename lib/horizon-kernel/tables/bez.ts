@@ -44,6 +44,12 @@
  *     Prognose!J(m−1) < drempel) ∨ leeftijd ≥ B64 — dezelfde drempel als AY. De
  *     spreiding loopt dan over `(90 − werkelijke startleeftijd)` jaar. Zonder het veld
  *     is dit `leeftijd ≥ B64` en het blok byte-identiek aan het oracle.
+ *   - **BE naar behoefte** (buiten oracle — ADR 0150): bij `opeetOpnameNaarBehoefte`
+ *     zónder eigen B67 is `gewenst` niet de auto-spreiding maar de door de engine
+ *     ná Verdeling bepaalde behoefte (`dep.opeetBehoefteOpname`: gat + openstaand
+ *     tekort), zelfde cap-restant. De vroege woning-call kent die behoefte nog niet
+ *     (⇒ BE 0 in CF!I: de opname gaat niet de potten in); de volle Bez-call draagt
+ *     het werkelijke bedrag. Zonder de vlag byte-identiek aan het oracle.
  *
  * ## Horizon-guard (afwijkend, per kolomtype — empirisch geverifieerd)
  * Voorbij leeftijd 100 leegt Excel de **waarde/rendement-kolommen** én B/C/AV/AW én
@@ -114,6 +120,24 @@ export interface BezWoningDep {
    * daarna dit veld. Alléén bij 'Wanneer nodig'.
    */
   readonly opeetStartLeeftijd?: number
+  /**
+   * BUITEN ORACLE-DOMEIN (ADR 0150) — alléén gelezen bij `woning.opeetOpnameNaarBehoefte
+   * === true` zonder eigen `opeetMaandopname`. De door de engine ná Verdeling(m)
+   * bepaalde behoefte-opname van maand m (gat + openstaand tekort, al gecapt op
+   * `opeetCapRestant`). Afwezig ⇒ 0: dat is de vroege woning-call (vóór CF/Verdeling),
+   * zodat BE dan niet in CF!I/Toename terechtkomt — de opname is directe dekking.
+   */
+  readonly opeetBehoefteOpname?: number
+}
+
+/**
+ * Resterende leenruimte van de opeethypotheek in maand m: de cap op het EIND-saldo
+ * (na de rente-bijschrijving van deze maand) minus het saldo van m−1, geklemd op 0:
+ * `MAX(0, BD/(1+B66/12) − S!P(m−1))`. Eén home voor BE (`computeWoningblok`) en voor
+ * de behoefte-opname in de engine (ADR 0150).
+ */
+export function opeetCapRestant(opeetCap: number, opeetRentePerJaar: number, opeetSaldoVorig: number): number {
+  return Math.max(0, opeetCap / (1 + opeetRentePerJaar / 12) - opeetSaldoVorig)
 }
 
 /**
@@ -426,6 +450,13 @@ function computeWoningblok(
   let opeetOpname = 0
   if (opeetGestart === 1) {
     opeetCap = overwaardeVorig * w.opeetMaxLeningPctOverwaarde
+    // Cap op het eind-saldo: na opname stapelt de rente nog op → opname ≤
+    // BD/(1+rente/12) − saldo(m−1). Verliest de cap zijn ruimte, dan valt BE naar 0.
+    const capRestant = opeetCapRestant(opeetCap, w.opeetRentePerJaar, dep.opeetSaldoVorig)
+    // ADR 0150 (app-only): opname naar behoefte — `gewenst` is de engine-behoefte van
+    // deze maand (gat + openstaand tekort), 0 zolang de engine 'm nog niet kent
+    // (vroege woning-call). Alleen zonder eigen B67; een eigen bedrag wint altijd.
+    const naarBehoefte = w.opeetOpnameNaarBehoefte === true && w.opeetMaandopname === null
     // Auto-opname-basis + spreidingsnoemer. Oracle-pad: bevroren overwaarde (engine,
     // maand B64−1) over (90 − B64)·12. App-pad: in de STARTMAAND zelf de eigen
     // overwaarde(m−1)/leeftijd (de engine bevriest exact die waarden voor m+1…), daarna
@@ -437,14 +468,12 @@ function computeWoningblok(
       : startNu
         ? age
         : (dep.opeetStartLeeftijd ?? age)
-    const gewenst =
-      w.opeetMaandopname !== null
+    const gewenst = naarBehoefte
+      ? (dep.opeetBehoefteOpname ?? 0)
+      : w.opeetMaandopname !== null
         ? w.opeetMaandopname * idx
         : (basisOverwaarde * w.opeetMaxLeningPctOverwaarde) /
           ((OPEET_LEVENSVERWACHTING_LEEFTIJD - startLeeftijd) * 12)
-    // Cap op het eind-saldo: na opname stapelt de rente nog op → opname ≤
-    // BD/(1+rente/12) − saldo(m−1). Verliest de cap zijn ruimte, dan valt BE naar 0.
-    const capRestant = Math.max(0, opeetCap / (1 + w.opeetRentePerJaar / 12) - dep.opeetSaldoVorig)
     opeetOpname = Math.max(0, Math.min(gewenst, capRestant))
   }
 

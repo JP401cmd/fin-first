@@ -125,6 +125,8 @@ export interface WithdrawalReceiptLine {
 export function buildWithdrawalReceiptLines(
   need: WithdrawalNeedBreakdown,
   withdrawal: number,
+  /** ADR 0150 — opeethypotheek-opname dit jaar; dekt (een deel van) `nietGedekt`. */
+  opeetOpname = 0,
 ): WithdrawalReceiptLine[] {
   const lines: WithdrawalReceiptLine[] = [
     {
@@ -161,8 +163,15 @@ export function buildWithdrawalReceiptLines(
     lines.push({ id: 'maandcorrectie', label: 'Maandcorrectie', signed: need.restMaandClamp, kind: 'component' })
   }
   lines.push({ id: 'totaal', label: 'Behoefte-totaal', signed: need.totaalNeed, kind: 'total' })
-  if (need.nietGedekt > 0.5) {
-    lines.push({ id: 'niet-gedekt', label: 'Niet gedekt (tekort)', signed: -need.nietGedekt, kind: 'deficit' })
+  // De opeethypotheek-opname (naar behoefte) dekt het gat dat de potten niet dekten; alleen
+  // wat daarna overblijft is een echt tekort. Sluiting: totaalNeed − opeet − tekort = withdrawal.
+  const opeetGedekt = Math.min(Math.max(0, opeetOpname), need.nietGedekt)
+  if (opeetGedekt > 0.5) {
+    lines.push({ id: 'opeet-gedekt', label: 'Gedekt uit je huis (opeethypotheek)', signed: -opeetGedekt, kind: 'component' })
+  }
+  const tekort = need.nietGedekt - opeetGedekt
+  if (tekort > 0.5) {
+    lines.push({ id: 'niet-gedekt', label: 'Niet gedekt (tekort)', signed: -tekort, kind: 'deficit' })
   }
   return lines
 }
@@ -616,6 +625,9 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
   // deze leeftijd) → 1.0, oftewel geen deflatie: liever het nominale bedrag dan een
   // bedrag op een zelf-verzonnen grondslag.
   const factor = row?.inflationFactor ?? 1
+  // Nominaal, zoals `cashflowNet`; `CostsRow` deflateert via `factor` (één keer).
+  const opeetOpnameJaar = row?.opeetOpname ?? 0
+  const overigeCashflows = (row?.cashflowNet ?? 0) - opeetOpnameJaar
   const { view } = useEuroView()
   const fc = useYearFc(factor)
   // Rauwe formatter voor de "≈ … vandaag"-hints: die dragen hun eigen, expliciete
@@ -709,8 +721,9 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
 
   // ── Onttrekkings-behoefte-kassabon (alleen post-FIRE behoefte-jaren) ─
   const withdrawalReceipt = useMemo(() => {
-    if (!row?.withdrawalNeed || row.withdrawal <= 0) return null
-    return buildWithdrawalReceiptLines(row.withdrawalNeed, row.withdrawal)
+    // Ook een jaar dat volledig uit de opeethypotheek wordt gedekt (withdrawal 0) krijgt de bon.
+    if (!row?.withdrawalNeed || row.withdrawal + (row.opeetOpname ?? 0) <= 0) return null
+    return buildWithdrawalReceiptLines(row.withdrawalNeed, row.withdrawal, row.opeetOpname ?? 0)
   }, [row])
 
   // ── Debt-rijen: alleen actief in dit jaar (saldo of aflossing/rente > 0) ─
@@ -1047,7 +1060,7 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
                     factor={factor}
                   />
                 )}
-                {row.withdrawal > 0 && (
+                {(row.withdrawal > 0 || withdrawalReceipt != null) && (
                   <CostsRow
                     label="Onttrekking uit portfolio"
                     sublabel="dekt jaarlijkse uitgaven na FIRE"
@@ -1128,12 +1141,23 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
                     ) : undefined}
                   </CostsRow>
                 )}
-                {row.cashflowNet !== 0 && (
+                {/* ADR 0150 — `cashflowNet` = opeethypotheek-opname − gebeurteniskosten
+                    (bridge). De opname als eigen regel; de rest blijft "overige cashflows". */}
+                {opeetOpnameJaar > 0 && (
+                  <CostsRow
+                    label="Opname uit je huis"
+                    sublabel="opeethypotheek, dekt wat je potten niet meer dekken"
+                    amount={opeetOpnameJaar}
+                    tone="income"
+                    factor={factor}
+                  />
+                )}
+                {overigeCashflows !== 0 && (
                   <CostsRow
                     label="Overige cashflows"
-                    sublabel="recurring life-events (excl. AOW)"
-                    amount={row.cashflowNet}
-                    tone={row.cashflowNet >= 0 ? 'income' : 'expense'}
+                    sublabel="terugkerende gebeurtenissen"
+                    amount={overigeCashflows}
+                    tone={overigeCashflows >= 0 ? 'income' : 'expense'}
                     factor={factor}
                   />
                 )}

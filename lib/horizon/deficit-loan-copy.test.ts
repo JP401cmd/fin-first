@@ -128,25 +128,25 @@ describe('buildDeficitLoanCopy — woonstrategie', () => {
   it('opeethypotheek die ná de eerste tekort-leeftijd start: benoemt de keuze, het startmoment en het resterende gat', () => {
     const copy = buildDeficitLoanCopy({ ...BASE, firstAge: 51, clearedAge: 89, housing: opeet(67) })
     expect(copy.woning).toContain('Je hebt een opeethypotheek gekozen')
-    expect(copy.woning).toContain('start in deze projectie op leeftijd 67')
-    expect(copy.woning).toContain('maandopname uit je huis vult het gat niet volledig')
+    expect(copy.woning).toContain('voor het eerst op op leeftijd 67')
+    expect(copy.woning).toContain('opname uit je huis vult het gat niet volledig')
   })
 
   it('opeethypotheek waarna de lening snel op nul staat → geen oorzaakclaim (dat kan ook AOW zijn)', () => {
     const copy = buildDeficitLoanCopy({ ...BASE, firstAge: 51, clearedAge: 53, housing: opeet(52) })
-    expect(copy.woning).toContain('start in deze projectie op leeftijd 52')
+    expect(copy.woning).toContain('voor het eerst op op leeftijd 52')
     expect(copy.woning).not.toContain('blijft er een tekort-lening openstaan')
     expect(copy.woning).not.toMatch(/weer op nul|afgelost/)
   })
 
   it('opeethypotheek die al loopt vóór het tekort → de opname vult het gat niet volledig', () => {
     const copy = buildDeficitLoanCopy({ ...BASE, firstAge: 60, housing: opeet(52) })
-    expect(copy.woning).toContain('loopt vanaf leeftijd 52')
+    expect(copy.woning).toContain('neemt op vanaf leeftijd 52')
     expect(copy.woning).toContain('vult het gat niet volledig')
   })
 
   it('opeethypotheek die in de projectie niet start', () => {
-    expect(buildDeficitLoanCopy({ ...BASE, housing: opeet(null) }).woning).toContain('start in deze projectie niet')
+    expect(buildDeficitLoanCopy({ ...BASE, housing: opeet(null) }).woning).toContain('wordt er niets uit opgenomen')
   })
 
   it('verkoop ná de eerste tekort-leeftijd die de lening aflost → noemt verkoop en aflossing', () => {

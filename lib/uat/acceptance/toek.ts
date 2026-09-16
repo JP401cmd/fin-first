@@ -829,6 +829,24 @@ const criteria: AcceptanceCriterion[] = [
       source: 'components/app/horizon/wealth-composition-chart.tsx (segment-kleuren per schuldsoort, ADR 0148) — consumeert bestaande kernel-uitkomsten zonder herberekening.',
     },
   },
+  {
+    workflow: 'WF-TOEK-54',
+    scenarioId: 'UAT-TOEK-54',
+    titel: 'Opeethypotheek naar behoefte: de opname is zichtbaar als eigen post (Inkomen & Uitgaven, jaar-kassabon, opbouw-hover, tijdlijn-marker) (ADR 0150)',
+    kriticiteit: 'BELANGRIJK',
+    persona: 'willem',
+    given:
+      'Persona Willem met een opeethypotheek zónder eigen maandbedrag (`monthlyPayout: null`) — de kernel neemt dan per maand op wat het gat is, tot het leenplafond (ADR 0150). VOORHEEN was die opname nergens als eigen post zichtbaar: hij liep ongelabeld mee in "Overige cashflows" (jaar-kassabon) en in geen enkele inkomstenlaag van "Inkomen & Uitgaven"; een jaar dat volledig door de opname werd gedekt (onttrekking uit portfolio = €0) toonde zelfs helemaal geen kassabon.',
+    when:
+      '(a) De gebruiker opent "Inkomen & Uitgaven" op een jaar met een opname en leest de bronnenlijst/sankey; (b) hij opent de jaar-kassabon op zowel een jaar met een gedeeltelijke opname (portfolio-onttrekking > 0) als een jaar dat volledig door de opname wordt gedekt (onttrekking = 0, opname > 0); (c) hij schakelt de tijdas naar "Opbouw" en hovert een jaar met een opname, en leest de tijdlijn-marker van de eerste opname.',
+    then:
+      '(a) Er staat een eigen inkomstenlaag "Opname uit je huis (opeethypotheek)" met dezelfde tint als de opeethypotheek-schuldlaag in de Opbouw-grafiek (instroom en schuld zijn twee kanten van hetzelfde geld); het bedrag komt uit `UnifiedProjectionRow.opeetOpname`, niet uit een eigen som. (b) De kassabon toont bij een gedeeltelijke opname de regel "Gedekt uit je huis (opeethypotheek)" vóór de "Niet gedekt (tekort)"-regel, met `tekort = need.nietGedekt − opeetGedekt` (nooit meer het volle `nietGedekt` als tekort tonen wanneer de opname al een deel dekt); een jaar met onttrekking = 0 maar opname > 0 krijgt nu WEL een kassabon (voorheen niet: de bon verscheen alleen bij `withdrawal > 0`). Onder de behoefte-uitsplitsing staat de regel "Opname uit je huis" (sublabel "opeethypotheek, dekt wat je potten niet meer dekken") als eigen post, gesplitst uit `cashflowNet`; "Overige cashflows" (sublabel "terugkerende gebeurtenissen") toont alleen het restant (`cashflowNet − opeetOpname`). (c) De Opbouw-grafiek toont bij hover op een jaar met opname > 0 de regel "Dit jaar uit je huis opgenomen (opeethypotheek): €… — dekt het deel van je uitgaven dat je potten niet meer dekken."; de chart-marker voor de eerste opname heet "Eerste opname opeethypotheek" (niet meer "Opeethypotheek start" — bij opname-naar-behoefte is de eerste gat-maand het relevante moment, niet het triggermoment). Op /toekomst/voorkeuren/huis-strategie toont het maandbedrag-veld bij een lege waarde de placeholder "automatisch" met de hint "Leeg = automatisch: elke maand wat je tekortkomt, tot het leenplafond (N% van de overwaarde). Vul je een bedrag in, dan rekent de app met dat vaste bedrag." — geen auto-geschatte lineaire spreiding meer.',
+    assertion: {
+      kind: 'ui-only',
+      source:
+        'lib/income-expense-breakdown.ts#buildBreakdown (opeethypotheek-laag, `FIXED_LABELS.opeethypotheek`/`FIXED_COLORS.opeethypotheek` uit `lib/wealth-composition.ts#DEBT_LAYER_COLORS`) + components/app/horizon/horizon-year-details-sheet.tsx#buildWithdrawalReceiptLines (opeet-gedekt/tekort-splitsing) + components/app/horizon/wealth-composition-chart.tsx (hover-regel) + components/app/horizon/horizon-client.tsx (tijdlijn-marker "Eerste opname opeethypotheek") + components/future/strategie/housing-strategy-section.tsx (placeholder/hint) — weergavegedrag op het bestaande bridge-veld `SimRow.opeetOpname`/`UnifiedProjectionRow.opeetOpname` (ADR 0150), geen eigen herberekening. Rekengedrag (behoefte, cap, dekking) is exact getoetst in lib/horizon-kernel/opeet-naar-behoefte.test.ts; het weergave-splitspunt in `buildWithdrawalReceiptLines` is bewaakt in components/app/horizon/horizon-year-details-sheet.test.tsx.',
+    },
+  },
 ]
 
 export const TOEK_ACCEPTANCE: AcceptanceSet = {
@@ -856,9 +874,13 @@ export const TOEK_ACCEPTANCE: AcceptanceSet = {
  * melding (werkelijk aflosmoment, woonstrategie-zin) — deze twee ADR's hadden
  * daarvoor geen eigen criterium. WF-TOEK-53 is NIEUW — ADR 0148 kleurt de
  * opbouw-grafiek per schuldsoort; ook dat stond nog niet gedekt.
+ * WF-TOEK-54 (17 sep 2026, ADR 0150 "Opeethypotheek: opname naar behoefte") is
+ * NIEUW — de opname zonder eigen maandbedrag draagt sindsdien een zichtbare
+ * eigen post (Inkomen & Uitgaven, jaar-kassabon, opbouw-hover, tijdlijn-marker,
+ * strategie-veld); dat stond nog niet gedekt.
  */
 export const TOEK_EXPECTED_WORKFLOW_NUMBERS: number[] = [
   ...Array.from({ length: 8 }, (_, i) => i + 1), // 1..8
   ...Array.from({ length: 17 }, (_, i) => i + 10), // 10..26
-  28, 29, 30, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53,
+  28, 29, 30, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54,
 ]

@@ -7,7 +7,6 @@ import {
   DEFAULT_DOWNSIZE_CONFIG,
   DEFAULT_REVERSE_MORTGAGE_CONFIG,
   estimateMonthlyHousingCostAfterSale,
-  estimateReverseMortgagePayout,
   isDepletionMarginDefault,
   type HousingStrategyConfig,
   type HousingStrategyMode,
@@ -472,7 +471,6 @@ function StrategyDetailsPanel({
   config,
   onChange,
   estimatedWoz,
-  estimatedEquity,
 }: StrategyDetailsPanelProps) {
   const setTrigger = (trigger: HousingStrategyTrigger) => onChange({ ...config, trigger })
 
@@ -482,12 +480,6 @@ function StrategyDetailsPanel({
     () => (estimatedWoz > 0 ? estimateMonthlyHousingCostAfterSale(estimatedWoz) : null),
     [estimatedWoz],
   )
-  const autoMonthlyPayout = useMemo(() => {
-    if (config.mode !== 'reverse_mortgage') return null
-    if (estimatedEquity <= 0) return null
-    const remainingYears = Math.max(1, 95 - config.triggerAge) // gok van levensduur
-    return estimateReverseMortgagePayout(estimatedEquity, config.maxLoanPct, remainingYears)
-  }, [config, estimatedEquity])
 
   return (
     <div className="mt-5 rounded-xl border border-[var(--border-ed)] bg-[var(--subtle)] p-4">
@@ -682,11 +674,7 @@ function StrategyDetailsPanel({
                 max={20000}
                 step={50}
                 value={config.monthlyPayout ?? ''}
-                placeholder={
-                  autoMonthlyPayout != null
-                    ? `auto-schatting: € ${autoMonthlyPayout}`
-                    : 'auto-schatting'
-                }
+                placeholder="automatisch"
                 onChange={(e) => {
                   const raw = e.target.value
                   onChange({ ...config, monthlyPayout: raw === '' ? null : Number(raw) })
@@ -694,7 +682,7 @@ function StrategyDetailsPanel({
                 className="w-40 rounded-lg border border-[var(--border-md)] bg-[var(--paper)] px-3 py-2 text-sm font-mono text-[var(--ink)] outline-none focus:border-[var(--ink)]"
               />
               <span className="text-[11px] text-[var(--ink-3)]">
-                Leeg = lineair berekend op basis van max %.
+                Leeg = automatisch: elke maand wat je tekortkomt, tot het leenplafond ({Math.round(config.maxLoanPct * 100)}% van de overwaarde). Vul je een bedrag in, dan rekent de app met dat vaste bedrag.
               </span>
             </div>
           </div>

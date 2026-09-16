@@ -120,6 +120,8 @@ export interface StackedRow {
   schuldOverig?: number
   schuldOpeethypotheek?: number
   schuldTekortLening?: number
+  /** Opname uit de opeethypotheek dit jaar (instroom, geen voorraad); afwezig = geen. */
+  opeetOpname?: number
 }
 
 // ── Helpers ─────────────────────────────────────────────────
@@ -654,6 +656,7 @@ export function unifiedRowsToStackedRows(
     if (debtTypeById) {
       for (const layer of DEBT_LAYERS) stacked[DEBT_LAYER_FIELD[layer]] = -Math.round(perLayer[layer])
     }
+    if ((row.opeetOpname ?? 0) > 0) stacked.opeetOpname = Math.round(row.opeetOpname!)
     return stacked
   })
 }

@@ -14,6 +14,7 @@
 import type { SimRow } from '@/lib/fire-simulation'
 import type { UnifiedProjectionRow } from '@/lib/unified-projection'
 import type { Debt } from '@/lib/debt-data'
+import { DEBT_LAYER_COLORS } from '@/lib/wealth-composition'
 
 // ── Layer & row types ───────────────────────────────────────
 
@@ -47,6 +48,9 @@ const FIXED_COLORS: Record<string, string> = {
   growth: 'var(--horizon-600, #8a6e42)',
   salaris: 'var(--horizon-300, #d8be93)',
   'gebeurtenis-baten': 'var(--horizon-500, #b3894e)',
+  // Zelfde tint als de opeethypotheek-schuldlaag in de Opbouw-grafiek: instroom en
+  // schuld zijn twee kanten van hetzelfde geld.
+  opeethypotheek: DEBT_LAYER_COLORS.opeethypotheek,
   withdrawal: 'var(--kern-400, #a07860)',
   box3: 'var(--kern-600, #6b4339)',
 }
@@ -59,6 +63,7 @@ const FIXED_LABELS: Record<string, string> = {
   // gebeurtenissen met inkomen (bv. extra inleg, huur). Het oude label "AOW & pensioen"
   // wekte de indruk dat er vóór de AOW-leeftijd al AOW binnenkwam.
   'gebeurtenis-baten': 'Inkomsten uit gebeurtenissen',
+  opeethypotheek: 'Opname uit je huis (opeethypotheek)',
   // Levensonderhoud toont ná box3-ontdubbeling alléén het niet-fiscale deel van
   // de onttrekking; Box 3 staat als eigen post ernaast (zie buildBreakdown).
   withdrawal: 'Levensonderhoud via onttrekking',
@@ -78,7 +83,7 @@ const EXPENSE_EVENT_PALETTE = [
 /** Reds for debt interest */
 const DEBT_INTEREST_COLOR = '#ef4444'
 
-const FIXED_INCOME_IDS: Set<string> = new Set(['savings', 'growth', 'salaris', 'gebeurtenis-baten'])
+const FIXED_INCOME_IDS: Set<string> = new Set(['savings', 'growth', 'salaris', 'gebeurtenis-baten', 'opeethypotheek'])
 const FIXED_EXPENSE_IDS: Set<string> = new Set(['withdrawal', 'box3'])
 
 // ── Helpers ─────────────────────────────────────────────────
@@ -166,6 +171,7 @@ export function buildBreakdown(
   const candidateIncomeLayers: BreakdownLayer[] = [
     buildLayer('salaris', FIXED_LABELS.salaris, FIXED_COLORS.salaris, true),
     buildLayer('gebeurtenis-baten', FIXED_LABELS['gebeurtenis-baten'], FIXED_COLORS['gebeurtenis-baten'], true),
+    buildLayer('opeethypotheek', FIXED_LABELS.opeethypotheek, FIXED_COLORS.opeethypotheek, true),
     buildLayer('savings', FIXED_LABELS.savings, FIXED_COLORS.savings, true),
     buildLayer('growth', FIXED_LABELS.growth, FIXED_COLORS.growth, true),
     ...incomeEventIds.map((id, i) =>
@@ -252,6 +258,14 @@ export function buildBreakdown(
       if (gib.gebeurtenisBaten > 0) {
         incomeBySource['gebeurtenis-baten'] = Math.round(gib.gebeurtenisBaten)
       }
+    }
+
+    // Opname uit de opeethypotheek (Bez!BE, bridge-weergaveveld). Op het app-pad (ADR 0150,
+    // naar behoefte) dekt die direct het deel van de uitgaven dat de potten niet dekken;
+    // op het oracle-pad (vast bedrag) loopt hij via CF!I en de toename-verdeling. In beide
+    // gevallen een instroom die anders nergens zichtbaar is.
+    if ((uRow.opeetOpname ?? 0) > 0) {
+      incomeBySource['opeethypotheek'] = Math.round(uRow.opeetOpname!)
     }
 
     // Positive life event cashflows from SimRow breakdown

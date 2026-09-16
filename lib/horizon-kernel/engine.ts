@@ -73,6 +73,7 @@ import {
 import {
   computeBez,
   computeBezWoning,
+  opeetCapRestant,
   type BezDep,
   type BezRow,
   type BezWoningblok,
@@ -503,6 +504,13 @@ export function runKernelProjection(
   // dit pad inert → byte-identiek.
   const opeetWanneerNodig =
     input.woning.selector === 'Opeethypotheek' && input.woning.opeetTrigger === 'Wanneer nodig'
+  // ADR 0150 (app-only, buiten oracle-domein): opname NAAR BEHOEFTE. Zonder eigen
+  // maandbedrag bepaalt de engine de opname pas ná Verdeling(m) — zie stap 7b. Zonder
+  // de vlag blijft die stap inert (byte-identiek).
+  const opeetNaarBehoefte =
+    input.woning.selector === 'Opeethypotheek' &&
+    input.woning.opeetOpnameNaarBehoefte === true &&
+    input.woning.opeetMaandopname === null
   const opeetStartMonth = Math.round(
     (input.woning.opeetStartleeftijdOpname - input.startLeeftijd) * 12,
   )
@@ -614,12 +622,15 @@ export function runKernelProjection(
     // Toename/Verdeling. Lichte call (F3): berekent alléén het woningblok, niet de volle
     // 10-slot-loop + totalen + rij-constructie die de vroegere `computeBez(earlyDep)` voor
     // niets draaide (er werd alleen `.woning` van gelezen). Byte-identiek — zie computeBezWoning.
+    // ADR 0150: bij opname naar behoefte is BE hier bewust 0 (de behoefte is pas ná
+    // Verdeling bekend) — zo blijft de opname uit CF!I/Toename en gaat ze niet de potten in.
     const woning = computeBezWoning(input, bezM1, m)
 
     // ADR 0148 — 'Wanneer nodig': de opeet-tak start déze maand (0→1). Bevries de
     // auto-opname-basis en de werkelijke startleeftijd voor m+1…; in maand m zelf las
     // het woningblok al exact deze waarden (overwaarde(m−1), eigen leeftijd), dus de
-    // volle computeBez-call hieronder (zelfde bezM1) geeft hetzelfde blok.
+    // volle computeBez-call hieronder (zelfde bezM1) geeft hetzelfde blok — op BE na
+    // onder ADR 0150 (behoefte-opname, stap 7b).
     if (opeetWanneerNodig && prevWon.opeetGestart === 0 && woning.opeetGestart === 1) {
       overwaardeBijOpeetStart = Math.max(0, bezM1.huisWaardeVorig - bezM1.hypotheekSaldoVorig)
       opeetStartLeeftijd = ageAtMonth(input, m)
@@ -689,6 +700,30 @@ export function runKernelProjection(
     }
     const verdelingRow = computeVerdeling(input, verdelingDep, m)
 
+    // (7b) Opeethypotheek naar behoefte (ADR 0150; app-only, inert zonder de vlag).
+    // Behoefte(m) = het gat dat anders de tekort-lening voedt (S!AB-voeding BV+EO =
+    // onbenut afname + onttrekking) + het pre-existente tekort dat ná Verdeling!AC nog
+    // openstaat (`tekortRestant`). Opname = MIN(behoefte, capRestant) — dezelfde cap als
+    // BE (één home: tables/bez.ts#opeetCapRestant). De opname is DIRECTE dekking: ze
+    // ging niet via CF!I/Toename de potten in (de vroege woning-call gaf BE 0), maar
+    // verlaagt hier de tekort-voeding en verhoogt de tekort-aflossing die S(m) leest —
+    // eerst het gat van deze maand, dan het oude tekort (de som is voor S!AB gelijk).
+    // Lag-conventie: capaciteit is m−1, dus in een overgangsmaand kan de opname hoger
+    // zijn dan strikt nodig (instroom van dezelfde maand is pas in m+1 opneembaar) —
+    // exact de conventie die de tekort-lening ook volgt.
+    let tekortBudget = verdelingRow.afname.onbenut + verdelingRow.onttrekking.onbenut
+    let tekortAflossing = verdelingRow.tekortAflossing
+    let opeetBehoefteOpname: number | undefined
+    if (opeetNaarBehoefte && woning.opeetGestart === 1) {
+      const capRestant = opeetCapRestant(woning.opeetCap, input.woning.opeetRentePerJaar, bezM1.opeetSaldoVorig)
+      const behoefte = tekortBudget + verdelingRow.tekortRestant
+      const opname = Math.max(0, Math.min(behoefte, capRestant))
+      const gatDekking = Math.min(opname, tekortBudget)
+      tekortBudget -= gatDekking
+      tekortAflossing += opname - gatDekking
+      opeetBehoefteOpname = opname
+    }
+
     // (8) Bez-waardekolommen(m) — volle Bez-call met de echte m-deps.
     // Liquidatie-opbrengst (snede 2b) telt hier — ná rendement — als inleg in de
     // doelcategorie mee (spiegel woningverkoop → nieuw liquide geld). `null` bij
@@ -696,6 +731,9 @@ export function runKernelProjection(
     const toenameEurBase = catMap(taBezitField(taRow, (c) => c.toenameEur), catBufToename)
     const bezDep: BezDep = {
       ...bezM1,
+      // ADR 0150: het werkelijke opnamebedrag van deze maand (alleen behoefte-modus);
+      // afwezig ⇒ bez.ts rekent de oracle-/eigen-bedrag-formule → byte-identiek.
+      ...(opeetBehoefteOpname !== undefined ? { opeetBehoefteOpname } : {}),
       toenameEur: liquidatieToename === null ? toenameEurBase : addCat(toenameEurBase, liquidatieToename),
       aantalPotten: catMap(taBezitField(taRow, (c) => c.aantal), catBufAantal),
       verdelingAfname: catMap(verdelingRow.afname.eind, catBufVerdAfname),
@@ -719,11 +757,13 @@ export function runKernelProjection(
       verkocht: bezWoningRow.verkocht,
       opeetCap: bezWoningRow.opeetCap,
       opeetOpname: bezWoningRow.opeetOpname,
-      tekortBudget: verdelingRow.afname.onbenut + verdelingRow.onttrekking.onbenut,
+      // BV+EO, resp. S!AC: de prio-1-tekort-aflossing die Verdeling(m) al berekende
+      // (EQ = ruwBudget − AC). Beide ná stap 7b: zonder behoefte-opname exact de
+      // Verdeling-waarden (byte-identiek), mét opname verlaagd resp. verhoogd.
+      tekortBudget,
       extraAflossingBudget: extraAflossingBuf,
       categorieCap: categorieCapBuf,
-      // S!AC: de prio-1-tekort-aflossing die Verdeling(m) al berekende (EQ = ruwBudget − AC).
-      tekortAflossing: verdelingRow.tekortAflossing,
+      tekortAflossing,
     }
     const sRow = computeS(input, sDep, m)
 

@@ -254,3 +254,23 @@ describe('buildBreakdown — terugval zonder withdrawalNeed', () => {
     expect(rows[0].expenseBySource['box3']).toBe(3000)
   })
 })
+
+describe('buildBreakdown — opname uit de opeethypotheek (ADR 0150)', () => {
+  // Given een jaar waarin de opeethypotheek uitkeert,
+  // When het overzicht Inkomen & Uitgaven wordt gebouwd,
+  // Then staat die opname als eigen inkomstenbron naast de onttrekking — het geld dat uit
+  // het huis komt was anders nergens zichtbaar (het verdwijnt meteen in de onttrekking).
+  it('toont de opname als eigen inkomstenlaag', () => {
+    const rows = [makeRow({ age: 55, phase: 'withdrawal', withdrawal: 40_000, opeetOpname: 18_000 })]
+    const out = buildBreakdown(rows, [makeSimRow(55, 'retirement')])
+    expect(out.rows[0].incomeBySource['opeethypotheek']).toBe(18_000)
+    const laag = out.incomeLayers.find((l) => l.id === 'opeethypotheek')
+    expect(laag?.label).toBe('Opname uit je huis (opeethypotheek)')
+  })
+
+  it('geen laag zonder opname', () => {
+    const rows = [makeRow({ age: 55, phase: 'withdrawal', withdrawal: 40_000 })]
+    const out = buildBreakdown(rows, [makeSimRow(55, 'retirement')])
+    expect(out.incomeLayers.some((l) => l.id === 'opeethypotheek')).toBe(false)
+  })
+})

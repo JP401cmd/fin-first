@@ -57,6 +57,9 @@ export const TOEK_FLOW: UatFlow = {
     { id: 'grondslagdoorwerking', scenarioId: 'UAT-TOEK-37', label: 'WF-TOEK-37 · Stip, band, drempels, pill & kassabon bewegen mee', kind: 'screen', stage: 2, lane: 'aflezen', subOf: 'grondslaglijn' },
     // ADR 0148 — schuld-segmenten per soort in de Opbouw-weergave.
     { id: 'opbouwkleuren', scenarioId: 'UAT-TOEK-53', label: 'WF-TOEK-53 · Opbouw-grafiek kleurt schulden per soort', kind: 'screen', stage: 2, lane: 'aflezen', subOf: 'grafiek' },
+    // ADR 0150 — opname naar behoefte krijgt een eigen post (Inkomen & Uitgaven,
+    // jaar-kassabon, opbouw-hover, tijdlijn-marker).
+    { id: 'opeetopname', scenarioId: 'UAT-TOEK-54', label: 'WF-TOEK-54 · Opname uit je huis zichtbaar als eigen post', kind: 'screen', stage: 2, lane: 'aflezen', subOf: 'grafiek' },
 
     // ── 2 · navigeren & delen ─────────────────────────────────────────────
     { id: 'navkaarten', scenarioId: 'UAT-TOEK-28', label: 'WF-TOEK-28 · Navigatiekaarten (drilldown)', kind: 'screen', stage: 2, lane: 'navigeren' },

@@ -149,6 +149,21 @@ describe('buildWithdrawalReceiptLines', () => {
     // totaalNeed − nietGedekt === withdrawal (getoonde bedrag)
     expect(DEFICIT_NEED.totaalNeed - DEFICIT_NEED.nietGedekt).toBe(withdrawal)
   })
+
+  // ADR 0150 — de opeethypotheek dekt het gat naar behoefte. Dat deel is géén tekort.
+  it('toont het door de opeethypotheek gedekte deel apart en alleen het restant als tekort', () => {
+    const lines = buildWithdrawalReceiptLines(DEFICIT_NEED, 150000, 20000)
+    const opeet = lines.find(l => l.id === 'opeet-gedekt')
+    expect(opeet?.label).toBe('Gedekt uit je huis (opeethypotheek)')
+    expect(opeet?.signed).toBe(-20000)
+    expect(lines.find(l => l.kind === 'deficit')?.signed).toBe(-4000)
+  })
+
+  it('volledig gedekt door de opeethypotheek → geen tekortregel', () => {
+    const lines = buildWithdrawalReceiptLines(DEFICIT_NEED, 150000, 24000)
+    expect(lines.find(l => l.kind === 'deficit')).toBeUndefined()
+    expect(lines.find(l => l.id === 'opeet-gedekt')?.signed).toBe(-24000)
+  })
 })
 
 // ── Render: kassabon-regels zichtbaar ────────────────────────────────

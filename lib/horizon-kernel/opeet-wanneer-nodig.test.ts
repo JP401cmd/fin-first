@@ -122,7 +122,11 @@ describe('kernel · opeethypotheek volgt "Wanneer nodig" (ADR 0148)', () => {
   })
 
   it('(1) eerste opname = overwaarde(m−1)·max-leen% gespreid over (90 − werkelijke startleeftijd)·12', () => {
-    const input = kernelInput(housing('on_depletion'))
+    // De spreidingsformule is sinds ADR 0150 het pad ZONDER `opeetOpnameNaarBehoefte`
+    // (oracle-formule; de adapter zet die vlag bij monthlyPayout null). Hier gaat het om
+    // de noemer over de wérkelijke startleeftijd, dus strip de vlag.
+    const { opeetOpnameNaarBehoefte: _weg, ...woningZonder } = kernelInput(housing('on_depletion')).woning
+    const input: KernelInput = { ...kernelInput(housing('on_depletion')), woning: woningZonder }
     const proj = runKernelProjection(input, { fireAge: FIRE_LEEFTIJD })
     const m0 = eersteOpnameMaand(proj)
     const row = proj.bez[m0]

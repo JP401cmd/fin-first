@@ -169,6 +169,17 @@ function inputFor(housing: HousingStrategyConfig) {
   })
 }
 
+/**
+ * ADR 0150: zonder eigen maandbedrag zet de adapter `opeetOpnameNaarBehoefte` en neemt de
+ * kern alléén op wat nodig is — op deze rijke persona is dat niets, dus S!P blijft 0. De
+ * pot-mechaniek (schuld boeken, cap knellen) toetsen we op de auto-spreiding: vlag eraf.
+ */
+function inputMetSpreiding(housing: HousingStrategyConfig) {
+  const input = inputFor(housing)
+  const { opeetOpnameNaarBehoefte: _weg, ...woning } = input.woning
+  return { ...input, woning }
+}
+
 /** S!P(m) — saldo van de fysieke opeet-slot 3 ("" / ontbrekend → 0). */
 function opeetSaldo(proj: ReturnType<typeof solveFire>['projection'], m: number): number {
   const cell = proj.s[m]?.slots[3]?.saldo ?? 0
@@ -214,7 +225,7 @@ describe('opeethypotheek — adapter bouwt de schuldpot op slot 3 (reverse_mortg
 
 describe('opeethypotheek — de schuld wordt geboekt en de opname wordt begrensd', () => {
   it('ná de opeet-startleeftijd is het opeetsaldo > 0 en groeit het maand op maand', () => {
-    const input = inputFor(REVERSE_CONFIG)
+    const input = inputMetSpreiding(REVERSE_CONFIG)
     const proj = solveFire(input).projection
     const startM = Math.round((OPEET_START_AGE - input.startLeeftijd) * 12)
 
@@ -227,8 +238,11 @@ describe('opeethypotheek — de schuld wordt geboekt en de opname wordt begrensd
   })
 
   it('het opeetsaldo drukt het netto vermogen: totalDebts stijgt ná de opeet-start', () => {
+    // Via de adapter-keten (runKernelUnified) is de vlag niet te strippen; een eigen
+    // maandbedrag geeft dezelfde vaste opname-mechaniek die deze bridge-toets nodig heeft.
+    const vasteOpname: HousingStrategyConfig = { ...REVERSE_CONFIG, monthlyPayout: 1_000 }
     const { result } = runKernelUnified({
-      adapterInput: { profile: profileWith(REVERSE_CONFIG), assets: ASSETS, debts: DEBTS, asOf: AS_OF },
+      adapterInput: { profile: profileWith(vasteOpname), assets: ASSETS, debts: DEBTS, asOf: AS_OF },
       yearlyExpenses: 36_000,
     })
     const at = (age: number) => result.rows.find((r) => r.age === age)!

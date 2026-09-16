@@ -431,6 +431,10 @@ export function buildWoningFromConfig(cfg: HousingStrategyConfig): WoningStrateg
       opeetMaxLeningPctOverwaarde: cfg.maxLoanPct,
       opeetRentePerJaar: cfg.interestRate,
       opeetMaandopname: cfg.monthlyPayout,
+      // ADR 0150: zonder eigen maandbedrag neemt de kern per maand op wat je tekortkomt
+      // (beide triggers). Alleen `true` reist mee; bij een eigen bedrag blijft het veld
+      // afwezig zodat dat pad byte-identiek aan het oracle rekent.
+      ...(cfg.monthlyPayout == null ? { opeetOpnameNaarBehoefte: true as const } : {}),
     }
   }
 

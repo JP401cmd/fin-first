@@ -526,6 +526,7 @@ const STACKED_ROW_MONEY_FIELDS = [
   'schuldOverig',
   'schuldOpeethypotheek',
   'schuldTekortLening',
+  'opeetOpname',
 ] as const satisfies readonly (keyof StackedRow)[]
 
 /**
@@ -2291,7 +2292,7 @@ export default function HorizonPage({
     if (reverseMortgageStartAge != null && showNaturalMilestones && showOwnEvents) {
       out.push({
         id: 'reverse-mortgage-start',
-        label: 'Opeethypotheek start',
+        label: 'Eerste opname opeethypotheek',
         age: reverseMortgageStartAge,
         side: 'above',
         color: COLOR_NAT_ASSET,

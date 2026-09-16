@@ -407,6 +407,22 @@ export interface WoningStrategieParams {
   readonly opeetRentePerJaar: number
   /** P!B67 — maandopname opeethypotheek; `null` = auto (leeg). */
   readonly opeetMaandopname: number | null
+  /**
+   * BUITEN ORACLE-DOMEIN (ADR 0150, 17 sep 2026) — opname NAAR BEHOEFTE. Zonder eigen
+   * maandbedrag (`opeetMaandopname === null`) spreidt het oracle de overwaarde-cap
+   * mechanisch over (90 − start)·12 maanden, ongeacht of het geld nodig is. Gezet op
+   * `true` neemt de kern per maand op wat je tekortkomt: het gat dat anders de
+   * tekort-lening voedt (Verdeling: onbenut afname + onttrekking) plus een al
+   * openstaande tekort-lening (`Verdeling.tekortRestant`), begrensd door de resterende
+   * leenruimte (`tables/bez.ts#opeetCapRestant`). De opname is DIRECTE dekking — ze
+   * gaat niet via CF!I/Toename de potten in, maar verlaagt in dezelfde maand de
+   * tekort-voeding en verhoogt de tekort-aflossing van S (`engine.ts`, stap 7b).
+   * Geldt bij beide opeet-triggers vanaf het startmoment (ADR 0148); een eigen
+   * `opeetMaandopname` wint altijd (vlag inert). Afwezig/`false` ⇒ exact het
+   * oracle-gedrag; `input-from-fixture` zet dit veld nooit ⇒ parity byte-identiek.
+   * Alleen de app-adapter (reverse_mortgage + `monthlyPayout === null`) zet het.
+   */
+  readonly opeetOpnameNaarBehoefte?: boolean
 }
 
 /** P!B69 — Onttrekkingsprofiel-selector. */

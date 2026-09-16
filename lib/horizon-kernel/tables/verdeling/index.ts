@@ -268,6 +268,14 @@ export interface VerdelingRow {
    * `tekortAflossingUitLiquide` is dit een nul-array (byte-identiek oracle-gedrag).
    */
   readonly tekortAflossingLiquide: readonly number[]
+  /**
+   * Het PRE-EXISTENTE tekort dat ná `tekortAflossing` nog openstaat: `MAX(0, saldo(m−1)
+   * + AE − AC)` — de rente-bijschrijving van deze maand (AE) inbegrepen, de same-month
+   * voeding (BV+EO) niet. Geen Excel-kolom; afgeleid uit dezelfde termen als AC.
+   * Consument: de behoefte-opname van de opeethypotheek (engine, ADR 0150). Zonder
+   * tekort 0.
+   */
+  readonly tekortRestant: number
   /** HC:HH — niet-plaatsbaar aflos-budget terug naar bezitting-toename (6 categorieën). */
   readonly overflow: readonly number[]
 }
@@ -380,6 +388,7 @@ export function computeVerdeling(
     }
   }
   const tekortAflossing = tekortAflossingSurplus + tekortAflossingExtra
+  const tekortRestant = Math.max(0, dep.tekortSaldoPrev + tekortRente - tekortAflossing)
 
   // HC:HH — de niet-plaatsbare aflossing (aflossing.onbenut) stroomt terug naar
   // bezitting-toename, verdeeld naar rato van de **bezit-toename-gewichten**
@@ -419,6 +428,7 @@ export function computeVerdeling(
     aflossing,
     tekortAflossing,
     tekortAflossingLiquide,
+    tekortRestant,
     overflow,
   }
 }

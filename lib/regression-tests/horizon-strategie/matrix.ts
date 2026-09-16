@@ -336,6 +336,20 @@ export interface ComboExpectation {
  * zonder de oorzaak weg te nemen: zonder fixture-fix loopt hij over ~6 maanden opnieuw tegen
  * de ±0,5 jr-marge. Los van gap V22; hoort op een eigen kaart.
  *
+ * ## Opname naar behoefte (A-reverse, herijkt 2026-09-17, ADR 0150) — waarom A-reverse
+ * naar A-exclude toe schoof
+ * Zonder eigen maandbedrag neemt de opeethypotheek sinds ADR 0150 per maand op wat je
+ * tekortkomt (het gat dat anders de tekort-lening voedt), niet meer de over (90 − start)·12
+ * gespreide volle cap. Op deze rijke persona is er op de FIRE-maand géén behoefte, dus de
+ * opeet-combinatie rekent tot ver ná FIRE exact als "woning uitsluiten": FIRE 42,08 → 42,67
+ * en doelbedrag +6,5%, beide op de A-exclude-waarden (het resterende verschil van tientallen
+ * euro's is de synthetische opeetpot op slot 3). De vroegere 42,08 was de "reached now"-quirk
+ * (oorzaak c) mét het rooskleurige effect van de spreiding: die leende vanaf 67 de volle cap,
+ * het overschot landde liquide in J terwijl de opeetschuld niet-liquide buiten J valt.
+ * Bewust herijkt: dit is de richting die het eigenaarsbesluit beoogt (conservatiever). De
+ * invariant "Opeethypotheek boekt een schuld" blijft discriminerend: de potten raken ná FIRE
+ * alsnog op en de behoefte-opname bouwt tegen het eind een opeetschuld van enkele tonnen op.
+ *
  * **Tolerantie-keuze (bewust, per grootheid).** Vrijheidsleeftijd: **absoluut** ±0,5 jr —
  * een half jaar is de betekenisvolle eenheid voor een pensioendatum, ongeacht of die op 42
  * of op 67 ligt. Doelbedrag: **relatief** ±2% — de bedragen lopen van €0,84 mln tot €5,85
@@ -347,7 +361,7 @@ export const EXPECTED: Record<string, ComboExpectation> = {
   'A-include_full': { fireAgeFractional: 42.083, doelbedrag: 1102623 },
   'A-exclude': { fireAgeFractional: 42.667, doelbedrag: 895562 },
   'A-downsize': { fireAgeFractional: 42.417, doelbedrag: 871910 },
-  'A-reverse': { fireAgeFractional: 42.083, doelbedrag: 840718 },
+  'A-reverse': { fireAgeFractional: 42.667, doelbedrag: 895598 },
   'B-deplete': { fireAgeFractional: 42.083, doelbedrag: 1102623 },
   'B-legacy': { fireAgeFractional: 42.083, doelbedrag: 1102623 },
   'B-perpetual': { fireAgeFractional: 45.083, doelbedrag: 1469348 },

@@ -38,7 +38,7 @@ export interface DeficitLoanHousingFacts {
   mode: HousingStrategyMode
   /** Leeftijd van de huisverkoop in deze run (`kernelHousingSale.age`), of null. */
   saleAge: number | null
-  /** Eerste leeftijd met een opeethypotheek-saldo in deze run, of null. */
+  /** Leeftijd van de eerste opname (eerste opeethypotheek-saldo) in deze run, of null. */
   reverseMortgageStartAge: number | null
 }
 
@@ -184,7 +184,7 @@ function housingSentence(
   if (housing.mode === 'reverse_mortgage') {
     const opeet = wholeAge(housing.reverseMortgageStartAge)
     if (opeet == null) {
-      return `Je hebt een opeethypotheek gekozen, maar die start in deze projectie niet: er komt geen geld uit je huis om dit gat te dekken.`
+      return `Je hebt een opeethypotheek gekozen, maar in deze projectie wordt er niets uit opgenomen: er komt geen geld uit je huis om dit gat te dekken.`
     }
     if (opeet > startAge) {
       // Staat de lening kort na de start op nul, dan zeggen we niets over de oorzaak:
@@ -192,10 +192,10 @@ function housingSentence(
       const daarna =
         cleared != null && cleared <= opeet + 1
           ? ''
-          : ` Ook daarna blijft er een tekort-lening openstaan: de maandopname uit je huis vult het gat niet volledig.`
-      return `Je hebt een opeethypotheek gekozen. Die start in deze projectie op leeftijd ${opeet}; tot dan komt er geen geld uit je huis en dekt de tekort-lening het gat.${daarna}`
+          : ` Ook daarna blijft er een tekort-lening openstaan: de opname uit je huis vult het gat niet volledig, bijvoorbeeld omdat het leenplafond is bereikt.`
+      return `Je hebt een opeethypotheek gekozen. Die neemt in deze projectie voor het eerst op op leeftijd ${opeet}; tot dan komt er geen geld uit je huis en dekt de tekort-lening het gat.${daarna}`
     }
-    return `Je hebt een opeethypotheek gekozen en die loopt vanaf leeftijd ${opeet}, maar de maandopname uit je huis vult het gat niet volledig. Het verschil is de tekort-lening.`
+    return `Je hebt een opeethypotheek gekozen en die neemt op vanaf leeftijd ${opeet}, maar de opname uit je huis vult het gat niet volledig, bijvoorbeeld omdat het leenplafond is bereikt. Het verschil is de tekort-lening.`
   }
 
   if (housing.mode === 'downsize') {

@@ -426,6 +426,13 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
                 </span>
               ))}
             </div>
+            {(tooltipRow.opeetOpname ?? 0) > 0 && (
+              <p className="mt-1 text-[10px] text-[var(--ink-3)]">
+                Dit jaar uit je huis opgenomen (opeethypotheek):{' '}
+                <span className="font-mono tabular-nums text-[var(--ink-2)]">{fmtEuro(tooltipRow.opeetOpname!)}</span>
+                {' '}— dekt het deel van je uitgaven dat je potten niet meer dekken.
+              </p>
+            )}
           </>
         ) : (
           <p className="py-2 text-center font-serif text-[11px] italic text-[var(--ink-4)]">
