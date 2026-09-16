@@ -172,6 +172,8 @@ describe('ProjectieBlock — planeinde, euro-weergave en tekort-meldingen (B-043
   it('toont een aangesproken tekort-lening met de gedeelde copy (wat de 0-vloer anders verbergt)', () => {
     const copy = buildDeficitLoanCopy({
       firstAge: 72,
+      clearedAge: null,
+      housing: null,
       aowAge: 67,
       displayEndAge: 90,
       isPensioenMode: false,

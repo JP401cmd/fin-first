@@ -261,3 +261,50 @@ describe('detectDeficitLoanFromRows — zelfherstellend bruggetje onderdrukken',
     expect(out!.peak).toBe(9_000)
   })
 })
+
+describe('detectDeficitLoanFromRows — clearedAge (werkelijk aflosmoment)', () => {
+  // Given een aanhoudende tekort-lening die later volledig is afgelost,
+  // When de detector de rijen leest,
+  // Then geeft hij de eerste leeftijd met een €0-saldo terug — niet een aangenomen AOW-grens.
+  it('aanhoudend tekort dat na AOW nog jaren doorloopt → clearedAge = eerste €0-rij', () => {
+    const rows = [row(50, 0), row(51, 20_000), row(60, 280_000), row(68, 560_000), row(80, 320_000), row(88, 41_000), row(89, 0)]
+    const out = detectDeficitLoanFromRows(rows, { endAge: 90 })
+    expect(out!.firstAge).toBe(51)
+    expect(out!.clearedAge).toBe(89)
+  })
+
+  it('tekort dat aan het venster-einde nog openstaat → clearedAge null', () => {
+    const rows = [row(55, 20_000), row(60, 150_000), row(89, 400_000)]
+    expect(detectDeficitLoanFromRows(rows, { endAge: 90 })!.clearedAge).toBeNull()
+  })
+
+  it('clearedAge hoort bij de gemelde (eerste aanhoudende) episode, niet bij een eerder bruggetje', () => {
+    const rows = [
+      row(69, 0), row(70, 2_500), row(71, 0),
+      row(84, 0), row(85, 4_000), row(86, 7_000), row(87, 9_000), row(88, 0),
+    ]
+    expect(detectDeficitLoanFromRows(rows, { endAge: 93 })!.clearedAge).toBe(88)
+  })
+})
+
+describe('detectDeficitLoanFromRows — meerdere aanhoudende episodes', () => {
+  // Given een eerste tekort dat wordt afgelost en een later tekort dat openblijft,
+  // When de detector de rijen leest,
+  // Then blijft clearedAge van de eerste episode en meldt terugkeerAge dat er later opnieuw geleend wordt.
+  it('geeft de start van de volgende aanhoudende episode terug', () => {
+    const rows = [
+      row(55, 10_000), row(57, 20_000), row(59, 5_000), row(60, 0),
+      row(75, 30_000), row(80, 90_000), row(89, 200_000),
+    ]
+    const out = detectDeficitLoanFromRows(rows, { endAge: 90 })
+    expect(out!.firstAge).toBe(55)
+    expect(out!.clearedAge).toBe(60)
+    expect(out!.terugkeerAge).toBe(75)
+    expect(out!.peak).toBe(200_000)
+  })
+
+  it('één episode → terugkeerAge null', () => {
+    const rows = [row(55, 10_000), row(57, 20_000), row(60, 0)]
+    expect(detectDeficitLoanFromRows(rows, { endAge: 90 })!.terugkeerAge).toBeNull()
+  })
+})

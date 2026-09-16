@@ -36,6 +36,18 @@ export interface DeficitLoanNotice {
   firstAge: number
   /** Hoogste tekort-lening-eindsaldo over alle rijen (afgerond, nominaal). */
   peak: number
+  /**
+   * Eerste leeftijd waarop de gemelde (eerste aanhoudende) episode weer op €0 staat,
+   * of null als hij binnen het venster niet bewezen is afgelost. Het werkelijke einde
+   * van de leenperiode — de copy mag dat niet uit de AOW-leeftijd afleiden.
+   */
+  clearedAge: number | null
+  /**
+   * Startleeftijd van de volgende aanhoudende episode na de gemelde, of null. `peak`
+   * loopt over álle aanhoudende episodes — zonder dit veld zou een afgeloste eerste
+   * episode naast de piek van een latere, openblijvende lening staan.
+   */
+  terugkeerAge: number | null
 }
 
 /** Opties voor de tekort-lening-detectie. */
@@ -106,6 +118,7 @@ export function detectDeficitLoanFromRows(
     lastAge: number
     peak: number
     clears: boolean
+    clearedAge: number | null
   }
   const episodes: Episode[] = []
   let current: Episode | null = null
@@ -114,13 +127,14 @@ export function detectDeficitLoanFromRows(
     const endBalance = r.debtBalances['tekort-lening']?.endBalance ?? 0
     if (Math.round(endBalance) >= 1) {
       if (current === null) {
-        current = { startAge: r.age, lastAge: r.age, peak: endBalance, clears: false }
+        current = { startAge: r.age, lastAge: r.age, peak: endBalance, clears: false, clearedAge: null }
       } else {
         current.lastAge = r.age
         if (endBalance > current.peak) current.peak = endBalance
       }
     } else if (current !== null) {
       current.clears = true
+      current.clearedAge = r.age
       episodes.push(current)
       current = null
     }
@@ -139,5 +153,10 @@ export function detectDeficitLoanFromRows(
   if (sustained.length === 0) return null
   const firstAge = sustained[0].startAge
   const peak = Math.max(...sustained.map((ep) => ep.peak))
-  return { firstAge, peak: Math.round(peak) }
+  return {
+    firstAge,
+    peak: Math.round(peak),
+    clearedAge: sustained[0].clearedAge,
+    terugkeerAge: sustained[1]?.startAge ?? null,
+  }
 }

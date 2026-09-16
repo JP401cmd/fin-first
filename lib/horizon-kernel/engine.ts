@@ -53,7 +53,7 @@
 
 import type { AssetCategorie, KernelInput, MonthIndex } from './types'
 import { HORIZON_MONTHS } from './types'
-import { isBeyondHorizon } from './scaffold'
+import { ageAtMonth, isBeyondHorizon } from './scaffold'
 
 import { computeBel, type BelDep, type BelRow } from './tables/bel'
 import { computeCF, type CFDep, type CFRow, type GebPostHelper } from './tables/cf'
@@ -120,6 +120,7 @@ const ZERO_WONING: BezWoningblok = {
   overwaardeVorig: 0,
   opeetCap: 0,
   opeetOpname: 0,
+  opeetGestart: 0,
 }
 
 /** Nul-categorie-bedrag (genulde m-deps voor de vroege woningblok-berekening). */
@@ -493,11 +494,20 @@ export function runKernelProjection(
   }
 
   // Opeethypotheek: overwaarde (J − S!D) in de maand vóór opeet-start (auto-opname-basis).
-  // Wordt tijdens de loop vastgelegd op maand mStart−1; vóór opeet-start ongebruikt.
+  // Oracle-pad: wordt tijdens de loop vastgelegd op maand mStart−1 (mStart = B64-maand);
+  // vóór opeet-start ongebruikt.
+  // App-pad 'Wanneer nodig' (ADR 0148, buiten oracle-domein): de startmaand is geen
+  // constante maar TOESTAND — tables/bez.ts beslist 'm per maand (virtuele kolom
+  // `opeetGestart`, monotoon); de engine bevriest op de 0→1-overgang de overwaarde
+  // (m−1) en de werkelijke startleeftijd voor de maanden erna. Zonder het veld blijft
+  // dit pad inert → byte-identiek.
+  const opeetWanneerNodig =
+    input.woning.selector === 'Opeethypotheek' && input.woning.opeetTrigger === 'Wanneer nodig'
   const opeetStartMonth = Math.round(
     (input.woning.opeetStartleeftijdOpname - input.startLeeftijd) * 12,
   )
   let overwaardeBijOpeetStart = 0
+  let opeetStartLeeftijd: number | undefined
 
   // Guardrails-anker: override of self-capture op maand fireMaand−1.
   //
@@ -596,6 +606,8 @@ export function runKernelProjection(
       prognoseLiquideVorig: prognoseJ(prevProg),
       fireLeeftijd: fireAge,
       overwaardeBijOpeetStart,
+      opeetGestartVorig: prevWon.opeetGestart,
+      opeetStartLeeftijd,
     }
 
     // (1) Woningblok AY:BE — hangt uitsluitend aan de m−1-toestand (bezM1), niet aan
@@ -603,6 +615,15 @@ export function runKernelProjection(
     // 10-slot-loop + totalen + rij-constructie die de vroegere `computeBez(earlyDep)` voor
     // niets draaide (er werd alleen `.woning` van gelezen). Byte-identiek — zie computeBezWoning.
     const woning = computeBezWoning(input, bezM1, m)
+
+    // ADR 0148 — 'Wanneer nodig': de opeet-tak start déze maand (0→1). Bevries de
+    // auto-opname-basis en de werkelijke startleeftijd voor m+1…; in maand m zelf las
+    // het woningblok al exact deze waarden (overwaarde(m−1), eigen leeftijd), dus de
+    // volle computeBez-call hieronder (zelfde bezM1) geeft hetzelfde blok.
+    if (opeetWanneerNodig && prevWon.opeetGestart === 0 && woning.opeetGestart === 1) {
+      overwaardeBijOpeetStart = Math.max(0, bezM1.huisWaardeVorig - bezM1.hypotheekSaldoVorig)
+      opeetStartLeeftijd = ageAtMonth(input, m)
+    }
 
     // (2) PT(m) en Werk-strategie(m).
     const ptRow = computePT(input, {}, m)
@@ -754,8 +775,10 @@ export function runKernelProjection(
     if (selfCaptureAnker && m === fireMonth - 1) {
       anker = prognoseJ(prognoseRow)
     }
-    // Overwaarde bij opeet-start (basis auto-opname) op mStart−1.
-    if (opeetStartMonth >= 1 && m === opeetStartMonth - 1) {
+    // Overwaarde bij opeet-start (basis auto-opname) op mStart−1 — oracle-pad. Bij
+    // 'Wanneer nodig' is de start toestand (bevroren hierboven op de 0→1-overgang) en
+    // mag de B64-constante de eerder bevroren basis niet overschrijven.
+    if (!opeetWanneerNodig && opeetStartMonth >= 1 && m === opeetStartMonth - 1) {
       overwaardeBijOpeetStart = Math.max(
         0,
         bezSlotWaarde(bezRow, houseSlot(input)) - sSlotSaldo(sRow, HYPOTHEEK_SLOT),

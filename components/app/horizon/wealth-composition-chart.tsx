@@ -8,6 +8,10 @@ import {
   WEALTH_GROUP_COLORS,
   DEBT_LAYER_COLOR,
   DEBT_LAYER_LABEL,
+  DEBT_LAYERS,
+  DEBT_LAYER_FIELD,
+  DEBT_LAYER_LABELS,
+  DEBT_LAYER_COLORS,
 } from '@/lib/wealth-composition'
 import { ChartEventMarkers, topPaddingFor, bottomPaddingFor } from './chart-event-markers'
 import type { ChartEventOverlay, ChartEventKind } from '@/lib/chart-event-overlay'
@@ -26,6 +30,28 @@ function fmtEuro(val: number): string {
   if (abs >= 1_000_000) return `€${(val / 1_000_000).toFixed(1)}M`
   if (abs >= 1_000) return `€${Math.round(val / 1_000)}k`
   return `€${Math.round(val)}`
+}
+
+/**
+ * Schuldsegmenten van één rij (absolute bedragen, stapelvolgorde vanaf de nullijn), of
+ * één totaal-segment wanneer de opsplitsing ontbreekt of niet (meer) optelt tot het
+ * totaal — bv. na een woonstrategie-injectie die alleen `schulden` bijstelt.
+ */
+function debtSegments(row: StackedRow): { key: string; label: string; value: number; color: string }[] {
+  const total = Math.abs(row.schulden)
+  if (total <= 0) return []
+  const parts = DEBT_LAYERS.map(layer => ({
+    key: layer,
+    label: DEBT_LAYER_LABELS[layer],
+    value: Math.abs(row[DEBT_LAYER_FIELD[layer]] ?? 0),
+    color: DEBT_LAYER_COLORS[layer],
+  }))
+  const som = parts.reduce((s, p) => s + p.value, 0)
+  const heeftOpsplitsing = DEBT_LAYERS.some(layer => row[DEBT_LAYER_FIELD[layer]] !== undefined)
+  if (!heeftOpsplitsing || Math.abs(som - total) > Math.max(4, total * 0.005)) {
+    return [{ key: 'schulden', label: DEBT_LAYER_LABEL, value: total, color: DEBT_LAYER_COLOR }]
+  }
+  return parts.filter(p => p.value > 0)
 }
 
 function pctStr(part: number, total: number): string {
@@ -307,9 +333,7 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
         ...ALL_GROUPS
           .filter(g => tooltipRow[g] > 0)
           .map(g => ({ label: WEALTH_GROUP_LABELS[g], value: tooltipRow[g], color: WEALTH_GROUP_COLORS[g] })),
-        ...(tooltipRow.schulden < 0
-          ? [{ label: DEBT_LAYER_LABEL, value: tooltipRow.schulden, color: DEBT_LAYER_COLOR }]
-          : []),
+        ...debtSegments(tooltipRow).map(s => ({ label: s.label, value: -s.value, color: s.color })),
       ]
     : []
   const tooltipNetWorth = tooltipRow ? tooltipPositiveTotal + tooltipRow.schulden : 0
@@ -498,9 +522,14 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
             }
           })
 
-          // Debt bar (negative, below zero line)
-          const debtValue = Math.abs(row.schulden)
-          const debtBarH = debtValue > 0 ? (debtValue / yRange) * innerH : 0
+          // Debt bars (negative, below zero line), gestapeld per schuldsoort
+          let debtCumH = 0
+          const debtBars = debtSegments(row).map(seg => {
+            const h = (seg.value / yRange) * innerH
+            const bar = { ...seg, offset: debtCumH, height: h }
+            debtCumH += h
+            return bar
+          })
 
           // Animation: bars grow from zero line
           const animProgress = hasEntered ? 1 : 0
@@ -525,18 +554,19 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
               ))}
 
               {/* Debt bar (below zero line) */}
-              {debtBarH > 0 && (
+              {debtBars.map(bar => (
                 <rect
+                  key={bar.key}
                   x={x}
-                  y={yZero}
+                  y={yZero + bar.offset * animProgress}
                   width={barWidth}
-                  height={debtBarH * animProgress}
-                  fill={DEBT_LAYER_COLOR}
+                  height={bar.height * animProgress}
+                  fill={bar.color}
                   opacity={isHovered ? 1 : 0.85}
                   rx={barWidth > 4 ? 1 : 0}
-                  style={{ transition: 'opacity 150ms ease, height 0.8s cubic-bezier(.22,1,.36,1)' }}
+                  style={{ transition: 'opacity 150ms ease, y 0.8s cubic-bezier(.22,1,.36,1), height 0.8s cubic-bezier(.22,1,.36,1)' }}
                 />
-              )}
+              ))}
 
               {/*
                 Transparante hover/click-rect — volledige kolom-hoogte zodat
@@ -764,17 +794,17 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
             </div>
           )
         })}
-        {stackedRows.some(r => r.schulden < 0) && (
-          <div className="flex items-center gap-1.5">
+        {[...new Map(visibleRows.flatMap(debtSegments).map(s => [s.key, s])).values()].map(s => (
+          <div key={s.key} className="flex items-center gap-1.5">
             <div
               className="h-2.5 w-2.5 rounded-sm shrink-0"
-              style={{ backgroundColor: DEBT_LAYER_COLOR }}
+              style={{ backgroundColor: s.color }}
             />
             <span className="text-[10px] font-medium text-[var(--ink-3)]">
-              {DEBT_LAYER_LABEL}
+              {s.label}
             </span>
           </div>
-        )}
+        ))}
       </div>
     </div>
   )

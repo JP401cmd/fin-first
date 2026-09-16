@@ -44,6 +44,7 @@ import {
 import { clipRowsToPlanEnd } from '@/lib/horizon/clip-rows-to-plan-end'
 import { buildDeficitLoanCopy, type DeficitLoanCopy } from '@/lib/horizon/deficit-loan-copy'
 import { detectDeficitLoanFromRows } from '@/lib/horizon/deficit-loan-display'
+import { detectReverseMortgageStartAge } from '@/lib/horizon/reverse-mortgage-start'
 import { solveFireAgeWithoutAnchor } from '@/lib/horizon/scenario-presets'
 import { toSimResult } from '@/lib/unified-projection'
 import {
@@ -344,19 +345,29 @@ function buildProjectie(
   // aangesproken tekort-lening is daardoor in het pad onzichtbaar. De detector telt
   // alleen t/m `displayEndAge − 1` (de staart erna is modelmarge, besluit 4 juli 2026).
   const tekortNotice = detectDeficitLoanFromRows(result.rows, { endAge: sim.displayEndAge })
+  const heeftEigenHuis = deriveHousingContext([...rawContext.assets], [...rawContext.debts]).hasEigenHuis
+  const woonstrategie = parseHousingStrategy(rawContext.profile.housing_strategy_config)
   const tekortLening: ProjectieTekortLening | null = tekortNotice
     ? {
         firstAge: tekortNotice.firstAge,
         peak: tekortNotice.peak,
         copy: buildDeficitLoanCopy({
           firstAge: tekortNotice.firstAge,
+          clearedAge: tekortNotice.clearedAge,
+          terugkeerAge: tekortNotice.terugkeerAge,
+          housing: heeftEigenHuis
+            ? {
+                mode: woonstrategie.mode,
+                saleAge: outcome.kernelHousingSale?.age ?? null,
+                reverseMortgageStartAge:
+                  woonstrategie.mode === 'reverse_mortgage' ? detectReverseMortgageStartAge(result.rows) : null,
+              }
+            : null,
           aowAge: lookupAowAge([...(rawContext.aowRows ?? [])], rawContext.profile.date_of_birth ?? null).fractional,
           displayEndAge: sim.displayEndAge,
           isPensioenMode: sim.strategy === 'pensioen',
           // Zelfde afleiding als dashboard-/core-loader: eigen woning aanwezig ∧ buiten de FIRE-pot.
-          homeExcludedFromFire:
-            deriveHousingContext([...rawContext.assets], [...rawContext.debts]).hasEigenHuis &&
-            isHomeExcludedFromFire(parseHousingStrategy(rawContext.profile.housing_strategy_config)),
+          homeExcludedFromFire: heeftEigenHuis && isHomeExcludedFromFire(woonstrategie),
           peakText: formatCurrency(tekortNotice.peak),
           // Bewust géén vrijheidstijd bij de piek: de detector levert geen leeftijd bij
           // het piekmoment, dus er is geen canonieke deflator voor die teller (ADR 0093 §11).

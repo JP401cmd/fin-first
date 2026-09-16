@@ -411,12 +411,17 @@ export function buildWoningFromConfig(cfg: HousingStrategyConfig): WoningStrateg
   }
 
   if (cfg.mode === 'reverse_mortgage') {
-    // V8: idem voor de opeet-startleeftijd bij "wanneer nodig".
-    const opeetStart =
-      cfg.trigger === 'on_depletion' ? cfg.fallbackAge ?? cfg.triggerAge : cfg.triggerAge
+    // V8: idem voor de opeet-startleeftijd bij "wanneer nodig" — dat is dan de UITERSTE
+    // leeftijd. ADR 0148: de opeet-tak volgt de behoefte-trigger via het app-only veld
+    // `opeetTrigger` (Excel P!B58 = `trigger` is verkoop-only en blijft inert voor opeet),
+    // met dezelfde marge-resolver als de downsize-tak (TPR-06) voor de drempel.
+    const wanneerNodig = cfg.trigger === 'on_depletion'
+    const opeetStart = wanneerNodig ? cfg.fallbackAge ?? cfg.triggerAge : cfg.triggerAge
     return {
       ...base,
-      trigger: cfg.trigger === 'on_depletion' ? 'Wanneer nodig' : 'Vaste leeftijd',
+      trigger: wanneerNodig ? 'Wanneer nodig' : 'Vaste leeftijd',
+      opeetTrigger: wanneerNodig ? 'Wanneer nodig' : 'Vaste leeftijd',
+      drempelMaandenUitgave: Math.round(resolveDepletionMarginYears(cfg.depletionThresholdYears) * 12),
       opeetStartleeftijdOpname: opeetStart,
       opeetMaxLeningPctOverwaarde: cfg.maxLoanPct,
       opeetRentePerJaar: cfg.interestRate,

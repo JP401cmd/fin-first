@@ -256,6 +256,45 @@ describe('TPR-06 — depletionThresholdYears → drempelMaandenUitgave', () => {
   it('kern-default en app-default zijn één getal (P!B60 = HOUSING_DEPLETION_MARGIN_DEFAULT_MONTHS)', () => {
     expect(EXCEL_WONING_DEFAULTS.drempelMaandenUitgave).toBe(HOUSING_DEPLETION_MARGIN_DEFAULT_MONTHS)
   })
+})
+
+// ── ADR 0148 — opeethypotheek volgt "wanneer nodig" via het app-only veld opeetTrigger ──
+
+describe('ADR 0148 — reverse_mortgage: opeetTrigger + drempel via de marge-resolver', () => {
+  const rmBase = {
+    mode: 'reverse_mortgage' as const,
+    triggerAge: 67,
+    maxLoanPct: 0.5,
+    interestRate: 0.055,
+    monthlyPayout: null,
+  }
+
+  it('on_depletion → opeetTrigger "Wanneer nodig"; uiterste leeftijd = fallbackAge', () => {
+    const w = buildWoning({ ...rmBase, trigger: 'on_depletion', depletionThresholdYears: 0, fallbackAge: 80 } as ReverseMortgageConfig)
+    expect(w.opeetTrigger).toBe('Wanneer nodig')
+    expect(w.opeetStartleeftijdOpname).toBe(80)
+  })
+
+  it('fixed_age → opeetTrigger "Vaste leeftijd" (= huidig gedrag), start op triggerAge', () => {
+    const w = buildWoning({ ...rmBase, trigger: 'fixed_age', depletionThresholdYears: 0 } as ReverseMortgageConfig)
+    expect(w.opeetTrigger).toBe('Vaste leeftijd')
+    expect(w.opeetStartleeftijdOpname).toBe(67)
+  })
+
+  it('drempelMaandenUitgave volgt resolveDepletionMarginYears (0 → 24 mnd; 1,5 → 18; 3 → 36)', () => {
+    const met = (jaren: number) =>
+      buildWoning({ ...rmBase, trigger: 'on_depletion', depletionThresholdYears: jaren } as ReverseMortgageConfig)
+        .drempelMaandenUitgave
+    expect(met(0)).toBe(HOUSING_DEPLETION_MARGIN_DEFAULT_MONTHS)
+    expect(met(1.5)).toBe(Math.round(resolveDepletionMarginYears(1.5) * 12))
+    expect(met(1.5)).toBe(18)
+    expect(met(3)).toBe(36)
+  })
+
+  it('niet-opeet-modi dragen geen "Wanneer nodig"-opeetTrigger', () => {
+    expect(buildWoning({ mode: 'include_full' }).opeetTrigger).not.toBe('Wanneer nodig')
+    expect(buildWoning({ mode: 'exclude_from_fire' }).opeetTrigger).not.toBe('Wanneer nodig')
+  })
 
   it('resolveDepletionMarginYears: 0/negatief/NaN → 2 jaar; positief → letterlijk', () => {
     expect(resolveDepletionMarginYears(0)).toBe(2)

@@ -14,6 +14,7 @@ import {
   type HousingStrategyTrigger,
 } from '@/lib/housing-strategy'
 import { HOUSING_DEPLETION_MARGIN_DEFAULT_MONTHS } from '@/lib/constants'
+import { EXCEL_WONING_DEFAULTS } from '@/lib/horizon-kernel/adapter/defaults'
 import {
   type HousingPreviewData,
   type HousingScenarioResult,
@@ -551,15 +552,20 @@ function StrategyDetailsPanel({
             // terugvallen) als het nieuwe kernel-veld `fallbackAge`, zodat beide
             // rekenkernen dezelfde uiterste leeftijd gebruiken. Eén veld i.p.v. twee
             // (triggerAge/fallbackAge convergeren) — F6 verwijdert de dubbeling.
-            value={config.fallbackAge ?? config.triggerAge}
+            // Toont wat de kern zonder eigen invoer werkelijk gebruikt (adapter/params.ts):
+            // verkopen valt terug op de Excel-default, de opeethypotheek op `triggerAge`.
+            value={
+              config.fallbackAge ??
+              (config.mode === 'downsize' ? EXCEL_WONING_DEFAULTS.verkoopleeftijd : config.triggerAge)
+            }
             min={50}
             max={95}
             step={1}
             onChange={(age) => onChange({ ...config, triggerAge: age, fallbackAge: age })}
             hint={
               config.mode === 'downsize'
-                ? 'Blijft je vermogen op koers, dan verkoop je uiterlijk op deze leeftijd. Standaard 75.'
-                : 'Blijft je vermogen op koers, dan start de opeethypotheek uiterlijk op deze leeftijd. Standaard 75.'
+                ? `Blijft je vermogen op koers, dan verkoop je uiterlijk op deze leeftijd. Standaard ${EXCEL_WONING_DEFAULTS.verkoopleeftijd}.`
+                : `Raakt je vermogen eerder op, dan start de opeethypotheek op dat moment; anders uiterlijk op deze leeftijd. Standaard ${DEFAULT_REVERSE_MORTGAGE_CONFIG.triggerAge}.`
             }
           />
         </div>

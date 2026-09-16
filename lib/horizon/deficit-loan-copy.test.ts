@@ -21,6 +21,8 @@ import {
 
 const BASE: DeficitLoanCopyInput = {
   firstAge: 58,
+  clearedAge: null,
+  housing: null,
   aowAge: 67.25,
   displayEndAge: 95,
   isPensioenMode: false,
@@ -42,75 +44,130 @@ function allText(copy: DeficitLoanCopy): string {
   ].join(' ')
 }
 
-describe('buildDeficitLoanCopy — leenperiode', () => {
-  it('gebruikt de AOW-leeftijd als bovengrens wanneer die ná de eerste tekort-leeftijd ligt', () => {
-    const copy = buildDeficitLoanCopy(BASE)
-    expect(copy.variant).toBe('tot-aow')
-    expect(copy.periode).toBe('De leenperiode loopt van leeftijd 58 tot je AOW-leeftijd (67 jaar en 3 maanden).')
+describe('buildDeficitLoanCopy — leenperiode volgt de rijen, niet de AOW-leeftijd', () => {
+  // Given een tekort-lening die na AOW nog decennia doorloopt (eigenaar-meting 16 sep 2026),
+  // When de copy wordt gebouwd,
+  // Then noemt hij het werkelijke aflosmoment en beweert hij niet "tot je AOW-leeftijd".
+  it('noemt het werkelijke aflosmoment wanneer de detector er een zag', () => {
+    const copy = buildDeficitLoanCopy({ ...BASE, firstAge: 51, clearedAge: 89 })
+    expect(copy.variant).toBe('tot-aflossing')
+    expect(copy.periode).toBe('De leenperiode loopt van leeftijd 51 tot leeftijd 89.')
+    expect(allText(copy)).not.toContain('tot je AOW-leeftijd')
   })
 
-  it('valt terug op de plan-eindleeftijd wanneer de AOW-leeftijd al gepasseerd is', () => {
-    // Tekort ontstaat pás ná AOW: dan is "tot je AOW-leeftijd" feitelijk onjuist.
-    const copy = buildDeficitLoanCopy({ ...BASE, firstAge: 72, aowAge: 67.25 })
+  it('loopt door tot het einde van de projectie wanneer de lening openstaat', () => {
+    const copy = buildDeficitLoanCopy(BASE)
     expect(copy.variant).toBe('tot-einde')
-    expect(copy.periode).toContain('begint op leeftijd 72')
+    expect(copy.periode).toContain('begint op leeftijd 58')
     expect(copy.periode).toContain('einde van je projectie (leeftijd 95)')
   })
 
-  it('valt terug op de plan-eindleeftijd zonder bekende AOW-leeftijd', () => {
-    const copy = buildDeficitLoanCopy({ ...BASE, aowAge: null })
-    expect(copy.variant).toBe('tot-einde')
-    expect(copy.periode).toContain('leeftijd 95')
-  })
-
-  it('laat de bovengrens weg wanneer noch AOW noch eindleeftijd bekend is', () => {
-    const copy = buildDeficitLoanCopy({ ...BASE, aowAge: null, displayEndAge: null })
+  it('laat de bovengrens weg wanneer de eindleeftijd onbekend is en de lening openstaat', () => {
+    const copy = buildDeficitLoanCopy({ ...BASE, displayEndAge: null })
     expect(copy.periode).toBe('De leenperiode begint op leeftijd 58.')
   })
 
-  // UR3-24: de AOW-leeftijd draagt de canonieke schrijfwijze (`formatAowAge`), niet
-  // meer een eigen `Math.floor` — dat schreef "(67)" voor een 67j3m-cohort en was de
-  // achtste van negen vormen. Een decimale weergave ("67,25") blijft verboden.
-  it('schrijft de AOW-leeftijd canoniek en toont nooit een decimale leeftijd', () => {
-    const copy = buildDeficitLoanCopy({ ...BASE, firstAge: 58.75, aowAge: 67.25 })
-    expect(copy.periode).toContain('leeftijd 58')
-    expect(copy.periode).toContain('(67 jaar en 3 maanden)')
-    expect(copy.periode).not.toMatch(/58[.,]7|67[.,]2/)
+  it('meldt een later, nieuw tekort in plaats van te suggereren dat het na de aflossing klaar is', () => {
+    const copy = buildDeficitLoanCopy({ ...BASE, firstAge: 55, clearedAge: 60, terugkeerAge: 75 })
+    expect(copy.periode).toBe('De leenperiode loopt van leeftijd 55 tot leeftijd 60. Vanaf leeftijd 75 ontstaat opnieuw een tekort-lening.')
   })
 
-  it('onderscheidt een korte van een lange leenperiode via de genoemde grenzen', () => {
-    const kort = buildDeficitLoanCopy({ ...BASE, firstAge: 66, aowAge: 67.25 })
-    const lang = buildDeficitLoanCopy({ ...BASE, firstAge: 52, aowAge: 67.25 })
-    expect(kort.periode).toContain('van leeftijd 66 tot je AOW-leeftijd (67 jaar en 3 maanden)')
-    expect(lang.periode).toContain('van leeftijd 52 tot je AOW-leeftijd (67 jaar en 3 maanden)')
-    expect(kort.periode).not.toBe(lang.periode)
+  it('toont nooit een decimale leeftijd', () => {
+    const copy = buildDeficitLoanCopy({ ...BASE, firstAge: 58.75, clearedAge: 70.5, aowAge: 67.25 })
+    expect(copy.periode).toBe('De leenperiode loopt van leeftijd 58 tot leeftijd 70.')
+    expect(allText(copy)).not.toMatch(/58[.,]7|67[.,]2|70[.,]5/)
   })
 })
 
 describe('buildDeficitLoanCopy — waarom er geleend wordt', () => {
-  it('noemt in de pensioen-tak dat AOW en pensioen nog niet begonnen zijn', () => {
+  it('noemt dat AOW en pensioen nog niet begonnen zijn wanneer AOW ná de start ligt, canoniek geschreven', () => {
     const copy = buildDeficitLoanCopy(BASE)
-    expect(copy.waarom).toContain('AOW en pensioen zijn nog niet begonnen')
+    expect(copy.waarom).toContain('AOW (vanaf 67 jaar en 3 maanden) en pensioen zijn nog niet begonnen')
     expect(copy.waarom).toContain('liquide vermogen is dan op')
   })
 
-  it('noemt in de tot-einde-tak dat het inkomen de uitgaven niet volledig dekt', () => {
-    const copy = buildDeficitLoanCopy({ ...BASE, aowAge: null })
-    expect(copy.waarom).toContain('inkomen dekt je uitgaven niet volledig')
-    expect(copy.waarom).not.toContain('AOW en pensioen zijn nog niet begonnen')
+  it('noemt dat het inkomen de uitgaven niet dekt wanneer AOW al loopt of onbekend is', () => {
+    for (const input of [{ ...BASE, aowAge: null }, { ...BASE, firstAge: 72 }]) {
+      const copy = buildDeficitLoanCopy(input)
+      expect(copy.waarom).toContain('inkomen dekt je uitgaven niet volledig')
+      expect(copy.waarom).not.toContain('nog niet begonnen')
+    }
   })
 })
 
 describe('buildDeficitLoanCopy — woonstrategie', () => {
+  const opeet = (reverseMortgageStartAge: number | null) => ({
+    mode: 'reverse_mortgage' as const,
+    saleAge: null,
+    reverseMortgageStartAge,
+  })
+  const verkoop = (saleAge: number | null) => ({
+    mode: 'downsize' as const,
+    saleAge,
+    reverseMortgageStartAge: null,
+  })
+  const vol = { mode: 'include_full' as const, saleAge: null, reverseMortgageStartAge: null }
+
   it('legt bij exclude_from_fire uit dat het huis in dit plan niet meetelt', () => {
-    const copy = buildDeficitLoanCopy({ ...BASE, homeExcludedFromFire: true })
-    expect(copy.woning).not.toBeNull()
+    const copy = buildDeficitLoanCopy({
+      ...BASE,
+      homeExcludedFromFire: true,
+      housing: { mode: 'exclude_from_fire', saleAge: null, reverseMortgageStartAge: null },
+    })
     expect(copy.woning).toContain('Je huis telt in dit plan niet mee')
     expect(copy.woning).toContain('overwaarde')
   })
 
-  it('laat de woning-zin weg wanneer het huis wél meetelt', () => {
-    expect(buildDeficitLoanCopy({ ...BASE, homeExcludedFromFire: false }).woning).toBeNull()
+  it('laat de woning-zin weg zonder eigen woning of bij volledig meetellen', () => {
+    expect(buildDeficitLoanCopy(BASE).woning).toBeNull()
+    expect(buildDeficitLoanCopy({ ...BASE, housing: vol }).woning).toBeNull()
+  })
+
+  it('opeethypotheek die ná de eerste tekort-leeftijd start: benoemt de keuze, het startmoment en het resterende gat', () => {
+    const copy = buildDeficitLoanCopy({ ...BASE, firstAge: 51, clearedAge: 89, housing: opeet(67) })
+    expect(copy.woning).toContain('Je hebt een opeethypotheek gekozen')
+    expect(copy.woning).toContain('start in deze projectie op leeftijd 67')
+    expect(copy.woning).toContain('maandopname uit je huis vult het gat niet volledig')
+  })
+
+  it('opeethypotheek waarna de lening snel op nul staat → geen oorzaakclaim (dat kan ook AOW zijn)', () => {
+    const copy = buildDeficitLoanCopy({ ...BASE, firstAge: 51, clearedAge: 53, housing: opeet(52) })
+    expect(copy.woning).toContain('start in deze projectie op leeftijd 52')
+    expect(copy.woning).not.toContain('blijft er een tekort-lening openstaan')
+    expect(copy.woning).not.toMatch(/weer op nul|afgelost/)
+  })
+
+  it('opeethypotheek die al loopt vóór het tekort → de opname vult het gat niet volledig', () => {
+    const copy = buildDeficitLoanCopy({ ...BASE, firstAge: 60, housing: opeet(52) })
+    expect(copy.woning).toContain('loopt vanaf leeftijd 52')
+    expect(copy.woning).toContain('vult het gat niet volledig')
+  })
+
+  it('opeethypotheek die in de projectie niet start', () => {
+    expect(buildDeficitLoanCopy({ ...BASE, housing: opeet(null) }).woning).toContain('start in deze projectie niet')
+  })
+
+  it('verkoop ná de eerste tekort-leeftijd die de lening aflost → noemt verkoop en aflossing', () => {
+    const copy = buildDeficitLoanCopy({ ...BASE, firstAge: 55, clearedAge: 67, housing: verkoop(67) })
+    expect(copy.woning).toBe(
+      'Je huis wordt in deze projectie verkocht op leeftijd 67. Tot die verkoop dekt de tekort-lening het gat; met de opbrengst is hij daarna afgelost.',
+    )
+  })
+
+  it('verkoop die de lening niet volledig aflost', () => {
+    const copy = buildDeficitLoanCopy({ ...BASE, firstAge: 55, clearedAge: null, housing: verkoop(67) })
+    expect(copy.woning).toContain('De opbrengst is niet genoeg om hem helemaal af te lossen')
+  })
+
+  it('verkoop die al vóór het tekort plaatsvond, en verkoop die niet gebeurt', () => {
+    expect(buildDeficitLoanCopy({ ...BASE, firstAge: 70, housing: verkoop(60) }).woning).toContain('al verkocht op leeftijd 60')
+    expect(buildDeficitLoanCopy({ ...BASE, housing: verkoop(null) }).woning).toContain('dat gebeurt in deze projectie niet')
+  })
+
+  it('biedt een ingang naar de woonstrategie zodra er een eigen woning is', () => {
+    expect(buildDeficitLoanCopy(BASE).toonWoonstrategieLink).toBe(false)
+    expect(buildDeficitLoanCopy({ ...BASE, housing: opeet(67) }).toonWoonstrategieLink).toBe(true)
+    expect(buildDeficitLoanCopy({ ...BASE, housing: vol }).toonWoonstrategieLink).toBe(true)
   })
 })
 
@@ -156,12 +213,17 @@ describe('buildDeficitLoanCopy — Wft-toon-grendel over alle plan-varianten', (
   const VARIANTEN: DeficitLoanCopyInput[] = [false, true].flatMap((isPensioenMode) =>
     [false, true].flatMap((homeExcludedFromFire) =>
       [
-        { aowAge: 67.25, firstAge: 58, displayEndAge: 95 }, // tot-aow, lang
-        { aowAge: 67.25, firstAge: 66, displayEndAge: 95 }, // tot-aow, kort
-        { aowAge: 67.25, firstAge: 72, displayEndAge: 95 }, // tot-einde (ná AOW)
-        { aowAge: null, firstAge: 48, displayEndAge: 90 }, // tot-einde (FIRE)
-        { aowAge: null, firstAge: 48, displayEndAge: null }, // geen bovengrens
-      ].flatMap((periode) =>
+        // opeet start ná het tekort, lening loopt lang door
+        { aowAge: 67.25, firstAge: 51, displayEndAge: 95, clearedAge: 89, housing: { mode: 'reverse_mortgage' as const, saleAge: null, reverseMortgageStartAge: 67 } },
+        // opeet dicht het gat kort na de start
+        { aowAge: 67.25, firstAge: 51, displayEndAge: 95, clearedAge: 53, housing: { mode: 'reverse_mortgage' as const, saleAge: null, reverseMortgageStartAge: 52 } },
+        // verkoop gebeurt niet, tekort ná AOW, openstaand
+        { aowAge: 67.25, firstAge: 72, displayEndAge: 95, clearedAge: null, housing: { mode: 'downsize' as const, saleAge: null, reverseMortgageStartAge: null } },
+        // verkoop lost af (FIRE-tak)
+        { aowAge: null, firstAge: 48, displayEndAge: 90, clearedAge: 67, housing: { mode: 'downsize' as const, saleAge: 67, reverseMortgageStartAge: null } },
+        // geen woning, geen bovengrens
+        { aowAge: null, firstAge: 48, displayEndAge: null, clearedAge: null, housing: null },
+      ].flatMap((periode): DeficitLoanCopyInput[] =>
         [
           { peakText: '€ 42.000', freedomText: '1 jaar en 4 maanden' },
           { peakText: '•••', freedomText: null },

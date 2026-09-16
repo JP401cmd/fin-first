@@ -10,6 +10,8 @@
 import { type Asset, type AssetType, ASSET_TYPE_COLORS, resolveDepreciation } from './asset-data'
 import {
   type Debt,
+  type DebtType,
+  DEBT_TYPE_COLORS,
   type RepaymentType,
   amortizationSchedule,
   linearAmortization,
@@ -72,6 +74,36 @@ export const DEBT_LAYER_COLOR = '#ef4444' // red-500
 
 export const DEBT_LAYER_LABEL = 'Schulden'
 
+/**
+ * Schuldsoorten in de opbouw-staaf, in stapelvolgorde vanaf de nullijn. Tinten uit
+ * de schuld-roodladder (`DEBT_TYPE_COLORS`, klasse I → III) plus een lichtere voor
+ * de opeethypotheek; de tekort-lening houdt het risico-rood — die is een signaal.
+ */
+export type DebtLayer = 'hypotheek' | 'overig' | 'opeethypotheek' | 'tekortLening'
+
+export const DEBT_LAYERS: readonly DebtLayer[] = ['hypotheek', 'overig', 'opeethypotheek', 'tekortLening']
+
+export const DEBT_LAYER_FIELD = {
+  hypotheek: 'schuldHypotheek',
+  overig: 'schuldOverig',
+  opeethypotheek: 'schuldOpeethypotheek',
+  tekortLening: 'schuldTekortLening',
+} as const satisfies Record<DebtLayer, keyof StackedRow>
+
+export const DEBT_LAYER_LABELS: Record<DebtLayer, string> = {
+  hypotheek: 'Hypotheek',
+  overig: 'Overige schulden',
+  opeethypotheek: 'Opeethypotheek',
+  tekortLening: 'Tekort-lening',
+}
+
+export const DEBT_LAYER_COLORS: Record<DebtLayer, string> = {
+  hypotheek: DEBT_TYPE_COLORS.mortgage, // oklch(0.50 0.09 25)
+  overig: DEBT_TYPE_COLORS.payment_plan, // oklch(0.66 0.07 25)
+  opeethypotheek: 'oklch(0.78 0.06 25)',
+  tekortLening: DEBT_LAYER_COLOR,
+}
+
 // ── Types ───────────────────────────────────────────────────
 
 export interface StackedRow {
@@ -83,6 +115,11 @@ export interface StackedRow {
   overig: number
   /** Negative value representing total outstanding debt */
   schulden: number
+  /** Opsplitsing van `schulden` per soort (negatief); afwezig = alleen het totaal bekend. */
+  schuldHypotheek?: number
+  schuldOverig?: number
+  schuldOpeethypotheek?: number
+  schuldTekortLening?: number
 }
 
 // ── Helpers ─────────────────────────────────────────────────
@@ -560,10 +597,22 @@ export function deriveWealthCompositionFromSim(
  * Box 3 per type, en surplus-allocatie automatisch meegenomen.
  *
  * @param rows - UnifiedProjectionRow[] uit runUnifiedProjection()
+ * @param debtTypeById - schuldsoort per app-debt-id; gezet ⇒ ook de opsplitsing per
+ *   schuldsoort. De synthetische kernel-sleutels 'opeethypotheek'/'tekort-lening'
+ *   hebben geen id en worden op naam herkend.
  * @returns StackedRow[] — drop-in voor WealthCompositionChart
  */
-export function unifiedRowsToStackedRows(rows: UnifiedProjectionRow[]): StackedRow[] {
+export function unifiedRowsToStackedRows(
+  rows: UnifiedProjectionRow[],
+  debtTypeById?: ReadonlyMap<string, DebtType>,
+): StackedRow[] {
   if (!rows.length) return []
+
+  const layerOf = (key: string): DebtLayer => {
+    if (key === 'tekort-lening') return 'tekortLening'
+    if (key === 'opeethypotheek') return 'opeethypotheek'
+    return debtTypeById?.get(key) === 'mortgage' ? 'hypotheek' : 'overig'
+  }
 
   return rows.map((row) => {
     // ── Aggregate assetBuckets per WealthGroup ──
@@ -585,13 +634,15 @@ export function unifiedRowsToStackedRows(rows: UnifiedProjectionRow[]): StackedR
 
     // ── Aggregate debtBalances to single negative schulden value ──
     let totalDebtBalance = 0
-    for (const debt of Object.values(row.debtBalances)) {
+    const perLayer: Record<DebtLayer, number> = { hypotheek: 0, overig: 0, opeethypotheek: 0, tekortLening: 0 }
+    for (const [key, debt] of Object.entries(row.debtBalances)) {
       if (debt) {
         totalDebtBalance += debt.endBalance
+        perLayer[layerOf(key)] += debt.endBalance
       }
     }
 
-    return {
+    const stacked: StackedRow = {
       age: row.age,
       spaargeld: Math.round(groupTotals.spaargeld),
       beleggingen: Math.round(groupTotals.beleggingen),
@@ -600,5 +651,9 @@ export function unifiedRowsToStackedRows(rows: UnifiedProjectionRow[]): StackedR
       overig: Math.round(groupTotals.overig),
       schulden: -Math.round(totalDebtBalance),
     }
+    if (debtTypeById) {
+      for (const layer of DEBT_LAYERS) stacked[DEBT_LAYER_FIELD[layer]] = -Math.round(perLayer[layer])
+    }
+    return stacked
   })
 }

@@ -21,21 +21,36 @@
  * doen. `deficit-loan-copy.test.ts` grendelt dit over álle plan-varianten.
  */
 
-/**
- * Welke bovengrens de leenperiode in dit plan heeft:
- *  - 'tot-aow'   — de AOW-leeftijd ligt ná de eerste tekort-leeftijd; vóór AOW
- *    is er nog geen inkomen dat de uitgaven dekt (de klassieke pensioen-tak).
- *  - 'tot-einde' — geen AOW-leeftijd ná de eerste tekort-leeftijd; de periode
- *    loopt tot het einde van de projectie (de FIRE-tak, of een tekort dat pas
- *    ná AOW ontstaat).
- */
 import { formatAowAge } from '@/lib/aow-leeftijd'
+import type { HousingStrategyMode } from '@/lib/housing-strategy'
 
-export type DeficitLoanPeriodVariant = 'tot-aow' | 'tot-einde'
+/**
+ * Welke bovengrens de leenperiode in dit plan heeft — altijd uit de rijen, nooit
+ * aangenomen (de oude 'tot-aow'-lezing beweerde "tot je AOW-leeftijd" terwijl de
+ * lening in de rijen vaak nog decennia doorliep):
+ *  - 'tot-aflossing' — de detector zag de lening binnen het venster op €0 komen.
+ *  - 'tot-einde'     — de lening staat aan het einde van de projectie nog open.
+ */
+export type DeficitLoanPeriodVariant = 'tot-aflossing' | 'tot-einde'
+
+/** Woonstrategie-feiten uit dezélfde run, zodat de melding de keuze benoemt. */
+export interface DeficitLoanHousingFacts {
+  mode: HousingStrategyMode
+  /** Leeftijd van de huisverkoop in deze run (`kernelHousingSale.age`), of null. */
+  saleAge: number | null
+  /** Eerste leeftijd met een opeethypotheek-saldo in deze run, of null. */
+  reverseMortgageStartAge: number | null
+}
 
 export interface DeficitLoanCopyInput {
   /** Eerste leeftijd met een aangesproken tekort-lening (uit de detector). */
   firstAge: number
+  /** Leeftijd waarop de gemelde episode weer op €0 staat, of null (detector). */
+  clearedAge: number | null
+  /** Start van een latere aanhoudende tekort-episode, of null/afwezig (detector). */
+  terugkeerAge?: number | null
+  /** Woonstrategie-feiten, of null zonder eigen woning. */
+  housing: DeficitLoanHousingFacts | null
   /** AOW-leeftijd van de gebruiker (fractioneel), of null als onbekend. */
   aowAge: number | null
   /** Eindleeftijd die de run zélf hanteerde (`SimResult.displayEndAge`). */
@@ -57,8 +72,10 @@ export interface DeficitLoanCopy {
   periode: string
   /** Waarom het model in die jaren bijleent. */
   waarom: string
-  /** Woonstrategie-uitleg — alleen bij `exclude_from_fire`, anders null. */
+  /** Wat de gekozen woonstrategie in deze run doet met dit gat, of null. */
   woning: string | null
+  /** Heeft de woonstrategie invloed op dit tekort (→ ingang naar de instelling)? */
+  toonWoonstrategieLink: boolean
   /** De piek, met vrijheidstijd-vertaling wanneer beschikbaar. */
   piek: string
   /** Waarom de vermogenslijn dit tekort niet laat zien. */
@@ -84,32 +101,29 @@ export function buildDeficitLoanCopy(input: DeficitLoanCopyInput): DeficitLoanCo
   const startAge = wholeAge(input.firstAge) ?? 0
   const aow = wholeAge(input.aowAge)
   const eind = wholeAge(input.displayEndAge)
+  const cleared = wholeAge(input.clearedAge)
 
-  // De AOW-bovengrens is alleen zinvol als hij ná de eerste tekort-leeftijd ligt;
-  // een tekort dát pas ná AOW ontstaat hoort bij de 'tot-einde'-lezing.
-  const variant: DeficitLoanPeriodVariant =
-    aow != null && aow > startAge ? 'tot-aow' : 'tot-einde'
+  const variant: DeficitLoanPeriodVariant = cleared != null ? 'tot-aflossing' : 'tot-einde'
 
-  // UR3-24: de VERGELIJKING mag op hele jaren (`aow`), de WEERGAVE niet — die ging
-  // via `Math.floor` en schreef "(67)" voor een 67j9m-cohort. Canonieke vorm:
-  // `formatAowAge` op de onafgeronde waarde.
-  const aowLabel = input.aowAge != null ? formatAowAge(input.aowAge) : ''
-
+  const terugkeer = wholeAge(input.terugkeerAge)
   const periode =
-    variant === 'tot-aow'
-      ? `De leenperiode loopt van leeftijd ${startAge} tot je AOW-leeftijd (${aowLabel}).`
+    cleared != null
+      ? `De leenperiode loopt van leeftijd ${startAge} tot leeftijd ${cleared}.` +
+        (terugkeer != null ? ` Vanaf leeftijd ${terugkeer} ontstaat opnieuw een tekort-lening.` : '')
       : eind != null
         ? `De leenperiode begint op leeftijd ${startAge} en loopt door tot het einde van je projectie (leeftijd ${eind}).`
         : `De leenperiode begint op leeftijd ${startAge}.`
 
+  // UR3-24: de VERGELIJKING mag op hele jaren (`aow`), de WEERGAVE niet — canonieke
+  // vorm via `formatAowAge` op de onafgeronde waarde.
   const waarom =
-    variant === 'tot-aow'
-      ? `Je liquide vermogen is dan op, en je AOW en pensioen zijn nog niet begonnen. Het model dekt je uitgaven in die jaren met een tekort-lening.`
+    aow != null && aow > startAge && input.aowAge != null
+      ? `Je liquide vermogen is dan op, en je AOW (vanaf ${formatAowAge(input.aowAge)}) en pensioen zijn nog niet begonnen. Het model dekt je uitgaven in die jaren met een tekort-lening.`
       : `Je liquide vermogen is dan op en je inkomen dekt je uitgaven niet volledig. Het model dekt het verschil met een tekort-lening.`
 
   const woning = input.homeExcludedFromFire
     ? `Je huis telt in dit plan niet mee: je hebt gekozen om je eigen woning buiten je vrijheidsvermogen te houden. De overwaarde staat er dus wel, maar het model spreekt hem niet aan.`
-    : null
+    : housingSentence(input.housing, startAge, cleared)
 
   const piek = input.freedomText
     ? `Op het diepste punt staat er ${input.peakText} open — ${input.freedomText} vrijheid die je later terugkoopt.`
@@ -123,5 +137,62 @@ export function buildDeficitLoanCopy(input: DeficitLoanCopyInput): DeficitLoanCo
 
   const disclaimer = `Indicatie, geen advies — een rekenuitkomst bij je huidige aannames.`
 
-  return { variant, periode, waarom, woning, piek, lijn, knoppen, disclaimer }
+  return {
+    variant,
+    periode,
+    waarom,
+    woning,
+    toonWoonstrategieLink: input.housing != null,
+    piek,
+    lijn,
+    knoppen,
+    disclaimer,
+  }
+}
+
+/**
+ * Wat de gekozen verkoop- of opeetstrategie in DEZE run met het gat doet. Een
+ * opeethypotheek is een keuze, de tekort-lening is wat er daarnaast nog openstaat —
+ * de melding moet die twee uit elkaar houden, anders leest hij als "je keuze werkt niet".
+ */
+function housingSentence(
+  housing: DeficitLoanHousingFacts | null,
+  startAge: number,
+  cleared: number | null,
+): string | null {
+  if (!housing) return null
+
+  if (housing.mode === 'reverse_mortgage') {
+    const opeet = wholeAge(housing.reverseMortgageStartAge)
+    if (opeet == null) {
+      return `Je hebt een opeethypotheek gekozen, maar die start in deze projectie niet: er komt geen geld uit je huis om dit gat te dekken.`
+    }
+    if (opeet > startAge) {
+      // Staat de lening kort na de start op nul, dan zeggen we niets over de oorzaak:
+      // dat kan de opname zijn, maar net zo goed AOW of pensioen die rond dezelfde tijd ingaan.
+      const daarna =
+        cleared != null && cleared <= opeet + 1
+          ? ''
+          : ` Ook daarna blijft er een tekort-lening openstaan: de maandopname uit je huis vult het gat niet volledig.`
+      return `Je hebt een opeethypotheek gekozen. Die start in deze projectie op leeftijd ${opeet}; tot dan komt er geen geld uit je huis en dekt de tekort-lening het gat.${daarna}`
+    }
+    return `Je hebt een opeethypotheek gekozen en die loopt vanaf leeftijd ${opeet}, maar de maandopname uit je huis vult het gat niet volledig. Het verschil is de tekort-lening.`
+  }
+
+  if (housing.mode === 'downsize') {
+    const verkoop = wholeAge(housing.saleAge)
+    if (verkoop == null) {
+      return `Je hebt gekozen om je huis te verkopen, maar dat gebeurt in deze projectie niet: de overwaarde dekt dit gat dus niet.`
+    }
+    if (verkoop > startAge) {
+      const aflossing =
+        cleared != null && cleared <= verkoop + 1
+          ? `; met de opbrengst is hij daarna afgelost.`
+          : `. De opbrengst is niet genoeg om hem helemaal af te lossen.`
+      return `Je huis wordt in deze projectie verkocht op leeftijd ${verkoop}. Tot die verkoop dekt de tekort-lening het gat${aflossing}`
+    }
+    return `Je huis is in deze projectie al verkocht op leeftijd ${verkoop}; de opbrengst dekt je uitgaven daarna niet tot het einde.`
+  }
+
+  return null
 }

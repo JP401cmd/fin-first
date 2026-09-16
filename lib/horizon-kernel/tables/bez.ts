@@ -39,6 +39,11 @@
  *   - **BE** opeet-opname/mnd `= MIN(gewenst, MAX(0, BD/(1+B66/12) − S!P(m−1)))`, met
  *     gewenst = B67·idx (indien ingevuld) óf — auto — de overwaarde-cap bij opeet-
  *     start gespreid over `(90 − B64)` jaar (levensverwachting 90; zie constante).
+ *   - **opeetGestart** (virtueel, buiten oracle — ADR 0148): bij `opeetTrigger ===
+ *     'Wanneer nodig'` start de opeet-tak monotoon zodra (leeftijd ≥ FIRE ∧
+ *     Prognose!J(m−1) < drempel) ∨ leeftijd ≥ B64 — dezelfde drempel als AY. De
+ *     spreiding loopt dan over `(90 − werkelijke startleeftijd)` jaar. Zonder het veld
+ *     is dit `leeftijd ≥ B64` en het blok byte-identiek aan het oracle.
  *
  * ## Horizon-guard (afwijkend, per kolomtype — empirisch geverifieerd)
  * Voorbij leeftijd 100 leegt Excel de **waarde/rendement-kolommen** én B/C/AV/AW én
@@ -96,6 +101,19 @@ export interface BezWoningDep {
   readonly fireLeeftijd: number
   /** Overwaarde (J − S!D) in de maand vóór opeet-start (bevroren auto-opname-basis). */
   readonly overwaardeBijOpeetStart: number
+  /**
+   * BUITEN ORACLE-DOMEIN (ADR 0148) — alléén gelezen bij `woning.opeetTrigger ===
+   * 'Wanneer nodig'`. Virtuele kolom Bez!opeetGestart(m−1): is de opeet-tak al
+   * gestart (monotoon, patroon AY)? Afwezig ⇒ 0.
+   */
+  readonly opeetGestartVorig?: number
+  /**
+   * BUITEN ORACLE-DOMEIN (ADR 0148) — de WERKELIJKE opeet-startleeftijd (engine-
+   * toestand, bevroren op de startmaand), noemer van de auto-spreiding
+   * `(90 − start)·12`. In de startmaand zelf leest het blok zijn eigen leeftijd;
+   * daarna dit veld. Alléén bij 'Wanneer nodig'.
+   */
+  readonly opeetStartLeeftijd?: number
 }
 
 /**
@@ -143,6 +161,12 @@ export interface BezWoningblok {
   readonly overwaardeVorig: number // BC
   readonly opeetCap: number // BD
   readonly opeetOpname: number // BE
+  /**
+   * Virtuele kolom (geen Excel-tegenhanger; ADR 0148): opeet-tak gestart 0/1, monotoon.
+   * Bij 'Vaste leeftijd' stateless `leeftijd ≥ B64`; bij 'Wanneer nodig' de m−1-gevoede
+   * toestand. Drager van de startmaand voor de engine (0→1-overgang).
+   */
+  readonly opeetGestart: number
 }
 
 /** Bez-rij (in-horizon), kolomletters tussen haakjes. */
@@ -191,6 +215,7 @@ const NUL_WONING: BezWoningblok = {
   overwaardeVorig: 0,
   opeetCap: 0,
   opeetOpname: 0,
+  opeetGestart: 0,
 }
 
 /** Aantal bezitting-slots (bens rij 4..13). */
@@ -315,7 +340,8 @@ export function computeBezWoning(
 /**
  * Woningblok AY:BE. De verkoop-status (AY) is monotoon en alle triggers lezen
  * maand m−1 (lag-veilig). De opeethypotheek-tak (BD/BE) is alléén actief bij
- * `Opeethypotheek` vanaf leeftijd B64.
+ * `Opeethypotheek` vanaf leeftijd B64 — of, bij `opeetTrigger` 'Wanneer nodig'
+ * (app-only, ADR 0148), vanaf de behoefte-trigger met B64 als uiterste leeftijd.
  */
 function computeWoningblok(
   input: KernelInput,
@@ -376,16 +402,46 @@ function computeWoningblok(
   // ── BC overwaarde(m−1) — geklemd op 0 (huis kan onder de hypotheek zakken) ────
   const overwaardeVorig = Math.max(0, jVorig - sdVorig)
 
-  // ── BD/BE opeethypotheek (alléén die modus, vanaf leeftijd B64) ──────────────
+  // ── opeetGestart (virtueel, 0/1) — wanneer start de opeet-tak? ───────────────
+  // Oracle-pad ('Vaste leeftijd'/afwezig): stateless `leeftijd ≥ B64`.
+  // App-pad ('Wanneer nodig', ADR 0148): monotoon (patroon AY) — op behoefte (zelfde
+  // drempel/formule als Verkopen, ná FIRE) óf uiterlijk op B64.
+  const opeetWanneerNodig = w.selector === 'Opeethypotheek' && w.opeetTrigger === 'Wanneer nodig'
+  const opeetGestartVorig = dep.opeetGestartVorig ?? 0
+  let opeetGestart = 0
+  if (w.selector === 'Opeethypotheek') {
+    if (!opeetWanneerNodig) {
+      if (age >= w.opeetStartleeftijdOpname) opeetGestart = 1
+    } else if (opeetGestartVorig === 1) {
+      opeetGestart = 1
+    } else {
+      const drempel = (input.inkomenUitgaven.uitgaveNaPensioenPerJaar / 12) * idx * w.drempelMaandenUitgave
+      const opBehoefte = age >= dep.fireLeeftijd && dep.prognoseLiquideVorig < drempel
+      if (opBehoefte || age >= w.opeetStartleeftijdOpname) opeetGestart = 1
+    }
+  }
+
+  // ── BD/BE opeethypotheek (alléén die modus, vanaf de start) ───────────────────
   let opeetCap = 0
   let opeetOpname = 0
-  if (w.selector === 'Opeethypotheek' && age >= w.opeetStartleeftijdOpname) {
+  if (opeetGestart === 1) {
     opeetCap = overwaardeVorig * w.opeetMaxLeningPctOverwaarde
+    // Auto-opname-basis + spreidingsnoemer. Oracle-pad: bevroren overwaarde (engine,
+    // maand B64−1) over (90 − B64)·12. App-pad: in de STARTMAAND zelf de eigen
+    // overwaarde(m−1)/leeftijd (de engine bevriest exact die waarden voor m+1…), daarna
+    // de bevroren dep-velden — zo blijft dit blok een pure m−1-functie.
+    const startNu = opeetWanneerNodig && opeetGestartVorig === 0
+    const basisOverwaarde = startNu ? overwaardeVorig : dep.overwaardeBijOpeetStart
+    const startLeeftijd = !opeetWanneerNodig
+      ? w.opeetStartleeftijdOpname
+      : startNu
+        ? age
+        : (dep.opeetStartLeeftijd ?? age)
     const gewenst =
       w.opeetMaandopname !== null
         ? w.opeetMaandopname * idx
-        : (dep.overwaardeBijOpeetStart * w.opeetMaxLeningPctOverwaarde) /
-          ((OPEET_LEVENSVERWACHTING_LEEFTIJD - w.opeetStartleeftijdOpname) * 12)
+        : (basisOverwaarde * w.opeetMaxLeningPctOverwaarde) /
+          ((OPEET_LEVENSVERWACHTING_LEEFTIJD - startLeeftijd) * 12)
     // Cap op het eind-saldo: na opname stapelt de rente nog op → opname ≤
     // BD/(1+rente/12) − saldo(m−1). Verliest de cap zijn ruimte, dan valt BE naar 0.
     const capRestant = Math.max(0, opeetCap / (1 + w.opeetRentePerJaar / 12) - dep.opeetSaldoVorig)
@@ -400,6 +456,7 @@ function computeWoningblok(
     overwaardeVorig,
     opeetCap,
     opeetOpname,
+    opeetGestart,
   }
 }
 

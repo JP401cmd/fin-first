@@ -97,6 +97,7 @@ import {
 } from '@/lib/horizon/liquid-wealth-line'
 import { applyHousingToComposition } from '@/lib/horizon/wealth-composition-housing'
 import { detectDeficitLoanFromRows } from '@/lib/horizon/deficit-loan-display'
+import { detectReverseMortgageStartAge } from '@/lib/horizon/reverse-mortgage-start'
 import { buildDeficitLoanCopy } from '@/lib/horizon/deficit-loan-copy'
 import { nettoLiquideAtAge } from '@/lib/horizon/vrijheidsdagen'
 import { useDeficitNotice } from '@/components/app/horizon/deficit-notice-provider'
@@ -521,6 +522,10 @@ const STACKED_ROW_MONEY_FIELDS = [
   'vastgoed',
   'overig',
   'schulden',
+  'schuldHypotheek',
+  'schuldOverig',
+  'schuldOpeethypotheek',
+  'schuldTekortLening',
 ] as const satisfies readonly (keyof StackedRow)[]
 
 /**
@@ -2143,6 +2148,16 @@ export default function HorizonPage({
     [unifiedRows, simResult?.displayEndAge],
   )
 
+  // Werkelijk startmoment van de opeethypotheek in DEZE run — bij "wanneer nodig"
+  // volgt dat uit de projectie, niet uit de instelling.
+  const reverseMortgageStartAge = useMemo(
+    () =>
+      initialData.housingStrategy?.mode === 'reverse_mortgage'
+        ? detectReverseMortgageStartAge(unifiedRows)
+        : null,
+    [initialData.housingStrategy, unifiedRows],
+  )
+
   // ── Chart event-overlay (markers boven/onder de bar) ───────────────────
   // Bouw één lijst met ChartEventOverlay-items uit gebruiker-events +
   // natuurlijke mijlpalen. De chart bepaalt zelf side+positie via xScale;
@@ -2273,8 +2288,20 @@ export default function HorizonPage({
         readOnly: true,
       })
     }
+    if (reverseMortgageStartAge != null && showNaturalMilestones && showOwnEvents) {
+      out.push({
+        id: 'reverse-mortgage-start',
+        label: 'Opeethypotheek start',
+        age: reverseMortgageStartAge,
+        side: 'above',
+        color: COLOR_NAT_ASSET,
+        icon: 'Home',
+        kind: 'natural',
+        readOnly: true,
+      })
+    }
     return out
-  }, [showLifeEvents, showNaturalMilestones, showGoals, goalChartMarkers, displayEvents, naturalMilestones, isHouseholdView, isPartnerView, partnerLine, partnerLifeEvents, deficitLoanNotice])
+  }, [showLifeEvents, showNaturalMilestones, showGoals, goalChartMarkers, displayEvents, naturalMilestones, isHouseholdView, isPartnerView, partnerLine, partnerLifeEvents, deficitLoanNotice, reverseMortgageStartAge])
 
   // ── Natuurlijke-mijlpaal info-sheet state ─────────────────────────────
   const [selectedNaturalMilestone, setSelectedNaturalMilestone] =
@@ -3207,6 +3234,15 @@ export default function HorizonPage({
       : null
     return buildDeficitLoanCopy({
       firstAge: deficitLoanNotice.firstAge,
+      clearedAge: deficitLoanNotice.clearedAge,
+      terugkeerAge: deficitLoanNotice.terugkeerAge,
+      housing: initialData.housingContext.hasEigenHuis && initialData.housingStrategy
+        ? {
+            mode: initialData.housingStrategy.mode,
+            saleAge: kernelHousingSale?.age ?? null,
+            reverseMortgageStartAge,
+          }
+        : null,
       aowAge: userAowAge.fractional,
       displayEndAge,
       isPensioenMode,
@@ -3214,7 +3250,7 @@ export default function HorizonPage({
       peakText: formatMaskedCurrency(deficitLoanNotice.peak, masked),
       freedomText,
     })
-  }, [deficitLoanNotice, deficitNoticeVisible, canonicalDailyRate, masked, userAowAge.fractional, displayEndAge, isPensioenMode, homeExcludedFromProgress])
+  }, [deficitLoanNotice, deficitNoticeVisible, canonicalDailyRate, masked, userAowAge.fractional, displayEndAge, isPensioenMode, initialData.housingContext.hasEigenHuis, initialData.housingStrategy, kernelHousingSale, reverseMortgageStartAge, homeExcludedFromProgress])
 
   // ── Erfgenamen (heirs) derivation for End-of-Life analysis ───────────────
   const erfgenamen = useMemo(() => {
@@ -3332,7 +3368,10 @@ export default function HorizonPage({
   const wealthCompositionRows: StackedRow[] = useMemo(() => {
     if (chartMode !== 'vermogensopbouw') return []
     if (!displayUnifiedRows.length) return []
-    const baseRows = unifiedRowsToStackedRows(displayUnifiedRows)
+    const baseRows = unifiedRowsToStackedRows(
+      displayUnifiedRows,
+      new Map(debts.map((d) => [d.id, d.debt_type])),
+    )
 
     const currentAgeFloor = initialData.effectiveInput.dateOfBirth
       ? Math.floor(ageAtDate(initialData.effectiveInput.dateOfBirth))
@@ -3352,7 +3391,7 @@ export default function HorizonPage({
       isV2: true,
       houseInLedger: true,
     })
-  }, [chartMode, displayUnifiedRows, initialData, displayEvents])
+  }, [chartMode, displayUnifiedRows, initialData, displayEvents, debts])
 
   // Lazy compute income/expense breakdown only when user toggles to 'breakdown' mode.
   // Consume de geclipte weergaverijen zodat de bronnen-breakdown niet tot het
@@ -5988,6 +6027,16 @@ export default function HorizonPage({
                       <p className="mt-1.5 font-sans text-[12px] leading-relaxed text-amber-800">
                         {deficitLoanCopy.knoppen}
                       </p>
+                      {deficitLoanCopy.toonWoonstrategieLink && (
+                        <button
+                          type="button"
+                          onClick={() => { setStrategieInitialTab('woning'); setActiveModal('strategie') }}
+                          className="mt-1.5 inline-flex items-center gap-1 font-sans text-[12px] font-medium text-amber-900 underline underline-offset-2 transition-colors hover:text-[var(--ink)]"
+                          style={{ minHeight: 44 }}
+                        >
+                          Bekijk of wijzig je woonstrategie &rarr;
+                        </button>
+                      )}
                       <p className="mt-2 font-sans text-[11px] text-[var(--ink-3)]">
                         {deficitLoanCopy.disclaimer}
                       </p>

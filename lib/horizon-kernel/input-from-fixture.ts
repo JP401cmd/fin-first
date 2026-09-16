@@ -379,6 +379,8 @@ function buildWoning(fx: OracleFixture): WoningStrategieParams {
     verkoopprijsPctWoz: num(fx, 'P!B61', 'verkoopprijs % WOZ'),
     verkoopkostenPct: num(fx, 'P!B62', 'verkoopkosten %'),
     huurNaVerkoopPctWozPerJaar: num(fx, 'P!B63', 'huur na verkoop % WOZ/jr'),
+    // Bewust GEEN `opeetTrigger` (ADR 0148): P!B58 is in Excel verkoop-only; de opeet-tak
+    // start in het oracle hard op P!B64. Afwezig = dat gedrag → parity byte-identiek.
     opeetStartleeftijdOpname: num(fx, 'P!B64', 'startleeftijd opname'),
     opeetMaxLeningPctOverwaarde: num(fx, 'P!B65', 'max lening % overwaarde'),
     opeetRentePerJaar: num(fx, 'P!B66', 'rente opeethypotheek'),

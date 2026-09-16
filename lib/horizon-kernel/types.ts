@@ -386,7 +386,20 @@ export interface WoningStrategieParams {
    * Een bewuste 0 = geen woonlast na verkoop.
    */
   readonly huurNaVerkoopPerMaand?: number | null
-  /** P!B64 — startleeftijd opname (opeethypotheek). */
+  /**
+   * BUITEN ORACLE-DOMEIN (ADR 0148, 16 sep 2026) — trigger van de OPEET-tak. Excel
+   * P!B58 (`trigger`) geldt uitsluitend voor 'Verkopen'; de opeethypotheek start in het
+   * oracle hard op P!B64. De app belooft bij "Wanneer nodig" een start zodra het
+   * vermogen op raakt. Gezet op 'Wanneer nodig' → `tables/bez.ts` start de opname
+   * (monotoon) zodra leeftijd ≥ FIRE ∧ Prognose!J(m−1) < drempel (zelfde drempel als
+   * Verkopen: `drempelMaandenUitgave`), óf uiterlijk op `opeetStartleeftijdOpname`;
+   * de engine bevriest overwaarde-basis en werkelijke startleeftijd op die maand.
+   * Afwezig of 'Vaste leeftijd' ⇒ exact het oracle-gedrag; `input-from-fixture` zet
+   * dit veld nooit ⇒ parity byte-identiek. Alleen de app-adapter (reverse_mortgage +
+   * on_depletion) zet het.
+   */
+  readonly opeetTrigger?: VerkoopTrigger
+  /** P!B64 — startleeftijd opname (opeethypotheek); bij `opeetTrigger` 'Wanneer nodig' de UITERSTE leeftijd. */
   readonly opeetStartleeftijdOpname: number
   /** P!B65 — max lening als % van de overwaarde. */
   readonly opeetMaxLeningPctOverwaarde: number
