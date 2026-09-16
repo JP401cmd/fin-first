@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-16T20:51:07.873Z",
+  "generatedAt": "2026-09-16T21:59:01.125Z",
   "generatedDate": "2026-09-16",
   "repo": {
     "name": "fin",
@@ -193,9 +193,9 @@
     "routesProduction": 90,
     "api": 322,
     "tables": 101,
-    "migrations": 246,
+    "migrations": 247,
     "integrations": 25,
-    "components": 1111,
+    "components": 1112,
     "providers": 19,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -8501,7 +8501,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 246
+    "migrationCount": 247
   },
   "tablesByDomain": [
     {
@@ -9043,7 +9043,7 @@
     }
   ],
   "components": {
-    "total": 1111,
+    "total": 1112,
     "groups": [
       {
         "group": "app",
@@ -9891,7 +9891,7 @@
       },
       {
         "group": "future",
-        "count": 80,
+        "count": 81,
         "items": [
           "afbouw-overzicht-card",
           "afbouw-overzicht-card.test",
@@ -9916,6 +9916,7 @@
           "duplicate-confirm-sheet",
           "editors",
           "eindstrategie-body",
+          "eindstrategie-body.geen-tekort-lening.test",
           "eindstrategie-body.nalatenschap.test",
           "fields",
           "gebeurtenissen-view",
@@ -18015,6 +18016,20 @@
       ],
       "summary": "De opeethypotheek start in de horizon-kernel niet langer hard op een vaste leeftijd wanneer de gebruiker \"Wanneer nodig\" kiest. Een apart, app-only veld `WoningStrategieParams.opeetTrigger` laat de opeet-tak starten zodra het liquide vermogen onder de behoefte-drempel zakt, met d",
       "file": "docs/adr/0148-opeethypotheek-volgt-wanneer-nodig.md"
+    },
+    {
+      "id": "0149-geen-tekort-lening-als-planvoorwaarde",
+      "title": "\"Geen tekort-lening in mijn plan\": een tweede haalbaarheidscriterium naast de gap, app-only",
+      "status": "accepted",
+      "date": "2026-09-16",
+      "elements": [
+        "as-planning",
+        "fn-toekomstplannen",
+        "data-cont",
+        "sp-plannen"
+      ],
+      "summary": "De horizon-kernel kent één haalbaarheidscriterium voor een stopmoment: `solver.ts#isToereikend`. Zonder de nieuwe instelling is dat exact de Excel-gap (`computeGap ≥ 0`, P!B38). Met de hoofdinstelling **\"Geen tekort-lening in mijn plan\"** (`profiles.fire_no_deficit_loan = true` →",
+      "file": "docs/adr/0149-geen-tekort-lening-als-planvoorwaarde.md"
     }
   ],
   "churn": {
@@ -18064,8 +18079,8 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 10578,
-        "commits": 88
+        "loc": 10600,
+        "commits": 89
       },
       {
         "file": "components/app/budgets-client.tsx",
@@ -19246,9 +19261,17 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-09-15",
-    "hasChanges": false,
-    "sections": []
+    "previousDate": "2026-09-16",
+    "hasChanges": true,
+    "sections": [
+      {
+        "label": "Componenten (aantal)",
+        "added": [
+          "+1"
+        ],
+        "removed": []
+      }
+    ]
   },
   "statsHistory": [
     {
@@ -19667,7 +19690,7 @@
     {
       "date": "2026-09-16",
       "api": 322,
-      "components": 1111,
+      "components": 1112,
       "tables": 101,
       "routesProduction": 90
     }
