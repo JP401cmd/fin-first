@@ -60,6 +60,7 @@ export const SCHRIJFROUTE_VELD_REGISTER = {
       fire_end_age: EINDSTRATEGIE,
       fire_legacy_amount: EINDSTRATEGIE,
       fire_legacy_include_illiquid: EINDSTRATEGIE,
+      fire_no_deficit_loan: EINDSTRATEGIE,
       deficit_loan_rate: EINDSTRATEGIE,
       retirement_expense_method: UITGAVEN,
       retirement_expense_custom_amount: UITGAVEN,

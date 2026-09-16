@@ -91,6 +91,7 @@ import { buildParameterGoalRows } from '@/lib/horizon/toekomst-doel'
 import { resolveLabAntwoorden } from '@/lib/horizon/lab-antwoorden'
 import { selectLabDoelenBuitenPlan } from '@/lib/goals/lab-doelen-buiten-plan'
 import { doelenPlanGewijzigdMelding } from '@/lib/horizon/anker-copy'
+import { buildDeficitLoanCopy } from '@/lib/horizon/deficit-loan-copy'
 import { TOEK_ACCEPTANCE } from './toek'
 import type { AcceptanceCriterion } from './types'
 
@@ -677,6 +678,33 @@ export const TOEK_ENGINE_CHECKS: ToekEngineCheck[] = [
       return {
         expected: 'buitenPlan=fire; melding=Je plan is veranderd. 1 doel uit het lab past er niet meer bij.',
         actual: `buitenPlan=${buiten.map((g) => g.id).join(',')}; melding=${doelenPlanGewijzigdMelding(buiten.length)}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-TOEK-52',
+    scenarioId: 'UAT-TOEK-52',
+    label: 'Tekort-lening-melding: instelling-zin + link per stand van geenTekortLeningAan (ADR 0149)',
+    run: () => {
+      criterion('WF-TOEK-52')
+      const base = {
+        firstAge: 60,
+        clearedAge: null,
+        housing: null,
+        aowAge: 67,
+        displayEndAge: 90,
+        isPensioenMode: false,
+        homeExcludedFromFire: false,
+        peakText: '€ 42.000',
+        freedomText: null,
+      }
+      const uit = buildDeficitLoanCopy({ ...base, geenTekortLeningAan: false })
+      const aan = buildDeficitLoanCopy({ ...base, geenTekortLeningAan: true, vastStopmoment: true })
+      const aanZonderAnker = buildDeficitLoanCopy({ ...base, geenTekortLeningAan: true, vastStopmoment: false })
+      return {
+        expected:
+          'instellingUit=Je plan staat een tekort-lening nu toe. Met de instelling "Geen tekort-lening in mijn plan" rekent de app met het vroegste stopmoment waarop je zonder lening rondkomt.; instellingAan=Je hebt ingesteld dat een tekort-lening niet in je plan hoort, maar met je gekozen stopmoment is hij toch nodig.; instellingAanZonderVastStopmoment=Je hebt ingesteld dat een tekort-lening niet in je plan hoort; deze berekening laat er toch een zien.; toonInstellingLink=true',
+        actual: `instellingUit=${uit.instelling}; instellingAan=${aan.instelling}; instellingAanZonderVastStopmoment=${aanZonderAnker.instelling}; toonInstellingLink=${uit.toonInstellingLink && aan.toonInstellingLink}`,
       }
     },
   },

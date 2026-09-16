@@ -98,6 +98,11 @@ export interface RegelSimOverride {
    * `null` = terug naar de kernel-default ('Nee').
    */
   legacyIncludeIlliquid?: boolean | null
+  /**
+   * ADR 0149 — "Geen tekort-lening in mijn plan" (`profiles.fire_no_deficit_loan`).
+   * `undefined` = kolom ongewijzigd; `null`/`false` = uit.
+   */
+  geenTekortLening?: boolean | null
   withdrawalStrategy?: WithdrawalStrategyConfig
   withdrawalProfileConfig?: Record<string, unknown> | null
   /**
@@ -203,6 +208,7 @@ function applyDraftToRawContext(
     !override?.withdrawalStrategy &&
     override?.withdrawalProfileConfig === undefined &&
     override?.legacyIncludeIlliquid === undefined &&
+    override?.geenTekortLening === undefined &&
     override?.housingStrategyConfig === undefined &&
     override?.retirementExpense === undefined &&
     override?.assetSaleConfigs === undefined &&
@@ -245,6 +251,9 @@ function applyDraftToRawContext(
   }
   if (override.legacyIncludeIlliquid !== undefined) {
     profile.fire_legacy_include_illiquid = override.legacyIncludeIlliquid
+  }
+  if (override.geenTekortLening !== undefined) {
+    profile.fire_no_deficit_loan = override.geenTekortLening
   }
   if (override.firePlan) {
     const p = override.firePlan

@@ -15,7 +15,9 @@
  *  3. Anders maand-bisectie: zoek de kleinste maand hiM met gap ≥ 0
  *     (invariant: gap(hiM) ≥ 0; loM start op 0 en wordt nooit geëvalueerd —
  *     net als in de VBA, wat de `reached_now`-uitkomsten via de statusformule
- *     laat lopen, niet via de bisectie).
+ *     laat lopen, niet via de bisectie). Het criterium is `isToereikend`: op het
+ *     app-pad met `geenTekortLening` (ADR 0149) is dat gap ≥ 0 ∧ geen blijvende
+ *     tekort-lening; zonder die vlag exact de gap.
  *
  * Statusblok (per kandidaat volledig herrekend, zoals Excel dat per
  * `Application.Calculate` doet):
@@ -45,6 +47,7 @@
 
 import { runKernelProjection, type KernelProjection } from './engine'
 import { clng, computeDoelblok, computeGap, eindleeftijdVan, prognoseJ } from './gap'
+import { heeftBlijvendeTekortLening } from './runway'
 import { computeEs, type EsRow } from './tables/es'
 import type { KernelInput } from './types'
 
@@ -116,6 +119,37 @@ export function resolveVastAnker(input: KernelInput, es: EsRow): number | null {
   return Math.min(Math.max(anker.leeftijd, ondergrens), Math.max(ondergrens, bovengrens))
 }
 
+/**
+ * **HET haalbaarheidscriterium van een stopmoment** — de enige plek die zegt of een
+ * doorgerekende stand op `fireAge` "toereikend" is. Gebruikt door de horizon-check en
+ * de bisectie van `solveFire`, en door elke wrapper die diezelfde toets herhaalt
+ * (`wrappers/band.ts`, `wrappers/mc.ts`, `rendement-marge.ts`) — één formule, één home.
+ *
+ *  - Oracle-deel (VBA `BepaalFIRE`): `computeGap(...) ≥ 0` — model ≥ doel op de
+ *    eindleeftijd (P!B38).
+ *  - ADR 0149 (app-only, `input.geenTekortLening === true`): bovendien mag er t/m de
+ *    eindleeftijd geen BLIJVENDE tekort-lening nodig zijn
+ *    (`runway.ts#heeftBlijvendeTekortLening`). Vlag weggelaten/`false` ⇒ exact het
+ *    oracle-criterium, dus de parity-fixtures blijven byte-identiek.
+ *
+ * Monotonie-aanname van de bisectie (zie ADR 0149): "later stoppen ⇒ minder tekort".
+ * Voor de gap gold die al (VBA-aanname); voor het tekort-criterium gaat ze in de regel
+ * op (langer salaris ⇒ meer liquide bij de stop ⇒ kortere/geen tekort-episode). Waar
+ * ze niet opgaat (bv. een gebeurtenis die pas ná een late stop een kortstondig gat
+ * slaat) vindt de bisectie nog steeds een toereikende maand met `hi` als invariant —
+ * alleen niet gegarandeerd de vroegste.
+ */
+export function isToereikend(
+  input: KernelInput,
+  es: EsRow,
+  proj: KernelProjection,
+  fireAge: number,
+): boolean {
+  if (computeGap(input, es, proj, fireAge) < 0) return false
+  if (input.geenTekortLening !== true) return true
+  return !heeftBlijvendeTekortLening(input, proj, eindleeftijdVan(es))
+}
+
 export interface SolveFireResult {
   /** P!B16 — gevonden FIRE-leeftijd (bij unreachable: geparkeerd op de horizon). */
   readonly fireAge: number
@@ -168,6 +202,8 @@ function computeStatusBlok(
   input: KernelInput,
   proj: KernelProjection,
   fireAge: number,
+  /** Ligt het stopmoment vast (anker, pensioen-kortsluiting of `evaluateFireAt`)? */
+  vastStop: boolean,
 ): StatusBlok {
   const es = computeEs(input)
   const code = es.interneCode
@@ -245,6 +281,21 @@ function computeStatusBlok(
   // vielen via de schijnbereik-tak op `unreachable` → bridge `fireReachable = false`
   // → hero zonder stopleeftijd, "FIRE niet haalbaar"-kopij en lege scenariokaarten.
   const vastAnkerTekort = tekortLening > 0 || gap < 0 || doelbedrag < 0
+  // ADR 0149 — "geen tekort-lening in mijn plan", alleen op het GESOLVEDE pad (geen
+  // anker, geen vast stopmoment): de bisectie zocht een maand zonder blijvende
+  // tekort-lening (`isToereikend`); staat die er op deze stand tóch (de horizon-
+  // parkeerstand), dan is het plan niet toereikend — `unreachable_within_horizon`, vóór
+  // de reached_now-/reached_at-takken zodat die 'm niet kunnen overrulen (zelfde plaats
+  // als de M6-vangrail). Een geforceerde `evaluateFireAt`-stand (stopkaarten, gekozen-
+  // stop-pad) is een vast moment en houdt zijn oude status: anders zet de bridge
+  // `fireReachable` op false en verdwijnt die lijn/kaart. Onder een vast anker meldt het
+  // tekort zich via `vastAnkerTekort` (tak hierboven, ongewijzigd). Vlag weggelaten ⇒
+  // deze tak bestaat niet ⇒ exact de oude IF-ketting.
+  const blijvendeTekortLening =
+    input.geenTekortLening === true &&
+    input.stopAnker === undefined &&
+    !vastStop &&
+    heeftBlijvendeTekortLening(input, proj, eindleeftijd)
   let status: SolverStatus
   if (code === 'pensioen' && tekortLening > 0) {
     status = 'pension_shortfall'
@@ -259,7 +310,7 @@ function computeStatusBlok(
     // `stopAnker`-blok. De app-adapter stuurt die selector sinds F2 niet meer
     // (het anker reist als blok); F4 verwijdert de selector én deze tak.
     status = 'stop_now_shortfall'
-  } else if (schijnbereik) {
+  } else if (schijnbereik || blijvendeTekortLening) {
     status = 'unreachable_within_horizon'
   } else if (jMaand0 >= doelbedrag) {
     status = 'reached_now'
@@ -301,7 +352,7 @@ export function solveFire(input: KernelInput): SolveFireResult {
     proj: KernelProjection,
     vastStopLeeftijd: number | null,
   ): SolveFireResult => {
-    const blok = computeStatusBlok(input, proj, fireAge)
+    const blok = computeStatusBlok(input, proj, fireAge, vastStopLeeftijd !== null)
     return {
       fireAge,
       eindleeftijd: blok.eindleeftijd,
@@ -345,21 +396,22 @@ export function solveFire(input: KernelInput): SolveFireResult {
   let lo = loStart
 
   // Horizon-check-run: NIET skippen (deze projectie wordt geretourneerd bij gap<0).
-  // F5: alleen de gap nodig → `computeGap` i.p.v. het volle `computeStatusBlok`
-  // (byte-identiek: beide leiden B38 uit computeDoelblok(input, es, proj, fireAge)).
+  // F5: alleen het criterium nodig → `isToereikend` i.p.v. het volle `computeStatusBlok`
+  // (byte-identiek: beide leiden B38 uit computeDoelblok(input, es, proj, fireAge);
+  // het ADR 0149-tekortdeel is zonder `geenTekortLening` inert).
   let proj = run(leeftijd + hi / 12)
-  if (computeGap(input, es, proj, leeftijd + hi / 12) < 0) {
+  if (!isToereikend(input, es, proj, leeftijd + hi / 12)) {
     // Parkeerstand: geen gekozen stopmoment → `vastStopLeeftijd` null.
     return afronden(leeftijd + hi / 12, proj, null)
   }
 
-  // ── Maand-bisectie op de gap (VBA: `\` = integer-deling, floor) ─────────────
+  // ── Maand-bisectie op het criterium (VBA: `\` = integer-deling, floor) ──────
   while (hi - lo > 1) {
     const mid = Math.floor((lo + hi) / 2)
     // F7: interne probe — projectie wordt weggegooid, dus sla de Ont-post-recompute
-    // over. F5: alleen de gap-sign telt → computeGap.
+    // over (de toets leest alleen prognose/s). F5: alleen het criterium telt.
     proj = run(leeftijd + mid / 12, true)
-    if (computeGap(input, es, proj, leeftijd + mid / 12) >= 0) {
+    if (isToereikend(input, es, proj, leeftijd + mid / 12)) {
       hi = mid
     } else {
       lo = mid
@@ -383,7 +435,7 @@ export function solveFire(input: KernelInput): SolveFireResult {
  */
 export function evaluateFireAt(input: KernelInput, fireAge: number): SolveFireResult {
   const proj = runKernelProjection(input, { fireAge })
-  const blok = computeStatusBlok(input, proj, fireAge)
+  const blok = computeStatusBlok(input, proj, fireAge, true)
   return {
     fireAge,
     eindleeftijd: blok.eindleeftijd,

@@ -62,10 +62,10 @@
  */
 
 import { RENDEMENT_MARGE_GRENS } from '@/lib/constants'
-import { runKernelProjection } from './engine'
+import { runKernelProjection, type KernelProjection } from './engine'
 import { computeEs, type EsRow } from './tables/es'
-import { computeGap, eindleeftijdVan } from './gap'
-import { resolveVastAnker } from './solver'
+import { eindleeftijdVan } from './gap'
+import { isToereikend, resolveVastAnker } from './solver'
 import { potRisicoFactor } from './wrappers/risico'
 import type { KernelInput } from './types'
 
@@ -175,7 +175,7 @@ export function resolveMargeAnker(
  * bleef de marge op de uniforme Δr staan, dan zou de band de pensioenpot wél
  * meenemen en de marge niet.
  */
-function gapBijShift(input: KernelInput, es: EsRow, ankerLeeftijd: number, delta: number): number {
+function projectieBijShift(input: KernelInput, ankerLeeftijd: number, delta: number): KernelProjection {
   const verschoven: KernelInput = {
     ...input,
     assetPotten: input.assetPotten.map((p) => {
@@ -183,11 +183,21 @@ function gapBijShift(input: KernelInput, es: EsRow, ankerLeeftijd: number, delta
       return factor === 0 ? p : { ...p, rendement: p.rendement + delta * factor }
     }),
   }
-  const proj = runKernelProjection(verschoven, { fireAge: ankerLeeftijd })
-  // Het doelblok leest alleen start-/inflatie-parameters uit `input` (die de
-  // shift niet raakt) plus de VERSCHOVEN projectie — identiek aan hoe
-  // `wrappers/mc.ts` de MC-gap evalueert.
-  return computeGap(input, es, proj, ankerLeeftijd)
+  return runKernelProjection(verschoven, { fireAge: ankerLeeftijd })
+}
+
+/**
+ * "Houdt het plan het bij deze verschuiving?" — HETZELFDE criterium als de solver
+ * (`solver.ts#isToereikend`): gap ≥ 0, en op het app-pad met `geenTekortLening`
+ * (ADR 0149) óók geen blijvende tekort-lening t/m de eindleeftijd. Zonder die vlag is
+ * dit exact `computeGap(...) ≥ 0`, dus de bestaande marge-uitkomsten veranderen niet.
+ *
+ * Het doelblok leest alleen start-/inflatie-parameters uit `input` (die de shift
+ * niet raakt) plus de VERSCHOVEN projectie — identiek aan hoe `wrappers/mc.ts` de
+ * MC-toets evalueert.
+ */
+function houdtBijShift(input: KernelInput, es: EsRow, ankerLeeftijd: number, delta: number): boolean {
+  return isToereikend(input, es, projectieBijShift(input, ankerLeeftijd, delta), ankerLeeftijd)
 }
 
 /**
@@ -204,32 +214,32 @@ export function computeRendementMarge(
   const anker = resolveMargeAnker(input, stopAge, es)
   if (anker === null) return null
 
-  const gap = (delta: number) => gapBijShift(input, es, anker.leeftijd, delta)
+  const houdt = (delta: number) => houdtBijShift(input, es, anker.leeftijd, delta)
   const basis = { ankerLeeftijd: anker.leeftijd, anker: anker.anker } as const
 
   // Houdt het plan het bij het verwachte rendement? Dat bepaalt in welke helft
   // van het zoekbereik de omslag ligt — en scheelt de helft van de bisectie.
   let lo: number
   let hi: number
-  if (gap(0) >= 0) {
-    if (gap(-RENDEMENT_MARGE_GRENS) >= 0) {
+  if (houdt(0)) {
+    if (houdt(-RENDEMENT_MARGE_GRENS)) {
       return { ...basis, marge: RENDEMENT_MARGE_GRENS, begrensd: 'boven' }
     }
-    lo = -RENDEMENT_MARGE_GRENS // gap < 0
-    hi = 0 // gap ≥ 0
+    lo = -RENDEMENT_MARGE_GRENS // houdt niet (gap < 0)
+    hi = 0 // houdt (gap ≥ 0)
   } else {
-    if (gap(RENDEMENT_MARGE_GRENS) < 0) {
+    if (!houdt(RENDEMENT_MARGE_GRENS)) {
       return { ...basis, marge: -RENDEMENT_MARGE_GRENS, begrensd: 'onder' }
     }
-    lo = 0 // gap < 0
-    hi = RENDEMENT_MARGE_GRENS // gap ≥ 0
+    lo = 0 // houdt niet (gap < 0)
+    hi = RENDEMENT_MARGE_GRENS // houdt (gap ≥ 0)
   }
 
-  // Invariant: gap(lo) < 0 ≤ gap(hi). `hi` convergeert naar de kleinste
+  // Invariant: houdt(lo) = false, houdt(hi) = true. `hi` convergeert naar de kleinste
   // verschuiving waarbij het plan nog net standhoudt; de marge is het spiegelbeeld.
   for (let i = 0; i < RENDEMENT_MARGE_ITERATIES; i++) {
     const mid = (lo + hi) / 2
-    if (gap(mid) >= 0) hi = mid
+    if (houdt(mid)) hi = mid
     else lo = mid
   }
 

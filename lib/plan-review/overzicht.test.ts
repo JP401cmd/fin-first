@@ -79,9 +79,27 @@ describe('plan-review overzicht — keuze · effect · waarom', () => {
     const run = vi.fn((_: RegelSimOverride): RegelProjection => ({ rows: [], fireAgeFractional: 61.7, reach: { kind: 'onbekend' } }))
     const plan = buildPlanReviewStap('plan', bronnen({ run }))
     expect(plan.effect[0]).toContain('vrijheidsleeftijd 55')
-    expect(plan.vergelijking.map((r) => r.waarde)).toEqual(['vrijheidsleeftijd 55', 'vrijheidsleeftijd 62'])
+    expect(plan.vergelijking.map((r) => r.waarde)).toEqual([
+      'vrijheidsleeftijd 55',
+      'vrijheidsleeftijd 62',
+      'vrijheidsleeftijd 62',
+    ])
     // De vergelijking rekent met vijf jaar langer reiken, via de plan-override.
     expect(run).toHaveBeenCalledWith({ firePlan: expect.objectContaining({ endAge: 95 }) })
+  })
+
+  it('ADR 0149 — "Geen tekort-lening in mijn plan": detailregel, effect en een vergelijking met de andere stand', () => {
+    const run = vi.fn((_: RegelSimOverride): RegelProjection => ({ rows: [], fireAgeFractional: 58.2, reach: { kind: 'onbekend' } }))
+    const uit = buildPlanReviewStap('plan', bronnen({ run }))
+    expect(uit.details).toContainEqual({ label: 'Tekort-lening in je plan', waarde: 'toegestaan' })
+    expect(uit.effect.join(' ')).toContain('Tekort-lening toegestaan')
+    expect(run).toHaveBeenCalledWith({ geenTekortLening: true })
+    expect(uit.vergelijking.at(-1)).toEqual({ label: 'Tekort-lening niet toegestaan', waarde: 'vrijheidsleeftijd 58' })
+
+    run.mockClear()
+    const aan = buildPlanReviewStap('plan', bronnen({ run, profile: { fire_no_deficit_loan: true } }))
+    expect(aan.details).toContainEqual({ label: 'Tekort-lening in je plan', waarde: 'niet toegestaan' })
+    expect(run).toHaveBeenCalledWith({ geenTekortLening: false })
   })
 
   it('onder een vast stopmoment telt tot waar het liquide vermogen reikt, niet de vrijheidsleeftijd', () => {
@@ -205,7 +223,8 @@ describe('stap 1 — Je plan', () => {
 
   it('"niet slinken" heeft geen eindleeftijd en dus geen langer-reiken-vergelijking', () => {
     const o = buildPlanReviewStap('plan', bronnen({ firePlan: { ...PLAN_SOLVED, endForm: 'perpetual' } }))
-    expect(o.vergelijking).toEqual([])
+    // Alleen de tekort-lening-vergelijking (ADR 0149), geen "geld reikt tot"-regels.
+    expect(o.vergelijking.map((r) => r.label)).toEqual(['Tekort-lening toegestaan (nu)', 'Tekort-lening niet toegestaan'])
     expect(o.rekentNu).toContain('niet mag slinken')
   })
 

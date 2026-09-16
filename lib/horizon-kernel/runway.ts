@@ -2,7 +2,8 @@
  * Horizon-kernel — runway-lezer: "als ik vandaag stop met werken, in welke maand
  * raakt mijn liquide vermogen op?" (ADR 0126, PR B — motor-laag).
  *
- * Domein-zuiver: leest uitsluitend Prognose!J (`nettoLiquide`) uit een voltooide
+ * Domein-zuiver: leest uitsluitend Prognose!J (`nettoLiquide`) — en, voor de
+ * tekort-lezer `heeftBlijvendeTekortLening` (ADR 0149), S!AB — uit een voltooide
  * projectie; kent geen app-type, geen Supabase, geen Date.now. De projectie komt
  * uit `evaluateFireAt(input, input.startLeeftijd, { guardrailsAnker })` — FIRE-maand
  * 0 — via het gedeelde geforceerde-stop-recept (`buildForcedStopSolve`,
@@ -36,6 +37,8 @@
  */
 
 import type { KernelRunSummary } from './engine'
+import { eindMaandVan } from './gap'
+import type { KernelInput } from './types'
 
 /**
  * Een liquiditeitsdip die binnen dit aantal jaar volledig herstelt is een
@@ -78,6 +81,35 @@ function isDepleted(proj: RunwayProjectionView, m: number): boolean {
 }
 
 /**
+ * DE episode-regel — de enige definitie van "aanhoudend vs. bruggetje", gedeeld door
+ * `depletionMonth` (Prognose!J ≤ 0) en `heeftBlijvendeTekortLening` (tekort-slot ≥ €1).
+ *
+ * Scant de maanden `0..last` op het predicaat `hit`. Aaneengesloten hit-maanden vormen
+ * een episode [first, lastHit]. Een episode is TRANSIENT wanneer ze bewezen herstelt
+ * (er volgt nog een maand ≤ `last`, en die is per constructie geen hit) én
+ * `lastHit − first ≤ MAX_TRANSIENT_SPAN_MONTHS`. Levert de `first` van de eerste
+ * AANHOUDENDE episode, of `null` als elke episode een bruggetje is. Een episode die op
+ * `last` nog openstaat is per definitie aanhoudend.
+ */
+function eersteAanhoudendeEpisode(last: number, hit: (m: number) => boolean): number | null {
+  let m = 0
+  while (m <= last) {
+    if (!hit(m)) {
+      m += 1
+      continue
+    }
+    const first = m
+    let lastHit = m
+    while (lastHit + 1 <= last && hit(lastHit + 1)) lastHit += 1
+    const clears = lastHit < last
+    const transient = clears && lastHit - first <= MAX_TRANSIENT_SPAN_MONTHS
+    if (!transient) return first
+    m = lastHit + 1
+  }
+  return null
+}
+
+/**
  * De eerste AANHOUDENDE uitputtingsmaand van het liquide vermogen (Prognose!J),
  * of `null` wanneer J — op zelfherstellende bruggetjes na — positief blijft tot en
  * met `lastInHorizonMonth`. Zie de module-kop voor de rekenregel.
@@ -88,22 +120,55 @@ function isDepleted(proj: RunwayProjectionView, m: number): boolean {
  */
 export function depletionMonth(proj: RunwayProjectionView): number | null {
   const last = Math.min(proj.summary.lastInHorizonMonth, proj.prognose.length - 1)
-  let m = 0
-  while (m <= last) {
-    if (!isDepleted(proj, m)) {
-      m += 1
-      continue
-    }
-    // Episode [first, lastDepleted] van aaneengesloten uitgeputte maanden.
-    const first = m
-    let lastDepleted = m
-    while (lastDepleted + 1 <= last && isDepleted(proj, lastDepleted + 1)) lastDepleted += 1
-    // Herstelt ze bewezen (er volgt nog een in-horizon maand, en die is per
-    // constructie niet uitgeput) én kort genoeg ⇒ bruggetje, verder zoeken.
-    const clears = lastDepleted < last
-    const transient = clears && lastDepleted - first <= MAX_TRANSIENT_SPAN_MONTHS
-    if (!transient) return first
-    m = lastDepleted + 1
+  return eersteAanhoudendeEpisode(last, (m) => isDepleted(proj, m))
+}
+
+// ── Blijvende tekort-lening (ADR 0149) ───────────────────────────────────────
+
+/**
+ * Wat `heeftBlijvendeTekortLening` van een projectie nodig heeft: de S-tabel (het
+ * tekort-lening-saldo per maand, S!AB) en de horizon-grens. `KernelProjection` past
+ * hier structureel op.
+ */
+export interface TekortProjectionView {
+  readonly s: readonly {
+    readonly slots: readonly { readonly saldo: number | '' }[]
+  }[]
+  readonly summary: Pick<KernelRunSummary, 'lastInHorizonMonth'>
+}
+
+/** Materialiteitsgate op het tekort-slot: `round(saldo) ≥ €1` (float-ruis rond nul telt als 0). */
+const TEKORT_MATERIEEL_EUR = 1
+
+/**
+ * Is er t/m de eindleeftijd een BLIJVENDE tekort-lening nodig? (ADR 0149 — het
+ * tweede haalbaarheidscriterium onder `KernelInput.geenTekortLening`.)
+ *
+ * Leest het saldo van de pot met rol `tekortLening` (S!AB) per maand in het venster
+ * `[0, eindMaand]` — `eindMaand` = `(eindleeftijd − start)·12`, hetzelfde
+ * inclusieve venster als P!B99 (`MAXIFS(S!AB; S!AR ≤ B35)`), begrensd door de horizon.
+ * Een maand is een hit als `round(saldo) ≥ 1`. Dezelfde episode-regel als
+ * `depletionMonth`: een tekort dat binnen `MAX_TRANSIENT_SPAN_MONTHS` bewezen is
+ * afgelost (een liquiditeitsbrug, bv. de transitie-lag bij een huisverkoop) telt NIET;
+ * een episode die langer aanhoudt — of aan het venster-einde nog openstaat — telt WÉL.
+ *
+ * Geen pot met rol `tekortLening` ⇒ `false` (er kan dan niets geleend worden).
+ */
+export function heeftBlijvendeTekortLening(
+  input: Pick<KernelInput, 'schuldPotten' | 'startLeeftijd'>,
+  proj: TekortProjectionView,
+  eindleeftijd: number,
+): boolean {
+  const slot = input.schuldPotten.find((p) => p.rol === 'tekortLening')?.slot
+  if (slot === undefined) return false
+  // Zelfde rij-index als het doelblok (`INDEX(…, (B35−B7)·12+1)`, Excel-trunc) — voor
+  // hele leeftijden exact `leeftijd ≤ eindleeftijd`, het P!B99-venster.
+  const eindMaand = eindMaandVan(eindleeftijd, input.startLeeftijd)
+  const last = Math.min(eindMaand, proj.summary.lastInHorizonMonth, proj.s.length - 1)
+  if (last < 0) return false
+  const hit = (m: number): boolean => {
+    const saldo = proj.s[m]?.slots[slot]?.saldo
+    return typeof saldo === 'number' && Math.round(saldo) >= TEKORT_MATERIEEL_EUR
   }
-  return null
+  return eersteAanhoudendeEpisode(last, hit) !== null
 }

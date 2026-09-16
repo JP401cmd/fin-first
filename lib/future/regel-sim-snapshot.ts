@@ -43,6 +43,7 @@ export const PROFIEL_KERNEL_KOLOMMEN = [
   'fire_end_age',
   'fire_legacy_amount',
   'fire_legacy_include_illiquid',
+  'fire_no_deficit_loan',
   'fire_stop_anchor',
   'fire_stop_age',
   'feature_preferences',

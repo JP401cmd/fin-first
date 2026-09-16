@@ -368,6 +368,8 @@ function buildProjectie(
           isPensioenMode: sim.strategy === 'pensioen',
           // Zelfde afleiding als dashboard-/core-loader: eigen woning aanwezig ∧ buiten de FIRE-pot.
           homeExcludedFromFire: heeftEigenHuis && isHomeExcludedFromFire(woonstrategie),
+          geenTekortLeningAan: rawContext.profile.fire_no_deficit_loan === true,
+          vastStopmoment: sim.stopAnker != null,
           peakText: formatCurrency(tekortNotice.peak),
           // Bewust géén vrijheidstijd bij de piek: de detector levert geen leeftijd bij
           // het piekmoment, dus er is geen canonieke deflator voor die teller (ADR 0093 §11).

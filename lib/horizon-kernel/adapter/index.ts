@@ -246,6 +246,10 @@ export function buildKernelInputFromAppWithNotices(input: KernelAdapterInput): K
     // weggelaten onder `solved`. Weglaten ⇒ letterlijk het oude gedrag; het
     // fixture-pad (input-from-fixture) zet 'm nooit → 736 fixtures byte-identiek.
     stopAnker: buildStopAnker(profile),
+    // ADR 0149 — "geen tekort-lening in mijn plan": alleen `true` reist mee; bij
+    // false/NULL blijft het veld `undefined` zodat een profiel zónder de instelling
+    // byte-identiek rekent (het fixture-pad zet 'm nooit → parity onaangetast).
+    geenTekortLening: profile.fire_no_deficit_loan === true ? true : undefined,
   }
 
   return {

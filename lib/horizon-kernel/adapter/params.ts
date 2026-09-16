@@ -98,6 +98,11 @@ export interface KernelAdapterProfile {
   fire_stop_anchor?: string | null
   /** ADR 0129 D1 — zelfgekozen stopleeftijd (halve jaren); alleen bij anker `age`. */
   fire_stop_age?: number | string | null
+  /**
+   * ADR 0149 — "geen tekort-lening in mijn plan". `true` → `KernelInput.geenTekortLening`;
+   * `false`/NULL/afwezig → het veld blijft weg (byte-identiek aan het bestaande gedrag).
+   */
+  fire_no_deficit_loan?: boolean | null
   feature_preferences?: Record<string, unknown> | null
   withdrawal_strategy?: string | null
   guardrail_floor?: number | null

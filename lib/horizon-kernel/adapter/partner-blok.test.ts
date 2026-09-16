@@ -42,7 +42,14 @@ describe('memberProfileToKernelAdapterProfile — RPC-rij → adapter-profiel', 
       fire_legacy_amount: null,
       retirement_expense_method: 'current_expenses',
       retirement_custom_amount: 18000,
+      // ADR 0149 — de kolom ontbreekt op deze rij → null (vlag uit).
+      fire_no_deficit_loan: null,
     })
+  })
+
+  it('ADR 0149 — fire_no_deficit_loan reist mee als EIGEN waarde van het lid', () => {
+    expect(memberProfileToKernelAdapterProfile({ ...RPC_ROW, fire_no_deficit_loan: true }).fire_no_deficit_loan).toBe(true)
+    expect(memberProfileToKernelAdapterProfile({ ...RPC_ROW, fire_no_deficit_loan: false }).fire_no_deficit_loan).toBe(false)
   })
 
   it('null-profiel → alle velden null (neutrale doorgifte, geen throw)', () => {

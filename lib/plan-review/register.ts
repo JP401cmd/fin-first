@@ -62,6 +62,7 @@ export const KERNEL_INPUT_REVIEW_REGISTER: Record<keyof KernelInput, { dekking: 
   reachedNowVereistBereikbaarDoel: { dekking: 'kern-intern', toelichting: 'Gap-besluit V21 (bevinding M6) — geen gebruikerskeuze.' },
   echteAnnuiteitAflossing: { dekking: 'kern-intern', toelichting: 'Annuïteitsaflossing-vlag van de adapter — volgt uit de schuldgegevens.' },
   stopAnker: { dekking: 'plan', toelichting: 'Het stop-anker van het plan (fire_stop_anchor/fire_stop_age) — stap 1.' },
+  geenTekortLening: { dekking: 'plan', toelichting: 'ADR 0149 — "Geen tekort-lening in mijn plan" (profiles.fire_no_deficit_loan, PUT /api/fire-settings): planvoorwaarde naast het stop-anker — stap 1.' },
 }
 
 /** Alle kernel-blokken die een stap dekt — voor de test en voor de i-info. */

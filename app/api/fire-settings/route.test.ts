@@ -206,6 +206,41 @@ describe('TPR-12 — fire_legacy_include_illiquid (niet-liquide meetellen in de 
   })
 })
 
+describe('ADR 0149 — fire_no_deficit_loan (geen tekort-lening in het plan)', () => {
+  it('PUT met true schrijft de kolom en echoot \'m', async () => {
+    const res = await put({ fire_no_deficit_loan: true })
+    expect(res.status).toBe(200)
+    expect(db.row.fire_no_deficit_loan).toBe(true)
+    expect(((await res.json()) as Row).fire_no_deficit_loan).toBe(true)
+  })
+
+  it('false en null schrijven de keuze uit', async () => {
+    for (const waarde of [false, null]) {
+      db = makeDb({ ...BASE_ROW, fire_no_deficit_loan: true }, ['perpetual', 'legacy', 'deplete'])
+      const res = await put({ fire_no_deficit_loan: waarde })
+      expect(res.status).toBe(200)
+      expect(db.row.fire_no_deficit_loan).toBe(waarde)
+    }
+  })
+
+  it('een niet-boolean wordt geweigerd (400, platte envelope), niets geschreven', async () => {
+    for (const bad of ['ja', 1, 'true', {}]) {
+      db = makeDb(BASE_ROW, ['perpetual', 'legacy', 'deplete'])
+      const res = await put({ fire_no_deficit_loan: bad })
+      expect(res.status).toBe(400)
+      expect(typeof ((await res.json()) as Row).error).toBe('string')
+      expect(db.updates).toHaveLength(0)
+    }
+  })
+
+  it('zonder de sleutel blijft de kolom onaangeraakt; GET geeft hem terug', async () => {
+    db = makeDb({ ...BASE_ROW, fire_no_deficit_loan: true }, ['perpetual', 'legacy', 'deplete'])
+    await put({ fire_end_strategy: 'deplete', fire_end_age: 90 })
+    expect(db.row.fire_no_deficit_loan).toBe(true)
+    expect(((await (await GET()).json()) as Row).fire_no_deficit_loan).toBe(true)
+  })
+})
+
 describe('GET — generiek terugleespad (canonieke allowlist, niet hardcoded pensioen)', () => {
   it("kolom 'deplete' + override 'nu-stoppen' → nu-stoppen", async () => {
     db = makeDb({ ...BASE_ROW, feature_preferences: { fire_strategy_override: 'nu-stoppen' } }, [])

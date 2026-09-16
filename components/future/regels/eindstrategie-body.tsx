@@ -40,6 +40,19 @@ export const NALATENSCHAP_NIET_LIQUIDE_UITLEG =
   'bent. Relevant omdat een woning wel waarde heeft, maar niet zomaar opneembaar is.'
 
 /**
+ * ADR 0149 — uitleg bij "Geen tekort-lening in mijn plan", norm keuze · effect · waarom.
+ * Beschrijvend (Wft): wat de berekening doet, geen advies. Geëxporteerd voor de test.
+ */
+export const GEEN_TEKORT_LENING_UITLEG =
+  'Je kiest of je plan mag leunen op een tekort-lening: geld dat de berekening leent zodra je ' +
+  'vermogen op is en je inkomen je uitgaven nog niet dekt. Aan: je vrijheidsleeftijd is het ' +
+  'vroegste moment waarop je zonder zo’n lening tot het einde van je plan komt; een korte ' +
+  'overbrugging die binnen een jaar is afgelost, zoals rond een huisverkoop, telt niet mee. Uit ' +
+  '(standaard): de berekening mag gaten overbruggen met een lening, waardoor je eerder vrij kunt ' +
+  'lijken. Relevant omdat vrij met een schuld die je later moet terugbetalen iets anders is dan ' +
+  'vrij zonder schuld.'
+
+/**
  * Regel 1 — de plan-regel als TWEE VRAGEN (ADR 0129 B13: Voorkeuren is de bron;
  * de strategie-modal op /toekomst spiegelt dezelfde twee vragen via hetzelfde
  * `StopPlanVragen`-component). Vraag 1 = het stop-anker, vraag 2 = de eind-vorm met
@@ -87,6 +100,9 @@ export function EindstrategieBody({
   // nalatenschap; dezelfde GET/PUT als de tekort-lening-rente.
   const [includeIlliquid, setIncludeIlliquid] = useState(false)
   const [savedIncludeIlliquid, setSavedIncludeIlliquid] = useState(false)
+  // ADR 0149 — geen tekort-lening in het plan. NULL in de kolom = uit.
+  const [geenTekortLening, setGeenTekortLening] = useState(false)
+  const [savedGeenTekortLening, setSavedGeenTekortLening] = useState(false)
   useEffect(() => {
     let cancelled = false
     fetch('/api/fire-settings')
@@ -102,6 +118,9 @@ export function EindstrategieBody({
         const illiquid = d.fire_legacy_include_illiquid === true
         setIncludeIlliquid(illiquid)
         setSavedIncludeIlliquid(illiquid)
+        const geenTekort = d.fire_no_deficit_loan === true
+        setGeenTekortLening(geenTekort)
+        setSavedGeenTekortLening(geenTekort)
       })
       .catch(() => {})
       .finally(() => {
@@ -122,16 +141,21 @@ export function EindstrategieBody({
     const draftProj = runRegelProjection(simSnapshot, {
       firePlan: debounced,
       ...(debounced.endForm === 'legacy' ? { legacyIncludeIlliquid: includeIlliquid } : {}),
+      geenTekortLening,
     })
     return { baseline, draftProj }
-  }, [simSnapshot, debounced, includeIlliquid])
+  }, [simSnapshot, debounced, includeIlliquid, geenTekortLening])
 
   // De AOW-toets kan alleen hier (de route kent de AOW niet): uit de snapshot, die
   // dezelfde tabel-lookup draagt als de Tijdas.
   const aowAge = simSnapshot?.aowFractional ?? null
   const validatie = validatePlanDraft(draft, { aowAge })
   const illiquidChanged = isLegacy && includeIlliquid !== savedIncludeIlliquid
-  const changed = !planDraftEquals(draft, opgeslagen) || deficitPct !== savedDeficitPct || illiquidChanged
+  const changed =
+    !planDraftEquals(draft, opgeslagen) ||
+    deficitPct !== savedDeficitPct ||
+    illiquidChanged ||
+    geenTekortLening !== savedGeenTekortLening
   const canSave = !saving && validatie.ok && deficitValid && changed
 
   // Save-handler via ref tegen stale closures (zelfde patroon als event-pane-edit).
@@ -151,6 +175,7 @@ export function EindstrategieBody({
             deficit_loan_rate: deficitPct / 100,
             // TPR-12 — alleen meesturen onder nalatenschap (daarbuiten blijft de kolom staan).
             ...(draft.endForm === 'legacy' ? { fire_legacy_include_illiquid: includeIlliquid } : {}),
+            fire_no_deficit_loan: geenTekortLening,
           }),
         })
         if (!res.ok) {
@@ -167,7 +192,7 @@ export function EindstrategieBody({
         setSaving(false)
       }
     }
-  }, [draft, deficitPct, includeIlliquid, onClose, onSaved])
+  }, [draft, deficitPct, includeIlliquid, geenTekortLening, onClose, onSaved])
 
   const footerSleutel = fireFooterSleutel(baseline, draftProj)
   useEffect(() => {
@@ -240,6 +265,45 @@ export function EindstrategieBody({
           </button>
         </div>
       )}
+
+      {/* ADR 0149 — geen tekort-lening in het plan (hoofdinstelling, dezelfde PUT). */}
+      <div
+        id="geen-tekort-lening"
+        aria-busy={!deficitLoaded}
+        className={`mt-6 transition-opacity duration-300 ${deficitLoaded ? 'opacity-100' : 'opacity-60'}`}
+      >
+        <SubsectionLabel>Tekort-lening</SubsectionLabel>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={geenTekortLening}
+          onClick={() => setGeenTekortLening((v) => !v)}
+          className="flex w-full items-start gap-3 text-left"
+        >
+          <span
+            className={`mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors ${
+              geenTekortLening
+                ? 'border-[var(--module-active-700)] bg-[var(--module-active-700)]'
+                : 'border-[var(--border-md)] bg-[var(--paper)]'
+            }`}
+            aria-hidden="true"
+          >
+            <span
+              className={`inline-block h-3.5 w-3.5 rounded-full bg-[var(--paper)] shadow transition-transform ${
+                geenTekortLening ? 'translate-x-4' : 'translate-x-0.5'
+              }`}
+            />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold text-[var(--ink)]">
+              Geen tekort-lening in mijn plan
+            </span>
+            <span className="mt-0.5 block text-[11px] leading-snug text-[var(--ink-2)]">
+              {GEEN_TEKORT_LENING_UITLEG}
+            </span>
+          </span>
+        </button>
+      </div>
 
       {/* V7 — tekort-lening-rente (FIRE-instelling, opgeslagen via dezelfde PUT). */}
       <div

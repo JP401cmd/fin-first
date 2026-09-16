@@ -27,6 +27,7 @@ const BASE: DeficitLoanCopyInput = {
   displayEndAge: 95,
   isPensioenMode: false,
   homeExcludedFromFire: false,
+  geenTekortLeningAan: false,
   peakText: '€ 42.000',
   freedomText: '1 jaar en 4 maanden',
 }
@@ -37,6 +38,7 @@ function allText(copy: DeficitLoanCopy): string {
     copy.periode,
     copy.waarom,
     copy.woning ?? '',
+    copy.instelling,
     copy.piek,
     copy.lijn,
     copy.knoppen,
@@ -171,6 +173,35 @@ describe('buildDeficitLoanCopy — woonstrategie', () => {
   })
 })
 
+describe('buildDeficitLoanCopy — instelling "Geen tekort-lening in mijn plan" (ADR 0149)', () => {
+  // Given een aangesproken tekort-lening,
+  // When de melding wordt gebouwd,
+  // Then benoemt hij altijd de instelling en biedt hij de ingang ernaartoe.
+  it('noemt bij uit dat het plan een tekort-lening toestaat', () => {
+    const copy = buildDeficitLoanCopy(BASE)
+    expect(copy.instelling).toContain('staat een tekort-lening nu toe')
+    expect(copy.toonInstellingLink).toBe(true)
+  })
+
+  it('noemt bij aan + vast stopmoment dat de lening door dat stopmoment toch nodig is', () => {
+    const copy = buildDeficitLoanCopy({ ...BASE, geenTekortLeningAan: true, vastStopmoment: true })
+    expect(copy.instelling).toContain('niet in je plan hoort')
+    expect(copy.instelling).toContain('met je gekozen stopmoment')
+    expect(copy.instelling).not.toContain('staat een tekort-lening nu toe')
+    expect(copy.toonInstellingLink).toBe(true)
+  })
+
+  it('claimt bij aan zónder vast stopmoment geen gekozen stopmoment (randgeval venster / onhaalbaar plan)', () => {
+    const copy = buildDeficitLoanCopy({ ...BASE, geenTekortLeningAan: true, vastStopmoment: false })
+    expect(copy.instelling).toContain('niet in je plan hoort')
+    expect(copy.instelling).not.toContain('gekozen stopmoment')
+  })
+
+  it('noemt de instelling bij de keuzes die het bedrag beïnvloeden', () => {
+    expect(buildDeficitLoanCopy(BASE).knoppen).toContain('of een tekort-lening in je plan mag')
+  })
+})
+
 describe('buildDeficitLoanCopy — piek en vermogenslijn', () => {
   it('koppelt de piek aan zijn vrijheidstijd-vertaling', () => {
     const copy = buildDeficitLoanCopy(BASE)
@@ -233,6 +264,7 @@ describe('buildDeficitLoanCopy — Wft-toon-grendel over alle plan-varianten', (
           ...bedrag,
           isPensioenMode,
           homeExcludedFromFire,
+          geenTekortLeningAan: homeExcludedFromFire,
         })),
       ),
     ),

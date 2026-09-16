@@ -96,7 +96,7 @@ export async function loadKernelReportInput(supabase: SupabaseClient): Promise<K
           // `withdrawal_profile_config` reist mee (B-042): zonder die kolom rekende
           // dit rapport een afnemend/oplopend plan als 'Vast' terwijl /toekomst
           // (rawProfile via select('*')) het echte profiel wél aan de adapter gaf.
-          `date_of_birth, household_type, number_of_children, net_monthly_income, estimated_monthly_expenses, income_source, expenses_source, expected_return, inflation_rate, box3_method, box3_heffingvrij_inkomen, ${FIRE_PLAN_COLUMNS}, fire_legacy_include_illiquid, retirement_expense_method, retirement_expense_custom_amount, withdrawal_strategy, withdrawal_profile_config, guardrail_floor, guardrail_ceiling, guardrail_cut_step, housing_strategy_config, pot_rules, feature_preferences`,
+          `date_of_birth, household_type, number_of_children, net_monthly_income, estimated_monthly_expenses, income_source, expenses_source, expected_return, inflation_rate, box3_method, box3_heffingvrij_inkomen, ${FIRE_PLAN_COLUMNS}, fire_legacy_include_illiquid, fire_no_deficit_loan, retirement_expense_method, retirement_expense_custom_amount, withdrawal_strategy, withdrawal_profile_config, guardrail_floor, guardrail_ceiling, guardrail_cut_step, housing_strategy_config, pot_rules, feature_preferences`,
         )
         .single(),
       supabase.from('assets').select('*').eq('is_active', true).limit(500),
@@ -168,6 +168,8 @@ export async function loadKernelReportInput(supabase: SupabaseClient): Promise<K
     // een aow-/age-plan als `solved` (bisectie) terwijl /toekomst het anker wél kent.
     fire_stop_anchor: profileRaw.fire_stop_anchor as string | null,
     fire_stop_age: profileRaw.fire_stop_age as number | string | null,
+    // ADR 0149 — de planvoorwaarde "geen tekort-lening" reist mee (zelfde reden als L1).
+    fire_no_deficit_loan: profileRaw.fire_no_deficit_loan as boolean | null,
     feature_preferences: profileRaw.feature_preferences as Record<string, unknown> | null,
     withdrawal_strategy: profileRaw.withdrawal_strategy as string | null,
     withdrawal_profile_config: profileRaw.withdrawal_profile_config,

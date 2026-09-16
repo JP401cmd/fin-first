@@ -303,6 +303,18 @@ function kleineLetter(s: string): string {
 /** Zoveel jaar verder laat de vergelijking het geld reiken. Weergavekeuze, geen aanname. */
 const PLAN_VERGELIJKING_EXTRA_JAREN = 5
 
+/** ADR 0149 — keuze-kopij "Geen tekort-lening in mijn plan" (keuze · effect). */
+export const GEEN_TEKORT_LENING_KOPIJ: Record<'aan' | 'uit', { waarde: string; effect: string }> = {
+  aan: {
+    waarde: 'niet toegestaan',
+    effect: 'je vrijheidsleeftijd is het vroegste moment waarop je zonder tekort-lening tot het einde van je plan komt',
+  },
+  uit: {
+    waarde: 'toegestaan',
+    effect: 'de berekening mag gaten in je vermogen overbruggen met een tekort-lening',
+  },
+}
+
 function stapPlan(b: PlanReviewBronnen): PlanReviewStapOverzicht {
   const plan = b.firePlan
   const draft = planDraftFromPlan(plan)
@@ -324,9 +336,12 @@ function stapPlan(b: PlanReviewBronnen): PlanReviewStapOverzicht {
   if (plan.endForm === 'legacy') {
     details.push({ label: 'Bedrag dat overblijft', waarde: formatCurrency(plan.legacyAmount) })
   }
+  const geenTekort = b.profile?.fire_no_deficit_loan === true
+  const tekortKeuze = GEEN_TEKORT_LENING_KOPIJ[geenTekort ? 'aan' : 'uit']
+  details.push({ label: 'Tekort-lening in je plan', waarde: tekortKeuze.waarde })
 
   const { basis, maat } = basisEnMaat(b)
-  const effect = [`Met dit plan: ${uitkomstFrase(basis, maat)}.`]
+  const effect = [`Met dit plan: ${uitkomstFrase(basis, maat)}.`, `Tekort-lening ${tekortKeuze.waarde}: ${tekortKeuze.effect}.`]
   const vergelijking: PlanReviewRegel[] = []
   const langer = plan.endAge + PLAN_VERGELIJKING_EXTRA_JAREN
   if (b.run && basis && toontEindleeftijd && langer <= END_AGE_MAX) {
@@ -335,6 +350,16 @@ function stapPlan(b: PlanReviewBronnen): PlanReviewStapOverzicht {
       { label: `Geld reikt tot ${plan.endAge} (nu)`, waarde: uitkomstFrase(basis, maat) },
       { label: `Geld reikt tot ${langer}`, waarde: uitkomstFrase(alt, maat) },
     )
+  }
+  if (b.run && basis) {
+    const andere = b.run({ geenTekortLening: !geenTekort })
+    if (vergelijking.length === 0) {
+      vergelijking.push({ label: `Tekort-lening ${tekortKeuze.waarde} (nu)`, waarde: uitkomstFrase(basis, maat) })
+    }
+    vergelijking.push({
+      label: `Tekort-lening ${GEEN_TEKORT_LENING_KOPIJ[geenTekort ? 'uit' : 'aan'].waarde}`,
+      waarde: uitkomstFrase(andere, maat),
+    })
   }
 
   const geldig = validatePlanDraft(draft, { aowAge: b.aowAge })

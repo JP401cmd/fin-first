@@ -503,10 +503,10 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
       },
       {
         title: 'Aannames erachter',
-        text: 'Rendement, inflatie, je uitgaven na pensioen en je eindleeftijd bepalen samen de uitkomst. Je stelt ze zelf in bij Voorkeuren — een kleine bijstelling kan jaren schelen. Onder de grafiek, bij Verken je aannames, draai je eraan zonder je plan te wijzigen: zoekt de app je stopmoment zelf, dan zie je je vrijheidsleeftijd verschuiven; ligt je stopmoment vast, dan zie je op de dekkingsas of je plan tot je eindleeftijd reikt, en bij een tekort wat het haalbaar maakt: doorwerken tot een leeftijd, meer opzij, of minder uitgeven. Je AOW telt alleen mee als er een actieve AOW-gebeurtenis op je tijdas staat; ontbreekt die, dan rekent de projectie met €0 AOW en zegt een melding boven de grafiek dat.',
+        text: 'Rendement, inflatie, je uitgaven na pensioen en je eindleeftijd bepalen samen de uitkomst. Je stelt ze zelf in bij Voorkeuren — een kleine bijstelling kan jaren schelen. Onder de grafiek, bij Verken je aannames, draai je eraan zonder je plan te wijzigen: zoekt de app je stopmoment zelf, dan zie je je vrijheidsleeftijd verschuiven; ligt je stopmoment vast, dan zie je op de dekkingsas of je plan tot je eindleeftijd reikt, en bij een tekort wat het haalbaar maakt: doorwerken tot een leeftijd, meer opzij, of minder uitgeven. Je AOW telt alleen mee als er een actieve AOW-gebeurtenis op je tijdas staat; ontbreekt die, dan rekent de projectie met €0 AOW en zegt een melding boven de grafiek dat. Is je vermogen onderweg op, dan overbrugt de projectie het gat met een tekort-lening en meldt dat boven de grafiek; bij Voorkeuren stel je in of je plan zo’n lening mag gebruiken.',
       },
     ],
-    terms: ['fire', 'vrijheidstijd', 'swr', 'inflatie', 'omslagpunt', 'stopmoment', 'bandbreedte'],
+    terms: ['fire', 'vrijheidstijd', 'swr', 'inflatie', 'omslagpunt', 'stopmoment', 'bandbreedte', 'tekort_lening'],
     related: [
       { href: '/toekomst/doelen', label: 'Je doelen beheren' },
       { href: '/toekomst/gebeurtenissen', label: 'Levensgebeurtenissen op je tijdas' },
@@ -581,6 +581,7 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
       'eindstrategie_deplete',
       'eindstrategie_legacy',
       'eindstrategie_perpetual',
+      'tekort_lening',
     ],
   },
   '/toekomst/bibliotheek': {

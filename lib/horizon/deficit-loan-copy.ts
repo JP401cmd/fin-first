@@ -59,6 +59,10 @@ export interface DeficitLoanCopyInput {
   isPensioenMode: boolean
   /** Staat de eigen woning buiten de FIRE-pot (`exclude_from_fire`)? */
   homeExcludedFromFire: boolean
+  /** ADR 0149 — staat "Geen tekort-lening in mijn plan" (`fire_no_deficit_loan`) aan? */
+  geenTekortLeningAan: boolean
+  /** Ligt het stopmoment vast (de run had een stop-anker)? Afwezig = nee. */
+  vastStopmoment?: boolean
   /** Reeds geformatteerde piek (masked-aware), bv. "€ 42.000" of "•••". */
   peakText: string
   /** Reeds geformatteerde vrijheidstijd bij de piek, of null (masked/geen dagtarief). */
@@ -76,6 +80,10 @@ export interface DeficitLoanCopy {
   woning: string | null
   /** Heeft de woonstrategie invloed op dit tekort (→ ingang naar de instelling)? */
   toonWoonstrategieLink: boolean
+  /** Wat de instelling "Geen tekort-lening in mijn plan" hier betekent (ADR 0149). */
+  instelling: string
+  /** Ingang naar die instelling — bij elke geconstateerde tekort-lening. */
+  toonInstellingLink: boolean
   /** De piek, met vrijheidstijd-vertaling wanneer beschikbaar. */
   piek: string
   /** Waarom de vermogenslijn dit tekort niet laat zien. */
@@ -131,9 +139,18 @@ export function buildDeficitLoanCopy(input: DeficitLoanCopyInput): DeficitLoanCo
 
   const lijn = `Op de vermogenslijn zie je dit niet: die toont je nettovermogen, waarin het tekort al is verrekend.`
 
+  // Wft: beschrijvend. Aan + toch een lening: onder een vast stopmoment is dat de oorzaak;
+  // zonder vast stopmoment (plan komt binnen de horizon niet rond, of een brug in het laatste
+  // planjaar die de melding anders venstert dan de solver) claimen we geen oorzaak.
+  const instelling = !input.geenTekortLeningAan
+    ? `Je plan staat een tekort-lening nu toe. Met de instelling "Geen tekort-lening in mijn plan" rekent de app met het vroegste stopmoment waarop je zonder lening rondkomt.`
+    : input.vastStopmoment === true
+      ? `Je hebt ingesteld dat een tekort-lening niet in je plan hoort, maar met je gekozen stopmoment is hij toch nodig.`
+      : `Je hebt ingesteld dat een tekort-lening niet in je plan hoort; deze berekening laat er toch een zien.`
+
   const knoppen = input.isPensioenMode
-    ? `Dit bedrag beweegt mee met je woonstrategie, met je liquide opbouw vóór leeftijd ${startAge}, en met je AOW- en pensioendatum.`
-    : `Dit bedrag beweegt mee met je woonstrategie, met je liquide opbouw vóór leeftijd ${startAge}, en met de leeftijd waarop je stopt met werken.`
+    ? `Dit bedrag beweegt mee met je woonstrategie, met je liquide opbouw vóór leeftijd ${startAge}, met je AOW- en pensioendatum, en met je instelling of een tekort-lening in je plan mag.`
+    : `Dit bedrag beweegt mee met je woonstrategie, met je liquide opbouw vóór leeftijd ${startAge}, met de leeftijd waarop je stopt met werken, en met je instelling of een tekort-lening in je plan mag.`
 
   const disclaimer = `Indicatie, geen advies — een rekenuitkomst bij je huidige aannames.`
 
@@ -143,6 +160,8 @@ export function buildDeficitLoanCopy(input: DeficitLoanCopyInput): DeficitLoanCo
     waarom,
     woning,
     toonWoonstrategieLink: input.housing != null,
+    instelling,
+    toonInstellingLink: true,
     piek,
     lijn,
     knoppen,

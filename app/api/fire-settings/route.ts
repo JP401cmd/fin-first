@@ -55,6 +55,13 @@ const LEGACY_SHADOW_STRATEGY = 'pensioen'
  */
 const LEGACY_INCLUDE_ILLIQUID_KEY = 'fire_legacy_include_illiquid'
 const legacyIncludeIlliquidSchema = z.boolean().nullable()
+/**
+ * ADR 0149 — `profiles.fire_no_deficit_loan`: hoort een blijvende tekort-lening niet in
+ * het plan? `true` = de solver kiest de vroegste stopleeftijd zónder; `false`/`null` = uit.
+ */
+const NO_DEFICIT_LOAN_KEY = 'fire_no_deficit_loan'
+const noDeficitLoanSchema = z.boolean().nullable()
+const SELECT_MET_ADR0149 = `retirement_expense_method, retirement_expense_custom_amount, ${FIRE_PLAN_COLUMNS}, ${LEGACY_INCLUDE_ILLIQUID_KEY}, ${NO_DEFICIT_LOAN_KEY}, feature_preferences, deficit_loan_rate`
 const SELECT_MET_TPR12 = `retirement_expense_method, retirement_expense_custom_amount, ${FIRE_PLAN_COLUMNS}, ${LEGACY_INCLUDE_ILLIQUID_KEY}, feature_preferences, deficit_loan_rate`
 const SELECT_ZONDER_TPR12 = `retirement_expense_method, retirement_expense_custom_amount, ${FIRE_PLAN_COLUMNS}, feature_preferences, deficit_loan_rate`
 
@@ -231,12 +238,19 @@ export async function GET() {
   // en geen 42703-vangnet meer.
   let { data, error } = await supabase
     .from('profiles')
-    .select(SELECT_MET_TPR12)
+    .select(SELECT_MET_ADR0149)
     .eq('id', claims.sub)
     .single()
 
-  // 42703 = kolom bestaat (nog) niet — migratie 20260913150000 niet toegepast. Dan de
-  // select zonder het TPR-12-veld, zodat het plan zelf gewoon leesbaar blijft.
+  // 42703 = een kolom bestaat (nog) niet. Trapsgewijs terugvallen, zodat een ontbrekende
+  // ADR 0149-kolom (migratie 20260916120000) de al-live TPR-12-keuze niet meesleept.
+  if (error?.code === '42703') {
+    ;({ data, error } = await supabase
+      .from('profiles')
+      .select(SELECT_MET_TPR12)
+      .eq('id', claims.sub)
+      .single())
+  }
   if (error?.code === '42703') {
     ;({ data, error } = await supabase
       .from('profiles')
@@ -254,6 +268,7 @@ export async function GET() {
     fire_end_age?: number | null
     fire_legacy_amount?: number | string | null
     fire_legacy_include_illiquid?: boolean | null
+    fire_no_deficit_loan?: boolean | null
     fire_stop_anchor?: string | null
     fire_stop_age?: number | string | null
     feature_preferences?: unknown
@@ -276,6 +291,8 @@ export async function GET() {
     fire_legacy_amount: row.fire_legacy_amount ?? null,
     // TPR-12 — niet-liquide meetellen in de nalatenschap. NULL = kernel-default ('Nee').
     fire_legacy_include_illiquid: row.fire_legacy_include_illiquid ?? null,
+    // ADR 0149 — geen tekort-lening in het plan. NULL = uit.
+    fire_no_deficit_loan: row.fire_no_deficit_loan ?? null,
     // V7 — tekort-lening-jaarrente (0..1). NULL = adapter gebruikt Excel-default 0,05.
     deficit_loan_rate: row.deficit_loan_rate ?? null,
   })
@@ -342,6 +359,14 @@ export async function PUT(request: NextRequest) {
     updatePayload[LEGACY_INCLUDE_ILLIQUID_KEY] = parsed.data
   }
 
+  if (NO_DEFICIT_LOAN_KEY in body) {
+    const parsed = noDeficitLoanSchema.safeParse(body[NO_DEFICIT_LOAN_KEY])
+    if (!parsed.success) {
+      return badRequest('fire_no_deficit_loan moet true, false of null zijn')
+    }
+    updatePayload[NO_DEFICIT_LOAN_KEY] = parsed.data
+  }
+
   if ('retirement_expense_method' in body) {
     const retirementMethod = String(body.retirement_expense_method ?? 'essential_budgets')
     if (!VALID_RETIREMENT_METHODS.includes(retirementMethod as typeof VALID_RETIREMENT_METHODS[number])) {
@@ -362,7 +387,10 @@ export async function PUT(request: NextRequest) {
   // 42703 op het TPR-12-veld (migratie 20260913150000 nog niet live): schrijf de rest
   // alsnog en laat het veld uit de echo — nooit een 200 die iets bevestigt dat niet is
   // opgeslagen (dezelfde regel als de cashflow_basis_prefs-retry op /api/parameters).
-  if (error?.code === '42703' && LEGACY_INCLUDE_ILLIQUID_KEY in updatePayload) {
+  // Alleen het TPR-12-veld valt hier weg. Voor `fire_no_deficit_loan` bestaat bewust
+  // géén stil vangnet: ontbreekt die kolom, dan faalt de schrijf zichtbaar (500) in
+  // plaats van een 200 die een wél-gedane TPR-12-keuze of deze keuze niet opslaat.
+  if (error?.code === '42703' && LEGACY_INCLUDE_ILLIQUID_KEY in updatePayload && !(NO_DEFICIT_LOAN_KEY in updatePayload)) {
     delete updatePayload[LEGACY_INCLUDE_ILLIQUID_KEY]
     if (Object.keys(updatePayload).length > 1) {
       ;({ error } = await supabase.from('profiles').update(updatePayload).eq('id', user.id))

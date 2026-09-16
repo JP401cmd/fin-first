@@ -65,10 +65,9 @@
  */
 
 import { runKernelProjection } from '../engine'
-import { solveFire } from '../solver'
+import { isToereikend, solveFire } from '../solver'
 import { computeEs, type EsRow } from '../tables/es'
 import type { KernelInput } from '../types'
-import { computeGap } from '../gap'
 import { nettoLiquidePerLeeftijd, nettoVermogenPerLeeftijd } from '../jaarrand'
 import { potIdiosyncraticNoise, sharedMarketShock } from './noise'
 import { potRisicoFactor } from './risico'
@@ -198,6 +197,12 @@ function buildBand(startAge: number, paden: readonly number[][]): MonteCarloBand
  *
  * `outcomes`/`successProbability` blijven daarmee byte-identiek op het fixture-pad:
  * geen fixture draagt `stopAnker` (`input-from-fixture` zet 'm nooit).
+ *
+ * De toets zelf is `solver.ts#isToereikend` — gap ≥ 0, en op het app-pad met
+ * `geenTekortLening` (ADR 0149) óók "geen blijvende tekort-lening t/m de
+ * eindleeftijd": een verstoorde run die alleen met een blijvende tekort-lening
+ * standhoudt, houdt het plan dan niet. Zelfde klasse als de D9-afwijking hierboven:
+ * inert zonder de vlag, dus `parity-mc` blijft cel-exact.
  */
 function successCriterion(
   input: KernelInput,
@@ -209,7 +214,7 @@ function successCriterion(
     // ROUND(P!B16, 2) ≥ ES!C15 (AOW). Live B16 sluit kort naar AOW → altijd 1.
     return Math.round(liveFireAge * 100) / 100 >= es.pensioenleeftijd ? 1 : 0
   }
-  return computeGap(input, es, proj, liveFireAge) >= 0 ? 1 : 0
+  return isToereikend(input, es, proj, liveFireAge) ? 1 : 0
 }
 
 /**
@@ -270,7 +275,7 @@ export function runMonteCarlo(input: KernelInput): MonteCarloResult {
     // plan-curve — opbouw, overgang én afbouw — i.p.v. de opbouw door te zetten.
     const proj = runKernelProjection(perturbed, { fireAge: liveFireAge })
     outcomes.push(successCriterion(input, es, proj, liveFireAge))
-    sustainOutcomes.push(computeGap(input, es, proj, liveFireAge) >= 0 ? 1 : 0)
+    sustainOutcomes.push(isToereikend(input, es, proj, liveFireAge) ? 1 : 0)
     paden.push(nettoVermogenPerLeeftijd(perturbed, proj))
     padenLiquide.push(nettoLiquidePerLeeftijd(perturbed, proj))
   }

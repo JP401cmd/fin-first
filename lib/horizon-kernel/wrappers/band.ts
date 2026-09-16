@@ -42,7 +42,8 @@
 import { runKernelProjection } from '../engine'
 import { computeEs } from '../tables/es'
 import type { KernelInput, ScenarioBand } from '../types'
-import { clng, computeGap, eindMaandVan, eindleeftijdVan, prognoseJ } from '../gap'
+import { clng, eindMaandVan, eindleeftijdVan, prognoseJ } from '../gap'
+import { isToereikend } from '../solver'
 import { potRisicoFactor } from './risico'
 
 /** De scenario's + hun rendement-shift P!B43 (SWITCH op P!B42). */
@@ -74,7 +75,10 @@ export interface ScenarioBandResult {
 
 // NB: de gap-sign-toetsen hieronder zijn bewust strikt — zie de toelichting in
 // solver.ts (calc-review): maand-gap-sprongen ≫ float-ruis; EPS zou de
-// Excel-semantiek veranderen.
+// Excel-semantiek veranderen. Het criterium zelf is `solver.ts#isToereikend`
+// (gap ≥ 0, plus op het app-pad ADR 0149 "geen blijvende tekort-lening") — zodat de
+// band per scenario dezelfde vraag stelt als de solver. Zonder `geenTekortLening`
+// is dat exact de gap → parity-band blijft cel-exact.
 
 /**
  * Draai de scenarioband: drie volledige FIRE-bisecties, één per scenario, met de
@@ -120,7 +124,7 @@ export function runScenarioBand(input: KernelInput): ScenarioBandResult {
 
     // Horizon-check: B16 = leeftijd + maxM/12 (= 100); gap < 0 → onhaalbaar (#N/A).
     const horizonFireAge = start + maxM / 12
-    if (computeGap(shifted, es, run(horizonFireAge), horizonFireAge) < 0) {
+    if (!isToereikend(shifted, es, run(horizonFireAge), horizonFireAge)) {
       rows.push({
         scenario,
         reachable: false,
@@ -137,7 +141,7 @@ export function runScenarioBand(input: KernelInput): ScenarioBandResult {
     while (hi - lo > 1) {
       const mid = Math.floor((lo + hi) / 2)
       const midFireAge = start + mid / 12
-      if (computeGap(shifted, es, run(midFireAge), midFireAge) >= 0) hi = mid
+      if (isToereikend(shifted, es, run(midFireAge), midFireAge)) hi = mid
       else lo = mid
     }
 

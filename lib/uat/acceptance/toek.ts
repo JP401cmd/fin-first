@@ -778,6 +778,57 @@ const criteria: AcceptanceCriterion[] = [
       source: 'lib/goals/lab-doelen-buiten-plan.ts#selectLabDoelenBuitenPlan + lib/horizon/anker-copy.ts#doelenPlanGewijzigdMelding — zie toek-checks.ts',
     },
   },
+  {
+    workflow: 'WF-TOEK-51',
+    scenarioId: 'UAT-TOEK-51',
+    titel: 'Hoofdinstelling "Geen tekort-lening in mijn plan": schakelaar, wizard-vergelijking en solver-gedrag (ADR 0149)',
+    kriticiteit: 'KERN',
+    persona: 'willem',
+    given:
+      'Persona Willem op /toekomst/voorkeuren, kaart Eindstrategie (deeplink `?regel=eindstrategie`, `components/future/regels/eindstrategie-body.tsx`). Een nieuwe schakelaar (role="switch", standaard UIT — `profiles.fire_no_deficit_loan` is NULL) "Geen tekort-lening in mijn plan" staat naast de bestaande tekort-lening-rente (V7), met uitleg-constante `GEEN_TEKORT_LENING_UITLEG` (keuze · effect · waarom). Dezelfde vraag staat als detailregel "Tekort-lening in je plan" in de plan-review-wizard, stap "Je plan" (WF-TOEK-44, `lib/plan-review/overzicht.ts#stapPlan`).',
+    when:
+      '(a) De gebruiker zet de schakelaar aan, leest het live-effect eronder (`runRegelProjection` met override `geenTekortLening`) en klikt "Opslaan"; (b) hij opent de plan-review-stap "Je plan" en leest de nieuwe detailregel, de effectzin en de vergelijkingsregel tegenover de andere stand; (c) los van de UI: de solver wordt met en zonder de vlag doorgerekend op een plan waarvan het gesolvede stopmoment normaliter een BLIJVENDE tekort-lening nodig heeft (niet een korte, afgeloste overbrugging).',
+    then:
+      '(a) De schakelaar bewaart zijn stand via dezelfde PUT /api/fire-settings als de andere eindstrategie-velden (`fire_no_deficit_loan: true|false`); een 42703 (migratie nog niet live) laat het veld uit de PUT en de echo vallen, nooit een foutieve 200-bevestiging. (b) De stap "Je plan" toont de detailregel met waarde "toegestaan" (uit) of "niet toegestaan" (aan) — `GEEN_TEKORT_LENING_KOPIJ`; de effectzin benoemt wat dat betekent; de vergelijkingsregel toont dezelfde uitkomstmaat (vrijheidsleeftijd of dekking, afhankelijk van het anker) voor de ANDERE stand via een tweede `runRegelProjection`-run — geen eigen som. (c) SOLVER (kernel-gedrag, richtingstoets — géén vast getal, want persona-/vermogensafhankelijk): AAN ⇒ de gevonden stopleeftijd is gelijk-of-hoger dan UIT, en op die leeftijd is er t/m de eindleeftijd geen blijvende tekort-lening meer nodig (een overbrugging ≤ 12 mnd die bewezen wordt afgelost telt niet mee). Onder een VAST stopanker blijft de leeftijd ongewijzigd; een blijvend tekort meldt zich daar via de bestaande anker-tekortstatus (`anchor_shortfall`/`stop_now_shortfall`), niet via een verschoven leeftijd. Is er nergens binnen de horizon (t/m 100 jaar) een stopmoment zonder blijvende tekort-lening, dan parkeert de solver op de horizon met status `unreachable_within_horizon`. Vlag weggelaten/UIT ⇒ byte-identiek aan het bestaande gedrag (alleen de gap telt) — de bestaande oracle-parity-fixtures blijven ongemoeid, want het fixture-invoerpad zet de vlag nooit.',
+    assertion: {
+      kind: 'direction',
+      source:
+        'lib/horizon-kernel/solver.ts#isToereikend (het gedeelde criterium: gap ≥ 0 ∧, met de vlag, geen blijvende tekort-lening) + lib/horizon-kernel/runway.ts#heeftBlijvendeTekortLening (episode-regel, MAX_TRANSIENT_SPAN_MONTHS) + lib/horizon-kernel/adapter/index.ts (`profile.fire_no_deficit_loan === true → KernelInput.geenTekortLening`, anders `undefined`) — richtingstoets/consistentie-eis vergrendeld in lib/horizon-kernel/geen-tekort-lening.test.ts (solveFire/evaluateFireAt/band/mc/rendement-marge, allemaal via hetzelfde predicaat). UI/opslag: components/future/regels/eindstrategie-body.tsx (schakelaar, `GEEN_TEKORT_LENING_UITLEG`) + app/api/fire-settings/route.ts (`fire_no_deficit_loan`-schema + 42703-fallback) + lib/future/regel-sim.ts#RegelSimOverride.geenTekortLening (live-effect zonder opslaan) + lib/plan-review/overzicht.ts#stapPlan/GEEN_TEKORT_LENING_KOPIJ (wizard-detailregel + vergelijking) + lib/plan-review/veld-register.ts + lib/plan-review/register.ts (veld geregistreerd op EINDSTRATEGIE resp. `stopAnker`-blok).',
+    },
+  },
+  {
+    workflow: 'WF-TOEK-52',
+    scenarioId: 'UAT-TOEK-52',
+    titel: 'Tekort-lening-melding boven de grafiek: werkelijk aflosmoment, woonstrategie-zin en instelling-ingang (ADR 0148/0149)',
+    kriticiteit: 'BELANGRIJK',
+    persona: 'willem',
+    given:
+      'Persona Willem met een run waarin de tekort-lening-detector (`lib/horizon/deficit-loan-display.ts`) een aangesproken tekort-lening ziet. De melding-copy is een PURE functie van de run-feiten (`lib/horizon/deficit-loan-copy.ts#buildDeficitLoanCopy`) — geen eigen herberekening in het component. Twee standen van `geenTekortLeningAan` (`profiles.fire_no_deficit_loan`): UIT (default) en AAN (en toch een lening nodig, bv. onder een vast stopanker of doorwerken tot 100).',
+    when:
+      'De gebruiker leest de melding op /toekomst met (a) `geenTekortLeningAan: false` en (b) `geenTekortLeningAan: true`, en volgt — indien een eigen woning meespeelt — de knop "Bekijk of wijzig je woonstrategie" en altijd de knop "Bekijk of wijzig of een tekort-lening mag →" (/toekomst/voorkeuren?regel=eindstrategie).',
+    then:
+      '(a) UIT: `instelling` = "Je plan staat een tekort-lening nu toe. Met de instelling \\"Geen tekort-lening in mijn plan\\" rekent de app met het vroegste stopmoment waarop je zonder lening rondkomt." (b) AAN met een vast stopmoment: `instelling` = "Je hebt ingesteld dat een tekort-lening niet in je plan hoort, maar met je gekozen stopmoment is hij toch nodig."; AAN zonder vast stopmoment (plan komt binnen de horizon niet rond, of een brug in het laatste planjaar): "Je hebt ingesteld dat een tekort-lening niet in je plan hoort; deze berekening laat er toch een zien." — nooit een gekozen stopmoment claimen dat er niet is. In beide standen is `toonInstellingLink` waar (de knop staat er bij elke geconstateerde tekort-lening) en noemt `knoppen` expliciet "je instelling of een tekort-lening in je plan mag" als vierde meebewegende factor (naast woonstrategie, liquide opbouw en stopleeftijd/pensioendatum). De periode-zin noemt het WERKELIJKE moment waarop de lening afloopt of doorloopt (leeftijd uit de rijen, nooit "tot je AOW-leeftijd" aangenomen) en, mét eigen woning, benoemt de woning-zin de gekozen strategie (verkoop/opeethypotheek) en verschijnt de woonstrategie-knop (`toonWoonstrategieLink = housing != null`). Alle tekst is beschrijvend (Wft): een rekenuitkomst, geen advies.',
+    assertion: {
+      kind: 'exact',
+      expected:
+        'instellingUit=Je plan staat een tekort-lening nu toe. Met de instelling "Geen tekort-lening in mijn plan" rekent de app met het vroegste stopmoment waarop je zonder lening rondkomt.; instellingAan=Je hebt ingesteld dat een tekort-lening niet in je plan hoort, maar met je gekozen stopmoment is hij toch nodig.; instellingAanZonderVastStopmoment=Je hebt ingesteld dat een tekort-lening niet in je plan hoort; deze berekening laat er toch een zien.; toonInstellingLink=true',
+      source: 'lib/horizon/deficit-loan-copy.ts#buildDeficitLoanCopy (pure functie, échte productiecode — gerenderd in components/app/horizon/horizon-client.tsx) — zie toek-checks.ts; grendel op alle plan-varianten in lib/horizon/deficit-loan-copy.test.ts.',
+    },
+  },
+  {
+    workflow: 'WF-TOEK-53',
+    scenarioId: 'UAT-TOEK-53',
+    titel: 'Opbouw-grafiek kleurt schulden per soort (hypotheek, overig, opeethypotheek, tekort-lening) (ADR 0148)',
+    kriticiteit: 'OVERIG',
+    persona: 'willem',
+    given: 'Persona Willem met een hypotheek, een tekort-lening-episode in de projectie en (in het opeethypotheek-scenario) een opeethypotheek-saldo. De opbouw-weergave van de tijdas-grafiek (`components/app/horizon/wealth-composition-chart.tsx`) toont schulden als onderdeel van de gestapelde balk.',
+    when: 'De gebruiker schakelt de grafiek naar "Opbouw" en leest de schuld-segmenten en hun legenda per jaar.',
+    then: 'De schuld-segmenten zijn per soort gekleurd i.p.v. één ongedifferentieerd schuld-blok — hypotheek, overige schulden, opeethypotheek en tekort-lening dragen elk hun eigen, consistente kleur en naam in de legenda/tooltip. Puur weergavegedrag: de onderliggende bedragen komen ongewijzigd uit dezelfde kernel-rijen als de "Pad"-weergave.',
+    assertion: {
+      kind: 'ui-only',
+      source: 'components/app/horizon/wealth-composition-chart.tsx (segment-kleuren per schuldsoort, ADR 0148) — consumeert bestaande kernel-uitkomsten zonder herberekening.',
+    },
+  },
 ]
 
 export const TOEK_ACCEPTANCE: AcceptanceSet = {
@@ -797,9 +848,17 @@ export const TOEK_ACCEPTANCE: AcceptanceSet = {
  * 45-48 zijn eerder al bezet). Gebruikt door de dekkings-meta-test.
  * WF-TOEK-50 (15 sep 2026, spec lab-haalbaarheid §4) is NIEUW — de
  * doelen-melding wanneer lab-doelen niet meer bij het plan passen.
+ * WF-TOEK-51 (16 sep 2026, ADR 0149 "Geen tekort-lening als planvoorwaarde")
+ * is NIEUW — de hoofdinstelling zelf: schakelaar, wizard-vergelijking en het
+ * gedeelde solver-criterium (`isToereikend`). WF-TOEK-52 is NIEUW — dezelfde
+ * ADR raakte ook de tekort-lening-melding op de tijdas (instelling-zin +
+ * ingang), samen met de eerder die dag geshipte ADR 0148-wijzigingen aan die
+ * melding (werkelijk aflosmoment, woonstrategie-zin) — deze twee ADR's hadden
+ * daarvoor geen eigen criterium. WF-TOEK-53 is NIEUW — ADR 0148 kleurt de
+ * opbouw-grafiek per schuldsoort; ook dat stond nog niet gedekt.
  */
 export const TOEK_EXPECTED_WORKFLOW_NUMBERS: number[] = [
   ...Array.from({ length: 8 }, (_, i) => i + 1), // 1..8
   ...Array.from({ length: 17 }, (_, i) => i + 10), // 10..26
-  28, 29, 30, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50,
+  28, 29, 30, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53,
 ]

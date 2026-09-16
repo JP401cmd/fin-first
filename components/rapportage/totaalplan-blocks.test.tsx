@@ -178,6 +178,7 @@ describe('ProjectieBlock — planeinde, euro-weergave en tekort-meldingen (B-043
       displayEndAge: 90,
       isPensioenMode: false,
       homeExcludedFromFire: false,
+      geenTekortLeningAan: false,
       peakText: '€ 42.000',
       freedomText: null,
     })

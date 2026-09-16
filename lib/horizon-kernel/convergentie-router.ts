@@ -91,6 +91,8 @@ export function buildConvergentieAdapterProfile(
     // `parseFirePlan` het anker nog uit `fire_end_strategy` (de tegenspraak-regel D2).
     fire_stop_anchor: p.fire_stop_anchor ?? null,
     fire_stop_age: p.fire_stop_age ?? null,
+    // ADR 0149 — "geen tekort-lening in mijn plan" reist mee naar de adapter.
+    fire_no_deficit_loan: p.fire_no_deficit_loan ?? null,
     feature_preferences: p.feature_preferences ?? null,
     withdrawal_strategy: p.withdrawal_strategy ?? null,
     guardrail_floor: p.guardrail_floor ?? null,

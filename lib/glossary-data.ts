@@ -417,6 +417,12 @@ export const GLOSSARY_ENTRIES: Record<string, GlossaryEntry> = {
     explanation:
       'Je houdt aan het eind bewust een doelbedrag over, bijvoorbeeld om na te laten. Wat je daarvoor apart houdt, kun je onderweg niet opnemen.',
   },
+  tekort_lening: {
+    name: 'Tekort-lening',
+    alternative: 'Lenen om een gat te overbruggen',
+    explanation:
+      'Geld dat de berekening leent zodra je vermogen op is en je inkomen je uitgaven nog niet dekt, bijvoorbeeld in de jaren tussen stoppen en je AOW. De lening loopt op met rente en wordt later terugbetaald. Met "Geen tekort-lening in mijn plan" rekent de app met het vroegste stopmoment waarop je zonder zo’n lening rondkomt.',
+  },
   eindstrategie_perpetual: {
     name: 'Eeuwigdurend',
     alternative: 'Vermogen intact houden',

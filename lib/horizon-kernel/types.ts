@@ -895,6 +895,28 @@ export interface KernelInput {
    * (`adapter/params.ts#buildStopAnker`) zet 'm zodra het plan een vast anker draagt.
    */
   readonly stopAnker?: KernelStopAnker
+
+  /**
+   * **Buiten oracle-domein (ADR 0149) — app-only.** "Geen tekort-lening in mijn
+   * plan": een stopmoment is pas TOEREIKEND wanneer, náást `gap ≥ 0`, er t/m de
+   * eindleeftijd geen BLIJVENDE tekort-lening nodig is (`runway.ts#
+   * heeftBlijvendeTekortLening`: een tekort-episode die binnen
+   * `MAX_TRANSIENT_SPAN_MONTHS` bewezen is afgelost — een liquiditeitsbrug, bv. rond
+   * een huisverkoop — telt niet; alles wat langer aanhoudt of aan het venster-einde
+   * nog openstaat wél).
+   *
+   *  - Zonder vast anker zoekt de bisectie de vroegste maand waarop het predicaat
+   *    `solver.ts#isToereikend` waar is; is dat nergens binnen de horizon zo, dan
+   *    parkeert B16 op de horizon met `unreachable_within_horizon`.
+   *  - Onder een vast `stopAnker` blijft de leeftijd staan; een tekort meldt zich
+   *    via de bestaande anker-tekortstatus (`anchor_shortfall`/`stop_now_shortfall`).
+   *
+   * Weggelaten/`false` ⇒ **byte-identiek aan het bestaande gedrag** (de gap is dan
+   * het enige criterium): `input-from-fixture` zet 'm nooit, dus de parity-fixtures
+   * blijven groen. De app-adapter zet 'm alleen op `true` wanneer
+   * `profiles.fire_no_deficit_loan === true` — anders laat hij het veld `undefined`.
+   */
+  readonly geenTekortLening?: boolean
 }
 
 /**

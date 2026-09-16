@@ -1301,7 +1301,7 @@ export default function HorizonPage({
           // de bijbehorende bronsignalen, terwijl de `loadData`-select ze al
           // meenam. Zonder die twee kan de rekenlaag hier niet zien welke
           // grondslag geldt en leest ze een profielbedrag alsof het de waarheid is.
-          .select(`date_of_birth, retirement_expense_method, retirement_expense_custom_amount, ${FIRE_PLAN_COLUMNS}, fire_legacy_include_illiquid, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, income_source, expenses_source, box3_method, box3_heffingvrij_inkomen, feature_preferences, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, withdrawal_profile_config, deficit_loan_rate, housing_strategy_config, pot_rules`)
+          .select(`date_of_birth, retirement_expense_method, retirement_expense_custom_amount, ${FIRE_PLAN_COLUMNS}, fire_legacy_include_illiquid, fire_no_deficit_loan, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, income_source, expenses_source, box3_method, box3_heffingvrij_inkomen, feature_preferences, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, withdrawal_profile_config, deficit_loan_rate, housing_strategy_config, pot_rules`)
           .single()
         if (cancelled || !profileData) return
         // Jaarlijkse essentiële uitgaven — zelfde grondslag (echte essentiële
@@ -1363,7 +1363,7 @@ export default function HorizonPage({
         supabase.from('transactions').select('amount').gte('date', monthStart).lt('date', monthEnd),
         supabase.from('assets').select('current_value, monthly_contribution, net_worth_inclusion_pct').eq('is_active', true),
         supabase.from('debts').select('current_balance, net_worth_inclusion_pct').eq('is_active', true),
-        supabase.from('profiles').select(`date_of_birth, retirement_expense_method, retirement_expense_custom_amount, ${FIRE_PLAN_COLUMNS}, fire_legacy_include_illiquid, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, income_source, expenses_source, box3_method, box3_heffingvrij_inkomen, feature_preferences, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, withdrawal_profile_config, deficit_loan_rate, housing_strategy_config, pot_rules`).single(),
+        supabase.from('profiles').select(`date_of_birth, retirement_expense_method, retirement_expense_custom_amount, ${FIRE_PLAN_COLUMNS}, fire_legacy_include_illiquid, fire_no_deficit_loan, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, income_source, expenses_source, box3_method, box3_heffingvrij_inkomen, feature_preferences, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, withdrawal_profile_config, deficit_loan_rate, housing_strategy_config, pot_rules`).single(),
         supabase.from('budgets').select('id, name, default_limit, interval, budget_type, is_essential').eq('is_essential', true).in('budget_type', ['expense']).is('parent_id', null),
         supabase.from('life_events').select('*').eq('is_active', true).order('sort_order', { ascending: true }),
         supabase
@@ -3247,10 +3247,12 @@ export default function HorizonPage({
       displayEndAge,
       isPensioenMode,
       homeExcludedFromFire: homeExcludedFromProgress,
+      geenTekortLeningAan: kernelRawProfile?.fire_no_deficit_loan === true,
+      vastStopmoment: simResult?.stopAnker != null,
       peakText: formatMaskedCurrency(deficitLoanNotice.peak, masked),
       freedomText,
     })
-  }, [deficitLoanNotice, deficitNoticeVisible, canonicalDailyRate, masked, userAowAge.fractional, displayEndAge, isPensioenMode, initialData.housingContext.hasEigenHuis, initialData.housingStrategy, kernelHousingSale, reverseMortgageStartAge, homeExcludedFromProgress])
+  }, [deficitLoanNotice, deficitNoticeVisible, canonicalDailyRate, masked, userAowAge.fractional, displayEndAge, isPensioenMode, initialData.housingContext.hasEigenHuis, initialData.housingStrategy, kernelHousingSale, reverseMortgageStartAge, kernelRawProfile?.fire_no_deficit_loan, simResult?.stopAnker, homeExcludedFromProgress])
 
   // ── Erfgenamen (heirs) derivation for End-of-Life analysis ───────────────
   const erfgenamen = useMemo(() => {
@@ -6025,8 +6027,21 @@ export default function HorizonPage({
                         {deficitLoanCopy.piek} {deficitLoanCopy.lijn}
                       </p>
                       <p className="mt-1.5 font-sans text-[12px] leading-relaxed text-amber-800">
+                        {deficitLoanCopy.instelling}
+                      </p>
+                      <p className="mt-1.5 font-sans text-[12px] leading-relaxed text-amber-800">
                         {deficitLoanCopy.knoppen}
                       </p>
+                      {deficitLoanCopy.toonInstellingLink && (
+                        <button
+                          type="button"
+                          onClick={() => router.push('/toekomst/voorkeuren?regel=eindstrategie')}
+                          className="mt-1.5 mr-4 inline-flex items-center gap-1 font-sans text-[12px] font-medium text-amber-900 underline underline-offset-2 transition-colors hover:text-[var(--ink)]"
+                          style={{ minHeight: 44 }}
+                        >
+                          Bekijk of wijzig of een tekort-lening mag &rarr;
+                        </button>
+                      )}
                       {deficitLoanCopy.toonWoonstrategieLink && (
                         <button
                           type="button"

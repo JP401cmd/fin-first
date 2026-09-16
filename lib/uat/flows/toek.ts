@@ -43,6 +43,8 @@ export const TOEK_FLOW: UatFlow = {
     // ── 2 · de grafiek aflezen ────────────────────────────────────────────
     { id: 'kpi', scenarioId: 'UAT-TOEK-02', label: 'WF-TOEK-02 · KPI-kassabon controleren', kind: 'screen', stage: 2, lane: 'aflezen' },
     { id: 'status', scenarioId: 'UAT-TOEK-03', label: 'WF-TOEK-03 · Statusmeldingen boven de grafiek', kind: 'screen', stage: 2, lane: 'aflezen' },
+    // ADR 0148/0149 — werkelijk aflosmoment, woonstrategie-zin en instelling-ingang.
+    { id: 'tekortmelding', scenarioId: 'UAT-TOEK-52', label: 'WF-TOEK-52 · Tekort-lening-melding (aflosmoment, woonstrategie, instelling)', kind: 'screen', stage: 2, lane: 'aflezen', subOf: 'status' },
     { id: 'grafiek', scenarioId: 'UAT-TOEK-04', label: 'WF-TOEK-04 · Grafiek verkennen (Pad/Opbouw, zoom)', kind: 'screen', stage: 2, lane: 'aflezen' },
     { id: 'jaardetail', scenarioId: 'UAT-TOEK-05', label: 'WF-TOEK-05 · Jaar-detail-kassabon', kind: 'screen', stage: 2, lane: 'aflezen', subOf: 'grafiek' },
     { id: 'details', scenarioId: 'UAT-TOEK-06', label: 'WF-TOEK-06 · "Details" · jaar-op-jaar tabel', kind: 'screen', stage: 2, lane: 'aflezen', subOf: 'grafiek' },
@@ -53,6 +55,8 @@ export const TOEK_FLOW: UatFlow = {
     { id: 'maskering', scenarioId: 'UAT-TOEK-34', label: 'WF-TOEK-34 · Bedragmaskering op de grafiek', kind: 'action', stage: 2, lane: 'aflezen', subOf: 'grafiek' },
     { id: 'grondslaglijn', scenarioId: 'UAT-TOEK-36', label: 'WF-TOEK-36 · Grondslag hoofdlijn per woonstrategie', kind: 'screen', stage: 2, lane: 'aflezen', subOf: 'grafiek' },
     { id: 'grondslagdoorwerking', scenarioId: 'UAT-TOEK-37', label: 'WF-TOEK-37 · Stip, band, drempels, pill & kassabon bewegen mee', kind: 'screen', stage: 2, lane: 'aflezen', subOf: 'grondslaglijn' },
+    // ADR 0148 — schuld-segmenten per soort in de Opbouw-weergave.
+    { id: 'opbouwkleuren', scenarioId: 'UAT-TOEK-53', label: 'WF-TOEK-53 · Opbouw-grafiek kleurt schulden per soort', kind: 'screen', stage: 2, lane: 'aflezen', subOf: 'grafiek' },
 
     // ── 2 · navigeren & delen ─────────────────────────────────────────────
     { id: 'navkaarten', scenarioId: 'UAT-TOEK-28', label: 'WF-TOEK-28 · Navigatiekaarten (drilldown)', kind: 'screen', stage: 2, lane: 'navigeren' },
@@ -91,6 +95,9 @@ export const TOEK_FLOW: UatFlow = {
 
     // ── 4 · de toekomst configureren · voorkeuren ─────────────────────────
     { id: 'eindstrat', scenarioId: 'UAT-TOEK-24', label: 'WF-TOEK-24 · Plan (stop × eind-vorm) / onttrekkingsstrategie', kind: 'screen', stage: 4, lane: 'voorkeuren' },
+    // ADR 0149 — hoofdinstelling naast de rest van de Eindstrategie-kaart; ook
+    // als detailregel + vergelijking in de plan-review-stap "Je plan" (WF-TOEK-44).
+    { id: 'geentekortlening', scenarioId: 'UAT-TOEK-51', label: 'WF-TOEK-51 · "Geen tekort-lening in mijn plan" (schakelaar + solver-gedrag)', kind: 'action', stage: 4, lane: 'voorkeuren', subOf: 'eindstrat' },
     { id: 'potregels', scenarioId: 'UAT-TOEK-25', label: 'WF-TOEK-25 · Pot-regels (volgorde, toe-/afname)', kind: 'screen', stage: 4, lane: 'voorkeuren' },
     // TPR-01 / ADR 0142 — de Voorkeuren-kaart is zolang niet voltooid de ingang van de
     // plan-review; bevestigen schrijft via de bestaande routes en voedt dus de uitkomst.
@@ -143,12 +150,15 @@ export const TOEK_FLOW: UatFlow = {
     // hub → aflezen
     { from: 'tijdas', to: 'kpi' },
     { from: 'tijdas', to: 'status' },
+    { from: 'status', to: 'tekortmelding' },
+    { from: 'tekortmelding', to: 'eindstrat', label: 'Bekijk of wijzig of een tekort-lening mag' },
     { from: 'tijdas', to: 'grafiek' },
     { from: 'grafiek', to: 'jaardetail' },
     { from: 'grafiek', to: 'details' },
     { from: 'grafiek', to: 'euroweergave' },
     { from: 'grafiek', to: 'maskering' },
     { from: 'grafiek', to: 'grondslaglijn' },
+    { from: 'grafiek', to: 'opbouwkleuren' },
     { from: 'grondslaglijn', to: 'grondslagdoorwerking' },
     { from: 'tijdas', to: 'fasebalk' },
     { from: 'tijdas', to: 'markers' },
@@ -193,6 +203,8 @@ export const TOEK_FLOW: UatFlow = {
     { from: 'navkaarten', to: 'eindstrat', kind: 'branch', label: 'Voorkeuren' },
     { from: 'eindstrat', to: 'potregels' },
     { from: 'eindstrat', to: 'marktaannames' },
+    { from: 'eindstrat', to: 'geentekortlening' },
+    { from: 'geentekortlening', to: 'planreview', label: 'zelfde plan-contract, ook als wizard-detailregel' },
     { from: 'navkaarten', to: 'planreview', kind: 'branch', label: 'Je plan (niet voltooid)' },
     { from: 'planreview', to: 'planreviewlaag2', kind: 'branch', label: 'Voor wie wil (inline, geen markering)' },
     { from: 'planreviewlaag2', to: 'fire' },
@@ -218,6 +230,9 @@ export const TOEK_FLOW: UatFlow = {
     { from: 'werkstrat', to: 'fire' },
     { from: 'downsizebeslis', to: 'fire' },
     { from: 'eindstrat', to: 'fire' },
+    { from: 'geentekortlening', to: 'fire' },
+    { from: 'tekortmelding', to: 'fire' },
+    { from: 'opbouwkleuren', to: 'fire' },
     { from: 'potregels', to: 'fire' },
     { from: 'marktaannames', to: 'fire' },
     { from: 'doelvoortgang', to: 'fire' },
