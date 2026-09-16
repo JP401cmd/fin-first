@@ -23,8 +23,9 @@ zich via de bestaande anker-status. Default UIT ⇒ byte-identiek aan vandaag.
   alleen `model ≥ doel op de eindleeftijd`. Een plan waarin het liquide vermogen op 58
   op is, de synthetische tekort-lening dertig jaar loopt en pas ná 68 uit een
   pensioeninkomen wordt afgelost, heeft op 90 een gap ≥ 0 en geldt daarmee als
-  "haalbaar vanaf 47". Gemeten op de Tessa-persona ×0,1 mét extra pensioen vanaf 68:
-  FIRE 47,1 met een tekort-piek van ~€917k (`geen-tekort-lening.test.ts`).
+  "haalbaar vanaf 47". De testpersona in `geen-tekort-lening.test.ts` (vermogen
+  geschaald, extra pensioen vanaf 68) laat precies dit zien: een vroege FIRE-leeftijd
+  met een tekort-lening die tot ruim boven het jaarinkomen oploopt.
 - **De tekort-lening is een rekenkundig vangnet, geen product.** ADR 0033 en 0148
   behandelen 'm als artefact dat zo klein mogelijk hoort te zijn. Voor een deel van
   de gebruikers is "ik wil nooit hoeven lenen" de planvoorwaarde zelf — een
