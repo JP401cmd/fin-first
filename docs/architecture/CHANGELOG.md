@@ -1094,3 +1094,8 @@
 ## 2026-09-17
 
 - Geen wijzigingen.
+
+## 2026-09-17
+
+- **API-routes** toegevoegd: /api/beta/addon
+- **Componenten (aantal)** toegevoegd: +4

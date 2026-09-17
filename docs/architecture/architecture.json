@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-17T14:46:55.458Z",
+  "generatedAt": "2026-09-17T17:58:14.721Z",
   "generatedDate": "2026-09-17",
   "repo": {
     "name": "fin",
@@ -191,11 +191,11 @@
   "stats": {
     "routes": 136,
     "routesProduction": 90,
-    "api": 325,
+    "api": 326,
     "tables": 102,
-    "migrations": 252,
+    "migrations": 253,
     "integrations": 25,
-    "components": 1135,
+    "components": 1139,
     "providers": 19,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -2646,6 +2646,14 @@
       "domain": "benchmark-comparison",
       "methods": [
         "GET"
+      ]
+    },
+    {
+      "url": "/api/beta/addon",
+      "file": "app/api/beta/addon/route.ts",
+      "domain": "beta",
+      "methods": [
+        "POST"
       ]
     },
     {
@@ -7038,6 +7046,21 @@
       ]
     },
     {
+      "domain": "beta",
+      "label": "beta",
+      "count": 1,
+      "routes": [
+        {
+          "url": "/api/beta/addon",
+          "file": "app/api/beta/addon/route.ts",
+          "domain": "beta",
+          "methods": [
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "budget-trends",
       "label": "budget-trends",
       "count": 1,
@@ -8574,7 +8597,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 252
+    "migrationCount": 253
   },
   "tablesByDomain": [
     {
@@ -9120,11 +9143,11 @@
     }
   ],
   "components": {
-    "total": 1135,
+    "total": 1139,
     "groups": [
       {
         "group": "app",
-        "count": 457,
+        "count": 460,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -9178,6 +9201,8 @@
           "benchmark-comparison-chart",
           "benchmark-comparison-chart.test",
           "bespreek-met-fin-button",
+          "beta-addon-choice",
+          "beta-addon-dialog",
           "bill-calendar",
           "bottom-nav-tabs",
           "bottom-sheet",
@@ -9516,6 +9541,7 @@
           "step-details-aflossingsvorm.test",
           "step-details-bedrag.test",
           "step-details-dga-koppeling.test",
+          "step-details-naamsuggesties.test",
           "step-header",
           "step-header-count.test",
           "step-housing-choice",
@@ -10128,7 +10154,7 @@
       },
       {
         "group": "onboarding",
-        "count": 43,
+        "count": 44,
         "items": [
           "aangifte-import-pane",
           "facts-panel",
@@ -10158,6 +10184,7 @@
           "onboarding-schulden.test",
           "onboarding-section-back-navigation.test",
           "onboarding-shell",
+          "onboarding-shell.scroll.test",
           "onboarding-spaardoel",
           "onboarding-success",
           "onboarding-uitgaven-pensioen",
@@ -10952,6 +10979,16 @@
           "write": false
         }
       ],
+      "beta": [
+        {
+          "name": "app_settings",
+          "write": false
+        },
+        {
+          "name": "tier_assignments_log",
+          "write": false
+        }
+      ],
       "briefing": [
         {
           "name": "app_settings",
@@ -11174,16 +11211,6 @@
         {
           "name": "life_events",
           "write": false
-        }
-      ],
-      "consent": [
-        {
-          "name": "consent_events",
-          "write": true
-        },
-        {
-          "name": "profiles",
-          "write": true
         }
       ],
       "cron": [
@@ -12365,14 +12392,6 @@
           ]
         },
         {
-          "domain": "consent",
-          "label": "consent",
-          "write": true,
-          "routes": [
-            "/api/consent/ai"
-          ]
-        },
-        {
           "domain": "crypto-holdings",
           "label": "Crypto",
           "write": true,
@@ -13521,6 +13540,14 @@
           ]
         },
         {
+          "domain": "beta",
+          "label": "beta",
+          "write": false,
+          "routes": [
+            "/api/beta/addon"
+          ]
+        },
+        {
           "domain": "local-ai-gate",
           "label": "local-ai-gate",
           "write": false,
@@ -13889,6 +13916,14 @@
           "write": true,
           "routes": [
             "/api/admin/tier-assign"
+          ]
+        },
+        {
+          "domain": "beta",
+          "label": "beta",
+          "write": false,
+          "routes": [
+            "/api/beta/addon"
           ]
         }
       ],
@@ -14965,24 +15000,6 @@
           ]
         }
       ],
-      "consent_events": [
-        {
-          "domain": "consent",
-          "label": "consent",
-          "write": true,
-          "routes": [
-            "/api/consent/ai"
-          ]
-        },
-        {
-          "domain": "pension",
-          "label": "pension",
-          "write": true,
-          "routes": [
-            "/api/pension/parse"
-          ]
-        }
-      ],
       "error_logs": [
         {
           "domain": "log-error",
@@ -15336,6 +15353,16 @@
           ]
         }
       ],
+      "consent_events": [
+        {
+          "domain": "pension",
+          "label": "pension",
+          "write": true,
+          "routes": [
+            "/api/pension/parse"
+          ]
+        }
+      ],
       "questionnaire_responses": [
         {
           "domain": "questionnaires",
@@ -15385,7 +15412,6 @@
       "balance_snapshots",
       "bank_accounts",
       "budgets",
-      "consent_events",
       "debts",
       "error_log_resolutions",
       "goals",
@@ -18273,6 +18299,20 @@
       ],
       "summary": "De onboarding eindigt met twee stappen onder een eigen groep, \"Je budget\": 1. **Budget inrichten.** Je kiest een template of begint leeg, en werkt de categorieën bij (toevoegen, hernoemen, verwijderen). 2. **Bank koppelen.** Je koppelt aan een gekozen cash-rekening of aan een nie",
       "file": "docs/adr/0156-budget-en-bank-in-de-onboarding-na-de-opslag.md"
+    },
+    {
+      "id": "0157-beta-add-ons-zijn-een-eigen-keuze",
+      "title": "In de beta zijn AI en de bankkoppeling een eigen keuze: dezelfde add-on, zelf aan te zetten",
+      "status": "aanvaard",
+      "date": "2026-09-17",
+      "elements": [
+        "t-aigateway",
+        "as-coach",
+        "t-bankconnect",
+        "sp-registreren"
+      ],
+      "summary": "AI en de bankkoppeling worden straks betaalde add-ons (`lib/subscription-catalog.ts`). Zolang TriFinity in beta is, zet de gebruiker ze **zelf** aan of uit. Het moment waarop dat gebeurt is het moment waarop iemand de functie wil gebruiken: een popup legt uit \"straks een abonneme",
+      "file": "docs/adr/0157-beta-add-ons-zijn-een-eigen-keuze.md"
     }
   ],
   "churn": {
@@ -18284,7 +18324,7 @@
       },
       {
         "path": "lib/ai",
-        "commits": 53
+        "commits": 54
       },
       {
         "path": "app/(app)/toekomst",
@@ -19533,8 +19573,23 @@
   "diff": {
     "baseline": false,
     "previousDate": "2026-09-17",
-    "hasChanges": false,
-    "sections": []
+    "hasChanges": true,
+    "sections": [
+      {
+        "label": "API-routes",
+        "added": [
+          "/api/beta/addon"
+        ],
+        "removed": []
+      },
+      {
+        "label": "Componenten (aantal)",
+        "added": [
+          "+4"
+        ],
+        "removed": []
+      }
+    ]
   },
   "statsHistory": [
     {
@@ -19959,8 +20014,8 @@
     },
     {
       "date": "2026-09-17",
-      "api": 325,
-      "components": 1135,
+      "api": 326,
+      "components": 1139,
       "tables": 102,
       "routesProduction": 90
     }
