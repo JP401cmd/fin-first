@@ -11,9 +11,11 @@ import {
   TargetAccountChoice,
   type TargetSelection,
 } from '@/components/app/bank-connect/target-account-choice'
+import { BankAuthWaiting } from '@/components/app/bank-connect/bank-auth-waiting'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { getPageInfo } from '@/lib/page-info-content'
+import { openBankAuth } from '@/lib/truelayer/open-bank-auth'
 import {
   occupiedTargetAccountMessage,
   type TargetAccountOption,
@@ -62,6 +64,11 @@ export default function ConnectBankPage() {
   const occupiedCarrierParam = error === 'drager_bezet' ? searchParams.get('drager') : null
 
   const [step, setStep] = useState<Step>('select')
+  /**
+   * Geïnstalleerde app: de bank staat in een apart venster en deze pagina wacht
+   * (B-051). Een toestand bínnen `redirect`, geen vierde stap — zie R3 hierboven.
+   */
+  const [waitingForBank, setWaitingForBank] = useState<string | null>(null)
   const [selectedBank, setSelectedBank] = useState<Provider | null>(null)
   const [connecting, setConnecting] = useState(false)
   const [connectError, setConnectError] = useState<string | null>(
@@ -289,9 +296,15 @@ export default function ConnectBankPage() {
         return
       }
 
-      // Redirect to bank authorization
+      // Naar de bank. In de geïnstalleerde app in een apart venster, zodat de
+      // terugkeer (die Android in de browser laat landen) deze pagina niet
+      // wegneemt — zie lib/truelayer/open-bank-auth.ts.
       setStep('redirect')
-      window.location.href = data.auth_url
+      const connectionId = typeof data.connection_id === 'string' ? data.connection_id : null
+      if (openBankAuth(data.auth_url, connectionId) === 'window') {
+        setWaitingForBank(connectionId)
+        setConnecting(false)
+      }
     } catch (err) {
       // Netwerk-/parse-fouten (bv. "Failed to fetch") nooit rauw tonen.
       console.error('Bank-connect verzoek mislukt', err)
@@ -501,7 +514,16 @@ export default function ConnectBankPage() {
       )}
 
       {/* Step: Redirect */}
-      {step === 'redirect' && (
+      {step === 'redirect' && waitingForBank && (
+        <BankAuthWaiting
+          connectionId={waitingForBank}
+          onCancel={() => {
+            setWaitingForBank(null)
+            setStep('confirm')
+          }}
+        />
+      )}
+      {step === 'redirect' && !waitingForBank && (
         <div className="flex flex-col items-center py-12 text-center">
           <div className="h-10 w-10 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" />
           <p className="mt-4 text-sm font-medium text-[var(--ink-2)]">

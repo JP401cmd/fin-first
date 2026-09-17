@@ -483,7 +483,10 @@ export async function POST(req: Request) {
     const fullState = `${connection.id}:${state}`
     const authUrl = await buildAuthLink(supabase, redirectUri, fullState, effectiveProvider.id)
 
-    return NextResponse.json({ auth_url: authUrl })
+    // `connection_id` laat het wachtscherm van de geïnstalleerde app déze poging
+    // volgen via GET /api/bank-connect/connection-status (B-051). Het is de id van
+    // een eigen rij en staat al in de `state` die naar de bank gaat.
+    return NextResponse.json({ auth_url: authUrl, connection_id: connection.id })
   } catch (err) {
     // De NL-mapping blijft (bekende oorzaak = bruikbare tekst), maar de log loopt
     // via `serverError` zodat de echte fout een grep-bare tag krijgt (ADR 0044) en

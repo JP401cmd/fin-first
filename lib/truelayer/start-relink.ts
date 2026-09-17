@@ -32,7 +32,9 @@ export const RELINK_GENERIC_ERROR = 'Opnieuw verbinden is niet gelukt — probee
  */
 const UNCURATED_ERROR_CODES = new Set(['validation_error', 'server_error'])
 
-export type StartRelinkResult = { ok: true; authUrl: string } | { ok: false; message: string }
+export type StartRelinkResult =
+  | { ok: true; authUrl: string; connectionId: string | null }
+  | { ok: false; message: string }
 
 /**
  * Start een herautorisatie voor één koppeling.
@@ -53,7 +55,7 @@ export async function startBankRelink(connectionAccountId: string): Promise<Star
     })
 
     const data = (await res.json().catch(() => null)) as
-      | { auth_url?: string; error?: string; code?: string }
+      | { auth_url?: string; connection_id?: string; error?: string; code?: string }
       | null
 
     if (!res.ok || !data?.auth_url) {
@@ -69,7 +71,11 @@ export async function startBankRelink(connectionAccountId: string): Promise<Star
       return { ok: false, message: usable ? (data.error as string) : RELINK_GENERIC_ERROR }
     }
 
-    return { ok: true, authUrl: data.auth_url }
+    return {
+      ok: true,
+      authUrl: data.auth_url,
+      connectionId: typeof data.connection_id === 'string' ? data.connection_id : null,
+    }
   } catch (err) {
     // Netwerk-/parsefouten ("Failed to fetch") nooit rauw tonen.
     console.error('Bank-connect herkoppel-verzoek mislukt', err)

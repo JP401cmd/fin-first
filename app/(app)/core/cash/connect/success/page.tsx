@@ -9,6 +9,7 @@ import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { CarrierCorrection } from '@/components/app/bank-connect/carrier-correction'
 import { CashflowAccountsExit } from '@/components/app/bank-connect/target-account-choice'
 import type { LinkedAccountView } from '@/lib/truelayer/linked-account'
+import { isInstalledApp } from '@/lib/truelayer/open-bank-auth'
 
 /**
  * Uitkomst van één sync, zoals `POST /api/bank-connect/sync` hem teruggeeft.
@@ -104,6 +105,19 @@ export default function ConnectSuccessPage() {
   const [syncResults, setSyncResults] = useState<Record<string, SyncResult>>({})
   /** Welke kaart heeft haar correctiepaneel open? Hooguit één, om de pagina rustig te houden. */
   const [correcting, setCorrecting] = useState<string | null>(null)
+  /**
+   * Landde de terugkeer van de bank in de browser van een telefoon? Dan kwam de
+   * gebruiker vaak uit de geïnstalleerde app: Android geeft de terugkeer-URL van
+   * de bank-app aan de browser, niet aan de app (B-051). Pas na mount bepaald —
+   * `matchMedia` bestaat niet op de server.
+   */
+  const [returnedInBrowser, setReturnedInBrowser] = useState(false)
+
+  useEffect(() => {
+    const coarse =
+      typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches
+    setReturnedInBrowser(coarse && !isInstalledApp())
+  }, [])
 
   // Lezen via de route, niet client-direct (ADR 0058): het correctiemoment heeft
   // er een tweede tabel bij nodig (wélke bank_accounts-rij draagt dit?), en dat is
@@ -221,6 +235,19 @@ export default function ConnectSuccessPage() {
               gebruikt zodra hij de bezette rekening niet kan aanwijzen. */}
           <CashflowAccountsExit className="mt-2" />
         </div>
+      )}
+
+      {/* Terug naar de app (B-051). Neutraal vlak, geen stoplicht: de koppeling
+          is gelukt, dit is alleen de weg terug. Ónder de geblokkeerd-melding:
+          die ziet de app zelf niet, dus die mag hier niet wegzakken. */}
+      {returnedInBrowser && (
+        <p className="mt-6 flex items-start gap-2 border border-[var(--border-ed)] bg-[var(--subtle)] px-4 py-3 text-left text-xs text-[var(--ink-2)]">
+          <Info aria-hidden className="mt-px h-3.5 w-3.5 shrink-0 text-[var(--ink-3)]" />
+          <span>
+            Begon je het koppelen in de TriFinity-app? Dan kun je dit tabblad sluiten en
+            teruggaan naar de app — die ziet de koppeling vanzelf.
+          </span>
+        </p>
       )}
 
       {/* Linked accounts */}

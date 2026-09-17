@@ -6,6 +6,8 @@ import { SyncStatusBadge } from './sync-status-badge'
 import type { LinkedAccountView } from '@/lib/truelayer/linked-account'
 import { BANK_DAILY_REQUEST_LIMIT, effectiveDailyRequests } from '@/lib/bank-connection-status'
 import { startBankRelink } from '@/lib/truelayer/start-relink'
+import { openBankAuth } from '@/lib/truelayer/open-bank-auth'
+import { BankAuthWaiting } from './bank-auth-waiting'
 
 /**
  * DE BANKVERBINDING op de rekeningdetail — status, synchroniseren, verbreken en
@@ -172,6 +174,8 @@ export function ConnectedAccountCard({ account, onSync, onDisconnect, onReauthor
   const [disconnecting, setDisconnecting] = useState(false)
   const [confirmDisconnect, setConfirmDisconnect] = useState(false)
   const [relinking, setRelinking] = useState(false)
+  /** Geïnstalleerde app: de bank staat in een apart venster en deze kaart wacht (B-051). */
+  const [waitingForBank, setWaitingForBank] = useState<string | null>(null)
   /**
    * Eén inline melding voor alle drie de acties — geen `alert()`: dat is geen
    * meldingpatroon dat deze app elders gebruikt, het is niet voorleesbaar en het
@@ -304,8 +308,13 @@ export function ConnectedAccountCard({ account, onSync, onDisconnect, onReauthor
       return
     }
 
-    // Volledige navigatie, geen router.push: we verlaten de app naar de bank.
-    window.location.href = result.authUrl
+    // Volledige navigatie, geen router.push: we verlaten de app naar de bank —
+    // behalve in de geïnstalleerde app, waar de bank in een apart venster opent
+    // en deze kaart wacht (zie lib/truelayer/open-bank-auth.ts).
+    if (openBankAuth(result.authUrl, result.connectionId) === 'window') {
+      setWaitingForBank(result.connectionId)
+      setRelinking(false)
+    }
   }
 
   return (
@@ -360,7 +369,7 @@ export function ConnectedAccountCard({ account, onSync, onDisconnect, onReauthor
           <button
             type="button"
             onClick={handleRelink}
-            disabled={relinking}
+            disabled={relinking || waitingForBank !== null}
             aria-busy={relinking}
             className={RECOVERY_BUTTON}
           >
@@ -384,13 +393,21 @@ export function ConnectedAccountCard({ account, onSync, onDisconnect, onReauthor
           <button
             type="button"
             onClick={handleRelink}
-            disabled={relinking}
+            disabled={relinking || waitingForBank !== null}
             aria-busy={relinking}
             className={RECOVERY_TEXT_LINK}
           >
             {relinking ? 'Verbinden…' : 'Verbind opnieuw'}
           </button>
         </div>
+      )}
+
+      {waitingForBank && (
+        <BankAuthWaiting
+          compact
+          connectionId={waitingForBank}
+          onCancel={() => setWaitingForBank(null)}
+        />
       )}
 
       {/* Eén inline melding voor sync, verbreken en herkoppelen. `--negative`:
@@ -420,7 +437,7 @@ export function ConnectedAccountCard({ account, onSync, onDisconnect, onReauthor
             <button
               type="button"
               onClick={handleRelink}
-              disabled={relinking}
+              disabled={relinking || waitingForBank !== null}
               aria-busy={relinking}
               className={RECOVERY_BUTTON}
             >

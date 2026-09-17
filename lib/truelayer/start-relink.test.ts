@@ -22,13 +22,19 @@ describe('startBankRelink — de body', () => {
     // die alleen de koppeling kent — dwingen tot een eigen leesronde.
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ auth_url: 'https://auth.truelayer.com/?x=1' }),
+      json: async () => ({ auth_url: 'https://auth.truelayer.com/?x=1', connection_id: 'conn-1' }),
     })
     vi.stubGlobal('fetch', fetchMock)
 
     const result = await startBankRelink('bca-1')
 
-    expect(result).toEqual({ ok: true, authUrl: 'https://auth.truelayer.com/?x=1' })
+    // `connectionId` laat het wachtscherm van de geïnstalleerde app deze poging
+    // volgen (B-051).
+    expect(result).toEqual({
+      ok: true,
+      authUrl: 'https://auth.truelayer.com/?x=1',
+      connectionId: 'conn-1',
+    })
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
     expect(url).toBe('/api/bank-connect/auth-link')
     expect(init.method).toBe('POST')

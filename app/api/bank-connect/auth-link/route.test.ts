@@ -288,7 +288,7 @@ describe('POST /api/bank-connect/auth-link — doelrekening: eigenaarschap is de
     const res = await POST(postRequest({ provider_id: 'ing', provider_name: 'ING', target_bank_account_id: OWN_ACCOUNT }))
 
     expect(res.status).toBe(200)
-    expect(await res.json()).toEqual({ auth_url: 'https://auth.truelayer.com/?state=x' })
+    expect(await res.json()).toEqual({ auth_url: 'https://auth.truelayer.com/?state=x', connection_id: 'conn-1' })
     expect(insertedConnections).toHaveLength(1)
     expect(insertedConnections[0]).toMatchObject({
       user_id: USER,
