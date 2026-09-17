@@ -1,9 +1,14 @@
 'use client'
 
 import Link from 'next/link'
-import { AlertTriangle, Building2, ExternalLink, History, Link2, Plus } from 'lucide-react'
+import { AlertTriangle, Building2, ExternalLink, History, Link2, Plus, Wallet } from 'lucide-react'
 import { formatDateShort } from '@/lib/format'
-import { isSelectableTargetOption, type TargetAccountOption } from '@/lib/truelayer/target-account'
+import {
+  isSelectableTargetOption,
+  type TargetAccountOption,
+  type TargetAssetOption,
+} from '@/lib/truelayer/target-account'
+import type { TargetSelection } from '@/lib/truelayer/start-bank-connect'
 
 /**
  * DE DOELREKENING-KEUZE in stap 2 van de bank-koppelwizard.
@@ -34,18 +39,25 @@ import { isSelectableTargetOption, type TargetAccountOption } from '@/lib/truela
  */
 
 /**
- * Waar de koppeling landt: op een bestaande rekening, of op een nieuwe.
+ * Waar de koppeling landt: op een bestaande rekening, een cash-bezit zonder
+ * rekening-rij, of een nieuwe. Woont in `lib/truelayer/start-bank-connect.ts`
+ * (de body-opbouw leest hem); hier opnieuw geëxporteerd voor bestaande imports.
  *
  * `none` = nog niets gekozen. Zolang er iets te kiezen valt start de wizard
  * daarop en blijft de knop "Verbind met …" uit: dat de app zelf een rekening
  * uitkoos is precies wat fase 4 repareert. Is er niets te kiezen (verse
  * gebruiker) of kon de lijst niet geladen worden, dan zet de pagina `new`.
  */
-export type TargetSelection = { kind: 'none' } | { kind: 'new' } | { kind: 'existing'; id: string }
+export type { TargetSelection }
 
 export type TargetAccountChoiceProps = {
   /** Kandidaat-rekeningen uit GET /api/bank-connect/accounts. Lege array = er is niets om te kiezen. */
   accounts: TargetAccountOption[]
+  /**
+   * Cash-bezittingen zonder rekening-rij (`assets` uit dezelfde GET). Kiezen =
+   * die rekening wordt bijgewerkt in plaats van dat er een tweede bijkomt.
+   */
+  assets?: TargetAssetOption[]
   loading: boolean
   /** NL-melding als de lijst niet geladen kon worden; de koppeling kan dan alleen op een nieuwe rekening landen. */
   loadError: string | null
@@ -165,6 +177,7 @@ const CONTROL_CLASS =
 
 export function TargetAccountChoice({
   accounts,
+  assets = [],
   loading,
   loadError,
   selection,
@@ -174,7 +187,7 @@ export function TargetAccountChoice({
   providerName,
   disabled = false,
 }: TargetAccountChoiceProps) {
-  const hasList = !loading && !loadError && accounts.length > 0
+  const hasList = !loading && !loadError && accounts.length + assets.length > 0
 
   return (
     <section className="space-y-3">
@@ -187,13 +200,17 @@ export function TargetAccountChoice({
         />
         Waar komt de data terecht
       </div>
-      <p
-        className="text-[13px] italic leading-snug text-[var(--ink-2)]"
-        style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
-      >
-        Kies je een rekening die je al hebt, dan houdt die zijn historie en zijn
-        budget-toewijzingen — {providerName} landt er bovenop.
-      </p>
+      {/* Alleen als er iets te kiezen valt: zonder rekeningen spreekt deze uitleg
+          de regel eronder ("Je hebt nog geen rekening…") tegen. */}
+      {(loading || hasList) && (
+        <p
+          className="text-[13px] italic leading-snug text-[var(--ink-2)]"
+          style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+        >
+          Kies je een rekening die je al hebt, dan houdt die zijn historie en zijn
+          budget-toewijzingen. {providerName} landt er bovenop.
+        </p>
+      )}
 
       {/* Laden: skeleton in de maat van de echte opties, geen spinner. */}
       {loading && (
@@ -233,7 +250,7 @@ export function TargetAccountChoice({
 
       {/* Niets om aan te koppelen (bv. tijdens onboarding): één rustige regel,
           geen lege keuzelijst. De pagina zet `selection` dan al op 'new'. */}
-      {!loading && !loadError && accounts.length === 0 && (
+      {!loading && !loadError && accounts.length === 0 && assets.length === 0 && (
         /* `role="status"`: wie "Rekeningen laden" heeft gehoord, hoort ook de
            uitkomst — net als bij de laadfout hieronder. */
         <p role="status" className="text-xs leading-relaxed text-[var(--ink-3)]">
@@ -246,7 +263,7 @@ export function TargetAccountChoice({
           opties zonder duiding raadselachtig — en "Nieuwe rekening aanmaken" is dan
           geen keuze meer maar de uitkomst. Zelfde regel als het correctiemoment
           toont in dezelfde toestand; twee oppervlakken, één uitleg. */}
-      {hasList && accounts.every((a) => !isSelectableTargetOption(a)) && (
+      {hasList && assets.length === 0 && accounts.every((a) => !isSelectableTargetOption(a)) && (
         <p role="status" className="text-xs leading-relaxed text-[var(--ink-2)]">
           Al je bestaande rekeningen dragen al een bankkoppeling. {providerName} komt
           daarom op een nieuwe rekening terecht, tenzij je er eerst één ontkoppelt.
@@ -348,6 +365,86 @@ export function TargetAccountChoice({
                           {/* `--ink-2` en niet `--ink-3`: op 11px haalt `--ink-3`
                               3,65:1 en dus geen AA. `--ink-3` blijft voor iconen
                               en decoratieve meta. */}
+                          <span className="block text-[11px] text-[var(--ink-2)]">
+                            Transacties van deze rekening tellen dan mee in je budgetten.
+                          </span>
+                        </span>
+                      </label>
+                    )}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+
+          {/* Cash-bezittingen zonder rekening-rij (bv. uit de onboarding). Een
+              gewone kiesbare optie: er zit per definitie nog geen koppeling op,
+              en er is nog geen historie om te tonen. De server maakt de
+              rekening-rij pas aan bij het verbinden. */}
+          {assets.map((asset) => {
+            const isSelected = selection.kind === 'asset' && selection.id === asset.id
+            const showBudgetToggle = isSelected && !asset.budget_tracking
+
+            return (
+              <div
+                key={`asset-${asset.id}`}
+                className={`${OPTION_BASE} ${isSelected ? OPTION_SELECTED : OPTION_IDLE} ${
+                  disabled ? 'opacity-60' : ''
+                }`}
+              >
+                <label
+                  className={`flex items-start gap-3 p-3 ${
+                    disabled ? 'cursor-not-allowed' : 'cursor-pointer'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name={RADIO_NAME}
+                    value={`asset-${asset.id}`}
+                    checked={isSelected}
+                    disabled={disabled}
+                    onChange={() => onSelect({ kind: 'asset', id: asset.id })}
+                    className={CONTROL_CLASS}
+                  />
+                  <Wallet aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-[var(--ink-3)]" />
+                  <span className="min-w-0 flex-1 space-y-0.5">
+                    <span className="block text-sm font-semibold text-[var(--ink)]">{asset.name}</span>
+                    <span className="block text-xs text-[var(--ink-3)]">
+                      {asset.institution ?? 'Rekening uit je overzicht'}
+                      {asset.iban_tail ? ` · ···· ${asset.iban_tail}` : ''}
+                    </span>
+                    <span className="block font-mono text-[11px] tabular-nums text-[var(--ink-3)]">
+                      nog geen transacties
+                    </span>
+                  </span>
+                </label>
+
+                {isSelected && (
+                  <div className="space-y-2 border-t border-[var(--border-ed)] px-3 py-2.5">
+                    <p className="flex items-start gap-2 text-xs text-[var(--ink-2)]">
+                      <History aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-kern-600" />
+                      Deze rekening wordt bijgewerkt met het saldo en de transacties van de
+                      koppeling, in plaats van dat er een tweede rekening bijkomt. We halen zo
+                      ver terug op als je bank geeft.
+                    </p>
+
+                    {showBudgetToggle && (
+                      <label
+                        className={`flex items-start gap-2 ${
+                          disabled ? 'cursor-not-allowed' : 'cursor-pointer'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={enableBudgetTracking}
+                          disabled={disabled}
+                          onChange={(e) => onToggleBudgetTracking(e.target.checked)}
+                          className={CONTROL_CLASS}
+                        />
+                        <span className="space-y-0.5">
+                          <span className="block text-xs font-medium text-[var(--ink-2)]">
+                            Neem deze rekening mee in mijn budgetten
+                          </span>
                           <span className="block text-[11px] text-[var(--ink-2)]">
                             Transacties van deze rekening tellen dan mee in je budgetten.
                           </span>

@@ -24,6 +24,7 @@ export const ACTIVITY_MODULES = [
   'nieuws',
   'mijn',
   'fin',
+  'grip',
 ] as const
 
 export type ActivityModule = (typeof ACTIVITY_MODULES)[number]
@@ -41,6 +42,7 @@ export const MODULE_LABELS: Record<ActivityModule, string> = {
   nieuws: 'Nieuws',
   mijn: 'Mijn (instellingen)',
   fin: 'Fin (chat)',
+  grip: 'Grip (tips, fiscale kansen, vergelijking)',
 }
 
 export function isActivityModule(waarde: unknown): waarde is ActivityModule {
@@ -53,6 +55,11 @@ export function isActivityModule(waarde: unknown): waarde is ActivityModule {
  * gebruiker bij horen. `fin` heeft geen route: die meldt het chatvenster zelf.
  */
 const VOORVOEGSELS: ReadonlyArray<readonly [string, ActivityModule]> = [
+  // Grip — "waar kun je op sturen" (eigenaarsbesluit 17 sep 2026, ADR 0153).
+  // Vóór hun ouders, want de lijst matcht op het eerste voorvoegsel.
+  ['/overzicht/belasting/optimizer', 'grip'],
+  ['/overzicht/tips', 'grip'],
+  ['/rapportages/benchmark', 'grip'],
   ['/overzicht/bezittingen', 'bezittingen'],
   ['/overzicht/schulden', 'schulden'],
   ['/overzicht/budget', 'budget'],

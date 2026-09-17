@@ -157,6 +157,8 @@ describe('POST /api/activate — succespad blijft ongemoeid', () => {
       'user-a',
       PERSONAS[PERSONA_KEY],
       expect.any(Function),
+      // Testaccount → AI-keuze gestempeld; een echte gebruiker kiest zelf (ADR 0155).
+      { stampAiConsent: true },
     )
   })
 

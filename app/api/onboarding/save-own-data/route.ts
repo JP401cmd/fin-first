@@ -24,6 +24,7 @@ import type { GoalSlug } from '@/lib/goals/types'
 import { GOAL_MODULE_PRESETS } from '@/lib/goals/catalog'
 import { deleteEmptyOnboardingBankAccounts } from '@/lib/onboarding-bank-cleanup'
 import { withRondleidingPending } from '@/lib/rondleiding/seed'
+import { withAfrondingOpen } from '@/lib/onboarding/afronding'
 import { resolveRetirementExpenseDefaults } from '@/lib/onboarding/retirement-expense-defaults'
 import {
   HOUSING_CHOICE_FALLBACK,
@@ -1389,7 +1390,14 @@ export async function POST(req: Request) {
         onboarding_completed: true,
         ...(guideStateReadErr
           ? {}
-          : { module_guide_state: withRondleidingPending(guideStateRow?.module_guide_state) }),
+          : {
+              // Rondleiding tegoed + de afrondingsstappen (budget, bank) open —
+              // die draaien pas ná deze opslag, omdat deze route budgetten en
+              // cash-bezittingen wist (zie lib/onboarding/afronding.ts).
+              module_guide_state: withAfrondingOpen(
+                withRondleidingPending(guideStateRow?.module_guide_state),
+              ),
+            }),
         updated_at: new Date().toISOString(),
       })
       .eq('id', user.id)

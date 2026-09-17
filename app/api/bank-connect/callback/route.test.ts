@@ -92,6 +92,7 @@ vi.mock('@/lib/crypto/field-encryption', () => ({
 }))
 
 import { GET } from './route'
+import { withAfrondingOpen, withAfrondingVoortgang } from '@/lib/onboarding/afronding'
 
 const ORIGIN = 'https://app.trifinity.nl'
 
@@ -1351,6 +1352,61 @@ describe('GET /api/bank-connect/callback — fase 7: bezette drager krijgt een e
     const res = await GET(requestFor(CALLBACK_URL))
 
     expect(res.headers.get('location')).toBe(`${ORIGIN}/onboarding?bank_error=1`)
+  })
+})
+
+describe('GET /api/bank-connect/callback — afrondingsstappen ná de onboarding-opslag', () => {
+  // De bankstap draait nadat `onboarding_completed` al `true` is (de opslag wist
+  // cash-bezittingen). Zolang de afrondingsmarkering open staat hoort de
+  // terugkeer in de onboarding, niet op het in-app succesvenster.
+  const openMarkering = () => withAfrondingOpen({})
+
+  function succesStub(profile: Record<string, unknown>) {
+    return makeQueuedSupabaseStub({
+      bank_connections: [
+        { data: pendingConnection({ target_bank_account_id: 'ba-target' }) },
+        { data: null },
+        { data: null },
+        ORPHAN_SOURCE(),
+      ],
+      bank_connection_accounts: [{ data: null }, NO_OCCUPYING_LINKS, { data: null }, { data: [] }],
+      bank_accounts: [eligibleTargetLookup('ba-target').account, carrierWithAsset('ba-target')],
+      assets: [eligibleTargetLookup('ba-target').asset, activeAssetFor('ba-target')],
+      profiles: [{ data: profile }],
+    })
+  }
+
+  it('voltooid mét open markering → /onboarding?bank_connected=1', async () => {
+    const stub = succesStub({ onboarding_completed: true, module_guide_state: openMarkering() })
+    wire(stub, [TL_ACCOUNT_WITH_IBAN])
+    const res = await GET(requestFor(CALLBACK_URL))
+    expect(res.headers.get('location')).toBe(`${ORIGIN}/onboarding?bank_connected=1`)
+  })
+
+  it('voltooid met afgeronde markering → gewoon het in-app succesvenster', async () => {
+    const klaar = withAfrondingVoortgang(openMarkering(), { stap: 'klaar', bank: 'gekoppeld' })
+    const stub = succesStub({ onboarding_completed: true, module_guide_state: klaar })
+    wire(stub, [TL_ACCOUNT_WITH_IBAN])
+    const res = await GET(requestFor(CALLBACK_URL))
+    expect(res.headers.get('location')).toBe(`${ORIGIN}/core/cash/connect/success`)
+  })
+
+  it('afgebroken bij de bank (geen code) met open markering → /onboarding?bank_error=1', async () => {
+    const stub = makeQueuedSupabaseStub({
+      profiles: [{ data: { onboarding_completed: true, module_guide_state: openMarkering() } }],
+    })
+    wire(stub, [])
+    const res = await GET(requestFor('/api/bank-connect/callback?error=access_denied'))
+    expect(res.headers.get('location')).toBe(`${ORIGIN}/onboarding?bank_error=1`)
+  })
+
+  it('afgebroken bij de bank zonder markering → blijft de wizard-foutmelding', async () => {
+    const stub = makeQueuedSupabaseStub({
+      profiles: [{ data: { onboarding_completed: true } }],
+    })
+    wire(stub, [])
+    const res = await GET(requestFor('/api/bank-connect/callback?error=access_denied'))
+    expect(res.headers.get('location')).toBe(`${ORIGIN}/core/cash/connect?error=missing_code`)
   })
 })
 

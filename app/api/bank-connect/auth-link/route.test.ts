@@ -42,7 +42,8 @@ vi.mock('@/lib/supabase/server', () => ({ createClient: mockCreateClient }))
 vi.mock('@/lib/truelayer/client', () => ({ buildAuthLink: mockBuildAuthLink }))
 vi.mock('@/lib/truelayer/feature-flag', () => ({ isTrueLayerEnabled: mockIsEnabled }))
 vi.mock('@/lib/crypto/field-encryption', () => ({ encryptField: (v: string) => `enc:${v}` }))
-vi.mock('@/lib/budget-tracking', () => ({
+vi.mock('@/lib/budget-tracking', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/budget-tracking')>()),
   setBudgetTracking: (...args: unknown[]) => mockSetBudgetTracking(...args),
 }))
 
@@ -154,8 +155,40 @@ const LINKS: LinkRow[] = [
   { id: RELINK_LINK_NO_PROVIDER, user_id: USER, bank_account_id: NO_PROVIDER_ACCOUNT, is_active: true, provider_name: null, provider_id: null },
 ]
 
+// ── Cash-bezit zonder companion (target_asset_id). Uuid's: ze reizen door zod. ──
+/** De betaalrekening uit de onboarding: eigen, cash, actief, géén companion. */
+const ONBOARDING_ASSET = '13131313-1313-4131-8131-131313131313'
+/** Zelfde, maar met budgetteren uit. */
+const NO_BUDGET_ASSET = '14141414-1414-4141-8141-141414141414'
+/** Cash-bezit van de PARTNER (huishoud-gedeeld leesbaar, maar niet van mij). */
+const PARTNER_ASSET = '15151515-1515-4151-8151-151515151515'
+/** Eigen bezit, maar geen cash. */
+const SAVINGS_ASSET = '16161616-1616-4161-8161-161616161616'
+/** Eigen cash-bezit dat gedeactiveerd is. */
+const INACTIVE_CASH_ASSET = '17171717-1717-4171-8171-171717171717'
+
+const CASH_ASSET_DEFAULTS = {
+  account_number: null,
+  account_number_encrypted: null,
+  institution: 'ING',
+  subtype: null,
+  ownership: 'personal',
+  household_id: null,
+  current_value: 1200,
+}
+
+const TARGET_CASH_ASSETS: (AssetRow & Record<string, unknown>)[] = [
+  { id: ONBOARDING_ASSET, user_id: USER, asset_type: 'cash', name: 'Betaalrekening', is_active: true, has_budget_tracking: true, ...CASH_ASSET_DEFAULTS },
+  { id: NO_BUDGET_ASSET, user_id: USER, asset_type: 'cash', name: 'Tweede rekening', is_active: true, has_budget_tracking: false, ...CASH_ASSET_DEFAULTS },
+  { id: PARTNER_ASSET, user_id: PARTNER, asset_type: 'cash', name: 'Partnerrekening', is_active: true, has_budget_tracking: true, ...CASH_ASSET_DEFAULTS },
+  { id: SAVINGS_ASSET, user_id: USER, asset_type: 'savings', name: 'Spaarpot', is_active: true, has_budget_tracking: null, ...CASH_ASSET_DEFAULTS },
+  { id: INACTIVE_CASH_ASSET, user_id: USER, asset_type: 'cash', name: 'Oude rekening', is_active: false, has_budget_tracking: true, ...CASH_ASSET_DEFAULTS },
+]
+
 /** Elke rij die naar `bank_connections` is geschreven. */
 let insertedConnections: Record<string, unknown>[] = []
+/** Veranderlijke kopie van BANK_ACCOUNTS: de companion-sync schrijft hierin. */
+let bankAccounts: Record<string, unknown>[] = []
 
 function makeSupabase(opts: { user?: string | null } = {}) {
   const user = opts.user === undefined ? USER : opts.user
@@ -164,15 +197,30 @@ function makeSupabase(opts: { user?: string | null } = {}) {
     const eqs: Record<string, unknown> = {}
     const neqs: Record<string, unknown> = {}
     let payload: Record<string, unknown> | null = null
+    let patch: Record<string, unknown> | null = null
 
     const b: Record<string, unknown> = {}
     b.select = () => b
-    b.eq = (col: string, val: unknown) => { eqs[col] = val; return b }
+    b.eq = (col: string, val: unknown) => {
+      eqs[col] = val
+      // `.update(...).eq('id', …)` wordt direct ge-await: pas de patch hier toe.
+      if (patch && table === 'bank_accounts') {
+        for (const row of bankAccounts) if (row[col] === val) Object.assign(row, patch)
+      }
+      return b
+    }
     b.neq = (col: string, val: unknown) => { neqs[col] = val; return b }
     b.limit = () => b
+    b.update = (p: Record<string, unknown>) => { patch = p; return b }
     b.insert = (row: Record<string, unknown>) => {
       payload = row
       if (table === 'bank_connections') insertedConnections.push(row)
+      if (table === 'bank_accounts') {
+        // UNIQUE op linked_asset_id, net als in de datalaag.
+        if (!bankAccounts.some((r) => r.linked_asset_id === row.linked_asset_id)) {
+          bankAccounts.push({ id: `companion-${bankAccounts.length}`, is_active: true, ...row })
+        }
+      }
       return b
     }
     b.maybeSingle = () => Promise.resolve(resolve())
@@ -182,8 +230,8 @@ function makeSupabase(opts: { user?: string | null } = {}) {
       if (payload) return { data: { id: 'conn-1' }, error: null }
 
       const source: Record<string, unknown>[] =
-        table === 'bank_accounts' ? BANK_ACCOUNTS
-        : table === 'assets' ? ASSETS
+        table === 'bank_accounts' ? bankAccounts
+        : table === 'assets' ? [...ASSETS, ...TARGET_CASH_ASSETS]
         : table === 'bank_connection_accounts' ? LINKS
         : []
       const match = source.find((row) =>
@@ -223,6 +271,7 @@ function postRequest(body: unknown) {
 
 beforeEach(() => {
   insertedConnections = []
+  bankAccounts = BANK_ACCOUNTS.map((r) => ({ ...r }))
   mockCreateClient.mockReset().mockResolvedValue(makeSupabase())
   mockBuildAuthLink.mockReset().mockResolvedValue('https://auth.truelayer.com/?state=x')
   mockIsEnabled.mockReset().mockResolvedValue(true)
@@ -566,6 +615,102 @@ describe('POST /api/bank-connect/auth-link — state-formaat (R2)', () => {
     expect(fullState.split(':')[1]).toMatch(/^550e8400-\d+$/)
     // De doelrekening reist NIET mee in de state.
     expect(fullState).not.toContain(OWN_ACCOUNT)
+  })
+})
+
+describe('POST /api/bank-connect/auth-link — cash-bezit zonder companion (target_asset_id)', () => {
+  const companionsOf = (assetId: string) => bankAccounts.filter((r) => r.linked_asset_id === assetId)
+
+  it('eigen onboarding-bezit → companion aangemaakt, en DIE staat als doelrekening op de pending-rij', async () => {
+    const res = await POST(postRequest({ provider_id: 'ing', provider_name: 'ING', target_asset_id: ONBOARDING_ASSET }))
+
+    expect(res.status).toBe(200)
+    const companions = companionsOf(ONBOARDING_ASSET)
+    expect(companions).toHaveLength(1)
+    expect(companions[0]).toMatchObject({ user_id: USER, name: 'Betaalrekening', is_active: true })
+    expect(insertedConnections).toHaveLength(1)
+    expect(insertedConnections[0]).toMatchObject({
+      user_id: USER,
+      status: 'pending',
+      link_intent: 'nieuw',
+      // Server-bepaald: de body noemde alleen het bezit, nooit deze rekening-id.
+      target_bank_account_id: companions[0].id,
+    })
+  })
+
+  it('idempotent: tweemaal hetzelfde bezit levert één companion en dezelfde doelrekening', async () => {
+    await POST(postRequest({ provider_id: 'ing', target_asset_id: ONBOARDING_ASSET }))
+    await POST(postRequest({ provider_id: 'ing', target_asset_id: ONBOARDING_ASSET }))
+
+    const companions = companionsOf(ONBOARDING_ASSET)
+    expect(companions).toHaveLength(1)
+    expect(insertedConnections).toHaveLength(2)
+    expect(insertedConnections[1].target_bank_account_id).toBe(companions[0].id)
+    expect(insertedConnections[0].target_bank_account_id).toBe(companions[0].id)
+  })
+
+  it('bezit van de PARTNER → dezelfde vaste 400, geen companion, geen pending-rij', async () => {
+    const res = await POST(postRequest({ provider_id: 'ing', target_asset_id: PARTNER_ASSET }))
+    const body = await res.json()
+
+    expect(res.status).toBe(400)
+    expect(body.error).toBe('Deze rekening bestaat niet of is niet van jou')
+    expect(companionsOf(PARTNER_ASSET)).toHaveLength(0)
+    expect(insertedConnections).toHaveLength(0)
+    expect(mockBuildAuthLink).not.toHaveBeenCalled()
+  })
+
+  it('onbekend, geen cash of gedeactiveerd → exact dezelfde 400 (geen existentie-orakel)', async () => {
+    for (const id of [UNKNOWN_ACCOUNT, SAVINGS_ASSET, INACTIVE_CASH_ASSET]) {
+      const res = await POST(postRequest({ provider_id: 'ing', target_asset_id: id }))
+      expect(res.status).toBe(400)
+      expect((await res.json()).error).toBe('Deze rekening bestaat niet of is niet van jou')
+      expect(companionsOf(id)).toHaveLength(0)
+    }
+    expect(insertedConnections).toHaveLength(0)
+  })
+
+  it('target_asset_id én target_bank_account_id samen → 400 (validatie), niets geschreven', async () => {
+    const res = await POST(postRequest({
+      provider_id: 'ing',
+      target_asset_id: ONBOARDING_ASSET,
+      target_bank_account_id: OWN_ACCOUNT,
+    }))
+    const body = await res.json()
+
+    expect(res.status).toBe(400)
+    expect(body.code).toBe('validation_error')
+    expect(companionsOf(ONBOARDING_ASSET)).toHaveLength(0)
+    expect(insertedConnections).toHaveLength(0)
+  })
+
+  it('target_asset_id naast een herstelpad → 400 (validatie)', async () => {
+    const res = await POST(postRequest({
+      provider_id: 'ing',
+      target_asset_id: ONBOARDING_ASSET,
+      relink_connection_account_id: RELINK_LINK,
+    }))
+
+    expect(res.status).toBe(400)
+    expect(insertedConnections).toHaveLength(0)
+  })
+
+  it('bezit met budgetteren uit → companion blijft inactief (vlaggen gelijk), het B2-vinkje zet het aan', async () => {
+    const res = await POST(postRequest({
+      provider_id: 'ing',
+      target_asset_id: NO_BUDGET_ASSET,
+      enable_budget_tracking: true,
+    }))
+
+    expect(res.status).toBe(200)
+    const companions = companionsOf(NO_BUDGET_ASSET)
+    expect(companions).toHaveLength(1)
+    // De koppeling zelf zet de budgettering niet stil aan …
+    expect(companions[0].is_active).toBe(false)
+    // … het vinkje wel, via de ene schrijver.
+    expect(mockSetBudgetTracking).toHaveBeenCalledTimes(1)
+    expect(mockSetBudgetTracking.mock.calls[0][2]).toBe(NO_BUDGET_ASSET)
+    expect(insertedConnections[0].target_bank_account_id).toBe(companions[0].id)
   })
 })
 

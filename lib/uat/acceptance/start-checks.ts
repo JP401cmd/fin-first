@@ -33,6 +33,14 @@
  * draft-persistence.ts` (concept-herstel; zod + pure helpers) en de geëxporteerde
  * `planDraftFromOnboarding` uit `components/onboarding/onboarding-eindstrategie.tsx`
  * (een 'use client'-module — de suite draait óók in de browser).
+ *
+ * Voor de afronding ná de opslag (ADR 0156, budget → bank): `lib/budget-templates/
+ * template-draft.ts` (`buildEmptyDraft`/`buildTemplateDraft`/`isProtectedBudget`
+ * — Eigen rekening verplicht en onwijzigbaar, gedeeld met de in-app planeditor),
+ * de geëxporteerde `preselectTarget` uit `components/onboarding/onboarding-bank.tsx`
+ * (nóg een 'use client'-module, zelfde reden) en `lib/onboarding/afronding.ts`
+ * (`readOpenAfronding`/`withAfrondingVoortgang`/`AFRONDING_GELDIG_MS` — de
+ * afrondingsmarkering zelf).
  */
 
 import { dailyExpenseRate, calculateFreedomTime } from '@/lib/format'
@@ -59,6 +67,18 @@ import {
   planDraftFromOnboarding,
   type OnboardingPlanValue,
 } from '@/components/onboarding/onboarding-eindstrategie'
+import {
+  buildEmptyDraft,
+  buildTemplateDraft,
+  isProtectedBudget,
+} from '@/lib/budget-templates/template-draft'
+import { preselectTarget } from '@/components/onboarding/onboarding-bank'
+import type { TargetAccountOption, TargetAssetOption } from '@/lib/truelayer/target-account'
+import {
+  readOpenAfronding,
+  withAfrondingVoortgang,
+  AFRONDING_GELDIG_MS,
+} from '@/lib/onboarding/afronding'
 import { START_ACCEPTANCE } from './start'
 import type { AcceptanceCriterion } from './types'
 
@@ -336,6 +356,72 @@ export const START_ENGINE_CHECKS: StartEngineCheck[] = [
         expected:
           'standaard=solved/deplete/90/null; aow=aow/deplete/90/null; standaardStopleeftijdBij40=45; ageGeldig=ok/age/deplete/90/62.5; ageStopNaEind=Je stopleeftijd moet vóór de eindleeftijd van je plan (90) liggen.|route400; ageLeeg=Kies een stopleeftijd.; ageGeenHalfJaar=In stappen van een half jaar.; legacyLeeg=Een bedrag boven nul.; legacy=ok/250000; perpetualEindleeftijdVeld=verborgen; depleteEindleeftijdVeld=zichtbaar; conceptPensioen=aow/deplete; routePensioen=aow/deplete/100/null',
         actual: `standaard=${standaard}; aow=${aow}; standaardStopleeftijdBij40=${standaardStop}; ageGeldig=${ageGeldig}; ageStopNaEind=${ageStopNaEind}; ageLeeg=${ageLeeg}; ageGeenHalfJaar=${ageGeenHalfJaar}; legacyLeeg=${legacyLeeg}; legacy=${legacy}; perpetualEindleeftijdVeld=${veld('perpetual')}; depleteEindleeftijdVeld=${veld('deplete')}; conceptPensioen=${conceptPensioen}; routePensioen=${routePensioen}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-START-31',
+    scenarioId: 'UAT-START-31',
+    label: 'Budget-afrondingsstap: Eigen rekening verplicht en onwijzigbaar (template + leeg beginnen)',
+    run: () => {
+      criterion('WF-START-31')
+      const leeg = buildEmptyDraft()
+      const template = buildTemplateDraft('nibud', 3000)
+      const heeftEigenRekening = (draft: ReturnType<typeof buildEmptyDraft>) =>
+        draft.some((r) => r.slug === 'eigen-rekening') && draft.some((r) => r.slug === 'eigen-rekening-sub')
+      const boodschappen = template.find((r) => r.slug === 'boodschappen') ?? { slug: 'boodschappen' }
+      return {
+        expected: 'leegBevatEigenRekening=true; templateBevatEigenRekening=true; eigenRekeningBeschermd=true; eigenRekeningSubBeschermd=true; boodschappenBeschermd=false',
+        actual: `leegBevatEigenRekening=${heeftEigenRekening(leeg)}; templateBevatEigenRekening=${heeftEigenRekening(template)}; eigenRekeningBeschermd=${isProtectedBudget({ slug: 'eigen-rekening' })}; eigenRekeningSubBeschermd=${isProtectedBudget({ slug: 'eigen-rekening-sub' })}; boodschappenBeschermd=${isProtectedBudget(boodschappen)}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-START-34',
+    scenarioId: 'UAT-START-34',
+    label: 'Bank-afrondingsstap: preselectTarget bij één/twee betaalrekening-kandidaten en zonder kandidaten',
+    run: () => {
+      criterion('WF-START-34')
+      const betaalrekening = (id: string): TargetAssetOption => ({
+        id,
+        name: 'Betaalrekening',
+        institution: null,
+        iban_tail: null,
+        account_type: 'checking',
+        budget_tracking: true,
+      })
+      const geen: TargetAccountOption[] = []
+      const eenSelectie = preselectTarget(geen, [betaalrekening('a1')])
+      const tweeSelectie = preselectTarget(geen, [betaalrekening('a1'), betaalrekening('a2')])
+      const leegSelectie = preselectTarget(geen, [])
+      return {
+        expected: 'preselectEenBetaalrekening=asset; preselectTweeBetaalrekeningen=none; preselectGeenKandidaten=new',
+        actual: `preselectEenBetaalrekening=${eenSelectie.kind}; preselectTweeBetaalrekeningen=${tweeSelectie.kind}; preselectGeenKandidaten=${leegSelectie.kind}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-START-37',
+    scenarioId: 'UAT-START-37',
+    label: 'Afrondingsmarkering: open → bank → klaar, geen heropening, verlopen na 24u',
+    run: () => {
+      criterion('WF-START-37')
+      const nu = new Date('2026-09-17T10:00:00.000Z')
+      const geopend = { 'onboarding:afronding': { stap: 'budget' as const, sinds: nu.toISOString() } }
+      const open = readOpenAfronding(geopend, nu)
+      const naBudget = withAfrondingVoortgang(geopend, { stap: 'bank', budget: 'opgeslagen' }, nu)
+      const openNaBudget = readOpenAfronding(naBudget, nu)
+      const naBank = withAfrondingVoortgang(naBudget, { stap: 'klaar', bank: 'gekoppeld' }, nu)
+      const openNaBank = readOpenAfronding(naBank, nu)
+      // Nog een POST tegen een 'klaar'-markering: readOpenAfronding levert null,
+      // dus de route (app/api/onboarding/afronding/route.ts) behandelt dit als
+      // no-op — hier getoetst op het pure fundament, niet de route zelf.
+      const klaarPostIsNoOp = readOpenAfronding(naBank, nu) === null
+      const verlopen = new Date(nu.getTime() + AFRONDING_GELDIG_MS + 60 * 60 * 1000)
+      const openVerlopen = readOpenAfronding(geopend, verlopen)
+      return {
+        expected: 'open=budget; naBudget=bank; naBank=null; klaarPostIsNoOp=true; verlopenNa24u=null',
+        actual: `open=${open}; naBudget=${openNaBudget}; naBank=${openNaBank}; klaarPostIsNoOp=${klaarPostIsNoOp}; verlopenNa24u=${openVerlopen}`,
       }
     },
   },

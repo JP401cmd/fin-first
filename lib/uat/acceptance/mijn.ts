@@ -230,10 +230,10 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'KERN',
     given: 'Ingelogd, /mijn/account, sectie "Danger zone".',
     when: 'De gebruiker typt exact het eigen e-mailadres over ter bevestiging en bevestigt de verwijdering.',
-    then: 'De verwijderknop blijft disabled tot het e-mailadres exact klopt; bij bevestiging worden account én alle data onomkeerbaar gewist en volgt uitlog/redirect. Verschil met WF-MIJN-25: daar blijft het account bestaan.',
+    then: 'De verwijderknop blijft disabled tot het e-mailadres exact klopt; bij bevestiging worden account én alle data onomkeerbaar gewist en volgt uitlog/redirect. Sinds ADR 0152 horen daar óók de geüploade bestanden bij (schermafbeeldingen bij meldingen, pensioen-PDF\'s in de buckets onder de eigen `<user-id>/`-prefix): die worden als EERSTE stap gewist en hard falend — mislukt die wis, dan is er nog niets verwijderd, krijgt de gebruiker een foutmelding en blijft het account bestaan (geen verdwenen account met achtergebleven beelden). Verschil met WF-MIJN-25: daar blijft het account bestaan.',
     assertion: {
       kind: 'ui-only',
-      source: 'components/mijn/account/danger-zone.tsx (getypte e-mailbevestiging + admin.deleteUser-pad), geen cijfermatige uitkomst',
+      source: 'components/mijn/account/danger-zone.tsx (getypte e-mailbevestiging) + app/api/account/delete/route.ts → lib/seed-persona.ts#deleteAllUserData (stap 0: lib/user-data-buckets.ts#wipeUserBucketPrefixes, alleen mét service-client) + admin.deleteUser-pad, geen cijfermatige uitkomst',
     },
   },
   {
@@ -255,11 +255,11 @@ const criteria: AcceptanceCriterion[] = [
     titel: 'AI-instellingen: financiële toelichting en AI aan/uit',
     kriticiteit: 'BELANGRIJK',
     given: 'Ingelogd, /mijn/privacy (AI-privacy-sectie).',
-    when: 'De gebruiker geeft de AI een persoonlijke context/toelichting mee en/of schakelt alle AI-functies uit.',
-    then: 'De toelichting wordt opgeslagen en meegegeven aan de AI-context; de kill-switch schakelt alle AI-functies uit (geen AI-oproepen meer), consistent app-breed.',
+    when: 'De gebruiker geeft de AI een persoonlijke context/toelichting mee en/of zet de AI-schakelaar aan of uit, en leest de regel onder de schakelaar en de drie transparantieblokken.',
+    then: 'De toelichting wordt opgeslagen en meegegeven aan de AI-context. AI is sinds ADR 0155 een echte opt-in: de schakelaar start UIT en is uitgeschakeld tot de eigen profielvelden geladen zijn (geen flits van "aan"). Omzetten schrijft NIET meer client-direct naar `profiles` maar gaat via `POST /api/consent/ai` (decision granted/withdrawn, source `mijn-privacy`) — elke omkering is dus een gelogde keuze in `consent_events`; de schakelaar neemt de door de server teruggegeven stand over. Onder de schakelaar staat "Keuze vastgelegd op <datum> · versie <versie>", of "Nog geen keuze vastgelegd — de vraag staat open." zonder vastgelegde keuze. Faalt de POST, dan springt de schakelaar terug en verschijnt een foutmelding (role="alert"). Uit = alle cloud-AI-functies uit (geen AI-oproepen meer), consistent app-breed. De blokken "wat wordt gedeeld / gemaskeerd / hoe verwerkt" lezen dezelfde feiten als de onboarding-stap en de keuze-overlay (WF-START-30).',
     assertion: {
       kind: 'ui-only',
-      source: 'components/mijn/ai-privacy-settings.tsx (AI-context-toelichting + kill-switch), geen cijfermatige uitkomst',
+      source: 'components/mijn/ai-privacy-settings.tsx (consentStatusLine + toggleAiEnabled → lib/ai/consent-client.ts#postAiConsent) + app/api/consent/ai/route.ts + lib/ai/privacy-facts.ts (AI_SHARED_FACTS/AI_MASKED_FACTS/AI_PROCESSING_FACTS), geen cijfermatige uitkomst',
     },
   },
   {
@@ -291,11 +291,11 @@ const criteria: AcceptanceCriterion[] = [
   {
     workflow: 'WF-MIJN-20',
     scenarioId: 'UAT-MIJN-20',
-    titel: 'Notificatievoorkeuren instellen (push-types + maandelijkse geldcheck-in)',
+    titel: 'Notificatievoorkeuren instellen (in-app meldingstypen + maandelijkse geldcheck-in)',
     kriticiteit: 'BELANGRIJK',
     given: 'Ingelogd, /mijn/notificaties. Sinds fase 4 van de eenvoudige weergave hangt de vorm aan de weergavemodus (MIJN-3): in Eenvoudig drie hoofdschakelaars (meldingen in de app, briefing per e-mail, maandelijkse geldcheck-in) plus een ingeklapte disclosure "Alle meldingstypen"; in Volledig de vlakke lijst met alle zeven types los.',
     when: 'De gebruiker kiest welke meldingstypes binnenkomen en zet de maandelijkse check-in-herinnering aan/uit — in Eenvoudig via de hoofdschakelaar of via de disclosure.',
-    then: 'De gekozen types en de check-in-herinnering worden bewaard; de "push-types" sturen uitsluitend in-app meldingen (geen browser-push — bevestigd geen web-push in de repo). De hoofdschakelaar "Meldingen in de app" is PRESENTATIE over dezelfde voorkeuren-blob: aan = minstens één type aan, uitzetten = alle types uit, aanzetten = alle types aan; er is geen tweede opslagveld en het opslagpad blijft PUT /api/notifications. De disclosure klapt in (niet weg), zodat elke afzonderlijke keuze in Eenvoudig één klik ver blijft. Het partner-blok verschijnt uitsluitend bij een ECHTE partner (beide modi): de poort staat sinds S10 op `GET /api/household/status` met `has_household && members.length > 1` — hetzelfde criterium als /api/household/box2|box3. "Huishouden hebben" is bewust niet genoeg: `POST /api/household/invite` maakt de huishoud- én de eigen ledenrij al aan bij het uitnodigen, dus op dat criterium zou iemand met alleen een openstaande uitnodiging vier partner-modi te zien krijgen. Tegenproef bij precies één lid: geen partnerblok, en `/api/partner-notifications` wordt niet eens opgevraagd.',
+    then: 'De gekozen types en de check-in-herinnering worden bewaard; de meldingstypen sturen uitsluitend in-app meldingen (geen browser-push — bevestigd geen web-push in de repo; sinds UR3-21 zegt de pagina dat zelf ook: "Deze meldingen verschijnen in de app", zonder "push" of "op je apparaat" — bewaakt in page.test.tsx). De hoofdschakelaar "Meldingen in de app" is PRESENTATIE over dezelfde voorkeuren-blob: aan = minstens één type aan, uitzetten = alle types uit, aanzetten = alle types aan; er is geen tweede opslagveld en het opslagpad blijft PUT /api/notifications. De disclosure klapt in (niet weg), zodat elke afzonderlijke keuze in Eenvoudig één klik ver blijft. Het partner-blok verschijnt uitsluitend bij een ECHTE partner (beide modi): de poort staat sinds S10 op `GET /api/household/status` met `has_household && members.length > 1` — hetzelfde criterium als /api/household/box2|box3. "Huishouden hebben" is bewust niet genoeg: `POST /api/household/invite` maakt de huishoud- én de eigen ledenrij al aan bij het uitnodigen, dus op dat criterium zou iemand met alleen een openstaande uitnodiging vier partner-modi te zien krijgen. Tegenproef bij precies één lid: geen partnerblok, en `/api/partner-notifications` wordt niet eens opgevraagd.',
     assertion: {
       kind: 'ui-only',
       source: 'app/(app)/mijn/notificaties/page.tsx (notificatie-preferences) — in-app meldingen, geen cijfermatige uitkomst; regressietest app/(app)/mijn/notificaties/page.test.tsx',
@@ -443,6 +443,19 @@ const criteria: AcceptanceCriterion[] = [
     assertion: {
       kind: 'ui-only',
       source: 'lib/milestones/timeline.ts (puur, getest in timeline.test.ts) + components/mijn/mijlpalen-tijdlijn.tsx (+ .test.tsx: jaargroepen, omstreeks-bij-seed, doelnaam, lege staat, geen-emoji) + app/(app)/mijn/mijlpalen/page.tsx — presentatielaag op de log, geen eigen cijfermatige uitkomst; de titels zijn de canonieke buildMilestoneCopy-uitvoer',
+    },
+  },
+  {
+    workflow: 'WF-MIJN-33',
+    scenarioId: 'UAT-MIJN-33',
+    titel: 'Al mijn gegevens downloaden als JSON (dataportabiliteit, AVG art. 20)',
+    kriticiteit: 'KERN',
+    given: 'Ingelogd met enige data én een vastgelegde AI-keuze (WF-START-30 of WF-MIJN-16), /mijn/geavanceerd, sectie "Data export".',
+    when: 'De gebruiker klikt "Download al mijn gegevens (JSON)" en opent het bestand.',
+    then: 'Er downloadt `trifinity-mijn-gegevens-<datum>.json` met de vorm `{ exported_at, user_id, tables: { <tabel>: [...] } }`. De tabellenlijst is dezelfde single source als de wis (`lib/user-data-tables.ts`): de eigen-rij-tabellen, de persoonlijke tabellen zonder eigen leesrecht (net_worth_history, feedback, user_reports — via de service-role, strikt op de eigen id) en sinds ADR 0155 óók `consent_events` (het toestemmingsbewijs: kind/decision/version/source per keuze). Versleutelde velden staan er leesbaar in; `*_encrypted`, `*_hash` en bank-/broker-credentials staan er NIET in (kolom-redactie). Het bestand bevat geen geüploade bestanden zelf (schermafbeeldingen, pensioen-PDF\'s) — alleen de rijen die ernaar verwijzen. Niet ingelogd → 401.',
+    assertion: {
+      kind: 'ui-only',
+      source: 'components/mijn/geavanceerd-settings.tsx (downloadlink) + app/api/account/export/route.ts (EXPORT_SESSION_TABLES + EXPORT_OWN_READ_EXTRA_TABLES + EXPORT_SERVICE_TABLES) + lib/account-export-shape.ts (kolom-redactie/ontsleuteling) — LIVE-account-export, geen deterministisch scenario-cijfer',
     },
   },
 ]

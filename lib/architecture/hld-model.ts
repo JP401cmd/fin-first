@@ -69,7 +69,7 @@ export function buildHldModel(): HldModel {
 
     // De reis als korte verhaallijn rond de functionaliteiten.
     journey: [
-      { n: 1, title: 'Beginnen', you: 'Je vertelt waar je naartoe wilt — en wanneer je wilt stoppen met werken.', app: 'We zetten alleen de onderdelen aan die jij nodig hebt en rekenen vanaf dag één met jouw plan.' },
+      { n: 1, title: 'Beginnen', you: 'Je vertelt waar je naartoe wilt — en wanneer je wilt stoppen met werken. Aan het eind kies je meteen je budget en koppel je je bank.', app: 'We zetten alleen de onderdelen aan die jij nodig hebt en rekenen vanaf dag één met jouw plan.' },
       { n: 2, title: 'Vastleggen', you: 'Je koppelt je bank of importeert je gegevens.', app: 'Inkomsten, uitgaven en bezittingen staan overzichtelijk bij elkaar.' },
       { n: 3, title: 'Begrijpen', you: 'Je ziet in één oogopslag hoe je ervoor staat.', app: 'Fin, je coach, legt uit wat opvalt en wat je nú kunt doen.' },
       { n: 4, title: 'Vooruitkijken', you: 'Je rekent je toekomst door.', app: 'Je ziet wanneer je financieel vrij bent — of, als je je stopmoment al kent, of je geld tot het einde van je plan reikt — en wat keuzes daaraan veranderen.' },
@@ -84,7 +84,8 @@ export function buildHldModel(): HldModel {
         accent: 'kern',
         items: [
           { title: 'Gratis weten waar je staat vóór je een account maakt', desc: 'Doe de Vrijheidscheck: een paar vragen en je krijgt meteen je vrijheidsrapport — pas daarna kies je of je een account aanmaakt.' },
-          { title: 'Je bank koppelen of een bestand importeren', desc: 'Transacties komen automatisch binnen — geen handwerk.' },
+          { title: 'Je bank koppelen of een bestand importeren', desc: 'Transacties komen automatisch binnen — geen handwerk. Je kiest zelf op welke rekening de koppeling landt, zodat je betaalrekening niet dubbel verschijnt.' },
+          { title: 'Je budget al klaarzetten bij het aanmelden', desc: 'Aan het eind van de kennismaking kies je een startbudget of begin je leeg, pas je de categorieën aan en koppel je je bank — overslaan kan, maar we vragen even of je het zeker weet.' },
           { title: 'Een rekening opruimen die je niet meer gebruikt', desc: 'Verwijder een oude of dubbele rekening en kies zelf wat er met je boekingen gebeurt: bewaren — dan blijven je historie en budgetten van eerdere maanden precies kloppen — of definitief wissen. Een bankkoppeling wordt vanzelf verbroken.' },
           { title: 'Al je uitgaven en inkomsten op een rij', desc: 'Overzichtelijk, met categorieën en grootste posten.' },
           { title: 'Budgetten maken en bewaken', desc: 'Zie per categorie hoeveel je deze maand nog hebt — en als je een transactie tijdens het slepen nergens kwijt kunt, maak je meteen een nieuw budget aan, zonder de sleepmodus te verlaten.' },

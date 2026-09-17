@@ -43,6 +43,11 @@ function clientFilesOnDisk(): string[] {
     // route belt TrueLayer. Geen tweede externe client, dus geen eigen
     // INTEGRATIONS-entry; hij staat wél in `apiRoutes` van de truelayer-entry.
     'start-relink.ts',
+    // ADR 0156 (budget + bank in de onboarding): `start-bank-connect.ts` is de
+    // clientkant van de koppelstart (fetch naar onze eigen accounts/auth-link) en
+    // `target-asset.ts` maakt server-side de bank_accounts-companion voor een
+    // gekozen cash-bezit — beide praten met Supabase/eigen routes, nooit met TrueLayer.
+    'start-bank-connect.ts', 'target-asset.ts',
     // fase 8 bank-connect-doelrekening: `balance-valuation.ts` schrijft het
     // herwaarderingsspoor van een banksaldo (valuations + balance_snapshots) naar
     // Supabase en belt TrueLayer nooit — de saldo-ophaal zelf zit in `client.ts`.

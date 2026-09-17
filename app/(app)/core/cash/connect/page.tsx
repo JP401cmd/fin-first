@@ -15,17 +15,18 @@ import { BankAuthWaiting } from '@/components/app/bank-connect/bank-auth-waiting
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { getPageInfo } from '@/lib/page-info-content'
-import { openBankAuth } from '@/lib/truelayer/open-bank-auth'
+import {
+  fetchTargetOptions,
+  startBankConnect,
+  type BankConnectProvider,
+} from '@/lib/truelayer/start-bank-connect'
 import {
   occupiedTargetAccountMessage,
   type TargetAccountOption,
+  type TargetAssetOption,
 } from '@/lib/truelayer/target-account'
 
-type Provider = {
-  id: string
-  name: string
-  logo: string
-}
+type Provider = BankConnectProvider
 
 /**
  * Drie stappen, en dat blijven het er drie (regressie-eis R3, gepind op de
@@ -131,6 +132,8 @@ export default function ConnectBankPage() {
   // Supabase-read: deze pagina staat niet op de grandfather-allowlist in
   // `scripts/check-client-data-reads.mjs` en dat hoort zo te blijven (ADR 0058).
   const [accounts, setAccounts] = useState<TargetAccountOption[]>([])
+  /** Cash-bezit zonder rekening-rij (bv. uit de onboarding) — kiesbaar om een dubbele rekening te voorkomen. */
+  const [assets, setAssets] = useState<TargetAssetOption[]>([])
   const [accountsLoading, setAccountsLoading] = useState(false)
   const [accountsLoaded, setAccountsLoaded] = useState(false)
   const [accountsError, setAccountsError] = useState<string | null>(null)
@@ -151,30 +154,21 @@ export default function ConnectBankPage() {
   const loadAccounts = useCallback(async () => {
     setAccountsLoading(true)
     setAccountsError(null)
-    try {
-      const res = await fetch('/api/bank-connect/accounts')
-      const data = await res.json().catch(() => null)
-
-      if (!res.ok) {
-        console.error('Doelrekeningen laden mislukt', { status: res.status, error: data?.error })
-        setAccounts([])
-        setSelection({ kind: 'new' })
-        setAccountsError('Je rekeningen konden niet worden geladen.')
-        return
-      }
-
-      const list: TargetAccountOption[] = Array.isArray(data?.accounts) ? data.accounts : []
-      setAccounts(list)
-      setSelection(list.length > 0 ? { kind: 'none' } : { kind: 'new' })
-      setAccountsLoaded(true)
-    } catch (err) {
-      console.error('Doelrekeningen verzoek mislukt', err)
+    // Gedeeld met de onboarding-stap (`fetchTargetOptions`), zodat beide dezelfde
+    // twee lijsten lezen: rekeningen én cash-bezit zonder rekening-rij.
+    const options = await fetchTargetOptions()
+    if (!options) {
       setAccounts([])
+      setAssets([])
       setSelection({ kind: 'new' })
       setAccountsError('Je rekeningen konden niet worden geladen.')
-    } finally {
-      setAccountsLoading(false)
+    } else {
+      setAccounts(options.accounts)
+      setAssets(options.assets)
+      setSelection(options.accounts.length + options.assets.length > 0 ? { kind: 'none' } : { kind: 'new' })
+      setAccountsLoaded(true)
     }
+    setAccountsLoading(false)
   }, [])
 
   /**
@@ -262,53 +256,27 @@ export default function ConnectBankPage() {
     setExitTarget(null)
     setUrlErrorDismissed(true)
 
-    // Vaste NL-fallback: de UI toont nooit een rauwe fetch-/SDK-/database-string.
-    const GENERIC_ERROR = 'Verbinding maken is niet gelukt — probeer het later opnieuw.'
+    // Body-opbouw, foutvertaling en de sprong naar de bank zijn gedeeld met de
+    // onboarding-stap — zie lib/truelayer/start-bank-connect.ts. De server levert
+    // bij een fout al een NL-melding (bv. de 409 met uitweg).
+    const result = await startBankConnect({
+      provider: selectedBank,
+      selection,
+      enableBudgetTracking,
+    })
 
-    try {
-      const res = await fetch('/api/bank-connect/auth-link', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          provider_id: selectedBank.id,
-          provider_name: selectedBank.name,
-          provider_logo: selectedBank.logo,
-          // Alleen bij een bestaande rekening iets meesturen: "nieuw" is de
-          // afwezigheid van een voorkeur, precies zoals de callback het al deed.
-          ...(selection.kind === 'existing'
-            ? {
-                target_bank_account_id: selection.id,
-                enable_budget_tracking: enableBudgetTracking,
-              }
-            : {}),
-        }),
-      })
+    if (!result.ok) {
+      setConnectError(result.error)
+      setConnecting(false)
+      return
+    }
 
-      const data = await res.json().catch(() => null)
-
-      if (!res.ok || !data?.auth_url) {
-        // De server levert al een NL-melding (zie toDutchAuthLinkError); die tonen
-        // we, met de vaste NL-fallback als er geen bruikbare tekst is. Technische
-        // details blijven in de console.
-        console.error('Bank-connect auth-link mislukt', { status: res.status, error: data?.error })
-        setConnectError(typeof data?.error === 'string' ? data.error : GENERIC_ERROR)
-        setConnecting(false)
-        return
-      }
-
-      // Naar de bank. In de geïnstalleerde app in een apart venster, zodat de
-      // terugkeer (die Android in de browser laat landen) deze pagina niet
-      // wegneemt — zie lib/truelayer/open-bank-auth.ts.
-      setStep('redirect')
-      const connectionId = typeof data.connection_id === 'string' ? data.connection_id : null
-      if (openBankAuth(data.auth_url, connectionId) === 'window') {
-        setWaitingForBank(connectionId)
-        setConnecting(false)
-      }
-    } catch (err) {
-      // Netwerk-/parse-fouten (bv. "Failed to fetch") nooit rauw tonen.
-      console.error('Bank-connect verzoek mislukt', err)
-      setConnectError(GENERIC_ERROR)
+    // Naar de bank. In de geïnstalleerde app in een apart venster, zodat de
+    // terugkeer (die Android in de browser laat landen) deze pagina niet
+    // wegneemt — zie lib/truelayer/open-bank-auth.ts.
+    setStep('redirect')
+    if (result.launch === 'window') {
+      setWaitingForBank(result.connectionId)
       setConnecting(false)
     }
   }
@@ -442,6 +410,7 @@ export default function ConnectBankPage() {
               blokken erna zijn de voorwaarden waaronder het gebeurt. */}
           <TargetAccountChoice
             accounts={accounts}
+            assets={assets}
             loading={accountsLoading}
             loadError={accountsError}
             selection={selection}

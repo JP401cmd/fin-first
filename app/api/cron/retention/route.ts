@@ -11,6 +11,7 @@ import {
   type RetentionTable,
 } from '@/lib/retention'
 import { isOntbrekendSchema } from '@/lib/supabase/ontbrekend-schema'
+import { purgeUserScopedBuckets } from '@/lib/user-data-buckets'
 
 // Node-runtime: we lezen de service-role-key server-side.
 export const runtime = 'nodejs'
@@ -147,8 +148,31 @@ export async function GET(request: Request) {
     errors.push('lead_intakes')
   }
 
+  // Storage-buckets met gebruikersuploads (ADR 0152): geen tabel, dus buiten de
+  // created_at-lus. In élke user-scoped bucket gaan de wezen weg (account bestaat
+  // niet meer); in de screenshots-bucket ook wat ouder is dan 90 dagen.
+  // lib/user-data-buckets.ts is de enige plek die de buckets aanraakt. Een fout
+  // is een storing — er is geen FK-cascade die dit later alsnog opruimt.
+  const storageWees: Record<string, number> = {}
+  try {
+    const perBucket = await purgeUserScopedBuckets(supabase, now)
+    for (const [bucket, veeg] of Object.entries(perBucket)) {
+      deleted[`storage:${bucket}`] = veeg.verlopen
+      storageWees[bucket] = veeg.wees
+      if (veeg.overgeslagenPrefixen.length > 0) {
+        console.warn(
+          `[cron:retention] storage:${bucket}: ${veeg.overgeslagenPrefixen.length} niet-UUID-prefix(en) ongemoeid gelaten`,
+        )
+      }
+    }
+  } catch (err) {
+    console.error('[cron:retention] storage-buckets:', err)
+    errors.push('storage-buckets')
+  }
+
   const summary = {
     deleted,
+    storage_wees: storageWees,
     lead_intakes_purged: !leadErr,
     errors: errors.length,
     ...(overgeslagen.length > 0 ? { overgeslagen } : {}),

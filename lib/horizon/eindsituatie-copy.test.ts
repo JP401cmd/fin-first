@@ -20,7 +20,7 @@ function duiding(ids: EindOorzaakId[], over: Partial<EindsituatieDuiding> = {}):
 }
 
 // Zonder de disclaimer: die zegt letterlijk "geen advies".
-const tekst = (c: EindsituatieCopy) => [c.kop, c.samenvatting, ...c.oorzaken, c.context ?? '', c.onduidelijk ?? '', c.finVraag].join(' ')
+const tekst = (c: EindsituatieCopy) => [c.kop, c.samenvatting, ...c.oorzaken, c.context ?? '', c.onduidelijk ?? '', c.finVraag, c.finContext].join(' ')
 
 describe('buildEindsituatieCopy', () => {
   it('a1 noemt de standaardinstelling, de leeftijd (heel) en het dieptepunt', () => {
@@ -56,6 +56,35 @@ describe('buildEindsituatieCopy', () => {
     const c = buildEindsituatieCopy({ duiding: duiding(['late-baten']), endForm: 'legacy', bedragTekst })
     expect(c.finVraag).not.toMatch(/€|\d{3}/)
     expect(c.finVraag).toContain('90e')
+  })
+
+  it('Fin-context draagt elke oorzaak uit de melding mee als instelling + leeftijd, zonder bedragen', () => {
+    const d = duiding(['geen-tekort-lening', 'opeet-plafond', 'later-inkomen', 'dalend-profiel'])
+    d.oorzaken = [
+      { id: 'geen-tekort-lening', age: 54.3, bedrag: n(54, 5_000) },
+      { id: 'opeet-plafond', age: 69, bedrag: null },
+      { id: 'later-inkomen', age: 69.2, bedrag: null },
+      { id: 'dalend-profiel', age: 85, bedrag: null },
+    ]
+    const c = buildEindsituatieCopy({ duiding: d, endForm: 'deplete', bedragTekst })
+    expect(c.finContext).toContain('geen tekort-lening')
+    expect(c.finContext).toContain('mijn 54e')
+    expect(c.finContext).toContain('leenplafond van mijn opeethypotheek')
+    expect(c.finContext).toContain('mijn 69e')
+    expect(c.finContext).toContain('AOW')
+    expect(c.finContext).toContain('mijn 85e')
+    expect(c.finContext).toContain('overwaarde van mijn huis')
+    expect(c.finContext).toContain('opeetschuld')
+    expect(c.finContext).toContain('meerdere regels')
+    expect(c.finContext).not.toMatch(/€|\d{3}/)
+  })
+
+  it('Fin-context bij elke oorzaak afzonderlijk: nooit bedragen of decimale leeftijden', () => {
+    for (const id of ALLE) {
+      const c = buildEindsituatieCopy({ duiding: duiding([id]), endForm: 'legacy', bedragTekst })
+      expect(c.finContext.length).toBeGreaterThan(0)
+      expect(c.finContext).not.toMatch(/€|\d{3}|\d+[.,]\d+e\b/)
+    }
   })
 
   it('toongrendel: geen opdracht, aanbeveling of belofte in welke combinatie ook', () => {

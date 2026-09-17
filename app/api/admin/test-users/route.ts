@@ -115,7 +115,10 @@ export async function POST(req: Request) {
 
     if (action === 'reset') {
       const noop = () => {}
-      await deleteAllUserData(service, userId, noop)
+      // Mét service-opties: anders slaat deleteAllUserData de service-only stappen
+      // over (storage-buckets ADR 0152, batch 5) — de functie kan een service-
+      // client als eerste argument niet van een sessie-client onderscheiden.
+      await deleteAllUserData(service, userId, noop, { service })
 
       // Reset profile to pre-onboarding state + clear welcome flag
       await service

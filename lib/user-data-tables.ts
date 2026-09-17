@@ -153,9 +153,12 @@ export const SERVICE_WIPE_TABLES: readonly string[] = [
   // DELETE-policy: 20260806104500_create_user_reports.sql geeft alleen own INSERT,
   // own-or-superadmin SELECT en superadmin UPDATE — een verzonden melding is geen
   // bewerkbaar document. Via de sessie-client zou een delete dus een STILLE no-op
-  // zijn, exact zoals bij `feedback`. LET OP: het screenshot in de privé bucket
-  // `user-report-screenshots` en een reeds gepusht Notion-kaartje volgen deze wis
-  // NIET (geen FK op storage.objects) — dat blijven aparte opruimstappen.
+  // zijn, exact zoals bij `feedback`. Het screenshot in de privé bucket
+  // `user-report-screenshots` volgt sinds ADR 0152 mee via
+  // lib/user-data-buckets.ts (stap 0 van deleteAllUserData, service-client) en
+  // verloopt daarnaast na 90 dagen (retentie-cron); een reeds gepusht
+  // Notion-kaartje blijft een aparte opruimstap (het draagt een 48-uurs signed
+  // URL, geen kopie van het beeld).
   'user_reports',
   // Uitnodigingen voor vragenlijsten (migratie 20260915*, ADR 0147). Draagt
   // `user_id` + wanneer iemand is uitgenodigd, de popup zag, 'm uitstelde of
@@ -187,6 +190,18 @@ export const RETENTION_ALLOWLIST: Record<string, string> = {
   error_logs: 'Operationele foutlogs (retentie 12 mnd). Bij full-delete per gebruiker gewist.',
   web_vitals: 'RUM-telemetrie (eigen retentie-cron). FK is ON DELETE SET NULL → geanonimiseerd bij delete.',
   household_members: 'Huishoud-lidmaatschap: behouden bij reset; bij full-delete gewist via ON DELETE CASCADE.',
+  // Bewijs van elke AI-toestemmingskeuze en omkering (migratie 20260917130000,
+  // ADR 0155). Behouden bij RESET: de keuze geldt voor het ACCOUNT, niet voor
+  // de financiële data — wie zijn cijfers wist heeft niet ineens opnieuw ja of
+  // nee gezegd tegen Fin (en de profielrij met ai_consent_at blijft bij een reset
+  // óók staan). Geen leeftijdspurge: bewijs moet aantoonbaar blijven zolang de
+  // verwerking loopt (art. 7 lid 1 AVG). Bij full-delete gewist via ON DELETE
+  // CASCADE op auth.users. De actuele stand (tijdstip + versie) zit in de
+  // profielrij en gaat zo mee in de zelf-export; de tabel zelf heeft een
+  // eigen-rij SELECT maar geen DELETE — de gebruiker kan zijn bewijs lezen, niet
+  // wissen (append-only is het punt).
+  consent_events:
+    'AI-toestemmingsbewijs (ADR 0155): behouden bij reset (keuze geldt voor het account), geen leeftijdspurge; bij full-delete gewist via ON DELETE CASCADE.',
 }
 
 /**
@@ -228,6 +243,16 @@ export const EXPORT_SESSION_TABLES: readonly string[] = SESSION_WIPE_TABLES
 export const EXPORT_SERVICE_TABLES: readonly string[] = SERVICE_WIPE_TABLES
 
 /**
+ * Tabellen die de gebruiker onder RLS wél mag LEZEN maar niet mag WISSEN, en
+ * die daarom buiten SESSION_WIPE vallen maar wél in de zelf-export horen (art.
+ * 15/20). Vandaag alleen het AI-toestemmingsbewijs: de profielkolommen dragen
+ * de laatste stand, maar de historie (ja → nee → ja, de pensioen-PDF-events) is
+ * óók een persoonsgegeven van de gebruiker. Gelezen via de sessie-client in
+ * app/api/account/export, exact zoals EXPORT_SESSION_TABLES.
+ */
+export const EXPORT_OWN_READ_EXTRA_TABLES: readonly string[] = ['consent_events'] as const
+
+/**
  * Canonieke inventaris: álle public-tabellen met een `user_id`-kolom
  * (geverifieerd tegen information_schema, laatst 2026-08-08). Drift-baken voor
  * de dekkings-vitest. Zie de regenereer-query in de header-docstring.
@@ -267,6 +292,9 @@ export const ALL_USER_SCOPED_TABLES: readonly string[] = [
   // eerstvolgende regeneratie van deze lijst.
   'chat_conversations',
   'chat_messages',
+  // Nieuw in migratie 20260917130000 (ADR 0155), uitgerold op 17-09-2026 en live
+  // geverifieerd (RLS eigen-rij INSERT/SELECT, FK-cascade op auth.users).
+  'consent_events',
   'crypto_holdings',
   'crypto_transactions',
   'custom_calculators',

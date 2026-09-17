@@ -275,8 +275,13 @@ describe('onboarding save-own-data — rondleiding-startsignaal (ADR 0130)', () 
     // De vlag zit in hetzelfde update-object, achter de leesfout-guard: is de
     // kolom niet leesbaar, dan wordt hij niet aangeraakt (geen merge op een lege basis).
     expect(codeOnly).toMatch(
-      /onboarding_completed:\s*true,\s*\.\.\.\(guideStateReadErr\s*\?\s*\{\}\s*:\s*\{\s*module_guide_state:\s*withRondleidingPending\(/,
+      /onboarding_completed:\s*true,\s*\.\.\.\(guideStateReadErr\s*\?\s*\{\}\s*:\s*\{\s*module_guide_state:\s*withAfrondingOpen\(\s*withRondleidingPending\(/,
     )
+  })
+
+  it('opent in dezelfde merge de afrondingsstappen (budget, bank) — die draaien pas ná deze opslag', () => {
+    expect(codeOnly).toContain("import { withAfrondingOpen } from '@/lib/onboarding/afronding'")
+    expect(codeOnly).not.toContain("'onboarding:afronding'")
   })
 
   it('leest module_guide_state eerst en merget (geen blinde overschrijving)', () => {

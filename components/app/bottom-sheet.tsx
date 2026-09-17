@@ -116,6 +116,22 @@ type BottomSheetProps = {
    * `open={false}` de eenvoudiger en juiste weg.
    */
   suspended?: boolean
+  /**
+   * VERGRENDELD OPEN: de sheet gaat uitsluitend dicht via `open={false}` van
+   * de ouder. Geen X in de titelbalk, geen Escape, geen backdrop-klik, geen
+   * swipe-down, geen terug-knop — élke sluitroute is uit, in één prop, zodat
+   * er geen halve vergrendeling kan bestaan (een zichtbare X die niets doet,
+   * of een poort die Escape weigert maar een veeg doorlaat). Bedoeld voor een
+   * overlay die pas weg mag na een keuze: de eenmalige AI-keuze (ADR 0155).
+   *
+   * Dit is bewust géén variant van `onRequestClose`: die poort is een VRAAG
+   * ("mag ik sluiten?", met een eigen bevestiging) en laat het veeg-gebaar met
+   * opzet ongemoeid — een swipe is een expliciete dismiss. `lockedOpen` is
+   * geen vraag maar een feit. Gebruik het schaars: een overlay die de
+   * gebruiker niet kan verlaten is alleen te verantwoorden als de keuze erin
+   * zelf de uitgang is.
+   */
+  lockedOpen?: boolean
 }
 
 const sizeClasses = {
@@ -126,7 +142,7 @@ const sizeClasses = {
   full: 'md:max-w-5xl',
 } as const
 
-export function BottomSheet({ open, onClose, onRequestClose, title, children, size = 'md', initialMobileHeight, footerSlot, actions, belowFloatingNav = false, closeOnBackdropClick = false, manageHistory = true, suspended = false }: BottomSheetProps) {
+export function BottomSheet({ open, onClose, onRequestClose, title, children, size = 'md', initialMobileHeight, footerSlot, actions, belowFloatingNav = false, closeOnBackdropClick = false, manageHistory = true, suspended = false, lockedOpen = false }: BottomSheetProps) {
   const [visible, setVisible] = useState(false)
   const [expandedToFull, setExpandedToFull] = useState(false)
   const sheetRef = useRef<HTMLDivElement>(null)
@@ -149,6 +165,10 @@ export function BottomSheet({ open, onClose, onRequestClose, title, children, si
   // basis van state die tussen twee renders veranderd kan zijn (dirty of niet).
   const onRequestCloseRef = useRef(onRequestClose)
   onRequestCloseRef.current = onRequestClose
+  // Vergrendeling leest óók op event-tijd (Escape/terug-knop-listeners hangen
+  // één render achter), net als de suspend-guard.
+  const lockedOpenRef = useRef(lockedOpen)
+  lockedOpenRef.current = lockedOpen
   /** Loopt er een asynchrone sluit-vraag? Voorkomt een tweede vraag per gebaar. */
   const closeRequestPendingRef = useRef(false)
 
@@ -250,6 +270,8 @@ export function BottomSheet({ open, onClose, onRequestClose, title, children, si
     onDismiss: handleSwipeDismissed,
     onDismissStart: handleSwipeDismissStart,
     onDragMove: handleDragUpExpand,
+    // Vergrendeld open = ook geen veeg-exit (zie `lockedOpen`).
+    enabled: !lockedOpen,
   })
 
   // ── Programmatic close (X / Escape / backdrop click) ───────
@@ -275,6 +297,9 @@ export function BottomSheet({ open, onClose, onRequestClose, title, children, si
     // gebruiker alleen het bovenste venster wilde verlaten.
     if (suspendedRef.current) return
     if (phaseRef.current === 'closing') return
+    // Vergrendeld: geen enkele programmatische sluitroute (X / Escape /
+    // backdrop / terug-knop) komt erdoor; alleen de ouder sluit via `open`.
+    if (lockedOpenRef.current) return false
 
     const magIkSluiten = onRequestCloseRef.current
     // Zonder poort: exact het oude pad — meteen sluiten.
@@ -474,13 +499,15 @@ export function BottomSheet({ open, onClose, onRequestClose, title, children, si
                 {actions}
               </div>
             )}
-            <button
-              onClick={handleProgrammaticClose}
-              aria-label="Sluiten"
-              className="touch-target rounded-md text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] shrink-0 ml-2"
-            >
-              <X className="h-5 w-5" />
-            </button>
+            {!lockedOpen && (
+              <button
+                onClick={handleProgrammaticClose}
+                aria-label="Sluiten"
+                className="touch-target rounded-md text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] shrink-0 ml-2"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            )}
           </div>
         )}
 

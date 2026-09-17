@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
-import { unauthorized } from '@/lib/api/respond'
+import { unauthorized, serverError } from '@/lib/api/respond'
+import { PENSION_PDF_CONSENT_VERSION } from '@/lib/ai/consent'
 import { recordAiUsage } from '@/lib/ai-credits'
 import { getModel } from '@/lib/ai/config'
 import { assertCloudAllowed } from '@/lib/ai/privacy-gate'
@@ -83,20 +84,14 @@ export async function POST(req: Request) {
   // that cannot be reliably PII-stripped, so instead of sending it silently we
   // require the client to record the user's explicit consent for one-time AI
   // processing. Absent consent → reject. The JSON-route is client-side and
-  // never reaches this endpoint. We log the consent event (user + token +
-  // timestamp) as an audit trail — never any file content.
+  // never reaches this endpoint.
   const consent = formData.get('consent')
-  if (consent !== 'pension_pdf_ai_v1') {
+  if (consent !== PENSION_PDF_CONSENT_VERSION) {
     return Response.json(
       { error: 'Toestemming voor AI-verwerking van de PDF ontbreekt. Upload opnieuw of gebruik de JSON-export.' },
       { status: 400 },
     )
   }
-  console.log(
-    '[pension/parse] AVG-consent geregistreerd:',
-    JSON.stringify({ userId: user.id, consent: 'pension_pdf_ai_v1', at: new Date().toISOString() }),
-  )
-
   const file = formData.get('file')
   if (!file || !(file instanceof File)) {
     return Response.json({ error: 'Geen bestand gevonden. Upload een PDF.' }, { status: 400 })
@@ -110,6 +105,23 @@ export async function POST(req: Request) {
   // Validate file size
   if (file.size > MAX_FILE_SIZE) {
     return Response.json({ error: 'Bestand is te groot. Maximaal 10 MB.' }, { status: 400 })
+  }
+
+  // Het bewijs gaat naar `consent_events` (ADR 0155) — vóór deze ronde was het een
+  // `console.log`, dat na de log-retentie verdampte (livegang r.55). Eigen-rij
+  // INSERT via de sessie-client; nooit bestandsinhoud. Bewust ná de
+  // bestandsvalidatie en direct vóór de modelcall: een event hoort bij een
+  // verwerking die ook echt plaatsvindt. Faalt de insert, dan gaat de PDF NIET
+  // naar het model: zonder vastgelegde toestemming geen verwerking.
+  const evidence = await supabase.from('consent_events').insert({
+    user_id: user.id,
+    kind: 'pension_pdf',
+    decision: 'granted',
+    version: PENSION_PDF_CONSENT_VERSION,
+    source: 'pension-upload',
+  })
+  if (evidence.error) {
+    return serverError(evidence.error, 'pension/parse:consent')
   }
 
   try {

@@ -50,12 +50,16 @@ export const WaardestromenSchema = z
   })
 export type Waardestromen = z.infer<typeof WaardestromenSchema>
 
-/** De standaardindeling (eigenaarsbesluit 15 sep 2026). */
+/**
+ * De standaardindeling (eigenaarsbesluit 15 sep 2026; Grip erbij op 17 sep
+ * 2026, ADR 0153 — de vier waardes plus Fin als kanaal).
+ */
 export const STANDAARD_WAARDESTROMEN: Waardestromen = {
   stromen: [
     { id: 'vermogen', naam: 'Vermogen', modules: ['overzicht', 'bezittingen', 'schulden', 'belasting', 'rapportages'] },
     { id: 'budget', naam: 'Budget', modules: ['budget'] },
     { id: 'toekomst', naam: 'Toekomst', modules: ['toekomst'] },
+    { id: 'grip', naam: 'Grip', modules: ['grip'] },
     { id: 'fin', naam: 'Fin', modules: ['fin', 'berichten', 'nieuws'] },
   ],
 }

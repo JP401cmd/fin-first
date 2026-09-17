@@ -637,7 +637,9 @@ export function sanitizeStoredDraft(raw: unknown): OnboardingDraft | null {
  */
 export function hasResumableDraft(draft: OnboardingDraft | null): boolean {
   if (!draft) return false
-  const progressedPastNaam = Boolean(draft.lastStep) && draft.lastStep !== 'naam'
+  // `ai_keuze` (ADR 0155) staat vóór `naam` en telt net zo min als voortgang.
+  const progressedPastNaam =
+    Boolean(draft.lastStep) && draft.lastStep !== 'naam' && draft.lastStep !== 'ai_keuze'
   const hasChoices =
     draft.selectedGoals.length > 0 ||
     draft.deferredFields.length > 0 ||

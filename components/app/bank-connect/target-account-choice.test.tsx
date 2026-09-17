@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
-import type { TargetAccountOption } from '@/lib/truelayer/target-account'
+import type { TargetAccountOption, TargetAssetOption } from '@/lib/truelayer/target-account'
 import {
   TargetAccountChoice,
   type TargetAccountChoiceProps,
@@ -299,6 +299,52 @@ describe('TargetAccountChoice — B2-budgetvinkje', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: vinkje }))
 
     expect(onToggleBudgetTracking).toHaveBeenCalledWith(false)
+  })
+})
+
+describe('TargetAccountChoice — cash-bezit zonder rekening-rij', () => {
+  const onboardingAsset: TargetAssetOption = {
+    id: 'asset-1',
+    name: 'Betaalrekening',
+    institution: 'ING',
+    iban_tail: null,
+    account_type: 'checking',
+    budget_tracking: true,
+  }
+
+  it('toont het bezit als kiesbare optie naast "Nieuwe rekening aanmaken", ook zonder rekeningen', () => {
+    renderChoice({ accounts: [], assets: [onboardingAsset], selection: { kind: 'none' } })
+
+    expect(screen.getByRole('radiogroup')).toBeTruthy()
+    expect(screen.getAllByRole('radio')).toHaveLength(2)
+    expect(screen.queryByText(/nog geen rekening om aan te koppelen/i)).toBeNull()
+    const radio = screen.getByRole('radio', { name: /Betaalrekening/ }) as HTMLInputElement
+    expect(radio.disabled).toBe(false)
+    expect(screen.getByText('Nieuwe rekening aanmaken')).toBeTruthy()
+  })
+
+  it('roept onSelect met { kind: "asset" }', () => {
+    const { onSelect } = renderChoice({ assets: [onboardingAsset], selection: { kind: 'none' } })
+
+    fireEvent.click(screen.getByRole('radio', { name: /Betaalrekening/ }))
+
+    expect(onSelect).toHaveBeenCalledWith({ kind: 'asset', id: 'asset-1' })
+  })
+
+  it('legt bij de gekozen optie uit dat de rekening wordt bijgewerkt, niet verdubbeld', () => {
+    renderChoice({ assets: [onboardingAsset], selection: { kind: 'asset', id: 'asset-1' } })
+
+    expect(screen.getByText(/in plaats van dat er een tweede rekening bijkomt/i)).toBeTruthy()
+    expect(screen.queryByRole('checkbox')).toBeNull()
+  })
+
+  it('toont het B2-vinkje bij een gekozen bezit zonder budgetteren', () => {
+    renderChoice({
+      assets: [{ ...onboardingAsset, budget_tracking: false }],
+      selection: { kind: 'asset', id: 'asset-1' },
+    })
+
+    expect(screen.getByRole('checkbox', { name: /Neem deze rekening mee in mijn budgetten/i })).toBeTruthy()
   })
 })
 

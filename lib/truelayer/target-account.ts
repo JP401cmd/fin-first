@@ -89,6 +89,40 @@ export type TargetAccountOption = {
 }
 
 /**
+ * Een CASH-BEZIT zonder eigen `bank_accounts`-companion, als tweede soort
+ * doeloptie naast {@link TargetAccountOption}.
+ *
+ * Waarom een eigen vorm en niet een `kind` op `TargetAccountOption`: deze optie
+ * heeft per definitie geen historie, geen ophaalplan en geen bezettende koppeling
+ * (er is nog geen rekening-rij om iets aan te hangen). Een gedeelde vorm zou die
+ * velden met nep-waarden moeten vullen — en `linked_provider_name: null` betekent
+ * daar "vrij", dus een verzonnen waarde is een verzonnen kiesbaarheidsfeit.
+ *
+ * Het typische geval is de betaalrekening uit de onboarding: `save-own-data` maakt
+ * het cash-bezit aan maar geen companion. Zonder deze optie maakte de callback bij
+ * de eerste bankkoppeling een TWEEDE cash-bezit aan — een dubbele betaalrekening.
+ * `POST /api/bank-connect/auth-link` accepteert het id als `target_asset_id`, maakt
+ * dan de companion aan en loopt verder het gewone doelrekening-pad.
+ */
+export type TargetAssetOption = {
+  /** `assets.id` */
+  id: string
+  name: string
+  /** `assets.institution` — de bank zoals de gebruiker die invulde. */
+  institution: string | null
+  /** Laatste vier tekens van het rekeningnummer, als dat bekend is. */
+  iban_tail: string | null
+  /**
+   * Het type waarop de companion straks landt (`cashSubtypeToAccountType`) —
+   * `'checking'` is een betaalrekening; een leeg subtype (de onboarding) telt
+   * daar ook als.
+   */
+  account_type: string
+  /** `assets.has_budget_tracking !== false` — bij `false` toont de wizard het B2-vinkje. */
+  budget_tracking: boolean
+}
+
+/**
  * Kolommen die {@link loadTargetAccount} en de keuzelijst-route nodig hebben.
  *
  * `iban_encrypted` en NIET de plaintext `iban`-kolom: die wordt in Stage B

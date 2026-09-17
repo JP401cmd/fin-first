@@ -74,10 +74,22 @@ export const START_FLOW: UatFlow = {
     { id: 'spaardoel', scenarioId: 'UAT-START-21', label: 'WF-START-21 · Spaardoel kiezen of overslaan', kind: 'action', stage: 5, lane: 'onboarding', subOf: 'onboarding' },
     { id: 'plan', scenarioId: 'UAT-START-28', label: 'WF-START-28 · "Jouw plan": stopmoment × eind-vorm (ADR 0129)', kind: 'action', stage: 5, lane: 'onboarding', subOf: 'onboarding' },
     { id: 'schatting', scenarioId: 'UAT-START-29', label: 'WF-START-29 · "Schat het voor me" (cohort-schatting, UR3-05)', kind: 'action', stage: 5, lane: 'onboarding', subOf: 'onboarding' },
+    { id: 'aikeuze', scenarioId: 'UAT-START-30', label: 'WF-START-30 · "Fin en je gegevens": AI-toestemming (ADR 0155)', kind: 'action', stage: 5, lane: 'onboarding', subOf: 'onboarding' },
     { id: 'defer', scenarioId: 'UAT-START-22', label: 'WF-START-22 · "Later invullen" (defer-pad)', kind: 'action', stage: 5, lane: 'onboarding', subOf: 'onboarding' },
     { id: 'obhervatten', scenarioId: 'UAT-START-23', label: 'WF-START-23 · Onboarding onderbreken/hervatten', kind: 'action', stage: 5, lane: 'onboarding', subOf: 'onboarding' },
     { id: 'obretry', scenarioId: 'UAT-START-24', label: 'WF-START-24 · Fout bij afronden herstellen (retry)', kind: 'action', stage: 5, lane: 'onboarding', subOf: 'onboarding' },
     { id: 'obuitloggen', scenarioId: 'UAT-START-25', label: 'WF-START-25 · Uitloggen vanuit onboarding', kind: 'action', stage: 5, lane: 'onboarding', subOf: 'onboarding' },
+
+    // ── 5b · afronding ná de opslag (budget → bank, ADR 0156) ────────────────
+    // Draait buiten computeStepOrder, alleen bereikbaar via een geslaagde opslag
+    // (handleSaveOwnData) of een hervatting op een open afrondingsmarkering.
+    { id: 'obbudget', scenarioId: 'UAT-START-31', label: 'WF-START-31 · Budget inrichten (template/leeg, Eigen rekening verplicht)', kind: 'screen', stage: 5, lane: 'afronding' },
+    { id: 'obbudgetedit', scenarioId: 'UAT-START-32', label: 'WF-START-32 · Budget-categorieën bewerken en opslaan', kind: 'action', stage: 5, lane: 'afronding', subOf: 'obbudget' },
+    { id: 'obbudgetskip', scenarioId: 'UAT-START-33', label: 'WF-START-33 · Budget-stap overslaan ("Ik doe dit later")', kind: 'action', stage: 5, lane: 'afronding', subOf: 'obbudget' },
+    { id: 'obbank', scenarioId: 'UAT-START-34', label: 'WF-START-34 · Bank koppelen (rekeningkeuze zonder dubbele rekening)', kind: 'screen', stage: 5, lane: 'afronding' },
+    { id: 'obbankterug', scenarioId: 'UAT-START-35', label: 'WF-START-35 · Terugkeer na de bankkoppelpoging (gelukt/mislukt/onderbroken)', kind: 'action', stage: 5, lane: 'afronding', subOf: 'obbank' },
+    { id: 'obbankskip', scenarioId: 'UAT-START-36', label: 'WF-START-36 · Bank-stap overslaan met verplichte reden', kind: 'action', stage: 5, lane: 'afronding', subOf: 'obbank' },
+    { id: 'obafrondhervat', scenarioId: 'UAT-START-37', label: 'WF-START-37 · Afronding hervatten + markering niet heropenbaar ná "klaar"', kind: 'action', stage: 5, lane: 'afronding' },
 
     // ── 6 · uitkomst ──────────────────────────────────────────────────────────
     { id: 'overgang', scenarioId: 'UAT-START-26', label: 'WF-START-26 · Overgang onboarding → app', kind: 'screen', stage: 6 },
@@ -126,11 +138,25 @@ export const START_FLOW: UatFlow = {
     { from: 'onboarding', to: 'pensioen' },
     { from: 'onboarding', to: 'spaardoel' },
     { from: 'onboarding', to: 'plan' },
+    { from: 'onboarding', to: 'aikeuze' },
     { from: 'onboarding', to: 'defer' },
     { from: 'onboarding', to: 'obhervatten' },
     { from: 'onboarding', to: 'obretry' },
     { from: 'onboarding', to: 'obuitloggen' },
-    { from: 'onboarding', to: 'overgang' },
+
+    // afronding ná de opslag (budget → bank) — vervangt de rechtstreekse
+    // 'onboarding' → 'overgang'-rand: de gewone inhoudelijke stappen eindigen
+    // bij de opslag (handleSaveOwnData), die opent de afrondingsmarkering en
+    // stuurt door naar de budget-stap.
+    { from: 'onboarding', to: 'obbudget' },
+    { from: 'obbudget', to: 'obbudgetedit' },
+    { from: 'obbudget', to: 'obbudgetskip' },
+    { from: 'obbudget', to: 'obbank' },
+    { from: 'obbank', to: 'obbankterug' },
+    { from: 'obbank', to: 'obbankskip' },
+    { from: 'obbank', to: 'overgang' },
+    { from: 'obbudget', to: 'obafrondhervat' },
+    { from: 'obbank', to: 'obafrondhervat' },
 
     // samenvloeien → uitkomst
     { from: 'overgang', to: 'uitkomst' },

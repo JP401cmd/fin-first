@@ -115,6 +115,14 @@ type ShellOverlayProps = {
    * de ouder, gebruik dan gewoon `open`.
    */
   suspended?: boolean
+  /**
+   * Voor kind="sheet" en kind="confirm": vergrendeld open — geen X, Escape,
+   * backdrop, swipe of terug-knop; alleen de ouder sluit via `open={false}`.
+   * Voor een overlay die pas weg mag na een keuze (de eenmalige AI-keuze, ADR
+   * 0155). Zie `BottomSheet.lockedOpen` voor het waarom en de afbakening
+   * t.o.v. `onRequestClose`. Bij kind="pane" geen effect.
+   */
+  lockedOpen?: boolean
   children: ReactNode
 }
 
@@ -138,6 +146,7 @@ export function ShellOverlay({
   footer,
   mobileBackCloses = false,
   suspended = false,
+  lockedOpen = false,
   children,
 }: ShellOverlayProps) {
   // SSR-safe matchMedia hook — bepaalt voor `kind="pane"` of we de SlideInPane
@@ -249,7 +258,7 @@ export function ShellOverlay({
     // bv. pijl-navigatie of share-icons binnen een sheet.
     return (
       <ModalFooterToneProvider tone={destructive ? 'destructive' : 'default'}>
-        <BottomSheet open={open} onClose={onClose} onRequestClose={onRequestClose} title={title} size={size} actions={actions} footerSlot={footer} suspended={suspended}>
+        <BottomSheet open={open} onClose={onClose} onRequestClose={onRequestClose} title={title} size={size} actions={actions} footerSlot={footer} suspended={suspended} lockedOpen={lockedOpen}>
           {children}
         </BottomSheet>
       </ModalFooterToneProvider>
@@ -273,7 +282,7 @@ export function ShellOverlay({
   // hun eigen knop renderen (bv. `event-pane`).
   return (
     <ModalFooterToneProvider tone={destructive ? 'destructive' : 'default'}>
-      <BottomSheet open={open} onClose={onClose} onRequestClose={onRequestClose} title={title} size="sm" footerSlot={footer}>
+      <BottomSheet open={open} onClose={onClose} onRequestClose={onRequestClose} title={title} size="sm" footerSlot={footer} lockedOpen={lockedOpen}>
         <div data-destructive={destructive ? 'true' : undefined}>{children}</div>
       </BottomSheet>
     </ModalFooterToneProvider>

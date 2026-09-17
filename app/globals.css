@@ -434,6 +434,47 @@
   --fin-melding-clearance: 0px;
 }
 
+/* ── Beheer-grafieken: vast categorisch reekspalet (6 tinten) ─────────────────
+   Voor /beheer/gebruik (ADR 0153): één kleur per waardestroom, op POSITIE in de
+   opgeslagen indeling (kleurIndex 0..5), nooit op rangorde. Bewust NIET de
+   instelbare accenten (kern/wil/horizon/fin betekenen hefbomen en verschillen
+   per kijker) en NIET de stoplicht-/positief-negatief-kleuren.
+
+   Keuze (OKLCH, C 0,105–0,125): 1 blauw · 2 roestbruin · 3 petrol · 4 violet ·
+   5 olijf · 6 magenta. Elke tint ligt > 20° van de drie statushues (groen 162,5 /
+   amber 70,1 / rood 25,3) → `accentClashesWithStatus` = 'ok' voor alle twaalf
+   (geborgd in components/app/beheer/gebruik/palet.test.ts, dat ook deze waarden
+   tegen palet.ts pint).
+
+   Gevalideerd met het dataviz-script `validate_palette.js` (17 sep 2026):
+     licht, oppervlak --paper #fbf7ec — ALL CHECKS PASS: L-band, chroma ≥ 0,10,
+       CVD adjacent ΔE 12,0 (deutan, violet↔petrol), normaal-zicht 19,8, alle ≥ 3:1.
+     donker, oppervlak #1f1d19 — ALL CHECKS PASS: CVD adjacent ΔE 12,2 (deutan,
+       magenta↔olijf), normaal-zicht 21,9, alle ≥ 3:1.
+     all-pairs (small multiples) haalt de vloer NIET (normaal-zicht 10,0
+       magenta↔violet) — zoals bij elk palet van > 3 tinten. Daarom draagt elk
+       small-multiple-paneel de stroomnaam als titel: kleur is nooit de enige drager.
+   De app heeft (nog) geen donker thema: de donkere waarden hangen alléén onder
+   `[data-theme="dark"]`, bewust niet onder prefers-color-scheme (dan kwamen
+   donker-gestapte tinten op licht papier). Wijzig de set alleen als geheel en
+   draai het script opnieuw. */
+.beheer-viz {
+  --beheer-reeks-1: #4076b9;
+  --beheer-reeks-2: #904b23;
+  --beheer-reeks-3: #009091;
+  --beheer-reeks-4: #6d509a;
+  --beheer-reeks-5: #707e1f;
+  --beheer-reeks-6: #8f3e69;
+}
+:root[data-theme="dark"] .beheer-viz {
+  --beheer-reeks-1: #5591dd;
+  --beheer-reeks-2: #c06f44;
+  --beheer-reeks-3: #00a1a1;
+  --beheer-reeks-4: #7858a9;
+  --beheer-reeks-5: #879831;
+  --beheer-reeks-6: #cc6e9d;
+}
+
 /* Zolang de meldingstrook in beeld is, maakt de mobiele `<main>` zich met deze
    band korter (zie components/app/shell/mobile-stack-shell.tsx). Zo schuift
    pagina-content bóven de strook uit in plaats van eronder te verdwijnen —

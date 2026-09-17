@@ -67,7 +67,7 @@ export async function POST(req: Request) {
         await deleteAllUserData(supabase, userId, progress)
 
         // Phase 2+3: Insert persona data
-        const summary = await seedPersonaData(supabase, userId, persona, progress)
+        const summary = await seedPersonaData(supabase, userId, persona, progress, { stampAiConsent: true })
 
         // Reset last_known_phase so activation FAB appears + markeer als
         // demo. De demo-vlag is de levenscyclus-marker: elke persona-seed

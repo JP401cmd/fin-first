@@ -98,10 +98,13 @@ type ProfileGateRow = AiExecutionPrefsRow & { ai_enabled: boolean }
  * iemand met `{gesprek: 'lokaal'}` zou dan alsnog naar de cloud gaan. Daarom
  * lezen we de plaatsing en de kill-switch in dat pad los van elkaar.
  *
- * `ai_enabled` leest `!== false` en niet `=== true`: de kolom is NULLABLE met
- * default `true`, en een omgeving waar hij nog ontbreekt levert `undefined`.
- * NULL en undefined zijn allebei "geen uitspraak", niet "uit" — dezelfde lezing
- * als app/api/ai-execution-prefs/route.ts en lib/dashboard-data-loader.ts.
+ * `ai_enabled` leest `!== false` en niet `=== true`: een omgeving waar de kolom
+ * nog ontbreekt levert `undefined`, en dat is "geen uitspraak", niet "uit" —
+ * dezelfde lezing als app/api/ai-execution-prefs/route.ts en
+ * lib/dashboard-data-loader.ts. Sinds migratie 20260917130000 (ADR 0155) is de
+ * kolom NOT NULL met default `false`: een nieuw account staat uit tot de
+ * gebruiker expliciet kiest (POST /api/consent/ai), dus de `!== false`-lezing
+ * kan op een bestaande kolom nooit meer stil "aan" opleveren.
  */
 async function readPrefsRow(
   supabase: SupabaseClient,

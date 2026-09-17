@@ -71,6 +71,7 @@ export const BEHEER_FLOW: UatFlow = {
 
     // ── 3 · Ter info ──────────────────────────────────────────────────────
     { id: 'kpi', scenarioId: 'UAT-BEHEER-04', label: 'WF-BEHEER-04 · AI-tokenverbruik + platform-kerngetallen', kind: 'screen', stage: 3, lane: 'info', subOf: 'sectie-info' },
+    { id: 'gebruik-analyse', scenarioId: 'UAT-BEHEER-39', label: 'WF-BEHEER-39 · Gebruik per waardestroom (anoniem, k=5)', kind: 'screen', stage: 3, lane: 'info', subOf: 'sectie-info' },
     { id: 'architectuur', scenarioId: 'UAT-BEHEER-30', label: 'WF-BEHEER-30 · Architectuurdocumentatie raadplegen', kind: 'screen', stage: 3, lane: 'info', subOf: 'sectie-info' },
     { id: 'naslag', scenarioId: 'UAT-BEHEER-33', label: 'WF-BEHEER-33 · Statische naslag bekijken', kind: 'screen', stage: 3, lane: 'info', subOf: 'sectie-info' },
     { id: 'webprestaties', scenarioId: 'UAT-BEHEER-34', label: 'WF-BEHEER-34 · Webprestaties (Core Web Vitals p75) raadplegen', kind: 'screen', stage: 3, lane: 'info', subOf: 'sectie-info' },

@@ -11,6 +11,7 @@ import {
   Cable,
   CalendarClock,
   CalendarDays,
+  ChartColumnStacked,
   ClipboardCheck,
   ClipboardList,
   FileSearch,
@@ -329,6 +330,12 @@ export const BEHEER_GROUPS: BeheerGroup[] = [
         href: '/beheer/kpi',
         description: 'Platform-KPI’s: gebruikers, actief gebruik, tiers, verbruik en fouten deze maand.',
         icon: BarChart3,
+      },
+      {
+        label: 'Gebruik',
+        href: '/beheer/gebruik',
+        description: 'Geanonimiseerd gebruik per waardestroom en app-deel: terugkeer, doorstroom en aanmeldcohorten.',
+        icon: ChartColumnStacked,
       },
       {
         label: 'AI-verbruik',

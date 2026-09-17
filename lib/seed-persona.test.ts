@@ -104,6 +104,73 @@ describe('deleteAllUserData — fail-fast bij delete-fouten', () => {
 })
 
 /**
+ * ADR 0152 — de storage-buckets met een `<user-id>/`-prefix volgen de wis.
+ * `storage.objects` heeft geen FK-cascade, dus dit is de enige plek waar de
+ * schermafbeeldingen van een verwijderd account weggaan. Drie eigenschappen die
+ * de bug-kaart eiste: (1) de wis draait als er een service-client is, (2) hij
+ * faalt zichtbaar en niet stil, (3) hij draait VÓÓR de tabellen zodat een fout
+ * niets half achterlaat.
+ */
+describe('deleteAllUserData — storage-buckets volgen de wis (ADR 0152)', () => {
+  // Een echte UUID: de prefix-wis weigert alles wat geen UUID is (vangrail tegen
+  // het per ongeluk listen van de wortel).
+  const UID = '11111111-1111-4111-8111-111111111111'
+
+  function makeServiceMock(opts: { failRemove?: boolean } = {}) {
+    const listed: string[] = []
+    const removed: string[] = []
+    const storage = {
+      from(bucket: string) {
+        return {
+          list: async (dir: string) => {
+            listed.push(`${bucket}/${dir}`)
+            return {
+              data: bucket === 'user-report-screenshots' && dir === UID
+                ? [{ name: 'r1.png', id: 'id-1', created_at: '2026-09-01T00:00:00Z' }]
+                : [],
+              error: null,
+            }
+          },
+          remove: async (paths: string[]) => {
+            if (opts.failRemove) return { data: null, error: { message: 'storage kaput' } }
+            removed.push(...paths.map((p) => `${bucket}/${p}`))
+            return { data: [], error: null }
+          },
+        }
+      },
+    }
+    const { client: tables, deletedTables } = makeSupabaseMock()
+    const service = { storage, from: (tables as unknown as { from: (t: string) => unknown }).from }
+    return { service: service as unknown as SupabaseClient, listed, removed, deletedTables }
+  }
+
+  it('wist de prefix `<user-id>/` in elke user-scoped bucket en telt in de summary', async () => {
+    const { client } = makeSupabaseMock()
+    const { service, removed } = makeServiceMock()
+    const summary = await deleteAllUserData(client, UID, undefined, { service })
+    expect(removed).toEqual([`user-report-screenshots/${UID}/r1.png`])
+    expect(summary['storage:user-report-screenshots']).toBe(1)
+    expect(summary['storage:pension-documents']).toBe(0)
+  })
+
+  it('zonder service-client wordt storage niet aangeraakt (dev/seed-paden) en verschijnt geen storage-telling', async () => {
+    const { client } = makeSupabaseMock()
+    const summary = await deleteAllUserData(client, 'user-123')
+    expect(Object.keys(summary).some((k) => k.startsWith('storage:'))).toBe(false)
+  })
+
+  it('faalt HARD en VÓÓR de eerste tabel-delete als de bucket niet leeg te krijgen is', async () => {
+    const { client, deletedTables } = makeSupabaseMock()
+    const { service } = makeServiceMock({ failRemove: true })
+    await expect(deleteAllUserData(client, UID, undefined, { service })).rejects.toThrow(
+      /user-report-screenshots/,
+    )
+    // Niets van de tabellen is geraakt: het account is intact en de gebruiker kan opnieuw.
+    expect(deletedTables).toEqual([])
+  })
+})
+
+/**
  * Regressie voor de seed-voortgangsbalk die boven 100% liep (bonus finding
  * UAT-plan §2.7 A.4): de admin-/onboarding-seed-routes hardcodeerden
  * `totalSteps` op 6/7 terwijl er feitelijk 9-11 `onProgress`-aanroepen zijn,

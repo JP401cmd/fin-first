@@ -44,6 +44,15 @@ describe('BankAuthWaiting', () => {
     expect(replace).toHaveBeenCalledWith('/core/cash/connect/success')
   })
 
+  it('met onSuccess: roept die aan in plaats van naar de succespagina te gaan (onboarding)', async () => {
+    respond(200, { outcome: 'gelukt' })
+    const onSuccess = vi.fn()
+    render(<BankAuthWaiting connectionId="conn-1" onCancel={() => {}} onSuccess={onSuccess} />)
+    await tick()
+    expect(onSuccess).toHaveBeenCalledTimes(1)
+    expect(replace).not.toHaveBeenCalled()
+  })
+
   it('blijft wachten zolang de bank bezig is', async () => {
     respond(200, { outcome: 'wachten' })
     render(<BankAuthWaiting connectionId="conn-1" onCancel={() => {}} />)

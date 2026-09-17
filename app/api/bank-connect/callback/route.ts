@@ -9,6 +9,7 @@ import { mapAccountType } from '@/lib/truelayer/mapper'
 import { syncBudgetingActive } from '@/lib/budgeting-active'
 import { blindIndex, encryptField } from '@/lib/crypto/field-encryption'
 import { accountNumberWriteColumns } from '@/lib/asset-account-number'
+import { readOpenAfronding } from '@/lib/onboarding/afronding'
 
 /**
  * GET /api/bank-connect/callback — de OAuth-terugkomst van TrueLayer.
@@ -65,6 +66,29 @@ function isCarrierOccupiedCollision(
   // koppeling sturen die niet bestaat. (Security-review fase 7.)
   return (error.message ?? '').includes(ONE_ACTIVE_LINK_PER_ACCOUNT_INDEX)
 }
+
+/**
+ * Hoort deze terugkeer thuis in de onboarding i.p.v. in de in-app wizard?
+ *
+ * Twee gevallen: de onboarding is nog niet opgeslagen (het oude pad), óf hij is
+ * opgeslagen maar de afrondingsstappen (budget → bank) staan nog open — die
+ * draaien ná `onboarding_completed = true`, zie `lib/onboarding/afronding.ts`.
+ * Zonder dat tweede geval landt de gebruiker midden in de onboarding op het
+ * in-app succesvenster en komt hij nooit meer bij de laatste stap.
+ */
+async function hoortBijOnboarding(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+): Promise<boolean> {
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('onboarding_completed, module_guide_state')
+    .eq('id', userId)
+    .single()
+  if (!profile) return false
+  return !profile.onboarding_completed || readOpenAfronding(profile.module_guide_state) !== null
+}
+
 export async function GET(req: Request) {
   const supabase = await createClient()
   const { searchParams } = new URL(req.url)
@@ -74,6 +98,12 @@ export async function GET(req: Request) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
 
   if (!code || !state) {
+    // Zonder code is de bank afgebroken (bv. "annuleren" bij de bank). Midden in
+    // de onboarding hoort de gebruiker dan terug op de bankstap, niet in de wizard.
+    const { data: { user: cancelUser } } = await supabase.auth.getUser()
+    if (cancelUser && (await hoortBijOnboarding(supabase, cancelUser.id))) {
+      return NextResponse.redirect(`${appUrl}/onboarding?bank_error=1`)
+    }
     return NextResponse.redirect(`${appUrl}/core/cash/connect?error=missing_code`)
   }
 
@@ -95,6 +125,9 @@ export async function GET(req: Request) {
       .single()
 
     if (!connection) {
+      if (await hoortBijOnboarding(supabase, user.id)) {
+        return NextResponse.redirect(`${appUrl}/onboarding?bank_error=1`)
+      }
       return NextResponse.redirect(`${appUrl}/core/cash/connect?error=connection_not_found`)
     }
 
@@ -705,14 +738,10 @@ export async function GET(req: Request) {
         .eq('user_id', user.id)
     }
 
-    // Check if user has completed onboarding. If not, redirect back to
-    // the onboarding flow instead of the in-app success page — the (app)
-    // layout would redirect them anyway since it gates on onboarding_completed.
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('onboarding_completed')
-      .eq('id', user.id)
-      .single()
+    // Hoort de terugkeer in de onboarding? Ja als die nog niet is opgeslagen (de
+    // (app)-layout zou anders toch terugsturen), én als de afrondingsstappen
+    // ná de opslag nog open staan — zie `hoortBijOnboarding`.
+    const naarOnboarding = await hoortBijOnboarding(supabase, user.id)
 
     // ── Geen enkele koppelrij? Dan is dit geen succes ─────────────────────────
     // Zie de noot bij `linkedCount`. Bewust "geen énkele" en niet "niet alle": bij
@@ -742,7 +771,7 @@ export async function GET(req: Request) {
 
       // Het onboardingpad blijft ongewijzigd: daar bestaat de wizard-uitleg niet en
       // is `?bank_error=1` de enige toestand die de onboarding-stap kent.
-      if (profile && !profile.onboarding_completed) {
+      if (naarOnboarding) {
         return NextResponse.redirect(`${appUrl}/onboarding?bank_error=1`)
       }
 
@@ -755,7 +784,7 @@ export async function GET(req: Request) {
       return NextResponse.redirect(`${appUrl}/core/cash/connect?error=geen_koppeling`)
     }
 
-    if (profile && !profile.onboarding_completed) {
+    if (naarOnboarding) {
       return NextResponse.redirect(`${appUrl}/onboarding?bank_connected=1`)
     }
 
@@ -783,15 +812,8 @@ export async function GET(req: Request) {
     // with an error param so the user can retry without hitting the (app)
     // layout gate.
     const { data: { user: errUser } } = await supabase.auth.getUser()
-    if (errUser) {
-      const { data: errProfile } = await supabase
-        .from('profiles')
-        .select('onboarding_completed')
-        .eq('id', errUser.id)
-        .single()
-      if (errProfile && !errProfile.onboarding_completed) {
-        return NextResponse.redirect(`${appUrl}/onboarding?bank_error=1`)
-      }
+    if (errUser && (await hoortBijOnboarding(supabase, errUser.id))) {
+      return NextResponse.redirect(`${appUrl}/onboarding?bank_error=1`)
     }
 
     return NextResponse.redirect(`${appUrl}/core/cash/connect?error=callback_failed`)

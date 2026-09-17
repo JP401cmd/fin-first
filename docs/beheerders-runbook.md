@@ -234,8 +234,8 @@ Vercel-omgeving, dan weigert iedere cron-handler zichzelf *fail-closed* met een 
 cron-endpoint draait op de service-role-sleutel en mag zonder secret niet open staan. De prijs
 is dat de storing zich verstopt.
 
-> **Lees `/beheer/jobs` daarom zo: "geen regel" betekent níét "nog niet aan de beurt".** Op zes
-> van de zeven crons zit die weigering vóór `recordJobRun()`, dus zonder secret ontstaat er
+> **Lees `/beheer/jobs` daarom zo: "geen regel" betekent níét "nog niet aan de beurt".** Op zeven
+> van de acht crons zit die weigering vóór `recordJobRun()`, dus zonder secret ontstaat er
 > helemaal geen regel — precies hetzelfde beeld als een taak die nooit is ingepland. Alleen
 > `news-ingest` logt de weigering wél, en dat ene spoor is dus de enige zichtbare thermometer
 > van de hele laag.
@@ -249,6 +249,25 @@ is dat de storing zich verstopt.
 > `app_settings`), briefing-mail (`RESEND_API_KEY`/`EMAIL_FROM`) en alerts-sweep
 > (`NTFY_TOPIC`/`NTFY_TOKEN` + externe pinger) — zie de tabel *Wijzigingen aan de draaiende
 > omgeving*.
+
+**Wat níét van de cron-laag afhangt — kijk daar dus niet als eerste.** Twee dingen die bij een
+cron-uitval het eerst "stuk" lijken, draaien er los van (UR3-21, geverifieerd tegen live
+`job_runs` + `net_worth_snapshots`, sep 2026):
+
+- De **verloopgrafieken** op /overzicht lezen `net_worth_snapshots`, en die tabel wordt dagelijks
+  gevuld door `AutoSnapshotTrigger` (`components/app/auto-snapshot-trigger.tsx`, gemount in de
+  app-layout → `GET /api/snapshots/auto`, gewone cookie-auth) zodra een gebruiker de app opent.
+  De maandelijkse `snapshots`-cron is alleen het vangnet voor wie rond de maandwisseling niet
+  inlogt — geen blackout voor actieve gebruikers.
+- De **meldingen** op /mijn/notificaties zijn compute-on-read: `GET /api/notifications` rekent ze
+  uit bij elke poll (client elke 10 min, de langzame checks 15 min gecached), en het
+  partner-actie-type (`recommendation`) wordt door `PATCH /api/ai/actions/[id]` in de historie van
+  de partner geschreven op het moment van afronden. Geen van die paden raakt `job_runs`. Er is
+  ook geen OS-/web-push: meldingen bestaan alleen in de app, onder het belletje.
+
+Wél 100% cron-afhankelijk, zonder terugval: **`briefing-email`** (de weekmail) en
+**`alerts-sweep`** (het beheer-alarm). Staat de cron-laag stil, dan zijn dát de twee die
+daadwerkelijk uitvallen.
 
 Controleren en herstellen:
 1. `npx vercel env ls production` — `CRON_SECRET` hoort in de lijst te staan.

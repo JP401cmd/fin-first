@@ -204,7 +204,7 @@ describe('MijnNotificatiesPage — partner-poort (S10)', () => {
 /**
  * MIJN-3 — in Eenvoudig drie hoofdschakelaars (meldingen in de app, briefing per
  * e-mail, maandelijkse geldcheck-in) plus een "Alle meldingstypen"-disclosure
- * met de losse push-types; in Volledig de vlakke lijst zoals hij was.
+ * met de losse meldingstypen; in Volledig de vlakke lijst zoals hij was.
  *
  * Bron: docs/eenvoudige-weergave-audit.md §7 (/mijn).
  */
@@ -262,4 +262,27 @@ describe('MijnNotificatiesPage — Eenvoudige weergave (MIJN-3)', () => {
     })
     expect(screen.getAllByText('Maandelijkse geldcheck-in')).toHaveLength(1)
   })
+})
+
+/**
+ * UR3-21 — de pagina beloofde "push-meldingen die je op je apparaat ontvangt",
+ * maar er is geen web-push: `app/sw.ts` heeft geen `push`-handler en er bestaat
+ * geen abonnement-opslag. De meldingen verschijnen uitsluitend in de app (onder
+ * het belletje op /berichten), berekend door GET /api/notifications bij elke
+ * poll. De copy mag die belofte dus niet (opnieuw) doen — in geen van beide
+ * weergavemodi — en moet wél zeggen wáár de meldingen dan verschijnen.
+ */
+describe('MijnNotificatiesPage — belooft geen apparaat-push (UR3-21)', () => {
+  for (const mode of ['simple', 'full'] as DisplayMode[]) {
+    it(`noemt in '${mode}' geen push of "op je apparaat", wel "in de app"`, async () => {
+      setupMocksWithUser()
+      renderInMode(mode)
+      await waitFor(() => {
+        expect(screen.getByText('Budget alerts')).toBeTruthy()
+      })
+      expect(screen.queryByText(/op je apparaat/i)).toBeNull()
+      expect(screen.queryByText(/push/i)).toBeNull()
+      expect(screen.getAllByText(/in de app/i).length).toBeGreaterThan(0)
+    })
+  }
 })

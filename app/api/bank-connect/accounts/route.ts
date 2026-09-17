@@ -15,8 +15,10 @@ import {
   TARGET_ASSET_SELECT,
   type TargetAccountOption,
   type TargetAccountRow,
+  type TargetAssetOption,
   type TargetAssetRow,
 } from '@/lib/truelayer/target-account'
+import { loadCompanionlessCashAssets } from '@/lib/truelayer/target-asset'
 
 /**
  * GET /api/bank-connect/accounts — de kandidaat-DOELREKENINGEN voor de
@@ -40,13 +42,16 @@ import {
  * grens in `auth-link` gelezen; stond hij op twee plekken, dan zou de lijst ooit
  * iets tonen dat de route weigert.
  *
- * **Bewust buiten deze fase:** een cash-bezit zónder companion-rij
- * (`bank_accounts`) is geen kandidaat — er is geen FK-doel voor
- * `bank_connections.target_bank_account_id`. Dat is geen gegevensverlies: om een
- * CSV op een rekening te kunnen importeren is een `bank_accounts`-rij nodig, dus
- * elke rekening MÉT historie heeft er per definitie een. Companion-loze
- * cash-bezittingen (bv. direct na onboarding) hebben nul transacties — daar is
- * "nieuwe rekening aanmaken" het juiste antwoord.
+ * ## Cash-bezit zonder companion (`assets`)
+ *
+ * Een cash-bezit zónder eigen `bank_accounts`-rij heeft geen FK-doel voor
+ * `bank_connections.target_bank_account_id`, en stond daarom eerst buiten de lijst.
+ * Dat bleek wél een gat: de onboarding maakt precies zo'n bezit aan (de
+ * betaalrekening), en "nieuwe rekening aanmaken" leverde daarna een dubbele
+ * betaalrekening op. Die bezittingen komen nu als aparte lijst `assets` terug
+ * (`TargetAssetOption`), zodat bestaande consumenten van `accounts` ongewijzigd
+ * blijven; `auth-link` accepteert het id als `target_asset_id` en maakt dan de
+ * companion aan. Zie `lib/truelayer/target-asset.ts`.
  */
 
 /** Bovengrens op het aantal kandidaten dat we tonen én bevragen. Zie de noot bij de query. */
@@ -66,6 +71,14 @@ export async function GET() {
     // het startpunt dat de wizard aankondigt en het startpunt dat de sync
     // gebruikt niet op een tijdzonegrens uit elkaar lopen.
     const today = new Date().toISOString().split('T')[0]
+
+    // Cash-bezittingen zonder companion — onafhankelijk van de rekeninglijst, dus
+    // óók bij nul rekeningen (de gebruiker direct na de onboarding).
+    const assetOptions: TargetAssetOption[] = await loadCompanionlessCashAssets(
+      supabase,
+      user.id,
+      MAX_TARGET_ACCOUNTS,
+    )
 
     // Eigen rijen, expliciet gefilterd — zie de eigenaarschapsnoot bij
     // `loadTargetAccount`: de SELECT-policy op `bank_accounts` laat óók
@@ -87,7 +100,7 @@ export async function GET() {
     if (accountsError) return serverError(accountsError, 'bankconnect-accounts:GET')
 
     const rows = (accountRows ?? []) as unknown as TargetAccountRow[]
-    if (rows.length === 0) return NextResponse.json({ accounts: [] })
+    if (rows.length === 0) return NextResponse.json({ accounts: [], assets: assetOptions })
 
     // ── Het cash-bezit achter de rekening ────────────────────────────────────
     // Twee vlaggen, twee betekenissen: `assets.is_active` = bestaat de bezitting
@@ -114,7 +127,7 @@ export async function GET() {
       isEligibleTargetAccount(row, row.linked_asset_id ? assets.get(row.linked_asset_id) : null),
     )
 
-    if (candidates.length === 0) return NextResponse.json({ accounts: [] })
+    if (candidates.length === 0) return NextResponse.json({ accounts: [], assets: assetOptions })
 
     // ── Actieve koppelingen: welke rekening is al bezet? (FR5) ───────────────
     // Sinds fase 6 is dit géén toelichting meer maar het kiesbaarheidsfeit: de
@@ -202,7 +215,7 @@ export async function GET() {
       }
     })
 
-    return NextResponse.json({ accounts })
+    return NextResponse.json({ accounts, assets: assetOptions })
   } catch (err) {
     return serverError(err, 'bankconnect-accounts:GET')
   }

@@ -116,6 +116,13 @@ const TOEGESTANE_RPCS = new Set([
   // ADR 0147 fase 2: per app-deel een aantal gebruikers — geen namen, geen
   // dagen, geen routes (service-role-only).
   'admin_module_activity_counts',
+  // ADR 0153: het gebruiksrapport voor /beheer/gebruik — tellingen per stroom,
+  // week, aanmeldmaand en profielstand, in de database k-onderdrukt (k = 5);
+  // geen ids, e-mailadressen, losse datums of chat (service-role-only).
+  'admin_gebruik_analyse',
+  // ADR 0153: doorstroom per actieve dag (Sankey) — idem tellingen, k-onderdrukt,
+  // knopen zijn waardestromen, geen schermen (service-role-only).
+  'admin_gebruik_doorstroom',
   // ADR 0147 fase 3: e-mailadres bij door beheer zelf gekozen groepsleden, zodat
   // beheer ze herkent — account-lookup, zelfde soort als de twee lookups
   // hierboven, geen inhoud (service-role-only).

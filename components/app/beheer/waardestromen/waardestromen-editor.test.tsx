@@ -141,15 +141,15 @@ describe('WaardestromenEditor', () => {
     await waitFor(() => expect(screen.queryByRole('group', { name: 'Stroom 2' })).not.toBeInTheDocument())
   })
 
-  it('standaard terugzetten vraagt eerst bevestiging en laadt dan de vier standaardstromen', async () => {
+  it('standaard terugzetten vraagt eerst bevestiging en laadt dan de vijf standaardstromen', async () => {
     render(<WaardestromenEditor />)
     await screen.findByRole('group', { name: 'Stroom 1' })
     fireEvent.click(screen.getByRole('button', { name: 'Standaard terugzetten' }))
     // Eerst de bevestiging: terugzetten laat regels op eigen stromen dood achter.
     expect(await screen.findByText('Standaardindeling terugzetten?')).toBeInTheDocument()
-    expect(screen.queryByRole('group', { name: 'Stroom 4' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'Stroom 5' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Terugzetten' }))
-    expect(await screen.findByRole('group', { name: 'Stroom 4' })).toBeInTheDocument()
-    expect(screen.getByText('4 van 6 stromen')).toBeInTheDocument()
+    expect(await screen.findByRole('group', { name: 'Stroom 5' })).toBeInTheDocument()
+    expect(screen.getByText('5 van 6 stromen')).toBeInTheDocument()
   })
 })

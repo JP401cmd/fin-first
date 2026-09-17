@@ -7,6 +7,7 @@ import {
   FULL_ERASE_SERVICE_TABLES,
   EXPORT_SERVICE_TABLES,
   EXPORT_SESSION_TABLES,
+  EXPORT_OWN_READ_EXTRA_TABLES,
 } from './user-data-tables'
 
 /**
@@ -77,6 +78,24 @@ describe('user-data-tables — AVG-partitie dekt de volledige schema-inventaris'
   it('full-erase omvat alle service-wipe-tabellen (orphan-preventie bij delete)', () => {
     for (const t of SERVICE_WIPE_TABLES) {
       expect(FULL_ERASE_SERVICE_TABLES).toContain(t)
+    }
+  })
+
+  /**
+   * ADR 0155: het toestemmingsbewijs is eigen-rij LEESBAAR maar niet WISBAAR
+   * (append-only). Het valt dus buiten SESSION_WIPE, maar het inzagerecht (art.
+   * 15) eist het wél in de export — via de extra eigen-rij-leeslijst, en nooit
+   * via de service-role (beheer heeft er geen leespad op).
+   */
+  it('het toestemmingsbewijs zit in de zelf-export via de sessie, niet via wis of service-role (ADR 0155)', () => {
+    expect(EXPORT_OWN_READ_EXTRA_TABLES).toContain('consent_events')
+    expect(Object.keys(RETENTION_ALLOWLIST)).toContain('consent_events')
+    expect(SESSION_WIPE_TABLES).not.toContain('consent_events')
+    expect(EXPORT_SERVICE_TABLES).not.toContain('consent_events')
+    // Elke extra-export-tabel staat in de inventaris én is bewust ingedeeld.
+    for (const t of EXPORT_OWN_READ_EXTRA_TABLES) {
+      expect(ALL_USER_SCOPED_TABLES).toContain(t)
+      expect(Object.keys(RETENTION_ALLOWLIST)).toContain(t)
     }
   })
 

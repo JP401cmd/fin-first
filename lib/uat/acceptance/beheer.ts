@@ -14,7 +14,8 @@
  * 0132) voegde de storings-strip op /beheer + de altijd-zichtbare statuskaart
  * op /beheer/ai toe, gevoed door deriveAiHealth/loadAiHealth — een nieuw
  * oppervlak náást het bestaande WF-BEHEER-02 (AI-configuratie) en
- * WF-BEHEER-04 (AI-verbruik/KPI's).
+ * WF-BEHEER-04 (AI-verbruik/KPI's). 39 (Gebruik per waardestroom, ADR 0153)
+ * voegde de geanonimiseerde, k-anonieme gebruiksanalyse op /beheer/gebruik toe.
  *
  * KERN-BEVINDING (bepaalt exact/consistency/oracle/ui-only): BEHEER is
  * admin-tooling achter superadmin-gating — de motoren wonen elders (Kern/
@@ -23,7 +24,7 @@
  * geforceerd (0 exact-criteria, lege BEHEER_ENGINE_CHECKS). De verdeling:
  *
  *  - 0  'exact'       — BEHEER heeft geen eigen hand-narekenbare rekenformule.
- *  - 12 'consistency' — een getoond getal komt aantoonbaar ergens anders vandaan
+ *  - 15 'consistency' — een getoond getal komt aantoonbaar ergens anders vandaan
  *                        (A=B): AI-credit-/token-/KPI-aggregaten = som van de
  *                        usage-/DB-rijen (03/04), gebruiksprofiel-tellingen =
  *                        de rijen van de doelgebruiker (08), AOW-tabel =
@@ -37,13 +38,16 @@
  *                        aggregatie-RPC's + officiële CWV-drempels (34),
  *                        FIRE-marktaannames-CRUD = de resolver + SWR-preview
  *                        (35), versie-/migratiedashboard = git-plumbing +
- *                        computeMigrationDrift() (36).
+ *                        computeMigrationDrift() (36), AI-gezondheid = dezelfde
+ *                        ai_token_usage-/error_logs-afleiding (38),
+ *                        gebruiksanalyse-tellingen = de k-onderdrukte
+ *                        database-aggregatie (39).
  *  - 2  'oracle'      — een zware-rekenmotor-uitkomst die NIET met de hand na te
  *                        rekenen is (de horizon-kernel). types.ts noemt precies
  *                        déze twee beheer-UI's als de oracle-UI: de
  *                        horizon-strategiematrix (26) en de horizon-kernel-
  *                        transparantie + Excel-oracle-verificatie (27).
- *  - 22 'ui-only'     — configuratie/inhoudsbeheer/naslag/moderatie zonder
+ *  - 21 'ui-only'     — configuratie/inhoudsbeheer/naslag/moderatie zonder
  *                        cijfermatige uitkomst.
  *
  * SUPERADMIN-GATING (blanket): alle scenario's draaien als superadmin — het
@@ -122,7 +126,7 @@ const criteria: AcceptanceCriterion[] = [
     when:
       'De beheerder bekijkt tokenverbruik per functie/account en de KPI-kaarten (gebruikers, tier-verdeling, AI-verbruik, foutmeldingen en e-mails deze maand).',
     then:
-      'De tokenaggregaten (calls/input/output, opgeteld via addTo) en de KPI-"deze maand"-tellingen moeten exact optellen tot de onderliggende usage-/DB-rijen binnen de tijdzone-veilige maandgrens (localMonthBounds) — A=B met de bron, geen hand-narekenbaar cijfer (live telemetrie).',
+      'De tokenaggregaten (calls/input/output, opgeteld via addTo) en de KPI-"deze maand"-tellingen moeten exact optellen tot de onderliggende usage-/DB-rijen binnen de tijdzone-veilige maandgrens (localMonthBounds) — A=B met de bron, geen hand-narekenbaar cijfer (live telemetrie). /beheer/kpi draagt sinds ADR 0153 ook de link "Meer over gebruik →" naar /beheer/gebruik (WF-BEHEER-39), de geanonimiseerde gebruiksanalyse per waardestroom.',
     assertion: {
       kind: 'consistency',
       source:
@@ -186,11 +190,11 @@ const criteria: AcceptanceCriterion[] = [
     when:
       'De beheerder klikt "Gebruik tonen" en verwijdert (uiterst geval) het account nadat het e-mailadres exact is overgetypt (de verwijderknop blijft anders disabled).',
     then:
-      'Het gebruiksblok toont actieve dagen (30 d), laatst actief, AI-aanroepen per functie, ingerichte apps, check-in-maanden, meldingen en AANTALLEN bezittingen/schulden/transacties/bankkoppelingen — die tellingen zijn gelijk aan het aantal rijen van die gebruiker. Er staat NERGENS een bedrag, rekeningnaam, omschrijving, check-in-cijfer of chattitel (ADR 0146), en er is geen knop om de data van de gebruiker te exporteren. Inzage ("Gebruik bekeken") en verwijdering staan in de audit-trail; verwijdering is onomkeerbaar.',
+      'Het gebruiksblok toont actieve dagen (30 d), laatst actief, AI-aanroepen per functie, ingerichte apps, check-in-maanden, meldingen en AANTALLEN bezittingen/schulden/transacties/bankkoppelingen — die tellingen zijn gelijk aan het aantal rijen van die gebruiker. Er staat NERGENS een bedrag, rekeningnaam, omschrijving, check-in-cijfer of chattitel (ADR 0146), en er is geen knop om de data van de gebruiker te exporteren. Inzage ("Gebruik bekeken") en verwijdering staan in de audit-trail; verwijdering is onomkeerbaar en is een VOLLEDIGE wis (fullErase, mét service-client): sinds ADR 0152 gaan de geüploade bestanden van die gebruiker (schermafbeeldingen bij meldingen, pensioen-PDF\'s onder de `<user-id>/`-prefix) als eerste stap mee — faalt die bucket-wis, dan is er nog niets verwijderd en toont beheer een fout. Na afloop staat er geen object meer onder de prefix van die gebruiker.',
     assertion: {
       kind: 'consistency',
       source:
-        'app/api/admin/users/activity/route.ts + lib/beheer/gebruik.ts + user-delete/route.ts — tellingen = rijen van de doelgebruiker (A=B), afwezigheid van inhoud bewaakt door lib/beheer/geen-inhoud.test.ts',
+        'app/api/admin/users/activity/route.ts + lib/beheer/gebruik.ts + app/api/admin/user-delete/route.ts (deleteAllUserData met { service, fullErase } → lib/user-data-buckets.ts#wipeUserBucketPrefixes) — tellingen = rijen van de doelgebruiker (A=B), afwezigheid van inhoud bewaakt door lib/beheer/geen-inhoud.test.ts',
     },
   },
   {
@@ -272,7 +276,7 @@ const criteria: AcceptanceCriterion[] = [
     when:
       'De beheerder maakt een vragenlijst (vragen van type open, schaal met instelbaar bereik, meerkeuze met optioneel "Anders, namelijk…", ja/nee of rangschikken; per vraag verplicht aan/uit), zet ’m live/offline en opent de respons-sheet.',
     then:
-      'Een nieuwe vragenlijst start inactief; opslaan met een lege vraag of een meerkeuze-/rangschikvraag met minder dan twee unieke opties geeft een melding per vraag en slaat niets op. Een actieve vragenlijst met minstens één vraag verschijnt voor gebruikers als klembord-icoon in de chat bij Fin, waar Fin de vragen één voor één stelt en elk antwoord per vraag bewaart (inactief = icoon weg); de lijst toont per vragenlijst een Actief/Inactief-badge en rij-tellingen (vragen/invullingen/voltooid) en respons per deelnemer en per vraag (schaal: gemiddelde + NPS bij 0–10; ja/nee: % ja; rangschikken: gemiddelde positie; meerkeuze: telling + Anders-teksten); lege staat = "Nog geen vragenlijsten aangemaakt". Weergave van rij-aantallen, geen eigen berekening. Verspreiding (ADR 0147): per lijst een derde knop "Verspreiding" opent een sheet met Doelgroep (iedereen / op regels: dagen sinds registratie, actieve dagen in 30 dagen, laatst actief binnen — alle regels moeten kloppen / handmatig gekozen personen via e-mailzoeker; groepen: statische of dynamische gebruikersgroepen, minstens één — met "dominante waardestroom is …" als vierde regelsoort), Popup (aan/uit, cooldown 14, uitstel 7 dagen, max 2× uitstellen) en Bereik (uitgenodigd/gezien/uitgesteld/geweigerd/gestart/afgerond — tellingen, geen namen bij antwoorden); de rij toont "verspreiding: iedereen/N regels/N personen". Een lijst zonder ingestelde verspreiding gedraagt zich als "iedereen, geen popup". Waardestromen (/beheer/waardestromen): 1–6 stromen (standaard Vermogen · Budget · Toekomst · Fin) als bundels van elf app-delen met per app-deel het aantal gebruikers in 30 dagen ("nog niet gemeten" zonder meting); een nieuwe stroom krijgt een vaste id die bij hernoemen niet verandert; signalen "telt nergens mee" en "in meer dan één stroom". Gebruikersgroepen (/beheer/gebruikersgroepen): een statische groep met leden via de e-mailzoeker of een dynamische groep met regels; de soort ligt vast na aanmaken; verwijderen vraagt bevestiging en de groep bereikt daarna niemand meer.',
+      'Een nieuwe vragenlijst start inactief; opslaan met een lege vraag of een meerkeuze-/rangschikvraag met minder dan twee unieke opties geeft een melding per vraag en slaat niets op. Een actieve vragenlijst met minstens één vraag verschijnt voor gebruikers als klembord-icoon in de chat bij Fin, waar Fin de vragen één voor één stelt en elk antwoord per vraag bewaart (inactief = icoon weg); de lijst toont per vragenlijst een Actief/Inactief-badge en rij-tellingen (vragen/invullingen/voltooid) en respons per deelnemer en per vraag (schaal: gemiddelde + NPS bij 0–10; ja/nee: % ja; rangschikken: gemiddelde positie; meerkeuze: telling + Anders-teksten); lege staat = "Nog geen vragenlijsten aangemaakt". Weergave van rij-aantallen, geen eigen berekening. Verspreiding (ADR 0147): per lijst een derde knop "Verspreiding" opent een sheet met Doelgroep (iedereen / op regels: dagen sinds registratie, actieve dagen in 30 dagen, laatst actief binnen — alle regels moeten kloppen / handmatig gekozen personen via e-mailzoeker; groepen: statische of dynamische gebruikersgroepen, minstens één — met "dominante waardestroom is …" als vierde regelsoort), Popup (aan/uit, cooldown 14, uitstel 7 dagen, max 2× uitstellen) en Bereik (uitgenodigd/gezien/uitgesteld/geweigerd/gestart/afgerond — tellingen, geen namen bij antwoorden); de rij toont "verspreiding: iedereen/N regels/N personen". Een lijst zonder ingestelde verspreiding gedraagt zich als "iedereen, geen popup". Waardestromen (/beheer/waardestromen): 1–6 stromen (standaard Vermogen · Budget · Toekomst · Grip · Fin, sinds ADR 0153) als bundels van twaalf app-delen (het app-deel `grip` bundelt /overzicht/tips, /overzicht/belasting/optimizer en /rapportages/benchmark) met per app-deel het aantal gebruikers in 30 dagen ("nog niet gemeten" zonder meting); een nieuwe stroom krijgt een vaste id die bij hernoemen niet verandert; signalen "telt nergens mee" en "in meer dan één stroom"; de pagina draagt sindsdien ook de link "Meer over gebruik →" naar /beheer/gebruik (WF-BEHEER-39). Gebruikersgroepen (/beheer/gebruikersgroepen): een statische groep met leden via de e-mailzoeker of een dynamische groep met regels; de soort ligt vast na aanmaken; verwijderen vraagt bevestiging en de groep bereikt daarna niemand meer.',
     assertion: {
       kind: 'ui-only',
       source:
@@ -384,11 +388,11 @@ const criteria: AcceptanceCriterion[] = [
     when:
       'De beheerder kiest een persona-kaart, bevestigt (dit wist en vervangt alle eigen financiële data) en bekijkt de samenvattingstabel per tabel.',
     then:
-      'De samenvattings-aantallen per tabel (Profiel … Vermogenssnapshots) zijn deterministisch en moeten gelijk zijn aan de persona-dataset (lib/test-personas.ts via seedPersonaData); de karakteristieke persona-kerngetallen (bv. Willems netto vermogen €1,62M) moeten daarna 1-op-1 op de gebruikersschermen kloppen — een A=B-consistentietoets tussen dataset, seed en schermen (LEIDEND voor WF-BEHEER-26).',
+      'De samenvattings-aantallen per tabel (Profiel … Vermogenssnapshots) zijn deterministisch en moeten gelijk zijn aan de persona-dataset (lib/test-personas.ts via seedPersonaData); de karakteristieke persona-kerngetallen (bv. Willems netto vermogen €1,62M) moeten daarna 1-op-1 op de gebruikersschermen kloppen — een A=B-consistentietoets tussen dataset, seed en schermen (LEIDEND voor WF-BEHEER-26). Sinds ADR 0155 omvat de post-onboarding-stand óók de AI-keuze: het geseede profiel staat op `ai_enabled=true` met `ai_consent_at` en de actuele `ai_consent_version`, en er wordt één `consent_events`-rij (kind ai_cloud, decision granted, source `seed`) geschreven — de samenvatting toont daarom ook "consent_events = 1", en na het seeden verschijnt de vergrendelde AI-keuze-overlay NIET (een seed zonder stempel zou elke UAT-run daarop laten vastlopen).',
     assertion: {
       kind: 'consistency',
       source:
-        'app/(app)/beheer/testdata/page.tsx + lib/test-personas.ts + lib/seed-persona.ts#seedPersonaData; API /api/admin/seed — seed-aantallen = dataset, kerngetallen = schermen (A=B), consistentietoets',
+        'app/(app)/beheer/testdata/page.tsx + lib/test-personas.ts + lib/seed-persona.ts#seedPersonaData (AI-consentstempel + consent_events-insert, AI_CONSENT_VERSION uit lib/ai/privacy-facts.ts); API /api/admin/seed — seed-aantallen = dataset, kerngetallen = schermen (A=B), consistentietoets',
     },
   },
   {
@@ -663,6 +667,23 @@ const criteria: AcceptanceCriterion[] = [
       kind: 'consistency',
       source:
         'lib/ai/ai-health.ts#deriveAiHealth (drempel 2 mislukte calls sinds laatste succes) + lib/ai/ai-health-loader.ts#loadAiHealth (service-role, isSuperAdmin-gated) + components/app/beheer/ai-status-card.tsx (AiHealthStrip op app/(app)/beheer/page.tsx, AiStatusCard op app/(app)/beheer/ai/page.tsx) — weergegeven status/sinds-tijdstip = afleiding uit ai_token_usage + error_logs (A=B), consistentietoets',
+    },
+  },
+  {
+    workflow: 'WF-BEHEER-39',
+    scenarioId: 'UAT-BEHEER-39',
+    titel: 'Gebruik per waardestroom bekijken — geanonimiseerd, k-anoniem (ADR 0153)',
+    kriticiteit: 'BELANGRIJK',
+    given:
+      '/beheer/gebruik (superadmin-only; de /beheer-layout-guard stuurt een niet-admin al server-side naar /overzicht). De server-loader roept twee service-role-RPC’s parallel aan (`admin_gebruik_analyse`, migratie 20260917121000, en `admin_gebruik_doorstroom`, migratie 20260917123000) die de indeling uit `app_settings.waardestromen` (standaard Vermogen · Budget · Toekomst · Grip · Fin) meekrijgt en uitsluitend k-onderdrukte tellingen teruggeeft — geen gebruikers-id, e-mailadres of losse datum. Filters: ?dagen= kiest een DISJUNCTE band (30 = laatste 30 dagen, 90 = 30–89 dagen geleden, 365 = 90–364 dagen geleden; standaard en bij een ongeldige waarde 30 — banden overlappen niet, zodat geen kleine groep uit het verschil van twee periodes volgt) en ?intern=1 (toont uitsluitend testaccounts/superadmins/demo-gebruikers, disjunct van het standaardsegment Extern — nooit beide samen). Bereikbaar via de "Meer over gebruik →"-link op /beheer/kpi en /beheer/waardestromen (WF-BEHEER-04/WF-BEHEER-14).',
+    when:
+      'De beheerder opent de pagina met verschillende ?dagen=/?intern=-combinaties en doorloopt de secties: kerncijfers (segment, actief en nieuw in de band, plus de band-onafhankelijke verdeling "laatst actief": vandaag/1–6/7–29/30–89/90+/nooit — géén geneste actief-vandaag/7/30-tegels meer) + weektrend in de band; per waardestroom (small multiples op gedeelde schaal, dominante stroom incl. "geen", overlap-verdeling); ritme per stroom (aandeel binnen ritme met n + mediaan naast het verwachte ritme; Toekomst/Fin tonen bewust geen ritme); doorstroom per actieve dag als Sankey (kolommen dag 1–4, knopen = waardestroom/meerdere/geen, uitloop "stopt", plus de verdeling precies 1/2/3/4/5+ actieve dagen) en van actieve dag naar volgende actieve dag (matrix) + app-delen die samen op één dag gebruikt worden; levenscyclus per aanmeldmaand (met rij "Eerder" en de markeringen "vóór de meting"/"deels gemeten"); eerste ervaring; en de expliciete lege staat "nog niet gemeten" (klikgedrag, schermvolgorde, sessieduur — fase 2, ADR 0154, nog niet gebouwd). Een tester opent de pagina ook (a) tegen een database zonder de RPC en (b) tegen een RPC die een cel met 1–4 gebruikers teruggeeft.',
+    then:
+      'Niet-superadmin → geen foutmelding, redirect naar /overzicht. Ontbreekt de databasefunctie: lege staat "nog niet uitgerold" (nooit nullen); faalt de RPC of wijkt de vorm af (schema/k/stroom-ids): foutstaat, geen stille nullen. Elke telling van 1 t/m 4 verschillende gebruikers toont "< 5", nooit het echte getal; bevat een verdeling met zichtbaar totaal zo’n kleine cel, dan tonen álle niet-nul cellen van die verdeling "verborgen" en blijft het totaal staan (alles-of-niets, lib/beheer/gebruik-analyse/onderdrukking.ts) — een onderdrukte cel is nooit een 0 of een geschaalde balk. In de Sankey is een overgang tussen twee dagen alleen zichtbaar als alle knopen en dagtotalen aan beide kanten zichtbaar zijn en geen enkele cel (ook "stopt") onder 5 ligt; anders één gearceerde zone "doorstroom verborgen" zonder banden (lib/beheer/gebruik-analyse/doorstroom.ts). Ontbreekt alleen de doorstroomfunctie, dan toont de Sankey "nog niet uitgerold" en blijft de rest van de pagina staan. Percentages verschijnen alleen mét hun noemer (n) en krijgen een waarschuwing onder n=40. Elke grafiek heeft een tabelweergave met dezelfde cellen. Er is geen doorklik naar personen, en het HTML/netwerkantwoord van de pagina bevat geen gebruikers-id, e-mailadres of exacte datum (alleen ISO-weeklabel/maand) — getoetst doordat GebruikAnalyseRuwSchema (schema.ts) strikt is en een afwijkende vorm als fout behandelt, niet stil doorlaat.',
+    assertion: {
+      kind: 'consistency',
+      source:
+        'app/(app)/beheer/gebruik/page.tsx (superadmin-redirect) + lib/beheer/gebruik-analyse/loader.ts#laadGebruikAnalyse/naarViewModel (RPC admin_gebruik_analyse, GebruikAnalyseRuwSchema) + lib/beheer/gebruik-analyse/onderdrukking.ts (GEBRUIK_K=5, onderdrukCel/onderdrukVerdeling) + lib/beheer/gebruik-analyse/doorstroom.ts (naarSankey, RPC admin_gebruik_doorstroom) — getoonde tellingen = k-onderdrukte database-aggregatie (A=B), geen losse berekening; afwezigheid van gebruikers-id/e-mail/datum bewaakt door lib/beheer/geen-inhoud.test.ts (docs/adr/0153-gebruik-per-waardestroom-geteld-met-k-anonimiteit.md)',
     },
   },
 ]

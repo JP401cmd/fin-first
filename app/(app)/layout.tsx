@@ -35,6 +35,8 @@ import type { SidebarSignals } from '@/components/app/shell/shell-contexts'
 import { PlatformBanner } from '@/components/app/platform-banner'
 import { VragenlijstSignaalProvider } from '@/components/app/vragenlijst/vragenlijst-signaal-provider'
 import { VragenlijstUitnodiging } from '@/components/app/vragenlijst/vragenlijst-uitnodiging'
+import { AiConsentInterstitial } from '@/components/app/ai-consent-interstitial'
+import { AI_CONSENT_VERSION } from '@/lib/ai/privacy-facts'
 import { parsePlatformStatus } from '@/lib/platform-status'
 import { CommandPaletteProvider } from '@/components/command-palette/command-palette-provider'
 import { computeFeatureAccess } from '@/lib/compute-feature-access'
@@ -677,6 +679,23 @@ export default async function AppLayout({
                                   aanwijst én het ~2,5 s stil is; op /beheer en
                                   in immersieve taakflows zwijgt hij helemaal. */}
                               <VragenlijstUitnodiging />
+                              {/* Eenmalige AI-keuze (ADR 0155) voor accounts zonder
+                                  vastgelegde keuze — of met een keuze voor een
+                                  oudere versie van de feiten (AI_CONSENT_VERSION
+                                  omhoog = opnieuw voorleggen). Niet wegklikbaar.
+                                  `Object.hasOwn` is de vangrail tegen een
+                                  verkeerde uitrolvolgorde: ontbreekt de kolom nog
+                                  (migratie 20260917130000 niet toegepast), dan is
+                                  dat "nog geen vraag" en geen app-brede muur
+                                  waarvan de POST óók zou falen. */}
+                              <AiConsentInterstitial
+                                open={
+                                  profile != null &&
+                                  Object.hasOwn(profile, 'ai_consent_at') &&
+                                  (profile.ai_consent_at == null ||
+                                    profile.ai_consent_version !== AI_CONSENT_VERSION)
+                                }
+                              />
                               {children}
                             </ResponsiveShell>
                           </PlanStatusProvider>

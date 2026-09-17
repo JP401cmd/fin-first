@@ -10,6 +10,7 @@ import type { HorizonData } from '@/lib/onboarding/horizon-draft'
 import type { AssetQuickInput, DebtQuickInput } from '@/lib/quick-add/types'
 
 import { OnboardingIdentity } from '@/components/onboarding/onboarding-identity'
+import { OnboardingAiKeuze } from '@/components/onboarding/onboarding-ai-keuze'
 import { OnboardingInkomen, parseBedragInput } from '@/components/onboarding/onboarding-inkomen'
 import { OnboardingBezittingen } from '@/components/onboarding/onboarding-bezittingen'
 import { OnboardingSchulden } from '@/components/onboarding/onboarding-schulden'
@@ -49,6 +50,13 @@ import {
 import { OnboardingFreedomTickerProvider } from '@/components/onboarding/freedom-ticker'
 import { INITIAL_HORIZON_DATA } from '@/lib/onboarding/horizon-draft'
 import { OnboardingSuccess } from '@/components/onboarding/onboarding-success'
+import { OnboardingBudget } from '@/components/onboarding/onboarding-budget'
+import { OnboardingBank } from '@/components/onboarding/onboarding-bank'
+import {
+  readOpenAfronding,
+  type AfrondingVoortgang,
+  type BankUitkomst,
+} from '@/lib/onboarding/afronding'
 import { WelcomePopup } from '@/components/onboarding/welcome-popup'
 import { type ModuleId, ALL_MODULES } from '@/lib/module-registry'
 import type { GoalSlug } from '@/lib/goals/types'
@@ -104,7 +112,8 @@ const SAVING_MESSAGES = [
  *
  * De grove 5-staps-iteratie is vervangen door micro-stappen, gegroepeerd per
  * onderwerp:
- *   · Profiel    → `naam`, `geboortedatum`   (één veld per scherm)
+ *   · Profiel    → `ai_keuze`, `naam`, `geboortedatum`
+ *                  (`ai_keuze` = "Fin en je gegevens", de AI-toestemming — ADR 0155)
  *   · Inkomen    → `inkomen`, `uitgaven`     (spaarquote-preview op `uitgaven`)
  *   · Bezittingen→ `bezittingen`             (begeleide ja/nee-enumeratie)
  *   · Schulden   → `schulden`                (begeleide ja/nee + altijd-uitgang)
@@ -122,6 +131,7 @@ const SAVING_MESSAGES = [
  * zodat self-healing restore werkt op oude localStorage-drafts.
  */
 type Step =
+  | 'ai_keuze'
   | 'naam'
   | 'geboortedatum'
   | 'inkomen'
@@ -134,6 +144,13 @@ type Step =
   | 'eindstrategie'
   | 'klaar'
   | 'saving'
+  // Afrondingsstappen ná de opslag (budget inrichten, bank koppelen). Bewust
+  // NIET in `computeStepOrder`: ze zijn alleen bereikbaar vanuit een geslaagde
+  // opslag (of een hervatting daarvan), nooit via vooruit/terug — terug naar
+  // `klaar` zou een tweede opslag uitlokken die budgetten en cash-rekeningen
+  // wist. Zie lib/onboarding/afronding.ts.
+  | 'budget'
+  | 'bank'
   | 'success'
 
 type Direction = 'forward' | 'back'
@@ -145,6 +162,8 @@ type Direction = 'forward' | 'back'
  * delen hetzelfde nummer.
  */
 const STEP_GROUP_INDEX: Record<Step, number> = {
+  // AI-toestemming (ADR 0155) deelt groep 1 met Profiel — geen extra groep.
+  ai_keuze: 1,
   naam: 1,
   geboortedatum: 1,
   inkomen: 2,
@@ -163,9 +182,12 @@ const STEP_GROUP_INDEX: Record<Step, number> = {
   eindstrategie: 7,
   klaar: 8,
   saving: 8,
-  success: 8,
+  // Eigen groep (9) "Je budget": budget inrichten + bank koppelen, ná de opslag.
+  budget: 9,
+  bank: 9,
+  success: 9,
 }
-const TOTAL_GROUPS = 8
+const TOTAL_GROUPS = 9
 
 /**
  * Canonical order of every step that has ever existed in the flow, used as a
@@ -179,6 +201,7 @@ const CANONICAL_STEP_ORDER: readonly string[] = [
   'doel',          // → naam (verwijderd jun 2026)
   'identity',      // → naam (gesplitst jun 2026)
   'goal',          // → naam (legacy)
+  'ai_keuze',      // toegevoegd sep 2026 — AI-toestemming vóór de eerste vraag (ADR 0155)
   'naam',
   'geboortedatum',
   'inkomen',
@@ -194,6 +217,8 @@ const CANONICAL_STEP_ORDER: readonly string[] = [
   'klaar',
   'nieuws_only',   // → naam (verwijderd jun 2026, samen met de doel-stap)
   'saving',
+  'budget',        // toegevoegd sep 2026 — afrondingsstap ná de opslag (niet herstelbaar uit een draft)
+  'bank',          // idem
   'success',
 ] as const
 
@@ -239,7 +264,7 @@ export function _resolveRestoredStep(lastStep: string | undefined, activeStepOrd
   step: Step
   healed: boolean
 } {
-  const terminalSteps: Step[] = ['saving', 'success']
+  const terminalSteps: Step[] = ['saving', 'budget', 'bank', 'success']
   const isSelectable = (s: Step): boolean => !terminalSteps.includes(s)
 
   // No saved step at all → start at naam (de eerste content-stap).
@@ -311,6 +336,7 @@ export function _firstNavigationRecoveryStep(activeStepOrder: Step[]): Step {
  */
 function computeStepOrder(): Step[] {
   return [
+    'ai_keuze',
     'naam',
     'geboortedatum',
     'inkomen',
@@ -443,7 +469,7 @@ type Action =
   | { type: 'RESTORE_STATE'; data: OnboardingDraft }
 
 export const _initialState: State = {
-  step: 'naam',
+  step: 'ai_keuze',
   direction: 'forward',
   selectedGoals: [],
   activeModules: [...ALL_MODULES],
@@ -754,6 +780,8 @@ export default function OnboardingPage() {
   // Uses useState instead of useSearchParams to avoid Suspense boundary requirement.
   const [bankConnected, setBankConnected] = useState(false)
   const [bankError, setBankError] = useState(false)
+  /** Netto maandinkomen voor de budgetstap: uit de opslag, of uit het profiel bij hervatten. */
+  const [afrondingIncome, setAfrondingIncome] = useState(0)
   // Welkomstpopup: alleen tonen bij eerste binnenkomst, niet bij restored-draft
   // (de gebruiker is dan al terug-bezig en de begroeting voelt op dat moment
   // als ruis). De show-beslissing wordt in de check-effect onderaan genomen
@@ -814,7 +842,7 @@ export default function OnboardingPage() {
 
       const { data: profile } = await supabase
         .from('profiles')
-        .select('onboarding_completed')
+        .select('onboarding_completed, module_guide_state, net_monthly_income')
         .eq('id', user.id)
         .single()
 
@@ -823,6 +851,40 @@ export default function OnboardingPage() {
         // Wissen vóór de redirect: een concept van een al voltooide onboarding
         // is dode, gevoelige data op de profielrij.
         await clearDraft()
+
+        // Opgeslagen, maar de afrondingsstappen (budget → bank) staan nog open:
+        // hervatten i.p.v. naar home. Dekt zowel de terugkeer van de bank in
+        // hetzelfde tabblad (?bank_connected / ?bank_error) als iemand die de app
+        // halverwege sloot. `restoreChecked` blijft dicht: na de opslag wordt er
+        // geen concept meer bewaard.
+        const openStap = readOpenAfronding(profile.module_guide_state)
+        if (openStap) {
+          const params = new URLSearchParams(window.location.search)
+          const bankTerug = params.get('bank_connected') === '1' || params.get('bank_error') === '1'
+          setAfrondingIncome(Number(profile.net_monthly_income) || 0)
+          if (bankTerug) {
+            setBankConnected(params.get('bank_connected') === '1')
+            setBankError(params.get('bank_error') === '1')
+          }
+          // Staat er al een plan terwijl de markering nog op `budget` staat (het
+          // doorschuiven na opslaan mislukte), dan laat de server hem door naar
+          // `bank` — een tweede opslag zou op de unieke slug-index botsen.
+          let hervatStap = openStap
+          if (!bankTerug && openStap === 'budget') {
+            try {
+              const res = await fetch('/api/onboarding/afronding', { cache: 'no-store' })
+              const body = res.ok ? ((await res.json()) as { stap?: string | null }) : null
+              if (body?.stap === 'bank') hervatStap = 'bank'
+            } catch {
+              // Best-effort: zonder antwoord hervatten we gewoon op de budgetstap.
+            }
+          }
+          dispatch({ type: 'SET_STEP', step: bankTerug ? 'bank' : hervatStap })
+          // Wel de laadspinner weghalen — anders blijft de hervatting hangen.
+          setLoading(false)
+          return
+        }
+
         // /dashboard = "ga naar home": de middleware vertaalt naar het gekozen
         // homescherm (profiles.home_screen).
         router.replace('/dashboard')
@@ -946,7 +1008,7 @@ export default function OnboardingPage() {
   //    toetsaanslag; zonder wachttijd zou dat evenzoveel PUT's kosten.
   useEffect(() => {
     if (!restoreChecked) return
-    if (['saving', 'success'].includes(state.step)) return
+    if (['saving', 'budget', 'bank', 'success'].includes(state.step)) return
     const draft = serializeDraft(state)
     // Nog niets te hervatten (net binnengekomen, niets ingevuld) → geen rij
     // beschrijven. Zodra er één antwoord staat, slaat dit om en blijft het om.
@@ -1263,7 +1325,11 @@ export default function OnboardingPage() {
       // terugdraaien (de volgende paginabezoek-check wist 'm alsnog).
       await draftWriter.clear()
 
-      dispatch({ type: 'SET_STEP', step: 'success' })
+      // Door naar de afrondingsstappen (budget → bank). Die draaien pas nu,
+      // omdat deze opslag budgetten en cash-rekeningen wist; de server heeft de
+      // afrondingsmarkering in dezelfde update geopend.
+      setAfrondingIncome(monthlyIncome)
+      dispatch({ type: 'SET_STEP', step: 'budget' })
     } catch (err) {
       let message: string
       if (err instanceof DOMException && err.name === 'AbortError') {
@@ -1292,6 +1358,37 @@ export default function OnboardingPage() {
       setSaving(false)
     }
   }, [saving, state, activeStepOrder, userAowAge])
+
+  // ── Afrondingsstappen (budget → bank) ─────────────────────────
+  // De markering op de server schuift mee, zodat een hervatting of de terugkeer
+  // van de bank op de juiste stap landt. Best-effort: een mislukte schrijf mag
+  // de gebruiker niet vastzetten (de markering verloopt vanzelf), maar we
+  // wachten er wél op vóór we verder gaan, zodat de volgende paginaload hem ziet.
+  const advanceAfronding = useCallback(async (body: AfrondingVoortgang) => {
+    try {
+      const res = await fetch('/api/onboarding/afronding', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      if (!res.ok) console.warn('[onboarding] afrondingsmarkering niet bijgewerkt', res.status)
+    } catch (err) {
+      console.warn('[onboarding] afrondingsmarkering niet bijgewerkt', err)
+    }
+  }, [])
+
+  const finishBudgetStep = useCallback(async (budget: 'opgeslagen' | 'overgeslagen') => {
+    // Eerst door naar de bank, dan de markering: zo is de budgetstap meteen weg
+    // (geen tweede opslagklik in het wachtvenster). De markering hoeft niet af te
+    // zijn vóór de bankstap — de callback keert ook bij `stap: 'budget'` terug.
+    dispatch({ type: 'SET_STEP', step: 'bank' })
+    await advanceAfronding({ stap: 'bank', budget })
+  }, [advanceAfronding])
+
+  const finishBankStep = useCallback(async (bank: BankUitkomst) => {
+    await advanceAfronding({ stap: 'klaar', bank })
+    dispatch({ type: 'SET_STEP', step: 'success' })
+  }, [advanceAfronding])
 
   // Defined after handleSaveOwnData so the safety-net branch below can call it
   // without tripping the no-use-before-define rule. goToNext is wired into
@@ -1592,6 +1689,16 @@ export default function OnboardingPage() {
           label={state.step === 'klaar' ? null : (freedomTicker?.label ?? null)}
         >
         <StepTransition key={state.step} direction={state.direction}>
+          {/* ── AI-toestemming (ADR 0155): eerste stap, schrijft zelf via
+              POST /api/consent/ai en gaat pas daarna door. ── */}
+          {state.step === 'ai_keuze' && (
+            <OnboardingAiKeuze
+              onNext={goToNext}
+              currentStep={currentContentStep}
+              totalSteps={totalContentSteps}
+            />
+          )}
+
           {/* ── Profiel-groep: naam + geboortedatum (één veld per scherm) ── */}
           {state.step === 'naam' && (
             <OnboardingIdentity
@@ -1869,6 +1976,26 @@ export default function OnboardingPage() {
                 <p className="mt-2 font-mono text-xs tabular-nums text-[var(--ink-4)]">{saveProgress}%</p>
               </div>
             </div>
+          )}
+
+          {state.step === 'budget' && (
+            <OnboardingBudget
+              netIncome={afrondingIncome}
+              onSaved={() => void finishBudgetStep('opgeslagen')}
+              onSkipped={() => void finishBudgetStep('overgeslagen')}
+              currentStep={currentContentStep}
+              totalSteps={totalContentSteps}
+            />
+          )}
+
+          {state.step === 'bank' && (
+            <OnboardingBank
+              result={bankConnected ? 'connected' : bankError ? 'error' : null}
+              onDone={() => void finishBankStep('gekoppeld')}
+              onSkipped={(reden) => void finishBankStep({ overgeslagen: reden })}
+              currentStep={currentContentStep}
+              totalSteps={totalContentSteps}
+            />
           )}
 
           {state.step === 'success' && (

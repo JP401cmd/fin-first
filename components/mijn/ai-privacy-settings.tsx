@@ -5,6 +5,29 @@ import { createClient } from '@/lib/supabase/client'
 import { Shield, Eye, EyeOff, Server, FileText } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { LegalEmail } from '@/components/legal/legal-email'
+import { postAiConsent } from '@/lib/ai/consent-client'
+import {
+  AI_FACT_HEADINGS,
+  AI_MASKED_FACTS,
+  AI_MASKING_NOTE,
+  AI_PROCESSING_FACTS,
+  AI_SHARED_FACTS,
+} from '@/lib/ai/privacy-facts'
+
+const CONSENT_DATE_FORMAT = new Intl.DateTimeFormat('nl-NL', {
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+})
+
+/** De regel onder de AI-schakelaar: wanneer en voor welke versie gekozen is (ADR 0155). */
+export function consentStatusLine(consentAt: string | null, version: string | null): string {
+  if (!consentAt) {
+    return 'Nog geen keuze vastgelegd — de vraag staat open.'
+  }
+  const datum = CONSENT_DATE_FORMAT.format(new Date(consentAt))
+  return `Keuze vastgelegd op ${datum} · versie ${version ?? 'onbekend'}`
+}
 
 /**
  * AiPrivacySettings — AI-toggle, financiële toelichting en de
@@ -13,14 +36,21 @@ import { LegalEmail } from '@/components/legal/legal-email'
  * /identity/instellingen-monolith (tab 'privacy' + privacy-modal) naar
  * /mijn/privacy (plan A-2, ontmanteling settings-monolith).
  *
- * Hergebruikt exact dezelfde profielvelden (ai_enabled, financial_context)
- * en optimistische update-logica als de monolith — geen nieuwe data-logica.
+ * De AI-schakelaar schrijft sinds ADR 0155 niet meer client-direct naar
+ * `profiles`, maar via `POST /api/consent/ai` (source `mijn-privacy`): elke
+ * omkering is een gelogde keuze. De transparantieblokken lezen dezelfde feiten
+ * als de onboarding-stap en de keuze-overlay (`lib/ai/privacy-facts.ts`).
+ * Het lezen van de eigen profielvelden blijft client-direct (eigen-rij prefs).
  */
 export function AiPrivacySettings() {
   const supabase = createClient()
 
-  const [aiEnabled, setAiEnabled] = useState(true)
+  const [aiEnabled, setAiEnabled] = useState(false)
+  const [aiLoaded, setAiLoaded] = useState(false)
   const [aiSaving, setAiSaving] = useState(false)
+  const [aiError, setAiError] = useState<string | null>(null)
+  const [consentAt, setConsentAt] = useState<string | null>(null)
+  const [consentVersion, setConsentVersion] = useState<string | null>(null)
   const [financialContext, setFinancialContext] = useState('')
   const [financialContextSaved, setFinancialContextSaved] = useState('')
   const [contextSaving, setContextSaving] = useState(false)
@@ -34,11 +64,14 @@ export function AiPrivacySettings() {
       if (!user) return
       const { data } = await supabase
         .from('profiles')
-        .select('ai_enabled, financial_context')
+        .select('ai_enabled, financial_context, ai_consent_at, ai_consent_version')
         .eq('id', user.id)
         .single()
       if (!active || !data) return
       if (data.ai_enabled != null) setAiEnabled(data.ai_enabled as boolean)
+      setConsentAt((data.ai_consent_at as string | null) ?? null)
+      setConsentVersion((data.ai_consent_version as string | null) ?? null)
+      setAiLoaded(true)
       if (data.financial_context) {
         setFinancialContext(data.financial_context as string)
         setFinancialContextSaved(data.financial_context as string)
@@ -49,22 +82,22 @@ export function AiPrivacySettings() {
     }
   }, [supabase])
 
-  const toggleAiEnabled = useCallback(
-    async (enabled: boolean) => {
-      setAiEnabled(enabled)
-      setAiSaving(true)
-      try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) throw new Error('Not authenticated')
-        const { error } = await supabase.from('profiles').update({ ai_enabled: enabled }).eq('id', user.id)
-        if (error) throw error
-      } catch {
-        setAiEnabled(!enabled)
-      }
-      setAiSaving(false)
-    },
-    [supabase],
-  )
+  const toggleAiEnabled = useCallback(async (enabled: boolean) => {
+    // Optimistisch omzetten, terugdraaien als het vastleggen mislukt.
+    setAiEnabled(enabled)
+    setAiSaving(true)
+    setAiError(null)
+    const result = await postAiConsent(enabled ? 'granted' : 'withdrawn', 'mijn-privacy')
+    if (result.ok) {
+      setAiEnabled(result.data.aiEnabled)
+      setConsentAt(result.data.consentAt)
+      setConsentVersion(result.data.version)
+    } else {
+      setAiEnabled(!enabled)
+      setAiError(result.error)
+    }
+    setAiSaving(false)
+  }, [])
 
   const saveFinancialContext = useCallback(async () => {
     setContextSaving(true)
@@ -151,13 +184,23 @@ export function AiPrivacySettings() {
                   ? 'AI-briefing, chat en gepersonaliseerd nieuws zijn actief.'
                   : 'AI is uitgeschakeld. De app werkt als puur financieel dashboard.'}
               </p>
+              {aiLoaded && (
+                <p className="mt-1.5 font-mono text-[11px] text-[var(--ink-4)]" aria-live="polite">
+                  {consentStatusLine(consentAt, consentVersion)}
+                </p>
+              )}
+              {aiError && (
+                <p role="alert" className="mt-1.5 text-xs text-negative">
+                  {aiError}
+                </p>
+              )}
             </div>
             <button
               type="button"
               role="switch"
               aria-checked={aiEnabled}
               aria-label={`AI-features ${aiEnabled ? 'uitschakelen' : 'inschakelen'}`}
-              disabled={aiSaving}
+              disabled={aiSaving || !aiLoaded}
               onClick={() => toggleAiEnabled(!aiEnabled)}
               className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-wil-500 disabled:opacity-50 ${aiEnabled ? 'bg-wil-500' : 'bg-zinc-300'}`}
             >
@@ -185,19 +228,10 @@ export function AiPrivacySettings() {
               <div className="flex h-7 w-7 items-center justify-center bg-wil-50">
                 <Eye className="h-4 w-4 text-wil-600" aria-hidden="true" />
               </div>
-              <h3 className="text-sm font-semibold text-[var(--ink)]">Wat wordt gedeeld</h3>
+              <h3 className="text-sm font-semibold text-[var(--ink)]">{AI_FACT_HEADINGS.shared}</h3>
             </div>
             <ul className="space-y-2 text-sm text-[var(--ink-2)]">
-              {[
-                'Geaggregeerde bedragen (netto vermogen, totale inkomsten/uitgaven)',
-                "Percentages en ratio's (spaarquote, vrijheidspercentage, SWR)",
-                'Budgetcategorieën en bijbehorende bedragen',
-                'Leeftijd (niet je geboortedatum)',
-                'Huishoudtype en temporal balance level',
-                'De vraag die je zelf aan Fin typt — zoals jij hem typt',
-                'Bij document-import: de volledige tekst van het document dat je uploadt',
-                'Bij abonnement-herkenning: de omschrijvingen van je transacties',
-              ].map((item) => (
+              {AI_SHARED_FACTS.map((item) => (
                 <li key={item} className="flex items-start gap-2">
                   <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-wil-400" />
                   <span>{item}</span>
@@ -212,23 +246,13 @@ export function AiPrivacySettings() {
               <div className="flex h-7 w-7 items-center justify-center bg-negative/10">
                 <EyeOff className="h-4 w-4 text-negative" aria-hidden="true" />
               </div>
-              <h3 className="text-sm font-semibold text-[var(--ink)]">Wat wordt gemaskeerd</h3>
+              <h3 className="text-sm font-semibold text-[var(--ink)]">{AI_FACT_HEADINGS.masked}</h3>
             </div>
             <p className="mb-3 text-xs text-[var(--ink-3)] leading-relaxed">
-              Op de chat-, categorisatie- en nieuwsroutes maskeren we
-              persoonsgegevens automatisch vóór verzending. Bij document-import
-              en abonnement-herkenning gaat de brontekst zelf mee — zonder die
-              inhoud kan de functie niet werken.
+              {AI_MASKING_NOTE}
             </p>
             <ul className="space-y-2 text-sm text-[var(--ink-2)]">
-              {[
-                "Namen (vervangen door 'gebruiker' / 'partner')",
-                'IBAN-nummers en bankrekeningen',
-                'BSN (burgerservicenummer)',
-                'E-mailadressen en telefoonnummers',
-                'Adressen en postcodes',
-                'Geboortedatum (vervangen door leeftijd)',
-              ].map((item) => (
+              {AI_MASKED_FACTS.map((item) => (
                 <li key={item} className="flex items-start gap-2">
                   <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-negative/70" />
                   <span>{item}</span>
@@ -243,36 +267,17 @@ export function AiPrivacySettings() {
               <div className="flex h-7 w-7 items-center justify-center bg-horizon-50">
                 <Server className="h-4 w-4 text-horizon-600" aria-hidden="true" />
               </div>
-              <h3 className="text-sm font-semibold text-[var(--ink)]">Hoe je data wordt verwerkt</h3>
+              <h3 className="text-sm font-semibold text-[var(--ink)]">{AI_FACT_HEADINGS.processing}</h3>
             </div>
             <ul className="space-y-2 text-sm text-[var(--ink-2)]">
-              <li className="flex items-start gap-2">
-                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-horizon-400" />
-                <span>
-                  <strong>Geen training:</strong> je gegevens worden door de AI-providers niet gebruikt
-                  om modellen te trainen
-                </span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-horizon-400" />
-                <span>
-                  <strong>Korte provider-retentie:</strong> AI-providers (Anthropic, OpenAI) bewaren
-                  verzoeken kortdurend volgens hun eigen voorwaarden, o.a. voor misbruikdetectie
-                </span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-horizon-400" />
-                <span>
-                  <strong>Data-minimalisatie:</strong> per functie gaat alleen de context mee die voor
-                  die taak nodig is — nooit je volledige dataset
-                </span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-horizon-400" />
-                <span>
-                  <strong>Versleuteld:</strong> alle communicatie verloopt via HTTPS/TLS
-                </span>
-              </li>
+              {AI_PROCESSING_FACTS.map((fact) => (
+                <li key={fact.title} className="flex items-start gap-2">
+                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-horizon-400" />
+                  <span>
+                    <strong>{fact.title}:</strong> {fact.text}
+                  </span>
+                </li>
+              ))}
             </ul>
           </div>
 

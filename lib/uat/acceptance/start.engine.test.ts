@@ -21,7 +21,7 @@ import { UAT_SCENARIOS } from '@/lib/uat/catalog'
 import type { AcceptanceCriterion } from './types'
 
 /** De START-scenario's zoals de catalogus ze kent (bron van waarheid voor
- *  WELKE workflows bestaan). START is aaneengesloten 01..29, geen gaten. */
+ *  WELKE workflows bestaan). START is aaneengesloten 01..30, geen gaten. */
 const catalogStartWorkflows = UAT_SCENARIOS.filter((s) => s.zone === 'START').map((s) => s.wf).sort()
 
 function criterion(workflow: string): AcceptanceCriterion {
@@ -31,11 +31,11 @@ function criterion(workflow: string): AcceptanceCriterion {
 }
 
 describe('UAT Start — acceptatiecriteria dekking', () => {
-  it('heeft precies één criterium per catalogus-START-scenario (01..29, geen gaten)', () => {
+  it('heeft precies één criterium per catalogus-START-scenario (01..37, geen gaten)', () => {
     const workflows = START_ACCEPTANCE.criteria.map((c) => c.workflow).sort()
     expect(workflows).toEqual(catalogStartWorkflows)
     expect(new Set(workflows).size).toBe(catalogStartWorkflows.length)
-    expect(workflows.length).toBe(29)
+    expect(workflows.length).toBe(37)
   })
 
   it('elk criterium heeft een geldige assertion.kind', () => {
@@ -61,21 +61,26 @@ describe('UAT Start — acceptatiecriteria dekking', () => {
       .sort()
     const checkWorkflows = START_ENGINE_CHECKS.map((c) => c.workflow).sort()
     expect(checkWorkflows).toEqual(exactWorkflows)
-    expect(exactWorkflows.length).toBe(9)
+    expect(exactWorkflows.length).toBe(12)
   })
 
-  it('markeert de niet-exacte scenario\'s met de juiste kind (allemaal ui-only)', () => {
+  it('markeert de niet-exacte scenario\'s met de juiste kind (ui-only)', () => {
     const uiOnly = [
       'WF-START-01', 'WF-START-02', 'WF-START-03', 'WF-START-05',
       'WF-START-07', 'WF-START-09', 'WF-START-11', 'WF-START-12',
       'WF-START-13', 'WF-START-14', 'WF-START-15', 'WF-START-16',
       'WF-START-17', 'WF-START-22', 'WF-START-23', 'WF-START-24',
-      'WF-START-25', 'WF-START-26',
+      'WF-START-25', 'WF-START-26', 'WF-START-33', 'WF-START-35',
+      'WF-START-36',
     ]
     for (const wf of uiOnly) {
       expect(criterion(wf).assertion.kind, `${wf} moet ui-only zijn`).toBe('ui-only')
     }
-    expect(uiOnly.length).toBe(18)
+    expect(uiOnly.length).toBe(21)
+  })
+
+  it('markeert het consistency-criterium voor de budget-categorie-bewerking (WF-START-32)', () => {
+    expect(criterion('WF-START-32').assertion.kind).toBe('consistency')
   })
 })
 

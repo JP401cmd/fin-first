@@ -137,6 +137,7 @@ describe('EindsituatieNotice — Fin-knop', () => {
     expect(chat.openWithMessage).toHaveBeenCalledTimes(1)
     const bericht = chat.openWithMessage.mock.calls[0][0] as string
     expect(bericht).toContain('Hoe komt dat?')
+    expect(bericht).toContain('De uitleg bij mijn plan noemt deze oorzaken')
     expect(bericht).not.toMatch(/€|\d{3}\.\d{3}/)
   })
 

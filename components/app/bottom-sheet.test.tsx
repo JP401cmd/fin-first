@@ -360,6 +360,80 @@ describe('BottomSheet — sluit-poort onRequestClose', () => {
 // rekeningdetail) liet zich niet scrollen — de browser mocht het gebaar nooit
 // als scroll uitvoeren. Given een sheet ín een sheet, When de gebruiker in de
 // kind-sheet veegt, Then houdt de ouder zich stil en blijft het gebaar native.
+/**
+ * `lockedOpen` (ADR 0155): één prop zet élke sluitroute uit — X, Escape,
+ * backdrop, swipe-down. Anders dan `onRequestClose` (een vraag, die de swipe
+ * met opzet doorlaat) is dit een feit: alleen de ouder sluit via `open`.
+ */
+describe('BottomSheet — lockedOpen (vergrendeld open)', () => {
+  function renderLocked() {
+    const onClose = vi.fn()
+    render(
+      <BottomSheet open onClose={onClose} title="Test" lockedOpen closeOnBackdropClick>
+        <p>inhoud</p>
+      </BottomSheet>,
+    )
+    const dialog = screen.getByRole('dialog')
+    return { onClose, dialog, backdrop: dialog.parentElement as HTMLElement }
+  }
+
+  it('toont geen X-knop', () => {
+    renderLocked()
+    expect(screen.queryByLabelText('Sluiten')).toBeNull()
+  })
+
+  it('sluit niet via Escape, ook niet via een backdrop-klik die anders wél zou sluiten', () => {
+    const { onClose, backdrop } = renderLocked()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    fireEvent.click(backdrop)
+    expect(onClose).not.toHaveBeenCalled()
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+  })
+
+  it('laat zich niet weg-swipen (het gebaar staat uit)', async () => {
+    const { dialog, onClose } = renderLocked()
+    fireEvent.touchStart(dialog, { touches: [{ clientX: 0, clientY: 0 }] })
+    fireEvent.touchMove(document, { touches: [{ clientX: 0, clientY: 160 }] })
+    fireEvent.touchEnd(document)
+    await new Promise((r) => setTimeout(r, 350))
+    expect(onClose).not.toHaveBeenCalled()
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+  })
+
+  it('houdt bij de mobiele terug-knop de sheet én zijn history-entry (de pagina wordt niet verlaten)', () => {
+    __resetOverlayHistory()
+    window.history.replaceState(null, '')
+    const pushSpy = vi.spyOn(window.history, 'pushState')
+    vi.spyOn(window.history, 'back').mockImplementation(() => {})
+
+    const { onClose } = renderLocked()
+    expect(pushSpy).toHaveBeenCalledTimes(1)
+
+    window.dispatchEvent(new PopStateEvent('popstate'))
+
+    expect(onClose).not.toHaveBeenCalled()
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    // Entry teruggeduwd: de volgende terug-druk verlaat niet stil de pagina.
+    expect(pushSpy).toHaveBeenCalledTimes(2)
+    expect(getOverlayHistoryDepth()).toBe(1)
+  })
+
+  it('gaat wél dicht zodra de ouder `open` uitzet', async () => {
+    const onClose = vi.fn()
+    const { rerender } = render(
+      <BottomSheet open onClose={onClose} title="Test" lockedOpen>
+        <p>inhoud</p>
+      </BottomSheet>,
+    )
+    rerender(
+      <BottomSheet open={false} onClose={onClose} title="Test" lockedOpen>
+        <p>inhoud</p>
+      </BottomSheet>,
+    )
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  })
+})
+
 describe('BottomSheet — geneste sheet houdt zijn eigen gebaar', () => {
   it('start GEEN ouder-drag bij een touch die in een geneste sheet begint', () => {
     const ouderSluit = vi.fn()

@@ -62,7 +62,7 @@ function NotifToggleRow({
 
 /**
  * /mijn/notificaties — geëxtraheerd uit het 1823-regel identity/instellingen
- * monster. Bevat alle notif-instellingen: push-types, partner-transactie-
+ * monster. Bevat alle notif-instellingen: in-app meldingstypen, partner-transactie-
  * meldingen (mode + drempel/categorie-picker) en de maandelijkse geld-
  * checkin-toggle.
  *
@@ -208,7 +208,7 @@ export default function MijnNotificatiesPage() {
     setNotifPrefs((prev) => ({ ...prev, [type]: !prev[type] }))
   }, [])
 
-  // ─ MIJN-3: hoofdschakelaar over de push-types ─────────────────────────────
+  // ─ MIJN-3: hoofdschakelaar over de meldingstypen ──────────────────────────
   //
   // In Eenvoudig staan de zeven losse types achter een disclosure; daarboven
   // staat één regel "Meldingen in de app". Die regel is PRESENTATIE over
@@ -329,7 +329,7 @@ export default function MijnNotificatiesPage() {
         titleBefore="Wat je hoort "
         emphasis="en wanneer"
         titleAfter=""
-        deck="Stel in welke meldingen je wilt ontvangen — push-types, partner-transacties en maandelijkse geld-checkin."
+        deck="Stel in welke meldingen je wilt ontvangen — meldingstypen in de app, partner-transacties en maandelijkse geldcheck-in."
       >
         <PageInfoButton
           content={getPageInfo('/mijn/notificaties')}
@@ -340,12 +340,18 @@ export default function MijnNotificatiesPage() {
       {/* Context-banner: maakt duidelijk waar deze meldingen verschijnen.
           User-feedback (mei 2026): "het is mij niet duidelijk welke
           notificaties dit zijn, die van de coach of die in het meldingen
-          scherm terecht komen?". */}
+          scherm terecht komen?".
+          UR3-21 (sep 2026): hier stond "push-meldingen die je op je apparaat
+          ontvangt" — maar er is geen web-push (app/sw.ts heeft geen
+          push-handler, er is geen abonnement-opslag). Deze meldingen bestaan
+          alleen in de app, dus de copy belooft niets anders meer; page.test.tsx
+          bewaakt dat "push" en "op je apparaat" niet terugkomen. */}
       <div className="mb-4 border border-[var(--border-ed)] bg-[var(--subtle)] p-3 sm:p-4 text-xs sm:text-sm text-[var(--ink-2)]">
         <p className="leading-relaxed">
-          <span className="font-semibold text-[var(--ink)]">Push-meldingen</span>{' '}
-          die je op je apparaat ontvangt — ook bekend onder het{' '}
-          <em>belletje</em>-icoon op /berichten. De{' '}
+          <span className="font-semibold text-[var(--ink)]">Deze meldingen verschijnen in de app</span>{' '}
+          — onder het <em>belletje</em> op /berichten, zolang je de app open hebt.
+          Er gaat niets naar je telefoon; alleen de briefing kun je hieronder apart
+          per e-mail aanzetten. De{' '}
           <span className="font-semibold text-[var(--ink)]">Fin-coach</span> heeft
           een eigen meldingen-stream onder &quot;Berichten&quot; in het hoofdmenu.
           Die twee zijn los van elkaar.
@@ -369,7 +375,7 @@ export default function MijnNotificatiesPage() {
                   <NotifToggleRow
                     Icon={Bell}
                     label="Meldingen in de app"
-                    description={`Push-meldingen op je apparaat — ${notifOnCount} van ${NOTIFICATION_TYPES.length} typen aan`}
+                    description={`Onder het belletje in de app — ${notifOnCount} van ${NOTIFICATION_TYPES.length} typen aan`}
                     enabled={anyNotifOn}
                     onToggle={toggleAllNotifPrefs}
                   />

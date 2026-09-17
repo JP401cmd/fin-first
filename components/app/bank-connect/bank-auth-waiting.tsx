@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { ConnectionOutcome } from '@/lib/truelayer/connection-outcome'
@@ -41,6 +41,8 @@ export function BankAuthWaiting({
   connectionId,
   onCancel,
   compact = false,
+  onSuccess,
+  showAccountsLink = true,
 }: {
   /** De `bank_connections`-rij die `auth-link` voor deze poging aanmaakte. */
   connectionId: string
@@ -48,9 +50,26 @@ export function BankAuthWaiting({
   onCancel: () => void
   /** Kaartvariant (herstelactie op de rekening) in plaats van een volle stap. */
   compact?: boolean
+  /**
+   * Wat er gebeurt als de koppeling gelukt is. Weggelaten = door naar
+   * `/core/cash/connect/success` (de wizard). De onboarding geeft hier zijn eigen
+   * succesweergave mee, omdat die flow niet naar de app-succespagina hoort te springen.
+   */
+  onSuccess?: () => void
+  /**
+   * Toon de link "Naar je rekeningen" (standaard aan). De onboarding zet 'm uit:
+   * tijdens de afrondingsstappen is `/core/cash` geen plek om heen te gaan.
+   */
+  showAccountsLink?: boolean
 }) {
   const router = useRouter()
   const [view, setView] = useState<View>('wachten')
+  // Ref en geen effect-dependency: een inline callback van de ouder zou anders bij
+  // elke render de polling herstarten (en de kwartier-teller resetten).
+  const onSuccessRef = useRef(onSuccess)
+  useEffect(() => {
+    onSuccessRef.current = onSuccess
+  }, [onSuccess])
 
   useEffect(() => {
     const startedAt = Date.now()
@@ -66,8 +85,10 @@ export function BankAuthWaiting({
       const outcome = await fetchOutcome(connectionId)
       if (stopped || outcome === null || outcome === 'wachten') return
       stopped = true
-      if (outcome === 'gelukt') router.replace('/core/cash/connect/success')
-      else setView(outcome === 'sessie' ? 'sessie' : 'mislukt')
+      if (outcome === 'gelukt') {
+        if (onSuccessRef.current) onSuccessRef.current()
+        else router.replace('/core/cash/connect/success')
+      } else setView(outcome === 'sessie' ? 'sessie' : 'mislukt')
     }
 
     const interval = window.setInterval(() => {
@@ -124,12 +145,14 @@ export function BankAuthWaiting({
       </p>
       <p className="mt-1 text-xs text-[var(--ink-2)]">{body}</p>
       <div className={`mt-4 flex flex-wrap items-center gap-3 ${compact ? '' : 'justify-center'}`}>
-        <Link
-          href="/core/cash"
-          className="text-xs font-medium text-kern-700 underline underline-offset-2"
-        >
-          Naar je rekeningen
-        </Link>
+        {showAccountsLink && (
+          <Link
+            href="/core/cash"
+            className="text-xs font-medium text-kern-700 underline underline-offset-2"
+          >
+            Naar je rekeningen
+          </Link>
+        )}
         <button
           type="button"
           onClick={onCancel}

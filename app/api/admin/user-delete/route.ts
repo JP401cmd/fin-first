@@ -80,7 +80,15 @@ export async function POST(req: Request) {
   })
 
   try {
-    const deletionSummary = await deleteAllUserData(service, userId)
+    // Volledige wis, dus mét service-opties: anders slaat deleteAllUserData de
+    // service-only stappen over (storage-buckets ADR 0152, batch 5) — het eerste
+    // argument zíjn van de service-role maakt dat niet goed, de functie kan een
+    // service-client niet van een sessie-client onderscheiden. De DB-cascade
+    // vanaf auth.users dekt de tabellen, maar de buckets niet.
+    const deletionSummary = await deleteAllUserData(service, userId, undefined, {
+      service,
+      fullErase: true,
+    })
     const { error: authErr } = await service.auth.admin.deleteUser(userId)
     if (authErr) {
       return serverError(authErr, 'admin-user-delete:POST')

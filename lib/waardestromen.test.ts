@@ -31,8 +31,8 @@ describe('parseWaardestromen', () => {
     expect(parseWaardestromen(JSON.stringify(cfg))).toEqual(cfg)
   })
 
-  it('de standaard is Vermogen · Budget · Toekomst · Fin', () => {
-    expect(STANDAARD_WAARDESTROMEN.stromen.map((s) => s.naam)).toEqual(['Vermogen', 'Budget', 'Toekomst', 'Fin'])
+  it('de standaard is Vermogen · Budget · Toekomst · Grip · Fin', () => {
+    expect(STANDAARD_WAARDESTROMEN.stromen.map((s) => s.naam)).toEqual(['Vermogen', 'Budget', 'Toekomst', 'Grip', 'Fin'])
     expect(WaardestromenSchema.safeParse(STANDAARD_WAARDESTROMEN).success).toBe(true)
   })
 
@@ -58,7 +58,7 @@ describe('dominanteStroom', () => {
   it('telt VERSCHILLENDE dagen per stroom, over al haar modules', () => {
     // Vermogen: overzicht op 1-3 en bezittingen op 2-5 → dagen 1..5 = 5.
     const r = dominanteStroom([...dagen('overzicht', 3), ...dagen('bezittingen', 4, 2), ...dagen('toekomst', 2)], STANDAARD_WAARDESTROMEN)
-    expect(r.dagenPerStroom).toEqual({ vermogen: 5, budget: 0, toekomst: 2, fin: 0 })
+    expect(r.dagenPerStroom).toEqual({ vermogen: 5, budget: 0, toekomst: 2, grip: 0, fin: 0 })
     expect(r.stroom).toBe('vermogen')
   })
 
@@ -85,7 +85,7 @@ describe('dominanteStroom', () => {
   it('geen rijen → geen stroom, geen throw', () => {
     expect(dominanteStroom([], STANDAARD_WAARDESTROMEN)).toEqual({
       stroom: null,
-      dagenPerStroom: { vermogen: 0, budget: 0, toekomst: 0, fin: 0 },
+      dagenPerStroom: { vermogen: 0, budget: 0, toekomst: 0, grip: 0, fin: 0 },
     })
   })
 })

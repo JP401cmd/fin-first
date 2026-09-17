@@ -25,6 +25,10 @@
  *    {@link USER_ACTIVITY_RETENTION_DAYS}.
  *  - user_activity_modules 400 dgn op `day` (ADR 0147, fase 2) — dezelfde
  *    termijn en kolom als user_activity_days, dus dezelfde constante.
+ *
+ * Buiten de tabellen: de privé storage-bucket met schermafbeeldingen bij
+ * meldingen (ADR 0152), 90 dagen op `created_at` van het object — zie
+ * {@link USER_REPORT_SCREENSHOT_RETENTION_DAYS}.
  */
 
 /** Retentie in MAANDEN per log-/usage-tabel (op basis van `created_at`). */
@@ -65,6 +69,29 @@ export const LEAD_INTAKES_RETENTION_DAYS = 90
  * {@link retentionCutoffDate}.
  */
 export const USER_ACTIVITY_RETENTION_DAYS = 400
+
+/**
+ * Schermafbeeldingen bij meldingen (bucket `user-report-screenshots`, ADR 0152):
+ * 90 dagen na upload. De melding zelf (`user_reports`, tekst) heeft geen
+ * bewaartermijn; het beeld wél, en een kortere dan de tekst — een schermafbeelding
+ * van een financieel scherm kan saldi, namen en rekeningnummers dragen, terwijl
+ * de tekst van de melder gecureerd is. Triage gebeurt binnen dagen en de Notion-
+ * push tekent een 48-uurs signed URL (lib/user-reports/notion.ts), dus na 90
+ * dagen leest niemand het beeld nog. Zelfde termijn als lead_intakes (ADR 0022).
+ * Gehandhaafd door de retentie-cron via lib/user-data-buckets.ts.
+ */
+export const USER_REPORT_SCREENSHOT_RETENTION_DAYS = 90
+
+/**
+ * ISO-timestamp van de cutoff voor een termijn in DAGEN: objecten/rijen met een
+ * `created_at` ouder dan dit worden gepurged. Tegenhanger van
+ * {@link retentionCutoffIso} (maanden) en {@link retentionCutoffDate} (kalenderdag).
+ */
+export function retentionCutoffDaysIso(days: number, now: Date = new Date()): string {
+  const d = new Date(now)
+  d.setUTCDate(d.getUTCDate() - days)
+  return d.toISOString()
+}
 
 /**
  * Cutoff als `YYYY-MM-DD` voor een `date`-kolom: rijen met een dag vóór deze

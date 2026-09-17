@@ -31,6 +31,13 @@ export interface EindsituatieCopy {
   onduidelijk: string | null
   /** Vooraf ingevulde vraag voor Fin — bewust zonder bedragen. */
   finVraag: string
+  /**
+   * De oorzaken uit deze melding in de ik-vorm voor het Fin-gesprek — instellingen en
+   * leeftijden, bewust zonder bedragen. Fins AI-context kent de tekort-lening, het
+   * opeetplafond en de eindsituatie-detector niet; zonder deze regel valt Fin terug op
+   * een algemene rendementsuitleg.
+   */
+  finContext: string
   disclaimer: string
 }
 
@@ -64,6 +71,26 @@ function oorzaakZin(o: EindOorzaak, input: EindsituatieCopyInput): string {
     }
     case 'dalend-profiel':
       return `Vanaf ${opLeeftijd} rekent je plan met lagere uitgaven dan in de eerste jaren na je stopmoment. Wat daardoor niet wordt uitgegeven, blijft staan.`
+  }
+}
+
+/** Dezelfde oorzaak als `oorzaakZin`, in de ik-vorm en zonder bedragen (voor Fin). */
+function finOorzaak(o: EindOorzaak): string {
+  const age = heel(o.age)
+  const op = age != null ? `mijn ${age}e` : 'een later moment'
+  switch (o.id) {
+    case 'nu-stoppen':
+      return 'mijn vermogen is nu al groot genoeg om te stoppen, dus het vroegste stopmoment is vandaag en wat ik niet nodig heb blijft staan'
+    case 'geen-tekort-lening':
+      return `mijn plan gebruikt geen tekort-lening (standaardinstelling); rond ${op} is mijn liquide geld (bijna) op en dat moment bepaalt mijn vroegste stopmoment, eerder stoppen zou daar een lening vragen, en daarna groeit het vermogen weer`
+    case 'opeet-plafond':
+      return `op ${op} is het leenplafond van mijn opeethypotheek bereikt; daarna komt er geen nieuw geld uit mijn huis en draagt mijn liquide vermogen de jaren erna zelf, wat mee bepaalt hoe vroeg ik kan stoppen`
+    case 'later-inkomen':
+      return `vanaf ${op} dekt inkomen (AOW, pensioen of de bijdrage van mijn partner) mijn uitgaven, zodat mijn vermogen niet meer wordt aangesproken en doorgroeit`
+    case 'late-baten':
+      return `op ${op} komt er eenmalig geld binnen (bijvoorbeeld erfenis of verkoop) dat na mijn stopmoment niet meer nodig is`
+    case 'dalend-profiel':
+      return `vanaf ${op} rekent mijn plan met lagere uitgaven dan in de eerste jaren na mijn stopmoment`
   }
 }
 
@@ -101,7 +128,23 @@ export function buildEindsituatieCopy(input: EindsituatieCopyInput): Eindsituati
       : 'Er is uit de berekening niet één regel aan te wijzen die dit verklaart.'
 
   const vorm = endForm === 'legacy' ? 'een nalatenschap' : endForm === 'perpetual' ? '"niet laten slinken"' : '"vermogen opeten"'
-  const finVraag = `Ik heb ${vorm} gekozen, maar in mijn plan blijft er op mijn ${eind}e veel meer over dan ik verwacht. Hoe komt dat?`
+  const finVraag = `Ik heb ${vorm} gekozen, maar in mijn plan blijft er op mijn ${eind}e veel meer over dan ik verwacht. Hoe komt dat? Leg per oorzaak uit hoe die instelling of dat moment dit eindbedrag veroorzaakt en welke het zwaarst weegt, in plaats van een algemene uitleg over rendement.`
+
+  const finDelen: string[] = []
+  if (duiding.oorzaken.length > 0) {
+    finDelen.push(
+      `De uitleg bij mijn plan noemt deze oorzaken: ${duiding.oorzaken.map((o, i) => `(${i + 1}) ${finOorzaak(o)}`).join('; ')}.`,
+    )
+  }
+  if (huis || opeetschuld) {
+    const buiten = [
+      huis ? 'de overwaarde van mijn huis' : null,
+      opeetschuld ? 'de opeetschuld (die tegenover mijn huis staat)' : null,
+    ].filter(Boolean)
+    finDelen.push(`Niet in het overschot zit: ${buiten.join(' en ')}.`)
+  }
+  if (onduidelijk) finDelen.push(onduidelijk.replace(/^Hier spelen/, 'Volgens de uitleg spelen').replace(/^Er is uit/, 'Volgens de uitleg is er uit'))
+  const finContext = finDelen.join(' ')
 
   return {
     kop,
@@ -110,6 +153,7 @@ export function buildEindsituatieCopy(input: EindsituatieCopyInput): Eindsituati
     context,
     onduidelijk,
     finVraag,
+    finContext,
     disclaimer: 'Indicatie, geen advies — een rekenuitkomst bij je huidige aannames.',
   }
 }

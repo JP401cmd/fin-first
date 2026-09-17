@@ -16,6 +16,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import { Plus, RotateCcw, Trash2 } from 'lucide-react'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { ModalFooter } from '@/components/app/modal-footer'
@@ -191,7 +192,15 @@ export function WaardestromenEditor() {
 
   return (
     <div>
-      <h2 className="font-display text-lg font-semibold text-[var(--ink)]">Waardestromen</h2>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="font-display text-lg font-semibold text-[var(--ink)]">Waardestromen</h2>
+        <Link
+          href="/beheer/gebruik"
+          className="text-xs text-[var(--ink-3)] underline decoration-[var(--border-md)] underline-offset-2 hover:text-[var(--ink)]"
+        >
+          Meer over gebruik →
+        </Link>
+      </div>
 
       {/* Uitleg — keuze · effect · waarom */}
       <div className="mt-3 max-w-2xl space-y-2 font-serif text-sm leading-relaxed text-[var(--ink-2)]">

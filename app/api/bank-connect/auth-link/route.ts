@@ -11,9 +11,11 @@ import {
   loadOccupyingLink,
   occupiedTargetAccountMessage,
   resolveTargetAccount,
+  TARGET_ACCOUNT_UNAVAILABLE_MESSAGE,
   type TargetAccountRow,
   type TargetAssetRow,
 } from '@/lib/truelayer/target-account'
+import { ensureCompanionForCashAsset } from '@/lib/truelayer/target-asset'
 import { setBudgetTracking } from '@/lib/budget-tracking'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -158,6 +160,15 @@ const AuthLinkSchema = z
      */
     target_bank_account_id: z.string().uuid('ongeldige rekening').nullish(),
     /**
+     * Alternatief voor `target_bank_account_id`: een CASH-BEZIT zonder eigen
+     * companion-rij (bv. de betaalrekening uit de onboarding). De server toetst
+     * eigenaarschap, maakt de companion aan via `syncBankAccountCompanion` en loopt
+     * daarna exact het `target_bank_account_id`-pad — zie
+     * `ensureCompanionForCashAsset`. De client levert dus nooit zelf de rekening-id
+     * die de koppeling gaat dragen.
+     */
+    target_asset_id: z.string().uuid('ongeldige rekening').nullish(),
+    /**
      * HERSTELPAD (fase 7): de `bank_connection_accounts`-rij waarvan de
      * autorisatie hersteld wordt. Aanwezig ⇒ dit is een herautorisatie: de route
      * zet `link_intent: 'herautoriseren'` en leidt de doelrekening af uit
@@ -180,6 +191,13 @@ const AuthLinkSchema = z
   .refine(
     (body) => !(body.relink_connection_account_id && body.target_bank_account_id),
     { message: 'Kies óf een doelrekening óf een te herstellen koppeling, niet beide' },
+  )
+  // Zelfde regel voor de twee vormen van "doelrekening": een rekening-id én een
+  // bezit-id zijn twee bronnen voor dezelfde beslissing. Ook naast een herstelpad
+  // is een bezit-id zinloos — daar komt de doelrekening uit de koppeling.
+  .refine(
+    (body) => !(body.target_asset_id && (body.target_bank_account_id || body.relink_connection_account_id)),
+    { message: 'Kies één doelrekening' },
   )
   // Buiten het herstelpad is er geen andere bron voor de bank dan de body.
   .refine((body) => !!body.relink_connection_account_id || !!body.provider_id, {
@@ -323,6 +341,7 @@ export async function POST(req: Request) {
     provider_name,
     provider_logo,
     target_bank_account_id,
+    target_asset_id,
     relink_connection_account_id,
     enable_budget_tracking,
   } = parsed.data
@@ -395,8 +414,21 @@ export async function POST(req: Request) {
     // actieve koppeling — ook als iemand deze route omzeilt. Dit is de
     // vriendelijke variant van dezelfde twee regels: hier staat waaróm het
     // misgaat, de datalaag vangt wat hier nooit langskomt.
-    const resolved = target_bank_account_id
-      ? await resolveTargetAccount(supabase, user.id, target_bank_account_id)
+    //
+    // Een gekozen CASH-BEZIT wordt eerst omgezet naar zijn companion-rij en loopt
+    // daarna door precies dezelfde toets — eigenaarschap, geschiktheid en FR5 staan
+    // dus niet op een tweede plek. Onbekend, andermans, geen cash of gedeactiveerd
+    // → dezelfde vaste 400 als voor een onbruikbare rekening, vóór er iets wordt
+    // geschreven.
+    let requestedAccountId = target_bank_account_id ?? null
+    if (target_asset_id) {
+      const companion = await ensureCompanionForCashAsset(supabase, user.id, target_asset_id)
+      if (!companion.ok) return badRequest(TARGET_ACCOUNT_UNAVAILABLE_MESSAGE)
+      requestedAccountId = companion.bankAccountId
+    }
+
+    const resolved = requestedAccountId
+      ? await resolveTargetAccount(supabase, user.id, requestedAccountId)
       : null
 
     if (resolved && !resolved.ok) {

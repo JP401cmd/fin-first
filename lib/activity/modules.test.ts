@@ -13,7 +13,10 @@ const ROOT = join(__dirname, '..', '..')
 describe('moduleVanPad', () => {
   it.each([
     ['/overzicht', 'overzicht'],
-    ['/overzicht/tips', 'overzicht'],
+    ['/overzicht/tips', 'grip'],
+    ['/overzicht/tips/iets', 'grip'],
+    ['/overzicht/belasting/optimizer', 'grip'],
+    ['/overzicht/belasting/box1', 'belasting'],
     ['/overzicht/bezittingen', 'bezittingen'],
     ['/overzicht/bezittingen/investment', 'bezittingen'],
     ['/overzicht/schulden/mortgage', 'schulden'],
@@ -26,7 +29,8 @@ describe('moduleVanPad', () => {
     ['/core/cash/import', 'budget'],
     ['/core/checkin', 'overzicht'],
     ['/dashboard', 'overzicht'],
-    ['/rapportages/benchmark', 'rapportages'],
+    ['/rapportages/benchmark', 'grip'],
+    ['/rapportages/balans', 'rapportages'],
     ['/berichten', 'berichten'],
     ['/nieuws', 'nieuws'],
     ['/mijn/uiterlijk', 'mijn'],

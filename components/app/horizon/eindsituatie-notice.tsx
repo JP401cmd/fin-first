@@ -35,7 +35,9 @@ import type { BannerDisplay } from '@/lib/page-status/display'
  *
  * Fin-knop: alleen wanneer er niet één regel aan te wijzen is (`!eenduidig`) én AI
  * actief is (abonnement `ai` ∧ uitvoermodus 'gesprek' kan cloud of lokaal). De vraag
- * bevat bewust geen bedragen.
+ * bevat bewust geen bedragen, maar wél de oorzaken uit deze melding (`finContext`):
+ * Fins AI-context kent tekort-lening en opeetplafond niet, dus zonder die regel geeft
+ * Fin een generieke rendementsuitleg.
  */
 export function EindsituatieNotice({
   duiding,
@@ -136,7 +138,7 @@ export function EindsituatieNotice({
               {toonFin && copy.onduidelijk && (
                 <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
                   <p className="font-sans text-[12px] leading-relaxed text-[var(--ink-2)]">{copy.onduidelijk}</p>
-                  <BesprekMetWillButton onderwerp={copy.kop} vraag={copy.finVraag} />
+                  <BesprekMetWillButton onderwerp={copy.kop} detail={copy.finContext} vraag={copy.finVraag} />
                 </div>
               )}
               <Link

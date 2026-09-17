@@ -15,6 +15,8 @@ import {
   isFieldEncryptionConfigured,
 } from '@/lib/crypto/field-encryption'
 import { SERVICE_WIPE_TABLES, FULL_ERASE_SERVICE_TABLES } from '@/lib/user-data-tables'
+import { AI_CONSENT_VERSION } from '@/lib/ai/privacy-facts'
+import { wipeUserBucketPrefixes } from '@/lib/user-data-buckets'
 import { isOntbrekendSchema } from '@/lib/supabase/ontbrekend-schema'
 
 type ProgressCallback = (step: string, table: string, action: string, count?: number) => void
@@ -346,6 +348,21 @@ export async function deleteAllUserData(
 ): Promise<Record<string, number>> {
   const summary: Record<string, number> = {}
 
+  // Stap 0 (service-role): de storage-buckets met een `<user-id>/`-prefix (ADR
+  // 0152, lib/user-data-buckets.ts). `storage.objects` kent geen FK-cascade, dus
+  // dit is de enige plek waar het beeld weggaat. Bewust VÓÓR alle tabellen en
+  // bewust hard falend: mislukt de wis, dan is er nog niets verwijderd, ziet de
+  // gebruiker een fout en probeert hij opnieuw — in plaats van een verdwenen
+  // account waarvan de schermafbeeldingen stil blijven staan. Zonder
+  // service-client (dev/seed-paden zonder key) wordt de stap overgeslagen, net
+  // als batch 5; de account-delete-route eist de key bij een volledige wis.
+  if (opts?.service) {
+    const gewist = await wipeUserBucketPrefixes(opts.service, userId)
+    for (const [bucket, aantal] of Object.entries(gewist)) {
+      summary[`storage:${bucket}`] = aantal
+    }
+  }
+
   // Batch 0: tables with no FK to other user tables + holding children (FK to *_holdings)
   // investment_transactions, crypto_transactions, holding_alerts must be deleted before *_holdings
   // target_allocations has user_id only (no FK to holdings)
@@ -607,6 +624,15 @@ export async function assertSeedSchema(
   }
 }
 
+export interface SeedPersonaOptions {
+  /**
+   * Leg een AI-toestemming vast (profielstempel + `consent_events`-rij, source
+   * 'seed'). Uitsluitend voor testaccounts (`/api/admin/seed`, `/api/activate`
+   * met `test_persona_key`); een echte gebruiker kiest zelf (ADR 0155).
+   */
+  stampAiConsent?: boolean
+}
+
 /**
  * Seed all persona data for a user.
  * Uses phased parallel inserts to minimize DB round-trips.
@@ -616,6 +642,7 @@ export async function seedPersonaData(
   userId: string,
   persona: PersonaData,
   onProgress: ProgressCallback,
+  options: SeedPersonaOptions = {},
 ): Promise<Record<string, number>> {
   const summary: Record<string, number> = {}
 
@@ -655,6 +682,21 @@ export async function seedPersonaData(
   // Onboarding completed — personas represent post-onboarding state
   profileData.onboarding_completed = true
 
+  // Post-onboarding omvat sinds ADR 0155 óók de AI-keuze: zonder stempel staat
+  // een geseed account op de nieuwe default `ai_enabled = false` én krijgt het de
+  // vergrendelde keuze-overlay — elke UAT-/regressie-run zou daar tegenaan lopen.
+  // De keuze wordt hieronder óók als event vastgelegd (source 'seed').
+  //
+  // Alléén op verzoek van een testaccount-pad: dezelfde seed vult ook het account
+  // van een échte gebruiker (Vrijheidscheck-conversie, onboarding-persona). Daar
+  // zou de stempel een toestemming vastleggen die niemand gaf — én de overlay
+  // onderdrukken die de keuze alsnog had gevraagd.
+  if (options.stampAiConsent) {
+    profileData.ai_enabled = true
+    profileData.ai_consent_at = new Date().toISOString()
+    profileData.ai_consent_version = AI_CONSENT_VERSION
+  }
+
   // Feature preferences (JSONB)
   profileData.feature_preferences = {
     ...(typeof persona.profile.feature_preferences === 'object' ? persona.profile.feature_preferences : {}),
@@ -681,6 +723,20 @@ export async function seedPersonaData(
     .upsert(profileData)
   if (profileError) throw new Error(`Profiel update mislukt: ${profileError.message}`)
   summary.profiles = 1
+
+  // Bewijs van de geseede AI-keuze (ADR 0155) — append-only, dezelfde vorm als
+  // POST /api/consent/ai, met de server-only bron 'seed'.
+  if (options.stampAiConsent) {
+    const { error: consentError } = await supabase.from('consent_events').insert({
+      user_id: userId,
+      kind: 'ai_cloud',
+      decision: 'granted',
+      version: AI_CONSENT_VERSION,
+      source: 'seed',
+    })
+    if (consentError) throw new Error(`Toestemmingsbewijs mislukt: ${consentError.message}`)
+    summary.consent_events = 1
+  }
 
   // ── Phase 1a: Cash assets first (bank_accounts need their IDs) ──
 

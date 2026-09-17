@@ -165,7 +165,7 @@ describe('PUT', () => {
       expect.objectContaining({
         action: 'config.update',
         targetLabel: 'waardestromen',
-        detail: { stromen: 4, ids: ['vermogen', 'budget', 'toekomst', 'fin'] },
+        detail: { stromen: 5, ids: ['vermogen', 'budget', 'toekomst', 'grip', 'fin'] },
       }),
     )
     const data = (await res.json()) as { success: boolean; waardestromen: unknown }

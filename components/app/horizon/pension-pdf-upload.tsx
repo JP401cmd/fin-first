@@ -17,6 +17,7 @@ import type { PensionParseResult } from '@/lib/pension/types'
 import { AiSubscriptionUpsell } from '@/components/app/ai-subscription-upsell'
 import { useHasAiSubscription } from '@/lib/feature-access/context'
 import { describeAiError, isAiErrorCode } from '@/lib/ai/error-copy'
+import { PENSION_PDF_CONSENT_VERSION } from '@/lib/ai/consent'
 
 // 'review' bestaat alleen op het LOKALE pad: daar wordt niets overgenomen
 // zonder dat de gebruiker het heeft gezien (zie pension-local-review.tsx).
@@ -347,7 +348,7 @@ export function PensionPdfUpload({
     // server-side. The JSON-route (above) never sends data to the AI provider.
     const formData = new FormData()
     formData.append('file', f)
-    formData.append('consent', 'pension_pdf_ai_v1')
+    formData.append('consent', PENSION_PDF_CONSENT_VERSION)
     fetch('/api/pension/parse', { method: 'POST', body: formData })
       .then(async res => {
         if (!res.ok) {

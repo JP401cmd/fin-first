@@ -10,6 +10,7 @@ import { MaskedAmount } from '@/components/app/masked-amount'
 import { formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { isTempId, type DraftBudget } from '@/lib/budget-plan-diff'
+import { EIGEN_REKENING_UITLEG, isProtectedBudget } from '@/lib/budget-templates/template-draft'
 
 const GOAL_TYPES = [
   { value: '', label: 'Geen' },
@@ -73,6 +74,8 @@ export function BudgetDetailPane({
 
   const isChild = !!row.parentId
   const persisted = !isTempId(row.id)
+  // Eigen rekening is verplicht: vaste naam, niet te verwijderen.
+  const locked = isProtectedBudget(row)
   const roundedAvg = average ? Math.round(average.avg) : 0
   const months = average?.months ?? 0
   const showAverage = !!average && months > 0 && !amountReadOnly && row.budgetType !== 'archive'
@@ -122,9 +125,15 @@ export function BudgetDetailPane({
                   type="text"
                   value={row.name}
                   onChange={(e) => onUpdate(row.id, { name: e.target.value })}
+                  readOnly={locked}
                   placeholder={isChild ? 'Naam deelbudget' : 'Naam hoofdbudget'}
                   className={inputCls}
                 />
+                {locked && (
+                  <p className="mt-1.5 text-xs text-[var(--ink-3)]">
+                    {EIGEN_REKENING_UITLEG}
+                  </p>
+                )}
               </div>
               <div>
                 <span className={labelCls}>Icoon</span>
@@ -438,8 +447,8 @@ export function BudgetDetailPane({
             )}
           </section>
 
-          {/* Verwijderen */}
-          <section className="border-t border-[var(--border-ed)] pt-4">
+          {/* Verwijderen — niet voor de verplichte post Eigen rekening. */}
+          {!locked && <section className="border-t border-[var(--border-ed)] pt-4">
             <button
               type="button"
               onClick={() => onDelete(row.id)}
@@ -448,7 +457,7 @@ export function BudgetDetailPane({
               <Trash2 className="h-3.5 w-3.5" />
               Budget verwijderen
             </button>
-          </section>
+          </section>}
         </div>
       </div>
     </div>

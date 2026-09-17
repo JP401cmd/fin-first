@@ -26,6 +26,8 @@ import { DRAFT_RESTORED_NOTICE } from './draft-notice-copy'
 let resolveGetUser: (value: { data: { user: { id: string } | null } }) => void
 let getUserPromise: Promise<{ data: { user: { id: string } | null } }>
 let onboardingCompleted = false
+/** `profiles.module_guide_state` — draagt de afrondingsmarkering (ADR 0156). */
+let guideState: Record<string, unknown> | null = null
 
 // Eén stabiele client-instantie: `createClient()` wordt bij élke render
 // aangeroepen en zit in de dependency-array van het check-effect. Een nieuw
@@ -37,7 +39,9 @@ const supabaseMock = {
   from: () => ({
     select: () => ({
       eq: () => ({
-        single: async () => ({ data: { onboarding_completed: onboardingCompleted } }),
+        single: async () => ({
+          data: { onboarding_completed: onboardingCompleted, module_guide_state: guideState, net_monthly_income: 3200 },
+        }),
       }),
       order: async () => ({ data: [], error: null }),
     }),
@@ -63,8 +67,19 @@ vi.mock('@/components/onboarding/onboarding-eindstrategie', () => ({
   OnboardingEindstrategie: () => <div data-testid="stap-eindstrategie" />,
 }))
 
+// De afrondingsstappen (ADR 0156) hebben hun eigen component-tests; hier telt
+// alleen of de pagina er bij hervatten op landt.
+vi.mock('@/components/onboarding/onboarding-budget', () => ({
+  OnboardingBudget: (p: { netIncome: number }) => <div data-testid="stap-budget">{p.netIncome}</div>,
+}))
+vi.mock('@/components/onboarding/onboarding-bank', () => ({
+  OnboardingBank: (p: { result: string | null }) => <div data-testid="stap-bank">{String(p.result)}</div>,
+}))
+
 // eslint-disable-next-line import/first -- moet ná de vi.mock-hoisting geladen worden
 import OnboardingPage from './page'
+// eslint-disable-next-line import/first
+import { withAfrondingOpen, withAfrondingVoortgang } from '@/lib/onboarding/afronding'
 
 /**
  * Serverconcept in de test: één variabele die de gemockte fetch teruggeeft en
@@ -142,6 +157,8 @@ describe('onboarding draft-restore race (WF-START-23)', () => {
     storedDraft = null
     putPayloads = []
     onboardingCompleted = false
+    guideState = null
+    window.history.replaceState(null, '', '/onboarding')
     getUserPromise = new Promise((resolve) => {
       resolveGetUser = resolve
     })
@@ -245,5 +262,59 @@ describe('onboarding draft-restore race (WF-START-23)', () => {
     // persisteer-effect het zojuist gewiste concept meteen opnieuw aanmaken.
     expect(putPayloads).toEqual([])
     expect(readDraft()).toBeNull()
+  })
+})
+
+describe('onboarding hervatten op de afrondingsstappen (ADR 0156)', () => {
+  beforeEach(() => {
+    routerReplace.mockClear()
+    storedDraft = null
+    putPayloads = []
+    onboardingCompleted = true
+    guideState = null
+    window.history.replaceState(null, '', '/onboarding')
+    getUserPromise = Promise.resolve({ data: { user: { id: 'user-1' } } })
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('{"ok":true}', { status: 200 })))
+  })
+
+  afterEach(() => {
+    cleanup()
+    vi.unstubAllGlobals()
+  })
+
+  it('voltooid mét open markering: hervat op de budgetstap, spinner weg, geen redirect', async () => {
+    guideState = withAfrondingOpen({})
+    render(<OnboardingPage />)
+
+    // De vondst uit de live test: de hervat-tak keerde terug vóór `setLoading(false)`,
+    // waardoor alleen een oneindige spinner bleef staan.
+    expect(await screen.findByTestId('stap-budget')).toHaveTextContent('3200')
+    expect(routerReplace).not.toHaveBeenCalled()
+  })
+
+  it('open op budget maar het plan staat al (server zegt bank) → hervat op de bankstap', async () => {
+    guideState = withAfrondingOpen({})
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('{"stap":"bank"}', { status: 200 })))
+    render(<OnboardingPage />)
+
+    expect(await screen.findByTestId('stap-bank')).toHaveTextContent('null')
+    expect(screen.queryByTestId('stap-budget')).toBeNull()
+  })
+
+  it('terugkeer van de bank (?bank_error=1) landt op de bankstap met het resultaat', async () => {
+    guideState = withAfrondingVoortgang(withAfrondingOpen({}), { stap: 'bank', budget: 'opgeslagen' })
+    window.history.replaceState(null, '', '/onboarding?bank_error=1')
+    render(<OnboardingPage />)
+
+    expect(await screen.findByTestId('stap-bank')).toHaveTextContent('error')
+    expect(routerReplace).not.toHaveBeenCalled()
+  })
+
+  it('voltooid met afgeronde markering: gewoon naar home', async () => {
+    guideState = withAfrondingVoortgang(withAfrondingOpen({}), { stap: 'klaar', bank: 'gekoppeld' })
+    render(<OnboardingPage />)
+
+    await waitFor(() => expect(routerReplace).toHaveBeenCalledWith('/dashboard'))
+    expect(screen.queryByTestId('stap-budget')).toBeNull()
   })
 })

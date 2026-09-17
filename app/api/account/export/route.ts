@@ -1,7 +1,7 @@
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { unauthorized, serverError } from '@/lib/api/respond'
 import { getServiceClient } from '@/lib/supabase/service'
-import { EXPORT_SESSION_TABLES, EXPORT_SERVICE_TABLES } from '@/lib/user-data-tables'
+import { EXPORT_SESSION_TABLES, EXPORT_SERVICE_TABLES, EXPORT_OWN_READ_EXTRA_TABLES } from '@/lib/user-data-tables'
 import { decryptField } from '@/lib/crypto/field-encryption'
 import { shapeExportRows, shapeExportRow, type ExportRow } from '@/lib/account-export-shape'
 
@@ -63,8 +63,10 @@ export async function GET() {
 
     // Alle user-scoped tabellen die de gebruiker onder RLS kan lezen. Parallel,
     // maar begrensd: het zijn eigen-rij-selects op geïndexeerde user_id-kolommen.
+    // Plus de eigen-rij-leesbare tabellen zonder wis-recht (het
+    // toestemmingsbewijs, ADR 0155) — zelfde pad, zelfde vorm.
     const results = await Promise.all(
-      EXPORT_SESSION_TABLES.map(async (table) => {
+      [...EXPORT_SESSION_TABLES, ...EXPORT_OWN_READ_EXTRA_TABLES].map(async (table) => {
         const { data, error } = await supabase
           .from(table)
           .select(EXPORT_EMBEDS[table] ?? '*')

@@ -63,7 +63,6 @@ const ALLOWLIST_ENTRIES = [
   'components/app/budget-detail-pane.tsx',
   'components/app/budget-form.tsx',
   'components/app/budget-icon-picker.tsx',
-  'components/app/budget-plan-editor-sheet.tsx',
   'components/app/budget-tree.tsx',
   'components/app/budgets-client.tsx',
   'components/app/cash-account-view.tsx',

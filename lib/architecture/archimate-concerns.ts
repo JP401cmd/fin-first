@@ -429,6 +429,15 @@ export const ARCHI_CONCERNS: ArchiConcern[] = [
     elementIds: ['as-budget', 'as-huishouden', 'do-budget'],
     reviewedAt: '2026-09-02',
   },
+  {
+    id: 'gebruik-analyse-k-anonimiteit-niet-sluitend-tussen-verdelingen',
+    title: 'k-anonimiteit op /beheer/gebruik dekt elke verdeling apart, niet de combinatie ertussen',
+    detail:
+      'ADR 0153 telt `admin_gebruik_analyse` twee lagen k=5-onderdrukking toe: primair per cel (< 5 → null) en aanvullend binnen ÉÉN verdeling met een publiek totaal (alles-of-niets: één kleine cel → elke niet-nul cel verborgen; getoetst tegen een lezer die het algoritme kent). Dat sluit een verdeling in zichzelf, maar niet de COMBINATIE van twee verdelingen die naar hetzelfde onderliggende feit kijken vanuit een andere invalshoek — ADR 0153 noemt zelf als voorbeeld: actieve gebruikers per waardestroom tegenover de overlapverdeling. Trechterstappen (eerste dag, tweede dag, week 2-5, maand 2) krijgen alleen een complementtoets tegen hun eigen noemers en de partitie over cohorten, en de samen-matrices uitsluitend primaire onderdrukking: hun cellen overlappen onderling en tellen niet op tot een getoond totaal, dus de alles-of-niets-laag kan er niet op toepassen. Bij de huidige omvang (sep 2026: enkele tientallen externe accounts) is een cel die via twee verdelingen tegelijk is te herleiden dus niet uitgesloten. Bewust aanvaard risico (ADR 0153, "Restrisico, benoemd"), geen omissie — een volledig sluitende cross-verdeling-toets zou een generieke k-anonimiteitsengine vergen die de huidige per-rapport-aanpak niet heeft. Verwijder dit punt zodra zo\'n cross-verdeling-toets bestaat, of zodra een eigenaarsbesluit vastlegt dat het bij de huidige twee lagen blijft.',
+    severity: 'risk',
+    elementIds: ['do-meta', 't-supabase'],
+    reviewedAt: '2026-09-17',
+  },
 ]
 
 /** Aandachtspunten die een specifiek element raken. */

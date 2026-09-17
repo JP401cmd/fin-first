@@ -1,4 +1,5 @@
 import { BarChart3 } from 'lucide-react'
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/supabase/service'
@@ -120,6 +121,14 @@ export default async function BeheerKpiPage() {
               : 'Actief gebruik kon niet worden geladen.'}
           </p>
         )}
+        <p className="mt-3 text-xs text-[var(--ink-3)]">
+          <Link
+            href="/beheer/gebruik"
+            className="underline decoration-[var(--border-md)] underline-offset-2 hover:text-[var(--ink)]"
+          >
+            Meer over gebruik →
+          </Link>
+        </p>
       </section>
 
       <section>

@@ -60,7 +60,20 @@ type BankAccountRow = {
   linked_asset_id: string | null
   sort_order?: number
 }
-type AssetRow = { id: string; user_id: string; is_active: boolean | null; has_budget_tracking: boolean | null }
+type AssetRow = {
+  id: string
+  user_id: string
+  is_active: boolean | null
+  has_budget_tracking: boolean | null
+  // Alleen nodig voor de companion-loze cash-lijst (`assets` in de response).
+  asset_type?: string
+  name?: string
+  institution?: string | null
+  subtype?: string | null
+  account_number?: string | null
+  account_number_encrypted?: string | null
+  sort_order?: number
+}
 type TxRow = { id: string; user_id: string; account_id: string; date: string }
 type LinkRow = {
   id: string
@@ -363,6 +376,88 @@ describe('GET /api/bank-connect/accounts — startpunt en IBAN', () => {
     expect(body.accounts).toHaveLength(1)
     expect(body.accounts[0].iban_tail).toBeNull()
     expect(body.accounts[0].name).toBe('Betaalrekening')
+  })
+})
+
+describe('GET /api/bank-connect/accounts — cash-bezit zonder companion (assets)', () => {
+  const cash = (over: Partial<AssetRow> & { id: string }): AssetRow => ({
+    user_id: USER,
+    is_active: true,
+    has_budget_tracking: true,
+    asset_type: 'cash',
+    name: 'Betaalrekening',
+    institution: 'ING',
+    subtype: null,
+    account_number: null,
+    account_number_encrypted: null,
+    sort_order: 0,
+    ...over,
+  })
+
+  it('biedt de onboarding-betaalrekening aan, óók zonder enige bank_accounts-rij', async () => {
+    const { res, body } = await callGet({
+      ...EMPTY,
+      assets: [cash({ id: 'asset-onb', account_number: 'NL91ABNA0417164300' })],
+    })
+
+    expect(res.status).toBe(200)
+    expect(body.accounts).toEqual([])
+    expect(body.assets).toEqual([
+      {
+        id: 'asset-onb',
+        name: 'Betaalrekening',
+        institution: 'ING',
+        iban_tail: '4300',
+        // Leeg subtype landt als betaalrekening (cashSubtypeToAccountType).
+        account_type: 'checking',
+        budget_tracking: true,
+      },
+    ])
+    // Alleen het staartje verlaat de server.
+    expect(JSON.stringify(body)).not.toContain('NL91')
+  })
+
+  it('laat het cash-bezit van de PARTNER weg', async () => {
+    const { body } = await callGet({
+      ...EMPTY,
+      assets: [cash({ id: 'asset-mine' }), cash({ id: 'asset-partner', user_id: PARTNER })],
+    })
+
+    expect(body.assets.map((a: { id: string }) => a.id)).toEqual(['asset-mine'])
+  })
+
+  it('laat bezit mét eigen companion, niet-cash en gedeactiveerd bezit weg', async () => {
+    const { body } = await callGet({
+      ...EMPTY,
+      bankAccounts: [
+        // Budgetteren uit (inactieve companion): het bezit HEEFT een rekening-rij en
+        // hoort dus in `accounts`, niet nog eens in `assets`.
+        { id: 'acc-1', user_id: USER, name: 'Met companion', bank_name: null, iban_encrypted: null, is_active: false, linked_asset_id: 'asset-with-companion' },
+      ],
+      assets: [
+        cash({ id: 'asset-with-companion', has_budget_tracking: false }),
+        cash({ id: 'asset-savings', asset_type: 'savings' }),
+        cash({ id: 'asset-dead', is_active: false }),
+        cash({ id: 'asset-free', name: 'Vrij', subtype: 'savings_account', has_budget_tracking: false }),
+      ],
+    })
+
+    expect(body.accounts.map((a: { id: string }) => a.id)).toEqual(['acc-1'])
+    expect(body.assets.map((a: { id: string }) => a.id)).toEqual(['asset-free'])
+    expect(body.assets[0]).toMatchObject({ account_type: 'savings', budget_tracking: false })
+  })
+
+  it('een companion van de partner op mijn bezit telt niet als MIJN companion (eigen-rij-filter)', async () => {
+    const { body } = await callGet({
+      ...EMPTY,
+      bankAccounts: [
+        { id: 'acc-p', user_id: PARTNER, name: 'Partner', bank_name: null, iban_encrypted: null, is_active: true, linked_asset_id: 'asset-mine' },
+      ],
+      assets: [cash({ id: 'asset-mine' })],
+    })
+
+    expect(body.accounts).toEqual([])
+    expect(body.assets.map((a: { id: string }) => a.id)).toEqual(['asset-mine'])
   })
 })
 

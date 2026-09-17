@@ -16,16 +16,44 @@ interface Cfg {
   deleteErrorTable: string | null
   ontbrekendeTabel: string | null
   rpcError: boolean
+  /** Storage-listing van de screenshots-bucket faalt (ADR 0152). */
+  storageError: boolean
 }
 let cfg: Cfg
 let deletedTables: string[]
 let rpcCalls: string[]
+let storageRemoved: string[]
+
+// Eén levend account met één verlopen (> 90 dagen) en één vers beeld, plus één
+// prefix van een verdwenen account (wees) — de retentie hoort 3 van de 4 te wissen.
+const LIVE = '11111111-1111-4111-8111-111111111111'
+const WEES = '22222222-2222-4222-8222-222222222222'
+const STORAGE_TREE: Record<string, { name: string; id: string | null; created_at: string | null }[]> = {
+  '': [
+    { name: LIVE, id: null, created_at: null },
+    { name: WEES, id: null, created_at: null },
+  ],
+  [LIVE]: [
+    { name: 'oud.png', id: 'a', created_at: '2020-01-01T00:00:00.000Z' },
+    { name: 'vers.png', id: 'b', created_at: new Date().toISOString() },
+  ],
+  [WEES]: [{ name: 'w.png', id: 'c', created_at: new Date().toISOString() }],
+}
 
 function makeService() {
   function from(table: string) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const b: any = {
       delete: () => b,
+      select: () => b,
+      update: () => b,
+      // `profiles`: bestaanscheck van de prefixen; `user_reports`: pad loskoppelen.
+      in: (_col: string, values: string[]) =>
+        Promise.resolve(
+          table === 'profiles'
+            ? { data: values.filter((v) => v === LIVE).map((id) => ({ id })), error: null }
+            : { data: null, error: null },
+        ),
       lt: () => {
         deletedTables.push(table)
         return Promise.resolve(
@@ -43,7 +71,29 @@ function makeService() {
     rpcCalls.push(name)
     return { error: cfg.rpcError ? { message: 'rpc-fout' } : null }
   })
-  return { from, rpc }
+  // Alleen de screenshots-bucket heeft inhoud; pension-documents is leeg (zoals live).
+  const storage = {
+    from: (bucket: string) => ({
+      list: async (dir: string) =>
+        cfg.storageError
+          ? { data: null, error: { message: `mock-storage-fout ${bucket}` } }
+          : { data: bucket === 'user-report-screenshots' ? (STORAGE_TREE[dir] ?? []) : [], error: null },
+      remove: async (paths: string[]) => {
+        storageRemoved.push(...paths.map((p) => `${bucket}/${p}`))
+        return { data: [], error: null }
+      },
+    }),
+  }
+  // Bevestiging van een wees-kandidaat: WEES bestaat niet meer in auth.users.
+  const auth = {
+    admin: {
+      getUserById: async (id: string) =>
+        id === WEES
+          ? { data: { user: null }, error: { status: 404, code: 'user_not_found', message: 'User not found' } }
+          : { data: { user: { id } }, error: null },
+    },
+  }
+  return { from, rpc, storage, auth }
 }
 
 vi.mock('@supabase/supabase-js', () => ({ createClient: () => makeService() }))
@@ -63,7 +113,8 @@ beforeEach(() => {
   vi.clearAllMocks()
   deletedTables = []
   rpcCalls = []
-  cfg = { deleteErrorTable: null, ontbrekendeTabel: null, rpcError: false }
+  storageRemoved = []
+  cfg = { deleteErrorTable: null, ontbrekendeTabel: null, rpcError: false, storageError: false }
   process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://db.test'
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-key'
   delete process.env.VERCEL_ENV
@@ -180,5 +231,35 @@ describe('cron verwerking', () => {
     const res = await GET(req('cron-secret'))
     const body = await res.json()
     expect(JSON.stringify(body)).not.toContain('mock-fout')
+  })
+
+  /**
+   * ADR 0152: de schermafbeeldingen bij meldingen leven in een storage-bucket
+   * zonder FK-cascade. De cron wist wezen (account weg) en verlopen beelden
+   * (> 90 dagen) en telt ze apart; een storage-fout is een storing, geen ruis.
+   */
+  it('veegt de user-scoped buckets: verlopen én wezen, vers beeld van een levend account blijft', async () => {
+    const res = await GET(req('cron-secret'))
+    const body = await res.json()
+    expect(res.status).toBe(200)
+    expect(storageRemoved.sort()).toEqual([
+      `user-report-screenshots/${LIVE}/oud.png`,
+      `user-report-screenshots/${WEES}/w.png`,
+    ])
+    expect(body.deleted['storage:user-report-screenshots']).toBe(1)
+    expect(body.deleted['storage:pension-documents']).toBe(0)
+    expect(body.storage_wees).toEqual({ 'user-report-screenshots': 1, 'pension-documents': 0 })
+  })
+
+  it('een storage-fout op de screenshots-bucket → 500 + job_runs status error, zonder rauwe melding', async () => {
+    cfg.storageError = true
+    const res = await GET(req('cron-secret'))
+    expect(res.status).toBe(500)
+    const body = await res.json()
+    expect(JSON.stringify(body)).not.toContain('mock-storage-fout')
+    expect(mockRecordJobRun).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ job: 'retention', status: 'error' }),
+    )
   })
 })

@@ -682,6 +682,10 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
     grip: 'Verberg je bedragen met de schakelaar bovenaan, of vraag direct een export van je data op (JSON), of verwijder je account, rechtstreeks vanaf deze pagina.',
     werking: [
       {
+        title: 'Fin en je gegevens: jouw keuze',
+        text: 'AI staat pas aan nadat jij daar ja tegen hebt gezegd — bij het aanmaken van je account, of éénmalig bij een later bezoek. Hier zie je wanneer je koos en zet je die keuze op elk moment om. Elke keuze wordt vastgelegd; zeg je nee, dan gaat er niets meer naar een AI-aanbieder en werkt de app als financieel dagblad zonder Fin.',
+      },
+      {
         title: 'Bedragen verbergen',
         text: 'Toont overal •••• in plaats van bedragen — handig op een trein of in een openbare ruimte. Geldt voor dit apparaat, niet voor je account; op een ander apparaat zet je hem apart aan. Snel wisselen kan ook met het zoekscherm (⌘K).',
       },
@@ -846,6 +850,30 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
   },
 
   // ── Beheer ───────────────────────────────────────────────────────────
+  '/beheer/gebruik': {
+    insight:
+      'Hoe de app gebruikt wordt, zonder één persoon te zien: per waardestroom en app-deel, van actieve dag naar actieve dag, en of mensen binnen het ritme van een stroom terugkomen. Zo zie je waar nieuwe gebruikers afhaken en later of een verbetering werkt.',
+    grip:
+      'Kies bovenaan een band (laatste 30 dagen, 30–89 of 90–364 dagen geleden; ze overlappen bewust niet), en of je externe of juist alleen interne accounts (test, superadmin, demo) wilt zien. Lees elk getal met zijn n erbij; “< 5” en “verborgen” betekenen dat de groep te klein is om te tonen.',
+    werking: [
+      {
+        title: 'Onderdrukking',
+        text: 'Elke groep van 1 tot en met 4 gebruikers toont als “< 5”. Soms wordt een extra cel verborgen, zodat je een kleine groep niet kunt terugrekenen uit het totaal.',
+      },
+      {
+        title: 'Wat er gemeten wordt',
+        text: 'Alleen op welke dag iemand welk app-deel gebruikte, sinds half september 2026. Geen routes, tijdstippen, kliks of inhoud; klikgedrag en schermvolgorde komen pas in fase 2.',
+      },
+      {
+        title: 'Van dag tot dag',
+        text: 'De Sankey volgt mensen over hun eerste vier actieve dagen in de periode: in welke waardestroom ze die dag zaten en wie daarna stopte. Dagen, geen schermen. Een overgang met een te kleine groep gaat als geheel dicht.',
+      },
+      {
+        title: 'Waardestromen',
+        text: 'De indeling in stromen komt van Waardestromen. Wijzig je die daar, dan telt deze pagina meteen volgens de nieuwe indeling.',
+      },
+    ],
+  },
   '/beheer/versie': {
     insight:
       'Alleen-lezen overzicht van je git-, deploy- en migratiestaat: waar localhost staat ten opzichte van master en productie.',
