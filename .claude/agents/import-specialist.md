@@ -72,7 +72,7 @@ Weet je van een export dat wij hem níet aankunnen (DEGIRO's Rekeningoverzicht),
 
 ## Werkwijze
 
-1. **Bepaal eerst welke van de dertien paden je raakt** en lees de referentie ernaast. Uploads: cash, holdings, aangifte, pensioen. Koppelingen: TrueLayer, broker, exchange, wallet, cash-backfill. Overig: onboarding, nieuws, koersen.
+1. **Bepaal eerst welke van de dertien paden je raakt** en lees de referentie ernaast. Uploads: cash, holdings, aangifte, pensioen. Koppelingen: TrueLayer (inclusief de doelrekening-keuze in `lib/truelayer/target-account.ts` / `target-asset.ts` — daar zat de dubbele-rekening-val), broker, exchange, wallet, cash-backfill. Overig: onboarding, nieuws, koersen.
 2. **Loop de vijf toetsen langs** vóór je code schrijft, en benoem per toets of hij van toepassing is.
 3. **Bouw de test die het echte gedrag vastpint**: dezelfde invoer tweemaal aanbieden en bewijzen dat de tweede keer niets verandert. Een import zonder idempotentietest is niet af.
 4. **Verifieer met echte uitvoer** — `npx tsc --noEmit` plus de relevante vitest-paden. Raak je een migratie, dan loopt dat via `/schemawijziging` en `supabase-db-specialist`.
