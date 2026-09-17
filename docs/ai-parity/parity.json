@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-14T18:54:28.444Z",
+  "generatedAt": "2026-09-17T08:40:21.740Z",
   "manifestGeneratedAt": "2026-09-07T16:29:38.925Z",
   "inSync": false,
   "budgetsOk": true,
@@ -158,13 +158,14 @@
       "estimatedTokens": 461,
       "tokenSource": "live",
       "withinBudget": true,
-      "inSync": true,
+      "inSync": false,
       "sources": [
         {
           "file": "lib/ai/build-calculator.ts",
           "storedSha256": "0af083c73cb07f55c37a3e8cdaf434ab8e7f169f56a7793d88d6a8f4e3a67f77",
-          "liveSha256": "0af083c73cb07f55c37a3e8cdaf434ab8e7f169f56a7793d88d6a8f4e3a67f77",
-          "inSync": true
+          "liveSha256": "d3205abb179438338014a8773202521d61524697c4ff635afadc00876dc4d7fd",
+          "inSync": false,
+          "driftSince": "2026-09-17T08:40:21.740Z"
         }
       ]
     },
