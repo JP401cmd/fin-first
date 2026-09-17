@@ -38,17 +38,18 @@ uit staat. Bij AI klapt de privacyverklaring pas open als die schakelaar aan gaa
 3. **AI aan = eerst toestemming.** De route legt eerst `granted` vast
    (`recordAiConsent`, dezelfde schrijfvolgorde als `POST /api/consent/ai`). Pas
    daarna gaat de add-on aan. AI uit haalt de add-on weg en legt `withdrawn` vast.
-4. **Eén body, drie hosts.** `BetaAddonChoice` bevat de beta-uitleg, de schakelaar
+4. **Eén body, twee hosts.** `BetaAddonChoice` bevat de beta-uitleg, de schakelaar
    (effect · waarom) en, bij AI en alleen als hij aan staat, `AiConsentFacts`. Die
-   body draait in:
-   - de popup `BetaAddonDialog`, geopend vanuit de gedeelde `AiSubscriptionUpsell`
-     (±15 AI-ingangen) en vanuit de koppelwizard;
-   - de onboardingstap "Fin en je gegevens";
-   - `/mijn/account`, waar een actieve add-on direct uit te zetten is.
-5. **Onboarding.** De eerste stap is nu één schakelaar. "Verder met AI" zet AI aan
-   via de beta-route. "Verder zonder AI" legt een `withdrawn` vast. De bankstap
-   opent de Connected-popup op het moment dat iemand op "Koppel mijn bank" drukt,
-   en probeert daarna direct opnieuw te koppelen.
+   body draait in de popup `BetaAddonDialog` — geopend vanuit de gedeelde
+   `AiSubscriptionUpsell` (±15 AI-ingangen), vanuit de koppelwizard en vanuit
+   `/mijn/account`, waar een actieve add-on ook direct uit te zetten is.
+5. **De onboarding stelt géén AI-vraag** (aanvulling 17 sep, na de eerste uitrol).
+   Ze gebruikt zelf nergens AI — de pensioenstap biedt daar bewust alleen XML/JSON
+   — dus de vraag vooraan ontgrendelde niets en stond vóór de naam. De stap
+   `ai_keuze` is verwijderd; een opgeslagen concept dat er nog op stond heelt naar
+   `naam`. Het keuzemoment van ADR 0155 is daarmee de popup bij het eerste
+   AI-gebruik. De bankstap opent de Connected-popup op het moment dat iemand op
+   "Koppel mijn bank" drukt, en probeert daarna direct opnieuw te koppelen.
 6. **De blokkerende overlay vraagt alleen wie AI al heeft.** De (app)-layout toont
    `AiConsentInterstitial` alleen bij een `ai`-add-on zonder (actuele) keuze. De
    rest krijgt de verklaring bij het aanzetten.

@@ -261,7 +261,8 @@ describe('PensionPdfUpload — onboarding', () => {
     expect(input.accept).not.toMatch(/pdf/i)
     expect(screen.getByTestId('pension-onboarding-pdf-notice').textContent).toBe(ONBOARDING_PDF_NOTICE)
     expect(ONBOARDING_PDF_NOTICE).toMatch(/met AI/)
-    expect(ONBOARDING_PDF_NOTICE).toMatch(/in de app met een AI-abonnement/)
+    // ADR 0157: geen abonnementsbelofte meer — AI zet je zelf aan, ná de onboarding.
+    expect(ONBOARDING_PDF_NOTICE).toMatch(/AI aanzet/)
     expect(ONBOARDING_PDF_NOTICE).toMatch(/XML- of JSON/)
     // Geen link weg uit de onboarding.
     expect(screen.queryByRole('link')).toBeNull()

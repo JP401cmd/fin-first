@@ -74,7 +74,6 @@ export const START_FLOW: UatFlow = {
     { id: 'spaardoel', scenarioId: 'UAT-START-21', label: 'WF-START-21 · Spaardoel kiezen of overslaan', kind: 'action', stage: 5, lane: 'onboarding', subOf: 'onboarding' },
     { id: 'plan', scenarioId: 'UAT-START-28', label: 'WF-START-28 · "Jouw plan": stopmoment × eind-vorm (ADR 0129)', kind: 'action', stage: 5, lane: 'onboarding', subOf: 'onboarding' },
     { id: 'schatting', scenarioId: 'UAT-START-29', label: 'WF-START-29 · "Schat het voor me" (cohort-schatting, UR3-05)', kind: 'action', stage: 5, lane: 'onboarding', subOf: 'onboarding' },
-    { id: 'aikeuze', scenarioId: 'UAT-START-30', label: 'WF-START-30 · "Fin en je gegevens": AI aanzetten in de beta (ADR 0155 + 0157)', kind: 'action', stage: 5, lane: 'onboarding', subOf: 'onboarding' },
     { id: 'defer', scenarioId: 'UAT-START-22', label: 'WF-START-22 · "Later invullen" (defer-pad)', kind: 'action', stage: 5, lane: 'onboarding', subOf: 'onboarding' },
     { id: 'obhervatten', scenarioId: 'UAT-START-23', label: 'WF-START-23 · Onboarding onderbreken/hervatten', kind: 'action', stage: 5, lane: 'onboarding', subOf: 'onboarding' },
     { id: 'obretry', scenarioId: 'UAT-START-24', label: 'WF-START-24 · Fout bij afronden herstellen (retry)', kind: 'action', stage: 5, lane: 'onboarding', subOf: 'onboarding' },
@@ -93,6 +92,9 @@ export const START_FLOW: UatFlow = {
 
     // ── 6 · uitkomst ──────────────────────────────────────────────────────────
     { id: 'overgang', scenarioId: 'UAT-START-26', label: 'WF-START-26 · Overgang onboarding → app', kind: 'screen', stage: 6 },
+    // Sinds ADR 0157 geen onboardingstap meer: de AI-keuze komt pas wanneer de
+    // gebruiker in de app een AI-functie opent.
+    { id: 'aikeuze', scenarioId: 'UAT-START-30', label: 'WF-START-30 · AI aanzetten bij het eerste gebruik (beta-keuze, ADR 0155 + 0157)', kind: 'action', stage: 6, subOf: 'overgang' },
     { id: 'uitkomst', label: 'Gebruiker in de app: bezittingen/schulden/doel/pensioen/plan zichtbaar', kind: 'outcome', stage: 6 },
 
     // ── 7 · cross-doorwerking (OUTPUT) ───────────────────────────────────────
@@ -138,7 +140,6 @@ export const START_FLOW: UatFlow = {
     { from: 'onboarding', to: 'pensioen' },
     { from: 'onboarding', to: 'spaardoel' },
     { from: 'onboarding', to: 'plan' },
-    { from: 'onboarding', to: 'aikeuze' },
     { from: 'onboarding', to: 'defer' },
     { from: 'onboarding', to: 'obhervatten' },
     { from: 'onboarding', to: 'obretry' },
@@ -159,6 +160,7 @@ export const START_FLOW: UatFlow = {
     { from: 'obbank', to: 'obafrondhervat' },
 
     // samenvloeien → uitkomst
+    { from: 'overgang', to: 'aikeuze' },
     { from: 'overgang', to: 'uitkomst' },
 
     // uitkomst → cross-doorwerking (OUTPUT)

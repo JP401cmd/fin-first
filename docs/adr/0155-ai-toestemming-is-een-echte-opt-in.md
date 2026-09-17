@@ -13,7 +13,12 @@ documentimport) draait uitsluitend na een **expliciete, gelogde en omkeerbare
 keuze** van de gebruiker. Nieuwe accounts starten met `profiles.ai_enabled =
 false`; de keuze is een eigen stap in de onboarding ("Fin en je gegevens", vóór
 de eerste vraag), bestaande accounts krijgen dezelfde keuze éénmalig als
-blokkerende overlay bij het eerstvolgende bezoek. Elke keuze — ook een latere
+blokkerende overlay bij het eerstvolgende bezoek.
+
+> **Bijgesteld door ADR 0157 (17 sep 2026).** Het keuzemoment is niet langer een
+> onboardingstap maar de popup bij het eerste AI-gebruik; de blokkerende overlay
+> geldt alleen nog voor accounts die de `ai`-add-on al hebben. De grondslag, het
+> bewijs (`consent_events`) en de handhaving (`ai_enabled`) blijven ongewijzigd. Elke keuze — ook een latere
 omkering op Mijn → Privacy — schrijft één rij in de append-only tabel
 `consent_events` en stempelt `profiles.ai_consent_at` + `ai_consent_version`.
 De handhaving is de bestaande server-side kill-switch (`lib/ai/privacy-gate.ts`),

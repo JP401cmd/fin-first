@@ -10,7 +10,6 @@ import type { HorizonData } from '@/lib/onboarding/horizon-draft'
 import type { AssetQuickInput, DebtQuickInput } from '@/lib/quick-add/types'
 
 import { OnboardingIdentity } from '@/components/onboarding/onboarding-identity'
-import { OnboardingAiKeuze } from '@/components/onboarding/onboarding-ai-keuze'
 import { OnboardingInkomen, parseBedragInput } from '@/components/onboarding/onboarding-inkomen'
 import { OnboardingBezittingen } from '@/components/onboarding/onboarding-bezittingen'
 import { OnboardingSchulden } from '@/components/onboarding/onboarding-schulden'
@@ -112,8 +111,7 @@ const SAVING_MESSAGES = [
  *
  * De grove 5-staps-iteratie is vervangen door micro-stappen, gegroepeerd per
  * onderwerp:
- *   · Profiel    → `ai_keuze`, `naam`, `geboortedatum`
- *                  (`ai_keuze` = "Fin en je gegevens", de AI-toestemming — ADR 0155)
+ *   · Profiel    → `naam`, `geboortedatum`
  *   · Inkomen    → `inkomen`, `uitgaven`     (spaarquote-preview op `uitgaven`)
  *   · Bezittingen→ `bezittingen`             (begeleide ja/nee-enumeratie)
  *   · Schulden   → `schulden`                (begeleide ja/nee + altijd-uitgang)
@@ -131,7 +129,6 @@ const SAVING_MESSAGES = [
  * zodat self-healing restore werkt op oude localStorage-drafts.
  */
 type Step =
-  | 'ai_keuze'
   | 'naam'
   | 'geboortedatum'
   | 'inkomen'
@@ -164,8 +161,6 @@ type Direction = 'forward' | 'back'
  * delen hetzelfde nummer.
  */
 const STEP_GROUP_INDEX: Record<Step, number> = {
-  // AI-toestemming (ADR 0155) deelt groep 1 met Profiel — geen extra groep.
-  ai_keuze: 1,
   naam: 1,
   geboortedatum: 1,
   inkomen: 2,
@@ -203,7 +198,7 @@ const CANONICAL_STEP_ORDER: readonly string[] = [
   'doel',          // → naam (verwijderd jun 2026)
   'identity',      // → naam (gesplitst jun 2026)
   'goal',          // → naam (legacy)
-  'ai_keuze',      // toegevoegd sep 2026 — AI-toestemming vóór de eerste vraag (ADR 0155)
+  'ai_keuze',      // sep 2026 AI-toestemming vóór de eerste vraag (ADR 0155); verwijderd door ADR 0157 → heelt naar `naam`
   'naam',
   'geboortedatum',
   'inkomen',
@@ -239,6 +234,10 @@ const LEGACY_STEP_MAP: Record<string, Step> = {
   preferences: 'eindstrategie',
   // fase 3 (mei 2026): intro/goal/budgets/horizon zijn niet meer actief
   intro: 'naam',
+  // sep 2026: de AI-keuze stond kort vóór `naam` (ADR 0155). Sinds ADR 0157
+  // vraagt de app hem pas bij het eerste AI-gebruik; een concept dat nog op
+  // deze stap stond landt gewoon op de eerste vraag.
+  ai_keuze: 'naam',
   goal: 'naam',
   budgets: 'eindstrategie',
   horizon: 'eindstrategie',
@@ -341,7 +340,6 @@ export function _firstNavigationRecoveryStep(activeStepOrder: Step[]): Step {
  */
 function computeStepOrder(): Step[] {
   return [
-    'ai_keuze',
     'naam',
     'geboortedatum',
     'inkomen',
@@ -476,7 +474,7 @@ type Action =
   | { type: 'RESTORE_STATE'; data: OnboardingDraft }
 
 export const _initialState: State = {
-  step: 'ai_keuze',
+  step: 'naam',
   direction: 'forward',
   selectedGoals: [],
   activeModules: [...ALL_MODULES],
@@ -1703,17 +1701,10 @@ export default function OnboardingPage() {
           label={state.step === 'klaar' ? null : (freedomTicker?.label ?? null)}
         >
         <StepTransition key={state.step} direction={state.direction}>
-          {/* ── AI-toestemming (ADR 0155): eerste stap, schrijft zelf via
-              POST /api/consent/ai en gaat pas daarna door. ── */}
-          {state.step === 'ai_keuze' && (
-            <OnboardingAiKeuze
-              onNext={goToNext}
-              currentStep={currentContentStep}
-              totalSteps={totalContentSteps}
-            />
-          )}
-
-          {/* ── Profiel-groep: naam + geboortedatum (één veld per scherm) ── */}
+          {/* ── Profiel-groep: naam + geboortedatum (één veld per scherm) ──
+              (De AI-keuze stond hier tot ADR 0157 als eerste stap; de
+              onboarding gebruikt zelf geen AI, dus de vraag komt nu pas bij
+              het eerste AI-gebruik — met de popup uit BetaAddonDialog.) */}
           {state.step === 'naam' && (
             <OnboardingIdentity
               data={state.identity}

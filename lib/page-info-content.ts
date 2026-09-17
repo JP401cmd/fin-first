@@ -683,7 +683,7 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
     werking: [
       {
         title: 'Fin en je gegevens: jouw keuze',
-        text: 'AI staat pas aan nadat jij daar ja tegen hebt gezegd — bij het aanmaken van je account, of éénmalig bij een later bezoek. Hier zie je wanneer je koos en zet je die keuze op elk moment om. Elke keuze wordt vastgelegd; zeg je nee, dan gaat er niets meer naar een AI-aanbieder en werkt de app als financieel dagblad zonder Fin.',
+        text: 'AI staat pas aan nadat jij daar ja tegen hebt gezegd — dat vragen we de eerste keer dat je een AI-functie opent. Hier zie je wanneer je koos en zet je die keuze op elk moment om. Elke keuze wordt vastgelegd; zeg je nee, dan gaat er niets meer naar een AI-aanbieder en werkt de app als financieel dagblad zonder Fin.',
       },
       {
         title: 'Bedragen verbergen',

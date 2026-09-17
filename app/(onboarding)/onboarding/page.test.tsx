@@ -19,9 +19,10 @@ import type { OnboardingDraft } from './draft-persistence'
 // Actieve volgorde sinds jun 2026 — begeleide één-vraag-tegelijk flow
 // (Boldin-stijl): identity gesplitst in naam+geboortedatum, inkomen gesplitst
 // in inkomen+uitgaven, en nieuwe stappen schulden + pensioen.
-// Sinds sep 2026 (ADR 0155) staat de AI-toestemming `ai_keuze` vooraan.
+// De AI-toestemming stond hier kort als eerste stap (`ai_keuze`, ADR 0155);
+// sinds ADR 0157 vraagt de app hem pas bij het eerste AI-gebruik, dus de
+// onboarding begint weer bij `naam`.
 const NEW_ACTIVE_ORDER = [
-  'ai_keuze',
   'naam',
   'geboortedatum',
   'inkomen',
@@ -120,11 +121,12 @@ describe('onboarding _resolveRestoredStep (self-healing restore)', () => {
 })
 
 describe('onboarding _initialState — modules default aan', () => {
-  it('starts on ai_keuze with all modules active', () => {
+  it('starts on naam with all modules active', () => {
     // Sinds jun 2026 is er geen doel-/module-keuze meer in onboarding: alle
     // modules staan default aan, gating gebeurt via abonnement + user-toggles
-    // buiten de onboarding. Eerste stap = `ai_keuze` (AI-toestemming, ADR 0155).
-    expect(_initialState.step).toBe('ai_keuze')
+    // buiten de onboarding. Eerste stap = `naam` (de AI-keuze is met ADR 0157
+    // uit de onboarding gehaald; die popup komt bij het eerste AI-gebruik).
+    expect(_initialState.step).toBe('naam')
     expect(_initialState.activeModules).toEqual([...ALL_MODULES])
     expect(_initialState.selectedGoals).toEqual([])
   })
@@ -748,9 +750,9 @@ describe('onboarding buildPensionParseResult', () => {
 })
 
 describe('onboarding _firstNavigationRecoveryStep', () => {
-  it('returns the first content step (ai_keuze) for the new active order', () => {
+  it('returns the first content step (naam) for the new active order', () => {
     const result = _firstNavigationRecoveryStep([...NEW_ACTIVE_ORDER])
-    expect(result).toBe('ai_keuze')
+    expect(result).toBe('naam')
   })
 
   it('falls back to naam when the active order is empty', () => {

@@ -4,8 +4,8 @@ import { UNIFIED_FEATURES } from '@/lib/feature-registry'
  * De feiten over Fin en je gegevens — ÉÉN bron voor drie oppervlakken
  * (ADR 0155, kaart UR3-16):
  *
- *   · de keuzestap "Fin en je gegevens" in de onboarding
- *     (components/onboarding/onboarding-ai-keuze.tsx),
+ *   · de beta-keuzepopup bij het eerste AI-gebruik (ADR 0157,
+ *     components/app/beta-addon/beta-addon-choice.tsx),
  *   · de eenmalige keuze-overlay voor bestaande accounts
  *     (components/app/ai-consent-interstitial.tsx),
  *   · de AI-schakelaar en transparantieblokken op /mijn/privacy

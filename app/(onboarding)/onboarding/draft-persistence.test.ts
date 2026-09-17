@@ -307,7 +307,8 @@ describe('hasResumableDraft — hervat-signaal', () => {
 
   it('false voor een leeg concept op de naam-stap zonder keuzes', () => {
     expect(hasResumableDraft(draft({ lastStep: 'naam' }))).toBe(false)
-    // De AI-keuzestap (ADR 0155) staat vóór naam en is evenmin voortgang.
+    // De verwijderde AI-keuzestap (ADR 0155 → 0157) is evenmin voortgang; een
+    // concept dat er nog op stond heelt naar `naam`.
     expect(hasResumableDraft(draft({ lastStep: 'ai_keuze' }))).toBe(false)
     expect(hasResumableDraft(draft())).toBe(false)
   })

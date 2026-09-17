@@ -77,7 +77,7 @@ const ACCEPT_ATTR =
 const ACCEPT_ATTR_DATA_ONLY = 'application/json,text/xml,application/xml,.json,.xml'
 
 export const ONBOARDING_PDF_NOTICE =
-  'Een PDF uitlezen gebeurt met AI. Dat kan straks in de app met een AI-abonnement, als je de onboarding hebt afgerond. Gebruik nu de XML- of JSON-download van mijnpensioenoverzicht.nl, of vul een schatting in.'
+  'Een PDF uitlezen gebeurt met AI. Dat kan straks in de app, zodra je de onboarding hebt afgerond en AI aanzet. Gebruik nu de XML- of JSON-download van mijnpensioenoverzicht.nl, of vul een schatting in.'
 
 const PDF_UPSELL_FEATURE = 'Je pensioenoverzicht (PDF) uitlezen'
 const PDF_UPSELL_NOTE =

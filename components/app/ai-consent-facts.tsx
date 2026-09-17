@@ -15,8 +15,8 @@ import {
 
 /**
  * AiConsentFacts — de feiten onder de AI-keuze (ADR 0155), één keer in JSX voor
- * twee hosts: de onboarding-stap "Fin en je gegevens" en de eenmalige
- * keuze-overlay in de app-shell. Alle tekst komt letterlijk uit
+ * twee hosts: de beta-keuzepopup bij het eerste AI-gebruik (ADR 0157) en de
+ * eenmalige keuze-overlay in de app-shell. Alle tekst komt letterlijk uit
  * `lib/ai/privacy-facts.ts` — toestemming is toestemming voor wat dáár staat.
  *
  * Compact maar zonder klik vindbaar: elk blok toont zijn kop plus de eerste
@@ -24,9 +24,9 @@ import {
  * `aria-expanded`; de losse zinnen (lokale variant, terugdraaien) en de
  * maskeer-nuance staan altijd volledig.
  *
- * Koppen: de host bepaalt het niveau (`headingLevel`) — in de onboarding (buiten
- * de app-shell, stap-titel = h1) zijn het h2's, in de overlay (titel = h3 van
- * de BottomSheet) h4's.
+ * Koppen: de host bepaalt het niveau (`headingLevel`) — in een sheet/overlay
+ * (titel = h3 van de BottomSheet) zijn het h4's; een host buiten de app-shell
+ * met een eigen h1 kan h2 vragen.
  */
 export interface AiConsentFactsProps {
   headingLevel?: 'h2' | 'h4'
