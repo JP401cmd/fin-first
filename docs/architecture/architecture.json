@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-09-16T23:08:08.746Z",
-  "generatedDate": "2026-09-16",
+  "generatedAt": "2026-09-17T08:36:34.730Z",
+  "generatedDate": "2026-09-17",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -191,11 +191,11 @@
   "stats": {
     "routes": 135,
     "routesProduction": 90,
-    "api": 322,
+    "api": 323,
     "tables": 101,
     "migrations": 247,
     "integrations": 25,
-    "components": 1112,
+    "components": 1119,
     "providers": 19,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -2551,6 +2551,14 @@
     {
       "url": "/api/bank-connect/callback",
       "file": "app/api/bank-connect/callback/route.ts",
+      "domain": "bank-connect",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "url": "/api/bank-connect/connection-status",
+      "file": "app/api/bank-connect/connection-status/route.ts",
       "domain": "bank-connect",
       "methods": [
         "GET"
@@ -5406,7 +5414,7 @@
     {
       "domain": "bank-connect",
       "label": "Bank-connect",
-      "count": 10,
+      "count": 11,
       "routes": [
         {
           "url": "/api/bank-connect/accounts",
@@ -5435,6 +5443,14 @@
         {
           "url": "/api/bank-connect/callback",
           "file": "app/api/bank-connect/callback/route.ts",
+          "domain": "bank-connect",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/bank-connect/connection-status",
+          "file": "app/api/bank-connect/connection-status/route.ts",
           "domain": "bank-connect",
           "methods": [
             "GET"
@@ -9043,11 +9059,11 @@
     }
   ],
   "components": {
-    "total": 1112,
+    "total": 1119,
     "groups": [
       {
         "group": "app",
-        "count": 441,
+        "count": 446,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -9090,6 +9106,8 @@
           "asset-pane",
           "auto-snapshot-trigger",
           "backtesting-modal",
+          "bank-auth-waiting",
+          "bank-auth-waiting.test",
           "bank-selector",
           "beheer-container",
           "beheer-nav",
@@ -9191,6 +9209,9 @@
           "doel-vastleg-sheet",
           "doel-vastleg-sheet.test",
           "eerder-stoppen",
+          "eindsituatie-notice",
+          "eindsituatie-notice-provider",
+          "eindsituatie-notice.test",
           "empty-state",
           "end-of-life",
           "envelope-transfer-sheet",
@@ -9891,7 +9912,7 @@
       },
       {
         "group": "future",
-        "count": 81,
+        "count": 82,
         "items": [
           "afbouw-overzicht-card",
           "afbouw-overzicht-card.test",
@@ -9927,6 +9948,7 @@
           "inkomsten-editor.test",
           "laag2-editors",
           "laag2-editors.test",
+          "levensstrategieen-section",
           "library-card",
           "library-filter",
           "like-button",
@@ -9978,9 +10000,10 @@
       },
       {
         "group": "mijn",
-        "count": 49,
+        "count": 50,
         "items": [
           "abonnement-section",
+          "abonnement-section.test",
           "account-basis-section",
           "account-client",
           "ai-credits-section",
@@ -14244,6 +14267,7 @@
             "/api/bank-connect/auth-link",
             "/api/bank-connect/balances",
             "/api/bank-connect/callback",
+            "/api/bank-connect/connection-status",
             "/api/bank-connect/disconnect",
             "/api/bank-connect/linked-accounts",
             "/api/bank-connect/relink",
@@ -14284,6 +14308,7 @@
             "/api/bank-connect/auth-link",
             "/api/bank-connect/balances",
             "/api/bank-connect/callback",
+            "/api/bank-connect/connection-status",
             "/api/bank-connect/sync"
           ]
         },
@@ -18043,6 +18068,19 @@
       ],
       "summary": "Een opeethypotheek zónder eigen maandbedrag (`ReverseMortgageConfig.monthlyPayout === null`) neemt in de horizon-kernel niet langer een vast, over de resterende levensverwachting gespreid bedrag op. Ze neemt per maand op wat je tekortkomt: het gat dat anders de synthetische tekor",
       "file": "docs/adr/0150-opeethypotheek-opname-naar-behoefte.md"
+    },
+    {
+      "id": "0151-opeet-rente-boven-plafond",
+      "title": "Opeethypotheek: de bijgeschreven rente is zichtbaar, loopt boven het leenplafond door en een dalend plafond kort de schuld niet in",
+      "status": "aanvaard",
+      "date": "2026-09-17",
+      "elements": [
+        "as-planning",
+        "fn-toekomstplannen",
+        "as-vermogen"
+      ],
+      "summary": "De opeethypotheek heeft per ontwerp géén maandlast: de rente wordt bij de schuld opgeteld. Dat blijft zo. Wat verandert: de bijgeschreven rente wordt een apart, zichtbaar getal, ze loopt door zodra de schuld tegen het leenplafond aanloopt (de schuld mag boven het plafond uitkomen",
+      "file": "docs/adr/0151-opeet-rente-boven-plafond.md"
     }
   ],
   "churn": {
@@ -18092,8 +18130,8 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 10601,
-        "commits": 90
+        "loc": 10652,
+        "commits": 91
       },
       {
         "file": "components/app/budgets-client.tsx",
@@ -19209,6 +19247,13 @@
       "parserFormat": null
     },
     {
+      "file": "lib/truelayer/connection-outcome.ts",
+      "exists": true,
+      "baseUrl": null,
+      "hasAdapter": false,
+      "parserFormat": null
+    },
+    {
       "file": "lib/truelayer/errors.ts",
       "exists": true,
       "baseUrl": null,
@@ -19231,6 +19276,13 @@
     },
     {
       "file": "lib/truelayer/linked-account.ts",
+      "exists": true,
+      "baseUrl": null,
+      "hasAdapter": false,
+      "parserFormat": null
+    },
+    {
+      "file": "lib/truelayer/open-bank-auth.ts",
       "exists": true,
       "baseUrl": null,
       "hasAdapter": false,
@@ -19274,9 +19326,17 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-09-16",
-    "hasChanges": false,
-    "sections": []
+    "previousDate": "2026-09-17",
+    "hasChanges": true,
+    "sections": [
+      {
+        "label": "Componenten (aantal)",
+        "added": [
+          "+1"
+        ],
+        "removed": []
+      }
+    ]
   },
   "statsHistory": [
     {
@@ -19696,6 +19756,13 @@
       "date": "2026-09-16",
       "api": 322,
       "components": 1112,
+      "tables": 101,
+      "routesProduction": 90
+    },
+    {
+      "date": "2026-09-17",
+      "api": 323,
+      "components": 1119,
       "tables": 101,
       "routesProduction": 90
     }

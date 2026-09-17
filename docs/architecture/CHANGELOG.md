@@ -1059,3 +1059,13 @@
 ## 2026-09-16
 
 - Geen wijzigingen.
+
+## 2026-09-17
+
+- **API-routes** toegevoegd: /api/bank-connect/connection-status
+- **Integratie-clients** toegevoegd: lib/truelayer/connection-outcome.ts, lib/truelayer/open-bank-auth.ts
+- **Componenten (aantal)** toegevoegd: +6
+
+## 2026-09-17
+
+- **Componenten (aantal)** toegevoegd: +1
