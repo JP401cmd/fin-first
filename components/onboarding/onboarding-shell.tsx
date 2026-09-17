@@ -15,7 +15,8 @@ import {
  * Editorial-split layout-shell voor de onboarding-stappen.
  *
  * Verantwoordelijkheid: levert de chrome rond een individuele stap —
- *   1. Sticky 1px voortgangsbalk top (met optionele back-affordance)
+ *   1. Editorial header bovenaan (kicker + vraag + deck), daar direct ONDER
+ *      de voortgangsrij (terug-knop + balk + stand + vrijheidsteller)
  *   2. Twee-koloms grid op desktop (≥lg) — links form, rechts facts-paneel
  *   3. Single-column fallback op mobile — facts-paneel verschijnt als
  *      border-l-callout onder de input (het FactsPanel zelf regelt z'n eigen
@@ -23,17 +24,19 @@ import {
  *      grid-layout)
  *   4. Sticky bottom CTA-bar op mobile (safe-area-aware), inline footer-row
  *      op desktop — verzorgd via de `footer` slot
- *   5. Editorial header (kicker met streep + romeinse num + headline-em +
- *      deck) bovenaan de form-kolom — alle drie via props zodat de stappen
- *      zelf geen layout-werk doen
+ *   5. De vraag is het eerste wat op het scherm staat (eigenaarswens
+ *      17 sep 2026): kicker met streep + romeinse num + headline-em + deck,
+ *      alle via props zodat de stappen zelf geen layout-werk doen
  *
  * Niet-verantwoordelijk: stap-specifieke validatie, data, of state.
  * De stap-componenten leveren `children` (form-velden) + `footer` (CTAs).
  *
  * **Module-tinten**: scope is bewust onaangetast — het is de
  * verantwoordelijkheid van de onboarding-page (één laag hoger) om
- * `--module-active-*` op kern-shades te zetten via een wrapper-style.
- * Dit shell-component leest alleen die tokens.
+ * `--module-active-*` te zetten via een wrapper-style. Sinds 17 sep 2026 is
+ * dat niet langer vast `kern`, maar het accent van de hefboom waar de stap
+ * over gaat (`STEP_ACCENT` in de page). Dit shell-component leest alleen die
+ * tokens en hoeft daar dus niets voor te doen.
  *
  * **Layout-tokens**:
  * - Grid `lg:grid-cols-[1fr_360px]` — matches plan §"Visuele blueprint"
@@ -117,42 +120,9 @@ export function OnboardingShell({
 
   return (
     <div className="w-full">
-      {/* Sticky top: voortgangsbalk + back-affordance.
-          De balk hangt aan de wrapper z'n top — sticky positioning is
-          relatief aan de scrollable parent (in de page is dat de body). */}
-      <OnboardingProgressBar
-        current={currentStep}
-        total={totalSteps}
-        tickerSlot={
-          freedomTicker ? <OnboardingFreedomTickerRow label={freedomTicker} /> : undefined
-        }
-        backSlot={
-          onBack && (
-            <button
-              type="button"
-              onClick={onBack}
-              className="flex h-11 min-w-[44px] items-center gap-1 px-1 text-xs uppercase tracking-[0.18em] text-[var(--ink-3)] transition-colors hover:text-[var(--ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
-              aria-label="Vorige stap"
-            >
-              <svg
-                className="h-3.5 w-3.5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-                aria-hidden="true"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-              </svg>
-              <span className="hidden sm:inline font-mono">Terug</span>
-            </button>
-          )
-        }
-      />
-
       {/* Main grid: 1-col mobile, 2-col desktop. Padding-bottom op mobile
           reserveert ruimte voor de sticky CTA-bar (h≈80px + safe-area). */}
-      <div className="mx-auto max-w-[1080px] px-4 sm:px-6 pt-8 sm:pt-12 pb-32 lg:pb-12">
+      <div className="mx-auto max-w-[1080px] px-4 sm:px-6 pb-32 lg:pb-12">
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] lg:gap-0">
           {/* ── Linker kolom: editorial form ───────────────────────── */}
           <div className="lg:pr-10 lg:border-r lg:border-[var(--rule-soft)]">
@@ -219,6 +189,51 @@ export function OnboardingShell({
                 </a>
               </p>
             )}
+
+            {/* Voortgangsrij — sinds 17 sep 2026 ONDER de vraag in plaats van
+                erboven (eigenaarswens). De vraag is waar het scherm om draait;
+                de voortgang is de voetnoot erbij. De terug-knop verhuisde mee:
+                hij hoort bij de stap-navigatie, dus bij de balk die de stand
+                toont — niet los bovenaan.
+
+                De rij blijft wél sticky, en dat is geen detail: deze `backSlot`
+                is de ENIGE stap-terug die de gebruiker heeft (de sticky
+                CTA-bar onderaan draagt alleen de vooruit-knop). Zonder sticky
+                scrolde hij bij een lange stap — bezittingen of schulden met een
+                paar ingevulde regels — samen met de kop uit beeld, en zat de
+                gebruiker in een scherm zonder zichtbare uitgang. Hij plakt nu
+                aan de bovenkant van de formulierkolom zodra de vraag erboven
+                wegscrolt; in rust staat hij gewoon onder het deck. */}
+            <OnboardingProgressBar
+              className="sticky top-0 z-30 mt-6 bg-[var(--subtle)]/95 py-2 backdrop-blur-sm"
+              current={currentStep}
+              total={totalSteps}
+              tickerSlot={
+                freedomTicker ? <OnboardingFreedomTickerRow label={freedomTicker} /> : undefined
+              }
+              backSlot={
+                onBack && (
+                  <button
+                    type="button"
+                    onClick={onBack}
+                    className="flex h-11 min-w-[44px] items-center gap-1 px-1 text-xs uppercase tracking-[0.18em] text-[var(--ink-3)] transition-colors hover:text-[var(--ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+                    aria-label="Vorige stap"
+                  >
+                    <svg
+                      className="h-3.5 w-3.5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      aria-hidden="true"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+                    </svg>
+                    <span className="hidden sm:inline font-mono">Terug</span>
+                  </button>
+                )
+              }
+            />
 
             {/* Stap-specifieke form-velden — caller bepaalt eigen spacing. */}
             <div className="mt-8">{children}</div>

@@ -2,7 +2,7 @@
 
 import { ColorPickerCard, type ColorPreset } from '@/components/app/color-picker-card'
 import { useModuleColors } from '@/components/app/module-color-provider'
-import { DEFAULT_MODULE_COLORS, type ModuleColorConfig } from '@/lib/color-palette'
+import { ACCENT_RING, DEFAULT_MODULE_COLORS, type ModuleColorConfig } from '@/lib/color-palette'
 
 /**
  * ModuleAccentPicker — voor elk van de vier accentkleuren een
@@ -35,63 +35,6 @@ import { DEFAULT_MODULE_COLORS, type ModuleColorConfig } from '@/lib/color-palet
  */
 
 type ModuleKey = keyof ModuleColorConfig
-
-/**
- * Gedeelde ring van achttien alternatieven: een raster van 20° over de hele
- * kleurencirkel, elk op zijn **sRGB-gamutgrens** — de fysieke bovengrens, niet
- * een gekozen getal.
- *
- * Het raster begint bewust op 17° en niet op 0°. Dat is de offset die de
- * grootste afstand houdt tot de vier standaarden (kern 165,6° · wil 49,9° ·
- * horizon 244,2° · fin 308,2°): minimaal 7,1°, tegen 4,1° bij zestien tinten en
- * 3,2° bij twintig. Zonder die offset zou op elke kaart een ring-tint vrijwel
- * samenvallen met de standaard erboven.
- *
- * Sinds 8 sep 2026 geldt hier GEEN chroma-plafond meer: de koppeling met de
- * stoplicht-semantiek is voor accenten losgelaten (eigenaarsbesluit, zie
- * DEFAULT_MODULE_COLORS in lib/color-palette.ts). Scharlaken en Karmijn liggen
- * daardoor bewust naast "actie"-rood, Oker naast "aandacht"-amber en Smaragd
- * naast "op koers"-groen. Dat is geen ongeluk en geen drift.
- *
- * **EIGENAARSBESLUIT 15 sep 2026: elke tint op zijn eigen chroma-optimale
- * lightness, niet meer allemaal op één vaste L ~ 0,52.** Voorheen was de hele
- * ring op één lightness geplat (gekozen omdat dat de bovengrens was voor de
- * meest beperkte hue in de set); dat liet chroma liggen bij elke hue waarvan
- * de sRGB-piek elders ligt. Per tint gezocht naar de lightness die de chroma
- * maximaliseert zónder onder de AA-ondergrens (4,5:1 op papier `#faf9f6`,
- * marge ingebouwd) te zakken: groen/oranje/geel pieken pas ver boven L 0,52
- * (te donker leesbaar, dus daar geldt de AA-grens als plafond); blauw/paars
- * (Indigo, Violet) piekt juist ónder of rond L 0,52 — die twee kregen dus
- * hun eigen, lagere piek-L in plaats van de AA-grens, en werden zo ook
- * feller. Netto chroma-winst t.o.v. 8 sep: 4-14% op vrijwel alle tinten.
- *
- * Waarom ze niet allemaal even fel ogen: sRGB laat in het groen/teal nog altijd
- * maar C ~ 0,10-0,13 toe tegen ~0,29-0,30 in het blauw/paars. Dat is de gamut,
- * geen terughoudendheid.
- *
- * Alle achttien halen minimaal 4,55:1 tegen papier (WCAG AA voor tekst = 4,5),
- * gepind in module-accent-picker.test.tsx.
- */
-const ACCENT_RING: ColorPreset[] = [
-  { name: 'Scharlaken', hex: '#e30046' },
-  { name: 'Roest', hex: '#d03e00' },
-  { name: 'Karamel', hex: '#b05c00' },
-  { name: 'Oker', hex: '#996900' },
-  { name: 'Olijf', hex: '#867100' },
-  { name: 'Mos', hex: '#6c7900' },
-  { name: 'Gras', hex: '#398200' },
-  { name: 'Smaragd', hex: '#00834f' },
-  { name: 'Jade', hex: '#00816e' },
-  { name: 'Petrol', hex: '#007f82' },
-  { name: 'Staal', hex: '#007d96' },
-  { name: 'Kobalt', hex: '#0079ae' },
-  { name: 'Ultramarijn', hex: '#006ee5' },
-  { name: 'Indigo', hex: '#4b00fe' },
-  { name: 'Violet', hex: '#8900fe' },
-  { name: 'Orchidee', hex: '#be00ea' },
-  { name: 'Magenta', hex: '#d200b2' },
-  { name: 'Karmijn', hex: '#dd007e' },
-]
 
 const MODULE_SWATCHES: Record<
   ModuleKey,

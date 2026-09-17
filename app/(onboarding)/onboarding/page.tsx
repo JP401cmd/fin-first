@@ -4,6 +4,13 @@ import { useState, useEffect, useReducer, useCallback, useMemo, useRef } from 'r
 import './onboarding.css'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import {
+  DEFAULT_MODULE_COLORS,
+  generateModuleColorVars,
+  randomModuleColors,
+  type ModuleColorConfig,
+  type ModuleName,
+} from '@/lib/color-palette'
 import { FinDots } from '@/components/app/fin-dots'
 import type { IdentityData } from '@/components/onboarding/onboarding-identity'
 import type { HorizonData } from '@/lib/onboarding/horizon-draft'
@@ -724,24 +731,49 @@ export function buildPensionParseResult(
 }
 
 // ── Module-tint wrapper-style ───────────────────────────────
-// Onboarding leeft buiten een specifieke module (de gebruiker is modules
-// aan het kiezen), maar de stappen-componenten consumeren --module-active-*
-// tokens voor kicker-strepen, italic-em en voortgangsbalk. Default is `kern`
-// — warm, mensgericht. We zetten alle shades expliciet zodat de componenten
-// geen fallback hoeven te kennen.
-const KERN_MODULE_TINT_STYLE = {
-  '--module-active-50': 'var(--color-kern-50)',
-  '--module-active-100': 'var(--color-kern-100)',
-  '--module-active-200': 'var(--color-kern-200)',
-  '--module-active-300': 'var(--color-kern-300)',
-  '--module-active-400': 'var(--color-kern-400)',
-  '--module-active-500': 'var(--color-kern-500)',
-  '--module-active-600': 'var(--color-kern-600)',
-  '--module-active-700': 'var(--color-kern-700)',
-  '--module-active-800': 'var(--color-kern-800)',
-  '--module-active-900': 'var(--color-kern-900)',
-  '--module-active-950': 'var(--color-kern-950)',
-} as React.CSSProperties
+// De stappen-componenten consumeren --module-active-* tokens voor de
+// kicker-streep, de italic-em in de kop, de deck-rand en de voortgangsbalk.
+// Tot 17 sep 2026 stond dat vast op `kern`; sindsdien krijgt elke stapgroep
+// het accent van de hefboom waar de vraag OVER gaat (zie STEP_ACCENT). Eén
+// wissel van deze elf vars kleurt daarmee het hele scherm mee — de kleur zegt
+// dus iets ("dit gaat over je schulden"), hij is geen versiering.
+const MODULE_ACTIVE_SHADES = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950] as const
+
+function moduleActiveVars(module: ModuleName): React.CSSProperties {
+  const vars: Record<string, string> = {}
+  for (const shade of MODULE_ACTIVE_SHADES) {
+    vars[`--module-active-${shade}`] = `var(--color-${module}-${shade})`
+  }
+  return vars as React.CSSProperties
+}
+
+/**
+ * Welk accent hoort bij welke stapgroep. Bewust ONDERWERPELIJK toegewezen en
+ * niet simpelweg roterend: de vier accenten zijn op /mijn/uiterlijk gelabeld
+ * als Bezittingen · Schulden · Budget · Fin, dus een vraag over schulden hoort
+ * in het schulden-accent te staan. Wie de onboarding doorloopt, leert de
+ * kleurtaal van de app al doende.
+ *
+ * Groep 1 (naam/geboortedatum) en de eindstrategie krijgen Fins eigen accent —
+ * dat zijn de momenten waarop de app zelf aan het woord is, niet een hefboom.
+ */
+const STEP_ACCENT: Record<Step, ModuleName> = {
+  naam: 'fin',
+  geboortedatum: 'fin',
+  inkomen: 'horizon',
+  uitgaven: 'horizon',
+  uitgaven_pensioen: 'horizon',
+  bezittingen: 'kern',
+  schulden: 'wil',
+  pensioen: 'kern',
+  spaardoel: 'horizon',
+  eindstrategie: 'fin',
+  saving: 'horizon',
+  budget: 'horizon',
+  bank: 'kern',
+  klaar: 'kern',
+  success: 'kern',
+}
 
 // ── Main Component ───────────────────────────────────────────
 
@@ -794,6 +826,20 @@ export default function OnboardingPage() {
   // als ruis). De show-beslissing wordt in de check-effect onderaan genomen
   // — initial false zodat SSR en eerste paint geen popup tonen.
   const [showWelcomePopup, setShowWelcomePopup] = useState(false)
+
+  /**
+   * De vier accentkleuren van deze gebruiker. Een nieuwe gebruiker krijgt ze
+   * WILLEKEURIG toebedeeld bij binnenkomst (`randomModuleColors`) in plaats van
+   * voor iedereen dezelfde standaardset: de app is van jou, en dat is vanaf het
+   * eerste scherm te zien. Ze worden meteen via `PUT /api/appearance` op de
+   * eigen profielrij gezet, zodat de rest van de app dezelfde vier tinten
+   * gebruikt — en op /mijn/uiterlijk blijft alles vrij te wijzigen.
+   *
+   * Tot de profielquery terug is staat hier de standaardset: het onboarding-
+   * scherm mag niet eerst in de defaults verschijnen en dan zichtbaar
+   * omklappen, dus we renderen pas ná `loading`.
+   */
+  const [moduleColors, setModuleColors] = useState<ModuleColorConfig>(DEFAULT_MODULE_COLORS)
 
   // AOW-leeftijd-referentierijen voor de pensioenstap (inschat-hulp: verwachte
   // ingangsleeftijd = AOW-leeftijd). Zelfde bron als save-own-data server-side
@@ -849,9 +895,44 @@ export default function OnboardingPage() {
 
       const { data: profile } = await supabase
         .from('profiles')
-        .select('onboarding_completed, module_guide_state, net_monthly_income')
+        .select('onboarding_completed, module_guide_state, net_monthly_income, module_colors')
         .eq('id', user.id)
         .single()
+
+      // ── Accentkleuren: hergebruiken wat er staat, anders vier trekken ──
+      // Eigen-rij preference, dus toegestaan als client-direct read (CLAUDE.md,
+      // datapad-conventie); het schrijven loopt via de bestaande
+      // /api/appearance-route, niet via een eigen insert.
+      const opgeslagenKleuren = profile?.module_colors as Partial<ModuleColorConfig> | null
+      // Bewust "staat er ÉÉN kleur?" en niet "staan alle vier?": bij een
+      // onvolledige rij (technisch schrijfbaar via een directe PUT) zou een
+      // alles-of-niets-check de bestaande keuzes overschrijven met een verse
+      // trekking. Een ontbrekende sleutel valt hieronder terug op de default —
+      // hetzelfde per-sleutel-patroon dat app/(app)/layout.tsx al gebruikt.
+      const heeftKleuren = Boolean(
+        opgeslagenKleuren?.kern ||
+          opgeslagenKleuren?.wil ||
+          opgeslagenKleuren?.horizon ||
+          opgeslagenKleuren?.fin,
+      )
+      if (heeftKleuren) {
+        setModuleColors({ ...DEFAULT_MODULE_COLORS, ...opgeslagenKleuren })
+      } else if (!profile?.onboarding_completed) {
+        // Alleen voor wie de onboarding nog niet af heeft: een bestaande
+        // gebruiker die hier langskomt (openstaande afrondingsstap, of een
+        // redirect) mag niet ineens een andere app-kleur krijgen.
+        const getrokken = randomModuleColors()
+        setModuleColors(getrokken)
+        // Best-effort: mislukt de opslag (offline, 500), dan blijft de
+        // onboarding gewoon in deze kleuren staan en valt de rest van de app
+        // terug op de standaardset. Geen melding — de gebruiker heeft hier
+        // niets om op te lossen, en een kleurkeuze is geen kritiek pad.
+        void fetch('/api/appearance', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ module_colors: getrokken }),
+        }).catch(() => {})
+      }
 
       if (profile?.onboarding_completed) {
         clearLegacyLocalDraft()
@@ -1583,6 +1664,29 @@ export default function OnboardingPage() {
 
   // ── Render ───────────────────────────────────────────────────
 
+  // De vier getrokken accenten als CSS-vars (44 stuks), plus de --module-active-*
+  // laag die het accent van DEZE stap doorgeeft aan de shell en de stap-
+  // componenten. De popup portalt naar document.body en staat dus buiten deze
+  // wrapper: die krijgt dezelfde vars apart mee.
+  //
+  // `useMemo` is hier geen bijgeloof: generateModuleColorVars rekent 4 modules ×
+  // 11 shades uit, en elke shade draait een binaire zoektocht naar de
+  // sRGB-gamutgrens (~1.760 OKLCH→RGB-conversies). Deze render vuurt bij élke
+  // toetsaanslag in de formuliervelden, en op het opslaan-scherm bovendien op
+  // twee lopende intervallen. De kleuren veranderen alleen bij de trekking.
+  //
+  // Staat bewust BOVEN de `loading`-return: hooks mogen niet achter een
+  // conditionele return liggen.
+  const accentVars = useMemo(() => generateModuleColorVars(moduleColors), [moduleColors])
+  const stepTintStyle = useMemo(
+    () => ({ ...accentVars, ...moduleActiveVars(STEP_ACCENT[state.step]) }) as React.CSSProperties,
+    [accentVars, state.step],
+  )
+  const welcomeTintStyle = useMemo(
+    () => ({ ...accentVars, ...moduleActiveVars('fin') }) as React.CSSProperties,
+    [accentVars],
+  )
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -1591,8 +1695,8 @@ export default function OnboardingPage() {
     )
   }
 
-  // De nieuwe shell heeft z'n eigen sticky voortgangsbalk en back-affordance;
-  // de logo/logout-strip blijft daarboven actief voor alle content-stappen.
+  // De shell draagt de voortgangsrij (onder de vraag) en de back-affordance;
+  // de masthead-strip blijft daarboven actief voor alle content-stappen.
   // Verbergen alleen op `saving`/`success` — daar is het visuele eindpunt
   // genoeg, en de uitloggen-knop hoort niet bij een eindscherm.
   const showHeader = !['saving', 'success'].includes(state.step)
@@ -1600,12 +1704,14 @@ export default function OnboardingPage() {
   return (
     <div
       className="flex min-h-screen flex-col items-center px-4 py-8 sm:justify-center sm:px-6 sm:py-12"
-      style={KERN_MODULE_TINT_STYLE}
+      style={stepTintStyle}
     >
       {/* ── Welkomstpopup ─────────────────────────────────────────
           Eén keer per nieuwe gebruiker, vóór stap 1. Niet voor restored
           drafts (zie check-effect). Sluit alleen via primary CTA of ESC. */}
-      {showWelcomePopup && <WelcomePopup onDismiss={dismissWelcomePopup} />}
+      {showWelcomePopup && (
+        <WelcomePopup onDismiss={dismissWelcomePopup} colorVars={welcomeTintStyle} />
+      )}
 
       {/* ── Sticky meldingsbanner ────────────────────────────────
           Twee oorzaken, twee teksten: `resolveNoticeDisplay` beslist welke
@@ -1676,17 +1782,20 @@ export default function OnboardingPage() {
           label + een tweeregelige toelichting; op smal scherm wikkelt die tot
           ~4 regels, dus mobiel ruimer dan de oude vaste mt-16. */}
       <div className={`w-full max-w-[480px] sm:max-w-[640px] lg:max-w-none ${saveError || restoredNotice ? 'mt-32 sm:mt-20' : ''}`}>
-        {/* Logo / Header — staat boven de shell-progressbar omdat dat z'n
-            eigen sticky-rij heeft. Logout-knop blijft beschikbaar voor alle
-            content-stappen. */}
+        {/* Masthead — bewust klein en links: tijdens het invullen is de vraag
+            de hoofdzaak, niet de merknaam. Tot 17 sep 2026 stond hier een
+            gecentreerde 4xl-titel die het eerste halve scherm opat en de vraag
+            onder de vouw duwde. Eén rij van 44px hoog, met de uitlog-knop
+            ernaast; de punt draagt het accent van deze stap en kleurt dus mee. */}
         {showHeader && (
-          <div className="relative mb-10 sm:mb-12 text-center">
-            <h1 className="font-display text-4xl font-bold tracking-tight text-[var(--ink)]">
-              <span className="lowercase">t</span>ri<span className="lowercase">f</span>inity<span className="text-kern-500">.</span>
-            </h1>
+          <div className="mb-6 flex h-11 items-center justify-between sm:mb-8">
+            <p className="font-display text-base font-bold tracking-tight text-[var(--ink)] sm:text-lg">
+              <span className="lowercase">t</span>ri<span className="lowercase">f</span>inity
+              <span style={{ color: 'var(--module-active-700)' }}>.</span>
+            </p>
             <button
               onClick={handleLogout}
-              className="absolute right-0 top-0 text-xs text-[var(--ink-4)] transition-colors hover:text-[var(--ink-2)]"
+              className="-mr-1 flex h-11 items-center px-1 text-xs text-[var(--ink-4)] transition-colors hover:text-[var(--ink-2)]"
             >
               Uitloggen
             </button>

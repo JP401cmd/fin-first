@@ -355,6 +355,106 @@ export function generateModuleColorVars(
 }
 
 /**
+ * Gedeelde ring van achttien alternatieve accenttinten — de voorkeuzes op
+ * `/mijn/uiterlijk` én de trekkingspot voor een nieuwe gebruiker
+ * (`randomModuleColors`). Stond tot 17 sep 2026 in
+ * `components/mijn/module-accent-picker.tsx`; verhuisd omdat een tweede
+ * consument (de onboarding) er anders een kopie van had moeten maken — en een
+ * gekopieerde kleurenlijst is precies hoe de ene helft van de app straks een
+ * andere tint "Jade" kent dan de andere.
+ *
+ * ── Herkomst van de getallen (verhuisd mét de constante) ──
+ *
+ * Een raster van 20° over de hele kleurencirkel, elk op zijn **sRGB-gamutgrens**
+ * — de fysieke bovengrens, niet een gekozen getal.
+ *
+ * Het raster begint bewust op 17° en niet op 0°. Dat is de offset die de
+ * grootste afstand houdt tot de vier standaarden (kern 165,6° · wil 49,9° ·
+ * horizon 244,2° · fin 308,2°): minimaal 7,1°, tegen 4,1° bij zestien tinten en
+ * 3,2° bij twintig. Zonder die offset zou op elke kaart een ring-tint vrijwel
+ * samenvallen met de standaard erboven.
+ *
+ * Sinds 8 sep 2026 geldt hier GEEN chroma-plafond meer: de koppeling met de
+ * stoplicht-semantiek is voor accenten losgelaten (eigenaarsbesluit, zie
+ * DEFAULT_MODULE_COLORS hierboven). Scharlaken en Karmijn liggen daardoor
+ * bewust naast "actie"-rood, Oker naast "aandacht"-amber en Smaragd naast
+ * "op koers"-groen. Dat is geen ongeluk en geen drift.
+ *
+ * **EIGENAARSBESLUIT 15 sep 2026: elke tint op zijn eigen chroma-optimale
+ * lightness, niet meer allemaal op één vaste L ~ 0,52.** Voorheen was de hele
+ * ring op één lightness geplat (gekozen omdat dat de bovengrens was voor de
+ * meest beperkte hue in de set); dat liet chroma liggen bij elke hue waarvan
+ * de sRGB-piek elders ligt. Per tint gezocht naar de lightness die de chroma
+ * maximaliseert zónder onder de AA-ondergrens (4,5:1 op papier `#faf9f6`,
+ * marge ingebouwd) te zakken: groen/oranje/geel pieken pas ver boven L 0,52
+ * (te donker leesbaar, dus daar geldt de AA-grens als plafond); blauw/paars
+ * (Indigo, Violet) piekt juist ónder of rond L 0,52 — die twee kregen dus
+ * hun eigen, lagere piek-L in plaats van de AA-grens, en werden zo ook
+ * feller. Netto chroma-winst t.o.v. 8 sep: 4-14% op vrijwel alle tinten.
+ *
+ * Waarom ze niet allemaal even fel ogen: sRGB laat in het groen/teal nog altijd
+ * maar C ~ 0,10-0,13 toe tegen ~0,29-0,30 in het blauw/paars. Dat is de gamut,
+ * geen terughoudendheid.
+ *
+ * Alle achttien halen minimaal 4,55:1 tegen papier (WCAG AA voor tekst = 4,5),
+ * gepind in `module-accent-picker.test.tsx`. Voeg hier dus nooit een tint toe
+ * zonder 'm langs diezelfde meetlat te leggen — de onboarding trekt inmiddels
+ * blind uit deze lijst.
+ */
+export const ACCENT_RING: readonly { name: string; hex: string }[] = [
+  { name: 'Scharlaken', hex: '#e30046' },
+  { name: 'Roest', hex: '#d03e00' },
+  { name: 'Karamel', hex: '#b05c00' },
+  { name: 'Oker', hex: '#996900' },
+  { name: 'Olijf', hex: '#867100' },
+  { name: 'Mos', hex: '#6c7900' },
+  { name: 'Gras', hex: '#398200' },
+  { name: 'Smaragd', hex: '#00834f' },
+  { name: 'Jade', hex: '#00816e' },
+  { name: 'Petrol', hex: '#007f82' },
+  { name: 'Staal', hex: '#007d96' },
+  { name: 'Kobalt', hex: '#0079ae' },
+  { name: 'Ultramarijn', hex: '#006ee5' },
+  { name: 'Indigo', hex: '#4b00fe' },
+  { name: 'Violet', hex: '#8900fe' },
+  { name: 'Orchidee', hex: '#be00ea' },
+  { name: 'Magenta', hex: '#d200b2' },
+  { name: 'Karmijn', hex: '#dd007e' },
+]
+
+/**
+ * Afstanden (in ring-stappen van 20°) tussen de vier getrokken accenten.
+ * 4 + 5 + 4 + 5 = 18, dus de vier tinten liggen altijd rond de héle
+ * kleurencirkel verdeeld met minimaal 80° ertussen.
+ *
+ * Waarom niet vier losse trekkingen: die leveren met regelmaat twee buurtinten
+ * op (kans op een paar binnen 40° is ruim een derde), en dan zijn Bezittingen
+ * en Schulden op één scherm niet meer uit elkaar te houden. De kleur draagt
+ * hier betekenis — dat mag de dobbelsteen niet stukmaken.
+ */
+const ACCENT_TETRAD_OFFSETS = [0, 4, 9, 13] as const
+
+/**
+ * Trekt vier willekeurige accentkleuren voor een nieuwe gebruiker: één
+ * willekeurig startpunt op de ring, daarna de vaste tetrad-afstanden. Elke
+ * uitkomst is dus een gespreide, AA-getoetste combinatie — nooit vier keer
+ * bijna dezelfde tint, en nooit een tint die op papier onleesbaar is.
+ *
+ * `random` is injecteerbaar zodat de test elke tetrad kan afdwingen.
+ */
+export function randomModuleColors(random: () => number = Math.random): ModuleColorConfig {
+  const ring = ACCENT_RING
+  // Geen tweede `% ring.length` hier: de indexering hieronder modulo't al, en
+  // (s % n + offset) % n === (s + offset) % n. Ook random() === 1 (sommige
+  // generatoren geven dat) landt daarmee gewoon op index 0.
+  const start = Math.floor(random() * ring.length)
+  const [kern, wil, horizon, fin] = ACCENT_TETRAD_OFFSETS.map(
+    (offset) => ring[(start + offset) % ring.length].hex,
+  )
+  return { kern, wil, horizon, fin }
+}
+
+/**
  * Returns the hex value for a specific module shade.
  * Useful for chart libraries that need hex colors.
  */
