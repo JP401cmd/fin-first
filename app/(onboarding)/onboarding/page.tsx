@@ -142,15 +142,17 @@ type Step =
   | 'pensioen'
   | 'spaardoel'
   | 'eindstrategie'
-  | 'klaar'
   | 'saving'
-  // Afrondingsstappen ná de opslag (budget inrichten, bank koppelen). Bewust
-  // NIET in `computeStepOrder`: ze zijn alleen bereikbaar vanuit een geslaagde
-  // opslag (of een hervatting daarvan), nooit via vooruit/terug — terug naar
-  // `klaar` zou een tweede opslag uitlokken die budgetten en cash-rekeningen
-  // wist. Zie lib/onboarding/afronding.ts.
+  // Afrondingsstappen ná de opslag: budget inrichten → bank koppelen →
+  // samenvatting (`klaar`) → welkom. Bewust NIET in `computeStepOrder`: ze zijn
+  // alleen bereikbaar vanuit een geslaagde opslag (of een hervatting daarvan),
+  // nooit via vooruit/terug — terug naar een invulstap zou een tweede opslag
+  // uitlokken die budgetten en cash-rekeningen wist. De opslag start daarom al
+  // na `eindstrategie`, zodat "Begin met TriFinity" op de samenvatting de laatste
+  // knop is (eigenaarskeuze 17 sep, ADR 0156). Zie lib/onboarding/afronding.ts.
   | 'budget'
   | 'bank'
+  | 'klaar'
   | 'success'
 
 type Direction = 'forward' | 'back'
@@ -177,14 +179,14 @@ const STEP_GROUP_INDEX: Record<Step, number> = {
   pensioen: 5,
   spaardoel: 6,
   // Eigen groep (7): de eindstrategie-keuze is een aparte, laatste inhoudelijke
-  // vraag (FIRE vs. pensioen) — geen sub-vraag van spaardoel. `klaar` schuift
-  // daardoor naar 8.
+  // vraag (FIRE vs. pensioen) — geen sub-vraag van spaardoel.
   eindstrategie: 7,
-  klaar: 8,
+  // Groep 8 "Je budget": opslaan, budget inrichten, bank koppelen.
   saving: 8,
-  // Eigen groep (9) "Je budget": budget inrichten + bank koppelen, ná de opslag.
-  budget: 9,
-  bank: 9,
+  budget: 8,
+  bank: 8,
+  // Groep 9: de samenvatting met "Begin met TriFinity", daarna het welkomscherm.
+  klaar: 9,
   success: 9,
 }
 const TOTAL_GROUPS = 9
@@ -212,13 +214,13 @@ const CANONICAL_STEP_ORDER: readonly string[] = [
   'pensioen',
   'spaardoel',     // toegevoegd mei 2026 — laagdrempelige spaardoel-keuze
   'eindstrategie', // toegevoegd jul 2026 — FIRE vs. pensioen als laatste vraag
-  'budgets',       // → klaar (legacy)
-  'horizon',       // → klaar (legacy)
-  'klaar',
+  'budgets',       // → eindstrategie (legacy)
+  'horizon',       // → eindstrategie (legacy)
   'nieuws_only',   // → naam (verwijderd jun 2026, samen met de doel-stap)
   'saving',
   'budget',        // toegevoegd sep 2026 — afrondingsstap ná de opslag (niet herstelbaar uit een draft)
   'bank',          // idem
+  'klaar',         // sinds 17 sep 2026 ná de opslag; een draft op 'klaar' heelt naar eindstrategie
   'success',
 ] as const
 
@@ -234,12 +236,15 @@ const LEGACY_STEP_MAP: Record<string, Step> = {
   persona: 'naam',
   intent: 'naam',
   extras: 'bezittingen',
-  preferences: 'klaar',
+  preferences: 'eindstrategie',
   // fase 3 (mei 2026): intro/goal/budgets/horizon zijn niet meer actief
   intro: 'naam',
   goal: 'naam',
-  budgets: 'klaar',
-  horizon: 'klaar',
+  budgets: 'eindstrategie',
+  horizon: 'eindstrategie',
+  // sep 2026: de samenvatting staat ná de opslag. Een concept dat op 'klaar'
+  // stond is nog niet opgeslagen → terug naar de laatste vraag vóór de opslag.
+  klaar: 'eindstrategie',
   // jun 2026: doel-stap ("Waar help ik je mee?") + news-only-pad verwijderd
   doel: 'naam',
   nieuws_only: 'naam',
@@ -264,7 +269,7 @@ export function _resolveRestoredStep(lastStep: string | undefined, activeStepOrd
   step: Step
   healed: boolean
 } {
-  const terminalSteps: Step[] = ['saving', 'budget', 'bank', 'success']
+  const terminalSteps: Step[] = ['saving', 'budget', 'bank', 'klaar', 'success']
   const isSelectable = (s: Step): boolean => !terminalSteps.includes(s)
 
   // No saved step at all → start at naam (de eerste content-stap).
@@ -347,7 +352,9 @@ function computeStepOrder(): Step[] {
     'pensioen',
     'spaardoel',
     'eindstrategie',
-    'klaar',
+    // Na de laatste vraag meteen opslaan: `goToNext` ziet 'saving' en start
+    // `handleSaveOwnData`. Budget, bank en de samenvatting (`klaar`) volgen
+    // daarna buiten deze volgorde — zie het `Step`-type.
     'saving',
     'success',
   ]
@@ -782,6 +789,8 @@ export default function OnboardingPage() {
   const [bankError, setBankError] = useState(false)
   /** Netto maandinkomen voor de budgetstap: uit de opslag, of uit het profiel bij hervatten. */
   const [afrondingIncome, setAfrondingIncome] = useState(0)
+  /** Zijn de antwoorden van deze sessie nog in state (dus is de samenvatting zinvol)? */
+  const recapAvailableRef = useRef(false)
   // Welkomstpopup: alleen tonen bij eerste binnenkomst, niet bij restored-draft
   // (de gebruiker is dan al terug-bezig en de begroeting voelt op dat moment
   // als ruis). De show-beslissing wordt in de check-effect onderaan genomen
@@ -1008,7 +1017,7 @@ export default function OnboardingPage() {
   //    toetsaanslag; zonder wachttijd zou dat evenzoveel PUT's kosten.
   useEffect(() => {
     if (!restoreChecked) return
-    if (['saving', 'budget', 'bank', 'success'].includes(state.step)) return
+    if (['saving', 'budget', 'bank', 'klaar', 'success'].includes(state.step)) return
     const draft = serializeDraft(state)
     // Nog niets te hervatten (net binnengekomen, niets ingevuld) → geen rij
     // beschrijven. Zodra er één antwoord staat, slaat dit om en blijft het om.
@@ -1329,6 +1338,9 @@ export default function OnboardingPage() {
       // omdat deze opslag budgetten en cash-rekeningen wist; de server heeft de
       // afrondingsmarkering in dezelfde update geopend.
       setAfrondingIncome(monthlyIncome)
+      // De samenvatting na de bankstap leest de antwoorden uit deze sessie; na
+      // een herlaad (bank-omweg in de browser) zijn die weg en slaan we hem over.
+      recapAvailableRef.current = true
       dispatch({ type: 'SET_STEP', step: 'budget' })
     } catch (err) {
       let message: string
@@ -1387,7 +1399,9 @@ export default function OnboardingPage() {
 
   const finishBankStep = useCallback(async (bank: BankUitkomst) => {
     await advanceAfronding({ stap: 'klaar', bank })
-    dispatch({ type: 'SET_STEP', step: 'success' })
+    // Samenvatting met "Begin met TriFinity" als laatste knop — alleen als de
+    // antwoorden uit deze sessie er nog zijn (anders zou hij leeg ogen).
+    dispatch({ type: 'SET_STEP', step: recapAvailableRef.current ? 'klaar' : 'success' })
   }, [advanceAfronding])
 
   // Defined after handleSaveOwnData so the safety-net branch below can call it
@@ -1945,11 +1959,10 @@ export default function OnboardingPage() {
               debts={state.quickDebts}
               spaardoel={spaardoelRecap}
               completeness={onboardingCompleteness}
-              onFillIncome={() => dispatch({ type: 'SET_STEP', step: 'inkomen' })}
-              onFillNetWorth={() => dispatch({ type: 'SET_STEP', step: 'bezittingen' })}
-              onAddMore={() => dispatch({ type: 'SET_STEP', step: 'bezittingen' })}
-              onFinish={handleSaveOwnData}
-              onBack={goToBack}
+              // Geen terug-/aanvul-acties: de samenvatting staat ná de opslag en
+              // ná budget + bank; terugspringen zou een wissende tweede opslag
+              // uitlokken (ADR 0156, aanvulling 17 sep).
+              onFinish={() => dispatch({ type: 'SET_STEP', step: 'success' })}
               currentStep={currentContentStep}
               totalSteps={totalContentSteps}
             />

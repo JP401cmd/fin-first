@@ -32,7 +32,8 @@ const NEW_ACTIVE_ORDER = [
   'pensioen',
   'spaardoel',
   'eindstrategie',
-  'klaar',
+  // Sinds 17 sep 2026 (ADR 0156): na eindstrategie meteen opslaan; budget, bank
+  // en de samenvatting `klaar` volgen buiten de navigatievolgorde.
   'saving',
   'success',
 ] as const
@@ -57,14 +58,14 @@ describe('onboarding _resolveRestoredStep (self-healing restore)', () => {
     expect(result).toEqual({ step: 'naam', healed: true })
   })
 
-  it('heals a legacy "budgets" lastStep to the new "klaar" step', () => {
+  it('heals a legacy "budgets" lastStep to "eindstrategie" (laatste vraag vóór de opslag)', () => {
     const result = _resolveRestoredStep('budgets', [...NEW_ACTIVE_ORDER])
-    expect(result).toEqual({ step: 'klaar', healed: true })
+    expect(result).toEqual({ step: 'eindstrategie', healed: true })
   })
 
-  it('heals a legacy "horizon" lastStep to "klaar"', () => {
+  it('heals a legacy "horizon" lastStep to "eindstrategie"', () => {
     const result = _resolveRestoredStep('horizon', [...NEW_ACTIVE_ORDER])
-    expect(result).toEqual({ step: 'klaar', healed: true })
+    expect(result).toEqual({ step: 'eindstrategie', healed: true })
   })
 
   it('heals a legacy "intro" lastStep to "naam"', () => {
@@ -326,15 +327,15 @@ describe('onboarding _reducer — RESTORE_STATE', () => {
     expect(warnSpy.mock.calls[0][0]).toContain('naam')
   })
 
-  it('migrates a legacy "budgets" lastStep to "klaar"', () => {
+  it('migrates a legacy "budgets" lastStep to "eindstrategie"', () => {
     const result = _reducer(_initialState, {
       type: 'RESTORE_STATE',
       data: makeDraft({ selectedGoals: ['grip-uitgaven'], lastStep: 'budgets' }),
     })
-    expect(result.step).toBe('klaar')
+    expect(result.step).toBe('eindstrategie')
     expect(warnSpy).toHaveBeenCalledOnce()
     expect(warnSpy.mock.calls[0][0]).toContain('budgets')
-    expect(warnSpy.mock.calls[0][0]).toContain('klaar')
+    expect(warnSpy.mock.calls[0][0]).toContain('eindstrategie')
   })
 
   it('heals a news-only draft (lastStep nieuws_only) back to naam', () => {
@@ -480,9 +481,12 @@ describe('onboarding _resolveRestoredStep — uitgaven_pensioen', () => {
 })
 
 describe('onboarding _resolveRestoredStep — spaardoel + klaar', () => {
-  it('keeps a klaar lastStep on klaar without retroactively routing to spaardoel', () => {
+  it('heals a klaar lastStep to eindstrategie: de samenvatting staat sinds 17 sep ná de opslag', () => {
+    // Een concept op `klaar` is nog niet opgeslagen; landen op de samenvatting
+    // zou de opslag overslaan. Terug naar de laatste vraag, van waaruit
+    // "Verder" de opslag start.
     const result = _resolveRestoredStep('klaar', [...NEW_ACTIVE_ORDER])
-    expect(result).toEqual({ step: 'klaar', healed: false })
+    expect(result).toEqual({ step: 'eindstrategie', healed: true })
   })
 
   it('restores a draft saved on spaardoel without warning', () => {
@@ -495,10 +499,11 @@ describe('onboarding _resolveRestoredStep — spaardoel + klaar', () => {
     expect(result).toEqual({ step: 'eindstrategie', healed: false })
   })
 
-  it('places eindstrategie between spaardoel and klaar in the active order', () => {
-    const order = [...NEW_ACTIVE_ORDER]
+  it('places eindstrategie between spaardoel and the save in the active order (klaar zit er niet meer in)', () => {
+    const order: string[] = [...NEW_ACTIVE_ORDER]
     expect(order.indexOf('eindstrategie')).toBeGreaterThan(order.indexOf('spaardoel'))
-    expect(order.indexOf('eindstrategie')).toBeLessThan(order.indexOf('klaar'))
+    expect(order.indexOf('saving')).toBe(order.indexOf('eindstrategie') + 1)
+    expect(order).not.toContain('klaar')
   })
 })
 
@@ -645,7 +650,7 @@ describe('onboarding _reducer — RESTORE_STATE keuzes (spaardoel + pensioen)', 
         lastStep: 'klaar',
       }),
     })
-    expect(result.step).toBe('klaar')
+    expect(result.step).toBe('eindstrategie')
     expect(result.pension).toEqual(_initialState.pension)
   })
 
@@ -654,7 +659,7 @@ describe('onboarding _reducer — RESTORE_STATE keuzes (spaardoel + pensioen)', 
       type: 'RESTORE_STATE',
       data: makeDraft({ lastStep: 'klaar' }),
     })
-    expect(result.step).toBe('klaar')
+    expect(result.step).toBe('eindstrategie')
     expect(result.spaardoel).toEqual(_initialState.spaardoel)
   })
 })

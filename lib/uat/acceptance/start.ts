@@ -368,8 +368,8 @@ const criteria: AcceptanceCriterion[] = [
     scenarioId: 'UAT-START-24',
     titel: 'Fout bij het afronden van onboarding herstellen (retry)',
     kriticiteit: 'BELANGRIJK',
-    given: 'Volledig ingevulde onboarding op de klaar-stap; netwerk/server faalt bij het afronden.',
-    when: 'De gebruiker klikt "Begin met TriFinity" terwijl de opslag faalt, herstelt de oorzaak en klikt "Opnieuw proberen".',
+    given: 'Volledig ingevulde onboarding op de laatste vraag (eindstrategie); netwerk/server faalt bij het opslaan. Sinds 17-09-2026 (ADR 0156) start de opslag na die vraag; budget, bank en de samenvatting met "Begin met TriFinity" volgen pas daarna.',
+    when: 'De gebruiker klikt "Verder" op de laatste vraag terwijl de opslag faalt, herstelt de oorzaak en klikt "Opnieuw proberen".',
     then: 'Sticky foutbanner met leesbare oorzaak (timeout/netwerk/serverfout); alle ingevulde data blijft intact; retry hergebruikt dezelfde idempotency-key (geen dubbele bezittingen/doelen); voortgangsbalk blijft op max 90% tot een geslaagde poging.',
     assertion: {
       kind: 'ui-only',

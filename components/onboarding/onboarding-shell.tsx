@@ -1,6 +1,6 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import { useLayoutEffect, useRef, type ReactNode } from 'react'
 import {
   DATA_NOTE_LINK_LABEL,
   DATA_NOTE_PRIVACY_HREF,
@@ -97,6 +97,24 @@ export function OnboardingShell({
   // zonder eigen prop-plumbing. `null` = nog niets eerlijks te tonen.
   const freedomTicker = useOnboardingFreedomTicker()
 
+  // Elke nieuwe vraag begint bovenaan. De pagina scrollt op de body, en die
+  // positie bleef staan bij een stapwissel (nieuwe shell-mount) én bij een
+  // micro-vraag binnen dezelfde stap (bv. "Heb je een spaargeldrekening?" na de
+  // betaalrekening — zelfde shell, andere kop). Beide vangen we hier: bij mount,
+  // en wanneer de koptekst verandert. Alleen als er daadwerkelijk gescrold is,
+  // zodat een render zonder wissel niets doet.
+  const headingRef = useRef<HTMLHeadingElement>(null)
+  const previousHeading = useRef<string | null>(null)
+  useLayoutEffect(() => {
+    const text = headingRef.current?.textContent ?? ''
+    if (previousHeading.current !== text && typeof window !== 'undefined' && window.scrollY > 0) {
+      // `instant`: de html draagt `scroll-behavior: smooth`; een nieuwe vraag
+      // hoort er meteen bovenaan te staan, niet zichtbaar omhoog te glijden.
+      window.scrollTo({ top: 0, behavior: 'instant' })
+    }
+    previousHeading.current = text
+  })
+
   return (
     <div className="w-full">
       {/* Sticky top: voortgangsbalk + back-affordance.
@@ -163,6 +181,7 @@ export function OnboardingShell({
             {/* Headline: Playfair black, narratief. Caller mag inline
                 italic-em in --module-active-700 plaatsen voor de signature-em. */}
             <h1
+              ref={headingRef}
               className="font-black leading-[1.05] tracking-[-0.025em] text-[28px] sm:text-[36px] md:text-[44px] text-[var(--ink)]"
               style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
             >

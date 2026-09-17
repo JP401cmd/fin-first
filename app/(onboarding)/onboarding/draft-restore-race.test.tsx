@@ -16,7 +16,7 @@
  * De test houdt `getUser()` bewust *pending* om precies dat venster te openen.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, waitFor, cleanup, act } from '@testing-library/react'
+import { render, screen, waitFor, cleanup, act, fireEvent } from '@testing-library/react'
 import { serializeDraft, type OnboardingDraft, type DraftStateSource } from './draft-persistence'
 import { DRAFT_RESTORED_NOTICE } from './draft-notice-copy'
 
@@ -73,7 +73,12 @@ vi.mock('@/components/onboarding/onboarding-budget', () => ({
   OnboardingBudget: (p: { netIncome: number }) => <div data-testid="stap-budget">{p.netIncome}</div>,
 }))
 vi.mock('@/components/onboarding/onboarding-bank', () => ({
-  OnboardingBank: (p: { result: string | null }) => <div data-testid="stap-bank">{String(p.result)}</div>,
+  OnboardingBank: (p: { result: string | null; onDone: () => void }) => (
+    <div data-testid="stap-bank">
+      {String(p.result)}
+      <button type="button" onClick={p.onDone}>bank-klaar</button>
+    </div>
+  ),
 }))
 
 // eslint-disable-next-line import/first -- moet ná de vi.mock-hoisting geladen worden
@@ -308,6 +313,16 @@ describe('onboarding hervatten op de afrondingsstappen (ADR 0156)', () => {
 
     expect(await screen.findByTestId('stap-bank')).toHaveTextContent('error')
     expect(routerReplace).not.toHaveBeenCalled()
+  })
+
+  it('na een hervatting (antwoorden weg) slaat de bankstap de lege samenvatting over → welkomscherm', async () => {
+    guideState = withAfrondingVoortgang(withAfrondingOpen({}), { stap: 'bank', budget: 'opgeslagen' })
+    window.history.replaceState(null, '', '/onboarding?bank_connected=1')
+    render(<OnboardingPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'bank-klaar' }))
+    expect(await screen.findByText(/Welkom bij TriFinity/)).toBeInTheDocument()
+    expect(screen.queryByText(/Bijna/)).toBeNull()
   })
 
   it('voltooid met afgeronde markering: gewoon naar home', async () => {

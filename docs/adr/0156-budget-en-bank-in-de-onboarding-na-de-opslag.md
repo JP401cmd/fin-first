@@ -24,7 +24,9 @@ Dit vult ADR 0130 aan (de welkomstgids pakt het op wat hier wordt overgeslagen).
 
 ## Besluit
 
-1. **Na de opslag, buiten de navigatievolgorde.** `budget` en `bank` staan niet in `computeStepOrder`. Ze zijn alleen bereikbaar vanuit een geslaagde opslag of een hervatting. Terug naar `klaar` zou een tweede, wissende opslag uitlokken.
+1. **Na de opslag, buiten de navigatievolgorde.** `budget` en `bank` staan niet in `computeStepOrder`. Ze zijn alleen bereikbaar vanuit een geslaagde opslag of een hervatting. Terug naar een invulstap zou een tweede, wissende opslag uitlokken.
+
+   **Aanvulling 17 sep 2026 (eigenaarsmelding na de livegang):** "Begin met TriFinity" moet de laatste knop zijn, direct gevolgd door het welkomscherm en de rondleiding. De volgorde is daarom: laatste vraag (`eindstrategie`) → opslaan → budget → bank → samenvatting (`klaar`, met "Begin met TriFinity") → welkom. Ook `klaar` staat nu buiten `computeStepOrder`, zonder terug- of "voeg nog iets toe"-actie. Een concept op `klaar` heelt naar `eindstrategie`. Na een herlaad (bank-omweg in de browser) zijn de sessie-antwoorden weg; dan wordt de samenvatting overgeslagen en gaat de bankstap direct naar het welkomscherm.
 2. **Afrondingsmarkering** (`lib/onboarding/afronding.ts`):
    - Wordt geopend in dezelfde update die `onboarding_completed = true` zet.
    - Schuift door via `POST /api/onboarding/afronding` (own-row, zod). Die route heropent nooit een gesloten markering.

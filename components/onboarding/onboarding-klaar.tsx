@@ -124,11 +124,17 @@ export interface OnboardingKlaarProps {
    * direct klikbaar. Weggelaten → de cel blijft statische tekst.
    */
   onFillNetWorth?: () => void
-  /** "Voeg nog iets toe →" — terug naar stap 4. */
-  onAddMore: () => void
-  /** Primaire CTA — orchestrator triggert save + redirect. */
+  /**
+   * "Voeg nog iets toe →" — terug naar de bezittingen. Weggelaten → geen link.
+   * Sinds ADR 0156 (aanvulling) staat de samenvatting ná de opslag en ná budget
+   * en bank; terugspringen zou een tweede opslag uitlokken die budgetten en
+   * cash-rekeningen wist, dus de orchestrator laat deze link dan weg.
+   */
+  onAddMore?: () => void
+  /** Primaire CTA "Begin met TriFinity" — door naar het welkomscherm. */
   onFinish: () => void
-  onBack: () => void
+  /** Weggelaten → geen terugknop (zelfde reden als `onAddMore`). */
+  onBack?: () => void
   /** 1-indexed stap-nummer voor de voortgangsbalk (default 6 sinds stap v.). */
   currentStep?: number
   totalSteps?: number
@@ -195,14 +201,16 @@ export function OnboardingKlaar({
           >
             Begin met TriFinity
           </button>
-          <button
-            type="button"
-            onClick={onAddMore}
-            className="w-full min-h-11 text-xs italic text-[var(--ink-3)] underline-offset-4 transition-colors hover:text-[var(--ink-2)] hover:underline"
-            style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
-          >
-            Voeg nog iets toe &rarr;
-          </button>
+          {onAddMore && (
+            <button
+              type="button"
+              onClick={onAddMore}
+              className="w-full min-h-11 text-xs italic text-[var(--ink-3)] underline-offset-4 transition-colors hover:text-[var(--ink-2)] hover:underline"
+              style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+            >
+              Voeg nog iets toe &rarr;
+            </button>
+          )}
         </div>
       }
     >

@@ -48,8 +48,8 @@ import type { AssetDraftState, DebtDraftState } from '../wizard-reducer'
  * en voor hypotheken aflossingsvorm/ingangsdatum/resterende looptijd).
  * Defaults uit `ASSET_DEFAULT_NAMES` / `DEBT_DEFAULT_NAMES` worden
  * automatisch ingevuld zodat de gebruiker in veel gevallen alleen het
- * bedrag hoeft te typen. Suggesties komen via een native `<datalist>` —
- * het simpelste patroon dat zowel keyboard als touch goed ondersteunt.
+ * bedrag hoeft te typen. Suggesties staan als knoppen onder het naamveld —
+ * bewust geen native `<datalist>`, zie de toelichting bij het veld.
  *
  * De "Meer details"-link onder de save-knop is de ontsnappingsroute voor
  * de ~10% power-users die direct het volledige formulier willen zien.
@@ -415,7 +415,6 @@ export function StepDetails(props: StepDetailsProps) {
           id={`${nameListId}-name`}
           type="text"
           autoComplete="off"
-          list={suggestions && suggestions.length > 0 ? `${nameListId}-suggestions` : undefined}
           value={draftName}
           placeholder={defaultName ?? `Bijv. ${typeLabel.toLowerCase()}`}
           onChange={(e) => handleNameChange(e.target.value)}
@@ -428,12 +427,27 @@ export function StepDetails(props: StepDetailsProps) {
               : `border-[var(--border-ed)] focus:ring-1 ${palette.focusBorder}`
           }`}
         />
+        {/* Suggesties als knoppen ónder het veld, niet als native <datalist>:
+            die dropdown tekent de browser zelf, buiten de sheet en het
+            z-index-systeem om, en viel op Android Chrome over het label en het
+            veld heen (melding 17-09-2026, zelfde oorzaak als 8a28dc in
+            spend-limits-section). Knoppen blijven in de sheet en in beeld. */}
         {suggestions && suggestions.length > 0 && (
-          <datalist id={`${nameListId}-suggestions`}>
-            {suggestions.map((s) => (
-              <option key={s} value={s} />
-            ))}
-          </datalist>
+          <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="Snel een naam kiezen">
+            {suggestions
+              .filter((s) => s !== draftName)
+              .slice(0, 6)
+              .map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => handleNameChange(s)}
+                  className="min-h-11 border border-[var(--border-ed)] bg-[var(--subtle)] px-3 text-xs text-[var(--ink-2)] transition-colors hover:border-[var(--ink-3)] hover:text-[var(--ink)]"
+                >
+                  {s}
+                </button>
+              ))}
+          </div>
         )}
         {showNameError && (
           <p
