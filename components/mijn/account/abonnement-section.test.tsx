@@ -2,39 +2,57 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 
 const replace = vi.fn()
+const refresh = vi.fn()
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ replace }),
+  useRouter: () => ({ replace, refresh }),
   usePathname: () => '/mijn/account',
 }))
 
 import { AbonnementSection } from './abonnement-section'
 
-beforeEach(() => replace.mockReset())
+beforeEach(() => {
+  replace.mockReset()
+  refresh.mockReset()
+})
 import { parseAddonDeeplink } from '@/lib/subscription-catalog'
 
 /**
- * V-002 — de AI-upsell linkt naar /mijn/account?addon=ai; dan opent het
- * upgrade-sheet ("Binnenkort") van de AI-add-on direct.
+ * V-002 — de AI-upsell linkt naar /mijn/account?addon=ai. In de beta (ADR 0157)
+ * opent daar de beta-keuze voor die add-on in plaats van het "Binnenkort"-sheet.
  */
 describe('AbonnementSection — deeplink ?addon=', () => {
-  it('opent het AI-upgrade-sheet bij het laden als initialAddon="ai"', () => {
+  it('opent de beta-keuze voor AI bij het laden als initialAddon="ai"', async () => {
     render(<AbonnementSection activeSubscriptions={[]} initialAddon="ai" />)
-    const dialog = screen.getByRole('dialog')
-    expect(dialog).toHaveTextContent('Binnenkort')
-    expect(dialog).toHaveTextContent(/AI/)
-    // Geen belofte van directe checkout.
-    expect(dialog).not.toHaveTextContent(/reken af/i)
-    fireEvent.click(screen.getAllByRole('button', { name: 'Sluiten' })[0])
-    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.getByTestId('beta-addon-dialog-ai')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Niet nu' }))
+    // De sheet sluit geanimeerd; daarna is hij weg.
+    await vi.waitFor(() => expect(screen.queryByTestId('beta-addon-dialog-ai')).toBeNull())
     // Eenmalig: de deeplink verdwijnt uit de URL, anders opent verversen hem weer.
     expect(replace).toHaveBeenCalledWith('/mijn/account', { scroll: false })
   })
 
-  it('opent het sheet ook als de pagina al open stond (soft-navigatie wijzigt alleen de prop)', () => {
+  it('opent de keuze ook als de pagina al open stond (soft-navigatie wijzigt alleen de prop)', () => {
     const { rerender } = render(<AbonnementSection activeSubscriptions={[]} />)
-    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.queryByTestId('beta-addon-dialog-ai')).toBeNull()
     rerender(<AbonnementSection activeSubscriptions={[]} initialAddon="ai" />)
-    expect(screen.getByRole('dialog')).toHaveTextContent('Binnenkort')
+    expect(screen.getByTestId('beta-addon-dialog-ai')).toBeInTheDocument()
+  })
+
+  it('een actieve add-on is in de beta direct uit te zetten', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ ok: true, tier: 'connected', active: false, subscriptions: [] }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    render(<AbonnementSection activeSubscriptions={['connected']} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Connected uitzetten' }))
+    await vi.waitFor(() => expect(refresh).toHaveBeenCalled())
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
+      tier: 'connected',
+      active: false,
+      source: 'mijn-privacy',
+    })
+    vi.unstubAllGlobals()
   })
 
   it('opent niets zonder deeplink', () => {

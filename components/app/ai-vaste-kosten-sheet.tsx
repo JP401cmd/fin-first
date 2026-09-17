@@ -87,6 +87,7 @@ export function AiVasteKostenSheet({ open, onOpenChange, onComplete }: AiVasteKo
   const [rows, setRows] = useState<SuggestionRow[]>([])
   const [skippedRows, setSkippedRows] = useState<AiSuggestion[]>([])
   const [showSkipped, setShowSkipped] = useState(false)
+  const [upsellDialogOpen, setUpsellDialogOpen] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   const [savedCount, setSavedCount] = useState(0)
 
@@ -354,7 +355,14 @@ export function AiVasteKostenSheet({ open, onOpenChange, onComplete }: AiVasteKo
   // ── Render ────────────────────────────────────────────────
 
   return (
-    <BottomSheet open={open} onClose={handleClose} title="Fin analyseert je vaste kosten" size="md">
+    <BottomSheet
+      open={open}
+      // De beta-popup (ADR 0157) is het bovenste venster zolang hij open is.
+      suspended={upsellDialogOpen}
+      onClose={handleClose}
+      title="Fin analyseert je vaste kosten"
+      size="md"
+    >
 
       {/* ── Loading ── */}
       {phase === 'loading' && (
@@ -405,6 +413,7 @@ export function AiVasteKostenSheet({ open, onOpenChange, onComplete }: AiVasteKo
             feature="Je vaste kosten laten analyseren door Fin"
             note="Nu scannen herkent je terugkerende kosten ook zonder abonnement."
             onNavigate={handleClose}
+            onDialogOpenChange={setUpsellDialogOpen}
           />
         </div>
       )}

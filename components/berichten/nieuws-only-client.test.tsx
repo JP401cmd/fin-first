@@ -515,9 +515,8 @@ describe('NieuwsOnlyClient — zonder AI-abonnement (V-002)', () => {
     mocks.useExecutionMode.mockReturnValue(cloud())
     render(<NieuwsOnlyClient userId="user-x" />)
     expect(await screen.findByTestId('nieuws-upsell')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /Bekijk AI-abonnement/i }).getAttribute('href')).toBe(
-      '/mijn/account?addon=ai',
-    )
+    // Beta (ADR 0157): de upsell biedt de keuze zelf aan.
+    expect(screen.getByTestId('ai-upsell-cta')).toHaveTextContent('AI aanzetten')
     expect(urls().some((u) => u === '/api/news' || u.startsWith('/api/news?'))).toBe(false)
     expect(screen.queryByText('Nieuws kon niet worden geladen')).toBeNull()
   })

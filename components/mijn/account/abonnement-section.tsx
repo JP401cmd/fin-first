@@ -10,6 +10,9 @@ import {
   formatPlanPrice,
   type AddonPlan,
 } from '@/lib/subscription-catalog'
+import { BETA_SELF_SERVE_ADDONS, betaAddonNotice } from '@/lib/beta-addons'
+import { postBetaAddon } from '@/lib/beta-addons-client'
+import { BetaAddonDialog } from '@/components/app/beta-addon/beta-addon-dialog'
 
 /**
  * AbonnementSection — toont de twee verkoopbare add-ons (AI + Connected) als
@@ -67,6 +70,27 @@ export function AbonnementSection({
     // De deeplink is eenmalig: laat hem niet in de URL staan, anders springt het
     // sheet bij verversen weer open.
     if (initialAddon) router.replace(pathname, { scroll: false })
+  }
+
+  // Het laatst geopende tier blijft staan terwijl de popup wegschuift, zodat
+  // titel en tekst tijdens de sluitanimatie niet naar AI omklappen.
+  const [lastBetaTier, setLastBetaTier] = useState<AddonPlan['tier']>('ai')
+  if (upgradePlan && upgradePlan.tier !== lastBetaTier) setLastBetaTier(upgradePlan.tier)
+  const [turningOff, setTurningOff] = useState<AddonPlan['tier'] | null>(null)
+  const [offError, setOffError] = useState<{ tier: AddonPlan['tier']; message: string } | null>(null)
+
+  /** Beta (ADR 0157): uitzetten mag direct; bij AI legt de route ook "nee" vast. */
+  async function uitzetten(plan: AddonPlan) {
+    if (turningOff) return
+    setTurningOff(plan.tier)
+    setOffError(null)
+    const result = await postBetaAddon(plan.tier, false, 'mijn-privacy')
+    setTurningOff(null)
+    if (!result.ok) {
+      setOffError({ tier: plan.tier, message: result.error })
+      return
+    }
+    router.refresh()
   }
 
   function openUpgrade(plan: AddonPlan) {
@@ -151,7 +175,32 @@ export function AbonnementSection({
               </ul>
 
               <div className="mt-4">
-                {active ? (
+                {BETA_SELF_SERVE_ADDONS ? (
+                  <div className="space-y-2">
+                    <p className="text-[11px] italic text-[var(--ink-3)]">{betaAddonNotice(plan.tier)}</p>
+                    {active ? (
+                      <button
+                        type="button"
+                        onClick={() => void uitzetten(plan)}
+                        disabled={turningOff !== null}
+                        className="inline-flex items-center gap-2 rounded-xl border border-[var(--border-md)] px-4 py-2.5 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)] transition-colors disabled:opacity-50"
+                      >
+                        {turningOff === plan.tier ? 'Uitzetten…' : `${plan.name} uitzetten`}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => openUpgrade(plan)}
+                        className="inline-flex items-center gap-2 rounded-xl bg-[var(--ink)] px-4 py-2.5 text-sm font-semibold text-[var(--paper)] hover:bg-[var(--ink-2)] transition-colors"
+                      >
+                        {plan.name} aanzetten
+                      </button>
+                    )}
+                    {offError?.tier === plan.tier && (
+                      <p role="alert" className="text-xs text-negative">{offError.message}</p>
+                    )}
+                  </div>
+                ) : active ? (
                   <p className="text-[11px] italic text-[var(--ink-3)]">
                     Actief — beheer of opzeggen kan binnenkort hier.
                   </p>
@@ -171,8 +220,16 @@ export function AbonnementSection({
         })}
       </div>
 
-      {upgradePlan && (
+      {upgradePlan && !BETA_SELF_SERVE_ADDONS && (
         <UpgradeSheet plan={upgradePlan} onClose={closeUpgrade} />
+      )}
+      {BETA_SELF_SERVE_ADDONS && (
+        <BetaAddonDialog
+          tier={upgradePlan?.tier ?? lastBetaTier}
+          open={upgradePlan !== null}
+          onClose={closeUpgrade}
+          source="mijn-privacy"
+        />
       )}
     </section>
   )

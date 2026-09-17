@@ -31,14 +31,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
  *     hier géén afwijzingsgrond (dat is SC-13, de reden dat dit pad bestaat).
  */
 
-const { mockCreateClient, mockBuildAuthLink, mockIsEnabled, mockSetBudgetTracking } = vi.hoisted(() => ({
+const { mockCreateClient, mockBuildAuthLink, mockIsEnabled, mockSetBudgetTracking, mockTierGate } = vi.hoisted(() => ({
   mockCreateClient: vi.fn(),
   mockBuildAuthLink: vi.fn(),
   mockIsEnabled: vi.fn(),
   mockSetBudgetTracking: vi.fn(),
+  mockTierGate: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/server', () => ({ createClient: mockCreateClient }))
+vi.mock('@/lib/require-tier', () => ({ checkTierGate: (...args: unknown[]) => mockTierGate(...args) }))
 vi.mock('@/lib/truelayer/client', () => ({ buildAuthLink: mockBuildAuthLink }))
 vi.mock('@/lib/truelayer/feature-flag', () => ({ isTrueLayerEnabled: mockIsEnabled }))
 vi.mock('@/lib/crypto/field-encryption', () => ({ encryptField: (v: string) => `enc:${v}` }))
@@ -275,6 +277,8 @@ beforeEach(() => {
   mockCreateClient.mockReset().mockResolvedValue(makeSupabase())
   mockBuildAuthLink.mockReset().mockResolvedValue('https://auth.truelayer.com/?state=x')
   mockIsEnabled.mockReset().mockResolvedValue(true)
+  // Default: de gebruiker heeft Connected (ADR 0157); de gate-tests hieronder zetten 'm uit.
+  mockTierGate.mockReset().mockResolvedValue(null)
   mockSetBudgetTracking.mockReset().mockResolvedValue({ ok: true, asset: { id: 'asset-2', has_budget_tracking: true, name: 'Zonder budgetteren' }, budgetingActive: true })
 })
 
@@ -303,6 +307,33 @@ describe('POST /api/bank-connect/auth-link — guards', () => {
 
     expect(res.status).toBe(400)
     expect(insertedConnections).toHaveLength(0)
+  })
+})
+
+describe('POST /api/bank-connect/auth-link — Connected-add-on (ADR 0157)', () => {
+  const NO_CONNECTED = { subscriptions: [], error: 'Deze functie vereist een Connected abonnement' }
+
+  it('een NIEUWE koppeling zonder Connected levert 403 connected_required, zonder pending-rij', async () => {
+    mockTierGate.mockResolvedValue(NO_CONNECTED)
+
+    const res = await POST(postRequest({ provider_id: 'ing' }))
+    const body = await res.json()
+
+    expect(res.status).toBe(403)
+    expect(body.code).toBe('connected_required')
+    expect(mockTierGate).toHaveBeenCalledWith(expect.anything(), USER, 'connected')
+    expect(insertedConnections).toHaveLength(0)
+    expect(mockBuildAuthLink).not.toHaveBeenCalled()
+  })
+
+  it('het HERSTELPAD blijft vrij: een bestaande koppeling herstellen vraagt geen Connected', async () => {
+    mockTierGate.mockResolvedValue(NO_CONNECTED)
+
+    const res = await POST(postRequest({ relink_connection_account_id: RELINK_LINK }))
+
+    expect(res.status).toBe(200)
+    expect(mockTierGate).not.toHaveBeenCalled()
+    expect(insertedConnections).toHaveLength(1)
   })
 })
 

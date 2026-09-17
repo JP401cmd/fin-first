@@ -56,7 +56,7 @@ export function buildAuthLinkBody(
 
 export type StartBankConnectResult =
   | { ok: true; launch: BankAuthLaunch; connectionId: string | null }
-  | { ok: false; error: string }
+  | { ok: false; error: string; code?: string }
 
 /**
  * Vraag de autorisatie-URL op en ga naar de bank.
@@ -85,7 +85,12 @@ export async function startBankConnect(input: {
 
     if (!res.ok || !data?.auth_url) {
       console.error('Bank-connect auth-link mislukt', { status: res.status, error: data?.error })
-      return { ok: false, error: typeof data?.error === 'string' ? data.error : BANK_CONNECT_GENERIC_ERROR }
+      return {
+        ok: false,
+        error: typeof data?.error === 'string' ? data.error : BANK_CONNECT_GENERIC_ERROR,
+        // `connected_required` (ADR 0157): de aanroeper opent de beta-keuze en probeert daarna opnieuw.
+        ...(typeof data?.code === 'string' ? { code: data.code } : {}),
+      }
     }
 
     const connectionId = typeof data.connection_id === 'string' ? data.connection_id : null

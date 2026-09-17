@@ -37,6 +37,7 @@ import { VragenlijstSignaalProvider } from '@/components/app/vragenlijst/vragenl
 import { VragenlijstUitnodiging } from '@/components/app/vragenlijst/vragenlijst-uitnodiging'
 import { AiConsentInterstitial } from '@/components/app/ai-consent-interstitial'
 import { AI_CONSENT_VERSION } from '@/lib/ai/privacy-facts'
+import { hasSubscription } from '@/lib/feature-registry'
 import { parsePlatformStatus } from '@/lib/platform-status'
 import { CommandPaletteProvider } from '@/components/command-palette/command-palette-provider'
 import { computeFeatureAccess } from '@/lib/compute-feature-access'
@@ -691,6 +692,10 @@ export default async function AppLayout({
                               <AiConsentInterstitial
                                 open={
                                   profile != null &&
+                                  // ADR 0157: alleen wie AI al hééft wordt
+                                  // gevraagd; de rest krijgt de privacy pas
+                                  // bij het aanzetten (BetaAddonDialog).
+                                  hasSubscription((profile.active_subscriptions as string[] | null) ?? [], 'ai') &&
                                   Object.hasOwn(profile, 'ai_consent_at') &&
                                   (profile.ai_consent_at == null ||
                                     profile.ai_consent_version !== AI_CONSENT_VERSION)

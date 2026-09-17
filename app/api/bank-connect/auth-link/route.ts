@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
-import { badRequest, conflict, serverError, unauthorized } from '@/lib/api/respond'
+import { badRequest, conflict, errorResponse, serverError, unauthorized } from '@/lib/api/respond'
+import { checkTierGate } from '@/lib/require-tier'
+import { CONNECTED_REQUIRED_CODE, CONNECTED_REQUIRED_MESSAGE } from '@/lib/beta-addons'
 import { parseBody } from '@/lib/api/parse-body'
 import { isTrueLayerEnabled } from '@/lib/truelayer/feature-flag'
 import { buildAuthLink } from '@/lib/truelayer/client'
@@ -345,6 +347,15 @@ export async function POST(req: Request) {
     relink_connection_account_id,
     enable_budget_tracking,
   } = parsed.data
+
+  // Connected-add-on (ADR 0157): een NIEUWE koppeling vraagt de add-on — in de
+  // beta een eigen keuze via POST /api/beta/addon. Het herstelpad blijft vrij:
+  // een bestaande koppeling mag na 90 dagen niet stil onherstelbaar worden.
+  // Vóór elke schrijfactie, zodat een geweigerde poging geen pending-rij achterlaat.
+  if (!relink_connection_account_id) {
+    const gate = await checkTierGate(supabase, user.id, 'connected')
+    if (gate) return errorResponse(CONNECTED_REQUIRED_MESSAGE, 403, CONNECTED_REQUIRED_CODE)
+  }
 
   try {
     // De twee feiten die de pending-rij straks draagt. Ze worden hieronder door

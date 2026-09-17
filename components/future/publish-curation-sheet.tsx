@@ -120,6 +120,7 @@ export function PublishCurationSheet({
   // Pre-check via de abonnementscontext; server-403 ('ai_subscription') alsnog.
   const knownNoAi = useHasAiSubscription() === false
   const [aiUpsell, setAiUpsell] = useState(false)
+  const [upsellDialogOpen, setUpsellDialogOpen] = useState(false)
   const showUpsell = knownNoAi || aiUpsell
 
   function updateDefault(key: string, raw: string) {
@@ -185,6 +186,8 @@ export function PublishCurationSheet({
       onClose={onClose}
       kind="sheet"
       size="md"
+      // De beta-popup (ADR 0157) is het bovenste venster zolang hij open is.
+      suspended={upsellDialogOpen}
       title="Publiceer in de bibliotheek"
       footer={
         showUpsell ? (
@@ -215,6 +218,8 @@ export function PublishCurationSheet({
               feature="Een rekenhulp publiceren in de bibliotheek"
               note="Bij publiceren toetst Fin je rekenhulp op advies-taal. Voor jezelf gebruiken kan zonder abonnement."
               onNavigate={onClose}
+              onDialogOpenChange={setUpsellDialogOpen}
+              onActivated={() => setAiUpsell(false)}
             />
           </div>
         )}

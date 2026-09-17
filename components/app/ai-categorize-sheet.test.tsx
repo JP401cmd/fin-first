@@ -1523,11 +1523,10 @@ describe('AICategorizeSheet — zonder AI-abonnement (V-002)', () => {
     )
     expect(screen.queryByRole('button', { name: /Vraag Fin/i })).toBeNull()
     expect(screen.getByTestId('ai-upsell-headline').textContent).toBe(
-      'Transacties laten indelen door Fin kan met een AI-abonnement',
+      'Transacties laten indelen door Fin werkt als je AI aanzet',
     )
-    expect(screen.getByRole('link', { name: /Bekijk AI-abonnement/i }).getAttribute('href')).toBe(
-      '/mijn/account?addon=ai',
-    )
+    // Beta (ADR 0157): de upsell biedt de keuze zelf aan.
+    expect(screen.getByTestId('ai-upsell-cta')).toHaveTextContent('AI aanzetten')
     expect(screen.getByRole('button', { name: /Slimme regels/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Handmatig categoriseren/i })).toBeInTheDocument()
   })

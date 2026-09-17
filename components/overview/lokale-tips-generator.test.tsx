@@ -150,10 +150,8 @@ describe('LokaleTipsGenerator — fail-closed', () => {
     render(<LokaleTipsGenerator />)
 
     expect(screen.getByTestId('ai-upsell-inline')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /Bekijk AI-abonnement/i })).toHaveAttribute(
-      'href',
-      '/mijn/account?addon=ai',
-    )
+    // Beta (ADR 0157): de upsell biedt de keuze zelf aan.
+    expect(screen.getByTestId('ai-upsell-cta')).toHaveTextContent('AI aanzetten')
     expect(fetchMock).not.toHaveBeenCalled()
   })
 })

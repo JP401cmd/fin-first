@@ -138,13 +138,10 @@ describe('Rapportage-hub — vergrendeling van de AI-inleiding (S9)', () => {
     expect(screen.getByTestId('ai-inleiding-slot')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /met ai-inleiding/i })).not.toBeInTheDocument()
     expect(screen.getByTestId('ai-upsell-headline')).toHaveTextContent(
-      'Een AI-inleiding bij je rapport kan met een AI-abonnement',
+      'Een AI-inleiding bij je rapport werkt als je AI aanzet',
     )
-    // Geen belofte van directe afrekening.
-    expect(screen.getByRole('link', { name: /Bekijk AI-abonnement/i })).toHaveAttribute(
-      'href',
-      '/mijn/account?addon=ai',
-    )
+    // Beta (ADR 0157): geen afrekening, de keuze zelf.
+    expect(screen.getByTestId('ai-upsell-cta')).toHaveTextContent('AI aanzetten')
   })
 
   it('toont het slot vóór de klik zodra de add-on te koop is en ontbreekt', () => {
@@ -155,10 +152,7 @@ describe('Rapportage-hub — vergrendeling van de AI-inleiding (S9)', () => {
     // Reden + uitweg staan erbij — een slot zonder duiding is precies de
     // ervaring die deze kaart moest wegnemen.
     expect(screen.getByText(/krijg je zonder abonnement volledig/i)).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /Bekijk AI-abonnement/i })).toHaveAttribute(
-      'href',
-      '/mijn/account?addon=ai',
-    )
+    expect(screen.getByTestId('ai-upsell-cta')).toHaveTextContent('AI aanzetten')
   })
 
   it('laat de keuze open voor wie de add-on wél heeft', () => {

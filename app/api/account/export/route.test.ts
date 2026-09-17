@@ -44,6 +44,15 @@ vi.mock('@/lib/supabase/service', () => ({
         select: () => ({
           eq: async (col: string, val: string) => {
             serviceEq(table, col, val)
+            if (table === 'tier_assignments_log') {
+              return {
+                data: [
+                  { old_tier: 'gratis', new_tier: 'ai (beta-keuze)', created_at: '2026-09-17T10:00:00Z', assigned_by: val },
+                  { old_tier: 'ai', new_tier: 'ai+connected', created_at: '2026-09-18T10:00:00Z', assigned_by: 'admin-id' },
+                ],
+                error: null,
+              }
+            }
             return { data: [{ id: `${table}-1`, user_id: val }], error: null }
           },
         }),
@@ -83,10 +92,21 @@ describe('GET /api/account/export — service-role-tabellen (ADR 0146)', () => {
       expect(body.tables[table], table).toEqual([{ id: `${table}-1`, user_id: USER_ID }])
       expect(serviceEq).toHaveBeenCalledWith(table, 'user_id', USER_ID)
     }
-    // Nooit een andere filter dan de eigen id.
-    for (const call of serviceEq.mock.calls) {
-      expect(call.slice(1)).toEqual(['user_id', USER_ID])
+    // Nooit een andere filter dan de eigen id (het abonnementslogboek noemt die kolom target_user).
+    for (const [table, col, val] of serviceEq.mock.calls) {
+      expect([col, val]).toEqual([table === 'tier_assignments_log' ? 'target_user' : 'user_id', USER_ID])
     }
+  })
+
+  it('neemt de abonnementsgeschiedenis mee zonder het id van een beheerder (ADR 0157)', async () => {
+    mockClaims.mockResolvedValue({ sub: USER_ID })
+    mockGetUser.mockResolvedValue({ data: { user: { id: USER_ID } } })
+    const body = JSON.parse(await (await GET()).text())
+    expect(body.tables.tier_assignments_log).toEqual([
+      { old_tier: 'gratis', new_tier: 'ai (beta-keuze)', created_at: '2026-09-17T10:00:00Z', gekozen_door: 'zelf' },
+      { old_tier: 'ai', new_tier: 'ai+connected', created_at: '2026-09-18T10:00:00Z', gekozen_door: 'beheer' },
+    ])
+    expect(JSON.stringify(body)).not.toContain('admin-id')
   })
 
   it('geen service-read als getUser() geen gebruiker oplevert — en de export benoemt het gat', async () => {
@@ -96,7 +116,7 @@ describe('GET /api/account/export — service-role-tabellen (ADR 0146)', () => {
     expect(res.status).toBe(200)
     expect(serviceFrom).not.toHaveBeenCalled()
     const body = JSON.parse(await res.text())
-    expect(body.onvolledig).toEqual([...EXPORT_SERVICE_TABLES])
+    expect(body.onvolledig).toEqual([...EXPORT_SERVICE_TABLES, 'tier_assignments_log'])
   })
 
   it('een volledige export draagt geen onvolledig-veld', async () => {

@@ -10,6 +10,7 @@ import { syncBudgetingActive } from '@/lib/budgeting-active'
 import { blindIndex, encryptField } from '@/lib/crypto/field-encryption'
 import { accountNumberWriteColumns } from '@/lib/asset-account-number'
 import { readOpenAfronding } from '@/lib/onboarding/afronding'
+import { checkTierGate } from '@/lib/require-tier'
 
 /**
  * GET /api/bank-connect/callback — de OAuth-terugkomst van TrueLayer.
@@ -199,6 +200,28 @@ export async function GET(req: Request) {
     const targetBankAccountId = (connection.target_bank_account_id as string | null) ?? null
     const linkIntent = (connection.link_intent as string | null) ?? null
 
+    // ── Herstelpad zonder 'connected': alleen herstellen, niets bijmaken ───────
+    // ADR 0157: `auth-link` weigert een NIEUWE koppeling zonder de 'connected'-
+    // add-on, maar laat het herstelpad bewust vrij, zodat een bestaande koppeling
+    // na 90 dagen herstelbaar blijft. Bij de bank kan de gebruiker op dat pad
+    // echter extra rekeningen aanvinken, of `provider_id` in de niet-ondertekende
+    // auth_url wijzigen. Zonder deze rem maakt schakel 4 daar dan alsnog nieuwe
+    // rekeningen aan — een lek in de betaalmuur zodra de beta-vlag uit gaat.
+    //
+    // Dus: alleen rekeningen die schakel 1 (identiteit, `external_account_id` van
+    // een eigen bestaande koppelrij mét drager) al kent, worden hersteld. Al het
+    // andere wordt overgeslagen — ook schakel 2/3, want die zouden een nieuwe
+    // koppelrij leggen. Een andere bank levert per constructie geen identiteits-
+    // treffer op, dus een provider-wissel valt hier vanzelf onder "overslaan".
+    // Bewust NIET gekoppeld aan `link_intent`: die kolom staat onder een eigen-rij
+    // `FOR ALL`-policy en is dus door de gebruiker zelf op `null`/'nieuw' te zetten
+    // (security-gate 17 sep). Een pending-rij zelf aanmaken omzeilt ook de poort in
+    // `auth-link`. Daarom geldt de rem op élk pad: zonder 'connected' kan de
+    // callback alleen herstellen. Legitieme nieuwe koppelingen hebben de add-on al
+    // (auth-link poort), dus voor hen verandert er niets.
+    const alleenHerstel = (await checkTierGate(supabase, user.id, 'connected')) !== null
+    let skippedWithoutAddon = 0
+
     // ── Schakel 1, vooraf: identiteit ─────────────────────────────────────────
     // Bewust GEEN filter op is_active: een reconnect na een soft disconnect moet
     // de bestaande rij hergebruiken en heractiveren, niet dupliceren.
@@ -299,8 +322,9 @@ export async function GET(req: Request) {
     // de reden dat het pad bestaat (SC-13): stap 2b reactiveert het. De waarde is er
     // veilig zonder deze toets, want ze is per constructie server-afgeleid uit de
     // koppelrij en de trigger `guard_bank_connection_target_account` borgt de
-    // eigenaar. `link_intent` is óók een serverfeit — `auth-link` schrijft het, geen
-    // client — dus het mag hier de tak bepalen.
+    // eigenaar. `link_intent` schrijft `auth-link`, maar de kolom is via de eigen-rij
+    // policy ook door de client te zetten: hij bepaalt hier alleen de koppelvolgorde,
+    // nooit toegang (de Connected-rem hierboven leunt er bewust niet op, ADR 0157).
     // De leesronde kost tijd, dus pas nadat vaststaat dát er een rekening te binden is.
     const targetForExternalId: string | null =
       targetCandidate &&
@@ -347,6 +371,13 @@ export async function GET(req: Request) {
       const iban = tlAccount.account_number?.iban ?? null
       const accountName = tlAccount.display_name || connection.provider_name
       const existingLink = identityLinks.get(tlAccount.account_id) ?? null
+
+      // Zie `alleenHerstel`: zonder 'connected' wordt op het herstelpad niets
+      // aangemaakt of nieuw gebonden — vóór elke schrijfactie overslaan.
+      if (alleenHerstel && !existingLink?.bank_account_id) {
+        skippedWithoutAddon += 1
+        continue
+      }
 
       // Schakel 1 — identiteit.
       let bankAccountId: string | null = existingLink?.bank_account_id ?? null
@@ -619,6 +650,15 @@ export async function GET(req: Request) {
       } catch (balanceErr) {
         console.error('TrueLayer saldo bij koppeling (niet-fataal) mislukt:', balanceErr)
       }
+    }
+
+    // Alleen een telling, geen rekening-id's of IBAN's. Landde er niets, dan valt
+    // de flow hieronder vanzelf op `?error=geen_koppeling`.
+    if (skippedWithoutAddon > 0) {
+      console.info(
+        '[bank-connect:callback] herstelpad zonder connected-add-on: rekeningen overgeslagen',
+        skippedWithoutAddon,
+      )
     }
 
     // ── Stap 5a: de voorkeur is verbruikt (consume-once) ──────────────────────

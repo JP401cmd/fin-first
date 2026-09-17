@@ -9,6 +9,8 @@ import { BankAuthWaiting } from '@/components/app/bank-connect/bank-auth-waiting
 import { TargetAccountChoice } from '@/components/app/bank-connect/target-account-choice'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { ModalFooter } from '@/components/app/modal-footer'
+import { BetaAddonDialog } from '@/components/app/beta-addon/beta-addon-dialog'
+import { BETA_SELF_SERVE_ADDONS, CONNECTED_REQUIRED_CODE } from '@/lib/beta-addons'
 import { BANK_CONNECT_SAFETY_SHORT } from '@/lib/bank-connect-copy'
 import { BANK_SKIP_REDENEN, type BankSkipReden } from '@/lib/onboarding/afronding'
 import {
@@ -114,6 +116,7 @@ export function OnboardingBank({
   const [connectError, setConnectError] = useState<string | null>(null)
   const [waitingFor, setWaitingFor] = useState<string | null>(null)
 
+  const [connectedDialogOpen, setConnectedDialogOpen] = useState(false)
   const [skipOpen, setSkipOpen] = useState(false)
   const [skipReden, setSkipReden] = useState<BankSkipReden | null>(null)
 
@@ -149,6 +152,13 @@ export function OnboardingBank({
     setConnectError(null)
     const started = await startBankConnect({ provider: bank, selection, enableBudgetTracking })
     if (!started.ok) {
+      // Beta (ADR 0157): nog geen Connected-keuze → eerst de popup, daarna
+      // opnieuw koppelen via `onActivated`.
+      if (started.code === CONNECTED_REQUIRED_CODE && BETA_SELF_SERVE_ADDONS) {
+        setConnectedDialogOpen(true)
+        setConnecting(false)
+        return
+      }
       setConnectError(started.error)
       setConnecting(false)
       return
@@ -424,6 +434,13 @@ export function OnboardingBank({
           <BankSelector onSelect={setBank} />
         )}
       </div>
+      <BetaAddonDialog
+        tier="connected"
+        source="onboarding"
+        open={connectedDialogOpen}
+        onClose={() => setConnectedDialogOpen(false)}
+        onActivated={() => void handleConnect()}
+      />
       {skipOverlay}
     </OnboardingShell>
   )

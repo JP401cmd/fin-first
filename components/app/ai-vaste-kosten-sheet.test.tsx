@@ -240,9 +240,8 @@ describe('AiVasteKostenSheet — zonder AI-abonnement (V-002)', () => {
     render(<AiVasteKostenSheet open onOpenChange={noop} onComplete={noop} />)
     await screen.findByTestId('ai-upsell-inline')
     expect(fetchCalls).toHaveLength(0)
-    expect(screen.getByRole('link', { name: /Bekijk AI-abonnement/i }).getAttribute('href')).toBe(
-      '/mijn/account?addon=ai',
-    )
+    // Beta (ADR 0157): de upsell biedt de keuze zelf aan.
+    expect(screen.getByTestId('ai-upsell-cta')).toHaveTextContent('AI aanzetten')
     expect(screen.queryByText(/er ging iets mis/i)).toBeNull()
   })
 

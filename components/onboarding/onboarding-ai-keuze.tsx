@@ -1,37 +1,32 @@
 'use client'
 
-import { useState, type ReactNode } from 'react'
-import { Lock, Sparkles } from 'lucide-react'
+import { useState } from 'react'
 import { OnboardingShell } from './onboarding-shell'
 import { FactsPanel } from './facts-panel'
-import { StrategyTile } from './strategy-tile'
-import { AiConsentFacts } from '@/components/app/ai-consent-facts'
+import { BetaAddonChoice } from '@/components/app/beta-addon/beta-addon-choice'
+import { postBetaAddon } from '@/lib/beta-addons-client'
+import { BETA_ADDON_COPY, BETA_SELF_SERVE_ADDONS } from '@/lib/beta-addons'
 import { postAiConsent } from '@/lib/ai/consent-client'
-import type { AiConsentDecision } from '@/lib/ai/consent'
 import {
-  AI_CONSENT_INTRO,
-  AI_CONSENT_OPTIONS,
   AI_CONSENT_PANEL_SOURCE,
   AI_CONSENT_PANEL_SUB,
-  AI_CONSENT_QUESTION,
   aiFeaturesLostWithoutConsent,
 } from '@/lib/ai/privacy-facts'
 
 /**
- * Eerste onboarding-stap — "Fin en je gegevens" (ADR 0155, kaart UR3-16).
+ * Eerste onboarding-stap — "Fin en je gegevens" (ADR 0155, aangevuld door ADR 0157).
  *
- * Cloud-AI draait pas na een expliciete, gelogde keuze. Deze stap stelt die
- * vraag vóór de eerste inhoudelijke vraag, met twee gelijkwaardige tegels (geen
- * voorselectie) en de feiten eronder. "Verder" blijft uit tot er gekozen is en
- * schrijft de keuze via `POST /api/consent/ai` (source `onboarding`); pas na een
- * geslaagde schrijfactie gaat de flow door. Geen localStorage: of er al gekozen
- * is, weet alleen de server (`profiles.ai_consent_at`). Wie deze stap via een
- * hersteld concept overslaat, krijgt de keuze-overlay in de app-shell.
+ * Eén schakelaar "Fin gebruiken" met de beta-uitleg: straks een abonnement, nu een
+ * eigen keuze. De schakelaar start uit (geen voorselectie). De privacyverklaring
+ * klapt pas open als hij aan gaat — dezelfde body (`BetaAddonChoice`) als de popup
+ * in de app.
  *
- * Alle kopij komt uit `lib/ai/privacy-facts.ts` — dezelfde bron als de overlay
- * en /mijn/privacy. Geen `dataNote`: dit scherm ís de gegevensuitleg. Geen
- * romeins cijfer: de stap deelt de voortgangsgroep met Profiel maar is geen
- * eigen categorie. Geen `onBack`: dit is de eerste stap.
+ * "Verder" legt de keuze vast vóór de flow doorgaat:
+ *   - aan → `POST /api/beta/addon` (source `onboarding`): eerst de toestemming,
+ *     dan de AI-add-on;
+ *   - uit → dezelfde route met `active: false`: de add-on eraf (ook een eerder
+ *     in deze onboarding of door beheer gezette) en een vastgelegde "nee".
+ * Geen localStorage: de server is de bron.
  */
 export interface OnboardingAiKeuzeProps {
   onNext: () => void
@@ -39,23 +34,22 @@ export interface OnboardingAiKeuzeProps {
   totalSteps?: number
 }
 
-const DECISIONS: readonly AiConsentDecision[] = ['granted', 'withdrawn']
-
-const ICONS: Record<AiConsentDecision, ReactNode> = {
-  granted: <Sparkles className="h-4 w-4" strokeWidth={2} />,
-  withdrawn: <Lock className="h-4 w-4" strokeWidth={2} />,
-}
+const COPY = BETA_ADDON_COPY.ai
 
 export function OnboardingAiKeuze({ onNext, currentStep = 1, totalSteps = 8 }: OnboardingAiKeuzeProps) {
-  const [decision, setDecision] = useState<AiConsentDecision | null>(null)
+  const [on, setOn] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   async function handleNext() {
-    if (!decision || saving) return
+    if (saving) return
     setSaving(true)
     setError(null)
-    const result = await postAiConsent(decision, 'onboarding')
+    // Beta gesloten: dan is dit weer alleen de toestemmingsvraag (ADR 0155); de
+    // add-on komt via het abonnement.
+    const result = BETA_SELF_SERVE_ADDONS
+      ? await postBetaAddon('ai', on, 'onboarding')
+      : await postAiConsent(on ? 'granted' : 'withdrawn', 'onboarding')
     setSaving(false)
     if (!result.ok) {
       setError(result.error)
@@ -67,8 +61,8 @@ export function OnboardingAiKeuze({ onNext, currentStep = 1, totalSteps = 8 }: O
   return (
     <OnboardingShell
       kicker="Fin en je gegevens"
-      title={AI_CONSENT_QUESTION}
-      deck={AI_CONSENT_INTRO}
+      title={COPY.titel}
+      deck="Fin is de AI in TriFinity: hij vertaalt je cijfers naar vrijheidstijd, schrijft je briefing en beantwoordt je vragen."
       factsPanel={
         <FactsPanel
           stat={String(aiFeaturesLostWithoutConsent().length)}
@@ -82,10 +76,10 @@ export function OnboardingAiKeuze({ onNext, currentStep = 1, totalSteps = 8 }: O
         <button
           type="button"
           onClick={handleNext}
-          disabled={!decision || saving}
+          disabled={saving}
           className="w-full min-h-11 bg-[var(--ink)] px-6 py-3 text-sm font-medium text-[var(--paper)] transition-colors hover:bg-[var(--ink-2)] disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {saving ? 'Opslaan…' : 'Verder'}
+          {saving ? 'Opslaan…' : on ? 'Verder met AI' : 'Verder zonder AI'}
         </button>
       }
     >
@@ -95,27 +89,17 @@ export function OnboardingAiKeuze({ onNext, currentStep = 1, totalSteps = 8 }: O
             <p className="text-sm font-medium text-negative">{error}</p>
           </div>
         )}
-
-        <div role="group" aria-label={AI_CONSENT_QUESTION} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {DECISIONS.map((d) => {
-            const opt = AI_CONSENT_OPTIONS[d]
-            return (
-              <StrategyTile
-                key={d}
-                icon={ICONS[d]}
-                label={opt.keuze}
-                sublabel={`${opt.effect} ${opt.waarom}`}
-                active={decision === d}
-                onClick={() => {
-                  setDecision(d)
-                  setError(null)
-                }}
-              />
-            )
-          })}
-        </div>
-
-        <AiConsentFacts headingLevel="h2" />
+        <BetaAddonChoice
+          tier="ai"
+          on={on}
+          onChange={(next) => {
+            setOn(next)
+            setError(null)
+          }}
+          disabled={saving}
+          headingLevel="h2"
+          confirmLabel="Verder met AI"
+        />
       </div>
     </OnboardingShell>
   )

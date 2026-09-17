@@ -31,7 +31,9 @@ const {
   mockDecryptField,
   mockSyncBudgetingActive,
   mockSetBudgetTracking,
+  mockTierGate,
 } = vi.hoisted(() => ({
+  mockTierGate: vi.fn(),
   mockCreateClient: vi.fn(),
   mockExchangeCode: vi.fn(),
   mockGetAccounts: vi.fn(),
@@ -45,6 +47,13 @@ const {
 vi.mock('@/lib/supabase/server', () => ({
   createClient: mockCreateClient,
 }))
+
+// ADR 0157: de callback leest op élk pad of de gebruiker 'connected' heeft.
+// Default: ja (null = geen blokkade); de herstel-tests zetten 'm uit.
+vi.mock('@/lib/require-tier', () => ({
+  checkTierGate: (...args: unknown[]) => mockTierGate(...args),
+}))
+const NO_CONNECTED = { subscriptions: [], error: 'Deze functie vereist een Connected abonnement' }
 
 vi.mock('@/lib/truelayer/client', () => ({
   exchangeCode: mockExchangeCode,
@@ -214,6 +223,7 @@ function makeNewAccountHappyPathStub() {
 }
 
 beforeEach(() => {
+  mockTierGate.mockReset().mockResolvedValue(null)
   mockCreateClient.mockReset()
   mockExchangeCode.mockReset()
   mockGetAccounts.mockReset()
@@ -779,6 +789,8 @@ describe('GET /api/bank-connect/callback — fase 5: schakel 3 (iban_hash)', () 
         carrierWithAsset('ba-target'), // stap 4b: heeft al een cash-bezit
       ],
       assets: [activeAssetFor('ba-target')], // stap 4b: bezit is actief, niets te reactiveren
+      // ADR 0157: mét 'connected' (default van mockTierGate) blijft de volledige
+      // precedentieketen gelden — dat pint deze test.
       profiles: [{ data: { onboarding_completed: true } }],
     })
 
@@ -788,6 +800,155 @@ describe('GET /api/bank-connect/callback — fase 5: schakel 3 (iban_hash)', () 
 
     expect(res.headers.get('location')).toBe(`${ORIGIN}/core/cash/connect/success`)
     expect(linkWrites(stub)[0].data.bank_account_id).toBe('ba-target')
+  })
+})
+
+/**
+ * ADR 0157: `auth-link` laat het herstelpad zonder 'connected'-add-on bewust vrij.
+ * Bij de bank kan de gebruiker daar extra rekeningen aanvinken (of de provider in
+ * de niet-ondertekende auth_url wijzigen). Zonder 'connected' mag de callback dan
+ * alleen herstellen wat identiteit al kent — nooit iets aanmaken of nieuw binden.
+ */
+describe('GET /api/bank-connect/callback — herstelpad zonder connected-add-on (ADR 0157)', () => {
+  const EXTRA_ACCOUNT = {
+    account_id: 'ext-acc-extra',
+    account_type: 'SAVINGS',
+    display_name: 'Spaarrekening',
+    currency: 'EUR',
+    account_number: { iban: 'NL02ABNA0123456789' },
+  }
+
+  it('herstelt de bekende rekening en maakt voor de extra rekening niets aan', async () => {
+    const stub = makeQueuedSupabaseStub({
+      bank_connections: [
+        { data: pendingConnection({ target_bank_account_id: 'ba-bekend', link_intent: 'herautoriseren' }) },
+        { data: null }, // token/status-update
+        { data: null }, // consume-once
+        ORPHAN_SOURCE(),
+      ],
+      bank_connection_accounts: [
+        { data: { id: 'link-1', bank_account_id: 'ba-bekend' } }, // schakel 1: bekende rekening
+        { data: null }, // schakel 1: extra rekening onbekend
+        { data: [{ id: 'link-1', bank_account_id: 'ba-bekend', bank_connections: { provider_name: 'ING' } }] },
+        { data: null }, // stap 4: bestaande koppelrij bijwerken
+        { data: [] }, // orphan cleanup
+      ],
+      // Bewust GEEN iban_hash-lookup of insert in de queue: raakt de route
+      // schakel 3/4 voor de extra rekening, dan loopt deze queue leeg.
+      bank_accounts: [carrierWithAsset('ba-bekend')],
+      assets: [activeAssetFor('ba-bekend')],
+      profiles: [{ data: { onboarding_completed: true } }],
+    })
+    mockTierGate.mockResolvedValue(NO_CONNECTED)
+
+    wire(stub, [TL_ACCOUNT_WITH_IBAN, EXTRA_ACCOUNT])
+
+    const res = await GET(requestFor(CALLBACK_URL))
+
+    expect(res.headers.get('location')).toBe(`${ORIGIN}/core/cash/connect/success`)
+
+    expect(stub.calls.filter((c) => c.op === 'insert')).toHaveLength(0)
+
+    const links = linkWrites(stub)
+    expect(links).toHaveLength(1)
+    expect(links[0].op).toBe('update')
+    expect(links[0].data.bank_account_id).toBe('ba-bekend')
+
+    expect(mockSyncAccountBalance).toHaveBeenCalledTimes(1)
+    expect(mockSyncAccountBalance).toHaveBeenCalledWith(
+      stub,
+      expect.objectContaining({ externalAccountId: 'ext-acc-1', bankAccountId: 'ba-bekend' }),
+    )
+  })
+
+  it('alleen onbekende rekeningen (bv. een andere bank) → niets geschreven, ?error=geen_koppeling', async () => {
+    const stub = makeQueuedSupabaseStub({
+      bank_connections: [
+        { data: pendingConnection({ target_bank_account_id: 'ba-bekend', link_intent: 'herautoriseren' }) },
+        { data: null },
+        { data: null }, // consume-once
+        ORPHAN_SOURCE(),
+      ],
+      bank_connection_accounts: [
+        { data: null }, // schakel 1: geen identiteit
+        NO_OCCUPYING_LINKS,
+        { data: [] }, // orphan cleanup
+      ],
+      profiles: [{ data: { onboarding_completed: true } }],
+    })
+    mockTierGate.mockResolvedValue(NO_CONNECTED)
+
+    wire(stub, [EXTRA_ACCOUNT])
+
+    const res = await GET(requestFor(CALLBACK_URL))
+
+    expect(res.headers.get('location')).toBe(`${ORIGIN}/core/cash/connect?error=geen_koppeling`)
+    expect(stub.calls.filter((c) => c.op === 'insert')).toHaveLength(0)
+    expect(linkWrites(stub)).toHaveLength(0)
+    expect(mockSyncAccountBalance).not.toHaveBeenCalled()
+  })
+
+  it('link_intent door de gebruiker zelf op null gezet: zonder connected alsnog niets aangemaakt', async () => {
+    // De kolom staat onder een eigen-rij FOR ALL-policy, dus een client kan
+    // `link_intent` wissen (of zelf een pending-rij maken). De rem mag daar niet op leunen.
+    const stub = makeQueuedSupabaseStub({
+      bank_connections: [
+        { data: pendingConnection({ link_intent: null }) },
+        { data: null },
+        ORPHAN_SOURCE(),
+      ],
+      bank_connection_accounts: [
+        { data: null }, // schakel 1: geen identiteit
+        NO_OCCUPYING_LINKS,
+        { data: [] },
+      ],
+      profiles: [{ data: { onboarding_completed: true } }],
+    })
+    mockTierGate.mockResolvedValue(NO_CONNECTED)
+
+    wire(stub, [EXTRA_ACCOUNT])
+
+    const res = await GET(requestFor(CALLBACK_URL))
+
+    expect(res.headers.get('location')).toBe(`${ORIGIN}/core/cash/connect?error=geen_koppeling`)
+    expect(stub.calls.filter((c) => c.op === 'insert')).toHaveLength(0)
+    expect(linkWrites(stub)).toHaveLength(0)
+  })
+
+  it('mét connected blijft de extra rekening gewoon aangemaakt worden', async () => {
+    const stub = makeQueuedSupabaseStub({
+      bank_connections: [
+        { data: pendingConnection({ target_bank_account_id: 'ba-bekend', link_intent: 'herautoriseren' }) },
+        { data: null },
+        { data: null },
+        ORPHAN_SOURCE(),
+      ],
+      bank_connection_accounts: [
+        { data: { id: 'link-1', bank_account_id: 'ba-bekend' } },
+        { data: null },
+        { data: [{ id: 'link-1', bank_account_id: 'ba-bekend', bank_connections: { provider_name: 'ING' } }] },
+        { data: null }, // update bekende koppelrij
+        { data: null }, // insert koppelrij extra rekening
+        { data: [] },
+      ],
+      bank_accounts: [
+        carrierWithAsset('ba-bekend'),
+        { data: null }, // schakel 3: geen iban_hash-treffer
+        { data: { id: 'ba-extra' } }, // schakel 4
+      ],
+      assets: [activeAssetFor('ba-bekend'), { data: { id: 'asset-extra' } }],
+      profiles: [{ data: { onboarding_completed: true } }],
+    })
+
+    wire(stub, [TL_ACCOUNT_WITH_IBAN, EXTRA_ACCOUNT])
+
+    const res = await GET(requestFor(CALLBACK_URL))
+
+    expect(res.headers.get('location')).toBe(`${ORIGIN}/core/cash/connect/success`)
+    expect(stub.calls.filter((c) => c.table === 'bank_accounts' && c.op === 'insert')).toHaveLength(1)
+    const links = linkWrites(stub)
+    expect(links.map((l) => l.op)).toEqual(['update', 'insert'])
+    expect(links[1].data.external_account_id).toBe('ext-acc-extra')
   })
 })
 

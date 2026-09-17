@@ -12,6 +12,8 @@ import {
   type TargetSelection,
 } from '@/components/app/bank-connect/target-account-choice'
 import { BankAuthWaiting } from '@/components/app/bank-connect/bank-auth-waiting'
+import { BetaAddonDialog } from '@/components/app/beta-addon/beta-addon-dialog'
+import { BETA_SELF_SERVE_ADDONS, CONNECTED_REQUIRED_CODE } from '@/lib/beta-addons'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { getPageInfo } from '@/lib/page-info-content'
@@ -72,6 +74,7 @@ export default function ConnectBankPage() {
   const [waitingForBank, setWaitingForBank] = useState<string | null>(null)
   const [selectedBank, setSelectedBank] = useState<Provider | null>(null)
   const [connecting, setConnecting] = useState(false)
+  const [connectedDialogOpen, setConnectedDialogOpen] = useState(false)
   const [connectError, setConnectError] = useState<string | null>(
     error === 'missing_reference' ? 'Ontbrekende referentie in callback'
     : error === 'requisition_not_found' ? 'Verbindingsverzoek niet gevonden'
@@ -266,8 +269,14 @@ export default function ConnectBankPage() {
     })
 
     if (!result.ok) {
-      setConnectError(result.error)
       setConnecting(false)
+      // Beta (ADR 0157): nog geen Connected-keuze → eerst de popup, daarna
+      // opnieuw koppelen via `onActivated`.
+      if (result.code === CONNECTED_REQUIRED_CODE && BETA_SELF_SERVE_ADDONS) {
+        setConnectedDialogOpen(true)
+        return
+      }
+      setConnectError(result.error)
       return
     }
 
@@ -284,6 +293,12 @@ export default function ConnectBankPage() {
   return (
     <div className="relative mx-auto max-w-2xl px-4 py-5 sm:px-6 sm:py-8">
       <NavStackMeta title="Bank koppelen" />
+      <BetaAddonDialog
+        tier="connected"
+        open={connectedDialogOpen}
+        onClose={() => setConnectedDialogOpen(false)}
+        onActivated={() => void handleConnect()}
+      />
       {/* "Wat zie ik hier?" — de koppelpagina had als enige uitnodigings-
           oppervlak geen info-knop, terwijl juist hier de vertrouwensvraag
           speelt (UR3-15). Vaste plek: absolute child rechtsboven. */}

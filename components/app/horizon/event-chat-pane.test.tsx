@@ -186,9 +186,8 @@ describe('EventChatPane — zonder AI-abonnement (V-002)', () => {
     expect(screen.getByTestId('event-chat-upsell')).toBeTruthy()
     const input = await screen.findByPlaceholderText(BLOCKED_PLACEHOLDER)
     expect(input).toBeDisabled()
-    expect(screen.getByRole('link', { name: /Bekijk AI-abonnement/i }).getAttribute('href')).toBe(
-      '/mijn/account?addon=ai',
-    )
+    // Beta (ADR 0157): de upsell biedt de keuze zelf aan.
+    expect(screen.getByTestId('ai-upsell-cta')).toHaveTextContent('AI aanzetten')
     expect(mockSendMessage).not.toHaveBeenCalled()
   })
 

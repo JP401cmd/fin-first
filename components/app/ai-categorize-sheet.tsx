@@ -152,6 +152,7 @@ export function AICategorizeSheet({
   // 'ai_subscription') zet `aiUpsell` alsnog, mocht de context onbekend zijn.
   const knownNoAi = useHasAiSubscription() === false
   const [aiUpsell, setAiUpsell] = useState(false)
+  const [upsellDialogOpen, setUpsellDialogOpen] = useState(false)
   const aiUpsellRef = useRef(false)
   const [showCount, setShowCount] = useState(SHOW_MORE_STEP)
   const [savedCount, setSavedCount] = useState(0)
@@ -1037,6 +1038,8 @@ export function AICategorizeSheet({
         zodat die niet vechten met de fullscreen overlay. State blijft staan. */}
     <BottomSheet
       open={phase !== 'sleep'}
+      // De beta-popup (ADR 0157) is het bovenste venster zolang hij open is.
+      suspended={upsellDialogOpen}
       onClose={onClose}
       title="Transacties categoriseren"
       footerSlot={
@@ -1133,6 +1136,7 @@ export function AICategorizeSheet({
               variant="inline"
               feature="Transacties laten indelen door Fin"
               note="Slimme regels, de Sleepmodus en handmatig indelen werken zonder abonnement."
+              onDialogOpenChange={setUpsellDialogOpen}
             />
           ) : (
           <button
@@ -1236,6 +1240,7 @@ export function AICategorizeSheet({
                 variant="inline"
                 feature="Transacties laten indelen door Fin"
                 note="De voorstellen van je regels hieronder staan wel klaar."
+                onDialogOpenChange={setUpsellDialogOpen}
               />
             </div>
           )}

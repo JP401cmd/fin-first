@@ -212,12 +212,11 @@ describe('PensionPdfUpload — zonder AI-abonnement (V-002)', () => {
     await waitFor(() => expect(screen.getByTestId('pension-pdf-upsell')).toBeTruthy())
     expect(global.fetch).not.toHaveBeenCalled()
     expect(resolveLocal).not.toHaveBeenCalled()
+    // Beta (ADR 0157): de upsell biedt de keuze zelf aan in plaats van een abonnementslink.
     expect(screen.getByTestId('ai-upsell-headline').textContent).toBe(
-      'Je pensioenoverzicht (PDF) uitlezen kan met een AI-abonnement',
+      'Je pensioenoverzicht (PDF) uitlezen werkt als je AI aanzet',
     )
-    expect(screen.getByRole('link', { name: /Bekijk AI-abonnement/i }).getAttribute('href')).toBe(
-      '/mijn/account?addon=ai',
-    )
+    expect(screen.getByRole('button', { name: /AI aanzetten/i })).toBeTruthy()
     expect(screen.getByText(/XML- of JSON-download .* werkt zonder abonnement/i)).toBeTruthy()
   })
 

@@ -5,6 +5,9 @@ import { EXPORT_SESSION_TABLES, EXPORT_SERVICE_TABLES, EXPORT_OWN_READ_EXTRA_TAB
 import { decryptField } from '@/lib/crypto/field-encryption'
 import { shapeExportRows, shapeExportRow, type ExportRow } from '@/lib/account-export-shape'
 
+const TIER_LOG_TABLE = 'tier_assignments_log'
+type TierLogRow = { old_tier: string | null; new_tier: string; created_at: string; assigned_by: string }
+
 /**
  * GET /api/account/export — [Arch F3] Recht 3 (dataportabiliteit, AVG art. 20).
  *
@@ -98,7 +101,7 @@ export async function GET() {
       data: { user: verified },
     } = await supabase.auth.getUser()
     if (!verified || verified.id !== claims.sub) {
-      onvolledig.push(...EXPORT_SERVICE_TABLES)
+      onvolledig.push(...EXPORT_SERVICE_TABLES, TIER_LOG_TABLE)
     } else {
       const service = getServiceClient()
       const serviceResults = await Promise.all(
@@ -112,6 +115,22 @@ export async function GET() {
       for (const [table, rows] of serviceResults) {
         tables[table] = rows
       }
+
+      // Abonnementsgeschiedenis (ADR 0157): sinds de beta staan hier óók keuzes
+      // die de gebruiker zelf maakte. De tabel wijst de gebruiker aan met
+      // `target_user`, niet `user_id`, en `assigned_by` kan een beheerder zijn —
+      // dat id geven we niet mee, alleen of het een eigen keuze was.
+      const { data: tierRows, error: tierError } = await service
+        .from(TIER_LOG_TABLE)
+        .select('old_tier, new_tier, created_at, assigned_by')
+        .eq('target_user', verified.id)
+      if (tierError) onvolledig.push(TIER_LOG_TABLE)
+      tables[TIER_LOG_TABLE] = ((tierError ? [] : tierRows ?? []) as TierLogRow[]).map((r) => ({
+        old_tier: r.old_tier,
+        new_tier: r.new_tier,
+        created_at: r.created_at,
+        gekozen_door: r.assigned_by === verified.id ? 'zelf' : 'beheer',
+      })) as unknown as ExportRow[]
     }
 
     const payload = {

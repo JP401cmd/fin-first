@@ -23,6 +23,14 @@ export function FeatureAccessProvider({
   children: ReactNode
 }) {
   const [featureOverrides, setFeatureOverrides] = useState<FeatureAccessMap>(data.features)
+  // Nieuwe server-data (router.refresh, bv. na het aanzetten van een add-on in de
+  // beta — ADR 0157) wint van de lokale stand; anders bleef een gate tot een
+  // volledige herlaad op slot.
+  const [featuresFrom, setFeaturesFrom] = useState(data.features)
+  if (featuresFrom !== data.features) {
+    setFeaturesFrom(data.features)
+    setFeatureOverrides(data.features)
+  }
 
   // Allow optimistic refresh after user toggles
   const refreshFeaturePrefs = useCallback((prefs: Record<string, boolean>) => {

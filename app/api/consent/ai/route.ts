@@ -9,6 +9,7 @@ import {
   type AiConsentResponse,
 } from '@/lib/ai/consent'
 import { AI_CONSENT_VERSION } from '@/lib/ai/privacy-facts'
+import { recordAiConsent } from '@/lib/ai/consent-record'
 
 /**
  * POST /api/consent/ai — de ene schrijfroute voor de AI-keuze (ADR 0155).
@@ -49,33 +50,19 @@ export async function POST(req: Request) {
   if (!parsed.ok) return parsed.response
   const { decision, source } = parsed.data
 
-  const consentAt = new Date().toISOString()
-  const aiEnabled = decision === 'granted'
-
+  let result: Awaited<ReturnType<typeof recordAiConsent>>
   try {
-    const event = await supabase.from('consent_events').insert({
-      user_id: claims.sub,
-      kind: 'ai_cloud',
-      decision,
-      version: AI_CONSENT_VERSION,
-      source,
-    })
-    if (event.error) return serverError(event.error, 'consent-ai:POST:event')
-
-    const profile = await supabase
-      .from('profiles')
-      .update({
-        ai_enabled: aiEnabled,
-        ai_consent_at: consentAt,
-        ai_consent_version: AI_CONSENT_VERSION,
-        updated_at: consentAt,
-      })
-      .eq('id', claims.sub)
-    if (profile.error) return serverError(profile.error, 'consent-ai:POST:profile')
+    result = await recordAiConsent(supabase, claims.sub, decision, source)
   } catch (err) {
     return serverError(err, 'consent-ai:POST')
   }
+  if (!result.ok) return serverError(result.error, `consent-ai:POST:${result.step}`)
 
-  const body: AiConsentResponse = { ok: true, aiEnabled, consentAt, version: AI_CONSENT_VERSION }
+  const body: AiConsentResponse = {
+    ok: true,
+    aiEnabled: result.aiEnabled,
+    consentAt: result.consentAt,
+    version: AI_CONSENT_VERSION,
+  }
   return NextResponse.json(body)
 }
