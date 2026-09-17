@@ -453,6 +453,24 @@ const criteria: AcceptanceCriterion[] = [
         'lib/budget-spending.ts#budgetFillRatio/#budgetSpentPct/#budgetBarPct/#budgetBeschikbaar + lib/budget-alerts.ts#isOverBudget (delegeert aan #budgetLimitStatus, cent-tolerantie) + lib/constants.ts#BUDGET_ZERO_LIMIT_BAR_PCT — échte productiefuncties/constante, geen mirror; zie budget-checks.ts',
     },
   },
+  {
+    workflow: 'WF-BUDGET-29',
+    scenarioId: 'UAT-BUDGET-29',
+    titel: 'Het eenmalige aanbod om je transacties aan budgetten te hangen (ADR 0158)',
+    kriticiteit: 'BELANGRIJK',
+    persona: 'lisa',
+    given:
+      'Een account dat /overzicht/budget voor het eerst opent. Drie uitgangssituaties: (a) er staan transacties ZONDER budget (`allTimeUncatCount > 0`, de HEAD-count in `BudgetsClient` over alle tijden, transfers uitgezonderd); (b) alles is al gekoppeld (`allTimeUncatCount = 0`); (c) er staan helemaal geen transacties — dat is het domein van de buurman `BudgetKoppelNudge`, niet van dit aanbod.',
+    when:
+      'De gebruiker opent de budgetpagina, wacht tot het stil is (geen rondleiding, geen andere overlay), en kiest "Nu koppelen" of "Later"; daarna herlaadt hij de pagina. Apart geval: de automatische eerste ophaal na de onboarding (WF-START-40) levert net transacties op en doet een `router.refresh()` zonder het clientcomponent te remounten.',
+    then:
+      '(a) Eén sheet (`ShellOverlay kind="sheet"`, titel "Je uitgaven aan je budget hangen") met het BEVROREN aantal ongekoppelde transacties, correct enkelvoud/meervoud, en twee knoppen in de sticky footer: "Nu koppelen" (sluit en opent dezelfde bestaande `AICategorizeSheet` als de knop "Transacties koppelen" — géén tweede koppel-UI) en "Later". Beide schrijven de keuze weg met `PUT /api/coachmark` ({id: \'budget-transacties-koppelen\', outcome: \'voltooid\'|\'overgeslagen\'}); ná een herlaad verschijnt het aanbod niet meer, ook op een ander apparaat niet — de staat staat op de eigen profielrij, niet in localStorage. Dat id staat op de DICHTE allowlist `COACHMARK_IDS` in `app/api/coachmark/route.ts`, naast `euro-view` en `overzicht-rondleiding`; een id daarbuiten wordt geweigerd. (b) en (c) tonen NIETS — er wordt zelfs geen coachmark-staat opgehaald zolang er niets te koppelen valt (geen netwerkverkeer zonder zichtbaarheid), en het aanbod en `BudgetKoppelNudge` sluiten elkaar per constructie uit (die eist nul transacties, dit er minstens één zonder budget). Valt het aantal alsnog naar nul terwijl de sheet openstaat, dan sluit hij zonder een keuze weg te schrijven. Bij een falende GET geldt "al gezien", zodat een hapering het aanbod niet bij elk bezoek laat opduiken. HERTELLING: `allTimeUncatCount` wordt niet meer alleen bij mount geteld maar bij élke verse serverronde (de effect hangt aan `initialData`) — anders bleef de teller ná de automatische ophaal op de oude waarde staan, verscheen dit aanbod nooit voor precies de gebruiker voor wie het bedoeld is, en meldde de actiestrip "Alles gekoppeld" boven een budget vol ongekoppelde transacties.',
+    assertion: {
+      kind: 'ui-only',
+      source:
+        'components/app/budget-transacties-aanbod.tsx (poort ongekoppeld > 0 + useAttentionQuiet + coachmark-leesronde, bevroren aantal, ShellOverlay/ModalFooter) + app/api/coachmark/route.ts (COACHMARK_IDS-allowlist met budget-transacties-koppelen, eigen-rij read-modify-write) + components/app/budgets-client.tsx (refreshAllTimeUncatCount op initialData, onKoppelen → AICategorizeSheet) — gedrag/zichtbaarheid, geen cijfermatige uitkomst; route-toets in app/api/coachmark/route.test.ts',
+    },
+  },
 ]
 
 export const BUDGET_ACCEPTANCE: AcceptanceSet = {

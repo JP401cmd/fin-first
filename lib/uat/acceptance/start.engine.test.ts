@@ -7,10 +7,10 @@
  * er alleen overheen en toetst `expect(actual).toBe(expected)` — één bron van
  * waarheid voor de rekenlogica, twee draaimomenten (CI + /beheer/regressietest).
  *
- * De niet-exacte criteria (18 ui-only workflows + 1 consistency-workflow)
+ * De niet-exacte criteria (22 ui-only workflows + 3 consistency-workflows)
  * hebben geen vast cijfer en worden hier als bespoke kind-controle geborgd,
  * samen met de dekkingscontrole op `start.ts` zelf (elk START-scenario uit de
- * catalogus heeft precies één criterium — 01..27, aaneengesloten, geen
+ * catalogus heeft precies één criterium — 01..40, aaneengesloten, geen
  * verwijsregel-gaten).
  */
 
@@ -31,11 +31,16 @@ function criterion(workflow: string): AcceptanceCriterion {
 }
 
 describe('UAT Start — acceptatiecriteria dekking', () => {
-  it('heeft precies één criterium per catalogus-START-scenario (01..37, geen gaten)', () => {
+  it('heeft precies één criterium per catalogus-START-scenario (01..40, geen gaten)', () => {
     const workflows = START_ACCEPTANCE.criteria.map((c) => c.workflow).sort()
     expect(workflows).toEqual(catalogStartWorkflows)
     expect(new Set(workflows).size).toBe(catalogStartWorkflows.length)
-    expect(workflows.length).toBe(37)
+    // 37 → 40 (17-09-2026): WF-START-38 (stapscherm-volgorde: vraag eerst,
+    // sticky voortgangsrij eronder, accent per stapgroep; 'ui-only'),
+    // WF-START-39 (vier getrokken accentkleuren bij binnenkomst;
+    // 'consistency') en WF-START-40 (de eerste ophaal op het homescherm,
+    // ADR 0158; 'consistency').
+    expect(workflows.length).toBe(40)
   })
 
   it('elk criterium heeft een geldige assertion.kind', () => {
@@ -71,16 +76,22 @@ describe('UAT Start — acceptatiecriteria dekking', () => {
       'WF-START-13', 'WF-START-14', 'WF-START-15', 'WF-START-16',
       'WF-START-17', 'WF-START-22', 'WF-START-23', 'WF-START-24',
       'WF-START-25', 'WF-START-26', 'WF-START-33', 'WF-START-35',
-      'WF-START-36',
+      'WF-START-36', 'WF-START-38',
     ]
     for (const wf of uiOnly) {
       expect(criterion(wf).assertion.kind, `${wf} moet ui-only zijn`).toBe('ui-only')
     }
-    expect(uiOnly.length).toBe(21)
+    expect(uiOnly.length).toBe(22)
   })
 
-  it('markeert het consistency-criterium voor de budget-categorie-bewerking (WF-START-32)', () => {
-    expect(criterion('WF-START-32').assertion.kind).toBe('consistency')
+  it('markeert de consistency-criteria (WF-START-32, -39, -40)', () => {
+    // 32: dezelfde diff-functie als de in-app planeditor.
+    // 39: de vier getrokken accenten komen uit ACCENT_RING op vaste
+    //     tetrad-afstanden — A=B, geen eigen cijfer.
+    // 40: de gesynchroniseerde set == de ids uit de afrondingsmarkering.
+    for (const wf of ['WF-START-32', 'WF-START-39', 'WF-START-40']) {
+      expect(criterion(wf).assertion.kind, `${wf} moet consistency zijn`).toBe('consistency')
+    }
   })
 })
 

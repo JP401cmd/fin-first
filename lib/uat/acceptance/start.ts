@@ -261,10 +261,10 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'OVERIG',
     given: 'Verse reset via "Onboarding starten", eerste bezoek aan /onboarding zonder herstelbaar concept.',
     when: 'De gebruiker landt op /onboarding en sluit de popup (knop of ESC).',
-    then: 'De popup verschijnt éénmalig (localStorage-flag `trifinity_onboarding_welcome_seen`) en komt bij verversen niet terug; bij een herstelbaar concept verschijnt de popup bewust niet.',
+    then: 'De popup verschijnt éénmalig (localStorage-flag `trifinity_onboarding_welcome_seen`) en komt bij verversen niet terug; bij een herstelbaar concept verschijnt de popup bewust niet. INHOUD sinds 17-09-2026 (was: twee alinea\'s proza en verder niets): na de kop "Welkom bij TriFinity" en de tagline "Geld is opgeslagen tijd." staat één alinea, dáárna VIER waardes onder elkaar — "Wat je hebt" (kern-accent), "Wat er omgaat" (horizon), "Waar het op uitloopt" (wil), "Waar je op kunt sturen" (fin) — elk met een 20px kicker-streep in zijn eigen accent, een belofte-regel en een toelichting. De vier strepen dragen de vier getrokken accenten van déze gebruiker (WF-START-39): de popup portalt naar `document.body` en krijgt die vars daarom expliciet mee via de `colorVars`-prop, dus de popup staat nooit in de standaardkleuren terwijl het scherm eronder de getrokken kleuren draagt. Er is geen sluit-X; sluiten kan alleen via "Begin →" of ESC, en de kaart scrollt intern zodat de begroeting op een korte telefoon niet boven de vouw verdwijnt.',
     assertion: {
       kind: 'ui-only',
-      source: 'components/onboarding/welcome-popup.tsx + localStorage-flag, geen cijfermatige uitkomst',
+      source: 'components/onboarding/welcome-popup.tsx (WAARDES-lijst, colorVars-prop, focus-trap + scrollTop-reset) + localStorage-flag in app/(onboarding)/onboarding/page.tsx, geen cijfermatige uitkomst',
     },
   },
   {
@@ -535,6 +535,45 @@ const criteria: AcceptanceCriterion[] = [
       kind: 'exact',
       expected: 'open=budget; naBudget=bank; naBank=null; klaarPostIsNoOp=true; verlopenNa24u=null',
       source: 'lib/onboarding/afronding.ts#readOpenAfronding + withAfrondingVoortgang + AFRONDING_GELDIG_MS — zie start-checks.ts; route-toets (no-op) in app/api/onboarding/afronding/route.ts',
+    },
+  },
+  {
+    workflow: 'WF-START-38',
+    scenarioId: 'UAT-START-38',
+    titel: 'Het stapscherm: eerst de vraag, dan pas de voortgang (volgordewissel 17-09-2026)',
+    kriticiteit: 'BELANGRIJK',
+    given: 'Een willekeurige inhoudelijke onboarding-stap (bv. "bezittingen" of "schulden", groep 4/9 resp. 5/9) met genoeg ingevulde regels om het scherm te laten scrollen. Tot 17-09-2026 was de volgorde omgekeerd: een full-bleed sticky voortgangsbalk bovenaan het scherm, daarboven een gecentreerde 4xl merknaam-kop.',
+    when: 'De tester bekijkt de volgorde van de elementen, scrollt binnen de stap naar beneden, klikt de terug-affordance, en loopt door de stapgroepen heen.',
+    then: 'VOLGORDE: (1) een kleine masthead-rij van 44px hoog — merknaam links (klein, `text-base sm:text-lg`, met de punt in het accent van deze stap) en "Uitloggen" rechts; dat is een `<p>`, géén `<h1>` meer. (2) De vraag: kicker-streep + romeinse nummering, de kop met italic-em, en het deck. (3) DAARONDER pas de voortgangsrij: terug-knop · balk (2px, gevuld in `--module-active-*`) · stand "n/9" (ook in het accent) · en op een tweede regel de vrijheidsteller, wanneer die er is. STICKY: de voortgangsrij plakt bij scrollen aan de bovenkant van de formulierkolom (`sticky top-0 z-30`, halfdoorzichtige achtergrond) — dat is geen detail, want deze terug-knop is de ENIGE stap-terug die de onboarding heeft (de sticky CTA-bar onderaan draagt alleen "Verder"); zonder sticky scrolt de uitgang op een lange stap uit beeld. ACCENT PER STAPGROEP: `--module-active-*` staat niet meer vast op `kern` maar op het accent van de hefboom waar de vraag over gaat (`STEP_ACCENT`): naam/geboortedatum/eindstrategie → fin, inkomen/uitgaven/uitgaven_pensioen/spaardoel → horizon, bezittingen/pensioen → kern, schulden → wil. Kicker-streep, italic-em, balk en de merknaam-punt kleuren dus mee bij elke stapwissel. De cijfers en validaties van de stappen zelf veranderen niet (WF-START-18/19/28).',
+    assertion: {
+      kind: 'ui-only',
+      source: 'components/onboarding/onboarding-shell.tsx (OnboardingProgressBar onder de header, sticky-className, backSlot) + components/onboarding/progress-bar.tsx (geen eigen sticky/full-bleed meer, module-active fill + stand) + app/(onboarding)/onboarding/page.tsx (STEP_ACCENT/moduleActiveVars, masthead-rij als <p>), geen cijfermatige uitkomst',
+    },
+  },
+  {
+    workflow: 'WF-START-39',
+    scenarioId: 'UAT-START-39',
+    titel: 'Vier willekeurige accentkleuren bij de eerste binnenkomst in de onboarding',
+    kriticiteit: 'OVERIG',
+    given: 'Drie accounts: (a) een vers account zonder `profiles.module_colors` en met `onboarding_completed = false`; (b) een account dat al minstens één van de vier kleuren heeft staan; (c) een account met `onboarding_completed = true` en zonder kleuren (bv. een openstaande afrondingsstap of een redirect).',
+    when: 'Elk van de drie opent /onboarding; daarna bekijkt de tester /mijn/uiterlijk en de app-shell.',
+    then: '(a) De onboarding trekt vier accenten met `randomModuleColors()`: één willekeurig startpunt op de gedeelde `ACCENT_RING` (18 tinten) plus de vaste tetrad-afstanden [0,4,9,13], zodat de vier tinten altijd rond de hele kleurencirkel liggen met minimaal 80° ertussen — nooit twee buurtinten die op één scherm niet uit elkaar te houden zijn. Ze worden meteen best-effort weggeschreven met `PUT /api/appearance` ({module_colors}); mislukt dat (offline/500), dan blijft de onboarding in die kleuren staan, komt er GEEN melding, en valt de rest van de app terug op de standaardset. (b) Geen trekking — de bestaande kleuren worden per sleutel over de standaardset heen gelegd, zodat een onvolledige rij niet met een verse trekking wordt overschreven. (c) Geen trekking: wie de onboarding al af heeft mag niet ineens een andere app-kleur krijgen. Alle achttien ringtinten halen minimaal 4,55:1 tegen papier (WCAG AA), dus elke uitkomst is leesbaar; op /mijn/uiterlijk blijven de vier vrij te wijzigen. Dat de accenten dicht bij een stoplichtkleur mogen liggen is sinds 8-09-2026 bewust (eigenaarsbesluit): er geldt geen chroma-plafond meer op deze ring.',
+    assertion: {
+      kind: 'consistency',
+      source: 'lib/color-palette.ts#randomModuleColors/ACCENT_RING/ACCENT_TETRAD_OFFSETS + app/(onboarding)/onboarding/page.tsx (heeftKleuren-poort, PUT /api/appearance) — A=B-toets: de vier getrokken tinten komen uit ACCENT_RING en liggen op de tetrad-afstanden; contrast en spreiding zijn gepind in lib/color-palette.random-accents.test.ts en components/mijn/module-accent-picker.test.tsx, geen eigen cijfer hier',
+    },
+  },
+  {
+    workflow: 'WF-START-40',
+    scenarioId: 'UAT-START-40',
+    titel: 'De eerste ophaal gebeurt op het homescherm, ná de rondleiding (ADR 0158)',
+    kriticiteit: 'KERN',
+    given: 'Een gebruiker die de onboarding zojuist afrondde MÉT een gekoppelde bank: `POST /api/onboarding/afronding` legde bij `stap:\'klaar\', bank:\'gekoppeld\'` server-side vast wélke actieve `bank_connection_accounts` op dat moment bestonden (`bankKoppelingen` in dezelfde markering; de client levert die ids niet aan). De markering is ≤24 uur oud. Losse gevallen: (a) het standaardgeval; (b) de gebruiker legt binnen datzelfde venster ergens anders een tweede koppeling en staat op /core/cash/connect/success; (c) een markering van vóór ADR 0158, die de ids nog niet draagt; (d) de bankstap is overgeslagen.',
+    when: 'De gebruiker komt de app binnen (in de praktijk /dashboard → het gekozen homescherm) en laat de rondleiding van ADR 0130 lopen of tikt hem weg.',
+    then: '(a) `EersteSyncNaOnboarding` hangt in de (app)-layout bínnen de `GlobalSyncProvider` en start ná ~2s stilte — pas als `useAttentionQuiet()` vals is, dus de rondleiding gaat vóór — dezelfde ronde als de syncknop (`loadGlobalSyncTargets` + `triggerGlobalSync`): dezelfde dagrem, dezelfde toasts per koppeling, dezelfde `router.refresh()`. Géén tweede sync-pad, géén tweede leesronde, géén eigen "al gedaan"-vlag: hij dooft uit doordat de markering na 24 uur verloopt en een geslaagde sync `last_synced_at` zet. Per browsertab vuurt hij hoogstens één keer (module-scoped vlag), maar valt de leesronde om vóórdat er één koppeling is aangeraakt, dan gaat die vlag terug — anders kapt één hapering de eerste ophaal voor de hele sessie af. (b) De ronde raakt UITSLUITEND de ids uit de markering: een koppeling die later ontstaat zit er structureel niet in, en bovendien vuurt de trigger nooit op een pad onder /core/cash/connect — dáár leeft het correctiemoment van ADR 0069 (een verkeerd gelande koppeling verhangen), dat onherroepelijk sluit zodra er transacties zijn. (c) en (d) leveren een lege lijst en dus GEEN automatische ophaal — fail-safe: liever een gemiste ophaal (de syncknop staat er nog) dan een gesloten correctiemoment. Fouten ín de sync blijven zichtbaar via de gewone toasts; alleen het omvallen van de leesronde faalt stil.',
+    assertion: {
+      kind: 'consistency',
+      source: 'A=B-toets tussen de gesynchroniseerde set en de markering: components/sync/eerste-sync-na-onboarding.tsx (filter op `koppelingen.includes(bank.connectionAccountId)`, useAttentionQuiet-poort, KOPPELWIZARD-uitsluiting) leest wat app/api/onboarding/afronding/route.ts server-side schreef via lib/onboarding/afronding.ts#readOnboardingBankKoppelingen (24u-venster, ontbrekend veld → leeg) en start app/(app)/layout.tsx\'s bestaande GlobalSyncProvider-ronde — geen eigen cijfer; de leesfunctie is gepind in lib/onboarding/afronding.test.ts',
     },
   },
 ]

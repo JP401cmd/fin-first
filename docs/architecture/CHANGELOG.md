@@ -1099,3 +1099,7 @@
 
 - **API-routes** toegevoegd: /api/beta/addon
 - **Componenten (aantal)** toegevoegd: +4
+
+## 2026-09-17
+
+- **Componenten (aantal)** toegevoegd: +2

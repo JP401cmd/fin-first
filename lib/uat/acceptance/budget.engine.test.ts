@@ -41,7 +41,9 @@ describe('UAT Budget — acceptatiecriteria dekking', () => {
     // bevinding C7, 26-08-2026; 'ui-only').
     // 27 → 28: WF-BUDGET-28 (de nul-limiet-tak van de weergave-klemfamilie en
     // de grens weergave ≠ melding, melding B-032, 08-09-2026; 'exact').
-    expect(workflows.length).toBe(28)
+    // 28 → 29: WF-BUDGET-29 (het eenmalige koppelaanbod + de coachmark-
+    // allowlist, ADR 0158, 17-09-2026; 'ui-only').
+    expect(workflows.length).toBe(29)
   })
 
   it('elk criterium heeft een geldige assertion.kind', () => {
@@ -80,7 +82,7 @@ describe('UAT Budget — acceptatiecriteria dekking', () => {
     // direction (AI-categorisatie + transactiebedragen niet-deterministisch)
     expect(criterion('WF-BUDGET-13').assertion.kind).toBe('direction')
     // ui-only (pure interactie/weergave/navigatie)
-    for (const wf of ['WF-BUDGET-04', 'WF-BUDGET-08', 'WF-BUDGET-11', 'WF-BUDGET-12', 'WF-BUDGET-17', 'WF-BUDGET-19', 'WF-BUDGET-23', 'WF-BUDGET-24']) {
+    for (const wf of ['WF-BUDGET-04', 'WF-BUDGET-08', 'WF-BUDGET-11', 'WF-BUDGET-12', 'WF-BUDGET-17', 'WF-BUDGET-19', 'WF-BUDGET-23', 'WF-BUDGET-24', 'WF-BUDGET-29']) {
       expect(criterion(wf).assertion.kind, `${wf} moet ui-only zijn`).toBe('ui-only')
     }
   })

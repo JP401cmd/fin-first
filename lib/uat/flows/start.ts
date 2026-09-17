@@ -68,7 +68,9 @@ export const START_FLOW: UatFlow = {
     // ── 5 · onboarding ────────────────────────────────────────────────────────
     { id: 'onboardpoort', label: 'onboarding_completed?', kind: 'decision', stage: 5 },
     { id: 'welkomst', scenarioId: 'UAT-START-17', label: 'WF-START-17 · Welkomstpopup', kind: 'screen', stage: 5, lane: 'onboarding' },
+    { id: 'obkleuren', scenarioId: 'UAT-START-39', label: 'WF-START-39 · Vier willekeurige accentkleuren bij binnenkomst', kind: 'action', stage: 5, lane: 'onboarding', subOf: 'welkomst' },
     { id: 'onboarding', scenarioId: 'UAT-START-18', label: 'WF-START-18 · Onboarding volledig doorlopen', kind: 'screen', stage: 5, lane: 'onboarding' },
+    { id: 'obstapscherm', scenarioId: 'UAT-START-38', label: 'WF-START-38 · Stapscherm: vraag eerst, voortgangsrij eronder', kind: 'action', stage: 5, lane: 'onboarding', subOf: 'onboarding' },
     { id: 'bezitschuld', scenarioId: 'UAT-START-19', label: 'WF-START-19 · Bezittingen & schulden (huis+hypotheek)', kind: 'action', stage: 5, lane: 'onboarding', subOf: 'onboarding' },
     { id: 'pensioen', scenarioId: 'UAT-START-20', label: 'WF-START-20 · Pensioen opgeven', kind: 'action', stage: 5, lane: 'onboarding', subOf: 'onboarding' },
     { id: 'spaardoel', scenarioId: 'UAT-START-21', label: 'WF-START-21 · Spaardoel kiezen of overslaan', kind: 'action', stage: 5, lane: 'onboarding', subOf: 'onboarding' },
@@ -94,6 +96,10 @@ export const START_FLOW: UatFlow = {
     { id: 'overgang', scenarioId: 'UAT-START-26', label: 'WF-START-26 · Overgang onboarding → app', kind: 'screen', stage: 6 },
     // Sinds ADR 0157 geen onboardingstap meer: de AI-keuze komt pas wanneer de
     // gebruiker in de app een AI-functie opent.
+    // De eerste ophaal hangt aan de (app)-layout, niet aan één route — hij
+    // volgt dus op de overgang, niet op de bankstap zelf (ADR 0158).
+    { id: 'obeerstesync', scenarioId: 'UAT-START-40', label: 'WF-START-40 · Eerste ophaal op het homescherm, ná de rondleiding (ADR 0158)', kind: 'action', stage: 6, subOf: 'overgang' },
+    { id: 'x-budget-koppel', label: 'Aanbod om de opgehaalde transacties aan budgetten te hangen (WF-BUDGET-29)', kind: 'cross', stage: 6, crossZone: 'BUDGET' },
     { id: 'aikeuze', scenarioId: 'UAT-START-30', label: 'WF-START-30 · AI aanzetten bij het eerste gebruik (beta-keuze, ADR 0155 + 0157)', kind: 'action', stage: 6, subOf: 'overgang' },
     { id: 'uitkomst', label: 'Gebruiker in de app: bezittingen/schulden/doel/pensioen/plan zichtbaar', kind: 'outcome', stage: 6 },
 
@@ -135,7 +141,9 @@ export const START_FLOW: UatFlow = {
     // onboarding-poort
     { from: 'onboardpoort', to: 'welkomst', kind: 'branch', label: 'niet geonboard' },
     { from: 'onboardpoort', to: 'overgang', kind: 'branch', label: 'al geonboard' },
+    { from: 'welkomst', to: 'obkleuren' },
     { from: 'welkomst', to: 'onboarding' },
+    { from: 'onboarding', to: 'obstapscherm' },
     { from: 'onboarding', to: 'bezitschuld' },
     { from: 'onboarding', to: 'pensioen' },
     { from: 'onboarding', to: 'spaardoel' },
@@ -160,6 +168,8 @@ export const START_FLOW: UatFlow = {
     { from: 'obbank', to: 'obafrondhervat' },
 
     // samenvloeien → uitkomst
+    { from: 'overgang', to: 'obeerstesync' },
+    { from: 'obeerstesync', to: 'x-budget-koppel', kind: 'cross', label: 'opgehaalde transacties → koppelaanbod op /overzicht/budget' },
     { from: 'overgang', to: 'aikeuze' },
     { from: 'overgang', to: 'uitkomst' },
 

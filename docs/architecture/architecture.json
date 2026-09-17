@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-17T17:58:14.721Z",
+  "generatedAt": "2026-09-17T21:34:25.684Z",
   "generatedDate": "2026-09-17",
   "repo": {
     "name": "fin",
@@ -195,7 +195,7 @@
     "tables": 102,
     "migrations": 253,
     "integrations": 25,
-    "components": 1139,
+    "components": 1141,
     "providers": 19,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -9143,11 +9143,11 @@
     }
   ],
   "components": {
-    "total": 1139,
+    "total": 1141,
     "groups": [
       {
         "group": "app",
-        "count": 460,
+        "count": 462,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -9226,6 +9226,8 @@
           "budget-plan-editor-sheet.sticky-footer.test",
           "budget-shared",
           "budget-sparkline",
+          "budget-transacties-aanbod",
+          "budget-transacties-aanbod.test",
           "budget-tree",
           "budget-tree-editor",
           "budget-tree-editor.test",
@@ -10154,14 +10156,12 @@
       },
       {
         "group": "onboarding",
-        "count": 44,
+        "count": 42,
         "items": [
           "aangifte-import-pane",
           "facts-panel",
           "freedom-ticker",
           "freedom-ticker.test",
-          "onboarding-ai-keuze",
-          "onboarding-ai-keuze.test",
           "onboarding-bank",
           "onboarding-bank.test",
           "onboarding-bezittingen",
@@ -10320,6 +10320,20 @@
         ]
       },
       {
+        "group": "sync",
+        "count": 8,
+        "items": [
+          "eerste-sync-na-onboarding",
+          "eerste-sync-na-onboarding.test",
+          "global-sync-button",
+          "global-sync-button.test",
+          "global-sync-provider",
+          "global-sync-provider.test",
+          "sync-progress-strip",
+          "sync-report-modal"
+        ]
+      },
+      {
         "group": "aangifte",
         "count": 6,
         "items": [
@@ -10353,18 +10367,6 @@
           "holding-source-badge",
           "investment-holding-card",
           "isin-lookup-field"
-        ]
-      },
-      {
-        "group": "sync",
-        "count": 6,
-        "items": [
-          "global-sync-button",
-          "global-sync-button.test",
-          "global-sync-provider",
-          "global-sync-provider.test",
-          "sync-progress-strip",
-          "sync-report-modal"
         ]
       },
       {
@@ -11763,6 +11765,10 @@
         {
           "name": "balance_snapshots",
           "write": true
+        },
+        {
+          "name": "bank_connection_accounts",
+          "write": false
         },
         {
           "name": "budgets",
@@ -14424,6 +14430,14 @@
           "write": false,
           "routes": [
             "/api/notifications"
+          ]
+        },
+        {
+          "domain": "onboarding",
+          "label": "Onboarding",
+          "write": false,
+          "routes": [
+            "/api/onboarding/afronding"
           ]
         },
         {
@@ -18313,6 +18327,21 @@
       ],
       "summary": "AI en de bankkoppeling worden straks betaalde add-ons (`lib/subscription-catalog.ts`). Zolang TriFinity in beta is, zet de gebruiker ze **zelf** aan of uit. Het moment waarop dat gebeurt is het moment waarop iemand de functie wil gebruiken: een popup legt uit \"straks een abonneme",
       "file": "docs/adr/0157-beta-add-ons-zijn-een-eigen-keuze.md"
+    },
+    {
+      "id": "0158-de-eerste-ophaal-gebeurt-op-het-homescherm",
+      "title": "De eerste ophaal gebeurt op het homescherm, ná de rondleiding — en het budget vraagt daarna één keer om koppeling",
+      "status": "aanvaard",
+      "date": "2026-09-17",
+      "elements": [
+        "t-bankconnect",
+        "do-transactie",
+        "as-import",
+        "sp-budget",
+        "sp-registreren"
+      ],
+      "summary": "Vult het gat dat ADR 0156 openliet en begrenst de uitzondering op ADR 0069.",
+      "file": "docs/adr/0158-de-eerste-ophaal-gebeurt-op-het-homescherm.md"
     }
   ],
   "churn": {
@@ -18324,11 +18353,11 @@
       },
       {
         "path": "lib/ai",
-        "commits": 54
+        "commits": 56
       },
       {
         "path": "app/(app)/toekomst",
-        "commits": 32
+        "commits": 31
       },
       {
         "path": "app/api/ai",
@@ -18367,7 +18396,7 @@
       },
       {
         "file": "components/app/budgets-client.tsx",
-        "loc": 5635,
+        "loc": 5661,
         "commits": 32
       },
       {
@@ -19576,16 +19605,9 @@
     "hasChanges": true,
     "sections": [
       {
-        "label": "API-routes",
-        "added": [
-          "/api/beta/addon"
-        ],
-        "removed": []
-      },
-      {
         "label": "Componenten (aantal)",
         "added": [
-          "+4"
+          "+2"
         ],
         "removed": []
       }
@@ -20015,7 +20037,7 @@
     {
       "date": "2026-09-17",
       "api": 326,
-      "components": 1139,
+      "components": 1141,
       "tables": 102,
       "routesProduction": 90
     }
