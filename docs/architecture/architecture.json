@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-17T08:36:34.730Z",
+  "generatedAt": "2026-09-17T14:46:55.458Z",
   "generatedDate": "2026-09-17",
   "repo": {
     "name": "fin",
@@ -189,13 +189,13 @@
     }
   },
   "stats": {
-    "routes": 135,
+    "routes": 136,
     "routesProduction": 90,
-    "api": 323,
-    "tables": 101,
-    "migrations": 247,
+    "api": 325,
+    "tables": 102,
+    "migrations": 252,
     "integrations": 25,
-    "components": 1119,
+    "components": 1135,
     "providers": 19,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -315,6 +315,12 @@
     {
       "url": "/beheer/fiscale-kerngetallen",
       "file": "app/(app)/beheer/fiscale-kerngetallen/page.tsx",
+      "group": "beheer",
+      "isTest": false
+    },
+    {
+      "url": "/beheer/gebruik",
+      "file": "app/(app)/beheer/gebruik/page.tsx",
       "group": "beheer",
       "isTest": false
     },
@@ -1128,6 +1134,12 @@
       {
         "url": "/beheer/fiscale-kerngetallen",
         "file": "app/(app)/beheer/fiscale-kerngetallen/page.tsx",
+        "group": "beheer",
+        "isTest": false
+      },
+      {
+        "url": "/beheer/gebruik",
+        "file": "app/(app)/beheer/gebruik/page.tsx",
         "group": "beheer",
         "isTest": false
       },
@@ -2911,6 +2923,14 @@
       ]
     },
     {
+      "url": "/api/consent/ai",
+      "file": "app/api/consent/ai/route.ts",
+      "domain": "consent",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
       "url": "/api/core/category-history",
       "file": "app/api/core/category-history/route.ts",
       "domain": "core",
@@ -3791,6 +3811,15 @@
       "methods": [
         "POST",
         "DELETE"
+      ]
+    },
+    {
+      "url": "/api/onboarding/afronding",
+      "file": "app/api/onboarding/afronding/route.ts",
+      "domain": "onboarding",
+      "methods": [
+        "GET",
+        "POST"
       ]
     },
     {
@@ -5675,7 +5704,7 @@
     {
       "domain": "onboarding",
       "label": "Onboarding",
-      "count": 8,
+      "count": 9,
       "routes": [
         {
           "url": "/api/onboarding/aangifte-extract",
@@ -5692,6 +5721,15 @@
           "methods": [
             "POST",
             "DELETE"
+          ]
+        },
+        {
+          "url": "/api/onboarding/afronding",
+          "file": "app/api/onboarding/afronding/route.ts",
+          "domain": "onboarding",
+          "methods": [
+            "GET",
+            "POST"
           ]
         },
         {
@@ -7122,6 +7160,21 @@
       ]
     },
     {
+      "domain": "consent",
+      "label": "consent",
+      "count": 1,
+      "routes": [
+        {
+          "url": "/api/consent/ai",
+          "file": "app/api/consent/ai/route.ts",
+          "domain": "consent",
+          "methods": [
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "core",
       "label": "core",
       "count": 1,
@@ -8225,6 +8278,10 @@
         "migration": "supabase/migrations/20260908120000_chat_gespreksgeschiedenis.sql"
       },
       {
+        "name": "consent_events",
+        "migration": "supabase/migrations/20260917130000_ai_consent_events.sql"
+      },
+      {
         "name": "contract_events",
         "migration": "supabase/migrations/20260617190000_create_contract_events.sql"
       },
@@ -8517,7 +8574,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 247
+    "migrationCount": 252
   },
   "tablesByDomain": [
     {
@@ -8570,6 +8627,10 @@
         {
           "name": "category_corrections",
           "migration": "supabase/migrations/20260213122235_add_category_corrections.sql"
+        },
+        {
+          "name": "consent_events",
+          "migration": "supabase/migrations/20260917130000_ai_consent_events.sql"
         },
         {
           "name": "contract_events",
@@ -9059,11 +9120,11 @@
     }
   ],
   "components": {
-    "total": 1119,
+    "total": 1135,
     "groups": [
       {
         "group": "app",
-        "count": 446,
+        "count": 457,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -9082,6 +9143,9 @@
           "add-item-cta",
           "ai-categorize-sheet",
           "ai-categorize-sheet.test",
+          "ai-consent-facts",
+          "ai-consent-interstitial",
+          "ai-consent-interstitial.test",
           "ai-privacy-indicator",
           "ai-privacy-indicator.test",
           "ai-settings-client",
@@ -9138,6 +9202,8 @@
           "budget-shared",
           "budget-sparkline",
           "budget-tree",
+          "budget-tree-editor",
+          "budget-tree-editor.test",
           "budget-zero-limit.test",
           "budgets-client",
           "budgets-client-degraded.test",
@@ -9248,6 +9314,9 @@
           "freshness-label",
           "freshness-label.test",
           "gap-analyse",
+          "gebruik-pagina",
+          "gebruik-pagina.test",
+          "gebruik-secties",
           "gebruiker-zoeker",
           "gebruiker-zoeker.test",
           "gebruikersgroepen-beheer",
@@ -9260,6 +9329,7 @@
           "goal-form",
           "goal-form.test",
           "grafiek-uitleg-walkthrough",
+          "grafieken",
           "groep-sheet",
           "guide-visit-tracker",
           "head-scripts",
@@ -9399,7 +9469,9 @@
           "regime-kaart.test",
           "responsive-shell",
           "responsive-shell.characterization.test",
+          "sankey",
           "sankey-diagram",
+          "sankey.test",
           "scenario-chip",
           "scenario-chip.test",
           "scenario-kaarten",
@@ -10056,15 +10128,20 @@
       },
       {
         "group": "onboarding",
-        "count": 38,
+        "count": 43,
         "items": [
           "aangifte-import-pane",
-          "budget-amount-editor",
           "facts-panel",
           "freedom-ticker",
           "freedom-ticker.test",
+          "onboarding-ai-keuze",
+          "onboarding-ai-keuze.test",
+          "onboarding-bank",
+          "onboarding-bank.test",
           "onboarding-bezittingen",
           "onboarding-bezittingen.test",
+          "onboarding-budget",
+          "onboarding-budget.test",
           "onboarding-data-note.test",
           "onboarding-eindstrategie",
           "onboarding-eindstrategie.test",
@@ -11099,6 +11176,16 @@
           "write": false
         }
       ],
+      "consent": [
+        {
+          "name": "consent_events",
+          "write": true
+        },
+        {
+          "name": "profiles",
+          "write": true
+        }
+      ],
       "cron": [
         {
           "name": "error_log_resolutions",
@@ -11719,6 +11806,10 @@
       ],
       "pension": [
         {
+          "name": "consent_events",
+          "write": true
+        },
+        {
           "name": "life_events",
           "write": true
         }
@@ -12274,6 +12365,14 @@
           ]
         },
         {
+          "domain": "consent",
+          "label": "consent",
+          "write": true,
+          "routes": [
+            "/api/consent/ai"
+          ]
+        },
+        {
           "domain": "crypto-holdings",
           "label": "Crypto",
           "write": true,
@@ -12357,6 +12456,7 @@
           "routes": [
             "/api/onboarding/aangifte-extract",
             "/api/onboarding/aangifte-import",
+            "/api/onboarding/afronding",
             "/api/onboarding/draft",
             "/api/onboarding/reset",
             "/api/onboarding/save-own-data",
@@ -13927,6 +14027,7 @@
           "label": "Onboarding",
           "write": true,
           "routes": [
+            "/api/onboarding/afronding",
             "/api/onboarding/save-own-data",
             "/api/onboarding/suggest-budgets"
           ]
@@ -14864,6 +14965,24 @@
           ]
         }
       ],
+      "consent_events": [
+        {
+          "domain": "consent",
+          "label": "consent",
+          "write": true,
+          "routes": [
+            "/api/consent/ai"
+          ]
+        },
+        {
+          "domain": "pension",
+          "label": "pension",
+          "write": true,
+          "routes": [
+            "/api/pension/parse"
+          ]
+        }
+      ],
       "error_logs": [
         {
           "domain": "log-error",
@@ -15266,6 +15385,7 @@
       "balance_snapshots",
       "bank_accounts",
       "budgets",
+      "consent_events",
       "debts",
       "error_log_resolutions",
       "goals",
@@ -16162,6 +16282,11 @@
         "rls": true
       },
       "user_group_members": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "consent_events": {
         "user": true,
         "household": false,
         "rls": true
@@ -18081,6 +18206,73 @@
       ],
       "summary": "De opeethypotheek heeft per ontwerp géén maandlast: de rente wordt bij de schuld opgeteld. Dat blijft zo. Wat verandert: de bijgeschreven rente wordt een apart, zichtbaar getal, ze loopt door zodra de schuld tegen het leenplafond aanloopt (de schuld mag boven het plafond uitkomen",
       "file": "docs/adr/0151-opeet-rente-boven-plafond.md"
+    },
+    {
+      "id": "0152-storage-buckets-volgen-de-wis",
+      "title": "Storage-buckets volgen de AVG-wis: prefix-wis vóór de tabellen, 90 dagen voor schermafbeeldingen, wezen-sweep in de retentie-cron",
+      "status": "aanvaard",
+      "date": "2026-09-17",
+      "elements": [
+        "t-supabase",
+        "do-melding",
+        "app-comp"
+      ],
+      "summary": "Bestanden die een gebruiker uploadt (schermafbeeldingen bij meldingen, pensioenoverzichten) worden bij accountverwijdering en reset gewist, als eerste stap en hard falend. Schermafbeeldingen krijgen daarnaast een bewaartermijn van 90 dagen; de retentie-cron ruimt verlopen beelden",
+      "file": "docs/adr/0152-storage-buckets-volgen-de-wis.md"
+    },
+    {
+      "id": "0153-gebruik-per-waardestroom-geteld-met-k-anonimiteit",
+      "title": "Beheer ziet gebruik per waardestroom als tellingen met k = 5, berekend in de database",
+      "status": "aanvaard",
+      "date": "2026-09-17",
+      "elements": [
+        "do-meta",
+        "t-supabase",
+        "sp-inzicht"
+      ],
+      "summary": "Nieuwe gebruikers bekijken hun FIRE-leeftijd en komen niet terug. Om dat zichtbaar te maken, en later te zien of verbeteringen werken, krijgt beheer de pagina `/beheer/gebruik`. Die toont gebruik per waardestroom en per app-deel, de doorstroom van actieve dag naar actieve dag, te",
+      "file": "docs/adr/0153-gebruik-per-waardestroom-geteld-met-k-anonimiteit.md"
+    },
+    {
+      "id": "0154-looppaden-worden-geteld-niet-gevolgd",
+      "title": "Looppaden worden geteld, niet gevolgd: gebeurtenissen en schermovergangen per sessie, opgeslagen als tellers zonder gebruikers-id",
+      "status": "aanvaard",
+      "date": "2026-09-17",
+      "elements": [
+        "do-meta",
+        "t-supabase",
+        "sp-inzicht"
+      ],
+      "summary": "Nieuwe gebruikers bekijken hun FIRE-leeftijd en komen niet terug. Fase 1 van `/beheer/gebruik` laat zien óf en op welke dagen iemand terugkomt, niet wáár hij binnen een bezoek afhaakt. Dit voorstel voegt een meting toe die dat zichtbaar maakt — gebeurtenissen uit een gesloten naa",
+      "file": "docs/adr/0154-looppaden-worden-geteld-niet-gevolgd.md"
+    },
+    {
+      "id": "0155-ai-toestemming-is-een-echte-opt-in",
+      "title": "AI-toestemming is een echte opt-in: gelogd, omkeerbaar, vóór het eerste cloud-contact",
+      "status": "aanvaard",
+      "date": "2026-09-17",
+      "elements": [
+        "t-aigateway",
+        "as-coach",
+        "sp-registreren"
+      ],
+      "summary": "Cloud-AI (Fin, briefing, nieuws, categorisatie, aanbevelingen, rapport-inleiding, documentimport) draait uitsluitend na een **expliciete, gelogde en omkeerbare keuze** van de gebruiker. Nieuwe accounts starten met `profiles.ai_enabled = false`; de keuze is een eigen stap in de on",
+      "file": "docs/adr/0155-ai-toestemming-is-een-echte-opt-in.md"
+    },
+    {
+      "id": "0156-budget-en-bank-in-de-onboarding-na-de-opslag",
+      "title": "Budget en bankkoppeling komen terug in de onboarding — ná de opslag, met een afrondingsmarkering",
+      "status": "aanvaard",
+      "date": "2026-09-17",
+      "elements": [
+        "sp-registreren",
+        "sp-budget",
+        "as-budget",
+        "t-bankconnect",
+        "ext-truelayer"
+      ],
+      "summary": "De onboarding eindigt met twee stappen onder een eigen groep, \"Je budget\": 1. **Budget inrichten.** Je kiest een template of begint leeg, en werkt de categorieën bij (toevoegen, hernoemen, verwijderen). 2. **Bank koppelen.** Je koppelt aan een gekozen cash-rekening of aan een nie",
+      "file": "docs/adr/0156-budget-en-bank-in-de-onboarding-na-de-opslag.md"
     }
   ],
   "churn": {
@@ -18088,19 +18280,19 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 74
+        "commits": 75
       },
       {
         "path": "lib/ai",
-        "commits": 52
+        "commits": 53
       },
       {
         "path": "app/(app)/toekomst",
-        "commits": 31
+        "commits": 32
       },
       {
         "path": "app/api/ai",
-        "commits": 18
+        "commits": 19
       },
       {
         "path": "app/api/assets",
@@ -18131,7 +18323,7 @@
       {
         "file": "components/app/horizon/horizon-client.tsx",
         "loc": 10652,
-        "commits": 91
+        "commits": 92
       },
       {
         "file": "components/app/budgets-client.tsx",
@@ -18161,7 +18353,7 @@
       {
         "file": "components/app/chat/chat-panel.tsx",
         "loc": 2439,
-        "commits": 23
+        "commits": 24
       },
       {
         "file": "app/(app)/core/cash/import/page.tsx",
@@ -19296,6 +19488,13 @@
       "parserFormat": null
     },
     {
+      "file": "lib/truelayer/start-bank-connect.ts",
+      "exists": true,
+      "baseUrl": null,
+      "hasAdapter": false,
+      "parserFormat": null
+    },
+    {
       "file": "lib/truelayer/start-relink.ts",
       "exists": true,
       "baseUrl": null,
@@ -19304,6 +19503,13 @@
     },
     {
       "file": "lib/truelayer/target-account.ts",
+      "exists": true,
+      "baseUrl": null,
+      "hasAdapter": false,
+      "parserFormat": null
+    },
+    {
+      "file": "lib/truelayer/target-asset.ts",
       "exists": true,
       "baseUrl": null,
       "hasAdapter": false,
@@ -19327,16 +19533,8 @@
   "diff": {
     "baseline": false,
     "previousDate": "2026-09-17",
-    "hasChanges": true,
-    "sections": [
-      {
-        "label": "Componenten (aantal)",
-        "added": [
-          "+1"
-        ],
-        "removed": []
-      }
-    ]
+    "hasChanges": false,
+    "sections": []
   },
   "statsHistory": [
     {
@@ -19761,9 +19959,9 @@
     },
     {
       "date": "2026-09-17",
-      "api": 323,
-      "components": 1119,
-      "tables": 101,
+      "api": 325,
+      "components": 1135,
+      "tables": 102,
       "routesProduction": 90
     }
   ]

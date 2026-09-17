@@ -1069,3 +1069,28 @@
 ## 2026-09-17
 
 - **Componenten (aantal)** toegevoegd: +1
+
+## 2026-09-17
+
+- **Schermen** toegevoegd: /beheer/gebruik
+- **Componenten (aantal)** toegevoegd: +4
+
+## 2026-09-17
+
+- **API-routes** toegevoegd: /api/consent/ai
+- **Tabellen** toegevoegd: consent_events
+- **Componenten (aantal)** toegevoegd: +7
+
+## 2026-09-17
+
+- Geen wijzigingen.
+
+## 2026-09-17
+
+- **API-routes** toegevoegd: /api/onboarding/afronding
+- **Integratie-clients** toegevoegd: lib/truelayer/start-bank-connect.ts, lib/truelayer/target-asset.ts
+- **Componenten (aantal)** toegevoegd: +5
+
+## 2026-09-17
+
+- Geen wijzigingen.
