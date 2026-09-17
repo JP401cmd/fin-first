@@ -14,7 +14,8 @@
       "mcp__notion__notion-create-pages",
       "Bash(git rev-list *)",
       "Skill(update-config)",
-      "Skill(update-config:*)"
+      "Skill(update-config:*)",
+      "PowerShell(npx vitest run lib/natural-milestones.test.ts lib/horizon-kernel/geen-tekort-lening.test.ts components/future/regels/eindstrategie-body.geen-tekort-lening.test.tsx 2>&1)"
     ]
   }
 }
