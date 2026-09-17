@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   AFRONDING_GELDIG_MS,
   ONBOARDING_AFRONDING_KEY,
+  readOnboardingBankKoppelingen,
   readOpenAfronding,
   withAfrondingOpen,
   withAfrondingVoortgang,
@@ -50,5 +51,89 @@ describe('onboarding-afronding markering', () => {
       { [ONBOARDING_AFRONDING_KEY]: { stap: 'bank', sinds: 'geen-datum' } }]) {
       expect(readOpenAfronding(raw, T0)).toBeNull()
     }
+  })
+})
+
+// De poort onder de eerste ophaal op het homescherm (ADR 0158).
+//
+// Deze poort hangt bewust aan de KOPPELING en niet aan gebruikerstoestand:
+// alleen de ids die bij de afronding zijn vastgelegd mogen automatisch worden
+// opgehaald. Elke andere uitkomst dan die lijst is leeg — fail-safe, want de
+// fout aan de andere kant (een koppeling synchroniseren waarvan het
+// correctiemoment van ADR 0069 nog leeft) is onherstelbaar.
+describe('readOnboardingBankKoppelingen', () => {
+  const klaar = (voortgang: Parameters<typeof withAfrondingVoortgang>[1]) =>
+    withAfrondingVoortgang(
+      withAfrondingVoortgang(withAfrondingOpen(null, T0), { stap: 'bank', budget: 'opgeslagen' }, T0),
+      voortgang,
+      T0,
+    )
+
+  const gekoppeld = klaar({ stap: 'klaar', bank: 'gekoppeld', bankKoppelingen: ['ca-1', 'ca-2'] })
+
+  it('geeft de vastgelegde koppelingen terug', () => {
+    expect(readOnboardingBankKoppelingen(gekoppeld, T0)).toEqual(['ca-1', 'ca-2'])
+  })
+
+  // Een markering van vóór ADR 0158 draagt de ids nog niet. Die mag géén
+  // automatische ophaal opleveren — anders valt de grens juist weg bij de
+  // gebruikers die op het moment van uitrol midden in hun venster zaten.
+  it('geeft leeg als de ids ontbreken (markering van vóór ADR 0158)', () => {
+    expect(readOnboardingBankKoppelingen(klaar({ stap: 'klaar', bank: 'gekoppeld' }), T0)).toEqual([])
+  })
+
+  it('geeft leeg bij een overgeslagen bank', () => {
+    const overgeslagen = klaar({ stap: 'klaar', bank: { overgeslagen: 'rondkijken' } })
+    expect(readOnboardingBankKoppelingen(overgeslagen, T0)).toEqual([])
+  })
+
+  it('geeft leeg zolang de bankstap nog open staat', () => {
+    const open = withAfrondingVoortgang(
+      withAfrondingOpen(null, T0),
+      { stap: 'bank', budget: 'opgeslagen' },
+      T0,
+    )
+    expect(readOnboardingBankKoppelingen(open, T0)).toEqual([])
+  })
+
+  it('vervalt na het geldigheidsvenster', () => {
+    expect(readOnboardingBankKoppelingen(gekoppeld, later(AFRONDING_GELDIG_MS - 1))).toEqual([
+      'ca-1',
+      'ca-2',
+    ])
+    expect(readOnboardingBankKoppelingen(gekoppeld, later(AFRONDING_GELDIG_MS + 1))).toEqual([])
+  })
+
+  it('geeft leeg bij ontbrekende, lege of corrupte staat', () => {
+    for (const raw of [
+      null,
+      undefined,
+      {},
+      'tekst',
+      { [ONBOARDING_AFRONDING_KEY]: { stap: 'klaar' } },
+      { [ONBOARDING_AFRONDING_KEY]: { stap: 'klaar', sinds: 'geen-datum', bank: 'gekoppeld' } },
+      {
+        [ONBOARDING_AFRONDING_KEY]: {
+          stap: 'klaar',
+          sinds: T0.toISOString(),
+          bank: 'gekoppeld',
+          bankKoppelingen: 'geen-lijst',
+        },
+      },
+    ]) {
+      expect(readOnboardingBankKoppelingen(raw, T0)).toEqual([])
+    }
+  })
+
+  it('zeeft niet-string en lege ids uit een corrupte lijst', () => {
+    const vies = {
+      [ONBOARDING_AFRONDING_KEY]: {
+        stap: 'klaar',
+        sinds: T0.toISOString(),
+        bank: 'gekoppeld',
+        bankKoppelingen: ['ca-1', '', null, 42, { id: 'ca-9' }, 'ca-2'],
+      },
+    }
+    expect(readOnboardingBankKoppelingen(vies, T0)).toEqual(['ca-1', 'ca-2'])
   })
 })

@@ -13,6 +13,8 @@ import { MobilePreviewProvider } from '@/components/app/beheer/mobile-preview-pr
 import { MobilePreviewFrame } from '@/components/app/beheer/mobile-preview-frame'
 import { ToastProvider } from '@/components/app/toast-provider'
 import { GlobalSyncProvider } from '@/components/sync/global-sync-provider'
+import { EersteSyncNaOnboarding } from '@/components/sync/eerste-sync-na-onboarding'
+import { readOnboardingBankKoppelingen } from '@/lib/onboarding/afronding'
 import { PrivacyProvider } from '@/lib/hooks/use-privacy'
 import { DisplayModeProvider, type DisplayMode } from '@/lib/hooks/use-display-mode'
 import { EuroViewProvider, type EuroView } from '@/lib/hooks/use-euro-view'
@@ -493,6 +495,14 @@ export default async function AppLayout({
     (profile?.module_guide_state as Record<string, unknown> | null)?.[COACH_STATE_KEY],
   )
 
+  // ── Eerste ophaal na de onboarding (ADR 0158) ──────────
+  // Wélke koppelingen kwamen uit een net afgeronde onboarding? Alleen díe
+  // haalt `EersteSyncNaOnboarding` verderop op — de grens hangt bewust aan de
+  // koppeling en niet aan gebruikerstoestand (ADR 0158 §4). Gratis af te
+  // lezen: dezelfde `module_guide_state` uit de main-batch profile-select die
+  // de coach-staat hierboven al gebruikt.
+  const onboardingBankKoppelingen = readOnboardingBankKoppelingen(profile?.module_guide_state)
+
   // ── Welkomstgids-seed (ADR 0130) ───────────────────────
   // De gids woont sinds ADR 0130 in Fin (een vierde icoon in de chat-kop) i.p.v.
   // als banner op /overzicht — dus wordt hij hier geseed, waar zowel ChatPanel
@@ -745,6 +755,10 @@ export default async function AppLayout({
                   </FinSlotProvider>
                 </ModuleColorProvider>
                 <NotificationModal />
+                {/* ADR 0158 — de eerste ophaal na de onboarding. Rendert niets;
+                    moet binnen GlobalSyncProvider hangen omdat hij dezelfde
+                    ronde start als de syncknop. */}
+                <EersteSyncNaOnboarding koppelingen={onboardingBankKoppelingen} />
               </GlobalSyncProvider>
               </NotificationProvider>
               </VragenlijstSignaalProvider>

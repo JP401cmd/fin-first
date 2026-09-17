@@ -7,6 +7,7 @@ import {
   BANK_SKIP_REDENEN,
   readOpenAfronding,
   withAfrondingVoortgang,
+  type AfrondingVoortgang,
 } from '@/lib/onboarding/afronding'
 
 /**
@@ -103,7 +104,32 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, open: false })
   }
 
-  const next = withAfrondingVoortgang(current, parsed.data)
+  // Welke koppelingen komen uit DEZE onboarding? (ADR 0158)
+  //
+  // De eerste ophaal op het homescherm mag alleen deze aanraken. Zonder die
+  // binding zou hij afgaan op gebruikerstoestand en daarmee ook een koppeling
+  // meesleuren die de gebruiker binnen hetzelfde 24-uursvenster ergens anders
+  // legt — wat stil het correctiemoment van ADR 0069 sluit. Onherstelbaar.
+  //
+  // Server-bepaald, net als de budget-telling in GET hierboven en om dezelfde
+  // reden (ADR 0058): de client mag deze ids niet aanleveren, anders kan hij
+  // de grens zelf oprekken. Expliciete `user_id`-filter.
+  //
+  // Niet-fataal: faalt de telling, dan blijft de lijst leeg en gebeurt er
+  // hooguit géén automatische ophaal. De afronding mag daar niet op stuklopen.
+  let voortgang: AfrondingVoortgang = parsed.data
+  if (voortgang.stap === 'klaar' && voortgang.bank === 'gekoppeld') {
+    const { data: koppelingen } = await supabase
+      .from('bank_connection_accounts')
+      .select('id')
+      .eq('user_id', claims.sub)
+      .eq('is_active', true)
+    if (koppelingen?.length) {
+      voortgang = { ...voortgang, bankKoppelingen: koppelingen.map((k) => k.id as string) }
+    }
+  }
+
+  const next = withAfrondingVoortgang(current, voortgang)
 
   const { error: writeError } = await supabase
     .from('profiles')

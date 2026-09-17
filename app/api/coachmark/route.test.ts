@@ -165,8 +165,16 @@ describe('GET /api/coachmark', () => {
       outcome: Record<string, string | null>
     }
 
-    expect(body.dismissed).toEqual({ 'euro-view': false, 'overzicht-rondleiding': true })
-    expect(body.outcome).toEqual({ 'euro-view': null, 'overzicht-rondleiding': 'onderbroken' })
+    expect(body.dismissed).toEqual({
+      'euro-view': false,
+      'overzicht-rondleiding': true,
+      'budget-transacties-koppelen': false,
+    })
+    expect(body.outcome).toEqual({
+      'euro-view': null,
+      'overzicht-rondleiding': 'onderbroken',
+      'budget-transacties-koppelen': null,
+    })
   })
 
   it('geeft outcome null voor een oude rij die alleen dismissedAt draagt', async () => {

@@ -25,8 +25,19 @@ import { serverError, unauthorized } from '@/lib/api/respond'
  * beveiligingsgrens. Spiegelt `app/api/appearance`.
  */
 
-/** Sleutels die als coachmark mogen worden weggeschreven — dichte allowlist. */
-const COACHMARK_IDS = ['euro-view', 'overzicht-rondleiding'] as const
+/**
+ * Sleutels die als coachmark mogen worden weggeschreven — dichte allowlist.
+ *
+ * - `euro-view` — uitleg bij de weergave-pill.
+ * - `overzicht-rondleiding` — de spotlight-tour (ADR 0130).
+ * - `budget-transacties-koppelen` — het eenmalige aanbod op /overzicht/budget
+ *   om je transacties aan budgetten te hangen (ADR 0158).
+ */
+const COACHMARK_IDS = [
+  'euro-view',
+  'overzicht-rondleiding',
+  'budget-transacties-koppelen',
+] as const
 export type CoachmarkId = (typeof COACHMARK_IDS)[number]
 
 /**

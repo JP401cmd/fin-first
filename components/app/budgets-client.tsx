@@ -115,6 +115,13 @@ const BudgetKoppelNudge = dynamic(() =>
   import('@/components/app/budget-koppel-nudge').then(m => ({ default: m.BudgetKoppelNudge })),
   { ssr: false }
 )
+// Het eenmalige aanbod om transacties aan budgetten te hangen (ADR 0158). Ook
+// lazy: hij verschijnt precies één keer per account, en zijn eigen poort
+// (ongekoppelde transacties + coachmark-staat) zit ín het component.
+const BudgetTransactiesAanbod = dynamic(() =>
+  import('@/components/app/budget-transacties-aanbod').then(m => ({ default: m.BudgetTransactiesAanbod })),
+  { ssr: false }
+)
 import { useToast } from '@/components/app/toast-provider'
 import { FormError, formErrorId } from '@/components/app/form-error'
 import { OVERLAY_QUERY_KEYS } from '@/lib/navigation'
@@ -1438,9 +1445,19 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
       .or('transaction_type.is.null,transaction_type.neq.transfer')
     setAllTimeUncatCount(count ?? 0)
   }, [currentUserId])
+  // Hertellen bij élke verse serverronde, niet alleen bij mount.
+  //
+  // `initialData` krijgt een nieuwe identiteit zodra de server-loader opnieuw
+  // draait — en dat gebeurt onder meer na een `router.refresh()`, die de
+  // globale sync doet zodra er banktransacties binnen zijn (ADR 0158).
+  // Zonder deze afhankelijkheid bleef de telling op de waarde van vóór de
+  // ophaal staan, met twee zichtbare gevolgen: het eenmalige koppelaanbod
+  // verscheen nooit voor precies de gebruiker voor wie het bedoeld is, en de
+  // actiestrip meldde `role="status"` "Alles gekoppeld" boven een budget vol
+  // ongekoppelde transacties. De hertelling is één HEAD-count.
   useEffect(() => {
     void refreshAllTimeUncatCount()
-  }, [refreshAllTimeUncatCount])
+  }, [refreshAllTimeUncatCount, initialData])
 
   // Compute date range + month count based on period mode.
   // Pure bron: lib/budget-period.ts. YTD/12m hangen aan de huidige datum (now),
@@ -3052,6 +3069,15 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
           currentUserId={currentUserId}
         />
       )}
+
+      {/* Eenmalig aanbod om de transacties aan budgetten te hangen (ADR 0158).
+          Regelt zelf of hij mag verschijnen: alleen bij ongekoppelde
+          transacties, alleen de eerste keer, en alleen als er niets anders de
+          aandacht vraagt. Opent dezelfde sheet als de knop hierboven. */}
+      <BudgetTransactiesAanbod
+        ongekoppeld={allTimeUncatCount}
+        onKoppelen={() => setShowAICategorize(true)}
+      />
 
 
       {/* Budget detail modal */}

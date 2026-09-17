@@ -41,6 +41,22 @@ export interface AfrondingState {
   sinds: string
   budget?: BudgetUitkomst
   bank?: BankUitkomst
+  /**
+   * De `bank_connection_accounts`-ids die bestonden toen de bankstap werd
+   * afgerond — dus precies de koppelingen die uit deze onboarding komen.
+   *
+   * WAAROM DEZE LIJST BESTAAT. De eerste ophaal op het homescherm (ADR 0158)
+   * mag alleen deze koppelingen aanraken. Zonder die binding zou hij afgaan op
+   * gebruikerstoestand ("heeft nog niets gesynchroniseerd"), en dan sleept hij
+   * een koppeling mee die de gebruiker binnen hetzelfde 24-uursvenster ergens
+   * ánders legde — en sluit daarmee stil het correctiemoment van ADR 0069, dat
+   * alleen leeft zolang er geen transacties zijn. Dat verlies is onherstelbaar.
+   *
+   * Server-bepaald in `POST /api/onboarding/afronding`; de client levert geen
+   * ids aan. Ontbreekt het veld (markering van vóór ADR 0158), dan telt dat als
+   * "geen" — fail-safe richting niet-synchroniseren.
+   */
+  bankKoppelingen?: string[]
 }
 
 function asMap(current: unknown): Record<string, unknown> {
@@ -75,6 +91,41 @@ export function readOpenAfronding(
   return state.stap
 }
 
+/**
+ * Welke bankkoppelingen komen uit een onboarding die binnen het
+ * geldigheidsvenster is afgerond? Voedt de eenmalige eerste ophaal op het
+ * homescherm (`components/sync/eerste-sync-na-onboarding.tsx`).
+ *
+ * Leeg betekent: niets automatisch ophalen. Dat geldt bij een ontbrekende,
+ * verlopen of corrupte markering, bij een overgeslagen bank, én bij een
+ * markering van vóór ADR 0158 die de ids nog niet droeg — fail-safe richting
+ * niet-synchroniseren, want de fout aan de andere kant (een koppeling
+ * synchroniseren die nog verhangen moest worden) is onherstelbaar.
+ *
+ * WAAROM DEZE MARKERING EN GEEN EIGEN SLEUTEL. De vraag die de trigger stelt
+ * is precies wat hier al staat. Een tweede sleutel zou een ZEVENDE
+ * niet-atomaire schrijver op `module_guide_state` zijn — ADR 0130 waarschuwt
+ * in zijn gevolgen expliciet dat overlappende read-modify-writes daar een
+ * sleutel kunnen laten vallen.
+ *
+ * `stap` doet er bewust NIET toe: de bankstap is de laatste die een uitkomst
+ * schrijft, dus `bank === 'gekoppeld'` impliceert dat hij is gepasseerd.
+ */
+export function readOnboardingBankKoppelingen(
+  moduleGuideState: unknown,
+  now: Date = new Date(),
+): string[] {
+  const state = readState(moduleGuideState)
+  // `bank` is een union: 'gekoppeld' óf `{ overgeslagen: reden }`. De
+  // gelijkheid hieronder verwerpt het object-geval vanzelf.
+  if (!state || state.bank !== 'gekoppeld') return []
+  const sinds = Date.parse(state.sinds)
+  if (Number.isNaN(sinds) || now.getTime() - sinds > AFRONDING_GELDIG_MS) return []
+  const ids = state.bankKoppelingen
+  if (!Array.isArray(ids)) return []
+  return ids.filter((id): id is string => typeof id === 'string' && id.length > 0)
+}
+
 /** Opent de markering op de budgetstap, zonder andere sleutels aan te raken. */
 export function withAfrondingOpen(
   current: unknown,
@@ -86,7 +137,7 @@ export function withAfrondingOpen(
 
 export type AfrondingVoortgang =
   | { stap: 'bank'; budget: BudgetUitkomst }
-  | { stap: 'klaar'; bank: BankUitkomst }
+  | { stap: 'klaar'; bank: BankUitkomst; bankKoppelingen?: string[] }
 
 /**
  * Zet de markering een stap verder. `sinds` blijft staan: de geldigheid telt
