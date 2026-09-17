@@ -253,18 +253,22 @@ describe('opeethypotheek — de schuld wordt geboekt en de opname wordt begrensd
   })
 
   // TOLERANTIE-KEUZE (bewust ABSOLUUT, €1e-6): beide vergelijkingen toetsen een
-  // STRUCTURELE ongelijkheid (saldo ≤ cap volgt uit de MIN() in `opeetSlot`; Σopname ≤
-  // maxCap volgt daaruit), geen numerieke reproductie van een oracle-waarde. De epsilon
+  // STRUCTURELE ongelijkheid (opname ≤ capRestant volgt uit `opeetCapRestant` in bez.ts;
+  // Σopname ≤ maxCap volgt daaruit), geen numerieke reproductie van een oracle-waarde. De epsilon
   // dekt uitsluitend float-ruis: de jaarsom loopt over ~400 optellingen rond €750k, wat
   // ≈7e-8 absolute drift geeft — ruim binnen 1e-6. Een RELATIEVE tolerantie zou hier juist
   // fout zijn: hij zou meeschalen met het bedrag en daarmee een echte cap-overschrijding
   // van tientallen euro's op een miljoenensaldo verbergen (precies de bugklasse die deze
   // test moet vangen — zónder de fix is de overschrijding 275×, dus de keuze is niet
   // grensbepalend, maar wel expliciet gemaakt).
-  it('opname-cap knelt: het saldo blijft ≤ Bez!BD en de opnames stoppen bij een vaste maandopname', () => {
+  it('opname-cap knelt: nieuwe opname stopt op Bez!BD (saldo groeit boven de cap alleen nog door rente) en de opnames stoppen bij een vaste maandopname', () => {
     const vasteOpname: HousingStrategyConfig = { ...REVERSE_CONFIG, monthlyPayout: 3_000 }
     const input = inputFor(vasteOpname)
     const proj = solveFire(input).projection
+    // ADR 0151 (app-pad): de MIN-cap op het saldo is vervallen — de rente loopt boven
+    // het plafond door. De cap-invariant is nu: saldo(m) ≤ MAX(BD(m), saldo(m−1)·(1+r/12)),
+    // en zodra saldo(m−1) ≥ BD/(1+r/12) is de opname 0.
+    const groei = 1 + input.woning.opeetRentePerJaar / 12
 
     let cumOpname = 0
     let maxCap = 0
@@ -275,8 +279,10 @@ describe('opeethypotheek — de schuld wordt geboekt en de opname wordt begrensd
       cumOpname += bez.woning.opeetOpname
       maxCap = Math.max(maxCap, bez.woning.opeetCap)
       laatsteOpname = bez.woning.opeetOpname
-      // Het saldo mag de leen-cap nooit passeren (S!P = MIN(BD, …)).
-      expect(opeetSaldo(proj, m)).toBeLessThanOrEqual(bez.woning.opeetCap + 1e-6)
+      // Nieuwe opname mag de leen-cap nooit passeren; boven de cap groeit alleen de rente.
+      const bovengrens = Math.max(bez.woning.opeetCap, opeetSaldo(proj, m - 1) * groei)
+      expect(opeetSaldo(proj, m)).toBeLessThanOrEqual(bovengrens + 1e-6)
+      if (m > 0 && opeetSaldo(proj, m - 1) >= bez.woning.opeetCap / groei) expect(bez.woning.opeetOpname).toBe(0)
     }
     // Zonder geboekte schuld is `capRestant` altijd de volle cap → €3.000/mnd stroomt
     // 33 jaar lang ongehinderd door en de som overschrijdt de leenruimte veelvoudig.

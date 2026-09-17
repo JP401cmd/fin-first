@@ -103,6 +103,9 @@ import { nettoLiquideAtAge } from '@/lib/horizon/vrijheidsdagen'
 import { useDeficitNotice } from '@/components/app/horizon/deficit-notice-provider'
 import { useAowNotice } from '@/components/app/horizon/aow-notice-provider'
 import { AOW_ONTBREEKT_COPY } from '@/lib/horizon/aow-notice-minimize'
+import { useEindsituatieNotice } from '@/components/app/horizon/eindsituatie-notice-provider'
+import { EindsituatieNotice } from '@/components/app/horizon/eindsituatie-notice'
+import { detectEindsituatie } from '@/lib/horizon/eindsituatie-duiding'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { FreedomTimeBadge } from '@/components/app/freedom-time-label'
 import { HideInSimple } from '@/components/app/hide-in-simple'
@@ -312,7 +315,7 @@ import {
 } from '@/lib/euro-display'
 import { useEuroView } from '@/lib/hooks/use-euro-view'
 import { PillRow } from '@/components/app/pill-row'
-import { FIRE_PLAN_COLUMNS, parseFireStrategy, DEFAULT_FIRE_STRATEGY, type FireStrategyConfig, type StopAnchor, STRATEGY_LABELS, resolveFreedomFraming, fireAgeForDisplay, isAtOrPastAow, isFixedAnchor, stopAnchorFromKernel } from '@/lib/fire-strategy'
+import { FIRE_PLAN_COLUMNS, parseFireStrategy, DEFAULT_FIRE_STRATEGY, type FireStrategyConfig, type StopAnchor, STRATEGY_LABELS, resolveFreedomFraming, fireAgeForDisplay, isAtOrPastAow, isFixedAnchor, stopAnchorFromKernel, resolveFirePlanWithOverride } from '@/lib/fire-strategy'
 import { buildHorizonInput } from '@/lib/horizon/build-input'
 import { buildDeeplinkCleanupUrl } from '@/lib/horizon/deeplink-cleanup'
 import type { PreviewBaseline } from '@/lib/strategy-preview'
@@ -3222,6 +3225,37 @@ export default function HorizonPage({
     minimize: minimizeAowNotice,
   } = useAowNotice(aowNoticeVisible)
 
+  // ── Eindsituatie-duiding: "waarom blijft er aan het eind zoveel over?" ─────
+  // Pure detector op DEZELFDE kernelrijen als de grafiek (`unifiedRows`); plan uit de
+  // rauwe profielrij via dezelfde resolver als de kernel-adapter (incl. schaduwpad),
+  // jaaruitgaven = de grondslag van deze run (`buildHorizonInput`: yearlyMustExpenses).
+  // Bedragen blijven NOMINAAL; `EindsituatieNotice` deflateert exact één keer.
+  // View-gating als de tekort-melding; niet in pensioen-modus (vast stopmoment).
+  const eindsituatiePlan = useMemo(
+    () => (kernelRawProfile ? resolveFirePlanWithOverride(kernelRawProfile) : null),
+    [kernelRawProfile],
+  )
+  const eindsituatieDuiding = useMemo(() => {
+    if (!eindsituatiePlan || !unifiedRows || currentAge == null || isPensioenMode || usePartnerMainLine) return null
+    return detectEindsituatie({
+      rows: unifiedRows,
+      endForm: eindsituatiePlan.endForm,
+      endAge: simResult?.displayEndAge ?? eindsituatiePlan.endAge,
+      legacyAmount: eindsituatiePlan.legacyAmount,
+      legacyIncludeIlliquid: kernelRawProfile?.fire_legacy_include_illiquid === true,
+      vastStopmoment: simResult?.stopAnker != null,
+      fireAgeFractional: simResult?.fireAgeFractional ?? null,
+      currentAge,
+      geenTekortLeningAan: kernelRawProfile?.fire_no_deficit_loan !== false,
+      jaarUitgavenNu: input?.yearlyMustExpenses ?? 0,
+    })
+  }, [eindsituatiePlan, unifiedRows, currentAge, isPensioenMode, usePartnerMainLine, simResult?.displayEndAge, simResult?.stopAnker, simResult?.fireAgeFractional, kernelRawProfile?.fire_legacy_include_illiquid, kernelRawProfile?.fire_no_deficit_loan, input?.yearlyMustExpenses])
+  const {
+    display: eindsituatieDisplay,
+    canMinimize: canMinimizeEindsituatie,
+    minimize: minimizeEindsituatieNotice,
+  } = useEindsituatieNotice(eindsituatieDuiding != null)
+
   // Situatie-specifieke uitleg bij de melding. Alle getallen komen uit DEZELFDE
   // run (detector + `displayEndAge` + AOW-leeftijd + woonstrategie); de copy
   // zelf woont in een pure sibling-module met eigen toon-grendel. Bedragen gaan
@@ -3248,7 +3282,7 @@ export default function HorizonPage({
       displayEndAge,
       isPensioenMode,
       homeExcludedFromFire: homeExcludedFromProgress,
-      geenTekortLeningAan: kernelRawProfile?.fire_no_deficit_loan === true,
+      geenTekortLeningAan: kernelRawProfile?.fire_no_deficit_loan !== false,
       vastStopmoment: simResult?.stopAnker != null,
       peakText: formatMaskedCurrency(deficitLoanNotice.peak, masked),
       freedomText,
@@ -6113,6 +6147,23 @@ export default function HorizonPage({
                   </div>
                 )}
               </section>
+
+              {/* Eindsituatie-duiding (plan 17 sep, D) — "waarom blijft er aan het eind
+                  zoveel over?". Minimaliseerbaar via `EindsituatieNoticeProvider`
+                  (statuspunt naast de pagina-'i'); neutrale horizon-stijl. Staat NÁ de
+                  tekort-sectie: de bron-grendel leest de éérste aria-live-sectie. */}
+              {eindsituatiePlan && (
+                <EindsituatieNotice
+                  duiding={eindsituatieDuiding}
+                  endForm={eindsituatiePlan.endForm}
+                  display={eindsituatieDisplay}
+                  canMinimize={canMinimizeEindsituatie}
+                  onMinimize={minimizeEindsituatieNotice}
+                  canonicalDailyRate={canonicalDailyRate}
+                  dailyRateSource={initialData.dailyExpenseRateDetail.source}
+                  overschotIsLiquide={!(eindsituatiePlan.endForm === 'legacy' && kernelRawProfile?.fire_legacy_include_illiquid === true)}
+                />
+              )}
 
               {/* "Huis wordt nooit verkocht" — beschrijvende info (geen advies, Wft-veilig).
                   Neutrale horizon-toon, niet de rode "fout"-stijl. */}

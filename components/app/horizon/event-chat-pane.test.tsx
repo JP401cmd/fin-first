@@ -16,13 +16,21 @@ import { resolveAllExecutionModes } from '@/lib/ai/execution-groups'
  */
 
 const mockSendMessage = vi.fn()
+let mockChatError: Error | undefined
 
 vi.mock('@ai-sdk/react', () => ({
   useChat: () => ({
     messages: [],
     sendMessage: mockSendMessage,
     status: 'ready',
+    error: mockChatError,
   }),
+}))
+
+// V-002: abonnementscontext — default onbekend (null), per test te zetten.
+let hasAiState: boolean | null = null
+vi.mock('@/lib/feature-access/context', () => ({
+  useHasAiSubscription: () => hasAiState,
 }))
 
 vi.mock('ai', () => ({
@@ -86,6 +94,8 @@ function renderPane() {
 
 beforeEach(() => {
   mockSendMessage.mockReset()
+  mockChatError = undefined
+  hasAiState = null
   localReady = true
 })
 
@@ -165,5 +175,28 @@ describe('EventChatPane — per-groep-override wint van de hoofdschakelaar (ADR 
     fireEvent.change(textarea, { target: { value: 'Ik wil een huis kopen' } })
     fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false })
     expect(mockSendMessage).toHaveBeenCalledWith({ text: 'Ik wil een huis kopen' })
+  })
+})
+
+describe('EventChatPane — zonder AI-abonnement (V-002)', () => {
+  it('pre-check: upsell, invoer dicht, niets verstuurd', async () => {
+    hasAiState = false
+    stubExecutionFetch({ privacyMode: false })
+    renderPane()
+    expect(screen.getByTestId('event-chat-upsell')).toBeTruthy()
+    const input = await screen.findByPlaceholderText(BLOCKED_PLACEHOLDER)
+    expect(input).toBeDisabled()
+    expect(screen.getByRole('link', { name: /Bekijk AI-abonnement/i }).getAttribute('href')).toBe(
+      '/mijn/account?addon=ai',
+    )
+    expect(mockSendMessage).not.toHaveBeenCalled()
+  })
+
+  it('stream-fout met code ai_subscription → upsell, geen rauwe body', async () => {
+    mockChatError = new Error(JSON.stringify({ error: 'Deze functie vereist een AI abonnement', code: 'ai_subscription' }))
+    stubExecutionFetch({ privacyMode: false })
+    renderPane()
+    expect(screen.getByTestId('event-chat-upsell')).toBeTruthy()
+    expect(screen.queryByText(/vereist een AI abonnement/)).toBeNull()
   })
 })

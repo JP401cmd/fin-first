@@ -356,7 +356,7 @@ describe('AiExecutionSettings', () => {
     await waitFor(() => expect(toggle).toBeDisabled())
     // De gedeelde upsell (inline-variant) is zichtbaar met CTA naar het abonnement.
     const cta = screen.getByRole('link', { name: /Bekijk AI-abonnement/i })
-    expect(cta.getAttribute('href')).toBe('/mijn/account')
+    expect(cta.getAttribute('href')).toBe('/mijn/account?addon=ai')
     // A11Y: de disabled-reden hangt via aria-describedby aan de schakelaar.
     expect(toggle.getAttribute('aria-describedby')).toBe('lokale-cat-reden-tier')
   })

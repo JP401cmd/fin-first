@@ -49,7 +49,7 @@ voor leesbaarheid):
 
 - `/toekomst/whatif` → `/toekomst?whatif=open`
 - `/toekomst/uitgaven-na-pensioen` → `/toekomst?uitgaven=open`
-- `/toekomst/strategie` → `/toekomst/gebeurtenissen?strategie=…`
+- `/toekomst/strategie` → `/toekomst/voorkeuren?strategie=…` (al in `next.config.ts`, sinds 17 sep 2026; daarvoor `/toekomst/gebeurtenissen`)
 - `/horizon/whatif`, `/horizon/uitgaven-na-pensioen`, `/horizon/inflatie-koopkracht`, `/horizon/samengestelde-interest`
 - `/dashboard` → `/overzicht`, `/core/cash` → `/overzicht/budget`
 

@@ -4,7 +4,7 @@
  * Gedeelde bouwstenen voor de levensstrategie-bodies (AOW, werk, pensioenpot) — TPR-15 stap 3.
  *
  * Eén body rendert op twee plekken, elk met zijn eigen, al bestaande preview:
- *  - `preview` — /toekomst/gebeurtenissen: `previewFireAge` op de PreviewBaseline van die
+ *  - `preview` — /toekomst/voorkeuren: `previewFireAge` op de PreviewBaseline van die
  *    pagina, getoond als "Vrijheidsleeftijd: nu → concept" in het formulier (ongewijzigd);
  *  - `kern`    — de plan-review-wizard: `runRegelProjection` op de client-veilige snapshot met
  *    een `lifeEvent`-override, getoond als delta in de footer (zoals de andere wizard-editors).

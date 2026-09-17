@@ -423,6 +423,22 @@ export interface WoningStrategieParams {
    * Alleen de app-adapter (reverse_mortgage + `monthlyPayout === null`) zet het.
    */
   readonly opeetOpnameNaarBehoefte?: boolean
+  /**
+   * BUITEN ORACLE-DOMEIN (ADR 0151, 17 sep 2026) — rente LOOPT DOOR boven het plafond.
+   * Het oracle capt het opeetsaldo hard op de leenruimte: `S!P = MIN(BD, (P(m−1)+BE)·
+   * (1+B66/12))`. Daardoor (b) valt de bijgeschreven rente stil weg zodra het saldo
+   * tegen het plafond aanloopt en (c) wordt de schuld bij een dalend plafond zonder
+   * aflossing ingekort — geld uit het niets. Gezet op `true` laat `tables/s.ts#opeetSlot`
+   * de MIN weg: de schuld groeit met opname + rente en mag boven het plafond uitkomen;
+   * alleen NIEUWE opname stopt (Bez!BE is al 0 zodra `opeetCapRestant` 0 is — dat
+   * verandert niet). Invariant met de vlag: `saldo(m) ≤ MAX(BD(m), saldo(m−1)·(1+B66/12))`
+   * en `saldo(m) ≥ saldo(m−1)` (nooit ingekort). De bijgeschreven rente staat in het
+   * aparte weergaveveld `SSlot.renteBijgeschreven`; de oracle-kolom `rente` (S!S) blijft
+   * 0 (die kolom voedt S!AI/Bel als kas-rente — de opeethypotheek heeft geen maandlast).
+   * Afwezig/`false` ⇒ exact het oracle-gedrag; `input-from-fixture` zet dit veld nooit ⇒
+   * parity byte-identiek. De app-adapter (reverse_mortgage) zet het altijd.
+   */
+  readonly opeetRenteBovenPlafond?: boolean
 }
 
 /** P!B69 — Onttrekkingsprofiel-selector. */
@@ -929,8 +945,9 @@ export interface KernelInput {
    *
    * Weggelaten/`false` ⇒ **byte-identiek aan het bestaande gedrag** (de gap is dan
    * het enige criterium): `input-from-fixture` zet 'm nooit, dus de parity-fixtures
-   * blijven groen. De app-adapter zet 'm alleen op `true` wanneer
-   * `profiles.fire_no_deficit_loan === true` — anders laat hij het veld `undefined`.
+   * blijven groen. De app-adapter zet 'm op `true` tenzij
+   * `profiles.fire_no_deficit_loan === false` (standaard AAN sinds 17 sep 2026, ADR 0149-
+   * aanvulling); alleen bij een bewuste `false` laat hij het veld `undefined`.
    */
   readonly geenTekortLening?: boolean
 }

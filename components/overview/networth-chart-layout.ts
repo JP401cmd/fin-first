@@ -26,11 +26,12 @@
  *
  * ── DE NAAD ─────────────────────────────────────────────────────────────────
  * `--nw-seam-gap` is de breedte van de tussenruimte (0 op mobiel, 0.75rem op
- * lg). De Vandaag-stip, de verticale naadlijn en de brug over de gap zijn
- * HTML-elementen in het toekomst-grafiekdeel met `left: calc(var(--nw-seam-gap)
- * / -2)`: op mobiel precies op de 1/3-grens, op lg precies midden in de gap —
- * op élke breedte, want de positie komt uit CSS en niet uit een vaste fractie
- * van een `preserveAspectRatio="none"`-viewBox.
+ * lg). Op mobiel staan de Vandaag-stip en de verticale naadlijn als HTML-
+ * elementen in het toekomst-grafiekdeel met `left: calc(var(--nw-seam-gap) / -2)`
+ * — precies op de 1/3-grens, want de positie komt uit CSS en niet uit een vaste
+ * fractie van een `preserveAspectRatio="none"`-viewBox. Op lg staat er tussen de
+ * kaarten NIETS (geen stip, lijn of brug): de lijnen eindigen/beginnen op
+ * dezelfde y aan hun kaartrand en elke kaart draagt een eigen x-as met "nu".
  */
 
 export const NW_SEAM_LEFT = 'calc(var(--nw-seam-gap) / -2)'

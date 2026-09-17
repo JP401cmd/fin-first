@@ -5,8 +5,6 @@ import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import {
-  Briefcase,
-  Home,
   Wallet,
   Compass,
   ArrowRight,
@@ -37,13 +35,9 @@ import {
   derivePensionPotEndFromRows,
 } from '@/lib/horizon/kernel-strategy-moments'
 import { detectDeficitLoanFromRows } from '@/lib/horizon/deficit-loan-display'
-import {
-  isStrategyManagedEvent,
-  STRATEGY_BADGE_LABEL,
-  type ManagedStrategy,
-} from '@/lib/strategy-events'
-import { StrategieEditors, type StrategieEditorsData } from './strategie/strategie-editors'
-import { useDisplayMode } from '@/lib/hooks/use-display-mode'
+import { isStrategyManagedEvent, STRATEGY_BADGE_LABEL } from '@/lib/strategy-events'
+import { strategieHref } from '@/lib/horizon/strategie-route'
+import type { StrategieEditorsData } from './strategie/strategie-editors'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 
 // EventPane = herstelde toevoeg/bewerk-flow uit /horizon (catalogus + Praat met
@@ -93,7 +87,7 @@ interface KernelMoment {
   key: string
   /** Leeftijd op de rij-as (kan fractioneel zijn; weergave vloert op hele jaren). */
   age: number
-  /** Klik-doel: strategie-modal (huis/pensioen) of de tekort-uitleg-sheet. */
+  /** Klik-doel: strategie-editor op Voorkeuren (huis/pensioen) of de tekort-uitleg-sheet. */
   action: 'huis' | 'pensioen' | 'tekort'
   Icon: typeof Compass
   title: string
@@ -108,19 +102,16 @@ const TIMELINE_CARD_CLASS =
   'flex-1 min-w-0 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 text-left'
 
 /**
- * GebeurtenissenView — content voor Gebeurtenissen-tab op /toekomst.
+ * GebeurtenissenView — content voor /toekomst/gebeurtenissen.
  *
- * Plan §6.3 splitst dit in twee secties:
- *  1. Levensgebeurtenissen — punt-in-tijd events (kind, erfenis, ZZP-start,
- *     deeltijd, verhuizing, schenking). Bewerken via sheet (kort formulier).
- *  2. Levensstrategieën — 3 multi-step strategieën met eigen pane:
- *     - AOW-strategie (ingangsleeftijd, partneraftrek, AOW-gat-overbrugging)
- *     - Pensioen-strategie (werknemerspensioen + lijfrente + jaarruimte)
- *     - Huis-strategie (kopen / verkopen / herfinancieren / aflossingsplan)
+ * Eén verticale tijdlijn met levensgebeurtenissen (kind, erfenis, ZZP-start,
+ * deeltijd, verhuizing, schenking — bewerken via de EventPane) en de momenten
+ * die de kernel zelf berekent (feature #876).
  *
- * Voor MVP-extractie: lijst van life_events uit horizonData + 3 strategie-
- * cards die deeplinken naar /toekomst/strategie. Native sheet/pane voor
- * bewerken komt in volgende iteratie.
+ * De vier levensstrategieën (AOW, Pensioen, Huis, Werk) wonen sinds 17 sep 2026
+ * op /toekomst/voorkeuren (besluit eigenaar: verhuizen, geen dubbeling). Een klik
+ * op een strategie-beheerd event of een berekend huis/pensioen-moment navigeert
+ * daarheen via `strategieHref(key)`.
  */
 
 // Icoon-resolutie loopt nu via de canonieke bron (lib/event-icon.ts): eerst
@@ -184,52 +175,6 @@ function eventImpact(event: LifeEvent): string {
   return parts.length > 0 ? parts.join(' · ') : 'Geen geldelijke impact'
 }
 
-const LEVENSSTRATEGIEEN: {
-  key: ManagedStrategy
-  label: string
-  description: string
-  Icon: typeof Compass
-  bg: string
-  text: string
-}[] = [
-  {
-    key: 'aow',
-    label: 'AOW-strategie',
-    description:
-      'Ingangsleeftijd, leefsituatie en opbouwkorting (jaren buiten NL). Default = wettelijk.',
-    Icon: Compass,
-    bg: 'bg-violet-50',
-    text: 'text-violet-700',
-  },
-  {
-    key: 'pensioen',
-    label: 'Pensioen-strategie',
-    description:
-      'Werknemerspensioen, lijfrente en banksparen — beheer al je pensioenpotten op één plek.',
-    Icon: Wallet,
-    bg: 'bg-emerald-50',
-    text: 'text-emerald-700',
-  },
-  {
-    key: 'huis',
-    label: 'Huis-strategie',
-    description:
-      'Volledig meetellen, uitsluiten, verkopen of opeethypotheek — hoe je woning meetelt in je vrijheid.',
-    Icon: Home,
-    bg: 'bg-amber-50',
-    text: 'text-amber-700',
-  },
-  {
-    key: 'werk',
-    label: 'Werk-strategie',
-    description:
-      'Salarisgroei, een plafond, minder werken en promotie-sprongen — je inkomenslijn over de jaren.',
-    Icon: Briefcase,
-    bg: 'bg-sky-50',
-    text: 'text-sky-700',
-  },
-]
-
 export function GebeurtenissenView({
   events,
   currentAge,
@@ -246,7 +191,10 @@ export function GebeurtenissenView({
    *  EventImpactBadge — plan F-5 vergelijk-modus MVP. Wanneer 0 of
    *  ontbrekend: badge toont "Impact onbekend". */
   annualSavings?: number
-  /** Baseline + lookup-data voor de levensstrategie-editors (AOW/Pensioen/Huis). */
+  /**
+   * Gedeelde strategie-editordata (`buildStrategieEditorsData`). Hier alleen gelezen voor
+   * de kernel-sim (`baseline.rawContext`) en het dagtarief; de editors zelf staan op Voorkeuren.
+   */
   strategieData: StrategieEditorsData
   /** Baseline-data voor de EventPane (toevoegen + bewerken vrije events). */
   eventPaneData: EventPaneData
@@ -260,23 +208,11 @@ export function GebeurtenissenView({
   const [eventPaneOpen, setEventPaneOpen] = useState(false)
   const [eventPaneEditingId, setEventPaneEditingId] = useState<string | null>(null)
   const [eventPaneMode, setEventPaneMode] = useState<'catalog' | 'view'>('catalog')
-  // Welke levensstrategie-modal is open (null = dicht).
-  const [openStrategy, setOpenStrategy] = useState<ManagedStrategy | null>(null)
   // Feature #876 — read-only uitleg-sheet voor de tekort-lening-rij.
   const [deficitSheetOpen, setDeficitSheetOpen] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const { mode: displayMode } = useDisplayMode()
-  const simpleMode = displayMode === 'simple'
-
-  // S6 — de Pensioen-strategie is de bestemming van twee zichtbare verwijzingen
-  // op /overzicht/belasting/box1 ("vul je factor A in bij je pensioen-strategie").
-  // Komt de gebruiker daar vandaan (?strategie=pensioen), dan staat de
-  // factor-A-uitvraag in de editor meteen open — geen tweede klik op
-  // "Bereken je fiscale ruimte" om de opdracht te kunnen uitvoeren.
-  const jaarruimteDeeplink =
-    openStrategy === 'pensioen' && searchParams.get('strategie') === 'pensioen'
 
   // ── Feature #876: kernel-run (zelfde run-site als de Tijdas-grafiek) ─────
   // De hook draait pas ná hydration (params null → isLoading, skeleton-rij);
@@ -385,36 +321,20 @@ export function GebeurtenissenView({
     return out.sort((a, b) => a.age - b.age)
   }, [sim.unifiedRows, sim.kernelPensionPots, deficitNotice, dailyExpenses])
 
-  // Klik-routering kernel-rijen: huis/opeet → bestaand ?strategie=huis-
-  // mechanisme (zelfde modal-open als de deeplink), pensioenpot-einde →
-  // pensioen-strategie, tekort-lening → read-only uitleg-sheet.
+  // Klik-routering kernel-rijen: huis/opeet en pensioenpot-einde → de strategie-
+  // editor op Voorkeuren (`?strategie=huis|pensioen`), tekort-lening → read-only
+  // uitleg-sheet op deze pagina.
   function openKernelMoment(m: KernelMoment) {
     if (m.action === 'tekort') setDeficitSheetOpen(true)
-    else setOpenStrategy(m.action)
-  }
-
-  // Deep-link: ?strategie=aow|pensioen|huis opent de bijbehorende modal.
-  // (Disjunct van het bestaande ?strategie=open van de horizon-strategiekiezer.)
-  useEffect(() => {
-    const s = searchParams.get('strategie')
-    if (s === 'aow' || s === 'pensioen' || s === 'huis' || s === 'werk') setOpenStrategy(s)
-  }, [searchParams])
-
-  function closeStrategy() {
-    setOpenStrategy(null)
-    if (searchParams.get('strategie')) {
-      const p = new URLSearchParams(searchParams)
-      p.delete('strategie')
-      router.replace(`${pathname}${p.toString() ? `?${p}` : ''}`, { scroll: false })
-    }
+    else router.push(strategieHref(m.action))
   }
 
   // Routeert een klik op een event-kaart: strategie-beheerde events openen hun
-  // eigen rijke editor; vrije events de herstelde EventPane (view → edit).
+  // eigen editor op Voorkeuren; vrije events de herstelde EventPane (view → edit).
   function openEventOrStrategy(event: LifeEvent) {
     const managed = isStrategyManagedEvent(event)
     if (managed) {
-      setOpenStrategy(managed)
+      router.push(strategieHref(managed))
     } else {
       setEventPaneEditingId(event.id)
       setEventPaneMode('view')
@@ -430,7 +350,7 @@ export function GebeurtenissenView({
   }
 
   // Deep-link: ?nieuw=1|true opent de EventPane direct in catalog-mode
-  // (vanuit een overlay-CTA op de Tijdas-grafiek). Spiegelt het ?strategie=-effect.
+  // (vanuit een overlay-CTA op de Tijdas-grafiek).
   // Na openCatalog gedeclareerd zodat de functie in scope is bij mount.
   useEffect(() => {
     const n = searchParams.get('nieuw')
@@ -438,7 +358,7 @@ export function GebeurtenissenView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams])
 
-  // Sluit de EventPane én ruim een eventuele ?nieuw-param op (spiegelt closeStrategy).
+  // Sluit de EventPane én ruim een eventuele ?nieuw-param op.
   function closeEventPane() {
     setEventPaneOpen(false)
     if (searchParams.get('nieuw')) {
@@ -561,8 +481,8 @@ export function GebeurtenissenView({
 
             {timeline.map((item) => {
               // ── Kernel-afgeleid strategiemoment (feature #876) ──────────
-              // Niet-bewerkbaar: geen EventPane/edit-affordance. Klik opent de
-              // bijbehorende strategie-modal of de tekort-uitleg-sheet.
+              // Niet-bewerkbaar: geen EventPane/edit-affordance. Klik navigeert naar
+              // de strategie-editor op Voorkeuren of opent de tekort-uitleg-sheet.
               if (item.kind === 'moment') {
                 const m = item.moment
                 const MomentIcon = m.Icon
@@ -603,8 +523,8 @@ export function GebeurtenissenView({
                           {m.sub}
                         </p>
                       )}
-                      {/* Klik-bestemming expliciet (ux-review): strategie-modal vs
-                          read-only uitleg — uit het uiterlijk alleen niet af te leiden. */}
+                      {/* Klik-bestemming expliciet (ux-review): strategie-editor op
+                          Voorkeuren vs read-only uitleg — uit het uiterlijk alleen niet af te leiden. */}
                       <p className="mt-1.5 text-[11px] font-medium text-[var(--module-active-700)]">
                         {m.action === 'tekort' ? 'Meer uitleg →' : 'Bekijk strategie →'}
                       </p>
@@ -644,12 +564,12 @@ export function GebeurtenissenView({
                     ? 'border-positive/40 text-positive'
                     : 'border-[var(--ink-3)] text-[var(--ink-2)]'
               // Content-kaart is een button die de EventPane (vrij event)
-              // of strategie-editor opent.
+              // opent of naar de strategie-editor op Voorkeuren navigeert.
               const managed = isStrategyManagedEvent(event)
               // Feature #876: het kernel-afgeleide verkoop-event (uit
               // `applyKernelHousingSaleToEvents`) is puur weergave — badge
               // "Berekend door je plan", geen edit-affordance; klik opent de
-              // Huis-strategie (via `managed`, zelfde ?strategie=huis-modal).
+              // Huis-strategie op Voorkeuren (via `managed`, ?strategie=huis).
               const meta = (event.metadata ?? {}) as {
                 kernelDerived?: boolean
                 saleProceeds?: number
@@ -747,87 +667,6 @@ export function GebeurtenissenView({
         )}
       </div>
 
-      {/* Levensstrategieën — S6.
-          BEWUST GEEN <HideInSimple>. Twee zichtbare teksten op
-          /overzicht/belasting/box1 (het jaarruimte-uitlegblok en de
-          JaarruimteCard) dragen de opdracht "vul je factor A in bij je
-          pensioen-strategie" en linken hierheen. Hard-hiden maakte daar een
-          eenrichtingsdeeplink van: de modal opende wél (de deeplink-useEffect
-          en <StrategieEditors> staan buiten de hide), maar zodra je 'm sloot
-          was er in Eenvoudig geen zichtbare ingang meer — een opdracht zonder
-          bestemming.
-
-          B-024: er stond in Eenvoudig vervolgens alléén de Pensioen-kaart. Dat
-          loste de deeplink op, maar nam de gebruiker drie keuzes af (AOW, huis,
-          werk) die hij nergens anders in de app terugvindt — en dat las als een
-          halve pagina, niet als een rustiger pagina. Besluit eigenaar:
-          Eenvoudig reduceert de VÓRM, niet het aantal keuzes — kleiner, niet
-          minder. Alle vier de strategieën staan dus in béíde modi; Eenvoudig
-          krijgt in plaats van een kortere lijst een compacter raster (twee
-          kolommen vanaf de smalste viewport, strakkere padding). */}
-      <div>
-        <header className="mb-4">
-          <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
-            Toekomst — levensstrategieën
-          </div>
-          <h2 className="font-serif text-xl text-[var(--ink)] mt-1">
-            Vier multi-step strategieën
-          </h2>
-          <p className="mt-1 text-xs text-[var(--ink-3)]">
-            Anders dan losse gebeurtenissen: strategieën hebben eigen parameters
-            en zijn als bandjes zichtbaar op de tijdas.
-          </p>
-        </header>
-
-        {/* Eenvoudig = compacter raster, niet minder kaarten (B-024): twee
-            kolommen vanaf de smalste viewport en strakkere padding, zodat de
-            vier strategieën samen ongeveer de hoogte van één Volledig-kaart
-            innemen. */}
-        <div
-          className={
-            simpleMode
-              ? 'grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4'
-              : 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4'
-          }
-        >
-          {LEVENSSTRATEGIEEN.map((strat) => {
-            const Icon = strat.Icon
-            const cls = `rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] flex flex-col text-left ${
-              simpleMode ? 'p-3' : 'p-4 sm:p-5'
-            }`
-            const inner = (
-              <>
-                <div
-                  className={`${simpleMode ? 'w-7 h-7 mb-2' : 'w-9 h-9 mb-3'} rounded-lg ${strat.bg} ${strat.text} flex items-center justify-center`}
-                >
-                  <Icon className={simpleMode ? 'w-3.5 h-3.5' : 'w-4 h-4'} aria-hidden="true" />
-                </div>
-                <h3 className="text-sm font-semibold text-[var(--ink)] mb-1.5">
-                  {strat.label}
-                </h3>
-                <p className={`${simpleMode ? 'text-[11px]' : 'text-xs'} text-[var(--ink-2)] leading-snug flex-1`}>
-                  {strat.description}
-                </p>
-                <span className="mt-3 text-[11px] font-semibold text-horizon-700 inline-flex items-center gap-1">
-                  Configureren
-                  <ArrowRight className="w-3 h-3" aria-hidden="true" />
-                </span>
-              </>
-            )
-            return (
-              <button
-                key={strat.key}
-                type="button"
-                onClick={() => setOpenStrategy(strat.key)}
-                className={`${cls} w-full hover:border-[var(--ink-3)] hover:shadow-sm transition-all`}
-              >
-                {inner}
-              </button>
-            )
-          })}
-        </div>
-      </div>
-
       <EventPane
         open={eventPaneOpen}
         onClose={closeEventPane}
@@ -843,15 +682,6 @@ export function GebeurtenissenView({
         householdMode={eventPaneData.householdMode}
         previewBaseline={eventPaneData.previewBaseline}
         onChanged={() => router.refresh()}
-      />
-
-      <StrategieEditors
-        open={openStrategy}
-        onClose={closeStrategy}
-        events={events}
-        data={strategieData}
-        readOnly={false}
-        autoOpenJaarruimte={jaarruimteDeeplink}
       />
 
       {/* Feature #876 — read-only uitleg-sheet voor de tekort-lening-rij.

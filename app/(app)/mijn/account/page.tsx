@@ -6,6 +6,7 @@ import { PageOpening } from '@/components/editorial'
 import { getPageInfo } from '@/lib/page-info-content'
 import { createClient } from '@/lib/supabase/server'
 import { AccountClient } from '@/components/mijn/account/account-client'
+import { parseAddonDeeplink } from '@/lib/subscription-catalog'
 
 export const metadata: Metadata = {
   title: 'Account — TriFinity',
@@ -17,8 +18,18 @@ export const metadata: Metadata = {
  * abonnementsstatus (active_subscriptions), inloggegevens (e-mail/wachtwoord)
  * en de danger zone. Server-component laadt user + abonnement; de interactie
  * leeft in AccountClient.
+ *
+ * Deeplink `?addon=ai` (V-002): elke AI-upsell linkt hierheen; dan opent het
+ * upgrade-sheet van die add-on direct. Server-side gelezen, dus geen
+ * useSearchParams/Suspense-grens nodig.
  */
-export default async function MijnAccountPage() {
+export default async function MijnAccountPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ addon?: string | string[] }>
+}) {
+  const { addon } = await searchParams
+  const initialAddon = parseAddonDeeplink(addon)
   const supabase = await createClient()
   const {
     data: { user },
@@ -56,6 +67,7 @@ export default async function MijnAccountPage() {
       <AccountClient
         email={user.email ?? ''}
         activeSubscriptions={activeSubscriptions}
+        initialAddon={initialAddon}
       />
     </>
   )

@@ -45,11 +45,10 @@ export const NALATENSCHAP_NIET_LIQUIDE_UITLEG =
  */
 export const GEEN_TEKORT_LENING_UITLEG =
   'Je kiest of je plan mag leunen op een tekort-lening: geld dat de berekening leent zodra je ' +
-  'vermogen op is en je inkomen je uitgaven nog niet dekt. Aan: je vrijheidsleeftijd is het ' +
-  'vroegste moment waarop je zonder zo’n lening tot het einde van je plan komt; een korte ' +
-  'overbrugging die binnen een jaar is afgelost, zoals rond een huisverkoop, telt niet mee. Uit ' +
-  '(standaard): de berekening mag gaten overbruggen met een lening, waardoor je eerder vrij kunt ' +
-  'lijken. Relevant omdat vrij met een schuld die je later moet terugbetalen iets anders is dan ' +
+  'vermogen op is en je inkomen je uitgaven nog niet dekt. Aan (standaard): je vrijheidsleeftijd ' +
+  'is het vroegste moment waarop je zonder zo’n lening tot het einde van je plan komt; een korte ' +
+  'overbrugging die binnen een jaar is afgelost, zoals rond een huisverkoop, telt niet mee. Uit: ' +
+  'de berekening mag gaten overbruggen met een lening, waardoor je eerder vrij kunt lijken. Relevant omdat vrij met een schuld die je later moet terugbetalen iets anders is dan ' +
   'vrij zonder schuld.'
 
 /**
@@ -100,9 +99,10 @@ export function EindstrategieBody({
   // nalatenschap; dezelfde GET/PUT als de tekort-lening-rente.
   const [includeIlliquid, setIncludeIlliquid] = useState(false)
   const [savedIncludeIlliquid, setSavedIncludeIlliquid] = useState(false)
-  // ADR 0149 — geen tekort-lening in het plan. NULL in de kolom = uit.
-  const [geenTekortLening, setGeenTekortLening] = useState(false)
-  const [savedGeenTekortLening, setSavedGeenTekortLening] = useState(false)
+  // ADR 0149 — geen tekort-lening in het plan. Standaard AAN: NULL in de kolom = aan,
+  // alleen een bewuste `false` = uit (aanvulling 17 sep 2026).
+  const [geenTekortLening, setGeenTekortLening] = useState(true)
+  const [savedGeenTekortLening, setSavedGeenTekortLening] = useState(true)
   useEffect(() => {
     let cancelled = false
     fetch('/api/fire-settings')
@@ -118,7 +118,7 @@ export function EindstrategieBody({
         const illiquid = d.fire_legacy_include_illiquid === true
         setIncludeIlliquid(illiquid)
         setSavedIncludeIlliquid(illiquid)
-        const geenTekort = d.fire_no_deficit_loan === true
+        const geenTekort = d.fire_no_deficit_loan !== false
         setGeenTekortLening(geenTekort)
         setSavedGeenTekortLening(geenTekort)
       })

@@ -21,10 +21,19 @@ import {
 } from '@/lib/horizon/deficit-loan-minimize'
 import { AowNoticeProvider, AowNoticeDot } from '@/components/app/horizon/aow-notice-provider'
 import { AOW_NOTICE_MINIMIZE_KEY, asAowMinimizedFlag } from '@/lib/horizon/aow-notice-minimize'
+import {
+  EindsituatieNoticeProvider,
+  EindsituatieNoticeDot,
+} from '@/components/app/horizon/eindsituatie-notice-provider'
+import {
+  EINDSITUATIE_NOTICE_MINIMIZE_KEY,
+  asEindsituatieMinimizedFlag,
+} from '@/lib/horizon/eindsituatie-notice-minimize'
 import { PlanReviewProvider } from '@/components/future/plan-review/plan-review-provider'
 import { readPlanReviewState } from '@/lib/plan-review/read-state'
 import { buildPlanReviewFacts, derivePlanReviewProgress } from '@/lib/plan-review/progress'
 import { loadEigenStrategieEvents } from '@/lib/plan-review/eigen-strategie-events'
+import { isStrategieKey } from '@/lib/horizon/strategie-route'
 
 export const metadata: Metadata = {
   title: 'Toekomst — TriFinity',
@@ -43,8 +52,10 @@ const TAB_ROUTES = new Set(['doelen', 'gebeurtenissen', 'voorkeuren', 'rekenhulp
  *  - `tab` ontbreekt of is geen bekende subpagina → `null` (blijf op /toekomst;
  *    bv. `?strategie=open`, `?whatif=open` zijn tijdas-modal/pane-params).
  *  - `tab` is een bekende subpagina → `/toekomst/<tab>`, met alle overige
- *    query-params behouden (bv. `?tab=gebeurtenissen&strategie=aow`
- *    → `/toekomst/gebeurtenissen?strategie=aow`).
+ *    query-params behouden (bv. `?tab=doelen&focus=g1` → `/toekomst/doelen?focus=g1`).
+ *  - Uitzondering: `tab=gebeurtenissen` mét een levensstrategie-sleutel
+ *    (`strategie=aow|pensioen|huis|werk`) → `/toekomst/voorkeuren?strategie=…`;
+ *    de strategieën wonen sinds 17 sep 2026 op Voorkeuren (één hop, geen keten).
  *
  * @returns de redirect-doel-URL, of `null` wanneer niet geredirect moet worden.
  */
@@ -65,7 +76,9 @@ export function resolveTabRedirect(
     }
   }
   const qs = rest.toString()
-  return qs ? `/toekomst/${tab}?${qs}` : `/toekomst/${tab}`
+  const doel =
+    tab === 'gebeurtenissen' && isStrategieKey(rest.get('strategie')) ? 'voorkeuren' : tab
+  return qs ? `/toekomst/${doel}?${qs}` : `/toekomst/${doel}`
 }
 
 /**
@@ -154,6 +167,10 @@ export default async function ToekomstPage({
   )
   // TPR-04 — zelfde server-seed voor de "AOW ontbreekt"-melding (vlag 1 of null).
   const aowMinimizedFlag = asAowMinimizedFlag(minimizedMap[AOW_NOTICE_MINIMIZE_KEY])
+  // Plan 17 sep (D) — zelfde server-seed voor de eindsituatie-uitleg (vlag 1 of null).
+  const eindsituatieMinimizedFlag = asEindsituatieMinimizedFlag(
+    minimizedMap[EINDSITUATIE_NOTICE_MINIMIZE_KEY],
+  )
 
   return (
     <>
@@ -172,6 +189,9 @@ export default async function ToekomstPage({
           adapter-notice in de horizon-run) deelt haar toestand met een tweede
           statuspunt naast de 'i'; zelfde PUT-pad, eigen pref-only sleutel. */}
       <AowNoticeProvider initialMinimizedFlag={aowMinimizedFlag}>
+      {/* Plan 17 sep (D) — de informatieve eindsituatie-uitleg: derde zusje, eigen
+          pref-only sleutel, statuspunt in horizon-tint naast de 'i'. */}
+      <EindsituatieNoticeProvider initialMinimizedFlag={eindsituatieMinimizedFlag}>
       {/* TPR-01 — plan-review: deelt `open()` met de Voorkeuren-kaart en montert de
           review-pane (ShellOverlay pane) naast de tijdas, zodat de grafiek zichtbaar
           blijft. Consumeert ook de deeplink `?planreview=open`. */}
@@ -195,6 +215,7 @@ export default async function ToekomstPage({
                 conventie noemt absolute offsets voor pagina's waar de 'i'
                 absoluut staat; deze kop is een flex-cluster, dus DOM-volgorde +
                 gap-2 (8px) geeft exact dezelfde plaatsing. */}
+            <EindsituatieNoticeDot />
             <AowNoticeDot />
             <DeficitNoticeDot />
             <PageInfoButton content={getPageInfo('/toekomst')} />
@@ -242,6 +263,7 @@ export default async function ToekomstPage({
         <OrnamentColophon text="Geld is opgeslagen tijd" module="De Toekomst" />
       </div>
       </PlanReviewProvider>
+      </EindsituatieNoticeProvider>
       </AowNoticeProvider>
       </DeficitNoticeProvider>
     </>

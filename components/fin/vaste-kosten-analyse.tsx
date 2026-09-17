@@ -12,6 +12,7 @@ import {
 import {
   AiVasteKostenSheet,
 } from '@/components/app/ai-vaste-kosten-sheet'
+import { useHasAiSubscription } from '@/lib/feature-access/context'
 import {
   CreditCard,
   Home,
@@ -116,6 +117,7 @@ export function VasteKostenAnalyse({
   const [scanning, setScanning] = useState(false)
   const [classifyItem, setClassifyItem] = useState<ClassifyItemData | null>(null)
   const [aiSheetOpen, setAiSheetOpen] = useState(false)
+  const knownNoAi = useHasAiSubscription() === false
   const [activeTab, setActiveTab] = useState<'abonnementen' | 'vaste-kosten'>('abonnementen')
   // Wanneer non-collapsible: altijd open, geen localStorage-state.
   const [isOpen, setIsOpen] = useState(!collapsible)
@@ -475,6 +477,9 @@ export function VasteKostenAnalyse({
           <button
             type="button"
             onClick={() => setAiSheetOpen(true)}
+            // Bewust niet verborgen zonder AI-abonnement (V-002): de sheet toont
+            // dan vooraf de upsell, zonder dat er iets verstuurd wordt.
+            aria-label={knownNoAi ? 'Laat Fin analyseren — kan met een AI-abonnement' : undefined}
             className="flex min-h-[44px] items-center gap-1.5 px-3 text-sm text-wil-600 transition-colors hover:text-wil-700 dark:text-wil-400 dark:hover:text-wil-300"
           >
             <Sparkles className="h-3.5 w-3.5" />

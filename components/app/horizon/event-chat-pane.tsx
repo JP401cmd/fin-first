@@ -15,6 +15,9 @@ import {
   type MessagePart,
 } from '@/components/app/chat/markdown-helpers'
 import { MaskedAmount } from '@/components/app/masked-amount'
+import { AiSubscriptionUpsell } from '@/components/app/ai-subscription-upsell'
+import { useHasAiSubscription } from '@/lib/feature-access/context'
+import { describeAiThrown } from '@/lib/ai/error-copy'
 
 /**
  * Fin-chat binnen de levensgebeurtenis-pane. Hergebruikt `/api/ai/chat` met
@@ -96,7 +99,7 @@ export function EventChatPane({ events, onAcceptSuggestion }: Props) {
     [scenarioJSON],
   )
 
-  const { messages, sendMessage, status } = useChat({
+  const { messages, sendMessage, status, error: chatError } = useChat({
     id: 'event-builder-chat',
     transport,
   })
@@ -120,9 +123,17 @@ export function EventChatPane({ events, onAcceptSuggestion }: Props) {
   // cloud uit te wijken. Geen `active`-vlag nodig: de pane wordt pas gemount
   // wanneer event-pane naar mode 'chat' schakelt.
   const exec = useExecutionMode('gesprek')
-  const canSend = exec.canUseCloud
+  // V-002: zonder AI-abonnement vertrekt er niets en toont de pane de upsell
+  // (pre-check). Komt er tóch een 403 terug ('ai_subscription'), dan vertaalt
+  // describeAiThrown dat naar dezelfde upsell — nooit een kale streamfout.
+  const knownNoAi = useHasAiSubscription() === false
+  const errorCopy = chatError ? describeAiThrown(chatError) : null
+  const showUpsell = knownNoAi || errorCopy?.affordance === 'upsell'
+  const canSend = exec.canUseCloud && !showUpsell
 
-  const notice: string | null = exec.canUseCloud
+  const notice: string | null = showUpsell
+    ? null
+    : exec.canUseCloud
     ? null
     : exec.status === 'lokaal'
       ? 'Je gesprekken met Fin draaien op je eigen toestel. Brainstormen over een levensgebeurtenis kan hier daardoor nog niet — voer dat gesprek in de Fin-chat, of zet de groep “Gesprek met Fin” op /mijn/privacy op de cloud.'
@@ -164,6 +175,20 @@ export function EventChatPane({ events, onAcceptSuggestion }: Props) {
       {/* Fail-closed melding: er is (nog) geen bestemming waar dit gesprek heen
           mag. Eerlijke uitleg i.p.v. een stille cloud-aanroep of een kale
           streamfout. */}
+      {showUpsell && (
+        <div className="mx-4 sm:mx-6 mb-2" data-testid="event-chat-upsell">
+          <AiSubscriptionUpsell
+            variant="inline"
+            feature="Brainstormen met Fin over een levensgebeurtenis"
+            note="Zelf een gebeurtenis invullen kan altijd, zonder abonnement."
+          />
+        </div>
+      )}
+      {!showUpsell && errorCopy && (
+        <p className="mx-4 sm:mx-6 mb-2 border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2.5 text-[11px] leading-relaxed text-[var(--ink-2)]" role="alert">
+          {errorCopy.text}
+        </p>
+      )}
       {notice && (
         <div className="mx-4 sm:mx-6 mb-2 border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2.5" role="status">
           <div className="flex items-start gap-2">

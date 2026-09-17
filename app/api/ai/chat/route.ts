@@ -1,7 +1,7 @@
 import { streamText, convertToModelMessages, createUIMessageStreamResponse, stepCountIs, type UIMessage } from 'ai'
 import { createClient } from '@/lib/supabase/server'
 import { recordAiUsage } from '@/lib/ai-credits'
-import { getModel, AIConfigError } from '@/lib/ai/config'
+import { getModel } from '@/lib/ai/config'
 import { buildSystemPrompt, type AIDomain, type ChatContext } from '@/lib/ai/dna'
 import { buildContext } from '@/lib/ai/context/builder'
 import { getTools } from '@/lib/ai/tools'
@@ -9,6 +9,7 @@ import { GEBEURTENIS_PROMPT } from '@/lib/ai/dna/wil'
 import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
 import { createChatOutputFilter } from '@/lib/ai/chat-output-filter'
 import { checkTierGate } from '@/lib/require-tier'
+import { aiSubscriptionRequired, aiCreditLimitReached, aiModelUnavailable } from '@/lib/ai/gate-responses'
 import { assertCloudAllowed } from '@/lib/ai/privacy-gate'
 import { checkCreditBudget, creditLimitMessage } from '@/lib/ai/credit-gate'
 import { AI_ERROR_CODE, describeAiError } from '@/lib/ai/error-copy'
@@ -60,7 +61,7 @@ export async function POST(req: Request) {
   // kon slagen (H27).
   const tierGate = await checkTierGate(supabase, user.id, 'ai')
   if (tierGate) {
-    return errorResponse(tierGate.error, 403, AI_ERROR_CODE.subscription)
+    return aiSubscriptionRequired()
   }
 
   // Per-gebruiker rate-limit: dwing het maand-creditbudget af (één gedeelde
@@ -69,9 +70,7 @@ export async function POST(req: Request) {
   if (!creditGate.allowed) {
     // De tekst blijft van de server komen: die noemt het aantal credits en de
     // resetdatum. `error-copy.ts` markeert deze code als `preferServerText`.
-    const res = errorResponse(creditLimitMessage(creditGate), 429, AI_ERROR_CODE.creditLimit)
-    res.headers.set('Retry-After', String(creditGate.retryAfterSeconds))
-    return res
+    return aiCreditLimitReached(creditLimitMessage(creditGate), creditGate.retryAfterSeconds)
   }
 
   const { messages, domain = 'wil', context: rawChatContext, scenarioContext } = await req.json() as {
@@ -110,16 +109,10 @@ export async function POST(req: Request) {
   try {
     model = await getModel(supabase, 'chat')
   } catch (err) {
-    if (err instanceof AIConfigError) {
-      // De echte reden (provider, beheerpad, env-variabele) gaat naar het
-      // SERVERLOG — nooit naar de client. Zie /beheer/ai voor de
-      // per-provider sleutel-indicator. De gebruiker krijgt de neutrale tekst
-      // uit de gedeelde copy-tabel plus een stabiele code (H27).
-      console.error(`[ai-chat:config] ${err.provider}: ${err.message}`)
-      return errorResponse(describeAiError(err.reason).text, 422, err.reason)
-    }
-    console.error('[ai-chat:model] model kon niet worden geladen:', err)
-    return errorResponse(describeAiError(AI_ERROR_CODE.unavailable).text, 500, AI_ERROR_CODE.unavailable)
+    // De echte reden (provider, beheerpad, env-variabele) gaat naar het
+    // SERVERLOG — nooit naar de client. De gebruiker krijgt de neutrale tekst
+    // uit de gedeelde copy-tabel plus een stabiele code (H27, V-002).
+    return aiModelUnavailable(err, 'ai-chat')
   }
 
   /* Build context and prompts — catch errors to avoid crashing the stream */

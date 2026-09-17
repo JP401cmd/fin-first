@@ -6,6 +6,7 @@ import { useExecutionMode } from '@/lib/ai/local/use-execution-mode'
 import { generateLocalTips, type LocalTipsProgress } from '@/lib/ai/local/local-tips-resolver'
 import type { LocalTipCandidate, LocalTipCandidates } from '@/lib/ai/local/local-tips-context'
 import type { ResolvedLocalTip } from '@/lib/ai/local/parse-tip'
+import { AiSubscriptionUpsell } from '@/components/app/ai-subscription-upsell'
 
 /**
  * LokaleTipsGenerator — de naad waar de gebruiker on-device tips laat maken.
@@ -44,6 +45,8 @@ export function LokaleTipsGenerator({ onGenerated }: LokaleTipsGeneratorProps) {
   const [voortgang, setVoortgang] = useState<LocalTipsProgress | null>(null)
   const [gemaakt, setGemaakt] = useState<ToonTip[]>([])
   const [foutmelding, setFoutmelding] = useState<string | null>(null)
+  /** V-002: de kandidatenroute weigerde omdat het AI-abonnement ontbreekt. */
+  const [zonderAbonnement, setZonderAbonnement] = useState(false)
   /**
    * Hoeveel kansen deze ronde werden aangeboden. Nodig om "er wáren geen kansen"
    * te onderscheiden van "er waren kansen, maar er kwam niets doorheen" — die
@@ -100,6 +103,7 @@ export function LokaleTipsGenerator({ onGenerated }: LokaleTipsGeneratorProps) {
 
     setFase('laden')
     setFoutmelding(null)
+    setZonderAbonnement(false)
     setGemaakt([])
     setVoortgang(null)
     setKandidatenAantal(0)
@@ -109,7 +113,14 @@ export function LokaleTipsGenerator({ onGenerated }: LokaleTipsGeneratorProps) {
       const res = await fetch('/api/local-tips-candidates', { cache: 'no-store' })
       if (!res.ok) {
         // 403 = kill-switch uit of abonnement weg; die reden verdient een eerlijk
-        // eigen antwoord, net als de rest van het lokale pad.
+        // eigen antwoord, net als de rest van het lokale pad. Ontbreekt het
+        // abonnement (`ai_subscription`), dan de upsell in plaats van een fout.
+        const body = (await res.json().catch(() => null)) as { code?: string } | null
+        if (res.status === 403 && body?.code === 'ai_subscription') {
+          setFase('fout')
+          setZonderAbonnement(true)
+          return
+        }
         setFase('fout')
         setFoutmelding(
           res.status === 403
@@ -184,6 +195,14 @@ export function LokaleTipsGenerator({ onGenerated }: LokaleTipsGeneratorProps) {
               {mode.message ??
                 'Je hebt gekozen om tips op je eigen apparaat te maken, maar dat lukt hier niet.'}
             </p>
+            {/* V-002: geblokkeerd omdat het AI-abonnement ontbreekt → geef de
+                keuze het abonnement te bekijken. De /api/local-tips*-routes zijn
+                óók tier-gegate; hun 403 `ai_subscription` toont dezelfde upsell. */}
+            {mode.reason === 'abonnement' && (
+              <div className="mt-3">
+                <AiSubscriptionUpsell variant="inline" feature="Tips maken op je eigen toestel" />
+              </div>
+            )}
           </div>
         </div>
       </section>
@@ -262,6 +281,9 @@ export function LokaleTipsGenerator({ onGenerated }: LokaleTipsGeneratorProps) {
           <p className="text-xs text-negative">
             Er kwam deze keer geen bruikbare tip uit. Probeer het opnieuw.
           </p>
+        )}
+        {fase === 'fout' && zonderAbonnement && (
+          <AiSubscriptionUpsell variant="inline" feature="Tips maken op je eigen toestel" />
         )}
         {fase === 'fout' && foutmelding && (
           <p className="text-xs text-negative">{foutmelding}</p>

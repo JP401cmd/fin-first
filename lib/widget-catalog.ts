@@ -538,7 +538,7 @@ export const WIDGET_HREFS: Record<string, string> = {
   // het getal en de uitleg erbij op één klik van elkaar, zonder de modal per
   // oppervlak na te bouwen.
   beleggingsrendement:      '/overzicht/bezittingen?rendementUitleg=open',
-  pensioen_aow:             '/toekomst/gebeurtenissen',
+  pensioen_aow:             '/toekomst/voorkeuren',
   meldingen:                '/berichten',
   volgende_stap:            '/overzicht/tips',
   maandoverzicht:           '/overzicht/budget/transacties',

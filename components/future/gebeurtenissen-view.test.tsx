@@ -16,8 +16,10 @@ import type { SimResult } from '@/lib/fire-simulation'
 // jsdom) + de strategie-launcher die next/navigation + supabase client gebruiken.
 // Mock beide zodat de view zelf in isolatie test-baar blijft. (Kaarten zijn
 // altijd interactieve buttons — geen Kijken/Plannen-modus meer.)
+// Gedeelde push-mock: strategie-klikken navigeren naar /toekomst/voorkeuren?strategie=…
+const { mockPush } = vi.hoisted(() => ({ mockPush: vi.fn() }))
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ refresh: vi.fn(), replace: vi.fn(), push: vi.fn() }),
+  useRouter: () => ({ refresh: vi.fn(), replace: vi.fn(), push: mockPush }),
   useSearchParams: () => new URLSearchParams(),
   usePathname: () => '/toekomst/gebeurtenissen',
 }))
@@ -46,21 +48,16 @@ let mockSimResult: HorizonFireSimResult = LOADING_SIM
 vi.mock('@/lib/hooks/use-horizon-fire-sim', () => ({
   useHorizonFireSim: (params: unknown) => (params ? mockSimResult : LOADING_SIM),
 }))
-// StrategieEditors gestubd: registreert alleen welke strategie open is, zodat
-// klik-routering van kernel-rijen (huis/pensioen) asserteerbaar is.
-vi.mock('./strategie/strategie-editors', () => ({
-  StrategieEditors: ({ open }: { open: string | null }) => (
-    <div data-testid="strategie-editors-open">{open ?? 'none'}</div>
-  ),
-}))
-
 beforeEach(() => {
   mockSimResult = LOADING_SIM
+  mockPush.mockClear()
 })
 
 /**
  * Tests voor GebeurtenissenView — Gebeurtenissen-tab op /toekomst.
- * Twee secties: levensgebeurtenissen + drie levensstrategieën.
+ * Eén tijdlijn met levensgebeurtenissen + berekende momenten. De vier
+ * levensstrategieën wonen sinds 17 sep 2026 op Voorkeuren (zie
+ * voorkeuren-view.test.tsx); hier alleen de klik-routering daarheen.
  */
 
 const mockStrategieData: StrategieEditorsData = {
@@ -249,20 +246,13 @@ describe('GebeurtenissenView — event-impact-badge (plan F-5)', () => {
   })
 })
 
-describe('GebeurtenissenView — strategieën-sectie', () => {
-  it('rendert vier levensstrategieën altijd', () => {
+describe('GebeurtenissenView — levensstrategieën zijn verhuisd naar Voorkeuren', () => {
+  it('toont geen strategiekaarten meer', () => {
     renderView({ events: [] })
-    expect(screen.getByText('AOW-strategie')).toBeTruthy()
-    expect(screen.getByText('Pensioen-strategie')).toBeTruthy()
-    expect(screen.getByText('Huis-strategie')).toBeTruthy()
-    expect(screen.getByText('Werk-strategie')).toBeTruthy()
-  })
-
-  it('strategie-kaarten zijn geen dode focus-deeplinks meer', () => {
-    // Voorheen <Link href="/toekomst/strategie?focus=...">; nu in-page modals.
-    const { container } = renderView({ events: [] })
-    const hrefs = Array.from(container.querySelectorAll('a')).map((a) => a.getAttribute('href'))
-    expect(hrefs.some((h) => h?.includes('focus='))).toBe(false)
+    expect(screen.queryByText('AOW-strategie')).toBeNull()
+    expect(screen.queryByText('Pensioen-strategie')).toBeNull()
+    expect(screen.queryByText('Huis-strategie')).toBeNull()
+    expect(screen.queryByText('Werk-strategie')).toBeNull()
   })
 
   it('markeert een strategie-beheerd event (pension) met een badge', () => {
@@ -271,50 +261,13 @@ describe('GebeurtenissenView — strategieën-sectie', () => {
     })
     expect(screen.getByText('Beheerd via Pensioen-strategie')).toBeTruthy()
   })
-})
 
-// ── S6 / B-024 — Eenvoudig reduceert de vorm, niet het aantal keuzes ─────────
-//
-// Box 1 draagt in béide weergavemodi de opdracht "vul je factor A in bij je
-// pensioen-strategie" en linkt naar /toekomst/gebeurtenissen?strategie=pensioen.
-// Was het hele strategieblok in Eenvoudig hard verborgen, dan opende de modal
-// wél (de deeplink-useEffect staat buiten de hide) maar was er ná sluiten geen
-// zichtbare ingang meer: een eenrichtingsdeeplink.
-//
-// De eerste oplossing liet in Eenvoudig alléén de Pensioen-kaart staan. Dat nam
-// de gebruiker drie keuzes af (AOW, huis, werk) die hij nergens anders
-// terugvindt — gemeld als B-024. Besluit eigenaar: Eenvoudig maakt de vorm
-// kleiner (compacter raster), niet de lijst korter. Deze tests pinnen dat om.
-describe('GebeurtenissenView — strategieën in Eenvoudig (S6/B-024)', () => {
-  it('toont in Eenvoudig alle vier de levensstrategieën', () => {
-    renderView({ events: [], mode: 'simple' })
-    expect(screen.getByText('AOW-strategie')).toBeTruthy()
-    expect(screen.getByText('Pensioen-strategie')).toBeTruthy()
-    expect(screen.getByText('Huis-strategie')).toBeTruthy()
-    expect(screen.getByText('Werk-strategie')).toBeTruthy()
-  })
-
-  it('draagt in béide modi dezelfde meervoudskop, zonder duiding over een kortere lijst', () => {
-    const { unmount } = renderView({ events: [], mode: 'simple' })
-    expect(screen.getByText('Vier multi-step strategieën')).toBeTruthy()
-    expect(screen.queryByText(/Zet je de weergave op Volledig/i)).toBeNull()
-    unmount()
-
-    renderView({ events: [] })
-    expect(screen.getByText('Vier multi-step strategieën')).toBeTruthy()
-  })
-
-  it('de zichtbare ingang staat los van de modal-state (geen eenrichtingsdeeplink)', () => {
-    // De bug was: de modal opende via ?strategie=pensioen, maar de kaart die
-    // 'm opnieuw kon openen bestond in Eenvoudig niet. Hier openen we via de
-    // kaart en asserten dat die ingang naast de open modal blijft bestaan —
-    // dus ook na een sluitactie, die de kaart niet unmount.
-    renderView({ events: [], mode: 'simple' })
-    const kaart = screen.getByText('Pensioen-strategie').closest('button')
-    expect(kaart).toBeTruthy()
-    fireEvent.click(kaart as HTMLButtonElement)
-    expect(screen.getByTestId('strategie-editors-open').textContent).toBe('pensioen')
-    expect(screen.getByText('Pensioen-strategie')).toBeTruthy()
+  it('klik op een strategie-beheerd event navigeert naar de editor op Voorkeuren', () => {
+    renderView({
+      events: [mockEvent({ event_type: 'aow', name: 'AOW', target_age: 67, target_date: null })],
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Open Beheerd via AOW-strategie' }))
+    expect(mockPush).toHaveBeenCalledWith('/toekomst/voorkeuren?strategie=aow')
   })
 })
 
@@ -450,12 +403,12 @@ describe('GebeurtenissenView — kernel-afgeleide strategiemomenten (feature #87
     expect(screen.queryByRole('button', { name: /Bewerk Verkoop eigen woning/ })).toBeNull()
     expect(screen.getByText(/Netto-opbrengst/)).toBeTruthy()
     expect(screen.getByText(/Restschuld hypotheek/)).toBeTruthy()
-    // Klik → bestaand huis-strategie-open-mechanisme.
+    // Klik → Huis-strategie op Voorkeuren.
     fireEvent.click(row)
-    expect(screen.getByTestId('strategie-editors-open').textContent).toBe('huis')
+    expect(mockPush).toHaveBeenCalledWith('/toekomst/voorkeuren?strategie=huis')
   })
 
-  it('opeet-rijen (start + uitputting) renderen uit de rijen en openen de Huis-strategie', () => {
+  it('opeet-rijen (start + uitputting) renderen uit de rijen en navigeren naar de Huis-strategie', () => {
     mockSimResult = loadedSim({
       effectiveLifeEvents: [mockEvent({ target_date: null, target_age: 60 })],
       unifiedRows: [
@@ -469,10 +422,10 @@ describe('GebeurtenissenView — kernel-afgeleide strategiemomenten (feature #87
     fireEvent.click(
       screen.getByRole('button', { name: 'Berekend: Opname opeethypotheek start' }),
     )
-    expect(screen.getByTestId('strategie-editors-open').textContent).toBe('huis')
+    expect(mockPush).toHaveBeenCalledWith('/toekomst/voorkeuren?strategie=huis')
   })
 
-  it('pensioenpot-einde rendert bij eindige duur en opent de Pensioen-strategie', () => {
+  it('pensioenpot-einde rendert bij eindige duur en navigeert naar de Pensioen-strategie', () => {
     mockSimResult = loadedSim({
       effectiveLifeEvents: [mockEvent({ target_date: null, target_age: 60 })],
       unifiedRows: [makeRow(55), makeRow(90)],
@@ -486,7 +439,7 @@ describe('GebeurtenissenView — kernel-afgeleide strategiemomenten (feature #87
     // Levenslange pot → geen einde-rij.
     expect(screen.queryByText('Bedrijfspensioen stopt')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Berekend: Lijfrente stopt' }))
-    expect(screen.getByTestId('strategie-editors-open').textContent).toBe('pensioen')
+    expect(mockPush).toHaveBeenCalledWith('/toekomst/voorkeuren?strategie=pensioen')
   })
 
   it('tekort-lening-rij opent de read-only uitleg-sheet met rente + voorkeuren-link', () => {
@@ -502,6 +455,8 @@ describe('GebeurtenissenView — kernel-afgeleide strategiemomenten (feature #87
     })
     renderKernelView([mockEvent({ target_date: null, target_age: 60 })])
     fireEvent.click(screen.getByRole('button', { name: 'Berekend: Tekort-lening ontstaat' }))
+    // De tekort-sheet blijft op Gebeurtenissen — geen navigatie.
+    expect(mockPush).not.toHaveBeenCalled()
     expect(screen.getByText('Gehanteerde rente')).toBeTruthy()
     expect(screen.getByText(/5%\/jr/)).toBeTruthy()
     expect(screen.getByText('Ontstaat op leeftijd')).toBeTruthy()

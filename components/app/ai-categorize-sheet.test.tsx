@@ -123,6 +123,14 @@ function makeQueryBuilder(table: string) {
   return builder
 }
 
+// V-002: abonnementscontext. Default null (= geen provider, onbekend) zodat de
+// bestaande suites niet vooraf geblokkeerd worden; per test te zetten.
+let hasAiState: boolean | null = null
+vi.mock('@/lib/feature-access/context', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/feature-access/context')>()),
+  useHasAiSubscription: () => hasAiState,
+}))
+
 vi.mock('@/lib/supabase/client', () => ({
   createClient: () => ({
     auth: {
@@ -300,6 +308,7 @@ const allTimeTransactions = Array.from({ length: 30 }, (_, i) => ({
 }))
 
 beforeEach(() => {
+  hasAiState = null
   supabaseCalls = []
   allTimeData = []
   allTimeError = null
@@ -1497,5 +1506,57 @@ describe('AICategorizeSheet — per-groep-override wint van de hoofdschakelaar (
 
     expect(aiCategorizeFetches().length).toBe(0)
     expect(createLocalResolverSpy).not.toHaveBeenCalled()
+  })
+})
+
+describe('AICategorizeSheet — zonder AI-abonnement (V-002)', () => {
+  it('pre-check: toont de upsell i.p.v. "Vraag Fin"; gratis opties blijven', () => {
+    hasAiState = false
+    render(
+      <AICategorizeSheet
+        transactions={monthTransactions}
+        budgets={mockBudgets}
+        budgetGroups={mockGroups}
+        onClose={() => {}}
+        onSaved={() => {}}
+      />,
+    )
+    expect(screen.queryByRole('button', { name: /Vraag Fin/i })).toBeNull()
+    expect(screen.getByTestId('ai-upsell-headline').textContent).toBe(
+      'Transacties laten indelen door Fin kan met een AI-abonnement',
+    )
+    expect(screen.getByRole('link', { name: /Bekijk AI-abonnement/i }).getAttribute('href')).toBe(
+      '/mijn/account?addon=ai',
+    )
+    expect(screen.getByRole('button', { name: /Slimme regels/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Handmatig categoriseren/i })).toBeInTheDocument()
+  })
+
+  it('server-403 ai_subscription → upsell in de review, geen rauwe fout, motor stopt', async () => {
+    autoCatContext = { ...autoCatContext, budgets: [boodschappenBudget] }
+    const txs = [makeTx('u1', { description: 'Betaling', counterparty_name: 'Onbekende Zaak' })]
+    vi.stubGlobal(
+      'fetch',
+      withExecPrefs(() =>
+        Promise.resolve({
+          ok: false,
+          status: 403,
+          json: () => Promise.resolve({ error: 'Deze functie vereist een AI abonnement', code: 'ai_subscription' }),
+        }),
+      ),
+    )
+    render(
+      <AICategorizeSheet
+        transactions={txs}
+        budgets={[boodschappenBudget]}
+        budgetGroups={[{ parent: boodschappenBudget, children: [boodschappenBudget] }]}
+        onClose={() => {}}
+        onSaved={() => {}}
+      />,
+    )
+    await clickVraagFin()
+    await waitFor(() => expect(screen.getByTestId('ai-upsell-inline')).toBeInTheDocument())
+    expect(screen.queryByText(/vereist een AI abonnement/)).toBeNull()
+    expect(screen.queryByText(/AI-analyse is nu niet beschikbaar/)).toBeNull()
   })
 })

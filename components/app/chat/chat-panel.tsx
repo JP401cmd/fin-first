@@ -2127,8 +2127,8 @@ export function ChatPanel() {
         <>
         {/* Geen AI-abonnement → upsell i.p.v. chat. Bewust vóór de Wft-gate en
             het invoerveld: een non-abonnee kan niets versturen (spiegelt de
-            server-403) en ziet meteen "dit is een betaalde functie" + CTA. */}
-        {!hasAi && <AiSubscriptionUpsell onNavigate={close} />}
+            server-403) en ziet meteen "dit kan met een AI-abonnement" + CTA (V-002). */}
+        {!hasAi && <AiSubscriptionUpsell feature="Chatten met Fin" onNavigate={close} />}
 
         {/* Wft Disclaimer (first-time only) */}
         {hasAi && wftAccepted === false && (
@@ -2296,7 +2296,7 @@ export function ChatPanel() {
                     // Geen retry-lus bij een abonnement-fout — die kan nooit
                     // slagen. Toon de upsell + CTA naar /mijn/account.
                     <div className="mt-2.5">
-                      <AiSubscriptionUpsell variant="inline" onNavigate={handleDismissError} />
+                      <AiSubscriptionUpsell variant="inline" feature="Chatten met Fin" onNavigate={handleDismissError} />
                     </div>
                   ) : (
                     <div className="mt-2 flex items-center gap-2">

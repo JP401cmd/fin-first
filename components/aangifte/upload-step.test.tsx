@@ -29,6 +29,12 @@ vi.mock('@/lib/pdf/extract-text', () => ({
   extractPdfPageTexts: vi.fn(async () => ['Aangifte inkomstenbelasting 2024']),
 }))
 
+// V-002: abonnementscontext — default onbekend (null), per test te zetten.
+let hasAiState: boolean | null = null
+vi.mock('@/lib/feature-access/context', () => ({
+  useHasAiSubscription: () => hasAiState,
+}))
+
 import { UploadStep } from './upload-step'
 
 function mode(partial: Partial<ExecutionModeState>): ExecutionModeState {
@@ -61,6 +67,7 @@ function renderStep() {
 }
 
 beforeEach(() => {
+  hasAiState = null
   execState.mockReset()
   modelState.mockReset()
   extractLocal.mockReset()
@@ -130,5 +137,34 @@ describe('UploadStep — fail-closed', () => {
     dropPdf()
     await waitFor(() => expect(fetch).toHaveBeenCalled())
     expect(extractLocal).not.toHaveBeenCalled()
+  })
+})
+
+describe('UploadStep — zonder AI-abonnement (V-002)', () => {
+  it('pre-check: geen drop-zone maar de upsell; zelf typen blijft', () => {
+    hasAiState = false
+    execState.mockReturnValue(mode({ status: 'cloud', intended: 'cloud', canUseCloud: true }))
+    renderStep()
+    expect(screen.getByTestId('aangifte-upsell')).toBeTruthy()
+    expect(screen.queryByLabelText('PDF uploaden of slepen')).toBeNull()
+    expect(screen.getByRole('button', { name: /Typ liever zelf/i })).toBeTruthy()
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('server-403 ai_subscription → upsell, geen foutkaart met servertekst', async () => {
+    execState.mockReturnValue(mode({ status: 'cloud', intended: 'cloud', canUseCloud: true }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: false,
+        status: 403,
+        json: async () => ({ error: 'Deze functie vereist een AI abonnement', code: 'ai_subscription' }),
+      })),
+    )
+    renderStep()
+    dropPdf()
+    await waitFor(() => expect(screen.getByTestId('aangifte-upsell')).toBeTruthy())
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.queryByText(/vereist een AI abonnement/)).toBeNull()
   })
 })

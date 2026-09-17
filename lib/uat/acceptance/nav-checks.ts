@@ -72,9 +72,14 @@ function capBadge(n: number): string {
   return n > 9 ? '9+' : n === 0 ? '' : String(n)
 }
 
-/** Mirror van `resolveTabRedirect` (app/(app)/toekomst/page.tsx r36-54) — zie
- *  de module-header voor waarom dit geen directe import kan zijn. */
+/** Mirror van `resolveTabRedirect` (app/(app)/toekomst/page.tsx r62-82) — zie
+ *  de module-header voor waarom dit geen directe import kan zijn. Sinds
+ *  17 sep 2026 wonen de vier levensstrategieën op Voorkeuren, niet meer op
+ *  Gebeurtenissen: een `?tab=gebeurtenissen`-deeplink met een geldige
+ *  `?strategie=`-sleutel wijkt daarom af naar 'voorkeuren' (spiegelt
+ *  `isStrategieKey`, lib/horizon/strategie-route.ts). */
 const TAB_ROUTES_MIRROR = new Set(['doelen', 'gebeurtenissen', 'voorkeuren', 'rekenhulp'])
+const STRATEGIE_KEYS_MIRROR = new Set(['aow', 'pensioen', 'huis', 'werk'])
 function resolveTabRedirectMirror(sp: Record<string, string | string[] | undefined>): string | null {
   const rawTab = sp.tab
   const tab = Array.isArray(rawTab) ? rawTab[0] : rawTab
@@ -90,7 +95,8 @@ function resolveTabRedirectMirror(sp: Record<string, string | string[] | undefin
     }
   }
   const qs = rest.toString()
-  return qs ? `/toekomst/${tab}?${qs}` : `/toekomst/${tab}`
+  const doel = tab === 'gebeurtenissen' && STRATEGIE_KEYS_MIRROR.has(rest.get('strategie') ?? '') ? 'voorkeuren' : tab
+  return qs ? `/toekomst/${doel}?${qs}` : `/toekomst/${doel}`
 }
 
 // ── Checks — één per 'exact'-workflow in NAV_ACCEPTANCE ────────────────────
@@ -233,7 +239,7 @@ export const NAV_ENGINE_CHECKS: NavEngineCheck[] = [
       const zonderTab = resolveTabRedirectMirror({ strategie: 'open' })
       const onbekendeTab = resolveTabRedirectMirror({ tab: 'onzin' })
       return {
-        expected: 'metTab=/toekomst/gebeurtenissen?strategie=aow; zonderTab=null; onbekendeTab=null',
+        expected: 'metTab=/toekomst/voorkeuren?strategie=aow; zonderTab=null; onbekendeTab=null',
         actual: `metTab=${metTab}; zonderTab=${zonderTab}; onbekendeTab=${onbekendeTab}`,
       }
     },

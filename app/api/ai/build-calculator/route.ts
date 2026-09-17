@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { serverError, unauthorized } from '@/lib/api/respond'
 import { checkTierGate } from '@/lib/require-tier'
+import { aiSubscriptionRequired } from '@/lib/ai/gate-responses'
 import { buildCalculator } from '@/lib/ai/build-calculator'
 import { assertCloudAllowed } from '@/lib/ai/privacy-gate'
 import { StoredCalculatorDefinitionSchema } from '@/lib/calculator/types'
@@ -54,7 +55,7 @@ export async function POST(req: Request) {
 
   const tierGate = await checkTierGate(supabase, user.id, 'ai')
   if (tierGate) {
-    return Response.json({ ok: false, error: tierGate.error }, { status: 403 })
+    return aiSubscriptionRequired({ withOkFalse: true })
   }
 
   let body: { prompt?: unknown; refineFrom?: unknown }

@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { unauthorized, errorResponse } from '@/lib/api/respond'
 import { assertAiEnabled, isCloudAllowed, PRIVACY_GATE_CODE } from '@/lib/ai/privacy-gate'
 import { checkTierGate } from '@/lib/require-tier'
+import { aiSubscriptionRequired, aiCreditLimitReached } from '@/lib/ai/gate-responses'
 import { checkCreditBudget, creditLimitMessage } from '@/lib/ai/credit-gate'
 import { recordAiUsage } from '@/lib/ai-credits'
 import { StoredCalculatorDefinitionSchema } from '@/lib/calculator/types'
@@ -105,15 +106,12 @@ export async function POST(req: Request) {
   // de curatie-sheet de échte reden toont in plaats van "Publiceren mislukt".
   const tierGate = await checkTierGate(supabase, user.id, 'ai')
   if (tierGate) {
-    return Response.json(
-      {
-        ok: false,
-        error:
-          'Publiceren vraagt een inhoudelijke controle door onze AI-screening, en die hoort bij het AI-abonnement. ' +
-          'Je rekenhulp blijft gewoon van jou: je kunt hem blijven gebruiken en bewerken, alleen delen kan nu niet.',
-      },
-      { status: 403 },
-    )
+    return aiSubscriptionRequired({
+      withOkFalse: true,
+      message:
+        'Publiceren vraagt een inhoudelijke controle door onze AI-screening, en die hoort bij het AI-abonnement. ' +
+        'Je rekenhulp blijft gewoon van jou: je kunt hem blijven gebruiken en bewerken, alleen delen kan nu niet.',
+    })
   }
 
   // CREDIT-GATE — direct ná de tier-gate en vóór getModel(), conform
@@ -127,12 +125,7 @@ export async function POST(req: Request) {
   // transactie-categorisatie in de verbruiksgrafiek vervuilen.
   const creditGate = await checkCreditBudget(supabase, user.id, 'report')
   if (!creditGate.allowed) {
-    const res = Response.json(
-      { ok: false, error: creditLimitMessage(creditGate) },
-      { status: 429 },
-    )
-    res.headers.set('Retry-After', String(creditGate.retryAfterSeconds))
-    return res
+    return aiCreditLimitReached(creditLimitMessage(creditGate), creditGate.retryAfterSeconds, { withOkFalse: true })
   }
 
   let body: {

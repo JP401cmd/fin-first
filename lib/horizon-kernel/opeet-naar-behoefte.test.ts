@@ -258,10 +258,16 @@ describe('kernel · opeethypotheek neemt op naar behoefte (ADR 0150)', () => {
     expect(wP.opeetOpname).toBeLessThan(gat(proj, mPlafond))
     // Het restgat van die maand is precies de tekort-lening-voeding.
     expect(tekortSaldo(input, proj, mPlafond)).toBeCloseTo(gat(proj, mPlafond) - wP.opeetOpname, 6)
-    // Daarna: de opeetschuld blijft ≤ cap en de tekort-lening loopt op.
+    // Daarna: geen nieuwe opname boven het plafond en de tekort-lening loopt op. Sinds
+    // ADR 0151 (app-pad: `opeetRenteBovenPlafond`) mag het saldo zélf boven de cap
+    // uitkomen — alleen door bijgeschreven rente: saldo(m) ≤ MAX(cap, saldo(m−1)·(1+r/12)).
     expect(tekortSaldo(input, proj, mPlafond + 12)).toBeGreaterThan(tekortSaldo(input, proj, mPlafond))
+    const groei = 1 + input.woning.opeetRentePerJaar / 12
     for (let m = mPlafond; m <= mEind; m++) {
-      expect(opeetSaldo(input, proj, m)).toBeLessThanOrEqual(woning(proj, m).opeetCap + EPS)
+      const w = woning(proj, m)
+      const bovengrens = Math.max(w.opeetCap, opeetSaldo(input, proj, m - 1) * groei)
+      expect(opeetSaldo(input, proj, m)).toBeLessThanOrEqual(bovengrens + EPS)
+      if (opeetSaldo(input, proj, m - 1) >= w.opeetCap / groei) expect(w.opeetOpname).toBeLessThan(EPS)
     }
   })
 

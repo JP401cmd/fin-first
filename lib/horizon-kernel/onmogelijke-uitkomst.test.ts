@@ -76,6 +76,9 @@ function profiel(over: Record<string, unknown> = {}, assets: Asset[] = tekortAss
       pot_rules: POT_RULES,
       retirement_expense_method: 'essential_budgets',
       retirement_custom_amount: null,
+      // ADR 0149-aanvulling (17 sep 2026): "geen tekort-lening" is standaard aan; deze
+      // suite toetst de M6-vangrail op het solvergedrag zónder die eis → expliciet uit.
+      fire_no_deficit_loan: false,
       ...over,
     },
     assets,

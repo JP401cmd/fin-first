@@ -110,3 +110,30 @@ gap en is aanvaard; een niet-monotoon geval hoort als fixture in
   wizard, `/api/fire-settings`) en de DB-kolom (`20260916120000`) lopen in de
   parallelle sessie; de RPC `household_member_profiles` moet `fire_no_deficit_loan`
   gaan leveren vóór de partner-run de eigen waarde kan lezen.
+
+## Aanvulling 17 sep 2026 — standaard AAN
+
+**Besluit (eigenaar, 17 sep 2026):** "Geen tekort-lening in mijn plan" is de
+**standaard**. Een plan dat alleen haalbaar is dankzij een lening die jarenlang
+openstaat, hoort niet stilzwijgend als "vrij vanaf X" te gelden; wie dat wél wil, zet
+de instelling bewust uit.
+
+- **Semantiek van de kolom:** NULL = **aan**, `true` = aan, `false` = bewust uit. Er is
+  geen migratie: de kolom was al nullable en zonder default. Wie de instelling vóór
+  17 sep expliciet uitzette (`false`), houdt die keuze.
+- **Adapter:** `geenTekortLening: profile.fire_no_deficit_loan !== false ? true :
+  undefined` (vervangt besluitpunt 4, "alleen bij `=== true`"). `input-from-fixture`
+  zet het veld nog steeds nooit, dus de oracle-parity blijft onaangetast.
+- **Lezers die de stand tonen** volgen dezelfde regel (`!== false`):
+  `components/future/regels/eindstrategie-body.tsx` (schakelaar standaard aan,
+  uitleg "Aan (standaard)"), `lib/plan-review/overzicht.ts`, de voeding van
+  `deficit-loan-copy` in `horizon-client.tsx` en `lib/totaalplan-data.ts`.
+- **Effect:** een gebruiker die niets koos en een blijvende tekort-lening had, ziet
+  zijn vrijheidsleeftijd opschuiven naar het vroegste moment zonder die lening. Dat
+  is bewust en hoort in de releasenotitie.
+- **Achterhaalde tekst:** het kolomcommentaar in migratie `20260916120000` ("false/NULL
+  = uit") beschrijft de oude semantiek. Een toegepaste migratie wordt niet herschreven
+  (append-only); het DB-commentaar gaat mee met de eerstvolgende migratie op `profiles`.
+- **Partner:** zolang de RPC `household_member_profiles` de kolom niet levert, rekent
+  een partner met NULL en dus met de standaard (aan). Een partner die de instelling
+  bewust uitzette, ziet dat pas terug zodra de RPC de kolom levert.

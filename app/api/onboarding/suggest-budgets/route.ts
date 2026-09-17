@@ -1,14 +1,15 @@
 import { generateObject } from 'ai'
 import { createClient } from '@/lib/supabase/server'
-import { getModel, AIConfigError } from '@/lib/ai/config'
+import { getModel } from '@/lib/ai/config'
 import { checkTierGate } from '@/lib/require-tier'
+import { aiSubscriptionRequired, aiModelUnavailable } from '@/lib/ai/gate-responses'
 import { assertCloudAllowed } from '@/lib/ai/privacy-gate'
 import { sanitizeForAI } from '@/lib/ai/sanitize'
 import {
   budgetSuggestionSchema,
   buildBudgetSuggestionPrompt,
 } from '@/lib/ai/schemas/budget-suggestion-schema'
-import { unauthorized, forbidden, serverError, errorResponse } from '@/lib/api/respond'
+import { unauthorized, serverError, errorResponse } from '@/lib/api/respond'
 import { isRefusedProviderError } from '@/lib/ai/provider-error'
 import { AI_ERROR_CODE, describeAiError } from '@/lib/ai/error-copy'
 
@@ -35,7 +36,7 @@ export async function POST(req: Request) {
 
   const tierGate = await checkTierGate(supabase, user.id, 'ai')
   if (tierGate) {
-    return forbidden(tierGate.error)
+    return aiSubscriptionRequired()
   }
 
   const body = await req.json()
@@ -54,11 +55,7 @@ export async function POST(req: Request) {
   try {
     model = await getModel(supabase, 'budget_suggesties')
   } catch (err) {
-    if (err instanceof AIConfigError) {
-      // eslint-disable-next-line no-restricted-syntax -- rauwe error.message: zie [Arch F4] API-error-envelope
-      return Response.json({ error: `AI niet geconfigureerd: ${err.message}` }, { status: 503 })
-    }
-    return Response.json({ error: 'AI model kon niet worden geladen' }, { status: 500 })
+    return aiModelUnavailable(err, 'onboarding-suggest-budgets')
   }
 
   // Plan-bewust: verdeel alleen over de categorieën uit het budgetplan dat de

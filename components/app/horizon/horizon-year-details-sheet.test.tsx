@@ -164,6 +164,14 @@ describe('buildWithdrawalReceiptLines', () => {
     expect(lines.find(l => l.kind === 'deficit')).toBeUndefined()
     expect(lines.find(l => l.id === 'opeet-gedekt')?.signed).toBe(-24000)
   })
+
+  // ADR 0151 — de opeethypotheek heeft geen maandlast; dat staat als toelichting op de regel.
+  it('licht toe dat de opeethypotheek geen maandlast heeft (rente wordt bijgeschreven)', () => {
+    const lines = buildWithdrawalReceiptLines(DEFICIT_NEED, 150000, 20000)
+    expect(lines.find(l => l.id === 'opeet-gedekt')?.sublabel).toBe(
+      'geen maandlast: de rente wordt bij de schuld opgeteld',
+    )
+  })
 })
 
 // ── Render: kassabon-regels zichtbaar ────────────────────────────────
@@ -331,6 +339,30 @@ describe('HorizonYearDetailsSheet — Schulden-kassabon reconcilieert', () => {
     expect(bedragen.length).toBeGreaterThanOrEqual(2)
     // Geen restregel nodig: de bon klopt zonder sluitpost.
     expect(screen.queryByText('Overige schulden')).toBeNull()
+  })
+
+  // ADR 0151 — de opeethypotheek groeit door opname én bijgeschreven rente; beide als
+  // "+"-regel onder de naam (de rente is geen kas: `interestPaid` blijft 0).
+  it('toont "+ Opgenomen" en "+ Rente bijgeschreven" bij de opeethypotheek, zonder "− Rente"', () => {
+    renderSheet(
+      makeYearRow({
+        debtBalances: {
+          opeethypotheek: {
+            startBalance: 1_000_000,
+            interestPaid: 0,
+            principalPaid: 0,
+            endBalance: 1_075_000,
+            renteBijgeschreven: 55_000,
+          },
+        },
+        totalDebts: 1_075_000,
+        opeetOpname: 20_000,
+        opeetCap: 1_100_000,
+      }),
+    )
+    expect(screen.getByText(/\+ Opgenomen/)).toBeTruthy()
+    expect(screen.getByText(/\+ Rente bijgeschreven/)).toBeTruthy()
+    expect(screen.queryByText(/− Rente\b/)).toBeNull()
   })
 
   it('een onbekende pot verdwijnt niet stil maar sluit de bon als restregel', () => {

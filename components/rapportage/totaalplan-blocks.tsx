@@ -48,6 +48,7 @@ import {
 import { widgetSimRowsToChartPoints } from '@/lib/horizon/sim-chart-geometry'
 import { freedomDaysAtAge } from '@/lib/horizon/vrijheidsdagen'
 import { leeftijdJaar } from '@/lib/horizon/leeftijd-jaar'
+import { buildEindsituatieCopy } from '@/lib/horizon/eindsituatie-copy'
 import { SectionLabel } from '@/components/editorial'
 import { DefinitionRow } from '@/components/rapportage/persoonlijk-plan-blocks'
 import type {
@@ -361,6 +362,26 @@ export function ProjectieBlock({
     canonicalDailyRate: dailyExpenseRate,
   })
 
+  // ── Eindsituatie-duiding (plan 17 sep, D) — zelfde copy als /toekomst, zonder Fin-knop ──
+  // Nominale bedragen met hun eigen rij-factor → exact één `deflate` volgens euro_view.
+  const eind = projectie.eindsituatie
+  const eindCopy = eind
+    ? buildEindsituatieCopy({
+        duiding: eind.duiding,
+        endForm: eind.endForm,
+        bedragTekst: (b) => formatCurrency(deflate(b.bedrag, b.inflationFactor, euroView)),
+      })
+    : null
+  const eindOverschotDagen =
+    eind && eind.overschotIsLiquide
+      ? freedomDaysAtAge({
+          rows: [{ age: eind.duiding.overschot.age, inflationFactor: eind.duiding.overschot.inflationFactor }],
+          age: eind.duiding.overschot.age,
+          nominalAmount: eind.duiding.overschot.bedrag,
+          canonicalDailyRate: dailyExpenseRate,
+        })
+      : null
+
   const eindLeeftijd = leeftijdJaar(projectie.displayEndAge)
   const weergave = euroViewLabel(euroView).toLowerCase()
 
@@ -415,6 +436,30 @@ export function ProjectieBlock({
           </p>
           <p className="mt-1 italic">{projectie.tekortLening.copy.disclaimer}</p>
         </ReportNotice>
+      )}
+
+      {/* Eindsituatie-duiding — informatief (neutrale rand, geen waarschuwingsstijl). */}
+      {eindCopy && (
+        <div
+          data-testid="eindsituatie-blok"
+          className="mt-4 border border-[var(--border-ed)] px-3 py-2.5 font-source-serif text-[13px] leading-snug text-[var(--ink-2)]"
+        >
+          <p className="font-sans text-[13px] font-semibold text-[var(--ink)]">{eindCopy.kop}</p>
+          <p className="mt-1">
+            {eindCopy.samenvatting}
+            {eindOverschotDagen != null ? ` Dat is ongeveer ${freedomLabel(eindOverschotDagen)} vrijheid.` : ''}
+          </p>
+          {eindCopy.oorzaken.length > 0 && (
+            <ul className="mt-1 list-disc space-y-0.5 pl-4">
+              {eindCopy.oorzaken.map((zin) => (
+                <li key={zin}>{zin}</li>
+              ))}
+            </ul>
+          )}
+          {eindCopy.context && <p className="mt-1">{eindCopy.context}</p>}
+          {eindCopy.onduidelijk && <p className="mt-1">{eindCopy.onduidelijk}</p>}
+          <p className="mt-1 italic text-[var(--ink-3)]">{eindCopy.disclaimer}</p>
+        </div>
       )}
 
       {/* Vermogenspad — grondslag én euro-weergave expliciet benoemd */}

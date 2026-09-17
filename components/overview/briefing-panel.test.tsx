@@ -426,7 +426,7 @@ describe('BriefingPanel — AI-abonnementspoort op de ververs', () => {
     expect(screen.queryByRole('button', { name: /ververs je briefing/i })).toBeNull()
     const link = screen.getByRole('link', { name: /ververs met fin/i })
     expect(link).toBeTruthy()
-    expect(link.getAttribute('href')).toBe('/mijn/account')
+    expect(link.getAttribute('href')).toBe('/mijn/account?addon=ai')
     // De deterministische briefing eronder blijft gewoon zichtbaar (gratis)
     expect(container.textContent).toContain('Vermogen +1.2%')
   })

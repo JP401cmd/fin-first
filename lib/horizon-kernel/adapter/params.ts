@@ -99,8 +99,8 @@ export interface KernelAdapterProfile {
   /** ADR 0129 D1 — zelfgekozen stopleeftijd (halve jaren); alleen bij anker `age`. */
   fire_stop_age?: number | string | null
   /**
-   * ADR 0149 — "geen tekort-lening in mijn plan". `true` → `KernelInput.geenTekortLening`;
-   * `false`/NULL/afwezig → het veld blijft weg (byte-identiek aan het bestaande gedrag).
+   * ADR 0149 — "geen tekort-lening in mijn plan", standaard AAN (aanvulling 17 sep 2026):
+   * `true`/NULL/afwezig → `KernelInput.geenTekortLening`; alleen `false` → het veld blijft weg.
    */
   fire_no_deficit_loan?: boolean | null
   feature_preferences?: Record<string, unknown> | null
@@ -435,6 +435,9 @@ export function buildWoningFromConfig(cfg: HousingStrategyConfig): WoningStrateg
       // (beide triggers). Alleen `true` reist mee; bij een eigen bedrag blijft het veld
       // afwezig zodat dat pad byte-identiek aan het oracle rekent.
       ...(cfg.monthlyPayout == null ? { opeetOpnameNaarBehoefte: true as const } : {}),
+      // ADR 0151: de rente loopt boven het leenplafond door en een dalend plafond kort de
+      // schuld niet in — altijd op het app-pad (het fixture-pad zet 'm nooit → parity).
+      opeetRenteBovenPlafond: true as const,
     }
   }
 

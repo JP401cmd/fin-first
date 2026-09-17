@@ -261,8 +261,9 @@ const nextConfig: NextConfig = {
         permanent: false,
       },
 
-      // /toekomst/strategie?focus=aow|pensioen|huis opende de bijbehorende
-      // levensstrategie op de Gebeurtenissen-tab. Die vertakking gaat mee naar
+      // /toekomst/strategie?focus=aow|pensioen|huis|werk opende de bijbehorende
+      // levensstrategie — sinds 17 sep 2026 op Voorkeuren (daarvoor de
+      // Gebeurtenissen-tab). Die vertakking gaat mee naar
       // de routing-laag via een named capture group in `has` — met een
       // volgorde-eis: de gerichte variant MOET vóór de
       // catch-all staan, anders landt elke deeplink op `aow`. Een onbekende
@@ -270,13 +271,13 @@ const nextConfig: NextConfig = {
       // oude server-component deed.
       {
         source: '/toekomst/strategie',
-        has: [{ type: 'query', key: 'focus', value: '(?<focus>aow|pensioen|huis)' }],
-        destination: '/toekomst/gebeurtenissen?strategie=:focus',
+        has: [{ type: 'query', key: 'focus', value: '(?<focus>aow|pensioen|huis|werk)' }],
+        destination: '/toekomst/voorkeuren?strategie=:focus',
         permanent: false,
       },
       {
         source: '/toekomst/strategie',
-        destination: '/toekomst/gebeurtenissen?strategie=aow',
+        destination: '/toekomst/voorkeuren?strategie=aow',
         permanent: false,
       },
 

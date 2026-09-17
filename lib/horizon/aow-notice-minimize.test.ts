@@ -28,7 +28,7 @@ describe('TPR-04 — aow-notice-minimize (puur)', () => {
 
   it('sleutel leeft in de /toekomst-naamruimte en de deeplink opent de AOW-editor', () => {
     expect(AOW_NOTICE_MINIMIZE_KEY).toBe('/toekomst/aow-ontbreekt')
-    expect(AOW_ONTBREEKT_COPY.actieHref).toBe('/toekomst/gebeurtenissen?strategie=aow')
+    expect(AOW_ONTBREEKT_COPY.actieHref).toBe('/toekomst/voorkeuren?strategie=aow')
   })
 
   it('kopij volgt de norm keuze · effect · waarom en is beschrijvend (geen aansporing)', () => {

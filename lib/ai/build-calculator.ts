@@ -18,11 +18,14 @@ import {
   type CalculatorDefinition,
 } from '@/lib/calculator/types'
 import { validateFormulas, validateNarrative } from '@/lib/calculator/evaluate'
+import { describeAiError, type AiErrorCode } from '@/lib/ai/error-copy'
+import { aiConfigErrorCode } from '@/lib/ai/gate-responses'
+import { isRefusedProviderError } from '@/lib/ai/provider-error'
 import { PREFILL_KEYS, PREFILL_KEY_SET } from '@/lib/calculator/user-data-keys'
 
 export type BuildCalculatorResult =
   | { ok: true; definition: CalculatorDefinition }
-  | { ok: false; error: string }
+  | { ok: false; error: string; code?: AiErrorCode }
 
 export function buildSystemPrompt(): string {
   const prefillList = PREFILL_KEYS.map(
@@ -343,10 +346,12 @@ narrative MOET naar een bestaande output resp. derived wijzen.`
     // Volledige error loggen voor server-diagnostiek.
     console.error('[build-calculator] generatie mislukt:', err)
 
-    // AI-config (geen API key, verkeerde provider, etc.) → laat de
-    // specifieke message door zodat de admin weet wat te configureren.
+    // AI-config (geen API key, kill-switch, etc.) → de echte reden staat
+    // hierboven in het serverlog; de gebruiker krijgt de neutrale copy + code
+    // (V-002). err.message is beheerderstaal en hoort nooit in de body.
     if (err instanceof AIConfigError) {
-      return { ok: false, error: err.message }
+      const code = aiConfigErrorCode(err)
+      return { ok: false, error: describeAiError(code).text, code }
     }
 
     // Zod-schema-mismatch → het AI-model produceerde een output die niet
@@ -397,26 +402,17 @@ narrative MOET naar een bestaande output resp. derived wijzen.`
       }
     }
 
-    // HTTP-fout bij het LLM-provider-endpoint (rate-limit, invalid key,
-    // overload, etc.). De API-message bevat meestal genoeg context om te
-    // begrijpen wat te doen — geef die door.
-    if (APICallError.isInstance(err)) {
-      const status = err.statusCode ?? '?'
-      const reason = err.responseBody?.slice(0, 200) || err.message || 'onbekend'
-      return {
-        ok: false,
-        error: `AI-provider gaf een fout (HTTP ${status}): ${reason}`,
-      }
+    // HTTP-fout bij het LLM-provider-endpoint (rate-limit, ongeldige sleutel,
+    // overload). De providertekst kan sleutel-, billing- of hostdetails bevatten
+    // en staat daarom alleen in het serverlog hierboven — de gebruiker krijgt
+    // de neutrale copy + code (ADR 0044, security-review V-002).
+    if (APICallError.isInstance(err) || isRefusedProviderError(err)) {
+      const code: AiErrorCode = isRefusedProviderError(err) ? 'ai_provider_refused' : 'ai_stream_failed'
+      return { ok: false, error: describeAiError(code).text, code }
     }
 
-    // Fallback: altijd de error-class naam + bericht meegeven. Voor een
-    // educatieve rekenhulp-flow is dat geen security-risico en zonder die
-    // info kan de gebruiker niets melden.
-    const detail =
-      err instanceof Error ? ` (${err.name}: ${err.message})` : ` (${String(err)})`
-    return {
-      ok: false,
-      error: `Kon geen rekenhulp genereren.${detail}`,
-    }
+    // Fallback: nooit err.name/err.message naar de client (kan tabel- of
+    // hostnamen bevatten). De echte fout staat in het serverlog.
+    return { ok: false, error: describeAiError('ai_unknown').text, code: 'ai_unknown' }
   }
 }

@@ -421,7 +421,7 @@ export const GLOSSARY_ENTRIES: Record<string, GlossaryEntry> = {
     name: 'Tekort-lening',
     alternative: 'Lenen om een gat te overbruggen',
     explanation:
-      'Geld dat de berekening leent zodra je vermogen op is en je inkomen je uitgaven nog niet dekt, bijvoorbeeld in de jaren tussen stoppen en je AOW. De lening loopt op met rente en wordt later terugbetaald. Met "Geen tekort-lening in mijn plan" rekent de app met het vroegste stopmoment waarop je zonder zo’n lening rondkomt.',
+      'Geld dat de berekening leent zodra je vermogen op is en je inkomen je uitgaven nog niet dekt, bijvoorbeeld in de jaren tussen stoppen en je AOW. De lening loopt op met rente en wordt later terugbetaald. Standaard staat "Geen tekort-lening in mijn plan" aan: de app rekent dan met het vroegste stopmoment waarop je zonder zo’n lening rondkomt; zet je die instelling uit, dan mag de berekening gaten met zo’n lening overbruggen.',
   },
   eindstrategie_perpetual: {
     name: 'Eeuwigdurend',

@@ -115,7 +115,7 @@ export function TierLockedCard({ featureId, requiredTier }: { featureId: string;
             een doodlopende lock. Nu kan de gebruiker direct het abonnement
             bekijken/afsluiten. */}
         <Link
-          href="/mijn/account"
+          href={`/mijn/account?addon=${encodeURIComponent(requiredTier)}`}
           className={`mt-1 inline-flex items-center gap-1 rounded-[var(--r-lg)] border ${accent.border} ${accent.bg} px-3 py-1.5 text-xs font-semibold ${accent.text} transition-colors hover:brightness-95`}
         >
           Bekijk {tierLabel}-abonnement

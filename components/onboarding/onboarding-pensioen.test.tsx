@@ -11,10 +11,11 @@ import {
 // teruggeeft — zo testen we het upload-pad zonder de echte file/fetch-flow.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 vi.mock('@/components/app/horizon/pension-pdf-upload', () => ({
-  PensionPdfUpload: ({ onParseResult }: any) => (
+  PensionPdfUpload: ({ onParseResult, context }: any) => (
     <button
       type="button"
       data-testid="pension-upload"
+      data-context={context}
       onClick={() =>
         onParseResult({
           aowBedrag: null,
@@ -104,6 +105,16 @@ describe('OnboardingPensioen', () => {
     expect(footerButton('Verder').disabled).toBe(true)
     fireEvent.click(screen.getByTestId('pension-upload'))
     expect(footerButton('Verder').disabled).toBe(false)
+  })
+
+  it('upload-pad: geen PDF/AI in de onboarding — XML/JSON-copy en de upload in onboarding-context (V-002)', () => {
+    const { container } = render(<Host />)
+    expect(screen.getByText('XML of JSON van mijnpensioen.nl')).toBeTruthy()
+    fireEvent.click(screen.getByText('Upload je overzicht'))
+    expect(screen.getByTestId('pension-upload').getAttribute('data-context')).toBe('onboarding')
+    expect(container.textContent).not.toMatch(/PDF of JSON/)
+    // Geen link die de onboarding verlaat.
+    expect(container.querySelector('a[href^="/mijn"]')).toBeNull()
   })
 
   // ── Inschat-hulp (salaris × NL-opbouw × jaren) ─────────────────────────

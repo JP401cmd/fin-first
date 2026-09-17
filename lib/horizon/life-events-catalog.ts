@@ -894,7 +894,7 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
     label: 'Carrière switch',
     icon: 'Briefcase',
     group: 'werk',
-    // Vervangen door de Werk-strategie op /toekomst/gebeurtenissen (jun 2026):
+    // Vervangen door de Werk-strategie (jun 2026; sinds 17 sep 2026 op /toekomst/voorkeuren):
     // niet meer los aanmaakbaar, maar de entry blijft voor wat-als/scenario/AI-lookups.
     hiddenFromCatalog: true,
     impactRange: '€5K–€30K totaal',
@@ -916,7 +916,7 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
     label: 'Part-time werken',
     icon: 'Clock',
     group: 'werk',
-    // Vervangen door de Werk-strategie op /toekomst/gebeurtenissen (jun 2026):
+    // Vervangen door de Werk-strategie (jun 2026; sinds 17 sep 2026 op /toekomst/voorkeuren):
     // niet meer los aanmaakbaar, maar de entry blijft voor wat-als/scenario/AI-lookups.
     hiddenFromCatalog: true,
     impactRange: '€500–€1.500/mnd inkomensverlies',

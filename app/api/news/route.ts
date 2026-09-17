@@ -1,14 +1,15 @@
 import { streamObject } from 'ai'
 import { createClient } from '@/lib/supabase/server'
 import { recordAiUsage } from '@/lib/ai-credits'
-import { getModel, AIConfigError } from '@/lib/ai/config'
+import { getModel } from '@/lib/ai/config'
 import { assertCloudAllowed } from '@/lib/ai/privacy-gate'
 import { buildSharedContext } from '@/lib/ai/context/shared-context'
 import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
 import { maskPIIInObject } from '@/lib/ai/pii-output-filter'
 import { NextResponse } from 'next/server'
-import { unauthorized, forbidden, serverError } from '@/lib/api/respond'
+import { unauthorized, serverError } from '@/lib/api/respond'
 import { checkTierGate } from '@/lib/require-tier'
+import { aiSubscriptionRequired, aiModelUnavailable } from '@/lib/ai/gate-responses'
 import { NEWS_SYSTEM_PROMPT } from '@/lib/news-system-prompt'
 import { filterGroundedItems, type SelectableArticle } from '@/lib/news-selection'
 import { newsItemSchema, type NewsItem } from '@/lib/news-item'
@@ -166,7 +167,7 @@ export async function GET(request: Request) {
 
   const tierGate = await checkTierGate(supabase, user.id, 'ai')
   if (tierGate) {
-    return forbidden(tierGate.error)
+    return aiSubscriptionRequired()
   }
 
   const url = new URL(request.url)
@@ -306,11 +307,7 @@ export async function GET(request: Request) {
   try {
     model = await getModel(supabase, 'nieuws')
   } catch (err) {
-    if (err instanceof AIConfigError) {
-      // eslint-disable-next-line no-restricted-syntax -- rauwe error.message: zie [Arch F4] API-error-envelope
-      return NextResponse.json({ error: err.message }, { status: 422 })
-    }
-    return NextResponse.json({ error: 'AI model kon niet worden geladen.' }, { status: 500 })
+    return aiModelUnavailable(err, 'news')
   }
 
   const [recentHeadlines, demotedCategories, sourceArticles] = await Promise.all([

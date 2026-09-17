@@ -2,8 +2,9 @@ import { generateObject } from 'ai'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { getModel, AIConfigError } from '@/lib/ai/config'
+import { getModel } from '@/lib/ai/config'
 import { checkTierGate } from '@/lib/require-tier'
+import { aiSubscriptionRequired, aiModelUnavailable } from '@/lib/ai/gate-responses'
 import { assertCloudAllowed } from '@/lib/ai/privacy-gate'
 import {
   detectRecurringTransactions,
@@ -48,7 +49,7 @@ export async function POST() {
 
     const tierGate = await checkTierGate(supabase, user.id, 'ai')
     if (tierGate) {
-      return NextResponse.json({ error: tierGate.error }, { status: 403 })
+      return aiSubscriptionRequired()
     }
 
     const now = new Date()
@@ -155,11 +156,7 @@ export async function POST() {
     try {
       model = await getModel(supabase, 'abonnementen_detectie')
     } catch (err) {
-      if (err instanceof AIConfigError) {
-        // eslint-disable-next-line no-restricted-syntax -- rauwe error.message: zie [Arch F4] API-error-envelope
-        return NextResponse.json({ error: err.message }, { status: 422 })
-      }
-      return NextResponse.json({ error: 'AI model kon niet worden geladen.' }, { status: 500 })
+      return aiModelUnavailable(err, 'subscriptions-detect-ai')
     }
 
     // Sanitize the counterparty/description pattern list before it reaches the

@@ -109,7 +109,7 @@ describe('GET /api/local-chat-overview — gate-drieluik', () => {
     const res = await GET()
 
     expect(res.status).toBe(403)
-    expect(await res.json()).toMatchObject({ error: 'Deze functie vereist een AI abonnement' })
+    expect(await res.json()).toEqual({ error: 'Dit kan in de app met een AI-abonnement.', code: 'ai_subscription' })
     expect(mockBuildLocalChatOverview).not.toHaveBeenCalled()
   })
 

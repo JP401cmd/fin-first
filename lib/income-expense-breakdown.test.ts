@@ -84,6 +84,33 @@ const debtHyp: Debt = { id: 'd1', name: 'Hypotheek' } as unknown as Debt
 
 // ── Tests ────────────────────────────────────────────────────────────
 
+describe('buildBreakdown — de opeethypotheek krijgt geen rentelaag (ADR 0151)', () => {
+  // Given een jaar met een echte hypotheek, een tekort-lening en een opeethypotheek,
+  // When de breakdown wordt gebouwd,
+  // Then krijgt de opeethypotheek geen rentelaag (bijgeschreven, geen kasstroom); de
+  // tekort-lening blijft consistent met flowOut/jaarkaart een rentelaag.
+  it('filtert alleen de opeethypotheek uit de rentelagen; tekort-lening en echte schulden blijven', () => {
+    const row = makeRow({
+      withdrawal: 40000,
+      debtBalances: {
+        d1: { startBalance: 100000, interestPaid: 1000, principalPaid: 0, endBalance: 100000 },
+        'tekort-lening': { startBalance: 10000, interestPaid: 500, principalPaid: 0, endBalance: 10500 },
+        opeethypotheek: { startBalance: 200000, interestPaid: 0, principalPaid: 0, endBalance: 211000, renteBijgeschreven: 11000 },
+      },
+    })
+    const out = buildBreakdown([row], [makeSimRow(60, 'retirement')], [debtHyp])
+    const r = out.rows[0]
+    expect(r.expenseBySource['debt-interest-d1']).toBe(1000)
+    expect(r.expenseBySource['debt-interest-tekort-lening']).toBe(500)
+    expect(r.expenseBySource['debt-interest-opeethypotheek']).toBeUndefined()
+    expect(out.expenseLayers.map((l) => l.id)).toContain('debt-interest-d1')
+    expect(out.expenseLayers.some((l) => l.id === 'debt-interest-tekort-lening')).toBe(true)
+    expect(out.expenseLayers.some((l) => l.id === 'debt-interest-opeethypotheek')).toBe(false)
+    // Totaal: withdrawal(40000) + rente d1(1000) + tekort-lening(500); opeet telt niet.
+    expect(r.totalExpenses).toBe(41500)
+  })
+})
+
 describe('buildBreakdown — box3-ontdubbeling (uitgaven-kant)', () => {
   it('telt Box 3 niet dubbel: onttrekking exclusief box3 + aparte box3-post', () => {
     const row = makeRow({

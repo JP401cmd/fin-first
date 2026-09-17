@@ -190,7 +190,7 @@ export function AiExecutionChoice({
           met prijs/tagline uit de abonnementscatalogus. */}
       {aiEnabled && !hasAiTier && !privacyMode && (
         <div id="lokale-cat-reden-tier">
-          <AiSubscriptionUpsell variant="inline" />
+          <AiSubscriptionUpsell variant="inline" feature="AI op je eigen toestel" />
         </div>
       )}
 

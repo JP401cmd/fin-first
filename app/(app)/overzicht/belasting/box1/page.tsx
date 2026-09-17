@@ -73,7 +73,7 @@ export default async function BelastingBox1Page() {
   // Factor A (jaarlijkse werkgeverspensioen-aangroei) — single source uit het
   // profiel (profiles.pension_factor_a), geconsumeerd uit de loader-bundel via
   // de canonieke resolver `resolvePensionFactorA` (clamp ≥ 0, NaN-guard,
-  // NULL≠0). Ingevuld via de pensioen-strategie (`/toekomst/gebeurtenissen?
+  // NULL≠0). Ingevuld via de pensioen-strategie (`/toekomst/voorkeuren?
   // strategie=pensioen`). NULL = onbekend → jaarruimte toont de bovengrens
   // (factor A 0); de uitleg framet dat expliciet. Partner-factor-A is privé en
   // out-of-scope, dus de partner-kaart blijft op de bovengrens (0).
@@ -456,7 +456,7 @@ function JaarruimteUitleg({ factorAKnown }: { factorAKnown: boolean }) {
             Je jaarruimte <strong>met je eigen factor A verrekend</strong> — de
             pensioenaangroei die je hebt ingevuld is er al vanaf. Klopt hij niet
             meer? Pas &apos;m aan bij je{' '}
-            <Link href="/toekomst/gebeurtenissen?strategie=pensioen" className={linkCls}>
+            <Link href="/toekomst/voorkeuren?strategie=pensioen" className={linkCls}>
               pensioen-strategie
             </Link>
             .
@@ -466,7 +466,7 @@ function JaarruimteUitleg({ factorAKnown }: { factorAKnown: boolean }) {
             Een <strong>bovengrens vóór aftrek van je werkgeverspensioen</strong>
             : je factor A is nog niet ingevuld, dus er is met 0 gerekend. Vul
             &apos;m in bij je{' '}
-            <Link href="/toekomst/gebeurtenissen?strategie=pensioen" className={linkCls}>
+            <Link href="/toekomst/voorkeuren?strategie=pensioen" className={linkCls}>
               pensioen-strategie
             </Link>{' '}
             voor één scherp bedrag in plaats van een bereik.

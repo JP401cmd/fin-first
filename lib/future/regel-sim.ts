@@ -100,7 +100,7 @@ export interface RegelSimOverride {
   legacyIncludeIlliquid?: boolean | null
   /**
    * ADR 0149 — "Geen tekort-lening in mijn plan" (`profiles.fire_no_deficit_loan`).
-   * `undefined` = kolom ongewijzigd; `null`/`false` = uit.
+   * `undefined` = kolom ongewijzigd; `false` = uit; `true`/`null` = aan (standaard, 17 sep 2026).
    */
   geenTekortLening?: boolean | null
   withdrawalStrategy?: WithdrawalStrategyConfig
@@ -283,7 +283,7 @@ function applyDraftToRawContext(
 
 /**
  * De gebeurtenissenlijst met één beheerde strategie-rij vervangen (zie `RegelSimOverride.lifeEvent`).
- * Geëxporteerd zodat de strategie-editors op /toekomst/gebeurtenissen hun preview met
+ * Geëxporteerd zodat de strategie-editors op /toekomst/voorkeuren hun preview met
  * dezelfde vervangregel opbouwen als de kern-override in de wizard.
  */
 export function vervangLifeEvent(

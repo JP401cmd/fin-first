@@ -172,3 +172,44 @@ describe('POST /api/ai/categorize — privé-modus-gate', () => {
     expect(mockCheckTierGate).not.toHaveBeenCalled()
   })
 })
+
+// V-002: de client herkent elke niet-beschikbare AI-functie aan een stabiele code.
+describe('POST /api/ai/categorize — weigeringscontract (V-002)', () => {
+  it('geen AI-abonnement → 403 ai_subscription, zonder model', async () => {
+    mockCreateClient.mockResolvedValue(buildSupabase({}))
+    mockCheckTierGate.mockResolvedValue({ subscriptions: [], error: 'Deze functie vereist een AI abonnement' })
+
+    const res = await POST(postRequest({ transactions: TX }))
+
+    expect(res.status).toBe(403)
+    expect(await res.json()).toEqual({ error: 'Dit kan in de app met een AI-abonnement.', code: 'ai_subscription' })
+    expect(mockGetModel).not.toHaveBeenCalled()
+  })
+
+  it('creditlimiet → 429 ai_credit_limit met de servertekst en Retry-After', async () => {
+    mockCreateClient.mockResolvedValue(buildSupabase({}))
+    mockCheckCreditBudget.mockResolvedValue({ allowed: false, retryAfterSeconds: 60 })
+
+    const res = await POST(postRequest({ transactions: TX }))
+
+    expect(res.status).toBe(429)
+    expect(res.headers.get('Retry-After')).toBe('60')
+    expect(await res.json()).toEqual({ error: 'limiet', code: 'ai_credit_limit' })
+  })
+
+  it('AIConfigError → 422 ai_unavailable, zonder beheerderstaal in de body', async () => {
+    mockCreateClient.mockResolvedValue(buildSupabase({}))
+    const err = new Error('Anthropic API key is niet geconfigureerd. Stel een API key in via Beheer.')
+    err.name = 'AIConfigError'
+    mockGetModel.mockRejectedValue(err)
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const res = await POST(postRequest({ transactions: TX }))
+    const body = await res.json()
+
+    expect(res.status).toBe(422)
+    expect(body.code).toBe('ai_unavailable')
+    expect(JSON.stringify(body)).not.toMatch(/API key|Beheer/)
+    log.mockRestore()
+  })
+})

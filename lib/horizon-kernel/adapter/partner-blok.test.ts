@@ -42,7 +42,7 @@ describe('memberProfileToKernelAdapterProfile — RPC-rij → adapter-profiel', 
       fire_legacy_amount: null,
       retirement_expense_method: 'current_expenses',
       retirement_custom_amount: 18000,
-      // ADR 0149 — de kolom ontbreekt op deze rij → null (vlag uit).
+      // ADR 0149 — de kolom ontbreekt op deze rij → null (standaard aan in de adapter).
       fire_no_deficit_loan: null,
     })
   })

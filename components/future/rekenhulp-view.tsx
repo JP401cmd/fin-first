@@ -27,6 +27,9 @@ import { RateLimitBadge } from './rate-limit-badge'
 import type { CalculatorDefinition, CustomCalculatorRow } from '@/lib/calculator/types'
 import type { PrefillValues } from '@/lib/calculator/user-data-keys'
 import { CalendarPlus } from 'lucide-react'
+import { AiSubscriptionUpsell } from '@/components/app/ai-subscription-upsell'
+import { useHasAiSubscription } from '@/lib/feature-access/context'
+import { describeAiError, isAiErrorCode } from '@/lib/ai/error-copy'
 
 /**
  * RekenhulpView — eigen plek (/toekomst?tab=rekenhulp) waar Fin helpt
@@ -59,6 +62,11 @@ export function RekenhulpView({
   const [prompt, setPrompt] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // V-002: zonder AI-abonnement de upsell i.p.v. de genereer-knop (pre-check),
+  // of alsnog na een server-403 met code 'ai_subscription'.
+  const knownNoAi = useHasAiSubscription() === false
+  const [aiUpsell, setAiUpsell] = useState(false)
+  const showUpsell = knownNoAi || aiUpsell
   const [draft, setDraft] = useState<CalculatorDefinition | null>(null)
   const [running, setRunning] = useState<CustomCalculatorRow | null>(null)
   const [saving, setSaving] = useState(false)
@@ -166,6 +174,15 @@ export function RekenhulpView({
       })
       const data = await res.json()
       if (!data.ok) {
+        if (isAiErrorCode(data.code)) {
+          const copy = describeAiError(data.code, data.error)
+          if (copy.affordance === 'upsell') {
+            setAiUpsell(true)
+            return
+          }
+          setError(copy.text)
+          return
+        }
         setError(data.error ?? 'Genereren mislukt.')
         return
       }
@@ -333,6 +350,15 @@ export function RekenhulpView({
           </div>
         )}
 
+        {showUpsell ? (
+          <div className="mt-3" data-testid="rekenhulp-upsell">
+            <AiSubscriptionUpsell
+              variant="inline"
+              feature="Een rekenhulp laten bouwen door Fin"
+              note="Je opgeslagen rekenhulpen en die uit de bibliotheek blijven gewoon werken."
+            />
+          </div>
+        ) : (
         <div className="mt-3 flex items-center gap-2">
           <button
             type="button"
@@ -348,6 +374,7 @@ export function RekenhulpView({
             {draft && !lokaal ? 'Verfijnen' : 'Genereer rekenhulp'}
           </button>
         </div>
+        )}
 
         {/* Voortgang van de vier deelstappen. `aria-live` zodat een schermlezer
             de stapwissel meekrijgt — bij minutenlange generatie is stilte geen

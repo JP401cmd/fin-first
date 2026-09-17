@@ -76,22 +76,23 @@ const putBodies = () =>
     .map(([, init]) => JSON.parse(String((init as RequestInit).body)) as Record<string, unknown>)
 
 describe('EindstrategieBody — Geen tekort-lening in mijn plan', () => {
-  it('toont de schakelaar (standaard uit) met uitleg in de vorm keuze · effect · waarom, zonder advies', async () => {
+  it('toont de schakelaar (standaard aan) met uitleg in de vorm keuze · effect · waarom, zonder advies', async () => {
     renderBody()
     const sw = await screen.findByRole('switch', { name: /Geen tekort-lening in mijn plan/ })
-    expect(sw.getAttribute('aria-checked')).toBe('false')
+    await waitFor(() => expect(sw.getAttribute('aria-checked')).toBe('true'))
+    expect(GEEN_TEKORT_LENING_UITLEG).toMatch(/Aan \(standaard\)/)
     expect(document.body.textContent).toContain(GEEN_TEKORT_LENING_UITLEG)
     expect(GEEN_TEKORT_LENING_UITLEG).toMatch(/Je kiest/)
-    expect(GEEN_TEKORT_LENING_UITLEG).toMatch(/Aan:/)
+    expect(GEEN_TEKORT_LENING_UITLEG).toMatch(/Uit:/)
     expect(GEEN_TEKORT_LENING_UITLEG).toMatch(/Relevant omdat/)
     expect(GEEN_TEKORT_LENING_UITLEG).not.toMatch(/aanbevolen|past bij jou|kies voor|je moet/i)
   })
 
-  it('leest de opgeslagen keuze uit GET /api/fire-settings', async () => {
-    getBody = { deficit_loan_rate: null, fire_no_deficit_loan: true }
+  it('leest de bewust uitgezette keuze (false) uit GET /api/fire-settings', async () => {
+    getBody = { deficit_loan_rate: null, fire_no_deficit_loan: false }
     renderBody()
     await waitFor(() =>
-      expect(screen.getByRole('switch', { name: /Geen tekort-lening in mijn plan/ }).getAttribute('aria-checked')).toBe('true'),
+      expect(screen.getByRole('switch', { name: /Geen tekort-lening in mijn plan/ }).getAttribute('aria-checked')).toBe('false'),
     )
     getBody = { deficit_loan_rate: null, fire_no_deficit_loan: null }
   })
@@ -101,17 +102,18 @@ describe('EindstrategieBody — Geen tekort-lening in mijn plan', () => {
     const sw = await screen.findByRole('switch', { name: /Geen tekort-lening in mijn plan/ })
     await waitFor(() => expect(getActions().canSave).toBe(false))
 
+    await waitFor(() => expect(sw.getAttribute('aria-checked')).toBe('true'))
     fireEvent.click(sw)
     await waitFor(() => expect(getActions().canSave).toBe(true))
     const overrides = mockRun.mock.calls.map((c) => (c as unknown[])[1] as { geenTekortLening?: boolean } | undefined)
-    expect(overrides.some((o) => o?.geenTekortLening === true)).toBe(true)
+    expect(overrides.some((o) => o?.geenTekortLening === false)).toBe(true)
 
     await act(async () => {
       getActions().save()
     })
     await waitFor(() => expect(putBodies()).toHaveLength(1))
     const body = putBodies()[0]
-    expect(body.fire_no_deficit_loan).toBe(true)
+    expect(body.fire_no_deficit_loan).toBe(false)
     expect(body.fire_end_strategy).toBe('deplete')
   })
 })

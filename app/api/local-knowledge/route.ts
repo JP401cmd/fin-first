@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server'
-import { unauthorized, forbidden, serverError } from '@/lib/api/respond'
+import { unauthorized, serverError } from '@/lib/api/respond'
 import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/supabase/service'
 import { checkTierGate } from '@/lib/require-tier'
+import { aiSubscriptionRequired } from '@/lib/ai/gate-responses'
 import { parseLocalKnowledge } from '@/lib/ai/local/knowledge-context'
 
 /**
@@ -42,7 +43,7 @@ export async function GET() {
   if (!user) return unauthorized()
 
   const gate = await checkTierGate(supabase, user.id, 'ai')
-  if (gate) return forbidden(gate.error)
+  if (gate) return aiSubscriptionRequired()
 
   const service = getServiceClient()
   const { data, error } = await service

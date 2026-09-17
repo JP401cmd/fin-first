@@ -18,7 +18,7 @@ import {
  *
  * De AOW-, werk- en pensioen-editor schreven client-direct naar `life_events` (ADR 0058:
  * muteren hoort via een API-route). Dezelfde editor-body rendert nu op
- * /toekomst/gebeurtenissen én in de plan-review-wizard; beide slaan hier op. De route
+ * /toekomst/voorkeuren én in de plan-review-wizard; beide slaan hier op. De route
  * schrijft uitsluitend deze drie typen, met een gesloten schema per type
  * (`lib/life-events/strategie-write.ts`); vrije gebeurtenissen blijven via hun eigen pad.
  *

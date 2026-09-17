@@ -86,7 +86,7 @@ async function loadWoning(
 
 /**
  * Stap 3 — de eigen AOW/werk/pensioen-rijen (expliciete `user_id`-lezing: de policy is
- * huishoud-gedeeld) en de formulierbasis van /toekomst/gebeurtenissen (`strategieEditorBasis`),
+ * huishoud-gedeeld) en de formulierbasis van /toekomst/voorkeuren (`strategieEditorBasis`),
  * zodat het formulier in de wizard dezelfde prefill en leeftijd toont.
  */
 async function loadInkomsten(

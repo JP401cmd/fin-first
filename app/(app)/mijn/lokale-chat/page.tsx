@@ -58,7 +58,7 @@ export default async function LokaleChatPage() {
           <AiDisabledNotice />
         ) : !hasAiTier ? (
           <div className="border border-[var(--border-ed)] bg-[var(--paper)] p-4">
-            <AiSubscriptionUpsell variant="panel" />
+            <AiSubscriptionUpsell variant="panel" feature="Chatten met Fin op je eigen toestel" />
           </div>
         ) : (
           <LocalChatPanel overview={await buildLocalChatOverview(supabase)} />

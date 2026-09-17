@@ -135,6 +135,26 @@ describe('LokaleTipsGenerator — fail-closed', () => {
     // Geen enkele knop die alsnog iets zou starten.
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
     expect(fetchMock).not.toHaveBeenCalled()
+    // Geen abonnements-reden → geen upsell.
+    expect(screen.queryByTestId('ai-upsell-inline')).not.toBeInTheDocument()
+  })
+
+  it("toont bij 'blocked' op reden 'abonnement' de upsell (V-002), nog steeds zonder fetch", () => {
+    modeState.current = mode({
+      status: 'blocked',
+      reason: 'abonnement',
+      message: 'Je AI-abonnement is niet (meer) actief.',
+      canUseLocal: false,
+      canUseCloud: false,
+    })
+    render(<LokaleTipsGenerator />)
+
+    expect(screen.getByTestId('ai-upsell-inline')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Bekijk AI-abonnement/i })).toHaveAttribute(
+      'href',
+      '/mijn/account?addon=ai',
+    )
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 })
 

@@ -143,13 +143,14 @@ export function MiniNetWorthChartAnchor({
               vectorEffect="non-scaling-stroke"
             />
           </svg>
-          {/* De naad + het Vandaag-anker — zelfde CSS-positie als de volle grafiek. */}
+          {/* De naad + het Vandaag-anker — zelfde CSS-positie als de volle grafiek;
+              net als daar alleen <lg (op lg staat er niets tussen de kaarten). */}
           <span
-            className="absolute inset-y-0 border-l border-dashed border-[var(--ink-4)] opacity-50"
+            className="absolute inset-y-0 border-l border-dashed border-[var(--ink-4)] opacity-50 lg:hidden"
             style={{ left: NW_SEAM_LEFT }}
           />
           <span
-            className="absolute h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[var(--module-active-700)]"
+            className="absolute h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[var(--module-active-700)] lg:hidden"
             style={{ left: NW_SEAM_LEFT, top: `${ANCHOR_Y}%` }}
           />
           {/* Fin loopt het projectie-traject af. */}
@@ -166,10 +167,13 @@ export function MiniNetWorthChartAnchor({
           </div>
         </div>
         <span
-          className="absolute bottom-0 -translate-x-1/2 bg-[var(--paper)] lg:bg-transparent px-1 font-mono text-[9px] leading-none text-[var(--ink-3)] whitespace-nowrap"
+          className="absolute bottom-0 -translate-x-1/2 bg-[var(--paper)] px-1 font-mono text-[9px] leading-none text-[var(--ink-3)] whitespace-nowrap lg:hidden"
           style={{ left: NW_SEAM_LEFT }}
         >
           Vandaag
+        </span>
+        <span className="absolute bottom-0 left-3 hidden font-mono text-[9px] leading-none text-[var(--ink-3)] whitespace-nowrap lg:block">
+          nu
         </span>
       </div>
 

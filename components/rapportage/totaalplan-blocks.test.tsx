@@ -38,6 +38,7 @@ const projectieOk: ProjectieData = {
   eindwaardeNettoLiquide: 900_000,
   ankerTekortZin: null,
   tekortLening: null,
+  eindsituatie: null,
 }
 
 describe('ProjectieBlock — grondslag-scheiding (nettoVermogen vs liquide pot)', () => {
@@ -199,6 +200,67 @@ describe('ProjectieBlock — planeinde, euro-weergave en tekort-meldingen (B-043
     render(<ProjectieBlock projectie={projectieOk} dailyExpenseRate={100} num="x." />)
     expect(screen.queryByTestId('anchor-shortfall-blok')).toBeNull()
     expect(screen.queryByTestId('tekort-lening-blok')).toBeNull()
+  })
+})
+
+/**
+ * Plan 17 sep (D) — eindsituatie-duiding in het rapport: dezelfde copy als /toekomst,
+ * zonder Fin-knop en zonder minimaliseren; bedragen exact één keer gedeflateerd.
+ */
+describe('ProjectieBlock — eindsituatie-duiding', () => {
+  const eindsituatie: NonNullable<ProjectieData['eindsituatie']> = {
+    endForm: 'deplete',
+    overschotIsLiquide: true,
+    duiding: {
+      eindAge: 90,
+      overschot: { age: 90, bedrag: 400_000, inflationFactor: 2 },
+      dieptepunt: { age: 70, bedrag: 5_000, inflationFactor: 1.5 },
+      oorzaken: [
+        { id: 'geen-tekort-lening', age: 70, bedrag: { age: 70, bedrag: 6_000, inflationFactor: 1.5 } },
+        { id: 'later-inkomen', age: 72, bedrag: null },
+      ],
+      context: { huis: null, opeetschuld: null },
+      eenduidig: false,
+    },
+  }
+
+  it('toont kop, oorzaken en disclaimer, zonder Fin-knop of instellingen-link', () => {
+    render(<ProjectieBlock projectie={{ ...projectieOk, eindsituatie }} dailyExpenseRate={100} num="x." />)
+    const blok = screen.getByTestId('eindsituatie-blok')
+    expect(blok.textContent).toContain('Aan het eind blijft er meer over dan "vermogen opeten" doet verwachten')
+    expect(blok.querySelectorAll('li')).toHaveLength(2)
+    expect(blok.textContent).toContain('Indicatie, geen advies')
+    expect(blok.textContent).toContain('niet één regel aan te wijzen')
+    expect(screen.queryByRole('button', { name: /Bespreek/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Minimaliseren/i })).toBeNull()
+  })
+
+  it("deflateert elk bedrag exact één keer met de factor van zijn eigen rij (euro_view 'real')", () => {
+    render(
+      <EuroViewProvider initialView="real">
+        <ProjectieBlock projectie={{ ...projectieOk, eindsituatie }} dailyExpenseRate={100} num="x." />
+      </EuroViewProvider>,
+    )
+    const tekst = screen.getByTestId('eindsituatie-blok').textContent ?? ''
+    // Overschot 400.000 / 2 = 200.000 — niet 400.000 (vergeten) of 100.000 (dubbel).
+    expect(tekst).toMatch(/200\.000 meer/)
+    expect(tekst).not.toMatch(/400\.000/)
+    // Dieptepunt-bedrag van de oorzaak: 6.000 / 1,5 = 4.000.
+    expect(tekst).toMatch(/4\.000\)/)
+    // Vrijheidstijd real-verankerd: 200.000 / €100 = 2.000 dagen ≈ 5 jaar en 5 maanden.
+    expect(tekst).toMatch(/Dat is ongeveer 5 jaar en 5 maanden vrijheid/)
+  })
+
+  it('nominaal: bedragen ongewijzigd, vrijheidstijd gelijk', () => {
+    render(<ProjectieBlock projectie={{ ...projectieOk, eindsituatie }} dailyExpenseRate={100} num="x." />)
+    const tekst = screen.getByTestId('eindsituatie-blok').textContent ?? ''
+    expect(tekst).toMatch(/400\.000 meer/)
+    expect(tekst).toMatch(/Dat is ongeveer 5 jaar en 5 maanden vrijheid/)
+  })
+
+  it('zonder duiding: geen blok', () => {
+    render(<ProjectieBlock projectie={projectieOk} dailyExpenseRate={100} num="x." />)
+    expect(screen.queryByTestId('eindsituatie-blok')).toBeNull()
   })
 })
 

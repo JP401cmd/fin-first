@@ -16,8 +16,9 @@ import type { PensionParseResult } from '@/app/api/pension/parse/route'
  *
  * "Heb je al pensioen opgebouwd?" met drie uitkomsten:
  *   (i)   Schatting — vrij bruto-maandbedrag (+ optioneel ingangsleeftijd).
- *   (ii)  Upload je mijnpensioen.nl-overzicht (JSON volledig client-side,
- *         PDF via de bestaande AI-route) — HERGEBRUIKT `PensionPdfUpload`.
+ *   (ii)  Upload je mijnpensioen.nl-overzicht (XML/JSON volledig client-side,
+ *         zonder AI) — HERGEBRUIKT `PensionPdfUpload` met `context="onboarding"`:
+ *         het PDF-pad (AI) is hier niet bruikbaar (V-002).
  *   (iii) Overslaan ("kan altijd later nog") — als deferred field getrackt.
  *
  * Het scherm rapporteert alleen z'n keuze terug aan de orchestrator
@@ -164,7 +165,7 @@ export function OnboardingPensioen({
           <ModeTile
             icon={<Upload className="h-4 w-4" strokeWidth={2} />}
             label="Upload je overzicht"
-            sublabel="PDF of JSON van mijnpensioen.nl"
+            sublabel="XML of JSON van mijnpensioen.nl"
             active={data.mode === 'upload'}
             onClick={() => selectMode('upload')}
           />
@@ -254,16 +255,20 @@ export function OnboardingPensioen({
           </div>
         )}
 
-        {/* Upload-pad — hergebruikt PensionPdfUpload (JSON client-side, PDF AI). */}
+        {/* Upload-pad — hergebruikt PensionPdfUpload. In de onboarding alleen de
+            data-route (XML/JSON, zonder AI): een PDF uitlezen vraagt AI en dat kan
+            pas in de app met een AI-abonnement (V-002). Geen link weg uit de
+            onboarding — die zou de voortgang kosten. */}
         {data.mode === 'upload' && (
           <div className="space-y-3 border-l-2 border-[var(--module-active-500)] pl-4">
             <p
               className="text-xs italic text-[var(--ink-3)]"
               style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
             >
-              Log in op mijnpensioen.nl, download je overzicht (PDF of JSON) en upload het hier.
+              Log in op mijnpensioen.nl, download je overzicht als XML of JSON en upload het hier.
             </p>
             <PensionPdfUpload
+              context="onboarding"
               samenwonend={samenwonend}
               onParseResult={(result) => {
                 setError(null)

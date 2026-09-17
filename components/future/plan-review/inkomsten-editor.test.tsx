@@ -8,7 +8,7 @@ import type { RegelSimOverride } from '@/lib/future/regel-sim'
 /**
  * TPR-15 stap 3 inline. Gepind:
  *  - AOW, werk, elke eigen pot en een nieuwe pot zijn apart te kiezen, met dezelfde bodies als
- *    /toekomst/gebeurtenissen;
+ *    /toekomst/voorkeuren;
  *  - zonder eigen AOW-rij is het formulier vooringevuld (alleenstaand, 0 jaar) en telt het als
  *    wijziging; opslaan schrijft via `PUT /api/life-events/strategie` en meldt `aowGeschreven`;
  *  - het live effect is de kern-run met alleen die rij vervangen (`lifeEvent`-override);

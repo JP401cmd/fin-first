@@ -4,6 +4,7 @@ import { unauthorized, forbidden, serverError } from '@/lib/api/respond'
 import { parseBody } from '@/lib/api/parse-body'
 import { createClient } from '@/lib/supabase/server'
 import { checkTierGate } from '@/lib/require-tier'
+import { aiSubscriptionRequired } from '@/lib/ai/gate-responses'
 import { filterGroundedItems } from '@/lib/news-selection'
 import {
   archiveCurrentEdition,
@@ -79,7 +80,7 @@ export async function GET() {
   }
 
   const gate = await checkTierGate(supabase, user.id, 'ai')
-  if (gate) return forbidden(gate.error)
+  if (gate) return aiSubscriptionRequired()
 
   try {
     const [cached, editionNr] = await Promise.all([
@@ -149,7 +150,7 @@ export async function POST(request: Request) {
   }
 
   const gate = await checkTierGate(supabase, user.id, 'ai')
-  if (gate) return forbidden(gate.error)
+  if (gate) return aiSubscriptionRequired()
 
   const parsed = await parseBody(bodySchema, request)
   if (!parsed.ok) return parsed.response

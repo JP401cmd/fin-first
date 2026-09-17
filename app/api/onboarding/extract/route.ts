@@ -1,8 +1,9 @@
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
-import { unauthorized, forbidden, errorResponse } from '@/lib/api/respond'
+import { unauthorized } from '@/lib/api/respond'
 import { assertCloudAllowed } from '@/lib/ai/privacy-gate'
 import { checkTierGate } from '@/lib/require-tier'
+import { aiSubscriptionRequired, aiCreditLimitReached } from '@/lib/ai/gate-responses'
 import { checkCreditBudget, creditLimitMessage } from '@/lib/ai/credit-gate'
 import { recordAiUsage } from '@/lib/ai-credits'
 import { extractFinancialData } from '@/lib/ai/extract-financial-data'
@@ -50,7 +51,7 @@ export async function POST(req: Request) {
   // kon iedere ingelogde gebruiker hier een externe LLM aanroepen op onze
   // rekening. Spiegel van de zuster-route onboarding/aangifte-extract.
   const tierGate = await checkTierGate(supabase, user.id, 'ai')
-  if (tierGate) return forbidden(tierGate.error)
+  if (tierGate) return aiSubscriptionRequired()
 
   // CREDIT-GATE — direct ná de tier-gate en vóór getModel(), zoals
   // lib/ai/credit-gate.ts voorschrijft. Sleutel 'extraction' (kosten 2): dit is
@@ -58,9 +59,7 @@ export async function POST(req: Request) {
   // gedeelde maandbucket.
   const creditGate = await checkCreditBudget(supabase, user.id, 'extraction')
   if (!creditGate.allowed) {
-    const res = errorResponse(creditLimitMessage(creditGate), 429)
-    res.headers.set('Retry-After', String(creditGate.retryAfterSeconds))
-    return res
+    return aiCreditLimitReached(creditLimitMessage(creditGate), creditGate.retryAfterSeconds)
   }
 
   const raw = await req.json()

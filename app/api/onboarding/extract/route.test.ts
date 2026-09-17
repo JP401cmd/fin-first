@@ -95,7 +95,7 @@ describe('POST /api/onboarding/extract — poorten vóór het model', () => {
     const body = await res.json()
 
     expect(res.status).toBe(403)
-    expect(body.error).toBe('Deze functie vereist een AI abonnement')
+    expect(body).toEqual({ error: 'Dit kan in de app met een AI-abonnement.', code: 'ai_subscription' })
     // Dít is het dichtgezette gat: geen extractie, dus geen externe LLM-call.
     expect(mockExtractFinancialData).not.toHaveBeenCalled()
     // En geen verbruiksregistratie voor een call die nooit plaatsvond.

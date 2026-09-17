@@ -52,6 +52,11 @@
  *                                lib/scenario-events + lib/horizon/anker-copy.
  *   - `lib/goals/lab-doelen-buiten-plan.ts` — pure filter (WF-TOEK-50, spec
  *                                lab-haalbaarheid §4); geen imports.
+ *   - `lib/horizon/eindsituatie-duiding.ts` + `eindsituatie-copy.ts` +
+ *                                `eindsituatie-notice-minimize.ts` (WF-TOEK-56,
+ *                                plan 17 sep 2026 onderdeel D); geen
+ *                                Supabase-/Next-imports, alleen een
+ *                                `UnifiedProjectionRow`-type-import.
  */
 
 import { PERSONAS } from '@/lib/test-personas'
@@ -92,6 +97,10 @@ import { resolveLabAntwoorden } from '@/lib/horizon/lab-antwoorden'
 import { selectLabDoelenBuitenPlan } from '@/lib/goals/lab-doelen-buiten-plan'
 import { doelenPlanGewijzigdMelding } from '@/lib/horizon/anker-copy'
 import { buildDeficitLoanCopy } from '@/lib/horizon/deficit-loan-copy'
+import { detectEindsituatie } from '@/lib/horizon/eindsituatie-duiding'
+import { buildEindsituatieCopy } from '@/lib/horizon/eindsituatie-copy'
+import { resolveEindsituatieNoticeDisplay, asEindsituatieMinimizedFlag } from '@/lib/horizon/eindsituatie-notice-minimize'
+import type { UnifiedProjectionRow } from '@/lib/unified-projection'
 import { TOEK_ACCEPTANCE } from './toek'
 import type { AcceptanceCriterion } from './types'
 
@@ -208,6 +217,47 @@ function balkGrondslag(context: HousingContext, config: HousingStrategyConfig): 
     requiredPortfolioExclHome: SENTINEL_J,
   })
   return requiredPortfolio === SENTINEL_J ? 'J' : 'I'
+}
+
+// ── WF-TOEK-56 helper (eindsituatie-duiding, plan 17 sep 2026 onderdeel D) ──
+
+/**
+ * Minimale, hand-narekenbare `UnifiedProjectionRow` — alleen de velden die
+ * `detectEindsituatie` leest zijn gevuld; de rest is neutrale vulling (cast).
+ * Zelfstandige fixture (geen committed test-fixture hergebruikt), zodat de
+ * check hier onafhankelijk blijft van eindsituatie-duiding.test.ts.
+ */
+function eindsituatieRow(age: number, opts: { j: number; income?: number; need?: number }): UnifiedProjectionRow {
+  return {
+    year: age - 50,
+    age,
+    phase: 'withdrawal',
+    assetBuckets: {},
+    debtBalances: {},
+    totalAssets: 0,
+    totalDebts: 0,
+    netWorth: opts.j,
+    startNetWorth: 0,
+    nettoLiquide: opts.j,
+    grossIncome: opts.income ?? 0,
+    savings: 0,
+    withdrawal: 0,
+    withdrawalByType: {},
+    cashflowNet: 0,
+    oneTimeNet: 0,
+    totalGrowth: 0,
+    totalBox3: 0,
+    cumulativeBox3: 0,
+    inflationFactor: 1,
+    ...(opts.need != null
+      ? {
+          withdrawalNeed: {
+            uitgaveTerm: opts.need, huurNaVerkoop: 0, vervallenHypotheeklast: 0, box3: 0,
+            partnerBijdrage: 0, totaalNeed: opts.need, restMaandClamp: 0, nietGedekt: 0,
+          },
+        }
+      : {}),
+  } as UnifiedProjectionRow
 }
 
 // ── Checks — één per 'exact'-workflow in TOEK_ACCEPTANCE ───────────────────
@@ -705,6 +755,51 @@ export const TOEK_ENGINE_CHECKS: ToekEngineCheck[] = [
         expected:
           'instellingUit=Je plan staat een tekort-lening nu toe. Met de instelling "Geen tekort-lening in mijn plan" rekent de app met het vroegste stopmoment waarop je zonder lening rondkomt.; instellingAan=Je hebt ingesteld dat een tekort-lening niet in je plan hoort, maar met je gekozen stopmoment is hij toch nodig.; instellingAanZonderVastStopmoment=Je hebt ingesteld dat een tekort-lening niet in je plan hoort; deze berekening laat er toch een zien.; toonInstellingLink=true',
         actual: `instellingUit=${uit.instelling}; instellingAan=${aan.instelling}; instellingAanZonderVastStopmoment=${aanZonderAnker.instelling}; toonInstellingLink=${uit.toonInstellingLink && aan.toonInstellingLink}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-TOEK-56',
+    scenarioId: 'UAT-TOEK-56',
+    label: 'Eindsituatie-duiding + copy + minimaliseer-display op een zelfstandige synthetische fixture (plan 17 sep 2026 onderdeel D)',
+    run: () => {
+      criterion('WF-TOEK-56')
+      const U = 40_000 // jaaruitgaven van vandaag
+      // Rij-conventie: een rij `age` beschrijft standen aan het EIND van dat
+      // jaar, dus op leeftijd `age + 1` (`nom()` in eindsituatie-duiding.ts).
+      // Rijen lopen daarom t/m eindleeftijd(90) − 1 = 89, zoals clipRowsToPlanEnd.
+      const rows = [
+        eindsituatieRow(55, { j: 500_000, need: U }),
+        eindsituatieRow(67, { j: 15_000, need: U }), // dieptepunt: 15.000 ≤ 0,5 × 40.000 → "bijna op", getoond op 67+1=68
+        eindsituatieRow(80, { j: 250_000, need: U, income: 45_000 }), // inkomen ≥ behoefte → later-inkomen, getoond op 80 (geen +1 in deze push)
+        eindsituatieRow(89, { j: 300_000, need: U }), // eindrij (age 89 → eindAge 89+1=90): overschot = 300.000 − 0 (deplete)
+      ]
+      const duiding = detectEindsituatie({
+        rows,
+        endForm: 'deplete',
+        endAge: 90,
+        legacyAmount: 0,
+        legacyIncludeIlliquid: false,
+        vastStopmoment: false,
+        fireAgeFractional: 55,
+        currentAge: 50,
+        geenTekortLeningAan: true,
+        jaarUitgavenNu: U,
+      })!
+      const bedragTekst = (b: { bedrag: number }) => `€ ${Math.round(b.bedrag).toLocaleString('nl-NL')}`
+      const copy = buildEindsituatieCopy({ duiding, endForm: 'deplete', bedragTekst })
+
+      const displayNone = resolveEindsituatieNoticeDisplay(false, null)
+      const displayExpanded = resolveEindsituatieNoticeDisplay(true, null)
+      const displayMinimized = resolveEindsituatieNoticeDisplay(true, 1)
+      const flagOnbekendeWaarde = asEindsituatieMinimizedFlag(2)
+      const flagGeldig = asEindsituatieMinimizedFlag(1)
+
+      return {
+        expected:
+          'oorzaken=geen-tekort-lening,later-inkomen; eenduidig=true; overschot=300000@90; dieptepunt=15000@68; kopBevatVermogenOpeten=true; oorzaak0BevatJe68e=true; oorzaak0BevatDieptepunt=true; oorzaak1BevatJe80e=true; onduidelijk=null; displayNone=none; displayExpanded=expanded; displayMinimized=minimized; flagOnbekendeWaarde=null; flagGeldig=1',
+        actual:
+          `oorzaken=${duiding.oorzaken.map((o) => o.id).join(',')}; eenduidig=${duiding.eenduidig}; overschot=${duiding.overschot.bedrag}@${duiding.overschot.age}; dieptepunt=${duiding.dieptepunt?.bedrag}@${duiding.dieptepunt?.age}; kopBevatVermogenOpeten=${copy.kop.includes('vermogen opeten')}; oorzaak0BevatJe68e=${copy.oorzaken[0]?.includes('je 68e')}; oorzaak0BevatDieptepunt=${copy.oorzaken[0]?.includes('€ 15.000')}; oorzaak1BevatJe80e=${copy.oorzaken[1]?.includes('je 80e')}; onduidelijk=${copy.onduidelijk}; displayNone=${displayNone}; displayExpanded=${displayExpanded}; displayMinimized=${displayMinimized}; flagOnbekendeWaarde=${flagOnbekendeWaarde}; flagGeldig=${flagGeldig}`,
       }
     },
   },

@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import type { RapportageArchiveItem, RapportagesData } from '@/lib/rapportages-data-loader'
 import { FileText, Trash2, Eye, Sparkles, Scale, BarChart3, Layers, Compass, Users, FileStack, Lock } from 'lucide-react'
 import {
@@ -24,6 +23,7 @@ import { formatTimestamp } from '@/lib/format'
 import { localMonthBounds } from '@/lib/month-range'
 import { formatAmsterdamDayMonth } from '@/lib/tz'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
+import { AiSubscriptionUpsell } from '@/components/app/ai-subscription-upsell'
 
 type PeriodType = 'month' | 'quarter' | 'year'
 
@@ -134,11 +134,13 @@ export function RapportagesClient({ data }: { data: RapportagesData }) {
   const { mode } = useDisplayMode()
   const simple = mode === 'simple'
   // De AI-inleiding is het énige betaalde onderdeel van dit hele scherm; de zeven
-  // rapporten zelf zijn deterministisch en gratis (H28/S9). Een slot tonen mag
-  // daarom alleen bij die ene toggle — en alleen als de add-on ook echt te koop
-  // is: zolang Polar niet live staat (`available: false`) zou een slotje een muur
-  // zijn zonder deur.
-  const aiLocked = data.aiAddonAvailable && !data.hasAiSubscription
+  // rapporten zelf zijn deterministisch en gratis (H28/S9). Het slot hoort dus
+  // alleen bij die ene toggle, en hangt af van het ABONNEMENT van de gebruiker —
+  // niet van of de add-on al af te rekenen is (V-002). Voorheen `aiAddonAvailable
+  // && …`: met `available: false` was dat altijd false, zodat een non-abonnee de
+  // AI-toggle kon kiezen en daarna tegen een 403 liep. De upsell linkt naar het
+  // AI-sheet op /mijn/account ("Binnenkort" zolang Polar niet live is).
+  const aiLocked = !data.hasAiSubscription
   const [periodType, setPeriodType] = useState<PeriodType>('month')
   const [selection, setSelection] = useState('')
   const [savedConfigs, setSavedConfigs] = useState<RapportageArchiveItem[]>(data.archive)
@@ -469,8 +471,7 @@ export function RapportagesClient({ data }: { data: RapportagesData }) {
                       Het rapport zelf is deterministisch en blijft gratis; de
                       vergrendeling hoort dus HIER en niet op de knop eronder,
                       en ze is vóór de klik zichtbaar in plaats van pas ná het
-                      genereren (S9). Zolang de add-on niet te koop is toont de
-                      hub niets — `aiLocked` leest dat uit de catalogus. */}
+                      genereren (S9). `aiLocked` volgt het abonnement (V-002). */}
                   <div className="mb-5">
                     <label className="mb-2 block font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--ink-3)]">Inleiding</label>
                     <div className="flex flex-wrap items-center gap-2">
@@ -489,13 +490,13 @@ export function RapportagesClient({ data }: { data: RapportagesData }) {
                       {useAi && !aiLocked && <Sparkles className="h-3.5 w-3.5 text-[var(--module-active-700)]" aria-hidden />}
                     </div>
                     {aiLocked && (
-                      <p className="mt-2 font-inter text-[12px] leading-snug text-[var(--ink-3)]">
-                        De AI-inleiding hoort bij de AI-add-on. Het rapport zelf — alle cijfers, grafieken en
-                        vergelijkingen — krijg je zonder abonnement volledig.{' '}
-                        <Link href="/mijn/account" className="underline underline-offset-2 hover:text-[var(--ink)]">
-                          Bekijk de add-on
-                        </Link>
-                      </p>
+                      <div className="mt-2">
+                        <AiSubscriptionUpsell
+                          variant="inline"
+                          feature="Een AI-inleiding bij je rapport"
+                          note="Het rapport zelf — alle cijfers, grafieken en vergelijkingen — krijg je zonder abonnement volledig."
+                        />
+                      </div>
                     )}
                   </div>
 

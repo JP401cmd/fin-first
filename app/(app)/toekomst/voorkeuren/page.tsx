@@ -11,11 +11,12 @@ import { ToekomstSubpageShell } from '@/components/future/toekomst-subpage-shell
 import { VoorkeurenView } from '@/components/future/voorkeuren-view'
 import { resolveWithdrawalProfiel } from '@/lib/withdrawal-strategy'
 import { buildPotBalances } from '@/lib/future/pot-balances'
+import { buildStrategieEditorsData } from '@/lib/horizon/strategie-editors-data'
 
 export const metadata: Metadata = {
   title: 'Voorkeuren — TriFinity',
   description:
-    'Toekomst-voorkeuren: eindstrategie, onttrekking, pot-regels en markt-aannames die over de hele tijdas gelden.',
+    'Toekomst-voorkeuren: eindstrategie, onttrekking, pot-regels, je AOW-, pensioen-, huis- en werkstrategie en markt-aannames die over de hele tijdas gelden.',
 }
 
 /**
@@ -24,6 +25,10 @@ export const metadata: Metadata = {
  * Repliceert de prop-opbouw die voorheen in app/(app)/toekomst/page.tsx
  * (de ToekomstTabs-variant) gebeurde, nu als zelfstandige server-page met een
  * "Terug naar tijdas"-header.
+ *
+ * Sinds 17 sep 2026 ook de thuisbasis van de vier levensstrategieën (AOW, Pensioen,
+ * Huis, Werk), verhuisd van /toekomst/gebeurtenissen. De editordata komt uit dezelfde
+ * helper als Gebeurtenissen (`buildStrategieEditorsData`) — één rekenpad.
  */
 export default async function ToekomstVoorkeurenPage() {
   const supabase = await createClient()
@@ -34,6 +39,9 @@ export default async function ToekomstVoorkeurenPage() {
     // TPR-01 — alleen om te weten of de review iets kan bewaren (kolom uitgerold).
     user ? readPlanReviewState(supabase, user.id) : Promise.resolve(null),
   ])
+
+  // Levensstrategie-editors (AOW/Pensioen/Huis/Werk) — gedeelde server-opbouw.
+  const { strategieData } = buildStrategieEditorsData(horizonData)
 
   // simRows + fireAge voor AfbouwOverzichtCard in VoorkeurenView (plan F-2).
   const simRows = dashboardResult.dashboardData.simRows ?? null
@@ -58,7 +66,7 @@ export default async function ToekomstVoorkeurenPage() {
         titleBefore="Onder welke "
         emphasis="aannames"
         titleAfter=" reken je?"
-        deck="Eindstrategie, onttrekking, pot-regels en markt-aannames die over je hele tijdas gelden."
+        deck="Eindstrategie, onttrekking, je AOW, pensioen, huis en werk, en de markt-aannames die over je hele tijdas gelden."
         infoKey="/toekomst/voorkeuren"
       >
         {/* TPR-01 — de plan-review heropenen (A6): start bij stap 1 zodat ook een
@@ -90,6 +98,8 @@ export default async function ToekomstVoorkeurenPage() {
         regelVoorkeuren={dashboardResult.regelVoorkeuren}
         potBalances={potBalances}
         box3HeffingvrijInkomen={box3HeffingvrijInkomen}
+        events={horizonData.events}
+        strategieData={strategieData}
       />
     </>
   )

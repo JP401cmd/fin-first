@@ -48,6 +48,10 @@ import {
   AOW_NOTICE_MINIMIZE_KEY,
   asAowMinimizedFlag,
 } from '@/lib/horizon/aow-notice-minimize'
+import {
+  EINDSITUATIE_NOTICE_MINIMIZE_KEY,
+  asEindsituatieMinimizedFlag,
+} from '@/lib/horizon/eindsituatie-notice-minimize'
 
 /** Welke databron(nen) een in-scope route nodig heeft. */
 export type Family = 'lever' | 'cashflow' | 'box2' | 'freedom'
@@ -126,12 +130,15 @@ export const NUMERIC_MINIMIZE_NARROWERS: ReadonlyMap<string, (value: unknown) =>
     [STALE_TX_NOTICE_MINIMIZE_KEY, asStaleMinimizedMonths],
     // TPR-04: de "AOW ontbreekt"-melding op /toekomst — vlag 1, geen escalatie-dimensie.
     [AOW_NOTICE_MINIMIZE_KEY, asAowMinimizedFlag],
+    // Plan 17 sep (D): de eindsituatie-uitleg op /toekomst — vlag 1, informatief.
+    [EINDSITUATIE_NOTICE_MINIMIZE_KEY, asEindsituatieMinimizedFlag],
   ])
 
 export const EXTRA_MINIMIZE_KEYS: readonly string[] = [
   DEFICIT_NOTICE_MINIMIZE_KEY,
   STALE_TX_NOTICE_MINIMIZE_KEY,
   AOW_NOTICE_MINIMIZE_KEY,
+  EINDSITUATIE_NOTICE_MINIMIZE_KEY,
 ]
 
 /**

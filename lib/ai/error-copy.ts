@@ -110,7 +110,9 @@ const COPY: Record<AiErrorCode, CopyEntry> = {
     affordance: 'geen',
   },
   [AI_ERROR_CODE.subscription]: {
-    text: 'Fin is een betaalde functie. Sluit het AI-abonnement af om verder te chatten.',
+    // Generiek: dezelfde code komt van élke AI-route (V-002, lib/ai/gate-responses.ts),
+    // niet alleen van de chat.
+    text: 'Dit kan in de app met een AI-abonnement.',
     affordance: 'upsell',
   },
   [AI_ERROR_CODE.aiDisabled]: {

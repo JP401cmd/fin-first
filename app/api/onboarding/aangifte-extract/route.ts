@@ -46,6 +46,7 @@ import { extractAangifteData } from '@/lib/aangifte/extract-aangifte-data'
 import { extractionSchema } from '@/lib/aangifte/extraction-schema'
 import { stripSensitiveData, stripHouseholdNames } from '@/lib/aangifte/strip-bsn'
 import { checkTierGate } from '@/lib/require-tier'
+import { aiSubscriptionRequired } from '@/lib/ai/gate-responses'
 
 // ── Body validation ─────────────────────────────────────────────────
 
@@ -104,7 +105,7 @@ export async function POST(req: Request) {
   // reeds-gegate onboarding/suggest-budgets — voorheen enkel auth-check.
   const gate = await checkTierGate(supabase, user.id, 'ai')
   if (gate) {
-    return Response.json({ error: gate.error }, { status: 403 })
+    return aiSubscriptionRequired()
   }
 
   let raw: unknown

@@ -397,7 +397,7 @@ describe('/api/report — AI-poort geldt alleen voor het AI-pad (H28)', () => {
     const res = await GET(getRequest('&use_ai=true'))
 
     expect(res.status).toBe(403)
-    expect(await res.json()).toMatchObject({ error: TIER_GATE.error })
+    expect(await res.json()).toEqual({ error: 'Dit kan in de app met een AI-abonnement.', code: 'ai_subscription' })
     expect(mockCheckTierGate).toHaveBeenCalledWith(expect.anything(), 'user-1', 'ai')
   })
 
@@ -466,7 +466,7 @@ describe('/api/report — AI-poort geldt alleen voor het AI-pad (H28)', () => {
     )
 
     expect(res.status).toBe(403)
-    expect(await res.json()).toMatchObject({ error: TIER_GATE.error })
+    expect(await res.json()).toEqual({ error: 'Dit kan in de app met een AI-abonnement.', code: 'ai_subscription' })
   })
 
   it('DELETE van een eigen configuratie heeft nooit een AI-abonnement nodig', async () => {

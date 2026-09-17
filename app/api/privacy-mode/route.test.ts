@@ -8,7 +8,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
  *   - POST: 401 zonder sessie · 400 bij malformed body of niet-boolean waarde ·
  *     200 + own-row update (`.eq('id', user.id)`) bij true/false
  *   - POST tier-gate (eigenaarsbesluit, requirements §5 optie 2): AANzetten zonder
- *     'ai'-abonnement → 403 `tier_required` zonder update; UITzetten roept de gate
+ *     'ai'-abonnement → 403 `ai_subscription` zonder update; UITzetten roept de gate
  *     nooit aan (blijft altijd vrij)
  *   - 500 → client kan optimistisch terugrollen
  * Verifieert expliciet dat lezen én schrijven op de EIGEN rij gaan
@@ -145,10 +145,8 @@ describe('POST /api/privacy-mode', () => {
     })
     const res = await POST(postRequest({ enabled: true }))
     expect(res.status).toBe(403)
-    expect(await res.json()).toEqual({
-      error: 'Deze functie vereist een AI abonnement',
-      code: 'tier_required',
-    })
+    // V-002: dezelfde abonnement-code als elke andere AI-route.
+    expect(await res.json()).toEqual({ error: 'Dit kan in de app met een AI-abonnement.', code: 'ai_subscription' })
     // De gate blokkeert vóór de update — er wordt niets naar `profiles` geschreven.
     expect(mockFrom).not.toHaveBeenCalled()
   })

@@ -55,7 +55,7 @@ export interface KernelMemberProfileRow {
   fire_legacy_amount?: number | string | null
   retirement_expense_method?: string | null
   retirement_expense_custom_amount?: number | string | null
-  /** ADR 0149 — de EIGEN planvoorwaarde van het lid ("geen tekort-lening"); NULL → uit. */
+  /** ADR 0149 — de EIGEN planvoorwaarde van het lid ("geen tekort-lening"); NULL → aan (standaard), `false` → uit. */
   fire_no_deficit_loan?: boolean | null
   /** Lid verbergt z'n toekomst-gegevens voor het huishouden (privacy 'future' = 'hidden'). */
   future_hidden?: boolean | null

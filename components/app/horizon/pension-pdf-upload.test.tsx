@@ -23,7 +23,14 @@ vi.mock('@/lib/ai/local/local-pension-resolver', () => ({
   createLocalPensionResolver: () => resolveLocal,
 }))
 
-const { PensionPdfUpload } = await import('./pension-pdf-upload')
+// Abonnementsbron (spiegel van profiles.active_subscriptions). Default: wél AI,
+// zodat de bestemmings-tests hieronder over de uitvoerkeuze blijven gaan.
+const accessState = { hasAi: true as boolean | null }
+vi.mock('@/lib/feature-access/context', () => ({
+  useHasAiSubscription: () => accessState.hasAi,
+}))
+
+const { PensionPdfUpload, ONBOARDING_PDF_NOTICE } = await import('./pension-pdf-upload')
 
 function mode(overrides: Partial<ExecutionModeState>): ExecutionModeState {
   return {
@@ -49,6 +56,7 @@ function kiesBestand(file: File) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  accessState.hasAi = true
   vi.stubGlobal('fetch', vi.fn())
 })
 
@@ -186,5 +194,84 @@ describe('PensionPdfUpload — de uitvoerkeuze bepaalt de bestemming', () => {
     const body = fetchMock.mock.calls[0][1].body as FormData
     expect(body.get('consent')).toBe('pension_pdf_ai_v1')
     expect(resolveLocal).not.toHaveBeenCalled()
+  })
+})
+
+function xmlFile(): File {
+  return new File(['<nope/>'], 'pensioenaanspraken.xml', { type: 'text/xml' })
+}
+
+describe('PensionPdfUpload — zonder AI-abonnement (V-002)', () => {
+  it('uploadt een PDF NIET en toont de upsell met het XML/JSON-alternatief', async () => {
+    accessState.hasAi = false
+    executionState.current = mode({ status: 'cloud', intended: 'cloud', canUseCloud: true })
+
+    render(<PensionPdfUpload />)
+    kiesBestand(pdfFile())
+
+    await waitFor(() => expect(screen.getByTestId('pension-pdf-upsell')).toBeTruthy())
+    expect(global.fetch).not.toHaveBeenCalled()
+    expect(resolveLocal).not.toHaveBeenCalled()
+    expect(screen.getByTestId('ai-upsell-headline').textContent).toBe(
+      'Je pensioenoverzicht (PDF) uitlezen kan met een AI-abonnement',
+    )
+    expect(screen.getByRole('link', { name: /Bekijk AI-abonnement/i }).getAttribute('href')).toBe(
+      '/mijn/account?addon=ai',
+    )
+    expect(screen.getByText(/XML- of JSON-download .* werkt zonder abonnement/i)).toBeTruthy()
+  })
+
+  it('laat XML zonder abonnement gewoon door (geen AI, geen upsell)', async () => {
+    accessState.hasAi = false
+    executionState.current = mode({ status: 'cloud', intended: 'cloud', canUseCloud: true })
+
+    render(<PensionPdfUpload />)
+    kiesBestand(xmlFile())
+
+    // Ongeldige XML → eigen parserfout, maar nooit de upsell en nooit een fetch.
+    await waitFor(() => expect(screen.queryByText(/wordt verwerkt/i)).toBeNull())
+    expect(screen.queryByTestId('pension-pdf-upsell')).toBeNull()
+    expect(global.fetch).not.toHaveBeenCalled()
+  })
+
+  it('toont de upsell ook na een server-403 met code ai_subscription', async () => {
+    executionState.current = mode({ status: 'cloud', intended: 'cloud', canUseCloud: true })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 403,
+        json: async () => ({ error: 'Geen abonnement', code: 'ai_subscription' }),
+      }),
+    )
+
+    render(<PensionPdfUpload />)
+    kiesBestand(pdfFile())
+
+    await waitFor(() => expect(screen.getByTestId('pension-pdf-upsell')).toBeTruthy())
+    expect(screen.queryByText('Geen abonnement')).toBeNull()
+  })
+})
+
+describe('PensionPdfUpload — onboarding', () => {
+  it('biedt geen PDF aan, legt uit waarom en start niets bij een PDF', async () => {
+    executionState.current = mode({ status: 'cloud', intended: 'cloud', canUseCloud: true })
+
+    render(<PensionPdfUpload context="onboarding" />)
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement
+    expect(input.accept).not.toMatch(/pdf/i)
+    expect(screen.getByTestId('pension-onboarding-pdf-notice').textContent).toBe(ONBOARDING_PDF_NOTICE)
+    expect(ONBOARDING_PDF_NOTICE).toMatch(/met AI/)
+    expect(ONBOARDING_PDF_NOTICE).toMatch(/in de app met een AI-abonnement/)
+    expect(ONBOARDING_PDF_NOTICE).toMatch(/XML- of JSON/)
+    // Geen link weg uit de onboarding.
+    expect(screen.queryByRole('link')).toBeNull()
+
+    kiesBestand(pdfFile())
+    await Promise.resolve()
+    expect(global.fetch).not.toHaveBeenCalled()
+    expect(resolveLocal).not.toHaveBeenCalled()
+    expect(extractPdfPageTexts).not.toHaveBeenCalled()
+    expect(screen.queryByTestId('pension-pdf-upsell')).toBeNull()
   })
 })

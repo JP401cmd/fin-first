@@ -2,12 +2,13 @@ import { generateObject } from 'ai'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { recordAiUsage } from '@/lib/ai-credits'
-import { getModel, AIConfigError } from '@/lib/ai/config'
+import { getModel } from '@/lib/ai/config'
 import { RECOMMENDATIONS_SYSTEM_PROMPT } from '@/lib/ai/dna/recommendations'
 import { buildRecommendationContext } from '@/lib/ai/context/recommendation-context'
 import { maskPIIInOutput } from '@/lib/ai/pii-output-filter'
 import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
 import { checkTierGate } from '@/lib/require-tier'
+import { aiSubscriptionRequired, aiCreditLimitReached, aiModelUnavailable } from '@/lib/ai/gate-responses'
 import { checkCreditBudget, creditLimitMessage } from '@/lib/ai/credit-gate'
 import { assertCloudAllowed } from '@/lib/ai/privacy-gate'
 import { unauthorized, serverError, errorResponse } from '@/lib/api/respond'
@@ -63,17 +64,14 @@ export async function POST() {
 
   const tierGate = await checkTierGate(supabase, user.id, 'ai')
   if (tierGate) {
-    return new Response(JSON.stringify({ error: tierGate.error }), { status: 403, headers: { 'Content-Type': 'application/json' } })
+    return aiSubscriptionRequired()
   }
 
   // Per-gebruiker rate-limit: dwing het maand-creditbudget af (gedeelde bucket)
   // vóór de dure LLM-call.
   const creditGate = await checkCreditBudget(supabase, user.id, 'recommendations')
   if (!creditGate.allowed) {
-    return new Response(JSON.stringify({ error: creditLimitMessage(creditGate) }), {
-      status: 429,
-      headers: { 'Content-Type': 'application/json', 'Retry-After': String(creditGate.retryAfterSeconds) },
-    })
+    return aiCreditLimitReached(creditLimitMessage(creditGate), creditGate.retryAfterSeconds)
   }
 
   // Fetch budgets + profile for freedom_days validation and budgeting_active check
@@ -110,11 +108,7 @@ export async function POST() {
   try {
     model = await getModel(supabase, 'aanbevelingen')
   } catch (err) {
-    if (err instanceof AIConfigError) {
-      // eslint-disable-next-line no-restricted-syntax -- rauwe error.message: zie [Arch F4] API-error-envelope
-      return Response.json({ error: err.message }, { status: 422 })
-    }
-    return Response.json({ error: 'AI model kon niet worden geladen.' }, { status: 500 })
+    return aiModelUnavailable(err, 'ai-recommendations')
   }
   const generationId = crypto.randomUUID()
 

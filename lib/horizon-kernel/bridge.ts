@@ -77,6 +77,7 @@ import {
   startNettoLiquide as startNettoLiquideT0,
 } from './jaarrand'
 import { computeEs, type EindstrategieCode } from './tables/es'
+import { opeetCapRestant } from './tables/bez'
 import type { GebPostHelpers } from './tables/geb'
 import { inflationIndex } from './scaffold'
 import { depletionMonth } from './runway'
@@ -315,6 +316,13 @@ export interface KernelUnifiedResult extends UnifiedProjectionResult {
 }
 
 // ── m-accessors (guard voorbij-horizon / lege cellen → 0) ────────────────────
+
+/**
+ * ADR 0151 — absolute drempel (€) waaronder de resterende opeet-leenruimte als "plafond
+ * bereikt" geldt. Absoluut, niet relatief: de referentie is 0 (opname = capRestant ⇒
+ * saldo = BD op float-ruis na), een relatieve tolerantie zou meeschalen met het saldo.
+ */
+const OPEET_PLAFOND_TOLERANTIE_EUR = 0.01
 
 /** Coerce een S-cel (getal of "") naar getal (leeg → 0). */
 function numCell(v: number | ''): number {
@@ -708,6 +716,9 @@ function buildRow(
       k === 0 ? pot.startwaarde : sSlotSaldo(proj, monthStart - 1, slot)
     let interestPaid = 0
     let principalPaid = 0
+    // ADR 0151 — bijgeschreven (niet-betaalde) rente van de opeethypotheek, apart van
+    // `interestPaid` (kas). Alleen de opeet-slot draagt `renteBijgeschreven`.
+    let renteBijgeschreven = 0
     for (let m = monthStart; m <= monthEnd; m++) {
       const row = proj.s[m]
       if (row === undefined) continue
@@ -715,6 +726,7 @@ function buildRow(
       if (cell === undefined) continue
       interestPaid += numCell(cell.rente)
       principalPaid += numCell(cell.aflossing) + numCell(cell.extra)
+      renteBijgeschreven += cell.renteBijgeschreven ?? 0
     }
     const key =
       pot.rol === 'tekortLening'
@@ -722,7 +734,32 @@ function buildRow(
         : pot.rol === 'opeethypotheek'
           ? 'opeethypotheek'
           : debtMetaBySlot.get(slot) ?? `slot-${slot}`
-    debtBalances[key] = { startBalance, interestPaid, principalPaid, endBalance }
+    debtBalances[key] = {
+      startBalance,
+      interestPaid,
+      principalPaid,
+      endBalance,
+      ...(pot.rol === 'opeethypotheek' ? { renteBijgeschreven } : {}),
+    }
+  }
+
+  // ADR 0151 — plafond bereikt aan het jaareinde (alleen opeet-modus): opeet-tak gestart
+  // én geen resterende leenruimte meer in de laatste maand (één home: bez.ts#
+  // opeetCapRestant op BD(m) en S!P(m)). Tolerantie ABSOLUUT (< €0,01): de referentie is
+  // een structurele 0 (opname = capRestant ⇒ saldo = BD op float-ruis na); relatief
+  // zou hier zinloos zijn.
+  let opeetPlafondBereikt = false
+  if (opeetMode) {
+    const bezEind = proj.bez[monthEnd]
+    const opeetSlot = input.schuldPotten.find((p) => p.rol === 'opeethypotheek')?.slot
+    if (bezEind !== undefined && !bezEind.beyondHorizon && bezEind.woning.opeetGestart === 1 && opeetSlot !== undefined) {
+      const restant = opeetCapRestant(
+        bezEind.woning.opeetCap,
+        input.woning.opeetRentePerJaar,
+        sSlotSaldo(proj, monthEnd, opeetSlot),
+      )
+      opeetPlafondBereikt = restant < OPEET_PLAFOND_TOLERANTIE_EUR
+    }
   }
 
   const phase: UnifiedProjectionRow['phase'] =
@@ -761,7 +798,7 @@ function buildRow(
     totalBox3,
     cumulativeBox3: cumBox3Prev + totalBox3,
     inflationFactor: Math.pow(1 + input.inflatie, k),
-    ...(opeetMode ? { opeetOpname, opeetCap } : {}),
+    ...(opeetMode ? { opeetOpname, opeetCap, opeetPlafondBereikt } : {}),
     ...(needTotaal > 0
       ? {
           withdrawalNeed: {

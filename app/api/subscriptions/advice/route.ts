@@ -1,8 +1,9 @@
 import { generateObject } from 'ai'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
-import { getModel, AIConfigError } from '@/lib/ai/config'
+import { getModel } from '@/lib/ai/config'
 import { checkTierGate } from '@/lib/require-tier'
+import { aiSubscriptionRequired, aiModelUnavailable } from '@/lib/ai/gate-responses'
 import { assertCloudAllowed } from '@/lib/ai/privacy-gate'
 import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
 import { maskPIIInObject } from '@/lib/ai/pii-output-filter'
@@ -84,7 +85,7 @@ export async function POST(req: Request) {
 
   const tierGate = await checkTierGate(supabase, user.id, 'ai')
   if (tierGate) {
-    return new Response(JSON.stringify({ error: tierGate.error }), { status: 403, headers: { 'Content-Type': 'application/json' } })
+    return aiSubscriptionRequired()
   }
 
   const body = await req.json() as {
@@ -124,11 +125,7 @@ export async function POST(req: Request) {
   try {
     model = await getModel(supabase, 'abonnementen_advies')
   } catch (err) {
-    if (err instanceof AIConfigError) {
-      // eslint-disable-next-line no-restricted-syntax -- rauwe error.message: zie [Arch F4] API-error-envelope
-      return Response.json({ error: err.message }, { status: 422 })
-    }
-    return Response.json({ error: 'AI model kon niet worden geladen.' }, { status: 500 })
+    return aiModelUnavailable(err, 'subscriptions-advice')
   }
 
   // Sanitize subscription names before they reach the AI provider (own name +

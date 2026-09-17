@@ -4,7 +4,7 @@
  * Stap 3 "Wat er binnenkomt" inline in de plan-review (TPR-15).
  *
  * Drie soorten instellingen, één tegelijk (zoals stap 4 en 5), elk met de BESTAANDE body van
- * /toekomst/gebeurtenissen en dezelfde schrijfroute (`PUT /api/life-events/strategie`):
+ * /toekomst/voorkeuren en dezelfde schrijfroute (`PUT /api/life-events/strategie`):
  *  - AOW (`AowStrategieBody`) — bestaat er nog geen eigen AOW-rij, dan is het formulier
  *    vooringevuld en maakt pas opslaan hem aan (besluit eigenaar 13 sep 2026);
  *  - werk (`WerkStrategieBody`);

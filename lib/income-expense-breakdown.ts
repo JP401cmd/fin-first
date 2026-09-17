@@ -15,6 +15,9 @@ import type { SimRow } from '@/lib/fire-simulation'
 import type { UnifiedProjectionRow } from '@/lib/unified-projection'
 import type { Debt } from '@/lib/debt-data'
 import { DEBT_LAYER_COLORS } from '@/lib/wealth-composition'
+import type { SyntheticDebtKey } from '@/lib/horizon/synthetic-debts'
+
+const OPEET_KEY: SyntheticDebtKey = 'opeethypotheek'
 
 // ── Layer & row types ───────────────────────────────────────
 
@@ -137,11 +140,12 @@ export function buildBreakdown(
   const debtIds: string[] = []
 
   for (const uRow of unifiedRows) {
-    // Discover debt IDs
+    // Discover debt IDs. De opeethypotheek heeft geen maandlast: haar rente wordt op de
+    // schuld bijgeschreven (ADR 0151, apart veld `renteBijgeschreven`, `interestPaid` 0)
+    // en is geen uitgaande kasstroom — geen rentelaag. De tekort-lening draagt haar rente
+    // (nog) in `interestPaid` en blijft consistent met flowOut/jaarkaart een rentelaag.
     for (const [dId, detail] of Object.entries(uRow.debtBalances)) {
-      if (detail.interestPaid > 0 && !debtNames.has(dId) === false) {
-        // Already in debtNames
-      }
+      if (dId === OPEET_KEY) continue
       if (detail.interestPaid > 0 && !debtIds.includes(dId)) {
         debtIds.push(dId)
       }
@@ -307,8 +311,9 @@ export function buildBreakdown(
       expenseBySource['box3'] = Math.round(uRow.totalBox3)
     }
 
-    // Rente per schuld
+    // Rente per schuld (opeethypotheek: bijgeschreven, geen kas — zie pass 1)
     for (const [dId, detail] of Object.entries(uRow.debtBalances)) {
+      if (dId === OPEET_KEY) continue
       if (detail.interestPaid > 0) {
         expenseBySource[`debt-interest-${dId}`] = Math.round(detail.interestPaid)
       }

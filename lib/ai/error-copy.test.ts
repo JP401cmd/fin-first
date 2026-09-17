@@ -84,6 +84,14 @@ describe('describeAiError', () => {
     expect(describeAiError(AI_ERROR_CODE.aiDisabled).affordance).toBe('link')
   })
 
+  it('ai_subscription is generiek (V-002): geldt voor elke AI-functie, niet alleen de chat', () => {
+    const copy = describeAiError(AI_ERROR_CODE.subscription)
+    expect(copy.text).toBe('Dit kan in de app met een AI-abonnement.')
+    expect(copy.text).not.toMatch(/chat/i)
+    // De servertekst wint hier niet: de tabeltekst is leidend.
+    expect(describeAiError(AI_ERROR_CODE.subscription, 'Deze functie vereist een AI abonnement').text).toBe(copy.text)
+  })
+
   it('hergebruikt de gedeelde kill-switch-tekst voor ai_disabled', () => {
     expect(describeAiError(AI_ERROR_CODE.aiDisabled).text).toBe(AI_DISABLED_GATE_MESSAGE)
   })

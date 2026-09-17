@@ -167,7 +167,15 @@ export function buildWithdrawalReceiptLines(
   // wat daarna overblijft is een echt tekort. Sluiting: totaalNeed − opeet − tekort = withdrawal.
   const opeetGedekt = Math.min(Math.max(0, opeetOpname), need.nietGedekt)
   if (opeetGedekt > 0.5) {
-    lines.push({ id: 'opeet-gedekt', label: 'Gedekt uit je huis (opeethypotheek)', signed: -opeetGedekt, kind: 'component' })
+    lines.push({
+      id: 'opeet-gedekt',
+      label: 'Gedekt uit je huis (opeethypotheek)',
+      // ADR 0151: de opeethypotheek kent geen maandlast; de rente wordt bijgeschreven
+      // op de schuld (zichtbaar in de Schulden-kassabon als "Rente bijgeschreven").
+      sublabel: 'geen maandlast: de rente wordt bij de schuld opgeteld',
+      signed: -opeetGedekt,
+      kind: 'component',
+    })
   }
   const tekort = need.nietGedekt - opeetGedekt
   if (tekort > 0.5) {
@@ -409,16 +417,28 @@ function DebtRow({
   endBalance,
   interestPaid,
   principalPaid,
+  renteBijgeschreven = 0,
+  opgenomen = 0,
   factor,
 }: {
   presentation: DebtRowPresentation
   endBalance: number
   interestPaid: number
   principalPaid: number
+  /** ADR 0151 — rente die dit jaar óp de schuld is bijgeschreven (opeethypotheek; geen kas). */
+  renteBijgeschreven?: number
+  /** ADR 0151 — dit jaar opgenomen bedrag (opeethypotheek, `row.opeetOpname`). */
+  opgenomen?: number
   /** Kernelfactor van dit jaar (`row.inflationFactor`). */
   factor: number
 }) {
   const fc = useYearFc(factor)
+  // Mutatieregels onder de naam: eerst wat de schuld laat groeien (+), dan wat 'm verkleint (−).
+  const mutaties: Array<{ label: string; bedrag: number }> = []
+  if (opgenomen > 0) mutaties.push({ label: '+ Opgenomen', bedrag: opgenomen })
+  if (renteBijgeschreven > 0) mutaties.push({ label: '+ Rente bijgeschreven', bedrag: renteBijgeschreven })
+  if (principalPaid > 0) mutaties.push({ label: '− Aflossing', bedrag: principalPaid })
+  if (interestPaid > 0) mutaties.push({ label: '− Rente', bedrag: interestPaid })
   return (
     <li className="flex items-start justify-between gap-3 border-b border-dotted border-[var(--border-ed)]/70 py-2.5 last:border-b-0">
       <div className="flex min-w-0 items-start gap-2.5">
@@ -438,21 +458,15 @@ function DebtRow({
           <p className="mt-0.5 text-[10px] uppercase tracking-wider text-[var(--ink-4)]">
             {presentation.typeLabel}
           </p>
-          {(principalPaid > 0 || interestPaid > 0) && (
+          {mutaties.length > 0 && (
             <p className="mt-1 text-[10px] text-[var(--ink-3)]">
-              {principalPaid > 0 && (
-                <>
-                  <span>− Aflossing </span>
-                  <span className="font-mono tabular-nums">{fc(principalPaid)}</span>
-                  {interestPaid > 0 && <span className="mx-1.5">·</span>}
-                </>
-              )}
-              {interestPaid > 0 && (
-                <>
-                  <span>− Rente </span>
-                  <span className="font-mono tabular-nums">{fc(interestPaid)}</span>
-                </>
-              )}
+              {mutaties.map((m, i) => (
+                <span key={m.label}>
+                  {i > 0 && <span className="mx-1.5">·</span>}
+                  <span>{m.label} </span>
+                  <span className="font-mono tabular-nums">{fc(m.bedrag)}</span>
+                </span>
+              ))}
             </p>
           )}
         </div>
@@ -750,7 +764,10 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
           : synthetic
             ? { name: synthetic.name, typeLabel: synthetic.typeLabel, debtType: synthetic.debtType }
             : null
-        return { id, detail, presentation }
+        // ADR 0151: de opeethypotheek groeit door opname (rijveld `opeetOpname`) en
+        // bijgeschreven rente (`detail.renteBijgeschreven`); beide als "+"-regel.
+        const opgenomen = id === 'opeethypotheek' ? row.opeetOpname ?? 0 : 0
+        return { id, detail, presentation, opgenomen }
       })
       .filter(({ detail, presentation }) =>
         presentation != null &&
@@ -761,6 +778,7 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
         id: string
         detail: UnifiedProjectionRow['debtBalances'][string]
         presentation: DebtRowPresentation
+        opgenomen: number
       }>
   }, [row, debtsById])
 
@@ -1004,13 +1022,15 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
                   }
                 />
                 <ul className="mt-1">
-                  {debtRows.map(({ id, detail, presentation }) => (
+                  {debtRows.map(({ id, detail, presentation, opgenomen }) => (
                     <DebtRow
                       key={id}
                       presentation={presentation}
                       endBalance={detail.endBalance}
                       interestPaid={detail.interestPaid}
                       principalPaid={detail.principalPaid}
+                      renteBijgeschreven={detail.renteBijgeschreven ?? 0}
+                      opgenomen={opgenomen}
                       factor={factor}
                     />
                   ))}

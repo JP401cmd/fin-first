@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { parseBody } from '@/lib/api/parse-body'
 import { unauthorized, forbidden, serverError } from '@/lib/api/respond'
 import { checkTierGate } from '@/lib/require-tier'
+import { aiSubscriptionRequired } from '@/lib/ai/gate-responses'
 import {
   buildLocalTipCandidates,
   tipGenerationId,
@@ -84,7 +85,7 @@ export async function POST(req: NextRequest) {
   }
 
   const gate = await checkTierGate(supabase, user.id, 'ai')
-  if (gate) return forbidden(gate.error)
+  if (gate) return aiSubscriptionRequired()
 
   const parsed = await parseBody(localTipsSchema, req)
   if (!parsed.ok) return parsed.response

@@ -190,7 +190,10 @@ export const INTEGRATIONS: IntegrationEntry[] = [
     changelogUrl: 'https://docs.coingecko.com/changelog',
     healthProbe: {
       kind: 'public',
-      url: 'https://api.coingecko.com/api/v3/ping',
+      // Hetzelfde endpoint als `coingecko-client.ts#fetchEurPrices`. `/ping`
+      // faalde vanaf Vercel terwijl `/simple/price` er gewoon slaagde: een probe
+      // moet testen wat de app gebruikt, anders meet hij een vals alarm.
+      url: 'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=eur',
       method: 'GET',
       expectStatus: 200,
     },

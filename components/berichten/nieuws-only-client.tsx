@@ -18,6 +18,25 @@ import { useLocalNewsEdition } from './use-local-news-edition'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import type { NewsItem } from '@/lib/news-item'
 import { NEWS_CACHE_KEY_PREFIX } from '@/lib/browser-account-storage'
+import { AiSubscriptionUpsell } from '@/components/app/ai-subscription-upsell'
+import { useHasAiSubscription } from '@/lib/feature-access/context'
+import { describeAiError, isAiErrorCode } from '@/lib/ai/error-copy'
+
+/** De server meldt 'geen AI-abonnement' (403 `ai_subscription`) → upsell. */
+class NewsUpsellSignal extends Error {}
+
+/**
+ * Zet een foutenvelope van /api/news om in een Error. AI-codes krijgen de
+ * canonieke copy (nooit rauwe servertekst); geen abonnement → NewsUpsellSignal.
+ */
+function newsErrorFromEnvelope(data: { error?: string; code?: unknown }, status: number): Error {
+  if (isAiErrorCode(data.code)) {
+    const copy = describeAiError(data.code, data.error)
+    if (copy.affordance === 'upsell') return new NewsUpsellSignal(copy.text)
+    return new Error(copy.text)
+  }
+  return new Error(data.error ?? `HTTP ${status}`)
+}
 
 // ── News cache (client-side) ────────────────────────────────────────
 // LET OP: deze cache hoort bij het CLOUDPAD. De on-device editie wordt
@@ -299,6 +318,12 @@ export function NieuwsOnlyClient({ userId }: { userId: string }) {
 
   // ── Waar draait deze editie? ──
   const execution = useExecutionMode('nieuws')
+  // V-002: de krant wordt door AI samengesteld. Zonder abonnement vooraf de
+  // upsell (niets ophalen), of alsnog na een server-403 'ai_subscription'.
+  const knownNoAi = useHasAiSubscription() === false
+  const [newsUpsell, setNewsUpsell] = useState(false)
+  const showNewsUpsell =
+    knownNoAi || newsUpsell || (execution.status === 'blocked' && execution.reason === 'abonnement')
   const isLocal = execution.status === 'lokaal'
   const isCloud = execution.status === 'cloud'
   const modeResolved = isCloud || isLocal
@@ -349,7 +374,7 @@ export function NieuwsOnlyClient({ userId }: { userId: string }) {
       const res = await fetch('/api/news')
       if (!res.ok) {
         const data = await res.json().catch(() => ({ error: 'Onbekende fout' }))
-        throw new Error(data.error ?? `HTTP ${res.status}`)
+        throw newsErrorFromEnvelope(data, res.status)
       }
       const data = await res.json()
 
@@ -372,7 +397,8 @@ export function NieuwsOnlyClient({ userId }: { userId: string }) {
       if (data.sourceCount !== undefined) setSourceCount(data.sourceCount)
       if (data.refreshesRemaining !== undefined) setRefreshesRemaining(data.refreshesRemaining)
     } catch (err) {
-      setNewsError(err instanceof Error ? err.message : 'Nieuws kon niet worden geladen')
+      if (err instanceof NewsUpsellSignal) setNewsUpsell(true)
+      else setNewsError(err instanceof Error ? err.message : 'Nieuws kon niet worden geladen')
     } finally {
       setNewsLoading(false)
     }
@@ -383,6 +409,11 @@ export function NieuwsOnlyClient({ userId }: { userId: string }) {
     // Fail-closed: een verversing is een cloud-generatie. Alleen bij een
     // expliciet cloud-groen licht.
     if (!execution.canUseCloud) return
+    // Pre-check (V-002): zonder abonnement geen generatie-aanvraag, wel de upsell.
+    if (knownNoAi) {
+      setNewsUpsell(true)
+      return
+    }
     try { localStorage.removeItem(newsCacheKey(userId)) } catch { /* noop */ }
     // Keep current items visible — use overlay instead of clearing
     setRefreshing(true)
@@ -397,7 +428,7 @@ export function NieuwsOnlyClient({ userId }: { userId: string }) {
           setRefreshing(false)
           return
         }
-        throw new Error(data.error ?? `HTTP ${res.status}`)
+        throw newsErrorFromEnvelope(data, res.status)
       }
       const data = await res.json()
 
@@ -425,18 +456,19 @@ export function NieuwsOnlyClient({ userId }: { userId: string }) {
       if (data.refreshesRemaining !== undefined) setRefreshesRemaining(data.refreshesRemaining)
     } catch (err) {
       generationDeadlineRef.current = null
-      setNewsError(err instanceof Error ? err.message : 'Nieuws kon niet worden geladen')
+      if (err instanceof NewsUpsellSignal) setNewsUpsell(true)
+      else setNewsError(err instanceof Error ? err.message : 'Nieuws kon niet worden geladen')
       setRefreshing(false)
     }
-  }, [execution.canUseCloud, userId])
+  }, [execution.canUseCloud, knownNoAi, userId])
 
   // News-only users have AI enabled by definition — fetch zodra vaststaat dat
   // deze editie via de cloud hoort te komen. In 'resolving'/'blocked'/'lokaal'
   // vertrekt er niets naar /api/news.
   useEffect(() => {
-    if (!execution.canUseCloud) return
+    if (!execution.canUseCloud || knownNoAi) return
     fetchNews()
-  }, [fetchNews, execution.canUseCloud])
+  }, [fetchNews, execution.canUseCloud, knownNoAi])
 
   // ── Poll for background generation — handles partial items progressively ──
   useEffect(() => {
@@ -457,7 +489,7 @@ export function NieuwsOnlyClient({ userId }: { userId: string }) {
         const res = await fetch('/api/news')
         if (!res.ok) {
           const data = await res.json().catch(() => ({ error: 'Onbekende fout' }))
-          throw new Error(data.error ?? `HTTP ${res.status}`)
+          throw newsErrorFromEnvelope(data, res.status)
         }
         const data = await res.json()
 
@@ -487,7 +519,8 @@ export function NieuwsOnlyClient({ userId }: { userId: string }) {
         if (data.refreshesRemaining !== undefined) setRefreshesRemaining(data.refreshesRemaining)
       } catch (err) {
         generationDeadlineRef.current = null
-        setNewsError(err instanceof Error ? err.message : 'Nieuws kon niet worden geladen')
+        if (err instanceof NewsUpsellSignal) setNewsUpsell(true)
+        else setNewsError(err instanceof Error ? err.message : 'Nieuws kon niet worden geladen')
         setGenerating(false)
         setRefreshing(false)
       }
@@ -601,7 +634,7 @@ export function NieuwsOnlyClient({ userId }: { userId: string }) {
                 Ook zichtbaar bij 'blocked': het archief is bewaarde leesstof en
                 heeft geen generatie nodig, dus een toestel dat lokaal niet kan
                 samenstellen hoort niet in een doodlopende straat te staan. */}
-            {((modeResolved && viewFetched && !viewLoading) || execution.status === 'blocked') && (
+            {((modeResolved && viewFetched && !viewLoading) || execution.status === 'blocked' || showNewsUpsell) && (
               <div className="mb-4 flex gap-1 rounded-[var(--r)] bg-[var(--subtle)] p-1" role="tablist">
                 <button
                   role="tab"
@@ -652,6 +685,17 @@ export function NieuwsOnlyClient({ userId }: { userId: string }) {
                     </p>
                     <NewsSkeletonLoader />
                   </>
+                ) : showNewsUpsell ? (
+                  <div
+                    className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-6 shadow-[var(--s0)]"
+                    data-testid="nieuws-upsell"
+                  >
+                    <AiSubscriptionUpsell
+                      variant="inline"
+                      feature="Een krant op maat van Fin"
+                      note="Edities die je eerder kreeg, blijven leesbaar in het archief."
+                    />
+                  </div>
                 ) : execution.status === 'blocked' ? (
                   <LocalUnavailableNotice
                     message={execution.message ?? 'Lokale AI is nu niet beschikbaar op dit toestel.'}

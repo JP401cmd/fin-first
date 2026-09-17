@@ -3,8 +3,9 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getCachedUser } from '@/lib/supabase/cached-user'
 import { checkTierGate } from '@/lib/require-tier'
+import { aiSubscriptionRequired } from '@/lib/ai/gate-responses'
 import { parseBody } from '@/lib/api/parse-body'
-import { serverError, unauthorized, forbidden } from '@/lib/api/respond'
+import { serverError, unauthorized } from '@/lib/api/respond'
 import {
   AI_EXECUTION_GROUP_IDS,
   resolveAllExecutionModes,
@@ -238,7 +239,7 @@ export async function POST(request: Request) {
     // altijd (niemand-opgesloten-principe, spiegelt /api/privacy-mode).
     if (mode === 'lokaal') {
       const tierGate = await checkTierGate(supabase, user.id, 'ai')
-      if (tierGate) return forbidden(tierGate.error)
+      if (tierGate) return aiSubscriptionRequired()
     }
 
     const row = await readRow(supabase, user.id)

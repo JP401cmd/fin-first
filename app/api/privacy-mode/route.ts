@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { getCachedUser } from '@/lib/supabase/cached-user'
 import { checkTierGate } from '@/lib/require-tier'
+import { aiSubscriptionRequired } from '@/lib/ai/gate-responses'
 
 /**
  * /api/privacy-mode — de per-gebruiker privé-modus voor lokale
@@ -10,7 +11,7 @@ import { checkTierGate } from '@/lib/require-tier'
  *
  * GET  → leest de EIGEN waarde: `{ privacyMode: boolean }` (lezen is altijd vrij).
  * POST → zet de boolean: body `{ enabled: boolean }` → `{ ok: true, privacyMode }`.
- *        AANzetten is gated achter het 'ai'-abonnement (403 `tier_required`);
+ *        AANzetten is gated achter het 'ai'-abonnement (403 `ai_subscription`);
  *        UITzetten blijft altijd vrij (eigenaarsbesluit, requirements §5 optie 2).
  *
  * SINGLE SOURCE / SECURITY: own-row read-modify-write via de anon RLS-client
@@ -76,7 +77,7 @@ export async function POST(request: NextRequest) {
     if (privacyMode === true) {
       const tierGate = await checkTierGate(supabase, user.id, 'ai')
       if (tierGate) {
-        return NextResponse.json({ error: tierGate.error, code: 'tier_required' }, { status: 403 })
+        return aiSubscriptionRequired()
       }
     }
 

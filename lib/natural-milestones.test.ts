@@ -226,6 +226,52 @@ describe('deriveNaturalMilestones — debt payoff uit unifiedRows (bug 2)', () =
     expect(debtFree!.target_age).toBe(maxPayoff)
   })
 
+  it('Schuldenvrij (17 sep 2026): een groeiende opeethypotheek-schuld (synthetische sleutel) → GEEN debt_free', () => {
+    const mortgage = mkDebt({ id: 'mortg', name: 'Hypotheek', debt_type: 'mortgage', current_balance: 300_000 })
+    const loan = mkDebt({ id: 'lening', name: 'Lening', debt_type: 'personal_loan', current_balance: 10_000 })
+    const rows = [
+      mkRow(50, { mortg: 250_000, lening: 8_000 }),
+      mkRow(55, { mortg: 200_000, lening: 0 }),
+      mkRow(75, { mortg: 0, lening: 0, opeethypotheek: 400_000 }),
+      mkRow(90, { mortg: 0, lening: 0, opeethypotheek: 1_200_000 }),
+    ]
+    const ms = deriveNaturalMilestones({
+      debts: [mortgage, loan], assets: [], simResult: null, unifiedRows: rows, dob: DOB, hasPartner: false,
+    })
+    expect(payoffMilestones(ms)).toHaveLength(2)
+    expect(ms.find(m => m.kind === 'debt_free')).toBeUndefined()
+  })
+
+  it('Schuldenvrij: een openstaande tekort-lening aan het eind → GEEN debt_free', () => {
+    const a = mkDebt({ id: 'a', name: 'A', debt_type: 'personal_loan', current_balance: 5_000 })
+    const b = mkDebt({ id: 'b', name: 'B', debt_type: 'personal_loan', current_balance: 5_000 })
+    const rows = [
+      mkRow(50, { a: 5_000, b: 5_000 }),
+      mkRow(52, { a: 0, b: 0 }),
+      mkRow(90, { a: 0, b: 0, 'tekort-lening': 30_000 }),
+    ]
+    const ms = deriveNaturalMilestones({
+      debts: [a, b], assets: [], simResult: null, unifiedRows: rows, dob: DOB, hasPartner: false,
+    })
+    expect(ms.find(m => m.kind === 'debt_free')).toBeUndefined()
+  })
+
+  it('Schuldenvrij: één schuld aflossingsvrij (nooit afgelost) naast twee afgeloste → GEEN debt_free', () => {
+    const a = mkDebt({ id: 'a', name: 'A', debt_type: 'personal_loan', current_balance: 5_000 })
+    const b = mkDebt({ id: 'b', name: 'B', debt_type: 'personal_loan', current_balance: 5_000 })
+    const vrij = mkDebt({ id: 'vrij', name: 'Aflossingsvrij', debt_type: 'mortgage', current_balance: 100_000 })
+    const rows = [
+      mkRow(50, { a: 5_000, b: 5_000, vrij: 100_000 }),
+      mkRow(55, { a: 0, b: 0, vrij: 100_000 }),
+      mkRow(90, { a: 0, b: 0, vrij: 100_000 }),
+    ]
+    const ms = deriveNaturalMilestones({
+      debts: [a, b, vrij], assets: [], simResult: null, unifiedRows: rows, dob: DOB, hasPartner: false,
+    })
+    expect(payoffMilestones(ms)).toHaveLength(2)
+    expect(ms.find(m => m.kind === 'debt_free')).toBeUndefined()
+  })
+
   it('fixed_rate_reset blijft: hypotheek met fixed_rate_end_date maar zonder rows-payoff toont nog steeds de reset', () => {
     const debt = mkDebt({
       id: 'mortg', name: 'Hypotheek', debt_type: 'mortgage', current_balance: 250_000,

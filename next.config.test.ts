@@ -73,12 +73,12 @@ describe('next.config redirects — legacy routes redirecten op de routing-laag 
     // anders vangt de catch-all elke ?focus= af en landt alles op `aow`.
     const [gericht, fallback] = rules
     expect(gericht.has).toEqual([
-      { type: 'query', key: 'focus', value: '(?<focus>aow|pensioen|huis)' },
+      { type: 'query', key: 'focus', value: '(?<focus>aow|pensioen|huis|werk)' },
     ])
-    expect(gericht.destination).toBe('/toekomst/gebeurtenissen?strategie=:focus')
+    expect(gericht.destination).toBe('/toekomst/voorkeuren?strategie=:focus')
 
     expect(fallback.has).toBeUndefined()
-    expect(fallback.destination).toBe('/toekomst/gebeurtenissen?strategie=aow')
+    expect(fallback.destination).toBe('/toekomst/voorkeuren?strategie=aow')
   })
 
   it('/horizon/whatif en /toekomst/whatif landen kaal op het inline lab (ADR 0144)', async () => {

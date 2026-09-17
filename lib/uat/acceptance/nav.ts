@@ -234,10 +234,10 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'OVERIG',
     given: 'Query-params `{tab: "gebeurtenissen", strategie: "aow"}`, `{strategie: "open"}` (geen tab), `{tab: "onzin"}`.',
     when: '`resolveTabRedirect` bepaalt het redirect-doel.',
-    then: 'Met een bekende tab: redirect naar /toekomst/gebeurtenissen?strategie=aow (overige parameters behouden). Zonder tab-param of met een onbekende tab-waarde: geen redirect (null).',
+    then: 'Met tab=gebeurtenissen + een geldige `?strategie=`-sleutel: redirect naar /toekomst/voorkeuren?strategie=aow (overige parameters behouden) — sinds 17 sep 2026 wonen de vier levensstrategieën op Voorkeuren, niet meer op Gebeurtenissen. Zonder tab-param of met een onbekende tab-waarde: geen redirect (null).',
     assertion: {
       kind: 'exact',
-      expected: 'metTab=/toekomst/gebeurtenissen?strategie=aow; zonderTab=null; onbekendeTab=null',
+      expected: 'metTab=/toekomst/voorkeuren?strategie=aow; zonderTab=null; onbekendeTab=null',
       source: 'app/(app)/toekomst/page.tsx#resolveTabRedirect (gemirrord — de server-page importeert next/navigation + @/lib/supabase/server en is dus niet client-bundelbaar; spiegelt hoe redirect-guard.test.ts diezelfde afhankelijkheden wegmockt) — zie nav-checks.ts',
     },
   },

@@ -36,6 +36,12 @@ vi.mock('@/lib/ai/local/local-vaste-kosten-resolver', () => ({
   createLocalVasteKostenResolver: (opts?: LocalVasteKostenOptions) => resolverFactory(opts),
 }))
 
+// V-002: abonnementscontext — default onbekend (null), per test te zetten.
+let hasAiState: boolean | null = null
+vi.mock('@/lib/feature-access/context', () => ({
+  useHasAiSubscription: () => hasAiState,
+}))
+
 import { AiVasteKostenSheet } from './ai-vaste-kosten-sheet'
 
 // ── fetch-spion ──────────────────────────────────────────────────────────────
@@ -71,6 +77,7 @@ function candidate(id: string, over: Partial<VasteKostenCandidate> = {}): VasteK
 }
 
 beforeEach(() => {
+  hasAiState = null
   fetchCalls = []
   candidatesResponse = []
   cloudResponse = { suggestions: [], analysedCount: 0, skippedCount: 0 }
@@ -224,5 +231,40 @@ describe('AiVasteKostenSheet — progressieve weergave op het lokale pad', () =>
     await screen.findByText(/Model wordt gestart/)
     releaseKlaar()
     await waitFor(() => expect(screen.queryByText(/Model wordt gestart/)).toBeNull())
+  })
+})
+
+describe('AiVasteKostenSheet — zonder AI-abonnement (V-002)', () => {
+  it('pre-check: geen fetch, wél de upsell met CTA naar het AI-aanbod', async () => {
+    hasAiState = false
+    render(<AiVasteKostenSheet open onOpenChange={noop} onComplete={noop} />)
+    await screen.findByTestId('ai-upsell-inline')
+    expect(fetchCalls).toHaveLength(0)
+    expect(screen.getByRole('link', { name: /Bekijk AI-abonnement/i }).getAttribute('href')).toBe(
+      '/mijn/account?addon=ai',
+    )
+    expect(screen.queryByText(/er ging iets mis/i)).toBeNull()
+  })
+
+  it('server-403 ai_subscription → upsell i.p.v. "er ging iets mis"', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: false,
+      status: 403,
+      json: async () => ({ error: 'Deze functie vereist een AI abonnement', code: 'ai_subscription' }),
+    }) as unknown as Response))
+    render(<AiVasteKostenSheet open onOpenChange={noop} onComplete={noop} />)
+    await screen.findByTestId('ai-upsell-inline')
+    expect(screen.queryByText(/er ging iets mis/i)).toBeNull()
+  })
+
+  it('422 zonder code → neutrale tekst, nooit beheerderstaal', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: false,
+      status: 422,
+      json: async () => ({}),
+    }) as unknown as Response))
+    render(<AiVasteKostenSheet open onOpenChange={noop} onComplete={noop} />)
+    await screen.findByText('Opnieuw proberen')
+    expect(screen.queryByText(/API key/i)).toBeNull()
   })
 })

@@ -2,8 +2,9 @@ import { generateObject } from 'ai'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { recordAiUsage } from '@/lib/ai-credits'
-import { getModel, AIConfigError } from '@/lib/ai/config'
+import { getModel } from '@/lib/ai/config'
 import { checkTierGate } from '@/lib/require-tier'
+import { aiSubscriptionRequired, aiCreditLimitReached, aiModelUnavailable } from '@/lib/ai/gate-responses'
 import { assertCloudAllowed } from '@/lib/ai/privacy-gate'
 import { checkCreditBudget, creditLimitMessage } from '@/lib/ai/credit-gate'
 import { sanitizeForAI } from '@/lib/ai/sanitize'
@@ -79,17 +80,14 @@ export async function POST(req: Request) {
 
   const tierGate = await checkTierGate(supabase, user.id, 'ai')
   if (tierGate) {
-    return new Response(JSON.stringify({ error: tierGate.error }), { status: 403, headers: { 'Content-Type': 'application/json' } })
+    return aiSubscriptionRequired()
   }
 
   // Per-gebruiker rate-limit: dwing het maand-creditbudget af (gedeelde bucket)
   // vóór de dure LLM-call. Categorisatie kost 1 credit per batch (max 20 tx).
   const creditGate = await checkCreditBudget(supabase, user.id, 'categorize')
   if (!creditGate.allowed) {
-    return new Response(JSON.stringify({ error: creditLimitMessage(creditGate) }), {
-      status: 429,
-      headers: { 'Content-Type': 'application/json', 'Retry-After': String(creditGate.retryAfterSeconds) },
-    })
+    return aiCreditLimitReached(creditLimitMessage(creditGate), creditGate.retryAfterSeconds)
   }
 
   let body: { transactions: RequestTransaction[] }
@@ -134,11 +132,7 @@ export async function POST(req: Request) {
   try {
     model = await getModel(supabase, 'categorisatie')
   } catch (err) {
-    if (err instanceof AIConfigError) {
-      // eslint-disable-next-line no-restricted-syntax -- rauwe error.message: zie [Arch F4] API-error-envelope
-      return Response.json({ error: err.message }, { status: 422 })
-    }
-    return Response.json({ error: 'AI model kon niet worden geladen.' }, { status: 500 })
+    return aiModelUnavailable(err, 'ai-categorize')
   }
 
   // Systeemprompt opbouwen uit de echte budgetten van de gebruiker. Budgetnamen

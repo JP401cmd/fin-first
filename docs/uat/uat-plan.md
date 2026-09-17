@@ -1393,7 +1393,7 @@ Dit deelgebied heeft geen eigen pagina's: het beschrijft de app-brede bediening 
 - **Eindresultaat:** Redirect naar /toekomst/<tab>, met behoud van alle overige query-parameters.
 - **Stappen:**
   1. Open /toekomst?tab=gebeurtenissen&strategie=aow.
-  2. Verwacht te landen op /toekomst/gebeurtenissen?strategie=aow.
+  2. Verwacht te landen op /toekomst/voorkeuren?strategie=aow (sinds 17 sep 2026 — de vier levensstrategieën wonen op Voorkeuren, niet meer op Gebeurtenissen).
   3. Open /toekomst?strategie=open (geen tab-param) en verwacht op /toekomst te blijven (modal/pane-parameters blijven werken).
   4. Open /toekomst?tab=onzin en verwacht op /toekomst te blijven (onbekende tab = geen redirect).
 - **Schermen/componenten:** `resolveTabRedirect` in `app/(app)/toekomst/page.tsx` (getest in `redirect-guard.test.ts`).
@@ -4384,7 +4384,7 @@ Alle live belasting-UI leeft onder `/overzicht/belasting` (hub + drie box-subpag
   - Factor A wijzigen terwijl de slider hoog staat → inleg wordt automatisch geklemd op de nieuwe (lagere) ruimte.
   - Factor A is een lokale simulatie: pagina verversen zet hem terug naar de profielwaarde (blijvend opslaan kan alleen via de pensioen-strategie).
   - Negatieve invoer factor A → als 0 behandeld (clamp in de motor).
-- **Cross-module effecten:** actie-knop schrijft naar Will/acties; link naar /toekomst/gebeurtenissen?strategie=pensioen (Toekomst-module).
+- **Cross-module effecten:** actie-knop schrijft naar Will/acties; link naar /toekomst/voorkeuren?strategie=pensioen (Toekomst-module; sinds 17 sep 2026 — daarvoor /toekomst/gebeurtenissen).
 
 #### WF-BELAST-11 — Jaarruimte per persoon in huishoudweergave
 - **Doel:** Partners zien ieder hun eigen jaarruimte naast elkaar (Box 1 is per persoon), inclusief nette afhandeling wanneer de partner geen inkomen deelt.
@@ -5153,8 +5153,8 @@ Scope: /toekomst (tijdas-landing), /toekomst/doelen, /toekomst/gebeurtenissen, /
 - **Trigger/startpunt:** Een URL met query-parameter of een legacy-route openen.
 - **Eindresultaat:** De juiste subpagina/modal/pane staat open; de query-parameter is na verwerking opgeruimd.
 - **Stappen:**
-  1. /toekomst?tab=doelen|gebeurtenissen|voorkeuren|rekenhulp → redirect naar /toekomst/<tab> met behoud van overige parameters (bv. ?tab=gebeurtenissen&strategie=aow → /toekomst/gebeurtenissen?strategie=aow).
-  2. /toekomst/strategie?focus=aow|pensioen|huis → redirect naar /toekomst/gebeurtenissen?strategie=<focus> (ongeldige/lege focus → aow).
+  1. /toekomst?tab=doelen|gebeurtenissen|voorkeuren|rekenhulp → redirect naar /toekomst/<tab> met behoud van overige parameters (bv. ?tab=gebeurtenissen&strategie=aow → /toekomst/voorkeuren?strategie=aow, sinds 17 sep 2026 — de vier levensstrategieën wonen op Voorkeuren, niet meer op Gebeurtenissen).
+  2. /toekomst/strategie?focus=aow|pensioen|huis → redirect naar /toekomst/voorkeuren?strategie=<focus> (ongeldige/lege focus → aow).
   3. /horizon/strategie → redirect naar /toekomst?strategie=open → de Strategie-modal (Eindstrategie/Onttrekking/Eigen woning) opent op de tijdas.
   4. Op de tijdas: ?modal=scenarios|simulations|withdrawal|backtesting|strategie opent de bijbehorende modal; ?uitgaven=open de UitgavenPane; ?whatif=open de sliders; ?event=new / ?event=<id>(&edit=true) de EventPane.
   5. Op /toekomst/gebeurtenissen: ?strategie=aow|pensioen|huis|werk opent de strategie-editor; ?nieuw=1 de catalogus; sluiten ruimt de parameter op.
@@ -5229,7 +5229,7 @@ Scope: /toekomst (tijdas-landing), /toekomst/doelen, /toekomst/gebeurtenissen, /
 
 - **/horizon (legacy) — LIVE, geen redirect.** Rendert dezelfde `HorizonPage` (tijdas + alle modals) maar zónder de landing-header, navigatiekaarten en colophon van /toekomst. Niet meer bereikbaar via de navigatie (lib/nav-config.ts verwijst uitsluitend naar /toekomst); alleen via oude links/bladwijzers. Alle tijdas-workflows hierboven gelden ook daar. (app/(app)/horizon/page.tsx)
 - **/horizon/strategie — redirect** naar /toekomst?strategie=open (single-hop). Alleen deeplink-doel. (app/(app)/horizon/strategie/page.tsx)
-- **/toekomst/strategie — pure redirect-route** naar /toekomst/gebeurtenissen?strategie=<focus>; heeft geen eigen UI. Alleen deeplink-doel. (app/(app)/toekomst/strategie/page.tsx)
+- **/toekomst/strategie — pure redirect-route** naar /toekomst/voorkeuren?strategie=<focus> (sinds 17 sep 2026; daarvoor /toekomst/gebeurtenissen); heeft geen eigen UI. Alleen deeplink-doel. (next.config.ts — geen React-pagina meer, zie WF-NAV-16)
 - **/horizon/whatif en /horizon/uitgaven-na-pensioen — redirects** naar respectievelijk /toekomst?whatif=open (sinds ADR 0144, 14 sep 2026 — geen dreamgate-tak meer) en /toekomst?uitgaven=open. Alleen deeplink-doel. (beide page.tsx-bestanden bekeken)
 - **/horizon/inflatie-koopkracht en /horizon/samengestelde-interest** — bestaan met eigen client-componenten in de map; niet geïnspecteerd (rekenhulp-onderwerpen vallen buiten dit deelgebied). Status live-of-redirect onbevestigd.
 - **Legacy event-formulier in horizon-client** (`showForm`, geopend via deeplink ?modal=life_events): een ouder, uitgebreid event-formulier met catalogusvelden en pensioen-PDF-upload dat parallel aan de nieuwe EventPane bestaat. Alleen via die deeplink bereikbaar — geen knop in de huidige UI leidt ernaartoe. (horizon-client.tsx regel 4218 e.v.)
@@ -8407,7 +8407,7 @@ Deze onderdelen bestaan in de code maar worden door geen enkele gebruikersworkfl
 **Toekomst: tijdas, doelen, gebeurtenissen, voorkeuren & strategie:**
 - /horizon (legacy) is LIVE, geen redirect: zelfde HorizonPage zonder landing-header/navkaarten; alleen via oude links bereikbaar (nav-config verwijst uitsluitend naar /toekomst)
 - /horizon/strategie = redirect naar /toekomst?strategie=open (alleen deeplink-doel)
-- /toekomst/strategie = pure redirect-route naar /toekomst/gebeurtenissen?strategie=<focus>, geen eigen UI
+- /toekomst/strategie = pure redirect-route naar /toekomst/voorkeuren?strategie=<focus> (sinds 17 sep 2026), geen eigen UI
 - /horizon/whatif en /horizon/uitgaven-na-pensioen = redirects naar /toekomst-varianten (alleen deeplink-doel)
 - /horizon/inflatie-koopkracht en /horizon/samengestelde-interest: niet geïnspecteerd (buiten deelgebied), status live-of-redirect onbevestigd
 - Legacy event-formulier in horizon-client (showForm) alleen bereikbaar via deeplink ?modal=life_events — geen knop in de huidige UI
@@ -9284,7 +9284,7 @@ WF-NAV-13 (Uitloggen) → **géén eigen scenario** in dit document; gedekt door
 - **Kriticiteit:** OVERIG · **Platform:** webapp · **Rooktest:** nee · **Duur:** ~3 min
 - **Preconditie:** Ingelogd.
 - **a. Happy path:**
-  1. Open /toekomst?tab=gebeurtenissen&strategie=aow. → *verwacht:* redirect naar /toekomst/gebeurtenissen?strategie=aow (overige parameters behouden).
+  1. Open /toekomst?tab=gebeurtenissen&strategie=aow. → *verwacht:* redirect naar /toekomst/voorkeuren?strategie=aow (overige parameters behouden; sinds 17 sep 2026).
   2. Open /toekomst?strategie=open (geen tab-param). → *verwacht:* blijft op /toekomst.
   3. Open /toekomst?tab=onzin. → *verwacht:* geen redirect, blijft op /toekomst (onbekende tab genegeerd).
 
@@ -11390,8 +11390,8 @@ WF-TOEK-27 (uitgave na pensioen verfijnen) → gedekt door UAT-REKEN-23/24.
 - **Kriticiteit:** BELANGRIJK · **Platform:** webapp · **Rooktest:** nee · **Duur:** ~6 min
 - **Preconditie:** persona `willem` geladen
 - **a. Happy path:**
-  1. Open `/toekomst?tab=gebeurtenissen&strategie=aow` → *verwacht:* redirect naar `/toekomst/gebeurtenissen?strategie=aow`, met de AOW-strategie-editor open.
-  2. Open `/toekomst/strategie?focus=huis` → *verwacht:* redirect naar `/toekomst/gebeurtenissen?strategie=huis`.
+  1. Open `/toekomst?tab=gebeurtenissen&strategie=aow` → *verwacht:* redirect naar `/toekomst/voorkeuren?strategie=aow`, met de AOW-strategie-editor open (sinds 17 sep 2026; daarvoor /toekomst/gebeurtenissen).
+  2. Open `/toekomst/strategie?focus=huis` → *verwacht:* redirect naar `/toekomst/voorkeuren?strategie=huis`.
   3. Open `/horizon/strategie` → *verwacht:* redirect naar `/toekomst?strategie=open` → Strategie-modal opent op de tijdas.
   4. Open `/horizon/whatif` → *verwacht:* redirect naar `/toekomst?whatif=open` (sinds ADR 0144, 14 sep 2026, altijd deze bestemming — geen dreamgate-tak meer); open `/horizon/uitgaven-na-pensioen` → *verwacht:* redirect naar `/toekomst?uitgaven=open`.
   5. Open `/horizon` zonder parameters → *verwacht:* dezelfde tijdas (HorizonPage) rendert LIVE, maar zonder landing-header en navigatiekaarten.

@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { unauthorized, forbidden, serverError, errorResponse } from '@/lib/api/respond'
+import { unauthorized, serverError, errorResponse } from '@/lib/api/respond'
 import { isCloudAllowed, PRIVACY_GATE_CODE } from '@/lib/ai/privacy-gate'
 import { recordAiUsage } from '@/lib/ai-credits'
 import type { FinancialInput } from '@/lib/horizon-data'
@@ -10,6 +10,7 @@ import { generateText } from 'ai'
 import { getModel } from '@/lib/ai/config'
 import type { ReportData, ReportConfig, HistoricalPeriodSummary } from '@/lib/report-data'
 import { checkTierGate } from '@/lib/require-tier'
+import { aiSubscriptionRequired } from '@/lib/ai/gate-responses'
 import { resolveFireParams } from '@/lib/fire-params'
 import { yearlyMustExpensesFromBudgets, buildBudgetTypeMap } from '@/lib/budget-utils'
 import { buildBudgetSpendingMap, spentForBudget, budgetBarPct } from '@/lib/budget-spending'
@@ -157,7 +158,7 @@ export async function GET(request: Request) {
     if (useAi) {
       const tierGate = await checkTierGate(supabase, user.id, 'ai')
       if (tierGate) {
-        return forbidden(tierGate.error)
+        return aiSubscriptionRequired()
       }
     }
 
@@ -973,7 +974,7 @@ export async function POST(request: Request) {
     if (wantsAi) {
       const tierGate = await checkTierGate(supabase, user.id, 'ai')
       if (tierGate) {
-        return forbidden(tierGate.error)
+        return aiSubscriptionRequired()
       }
     }
 

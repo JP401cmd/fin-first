@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { DisplayModeProvider } from '@/lib/hooks/use-display-mode'
 import { VoorkeurenView } from './voorkeuren-view'
@@ -6,9 +6,11 @@ import { VoorkeurenView } from './voorkeuren-view'
 // VoorkeurenView mount nu VoorkeurBewerkenSheet (markt-aannames) + RegelBewerkenPane
 // (de 5 regels). Mock next/navigation + supabase client, en stub de pane (die op
 // matchMedia/ShellOverlay leunt) zodat de card-tests gefocust blijven.
+// Stuurbare searchParams + replace-mock voor de ?strategie=-deeplink (S6).
+const nav = vi.hoisted(() => ({ search: new URLSearchParams(), replace: vi.fn() }))
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ refresh: vi.fn(), replace: vi.fn(), push: vi.fn() }),
-  useSearchParams: () => new URLSearchParams(),
+  useRouter: () => ({ refresh: vi.fn(), replace: nav.replace, push: vi.fn() }),
+  useSearchParams: () => nav.search,
   usePathname: () => '/toekomst/voorkeuren',
 }))
 vi.mock('@/lib/supabase/client', () => ({
@@ -24,11 +26,33 @@ vi.mock('@/lib/supabase/client', () => ({
 vi.mock('./regel-bewerken-pane', () => ({
   RegelBewerkenPane: () => null,
 }))
+// StrategieEditors gestubd: registreert welke strategie open is en of de
+// jaarruimte-uitvraag (S6) automatisch openstaat, plus een sluitknop.
+vi.mock('./strategie/strategie-editors', () => ({
+  StrategieEditors: ({
+    open,
+    autoOpenJaarruimte,
+    onClose,
+  }: {
+    open: string | null
+    autoOpenJaarruimte?: boolean
+    onClose: () => void
+  }) => (
+    <div>
+      <div data-testid="strategie-editors-open">{open ?? 'none'}</div>
+      <div data-testid="strategie-jaarruimte">{String(Boolean(autoOpenJaarruimte))}</div>
+      <button type="button" onClick={onClose}>
+        editor-sluiten
+      </button>
+    </div>
+  ),
+}))
 import type { FireParams } from '@/lib/fire-params'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
 import type { WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
 import { POT_RULES_DEFAULTS } from '@/lib/pot-rules'
 import type { WealthGroup } from '@/lib/wealth-composition'
+import type { StrategieEditorsData } from './strategie/strategie-editors'
 
 /**
  * Tests voor VoorkeurenView — Voorkeuren-tab op /toekomst. Toont de vijf
@@ -64,7 +88,27 @@ const mockPotBalances: Record<WealthGroup, number> = {
   overig: 0,
 }
 
+const mockStrategieData: StrategieEditorsData = {
+  baseline: null,
+  dailyExpenses: 0,
+  aowRows: [],
+  dateOfBirth: null,
+  grossYearlyIncome: 0,
+  pensioenFactorA: 0,
+  currentAge: null,
+  inflationRate: 0,
+  currentNetMonthly: 0,
+  housingPreview: null,
+}
+
+beforeEach(() => {
+  nav.search = new URLSearchParams()
+  nav.replace.mockClear()
+})
+
 const baseProps = {
+  events: [],
+  strategieData: mockStrategieData,
   fireParams: mockFireParams,
   fireStrategy: mockFireStrategy,
   withdrawalStrategy: mockWithdrawal,
@@ -328,5 +372,100 @@ describe('VoorkeurenView — weergavemodus (S7, herziet TOE-3)', () => {
     // 5 regel-kaarten + inflatie + bruto rendement + Box 3-methode (effectief SWR is statisch).
     expect(cardCount(container)).toBe(8)
     expect(container.querySelectorAll('[data-testid="depth-section"]').length).toBe(0)
+  })
+})
+
+// ── Levensstrategieën (verhuisd van Gebeurtenissen, 17 sep 2026) ─────────────
+//
+// S6 / B-024 — Box 1 draagt in béide weergavemodi de opdracht "vul je factor A
+// in bij je pensioen-strategie" en linkt naar /toekomst/voorkeuren?strategie=pensioen.
+// Hard verbergen in Eenvoudig maakte daar een eenrichtingsdeeplink van (modal
+// opende, maar ná sluiten geen zichtbare ingang). De eerste fix liet in Eenvoudig
+// alléén de Pensioen-kaart staan; dat nam drie keuzes af (B-024). Besluit
+// eigenaar: Eenvoudig maakt de vorm kleiner (compacter raster), niet de lijst korter.
+describe('VoorkeurenView — levensstrategieën', () => {
+  const VIER = ['AOW-strategie', 'Pensioen-strategie', 'Huis-strategie', 'Werk-strategie']
+
+  it.each(['full', 'simple'] as const)('toont in %s alle vier de levensstrategieën als h3 onder een h2', (mode) => {
+    render(
+      <DisplayModeProvider initialMode={mode}>
+        <VoorkeurenView {...baseProps} />
+      </DisplayModeProvider>,
+    )
+    for (const label of VIER) {
+      expect(screen.getByRole('heading', { level: 3, name: label })).toBeTruthy()
+    }
+    expect(screen.getByRole('heading', { level: 2, name: 'AOW, pensioen, huis en werk' })).toBeTruthy()
+  })
+
+  it('Eenvoudig krijgt een compacter raster, geen kortere lijst (B-024)', () => {
+    const { container } = render(
+      <DisplayModeProvider initialMode="simple">
+        <VoorkeurenView {...baseProps} />
+      </DisplayModeProvider>,
+    )
+    const kaart = screen.getByText('AOW-strategie').closest('button')!
+    expect(kaart.parentElement?.className).toContain('grid-cols-2')
+    expect(container.textContent).not.toMatch(/Zet je de weergave op Volledig/i)
+  })
+
+  it('icoonvlak gebruikt horizon-tokens, geen Tailwind-standaardkleuren', () => {
+    const { container } = render(
+      <DisplayModeProvider initialMode="full">
+        <VoorkeurenView {...baseProps} />
+      </DisplayModeProvider>,
+    )
+    const html = container.innerHTML
+    expect(html).toContain('bg-horizon-50')
+    expect(html).not.toMatch(/(bg|text)-(violet|emerald|amber|sky)-\d/)
+  })
+
+  it('de zichtbare ingang staat los van de editor-state (geen eenrichtingsdeeplink)', () => {
+    render(
+      <DisplayModeProvider initialMode="simple">
+        <VoorkeurenView {...baseProps} />
+      </DisplayModeProvider>,
+    )
+    fireEvent.click(screen.getByText('Pensioen-strategie').closest('button')!)
+    expect(screen.getByTestId('strategie-editors-open').textContent).toBe('pensioen')
+    // Via een kaart geopend → geen automatische jaarruimte-uitvraag.
+    expect(screen.getByTestId('strategie-jaarruimte').textContent).toBe('false')
+    fireEvent.click(screen.getByText('editor-sluiten'))
+    expect(screen.getByTestId('strategie-editors-open').textContent).toBe('none')
+    expect(screen.getByText('Pensioen-strategie')).toBeTruthy()
+  })
+
+  it('S6 — ?strategie=pensioen opent de editor mét jaarruimte-uitvraag en sluiten ruimt de param op', () => {
+    nav.search = new URLSearchParams('strategie=pensioen&x=1')
+    render(
+      <DisplayModeProvider initialMode="full">
+        <VoorkeurenView {...baseProps} />
+      </DisplayModeProvider>,
+    )
+    expect(screen.getByTestId('strategie-editors-open').textContent).toBe('pensioen')
+    expect(screen.getByTestId('strategie-jaarruimte').textContent).toBe('true')
+    fireEvent.click(screen.getByText('editor-sluiten'))
+    expect(nav.replace).toHaveBeenCalledWith('/toekomst/voorkeuren?x=1', { scroll: false })
+  })
+
+  it.each(['aow', 'huis', 'werk'] as const)('?strategie=%s opent die editor zonder jaarruimte-uitvraag', (key) => {
+    nav.search = new URLSearchParams(`strategie=${key}`)
+    render(
+      <DisplayModeProvider initialMode="full">
+        <VoorkeurenView {...baseProps} />
+      </DisplayModeProvider>,
+    )
+    expect(screen.getByTestId('strategie-editors-open').textContent).toBe(key)
+    expect(screen.getByTestId('strategie-jaarruimte').textContent).toBe('false')
+  })
+
+  it('?strategie=open (horizon-strategiekiezer) opent hier niets', () => {
+    nav.search = new URLSearchParams('strategie=open')
+    render(
+      <DisplayModeProvider initialMode="full">
+        <VoorkeurenView {...baseProps} />
+      </DisplayModeProvider>,
+    )
+    expect(screen.getByTestId('strategie-editors-open').textContent).toBe('none')
   })
 })

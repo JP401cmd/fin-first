@@ -200,9 +200,17 @@ function deriveDebtMilestones(
 
   // Aggregaat: schuldenvrij = laatste (gecorrigeerde) payoff over alle actieve
   // debts. Volgt automatisch de rows-payoffs, zodat individueel en aggregaat
-  // nooit tegenspreken.
+  // nooit tegenspreken. Alleen wanneer het plan écht schuldenvrij eindigt: élke
+  // actieve schuld heeft een aflossingsleeftijd én de laatste rij draagt geen
+  // enkel materieel schuldsaldo — ook niet op de synthetische kernel-sleutels
+  // ('opeethypotheek', 'tekort-lening') die geen `Debt`-rij hebben. Anders zou een
+  // groeiende opeetschuld naast een afgeloste hypotheek "Schuldenvrij" tonen.
   const payoffMilestones = out.filter(m => m.kind === 'debt_payoff')
-  if (payoffMilestones.length >= 2) {
+  const lastRow = rows ? rows[rows.length - 1] : null
+  const eindigtZonderSchuld =
+    lastRow != null &&
+    Object.values(lastRow.debtBalances).every(d => Math.abs(d?.endBalance ?? 0) < 0.5)
+  if (payoffMilestones.length >= 2 && payoffMilestones.length === activeDebts.length && eindigtZonderSchuld) {
     const last = payoffMilestones.reduce((a, b) => (a.target_age > b.target_age ? a : b))
     out.push({
       id: 'nat-debt-free',

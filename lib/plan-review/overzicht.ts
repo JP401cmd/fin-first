@@ -336,7 +336,8 @@ function stapPlan(b: PlanReviewBronnen): PlanReviewStapOverzicht {
   if (plan.endForm === 'legacy') {
     details.push({ label: 'Bedrag dat overblijft', waarde: formatCurrency(plan.legacyAmount) })
   }
-  const geenTekort = b.profile?.fire_no_deficit_loan === true
+  // Standaard AAN (ADR 0149-aanvulling 17 sep 2026): alleen een bewuste `false` is uit.
+  const geenTekort = b.profile?.fire_no_deficit_loan !== false
   const tekortKeuze = GEEN_TEKORT_LENING_KOPIJ[geenTekort ? 'aan' : 'uit']
   details.push({ label: 'Tekort-lening in je plan', waarde: tekortKeuze.waarde })
 
@@ -559,14 +560,14 @@ function stapInkomsten(b: PlanReviewBronnen): PlanReviewStapOverzicht {
     // Het eerste label is ook de knop van de inline bewerkstand (TPR-15).
     aanpassen: [
       {
-        href: '/toekomst/gebeurtenissen?strategie=aow',
+        href: '/toekomst/voorkeuren?strategie=aow',
         label: heeftAow ? 'AOW, pensioen en werk aanpassen' : 'AOW-gegevens toevoegen',
       },
-      { href: '/toekomst/gebeurtenissen?strategie=pensioen', label: 'Pensioen bekijken' },
+      { href: '/toekomst/voorkeuren?strategie=pensioen', label: 'Pensioen bekijken' },
     ],
     // De upload van je pensioenoverzicht en de jaarruimte blijven op het pensioenscherm.
     beperking:
-      'Je pensioenoverzicht uploaden, een pot of werkplan verwijderen en je jaarruimte berekenen doe je op het pensioenscherm onder Gebeurtenissen.',
+      'Je pensioenoverzicht uploaden, een pot of werkplan verwijderen en je jaarruimte berekenen doe je op het pensioenscherm onder Voorkeuren.',
   }
 }
 
@@ -739,7 +740,7 @@ function stapWoning(b: PlanReviewBronnen): PlanReviewStapOverzicht {
     // TPR-15 — de eerste regel is ook het label van de inline bewerkstand (stap 4 heeft een editor).
     aanpassen: [
       ...(heeftHuis
-        ? [{ href: '/toekomst/gebeurtenissen?strategie=huis', label: overig.length > 0 ? 'Woonstrategie en verkoop aanpassen' : 'Woonstrategie aanpassen' }]
+        ? [{ href: '/toekomst/voorkeuren?strategie=huis', label: overig.length > 0 ? 'Woonstrategie en verkoop aanpassen' : 'Woonstrategie aanpassen' }]
         : []),
       ...(overig.length > 0 ? [{ href: '/overzicht/bezittingen', label: 'Verkoopinstellingen aanpassen' }] : []),
     ],

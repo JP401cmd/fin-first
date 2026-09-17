@@ -26,6 +26,7 @@ import {
 import { maskPIIInOutput } from '@/lib/ai/pii-output-filter'
 import { recordAiUsage } from '@/lib/ai-credits'
 import { checkTierGate } from '@/lib/require-tier'
+import { aiSubscriptionRequired } from '@/lib/ai/gate-responses'
 import { assertAiEnabled, assertCloudAllowed, isCloudAllowed } from '@/lib/ai/privacy-gate'
 import { unauthorized, forbidden, badRequest, serverError } from '@/lib/api/respond'
 import { parseBody } from '@/lib/api/parse-body'
@@ -114,7 +115,7 @@ export async function POST(req: Request) {
   // /overzicht blijft gratis en ongemoeid.
   const gate = await checkTierGate(supabase, user.id, 'ai')
   if (gate) {
-    return forbidden(gate.error)
+    return aiSubscriptionRequired()
   }
 
   if (stapParam !== null) {

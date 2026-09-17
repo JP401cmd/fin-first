@@ -96,6 +96,7 @@ export function OnboardingUpoSection({
 
           {/* Upload area */}
           <PensionPdfUpload
+            context="onboarding"
             onParseResult={(result) => {
               const data = result as PensionParseData
               onParsed(data)

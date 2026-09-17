@@ -73,3 +73,14 @@ export function formatPlanPrice(priceEur: number): string {
     maximumFractionDigits: 0,
   }).format(priceEur)
 }
+
+/**
+ * Leest de deeplink `/mijn/account?addon=<tier>` (V-002). Alleen een bekende,
+ * verkoopbare add-on telt; al het andere (onbekende tier, 'gratis', meervoudige
+ * waarde) → null, zodat een gemanipuleerde URL nooit een sheet forceert.
+ */
+export function parseAddonDeeplink(value: string | string[] | undefined | null): AddonPlan['tier'] | null {
+  if (typeof value !== 'string') return null
+  const plan = ADDON_PLANS.find((p) => p.tier === value)
+  return plan ? plan.tier : null
+}

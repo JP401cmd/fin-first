@@ -26,7 +26,8 @@
  * Pure module: geen Supabase/fs/Math.random (de MC-ruis is deterministisch;
  * `runMonteCarlo` is sin-hash-gebaseerd). Server- én test-bruikbaar.
  */
-import { stopAnchorFromKernel, type FireEndStrategy } from '@/lib/fire-strategy'
+import { resolveFirePlanWithOverride, stopAnchorFromKernel, type FireEndStrategy, type FireEndForm } from '@/lib/fire-strategy'
+import { detectEindsituatie, type EindsituatieDuiding } from '@/lib/horizon/eindsituatie-duiding'
 import type { Aandachtspunt } from '@/lib/aandachtspunten'
 import { lookupAowAge } from '@/lib/aow-leeftijd'
 import { formatCurrency } from '@/lib/format'
@@ -110,6 +111,18 @@ export interface ProjectieTekortLening {
 }
 
 /**
+ * Eindsituatie-duiding (plan 17 sep, D) — dezelfde detector als /toekomst, op dezelfde
+ * run. Bedragen NOMINAAL met hun rij-factor; het rapport-blok deflateert één keer en
+ * bouwt de copy (`buildEindsituatieCopy`) aan de render-grens.
+ */
+export interface ProjectieEindsituatie {
+  duiding: EindsituatieDuiding
+  endForm: FireEndForm
+  /** Staat het overschot op de liquide grondslag (J)? Alleen dan telt het als vrijheidstijd. */
+  overschotIsLiquide: boolean
+}
+
+/**
  * Vermogensprojectie + FIRE-uitkomsten, geconsumeerd uit de horizon-kernel.
  * `ok === false` → kernel kon niet rekenen (bv. geen geboortedatum); alle
  * cijfervelden zijn dan null/leeg en de UI toont een fout-/lege staat.
@@ -190,6 +203,8 @@ export interface ProjectieData {
    * is het expliciete signaal dat de vloer anders zou verbergen. `null` = geen.
    */
   tekortLening: ProjectieTekortLening | null
+  /** "Waarom blijft er aan het eind zoveel over?" — `null` = niets te duiden. */
+  eindsituatie: ProjectieEindsituatie | null
 }
 
 /** Plan-brede slagingskans uit de Monte-Carlo-wrapper. */
@@ -307,6 +322,7 @@ function buildProjectie(
       eindwaardeNettoLiquide: 0,
       ankerTekortZin: null,
       tekortLening: null,
+      eindsituatie: null,
     }
   }
 
@@ -368,13 +384,41 @@ function buildProjectie(
           isPensioenMode: sim.strategy === 'pensioen',
           // Zelfde afleiding als dashboard-/core-loader: eigen woning aanwezig ∧ buiten de FIRE-pot.
           homeExcludedFromFire: heeftEigenHuis && isHomeExcludedFromFire(woonstrategie),
-          geenTekortLeningAan: rawContext.profile.fire_no_deficit_loan === true,
+          geenTekortLeningAan: rawContext.profile.fire_no_deficit_loan !== false,
           vastStopmoment: sim.stopAnker != null,
           peakText: formatCurrency(tekortNotice.peak),
           // Bewust géén vrijheidstijd bij de piek: de detector levert geen leeftijd bij
           // het piekmoment, dus er is geen canonieke deflator voor die teller (ADR 0093 §11).
           freedomText: null,
         }),
+      }
+    : null
+
+  // ── Eindsituatie-duiding (plan 17 sep, D) — zelfde detector + invoer als /toekomst ──
+  // Plan via dezelfde resolver als de kernel-adapter; jaaruitgaven = de grondslag van
+  // deze run (`rawContext.yearlyExpenses`). Niet onder een pensioen-anker.
+  const plan = resolveFirePlanWithOverride(rawContext.profile)
+  const legacyIncludeIlliquid = rawContext.profile.fire_legacy_include_illiquid === true
+  const eindDuiding =
+    currentAge != null && sim.strategy !== 'pensioen'
+      ? detectEindsituatie({
+          rows: result.rows,
+          endForm: plan.endForm,
+          endAge: sim.displayEndAge ?? plan.endAge,
+          legacyAmount: plan.legacyAmount,
+          legacyIncludeIlliquid,
+          vastStopmoment: sim.stopAnker != null,
+          fireAgeFractional: sim.fireAgeFractional ?? null,
+          currentAge,
+          geenTekortLeningAan: rawContext.profile.fire_no_deficit_loan !== false,
+          jaarUitgavenNu: rawContext.yearlyExpenses,
+        })
+      : null
+  const eindsituatie: ProjectieEindsituatie | null = eindDuiding
+    ? {
+        duiding: eindDuiding,
+        endForm: plan.endForm,
+        overschotIsLiquide: !(plan.endForm === 'legacy' && legacyIncludeIlliquid),
       }
     : null
 
@@ -422,6 +466,7 @@ function buildProjectie(
     eindwaardeNettoLiquide,
     ankerTekortZin,
     tekortLening,
+    eindsituatie,
   }
 }
 

@@ -1,11 +1,12 @@
 import { createClient } from '@/lib/supabase/server'
-import { unauthorized, forbidden } from '@/lib/api/respond'
+import { unauthorized } from '@/lib/api/respond'
 import { recordAiUsage } from '@/lib/ai-credits'
 import { getModel } from '@/lib/ai/config'
 import { assertCloudAllowed } from '@/lib/ai/privacy-gate'
 import { generateObject } from 'ai'
 import { PENSION_PARSE_PROMPT } from '@/lib/ai/pension-parse-prompt'
 import { checkTierGate } from '@/lib/require-tier'
+import { aiSubscriptionRequired, aiModelUnavailable, isAIConfigError } from '@/lib/ai/gate-responses'
 
 // ── Rate limiting (in-memory, per user) ──
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>()
@@ -59,7 +60,7 @@ export async function POST(req: Request) {
   // enkel auth — nu gegate zoals de overige AI-routes (kostenbeheersing).
   const gate = await checkTierGate(supabase, user.id, 'ai')
   if (gate) {
-    return forbidden(gate.error)
+    return aiSubscriptionRequired()
   }
 
   // Rate limit check
@@ -144,16 +145,12 @@ export async function POST(req: Request) {
     await recordAiUsage(supabase, user.id, 'extraction')
     return Response.json(result)
   } catch (err) {
-    console.error('[pension/parse] Error:', err)
-    const message = err instanceof Error ? err.message : 'Onbekende fout'
-
-    // Check for AI config errors
-    if (message.includes('API key')) {
-      return Response.json(
-        { error: 'AI is niet geconfigureerd. Stel een API key in via Beheer > AI Instellingen.' },
-        { status: 503 }
-      )
+    // AI-config/kill-switch: neutrale copy + code naar de client; de echte
+    // reden (beheerderstaal) staat alleen in het serverlog (V-002).
+    if (isAIConfigError(err)) {
+      return aiModelUnavailable(err, 'pension/parse')
     }
+    console.error('[pension/parse] Error:', err)
 
     return Response.json(
       { error: 'Fout bij het verwerken van de PDF. Probeer het opnieuw.' },

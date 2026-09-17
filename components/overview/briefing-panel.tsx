@@ -25,7 +25,7 @@ import {
 } from '@/lib/briefing/rotation'
 import { formatTimestamp } from '@/lib/format'
 import { useModuleAccess } from '@/components/app/feature-access-provider'
-import { AiSubscriptionUpsell } from '@/components/app/ai-subscription-upsell'
+import { AiSubscriptionUpsell, AI_UPSELL_HREF } from '@/components/app/ai-subscription-upsell'
 import { useExecutionMode } from '@/lib/ai/local/use-execution-mode'
 import type { LocalBriefingProgress } from '@/lib/ai/local/local-briefing-resolver'
 
@@ -421,7 +421,7 @@ export function BriefingPanel({
       )}
       {showUpsell && (
         <div className="mb-3">
-          <AiSubscriptionUpsell variant="inline" />
+          <AiSubscriptionUpsell variant="inline" feature="Een briefing op maat van Fin" />
         </div>
       )}
 
@@ -584,7 +584,7 @@ function BriefingHeader({
             // (een betaalde AI-functie). Toon op dezelfde plek een upsell-affordance
             // i.p.v. de POST — de deterministische briefing eronder blijft gratis.
             <Link
-              href="/mijn/account"
+              href={AI_UPSELL_HREF}
               title="Laat Fin je briefing herschrijven — met AI-abonnement"
               aria-label="Ververs met Fin — vereist een AI-abonnement, bekijk het abonnement"
               className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-wil-200 bg-wil-50/70 px-3 py-1.5 text-[11px] font-semibold text-wil-700 transition-colors hover:border-wil-300 hover:bg-wil-100"

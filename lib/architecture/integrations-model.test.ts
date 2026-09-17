@@ -49,6 +49,11 @@ function clientFilesOnDisk(): string[] {
     // Geen externe client, dus geen eigen INTEGRATIONS-entry; hij staat wél als
     // bronbestand bij de calc "Netto vermogen (gewogen)".
     'balance-valuation.ts',
+    // B-051: `open-bank-auth.ts` beslist in de browser hoe we naar de bank gaan
+    // (apart venster in de geïnstalleerde app) en `connection-outcome.ts` is de
+    // pure afleiding achter `/api/bank-connect/connection-status`. Geen van beide
+    // belt TrueLayer — dat blijft `client.ts`.
+    'open-bank-auth.ts', 'connection-outcome.ts',
     // infra/probe/registry — geen extern API-client
     'health-probe.ts', 'version-registry.ts',
     // parser-support

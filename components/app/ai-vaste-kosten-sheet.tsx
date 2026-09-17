@@ -11,6 +11,9 @@ import {
 } from '@/lib/ai/local/local-vaste-kosten-resolver'
 
 import { MaskedAmount } from '@/components/app/masked-amount'
+import { AiSubscriptionUpsell } from '@/components/app/ai-subscription-upsell'
+import { useHasAiSubscription } from '@/lib/feature-access/context'
+import { AI_ERROR_CODE, describeAiError, isAiErrorCode } from '@/lib/ai/error-copy'
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -78,7 +81,9 @@ function toSuggestion(c: VasteKostenCandidate, r: VasteKostenClassificatie): AiS
 }
 
 export function AiVasteKostenSheet({ open, onOpenChange, onComplete }: AiVasteKostenSheetProps) {
-  const [phase, setPhase] = useState<'loading' | 'review' | 'saving' | 'success' | 'error' | 'empty'>('loading')
+  // 'upsell' (V-002): geen AI-abonnement — er is niets verstuurd.
+  const [phase, setPhase] = useState<'loading' | 'review' | 'saving' | 'success' | 'error' | 'empty' | 'upsell'>('loading')
+  const knownNoAi = useHasAiSubscription() === false
   const [rows, setRows] = useState<SuggestionRow[]>([])
   const [skippedRows, setSkippedRows] = useState<AiSuggestion[]>([])
   const [showSkipped, setShowSkipped] = useState(false)
@@ -130,14 +135,26 @@ export function AiVasteKostenSheet({ open, onOpenChange, onComplete }: AiVasteKo
       })
       if (!alive()) return
 
-      if (res.status === 422) {
-        setErrorMessage('AI is niet geconfigureerd. Stel een API key in via Instellingen.')
-        setPhase('error')
-        return
-      }
-
       if (!res.ok) {
-        setErrorMessage('Er ging iets mis bij de AI analyse. Probeer het opnieuw.')
+        // Canonieke AI-foutcopy (lib/ai/error-copy.ts): nooit beheerderstaal
+        // ("stel een API key in") richting de gebruiker. Geen abonnement → upsell.
+        const errData = (await res.json().catch(() => ({}))) as { error?: string; code?: unknown }
+        if (!alive()) return
+        const code = isAiErrorCode(errData.code)
+          ? errData.code
+          : res.status === 422
+            ? AI_ERROR_CODE.unavailable
+            : null
+        if (code) {
+          const copy = describeAiError(code, errData.error)
+          if (copy.affordance === 'upsell') {
+            setPhase('upsell')
+            return
+          }
+          setErrorMessage(copy.text)
+        } else {
+          setErrorMessage('Er ging iets mis bij de AI analyse. Probeer het opnieuw.')
+        }
         setPhase('error')
         return
       }
@@ -247,6 +264,12 @@ export function AiVasteKostenSheet({ open, onOpenChange, onComplete }: AiVasteKo
 
   /** Start (of herstart) de analyse in de modus die nu geldt. Fail-closed. */
   const startAnalysis = useCallback(() => {
+    // Pre-check (V-002): zonder AI-abonnement vertrekt er niets — ook lokaal
+    // niet (de uitvoerhook blokkeert dan met reden 'abonnement').
+    if (knownNoAi || (exec.status === 'blocked' && exec.reason === 'abonnement')) {
+      setPhase('upsell')
+      return
+    }
     if (exec.status === 'resolving') return
     if (exec.status === 'blocked') {
       setErrorMessage(exec.message ?? 'Lokale AI is nu niet beschikbaar op dit toestel.')
@@ -254,7 +277,7 @@ export function AiVasteKostenSheet({ open, onOpenChange, onComplete }: AiVasteKo
       return
     }
     void runAnalysis(exec.status === 'lokaal' ? 'lokaal' : 'cloud')
-  }, [exec.status, exec.message, runAnalysis])
+  }, [knownNoAi, exec.status, exec.reason, exec.message, runAnalysis])
 
   // Trigger fetch when sheet opens — intentional: we load data when
   // the open prop transitions to true, same pattern as account-form-modal.tsx.
@@ -371,6 +394,18 @@ export function AiVasteKostenSheet({ open, onOpenChange, onComplete }: AiVasteKo
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* ── Upsell (geen AI-abonnement) ── */}
+      {phase === 'upsell' && (
+        <div className="px-5 py-8">
+          <AiSubscriptionUpsell
+            variant="inline"
+            feature="Je vaste kosten laten analyseren door Fin"
+            note="Nu scannen herkent je terugkerende kosten ook zonder abonnement."
+            onNavigate={handleClose}
+          />
         </div>
       )}
 

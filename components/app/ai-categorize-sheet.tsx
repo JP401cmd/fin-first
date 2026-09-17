@@ -25,6 +25,9 @@ import { createLocalAiResolver, LOCAL_REP_BATCH_SIZE } from '@/lib/ai/local/loca
 import { useExecutionMode } from '@/lib/ai/local/use-execution-mode'
 import { createPrefetchGate, LOCAL_PREFETCH_WINDOW, type PrefetchGate } from '@/lib/categorize/wizard-gate'
 import { CategorizeWizard } from '@/components/app/categorize-wizard'
+import { AiSubscriptionUpsell } from '@/components/app/ai-subscription-upsell'
+import { useHasAiSubscription } from '@/lib/feature-access/context'
+import { describeAiError, isAiErrorCode } from '@/lib/ai/error-copy'
 import { escapeLikePattern } from '@/lib/transactions/search-query'
 import {
   TransactionRow,
@@ -144,6 +147,12 @@ export function AICategorizeSheet({
   // gezamenlijk. Alleen relevant met een huishouden + minstens één gedeeld budget.
   const [shareSharedBudgetTx, setShareSharedBudgetTx] = useState(true)
   const [aiError, setAiError] = useState<string | null>(null)
+  // V-002: geen AI-abonnement → upsell i.p.v. een foutmelding. Pre-check via de
+  // abonnementscontext (false = zeker niet); de server-403 (code
+  // 'ai_subscription') zet `aiUpsell` alsnog, mocht de context onbekend zijn.
+  const knownNoAi = useHasAiSubscription() === false
+  const [aiUpsell, setAiUpsell] = useState(false)
+  const aiUpsellRef = useRef(false)
   const [showCount, setShowCount] = useState(SHOW_MORE_STEP)
   const [savedCount, setSavedCount] = useState(0)
   const [ruleCount, setRuleCount] = useState(0)
@@ -368,6 +377,8 @@ export function AICategorizeSheet({
 
   const fetchSuggestions = useCallback(async () => {
     setAiError(null)
+    setAiUpsell(false)
+    aiUpsellRef.current = false
     setLocalSessionState('idle')
     setReviewMode('wizard')
     setWizardStep(null)
@@ -444,8 +455,18 @@ export function AICategorizeSheet({
         }),
       })
       if (!res.ok) {
-        const errData = await res.json().catch(() => ({}))
-        throw new Error((errData as { error?: string }).error ?? 'AI-analyse niet beschikbaar')
+        const errData = (await res.json().catch(() => ({}))) as { error?: string; code?: unknown }
+        if (isAiErrorCode(errData.code)) {
+          const copy = describeAiError(errData.code, errData.error)
+          if (copy.affordance === 'upsell') {
+            // Geen abonnement: elke volgende ronde strandt ook — stop de motor.
+            // De voorstellen van de gratis regels blijven in de review staan.
+            aiUpsellRef.current = true
+            abortRef.current?.abort()
+          }
+          throw new Error(copy.text)
+        }
+        throw new Error(errData.error ?? 'AI-analyse niet beschikbaar')
       }
       const data = await res.json() as { results: { import_hash: string; budget_id: string | null; confidence: number; reasoning: string }[] }
       return data.results.map((s) => ({
@@ -584,7 +605,9 @@ export function AICategorizeSheet({
 
       // Alle AI-rondes mislukt en géén enkel AI-voorstel → meld het; de lokale
       // (regel/transfer/spiegel-)voorstellen staan wél gewoon in de review.
-      if (result.failedBatches.length > 0 && result.counts.ai === 0) {
+      if (aiUpsellRef.current) {
+        setAiUpsell(true)
+      } else if (result.failedBatches.length > 0 && result.counts.ai === 0) {
         setAiError(
           aiBlocked
             ? (aiBlockedMessage ??
@@ -598,8 +621,12 @@ export function AICategorizeSheet({
       // Onverwachte fout buiten de AI-rondes om (resolver-fouten worden al per
       // ronde opgevangen) → de al-binnengekomen voorstellen staan al in de wizard;
       // toon enkel een melding.
-      const msg = err instanceof Error ? err.message : 'AI-analyse niet beschikbaar'
-      setAiError(msg)
+      if (aiUpsellRef.current) {
+        setAiUpsell(true)
+      } else {
+        const msg = err instanceof Error ? err.message : 'AI-analyse niet beschikbaar'
+        setAiError(msg)
+      }
       flushRows()
     } finally {
       // Vangnet: zodra de run eindigt is stap 1 hoe dan ook bepaald. onProgress
@@ -1101,6 +1128,13 @@ export function AICategorizeSheet({
           {/* Vraag Fin — pas beschikbaar zodra we weten WAAR Fin mag draaien.
               Fail-closed: tijdens 'resolving' vertrekt er niets, dus dan is de
               knop uit i.p.v. een AI-fase te starten die toch geblokkeerd wordt. */}
+          {knownNoAi ? (
+            <AiSubscriptionUpsell
+              variant="inline"
+              feature="Transacties laten indelen door Fin"
+              note="Slimme regels, de Sleepmodus en handmatig indelen werken zonder abonnement."
+            />
+          ) : (
           <button
             type="button"
             onClick={() => void fetchSuggestions()}
@@ -1127,6 +1161,7 @@ export function AICategorizeSheet({
               )}
             </div>
           </button>
+          )}
 
           {/* Slimme regels (optie 3) */}
           <button
@@ -1194,6 +1229,16 @@ export function AICategorizeSheet({
       {/* ── Review ── */}
       {phase === 'review' && (
         <div className="flex flex-col gap-0 px-5 pb-5 sm:px-6">
+          {/* Geen AI-abonnement (server-403) → upsell; regel-voorstellen staan er wel. */}
+          {aiUpsell && (
+            <div className="mb-4">
+              <AiSubscriptionUpsell
+                variant="inline"
+                feature="Transacties laten indelen door Fin"
+                note="De voorstellen van je regels hieronder staan wel klaar."
+              />
+            </div>
+          )}
           {/* AI error fallback */}
           {aiError && (
             <div className="mb-4 rounded-[var(--r)] border border-orange-200 bg-orange-50 px-3 py-3 text-[11px] text-orange-700">

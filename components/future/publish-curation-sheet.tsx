@@ -12,6 +12,9 @@ import type {
 } from '@/lib/calculator/types'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { ModalFooter } from '@/components/app/modal-footer'
+import { AiSubscriptionUpsell } from '@/components/app/ai-subscription-upsell'
+import { useHasAiSubscription } from '@/lib/feature-access/context'
+import { describeAiError, isAiErrorCode } from '@/lib/ai/error-copy'
 
 /**
  * PublishCurationSheet — laat de auteur per input een neutrale publieke
@@ -113,6 +116,11 @@ export function PublishCurationSheet({
   const [prefillOverrides, setPrefillOverrides] = useState<Record<string, boolean>>(initialPrefill)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // V-002: publiceren draait een AI-toets en vraagt dus het AI-abonnement.
+  // Pre-check via de abonnementscontext; server-403 ('ai_subscription') alsnog.
+  const knownNoAi = useHasAiSubscription() === false
+  const [aiUpsell, setAiUpsell] = useState(false)
+  const showUpsell = knownNoAi || aiUpsell
 
   function updateDefault(key: string, raw: string) {
     const parsed = Number(raw)
@@ -128,6 +136,7 @@ export function PublishCurationSheet({
 
   async function handleSubmit(e?: React.FormEvent) {
     e?.preventDefault()
+    if (showUpsell) return
     setSubmitting(true)
     setError(null)
     try {
@@ -145,6 +154,14 @@ export function PublishCurationSheet({
         data = (await res.json()) as PublishApiResponse
       } catch {
         data = null
+      }
+      const envelope = data as { code?: unknown; error?: string } | null
+      if (!res.ok && envelope && isAiErrorCode(envelope.code)) {
+        const copy = describeAiError(envelope.code, envelope.error)
+        setSubmitting(false)
+        if (copy.affordance === 'upsell') setAiUpsell(true)
+        else setError(copy.text)
+        return
       }
       if (!res.ok || !data || data.ok === false) {
         const msg = data && data.ok === false ? data.error : 'Publiceren mislukt — probeer het opnieuw.'
@@ -170,10 +187,14 @@ export function PublishCurationSheet({
       size="md"
       title="Publiceer in de bibliotheek"
       footer={
-        <ModalFooter
-          primary={{ label: 'Publiceren', onClick: () => handleSubmit(), loading: submitting }}
-          secondary={{ label: 'Annuleer', onClick: onClose }}
-        />
+        showUpsell ? (
+          <ModalFooter primary={{ label: 'Sluiten', onClick: onClose }} />
+        ) : (
+          <ModalFooter
+            primary={{ label: 'Publiceren', onClick: () => handleSubmit(), loading: submitting }}
+            secondary={{ label: 'Annuleer', onClick: onClose }}
+          />
+        )
       }
     >
       <form onSubmit={handleSubmit} className="p-5 sm:p-6">
@@ -186,6 +207,17 @@ export function PublishCurationSheet({
           instelt — niet jouw privé-cijfers. Suggesties zijn afgerond op
           ronde getallen; je mag ze aanpassen.
         </p>
+
+        {showUpsell && (
+          <div className="mb-4" data-testid="publish-upsell">
+            <AiSubscriptionUpsell
+              variant="inline"
+              feature="Een rekenhulp publiceren in de bibliotheek"
+              note="Bij publiceren toetst Fin je rekenhulp op advies-taal. Voor jezelf gebruiken kan zonder abonnement."
+              onNavigate={onClose}
+            />
+          </div>
+        )}
 
         {error && (
           <div

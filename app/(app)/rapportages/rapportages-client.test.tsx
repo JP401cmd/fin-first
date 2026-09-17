@@ -15,17 +15,18 @@
  *     verschil met `HideInSimple`, en de reden dat we hier DepthSection kozen —
  *     een nieuw account landt standaard in Eenvoudig.
  *
- *  3. **Geen slot zonder kassa.** De AI-inleiding is het enige betaalde
- *     onderdeel. Zolang de add-on niet af te rekenen is (`available: false`,
- *     Polar niet live) toont de hub GEEN vergrendeling — een muur zonder deur.
- *     Is de add-on wél te koop en heeft de gebruiker 'm niet, dan is de
- *     vergrendeling vóór de klik zichtbaar mét reden en een weg naar
- *     /mijn/account.
+ *  3. **Slot volgt het abonnement (V-002, eigenaarsbesluit).** De AI-inleiding
+ *     is het enige betaalde onderdeel. Heeft de gebruiker geen AI-abonnement,
+ *     dan is de vergrendeling vóór de klik zichtbaar mét reden en de keuze om
+ *     het abonnement te bekijken (/mijn/account?addon=ai) — ongeacht of de
+ *     add-on al af te rekenen is. Vervangt de eerdere S9-regel "geen slot
+ *     zolang Polar niet live is": daardoor kon een non-abonnee de toggle kiezen
+ *     en liep hij daarna tegen een 403.
  *
  * Bijt-proef gedraaid: (a) `DepthSection` vervangen door een kaal fragment →
  * test 1 rood op het ontbrekende `data-collapsed`; (b) `aiLocked` vastgezet op
- * `!data.hasAiSubscription` (dus zónder de `available`-voorwaarde) → de
- * "geen slot zolang de add-on niet te koop is"-test rood.
+ * `!data.hasAiSubscription` (dus zónder de `available`-voorwaarde) → destijds
+ * rood; sinds V-002 is dat juist de gewenste regel en pint de test hem vast.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, within } from '@testing-library/react'
@@ -131,12 +132,19 @@ describe('Rapportage-hub — curatie per weergavemodus (S9, optie B)', () => {
 })
 
 describe('Rapportage-hub — vergrendeling van de AI-inleiding (S9)', () => {
-  it('toont GEEN slot zolang de add-on niet af te rekenen is', () => {
+  it('toont het slot + upsell ook als de add-on nog niet af te rekenen is (V-002)', () => {
     renderHub('full', { aiAddonAvailable: false, hasAiSubscription: false })
 
-    expect(screen.queryByTestId('ai-inleiding-slot')).not.toBeInTheDocument()
-    // De keuze blijft dus gewoon bedienbaar.
-    expect(screen.getByRole('button', { name: /met ai-inleiding/i })).toBeInTheDocument()
+    expect(screen.getByTestId('ai-inleiding-slot')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /met ai-inleiding/i })).not.toBeInTheDocument()
+    expect(screen.getByTestId('ai-upsell-headline')).toHaveTextContent(
+      'Een AI-inleiding bij je rapport kan met een AI-abonnement',
+    )
+    // Geen belofte van directe afrekening.
+    expect(screen.getByRole('link', { name: /Bekijk AI-abonnement/i })).toHaveAttribute(
+      'href',
+      '/mijn/account?addon=ai',
+    )
   })
 
   it('toont het slot vóór de klik zodra de add-on te koop is en ontbreekt', () => {
@@ -147,9 +155,9 @@ describe('Rapportage-hub — vergrendeling van de AI-inleiding (S9)', () => {
     // Reden + uitweg staan erbij — een slot zonder duiding is precies de
     // ervaring die deze kaart moest wegnemen.
     expect(screen.getByText(/krijg je zonder abonnement volledig/i)).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /Bekijk de add-on/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /Bekijk AI-abonnement/i })).toHaveAttribute(
       'href',
-      '/mijn/account',
+      '/mijn/account?addon=ai',
     )
   })
 

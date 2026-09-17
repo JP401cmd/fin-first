@@ -43,6 +43,11 @@ vi.mock('@/components/app/ai-privacy-indicator', () => ({
   AiPrivacyIndicator: () => <span />,
 }))
 vi.mock('@/components/editorial', () => ({ PageInfoButton: () => null }))
+// V-002: abonnementscontext — default onbekend (null), per test te zetten.
+let hasAiState: boolean | null = null
+vi.mock('@/lib/feature-access/context', () => ({
+  useHasAiSubscription: () => hasAiState,
+}))
 
 import { NieuwsOnlyClient } from './nieuws-only-client'
 
@@ -96,6 +101,7 @@ function urls(): string[] {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  hasAiState = null
   localStorage.clear()
   postCalls = []
   storedEdition = { items: [], cached: false }
@@ -498,5 +504,42 @@ describe('NieuwsOnlyClient — generatie die nooit afrondt', () => {
 
     await tick(60_000)
     expect(urls().filter((u) => u === '/api/news').length).toBe(naTimeout)
+  })
+})
+
+describe('NieuwsOnlyClient — zonder AI-abonnement (V-002)', () => {
+  const cloud = () => executionState({ status: 'cloud', intended: 'cloud', canUseCloud: true })
+
+  it('pre-check: haalt /api/news niet op en toont de upsell', async () => {
+    hasAiState = false
+    mocks.useExecutionMode.mockReturnValue(cloud())
+    render(<NieuwsOnlyClient userId="user-x" />)
+    expect(await screen.findByTestId('nieuws-upsell')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Bekijk AI-abonnement/i }).getAttribute('href')).toBe(
+      '/mijn/account?addon=ai',
+    )
+    expect(urls().some((u) => u === '/api/news' || u.startsWith('/api/news?'))).toBe(false)
+    expect(screen.queryByText('Nieuws kon niet worden geladen')).toBeNull()
+  })
+
+  it('server-403 ai_subscription → upsell i.p.v. de generieke foutkaart', async () => {
+    mocks.useExecutionMode.mockReturnValue(cloud())
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.startsWith('/api/news/read')) {
+        return { ok: true, status: 200, json: async () => ({ readIds: [] }) } as unknown as Response
+      }
+      if (url.startsWith('/api/news')) {
+        return {
+          ok: false,
+          status: 403,
+          json: async () => ({ error: 'Deze functie vereist een AI abonnement', code: 'ai_subscription' }),
+        } as unknown as Response
+      }
+      return { ok: true, status: 200, json: async () => ({}) } as unknown as Response
+    })
+    render(<NieuwsOnlyClient userId="user-y" />)
+    expect(await screen.findByTestId('nieuws-upsell')).toBeInTheDocument()
+    expect(screen.queryByText('Nieuws kon niet worden geladen')).toBeNull()
+    expect(screen.queryByText(/vereist een AI abonnement/)).toBeNull()
   })
 })

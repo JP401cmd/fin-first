@@ -80,8 +80,10 @@ function makeInput(
   assets: readonly Asset[] = scaleAssets(0.1),
   lifeEvents: readonly LifeEvent[] = [...fx.lifeEvents, EXTRA_PENSIOEN],
 ): KernelInput {
+  // Sinds 17 sep 2026 is de instelling standaard AAN (NULL = aan). Deze suite
+  // vergelijkt UIT met AAN, dus de basis zet 'm expliciet uit.
   return buildKernelInputFromApp({
-    profile: buildConvergentieAdapterProfile({ ...basisProfiel, ...over }),
+    profile: buildConvergentieAdapterProfile({ ...basisProfiel, fire_no_deficit_loan: false, ...over }),
     assets,
     debts: fx.debts,
     lifeEvents,
@@ -367,11 +369,11 @@ describe('wrappers — band, MC en marge respecteren geenTekortLening (ADR 0149)
 // ── Adapter: profiles.fire_no_deficit_loan → KernelInput.geenTekortLening ──────
 
 describe('adapter — fire_no_deficit_loan (ADR 0149)', () => {
-  it('true ⇒ geenTekortLening true; null/false/afwezig ⇒ undefined (byte-identiek)', () => {
+  it('standaard AAN (17 sep 2026): true/null/afwezig ⇒ geenTekortLening true; alleen false ⇒ undefined', () => {
     expect(makeInput({ fire_no_deficit_loan: true }).geenTekortLening).toBe(true)
+    expect(makeInput({ fire_no_deficit_loan: null }).geenTekortLening).toBe(true)
+    expect(makeInput({ fire_no_deficit_loan: undefined }).geenTekortLening).toBe(true)
     expect(makeInput({ fire_no_deficit_loan: false }).geenTekortLening).toBeUndefined()
-    expect(makeInput({ fire_no_deficit_loan: null }).geenTekortLening).toBeUndefined()
-    expect(makeInput().geenTekortLening).toBeUndefined()
   })
 
   it('de convergentie-mapper laat de kolom door (ook null)', () => {

@@ -14,10 +14,14 @@ import { createLocalPensionResolver } from '@/lib/ai/local/local-pension-resolve
 import { PensionLocalReview } from './pension-local-review'
 import type { PensionOnzekerVeld } from '@/lib/ai/local/local-pension-parse'
 import type { PensionParseResult } from '@/lib/pension/types'
+import { AiSubscriptionUpsell } from '@/components/app/ai-subscription-upsell'
+import { useHasAiSubscription } from '@/lib/feature-access/context'
+import { describeAiError, isAiErrorCode } from '@/lib/ai/error-copy'
 
 // 'review' bestaat alleen op het LOKALE pad: daar wordt niets overgenomen
 // zonder dat de gebruiker het heeft gezien (zie pension-local-review.tsx).
-type UploadStatus = 'idle' | 'uploading' | 'review' | 'success' | 'error'
+// 'upsell': PDF gekozen zonder AI-abonnement — er is niets verstuurd (V-002).
+type UploadStatus = 'idle' | 'uploading' | 'review' | 'success' | 'error' | 'upsell'
 
 /** Wat de reviewstap nodig heeft, zoals de lokale resolver het teruggeeft. */
 interface LocalReviewData {
@@ -47,12 +51,36 @@ interface PensionPdfUploadProps {
    * Niet relevant voor de PDF-route (AI leidt dat zelf af). Default: samenwonend.
    */
   samenwonend?: boolean
+  /**
+   * Waar de upload leeft. 'onboarding': het PDF-pad (AI) is daar niet
+   * bruikbaar — de gebruiker leest dat een PDF uitlezen met AI gaat en na de
+   * onboarding in de app kan met een AI-abonnement; XML/JSON blijft gewoon werken.
+   * Bewust geen link weg uit de onboarding (voortgang zou verloren gaan).
+   */
+  context?: 'app' | 'onboarding'
+  /**
+   * Expliciet abonnementsfeit (bv. uit een server-loader). Zonder deze prop
+   * leest de upload `useHasAiSubscription()` — dezelfde bron
+   * (`profiles.active_subscriptions`) als de server-gate `checkTierGate`.
+   * Onbekend (null) blokkeert niet vooraf; dan vangt de server-403 het af.
+   */
+  hasAiSubscription?: boolean
 }
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 
 const ACCEPT_ATTR =
   'application/pdf,application/json,text/xml,application/xml,.pdf,.json,.xml'
+
+/** Onboarding: het PDF-pad is daar niet bruikbaar, dus de kiezer biedt het niet aan. */
+const ACCEPT_ATTR_DATA_ONLY = 'application/json,text/xml,application/xml,.json,.xml'
+
+export const ONBOARDING_PDF_NOTICE =
+  'Een PDF uitlezen gebeurt met AI. Dat kan straks in de app met een AI-abonnement, als je de onboarding hebt afgerond. Gebruik nu de XML- of JSON-download van mijnpensioenoverzicht.nl, of vul een schatting in.'
+
+const PDF_UPSELL_FEATURE = 'Je pensioenoverzicht (PDF) uitlezen'
+const PDF_UPSELL_NOTE =
+  'De XML- of JSON-download van mijnpensioenoverzicht.nl werkt zonder abonnement — die lezen we zonder AI, op je eigen apparaat.'
 
 /** Of een bestand een mijnpensioen.nl JSON-export is (op naam óf MIME-type). */
 function isJsonFile(f: File): boolean {
@@ -79,7 +107,14 @@ export function PensionPdfUpload({
   lifeEventId,
   existingPdfPath,
   samenwonend = true,
+  context = 'app',
+  hasAiSubscription,
 }: PensionPdfUploadProps) {
+  const hasAiFromContext = useHasAiSubscription()
+  // false = zeker géén abonnement; null = onbekend (geen vooraf-blokkade).
+  const hasAi = hasAiSubscription ?? hasAiFromContext
+  const knownNoAi = hasAi === false
+  const inOnboarding = context === 'onboarding'
   const [status, setStatus] = useState<UploadStatus>('idle')
   const [file, setFile] = useState<File | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -261,6 +296,13 @@ export function PensionPdfUpload({
       return
     }
 
+    // ── Onboarding: geen AI-pad ──────────────────────────────────────────────
+    // Niets versturen, niets lokaal starten. Eerlijk zeggen waarom en wat nu wél kan.
+    if (inOnboarding) {
+      setError(ONBOARDING_PDF_NOTICE)
+      return
+    }
+
     // ── PDF-route: de uitvoerkeuze bepaalt WAAR dit draait ────────────────────
     // FAIL-CLOSED. Alleen bij een expliciet 'mag lokaal' of 'mag cloud' vertrekt
     // er iets. In 'resolving' weten we de voorkeur nog niet en in 'blocked' kan
@@ -268,6 +310,17 @@ export function PensionPdfUpload({
     // stille cloud-aanroep "want dat werkt tenminste".
     if (exec.canUseLocal) {
       void handleLocalPdf(f)
+      return
+    }
+
+    // ── Pre-check abonnement (V-002) ─────────────────────────────────────────
+    // Zonder AI-abonnement vertrekt er niets: geen upload die toch op een 403
+    // strandt. De gebruiker ziet de upsell + het gratis XML/JSON-alternatief.
+    // Ook wanneer de lokale route op 'abonnement' blokkeert.
+    if (knownNoAi || (exec.status === 'blocked' && exec.reason === 'abonnement')) {
+      setFile(f)
+      setStatus('upsell')
+      pendingFileRef.current = null
       return
     }
 
@@ -299,6 +352,11 @@ export function PensionPdfUpload({
       .then(async res => {
         if (!res.ok) {
           const data = await res.json().catch(() => ({}))
+          if (isAiErrorCode(data.code)) {
+            const copy = describeAiError(data.code, data.error)
+            if (copy.affordance === 'upsell') throw new UpsellSignal()
+            throw new Error(copy.text)
+          }
           throw new Error(data.error || `Upload mislukt (${res.status})`)
         }
         return res.json()
@@ -313,6 +371,13 @@ export function PensionPdfUpload({
         }
       })
       .catch(err => {
+        if (err instanceof UpsellSignal) {
+          // Server zegt: geen AI-abonnement (403 ai_subscription). Zelfde upsell
+          // als de pre-check; het bestand wordt niet bewaard.
+          pendingFileRef.current = null
+          setStatus('upsell')
+          return
+        }
         setStatus('error')
         setError(err.message || 'Er ging iets mis bij het verwerken van de PDF.')
       })
@@ -323,6 +388,9 @@ export function PensionPdfUpload({
     uploadToStorage,
     handleDataFile,
     handleLocalPdf,
+    inOnboarding,
+    knownNoAi,
+    exec.reason,
     exec.canUseLocal,
     exec.canUseCloud,
     exec.status,
@@ -504,6 +572,26 @@ export function PensionPdfUpload({
     )
   }
 
+  // ── Upsell: PDF zonder AI-abonnement — niets verstuurd ──
+  if (status === 'upsell' && file) {
+    return (
+      <div className="space-y-2" data-testid="pension-pdf-upsell">
+        <AiSubscriptionUpsell
+          variant="inline"
+          feature={PDF_UPSELL_FEATURE}
+          note={PDF_UPSELL_NOTE}
+        />
+        <button
+          type="button"
+          onClick={handleRemove}
+          className="w-full text-center text-xs text-[var(--ink-3)] hover:text-horizon-600 transition-colors underline underline-offset-2"
+        >
+          Kies een XML- of JSON-bestand
+        </button>
+      </div>
+    )
+  }
+
   // ── Uploading state ──
   if (status === 'uploading' && file) {
     return (
@@ -583,7 +671,7 @@ export function PensionPdfUpload({
         <input
           ref={inputRef}
           type="file"
-          accept={ACCEPT_ATTR}
+          accept={inOnboarding ? ACCEPT_ATTR_DATA_ONLY : ACCEPT_ATTR}
           onChange={handleFileChange}
           className="hidden"
         />
@@ -596,11 +684,15 @@ export function PensionPdfUpload({
           {/* Desktop: drag & drop text; Mobile: tap to select */}
           <div>
             <p className="text-sm font-medium text-[var(--ink-2)]">
-              <span className="hidden sm:inline">Sleep je XML, JSON of PDF hierheen of </span>
+              <span className="hidden sm:inline">
+                {inOnboarding ? 'Sleep je XML of JSON hierheen of ' : 'Sleep je XML, JSON of PDF hierheen of '}
+              </span>
               <span className="text-horizon-600 underline underline-offset-2">kies een bestand</span>
             </p>
             <p className="mt-0.5 text-xs text-[var(--ink-4)]">
-              {exec.status === 'lokaal'
+              {inOnboarding
+                ? 'XML of JSON van mijnpensioenoverzicht.nl, max 10 MB'
+                : exec.status === 'lokaal'
                 ? 'XML of JSON van mijnpensioenoverzicht.nl (aanbevolen) of PDF, max 10 MB'
                 : 'XML, JSON of PDF van mijnpensioenoverzicht.nl, max 10 MB'}
             </p>
@@ -610,7 +702,15 @@ export function PensionPdfUpload({
       {/* AVG-notice — drie varianten, want de bestemming van het document
           verschilt écht per uitvoerkeuze en dat mag de gebruiker niet raden. */}
       <p className="mt-1.5 text-[11px] leading-snug text-[var(--ink-4)]">
-        {exec.status === 'lokaal' ? (
+        {inOnboarding ? (
+          <span data-testid="pension-onboarding-pdf-notice">{ONBOARDING_PDF_NOTICE}</span>
+        ) : knownNoAi ? (
+          <>
+            Een PDF uitlezen gebeurt met AI — dat kan met een AI-abonnement. De XML- of
+            JSON-download van mijnpensioenoverzicht.nl werkt zonder abonnement; die verwerken we
+            zonder AI, volledig op je eigen apparaat.
+          </>
+        ) : exec.status === 'lokaal' ? (
           <>
             Alle drie de bestanden verwerken we volledig op je eigen apparaat — er gaat niets naar
             een AI-dienst. De datadownload van mijnpensioenoverzicht.nl (XML, of JSON) is de
@@ -632,8 +732,9 @@ export function PensionPdfUpload({
           </>
         )}
       </p>
-      {/* Inline error (no file selected yet) */}
-      {error && !file && (
+      {/* Inline error (no file selected yet). In onboarding staat de PDF-uitleg
+          al in de notice hierboven — niet dubbel tonen. */}
+      {error && !file && !(inOnboarding && error === ONBOARDING_PDF_NOTICE) && (
         <p className="mt-1.5 flex items-center gap-1 text-xs text-red-600">
           <AlertCircle className="h-3 w-3 shrink-0" />
           {error}
@@ -642,6 +743,9 @@ export function PensionPdfUpload({
     </div>
   )
 }
+
+/** Interne marker: de server meldt 'geen AI-abonnement' → upsell i.p.v. fout. */
+class UpsellSignal extends Error {}
 
 /**
  * Upload a pending pension PDF to storage after a life event is created/updated.

@@ -32,10 +32,17 @@ describe('resolveTabRedirect — bekende sub-tabs', () => {
     expect(resolveTabRedirect({ tab: 'rekenhulp' })).toBe('/toekomst/rekenhulp')
   })
 
-  it('behoudt overige query-params (tab=gebeurtenissen&strategie=aow)', () => {
+  it('tab=gebeurtenissen&strategie=aow → Voorkeuren (levensstrategieën wonen daar sinds 17 sep 2026)', () => {
     expect(resolveTabRedirect({ tab: 'gebeurtenissen', strategie: 'aow' })).toBe(
-      '/toekomst/gebeurtenissen?strategie=aow',
+      '/toekomst/voorkeuren?strategie=aow',
     )
+  })
+
+  it('tab=gebeurtenissen zonder strategie-sleutel blijft op Gebeurtenissen', () => {
+    expect(resolveTabRedirect({ tab: 'gebeurtenissen', nieuw: '1' })).toBe(
+      '/toekomst/gebeurtenissen?nieuw=1',
+    )
+    expect(resolveTabRedirect({ tab: 'gebeurtenissen' })).toBe('/toekomst/gebeurtenissen')
   })
 
   it('behoudt meerdere overige params', () => {

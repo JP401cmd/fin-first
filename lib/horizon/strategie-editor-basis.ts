@@ -1,6 +1,7 @@
 /**
  * De basisgegevens van de levensstrategie-editors (AOW, werk, pensioen) — één home voor de
- * twee plekken waar die editors renderen: /toekomst/gebeurtenissen en de plan-review-wizard
+ * twee plekken waar die editors renderen: /toekomst/voorkeuren (sinds 17 sep 2026; de
+ * server-opbouw staat in `strategie-editors-data.ts`) en de plan-review-wizard
  * (TPR-15 stap 3). Zo toont hetzelfde formulier op beide plekken dezelfde leeftijd, dezelfde
  * werk-prefill en dezelfde vrijheidstijd-framing. Pure module; de lezing zelf doet de loader.
  */

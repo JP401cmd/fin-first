@@ -433,7 +433,7 @@ export function JaarruimteCard({
             dus dit is een bovengrens (elke euro factor A verlaagt de ruimte met{' '}
             {JAARRUIMTE_FACTOR_A_IMPUTATIE} euro). Vul &apos;m in bij je{' '}
             <Link
-              href="/toekomst/gebeurtenissen?strategie=pensioen"
+              href="/toekomst/voorkeuren?strategie=pensioen"
               className="font-medium text-[var(--ink-2)] underline underline-offset-2 hover:text-[var(--ink)]"
             >
               pensioen-strategie
@@ -447,7 +447,7 @@ export function JaarruimteCard({
             {' '}(telt × {JAARRUIMTE_FACTOR_A_IMPUTATIE} mee in de aftrek). Je factor
             A beheer je bij je{' '}
             <Link
-              href="/toekomst/gebeurtenissen?strategie=pensioen"
+              href="/toekomst/voorkeuren?strategie=pensioen"
               className="font-medium text-[var(--ink-2)] underline underline-offset-2 hover:text-[var(--ink)]"
             >
               pensioen-strategie

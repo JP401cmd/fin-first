@@ -28,6 +28,11 @@ import { REGEL_ORDER, type RegelId } from '@/lib/future/regel-registry'
 import type { RegelSimSnapshot } from '@/lib/future/regel-sim'
 import type { PotRulesConfig, SurplusGroup } from '@/lib/pot-rules'
 import { WEALTH_GROUP_LABELS, type WealthGroup } from '@/lib/wealth-composition'
+import type { LifeEvent } from '@/lib/horizon-data'
+import type { ManagedStrategy } from '@/lib/strategy-events'
+import { isStrategieKey } from '@/lib/horizon/strategie-route'
+import { StrategieEditors, type StrategieEditorsData } from './strategie/strategie-editors'
+import { LevensstrategieenSection } from './levensstrategieen-section'
 
 /**
  * VoorkeurenView — content voor Voorkeuren-tab op /toekomst.
@@ -66,6 +71,13 @@ import { WEALTH_GROUP_LABELS, type WealthGroup } from '@/lib/wealth-composition'
  *
  * De AfbouwOverzichtCard blijft `HideInSimple` — dat is uitkomst-analyse, geen
  * bedieningsvlak, en valt daarmee aan de goede kant van diezelfde norm.
+ *
+ * Sectie "Levensstrategieën" (AOW, Pensioen, Huis, Werk) — sinds 17 sep 2026 hier
+ * i.p.v. op /toekomst/gebeurtenissen (besluit eigenaar: verhuizen, geen dubbeling).
+ * `?strategie=aow|pensioen|huis|werk` opent de bijbehorende editor; Gebeurtenissen,
+ * Box 1, de jaarruimte-kaart, de plan-review en de AOW-melding deeplinken hierheen
+ * (`strategieHref`). In beide weergavemodi alle vier (S6/B-024), zie
+ * `LevensstrategieenSection`.
  */
 
 /**
@@ -135,8 +147,14 @@ export function VoorkeurenView({
   regelVoorkeuren,
   potBalances,
   box3HeffingvrijInkomen = null,
+  events,
+  strategieData,
 }: {
   fireParams: FireParams
+  /** Levensgebeurtenissen (incl. de beheerde AOW/pensioen/werk-rijen) voor de strategie-editors. */
+  events: LifeEvent[]
+  /** Gedeelde strategie-editordata (`buildStrategieEditorsData`, zelfde bron als Gebeurtenissen). */
+  strategieData: StrategieEditorsData
   /**
    * TPR-12 — `profiles.box3_heffingvrij_inkomen` (euro p.p. per jaar) uit de rauwe
    * profielrij; null = kernel-default. Alleen getoond/bewerkbaar onder werkelijk rendement.
@@ -185,9 +203,37 @@ export function VoorkeurenView({
   // Welke "Regel op de hele tijdas" wordt bewerkt (null = gesloten).
   const [editingRegel, setEditingRegel] = useState<RegelId | null>(null)
 
+  // Welke levensstrategie-editor open is (null = dicht).
+  const [openStrategy, setOpenStrategy] = useState<ManagedStrategy | null>(null)
+
+  // Deep-link: ?strategie=aow|pensioen|huis|werk opent de bijbehorende editor.
+  // (Disjunct van ?strategie=open op /toekomst — dat is de horizon-strategiekiezer.)
+  useEffect(() => {
+    const s = searchParams.get('strategie')
+    if (isStrategieKey(s)) setOpenStrategy(s)
+  }, [searchParams])
+
+  // S6 — de Pensioen-strategie is de bestemming van twee zichtbare verwijzingen
+  // op /overzicht/belasting/box1 ("vul je factor A in bij je pensioen-strategie").
+  // Komt de gebruiker daar vandaan (?strategie=pensioen), dan staat de
+  // factor-A-uitvraag in de editor meteen open — geen tweede klik op
+  // "Bereken je fiscale ruimte" om de opdracht te kunnen uitvoeren.
+  const jaarruimteDeeplink =
+    openStrategy === 'pensioen' && searchParams.get('strategie') === 'pensioen'
+
+  // Sluit de strategie-editor én ruim de ?strategie-param op.
+  function closeStrategy() {
+    setOpenStrategy(null)
+    if (searchParams.get('strategie')) {
+      const p = new URLSearchParams(searchParams)
+      p.delete('strategie')
+      router.replace(`${pathname}${p.toString() ? `?${p}` : ''}`, { scroll: false })
+    }
+  }
+
   // Deep-link: ?regel=eindstrategie|onttrekkingsstrategie|… opent het
-  // bijbehorende regel-bewerkscherm (spiegelt het ?strategie=-patroon van
-  // gebeurtenissen-view). Valideert tegen de geldige RegelId-set.
+  // bijbehorende regel-bewerkscherm (spiegelt het ?strategie=-patroon
+  // hierboven). Valideert tegen de geldige RegelId-set.
   useEffect(() => {
     const r = searchParams.get('regel')
     if (r && (REGEL_ORDER as string[]).includes(r)) {
@@ -413,6 +459,10 @@ export function VoorkeurenView({
         )}
       </div>
 
+      {/* Levensstrategieën — tussen de plan-regels en de markt-aannames: ze
+          gelden net als de regels over de hele tijdas. Alle vier in beide modi. */}
+      <LevensstrategieenSection simple={simple} onOpen={setOpenStrategy} />
+
       {/* Markt-aannames — in Eenvoudig ingeklapt mét leesregel, in Volledig
           exact de bestaande boom. */}
       {simple ? (
@@ -492,6 +542,16 @@ export function VoorkeurenView({
         withdrawalStrategy={withdrawalStrategy}
         potRules={regelVoorkeuren}
         potBalances={potBalances}
+      />
+
+      {/* Editors van de vier levensstrategieën (één tegelijk, eigen modal-shell). */}
+      <StrategieEditors
+        open={openStrategy}
+        onClose={closeStrategy}
+        events={events}
+        data={strategieData}
+        readOnly={false}
+        autoOpenJaarruimte={jaarruimteDeeplink}
       />
     </section>
   )

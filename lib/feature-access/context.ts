@@ -14,6 +14,7 @@
 import { createContext, useContext } from 'react'
 import type { FeatureAccessData } from '@/lib/compute-feature-access'
 import { ALL_MODULES, isModuleActive, type ModuleId } from '@/lib/module-registry'
+import { hasSubscription } from '@/lib/feature-registry'
 
 export type FeatureAccessContextValue = FeatureAccessData & {
   /** Refresh feature prefs after user toggle */
@@ -56,4 +57,23 @@ export function useModuleAccess() {
     isModuleActive: (id: ModuleId) => isModuleActive(ctx.activeModules, id),
     refreshModules: ctx.refreshModules,
   }
+}
+
+/**
+ * Heeft de gebruiker het AI-abonnement? (V-002 — pre-check vóór een AI-actie.)
+ *
+ * Bron = `profiles.active_subscriptions`, server-side geladen in
+ * `app/(app)/layout.tsx` → `computeFeatureAccess` → deze context. Dat is exact
+ * dezelfde kolom + dezelfde `hasSubscription`-regel als de server-gate
+ * `checkTierGate` (lib/require-tier.ts); er is geen admin-/beta-override.
+ *
+ * Driewaardig: `null` = onbekend (geen provider gemount, bv. de onboarding of
+ * een losse test). Dan blokkeert de aanroeper níét vooraf maar leunt op de
+ * server-403 (`code: 'ai_subscription'`) → dezelfde upsell. Zo kan een
+ * ontbrekende provider nooit een betalende gebruiker buitensluiten.
+ */
+export function useHasAiSubscription(): boolean | null {
+  const ctx = useContext(FeatureAccessContext)
+  if (!ctx) return null
+  return hasSubscription(ctx.subscriptions, 'ai')
 }

@@ -56,6 +56,13 @@ export interface DebtBalanceDetail {
   principalPaid: number
   /** Uitstaand saldo aan einde van het jaar */
   endBalance: number
+  /**
+   * ADR 0151 — alléén op de synthetische sleutel `'opeethypotheek'`: de rente die dit
+   * jaar óp de schuld is BIJGESCHREVEN (Σ maanden `SSlot.renteBijgeschreven`). Bewust
+   * niet in `interestPaid`: dat is betaalde (kas-)rente en voedt kas-sommen zoals
+   * `totalDebtInterest`; de opeethypotheek heeft geen maandlast. Weergaveveld.
+   */
+  renteBijgeschreven?: number
 }
 
 // ── Read-only weergave-decomposities (kernel-bridge, spread-gated) ──────────
@@ -305,6 +312,15 @@ export interface UnifiedProjectionRow {
    * het uitputtingssignaal ("pot 0 ná start"). Geen rekeninput.
    */
   opeetCap?: number
+  /**
+   * ADR 0151 — read-only WEERGAVEVELD (zelfde voorwaarde als `opeetOpname`): is aan
+   * het eind van dit jaar het leenplafond bereikt? `true` ⇔ de opeet-tak is gestart én
+   * de resterende leenruimte in de laatste maand van het jaar
+   * (`tables/bez.ts#opeetCapRestant` op BD(m) en S!P(m)) is < €0,01. Daarna stopt
+   * nieuwe opname; de schuld groeit alleen nog met bijgeschreven rente en kan boven
+   * `opeetCap` uitkomen (`debtBalances['opeethypotheek'].endBalance`). Geen rekeninput.
+   */
+  opeetPlafondBereikt?: boolean
 
   // ── Kassabon-decomposities (kernel-bridge, read-only weergave, spread-gated) ──
   /**

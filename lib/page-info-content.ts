@@ -503,7 +503,7 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
       },
       {
         title: 'Aannames erachter',
-        text: 'Rendement, inflatie, je uitgaven na pensioen en je eindleeftijd bepalen samen de uitkomst. Je stelt ze zelf in bij Voorkeuren — een kleine bijstelling kan jaren schelen. Onder de grafiek, bij Verken je aannames, draai je eraan zonder je plan te wijzigen: zoekt de app je stopmoment zelf, dan zie je je vrijheidsleeftijd verschuiven; ligt je stopmoment vast, dan zie je op de dekkingsas of je plan tot je eindleeftijd reikt, en bij een tekort wat het haalbaar maakt: doorwerken tot een leeftijd, meer opzij, of minder uitgeven. Je AOW telt alleen mee als er een actieve AOW-gebeurtenis op je tijdas staat; ontbreekt die, dan rekent de projectie met €0 AOW en zegt een melding boven de grafiek dat. Is je vermogen onderweg op, dan overbrugt de projectie het gat met een tekort-lening en meldt dat boven de grafiek; bij Voorkeuren stel je in of je plan zo’n lening mag gebruiken.',
+        text: 'Rendement, inflatie, je uitgaven na pensioen en je eindleeftijd bepalen samen de uitkomst. Je stelt ze zelf in bij Voorkeuren — een kleine bijstelling kan jaren schelen. Onder de grafiek, bij Verken je aannames, draai je eraan zonder je plan te wijzigen: zoekt de app je stopmoment zelf, dan zie je je vrijheidsleeftijd verschuiven; ligt je stopmoment vast, dan zie je op de dekkingsas of je plan tot je eindleeftijd reikt, en bij een tekort wat het haalbaar maakt: doorwerken tot een leeftijd, meer opzij, of minder uitgeven. Je AOW telt alleen mee als er een actieve AOW-gebeurtenis op je tijdas staat; ontbreekt die, dan rekent de projectie met €0 AOW en zegt een melding boven de grafiek dat. Standaard rekent je plan zonder blijvende tekort-lening: je vrijheidsleeftijd is het vroegste moment waarop je zonder zo’n lening rondkomt. Kies je een vast stopmoment en is je vermogen onderweg op, dan overbrugt de projectie het gat met een tekort-lening en meldt dat boven de grafiek; bij Voorkeuren stel je in of je plan zo’n lening mag gebruiken. Blijft er aan het eind van je plan veel meer over dan je gekozen eind-vorm doet verwachten, dan legt een melding boven de grafiek uit welke regels dat in deze berekening veroorzaken.',
       },
     ],
     terms: ['fire', 'vrijheidstijd', 'swr', 'inflatie', 'omslagpunt', 'stopmoment', 'bandbreedte', 'tekort_lening'],
@@ -561,13 +561,13 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
   },
   '/toekomst/gebeurtenissen': {
     insight:
-      'Pensioen, AOW, een huis kopen of verkopen, een erfenis — elke levensgebeurtenis op je tijdas verschuift je vrijheidsmoment.',
-    grip: 'Voeg een gebeurtenis toe of sleep ’m naar een ander jaar en zie meteen het effect op je pad naar vrijheid.',
+      'Een kind, een erfenis, een verhuizing of minder werken — elke levensgebeurtenis op je tijdas verschuift je vrijheidsmoment. Ook momenten die je plan zelf berekent, zoals het stoppen van een pensioenpot, staan hier.',
+    grip: 'Voeg een gebeurtenis toe of sleep ’m naar een ander jaar en zie meteen het effect op je pad naar vrijheid. Je AOW, pensioen, huis en werk stel je in bij Voorkeuren.',
   },
   '/toekomst/voorkeuren': {
     insight:
       'Achter elke projectie zitten aannames — verwacht rendement, inflatie, je uitgaven na pensioen, je eindleeftijd — en die bepalen samen hoeveel jaar vrijheid je berekening laat zien.',
-    grip: 'Draai hier aan die knoppen; een kleine bijstelling kan je uitkomst met jaren verschuiven. Liever stap voor stap? "Je voorkeuren voor je plan instellen" zet de belangrijkste keuzes met hun effect op een rij.',
+    grip: 'Draai hier aan die knoppen; een kleine bijstelling kan je uitkomst met jaren verschuiven. Ook je AOW-, pensioen-, huis- en werkstrategie stel je hier in. Liever stap voor stap? "Je voorkeuren voor je plan instellen" zet de belangrijkste keuzes met hun effect op een rij.',
     // De plan-regel (ADR 0129) is hier twee vragen: wanneer stop je, en wat moet
     // er aan het eind gelden. De opties van die twee vragen zijn precies deze
     // begrippen — als radio-label kunnen ze geen popover dragen, dus staan ze

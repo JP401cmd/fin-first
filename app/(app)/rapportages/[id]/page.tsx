@@ -28,6 +28,9 @@ import { PullQuoteSection } from './components/pull-quote'
 import { MonthlyTable } from './components/monthly-table'
 import { HistoricalComparison } from './components/historical-comparison'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
+import { AiSubscriptionUpsell } from '@/components/app/ai-subscription-upsell'
+import { useHasAiSubscription } from '@/lib/feature-access/context'
+import { describeAiError, isAiErrorCode } from '@/lib/ai/error-copy'
 
 /**
  * Hoe lang we op een uitsluitsel over de uitvoerbestemming wachten voordat we
@@ -45,6 +48,10 @@ export default function ReportViewerPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [introNotice, setIntroNotice] = useState<string | null>(null)
+  // V-002: de inleiding vraagt het AI-abonnement. Zonder → het rapport komt
+  // volledig binnen en de gebruiker krijgt de keuze het abonnement te bekijken.
+  const knownNoAi = useHasAiSubscription() === false
+  const [introUpsell, setIntroUpsell] = useState(false)
 
   // Waar hoort de rapport-inleiding te draaien? Dit bepaalt of we het rapport
   // met `use_ai=true` mogen opvragen. FAIL-CLOSED: zolang de bestemming
@@ -84,8 +91,11 @@ export default function ReportViewerPage() {
       // 'm alleen naar het eigen toestel verplaatsen, nooit naar de cloud.
       // Liep de bestemmings-lezing vast (zie de timer hierboven), dan gaan we
       // door zónder inleiding — nooit mét.
-      const useAi =
-        searchParams.get('ai') !== 'false' && execution.canUseCloud && !resolveTimedOut
+      const wantsAi = searchParams.get('ai') !== 'false'
+      // Pre-check: zonder abonnement vragen we de inleiding niet eens op (geen
+      // 403-rondje), maar tonen we wél waarom ze ontbreekt.
+      if (wantsAi && knownNoAi && execution.status !== 'lokaal') setIntroUpsell(true)
+      const useAi = wantsAi && execution.canUseCloud && !resolveTimedOut && !knownNoAi
 
       if (!dateFrom || !dateTo) {
         setError('Geen datumbereik opgegeven')
@@ -114,10 +124,17 @@ export default function ReportViewerPage() {
           const retry = await fetch(buildUrl(false))
           if (retry.ok) {
             setData((await retry.json()) as ReportData)
-            setIntroNotice(
-              (gate as { error?: string } | null)?.error ??
-                'De AI-inleiding is niet beschikbaar; je rapport staat er verder volledig.',
-            )
+            const envelope = gate as { error?: string; code?: unknown } | null
+            const copy = isAiErrorCode(envelope?.code)
+              ? describeAiError(envelope.code, envelope.error)
+              : null
+            if (copy?.affordance === 'upsell') {
+              setIntroUpsell(true)
+            } else {
+              setIntroNotice(
+                copy?.text ?? 'De AI-inleiding is niet beschikbaar; je rapport staat er verder volledig.',
+              )
+            }
             return
           }
           res = retry
@@ -137,7 +154,7 @@ export default function ReportViewerPage() {
     }
 
     fetchReport()
-  }, [searchParams, configId, execution.status, execution.canUseCloud, resolveTimedOut])
+  }, [searchParams, configId, execution.status, execution.canUseCloud, resolveTimedOut, knownNoAi])
 
   // ── Lokale inleiding (progressive enhancement) ────────────────────────────
   // Draait 'rapporten' lokaal, dan levert de route geen inleiding en schrijft de
@@ -208,6 +225,16 @@ export default function ReportViewerPage() {
       {/* Duiding in plaats van een dichte deur: het rapport is er wél, alleen
           de inleiding niet. Bewust géén print-onderdeel — het is een melding
           over dit scherm, niet over het document. */}
+      {introUpsell && (
+        <div className="mt-4 print:hidden" data-print-hide>
+          <AiSubscriptionUpsell
+            variant="inline"
+            feature="Een AI-inleiding bij je rapport"
+            note="Je rapport zelf — alle cijfers, grafieken en vergelijkingen — staat er volledig."
+          />
+        </div>
+      )}
+
       {introNotice && (
         <p
           role="status"

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { unauthorized, forbidden, serverError } from '@/lib/api/respond'
 import { createClient } from '@/lib/supabase/server'
 import { checkTierGate } from '@/lib/require-tier'
+import { aiSubscriptionRequired } from '@/lib/ai/gate-responses'
 import { buildLocalTipCandidates } from '@/lib/ai/local/local-tips-context'
 
 /**
@@ -56,7 +57,7 @@ export async function GET() {
   }
 
   const gate = await checkTierGate(supabase, user.id, 'ai')
-  if (gate) return forbidden(gate.error)
+  if (gate) return aiSubscriptionRequired()
 
   try {
     const candidates = await buildLocalTipCandidates(supabase)

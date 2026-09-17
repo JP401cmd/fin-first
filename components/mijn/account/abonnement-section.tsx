@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
 import { Check, Lock, Sparkles, Link2, X, Clock } from 'lucide-react'
 import {
   ADDON_PLANS,
@@ -32,10 +33,41 @@ const TIER_TINT: Record<AddonPlan['tier'], string> = {
 
 export function AbonnementSection({
   activeSubscriptions,
+  initialAddon = null,
 }: {
   activeSubscriptions: string[]
+  /**
+   * Deeplink (`/mijn/account?addon=ai`, V-002): open het upgrade-sheet van
+   * deze add-on bij het laden — tenzij hij al actief is (dan valt er niets te
+   * upgraden en toont de kaart gewoon "Actief").
+   */
+  initialAddon?: AddonPlan['tier'] | null
 }) {
-  const [upgradePlan, setUpgradePlan] = useState<AddonPlan | null>(null)
+  const router = useRouter()
+  const pathname = usePathname()
+  const planFor = (tier: AddonPlan['tier'] | null) => {
+    if (!tier) return null
+    const plan = ADDON_PLANS.find((p) => p.tier === tier)
+    if (!plan || isAddonActive(activeSubscriptions, plan)) return null
+    return plan
+  }
+  const [upgradePlan, setUpgradePlan] = useState<AddonPlan | null>(() => planFor(initialAddon))
+
+  // Ook als de gebruiker al op deze pagina stond: een klik op een upsell elders
+  // (bv. de chat) is een soft-navigatie die deze component niet opnieuw mount,
+  // alleen de prop wijzigt. Zonder dit effect opende het sheet dan niet.
+  useEffect(() => {
+    const plan = planFor(initialAddon)
+    if (plan) setUpgradePlan(plan)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialAddon])
+
+  function closeUpgrade() {
+    setUpgradePlan(null)
+    // De deeplink is eenmalig: laat hem niet in de URL staan, anders springt het
+    // sheet bij verversen weer open.
+    if (initialAddon) router.replace(pathname, { scroll: false })
+  }
 
   function openUpgrade(plan: AddonPlan) {
     // POLAR: zodra betaling live is en plan.available === true, vervang deze
@@ -140,7 +172,7 @@ export function AbonnementSection({
       </div>
 
       {upgradePlan && (
-        <UpgradeSheet plan={upgradePlan} onClose={() => setUpgradePlan(null)} />
+        <UpgradeSheet plan={upgradePlan} onClose={closeUpgrade} />
       )}
     </section>
   )

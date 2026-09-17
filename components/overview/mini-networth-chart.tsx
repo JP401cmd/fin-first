@@ -405,6 +405,16 @@ function MiniNetWorthChartComponent({
       ageTicks.push({ age: a, x })
     }
 
+    // Maand-ticks op het verleden-deel (lg: eigen as per kaart). Stap 1 bij een
+    // kort venster, anders 3; ticks tegen "−N mnd" of "nu" aan vervallen.
+    const monthTickStep = HISTORY_WINDOW_MONTHS > 6 ? 3 : 1
+    const monthTicks: { monthsBack: number; x: number }[] = []
+    for (let mb = monthTickStep; mb < HISTORY_WINDOW_MONTHS; mb += monthTickStep) {
+      const x = monthsBackToX(mb)
+      if (x < 18 || x > 86) continue
+      monthTicks.push({ monthsBack: mb, x })
+    }
+
     return {
       fireReached,
       cutAtKnip,
@@ -423,6 +433,7 @@ function MiniNetWorthChartComponent({
       endX: ageToX(finalAge),
       endY: valueToY(endValue),
       ageTicks,
+      monthTicks,
       estHistPath,
       realHistPath,
       histAreaPath,
@@ -483,6 +494,7 @@ function MiniNetWorthChartComponent({
     endX,
     endY,
     ageTicks,
+    monthTicks,
     estHistPath,
     realHistPath,
     histAreaPath,
@@ -740,6 +752,20 @@ function MiniNetWorthChartComponent({
                 vectorEffect="non-scaling-stroke"
               />
             )}
+            {monthTicks.map(({ monthsBack, x }) => (
+              <line
+                key={monthsBack}
+                className="hidden lg:inline"
+                x1={x}
+                y1={FLOOR}
+                x2={x}
+                y2={100}
+                stroke="var(--ink-4)"
+                strokeWidth="0.5"
+                opacity="0.6"
+                vectorEffect="non-scaling-stroke"
+              />
+            ))}
           </svg>
         </div>
         <span
@@ -747,6 +773,23 @@ function MiniNetWorthChartComponent({
           style={{ left: `${PAST_PAD_LEFT}%` }}
         >
           −{HISTORY_WINDOW_MONTHS} mnd
+        </span>
+        {/* Maand-ticks + "nu" — alleen op lg, waar deze kaart los te lezen is.
+            Op mobiel is het deel 1/3 breed en draagt de naad het Vandaag-label. */}
+        {monthTicks.map(({ monthsBack, x }) => (
+          <span
+            key={monthsBack}
+            className="absolute bottom-0 hidden -translate-x-1/2 font-mono text-[9px] leading-none text-[var(--ink-4)] lg:block"
+            style={{ left: `${x.toFixed(1)}%` }}
+          >
+            −{monthsBack}
+          </span>
+        ))}
+        <span
+          data-testid="nw-as-nu-verleden"
+          className="absolute bottom-0 right-3 hidden font-mono text-[9px] leading-none text-[var(--ink-3)] whitespace-nowrap lg:block"
+        >
+          nu
         </span>
       </div>
 
@@ -819,25 +862,18 @@ function MiniNetWorthChartComponent({
             )}
           </svg>
 
-          {/* ── De naad: verticale Vandaag-lijn, brug over de gap, Vandaag-stip.
-              Posities uit CSS (`--nw-seam-gap`), niet uit een viewBox-fractie. */}
+          {/* ── De naad (alleen <lg, één kaart): verticale Vandaag-lijn + stip.
+              Op lg staat er tussen de twee kaarten niets: de lijnen eindigen en
+              beginnen op dezelfde hoogte aan hun kaartrand (eigenaarswens 15 sep
+              2026 — verbonden, maar elke kaart los te lezen). */}
           <span
-            className="absolute inset-y-0 border-l border-dashed border-[var(--ink-4)] opacity-50"
+            className="absolute inset-y-0 border-l border-dashed border-[var(--ink-4)] opacity-50 lg:hidden"
             style={{ left: NW_SEAM_LEFT }}
-          />
-          <span
-            data-testid="nw-naad-brug"
-            className="absolute h-0.5 bg-[var(--module-active-700)] opacity-70"
-            style={{
-              left: 'calc(var(--nw-seam-gap) * -1)',
-              width: 'var(--nw-seam-gap)',
-              top: `calc(${todayY.toFixed(1)}% - 1px)`,
-            }}
           />
           <span
             data-testid="nw-vandaag-punt"
             data-y={todayY.toFixed(1)}
-            className="absolute h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[var(--module-active-700)]"
+            className="absolute h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[var(--module-active-700)] lg:hidden"
             style={{ left: NW_SEAM_LEFT, top: `${todayY.toFixed(1)}%` }}
           />
           {/* Eindmarker: vrijheidsmoment, of eindleeftijd bij "bereikt" —
@@ -876,11 +912,18 @@ function MiniNetWorthChartComponent({
         >
           {finalAgeLabel} jr
         </span>
+        {/* <lg: één label op de naad. lg: "nu" linksonder in de eigen kaart. */}
         <span
-          className="absolute bottom-0 -translate-x-1/2 bg-[var(--paper)] lg:bg-transparent px-1 font-mono text-[9px] leading-none text-[var(--ink-3)] whitespace-nowrap"
+          className="absolute bottom-0 -translate-x-1/2 bg-[var(--paper)] px-1 font-mono text-[9px] leading-none text-[var(--ink-3)] whitespace-nowrap lg:hidden"
           style={{ left: NW_SEAM_LEFT }}
         >
           Vandaag ({startAge})
+        </span>
+        <span
+          data-testid="nw-as-nu-toekomst"
+          className="absolute bottom-0 left-3 hidden font-mono text-[9px] leading-none text-[var(--ink-3)] whitespace-nowrap lg:block"
+        >
+          nu ({startAge})
         </span>
       </div>
 

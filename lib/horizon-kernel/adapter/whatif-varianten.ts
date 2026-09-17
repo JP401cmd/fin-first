@@ -132,7 +132,7 @@ export interface WhatifRawProfileRow {
   fire_stop_anchor?: string | null
   /** ADR 0129 D1 — zelfgekozen stopleeftijd (halve jaren). */
   fire_stop_age?: number | string | null
-  /** ADR 0149 — "geen tekort-lening in mijn plan"; NULL/afwezig → uit. */
+  /** ADR 0149 — "geen tekort-lening in mijn plan"; NULL/afwezig → aan (standaard), `false` → uit. */
   fire_no_deficit_loan?: boolean | null
   feature_preferences?: Record<string, unknown> | null
   withdrawal_strategy?: string | null

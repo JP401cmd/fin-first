@@ -20,6 +20,7 @@ import { isStrategyManagedEvent, STRATEGY_BADGE_LABEL } from '@/lib/strategy-eve
 import { formatCurrency } from '@/lib/format'
 import { EventImpactPreview } from './event-impact-preview'
 import { EVENT_ICONS } from './log-timeline'
+import { strategieHref } from '@/lib/horizon/strategie-route'
 
 interface Props {
   event: LifeEvent
@@ -209,7 +210,7 @@ export function EventPaneView({
                 {' · '}
                 <span className="not-italic">Beheerd via</span>{' '}
                 <Link
-                  href={`/toekomst?tab=gebeurtenissen&strategie=${managed}`}
+                  href={strategieHref(managed)}
                   className="not-italic underline underline-offset-2 hover:text-[var(--ink-2)]"
                 >
                   {managedStrategyLabel}

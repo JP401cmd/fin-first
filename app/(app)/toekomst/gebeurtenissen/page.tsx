@@ -1,130 +1,49 @@
 import type { Metadata } from 'next'
+import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { loadHorizonRaw } from '@/lib/horizon-data-loader'
 import { GebeurtenissenView, type KernelSimData } from '@/components/future/gebeurtenissen-view'
 import { ToekomstSubpageShell } from '@/components/future/toekomst-subpage-shell'
-import { ageAtDate } from '@/lib/horizon-data'
 import { computeScalarFireProjection } from '@/lib/horizon-kernel/scalar-router'
 import { buildConvergentieAdapterProfile } from '@/lib/horizon-kernel/convergentie-router'
 import { resolveDeficitLoanRate } from '@/lib/horizon-kernel/adapter/params'
-import type { PreviewBaseline } from '@/lib/strategy-preview'
-import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
-import { buildHorizonInput } from '@/lib/horizon/build-input'
-import { AOW_LEEFTIJD_KOLOMMEN, strategieEditorBasis } from '@/lib/horizon/strategie-editor-basis'
+import { buildStrategieEditorsData } from '@/lib/horizon/strategie-editors-data'
+import { resolveStrategieRedirect } from '@/lib/horizon/strategie-route'
 
 export const metadata: Metadata = {
   title: 'Gebeurtenissen — TriFinity',
   description:
-    'Levensgebeurtenissen en levensstrategieën op je tijdas — kind, erfenis, AOW, pensioen en huis.',
+    'Levensgebeurtenissen op je tijdas — kind, erfenis, verhuizing of minder werken — en de momenten die je plan zelf berekent.',
 }
 
 /**
- * /toekomst/gebeurtenissen — subpagina voor levensgebeurtenissen en
- * levensstrategieën (AOW/Pensioen/Huis).
+ * /toekomst/gebeurtenissen — subpagina voor levensgebeurtenissen.
  *
- * Geëxtraheerd uit de oude tab-structuur van /toekomst: de prop-opbouw voor
- * <GebeurtenissenView> is 1-op-1 overgenomen uit de voormalige ToekomstPage.
+ * De vier levensstrategieën (AOW/Pensioen/Huis/Werk) wonen sinds 17 sep 2026 op
+ * /toekomst/voorkeuren. Een klik op een strategie-beheerd event of een berekend
+ * huis/pensioen-moment navigeert daarheen; een oude deeplink
+ * `?strategie=aow|pensioen|huis|werk` redirect hier server-side naar
+ * `/toekomst/voorkeuren?strategie=…` (overige params behouden).
  *
- * GebeurtenissenView leest zelf de ?strategie=aow|pensioen|huis query-param
- * (client) om de bijbehorende levensstrategie-modal te openen — die deeplinks
- * blijven dus werken op deze route.
+ * `strategieData` komt uit dezelfde helper als Voorkeuren
+ * (`buildStrategieEditorsData`): de tijdlijn gebruikt er de kernel-context
+ * (`baseline.rawContext`) en het dagtarief van.
  */
-export default async function ToekomstGebeurtenissenPage() {
+export default async function ToekomstGebeurtenissenPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}) {
+  const strategieRedirect = resolveStrategieRedirect(await searchParams)
+  if (strategieRedirect) redirect(strategieRedirect)
+
   const supabase = await createClient()
-  const [horizonData, aowRes] = await Promise.all([
-    loadHorizonRaw(supabase),
-    supabase
-      .from('aow_leeftijd')
-      .select(AOW_LEEFTIJD_KOLOMMEN)
-      .order('birth_date_from', { ascending: true }),
-  ])
+  const horizonData = await loadHorizonRaw(supabase)
 
-  const aowRows = (aowRes.data ?? []) as AowLeeftijdRow[]
-  // currentAge afgeleid uit DOB voor ScenarioBibliotheek-defaults
-  // (target_age = currentAge + N jaar). Null wanneer DOB ontbreekt.
-  const dob = horizonData.effectiveInput?.dateOfBirth ?? null
-  const currentAge = dob ? Math.round(ageAtDate(dob)) : null
-
-  // Baseline + lookup-data voor de levensstrategie-editors (AOW/Pensioen/Huis).
   const ei = horizonData.effectiveInput
-  // Kernel-only: bouw de reële jaaruitgave-grondslag (+ null-guards) via de gedeelde
-  // `buildHorizonInput`; de preview-baseline draagt de rauwe kernel-context (de events
-  // injecteert `previewFireAge` per-aanroep). Zo matchen de AOW/Pensioen-previews per
-  // constructie de Tijdas-grafiek (dezelfde motor: de horizon-kernel).
-  const aowFractional = lookupAowAge(aowRows, dob).fractional
-  const builtPreview = buildHorizonInput({
-    horizonInput: ei,
-    lifeEvents: [], // events per-aanroep geïnjecteerd door previewFireAge
-    fireStrategy: horizonData.fireStrategy,
-    withdrawalStrategy: horizonData.withdrawalStrategy,
-    grossReturn: horizonData.fireParams.grossReturn,
-    inflation: horizonData.fireParams.inflationRate,
-    aowAgeFractional: aowFractional,
-    assets: horizonData.assets,
-    debts: horizonData.debts,
-    box3Method: horizonData.box3Method,
-    hasPartner: horizonData.hasPartner,
-    bankAccountCash: horizonData.unlinkedCash,
-    baseAnnualSavingsFromCashflow: horizonData.baseAnnualSavingsFromCashflow,
-    housingStrategy: horizonData.housingStrategy,
-  })
-  const strategieBaseline: PreviewBaseline | null =
-    builtPreview && horizonData.rawProfile
-      ? {
-          // Rauwe kernel-context (mínus lifeEvents; die injecteert previewFireAge
-          // per-aanroep). loadHorizonData leverde rawProfile al mee (met
-          // yearly_essential_expenses), dus GEEN extra fetch.
-          rawContext: {
-            profile: horizonData.rawProfile,
-            assets: horizonData.assets,
-            debts: horizonData.debts,
-            aowRows,
-            yearlyExpenses: builtPreview.input.yearlyExpenses,
-          },
-        }
-      : null
-  // Netto maandinkomen (werk-prefill) en dagtarief: dezelfde basis als de plan-review-wizard
-  // (`strategieEditorBasis`), zodat hetzelfde formulier op beide plekken hetzelfde toont.
-  const { currentNetMonthly, dailyExpenses } = strategieEditorBasis(horizonData)
-  const strategieData = {
-    baseline: strategieBaseline,
-    dailyExpenses,
-    aowRows,
-    dateOfBirth: dob,
-    grossYearlyIncome: (ei.monthlyIncome ?? 0) * 12,
-    pensioenFactorA: horizonData.pensioenFactorA,
-    currentAge,
-    // Inflatievoet (single-sourced uit resolveFireParams) — indexatie-as van
-    // de pensioen-projectiegrafiek in de pensioen-editor.
-    inflationRate: horizonData.fireParams.inflationRate,
-    currentNetMonthly,
-    // Live preview Huis-strategie: zelfde simBasis als waarmee de loader de
-    // virtuele housing-events resolvede — de modal rekent dan per definitie
-    // hetzelfde trigger-moment en dezelfde vrijheidsleeftijd als de grafiek.
-    housingPreview: horizonData.housingSimBasis
-      ? {
-          simBasis: horizonData.housingSimBasis,
-          context: horizonData.housingContext,
-          // Kernel-native woon-scenario-preview: de rauwe kernel-context (dezelfde als
-          // de Tijdas-grafiek). De preview overschrijft per scenario alleen
-          // `profile.housing_strategy_config`; de adapter mapt dat native naar de
-          // kernel-woning-params. Zonder rawProfile → lege scenario-uitkomst.
-          kernelRawContext: horizonData.rawProfile
-            ? {
-                profile: horizonData.rawProfile,
-                assets: horizonData.assets,
-                debts: horizonData.debts,
-                // Rauwe app-events; de adapter-guard routeert virtuele woning-events
-                // (en AOW/pensioen/werk) zelf naar hun param-blokken.
-                lifeEvents: horizonData.events,
-                aowRows,
-                // Zelfde jaaruitgaven-grondslag als de housing-simBasis (geen nieuwe som).
-                yearlyExpenses: horizonData.housingSimBasis.yearlyExpenses,
-              }
-            : undefined,
-        }
-      : null,
-  }
+  const { strategieData, aowAgeFractional: aowFractional } = buildStrategieEditorsData(horizonData)
+  const strategieBaseline = strategieData.baseline
+  const currentAge = strategieData.currentAge
 
   // Baseline FIRE-projectie voor de EventPane impact-preview — zelfde
   // strategy-aware aanroep als /horizon (scalar-projectie met strategy +
@@ -187,7 +106,7 @@ export default async function ToekomstGebeurtenissenPage() {
         titleBefore="Welke gebeurtenissen verschuiven je "
         emphasis="vrijheid"
         titleAfter="?"
-        deck="Kind, erfenis, AOW, pensioen en je huis — momenten die je tijdas naar voren of naar achteren duwen."
+        deck="Kind, erfenis, verhuizing of minder werken — momenten die je tijdas naar voren of naar achteren duwen."
         infoKey="/toekomst/gebeurtenissen"
       />
       <GebeurtenissenView

@@ -28,6 +28,9 @@
  *   `saldo(m) = MIN(Bez!BD, (saldo(m−1)+Bez!BE)·(1+P!B66/12))` — maandopname + rente,
  *   gecapt op de leenruimte; aflossing/extra/rente-kolommen zijn 0. Buiten
  *   opeet-modus is slot 3 een gewone (lege) reguliere slot.
+ *   **Kern-uitbreiding (ADR 0151, app-pad):** met `woning.opeetRenteBovenPlafond`
+ *   vervalt de MIN (rente loopt boven het plafond door, een dalend plafond kort de
+ *   schuld niet in); de bijgeschreven rente staat apart in `SSlot.renteBijgeschreven`.
  * - **Tekort-lening** (slot 6): gevoed uit het Verdeling-restant `BV+EO`, groeit met
  *   rente `AE = saldo(m−1)·P!B25/12` en wordt afgelost met de prio-1-toewijzing
  *   `AC` uit de schuld-waterval: `saldo(m)=MAX(0, saldo(m−1)+AE+(BV+EO)−AC)` (structuur.md
@@ -99,6 +102,17 @@ export interface SSlot {
   readonly aflossing: SCell
   readonly extra: SCell
   readonly rente: SCell
+  /**
+   * BUITEN ORACLE-DOMEIN (ADR 0151) — alléén gezet op de opeethypotheek-slot in
+   * opeet-modus: de rente die deze maand óp de schuld is BIJGESCHREVEN,
+   * `(saldo(m−1) + BE)·B66/12`. Géén kas-stroom en géén Excel-kolom: de oracle-kolom
+   * `rente` (S!S) blijft voor deze slot 0 omdat die S!AI en Bel als betaalde rente
+   * voedt. Zonder `opeetRenteBovenPlafond` kan de MIN-cap in `opeetSlot` dit bedrag
+   * (deels) opslokken; het veld toont dan wat berekend is, niet wat het saldo netto
+   * groeide. De parity-comparator leest dit veld niet (kolomgewijs op saldo/aflossing/
+   * extra/rente). 0 op m=0 en voorbij de horizon.
+   */
+  readonly renteBijgeschreven?: number
 }
 
 /**
@@ -240,7 +254,22 @@ function regularSlot(
   return { saldo, aflossing, extra, rente: rente === '' ? '' : rente / 12 }
 }
 
-/** Opeethypotheek-slot (alleen actief als `P!B57="Opeethypotheek"`). */
+/**
+ * Opeethypotheek-slot (alleen actief als `P!B57="Opeethypotheek"`).
+ *
+ * Oracle: `saldo(m) = MIN(BD, (saldo(m−1) + BE)·(1 + B66/12))` — opname + rente,
+ * hard gecapt op de leenruimte. Twee gevolgen van die MIN (ADR 0151): (b) zodra het
+ * saldo tegen het plafond aanloopt valt de bijgeschreven rente stil weg, en (c) daalt
+ * BD (overwaarde krimpt), dan wordt de schuld zonder aflossing ingekort.
+ *
+ * **Kern-uitbreiding (ADR 0151, app-pad):** met `WoningStrategieParams.
+ * opeetRenteBovenPlafond` vervalt de MIN: de schuld groeit met opname + rente en mag
+ * boven BD uitkomen. Nieuwe opname stopt vanzelf — Bez!BE is 0 zodra
+ * `opeetCapRestant` (bez.ts) geen ruimte meer ziet, en dat leest `saldo(m−1)` ongeacht
+ * de vlag. De bijgeschreven rente wordt in beide paden apart gerapporteerd
+ * (`renteBijgeschreven`); de oracle-kolom `rente` blijft 0 (geen maandlast).
+ * Vlag uit (élke fixture) → byte-identiek.
+ */
 function opeetSlot(
   saldoPrev: number,
   m: MonthIndex,
@@ -248,15 +277,25 @@ function opeetSlot(
   startwaarde: number,
   dep: SDep,
   opeetRentePerJaar: number,
+  renteBovenPlafond: boolean,
 ): SSlot {
-  // saldo (P): "" voorbij horizon; m=0 → startwaarde; anders opname+rente gecapt op leenruimte.
+  // Oracle-basis en -formule LETTERLIJK (float-identiek): `(P(m−1)+BE)·(1+B66/12)`.
+  // De bijgeschreven rente is een apart weergavegetal; hij wordt NIET hergebruikt om
+  // het saldo te vormen, anders verschuift de float-associativiteit t.o.v. Excel.
+  const basis = saldoPrev + dep.opeetOpname
+  const ongecapt = basis * (1 + opeetRentePerJaar / 12)
+  const renteBijgeschreven = beyond || m === 0 ? 0 : (basis * opeetRentePerJaar) / 12
+  // saldo (P): "" voorbij horizon; m=0 → startwaarde; anders opname+rente — oracle
+  // gecapt op leenruimte, app-pad (vlag) ongecapt (alleen nieuwe opname stopt).
   const saldo: SCell = beyond
     ? ''
     : m === 0
       ? startwaarde
-      : Math.min(dep.opeetCap, (saldoPrev + dep.opeetOpname) * (1 + opeetRentePerJaar / 12))
+      : renteBovenPlafond
+        ? ongecapt
+        : Math.min(dep.opeetCap, ongecapt)
   // aflossing (Q) / rente (S): 0 in opeet-modus ("" voorbij horizon); extra (R): altijd 0.
-  return { saldo, aflossing: beyond ? '' : 0, extra: 0, rente: beyond ? '' : 0 }
+  return { saldo, aflossing: beyond ? '' : 0, extra: 0, rente: beyond ? '' : 0, renteBijgeschreven }
 }
 
 /** Tekort-lening-slot: gevoed uit BV+EO, afgelost met AC, groeit met rente; voorbij horizon bevroren. */
@@ -315,7 +354,17 @@ export function computeS(input: KernelInput, dep: SDep, m: MonthIndex): SRow {
         ),
       )
     } else if (pot?.rol === 'opeethypotheek' && opeetMode) {
-      slots.push(opeetSlot(saldoPrev, m, beyond, pot.startwaarde, dep, input.woning.opeetRentePerJaar))
+      slots.push(
+        opeetSlot(
+          saldoPrev,
+          m,
+          beyond,
+          pot.startwaarde,
+          dep,
+          input.woning.opeetRentePerJaar,
+          input.woning.opeetRenteBovenPlafond === true,
+        ),
+      )
     } else {
       // Reguliere slot; de hypotheek (slot 0) draagt de AY-guard.
       slots.push(

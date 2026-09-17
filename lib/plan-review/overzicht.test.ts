@@ -90,16 +90,19 @@ describe('plan-review overzicht — keuze · effect · waarom', () => {
 
   it('ADR 0149 — "Geen tekort-lening in mijn plan": detailregel, effect en een vergelijking met de andere stand', () => {
     const run = vi.fn((_: RegelSimOverride): RegelProjection => ({ rows: [], fireAgeFractional: 58.2, reach: { kind: 'onbekend' } }))
-    const uit = buildPlanReviewStap('plan', bronnen({ run }))
+    const uit = buildPlanReviewStap('plan', bronnen({ run, profile: { fire_no_deficit_loan: false } }))
     expect(uit.details).toContainEqual({ label: 'Tekort-lening in je plan', waarde: 'toegestaan' })
     expect(uit.effect.join(' ')).toContain('Tekort-lening toegestaan')
     expect(run).toHaveBeenCalledWith({ geenTekortLening: true })
     expect(uit.vergelijking.at(-1)).toEqual({ label: 'Tekort-lening niet toegestaan', waarde: 'vrijheidsleeftijd 58' })
 
-    run.mockClear()
-    const aan = buildPlanReviewStap('plan', bronnen({ run, profile: { fire_no_deficit_loan: true } }))
-    expect(aan.details).toContainEqual({ label: 'Tekort-lening in je plan', waarde: 'niet toegestaan' })
-    expect(run).toHaveBeenCalledWith({ geenTekortLening: false })
+    // Standaard AAN (aanvulling 17 sep 2026): NULL én true tonen "niet toegestaan".
+    for (const waarde of [true, null]) {
+      run.mockClear()
+      const aan = buildPlanReviewStap('plan', bronnen({ run, profile: { fire_no_deficit_loan: waarde } }))
+      expect(aan.details).toContainEqual({ label: 'Tekort-lening in je plan', waarde: 'niet toegestaan' })
+      expect(run).toHaveBeenCalledWith({ geenTekortLening: false })
+    }
   })
 
   it('onder een vast stopmoment telt tot waar het liquide vermogen reikt, niet de vrijheidsleeftijd', () => {
@@ -224,7 +227,7 @@ describe('stap 1 — Je plan', () => {
   it('"niet slinken" heeft geen eindleeftijd en dus geen langer-reiken-vergelijking', () => {
     const o = buildPlanReviewStap('plan', bronnen({ firePlan: { ...PLAN_SOLVED, endForm: 'perpetual' } }))
     // Alleen de tekort-lening-vergelijking (ADR 0149), geen "geld reikt tot"-regels.
-    expect(o.vergelijking.map((r) => r.label)).toEqual(['Tekort-lening toegestaan (nu)', 'Tekort-lening niet toegestaan'])
+    expect(o.vergelijking.map((r) => r.label)).toEqual(['Tekort-lening niet toegestaan (nu)', 'Tekort-lening toegestaan'])
     expect(o.rekentNu).toContain('niet mag slinken')
   })
 

@@ -45,6 +45,8 @@ export const TOEK_FLOW: UatFlow = {
     { id: 'status', scenarioId: 'UAT-TOEK-03', label: 'WF-TOEK-03 · Statusmeldingen boven de grafiek', kind: 'screen', stage: 2, lane: 'aflezen' },
     // ADR 0148/0149 — werkelijk aflosmoment, woonstrategie-zin en instelling-ingang.
     { id: 'tekortmelding', scenarioId: 'UAT-TOEK-52', label: 'WF-TOEK-52 · Tekort-lening-melding (aflosmoment, woonstrategie, instelling)', kind: 'screen', stage: 2, lane: 'aflezen', subOf: 'status' },
+    // Plan 17 sep 2026 onderdeel D — "waarom blijft er aan het eind zoveel over?".
+    { id: 'eindsituatie', scenarioId: 'UAT-TOEK-56', label: 'WF-TOEK-56 · Melding "waarom blijft er aan het eind zoveel over?"', kind: 'screen', stage: 2, lane: 'aflezen', subOf: 'status' },
     { id: 'grafiek', scenarioId: 'UAT-TOEK-04', label: 'WF-TOEK-04 · Grafiek verkennen (Pad/Opbouw, zoom)', kind: 'screen', stage: 2, lane: 'aflezen' },
     { id: 'jaardetail', scenarioId: 'UAT-TOEK-05', label: 'WF-TOEK-05 · Jaar-detail-kassabon', kind: 'screen', stage: 2, lane: 'aflezen', subOf: 'grafiek' },
     { id: 'details', scenarioId: 'UAT-TOEK-06', label: 'WF-TOEK-06 · "Details" · jaar-op-jaar tabel', kind: 'screen', stage: 2, lane: 'aflezen', subOf: 'grafiek' },
@@ -60,6 +62,8 @@ export const TOEK_FLOW: UatFlow = {
     // ADR 0150 — opname naar behoefte krijgt een eigen post (Inkomen & Uitgaven,
     // jaar-kassabon, opbouw-hover, tijdlijn-marker).
     { id: 'opeetopname', scenarioId: 'UAT-TOEK-54', label: 'WF-TOEK-54 · Opname uit je huis zichtbaar als eigen post', kind: 'screen', stage: 2, lane: 'aflezen', subOf: 'grafiek' },
+    // ADR 0151 — bijgeschreven rente krijgt een eigen "+"-regel op de jaarkaart.
+    { id: 'opeetrente', scenarioId: 'UAT-TOEK-55', label: 'WF-TOEK-55 · Bijgeschreven rente zichtbaar, geen-maandlast-toelichting', kind: 'action', stage: 2, lane: 'aflezen', subOf: 'opeetopname' },
 
     // ── 2 · navigeren & delen ─────────────────────────────────────────────
     { id: 'navkaarten', scenarioId: 'UAT-TOEK-28', label: 'WF-TOEK-28 · Navigatiekaarten (drilldown)', kind: 'screen', stage: 2, lane: 'navigeren' },
@@ -155,6 +159,8 @@ export const TOEK_FLOW: UatFlow = {
     { from: 'tijdas', to: 'status' },
     { from: 'status', to: 'tekortmelding' },
     { from: 'tekortmelding', to: 'eindstrat', label: 'Bekijk of wijzig of een tekort-lening mag' },
+    { from: 'status', to: 'eindsituatie' },
+    { from: 'eindsituatie', to: 'eindstrat', label: 'Bekijk of wijzig je plan' },
     { from: 'tijdas', to: 'grafiek' },
     { from: 'grafiek', to: 'jaardetail' },
     { from: 'grafiek', to: 'details' },
@@ -162,6 +168,7 @@ export const TOEK_FLOW: UatFlow = {
     { from: 'grafiek', to: 'maskering' },
     { from: 'grafiek', to: 'grondslaglijn' },
     { from: 'grafiek', to: 'opbouwkleuren' },
+    { from: 'opeetopname', to: 'opeetrente' },
     { from: 'grondslaglijn', to: 'grondslagdoorwerking' },
     { from: 'tijdas', to: 'fasebalk' },
     { from: 'tijdas', to: 'markers' },

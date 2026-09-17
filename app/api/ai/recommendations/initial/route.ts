@@ -1,12 +1,13 @@
 import { generateObject } from 'ai'
 import { z } from 'zod'
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
-import { getModel, AIConfigError } from '@/lib/ai/config'
+import { getModel } from '@/lib/ai/config'
 import { RECOMMENDATIONS_SYSTEM_PROMPT } from '@/lib/ai/dna/recommendations'
 import { buildRecommendationContext } from '@/lib/ai/context/recommendation-context'
 import { maskPIIInOutput } from '@/lib/ai/pii-output-filter'
 import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
 import { checkTierGate } from '@/lib/require-tier'
+import { aiSubscriptionRequired, aiCreditLimitReached, aiModelUnavailable } from '@/lib/ai/gate-responses'
 import { checkCreditBudget, creditLimitMessage } from '@/lib/ai/credit-gate'
 import { recordAiUsage } from '@/lib/ai-credits'
 import { assertCloudAllowed } from '@/lib/ai/privacy-gate'
@@ -88,7 +89,7 @@ export async function POST() {
 
   const tierGate = await checkTierGate(supabase, user.id, 'ai')
   if (tierGate) {
-    return Response.json({ error: tierGate.error }, { status: 403 })
+    return aiSubscriptionRequired()
   }
 
   // Maand-creditbudget (gedeelde bucket) vóór de dure LLM-call. Ontbrak hier,
@@ -97,10 +98,7 @@ export async function POST() {
   // dezelfde bucket putten en de meting klopt.
   const creditGate = await checkCreditBudget(supabase, user.id, 'recommendations')
   if (!creditGate.allowed) {
-    return Response.json(
-      { error: creditLimitMessage(creditGate) },
-      { status: 429, headers: { 'Retry-After': String(creditGate.retryAfterSeconds) } },
-    )
+    return aiCreditLimitReached(creditLimitMessage(creditGate), creditGate.retryAfterSeconds)
   }
 
   const [{ data: budgets }, { data: profile }] = await Promise.all([
@@ -130,11 +128,7 @@ export async function POST() {
   try {
     model = await getModel(supabase, 'aanbevelingen_initieel')
   } catch (err) {
-    if (err instanceof AIConfigError) {
-      // eslint-disable-next-line no-restricted-syntax -- rauwe error.message: zie [Arch F4] API-error-envelope
-      return Response.json({ error: err.message }, { status: 422 })
-    }
-    return Response.json({ error: 'AI model kon niet worden geladen.' }, { status: 500 })
+    return aiModelUnavailable(err, 'ai-recommendations-initial')
   }
 
   const generationId = crypto.randomUUID()
@@ -222,7 +216,7 @@ export async function GET() {
 
   const tierGateGet = await checkTierGate(supabase, claims.sub, 'ai')
   if (tierGateGet) {
-    return Response.json({ error: tierGateGet.error }, { status: 403 })
+    return aiSubscriptionRequired()
   }
 
   // Check database for recently generated recommendations

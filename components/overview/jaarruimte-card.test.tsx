@@ -124,7 +124,7 @@ describe('JaarruimteCard — factor A via prop (geen lokale invoer meer)', () =>
     render(<JaarruimteCard grossYearlyIncome={50_000} />)
     const link = screen.getByRole('link', { name: /pensioen-strategie/i })
     expect(link.getAttribute('href')).toBe(
-      '/toekomst/gebeurtenissen?strategie=pensioen',
+      '/toekomst/voorkeuren?strategie=pensioen',
     )
   })
 

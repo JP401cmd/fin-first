@@ -39,6 +39,12 @@ import { extractPdfPageTexts } from '@/lib/pdf/extract-text'
 import { useExecutionMode } from '@/lib/ai/local/use-execution-mode'
 import { getLocalModelState } from '@/lib/ai/local/model-manager'
 import type { AangifteExtractionResult } from '@/lib/aangifte/types'
+import { AiSubscriptionUpsell } from '@/components/app/ai-subscription-upsell'
+import { useHasAiSubscription } from '@/lib/feature-access/context'
+import { describeAiError, isAiErrorCode } from '@/lib/ai/error-copy'
+
+/** Interne marker: server meldt 'geen AI-abonnement' → upsell i.p.v. foutkaart. */
+class AangifteUpsellSignal extends Error {}
 
 interface UploadStepProps {
   /** Default tax-year voor de picker. Default: huidige jaar - 1. */
@@ -79,6 +85,11 @@ export function UploadStep({
   const [taxYear, setTaxYear] = useState<number>(fallbackTaxYear)
   const [parsedFileName, setParsedFileName] = useState<string | null>(null)
   const [voortgang, setVoortgang] = useState<string | null>(null)
+  // V-002: het uitlezen draait op AI. Zonder abonnement (pre-check, of na een
+  // server-403 'ai_subscription') de upsell i.p.v. de drop-zone; "Typ liever
+  // zelf" blijft altijd beschikbaar.
+  const knownNoAi = useHasAiSubscription() === false
+  const [aiUpsell, setAiUpsell] = useState(false)
 
   // ── Waar draait het uitlezen? ───────────────────────────────────────────
   // Eén hook beslist (lib/ai/local/use-execution-mode.ts), FAIL-CLOSED: in
@@ -106,6 +117,10 @@ export function UploadStep({
 
   const lokaalBeschikbaar = exec.canUseLocal && modelKlaar === true
   const kanLezen = exec.canUseCloud || lokaalBeschikbaar
+  const showUpsell =
+    aiUpsell ||
+    (knownNoAi && !lokaalBeschikbaar) ||
+    (exec.status === 'blocked' && exec.reason === 'abonnement')
 
   /**
    * Centrale parse-flow: bestand binnen → tekst eruit → BSN-strip → uitlezen
@@ -114,6 +129,8 @@ export function UploadStep({
    */
   const processFile = useCallback(
     async (file: File) => {
+      // Pre-check abonnement (V-002): er vertrekt niets.
+      if (showUpsell) return
       // Fail-closed: zolang niet vaststaat waar dit mag draaien, vertrekt er
       // niets. Ook niet "even via de cloud".
       if (!kanLezen) {
@@ -199,9 +216,14 @@ export function UploadStep({
           // de generieke kop maar laten de fallback open.
           let detail = 'PDF lezen lukte niet'
           try {
-            const data = (await res.json()) as { error?: string }
-            if (data?.error) detail = data.error
-          } catch {
+            const data = (await res.json()) as { error?: string; code?: unknown }
+            if (isAiErrorCode(data?.code)) {
+              const copy = describeAiError(data.code, data.error)
+              if (copy.affordance === 'upsell') throw new AangifteUpsellSignal(copy.text)
+              detail = copy.text
+            } else if (data?.error) detail = data.error
+          } catch (parseErr) {
+            if (parseErr instanceof AangifteUpsellSignal) throw parseErr
             // Body kan leeg/non-JSON zijn — gebruik generieke tekst.
           }
           throw new Error(detail)
@@ -210,6 +232,10 @@ export function UploadStep({
         const result = (await res.json()) as AangifteExtractionResult
         onExtracted(result, 'cloud')
       } catch (err) {
+        if (err instanceof AangifteUpsellSignal) {
+          setAiUpsell(true)
+          return
+        }
         const message =
           err instanceof Error ? err.message : 'Er ging iets mis bij het lezen van de PDF.'
         setError(message)
@@ -218,7 +244,7 @@ export function UploadStep({
         setVoortgang(null)
       }
     },
-    [taxYear, onExtracted, kanLezen, lokaalBeschikbaar, exec.status, exec.message],
+    [taxYear, onExtracted, kanLezen, lokaalBeschikbaar, showUpsell, exec.status, exec.message],
   )
 
   // ── Drag-drop handlers ─────────────────────────────────────
@@ -329,8 +355,19 @@ export function UploadStep({
         </select>
       </div>
 
+      {/* Geen AI-abonnement → upsell i.p.v. de drop-zone (V-002). */}
+      {showUpsell && !parsing && (
+        <div data-testid="aangifte-upsell">
+          <AiSubscriptionUpsell
+            variant="inline"
+            feature="Je aangifte (PDF) laten uitlezen"
+            note="Zelf typen kan altijd, zonder abonnement — dat is in een minuut gedaan."
+          />
+        </div>
+      )}
+
       {/* Drop-zone */}
-      {!parsing && !error && (
+      {!parsing && !error && !showUpsell && (
         <div
           role="button"
           tabIndex={0}
