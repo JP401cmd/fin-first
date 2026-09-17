@@ -1,12 +1,16 @@
 // ── Health-probe bibliotheek ─────────────────────────────────────────────────
 // Gedeeld door de admin-route en de dagelijkse cron. Raak NOOIT opgeslagen
 // credentials aan — alleen publieke endpoints en admin-test via TrueLayer.
+// "Opgeslagen credentials" zijn sleutels van gebruikers in de database; een
+// app-sleutel uit de omgeving (COINGECKO_API_KEY) valt daar niet onder en gaat
+// mee zodat de probe exact de aanroep van de app nabootst.
 //
 // Concurrency ≤ 4 om rate-limits te respecteren (CoinGecko demo ~30/min).
 // Elke probe heeft een harde timeout van 5 seconden.
 
 import { INTEGRATIONS } from '@/lib/architecture/integrations-model'
 import { classifyExchangeError } from './exchange-adapter'
+import { coingeckoHeaders } from './coingecko-client'
 import { getBaseUrls, getProviders } from '@/lib/truelayer/client'
 import { getServiceClient } from '@/lib/supabase/service'
 
@@ -61,10 +65,15 @@ async function withConcurrency<T>(
 async function probePublicUrl(id: string, url: string): Promise<ProbeResult> {
   const start = Date.now()
   try {
+    // CoinGecko krijgt de headers van de echte koersophaal (Accept + optionele
+    // demo-key, géén eigen User-Agent): de oude probe met eigen UA op `/ping`
+    // stond maandenlang rood terwijl de koersophaal vanaf Vercel gewoon slaagde.
+    const headers =
+      id === 'coingecko' ? coingeckoHeaders() : { 'User-Agent': 'TriFinity-HealthCheck/1.0' }
     const res = await fetch(url, {
       cache: 'no-store',
       signal: AbortSignal.timeout(5000),
-      headers: { 'User-Agent': 'TriFinity-HealthCheck/1.0' },
+      headers,
     })
     const latencyMs = Date.now() - start
     const ok = res.status >= 200 && res.status < 300

@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { fetchPriceData } from '@/lib/price-feed'
+import { isResolvableTicker, normalizeTicker } from '@/lib/yahoo-ticker'
 import { buildClassificationUpdate } from '@/lib/holdings-classification'
 import { fetchCoinPricesEurBatch } from '@/lib/integrations/coingecko-client'
 import { fetchBatchForexRates } from '@/lib/forex'
@@ -152,11 +153,19 @@ export async function GET(request: Request) {
       const perId = Object.fromEntries(
         probeResults.map((r) => [r.id, r.ok === true ? r.latencyMs ?? 'ok' : (r.code ?? 'error')])
       )
+      // `perId` toont alleen de code; zonder HTTP-status bleef "http_error" op
+      // CoinGecko maandenlang onverklaarbaar. Aparte sleutel zodat `perId` zijn
+      // vorm houdt.
+      const failures = Object.fromEntries(
+        probeResults
+          .filter((r) => r.ok === false)
+          .map((r) => [r.id, { code: r.code, status: r.status, error: r.error ?? null }])
+      )
       await recordJobRun(supabase, {
         job: 'integraties-health',
         status: failed === 0 ? 'success' : 'error',
         startedAt: probeStartedAt,
-        summary: { probed, ok, failed, perId },
+        summary: { probed, ok, failed, perId, failures },
         error: failed > 0 ? `${failed} van ${probed} probe(s) gefaald` : null,
       })
     } catch {
@@ -183,7 +192,12 @@ interface BucketSummary {
   total: number
   unique_tickers: number
   updated: number
+  /** Symbool met geldige vorm dat toch geen koers kreeg — echte koersuitval. */
   stale: number
+  /** Gesloten positie (0 stuks): geen koers nodig, niet opgevraagd. */
+  closed: number
+  /** Ticker is geen beurssymbool (broker-omschrijving, turbo, ISIN): niet opgevraagd. */
+  not_priceable: number
   skipped: number
   errors: number
   assets_synced: number
@@ -197,7 +211,7 @@ interface BucketSummary {
 }
 
 async function refreshInvestmentHoldings(supabase: SupabaseClient): Promise<BucketSummary> {
-  const summary: BucketSummary = { total: 0, unique_tickers: 0, updated: 0, stale: 0, skipped: 0, errors: 0, assets_synced: 0, classified: 0 }
+  const summary: BucketSummary = { total: 0, unique_tickers: 0, updated: 0, stale: 0, closed: 0, not_priceable: 0, skipped: 0, errors: 0, assets_synced: 0, classified: 0 }
 
   const { data: rows, error } = await supabase
     .from('investment_holdings')
@@ -216,12 +230,30 @@ async function refreshInvestmentHoldings(supabase: SupabaseClient): Promise<Buck
   if (error || !rows) return summary
   summary.total = rows.length
 
-  // Deduplicate tickers to minimise Yahoo calls.
+  // Deduplicate tickers to minimise Yahoo calls. Alleen OPEN posities met een
+  // echte symboolvorm gaan de feed in:
+  //  - Gesloten positie (0 stuks) → geen koers nodig, net als de handmatige
+  //    refresh. De rollup hieronder sloot die al uit.
+  //  - Geen beurssymbool (broker-omschrijving, turbo, ISIN in het tickerveld) →
+  //    de chart-API kent die nooit. Anders dan de handmatige refresh zoekt de
+  //    cron bewust NIET via ISIN/naam naar een symbool: die route schrijft een
+  //    gevonden ticker terug en rekent naar EUR om, en dat hoort bij een
+  //    handeling van de gebruiker, niet bij een stille nachtelijke ronde.
+  // Zonder deze splitsing telde productie 109 van 134 posities als `stale`,
+  // waarvan 104 gesloten — de teller zei niets meer over echte koersuitval.
   const tickerToHoldings = new Map<string, Array<typeof rows[number]>>()
   for (const h of rows) {
-    const t = ((h.ticker as string | null) || (h.isin as string | null) || '').trim().toUpperCase()
+    const t = normalizeTicker((h.ticker as string | null) || (h.isin as string | null))
     if (!t) {
       summary.skipped++
+      continue
+    }
+    if (Math.abs(Number(h.units) || 0) < 1e-9) {
+      summary.closed++
+      continue
+    }
+    if (!isResolvableTicker(t)) {
+      summary.not_priceable++
       continue
     }
     const list = tickerToHoldings.get(t) ?? []
@@ -349,7 +381,7 @@ async function refreshInvestmentHoldings(supabase: SupabaseClient): Promise<Buck
 }
 
 async function refreshCryptoHoldings(supabase: SupabaseClient): Promise<BucketSummary> {
-  const summary: BucketSummary = { total: 0, unique_tickers: 0, updated: 0, stale: 0, skipped: 0, errors: 0, assets_synced: 0, classified: 0 }
+  const summary: BucketSummary = { total: 0, unique_tickers: 0, updated: 0, stale: 0, closed: 0, not_priceable: 0, skipped: 0, errors: 0, assets_synced: 0, classified: 0 }
 
   const { data: rows, error } = await supabase
     .from('crypto_holdings')

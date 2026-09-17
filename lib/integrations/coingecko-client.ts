@@ -105,6 +105,18 @@ function setCached(id: string, price: number): void {
   priceCache.set(id, { price, expiresAt: Date.now() + CACHE_TTL_MS })
 }
 
+/**
+ * Request-headers voor élke CoinGecko-aanroep. Eén bron, zodat de health-probe
+ * (`lib/integrations/health-probe.ts`) exact dezelfde aanroep doet als de
+ * koersophaal — een probe met afwijkende headers meet iets anders dan de app.
+ */
+export function coingeckoHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { Accept: 'application/json' }
+  const apiKey = process.env.COINGECKO_API_KEY?.trim()
+  if (apiKey) headers['x-cg-demo-api-key'] = apiKey
+  return headers
+}
+
 interface SimplePriceResponse {
   [id: string]: { eur?: number }
 }
@@ -130,9 +142,7 @@ export async function fetchEurPrices(ids: string[]): Promise<Record<string, numb
   if (misses.length === 0) return result
 
   const url = `${COINGECKO_BASE}/simple/price?ids=${encodeURIComponent(misses.join(','))}&vs_currencies=eur`
-  const headers: Record<string, string> = { Accept: 'application/json' }
-  const apiKey = process.env.COINGECKO_API_KEY?.trim()
-  if (apiKey) headers['x-cg-demo-api-key'] = apiKey
+  const headers = coingeckoHeaders()
 
   try {
     const res = await fetch(url, { method: 'GET', headers, cache: 'no-store' })
@@ -209,9 +219,7 @@ export async function fetchMarketChartEur(
   // `interval=daily` levert één punt per dag; voor <90 dagen valt CoinGecko
   // anders terug op uur-granulariteit, wat we hier niet willen.
   const url = `${COINGECKO_BASE}/coins/${encodeURIComponent(coingeckoId)}/market_chart?vs_currency=eur&days=${safeDays}&interval=daily`
-  const headers: Record<string, string> = { Accept: 'application/json' }
-  const apiKey = process.env.COINGECKO_API_KEY?.trim()
-  if (apiKey) headers['x-cg-demo-api-key'] = apiKey
+  const headers = coingeckoHeaders()
 
   try {
     const res = await fetch(url, { method: 'GET', headers, cache: 'no-store' })
