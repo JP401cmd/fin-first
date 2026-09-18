@@ -39,6 +39,7 @@
 import { HORIZON_PLAFOND_LEEFTIJD } from '@/lib/constants'
 import { euroViewLabel, type EuroView } from '@/lib/euro-display'
 import { formatCurrency, MASKED_AMOUNT_PLACEHOLDER } from '@/lib/format'
+import type { HaalbareUitgave } from './haalbare-uitgave'
 import type { KernelStopAnker } from '@/lib/horizon-kernel/types'
 // Dezelfde afrondingsregel als het hero-kopgetal (`heroFireAgeYear`), via het
 // import-vrije blad — hero-fire-age.ts importeert dít bestand, niet andersom.
@@ -264,6 +265,7 @@ export const HEFBOOM_COPY = {
   meerSalaris: 'Meer salaris',
   spaarquote: 'Spaarquote',
   minderWerken: 'Minder werken',
+  uitgaveNaPensioen: 'Uitgave na pensioen',
   laterEerder: 'Later of eerder stoppen',
 } as const
 
@@ -701,6 +703,33 @@ export function antwoordMeerSalaris(hint: number, masked = false): string {
 /** Antwoord 3 — hetzelfde bedrag als minder uitgeven (dezelfde maandelijkse stroom). */
 export function antwoordMinderUitgeven(hint: number, masked = false): string {
   return `Zo'n ${maandBedrag(hint, masked)}/mnd minder uitgeven hoort bij een gedekt plan.`
+}
+
+/**
+ * De regel onder het bedrag in de KPI-tegel "Na pensioen": bij welke uitgave het plan
+ * precies tot de eindleeftijd reikt. `null` bij `richting === 'gelijk'` — dan valt er
+ * niets te melden en zou een rode of groene regel over een paar euro per jaar liegen.
+ *
+ * Het bedrag is een NOMINAAL jaar-0-jaarbedrag, net als het bedrag erboven in dezelfde
+ * tegel: hier wordt niets gedeflateerd (ADR 0090/0093).
+ */
+export function haalbaarBijUitgaveRegel(h: HaalbareUitgave, masked = false): string | null {
+  if (h.richting === 'gelijk') return null
+  const bedrag = masked ? MASKED_AMOUNT_PLACEHOLDER : formatCurrency(Math.round(h.perJaar))
+  return `haalbaar tot ${heroFireAgeYear(h.eindleeftijd)} bij uitgave: ${bedrag}`
+}
+
+/**
+ * Antwoord 4 — de uitgave na pensioen als hefboom, onder zijn eigen knop.
+ *
+ * Toon: beschrijvend, geen instructie, en bewust NIET "dekt je plan" — die claim is
+ * voorbehouden aan het doorwerken-antwoord, dat kernel-bewezen is (eindreview I2,
+ * 15 sep 2026). Dit getal ís weliswaar gesolved, maar het staat naast een knop waarvan
+ * het bereik geklemd kan zijn; dezelfde terughoudendheid als bij de €-regels.
+ */
+export function antwoordUitgaveNaPensioen(perJaar: number, masked = false): string {
+  const bedrag = masked ? MASKED_AMOUNT_PLACEHOLDER : formatCurrency(Math.round(perJaar))
+  return `Zo'n ${bedrag} per jaar uitgeven hoort bij een gedekt plan.`
 }
 
 /** Doelenpagina: één regel wanneer lab-doelen niet meer bij het plan passen (spec §4.2). */

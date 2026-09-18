@@ -32,6 +32,8 @@ import {
   HEFBOOM_COPY,
   spaarquoteEuroRegel,
   antwoordMinderUitgeven,
+  haalbaarBijUitgaveRegel,
+  antwoordUitgaveNaPensioen,
   ANTWOORD_KNOP,
   ANTWOORD_KNOP_MAX,
   ANTWOORD_BOVEN_BEREIK,
@@ -62,7 +64,7 @@ import {
 } from './nu-stoppen-copy'
 import type { RunwayResult } from './runway'
 import { HORIZON_PLAFOND_LEEFTIJD } from '@/lib/constants'
-import { MASKED_AMOUNT_PLACEHOLDER } from '@/lib/format'
+import { formatCurrency, MASKED_AMOUNT_PLACEHOLDER } from '@/lib/format'
 
 /**
  * ADR 0129 F3a — de anker-generieke opvolger van `nu-stoppen-copy.test.ts`. De
@@ -367,6 +369,7 @@ describe('dekking-zinnen — de vastgestelde kopij', () => {
       meerSalaris: 'Meer salaris',
       spaarquote: 'Spaarquote',
       minderWerken: 'Minder werken',
+      uitgaveNaPensioen: 'Uitgave na pensioen',
       laterEerder: 'Later of eerder stoppen',
     })
     expect(spaarquoteEuroRegel(0)).toBeNull()
@@ -586,5 +589,35 @@ describe('eindvermogen-kopij (ADR 0145 D12, eigenaarsbesluit 15 sep 2026)', () =
     expect(eindvermogenVastgelegdToast(90)).toBe(
       'Je verkenning is nu je doel — de app volgt wat er op je 90e over is.',
     )
+  })
+})
+
+describe('haalbare uitgave na pensioen — kopij', () => {
+  const basis = { perJaar: 31_200, eindleeftijd: 90, huidigPerJaar: 38_640 } as const
+
+  it('noemt de doelleeftijd en het bedrag', () => {
+    expect(haalbaarBijUitgaveRegel({ ...basis, richting: 'minder' }))
+      .toBe(`haalbaar tot 90 bij uitgave: ${formatCurrency(31_200)}`)
+  })
+
+  it('zwijgt wanneer het verschil onder de drempel ligt', () => {
+    expect(haalbaarBijUitgaveRegel({ ...basis, richting: 'gelijk' })).toBeNull()
+  })
+
+  it('maskeert het bedrag in de privacy-weergave', () => {
+    const zin = haalbaarBijUitgaveRegel({ ...basis, richting: 'meer' }, true)
+    expect(zin).toContain('haalbaar tot 90 bij uitgave:')
+    expect(zin).not.toMatch(/31\.200/)
+  })
+
+  it('claimt in het antwoord geen dekking, alleen dat het erbij hoort', () => {
+    const zin = antwoordUitgaveNaPensioen(31_200)
+    expect(zin).toBe(`Zo'n ${formatCurrency(31_200)} per jaar uitgeven hoort bij een gedekt plan.`)
+    // "dekt je plan" is voorbehouden aan het doorwerken-antwoord (eindreview I2).
+    expect(zin).not.toMatch(/dekt je plan/)
+  })
+
+  it('kent de hefboomnaam', () => {
+    expect(HEFBOOM_COPY.uitgaveNaPensioen).toBe('Uitgave na pensioen')
   })
 })
