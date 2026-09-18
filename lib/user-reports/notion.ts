@@ -437,7 +437,13 @@ export function buildReportPagePayload(
     // LET OP: `Status` is in deze database een STATUS-property, geen select.
     // `{ select: … }` levert hier een 400 — de bekendste valkuil van deze koppeling.
     Status: { status: { name: 'Nieuw' } },
-    'CC-actie': { select: { name: 'Backlog' } },
+    // Altijd op onderzoek, nooit op `Backlog`. Een melding uit echt gebruik is bij
+    // binnenkomst nog niet begrepen — dát is precies wat de onderzoekstap doet. En
+    // `Backlog` is in deze database geen wachtrij maar een dood spoor: de drain
+    // (`/trifinity-next`) pakt uitsluitend `1. Onderzoek gevraagd`,
+    // `3. Implementatie akkoord` en `6. Testen door Claude` op. Terugzetten naar
+    // `Backlog` mag altijd — maar dan als besluit ná onderzoek, niet ervóór.
+    'CC-actie': { select: { name: '1. Onderzoek gevraagd' } },
     // Op ÉLK kaartje, ook bij vraag/wens — anders sorteert een prio-loze rij
     // onderaan de queue in plaats van op zijn eigen niveau.
     Prioriteit: { select: { name: NOTION_PRIORITY_BY_REPORT[row.report_type] } },

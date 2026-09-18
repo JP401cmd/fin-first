@@ -84,10 +84,10 @@ describe('buildReportPagePayload — Status', () => {
 })
 
 describe('buildReportPagePayload — CC-actie en Severity', () => {
-  it('CC-actie is altijd Backlog, voor elk type', () => {
+  it('CC-actie is altijd "1. Onderzoek gevraagd", nooit Backlog — anders pakt de drain het kaartje nooit op', () => {
     for (const type of ['bug', 'vraag', 'aanbeveling'] as const) {
       const payload = buildReportPagePayload(mkRow({ report_type: type }), null)
-      expect(props(payload)['CC-actie']).toEqual({ select: { name: 'Backlog' } })
+      expect(props(payload)['CC-actie']).toEqual({ select: { name: '1. Onderzoek gevraagd' } })
     }
   })
 
