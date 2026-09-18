@@ -20,6 +20,7 @@
 - **Euro-weergave:** dit bedrag is een **nominaal jaar-0-jaarbedrag**, net als het bedrag erboven in dezelfde tegel. Niet deflateren, geen eigen `Math.pow` (ADR 0090/0093).
 - **Drempel:** `HAALBARE_UITGAVE_DREMPEL = 250` (€/jaar) — één constante, nergens herhaald.
 - **Bisectie-precisie:** € 50/jaar. **Sliderstap:** € 600/jaar (= € 50/mnd). **Bovengrens:** 3 × de huidige uitgave.
+- **`formatCurrency` gebruikt een NON-BREAKING SPACE** (U+00A0) tussen € en het bedrag: `formatCurrency(2500) === '€ 2.500'`. Hardcodeer die string dus NOOIT met een gewone spatie in een assertie — bouw de verwachting met `formatCurrency(...)` zelf, of gebruik `\s` in een regex (dat matcht U+00A0 wél). Geverifieerd 19 sep 2026.
 - **Commit-attributie:** elke commit eindigt op `Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>`.
 - **Stage per pad**, nooit `git add -A` (parallelle sessies delen deze werkboom). Nooit `git stash` / `git checkout --` / `git reset` / `git clean`.
 
@@ -178,7 +179,7 @@ Maak `lib/horizon/haalbare-uitgave.ts`:
 ```ts
 // lib/horizon/haalbare-uitgave.ts
 //
-// DE HAALBARE UITGAVE NA PENSIOEN (spec 2026-09-18, ADR 0159)
+// DE HAALBARE UITGAVE NA PENSIOEN (spec 2026-09-18, ADR 0160)
 // ───────────────────────────────────────────────────────────────────────────
 // Onder een VAST stopmoment is de vraag niet "wanneer kan ik stoppen?" maar "reikt mijn
 // geld tot mijn eindleeftijd?". Deze module beantwoordt de omgekeerde vraag: bij wélke
@@ -527,7 +528,7 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 
 - [ ] **Step 1: Schrijf de falende tests**
 
-Voeg onderaan `lib/horizon/anker-copy.test.ts` een nieuw `describe`-blok toe en vul de bestaande `import`-regel aan met `haalbaarBijUitgaveRegel` en `antwoordUitgaveNaPensioen`:
+Voeg onderaan `lib/horizon/anker-copy.test.ts` een nieuw `describe`-blok toe, vul de bestaande `import`-regel aan met `haalbaarBijUitgaveRegel` en `antwoordUitgaveNaPensioen`, en importeer `formatCurrency` uit `@/lib/format` (zie de global constraint over de non-breaking space):
 
 ```ts
 describe('haalbare uitgave na pensioen — kopij', () => {
@@ -535,7 +536,7 @@ describe('haalbare uitgave na pensioen — kopij', () => {
 
   it('noemt de doelleeftijd en het bedrag', () => {
     expect(haalbaarBijUitgaveRegel({ ...basis, richting: 'minder' }))
-      .toBe('haalbaar tot 90 bij uitgave: € 31.200')
+      .toBe(`haalbaar tot 90 bij uitgave: ${formatCurrency(31_200)}`)
   })
 
   it('zwijgt wanneer het verschil onder de drempel ligt', () => {
@@ -550,7 +551,7 @@ describe('haalbare uitgave na pensioen — kopij', () => {
 
   it('claimt in het antwoord geen dekking, alleen dat het erbij hoort', () => {
     const zin = antwoordUitgaveNaPensioen(31_200)
-    expect(zin).toBe("Zo'n € 31.200 per jaar uitgeven hoort bij een gedekt plan.")
+    expect(zin).toBe(`Zo'n ${formatCurrency(31_200)} per jaar uitgeven hoort bij een gedekt plan.`)
     // "dekt je plan" is voorbehouden aan het doorwerken-antwoord (eindreview I2).
     expect(zin).not.toMatch(/dekt je plan/)
   })
@@ -715,14 +716,14 @@ describe('vierde antwoord — uitgave na pensioen', () => {
 
   it('landt op zijn eigen uitgang in labAntwoordenPerSlider', () => {
     const per = labAntwoordenPerSlider(resolveLabAntwoorden({ ...leeg, haalbareUitgave: hu }), () => {})
-    expect(per.uitgave?.tekst).toBe("Zo'n € 31.200 per jaar uitgeven hoort bij een gedekt plan.")
+    expect(per.uitgave?.tekst).toBe(`Zo'n ${formatCurrency(31_200)} per jaar uitgeven hoort bij een gedekt plan.`)
     expect(per.uitgave?.knop?.label).toBe('Reken hiermee')
     expect(per.stop).toBeNull()
   })
 
   it('meldt de nieuwe stand na een klik', () => {
     expect(labAntwoordGezetMelding({ kind: 'uitgave', perJaar: 31_200 }))
-      .toBe('Uitgave na pensioen staat nu op € 31.200.')
+      .toBe(`Uitgave na pensioen staat nu op ${formatCurrency(31_200)}.`)
   })
 })
 ```
@@ -1067,7 +1068,7 @@ describe('vierde knop — Uitgave na pensioen', () => {
   it('toont de knop, de sliderstap en de maandvertaling', () => {
     render(<WhatIfSliders {...basisProps} uitgaveNaPensioen={{ waarde: 30_000, basis: 30_000, onChange: () => {} }} />)
     expect(screen.getByLabelText('Uitgave na pensioen')).toHaveAttribute('step', '600')
-    expect(screen.getByText(/€ 2\.500\/mnd/)).toBeInTheDocument()
+    expect(screen.getByText(/€\s2\.500\/mnd/)).toBeInTheDocument()
   })
 
   it('geeft de nieuwe waarde door', () => {
@@ -1084,14 +1085,14 @@ describe('vierde knop — Uitgave na pensioen', () => {
         uitgaveNaPensioen={{ waarde: 30_000, basis: 30_000, onChange: () => {} }}
         antwoorden={{
           uitgave_na_pensioen: {
-            tekst: "Zo'n € 24.000 per jaar uitgeven hoort bij een gedekt plan.",
+            tekst: `Zo'n ${formatCurrency(24_000)} per jaar uitgeven hoort bij een gedekt plan.`,
             bovenBereik: false,
             knop: null,
           },
         }}
       />,
     )
-    expect(screen.getByText(/€ 24\.000 per jaar uitgeven/)).toBeInTheDocument()
+    expect(screen.getByText(/€\s24\.000 per jaar uitgeven/)).toBeInTheDocument()
   })
 })
 ```
@@ -1388,7 +1389,7 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 
 **Files:**
 - Modify: `lib/architecture/calculations.ts`
-- Create: `docs/adr/0159-de-haalbare-uitgave-na-pensioen.md`
+- Create: `docs/adr/0160-de-haalbare-uitgave-na-pensioen.md`
 - Modify: `lib/uat/acceptance/toek.ts` + `lib/uat/acceptance/toek-checks.ts`
 - Modify: `docs/architecture/architecture.json` (gegenereerd)
 
@@ -1410,7 +1411,7 @@ Draai: `npx vitest run lib/architecture/` — `validateCalculations` eist dat el
 
 - [ ] **Step 2: Het ADR**
 
-Maak `docs/adr/0159-de-haalbare-uitgave-na-pensioen.md`, met frontmatter in de vorm van ADR 0158 (`id`, `title`, `status: aanvaard`, `date: 2026-09-18`, `elements: [...]`) en deze secties:
+Maak `docs/adr/0160-de-haalbare-uitgave-na-pensioen.md`, met frontmatter in de vorm van ADR 0158 (`id`, `title`, `status: aanvaard`, `date: 2026-09-19`, `elements: [...]`) en deze secties:
 
 - **Context** — onder een vast stopmoment verandert de vraag; de drie bestaande hefbomen grijpen allemaal vóór het stopmoment, terwijl de uitgave ná het stopmoment bij een vastgezette stopleeftijd vaak de enige knop is die nog draait.
 - **Besluit** — één gesolved getal, twee oppervlakken, één bron; bisectie op de profielrij; "gedekt" = `SolveFireResult.status`.
@@ -1447,8 +1448,8 @@ Verwacht: groen. Faalt een test in een bestand dat je níet hebt aangeraakt: ins
 - [ ] **Step 6: Commit**
 
 ```bash
-git add lib/architecture/calculations.ts docs/adr/0159-de-haalbare-uitgave-na-pensioen.md lib/uat/acceptance/toek.ts lib/uat/acceptance/toek-checks.ts docs/architecture/architecture.json
-git commit -m "docs(arch): ADR 0159 + Berekeningen-catalogus voor de haalbare uitgave
+git add lib/architecture/calculations.ts docs/adr/0160-de-haalbare-uitgave-na-pensioen.md lib/uat/acceptance/toek.ts lib/uat/acceptance/toek-checks.ts docs/architecture/architecture.json
+git commit -m "docs(arch): ADR 0160 + Berekeningen-catalogus voor de haalbare uitgave
 
 Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 ```

@@ -3,7 +3,7 @@
 **Datum:** 18 september 2026
 **Status:** goedgekeurd ontwerp, wacht op implementatieplan
 **Bouwt voort op:** spec `2026-09-14-lab-haalbaarheid-design.md` (§1 dekkingsas, §3 antwoordenblok), ADR 0129 (vast stopmoment × eind-vorm), ADR 0145 (labuitkomst)
-**Voorgesteld ADR-nummer:** 0159
+**Voorgesteld ADR-nummer:** 0160
 
 ## Context
 
@@ -386,7 +386,7 @@ bewaakt dat er geen Tailwind-standaardkleur of losse hex in de nieuwe markup sta
 | `components/app/horizon/horizon-client.tsx` | regel in beide tegels, knop-state, override in `scenarioOverrides` |
 | `lib/architecture/calculations.ts` | de nieuwe afgeleide in de Berekeningen-catalogus |
 | `lib/uat/acceptance/toek.ts` + `reken.ts` | criteria bijwerken (definities, niet uitvoeren); `*-checks.ts`-spiegels mee |
-| `docs/adr/0159-*.md` | het besluit |
+| `docs/adr/0160-*.md` | het besluit |
 
 ## Definition of done
 
@@ -400,7 +400,7 @@ bewaakt dat er geen Tailwind-standaardkleur of losse hex in de nieuwe markup sta
   `lab-antwoorden*.test.ts`, `anker-copy.test.ts`, `vrijheidsas.test.tsx`,
   `dekkingsbalk.test.tsx`.
 - Vitest via PowerShell, niet via Bash (CLAUDE.md).
-- ADR 0159 geschreven; `lib/architecture/calculations.ts` bijgewerkt;
+- ADR 0160 geschreven; `lib/architecture/calculations.ts` bijgewerkt;
   `npm run arch:diagram` gedraaid.
 - Gebundelde fork-eindreview (correctheid · UI-consistentie · security-lens). Geen
   aparte `security-specialist`-run nodig: geen auth, geen RLS, geen migratie, geen nieuwe
