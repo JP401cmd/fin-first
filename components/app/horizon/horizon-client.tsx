@@ -3698,6 +3698,12 @@ export default function HorizonPage({
         meld()
         return
       }
+      if (actie.kind === 'uitgave') {
+        // Bedrading volgt in Task 7 (de sliderstand leeft daar). Vandaag is deze tak
+        // onbereikbaar: horizon-client geeft nog geen `haalbareUitgave` mee aan
+        // resolveLabAntwoorden, dus dit antwoord ontstaat niet.
+        return
+      }
       if (!whatIfBaseline || currentAge === null) return
       const ev = buildSliderEvent(actie.key, actie.value, whatIfBaseline, currentAge)
       setScenarioSliderEvents((prev) => applySliderEvent(prev, actie.key, ev))
