@@ -175,10 +175,12 @@ import {
   eindvermogenSheetToelichting,
   eindvermogenVastgelegdToast,
   formatStopAge,
+  haalbaarBijUitgaveRegel,
   radarSubtitel,
   type AnkerReach,
   type AnkerStop,
 } from '@/lib/horizon/anker-copy'
+import type { HaalbareUitgave } from '@/lib/horizon/haalbare-uitgave'
 import { dekkingVanRun, resolveLabUitkomst, type LabUitkomst } from '@/lib/horizon/lab-uitkomst'
 import {
   labAntwoordenPerSlider,
@@ -718,6 +720,10 @@ export default function HorizonPage({
   // uitgepakt uit dezelfde worker-batch als de scenariokaarten. `null` = nog niet
   // gedraaid of `solved` (dan ís de hoofdrun de opgeloste run).
   const [solvedRun, setSolvedRun] = useState<{ fireAge: number | null; endAge: number | null } | null>(null)
+  /** De gesolvede uitgave na pensioen uit de scenario-batch (spec 2026-09-18). */
+  const [haalbareUitgave, setHaalbareUitgave] = useState<HaalbareUitgave | null>(null)
+  /** Sliderstand van de vierde draaiknop (€/jaar); null = op de basis, geen override. */
+  const [scenarioUitgaveNaPensioen, setScenarioUitgaveNaPensioen] = useState<number | null>(null)
 
   // Scenario overlay state
   const [scenariosExpanded, setScenariosExpanded] = useState(false)
@@ -1136,7 +1142,10 @@ export default function HorizonPage({
   // `stopAge` telt bewust NIET mee voor de scenario-RUN — die blijft de gesolvede "wanneer
   // kán ik vrij zijn"-projectie. Voor de gestippelde DOEL-LIJN telt de stopkeuze wél mee
   // (ADR 0085): dan wint het geforceerde stop-pad als bron. Zie `doelLijnBron` verderop.
-  const hasScenario = scenarioSliderEvents.length > 0 || Object.keys(scenarioReturnDeltas).length > 0
+  const hasScenario =
+    scenarioSliderEvents.length > 0 ||
+    Object.keys(scenarioReturnDeltas).length > 0 ||
+    scenarioUitgaveNaPensioen != null
   /** Staat er een gekozen stopleeftijd? (Koppelmodus schrijft óók `scenarioStopAge`.) */
   const hasStopKeuze = scenarioStopAge != null
   // Is er een doel vastgelegd? Stuurt de doel-taal (kop/chip/as/legenda) en de sectie-states.
@@ -1150,8 +1159,11 @@ export default function HorizonPage({
     return {
       extraLifeEvents: scenarioSliderEvents,
       returnDeltaByCategorie: scenarioReturnDeltas as Partial<Record<AssetCategorie, number>>,
+      ...(scenarioUitgaveNaPensioen != null
+        ? { uitgaveNaPensioenPerJaar: scenarioUitgaveNaPensioen }
+        : {}),
     }
-  }, [hasScenario, scenarioSliderEvents, scenarioReturnDeltas])
+  }, [hasScenario, scenarioSliderEvents, scenarioReturnDeltas, scenarioUitgaveNaPensioen])
 
   // Server FIRE-leeftijd voor de progressieve first paint (Task 4.2): de
   // kernel-leeftijd uit de canonieke server-run (`computeHorizonFireSim` via
@@ -2050,11 +2062,11 @@ export default function HorizonPage({
     // duiding scrolt (lab-haalbaarheid Task 0, 15 sep 2026: tegel bleef "—", en met
     // `?whatif=open` haakte de observer soms nooit aan). Onder `solved` blijft het lui.
     const presetBatchNodig = isFixedAnchorMode || (displayMode === 'full' && duidingInView)
-    if (!presetBatchNodig) { setScenarioPresets(null); setScenarioPresetsLoading(false); return }
+    if (!presetBatchNodig) { setScenarioPresets(null); setScenarioPresetsLoading(false); setHaalbareUitgave(null); return }
     if (!kernelRawProfile || !effectiveInput || currentAge == null) return
     const yearlyExp = effectiveInput.yearlyMustExpenses > 0 ? effectiveInput.yearlyMustExpenses : 0
     // Zonder uitgaven-grondslag draait er geen batch — ook dan geen eindeloze rekenstand.
-    if (yearlyExp <= 0) { setSolvedRun({ fireAge: null, endAge: null }); return }
+    if (yearlyExp <= 0) { setSolvedRun({ fireAge: null, endAge: null }); setHaalbareUitgave(null); return }
     const strat = fireStrategy ?? DEFAULT_FIRE_STRATEGY
     const downsizeActief =
       initialData.housingStrategy.mode === 'downsize' || initialData.housingStrategy.mode === 'reverse_mortgage'
@@ -2086,6 +2098,7 @@ export default function HorizonPage({
         if (cancelled) return
         setScenarioPresets(batch.presets as ScenarioPresetResult[])
         setSolvedRun({ fireAge: batch.solvedFireAge ?? null, endAge: batch.solvedFireEndAge ?? null })
+        setHaalbareUitgave(batch.haalbareUitgave ?? null)
         setScenarioPresetsLoading(false)
       })
       .catch((err) => {
@@ -2095,6 +2108,7 @@ export default function HorizonPage({
         // Een gefaalde batch beëindigt de rekenstand van de hero-tegel ("wordt berekend"):
         // géén leeftijd, maar ook geen eindeloos wachten.
         setSolvedRun({ fireAge: null, endAge: null })
+        setHaalbareUitgave(null)
       })
     return () => { cancelled = true }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2974,8 +2988,8 @@ export default function HorizonPage({
   // slider-bereik. Het bedrag is de PLAN-hint (`kernelMaandHint`), nooit `labDekking.maandHint`
   // — dat laat het verkende stop-pad voorgaan (eindreview I1). De klik-handler (`handleLabAntwoord`) staat ná `handleStopAgeChange`.
   const labAntwoorden = useMemo(
-    () => resolveLabAntwoorden({ dekking: labDekking, solvedFireAge: solvedRun?.fireAge ?? null, planMaandHint: kernelMaandHint, baseline: whatIfBaseline, masked }),
-    [labDekking, solvedRun, kernelMaandHint, whatIfBaseline, masked],
+    () => resolveLabAntwoorden({ dekking: labDekking, solvedFireAge: solvedRun?.fireAge ?? null, planMaandHint: kernelMaandHint, baseline: whatIfBaseline, masked, haalbareUitgave }),
+    [labDekking, solvedRun, kernelMaandHint, whatIfBaseline, masked, haalbareUitgave],
   )
   // ── Dekkingsradar-assen — pure consume-laag over de duiding-rijen ──────
   // Alle grootheden komen elders vandaan: de duiding-rijen (stop-pad wint), de actieve-pad
@@ -3699,9 +3713,8 @@ export default function HorizonPage({
         return
       }
       if (actie.kind === 'uitgave') {
-        // Bedrading volgt in Task 7 (de sliderstand leeft daar). Vandaag is deze tak
-        // onbereikbaar: horizon-client geeft nog geen `haalbareUitgave` mee aan
-        // resolveLabAntwoorden, dus dit antwoord ontstaat niet.
+        setScenarioUitgaveNaPensioen(actie.perJaar)
+        meld()
         return
       }
       if (!whatIfBaseline || currentAge === null) return
@@ -3740,12 +3753,16 @@ export default function HorizonPage({
     const snapshot = {
       sliderEvents: scenarioSliderEvents,
       returnDeltas: scenarioReturnDeltas,
+      uitgaveNaPensioen: scenarioUitgaveNaPensioen,
     }
     const hadSomething =
-      snapshot.sliderEvents.length > 0 || Object.keys(snapshot.returnDeltas).length > 0
+      snapshot.sliderEvents.length > 0 ||
+      Object.keys(snapshot.returnDeltas).length > 0 ||
+      snapshot.uitgaveNaPensioen != null
 
     setScenarioSliderEvents([])
     setScenarioReturnDeltas({})
+    setScenarioUitgaveNaPensioen(null)
 
     // Niets te wissen → geen undo-toast (voorkomt een misleidende "Ongedaan maken").
     if (!hadSomething) return
@@ -3757,13 +3774,14 @@ export default function HorizonPage({
       action: {
         label: 'Ongedaan maken',
         onClick: () => {
-          // Exact terug wat de reset wiste: sliders + rendement-delta's.
+          // Exact terug wat de reset wiste: sliders + rendement-delta's + de vierde knop.
           setScenarioSliderEvents(snapshot.sliderEvents)
           setScenarioReturnDeltas(snapshot.returnDeltas)
+          setScenarioUitgaveNaPensioen(snapshot.uitgaveNaPensioen)
         },
       },
     })
-  }, [scenarioSliderEvents, scenarioReturnDeltas, addToast])
+  }, [scenarioSliderEvents, scenarioReturnDeltas, scenarioUitgaveNaPensioen, addToast])
 
   // ── Doel: één stand-bouwer (gedeeld met persist), concept-detectie, previews ──────
   // EXACT dezelfde inclusie-/afrondingsregels als het (oude) persist-effect — nu via de
@@ -5312,6 +5330,12 @@ export default function HorizonPage({
   const retirementExpenseGuard = guardRetirementExpense(input?.yearlyMustExpenses ?? null)
   const showRetirementExpenseNotice = !hasPerspectiveHero && !retirementExpenseGuard.ok
 
+  /** De regel onder het bedrag in de KPI-tegel "Na pensioen"; null = niets te melden. */
+  const haalbareUitgaveRegel = haalbareUitgave ? haalbaarBijUitgaveRegel(haalbareUitgave, masked) : null
+  /** Donkerrood = minder moeten uitgeven, donkergroen = meer mogen. Semantische tokens. */
+  const haalbareUitgaveToon =
+    haalbareUitgave?.richting === 'minder' ? 'text-negative' : 'text-positive'
+
   const hasNoDob = !effectiveInput?.dateOfBirth
   const fireNotReachable = effectiveCountdown.fireDate === 'Niet haalbaar'
   const hasDebt = (effectiveInput?.totalDebts ?? 0) > 0
@@ -5687,6 +5711,14 @@ export default function HorizonPage({
               >
                 per jaar
               </div>
+                {!hasPerspectiveHero && haalbareUitgaveRegel && (
+                  <p
+                    data-testid="haalbaar-bij-uitgave"
+                    className={`mt-1 font-sans text-[11px] leading-snug ${haalbareUitgaveToon}`}
+                  >
+                    {haalbareUitgaveRegel}
+                  </p>
+                )}
                 </>
               )}
             </button>
@@ -5994,6 +6026,14 @@ export default function HorizonPage({
               >
                 per jaar
               </div>
+                {!hasPerspectiveHero && haalbareUitgaveRegel && (
+                  <p
+                    data-testid="haalbaar-bij-uitgave"
+                    className={`mt-1 font-sans text-[10px] leading-snug ${haalbareUitgaveToon}`}
+                  >
+                    {haalbareUitgaveRegel}
+                  </p>
+                )}
                 </>
               )}
             </button>
@@ -7458,7 +7498,24 @@ export default function HorizonPage({
                             events={scenarioSliderEvents}
                             setEvents={handleScenarioSliderEvents}
                             currentAge={currentAge}
-                            antwoorden={labAntwoordenPerKnop.sliders}
+                            antwoorden={{
+                              ...labAntwoordenPerKnop.sliders,
+                              ...(labAntwoordenPerKnop.uitgave
+                                ? { uitgave_na_pensioen: labAntwoordenPerKnop.uitgave }
+                                : {}),
+                            }}
+                            uitgaveNaPensioen={
+                              haalbareUitgave
+                                ? {
+                                    waarde: scenarioUitgaveNaPensioen ?? haalbareUitgave.huidigPerJaar,
+                                    basis: haalbareUitgave.huidigPerJaar,
+                                    onChange: (v: number) =>
+                                      setScenarioUitgaveNaPensioen(
+                                        v === haalbareUitgave.huidigPerJaar ? null : v,
+                                      ),
+                                  }
+                                : undefined
+                            }
                           />
                         </div>
                       )}
