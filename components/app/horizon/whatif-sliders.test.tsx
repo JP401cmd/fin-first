@@ -6,6 +6,28 @@ import type { WhatIfEvent } from '@/lib/types/horizon-whatif'
 import { buildSliderEvent } from '@/lib/scenario-events'
 
 /**
+ * Gedeelde props-opstelling voor de vierde-knop-tests (task-6-brief.md): dezelfde baseline/
+ * events/setEvents/currentAge die de bestaande describes hieronder losstaand al gebruiken.
+ */
+const basisProps: {
+  baseline: WhatIfOverrides
+  events: WhatIfEvent[]
+  setEvents: (updater: (prev: WhatIfEvent[]) => WhatIfEvent[]) => void
+  currentAge: number
+} = {
+  baseline: {
+    monthlyIncome: 3000,
+    workDaysPerWeek: 5,
+    savingsRate: 20,
+    expectedReturn: 6,
+    extraContribution: 0,
+  },
+  events: [],
+  setEvents: () => {},
+  currentAge: 40,
+}
+
+/**
  * Unit-tests voor `computeSliderUiRange` — het ZICHTBARE (UI-)bereik per slidertype
  * (±20% rond de basisstand; rendement apart). Puur; de validatie-clamps (`SLIDER_RANGES`)
  * blijven ongewijzigd — dit helpertje raakt ze niet. Dekt de per-type-afronding/clamps,
@@ -270,5 +292,47 @@ describe('WhatIfSliders — iOS: tik op de baan verschuift de slider', () => {
     fireEvent.touchStart(slider, { touches: [{ clientX: 218, clientY: 5 }] })
     fireEvent.touchEnd(slider, { touches: [] })
     expect(setEvents).not.toHaveBeenCalled()
+  })
+})
+
+/**
+ * Vierde draaiknop — Uitgave na pensioen (spec 2026-09-18, ADR 0160). Optionele prop:
+ * alleen /toekomst levert 'm, en alleen onder een vast stopmoment. Task 7 (horizon-client)
+ * bedraadt de host; hier alleen de knop zelf.
+ */
+describe('vierde knop — Uitgave na pensioen', () => {
+  it('verschijnt niet zonder de prop', () => {
+    render(<WhatIfSliders {...basisProps} />)
+    expect(screen.queryByLabelText('Uitgave na pensioen')).toBeNull()
+  })
+
+  it('toont de knop, de sliderstap en de maandvertaling', () => {
+    render(<WhatIfSliders {...basisProps} uitgaveNaPensioen={{ waarde: 30_000, basis: 30_000, onChange: () => {} }} />)
+    expect(screen.getByLabelText('Uitgave na pensioen')).toHaveAttribute('step', '600')
+    expect(screen.getByText(/€\s2\.500\/mnd/)).toBeInTheDocument()
+  })
+
+  it('geeft de nieuwe waarde door', () => {
+    const onChange = vi.fn()
+    render(<WhatIfSliders {...basisProps} uitgaveNaPensioen={{ waarde: 30_000, basis: 30_000, onChange }} />)
+    fireEvent.change(screen.getByLabelText('Uitgave na pensioen'), { target: { value: '24000' } })
+    expect(onChange).toHaveBeenCalledWith(24_000)
+  })
+
+  it('rendert het antwoord onder zijn eigen knop', () => {
+    render(
+      <WhatIfSliders
+        {...basisProps}
+        uitgaveNaPensioen={{ waarde: 30_000, basis: 30_000, onChange: () => {} }}
+        antwoorden={{
+          uitgave_na_pensioen: {
+            tekst: `Zo'n ${formatCurrency(24_000)} per jaar uitgeven hoort bij een gedekt plan.`,
+            bovenBereik: false,
+            knop: null,
+          },
+        }}
+      />,
+    )
+    expect(screen.getByText(/€\s24\.000 per jaar uitgeven/)).toBeInTheDocument()
   })
 })

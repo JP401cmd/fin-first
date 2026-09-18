@@ -10,6 +10,8 @@ import {
   readSliderValueFromEvents,
   computeSliderUiRange,
   savingsEuroForPp,
+  uitgaveNaPensioenRange,
+  UITGAVE_NA_PENSIOEN_STAP,
   type SliderKey,
 } from '@/lib/scenario-events'
 import type { WhatIfEvent } from '@/lib/types/horizon-whatif'
@@ -31,7 +33,7 @@ export type { WhatIfOverrides }
  */
 export type SliderAntwoord = SliderAntwoordItem
 
-type SliderAntwoordKey = 'extra_inleg' | 'savings' | 'workdays'
+type SliderAntwoordKey = 'extra_inleg' | 'savings' | 'workdays' | 'uitgave_na_pensioen'
 
 interface SlidersProps {
   baseline: WhatIfOverrides
@@ -40,6 +42,12 @@ interface SlidersProps {
   currentAge: number
   /** Antwoord per knop; een ontbrekende key = geen regel en geen lege ruimte. */
   antwoorden?: Partial<Record<SliderAntwoordKey, SliderAntwoord>>
+  /**
+   * De vierde knop (spec 2026-09-18). Optioneel: alleen /toekomst levert 'm, en alleen
+   * onder een vast stopmoment. Geen `SliderKey`/event — de host houdt de waarde zelf en
+   * stuurt 'm als scenario-override naar de kern.
+   */
+  uitgaveNaPensioen?: { waarde: number; basis: number; onChange: (v: number) => void }
 }
 
 export { computeSliderUiRange }
@@ -190,7 +198,7 @@ function SliderRow({
   )
 }
 
-function SliderGrid({ baseline, events, setEvents, currentAge, antwoorden = {} }: SlidersProps) {
+function SliderGrid({ baseline, events, setEvents, currentAge, antwoorden = {}, uitgaveNaPensioen }: SlidersProps) {
   const workdaysValue = readSliderValueFromEvents('workdays', events, baseline)
   const savingsValue = readSliderValueFromEvents('savings', events, baseline)
   const extraValue = readSliderValueFromEvents('extra_inleg', events, baseline)
@@ -201,6 +209,13 @@ function SliderGrid({ baseline, events, setEvents, currentAge, antwoorden = {} }
   const savingsRange = computeSliderUiRange('savings', baseline.savingsRate, savingsValue)
   // Extra inleg = bóvenop je huidige inleg (basis 0); het bereik hangt aan het maandinkomen.
   const extraRange = computeSliderUiRange('extra_inleg', baseline.monthlyIncome, extraValue)
+  // Uitgave na pensioen: het bereik rekent op de HUIDIGE sliderstand (niet de basis) — het
+  // verbreding-vangnet van uitgaveNaPensioenRange moet zich anders naar het gezette antwoord
+  // toe kunnen verbreden (dragende eis, task-6-brief.md).
+  const uitgaveRange = uitgaveNaPensioenRange(
+    uitgaveNaPensioen?.basis ?? 0,
+    uitgaveNaPensioen?.waarde ?? 0,
+  )
   const dayLabel = (n: number) => `${n} dag${n === 1 ? '' : 'en'}`
   // Procenten altijd heel: het verbreding-vangnet van computeSliderUiRange kan een opgeslagen,
   // niet-afgeronde spaarquote als rand teruggeven ("52.008244023083265%").
@@ -276,20 +291,47 @@ function SliderGrid({ baseline, events, setEvents, currentAge, antwoorden = {} }
           antwoord={antwoorden.workdays}
         />
       </div>
+
+      {/* 4 — Uitgave na pensioen: de enige hefboom die ná het stopmoment grijpt, en bij
+          een vastgezette stopleeftijd vaak de enige die nog draait. In €/JAAR (gelijk aan
+          de KPI-tegel "Na pensioen", zodat het antwoord hetzelfde getal is als daar), met
+          de maandvertaling in de detail-regel — zoals de euro-regel onder Spaarquote. */}
+      {uitgaveNaPensioen && (
+        <div className="border-b border-dashed border-[var(--border-ed)] xl:col-span-2 xl:border-b-0">
+          <SliderRow
+            label={HEFBOOM_COPY.uitgaveNaPensioen}
+            hint="→ Uitgave na pensioen"
+            value={uitgaveNaPensioen.waarde}
+            baseValue={uitgaveNaPensioen.basis}
+            min={uitgaveRange.min}
+            max={uitgaveRange.max}
+            step={UITGAVE_NA_PENSIOEN_STAP}
+            formatValue={formatCurrency}
+            formatDelta={v => `${formatCurrency(v)}/jr`}
+            detail={`≈ ${formatCurrency(Math.round(uitgaveNaPensioen.waarde / 12))}/mnd`}
+            onChange={uitgaveNaPensioen.onChange}
+            minLabel={formatCurrency(uitgaveRange.min)}
+            maxLabel={formatCurrency(uitgaveRange.max)}
+            antwoord={antwoorden.uitgave_na_pensioen}
+          />
+        </div>
+      )}
     </div>
   )
 }
 
 /**
- * De scenario-sliders op de tijdas van /toekomst ("Verken je aannames"). Drie
- * draaiknoppen in vaste volgorde — 1 Meer salaris, 2 Spaarquote (met euro's eronder),
- * 3 Minder werken (eigenaarskeuze 15 sep 2026, bijstelling van spec lab-haalbaarheid §2). Rendert
+ * De scenario-sliders op de tijdas van /toekomst ("Verken je aannames"). Drie vaste
+ * draaiknoppen — 1 Meer salaris, 2 Spaarquote (met euro's eronder), 3 Minder werken
+ * (eigenaarskeuze 15 sep 2026, bijstelling van spec lab-haalbaarheid §2) — plus een optionele
+ * vierde (`uitgaveNaPensioen`, spec 2026-09-18, ADR 0160): de enige hefboom die ná het
+ * stopmoment grijpt, alleen geleverd door /toekomst onder een vast stopmoment. Rendert
  * alleen het slidergrid — geen kaart, geen kop, geen eigen reset: die leven in de
  * host-sectie. De losse kaartvariant verviel met de Wat-Als-pagina (ADR 0144).
  * `antwoorden` zet onder een knop wat daar bij een tekort zou horen (spec
  * antwoorden-naast-sliders); de host levert ze via `labAntwoordenPerSlider`.
  */
-export function WhatIfSliders({ baseline, events, setEvents, currentAge, antwoorden }: SlidersProps) {
+export function WhatIfSliders({ baseline, events, setEvents, currentAge, antwoorden, uitgaveNaPensioen }: SlidersProps) {
   return (
     <SliderGrid
       baseline={baseline}
@@ -297,6 +339,7 @@ export function WhatIfSliders({ baseline, events, setEvents, currentAge, antwoor
       setEvents={setEvents}
       currentAge={currentAge}
       antwoorden={antwoorden}
+      uitgaveNaPensioen={uitgaveNaPensioen}
     />
   )
 }
