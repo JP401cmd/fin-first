@@ -11,9 +11,10 @@
 // Elke regel is één klik die de betreffende hefboom als VERKENNING zet, nooit als plan.
 // Puur: geen kernel-run, geen eigen som — alleen klemmen op het slider-bereik.
 
-import { computeSliderUiRange, savingsPpForMonthlyAmount } from '@/lib/scenario-events'
+import { computeSliderUiRange, savingsPpForMonthlyAmount, uitgaveNaPensioenRange } from '@/lib/scenario-events'
 import type { WhatIfOverrides } from '@/lib/types/horizon-whatif'
 import type { LabUitkomstDekking } from './lab-uitkomst'
+import type { HaalbareUitgave } from './haalbare-uitgave'
 import { formatCurrency } from '@/lib/format'
 import {
   ANTWOORD_KNOP,
@@ -23,15 +24,18 @@ import {
   antwoordDoorwerken,
   antwoordMeerSalaris,
   antwoordMinderUitgeven,
+  antwoordUitgaveNaPensioen,
   formatStopAge,
 } from './anker-copy'
 
 export type LabAntwoordActie =
   | { readonly kind: 'stop'; readonly stopAge: number }
   | { readonly kind: 'slider'; readonly key: 'extra_inleg' | 'savings'; readonly value: number }
+  /** Geen SliderKey: deze hefboom is een profielparameter, geen life-event (spec 2026-09-18). */
+  | { readonly kind: 'uitgave'; readonly perJaar: number }
 
 export interface LabAntwoord {
-  readonly kind: 'doorwerken' | 'extra_opzij' | 'minder_uitgeven'
+  readonly kind: 'doorwerken' | 'extra_opzij' | 'minder_uitgeven' | 'uitgave_na_pensioen'
   readonly zin: string
   /** Het bedrag ligt boven het slider-bereik; de actie zet het maximum (spec §3). */
   readonly bovenBereik: boolean
@@ -51,44 +55,68 @@ export interface LabAntwoordenInput {
   planMaandHint: number | null
   baseline: WhatIfOverrides | null
   masked?: boolean
+  /**
+   * De gesolvede uitgave na pensioen uit `ScenarioPresetBatch` — `null`/afwezig ⇒ geen
+   * vierde antwoord. Anders dan de drie bestaande antwoorden hangt deze NIET aan een
+   * tekort: bij een overschot luidt hij "je mag méér uitgeven".
+   */
+  haalbareUitgave?: HaalbareUitgave | null
 }
 
 export function resolveLabAntwoorden(input: LabAntwoordenInput): LabAntwoord[] {
-  const { dekking, solvedFireAge, planMaandHint, baseline, masked = false } = input
-  if (!dekking || !dekking.tekort || !dekking.stop || dekking.stop.kind === 'now') return []
-  const stopAge = dekking.stop.stopAge
+  const { dekking, solvedFireAge, planMaandHint, baseline, masked = false, haalbareUitgave } = input
   const out: LabAntwoord[] = []
 
-  if (solvedFireAge != null && Number.isFinite(solvedFireAge) && solvedFireAge > stopAge) {
-    // Naar boven op een half jaar: de stop-slider kent halve jaren, en naar beneden
-    // afronden zou een leeftijd noemen waarop het plan nét niet reikt.
-    const tot = Math.ceil(solvedFireAge * 2) / 2
-    out.push({ kind: 'doorwerken', zin: antwoordDoorwerken(tot), bovenBereik: false, actie: { kind: 'stop', stopAge: tot } })
-  }
+  // De drie bestaande hefbomen: alleen bij een tekort onder een vast anker.
+  if (dekking && dekking.tekort && dekking.stop && dekking.stop.kind !== 'now') {
+    const stopAge = dekking.stop.stopAge
 
-  const hint = planMaandHint
-  if (hint != null && Number.isFinite(hint) && hint > 0 && baseline) {
-    const extraRange = computeSliderUiRange('extra_inleg', baseline.monthlyIncome, 0)
-    const extra = Math.round(hint)
-    out.push({
-      kind: 'extra_opzij',
-      zin: antwoordMeerSalaris(hint, masked),
-      bovenBereik: extra > extraRange.max,
-      actie: { kind: 'slider', key: 'extra_inleg', value: Math.min(extra, extraRange.max) },
-    })
+    if (solvedFireAge != null && Number.isFinite(solvedFireAge) && solvedFireAge > stopAge) {
+      // Naar boven op een half jaar: de stop-slider kent halve jaren, en naar beneden
+      // afronden zou een leeftijd noemen waarop het plan nét niet reikt.
+      const tot = Math.ceil(solvedFireAge * 2) / 2
+      out.push({ kind: 'doorwerken', zin: antwoordDoorwerken(tot), bovenBereik: false, actie: { kind: 'stop', stopAge: tot } })
+    }
 
-    const pp = savingsPpForMonthlyAmount(baseline, hint)
-    if (pp != null) {
-      const savingsRange = computeSliderUiRange('savings', baseline.savingsRate, baseline.savingsRate)
-      const ppRound = Math.round(pp)
+    const hint = planMaandHint
+    if (hint != null && Number.isFinite(hint) && hint > 0 && baseline) {
+      const extraRange = computeSliderUiRange('extra_inleg', baseline.monthlyIncome, 0)
+      const extra = Math.round(hint)
       out.push({
-        kind: 'minder_uitgeven',
-        zin: antwoordMinderUitgeven(hint, masked),
-        bovenBereik: ppRound > savingsRange.max,
-        actie: { kind: 'slider', key: 'savings', value: Math.min(ppRound, savingsRange.max) },
+        kind: 'extra_opzij',
+        zin: antwoordMeerSalaris(hint, masked),
+        bovenBereik: extra > extraRange.max,
+        actie: { kind: 'slider', key: 'extra_inleg', value: Math.min(extra, extraRange.max) },
       })
+
+      const pp = savingsPpForMonthlyAmount(baseline, hint)
+      if (pp != null) {
+        const savingsRange = computeSliderUiRange('savings', baseline.savingsRate, baseline.savingsRate)
+        const ppRound = Math.round(pp)
+        out.push({
+          kind: 'minder_uitgeven',
+          zin: antwoordMinderUitgeven(hint, masked),
+          bovenBereik: ppRound > savingsRange.max,
+          actie: { kind: 'slider', key: 'savings', value: Math.min(ppRound, savingsRange.max) },
+        })
+      }
     }
   }
+
+  // Vierde hefboom — hangt aan het PLAN, niet aan een tekort: bij een overschot is het
+  // antwoord "je mag méér uitgeven". Achteraan, zodat de volgorde van de drie hierboven
+  // ongewijzigd blijft.
+  if (haalbareUitgave && haalbareUitgave.richting !== 'gelijk') {
+    const range = uitgaveNaPensioenRange(haalbareUitgave.huidigPerJaar, haalbareUitgave.huidigPerJaar)
+    const bedrag = Math.round(haalbareUitgave.perJaar)
+    out.push({
+      kind: 'uitgave_na_pensioen',
+      zin: antwoordUitgaveNaPensioen(bedrag, masked),
+      bovenBereik: bedrag > range.max || bedrag < range.min,
+      actie: { kind: 'uitgave', perJaar: Math.min(range.max, Math.max(range.min, bedrag)) },
+    })
+  }
+
   return out
 }
 
@@ -111,6 +139,8 @@ export interface SliderAntwoordItem {
 export interface LabAntwoordenPerSlider {
   sliders: Partial<Record<'extra_inleg' | 'savings', SliderAntwoordItem>>
   stop: SliderAntwoordItem | null
+  /** De knop "Uitgave na pensioen" — geen SliderKey, dus een eigen uitgang. */
+  uitgave: SliderAntwoordItem | null
 }
 
 /**
@@ -123,7 +153,7 @@ export function labAntwoordenPerSlider(
   onActie: (actie: LabAntwoordActie) => void,
   opts: { masked?: boolean } = {},
 ): LabAntwoordenPerSlider {
-  const out: LabAntwoordenPerSlider = { sliders: {}, stop: null }
+  const out: LabAntwoordenPerSlider = { sliders: {}, stop: null, uitgave: null }
   for (const a of antwoorden) {
     const item: SliderAntwoordItem = {
       tekst: a.zin,
@@ -133,6 +163,7 @@ export function labAntwoordenPerSlider(
         : { label: a.bovenBereik ? ANTWOORD_KNOP_MAX : ANTWOORD_KNOP, onClick: () => onActie(a.actie) },
     }
     if (a.actie.kind === 'stop') out.stop = item
+    else if (a.actie.kind === 'uitgave') out.uitgave = item
     else out.sliders[a.actie.key] = item
   }
   return out
@@ -144,6 +175,7 @@ export function labAntwoordenPerSlider(
  */
 export function labAntwoordGezetMelding(actie: LabAntwoordActie): string {
   if (actie.kind === 'stop') return `${DEKKINGSAS_COPY.sliderLabel} staat nu op ${formatStopAge(actie.stopAge)}.`
+  if (actie.kind === 'uitgave') return `${HEFBOOM_COPY.uitgaveNaPensioen} staat nu op ${formatCurrency(actie.perJaar)}.`
   if (actie.key === 'extra_inleg') return `${HEFBOOM_COPY.meerSalaris} staat nu op ${formatCurrency(actie.value)}.`
   return `${HEFBOOM_COPY.spaarquote} staat nu op ${Math.round(actie.value)}%.`
 }

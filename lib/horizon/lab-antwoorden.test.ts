@@ -20,9 +20,13 @@ const tekort: LabUitkomstDekking = {
   promotie: { kind: 'geen', reden: 'geen-verkenning' },
 }
 
+// Pure verplaatsing (geen gedragswijziging): gedeeld met de 'vierde antwoord'-describe
+// hieronder, die deze invoer hergebruikt in de volgorde-test.
+const tekortInput = { dekking: tekort, solvedFireAge: 61.2, planMaandHint: 500, baseline }
+
 describe('resolveLabAntwoorden — de drie hefbomen als antwoorden (spec §3)', () => {
   it('geeft drie antwoorden bij een tekort met tweede run en hint', () => {
-    const a = resolveLabAntwoorden({ dekking: tekort, solvedFireAge: 61.2, planMaandHint: 500, baseline })
+    const a = resolveLabAntwoorden(tekortInput)
     expect(a.map((x) => x.kind)).toEqual(['doorwerken', 'extra_opzij', 'minder_uitgeven'])
     expect(a[0].zin).toBe('Doorwerken tot 61,5 dekt je plan.')
     expect(a[0].actie).toEqual({ kind: 'stop', stopAge: 61.5 })
@@ -133,7 +137,7 @@ describe('labAntwoordenPerSlider — elk antwoord onder zijn eigen knop (spec an
   })
 
   it('geen antwoorden → niets te verdelen', () => {
-    expect(labAntwoordenPerSlider([], () => {})).toEqual({ sliders: {}, stop: null })
+    expect(labAntwoordenPerSlider([], () => {})).toEqual({ sliders: {}, stop: null, uitgave: null })
   })
 })
 
@@ -142,5 +146,42 @@ describe('labAntwoordGezetMelding — de sr-only melding na een klik', () => {
     expect(labAntwoordGezetMelding({ kind: 'slider', key: 'extra_inleg', value: 1800 })).toBe(`Meer salaris staat nu op ${formatCurrency(1800)}.`)
     expect(labAntwoordGezetMelding({ kind: 'slider', key: 'savings', value: 33 })).toBe('Spaarquote staat nu op 33%.')
     expect(labAntwoordGezetMelding({ kind: 'stop', stopAge: 61.5 })).toBe('Doorwerken tot staat nu op 61,5.')
+  })
+})
+
+describe('vierde antwoord — uitgave na pensioen', () => {
+  const hu = { perJaar: 31_200, eindleeftijd: 90, huidigPerJaar: 38_640, richting: 'minder' } as const
+  const leeg = { dekking: null, solvedFireAge: null, planMaandHint: null, baseline: null }
+
+  it('verschijnt ook zonder tekort (overschot: je mag meer uitgeven)', () => {
+    const a = resolveLabAntwoorden({
+      ...leeg,
+      haalbareUitgave: { ...hu, richting: 'meer', perJaar: 44_000 },
+    })
+    expect(a).toHaveLength(1)
+    expect(a[0].kind).toBe('uitgave_na_pensioen')
+    expect(a[0].actie).toEqual({ kind: 'uitgave', perJaar: 44_000 })
+  })
+
+  it('verschijnt niet bij richting "gelijk"', () => {
+    expect(resolveLabAntwoorden({ ...leeg, haalbareUitgave: { ...hu, richting: 'gelijk' } })).toHaveLength(0)
+  })
+
+  it('staat achteraan, zodat de bestaande volgorde niet verschuift', () => {
+    const a = resolveLabAntwoorden({ ...tekortInput, haalbareUitgave: hu })
+    expect(a[0].zin).toMatch(/^Doorwerken tot /)
+    expect(a[a.length - 1].kind).toBe('uitgave_na_pensioen')
+  })
+
+  it('landt op zijn eigen uitgang in labAntwoordenPerSlider', () => {
+    const per = labAntwoordenPerSlider(resolveLabAntwoorden({ ...leeg, haalbareUitgave: hu }), () => {})
+    expect(per.uitgave?.tekst).toBe(`Zo'n ${formatCurrency(31_200)} per jaar uitgeven hoort bij een gedekt plan.`)
+    expect(per.uitgave?.knop?.label).toBe('Reken hiermee')
+    expect(per.stop).toBeNull()
+  })
+
+  it('meldt de nieuwe stand na een klik', () => {
+    expect(labAntwoordGezetMelding({ kind: 'uitgave', perJaar: 31_200 }))
+      .toBe(`Uitgave na pensioen staat nu op ${formatCurrency(31_200)}.`)
   })
 })

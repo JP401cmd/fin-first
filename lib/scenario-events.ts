@@ -306,3 +306,24 @@ export function clearScenarioEvents(
   }
   return events.filter(e => !(e.is_scenario_only && e.scenario_origin?.startsWith(originPrefix)))
 }
+
+/** Eén stap van de knop "Uitgave na pensioen": € 600/jaar = € 50/mnd, zoals Meer salaris. */
+export const UITGAVE_NA_PENSIOEN_STAP = 600
+
+/**
+ * Zichtbaar bereik van de knop "Uitgave na pensioen": ±40% rond wat je nu rekent,
+ * afgerond op de sliderstap. Bewust ruimer dan de ±20%/±30% van de andere knoppen — een
+ * tekort van tientallen procenten is bij een vastgezet stopmoment heel gewoon, en een
+ * knop die het antwoord niet kán bereiken is een knop zonder nut.
+ *
+ * Zelfde verbreding-vangnet als `computeSliderUiRange`: ligt de opgeslagen waarde buiten
+ * de band, dan verbreedt de band — niets clampt. Staat hier (en niet in de component)
+ * omdat het antwoordenblok hetzelfde bereik nodig heeft om `bovenBereik` te bepalen.
+ */
+export function uitgaveNaPensioenRange(basis: number, saved: number): { min: number; max: number } {
+  const stap = UITGAVE_NA_PENSIOEN_STAP
+  const veilig = Number.isFinite(basis) && basis > 0 ? basis : 0
+  const min = Math.max(0, Math.round((veilig * 0.6) / stap) * stap)
+  const max = Math.max(stap, Math.round((veilig * 1.4) / stap) * stap)
+  return { min: Math.min(min, saved), max: Math.max(max, saved) }
+}
