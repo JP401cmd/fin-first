@@ -58,6 +58,14 @@ export interface HorizonScenarioOverrides {
   extraLifeEvents: WhatIfEvent[]
   /** Per-kern-categorie rendement-delta (decimaal, ±0,05); leeg/afwezig ⇒ geen verschuiving. */
   returnDeltaByCategorie?: Partial<Record<AssetCategorie, number>>
+  /**
+   * Uitgave na pensioen (€/jaar) voor de verkenning — de vierde draaiknop (spec
+   * 2026-09-18). Bewust GEEN `WhatIfEvent`: de kern leest deze grootheid als
+   * profielparameter (`inkomenUitgaven.uitgaveNaPensioenPerJaar`), en 'm als
+   * `lifestyle_adjustment` modelleren zou een tweede waarheid naast dat veld zetten.
+   * Afwezig ⇒ het profiel bepaalt de uitgave (ongewijzigd, referentie behouden).
+   */
+  uitgaveNaPensioenPerJaar?: number
 }
 
 /** Resultaat van de gescheiden scenario-run — spiegelt het hoofd-pad minimaal. */
@@ -79,17 +87,31 @@ export interface HorizonScenarioResult {
 export type HorizonStopPadResult = ForcedStopPathResult
 
 /**
- * Context-assemblage voor de scenario-/stop-pad-runs (één home). Past — ALLEEN wanneer
- * er actieve overrides zijn — (a) de per-categorie rendement-delta's op de assets toe en
- * (b) de scenario-events bovenop de hoofd-`lifeEvents`. Nul overrides ⇒ ongewijzigde
- * referenties (identiek aan de basislijn — golden: scenario-baseline-parity.test.ts).
+ * Draagt deze override-set iets? Eén home voor de drie takken (synchrone scenario-memo,
+ * worker-effect, stop-pad). Stond eerder drie keer uitgeschreven als
+ * `extraEvents.length === 0 && !hasReturnDeltas`; met een derde override erbij is dat
+ * precies het soort regel dat op één van de drie plekken vergeten wordt.
  */
-function resolveScenarioAssetsAndEvents(
+export function heeftScenarioOverrides(ov: HorizonScenarioOverrides | null): boolean {
+  if (!ov) return false
+  if ((ov.extraLifeEvents?.length ?? 0) > 0) return true
+  if (ov.returnDeltaByCategorie && Object.keys(ov.returnDeltaByCategorie).length > 0) return true
+  return ov.uitgaveNaPensioenPerJaar != null && Number.isFinite(ov.uitgaveNaPensioenPerJaar)
+}
+
+/**
+ * Context-assemblage voor de scenario-/stop-pad-runs (één home). Past — ALLEEN wanneer er
+ * actieve overrides zijn — (a) de per-categorie rendement-delta's op de assets toe,
+ * (b) de scenario-events bovenop de hoofd-`lifeEvents` en (c) de uitgave na pensioen op
+ * het profiel. Nul overrides ⇒ ongewijzigde referenties (identiek aan de basislijn —
+ * golden: scenario-baseline-parity.test.ts).
+ */
+export function resolveScenarioContext(
   assets: Asset[] | undefined,
   lifeEvents: LifeEvent[] | undefined,
   ov: HorizonScenarioOverrides | null,
   profile: ConvergentieRawProfileRow,
-): { assets: Asset[]; lifeEvents: LifeEvent[] } {
+): { assets: Asset[]; lifeEvents: LifeEvent[]; profile: ConvergentieRawProfileRow } {
   const extraEvents = ov?.extraLifeEvents ?? []
   const returnDeltas = ov?.returnDeltaByCategorie
   const hasReturnDeltas = returnDeltas != null && Object.keys(returnDeltas).length > 0
@@ -108,7 +130,15 @@ function resolveScenarioAssetsAndEvents(
     : baseAssets
   const baseLifeEvents = lifeEvents ?? []
   const scenarioLifeEvents = extraEvents.length > 0 ? [...baseLifeEvents, ...extraEvents] : baseLifeEvents
-  return { assets: scenarioAssets, lifeEvents: scenarioLifeEvents }
+  // (c) uitgave na pensioen als profielparameter — zelfde mechanisme als
+  // `lib/horizon/haalbare-uitgave.ts` (`inputMet`): de kern leidt bij `custom_amount` alles
+  // consistent af (incl. de nice-fractie), dus dit is de ENE plek die het bedrag vertaalt.
+  const bedrag = ov?.uitgaveNaPensioenPerJaar
+  const scenarioProfile =
+    bedrag != null && Number.isFinite(bedrag)
+      ? { ...profile, retirement_expense_method: 'custom_amount', retirement_expense_custom_amount: bedrag }
+      : profile
+  return { assets: scenarioAssets, lifeEvents: scenarioLifeEvents, profile: scenarioProfile }
 }
 
 export interface HorizonFireSimResult {
@@ -332,9 +362,9 @@ function buildStopPadInput(
   stopAge: number,
   yearlyExpenses: number,
 ): ForcedStopPathInput {
-  const { assets, lifeEvents } = resolveScenarioAssetsAndEvents(p.assets, p.lifeEvents, ov, profile)
+  const { assets, lifeEvents, profile: scenarioProfile } = resolveScenarioContext(p.assets, p.lifeEvents, ov, profile)
   return {
-    profile,
+    profile: scenarioProfile,
     assets,
     debts: p.debts ?? [],
     lifeEvents,
@@ -523,11 +553,9 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
   const syncScenario = useMemo<HorizonScenarioResult | null>(() => {
     if (!runSyncKernel) return null
     const ov = deferredScenarioOverrides
-    const extraEvents = ov?.extraLifeEvents ?? []
-    const returnDeltas = ov?.returnDeltaByCategorie
-    const hasReturnDeltas = returnDeltas != null && Object.keys(returnDeltas).length > 0
-    // hasScenario: alleen rekenen bij ≥1 afwijkende slider/preset of rendement-delta.
-    if (extraEvents.length === 0 && !hasReturnDeltas) return null
+    // hasScenario: alleen rekenen bij ≥1 actieve override (events, rendement-delta of
+    // uitgave-na-pensioen — één home, zie `heeftScenarioOverrides`).
+    if (!heeftScenarioOverrides(ov)) return null
 
     const p = deferredKernelInput
     // Zelfde metadata-assemblage als de hoofdrun (yearlyExpenses + guards) — met de
@@ -538,13 +566,14 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
     const { input: unifiedInput } = built
 
     // (a) assets pre-muteren met de categorie-rendement-delta's + (b) scenario-events
-    //     bovenop de hoofd-events — via de gedeelde assemblage (één home; identiek gedrag).
-    const { assets: scenarioAssets, lifeEvents: scenarioLifeEvents } =
-      resolveScenarioAssetsAndEvents(p.assets, p.lifeEvents, ov, kernelProfileWithBasis)
+    //     bovenop de hoofd-events + (c) uitgave na pensioen op het profiel — via de
+    //     gedeelde assemblage (één home; identiek gedrag).
+    const { assets: scenarioAssets, lifeEvents: scenarioLifeEvents, profile: scenarioProfile } =
+      resolveScenarioContext(p.assets, p.lifeEvents, ov, kernelProfileWithBasis)
 
     const outcome = computeConvergentieProjection({
       rawContext: {
-        profile: kernelProfileWithBasis,
+        profile: scenarioProfile,
         assets: scenarioAssets,
         debts: p.debts ?? [],
         lifeEvents: scenarioLifeEvents,
@@ -630,18 +659,15 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
     if (!useWorker) return
     const reqId = (scenarioReqIdRef.current += 1)
     const ov = deferredScenarioOverrides
-    const extraEvents = ov?.extraLifeEvents ?? []
-    const returnDeltas = ov?.returnDeltaByCategorie
-    const hasReturnDeltas = returnDeltas != null && Object.keys(returnDeltas).length > 0
-    if (extraEvents.length === 0 && !hasReturnDeltas) { setAsyncScenario(null); return }
+    if (!heeftScenarioOverrides(ov)) { setAsyncScenario(null); return }
 
     const p = deferredKernelInput
     const built = buildInputFromBundle(p)
     if (!built || !kernelProfileWithBasis) { setAsyncScenario(null); return }
-    const { assets: scenarioAssets, lifeEvents: scenarioLifeEvents } =
-      resolveScenarioAssetsAndEvents(p.assets, p.lifeEvents, ov, kernelProfileWithBasis)
+    const { assets: scenarioAssets, lifeEvents: scenarioLifeEvents, profile: scenarioProfile } =
+      resolveScenarioContext(p.assets, p.lifeEvents, ov, kernelProfileWithBasis)
     const rawContext: ConvergentieRawContext = {
-      profile: kernelProfileWithBasis,
+      profile: scenarioProfile,
       assets: scenarioAssets,
       debts: p.debts ?? [],
       lifeEvents: scenarioLifeEvents,
