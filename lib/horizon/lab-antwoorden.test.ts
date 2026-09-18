@@ -169,8 +169,23 @@ describe('vierde antwoord — uitgave na pensioen', () => {
 
   it('staat achteraan, zodat de bestaande volgorde niet verschuift', () => {
     const a = resolveLabAntwoorden({ ...tekortInput, haalbareUitgave: hu })
+    expect(a.map((x) => x.kind)).toEqual(['doorwerken', 'extra_opzij', 'minder_uitgeven', 'uitgave_na_pensioen'])
     expect(a[0].zin).toMatch(/^Doorwerken tot /)
     expect(a[a.length - 1].kind).toBe('uitgave_na_pensioen')
+  })
+
+  it('klemt nooit — een antwoord ruim ónder de band zet het exacte bedrag, geen bovenBereik', () => {
+    // Band rond huidigPerJaar 38.640: [23.400, 54.000]. 12.000 ligt daar ruim onder.
+    const a = resolveLabAntwoorden({ ...leeg, haalbareUitgave: { ...hu, perJaar: 12_000 } })
+    expect(a[0].actie).toEqual({ kind: 'uitgave', perJaar: 12_000 })
+    expect(a[0].bovenBereik).toBe(false)
+  })
+
+  it('klemt nooit — een antwoord ruim bóven de band (de 3×-klem van de solver) zet het exacte bedrag', () => {
+    // 115.920 = 38.640 × 3 (BOVENGRENS_FACTOR in haalbare-uitgave.ts) — ruim boven [23.400, 54.000].
+    const a = resolveLabAntwoorden({ ...leeg, haalbareUitgave: { ...hu, richting: 'meer', perJaar: 115_920 } })
+    expect(a[0].actie).toEqual({ kind: 'uitgave', perJaar: 115_920 })
+    expect(a[0].bovenBereik).toBe(false)
   })
 
   it('landt op zijn eigen uitgang in labAntwoordenPerSlider', () => {

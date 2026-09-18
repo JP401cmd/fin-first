@@ -29,6 +29,7 @@ import {
 } from '@/lib/horizon-kernel/convergentie-router'
 import { buildKernelInputFromApp, type KernelAdapterPartner } from '@/lib/horizon-kernel/adapter'
 import { solveFire, type SolverStatus } from '@/lib/horizon-kernel/solver'
+import { UITGAVE_NA_PENSIOEN_STAP } from '@/lib/scenario-events'
 
 /** De drie statussen die de kern onder een vast anker zet bij een tekort. */
 const SHORTFALL: ReadonlySet<SolverStatus> = new Set<SolverStatus>([
@@ -41,8 +42,13 @@ const SHORTFALL: ReadonlySet<SolverStatus> = new Set<SolverStatus>([
 const PRECISIE = 50
 /** Bovengrens van de zoekruimte: 3 × wat je nu rekent. Daarboven klemmen we. */
 const BOVENGRENS_FACTOR = 3
-/** Eén stap van de draaiknop (€ 50/mnd) — de afstand waarop de vangrail toetst. */
-const SLIDER_STAP = 600
+/**
+ * Eén stap van de draaiknop (€ 50/mnd) — de afstand waarop de vangrail toetst. Zelfde
+ * bron als de knop-UI (`UITGAVE_NA_PENSIOEN_STAP`, lib/scenario-events.ts): anders kan
+ * de belofte "één sliderstap hoger dekt niet meer" stil onwaar worden als een van de
+ * twee losraakt.
+ */
+const SLIDER_STAP = UITGAVE_NA_PENSIOEN_STAP
 
 /**
  * Verschil waaronder we geen richting meer claimen. Gespiegeld aan de € 500-regel van de

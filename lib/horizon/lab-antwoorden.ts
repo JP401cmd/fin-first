@@ -11,7 +11,7 @@
 // Elke regel is één klik die de betreffende hefboom als VERKENNING zet, nooit als plan.
 // Puur: geen kernel-run, geen eigen som — alleen klemmen op het slider-bereik.
 
-import { computeSliderUiRange, savingsPpForMonthlyAmount, uitgaveNaPensioenRange } from '@/lib/scenario-events'
+import { computeSliderUiRange, savingsPpForMonthlyAmount } from '@/lib/scenario-events'
 import type { WhatIfOverrides } from '@/lib/types/horizon-whatif'
 import type { LabUitkomstDekking } from './lab-uitkomst'
 import type { HaalbareUitgave } from './haalbare-uitgave'
@@ -58,7 +58,8 @@ export interface LabAntwoordenInput {
   /**
    * De gesolvede uitgave na pensioen uit `ScenarioPresetBatch` — `null`/afwezig ⇒ geen
    * vierde antwoord. Anders dan de drie bestaande antwoorden hangt deze NIET aan een
-   * tekort: bij een overschot luidt hij "je mag méér uitgeven".
+   * tekort: hij verschijnt óók wanneer het plan al gedekt is (dan bij een overschot),
+   * terwijl de andere drie alleen bij een tekort onder een vast anker komen.
    */
   haalbareUitgave?: HaalbareUitgave | null
 }
@@ -103,17 +104,21 @@ export function resolveLabAntwoorden(input: LabAntwoordenInput): LabAntwoord[] {
     }
   }
 
-  // Vierde hefboom — hangt aan het PLAN, niet aan een tekort: bij een overschot is het
-  // antwoord "je mag méér uitgeven". Achteraan, zodat de volgorde van de drie hierboven
-  // ongewijzigd blijft.
+  // Vierde hefboom — hangt aan het PLAN, niet aan een tekort: dit antwoord verschijnt
+  // óók wanneer het plan al gedekt is, terwijl de drie hierboven alleen bij een tekort
+  // komen. Achteraan, zodat de volgorde van de drie hierboven ongewijzigd blijft.
   if (haalbareUitgave && haalbareUitgave.richting !== 'gelijk') {
-    const range = uitgaveNaPensioenRange(haalbareUitgave.huidigPerJaar, haalbareUitgave.huidigPerJaar)
     const bedrag = Math.round(haalbareUitgave.perJaar)
     out.push({
       kind: 'uitgave_na_pensioen',
       zin: antwoordUitgaveNaPensioen(bedrag, masked),
-      bovenBereik: bedrag > range.max || bedrag < range.min,
-      actie: { kind: 'uitgave', perJaar: Math.min(range.max, Math.max(range.min, bedrag)) },
+      // Deze hefboom klemt NOOIT. `uitgaveNaPensioenRange` verbreedt de band naar de
+      // gezette stand (Task 6 geeft de huidige sliderstand als `saved` mee), dus het
+      // antwoord is altijd bereikbaar en de knop zet precies het genoemde bedrag.
+      // Vandaar geen bovenBereik: die vlag rendert als "Reken met maximum", en dat zou
+      // bij een antwoord ONDER de band een maximum-label op een minimum-klem zetten.
+      bovenBereik: false,
+      actie: { kind: 'uitgave', perJaar: bedrag },
     })
   }
 
