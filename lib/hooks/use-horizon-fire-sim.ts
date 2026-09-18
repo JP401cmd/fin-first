@@ -49,9 +49,10 @@ import { withResolvedKernelBedragen } from '@/lib/horizon/kernel-profile-basis'
  * Wat-als-scenario-overrides (2e projectielijn op /toekomst, plan §A/§B). Additief en
  * volledig optioneel: afwezig/null ⇒ geen scenario-run. De scenario-run draait via exact
  * dezelfde `computeConvergentieProjection`-context als de hoofdlijn — alléén (a) de assets
- * gaan vooraf door `applyReturnDeltasToAssets(expandCategorieReturnDeltas(...))` en (b) de
- * scenario-events komen bovenop de hoofd-`lifeEvents`. Nul overrides ⇒ identieke context ⇒
- * identieke uitkomst (golden: `lib/horizon/scenario-baseline-parity.test.ts`).
+ * gaan vooraf door `applyReturnDeltasToAssets(expandCategorieReturnDeltas(...))`, (b) de
+ * scenario-events komen bovenop de hoofd-`lifeEvents` en (c) de uitgave na pensioen landt
+ * als profielparameter. Nul overrides ⇒ identieke context ⇒ identieke uitkomst (golden:
+ * `lib/horizon/scenario-baseline-parity.test.ts`).
  */
 export interface HorizonScenarioOverrides {
   /** Slider-/preset-events (scenario-only) die BOVENOP de hoofd-events komen. */
@@ -87,10 +88,17 @@ export interface HorizonScenarioResult {
 export type HorizonStopPadResult = ForcedStopPathResult
 
 /**
- * Draagt deze override-set iets? Eén home voor de drie takken (synchrone scenario-memo,
- * worker-effect, stop-pad). Stond eerder drie keer uitgeschreven als
- * `extraEvents.length === 0 && !hasReturnDeltas`; met een derde override erbij is dat
- * precies het soort regel dat op één van de drie plekken vergeten wordt.
+ * Draagt deze override-set iets? Eén home voor de vraag "is er een actief scenario",
+ * met drie consumenten: de synchrone scenario-memo en het worker-scenario-effect (beide
+ * bailen hierop uit vóórdat ze rekenen) en `scenarioActive` (voedt `scenarioPending`, de
+ * "bijwerken…"-hint richting de UI). Stond eerder **twee keer** uitgeschreven als
+ * `extraEvents.length === 0 && !hasReturnDeltas` (de twee memo/effect-guards) plus **één
+ * keer in positieve vorm** zonder de uitgave-override (`scenarioActive`) — met een derde
+ * override erbij is dat precies het soort losse plek waar hij vergeten wordt.
+ *
+ * Het STOP-PAD is bewust GEEN consument: dat pad rekent altijd op de actieve context
+ * (met of zonder scenario-overrides) en wordt uitsluitend door `stopPadAge` gegateerd —
+ * niet door deze functie.
  */
 export function heeftScenarioOverrides(ov: HorizonScenarioOverrides | null): boolean {
   if (!ov) return false
@@ -544,12 +552,14 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
   // Keyt op het deferred hoofd-input-object ÉN de deferred overrides. De hoofd-memo
   // (:hierboven) blijft uitsluitend op `deferredKernelInput` gekeyed → een override-
   // wijziging laat de hoofdlijn NOOIT herrekenen. Zonder actieve override (geen extra
-  // events én geen rendement-delta) ⇒ null (geen 2e kernel-run). Bij een actieve
-  // override: exact dezelfde `ConvergentieRawContext` als de hoofdrun, met alléén
-  // (a) assets vooraf door `applyReturnDeltasToAssets(expandCategorieReturnDeltas(...))` en
-  // (b) de scenario-events bovenop de hoofd-`lifeEvents`. `yearlyExpenses` is puur afgeleid
-  // van `horizonInput` (niet van assets/events) → identiek aan de basislijn; nul overrides
-  // ⇒ identieke context ⇒ identieke uitkomst (golden: scenario-baseline-parity.test.ts).
+  // events, geen rendement-delta én geen uitgave-na-pensioen — `heeftScenarioOverrides`)
+  // ⇒ null (geen 2e kernel-run). Bij een actieve override: exact dezelfde
+  // `ConvergentieRawContext` als de hoofdrun, met alléén (a) assets vooraf door
+  // `applyReturnDeltasToAssets(expandCategorieReturnDeltas(...))`, (b) de scenario-events
+  // bovenop de hoofd-`lifeEvents` en (c) de uitgave na pensioen op het profiel.
+  // `yearlyExpenses` is puur afgeleid van `horizonInput` (niet van assets/events) →
+  // identiek aan de basislijn; nul overrides ⇒ identieke context ⇒ identieke uitkomst
+  // (golden: scenario-baseline-parity.test.ts).
   const syncScenario = useMemo<HorizonScenarioResult | null>(() => {
     if (!runSyncKernel) return null
     const ov = deferredScenarioOverrides
@@ -718,10 +728,7 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
   // (React's standaard stale-pattern: `input !== deferredInput`), of — in de worker-tak —
   // zolang de scenario-run nog niet geland is terwijl er een actieve override is ("verfijnen
   // bezig"). In rust/synchroon zonder override ⇒ false. Additief afgeleid veld.
-  const scenarioActive =
-    (deferredScenarioOverrides?.extraLifeEvents.length ?? 0) > 0 ||
-    (deferredScenarioOverrides?.returnDeltaByCategorie != null &&
-      Object.keys(deferredScenarioOverrides.returnDeltaByCategorie).length > 0)
+  const scenarioActive = heeftScenarioOverrides(deferredScenarioOverrides)
   const scenarioPending =
     deferredKernelInput !== kernelInput ||
     deferredScenarioOverrides !== scenarioOverrides ||
