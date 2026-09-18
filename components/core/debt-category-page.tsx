@@ -17,8 +17,10 @@ import { getPageInfo, hasPageInfo } from '@/lib/page-info-content'
 import { HideInSimple } from '@/components/app/hide-in-simple'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import { EenvoudigPillList } from '@/components/overview/eenvoudig-pill-list'
-import { debtPillItem, withSharePct } from '@/components/overview/eenvoudig-pill-items'
+import { debtPillItemsMetLeningdelen, withSharePct } from '@/components/overview/eenvoudig-pill-items'
+import { groepeerLeningdelen } from '@/lib/debt-leningdelen'
 import { AddCategoryCard } from './add-category-card'
+import { DebtLeningdeelGroep } from './debt-leningdeel-groep'
 import { VermogenDebtCard } from './vermogen-debt-card'
 import { buildKpiContext, type KpiContextRefs } from '@/lib/kpi-context'
 import { computeDebtKpi } from '@/lib/debt-kpi'
@@ -162,11 +164,14 @@ type PerspectiveDebt = Debt & {
  * het hero-totaal én de Eenvoudig-pillen, zodat de aandeel-balken optellen
  * tot het getoonde totaal.
  */
-function debtDisplayValue(debt: PerspectiveDebt, perspective: Perspective): number {
-  const raw = Number(debt.current_balance)
+function debtShareFraction(debt: PerspectiveDebt, perspective: Perspective): number {
   return debt.ownership === 'shared' && perspective !== 'household'
-    ? raw * (debt._myShareFraction ?? 1)
-    : raw
+    ? (debt._myShareFraction ?? 1)
+    : 1
+}
+
+function debtDisplayValue(debt: PerspectiveDebt, perspective: Perspective): number {
+  return Number(debt.current_balance) * debtShareFraction(debt, perspective)
 }
 
 // ── Component ────────────────────────────────────────────────
@@ -495,6 +500,7 @@ export function DebtCategoryPage({
                 onAddClick={() => setQuickAddOpen(true)}
                 perspective={perspective}
                 partnerName={ctx?.partnerName ?? null}
+                selectedDebtId={requestedDebtId}
               />
 
               {initialHistoryData && (
@@ -705,6 +711,8 @@ interface DebtItemsTabProps {
   perspective: Perspective
   /** Partnernaam voor de partner-badge. */
   partnerName: string | null
+  /** Open de leningdeel-groep waar deze schuld in zit (deeplink `?debt=`). */
+  selectedDebtId?: string | null
 }
 
 function DebtItemsTab({
@@ -719,6 +727,7 @@ function DebtItemsTab({
   onAddClick,
   perspective,
   partnerName,
+  selectedDebtId,
 }: DebtItemsTabProps) {
   // Vóór de early return: hooks-volgorde blijft gelijk ongeacht de lijstlengte.
   const simple = useDisplayMode().mode === 'simple'
@@ -732,14 +741,14 @@ function DebtItemsTab({
   // Gedeelde opbouw (eenvoudig-pill-items.ts), bedrag via dezelfde
   // perspectief-weging als het hero-totaal. Toevoegroute blijft staan.
   if (simple) {
+    // Leningdelen van één hypotheek vallen samen tot één uitklapbare pill met
+    // het groepstotaal (W-005 / ADR 0140) — zelfde opbouw als /overzicht/schulden.
     const items = withSharePct(
-      debts.map((debt) =>
-        debtPillItem(debt, type, {
-          amount: debtDisplayValue(debt, perspective),
-          sparklineValues: sparklinesByDebtId?.[debt.id],
-          onClick: () => onItemClick(debt.id),
-        }),
-      ),
+      debtPillItemsMetLeningdelen(debts, type, {
+        amountOf: (debt) => debtDisplayValue(debt, perspective),
+        sparklineOf: (debt) => sparklinesByDebtId?.[debt.id],
+        onItemClick: (debt) => onItemClick(debt.id),
+      }),
     )
     return (
       <div className="space-y-3">
@@ -755,35 +764,59 @@ function DebtItemsTab({
     )
   }
 
+  // Zelfde groepering als in Eenvoudig: de delen van één hypotheek onder één
+  // inklapbare kop met het groepstotaal. Presentatie-only — dezelfde kaarten.
+  const entries = groepeerLeningdelen(debts, (debt) => debtDisplayValue(debt, perspective))
+  const debtCard = (debt: PerspectiveDebt, idx: number) => (
+    <VermogenDebtCard
+      key={debt.id}
+      debt={debt}
+      kpiPair={kpiByDebtId?.get(debt.id)}
+      connection={connectionsByDebtId?.[debt.id]}
+      sparklineValues={sparklinesByDebtId?.[debt.id]}
+      onClick={onItemClick}
+      onEditClick={onEditClick}
+      onRevalueClick={onRevalueClick}
+      staggerIndex={idx}
+      provenance={debt._provenance}
+      perspective={perspective}
+      partnerName={partnerName}
+      ownershipSubline={formatOwnershipSubline(
+        debt,
+        perspective,
+        Number(debt.current_balance),
+      )}
+    />
+  )
+
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      {debts.map((debt, idx) => (
-        <VermogenDebtCard
-          key={debt.id}
-          debt={debt}
-          kpiPair={kpiByDebtId?.get(debt.id)}
-          connection={connectionsByDebtId?.[debt.id]}
-          sparklineValues={sparklinesByDebtId?.[debt.id]}
-          onClick={onItemClick}
-          onEditClick={onEditClick}
-          onRevalueClick={onRevalueClick}
-          staggerIndex={idx}
-          provenance={debt._provenance}
-          perspective={perspective}
-          partnerName={partnerName}
-          ownershipSubline={formatOwnershipSubline(
-            debt,
-            perspective,
-            Number(debt.current_balance),
-          )}
-        />
-      ))}
+      {entries.map((entry, idx) =>
+        entry.kind === 'enkel' ? (
+          debtCard(entry.debt, idx)
+        ) : (
+          <DebtLeningdeelGroep
+            key={entry.hoofd.id}
+            naam={entry.hoofd.name}
+            aantalLeden={entry.leden.length}
+            totaal={entry.totaal}
+            maandlast={entry.leden.reduce(
+              (s, d) => s + Number(d.monthly_payment ?? 0) * debtShareFraction(d, perspective),
+              0,
+            )}
+            defaultOpen={entry.leden.some((d) => d.id === selectedDebtId)}
+            staggerIndex={idx}
+          >
+            {entry.leden.map((lid, i) => debtCard(lid, i))}
+          </DebtLeningdeelGroep>
+        ),
+      )}
       <AddCategoryCard
         label={addDebtCta(type)}
         onClick={onAddClick}
         variant="debt"
         shape="item"
-        staggerIndex={debts.length}
+        staggerIndex={entries.length}
       />
     </div>
   )

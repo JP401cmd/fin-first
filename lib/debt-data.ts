@@ -67,6 +67,15 @@ export interface Debt {
   credit_limit: number | null
   repayment_type: RepaymentType | null
   draagkrachtmeting_date: string | null
+  // ── Leningdelen (W-005 / ADR 0140) ──────────────────────────────────
+  // Groepeert leningdelen onder één hypotheek: verwijst naar de hoofdrij van
+  // dezelfde hypotheek en dezelfde eigenaar (samengestelde FK
+  // `(parent_debt_id, user_id)`). NULL = zelfstandige schuld of hoofdrij.
+  // De hoofdrij is ZELF een leningdeel en draagt nooit het groepstotaal — elke
+  // rekenmotor telt alle mortgage-rijen op. Optioneel in TS omdat de kolom
+  // nullable is en geen enkel schrijfpad hem vandaag zet; groeperen gebeurt
+  // puur voor de weergave via `lib/debt-leningdelen.ts`.
+  parent_debt_id?: string | null
   // Belastingschuld fields
   tax_year: number | null
   has_payment_plan: boolean

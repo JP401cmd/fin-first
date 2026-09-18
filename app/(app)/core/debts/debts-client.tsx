@@ -48,7 +48,13 @@ import { VermogenDebtCard } from '@/components/core/vermogen-debt-card'
 import { AddCategoryCard } from '@/components/core/add-category-card'
 import { CategoryGroupHeader } from '@/components/core/category-group-header'
 import { EenvoudigPillList, type PillItem } from '@/components/overview/eenvoudig-pill-list'
-import { debtPillItem, withSharePct } from '@/components/overview/eenvoudig-pill-items'
+import {
+  debtPillItem,
+  debtPillItemsMetLeningdelen,
+  withSharePct,
+} from '@/components/overview/eenvoudig-pill-items'
+import { DebtLeningdeelGroep } from '@/components/core/debt-leningdeel-groep'
+import { groepeerLeningdelen } from '@/lib/debt-leningdelen'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import { Kicker, FiguresStrip, PageInfoButton, GlossaryTerm, PageOpening, SubtotalLine } from '@/components/editorial'
 import { getPageInfo } from '@/lib/page-info-content'
@@ -575,13 +581,13 @@ export function DebtsClient({ toolbarFilter, debtTypeFilter, initialData, showPa
         const group = byType[type]
         if (!group || group.debts.length === 0) return []
         // Gedeelde opbouw met de categoriepagina (B-044) — zie eenvoudig-pill-items.ts.
-        return group.debts.map((debt) =>
-          debtPillItem(debt, type, {
-            amount: shareOf(debt, Number(debt.current_balance)),
-            sparklineValues: debtSparklines[debt.id],
-            onClick: () => openDebtModal(debt),
-          }),
-        )
+        // Leningdelen van één hypotheek vallen samen tot één uitklapbare pill
+        // met het groepstotaal (W-005): de som over de lijst blijft gelijk.
+        return debtPillItemsMetLeningdelen(group.debts, type, {
+          amountOf: (debt) => shareOf(debt, Number(debt.current_balance)),
+          sparklineOf: (debt) => debtSparklines[debt.id],
+          onItemClick: (debt) => openDebtModal(debt),
+        })
       })
 
     // Partner-aggregaat als pills (optie A) — alleen buiten een type-filter,
@@ -861,6 +867,33 @@ export function DebtsClient({ toolbarFilter, debtTypeFilter, initialData, showPa
           const groupColor = DEBT_TYPE_COLORS[type]
           const groupIcon = DEBT_TYPE_ICONS[type] ?? 'CircleDot'
 
+          // Leningdelen van één hypotheek vallen samen onder één inklapbare
+          // groepskop met het groepstotaal (W-005 / ADR 0140). Presentatie-only:
+          // dezelfde aandeel-weging, dezelfde kaarten, dezelfde som.
+          const entries = groepeerLeningdelen(group.debts, (d) =>
+            shareOf(d, Number(d.current_balance)),
+          )
+          const debtCard = (debt: PerspectiveDebt, idx: number) => (
+            <VermogenDebtCard
+              key={debt.id}
+              debt={debt}
+              kpiPair={kpiByDebtId.get(debt.id)}
+              sparklineValues={debtSparklines[debt.id]}
+              onClick={() => openDebtModal(debt)}
+              onEditClick={handleDebtEdit}
+              onRevalueClick={handleDebtRevalue}
+              staggerIndex={idx}
+              provenance={debt._provenance}
+              perspective={effectivePerspective}
+              partnerName={ctx?.partnerName}
+              ownershipSubline={formatOwnershipSubline(
+                debt,
+                effectivePerspective,
+                Number(debt.current_balance),
+              )}
+            />
+          )
+
           return (
             <div key={type} id={`debt-group-${type}`} className="scroll-mt-24">
               {/* Group header — gedeelde component (zie assets-client.tsx):
@@ -877,32 +910,34 @@ export function DebtsClient({ toolbarFilter, debtTypeFilter, initialData, showPa
                   KPI-strip + sparkline-overlay worden door VermogenDebtCard
                   zelf gerenderd zodra de props aanwezig zijn. */}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {group.debts.map((debt, idx) => (
-                  <VermogenDebtCard
-                    key={debt.id}
-                    debt={debt}
-                    kpiPair={kpiByDebtId.get(debt.id)}
-                    sparklineValues={debtSparklines[debt.id]}
-                    onClick={() => openDebtModal(debt)}
-                    onEditClick={handleDebtEdit}
-                    onRevalueClick={handleDebtRevalue}
-                    staggerIndex={idx}
-                    provenance={debt._provenance}
-                    perspective={effectivePerspective}
-                    partnerName={ctx?.partnerName}
-                    ownershipSubline={formatOwnershipSubline(
-                      debt,
-                      effectivePerspective,
-                      Number(debt.current_balance),
-                    )}
-                  />
-                ))}
+                {entries.map((entry, idx) =>
+                  entry.kind === 'enkel' ? (
+                    debtCard(entry.debt, idx)
+                  ) : (
+                    <DebtLeningdeelGroep
+                      key={entry.hoofd.id}
+                      naam={entry.hoofd.name}
+                      aantalLeden={entry.leden.length}
+                      totaal={entry.totaal}
+                      maandlast={entry.leden.reduce(
+                        (s, d) => s + shareOf(d, Number(d.monthly_payment ?? 0)),
+                        0,
+                      )}
+                      // Deeplink naar een deel (`?debt=<id>`) opent de groep,
+                      // anders lijkt de schuld van de pagina verdwenen.
+                      defaultOpen={entry.leden.some((d) => d.id === requestedDebtId)}
+                      staggerIndex={idx}
+                    >
+                      {entry.leden.map((lid, i) => debtCard(lid, i))}
+                    </DebtLeningdeelGroep>
+                  ),
+                )}
                 <AddCategoryCard
                   label={addDebtCta(type)}
                   onClick={() => { setQuickAddInitialType(type); setQuickAddOpen(true) }}
                   variant="debt"
                   shape="item"
-                  staggerIndex={group.debts.length}
+                  staggerIndex={entries.length}
                   ariaLabel={`Voeg item toe aan ${DEBT_TYPE_LABELS[type]}`}
                 />
               </div>
