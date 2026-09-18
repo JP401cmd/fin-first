@@ -319,6 +319,22 @@ describe('vierde knop — Uitgave na pensioen', () => {
     expect(onChange).toHaveBeenCalledWith(24_000)
   })
 
+  it('verbreedt de band naar de HUIDIGE stand, niet naar de basis', () => {
+    // basis 10.000 geeft een eigen band van [6.000, 13.800]; het vangnet verbreedt de
+    // bovengrens naar de gezette waarde 40.000, maar de ONDERGRENS blijft op de
+    // basis-band (6.000) staan — dat is precies het verschil met de omgekeerde
+    // aanroep: uitgaveNaPensioenRange(waarde, basis) omgedraaid rekent zijn eigen band
+    // uit vanaf 40.000 (ondergrens 24.000) en verbreedt die dan naar 10.000, wat op deze
+    // render een min van 10.000 zou geven i.p.v. 6.000. Alleen de min discrimineert hier
+    // aantoonbaar tussen de twee argumentvolgordes (geverifieerd: op de max alleen
+    // faalt de omgekeerde aanroep NIET, want de vangnet-verbreding naar 40.000 domineert
+    // in beide volgordes — zie task-6-report.md, fix-ronde 1).
+    render(<WhatIfSliders {...basisProps} uitgaveNaPensioen={{ waarde: 40_000, basis: 10_000, onChange: () => {} }} />)
+    const slider = screen.getByLabelText('Uitgave na pensioen')
+    expect(Number(slider.getAttribute('min'))).toBe(6_000)
+    expect(Number(slider.getAttribute('max'))).toBe(40_000)
+  })
+
   it('rendert het antwoord onder zijn eigen knop', () => {
     render(
       <WhatIfSliders

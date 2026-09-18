@@ -300,7 +300,7 @@ function SliderGrid({ baseline, events, setEvents, currentAge, antwoorden = {}, 
         <div className="border-b border-dashed border-[var(--border-ed)] xl:col-span-2 xl:border-b-0">
           <SliderRow
             label={HEFBOOM_COPY.uitgaveNaPensioen}
-            hint="→ Uitgave na pensioen"
+            hint="→ Profielparameter, geen event"
             value={uitgaveNaPensioen.waarde}
             baseValue={uitgaveNaPensioen.basis}
             min={uitgaveRange.min}
