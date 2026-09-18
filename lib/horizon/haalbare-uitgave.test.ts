@@ -14,7 +14,12 @@ import { solveHaalbareUitgave, HAALBARE_UITGAVE_DREMPEL } from './haalbare-uitga
 const SHORTFALL = new Set(['anchor_shortfall', 'stop_now_shortfall', 'pension_shortfall'])
 
 /** Context op de persona "compleet": leeftijd, vast stopmoment, jaarlijkse pensioenuitgave. */
-function ctx(age: number, stop: number | null, essentieel: number) {
+function ctx(
+  age: number,
+  stop: number | null,
+  essentieel: number,
+  extra: Partial<ConvergentieRawProfileRow> = {},
+) {
   const fx = buildCompleetHorizonFixture(age)
   const profile: ConvergentieRawProfileRow = {
     ...buildCompleetKernelProfileBase(age),
@@ -27,6 +32,7 @@ function ctx(age: number, stop: number | null, essentieel: number) {
     ...(stop == null
       ? { fire_stop_anchor: 'solved' as const }
       : { fire_stop_anchor: 'age' as const, fire_stop_age: stop }),
+    ...extra,
   }
   return { profile, assets: fx.assets, debts: fx.debts, lifeEvents: fx.lifeEvents, aowRows: [] }
 }
@@ -77,10 +83,14 @@ describe('solveHaalbareUitgave', () => {
   })
 
   it('geeft null wanneer het plan ook zonder pensioenuitgaven niet dekt', () => {
-    // Stoppen op de huidige leeftijd: het tekort zit vóór het stopmoment, niet erna.
-    const c = ctx(42, 42, 100_000)
-    const h = solveHaalbareUitgave(c)
-    if (h !== null) expect(dektBij(c, 0)).toBe(true) // anders had hij null moeten geven
+    // Stoppen op de huidige leeftijd mét een nalatenschapsdoel (€ 5 mln — ver boven de
+    // € 1,551 mln totale bezittingen van deze persona op leeftijd 42) dat ook bij € 0
+    // pensioenuitgave onhaalbaar blijft: een structureel tekort dat de knop "uitgave na
+    // pensioen" niet kan oplossen, ongeacht welk bedrag je daar invult.
+    const c = ctx(42, 42, 100_000, { fire_end_strategy: 'legacy', fire_legacy_amount: 5_000_000 })
+    // De voorwaarde van dit geval, expliciet: zelfs € 0 uitgeven dekt niet.
+    expect(dektBij(c, 0)).toBe(false)
+    expect(solveHaalbareUitgave(c)).toBeNull()
   })
 
   it('noemt een verschil onder de drempel "gelijk"', () => {

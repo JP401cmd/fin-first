@@ -110,9 +110,10 @@ function maak(perJaar: number, huidigPerJaar: number, eindleeftijd: number): Haa
  *
  * `null` wanneer de vraag niet gesteld kan worden: geen vast stopmoment (dan ís de
  * hoofdrun het antwoord), geen uitgave-grondslag, een tekort dat al vóór het stopmoment
- * zit (ook € 0 uitgeven dekt niet — daar helpen alleen de bestaande drie hefbomen), of
- * een kern-fout. Zelfde degradatie als `solveWithoutAnchor`: liever geen getal dan een
- * getal dat niet klopt.
+ * zit (ook € 0 uitgeven dekt niet — daar helpen alleen de bestaande drie hefbomen), de
+ * dekking blijkt niet monotoon (één sliderstap hoger dekt tegen de verwachting in nog
+ * wél — dan zegt het gevonden bedrag niets), of een kern-fout. Zelfde degradatie als
+ * `solveWithoutAnchor`: liever geen getal dan een getal dat niet klopt.
  *
  * KOSTEN: ~14 geankerde runs. Onder een vast anker kórtsluit `solveFire` (geen binnenste
  * bisectie), dus dit is een fractie van wat de scenario-batch toch al doet — en het
