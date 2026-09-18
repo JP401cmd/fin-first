@@ -407,6 +407,8 @@ describe('dekking-zinnen — de vastgestelde kopij', () => {
       antwoordMeerSalaris(500, true),
       antwoordMinderUitgeven(500),
       antwoordMinderUitgeven(500, true),
+      antwoordUitgaveNaPensioen(500),
+      antwoordUitgaveNaPensioen(500, true),
       ANTWOORD_BOVEN_BEREIK,
       ANTWOORD_KNOP,
       ANTWOORD_KNOP_MAX,
@@ -468,7 +470,7 @@ describe('dekking-zinnen — toon-invarianten over alle ankers', () => {
   })
 
   it('de antwoorden beschrijven, geen instructie: nooit "leg"/"spaar"', () => {
-    for (const zin of [antwoordDoorwerken(60), antwoordMeerSalaris(300), antwoordMinderUitgeven(300)]) {
+    for (const zin of [antwoordDoorwerken(60), antwoordMeerSalaris(300), antwoordMinderUitgeven(300), antwoordUitgaveNaPensioen(300)]) {
       expect(zin).not.toMatch(/\bleg\b|\bspaar\b/i)
     }
     // Alleen "doorwerken" claimt de uitkomst (kernel-bewezen, lab-antwoorden.kernel.test.ts);
@@ -476,6 +478,13 @@ describe('dekking-zinnen — toon-invarianten over alle ankers', () => {
     expect(antwoordDoorwerken(60)).toMatch(/dekt je plan\.$/)
     for (const zin of [antwoordMeerSalaris(300), antwoordMinderUitgeven(300), antwoordMeerSalaris(300, true), antwoordMinderUitgeven(300, true)]) {
       expect(zin).toMatch(/\/mnd (meer salaris|minder uitgeven) hoort bij een gedekt plan\.$/)
+      expect(zin).not.toMatch(/dekt je plan/)
+    }
+    // antwoordUitgaveNaPensioen draagt hetzelfde toon-contract ("hoort bij", nooit "dekt"),
+    // maar een eigen zinsvorm ("per jaar uitgeven" i.p.v. "/mnd …") — vandaar een eigen regex
+    // in plaats van geforceerd meeliften op het "/mnd"-patroon van de twee zusters hierboven.
+    for (const zin of [antwoordUitgaveNaPensioen(300), antwoordUitgaveNaPensioen(300, true)]) {
+      expect(zin).toMatch(/per jaar uitgeven hoort bij een gedekt plan\.$/)
       expect(zin).not.toMatch(/dekt je plan/)
     }
   })
@@ -608,6 +617,9 @@ describe('haalbare uitgave na pensioen — kopij', () => {
     const zin = haalbaarBijUitgaveRegel({ ...basis, richting: 'meer' }, true)
     expect(zin).toContain('haalbaar tot 90 bij uitgave:')
     expect(zin).not.toMatch(/31\.200/)
+    // Niet alleen "het bedrag is weg" — ook dat de placeholder er echt staat, anders
+    // glipt een regressie die een lege string produceert (in plaats van te maskeren) erdoorheen.
+    expect(zin).toContain(MASKED_AMOUNT_PLACEHOLDER)
   })
 
   it('claimt in het antwoord geen dekking, alleen dat het erbij hoort', () => {

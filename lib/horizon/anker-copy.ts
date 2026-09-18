@@ -258,8 +258,9 @@ export const RAPPORT_ANKER_KICKER = 'Stopmoment'
 /**
  * De draaiknoppen van het lab, in deze volgorde (eigenaarskeuze 15 sep 2026, bijstelling van
  * spec lab-haalbaarheid §2): 1 Meer salaris (het extra-inleg-event — rekenkundig dezelfde
- * hefboom), 2 Spaarquote (in % met het bedrag minder uitgeven eronder), 3 Minder werken.
- * "Later of eerder stoppen" is de stop-schuif in sectie 2 van de Vrijheidsas.
+ * hefboom), 2 Spaarquote (in % met het bedrag minder uitgeven eronder), 3 Minder werken,
+ * 4 Uitgave na pensioen (spec 2026-09-18, ADR 0160). "Later of eerder stoppen" is de
+ * stop-schuif in sectie 2 van de Vrijheidsas.
  */
 export const HEFBOOM_COPY = {
   meerSalaris: 'Meer salaris',
