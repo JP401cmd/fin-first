@@ -17,6 +17,7 @@ import {
   ScenarioCallout,
   OrnamentColophon,
 } from '@/components/editorial'
+import { rapportAnkerVoortgang, RAPPORT_ANKER_KICKER } from '@/lib/horizon/anker-copy'
 import { SectionDivider } from '@/components/app/section-divider'
 import { PrintToolbar } from './components/print-toolbar'
 import { ReportMasthead } from './components/report-masthead'
@@ -198,6 +199,16 @@ export default function ReportViewerPage() {
   const savingsRate = data.kern.savingsRate ?? 0
   const firePercentage = data.horizon.fireEnd?.percentage ?? 0
   const fireDelta = data.horizon.fireProgressDelta
+  // ADR 0129 B3/D4 — ligt het stopmoment vast, dan bestaat er geen doelvermogen en
+  // meet een kapitaalratio niets; de route levert `fireEnd` dan bewust als `null`.
+  // Zonder deze tak zou de derde scan-anker "FIRE-voortgang 0%" tonen: erger dan het
+  // oude, betekenisloze percentage, want 0 % leest als een uitspraak. De cel wordt
+  // daarom het STOPMOMENT — het enige anker-feit dat dit rapport zelf kent (het
+  // draait geen kernel-run, dus de dekking is hier niet beschikbaar).
+  const rapportAnker =
+    data.horizon.stopAnchor != null && data.horizon.stopAnchor !== 'solved'
+      ? rapportAnkerVoortgang(data.horizon.stopAnchor, data.horizon.stopAge ?? null)
+      : null
   const netWorthEnd = data.kern.netWorthEnd ?? 0
   // Freedom time falls back to '—' when we cannot translate the eindstand into
   // days — either because there's no balance to project or no expense-rate to
@@ -268,15 +279,22 @@ export default function ReportViewerPage() {
                 : undefined,
             variant: 'neutral',
           },
-          {
-            kicker: 'FIRE-voortgang',
-            amount: `${firePercentage}%`,
-            sub:
-              fireDelta != null
-                ? `${fireDelta >= 0 ? '+' : ''}${fireDelta}% deze periode`
-                : undefined,
-            variant: 'neutral',
-          },
+          rapportAnker
+            ? {
+                kicker: RAPPORT_ANKER_KICKER,
+                amount: rapportAnker.kop,
+                sub: 'geen doelvermogen om tegen af te zetten',
+                variant: 'neutral' as const,
+              }
+            : {
+                kicker: 'FIRE-voortgang',
+                amount: `${firePercentage}%`,
+                sub:
+                  fireDelta != null
+                    ? `${fireDelta >= 0 ? '+' : ''}${fireDelta}% deze periode`
+                    : undefined,
+                variant: 'neutral' as const,
+              },
           {
             kicker: 'Vrijheidstijd',
             amount: freedomTimeShort,

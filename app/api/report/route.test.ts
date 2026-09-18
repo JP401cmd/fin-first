@@ -6,6 +6,7 @@ import { computeFireProjection } from '@/lib/horizon-data'
 import { computeScalarFireProjection } from '@/lib/horizon-kernel/scalar-router'
 import { resolveFireParams } from '@/lib/fire-params'
 import { resolveSavingsSource } from '@/lib/savings-source'
+import { REPORT_DATA_VERSION } from '@/lib/report-data'
 
 /**
  * GET /api/report — de FIRE-leeftijd van het PDF-rapport komt uit de horizon-kernel.
@@ -165,19 +166,35 @@ function buildClient(tables: TableRows) {
 }
 
 type ReportResponse = {
-  horizon: { fireAge: number | null; fireDate: string | null; monthlyPassiveIncome: number | null }
-  kern: { totalAssets: number; totalDebts: number }
+  version?: number
+  reportName?: string
+  horizon: {
+    fireAge: number | null
+    fireDate: string | null
+    monthlyPassiveIncome: number | null
+    stopAnchor?: string
+    stopAge?: number | null
+    fireStart: { percentage: number } | null
+    fireEnd: { percentage: number; fireTarget: number } | null
+    fireProgressDelta: number | null
+  }
+  kern: { totalAssets: number; totalDebts: number; firePercentage: number | null }
+  aiIntroduction?: string | null
 }
 
-async function reportFor(tables: TableRows = DEFAULT_TABLES): Promise<ReportResponse> {
+async function reportFor(
+  tables: TableRows = DEFAULT_TABLES,
+  opts: { configId?: string } = {},
+): Promise<ReportResponse> {
   mockCreateClient.mockResolvedValue(buildClient(tables))
   mockCheckTierGate.mockResolvedValue(null)
   mockIsCloudAllowed.mockResolvedValue(true)
   mockDailyRate.mockResolvedValue({ dailyRate: 100 })
   // use_ai=false → het modelblok wordt volledig overgeslagen; het rapport blijft
   // verder volledig deterministisch.
+  const config = opts.configId ? `&config_id=${opts.configId}` : ''
   const res = await GET(
-    new Request('http://localhost/api/report?period_type=month&date_from=2026-05-01&date_to=2026-06-01&use_ai=false'),
+    new Request(`http://localhost/api/report?period_type=month&date_from=2026-05-01&date_to=2026-06-01&use_ai=false${config}`),
   )
   return (await res.json()) as ReportResponse
 }
@@ -298,6 +315,131 @@ describe('GET /api/report — gedragspin op de FIRE-leeftijd', () => {
     expect(data.horizon.monthlyPassiveIncome).toBe(
       Math.round(((180000 - 20000) * fireParams.effectiveSwr) / 12),
     )
+  })
+})
+
+/**
+ * Het vrijheids-% van het rapport onder een VAST stopmoment-anker (ADR 0129 B3/D5).
+ *
+ * Melding 18-09-2026: /toekomst zei "Je bent vrij" bij een plan dat maar tot 47 van de
+ * 90 reikte, omdat het scherm een KAPITAALRATIO rekende terwijl onder een vast anker de
+ * DEKKING de maat is. Dit rapport deed dezelfde som (`computeFreedomProgressWithBasis`
+ * op het 25×-terugvaldoel) en drukte 'm af als "FIRE-voortgang" — hetzelfde getal-dat-
+ * iets-anders-meet, alleen op papier. De dekking vraagt een kernel-run die dit rapport
+ * niet draait (het kent alleen het scalar-fireTarget), dus het juiste antwoord hier is
+ * "onbekend": onder een vast anker bestaat er geen doelvermogen om tegen af te zetten
+ * (D4) en zonder run geen dekking. Geen kapitaalratio als plaatsvervanger.
+ */
+describe('GET /api/report — vrijheids-% volgt het stop-anker', () => {
+  const VAST_ANKER_PROFIEL = { ...PROFILE_ROW, fire_stop_anchor: 'age', fire_stop_age: 46 }
+
+  it('noemt onder `solved` (geen vast anker) gewoon de kapitaalratio', async () => {
+    const data = await reportFor()
+    expect(data.kern.firePercentage).not.toBeNull()
+    expect(data.kern.firePercentage!).toBeGreaterThan(0)
+  })
+
+  it('laat het percentage weg onder een vast anker — geen run, dus geen dekking', async () => {
+    const data = await reportFor({ ...DEFAULT_TABLES, profiles: [VAST_ANKER_PROFIEL] })
+    expect(data.kern.firePercentage).toBeNull()
+  })
+
+  // ── De HEADLINE-KPI van de rapportpagina ──────────────────────────────────
+  // `kern.firePercentage` is niet het getal dat de lezer als eerste ziet: de
+  // figures-strip leest `horizon.fireEnd.percentage` en de Toekomst-kolom rendert
+  // daar een balk mét "Doel: € X" bij. Die tweede bron stond ongeguard, dus op
+  // één pagina stond "FIRE-voortgang 62 %" naast een vergelijkingstabel met "—".
+  const MET_SNAPSHOTS: TableRows = {
+    ...DEFAULT_TABLES,
+    net_worth_snapshots: [
+      { net_worth: 140000, snapshot_date: '2026-05-01' },
+      { net_worth: 160000, snapshot_date: '2026-05-31' },
+    ],
+  }
+
+  it('onder `solved` staan fireStart/fireEnd/delta er gewoon', async () => {
+    const data = await reportFor(MET_SNAPSHOTS)
+    expect(data.horizon.stopAnchor).toBe('solved')
+    expect(data.horizon.fireEnd).not.toBeNull()
+    expect(data.horizon.fireEnd!.percentage).toBeGreaterThan(0)
+    expect(data.horizon.fireEnd!.fireTarget).toBeGreaterThan(0)
+    expect(data.horizon.fireStart).not.toBeNull()
+    expect(data.horizon.fireProgressDelta).not.toBeNull()
+  })
+
+  it('onder een vast anker vervallen fireStart/fireEnd/delta — geen ratio, geen doelbedrag', async () => {
+    const data = await reportFor({ ...MET_SNAPSHOTS, profiles: [VAST_ANKER_PROFIEL] })
+    expect(data.horizon.fireEnd).toBeNull()
+    expect(data.horizon.fireStart).toBeNull()
+    expect(data.horizon.fireProgressDelta).toBeNull()
+    // …en het anker reist mee, zodat de pagina kan zeggen wáárom er niets staat
+    // in plaats van naar "0 %" of een lege balk te degraderen.
+    expect(data.horizon.stopAnchor).toBe('age')
+    expect(data.horizon.stopAge).toBe(46)
+  })
+
+  it('draagt een versiestempel, zodat een gecachte editie deze correctie kan halen', async () => {
+    const data = await reportFor(MET_SNAPSHOTS)
+    expect(data.version).toBe(REPORT_DATA_VERSION)
+  })
+})
+
+/**
+ * De CACHE-tak (`report_configs.cached_data`) serveert een volledig gegenereerd rapport
+ * vóórdat het profiel — en dus het stop-anker — is opgehaald. Zonder versiepoort bereikt
+ * geen enkele correctie de bestaande edities: gemeten 18-09-2026 droegen 16 van de 18
+ * `report_configs` op productie een cache, de oudste uit februari 2026, en er is nergens
+ * invalidatie.
+ */
+describe('GET /api/report — de cache laat een verouderde editie niet staan', () => {
+  // Herkenbaar aan een waarde die een verse generatie nooit oplevert.
+  const CACHE_MARKER = 'UIT-DE-CACHE'
+  function configMet(version: number | undefined): TableRows {
+    return {
+      ...DEFAULT_TABLES,
+      report_configs: [
+        {
+          cached_data: {
+            version,
+            reportName: CACHE_MARKER,
+            aiIntroduction: null,
+            horizon: {},
+            kern: { totalAssets: 1, totalDebts: 1, firePercentage: null },
+          },
+        },
+      ],
+    }
+  }
+
+  it('serveert een editie op de huidige versie ongewijzigd', async () => {
+    const data = await reportFor(configMet(REPORT_DATA_VERSION), { configId: 'cfg-1' })
+    expect(data.reportName).toBe(CACHE_MARKER)
+    expect(data.kern.totalAssets).toBe(1)
+  })
+
+  it('valt door naar hergeneratie bij een oudere versie', async () => {
+    const data = await reportFor(configMet(1), { configId: 'cfg-1' })
+    expect(data.reportName).not.toBe(CACHE_MARKER)
+    expect(data.version).toBe(REPORT_DATA_VERSION)
+    expect(data.kern.totalAssets).toBe(180000)
+  })
+
+  it('valt door bij een editie zónder versie (alles van vóór de invoering)', async () => {
+    const data = await reportFor(configMet(undefined), { configId: 'cfg-1' })
+    expect(data.reportName).not.toBe(CACHE_MARKER)
+    expect(data.version).toBe(REPORT_DATA_VERSION)
+    expect(data.kern.totalAssets).toBe(180000)
+  })
+
+  it('broncontrole: de route leest het plan-anker uit het profiel', () => {
+    // De stub levert de hele rij ongeacht de select; alleen de bron bewijst dat de
+    // kolommen ook écht worden opgehaald (anders is het anker in productie altijd
+    // `solved` en bijt de tak hierboven nooit).
+    const src = readFileSync(path.resolve(__dirname, 'route.ts'), 'utf-8')
+    expect(src).toContain('resolveFirePlanWithOverride')
+    for (const kolom of ['fire_stop_anchor', 'fire_stop_age', 'fire_end_strategy', 'feature_preferences']) {
+      expect(src, kolom).toMatch(new RegExp(`\\.select\\('[^']*${kolom}`))
+    }
   })
 })
 
@@ -483,6 +625,9 @@ describe('/api/report — AI-poort geldt alleen voor het AI-pad (H28)', () => {
 
 describe('GET /api/report — de cache honoreert de keuze "zonder AI-inleiding"', () => {
   const CACHED = {
+    // Op de HUIDIGE rapportversie — anders valt deze editie (terecht) door de
+    // versiepoort naar hergeneratie en toetst dit blok de cache-tak niet meer.
+    version: REPORT_DATA_VERSION,
     reportId: 'cached-1',
     reportName: 'Mei 2026',
     useAi: true,

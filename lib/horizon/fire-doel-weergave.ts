@@ -107,9 +107,51 @@ export interface FireDoelWeergaveInput {
  * verzwarende deel van UR3-07 defect 3 (het J-bedrag stond onder het bijschrift
  * "benodigd — met je huis").
  */
+export const FIRE_DOEL_KWALIFICATIE: Record<FireDoelGrondslag, string> = {
+  'incl-huis': 'met je huis',
+  'excl-huis': 'zonder je huis',
+}
+
 export const FIRE_DOEL_ONDERSCHRIFT: Record<FireDoelGrondslag, string> = {
-  'incl-huis': 'benodigd — met je huis',
-  'excl-huis': 'benodigd — zonder je huis',
+  'incl-huis': `benodigd — ${FIRE_DOEL_KWALIFICATIE['incl-huis']}`,
+  'excl-huis': `benodigd — ${FIRE_DOEL_KWALIFICATIE['excl-huis']}`,
+}
+
+/** Eén regel van de dubbele doelweergave: bedrag + wélke grootheid het is. */
+export interface FireDoelPaarRegel {
+  bedrag: number
+  grondslag: FireDoelGrondslag
+  /** Inline kwalificatie naast het getal — dezelfde woorden als het onderschrift. */
+  kwalificatie: string
+}
+
+/**
+ * De twee doelbedragen in LEESVOLGORDE: eerst de grondslag die het antwoord
+ * draagt, dan de andere.
+ *
+ * WAAROM DIT HIER STAAT EN NIET IN DE TEGEL (bugmelding 18-09-2026): de tegel
+ * zette het incl.-huis-doel ONVOORWAARDELIJK groot en het excl.-huis-doel klein.
+ * Bij `exclude_from_fire` koos `resolveFireDoelWeergave` wél de excl.-grondslag —
+ * dus stond op één scherm "ca. € 1.900.000 met je huis" als hoofdantwoord bóven
+ * een voortgangsbalk die "ca. € 530.000 — volledige vrijheid" zei, en bóven een
+ * kassabon die € 530.000 als "Benodigd" onderbouwde. Dezelfde klasse fout als
+ * UR3-07 defect 3, nu niet langs de tijd-as maar langs de TYPOGRAFIE: het
+ * grootste getal is een bewering over wat het antwoord is.
+ *
+ * De volgorde hangt daarom aan diezelfde ene grondslagkeuze, en de kwalificaties
+ * komen uit dezelfde tabel als het onderschrift — één woordenschat.
+ */
+export function fireDoelPaarInLeesvolgorde(
+  grondslag: FireDoelGrondslag,
+  bedragen: Record<FireDoelGrondslag, number>,
+): [FireDoelPaarRegel, FireDoelPaarRegel] {
+  const ander: FireDoelGrondslag = grondslag === 'incl-huis' ? 'excl-huis' : 'incl-huis'
+  const regel = (g: FireDoelGrondslag): FireDoelPaarRegel => ({
+    bedrag: bedragen[g],
+    grondslag: g,
+    kwalificatie: FIRE_DOEL_KWALIFICATIE[g],
+  })
+  return [regel(grondslag), regel(ander)]
 }
 
 /** Kernel wint van server; `null`/`undefined` telt als "niet geleverd". */

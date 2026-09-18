@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   resolveFireDoelWeergave,
+  fireDoelPaarInLeesvolgorde,
   FIRE_DOEL_ONDERSCHRIFT,
   type FireDoelGrondslag,
 } from './fire-doel-weergave'
@@ -193,5 +194,57 @@ describe('resolveFireDoelWeergave — first paint en verfijning delen één gron
     expect(beide.exclHuis).toBe(60_000)
     expect(beide.bron).toBe('kernel')
     expect(beide.status).toBe('definitief')
+  })
+})
+
+/**
+ * Het PAAR in leesvolgorde (bugmelding 18-09-2026).
+ *
+ * Given een gebruiker met woonstrategie "Uitsluiten" (`exclude_from_fire`),
+ * When /toekomst beide doelen naast elkaar toont (`showDualFireTarget`),
+ * Then is het GROTE getal het doel ZONDER huis — dezelfde grondslag die de
+ * voortgangsbalk eronder al noemt ("ca. € 530.000 — volledige vrijheid") en die
+ * de kassabon als "Benodigd" onderbouwt.
+ *
+ * Wat er misging: de tegel zette `inclHuis` onvoorwaardelijk als het grote getal
+ * en `exclHuis` eronder — óók wanneer `resolveFireDoelWeergave` de excl.-huis-
+ * grondslag had gekozen. Dezelfde pagina toonde toen "ca. € 1.900.000 met je
+ * huis" als hoofdantwoord bóven een balk die op € 530.000 stond.
+ */
+describe('fireDoelPaarInLeesvolgorde — de grondslag bepaalt wélk bedrag vooraan staat', () => {
+  const bedragen = { 'incl-huis': 1_900_000, 'excl-huis': 530_000 } as const
+
+  it('uitsluiten (excl.-grondslag): het liquide doel is het antwoord en staat vooraan', () => {
+    const [primair, secundair] = fireDoelPaarInLeesvolgorde('excl-huis', bedragen)
+    expect(primair).toEqual({ bedrag: 530_000, grondslag: 'excl-huis', kwalificatie: 'zonder je huis' })
+    expect(secundair).toEqual({ bedrag: 1_900_000, grondslag: 'incl-huis', kwalificatie: 'met je huis' })
+  })
+
+  it('downsize/opeethypotheek (incl.-grondslag): het doel mét huis blijft vooraan', () => {
+    const [primair, secundair] = fireDoelPaarInLeesvolgorde('incl-huis', bedragen)
+    expect(primair).toEqual({ bedrag: 1_900_000, grondslag: 'incl-huis', kwalificatie: 'met je huis' })
+    expect(secundair).toEqual({ bedrag: 530_000, grondslag: 'excl-huis', kwalificatie: 'zonder je huis' })
+  })
+
+  it('de kwalificatie komt uit dezelfde tabel als het onderschrift — geen tweede woordenschat', () => {
+    for (const grondslag of ['incl-huis', 'excl-huis'] as const) {
+      const [primair] = fireDoelPaarInLeesvolgorde(grondslag, bedragen)
+      expect(FIRE_DOEL_ONDERSCHRIFT[grondslag]).toContain(primair.kwalificatie)
+    }
+  })
+
+  it('het primaire bedrag is per constructie hetzelfde getal als `bedrag` van de resolver', () => {
+    // De tegel mag niet iets anders groot zetten dan wat de balk en de kassabon
+    // als antwoord gebruiken.
+    const weergave = resolveFireDoelWeergave({
+      homeExcludedFromProgress: true,
+      kernelRequiredNetWorthInclHome: 1_900_000,
+      kernelRequiredPortfolioExclHome: 530_000,
+    })
+    const [primair] = fireDoelPaarInLeesvolgorde(weergave.grondslag, {
+      'incl-huis': weergave.inclHuis!,
+      'excl-huis': weergave.exclHuis!,
+    })
+    expect(primair.bedrag).toBe(weergave.bedrag)
   })
 })

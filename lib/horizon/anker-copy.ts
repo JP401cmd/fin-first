@@ -176,6 +176,85 @@ export const ANKER_KPI_LABEL = 'Reikt tot'
 export const ANKER_KPI_LABEL_KORT = 'Reikt tot'
 
 /**
+ * Het onderschrift onder de vermogenstegel van een vast anker ("Vermogen op je
+ * stopmoment").
+ *
+ * AANLEIDING (melding 18-09-2026): die tegel toont de stand van Prognose!J op de
+ * ankermaand — netto LIQUIDE, dus zónder de eigen woning en ná aftrek van de
+ * niet-woningschulden (gemeten: € 56.201 liquide bezit − € 40.000 studieschuld −
+ * € 800 krediet + één maand inleg = € 17.101). Het onderschrift zei alleen
+ * "geprojecteerd op je stopmoment"; zonder de grondslag erbij leest dat als een
+ * doelbedrag dat te laag is. In de `solved`-tak noemt het onderschrift zijn
+ * grondslag wél ("benodigd — met/zonder je huis", `FIRE_DOEL_ONDERSCHRIFT`,
+ * UR2-17) — precies dezelfde reden: het label moet de grootheid benoemen die er
+ * staat.
+ *
+ * WAAROM NIET "liquide vermogen — geprojecteerd op je stopmoment" (eigenaarsbesluit
+ * 18-09-2026, herziening van de eerste versie hiervan):
+ *  - "liquide" is een VAKTERM. De ui-ux-conventie zet de vakterm in de kicker, niet
+ *    in de enige duidingsregel die de lezer krijgt. De kicker boven de tegel is al
+ *    "Vermogen op je stopmoment"; het title-attribuut draagt de term voluit.
+ *  - "geprojecteerd op je stopmoment" herhaalt die kicker letterlijk — twee regels
+ *    die hetzelfde zeggen, terwijl er maar één iets kán toevoegen.
+ *  - De klacht ging er juist over dat de gebruiker niet wist dát zijn studielening
+ *    er al vanaf was. "na schulden" beantwoordt die vraag; "liquide" niet.
+ *  - "zonder je huis" sluit aan op het bestaande woordpaar "met je huis / zonder je
+ *    huis" in `FIRE_DOEL_ONDERSCHRIFT`, zodat de twee takken één taal spreken.
+ * De uitzondering blijft benoemd: maakt de woonstrategie de woning liquide
+ * (verkopen/opeethypotheek), dan zit de opbrengst er ná dat moment wél in — dat is
+ * de verkoopmarker in de grafiek, niet iets dat dit onderschrift moet dragen.
+ * Geen doel-woord: onder een vast anker bestaat er geen doelvermogen (ADR 0129 D4).
+ */
+export const ANKER_VERMOGEN_TEGEL_ONDERSCHRIFT = 'zonder je huis, na schulden'
+
+/**
+ * Wat er in een RAPPORTAGE in de plaats komt van "FIRE-voortgang X %" zodra het
+ * stopmoment vastligt (ADR 0129 B3/D4).
+ *
+ * AANLEIDING (eindreview 18-09-2026): de rapportpagina toonde in dezelfde kolom een
+ * voortgangsbalk mét "Doel: € X" én een vergelijkingstabel met "—". Onder een vast
+ * anker bestaat dat doelbedrag niet en meet `nettoVermogen / fireTarget` niets. Het
+ * rapport draait geen kernel-run, dus de DEKKING (het getal dat /toekomst wél kan
+ * tonen) is daar niet beschikbaar — vandaar een zin in plaats van een tweede getal.
+ *
+ * Twee delen, bewust gescheiden: `kop` is kort genoeg voor een figures-strip-cel,
+ * `uitleg` staat in de kolom eronder. Toon-invarianten van deze module: beschrijvend,
+ * geen aansporing, en het woord AOW mag hier wél — dit is een instellingslabel, geen
+ * tekortzin (zelfde uitzondering als `planCoverageKaartSubregel`).
+ *
+ * `stopAge` is alleen bekend bij een `age`-anker (het rapport laadt de wettelijke
+ * AOW-tabel niet); `null` laat de zin die leeftijd weg.
+ */
+export function rapportAnkerVoortgang(
+  anchor: 'aow' | 'now' | 'age',
+  stopAge: number | null,
+): { kop: string; uitleg: string } {
+  const kop =
+    anchor === 'now'
+      ? 'Je stopt nu'
+      : anchor === 'aow'
+        ? 'Je AOW-leeftijd'
+        : stopAge != null
+          ? formatStopAge(stopAge)
+          : 'Vast stopmoment'
+  const aanhef =
+    anchor === 'now'
+      ? 'Je rekent alsof je nu stopt.'
+      : anchor === 'aow'
+        ? 'Je stopmoment ligt vast op je AOW-leeftijd.'
+        : stopAge != null
+          ? `Je stopmoment ligt vast op ${formatStopAge(stopAge)}.`
+          : 'Je stopmoment ligt vast.'
+  return {
+    kop,
+    uitleg: `${aanhef} Er is dan geen doelvermogen om voortgang tegen af te zetten; wat telt is hoe ver je plan reikt.`,
+  }
+}
+
+/** De kicker boven die cel/kolom — vervangt "FIRE-voortgang" onder een vast anker. */
+export const RAPPORT_ANKER_KICKER = 'Stopmoment'
+
+/**
  * De draaiknoppen van het lab, in deze volgorde (eigenaarskeuze 15 sep 2026, bijstelling van
  * spec lab-haalbaarheid §2): 1 Meer salaris (het extra-inleg-event — rekenkundig dezelfde
  * hefboom), 2 Spaarquote (in % met het bedrag minder uitgeven eronder), 3 Minder werken.

@@ -914,3 +914,57 @@ describe('unifiedRowsToStackedRows (#505)', () => {
     }
   })
 })
+
+/**
+ * Eigen huis apart zichtbaar in de opbouw-staaf (bugmelding 18-09-2026).
+ *
+ * Given een gebruiker met woonstrategie "Uitsluiten",
+ * When de opbouw-grafiek het eigen huis tóch toont (bewust — het is echt bezit),
+ * Then moet de staaf het eigen-huis-deel apart kunnen dempen. Daarvoor moet de
+ * rij weten WELK deel van `vastgoed` het eigen huis is en welk deel van
+ * `schuldHypotheek` de daaraan gekoppelde hypotheek — de groep `vastgoed` draagt
+ * óók beleggingsvastgoed (`real_estate`) en de laag `hypotheek` draagt óók
+ * hypotheken op een ánder pand; die tellen wél mee voor FIRE
+ * (`filterAssetsForFire` haalt uitsluitend `eigen_huis` + de eraan gekoppelde
+ * hypotheek uit de FIRE-pot).
+ */
+describe('unifiedRowsToStackedRows — eigen-huis-deel apart (uitsluiten-weergave)', () => {
+  it('splitst het eigen-huis-deel af van de vastgoedgroep', () => {
+    const rows = [makeUnifiedRow({
+      age: 30,
+      assetBuckets: { eigen_huis: makeBucket(350000), real_estate: makeBucket(200000) },
+    })]
+    const result = unifiedRowsToStackedRows(rows)
+    expect(result[0].vastgoed, 'de groep blijft het totaal').toBe(550000)
+    expect(result[0].vastgoedEigenHuis).toBe(350000)
+  })
+
+  it('laat het eigen-huis-deel weg wanneer er geen eigen huis is', () => {
+    const rows = [makeUnifiedRow({ age: 30, assetBuckets: { real_estate: makeBucket(200000) } })]
+    expect(unifiedRowsToStackedRows(rows)[0].vastgoedEigenHuis).toBeUndefined()
+  })
+
+  it('splitst de aan het eigen huis gekoppelde hypotheek af van de hypotheeklaag', () => {
+    const rows = [makeUnifiedRow({
+      age: 30,
+      assetBuckets: { eigen_huis: makeBucket(350000) },
+      debtBalances: { 'hyp-eigen': makeDebtBalance(180000), 'hyp-pand': makeDebtBalance(90000) },
+    })]
+    const result = unifiedRowsToStackedRows(
+      rows,
+      new Map([['hyp-eigen', 'mortgage' as const], ['hyp-pand', 'mortgage' as const]]),
+      new Set(['hyp-eigen']),
+    )
+    expect(result[0].schuldHypotheek, 'de laag blijft het totaal').toBe(-270000)
+    expect(result[0].schuldEigenHuisHypotheek).toBe(-180000)
+  })
+
+  it('laat het hypotheek-deel weg zonder opgegeven eigen-huis-hypotheken', () => {
+    const rows = [makeUnifiedRow({
+      age: 30,
+      debtBalances: { 'hyp-pand': makeDebtBalance(90000) },
+    })]
+    const result = unifiedRowsToStackedRows(rows, new Map([['hyp-pand', 'mortgage' as const]]))
+    expect(result[0].schuldEigenHuisHypotheek).toBeUndefined()
+  })
+})

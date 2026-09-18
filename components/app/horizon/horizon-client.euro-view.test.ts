@@ -142,12 +142,19 @@ describe('horizon-client.tsx — euro-weergave-render-grens (T4)', () => {
     // onzichtbaar: het bedrag blijft plausibel, alleen te hoog.
     expect(src).not.toMatch(/MaskedAmount value=\{fireTargetInclHome!\}/)
     expect(src).not.toMatch(/MaskedAmount value=\{fireTargetExclHome!\}/)
-    expect(src).not.toMatch(/isPensioenMode \? \(portfolioAtAow \?\? 0\) : balkVrijheidDoel/)
+    expect(src).not.toMatch(/isPensioenMode \? \(vermogenOpAnker \?\? 0\) : balkVrijheidDoel/)
     expect(src).toMatch(/const viewFireTargetInclHome = /)
-    expect(src).toMatch(/const viewPortfolioAtAow = /)
+    expect(src).toMatch(/const viewVermogenOpAnker = /)
     expect(src).toMatch(/const viewMonthlyWithdrawalAtAow =/)
     // De factor komt van de bijbehorende leeftijd, niet van "nu".
     expect(src).toMatch(/factorAtAge\(displayUnifiedRows, userAowAge\.fractional\)/)
+    // …en niet van de leeftijd van de BUURWAARDE. `vermogenOpAnker` staat op de
+    // ankermaand, dus op `SimResult.vastStopLeeftijd`; met `aowFactor` werd een
+    // `age`-anker van 46 bij een AOW van 68,5 ruim twintig jaar te ver
+    // teruggerekend — onzichtbaar, want het bedrag bleef plausibel (alleen te laag).
+    expect(src).toMatch(/const ankerFactor = useMemo\(\s*\r?\n?\s*\(\) => factorAtAge\(displayUnifiedRows, simResult\?\.vastStopLeeftijd \?\? null\)/)
+    expect(src).toMatch(/deflate\(vermogenOpAnker, ankerFactor, euroView\)/)
+    expect(src).not.toMatch(/deflate\(vermogenOpAnker, aowFactor/)
   })
 
   it('zet het balk-label in de actieve euro-weergave, gelijk aan de Doelbedrag-KPI', () => {
@@ -173,7 +180,7 @@ describe('horizon-client.tsx — euro-weergave-render-grens (T4)', () => {
     // …en de nominale variant is wég. Een terugval hierop is onzichtbaar: het
     // bedrag blijft plausibel, alleen te hoog.
     expect(src).not.toMatch(/formatMaskedCurrency\(balkVrijheidDoel, masked\)/)
-    expect(src).not.toMatch(/formatMaskedCurrency\(portfolioAtAow \?\? 0, masked\)/)
+    expect(src).not.toMatch(/formatMaskedCurrency\(vermogenOpAnker \?\? 0, masked\)/)
     // De euro-view-uitzondering op deze plek is vervallen met het besluit; laat
     // hem niet stil terugkeren (dat zou de oude conventie heropenen).
     expect(src).not.toMatch(/euro-view: exempt — hoort bij de nominale freedomPct-noemer/)
@@ -181,7 +188,7 @@ describe('horizon-client.tsx — euro-weergave-render-grens (T4)', () => {
     // waarde waaraan het label is gelijkgetrokken.
     // ADR 0129 F3b: de tegel toont onder ÉLK vast anker het geprojecteerde (gedeflateerde)
     // vermogen op het stopmoment — de sleutel is het anker, niet de pensioen-label.
-    expect(src).toMatch(/isFixedAnchorMode \? \(viewPortfolioAtAow \?\? 0\) : viewBalkVrijheidDoel/)
+    expect(src).toMatch(/isFixedAnchorMode \? \(viewVermogenOpAnker \?\? 0\) : viewBalkVrijheidDoel/)
   })
 
   it('deflateert het balk-doelbedrag via de canonieke route — € 200.032 nominaal wordt ca. € 180.000', () => {

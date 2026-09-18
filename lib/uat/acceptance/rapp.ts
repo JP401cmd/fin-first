@@ -92,12 +92,12 @@ const criteria: AcceptanceCriterion[] = [
     scenarioId: 'UAT-RAPP-04',
     titel: 'Opgeslagen rapport uit het archief heropenen',
     kriticiteit: 'BELANGRIJK',
-    given: 'Een gegenereerd periodiek rapport (WF-RAPP-02.a) met gecachte data in `report_configs.cached_data`.',
+    given: 'Een gegenereerd periodiek rapport (WF-RAPP-02.a) met gecachte data in `report_configs.cached_data`, gegenereerd op de HUIDIGE `REPORT_DATA_VERSION` (2).',
     when: 'De gebruiker heropent het rapport uit het archief, ná wijzigingen aan de brondata.',
-    then: 'De getoonde cijfers zijn byte-gelijk aan de oorspronkelijke generatie (bv. Vermogensgroei blijft +€9.800) — een A=B-consistentietoets tussen "eerste generatie" en "heropend uit cache", ongeacht latere brondata-wijzigingen. Uitzondering op de bevriezing, en alleen op de NIET-cijfers: heropent iemand met `use_ai=false` (eigen keuze, privé-modus of een verlopen AI-abonnement), dan wordt een eerder gegenereerde AI-inleiding uit de cache weggelaten — de cijfers blijven ongemoeid.',
+    then: 'De getoonde cijfers zijn byte-gelijk aan de oorspronkelijke generatie (bv. Vermogensgroei blijft +€9.800) — een A=B-consistentietoets tussen "eerste generatie" en "heropend uit cache", ongeacht latere brondata-wijzigingen. Uitzondering op de bevriezing, en alleen op de NIET-cijfers: heropent iemand met `use_ai=false` (eigen keuze, privé-modus of een verlopen AI-abonnement), dan wordt een eerder gegenereerde AI-inleiding uit de cache weggelaten — de cijfers blijven ongemoeid. NIEUW (ADR 0129, 18 sep 2026) — de bevriezing geldt alleen ACHTER een versiepoort: `cached.version === REPORT_DATA_VERSION`. Draagt de gecachte editie een oudere of ontbrekende versie (elke editie van vóór deze wijziging: `version` is dan `undefined`, per definitie ouder dan 2 — de stop-anker-correctie op `firePercentage`/`fireStart`/`fireEnd`/`historicalPeriods[].firePercentage` raakt anders nooit een bestaande rij), dan valt de aanvraag door naar een VOLLEDIGE hergeneratie in plaats van de cache te serveren — dat is dan geen regressie op deze byte-gelijkheidstoets, want de "eerste generatie" om tegen te vergelijken bestond nog niet op de huidige versie.',
     assertion: {
       kind: 'consistency',
-      source: 'app/api/report/route.ts (cached_data-teruggave) — bevroren cache vs. eerste generatie, geen nieuw cijfer',
+      source: 'app/api/report/route.ts (versiepoort `cached.version === REPORT_DATA_VERSION` vóór de cached_data-teruggave, gevolgd door de bestaande use_ai-correctie) — bevroren cache vs. eerste generatie op dezelfde versie, geen nieuw cijfer',
     },
   },
   {

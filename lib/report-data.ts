@@ -31,7 +31,30 @@ export interface HistoricalPeriodSummary {
   firePercentage: number | null
 }
 
+/**
+ * Versiestempel van de rapportvórm. Verhoog dit getal zodra een wijziging betekent dat
+ * een REEDS GEGENEREERD rapport iets verkeerds toont — niet bij elke nieuwe veldnaam,
+ * wél bij elke correctie van een getal of een grondslag.
+ *
+ * Waarom: `report_configs.cached_data` bewaart een volledig gegenereerd rapport en de
+ * route serveert dat vóórdat ze het profiel ophaalt. Zonder stempel bereikt een
+ * correctie de bestaande edities nooit (gemeten 18-09-2026: 16 van de 18 rijen op
+ * productie droegen een cache, de oudste uit februari) en is er ook geen invalidatie
+ * die dat repareert. Een cache-hit met een ándere versie valt door naar hergeneratie.
+ *
+ * 2 — ADR 0129 B3/D5: onder een vast stopmoment-anker geen kapitaalratio en geen
+ *     doelbedrag in het rapport (`kern.firePercentage`, `horizon.fireStart/fireEnd`,
+ *     `historicalPeriods[].firePercentage`).
+ */
+export const REPORT_DATA_VERSION = 2
+
 export interface ReportData {
+  /**
+   * `REPORT_DATA_VERSION` ten tijde van genereren. Ontbreekt op elke editie van vóór
+   * de invoering — die zijn per definitie ouder dan versie 2 en worden hergenereerd.
+   */
+  version?: number
+
   // ── Identity ──
   reportId: string
   reportName: string
@@ -146,6 +169,21 @@ export interface ReportWilSection {
 }
 
 export interface ReportHorizonSection {
+  /**
+   * Het STOP-ANKER van het plan (ADR 0129 D2) ten tijde van genereren. Alles behalve
+   * `'solved'` betekent: het stopmoment ligt vast, er is géén doelvermogen (D4) en een
+   * kapitaalratio meet daar niets. `fireStart`/`fireEnd`/`fireProgressDelta` zijn dan
+   * `null` — niet omdat de data ontbreekt, maar omdat de grootheid niet bestaat. De
+   * weergavelaag gebruikt dit veld om dát te zeggen in plaats van "0 %" te tonen.
+   * Ontbreekt op edities van vóór `REPORT_DATA_VERSION` 2 (die worden hergenereerd).
+   */
+  stopAnchor?: 'solved' | 'aow' | 'now' | 'age'
+  /**
+   * De vastgelegde stopleeftijd bij `stopAnchor: 'age'`. `null` bij de andere ankers —
+   * onder `'aow'` bewust NIET ingevuld: die leeftijd komt uit de wettelijke AOW-tabel
+   * en dit rapport laadt die niet; de zin noemt dan "je AOW-leeftijd" i.p.v. een getal.
+   */
+  stopAge?: number | null
   fireStart: { percentage: number; netWorth: number; fireTarget: number } | null
   fireEnd: { percentage: number; netWorth: number; fireTarget: number } | null
   fireProgressDelta: number | null

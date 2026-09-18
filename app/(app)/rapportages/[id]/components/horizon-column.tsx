@@ -4,6 +4,7 @@ import { useCallback } from 'react'
 import type { ReportHorizonSection } from '@/lib/report-data'
 import { formatMaskedCurrency } from '@/lib/format'
 import { formatFireAge } from '@/lib/horizon/fire-format'
+import { rapportAnkerVoortgang, RAPPORT_ANKER_KICKER } from '@/lib/horizon/anker-copy'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { useResolvedModuleColor } from '@/lib/hooks/use-resolved-module-color'
 import { SectionLabel } from '@/components/editorial'
@@ -31,20 +32,39 @@ export function HorizonColumn({
   const fc = useCallback((v: number) => formatMaskedCurrency(v, masked), [masked])
   const resolvedAccent = useResolvedModuleColor('--module-active-700', accentColor)
   const resolvedThreshold = useResolvedModuleColor('--module-active-500', accentColor)
+  // ADR 0129 B3/D4 — ligt het stopmoment vast, dan bestaat er geen doelvermogen: de
+  // route levert `fireStart`/`fireEnd` dan bewust als `null` en dit blok zegt waaróm,
+  // in plaats van de sectie stil weg te laten (dat leest als ontbrekende data).
+  // Ontbrekend veld (editie van vóór `REPORT_DATA_VERSION` 2) ⇒ ongewijzigd gedrag.
+  const ankerDuiding =
+    horizon.stopAnchor != null && horizon.stopAnchor !== 'solved'
+      ? rapportAnkerVoortgang(horizon.stopAnchor, horizon.stopAge ?? null)
+      : null
 
   return (
     <div className="space-y-6">
       <SectionLabel num="iii.">Toekomst</SectionLabel>
 
-      {/* FIRE progress */}
-      {(horizon.fireStart || horizon.fireEnd) && (
+      {/* ADR 0129 B3/D4 — vast stopmoment: geen kapitaalratio en géén "Doel: € X".
+          Dat doelbedrag bestaat onder dit anker niet, dus de balk eronder zou een
+          noemer suggereren die het plan niet kent. In de plaats komt de reden, niet
+          een leeg blok: anders leest de weggelaten sectie als ontbrekende data.
+          Het rapport draait geen kernel-run en kan de DEKKING (het getal dat
+          /toekomst hier toont) dus niet meten — vandaar een zin, geen tweede getal. */}
+      {(ankerDuiding || horizon.fireStart || horizon.fireEnd) && (
         <div className="report-section">
           <div className="flex items-center gap-2 mb-3">
             <Flame className="h-4 w-4 text-[var(--module-active-700)]" />
             <span className="font-inter text-xs font-semibold uppercase tracking-wider text-[var(--ink-3)]">
-              FIRE voortgang
+              {ankerDuiding ? RAPPORT_ANKER_KICKER : 'FIRE voortgang'}
             </span>
           </div>
+
+          {ankerDuiding && (
+            <p className="mb-3 font-inter text-[11px] leading-relaxed text-[var(--ink-2)]">
+              {ankerDuiding.uitleg}
+            </p>
+          )}
 
           {horizon.fireStart && horizon.fireEnd && (
             <div className="mb-3">

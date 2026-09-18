@@ -99,6 +99,23 @@ describe('horizon-client — één beslisser voor de doelbedrag-grondslag', () =
     expect(source).toMatch(/initialRequiredNetWorth:\s*initialData\.requiredNetWorthInclHome/)
   })
 
+  it('laat de DUBBELE weergave de grondslag volgen, niet een vaste volgorde', () => {
+    // Bugmelding 18-09-2026: de dual-tak zette `viewFireTargetInclHome` altijd als
+    // het grote getal en `viewFireTargetExclHome` eronder. Bij 'Uitsluiten' koos de
+    // resolver juist de excl.-grondslag, dus stond "ca. € 1.900.000 met je huis"
+    // als hoofdantwoord bóven een balk die € 530.000 noemde. Het grootste getal is
+    // een bewering over wát het antwoord is — die moet dus uit dezelfde ene
+    // grondslagkeuze komen als het bedrag, het onderschrift en de balk.
+    expect(source).toMatch(/fireDoelPaarInLeesvolgorde\(fireDoel\.grondslag/)
+    // Geen enkel bedrag in de tegel meer rechtstreeks uit een grondslag-vaste bron.
+    for (const regel of codeRegels()) {
+      expect(
+        /MaskedAmount value=\{viewFireTarget(Incl|Excl)Home/.test(regel),
+        `de dubbele doeltegel leest via de leesvolgorde, niet rechtstreeks: ${regel.trim()}`,
+      ).toBe(false)
+    }
+  })
+
   it('gebruikt de canonieke server-Prognose!I ook als noemer van de balk-vulling', () => {
     // Balk-vulling en balk-label moeten op dezelfde grondslag staan; de vulling
     // bouwde Prognose!I bij de eerste paint lokaal na uit Prognose!J terwijl de

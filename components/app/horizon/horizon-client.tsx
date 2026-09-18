@@ -146,11 +146,13 @@ import {
 } from '@/lib/horizon/hero-fire-age'
 import {
   resolveFireDoelWeergave,
+  fireDoelPaarInLeesvolgorde,
   FIRE_DOEL_ONDERSCHRIFT,
 } from '@/lib/horizon/fire-doel-weergave'
 import {
   ANKER_KPI_LABEL,
   ANKER_KPI_LABEL_KORT,
+  ANKER_VERMOGEN_TEGEL_ONDERSCHRIFT,
   ankerKpiCaption,
   ankerReachFromSim,
   ankerStopFromSim,
@@ -177,7 +179,7 @@ import {
   type AnkerReach,
   type AnkerStop,
 } from '@/lib/horizon/anker-copy'
-import { resolveLabUitkomst, type LabUitkomst } from '@/lib/horizon/lab-uitkomst'
+import { dekkingVanRun, resolveLabUitkomst, type LabUitkomst } from '@/lib/horizon/lab-uitkomst'
 import {
   labAntwoordenPerSlider,
   labAntwoordGezetMelding,
@@ -524,8 +526,10 @@ const STACKED_ROW_MONEY_FIELDS = [
   'pensioen',
   'vastgoed',
   'overig',
+  'vastgoedEigenHuis',
   'schulden',
   'schuldHypotheek',
+  'schuldEigenHuisHypotheek',
   'schuldOverig',
   'schuldOpeethypotheek',
   'schuldTekortLening',
@@ -1847,13 +1851,27 @@ export default function HorizonPage({
     const hsHomeExcludedFromFire =
       initialData.housingContext.hasEigenHuis && isHomeExcludedFromFire(initialData.housingStrategy)
     const hsRequiredPortfolioExcl = hsFireTarget > 0 ? hsFireTarget : null
-    const fPct = computeFreedomProgressWithBasis({
-      homeExcludedFromFire: hsHomeExcludedFromFire,
-      netWorthInclHome: nw,
-      fireEligibleNetWorth: hsFireEligibleNetWorth,
-      requiredNetWorthInclHome: inclHomeTargetFromScalar(hsRequiredPortfolioExcl, nw, hsFireEligibleNetWorth),
-      requiredPortfolioExclHome: hsRequiredPortfolioExcl,
-    })
+    // ADR 0129 B3/D5 — dezelfde anker-splitsing als de hero hieronder, want de
+    // vrijheids-pijler mag niet op een ándere definitie draaien dan het getal dat
+    // erboven staat. Onder een vast anker is een kapitaalratio betekenisloos (de
+    // noemer IS de geprojecteerde stand op het anker): dan de DEKKING van dezelfde
+    // run, en zonder kernel-antwoord exact dezelfde terugvalketen als de hero —
+    // `firstPaintFreedomPct ?? initialData.freedomPct`, beide `computeFreedomPctForPlan`
+    // uit de loader. Nooit een eigen som, en bewust NIET `healthScoreInput.freedomPct`:
+    // dat is de waarde die dít effect zelf schreef, dus een stale waarde zou zichzelf
+    // voeden zodra de run een keer geen antwoord gaf. `isFixedAnchorMode` staat lager in
+    // het bestand maar is hier veilig: deze effect-body draait ná de render, niet
+    // tijdens (anders dan een deps-array) — en hij hangt alleen aan `simResult`, dat wél
+    // in de deps staat.
+    const fPct = isFixedAnchorMode
+      ? (dekkingVanRun(simResult, hsCurrentAge) ?? firstPaintFreedomPct ?? initialData.freedomPct)
+      : computeFreedomProgressWithBasis({
+          homeExcludedFromFire: hsHomeExcludedFromFire,
+          netWorthInclHome: nw,
+          fireEligibleNetWorth: hsFireEligibleNetWorth,
+          requiredNetWorthInclHome: inclHomeTargetFromScalar(hsRequiredPortfolioExcl, nw, hsFireEligibleNetWorth),
+          requiredPortfolioExclHome: hsRequiredPortfolioExcl,
+        })
     const newInput: HealthScoreInput = {
       ...healthScoreInput,
       totalAssets: effectiveInput.totalAssets,
@@ -1866,8 +1884,15 @@ export default function HorizonPage({
     if (displayEvents.length > 0) {
       setImpacts(computeCumulativeImpacts(effectiveInput, displayEvents))
     }
+  // `simResult` + `firstPaintFreedomPct` zijn GEEN cosmetische toevoeging: sinds de
+  // anker-splitsing hierboven leest deze body de kernel-run. Zonder die deps bleef de
+  // vrijheids-pijler hangen op de dekking van vóór de laatste run (en vóór een
+  // strategie-wijziging), terwijl de hero ernaast al was bijgewerkt — precies de
+  // twee-definities-op-één-scherm die we hier repareren. `isFixedAnchorMode` zelf kan
+  // niet in de array (het is een latere `const`; TDZ tijdens de render) en hoeft dat ook
+  // niet: hij is een pure functie van `simResult` en de stabiele `initialData`-prop.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [input, fireSwr, fireParams, avgIncome6m, avgExpenses6m, fireStrategy])
+  }, [input, fireSwr, fireParams, avgIncome6m, avgExpenses6m, fireStrategy, simResult, firstPaintFreedomPct])
 
   // Houd de impact-lijst in sync met de client-geregenereerde housing-events.
   // De setImpacts-callsites in loadData/refreshEvents werken op de ruwe
@@ -2505,15 +2530,41 @@ export default function HorizonPage({
       effectiveNetWorth,
       effectiveFireEligibleNetWorth,
     )
-  const effectiveFreedomPct = effectiveFireTarget > 0
-    ? computeFreedomProgressWithBasis({
-        homeExcludedFromFire: homeExcludedFromProgress,
-        netWorthInclHome: effectiveNetWorth,
-        fireEligibleNetWorth: effectiveFireEligibleNetWorth,
-        requiredNetWorthInclHome: effectiveRequiredNetWorthInclHome,
-        requiredPortfolioExclHome: effectiveFireTarget,
-      })
-    : (firstPaintFreedomPct ?? fire?.freedomPercentage ?? 0)
+  // ── Het ANKER kiest de definitie van het vrijheids-% (ADR 0129 B3/D5) ──────
+  // Onder `solved` is het de KAPITAALRATIO hierboven: hoe vol is de pot t.o.v. het
+  // FIRE-doel. Onder een VAST anker (aow/now/age) is het de DEKKING van het plan, en
+  // dat is geen smaakverschil: `requiredFirePortfolio`/`requiredFireNetWorth` zijn
+  // daar de GEPROJECTEERDE STAND op het anker (bridge-vlag
+  // `requiredFireIsAnchorPortfolio`, ADR 0129 D4) — teller en noemer zijn dezelfde
+  // grootheid, dus de ratio komt per constructie op ~100 % uit. Dit scherm rekende
+  // die ratio onvoorwaardelijk en overschreef daarmee de bundelwaarde die de loader
+  // al correct had gekozen (`computeFreedomPctForPlan`, lib/horizon-data-loader.ts):
+  // bij een anker op vandaag (ankermaand 0) zei de hero "Je bent vrij" — de gate
+  // `isFinanciallyFree` opent bij ≥ 100 % ∧ anker bereikt — naast een tekort-lening
+  // van vier ton en een plan dat maar tot 47 van de 90 reikte. De voortgangsbalk
+  // stond vol terwijl het LABEL ernaast de tijd-uitspraak "tot je 90e — einde van je
+  // plan" deed: vulling en label maten twee verschillende dingen.
+  // De dekking komt uit `dekkingVanRun` — letterlijk de loader-formule op DEZELFDE
+  // run (lib/horizon/lab-uitkomst.ts), zodat hero, lab-dekkingsas en bundel niet
+  // uiteen kunnen lopen. Dat is de HOOFDRUN: de wat-als-sliders draaien een eigen,
+  // gescheiden projectie (`scenario` uit use-horizon-fire-sim.ts) en bewegen dit
+  // getal dus niet mee — net zomin als de oude kapitaalratio dat deed. Geen
+  // regressie, wel een grens om te kennen; de dekking van een scenario staat in de
+  // lab-dekkingsas (`labDekking`), niet in de hero.
+  // Zonder kernel-antwoord (eerste paint, of een gedegradeerde run) consumeren we de
+  // bundel: die is via dezelfde ene home gekozen. Nooit 0 en nooit een ratio.
+  const ankerDekkingPct = dekkingVanRun(simResult, currentAge)
+  const effectiveFreedomPct = isFixedAnchorMode
+    ? (ankerDekkingPct ?? firstPaintFreedomPct ?? initialData.freedomPct)
+    : effectiveFireTarget > 0
+      ? computeFreedomProgressWithBasis({
+          homeExcludedFromFire: homeExcludedFromProgress,
+          netWorthInclHome: effectiveNetWorth,
+          fireEligibleNetWorth: effectiveFireEligibleNetWorth,
+          requiredNetWorthInclHome: effectiveRequiredNetWorthInclHome,
+          requiredPortfolioExclHome: effectiveFireTarget,
+        })
+      : (firstPaintFreedomPct ?? fire?.freedomPercentage ?? 0)
 
   // (`planAnchor` / `isFixedAnchorMode` staan hoger, vóór het preset-batch-effect dat ze leest.)
   // Pensioen-WEERGAVE: alleen het aow-anker splitst de grafiek en de fasebalk op de
@@ -2608,7 +2659,11 @@ export default function HorizonPage({
   // Doelbedrag dat bij de voortgangsbalk-grondslag hoort: incl. woning
   // (Prognose!I) tenzij de woning is uitgesloten (exclude_from_fire) → dan het
   // liquide excl.-doel (Prognose!J). Consistent met de noemer van
-  // effectiveFreedomPct, zodat de balk-fill en het balk-label niet botsen.
+  // `effectiveFreedomPct` in de `solved`-tak, zodat de balk-fill en het balk-label
+  // daar niet botsen. Onder een VAST anker geldt die uitspraak NIET meer: de vulling
+  // meet daar dekking (tijd, ADR 0129 D5) en heeft dus geen euro-noemer, het
+  // balk-label noemt het einde van het plan i.p.v. een bedrag, en de KPI-tegel toont
+  // `vermogenOpAnker`. Dit bedrag doet daar alleen nog mee in `fireTargetGuard`.
   // Zelfde C1-regel als bij `effectiveFireTarget`: alleen kernel-afgeleide
   // bronnen — en sinds UR3-07 defect 3 óók dezelfde grondslag vóór en ná de
   // worker-run, want beide runs leveren nu allebei de grootheden.
@@ -2687,24 +2742,36 @@ export default function HorizonPage({
           ? 'Wordt berekend…'
           : 'Niet bereikbaar'
   const aowAgeInt = Math.floor(userAowAge.fractional)
-  // Use startPortfolio of the first retirement row at AOW age = actual portfolio AT AOW
-  // (not endPortfolio which is after a year of withdrawals). Fallback to firePortfolioAtFire
-  // which is the actual projected portfolio, NOT requiredFirePortfolio (binary-search minimum). (#473)
+  // De jaarrij op de AOW-leeftijd. Draagt nog precies één ding: de ONTTREKKING
+  // (een stroom). De voorraad-kant is hieronder weg — zie de grondslag-noot.
   const aowRow = isPensioenMode && simResult
     ? simResult.rows.find(r => r.age === aowAgeInt && r.phase === 'retirement')
       ?? simResult.rows.find(r => r.age === aowAgeInt)
     : null
-  // ADR 0129 — onder ÉLK vast anker: het GEPROJECTEERDE vermogen op het stopmoment
-  // (`firePortfolioAtFire` = de stand op de ankermaand). Onder het aow-anker blijft de
-  // rij-lookup op de AOW-leeftijd de eerste bron (bestaand gedrag, #473).
-  const portfolioAtAow = isFixedAnchorMode && simResult
-    ? (aowRow?.startPortfolio ?? simResult.firePortfolioAtFire)
-    : null
+  // ── Het vermogen op het STOPMOMENT — één grondslag: Prognose!J (liquide) ──────
+  // ADR 0129: onder élk vast anker toont de tegel de GEPROJECTEERDE stand op de
+  // ankermaand. `firePortfolioAtFire` (= `requiredFirePortfolio`, bridge.ts) IS die
+  // stand, op de netto-LIQUIDE grondslag — zonder eigen woning, ná aftrek van de
+  // niet-woningschulden.
+  //
+  // Vóór deze fix stond er een rij-lookup vóór: `aowRow.startPortfolio`. Dat veld is
+  // `row.startNetWorth` = Prognose!**I** (netto vermogen INCL. eigen woning; zie de
+  // GRONDSLAG-WAARSCHUWING bij `startNettoLiquide` in lib/unified-projection.ts). Eén
+  // kop, twee grootheden — en onder het aow-anker won in de praktijk altijd de I-tak,
+  // dus dezelfde tegel stond bij de ene gebruiker op I en bij de andere op J. Dat is
+  // exact wat CLAUDE.md verbiedt (`nettoVermogen` en `liquideVermogen` nooit op één
+  // oppervlak mengen), en het onderschrift eronder belooft nu expliciet "zonder je
+  // huis, na schulden". De voortgangsbalk ernaast meet al op liquide uitputting.
+  // Bewust zichtbaar: voor aow-anker-gebruikers mét overwaarde valt dit getal fors
+  // lager uit — dát is de correctie.
+  const vermogenOpAnker = isFixedAnchorMode && simResult ? simResult.firePortfolioAtFire : null
   // Use actual withdrawal from the sim engine (guardrails-aware) instead of simple SWR calc (#473)
+  // De SWR-terugval draait mee op de J-grondslag: je onttrekt uit je liquide pot, niet
+  // uit je huis — dus dit is óók de juistere noemer voor die terugval.
   const monthlyWithdrawalAtAow = isPensioenMode && aowRow != null && aowRow.withdrawal > 0
     ? aowRow.withdrawal / 12
-    : isPensioenMode && portfolioAtAow != null
-      ? (fireSwr * portfolioAtAow) / 12
+    : isPensioenMode && vermogenOpAnker != null
+      ? (fireSwr * vermogenOpAnker) / 12
       : null
 
   // ── Overgang (transition phase) berekening ──────────────────────────────────
@@ -3408,6 +3475,10 @@ export default function HorizonPage({
     const baseRows = unifiedRowsToStackedRows(
       displayUnifiedRows,
       new Map(debts.map((d) => [d.id, d.debt_type])),
+      // Alleen de hypotheken OP DE EIGEN WONING — dezelfde koppeling die
+      // `filterAssetsForFire` gebruikt om ze met het huis uit de FIRE-pot te
+      // halen; een hypotheek op een ander pand telt gewoon mee.
+      new Set(initialData.housingContext.eigenHuisMortgages.map((d) => d.id)),
     )
 
     const currentAgeFloor = initialData.effectiveInput.dateOfBirth
@@ -4863,10 +4934,11 @@ export default function HorizonPage({
   )
 
   // ── Hero-KPI's: puntbedragen op een specifieke leeftijd ───────────────────
-  // De FIRE-doelen horen bij de FIRE-leeftijd, "vermogen op AOW" en de
-  // maandonttrekking bij de AOW-leeftijd. Een generieke "factor van nu" zou hier
-  // stelselmatig te weinig deflateren; de leeftijd is juist wat het bedrag zijn
-  // koopkracht geeft.
+  // De FIRE-doelen horen bij de FIRE-leeftijd, het vermogen op het stopmoment bij
+  // de ANKERLEEFTIJD en de maandonttrekking bij de AOW-leeftijd. Een generieke
+  // "factor van nu" zou hier stelselmatig te weinig deflateren; de leeftijd is juist
+  // wat het bedrag zijn koopkracht geeft — dus ook: de leeftijd die bij dít bedrag
+  // hoort, niet die van de buurwaarde.
   // Zelfde genormaliseerde leeftijdsbron als `viewFireTarget` hierboven — anders
   // zouden twee FIRE-doelbedragen op dezelfde pagina op een andere rij landen.
   const fireFactor = useMemo(
@@ -4877,10 +4949,21 @@ export default function HorizonPage({
     () => factorAtAge(displayUnifiedRows, userAowAge.fractional),
     [displayUnifiedRows, userAowAge.fractional],
   )
+  // `vermogenOpAnker` staat op de ANKERMAAND, niet op de AOW-leeftijd — dus de factor
+  // van het STOPMOMENT van de run (`SimResult.vastStopLeeftijd`, fractioneel; bridge.ts).
+  // Met `aowFactor` werd een `age`-anker van 46 bij een AOW van 68,5 ruim twintig jaar te
+  // ver teruggerekend zodra de gebruiker "huidige euro's" aanzette. Onder het aow-anker is
+  // `vastStopLeeftijd` gelijk aan de AOW-leeftijd, dus dát pad blijft numeriek identiek.
+  // Onder `solved` is het veld `null` en geeft `factorAtAge` 1 — en dan is `vermogenOpAnker`
+  // sowieso `null`. Eén deflatie per bedrag (ADR 0090/0093), geen eigen `Math.pow`.
+  const ankerFactor = useMemo(
+    () => factorAtAge(displayUnifiedRows, simResult?.vastStopLeeftijd ?? null),
+    [displayUnifiedRows, simResult?.vastStopLeeftijd],
+  )
   const viewFireTargetExclHome = fireTargetExclHome == null ? null : deflate(fireTargetExclHome, fireFactor, euroView)
   const viewBalkVrijheidDoel = deflate(balkVrijheidDoel, fireFactor, euroView)
   const viewEffectiveFireTarget = deflate(effectiveFireTarget, fireFactor, euroView)
-  const viewPortfolioAtAow = portfolioAtAow == null ? null : deflate(portfolioAtAow, aowFactor, euroView)
+  const viewVermogenOpAnker = vermogenOpAnker == null ? null : deflate(vermogenOpAnker, ankerFactor, euroView)
   const viewMonthlyWithdrawalAtAow =
     monthlyWithdrawalAtAow == null ? null : deflate(monthlyWithdrawalAtAow, aowFactor, euroView)
 
@@ -5116,11 +5199,33 @@ export default function HorizonPage({
   // het getal een projectie (geen doel), onder 'nu stoppen' bestaat er geen
   // doelbedrag (ADR 0127 D4) en bij een huishoud-/partnerweergave komt het
   // bedrag uit een andere bron dan deze keuze.
+  // Onder een vast anker is dat bedrag `vermogenOpAnker` = de kernel-stand van
+  // Prognose!J op de ankermaand, dus altijd de LIQUIDE grondslag — die kwalificatie
+  // ontbrak en liet het getal als een (te laag) doelbedrag lezen. De woorden staan
+  // náást die grondslag in `anker-copy.ts`, net zoals FIRE_DOEL_ONDERSCHRIFT dat
+  // doet voor de solved-tak; de tegel schrijft ze niet zelf uit.
   const fireTargetCaption = isFixedAnchorMode
-    ? 'geprojecteerd op je stopmoment'
+    ? ANKER_VERMOGEN_TEGEL_ONDERSCHRIFT
     : hasPerspectiveHero
       ? 'benodigd'
       : FIRE_DOEL_ONDERSCHRIFT[fireDoel.grondslag]
+
+  // ── Leesvolgorde van het DUBBELE doelbedrag ────────────────────────────────
+  // Het grote getal is een bewering over wat het antwoord IS. De tak hieronder
+  // zette daar onvoorwaardelijk het incl.-huis-doel neer — ook bij 'Uitsluiten',
+  // waar de grondslag juist het liquide doel is. Op één scherm stond dan
+  // "ca. € 1.900.000 met je huis" bóven een balk die "ca. € 530.000 — volledige
+  // vrijheid" zei en een kassabon die € 530.000 onderbouwde. De volgorde volgt
+  // nu dezelfde ene grondslagkeuze als het bedrag, het onderschrift en de balk;
+  // beide doelen blijven staan, alleen de nadruk verhuist. Consume-only: de
+  // bedragen zijn de al gedeflateerde weergavewaarden, hier alleen geordend.
+  const dualDoelRegels =
+    showDualFireTarget && viewFireTargetInclHome != null && viewFireTargetExclHome != null
+      ? fireDoelPaarInLeesvolgorde(fireDoel.grondslag, {
+          'incl-huis': viewFireTargetInclHome,
+          'excl-huis': viewFireTargetExclHome,
+        })
+      : null
 
   // ── Reeds-vrij / met-pensioen framing voor de hero-leeftijdsstat ───────────
   // Consume-only (ADR 0009): leest de reeds-berekende vrijheidsvoortgang +
@@ -5444,36 +5549,37 @@ export default function HorizonPage({
               {!hasPerspectiveHero && showFireTargetNotice ? (
                 /* M6: onmogelijk/niet-berekenbaar doelbedrag — melding i.p.v. getal. */
                 <HeroKpiNotice guard={fireTargetGuard} label={isNuStoppenMode ? 'Geen doelbedrag' : undefined} />
-              ) : !hasPerspectiveHero && showDualFireTarget ? (
+              ) : !hasPerspectiveHero && dualDoelRegels ? (
                 <>
-                  {/* Doel MET je huis — het grote doel; kwalificatie inline zodat de kaart even hoog blijft als de buur-KPI's */}
+                  {/* Het doel op de GRONDSLAG van dit plan — het grote getal; kwalificatie
+                      inline zodat de kaart even hoog blijft als de buur-KPI's */}
                   <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                     <div
                       className="text-[24px] sm:text-[28px] font-black leading-none tracking-[-0.02em]"
                       style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
                     >
-                      <MaskedAmount value={viewFireTargetInclHome!} tone="horizon" monoWhenVisible={false} approx />
+                      <MaskedAmount value={dualDoelRegels[0].bedrag} tone="horizon" monoWhenVisible={false} approx />
                     </div>
                     <span
                       className="italic text-[11px] text-[var(--ink-3)]"
                       style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
                     >
-                      met je huis
+                      {dualDoelRegels[0].kwalificatie}
                     </span>
                   </div>
-                  {/* Doel ZONDER je huis (liquide) — het kleinere doel in horizon-accent, inline kwalificatie */}
+                  {/* Het doel op de ándere grondslag — kleiner, in horizon-accent */}
                   <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 mt-1.5">
                     <div
                       className="text-[16px] sm:text-[18px] font-black leading-none tracking-[-0.02em] text-[var(--module-active-800)]"
                       style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
                     >
-                      <MaskedAmount value={viewFireTargetExclHome!} tone="horizon" monoWhenVisible={false} approx />
+                      <MaskedAmount value={dualDoelRegels[1].bedrag} tone="horizon" monoWhenVisible={false} approx />
                     </div>
                     <span
                       className="italic text-[11px] text-[var(--ink-3)]"
                       style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
                     >
-                      zonder je huis
+                      {dualDoelRegels[1].kwalificatie}
                     </span>
                   </div>
                 </>
@@ -5485,7 +5591,7 @@ export default function HorizonPage({
                   >
                     {hasPerspectiveHero
                       ? <MaskedAmount value={viewPerspectiveHeroFireTarget ?? perspectiveHero!.fireTarget} tone="horizon" monoWhenVisible={false} approx />
-                      : <MaskedAmount value={isFixedAnchorMode ? (viewPortfolioAtAow ?? 0) : viewBalkVrijheidDoel} tone="horizon" monoWhenVisible={false} approx />}
+                      : <MaskedAmount value={isFixedAnchorMode ? (viewVermogenOpAnker ?? 0) : viewBalkVrijheidDoel} tone="horizon" monoWhenVisible={false} approx />}
                   </div>
                   <div
                     className="italic text-[11px] text-[var(--ink-3)] mt-1.5"
@@ -5669,16 +5775,20 @@ export default function HorizonPage({
                 een fout, ook al was de eerdere nominale keuze intern
                 verdedigbaar. Daarmee vervalt de euro-view-uitzondering die hier
                 stond (D12/D13).
-                Wat NIET meebeweegt: de vulling blijft `effectiveFreedomPct`,
-                canoniek uit computeFreedomProgressWithBasis — een ratio (klasse
-                R, ADR 0093) deflateert nooit. Gevolg dat de eigenaar accepteert:
+                Wat NIET meebeweegt: de vulling blijft `effectiveFreedomPct` —
+                onder `solved` de kapitaalratio (computeFreedomProgressWithBasis),
+                onder een vast anker de DEKKING (ADR 0129 B3/D5), zodat de vulling
+                dezelfde grootheid meet als het tijd-label hieronder. Beide zijn een
+                ratio (klasse R, ADR 0093) en deflateren nooit. Gevolg dat de eigenaar accepteert:
                 in 'real' is de breuk onder de balk niet meer letterlijk
                 teller/label. Ook de grondslag-keuze (excl. woning bij
                 `isHomeExcludedFromFire`) is ongewijzigd — ADR 0034.
                 Deflatie loopt via de canonieke route en exact één keer:
-                `viewBalkVrijheidDoel`/`viewPortfolioAtAow` zijn binnen de
+                `viewBalkVrijheidDoel`/`viewVermogenOpAnker` zijn binnen de
                 render-grens gedeeld door `factorAtAge` op het FIRE- resp.
-                AOW-jaar. Gepind in horizon-client.euro-view.test.ts. */}
+                ANKER-jaar (`SimResult.vastStopLeeftijd` — het bedrag staat op de
+                ankermaand, niet op de AOW-leeftijd).
+                Gepind in horizon-client.euro-view.test.ts. */}
             <div className="mt-2 flex justify-between text-xs text-[var(--ink-4)]">
               <span>0%</span>
               <span className="font-mono">
@@ -5761,36 +5871,36 @@ export default function HorizonPage({
               {!hasPerspectiveHero && showFireTargetNotice ? (
                 /* M6: onmogelijk/niet-berekenbaar doelbedrag — melding i.p.v. getal. */
                 <HeroKpiNotice guard={fireTargetGuard} compact label={isNuStoppenMode ? 'Geen doelbedrag' : undefined} />
-              ) : !hasPerspectiveHero && showDualFireTarget ? (
+              ) : !hasPerspectiveHero && dualDoelRegels ? (
                 <>
-                  {/* Doel MET je huis — het grote doel; kwalificatie inline zodat de kaart even hoog blijft als de buur-KPI's */}
+                  {/* Het doel op de GRONDSLAG van dit plan — het grote getal */}
                   <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
                     <div
                       className="text-[18px] font-black leading-none tracking-[-0.02em]"
                       style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
                     >
-                      <MaskedAmount value={viewFireTargetInclHome!} tone="horizon" monoWhenVisible={false} approx />
+                      <MaskedAmount value={dualDoelRegels[0].bedrag} tone="horizon" monoWhenVisible={false} approx />
                     </div>
                     <span
                       className="italic text-[10px] text-[var(--ink-3)]"
                       style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
                     >
-                      met je huis
+                      {dualDoelRegels[0].kwalificatie}
                     </span>
                   </div>
-                  {/* Doel ZONDER je huis (liquide) — het kleinere doel in horizon-accent, inline kwalificatie */}
+                  {/* Het doel op de ándere grondslag — kleiner, in horizon-accent */}
                   <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 mt-1">
                     <div
                       className="text-[13px] font-black leading-none tracking-[-0.02em] text-[var(--module-active-800)]"
                       style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
                     >
-                      <MaskedAmount value={viewFireTargetExclHome!} tone="horizon" monoWhenVisible={false} approx />
+                      <MaskedAmount value={dualDoelRegels[1].bedrag} tone="horizon" monoWhenVisible={false} approx />
                     </div>
                     <span
                       className="italic text-[10px] text-[var(--ink-3)]"
                       style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
                     >
-                      zonder je huis
+                      {dualDoelRegels[1].kwalificatie}
                     </span>
                   </div>
                 </>
@@ -5802,7 +5912,7 @@ export default function HorizonPage({
                   >
                     {hasPerspectiveHero
                       ? <MaskedAmount value={viewPerspectiveHeroFireTarget ?? perspectiveHero!.fireTarget} tone="horizon" monoWhenVisible={false} approx />
-                      : <MaskedAmount value={isFixedAnchorMode ? (viewPortfolioAtAow ?? 0) : viewBalkVrijheidDoel} tone="horizon" monoWhenVisible={false} approx />}
+                      : <MaskedAmount value={isFixedAnchorMode ? (viewVermogenOpAnker ?? 0) : viewBalkVrijheidDoel} tone="horizon" monoWhenVisible={false} approx />}
                   </div>
                   <div
                     className="italic text-[10px] text-[var(--ink-3)] mt-1"
@@ -6780,6 +6890,10 @@ export default function HorizonPage({
                             planningMode={planningMode}
                             aowAgeFractional={userAowAge.fractional}
                             housingSaleAge={kernelHousingSale?.age ?? null}
+                            // Het huis blijft in de staaf staan (het is echt bezit), maar
+                            // gedempt zodra het buiten het doel valt — dezelfde
+                            // strategie-beslissing als de doelbedrag-grondslag hierboven.
+                            homeExcludedFromFire={homeExcludedFromProgress}
                             eventOverlay={chartEventOverlay}
                             onEventClick={handleChartEventClick}
                             onClusterOpen={handleChartClusterOpen}
@@ -10049,11 +10163,13 @@ export default function HorizonPage({
               )}
               {/* Beide zijn puntbedragen op de AOW-leeftijd (klasse S resp. F) en
                   moeten hetzelfde tonen als de KPI hierboven — anders spreekt de
-                  onderbouwing de kaart tegen. */}
-              {isPensioenMode && viewPortfolioAtAow != null && (
+                  onderbouwing de kaart tegen. Onder het aow-anker valt de ankermaand
+                  samen met de AOW-leeftijd, dus dit bedrag hoort hier; de grondslag is
+                  netto LIQUIDE (Prognose!J), zoals het onderschrift bij de KPI zegt. */}
+              {isPensioenMode && viewVermogenOpAnker != null && (
                 <div className="flex justify-between py-0.5">
                   <span className="font-sans text-sm text-[var(--ink-2)]">Vermogen op AOW</span>
-                  <span className="tabular-nums text-[var(--ink)]">{<MaskedAmount value={Math.round(viewPortfolioAtAow)} tone="horizon" />}</span>
+                  <span className="tabular-nums text-[var(--ink)]">{<MaskedAmount value={Math.round(viewVermogenOpAnker)} tone="horizon" />}</span>
                 </div>
               )}
               {isPensioenMode && viewMonthlyWithdrawalAtAow != null && (
@@ -10181,13 +10297,13 @@ export default function HorizonPage({
               {/* ADR 0129 — geen "Benodigd"-totaalregel onder een vast anker: het bedrag is
                   de geprojecteerde stand op het stopmoment, geen doel. */}
               <span className="text-[var(--ink)]">{isFixedAnchorMode ? 'Vermogen op je stopmoment (geprojecteerd)' : 'Benodigd'}</span>
-              <span className="tabular-nums text-[var(--ink)]">{<MaskedAmount value={isFixedAnchorMode ? (viewPortfolioAtAow ?? 0) : viewEffectiveFireTarget} tone="horizon" />}</span>
+              <span className="tabular-nums text-[var(--ink)]">{<MaskedAmount value={isFixedAnchorMode ? (viewVermogenOpAnker ?? 0) : viewEffectiveFireTarget} tone="horizon" />}</span>
             </div>
 
             <div className="mt-3 flex justify-center">
               {/* De vrijheidstijd volgt automatisch het (eventueel gedeflateerde)
                   bedrag — het dagtarief zelf blijft een grootheid van vandaag (D15). */}
-              <FreedomTimeBadge amount={isFixedAnchorMode ? (viewPortfolioAtAow ?? 0) : viewEffectiveFireTarget} />
+              <FreedomTimeBadge amount={isFixedAnchorMode ? (viewVermogenOpAnker ?? 0) : viewEffectiveFireTarget} />
             </div>
 
             <div className="mt-3 border-t border-dashed border-[var(--border-ed)] pt-2 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">

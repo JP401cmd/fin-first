@@ -50,6 +50,8 @@ import {
   eindvermogenSheetToelichting,
   eindvermogenGoalName,
   eindvermogenVastgelegdToast,
+  ANKER_VERMOGEN_TEGEL_ONDERSCHRIFT,
+  rapportAnkerVoortgang,
   type AnkerReach,
   type AnkerStop,
 } from './anker-copy'
@@ -143,6 +145,65 @@ describe('woorden — stopmoment en titel', () => {
     expect(ankerReachYear({ kind: 'gedekt', endAge: null })).toBeNull()
     expect(ankerKort({ kind: 'reikt-tot', age: 57.5, endAge: 90 })).toBe(`${ANKER_KPI_LABEL}: 58 jr`)
     expect(ankerKpiCaption({ kind: 'gedekt', endAge: 90 })).toContain('einde van je plan')
+  })
+  /**
+   * Melding 18-09-2026 — de tegel "Vermogen op je stopmoment" toonde een bedrag
+   * zonder te zeggen WELKE grootheid het is (netto LIQUIDE: zonder eigen woning en
+   * ná aftrek van de niet-woningschulden). De gebruiker las het als een doelbedrag
+   * en vond het te laag. In de `solved`-tak noemt het onderschrift zijn grondslag
+   * al ("benodigd — met/zonder je huis", FIRE_DOEL_ONDERSCHRIFT); onder een vast
+   * anker viel die kwalificatie weg.
+   */
+  it('het onderschrift van de vermogenstegel noemt de grondslag in gewone woorden', () => {
+    // Eigenaarsbesluit 18-09-2026: de grondslag moet erin, maar zónder vakterm en
+    // zónder de kicker ("Vermogen op je stopmoment") te herhalen. De twee dingen die
+    // de lezer miste: het huis zit er NIET in en de schulden zijn er al áf.
+    // Spiegelt bewust het woordpaar "met je huis / zonder je huis" van de solved-tak
+    // (`FIRE_DOEL_KWALIFICATIE`), zodat beide takken één taal spreken. Niet tegen dié
+    // constante geassert: dat zou deze suite rood maken voor een wijziging in een
+    // ander bestand.
+    expect(ANKER_VERMOGEN_TEGEL_ONDERSCHRIFT).toBe('zonder je huis, na schulden')
+    // Geen vakterm in de enige duidingsregel (ui-ux: die hoort in de kicker/title).
+    expect(ANKER_VERMOGEN_TEGEL_ONDERSCHRIFT).not.toMatch(/liquide/i)
+    // Geen herhaling van de kicker erboven.
+    expect(ANKER_VERMOGEN_TEGEL_ONDERSCHRIFT).not.toMatch(/stopmoment/i)
+    // Geen doel-woord: onder een vast anker bestaat er geen doelbedrag (ADR 0129 D4).
+    expect(ANKER_VERMOGEN_TEGEL_ONDERSCHRIFT).not.toMatch(/benodigd|doel/i)
+  })
+})
+
+/**
+ * Wat een RAPPORTAGE zegt in de plaats van "FIRE-voortgang X %" (eindreview 18-09-2026).
+ * De rapportpagina toonde die kapitaalratio én een balk met "Doel: € X" naast een
+ * vergelijkingstabel die al "—" gaf. Onder een vast anker bestaat dat doelbedrag niet;
+ * het rapport draait geen kernel-run, dus de dekking is daar niet beschikbaar.
+ */
+describe('rapportAnkerVoortgang — het rapport onder een vast stopmoment', () => {
+  it('geeft per anker een korte cel-kop en een uitleg', () => {
+    expect(rapportAnkerVoortgang('now', null).kop).toBe('Je stopt nu')
+    expect(rapportAnkerVoortgang('aow', null).kop).toBe('Je AOW-leeftijd')
+    expect(rapportAnkerVoortgang('age', 58.5).kop).toBe('58,5')
+    // Zonder leeftijd (defensief; de DB-CHECK verbiedt `age` zonder getal) nog steeds
+    // een leesbare cel — nooit "null" of een leeg vak.
+    expect(rapportAnkerVoortgang('age', null).kop).toBe('Vast stopmoment')
+  })
+
+  it('zegt in de uitleg dat er geen doelvermogen is, en wat er wél telt', () => {
+    for (const [anchor, age] of [['now', null], ['aow', null], ['age', 58.5]] as const) {
+      const { uitleg } = rapportAnkerVoortgang(anchor, age)
+      expect(uitleg).toContain('geen doelvermogen')
+      expect(uitleg).toContain('hoe ver je plan reikt')
+      // Toon-invariant van deze module: beschrijvend, nooit aansporend.
+      expect(uitleg).not.toMatch(/je kunt (nu )?(al )?stoppen|je moet|oneindig/i)
+    }
+  })
+
+  it('noemt "AOW" alleen als instellingslabel — nooit in een tekortzin', () => {
+    // Zelfde uitzondering als `planCoverageKaartSubregel`: dit is het LABEL van een
+    // gekozen stopmoment, niet een uitspraak over een tekort.
+    expect(rapportAnkerVoortgang('aow', null).uitleg).toContain('je AOW-leeftijd')
+    expect(rapportAnkerVoortgang('age', 58.5).uitleg).not.toMatch(/\bAOW\b/i)
+    expect(rapportAnkerVoortgang('now', null).uitleg).not.toMatch(/\bAOW\b/i)
   })
 })
 

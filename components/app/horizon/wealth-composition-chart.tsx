@@ -23,6 +23,35 @@ const PAD_BASE = { top: 16, right: 16, bottom: 28, left: 60 }
 
 const ALL_GROUPS: WealthGroup[] = ['spaargeld', 'beleggingen', 'pensioen', 'vastgoed', 'overig']
 
+/**
+ * Segmenten van de eigen woning wanneer die BUITEN het doel valt
+ * (woonstrategie 'Uitsluiten'). Het huis blijft staan — het is echt bezit en de
+ * staaf hoort het netto vermogen eerlijk te tonen — maar gedempt, want het telt
+ * niet mee voor het doelbedrag waar de rest van de pagina op staat.
+ */
+const EIGEN_HUIS_SEGMENT = 'eigen-huis'
+const EIGEN_HUIS_HYPOTHEEK_SEGMENT = 'eigen-huis-hypotheek'
+const EIGEN_HUIS_LABEL = 'Eigen huis'
+const EIGEN_HUIS_HYPOTHEEK_LABEL = 'Hypotheek eigen huis'
+/**
+ * Dekking van een gedempt segment. Duidelijk onder de 0,85 van een gewoon
+ * segment, maar niet zo licht dat een smalle jaarstaaf (2–4px op mobiel) tegen
+ * het papier wegvalt — 0,3 haalde de 3:1 van WCAG 1.4.11 (non-text contrast)
+ * niet. De demping is bewust niet de énige drager: legenda en duidingsregel
+ * benoemen 'm ook in woorden.
+ */
+const GEDEMPTE_DEKKING = 0.45
+
+interface BarSegment {
+  /** Stabiele sleutel én `data-wealth-segment`-waarde. */
+  key: string
+  label: string
+  value: number
+  color: string
+  /** Telt niet mee voor het doel → gedempt tekenen. */
+  gedempt?: boolean
+}
+
 // ── Helpers ─────────────────────────────────────────────────
 
 function fmtEuro(val: number): string {
@@ -37,11 +66,15 @@ function fmtEuro(val: number): string {
  * één totaal-segment wanneer de opsplitsing ontbreekt of niet (meer) optelt tot het
  * totaal — bv. na een woonstrategie-injectie die alleen `schulden` bijstelt.
  */
-function debtSegments(row: StackedRow): { key: string; label: string; value: number; color: string }[] {
+function debtSegments(row: StackedRow, dempEigenHuis = false): BarSegment[] {
   const total = Math.abs(row.schulden)
   if (total <= 0) return []
   const parts = DEBT_LAYERS.map(layer => ({
-    key: layer,
+    // Geprefixt: 'overig' bestaat zowel als WealthGroup ('Overig' bezit) als als
+    // DebtLayer ('Overige schulden'). Sinds legenda en tooltip beide reeksen in
+    // één array samenvoegen, zou een kale laagnaam een dubbele React-key geven
+    // bij iedereen met tegelijk overig bezit én een consumptieve schuld.
+    key: `schuld-${layer}`,
     label: DEBT_LAYER_LABELS[layer],
     value: Math.abs(row[DEBT_LAYER_FIELD[layer]] ?? 0),
     color: DEBT_LAYER_COLORS[layer],
@@ -51,7 +84,56 @@ function debtSegments(row: StackedRow): { key: string; label: string; value: num
   if (!heeftOpsplitsing || Math.abs(som - total) > Math.max(4, total * 0.005)) {
     return [{ key: 'schulden', label: DEBT_LAYER_LABEL, value: total, color: DEBT_LAYER_COLOR }]
   }
-  return parts.filter(p => p.value > 0)
+  const zichtbaar: BarSegment[] = parts.filter(p => p.value > 0)
+  // Alleen de hypotheek OP DE EIGEN WONING valt met het huis buiten de FIRE-pot;
+  // een hypotheek op een ander pand telt gewoon mee (`filterAssetsForFire`).
+  const huisHypotheek = dempEigenHuis ? Math.abs(row.schuldEigenHuisHypotheek ?? 0) : 0
+  if (huisHypotheek <= 0) return zichtbaar
+  return zichtbaar.flatMap((p): BarSegment[] => {
+    if (p.key !== 'schuld-hypotheek') return [p]
+    const gedempt = Math.min(huisHypotheek, p.value)
+    const rest = p.value - gedempt
+    return [
+      ...(rest > 0 ? [{ ...p, value: rest }] : []),
+      {
+        key: EIGEN_HUIS_HYPOTHEEK_SEGMENT,
+        label: EIGEN_HUIS_HYPOTHEEK_LABEL,
+        value: gedempt,
+        color: p.color,
+        gedempt: true,
+      },
+    ]
+  })
+}
+
+/**
+ * Bezit-segmenten van één rij, in stapelvolgorde vanaf de nullijn. Splitst de
+ * vastgoedgroep in beleggingsvastgoed (telt mee) en de eigen woning (gedempt)
+ * zodra die buiten het doel valt — de groep `vastgoed` draagt beide, terwijl
+ * 'Uitsluiten' uitsluitend het eigen huis buiten de FIRE-pot zet.
+ */
+function positiveSegments(row: StackedRow, dempEigenHuis = false): BarSegment[] {
+  const huis = dempEigenHuis ? Math.min(Math.max(0, row.vastgoedEigenHuis ?? 0), row.vastgoed) : 0
+  return ALL_GROUPS.flatMap((g): BarSegment[] => {
+    if (g !== 'vastgoed' || huis <= 0) {
+      return row[g] > 0
+        ? [{ key: g, label: WEALTH_GROUP_LABELS[g], value: row[g], color: WEALTH_GROUP_COLORS[g] }]
+        : []
+    }
+    const rest = row.vastgoed - huis
+    return [
+      ...(rest > 0
+        ? [{ key: g, label: WEALTH_GROUP_LABELS[g], value: rest, color: WEALTH_GROUP_COLORS[g] }]
+        : []),
+      {
+        key: EIGEN_HUIS_SEGMENT,
+        label: EIGEN_HUIS_LABEL,
+        value: huis,
+        color: WEALTH_GROUP_COLORS.vastgoed,
+        gedempt: true,
+      },
+    ]
+  })
 }
 
 function pctStr(part: number, total: number): string {
@@ -73,6 +155,7 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
   planningMode = 'fire',
   aowAgeFractional,
   housingSaleAge,
+  homeExcludedFromFire = false,
   eventOverlay,
   onEventClick,
   onClusterOpen,
@@ -99,6 +182,14 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
    * wat zonder marker als "fout" leest.
    */
   housingSaleAge?: number | null
+  /**
+   * Staat de eigen woning BUITEN het doel (woonstrategie 'Uitsluiten',
+   * `hasEigenHuis && isHomeExcludedFromFire`)? Dan blijft het huis in de staaf
+   * staan — het is echt bezit — maar gedempt, samen met de eraan gekoppelde
+   * hypotheek. Consume-only: deze vlag is de al genomen strategie-beslissing,
+   * niet een tweede afleiding.
+   */
+  homeExcludedFromFire?: boolean
   /**
    * Optionele event-markers (levensgebeurtenissen + natuurlijke mijlpalen)
    * die boven of onder de bars worden gerenderd. Wanneer aanwezig vergroot
@@ -328,15 +419,40 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
   const tooltipPositiveTotal = tooltipRow
     ? tooltipRow.spaargeld + tooltipRow.beleggingen + tooltipRow.pensioen + tooltipRow.vastgoed + tooltipRow.overig
     : 0
-  const tooltipItems: { label: string; value: number; color: string }[] = tooltipRow
+  const tooltipItems: { label: string; value: number; color: string; gedempt?: boolean }[] = tooltipRow
     ? [
-        ...ALL_GROUPS
-          .filter(g => tooltipRow[g] > 0)
-          .map(g => ({ label: WEALTH_GROUP_LABELS[g], value: tooltipRow[g], color: WEALTH_GROUP_COLORS[g] })),
-        ...debtSegments(tooltipRow).map(s => ({ label: s.label, value: -s.value, color: s.color })),
+        ...positiveSegments(tooltipRow, homeExcludedFromFire).map(seg => ({
+          label: seg.label,
+          value: seg.value,
+          color: seg.color,
+          gedempt: seg.gedempt,
+        })),
+        ...debtSegments(tooltipRow, homeExcludedFromFire).map(seg => ({
+          label: seg.label,
+          value: -seg.value,
+          color: seg.color,
+          gedempt: seg.gedempt,
+        })),
       ]
     : []
   const tooltipNetWorth = tooltipRow ? tooltipPositiveTotal + tooltipRow.schulden : 0
+
+  // Legenda-segmenten: dezelfde helpers als de staven, zodat een gesplitste
+  // (gedempte) eigen woning nooit naamloos in de grafiek kan staan.
+  const legendaSegmenten: BarSegment[] = [
+    ...new Map(
+      stackedRows.flatMap(r => positiveSegments(r, homeExcludedFromFire)).map(seg => [seg.key, seg]),
+    ).values(),
+    ...new Map(
+      visibleRows.flatMap(r => debtSegments(r, homeExcludedFromFire)).map(seg => [seg.key, seg]),
+    ).values(),
+  ]
+  // Is er daadwerkelijk iets gedempt? Afgeleid uit de GEPRODUCEERDE segmenten,
+  // niet uit de rij-velden: `debtSegments` valt bij een niet-sluitende
+  // opsplitsing terug op één ongedeeld 'schulden'-segment en leest de eigen-huis-
+  // hypotheek dan nooit — de duidingsregel zou daar een demping beloven die niet
+  // op het scherm staat.
+  const heeftGedempteSegmenten = legendaSegmenten.some(seg => seg.gedempt)
 
   return (
     <div ref={ref}>
@@ -410,11 +526,12 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
               {tooltipItems.map(item => (
                 <span
                   key={item.label}
-                  className="inline-flex items-center gap-1.5 text-[10px] text-[var(--ink-2)]"
+                  className="inline-flex items-center gap-1.5 text-[10px]"
+                  style={{ color: item.gedempt ? 'var(--ink-meta)' : 'var(--ink-2)' }}
                 >
                   <span
                     className="inline-block h-2 w-2 rounded-sm shrink-0"
-                    style={{ backgroundColor: item.color }}
+                    style={{ backgroundColor: item.color, opacity: item.gedempt ? GEDEMPTE_DEKKING : 1 }}
                   />
                   <span>{item.label}</span>
                   <span className="font-mono tabular-nums text-[var(--ink-3)]">
@@ -514,9 +631,7 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
           const isHovered = hoveredAge === row.age
 
           // Positive layers stacked upward from zero
-          const layers: { group: WealthGroup; value: number; color: string }[] = ALL_GROUPS
-            .map(g => ({ group: g, value: row[g], color: WEALTH_GROUP_COLORS[g] }))
-            .filter(l => l.value > 0)
+          const layers = positiveSegments(row, homeExcludedFromFire)
 
           let cumY = yZero
           const positiveBars = layers.map(layer => {
@@ -531,7 +646,7 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
 
           // Debt bars (negative, below zero line), gestapeld per schuldsoort
           let debtCumH = 0
-          const debtBars = debtSegments(row).map(seg => {
+          const debtBars = debtSegments(row, homeExcludedFromFire).map(seg => {
             const h = (seg.value / yRange) * innerH
             const bar = { ...seg, offset: debtCumH, height: h }
             debtCumH += h
@@ -548,13 +663,14 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
               {/* Positive stacked bars */}
               {positiveBars.map(bar => (
                 <rect
-                  key={bar.group}
+                  key={bar.key}
+                  data-wealth-segment={bar.key}
                   x={x}
                   y={yZero - (yZero - bar.y) * animProgress}
                   width={barWidth}
                   height={bar.height * animProgress}
                   fill={bar.color}
-                  opacity={isHovered ? 1 : 0.85}
+                  opacity={bar.gedempt ? GEDEMPTE_DEKKING : isHovered ? 1 : 0.85}
                   rx={barWidth > 4 ? 1 : 0}
                   style={{ transition: 'opacity 150ms ease, y 0.8s cubic-bezier(.22,1,.36,1), height 0.8s cubic-bezier(.22,1,.36,1)' }}
                 />
@@ -564,12 +680,13 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
               {debtBars.map(bar => (
                 <rect
                   key={bar.key}
+                  data-wealth-segment={bar.key}
                   x={x}
                   y={yZero + bar.offset * animProgress}
                   width={barWidth}
                   height={bar.height * animProgress}
                   fill={bar.color}
-                  opacity={isHovered ? 1 : 0.85}
+                  opacity={bar.gedempt ? GEDEMPTE_DEKKING : isHovered ? 1 : 0.85}
                   rx={barWidth > 4 ? 1 : 0}
                   style={{ transition: 'opacity 150ms ease, y 0.8s cubic-bezier(.22,1,.36,1), height 0.8s cubic-bezier(.22,1,.36,1)' }}
                 />
@@ -785,34 +902,31 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
 
       {/* Legend */}
       <div className="mt-1.5 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 px-4">
-        {ALL_GROUPS.map(g => {
-          // Only show groups that appear in data
-          const hasData = stackedRows.some(r => r[g] > 0)
-          if (!hasData) return null
-          return (
-            <div key={g} className="flex items-center gap-1.5">
-              <div
-                className="h-2.5 w-2.5 rounded-sm shrink-0"
-                style={{ backgroundColor: WEALTH_GROUP_COLORS[g] }}
-              />
-              <span className="text-[10px] font-medium text-[var(--ink-3)]">
-                {WEALTH_GROUP_LABELS[g]}
-              </span>
-            </div>
-          )
-        })}
-        {[...new Map(visibleRows.flatMap(debtSegments).map(s => [s.key, s])).values()].map(s => (
-          <div key={s.key} className="flex items-center gap-1.5">
+        {legendaSegmenten.map(seg => (
+          <div key={seg.key} className="flex items-center gap-1.5">
             <div
               className="h-2.5 w-2.5 rounded-sm shrink-0"
-              style={{ backgroundColor: s.color }}
+              style={{ backgroundColor: seg.color, opacity: seg.gedempt ? GEDEMPTE_DEKKING : 1 }}
             />
-            <span className="text-[10px] font-medium text-[var(--ink-3)]">
-              {s.label}
+            <span
+              className="text-[10px] font-medium"
+              style={{ color: seg.gedempt ? 'var(--ink-meta)' : 'var(--ink-3)' }}
+            >
+              {seg.label}
             </span>
           </div>
         ))}
       </div>
+      {/* Duiding bij de demping: zonder deze regel leest een lichte band als een
+          renderfout in plaats van als een bewuste uitspraak over het plan. */}
+      {heeftGedempteSegmenten && (
+        <p
+          className="mt-1 px-4 text-center text-[10px] italic text-[var(--ink-meta)]"
+          style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+        >
+          Gedempt = telt niet mee voor je doel — je woont er.
+        </p>
+      )}
     </div>
   )
 })

@@ -415,3 +415,133 @@ describe('WealthCompositionChart — debt layer', () => {
     expect(lines.length).toBeGreaterThan(0) // grid lines + zero line
   })
 })
+
+// ── Bugmelding 18-09-2026 — eigen huis gedempt bij "Uitsluiten" ─────────────
+
+/**
+ * Given een gebruiker met woonstrategie "Uitsluiten" (`exclude_from_fire`),
+ * When de opbouw-grafiek zijn vermogen toont,
+ * Then staat het eigen huis er wél in (het is echt bezit), maar GEDEMPT — het
+ * telt niet mee voor het doelbedrag waar de rest van de pagina op staat.
+ * Beleggingsvastgoed en een hypotheek op een ánder pand tellen wél mee en
+ * blijven dus op volle sterkte.
+ */
+describe('WealthCompositionChart — eigen huis gedempt bij uitgesloten woning', () => {
+  function rowsMetEigenHuis(): StackedRow[] {
+    return [35, 36].map(age => ({
+      age,
+      spaargeld: 20000,
+      beleggingen: 100000,
+      pensioen: 0,
+      vastgoed: 550000,
+      vastgoedEigenHuis: 350000,
+      overig: 0,
+      schulden: -270000,
+      schuldHypotheek: -270000,
+      schuldEigenHuisHypotheek: -180000,
+    }))
+  }
+
+  function segment(container: HTMLElement, naam: string): SVGRectElement | null {
+    return container.querySelector(`rect[data-wealth-segment="${naam}"]`)
+  }
+
+  it('tekent het eigen huis als eigen, gedempt segment binnen de vastgoedband', () => {
+    const { container } = render(
+      <WealthCompositionChart
+        stackedRows={rowsMetEigenHuis()}
+        currentAge={35}
+        endAge={36}
+        homeExcludedFromFire
+      />
+    )
+    const huis = segment(container, 'eigen-huis')
+    const vastgoed = segment(container, 'vastgoed')
+    expect(huis, 'eigen huis krijgt een eigen segment').toBeTruthy()
+    expect(vastgoed, 'het overige vastgoed blijft een eigen segment').toBeTruthy()
+    expect(Number(huis!.getAttribute('opacity'))).toBeLessThan(
+      Number(vastgoed!.getAttribute('opacity')),
+    )
+  })
+
+  it('dempt ook de hypotheek van datzelfde huis, niet de andere hypotheek', () => {
+    const { container } = render(
+      <WealthCompositionChart
+        stackedRows={rowsMetEigenHuis()}
+        currentAge={35}
+        endAge={36}
+        homeExcludedFromFire
+      />
+    )
+    const huisHyp = segment(container, 'eigen-huis-hypotheek')
+    const hyp = segment(container, 'schuld-hypotheek')
+    expect(huisHyp).toBeTruthy()
+    expect(hyp).toBeTruthy()
+    expect(Number(huisHyp!.getAttribute('opacity'))).toBeLessThan(
+      Number(hyp!.getAttribute('opacity')),
+    )
+  })
+
+  it('benoemt de demping in de legenda, zodat het geen renderfout lijkt', () => {
+    render(
+      <WealthCompositionChart
+        stackedRows={rowsMetEigenHuis()}
+        currentAge={35}
+        endAge={36}
+        homeExcludedFromFire
+      />
+    )
+    expect(screen.getByText('Eigen huis'), 'het huis krijgt een eigen legenda-regel').toBeTruthy()
+    expect(screen.getByText('Hypotheek eigen huis')).toBeTruthy()
+    expect(
+      screen.getByText(/telt niet mee voor je doel/i),
+      'de demping wordt geduid, anders leest ze als renderfout',
+    ).toBeTruthy()
+  })
+
+  it('dempt NIETS wanneer de woning gewoon meetelt — de staaf blijft zoals hij was', () => {
+    const { container } = render(
+      <WealthCompositionChart
+        stackedRows={rowsMetEigenHuis()}
+        currentAge={35}
+        endAge={36}
+      />
+    )
+    expect(segment(container, 'eigen-huis'), 'geen apart huis-segment').toBeNull()
+    expect(segment(container, 'eigen-huis-hypotheek')).toBeNull()
+    expect(segment(container, 'vastgoed'), 'één ongedeelde vastgoedband').toBeTruthy()
+  })
+})
+
+/**
+ * Review-bevinding H1 (18-09-2026): sinds legenda en tooltip beide reeksen in
+ * ÉÉN array samenvoegen, kunnen de twee sleutelruimtes botsen — `'overig'`
+ * bestaat zowel als `WealthGroup` ("Overig" bezit) als als `DebtLayer`
+ * ("Overige schulden"). Een gebruiker met een auto én een persoonlijke lening
+ * kreeg dan twee React-children met dezelfde key: geen verkeerd getal, wél een
+ * legenda-regel die bij een re-render kan verdwijnen of verwisselen.
+ */
+describe('WealthCompositionChart — sleutels van bezit en schuld botsen niet', () => {
+  it('geeft overig bezit en overige schulden elk een eigen segment-sleutel', () => {
+    const rows: StackedRow[] = [35, 36].map(age => ({
+      age,
+      spaargeld: 10000,
+      beleggingen: 0,
+      pensioen: 0,
+      vastgoed: 0,
+      overig: 25000,
+      schulden: -8000,
+      schuldHypotheek: 0,
+      schuldOverig: -8000,
+    }))
+    const { container } = render(
+      <WealthCompositionChart stackedRows={rows} currentAge={35} endAge={36} />
+    )
+    const sleutels = [...container.querySelectorAll('rect[data-wealth-segment]')].map(r =>
+      r.getAttribute('data-wealth-segment'),
+    )
+    // Drie soorten segmenten (spaargeld, overig bezit, overige schulden) — en
+    // bezit en schuld dragen elk hun eigen sleutel, geen gedeelde 'overig'.
+    expect([...new Set(sleutels)].sort()).toEqual(['overig', 'schuld-overig', 'spaargeld'])
+  })
+})

@@ -44,8 +44,15 @@ const PROGNOSE_OPPERVLAKKEN = [
   ['components', 'overview', 'mini-networth-chart.tsx'],
 ] as const
 
-/** Het FIRE-doelbedrag, in al zijn benamingen over de vier oppervlakken. */
-const DOELBEDRAG = /value=\{[^}]*(fireTarget|FireTarget|VrijheidDoel|PortfolioAtAow|RequiredPortfolio)/
+/**
+ * Het FIRE-doelbedrag, in al zijn benamingen over de vier oppervlakken.
+ * `dualDoelRegels` is de dubbele doelweergave op /toekomst (incl./excl. eigen
+ * woning, in leesvolgorde van de grondslag) — zonder die term viel de tegel
+ * stilzwijgend buiten de approx-regel toen de tak van propnaam wisselde, wat de
+ * assertie hieronder ("de grendel mag niet leeg draaien") netjes ving.
+ */
+const DOELBEDRAG =
+  /value=\{[^}]*(fireTarget|FireTarget|VrijheidDoel|PortfolioAtAow|RequiredPortfolio|dualDoelRegels)/
 
 /** Een vrijheids-/FIRE-leeftijd die met decimalen wordt getoond. */
 const LEEFTIJD_MET_DECIMALEN = /\b\w*[fF]ire[aA]ge\w*[?!]?\.toFixed\(|\bheroFireAge\.age[?!]?\.toFixed\(/

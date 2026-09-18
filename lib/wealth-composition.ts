@@ -113,6 +113,15 @@ export interface StackedRow {
   pensioen: number
   vastgoed: number
   overig: number
+  /**
+   * Het deel van `vastgoed` dat de EIGEN WONING is (`eigen_huis`); afwezig = geen
+   * eigen woning in deze rij. Bestaat omdat `vastgoed` ook beleggingsvastgoed
+   * (`real_estate`) draagt, terwijl de woonstrategie 'Uitsluiten' uitsluitend het
+   * eigen huis buiten de FIRE-pot zet (`filterAssetsForFire`). Zonder deze
+   * splitsing kan een weergave die het uitgesloten huis wil dempen niet anders
+   * dan de hele band dempen — en daarmee bezit dempen dat wél meetelt.
+   */
+  vastgoedEigenHuis?: number
   /** Negative value representing total outstanding debt */
   schulden: number
   /** Opsplitsing van `schulden` per soort (negatief); afwezig = alleen het totaal bekend. */
@@ -120,6 +129,13 @@ export interface StackedRow {
   schuldOverig?: number
   schuldOpeethypotheek?: number
   schuldTekortLening?: number
+  /**
+   * Het deel van `schuldHypotheek` (negatief) dat aan de eigen woning gekoppeld is;
+   * afwezig = onbekend of niet van toepassing. Tegenhanger van `vastgoedEigenHuis`:
+   * 'Uitsluiten' haalt het huis én zijn gekoppelde hypotheek uit de FIRE-pot, een
+   * hypotheek op een ánder pand blijft meetellen.
+   */
+  schuldEigenHuisHypotheek?: number
   /** Opname uit de opeethypotheek dit jaar (instroom, geen voorraad); afwezig = geen. */
   opeetOpname?: number
 }
@@ -602,11 +618,15 @@ export function deriveWealthCompositionFromSim(
  * @param debtTypeById - schuldsoort per app-debt-id; gezet ⇒ ook de opsplitsing per
  *   schuldsoort. De synthetische kernel-sleutels 'opeethypotheek'/'tekort-lening'
  *   hebben geen id en worden op naam herkend.
+ * @param eigenHuisMortgageIds - debt-ids van de hypotheken op de EIGEN WONING; gezet
+ *   ⇒ ook `schuldEigenHuisHypotheek`. Tegenhanger van `vastgoedEigenHuis`, dat
+ *   altijd wordt gevuld zodra er een `eigen_huis`-bucket is.
  * @returns StackedRow[] — drop-in voor WealthCompositionChart
  */
 export function unifiedRowsToStackedRows(
   rows: UnifiedProjectionRow[],
   debtTypeById?: ReadonlyMap<string, DebtType>,
+  eigenHuisMortgageIds?: ReadonlySet<string>,
 ): StackedRow[] {
   if (!rows.length) return []
 
@@ -626,21 +646,26 @@ export function unifiedRowsToStackedRows(
       overig: 0,
     }
 
+    // Het eigen-huis-deel apart bijhouden — zie `StackedRow.vastgoedEigenHuis`.
+    let eigenHuisValue = 0
     for (const [assetType, bucket] of Object.entries(row.assetBuckets)) {
       if (!bucket) continue
       const group = WEALTH_GROUPS[assetType as AssetType]
       if (group) {
         groupTotals[group] += bucket.endValue
       }
+      if (assetType === 'eigen_huis') eigenHuisValue += bucket.endValue
     }
 
     // ── Aggregate debtBalances to single negative schulden value ──
     let totalDebtBalance = 0
+    let eigenHuisMortgageBalance = 0
     const perLayer: Record<DebtLayer, number> = { hypotheek: 0, overig: 0, opeethypotheek: 0, tekortLening: 0 }
     for (const [key, debt] of Object.entries(row.debtBalances)) {
       if (debt) {
         totalDebtBalance += debt.endBalance
         perLayer[layerOf(key)] += debt.endBalance
+        if (eigenHuisMortgageIds?.has(key)) eigenHuisMortgageBalance += debt.endBalance
       }
     }
 
@@ -653,8 +678,12 @@ export function unifiedRowsToStackedRows(
       overig: Math.round(groupTotals.overig),
       schulden: -Math.round(totalDebtBalance),
     }
+    if (eigenHuisValue > 0) stacked.vastgoedEigenHuis = Math.round(eigenHuisValue)
     if (debtTypeById) {
       for (const layer of DEBT_LAYERS) stacked[DEBT_LAYER_FIELD[layer]] = -Math.round(perLayer[layer])
+    }
+    if (eigenHuisMortgageBalance > 0) {
+      stacked.schuldEigenHuisHypotheek = -Math.round(eigenHuisMortgageBalance)
     }
     if ((row.opeetOpname ?? 0) > 0) stacked.opeetOpname = Math.round(row.opeetOpname!)
     return stacked

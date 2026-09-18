@@ -8,13 +8,14 @@ import { computeNetWorthProjection } from '@/lib/net-worth-projection'
 import { buildCategorySpending, patternsToInsights, detectSeasonalPatterns, detectTrends, detectAnomalies } from '@/lib/spending-patterns'
 import { generateText } from 'ai'
 import { getModel } from '@/lib/ai/config'
-import type { ReportData, ReportConfig, HistoricalPeriodSummary } from '@/lib/report-data'
+import { REPORT_DATA_VERSION, type ReportData, type ReportConfig, type HistoricalPeriodSummary } from '@/lib/report-data'
 import { checkTierGate } from '@/lib/require-tier'
 import { aiSubscriptionRequired } from '@/lib/ai/gate-responses'
 import { resolveFireParams } from '@/lib/fire-params'
 import { yearlyMustExpensesFromBudgets, buildBudgetTypeMap } from '@/lib/budget-utils'
 import { buildBudgetSpendingMap, spentForBudget, budgetBarPct } from '@/lib/budget-spending'
 import { computeFreedomProgressWithBasis, inclHomeTargetFromScalar } from '@/lib/core-metrics'
+import { isFixedAnchor, resolveFirePlanWithOverride } from '@/lib/fire-strategy'
 import { resolveSavingsSource, savingsRateFromAggregates, computeDebtAflossingMonthly } from '@/lib/savings-source'
 import { resolveAmountWithBasis } from '@/lib/effective-financials'
 import { loadBudgetBasis } from '@/lib/household/budget-share'
@@ -189,16 +190,30 @@ export async function GET(request: Request) {
         .single()
       if (config?.cached_data) {
         const cached = config.cached_data as ReportData
-        // De keuze "zonder AI-inleiding" geldt óók voor een editie die uit de
-        // cache komt. Zonder deze correctie zou een rapport dat ooit mét
-        // inleiding is gegenereerd die alinea alsnog tonen aan iemand die nu
-        // expliciet zonder AI vraagt — of aan iemand die inmiddels in
-        // privé-modus zit of geen AI-abonnement meer heeft. Er wordt niets
-        // opnieuw gegenereerd; alleen de alinea gaat eruit.
-        if (!useAi && cached.aiIntroduction) {
-          return Response.json({ ...cached, aiIntroduction: null, useAi: false })
+        // VERSIEPOORT — vóór elke correctie-op-leesmoment hieronder. Een gecachte
+        // editie is een volledig gegenereerd rapport; wijzigt de BETEKENIS van een
+        // getal (niet de opmaak), dan is die editie fout en valt ze hier door naar
+        // hergeneratie. Zonder deze poort bereikt zo'n fix de bestaande rijen nooit:
+        // de cache wordt hier geserveerd vóórdat het profiel — en dus het stop-anker —
+        // überhaupt is opgehaald, en er is nergens invalidatie. Gemeten 18-09-2026:
+        // 16 van de 18 `report_configs` op productie droegen een cache, de oudste uit
+        // februari 2026. Een `undefined` versie is per definitie ouder dan 2.
+        // LET OP: hergeneratie kan een AI-inleiding aanroepen. Dat pad is al
+        // getierd/gegated (kill-switch, abonnement, privé-modus) en gedraagt zich
+        // exact als een eerste generatie van dit rapport — er is alleen éénmalig per
+        // verouderde editie extra werk.
+        if (cached.version === REPORT_DATA_VERSION) {
+          // De keuze "zonder AI-inleiding" geldt óók voor een editie die uit de
+          // cache komt. Zonder deze correctie zou een rapport dat ooit mét
+          // inleiding is gegenereerd die alinea alsnog tonen aan iemand die nu
+          // expliciet zonder AI vraagt — of aan iemand die inmiddels in
+          // privé-modus zit of geen AI-abonnement meer heeft. Er wordt niets
+          // opnieuw gegenereerd; alleen de alinea gaat eruit.
+          if (!useAi && cached.aiIntroduction) {
+            return Response.json({ ...cached, aiIntroduction: null, useAi: false })
+          }
+          return Response.json(cached)
         }
-        return Response.json(cached)
       }
     }
 
@@ -253,7 +268,10 @@ export async function GET(request: Request) {
         .select('id, name, goal_type, target_value, current_value, is_completed'),
       supabase
         .from('profiles')
-        .select('full_name, date_of_birth, expected_return, inflation_rate, box3_method, net_monthly_income, estimated_monthly_expenses, income_source, expenses_source, housing_strategy_config')
+        // De vier plan-kolommen + `feature_preferences` komen erbij voor het STOP-ANKER
+        // (ADR 0129 D2): zonder die kolommen leest elk plan hier als `solved` en zou het
+        // rapport onder een vast stopmoment een kapitaalratio afdrukken die daar niets meet.
+        .select('full_name, date_of_birth, expected_return, inflation_rate, box3_method, net_monthly_income, estimated_monthly_expenses, income_source, expenses_source, housing_strategy_config, fire_end_strategy, fire_end_age, fire_legacy_amount, fire_stop_anchor, fire_stop_age, feature_preferences')
         .single(),
       // Grondslag-selectie (ADR 0103), apart gehouden: `cashflow_basis_prefs`
       // bestaat pas na migratie 20260811160000 en zou als extra kolom hierboven
@@ -418,7 +436,17 @@ export async function GET(request: Request) {
     // rapport laadt geen unified projection).
     const homeExcludedFromFire = housingContext.hasEigenHuis && isHomeExcludedFromFire(housingStrategy)
     const requiredPortfolioExclHome = fireTarget > 0 ? fireTarget : null
-    const firePercentage = fireTarget > 0
+    // ADR 0129 B3/D5 — onder een VAST stopmoment-anker (aow/now/age) is het
+    // vrijheids-% niet de kapitaalratio maar de DEKKING van het plan: er ís daar
+    // geen doelvermogen (D4), de "noemer" zou de geprojecteerde stand op het anker
+    // zelf zijn en de ratio komt dan per constructie op ~100 % uit. Dit rapport
+    // draait geen kernel-run (het kent alleen het scalar-fireTarget) en kán de
+    // dekking dus niet meten ⇒ `null` = "onbekend", precies zoals het rapport dat
+    // al doet zonder doelbedrag. Liever geen getal dan een getal dat iets anders
+    // meet dan het kopje belooft — /toekomst zei op ditzelfde plan "Je bent vrij".
+    const firePlan = resolveFirePlanWithOverride(profile ?? {})
+    const anchorFixed = isFixedAnchor(firePlan)
+    const firePercentage = fireTarget > 0 && !anchorFixed
       ? Math.round(computeFreedomProgressWithBasis({
           homeExcludedFromFire,
           netWorthInclHome: currentNetWorth,
@@ -607,7 +635,22 @@ export async function GET(request: Request) {
     let fireStart: ReportData['horizon']['fireStart'] = null
     let fireEnd: ReportData['horizon']['fireEnd'] = null
 
-    if (firstSnapshot && fireTarget > 0) {
+    // ADR 0129 B3/D4/D5 — dezelfde anker-regel als `firePercentage` hierboven, en om
+    // dezelfde reden: onder een VAST stopmoment bestaat er geen doelvermogen, dus meet
+    // `netWorth / fireTarget` niets en is "Doel: € X" (het label in horizon-column) een
+    // bedrag dat het plan niet kent. De eerste correctie raakte alleen
+    // `kern.firePercentage`; dit blok voedt de zichtbaarste KPI van de rapportpagina
+    // (de figures-strip "FIRE-voortgang X% · +Y% deze periode") en stond daar
+    // ongeguard naast een vergelijkingstabel die al "—" toonde.
+    //
+    // KEUZE: WEGLATEN, niet "vervangen door de dekking". De dekking is een
+    // kernel-grootheid (`computeRunwayCoveragePct` op een volle projectie); dit rapport
+    // draait bewust geen kernel-run — het kent alleen het scalar-`fireTarget` en
+    // snapshots. Een dekking hier zou een tweede motor introduceren, precies wat
+    // "consume, don't recompute" verbiedt. De weergavelaag leest `stopAnchor` en zegt
+    // wát er in de plaats komt, zodat de pagina niet naar "0 %" of een lege balk
+    // degradeert.
+    if (firstSnapshot && fireTarget > 0 && !anchorFixed) {
       const startNw = Number(firstSnapshot.net_worth)
       fireStart = {
         percentage: Math.round(Math.min((startNw / fireTarget) * 100, 100) * 10) / 10,
@@ -615,7 +658,7 @@ export async function GET(request: Request) {
         fireTarget: Math.round(fireTarget),
       }
     }
-    if (lastSnapshot && fireTarget > 0) {
+    if (lastSnapshot && fireTarget > 0 && !anchorFixed) {
       const endNw = Number(lastSnapshot.net_worth)
       fireEnd = {
         percentage: Math.round(Math.min((endNw / fireTarget) * 100, 100) * 10) / 10,
@@ -816,7 +859,10 @@ export async function GET(request: Request) {
         histExpenses = Math.round(histExpenses)
         const histSaved = histIncome - histExpenses + Math.round(histSavingsBudgetSpent)
         const histSavingsRate = histIncome > 0 ? Math.round((histSaved / histIncome) * 1000) / 10 : null
-        const histFirePct = fireTarget > 0 && histNetWorthEnd != null
+        // Zelfde anker-regel als het actuele percentage hierboven: onder een vast
+        // stopmoment meet een kapitaalratio niet wat de kolom belooft, en een
+        // vergelijkingstabel met "—" nu en percentages toen leest als een terugval.
+        const histFirePct = fireTarget > 0 && !anchorFixed && histNetWorthEnd != null
           ? Math.round(Math.min((histNetWorthEnd / fireTarget) * 100, 100) * 10) / 10
           : null
 
@@ -866,6 +912,7 @@ Schrijf in het Nederlands, persoonlijk en bemoedigend. Gebruik de filosofie "gel
     // ── BUILD RESPONSE ──
 
     const reportData: ReportData = {
+      version: REPORT_DATA_VERSION,
       reportId: crypto.randomUUID(),
       reportName: formatPeriodName(periodType, dateFrom, dateTo),
       periodType: periodType as ReportData['periodType'],
@@ -908,6 +955,8 @@ Schrijf in het Nederlands, persoonlijk en bemoedigend. Gebruik de filosofie "gel
       },
 
       horizon: {
+        stopAnchor: firePlan.anchor.kind,
+        stopAge: firePlan.anchor.kind === 'age' ? firePlan.anchor.age : null,
         fireStart,
         fireEnd,
         fireProgressDelta,
