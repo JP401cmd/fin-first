@@ -9,9 +9,9 @@ import { pushReportToNotion, type UserReportRow } from '@/lib/user-reports/notio
  * POST `/api/user-reports` — meldingen van testgebruikers (bug/vraag/wens).
  *
  * Supabase-first: het screenshot gaat als eerste naar de privé bucket, daarna
- * legt `public.reserve_user_report_slot` de melding vast (rem + insert in één
- * atomaire stap) en daarna pas volgt — best effort — het Notion-kaartje. Zo is
- * een melding nooit kwijt als Notion hapert.
+ * legt `public.reserve_user_report_slot` de melding vast en daarna pas volgt —
+ * best effort — het Notion-kaartje. Zo is een melding nooit kwijt als Notion
+ * hapert.
  *
  * Body is multipart FormData:
  *   - `payload`    JSON-string met de tekstvelden (schema hieronder)
@@ -33,13 +33,17 @@ const ALLOWED_MIME: Record<string, string> = {
 }
 
 /**
- * De rem (5 meldingen per rollend uur) staat NIET meer hier maar in
- * `public.reserve_user_report_slot` (migratie 20260806161500). Bewust: de vorige
- * count-dan-insert was een TOCTOU én volledig te omzeilen door rechtstreeks via
- * PostgREST in te voegen. De RPC telt en voegt in onder één advisory lock, en de
- * eigen-rij INSERT-policy is opgeheven zodat er geen pad omheen meer bestaat.
- * De limiet is geen parameter van de RPC — anders zou een directe aanroep hem
- * kunnen oprekken. Hij komt terug als `slot_limit` voor logging.
+ * Er is GEEN rem meer op melden (ADR 0159, migratie 20260918210000). De rem van
+ * 5 meldingen per rollend uur zat in `public.reserve_user_report_slot` en is
+ * daar geschrapt: in een gesloten beta is een dichte meldknop duurder dan het
+ * misbruik dat de rem tegenhield. `slot_allowed` is sindsdien altijd `true` en
+ * `slot_used`/`slot_limit` zijn `0` ("geen rem").
+ *
+ * De 429-tak hieronder blijft bewust staan als vangrail: de RPC is en blijft de
+ * gezaghebbende partij, dus als een correctiemigratie de rem ooit herstelt,
+ * handelt deze route dat af zonder wijziging. Wat WEL bleef: de RPC is het enige
+ * insert-pad (de eigen-rij INSERT-policy is sinds 20260806161500 opgeheven) en
+ * zet `user_id`/`email` zelf uit de sessie, zodat niemand op andermans naam meldt.
  */
 
 /**
@@ -236,11 +240,10 @@ export async function POST(request: Request) {
       }
     }
 
-    // 4. Reserveren én invoegen in één atomaire stap. De rem van 5 per rollend
-    //    uur zit ín deze RPC (advisory lock op de melder), dus N gelijktijdige
-    //    verzoeken kunnen samen nooit meer dan de limiet doorlaten — de vorige
-    //    count-dan-insert liet dat wél toe. `user_id` en `email` komen daar uit
-    //    de sessie resp. `auth.users`, dus die sturen we bewust NIET mee.
+    // 4. Invoegen via de RPC — het enige insert-pad op `user_reports`, want de
+    //    eigen-rij INSERT-policy is opgeheven. `user_id` en `email` komen daar
+    //    uit de sessie resp. `auth.users`, dus die sturen we bewust NIET mee.
+    //    Remmen doet ze sinds ADR 0159 niet meer.
     const { data: slots, error: slotError } = await supabase.rpc('reserve_user_report_slot', {
       p_id: reportId,
       p_report_type: body.type,
@@ -271,9 +274,11 @@ export async function POST(request: Request) {
       )
     }
 
+    // Onbereikbaar zolang de rem vervallen is (ADR 0159) — bewust behouden, zie
+    // de kop: de RPC blijft de gezaghebbende partij over wie er mag melden.
     if (!slot.slot_allowed) {
       console.warn(
-        `[user-reports:POST] throttle geweigerd voor ${user.id}: ${slot.slot_used}/${slot.slot_limit} in het laatste uur`,
+        `[user-reports:POST] throttle geweigerd voor ${user.id}: ${slot.slot_used}/${slot.slot_limit}`,
       )
       return errorResponse(
         'Je hebt al veel meldingen gestuurd. Probeer het over een uur nog eens.',

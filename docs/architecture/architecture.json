@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-09-17T21:34:25.684Z",
-  "generatedDate": "2026-09-17",
+  "generatedAt": "2026-09-18T19:20:44.522Z",
+  "generatedDate": "2026-09-18",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -193,9 +193,9 @@
     "routesProduction": 90,
     "api": 326,
     "tables": 102,
-    "migrations": 253,
+    "migrations": 254,
     "integrations": 25,
-    "components": 1141,
+    "components": 1143,
     "providers": 19,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -8597,7 +8597,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 253
+    "migrationCount": 254
   },
   "tablesByDomain": [
     {
@@ -9143,7 +9143,7 @@
     }
   ],
   "components": {
-    "total": 1141,
+    "total": 1143,
     "groups": [
       {
         "group": "app",
@@ -9615,7 +9615,7 @@
       },
       {
         "group": "overview",
-        "count": 199,
+        "count": 200,
         "items": [
           "aandachtspunt-actie-button",
           "atomic-cards",
@@ -9684,6 +9684,7 @@
           "checkin-banner",
           "checkin-banner.test",
           "eenvoudig-pill-list",
+          "eenvoudig-pill-list.leningdelen.test",
           "embedded-page-info.test",
           "empty-states",
           "empty-states.test",
@@ -9924,7 +9925,7 @@
       },
       {
         "group": "core",
-        "count": 82,
+        "count": 83,
         "items": [
           "account-source-icon",
           "account-source-icon.test",
@@ -9969,6 +9970,7 @@
           "crypto-transactions-log",
           "debt-category-page",
           "debt-detail-sheet",
+          "debt-leningdeel-groep",
           "debt-payoff-strategy",
           "equity-buildup-bar",
           "fire-progress-strip",
@@ -18342,6 +18344,19 @@
       ],
       "summary": "Vult het gat dat ADR 0156 openliet en begrenst de uitzondering op ADR 0069.",
       "file": "docs/adr/0158-de-eerste-ophaal-gebeurt-op-het-homescherm.md"
+    },
+    {
+      "id": "0159-de-meldingenrem-vervalt",
+      "title": "De rem van 5 meldingen per uur vervalt — in de testfase is een dichte meldknop duurder dan misbruik",
+      "status": "aanvaard",
+      "date": "2026-09-18",
+      "elements": [
+        "as-coach",
+        "do-melding",
+        "t-supabase"
+      ],
+      "summary": "Melden vanuit het gesprek met Fin kende een rem van 5 meldingen per rollend uur per gebruiker, afgedwongen in `public.reserve_user_report_slot`. Die rem raakte in de praktijk de verkeerde persoon: iemand die een scherm systematisch naloopt, loopt er halverwege tegenaan en krijgt ",
+      "file": "docs/adr/0159-de-meldingenrem-vervalt.md"
     }
   ],
   "churn": {
@@ -18391,13 +18406,13 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 10652,
+        "loc": 10768,
         "commits": 92
       },
       {
         "file": "components/app/budgets-client.tsx",
         "loc": 5661,
-        "commits": 32
+        "commits": 33
       },
       {
         "file": "components/core/assets-client.tsx",
@@ -20038,6 +20053,13 @@
       "date": "2026-09-17",
       "api": 326,
       "components": 1141,
+      "tables": 102,
+      "routesProduction": 90
+    },
+    {
+      "date": "2026-09-18",
+      "api": 326,
+      "components": 1143,
       "tables": 102,
       "routesProduction": 90
     }

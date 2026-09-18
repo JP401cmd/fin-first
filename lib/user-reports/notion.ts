@@ -223,8 +223,9 @@ export function sequenceLabel(type: UserReportType, sequence: number | null): st
  *
  * Grenzen, eerlijk benoemd:
  *   - twee meldingen van dezelfde soort in exact dezelfde microseconde krijgen
- *     hetzelfde nummer. Bij dit volume (een handvol per dag, en de melder zit
- *     op een rem van 5 per uur) is dat theorie;
+ *     hetzelfde nummer. Bij dit volume (een handvol per dag) is dat theorie —
+ *     let wel: sinds ADR 0159 remt niets het meldtempo nog af, dus "theorie"
+ *     leunt nu volledig op het volume en niet meer op een limiet;
  *   - het nummer wordt bepaald op het moment van het kaartje. Een melding die
  *     pas later alsnog een kaartje krijgt, schuift dus niet mee — dat is juist
  *     de bedoeling: een nummer op een kaartje verandert nooit meer.
@@ -551,9 +552,10 @@ export type PushReportResult =
  * Korte, servergerichte fouttekst voor `notion_last_error`.
  *
  * LET OP — dit veld is NIET onzichtbaar voor de melder. De eigen-rij
- * SELECT-policy op `user_reports` (nodig voor de throttle-telling) maakt élke
- * kolom van de eigen rij leesbaar, dus ook deze. Het uit onze eigen kolomlijst
- * weglaten zou daar niets aan veranderen — dat is de reden dat we het commentaar
+ * SELECT-policy op `user_reports` (de melder leest zijn eigen meldingen terug;
+ * tot ADR 0159 droeg diezelfde policy ook de inmiddels vervallen throttle-
+ * telling) maakt élke kolom van de eigen rij leesbaar, dus ook deze. Het uit
+ * onze eigen kolomlijst weglaten zou daar niets aan veranderen — dat is de reden dat we het commentaar
  * corrigeren in plaats van het veld te verstoppen; verstoppen zou schijnzekerheid
  * zijn.
  *

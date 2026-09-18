@@ -5,7 +5,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
  *   - 401 zonder ingelogde gebruiker
  *   - 400-matrix: payload onleesbaar/ontbrekend, zod-validatie, screenshot-regels
  *   - validatiefouten zijn NEDERLANDS — nooit een rauwe zod-tekst
- *   - 429 wanneer de reserveer-RPC de rem laat afgaan
+ *   - 429 wanneer de RPC een melding weigert (vangrail; de rem zelf is vervallen)
  *   - happy path per type (bug/vraag/aanbeveling): juiste RPC-argumenten, {ok,id}
  *   - Notion-push faalt → response toch 200 (kernbelofte: de melding is nooit kwijt)
  *   - nooit een rauwe error.message in de response-body
@@ -333,8 +333,14 @@ describe('POST /api/user-reports — validatiefouten zijn Nederlands', () => {
   })
 })
 
-describe('POST /api/user-reports — throttle (429)', () => {
-  it('RPC weigert (rem bereikt) → 429 met de Nederlandse tekst', async () => {
+/**
+ * De rem zelf is vervallen (ADR 0159) — de RPC weigert in productie niet meer.
+ * Deze blok test dus geen live gedrag maar de VANGRAIL: de route blijft een
+ * weigering van de RPC netjes afhandelen, zodat een correctiemigratie die de
+ * rem herstelt geen route-wijziging nodig heeft.
+ */
+describe('POST /api/user-reports — weigering door de RPC (429-vangrail)', () => {
+  it('RPC weigert → 429 met de Nederlandse tekst', async () => {
     cfg.slotAllowed = false
     const req = makeRequest(basePayload())
     const res = await POST(req)

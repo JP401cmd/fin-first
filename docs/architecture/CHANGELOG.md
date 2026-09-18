@@ -1103,3 +1103,7 @@
 ## 2026-09-17
 
 - **Componenten (aantal)** toegevoegd: +2
+
+## 2026-09-18
+
+- **Componenten (aantal)** toegevoegd: +2

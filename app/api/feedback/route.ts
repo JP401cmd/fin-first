@@ -4,8 +4,8 @@ import { gone } from '@/lib/api/respond'
  * POST /api/feedback — GESLOTEN (ADR 0096).
  *
  * Melden loopt sinds 9 aug 2026 uitsluitend via de meldmodus in het gesprek
- * met Fin (`POST /api/user-reports`): zod-validatie, 5 meldingen per rollend
- * uur, optioneel scherm, en doorstroom naar de werkqueue. Dit endpoint schreef
+ * met Fin (`POST /api/user-reports`): zod-validatie, optioneel scherm, en
+ * doorstroom naar de werkqueue. Dit endpoint schreef
  * naar de tabel `feedback` — een tweede inbox die niemand structureel las.
  *
  * De route blijft bestaan en antwoordt bewust met **410 Gone** in plaats van
