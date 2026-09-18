@@ -54,6 +54,7 @@ import { kernelToUnifiedResult, buildKernelSlotMeta, type KernelHousingSale } fr
 import { DEFAULT_FIRE_STRATEGY } from '@/lib/fire-strategy'
 import { DEFAULT_DOWNSIZE_CONFIG } from '@/lib/housing-strategy'
 import { computeLaagsteBuffer, type LaagsteBuffer } from '@/lib/horizon/laagste-buffer'
+import { solveHaalbareUitgave, type HaalbareUitgave } from '@/lib/horizon/haalbare-uitgave'
 
 // ── Preset-definitie-bedragen (scenario-config, GEEN financiële aanname) ─────
 // Dit zijn de "wat test deze mockup-kaart"-bedragen, geen SWR/rendement/inflatie.
@@ -719,6 +720,13 @@ export interface ScenarioPresetBatch {
    * `solved`/kern-fout. Zie `SolvedWithoutAnchor.eindleeftijd`.
    */
   readonly solvedFireEndAge: number | null
+  /**
+   * De uitgave na pensioen waarbij het plan precies tot de eindleeftijd reikt (spec
+   * 2026-09-18). `null` onder `solved`, zonder uitgave-grondslag of bij een tekort dat
+   * al vóór het stopmoment zit. Meereizend in DEZE batch om dezelfde reden als
+   * `solvedFireAge` (ADR 0129 D7): anders start elk oppervlak zijn eigen bisectie.
+   */
+  readonly haalbareUitgave: HaalbareUitgave | null
 }
 
 /**
@@ -734,5 +742,6 @@ export function runScenarioPresetBatch(ctx: ScenarioPresetContext): ScenarioPres
     presets: runScenarioPresets(ctx),
     solvedFireAge: solved?.fireAge ?? null,
     solvedFireEndAge: solved?.eindleeftijd ?? null,
+    haalbareUitgave: solveHaalbareUitgave(ctx),
   }
 }
