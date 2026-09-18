@@ -93,21 +93,41 @@ export function solveHaalbareUitgave(ctx: HaalbareUitgaveContext): HaalbareUitga
 
 ### Recept
 
-Letterlijk het patroon van `solveWithoutAnchor` (`lib/horizon/scenario-presets.ts`): bouw
-de `KernelInput` één keer met `buildKernelInputFromApp` op dezelfde context als de
-hoofdrun, en varieer daarna **één veld**. Geen tweede profiel-assemblage, geen
-gespiegelde profielrij — dat is precies waar een tweede waarheid ontstaat.
+Het patroon van `solveWithoutAnchor` (`lib/horizon/scenario-presets.ts`): dezelfde
+context als de hoofdrun, en per iteratie één ding anders. Geen gespiegelde profielrij, geen
+tweede assemblageweg.
 
-Het veld is `input.inkomenUitgaven.uitgaveNaPensioenPerJaar`
-(`lib/horizon-kernel/adapter/params.ts#buildInkomenUitgaven`).
+**Waar de variatie ingrijpt — correctie op de eerste lezing.** `solveWithoutAnchor` mag
+`{ ...input, stopAnker: undefined }` doen omdat `stopAnker` geen afgeleide buren heeft.
+`uitgaveNaPensioenPerJaar` heeft die wél: `buildInkomenUitgaven` leidt bij actieve
+flex-spending óók `flexNiceFractiePerJaar` uit datzelfde bedrag af
+(`deriveNiceFractie(uitgaveNaPensioenPerJaar, yearlyEssential)`,
+`lib/horizon-kernel/adapter/params.ts`). Alléén het bedrag verlagen zou de must/nice-split
+stil scheeftrekken: de nice-fractie blijft dan op de oude stand staan en daarmee schuift
+het *must*-deel mee omlaag, terwijl essentiële uitgaven per definitie niet meebewegen.
+
+Daarom bisecteren we op de **rauwe profielrij** en bouwen we de `KernelInput` per
+iteratie opnieuw:
+
+```ts
+const patched = { ...ctx.profile,
+  retirement_expense_method: 'custom_amount',
+  retirement_expense_custom_amount: E }
+```
+
+`ConvergentieRawProfileRow` draagt beide kolommen al, dus `buildKernelInputFromApp`
+herleidt alles consistent — inclusief de nice-fractie. Twee winstpunten bovenop de
+correctheid: dit is **exact hetzelfde mechanisme als de nieuwe draaiknop** (onderdeel 3),
+dus het beloofde getal en wat de slider daadwerkelijk doorrekent zijn dezelfde run; en
+`buildKernelInputFromApp` is O(bezittingen + gebeurtenissen), verwaarloosbaar naast de
+projectie van ~800 maanden die er per iteratie toch al loopt.
 
 ```
 if (input.stopAnker === undefined) return null      // geen vast anker → geen vraag
 huidig = input.inkomenUitgaven.uitgaveNaPensioenPerJaar
 if (!(huidig > 0)) return null                       // geen grondslag om tegen af te zetten
 
-gedekt(E) = isGedekt(solveFire({ ...input, inkomenUitgaven: { ...input.inkomenUitgaven,
-                                 uitgaveNaPensioenPerJaar: E } }))
+gedekt(E) = isGedekt(solveFire(buildKernelInputFromApp(metUitgave(ctx, E))))
 
 if (!gedekt(0))        return null                   // ook zonder uitgaven niet dekkend
 hoog = 3 × huidig
