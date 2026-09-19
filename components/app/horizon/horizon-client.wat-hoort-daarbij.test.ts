@@ -77,7 +77,11 @@ describe('horizon-client — "Wat hoort daarbij?" blijft binnen de Wft-grens', (
     // Eén "Wat hoort daarbij?"-kicker: de plan-variant bestaat niet meer.
     expect(src.split('>Wat hoort daarbij?</p>').length - 1).toBe(1)
     // Spec antwoorden-naast-sliders: de antwoorden staan onder hun knop, met één sluitregel.
-    expect(src).toContain('antwoorden={labAntwoordenPerKnop.sliders}')
+    // `whatIfSliderAntwoorden` is de samenvoeging van `labAntwoordenPerKnop.sliders` +
+    // de vierde-knop-sleutel (spec 2026-09-18, fix-ronde 2) — de render-prop wijst dus
+    // niet rechtstreeks naar `labAntwoordenPerKnop` meer, maar de memo zelf nog wel.
+    expect(src).toContain('antwoorden={whatIfSliderAntwoorden}')
+    expect(src).toMatch(/const whatIfSliderAntwoorden = useMemo\(\s*\(\) => \(\{\s*\.\.\.labAntwoordenPerKnop\.sliders,/)
     expect(src).toContain('data-testid="lab-antwoorden-sluitregel"')
   })
 

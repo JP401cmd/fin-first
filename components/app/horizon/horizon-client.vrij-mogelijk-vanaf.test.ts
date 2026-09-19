@@ -28,7 +28,10 @@ function presetEffect(): string {
 describe('preset-batch onder een vast anker wacht niet op scrollen', () => {
   it('de gate is een benoemde afleiding: vast anker OF (volledig + duiding in beeld)', () => {
     expect(src).toContain("const presetBatchNodig = isFixedAnchorMode || (displayMode === 'full' && duidingInView)")
-    expect(presetEffect()).toContain('if (!presetBatchNodig) { setScenarioPresets(null); setScenarioPresetsLoading(false); return }')
+    // Spec 2026-09-18 (fix-ronde 1) — deze tak ruimt de VOLLEDIGE preset-stand op, niet
+    // alleen de kaarten: `haalbareUitgave` is sindsdien onderdeel van diezelfde batch-
+    // uitkomst en moet hier dus net zo goed vervallen als de gate wegvalt.
+    expect(presetEffect()).toContain('if (!presetBatchNodig) { setScenarioPresets(null); setScenarioPresetsLoading(false); setHaalbareUitgave(null); return }')
     expect(src).not.toContain("if (displayMode !== 'full' || !duidingInView) {")
   })
 

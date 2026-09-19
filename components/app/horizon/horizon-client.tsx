@@ -3730,6 +3730,18 @@ export default function HorizonPage({
     () => labAntwoordenPerSlider(isNuStoppenMode ? [] : labAntwoorden, (actie) => handleLabAntwoord(actie), { masked }),
     [isNuStoppenMode, labAntwoorden, handleLabAntwoord, masked],
   )
+  // `labAntwoordenPerSlider` levert de vierde knop onder het veld `uitgave` (spec
+  // antwoorden-naast-sliders); `WhatIfSliders` verwacht 'm onder de eigen `antwoorden`-
+  // sleutel `uitgave_na_pensioen` (spec 2026-09-18). Eén samenvoegpunt hier — niet in de
+  // JSX — zodat de seam-mapping op dezelfde plek woont als de rest van de lab-antwoorden-
+  // afleiding, en de render-prop weer één benoemde expressie is.
+  const whatIfSliderAntwoorden = useMemo(
+    () => ({
+      ...labAntwoordenPerKnop.sliders,
+      ...(labAntwoordenPerKnop.uitgave ? { uitgave_na_pensioen: labAntwoordenPerKnop.uitgave } : {}),
+    }),
+    [labAntwoordenPerKnop],
+  )
   // Aanzetten van de koppeling legt de HUIDIGE marge vast; uitzetten laat de stop staan.
   const handleStopKoppelChange = useCallback(
     (v: boolean) => {
@@ -7506,12 +7518,7 @@ export default function HorizonPage({
                             events={scenarioSliderEvents}
                             setEvents={handleScenarioSliderEvents}
                             currentAge={currentAge}
-                            antwoorden={{
-                              ...labAntwoordenPerKnop.sliders,
-                              ...(labAntwoordenPerKnop.uitgave
-                                ? { uitgave_na_pensioen: labAntwoordenPerKnop.uitgave }
-                                : {}),
-                            }}
+                            antwoorden={whatIfSliderAntwoorden}
                             uitgaveNaPensioen={
                               haalbareUitgave
                                 ? {

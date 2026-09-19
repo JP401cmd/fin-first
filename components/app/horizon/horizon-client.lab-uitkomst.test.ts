@@ -126,7 +126,12 @@ describe('horizon-client consumeert ÉÉN lab-uitkomst (ADR 0145)', () => {
     expect(code.match(/handleLabAntwoord\(/g) ?? []).toHaveLength(1)
     expect(code).not.toMatch(/\.knop\??\.onClick\(\)/)
     // elk antwoord bij zijn knop; het losse blok met kop is weg, één sluitregel blijft
-    expect(src).toContain('antwoorden={labAntwoordenPerKnop.sliders}')
+    // `whatIfSliderAntwoorden` is de samenvoeging van `labAntwoordenPerKnop.sliders` +
+    // de vierde-knop-sleutel (spec 2026-09-18, fix-ronde 2): de render-prop wijst niet
+    // meer rechtstreeks naar `labAntwoordenPerKnop`, maar de memo zelf nog altijd wel —
+    // dus beide kanten van de seam blijven gepind.
+    expect(src).toContain('antwoorden={whatIfSliderAntwoorden}')
+    expect(src).toMatch(/const whatIfSliderAntwoorden = useMemo\(\s*\(\) => \(\{\s*\.\.\.labAntwoordenPerKnop\.sliders,/)
     expect(src).toContain('stopAntwoord={labAntwoordenPerKnop.stop}')
     expect(src).not.toContain('data-testid="lab-antwoorden"')
     expect(src).not.toContain('Wat maakt het haalbaar?')
