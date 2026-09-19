@@ -216,7 +216,13 @@ import { WhatIfMarketAssumptions } from '@/components/app/horizon/whatif-market-
 import { DoelLoslatenConfirm } from '@/components/future/doel-loslaten-confirm'
 import { StopPlanConfirm } from '@/components/app/horizon/stop-plan-confirm'
 import { planDraftFromSettings, planDraftToFireSettingsBody, validatePlanDraft } from '@/lib/horizon/plan-draft'
-import { applySliderEvent, buildSliderEvent, readSliderValueFromEvents, type SliderKey } from '@/lib/scenario-events'
+import {
+  applySliderEvent,
+  buildSliderEvent,
+  readSliderValueFromEvents,
+  UITGAVE_NA_PENSIOEN_STAP,
+  type SliderKey,
+} from '@/lib/scenario-events'
 import type { HorizonScenarioOverrides } from '@/lib/hooks/use-horizon-fire-sim'
 import type { AssetCategorie } from '@/lib/horizon-kernel/types'
 import { runMarktcheckAsync, runScenarioPresetsAsync } from '@/lib/horizon-kernel/worker/run-in-worker'
@@ -5350,11 +5356,31 @@ export default function HorizonPage({
   const retirementExpenseGuard = guardRetirementExpense(input?.yearlyMustExpenses ?? null)
   const showRetirementExpenseNotice = !hasPerspectiveHero && !retirementExpenseGuard.ok
 
-  /** De regel onder het bedrag in de KPI-tegel "Na pensioen"; null = niets te melden. */
-  const haalbareUitgaveRegel = haalbareUitgave ? haalbaarBijUitgaveRegel(haalbareUitgave, masked) : null
+  /**
+   * De regel onder het bedrag in de KPI-tegel "Na pensioen"; null = niets te melden.
+   * F2b (eindreview 19 sep) — onder 'nu stoppen' zet `labAntwoordenPerKnop` het
+   * antwoord onder de vierde knop al op `[]` (bestaande ADR 0145-regel); zonder
+   * dezelfde uitzondering hier zou de tegelregel wél verschijnen terwijl het antwoord
+   * eronder verdwijnt — de twee helften van AC-6 (mede-aanwezigheid) die uit elkaar
+   * vallen. Of deze hefboom onder 'nu stoppen' juist wél relevant is, ligt apart bij
+   * de eigenaar — dit is alleen de symmetrie-fix.
+   */
+  const haalbareUitgaveRegel =
+    !isNuStoppenMode && haalbareUitgave ? haalbaarBijUitgaveRegel(haalbareUitgave, masked) : null
   /** Donkerrood = minder moeten uitgeven, donkergroen = meer mogen. Semantische tokens. */
   const haalbareUitgaveToon =
     haalbareUitgave?.richting === 'minder' ? 'text-negative' : 'text-positive'
+  /**
+   * De grondslag voor de vierde draaiknop, ONAFHANKELIJK van of er een opgelost
+   * antwoord is (F3, eindreview 19 sep). Onder een `solved`-anker bestaat
+   * `haalbareUitgave` niet (geen vast stopmoment om tegen te solven), maar de spec
+   * ("Uit scope → plannen zonder vast stopmoment") eist dat de knop dan als
+   * VERKENNING bruikbaar blijft — alleen de tegelregel en het antwoord eronder
+   * blijven weg. Bij een vast anker is `haalbareUitgave.huidigPerJaar` de precieze
+   * grondslag (herleid via de nice-fractie-aware profielrij); zonder anker valt hij
+   * terug op dezelfde ruwe grondslag als `retirementExpenseGuard` hierboven.
+   */
+  const uitgaveNaPensioenBasis = haalbareUitgave?.huidigPerJaar ?? input?.yearlyMustExpenses ?? 0
 
   const hasNoDob = !effectiveInput?.dateOfBirth
   const fireNotReachable = effectiveCountdown.fireDate === 'Niet haalbaar'
@@ -7520,13 +7546,25 @@ export default function HorizonPage({
                             currentAge={currentAge}
                             antwoorden={whatIfSliderAntwoorden}
                             uitgaveNaPensioen={
-                              haalbareUitgave
+                              // F2a (eindreview 19 sep) — huishoud-/partnerweergave heeft
+                              // een ander "uitgave na pensioen"-getal (perspectiveHero.
+                              // retirementExpense, huishouden) dan deze knop (eigen); dat
+                              // is precies de grondslagvermenging die de spec uitsluit.
+                              !hasPerspectiveHero && uitgaveNaPensioenBasis > 0
                                 ? {
-                                    waarde: scenarioUitgaveNaPensioen ?? haalbareUitgave.huidigPerJaar,
-                                    basis: haalbareUitgave.huidigPerJaar,
+                                    waarde: scenarioUitgaveNaPensioen ?? uitgaveNaPensioenBasis,
+                                    basis: uitgaveNaPensioenBasis,
+                                    // F1 (eindreview 19 sep) — de bereikbare sliderstanden
+                                    // liggen op een € 600-raster vanaf een afgerond minimum
+                                    // (uitgaveNaPensioenRange); de neutrale stand (basis)
+                                    // ligt daar meestal niet exact op. Exacte gelijkheid
+                                    // liet de override dan nooit meer op `null` vallen, ook
+                                    // niet na "terugslepen" — vandaar een halve-stap-marge.
                                     onChange: (v: number) =>
                                       setScenarioUitgaveNaPensioen(
-                                        v === haalbareUitgave.huidigPerJaar ? null : v,
+                                        Math.abs(v - uitgaveNaPensioenBasis) < UITGAVE_NA_PENSIOEN_STAP / 2
+                                          ? null
+                                          : v,
                                       ),
                                   }
                                 : undefined

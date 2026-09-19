@@ -27,7 +27,7 @@ import {
   buildConvergentieAdapterProfile,
   type ConvergentieRawProfileRow,
 } from '@/lib/horizon-kernel/convergentie-router'
-import { buildKernelInputFromApp, type KernelAdapterPartner } from '@/lib/horizon-kernel/adapter'
+import { buildKernelInputFromApp } from '@/lib/horizon-kernel/adapter'
 import { solveFire, type SolverStatus } from '@/lib/horizon-kernel/solver'
 import { UITGAVE_NA_PENSIOEN_STAP } from '@/lib/scenario-events'
 
@@ -74,8 +74,6 @@ export interface HaalbareUitgaveContext {
   debts: readonly Debt[]
   lifeEvents: readonly LifeEvent[]
   aowRows?: readonly AowLeeftijdRow[]
-  /** TPR-07 — partnerblok van de hoofdrun (huishoudperspectief); afwezig ⇒ solo. */
-  partner?: KernelAdapterPartner
 }
 
 /** De KernelInput van deze context, met (optioneel) een afgedwongen uitgave na pensioen. */
@@ -88,13 +86,17 @@ function inputMet(ctx: HaalbareUitgaveContext, bedrag: number | null) {
           retirement_expense_method: 'custom_amount',
           retirement_expense_custom_amount: bedrag,
         }
+  // F6 (eindreview 19 sep) — géén partnerblok: `ScenarioPresetContext`, de enige
+  // productie-aanroeper, draagt geen `partner`-veld. Komt er ooit een
+  // huishoud-variant van deze solve, dan is dat een bewuste toevoeging mét een
+  // besluit (ADR 0160 draagt het security-argument "ScenarioPresetContext draagt
+  // geen partnerblok" al) — niet een stille superset-doorgifte zoals hiervoor.
   return buildKernelInputFromApp({
     profile: buildConvergentieAdapterProfile(profile),
     assets: ctx.assets,
     debts: ctx.debts,
     lifeEvents: ctx.lifeEvents,
     aowRows: ctx.aowRows,
-    ...(ctx.partner ? { partner: ctx.partner } : {}),
   })
 }
 
@@ -138,8 +140,11 @@ export function solveHaalbareUitgave(ctx: HaalbareUitgaveContext): HaalbareUitga
     if (!nul.ok) return null
     const eindleeftijd = nul.eindleeftijd
 
-    // Bovengrens. Dekt 3× ook nog, dan klemmen we daar — de slider-tekst meldt dat het
-    // bedrag boven het bereik ligt; de regel doet geen belofte over de klem.
+    // Bovengrens. Dekt 3× ook nog, dan klemmen we daar (richting = 'meer') en doen we
+    // geen verdere uitspraak — noch de tegelregel, noch de slider-`bovenBereik`-tekst
+    // noemt de klem (ADR 0160 besluit 4: `bovenBereik` is voor deze hefboom altijd
+    // `false`; `uitgaveNaPensioenRange` verbreedt de sliderband zelf naar de gezette
+    // stand, dus er is niets om "boven het bereik" te melden).
     const hoogBedrag = huidig * BOVENGRENS_FACTOR
     if (dekking(ctx, hoogBedrag).ok) return maak(Math.floor(hoogBedrag), huidig, eindleeftijd)
 
@@ -150,7 +155,11 @@ export function solveHaalbareUitgave(ctx: HaalbareUitgaveContext): HaalbareUitga
       if (dekking(ctx, mid).ok) laag = mid
       else hoog = mid
     }
-    const gevonden = Math.floor(laag)
+    // Afronden op de bisectie-precisie, niet op de hele euro (F5, eindreview 19 sep):
+    // `laag` is een bisectie-middelpunt en komt er zonder deze afronding als bv.
+    // € 31.236 uit — schijnprecisie op een antwoord met € 50 tolerantie. Naar
+    // beneden afronden (nooit naar boven) blijft binnen het gedekte gebied.
+    const gevonden = Math.floor(laag / PRECISIE) * PRECISIE
 
     // Monotonie-vangrail. De dekking hóórt monotoon af te nemen in de uitgave; is dat
     // door een discontinuïteit (woningverkoop, potregel) niet zo, dan zegt dit getal

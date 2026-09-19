@@ -37,7 +37,12 @@ export type LabAntwoordActie =
 export interface LabAntwoord {
   readonly kind: 'doorwerken' | 'extra_opzij' | 'minder_uitgeven' | 'uitgave_na_pensioen'
   readonly zin: string
-  /** Het bedrag ligt boven het slider-bereik; de actie zet het maximum (spec §3). */
+  /**
+   * Het bedrag ligt boven het slider-bereik; de actie zet het maximum (spec §3).
+   * Uitzondering: voor `kind: 'uitgave_na_pensioen'` is dit altijd `false` (ADR 0160
+   * besluit 4) — die hefboom klemt nooit, `uitgaveNaPensioenRange` verbreedt de band
+   * zelf naar de gezette stand.
+   */
   readonly bovenBereik: boolean
   readonly actie: LabAntwoordActie
 }

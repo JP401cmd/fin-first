@@ -88,11 +88,13 @@ die de adapter al kent.
 1. **Bovengrens van de bisectie = 3× de huidige uitgave
    (`BOVENGRENS_FACTOR`).** Een praktische klem, geen gemeten grens. Dekt het
    plan ook bij 3× de huidige uitgave, dan klemmen we daar (`richting =
-   'meer'`) en doen we geen verdere uitspraak — de regel in de tegel noemt de
-   klem niet, de slider-`bovenBereik`-tekst wel. Alternatief overwogen: klemmen
-   op het netto jaarinkomen — niet gekozen, want dat veld ontbreekt op een
-   deel van de profielen (bv. `income_source` niet 'manual') en zou de klem
-   zelf een tweede afhankelijkheid geven.
+   'meer'`) en doen we geen verdere uitspraak — noch de regel in de tegel,
+   noch de slider-`bovenBereik`-tekst noemt de klem (zie besluit 4: die vlag
+   is voor deze hefboom altijd `false`, want `uitgaveNaPensioenRange`
+   verbreedt de sliderband zelf naar de gezette stand). Alternatief overwogen:
+   klemmen op het netto jaarinkomen — niet gekozen, want dat veld ontbreekt op
+   een deel van de profielen (bv. `income_source` niet 'manual') en zou de
+   klem zelf een tweede afhankelijkheid geven.
 2. **Drempel € 250/jaar (`HAALBARE_UITGAVE_DREMPEL`).** Onder dit verschil is
    `richting === 'gelijk'` en verschijnt er geen regel. Gespiegeld aan de
    bestaande "toon de delta alleen bij |Δ| ≥ € 500"-regel van de
@@ -159,15 +161,16 @@ die de adapter al kent.
   niet in. Een opgeslagen of gedeeld scenario draagt de vierde-hefboom-stand
   dus niet terug — alleen de drie bestaande knoppen (die wél events zijn)
   reizen mee.
-- **Huishoud-/partnerweergave: bewuste asymmetrie, nog een open punt.** De
-  tegelregel verbergt zich in partner-/huishoudweergave (`!hasPerspectiveHero`)
-  — de solve rekent op de eigen kernel-invoer, en die naast het
-  huishoudbedrag in de tegel zetten zou twee grondslagen mengen. De
-  antwoordregel onder de vierde knop volgt dat perspectief-gedrag **niet** en
-  blijft zichtbaar. Dat is een bewuste keuze (de knop is een verkenning op de
-  eigen invoer, ongeacht welk bedrag de tegel ernaast toont) maar staat als
-  open punt voor visuele controle: een lezer die de tegel zonder regel ziet
-  en de knop mét antwoord eronder kan dat als inconsistent ervaren.
+- **Huishoud-/partnerweergave: opgelost (eindreview F2a, 19 sep 2026).** Deze
+  ADR beschreef eerder een bewuste asymmetrie: de tegelregel verbergt zich in
+  partner-/huishoudweergave (`!hasPerspectiveHero`), de knop + antwoordregel
+  niet. Bij nader inzien was dat exact de grondslagvermenging die dit besluit
+  elders uitsluit — de tegel toonde dan `perspectiveHero.retirementExpense`
+  (huishouden) terwijl de knop zijn "nu"-inkeping en basis op `huidigPerJaar`
+  (eigen) zette, twee verschillende "uitgave na pensioen"-getallen een paar
+  secties uit elkaar. De `uitgaveNaPensioen`-prop (`horizon-client.tsx`) gaat
+  nu ook alleen mee als `!hasPerspectiveHero`: de knop bestaat, net als de
+  tegelregel, alleen in de eigen weergave.
 - **Bij een niet-monotone dekking geeft de solve `null` in plaats van een
   getal** — geen regel, geen antwoord, in plaats van een bedrag dat de
   belofte "dit dekt, één stap hoger niet meer" niet waarmaakt.
