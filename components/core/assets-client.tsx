@@ -3536,7 +3536,14 @@ export function AssetForm({
     const numCurrentValue = parseAmountInput(currentValue)
     const numPurchaseValue = purchaseValue ? parseAmountInput(purchaseValue) : 0
     const numMonthlyContribution = monthlyContribution ? parseAmountInput(monthlyContribution) : 0
-    const numExpectedReturn = expectedReturn ? parseAmountInput(expectedReturn, 'allow-negative') : 0
+    // Bewust ZONDER falsy-guard, anders dan de drie regels hierboven. Die
+    // guards zetten een leeg OPTIONEEL veld op 0 ("niets ingevuld = niets"),
+    // en dat klopt daar. Voor het rendement klopt het sinds ADR 0166 niet
+    // meer: `0` is daar een BEWUSTE 0% en `null` betekent "geen eigen aanname".
+    // Een lege string is falsy, dus de oude `expectedReturn ? … : 0` liet het
+    // leegste geval als 0 door de invoerfout-tak hieronder glippen — precies
+    // het onderscheid dat deze release invoert.
+    const numExpectedReturn = parseAmountInput(expectedReturn, 'allow-negative')
     const numDepreciationRate = depreciationRate ? Number(depreciationRate) : 0
 
     const errors: Partial<Record<AssetFieldKey, string>> = {}

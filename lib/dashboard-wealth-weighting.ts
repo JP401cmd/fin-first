@@ -110,7 +110,7 @@ export interface AssetTypeGroup {
  * @param terugvalRendementPct Profielrendement in PROCENTEN
  *   (`resolveFireParams(profile).grossReturn × 100`) als terugval voor een
  *   bezitting ZONDER eigen rendementsaanname (`expected_return = null`, ADR
- *   0165) — keuze (a): dezelfde ketting als `potRendement` in de kernel, zodat
+ *   0166) — keuze (a): dezelfde ketting als `potRendement` in de kernel, zodat
  *   de vermogensverdeling op /overzicht niet 0% weegt waar /toekomst het
  *   profielrendement rekent. Weggelaten → 0 (oude nul-basis; bestaande
  *   callers/tests byte-identiek). Een ingevulde 0 blijft een bewuste 0%.

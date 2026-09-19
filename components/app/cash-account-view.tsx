@@ -75,6 +75,8 @@ import {
   resolveKeuzeWaarde,
   type AssetRendementKeuze,
 } from '@/lib/asset-return-keuze'
+import { parseAmountInput } from '@/lib/amount-input'
+import { assetReturnBandError } from '@/lib/asset-parameter-bands'
 
 // Aantal rijen dat de transactielijst per keer toont; "Toon meer" voegt telkens
 // een pagina toe. Houdt de DOM klein bij een zware maand (100-400 rijen).
@@ -3531,6 +3533,12 @@ function AssetEditForm({
     keuzeUitWaarde(asset.expected_return),
   )
   const [expectedReturn, setExpectedReturn] = useState(String(asset.expected_return ?? 0))
+  /**
+   * Invoerfout op het rendementsveld. Bewust een eigen melding en niet de
+   * generieke `saveError`: die komt pas terug van de server, terwijl dit een
+   * fout is die het scherm zelf ziet en die bij het veld hoort te staan.
+   */
+  const [rendementFout, setRendementFout] = useState<string | null>(null)
   const [visibility, setVisibility] = useState<PartnerVisibility>(() =>
     normalizePartnerVisibility(
       (account as { partner_visibility?: string | null }).partner_visibility,
@@ -3616,16 +3624,37 @@ function AssetEditForm({
           type="number"
           step="0.1"
           value={expectedReturn}
-          onChange={(e) => setExpectedReturn(e.target.value)}
+          onChange={(e) => {
+            setExpectedReturn(e.target.value)
+            setRendementFout(null)
+          }}
           disabled={rendementKeuze === 'profiel'}
           className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2.5 text-sm font-mono tabular-nums disabled:opacity-50"
           placeholder="0"
+          // Het bijschrift ernaast is een losse `<label>` zonder koppeling: zonder
+          // deze naam heeft het veld geen toegankelijke naam.
+          aria-label="Verwacht rendement (% p.j.)"
         />
+        {rendementFout && (
+          <p
+            role="alert"
+            data-testid="account-rendement-error"
+            className="mt-1 text-[11px] leading-snug text-negative"
+          >
+            {rendementFout}
+          </p>
+        )}
+        {/* "Geen eigen rendement" is een EXPLICIETE keuze, nooit een leeg veld
+            (ADR 0166) — vandaar dat het aanvinken de invoerfout opheft en het
+            leegmaken van het veld dat juist níet doet. */}
         <label className="mt-2 flex items-start gap-2 text-[11px] leading-snug text-[var(--ink-2)]">
           <input
             type="checkbox"
             checked={rendementKeuze === 'profiel'}
-            onChange={(e) => setRendementKeuze(e.target.checked ? 'profiel' : 'eigen')}
+            onChange={(e) => {
+              setRendementKeuze(e.target.checked ? 'profiel' : 'eigen')
+              if (e.target.checked) setRendementFout(null)
+            }}
             className="mt-0.5 h-4 w-4 shrink-0 accent-kern-600"
           />
           <span>{ASSET_RENDEMENT_KEUZE_KOPIJ.profiel.keuze}</span>
@@ -3712,11 +3741,29 @@ function AssetEditForm({
           Annuleren
         </button>
         <button
-          onClick={() => onSave({
-            name,
-            expected_return: resolveKeuzeWaarde(rendementKeuze, Number(expectedReturn) || 0),
-            partner_visibility: visibility,
-          })}
+          onClick={() => {
+            // Spiegelt het bezittingenformulier (components/core/assets-client.tsx):
+            // eerst lezen met `parseAmountInput` — `null` = "niet als getal te
+            // lezen", nadrukkelijk iets anders dan 0 — en dat onder de keuze
+            // 'eigen' als INVOERFOUT behandelen. De oude `Number(x) || 0` maakte
+            // van een leeggemaakt veld stil een bewuste 0%, precies het
+            // onderscheid dat ADR 0166 invoert. Negatief mag blijven: de
+            // DB-band laat het toe en de keuze is de gebruiker zijn.
+            const numExpectedReturn = parseAmountInput(expectedReturn, 'allow-negative')
+            if (rendementKeuze === 'eigen' && numExpectedReturn === null) {
+              // De companion-rij van een bankrekening is altijd `asset_type: 'cash'`;
+              // daarom hier hard die band, zodat de tekst gelijk is aan die van
+              // hetzelfde veld in het bezittingenformulier.
+              setRendementFout(assetReturnBandError('cash'))
+              return
+            }
+            setRendementFout(null)
+            onSave({
+              name,
+              expected_return: resolveKeuzeWaarde(rendementKeuze, numExpectedReturn),
+              partner_visibility: visibility,
+            })
+          }}
           disabled={saving || !name.trim()}
           className="inline-flex items-center gap-2 rounded-[var(--r)] bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
         >

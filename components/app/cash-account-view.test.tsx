@@ -1064,3 +1064,75 @@ describe('CashAccountView — Escape geeft de host weer vrij (M35-restdefect)', 
     await waitFor(() => expect(meldingen.at(-1)).toBe(false))
   })
 })
+
+/**
+ * Een leeg rendementsveld onder de keuze "ik vul zelf een rendement in" mag
+ * geen BEWUSTE 0% worden.
+ *
+ * Tot ADR 0166 was `assets.expected_return` `NOT NULL DEFAULT 0`; een
+ * `Number(veld) || 0` bij het opslaan was toen onschuldig. Sinds die migratie
+ * dragen `null` ("geen eigen aanname — reken met mijn profielrendement") en `0`
+ * ("dit groeit niet") tegengestelde betekenissen, en is een stille nul precies
+ * het onderscheid dat deze release invoert weer ongedaan maken. Het
+ * bezittingenformulier (`components/core/assets-client.tsx`) behandelt een
+ * onleesbaar veld onder 'eigen' daarom als INVOERFOUT; dit scherm hoort zich
+ * identiek te gedragen — twee formulieren voor hetzelfde veld met verschillende
+ * uitkomsten is hoe een gebruiker twee mentale modellen van één getal krijgt.
+ */
+describe('CashAccountView — leeg rendementsveld is een invoerfout, geen stille 0% (ADR 0166)', () => {
+  async function openBewerkscherm() {
+    fireEvent.click(await screen.findByTitle('Instellingen'))
+    fireEvent.click(await screen.findByText('Rekening bewerken'))
+  }
+
+  it('blokkeert opslaan met een melding wanneer het rendementsveld leeg is onder "eigen"', async () => {
+    setupEnv()
+    render(<CashAccountView accountId="acc-1" />)
+
+    await screen.findByRole('heading', { name: 'Betaalrekening' })
+    await openBewerkscherm()
+
+    const veld = await screen.findByLabelText('Verwacht rendement (% p.j.)')
+    fireEvent.change(veld, { target: { value: '' } })
+    fireEvent.click(await screen.findByRole('button', { name: 'Opslaan' }))
+
+    // 1. De gebruiker ziet wát er mis is.
+    expect(await screen.findByTestId('account-rendement-error')).toBeInTheDocument()
+
+    // 2. En er is niets opgeslagen — geen PATCH op de rekening, geen
+    //    client-directe update op `assets` met een verzonnen 0.
+    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>
+    expect(
+      fetchMock.mock.calls.some(([url]) => String(url) === '/api/bank-accounts/acc-1'),
+    ).toBe(false)
+    expect(mutationLog.filter((m) => m.table === 'assets')).toHaveLength(0)
+  })
+
+  it('slaat wél op zodra er weer een getal staat', async () => {
+    setupEnv()
+    render(<CashAccountView accountId="acc-1" />)
+
+    await screen.findByRole('heading', { name: 'Betaalrekening' })
+    await openBewerkscherm()
+
+    const veld = await screen.findByLabelText('Verwacht rendement (% p.j.)')
+    fireEvent.change(veld, { target: { value: '' } })
+    fireEvent.click(await screen.findByRole('button', { name: 'Opslaan' }))
+    await screen.findByTestId('account-rendement-error')
+
+    // Punt, geen komma: het veld is `type="number"`, en jsdom (net als de
+    // browser) weigert een komma daar en laat de waarde leeg — dan zou deze
+    // test het foutpad opnieuw meten in plaats van het succespad.
+    fireEvent.change(veld, { target: { value: '2.5' } })
+    fireEvent.click(await screen.findByRole('button', { name: 'Opslaan' }))
+
+    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.some(([url]) => String(url) === '/api/bank-accounts/acc-1'),
+      ).toBe(true),
+    )
+    // De melding verdwijnt zodra de invoer weer leesbaar is.
+    expect(screen.queryByTestId('account-rendement-error')).not.toBeInTheDocument()
+  })
+})
