@@ -49,7 +49,7 @@ const ARTICLE: LocalNewsSource = {
 }
 
 describe('LOCAL_NEWS_DNA — budget en invarianten', () => {
-  it('blijft binnen het gecondenseerde budget van 500-650 tokens', () => {
+  it('blijft binnen het gecondenseerde budget van 500-675 tokens', () => {
     // Krap: bij oplevering 442, na de parity-ronde van sep 2026 610. De band is
     // toen bewust opgehoogd (niet stilzwijgend gerekt) omdat er drie regels uit
     // de cloud-DNA bij kwamen: jaartal/tarief/drempel in de getallenregel, het
@@ -58,9 +58,19 @@ describe('LOCAL_NEWS_DNA — budget en invarianten', () => {
     // 700; deze test houdt de marge daaronder zichtbaar. Zonder deze test
     // verdampt de meting bij de eerstvolgende woordwijziging en groeit het DNA
     // stil het venster uit.
+    //
+    // 650 -> 675 (parity-ronde emoji-verbod, sep 2026). Zelfde afweging als de
+    // vorige ophoging, en om dezelfde reden expliciet: er kwam één regel uit
+    // base.ts bij (het aangescherpte emoji-verbod mét vervanging) waarmee het
+    // artefact op 647 uitkwam — drie tokens onder het oude plafond. Die marge is
+    // geen bewijs van zuinigheid maar een valkuil: de eerstvolgende woordkeuze
+    // breekt 'm, en de reflex is dan de band rekken in plaats van de afweging
+    // maken. Daarom nu één keer bewust opgehoogd, met 25 tokens werkruimte en
+    // nog altijd 25 tokens speling tot het sub-budget van 700 — dát blijft de
+    // harde poort.
     const tokens = estimateTokens(LOCAL_NEWS_DNA)
     expect(tokens).toBeGreaterThanOrEqual(500)
-    expect(tokens).toBeLessThanOrEqual(650)
+    expect(tokens).toBeLessThanOrEqual(675)
   })
 
   it('draagt de Wft-kernclausule van LOCAL_CHAT_DNA én de nieuws-eigen aanscherping', () => {

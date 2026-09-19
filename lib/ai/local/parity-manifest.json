@@ -1,15 +1,15 @@
 {
-  "generatedAt": "2026-09-07T16:29:38.925Z",
+  "generatedAt": "2026-09-18T23:01:20.865Z",
   "dnaSubBudget": 2000,
-  "dnaEstimatedTokens": 890,
+  "dnaEstimatedTokens": 999,
   "sources": [
     {
       "file": "lib/ai/dna/base.ts",
-      "sha256": "ef73346d82b0a3f3a97deac0077f5c7f76ae11297eee1b1ba1cd91d9e68a7ddf"
+      "sha256": "9017440685c29e80f1ca0ef3fef55a804d9d791880272d78373aaac70972f62f"
     },
     {
       "file": "lib/ai/dna/wil.ts",
-      "sha256": "db0a1336f20b520e46d320bc45eacefc81f994ccce54fd29cc8823fd39d3aa8f"
+      "sha256": "b3c376de2f17c43e845bdf8b0c517f96767a9ce0a9dc7296887e29f909112d90"
     }
   ],
   "artefacts": [
@@ -19,15 +19,15 @@
       "constant": "LOCAL_CHAT_DNA",
       "file": "lib/ai/local/local-chat-prompt.ts",
       "subBudget": 2000,
-      "estimatedTokens": 890,
+      "estimatedTokens": 999,
       "sources": [
         {
           "file": "lib/ai/dna/base.ts",
-          "sha256": "ef73346d82b0a3f3a97deac0077f5c7f76ae11297eee1b1ba1cd91d9e68a7ddf"
+          "sha256": "9017440685c29e80f1ca0ef3fef55a804d9d791880272d78373aaac70972f62f"
         },
         {
           "file": "lib/ai/dna/wil.ts",
-          "sha256": "db0a1336f20b520e46d320bc45eacefc81f994ccce54fd29cc8823fd39d3aa8f"
+          "sha256": "b3c376de2f17c43e845bdf8b0c517f96767a9ce0a9dc7296887e29f909112d90"
         }
       ]
     },
@@ -37,7 +37,7 @@
       "constant": "LOCAL_BRIEFING_DNA",
       "file": "lib/ai/local/local-briefing-prompt.ts",
       "subBudget": 600,
-      "estimatedTokens": 321,
+      "estimatedTokens": 368,
       "sources": [
         {
           "file": "lib/briefing/redactie.ts",
@@ -45,7 +45,7 @@
         },
         {
           "file": "lib/ai/dna/base.ts",
-          "sha256": "ef73346d82b0a3f3a97deac0077f5c7f76ae11297eee1b1ba1cd91d9e68a7ddf"
+          "sha256": "9017440685c29e80f1ca0ef3fef55a804d9d791880272d78373aaac70972f62f"
         }
       ]
     },
@@ -55,11 +55,11 @@
       "constant": "LOCAL_REPORT_DNA",
       "file": "lib/ai/local/local-report-prompt.ts",
       "subBudget": 800,
-      "estimatedTokens": 405,
+      "estimatedTokens": 452,
       "sources": [
         {
           "file": "lib/ai/dna/base.ts",
-          "sha256": "ef73346d82b0a3f3a97deac0077f5c7f76ae11297eee1b1ba1cd91d9e68a7ddf"
+          "sha256": "9017440685c29e80f1ca0ef3fef55a804d9d791880272d78373aaac70972f62f"
         }
       ]
     },
@@ -69,15 +69,15 @@
       "constant": "LOCAL_RECOMMENDATIONS_DNA",
       "file": "lib/ai/local/local-recommendations-prompt.ts",
       "subBudget": 1000,
-      "estimatedTokens": 828,
+      "estimatedTokens": 874,
       "sources": [
         {
           "file": "lib/ai/dna/recommendations.ts",
-          "sha256": "3bb8423b6d9ae4b2de44dc13005bd489594ca4f11274fd0d0642ed74458e6787"
+          "sha256": "7d7751a4615f7375491433950f5b19331695249de1ba1788c168e583131d364d"
         },
         {
           "file": "lib/ai/dna/base.ts",
-          "sha256": "ef73346d82b0a3f3a97deac0077f5c7f76ae11297eee1b1ba1cd91d9e68a7ddf"
+          "sha256": "9017440685c29e80f1ca0ef3fef55a804d9d791880272d78373aaac70972f62f"
         }
       ]
     },
@@ -87,7 +87,7 @@
       "constant": "LOCAL_NEWS_DNA",
       "file": "lib/ai/local/local-news-prompt.ts",
       "subBudget": 700,
-      "estimatedTokens": 610,
+      "estimatedTokens": 647,
       "sources": [
         {
           "file": "lib/news-system-prompt.ts",
@@ -95,7 +95,7 @@
         },
         {
           "file": "lib/ai/dna/base.ts",
-          "sha256": "ef73346d82b0a3f3a97deac0077f5c7f76ae11297eee1b1ba1cd91d9e68a7ddf"
+          "sha256": "9017440685c29e80f1ca0ef3fef55a804d9d791880272d78373aaac70972f62f"
         }
       ]
     },
@@ -109,7 +109,7 @@
       "sources": [
         {
           "file": "lib/ai/build-calculator.ts",
-          "sha256": "0af083c73cb07f55c37a3e8cdaf434ab8e7f169f56a7793d88d6a8f4e3a67f77"
+          "sha256": "d3205abb179438338014a8773202521d61524697c4ff635afadc00876dc4d7fd"
         }
       ]
     },

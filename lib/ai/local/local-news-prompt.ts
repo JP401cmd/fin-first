@@ -35,7 +35,7 @@
 // De bronartikelen komen wél van buiten (RSS), dus die worden GEFENCED — zelfde
 // K1-redenering als de kennisinjectie in local-chat-prompt.ts.
 //
-// PARITY sep 2026 — drie regels uit base.ts overgenomen, allemaal omdat dit een
+// PARITY sep 2026 — vier regels uit base.ts overgenomen, allemaal omdat dit een
 // PUBLIEKSGERICHTE tekst is over keuzes met geld. (1) Nul zelfbedachte cijfers
 // bij een algemene fiscale of pensioenregel: de post-hoc guard beschermt alleen
 // de IMPACT-regel, dus een verzonnen "vanaf 2027 geldt 36%" in de andere regels
@@ -45,10 +45,22 @@
 // het bestaande blok verbood al het AANZETTEN tot handelen, maar niet het
 // OORDELEN ("sparen is nu beter dan beleggen") — precies de zin die rente- en
 // spaarnieuws uitlokt. (3) De vaktermregel: rente-, pensioen- en fiscaal nieuws
-// zit vol jargon en de lezer is een leek. NIET overgenomen: de 150-woordengrens
-// (de passes leveren vaste, korte regels) en de eerste-alinea-adviesgrens (het
+// zit vol jargon en de lezer is een leek. (4) Het AANGESCHERPTE emoji-verbod
+// (a378ce7cc): pictogrammen erbij, expliciet óók als afsluiter na een uitroep,
+// mét de vervanging (enthousiasme in de woorden, status in woorden). Dat de
+// vervanging erbij staat is het werkzame deel — een kaal verbod hield in de
+// meting van 6 sep niet stand. Het weegt hier zwaarder dan in de chat: de
+// emoji-uitvoerfilter draait ALLEEN op de cloud-chatroute, dus op dit pad is de
+// promptregel de enige verdediging.
+// NIET overgenomen: de 150-woordengrens
+// (de passes leveren vaste, korte regels), de eerste-alinea-adviesgrens (het
 // model krijgt hier nooit een vraag en schrijft geen alinea's; de grens wordt
-// gehandhaafd door wat er niet in mag staan, niet door een disclaimer-zin).
+// gehandhaafd door wat er niet in mag staan, niet door een disclaimer-zin) en —
+// als enige van de vier lokale artefacten — de ∞-uitzondering op het
+// emoji-verbod. Dat is beredeneerd, niet budgettair: ∞ kan hier niet in de
+// invoer landen. Het profiel rendert het dagtarief als euro-bedrag (`euro()`,
+// niet `formatWithFreedom`) en het bronartikel is externe RSS-tekst. Een
+// uitzondering licentieert een teken; licentieer 'm niet waar hij niet hoort.
 //
 // BUDGET: LOCAL_NEWS_DNA ~500-650 tokens (meetmethode chars/4, zie
 // scripts/ai-parity/scan.mjs; sub-budget in het manifest is 700). De
@@ -103,7 +115,7 @@ COMPLIANCE (Nederlandse wet, Wft): je geeft NOOIT individueel beleggingsadvies �
 
 BRON: schrijf alleen wat in het bronartikel staat; voeg niets toe. Noem NOOIT een link, webadres, bronnaam, onderwerp-label of datum — de app zet die er zelf bij.
 
-UITVOER: alleen de gevraagde kale regels, in exact het gevraagde format. Geen inleiding als "Hier is", geen uitleg, geen markdown, geen sterretjes, geen emoji, geen aanhalingstekens.
+UITVOER: alleen de gevraagde kale regels, in exact het gevraagde format. Geen inleiding als "Hier is", geen uitleg, geen markdown, geen sterretjes, geen aanhalingstekens, geen emoji of pictogram — ook niet als afsluiter na een uitroep. Enthousiasme leg je in de woorden zelf, een status benoem je in woorden (op koers, aandacht).
 
 TOON: Nederlands, je/jij, empowerend, nooit veroordelend, eerlijk maar optimistisch, kort en concreet. Gebruik je een vakterm uit het artikel (rendementsgrondslag, jaarruimte, Box 3, marginaal tarief), leg 'm dan in dezelfde zin uit in gewone taal, of vermijd 'm — laat nooit een vakterm onverklaard staan.`
 

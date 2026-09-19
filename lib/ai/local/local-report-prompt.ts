@@ -45,7 +45,15 @@ import { guardFigures } from './figure-guard'
  * de inleiding staat bóven een rapport vol berekende cijfers, en juist die vorm
  * verleidt een klein model tot een afsluitende "de slimste volgende stap is…".
  * (2) De vaktermregel — het rapport wordt door een leek gelezen en de
- * kerncijfers heten letterlijk 'spaarquote' en 'FIRE'. Bewust NIET overgenomen:
+ * kerncijfers heten letterlijk 'spaarquote' en 'FIRE'. (3) Het AANGESCHERPTE
+ * emoji-verbod (a378ce7cc): ook pictogrammen, ook als afsluiter na een uitroep,
+ * mét de vervanging erbij (enthousiasme in de woorden, status in woorden). Dat
+ * de vervanging erbij staat is het werkzame deel — een kaal verbod hield in de
+ * meting van 6 sep niet stand. Het weegt hier zwaarder dan in de chat: de
+ * emoji-uitvoerfilter draait ALLEEN op de cloud-chatroute, dus hier is de
+ * promptregel de enige verdediging. De ∞-uitzondering gaat mee omdat de
+ * kerncijfers vrijheidstijd dragen en `formatWithFreedom` bij een dagtarief van
+ * 0 letterlijk "∞ vrijheid" oplevert. Bewust NIET overgenomen:
  * de 150-woordengrens (hier hardere vorm: 3-4 zinnen, na afloop op 600 tekens
  * geknipt), de eerste-alinea-adviesgrens (de inleiding is één alinea en geeft
  * per definitie geen advies, dus een disclaimer-zin zou hier ruis zijn) en de
@@ -60,7 +68,7 @@ KERNFILOSOFIE: Geld is opgeslagen tijd — elke euro vertegenwoordigt een stukje
 
 REGELS: Verzin NOOIT zelf cijfers, percentages of rekenregels — alle getallen komen uit het FINANCIEEL OVERZICHT hieronder; herbereken niets en hanteer geen vaste aannames zoals een vaste 4%-regel (de gebruiker heeft een persoonlijk veilig opnamepercentage). Noem hooguit drie cijfers en neem ze exact over zoals ze er staan. Je geeft NOOIT individueel beleggingsadvies; belastinguitleg is informatief, nooit bindend. Je beschrijft, je schrijft niets voor: vel geen vergelijkend oordeel tussen twee legitieme geldkeuzes (nooit "beter dan", "X wint", "de slimste keuze") en spoor niet aan tot een geldhandeling (nooit "los dit af", "beleg in", "stap over") — ook niet wanneer de cijfers eenduidig lijken. Benoem het feit; de keuze is aan de gebruiker.
 
-VORM: schrijf 3 tot 4 vloeiende zinnen in het Nederlands, je/jij, als één doorlopende alinea. Geen kopjes, geen opsommingen, geen markdown, geen emoji's. Gebruik je een vakterm (spaarquote, jaarruimte, Box 3, FIRE), leg 'm dan in dezelfde zin uit in gewone taal, of vermijd 'm — laat nooit een vakterm onverklaard staan. Begin direct met de eerste zin van de inleiding — dus geen aankondiging als "Natuurlijk" of "Hier is de inleiding". Toon: persoonlijk, bemoedigend, eerlijk en nooit veroordelend.`
+VORM: schrijf 3 tot 4 vloeiende zinnen in het Nederlands, je/jij, als één doorlopende alinea. Geen kopjes, geen opsommingen, geen markdown, geen emoji's of pictogrammen — ook niet als afsluiter na een uitroep. Enthousiasme leg je in de woorden zelf, een status benoem je in woorden (op koers, aandacht). Alleen het ∞-symbool blijft toegestaan. Gebruik je een vakterm (spaarquote, jaarruimte, Box 3, FIRE), leg 'm dan in dezelfde zin uit in gewone taal, of vermijd 'm — laat nooit een vakterm onverklaard staan. Begin direct met de eerste zin van de inleiding — dus geen aankondiging als "Natuurlijk" of "Hier is de inleiding". Toon: persoonlijk, bemoedigend, eerlijk en nooit veroordelend.`
 
 /** Vaste opdracht-regel (user-turn); de inhoud zit volledig in de systeemprompt. */
 export const LOCAL_REPORT_TASK = 'Schrijf nu de inleiding boven dit rapport.'

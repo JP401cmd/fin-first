@@ -39,7 +39,20 @@
 // tips-model wil schrijven, en dat is een compliance-probleem, geen stijlkwestie).
 // Verder overgenomen: de vaktermregel (vermijd-eerst, want de description is 200
 // tekens) en jaartal/tarief/drempel expliciet in de getallenregel — een model
-// telt "2026" niet vanzelf als "getal". NIET overgenomen: de 150-woordengrens
+// telt "2026" niet vanzelf als "getal". Sinds sep 2026 ook het AANGESCHERPTE
+// emoji-verbod (a378ce7cc): pictogrammen erbij, expliciet óók als afsluiter na
+// een uitroep, mét de vervanging (enthousiasme in de woorden, status in
+// woorden). De vervanging erbij zetten is het werkzame deel — een kaal verbod
+// hield in de meting van 6 sep niet stand — en het weegt hier zwaarder dan in
+// de chat, want de emoji-uitvoerfilter draait ALLEEN op de cloud-chatroute: op
+// dit pad is de promptregel de enige verdediging. Een tip is bovendien
+// aanmoedigende copy, precies het slot waar een ✅ of 🎉 in wil sluipen.
+// NIET overgenomen uit de bron: de hele REKENREGELS-sectie, en daarmee ook de
+// B-040-aanscherping van sep 2026 die het dagtarief tot enige wisselkoers
+// maakt (8910a07c2). Dat is hier geen gat maar een strengere oplossing: dit
+// artefact rekent überhaupt niet — het krijgt een voorgerekende regel
+// "Vrijheidsdagen:" aangereikt en mag die alleen letterlijk overnemen. De vraag
+// "welke noemer?" bestaat op dit pad dus niet. NIET overgenomen: de 150-woordengrens
 // (hier gelden hardere tekenlimieten) en de eerste-alinea-adviesgrens (een
 // tipkaart kent geen alinea's en geen disclaimer-zin; de grens wordt hier
 // gehandhaafd door wat er NIET in mag staan).
@@ -76,7 +89,7 @@ CONCREET: schrijf over déze ene kans en noem 'm bij naam — niet over sparen, 
 
 COMPLIANCE (Wft): geen individueel beleggingsadvies, geen koop- of verkoopaanbeveling voor specifieke aandelen, crypto of andere producten, ook niet indirect. Noem NOOIT een bank, broker, verzekeraar of beleggingsfonds bij naam en stuur nooit naar een specifiek financieel product. Gaat de kans over sparen of beleggen, beschrijf dan alleen wát de kans is en laat de keuze aan de gebruiker. Vel NOOIT een vergelijkend oordeel tussen twee legitieme geldkeuzes — niet "aflossen is beter dan beleggen", niet "X wint", niet "de slimste keuze" — ook niet als de rekensom eenduidig oogt. Je acties zijn stappen bínnen déze ene kans (vergelijken, instellen, opzeggen, aanvragen); nooit een aansporing om geld te verplaatsen naar of tussen producten, potten of doelen.
 
-TOON: Nederlands, je/jij, empowerend, eerlijk, kort. Vermijd vaktermen; moet je er één gebruiken die in het KANS-blok staat (jaarruimte, Box 3), leg 'm dan in dezelfde zin uit in gewone taal — laat 'm nooit onverklaard staan. Geen markdown-headers, geen emoji.
+TOON: Nederlands, je/jij, empowerend, eerlijk, kort. Vermijd vaktermen; moet je er één gebruiken die in het KANS-blok staat (jaarruimte, Box 3), leg 'm dan in dezelfde zin uit in gewone taal — laat 'm nooit onverklaard staan. Geen markdown-headers, geen emoji of pictogram — ook niet als afsluiter na een uitroep. Enthousiasme leg je in de woorden zelf, een status benoem je in woorden (op koers, aandacht). Alleen het ∞-symbool blijft toegestaan.
 
 UITVOER: precies dit ene blok en niets eromheen — geen inleiding, geen proza, geen uitleg erna:
 \`\`\`fin-tip
