@@ -55,7 +55,7 @@ Elke inhoudelijke opdracht routeert via de bijpassende pijplijn-skill — niet a
 - **Sessies knippen.** Is een opdracht afgerond en begint de gebruiker over iets ongerelateerds: stel voor om een verse sessie (of `/clear`) te starten. Elke beurt in een lange sessie herleest de complete historie; een sessie van dagen kost per vraag een veelvoud van dezelfde vraag in een verse sessie.
 - **Agent-budget per skill.** Elke pijplijn-skill noemt een agent-budget (aantal subagent-runs). Daarbinnen blijven is de norm; erboven mag alleen met een expliciete motivering vooraf aan de gebruiker ("dit raakt X en Y, daarom ook agent Z").
 - **Eén gebundelde eindreview.** De afsluitende review is één review-run die correctheid, UI-consistentie én de security-lens in dezelfde opdracht meeneemt — geen drie aparte review-spawns. Die review draait als **fork-subagent** (`subagent_type: "fork"`; erft het gesprek — geen koude opstartcontext; instrueer 'm de diff adversarieel te lezen, zie de gedeelde pijplijn-conventies). Een aparte `security-specialist`-run blijft verplicht wanneer de wijziging auth, RLS, een migratie, een nieuwe route met datatoegang of partner-/huishouddata raakt — die run bewust mét schone context (géén fork).
-- **Herijking sept 2026 (Fable 5.1).** Bovenstaande budgetten zijn gekalibreerd op de meting van 2 aug 2026, toen ~90% van het gewogen verbruik cache-read-contextverkeer was tegen de oude cacheprijs. Met Fable 5.1 kosten cache-reads 75% minder ($0,25 i.p.v. $1,00 per Mtok), waardoor een agent-spawn in geld ~4× lichter weegt. De budgetten en de fast-path blijven de norm (doorlooptijd en context-vervuiling zijn óók kosten), met twee expliciete versoepelingen: (a) de aparte `security-specialist`-run wordt **nooit op kostengrond overgeslagen** — bij twijfel draaien; (b) parallelle verkenning bij écht onafhankelijke leesklussen hoeft niet krampachtig vermeden te worden. Effort-richtlijn: 5.1 op low/medium presteert op Fable 5-niveau tegen lagere kosten — mechanisch werk laag houden, en `/effort` alleen opschalen voor rekenmotor-, security- en architectuurwerk (de agent-frontmatter draagt al per-agent tiers).
+- **Herijking sept 2026 (Fable 5.1).** Bovenstaande budgetten zijn gekalibreerd op de meting van 2 aug 2026, toen ~90% van het gewogen verbruik cache-read-contextverkeer was tegen de oude cacheprijs. Met Fable 5.1 kosten cache-reads 75% minder ($0,25 i.p.v. $1,00 per Mtok), maar de hermeting van 19 sep 2026 laat zien dat cache-writes (het inlezen van opstartcontext en toolresultaten) ~76% van het Fable-geld dragen — een Fable-spawn weegt daardoor circa 2× een Opus-spawn, niet "~4× lichter". De budgetten en de fast-path blijven de norm (doorlooptijd en context-vervuiling zijn óók kosten), met twee expliciete versoepelingen: (a) de aparte `security-specialist`-run wordt **nooit op kostengrond overgeslagen** — bij twijfel draaien; (b) parallelle verkenning bij écht onafhankelijke leesklussen hoeft niet krampachtig vermeden te worden. Effort-richtlijn: 5.1 op low/medium presteert op Fable 5-niveau tegen lagere kosten — mechanisch werk laag houden, en `/effort` alleen opschalen voor rekenmotor-, security- en architectuurwerk (de agent-frontmatter draagt al per-agent tiers).
 
 ### Organisatieopzet (verwijzing)
 
@@ -207,13 +207,16 @@ De wizard "Je voorkeuren voor je plan instellen" op /toekomst (ADR 0142, aanvull
   <project_name>TriFinity</project_name>
 
   <overview>
-    TriFinity is an existing Dutch-language personal finance application built around the philosophy "Geld is opgeslagen tijd" (Money is stored time). It translates financial metrics into freedom time — days, months, and years of financial independence. This specification covers improvements, refinements, and new features to mature the application's UX, deepen its philosophical consistency, add gamification, and create a unified historical insight and prediction layer across all modules.
+    TriFinity is an existing Dutch-language personal finance application built around the philosophy "Geld levert tijd op" (money yields time — ADR 0165). It translates financial metrics into freedom time — days, months, and years of financial independence. This specification covers improvements, refinements, and new features to mature the application's UX, deepen its philosophical consistency, add gamification, and create a unified historical insight and prediction layer across all modules.
 
     IMPORTANT: This is an EXISTING application with a full codebase. Work within the established architecture (Next.js 16, Supabase, React 19, Tailwind CSS v4). All changes are improvements to existing functionality or additions that integrate with current patterns.
   </overview>
 
   <philosophy>
-    CORE PRINCIPLE: "Geld is opgeslagen tijd — elke euro vertegenwoordigt een stukje levenstijd."
+    CORE PRINCIPLE: "Geld levert tijd op — elk bedrag staat voor tijd waarin je uitgaven gedekt zijn."
+    De koop-/verkoop-metafoor is VERBODEN (ADR 0165): nooit "vrijgekocht", "vrijheid
+    terugkopen/vrijkopen", "gekochte of verkochte tijd" of "teruggekochte levenstijd".
+    Vrijheidstijd bouw je op. Canonieke bron: `lib/ai/dna/base.ts` § KERNFILOSOFIE/§ FRAMING.
 
     This philosophy MUST be expressed consistently throughout every UI surface:
     - Every EUR amount over €100 should also show its freedom-time equivalent
@@ -223,7 +226,8 @@ De wizard "Je voorkeuren voor je plan instellen" op /toekomst (ADR 0142, aanvull
     Key translations:
     - "Netto vermogen" → also show "X jaar en Y maanden vrijheid"
     - "Budget uitgaven" → also show "X dagen deze maand"
-    - "Schulden" → frame as "vrijheid die je terugkoopt"
+    - "Schulden" → frame neutraal ("schulden die je aflost"), met de positieve regel
+      "elke aflossing levert tijd op" — nooit "vrijheid die je terugkoopt"
     - "Sparen" → frame as "vrijheid opbouwen"
     - "Transacties" → show freedom-day cost/benefit
     - "FIRE target" → frame as "volledige vrijheid"
