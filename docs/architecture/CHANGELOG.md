@@ -1130,3 +1130,7 @@
 - **API-routes** toegevoegd: /api/transactions/import/overlap
 - **Integratie-clients** toegevoegd: lib/parsers/other-account-overlap.ts
 - **Componenten (aantal)** toegevoegd: +3
+
+## 2026-09-19
+
+- **Componenten (aantal)** toegevoegd: +1

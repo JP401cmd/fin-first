@@ -96,6 +96,149 @@ export const RELEASE_NOTE_NORM = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.90.0',
+    date: '2026-09-19',
+    title: 'Dezelfde cijfers overal, en een kortere start',
+    sections: [
+      {
+        module: 'Bezittingen',
+        color: 'amber',
+        items: [
+          {
+            title: 'Geen eigen rendement is nu een echte keuze',
+            description:
+              'Je kunt aangeven dat je bij een bezitting geen eigen verwachting hebt. Die rekent dan met je profielrendement, in plaats van stilletjes met nul.',
+          },
+          {
+            title: 'Vrijheidstijd rekent met hetzelfde dagtarief',
+            description:
+              'De tijd die een bezitting je geeft, gebruikt nu dezelfde dagprijs als de rest van de app. Eerder stond daar een ander getal.',
+          },
+          {
+            title: 'De verdeelcirkel is groter op je telefoon',
+            description: 'De cirkel en de bijbehorende namen zijn beter leesbaar op een klein scherm.',
+          },
+        ],
+      },
+      {
+        module: 'Budget',
+        color: 'purple',
+        items: [
+          {
+            title: 'Transacties indelen heet ook zo',
+            description:
+              'Overal waar eerder "koppelen" stond, staat nu "categoriseren" of "indelen" — hetzelfde werk, een naam die klopt.',
+          },
+          {
+            title: 'Niet-ingedeeld toont uitgaven en inkomsten apart',
+            description: 'Je ziet meteen welk deel geld is dat binnenkwam en welk deel eruit ging.',
+          },
+          {
+            title: 'Waarschuwing bij dubbel uploaden',
+            description:
+              'Staan de transacties uit je bestand al op een andere eigen rekening, dan zegt de app dat vóór het importeren.',
+          },
+          {
+            title: 'Een gestopt abonnement blijft weg',
+            description: 'Wat je uitsloot of afwees bij je vaste lasten, komt niet meer terug in het overzicht.',
+          },
+          {
+            title: 'Rustiger vaste lasten',
+            description:
+              'De pagina laat zien wat je vaste lasten zijn en wat eraan sluipt, zonder de onderdelen die daarnaast stonden.',
+          },
+        ],
+      },
+      {
+        module: 'Je plan',
+        color: 'purple',
+        items: [
+          {
+            title: 'Een negatief vermogen is nu zichtbaar',
+            description:
+              'Gaat je vermogen in een scenario onder nul, dan tekent de grafiek dat ook. Eerder bleef de lijn op nul hangen en leek er niets aan de hand.',
+          },
+          {
+            title: 'Je ziet dat de projectie herrekent',
+            description: 'Na een aanpassing verschijnt er een laadmelding in plaats van een stilstaand beeld.',
+          },
+          {
+            title: 'Wat niet meetelt is ook te zien',
+            description:
+              'Delen die buiten je doel vallen — zoals een uitgesloten eigen woning — zijn nu gearceerd, ook in het jaaroverzicht. Niet meer alleen lichter van kleur.',
+          },
+          {
+            title: 'Gebeurtenissen tonen wanneer ze stoppen',
+            description: 'Een balk die loopt tot je stopt met werken, zegt dat er nu bij.',
+          },
+          {
+            title: 'Bedragen zonder inflatie blijven staan',
+            description:
+              'Zet je bij een gebeurtenis uit dat het bedrag meegroeit met de inflatie, dan groeit het ook echt niet meer mee.',
+          },
+          {
+            title: 'Je partner staat op de tijdlijn',
+            description: 'De tijdlijn van je huishouden loopt langs jouw leeftijd, met de mijlpalen van je partner erin.',
+          },
+          {
+            title: 'Één spaarquote in de hele app',
+            description:
+              'Check-in, overzicht en de schuifjes rekenden met verschillende getallen. Nu is het één getal, waarin overboekingen tussen je eigen rekeningen niet meetellen.',
+          },
+        ],
+      },
+      {
+        module: 'Fin',
+        color: 'blue',
+        items: [
+          {
+            title: 'Fin houdt op met ongevraagde tips',
+            description:
+              'Wil je geen tips meer uit zichzelf, dan zet je dat uit — op de tip zelf of bij je meldingen. Je bewaart je tips dan ook echt voor later.',
+          },
+          {
+            title: 'Fin kent je plan-instellingen',
+            description:
+              'Je keuzes over lenen bij een tekort, je opeetplafond en hoe je wilt eindigen, wegen nu mee in wat Fin zegt.',
+          },
+          {
+            title: 'Twee gesprekken die nooit begonnen',
+            description: 'De check-in kon niets zeggen over je gegroeide of gedaalde vermogen. Nu wel.',
+          },
+        ],
+      },
+      {
+        module: 'Platform',
+        color: 'zinc',
+        items: [
+          {
+            title: 'Je bankkoppeling blijft staan',
+            description:
+              'De koppeling leek na een uur verlopen en vroeg je telkens opnieuw in te loggen bij je bank. Hij houdt nu de echte einddatum van je toestemming aan.',
+          },
+          {
+            title: 'Een kortere start',
+            description:
+              'De vraag naar een spaardoel is weg, de schuldenvraag is één scherm als je geen schulden hebt, en je pensioen kun je laten schatten.',
+          },
+          {
+            title: 'Heldere namen in het menu',
+            description: '"Identiteit" heet nu "Mijn", en de namen van de kleurenpaletten zeggen wat ze zijn.',
+          },
+          {
+            title: 'Versie en wat er veranderde',
+            description: 'Je ziet welke versie er draait en wat elke versie bracht.',
+          },
+          {
+            title: 'Opnieuw beginnen wist nu alles',
+            description:
+              'Je account resetten liet eerder wat gegevens staan, waaronder je antwoorden op vragenlijsten en eerder geïmporteerde bestanden.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: '0.89.0',
     date: '2026-09-19',
     title: 'Inhaalnotitie juni–september 2026: van plan tot bankkoppeling',

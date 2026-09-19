@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-09-19T08:50:02.076Z",
+  "generatedAt": "2026-09-19T14:18:00.491Z",
   "generatedDate": "2026-09-19",
   "repo": {
     "name": "fin",
-    "version": "0.89.0"
+    "version": "0.90.0"
   },
   "annotations": {
     "philosophy": "Geld is opgeslagen tijd — elke euro vertegenwoordigt een stukje levenstijd.",
@@ -195,7 +195,7 @@
     "tables": 102,
     "migrations": 257,
     "integrations": 25,
-    "components": 1145,
+    "components": 1146,
     "providers": 19,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -9159,7 +9159,7 @@
     }
   ],
   "components": {
-    "total": 1145,
+    "total": 1146,
     "groups": [
       {
         "group": "app",
@@ -10176,7 +10176,7 @@
       },
       {
         "group": "onboarding",
-        "count": 42,
+        "count": 43,
         "items": [
           "aangifte-import-pane",
           "facts-panel",
@@ -10206,6 +10206,7 @@
           "onboarding-shell",
           "onboarding-shell.scroll.test",
           "onboarding-success",
+          "onboarding-success.test",
           "onboarding-uitgaven-pensioen",
           "onboarding-uitgaven-pensioen.test",
           "onboarding-upo-section",
@@ -18441,18 +18442,6 @@
       "file": "docs/adr/0165-geld-levert-tijd-op.md"
     },
     {
-      "id": "0165-niet-geindexeerd-is-nominaal-vast",
-      "title": "\"Stijgt niet mee met inflatie\" is een nominaal vast bedrag — ook na de startmaand",
-      "status": "aanvaard",
-      "date": "2026-09-19",
-      "elements": [
-        "as-planning",
-        "fn-toekomstplannen"
-      ],
-      "summary": "Een eigen gebeurtenis met het vinkje *Stijgt mee met inflatie* **uit** hoort een nominaal vast maandbedrag te zijn: €1.000 blijft €1.000, en verliest dus elk jaar koopkracht. De horizon-kernel rekent nominaal en indexeert alle gebeurtenis-posten centraal (`CF!H = Σ posten · (1+i)",
-      "file": "docs/adr/0165-niet-geindexeerd-is-nominaal-vast.md"
-    },
-    {
       "id": "0166-geen-eigen-rendement-is-null",
       "title": "Geen eigen rendement\" is NULL — en een ingevulde 0 blijft een bewuste 0%",
       "status": "aanvaard",
@@ -18465,6 +18454,42 @@
       ],
       "summary": "`public.assets.expected_return` was `numeric NOT NULL DEFAULT 0` en kon daardoor twee wezenlijk verschillende dingen niet uit elkaar houden: \"deze bezitting rendeert bewust 0%\" (betaalrekening, bitcoin, afschrijvende auto) en \"ik heb hier geen eigen aanname; reken met mijn profie",
       "file": "docs/adr/0166-geen-eigen-rendement-is-null.md"
+    },
+    {
+      "id": "0167-niet-geindexeerd-is-nominaal-vast",
+      "title": "\"Stijgt niet mee met inflatie\" is een nominaal vast bedrag — ook na de startmaand",
+      "status": "aanvaard",
+      "date": "2026-09-19",
+      "elements": [
+        "as-planning",
+        "fn-toekomstplannen"
+      ],
+      "summary": "Een eigen gebeurtenis met het vinkje *Stijgt mee met inflatie* **uit** hoort een nominaal vast maandbedrag te zijn: €1.000 blijft €1.000, en verliest dus elk jaar koopkracht. De horizon-kernel rekent nominaal en indexeert alle gebeurtenis-posten centraal (`CF!H = Σ posten · (1+i)",
+      "file": "docs/adr/0167-niet-geindexeerd-is-nominaal-vast.md"
+    },
+    {
+      "id": "0168-de-huishoudtijdas-is-de-as-van-de-kijker",
+      "title": "De huishoud-tijdas is de as van de kijker, niet van de oudste partner",
+      "status": "aanvaard",
+      "date": "2026-09-19",
+      "elements": [
+        "as-planning",
+        "fn-toekomstplannen"
+      ],
+      "summary": "De gecombineerde huishoudprojectie (`lib/household-projection.ts`, sectie op /toekomst) draaide op de tijdas van de **oudste** partner: een v2-erfenis uit de tijd dat de dual-AOW-omrekening in de app zelf gebeurde. De canonieke FIRE-run op /overzicht (`computeHorizonFireSim(supab",
+      "file": "docs/adr/0168-de-huishoudtijdas-is-de-as-van-de-kijker.md"
+    },
+    {
+      "id": "0169-een-inkomensgrondslag-voor-alle-paden",
+      "title": "Eén inkomensgrondslag voor alle paden: de horizon-FIRE-som filtert transfers net als de rest",
+      "status": "aanvaard",
+      "date": "2026-09-19",
+      "elements": [
+        "as-planning",
+        "fn-toekomstplannen"
+      ],
+      "summary": "Het transactie-jaarinkomen (`transactionAnnualIncome`, lib/budget-realized.ts) voedt bij `retirement_expense_method = 'current_income'` de pensioenuitgave en daarmee het FIRE-doel. Tot 19 sep 2026 kende die helper een `includeTransfers`-optie: de horizon-FIRE-som (SSR-loader van ",
+      "file": "docs/adr/0169-een-inkomensgrondslag-voor-alle-paden.md"
     }
   ],
   "churn": {
@@ -18472,34 +18497,34 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 75
+        "commits": 76
       },
       {
         "path": "lib/ai",
-        "commits": 57
+        "commits": 58
       },
       {
         "path": "app/(app)/toekomst",
-        "commits": 31
+        "commits": 32
       },
       {
         "path": "app/api/ai",
-        "commits": 19
+        "commits": 20
       },
       {
         "path": "app/api/assets",
-        "commits": 15
+        "commits": 16
       },
       {
         "path": "app/api/household",
         "commits": 13
       },
       {
-        "path": "app/api/budgets",
-        "commits": 6
+        "path": "lib/fire-simulation.ts",
+        "commits": 7
       },
       {
-        "path": "lib/fire-simulation.ts",
+        "path": "app/api/budgets",
         "commits": 6
       },
       {
@@ -18514,38 +18539,38 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 10918,
-        "commits": 98
+        "loc": 11015,
+        "commits": 99
       },
       {
         "file": "components/app/budgets-client.tsx",
         "loc": 5675,
-        "commits": 33
+        "commits": 34
       },
       {
         "file": "components/core/assets-client.tsx",
-        "loc": 4830,
-        "commits": 39
+        "loc": 4837,
+        "commits": 40
       },
       {
         "file": "components/app/cash-account-view.tsx",
         "loc": 3730,
-        "commits": 20
+        "commits": 21
+      },
+      {
+        "file": "lib/release-notes.ts",
+        "loc": 3183,
+        "commits": 2
       },
       {
         "file": "lib/dashboard-data-loader.ts",
         "loc": 3140,
-        "commits": 60
-      },
-      {
-        "file": "lib/release-notes.ts",
-        "loc": 3040,
-        "commits": 1
+        "commits": 61
       },
       {
         "file": "app/(app)/core/cash/import/page.tsx",
         "loc": 2577,
-        "commits": 15
+        "commits": 16
       },
       {
         "file": "components/app/chat/chat-panel.tsx",
@@ -19742,23 +19767,9 @@
     "hasChanges": true,
     "sections": [
       {
-        "label": "API-routes",
-        "added": [
-          "/api/transactions/import/overlap"
-        ],
-        "removed": []
-      },
-      {
-        "label": "Integratie-clients",
-        "added": [
-          "lib/parsers/other-account-overlap.ts"
-        ],
-        "removed": []
-      },
-      {
         "label": "Componenten (aantal)",
         "added": [
-          "+3"
+          "+1"
         ],
         "removed": []
       }
@@ -20202,7 +20213,7 @@
     {
       "date": "2026-09-19",
       "api": 327,
-      "components": 1145,
+      "components": 1146,
       "tables": 102,
       "routesProduction": 90
     }

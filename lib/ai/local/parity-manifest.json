@@ -1,15 +1,15 @@
 {
-  "generatedAt": "2026-09-19T08:45:34.400Z",
+  "generatedAt": "2026-09-19T14:18:38.915Z",
   "dnaSubBudget": 2000,
   "dnaEstimatedTokens": 999,
   "sources": [
     {
       "file": "lib/ai/dna/base.ts",
-      "sha256": "9017440685c29e80f1ca0ef3fef55a804d9d791880272d78373aaac70972f62f"
+      "sha256": "e17694e41765e79b0f5bec8dab3c412f29c35feb975af4302262588ec6eac79e"
     },
     {
       "file": "lib/ai/dna/wil.ts",
-      "sha256": "b3c376de2f17c43e845bdf8b0c517f96767a9ce0a9dc7296887e29f909112d90"
+      "sha256": "61d063c4a71f79aa0ed0be51970803900891cc92423b268cf12aeb7f35f9d66e"
     }
   ],
   "artefacts": [
@@ -23,11 +23,11 @@
       "sources": [
         {
           "file": "lib/ai/dna/base.ts",
-          "sha256": "9017440685c29e80f1ca0ef3fef55a804d9d791880272d78373aaac70972f62f"
+          "sha256": "e17694e41765e79b0f5bec8dab3c412f29c35feb975af4302262588ec6eac79e"
         },
         {
           "file": "lib/ai/dna/wil.ts",
-          "sha256": "b3c376de2f17c43e845bdf8b0c517f96767a9ce0a9dc7296887e29f909112d90"
+          "sha256": "61d063c4a71f79aa0ed0be51970803900891cc92423b268cf12aeb7f35f9d66e"
         }
       ]
     },
@@ -41,11 +41,11 @@
       "sources": [
         {
           "file": "lib/briefing/redactie.ts",
-          "sha256": "38f94bbc97c00f31933c2fa7a1c7127861e7932d3a7a9574df44937b37474fa1"
+          "sha256": "4744a61c2de26316746e5f4c15743c1f1b5692873dd380c7f40bb89c5979fb47"
         },
         {
           "file": "lib/ai/dna/base.ts",
-          "sha256": "9017440685c29e80f1ca0ef3fef55a804d9d791880272d78373aaac70972f62f"
+          "sha256": "e17694e41765e79b0f5bec8dab3c412f29c35feb975af4302262588ec6eac79e"
         }
       ]
     },
@@ -59,7 +59,7 @@
       "sources": [
         {
           "file": "lib/ai/dna/base.ts",
-          "sha256": "9017440685c29e80f1ca0ef3fef55a804d9d791880272d78373aaac70972f62f"
+          "sha256": "e17694e41765e79b0f5bec8dab3c412f29c35feb975af4302262588ec6eac79e"
         }
       ]
     },
@@ -77,7 +77,7 @@
         },
         {
           "file": "lib/ai/dna/base.ts",
-          "sha256": "9017440685c29e80f1ca0ef3fef55a804d9d791880272d78373aaac70972f62f"
+          "sha256": "e17694e41765e79b0f5bec8dab3c412f29c35feb975af4302262588ec6eac79e"
         }
       ]
     },
@@ -91,11 +91,11 @@
       "sources": [
         {
           "file": "lib/news-system-prompt.ts",
-          "sha256": "a5eb8c49436a4450268c8f1ef477487783ec789fb678bd8e3f6ac201525521d3"
+          "sha256": "f5b4b4e78ad48796164482d1f580d0bf8c4409cde03b8992a72162a323a0086b"
         },
         {
           "file": "lib/ai/dna/base.ts",
-          "sha256": "9017440685c29e80f1ca0ef3fef55a804d9d791880272d78373aaac70972f62f"
+          "sha256": "e17694e41765e79b0f5bec8dab3c412f29c35feb975af4302262588ec6eac79e"
         }
       ]
     },
@@ -109,7 +109,7 @@
       "sources": [
         {
           "file": "lib/ai/build-calculator.ts",
-          "sha256": "d3205abb179438338014a8773202521d61524697c4ff635afadc00876dc4d7fd"
+          "sha256": "29811a34ae23c220558aefa5a5e55ed7dd810334ca3752266f89cafb09ca69f6"
         }
       ]
     },
