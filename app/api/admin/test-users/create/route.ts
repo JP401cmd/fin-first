@@ -22,6 +22,20 @@ export async function POST() {
       }, { status: 500 })
     }
 
+    // Testaccount-wachtwoord komt UITSLUITEND uit de environment — bewust geen
+    // fallback-default. Een hardcoded default (`?? '<literal>'`) is precies hoe
+    // een gelekt wachtwoord bij elke seed-run terugkeert; ontbreekt de variabele,
+    // dan weigert de route i.p.v. stil een bekend wachtwoord te herstellen.
+    // Zie e2e/smoke.spec.ts + .github/workflows/ci.yml voor het REGRESSION_TEST_PASSWORD-patroon.
+    const testPassword = process.env.TEST_USER_PASSWORD
+    if (!testPassword) {
+      return serverError(
+        new Error('TEST_USER_PASSWORD ontbreekt in de environment'),
+        'admin-test-users-create:config',
+        'TEST_USER_PASSWORD is niet geconfigureerd in de environment variables.',
+      )
+    }
+
     const service = createServiceClient(url, serviceKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     })
@@ -51,7 +65,7 @@ export async function POST() {
         // Create via GoTrue Admin API
         const { data, error } = await service.auth.admin.createUser({
           email: u.email,
-          password: 'Test2026!',
+          password: testPassword,
           email_confirm: true,
           user_metadata: {
             test_persona_key: u.persona,

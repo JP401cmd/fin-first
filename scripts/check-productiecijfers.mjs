@@ -43,13 +43,17 @@
  *     hele gate uit te zetten (zie ESCAPE).
  *
  * ── Wat deze gate NIET ziet (gemeten, niet gegokt) ──────────────────────────
- *  a. ANDERE PADEN. `specs/**`, `lib/**.test.ts`, `scripts/**` en `docs/**` buiten
- *     `adr/` worden NIET gescand. Dat is een scope-keuze, geen dekkingsbewijs:
- *     er staan vandaag echte eigenaar-cijfers en e-mailadressen in o.a.
+ *  a. ANDERE PADEN voor REGEL 1/3/4. De identifier-, omvang- en populatieregels
+ *     draaien nog steeds ALLEEN op `supabase/migrations/**` en `docs/adr/**`.
+ *     `specs/**`, `lib/**.test.ts`, `scripts/**` en `docs/**` buiten `adr/` worden
+ *     daarvoor NIET gescand. Dat is een scope-keuze, geen dekkingsbewijs: er staan
+ *     vandaag echte eigenaar-cijfers en e-mailadressen in o.a.
  *     `lib/horizon/networth-rows.test.ts`, `scripts/horizon-oracle/**` en
  *     `specs/bank-connect-doelrekening/live-testplan.md`. Verbreden kan, maar pas
  *     nadat die paden zijn opgeruimd — anders start de gate rood en wordt hij
- *     genegeerd.
+ *     genegeerd. REGEL 2 (credentials) is wél al verbreed naar `app/api/**` en
+ *     `docs/**` (die zijn schoon); `scripts/**` volgt zodra de wegwerpscripts weg
+ *     zijn — precies volgens deze doctrine.
  *  b. PARAFRASE. "een kleine honderd gebruikers" ontwijkt elke cijferregex. De
  *     gate vangt de vorm waarin dit feitelijk fout ging, niet elk denkbaar lek.
  *  c. CONTEXT. Hij kan niet zien of een bedrag van een echt account komt of uit
@@ -68,9 +72,36 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 
 const ROOT = process.cwd()
+
+/**
+ * Elke SCAN-entry draagt de regels die op dat pad draaien. Bewust per-scope:
+ *
+ *   * De VOLLEDIGE gate (regels 1-4: identifier, credential, omvang, populatie)
+ *     draait alléén op `supabase/migrations/**` en `docs/adr/**` — de twee plekken
+ *     waar we ons huiswerk opschrijven. Die scope blijft NAUW (zie hieronder).
+ *   * REGEL 2 (platte credentials) draait daarnaast op `app/api/**` en `docs/**`,
+ *     zodat een hardcoded wachtwoord of sleutel BUITEN een migratie óók gevangen
+ *     wordt (aanleiding: een gelekt testaccount-wachtwoord dat een route bij elke
+ *     seed-run herstelde). Die scopes draaien UITSLUITEND de credential-literal-
+ *     regel: een striktere, quoted-literal matcher zodat een variabele
+ *     (`password: pw`) of UI-copy ("Je wachtwoord is bijgewerkt.") geen valse
+ *     positief geeft — en NIET regel 1/3/4, want app/api en docs staan vol
+ *     legitieme voorbeeld-e-mails, getallen en bedragen.
+ *
+ *   * `scripts/**` is BEWUST (nog) NIET in scope, hoewel het dezelfde regel-2-
+ *     dekking verdient. Reden = exact de doctrine hieronder ("ANDERE PADEN"): de
+ *     map is vandaag een kerkhof van ~65 wegwerp-diagnosescripts die de publieke
+ *     anon-JWT en losse test-wachtwoorden hardcoderen. Een gate die daar rood
+ *     start, wordt uitgezet en is dan minder waard dan geen gate. Ruim die scripts
+ *     eerst op (of verplaats ze buiten de repo); daarna is `scripts/**` toe te
+ *     voegen met dezelfde `['credential-literal']`-scope.
+ */
+const ALL_RULES = ['identifier', 'credential', 'scale', 'population']
 const SCAN = [
-  { dir: 'supabase/migrations', ext: /\.sql$/ },
-  { dir: 'docs/adr', ext: /\.md$/ },
+  { dir: 'supabase/migrations', ext: /\.sql$/, rules: ALL_RULES },
+  { dir: 'docs/adr', ext: /\.md$/, rules: ALL_RULES },
+  { dir: 'app/api', ext: /\.(ts|tsx|js|mjs)$/, rules: ['credential-literal'] },
+  { dir: 'docs', ext: /\.md$/, rules: ['credential-literal'] },
 ]
 
 /**
@@ -146,6 +177,26 @@ const CREDENTIAL_RES = [
   { re: /\b(eyJ[A-Za-z0-9_-]{20,}|sb_secret_[A-Za-z0-9_-]{10,}|service_role_key\s*[:=]\s*\S+)/g, what: 'sleutel/JWT' },
 ]
 
+/**
+ * Regel 2 — striktere variant voor de bredere scopes (app/api, docs).
+ *
+ * Buiten een migratie is de omgeving code en proza, geen SQL. De platte
+ * `\S{4,}`-regel uit CREDENTIAL_RES flagt daar élke `password: <iets>` — óók een
+ * variabele (`password: testPassword`) of een UI-zin (`wachtwoord: "Je wachtwoord
+ * is bijgewerkt."`). Die zijn geen lek. Daarom eist deze variant een QUOTED,
+ * whitespace-vrij string-literal na de sleutel: een echt wachtwoord/sleutel heeft
+ * geen spaties, een variabele geen quotes en een zin wél spaties. crypt('…') en de
+ * JWT-/service-role-detectie blijven ongewijzigd — die zijn al specifiek genoeg.
+ */
+const CREDENTIAL_LITERAL_RES = [
+  {
+    re: /(?:^|\s)(?:password|wachtwoord|passwd|pwd)\s*[:=]\s*['"][^'"\s]{4,}['"]/gi,
+    what: 'hardcoded wachtwoord (string-literal)',
+  },
+  { re: /\bcrypt\(\s*'[^']{4,}'/gi, what: "letterlijk wachtwoord in crypt('…')" },
+  { re: /\b(eyJ[A-Za-z0-9_-]{20,}|sb_secret_[A-Za-z0-9_-]{10,}|service_role_key\s*[:=]\s*\S+)/g, what: 'sleutel/JWT' },
+]
+
 // ── Regel 3 — productieomvang ───────────────────────────────────────────────
 // Nederlandse duizendscheiding is een punt: 37.002, 495.432. Ook 900k / 1,2M.
 const NUM = String.raw`\d{1,3}(?:\.\d{3})+|\d+(?:[.,]\d+)?\s*[kKmM]\b|\d+`
@@ -203,11 +254,12 @@ const POPULATION_RE = new RegExp(
 const RESIDUE = new Map([
   [
     'supabase/migrations/20260325000002_create_landing_test_users.sql::credential',
-    'ACUUT — openstaand credential-punt. Details en de herstelroute staan bewust NIET ' +
-      'hier: deze repo is publiek en dit bestand wordt bij elke run luid geprint, dus een ' +
-      'beschrijving van wat er precies bloot ligt en of dat nog leeft, is zelf een ' +
-      'wegwijzer. Zie de kaart "Productieomvang staat in een publiek gecommitte migratie" ' +
-      '(R6) voor de aard, de status en de vereiste productie-actie.',
+    'Dode historie. Het testaccount-wachtwoord in deze reeds-gedraaide, append-only ' +
+      'migratie is op 19 sep 2026 geroteerd (de accounts dragen dat wachtwoord niet meer) ' +
+      'en de seed-route leest het nu uit TEST_USER_PASSWORD, niet meer uit een literal. De ' +
+      'literal blijft alleen als historie in dit bestand staan; hem echt weghalen kan enkel ' +
+      'via git-historie-herschrijving — afgeraden (breekt SHA’s, forks en archieven). Deze ' +
+      'entry blijft dus staan zolang de literal in de historie zit.',
   ],
 ])
 
@@ -238,7 +290,7 @@ function isZero(raw) {
   return /^0+([.,]0+)?$/.test(String(raw).trim())
 }
 
-function scanFile(rel, src) {
+function scanFile(rel, src, rules) {
   const lines = src.split(/\r?\n/)
   const hits = []
   let measureUntil = -1
@@ -254,23 +306,35 @@ function scanFile(rel, src) {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
     if (MEASUREMENT_MARKERS.test(line)) measureUntil = i + MEASUREMENT_WINDOW
+    let m
 
     // Regel 1 — e-mailadres
-    EMAIL_RE.lastIndex = 0
-    let m
-    while ((m = EMAIL_RE.exec(line))) {
-      if (EMAIL_OK.test(m[0])) continue
-      push(i, 'identifier', 'e-mailadres (directe identifier)', m[0])
+    if (rules.has('identifier')) {
+      EMAIL_RE.lastIndex = 0
+      while ((m = EMAIL_RE.exec(line))) {
+        if (EMAIL_OK.test(m[0])) continue
+        push(i, 'identifier', 'e-mailadres (directe identifier)', m[0])
+      }
     }
 
-    // Regel 2 — credentials
-    for (const { re, what } of CREDENTIAL_RES) {
-      re.lastIndex = 0
-      while ((m = re.exec(line))) push(i, 'credential', what, m[0].trim().slice(0, 60))
+    // Regel 2 — credentials (platte tekst in migraties/ADR, óf de striktere
+    // quoted-literal variant op de bredere scopes). Beide labelen als 'credential'
+    // zodat de RESIDUE-sleutel `<pad>::credential` één vorm houdt; een scope draagt
+    // altijd hooguit één van de twee, dus geen dubbeltelling.
+    const credRes = rules.has('credential')
+      ? CREDENTIAL_RES
+      : rules.has('credential-literal')
+        ? CREDENTIAL_LITERAL_RES
+        : null
+    if (credRes) {
+      for (const { re, what } of credRes) {
+        re.lastIndex = 0
+        while ((m = re.exec(line))) push(i, 'credential', what, m[0].trim().slice(0, 60))
+      }
     }
 
     // Regel 3 — omvang, UITSLUITEND binnen een meetblok
-    if (i <= measureUntil) {
+    if (rules.has('scale') && i <= measureUntil) {
       for (const { re, what } of SCALE_RES) {
         re.lastIndex = 0
         while ((m = re.exec(line))) {
@@ -280,20 +344,23 @@ function scanFile(rel, src) {
       }
     }
 
-    // Regel 4 — populatiewoorden, altijd
-    POPULATION_RE.lastIndex = 0
-    while ((m = POPULATION_RE.exec(line))) {
-      push(i, 'populatie', 'uitspraak over de productiepopulatie', m[0].trim())
+    // Regel 4 — populatiewoorden, altijd (binnen de scope die 'm draait)
+    if (rules.has('population')) {
+      POPULATION_RE.lastIndex = 0
+      while ((m = POPULATION_RE.exec(line))) {
+        push(i, 'populatie', 'uitspraak over de productiepopulatie', m[0].trim())
+      }
     }
   }
   return hits
 }
 
 const all = []
-for (const { dir, ext } of SCAN) {
+for (const { dir, ext, rules } of SCAN) {
+  const ruleSet = new Set(rules)
   for (const file of walk(join(ROOT, dir), ext)) {
     const rel = relative(ROOT, file).split('\\').join('/')
-    all.push(...scanFile(rel, readFileSync(file, 'utf8')))
+    all.push(...scanFile(rel, readFileSync(file, 'utf8'), ruleSet))
   }
 }
 all.sort((a, b) => a.rel.localeCompare(b.rel) || a.line - b.line)
@@ -354,7 +421,7 @@ if (violations.length > 0) {
 }
 
 console.log(
-  `✓ Productiecijfers: 0 nieuwe treffers in supabase/migrations + docs/adr` +
+  `✓ Productiecijfers: 0 nieuwe treffers in ${SCAN.map((s) => s.dir).join(' + ')}` +
     (openResidue.length > 0 ? ` (${openResidue.length} bekende rest, zie hierboven).` : '.'),
 )
 process.exit(0)

@@ -160,7 +160,7 @@ Voeg aan de dependency-array (`:2026`) toe: `effectiveInput?.monthlyIncome, effe
 
 Run: `npx tsc --noEmit` → schoon.
 Run: `npx vitest run components/app/horizon/horizon-client.vrij-mogelijk-vanaf.test.ts lib/horizon/scenario-presets.test.ts components/app/horizon/horizon-client.nu-stoppen.test.ts lib/horizon-kernel/worker/run-in-worker.test.ts` → PASS.
-Handmatig (chrome-devtools, dev-server localhost:3000, testaccount jochen@test.trifinity.nl / Test2026!): zet via `/toekomst` → plan-keuzes het stopmoment op "leeftijd 60" (of PUT `/api/fire-settings` `{fire_stop_anchor:'age', fire_stop_age:60}` vanaf `/mijn`), laad `/toekomst`, scroll tot de duiding in beeld is; de hero-tegel **VRIJ MOGELIJK VANAF** toont een getal, geen "—". Zet daarna het plan terug op "zo vroeg als het kan".
+Handmatig (chrome-devtools, dev-server localhost:3000, testaccount jochen@test.trifinity.nl, wachtwoord zie `TEST_USER_PASSWORD` in `.env.local`): zet via `/toekomst` → plan-keuzes het stopmoment op "leeftijd 60" (of PUT `/api/fire-settings` `{fire_stop_anchor:'age', fire_stop_age:60}` vanaf `/mijn`), laad `/toekomst`, scroll tot de duiding in beeld is; de hero-tegel **VRIJ MOGELIJK VANAF** toont een getal, geen "—". Zet daarna het plan terug op "zo vroeg als het kan".
 
 - [ ] **Step 7: Commit**
 
