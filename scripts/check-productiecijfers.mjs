@@ -51,9 +51,8 @@
  *     `lib/horizon/networth-rows.test.ts`, `scripts/horizon-oracle/**` en
  *     `specs/bank-connect-doelrekening/live-testplan.md`. Verbreden kan, maar pas
  *     nadat die paden zijn opgeruimd — anders start de gate rood en wordt hij
- *     genegeerd. REGEL 2 (credentials) is wél al verbreed naar `app/api/**` en
- *     `docs/**` (die zijn schoon); `scripts/**` volgt zodra de wegwerpscripts weg
- *     zijn — precies volgens deze doctrine.
+ *     genegeerd. REGEL 2 (credentials) is wél al verbreed naar `app/api/**`,
+ *     `docs/**` en `scripts/**` (die zijn schoon) — precies volgens deze doctrine.
  *  b. PARAFRASE. "een kleine honderd gebruikers" ontwijkt elke cijferregex. De
  *     gate vangt de vorm waarin dit feitelijk fout ging, niet elk denkbaar lek.
  *  c. CONTEXT. Hij kan niet zien of een bedrag van een echt account komt of uit
@@ -79,8 +78,8 @@ const ROOT = process.cwd()
  *   * De VOLLEDIGE gate (regels 1-4: identifier, credential, omvang, populatie)
  *     draait alléén op `supabase/migrations/**` en `docs/adr/**` — de twee plekken
  *     waar we ons huiswerk opschrijven. Die scope blijft NAUW (zie hieronder).
- *   * REGEL 2 (platte credentials) draait daarnaast op `app/api/**` en `docs/**`,
- *     zodat een hardcoded wachtwoord of sleutel BUITEN een migratie óók gevangen
+ *   * REGEL 2 (platte credentials) draait daarnaast op `app/api/**`, `docs/**` en
+ *     `scripts/**`, zodat een hardcoded wachtwoord of sleutel BUITEN een migratie óók gevangen
  *     wordt (aanleiding: een gelekt testaccount-wachtwoord dat een route bij elke
  *     seed-run herstelde). Die scopes draaien UITSLUITEND de credential-literal-
  *     regel: een striktere, quoted-literal matcher zodat een variabele
@@ -88,13 +87,12 @@ const ROOT = process.cwd()
  *     positief geeft — en NIET regel 1/3/4, want app/api en docs staan vol
  *     legitieme voorbeeld-e-mails, getallen en bedragen.
  *
- *   * `scripts/**` is BEWUST (nog) NIET in scope, hoewel het dezelfde regel-2-
- *     dekking verdient. Reden = exact de doctrine hieronder ("ANDERE PADEN"): de
- *     map is vandaag een kerkhof van ~65 wegwerp-diagnosescripts die de publieke
- *     anon-JWT en losse test-wachtwoorden hardcoderen. Een gate die daar rood
- *     start, wordt uitgezet en is dan minder waard dan geen gate. Ruim die scripts
- *     eerst op (of verplaats ze buiten de repo); daarna is `scripts/**` toe te
- *     voegen met dezelfde `['credential-literal']`-scope.
+ *   * `scripts/**` draait sinds 19 sep 2026 óók de credential-literal-regel. De
+ *     map was een kerkhof van wegwerp-diagnosescripts die de publieke anon-JWT en
+ *     losse test-wachtwoorden hardcodeerden; die zijn opgeruimd, waarna de scope
+ *     met dezelfde `['credential-literal']`-scope kon worden toegevoegd — precies
+ *     volgens de doctrine hieronder ("ANDERE PADEN"): eerst het pad schoon, dan de
+ *     gate erop, zodat hij niet rood start en wordt uitgezet.
  */
 const ALL_RULES = ['identifier', 'credential', 'scale', 'population']
 const SCAN = [
@@ -102,6 +100,7 @@ const SCAN = [
   { dir: 'docs/adr', ext: /\.md$/, rules: ALL_RULES },
   { dir: 'app/api', ext: /\.(ts|tsx|js|mjs)$/, rules: ['credential-literal'] },
   { dir: 'docs', ext: /\.md$/, rules: ['credential-literal'] },
+  { dir: 'scripts', ext: /\.(ts|tsx|js|mjs)$/, rules: ['credential-literal'] },
 ]
 
 /**
