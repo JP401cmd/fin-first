@@ -3803,11 +3803,16 @@ export default function HorizonPage({
   // "Je draait aan je doel"-banner: wijkt de live-stand af van het vastgelegde doel?
   // Onder een vast stopmoment telt de stopkeuze niet mee (ADR 0145 D4): de slider
   // verkent daar alleen en mag de banner niet laten afgaan.
+  // `buildLiveStand`/`doel.stand` kennen de vierde knop nog niet (spec 2026-09-18): een
+  // vastgelegd doel heeft er dus per definitie geen — elke actieve override IS drift,
+  // ongeacht de waarde, en die telt hier apart mee (anders ziet `isDoelConceptGewijzigd`
+  // 'm nooit, want hij vergelijkt een veld dat aan geen van beide kanten bestaat).
   const conceptGewijzigd = useMemo(
     () =>
       doelActief &&
-      isDoelConceptGewijzigd(buildLiveStandNow(), doelBlok?.stand, { stopKeuzeTelt: !isFixedAnchorMode }),
-    [doelActief, doelBlok, buildLiveStandNow, isFixedAnchorMode],
+      (scenarioUitgaveNaPensioen != null ||
+        isDoelConceptGewijzigd(buildLiveStandNow(), doelBlok?.stand, { stopKeuzeTelt: !isFixedAnchorMode })),
+    [doelActief, doelBlok, buildLiveStandNow, isFixedAnchorMode, scenarioUitgaveNaPensioen],
   )
 
   // Doel-gewogen totaalrendement (%) uit de live rendement-delta's; null → geen rendement-doel.
@@ -4074,6 +4079,9 @@ export default function HorizonPage({
       setScenarioStopKoppel(stand.stopKoppel ?? false)
       lockedMargeRef.current = stand.stopMarge ?? null
     }
+    // `doel.stand` kent de vierde knop nog niet (spec 2026-09-18 is ná de doel-persistentie
+    // gekomen) — "herstellen naar een doel zonder dat veld" betekent dus "geen override".
+    setScenarioUitgaveNaPensioen(null)
   }, [doelBlok, whatIfBaseline, currentAge, isFixedAnchorMode])
 
   // Compacte FIRE-delta voor de toggle-pill ("−30 mnd" = eerder vrij; beslishulp-conventie).
@@ -5711,14 +5719,14 @@ export default function HorizonPage({
               >
                 per jaar
               </div>
-                {!hasPerspectiveHero && haalbareUitgaveRegel && (
-                  <p
-                    data-testid="haalbaar-bij-uitgave"
-                    className={`mt-1 font-sans text-[11px] leading-snug ${haalbareUitgaveToon}`}
-                  >
-                    {haalbareUitgaveRegel}
-                  </p>
-                )}
+              {!hasPerspectiveHero && haalbareUitgaveRegel && (
+                <p
+                  data-testid="haalbaar-bij-uitgave"
+                  className={`mt-1 font-sans text-[11px] leading-snug ${haalbareUitgaveToon}`}
+                >
+                  {haalbareUitgaveRegel}
+                </p>
+              )}
                 </>
               )}
             </button>
@@ -6026,14 +6034,14 @@ export default function HorizonPage({
               >
                 per jaar
               </div>
-                {!hasPerspectiveHero && haalbareUitgaveRegel && (
-                  <p
-                    data-testid="haalbaar-bij-uitgave"
-                    className={`mt-1 font-sans text-[10px] leading-snug ${haalbareUitgaveToon}`}
-                  >
-                    {haalbareUitgaveRegel}
-                  </p>
-                )}
+              {!hasPerspectiveHero && haalbareUitgaveRegel && (
+                <p
+                  data-testid="haalbaar-bij-uitgave"
+                  className={`mt-1 font-sans text-[10px] leading-snug ${haalbareUitgaveToon}`}
+                >
+                  {haalbareUitgaveRegel}
+                </p>
+              )}
                 </>
               )}
             </button>
