@@ -108,6 +108,13 @@ function makeCountingSupabase() {
     const b: any = {
       select: () => b,
       eq: () => b,
+      // `loadFingerprintRound` filtert recurring_transactions met
+      // `.or(REVIEWED_RECURRING_FILTER)` (bevestigd ÓF uitgesloten, B-054).
+      // Deze test gaat over auth-roundtrip-telling, niet over filtersemantiek —
+      // net als de minimale mock in vaste-lasten-summary.test.ts is `.or()` hier
+      // bewust een passthrough. De échte filter-toets zit in
+      // lib/vaste-lasten-summary.excluded-resurfaces.test.ts (fake-supabase.ts).
+      or: () => b,
       in: () => b,
       gte: () => b,
       lte: () => b,
