@@ -414,10 +414,15 @@ describe('spaarquote — check-in en bundel bouwen de meting uit dezelfde invoer
  * en op handmatig/handmatig het profiel — daar telde het anker niet mee, en
  * precies dáár draaiden de bestaande suites.
  *
- * Het FIRE-anker blijft bewust inclusief (`baseAnnualSavingsFromCashflow`); die
- * keuze staat hieronder als assertie, zodat het onderscheid rate-exclusief /
- * FIRE-spaarbron-inclusief niet stil kan verdwijnen. Tolerantie: exact (`toBe`),
- * gehele euro's — één getal via vier assemblages.
+ * De FIRE-spaarbron (`baseAnnualSavingsFromCashflow`) staat op DATZELFDE
+ * transfer-exclusieve anker (eigenaarsbesluit 19 sep 2026, in lijn met ADR 0169:
+ * overboekingen tussen eigen rekeningen zijn geen sparen). Eerder die dag was het
+ * tegendeel vastgelegd — rate exclusief, FIRE-spaarbron inclusief (€ 45.600 op
+ * deze fixture) — waardoor de kernel via /toekomst een andere spaarbron kreeg dan
+ * via /overzicht (dashboardbundel `baseAnnualSavings`, exclusief) en de
+ * FIRE-leeftijd van de ingang afhing. Dat besluit is teruggedraaid; de assertie
+ * hieronder vergrendelt nu dat horizon- en dashboard-spaarbron één bedrag zijn.
+ * Tolerantie: exact (`toBe`), gehele euro's — één getal via vier assemblages.
  */
 describe('spaarquote — gemengde grondslag mét transfers: één jaarinkomen-anker op alle oppervlakken', () => {
   bevriesDeKlok()
@@ -457,14 +462,19 @@ describe('spaarquote — gemengde grondslag mét transfers: één jaarinkomen-an
     expect(JSON.stringify(starters)).toContain('30%')
   })
 
-  it('B · de fixture is aantoonbaar transfer-gevoelig: de FIRE-spaarbron van de horizon blijft op het inclusieve anker (bewust)', async () => {
+  it('B · de FIRE-spaarbron is transfer-EXCLUSIEF en op /toekomst en /overzicht hetzelfde bedrag (eigenaarsbesluit 19 sep 2026)', async () => {
     const raw = await loadHorizonRaw(makeSupabase(DB_GEMENGD).client)
-    // Inclusief: (36.000 + 12.000) over 6 maanden → € 8.000/mnd; (8.000 − 4.200) / 8.000
-    // = 47,5 % × € 96.000 = € 45.600/jaar. Exclusief zou het € 21.600 zijn (30 % × 72.000).
-    // Dit is het gedocumenteerde besluit "FIRE-projectie-inputs zien alle kasstromen";
-    // verandert dit, dan verschuift de FIRE-leeftijd en hoort daar een eigen besluit bij.
-    expect(raw.baseAnnualSavingsFromCashflow).toBe(45600)
-    expect(raw.baseAnnualSavingsFromCashflow).not.toBe(EFFECTIEF_EUR_PER_MAAND * 12)
+    const { dashboardData } = await loadDashboardData(makeSupabase(DB_GEMENGD).client)
+    // Exclusief: 36.000 over 6 historiemaanden → € 72.000/jaar × 30 % = € 21.600/jaar.
+    // De fixture is aantoonbaar transfer-gevoelig: inclusief zou het (36.000 + 12.000)
+    // → € 96.000 × 47,5 % = € 45.600 zijn. Dat getal mag NERGENS meer verschijnen:
+    // de kernel krijgt via beide ingangen (`baseAnnualSavingsFromCashflow` uit de
+    // horizon-loader, `baseAnnualSavings` = effectiveMonthlySavings × 12 uit de
+    // dashboardbundel) dezelfde spaarbron, dus de FIRE-leeftijd hangt niet van de
+    // ingang af.
+    expect(raw.baseAnnualSavingsFromCashflow).toBe(EFFECTIEF_EUR_PER_MAAND * 12)
+    expect(raw.baseAnnualSavingsFromCashflow).not.toBe(45600)
+    expect(dashboardData.effectiveMonthlySavings * 12).toBe(raw.baseAnnualSavingsFromCashflow)
   })
 })
 

@@ -52,7 +52,12 @@ zelf en dan de eerste SSR-render — de derde divergentie op de kaart WF-TOEK-02
   Dat is de correctie, geen regressie: de overboekingen waren geen inkomen.
 - De FIRE-spaarbron `baseAnnualSavingsFromCashflow` (inkomen × spaarquote) staat nu op
   hetzelfde jaarinkomen als de spaarquote-rate zelf — multiplier en rate op één
-  grondslag.
+  grondslag. *Aanvulling 19 sep 2026 (eigenaarsbesluit):* een tussentijdse wijziging
+  van dezelfde dag had de FIRE-spaarbron in de horizon-loader bewust transfer-
+  **inclusief** gehouden ("twee ankers"), waardoor de kernel via /toekomst een andere
+  spaarbron kreeg dan via /overzicht. Dat is teruggedraaid: de spaarbron is overal
+  transfer-exclusief en komt in beide loaders uit dezelfde `resolveSavingsSource`-
+  aanroep als de rate. Overboekingen tussen eigen rekeningen zijn geen sparen.
 - Geraakt: lib/budget-realized.ts, lib/horizon/raw-data-loader.ts,
   app/api/uitgaven-na-pensioen/context/route.ts, lib/household-projection.ts,
   components/app/horizon/horizon-client.tsx, lib/retirement-expense-basis.ts,

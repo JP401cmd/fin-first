@@ -369,6 +369,10 @@ export interface HorizonRawData {
   /** Jaarlijks spaarbedrag afgeleid van de cashflow-pagina: inkomen × spaarquote
    *  (berekend óf overschreven, incl. spaarbudgetten + schuldaflossing). Primaire
    *  spaarbron voor de FIRE-prognose wanneer er geen handmatige spaar-override is.
+   *  TRANSFER-EXCLUSIEF (eigenaarsbesluit 19 sep 2026, in lijn met ADR 0169): het is
+   *  letterlijk `resolveSavingsSource(...).baseAnnualSavings` uit dezelfde aanroep
+   *  die `effectiveSavingsRatePct` levert — dus per constructie hetzelfde bedrag
+   *  dat de dashboardbundel als `baseAnnualSavings` aan `buildHorizonInput` geeft.
    *  Zie lib/savings-source.ts — spiegelt het instellingenblok op /overzicht/budget. */
   baseAnnualSavingsFromCashflow: number
   /** Retirement-expense methode uit profile (raw, mogelijk null bij nieuwe users). */
@@ -569,13 +573,14 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
       .select('id, birth_date_from, birth_date_through, aow_years, aow_months, is_definitive, source')
       .order('birth_date_from', { ascending: true }),
     // 12-maands maandaggregaat (som pos/neg per maand/budget/type) voor de SUM-
-    // consumers (last12Income + 6-maands inkomen/uitgaven/spaarbudget). SQL-aggregaat
+    // consumers (de 6-maands inkomen/uitgaven/spaarbudget-sommen). SQL-aggregaat
     // i.p.v. een rijen-slice: kan niet stil afkappen op max_rows=1000 (correctheid).
-    // GEMENGDE grondslag per reductie: de spaarquote- én gezondheidsscore-sommen
-    // (income6m/expenses6m/savingsBudgetSpent6m + de 6-maands avg income/expenses)
-    // draaien transfer-EXCLUSIEF (realOnly:true — app-brede spaarquote/health-
-    // grondslag, eigen-rekening-overboekingen tellen NERGENS mee); alleen de
-    // FIRE-projectie-som last12Income telt transfers BEWUST mee (realOnly:false).
+    // ÉÉN grondslag voor élke reductie: transfer-EXCLUSIEF (realOnly:true) —
+    // eigen-rekening-overboekingen tellen NERGENS mee, niet in de spaarquote-/
+    // gezondheidsscore-sommen en sinds ADR 0169 + het eigenaarsbesluit van 19 sep
+    // 2026 ook niet in enige FIRE-som (de vroegere transfer-inclusieve
+    // `last12Income` bestaat niet meer; het jaarinkomen komt uit het
+    // realisatievenster van `loadBudgetBasis`, zie `horizonTxAnnualIncome`).
     // RLS-breed.
     //
     // Via de gedeelde `getTxAgg12m` i.p.v. een eigen `fetchTxMonthAggregate`: het
@@ -604,9 +609,9 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
   // Same row both consumers want: alias instead of re-querying.
   const assetsResult = fullAssetsResult
 
-  // Gedeeld 12-maands maandaggregaat — voedt last12Income + de 6-maands sommen.
-  // Per-reductie grondslag: de spaarquote/health-sommen transfer-EXCLUSIEF
-  // (realOnly:true), de FIRE-som last12Income transfer-INCLUSIEF (realOnly:false).
+  // Gedeeld 12-maands maandaggregaat — voedt de 6-maands sommen (spaarquote/
+  // health), allemaal transfer-EXCLUSIEF (realOnly:true); er is geen transfer-
+  // inclusieve reductie meer (zie de toelichting bij de query hierboven).
   // Kan niet stil afkappen op 1000 rijen. earliestIncomeDate komt niet meer uit
   // een 12-maands-slice maar uit de aparte all-time `getEarliestIncomeDate` (zie
   // hieronder).
@@ -751,11 +756,13 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
   // mee (de vroegere `includeTransfers`-optie) — een gedocumenteerde per-module-splitsing die
   // de "Na pensioen"-KPI na het sluiten van de sheet een ander bedrag liet tonen
   // dan de sheet zelf (client-herlading op de exclusieve bundel, SSR + sheet
-  // inclusief). extrapolatedIncome voedt computeRetirementExpenses (FIRE-
-  // pensioenuitgave, methode current_income) én de income-basis van
-  // baseAnnualSavingsFromCashflow (inkomen × spaarquote); de spaarquote-RATE
-  // (savingsRate6m, effectieve quote) was al transfer-exclusief — nu staan
-  // multiplier en rate op dezelfde grondslag.
+  // inclusief). Dit ene jaarinkomen (`horizonTxAnnualIncome` → grondslag-
+  // geresolveerd `horizonAnnualIncome`) voedt computeRetirementExpenses (FIRE-
+  // pensioenuitgave, methode current_income) én — via één en dezelfde
+  // `resolveSavingsSource`-aanroep verderop — zowel de effectieve spaarquote-RATE
+  // als de FIRE-spaarbron `baseAnnualSavingsFromCashflow` (inkomen × quote).
+  // Eigenaarsbesluit 19 sep 2026: er is géén transfer-inclusieve FIRE-som meer;
+  // multiplier en rate staan op dezelfde transfer-exclusieve grondslag.
   //
   // HISTORIEBASIS (ADR 0138): de som komt uit het realisatievenster van
   // `loadBudgetBasis` — twaalf AFGESLOTEN maanden, geschaald met dezelfde
@@ -800,7 +807,7 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
     horizonBudgetIncome.annualTotal,
   )
 
-  const { extrapolatedIncome, yearlyRetirementExpenses } = deriveRetirementExpenseBasis({
+  const { yearlyRetirementExpenses } = deriveRetirementExpenseBasis({
     method: profile.retirement_expense_method as RetirementExpenseMethod,
     yearlyMustExpenses,
     transactionAnnualIncome: horizonTxAnnualIncome,
@@ -955,28 +962,27 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
     fallbackMonthlyExpenses: effectiveMonthlyExpenses,
   })
 
-  // ── De EFFECTIEVE spaarquote en de FIRE-spaarbron: TWEE ANKERS, BEWUST ────
+  // ── De EFFECTIEVE spaarquote en de FIRE-spaarbron: ÉÉN ANKER, ÉÉN AANROEP ──
   //
   // `effectiveSavingsRate` (de tegel op /overzicht, de Rondkomen-pijler, de
   // slider-start van het lab) moet HET spaarquote-getal zijn dat de rest van de
   // app toont (ADR 0121): dashboardbundel, forecast-laag en check-in ankeren het
-  // transactie-jaarinkomen transfer-EXCLUSIEF (`transactionAnnualIncome(realized)`).
-  // Tot 19 sep 2026 kreeg `resolveSavingsSource` hier `extrapolatedIncome` — de
-  // transfer-INCLUSIEVE som hierboven — en rekende op de GEMENGDE grondslag
-  // (inkomen 'transaction', uitgaven budget/handmatig) de uniforme formule
-  // (I − E)/I op dat inflated anker: gemeten 47,5 % op de tegel naast 30 % in de
-  // spaarquote-widget op dezelfde pagina (kaart "what-if-slider start op een
-  // andere spaarquote-grondslag", geval B; op tx/tx en handmatig/handmatig wint
-  // resp. het rauwe `savingsRate6m` of het profiel en telde het anker niet mee).
+  // transactie-jaarinkomen transfer-EXCLUSIEF (`transactionAnnualIncome(realized)`,
+  // hierboven `horizonTxAnnualIncome`). Op de GEMENGDE grondslag (inkomen
+  // 'transaction', uitgaven budget/handmatig) rekent `resolveSavingsSource` de
+  // uniforme formule (I − E)/I op dat anker; een transfer-inclusief anker gaf daar
+  // ooit 47,5 % op de tegel naast 30 % in de widget (kaart "what-if-slider start
+  // op een andere spaarquote-grondslag", geval B).
   //
-  // De FIRE-spaarbron (`baseAnnualSavingsFromCashflow` → `buildHorizonInput`)
-  // blijft op het transfer-INCLUSIEVE anker — dat is het gedocumenteerde besluit
-  // bij `horizonTxAnnualIncome` hierboven ("FIRE-projectie-inputs zien bewust
-  // alle kasstromen"), en zo verschuift de FIRE-leeftijd niet door deze fix.
-  // EXPLICIET VASTGELEGD (eigenaarsbesluit 19 sep 2026): rate exclusief, FIRE-
-  // spaarbron inclusief. Twee aanroepen van dezelfde canonieke resolver, géén
-  // tweede formule. Aandachtspunt: de dashboardbundel voedt diezelfde kernel-
-  // parameter met haar EXCLUSIEVE `baseAnnualSavings` — een eigen besluit waard.
+  // De FIRE-spaarbron (`baseAnnualSavingsFromCashflow` → `buildHorizonInput`) is
+  // `baseAnnualSavings` uit DEZELFDE aanroep: inkomen × diezelfde quote, op
+  // hetzelfde transfer-exclusieve anker. EIGENAARSBESLUIT 19 sep 2026 (verving het
+  // "twee ankers"-besluit van dezelfde dag): overboekingen tussen eigen rekeningen
+  // zijn geen sparen en tellen in GEEN enkele FIRE-som mee — in lijn met ADR 0169
+  // (één inkomensgrondslag voor alle paden). Daarmee krijgt de kernel via
+  // /toekomst (deze loader) en via /overzicht (dashboardbundel `baseAnnualSavings`)
+  // per constructie dezelfde spaarbron; de FIRE-leeftijd hangt niet meer af van de
+  // ingang. Vergrendeld in lib/spaarquote-eenduidige-grondslag.test.tsx (geval B).
   const sources = profile as { income_source?: string | null; expenses_source?: string | null }
   // Uitgaven-grondslag voor de spaarquote, op de 6-maands meetbasis.
   const horizonSavingsExpenses = resolveAmountWithBasis(
@@ -985,45 +991,25 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
     expenses6m / SAVINGS_RATE_WINDOW_MONTHS,
     horizonBudgetExpenses.monthlyTotal,
   )
-  // Transfer-EXCLUSIEF anker voor de effectieve quote — letterlijk
-  // `extrapolatedIncome` in lib/dashboard-data-loader.ts en de forecast-laag.
-  const horizonSavingsTxAnnualIncome = transactionAnnualIncome(horizonRealized)
-  const horizonSavingsAnnualIncome = resolveAmountWithBasis(
-    sources.income_source,
-    Number(profile.net_monthly_income ?? 0) * 12,
-    horizonSavingsTxAnnualIncome,
-    horizonBudgetIncome.annualTotal,
-  )
-  const { effectiveSavingsRatePct: effectiveSavingsRate } = resolveSavingsSource({
+  const {
+    effectiveSavingsRatePct: effectiveSavingsRate,
+    baseAnnualSavings: baseAnnualSavingsFromCashflow,
+  } = resolveSavingsSource({
     incomeSource: sources.income_source,
     expensesSource: sources.expenses_source,
     netMonthlyIncome: Number(profile.net_monthly_income ?? 0),
-    estimatedAnnualIncome: horizonSavingsTxAnnualIncome,
+    estimatedAnnualIncome: horizonTxAnnualIncome,
     estimatedMonthlyExpenses: profileMonthlyExpenses,
     savingsRate6m,
-    // De spaarquote volgt de grondslag (ADR 0103). De uitgaven-invoer is het
-    // 6-maands GEMIDDELDE (`expenses6m / 6`) — dezelfde meting als savingsRate6m,
-    // niet de lopende maand.
-    basis: {
-      income: horizonSavingsAnnualIncome.basis,
-      expenses: horizonSavingsExpenses.basis,
-      annualIncome: horizonSavingsAnnualIncome.amount,
-      monthlyExpenses: horizonSavingsExpenses.amount,
-    },
-  })
-  // FIRE-spaarbron: inkomen × spaarquote — sinds ADR 0169 op hetzelfde
-  // transfer-exclusieve jaarinkomen als de spaarquote-rate zelf (één grondslag).
-  const { baseAnnualSavings: baseAnnualSavingsFromCashflow } = resolveSavingsSource({
-    incomeSource: sources.income_source,
-    expensesSource: sources.expenses_source,
-    netMonthlyIncome: Number(profile.net_monthly_income ?? 0),
-    estimatedAnnualIncome: extrapolatedIncome,
-    estimatedMonthlyExpenses: profileMonthlyExpenses,
-    savingsRate6m,
+    // De spaarquote volgt de grondslag (ADR 0103). De inkomens-invoer is het
+    // jaar-geresolveerde `horizonAnnualIncome` (dezelfde resolutie die via
+    // `deriveRetirementExpenseBasis` de pensioenuitgave voedt); de uitgaven-invoer
+    // is het 6-maands GEMIDDELDE (`expenses6m / 6`) — dezelfde meting als
+    // savingsRate6m, niet de lopende maand.
     basis: {
       income: horizonAnnualIncome.basis,
       expenses: horizonSavingsExpenses.basis,
-      annualIncome: extrapolatedIncome,
+      annualIncome: horizonAnnualIncome.amount,
       monthlyExpenses: horizonSavingsExpenses.amount,
     },
   })
