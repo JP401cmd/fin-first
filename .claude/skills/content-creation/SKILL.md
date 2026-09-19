@@ -19,7 +19,7 @@ description: Gebruik voor elk nieuw publiek stuk tekst — landingcopy, een root
 
 1. **Waar gaat het over.** Komt het onderwerp uit `zoekvraag-onderzoek` (oordeel `inzicht`), dan ligt de vraag er al. Zo niet: schrijf in één zin welke vraag van de lezer je beantwoordt. Kun je dat niet, dan is het stuk er nog niet.
 2. **Wat is de belofte, en houdt hij stand.** Eén kernbelofte per stuk. Toets 'm meteen tegen de claimlijst — een belofte die je later moet afzwakken is beter nu al anders geformuleerd.
-3. **Schrijven.** Nederlands, je/jij, kort en concreet, geen emoji. Bedragen van betekenis ook in vrijheidstijd — "geld is opgeslagen tijd" is de taal, geen opsmuk. Kansen, niet schaarste.
+3. **Schrijven.** Nederlands, je/jij, kort en concreet, geen emoji. Bedragen van betekenis ook in vrijheidstijd — "geld levert tijd op" is de taal, geen opsmuk; vrijheidstijd bouw je op, je koopt 'm nooit (vrij/terug) — ADR 0165. Kansen, niet schaarste.
 4. **De poort.** `compliance-check`, met een beslisbare uitkomst (goedkeuren · aanpassen · afwijzen). Raakt het `/privacy`, `/voorwaarden` of `/wft`, dan geldt de uitzonderingsroute uit `CLAUDE.md`: nooit via `kleine-aanpassing`, altijd mét een `juridische-brief`-aantekening.
 5. **Vormgeven.** Publieke/marketing-oppervlakken: `frontend-design`. In-app schermen: `ui-ux` is daar de single source of truth — verwar die twee niet.
 

@@ -5,7 +5,9 @@ description: "Gebruik vóór het schrijven of wijzigen van elke tekst die naar b
 
 # Merkstem — één stem, vier oppervlakken
 
-**Eerste regel — de merkstem heeft één vertrekpunt: _geld is opgeslagen tijd_.** Elke tekst komt daar vandaan, of hij nu door een mens of door het model geschreven is. Vrijheidstijd is de táal van TriFinity, geen optionele opsmuk.
+**Eerste regel — de merkstem heeft één vertrekpunt: _geld levert tijd op_.** Elke tekst komt daar vandaan, of hij nu door een mens of door het model geschreven is. Vrijheidstijd is de táal van TriFinity, geen optionele opsmuk.
+
+**Tweede vertrekpunt — de koop-/verkoop-metafoor is verboden (ADR 0165).** Niemand koopt, vrijkoopt, terugkoopt of verkoopt tijd. Schrijf nooit "vrijgekocht", "vrijheid terugkopen", "gekochte of verkochte tijd" of "teruggekochte levenstijd" — je **bouwt vrijheidstijd op**. De leus "geld is opgeslagen tijd" is vervallen.
 
 **Tweede harde regel — deze skill is een wegwijzer, geen kopie.** Toon en claims staan al canoniek in de code. Schrijf ze hier nooit over: een tweede exemplaar driftet, en dan heb je precies het probleem dat deze skill moest oplossen.
 
@@ -17,7 +19,7 @@ description: "Gebruik vóór het schrijven of wijzigen van elke tekst die naar b
 | Toegestane claims | `.claude/skills/compliance-check/SKILL.md` — sectie *De claimlijst* | een tweede claimlijst |
 | Rekenregels/getallen | de canonieke engines (CLAUDE.md: *consume, don't recompute*) | zelf een getal noemen |
 
-Kort als geheugensteun — **bij twijfel wint de bron hierboven**: Nederlands, je/jij, empowerend nooit veroordelend, kort en concreet, geen emoji. Bedragen van betekenis ook in vrijheidstijd. "Vrijgekocht", niet "gespaard". Kansen, niet schaarste. Bewuster genieten, niet minder genieten.
+Kort als geheugensteun — **bij twijfel wint de bron hierboven**: Nederlands, je/jij, empowerend nooit veroordelend, kort en concreet, geen emoji. Bedragen van betekenis ook in vrijheidstijd. "Opgebouwd", niet "gespaard" — en nooit "vrijgekocht". Kansen, niet schaarste. Bewuster genieten, niet minder genieten.
 
 ## De vier oppervlakken die dezelfde stem dragen
 

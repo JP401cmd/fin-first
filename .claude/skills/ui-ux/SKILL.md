@@ -9,7 +9,7 @@ description: Use when building, restyling or reviewing ANY TriFinity UI — pagi
 
 ## Kernprincipe
 
-> "Geld is opgeslagen tijd." Elke UI-laag versterkt dat; elk significant bedrag krijgt zijn vrijheidstijd-equivalent (via `lib/format.ts` — nooit zelf de dag/jaar-conversie verzinnen).
+> "Geld levert tijd op." Elke UI-laag versterkt dat; elk significant bedrag krijgt zijn vrijheidstijd-equivalent (via `lib/format.ts` — nooit zelf de dag/jaar-conversie verzinnen). Vrijheidstijd **bouw je op**; de koop-/verkoop-metafoor ("vrijgekocht", "vrijheid terugkopen") is verboden — ADR 0165.
 
 ## Ontwerpfilosofie (altijd van toepassing)
 

@@ -12,7 +12,7 @@ You are the **Prompt & DNA Specialist** for TriFinity — the keeper of how the 
 
 ## The "DNA" — where the prompts live
 
-- `lib/ai/dna/base.ts` — `BASE_SYSTEM_PROMPT`. The shared spine prepended to every domain: the **kernfilosofie** ("Geld is opgeslagen tijd"), the propositie, the **rekenregels** ("verzin NOOIT zelf cijfers" — all numbers come from the `FINANCIEEL OVERZICHT`), the **framing** rules (show amounts also as vrijheidstijd; "vrijgekocht" not "gespaard"), **toon** (Dutch, je/jij, empowering, compact, no emoji, no markdown headers), visualisatie tool usage, and the **Wft-compliance** limits (no buy/sell/tax advice; always refer to an AFM-registered adviser). Treat these invariants as load-bearing — never silently drop them.
+- `lib/ai/dna/base.ts` — `BASE_SYSTEM_PROMPT`. The shared spine prepended to every domain: the **kernfilosofie** ("Geld levert tijd op"), the propositie, the **rekenregels** ("verzin NOOIT zelf cijfers" — all numbers come from the `FINANCIEEL OVERZICHT`), the **framing** rules (show amounts also as vrijheidstijd; "opgebouwd" not "gespaard"; the buy/sell metaphor "vrijgekocht"/"vrijheid terugkopen" is forbidden — ADR 0165), **toon** (Dutch, je/jij, empowering, compact, no emoji, no markdown headers), visualisatie tool usage, and the **Wft-compliance** limits (no buy/sell/tax advice; always refer to an AFM-registered adviser). Treat these invariants as load-bearing — never silently drop them.
 - `lib/ai/dna/kern.ts`, `wil.ts`, `horizon.ts` — per-domain personalities (`KERN_PROMPT`/`WIL_PROMPT`/`HORIZON_PROMPT` + exported `*_PERSONALITY` objects typed by `DomainPersonality` in `types.ts`). `wil.ts` is the largest and also exports `GEBEURTENIS_PROMPT` (the life-event chat, chat context `'gebeurtenis'`).
 - `lib/ai/dna/index.ts` — `buildSystemPrompt(domain, supabase)` = `BASE_SYSTEM_PROMPT + '\n' + DOMAIN_PROMPTS[domain]`, unless an `ai_system_prompt_override` exists in `app_settings` (then the override is the FULL prompt). `getDefaultFullPrompt(domain)` is what the admin UI shows. Keep base + domain composable and non-contradictory.
 - `lib/ai/dna/recommendations.ts` — recommendation-generation prompt.
@@ -34,7 +34,7 @@ You are the **Prompt & DNA Specialist** for TriFinity — the keeper of how the 
 
 ## Prompt-craft principles (TriFinity-specific)
 
-- **One philosophy, not "data + coaching."** Every prompt should sound like TriFinity: geld = opgeslagen tijd, vrijheidstijd as the native language.
+- **One philosophy, not "data + coaching."** Every prompt should sound like TriFinity: geld levert tijd op, vrijheidstijd as the native language — built up, never bought or bought back.
 - **Determinism for classification.** Categorization/extraction prompts must be unambiguous: explicit slugs, ordered output, confidence thresholds, tie-break rules, "null when unsure." No creativity there.
 - **Personality for chat.** Kern/Wil/Horizon may have distinct voice and expertise, but never contradict the base DNA or the compliance limits.
 - **Examples beat adjectives.** "Picnic, Crisp → boodschappen" is worth more than "be accurate."

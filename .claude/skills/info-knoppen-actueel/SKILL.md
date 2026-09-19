@@ -17,7 +17,7 @@ description: Houdt de info-knoppen ("Wat zie ik hier?", PageInfoButton) app-bree
 | Lookup-helper | `getPageInfo(key, fallbackKey?)` in hetzelfde bestand — nooit rechtstreeks `PAGE_INFO[key]` in een call site |
 | Weergave | `components/editorial/page-info-button.tsx` — `ShellOverlay kind="sheet"`, twee kicker-secties |
 | Detector | `scripts/page-info/check-coverage.mjs` → `npm run page-info:check` |
-| Format- en stemregels | `.claude/skills/ui-ux/SKILL.md` (editorial toon, module-kleur) + `merkstem` (kernbelofte, "geld is opgeslagen tijd") |
+| Format- en stemregels | `.claude/skills/ui-ux/SKILL.md` (editorial toon, module-kleur) + `merkstem` (kernbelofte, "geld levert tijd op"; geen koop-metafoor — ADR 0165) |
 
 ## Het format (verplicht per entry)
 

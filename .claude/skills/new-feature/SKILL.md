@@ -6,7 +6,7 @@ description: "End-to-end pijplijn voor een NIEUWE functionaliteit in TriFinity. 
 
 # Nieuwe-functie pijplijn
 
-Bouwt een nieuwe functionaliteit via de gespecialiseerde subagents. Nadruk: eerst *waarom & wat* scherp, dán *hoe het past*, dán pas bouwen — zodat het past binnen één filosofie ("Geld is opgeslagen tijd") en de architectuur coherent blijft.
+Bouwt een nieuwe functionaliteit via de gespecialiseerde subagents. Nadruk: eerst *waarom & wat* scherp, dán *hoe het past*, dán pas bouwen — zodat het past binnen één filosofie ("Geld levert tijd op") en de architectuur coherent blijft.
 
 Geef het idee mee als argument; is het vaag, laat de `business-owner` het eerst scherpen.
 

@@ -54,7 +54,7 @@ De hoofdchat voert de tweak standaard zelf uit. Is het domein specialistisch, ro
 - UI/component/scherm/tekst/marge/kleur/beeld → `frontend-ui-builder`
 - Overig (lijm, config, niet-financiële constante, copy in code) → `coder`
 
-Schaaf bij de **bron**, hergebruik bestaande tokens/componenten/helpers; introduceer geen tweede manier van iets doen. Respecteer "Geld is opgeslagen tijd"-framing en de bestaande conventies (design tokens, `font-mono tabular-nums` voor bedragen, vrijheidstijd-framing). Git-experimenten alleen in een geïsoleerde worktree, nooit in de gedeelde werkboom (zie de gedeelde conventies).
+Schaaf bij de **bron**, hergebruik bestaande tokens/componenten/helpers; introduceer geen tweede manier van iets doen. Respecteer de "Geld levert tijd op"-framing (opbouwen, nooit vrij-/terugkopen — ADR 0165) en de bestaande conventies (design tokens, `font-mono tabular-nums` voor bedragen, vrijheidstijd-framing). Git-experimenten alleen in een geïsoleerde worktree, nooit in de gedeelde werkboom (zie de gedeelde conventies).
 
 ### 4. Verifiëren — verplicht, geen groen-theater
 Altijd: `npx tsc --noEmit` + het **gerichte** `npm run test:run`-pad rond het geraakte bestand (niet de hele suite tenzij nodig). Bij een UI-wijziging ook een **visuele check** van het geraakte scherm in de betrokken toestanden. Echte output rapporteren. Brak een bestaande test door de tweak → fix of pas de test bewust aan met uitleg; nooit wegmoffelen. Een nieuwe (regressie)test is bij een echt kleine aanpassing meestal niet nodig — voeg er één toe als de tweak gedrag raakt dat makkelijk terug kan vallen.
