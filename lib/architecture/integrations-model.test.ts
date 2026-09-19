@@ -105,6 +105,12 @@ function parserFilesOnDisk(): string[] {
     'counterparty-normalize.ts',
     'cross-source-dedup.ts',
     'iban.ts',
+    // - other-account-overlap.ts: pure telling bovenop cross-source-dedup.ts
+    //   (laag 2) — telt per ANDERE eigen rekening hoeveel importregels daar al
+    //   staan (de upload-overlapwaarschuwing, eigenaarsbesluit 11-09-2026). Zelf
+    //   geen bestandsformaat en geen externe client; precies dezelfde familie
+    //   als cross-source-dedup.ts hierboven, en gedeeld door alle importformaten.
+    'other-account-overlap.ts',
   ]
   return readdirSync(dir)
     .filter(f => f.endsWith('.ts') && !f.endsWith('.test.ts') && !f.endsWith('.d.ts') && !SKIP.includes(f))
