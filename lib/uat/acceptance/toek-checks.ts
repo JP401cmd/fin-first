@@ -57,6 +57,14 @@
  *                                plan 17 sep 2026 onderdeel D); geen
  *                                Supabase-/Next-imports, alleen een
  *                                `UnifiedProjectionRow`-type-import.
+ *   - `lib/horizon/haalbare-uitgave.ts` (alleen het `HAALBARE_UITGAVE_DREMPEL`-
+ *                                type/de constante) + `lib/scenario-events.ts`
+ *                                (WF-TOEK-57, ADR 0160); de bisectie zelf
+ *                                (`solveHaalbareUitgave`) draait niet mee — die
+ *                                is kernel-zwaar en is kernel-bewezen in
+ *                                lib/horizon/haalbare-uitgave.test.ts, hier
+ *                                alleen de pure kopij-/kleur-/drempellaag op
+ *                                synthetische `HaalbareUitgave`-fixtures.
  */
 
 import { PERSONAS } from '@/lib/test-personas'
@@ -95,7 +103,9 @@ import { resolveLabUitkomst, type LabEindvermogen, type LabUitkomst } from '@/li
 import { buildParameterGoalRows } from '@/lib/horizon/toekomst-doel'
 import { resolveLabAntwoorden } from '@/lib/horizon/lab-antwoorden'
 import { selectLabDoelenBuitenPlan } from '@/lib/goals/lab-doelen-buiten-plan'
-import { doelenPlanGewijzigdMelding } from '@/lib/horizon/anker-copy'
+import { doelenPlanGewijzigdMelding, haalbaarBijUitgaveRegel, antwoordUitgaveNaPensioen } from '@/lib/horizon/anker-copy'
+import { HAALBARE_UITGAVE_DREMPEL, type HaalbareUitgave } from '@/lib/horizon/haalbare-uitgave'
+import { UITGAVE_NA_PENSIOEN_STAP } from '@/lib/scenario-events'
 import { buildDeficitLoanCopy } from '@/lib/horizon/deficit-loan-copy'
 import { detectEindsituatie } from '@/lib/horizon/eindsituatie-duiding'
 import { buildEindsituatieCopy } from '@/lib/horizon/eindsituatie-copy'
@@ -800,6 +810,45 @@ export const TOEK_ENGINE_CHECKS: ToekEngineCheck[] = [
           'oorzaken=geen-tekort-lening,later-inkomen; eenduidig=true; overschot=300000@90; dieptepunt=15000@68; kopBevatVermogenOpeten=true; oorzaak0BevatJe68e=true; oorzaak0BevatDieptepunt=true; oorzaak1BevatJe80e=true; onduidelijk=null; displayNone=none; displayExpanded=expanded; displayMinimized=minimized; flagOnbekendeWaarde=null; flagGeldig=1',
         actual:
           `oorzaken=${duiding.oorzaken.map((o) => o.id).join(',')}; eenduidig=${duiding.eenduidig}; overschot=${duiding.overschot.bedrag}@${duiding.overschot.age}; dieptepunt=${duiding.dieptepunt?.bedrag}@${duiding.dieptepunt?.age}; kopBevatVermogenOpeten=${copy.kop.includes('vermogen opeten')}; oorzaak0BevatJe68e=${copy.oorzaken[0]?.includes('je 68e')}; oorzaak0BevatDieptepunt=${copy.oorzaken[0]?.includes('€ 15.000')}; oorzaak1BevatJe80e=${copy.oorzaken[1]?.includes('je 80e')}; onduidelijk=${copy.onduidelijk}; displayNone=${displayNone}; displayExpanded=${displayExpanded}; displayMinimized=${displayMinimized}; flagOnbekendeWaarde=${flagOnbekendeWaarde}; flagGeldig=${flagGeldig}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-TOEK-57',
+    scenarioId: 'UAT-TOEK-57',
+    label: 'Haalbare uitgave na pensioen — duidingsregel + antwoordregel, één bron, twee lezers (ADR 0160)',
+    run: () => {
+      criterion('WF-TOEK-57')
+      const minder: HaalbareUitgave = { perJaar: 31_200, huidigPerJaar: 38_640, eindleeftijd: 90, richting: 'minder' }
+      const meer: HaalbareUitgave = { perJaar: 54_000, huidigPerJaar: 38_640, eindleeftijd: 90, richting: 'meer' }
+      const gelijk: HaalbareUitgave = { perJaar: 38_760, huidigPerJaar: 38_640, eindleeftijd: 90, richting: 'gelijk' }
+
+      const regelMinder = haalbaarBijUitgaveRegel(minder)
+      const regelMeer = haalbaarBijUitgaveRegel(meer)
+      const regelGelijk = haalbaarBijUitgaveRegel(gelijk)
+      const antwoordMinder = antwoordUitgaveNaPensioen(minder.perJaar)
+
+      // Klassekeuze — spiegelt exact de regel in horizon-client.tsx: richting bepaalt
+      // de semantische kleurtoken, nooit het accent van de gebruiker (CLAUDE.md).
+      const klasse = (h: HaalbareUitgave): string =>
+        h.richting === 'minder' ? 'text-negative' : h.richting === 'meer' ? 'text-positive' : 'geen-regel'
+
+      // Antwoord 4 klemt nooit (ADR 0160 besluit 4): bovenBereik is altijd false, ook
+      // wanneer het bedrag buiten een fictief sliderbereik zou vallen.
+      const antwoorden = resolveLabAntwoorden({
+        dekking: null,
+        solvedFireAge: null,
+        planMaandHint: null,
+        baseline: null,
+        haalbareUitgave: minder,
+      })
+      const uitgaveAntwoord = antwoorden.find((a) => a.kind === 'uitgave_na_pensioen')
+
+      return {
+        expected:
+          'drempel=250; sliderstap=600; regelMinder=haalbaar tot 90 bij uitgave: € 31.200; klasseMinder=text-negative; regelMeer=haalbaar tot 90 bij uitgave: € 54.000; klasseMeer=text-positive; regelGelijk=null; antwoordMinder=Zo\'n € 31.200 per jaar uitgeven hoort bij een gedekt plan.; antwoordBovenBereikMinder=false',
+        actual:
+          `drempel=${HAALBARE_UITGAVE_DREMPEL}; sliderstap=${UITGAVE_NA_PENSIOEN_STAP}; regelMinder=${regelMinder}; klasseMinder=${klasse(minder)}; regelMeer=${regelMeer}; klasseMeer=${klasse(meer)}; regelGelijk=${regelGelijk}; antwoordMinder=${antwoordMinder}; antwoordBovenBereikMinder=${uitgaveAntwoord?.bovenBereik}`,
       }
     },
   },

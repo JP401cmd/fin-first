@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-09-18T19:20:44.522Z",
-  "generatedDate": "2026-09-18",
+  "generatedAt": "2026-09-19T00:17:32.467Z",
+  "generatedDate": "2026-09-19",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -18357,6 +18357,18 @@
       ],
       "summary": "Melden vanuit het gesprek met Fin kende een rem van 5 meldingen per rollend uur per gebruiker, afgedwongen in `public.reserve_user_report_slot`. Die rem raakte in de praktijk de verkeerde persoon: iemand die een scherm systematisch naloopt, loopt er halverwege tegenaan en krijgt ",
       "file": "docs/adr/0159-de-meldingenrem-vervalt.md"
+    },
+    {
+      "id": "0160-de-haalbare-uitgave-na-pensioen",
+      "title": "De haalbare uitgave na pensioen — een vierde hefboom voor wie zijn stopmoment al vastzet",
+      "status": "aanvaard",
+      "date": "2026-09-19",
+      "elements": [
+        "as-planning",
+        "fn-toekomstplannen"
+      ],
+      "summary": "Bouwt voort op spec `2026-09-18-haalbare-uitgave-na-pensioen-design.md`, ADR 0129 (vast stopmoment × eind-vorm) en ADR 0145 (lab-uitkomst/dekking als uitkomst onder een vast anker).",
+      "file": "docs/adr/0160-de-haalbare-uitgave-na-pensioen.md"
     }
   ],
   "churn": {
@@ -18406,8 +18418,8 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 10768,
-        "commits": 92
+        "loc": 10839,
+        "commits": 96
       },
       {
         "file": "components/app/budgets-client.tsx",
@@ -19616,17 +19628,9 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-09-17",
-    "hasChanges": true,
-    "sections": [
-      {
-        "label": "Componenten (aantal)",
-        "added": [
-          "+2"
-        ],
-        "removed": []
-      }
-    ]
+    "previousDate": "2026-09-18",
+    "hasChanges": false,
+    "sections": []
   },
   "statsHistory": [
     {
@@ -20058,6 +20062,13 @@
     },
     {
       "date": "2026-09-18",
+      "api": 326,
+      "components": 1143,
+      "tables": 102,
+      "routesProduction": 90
+    },
+    {
+      "date": "2026-09-19",
       "api": 326,
       "components": 1143,
       "tables": 102,

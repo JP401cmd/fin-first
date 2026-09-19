@@ -885,6 +885,26 @@ const criteria: AcceptanceCriterion[] = [
         'lib/horizon/eindsituatie-duiding.ts#detectEindsituatie + lib/horizon/eindsituatie-copy.ts#buildEindsituatieCopy (incl. finVraag/finContext, doorgegeven als `detail` aan BesprekMetWillButton) op een zelfstandige synthetische UnifiedProjectionRow-fixture (géén kernel-run, wél echte productiefuncties) + lib/horizon/eindsituatie-notice-minimize.ts#resolveEindsituatieNoticeDisplay/asEindsituatieMinimizedFlag — zie toek-checks.ts. Gerenderd in components/app/horizon/eindsituatie-notice.tsx (/toekomst) en components/rapportage/totaalplan-blocks.tsx (totaalplan, zonder Fin-knop); trigger-varianten (vast stopmoment, drempel, per-oorzaak, dieptepunt ≤ 0, partnerbijdrage-aftrek) vergrendeld in lib/horizon/eindsituatie-duiding.test.ts; toongrendel + context-copy in lib/horizon/eindsituatie-copy.test.ts; acht scenario\'s op ÉCHTE kernel-runs (convergentie-projectie, persona Tessa Compleet — pensioengat, instelling uit, vast stopmoment, "nu al vrij", opeethypotheek, nalatenschap, "niet laten slinken", krap plan) in lib/horizon/eindsituatie-scenarios.test.ts.',
     },
   },
+  {
+    workflow: 'WF-TOEK-57',
+    scenarioId: 'UAT-TOEK-57',
+    titel: 'Haalbare uitgave na pensioen: duidingsregel in de "Na pensioen"-tegel en de vierde draaiknop (ADR 0160)',
+    kriticiteit: 'KERN',
+    persona: 'willem',
+    given:
+      'Persona Willem met een vastgezet stopmoment (`fire_stop_anchor` op `age`/`aow`, niet `solved`) waarbij het plan niet precies tot de eindleeftijd reikt — subscenario a: een tekort (het plan raakt vóór de eindleeftijd op), subscenario b: een overschot (het plan reikt ruim voorbij de eindleeftijd). `solveHaalbareUitgave` (lib/horizon/haalbare-uitgave.ts, ADR 0160) bisecteert de uitgave na pensioen (€/jaar) tot `solveFire(...).status` geen shortfall meer is en levert `HaalbareUitgave { perJaar, eindleeftijd, huidigPerJaar, richting }`; dat resultaat landt als `ScenarioPresetBatch.haalbareUitgave`, in dezelfde worker-oversteek als de zes preset-kaarten.',
+    when:
+      'De gebruiker opent /toekomst en leest (1) de regel onder het bedrag in beide "Na pensioen"-KPI-tegels (desktop- en mobiele strip, `data-testid="hero-stat-retirement-expense"`) en (2) de antwoordregel onder de vierde draaiknop "Uitgave na pensioen" in de vrijheidsas (sectie 2, ná Minder werken).',
+    then:
+      'Beide plekken tonen HETZELFDE bedrag uit dezelfde bron — geen tweede berekening in de UI. (a) Tekort: de tegelregel luidt "haalbaar tot {eindleeftijd} bij uitgave: {bedrag}" in `text-negative` (donkerrood; `perJaar < huidigPerJaar`), en de antwoordregel onder de knop luidt "Zo\'n {hetzelfde bedrag} per jaar uitgeven hoort bij een gedekt plan." (b) Overschot: dezelfde tegelregel in `text-positive` (donkergroen; `perJaar > huidigPerJaar`) en dezelfde antwoordvorm met het hogere bedrag. Bij |perJaar − huidigPerJaar| < € 250/jaar (HAALBARE_UITGAVE_DREMPEL) verschijnt in GEEN van beide plekken een regel (`richting === \'gelijk\'`). Zet de gebruiker de vierde knop op een andere stand, dan rekent de scenario-run met die gekozen uitgave na pensioen mee (dekkingsas + wat-als-lijn bewegen), en zonder actieve overrides blijft de scenario-run byte-identiek aan de basislijn (`scenario-baseline-parity.test.ts`). Geen vast stopmoment (anker `solved`) ⇒ geen regel en geen antwoordregel; huishoud-/partnerweergave (`hasPerspectiveHero`) ⇒ de tegelregel verbergt zich, de antwoordregel onder de knop niet (bewuste asymmetrie, ADR 0160 Gevolgen — open punt voor visuele controle). Privacy-weergave: `···` op de plaats van het bedrag in beide regels, en de antwoordregel draagt dan geen knop.',
+    assertion: {
+      kind: 'exact',
+      expected:
+        'drempel=250; sliderstap=600; regelMinder=haalbaar tot 90 bij uitgave: € 31.200; klasseMinder=text-negative; regelMeer=haalbaar tot 90 bij uitgave: € 54.000; klasseMeer=text-positive; regelGelijk=null; antwoordMinder=Zo\'n € 31.200 per jaar uitgeven hoort bij een gedekt plan.; antwoordBovenBereikMinder=false',
+      source:
+        'lib/horizon/haalbare-uitgave.ts#HAALBARE_UITGAVE_DREMPEL (250; de bisectie-precisie € 50/jaar en de bovengrens-factor 3× zijn module-privé constanten, gepind in lib/horizon/haalbare-uitgave.test.ts) + lib/scenario-events.ts#UITGAVE_NA_PENSIOEN_STAP (600) + lib/horizon/anker-copy.ts#haalbaarBijUitgaveRegel/antwoordUitgaveNaPensioen op synthetische HaalbareUitgave-fixtures (géén kernel-run — de tekst-/kleur-/drempellaag is puur; de bisectie zelf is kernel-bewezen in lib/horizon/haalbare-uitgave.test.ts en lib/horizon/scenario-presets.haalbare-uitgave.test.ts) — zie toek-checks.ts. Kleurtokens (text-negative/text-positive) zijn de bestaande semantische tokens (CLAUDE.md kleurconventie); de bron-test op de tegels bewaakt dat er geen Tailwind-standaardkleur of losse hex in de nieuwe markup staat.',
+    },
+  },
 ]
 
 export const TOEK_ACCEPTANCE: AcceptanceSet = {
@@ -924,9 +944,13 @@ export const TOEK_ACCEPTANCE: AcceptanceSet = {
  * NIEUW — de melding "waarom blijft er aan het eind zoveel over?" boven de
  * grafiek (en hetzelfde blok in het totaalplan) is een geheel nieuw oppervlak
  * zonder eerder criterium.
+ * WF-TOEK-57 (19 sep 2026, ADR 0160 "De haalbare uitgave na pensioen") is
+ * NIEUW — de duidingsregel in de "Na pensioen"-tegel en de antwoordregel onder
+ * de nieuwe vierde draaiknop "Uitgave na pensioen" in de vrijheidsas; beide
+ * bewezen op dezelfde bron (ScenarioPresetBatch.haalbareUitgave).
  */
 export const TOEK_EXPECTED_WORKFLOW_NUMBERS: number[] = [
   ...Array.from({ length: 8 }, (_, i) => i + 1), // 1..8
   ...Array.from({ length: 17 }, (_, i) => i + 10), // 10..26
-  28, 29, 30, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56,
+  28, 29, 30, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57,
 ]
