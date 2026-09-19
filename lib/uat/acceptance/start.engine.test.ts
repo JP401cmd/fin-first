@@ -31,7 +31,7 @@ function criterion(workflow: string): AcceptanceCriterion {
 }
 
 describe('UAT Start — acceptatiecriteria dekking', () => {
-  it('heeft precies één criterium per catalogus-START-scenario (01..40, geen gaten)', () => {
+  it('heeft precies één criterium per catalogus-START-scenario (01..40 met een gat op 21, geen andere gaten)', () => {
     const workflows = START_ACCEPTANCE.criteria.map((c) => c.workflow).sort()
     expect(workflows).toEqual(catalogStartWorkflows)
     expect(new Set(workflows).size).toBe(catalogStartWorkflows.length)
@@ -40,7 +40,10 @@ describe('UAT Start — acceptatiecriteria dekking', () => {
     // WF-START-39 (vier getrokken accentkleuren bij binnenkomst;
     // 'consistency') en WF-START-40 (de eerste ophaal op het homescherm,
     // ADR 0158; 'consistency').
-    expect(workflows.length).toBe(40)
+    // 19-09-2026 (ADR 0162, B-056): WF-START-21/UAT-START-21 (spaardoel
+    // kiezen/overslaan) verwijderd — de onboarding-stap "Spaardoel" bestaat
+    // niet meer. 40 → 39 criteria, met een bewust gat op nummer 21.
+    expect(workflows.length).toBe(39)
   })
 
   it('elk criterium heeft een geldige assertion.kind', () => {
@@ -66,7 +69,7 @@ describe('UAT Start — acceptatiecriteria dekking', () => {
       .sort()
     const checkWorkflows = START_ENGINE_CHECKS.map((c) => c.workflow).sort()
     expect(checkWorkflows).toEqual(exactWorkflows)
-    expect(exactWorkflows.length).toBe(12)
+    expect(exactWorkflows.length).toBe(11)
   })
 
   it('markeert de niet-exacte scenario\'s met de juiste kind (ui-only)', () => {

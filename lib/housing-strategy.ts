@@ -39,6 +39,7 @@
  */
 
 import type { Asset } from '@/lib/asset-data'
+import { resolveExpectedReturnPct } from '@/lib/asset-return'
 import { type Debt, amortizationSchedule } from '@/lib/debt-data'
 import type { SimCashflow } from '@/lib/fire-simulation'
 import type { LifeEvent, UserDefinedCashflow } from '@/lib/horizon-data'
@@ -359,7 +360,14 @@ export function deriveHousingContext(assets: Asset[], debts: Debt[]): HousingCon
  *   - `currentValue` wordt opgebouwd uit `current_value` (fallback `woz_value`).
  *   - `net_worth_inclusion_pct` wordt per asset toegepast — consistent met
  *     `deriveHousingContext`.
- *   - Negatieve of NaN `expected_return` valt terug op 0 (geen groei).
+ *   - NaN `expected_return` valt terug op 0 (geen groei); een negatieve waarde
+ *     telt letterlijk (waardedaling).
+ *   - `expected_return = null` = GEEN eigen aanname (ADR 0166) → valt terug op
+ *     `terugvalRendementPct` (profielrendement in PROCENTEN, keuze a — dezelfde
+ *     ketting als `potRendement` in de kernel, waar het huis-pot óók op het
+ *     profielrendement groeit). Weggelaten → 0: de oude nul-basis, zodat een
+ *     aanroeper zonder profiel geen verzonnen groei krijgt. Een ingevulde 0
+ *     blijft een bewuste 0% — de "WOZ-groei wint"-tests leunen daarop.
  *   - Bij `monthsForward <= 0` retourneert dezelfde basiswaarden zonder
  *     compounding.
  *
@@ -368,6 +376,7 @@ export function deriveHousingContext(assets: Asset[], debts: Debt[]): HousingCon
 export function projectEigenHuisValuesAt(
   eigenHuisAssets: Asset[],
   monthsForward: number,
+  terugvalRendementPct = 0,
 ): { wozValue: number; currentValue: number } {
   const years = Math.max(0, monthsForward) / 12
   let wozValue = 0
@@ -375,7 +384,7 @@ export function projectEigenHuisValuesAt(
   for (const a of eigenHuisAssets) {
     if (!a.is_active || a.asset_type !== 'eigen_huis') continue
     const inclusion = Number(a.net_worth_inclusion_pct ?? 100) / 100
-    const ret = Number.isFinite(Number(a.expected_return)) ? Number(a.expected_return) / 100 : 0
+    const ret = resolveExpectedReturnPct(a.expected_return, terugvalRendementPct) / 100
     const factor = Math.pow(1 + ret, years)
     const baseWoz = Number(a.woz_value) || Number(a.current_value) || 0
     const baseCurrent = Number(a.current_value) || baseWoz
@@ -1024,6 +1033,13 @@ export function buildHousingLifeEventsAtAge(
   currentAge: number,
   endAge: number,
   extraMetadata: Record<string, unknown> = {},
+  /**
+   * Profielrendement in PROCENTEN — terugval voor een woning zonder eigen
+   * rendementsaanname (ADR 0166) in de WOZ-/waardeprojectie naar het
+   * trigger-moment. `getHousingLifeEvents` geeft `grossReturn × 100` door;
+   * weggelaten → 0 (oude nul-basis).
+   */
+  terugvalRendementPct = 0,
 ): LifeEvent[] {
   if (!context.hasEigenHuis) return []
 
@@ -1059,7 +1075,7 @@ export function buildHousingLifeEventsAtAge(
       // de context zitten.
       const projectedHouse =
         context.eigenHuisAssets.length > 0
-          ? projectEigenHuisValuesAt(context.eigenHuisAssets, monthsToTrigger)
+          ? projectEigenHuisValuesAt(context.eigenHuisAssets, monthsToTrigger, terugvalRendementPct)
           : { wozValue: context.wozValue, currentValue: context.eigenHuisValue }
       const wozValueAtTrigger = projectedHouse.wozValue
 
@@ -1176,7 +1192,7 @@ export function buildHousingLifeEventsAtAge(
       const mortgageBalanceAtTrigger = projected.balance
       const projectedHouse =
         context.eigenHuisAssets.length > 0
-          ? projectEigenHuisValuesAt(context.eigenHuisAssets, monthsToTrigger)
+          ? projectEigenHuisValuesAt(context.eigenHuisAssets, monthsToTrigger, terugvalRendementPct)
           : { wozValue: context.wozValue, currentValue: context.eigenHuisValue }
       const eigenHuisValueAtTrigger = projectedHouse.currentValue
       const equityAtTrigger = Math.max(0, eigenHuisValueAtTrigger - mortgageBalanceAtTrigger)
@@ -1249,6 +1265,10 @@ export function getHousingLifeEvents(input: ApplyHousingStrategyInput): LifeEven
     inflationRate,
   } = input
   if (!context.hasEigenHuis) return []
+  // Terugval voor een woning zonder eigen rendement (ADR 0166): hetzelfde
+  // profielrendement dat de kernel-adapter op het huis-pot zet. Zonder
+  // `grossReturn` in de invoer blijft de oude nul-basis staan.
+  const terugvalRendementPct = (grossReturn ?? 0) * 100
 
   switch (config.mode) {
     case 'include_full':
@@ -1280,7 +1300,7 @@ export function getHousingLifeEvents(input: ApplyHousingStrategyInput): LifeEven
         yearlyExpenses,
         annualSavings,
         currentNetCashflowYearly,
-      })
+      }, terugvalRendementPct)
     }
 
     case 'reverse_mortgage': {
@@ -1292,7 +1312,7 @@ export function getHousingLifeEvents(input: ApplyHousingStrategyInput): LifeEven
         yearlyExpenses,
         currentLiquidPortfolio,
       )
-      return buildHousingLifeEventsAtAge(config, context, triggerAge, currentAge, endAge)
+      return buildHousingLifeEventsAtAge(config, context, triggerAge, currentAge, endAge, {}, terugvalRendementPct)
     }
   }
 }

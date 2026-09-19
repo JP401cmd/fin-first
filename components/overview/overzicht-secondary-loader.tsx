@@ -389,6 +389,10 @@ export async function OverzichtSecondaryLoader({
     currentAge,
     strategy: horizonData?.fireStrategy?.strategy,
     anchor: horizonData?.firePlan?.anchor ?? null,
+    // B-058 — feitenbasis onder de vrijheidsconclusie. De EFFECTIEVE maanduitgaven
+    // die de kernel zelf at (consume, don't recompute); zonder ingevulde
+    // uitgavenkant is het FIRE-doel ≈ 0 en zou élke portefeuille "vrij" heten.
+    basis: { monthlyExpenses: horizonData?.effectiveInput?.monthlyExpenses ?? null },
   }
   const { fireAgeDisplay, framing: freedomFraming, dataIssue: freedomDataIssue } =
     resolveFreedomAgeView(freedomState)

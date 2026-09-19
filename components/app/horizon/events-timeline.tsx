@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import type { LifeEvent } from '@/lib/horizon-data'
 import { formatMaskedCurrency } from '@/lib/format'
+import { describeEventDuration } from '@/lib/horizon/event-duration-copy'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { CHART_PAD } from '@/lib/chart-constants'
 import { CLUSTER_THRESHOLD_PX, packByPixelProximity } from '@/lib/chart-event-overlay'
@@ -41,10 +42,17 @@ export function EventsTimeline({
   onEditEvent,
   onClusterOpen,
   onEventDragEnd,
+  stopAge = null,
 }: {
   events: LifeEvent[]
   currentAge: number
   endAge: number
+  /**
+   * Stopmoment van de hoofdrun (`eventStopAgeFromSim`): vast anker of gevonden
+   * vrijheidsleeftijd, fractioneel. `null` = geen bereikbaar stopmoment. Alleen voor
+   * de looptijd-tekst van "tot ik stop met werken"-gebeurtenissen; geen rekenwerk.
+   */
+  stopAge?: number | null
   /** Zoomed visible range (optional — defaults to full range) */
   visibleMinAge?: number
   visibleMaxAge?: number
@@ -235,11 +243,14 @@ export function EventsTimeline({
     } else if (ev.one_time_cost < 0) {
       lines.push({ label: `+${formatMaskedCurrency(Math.abs(ev.one_time_cost), masked)} eenmalig`, color: '#10b981' })
     }
+    // Looptijd via de gedeelde helper: "24 mnd" / "blijvend" / "tot stopmoment (58,5)" —
+    // nooit meer "0 mnd" voor een blijvende gebeurtenis.
+    const looptijd = describeEventDuration(ev, stopAge)
     if (ev.monthly_cost_change > 0) {
-      lines.push({ label: `−${formatMaskedCurrency(ev.monthly_cost_change, masked)}/mnd · ${ev.duration_months} mnd`, color: '#ef4444' })
+      lines.push({ label: `−${formatMaskedCurrency(ev.monthly_cost_change, masked)}/mnd · ${looptijd}`, color: '#ef4444' })
     }
     if (ev.monthly_income_change > 0) {
-      lines.push({ label: `+${formatMaskedCurrency(ev.monthly_income_change, masked)}/mnd · ${ev.duration_months} mnd`, color: '#10b981' })
+      lines.push({ label: `+${formatMaskedCurrency(ev.monthly_income_change, masked)}/mnd · ${looptijd}`, color: '#10b981' })
     }
     return lines
   }

@@ -826,6 +826,99 @@ function stapPotten(b: PlanReviewBronnen): PlanReviewStapOverzicht {
   }
 }
 
+// ── Stap 6 — Waar je cijfers op rusten (W-009) ───────────────────────────────
+
+/**
+ * De grondslag van inkomen en uitgaven NU (ADR 0103). Geen nieuwe instelling: de twee
+ * bestaande kolommen `profiles.income_source` / `profiles.expenses_source`, met de
+ * spaarquote als UITKOMST — er is bewust geen derde "spaarquote-bron".
+ *
+ * WAAROM DIT EEN REVIEW-STAP IS. De kern modelleert kasstroom: `withResolvedKernelBedragen`
+ * vervangt vóór elke run `net_monthly_income` en `estimated_monthly_expenses` door de
+ * geresolveerde effectieve bedragen (lib/horizon/kernel-profile-basis.ts). De grondslagkeuze
+ * stuurt dus rechtstreeks het basissalaris in de kern, en daarmee de vrijheidsleeftijd.
+ *
+ * CONSUME, DON'T RECOMPUTE. Deze stap rekent niets: hij LEEST de bedragen waarmee de kern
+ * zojuist gerekend heeft (de al-geïnjecteerde profielrij) en benoemt de gekozen bron. De
+ * vergelijking "wat als je grondslag anders was" zit in de editor-body, die de
+ * kandidaat-bedragen uit `/api/overzicht/cashflow-settings` haalt en er de canonieke
+ * `RegelSimOverride.cashflow` mee draait — niet hier, want de horizon-bundel draagt geen
+ * budgetsom en geen transactiereeks.
+ */
+const GRONDSLAG_KOPIJ: Record<string, string> = {
+  auto: 'automatisch (de app kiest de sterkste bron die je hebt)',
+  budget: 'uit je budgetten',
+  transaction: 'uit je transacties',
+  manual: 'een bedrag dat je zelf invulde',
+  estimate: 'een schatting op basis van je leeftijd',
+}
+
+function grondslagFrase(waarde: unknown): string {
+  return typeof waarde === 'string' && waarde in GRONDSLAG_KOPIJ
+    ? GRONDSLAG_KOPIJ[waarde]
+    : GRONDSLAG_KOPIJ.auto
+}
+
+function maandBedrag(waarde: unknown): number | null {
+  return typeof waarde === 'number' && Number.isFinite(waarde) ? waarde : null
+}
+
+function stapGrondslag(b: PlanReviewBronnen): PlanReviewStapOverzicht {
+  const profile = b.profile ?? {}
+  const inkomenBron = profile.income_source
+  const uitgavenBron = profile.expenses_source
+  // De rauwe profielrij die de kern leest is AL geïnjecteerd met de effectieve bedragen
+  // (`withResolvedKernelBedragen`) — dit zijn dus letterlijk de getallen waarmee gerekend is.
+  const maandInkomen = maandBedrag(profile.net_monthly_income)
+  const maandUitgaven = maandBedrag(profile.estimated_monthly_expenses)
+
+  const details: PlanReviewRegel[] = [
+    { label: 'Inkomen nu komt', waarde: hoofdletter(grondslagFrase(inkomenBron)) },
+    { label: 'Uitgaven nu komen', waarde: hoofdletter(grondslagFrase(uitgavenBron)) },
+  ]
+  if (maandInkomen != null) {
+    details.push({ label: 'De kern rekent met inkomen', waarde: `${formatCurrency(maandInkomen)} per maand` })
+  }
+  if (maandUitgaven != null) {
+    details.push({ label: 'De kern rekent met uitgaven', waarde: `${formatCurrency(maandUitgaven)} per maand` })
+  }
+
+  const { basis, maat } = basisEnMaat(b)
+  const effect: string[] = [`Met deze cijfers: ${uitkomstFrase(basis, maat)}.`]
+  const handmatig = inkomenBron === 'manual' || uitgavenBron === 'manual'
+  if (handmatig) {
+    effect.push(
+      'Een bedrag dat je zelf invulde beweegt niet mee: latere budgetten en transacties veranderen ' +
+        'dit getal niet, ook niet als ze er allang zijn.',
+    )
+  }
+
+  return {
+    stap: 'grondslag',
+    titel: PLAN_REVIEW_STAP_TITELS.grondslag,
+    rekentNu:
+      `De app rekent nu met een inkomen dat ${grondslagFrase(inkomenBron)} komt, en uitgaven die ` +
+      `${grondslagFrase(uitgavenBron)} komen.`,
+    details,
+    effect,
+    vergelijking: [],
+    waarom:
+      'Alle stappen hiervoor rekenen met deze twee bedragen. Waar ze vandaan komen, bepaalt je spaarquote — ' +
+      'het tempo waarin je vrijheid opbouwt — en daarmee vanaf wanneer je kunt stoppen.',
+    keuzes: [],
+    keuzeVerplicht: false,
+    // Bewust LEEG: de bron zelf schrijft de editor-body via PUT /api/parameters. Bevestigen
+    // zou anders een geresolveerde uitkomst (`profile`/`estimate`/`unknown`) als KEUZE moeten
+    // wegschrijven, en die drie zijn geen kiesbare bronwaarden (BASIS_SOURCES).
+    schrijf: [],
+    blokkade: null,
+    aanpassen: [{ href: '/overzicht/budget/transacties', label: 'Grondslag aanpassen' }],
+    beperking:
+      'Je spaarquote is geen aparte instelling: hij volgt uit deze twee grondslagen. Wil je hem veranderen, ' +
+      'verander dan wat je verdient of wat je uitgeeft.',
+  }
+}
+
 // ── Ingang ───────────────────────────────────────────────────────────────────
 
 export function buildPlanReviewStap(stap: PlanReviewStap, bronnen: PlanReviewBronnen): PlanReviewStapOverzicht {
@@ -840,5 +933,7 @@ export function buildPlanReviewStap(stap: PlanReviewStap, bronnen: PlanReviewBro
       return stapWoning(bronnen)
     case 'potten':
       return stapPotten(bronnen)
+    case 'grondslag':
+      return stapGrondslag(bronnen)
   }
 }

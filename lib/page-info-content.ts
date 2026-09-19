@@ -265,8 +265,8 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
         text: 'Je stelt zelf een maandbedrag in. De balk vult zich met wat er tot nu toe geboekt is, zodat de resterende ruimte zichtbaar blijft in plaats van pas achteraf.',
       },
       {
-        title: 'Automatische indeling',
-        text: 'Nieuwe transacties krijgen zelf een categorie toegewezen. Klopt er een niet, dan pas je die aan bij de transactie; het budget rekent direct opnieuw.',
+        title: 'Automatisch categoriseren',
+        text: 'Categoriseren is elke transactie bij het juiste budget zetten — zo zie je per budget wat erin en eruit gaat. Nieuwe transacties categoriseert de app zelf. Klopt er een niet, dan pas je die aan bij de transactie; het budget rekent direct opnieuw.',
       },
       {
         title: 'Vrijheidsdagen per post',
@@ -311,7 +311,7 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
     terms: ['spaarquote', 'vrijheidstijd'],
     related: [
       { href: '/overzicht/budget', label: 'Terug naar je budgetten' },
-      { href: '/overzicht/budget/transacties', label: 'Transacties indelen' },
+      { href: '/overzicht/budget/transacties', label: 'Transacties categoriseren' },
       { href: '/overzicht/bezittingen', label: 'Je rekeningen bij Bezittingen' },
     ],
   },
@@ -347,7 +347,7 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
     insight:
       'Je abonnementen en terugkerende kosten op één plek, uitgedrukt in hoeveel vrijheidstijd ze je kosten. Elke euro minder vaste last is vrijheid die je terugkoopt.',
     grip:
-      'In Volledig zie je je vaste-lastenquote — het aandeel van je inkomen, met Nibud-duiding — plus abonnementen-sluipverbruik ten opzichte van het gemiddelde, de samenstelling per categorie en wat opzeggen concreet oplevert.',
+      'Onder de lijst staat je vaste-lastenquote — het aandeel van je inkomen, met Nibud-duiding — en je abonnementen-sluipverbruik ten opzichte van het gemiddelde. In Volledig zie je ook de samenstelling per categorie.',
     werking: [
       {
         title: 'Herkende abonnementen',
@@ -363,7 +363,7 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
       },
       {
         title: 'Opzeghulp',
-        text: 'Per post zie je wat stoppen oplevert in euro’s en in vrijheidstijd, met de gegevens die je voor de opzegging nodig hebt bij elkaar.',
+        text: 'Bij een abonnement dat je wilt stoppen staan de gegevens die je voor de opzegging nodig hebt bij elkaar, met een opzegbrief die je meteen kunt gebruiken.',
       },
     ],
     terms: ['vrijheidstijd', 'spaarquote'],
@@ -739,7 +739,7 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
     insight:
       'Alleen meldingen die er voor jou toe doen houden je scherp — te veel ruis en je mist het signaal dat wél belangrijk is.',
     grip:
-      'Kies per soort melding — budgetwaarschuwingen, partner-transacties, mijlpalen, herinneringen en tips — of en via welk kanaal je ’m ontvangt: in-app of e-mail.',
+      'Kies per soort melding — budgetwaarschuwingen, partner-transacties, mijlpalen, herinneringen en tips — of en via welk kanaal je ’m ontvangt: in-app of e-mail. Hier zet je ook uit dat Fin uit zichzelf een tip laat zien; vragen om een tip kan dan nog steeds.',
   },
   '/nieuws': {
     insight:
@@ -780,7 +780,7 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
       },
       {
         title: 'Toestemming verloopt',
-        text: 'Je bank geeft toestemming voor 90 dagen. Daarna vraagt de app je opnieuw; tot die tijd blijft alles wat al binnenkwam gewoon staan.',
+        text: 'Je bank geeft toestemming voor uiterlijk 180 dagen (PSD2). Daarna vraagt de app je opnieuw; tot die tijd blijft alles wat al binnenkwam gewoon staan.',
       },
       {
         title: 'Handmatig blijft mogelijk',

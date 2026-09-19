@@ -17,6 +17,7 @@ import {
   Plus,
 } from 'lucide-react'
 import { formatCurrency, formatWithFreedom } from '@/lib/format'
+import { describeEventDuration, eventStopAgeFromSim } from '@/lib/horizon/event-duration-copy'
 import { resolveEventIcon } from '@/lib/event-icon'
 import type { LifeEvent, FinancialInput, FireProjection, WerkMetadata } from '@/lib/horizon-data'
 import type { FireParams } from '@/lib/fire-params'
@@ -156,7 +157,7 @@ function werkSummary(event: LifeEvent): string {
   return parts.length > 0 ? parts.join(' · ') : 'Inkomenslijn ingesteld'
 }
 
-function eventImpact(event: LifeEvent): string {
+function eventImpact(event: LifeEvent, stopAge: number | null): string {
   if (event.event_type === 'werk') return werkSummary(event)
   const parts: string[] = []
   if (event.one_time_cost > 0) {
@@ -171,6 +172,11 @@ function eventImpact(event: LifeEvent): string {
   if (event.monthly_income_change !== 0) {
     const sign = event.monthly_income_change > 0 ? '+' : '−'
     parts.push(`${sign}${formatCurrency(Math.abs(event.monthly_income_change))}/mnd inkomen`)
+  }
+  // Looptijd van het maandbedrag (gedeelde helper): "24 mnd" / "blijvend" /
+  // "tot stopmoment (58,5)" — dezelfde grens die de rekenmotor hanteert (ADR 0143).
+  if (event.monthly_cost_change !== 0 || event.monthly_income_change !== 0) {
+    parts.push(describeEventDuration(event, stopAge))
   }
   return parts.length > 0 ? parts.join(' · ') : 'Geen geldelijke impact'
 }
@@ -264,6 +270,9 @@ export function GebeurtenissenView({
     () => detectDeficitLoanFromRows(sim.unifiedRows, { endAge: sim.result?.displayEndAge }),
     [sim.unifiedRows, sim.result?.displayEndAge],
   )
+  // Stopmoment van de run voor de looptijd-tekst ("tot stopmoment (58,5)"): vast anker
+  // ?? gevonden vrijheidsleeftijd, nooit fireAge (ceil); null zonder kernel-run.
+  const eventStopAge = useMemo(() => eventStopAgeFromSim(sim.result), [sim.result])
 
   // Kernel-afgeleide strategiemomenten (puur weergave; voeden NOOIT lifeEvents
   // of simulatie-invoer terug). Rijen verschijnen alleen als het moment bestaat.
@@ -627,7 +636,7 @@ export function GebeurtenissenView({
                     <p className="text-xs text-[var(--ink-2)] leading-snug mt-1">
                       {kernelDerived && typeof meta.saleProceeds === 'number' && meta.saleProceeds > 0
                         ? `Netto-opbrengst ${fmtAmount(Math.round(meta.saleProceeds))}`
-                        : eventImpact(event)}
+                        : eventImpact(event, eventStopAge)}
                     </p>
                     {kernelDerived &&
                       typeof meta.mortgageBalanceAtTrigger === 'number' &&

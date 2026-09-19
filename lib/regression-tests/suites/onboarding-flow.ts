@@ -9,16 +9,17 @@ const CAT = 'onboarding.flow'
 // ── Constants derived from onboarding page.tsx (redesign mei 2026, ───────────
 // versimpeld jun 2026)
 //
-// Happy-path: identity → inkomen → bezittingen → spaardoel → klaar →
+// Happy-path: identity → inkomen → bezittingen → eindstrategie → klaar →
 // saving → success. De doel-stap ("Waar help ik je mee?") en het news-only-pad
-// zijn in jun 2026 verwijderd; alle modules staan na onboarding default aan en
+// zijn in jun 2026 verwijderd; de spaardoel-stap ("Waar wil je voor sparen?")
+// op 19 sep 2026 (ADR 0162). Alle modules staan na onboarding default aan en
 // gating gebeurt buiten onboarding (abonnement + user-toggles).
 
 type Step =
   | 'identity'
   | 'inkomen'
   | 'bezittingen'
-  | 'spaardoel'
+  | 'eindstrategie'
   | 'klaar'
   | 'saving'
   | 'success'
@@ -26,11 +27,12 @@ type Step =
 type Direction = 'forward' | 'back'
 
 /**
- * Replica van computeStepOrder uit page.tsx. Sinds jun 2026 statisch: er is
- * geen module-keuze (en dus geen afwijkend news-only-pad) meer in onboarding.
+ * Replica van computeStepOrder uit page.tsx (op groepsniveau). Sinds jun 2026
+ * statisch: er is geen module-keuze (en dus geen afwijkend news-only-pad) meer
+ * in onboarding.
  */
 function computeStepOrder(): Step[] {
-  return ['identity', 'inkomen', 'bezittingen', 'spaardoel', 'klaar', 'saving', 'success']
+  return ['identity', 'inkomen', 'bezittingen', 'eindstrategie', 'klaar', 'saving', 'success']
 }
 
 /** Compute direction from old step to new step within a given step order */
@@ -51,9 +53,10 @@ const tests: TestCase[] = [
   // ── Step 1: Happy-path — vaste stappenvolgorde ─────────────────────────────
   {
     id: 'ob-flow-happy-path-steps',
-    name: 'Happy-path: identity → inkomen → bezittingen → spaardoel → klaar',
+    name: 'Happy-path: identity → inkomen → bezittingen → eindstrategie → klaar',
     category: CAT,
-    description: 'Vaste stappenvolgorde — de doel-stap en news-only zijn verwijderd (jun 2026)',
+    description:
+      'Vaste stappenvolgorde — de doel-stap en news-only zijn verwijderd (jun 2026), de spaardoel-stap op 19 sep 2026 (ADR 0162)',
     priority: 'critical',
     estimatedDurationMs: 100,
     fn() {
@@ -63,12 +66,13 @@ const tests: TestCase[] = [
       assertEqual(steps[0], 'identity', 'Stap 1: identity')
       assertEqual(steps[1], 'inkomen', 'Stap 2: inkomen')
       assertEqual(steps[2], 'bezittingen', 'Stap 3: bezittingen')
-      assertEqual(steps[3], 'spaardoel', 'Stap 4: spaardoel')
+      assertEqual(steps[3], 'eindstrategie', 'Stap 4: eindstrategie')
       assertEqual(steps[4], 'klaar', 'Stap 5: klaar')
       assertEqual(steps[5], 'saving', 'Stap 6: saving')
       assertEqual(steps[6], 'success', 'Stap 7: success')
       assert(!(steps as string[]).includes('doel'), 'geen doel-stap meer')
       assert(!(steps as string[]).includes('nieuws_only'), 'geen nieuws_only-pad meer')
+      assert(!(steps as string[]).includes('spaardoel'), 'geen spaardoel-stap meer (ADR 0162)')
     },
   },
 
@@ -85,12 +89,12 @@ const tests: TestCase[] = [
 
       assertEqual(getDirection(stepOrder, 'identity', 'inkomen'), 'forward', 'identity → inkomen = forward')
       assertEqual(getDirection(stepOrder, 'inkomen', 'bezittingen'), 'forward', 'inkomen → bezittingen = forward')
-      assertEqual(getDirection(stepOrder, 'bezittingen', 'spaardoel'), 'forward', 'bezittingen → spaardoel = forward')
-      assertEqual(getDirection(stepOrder, 'spaardoel', 'klaar'), 'forward', 'spaardoel → klaar = forward')
+      assertEqual(getDirection(stepOrder, 'bezittingen', 'eindstrategie'), 'forward', 'bezittingen → eindstrategie = forward')
+      assertEqual(getDirection(stepOrder, 'eindstrategie', 'klaar'), 'forward', 'eindstrategie → klaar = forward')
       assertEqual(getDirection(stepOrder, 'klaar', 'saving'), 'forward', 'klaar → saving = forward')
 
       assertEqual(getDirection(stepOrder, 'inkomen', 'identity'), 'back', 'inkomen → identity = back')
-      assertEqual(getDirection(stepOrder, 'klaar', 'spaardoel'), 'back', 'klaar → spaardoel = back')
+      assertEqual(getDirection(stepOrder, 'klaar', 'eindstrategie'), 'back', 'klaar → eindstrategie = back')
 
       // Zelfde stap = forward (newIdx >= oldIdx)
       assertEqual(getDirection(stepOrder, 'identity', 'identity'), 'forward', 'Zelfde stap = forward')

@@ -4,7 +4,7 @@
  * widget). Sinds de v2-verwijdering rekent het huishouden via de **horizon-kernel**.
  *
  * ## Wat de kernel-tak doet
- *  - **GECOMBINEERD** = één kernel-**huishouden-run**: de head (oudste partner) drijft de
+ *  - **GECOMBINEERD** = één kernel-**huishouden-run**: de head (de KIJKER, TPR-07 fase 2a) drijft de
  *    tijdas/instellingen; de andere partner komt via de **PT-parameterlaag**
  *    (`adapter/household.ts#buildPartnerParams` → `box3.personen = 2`, `leefsituatie =
  *    'Samenwonend'`, partner-inkomen/-AOW). Géén tweede persoon in de maandloop.
@@ -68,7 +68,7 @@ export interface HouseholdKernelMember {
  * `debts` zijn de VOLLEDIGE, itemized huishoud-potten met correcte `user_id` + `ownership`.
  */
 export interface HouseholdKernelRawContext {
-  /** De HEAD (oudste partner): drijft de gecombineerde tijdas/instellingen + eigen solo-run. */
+  /** De HEAD (de kijker — sinds TPR-07 fase 2a niet meer de oudste): drijft de gecombineerde tijdas/instellingen + eigen solo-run. */
   readonly head: HouseholdKernelMember
   /** De andere partner: PT-laag in de gecombineerde run + eigen solo-perspectief-run. */
   readonly partner: HouseholdKernelMember

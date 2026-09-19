@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-18T23:01:20.865Z",
+  "generatedAt": "2026-09-19T08:45:34.400Z",
   "dnaSubBudget": 2000,
   "dnaEstimatedTokens": 999,
   "sources": [
@@ -19,7 +19,7 @@
       "constant": "LOCAL_CHAT_DNA",
       "file": "lib/ai/local/local-chat-prompt.ts",
       "subBudget": 2000,
-      "estimatedTokens": 999,
+      "estimatedTokens": 1017,
       "sources": [
         {
           "file": "lib/ai/dna/base.ts",
@@ -37,7 +37,7 @@
       "constant": "LOCAL_BRIEFING_DNA",
       "file": "lib/ai/local/local-briefing-prompt.ts",
       "subBudget": 600,
-      "estimatedTokens": 368,
+      "estimatedTokens": 377,
       "sources": [
         {
           "file": "lib/briefing/redactie.ts",
@@ -55,7 +55,7 @@
       "constant": "LOCAL_REPORT_DNA",
       "file": "lib/ai/local/local-report-prompt.ts",
       "subBudget": 800,
-      "estimatedTokens": 452,
+      "estimatedTokens": 468,
       "sources": [
         {
           "file": "lib/ai/dna/base.ts",
@@ -69,7 +69,7 @@
       "constant": "LOCAL_RECOMMENDATIONS_DNA",
       "file": "lib/ai/local/local-recommendations-prompt.ts",
       "subBudget": 1000,
-      "estimatedTokens": 874,
+      "estimatedTokens": 884,
       "sources": [
         {
           "file": "lib/ai/dna/recommendations.ts",
@@ -87,7 +87,7 @@
       "constant": "LOCAL_NEWS_DNA",
       "file": "lib/ai/local/local-news-prompt.ts",
       "subBudget": 700,
-      "estimatedTokens": 647,
+      "estimatedTokens": 656,
       "sources": [
         {
           "file": "lib/news-system-prompt.ts",

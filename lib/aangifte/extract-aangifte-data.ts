@@ -43,6 +43,7 @@
 import { generateObject } from 'ai'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getModel } from '@/lib/ai/config'
+import { leesBeheerInstelling } from '@/lib/app-settings/beheer-instelling'
 import {
   extractionSchema,
   type AangifteExtractionResult,
@@ -123,19 +124,13 @@ export async function extractAangifteData(
     // UI gets the same empty-result fallback regardless of cause.
     const model = await getModel(supabase, 'aangifte_extractie')
 
-    // 2) Optional admin override of the system prompt. Stored in the
-    // shared `app_settings` table under the stable key from
-    // `system-prompt.ts`. If the row doesn't exist or is empty, fall
-    // back to the in-code default.
-    const { data: overrideRow } = await supabase
-      .from('app_settings')
-      .select('value')
-      .eq('key', AANGIFTE_PROMPT_OVERRIDE_KEY)
-      .maybeSingle()
+    // 2) Optional admin override of the system prompt, stored in
+    // `app_settings` under the stable key from `system-prompt.ts`. Beheer-
+    // content, dus server-side via de service-role (ADR 0163) — de
+    // sessie-client mag die sleutel niet lezen. Ontbreekt de rij of is hij
+    // leeg, dan het in-code default.
     const systemPrompt =
-      typeof overrideRow?.value === 'string' && overrideRow.value.trim().length > 0
-        ? overrideRow.value
-        : DEFAULT_AANGIFTE_EXTRACTION_PROMPT
+      (await leesBeheerInstelling(AANGIFTE_PROMPT_OVERRIDE_KEY)) ?? DEFAULT_AANGIFTE_EXTRACTION_PROMPT
 
     // 3) The user-prompt is intentionally minimal: a tiny preamble that
     // tells the model how to interpret the fallback-year, then the raw

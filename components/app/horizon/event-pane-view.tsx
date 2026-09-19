@@ -9,6 +9,7 @@ import {
   type LifeEvent,
   type FinancialInput,
 } from '@/lib/horizon-data'
+import { describeEventDuration, eventStopAgeFromSim } from '@/lib/horizon/event-duration-copy'
 import { previewSimResult, EMPTY_SIM_RESULT } from './event-preview-sim'
 import type { PreviewBaseline } from '@/lib/strategy-preview'
 import type { FireParams } from '@/lib/fire-params'
@@ -126,7 +127,12 @@ export function EventPaneView({
       kicker: 'Duur',
       amount:
         event.duration_months === 0 && (event.monthly_cost_change > 0 || event.monthly_income_change > 0) ? (
-          <span className="text-base">{isTotStopmoment(event) ? 'tot stopmoment' : 'blijvend'}</span>
+          // Looptijd via de gedeelde helper — het stopmoment van de run MÉT dit event
+          // (`withSim`), consistent met wat de motor doet; zonder bereikbaar stopmoment
+          // geen leeftijd (helper geeft het eerlijke label).
+          <span className={isTotStopmoment(event) ? 'text-sm leading-snug' : 'text-base'}>
+            {describeEventDuration(event, eventStopAgeFromSim(withSim), { hasRun: previewBaseline != null })}
+          </span>
         ) : event.duration_months > 0 ? (
           <span>
             {Math.round(event.duration_months / 12)}

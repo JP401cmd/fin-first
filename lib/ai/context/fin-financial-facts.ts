@@ -55,9 +55,9 @@ export interface FinFacts {
   hasData: boolean
   /** Netto vermogen in EUR (bezittingen − schulden) — `computeCoreData().netWorth`. */
   nettoVermogen: number
-  /** Vrijgekochte tijd: hele jaren (`computeCoreData().freedomYears`). */
+  /** Opgebouwde vrijheidstijd: hele jaren (`computeCoreData().freedomYears`). */
   freedomYears: number
-  /** Vrijgekochte tijd: resterende maanden (`computeCoreData().freedomMonths`). */
+  /** Opgebouwde vrijheidstijd: resterende maanden (`computeCoreData().freedomMonths`). */
   freedomMonths: number
   /** Vrijheids-% (0–100), canonieke ADR 0009-grondslag, MET-terugval. Ongerond. */
   vrijheidsPct: number
@@ -143,7 +143,7 @@ export function buildWillFinancialFacts(coreData: CorePageData, profile: FinFact
     }
   }
 
-  // Canonieke kern-metrics (netto vermogen, vrijgekochte tijd, FIRE-doel-fallback).
+  // Canonieke kern-metrics (netto vermogen, opgebouwde vrijheidstijd, FIRE-doel-fallback).
   const coreInput: FinancialInput = {
     totalAssets,
     totalDebts,

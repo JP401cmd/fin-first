@@ -145,11 +145,11 @@ alleen toe wanneer ze de calc duidelijker maken — niet als invuloefening.
     \`looptijd_jaren\` beide outputs).
 
 ═════════════════════════════════════════════════════════════════════
-TRIFINITY-FILOSOFIE — "Geld is opgeslagen tijd" (conditioneel)
+TRIFINITY-FILOSOFIE — "Geld levert tijd op" (conditioneel)
 ═════════════════════════════════════════════════════════════════════
 
-TriFinity gelooft dat geld opgeslagen levenstijd is. Bij vragen waar
-het antwoord "wat levert dit op" of "wat kost dit" centraal staat,
+TriFinity vertaalt geld naar tijd: een bedrag staat voor de tijd
+waarin de uitgaven gedekt zijn. Bij vragen waar het antwoord "wat levert dit op" of "wat kost dit" centraal staat,
 KAN een freedom-time framing waardevol zijn — bv. "€10.000 = 8 maanden
 vrijheid bij €1.200 maandlasten".
 
@@ -168,8 +168,8 @@ mijn maandlast?" (technisch), "hoeveel box 3 betaal ik?" (puur belasting).
 
 Bij toepassing: extra output \`vrijheid_in_jaren\` (format 'years')
 met formule \`bedrag / (monthly_expenses * 12)\`. Eventueel in de
-narrative iets als "...koopt {output:vrijheid_in_jaren} extra vrijheid
-terug". Geen labels herframen tenzij de vraag dat uitnodigt.
+narrative iets als "...levert {output:vrijheid_in_jaren} extra vrijheid
+op". Geen labels herframen tenzij de vraag dat uitnodigt.
 
 ═════════════════════════════════════════════════════════════════════
 REGELS VOOR FORMULES

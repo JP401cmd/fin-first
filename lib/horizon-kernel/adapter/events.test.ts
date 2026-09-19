@@ -290,7 +290,7 @@ describe('events — werk-strategie', () => {
 // ── Vrije events → handmatige Geb-rijen (postconventie) ───────────────────────────────
 
 describe('events — handmatige Geb-rijen', () => {
-  it('eenmalige kost (niet-geïndexeerd) → Eenmalig-post, negatief, gede-indexeerd', () => {
+  it('eenmalige kost (niet-geïndexeerd) → Eenmalig-post, negatief, nominaal vast (ADR 0167)', () => {
     const ev = makeEvent({ id: 'o', event_type: 'aankopen', target_age: 50, one_time_cost: 20_000, is_indexed: false })
     const { gebeurtenissen } = buildEventInputs([ev], CTX)
     expect(gebeurtenissen).toHaveLength(1)
@@ -300,8 +300,31 @@ describe('events — handmatige Geb-rijen', () => {
     expect(post.startLeeftijd).toBe(50)
     expect(post.startMaand).toBe(1)
     expect(post.eindLeeftijd).toBeNull()
-    // Kost negatief; gede-indexeerd naar startjaar (50 − 45 = 5 jaar).
-    expect(post.bedrag).toBeCloseTo(-20_000 / Math.pow(1.02, 5), 6)
+    // Kost negatief; het ingevoerde bedrag ONGEDEELD + nominaalVast — de kern telt 'm
+    // zónder inflatie-index (de oude deling naar het startjaar is vervallen).
+    expect(post.bedrag).toBe(-20_000)
+    expect(post.nominaalVast).toBe(true)
+  })
+
+  it('doorlopende baat (niet-geïndexeerd) → Periodiek zonder eind, ongedeeld + nominaalVast (ADR 0167)', () => {
+    // Given een blijvende inkomst van €1.000/mnd vanaf 55 met "Stijgt mee met inflatie" UIT,
+    // When de adapter 'm naar een Geb-post mapt,
+    // Then is het bedrag exact €1.000 (geen deling naar de startmaand) en draagt de post de vlag.
+    const ev = makeEvent({ id: 'vast', event_type: 'income_change', target_age: 55, monthly_income_change: 1000, duration_months: 0, is_indexed: false })
+    const { gebeurtenissen } = buildEventInputs([ev], CTX)
+    const [post] = gebeurtenissen[0].posten
+    expect(post.type).toBe('Periodiek')
+    expect(post.eindLeeftijd).toBeNull()
+    expect(post.bedrag).toBe(1000)
+    expect(post.nominaalVast).toBe(true)
+  })
+
+  it('geïndexeerde post draagt het veld nominaalVast niet (byte-identieke vorm)', () => {
+    const ev = makeEvent({ id: 'geind', event_type: 'income_change', target_age: 55, monthly_income_change: 1000, duration_months: 0, is_indexed: true })
+    const { gebeurtenissen } = buildEventInputs([ev], CTX)
+    const [post] = gebeurtenissen[0].posten
+    expect(post.bedrag).toBe(1000)
+    expect('nominaalVast' in post).toBe(false)
   })
 
   it('maandelijkse baat met duur → Periodiek met eind, positief, koopkracht-nu', () => {

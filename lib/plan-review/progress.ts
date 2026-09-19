@@ -11,6 +11,11 @@
  *  - `plan`, `uitgaven`, `potten`: markering = bevestigd. Bevestigen schrijft hier
  *    de waarde expliciet via de bestaande route, dus de staat is per constructie
  *    expliciet zodra de markering er is.
+ *  - `grondslag` (W-009, fase 1): markering = bevestigd. De keuze zelf schrijft de
+ *    editor-body via `PUT /api/parameters`; bevestigen legt vast dat de gebruiker de
+ *    twee grondslagen heeft gezien. Een inhaalregel ("de grondslag staat op eigen
+ *    invoer terwijl er intussen budgetten zijn") hoort bij fase 2 — die heeft een
+ *    budget-/transactiefeit nodig dat `PlanReviewFacts` vandaag niet draagt.
  *
  * Pure module (géén 'use client'): de server-page leidt hiermee de kaartstatus af,
  * de pane herhaalt dezelfde afleiding na een bevestiging. Eén functie, twee lezers.
@@ -47,6 +52,7 @@ function stapVoortgang(
     case 'plan':
     case 'uitgaven':
     case 'potten':
+    case 'grondslag':
       return { stap, status: markering ? 'bevestigd' : 'open', reden: null }
   }
 }

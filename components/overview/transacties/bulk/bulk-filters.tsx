@@ -254,7 +254,7 @@ export function BulkFilters({
             className={FIELD_CLASS}
           >
             <option value="">Alle budgetten</option>
-            <option value="__none__">Zonder budget</option>
+            <option value="__none__">Zonder categorie</option>
             {budgetEntries.map((entry) =>
               entry.kind === 'group' ? (
                 <optgroup key={entry.id} label={entry.label}>

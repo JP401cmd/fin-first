@@ -1,23 +1,28 @@
 /**
- * Release notes for TriFinity.
- * Add new releases at the TOP of the array (newest first).
+ * Vrijgavenotities van TriFinity — nieuwste bovenaan.
  *
- * To add a new release:
- * 1. Copy the template below
- * 2. Fill in version, date, and sections
- * 3. Place it at index 0 of RELEASE_NOTES
+ * Versie: semver `0.MINOR.PATCH`, gelijk aan `package.json` (de enige
+ * versiebron, zie lib/app-version.ts). De major blijft 0 tot het go-besluit
+ * voor de livegang — `lib/release-notes.test.ts` houdt dat hard. Alleen de
+ * release-skill bumpt (stap "Versie & vrijgavenotitie"): fix → patch,
+ * functionaliteit → minor, nooit major. Checkpoints en losse pushes bumpen niet.
  *
- * Template:
+ * Schrijfnorm vanaf 0.89.0 (RELEASE_NOTE_NORM, getoetst in de vitest): kort,
+ * in gewone taal, gegroepeerd op wat de gebruiker kent — Bezittingen, Schulden,
+ * Budget, Je plan, Fin, Platform — en zonder bestandsnamen, paden of ADR-nummers.
+ * Toon volgt `merkstem`. Oudere notities (≤ 0.88.0) vallen buiten die norm.
+ *
+ * Sjabloon:
  * {
- *   version: 'fin_prod_X.Y',
+ *   version: '0.MINOR.PATCH',
  *   date: 'YYYY-MM-DD',
  *   title: 'Korte titel',
  *   sections: [
  *     {
- *       module: 'De Kern' | 'De Wil' | 'De Horizon' | 'Identiteit' | 'Platform',
- *       color: 'amber' | 'teal' | 'purple' | 'zinc' | 'blue',
+ *       module: 'Bezittingen' | 'Schulden' | 'Budget' | 'Je plan' | 'Fin' | 'Platform',
+ *       color: 'amber' | 'teal' | 'purple' | 'purple' | 'blue' | 'zinc',
  *       items: [
- *         { title: 'Feature naam', description: 'Korte omschrijving' },
+ *         { title: 'Wat kan er nu', description: 'Wat de gebruiker ervan merkt' },
  *       ],
  *     },
  *   ],
@@ -42,9 +47,281 @@ export type ReleaseNote = {
   sections: ReleaseSection[]
 }
 
+export type ReleaseVersion = { major: number; minor: number; patch: number }
+
+const SEMVER_RE = /^(\d+)\.(\d+)\.(\d+)$/
+
+/** `'0.89.1'` → `{ major: 0, minor: 89, patch: 1 }`; `null` als het geen semver is. */
+export function parseReleaseVersion(version: string): ReleaseVersion | null {
+  const m = SEMVER_RE.exec(version)
+  if (!m) return null
+  return { major: Number(m[1]), minor: Number(m[2]), patch: Number(m[3]) }
+}
+
+/**
+ * Numerieke semver-vergelijking (0.100.0 > 0.99.0 — een parseFloat zou dat
+ * omdraaien). Positief als `a` nieuwer is dan `b`. Gooit bij een ongeldige
+ * versie: een stille 0 zou een sorteertest groen laten over rommel.
+ */
+export function compareReleaseVersions(a: string, b: string): number {
+  const pa = parseReleaseVersion(a)
+  const pb = parseReleaseVersion(b)
+  if (!pa) throw new Error(`Ongeldige releaseversie: "${a}"`)
+  if (!pb) throw new Error(`Ongeldige releaseversie: "${b}"`)
+  return pa.major - pb.major || pa.minor - pb.minor || pa.patch - pb.patch
+}
+
+/**
+ * De kort/gebruikersvriendelijk-norm. Geldt voor elke notitie vanaf `vanaf`;
+ * `lib/release-notes.test.ts` maakt een nieuwe notitie die 'm schendt rood.
+ */
+export const RELEASE_NOTE_NORM = {
+  vanaf: '0.89.0',
+  releaseTitleMax: 80,
+  itemTitleMax: 60,
+  itemDescriptionMax: 160,
+  /** Bestandsnamen, paden, routes en besluitnummers horen niet in een vrijgavenotitie. */
+  verbodenPatronen: [
+    /\blib\//,
+    /\bapp\//,
+    /\bcomponents\//,
+    /\bscripts\//,
+    /\/api\//,
+    /\.tsx?\b/,
+    /\.mjs\b/,
+    /\.sql\b/,
+    /\bADR\s?\d/,
+  ],
+} as const
+
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
-    version: 'fin_prod_0.88',
+    version: '0.89.0',
+    date: '2026-09-19',
+    title: 'Inhaalnotitie juni–september 2026: van plan tot bankkoppeling',
+    sections: [
+      {
+        module: 'Bezittingen',
+        color: 'amber',
+        items: [
+          {
+            title: 'Bankkoppeling die je zelf richt',
+            description:
+              'Kies vooraf welke rekening een koppeling vult en haal de volledige historie op. Dubbele boekingen uit meerdere bronnen worden herkend.',
+          },
+          {
+            title: 'Beleggingen importeren met een doel',
+            description:
+              'Een broker-upload vraagt eerst welke bezitting hij vult, kan een eerdere upload wissen en tekent de waarde uit je eigen historie.',
+          },
+          {
+            title: 'Eerlijk rendement op je portefeuille',
+            description:
+              'Het rendement rekent met wat je werkelijk inlegde en wanneer. Een rekenvenster laat de som zien.',
+          },
+          {
+            title: 'Netto vermogen door de tijd',
+            description:
+              'Je ziet het verloop van je netto vermogen, met en zonder eigen woning, en een vermogens-widget waarin je zelf kiest wat meetelt.',
+          },
+          {
+            title: 'Doelen koppelen en vieren',
+            description:
+              'Een doel hangt aan meerdere bezittingen of schulden, of aan een kengetal. Mijlpalen staan op een tijdlijn en het jaaroverzicht viert wat je haalde.',
+          },
+          {
+            title: 'Vrijheidstijd is een echte runway',
+            description:
+              'Hoeveel tijd je vermogen je geeft komt uit dezelfde motor als je plan, niet meer uit een losse deling die door overboekingen vervuild raakte.',
+          },
+        ],
+      },
+      {
+        module: 'Schulden',
+        color: 'teal',
+        items: [
+          {
+            title: 'Hypotheek met meerdere leningdelen',
+            description:
+              'Leningdelen staan als groep bij één hypotheek, elk met een eigen rente en aflossing.',
+          },
+          {
+            title: 'Geen tekort-lening in je plan',
+            description:
+              'Je plan dicht een tekort niet meer stilzwijgend met een lening. Jij kiest of dat mag, en ziet wat die keuze doet met je vrijheidsdatum.',
+          },
+          {
+            title: 'Opeethypotheek naar behoefte',
+            description:
+              'Een opeethypotheek neemt alleen op wat je nodig hebt. De opname en de rente zijn zichtbaar, met een plafond op wat je kunt opeten.',
+          },
+          {
+            title: 'Schuldenvrij als mijlpaal',
+            description:
+              'Het moment waarop je laatste schuld weg is, staat als mijlpaal in je plan.',
+          },
+        ],
+      },
+      {
+        module: 'Budget',
+        color: 'purple',
+        items: [
+          {
+            title: 'Grenzenpotten met meerdere regels',
+            description:
+              'Een grenzenpot kan meerdere regels dragen, per dag, week of maand, en telt ze bij elkaar op.',
+          },
+          {
+            title: 'Budgetteren op saldo',
+            description:
+              '"Budgetteren uit" telt alleen het saldo van een rekening, niet elke losse boeking erop.',
+          },
+          {
+            title: 'Abonnementen worden gevonden',
+            description:
+              'Ook jaarabonnementen worden herkend; opgezegde abonnementen verdwijnen vanzelf uit het overzicht.',
+          },
+          {
+            title: 'Eigen rekeningen en bulk-bewerken',
+            description:
+              'Overboekingen tussen eigen rekeningen tellen nergens als uitgave. Boekingen bewerk je in bulk; een betaalrekening verwijder je met keuze over de boekingen.',
+          },
+          {
+            title: 'Eén spaarquote in de hele app',
+            description:
+              'Overal dezelfde spaarquote, berekend over afgesloten maanden — geen twee schermen die elk hun eigen som maken.',
+          },
+        ],
+      },
+      {
+        module: 'Je plan',
+        color: 'purple',
+        items: [
+          {
+            title: 'Je voorkeuren voor je plan instellen',
+            description:
+              'Eén doorloop op Toekomst gaat alle instellingen langs, met live zicht op wat elke keuze met je vrijheidsdatum doet.',
+          },
+          {
+            title: 'Stopmoment en eindsituatie als twee keuzes',
+            description:
+              'Wanneer je stopt en wat er dan over moet zijn, stel je apart in. "Nu stoppen" is een scenario dat je altijd kunt bekijken.',
+          },
+          {
+            title: 'Het lab volgt je plan',
+            description:
+              'Draai aan salaris, spaarquote, minder werken of je uitgave na pensioen en zie wat een tekort dicht. Het lab rekent met je eigen stopkeuze.',
+          },
+          {
+            title: 'Plan-stoplicht',
+            description:
+              'Op koers, aandacht of actie: één kleur op de plankaart, in de banner en in het menu zegt hoe je plan ervoor staat.',
+          },
+          {
+            title: 'Gebeurtenissen tot je stopmoment',
+            description:
+              'Een blijvende verandering loopt door tot het eind of stopt bij je stopmoment. Jij zegt welke.',
+          },
+          {
+            title: 'Fiscale keuzes naast elkaar',
+            description:
+              'Leg drie plekken voor je pensioenpot naast elkaar en zie wat elke keuze kost of oplevert, in euro\'s en in vrijheidsdagen.',
+          },
+          {
+            title: 'Totaalplan als deelbaar rapport',
+            description: 'Je volledige plan als één rapport dat je kunt delen of bewaren.',
+          },
+          {
+            title: 'Vergelijk je koers met leeftijdsgenoten',
+            description:
+              'Je voortgang naar vrijheid wordt beoordeeld ten opzichte van je leeftijdsgroep, niet tegen een absolute lat.',
+          },
+        ],
+      },
+      {
+        module: 'Fin',
+        color: 'blue',
+        items: [
+          {
+            title: 'Gesprekken die bewaard blijven',
+            description:
+              'Fin onthoudt je gesprekken. Je start een nieuwe chat, kiest een suggestievraag, stopt een antwoord of sluit het gesprek af.',
+          },
+          {
+            title: 'AI pas als jij het aanzet',
+            description:
+              'AI-hulp is een echte opt-in: je zet Fin zelf aan en leest pas dan wat er met je gegevens gebeurt. In de beta zet je ook de bankkoppeling zelf aan.',
+          },
+          {
+            title: 'Lokaal of in de cloud',
+            description:
+              'Kies per functie of de AI op je eigen toestel draait of in de cloud. Toelating tot lokale AI gaat op gemeten snelheid, niet op een gok.',
+          },
+          {
+            title: 'Welkomstgids en rondleiding',
+            description:
+              'Na de onboarding neemt Fin je mee: een korte rondleiding over het overzicht en een gids die bij Fin blijft wonen.',
+          },
+          {
+            title: 'Melden vanuit je gesprek',
+            description:
+              'Een melding of een schermafbeelding stuur je mee vanuit de chat; je hoeft er niet voor uit je gesprek.',
+          },
+        ],
+      },
+      {
+        module: 'Platform',
+        color: 'zinc',
+        items: [
+          {
+            title: 'Onboarding korter en in gewone taal',
+            description:
+              'De stap "Jouw plan" vraagt je stopmoment en wat er over moet zijn in gewone taal. Budget en bank zitten in de onboarding, de rest komt later.',
+          },
+          {
+            title: 'Kiesbaar startscherm en uitklapbaar menu',
+            description:
+              'Kies je eigen startscherm. Elke tak in het menu klapt uit en het zoekmenu voert acties direct uit.',
+          },
+          {
+            title: 'Vier accentkleuren naar smaak',
+            description:
+              'Tweeëntwintig kleuren voor Bezittingen, Schulden, Budget en Fin. Het stoplicht (op koers, aandacht, actie) houdt zijn eigen kleuren.',
+          },
+          {
+            title: 'Eenvoudige weergave en euro-weergave',
+            description:
+              'Minder op het scherm als je dat wilt, en bedragen in het geld van vandaag in plaats van in toekomsteuro\'s.',
+          },
+          {
+            title: 'Info-knop op elke pagina',
+            description: '"Wat zie ik hier?" op elke pagina: eerst het inzicht, dan wat je ermee kunt.',
+          },
+          {
+            title: 'Inloggen met Google en veiliger wachtwoorden',
+            description:
+              'Je kunt inloggen met Google. Een wachtwoord dat in een bekend datalek voorkomt, wordt geweigerd.',
+          },
+          {
+            title: 'Wekelijkse briefing per mail',
+            description:
+              'Als je wilt krijg je wekelijks een briefing per mail, zonder bedragen in de mail zelf.',
+          },
+          {
+            title: 'Beheer ziet gebruik, geen inhoud',
+            description: 'Beheerders zien gebruikscijfers, niet de inhoud van je financiën.',
+          },
+          {
+            title: 'Vragenlijsten gericht verspreid',
+            description:
+              'Testers krijgen vragenlijsten per groep en zien alleen die voor hen bedoeld zijn.',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: '0.88.0',
     date: '2026-06-10',
     title: 'Beheerscherm heringedeeld: vier groepen, hub-startpagina en opschoning',
     sections: [
@@ -72,7 +349,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
     ],
   },
   {
-    version: 'fin_prod_0.87',
+    version: '0.87.0',
     date: '2026-03-27',
     title:
       'Unified Projection Engine, fase-analyse met Monte Carlo, pensioen-modus, what-if scenario\'s & editorial design',
@@ -282,7 +559,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
     ],
   },
   {
-    version: 'fin_prod_0.86',
+    version: '0.86.0',
     date: '2026-03-19',
     title:
       'Vermogensopbouw, rebalancing, kostenanalyse (TER), hypotheek vs beleggen & FIRE voortgangsbalk',
@@ -436,7 +713,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
     ],
   },
   {
-    version: 'fin_prod_0.85',
+    version: '0.85.0',
     date: '2026-03-13',
     title:
       'Optionele budgettering, multi-view vermogensprognose, cash-overzicht & AI zonder budgetdata',
@@ -528,7 +805,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
     ],
   },
   {
-    version: 'fin_prod_0.84',
+    version: '0.84.0',
     date: '2026-03-12',
     title:
       'Vermogensprognose per bucket, nieuwsarchief, eigen-overboekingenfilter & vereenvoudigde onboarding',
@@ -681,7 +958,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
     ],
   },
   {
-    version: 'fin_prod_0.83',
+    version: '0.83.0',
     date: '2026-03-11',
     title:
       'TrueLayer bankconnectie, dashboard-wizard, uitgebreide doelen, trend-widgets & data-architectuur',
@@ -825,7 +1102,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
     ],
   },
   {
-    version: 'fin_prod_0.82',
+    version: '0.82.0',
     date: '2026-03-08',
     title:
       'Huishouden & partner, levensgebeurtenissen, what-if scenario\'s, gids-pagina & De Wil editorial',
@@ -1059,7 +1336,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
     ],
   },
   {
-    version: 'fin_prod_0.81',
+    version: '0.81.0',
     date: '2026-03-07',
     title:
       'Privacy & AI veiligheid, Berichten-pagina, widget grid redesign & onboarding editorial',
@@ -1234,7 +1511,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
     ],
   },
   {
-    version: 'fin_prod_0.80',
+    version: '0.80.0',
     date: '2026-03-04',
     title: 'Streaming AI briefing, dashboard-type switcher, briefing directives & nieuwe card types',
     sections: [
@@ -1299,7 +1576,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
     ],
   },
   {
-    version: 'fin_prod_0.79',
+    version: '0.79.0',
     date: '2026-03-03',
     title: 'Vermogensbalans, cash-as-asset, balance snapshots & grote refactoring',
     sections: [
@@ -1458,7 +1735,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
     ],
   },
   {
-    version: 'fin_prod_0.78',
+    version: '0.78.0',
     date: '2026-03-01',
     title: 'What-If Net Worth Planner, droomscenario chat & identity restructure',
     sections: [
@@ -1564,7 +1841,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
     ],
   },
   {
-    version: 'fin_prod_0.77',
+    version: '0.77.0',
     date: '2026-02-27',
     title: 'Simulatie-engine, 6 nieuwe horizon-widgets & AOW/pensioen',
     sections: [
@@ -1639,7 +1916,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
     ],
   },
   {
-    version: 'fin_prod_0.76',
+    version: '0.76.0',
     date: '2026-02-26',
     title: 'Tiers-systeem, backtesting, landing redesign & grote UX-batch',
     sections: [
@@ -1778,7 +2055,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
     ],
   },
   {
-    version: 'fin_prod_0.75',
+    version: '0.75.0',
     date: '2026-02-25',
     title: 'Grafiek-animaties, kassabon forecasts & Fin insights',
     sections: [
@@ -1837,7 +2114,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
     ],
   },
   {
-    version: 'fin_prod_0.74',
+    version: '0.74.0',
     date: '2026-02-23',
     title: 'Opruimen badges/streaks & UX verbeteringen',
     sections: [
@@ -1866,7 +2143,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
     ],
   },
   {
-    version: 'fin_prod_0.73',
+    version: '0.73.0',
     date: '2026-02-22',
     title: 'Widget dashboard, AI-categorisatie & transactiescope',
     sections: [
@@ -1961,7 +2238,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
     ],
   },
   {
-    version: 'fin_prod_0.72',
+    version: '0.72.0',
     date: '2026-02-21',
     title: 'Budgetmodule & terugkerende transacties',
     sections: [
@@ -2012,7 +2289,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
     ],
   },
   {
-    version: 'fin_prod_0.71',
+    version: '0.71.0',
     date: '2026-02-20',
     title: 'Abonnementen, eigen overboekingen & kleurpersonalisatie',
     sections: [
@@ -2111,7 +2388,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
     ],
   },
   {
-    version: 'fin_prod_0.7',
+    version: '0.7.0',
     date: '2026-02-19',
     title: 'Identiteit, bankkoppeling & dynamische kleuren',
     sections: [
@@ -2210,7 +2487,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
     ],
   },
   {
-    version: 'fin_prod_0.6',
+    version: '0.6.0',
     date: '2026-02-18',
     title: 'Voorspellingen, trendgrafieken & holdings-beheer',
     sections: [
@@ -2305,7 +2582,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
     ],
   },
   {
-    version: 'fin_prod_0.5',
+    version: '0.5.0',
     date: '2026-02-15',
     title: 'Beveiliging, gamificatie & data-integriteit',
     sections: [
@@ -2432,7 +2709,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
     ],
   },
   {
-    version: 'fin_prod_0.4',
+    version: '0.4.0',
     date: '2026-02-14',
     title: 'Configureerbare parameters & database migraties in git',
     sections: [
@@ -2489,7 +2766,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
     ],
   },
   {
-    version: 'fin_prod_0.3',
+    version: '0.3.0',
     date: '2026-02-14',
     title: 'Mobile preview met echte viewport & PWA-basis',
     sections: [
@@ -2532,7 +2809,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
     ],
   },
   {
-    version: 'fin_prod_0.2',
+    version: '0.2.0',
     date: '2026-02-13',
     title: 'Onboarding, fase-systeem & activatieflow',
     sections: [
@@ -2651,7 +2928,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
     ],
   },
   {
-    version: 'fin_prod_0.1',
+    version: '0.1.0',
     date: '2026-02-13',
     title: 'Feature completeness & AI op echte data',
     sections: [

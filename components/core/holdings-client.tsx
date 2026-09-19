@@ -965,7 +965,11 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
       <section className="mt-6">
         <PortfolioValueChart
           months={chartMonths}
-          yearlyEssentialExpenses={initialData?.yearlyEssentialExpenses ?? 0}
+          // Consume, don't recompute (ADR 0126 D1): één canonieke €→tijd-koers uit
+          // de loader. Stond hier `yearlyEssentialExpenses`, waaruit de grafiek zelf
+          // een must-grondslag-dagtarief afleidde — een derde vrijheidstijd-grootheid.
+          dailyExpenses={initialData?.dailyExpenses ?? 0}
+          dailyExpensesSource={initialData?.dailyExpensesSource}
           onOpenHolding={openHoldingPane}
         />
       </section>

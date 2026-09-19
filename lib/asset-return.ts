@@ -164,6 +164,77 @@ export function formatGainPct(pct: number | null): string | null {
 }
 
 /**
+ * "HEEFT DEZE BEZITTING EEN EIGEN RENDEMENTSAANNAME?" — de ENIGE plek waar die
+ * vraag beantwoord wordt (TPR-02 vervolg, eigenaarsbesluit 19-09-2026, ADR 0166).
+ *
+ * Sinds migratie 20260919140000 is `assets.expected_return` nullable zónder
+ * default. Daarmee dragen drie waarden drie verschillende betekenissen:
+ *
+ *   | waarde | betekenis                                              |
+ *   |--------|--------------------------------------------------------|
+ *   | `7`    | eigen aanname: 7% per jaar                             |
+ *   | `0`    | een BEWUSTE 0% — betaalrekening, bitcoin, auto         |
+ *   | `null` | GEEN eigen aanname → val terug op het profielrendement  |
+ *
+ * WAAROM EEN PREDICAAT EN NIET ÉÉN RESOLVER: de terugval leeft op twee schalen.
+ * De kern (`potRendement`, lib/horizon-kernel/adapter/potten.ts) rekent in
+ * DECIMALEN (0,07) omdat `resolveFireParams(profile).grossReturn` dat doet;
+ * elk weergave-oppervlak rekent in PROCENTEN (7). Eén resolver zou één van
+ * beide door ×100 ÷100 moeten halen, en dat is niet bit-identiek
+ * (0.07 × 100 ÷ 100 !== 0.07) — precies het soort drift dat de gouden
+ * horizon-matrix zou laten kantelen. Daarom deelt iedereen de BESLISSING en
+ * houdt iedereen zijn eigen schaal.
+ *
+ * Let op de asymmetrie met NaN: een niet-eindige waarde uit een corrupte rij is
+ * géén "ontbreken". Die valt niet terug maar wordt 0, zoals vóór TPR-02 — een
+ * kapotte rij mag nooit stil het profielrendement erven.
+ */
+export function heeftEigenRendement(expectedReturnPct: number | null | undefined): expectedReturnPct is number {
+  return expectedReturnPct != null
+}
+
+/**
+ * "Dit oppervlak heeft bewust GEEN terugval" — geef dit mee in plaats van het
+ * argument weg te laten.
+ *
+ * Een weglating en een bewuste nul-basis zijn rekenkundig hetzelfde en
+ * daarom niet uit elkaar te houden: allebei lezen ze NULL als 0%. Alleen bij de
+ * één is dat een keuze en bij de ander een vergetelheid, en juist die
+ * vergetelheid is wat een bezitting stil op 0% laat staan terwijl /toekomst het
+ * profielrendement rekent. Een benoemde constante maakt het verschil zichtbaar
+ * in de code én greppbaar.
+ */
+export const NUL_BASIS = 0
+
+/**
+ * Het rendement van één bezitting in PROCENTEN — de weergave-/projectie-kant van
+ * de ketting die `potRendement` in decimalen draagt. Gebruik dit overal waar
+ * vandaag `Number(a.expected_return)` stond: `Number(null) === 0` in JavaScript
+ * (géén NaN), dus zonder deze helper leest NULL stilzwijgend als 0% en rekent
+ * dezelfde bezitting 7% in /toekomst en 0% in de bezittingenlijst.
+ *
+ * @param expectedReturnPct `assets.expected_return` (percentage, mag NULL zijn).
+ * @param terugvalPct Het profielrendement in PROCENTEN — `resolveFireParams(profile).grossReturn × 100`.
+ *   Heeft een oppervlak geen profiel bij de hand, geef dan `NUL_BASIS` mee — niet
+ *   niets. Het argument WEGLATEN geeft hetzelfde resultaat, maar is onzichtbaar:
+ *   zo'n weglating draagt stil de NULL→0%-lezing die deze module juist wegneemt,
+ *   en is noch voor tsc noch voor een grep te onderscheiden van een bewuste
+ *   keuze. `lib/asset-return.null-semantiek.test.ts` flagt de één-argument-vorm
+ *   daarom als overtreding.
+ */
+export function resolveExpectedReturnPct(
+  expectedReturnPct: number | null | undefined,
+  terugvalPct: number | null | undefined = NUL_BASIS,
+): number {
+  if (!heeftEigenRendement(expectedReturnPct)) {
+    const t = Number(terugvalPct ?? 0)
+    return Number.isFinite(t) ? t : 0
+  }
+  const r = Number(expectedReturnPct)
+  return Number.isFinite(r) ? r : 0
+}
+
+/**
  * DE VIER GRONDSLAGEN ACHTER HET WOORD "RENDEMENT" — één vocabulaire.
  *
  * Aanleiding (kaart H7, testronde 24-08-2026): op /overzicht en

@@ -5,7 +5,6 @@ import { TypeIcon } from '@/components/app/quick-add-wizard/icon-map'
 import { ASSET_TYPE_ICONS } from '@/lib/asset-data'
 import { DEBT_TYPE_ICONS } from '@/lib/debt-data'
 import type { AssetQuickInput, DebtQuickInput } from '@/lib/quick-add/types'
-import type { SpaardoelPresetKey } from '@/lib/onboarding-presets'
 import { formatCurrency } from '@/lib/format'
 import type { MonthlyFreedomBuildup } from '@/lib/freedom-ticker'
 import {
@@ -26,9 +25,11 @@ import {
  *   2. Figures-strip met 3 cellen (recap-totalen):
  *        - Inkomen → kicker `NETTO/MND`, body DM Mono €
  *        - Bezit  → kicker `NETTO VERMOGEN`, body DM Mono €
- *        - Spaardoel óf Voortgang → kicker `SPAARDOEL`/`VOORTGANG`, body
- *          italic Playfair met highlight-marker (`--module-active-200`).
- *          De Voortgang-cel toont "6 van 8" uit `computeOnboardingCompleteness`
+ *        - Voortgang → kicker `VOORTGANG`, body italic Playfair met
+ *          highlight-marker (`--module-active-200`). Tot 19 sep 2026 (ADR
+ *          0162) stond hier een Spaardoel-cel wanneer de spaardoel-stap was
+ *          ingevuld; die stap is geschrapt.
+ *          De Voortgang-cel toont "6 van 7" uit `computeOnboardingCompleteness`
  *          — een echte meting van het profiel. Tot aug 2026 stond hier een
  *          hardgecodeerde "100%" naast cellen die "Vul je later aan" toonden
  *          (bevinding M11): dat mat "einde wizard bereikt", niet "profiel
@@ -49,20 +50,6 @@ import {
  * recap-strip, die alleen het *totale* netto vermogen toont — hier zie je
  * juist de opsplitsing per post.
  */
-/**
- * Compact spaardoel-recap voor cel 4 van de figures-strip. Wanneer aanwezig
- * vervangt deze de standaard "Voortgang 100%"-cel met de gekozen label en
- * het streefbedrag. Skip-flow zet deze prop op `null` — dan blijft de
- * voortgangs-cel zichtbaar zoals altijd.
- */
-export interface OnboardingKlaarSpaardoelRecap {
-  presetKey: SpaardoelPresetKey
-  /** Uiteindelijke label die de gebruiker invulde (na trim). */
-  label: string
-  /** Streefbedrag in euro's. */
-  amount: number
-}
-
 export interface OnboardingKlaarProps {
   netMonthlyIncome: number
   netWorth: number | null
@@ -100,12 +87,7 @@ export interface OnboardingKlaarProps {
    */
   incomeIsEstimate?: boolean
   /**
-   * Spaardoel-recap van stap v. — `null` wanneer de gebruiker geskipt of
-   * niets ingevuld heeft. Caller (orchestrator) bepaalt deze gating.
-   */
-  spaardoel?: OnboardingKlaarSpaardoelRecap | null
-  /**
-   * Echte profiel-compleetheid ("6 van 8"), berekend door de orchestrator via
+   * Echte profiel-compleetheid ("6 van 7"), berekend door de orchestrator via
    * `computeOnboardingCompleteness`. Bewust verplicht: het eindscherm mag nooit
    * meer een vast voortgangsgetal tonen (bevinding M11).
    */
@@ -147,7 +129,6 @@ export function OnboardingKlaar({
   monthlyBuildup = null,
   housingChoice = null,
   incomeIsEstimate = false,
-  spaardoel = null,
   completeness,
   assets,
   debts,
@@ -161,7 +142,7 @@ export function OnboardingKlaar({
 }: OnboardingKlaarProps) {
   // Detect minimal-input scenario: user only filled mandatory fields.
   // We adapt messaging to feel encouraging rather than incomplete.
-  const hasOptionalData = netMonthlyIncome > 0 || netWorth !== null || spaardoel !== null
+  const hasOptionalData = netMonthlyIncome > 0 || netWorth !== null
 
   const headline = (
     <>
@@ -306,61 +287,34 @@ export function OnboardingKlaar({
           }
         />
 
-        {/* Cel 3: Spaardoel (indien aanwezig) óf Voortgang als fallback. */}
-        {spaardoel ? (
-          <RecapCell
-            kicker="Spaardoel"
-            value={
+        {/* Cel 3: Voortgang — de echte meting, nooit een vast getal. */}
+        <RecapCell
+          kicker="Voortgang"
+          value={
+            <>
               <span
-                className="block text-[16px] sm:text-[18px] italic leading-tight"
-                style={{
-                  fontFamily: 'var(--font-playfair, Georgia, serif)',
-                  color: 'var(--ink)',
-                }}
+                className="block text-[22px] sm:text-[28px] font-black leading-none italic tabular-nums tracking-[-0.02em]"
+                style={{ fontFamily: 'var(--font-playfair, Georgia, serif)', color: 'var(--ink)' }}
               >
-                {spaardoel.label}
-                <span className="not-italic text-[var(--ink-3)]"> · </span>
                 <span
-                  className="tabular-nums px-1"
+                  className="inline px-1"
                   style={{
                     backgroundImage:
                       'linear-gradient(transparent 60%, var(--module-active-200) 60%)',
                   }}
                 >
-                  {formatCurrency(spaardoel.amount)}
+                  {completeness.gevuld} van {completeness.totaal}
                 </span>
               </span>
-            }
-          />
-        ) : (
-          <RecapCell
-            kicker="Voortgang"
-            value={
-              <>
-                <span
-                  className="block text-[22px] sm:text-[28px] font-black leading-none italic tabular-nums tracking-[-0.02em]"
-                  style={{ fontFamily: 'var(--font-playfair, Georgia, serif)', color: 'var(--ink)' }}
-                >
-                  <span
-                    className="inline px-1"
-                    style={{
-                      backgroundImage:
-                        'linear-gradient(transparent 60%, var(--module-active-200) 60%)',
-                    }}
-                  >
-                    {completeness.gevuld} van {completeness.totaal}
-                  </span>
-                </span>
-                <span
-                  className="mt-1.5 block text-[11px] italic leading-snug text-[var(--ink-3)]"
-                  style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
-                >
-                  onderdelen ingevuld
-                </span>
-              </>
-            }
-          />
-        )}
+              <span
+                className="mt-1.5 block text-[11px] italic leading-snug text-[var(--ink-3)]"
+                style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+              >
+                onderdelen ingevuld
+              </span>
+            </>
+          }
+        />
       </div>
 
       {/* ── De wisselkoers, onder de strip ────────────────────────────────

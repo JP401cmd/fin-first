@@ -8,11 +8,14 @@ import { acquireOverlay } from '@/lib/overlay-signal'
 /**
  * Welkomstpopup vóór stap 1 — een rustig "lees-en-begin"-moment.
  *
- * Editorial centered modal (NIET een bottom-sheet): begroeting, filosofie, de
- * vier waardes van de app (elk in zijn eigen accent), en een korte vooruitblik
- * op wat de gebruiker te wachten staat. De vier waardes kwamen er op 17 sep
- * 2026 bij — tot dan was dit puur proza, en las een nieuwe gebruiker nergens
- * wát de app voor 'm doet.
+ * Editorial centered modal (NIET een bottom-sheet): begroeting, filosofie, twee
+ * regels over wat de app doet, en een korte vooruitblik op de onboarding met de
+ * CTA "Start de onboarding →". Bewust kort (B-052, 19 sep 2026): de vier
+ * waardes die hier van 17 tot 19 sep 2026 stonden zijn verhuisd naar
+ * `lib/onboarding/waardes.ts` en horen op het successcherm ná de onboarding
+ * (W-015) — het moment waarop er data staat om ze waar te maken. Vóór 17 sep
+ * was dit twee alinea's proza waarin een nieuwe gebruiker nergens las wát de
+ * app voor 'm doet; de twee regels hieronder zeggen dat nu in één adem.
  *
  * **Render-strategie**:
  * - `createPortal` naar document.body — modal staat los van de onboarding-
@@ -21,7 +24,7 @@ import { acquireOverlay } from '@/lib/overlay-signal'
  *   met `p-4` zodat op smalle schermen de card altijd buiten de safe-area
  *   blijft. Inner card is `max-w-lg` — leesbreedte voor proza, zonder
  *   overweldigend te worden — en scrollt intern (`max-h-[calc(100dvh-2rem)]`)
- *   zodat de vier waardes ook op een korte telefoon volledig bereikbaar zijn.
+ *   als vangnet voor een heel korte telefoon.
  * - Scherpe hoeken (editorial-DNA), 1px ink-border voor het krant-effect.
  *   Geen schaduw — backdrop-blur op de overlay levert de diepte.
  * - Geen close-X: de gebruiker sluit uitsluitend via de primaire CTA.
@@ -51,56 +54,6 @@ export interface WelcomePopupProps {
   colorVars?: CSSProperties
 }
 
-/**
- * De vier waardes waar TriFinity om draait, elk in zijn eigen accent. De popup
- * is het eerste moment waarop die kleurtaal wordt geïntroduceerd; vanaf stap 1
- * kleurt elke vraag mee met de hefboom waar hij over gaat (`STEP_ACCENT`).
- *
- * **Over de toewijzing — er zijn vier accenten en drie hefbomen, dus hij kan
- * niet overal kloppen.** De accenten heten op /mijn/uiterlijk Bezittingen
- * (`kern`) · Schulden (`wil`) · Budget (`horizon`) · Fin (`fin`). Drie waardes
- * vallen daar exact op: "wat je hebt" → kern, "wat er omgaat" → horizon,
- * "waar je op kunt sturen" → fin. De vierde, "waar het op uitloopt", heeft
- * geen eigen hefboom — er ís geen Toekomst-accent — en krijgt daarom het
- * overgebleven accent (`wil`). Noem dat dus niet "de kleur van de toekomst":
- * dezelfde tint betekent in de stappen Schulden. Wie hier ooit betekenis aan
- * wil hangen, moet eerst een vijfde accent invoeren, niet de comment oprekken.
- *
- * Copy-grens: elke regel beschrijft wat de app TOONT, nooit wat de gebruiker
- * zou moeten doen of wat iets gaat opleveren — inzicht mag, advies niet
- * (Wft-grens, zie de compliance-check-skill).
- */
-const WAARDES: { kicker: string; belofte: string; toelichting: string; accent: string }[] = [
-  {
-    kicker: 'Wat je hebt',
-    belofte: 'Je vermogen in euro’s én in jaren.',
-    toelichting:
-      'We tellen je bezittingen, schulden en pensioen bij elkaar op, en rekenen dat bedrag om naar de tijd die het je vrij koopt.',
-    accent: 'kern',
-  },
-  {
-    kicker: 'Wat er omgaat',
-    belofte: 'Elke maand zie je wat je vrijkoopt.',
-    toelichting:
-      'Je ziet wat er binnenkomt, waar het heen gaat en wat je overhoudt — inclusief de abonnementen die stilletjes blijven lopen.',
-    accent: 'horizon',
-  },
-  {
-    kicker: 'Waar het op uitloopt',
-    belofte: 'De datum waarop werken een keuze wordt.',
-    toelichting:
-      'We rekenen je plan door op je eigen cijfers en schuiven die datum mee zodra er iets verandert.',
-    accent: 'wil',
-  },
-  {
-    kicker: 'Waar je op kunt sturen',
-    belofte: 'Zie wat één keuze met die datum doet.',
-    toelichting:
-      'Fin rekent mee, wijst aan welke knop het zwaarst weegt en laat zien wat er gebeurt als je eraan draait.',
-    accent: 'fin',
-  },
-]
-
 export function WelcomePopup({ onDismiss, colorVars }: WelcomePopupProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const ctaRef = useRef<HTMLButtonElement>(null)
@@ -115,8 +68,8 @@ export function WelcomePopup({ onDismiss, colorVars }: WelcomePopupProps) {
     initialFocusRef: ctaRef,
   })
 
-  // De kaart scrollt intern zodra de vier waardes niet op één schermhoogte
-  // passen (kleine telefoon). De focus-trap zet de focus op de CTA onderaan en
+  // De kaart scrollt intern zodra de tekst niet op één schermhoogte past
+  // (heel kleine telefoon). De focus-trap zet de focus op de CTA onderaan en
   // de browser scrolt die in beeld — waardoor de popup halverwege opende en de
   // begroeting bóven de vouw verdween (gezien op 390×844). We zetten de kaart
   // daarom na die focus expliciet terug naar boven. De focus blijft op de CTA,
@@ -211,54 +164,21 @@ export function WelcomePopup({ onDismiss, colorVars }: WelcomePopupProps) {
           Geld is opgeslagen tijd.
         </p>
 
-        {/* Eén alinea proza die de toon zet, daarna de vier waardes. Tot
-            17 sep 2026 stonden hier twee alinea's en verder niets: mooi, maar
-            een nieuwe gebruiker las nergens wát de app nu eigenlijk voor 'm
-            doet. De vier waardes zeggen dat — in beloftes, niet in features. */}
+        {/* Twee regels over wat de app doet — in beloftes, niet in features
+            (B-052). Copy-grens: beschrijft wat de app TOONT, geen advies of
+            opbrengstbelofte (Wft). */}
         <p
           className="mt-6 font-serif text-[15px] leading-relaxed text-[var(--ink-2)]"
           style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
         >
-          TriFinity leest je geldzaken als een dagblad: elke ochtend een kort
-          bericht over hoe je ervoor staat. Vier dingen houdt het voor je bij.
+          TriFinity telt op wat je hebt en wat er elke maand omgaat, en rekent
+          dat om naar tijd: de datum waarop werken een keuze wordt. Fin laat
+          zien wat één keuze met die datum doet.
         </p>
 
-        {/* De vier waardes — elk met de kicker-streep in zijn eigen accent
-            (editorial patroon-kaart *Kicker-streep*). Dezelfde vier kleuren
-            kleuren straks de vragen en de hele app, dus dit is meteen de
-            introductie van de kleurtaal. */}
-        <ul className="mt-6 space-y-5">
-          {WAARDES.map((waarde) => (
-            <li key={waarde.kicker} className="flex gap-3">
-              <span
-                aria-hidden
-                className="mt-[9px] h-px w-5 shrink-0"
-                style={{ background: `var(--color-${waarde.accent}-500)` }}
-              />
-              <div className="min-w-0">
-                <p
-                  className="font-mono text-[10px] uppercase tracking-[0.20em]"
-                  style={{ color: `var(--color-${waarde.accent}-700)` }}
-                >
-                  {waarde.kicker}
-                </p>
-                <p
-                  className="mt-1 font-serif text-[15px] font-semibold leading-snug text-[var(--ink)]"
-                  style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
-                >
-                  {waarde.belofte}
-                </p>
-                <p className="mt-1 text-[13px] leading-snug text-[var(--ink-3)]">
-                  {waarde.toelichting}
-                </p>
-              </div>
-            </li>
-          ))}
-        </ul>
-
-        <p className="mt-6 text-[13px] leading-snug text-[var(--ink-3)]">
-          Daarvoor beginnen we met een paar korte vragen, in een paar minuten
-          klaar. Alles wat je invult, kun je later nog aanpassen.
+        <p className="mt-5 text-[13px] leading-snug text-[var(--ink-3)]">
+          We beginnen met een korte onboarding: een paar vragen, in een paar
+          minuten klaar. Alles wat je invult, kun je later nog aanpassen.
         </p>
 
         {/* CTA-rij — rechts-uitgelijnd, primary alleen. Geen secundaire actie
@@ -271,7 +191,7 @@ export function WelcomePopup({ onDismiss, colorVars }: WelcomePopupProps) {
             onClick={onDismiss}
             className="inline-flex min-h-11 items-center justify-center bg-[var(--ink)] px-6 py-3 text-sm font-medium text-[var(--paper)] transition-colors hover:bg-[var(--ink-2)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
           >
-            Begin &rarr;
+            Start de onboarding &rarr;
           </button>
         </div>
       </div>

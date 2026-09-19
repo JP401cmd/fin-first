@@ -47,7 +47,7 @@ export function UncategorizedTransactionsBanner({
             className="mt-0.5 inline-block rounded-[var(--r-sm)] border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.05em]"
             style={{ background: '#fff0ef', color: '#b33a2e', borderColor: '#f5c5c0' }}
           >
-            Niet verdeeld
+            Zonder categorie
           </span>
         </div>
         <div

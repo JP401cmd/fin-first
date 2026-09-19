@@ -6,18 +6,25 @@ import { loadPerspectiveContext } from '@/lib/household/perspective-loader'
 import { computeFireAge } from '@/lib/checkin/fire-age'
 import { resolveFireParams } from '@/lib/fire-params'
 import { localMonthBounds, localMonthStart } from '@/lib/month-range'
-import { budgetIdsOfType } from '@/lib/cashflow-kpis'
+import {
+  budgetIdsOfType,
+  deriveDataMonths6,
+  deriveSavingsRate6mWindow,
+  resolveSavingsRate6m,
+  type NetWorthSnapshotRow,
+} from '@/lib/cashflow-kpis'
 import { buildBudgetTypeMap } from '@/lib/budget-utils'
 import { getRecentDailyExpenseRate } from '@/lib/expense-rate'
-import { resolveAmountWithBasis } from '@/lib/effective-financials'
+import { resolveAmountWithBasis, resolveEffectiveIncomeExpenses } from '@/lib/effective-financials'
 import { loadBudgetBasis, selectBudgetsForBasis } from '@/lib/household/budget-share'
 import type { BudgetBasisRow } from '@/lib/budget-basis'
+import { transactionAnnualIncome } from '@/lib/budget-realized'
+import { getTxAgg12m, type TxMonthAggregateRow } from '@/lib/server-data/tx-aggregates'
+import { getEarliestIncomeDate, getNetWorthSnapshots12m } from '@/lib/server-data/base'
+import type { Asset } from '@/lib/asset-data'
 import {
   computeDebtAflossingMonthly,
-  computeSavingsRate6m,
   resolveSavingsSource,
-  savingsRateDataMonths,
-  savingsRateWindow,
 } from '@/lib/savings-source'
 import { selectUnlinkedBankAccounts, unlinkedCashTotal } from '@/lib/unlinked-cash'
 import {
@@ -43,21 +50,19 @@ export async function GET() {
   // tegen de vorige — zie de toelichting bij monthBeforePrev* in
   // lib/checkin/gespreksstarters.ts (B-016).
   const monthBeforePrevStart = localMonthStart(new Date(currentYear, currentMonth - 2, 1))
-  // 6-maands venster uit de CANONIEKE bron (lib/savings-source.ts): zes
-  // VOLTOOIDE kalendermaanden, de lopende maand exclusief — zelfde grenzen als
-  // de spaarquote op /overzicht. Stond hier als `currentMonth - 6` t/m
-  // `monthEnd`, wat ZEVEN kalendermaanden door een deler 6 haalde.
-  const window6m = savingsRateWindow(now)
   const threeMonthsAgo = localMonthStart(new Date(currentYear, currentMonth - 3, 1))
 
   const [
     assetsRes, debtsRes, curIncomeRes, prevIncomeRes,
-    goalsRes, budgetsRes, actionsRes, snapshotsRes,
-    income6mRes, expense6mRes, profileRes, bankRes,
+    goalsRes, budgetsRes, actionsRes,
+    txAgg12Res, earliestIncomeRes, profileRes, bankRes,
     curCatRes, prevCatRes, recurringRes, perspective,
-    prevFireAge, expenseRate, basisBudgetsRes,
+    prevFireAge, expenseRate, basisBudgetsRes, snapshots12mRes,
   ] = await Promise.all([
-    supabase.from('assets').select('name, current_value, net_worth_inclusion_pct').eq('user_id', claims.sub).eq('is_active', true),
+    // `asset_type`/`expected_return`/`depreciation_rate`/`purchase_value` staan
+    // erbij voor de net-vermogen-delta-tak van `resolveSavingsRate6m`
+    // (`computeExpectedAnnualAppreciation`: koerswinst is geen sparen).
+    supabase.from('assets').select('name, current_value, net_worth_inclusion_pct, asset_type, expected_return, depreciation_rate, purchase_value').eq('user_id', claims.sub).eq('is_active', true),
     supabase.from('debts').select('current_balance, name, debt_type, interest_rate, monthly_payment, repayment_type, end_date, start_date, net_worth_inclusion_pct, include_aflossing_in_savings, custom_aflossing_amount, is_active').eq('user_id', claims.sub),
     supabase.from('transactions').select('amount').eq('user_id', claims.sub).eq('is_income', true).gte('date', monthStart).lt('date', monthEnd),
     // Vorige maand ÉN de maand daarvóór; hieronder gesplitst op de maandgrens.
@@ -70,9 +75,26 @@ export async function GET() {
     // gefilterd, dus de categorie-weergave verandert niet.
     supabase.from('budgets').select('id, name, monthly_limit, budget_type, parent_id').eq('user_id', claims.sub),
     supabase.from('actions').select('id, freedom_days, is_completed, completed_at').eq('user_id', claims.sub),
-    supabase.from('net_worth_snapshots').select('value, snapshot_date').eq('user_id', claims.sub).order('snapshot_date', { ascending: false }).limit(6),
-    supabase.from('transactions').select('amount, transaction_type, date').eq('user_id', claims.sub).eq('is_income', true).gte('date', window6m.fromDate).lt('date', window6m.toDate),
-    supabase.from('transactions').select('amount, transaction_type, date, budget_id').eq('user_id', claims.sub).eq('is_income', false).gte('date', window6m.fromDate).lt('date', window6m.toDate),
+    // Géén eigen snapshot-query meer: de vermogenstrend komt uit dezelfde
+    // 12-maands reeks als de spaarquote-delta (`getNetWorthSnapshots12m`,
+    // onderaan deze lijst). De oude query hier las `value` — een kolom die
+    // `net_worth_snapshots` nooit heeft gehad — en gaf op productie stil
+    // `null → []`, waardoor `vermogen-groei`/`-daling` nooit vuurden.
+    // 6-maands sommen uit HET maandaggregaat (`tx_month_aggregate`, cache()-
+    // gedeeld met de dashboardbundel) — niet langer twee rauwe rij-queries over
+    // het venster. Drie afwijkingen van /overzicht verdwijnen daarmee in één
+    // beweging (kaart "restdivergentie na R2", 19 sep 2026): (1) rauwe rijen
+    // kapten stil af op PostgREST's max_rows = 1000, waardoor de uitgavensom
+    // voor tx-rijke gebruikers te laag werd en de check-in zweeg waar de bundel
+    // 9,5 % gaf; (2) de classificatie liep op de kolom `is_income` i.p.v. het
+    // TEKEN van `amount` (het aggregaat kent alleen het teken — "één huis");
+    // (3) de ADR 0139-filter (rekeningen met budgetteren uit) zit in de RPC en
+    // ontbrak hier. SECURITY INVOKER + own-only RLS op transactions: dezelfde
+    // scope als de vervangen rij-queries.
+    getTxAgg12m(supabase),
+    // All-time vroegste inkomstendatum voor de datamaand-telling — één rij, kan
+    // niet afkappen; dezelfde bron als `deriveDataMonths6` op /overzicht.
+    getEarliestIncomeDate(supabase),
     // De grondslag-kolommen staan hier bewust bij de FIRE-parameters: de
     // spaarquote van deze check-in moet dezelfde grondslagresolutie doorlopen
     // als /overzicht (ADR 0103/0121), en die leest income_source /
@@ -99,6 +121,13 @@ export async function GET() {
     // blijven omdat hij de categorie-limieten en de spaarbudget-ID's voedt.
     // Zelfde splitsing als in de snapshot-routes.
     selectBudgetsForBasis(supabase),
+    // 12-maands snapshotreeks OPLOPEND — dezelfde fetch als de dashboardbundel.
+    // Eén reeks, twee afnemers: de net-vermogen-delta-tak van
+    // `resolveSavingsRate6m` én de vermogenstrend voor de starters
+    // (`netWorthTrend`/`prevNetWorth`, laatste twee rijen). Consume, don't
+    // recompute: hier stond een tweede, eigen snapshot-lezer met een
+    // niet-bestaande kolom (`value`) — zie de noot bij de query-lijst hierboven.
+    getNetWorthSnapshots12m(supabase),
   ])
 
   // ── Kernmetrics ──────────────────────────────────────────────────────
@@ -144,76 +173,114 @@ export async function GET() {
   const prevMonthlySavings = prevMonthIncome - prevMonthExpenses
   const monthBeforePrevSavings = monthBeforePrevIncome - monthBeforePrevExpenses
 
-  // 6-maands gemiddelden (excl. eigen-rekening-transfers, zoals de loaders);
-  // bij minder dan 6 maanden data middelen we over de beschikbare maanden.
-  const isRealTx = (t: { transaction_type?: string | null }) =>
-    t.transaction_type !== 'transfer' && t.transaction_type !== 'joint_transfer'
-  const income6mRows = (income6mRes.data || []).filter(isRealTx)
-  const expense6mRows = (expense6mRes.data || []).filter(isRealTx)
-  const income6m = income6mRows.reduce((s, t) => s + Math.abs(t.amount || 0), 0)
-  const expenses6m = expense6mRows.reduce((s, t) => s + Math.abs(t.amount || 0), 0)
-  const earliest6m = [...income6mRows, ...expense6mRows]
-    .reduce<string | null>((min, t) => (t.date && (!min || t.date < min) ? t.date : min), null)
-  // Deler uit dezelfde canonieke bron als het venster: VOLTOOIDE maanden.
-  const dataMonths6 = savingsRateDataMonths(now, earliest6m)
+  // ── 6-maands sommen: uit HET maandaggregaat, via de gedeelde helpers ───────
+  // Exact dezelfde assemblage als `loadDashboardData` (lib/dashboard-data-loader.ts
+  // rond `deriveSavingsRate6mWindow`): venster = zes VOLTOOIDE kalendermaanden
+  // (`savingsRateWindow`, de lopende maand exclusief), transfer-gefilterd, mét
+  // de spaarbudget-stortingen apart; deler = `deriveDataMonths6` op de all-time
+  // vroegste inkomstendatum. Hier stond tot 19 sep 2026 een eigen reduce-lus
+  // over rauwe rijen met een eigen "vroegste datum BINNEN het venster" — zie de
+  // toelichting bij `getTxAgg12m` in de query-lijst hierboven.
+  const txAgg12 = (txAgg12Res.data ?? []) as TxMonthAggregateRow[]
+  const allBudgets = budgetsRes.data || []
+  const savingsBudgetIds = budgetIdsOfType(buildBudgetTypeMap(allBudgets), 'savings')
+  const { income6m, expenses6m, savingsBudgetSpent6m } =
+    deriveSavingsRate6mWindow(now, txAgg12, savingsBudgetIds)
+  const dataMonths6 = deriveDataMonths6(
+    now,
+    (earliestIncomeRes.data as { date?: string | null } | null)?.date ?? undefined,
+  )
+  // 6-maands gemiddelden — alleen nog voor `computeFireAge` hieronder; de
+  // spaarquote zelf leest deze gemiddelden niet meer (zie het anker hieronder).
   const income6mAvg = income6m / dataMonths6
   const expenses6mAvg = expenses6m / dataMonths6
   const debtAflossing6m = computeDebtAflossingMonthly(activeDebts) * SAVINGS_RATE_WINDOW_MONTHS
 
-  // ── Spaarquote: de EFFECTIEVE, grondslag-geresolveerde quote (R2) ─────────
+  // ── Spaarquote: de EFFECTIEVE, grondslag-geresolveerde quote ──────────────
   //
-  // TWEE CORRECTIES, OP TWEE VERSCHILLENDE ASSEN — verwar ze niet:
+  // DRIE CORRECTIES, OP DRIE VERSCHILLENDE ASSEN — verwar ze niet:
   //
   //  1. (eerder) de MÉTING zelf loopt via de canonieke `computeSavingsRate6m`
   //     i.p.v. de kale `savingsRateFromAggregates`: die trekt eerst de
   //     spaarbudget-stortingen van de uitgaven af (sparen is geen uitgave) en
   //     extrapoleert bij <6 maanden data.
-  //  2. (R2, eigenaarsbesluit 5 — 7 sep 2026) de GRONDSLAGRESOLUTIE. Die
-  //     ontbrak nog volledig. `computeSavingsRate6m` is de rauwe
-  //     transactiemeting; de tegel op /overzicht en de Fin-zijbalk tonen
+  //  2. (R2, eigenaarsbesluit 5 — 7 sep 2026) de GRONDSLAGRESOLUTIE:
   //     `resolveSavingsSource(...).effectiveSavingsRatePct` (ADR 0121), waar
   //     `income_source`/`expenses_source` = 'manual' of 'budget' de
-  //     gebruikerskeuze laat winnen. Onder zo'n grondslag toonde de check-in
-  //     een ánder percentage dan /overzicht — onder een IDENTIEK label
-  //     ("6-maands spaarquote"). Gemeten op de fixture van
-  //     lib/spaarquote-eenduidige-grondslag.test.tsx: /overzicht 30 %,
-  //     check-in 10 %, en daarmee de omgekeerde vraag ("welke kleine stap zou
-  //     die kunnen verhogen?" tegen iemand die 30 % spaart).
+  //     gebruikerskeuze laat winnen. Zonder die stap toonde de check-in onder
+  //     zo'n grondslag een ánder percentage dan /overzicht — onder een
+  //     identiek label — en stelde daarmee de omgekeerde vraag.
+  //  3. (19 sep 2026, kaart "restdivergentie na R2", optie A) de INVOER van die
+  //     twee stappen komt nu uit dezelfde bundel-laag als /overzicht:
+  //       · meting via `resolveSavingsRate6m` (lib/cashflow-kpis.ts) i.p.v. de
+  //         kale `computeSavingsRate6m` — dus MÉT de profiel-terugval en de
+  //         net-vermogen-delta-tak bij een leeg venster ("één meting, één huis");
+  //       · jaarinkomen-anker = `transactionAnnualIncome(realized)`: twaalf
+  //         AFGESLOTEN maanden, één deler (historiebasis, ADR 0138), i.p.v.
+  //         `income6mAvg × 12`. Dat anker bepaalt de basis-VLAG en daarmee
+  //         wélke formule draait: met inkomsten die alleen 7–12 maanden terug
+  //         liggen zag /overzicht nog 'transaction' (−54 % op de gemengde
+  //         formule) en de check-in 'profile' (+30 %) — gemeten op de fixture
+  //         van lib/spaarquote-eenduidige-grondslag.test.tsx, case C.
+  //     Spiegelt exact app/api/snapshots/route.ts (blok "snapshotTxAnnualIncome").
   //
   // GEEN TWEEDE FORMULE: `resolveSavingsSource` blijft de enige plek waar de
   // grondslagkeuze in een percentage wordt omgezet; hier wordt uitsluitend
-  // dezelfde INVOER samengesteld als in de snapshot-routes (jaarinkomen =
-  // 6-maands gemiddelde × 12, uitgaven op diezelfde 6-maands meetbasis).
-  const allBudgets = budgetsRes.data || []
-  const savingsBudgetIds = budgetIdsOfType(buildBudgetTypeMap(allBudgets), 'savings')
-  const savingsBudgetSpent6m = expense6mRows.reduce(
-    (s, t) => (t.budget_id && savingsBudgetIds.has(t.budget_id) ? s + Math.abs(t.amount || 0) : s),
-    0,
-  )
-  const measuredSavingsRate6m = computeSavingsRate6m({
-    income6m,
-    expenses6m,
-    savingsBudgetSpent6m,
-    debtAflossing6m,
-    dataMonths: dataMonths6,
-  }).savingsRate6m
-
+  // dezelfde INVOER samengesteld als in de dashboardbundel en de snapshot-routes.
   const profileRow = (profileRes.data ?? {}) as Record<string, unknown>
+  // Gepersonaliseerde FIRE-parameters (resolveFireParams) — hier al geresolved
+  // omdat de spaarquote-delta-tak hieronder het profielrendement nodig heeft als
+  // terugval voor bezittingen zonder eigen rendement (ADR 0166); de FIRE-leeftijd
+  // verderop consumeert hetzelfde object.
+  const profile = profileRes.data
+  const fireParams = resolveFireParams(profile ?? {})
   const checkinBudgetBasis = await loadBudgetBasis(
     supabase,
     profileRow,
     (basisBudgetsRes.data ?? []) as unknown as BudgetBasisRow[],
   )
+  const checkinTxAnnualIncome = transactionAnnualIncome(checkinBudgetBasis.realized)
+  // EFFECTIVE maandinkomen/-uitgaven (ADR 0073) — uitsluitend de terugvallen van
+  // `resolveSavingsRate6m` (profiel-fallback + noemer van de delta-tak), dezelfde
+  // rol als `effectiveMonthlyIncome/-Expenses` in de dashboardbundel. Transactie-
+  // invoer = de huidige-maand-sommen van deze route, zoals de bundel
+  // `getCurrentMonthTx` meegeeft.
+  const { income: effectiveMonthlyIncome, expenses: effectiveMonthlyExpenses } =
+    resolveEffectiveIncomeExpenses(profileRow, monthlyIncome, monthlyExpenses, {
+      income: checkinBudgetBasis.income.monthlyTotal,
+      expenses: checkinBudgetBasis.expenses.monthlyTotal,
+    })
+  const measuredSavingsRate6m = resolveSavingsRate6m({
+    income6m,
+    expenses6m,
+    savingsBudgetSpent6m,
+    debtAflossing6m,
+    dataMonths: dataMonths6,
+    effectiveMonthlyIncome,
+    effectiveMonthlyExpenses,
+    netWorthSnapshots: (snapshots12mRes.data ?? []) as unknown as NetWorthSnapshotRow[],
+    assets: assets as unknown as Asset[],
+    // Terugval voor bezittingen zonder eigen rendement (ADR 0166) — dezelfde
+    // profielketen als de FIRE-leeftijd van deze check-in.
+    terugvalRendementPct: fireParams.grossReturn * 100,
+  }).savingsRate6m
+
   const checkinAnnualIncome = resolveAmountWithBasis(
     profileRow.income_source as string | null | undefined,
     Number(profileRow.net_monthly_income ?? 0) * 12,
-    income6mAvg * 12,
+    checkinTxAnnualIncome,
     checkinBudgetBasis.income.annualTotal,
   )
+  // Uitgaven op de 6-maands MEETBASIS (`expenses6m / 6`), letterlijk zoals
+  // `dashboardSavingsExpenses` in de dashboardbundel — niet `expenses6mAvg`
+  // (÷ dataMonths6), anders wijkt de gemengde formule bij <6 maanden data af
+  // van /overzicht. Pariteit met de bundel gaat hier vóór; of die ÷6 zelf de
+  // juiste deler is bij weinig historie is een vraag aan de bundel, niet aan
+  // deze route.
   const checkinExpenses = resolveAmountWithBasis(
     profileRow.expenses_source as string | null | undefined,
     Number(profileRow.estimated_monthly_expenses ?? 0),
-    expenses6mAvg,
+    expenses6m / SAVINGS_RATE_WINDOW_MONTHS,
     checkinBudgetBasis.expenses.monthlyTotal,
   )
   const { effectiveSavingsRatePct } = resolveSavingsSource({
@@ -223,20 +290,8 @@ export async function GET() {
     // Terugval wanneer de gekozen grondslag geen bruikbaar jaarinkomen oplevert
     // (bv. income_source='manual' met een leeggemaakt bedrag) — daarom bewust de
     // transactie-afleiding en niet `checkinAnnualIncome.amount` zelf.
-    estimatedAnnualIncome: income6mAvg * 12,
+    estimatedAnnualIncome: checkinTxAnnualIncome,
     estimatedMonthlyExpenses: Number(profileRow.estimated_monthly_expenses ?? 0),
-    // Op een zuivere transactie/transactie-grondslag geeft `resolveSavingsSource`
-    // deze meting ongewijzigd terug — de check-in toont dan hetzelfde getal als
-    // vóór R2.
-    //
-    // Dat is NIET hetzelfde als pariteit met /overzicht. Die pagina bouwt de
-    // meting met `resolveSavingsRate6m` (lib/cashflow-kpis.ts): mét profiel- en
-    // netto-vermogen-delta-terugval bij een leeg venster, en uit het
-    // maandaggregaat in plaats van rauwe rijen. Deze route heeft die terugvallen
-    // niet en leest rijen zonder `.limit()`, dus bij een leeg venster of >1000
-    // rijen kunnen de twee uiteenlopen. Grotendeels bestaand gedrag, maar het is
-    // een echte restdivergentie — apart vastgelegd, niet hier stilzwijgend
-    // weggeschreven.
     savingsRate6m: measuredSavingsRate6m,
     basis: {
       income: checkinAnnualIncome.basis,
@@ -250,10 +305,14 @@ export async function GET() {
   // toelichting bij de query hierboven.
   const dailyExpenses = expenseRate.dailyRate
 
-  // Snapshots → trend
-  const snapshots = snapshotsRes.data || []
-  const netWorthTrend = snapshots.length >= 2 ? snapshots[0].value - snapshots[1].value : 0
-  const prevNetWorth = snapshots.length >= 2 ? snapshots[1].value : netWorth
+  // Snapshots → trend. De gedeelde reeks is OPLOPEND (12 maanden, kolom
+  // `net_worth`): laatste = [n−1], vorige = [n−2]. Zelfde bron als de
+  // spaarquote-delta hierboven; géén tweede snapshot-lezer meer.
+  const snapshots = (snapshots12mRes.data ?? []) as unknown as NetWorthSnapshotRow[]
+  const laatste = snapshots.at(-1)
+  const vorige = snapshots.at(-2)
+  const netWorthTrend = laatste && vorige ? Number(laatste.net_worth) - Number(vorige.net_worth) : 0
+  const prevNetWorth = vorige ? Number(vorige.net_worth) : netWorth
 
   // Acties
   const allActions = actionsRes.data || []
@@ -264,10 +323,9 @@ export async function GET() {
   const pendingActionsCount = allActions.filter(a => !a.is_completed).length
 
   // FIRE-leeftijd nu + vorige check-in — gepersonaliseerde parameters
-  // (resolveFireParams) + 6-maands gemiddelden i.p.v. deze-maand-cijfers,
-  // zodat de schatting niet halverwege de maand alle kanten op springt.
-  const profile = profileRes.data
-  const fireParams = resolveFireParams(profile ?? {})
+  // (`fireParams`, hierboven geresolved) + 6-maands gemiddelden i.p.v.
+  // deze-maand-cijfers, zodat de schatting niet halverwege de maand alle
+  // kanten op springt.
   const fireAge = computeFireAge({
     dateOfBirth: profile?.date_of_birth ?? null,
     netWorth,

@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, memo, useCallback, useRef } from 'react'
+import { useState, useEffect, memo, useCallback, useRef, useId } from 'react'
+import type { CSSProperties } from 'react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import type { StackedRow, WealthGroup } from '@/lib/wealth-composition'
 import {
@@ -12,6 +13,10 @@ import {
   DEBT_LAYER_FIELD,
   DEBT_LAYER_LABELS,
   DEBT_LAYER_COLORS,
+  BUITEN_DOEL_ZIN,
+  BUITEN_DOEL_INKT,
+  EIGEN_WONING_LABEL,
+  EIGEN_WONING_HYPOTHEEK_LABEL,
 } from '@/lib/wealth-composition'
 import { ChartEventMarkers, topPaddingFor, bottomPaddingFor } from './chart-event-markers'
 import type { ChartEventOverlay, ChartEventKind } from '@/lib/chart-event-overlay'
@@ -31,16 +36,46 @@ const ALL_GROUPS: WealthGroup[] = ['spaargeld', 'beleggingen', 'pensioen', 'vast
  */
 const EIGEN_HUIS_SEGMENT = 'eigen-huis'
 const EIGEN_HUIS_HYPOTHEEK_SEGMENT = 'eigen-huis-hypotheek'
-const EIGEN_HUIS_LABEL = 'Eigen huis'
-const EIGEN_HUIS_HYPOTHEEK_LABEL = 'Hypotheek eigen huis'
+const EIGEN_HUIS_LABEL = EIGEN_WONING_LABEL
+const EIGEN_HUIS_HYPOTHEEK_LABEL = EIGEN_WONING_HYPOTHEEK_LABEL
 /**
- * Dekking van een gedempt segment. Duidelijk onder de 0,85 van een gewoon
- * segment, maar niet zo licht dat een smalle jaarstaaf (2–4px op mobiel) tegen
- * het papier wegvalt — 0,3 haalde de 3:1 van WCAG 1.4.11 (non-text contrast)
- * niet. De demping is bewust niet de énige drager: legenda en duidingsregel
- * benoemen 'm ook in woorden.
+ * Dekking van een gedempt segment — de DERDE drager, niet de eerste.
+ *
+ * Eerder stond hier dat 0,45 "de 3:1 van WCAG 1.4.11 haalt". Dat is nagerekend
+ * (19-09-2026, met `generatePalette`/`contrastRatio` uit lib/color-palette.ts,
+ * sRGB-compositing op `--paper`) en het klopt niet: gedempt huis vs papier komt
+ * op 1,58–1,82:1 over 19 accenten, en vs de stapelbuur "Overig" zelfs op
+ * 1,09–1,18:1. In een gestapelde staaf komt leesbaarheid namelijk niet van het
+ * contrast met papier maar van de grens tussen buren — en dekking schuift een
+ * segment precies langs de as (lichtheid) die de kern-schaal al voor CATEGORIE
+ * gebruikt. Dekking kan dus nooit de enige drager zijn.
+ *
+ * Dragers in volgorde van betrouwbaarheid (besluit 19-09-2026, WCAG 1.4.1):
+ *  1. tekst — legenda-regel, duidingsregel en de kassabon (primair op mobiel,
+ *     waar een jaarstaaf ≈ 3px breed is);
+ *  2. arcering — een SVG-`<pattern>` over hetzelfde vlak, dat grijstinten,
+ *     print en screenshots overleeft (zie GEDEMPTE_ARCERING_*);
+ *  3. deze dekking.
  */
 const GEDEMPTE_DEKKING = 0.45
+
+/** Tegelgrootte en lijndikte van de arcering over een gedempt segment (px). */
+const GEDEMPTE_ARCERING_TEGEL = 4
+const GEDEMPTE_ARCERING_LIJN = 1.5
+
+/**
+ * CSS-tegenhanger van het SVG-patroon, voor de HTML-swatches in legenda en
+ * tooltip. Die swatches zijn de SLEUTEL bij de staaf — dragen ze het patroon
+ * niet, dan verwijst de legenda naar een codering die ze zelf niet toont.
+ * `color-mix` i.p.v. element-`opacity`, zodat de arceerlijnen op volle sterkte
+ * blijven staan, precies zoals in de SVG.
+ */
+function gedempteSwatchStijl(color: string): CSSProperties {
+  return {
+    backgroundColor: `color-mix(in srgb, ${color} ${Math.round(GEDEMPTE_DEKKING * 100)}%, transparent)`,
+    backgroundImage: `repeating-linear-gradient(45deg, ${color} 0 1px, transparent 1px ${GEDEMPTE_ARCERING_TEGEL - 1}px)`,
+  }
+}
 
 interface BarSegment {
   /** Stabiele sleutel én `data-wealth-segment`-waarde. */
@@ -220,6 +255,7 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
   onYearClick?: (age: number) => void
 }) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 1200, forModal })
+  const uid = useId()
   const [hoveredAge, setHoveredAge] = useState<number | null>(null)
   const [hoveredEvent, setHoveredEvent] = useState<ChartEventOverlay | null>(null)
 
@@ -453,6 +489,14 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
   // hypotheek dan nooit — de duidingsregel zou daar een demping beloven die niet
   // op het scherm staat.
   const heeftGedempteSegmenten = legendaSegmenten.some(seg => seg.gedempt)
+  // Arcering-patronen per gedempt segment. Eén `<pattern>` per segmentsoort,
+  // want de lijnkleur is de kleur van dát segment (huis = kern-ladder, hypotheek
+  // = schuld-rood) en `currentColor` erft binnen `<defs>` niet van de rect die
+  // ernaar verwijst. `useId()` houdt de ids uniek wanneer de chart twee keer op
+  // één pagina staat (inline + modal).
+  const gedempteSegmenten = legendaSegmenten.filter(seg => seg.gedempt)
+  const arceringId = (key: string) => `${uid}-arcering-${key}`
+  const gedemptFill = (key: string) => `url(#${arceringId(key)})`
 
   return (
     <div ref={ref}>
@@ -527,17 +571,20 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
                 <span
                   key={item.label}
                   className="inline-flex items-center gap-1.5 text-[10px]"
-                  style={{ color: item.gedempt ? 'var(--ink-meta)' : 'var(--ink-2)' }}
+                  style={{ color: item.gedempt ? BUITEN_DOEL_INKT : 'var(--ink-2)' }}
                 >
                   <span
+                    data-swatch-gedempt={item.gedempt ? 'true' : undefined}
                     className="inline-block h-2 w-2 rounded-sm shrink-0"
-                    style={{ backgroundColor: item.color, opacity: item.gedempt ? GEDEMPTE_DEKKING : 1 }}
+                    style={
+                      item.gedempt ? gedempteSwatchStijl(item.color) : { backgroundColor: item.color }
+                    }
                   />
                   <span>{item.label}</span>
                   <span className="font-mono tabular-nums text-[var(--ink-3)]">
                     {fmtEuro(item.value)}
                     {item.value > 0 && tooltipPositiveTotal > 0 && (
-                      <span className="text-[var(--ink-4)]"> · {pctStr(item.value, tooltipPositiveTotal)}</span>
+                      <span className="text-[var(--ink-meta)]"> · {pctStr(item.value, tooltipPositiveTotal)}</span>
                     )}
                   </span>
                 </span>
@@ -552,7 +599,7 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
             )}
           </>
         ) : (
-          <p className="py-2 text-center font-serif text-[11px] italic text-[var(--ink-4)]">
+          <p className="py-2 text-center font-serif text-[11px] italic text-[var(--ink-meta)]">
             Beweeg over een jaar voor de samenstelling — tik om alle details te zien
           </p>
         )}
@@ -567,6 +614,34 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
       >
+        {/* Arcering voor segmenten die buiten het doel vallen — tweede,
+            kleuronafhankelijke drager naast de dekking (WCAG 1.4.1).
+            `userSpaceOnUse` houdt de tegel even groot ongeacht de staafbreedte,
+            zodat de hoogte-animatie het motief niet uitrekt. */}
+        {gedempteSegmenten.length > 0 && (
+          <defs>
+            {gedempteSegmenten.map(seg => (
+              <pattern
+                key={seg.key}
+                id={arceringId(seg.key)}
+                patternUnits="userSpaceOnUse"
+                width={GEDEMPTE_ARCERING_TEGEL}
+                height={GEDEMPTE_ARCERING_TEGEL}
+                patternTransform="rotate(45)"
+              >
+                <line
+                  x1={0}
+                  y1={0}
+                  x2={0}
+                  y2={GEDEMPTE_ARCERING_TEGEL}
+                  stroke={seg.color}
+                  strokeWidth={GEDEMPTE_ARCERING_LIJN}
+                />
+              </pattern>
+            ))}
+          </defs>
+        )}
+
         {/* Horizontal grid lines */}
         {yTicks.map(({ val, y }) => (
           <line
@@ -603,14 +678,20 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
             y={y + 4}
             textAnchor="end"
             fontSize={11}
-            fill="var(--ink-4)"
+            fill="var(--ink-meta)"
             fontFamily="var(--font-dm-mono, monospace)"
           >
             {fmtEuro(val)}
           </text>
         ))}
 
-        {/* X-axis labels — fontSize 11 (M16), gelijk aan de vermogenspad-chart. */}
+        {/* X-axis labels — fontSize 11 (M16), gelijk aan de vermogenspad-chart.
+            Inkt: `--ink-meta`, niet `--ink-4`. Dat laatste is GEEN teksttoken
+            (1,65–1,85:1, ver onder de AA-eis van 4,5:1 — zie globals.css r.24-27);
+            het is er voor hairlines, uitgeschakelde vlakken en achtergrond-tints.
+            Deze twee as-labels stonden sinds de eerste versie van de component op
+            `--ink-4` en waren daarmee het precedent dat nieuwe code bleef
+            uitnodigen. Rechtgezet 19-09-2026. */}
         {xTickAges.map(age => (
           <text
             key={age}
@@ -618,7 +699,7 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
             y={H - 4}
             textAnchor="middle"
             fontSize={11}
-            fill="var(--ink-4)"
+            fill="var(--ink-meta)"
             fontFamily="var(--font-dm-mono, monospace)"
           >
             {age}
@@ -662,34 +743,62 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
             }}>
               {/* Positive stacked bars */}
               {positiveBars.map(bar => (
-                <rect
-                  key={bar.key}
-                  data-wealth-segment={bar.key}
-                  x={x}
-                  y={yZero - (yZero - bar.y) * animProgress}
-                  width={barWidth}
-                  height={bar.height * animProgress}
-                  fill={bar.color}
-                  opacity={bar.gedempt ? GEDEMPTE_DEKKING : isHovered ? 1 : 0.85}
-                  rx={barWidth > 4 ? 1 : 0}
-                  style={{ transition: 'opacity 150ms ease, y 0.8s cubic-bezier(.22,1,.36,1), height 0.8s cubic-bezier(.22,1,.36,1)' }}
-                />
+                <g key={bar.key}>
+                  <rect
+                    data-wealth-segment={bar.key}
+                    x={x}
+                    y={yZero - (yZero - bar.y) * animProgress}
+                    width={barWidth}
+                    height={bar.height * animProgress}
+                    fill={bar.color}
+                    opacity={bar.gedempt ? GEDEMPTE_DEKKING : isHovered ? 1 : 0.85}
+                    rx={barWidth > 4 ? 1 : 0}
+                    style={{ transition: 'opacity 150ms ease, y 0.8s cubic-bezier(.22,1,.36,1), height 0.8s cubic-bezier(.22,1,.36,1)' }}
+                  />
+                  {bar.gedempt && (
+                    <rect
+                      data-wealth-segment-arcering={bar.key}
+                      x={x}
+                      y={yZero - (yZero - bar.y) * animProgress}
+                      width={barWidth}
+                      height={bar.height * animProgress}
+                      fill={gedemptFill(bar.key)}
+                      rx={barWidth > 4 ? 1 : 0}
+                      pointerEvents="none"
+                      style={{ transition: 'y 0.8s cubic-bezier(.22,1,.36,1), height 0.8s cubic-bezier(.22,1,.36,1)' }}
+                    />
+                  )}
+                </g>
               ))}
 
               {/* Debt bar (below zero line) */}
               {debtBars.map(bar => (
-                <rect
-                  key={bar.key}
-                  data-wealth-segment={bar.key}
-                  x={x}
-                  y={yZero + bar.offset * animProgress}
-                  width={barWidth}
-                  height={bar.height * animProgress}
-                  fill={bar.color}
-                  opacity={bar.gedempt ? GEDEMPTE_DEKKING : isHovered ? 1 : 0.85}
-                  rx={barWidth > 4 ? 1 : 0}
-                  style={{ transition: 'opacity 150ms ease, y 0.8s cubic-bezier(.22,1,.36,1), height 0.8s cubic-bezier(.22,1,.36,1)' }}
-                />
+                <g key={bar.key}>
+                  <rect
+                    data-wealth-segment={bar.key}
+                    x={x}
+                    y={yZero + bar.offset * animProgress}
+                    width={barWidth}
+                    height={bar.height * animProgress}
+                    fill={bar.color}
+                    opacity={bar.gedempt ? GEDEMPTE_DEKKING : isHovered ? 1 : 0.85}
+                    rx={barWidth > 4 ? 1 : 0}
+                    style={{ transition: 'opacity 150ms ease, y 0.8s cubic-bezier(.22,1,.36,1), height 0.8s cubic-bezier(.22,1,.36,1)' }}
+                  />
+                  {bar.gedempt && (
+                    <rect
+                      data-wealth-segment-arcering={bar.key}
+                      x={x}
+                      y={yZero + bar.offset * animProgress}
+                      width={barWidth}
+                      height={bar.height * animProgress}
+                      fill={gedemptFill(bar.key)}
+                      rx={barWidth > 4 ? 1 : 0}
+                      pointerEvents="none"
+                      style={{ transition: 'y 0.8s cubic-bezier(.22,1,.36,1), height 0.8s cubic-bezier(.22,1,.36,1)' }}
+                    />
+                  )}
+                </g>
               ))}
 
               {/*
@@ -905,26 +1014,29 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
         {legendaSegmenten.map(seg => (
           <div key={seg.key} className="flex items-center gap-1.5">
             <div
+              data-swatch-gedempt={seg.gedempt ? 'true' : undefined}
               className="h-2.5 w-2.5 rounded-sm shrink-0"
-              style={{ backgroundColor: seg.color, opacity: seg.gedempt ? GEDEMPTE_DEKKING : 1 }}
+              style={seg.gedempt ? gedempteSwatchStijl(seg.color) : { backgroundColor: seg.color }}
             />
             <span
               className="text-[10px] font-medium"
-              style={{ color: seg.gedempt ? 'var(--ink-meta)' : 'var(--ink-3)' }}
+              style={{ color: seg.gedempt ? BUITEN_DOEL_INKT : 'var(--ink-3)' }}
             >
               {seg.label}
             </span>
           </div>
         ))}
       </div>
-      {/* Duiding bij de demping: zonder deze regel leest een lichte band als een
-          renderfout in plaats van als een bewuste uitspraak over het plan. */}
+      {/* Duiding bij de markering: zonder deze regel leest een gearceerde,
+          lichte band als een renderfout in plaats van als een bewuste uitspraak
+          over het plan. De regel benoemt de dragers die er écht staan (arcering
+          + demping) — op een staaf van ~3px is tekst de primaire drager. */}
       {heeftGedempteSegmenten && (
         <p
-          className="mt-1 px-4 text-center text-[10px] italic text-[var(--ink-meta)]"
-          style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+          className="mt-1 px-4 text-center text-[10px] italic"
+          style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)', color: BUITEN_DOEL_INKT }}
         >
-          Gedempt = telt niet mee voor je doel — je woont er.
+          Gearceerd en gedempt = {BUITEN_DOEL_ZIN}.
         </p>
       )}
     </div>

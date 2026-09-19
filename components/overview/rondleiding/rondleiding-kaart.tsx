@@ -34,10 +34,14 @@ import type { SpotlightRect } from './use-spotlight-rect'
  *  - **Desktop**: popover bij het gat, in de volgorde onder → boven → rechts,
  *    met 16px viewport-marge. De zijbalk-stap gaat altijd naar rechts: onder of
  *    boven een kolom van volle schermhoogte bestaat geen ruimte.
- *  - **Mobiel**: een vaste kaart onderin, want een popover van 22rem naast een
- *    element van 45% schermbreedte past nergens. Ligt het gat zelf in de onderste
- *    40% (de nav-pill-stap), dan verhuist de kaart naar bóven — anders dekt hij
- *    precies af wat hij uitlicht.
+ *  - **Mobiel**: een vaste kaart tegen de onder- of bovenrand, want een popover
+ *    van 22rem naast een element van 45% schermbreedte past nergens. Welke rand
+ *    het wordt, volgt — net als op desktop — uit de eigen gemeten kaarthoogte:
+ *    we kiezen de rand waar de kaart het gat het mínst bedekt, met de onderrand
+ *    (duimbereik) als voorkeur bij gelijkspel. De oude regel keek alleen naar de
+ *    positie van het gat (`rect.top > vh * 0,6`) en liet de kaart bij een lage
+ *    viewport dus dwars over het element vallen dat hij uitlicht — gemeld en
+ *    gemeten op 384×410 (B-052).
  *
  * ══ Afscheid ═════════════════════════════════════════════════════════════
  *
@@ -78,10 +82,37 @@ function isVast(p: Positie): p is { onderin: boolean; zij: number } {
 const VASTE_KAART_MAX = 560
 
 /**
+ * Marge van de vaste mobiele kaart tot de onder- of bovenrand. Spiegelt de
+ * `max(12px, env(safe-area-inset-*))` uit `stijl`: de safe-area is niet vooraf
+ * te kennen in een pure functie, dus rekenen we met de ondergrens. Een grotere
+ * safe-area schuift de kaart altijd verder wég van het gat, nooit erin.
+ */
+const VASTE_KAART_MARGE = 12
+
+/**
+ * Hoeveel px van het spotlight-gat de vaste kaart zou bedekken als hij tegen de
+ * gegeven rand staat. Puur rekenwerk, zodat de plaatsingskeuze hieronder één
+ * vergelijking is in plaats van een vuistregel.
+ */
+function vasteOverlap(
+  rect: SpotlightRect,
+  hoogte: number,
+  vh: number,
+  onderin: boolean,
+): number {
+  const kaartTop = onderin ? vh - VASTE_KAART_MARGE - hoogte : VASTE_KAART_MARGE
+  const kaartBodem = kaartTop + hoogte
+  return Math.max(
+    0,
+    Math.min(kaartBodem, rect.top + rect.height) - Math.max(kaartTop, rect.top),
+  )
+}
+
+/**
  * Waar de popover komt te staan. Pure functie zodat de plaatsingsregel te lezen
  * (en te herzien) is zonder door de JSX te hoeven.
  */
-function berekenPositie(
+export function berekenPositie(
   rect: SpotlightRect | null,
   maat: { w: number; h: number },
   platform: RondleidingPlatform,
@@ -111,9 +142,14 @@ function berekenPositie(
 
   if (platform === 'mobiel') {
     // Vaste kaart: een popover van 22rem naast een element van bijna
-    // schermbreedte past nergens. Onderin, tenzij het gat daar zelf ligt (de
-    // nav-pill-stap) — anders dekt de kaart af wat hij uitlicht.
-    return { onderin: !(rect.top > vh * 0.6), zij }
+    // schermbreedte past nergens. Welke rand, bepaalt de eigen kaarthoogte —
+    // we nemen de rand die het uitgelichte element het minst bedekt, met de
+    // onderrand (duimbereik) als voorkeur bij gelijkspel. Ligt het gat onderin
+    // (de nav-pill-stap), dan valt de keuze vanzelf op bóven; en bij een lage
+    // viewport valt hij niet langer per ongeluk óp het gat (B-052).
+    const onderinOverlap = vasteOverlap(rect, maat.h, vh, true)
+    const bovenOverlap = vasteOverlap(rect, maat.h, vh, false)
+    return { onderin: onderinOverlap <= bovenOverlap, zij }
   }
   const midden = rect.left + rect.width / 2
   const left = Math.min(Math.max(MARGE, midden - breedte / 2), vw - breedte - MARGE)

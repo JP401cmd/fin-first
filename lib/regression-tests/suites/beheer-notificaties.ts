@@ -215,14 +215,14 @@ const tests: TestCase[] = [
         providerName: 'ING',
         linkIsActive: true,
         connectionStatus: 'active',
-        tokenExpiresAt: overDagen(60),
+        consentExpiresAt: overDagen(60),
         lastSyncedAt: dagenGeleden(0),
       }
 
       assertEqual(buildBankSignalNotification(base, now), null, 'Gezonde koppeling zwijgt')
 
       const bijnaVerlopen = buildBankSignalNotification(
-        { ...base, tokenExpiresAt: overDagen(10) },
+        { ...base, consentExpiresAt: overDagen(10) },
         now,
       )
       assertNotNull(bijnaVerlopen, 'Waarschuwt binnen het 14-dagenvenster')
@@ -231,19 +231,19 @@ const tests: TestCase[] = [
       assert(!bijnaVerlopen!.title.includes('1 6430 01'), 'Geen rekeningnummer in de verloop-melding')
 
       assertEqual(
-        buildBankSignalNotification({ ...base, linkIsActive: false, tokenExpiresAt: overDagen(3) }, now),
+        buildBankSignalNotification({ ...base, linkIsActive: false, consentExpiresAt: overDagen(3) }, now),
         null,
         'Zacht ontkoppelde rekening zwijgt volledig',
       )
 
       assertEqual(
-        buildBankSignalNotification({ ...base, connectionStatus: 'expired', tokenExpiresAt: dagenGeleden(2) }, now),
+        buildBankSignalNotification({ ...base, connectionStatus: 'expired', consentExpiresAt: dagenGeleden(2) }, now),
         null,
         'Al verlopen koppeling krijgt geen "verloopt bijna"-bericht',
       )
 
       const beide = buildBankSignalNotification(
-        { ...base, tokenExpiresAt: overDagen(4), lastSyncedAt: dagenGeleden(20) },
+        { ...base, consentExpiresAt: overDagen(4), lastSyncedAt: dagenGeleden(20) },
         now,
       )
       assertEqual(beide!.id, 'bank_expiry_acc-1', 'Verloop wint van versheid — nooit twee berichten')

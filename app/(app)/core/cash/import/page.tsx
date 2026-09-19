@@ -14,6 +14,9 @@ import { detectFormat, CSV_PRESETS, type CSVPreset } from '@/lib/parsers/index'
 import type { ImportWarning } from '@/lib/parsers/shared'
 import type { ParsedTransaction } from '@/lib/parsers/shared'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
+import { ShellOverlay } from '@/components/app/shell/shell-overlay'
+import { ModalFooter } from '@/components/app/modal-footer'
+import type { OverlapResponse } from '@/app/api/transactions/import/overlap/route'
 import { InfoTooltip } from '@/components/editorial/info-icon-tooltip'
 import { categorizeTransaction, isOwnAccountTransfer, isWalletTransferType, buildFrequencyMap, type CategoryCorrection, type FrequencyMatch } from '@/lib/parsers/categorize'
 import { type Budget, resolveEigenRekeningBudgetId } from '@/lib/budget-data'
@@ -174,6 +177,17 @@ export default function ImportPage() {
   const [parsing, setParsing] = useState(false)
   const [importing, setImporting] = useState(false)
   const [importProgress, setImportProgress] = useState({ current: 0, total: 0, failed: 0 })
+  /**
+   * "X regels staan al op rekening Y" — treffers op ANDERE eigen rekeningen,
+   * geteld door `POST /api/transactions/import/overlap` (dezelfde matchsleutel
+   * als dedup-laag 2, maar over de andere rekeningen van de gebruiker). Alleen
+   * een waarschuwing: niets wordt uitgevinkt en niets wordt tegengehouden — de
+   * gebruiker bevestigt vóór het importeren (eigenaarsbesluit 11-09-2026).
+   */
+  const [otherAccountOverlaps, setOtherAccountOverlaps] = useState<OverlapResponse['overlaps']>([])
+  /** De controle zelf faalde (netwerk/server): eerlijk melden, niet stil "0". */
+  const [overlapCheckFailed, setOverlapCheckFailed] = useState(false)
+  const [showOverlapConfirm, setShowOverlapConfirm] = useState(false)
   const [failedBatches, setFailedBatches] = useState<{ batchIdx: number; error: string; retries: number; rows: Record<string, unknown>[] }[]>([])
   const [showFailedDetails, setShowFailedDetails] = useState(false)
   const [retrying, setRetrying] = useState(false)
@@ -399,6 +413,49 @@ export default function ImportPage() {
   const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024
   const MAX_FILE_SIZE_LABEL = '10 MB'
 
+  /**
+   * Overlap met ANDERE eigen rekeningen — de waarschuwing, geen dedup. Vraagt
+   * de server per 1.000 rijen (zelfde grens als de import zelf) en telt de
+   * uitkomsten per rekening op. Faalt zacht: een mislukte controle wordt als
+   * zodanig getoond, nooit stil als "0 treffers".
+   */
+  async function checkOtherAccountOverlap(candidateRows: ImportRow[], accountId: string) {
+    setOtherAccountOverlaps([])
+    setOverlapCheckFailed(false)
+    if (candidateRows.length === 0 || !accountId) return
+
+    const OVERLAP_CHUNK = 1000
+    const byAccount = new Map<string, OverlapResponse['overlaps'][number]>()
+    try {
+      for (let i = 0; i < candidateRows.length; i += OVERLAP_CHUNK) {
+        const chunk = candidateRows.slice(i, i + OVERLAP_CHUNK)
+        const res = await fetch('/api/transactions/import/overlap', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            account_id: accountId,
+            rows: chunk.map((r) => ({
+              date: r.date,
+              amount: r.amount,
+              counterparty_name: r.counterparty_name ?? null,
+              counterparty_iban: r.counterparty_iban ?? null,
+            })),
+          }),
+        })
+        if (!res.ok) throw new Error(`overlap-check ${res.status}`)
+        const data = (await res.json()) as OverlapResponse
+        for (const o of data.overlaps ?? []) {
+          const prev = byAccount.get(o.account_id)
+          byAccount.set(o.account_id, prev ? { ...prev, count: prev.count + o.count } : o)
+        }
+      }
+      setOtherAccountOverlaps([...byAccount.values()].sort((a, b) => b.count - a.count))
+    } catch (err) {
+      console.error('Controle op andere rekeningen mislukt:', err)
+      setOverlapCheckFailed(true)
+    }
+  }
+
   // Check for duplicates against existing transactions.
   // When called with rowsParam (after parsing), sets rows + goes to step 2.
   // When called without param (retry), re-checks current rows state.
@@ -585,11 +642,18 @@ export default function ImportPage() {
         })
       }
 
-      if (rowsParam) {
-        setRows(applyCrossSource(rowsParam.map(markDups).map(applyFileDedup)))
-      } else {
-        setRows((prev) => applyCrossSource(prev.map(markDups).map(applyFileDedup)))
-      }
+      // `sourceRows` is bij een retry de huidige `rows`-state en bij een verse
+      // parse `rowsParam` — in beide gevallen de volledige set, dus één pad.
+      const checkedRows = applyCrossSource(sourceRows.map(markDups).map(applyFileDedup))
+      setRows(checkedRows)
+
+      // Los van de dedup-lagen, en bewust niet blokkerend voor stap 2: staan
+      // deze regels al op een ANDERE eigen rekening? Alleen de rijen die hier
+      // überhaupt in aanmerking komen (geen exacte treffer op déze rekening).
+      void checkOtherAccountOverlap(
+        checkedRows.filter((r) => !r.isDuplicate),
+        selectedAccountId,
+      )
 
       setCheckingDups(false)
     } catch (err) {
@@ -1350,6 +1414,7 @@ export default function ImportPage() {
   // benoemt de selectie expliciet zodat hij niet als classificatie leest (M33).
   const counters = countImportRows(rows)
   const { crossSourceCount, newCount, dupCount, toImportCount } = counters
+  const otherAccountOverlapTotal = otherAccountOverlaps.reduce((s, o) => s + o.count, 0)
   const selectionLabel = selectionCounterLabel(counters)
   // Zachte plausibiliteitscheck op de aangevinkte rijen (UR2-18). Dezelfde
   // grens als het transactieformulier — bij een bestand is de bron van de fout
@@ -1968,7 +2033,10 @@ export default function ImportPage() {
                   </span>
                 </div>
                 <button
-                  onClick={() => handleImport()}
+                  // Staan er regels al op een andere eigen rekening, dan eerst
+                  // de vraag "toch importeren?" — de gebruiker beslist, de app
+                  // verwijdert of blokkeert niets.
+                  onClick={() => (otherAccountOverlapTotal > 0 ? setShowOverlapConfirm(true) : handleImport())}
                   disabled={importing || toImportCount === 0}
                   className="inline-flex items-center gap-2 bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
                 >
@@ -2027,6 +2095,38 @@ export default function ImportPage() {
                   Ze staan hieronder uitgevinkt. Vink je er toch één aan, dan importeren we hem
                   opnieuw — controleer daarna of hij niet dubbel in je overzicht staat.
                 </div>
+              )}
+
+              {/* Andere EIGEN rekening: dezelfde export twee keer geüpload (PayPal in
+                  "creditcard" én in "PayPal") telt dubbel in de uitgaven en brengt
+                  de abonnementsdetectie van de wijs. Geen dedup-laag — niets wordt
+                  uitgevinkt — maar een waarschuwing mét de vraag vóór het importeren. */}
+              {otherAccountOverlapTotal > 0 && (
+                <div
+                  role="status"
+                  data-testid="other-account-overlap"
+                  className="border border-warning/30 bg-warning-bg p-4 text-sm text-warning"
+                >
+                  <p>
+                    <strong>{otherAccountOverlapTotal}</strong>{' '}
+                    {otherAccountOverlapTotal === 1 ? 'regel staat' : 'regels staan'} al op een andere rekening van je
+                    — zelfde datum, bedrag en tegenpartij. Importeer je ze hier óók, dan tellen ze dubbel mee.
+                  </p>
+                  <ul className="mt-1.5 list-disc space-y-0.5 pl-5">
+                    {otherAccountOverlaps.map((o) => (
+                      <li key={o.account_id}>
+                        <strong>{o.count}</strong> op <strong>{o.account_name}</strong>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-1.5 text-xs">Bij "Importeren" vragen we je dit te bevestigen.</p>
+                </div>
+              )}
+              {overlapCheckFailed && (
+                <p className="text-xs text-[var(--ink-3)]">
+                  De controle of deze regels al op een andere rekening staan is niet gelukt; je kunt gewoon
+                  importeren, maar let zelf op dubbele boekingen.
+                </p>
               )}
 
               {/* Geruststelling: categoriseren gebeurt ná het importeren, op de
@@ -2430,6 +2530,47 @@ export default function ImportPage() {
             </div>
           )
         })()}
+
+      {/* "Toch importeren?" — de bevestiging bij overlap met een andere eigen
+          rekening. De gebruiker beslist; annuleren laat stap 2 ongemoeid. */}
+      <ShellOverlay
+        kind="confirm"
+        open={showOverlapConfirm}
+        onClose={() => setShowOverlapConfirm(false)}
+        title="Toch importeren?"
+        footer={
+          <ModalFooter
+            layout="stacked"
+            primary={{
+              label: 'Toch importeren',
+              onClick: () => {
+                setShowOverlapConfirm(false)
+                void handleImport()
+              },
+            }}
+            secondary={{ label: 'Annuleren', onClick: () => setShowOverlapConfirm(false) }}
+          />
+        }
+      >
+        <div className="space-y-3 px-5 py-4 text-sm text-[var(--ink-2)]">
+          <p>
+            <strong>{otherAccountOverlapTotal}</strong>{' '}
+            {otherAccountOverlapTotal === 1 ? 'regel staat' : 'regels staan'} al op een andere rekening van je:
+          </p>
+          <ul className="list-disc space-y-0.5 pl-5">
+            {otherAccountOverlaps.map((o) => (
+              <li key={o.account_id}>
+                <strong>{o.count}</strong> op <strong>{o.account_name}</strong>
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs text-[var(--ink-3)]">
+            Importeer je ze hier óók, dan tellen ze dubbel mee in je uitgaven en je vaste lasten. We verwijderen
+            nooit zelf iets — wil je ze niet dubbel, annuleer dan en importeer het bestand alleen op de rekening
+            waar het hoort.
+          </p>
+        </div>
+      </ShellOverlay>
     </div>
   )
 }

@@ -51,7 +51,6 @@ export type OnboardingDataNoteStep =
   | 'uitgaven-later'
   | 'bezittingen'
   | 'schulden'
-  | 'spaardoel'
 
 /**
  * De belofte die elke variant deelt. Staat apart zodat de test kan afdwingen
@@ -70,7 +69,6 @@ export const DATA_NOTE_BY_STEP: Record<OnboardingDataNoteStep, string> = {
     'Wat je toevoegt bewaren we versleuteld in de EU; aanpassen of verwijderen kan later altijd',
   schulden:
     'Wat je toevoegt bewaren we versleuteld in de EU; aanpassen of verwijderen kan later altijd',
-  spaardoel: 'Je doel bewaren we versleuteld in de EU; aanpassen kan later altijd',
 }
 
 /** Lookup met een sprekende naam; gebruik deze in plaats van de map zelf. */

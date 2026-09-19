@@ -5,6 +5,7 @@ import { buildBudgetTypeMap } from '@/lib/budget-utils'
 import { buildBudgetSpendingMap, budgetBarPct } from '@/lib/budget-spending'
 import { shouldSendWozReminder, WOZ_REMINDER_TEMPLATE } from '@/lib/notifications/woz-reminder'
 import { shouldSendPensionReminder, PENSION_REMINDER_TEMPLATE } from '@/lib/notifications/pension-reminder'
+import { beslisGrondslagBudget, GRONDSLAG_BUDGET_TEMPLATE } from '@/lib/notifications/grondslag-budget'
 import { amsterdamWeekKey } from '@/lib/briefing/snapshot'
 import { localMonthBounds } from '@/lib/month-range'
 import { resolveFireParams } from '@/lib/fire-params'
@@ -43,6 +44,7 @@ export type NotificationType =
   | 'spend_limit'
   | 'milestone'
   | 'postponed_tip'
+  | 'grondslag'
 
 /**
  * Eén koppelrij met de embed erbij. PostgREST levert een to-one embed soms als
@@ -61,7 +63,7 @@ type BankConnectionAccountRow = {
 type BankConnectionEmbed = {
   provider_name: string | null
   status: string | null
-  token_expires_at: string | null
+  consent_expires_at: string | null
 }
 
 export type Notification = {
@@ -172,6 +174,7 @@ export async function GET(request: NextRequest) {
       spend_limit: true,
       milestone: true,
       postponed_tip: true,
+      grondslag: true,
     }
     const prefs: Record<string, boolean> = prefsRes.data?.value
       ? { ...defaultPrefs, ...JSON.parse(prefsRes.data.value) }
@@ -477,7 +480,7 @@ export async function GET(request: NextRequest) {
           // `bank_connection_accounts.iban`. De IBAN dient hier één cosmetisch
           // doel (het label van de melding), dus een onleesbare rij degradeert
           // naar 'Bankrekening' i.p.v. de hele meldingenlijst mee te nemen.
-          .select('id, iban_encrypted, last_synced_at, bank_connections(provider_name, status, token_expires_at)')
+          .select('id, iban_encrypted, last_synced_at, bank_connections(provider_name, status, consent_expires_at)')
           // Zacht ontkoppelde rekeningen vallen hier al weg — gebruikersintentie
           // wint van storing (zie BankLinkSignals.linkIsActive).
           .eq('is_active', true)
@@ -501,7 +504,7 @@ export async function GET(request: NextRequest) {
             providerName: connection?.provider_name ?? null,
             linkIsActive: true,
             connectionStatus: connection?.status ?? null,
-            tokenExpiresAt: connection?.token_expires_at ?? null,
+            consentExpiresAt: connection?.consent_expires_at ?? null,
             lastSyncedAt: account.last_synced_at,
           },
           nowDate,
@@ -594,6 +597,61 @@ export async function GET(request: NextRequest) {
       }
     } catch (err) {
       console.error('Yearly reminder notification error:', err)
+    }
+
+    // ── 4d. Grondslag rust op eigen invoer terwijl er budgetten liggen ──
+    // W-009 deel 2. Pure beslislogica in `lib/notifications/grondslag-budget.ts`.
+    // HARDE VOORWAARDE: alleen bij grondslag 'manual' MÉT budgetten voor diezelfde
+    // kant — bij 'auto'/'estimate' verdringt de budgetbasis het profielbedrag al
+    // vanzelf (resolveAmountWithBasis), dus daar zou de uitnodiging iets beschrijven
+    // dat allang gebeurd is. Hooguit 1x per kalenderjaar, gegate via app_settings —
+    // zelfde ritme als de WOZ-/pensioenreminder hierboven, zodat wie bewust
+    // handmatig blijft niet elke poll dezelfde vraag krijgt.
+    if (computeSlow) try {
+      const grondslagKey = `grondslag_budget_last_sent_${user.id}`
+      const [grondslagProfileRes, grondslagBudgetsRes, grondslagLastRes] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('income_source, expenses_source')
+          .eq('id', user.id)
+          .maybeSingle(),
+        supabase
+          .from('budgets')
+          .select('budget_type')
+          .eq('user_id', user.id)
+          .eq('is_archived', false)
+          .in('budget_type', ['income', 'expense']),
+        supabase.from('app_settings').select('value').eq('key', grondslagKey).maybeSingle(),
+      ])
+
+      const grondslagBudgetten = grondslagBudgetsRes.data ?? []
+      const uitkomst = beslisGrondslagBudget({
+        incomeSource: grondslagProfileRes.data?.income_source ?? null,
+        expensesSource: grondslagProfileRes.data?.expenses_source ?? null,
+        heeftInkomstenBudgetten: grondslagBudgetten.some((b) => b.budget_type === 'income'),
+        heeftUitgavenBudgetten: grondslagBudgetten.some((b) => b.budget_type === 'expense'),
+        lastSentAt: grondslagLastRes.data?.value ?? null,
+      })
+
+      if (uitkomst) {
+        await supabase
+          .from('app_settings')
+          .upsert({ key: grondslagKey, value: now }, { onConflict: 'key' })
+
+        const id = `grondslag_budget_${new Date().getUTCFullYear()}`
+        slow.push({
+          id,
+          ...GRONDSLAG_BUDGET_TEMPLATE,
+          title: uitkomst.title,
+          description: uitkomst.description,
+          createdAt: now,
+          read: readIds.includes(id),
+          aiContext:
+            'Waar komen mijn inkomen en uitgaven vandaan, en wat verandert er als ik ze op mijn budgetten laat rusten?',
+        })
+      }
+    } catch (err) {
+      console.error('Grondslag notification error:', err)
     }
 
     // ── 4c. Wekelijkse briefing-melding ─────────────────────────────

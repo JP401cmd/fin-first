@@ -36,14 +36,14 @@ function renderBadge(
   props: {
     lastSyncedAt?: string | null
     dailyRequests?: number
-    tokenExpiresAt?: string | null
+    consentExpiresAt?: string | null
     connectionStatus?: string
   } = {},
 ) {
   const {
     lastSyncedAt = null,
     dailyRequests = 0,
-    tokenExpiresAt = null,
+    consentExpiresAt = null,
     connectionStatus = 'active',
   } = props
   return render(
@@ -54,7 +54,7 @@ function renderBadge(
         // lezing van dat signaal doet de route.
         linkIsActive: true,
         connectionStatus,
-        tokenExpiresAt,
+        consentExpiresAt,
         lastSyncedAt,
       })}
       dailyRequests={dailyRequests}
@@ -125,10 +125,10 @@ describe('SyncStatusBadge — verbinding kwijt', () => {
     expect(screen.getByText('Verbinding kwijt')).toBeTruthy()
   })
 
-  it('toont "Verbinding kwijt" zodra token_expires_at in het verleden ligt, ook bij status active', () => {
+  it('toont "Verbinding kwijt" zodra consent_expires_at in het verleden ligt, ook bij status active', () => {
     renderBadge({
       connectionStatus: 'active',
-      tokenExpiresAt: new Date(Date.now() - 2 * DAY_MS).toISOString(),
+      consentExpiresAt: new Date(Date.now() - 2 * DAY_MS).toISOString(),
       lastSyncedAt: '2026-07-01T08:00:00Z',
     })
 
@@ -141,7 +141,7 @@ describe('SyncStatusBadge — verbinding kwijt', () => {
 describe('SyncStatusBadge — vooraankondiging', () => {
   it('toont "Verloopt over Nd" binnen de waarschuwingsdrempel', () => {
     const { container } = renderBadge({
-      tokenExpiresAt: new Date(Date.now() + 9 * DAY_MS).toISOString(),
+      consentExpiresAt: new Date(Date.now() + 9 * DAY_MS).toISOString(),
       lastSyncedAt: '2026-07-01T08:00:00Z',
     })
 
@@ -155,7 +155,7 @@ describe('SyncStatusBadge — vooraankondiging', () => {
   it('zwijgt net buiten de drempel en toont dan het gewone tijdlabel', () => {
     const synced = '2026-07-01T08:00:00Z'
     renderBadge({
-      tokenExpiresAt: new Date(Date.now() + (BANK_LINK_EXPIRY_WARNING_DAYS + 2) * DAY_MS).toISOString(),
+      consentExpiresAt: new Date(Date.now() + (BANK_LINK_EXPIRY_WARNING_DAYS + 2) * DAY_MS).toISOString(),
       lastSyncedAt: synced,
     })
 
@@ -193,7 +193,7 @@ describe('SyncStatusBadge — kleurconventie', () => {
   it('gebruikt in geen enkele toestand een Tailwind-standaardkleur', () => {
     const cases: BadgeSituation[] = [
       { connectionStatus: 'expired' },
-      { tokenExpiresAt: new Date(Date.now() + 3 * DAY_MS).toISOString(), lastSyncedAt: '2026-07-01T08:00:00Z' },
+      { consentExpiresAt: new Date(Date.now() + 3 * DAY_MS).toISOString(), lastSyncedAt: '2026-07-01T08:00:00Z' },
       { lastSyncedAt: null },
       { lastSyncedAt: '2026-07-01T08:00:00Z', dailyRequests: 1 },
     ]

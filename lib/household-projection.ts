@@ -13,10 +13,15 @@
 //   • TWEE projecties worden gedraaid en samengevoegd — er wordt NOOIT een
 //     tweede persoon in één `runUnifiedProjection` gepropt. Elke partner krijgt
 //     z'n eigen tijdas (eigen DOB → currentAge → endAge).
-//   • De GECOMBINEERDE projectie draait op de tijdas van de OUDSTE partner
-//     (head-age). De AOW/pensioen van de jongere partner wordt naar deze
-//     head-age-as omgerekend via de DOB-offset, en als income-cashflow
-//     toegevoegd — dual-AOW ZONDER engine-wijziging.
+//   • De GECOMBINEERDE projectie draait op de tijdas van de KIJKER (head = de
+//     ingelogde gebruiker; TPR-07 fase 2a, eigenaarsbesluit 19 sep 2026 — vóór
+//     die datum de oudste partner). De PT-laag van de kernel is as-agnostisch
+//     (een oudere partner geeft een drempel ≤ 0), en de canonieke run op
+//     /overzicht draaide al op het eigen profiel: één as per kijker, overal.
+//     "Oudste overal" is afgewezen omdat de canonieke run dan op de instellingen
+//     van de PARTNER zou draaien (privacy-verbreding). De AOW van de partner
+//     wordt naar de kijker-as omgerekend via de DOB-offset (v2-pad) resp. door
+//     de PT-laag (kernel-pad).
 //   • Gedeelde events/goals tellen hun VOLLE kost in de combined projectie en
 //     bij elke partner naar diens aandeel; persoonlijke events tellen alleen
 //     bij die partner (en in de combined). Nooit dubbel.
@@ -172,13 +177,19 @@ export interface HouseholdProjectionResult {
     projection: HouseholdFireProjectionData
     /**
      * Volledige gecombineerde projectie-pad (vermogen per leeftijd op de
-     * head-age-as) zodat de Horizon-grafiek de gezamenlijke lijn EXACT
+     * head-age-as = de as van de KIJKER) zodat de Horizon-grafiek de gezamenlijke lijn EXACT
      * consistent met deze projectie tekent. Leeg (`[]`) bij privacy-degrade
      * (partner deelt alleen 'totals'/verborgen) of ontbrekende DOB/uitgaven.
      */
     rows: SimRow[]
     /** Fractionele gecombineerde FIRE-leeftijd horend bij `rows`. */
     fireAgeFractional: number | null
+    /**
+     * AOW-leeftijd van de partner op de as van de kijker (TPR-07 fase 2a, ADR 0168) —
+     * uit de PT-laag van de gecombineerde kernel-run (`SimResult.partnerAowAge`);
+     * `null` op de niet-kernel-paden of zonder partnerblok. Consume, don't recompute.
+     */
+    partnerAowAge: number | null
   }
   partners: HouseholdPartnerProjection[]
   comparison: {
@@ -561,7 +572,7 @@ export function buildTotalsInput(
 /**
  * Bouw de huishouden-brede FIRE-projectie-invoer en draai twee unified
  * projecties (per partner) + een gecombineerde unified projectie op de
- * head-age-as van de oudste partner.
+ * head-age-as van de KIJKER (TPR-07 fase 2a).
  *
  * Gebruikt de SERVER- of BROWSER-client (beide werken; pass de juiste door op
  * basis van waar je aanroept). Privacy van de partner wordt via dezelfde
@@ -580,7 +591,7 @@ export async function buildHouseholdProjectionInput(
     householdName: '',
     splitMode: 'equal',
     customSplitPct: null,
-    combined: { projection: emptyProjection(), rows: [], fireAgeFractional: null },
+    combined: { projection: emptyProjection(), rows: [], fireAgeFractional: null, partnerAowAge: null },
     partners: [],
     comparison: emptyComparison(),
     partnerDataHidden: false,
@@ -761,8 +772,8 @@ export async function buildHouseholdProjectionInput(
 
   // Transactie-JAARinkomen van de HUIDIGE gebruiker — DEZELFDE bron als de
   // /toekomst-hero (lib/horizon/raw-data-loader.ts): `transactionAnnualIncome`
-  // op het realisatievenster, transfer-INCLUSIEF zoals de FIRE-projectiesom
-  // daar (ADR 0138: twaalf afgesloten maanden, één deler). Nodig zodat de
+  // op het realisatievenster, transfer-EXCLUSIEF zoals élke inkomenssom sinds
+  // ADR 0169 (ADR 0138: twaalf afgesloten maanden, één deler). Nodig zodat de
   // 'current_income'-uitgave-na-pensioen + FIRE-leeftijd van de gebruiker
   // matchen tussen de hero en de huishoud-sectie. Tot 11 sep 2026 stond hier een
   // eigen dag-niveau rollend venster (inclusief vandaag) met een eigen
@@ -770,7 +781,7 @@ export async function buildHouseholdProjectionInput(
   // ADR 0138 niet meer gelijk was aan de hero (review golf 2, H1). Partner-tx zijn
   // niet zichtbaar (RLS) → die houdt de profiel/RPC-fallback via memberIncome.
   const currentUserId = user.id
-  const ownExtrapolatedAnnualIncome = transactionAnnualIncome(realizedWindow, { includeTransfers: true })
+  const ownExtrapolatedAnnualIncome = transactionAnnualIncome(realizedWindow)
 
   // Profiel-fallback voor income/expenses wanneer er geen transacties zijn.
   function memberIncome(id: string): number {
@@ -1040,13 +1051,14 @@ export async function buildHouseholdProjectionInput(
     }
   }
 
-  // ── Gecombineerde projectie op de head-age (oudste partner) ─────────────────
-  // Verzamel alle DOBs; head = oudste (vroegste DOB).
+  // ── Gecombineerde projectie op de head-age = de KIJKER (TPR-07 fase 2a) ─────
+  // Head = de ingelogde gebruiker (niet meer de oudste): /toekomst en /overzicht
+  // spreken dan per kijker dezelfde as, en de run draait op de eigen instellingen.
+  // Zonder eigen DOB is er geen head-as (graceful degrade hieronder).
   const dobs = profiles
     .map(p => ({ id: p.id, dob: p.date_of_birth }))
     .filter((d): d is { id: string; dob: string } => !!d.dob)
-  const sortedByDob = [...dobs].sort((a, b) => a.dob.localeCompare(b.dob))
-  const headDobEntry = sortedByDob[0] ?? null
+  const headDobEntry = dobs.find(d => d.id === user.id) ?? null
   const headAge = headDobEntry ? ageAtDate(headDobEntry.dob) : null
   void partnerId // gereserveerd voor toekomstige per-partner privacy-labeling
 
@@ -1101,7 +1113,7 @@ export async function buildHouseholdProjectionInput(
   // maar één keer meetellen i.p.v. twee keer (onderbouwt "Samen sterker").
   const sharedEssentialDetail = computeSharedEssentialBudgets(allBudgets)
 
-  // Combined cashflows: persoonlijke + gedeelde events op de head-age-as +
+  // Combined cashflows: persoonlijke + gedeelde events op de head-age-as (kijker) +
   // dual-AOW (head AOW op headAge, partner AOW omgerekend naar head-as).
   const headProfile = headDobEntry ? profiles.find(p => p.id === headDobEntry.id) ?? null : null
   const headFireParams = headProfile ? resolveFireParams(headProfile) : { grossReturn: DEFAULT_RETURN, inflationRate: INFLATION, effectiveSwr: HOUSEHOLD_SWR, box3Method: 'forfaitair' as Box3Method }
@@ -1181,9 +1193,10 @@ export async function buildHouseholdProjectionInput(
   // Gecombineerd projectie-pad voor de grafieklijn. Bij itemized ('full') uit de
   // unified engine; bij 'totals' uit een TOTALEN-simulatie via dezelfde
   // runSimulation-engine — dus mét afbouw na FIRE volgens de eindstrategie van de
-  // oudste partner (deplete → dalend, perpetual → vlak, legacy → naar nalatenschap).
+  // kijker/head (deplete → dalend, perpetual → vlak, legacy → naar nalatenschap).
   let combinedRows: SimRow[] = []
   let combinedFireAgeFractional: number | null = null
+  let combinedPartnerAowAge: number | null = null
   if (kernelOutcome.ok) {
     // Gecombineerde kernel-huishouden-run (head-as + partner-PT). Nabewerking:
     // toSimResult → simResultToProjection op de huishoud-brede grondslagen.
@@ -1193,6 +1206,7 @@ export async function buildHouseholdProjectionInput(
     )
     combinedRows = sim.rows
     combinedFireAgeFractional = sim.fireAgeFractional
+    combinedPartnerAowAge = sim.partnerAowAge ?? null
   } else if (partnerAggregateOnly && headAge !== null && combinedYearlyExpenses > 0) {
     // Partner deelt alleen totalen → SYNTHETISCHE gecombineerde totalen-kernel-run (geen
     // itemized data). Bewuste degradatie t.o.v. de itemized run; de kernel is dé motor.
@@ -1225,9 +1239,17 @@ export async function buildHouseholdProjectionInput(
     combinedProjection = mine ?? emptyProjection(combinedNetWorth, combinedMonthlyIncome, combinedMonthlyExpenses, combinedYearlyExpenses, headAge)
   }
 
-  // Persisteer de gecombineerde samenvatting op het huishouden, zodat dashboard-
-  // FIRE-widgets exact dezelfde huishoud-cijfers tonen als /toekomst (i.p.v. een
-  // tweede berekening). Members-scoped RPC; niet kritisch voor de weergave.
+  // Persisteer de gecombineerde samenvatting op het huishouden; de dashboard-
+  // loader leest `households.combined_fire_summary` voor de huishoud-FIRE-velden
+  // op /overzicht (lib/dashboard-data-loader.ts, `householdOverrides`).
+  // RESTPUNT (TPR-07 fase 2a, security-review 19 sep 2026): met head = de kijker
+  // is `projection.fireAge` in deze samenvatting KIJKER-afhankelijk (laatste
+  // schrijver wint; bedragen/datums zijn as-onafhankelijk). Structurele fix =
+  // de dashboard-loader laat de kolom los en consumeert de canonieke huishoud-run
+  // (`computeHorizonFireSim(supabase, 'household')`, ADR 0107), waarna kolom + RPC
+  // via een schemawijziging vervallen. Tot die tijd blijft de write staan —
+  // een bevroren samenvatting (nooit meer bijgewerkt) was erger dan een
+  // kijker-afhankelijke leeftijd.
   try {
     await supabase.rpc('set_household_combined_summary', {
       p_summary: {
@@ -1249,6 +1271,7 @@ export async function buildHouseholdProjectionInput(
       projection: combinedProjection,
       rows: combinedRows,
       fireAgeFractional: combinedFireAgeFractional,
+      partnerAowAge: combinedPartnerAowAge,
     },
     partners,
     comparison: {
@@ -1313,13 +1336,14 @@ function buildMemberCashflows(events: LifeEvent[], currentAge: number, hasPartne
 }
 
 /**
- * Bouw de cashflows voor de GECOMBINEERDE projectie op de head-age-as.
+ * Bouw de cashflows voor de GECOMBINEERDE projectie op de head-age-as (= de
+ * kijker sinds TPR-07 fase 2a; de partner kan ouder óf jonger zijn).
  * Dual-AOW ZONDER engine-wijziging:
  *   • Head AOW: income vanaf head's AOW-leeftijd op de head-as.
  *   • Partner AOW: omgerekend naar de head-as via de DOB-offset.
  *       headAxisFromAge = partnerAowAge − (partnerAge − headAge)
- *     d.w.z. wanneer de partner z'n AOW bereikt, is de head al
- *     (partnerAge − headAge) jaar ouder geweest tot dat punt.
+ *     Een oudere partner (offset > 0) bereikt AOW eerder op de head-as; ligt dat
+ *     moment al achter ons, dan start de stroom op `headAge` (Math.max).
  * Bestaande aow/pension life-events worden via lifeEventsToCashflows op hun
  * eigen target_age verwerkt; we voegen alleen een AOW-flow toe per lid dat er
  * geen aow-event heeft. Persoonlijke + gedeelde events tellen één keer in de
@@ -1350,7 +1374,7 @@ function buildCombinedCashflows(args: {
     if (hasAow) continue
 
     const memberAge = ageAtDate(p.date_of_birth)
-    const ageOffset = memberAge - headAge // >0 wanneer lid ouder dan head (head=oudste, dus <=0)
+    const ageOffset = memberAge - headAge // >0 wanneer lid ouder dan de kijker, <0 wanneer jonger
     // AOW van dit lid op de head-as: partnerAowAge − (partnerAge − headAge)
     const headAxisAowAge = NL_AOW_AGE - ageOffset
     const aow = buildAowCashflow(

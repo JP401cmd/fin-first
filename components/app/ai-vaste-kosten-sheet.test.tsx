@@ -8,7 +8,7 @@
  * modus — die tak stopt server-side vóór `getModel`.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import type { ExecutionModeState } from '@/lib/ai/local/use-execution-mode'
 import type {
   VasteKostenCandidate,
@@ -177,6 +177,74 @@ describe('AiVasteKostenSheet — cloud-pad', () => {
     expect(fetchCalls).toHaveLength(1)
     expect(fetchCalls[0].body).toEqual({})
     expect(resolverFactory).not.toHaveBeenCalled()
+  })
+})
+
+// ── AFWIJZING WORDT GEPERSISTEERD (B-054) ───────────────────────────────────
+//
+// "Niet opnemen" (X-knop) heeft hetzelfde gewicht als "Niet opnemen" in de
+// losse classificatiesheet: de rij gaat als uitsluiting naar /api/recurring.
+// Voorheen bleef een afwijzing pure React-state en kwam het patroon bij de
+// volgende analyse gewoon terug.
+
+describe('AiVasteKostenSheet — afwijzen schrijft een uitsluiting weg (B-054)', () => {
+  const twee = {
+    suggestions: [
+      {
+        id: 'k-1', name: 'Netflix', monthlyAmount: 13.99, frequency: 'monthly', occurrences: 12,
+        autoCategory: 'subscription', autoCategoryLabel: 'Abonnement',
+        aiClassification: 'subscription', aiReason: 'streamingdienst', confidence: 'high',
+      },
+      {
+        id: 'k-2', name: 'Ziggo', monthlyAmount: 55, frequency: 'monthly', occurrences: 12,
+        autoCategory: 'utility', autoCategoryLabel: 'Nutsvoorziening',
+        aiClassification: 'vaste_kosten', aiReason: 'internet', confidence: 'high',
+      },
+    ],
+    analysedCount: 2,
+    skippedCount: 0,
+  }
+
+  function recurringPosts() {
+    return fetchCalls
+      .filter((c) => c.url === '/api/recurring')
+      .map((c) => c.body as { name: string; category_override: string })
+  }
+
+  it('een afgewezen rij gaat als category_override "excluded" mee, een geaccepteerde met haar klasse', async () => {
+    execState = mode('cloud')
+    cloudResponse = twee
+
+    render(<AiVasteKostenSheet open onOpenChange={noop} onComplete={noop} />)
+    await screen.findByText('Ziggo')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ziggo niet opnemen' }))
+    fireEvent.click(screen.getByRole('button', { name: /Opslaan/ }))
+
+    await screen.findByText('Klaar')
+    expect(recurringPosts()).toEqual([
+      { name: 'Netflix', category_override: 'subscription' },
+      { name: 'Ziggo', category_override: 'excluded' },
+    ].map((p) => expect.objectContaining(p)))
+    expect(screen.getByText('1 item komt niet meer terug in de detectie')).toBeTruthy()
+  })
+
+  it('alles afwijzen is óók een beoordeling: Opslaan blijft actief en schrijft twee uitsluitingen', async () => {
+    execState = mode('cloud')
+    cloudResponse = twee
+
+    render(<AiVasteKostenSheet open onOpenChange={noop} onComplete={noop} />)
+    await screen.findByText('Ziggo')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Netflix niet opnemen' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Ziggo niet opnemen' }))
+    const opslaan = screen.getByRole('button', { name: /Opslaan/ }) as HTMLButtonElement
+    expect(opslaan.disabled).toBe(false)
+    fireEvent.click(opslaan)
+
+    await screen.findByText('Klaar')
+    expect(recurringPosts().map((p) => p.category_override)).toEqual(['excluded', 'excluded'])
+    expect(screen.getByText('2 items komen niet meer terug in de detectie')).toBeTruthy()
   })
 })
 

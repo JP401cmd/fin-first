@@ -8,11 +8,15 @@
 // lib/uat/catalog.ts (UAT-START-NN) en erven daarmee de rondestatus. Het label
 // toont bewust het WF-nummer, spiegelt lib/uat/flows/budget.ts + schuld.ts + toek.ts.
 //
-// START is — net als BUDGET — een AANEENGESLOTEN catalogus: alle
-// WF-START-01..28 hebben een eigen UAT-scenario en dus een eigen knoop
-// hieronder. Geen verwijsregel-gaten (UAT-START-15 wordt WÉL door het
-// NAV-deelgebied naar hier terugverwezen als "leidend scenario" — dat is een
-// verwijzing VAN NAV NAAR START, niet andersom, dus hier gewoon een normale knoop).
+// START is — net als BUDGET — een AANEENGESLOTEN catalogus (01..40, met één
+// bewust gat op 21): elk overig WF-START-nummer heeft een eigen UAT-scenario
+// en dus een eigen knoop hieronder. WF-START-21/UAT-START-21 (spaardoel
+// kiezen/overslaan) is op 19-09-2026 verwijderd (ADR 0162, B-056) — de
+// onboarding-stap "Spaardoel" bestaat niet meer, doelen leven op
+// /toekomst/doelen. Geen andere verwijsregel-gaten (UAT-START-15 wordt WÉL
+// door het NAV-deelgebied naar hier terugverwezen als "leidend scenario" —
+// dat is een verwijzing VAN NAV NAAR START, niet andersom, dus hier gewoon
+// een normale knoop).
 //
 // Het proces leest links→rechts: instap (marketing-site verkennen) →
 // vrijheidscheck (anoniem invullen → rapport → PDF) → conversie/registratie
@@ -73,7 +77,6 @@ export const START_FLOW: UatFlow = {
     { id: 'obstapscherm', scenarioId: 'UAT-START-38', label: 'WF-START-38 · Stapscherm: vraag eerst, voortgangsrij eronder', kind: 'action', stage: 5, lane: 'onboarding', subOf: 'onboarding' },
     { id: 'bezitschuld', scenarioId: 'UAT-START-19', label: 'WF-START-19 · Bezittingen & schulden (huis+hypotheek)', kind: 'action', stage: 5, lane: 'onboarding', subOf: 'onboarding' },
     { id: 'pensioen', scenarioId: 'UAT-START-20', label: 'WF-START-20 · Pensioen opgeven', kind: 'action', stage: 5, lane: 'onboarding', subOf: 'onboarding' },
-    { id: 'spaardoel', scenarioId: 'UAT-START-21', label: 'WF-START-21 · Spaardoel kiezen of overslaan', kind: 'action', stage: 5, lane: 'onboarding', subOf: 'onboarding' },
     { id: 'plan', scenarioId: 'UAT-START-28', label: 'WF-START-28 · "Jouw plan": stopmoment × eind-vorm (ADR 0129)', kind: 'action', stage: 5, lane: 'onboarding', subOf: 'onboarding' },
     { id: 'schatting', scenarioId: 'UAT-START-29', label: 'WF-START-29 · "Schat het voor me" (cohort-schatting, UR3-05)', kind: 'action', stage: 5, lane: 'onboarding', subOf: 'onboarding' },
     { id: 'defer', scenarioId: 'UAT-START-22', label: 'WF-START-22 · "Later invullen" (defer-pad)', kind: 'action', stage: 5, lane: 'onboarding', subOf: 'onboarding' },
@@ -99,7 +102,7 @@ export const START_FLOW: UatFlow = {
     // De eerste ophaal hangt aan de (app)-layout, niet aan één route — hij
     // volgt dus op de overgang, niet op de bankstap zelf (ADR 0158).
     { id: 'obeerstesync', scenarioId: 'UAT-START-40', label: 'WF-START-40 · Eerste ophaal op het homescherm, ná de rondleiding (ADR 0158)', kind: 'action', stage: 6, subOf: 'overgang' },
-    { id: 'x-budget-koppel', label: 'Aanbod om de opgehaalde transacties aan budgetten te hangen (WF-BUDGET-29)', kind: 'cross', stage: 6, crossZone: 'BUDGET' },
+    { id: 'x-budget-koppel', label: 'Aanbod om de opgehaalde transacties te categoriseren (WF-BUDGET-29)', kind: 'cross', stage: 6, crossZone: 'BUDGET' },
     { id: 'aikeuze', scenarioId: 'UAT-START-30', label: 'WF-START-30 · AI aanzetten bij het eerste gebruik (beta-keuze, ADR 0155 + 0157)', kind: 'action', stage: 6, subOf: 'overgang' },
     { id: 'uitkomst', label: 'Gebruiker in de app: bezittingen/schulden/doel/pensioen/plan zichtbaar', kind: 'outcome', stage: 6 },
 
@@ -146,7 +149,6 @@ export const START_FLOW: UatFlow = {
     { from: 'onboarding', to: 'obstapscherm' },
     { from: 'onboarding', to: 'bezitschuld' },
     { from: 'onboarding', to: 'pensioen' },
-    { from: 'onboarding', to: 'spaardoel' },
     { from: 'onboarding', to: 'plan' },
     { from: 'onboarding', to: 'defer' },
     { from: 'onboarding', to: 'obhervatten' },

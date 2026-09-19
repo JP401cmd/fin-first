@@ -265,18 +265,18 @@ const ALLOWED_FILES = new Map([
   // een scenario dat de werkelijke levenskosten van vandaag niet verandert. Beide
   // consumeren nu `canonicalDailyRate` uit de bundel; de uitzondering is daarmee
   // opgeheven en de entries zijn verwijderd i.p.v. blijven staan.
-  [
-    'components/core/holdings/portfolio-value-chart.tsx',
-    'ESSENTIELE-uitgaven-grondslag (yearlyEssentialExpenses): bewust de must-basis ' +
-      'van de FIRE-doelberekening, niet het totale levensstijl-tarief.',
-  ],
-  [
-    'components/app/core/assets/asset-pane.tsx',
-    'ESSENTIELE-uitgaven-grondslag voor de vrijheidstijd-badge van één bezitting: ' +
-      'computeYearlyMustExpenses/365 (dezelfde must-basis als portfolio-value-chart.tsx); ' +
-      'de profielschatting als terugval loopt door de canonieke conversie. Verving een ' +
-      'inline ×12/365 (regel 4).',
-  ],
+  // VERVALLEN (19 sep 2026, Notion "Vrijheidsduren op /overzicht/bezittingen"):
+  // portfolio-value-chart.tsx en asset-pane.tsx stonden hier met de reden
+  // "bewust de must-basis van de FIRE-doelberekening". Die uitzondering landde op
+  // 3 sep — één dag NÁ ADR 0126 (2 sep), dat naast dagtarief (marginaal, op
+  // consumptie) en runway (totaal, uit de kernel) een DERDE vrijheidstijd-grootheid
+  // expliciet verbiedt. De allowlist grandfatherde dus een ADR-schending, en "0
+  // afwijkend" was vals-groen: het bezit-detailvenster toonde op dezelfde pagina,
+  // voor hetzelfde bezit, een langere vrijheidsduur dan de kaarten eromheen
+  // (≈ €105 tegenover ≈ €107 per dag). Beide oppervlakken consumeren nu het
+  // canonieke tarief als prop uit hun loader; de entries zijn verwijderd i.p.v.
+  // blijven staan. `yearlyEssentialExpenses` blijft wél de grondslag van de
+  // SWR-deckregel in PortfolioSummary — dat is een dekkingsvraag, geen €→tijd-koers.
   [
     'lib/dashboard-data-loader.ts',
     'Produceert het canonieke bundelveld; de resterende aanroep is de must-grondslag ' +

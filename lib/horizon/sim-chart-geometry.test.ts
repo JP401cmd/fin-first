@@ -554,6 +554,68 @@ describe('buildSimChartGeometry — primaryBasis wisselt de grondslag van de hoo
   })
 })
 
+// ── B-053: geen halt-op-nul in het y-domein ─────────────────────────────────
+
+describe('buildSimChartGeometry — y-domein onder nul (B-053, geen halt-op-nul)', () => {
+  // Zware onttrekking: het vermogen raakt op en de kernel rekent door in het rood
+  // (tekort-lening). De grafiek moet dat tekort TEKENEN, niet op de nullijn klemmen.
+  const tekortRows = buildRows(40, 65, { initial: 50_000, retireAge: 45, savings: 5_000, withdrawal: 40_000 })
+  const g = buildSimChartGeometry({
+    ...baseInput,
+    rows: tekortRows,
+    fireAge: 45,
+    fireAgeFractional: 45,
+    fireTarget: 100_000,
+  })
+  const minNetWorth = Math.min(...tekortRows.map((r) => r.endPortfolio))
+
+  it('de fixture zakt daadwerkelijk onder nul', () => {
+    expect(minNetWorth).toBeLessThan(0)
+  })
+
+  it('de nullijn ligt bóven de plot-onderrand en de afbouwlijn eindigt eronder', () => {
+    const plotBottom = g.PAD.top + g.innerH
+    expect(g.yZero).toBeLessThan(plotBottom)
+    // Laatste y-coördinaat van de afbouwlijn (na de laatste "L x y").
+    const lastY = Number(g.decPath!.trim().split(' ').at(-1))
+    expect(lastY).toBeGreaterThan(g.yZero)
+    expect(lastY).toBeLessThanOrEqual(plotBottom)
+  })
+
+  it('geen enkel pad-punt is op de nullijn geklemd: de laagste waarde krijgt de laagste y', () => {
+    const yLaagste = g.PAD.top + g.yScale(minNetWorth)
+    const yNul = g.PAD.top + g.yScale(0)
+    expect(yLaagste).toBeGreaterThan(yNul)
+    expect(g.lineYAt(64)).toBeGreaterThan(yNul)
+  })
+
+  it('krijgt één extra as-tick op de laagste getekende waarde', () => {
+    expect(g.yTicks).toHaveLength(5)
+    expect(g.yTicks[4].val).toBe(minNetWorth)
+    expect(g.yTicks[4].val).toBeLessThan(0)
+  })
+
+  it('de depletion-zone begint waar de lijn door nul gaat', () => {
+    expect(g.depletion).not.toBeNull()
+  })
+
+  it('zonder negatieve waarde is het domein byte-identiek aan [0, maxVal] (yZero = plot-onderrand)', () => {
+    const positief = buildSimChartGeometry(baseInput)
+    expect(positief.yZero).toBeCloseTo(positief.PAD.top + positief.innerH, 6)
+    expect(positief.yTicks).toHaveLength(4)
+  })
+
+  it('een negatieve scenario-overlay verlaagt het domein ook zonder negatieve hoofdlijn', () => {
+    const overlayPts: [number, number][] = buildRows(40, 65, { retireAge: 58 }).map((r) => [r.age + 1, r.endPortfolio - 300_000])
+    const met = buildSimChartGeometry({
+      ...baseInput,
+      scenarioOverlays: [{ name: 'pessimist', label: 'Voorzichtig', color: '#9e6b50', points: overlayPts }],
+    })
+    expect(met.yZero).toBeLessThan(met.PAD.top + met.innerH)
+    expect(met.scenarioPaths[0].d).not.toBeNull()
+  })
+})
+
 describe('simRowsToChartPoints — tijdstip-conventie', () => {
   const rows = [
     makeRow(40, 100_000, { endPortfolio: 110_000 }),

@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-09-19T00:55:13.662Z",
+  "generatedAt": "2026-09-19T08:50:02.076Z",
   "generatedDate": "2026-09-19",
   "repo": {
     "name": "fin",
-    "version": "0.71.0"
+    "version": "0.89.0"
   },
   "annotations": {
     "philosophy": "Geld is opgeslagen tijd — elke euro vertegenwoordigt een stukje levenstijd.",
@@ -191,11 +191,11 @@
   "stats": {
     "routes": 136,
     "routesProduction": 90,
-    "api": 326,
+    "api": 327,
     "tables": 102,
-    "migrations": 254,
+    "migrations": 257,
     "integrations": 25,
-    "components": 1143,
+    "components": 1145,
     "providers": 19,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -4474,6 +4474,14 @@
       ]
     },
     {
+      "url": "/api/transactions/import/overlap",
+      "file": "app/api/transactions/import/overlap/route.ts",
+      "domain": "transactions",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
       "url": "/api/transactions/search",
       "file": "app/api/transactions/search/route.ts",
       "domain": "transactions",
@@ -5989,6 +5997,70 @@
       ]
     },
     {
+      "domain": "transactions",
+      "label": "transactions",
+      "count": 7,
+      "routes": [
+        {
+          "url": "/api/transactions/bulk-budget",
+          "file": "app/api/transactions/bulk-budget/route.ts",
+          "domain": "transactions",
+          "methods": [
+            "PATCH"
+          ]
+        },
+        {
+          "url": "/api/transactions/bulk-budget/regel",
+          "file": "app/api/transactions/bulk-budget/regel/route.ts",
+          "domain": "transactions",
+          "methods": [
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/transactions/bulk-delete",
+          "file": "app/api/transactions/bulk-delete/route.ts",
+          "domain": "transactions",
+          "methods": [
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/transactions/import",
+          "file": "app/api/transactions/import/route.ts",
+          "domain": "transactions",
+          "methods": [
+            "GET",
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/transactions/import/overlap",
+          "file": "app/api/transactions/import/overlap/route.ts",
+          "domain": "transactions",
+          "methods": [
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/transactions/search",
+          "file": "app/api/transactions/search/route.ts",
+          "domain": "transactions",
+          "methods": [
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/transactions/search/manifest",
+          "file": "app/api/transactions/search/manifest/route.ts",
+          "domain": "transactions",
+          "methods": [
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "calculators",
       "label": "Calculators",
       "count": 6,
@@ -6095,62 +6167,6 @@
           "domain": "checkin",
           "methods": [
             "GET"
-          ]
-        }
-      ]
-    },
-    {
-      "domain": "transactions",
-      "label": "transactions",
-      "count": 6,
-      "routes": [
-        {
-          "url": "/api/transactions/bulk-budget",
-          "file": "app/api/transactions/bulk-budget/route.ts",
-          "domain": "transactions",
-          "methods": [
-            "PATCH"
-          ]
-        },
-        {
-          "url": "/api/transactions/bulk-budget/regel",
-          "file": "app/api/transactions/bulk-budget/regel/route.ts",
-          "domain": "transactions",
-          "methods": [
-            "POST"
-          ]
-        },
-        {
-          "url": "/api/transactions/bulk-delete",
-          "file": "app/api/transactions/bulk-delete/route.ts",
-          "domain": "transactions",
-          "methods": [
-            "POST"
-          ]
-        },
-        {
-          "url": "/api/transactions/import",
-          "file": "app/api/transactions/import/route.ts",
-          "domain": "transactions",
-          "methods": [
-            "GET",
-            "POST"
-          ]
-        },
-        {
-          "url": "/api/transactions/search",
-          "file": "app/api/transactions/search/route.ts",
-          "domain": "transactions",
-          "methods": [
-            "POST"
-          ]
-        },
-        {
-          "url": "/api/transactions/search/manifest",
-          "file": "app/api/transactions/search/manifest/route.ts",
-          "domain": "transactions",
-          "methods": [
-            "POST"
           ]
         }
       ]
@@ -8597,7 +8613,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 254
+    "migrationCount": 257
   },
   "tablesByDomain": [
     {
@@ -9143,11 +9159,11 @@
     }
   ],
   "components": {
-    "total": 1143,
+    "total": 1145,
     "groups": [
       {
         "group": "app",
-        "count": 462,
+        "count": 464,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -9481,6 +9497,8 @@
           "portfolio-allocation-chart",
           "postpone-form",
           "privacy-hidden-notice",
+          "projectie-laadlaag",
+          "projectie-laadlaag.test",
           "pull-refresh-indicator",
           "quick-add-bedrag-bevestiging.test",
           "quick-add-trigger",
@@ -9615,7 +9633,7 @@
       },
       {
         "group": "overview",
-        "count": 200,
+        "count": 199,
         "items": [
           "aandachtspunt-actie-button",
           "atomic-cards",
@@ -9673,12 +9691,11 @@
           "cashflow-forecast",
           "cashflow-forecast-sparkline",
           "cashflow-forecast.test",
+          "cashflow-grondslag-body",
           "cashflow-instellingen-blok",
           "cashflow-instellingen-blok.test",
           "cashflow-instellingen-lazy",
           "cashflow-instellingen-lazy.test",
-          "cashflow-kalender",
-          "cashflow-kalender.test",
           "cashflow-landing-cards",
           "cashflow-landing-cards.test",
           "checkin-banner",
@@ -9924,8 +9941,98 @@
         ]
       },
       {
+        "group": "future",
+        "count": 84,
+        "items": [
+          "afbouw-overzicht-card",
+          "afbouw-overzicht-card.test",
+          "aow-strategie-body",
+          "aow-strategie-editor",
+          "box3-methode-body",
+          "box3-methode-sheet",
+          "box3-methode-sheet.test",
+          "calculator-runner",
+          "calculator-to-life-event-sheet",
+          "calculator-to-life-event-sheet.test",
+          "categorie-prio-editor",
+          "categorie-prio-editor.test",
+          "disclaimer-strip",
+          "doel-bewerken-sheet",
+          "doel-bewerken-sheet.test",
+          "doel-loslaten-confirm",
+          "doel-toevoegen-sheet",
+          "doel-toevoegen-sheet.test",
+          "doelen-view",
+          "doelen-view.test",
+          "duplicate-confirm-sheet",
+          "editors",
+          "eindstrategie-body",
+          "eindstrategie-body.geen-tekort-lening.test",
+          "eindstrategie-body.nalatenschap.test",
+          "fields",
+          "gebeurtenissen-view",
+          "gebeurtenissen-view.test",
+          "grondslag-editor",
+          "grondslag-editor.test",
+          "housing-strategy-section",
+          "housing-strategy-section.test",
+          "inkomsten-editor",
+          "inkomsten-editor.test",
+          "laag2-editors",
+          "laag2-editors.test",
+          "levensstrategieen-section",
+          "library-card",
+          "library-filter",
+          "like-button",
+          "onttrekking-afname-body",
+          "onttrekkingsstrategie-body",
+          "onttrekkingsstrategie-body.test",
+          "onttrekkingsvolgorde-body",
+          "onttrekkingsvolgorde-body.test",
+          "order-preset-picker",
+          "order-preset-picker.test",
+          "owner-stats-badge",
+          "pensioen-pot-body",
+          "pensioen-projectie-chart",
+          "pensioen-strategie-editor",
+          "pensioen-strategie-editor.test",
+          "plan-review-pane",
+          "plan-review-pane.test",
+          "plan-review-provider",
+          "pot-flow-diagram",
+          "potten-editor",
+          "potten-editor.test",
+          "publish-curation-sheet",
+          "rate-limit-badge",
+          "regel-bewerken-pane",
+          "rekenhulp-view",
+          "report-sheet",
+          "requirements-checklist",
+          "requirements-chips",
+          "shared",
+          "strategie-editors",
+          "strategie-impact",
+          "strategie-modal-shell",
+          "toekomst-nav-cards",
+          "toekomst-nav-cards.test",
+          "toekomst-subpage-shell",
+          "uitgaven-editor",
+          "uitgaven-editor.test",
+          "verdeling-toename-body",
+          "voorkeur-bewerken-body",
+          "voorkeur-bewerken-sheet",
+          "voorkeur-bewerken-sheet.test",
+          "voorkeuren-view",
+          "voorkeuren-view.test",
+          "werk-strategie-body",
+          "werk-strategie-editor",
+          "woning-editor",
+          "woning-editor.test"
+        ]
+      },
+      {
         "group": "core",
-        "count": 83,
+        "count": 82,
         "items": [
           "account-source-icon",
           "account-source-icon.test",
@@ -9988,7 +10095,6 @@
           "investment-holdings-tab",
           "milestones-list",
           "module-tip-strip",
-          "net-worth-projection-chart",
           "opbrengst-uitsplitsing",
           "opbrengst-uitsplitsing.test",
           "portfolio-month-details-sheet",
@@ -10010,94 +10116,6 @@
           "vermogen-debt-card",
           "vermogen-wealth-group",
           "waardestijging-slider"
-        ]
-      },
-      {
-        "group": "future",
-        "count": 82,
-        "items": [
-          "afbouw-overzicht-card",
-          "afbouw-overzicht-card.test",
-          "aow-strategie-body",
-          "aow-strategie-editor",
-          "box3-methode-body",
-          "box3-methode-sheet",
-          "box3-methode-sheet.test",
-          "calculator-runner",
-          "calculator-to-life-event-sheet",
-          "calculator-to-life-event-sheet.test",
-          "categorie-prio-editor",
-          "categorie-prio-editor.test",
-          "disclaimer-strip",
-          "doel-bewerken-sheet",
-          "doel-bewerken-sheet.test",
-          "doel-loslaten-confirm",
-          "doel-toevoegen-sheet",
-          "doel-toevoegen-sheet.test",
-          "doelen-view",
-          "doelen-view.test",
-          "duplicate-confirm-sheet",
-          "editors",
-          "eindstrategie-body",
-          "eindstrategie-body.geen-tekort-lening.test",
-          "eindstrategie-body.nalatenschap.test",
-          "fields",
-          "gebeurtenissen-view",
-          "gebeurtenissen-view.test",
-          "housing-strategy-section",
-          "housing-strategy-section.test",
-          "inkomsten-editor",
-          "inkomsten-editor.test",
-          "laag2-editors",
-          "laag2-editors.test",
-          "levensstrategieen-section",
-          "library-card",
-          "library-filter",
-          "like-button",
-          "onttrekking-afname-body",
-          "onttrekkingsstrategie-body",
-          "onttrekkingsstrategie-body.test",
-          "onttrekkingsvolgorde-body",
-          "onttrekkingsvolgorde-body.test",
-          "order-preset-picker",
-          "order-preset-picker.test",
-          "owner-stats-badge",
-          "pensioen-pot-body",
-          "pensioen-projectie-chart",
-          "pensioen-strategie-editor",
-          "pensioen-strategie-editor.test",
-          "plan-review-pane",
-          "plan-review-pane.test",
-          "plan-review-provider",
-          "pot-flow-diagram",
-          "potten-editor",
-          "potten-editor.test",
-          "publish-curation-sheet",
-          "rate-limit-badge",
-          "regel-bewerken-pane",
-          "rekenhulp-view",
-          "report-sheet",
-          "requirements-checklist",
-          "requirements-chips",
-          "shared",
-          "strategie-editors",
-          "strategie-impact",
-          "strategie-modal-shell",
-          "toekomst-nav-cards",
-          "toekomst-nav-cards.test",
-          "toekomst-subpage-shell",
-          "uitgaven-editor",
-          "uitgaven-editor.test",
-          "verdeling-toename-body",
-          "voorkeur-bewerken-body",
-          "voorkeur-bewerken-sheet",
-          "voorkeur-bewerken-sheet.test",
-          "voorkeuren-view",
-          "voorkeuren-view.test",
-          "werk-strategie-body",
-          "werk-strategie-editor",
-          "woning-editor",
-          "woning-editor.test"
         ]
       },
       {
@@ -10187,7 +10205,6 @@
           "onboarding-section-back-navigation.test",
           "onboarding-shell",
           "onboarding-shell.scroll.test",
-          "onboarding-spaardoel",
           "onboarding-success",
           "onboarding-uitgaven-pensioen",
           "onboarding-uitgaven-pensioen.test",
@@ -10201,7 +10218,8 @@
           "speech-bubble",
           "step-progress",
           "strategy-tile",
-          "welcome-popup"
+          "welcome-popup",
+          "welcome-popup.test"
         ]
       },
       {
@@ -11160,10 +11178,6 @@
         },
         {
           "name": "life_events",
-          "write": false
-        },
-        {
-          "name": "net_worth_snapshots",
           "write": false
         },
         {
@@ -14353,7 +14367,8 @@
           "label": "transactions",
           "write": false,
           "routes": [
-            "/api/transactions/import"
+            "/api/transactions/import",
+            "/api/transactions/import/overlap"
           ]
         }
       ],
@@ -14882,61 +14897,6 @@
           ]
         }
       ],
-      "net_worth_snapshots": [
-        {
-          "domain": "snapshots",
-          "label": "Snapshots",
-          "write": true,
-          "routes": [
-            "/api/snapshots",
-            "/api/snapshots/auto",
-            "/api/snapshots/cron",
-            "/api/snapshots/group-history",
-            "/api/snapshots/history"
-          ]
-        },
-        {
-          "domain": "checkin",
-          "label": "checkin",
-          "write": false,
-          "routes": [
-            "/api/checkin/gespreksstarters",
-            "/api/checkin/overview"
-          ]
-        },
-        {
-          "domain": "export",
-          "label": "export",
-          "write": false,
-          "routes": [
-            "/api/export"
-          ]
-        },
-        {
-          "domain": "next-steps",
-          "label": "next-steps",
-          "write": false,
-          "routes": [
-            "/api/next-steps"
-          ]
-        },
-        {
-          "domain": "report",
-          "label": "Rapportages",
-          "write": false,
-          "routes": [
-            "/api/report"
-          ]
-        },
-        {
-          "domain": "year-in-review",
-          "label": "year-in-review",
-          "write": false,
-          "routes": [
-            "/api/year-in-review"
-          ]
-        }
-      ],
       "life_events": [
         {
           "domain": "life-events",
@@ -15089,6 +15049,52 @@
             "/api/snapshots/balances",
             "/api/snapshots/entity-backfill",
             "/api/snapshots/group-history"
+          ]
+        }
+      ],
+      "net_worth_snapshots": [
+        {
+          "domain": "snapshots",
+          "label": "Snapshots",
+          "write": true,
+          "routes": [
+            "/api/snapshots",
+            "/api/snapshots/auto",
+            "/api/snapshots/cron",
+            "/api/snapshots/group-history",
+            "/api/snapshots/history"
+          ]
+        },
+        {
+          "domain": "export",
+          "label": "export",
+          "write": false,
+          "routes": [
+            "/api/export"
+          ]
+        },
+        {
+          "domain": "next-steps",
+          "label": "next-steps",
+          "write": false,
+          "routes": [
+            "/api/next-steps"
+          ]
+        },
+        {
+          "domain": "report",
+          "label": "Rapportages",
+          "write": false,
+          "routes": [
+            "/api/report"
+          ]
+        },
+        {
+          "domain": "year-in-review",
+          "label": "year-in-review",
+          "write": false,
+          "routes": [
+            "/api/year-in-review"
           ]
         }
       ],
@@ -17966,7 +17972,7 @@
         "sp-inzicht",
         "app-comp"
       ],
-      "summary": "> **Geamendeerd door ADR 0147 (15 sep 2026):** er bestaat sindsdien één tweede numerieke teller in de shell, bij Fin (nav-pill-segment en desktop-bubbel), voor \"vragenlijsten die je nu kunt invullen\". Die N is scherp gedefinieerd en daalt alleen door handelen; de regel \"geen badg",
+      "summary": "> **Aangevuld 19 sep 2026 (W-016) — Fins proactiviteit is een gebruikerskeuze, default aan.** De meldkaart is het enige mechanisme dat ongevraagd namens Fin praat; sinds deze aanvulling kan de gebruiker hem dempen met `profiles.module_guide_state['coach:state'].proactief` (afwezi",
       "file": "docs/adr/0130-de-welkomstgids-woont-bij-fin-en-de-rondleiding-op-overzicht.md"
     },
     {
@@ -18369,6 +18375,96 @@
       ],
       "summary": "Bouwt voort op spec `2026-09-18-haalbare-uitgave-na-pensioen-design.md`, ADR 0129 (vast stopmoment × eind-vorm) en ADR 0145 (lab-uitkomst/dekking als uitkomst onder een vast anker).",
       "file": "docs/adr/0160-de-haalbare-uitgave-na-pensioen.md"
+    },
+    {
+      "id": "0161-de-consent-vervaldatum-is-geen-toegangstoken",
+      "title": "De vervaldatum van een bankkoppeling is de consent, niet het toegangstoken — een eigen kolom, gevuld uit de bron",
+      "status": "aanvaard",
+      "date": "2026-09-19",
+      "elements": [
+        "t-bankconnect",
+        "t-supabase",
+        "do-transactie"
+      ],
+      "summary": "Een bankkoppeling via TrueLayer heeft twee levensduren die niets met elkaar te maken hebben: het **toegangstoken** (`expires_in`, één uur, ververst via het refresh-token) en de **bankautorisatie** of consent (PSD2, doorgaans 90 dagen, RTS-plafond 180). De app sloeg alleen de eers",
+      "file": "docs/adr/0161-de-consent-vervaldatum-is-geen-toegangstoken.md"
+    },
+    {
+      "id": "0162-de-spaardoel-stap-uit-de-onboarding",
+      "title": "De spaardoel-stap gaat uit de onboarding — doelen leven op /toekomst/doelen",
+      "status": "aanvaard",
+      "date": "2026-09-19",
+      "elements": [
+        "sp-registreren",
+        "as-planning",
+        "fn-toekomstplannen"
+      ],
+      "summary": "Eigenaarsbesluit van 19 september 2026 op Notion-kaart B-056 (optie A).",
+      "file": "docs/adr/0162-de-spaardoel-stap-uit-de-onboarding.md"
+    },
+    {
+      "id": "0163-app-settings-allowlist-standaard-dicht",
+      "title": "Wat een gebruiker uit app_settings mag lezen staat op een allowlist — standaard dicht, beheer-content via de service-role",
+      "status": "aanvaard",
+      "date": "2026-09-19",
+      "elements": [
+        "t-supabase",
+        "t-aigateway",
+        "t-bankconnect"
+      ],
+      "summary": "`public.app_settings` draagt in één tabel de publieke configuratie van de app (coach, platformstatus, bankkoppeling aan/uit), beheer-content die de app namens de beheerder gebruikt (prompt-overrides, briefing-directives) én de externe geheimen (API-sleutels, TrueLayer-credentials",
+      "file": "docs/adr/0163-app-settings-allowlist-standaard-dicht.md"
+    },
+    {
+      "id": "0164-schulden-stap-raster-first",
+      "title": "De schulden-stap van de onboarding is raster-first — één aanvinkraster, meerdere schulden per soort",
+      "status": "aanvaard",
+      "date": "2026-09-19",
+      "elements": [
+        "sp-registreren",
+        "as-vermogen"
+      ],
+      "summary": "Eigenaarsbesluit van 19 september 2026 op Notion-kaart B-054 (optie A). Herziet het eigenaarsbesluit H13 van 26 augustus 2026 (`docs/ux-review-jul2026.md` §8, optie C \"hybride\") naar de destijds afgewezen optie B.",
+      "file": "docs/adr/0164-schulden-stap-raster-first.md"
+    },
+    {
+      "id": "0165-geld-levert-tijd-op",
+      "title": "Geld levert tijd op — de leus \"geld is opgeslagen tijd\" en de koop-/verkoop-metafoor vervallen",
+      "status": "aanvaard",
+      "date": "2026-09-19",
+      "elements": [
+        "as-coach",
+        "t-aigateway",
+        "sp-inzicht"
+      ],
+      "summary": "Eigenaarsbesluit van 19 september 2026 op Notion-kaart B-051 (`2026-09-18-testbug-d901ad`), keuzes K1 t/m K6. Dit is **fase 0** van een gefaseerd spoor: de norm gaat eerst, de kopij-sweep volgt.",
+      "file": "docs/adr/0165-geld-levert-tijd-op.md"
+    },
+    {
+      "id": "0165-niet-geindexeerd-is-nominaal-vast",
+      "title": "\"Stijgt niet mee met inflatie\" is een nominaal vast bedrag — ook na de startmaand",
+      "status": "aanvaard",
+      "date": "2026-09-19",
+      "elements": [
+        "as-planning",
+        "fn-toekomstplannen"
+      ],
+      "summary": "Een eigen gebeurtenis met het vinkje *Stijgt mee met inflatie* **uit** hoort een nominaal vast maandbedrag te zijn: €1.000 blijft €1.000, en verliest dus elk jaar koopkracht. De horizon-kernel rekent nominaal en indexeert alle gebeurtenis-posten centraal (`CF!H = Σ posten · (1+i)",
+      "file": "docs/adr/0165-niet-geindexeerd-is-nominaal-vast.md"
+    },
+    {
+      "id": "0166-geen-eigen-rendement-is-null",
+      "title": "Geen eigen rendement\" is NULL — en een ingevulde 0 blijft een bewuste 0%",
+      "status": "aanvaard",
+      "date": "2026-09-19",
+      "elements": [
+        "do-bezitting",
+        "as-vermogen",
+        "as-planning",
+        "t-supabase"
+      ],
+      "summary": "`public.assets.expected_return` was `numeric NOT NULL DEFAULT 0` en kon daardoor twee wezenlijk verschillende dingen niet uit elkaar houden: \"deze bezitting rendeert bewust 0%\" (betaalrekening, bitcoin, afschrijvende auto) en \"ik heb hier geen eigen aanname; reken met mijn profie",
+      "file": "docs/adr/0166-geen-eigen-rendement-is-null.md"
     }
   ],
   "churn": {
@@ -18380,7 +18476,7 @@
       },
       {
         "path": "lib/ai",
-        "commits": 56
+        "commits": 57
       },
       {
         "path": "app/(app)/toekomst",
@@ -18418,43 +18514,43 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 10846,
-        "commits": 97
+        "loc": 10918,
+        "commits": 98
       },
       {
         "file": "components/app/budgets-client.tsx",
-        "loc": 5661,
+        "loc": 5675,
         "commits": 33
       },
       {
         "file": "components/core/assets-client.tsx",
-        "loc": 4742,
+        "loc": 4830,
         "commits": 39
       },
       {
         "file": "components/app/cash-account-view.tsx",
-        "loc": 3698,
+        "loc": 3730,
         "commits": 20
       },
       {
         "file": "lib/dashboard-data-loader.ts",
-        "loc": 3126,
+        "loc": 3140,
         "commits": 60
       },
       {
         "file": "lib/release-notes.ts",
-        "loc": 2763,
+        "loc": 3040,
         "commits": 1
+      },
+      {
+        "file": "app/(app)/core/cash/import/page.tsx",
+        "loc": 2577,
+        "commits": 15
       },
       {
         "file": "components/app/chat/chat-panel.tsx",
         "loc": 2439,
         "commits": 24
-      },
-      {
-        "file": "app/(app)/core/cash/import/page.tsx",
-        "loc": 2436,
-        "commits": 15
       }
     ]
   },
@@ -18498,7 +18594,7 @@
       {
         "id": "business-owner",
         "name": "business-owner",
-        "description": "Use this agent for product/business-owner thinking on TriFinity: deciding what to build and why, shaping and prioritizing the backlog, writing clear feature definitions, and judging whether a proposed change serves the product's mission and philosophy ('Geld is opgeslagen tijd'). It owns the feature-management MCP tools (feature_create, feature_create_bulk, feature_skip, feature_get_stats, feature_get_ready, feature_get_blocked, feature_get_by_id). Use it to turn a vague idea into well-scoped features, to challenge scope/priority, to assess value and risk (incl. Wft-compliance and trust), and for the user-facing 'is this worth doing?' call.",
+        "description": "Use this agent for product/business-owner thinking on TriFinity: deciding what to build and why, shaping and prioritizing the backlog, writing clear feature definitions, and judging whether a proposed change serves the product's mission and philosophy ('Geld levert tijd op'). It owns the feature-management MCP tools (feature_create, feature_create_bulk, feature_skip, feature_get_stats, feature_get_ready, feature_get_blocked, feature_get_by_id). Use it to turn a vague idea into well-scoped features, to challenge scope/priority, to assess value and risk (incl. Wft-compliance and trust), and for the user-facing 'is this worth doing?' call.",
         "model": "sonnet",
         "color": "amber"
       },
@@ -18527,13 +18623,13 @@
         "id": "deep-dive",
         "name": "deep-dive",
         "description": "Use this agent for a deep second opinion before a critical or hard-to-reverse decision, and for research that reaches beyond the codebase — comparing solution approaches, library/API research via the web, multi-source verification of assumptions. It complements the specialists, it does not replace them: bug investigation → bug-reporter, security audit → security-specialist, quick codebase lookup → Explore, solution design → architect. Pipelines may also dispatch it explicitly for deep pre-work analysis (e.g. understanding current behaviour before extending a feature).",
-        "model": "fable",
+        "model": "opus",
         "color": "purple"
       },
       {
         "id": "frontend-ui-builder",
         "name": "frontend-ui-builder",
-        "description": "Use this agent to BUILD new TriFinity UI: pages and React components in the established Next.js 16 / React 19 / Tailwind v4 style — module heroes, KPI stat cards, BottomSheet deep-dives, charts — always with the 'Geld is opgeslagen tijd' framing and correct feature/module gating. It writes components; the separate `ux-review-expert` agent reviews them. Use it when a new screen, widget, modal or component is needed, or when restyling existing UI to match the design system.",
+        "description": "Use this agent to BUILD new TriFinity UI: pages and React components in the established Next.js 16 / React 19 / Tailwind v4 style — module heroes, KPI stat cards, BottomSheet deep-dives, charts — always with the 'Geld levert tijd op' framing and correct feature/module gating. It writes components; the separate `ux-review-expert` agent reviews them. Use it when a new screen, widget, modal or component is needed, or when restyling existing UI to match the design system.",
         "model": "opus",
         "color": "purple"
       },
@@ -18569,7 +18665,7 @@
         "id": "senior-developer",
         "name": "senior-developer",
         "description": "Use this agent as the senior/principal engineer for TriFinity: code-level technical direction, tricky cross-cutting refactors, hard debugging, and final technical judgement that spans multiple domains (Next.js 16, React 19, Supabase/RLS, AI, the calc engines, the self-documenting architecture). It coordinates the specialist agents, weighs trade-offs, and owns codebase-wide quality and consistency. Boundary: structural/domain decisions, enterprise fit and ADRs belong to the `architect` agent — this agent owns how it gets built well. Use it when a change touches several subsystems, needs a build/refactor plan, or when you want a seasoned 'is this the right approach?' call before committing.",
-        "model": "fable",
+        "model": "opus",
         "color": "red"
       },
       {
@@ -19293,17 +19389,17 @@
           },
           {
             "index": 11,
-            "title": "Ship",
+            "title": "Versie & vrijgavenotitie",
             "agents": []
           },
           {
             "index": 12,
-            "title": "Deploy-verificatie & rollback-pad",
+            "title": "Ship",
             "agents": []
           },
           {
             "index": 13,
-            "title": "Slotstap",
+            "title": "Deploy-verificatie & rollback-pad",
             "agents": []
           }
         ]
@@ -19514,6 +19610,13 @@
       "parserFormat": "ofx"
     },
     {
+      "file": "lib/parsers/other-account-overlap.ts",
+      "exists": true,
+      "baseUrl": null,
+      "hasAdapter": false,
+      "parserFormat": null
+    },
+    {
       "file": "lib/truelayer/balance-valuation.ts",
       "exists": true,
       "baseUrl": null,
@@ -19536,6 +19639,13 @@
     },
     {
       "file": "lib/truelayer/connection-outcome.ts",
+      "exists": true,
+      "baseUrl": null,
+      "hasAdapter": false,
+      "parserFormat": null
+    },
+    {
+      "file": "lib/truelayer/consent.ts",
       "exists": true,
       "baseUrl": null,
       "hasAdapter": false,
@@ -19629,8 +19739,30 @@
   "diff": {
     "baseline": false,
     "previousDate": "2026-09-19",
-    "hasChanges": false,
-    "sections": []
+    "hasChanges": true,
+    "sections": [
+      {
+        "label": "API-routes",
+        "added": [
+          "/api/transactions/import/overlap"
+        ],
+        "removed": []
+      },
+      {
+        "label": "Integratie-clients",
+        "added": [
+          "lib/parsers/other-account-overlap.ts"
+        ],
+        "removed": []
+      },
+      {
+        "label": "Componenten (aantal)",
+        "added": [
+          "+3"
+        ],
+        "removed": []
+      }
+    ]
   },
   "statsHistory": [
     {
@@ -20069,8 +20201,8 @@
     },
     {
       "date": "2026-09-19",
-      "api": 326,
-      "components": 1143,
+      "api": 327,
+      "components": 1145,
       "tables": 102,
       "routesProduction": 90
     }

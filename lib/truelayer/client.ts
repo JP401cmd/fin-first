@@ -14,6 +14,7 @@ import type {
   TLBalance,
   TLTransaction,
   TLTokenResponse,
+  TLMe,
 } from './types'
 
 // keyprintOf is vervangen door de gedeelde SHA-256 fingerprintKeys uit
@@ -385,4 +386,44 @@ export async function getProviders(
   }
 
   return providers
+}
+
+const TLMeSchema = z.looseObject({
+  client_id: z.string().optional(),
+  credentials_id: z.string().optional(),
+  consent_status: z.string().optional(),
+  consent_created_at: z.string().optional(),
+  consent_expires_at: z.string().nullable().optional(),
+  provider: z
+    .looseObject({
+      display_name: z.string().optional(),
+      logo_uri: z.string().optional(),
+      provider_id: z.string().optional(),
+    })
+    .optional(),
+})
+
+/**
+ * De consent achter dit toegangstoken (`GET /data/v1/me`).
+ *
+ * Transport, geen beleid: gooit bij een mislukte respons, net als de andere
+ * Data-API-calls. Het niet-fatale gebruik (consent-datum is een verrijking)
+ * woont in `lib/truelayer/consent.ts`. Korte timeout (4s): dit is een
+ * TrueLayer-metadata-call, geen bankcall, en de callback roept 'm vóór haar
+ * redirect aan — een trage /me mag de autorisatie zelf nooit kosten.
+ */
+export async function getMe(accessToken: string, dataUrl: string): Promise<TLMe[]> {
+  const res = await fetch(`${dataUrl}/data/v1/me`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    signal: AbortSignal.timeout(4000),
+  })
+
+  if (!res.ok) {
+    throw new Error(`TrueLayer consent ophalen mislukt: ${res.status}`)
+  }
+
+  const data = await res.json()
+  const results = data.results ?? []
+  const parsed = z.array(TLMeSchema).safeParse(results)
+  return (parsed.success ? parsed.data : results) as TLMe[]
 }

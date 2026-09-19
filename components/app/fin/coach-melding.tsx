@@ -13,6 +13,12 @@ export type CoachMeldingProps = {
   onClose: () => void
   onCtaActivate: () => void
   onOpenChat: () => void
+  /**
+   * W-016 — "Niet meer uit jezelf": zet Fins proactieve tips uit en sluit deze kaart.
+   * Optioneel, zodat een host die de keuze niet aanbiedt (of een test) de link
+   * gewoon weglaat.
+   */
+  onStopProactief?: () => void
 }
 
 const CTA_CLASS =
@@ -25,6 +31,7 @@ const CTA_CLASS =
  */
 export function CoachMelding({
   headerLabel, shown, showCursor, done, cta, ctaHref, onClose, onCtaActivate, onOpenChat,
+  onStopProactief,
 }: CoachMeldingProps) {
   return (
     <div
@@ -89,6 +96,25 @@ export function CoachMelding({
               <ArrowRight className="h-3 w-3" />
             </button>
           )
+        )}
+
+        {/*
+          W-016 — de uitknop op het moment van ergernis, precies zoals
+          "Niet meer vragen" op de vragenlijst-uitnodiging. Bewust TERTIAIR en
+          onder de CTA: de kaart is 320 px breed met een 44 px-tapzone voor het
+          kruisje rechtsboven; een derde knop in de kop zou daar tegenaan lopen.
+          Verschijnt pas na `done`, samen met de CTA — tijdens het uittypen hoort
+          er nog niets te kiezen te zijn. `--ink-meta` en niet `--ink-4`: dat
+          laatste is per app/globals.css geen teksttoken (te laag contrast).
+        */}
+        {done && onStopProactief && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onStopProactief() }}
+            className="mt-2.5 block font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--ink-meta)] underline underline-offset-4 transition-colors hover:text-[var(--ink-2)]"
+          >
+            Niet meer uit jezelf
+          </button>
         )}
       </div>
     </div>

@@ -102,7 +102,14 @@ const CreateAssetSchema = z.object({
 
   // Rendement in PROCENTEN p.j. De band is per asset-type en wordt hieronder
   // in een superRefine getoetst, omdat hij van `asset_type` afhangt.
-  expected_return: z.number().finite(),
+  //
+  // `null` = "geen eigen rendementsaanname" → de kern valt terug op het
+  // profielrendement (ADR 0166). Bewust `.nullable()` en niet `.optional()`:
+  // een weggelaten veld is een onvolledig formulier, een expliciete `null` is
+  // een keuze. Sinds migratie 20260919140000 draagt de kolom geen DEFAULT meer,
+  // dus "weglaten" zou hier stil hetzelfde worden als "geen aanname" — precies
+  // het onderscheid dat deze kaart juist maakt.
+  expected_return: z.number().finite().nullable(),
 
   purchase_date: isoDate,
   lock_end_date: isoDate,
@@ -158,7 +165,8 @@ const CreateAssetSchema = z.object({
   // Rendementsband — per type, want 'vehicle' MOET negatief kunnen (afschrijving)
   // en 'savings' mag geen 50% beloven. Dit is de check die de gemelde 665,5%
   // (H1/H7) tegenhoudt.
-  if (!isWithinAssetReturnBand(data.asset_type, data.expected_return)) {
+  // NULL slaat de band over: een band begrenst een getal, en dat is er niet.
+  if (data.expected_return !== null && !isWithinAssetReturnBand(data.asset_type, data.expected_return)) {
     ctx.addIssue({
       code: 'custom',
       path: ['expected_return'],

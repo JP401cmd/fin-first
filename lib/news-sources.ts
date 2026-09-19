@@ -290,6 +290,13 @@ export async function fetchWebContent(source: WebSource): Promise<string> {
  * Load news sources from the `app_settings` table.
  * Keys: `news_web_sources` and `news_rss_feeds`.
  * Returns empty arrays if not configured.
+ *
+ * Vereist een superadmin-sessie (tak 4 van de SELECT-policy) of de
+ * service-role: beide sleutels zijn beheer-content en staan bewust NIET op de
+ * allowlist van ADR 0163. Aanroepers vandaag: `app/(app)/beheer/nieuws` en
+ * `lib/news-ingest.ts` (cron). Met een gewone gebruikerssessie levert dit
+ * stil lege arrays — `lib/app-settings/publieke-sleutels.test.ts` zondert dit
+ * bestand om die reden expliciet uit.
  */
 export async function loadNewsSources(supabase: SupabaseClient): Promise<NewsSources> {
   const [webRes, rssRes] = await Promise.all([

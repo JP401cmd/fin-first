@@ -1115,3 +1115,18 @@
 ## 2026-09-19
 
 - Geen wijzigingen.
+
+## 2026-09-19
+
+- **Integratie-clients** toegevoegd: lib/truelayer/consent.ts
+- **Componenten (aantal)** verwijderd: -2
+
+## 2026-09-19
+
+- **Componenten (aantal)** toegevoegd: +1
+
+## 2026-09-19
+
+- **API-routes** toegevoegd: /api/transactions/import/overlap
+- **Integratie-clients** toegevoegd: lib/parsers/other-account-overlap.ts
+- **Componenten (aantal)** toegevoegd: +3

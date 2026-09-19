@@ -15,6 +15,7 @@ import {
   isVariableMerchant,
   CATEGORY_LABELS,
   RECURRING_ANALYSIS_MONTHS,
+  REVIEWED_RECURRING_FILTER,
   type RecurringCategory,
 } from '@/lib/recurring-detection'
 import { isRecurringExpired, type RecurringSchedule } from '@/lib/recurring-data'
@@ -398,10 +399,13 @@ async function loadFingerprintRound(
       maxOf('date'),
       maxOf('created_at'),
       maxOf('updated_at'),
+      // Bevestigd ÓF uitgesloten — een "Niet opnemen"-rij is `is_active:false`
+      // en moet hier tóch mee, anders komt het patroon als nieuw terug (B-054).
+      // De vingerafdruk ziet daarmee ook een nieuwe uitsluiting als wijziging.
       supabase
         .from('recurring_transactions')
         .select('id, counterparty_name, amount, name, frequency, category_override, end_date')
-        .eq('is_active', true),
+        .or(REVIEWED_RECURRING_FILTER),
     ])
 
   const recurring = (recurringResult.data ?? []) as RecurringRow[]

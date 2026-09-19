@@ -15,7 +15,9 @@
  * doel en onboarding-tegel exact hetzelfde bedrag.
  *
  * Consumenten: `components/future/doel-toevoegen-sheet.tsx` (quick-add-kiezer) en
- * `lib/onboarding-presets.ts` (`computeNoodfondsTarget` delegeert hierheen).
+ * de noodfonds-widget. De onboarding-tegel (`lib/onboarding-presets.ts`) is op
+ * 19 sep 2026 met de spaardoel-stap verdwenen (ADR 0162); dit is sindsdien de
+ * enige invoerroute voor een standaarddoel.
  */
 
 import { CLASSIC_MULTIPLIER, TARGET_EMERGENCY_MONTHS } from '@/lib/constants'
@@ -33,7 +35,7 @@ export interface StandaardDoelContext {
  * Doel-type zoals de quick-add-sheet het verstaat (`savings`/`wealth`/`debt`).
  * Bewust NIET het volledige `GoalType`-uniom: alle euro-spaardoelen dragen hun
  * noodfonds-/FIRE-semantiek via naam + icoon, niet via een aparte enum met een
- * afwijkende UI-eenheid (spiegelt de bewuste keuze in `lib/onboarding-presets.ts`).
+ * afwijkende UI-eenheid (de keuze die de voormalige onboarding-presets ook maakten).
  */
 export type StandaardDoelGoalType = 'savings' | 'wealth' | 'debt'
 
@@ -72,8 +74,7 @@ function roundToStep(value: number, step: number): number {
  * 70% van het maandinkomen wanneer de uitgaven (nog) onbekend zijn. Afgerond op
  * €100. Geen inkomen én geen uitgaven → `0` (geen prefill forceren).
  *
- * Gedeelde bron: `lib/onboarding-presets.ts#computeNoodfondsTarget` delegeert
- * hierheen zodat onboarding en de Doelen-tab dezelfde grondslag gebruiken.
+ * Canonieke bron voor het noodfonds-streefbedrag (Doelen-tab, widget, UAT-checks).
  */
 export function computeNoodfondsTarget(ctx: StandaardDoelContext): number {
   if (ctx.monthlyExpenses <= 0 && ctx.monthlyIncome <= 0) return 0

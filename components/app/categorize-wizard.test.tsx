@@ -244,9 +244,9 @@ describe('CategorizeWizard — de vier keuzes routeren correct', () => {
     expect(props.onAcceptOne).toHaveBeenCalledWith('g1')
   })
 
-  it('"Zelf indelen (sleepmodus)" roept onSplitGroup aan met exact de groep-tx-id\'s', () => {
+  it('"Zelf categoriseren (sleepmodus)" roept onSplitGroup aan met exact de groep-tx-id\'s', () => {
     const props = renderWizard({ rows: multiTxGroup() })
-    fireEvent.click(screen.getByRole('button', { name: /Zelf indelen \(sleepmodus\)/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Zelf categoriseren \(sleepmodus\)/i }))
     expect(props.onSplitGroup).toHaveBeenCalledWith(['g1', 'g2', 'g3'])
     // Splitsen "verbruikt" geen ronde — de motor-voortgang beweegt hier niet.
     expect(props.onAdvanceRound).not.toHaveBeenCalled()
@@ -318,7 +318,7 @@ describe('CategorizeWizard — randgevallen', () => {
     expect(screen.queryByText(/Fin beoordeelt groep/i)).toBeNull()
     const select = screen.getByRole('combobox', { name: /Categorie kiezen voor deze groep/i })
     fireEvent.change(select, { target: { value: boodschappenBudget.id } })
-    fireEvent.click(screen.getByRole('button', { name: /Deze groep indelen/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Deze groep categoriseren/i }))
     expect(props.onSetGroupBudget).toHaveBeenCalledWith(['nm1'], boodschappenBudget.id, false)
   })
 
@@ -333,7 +333,7 @@ describe('CategorizeWizard — randgevallen', () => {
     expect(screen.getByText(/Fin kon dit niet zeker plaatsen/i)).toBeInTheDocument()
     const select = screen.getByRole('combobox', { name: /Categorie kiezen voor deze groep/i })
     fireEvent.change(select, { target: { value: boodschappenBudget.id } })
-    fireEvent.click(screen.getByRole('button', { name: /Deze groep indelen/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Deze groep categoriseren/i }))
 
     expect(props.onSetGroupBudget).toHaveBeenCalledWith(['f1'], boodschappenBudget.id, false)
   })

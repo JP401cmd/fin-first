@@ -18,6 +18,8 @@ import { render, screen, within } from '@testing-library/react'
 import { HorizonYearDetailsSheet, buildWithdrawalReceiptLines } from './horizon-year-details-sheet'
 import type { UnifiedProjectionRow, WithdrawalNeedBreakdown } from '@/lib/unified-projection'
 import type { SimRow } from '@/lib/fire-simulation'
+import type { Debt } from '@/lib/debt-data'
+import { BUITEN_DOEL_ZIN } from '@/lib/wealth-composition'
 
 // Stub de ingebedde Sankey — buildBreakdown wordt elders getest.
 vi.mock('@/components/app/horizon/horizon-cashflow-sankey', () => ({
@@ -107,7 +109,14 @@ const SIM_ROWS: SimRow[] = [
   { age: 91, phase: 'retirement', startPortfolio: 0, growth: 0, savings: 0, withdrawal: 0, cashflowNet: 0, oneTimeNet: 0, endPortfolio: 0, grossIncome: 0, grossExpenses: 0, flowIn: 0, flowOut: 0 },
 ]
 
-function renderSheet(row: UnifiedProjectionRow, primaryBasis?: 'total' | 'liquid') {
+function renderSheet(
+  row: UnifiedProjectionRow,
+  primaryBasis?: 'total' | 'liquid',
+  extra: {
+    debts?: Debt[]
+    eigenHuisMortgageIds?: ReadonlySet<string>
+  } = {},
+) {
   return render(
     <HorizonYearDetailsSheet
       open
@@ -117,10 +126,11 @@ function renderSheet(row: UnifiedProjectionRow, primaryBasis?: 'total' | 'liquid
       simRows={SIM_ROWS}
       currentAge={40}
       inflationRate={0.02}
-      debts={[]}
+      debts={extra.debts ?? []}
       lifeEvents={[]}
       cashflows={[]}
       primaryBasis={primaryBasis}
+      eigenHuisMortgageIds={extra.eigenHuisMortgageIds}
     />,
   )
 }
@@ -423,5 +433,150 @@ describe('HorizonYearDetailsSheet — "waarvan besteedbaar" bij woonstrategie Ui
   it('toont de regel NIET wanneer J ≡ I (Meerekenen — hij zou het hoofdcijfer herhalen)', () => {
     const { container } = renderSheet(makeYearRow(), 'liquid')
     expect(container.textContent).not.toContain('waarvan besteedbaar')
+  })
+})
+
+// ── Buiten-doel-markering in de bon (bevinding L1, besluit 19-09-2026) ─────
+
+/**
+ * De Opbouw-grafiek dempt en arceert het eigen huis + zijn hypotheek zodra de
+ * woonstrategie "Uitsluiten" is. Klikte je op precies die band, dan verdween het
+ * onderscheid volledig in de kassabon — de grafiek zei "dit telt niet mee", de
+ * bon zei niets. Dat is dezelfde klasse tegenspraak als de oorspronkelijke bug,
+ * één laag dieper.
+ *
+ * Voorstel A: markeer de BESTAANDE regels, laat de optelling met rust. De bon
+ * blijft dus op de I-grondslag sluiten (ADR 0114 D3) met J ernaast als
+ * "waarvan besteedbaar"; dat is wat de markering niet-misleidend maakt.
+ */
+describe('HorizonYearDetailsSheet — eigen woning buiten het doel wordt gemarkeerd', () => {
+  const HUIS_HYPOTHEEK_ID = 'hyp-eigen-huis'
+  const ANDER_PAND_ID = 'hyp-ander-pand'
+
+  function mortgage(id: string, name: string): Debt {
+    return {
+      id,
+      user_id: 'u1',
+      name,
+      debt_type: 'mortgage',
+      original_amount: 300_000,
+      current_balance: 200_000,
+      interest_rate: 3,
+      minimum_payment: 0,
+      monthly_payment: 1000,
+      start_date: '2010-01-01',
+      end_date: null,
+      creditor: null,
+      notes: null,
+      is_active: true,
+      sort_order: 0,
+      created_at: '2010-01-01',
+      updated_at: '2010-01-01',
+      subtype: null,
+      is_tax_deductible: null,
+      fixed_rate_end_date: null,
+      nhg: null,
+      linked_asset_id: null,
+      credit_limit: null,
+      repayment_type: 'annuiteit',
+      draagkrachtmeting_date: null,
+      tax_year: null,
+      has_payment_plan: false,
+      has_written_agreement: false,
+      ownership: 'personal',
+      household_id: null,
+      partner_split_pct: null,
+      net_worth_inclusion_pct: 100,
+      include_aflossing_in_savings: false,
+      custom_aflossing_amount: null,
+      has_hypotheekplanner_tracking: false,
+    }
+  }
+
+  const DEBTS = [
+    mortgage(HUIS_HYPOTHEEK_ID, 'Hypotheek eigen woning'),
+    mortgage(ANDER_PAND_ID, 'Hypotheek verhuurd pand'),
+  ]
+  const IDS = new Set([HUIS_HYPOTHEEK_ID])
+
+  /** Jaar met een eigen woning, een woninghypotheek én een hypotheek elders. */
+  const UITSLUITEN = makeYearRow({
+    nettoLiquide: 180_000,
+    assetBuckets: {
+      investment: { startValue: 480000, growth: 30000, contributions: 0, box3Drag: 3000, endValue: 500000 },
+      eigen_huis: { startValue: 395000, growth: 5000, contributions: 0, box3Drag: 0, endValue: 400000 },
+    },
+    debtBalances: {
+      [HUIS_HYPOTHEEK_ID]: { startBalance: 205000, endBalance: 200000, interestPaid: 6000, principalPaid: 5000 },
+      [ANDER_PAND_ID]: { startBalance: 105000, endBalance: 100000, interestPaid: 3000, principalPaid: 5000 },
+    },
+  })
+
+  function renderUitsluiten(basis: 'total' | 'liquid' = 'liquid') {
+    return renderSheet(UITSLUITEN, basis, { debts: DEBTS, eigenHuisMortgageIds: IDS })
+  }
+
+  it('markeert het huis én zijn hypotheek — en niets anders', () => {
+    renderUitsluiten()
+    const markeringen = screen.getAllByText(BUITEN_DOEL_ZIN)
+    expect(markeringen.length, 'precies twee regels: het huis en zijn hypotheek').toBe(2)
+  })
+
+  it('gebruikt letterlijk dezelfde zin als de Opbouw-grafiek', () => {
+    renderUitsluiten()
+    // Drager mag per oppervlak verschillen (vlak vs. tekstregel), woorden niet.
+    expect(screen.getAllByText(BUITEN_DOEL_ZIN).length).toBeGreaterThan(0)
+  })
+
+  it('laat een hypotheek op een ánder pand ongemarkeerd', () => {
+    renderUitsluiten()
+    const ander = screen.getByText('Hypotheek verhuurd pand').closest('li')!
+    expect(within(ander).queryByText(BUITEN_DOEL_ZIN), 'ander pand telt gewoon mee').toBeNull()
+    const huis = screen.getByText('Hypotheek eigen woning').closest('li')!
+    expect(within(huis).getByText(BUITEN_DOEL_ZIN)).toBeTruthy()
+  })
+
+  it('rendert de grondslagzin uit ADR 0114 D3 — die was besloten maar landde nooit', () => {
+    renderUitsluiten()
+    expect(
+      screen.getByText(
+        /Je huis staat op deze bon omdat je het bezit — het telt alleen niet mee in je vrijheidsdoel\./,
+      ),
+    ).toBeTruthy()
+  })
+
+  it('laat de optelling ongemoeid: de bon sluit onveranderd op de I-grondslag', () => {
+    renderUitsluiten()
+    // "Eind netto" staat er nog, en J staat ernaast als *waarvan* — precies de
+    // constructie die de markering niet-misleidend maakt.
+    expect(screen.getByText('Eind netto')).toBeTruthy()
+    expect(screen.getAllByText(/waarvan besteedbaar/).length).toBe(2)
+  })
+
+  it('markeert NIETS wanneer de grafiek op de totaal-grondslag staat (D6-terugval)', () => {
+    // Bewust aan `primaryBasis` gekeyd, niet aan de kernelvlag: die staat óók bij
+    // Verkopen/Opeet aan. Zonder besteedbaar-regel zou de markering een
+    // grondslag beloven die nergens op de bon staat.
+    const { container } = renderUitsluiten('total')
+    expect(container.textContent).not.toContain(BUITEN_DOEL_ZIN)
+  })
+
+  it('markeert NIETS bij Meerekenen (J ≡ I)', () => {
+    const { container } = renderSheet(
+      makeYearRow({
+        assetBuckets: UITSLUITEN.assetBuckets,
+        debtBalances: UITSLUITEN.debtBalances,
+      }),
+      'liquid',
+      { debts: DEBTS, eigenHuisMortgageIds: IDS },
+    )
+    expect(container.textContent).not.toContain(BUITEN_DOEL_ZIN)
+  })
+
+  it('markeert het huis ook zonder gekoppelde-hypotheek-Set — dan alleen het huis', () => {
+    // Risico uit de analyse: de Set is optioneel (oudere call-sites). Het huis
+    // zelf hangt aan het bucket-type en moet dan nog steeds gemarkeerd zijn.
+    renderSheet(UITSLUITEN, 'liquid', { debts: DEBTS })
+    expect(screen.getAllByText(BUITEN_DOEL_ZIN).length).toBe(1)
   })
 })

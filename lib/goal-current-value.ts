@@ -47,6 +47,9 @@ import type { BudgetBasisRow } from '@/lib/budget-basis'
 import { localMonthStart, localMonthBounds } from '@/lib/month-range'
 import type { GoalType } from '@/lib/goal-data'
 import type { DebtTermBasis } from '@/lib/debt-term-basis'
+import { resolveExpectedReturnPct } from '@/lib/asset-return'
+import type { FireAssumptionRow } from '@/lib/fire-assumptions'
+import { resolveFireParamsWithAssumptions, type FireProfileInput } from '@/lib/fire-params'
 import {
   applyVrijheidsgetalSync,
   isVrijheidsgetalGoal,
@@ -403,12 +406,20 @@ export function computeParameterEffectiveSalary(
 /**
  * Gewogen verwacht rendement (%) over de actieve assets — één TOTAAL met exact de
  * weegregels van `buildCategorieReturnGroups` (lib/horizon/toekomst-scenario.ts):
- * actieve assets, inclusion-gewogen waarde, `expected_return/100` (nul-basis).
+ * actieve assets, inclusion-gewogen waarde, `expected_return/100`.
  * Σ(waarde × rendement) / Σ(waarde). Geen assets/waarde → `undefined` (tolerant).
  * Rondt op 1 decimaal (zoals `formatGoalValue` voor `%`).
+ *
+ * @param terugvalRendementPct Profielrendement in PROCENTEN als terugval voor een
+ *   bezitting ZONDER eigen aanname (`expected_return = null`, ADR 0166) — keuze
+ *   (a): het rendement-doel meet zich aan dezelfde ketting als `doelGewogenRendement`
+ *   (lib/horizon/toekomst-doel.ts, `potRendement` met `fireParams.grossReturn`),
+ *   anders toont de doelkaart een lager rendement dan /toekomst voor dezelfde
+ *   bezittingen. Weggelaten → 0 (oude nul-basis). Een ingevulde 0 blijft 0%.
  */
 export function computeParameterWeightedReturnPct(
   assets: readonly ParamAssetRow[],
+  terugvalRendementPct = 0,
 ): number | undefined {
   let totalValue = 0
   let weightedReturnSum = 0
@@ -418,8 +429,10 @@ export function computeParameterWeightedReturnPct(
     const inclFactor = Number.isFinite(inclRaw) ? inclRaw : 1
     const value = Number(a.current_value ?? 0) * inclFactor
     if (!(value > 0)) continue
-    const retRaw = Number(a.expected_return ?? 0) / 100
-    const ret = Number.isFinite(retRaw) ? retRaw : 0
+    // NUMERIC komt als string uit PostgREST → eerst naar getal; `null` blijft null
+    // zodat de terugval (en niet `Number(null) === 0`) de beslissing draagt.
+    const eigen = a.expected_return == null ? null : Number(a.expected_return)
+    const ret = resolveExpectedReturnPct(eigen, terugvalRendementPct) / 100
     totalValue += value
     weightedReturnSum += value * ret
   }
@@ -486,7 +499,7 @@ export async function injectParameterGoalCurrentValues(
   // spaarquote-venster (lib/savings-source.ts): dezelfde rijen, één query.
   const { fromDate: sixMonthsAgo } = savingsRateWindow(now)
 
-  const [txRows, budgetRows, profileRow, basisPrefsRow, assetRows, snapshotRows, forecastScalars] = await Promise.all([
+  const [txRows, budgetRows, profileRow, basisPrefsRow, assetRows, snapshotRows, forecastScalars, returnFireParams] = await Promise.all([
     needsTx
       ? supabase
           .from('transactions')
@@ -530,6 +543,13 @@ export async function injectParameterGoalCurrentValues(
           .from('assets')
           .select('current_value, expected_return, net_worth_inclusion_pct, asset_type, is_active')
           .eq('is_active', true)
+          // EXPLICIETE EIGENAAR-SCOPING. De SELECT-policy op `assets` is
+          // huishoud-gedeeld, dus RLS filtert hier NIET: zonder deze regel wegen
+          // partnerbezittingen mee in een doel dat persoonlijk is (de
+          // profiel-queries ernaast zijn wél `.eq('id', userId)`). Sinds ADR 0166
+          // weegt dat dubbel: een partnerrij zónder eigen rendement zou het
+          // profielrendement van de KIJKER erven.
+          .eq('user_id', userId)
           .then(r => ((r.data ?? []) as ParamAssetRow[]))
       : Promise.resolve([] as ParamAssetRow[]),
     needsFireAge
@@ -559,6 +579,25 @@ export async function injectParameterGoalCurrentValues(
     needsSavingsRate
       ? loadForecastSectionData(supabase)
       : Promise.resolve(null as Awaited<ReturnType<typeof loadForecastSectionData>> | null),
+    // TERUGVAL VOOR HET RENDEMENT-DOEL (ADR 0166): het profielrendement via de
+    // volledige canonieke keten (eigen keuze → jaarlaag `fire_assumptions` →
+    // DEFAULT_RETURN), zoals lib/goals/metric-sources.ts#loadGoalEffectiveSwr.
+    // Alleen geladen wanneer er een rendement-doel is; eigen-rij expliciet.
+    needsReturn && userId
+      ? Promise.all([
+          supabase
+            .from('profiles')
+            .select('expected_return, inflation_rate')
+            .eq('id', userId)
+            .maybeSingle()
+            .then(r => (r.data as FireProfileInput | null), () => null),
+          supabase
+            .from('fire_assumptions')
+            .select('year, expected_return, inflation, volatility, source, is_definitive')
+            .order('year', { ascending: true })
+            .then(r => ((r.data ?? null) as FireAssumptionRow[] | null), () => null),
+        ]).then(([profile, rows]) => resolveFireParamsWithAssumptions(profile, rows))
+      : Promise.resolve(null),
   ])
 
   // TOLERANTIE-GUARD OP DE INVOER, NIET OP DE UITKOMST (M4).
@@ -585,7 +624,9 @@ export async function injectParameterGoalCurrentValues(
         await loadBudgetBasis(supabase, basisPrefsRow, budgetRows as unknown as BudgetBasisRow[]),
       )
     : undefined
-  const weightedReturnPct = needsReturn ? computeParameterWeightedReturnPct(assetRows) : undefined
+  const weightedReturnPct = needsReturn
+    ? computeParameterWeightedReturnPct(assetRows, (returnFireParams?.grossReturn ?? 0) * 100)
+    : undefined
   const fireAge = needsFireAge ? pickLatestSnapshotFireAge(snapshotRows) : undefined
 
   for (const g of parameterGoals) {

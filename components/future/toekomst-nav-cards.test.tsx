@@ -720,15 +720,15 @@ describe('ToekomstNavCards — plan-review-ingang (TPR-01, A2)', () => {
     const { container } = renderCards({ planReview: progress(['plan', 'uitgaven', 'inkomsten']) })
     const card = cardByHref(container, PLAN_REVIEW_HREF)
     expect(within(card).getByText('Je voorkeuren voor je plan instellen')).toBeInTheDocument()
-    expect(within(card).getByText('3 van 5')).toBeInTheDocument()
-    expect(within(card).getByText('2 stappen nog niet bevestigd')).toBeInTheDocument()
+    expect(within(card).getByText('3 van 6')).toBeInTheDocument()
+    expect(within(card).getByText('3 stappen nog niet bevestigd')).toBeInTheDocument()
     expect(dotClass(card)).toContain('amber')
     expect(container.querySelector('a[href="/toekomst/voorkeuren"]')).toBeNull()
   })
 
   it('n.v.t.-stappen tellen niet mee in het totaal', () => {
     const { container } = renderCards({ planReview: progress(['plan'], ['woning']) })
-    expect(within(cardByHref(container, PLAN_REVIEW_HREF)).getByText('1 van 4')).toBeInTheDocument()
+    expect(within(cardByHref(container, PLAN_REVIEW_HREF)).getByText('1 van 5')).toBeInTheDocument()
   })
 
   it('voltooid of niet beschikbaar: weer de gewone Voorkeuren-kaart', () => {
@@ -741,7 +741,7 @@ describe('ToekomstNavCards — plan-review-ingang (TPR-01, A2)', () => {
 
   it('Eenvoudig: compact label "Je voorkeuren voor je plan instellen · N/M"', () => {
     renderCards({ planReview: progress(['plan']) }, 'simple')
-    expect(screen.getByText('Je voorkeuren voor je plan instellen · 1/5')).toBeInTheDocument()
+    expect(screen.getByText('Je voorkeuren voor je plan instellen · 1/6')).toBeInTheDocument()
   })
 
   it('binnen de provider opent een klik de review i.p.v. te navigeren; een ctrl-klik volgt de link', () => {

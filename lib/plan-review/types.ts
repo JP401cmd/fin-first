@@ -14,8 +14,15 @@
  * bevestigd"; de profielstaat zegt of die bevestiging nog geldt (zie `progress.ts`).
  */
 
-/** De vijf stappen, in de volgorde die de code-afhankelijkheden afdwingen. */
-export const PLAN_REVIEW_STAPPEN = ['plan', 'uitgaven', 'inkomsten', 'woning', 'potten'] as const
+/**
+ * De stappen, in de volgorde die de code-afhankelijkheden afdwingen.
+ *
+ * `grondslag` (W-009, 19 sep 2026) staat bewust ACHTERAAN: hij gaat niet over het plan
+ * maar over waar de cijfers van vandaag op rusten — de invoer waar alle vijf de stappen
+ * ervoor mee rekenen. Wie de review doorloopt, ziet eerst zijn keuzes en daarna de bron
+ * eronder. Zie `lib/plan-review/overzicht.ts` → `stapGrondslag`.
+ */
+export const PLAN_REVIEW_STAPPEN = ['plan', 'uitgaven', 'inkomsten', 'woning', 'potten', 'grondslag'] as const
 export type PlanReviewStap = (typeof PLAN_REVIEW_STAPPEN)[number]
 
 /**
@@ -48,6 +55,7 @@ export const PLAN_REVIEW_STAP_TITELS: Record<PlanReviewStap, string> = {
   inkomsten: 'Wat er binnenkomt',
   woning: 'Je huis en ander vast bezit',
   potten: 'Hoe je potten werken',
+  grondslag: 'Waar je cijfers op rusten',
 }
 
 /**

@@ -44,11 +44,12 @@ import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import {
   calculateFreedomTime,
-  dailyExpenseRate,
   formatDateShort,
   formatFreedomTimeString,
   formatMaskedCurrency,
+  type FreedomRateSource,
 } from '@/lib/format'
+import { VrijheidstijdVoetnoot } from '@/components/app/vrijheidstijd-voetnoot'
 import {
   PortfolioMonthDetailsSheet,
   type PortfolioValueHoldingSlice,
@@ -99,12 +100,21 @@ export type PortfolioValueChartProps = {
    */
   months?: number | null
   /**
-   * Jaarlijkse essentiële uitgaven uit de must-budgets (loader-veld
-   * `yearlyEssentialExpenses`, zelfde bron als `PortfolioSummary`). 0 of
-   * ontbrekend verbergt de vrijheidstijd-regel — liever geen duiding dan een
-   * verzonnen dagtarief.
+   * Het CANONIEKE dagtarief (€/dag) uit de loader — `getRecentDailyExpenseRate`
+   * (12-mnd gerealiseerde consumptie, ADR 0126 D1/D2). 0 of ontbrekend verbergt
+   * de vrijheidstijd-regel — liever geen duiding dan een verzonnen dagtarief.
+   *
+   * WAS `yearlyEssentialExpenses` (de must-budgetten-grondslag van de
+   * FIRE-doelberekening), waaruit dit component zelf `dailyExpenseRate(/12)`
+   * afleidde. Dat was een DERDE vrijheidstijd-grootheid naast dagtarief en
+   * runway, wat ADR 0126 D1 verbiedt: dezelfde portefeuille las hier langer dan
+   * op elk ander scherm. `yearlyEssentialExpenses` blijft wél de grondslag van
+   * de SWR-deckregel in `PortfolioSummary` — dat is een dekkingsvraag
+   * ("hoeveel jaar essentiële uitgaven dekt dit bij je SWR"), geen €→tijd-koers.
    */
-  yearlyEssentialExpenses?: number
+  dailyExpenses?: number
+  /** Herkomst van dat tarief, voor de wisselkoers-voetnoot (B-039/UR3-08). */
+  dailyExpensesSource?: FreedomRateSource
   /** Opent de holding-pane; komt uit holdings-client zodat open en sluiten
    *  dezelfde pane-url-history-instantie delen. */
   onOpenHolding: (id: string) => void
@@ -183,7 +193,8 @@ function layoutFor(width: number) {
 
 export const PortfolioValueChart = memo(function PortfolioValueChart({
   months = 12,
-  yearlyEssentialExpenses = 0,
+  dailyExpenses = 0,
+  dailyExpensesSource,
   onOpenHolding,
   className = '',
 }: PortfolioValueChartProps) {
@@ -350,7 +361,8 @@ export const PortfolioValueChart = memo(function PortfolioValueChart({
       averagePricedFromMarket={data!.averagePricedFromMarket}
       holdingsWithoutMarketPriceCount={data!.holdingsWithoutMarketPriceCount}
       totalHoldings={data!.totalHoldings}
-      yearlyEssentialExpenses={yearlyEssentialExpenses}
+      dailyExpenses={dailyExpenses}
+      dailyExpensesSource={dailyExpensesSource}
       onReload={retry}
       onOpenHolding={onOpenHolding}
       // Nieuwe periode onderweg terwijl er nog een oudere reeks staat: die reeks
@@ -414,7 +426,8 @@ function ValueHistoryChart({
   averagePricedFromMarket,
   holdingsWithoutMarketPriceCount,
   totalHoldings,
-  yearlyEssentialExpenses,
+  dailyExpenses,
+  dailyExpensesSource,
   onReload,
   onOpenHolding,
   busy = false,
@@ -424,7 +437,9 @@ function ValueHistoryChart({
   averagePricedFromMarket: number
   holdingsWithoutMarketPriceCount: number
   totalHoldings: number
-  yearlyEssentialExpenses: number
+  /** Canoniek dagtarief (ADR 0126 D1) — doorgegeven, nooit hier afgeleid. */
+  dailyExpenses: number
+  dailyExpensesSource?: FreedomRateSource
   /** Herlaadt de reeks nadat de koershistorie is opgehaald. */
   onReload: () => void
   /** Opent de holding-pane via de controller (pane-url-history). */
@@ -723,10 +738,8 @@ function ValueHistoryChart({
   const first = points[0]
   const last = points[points.length - 1]
 
-  // Vrijheidstijd van de eindwaarde. Dagtarief via de canonieke helper; de
-  // /12 is enkel de jaar→maand-eenheid die `dailyExpenseRate` verwacht
-  // (×12/365 blijft dus de enige dag-conversie in de app).
-  const dailyExpenses = yearlyEssentialExpenses > 0 ? dailyExpenseRate(yearlyEssentialExpenses / 12) : 0
+  // Vrijheidstijd van de eindwaarde. Het dagtarief komt sinds 19 sep 2026 uit de
+  // loader (één canonieke koers, ADR 0126 D1); hier wordt niets meer afgeleid.
   const freedomText = useMemo(() => {
     if (dailyExpenses <= 0) return null
     const breakdown = calculateFreedomTime(last.marketValue, dailyExpenses)
@@ -818,12 +831,16 @@ function ValueHistoryChart({
           className="mt-2 max-w-[60ch] border-l-2 border-[var(--module-active-500)] pl-3 font-serif text-[13px] italic leading-relaxed text-[var(--ink-2)]"
           data-testid="portfolio-value-freedom"
         >
-          Op je essentiële uitgaven staat deze portefeuille vandaag voor{' '}
+          Tegen je huidige uitgaven staat deze portefeuille vandaag voor{' '}
           <span className="whitespace-nowrap font-mono not-italic tabular-nums text-[var(--ink)]">
             {freedomText}
           </span>{' '}
           vrijheid.
         </p>
+      )}
+      {/* De wisselkoers erbij, zodat een schatting niet als meting leest (B-039). */}
+      {freedomText && !masked && (
+        <VrijheidstijdVoetnoot dailyRate={dailyExpenses} source={dailyExpensesSource} className="mt-1 pl-3" />
       )}
 
       {/* Balkweergave gevraagd, maar de reeks draagt geen verdeling per positie.

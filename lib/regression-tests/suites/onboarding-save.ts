@@ -4,6 +4,7 @@ import type { TestCase } from '../test-types'
 import { authenticatedFetch } from '../server-runner'
 import { sanitizeStoredDraft } from '@/app/(onboarding)/onboarding/draft-persistence'
 import { FIRE_END_STRATEGIES } from '@/lib/fire-strategy'
+import { WAARDES } from '@/lib/onboarding/waardes'
 
 const CAT = 'onboarding.save'
 
@@ -560,46 +561,40 @@ const tests: TestCase[] = [
   // ── Step 12: Success scherm ──────────────────────────────────────────
   {
     id: 'ob-save-success-screen',
-    name: 'Success scherm: FinDots avatar, module kaarten, CTA naar getHomePath()',
+    name: 'Success scherm: de vier waardes zijn de bron van het scherm',
     category: CAT,
-    description: 'OnboardingSuccess component toont welkomstscherm met dynamische module cards en CTA',
+    description:
+      'De vier WAARDES uit lib/onboarding/waardes.ts voeden het successcherm (W-015). Deze test toetst het DATACONTRACT eronder; dat het scherm ze ook echt rendert staat in components/onboarding/onboarding-success.test.tsx.',
     priority: 'critical',
     estimatedDurationMs: 100,
     fn() {
-      // FinDots size on success screen: 140px
-      const SUCCESS_WILLDOTS_SIZE = 140
-      assertEqual(SUCCESS_WILLDOTS_SIZE, 140, 'FinDots success size is 140px')
-      const successAnimation = 'animate-[pulse_3s_ease-in-out_1]'
-      assert(successAnimation.includes('pulse'), 'Success FinDots heeft pulse animatie')
-      assert(successAnimation.includes('_1]'), 'Pulse speelt slechts 1 keer af')
+      // Deze test spiegelde tot 19-09-2026 een eigen kopie van het scherm:
+      // drie kaarten "De Kern / De Wil / De Horizon" en een CTA naar /will.
+      // Geen van drieen stond ooit op dit scherm, en de asserts vergeleken
+      // lokale constanten met zichzelf - hij kon dus per constructie niet
+      // breken. Nu leest hij de echte bron.
+      assertEqual(WAARDES.length, 4, 'Vier waardes')
 
-      // Heading text
-      const heading = 'Welkom bij TriFinity!'
-      assert(heading.includes('TriFinity'), 'Heading bevat app naam')
-
-      // Philosophy tagline
-      const tagline = 'Geld is opgeslagen tijd \u2014 en jouw reis naar vrijheid begint nu.'
-      assert(tagline.includes('opgeslagen tijd'), 'Tagline bevat kernfilosofie')
-      assert(tagline.includes('vrijheid'), 'Tagline verwijst naar vrijheid')
-
-      // Module cards: 3 cards with specific names and icons
-      const moduleCards = [
-        { name: 'De Kern', icon: 'Shield', border: 'border-kern-400' },
-        { name: 'De Wil', icon: 'Zap', border: 'border-wil-400' },
-        { name: 'De Horizon', icon: 'Telescope', border: 'border-horizon-400' },
-      ]
-      assertEqual(moduleCards.length, 3, 'Exact 3 module kaarten')
-
-      // CTA destination depends on active modules via getHomePath
-      // If only nieuws → '/berichten'
-      // If inzicht_acties → '/will'
-      // Otherwise → '/core'
-      const ctaDestinations = {
-        fireAll: '/will', // inzicht_acties is active
-        budgetOnly: '/core', // no inzicht_acties
-        nieuwsOnly: '/berichten',
+      const accenten = WAARDES.map((w) => w.accent)
+      assertEqual(new Set(accenten).size, 4, 'Elke waarde heeft zijn eigen accent')
+      for (const accent of accenten) {
+        assertIncludes(
+          ['kern', 'wil', 'horizon', 'fin'],
+          accent,
+          `Accent ${accent} is een bestaande accentsleutel`,
+        )
       }
-      assertEqual(ctaDestinations.nieuwsOnly, '/berichten', 'Nieuws-only → /berichten')
+
+      for (const waarde of WAARDES) {
+        assert(waarde.kicker.length > 0, `Kicker gevuld: ${waarde.kicker}`)
+        assert(waarde.belofte.length > 0, `Belofte gevuld bij ${waarde.kicker}`)
+        assert(waarde.toelichting.length > 0, `Toelichting gevuld bij ${waarde.kicker}`)
+      }
+
+      // De CTA navigeert HARD naar /dashboard; de middleware vertaalt dat naar
+      // profiles.home_screen (ADR 0130). Geen vaste bestemming in de kopij.
+      const ctaLabel = 'Naar je overzicht'
+      assert(!ctaLabel.includes('/'), 'De CTA noemt geen route')
     },
   },
 

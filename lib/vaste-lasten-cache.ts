@@ -63,8 +63,11 @@ export const VASTE_LASTEN_CACHE_TTL_MS = 30 * 60_000
  * WAT DE VINGERAFDRUK ZIET:
  *  - rijen erbij of eraf in het venster (`txCount`);
  *  - een verschoven venstergrens bij een maandwissel (`windowStart`);
- *  - een nieuwe of gewijzigde bevestigde vaste last, inclusief hernoemen,
- *    bedrag wijzigen en op 'excluded' zetten (`recurring`, op inhoud);
+ *  - een nieuwe of gewijzigde beoordeelde vaste last, inclusief hernoemen,
+ *    bedrag wijzigen en op 'excluded' zetten (`recurring`, op inhoud). Dat
+ *    laatste werkt alleen omdat de ronde bevestigde ÉN uitgesloten rijen
+ *    ophaalt (`REVIEWED_RECURRING_FILTER`): een uitsluiting is `is_active:
+ *    false`, en een ronde die alleen actieve rijen zag, zag haar niet (B-054);
  *  - een import (`txCount` + `txMaxCreatedAt`);
  *  - een boeking die als overboeking wordt gemarkeerd (`txTransferCount`) — de
  *    detectie gooit die rijen weg, dus dat verandert de uitkomst zonder dat het
@@ -94,7 +97,7 @@ export interface VasteLastenFingerprintInput {
   txMaxDate: string | null
   txMaxCreatedAt: string | null
   txMaxUpdatedAt: string | null
-  /** De actieve `recurring_transactions`, op INHOUD (zie de kop van dit bestand). */
+  /** De beoordeelde (bevestigde óf uitgesloten) `recurring_transactions`, op INHOUD (zie de kop van dit bestand). */
   recurring: {
     id: string
     counterparty_name: string | null
@@ -176,8 +179,14 @@ function digest(input: string): string {
  *       `VasteLastenFingerprintInput`). De TTL van 30 minuten is daar het
  *       vangnet: de staarttermijnen zijn tientallen dagen, dus een half uur
  *       vertraging op die grens is niet waarneembaar.
+ *   4 — B-054: uitgesloten rijen (`category_override = 'excluded'`, altijd
+ *       `is_active = false`) bereiken nu de detector, dus een eerder uitgesloten
+ *       patroon verdwijnt uit de lijst bij ONVERANDERDE transacties. Voor een
+ *       gebruiker mét uitsluitingen verschuift de vingerafdruk al door de
+ *       bredere rijenset; deze teller dekt de instance waar zo'n samenvatting
+ *       nog onder de oude logica in het geheugen staat.
  */
-const SUMMARY_LOGIC_VERSION = 3
+const SUMMARY_LOGIC_VERSION = 4
 
 export function vasteLastenFingerprint(input: VasteLastenFingerprintInput): string {
   const recurring = [...input.recurring]

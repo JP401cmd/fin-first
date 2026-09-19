@@ -147,6 +147,10 @@ export default async function OverzichtPage() {
     currentAge,
     anchor: planAnchor,
     aowAge: aowAgeFractional,
+    // B-058 — feitenbasis onder de vrijheidsconclusie. De EFFECTIEVE maanduitgaven
+    // die de kernel zelf at (consume, don't recompute); is die kant nog niet
+    // ingevuld, dan is het FIRE-doel ≈ 0 en zou élke portefeuille "vrij" heten.
+    basis: { monthlyExpenses: horizonData?.effectiveInput?.monthlyExpenses ?? null },
   }).framing
 
   // Totaalbedragen per hefboom-tegel — uit healthScoreInput (horizonData,

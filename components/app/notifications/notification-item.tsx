@@ -41,6 +41,9 @@ const MODULE_MAP: Record<NotificationType, ModuleInfo> = {
   // Een tip die terug is van uitstel (lib/notifications/tip-terug.ts) — een
   // handelmoment, dus dezelfde will-familie als briefing en mijlpaal.
   postponed_tip:       { label: 'Tip',         colorVar: 'var(--will)',   textVar: 'var(--will-t)',   lightVar: 'var(--will-l)', mediumVar: 'var(--will-m)' },
+  // W-009 — de herkomst van je cijfers hoort bij Overzicht (budget/transacties),
+  // dus dezelfde kern-familie als budget en bank.
+  grondslag:           { label: 'Grondslag',   colorVar: 'var(--kern)',   textVar: 'var(--kern-t)',   lightVar: 'var(--kern-l)', mediumVar: 'var(--kern-m)' },
 }
 
 /**

@@ -53,8 +53,11 @@ export interface PlanReviewLaag2Bezitting {
   id: string
   name: string
   asset_type: AssetType
-  /** PERCENT (7 = 7%), zoals opgeslagen. */
-  expected_return: number
+  /**
+   * PERCENT (7 = 7%), zoals opgeslagen. `null` = geen eigen aanname; de kern
+   * rekent dan met `terugvalRendement` (ADR 0166).
+   */
+  expected_return: number | null
   /** `depreciation_rate > 0`: het rendement is dan per definitie 0 en niet hier in te stellen. */
   afschrijvend: boolean
 }
@@ -72,8 +75,10 @@ export interface PlanReviewLaag2Context {
   bezittingen: PlanReviewLaag2Bezitting[]
   /**
    * Bezittingen in de rekenrun zonder eigen rendement — alleen daarop werkt het
-   * terugvalrendement. Uit de database is dat vandaag 0 (kolom NOT NULL, TPR-02); de wizard
-   * zegt dan eerlijk dat dit getal het plan nu niet verandert.
+   * terugvalrendement. Sinds migratie 20260919140000 (ADR 0166) kan dit er écht meer
+   * dan 0 zijn: de kolom is nullable en de gebruiker kan "geen eigen rendement"
+   * expliciet kiezen. Staat het op 0, dan zegt de wizard eerlijk dat dit getal zijn
+   * plan nu niet verandert.
    */
   zonderEigenRendement: number
 }

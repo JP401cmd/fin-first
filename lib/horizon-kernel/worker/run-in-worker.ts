@@ -44,6 +44,14 @@ import type {
   VariantenSweepResultaat,
   VariantenSweepSnapshot,
 } from '@/lib/tax-lifetime/varianten-sweep'
+import {
+  createLaneDispatcher,
+  KERNEL_SUPERSEDED,
+  KERNEL_SUPERSEDED_REASON,
+  type KernelLane,
+} from './kernel-lanes'
+
+export { KERNEL_SUPERSEDED, KERNEL_SUPERSEDED_REASON, type KernelLane } from './kernel-lanes'
 
 /**
  * Is een echte `Worker` beschikbaar? False in jsdom (tests) en tijdens SSR
@@ -115,6 +123,15 @@ function geenWorkerResponse(id: number): KernelWorkerResponse {
   return { id, ok: false, error: 'kernel-worker niet beschikbaar' }
 }
 
+// ── Rijstroken: één-in-vlucht-per-soort met "laatste wacht" (B-057 / B4) ─────
+// Logica in `kernel-lanes.ts` (puur, getest zonder Worker); hier alleen de
+// instantie die op het echte posten is aangesloten. Zonder `lane`
+// (marktcheck/MC/sweep) blijft de dispatch ongewijzigd FIFO.
+const laneDispatcher = createLaneDispatcher<KernelWorkerRequest, KernelWorkerResponse>(
+  (req, workerOnly) => postRequest(req, workerOnly),
+  (req) => ({ id: req.id, ok: false, error: KERNEL_SUPERSEDED }),
+)
+
 /**
  * Dispatch één verzoek: via de worker wanneer beschikbaar, anders synchroon.
  * Bij een worker-fout valt deze aanroep alsnog terug op de synchrone runner,
@@ -125,16 +142,30 @@ function geenWorkerResponse(id: number): KernelWorkerResponse {
  * kernel-projecties, 2,6–5,1 s). Let op dat `workerBroken` sticky is voor de hele
  * sessie: zonder deze vlag zou één eerdere worker-fout élke volgende marktcheck
  * in een meerdere-seconden-freeze veranderen.
+ *
+ * `lane` zet het verzoek op een rijstrook (zie boven). Zonder worker (synchrone
+ * tak) is er niets te verdringen: dan rekent de aanroep direct.
  */
 function dispatch(
   req: KernelWorkerRequest,
-  opts?: { workerOnly?: boolean },
+  opts?: { workerOnly?: boolean; lane?: KernelLane },
 ): Promise<KernelWorkerResponse> {
   const workerOnly = opts?.workerOnly === true
   const worker = isKernelWorkerAvailable() ? getWorker() : null
   if (!worker) {
     // Synchrone fallback (test/SSR/oude runtime/kapotte worker) — tenzij de
     // aanroeper die expliciet verbiedt.
+    return Promise.resolve(workerOnly ? geenWorkerResponse(req.id) : executeKernelRequest(req))
+  }
+  if (opts?.lane) return laneDispatcher.dispatch(opts.lane, req, workerOnly)
+  return postRequest(req, workerOnly)
+}
+
+/** Het echte posten naar de worker (met de bestaande terugval-paden). Settelt
+ *  altijd precies één keer. */
+function postRequest(req: KernelWorkerRequest, workerOnly: boolean): Promise<KernelWorkerResponse> {
+  const worker = getWorker()
+  if (!worker) {
     return Promise.resolve(workerOnly ? geenWorkerResponse(req.id) : executeKernelRequest(req))
   }
   return new Promise<KernelWorkerResponse>((resolve) => {
@@ -166,23 +197,34 @@ function claimId(): number {
 
 // ── Publieke async-wrappers (één per run-vorm) ───────────────────────────────
 
-/** Hoofd- of scenario-projectie via de worker (of synchrone fallback). */
+/**
+ * Hoofd- of scenario-projectie via de worker (of synchrone fallback).
+ *
+ * `lane` (B-057/B4): rijstrook zodat een nieuwere run een nog niet geposte
+ * oudere verdringt. Een verdrongen verzoek levert `{ ok: false, reason:
+ * KERNEL_SUPERSEDED_REASON }` — bewust ZONDER het synchrone vangnet: dat zou
+ * verouderd werk alsnog op de main thread zetten. De aanroeper negeert het
+ * antwoord toch al (reqId-guard).
+ */
 export async function runKernelAsync(
   rawContext: ConvergentieRawContext,
+  opts?: { lane?: KernelLane },
 ): Promise<ConvergentieProjectionOutcome> {
-  const res = await dispatch({ id: claimId(), kind: 'projection', rawContext })
+  const res = await dispatch({ id: claimId(), kind: 'projection', rawContext }, { lane: opts?.lane })
   if (res.ok && res.kind === 'projection') return res.result
+  if (!res.ok && res.error === KERNEL_SUPERSEDED) return { ok: false, reason: KERNEL_SUPERSEDED_REASON }
   // Vangnet: onverwachte/foutieve response-vorm → synchroon herberekenen (byte-identiek).
   const sync = executeKernelRequest({ id: 0, kind: 'projection', rawContext })
   if (sync.ok && sync.kind === 'projection') return sync.result
   return { ok: false, reason: 'kernel-worker-fout' }
 }
 
-/** Gekozen-stop-pad via de worker (of synchrone fallback). */
+/** Gekozen-stop-pad via de worker (of synchrone fallback). `lane`: zie `runKernelAsync`. */
 export async function runForcedStopPathAsync(
   input: ForcedStopPathInput,
+  opts?: { lane?: KernelLane },
 ): Promise<ForcedStopPathResult | null> {
-  const res = await dispatch({ id: claimId(), kind: 'stoppad', input })
+  const res = await dispatch({ id: claimId(), kind: 'stoppad', input }, { lane: opts?.lane })
   if (res.ok && res.kind === 'stoppad') return res.result
   return null
 }
@@ -194,8 +236,9 @@ export async function runForcedStopPathAsync(
  */
 export async function runScenarioPresetsAsync(
   ctx: ScenarioPresetContext,
+  opts?: { lane?: KernelLane },
 ): Promise<ScenarioPresetBatch> {
-  const res = await dispatch({ id: claimId(), kind: 'presets', ctx })
+  const res = await dispatch({ id: claimId(), kind: 'presets', ctx }, { lane: opts?.lane })
   if (res.ok && res.kind === 'presets') return res.result
   return { presets: [], solvedFireAge: null, solvedFireEndAge: null, haalbareUitgave: null }
 }

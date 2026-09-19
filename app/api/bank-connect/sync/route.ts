@@ -5,6 +5,7 @@ import { unauthorized, conflict, serverError } from '@/lib/api/respond'
 import { parseBody } from '@/lib/api/parse-body'
 import { isTrueLayerEnabled } from '@/lib/truelayer/feature-flag'
 import { getBaseUrls, getAccountTransactions, refreshAccessToken } from '@/lib/truelayer/client'
+import { fetchConsentExpiry } from '@/lib/truelayer/consent'
 import { mapTransactions } from '@/lib/truelayer/mapper'
 import {
   loadCrossSourceCandidates,
@@ -288,6 +289,36 @@ export async function POST(req: Request) {
     // en SCHRIJVEN we dat weg. Een afgekapte historie is een resultaat; een
     // weggegooide ophaal is dataverlies.
     const { dataUrl } = await getBaseUrls(supabase)
+
+    // ── De consent-einddatum aanvullen (zelfherstel, ADR 0161) ───────────────
+    // De callback zet `consent_expires_at` bij de autorisatie; rijen van vóór
+    // die kolom missen 'm, en zonder einddatum zwijgt de vooraankondiging. De
+    // datum komt uit de bron (`/me`, geen aanname) en de sync gaat door als dat
+    // mislukt. Twee gevallen vragen om een verse ophaal:
+    //  - ONBEKEND (`null`): nog nooit opgehaald, of deze provider meldt 'm niet.
+    //    In dat laatste geval kost élke sync één extra /me — een goedkope
+    //    TrueLayer-metadata-call, geen bankverzoek, achter de dag-rem.
+    //  - VERSTREKEN: de token-refresh hierboven is zojuist geslaagd, dus de
+    //    consent lééft aantoonbaar — een opgeslagen datum in het verleden is dan
+    //    per definitie fout (bron, klok) en zou het scherm "verbinding kwijt"
+    //    laten zeggen vlak nadat er data binnenkwam. Alleen in dát alarmgeval
+    //    herleiden; een geldige bekende datum kost geen extra verzoek.
+    // `user_id` expliciet naast de eigen-rij-RLS: zelfde leesbaarheidsregel als
+    // in de andere bank-connect-routes.
+    const storedConsent = connection.consent_expires_at
+      ? new Date(connection.consent_expires_at).getTime()
+      : Number.NaN
+    if (!Number.isFinite(storedConsent) || storedConsent <= Date.now()) {
+      const consentExpiresAt = await fetchConsentExpiry(accessToken, dataUrl)
+      if (consentExpiresAt) {
+        await supabase
+          .from('bank_connections')
+          .update({ consent_expires_at: consentExpiresAt, updated_at: new Date().toISOString() })
+          .eq('id', connection.id)
+          .eq('user_id', user.id)
+      }
+    }
+
     const tlTransactions: TLTransaction[] = []
     const seenTransactionIds = new Set<string>()
     let transactionRequests = 0

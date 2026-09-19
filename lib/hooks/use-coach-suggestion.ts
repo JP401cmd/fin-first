@@ -132,10 +132,24 @@ export function useCoachSuggestion({
 }: UseCoachSuggestionArgs): {
   suggestion: CoachSuggestion | null
   dismiss: (reason?: CoachDismissReason) => void
+  /** Mag Fin uit zichzelf een tip tonen? (W-016) — optimistische kopie van de seed. */
+  proactief: boolean
+  /** Zet die keuze om; `false` sluit een openstaande melding meteen. */
+  setProactief: (enabled: boolean) => void
 } {
   const pathname = usePathname()
   const [suggestion, setSuggestion] = useState<CoachSuggestion | null>(null)
   const dismissedThisMount = useRef(false)
+
+  // ── W-016 — "Fin uit zichzelf" ────────────────────────────────────────────
+  // Optimistische kopie van `coachState.proactief`, zodat de link op de kaart
+  // ("Niet meer uit jezelf") direct werkt zonder op de PUT te wachten. Staat hij
+  // uit, dan is dit een HARDE kortsluiting: dezelfde poort als `paused`, dus geen
+  // selectie, geen timer, geen dagstempel en geen dismiss-schrijfactie. Fins
+  // bubbel, de chat en de tips op verzoek blijven ongemoeid.
+  const [proactief, setProactiefLocal] = useState(coachState.proactief)
+  useEffect(() => { setProactiefLocal(coachState.proactief) }, [coachState.proactief])
+  const stil = paused || !proactief
 
   // Optimistische kopie van de server-staat. Wordt aangevuld bij een dismiss en
   // bij de legacy-import; blijft verder een spiegel van de seed.
@@ -146,8 +160,8 @@ export function useCoachSuggestion({
 
   // De pauze en de huidige melding lezen we in callbacks via refs: `dismiss`
   // moet stabiel blijven (FinHome hangt 'm in een effect-dependency).
-  const pausedRef = useRef(paused)
-  pausedRef.current = paused
+  const pausedRef = useRef(stil)
+  pausedRef.current = stil
   const suggestionRef = useRef<CoachSuggestion | null>(null)
 
   const show = useCallback((next: CoachSuggestion | null) => {
@@ -244,7 +258,7 @@ export function useCoachSuggestion({
       // auto-dismiss) alleen de dagstempel — de stap blijft open in de gids.
       dismiss('auto')
     }
-    if (paused) return
+    if (stil) return
     if (dismissedThisMount.current) return
     // Dagregel: is er vandaag al een gidsstap genoemd, dan houden we de STAPPEN
     // leeg — niet de hele gids-invoer. `status: 'active'` blijft dus staan, zodat
@@ -283,10 +297,26 @@ export function useCoachSuggestion({
     }, delayMs)
     return () => clearTimeout(timer)
   }, [
-    paused, pathname, dataGaps, deferredFields, overrides, activeModules, delayMs,
+    stil, pathname, dataGaps, deferredFields, overrides, activeModules, delayMs,
     dismissedKeys, lastDismissedAt, show, guide, markGuideShown, dismiss,
   ])
 
+  /**
+   * W-016 — de keuze omzetten. Uitzetten sluit een openstaande melding meteen
+   * (zonder 'm als "weggeklikt" te stempelen: de keuze is de reden, niet de tip) en
+   * zet `dismissedThisMount` zodat er deze mount niets meer opkomt. Aanzetten laat
+   * de gewone selectie op de volgende navigatie weer lopen.
+   */
+  const setProactief = useCallback((enabled: boolean) => {
+    setProactiefLocal(enabled)
+    if (!enabled) {
+      dismissedThisMount.current = true
+      show(null)
+    } else {
+      dismissedThisMount.current = false
+    }
+    putCoachState({ action: 'setProactief', enabled })
+  }, [show])
 
-  return { suggestion, dismiss }
+  return { suggestion, dismiss, proactief, setProactief }
 }

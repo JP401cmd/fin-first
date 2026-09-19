@@ -17,6 +17,8 @@ import { buildUnlinkedCashAssets } from './unlinked-cash-assets'
 // een eigen aftrekking op `purchase_value` te doen. Zuivere verplaatsing.
 import { loadHoldingsCostByAssetId } from './holdings-cost'
 import type { AssetHoldingsCost } from './asset-return'
+import { resolveFireParamsWithAssumptions, type FireProfileInput } from './fire-params'
+import type { FireAssumptionRow } from './fire-assumptions'
 import type { Perspective } from './household-data'
 
 // ── Types ──────────────────────────────────────────────────────
@@ -57,6 +59,13 @@ export interface AssetsPageData {
   kpiRefs: KpiContextRefs | null
   /** Actieve externe koppeling (Bitvavo, broker, wallet) per asset-ID. */
   connectionsByAssetId: Record<string, AssetConnectionSummary>
+  /**
+   * Profielrendement in PROCENTEN (7 = 7%) — de terugval voor een bezitting
+   * zónder eigen rendementsaanname (`expected_return = null`, ADR 0166).
+   * Optioneel gehouden zodat bestaande fixtures/testbundels niet hoeven te
+   * wijzigen; ontbreekt hij, dan houdt de client de oude nul-basis.
+   */
+  terugvalRendementPct?: number
   /** Perspectief waarmee de assets gestempeld zijn (eigen/huishouden/partner). */
   perspective: Perspective
   /** Huishoud-context voor aandeel-/badge-rendering op de kaarten. */
@@ -108,7 +117,7 @@ export const loadAssetsData = cache(async (
   // Bezittingen komen uit de perspectief-loader (single source of truth voor
   // ownership-/privacy-filtering). De rest (hypotheken, transacties,
   // bankkoppelingen, profiel, waarderingen) blijft een directe query.
-  const [perspectiveData, mortgageRes, expenseRate, bankLinksRes, unlinkedBankRes, profileRes, valuationsRes] = await Promise.all([
+  const [perspectiveData, mortgageRes, expenseRate, bankLinksRes, unlinkedBankRes, profileRes, valuationsRes, fireAssumptionRows] = await Promise.all([
     loadPerspectiveDataServer(supabase, perspective),
     supabase
       .from('debts')
@@ -140,13 +149,21 @@ export const loadAssetsData = cache(async (
       .eq('is_active', true),
     supabase
       .from('profiles')
-      .select('budgeting_active, housing_strategy_config')
+      .select('budgeting_active, housing_strategy_config, expected_return, inflation_rate')
       .single(),
     supabase
       .from('valuations')
       .select('*')
       .eq('entity_type', 'asset')
       .order('valuation_date', { ascending: true }),
+    // Jaarlaag onder het profielrendement — dezelfde keten als de dashboard-loader
+    // (`resolveFireParamsWithAssumptions`), zodat de terugval hieronder niet op een
+    // ándere grondslag staat dan /toekomst.
+    supabase
+      .from('fire_assumptions')
+      .select('year, expected_return, inflation, volatility, source, is_definitive')
+      .order('year', { ascending: true })
+      .then((r) => ((r.data ?? null) as FireAssumptionRow[] | null), () => null),
   ])
 
   // Sorteer op sort_order (de loader sorteert niet) zodat de volgorde gelijk
@@ -217,6 +234,17 @@ export const loadAssetsData = cache(async (
 
   const ctx = perspectiveData.context
 
+  // TERUGVALRENDEMENT IN PROCENTEN — voor bezittingen zonder eigen aanname
+  // (`expected_return = null`, ADR 0166). Zonder dit getal zou de projectie op
+  // deze pagina zulke bezittingen op 0% laten staan terwijl /toekomst het
+  // profielrendement rekent: precies de divergentie die de kaart wegneemt.
+  // Zelfde resolver-keten als de dashboard-loader, dus één grondslag.
+  const terugvalRendementPct =
+    resolveFireParamsWithAssumptions(
+      (profileRes.data ?? null) as FireProfileInput | null,
+      fireAssumptionRows,
+    ).grossReturn * 100
+
   return {
     assets,
     mortgages,
@@ -238,5 +266,6 @@ export const loadAssetsData = cache(async (
     },
     housingStrategyConfig,
     holdingsCostByAssetId,
+    terugvalRendementPct,
   }
 })

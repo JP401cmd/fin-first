@@ -10,6 +10,7 @@ import {
   detectRecurringTransactions,
   CATEGORY_LABELS,
   RECURRING_ANALYSIS_MONTHS,
+  REVIEWED_RECURRING_FILTER,
 } from '@/lib/recurring-detection'
 import { VASTE_KOSTEN_ANALYSE_PROMPT } from '@/lib/ai/dna/wil'
 import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
@@ -122,10 +123,13 @@ export async function POST(req: Request) {
     // en levert dan alleen de oudste rijen (V-001).
     const [txResult, recurringResult, budgetResult] = await Promise.all([
       fetchAllRecurringTx(supabase, startDateStr),
+      // Bevestigd ÓF uitgesloten (B-054): een "Niet opnemen"-rij is
+      // `is_active:false` en moet de detector én `confirmedKeys` tóch bereiken —
+      // anders stelt Fin een uitgesloten patroon bij elke analyse opnieuw voor.
       supabase
         .from('recurring_transactions')
         .select('id, counterparty_name, amount, name, frequency')
-        .eq('is_active', true),
+        .or(REVIEWED_RECURRING_FILTER),
       supabase
         .from('budgets')
         .select('id, name, parent_id, budget_type')

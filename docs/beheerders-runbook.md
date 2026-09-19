@@ -472,6 +472,24 @@ Aanpasbaar zonder deploy (Functioneel beheer):
 Nog hardcoded (vereisen een deploy): landingscopy, FAQ, glossarium, en de juridische pagina's
 (`/privacy`, `/voorwaarden`, `/wft` — gemarkeerd als concept, nog juridisch te valideren).
 
+### Een nieuwe `app_settings`-sleutel die gebruikers moeten kunnen lezen
+
+Sinds ADR 0163 is de SELECT-policy op `app_settings` voor ingelogde gebruikers een **allowlist**:
+standaard dicht. Een sleutel die je via het beheerscherm zet is dus voor gebruikers **onleesbaar**
+totdat hij expliciet is opengezet — en dat gaat niet via een scherm maar via een deploy:
+
+1. Nieuwe migratie in `supabase/migrations/` (append-only: `drop policy … ; create policy
+   "app_settings select" …` met de hele array opnieuw — kopieer de nieuwste en voeg de sleutel toe).
+2. Dezelfde sleutel in `lib/app-settings/publieke-sleutels.ts`; `npm run test:run
+   lib/app-settings` bewaakt dat beide lijsten gelijk zijn en dat de sleutel een lezer heeft.
+3. Volgorde bij uitrol: eerst de code (de lezer), dan de migratie.
+
+Is de sleutel **beheer-content** (een prompt-override, directives, een intern endpoint)? Dan hoort hij
+níet op de allowlist: lees hem server-side via `lib/app-settings/beheer-instelling.ts`. De vraag is
+niet "is dit geheim?" maar "moet een gebruiker dit kunnen lezen?" — standaard nee. Symptoom van een
+vergeten sleutel is zichtbaar, niet stil: de lezer valt op zijn in-code default terug (bij
+`truelayer_enabled` antwoorden de bank-connect-routes 503 "Bank Connect is niet ingeschakeld").
+
 ## Wijzigingen aan de draaiende omgeving
 
 De werkwijze staat in `.claude/skills/change-request` — vier vragen vóór de wijziging, één regel erna.

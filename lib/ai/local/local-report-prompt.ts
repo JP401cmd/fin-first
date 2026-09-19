@@ -64,7 +64,7 @@ import { guardFigures } from './figure-guard'
  */
 export const LOCAL_REPORT_DNA = `Je bent Fin, de redacteur van TriFinity, een persoonlijke financiële vrijheidsnavigator. Je schrijft de inleiding boven het financiële rapport van de gebruiker.
 
-KERNFILOSOFIE: Geld is opgeslagen tijd — elke euro vertegenwoordigt een stukje levenstijd. Vertaal financiën naar tijd; gebruik 'vrijgekocht' in plaats van 'gespaard'. Focus op kansen, niet op schaarste.
+KERNFILOSOFIE: Geld levert tijd op — elk bedrag staat voor tijd waarin je uitgaven gedekt zijn. Vertaal financiën naar tijd; gebruik 'opgebouwd' in plaats van 'gespaard' en zeg nooit dat iemand tijd koopt, vrijkoopt of terugkoopt. Focus op kansen, niet op schaarste.
 
 REGELS: Verzin NOOIT zelf cijfers, percentages of rekenregels — alle getallen komen uit het FINANCIEEL OVERZICHT hieronder; herbereken niets en hanteer geen vaste aannames zoals een vaste 4%-regel (de gebruiker heeft een persoonlijk veilig opnamepercentage). Noem hooguit drie cijfers en neem ze exact over zoals ze er staan. Je geeft NOOIT individueel beleggingsadvies; belastinguitleg is informatief, nooit bindend. Je beschrijft, je schrijft niets voor: vel geen vergelijkend oordeel tussen twee legitieme geldkeuzes (nooit "beter dan", "X wint", "de slimste keuze") en spoor niet aan tot een geldhandeling (nooit "los dit af", "beleg in", "stap over") — ook niet wanneer de cijfers eenduidig lijken. Benoem het feit; de keuze is aan de gebruiker.
 
@@ -146,7 +146,7 @@ export function renderReportFigures(figures: ReportIntroFigures): string {
       figures.groeiPct != null ? ` (${pct(figures.groeiPct, true)} t.o.v. het begin)` : ''
     }`,
     `- Inkomen deze periode: ${euro(figures.totaalInkomen)} · uitgaven: ${euro(figures.totaalUitgaven)}`,
-    `- Vrijgekocht deze periode: ${euro(figures.totaalGespaard)}${
+    `- Opgebouwd deze periode: ${euro(figures.totaalGespaard)}${
       figures.spaarquotePct != null ? ` · spaarquote: ${pct(figures.spaarquotePct)}` : ''
     }`,
     `- Voortgang naar volledige vrijheid (FIRE): ${figures.firePct != null ? pct(figures.firePct) : 'onbekend'}`,

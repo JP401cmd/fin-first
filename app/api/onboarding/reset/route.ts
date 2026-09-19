@@ -67,6 +67,14 @@ export async function POST(request: Request) {
         last_known_phase: null,
         active_modules: null,
         feature_preferences: {},
+        // B-058 — terug naar "nooit geseed". `milestones_seeded_at` draagt de
+        // eerste-run-regel uit ADR 0123 §5: staat 'ie gezet, dan VIERT de
+        // mijlpalenmotor de eerstvolgende kandidaat meteen in plaats van 'm stil
+        // te loggen. Na een data-wipe is `totalDebts === 0` de triviale default,
+        // dus vierde een gereset + heronboard account direct "je bent
+        // schuldenvrij" — op een leeg profiel. De rijen zelf gaan mee in batch 5
+        // van deleteAllUserData (`achieved_milestones`, service-role).
+        milestones_seeded_at: null,
         updated_at: new Date().toISOString(),
       })
       .eq('id', user.id)

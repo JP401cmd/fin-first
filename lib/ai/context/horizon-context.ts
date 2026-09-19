@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { ASSET_TYPE_LABELS, projectPortfolio, type Asset } from '@/lib/asset-data'
+import { heeftEigenRendement } from '@/lib/asset-return'
 import { DEBT_TYPE_LABELS, debtProjection, type Debt } from '@/lib/debt-data'
 import { WEALTH_GROUPS, WEALTH_GROUP_LABELS, type WealthGroup } from '@/lib/wealth-composition'
 import { section, formatCurrency } from './formatter'
@@ -22,6 +23,25 @@ import { section, formatCurrency } from './formatter'
  */
 const GRONDSLAG_PROJECTIEBEDRAGEN =
   "Alle projectiebedragen staan in toekomstige euro's (nominaal). Reken zelf nooit om naar huidige euro's — gebruik alleen bedragen die hier letterlijk staan."
+
+/**
+ * Tekst voor een bezitting ZONDER eigen rendementsaanname (`expected_return =
+ * null`, ADR 0166). Eén constante voor de assets-regel én de 5-jaarsprojectie,
+ * zodat het model dezelfde woorden leest en niet "null%" of "0%" ziet.
+ */
+export const RENDEMENT_GEEN_EIGEN_AANNAME =
+  'rendement: geen eigen aanname (het profielrendement uit je voorkeuren geldt)'
+
+/**
+ * Kanttekening bij de 5-jaarsprojectie wanneer minstens één bezitting geen
+ * eigen rendement draagt. `projectPortfolio` krijgt hier bewust GEEN terugval
+ * mee: deze context heeft het profiel niet bij de hand en het profielrendement
+ * mét jaarlaag-shadow leeft in de loaders — een tweede, kale profielquery hier
+ * zou een ándere terugval kunnen geven dan /toekomst. Liever eerlijk zeggen
+ * dat die bezittingen hier op 0% staan dan een half-consistent getal.
+ */
+const PROJECTIE_ZONDER_EIGEN_RENDEMENT_NOOT =
+  'Let op: bezittingen zonder eigen rendementsaanname zijn in dit bedrag op 0% gerekend; /toekomst rekent daar het profielrendement — gebruik voor het volledige beeld de /toekomst-cijfers.'
 
 /**
  * Horizon-specific context: assets, debts, projections.
@@ -83,8 +103,15 @@ export async function buildHorizonContext(
 
   // Asset breakdown
   if (assets.length > 0) {
+    // NULL = geen eigen rendementsaanname (ADR 0166): benoem dat letterlijk. Een
+    // rauwe interpolatie zou "rendement null%/jr" opleveren en het model laten
+    // raden; het profielrendement zelf staat al in de gedeelde context.
     const assetLines = assets.map((a) =>
-      `${a.name} (${ASSET_TYPE_LABELS[a.asset_type]}): ${formatCurrency(Number(a.current_value))} | rendement ${a.expected_return}%/jr | bijdrage ${formatCurrency(Number(a.monthly_contribution))}/mnd`
+      `${a.name} (${ASSET_TYPE_LABELS[a.asset_type]}): ${formatCurrency(Number(a.current_value))} | ${
+        heeftEigenRendement(a.expected_return)
+          ? `rendement ${a.expected_return}%/jr`
+          : RENDEMENT_GEEN_EIGEN_AANNAME
+      } | bijdrage ${formatCurrency(Number(a.monthly_contribution))}/mnd`
     )
     parts.push(section('ASSETS', assetLines.join('\n')))
   }
@@ -142,10 +169,15 @@ export async function buildHorizonContext(
   // hier bewust geen tweede, reële variant bij: dat zou een deflator vereisen die deze
   // motor niet heeft. Het bedrag valt onder de grondslag-regel bovenaan deze context.
   if (assets.length > 0) {
+    // Geen terugval (default 0) — zie PROJECTIE_ZONDER_EIGEN_RENDEMENT_NOOT voor het waarom.
     const projection = projectPortfolio(assets, 60)
     const proj5y = projection[projection.length - 1]
     if (proj5y) {
-      parts.push(section('5-JAAR PROJECTIE', `Totale assets over 5 jaar (projectie): ${formatCurrency(proj5y.total)}`))
+      const zonderEigen = assets.some((a) => !heeftEigenRendement(a.expected_return))
+      parts.push(section('5-JAAR PROJECTIE', [
+        `Totale assets over 5 jaar (projectie): ${formatCurrency(proj5y.total)}`,
+        ...(zonderEigen ? [PROJECTIE_ZONDER_EIGEN_RENDEMENT_NOOT] : []),
+      ].join('\n')))
     }
   }
 

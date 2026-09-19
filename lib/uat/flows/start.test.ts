@@ -47,15 +47,18 @@ describe('START_FLOW — curatie-integriteit', () => {
     }
   })
 
-  it('dekt alle 40 WF-START-scenario\'s (01..40, aaneengesloten — geen verwijsregel-gaten)', () => {
+  it('dekt alle 39 WF-START-scenario\'s (01..40 met een bewust gat op 21 — UAT-START-21 is 19-09-2026 vervallen, ADR 0162)', () => {
     const covered = new Set(
       START_FLOW.nodes.map((n) => n.scenarioId).filter((id): id is string => Boolean(id)),
     )
-    const expected = Array.from({ length: 40 }, (_, i) => `UAT-START-${String(i + 1).padStart(2, '0')}`)
+    const expected = Array.from({ length: 40 }, (_, i) => `UAT-START-${String(i + 1).padStart(2, '0')}`).filter(
+      (id) => id !== 'UAT-START-21',
+    )
     for (const id of expected) {
       expect(covered.has(id), `${id} moet als flow-knoop voorkomen`).toBe(true)
     }
-    expect(covered.size).toBe(40)
+    expect(covered.has('UAT-START-21'), 'UAT-START-21 (spaardoel) bestaat niet meer').toBe(false)
+    expect(covered.size).toBe(39)
   })
 
   it('de domeinoverschrijdende cross-knopen dekken OVZ/TOEK/WILL/NAV', () => {

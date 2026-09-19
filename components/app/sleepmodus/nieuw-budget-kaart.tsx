@@ -244,7 +244,7 @@ export function NieuwBudgetKaart({ parents, txLabel, txAmount, onCreate, onCance
           disabled={saving}
           className="mb-1.5 mt-4 block min-h-[44px] w-full border border-[var(--ink)] bg-[var(--ink)] px-3 py-2 text-center font-serif text-[11.5px] font-semibold text-[var(--paper)] transition-opacity duration-150 disabled:opacity-50"
         >
-          {saving ? 'Bezig met aanmaken…' : 'Aanmaken en toewijzen'}
+          {saving ? 'Bezig met aanmaken…' : 'Aanmaken en categoriseren'}
         </button>
         {/* Ook tijdens het opslaan uit: annuleren midden in de lopende write is
             dubbelzinnig (het budget wordt dan wél aangemaakt). De overlay houdt

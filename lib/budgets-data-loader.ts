@@ -10,6 +10,7 @@ import type { BudgetRollover } from '@/lib/budget-rollover'
 import { formatPeriod } from '@/lib/budget-rollover'
 import { isExpenseDirectionBudget, spendingContribution, splitContribution } from '@/lib/budget-spending'
 import { buildBudgetTypeMap } from '@/lib/budget-utils'
+import { summarizeUncategorized } from '@/lib/budget-uncategorized'
 
 // ── Helper ────────────────────────────────────────────────────
 
@@ -60,7 +61,13 @@ export interface BudgetsPageData {
   budgetAmounts: BudgetAmountRow[]
   goals: BudgetGoal[]
   uncategorizedCount: number
-  uncategorizedTotal: number
+  /**
+   * Eurosom van de ongecategoriseerde rijen, GESPLITST (B-055): één ongetekende
+   * som van uitgaven en inkomsten door elkaar zegt niets. Predikaat + splitsing
+   * in lib/budget-uncategorized.ts.
+   */
+  uncategorizedExpenseTotal: number
+  uncategorizedIncomeTotal: number
   currentPeriod: string  // e.g. '2026-03'
   monthStart: string     // e.g. '2026-03-01'
   monthEnd: string       // e.g. '2026-04-01'
@@ -246,19 +253,11 @@ export const loadBudgetsData = cache(async (supabase: SupabaseClient): Promise<B
   }
 
   // ── Uncategorized stats ─────────────────────────────────────
-  const uncategorized = txData.filter(
-    (t) =>
-      !t.budget_id &&
-      !t.is_split &&
-      t.transaction_type !== 'transfer' &&
-      t.transaction_type !== 'income' &&
-      Number(t.amount) < 0,
-  )
-  const uncategorizedCount = uncategorized.length
-  const uncategorizedTotal = uncategorized.reduce(
-    (sum, t) => sum + Math.abs(Number(t.amount)),
-    0,
-  )
+  // Eén gedeeld predikaat (lib/budget-uncategorized.ts) — inkomsten zonder
+  // budget tellen mee; hier stond een uitgaven-only filter dat de "Deze
+  // maand"-scope van de sheet stil leeg liet (B-055).
+  const uncategorized = summarizeUncategorized(txData)
+  const uncategorizedCount = uncategorized.count
 
   // ── 12-month averages per budget ────────────────────────────
   // Excludes transfers (they are not real spending/income). Averages are
@@ -340,7 +339,8 @@ export const loadBudgetsData = cache(async (supabase: SupabaseClient): Promise<B
     budgetAmounts: (amountsRes.data ?? []) as BudgetAmountRow[],
     goals: (goalsRes.data ?? []) as BudgetGoal[],
     uncategorizedCount,
-    uncategorizedTotal,
+    uncategorizedExpenseTotal: uncategorized.expenseTotal,
+    uncategorizedIncomeTotal: uncategorized.incomeTotal,
     currentPeriod,
     monthStart,
     monthEnd,

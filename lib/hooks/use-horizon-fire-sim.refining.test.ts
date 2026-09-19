@@ -114,10 +114,17 @@ function makeParams(yearlyMustExpenses: number): HookParams {
   }
 }
 
+// De params zijn per test ÉÉN stabiel object (niet `makeParams()` ín de renderHook-
+// callback): de hook keyt zijn kernel-invoer op de referenties van horizonInput/
+// lifeEvents/debts/aowRows, en `useDeferredValue` plant bij een per-render-nieuw
+// object telkens een inhaal-render — met een state-update in het worker-effect
+// (`mainInFlight`, B-057) werd dat een oneindige lus. Productie levert deze velden
+// uit state/props en is dus wél stabiel; de fixture hoort dat te spiegelen.
 describe('useHorizonFireSim — isRefining volgt de kernel-invoer, niet de rauwe invoer', () => {
   it('met een berekenbare invoer wacht de hero wél op de worker (isRefining=true)', () => {
     kernelCalls.count = 0
-    const { result, unmount } = renderHook(() => useHorizonFireSim(makeParams(30_000)))
+    const params = makeParams(30_000)
+    const { result, unmount } = renderHook(() => useHorizonFireSim(params))
 
     expect(kernelCalls.count, 'de worker hoort aangeroepen te zijn').toBeGreaterThan(0)
     expect(result.current.isRefining).toBe(true)
@@ -127,7 +134,8 @@ describe('useHorizonFireSim — isRefining volgt de kernel-invoer, niet de rauwe
 
   it('zonder jaaruitgave draait de worker NOOIT — dus is er ook niets aan het rekenen', () => {
     kernelCalls.count = 0
-    const { result, unmount } = renderHook(() => useHorizonFireSim(makeParams(0)))
+    const params = makeParams(0)
+    const { result, unmount } = renderHook(() => useHorizonFireSim(params))
 
     // De bug in één regel: het effect roept de kernel niet aan (buildHorizonInput
     // geeft null), dus een vlag die zegt "we zijn aan het verfijnen" liegt.
@@ -140,9 +148,8 @@ describe('useHorizonFireSim — isRefining volgt de kernel-invoer, niet de rauwe
 
   it('zonder rauw profiel is er evenmin iets aan het rekenen', () => {
     kernelCalls.count = 0
-    const { result, unmount } = renderHook(() =>
-      useHorizonFireSim({ ...makeParams(30_000), kernelRawProfile: null }),
-    )
+    const params: HookParams = { ...makeParams(30_000), kernelRawProfile: null }
+    const { result, unmount } = renderHook(() => useHorizonFireSim(params))
 
     expect(kernelCalls.count).toBe(0)
     expect(result.current.isRefining).toBe(false)

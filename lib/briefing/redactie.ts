@@ -23,6 +23,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { getModel } from '@/lib/ai/config'
 import { sanitizeForAI } from '@/lib/ai/sanitize'
 import { maskPIIInObject } from '@/lib/ai/pii-output-filter'
+import { leesBeheerInstellingen } from '@/lib/app-settings/beheer-instelling'
 import type { BriefingEntry } from '@/lib/types/briefing'
 import { sanitizeAiHeadline } from './overview-briefing'
 import { sanitizeRedactedText } from './nummer-guard'
@@ -44,17 +45,13 @@ export interface BriefingDirectivesConfig {
   functional: FunctionalDirective[]
 }
 
-/** Lees beide directive-sets uit app_settings. Fouten → lege sets (de
- *  redactie werkt dan zonder redactionele sturing, nooit een harde fout). */
-export async function loadBriefingDirectives(
-  supabase: SupabaseClient,
-): Promise<BriefingDirectivesConfig> {
+/** Lees beide directive-sets uit app_settings. Beheer-content, dus server-side
+ *  via de service-role (ADR 0163) — de sessie-client van de gebruiker mag die
+ *  sleutels bewust niet lezen. Fouten → lege sets (de redactie werkt dan
+ *  zonder redactionele sturing, nooit een harde fout). */
+export async function loadBriefingDirectives(): Promise<BriefingDirectivesConfig> {
   try {
-    const { data: rows } = await supabase
-      .from('app_settings')
-      .select('key, value')
-      .in('key', ['briefing_directives', 'briefing_functional_directives'])
-    const map = Object.fromEntries((rows ?? []).map((r) => [r.key, r.value]))
+    const map = await leesBeheerInstellingen(['briefing_directives', 'briefing_functional_directives'])
     const temporal: BriefingDirective[] = map.briefing_directives
       ? JSON.parse(map.briefing_directives)
       : []
@@ -167,7 +164,7 @@ export {
 
 // ── De redactie-call ─────────────────────────────────────────────────
 
-const REDACTIE_SYSTEM = `Je bent Fin, de financiële redacteur van TriFinity. Kernfilosofie: "Geld is opgeslagen tijd" — elke euro is vrijheidstijd.
+const REDACTIE_SYSTEM = `Je bent Fin, de financiële redacteur van TriFinity. Kernfilosofie: "Geld levert tijd op" — elk bedrag staat voor vrijheidstijd. Schrijf nooit dat iemand tijd koopt, vrijkoopt, terugkoopt of verkoopt.
 
 Je krijgt de wekelijkse briefing als kant-en-klare, feitelijk correcte briefjes. Jouw taak is uitsluitend REDACTIE:
 - Herschrijf de tekst van elk briefje in jouw stem: warm, helder, concreet, nooit klef. Maximaal 2 zinnen per briefje.

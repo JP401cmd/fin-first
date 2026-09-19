@@ -410,6 +410,9 @@ export function EventPaneEdit({
               />
               Stijgt mee met inflatie
             </label>
+            <p className="text-xs text-[var(--ink-3)]">
+              Uit = een vast bedrag in euro's van dat moment; het koopt dus elk jaar iets minder.
+            </p>
           </div>
         )}
       </CardEditorial>
@@ -487,6 +490,9 @@ export function EventPaneEdit({
               />
               Stijgt mee met inflatie
             </label>
+            <p className="text-xs text-[var(--ink-3)]">
+              Uit = een vast bedrag in euro's van dat moment; het koopt dus elk jaar iets minder.
+            </p>
           </div>
         )}
       </CardEditorial>

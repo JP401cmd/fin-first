@@ -1,0 +1,32 @@
+---
+id: 0161-de-consent-vervaldatum-is-geen-toegangstoken
+title: De vervaldatum van een bankkoppeling is de consent, niet het toegangstoken — een eigen kolom, gevuld uit de bron
+status: aanvaard
+date: 2026-09-19
+elements: [t-bankconnect, t-supabase, do-transactie]
+---
+
+Een bankkoppeling via TrueLayer heeft twee levensduren die niets met elkaar te maken hebben: het **toegangstoken** (`expires_in`, één uur, ververst via het refresh-token) en de **bankautorisatie** of consent (PSD2, doorgaans 90 dagen, RTS-plafond 180). De app sloeg alleen de eerste op (`bank_connections.token_expires_at`) en las die als de tweede. Besluit: de consent krijgt een eigen kolom, `consent_expires_at`, gevuld met wat TrueLayer zelf meldt — en de gezondheidsafleiding leest uitsluitend die.
+
+## Context
+
+`deriveBankLinkHealth` (`lib/bank-connection-status.ts`) is sinds fase 7 van het bank-connect-plan de enige afleiding van koppelgezondheid: regel 4 (datum verstreken → `linked-broken`) en de vlag `expiringSoon` (binnen 14 dagen → "Verloopt over Nd" + een melding in `/berichten`). Het bestand documenteerde `token_expires_at` als "de 90-dagen-autorisatie". Dat was het niet: de callback, de sync-route en de balances-route schrijven er `now + expires_in` in, en `expires_in` is de levensduur van het toegangstoken — 3600 seconden. Live geverifieerd op 19 september 2026: in élke rij staat `token_expires_at` exact 1,00 uur na `updated_at`.
+
+Het gevolg, met `Math.ceil` op hele dagen: direct na elke sync `daysUntilExpiry = 1`, dus "Verloopt over 1d" en een bericht "<bank>: koppeling verloopt over 1 dagen"; vanaf ~25 uur na de laatste sync `daysUntilExpiry = −1`, dus "Verbinding kwijt" met een herstelknop die een **nieuwe bankautorisatie** start. Dezelfde Rabobank-koppeling is daardoor tussen 31 juli en 18 september 18× opnieuw geautoriseerd, telkens 1–2 dagen na de vorige. De melder (W-014) schreef dat aan TrueLayer toe; de oorzaak zat in de app.
+
+De echte einddatum is bij TrueLayer opvraagbaar: `GET /data/v1/me` levert per toegangstoken één consent met `consent_status`, `consent_created_at` en `consent_expires_at`. Er is dus geen reden om een looptijd aan te némen — en dat is relevant, want de aanname "90 dagen" (in de code-commentaren en op de connect-pagina) en de aanname "180 dagen" (besloten voor de Connected-popup, W-014) kunnen niet allebei waar zijn. Welke geldt verschilt per bank.
+
+## Besluit
+
+1. **Eigen kolom.** `bank_connections.consent_expires_at timestamptz null` (migratie `20260919120000`). `token_expires_at` blijft bestaan met zijn echte betekenis — de token-refresh in sync en balances leest 'm — en krijgt een kolomcommentaar dat die betekenis vastlegt.
+2. **Gevuld uit de bron, niet uit een aanname.** De callback haalt ná de token-write `/data/v1/me` op (`lib/truelayer/consent.ts#fetchConsentExpiry`) en schrijft de datum in een **losse** update: de consent is een verrijking, geen voorwaarde — een trage of falende `/me` kost de autorisatie nooit. De token-write zelf is sindsdien fail-closed (een mislukte write gooit en landt op `callback_failed`; voorheen liep de route stil door met koppelrijen aan een `pending`-rij zonder tokens). De sync-route herleidt de datum uit `/me` wanneer hij **onbekend** is (bestaande koppelingen; zelfherstel bij de eerstvolgende sync) én wanneer de opgeslagen datum **verstreken** is terwijl de token-refresh zojuist slaagde — dan leeft de consent aantoonbaar en is de opgeslagen waarde per definitie fout. Een geldige bekende datum kost geen extra verzoek. Geen backfill in SQL: de waarde is niet uit bestaande kolommen af te leiden.
+3. **Onbekend is onbekend.** Mislukt `/me`, of levert het iets anders dan een leesbare datum-string (een epoch-getal zou via `new Date()` een geldige datum in 1970 worden — "verlopen"), dan blijft de kolom `NULL` en zwijgt de afleiding over de datum (`daysUntilExpiry: null`, geen `expiringSoon`, geen `linked-broken` op datum). De statuskolom en de eerstvolgende mislukte token-refresh vangen een echte expiratie alsnog. Een verzonnen einddatum (90 of 180 dagen vanaf `authorized_at`) is bewust afgewezen: hij leest voor de gebruiker net zo stellig als een echte.
+4. **Grondslag in de veldnaam.** `BankLinkSignals.tokenExpiresAt` heet `consentExpiresAt`; alle lezers (`lib/bank-link-loader.ts`, `/api/bank-connect/linked-accounts`, `/api/notifications`, `lib/notifications/bank-signalen.ts`) selecteren `consent_expires_at`. Dezelfde regel als ADR 0073 voor de inkomsten-/uitgavenvelden: een naam die de bron benoemt kan niet stil de verkeerde kolom dragen.
+5. **Kopij volgt de datum.** Oppervlakken die een looptijd noemen ("90 dagen geldig", "180 dagen") horen de werkelijke datum of een neutrale formulering te tonen; een hardcoded aantal dagen is een tweede bron van waarheid naast de kolom. Dat is de opdracht voor W-014.
+
+## Gevolgen
+
+- De regressie is vastgelegd in `lib/bank-connection-status.toegangstoken-1u.repro.test.ts` (een koppeling met een consent van 90 dagen blijft `linked` en meldt niet "verloopt bijna", ook 26 uur na de laatste sync) en in de callback-/sync-route-tests (de datum wordt geschreven, respectievelijk aangevuld).
+- Volgorde bij release: de migratie **vóór** de deploy toepassen (huisprocedure: `execute_sql` + expliciete versie-INSERT, daarna `get_advisors`). Zonder de kolom breken op de nieuwe code vijf paden tegelijk: de consent-write in de callback (niet-fataal, wél gelogd), `GET /api/bank-connect/linked-accounts` (500 op de embed), `lib/bank-link-loader.ts` (lege lijst → alles `manual`), de banksectie van `/api/notifications` (stil leeg) en de sync (elke ronde een `/me`-call plus een stil mislukte update). De oude code refereert de kolom nergens, dus de omgekeerde volgorde is de enige veilige; er is bewust géén 42703-tolerante terugval ingebouwd (permanente tolerantie voor een eenmalige volgorde).
+- Bestaande koppelingen tonen geen verloopdatum (kolom `NULL`) zolang er niet minstens één keer gesynchroniseerd is — er is geen bank-cron, de kolom vult zich uitsluitend bij een sync die de gebruiker zelf start. Tot dan geen vooraankondiging, maar ook geen valse "verbinding kwijt"; dat is netto altijd beter dan de dagelijkse valse waarschuwing van vóór dit besluit.
+- De balances-route vult de consent niet aan: die route wordt vanuit de app niet aangeroepen (alleen vanuit twee regressiesuites), dus zelfherstel dáár zou nooit draaien. De sync is het ene pad, en die draait ook via de globale sync-knop.

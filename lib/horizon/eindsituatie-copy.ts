@@ -74,24 +74,53 @@ function oorzaakZin(o: EindOorzaak, input: EindsituatieCopyInput): string {
   }
 }
 
-/** Dezelfde oorzaak als `oorzaakZin`, in de ik-vorm en zonder bedragen (voor Fin). */
-function finOorzaak(o: EindOorzaak): string {
+/**
+ * De persoonsvorm van `eindOorzaakKort`. Twee afnemers, één tabel:
+ *  - `'ik'` — de kick-off-tekst die de gebruiker namens zichzelf aan Fin meestuurt
+ *    (`finContext`, via de knop "Bespreek met Fin");
+ *  - `'je'` — dezelfde oorzaak in Fins vaste systeemcontext
+ *    (`lib/ai/context/plan-context.ts`), die de gebruiker aanspreekt.
+ */
+export type EindOorzaakPersoonsvorm = 'ik' | 'je'
+
+const PERSOONSVORM: Record<EindOorzaakPersoonsvorm, { bez: string; nodig: string; kan: string }> = {
+  ik: { bez: 'mijn', nodig: 'ik niet nodig heb', kan: 'ik kan' },
+  je: { bez: 'je', nodig: 'je niet nodig hebt', kan: 'je kunt' },
+}
+
+/**
+ * Dezelfde oorzaak als `oorzaakZin`, kort en ZONDER bedragen — de tekst die naar het
+ * taalmodel gaat.
+ *
+ * ÉÉN TABEL, TWEE AFNEMERS (review 19 sep 2026): deze zinnen stonden op het punt een
+ * derde keer geformuleerd te worden, in de AI-contextbouwer. Drie tabellen voor
+ * dezelfde zes oorzaken betekent dat de kick-off-vraag en de systeemcontext hetzelfde
+ * feit in twee bewoordingen aan één gesprek aanbieden — en dat de instructie "noem ze
+ * letterlijk" niet waar is. De persoonsvorm is daarom een parameter, de zin niet.
+ */
+export function eindOorzaakKort(o: EindOorzaak, vorm: EindOorzaakPersoonsvorm): string {
+  const { bez, nodig, kan } = PERSOONSVORM[vorm]
   const age = heel(o.age)
-  const op = age != null ? `mijn ${age}e` : 'een later moment'
+  const op = age != null ? `${bez} ${age}e` : 'een later moment'
   switch (o.id) {
     case 'nu-stoppen':
-      return 'mijn vermogen is nu al groot genoeg om te stoppen, dus het vroegste stopmoment is vandaag en wat ik niet nodig heb blijft staan'
+      return `${bez} vermogen is nu al groot genoeg om te stoppen, dus het vroegste stopmoment is vandaag en wat ${nodig} blijft staan`
     case 'geen-tekort-lening':
-      return `mijn plan gebruikt geen tekort-lening (standaardinstelling); rond ${op} is mijn liquide geld (bijna) op en dat moment bepaalt mijn vroegste stopmoment, eerder stoppen zou daar een lening vragen, en daarna groeit het vermogen weer`
+      return `${bez} plan gebruikt geen tekort-lening (standaardinstelling); rond ${op} is ${bez} liquide geld (bijna) op en dat moment bepaalt ${bez} vroegste stopmoment, eerder stoppen zou daar een lening vragen, en daarna groeit het vermogen weer`
     case 'opeet-plafond':
-      return `op ${op} is het leenplafond van mijn opeethypotheek bereikt; daarna komt er geen nieuw geld uit mijn huis en draagt mijn liquide vermogen de jaren erna zelf, wat mee bepaalt hoe vroeg ik kan stoppen`
+      return `op ${op} is het leenplafond van ${bez} opeethypotheek bereikt; daarna komt er geen nieuw geld uit ${bez} huis en draagt ${bez} liquide vermogen de jaren erna zelf, wat mee bepaalt hoe vroeg ${kan} stoppen`
     case 'later-inkomen':
-      return `vanaf ${op} dekt inkomen (AOW, pensioen of de bijdrage van mijn partner) mijn uitgaven, zodat mijn vermogen niet meer wordt aangesproken en doorgroeit`
+      return `vanaf ${op} dekt inkomen (AOW, pensioen of de bijdrage van ${bez} partner) ${bez} uitgaven, zodat ${bez} vermogen niet meer wordt aangesproken en doorgroeit`
     case 'late-baten':
-      return `op ${op} komt er eenmalig geld binnen (bijvoorbeeld erfenis of verkoop) dat na mijn stopmoment niet meer nodig is`
+      return `op ${op} komt er eenmalig geld binnen (bijvoorbeeld erfenis of verkoop) dat na ${bez} stopmoment niet meer nodig is`
     case 'dalend-profiel':
-      return `vanaf ${op} rekent mijn plan met lagere uitgaven dan in de eerste jaren na mijn stopmoment`
+      return `vanaf ${op} rekent ${bez} plan met lagere uitgaven dan in de eerste jaren na ${bez} stopmoment`
   }
+}
+
+/** Dezelfde oorzaak in de ik-vorm en zonder bedragen (voor Fins kick-off-vraag). */
+function finOorzaak(o: EindOorzaak): string {
+  return eindOorzaakKort(o, 'ik')
 }
 
 /** Bouw de uitleg bij een gedetecteerde eindsituatie. Alle getallen komen uit dezelfde run. */

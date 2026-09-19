@@ -253,7 +253,7 @@ export function BulkResultaten({
                   row.counterparty_name && row.counterparty_name !== row.description
                     ? row.counterparty_name
                     : null,
-                  budget ?? 'Zonder budget',
+                  budget ?? 'Zonder categorie',
                   account,
                 ]
                   .filter(Boolean)

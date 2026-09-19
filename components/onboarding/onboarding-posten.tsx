@@ -252,25 +252,58 @@ export function DebtTypePicker({
  */
 export function DebtTypeMultiPicker({
   exclude = [],
+  featured = [],
+  linked = {},
   selected,
   onToggle,
 }: {
   exclude?: DebtType[]
+  /**
+   * Types die als "Meest voorkomend" vooraan staan (raster-first, B-054): de
+   * vier soorten die vóór de herziening een eigen ja/nee-vraag hadden. Zo blijft
+   * hypotheek/studielening actief herkenbaar zonder losse schermen.
+   */
+  featured?: readonly DebtType[]
+  /**
+   * Types die al via een bezitting zijn opgegeven (hypotheek bij je woning,
+   * autolening bij je voertuig, RC bij je BV): zichtbaar maar uitgeschakeld,
+   * mét de herkomst — niet stil weggelaten, zodat niemand ze dubbel opvoert of
+   * denkt dat ze ontbreken.
+   */
+  linked?: Partial<Record<DebtType, string>>
   selected: DebtType[]
   onToggle: (type: DebtType) => void
 }) {
   const types = QUICK_ADD_DEBT_ORDER.filter((t) => !exclude.includes(t))
+  const featuredTypes = featured.filter((t) => types.includes(t))
+  const otherTypes = types.filter((t) => !featuredTypes.includes(t))
+  const tile = (type: DebtType) => (
+    <TypeMultiPickerTile
+      key={type}
+      iconName={DEBT_TYPE_ICONS[type] ?? 'CircleDot'}
+      label={DEBT_QUICK_ADD_LABELS[type]}
+      checked={selected.includes(type)}
+      linkedOrigin={linked[type]}
+      onToggle={() => onToggle(type)}
+    />
+  )
+  if (featuredTypes.length === 0) {
+    return <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{otherTypes.map(tile)}</div>
+  }
   return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-      {types.map((type) => (
-        <TypeMultiPickerTile
-          key={type}
-          iconName={DEBT_TYPE_ICONS[type] ?? 'CircleDot'}
-          label={DEBT_QUICK_ADD_LABELS[type]}
-          checked={selected.includes(type)}
-          onToggle={() => onToggle(type)}
-        />
-      ))}
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--ink-3)]">
+          Meest voorkomend
+        </p>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{featuredTypes.map(tile)}</div>
+      </div>
+      <div className="space-y-2">
+        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--ink-3)]">
+          Andere schulden
+        </p>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{otherTypes.map(tile)}</div>
+      </div>
     </div>
   )
 }
@@ -279,40 +312,59 @@ function TypeMultiPickerTile({
   iconName,
   label,
   checked,
+  linkedOrigin,
   onToggle,
 }: {
   iconName: string
   label: string
   checked: boolean
+  /** Gezet = al opgegeven via een bezitting; de tegel is dan uitgeschakeld. */
+  linkedOrigin?: string
   onToggle: () => void
 }) {
+  const disabled = Boolean(linkedOrigin)
   return (
     <label
-      className={`flex min-h-[44px] cursor-pointer flex-col items-center gap-1.5 border p-3 text-center text-xs font-medium transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[var(--ink)] ${
-        checked
-          ? 'border-[var(--module-active-500)] bg-[var(--module-active-50)]/60 text-[var(--ink)]'
-          : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-2)] hover:border-[var(--module-active-500)] hover:bg-[var(--module-active-50)]/40'
+      className={`flex min-h-[44px] flex-col items-center gap-1.5 border p-3 text-center text-xs font-medium transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[var(--ink)] ${
+        disabled
+          ? 'cursor-default border-dashed border-[var(--border-ed)] bg-[var(--subtle)] text-[var(--ink-3)]'
+          : checked
+            ? 'cursor-pointer border-[var(--module-active-500)] bg-[var(--module-active-50)]/60 text-[var(--ink)]'
+            : 'cursor-pointer border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-2)] hover:border-[var(--module-active-500)] hover:bg-[var(--module-active-50)]/40'
       }`}
     >
       <input
         type="checkbox"
-        checked={checked}
+        checked={disabled ? true : checked}
+        disabled={disabled}
         onChange={onToggle}
         className="sr-only"
       />
       <span
         aria-hidden
         className={`flex h-7 w-7 items-center justify-center ${
-          checked ? 'text-[var(--module-active-800)]' : 'text-[var(--module-active-700)]'
+          disabled
+            ? 'text-[var(--ink-4)]'
+            : checked
+              ? 'text-[var(--module-active-800)]'
+              : 'text-[var(--module-active-700)]'
         }`}
       >
-        {checked ? (
+        {checked || disabled ? (
           <Check className="h-4 w-4" strokeWidth={2} />
         ) : (
           <TypeIcon name={iconName} className="h-4 w-4" strokeWidth={1.75} />
         )}
       </span>
       <span className="w-full truncate">{label}</span>
+      {linkedOrigin && (
+        <span
+          className="w-full text-[10px] font-normal italic leading-tight"
+          style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+        >
+          al opgegeven {linkedOrigin}
+        </span>
+      )}
     </label>
   )
 }

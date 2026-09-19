@@ -54,6 +54,11 @@ export interface GebPostHelper {
   readonly eIdx: number
   /** Geb!Y/AB/AE — bedrag in koopkracht-nu (+ bate / − kost). */
   readonly bedrag: number
+  /**
+   * BUITEN ORACLE-DOMEIN (ADR 0167): `true` ⇒ `bedrag` is nominaal vast en telt zónder
+   * idx(m) mee. Afwezig/`false` ⇒ koopkracht-nu × idx(m) (Excel-gedrag).
+   */
+  readonly nominaalVast?: boolean
 }
 
 /**
@@ -177,12 +182,18 @@ export function computeCF(input: KernelInput, dep: CFDep, m: MonthIndex): CFRow 
   }
 
   // H — gebeurtenis-baten: som van de positieve, in maand m actieve Geb-posten
-  //     (koopkracht-nu), nominaal gemaakt met de inflatie-index.
+  //     (koopkracht-nu), nominaal gemaakt met de inflatie-index. Nominaal-vaste posten
+  //     (ADR 0167, buiten oracle-domein) tellen zónder index; zonder zulke posten is
+  //     `batenVast === 0` en blijft H letterlijk `baten * idx` (parity byte-identiek).
   let baten = 0
+  let batenVast = 0
   for (const post of dep.gebPosten) {
-    if (post.bedrag > 0 && post.sIdx <= m && m <= post.eIdx) baten += post.bedrag
+    if (post.bedrag > 0 && post.sIdx <= m && m <= post.eIdx) {
+      if (post.nominaalVast === true) batenVast += post.bedrag
+      else baten += post.bedrag
+    }
   }
-  const H = baten * idx
+  const H = batenVast === 0 ? baten * idx : baten * idx + batenVast
 
   // I — totaal extra geld: sparen + rente-vrijval + baten + verkoopopbrengst +
   //     opeet-opname, minus de Box 3-heffing (alleen vóór FIRE — ná FIRE zit Box 3

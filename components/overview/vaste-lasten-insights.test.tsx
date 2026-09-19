@@ -38,25 +38,28 @@ function renderInMode(mode: 'simple' | 'full') {
   return render(
     <DisplayModeProvider initialMode={mode}>
       <HideInSimple>
-        <VasteLastenInsights insights={insights} onOpzeg={() => {}} />
+        <VasteLastenInsights insights={insights} />
       </HideInSimple>
     </DisplayModeProvider>,
   )
 }
 
+// W-017 (19-09-2026): dit component draagt alleen nog de samenstelling. De
+// quote-meter en het sluipverbruik rendert de client in beide modi zelf;
+// "In vrijheidstijd" en "Wat als ik opzeg" zijn verwijderd.
 describe('VasteLastenInsights — weergavemodus', () => {
-  it('Volledig toont de inzicht-blokken', () => {
+  it('Volledig toont de samenstelling, en niets van wat verwijderd is', () => {
     renderInMode('full')
-    expect(screen.getByText('Vaste-lastenquote')).toBeTruthy()
-    expect(screen.getByText('In vrijheidstijd')).toBeTruthy()
     expect(screen.getByText('Samenstelling')).toBeTruthy()
-    expect(screen.getByText('Wat als ik opzeg')).toBeTruthy()
+    expect(screen.queryByText('In vrijheidstijd')).toBeNull()
+    expect(screen.queryByText('Wat als ik opzeg')).toBeNull()
+    // Niet dubbel: die twee blokken komen uit de client, niet van hier.
+    expect(screen.queryByText('Vaste-lastenquote')).toBeNull()
+    expect(screen.queryByText('Abonnementen-sluipverbruik')).toBeNull()
   })
 
-  it('Eenvoudig verbergt de inzicht-blokken', () => {
+  it('Eenvoudig verbergt de verdieping', () => {
     renderInMode('simple')
-    expect(screen.queryByText('Vaste-lastenquote')).toBeNull()
-    expect(screen.queryByText('In vrijheidstijd')).toBeNull()
     expect(screen.queryByText('Samenstelling')).toBeNull()
   })
 })

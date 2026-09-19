@@ -60,7 +60,7 @@ het **tweede** account, niet op het hoofdaccount met echte historie.
 
 | # | Scenario | Ingreep |
 |---|---|---|
-| SC-10 | Herautorisatie na 90 dagen | Zet `bank_connections.token_expires_at` in het verleden |
+| SC-10 | Herautorisatie na verlopen consent | Zet `bank_connections.consent_expires_at` in het verleden (niet `token_expires_at` — dat is het 1-uurs toegangstoken, ADR 0161) |
 | SC-11 | Verbinding ingetrokken bij de bank | Zet `status = 'revoked'`. **Let op:** geen enkel codepad schrijft die waarde ooit — dit toetst dus alleen dat de UI 'm als "verbinding kwijt" leest, zoals besloten |
 | SC-12 | Verbinding kwijt (indicator + herstelknop) | Idem SC-10; controleer dat het icoon omslaat en de herstelknop verschijnt |
 | SC-16 | Periode waarin de bank niets teruggeeft | Zet `sync_cursor` op vandaag, sync → verwacht een nette "niets nieuws"-melding |

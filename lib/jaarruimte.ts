@@ -50,7 +50,8 @@
 
 import type { LeverageStatus } from '@/lib/leverage-status'
 import type { RetirementSubtype } from '@/lib/asset-data'
-import { computeBox1Tax, type Box1TaxYear } from '@/lib/box1-tax'
+import { computeBox1Tax, grossFromNet, type Box1TaxYear } from '@/lib/box1-tax'
+import { ESTIMATE_ROUNDING_STEP, NL_PENSIOENOPBOUW_STARTLEEFTIJD } from '@/lib/constants'
 
 /**
  * Opbouwpercentage in de jaarruimteformule: 30% sinds Wet toekomst pensioenen
@@ -292,6 +293,63 @@ export function estimateAccruedPensionMonthly(
 
   const factorA = estimateFactorAFromSalary(grossYearlySalary, opts)
   return Math.round((factorA * years) / 12)
+}
+
+/** Uitkomst van {@link estimateAccruedPensionFromNet}. */
+export interface AccruedPensionFromNetEstimate {
+  /** Bruto jaarsalaris afgeleid uit het netto maandinkomen (`grossFromNet`), hele euro's. */
+  grossYearly: number
+  /** Aangenomen jaren pensioenopbouw: leeftijd − `NL_PENSIOENOPBOUW_STARTLEEFTIJD`, ≥ 0. */
+  years: number
+  /**
+   * Geschat opgebouwd bruto werkgeverspensioen per maand (ex AOW), afgerond op
+   * `ESTIMATE_ROUNDING_STEP` zodat het getal leest als schatting.
+   */
+  monthly: number
+}
+
+/**
+ * "Schat het voor me" in de onboarding-pensioenstap (B-055): schat het tot nu
+ * toe opgebouwde bruto werkgeverspensioen per maand uit wat de wizard al weet —
+ * het **netto maandinkomen** en de **leeftijd** — zonder een nieuwe formule.
+ *
+ * Compositie van drie bestaande bouwstenen:
+ *   1. netto → bruto via {@link grossFromNet} (exacte Box 1-inversie, dezelfde
+ *      die `/overzicht/belasting/box1` gebruikt — bewust niet
+ *      `estimateGrossYearly` uit jaarruimte-facts, dat zou een tweede bruto zijn);
+ *   2. jaren opbouw = leeftijd − {@link NL_PENSIOENOPBOUW_STARTLEEFTIJD};
+ *   3. {@link estimateAccruedPensionMonthly} (factor A × jaren ÷ 12).
+ *
+ * Het resultaat bevat de AOW **niet** — die is apart gemodelleerd
+ * (`life_events` type 'aow', `NL_AOW_MONTHLY*`). Indicatie met een band van
+ * ruwweg ±30% (opbouw%, franchise, salarisverloop, opbouwgaten, WTP); een
+ * mijnpensioen.nl-upload wint altijd. `grossYearly` en `years` worden
+ * teruggegeven zodat de UI ze zichtbaar en bewerkbaar kan vóórvullen.
+ *
+ * @param input.netMonthly  Netto maandinkomen (€). ≤ 0 of niet-eindig → alles 0.
+ * @param input.age         Leeftijd in hele of gebroken jaren; ≤ startleeftijd → 0 jaren.
+ * @param opts.year         Belastingjaar voor bruto-inversie én franchise (default 2026).
+ */
+export function estimateAccruedPensionFromNet(
+  input: { netMonthly: number; age: number },
+  opts: { year?: JaarruimteJaar } = {},
+): AccruedPensionFromNetEstimate {
+  const year = opts.year ?? 2026
+  const netMonthly = Number.isFinite(input.netMonthly) ? input.netMonthly : 0
+  const age = Number.isFinite(input.age) ? input.age : 0
+  const grossYearly = netMonthly > 0 ? grossFromNet(netMonthly * 12, year) : 0
+  const years = Math.max(0, Math.floor(age - NL_PENSIOENOPBOUW_STARTLEEFTIJD))
+  const raw = estimateAccruedPensionMonthly(grossYearly, years, { year })
+  return { grossYearly, years, monthly: roundToEstimateStep(raw) }
+}
+
+/**
+ * Rond een geschat bedrag af op {@link ESTIMATE_ROUNDING_STEP} (€25) — dezelfde
+ * conventie als de cohort-schatting van inkomen/uitgaven. Niet-eindig of ≤ 0 → 0.
+ */
+export function roundToEstimateStep(value: number): number {
+  if (!Number.isFinite(value) || value <= 0) return 0
+  return Math.round(value / ESTIMATE_ROUNDING_STEP) * ESTIMATE_ROUNDING_STEP
 }
 
 /** Resultaat van {@link resolvePensionFactorA}. */

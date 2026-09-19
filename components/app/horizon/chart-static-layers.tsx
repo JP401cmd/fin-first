@@ -35,6 +35,9 @@ export type ChartStaticLayersProps = {
   showDepletionWarning?: boolean
   /** Wat-als-run loopt achter op de live input → de scenario-lijn wordt gedempt met puls. */
   scenarioPending?: boolean
+  /** B-057 — hersolve van de HOOFDLIJN onderweg (of herlaad van de grondslag): de
+   *  getekende hoofdpaden zijn verouderd en pulseren gedempt tot de nieuwe run landt. */
+  mainPending?: boolean
   eventOverlay?: ChartEventOverlay[]
   onEventClick?: (id: string, kind: ChartEventKind, sourceId?: string) => void
   onEventDragEnd?: (
@@ -81,12 +84,16 @@ export function ChartStaticLayersInner({
   baselineEmphasis,
   showDepletionWarning,
   scenarioPending,
+  mainPending,
   eventOverlay,
   onEventClick,
   onEventDragEnd,
   onEventDragMove,
   onClusterOpen,
 }: ChartStaticLayersProps) {
+  // B-057 — dezelfde puls als de wat-als-lijn, op de hoofdpaden zolang een hersolve
+  // onderweg is. Pas ná de intreek-animatie (anders vecht de puls met de reveal).
+  const mainPendingClass = mainPending && hasEntered ? 'animate-scenario-pending' : undefined
   const {
     PAD,
     innerW,
@@ -209,16 +216,23 @@ export function ChartStaticLayersInner({
           fontSize 11 is de ondergrens uit bevinding M16 (was 9, op mobiel
           onleesbaar). Past binnen PAD.left (60) omdat het label rechts uitlijnt
           op PAD.left − 5: "€1.1M" is ~40px breed. */}
-      {!masked && yTicks.map(({ val, y }) => (
-        <text key={val} x={PAD.left - 5} y={y + 4} textAnchor="end" fontSize={11}
-          fill="var(--ink-4)" fontFamily="var(--font-dm-mono, monospace)">
-          {val >= 1_000_000
-            ? `€${(val / 1_000_000).toFixed(1)}M`
-            : val >= 1_000
-            ? `€${Math.round(val / 1_000)}k`
-            : val > 0 ? `€${Math.round(val)}` : '€0'}
-        </text>
-      ))}
+      {!masked && yTicks.map(({ val, y }) => {
+        // Een tick onder nul (B-053: het y-domein volgt een tekort) krijgt een
+        // minteken op het absolute bedrag; positieve ticks renderen byte-identiek.
+        const abs = Math.abs(val)
+        const sign = val < 0 ? '−' : ''
+        const label = abs >= 1_000_000
+          ? `${sign}€${(abs / 1_000_000).toFixed(1)}M`
+          : abs >= 1_000
+          ? `${sign}€${Math.round(abs / 1_000)}k`
+          : abs > 0 ? `${sign}€${Math.round(abs)}` : '€0'
+        return (
+          <text key={val} x={PAD.left - 5} y={y + 4} textAnchor="end" fontSize={11}
+            fill="var(--ink-4)" fontFamily="var(--font-dm-mono, monospace)">
+            {label}
+          </text>
+        )
+      })}
 
       {/* X-axis labels — fontSize 11 (M16). De baseline op H − 4 laat binnen
           PAD.bottom (28) ruim genoeg staan voor de grotere letter. */}
@@ -630,6 +644,7 @@ export function ChartStaticLayersInner({
       {accPath && (
         <path
           d={accPath}
+          className={mainPendingClass}
           fill="none"
           stroke={mainStrokeAcc}
           strokeWidth={emphasis === 'accumulation' ? 3.25 : 2.5}
@@ -647,6 +662,7 @@ export function ChartStaticLayersInner({
       {decPath && (
         <path
           d={decPath}
+          className={mainPendingClass}
           fill="none"
           stroke={mainStrokeDec}
           strokeWidth={emphasis === 'withdrawal' ? 3.25 : 2.5}
@@ -666,6 +682,7 @@ export function ChartStaticLayersInner({
       {bridgePath && (
         <path
           d={bridgePath}
+          className={mainPendingClass}
           fill="none"
           stroke={bridgeStroke}
           strokeWidth={2.5}
@@ -683,6 +700,7 @@ export function ChartStaticLayersInner({
       {withdrawalPath && (
         <path
           d={withdrawalPath}
+          className={mainPendingClass}
           fill="none"
           stroke={mainStrokeDec}
           strokeWidth={emphasis === 'withdrawal' ? 3.25 : 2.5}
@@ -700,6 +718,7 @@ export function ChartStaticLayersInner({
       {allPath && (
         <path
           d={allPath}
+          className={mainPendingClass}
           fill="none"
           stroke="var(--ink-3)"
           strokeWidth={2.5}

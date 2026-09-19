@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getServiceClient } from '@/lib/supabase/service'
 import { isSuperAdmin } from '@/lib/admin'
 import { PERSONAS, type PersonaKey } from '@/lib/test-personas'
 import { deleteAllUserData, seedPersonaData, countSeedSteps, assertSeedSchema, SeedSchemaError } from '@/lib/seed-persona'
@@ -63,8 +64,17 @@ export async function POST(req: Request) {
           throw preErr
         }
 
-        // Phase 1: Delete all user data
-        await deleteAllUserData(supabase, userId, progress)
+        // Phase 1: Delete all user data.
+        // Service-role voor de RLS-afgeschermde persoonlijke tabellen (afgeronde
+        // vragenlijst-sessies, feedback, user_reports, net_worth_history) en de
+        // bucket-prefix, die de sessie-client niet kan wissen — zonder
+        // `{ service }` is die stap een stille no-op. Best-effort zonder
+        // service-key (dev). Zelfde patroon als app/api/onboarding/reset; géén
+        // fullErase (reseed, geen accountverwijdering).
+        const hasServiceKey =
+          !!process.env.NEXT_PUBLIC_SUPABASE_URL && !!process.env.SUPABASE_SERVICE_ROLE_KEY
+        const service = hasServiceKey ? getServiceClient() : undefined
+        await deleteAllUserData(supabase, userId, progress, { service })
 
         // Phase 2+3: Insert persona data
         const summary = await seedPersonaData(supabase, userId, persona, progress, { stampAiConsent: true })

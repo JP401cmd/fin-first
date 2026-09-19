@@ -9,7 +9,7 @@ import {
 const ARTIKEL = 'De ECB verhoogt de rente naar 3,25 procent. Spaarrekeningen stijgen mee met 0,5 procentpunt.'
 const PROFIEL = [
   'PROFIEL VAN DE GEBRUIKER (canoniek berekend):',
-  '- Netto vermogen: €85.000 (≈ 2 jaar en 9 maanden vrijgekochte tijd)',
+  '- Netto vermogen: €85.000 (≈ 2 jaar en 9 maanden opgebouwde vrijheidstijd)',
   '- Maandinkomen netto: €3.400 · maanduitgaven: €2.550',
   '- Spaarquote: 25% · dagtarief (uitgaven per dag): €85',
 ].join('\n')

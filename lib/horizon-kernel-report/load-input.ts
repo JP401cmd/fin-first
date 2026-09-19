@@ -15,6 +15,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Asset } from '@/lib/asset-data'
+import { heeftEigenRendement, resolveExpectedReturnPct } from '@/lib/asset-return'
 import type { Debt } from '@/lib/debt-data'
 import type { LifeEvent } from '@/lib/horizon-data'
 import type { AowLeeftijdRow } from '@/lib/aow-leeftijd'
@@ -39,8 +40,34 @@ export interface RawAssetRow {
   readonly naam: string
   readonly type: string
   readonly waarde: number
+  /**
+   * Het rendement waarmee de kern dit pot laat groeien, in PROCENTEN — bij een
+   * eigen aanname die aanname zelf, anders het profielrendement (ADR 0166).
+   * Zie `rendementBron` voor welke van de twee het is.
+   */
   readonly rendementPct: number
+  /** 'eigen' = `assets.expected_return` ingevuld (ook een bewuste 0); 'profiel' = NULL → terugval. */
+  readonly rendementBron: 'eigen' | 'profiel'
   readonly maandinleg: number
+}
+
+/**
+ * Rendement + bron van één ruwe bezittingsrij voor het beheer-scherm — dezelfde
+ * beslissing als `potRendement` in de adapter (`heeftEigenRendement`), op de
+ * percentage-schaal. Pure helper zodat de mapping testbaar is zonder Supabase.
+ *
+ * @param expectedReturn `assets.expected_return` (PERCENT, mag NULL/string zijn — NUMERIC komt als string).
+ * @param grossReturn Profielrendement DECIMAAL (`resolveFireParams(...).grossReturn`).
+ */
+export function rawAssetRendement(
+  expectedReturn: number | string | null | undefined,
+  grossReturn: number,
+): Pick<RawAssetRow, 'rendementPct' | 'rendementBron'> {
+  const eigen = expectedReturn == null ? null : Number(expectedReturn)
+  return {
+    rendementPct: resolveExpectedReturnPct(eigen, grossReturn * 100),
+    rendementBron: heeftEigenRendement(eigen) ? 'eigen' : 'profiel',
+  }
 }
 export interface RawDebtRow {
   readonly naam: string
@@ -229,7 +256,9 @@ export async function loadKernelReportInput(supabase: SupabaseClient): Promise<K
       naam: a.name ?? a.asset_type,
       type: a.asset_type,
       waarde: num(a.current_value),
-      rendementPct: num(a.expected_return),
+      // NULL = geen eigen aanname → het profielrendement, expliciet gemarkeerd
+      // (ADR 0166) — géén `num(null) → 0`.
+      ...rawAssetRendement(a.expected_return, fireParams.grossReturn),
       maandinleg: num(a.monthly_contribution),
     })),
     debts: debts.map((d) => ({

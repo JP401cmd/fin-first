@@ -59,6 +59,13 @@ export interface ApplyHousingCompositionOpts {
    * exclude_from_fire) — vandaar dat `isV2` de fijnere paden hieronder blijft sturen.
    */
   houseInLedger?: boolean
+  /**
+   * Profielrendement (DECIMAAL) als terugval voor een woning zonder eigen
+   * rendementsaanname (`expected_return = null`, ADR 0166) in de huiswaarde-
+   * projectie van de injectiepaden — dezelfde ketting als het huis-pot in de
+   * kernel. Onder `houseInLedger: true` (kernel-tak) inert. Weggelaten → 0.
+   */
+  terugvalRendement?: number
 }
 
 /**
@@ -75,7 +82,9 @@ export function applyHousingToComposition(
 ): StackedRow[] {
   // `fireEndAge` blijft in de opts-interface (callers geven 'm), maar wordt sinds
   // ADR 0029 niet meer gebruikt (de reverse_mortgage-schaduwschuld is vervallen).
-  const { housingCfg, ctx, displayEvents, currentAgeFloor, isV2, houseInLedger } = opts
+  const { housingCfg, ctx, displayEvents, currentAgeFloor, isV2, houseInLedger, terugvalRendement } = opts
+  // Terugval (ADR 0166) op percentage-schaal — `projectEigenHuisValuesAt` rekent in procenten.
+  const terugvalRendementPct = (terugvalRendement ?? 0) * 100
 
   const eigenHuisAssets = ctx.eigenHuisAssets ?? []
   const mortgages = ctx.eigenHuisMortgages
@@ -113,7 +122,7 @@ export function applyHousingToComposition(
 
   return baseRows.map((row) => {
     const monthsForward = Math.max(0, (row.age - currentAgeFloor) * 12)
-    const projectedHouse = projectEigenHuisValuesAt(eigenHuisAssets, monthsForward)
+    const projectedHouse = projectEigenHuisValuesAt(eigenHuisAssets, monthsForward, terugvalRendementPct)
     const mortgageState = projectMortgageStateAt(mortgages, monthsForward)
 
     if (housingCfg.mode === 'exclude_from_fire') {

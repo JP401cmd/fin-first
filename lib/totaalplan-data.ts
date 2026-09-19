@@ -27,7 +27,8 @@
  * `runMonteCarlo` is sin-hash-gebaseerd). Server- én test-bruikbaar.
  */
 import { resolveFirePlanWithOverride, stopAnchorFromKernel, type FireEndStrategy, type FireEndForm } from '@/lib/fire-strategy'
-import { detectEindsituatie, type EindsituatieDuiding } from '@/lib/horizon/eindsituatie-duiding'
+import type { EindsituatieDuiding } from '@/lib/horizon/eindsituatie-duiding'
+import { detectEindsituatieForRun } from '@/lib/horizon/eindsituatie-run'
 import type { Aandachtspunt } from '@/lib/aandachtspunten'
 import { lookupAowAge } from '@/lib/aow-leeftijd'
 import { formatCurrency } from '@/lib/format'
@@ -395,25 +396,20 @@ function buildProjectie(
     : null
 
   // ── Eindsituatie-duiding (plan 17 sep, D) — zelfde detector + invoer als /toekomst ──
-  // Plan via dezelfde resolver als de kernel-adapter; jaaruitgaven = de grondslag van
-  // deze run (`rawContext.yearlyExpenses`). Niet onder een pensioen-anker.
+  // De samenstelling van de detector-invoer staat sinds laag C van de kaart "Fin kent je
+  // plan-instellingen niet" één keer, in `lib/horizon/eindsituatie-run.ts`; de gedeelde
+  // server-run (`computeHorizonFireSim`) leest exact dezelfde helper. Die acht
+  // afleidingen (pensioen-gate, `displayEndAge ?? plan.endAge`, de tekort-lening-default)
+  // stonden hier eerder letterlijk uitgeschreven.
   const plan = resolveFirePlanWithOverride(rawContext.profile)
   const legacyIncludeIlliquid = rawContext.profile.fire_legacy_include_illiquid === true
-  const eindDuiding =
-    currentAge != null && sim.strategy !== 'pensioen'
-      ? detectEindsituatie({
-          rows: result.rows,
-          endForm: plan.endForm,
-          endAge: sim.displayEndAge ?? plan.endAge,
-          legacyAmount: plan.legacyAmount,
-          legacyIncludeIlliquid,
-          vastStopmoment: sim.stopAnker != null,
-          fireAgeFractional: sim.fireAgeFractional ?? null,
-          currentAge,
-          geenTekortLeningAan: rawContext.profile.fire_no_deficit_loan !== false,
-          jaarUitgavenNu: rawContext.yearlyExpenses,
-        })
-      : null
+  const eindDuiding = detectEindsituatieForRun({
+    rows: result.rows,
+    sim,
+    profile: rawContext.profile,
+    currentAge,
+    yearlyExpenses: rawContext.yearlyExpenses,
+  })
   const eindsituatie: ProjectieEindsituatie | null = eindDuiding
     ? {
         duiding: eindDuiding,

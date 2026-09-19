@@ -140,6 +140,12 @@ export interface SimResult {
    */
   vastStopLeeftijd?: number | null
   /**
+   * AOW-leeftijd van de PARTNER op de as van deze run (TPR-07 fase 2a, ADR 0168) —
+   * uit de PT-laag van de kernel via de bridge; `null`/afwezig zonder partnerblok.
+   * Doorgeven, niet afleiden (geen eigen `lookupAowAge` + DOB-offset in de client).
+   */
+  partnerAowAge?: number | null
+  /**
    * Eerste aanhoudende uitputtingsmaand van Prognose!J (maand 0 = nu) of `null`
    * (ADR 0126). Kernel-pad only; voedt onder 'nu-stoppen' de tijdsdekking.
    */

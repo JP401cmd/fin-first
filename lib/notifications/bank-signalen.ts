@@ -5,7 +5,7 @@
  *
  * Over een gekoppelde rekening kunnen we twee dingen zeggen:
  *
- *  1. **De autorisatie verloopt bijna.** Een bankautorisatie leeft 90 dagen;
+ *  1. **De autorisatie verloopt bijna.** Een bankautorisatie leeft doorgaans 90 dagen (per bank tot 180; de echte einddatum is `consent_expires_at`);
  *     `sync-status-badge.tsx` waarschuwde daar al 14 dagen van tevoren voor, maar
  *     alléén op de rekening zelf. Wie daar niet toevallig kijkt, merkt het pas als
  *     het synchroniseren stopt. Dit is het proactieve kanaal dat daarvoor ontbrak.
@@ -59,7 +59,7 @@ export interface BankSignalInput {
    * `bank_connections.provider_name` — de banknaam, en bewust het label van de
    * verloop-waarschuwing.
    *
-   * Die waarschuwing raakt namelijk élke gekoppelde rekening 14 van elke 90 dagen,
+   * Die waarschuwing raakt namelijk élke gekoppelde rekening 14 van elke ~90 dagen,
    * waar het versheidsbericht een uitzonderingstoestand is. Met het IBAN-fragment
    * zou dit bericht dus structureel een stukje rekeningnummer in
    * `app_settings.notifications_history_*` schrijven — plaintext JSON, terwijl de
@@ -76,8 +76,8 @@ export interface BankSignalInput {
   linkIsActive: boolean
   /** `bank_connections.status`. */
   connectionStatus: string | null
-  /** `bank_connections.token_expires_at` (ISO-string). */
-  tokenExpiresAt: string | null
+  /** `bank_connections.consent_expires_at` (ISO-string). */
+  consentExpiresAt: string | null
   /** `bank_connection_accounts.last_synced_at` (ISO-string). */
   lastSyncedAt: string | null
 }
@@ -130,7 +130,7 @@ export function buildBankSignalNotification(
     {
       linkIsActive: input.linkIsActive,
       connectionStatus: input.connectionStatus,
-      tokenExpiresAt: input.tokenExpiresAt,
+      consentExpiresAt: input.consentExpiresAt,
       lastSyncedAt: input.lastSyncedAt,
     },
     now,

@@ -61,7 +61,7 @@ const TONE: Record<Tone, { badge: string; dot: string; banner: string; text: str
 type ProdInfo =
   | { state: 'loading' }
   | { state: 'error' }
-  | { state: 'ok'; sha: string; env: string }
+  | { state: 'ok'; sha: string; env: string; version: string | null }
 
 function relativeTime(iso: string): string {
   const then = new Date(iso).getTime()
@@ -132,7 +132,12 @@ function computeGitVerdict(git: GitStateAvailable): { tone: Tone; line: string }
 
 // ── Hoofd-component ──────────────────────────────────────────────────────────
 
-export function VersieClient() {
+/**
+ * `localVersion` komt van de server-page uit lib/app-version.ts (package.json,
+ * de enige versiebron); de prod-versie komt van PROD/api/version. Zo vergelijkt
+ * de pagina twee lezingen van dezelfde bron, geen eigen constante.
+ */
+export function VersieClient({ localVersion }: { localVersion: string }) {
   const [data, setData] = useState<VersionStatusResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -170,8 +175,14 @@ export function VersieClient() {
         setProd({ state: 'error' })
         return
       }
-      const json = (await res.json()) as { sha?: string; env?: string }
-      setProd({ state: 'ok', sha: json.sha ?? 'onbekend', env: json.env ?? 'onbekend' })
+      const json = (await res.json()) as { sha?: string; env?: string; version?: string }
+      setProd({
+        state: 'ok',
+        sha: json.sha ?? 'onbekend',
+        env: json.env ?? 'onbekend',
+        // Een prod-build van vóór het versieveld geeft geen version terug.
+        version: typeof json.version === 'string' ? json.version : null,
+      })
     } catch {
       setProd({ state: 'error' })
     } finally {
@@ -243,7 +254,7 @@ export function VersieClient() {
               </div>
             </Panel>
           )}
-          <DeployPanel data={data} prod={prod} onRetryProd={loadProd} />
+          <DeployPanel data={data} prod={prod} localVersion={localVersion} onRetryProd={loadProd} />
           <MigrationsPanel data={data} />
           <Spiekbrief />
           <p className="text-right font-mono text-[10px] text-[var(--ink-4)]">
@@ -431,13 +442,16 @@ function CommitsPanel({ git }: { git: GitStateAvailable }) {
 function DeployPanel({
   data,
   prod,
+  localVersion,
   onRetryProd,
 }: {
   data: VersionStatusResponse
   prod: ProdInfo
+  localVersion: string
   onRetryProd: () => void
 }) {
   const localSha = data.git.available ? data.git.headSha : null
+  const prodVersion = prod.state === 'ok' ? prod.version : null
 
   let verdict: { tone: Tone; label: string }
   if (prod.state === 'loading') verdict = { tone: 'muted', label: 'prod ophalen…' }
@@ -464,6 +478,20 @@ function DeployPanel({
           <span className="text-[11px] uppercase tracking-[0.06em] text-[var(--ink-4)]">Prod SHA</span>
           <span className="font-mono text-sm tabular-nums text-[var(--ink)]">
             {prod.state === 'ok' ? shortProd : prod.state === 'loading' ? '…' : 'onbekend'}
+          </span>
+        </div>
+        <div className="flex items-baseline justify-between gap-3 border-b border-dotted border-[var(--border-ed)] py-2">
+          <span className="text-[11px] uppercase tracking-[0.06em] text-[var(--ink-4)]">Lokale versie</span>
+          <span className="font-mono text-sm tabular-nums text-[var(--ink)]">v{localVersion}</span>
+        </div>
+        <div className="flex items-baseline justify-between gap-3 border-b border-dotted border-[var(--border-ed)] py-2">
+          <span className="text-[11px] uppercase tracking-[0.06em] text-[var(--ink-4)]">Prod versie</span>
+          <span
+            className={`font-mono text-sm tabular-nums ${
+              prodVersion && prodVersion !== localVersion ? TONE.warn.text : 'text-[var(--ink)]'
+            }`}
+          >
+            {prod.state === 'loading' ? '…' : prodVersion ? `v${prodVersion}` : 'onbekend'}
           </span>
         </div>
       </div>

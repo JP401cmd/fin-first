@@ -28,6 +28,16 @@ interface MastheadProps {
    * live statusregel, geen editie-aanduiding.
    */
   hideEdition?: boolean
+  /**
+   * Naam van de rubriek waar deze masthead voor staat, bv. "De Krant"
+   * (UR3-30 / K2a). Rendert als hairline-kicker bóven de TriFinity-titel.
+   *
+   * Waarom optioneel: dezelfde masthead draagt /nieuws (De Krant) én
+   * /berichten (het berichtencentrum). De menu-ingang heet "Krant", maar de
+   * bestemming zei dat woord nergens — wie erop klikte landde op iets dat
+   * zichzelf anders noemde. Alleen de krant-oppervlakken vullen dit dus.
+   */
+  rubriek?: string
 }
 
 // Kapitaliseer de eerste letter — nl-NL geeft "maandag", krantdatelines zijn "Maandag …"
@@ -50,7 +60,7 @@ function formatUpdated(iso: string): string | null {
   return `Bijgewerkt ${when}`
 }
 
-export function Masthead({ editionNr, jaargang, dateline, metaLeft, articleCount, updatedAt, sourceNote, hideEdition = false }: MastheadProps) {
+export function Masthead({ editionNr, jaargang, dateline, metaLeft, articleCount, updatedAt, sourceNote, hideEdition = false, rubriek }: MastheadProps) {
   const now = new Date()
   const rawDateline = dateline ?? now.toLocaleDateString('nl-NL', {
     weekday: 'long',
@@ -103,8 +113,15 @@ export function Masthead({ editionNr, jaargang, dateline, metaLeft, articleCount
           allemaal ín de shell — dus stonden daar twee h1's op één route,
           dezelfde klasse als #26 op de check-in. Alleen het niveau wijzigt;
           de krant-typografie blijft ongemoeid. */}
+      {/* Rubriek-kicker — de naam waaronder deze pagina in het menu staat.
+          Hairline-kicker, dus hij concurreert niet met de masthead-titel. */}
+      {rubriek && (
+        <p className="mt-2 text-center font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--ink-3)]">
+          {rubriek}
+        </p>
+      )}
       <h2
-        className="mt-2 text-center text-3xl font-black italic tracking-[-0.025em] sm:text-4xl md:text-[2.75rem]"
+        className={`${rubriek ? 'mt-1' : 'mt-2'} text-center text-3xl font-black italic tracking-[-0.025em] sm:text-4xl md:text-[2.75rem]`}
         style={{ fontFamily: 'var(--font-playfair, serif)' }}
       >
         TriFinity{' '}

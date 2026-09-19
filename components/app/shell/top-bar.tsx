@@ -122,7 +122,7 @@ type TopBarProps = {
  * - Newspaper: shortcut naar `/nieuws` (TriFinity Post).
  * - Bell: opent `NotificationModal` via `useNotifications().openModal`.
  *   Toont badge met `unreadCount` (cap '9+').
- * - Avatar: tap toont dropdown met Identiteit / Rapportages / Sync nu +
+ * - Avatar: tap toont dropdown met Mijn / Rapportages / Sync nu +
  *   Sync-rapport (2-kolom-grid) / Beheer (superadmin) / Uitloggen.
  * - Weergave-badge (`PerspectiveSwitcher`, compact): eerste item in de cluster,
  *   self-gating — alleen zichtbaar voor leden van een huishouden.
@@ -166,9 +166,13 @@ function TopBarUtilities({ email, initials, role }: { email: string; initials?: 
       {/* Vier-hefbomen-kompas — compact dots, expand on tap */}
       <LeverCompassMobile scores={leverScores} />
 
+      {/* "Krant", niet "Nieuws" — dezelfde regel als de zijbalk-rij en het
+          ⌘K-item (bevinding M14, één naam per concept). Dit icoon draagt geen
+          zichtbaar label, dus dit aria-label wás de enige naam die een
+          screenreader hier hoorde: een naam die nergens anders in de app staat. */}
       <Link
         href="/nieuws"
-        aria-label="Nieuws"
+        aria-label="Krant"
         className={`flex h-9 w-9 items-center justify-center text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] ${TAP_TARGET_EXTEND_BLOCK}`}
       >
         <Newspaper className="h-4 w-4" aria-hidden="true" />
@@ -231,7 +235,13 @@ function TopBarUtilities({ email, initials, role }: { email: string; initials?: 
               className="block px-4 py-2 text-sm text-[var(--ink-2)] hover:bg-[var(--subtle)]"
               onClick={() => setMenuOpen(false)}
             >
-              Identiteit
+              {/* "Mijn", niet "Identiteit" (UR3-30 / K4). De module heet al
+                  sinds de /identity-opruiming "Mijn" — in de zijbalk-footer,
+                  in ⌘K en op de pagina zelf. Deze dropdown was de laatste
+                  aanklikbare ingang die de oude modulenaam nog droeg, en dus
+                  de enige plek waar een gebruiker "Identiteit" tegenkwam
+                  zonder dat dat pad nog bestaat. */}
+              Mijn
             </Link>
             <Link
               href="/rapportages"

@@ -111,11 +111,15 @@ export interface EventInputs {
   readonly notices: readonly EventMappingNotice[]
 }
 
-/** Context die de mapping deelt (tijdas + indexatie voor de de-indexatie van Geb-posten). */
+/** Context die de mapping deelt (tijdas van de kern). */
 export interface EventMappingContext {
   /** P!B7 — startleeftijd (hele jaren). */
   readonly startLeeftijd: number
-  /** P!B14 — algemene inflatie per jaar (voor het gede-indexeren van niet-geïndexeerde posten). */
+  /**
+   * P!B14 — algemene inflatie per jaar. Sinds ADR 0167 NIET meer gebruikt om niet-
+   * geïndexeerde Geb-posten te de-indexeren (die gaan nominaal vast de kern in); blijft in
+   * de context omdat de aanroepers 'm al leveren en een latere mapping 'm kan nodig hebben.
+   */
   readonly inflatie: number
 }
 
@@ -511,7 +515,7 @@ function buildManualGebeurtenissen(
         }
         continue
       }
-      const post = cashflowToGebPost(cf, ctx)
+      const post = cashflowToGebPost(cf)
       if (post !== null) posten.push(post)
     }
     if (posten.length === 0) continue
@@ -542,17 +546,20 @@ function buildManualGebeurtenissen(
 }
 
 /**
- * `SimCashflow` → `GebPost` (of `null` bij nul-bedrag/lege duur). `bedrag` in
- * koopkracht-nu (+ bate / − kost); geïndexeerde flow = as-is, niet-geïndexeerde flow
- * gede-indexeerd naar de startmaand zodat de centrale CF!H/Af!D-indexatie 'm nominaal-
- * vast maakt (één-op-één de kern-conventie voor erfenis/niet-geïndexeerd pensioen).
+ * `SimCashflow` → `GebPost` (of `null` bij nul-bedrag/lege duur). Geïndexeerde flow =
+ * `bedrag` in koopkracht-nu (+ bate / − kost), centraal geïndexeerd door CF!H/Af!D.
+ * Niet-geïndexeerde flow ("Stijgt mee met inflatie" uit) = NOMINAAL VAST: het bedrag
+ * as-is + `nominaalVast: true` (ADR 0167) — de kern telt 'm dan zónder index. De oude
+ * één-keer-deling naar de startmaand was alleen exact voor een eenmalige post; een
+ * periodieke post groeide daarna tóch mee met idx(m).
  */
-function cashflowToGebPost(cf: SimCashflow, ctx: EventMappingContext): GebPost | null {
+function cashflowToGebPost(cf: SimCashflow): GebPost | null {
   const signed = cf.direction === 'income' ? Math.abs(cf.amount) : -Math.abs(cf.amount)
   if (signed === 0) return null
 
-  const startYears = Math.max(0, cf.fromAge - ctx.startLeeftijd)
-  const bedrag = cf.indexed ? signed : signed / Math.pow(1 + ctx.inflatie, startYears)
+  const bedrag = signed
+  // Alleen gezet als waar, zodat geïndexeerde posten exact de oude vorm houden.
+  const vast = cf.indexed ? {} : { nominaalVast: true as const }
 
   const startMonths = monthsFromBirth(cf.fromAge)
   const start = postFromMonths(startMonths)
@@ -565,6 +572,7 @@ function cashflowToGebPost(cf: SimCashflow, ctx: EventMappingContext): GebPost |
       startMaand: start.maand,
       eindLeeftijd: null,
       eindMaand: null,
+      ...vast,
     }
   }
 
@@ -582,6 +590,7 @@ function cashflowToGebPost(cf: SimCashflow, ctx: EventMappingContext): GebPost |
       eindLeeftijd: null, // doorlopend → de kern loopt tot de horizon (eIdx = 1199)
       eindMaand: null,
       ...stopmoment,
+      ...vast,
     }
   }
   // Laatste actieve maand = maand vóór `toAge` (de app-flow loopt [fromAge, toAge)).
@@ -596,6 +605,7 @@ function cashflowToGebPost(cf: SimCashflow, ctx: EventMappingContext): GebPost |
     eindLeeftijd: end.leeftijd,
     eindMaand: end.maand,
     ...stopmoment,
+    ...vast,
   }
 }
 

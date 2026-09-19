@@ -61,14 +61,22 @@ export const PALETTE_THEMES: Record<PaletteTheme, {
     borderEd: '#c9b88e',
     borderMd: '#a89968',
   },
-  // "Krant": knapperige redactionele wit-op-papier (bron: TriFinity Design
-  // System-plaat). Lichtere, koelere basis met zuiver-witte kaarten voor
+  // "Redactioneel wit": knapperige redactionele wit-op-papier (bron: TriFinity
+  // Design System-plaat). Lichtere, koelere basis met zuiver-witte kaarten voor
   // maximaal krantencontrast. Ink-shades blijven identiek aan de andere
   // paletten. Draagt een eigen label-font (Inter i.p.v. DM Mono) — gescopet
   // via data-palette="krant" in globals.css, dus opt-in en zonder regressie.
+  //
+  // Het LABEL heette tot UR3-30 "Krant" en botste daarmee op het woord dat de
+  // app óók gebruikt voor de nieuwsrubriek (/nieuws): één woord, twee losse
+  // betekenissen, allebei aanklikbaar. Besluit 6 sep 2026 (K3): de rubriek
+  // houdt de naam, het palet krijgt de omschrijving die er al stond. De SLEUTEL
+  // blijft bewust `krant` — die zit in localStorage (`tf-palette-theme`), in
+  // `data-palette` op <html> en in de globals.css-scoping; hem hernoemen zou
+  // de voorkeur van elke bestaande gebruiker stil terugzetten op 'cream'.
   krant: {
-    label: 'Krant',
-    description: 'Redactioneel wit — lichter, knapperig, Inter-labels',
+    label: 'Redactioneel wit',
+    description: 'Zuiver papier — lichter, knapperig, Inter-labels',
     bg: '#faf9f6',
     paper: '#ffffff',
     subtle: '#f3f2ee',

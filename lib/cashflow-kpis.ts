@@ -85,6 +85,7 @@ import {
 import { computeSavingsRateFromNetWorthDelta } from '@/lib/core-metrics'
 import { computeExpectedAnnualAppreciation, type Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
+import { resolveFireParams, type FireProfileInput } from '@/lib/fire-params'
 
 // ── Invoervormen ────────────────────────────────────────────────────────────
 
@@ -487,6 +488,14 @@ export interface SavingsRate6mInput extends SavingsRate6mWindow {
   netWorthSnapshots: NetWorthSnapshotRow[]
   /** Actieve bezittingen — ALLEEN gelezen wanneer de delta-tak aanslaat. */
   assets: Asset[]
+  /**
+   * Profielrendement in PROCENTEN (`resolveFireParams(profile).grossReturn × 100`)
+   * — terugval voor een bezitting ZONDER eigen rendementsaanname
+   * (`expected_return = null`, ADR 0166) in `computeExpectedAnnualAppreciation`.
+   * Zonder dit veld rekent de delta-tak zo'n bezitting op 0% koerswinst waar de
+   * kernel het profielrendement rekent. Weggelaten → 0 (oude nul-basis).
+   */
+  terugvalRendementPct?: number
 }
 
 export interface SavingsRate6mOutcome {
@@ -539,7 +548,10 @@ export function resolveSavingsRate6m(input: SavingsRate6mInput): SavingsRate6mOu
 
   let savingsRate6m = savings6m.savingsRate6m
   if (savings6m.isEstimate && input.netWorthSnapshots.length >= 2 && input.effectiveMonthlyIncome > 0) {
-    const expectedAnnualAppreciation = computeExpectedAnnualAppreciation(input.assets)
+    const expectedAnnualAppreciation = computeExpectedAnnualAppreciation(
+      input.assets,
+      input.terugvalRendementPct ?? 0,
+    )
     const deltaResult = computeSavingsRateFromNetWorthDelta(
       input.netWorthSnapshots,
       input.effectiveMonthlyIncome,
@@ -834,6 +846,12 @@ export const loadForecastSectionData = cache(async (supabase: SupabaseClient): P
     effectiveMonthlyExpenses: monthlyExpenses,
     netWorthSnapshots: snapshots,
     assets,
+    // Terugval voor bezittingen zonder eigen rendement (ADR 0166). Deze slanke
+    // laag laadt de `fire_assumptions`-jaarlaag niet (bewust: geen extra fetch
+    // voor één correctieterm), dus hier de kale profiel-keten — bij een gezette
+    // profielwaarde identiek aan de bundel; alleen bij een leeg profiel wijkt de
+    // terugval af (DEFAULT_RETURN i.p.v. de jaarlaag).
+    terugvalRendementPct: resolveFireParams((profile ?? {}) as FireProfileInput).grossReturn * 100,
   })
 
   // ── De EFFECTIEVE quote: dezelfde assemblage als `loadDashboardData` ───────

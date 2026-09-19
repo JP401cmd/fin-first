@@ -26,7 +26,6 @@
  * `lib/format.ts`, `lib/housing-strategy.ts` (alleen `getFireEligibleNetWorth`),
  * `lib/health-score-input.ts` (alleen `computeEmergencyFundMonths`),
  * `lib/savings-source.ts`, `lib/onboarding/retirement-prefill.ts`,
- * `lib/onboarding-presets.ts` (alleen `computeNoodfondsTarget`),
  * `lib/subscription-catalog.ts`, en voor WF-START-28 (stap "Jouw plan", ADR
  * 0129): `lib/horizon/plan-draft.ts` (validatie + kopij), `lib/onboarding-plan.ts`
  * (de route-toets van save-own-data), `app/(onboarding)/onboarding/
@@ -48,7 +47,6 @@ import { getFireEligibleNetWorth, type HousingContext } from '@/lib/housing-stra
 import { computeEmergencyFundMonths, type HealthScoreAsset } from '@/lib/health-score-input'
 import { resolveSavingsSource } from '@/lib/savings-source'
 import { computeRetirementPrefill } from '@/lib/onboarding/retirement-prefill'
-import { computeNoodfondsTarget } from '@/lib/onboarding-presets'
 import {
   ONBOARDING_HOUSING_MODE,
   computeFreedomTicker,
@@ -240,7 +238,6 @@ export const START_ENGINE_CHECKS: StartEngineCheck[] = [
       criterion('WF-START-18')
       const spaarquote = spaarquotePreview(3000, 2100)
       const pensioenPrefill = computeRetirementPrefill({ monthlyExpenses: 2100 }).amount
-      const noodfondsPrefill = computeNoodfondsTarget({ monthlyIncome: 3000, monthlyExpenses: 2100 })
       const netto = nettoVermogenRecap([2500, 18000, 12000], [9000])
       // Meelopende vrijheidstijd-teller (bevinding H12): dezelfde persona, na
       // de derde bezitting en MET de studieschuld erbij — op de intake-
@@ -255,8 +252,8 @@ export const START_ENGINE_CHECKS: StartEngineCheck[] = [
       })
       return {
         expected:
-          'spaarquotePreview=30; pensioenPrefill=20160; noodfondsPrefill=12600; nettoVermogenRecap=23500; vrijheidsteller=1j 3m; tellerBedrag=32500',
-        actual: `spaarquotePreview=${spaarquote}; pensioenPrefill=${pensioenPrefill}; noodfondsPrefill=${noodfondsPrefill}; nettoVermogenRecap=${netto}; vrijheidsteller=${teller?.label ?? 'geen'}; tellerBedrag=${teller?.amount ?? 0}`,
+          'spaarquotePreview=30; pensioenPrefill=20160; nettoVermogenRecap=23500; vrijheidsteller=1j 3m; tellerBedrag=32500',
+        actual: `spaarquotePreview=${spaarquote}; pensioenPrefill=${pensioenPrefill}; nettoVermogenRecap=${netto}; vrijheidsteller=${teller?.label ?? 'geen'}; tellerBedrag=${teller?.amount ?? 0}`,
       }
     },
   },
@@ -289,19 +286,6 @@ export const START_ENGINE_CHECKS: StartEngineCheck[] = [
       return {
         expected: 'ingangsleeftijdGeldig=75; ingangsleeftijdAowFallback=68; ingangsleeftijdDefault=67',
         actual: `ingangsleeftijdGeldig=${geldig}; ingangsleeftijdAowFallback=${ontbrekendMetAow}; ingangsleeftijdDefault=${ontbrekendZonderAow}`,
-      }
-    },
-  },
-  {
-    workflow: 'WF-START-21',
-    scenarioId: 'UAT-START-21',
-    label: 'Noodfonds-spaardoel-prefill (computeNoodfondsTarget, inkomen 2800/uitgaven 1900)',
-    run: () => {
-      criterion('WF-START-21')
-      const prefill = computeNoodfondsTarget({ monthlyIncome: 2800, monthlyExpenses: 1900 })
-      return {
-        expected: 'noodfondsPrefill=11400',
-        actual: `noodfondsPrefill=${prefill}`,
       }
     },
   },

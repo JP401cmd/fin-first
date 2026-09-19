@@ -451,15 +451,54 @@ export function buildSimChartGeometry(input: SimChartGeometryInput): SimChartGeo
     : Math.max(1, overlayMax, mcMax, hhMax, secondaryMax)
   const maxVal = Math.max(rawMax, 1) * 1.08
 
+  // ── Ondergrens van het y-domein: GEEN halt-op-nul (B-053, 19 sep 2026) ────
+  //
+  // De kernel rekent ná depletie door tot diep negatief (tekort-lening-pot,
+  // `tables/s.ts`; regressie "geen halt-op-nul" in horizon-grafiek.ts) en de
+  // scenario-varianten volgen die hoofdlijn sinds B-053 ongeklemd. Tot dit
+  // besluit was het domein hard [0, maxVal] en klemde élke reeks hier op
+  // `Math.max(val, 0)`: een tekort werd als een vlakke lijn óp de nullijn
+  // getekend — een onjuist financieel beeld. Het domein loopt nu van de laagste
+  // GETEKENDE waarde (zelfde reeksen als `rawMax`, MC op de getekende p25) tot
+  // maxVal. Zonder negatieve waarde is `minVal` exact 0 en is elke y-coördinaat
+  // byte-identiek aan voorheen — de bestaande snapshots bewijzen dat.
+  const minOf = (vals: number[]) => (vals.length > 0 ? Math.min(...vals) : 0)
+  const overlayMin = scenarioOverlays?.length
+    ? minOf(scenarioOverlays.flatMap(o => o.points.filter(inRange).map(([, v]) => v)))
+    : 0
+  const mcMin = monteCarloOverlay
+    ? minOf(monteCarloOverlay.p25.filter((_, i) => {
+        const age = monteCarloOverlay.startAge + i
+        return age >= minAge && age <= maxAge
+      }))
+    : 0
+  const hhMin = householdOverlays?.length
+    ? minOf(householdOverlays.flatMap(o => o.points.filter(inRange).map(([, v]) => v)))
+    : 0
+  const rawMin = Math.min(
+    0,
+    minOf(visibleAllPts.map(([, v]) => v)),
+    minOf(visibleBaselinePts.map(([, v]) => v)),
+    minOf(visibleSecondaryPts.map(([, v]) => v)),
+    overlayMin,
+    mcMin,
+    hhMin,
+  )
+  // Zelfde 8% marge als aan de bovenkant; 0 blijft 0 (geen negatieve marge
+  // wanneer niets onder nul komt — anders zou elke grafiek een lege strook
+  // onder de nullijn krijgen).
+  const minVal = rawMin * 1.08
+  const ySpan = maxVal - minVal
+
   const xScale = (age: number) =>
     maxAge > minAge ? ((age - minAge) / (maxAge - minAge)) * innerW : 0
-  const yScale = (val: number) => innerH - (val / maxVal) * innerH
+  const yScale = (val: number) => innerH - ((val - minVal) / ySpan) * innerH
 
   function pointsToPath(pts: [number, number][]): string {
     return pts
       .map(([age, val], i) => {
         const x = PAD.left + xScale(age)
-        const y = PAD.top + yScale(Math.max(val, 0))
+        const y = PAD.top + yScale(val)
         return `${i === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`
       })
       .join(' ')
@@ -563,16 +602,16 @@ export function buildSimChartGeometry(input: SimChartGeometryInput): SimChartGeo
   // hoofdlijn) zodat ook fractionele leeftijden een correcte y krijgen.
   const lineYAt = (age: number): number | null => {
     if (allPts.length === 0) return null
-    if (age <= allPts[0][0]) return PAD.top + yScale(Math.max(allPts[0][1], 0))
+    if (age <= allPts[0][0]) return PAD.top + yScale(allPts[0][1])
     const last = allPts[allPts.length - 1]
-    if (age >= last[0]) return PAD.top + yScale(Math.max(last[1], 0))
+    if (age >= last[0]) return PAD.top + yScale(last[1])
     for (let i = 0; i < allPts.length - 1; i++) {
       const [a0, v0] = allPts[i]
       const [a1, v1] = allPts[i + 1]
       if (age >= a0 && age <= a1) {
         const t = a1 === a0 ? 0 : (age - a0) / (a1 - a0)
         const v = v0 + t * (v1 - v0)
-        return PAD.top + yScale(Math.max(v, 0))
+        return PAD.top + yScale(v)
       }
     }
     return null
@@ -614,10 +653,14 @@ export function buildSimChartGeometry(input: SimChartGeometryInput): SimChartGeo
   // die — wanneer geclampt — vlak boven de plot-rand kan eindigen.
   const labelSafeTopY = PAD.top + (extraTop > 0 ? 14 : 2)
 
+  // Ticks op de positieve helft zoals voorheen; zakt het domein onder nul, dan
+  // komt er één extra tick op de laagste getekende waarde bij, zodat het tekort
+  // ook aan de as afleesbaar is (de nullijn zelf tekent `yZero`).
   const yTicks = [0, 0.33, 0.66, 1.0].map(f => ({
     val: maxVal * f,
     y: PAD.top + yScale(maxVal * f),
   }))
+  if (rawMin < 0) yTicks.push({ val: rawMin, y: PAD.top + yScale(rawMin) })
 
   const totalAgeSpan = maxAge - minAge
   const xStep = totalAgeSpan <= 10 ? 1 : totalAgeSpan <= 20 ? 2 : totalAgeSpan <= 40 ? 5 : 10
@@ -626,7 +669,7 @@ export function buildSimChartGeometry(input: SimChartGeometryInput): SimChartGeo
     xTickAges.push(a)
   }
 
-  const yFireDot = fireFractionalPt !== null ? PAD.top + yScale(Math.max(fireFractionalPt[1], 0)) : null
+  const yFireDot = fireFractionalPt !== null ? PAD.top + yScale(fireFractionalPt[1]) : null
 
   // Meegroeiende erfenis/koopkracht-doellijn (legacy/perpetual). `targetEndPortfolio`
   // is de NOMINALE eindwaarde op eindleeftijd; gedeeld door de inflatie-indexfactor
@@ -684,8 +727,8 @@ export function buildSimChartGeometry(input: SimChartGeometryInput): SimChartGeo
         const age = mc.startAge + i
         if (age < minAge || age > maxAge) continue
         const x = PAD.left + xScale(age)
-        fwd.push(`${x.toFixed(1)},${(PAD.top + yScale(Math.max(upper[i], 0))).toFixed(1)}`)
-        bwd.unshift(`${x.toFixed(1)},${(PAD.top + yScale(Math.max(lower[i], 0))).toFixed(1)}`)
+        fwd.push(`${x.toFixed(1)},${(PAD.top + yScale(upper[i])).toFixed(1)}`)
+        bwd.unshift(`${x.toFixed(1)},${(PAD.top + yScale(lower[i])).toFixed(1)}`)
       }
       if (fwd.length < 2) return ''
       return `M ${fwd[0]} ${fwd.slice(1).map(p => `L ${p}`).join(' ')} L ${bwd.join(' L ')} Z`
@@ -696,7 +739,7 @@ export function buildSimChartGeometry(input: SimChartGeometryInput): SimChartGeo
         const age = mc.startAge + i
         if (age < minAge || age > maxAge) return null
         const x = PAD.left + xScale(age)
-        const y = PAD.top + yScale(Math.max(val, 0))
+        const y = PAD.top + yScale(val)
         const cmd = first ? 'M' : 'L'
         first = false
         return `${cmd} ${x.toFixed(1)} ${y.toFixed(1)}`

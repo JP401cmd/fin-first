@@ -573,6 +573,9 @@ export function NieuwsOnlyClient({ userId }: { userId: string }) {
           Editienummer, jaargang en de bronartikelen-grondslag zijn transparantie
           over hóé de krant tot stand komt; die horen bij Volledig. */}
       <Masthead
+        // UR3-30 / K2a: de bestemming zegt haar eigen naam. "Krant" staat in
+        // het menu, in ⌘K en in de zijbalk; tot nu toe nergens op de pagina.
+        rubriek="De Krant"
         editionNr={viewEditionNr}
         jaargang={viewJaargang}
         hideEdition={simple}

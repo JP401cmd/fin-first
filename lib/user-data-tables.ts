@@ -40,12 +40,20 @@ export const SESSION_WIPE_TABLES: readonly string[] = [
   'crypto_transactions',
   'holding_alerts',
   'target_allocations',
-  'user_feature_visits',
-  'next_step_completions',
+  // `user_feature_visits` en `next_step_completions` stonden hier tot 19-09-2026,
+  // maar hebben live GEEN eigen-rij DELETE-policy (alleen SELECT/INSERT/UPDATE,
+  // gemeten tegen pg_policies) — de sessie-delete was een stille no-op en beide
+  // overleefden elke reset. Ze staan nu in SERVICE_WIPE_TABLES (security-review
+  // B-058).
   'investment_holdings',
   'crypto_holdings',
   'goal_contributions',
   'category_corrections',
+  // Heeft live óók geen eigen-rij DELETE-policy (alleen SELECT/INSERT, TO public),
+  // maar de FK `recommendation_id → recommendations ON DELETE CASCADE` wist de
+  // rijen mee zodra batch 3 van deleteAllUserData `recommendations` wist. De
+  // sessie-delete in batch 1b is dus een no-op, de cascade doet het werk; blijft
+  // hier voor de export (eigen-rij SELECT). Gemeten 19-09-2026.
   'recommendation_feedback',
   'budget_rollovers',
   'recurring_transactions',
@@ -98,6 +106,35 @@ export const SESSION_WIPE_TABLES: readonly string[] = [
   // een reset/verwijdering. De dekkings-vitest ziet dat niet — die bewaakt de
   // partitie, niet het wispad. Gemeld bij fix-brok FIX2-SEC (08-08-2026).
   'spend_limits',
+  // Regels binnen een uitgavenplafond (migratie 20260810120000, ADR 0097).
+  // Draagt `user_id`, `budget_ids` én `counterparty_keys`/`counterparty_labels`
+  // — dezelfde tegenpartijnamen die `spend_limits` hierboven in de export
+  // brachten (een persoonsnaam KAN erin staan). Eigen-rij DELETE-policy
+  // ("spend_limit_rules own delete", gemeten 19-09-2026) én FK
+  // `spend_limit_id → spend_limits ON DELETE CASCADE`: de wis loopt via de
+  // ouder in batch 2 van deleteAllUserData, de export via deze lijst. Ontbrak
+  // tot 19-09-2026 in de inventaris (security-review B-058).
+  'spend_limit_rules',
+  // Koppeling doel ↔ bezitting/schuld (migratie 20260901140000). Alleen id's,
+  // maar wél een persoonsgegeven (welk doel de gebruiker aan welk bezit hangt).
+  // Eigen-rij DELETE-policy ("goal_links own delete", gemeten 19-09-2026) en
+  // FK-cascade vanaf goals/assets/debts, dus de wis loopt via batch 1b/3 mee.
+  // Ontbrak tot 19-09-2026 in de inventaris (security-review B-058).
+  'goal_links',
+  // Idempotentie-claims van de aangifte-import (migratie 20260827170000):
+  // PK (user_id, scope, key) met `key` = een inhouds-hash van de aangifte en
+  // `response` = de id-lijsten van de geschreven rijen (geen klaartekst).
+  // Eigen-rij DELETE-policy ("import_idempotency own delete", gemeten
+  // 19-09-2026) → sessie-partitie; de export neemt 'm generiek mee.
+  // LET OP — net als bij `spend_limits` destijds maakt deze entry de EXPORT
+  // compleet, de WIS nog niet: `deleteAllUserData` (lib/seed-persona.ts) roept
+  // voor deze tabel géén deleteTable aan en er is geen FK naar een public-tabel
+  // die cascadeert. Gevolg: een claim met status 'done' overleeft een reset, en
+  // een her-import van dezelfde aangifte na een reset wordt als replay
+  // beantwoord (`already_imported: true`, oude id's) zonder iets te schrijven.
+  // Bij full-delete cascadeert hij wél via auth.users. Gemeld in de
+  // security-review B-058 (19-09-2026); de deleteTable-regel hoort in batch 0.
+  'import_idempotency',
   // Gespreksgeschiedenis met Fin (migratie 20260908120000, ADR 0137). Beide
   // tabellen dragen `user_id` én een eigen-rij DELETE-policy
   // ("chat_conversations own delete" / "chat_messages own delete",
@@ -176,6 +213,37 @@ export const SERVICE_WIPE_TABLES: readonly string[] = [
   // DELETE — anders kon hij zich uit een interviewgroep schrijven. De
   // service-role wist 'm; een accountverwijdering ook via de FK-cascade.
   'user_group_members',
+  // Gevierde mijlpalen (migratie 20260831160000, ADR 0123). SERVICE-partitie en
+  // niet SESSION: die migratie geeft bewust GEEN eigen-rij DELETE-policy — een
+  // wisbare mijlpaal maakt de log waardeloos als datering. Via de sessie-client
+  // zou een delete dus een stille no-op zijn, net als bij `user_reports`.
+  //
+  // WEL bij RESET wissen (B-058). De migratiekop zegt "wissen op verzoek gaat via
+  // het schrappen van de gebruiker" en dat blijft waar voor de AVG-route; een
+  // reset is een andere handeling — hij wist per definitie álle financiële data,
+  // en een mijlpalenlog over cijfers die niet meer bestaan is geen historie maar
+  // een dateringsfout. Bleef hij staan, dan vierde de motor na het heronboarden
+  // de eerste triviale drempel als verse mijlpaal (B-058, samen met
+  // `profiles.milestones_seeded_at` in de reset-payload).
+  //
+  // Dat deze tabel hier tot 19-09-2026 ONTBRAK is geen vergeten regel maar een
+  // gat in de inventaris: `achieved_milestones` stond evenmin in
+  // ALL_USER_SCOPED_TABLES, dus de dekkings-vitest kón 'm niet flaggen. Beide
+  // lijsten zijn nu bij.
+  'achieved_milestones',
+  // Bezochte functies en afgevinkte vervolgstappen (stappenplan/gids-staat).
+  // Stonden sinds het begin in SESSION_WIPE_TABLES, maar hebben live GEEN
+  // eigen-rij DELETE-policy — alleen "Users can view/insert/update own …"
+  // (gemeten tegen pg_policies 19-09-2026). De sessie-delete in batch 0 van
+  // deleteAllUserData leverde dus 0 rijen zonder fout en beide tabellen
+  // overleefden elke reset: de gids toonde na een heronboarding de oude
+  // bezocht-/afgevinkt-staat, terwijl de reset-route `module_guide_state` en
+  // `completed_onboarding_steps` op het profiel juist wél leegt. Zelfde
+  // foutbeeld als B-058, andere tabellen. Batch 5 wist ze nu via de
+  // service-role; bij full-delete cascaderen ze bovendien via auth.users.
+  // De deleteTable-aanroepen in batch 0 mogen weg (onschadelijke no-op).
+  'next_step_completions',
+  'user_feature_visits',
 ] as const
 
 /**
@@ -254,8 +322,16 @@ export const EXPORT_OWN_READ_EXTRA_TABLES: readonly string[] = ['consent_events'
 
 /**
  * Canonieke inventaris: álle public-tabellen met een `user_id`-kolom
- * (geverifieerd tegen information_schema, laatst 2026-08-08). Drift-baken voor
- * de dekkings-vitest. Zie de regenereer-query in de header-docstring.
+ * (geverifieerd tegen information_schema, laatst 2026-09-19: 62 tabellen).
+ * Drift-baken voor de dekkings-vitest. Zie de regenereer-query in de
+ * header-docstring.
+ *
+ * GRENS VAN DIT BAKEN: de vitest vergelijkt de partities met DEZE lijst, niet
+ * met het live schema. Een user_id-tabel die hier niet staat is voor de test
+ * onzichtbaar — zo bleef `achieved_milestones` (B-058) én bleven
+ * `goal_links`/`import_idempotency`/`spend_limit_rules` (security-review
+ * 19-09-2026) een maand lang buiten wis én export. De meting hierboven is dus
+ * een handmatige stap bij élke migratie die een user_id-kolom toevoegt.
  *
  * BEWUST NIET IN DEZE LIJST, met reden — anders is de claim "álle" onwaar:
  *   `backup_tx_rabobank0596_20260804` — een ad-hoc BACKUP-tabel (geen
@@ -269,6 +345,10 @@ export const EXPORT_OWN_READ_EXTRA_TABLES: readonly string[] = ['consent_events'
 export const ALL_USER_SCOPED_TABLES: readonly string[] = [
   '_legacy_holding_transactions',
   '_legacy_holdings',
+  // Live sinds migratie 20260831160000 (ADR 0123), maar tot 19-09-2026 NIET in
+  // deze inventaris — waardoor de dekkings-vitest het wis-gat niet kon zien dat
+  // B-058 opleverde. Meten bij de eerstvolgende regeneratie van deze lijst.
+  'achieved_milestones',
   'actions',
   'ai_calculator_usage',
   'ai_token_usage',
@@ -304,9 +384,13 @@ export const ALL_USER_SCOPED_TABLES: readonly string[] = [
   'external_data_sources',
   'feedback',
   'goal_contributions',
+  // Migratie 20260901140000 — tot 19-09-2026 niet in de inventaris.
+  'goal_links',
   'goals',
   'holding_alerts',
   'household_members',
+  // Migratie 20260827170000 — tot 19-09-2026 niet in de inventaris.
+  'import_idempotency',
   'investment_holdings',
   'investment_transactions',
   'life_events',
@@ -325,6 +409,8 @@ export const ALL_USER_SCOPED_TABLES: readonly string[] = [
   'recommendations',
   'recurring_transactions',
   'report_configs',
+  // Migratie 20260810120000 — tot 19-09-2026 niet in de inventaris.
+  'spend_limit_rules',
   'spend_limits',
   'target_allocations',
   'transactions',

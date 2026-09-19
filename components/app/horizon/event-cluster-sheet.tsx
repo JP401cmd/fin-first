@@ -22,6 +22,7 @@ import type { LifeEvent } from '@/lib/horizon-data'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { EVENT_ICONS } from '@/components/app/horizon/log-timeline'
 import { formatMaskedCurrency } from '@/lib/format'
+import { describeEventDuration } from '@/lib/horizon/event-duration-copy'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 
 // ── Helpers ───────────────────────────────────────────────────────
@@ -72,7 +73,7 @@ function naturalImpactLine(ev: LifeEvent, masked: boolean): string {
   return 'Automatisch afgeleide mijlpaal'
 }
 
-function lifeImpactLine(ev: LifeEvent, masked: boolean): string {
+function lifeImpactLine(ev: LifeEvent, masked: boolean, stopAge: number | null): string {
   const preset = presetImpactLine(ev)
   if (preset) return preset
   const parts: string[] = []
@@ -86,6 +87,11 @@ function lifeImpactLine(ev: LifeEvent, masked: boolean): string {
   }
   if (ev.monthly_income_change > 0) {
     parts.push(`+${formatMaskedCurrency(ev.monthly_income_change, masked)}/mnd`)
+  }
+  // Looptijd van het maandbedrag (gedeelde helper): "24 mnd" / "blijvend" /
+  // "tot stopmoment (58,5)" — dezelfde grens die de rekenmotor hanteert (ADR 0143).
+  if (ev.monthly_cost_change > 0 || ev.monthly_income_change > 0) {
+    parts.push(describeEventDuration(ev, stopAge))
   }
   return parts.length > 0 ? parts.join(' · ') : 'Geen financiële impact'
 }
@@ -118,10 +124,13 @@ export function EventClusterSheet({
   centerAge,
   onClose,
   onSelectEvent,
+  stopAge = null,
 }: {
   open: boolean
   events: LifeEvent[]
   centerAge: number
+  /** Stopmoment van de hoofdrun (`eventStopAgeFromSim`) voor de looptijd-tekst; null = geen. */
+  stopAge?: number | null
   onClose: () => void
   /** Klik op een rij — krijgt de event.id door en is verantwoordelijk voor
    *  routing (life-event → EventPane open; natural → deeplink). Conform
@@ -182,6 +191,7 @@ export function EventClusterSheet({
                 key={ev.id}
                 event={ev}
                 masked={masked}
+                stopAge={stopAge}
                 onClick={() => handleClick(ev.id)}
               />
             ))}
@@ -198,6 +208,7 @@ export function EventClusterSheet({
                 key={ev.id}
                 event={ev}
                 masked={masked}
+                stopAge={stopAge}
                 onClick={() => handleClick(ev.id)}
               />
             ))}
@@ -239,15 +250,17 @@ function Section({
 function ClusterRow({
   event,
   masked,
+  stopAge,
   onClick,
 }: {
   event: LifeEvent
   masked: boolean
+  stopAge: number | null
   onClick: () => void
 }) {
   const natural = isNaturalEvent(event)
   const color = colorFor(event)
-  const impact = natural ? naturalImpactLine(event, masked) : lifeImpactLine(event, masked)
+  const impact = natural ? naturalImpactLine(event, masked) : lifeImpactLine(event, masked, stopAge)
   const Icon = EVENT_ICONS[event.icon] || EVENT_ICONS['Calendar']
 
   return (

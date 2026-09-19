@@ -294,6 +294,27 @@ export const NL_AOW_MONTHLY = 1581.55
 /** Dutch AOW netto monthly benefit, cohabiting/married — €1 084,13 per person, per 1-7-2026, SVB. */
 export const NL_AOW_MONTHLY_SAMENWONEND = 1084.13
 
+// ── Schattingen (app-brede conventies) ───────────────────────────
+
+/**
+ * Leeftijd waarop de app aanneemt dat iemand begon met pensioenopbouw via een
+ * werkgever — de enige nieuwe aanname achter "Schat het voor me" in de
+ * onboarding-pensioenstap (B-055, eigenaarsbesluit 19-09-2026). Bewust
+ * voorzichtig: 21 was tot 2024 de wettelijke maximale toetredingsleeftijd (18
+ * sinds de WTP), maar studie-, zzp- en buitenlandjaren zonder opbouw zijn de
+ * norm, en de schatter rekent al met het fiscale maximum-opbouwpercentage.
+ * De gebruiker kan het aantal jaren altijd overtypen.
+ */
+export const NL_PENSIOENOPBOUW_STARTLEEFTIJD = 25
+
+/**
+ * Afrondingsstap (€) van een door de app geschát bedrag. Fijn genoeg om
+ * plausibel te blijven (€3.075, niet €3.000) en grof genoeg om zichtbaar te
+ * maken dat het een schatting is en geen meting. Gedeeld door de
+ * cohort-schatting (inkomen/uitgaven) en de pensioenschatting.
+ */
+export const ESTIMATE_ROUNDING_STEP = 25
+
 // ── Dutch Tax System — Box 3 (jaargebonden) ────────────────────
 //
 // GEEN losse literals meer: forfait en tarief worden één-op-één afgeleid uit de

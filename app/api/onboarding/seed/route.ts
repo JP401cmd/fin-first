@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getServiceClient } from '@/lib/supabase/service'
 import { PERSONAS, type PersonaKey } from '@/lib/test-personas'
 import { deleteAllUserData, seedPersonaData, countSeedSteps } from '@/lib/seed-persona'
 import { unauthorized, forbidden } from '@/lib/api/respond'
@@ -57,8 +58,17 @@ export async function POST(req: Request) {
       try {
         const persona = PERSONAS[personaKey]
 
-        // Phase 1: Delete existing data
-        await deleteAllUserData(supabase, user.id, progress)
+        // Phase 1: Delete existing data.
+        // Service-role voor de RLS-afgeschermde persoonlijke tabellen (afgeronde
+        // vragenlijst-sessies, feedback, user_reports, net_worth_history) en de
+        // bucket-prefix, die de sessie-client niet kan wissen — zonder
+        // `{ service }` is die stap een stille no-op. Best-effort zonder
+        // service-key (dev). Zelfde patroon als app/api/onboarding/reset; géén
+        // fullErase (reseed, geen accountverwijdering).
+        const hasServiceKey =
+          !!process.env.NEXT_PUBLIC_SUPABASE_URL && !!process.env.SUPABASE_SERVICE_ROLE_KEY
+        const service = hasServiceKey ? getServiceClient() : undefined
+        await deleteAllUserData(supabase, user.id, progress, { service })
 
         // Phase 2: Insert persona data
         const summary = await seedPersonaData(supabase, user.id, persona, progress)
@@ -75,8 +85,12 @@ export async function POST(req: Request) {
 
         send({ done: true, summary })
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Onbekende fout'
-        send({ error: message })
+        // Geen rauwe error.message de stream in (AVG/ADR 0044): log server-side
+        // met tag, stuur een generieke tekst naar de client — spiegel van
+        // app/api/admin/seed. serverError() geeft een NextResponse terug en is
+        // hier binnen de ReadableStream niet bruikbaar.
+        console.error(`[onboarding-seed:POST] ${err instanceof Error ? err.message : String(err)}`, err instanceof Error ? (err.stack ?? '') : '')
+        send({ error: 'Er ging iets mis. Probeer het later opnieuw.' })
       } finally {
         controller.close()
       }

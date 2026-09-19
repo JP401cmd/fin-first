@@ -98,6 +98,22 @@ handmatige rijen gebruikt de horizon-conventie — tijdens de engine-integratie
 euro-exact bewezen (een open-einde "Pensionering"-post lekte anders vanaf
 maand 349). Verwar de twee niet.
 
+### Geb-postconventie — indexatie (ADR 0167, buiten oracle-domein)
+
+`GebPost.bedrag` is **koopkracht-nu**; CF!H en Af!D indexeren centraal met
+`idx(m) = (1+i)^(m/12)`. Excel-Geb kent géén indexatievlag per handmatige post.
+De app wél ("Stijgt mee met inflatie" uit): zo'n post is een **nominaal vast**
+bedrag en draagt `GebPost.nominaalVast: true` — de adapter deelt het bedrag dan
+NIET meer naar de startmaand (die deling was alleen exact voor een Eenmalig-post;
+een Periodiek-post groeide daarna tóch mee met `idx(m)`), en CF!H/Af!D tellen
+vaste posten in een aparte som zónder index. Zonder de vlag is de som 0 en blijft
+`H = baten·idx` letterlijk staan → parity byte-identiek. Hetzelfde geldt voor het
+eigen pensioen met "Geïndexeerd = Nee" onder `KernelInput.pensioenNominaalVast`
+(app-pad aan, fixture-pad nooit): de Excel-structuur (Auto-geb M gede-indexeerd
+naar de ingang, daarna centraal geïndexeerd) is groei, geen vast bedrag, en is
+strijdig met het partnerpensioen PT!K dat wél vlak nominaal blijft. Eigenschaps-
+test: `geb-nominaal-vast.test.ts`.
+
 ### Belangrijk formule-detail uit de Bel-port (één-maand-lag)
 
 De grondslagen `Bel!D/E/F` zijn de Bez/S-saldi van **dezelfde maand `m`** —

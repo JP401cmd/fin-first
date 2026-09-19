@@ -3,6 +3,8 @@ import {
   computeJaarruimte,
   jaarruimteBesparing,
   estimateAccruedPensionMonthly,
+  estimateAccruedPensionFromNet,
+  roundToEstimateStep,
   estimateFactorAFromSalary,
   resolvePensionFactorA,
   hasWerkgeverspensioen,
@@ -17,7 +19,8 @@ import {
   JAARRUIMTE_FRANCHISE_2026,
   JAARRUIMTE_MAX_2026,
 } from './jaarruimte'
-import { computeBox1Tax } from './box1-tax'
+import { computeBox1Tax, grossFromNet } from './box1-tax'
+import { ESTIMATE_ROUNDING_STEP, NL_PENSIOENOPBOUW_STARTLEEFTIJD } from './constants'
 
 // ── WERKGEVERSPENSIOEN-SIGNAAL (Notion P3, 3 sep 2026) ────────────────────────
 // Eén definitie van "bouwt zelf werkgeverspensioen op": life_event OF eigen
@@ -424,6 +427,57 @@ describe('estimateAccruedPensionMonthly', () => {
     expect(estimateAccruedPensionMonthly(Number.NaN, 10)).toBe(0)
     expect(estimateAccruedPensionMonthly(-40_000, 10)).toBe(0)
     expect(estimateAccruedPensionMonthly(50_000, Number.NaN)).toBe(0)
+  })
+})
+
+// ── estimateAccruedPensionFromNet — onboarding "Schat het voor me" (B-055) ────
+describe('estimateAccruedPensionFromNet', () => {
+  it('componeert grossFromNet × (leeftijd − startleeftijd) × estimateAccruedPensionMonthly, afgerond op €25', () => {
+    const r = estimateAccruedPensionFromNet({ netMonthly: 3_000, age: 40 }, { year: 2026 })
+    // Bruto: de exacte Box 1-inversie — niet een marginaal-tarief-benadering.
+    expect(r.grossYearly).toBe(grossFromNet(36_000, 2026))
+    expect(r.grossYearly).toBeGreaterThan(36_000)
+    // Jaren: 40 − 25.
+    expect(r.years).toBe(40 - NL_PENSIOENOPBOUW_STARTLEEFTIJD)
+    expect(r.years).toBe(15)
+    // Maandbedrag: dezelfde bouwsteen als de handmatige hulp, op de schattingsstap.
+    const raw = estimateAccruedPensionMonthly(r.grossYearly, 15, { year: 2026 })
+    expect(r.monthly).toBe(roundToEstimateStep(raw))
+    expect(r.monthly % ESTIMATE_ROUNDING_STEP).toBe(0)
+    expect(Math.abs(r.monthly - raw)).toBeLessThanOrEqual(ESTIMATE_ROUNDING_STEP / 2)
+    expect(r.monthly).toBeGreaterThan(0)
+  })
+
+  it('leeftijd op of onder de startleeftijd → 0 jaren en €0', () => {
+    expect(estimateAccruedPensionFromNet({ netMonthly: 3_000, age: NL_PENSIOENOPBOUW_STARTLEEFTIJD }))
+      .toMatchObject({ years: 0, monthly: 0 })
+    expect(estimateAccruedPensionFromNet({ netMonthly: 3_000, age: 22 }).monthly).toBe(0)
+  })
+
+  it('gebroken leeftijd telt alleen volle opbouwjaren', () => {
+    expect(estimateAccruedPensionFromNet({ netMonthly: 3_000, age: 40.9 }).years).toBe(15)
+  })
+
+  it('netto onder de franchise → €0; geen of ongeldig inkomen → alles 0', () => {
+    // €1.000 netto/mnd ≈ €12k–13k bruto, ruim onder de franchise van €19.172.
+    expect(estimateAccruedPensionFromNet({ netMonthly: 1_000, age: 50 }).monthly).toBe(0)
+    expect(estimateAccruedPensionFromNet({ netMonthly: 0, age: 50 })).toEqual({
+      grossYearly: 0,
+      years: 25,
+      monthly: 0,
+    })
+    expect(estimateAccruedPensionFromNet({ netMonthly: Number.NaN, age: Number.NaN })).toEqual({
+      grossYearly: 0,
+      years: 0,
+      monthly: 0,
+    })
+  })
+
+  it('roundToEstimateStep: veelvouden van €25, niet-eindig/negatief → 0', () => {
+    expect(roundToEstimateStep(723)).toBe(725)
+    expect(roundToEstimateStep(712)).toBe(700)
+    expect(roundToEstimateStep(-5)).toBe(0)
+    expect(roundToEstimateStep(Number.POSITIVE_INFINITY)).toBe(0)
   })
 })
 

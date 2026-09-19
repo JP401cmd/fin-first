@@ -11,6 +11,7 @@ import {
   ASSET_TYPE_COLORS,
   ASSET_TYPE_LABELS,
 } from '@/lib/asset-data'
+import type { FreedomRateSource } from '@/lib/format'
 import type { BudgetsPageData } from '@/lib/budgets-data-loader'
 import type { HoldingsPageData } from '@/lib/holdings-data-loader'
 import type { CorePageData } from '@/lib/core-data-loader'
@@ -161,6 +162,16 @@ interface AssetCategoryPageProps {
   currentUserId?: string
   /** Initiële assets, server-side geladen. Client kan deze later updaten. */
   initialAssets: Asset[]
+  /**
+   * Het CANONIEKE dagtarief (€/dag) van de server-page — `getRecentDailyExpenseRate`
+   * (12-mnd gerealiseerde consumptie, ADR 0126 D1/D2). Reist door naar `<AssetPane>`,
+   * dat sinds 19 sep 2026 geen eigen tarief meer berekent: die eigen som stond op de
+   * essentiële-budgetten-grondslag en gaf het detailvenster een lángere vrijheidsduur
+   * dan elk ander oppervlak. Ontbreekt = geen vrijheidstijd in het venster.
+   */
+  dailyExpenses?: number
+  /** Herkomst van dat tarief, voor de wisselkoers-voetnoot (B-039). */
+  dailyExpensesSource?: FreedomRateSource
   /**
    * Server-geladen budget-data, alleen relevant voor `type === 'cash'`. Wordt
    * doorgegeven aan de Budgetteren-verdieping zodat `<BudgetsClient />` direct
@@ -350,6 +361,8 @@ export function AssetCategoryPage({
   type,
   currentUserId,
   initialAssets,
+  dailyExpenses,
+  dailyExpensesSource,
   initialBudgetsData,
   initialHoldingsData,
   initialCoreData,
@@ -831,6 +844,9 @@ export function AssetCategoryPage({
         <AssetPane
           asset={selectedAsset}
           currentUserId={currentUserId}
+          // Consume, don't recompute (ADR 0126 D1) — zie `AssetPaneProps.dailyExpenses`.
+          dailyExpenses={dailyExpenses}
+          dailyExpensesSource={dailyExpensesSource}
           onClose={() => setSelectedAssetId(null)}
           onChanged={() => router.refresh()}
         />

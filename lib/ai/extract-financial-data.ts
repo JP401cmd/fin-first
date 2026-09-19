@@ -14,6 +14,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { getModel } from '@/lib/ai/config'
 import { sanitizeForAI } from '@/lib/ai/sanitize'
 import { DEFAULT_EXTRACTION_PROMPT } from '@/lib/ai/extraction-system-prompt'
+import { leesBeheerInstelling } from '@/lib/app-settings/beheer-instelling'
 // Het schema woont sinds de on-device-variant in een eigen, zod-only bestand:
 // het lokale pad valideert dezelfde vorm PER ITEM (geen constrained decoding)
 // en mag deze servermodule — met getModel en de provider-SDK's erachter — niet
@@ -66,13 +67,9 @@ export async function extractFinancialData(
     // Resolve the AI model from project settings
     const model = await getModel(supabase, 'document_extractie')
 
-    // Check for admin-configured prompt override, fall back to hardcoded default
-    const { data: overrideRow } = await supabase
-      .from('app_settings')
-      .select('value')
-      .eq('key', 'extraction_system_prompt')
-      .single()
-    const systemPrompt = overrideRow?.value || DEFAULT_EXTRACTION_PROMPT
+    // Beheerder-override van het prompt: beheer-content, dus server-side via de
+    // service-role (ADR 0163) — de sessie-client mag die sleutel niet lezen.
+    const systemPrompt = (await leesBeheerInstelling('extraction_system_prompt')) ?? DEFAULT_EXTRACTION_PROMPT
 
     // Build the user prompt with profile context for age-relative calculations
     const contextParts: string[] = []

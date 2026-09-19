@@ -118,3 +118,31 @@ describe('runRegelProjection — parameters en assetExpectedReturns (TPR-15 laag
     }
   })
 })
+
+describe('runRegelProjection — cashflow (W-009)', () => {
+  const metBedragen = {
+    rawContext: {
+      profile: { net_monthly_income: 3000, estimated_monthly_expenses: 2000 },
+      assets: [],
+      debts: [],
+      lifeEvents: [],
+    },
+  } as unknown as RegelSimSnapshot
+
+  it('zonder cashflow-override blijft de context byte-identiek (geen default-drift)', () => {
+    runRegelProjection(metBedragen)
+    expect(ontvangen.contexts[0]).toBe(metBedragen.rawContext)
+  })
+
+  it('vervangt precies de twee kasstroomvelden die withResolvedKernelBedragen ook vult', () => {
+    runRegelProjection(metBedragen, { cashflow: { monthlyIncome: 4200, monthlyExpenses: 2500 } })
+    const ctx = ontvangen.contexts[0] as { profile: Record<string, unknown> }
+    expect(ctx.profile.net_monthly_income).toBe(4200)
+    expect(ctx.profile.estimated_monthly_expenses).toBe(2500)
+    // De snapshot zelf is niet gemuteerd.
+    expect(metBedragen.rawContext.profile).toEqual({
+      net_monthly_income: 3000,
+      estimated_monthly_expenses: 2000,
+    })
+  })
+})

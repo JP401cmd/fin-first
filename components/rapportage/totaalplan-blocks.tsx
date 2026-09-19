@@ -33,6 +33,7 @@
  * staat als expliciete melding boven de grafiek, met de gedeelde /toekomst-copy.
  */
 
+import Link from 'next/link'
 import { AlertTriangle } from 'lucide-react'
 import { formatCurrency, formatWithFreedom } from '@/lib/format'
 import { formatFireAge } from '@/lib/horizon-data'
@@ -434,6 +435,22 @@ export function ProjectieBlock({
           <p className="mt-1">
             {projectie.tekortLening.copy.piek} {projectie.tekortLening.copy.lijn}
           </p>
+          {/* B-050 — dezelfde instelling-/knoppen-zinnen als het /toekomst-blok: de copy
+              zat al in het object, alleen het rapport liet ze weg. Onder een vast
+              stopmoment legt `.instelling` uit waarom de lening er ondanks "Geen
+              tekort-lening in mijn plan" toch is. */}
+          <p className="mt-1">{projectie.tekortLening.copy.instelling}</p>
+          <p className="mt-1">{projectie.tekortLening.copy.knoppen}</p>
+          {projectie.tekortLening.copy.toonInstellingLink && (
+            <p className="mt-1">
+              <Link
+                href="/toekomst/voorkeuren?regel=eindstrategie"
+                className="font-medium text-amber-900 underline underline-offset-2 transition-colors hover:text-[var(--ink)]"
+              >
+                Bekijk of wijzig of een tekort-lening mag &rarr;
+              </Link>
+            </p>
+          )}
           <p className="mt-1 italic">{projectie.tekortLening.copy.disclaimer}</p>
         </ReportNotice>
       )}

@@ -30,7 +30,8 @@ const tests: TestCase[] = [
     estimatedDurationMs: 2000,
     async fn() {
       // Dynamically import release notes data
-      const { RELEASE_NOTES } = await import('@/lib/release-notes')
+      const { RELEASE_NOTES, compareReleaseVersions } = await import('@/lib/release-notes')
+      const { APP_VERSION } = await import('@/lib/app-version')
 
       // Should have releases
       assertGreaterThan(
@@ -88,25 +89,25 @@ const tests: TestCase[] = [
         }
       }
 
-      // Releases should be sorted newest first (version descending)
-      // Version format: fin_prod_X.Y — compare by extracting numeric part
-      const versions = RELEASE_NOTES.map((r) => {
-        const match = r.version.match(/(\d+(?:\.\d+)*)$/)
-        return match ? parseFloat(match[1]) : 0
-      })
-      for (let i = 0; i < versions.length - 1; i++) {
+      // Releases should be sorted newest first (semver descending). Numeric
+      // compare — a parseFloat would put 0.100.0 below 0.99.0.
+      for (let i = 0; i < RELEASE_NOTES.length - 1; i++) {
+        const a = RELEASE_NOTES[i].version
+        const b = RELEASE_NOTES[i + 1].version
         assert(
-          versions[i] >= versions[i + 1],
-          `Releases not sorted newest first: ${RELEASE_NOTES[i].version} (${versions[i]}) before ${RELEASE_NOTES[i + 1].version} (${versions[i + 1]})`,
+          compareReleaseVersions(a, b) > 0,
+          `Releases not sorted newest first: ${a} before ${b}`,
         )
       }
 
       // Collapsible card verification: first release should default open
       // This is a UI behavior — we verify the ReleaseCard component receives defaultOpen={i === 0}
-      // Structural verification: at least the first release exists
-      assert(
-        RELEASE_NOTES[0].version.startsWith('fin_prod_'),
-        `First release version should start with fin_prod_, got ${RELEASE_NOTES[0].version}`,
+      // Structural verification: the first release carries the package.json version
+      // (one version source — lib/app-version.ts; lib/release-notes.test.ts guards the same).
+      assertEqual(
+        RELEASE_NOTES[0].version,
+        APP_VERSION,
+        `First release version should equal package.json version ${APP_VERSION}, got ${RELEASE_NOTES[0].version}`,
       )
     },
   },
@@ -141,10 +142,20 @@ const tests: TestCase[] = [
       )
 
       // Verify the color mapping aligns with module conventions
-      // amber = Kern, teal = Wil, purple = Horizon
+      // amber = Kern/Bezittingen, teal = Wil/Schulden, purple = Horizon/Budget
+      // (the hefboom names since 0.89.0 map onto the same accent tokens).
       // Check at least some releases follow convention
       const firstRelease = RELEASE_NOTES[0]
       for (const section of firstRelease.sections) {
+        if (section.module === 'Bezittingen') {
+          assertEqual(section.color, 'amber', `Bezittingen should use amber in ${firstRelease.version}`)
+        }
+        if (section.module === 'Schulden') {
+          assertEqual(section.color, 'teal', `Schulden should use teal in ${firstRelease.version}`)
+        }
+        if (section.module === 'Budget') {
+          assertEqual(section.color, 'purple', `Budget should use purple in ${firstRelease.version}`)
+        }
         if (section.module.includes('Kern')) {
           assertEqual(
             section.color,
@@ -213,7 +224,7 @@ const tests: TestCase[] = [
     priority: 'medium',
     estimatedDurationMs: 500,
     async fn() {
-      const { RELEASE_NOTES } = await import('@/lib/release-notes')
+      const { RELEASE_NOTES, parseReleaseVersion } = await import('@/lib/release-notes')
 
       assertGreaterThan(
         RELEASE_NOTES.length,
@@ -221,12 +232,12 @@ const tests: TestCase[] = [
         `Expected at least 20 releases, got ${RELEASE_NOTES.length}`,
       )
 
-      // Verify version format consistency
+      // Verify version format consistency: semver 0.MINOR.PATCH, major stays 0
+      // until the formal go-decision for the livegang.
       for (const release of RELEASE_NOTES) {
-        assert(
-          release.version.startsWith('fin_prod_'),
-          `Version should start with fin_prod_: ${release.version}`,
-        )
+        const parsed = parseReleaseVersion(release.version)
+        assert(parsed !== null, `Version should be semver 0.MINOR.PATCH: ${release.version}`)
+        assertEqual(parsed?.major, 0, `Major must stay 0 before livegang: ${release.version}`)
       }
 
       // Verify dates are valid ISO strings

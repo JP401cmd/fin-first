@@ -18,6 +18,7 @@
  */
 
 import { describe, it, expect } from 'vitest'
+import { computePartnerHead } from './tables/pt'
 import type { Asset, AssetType } from '@/lib/asset-data'
 import type { Debt, DebtType } from '@/lib/debt-data'
 import { buildKernelInputFromApp, type KernelAdapterProfile } from '@/lib/horizon-kernel/adapter'
@@ -140,6 +141,72 @@ describe('buildConvergentieAdapterInput — partnerblok (TPR-07)', () => {
     expect(input.autoGebeurtenissen.leefsituatie).toBe('Samenwonend')
     expect(input.partner.aanwezig).toBe(true)
     expect(input.partner.nettoJaarinkomen).toBe(3000 * 12)
+  })
+})
+
+/**
+ * SPIEGELFIXTURE (TPR-07 fase 2a): de kijker is de JONGSTE (42) en de partner de oudste (45).
+ * Head = de kijker, óók dan — de PT-laag is as-agnostisch (een oudere partner geeft
+ * PT!B10 < 0 en een AOW-drempel eerder op de as). Zonder deze fixture was "head = kijker"
+ * per constructie onzichtbaar: de hoofdfixture zet de kijker ouder dan de partner.
+ */
+const HEAD_JONG = profile({ date_of_birth: `${JAAR - 42}-01-01` })
+const PARTNER_OUD = profile({ date_of_birth: `${JAAR - 45}-01-01`, net_monthly_income: 3000 })
+
+function householdContextSpiegel(): HouseholdKernelRawContext {
+  return {
+    ...householdContext(),
+    head: { userId: 'hoofd', profile: HEAD_JONG, lifeEvents: [], yearlyExpenses: 30_000 },
+    partner: { userId: 'partner', profile: PARTNER_OUD, lifeEvents: [], yearlyExpenses: 24_000 },
+  }
+}
+
+function convergentieContextSpiegel(): ConvergentieRawContext {
+  const row: ConvergentieRawProfileRow = {
+    ...HEAD_JONG,
+    retirement_expense_custom_amount: HEAD_JONG.retirement_custom_amount ?? null,
+    retirement_expense_method: 'essential_budgets',
+    yearly_essential_expenses: COMBINED_YEARLY,
+  }
+  const partner = buildKernelPartnerBlok({ profile: PARTNER_OUD, lifeEvents: [] })
+  return { profile: row, assets: ASSETS, debts: DEBTS, lifeEvents: [], yearlyExpenses: COMBINED_YEARLY, ...(partner ? { partner } : {}) }
+}
+
+describe('TPR-07 fase 2a — head = de kijker, óók als de kijker de jongste is (spiegelfixture)', () => {
+  it('de kern accepteert een oudere partner: PT!B10 > 0 en de partner-AOW-drempel ligt vóór de eigen AOW', () => {
+    const input = buildKernelInputFromApp(buildConvergentieAdapterInput(convergentieContextSpiegel()))
+    expect(input.startLeeftijd).toBe(42)
+    expect(input.partner.aanwezig).toBe(true)
+    // Partner is 3 jaar ouder ⇒ PT!B10 = (head-geboortejaar − partner-geboortejaar)·12 = +36
+    // (de hoofdfixture, kijker ouder, geeft −36); AOW-drempel = (partnerAOW − 45)·12.
+    const head = computePartnerHead(input)
+    expect(head.dobVerschilMnd).toBe(36)
+    expect(head.aowStartMaand).toBe(Math.round((input.partner.aowLeeftijd - 45) * 12))
+    expect(head.aowStartMaand).toBeLessThan(Math.round((input.partner.aowLeeftijd - 42) * 12))
+  })
+
+  it('hoofdgrafiek ≡ sectie op de kijker-as (absolute gelijkheid) en de bridge draagt partnerAowAge op die as', () => {
+    const sectie = computeHouseholdProjection({ rawContext: householdContextSpiegel() })
+    expect(sectie.ok).toBe(true)
+    if (!sectie.ok) return
+    const grafiek = computeConvergentieProjection({ rawContext: convergentieContextSpiegel() })
+    expect(grafiek.ok).toBe(true)
+    if (!grafiek.ok) return
+    expect(grafiek.result.fireAgeFractional).toBe(sectie.combined.fireAgeFractional)
+    expect(grafiek.result.rows).toEqual(sectie.combined.rows)
+    // Partner-AOW op de as van de kijker = 42 + PT!B11/12 — en dat is vóór de eigen AOW-leeftijd.
+    const input = buildKernelInputFromApp(buildConvergentieAdapterInput(convergentieContextSpiegel()))
+    const verwacht = 42 + computePartnerHead(input).aowStartMaand / 12
+    expect(grafiek.result.partnerAowAge).toBe(verwacht)
+    expect(sectie.combined.partnerAowAge).toBe(verwacht)
+    expect(verwacht).toBeLessThan(input.partner.aowLeeftijd)
+  })
+
+  it('solo (zonder partnerblok) draagt géén partnerAowAge', () => {
+    const grafiek = computeConvergentieProjection({ rawContext: convergentieContext(false) })
+    expect(grafiek.ok).toBe(true)
+    if (!grafiek.ok) return
+    expect(grafiek.result.partnerAowAge).toBeNull()
   })
 })
 

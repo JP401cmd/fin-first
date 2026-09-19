@@ -9,14 +9,14 @@
 //   - aandeel% + status  → `vasteLastenRatio` + `vasteLastenCardStatus` (lib/cashflow-cards.ts)
 //   - meter-zones        → `VASTE_LASTEN_GOOD_MAX` / `VASTE_LASTEN_WARN_MAX`
 //   - vrijheidstijd      → `dailyExpenseRate` → `calculateFreedomTime` (lib/format)
-//   - werktijd           → `dailyIncomeRate` → `calculateWorkTime` (lib/work-time, ADR 0105)
 //   - benchmark-getal    → `SUBSCRIPTION_BENCHMARK` (redactioneel, lib/vaste-lasten-benchmarks)
 //
-// TWEE TIJD-GROOTHEDEN, NOOIT DOOR ELKAAR (ADR 0105):
-//   · VRIJHEIDSTIJD  — bedrag / uitgaven-dagtarief = "hoeveel dagen leven koopt dit".
-//   · WERKTIJD       — jaarbedrag / bruto inkomen-dagtarief = "welk deel van mijn
-//     werkjaar gaat hier naartoe". Alleen dít getal mag "die je werkt om te
-//     betalen"-taal dragen, en alleen dít getal is optelbaar tot twaalf maanden.
+// ALLEEN VRIJHEIDSTIJD (W-017, 19-09-2026). De werktijd-claim ("je werkt X van je
+// jaar om ze te betalen", ADR 0105) stond hier als tweede tijd-grootheid; die
+// sectie is van deze pagina verwijderd, en daarmee ook de bruto-inkomen-noemer
+// (`dailyIncomeRate`) die er een dure `loadCoreData`-bundel voor binnentrok.
+// ADR 0105 blijft staan: de belasting-hub draagt de werktijd-claim nog, en het
+// besluit ging over niet dúbbel claimen, niet over overal claimen.
 // Er wordt hier geen eigen som van een kerngetal gemaakt; alleen samenstellen,
 // groeperen en delta's t.o.v. de geciteerde benchmark.
 
@@ -33,7 +33,6 @@ import {
   roundCents,
   type FreedomTimeBreakdown,
 } from '@/lib/format'
-import { calculateWorkTime, EMPTY_WORK_TIME, type WorkTimeBreakdown } from '@/lib/work-time'
 import {
   CATEGORY_LABELS,
   type RecurringCategory,
@@ -63,11 +62,10 @@ export interface VasteLastenInsights {
 
   monthlyIncome: number
   /**
-   * CANONIEK dagtarief (€/dag, 12-mnd rolling) — doorgegeven aan `cancelEffect`
-   * voor de "wat als ik opzeg"-interactie, zodat die exact dezelfde noemer
-   * gebruikt als de vrijheidstijd-regels op deze pagina. Verving het vroegere
-   * `monthlyExpenses`-veld (effective grondslag), dat de client dwong zelf een
-   * dagtarief te maken.
+   * CANONIEK dagtarief (€/dag, 12-mnd rolling) waarop de vrijheidstijd hieronder
+   * staat. Reist mee in het model zodat een consument die ooit weer iets naar
+   * tijd wil vertalen dezelfde noemer pakt — nooit een eigen maand-conversie
+   * (vervolg KRUIS-20).
    */
   dailyExpenseRate: number
   /** Aandeel van vaste lasten in het maandinkomen (0-1), of null zonder inkomen. */
@@ -88,17 +86,6 @@ export interface VasteLastenInsights {
   /** Afgeronde vrijheidsdagen per maand (voor het onderschrift). */
   freedomDaysPerMonth: number
 
-  /**
-   * WERKTIJD (ADR 0105): welk deel van het WERKJAAR de vaste lasten opeisen —
-   * jaarbedrag gedeeld door het bruto dagelijks inkomen. Een ANDERE grootheid dan
-   * `freedomPerYear` hierboven (dat deelt op de uitgaven) en de enige die de
-   * "die je werkt om te betalen"-formulering mag dragen. `hasBasis: false` →
-   * bruto jaarinkomen onbekend, het scherm laat de werktijd-zin dan weg.
-   */
-  workTimePerYear: WorkTimeBreakdown
-  /** Het bruto dagtarief waarop `workTimePerYear` staat (€/dag, 0 = geen basis). */
-  dailyIncomeRate: number
-
   /** Benchmark-duiding voor abonnementen (redactioneel geciteerd getal). */
   subscriptionBenchmarkMonthly: number
   /** jouw abonnementen − benchmark (€/mnd). Positief = boven gemiddeld. */
@@ -117,23 +104,6 @@ export interface VasteLastenInsights {
   variabelCount: number
   /** De variabele posten, aflopend op maandbedrag (gecapt op 6 voor de lijst). */
   variabelItems: { id: string; name: string; monthlyAmount: number }[]
-
-  /**
-   * TOP-5 GROOTSTE POSTEN (S2) — abonnementen én overige vaste kosten door
-   * elkaar, aflopend op maandbedrag, gecapt op 5. Dit is een SORT + SLICE over
-   * de al afgeleide items: exact dezelfde klasse als `largestOf()` en
-   * `buildComposition()` hierboven, géén nieuw rekenpad en geen tweede
-   * grondslag. `terugkerendVariabel` blijft er bewust BUITEN — die posten staan
-   * ook buiten `totalMonthly`, de quote en de status (H14), dus ze horen niet in
-   * een lijst die "je grootste vaste lasten" heet.
-   */
-  topItems: {
-    id: string
-    name: string
-    monthlyAmount: number
-    category: RecurringCategory
-    categoryLabel: string
-  }[]
 
   /** Samenstelling per categorie, aflopend op maandbedrag. */
   composition: CategoryComposition[]
@@ -182,27 +152,6 @@ function largestOf(
 }
 
 /**
- * Effect van het opzeggen van een maandelijkse post: jaarbedrag +
- * vrijheidstijd. Pure helper zodat de "wat als ik opzeg"-interactie in de UI
- * exact dezelfde grondslag deelt als de rest van het scherm.
- *
- * `dailyRate` is het AL-BEREKENDE canonieke dagtarief (€/dag), niet een
- * maandbedrag: deze functie mag de grondslag niet meer kiezen. Was
- * `cancelEffect(monthlyAmount, monthlyExpenses)` met een interne
- * `dailyExpenseRate(monthlyExpenses)` — waardoor de aanroeper er ongemerkt de
- * EFFECTIVE maanduitgaven in kon schuiven (vervolg KRUIS-20). Geef
- * `insights.dailyExpenseRate` door.
- */
-export function cancelEffect(
-  monthlyAmount: number,
-  dailyRate: number,
-): { yearlyEuro: number; freedom: FreedomTimeBreakdown } {
-  const yearlyEuro = roundCents(Math.max(0, monthlyAmount) * 12)
-  const freedom = calculateFreedomTime(yearlyEuro, dailyRate)
-  return { yearlyEuro, freedom }
-}
-
-/**
  * @param monthlyIncome - EFFECTIVE maandinkomen: de noemer van het structurele
  *   aandeel ("hoeveel van mijn inkomen ligt vast?"). Bewust effective (ADR 0073).
  * @param dailyExpenseRate - CANONIEK dagtarief (€/dag) uit de 12-mnd rolling
@@ -211,25 +160,13 @@ export function cancelEffect(
  *   voorheen zelf `dailyExpenseRate(monthlyExpenses)` op de effective grondslag,
  *   waardoor dezelfde vaste last hier een ander aantal vrijheidsdagen kostte dan
  *   in de widgets (vervolg KRUIS-20). 0 → geen vrijheidstijd, geen benadering.
- * @param dailyIncomeRate - CANONIEK bruto dagtarief (€/dag) uit `lib/income-rate.ts`
- *   (`getCanonicalDailyIncomeRate` → `resolveBox1GrossIncome`, ADR 0086/0105) —
- *   de noemer van de WERKTIJD-claim. Bewust een KANT-EN-KLAAR tarief én bewust
- *   een ANDER tarief dan `dailyExpenseRate`: werktijd deelt op het inkomen, niet
- *   op de uitgaven. Optioneel/additief: 0 (of weggelaten) → geen werkjaar-basis,
- *   de motor laat de werktijd-regel leeg i.p.v. hem te benaderen.
  */
 export function buildVasteLastenInsights(params: {
   summary: VasteLastenSummary
   monthlyIncome: number
   dailyExpenseRate: number
-  dailyIncomeRate?: number
 }): VasteLastenInsights {
-  const {
-    summary,
-    monthlyIncome,
-    dailyExpenseRate: dailyRate,
-    dailyIncomeRate: dailyIncome = 0,
-  } = params
+  const { summary, monthlyIncome, dailyExpenseRate: dailyRate } = params
 
   const subscriptionsMonthly = roundCents(summary.totalMonthlySubscriptions)
   const vasteKostenMonthly = roundCents(summary.totalMonthlyVasteKosten)
@@ -249,12 +186,6 @@ export function buildVasteLastenInsights(params: {
   const freedomPerYear =
     hasData && dailyRate > 0 ? calculateFreedomTime(totalMonthly * 12, dailyRate) : EMPTY_FREEDOM
 
-  // Werktijd via het canonieke bruto dagtarief — aangeleverd, niet zelf gerekend.
-  // SCHAAL: `calculateWorkTime` wil een JAARbedrag, vandaar ×12 (spiegelt
-  // `freedomPerYear` hierboven).
-  const workTimePerYear =
-    hasData && dailyIncome > 0 ? calculateWorkTime(totalMonthly * 12, dailyIncome) : EMPTY_WORK_TIME
-
   // Benchmark-delta (geciteerd getal, redactioneel).
   const subscriptionBenchmarkMonthly = SUBSCRIPTION_BENCHMARK.avgMonthlyPerPerson
   const subscriptionDeltaMonthly = roundCents(subscriptionsMonthly - subscriptionBenchmarkMonthly)
@@ -265,18 +196,6 @@ export function buildVasteLastenInsights(params: {
   )
 
   const largestSub = largestOf(summary.subscriptions)
-
-  // Top-5 — sort + slice over de al afgeleide posten (zie `topItems` hierboven).
-  const topItems = [...summary.subscriptions, ...summary.vasteKosten]
-    .sort((a, b) => b.monthlyAmount - a.monthlyAmount)
-    .slice(0, 5)
-    .map((i) => ({
-      id: i.id,
-      name: i.name,
-      monthlyAmount: roundCents(i.monthlyAmount),
-      category: i.category,
-      categoryLabel: i.categoryLabel,
-    }))
 
   // Variabele groep — puur doorgeven/sorteren, geen eigen som van een kerngetal.
   const variabelItems = [...summary.terugkerendVariabel]
@@ -311,9 +230,6 @@ export function buildVasteLastenInsights(params: {
     freedomPerYear,
     freedomDaysPerMonth: Math.round(freedomPerMonth.totalDays),
 
-    workTimePerYear,
-    dailyIncomeRate: dailyIncome,
-
     subscriptionBenchmarkMonthly,
     subscriptionDeltaMonthly,
     aboveSubscriptionBenchmark: subscriptionsMonthly > subscriptionBenchmarkMonthly,
@@ -322,7 +238,6 @@ export function buildVasteLastenInsights(params: {
     variabelCount: summary.terugkerendVariabel.length,
     variabelItems,
 
-    topItems,
     composition,
     largestItem: largestOf([...summary.subscriptions, ...summary.vasteKosten]),
     largestSubscription: largestSub

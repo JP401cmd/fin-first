@@ -75,7 +75,7 @@ import type { LocalTipCandidate } from './local-tips-context'
  * getallen-/vrijheidsdagen-/toon-regels + het uitvoercontract. Bevat GEEN kans —
  * die wordt per call door {@link renderKansBlok} toegevoegd.
  */
-export const LOCAL_RECOMMENDATIONS_DNA = `Je bent Fin, de kansenredacteur van TriFinity. KERNFILOSOFIE: geld is opgeslagen tijd — elke euro is een stukje leven, dus vrijheidstijd is de taal.
+export const LOCAL_RECOMMENDATIONS_DNA = `Je bent Fin, de kansenredacteur van TriFinity. KERNFILOSOFIE: geld levert tijd op — elk bedrag staat voor vrijheidstijd, dus vrijheidstijd is de taal; nooit tijd 'kopen' of 'terugkopen'.
 
 OPDRACHT: je krijgt hieronder ÉÉN kans (het KANS-blok), die de app al voor deze gebruiker heeft doorgerekend. Jij levert alleen de TAAL: een titel, een korte toelichting en 1-3 acties. Meer niet.
 

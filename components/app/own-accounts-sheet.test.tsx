@@ -380,12 +380,12 @@ describe('OwnAccountsSheet', () => {
 
   // ── L1: het handmatige herstelpad ─────────────────────────────────────────
 
-  it('kan de bestaande historie opnieuw laten indelen en meldt het aantal', async () => {
+  it('kan de bestaande historie opnieuw laten categoriseren en meldt het aantal', async () => {
     reclassified = 5
     const onSaved = renderSheet()
     await rowFor('Albert Heijn')
 
-    fireEvent.click(screen.getByRole('button', { name: /Bestaande transacties opnieuw indelen/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Bestaande transacties opnieuw categoriseren/i }))
 
     expect(
       await screen.findByText('5 bestaande transacties alsnog op Eigen rekening gezet.'),

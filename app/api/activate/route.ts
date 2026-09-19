@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getServiceClient } from '@/lib/supabase/service'
 import { computeFeatureAccess } from '@/lib/compute-feature-access'
 import { PERSONAS, type PersonaKey } from '@/lib/test-personas'
 import { deleteAllUserData, seedPersonaData } from '@/lib/seed-persona'
@@ -44,7 +45,16 @@ export async function POST() {
 
       // Seed persona data (replaces any onboarding data)
       const noop = () => {}
-      await deleteAllUserData(supabase, user.id, noop)
+      // Service-role voor de RLS-afgeschermde persoonlijke tabellen (afgeronde
+      // vragenlijst-sessies, feedback, user_reports, net_worth_history) en de
+      // bucket-prefix, die de sessie-client bij een wipe niet kan wissen — zonder
+      // `{ service }` is die stap een stille no-op en houdt het hergeseede account
+      // de antwoorden van vóór de reset. Best-effort: zonder service-key (dev)
+      // worden ze overgeslagen. Zelfde patroon als app/api/onboarding/reset.
+      const hasServiceKey =
+        !!process.env.NEXT_PUBLIC_SUPABASE_URL && !!process.env.SUPABASE_SERVICE_ROLE_KEY
+      const service = hasServiceKey ? getServiceClient() : undefined
+      await deleteAllUserData(supabase, user.id, noop, { service })
       await seedPersonaData(supabase, user.id, persona, noop, { stampAiConsent: true })
       await supabase.from('profiles').update({ is_demo_user: true }).eq('id', user.id)
     }

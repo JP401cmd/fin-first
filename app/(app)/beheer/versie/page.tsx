@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { PageInfoButton } from '@/components/editorial'
 import { getPageInfo } from '@/lib/page-info-content'
+import { APP_VERSION } from '@/lib/app-version'
 import { VersieClient } from './versie-client'
 
 export const metadata: Metadata = { title: 'Versie & git — Beheer' }
@@ -19,7 +20,7 @@ export default function BeheerVersiePage() {
         className="absolute right-0 top-0 z-10"
         content={getPageInfo('/beheer/versie')}
       />
-      <VersieClient />
+      <VersieClient localVersion={APP_VERSION} />
     </div>
   )
 }

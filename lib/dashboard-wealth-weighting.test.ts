@@ -260,3 +260,40 @@ describe('hasInvestedAssets', () => {
     expect(hasInvestedAssets([rij('investment', 0)])).toBe(false)
   })
 })
+
+// ── ADR 0166 — `expected_return = null` valt terug op het profielrendement ────
+//
+// `Number(null ?? 0) === 0` liet een bezitting zonder eigen aanname hier op 0%
+// wegen, terwijl de kernel (`potRendement`) er het profielrendement op rekent.
+// Keuze (a): dezelfde terugval, op percentage-schaal; weggelaten → oude nul-basis.
+describe('dashboard-wealth-weighting — computeAssetsByType terugval (ADR 0166)', () => {
+  const NULL_INVESTMENT: WeightableAssetRow = {
+    asset_type: 'investment',
+    current_value: 100_000,
+    purchase_value: 80_000,
+    expected_return: null,
+    net_worth_inclusion_pct: 100,
+  }
+
+  it('null → het profielrendement (7% → 0,07) zodra de terugval is meegegeven', () => {
+    const [g] = computeAssetsByType([NULL_INVESTMENT], 7)
+    expect(g.expectedReturn).toBeCloseTo(0.07, 10)
+  })
+
+  it('zonder terugval blijft null de oude nul-basis (bestaande callers byte-identiek)', () => {
+    const [g] = computeAssetsByType([NULL_INVESTMENT])
+    expect(g.expectedReturn).toBe(0)
+  })
+
+  it('een ingevulde 0 blijft 0%, ook mét terugval — een bewuste nul erft niets', () => {
+    const [g] = computeAssetsByType([{ ...NULL_INVESTMENT, expected_return: 0 }], 7)
+    expect(g.expectedReturn).toBe(0)
+  })
+
+  it('mengt correct: null-rij op terugval, ingevulde rij op eigen aanname', () => {
+    const eigen: WeightableAssetRow = { ...NULL_INVESTMENT, expected_return: 3 }
+    const [g] = computeAssetsByType([NULL_INVESTMENT, eigen], 7)
+    // (100k × 0,07 + 100k × 0,03) / 200k = 0,05
+    expect(g.expectedReturn).toBeCloseTo(0.05, 10)
+  })
+})

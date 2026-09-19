@@ -23,7 +23,11 @@ vi.mock('@/lib/future/regel-sim', () => ({
   runRegelProjection: (...args: unknown[]) => mockRun(...(args as [])),
 }))
 
-import { EindstrategieBody, GEEN_TEKORT_LENING_UITLEG } from './eindstrategie-body'
+import {
+  EindstrategieBody,
+  GEEN_TEKORT_LENING_UITLEG,
+  GEEN_TEKORT_LENING_VAST_ANKER_UITLEG,
+} from './eindstrategie-body'
 
 const mockFetch = vi.fn()
 let getBody: Record<string, unknown> = { deficit_loan_rate: null, fire_no_deficit_loan: null }
@@ -53,13 +57,13 @@ const snapshot = {
   aowFractional: 67.25,
 } as unknown as NonNullable<Parameters<typeof EindstrategieBody>[0]['simSnapshot']>
 
-function renderBody() {
+function renderBody(firePlan: FirePlan = plan) {
   let actions: RegelEditActionsState | null = null
   const utils = render(
     <EindstrategieBody
       simSnapshot={snapshot}
-      fireStrategy={{ strategy: plan.endForm, endAge: plan.endAge, legacyAmount: plan.legacyAmount }}
-      firePlan={plan}
+      fireStrategy={{ strategy: firePlan.endForm, endAge: firePlan.endAge, legacyAmount: firePlan.legacyAmount }}
+      firePlan={firePlan}
       onActionsChange={(s) => {
         actions = s
       }}
@@ -86,6 +90,29 @@ describe('EindstrategieBody — Geen tekort-lening in mijn plan', () => {
     expect(GEEN_TEKORT_LENING_UITLEG).toMatch(/Uit:/)
     expect(GEEN_TEKORT_LENING_UITLEG).toMatch(/Relevant omdat/)
     expect(GEEN_TEKORT_LENING_UITLEG).not.toMatch(/aanbevolen|past bij jou|kies voor|je moet/i)
+  })
+
+  // B-050 (19 sep 2026, variant B): de ankervoorwaarde staat alleen bij een vast stopmoment.
+  it('"zo vroeg als het kan" (solved): geen ankervoorwaarde bij de instelling', async () => {
+    renderBody()
+    await screen.findByRole('switch', { name: /Geen tekort-lening in mijn plan/ })
+    expect(screen.queryByTestId('geen-tekort-lening-vast-anker')).toBeNull()
+    expect(document.body.textContent).not.toContain(GEEN_TEKORT_LENING_VAST_ANKER_UITLEG)
+  })
+
+  it.each([
+    ['age', { kind: 'age', age: 58 } as FirePlan['anchor']],
+    ['aow', { kind: 'aow' } as FirePlan['anchor']],
+    ['now', { kind: 'now' } as FirePlan['anchor']],
+  ])('vast anker (%s): de instelling legt uit dat de leeftijd niet verschuift en de lening kan blijven', async (_kind, anchor) => {
+    renderBody({ ...plan, anchor })
+    await screen.findByRole('switch', { name: /Geen tekort-lening in mijn plan/ })
+    const caveat = screen.getByTestId('geen-tekort-lening-vast-anker')
+    expect(caveat.textContent).toBe(GEEN_TEKORT_LENING_VAST_ANKER_UITLEG)
+    expect(GEEN_TEKORT_LENING_VAST_ANKER_UITLEG).toMatch(/verschuift die leeftijd niet/)
+    expect(GEEN_TEKORT_LENING_VAST_ANKER_UITLEG).toMatch(/zo vroeg als het kan/)
+    // Beschrijvend (Wft): geen advies.
+    expect(GEEN_TEKORT_LENING_VAST_ANKER_UITLEG).not.toMatch(/aanbevolen|past bij jou|kies voor|je moet/i)
   })
 
   it('leest de bewust uitgezette keuze (false) uit GET /api/fire-settings', async () => {

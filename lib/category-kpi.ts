@@ -13,10 +13,11 @@
  * Pure server-safe functies — geen 'use client'.
  */
 import type { Asset, AssetType } from './asset-data'
+import { heeftEigenRendement } from './asset-return'
 import type { Debt, DebtType } from './debt-data'
 import type { AssetKpiContext } from './asset-kpi'
 import type { DebtKpiContext } from './debt-kpi'
-import type { KpiPair, KpiValue } from './asset-kpi'
+import { KPI_GEEN_EIGEN_RENDEMENT, type KpiPair, type KpiValue } from './asset-kpi'
 import { formatCurrency } from './format'
 import { debtRemainingMonths } from './debt-remaining-term'
 
@@ -70,6 +71,27 @@ function weightedAverage(
   return sumWV / sumW
 }
 
+/**
+ * Weegitems voor een rendement-/rente-gemiddelde over `assets.expected_return`.
+ *
+ * Rijen ZONDER eigen aanname (`null`, ADR 0166) doen niet mee: `Number(null)`
+ * is 0 (géén NaN), dus zonder deze filter drukt zo'n rij het gewogen gemiddelde
+ * stilzwijgend omlaag terwijl /toekomst er het profielrendement op rekent. Een
+ * ingevulde 0 telt wél mee — dat is een bewuste 0%. Display-keuze (b): de
+ * categorie-strip heeft geen profiel bij de hand, dus hij middelt over wat er
+ * wél is ingevuld en toont `KPI_GEEN_EIGEN_RENDEMENT` zodra niets dat heeft.
+ */
+function eigenRendementItems(assets: Asset[]): Array<{ value: number; weight: number }> {
+  return assets.flatMap((a) =>
+    heeftEigenRendement(a.expected_return) ? [{ value: Number(a.expected_return), weight: Number(a.current_value) }] : [],
+  )
+}
+
+/** Waar of niet: geen enkele rij in deze categorie draagt een eigen rendementsaanname. */
+function zonderEigenRendement(assets: Asset[]): boolean {
+  return assets.length > 0 && !assets.some((a) => heeftEigenRendement(a.expected_return))
+}
+
 function sumValid(values: number[]): number {
   let total = 0
   for (const v of values) {
@@ -93,11 +115,8 @@ function aggCash(assets: Asset[], ctx: AssetKpiContext): KpiPair {
   // bank-rekeningen) → val terug op gewogen gemiddelde rente. Dit voorkomt
   // dat de categorie­kaart leeg blijft.
   if (!stats || stats.size === 0) {
-    const items = assets.map((a) => ({
-      value: Number(a.expected_return),
-      weight: Number(a.current_value),
-    }))
-    const avg = weightedAverage(items)
+    if (zonderEigenRendement(assets)) return { primary: KPI_GEEN_EIGEN_RENDEMENT }
+    const avg = weightedAverage(eigenRendementItems(assets))
     if (avg == null) return {}
     return {
       primary: { value: formatPercent(avg, { decimals: 1 }), label: 'rente', tone: 'neutral' },
@@ -156,15 +175,13 @@ function aggCash(assets: Asset[], ctx: AssetKpiContext): KpiPair {
 }
 
 function aggSavings(assets: Asset[], ctx: AssetKpiContext): KpiPair {
-  // KPI 1 — gewogen gem. rente
-  const rateItems = assets.map((a) => ({
-    value: Number(a.expected_return),
-    weight: Number(a.current_value),
-  }))
-  const avgRate = weightedAverage(rateItems)
-  const primary: KpiValue | undefined = avgRate != null
-    ? { value: formatPercent(avgRate, { decimals: 1 }), label: 'rente', tone: 'neutral' }
-    : undefined
+  // KPI 1 — gewogen gem. rente (alleen rijen mét eigen aanname, zie eigenRendementItems)
+  const avgRate = weightedAverage(eigenRendementItems(assets))
+  const primary: KpiValue | undefined = zonderEigenRendement(assets)
+    ? KPI_GEEN_EIGEN_RENDEMENT
+    : avgRate != null
+      ? { value: formatPercent(avgRate, { decimals: 1 }), label: 'rente', tone: 'neutral' }
+      : undefined
 
   // KPI 2 — gewogen gem. vasttijd (alleen items met einddatum)
   const now = ctx.now ?? new Date()
@@ -255,15 +272,13 @@ function aggRetirement(assets: Asset[]): KpiPair {
     ? { value: `${formatCurrency(totalMonthly)}/mnd`, tone: 'neutral' }
     : undefined
 
-  // KPI 2 — gewogen gem. verwacht rendement
-  const items = assets.map((a) => ({
-    value: Number(a.expected_return),
-    weight: Number(a.current_value),
-  }))
-  const avg = weightedAverage(items)
-  const secondary: KpiValue | undefined = avg != null && avg > 0
-    ? { value: formatPercent(avg, { decimals: 1 }), label: 'verwacht', tone: 'neutral' }
-    : undefined
+  // KPI 2 — gewogen gem. verwacht rendement (alleen rijen mét eigen aanname)
+  const avg = weightedAverage(eigenRendementItems(assets))
+  const secondary: KpiValue | undefined = zonderEigenRendement(assets)
+    ? KPI_GEEN_EIGEN_RENDEMENT
+    : avg != null && avg > 0
+      ? { value: formatPercent(avg, { decimals: 1 }), label: 'verwacht', tone: 'neutral' }
+      : undefined
 
   return { primary, secondary }
 }
@@ -457,14 +472,14 @@ function aggLevensverzekering(assets: Asset[], ctx: AssetKpiContext): KpiPair {
 }
 
 function aggVordering(assets: Asset[], ctx: AssetKpiContext): KpiPair {
-  // KPI 1 — gewogen gem. rente
-  const rateItems = assets
-    .filter((a) => Number(a.expected_return) > 0)
-    .map((a) => ({ value: Number(a.expected_return), weight: Number(a.current_value) }))
+  // KPI 1 — gewogen gem. rente (alleen rijen mét eigen aanname én rente > 0)
+  const rateItems = eigenRendementItems(assets).filter((it) => it.value > 0)
   const avgRate = rateItems.length > 0 ? weightedAverage(rateItems) : null
-  const primary: KpiValue | undefined = avgRate != null
-    ? { value: formatPercent(avgRate, { decimals: 1 }), label: 'rente', tone: 'pos' }
-    : undefined
+  const primary: KpiValue | undefined = zonderEigenRendement(assets)
+    ? KPI_GEEN_EIGEN_RENDEMENT
+    : avgRate != null
+      ? { value: formatPercent(avgRate, { decimals: 1 }), label: 'rente', tone: 'pos' }
+      : undefined
 
   // KPI 2 — gewogen gem. resterende looptijd (alleen items met einddatum)
   const now = ctx.now ?? new Date()

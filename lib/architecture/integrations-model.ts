@@ -226,7 +226,7 @@ export const INTEGRATIONS: IntegrationEntry[] = [
     apiVersionPinned: null,
     // baseUrl is runtime-dynamisch (sandbox vs. prod via app_settings) — null om false drift te vermijden
     baseUrl: null,
-    sourceFiles: ['lib/truelayer/client.ts'],
+    sourceFiles: ['lib/truelayer/client.ts', 'lib/truelayer/consent.ts'],
     apiRoutes: ['/api/bank-connect/accounts', '/api/bank-connect/auth-link', '/api/bank-connect/callback', '/api/bank-connect/linked-accounts', '/api/bank-connect/relink', '/api/bank-connect/sync', '/api/bank-connect/balances', '/api/bank-connect/status', '/api/bank-connect/disconnect', '/api/bank-connect/providers'],
     dbTable: 'bank_connections',
     docsUrl: 'https://docs.truelayer.com/',

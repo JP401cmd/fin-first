@@ -1279,7 +1279,13 @@ export const loadCoreData = cache(async function loadCoreData(
   if (savingsRateMethod === 'estimate' && snapshotResult.data && effectiveMonthlyIncome > 0) {
     // Verwachte koerswinst op beleggingen — geen sparen, dus afhalen voor een
     // eerlijker fallback-quote. Gedeelde helper (expected_return is een %, dus /100).
-    const expectedAnnualAppreciation = computeExpectedAnnualAppreciation(assetsResult.data as unknown as Asset[])
+    // Bezittingen zonder eigen rendement (`expected_return = null`, ADR 0166) groeien
+    // op het profielrendement — dezelfde ketting als de kernel; `fireParams` is hierboven
+    // al met de jaarlaag geshadowd.
+    const expectedAnnualAppreciation = computeExpectedAnnualAppreciation(
+      assetsResult.data as unknown as Asset[],
+      fireParams.grossReturn * 100,
+    )
     const deltaResult = computeSavingsRateFromNetWorthDelta(
       snapshotResult.data as NetWorthSnapshot[],
       effectiveMonthlyIncome,

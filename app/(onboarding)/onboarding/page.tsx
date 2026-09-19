@@ -21,6 +21,8 @@ import { OnboardingInkomen, parseBedragInput } from '@/components/onboarding/onb
 import { OnboardingBezittingen } from '@/components/onboarding/onboarding-bezittingen'
 import { OnboardingSchulden } from '@/components/onboarding/onboarding-schulden'
 import {
+  healSchuldenPhases,
+  initialSchuldenPhases,
   initialSectionPhases,
   type SectionPhase,
 } from '@/components/onboarding/section-phase'
@@ -29,7 +31,6 @@ import {
   INITIAL_PENSION_DRAFT,
   type PensionDraft,
 } from '@/components/onboarding/onboarding-pensioen'
-import { OnboardingSpaardoel } from '@/components/onboarding/onboarding-spaardoel'
 import { OnboardingEindstrategie } from '@/components/onboarding/onboarding-eindstrategie'
 import {
   OnboardingUitgavenPensioen,
@@ -40,7 +41,6 @@ import { OnboardingKlaar } from '@/components/onboarding/onboarding-klaar'
 import { applyPensionParseResult } from '@/lib/pension/apply-parse-result'
 import { formatAowAge, lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import type { PensionParseResult } from '@/app/api/pension/parse/route'
-import { SPAARDOEL_PRESETS, type SpaardoelPresetKey } from '@/lib/onboarding-presets'
 import { computeOnboardingCompleteness } from '@/lib/onboarding-completeness'
 import { computeCurrentAge } from '@/lib/persoonlijk-plan-assembly'
 import {
@@ -123,7 +123,6 @@ const SAVING_MESSAGES = [
  *   · Bezittingen→ `bezittingen`             (begeleide ja/nee-enumeratie)
  *   · Schulden   → `schulden`                (begeleide ja/nee + altijd-uitgang)
  *   · Pensioen   → `pensioen`                (schatting / upload / overslaan)
- *   · Spaardoel  → `spaardoel`
  *   · Klaar      → `klaar`
  * Plus de twee terminal-stappen `saving`/`success`.
  *
@@ -132,8 +131,8 @@ const SAVING_MESSAGES = [
  * De voortgang loopt PER GROEP (zie `STEP_GROUP_INDEX`), niet per micro-vraag.
  *
  * Legacy step-namen (`identity`, `intro`, `goal`, `doel`, `nieuws_only`,
- * `budgets`, `horizon`) leven nog in `CANONICAL_STEP_ORDER`/`LEGACY_STEP_MAP`
- * zodat self-healing restore werkt op oude localStorage-drafts.
+ * `budgets`, `horizon`, `spaardoel`) leven nog in `CANONICAL_STEP_ORDER`/
+ * `LEGACY_STEP_MAP` zodat self-healing restore werkt op oude drafts.
  */
 type Step =
   | 'naam'
@@ -144,7 +143,6 @@ type Step =
   | 'bezittingen'
   | 'schulden'
   | 'pensioen'
-  | 'spaardoel'
   | 'eindstrategie'
   | 'saving'
   // Afrondingsstappen ná de opslag: budget inrichten → bank koppelen →
@@ -179,19 +177,19 @@ const STEP_GROUP_INDEX: Record<Step, number> = {
   bezittingen: 3,
   schulden: 4,
   pensioen: 5,
-  spaardoel: 6,
-  // Eigen groep (7): de eindstrategie-keuze is een aparte, laatste inhoudelijke
-  // vraag (FIRE vs. pensioen) — geen sub-vraag van spaardoel.
-  eindstrategie: 7,
-  // Groep 8 "Je budget": opslaan, budget inrichten, bank koppelen.
-  saving: 8,
-  budget: 8,
-  bank: 8,
-  // Groep 9: de samenvatting met "Begin met TriFinity", daarna het welkomscherm.
-  klaar: 9,
-  success: 9,
+  // Eigen groep (6): de eindstrategie-keuze is een aparte, laatste inhoudelijke
+  // vraag (FIRE vs. pensioen). De spaardoel-stap die hiertussen stond is op
+  // 19 sep 2026 geschrapt (ADR 0162); doelen leven op /toekomst/doelen.
+  eindstrategie: 6,
+  // Groep 7 "Je budget": opslaan, budget inrichten, bank koppelen.
+  saving: 7,
+  budget: 7,
+  bank: 7,
+  // Groep 8: de samenvatting met "Begin met TriFinity", daarna het welkomscherm.
+  klaar: 8,
+  success: 8,
 }
-const TOTAL_GROUPS = 9
+const TOTAL_GROUPS = 8
 
 /**
  * Canonical order of every step that has ever existed in the flow, used as a
@@ -214,7 +212,7 @@ const CANONICAL_STEP_ORDER: readonly string[] = [
   'bezittingen',
   'schulden',
   'pensioen',
-  'spaardoel',     // toegevoegd mei 2026 — laagdrempelige spaardoel-keuze
+  'spaardoel',     // mei 2026 – sep 2026 (ADR 0162) — laagdrempelige spaardoel-keuze; heelt naar eindstrategie
   'eindstrategie', // toegevoegd jul 2026 — FIRE vs. pensioen als laatste vraag
   'budgets',       // → eindstrategie (legacy)
   'horizon',       // → eindstrategie (legacy)
@@ -251,6 +249,10 @@ const LEGACY_STEP_MAP: Record<string, Step> = {
   // sep 2026: de samenvatting staat ná de opslag. Een concept dat op 'klaar'
   // stond is nog niet opgeslagen → terug naar de laatste vraag vóór de opslag.
   klaar: 'eindstrategie',
+  // 19 sep 2026 (ADR 0162): de spaardoel-stap is geschrapt. Een concept dat
+  // daar stond gaat door naar de eerstvolgende vraag; de gekozen preset in het
+  // concept wordt genegeerd (de stap schreef pas bij de eind-save).
+  spaardoel: 'eindstrategie',
   // jun 2026: doel-stap ("Waar help ik je mee?") + news-only-pad verwijderd
   doel: 'naam',
   nieuws_only: 'naam',
@@ -355,7 +357,6 @@ function computeStepOrder(): Step[] {
     'bezittingen',
     'schulden',
     'pensioen',
-    'spaardoel',
     'eindstrategie',
     // Na de laatste vraag meteen opslaan: `goToNext` ziet 'saving' en start
     // `handleSaveOwnData`. Budget, bank en de samenvatting (`klaar`) volgen
@@ -363,21 +364,6 @@ function computeStepOrder(): Step[] {
     'saving',
     'success',
   ]
-}
-
-/**
- * Spaardoel-keuze van stap v. — orchestrator-state. De child-component
- * (`OnboardingSpaardoel`) bezit z'n eigen logica voor pre-fill en
- * validatie; orchestrator slaat alleen de complete shape op.
- */
-interface SpaardoelState {
-  presetKey: SpaardoelPresetKey | null
-  name: string
-  target_value: string
-  /** 'YYYY-MM' of '' wanneer leeg. */
-  target_date: string
-  /** True wanneer de gebruiker bewust heeft geskipt — gating voor insert. */
-  skipped: boolean
 }
 
 interface State {
@@ -406,8 +392,6 @@ interface State {
    */
   bezittingenPhases: SectionPhase[]
   schuldenPhases: SectionPhase[]
-  /** Stap v. — spaardoel-keuze. Skipped + presetKey=null = niet weggeschreven. */
-  spaardoel: SpaardoelState
   /**
    * Uitgaven-na-pensioen-keuze (groep 2, ná uitgaven). Maakt de impliciete
    * 80%-server-default expliciet. Skipped → niets meesturen, server-default wint.
@@ -454,11 +438,6 @@ type Action =
   | { type: 'SET_BEZITTINGEN_PHASES'; phases: SectionPhase[] }
   /** Vervang de gelifte fase-stack van de Schulden-sub-machine. */
   | { type: 'SET_SCHULDEN_PHASES'; phases: SectionPhase[] }
-  /**
-   * Vervang de complete spaardoel-substate per dispatch — eenvoudiger dan
-   * partial-update-acties want de child levert telkens de volledige shape.
-   */
-  | { type: 'SET_SPAARDOEL'; data: SpaardoelState }
   /** Vervang de complete uitgaven-na-pensioen-substate per dispatch. */
   | { type: 'SET_RETIREMENT_EXPENSE'; data: RetirementExpenseState }
   /** Vervang de complete pensioen-substate per dispatch (child levert de volledige shape). */
@@ -499,14 +478,8 @@ export const _initialState: State = {
   quickAssets: [],
   quickDebts: [],
   bezittingenPhases: initialSectionPhases(),
-  schuldenPhases: initialSectionPhases(),
-  spaardoel: {
-    presetKey: null,
-    name: '',
-    target_value: '',
-    target_date: '',
-    skipped: false,
-  },
+  // Raster-first (B-054): de schulden-sectie begint op het aanvinkraster.
+  schuldenPhases: initialSchuldenPhases(),
   retirementExpense: INITIAL_RETIREMENT_EXPENSE,
   pension: INITIAL_PENSION_DRAFT,
   deferredFields: [],
@@ -537,8 +510,6 @@ export function _reducer(state: State, action: Action): State {
       return { ...state, bezittingenPhases: action.phases }
     case 'SET_SCHULDEN_PHASES':
       return { ...state, schuldenPhases: action.phases }
-    case 'SET_SPAARDOEL':
-      return { ...state, spaardoel: action.data }
     case 'SET_RETIREMENT_EXPENSE':
       return { ...state, retirementExpense: action.data }
     case 'SET_PENSION':
@@ -589,10 +560,9 @@ export function _reducer(state: State, action: Action): State {
         action.data.bezittingenPhases.length > 0
           ? action.data.bezittingenPhases
           : initialSectionPhases()
-      const restoredSchuldenPhases =
-        action.data.schuldenPhases.length > 0
-          ? action.data.schuldenPhases
-          : initialSectionPhases()
+      // Een schulden-stack van vóór raster-first (op `ask`/`more`) heelt naar
+      // het raster; leeg → beginstack (`healSchuldenPhases` doet beide).
+      const restoredSchuldenPhases = healSchuldenPhases(action.data.schuldenPhases)
       return {
         ...state,
         step: restoredStep,
@@ -608,7 +578,6 @@ export function _reducer(state: State, action: Action): State {
         quickDebts: action.data.quickDebts.map((d) => ({ ...d })),
         bezittingenPhases: restoredBezittingenPhases,
         schuldenPhases: restoredSchuldenPhases,
-        spaardoel: { ...action.data.spaardoel },
         retirementExpense: { ...action.data.retirementExpense },
         // Het gekozen pad + de handmatige schatting terug; `parseResult` blijft
         // leeg (ADR 0115 — het overzicht blijft op het toestel).
@@ -617,6 +586,7 @@ export function _reducer(state: State, action: Action): State {
           mode: action.data.pension.mode,
           grossMonthly: action.data.pension.grossMonthly,
           startAge: action.data.pension.startAge,
+          isEstimate: action.data.pension.isEstimate === true,
         },
         deferredFields: [...action.data.deferredFields],
         // Zelf-helend voor oude concepten: zonder deze sleutel leest een
@@ -665,21 +635,6 @@ async function loadResumableDraft(): Promise<OnboardingDraft | null> {
     return serverDraft
   }
   return takeLegacyLocalDraft()
-}
-
-/**
- * Parse de spaardoel-target_value string (NL-locale display met thousand-
- * separators) naar een Number. Wordt in twee plekken gebruikt:
- *   1. Bij het samenstellen van de recap-prop voor `OnboardingKlaar`.
- *   2. Bij het samenstellen van de API-payload in `handleSaveOwnData`.
- * Eén helper voorkomt duplicate-parsing met afwijkende regex tussen UI en
- * server-call.
- */
-function parseSpaardoelAmount(s: string): number {
-  if (!s) return 0
-  const cleaned = s.replace(/\./g, '').replace(',', '.')
-  const n = Number(cleaned)
-  return isFinite(n) && n > 0 ? n : 0
 }
 
 /**
@@ -766,7 +721,6 @@ const STEP_ACCENT: Record<Step, ModuleName> = {
   bezittingen: 'kern',
   schulden: 'wil',
   pensioen: 'kern',
-  spaardoel: 'horizon',
   eindstrategie: 'fin',
   saving: 'horizon',
   budget: 'horizon',
@@ -1277,36 +1231,6 @@ export default function OnboardingPage() {
         body.selectedGoalSlug = state.selectedGoals[0]
       }
 
-      // Add spaardoel-keuze van stap v. — alleen wanneer de gebruiker
-      // bewust een preset heeft gekozen, een naam heeft ingevuld, en een
-      // positief bedrag heeft. Skip-flow zet `skipped: true` en wist de
-      // velden, dus dit blok wordt dan automatisch overgeslagen.
-      if (
-        !state.spaardoel.skipped
-        && state.spaardoel.presetKey
-        && state.spaardoel.name.trim()
-      ) {
-        const amount = parseSpaardoelAmount(state.spaardoel.target_value)
-        if (amount > 0) {
-          const preset = SPAARDOEL_PRESETS[state.spaardoel.presetKey]
-          body.onboardingGoal = {
-            name: state.spaardoel.name.trim(),
-            target_value: amount,
-            // `<input type="month">` levert 'YYYY-MM' — voeg '-01' toe voor
-            // een geldige ISO-date die Supabase `date`-kolom accepteert.
-            target_date: state.spaardoel.target_date
-              ? `${state.spaardoel.target_date}-01`
-              : null,
-            goal_type: preset.goalType,
-            icon: preset.icon,
-            color: preset.color,
-            // Marker B: preset-key → goals.metadata.standaardDoel (detecteerbaar
-            // noodfonds-doel voor de score/resolver, lib/emergency-fund.ts).
-            standaardDoel: preset.key,
-          }
-        }
-      }
-
       // Add deferred fields for post-onboarding suggestions (feature #830)
       if (state.deferredFields.length > 0) {
         body.deferredFields = state.deferredFields
@@ -1540,7 +1464,7 @@ export default function OnboardingPage() {
     return totalAssets - totalDebts
   }, [state.quickAssets, state.quickDebts])
 
-  // Maandinkomen voor recap + spaardoel-suggesties: sinds jun 2026 wordt het
+  // Maandinkomen voor de recap: sinds jun 2026 wordt het
   // inkomen per MAAND uitgevraagd, dus `net_monthly_income` is de primaire
   // bron. Valt terug op het canonieke jaarinkomen (÷12) voor herstelde oude
   // drafts waarin alleen dat gevuld was.
@@ -1612,22 +1536,7 @@ export default function OnboardingPage() {
   )
 
   /**
-   * Spaardoel-recap voor het eindscherm — geskipt of onvolledig ingevuld geeft
-   * `null`. Eén memo zodat de recap-cel en de compleetheids-teller gegarandeerd
-   * dezelfde lezing van "spaardoel ingevuld" gebruiken.
-   */
-  const spaardoelRecap = useMemo(() => {
-    const { skipped, presetKey, name, target_value } = state.spaardoel
-    if (skipped || !presetKey || !name.trim()) return null
-    return {
-      presetKey,
-      label: name.trim(),
-      amount: parseSpaardoelAmount(target_value),
-    }
-  }, [state.spaardoel])
-
-  /**
-   * Echte profiel-compleetheid voor het eindscherm ("6 van 8"). Vervangt de
+   * Echte profiel-compleetheid voor het eindscherm ("6 van 7"). Vervangt de
    * hardgecodeerde "100%" uit bevinding M11. De definitie per onderdeel staat
    * in `lib/onboarding-completeness.ts`; hier leveren we alleen de al afgeleide
    * waarden aan.
@@ -1644,7 +1553,6 @@ export default function OnboardingPage() {
         // Zelfde bron als de life_events-write bij de eind-save: alleen een
         // upload of een schatting met bedrag levert een resultaat op.
         pensioenResultaat: buildPensionParseResult(state.pension),
-        spaardoel: spaardoelRecap,
         // De eindstrategie-stap kent geen overslaan-knop en ligt vóór `klaar`
         // in de stap-volgorde: wie dit scherm ziet, heeft de keuze bevestigd.
         // Komt er ooit een skip, dan verandert alleen deze regel.
@@ -1658,7 +1566,6 @@ export default function OnboardingPage() {
       state.quickAssets.length,
       state.quickDebts.length,
       state.pension,
-      spaardoelRecap,
     ],
   )
 
@@ -1979,6 +1886,11 @@ export default function OnboardingPage() {
               samenwonend={state.identity.household_type !== 'solo'}
               aowAge={userAowAge}
               aowAgeLabel={userAowAgeLabel}
+              // "Schat het voor me" (B-055): leeftijd + het eerder ingevulde of
+              // geschatte netto maandinkomen; zonder een van beide geen knop.
+              age={currentAgeForPlan}
+              netMonthlyIncome={netMonthlyIncomeForKlaar}
+              incomeIsEstimate={state.estimatedFields.includes('income')}
               onNext={goToNext}
               onBack={goToBack}
               onSkip={() => {
@@ -1986,39 +1898,6 @@ export default function OnboardingPage() {
                 dispatch({ type: 'SET_PENSION', data: INITIAL_PENSION_DRAFT })
                 goToNext()
               }}
-              currentStep={currentContentStep}
-              totalSteps={totalContentSteps}
-            />
-          )}
-
-          {state.step === 'spaardoel' && (
-            <OnboardingSpaardoel
-              data={state.spaardoel}
-              onChange={(data) => dispatch({ type: 'SET_SPAARDOEL', data })}
-              onNext={goToNext}
-              onBack={goToBack}
-              onSkip={() => {
-                // Skip = één klik, geen confirm. Zet `skipped: true` en
-                // wis pre-fill-velden zodat een per ongeluk eerder
-                // ingevulde naam/bedrag niet alsnog wordt weggeschreven
-                // door handleSaveOwnData.
-                dispatch({
-                  type: 'SET_SPAARDOEL',
-                  data: {
-                    presetKey: null,
-                    name: '',
-                    target_value: '',
-                    target_date: '',
-                    skipped: true,
-                  },
-                })
-                // Track deferral for post-onboarding suggestions (feature #830)
-                dispatch({ type: 'DEFER_FIELD', key: 'spaardoel' })
-                goToNext()
-              }}
-              monthlyIncome={netMonthlyIncomeForKlaar}
-              monthlyExpenses={monthlyExpensesParsed}
-              selectedGoals={state.selectedGoals}
               currentStep={currentContentStep}
               totalSteps={totalContentSteps}
             />
@@ -2057,7 +1936,6 @@ export default function OnboardingPage() {
               incomeIsEstimate={state.estimatedFields.includes('income')}
               assets={state.quickAssets}
               debts={state.quickDebts}
-              spaardoel={spaardoelRecap}
               completeness={onboardingCompleteness}
               // Geen terug-/aanvul-acties: de samenvatting staat ná de opslag en
               // ná budget + bank; terugspringen zou een wissende tweede opslag

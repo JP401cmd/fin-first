@@ -173,11 +173,17 @@ export default async function BibliotheekPage({
 
   // UR2-16c — de pagina noemde alleen een aantal PER niveau, nooit een totaal.
   // De eerste sectie ("Starters · 4") las daardoor als de hele bibliotheek,
-  // terwijl de post-onboarding-belofte 12 gecureerde rekenhulpen noemt
-  // (`components/onboarding/onboarding-success.tsx`). Die belofte klopt — alle
-  // twaalf uit `PREFAB_CALCULATORS` staan publiek in de database (seed-migratie
-  // 20260530120000) — alleen was ze op dit scherm niet na te tellen. Beide
-  // getallen zijn afgeleid uit de al opgebouwde groepen; geen los getal in copy.
+  // terwijl elders een belofte van 12 gecureerde rekenhulpen stond. Die belofte
+  // klopt — alle twaalf uit `PREFAB_CALCULATORS` staan publiek in de database
+  // (seed-migratie 20260530120000) — alleen was ze op dit scherm niet na te
+  // tellen. Beide getallen zijn afgeleid uit de al opgebouwde groepen; geen los
+  // getal in copy.
+  //
+  // De belofte stond tot 19-09-2026 ook op het successcherm na de onboarding;
+  // met W-015 toont dat scherm de vier waardes en geen featurelijst meer. De
+  // enige overgebleven plek die het getal noemt is de landing
+  // (`components/landing/pricing-tiers.tsx`) — de telling hieronder blijft dus
+  // nodig, maar hang er geen onboarding-belofte meer aan.
   const curatedCount = nonEmptyGroups
     .filter((g) => g.key !== 'community')
     .reduce((sum, g) => sum + g.items.length, 0)

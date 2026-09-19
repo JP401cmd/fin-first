@@ -9,7 +9,12 @@
  *  1. `bank_connection_accounts.is_active` — heeft de gebruiker de koppeling zelf
  *     verbroken? (zachte ontkoppeling, `POST /api/bank-connect/disconnect`)
  *  2. `bank_connections.status` — `active` / `expired` / `revoked` / `pending`
- *  3. `bank_connections.token_expires_at` — de 90-dagen-autorisatie
+ *  3. `bank_connections.consent_expires_at` — wanneer de bankautorisatie
+ *     (PSD2-consent, doorgaans 90 dagen, per bank tot 180) verloopt, zoals
+ *     TrueLayer 'm meldt via `GET /data/v1/me`. **Niet** `token_expires_at`:
+ *     dat is het 1-uurs toegangstoken, en die twee door elkaar halen was het
+ *     defect achter ADR 0161 (elke sync "verloopt over 1 dag", na ~25 uur
+ *     "verbinding kwijt"). `null` = einddatum onbekend, geen oordeel op datum.
  *  4. `bank_connection_accounts.last_synced_at` — wanneer er voor het laatst
  *     transacties binnenkwamen
  *
@@ -64,8 +69,12 @@ export type BankLinkSignals = {
   linkIsActive: boolean
   /** `bank_connections.status`. */
   connectionStatus: string | null
-  /** `bank_connections.token_expires_at` (ISO-string). */
-  tokenExpiresAt: string | null
+  /**
+   * `bank_connections.consent_expires_at` (ISO-string) — de einddatum van de
+   * bankautorisatie, niet van het toegangstoken. `null` als TrueLayer 'm (nog)
+   * niet meldde; de sync-route vult 'm dan aan (ADR 0161).
+   */
+  consentExpiresAt: string | null
   /**
    * `bank_connection_accounts.last_synced_at`.
    *
@@ -100,11 +109,13 @@ export type BankLinkHealth = {
    */
   daysUntilExpiry: number | null
   /**
-   * De 90-dagen-vooraankondiging: de koppeling werkt nog, maar verloopt binnen
-   * {@link BANK_LINK_EXPIRY_WARNING_DAYS} dagen.
+   * De vooraankondiging van de consent: de koppeling werkt nog, maar de
+   * bankautorisatie verloopt binnen {@link BANK_LINK_EXPIRY_WARNING_DAYS} dagen.
+   * Gerekend op `consent_expires_at` — een koppeling zónder bekende einddatum
+   * krijgt deze vlag nooit.
    *
-   * **Deze vlag hoort NIET op het kaart-icoon.** De autorisatie verloopt elk
-   * kwartaal, dus het icoon zou elk kwartaal twee weken lang om aandacht vragen
+   * **Deze vlag hoort NIET op het kaart-icoon.** De autorisatie verloopt elke
+   * 90 tot 180 dagen, dus het icoon zou telkens twee weken lang om aandacht vragen
    * zonder dat er iets stuk is — en dan leert de gebruiker het te negeren, ook
    * op het moment dat het wél stuk is. Het icoon spreekt pas als de verbinding
    * daadwerkelijk kwijt is.
@@ -173,16 +184,18 @@ export function effectiveDailyRequests(
 const MS_PER_DAY = 1000 * 60 * 60 * 24
 
 /**
- * Dagen tot `tokenExpiresAt`, of `null` bij een ontbrekende of onleesbare datum.
+ * Dagen tot `consentExpiresAt`, of `null` bij een ontbrekende of onleesbare datum.
  *
- * Een onleesbare datum levert bewust `null` en niet "verlopen": een rekening
- * kapot verklaren op grond van een kolom die we niet konden parsen is erger dan
- * hem gezond noemen — de statuskolom en de eerstvolgende mislukte refresh vangen
- * een echte expiratie alsnog.
+ * Een ontbrekende of onleesbare datum levert bewust `null` en niet "verlopen":
+ * een rekening kapot verklaren op grond van een kolom die we niet kennen of niet
+ * konden parsen is erger dan hem gezond noemen — de statuskolom en de
+ * eerstvolgende mislukte token-refresh vangen een echte expiratie alsnog. Dat is
+ * ook waarom er géén aanname (90 of 180 dagen vanaf autorisatie) als terugval
+ * staat: welke van de twee geldt weet alleen de bank.
  */
-function daysUntil(tokenExpiresAt: string | null, now: Date): number | null {
-  if (!tokenExpiresAt) return null
-  const expiry = new Date(tokenExpiresAt)
+function daysUntil(consentExpiresAt: string | null, now: Date): number | null {
+  if (!consentExpiresAt) return null
+  const expiry = new Date(consentExpiresAt)
   const time = expiry.getTime()
   if (!Number.isFinite(time)) return null
   return Math.ceil((time - now.getTime()) / MS_PER_DAY)
@@ -198,10 +211,12 @@ function daysUntil(tokenExpiresAt: string | null, now: Date): number | null {
  *  2. **`is_active = false`** → `manual`. Gebruikersintentie wint van alles wat
  *     erna komt (zie {@link BankLinkSignals.linkIsActive}).
  *  3. **status `expired`/`revoked`** → `linked-broken`.
- *  4. **autorisatie verstreken** (`token_expires_at` in het verleden) →
+ *  4. **autorisatie verstreken** (`consent_expires_at` in het verleden) →
  *     `linked-broken`. Nodig náást (3): de status wordt pas op `expired` gezet
  *     door een mislukte token-refresh, en die draait alleen als er iemand
  *     synchroniseert. Tot dat moment is de datum het enige eerlijke signaal.
+ *     Let op de kolom: de CONSENT, niet `token_expires_at` — dat token verloopt
+ *     elk uur en wordt stil ververst; het zegt niets over de autorisatie.
  *  5. anders → `linked`.
  *
  * `pending` is bewust géén vierde uitkomst. De callback zet de verbinding op
@@ -219,11 +234,11 @@ export function deriveBankLinkHealth(
     return { state: 'manual', daysUntilExpiry: null, expiringSoon: false, lastSyncedAt: null }
   }
 
-  const daysUntilExpiry = daysUntil(signals.tokenExpiresAt, now)
+  const daysUntilExpiry = daysUntil(signals.consentExpiresAt, now)
   const statusBroken = !!signals.connectionStatus && BROKEN_CONNECTION_STATUSES.has(signals.connectionStatus)
-  const tokenElapsed = daysUntilExpiry !== null && daysUntilExpiry < 0
+  const consentElapsed = daysUntilExpiry !== null && daysUntilExpiry < 0
 
-  const state: BankLinkState = statusBroken || tokenElapsed ? 'linked-broken' : 'linked'
+  const state: BankLinkState = statusBroken || consentElapsed ? 'linked-broken' : 'linked'
 
   return {
     state,

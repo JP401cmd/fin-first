@@ -40,7 +40,6 @@ import { z } from 'zod'
 import type { GoalSlug } from '@/lib/goals/types'
 import { isGoalSlug } from '@/lib/goals/catalog'
 import type { ModuleId } from '@/lib/module-registry'
-import type { SpaardoelPresetKey } from '@/lib/onboarding-presets'
 import type { HorizonData, LifeEventEntry } from '@/lib/onboarding/horizon-draft'
 import type { RetirementExpenseState } from '@/components/onboarding/onboarding-uitgaven-pensioen'
 import type { PensionDraft } from '@/components/onboarding/onboarding-pensioen'
@@ -59,7 +58,11 @@ import {
 import type { HouseholdType } from '@/lib/household-type'
 import { isHousingChoice, type HousingChoice } from '@/lib/housing-choice'
 
-/** Velden die de gebruiker expliciet oversloeg via "Later invullen" (feature #830). */
+/**
+ * Velden die de gebruiker expliciet oversloeg via "Later invullen" (feature #830).
+ * `'spaardoel'` wordt sinds 19 sep 2026 (ADR 0162) niet meer gezet — de stap is
+ * geschrapt — maar blijft geldig voor bestaande profielen en concepten.
+ */
 export type DeferredFieldKey = 'income' | 'assets' | 'spaardoel'
 
 /**
@@ -74,19 +77,6 @@ export type EstimatedFieldKey = 'income' | 'expenses'
 export const ONBOARDING_DRAFT_VERSION = 2
 
 /**
- * Spaardoel-substate zoals de orchestrator 'm draagt. Lokaal gedefinieerd
- * (de page exporteert 'm niet) maar structureel identiek.
- */
-export interface SpaardoelDraft {
-  presetKey: SpaardoelPresetKey | null
-  name: string
-  target_value: string
-  /** 'YYYY-MM' of '' wanneer leeg. */
-  target_date: string
-  skipped: boolean
-}
-
-/**
  * Pensioen in het concept: het gekozen pad plus de handmatige schatting.
  * BEWUST ZONDER `parseResult` — zie ADR 0115.
  */
@@ -94,6 +84,8 @@ export interface PensionDraftPersisted {
   mode: PensionDraft['mode']
   grossMonthly: string
   startAge: string
+  /** "(schatting)"-markering van de inschat-hulp (B-055) — overleeft een reload. */
+  isEstimate: boolean
 }
 
 /**
@@ -129,7 +121,6 @@ export interface OnboardingDraft {
   quickDebts: DebtQuickInput[]
   bezittingenPhases: SectionPhase[]
   schuldenPhases: SectionPhase[]
-  spaardoel: SpaardoelDraft
   pension: PensionDraftPersisted
   retirementExpense: RetirementExpenseState
   horizon: HorizonData
@@ -141,15 +132,6 @@ export interface OnboardingDraft {
  * komt er een veld bij, dan is de copy compile-time verplicht om het te noemen.
  */
 export const UNRESTORED_DRAFT_KEYS = ['pensionParseResult'] as const
-
-const VALID_PRESET_KEYS: readonly SpaardoelPresetKey[] = [
-  'noodfonds',
-  'vakantie',
-  'auto',
-  'aanbetaling',
-  'groei',
-  'custom',
-]
 
 // Het plan in het concept (ADR 0129, stap "Jouw plan" sinds 5 sep 2026): de
 // eind-vorm (`deplete`/`legacy`/`perpetual`) en het stop-anker reizen als twee
@@ -263,6 +245,11 @@ export const OnboardingDraftSchema = z
     quickDebts: z.array(DebtDraftSchema).max(100),
     bezittingenPhases: z.array(SectionPhaseSchema).max(50),
     schuldenPhases: z.array(SectionPhaseSchema).max(50),
+    // De spaardoel-stap is op 19 sep 2026 geschrapt (ADR 0162). De sleutel
+    // blijft hier optioneel en wordt genegeerd: `strict()` op het topniveau
+    // zou anders élk lopend concept met dit veld afwijzen — en daarmee alle
+    // andere antwoorden van die gebruiker weggooien. Verwijderen kan pas
+    // wanneer geen concept dit veld meer draagt.
     spaardoel: z
       .object({
         presetKey: draftText.nullable(),
@@ -271,12 +258,15 @@ export const OnboardingDraftSchema = z
         target_date: draftText,
         skipped: z.boolean(),
       })
-      .strict(),
+      .strict()
+      .optional(),
     pension: z
       .object({
         mode: draftText.nullable(),
         grossMonthly: draftText,
         startAge: draftText,
+        // Optioneel: een concept van vóór B-055 (19 sep 2026) draagt de vlag niet.
+        isEstimate: z.boolean().optional(),
       })
       .strict(),
     retirementExpense: z
@@ -330,7 +320,6 @@ export interface DraftStateSource {
   quickDebts: DebtQuickInput[]
   bezittingenPhases: SectionPhase[]
   schuldenPhases: SectionPhase[]
-  spaardoel: SpaardoelDraft
   pension: PensionDraft
   retirementExpense: RetirementExpenseState
   horizon: HorizonData
@@ -356,11 +345,11 @@ export function serializeDraft(state: DraftStateSource): OnboardingDraft {
     quickDebts: state.quickDebts.map((d) => ({ ...d })),
     bezittingenPhases: state.bezittingenPhases.map((p) => ({ ...p })),
     schuldenPhases: state.schuldenPhases.map((p) => ({ ...p })),
-    spaardoel: { ...state.spaardoel },
     pension: {
       mode: state.pension.mode,
       grossMonthly: state.pension.grossMonthly,
       startAge: state.pension.startAge,
+      isEstimate: state.pension.isEstimate === true,
     },
     retirementExpense: { ...state.retirementExpense },
     horizon: { ...state.horizon, life_events: state.horizon.life_events.map((e) => ({ ...e })) },
@@ -545,24 +534,15 @@ export function sanitizeStoredDraft(raw: unknown): OnboardingDraft | null {
     ? p.housingChoice
     : null
 
-  const rawSp = obj(p.spaardoel)
-  const spaardoel: SpaardoelDraft = {
-    presetKey:
-      typeof rawSp.presetKey === 'string' &&
-      (VALID_PRESET_KEYS as readonly string[]).includes(rawSp.presetKey)
-        ? (rawSp.presetKey as SpaardoelPresetKey)
-        : null,
-    name: str(rawSp.name),
-    target_value: str(rawSp.target_value),
-    target_date: str(rawSp.target_date),
-    skipped: rawSp.skipped === true,
-  }
+  // `p.spaardoel` (concepten van vóór 19 sep 2026, ADR 0162) wordt bewust
+  // genegeerd: de stap bestaat niet meer en schreef pas bij de eind-save.
 
   const rawPen = obj(p.pension)
   const pension: PensionDraftPersisted = {
     mode: rawPen.mode === 'estimate' || rawPen.mode === 'upload' ? rawPen.mode : null,
     grossMonthly: str(rawPen.grossMonthly),
     startAge: str(rawPen.startAge),
+    isEstimate: rawPen.isEstimate === true,
   }
 
   const rawRet = obj(p.retirementExpense)
@@ -622,7 +602,6 @@ export function sanitizeStoredDraft(raw: unknown): OnboardingDraft | null {
     quickDebts: sanitizeDebts(p.quickDebts),
     bezittingenPhases: sanitizePhases(p.bezittingenPhases),
     schuldenPhases: sanitizePhases(p.schuldenPhases),
-    spaardoel,
     pension,
     retirementExpense,
     horizon,
@@ -644,8 +623,6 @@ export function hasResumableDraft(draft: OnboardingDraft | null): boolean {
   const hasChoices =
     draft.selectedGoals.length > 0 ||
     draft.deferredFields.length > 0 ||
-    draft.spaardoel.presetKey !== null ||
-    draft.spaardoel.skipped ||
     draft.pension.mode !== null ||
     draft.retirementExpense.skipped
   const hasAnswers =

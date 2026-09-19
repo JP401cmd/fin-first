@@ -56,7 +56,7 @@ import { recurringPerMonth, buildForecast, type ForecastRow } from '@/lib/cashfl
 import { RECURRING_ANALYSIS_MONTHS } from '@/lib/recurring-detection'
 import type { RecurringTransaction } from '@/lib/recurring-data'
 import { getExpectedMonthlyTotal } from '@/lib/recurring-data'
-import { cancelEffect } from '@/lib/vaste-lasten-insights'
+import { countOtherAccountOverlaps } from '@/lib/parsers/other-account-overlap'
 import { parseMT940 } from '@/lib/parsers/mt940'
 import { parseOFX } from '@/lib/parsers/ofx'
 import { parseCSV } from '@/lib/parsers/csv'
@@ -286,21 +286,6 @@ function rateLimitCheck(dailyRequests: number, resetDate: string, today: string)
  *  ALS dezelfde `account_id` heeft — de query filtert expliciet op accountId. */
 function existsInAccount(existing: { accountId: string; hash: string }[], candidate: { accountId: string; hash: string }): boolean {
   return existing.some((e) => e.accountId === candidate.accountId && e.hash === candidate.hash)
-}
-
-/** Mirror van de eerstvolgende-voorkomst-arithmetiek voor een monthly recurring
- *  (lib/recurring-data.ts#getNextOccurrence — hier met injecteerbare `now`, want
- *  de productiefunctie gebruikt intern `new Date()` en is dus niet los te pinnen). */
-function nextMonthlyOccurrence(dayOfMonth: number, now: Date): string {
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  let next = new Date(today.getFullYear(), today.getMonth(), dayOfMonth)
-  if (next <= today) {
-    next = new Date(today.getFullYear(), today.getMonth() + 1, dayOfMonth)
-  }
-  const y = next.getFullYear()
-  const m = String(next.getMonth() + 1).padStart(2, '0')
-  const d = String(next.getDate()).padStart(2, '0')
-  return `${y}-${m}-${d}`
 }
 
 /** Fake PostgREST-filterbuilder die alleen registreert welke methoden zijn
@@ -594,36 +579,6 @@ export const CASH_ENGINE_CHECKS: CashEngineCheck[] = [
       return {
         expected: 'euroImpactMonthly=-15.99',
         actual: `euroImpactMonthly=${impact}`,
-      }
-    },
-  },
-  {
-    workflow: 'WF-CASH-20',
-    scenarioId: 'UAT-CASH-20',
-    label: '"Wat als ik opzeg" (cancelEffect): €44,90/mnd → €538,80/jr + vrijheidsdagen',
-    run: () => {
-      criterion('WF-CASH-20')
-      // `cancelEffect` neemt sinds de vervolg-KRUIS-20-fix het KANT-EN-KLARE
-      // dagtarief (€/dag) i.p.v. maanduitgaven, zodat de aanroeper de grondslag
-      // niet meer kan kiezen. De verwachting blijft identiek: hetzelfde
-      // €2.200/mnd, alleen expliciet door de canonieke conversie geleid.
-      const r = cancelEffect(44.9, dailyExpenseRate(2200))
-      return {
-        expected: 'jaarbedrag=538.8; vrijheidsdagen=7.4',
-        actual: `jaarbedrag=${r.yearlyEuro}; vrijheidsdagen=${r.freedom.totalDays}`,
-      }
-    },
-  },
-  {
-    workflow: 'WF-CASH-21',
-    scenarioId: 'UAT-CASH-21',
-    label: 'Eerstvolgende voorkomst (mirror van getNextOccurrence): dag 7, "nu"=5 juli 2026',
-    run: () => {
-      criterion('WF-CASH-21')
-      const next = nextMonthlyOccurrence(7, new Date(2026, 6, 5))
-      return {
-        expected: 'eerstvolgendeDatum=2026-07-07',
-        actual: `eerstvolgendeDatum=${next}`,
       }
     },
   },
@@ -1017,24 +972,24 @@ NEWFILEUID:NONE
       const now = new Date('2026-07-30T12:00:00.000Z')
       const geenKoppelrij = deriveBankLinkState(null, now)
       const zachtOntkoppeldMaarVerlopen = deriveBankLinkState(
-        { linkIsActive: false, connectionStatus: 'expired', tokenExpiresAt: '2026-01-01T00:00:00.000Z', lastSyncedAt: null },
+        { linkIsActive: false, connectionStatus: 'expired', consentExpiresAt: '2026-01-01T00:00:00.000Z', lastSyncedAt: null },
         now,
       )
       const statusKapot = deriveBankLinkState(
-        { linkIsActive: true, connectionStatus: 'expired', tokenExpiresAt: '2026-09-01T00:00:00.000Z', lastSyncedAt: null },
+        { linkIsActive: true, connectionStatus: 'expired', consentExpiresAt: '2026-09-01T00:00:00.000Z', lastSyncedAt: null },
         now,
       )
-      const tokenVerstreken = deriveBankLinkState(
-        { linkIsActive: true, connectionStatus: 'active', tokenExpiresAt: '2026-07-01T00:00:00.000Z', lastSyncedAt: null },
+      const consentVerstreken = deriveBankLinkState(
+        { linkIsActive: true, connectionStatus: 'active', consentExpiresAt: '2026-07-01T00:00:00.000Z', lastSyncedAt: null },
         now,
       )
       const gezond = deriveBankLinkState(
-        { linkIsActive: true, connectionStatus: 'active', tokenExpiresAt: '2026-09-01T00:00:00.000Z', lastSyncedAt: null },
+        { linkIsActive: true, connectionStatus: 'active', consentExpiresAt: '2026-09-01T00:00:00.000Z', lastSyncedAt: null },
         now,
       )
       return {
-        expected: 'geenKoppelrij=manual; zachtOntkoppeldMaarVerlopen=manual; statusKapot=linked-broken; tokenVerstreken=linked-broken; gezond=linked',
-        actual: `geenKoppelrij=${geenKoppelrij}; zachtOntkoppeldMaarVerlopen=${zachtOntkoppeldMaarVerlopen}; statusKapot=${statusKapot}; tokenVerstreken=${tokenVerstreken}; gezond=${gezond}`,
+        expected: 'geenKoppelrij=manual; zachtOntkoppeldMaarVerlopen=manual; statusKapot=linked-broken; consentVerstreken=linked-broken; gezond=linked',
+        actual: `geenKoppelrij=${geenKoppelrij}; zachtOntkoppeldMaarVerlopen=${zachtOntkoppeldMaarVerlopen}; statusKapot=${statusKapot}; consentVerstreken=${consentVerstreken}; gezond=${gezond}`,
       }
     },
   },
@@ -1783,6 +1738,32 @@ NEWFILEUID:NONE
           `label=${SPEND_LIMIT_STATUS_LABEL.reached}; kleur=${SPEND_LIMIT_STATUS_TEXT_CLASS.reached}; ` +
           `scoreOpDeGrens=${scoreOpDeGrens.score}; hitRateOpDeGrens=${scoreOpDeGrens.hitRatePct}; ` +
           `exceededTellingOpDeGrens=${streaksOpDeGrens.exceededPeriodCount}; reeksOpDeGrens=${streaksOpDeGrens.currentStreak}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-CASH-69',
+    scenarioId: 'UAT-CASH-69',
+    label: 'Overlap met een ANDERE eigen rekening (countOtherAccountOverlaps): PayPal-export al op Creditcard → 2 treffers, partnerrijen tellen niet',
+    run: () => {
+      criterion('WF-CASH-69')
+      const paypalExport = [
+        { date: '2026-09-01', amount: -9.99, counterparty_name: 'Spotify', counterparty_iban: null },
+        { date: '2026-09-03', amount: -13.99, counterparty_name: 'Netflix', counterparty_iban: null },
+        { date: '2026-09-05', amount: -55, counterparty_name: 'Ziggo', counterparty_iban: null },
+      ]
+      const opCreditcard = [
+        { date: '2026-09-02', amount: -9.99, counterparty_name: 'SPOTIFY', counterparty_iban: null },
+        { date: '2026-09-03', amount: -13.99, counterparty_name: 'Netflix', counterparty_iban: null },
+      ]
+      const overlaps = countOtherAccountOverlaps(paypalExport, [{ account_id: 'creditcard', rows: opCreditcard }])
+      // Partnerrijen bereiken de matcher nooit: de loader filtert op `user_id`
+      // (route-test bewijst dat); hier is de rekenkundige tegenhanger — een lege
+      // set andere rekeningen geeft geen enkele treffer.
+      const geenPartner = countOtherAccountOverlaps(paypalExport, []).length
+      return {
+        expected: 'overlaps=creditcard:2; geenPartner=0',
+        actual: `overlaps=${overlaps.map((o) => `${o.account_id}:${o.count}`).join(',')}; geenPartner=${geenPartner}`,
       }
     },
   },

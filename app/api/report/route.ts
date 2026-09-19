@@ -895,7 +895,7 @@ Kerndata:
 - FIRE-voortgang: ${firePercentage != null ? firePercentage + '%' : 'onbekend'}
 - Acties voltooid: ${actions.length}, Vrijheidsdagen gewonnen: ${Math.round(totalFreedomDays * 10) / 10}
 
-Schrijf in het Nederlands, persoonlijk en bemoedigend. Gebruik de filosofie "geld is opgeslagen tijd". Geen opsommingen, geen bullets — vloeiende tekst.`
+Schrijf in het Nederlands, persoonlijk en bemoedigend. Gebruik de filosofie "geld levert tijd op" — nooit dat iemand tijd koopt, vrijkoopt of terugkoopt. Geen opsommingen, geen bullets — vloeiende tekst.`
 
         const result = await generateText({
           model,

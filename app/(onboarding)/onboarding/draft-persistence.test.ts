@@ -36,13 +36,6 @@ function makeFullState(): DraftStateSource & Record<string, unknown> {
     selectedGoals: ['grip-uitgaven'],
     activeModules: ['budgetteren', 'toekomstplannen'],
     deferredFields: ['income'],
-    spaardoel: {
-      presetKey: 'vakantie',
-      name: 'Italië 2027',
-      target_value: '3500',
-      target_date: '2027-06',
-      skipped: false,
-    },
     pension: {
       mode: 'estimate',
       grossMonthly: '1500',
@@ -81,8 +74,6 @@ describe('serializeDraft — het concept draagt alle antwoorden (UR2-01)', () =>
     expect(draft.quickDebts).toEqual([
       { debt_type: 'student_loan', name: 'DUO', current_balance: 9000 },
     ])
-    expect(draft.spaardoel.name).toBe('Italië 2027')
-    expect(draft.spaardoel.target_value).toBe('3500')
     expect(draft.retirementExpense.customAmount).toBe('30.000')
     expect(draft.horizon.fire_legacy_amount).toBe('100000')
     expect(draft.horizon.life_events).toHaveLength(1)
@@ -96,7 +87,12 @@ describe('serializeDraft — het concept draagt alle antwoorden (UR2-01)', () =>
 
   it('laat het geparste pensioenoverzicht buiten het concept (ADR 0115)', () => {
     const draft = serializeDraft(makeFullState())
-    expect(draft.pension).toEqual({ mode: 'estimate', grossMonthly: '1500', startAge: '67' })
+    expect(draft.pension).toEqual({
+      mode: 'estimate',
+      grossMonthly: '1500',
+      startAge: '67',
+      isEstimate: false,
+    })
     expect(JSON.stringify(draft)).not.toContain('aowBedrag')
   })
 
@@ -212,6 +208,24 @@ describe('OnboardingDraftSchema — vormcontrole op de PUT-route', () => {
     draft.quickAssets = [{ asset_type: 'cash', name: '', current_value: 0 }]
     expect(OnboardingDraftSchema.safeParse(draft).success).toBe(true)
   })
+
+  it('accepteert een concept van vóór 19 sep 2026 mét spaardoel-veld — de geschrapte stap mag geen conceptverlies geven (ADR 0162)', () => {
+    // De sleutel is uit de state, maar het topniveau is `strict()`: zonder de
+    // optionele sleutel in het schema zou élk lopend concept met dit veld
+    // geweigerd worden — inclusief alle andere antwoorden van die gebruiker.
+    const draft = serializeDraft(makeFullState()) as OnboardingDraft & Record<string, unknown>
+    const legacy = {
+      ...draft,
+      spaardoel: {
+        presetKey: 'vakantie',
+        name: 'Italië 2027',
+        target_value: '3500',
+        target_date: '2027-06',
+        skipped: false,
+      },
+    }
+    expect(OnboardingDraftSchema.safeParse(legacy).success).toBe(true)
+  })
 })
 
 describe('sanitizeStoredDraft — herstel + migratie van oude concepten', () => {
@@ -238,7 +252,8 @@ describe('sanitizeStoredDraft — herstel + migratie van oude concepten', () => 
     expect(restored!.lastStep).toBe('pensioen')
     expect(restored!.version).toBe(1)
     expect(restored!.selectedGoals).toEqual(['grip-uitgaven'])
-    expect(restored!.spaardoel.presetKey).toBe('noodfonds')
+    // De spaardoel-keuze uit een oud concept wordt genegeerd (ADR 0162).
+    expect(restored).not.toHaveProperty('spaardoel')
     expect(restored!.pension.mode).toBe('upload')
     // Ontbrekende velden krijgen hun lege beginwaarde, geen undefined.
     expect(restored!.identity.full_name).toBe('')
@@ -254,7 +269,35 @@ describe('sanitizeStoredDraft — herstel + migratie van oude concepten', () => 
       lastStep: 'pensioen',
       pension: { mode: 'upload', grossMonthly: '2000', startAge: '', parseResult: { x: 1 } },
     })
-    expect(restored!.pension).toEqual({ mode: 'upload', grossMonthly: '2000', startAge: '' })
+    expect(restored!.pension).toEqual({
+      mode: 'upload',
+      grossMonthly: '2000',
+      startAge: '',
+      isEstimate: false,
+    })
+  })
+
+  it('bewaart de "(schatting)"-markering van de pensioen-inschat-hulp (B-055) en leest een oud concept zonder vlag als eigen bedrag', () => {
+    const state = makeFullState()
+    state.pension = { ...state.pension, isEstimate: true }
+    const draft = serializeDraft(state)
+    expect(draft.pension.isEstimate).toBe(true)
+    expect(OnboardingDraftSchema.safeParse(draft).success).toBe(true)
+    expect(sanitizeStoredDraft(JSON.parse(JSON.stringify(draft)))!.pension.isEstimate).toBe(true)
+
+    // Concept van vóór de vlag: geen sleutel → false (een hersteld bedrag
+    // zonder markering leest als eigen bedrag, spiegel van estimatedFields).
+    const oud = sanitizeStoredDraft({
+      lastStep: 'pensioen',
+      pension: { mode: 'estimate', grossMonthly: '900', startAge: '' },
+    })
+    expect(oud!.pension.isEstimate).toBe(false)
+    expect(
+      OnboardingDraftSchema.safeParse({
+        ...draft,
+        pension: { mode: 'estimate', grossMonthly: '900', startAge: '' },
+      }).success,
+    ).toBe(true)
   })
 
   it('migreert een legacy single-goal concept naar een selectedGoals-array', () => {
@@ -262,9 +305,8 @@ describe('sanitizeStoredDraft — herstel + migratie van oude concepten', () => 
     expect(restored!.selectedGoals).toEqual(['grip-uitgaven'])
   })
 
-  it('valideert onbekende preset/strategie/fase-waarden weg naar veilige defaults', () => {
+  it('valideert onbekende strategie/fase-waarden weg naar veilige defaults', () => {
     const restored = sanitizeStoredDraft({
-      spaardoel: { presetKey: 'verzonnen', skipped: false },
       horizon: { fire_end_strategy: 'onzin', fire_end_age: 'x', temporal_balance: null },
       bezittingenPhases: [{ kind: 'verzonnen' }, { kind: 'review' }],
       identity: { household_type: 'buitenaards', number_of_children: 'twee' },
@@ -272,7 +314,6 @@ describe('sanitizeStoredDraft — herstel + migratie van oude concepten', () => 
       quickAssets: [{ name: 'geen type' }, { asset_type: 'cash', name: 'Buffer', current_value: 5 }],
       lastStep: 'spaardoel',
     })
-    expect(restored!.spaardoel.presetKey).toBeNull()
     expect(restored!.horizon.fire_end_strategy).toBe('deplete')
     expect(restored!.horizon.fire_end_age).toBe(90)
     expect(restored!.horizon.temporal_balance).toBe(3)

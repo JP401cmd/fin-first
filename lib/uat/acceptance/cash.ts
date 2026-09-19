@@ -67,13 +67,14 @@
  * gedeeld door de motor en de "Vraag Fin"-wizard) — geen mirror meer van de
  * vervallen import-pagina-confidence-drempels 0,8/0,5.
  *
- * TWEE ECHTE MAAR NIET-INJECTEERBARE FUNCTIES (`getNextOccurrence`/
- * `getUpcomingTransactions` in lib/recurring-data.ts gebruiken intern
- * `new Date()`, geen `now`-parameter): voor WF-CASH-21 wordt daarom de
- * dag-van-de-maand-arithmetiek MET INJECTEERBARE `now` gemirrord (zelfde
- * eerstvolgende-datum-logica, bronregel-verwijzing) — `getExpectedMonthlyTotal`
- * (WF-CASH-31) is wél puur or datum-onafhankelijk en wordt rechtstreeks
- * geïmporteerd.
+ * `getExpectedMonthlyTotal` (WF-CASH-31) is puur en datum-onafhankelijk en wordt
+ * rechtstreeks geïmporteerd.
+ *
+ * VERVALLEN 19-09-2026 (W-017): WF-CASH-20 ("Wat als ik opzeg"-schuif) en
+ * WF-CASH-21 (cashflow-kalender op de vaste-lastenpagina). Beide oppervlakken
+ * zijn verwijderd; `cancelEffect` bestaat niet meer en de kalender-component is
+ * weg. "Wanneer komt de afschrijving" blijft via de Agenda-widget
+ * (lib/upcoming-events.ts) — die heeft zijn eigen criteria in OVZ.
  */
 
 import type { AcceptanceCriterion, AcceptanceSet } from './types'
@@ -325,34 +326,6 @@ const criteria: AcceptanceCriterion[] = [
     },
   },
   {
-    workflow: 'WF-CASH-20',
-    scenarioId: 'UAT-CASH-20',
-    titel: '"Wat als ik opzeg"-schuif: besparing omrekenen naar vrijheid',
-    kriticiteit: 'OVERIG',
-    given: 'Slider op €44,90 (Basic-Fit); maanduitgaven €2.200.',
-    when: '`cancelEffect` berekent het jaarbedrag en de vrijheidstijd.',
-    then: 'Jaarbedrag = 44,90×12 = €538,80 exact; vrijheidsdagen = `calculateFreedomTime(538.80, dailyExpenseRate(2200)).totalDays` ≈ 7,4 dagen (al afgerond op 1 decimaal).',
-    assertion: {
-      kind: 'exact',
-      expected: 'jaarbedrag=538.8; vrijheidsdagen=7.4',
-      source: 'lib/vaste-lasten-insights.ts#cancelEffect — echte productiefunctie, geen mirror',
-    },
-  },
-  {
-    workflow: 'WF-CASH-21',
-    scenarioId: 'UAT-CASH-21',
-    titel: 'Cashflow-kalender op /overzicht/budget/vaste-lasten: komende 5 weken vooruitkijken',
-    kriticiteit: 'BELANGRIJK',
-    given: 'PLAATS TOEGEVOEGD 07-09-2026 (ADR 0135): de kalender hing onder de opgeheven cashflow-hub en wordt sindsdien gemount vanuit `app/(app)/overzicht/budget/vaste-lasten/vaste-lasten-loader.tsx`. De component heet zelf nog `cashflow-kalender.tsx`, dus de naam blijft staan; alleen de plek is toegevoegd. "Nu" vastgezet op 5 juli 2026; een monthly recurring met `day_of_month=7`.',
-    when: 'De eerstvolgende voorkomst wordt bepaald.',
-    then: 'Aangezien 5 juli vóór dag 7 valt, is de eerstvolgende datum 7 juli 2026 (dezelfde maand, niet de volgende).',
-    assertion: {
-      kind: 'exact',
-      expected: 'eerstvolgendeDatum=2026-07-07',
-      source: 'lib/recurring-data.ts#getNextOccurrence-logica (dag-van-de-maand-arithmetiek, gemirrord met injecteerbare `now` omdat de productiefunctie intern `new Date()` gebruikt) — zie cash-checks.ts',
-    },
-  },
-  {
     workflow: 'WF-CASH-22',
     scenarioId: 'UAT-CASH-22',
     titel: 'Zes maanden vooruitkijken met de cashflow-forecast',
@@ -561,7 +534,7 @@ const criteria: AcceptanceCriterion[] = [
   {
     workflow: 'WF-CASH-37',
     scenarioId: 'UAT-CASH-37',
-    titel: 'Herautorisatie na 90 dagen: hergebruik via external_account_id, geen tweede rekening',
+    titel: 'Herautorisatie na verlopen consent (uiterlijk 180 dagen): hergebruik via external_account_id, geen tweede rekening',
     kriticiteit: 'KERN',
     given: 'Een verlopen koppeling (`bank_connections.status = expired` na een mislukte token-refresh); dezelfde bank wordt opnieuw geautoriseerd.',
     when: 'De callback verwerkt de herautorisatie.',
@@ -672,7 +645,7 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'KERN',
     given: 'specs/bank-connect-doelrekening/plan.md fase 5. Eén TrueLayer-consent levert 3 rekeningen (N=3) terug. Rekening 1 was al eerder (via `external_account_id`) gekoppeld aan TriFinity-rekening Y. In de wizard koos de gebruiker rekening X als doelrekening (`target_bank_account_id`, `link_intent=\'nieuw\'`) — X is op het moment van de callback nog geschikt (`loadTargetAccount`). Rekening 2 en 3 zijn nieuw voor TriFinity.',
     when: 'De callback verwerkt alle 3 rekeningen in de volgorde die TrueLayer teruggeeft.',
-    then: 'Rekening 1 landt op Y — identiteit (`external_account_id`) wint ALTIJD, óók van de expliciete keuze X. Dit is CORRECT gedrag en GEEN defect: een herautorisatie mag een bestaande koppeling niet verhangen; WF-CASH-47 (het correctiemoment) is de uitweg als de gebruiker toch X bedoelde. De EERSTE onbediende rekening (2) bindt de voorkeur X. Rekening 3 heeft geen identiteit- of voorkeurmatch en volgt de IBAN-fallback, of — zonder match — wordt een nieuwe rekening + cash-asset aangemaakt. Alle 3 rekeningen blijven gekoppeld (`bank_connection_accounts`); geen enkele valt stilzwijgend weg. Ná de lus gaat `target_bank_account_id` op `null` — óók wanneer de voorkeur nooit is toegepast (bv. omdat identiteit rekening 2 vóór was, of `link_intent=\'herautoriseren\'`) — zodat een volgende herautorisatie (90 dagen later) de voorkeur niet stilletjes herhaalt; `link_intent` blijft staan als feit over de koppelpoging. Bij `link_intent=\'herautoriseren\'` claimt identiteit sowieso, dus de voorkeur wordt daar helemaal niet in overweging genomen. Wordt dezelfde doelrekening achtereenvolgens aan twee verschillende providers gekoppeld (SC-14), dan ontstaat evenmin een tweede rekening of cash-asset.',
+    then: 'Rekening 1 landt op Y — identiteit (`external_account_id`) wint ALTIJD, óók van de expliciete keuze X. Dit is CORRECT gedrag en GEEN defect: een herautorisatie mag een bestaande koppeling niet verhangen; WF-CASH-47 (het correctiemoment) is de uitweg als de gebruiker toch X bedoelde. De EERSTE onbediende rekening (2) bindt de voorkeur X. Rekening 3 heeft geen identiteit- of voorkeurmatch en volgt de IBAN-fallback, of — zonder match — wordt een nieuwe rekening + cash-asset aangemaakt. Alle 3 rekeningen blijven gekoppeld (`bank_connection_accounts`); geen enkele valt stilzwijgend weg. Ná de lus gaat `target_bank_account_id` op `null` — óók wanneer de voorkeur nooit is toegepast (bv. omdat identiteit rekening 2 vóór was, of `link_intent=\'herautoriseren\'`) — zodat een volgende herautorisatie (tot 180 dagen later) de voorkeur niet stilletjes herhaalt; `link_intent` blijft staan als feit over de koppelpoging. Bij `link_intent=\'herautoriseren\'` claimt identiteit sowieso, dus de voorkeur wordt daar helemaal niet in overweging genomen. Wordt dezelfde doelrekening achtereenvolgens aan twee verschillende providers gekoppeld (SC-14), dan ontstaat evenmin een tweede rekening of cash-asset.',
     assertion: {
       kind: 'ui-only',
       source: 'app/api/bank-connect/callback/route.ts (het precedentieketen-commentaarblok + schakel 1 t/m 3 + stap 5a consume-once) — DB-mutatie/precedentieketen over meerdere Supabase-rondes, geen pure functie zonder Supabase',
@@ -724,12 +697,12 @@ const criteria: AcceptanceCriterion[] = [
     scenarioId: 'UAT-CASH-49',
     titel: 'Bankkoppeling-gezondheid: derde icoon-toestand + herstelpad vanaf de rekening + SC-13-herstel (beide assen) (B6)',
     kriticiteit: 'KERN',
-    given: 'specs/bank-connect-doelrekening/plan.md fase 7 (B6, SC-12/SC-13). Vier signalen bepalen de koppelgezondheid van één rekening: `bank_connection_accounts.is_active`, `bank_connections.status`, `token_expires_at` en `last_synced_at` (dat laatste is bewust GÉÉN onderdeel van het verdict). Drie oppervlakken consumeren dezelfde afleiding: het herkomst-icoon op de rekeningkaart, `SyncStatusBadge` en `ConnectedAccountCard` — vóór fase 7 leidde elk het zelf af. Vijf testcases: (1) geen koppelrij, (2) zacht ontkoppeld (`is_active=false`) waarbij de autorisatie ná het ontkoppelen alsnog is verlopen, (3) status `expired` met een nog geldig token, (4) status `active` met een verstreken `token_expires_at`, (5) status `active` met een geldig token.',
-    when: '`deriveBankLinkHealth`/`deriveBankLinkState` (`lib/bank-connection-status.ts`) beoordeelt elk van de vijf combinaties, in de vaste regelvolgorde: 1) geen koppelrij → manual, 2) zacht ontkoppeld → manual, 3) status kapot (`expired`/`revoked`) → linked-broken, 4) token verstreken → linked-broken, 5) anders → linked.',
+    given: 'specs/bank-connect-doelrekening/plan.md fase 7 (B6, SC-12/SC-13). Vier signalen bepalen de koppelgezondheid van één rekening: `bank_connection_accounts.is_active`, `bank_connections.status`, `consent_expires_at` en `last_synced_at` (dat laatste is bewust GÉÉN onderdeel van het verdict). Drie oppervlakken consumeren dezelfde afleiding: het herkomst-icoon op de rekeningkaart, `SyncStatusBadge` en `ConnectedAccountCard` — vóór fase 7 leidde elk het zelf af. Vijf testcases: (1) geen koppelrij, (2) zacht ontkoppeld (`is_active=false`) waarbij de autorisatie ná het ontkoppelen alsnog is verlopen, (3) status `expired` met een nog geldige consent, (4) status `active` met een verstreken `consent_expires_at`, (5) status `active` met een geldige consent.',
+    when: '`deriveBankLinkHealth`/`deriveBankLinkState` (`lib/bank-connection-status.ts`) beoordeelt elk van de vijf combinaties, in de vaste regelvolgorde: 1) geen koppelrij → manual, 2) zacht ontkoppeld → manual, 3) status kapot (`expired`/`revoked`) → linked-broken, 4) consent verstreken → linked-broken, 5) anders → linked.',
     then: 'De regelvolgorde IS het contract: case 2 bewijst dat gebruikersintentie wint van storing — een bewust verbroken koppeling die daarna verliep vraagt geen aandacht meer en blijft `manual`, nooit `linked-broken`. Case 3 en 4 bewijzen dat status ÉN datum allebei tot `linked-broken` leiden (de status springt pas op `expired` bij een mislukte token-refresh, die alleen draait als iemand synchroniseert — de datum is tot dat moment het enige eerlijke signaal). `linked-broken` ≠ `manual` in de UI: het icoon krijgt het `Unlink`-glyph op `--warning` (aandacht, geen verlies) in plaats van de kleurloze herkomst-tint, met tooltip "verbinding kwijt" — `expired` en `revoked` zijn daarbij één copy, want geen enkel codepad schrijft ooit `revoked`. Het herstelpad start vanaf de rekeningkaart: de client post alleen `relink_connection_account_id` naar `auth-link`; de server leidt de doelrekening, `link_intent=\'herautoriseren\'` én de bank af uit de koppeling zelf (`lib/truelayer/start-relink.ts`) — geen extra wizardstap, rechtstreeks naar de bank. `exceptConnectionAccountId` voorkomt dat de eigen koppeling zichzelf op een 409 laat lopen; draagt een ándere actieve koppeling dezelfde rekening, dan blijft de 409 met `occupiedTargetAccountMessage` bestaan. Wordt bij dat herstel een rekening hergebruikt waarvan het cash-bezit gedeactiveerd was (SC-13), dan herstelt de callback dat bezit pas ná de geslaagde koppelwrite (stap 4b) — een mislukte poging (bezet-botsing) laat dus geen stille vermogenswijziging achter. Sinds het eigenaarsbesluit van 30 juli omvat dat herstel BEIDE assen: eerst de zichtbaarheid (`assets.is_active=true`), daarna de budgettracking via `setBudgetTracking` (de ene schrijver van `has_budget_tracking` + companion-rij + de module-gate `profiles.budgeting_active`; `bank_accounts.is_active` beweegt daardoor mee, want dát is hoe de companion "budgetteren staat aan" uitdrukt). Herstel dat de rekening zichtbaar maakt maar buiten de budgetten laat, las als half hersteld. De volgorde is het contract: faalt de budget-write, dan blijft het bezit hersteld (`reactivated: true`) en is de rest zichtbaar en zelf-herstelbaar via de bestaande toggle; faalt de zichtbaarheids-write, dan wordt de budget-as niet aangeraakt. Een bezit dat al ACTIEF is krijgt geen budget-write: herstel is een reparatie, geen "zet altijd maar aan".',
     assertion: {
       kind: 'exact',
-      expected: 'geenKoppelrij=manual; zachtOntkoppeldMaarVerlopen=manual; statusKapot=linked-broken; tokenVerstreken=linked-broken; gezond=linked',
+      expected: 'geenKoppelrij=manual; zachtOntkoppeldMaarVerlopen=manual; statusKapot=linked-broken; consentVerstreken=linked-broken; gezond=linked',
       source: 'lib/bank-connection-status.ts#deriveBankLinkHealth (de regelvolgorde-contract) — echte productiefunctie, geen mirror; het herstelpad (relink_connection_account_id, server-afgeleide doelrekening/intentie/bank) en het SC-13-herstel van beide assen (lib/truelayer/cash-asset-backfill.ts#ensureCashAssetForBankAccount → lib/budget-tracking.ts#setBudgetTracking, aangeroepen ná de koppelwrite in app/api/bank-connect/callback/route.ts) zijn DB-mutatie over meerdere Supabase-rondes en staan hier narratief vastgelegd, niet los getoetst — de vitest-dekking zit in lib/truelayer/cash-asset-backfill.test.ts.',
     },
   },
@@ -1046,6 +1019,23 @@ const cardR7Criteria: AcceptanceCriterion[] = [
       kind: 'ui-only',
       source:
         'app/(app)/overzicht/budget/transacties/page.tsx (accountCount → KoppelRekeningBanner + vulIngangenInBanner) + components/overview/koppel-rekening-banner.tsx (vroege terugval bij accountCount > 0) + components/overview/transacties/transacties-analyse.tsx (`!vulIngangenInBanner`-tak rond de twee Links) — conditioneel renderen zonder eigen berekening; geborgd door koppel-rekening-banner.test.tsx + transacties-analyse.test.tsx',
+    },
+  },
+  {
+    workflow: 'WF-CASH-69',
+    scenarioId: 'UAT-CASH-69',
+    titel: 'Import waarschuwt als regels al op een ANDERE eigen rekening staan — "toch importeren?"',
+    kriticiteit: 'BELANGRIJK',
+    persona: 'daan',
+    given:
+      'NIEUW 19-09-2026 (eigenaarsbesluit 11-09-2026, Notion 3d8f9e8d…). De cross-bron-dedup (laag 2) is bewust gescoped op (user_id, account_id); wie dezelfde export in twee rekeningen uploadt kreeg geen signaal. Persona Daan heeft een PayPal-export (Spotify −9,99 op 1 sep, Netflix −13,99 op 3 sep, Ziggo −55 op 5 sep) al op rekening "Creditcard" geïmporteerd (Spotify daar op 2 sep geboekt) en uploadt hetzelfde bestand nu naar rekening "PayPal". Stap 2 van de import-wizard vraagt `POST /api/transactions/import/overlap` (per 1.000 rijen) met de vier laag-2-matchvelden; de route vergelijkt met dezelfde sleutel als laag 2 (datum ±1 dag, bedrag exact, tegenpartij-IBAN of genormaliseerde naam) tegen uitsluitend EIGEN rijen (`user_id = ik`) op ANDERE rekeningen dan de doelrekening — partnerrijen nooit, ook niet op een gedeelde rekening.',
+    when: 'De duplicaatcontrole van stap 2 is klaar en de gebruiker klikt "Importeren".',
+    then: 'Stap 2 toont een waarschuwing "N regels staan al op een andere rekening van je" met per rekening het aantal en de naam ("2 op Creditcard"); niets wordt uitgevinkt of tegengehouden. "Importeren" opent eerst een bevestiging (ShellOverlay kind="confirm") "Toch importeren?" met dezelfde uitsplitsing; "Toch importeren" start de import ongewijzigd, "Annuleren" laat stap 2 ongemoeid. De app verwijdert nooit zelf iets. Faalt de controle (netwerk), dan staat er een eerlijke melding en kan de gebruiker gewoon importeren. Rekenkundig: `countOtherAccountOverlaps` op bovenstaande export tegen Creditcard (Spotify 2 sep, Netflix 3 sep) = [{Creditcard, 2}]; één bestaande rij absorbeert hooguit één kandidaat.',
+    assertion: {
+      kind: 'exact',
+      expected: 'overlaps=creditcard:2; geenPartner=0',
+      source:
+        'lib/parsers/other-account-overlap.ts#countOtherAccountOverlaps (op partitionCrossSourceDuplicates, echte productiefunctie) + lib/truelayer/existing-hashes.ts#loadOtherOwnAccountCandidates (.eq(user_id) + .neq(account_id)) + app/api/transactions/import/overlap/route.ts + app/(app)/core/cash/import/page.tsx (checkOtherAccountOverlap → waarschuwing + ShellOverlay-confirm) — zie cash-checks.ts',
     },
   },
 ]

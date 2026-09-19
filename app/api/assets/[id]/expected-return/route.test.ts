@@ -139,13 +139,42 @@ describe('PATCH /api/assets/[id]/expected-return', () => {
   it.each([
     ['extra sleutel', { expected_return: 6, user_id: 'u2' }],
     ['geen getal', { expected_return: '6' }],
-    ['null', { expected_return: null }],
     ['geen veld', {}],
     ['geen JSON', 'nee'],
   ])('400 bij %s, zonder DB-toegang', async (_naam, body) => {
     const res = await PATCH(req(body), params())
     expect(res.status).toBe(400)
     expect(calls).toHaveLength(0)
+  })
+
+  // OMGEKLAPT met ADR 0166 (TPR-02 vervolg). `null` was hier een 400: de kolom
+  // was NOT NULL DEFAULT 0 en "geen eigen rendement" bestond niet als keuze.
+  // Sinds migratie 20260919140000 IS het een keuze, en deze route is het
+  // schrijfpad ervoor. De oude assertie stond in de 400-tabel hierboven; dat
+  // deze test van betekenis omklapt is het bewijs dat de semantiek daadwerkelijk
+  // is veranderd en niet alleen het schema.
+  it('null wordt opgeslagen als "geen eigen rendement", niet geweigerd', async () => {
+    readResult = { data: { id: ID, asset_type: 'investment', depreciation_rate: 0 }, error: null }
+    const res = await PATCH(req({ expected_return: null }), params())
+    expect(res.status).toBe(200)
+    await expect(res.json()).resolves.toMatchObject({ id: ID, expected_return: null })
+  })
+
+  it('null slaat de rendementsband over — een band begrenst een getal dat er niet is', async () => {
+    // `savings` heeft een smalle band; 999 zou hier een 400 geven. `null` niet:
+    // er valt niets te begrenzen, de terugval heeft zijn eigen grens op het profiel.
+    readResult = { data: { id: ID, asset_type: 'savings', depreciation_rate: 0 }, error: null }
+    expect((await PATCH(req({ expected_return: 999 }), params())).status).toBe(400)
+    expect((await PATCH(req({ expected_return: null }), params())).status).toBe(200)
+  })
+
+  it('afschrijvend bezit blijft 409, ook bij null', async () => {
+    // Een afschrijvende auto moet een BEWUSTE 0 houden. Zou null hier passeren,
+    // dan ging hij op het profielrendement (bv. 7%) GROEIEN in plaats van dalen.
+    readResult = { data: { id: ID, asset_type: 'vehicle', depreciation_rate: 15 }, error: null }
+    const res = await PATCH(req({ expected_return: null }), params())
+    expect(res.status).toBe(409)
+    expect(calls).toHaveLength(1)
   })
 
   it('DB-fout: generieke 500 zonder interne tekst', async () => {

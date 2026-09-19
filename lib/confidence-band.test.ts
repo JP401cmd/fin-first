@@ -41,16 +41,28 @@ describe('computeConfidenceBand — basis', () => {
     expect(year3Spread).toBeGreaterThan(year1Spread)
   })
 
-  it('low niet negatief (clamp op 0)', () => {
-    // Verzin extreem hoog jaar zodat factor > 1 zou worden
-    const longHorizon = Array.from({ length: 100 }, (_, i) => ({
-      age: 35 + i,
-      endPortfolio: 100_000,
-    }))
-    const result = computeConfidenceBand(longHorizon, 0.5, Z_SCORE_P10_P90)
-    for (const p of result) {
-      expect(p.low).toBeGreaterThanOrEqual(0)
+  // B-053 (19 sep 2026): geen klem op nul — de band volgt het teken van de lijn.
+  it('negatieve lijn (tekort-lening) ⇒ band rond de negatieve waarde, low ≤ mid ≤ high', () => {
+    const tekort = [
+      { age: 60, endPortfolio: 20_000 },
+      { age: 61, endPortfolio: -80_000 },
+      { age: 62, endPortfolio: -170_000 },
+    ]
+    const result = computeConfidenceBand(tekort)
+    // Jaar 1 en 2: mid negatief, band symmetrisch eromheen — niets blijft op 0 hangen.
+    for (const p of result.slice(1)) {
+      expect(p.mid).toBeLessThan(0)
+      expect(p.low).toBeLessThan(p.mid)
+      expect(p.high).toBeGreaterThan(p.mid)
+      expect(p.high).toBeLessThan(0)
+      expect(p.high - p.mid).toBeCloseTo(p.mid - p.low, 6)
     }
+  })
+
+  it('positieve lijn onder de default P40–P60 houdt over 65 jaar een positieve onderrand (factor < 1)', () => {
+    const lang = Array.from({ length: 66 }, (_, i) => ({ age: 30 + i, endPortfolio: 100_000 }))
+    const result = computeConfidenceBand(lang)
+    for (const p of result) expect(p.low).toBeGreaterThan(0)
   })
 
   it('high > mid > low op alle non-eerste jaren', () => {

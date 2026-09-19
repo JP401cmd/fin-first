@@ -217,6 +217,23 @@ describe('projectWealthComposition — projection growth', () => {
     }
   })
 
+  // ADR 0166 — `expected_return = null` is GEEN 0%: met een terugval groeit de
+  // bezitting op het profielrendement, zonder terugval blijft de oude nul-basis
+  // (bestaande callers byte-identiek), en een bewuste 0 groeit nooit.
+  it('null expected_return groeit op de terugval (ADR 0166), 0 blijft 0', () => {
+    const nullAsset = makeAsset({ asset_type: 'investment', current_value: 100000, expected_return: null, monthly_contribution: 0 })
+    const zeroAsset = makeAsset({ asset_type: 'investment', current_value: 100000, expected_return: 0, monthly_contribution: 0 })
+
+    const metTerugval = projectWealthComposition(baseInput({ assets: [nullAsset], terugvalRendementPct: 7 }))
+    expect(metTerugval[1].beleggingen).toBe(Math.round(100000 * 1.07))
+
+    const zonderTerugval = projectWealthComposition(baseInput({ assets: [nullAsset] }))
+    expect(zonderTerugval[1].beleggingen).toBe(100000)
+
+    const bewusteNul = projectWealthComposition(baseInput({ assets: [zeroAsset], terugvalRendementPct: 7 }))
+    expect(bewusteNul[1].beleggingen).toBe(100000)
+  })
+
   it('monthly contributions add to asset value linearly', () => {
     const rows = projectWealthComposition(baseInput({
       assets: [makeAsset({

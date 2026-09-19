@@ -156,7 +156,7 @@ export async function POST(req: Request) {
 
     // AI-redactie: directives uit beheer + metrics uit de engine-input sturen
     // de herschrijving. Faalt dit (AI uit, fout, guard) → deterministisch.
-    const directives = await loadBriefingDirectives(supabase)
+    const directives = await loadBriefingDirectives()
     const directivesBlock = buildDirectivesBlock(directives, now, buildEngineMetrics(input))
     const { headline, texts } = await redactBriefing(supabase, entries, { directivesBlock })
 
@@ -235,7 +235,7 @@ async function composeVoorLokaal(
 
   const now = new Date()
   const { entries, input } = await loadAndComposeOverviewBriefing(supabase, now)
-  const directives = await loadBriefingDirectives(supabase)
+  const directives = await loadBriefingDirectives()
   // ALLEEN-ACTIEVE richtlijnen: de [INACTIEF]-regels zijn voor een 2B-model
   // ruis én kosten ~350 tokens van een venster van 8192.
   const directivesBlock = buildLocalDirectivesBlock(directives, now, buildEngineMetrics(input))

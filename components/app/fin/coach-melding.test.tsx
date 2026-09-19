@@ -67,3 +67,60 @@ describe('CoachMelding', () => {
     expect(screen.getByText('▮')).toBeInTheDocument()
   })
 })
+
+/**
+ * W-016 — de uitknop op de kaart zelf ("Niet meer uit jezelf"), het moment van
+ * ergernis. Optioneel in het contract: een host die de keuze niet aanbiedt, rendert
+ * hem niet.
+ */
+describe('CoachMelding — "Niet meer uit jezelf" (W-016)', () => {
+  it('toont de link alleen wanneer de host hem aanbiedt', () => {
+    const { unmount } = render(
+      <CoachMelding {...base} onClose={vi.fn()} onCtaActivate={vi.fn()} onOpenChat={vi.fn()} />,
+    )
+    expect(screen.queryByRole('button', { name: /Niet meer uit jezelf/i })).toBeNull()
+    unmount()
+
+    render(
+      <CoachMelding
+        {...base}
+        onClose={vi.fn()}
+        onCtaActivate={vi.fn()}
+        onOpenChat={vi.fn()}
+        onStopProactief={vi.fn()}
+      />,
+    )
+    expect(screen.getByRole('button', { name: /Niet meer uit jezelf/i })).toBeInTheDocument()
+  })
+
+  it('verschijnt pas na het uittypen, samen met de CTA', () => {
+    render(
+      <CoachMelding
+        {...base}
+        done={false}
+        onClose={vi.fn()}
+        onCtaActivate={vi.fn()}
+        onOpenChat={vi.fn()}
+        onStopProactief={vi.fn()}
+      />,
+    )
+    expect(screen.queryByRole('button', { name: /Niet meer uit jezelf/i })).toBeNull()
+  })
+
+  it('roept de host aan en valt niet door naar de body-klik (chat blijft dicht)', () => {
+    const onStopProactief = vi.fn()
+    const onOpenChat = vi.fn()
+    render(
+      <CoachMelding
+        {...base}
+        onClose={vi.fn()}
+        onCtaActivate={vi.fn()}
+        onOpenChat={onOpenChat}
+        onStopProactief={onStopProactief}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: /Niet meer uit jezelf/i }))
+    expect(onStopProactief).toHaveBeenCalledTimes(1)
+    expect(onOpenChat).not.toHaveBeenCalled()
+  })
+})

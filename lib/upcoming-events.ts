@@ -9,9 +9,8 @@
  * Alle datum-vergelijkingen gebeuren op de LOKALE kalenderdag — nooit via
  * `new Date('YYYY-MM-DD')` (dat parseert op UTC-middernacht en schuift in NL
  * een dag) of `toISOString()` (idem, andere richting). Dit is exact de
- * tijdzone-val uit de conventies (zie lib/recurring-data.ts en
- * components/overview/cashflow-kalender.tsx die om dezelfde reden op het
- * middaguur ankeren).
+ * tijdzone-val uit de conventies (zie lib/recurring-data.ts, dat om dezelfde
+ * reden op het middaguur ankert).
  */
 
 import type { RecurringTransaction } from '@/lib/recurring-data'

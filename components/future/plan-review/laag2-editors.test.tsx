@@ -197,6 +197,45 @@ describe('laag 2 — rendement per bezitting', () => {
     await waitFor(() => expect(actions?.changed).toBe(true))
   })
 
+  // ADR 0166 — "geen eigen rendement" is een EXPLICIETE keuze, en de wizard
+  // rekent er niet zelf een profielrendement voor uit: hij stuurt `null` de kern
+  // in en laat `potRendement` de terugval doen (consume, don't recompute).
+  it('"geen eigen rendement": live effect met null en PATCH met null', async () => {
+    renderOnderdeel('rendement-bezitting')
+    fireEvent.click(screen.getByRole('checkbox', { name: /Geen eigen rendement/ }))
+    await waitFor(() => expect(actions?.changed).toBe(true))
+    // NIET `{ [ETF.id]: 7 }` — zou de wizard hier zelf het profielrendement
+    // invullen, dan wijkt het live effect af van het bewaarde plan zodra die
+    // twee grondslagen uiteenlopen.
+    expect(overrides.lijst).toContainEqual({ assetExpectedReturns: { [ETF.id]: null } })
+    await act(async () => actions!.save())
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/assets/${ETF.id}/expected-return`,
+      expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ expected_return: null }) }),
+    )
+  })
+
+  it('"geen eigen rendement" zet het getalveld uit en de bandfout verdwijnt', async () => {
+    renderOnderdeel('rendement-bezitting')
+    fireEvent.click(screen.getByRole('button', { name: 'Spaarrekening' }))
+    fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '-1' } })
+    expect(await screen.findByText('Rente moet tussen 0% en 15% per jaar liggen.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('checkbox', { name: /Geen eigen rendement/ }))
+    // Er valt niets meer te begrenzen: opslaan mag weer, met `null`.
+    await waitFor(() => expect(actions?.canSave).toBe(true))
+    expect(screen.getByRole('spinbutton')).toBeDisabled()
+    expect(screen.queryByText('Rente moet tussen 0% en 15% per jaar liggen.')).not.toBeInTheDocument()
+  })
+
+  it('een bezitting die al op null staat opent mét het vinkje aan en meldt niets gewijzigd', () => {
+    const ZONDER = { ...ETF, expected_return: null }
+    renderOnderdeel('rendement-bezitting', laag2({ bezittingen: [ZONDER], zonderEigenRendement: 1 }))
+    expect(screen.getByRole('checkbox', { name: /Geen eigen rendement/ })).toBeChecked()
+    // Openen is geen wijziging — anders zou de wizard bij elk bezoek een
+    // schrijfactie aanbieden die niets verandert.
+    expect(actions?.changed).toBe(false)
+  })
+
   it('afschrijvend bezit: uitleg, niets op te slaan', () => {
     renderOnderdeel('rendement-bezitting')
     fireEvent.click(screen.getByRole('button', { name: 'Auto' }))

@@ -41,6 +41,8 @@ import type { WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
 import type { FactorRow } from '@/lib/euro-display'
 import { computeRunwayFromRawContext, type RunwayResult } from '@/lib/horizon/runway'
 import { loadPartnerKernelBlok } from '@/lib/horizon/partner-kernel-blok'
+import { detectEindsituatieForRun } from '@/lib/horizon/eindsituatie-run'
+import type { EindsituatieDuiding } from '@/lib/horizon/eindsituatie-duiding'
 
 /**
  * Beide FIRE-doel-grondslagen uit ÉÉN kernel-run (ADR 0034).
@@ -147,6 +149,23 @@ export interface HorizonFireSim {
    * factor 1 (= geen deflatie), nooit op een verzonnen getal.
    */
   unifiedRows: HorizonFireSimRow[]
+  /**
+   * Duiding van de eindsituatie ("waarom blijft er aan het eind zoveel over?") uit
+   * DEZELFDE run — `null` wanneer er niets te duiden valt.
+   *
+   * WAAROM OP DEZE NAAD EN NIET IN EEN TWEEDE `cache()` (kaart "Fin kent je
+   * plan-instellingen niet", laag C): de detector heeft de VOLLEDIGE
+   * `UnifiedProjectionRow[]` nodig (`opeetPlafondBereikt`, `withdrawalNeed`,
+   * `debtBalances`), en die zijn hier al in de hand — `unifiedRows` comprimeert ze
+   * juist weg. Buiten deze functie bestaan ze niet meer, dus elke andere consument
+   * zou een volledige tweede `computeConvergentieProjection` betalen. Hier kost het
+   * één pure functie-aanroep op rijen die er al liggen: geen extra query, geen
+   * extra engine-run.
+   *
+   * De samenstelling van de detector-invoer staat één keer, in
+   * `lib/horizon/eindsituatie-run.ts` — dezelfde die `lib/totaalplan-data.ts` leest.
+   */
+  eindsituatie: EindsituatieDuiding | null
 }
 
 /**
@@ -223,7 +242,8 @@ const computeHorizonFireSimCached = cache(async function computeHorizonFireSimIn
 
   // ── Inputs guard-clause: geboortedatum vereist ──────────────
   const dob = data.effectiveInput.dateOfBirth
-  if ((dob ? ageAtDate(dob) : null) === null) return null
+  const currentAge = dob ? ageAtDate(dob) : null
+  if (currentAge === null) return null
 
   // FASE 6 stap 5A — kernel-only. Gebruik DEZELFDE gedeelde metadata-assemblage
   // (`buildHorizonInput`, voor `yearlyExpenses`) + de horizon-kernel als de /toekomst-hook en
@@ -292,8 +312,40 @@ const computeHorizonFireSimCached = cache(async function computeHorizonFireSimIn
     ...(row.startNettoLiquide !== undefined ? { startNettoLiquide: row.startNettoLiquide } : {}),
   }))
 
+  const sim = toSimResult(outcome.result)
+
+  // ── Eindsituatie-duiding op de VOLLEDIGE rijen van deze run ─────────────────
+  // Zie het veld-commentaar op `HorizonFireSim.eindsituatie`. Puur; leest uitsluitend
+  // `rawContext.profile` (de eigen profielrij), nooit `rawContext.partner`.
+  //
+  // ALLEEN IN DE EIGEN BLIK (fail-closed, security-review 19 sep 2026). In het
+  // huishoudperspectief draait de run op de GECOMBINEERDE potten mét de partner-PT-laag
+  // (partner-inkomen/-AOW), waardoor de oorzaken `later-inkomen`/`late-baten` indirect
+  // partner-leeftijden zouden dragen; in het partnerperspectief is de duiding
+  // inhoudelijk onzin (eigen profiel op andermans potten) — /toekomst onderdrukt 'm daar
+  // al client-side. Deze naad deed dat niet. De enige consument is vandaag de AI-context,
+  // die per definitie `personal` draait; de gate kost dus niets en sluit de wissel af.
+  //
+  // TRY/CATCH: een throw hier zou de canonieke run voor ÁLLE consumenten in dit request
+  // verwerpen (/overzicht awaitet 'm zonder catch → 500) voor een regel duiding. De
+  // duiding is aanvullend, niet dragend: bij een fout blijft de run staan zonder duiding.
+  let eindsituatie: EindsituatieDuiding | null = null
+  if (perspective === 'personal') {
+    try {
+      eindsituatie = detectEindsituatieForRun({
+        rows: outcome.result.rows ?? [],
+        sim,
+        profile: rawContext.profile,
+        currentAge,
+        yearlyExpenses: rawContext.yearlyExpenses,
+      })
+    } catch (err) {
+      console.error('[fire-target-shared:eindsituatie]', err)
+    }
+  }
+
   return {
-    sim: toSimResult(outcome.result),
+    sim,
     rawContext,
     fireStrategy: data.fireStrategy,
     firePlan: data.firePlan,
@@ -301,6 +353,7 @@ const computeHorizonFireSimCached = cache(async function computeHorizonFireSimIn
     aowAgeInt: built.aowAgeInt,
     aowAgeFractional,
     unifiedRows,
+    eindsituatie,
   }
 })
 

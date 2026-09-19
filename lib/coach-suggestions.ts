@@ -299,7 +299,11 @@ export const DEFERRED_FIELD_SUGGESTIONS: DeferredRule[] = [
   {
     field: 'spaardoel',
     key: 'deferred_spaardoel',
-    condition: 'Spaardoel overgeslagen tijdens onboarding. Verdwijnt zodra er ≥1 doel is.',
+    // De spaardoel-stap is op 19 sep 2026 uit de onboarding gehaald (ADR 0162);
+    // nieuwe accounts dragen deze deferral niet meer. De regel blijft voor de
+    // profielen die 'm vóór die datum kregen.
+    condition:
+      'Spaardoel overgeslagen tijdens de onboarding van vóór 19 sep 2026. Verdwijnt zodra er ≥1 doel is.',
     resolved: (gaps) => gaps.hasGoals,
     suggestion: {
       message:

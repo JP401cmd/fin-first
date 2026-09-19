@@ -126,12 +126,12 @@ export function HouseholdFireSection({
   const splitLabel = SPLIT_MODE_LABELS[splitMode] ?? splitMode
 
   // Gecombineerde FIRE uitgedrukt als kalenderjaar + ieders leeftijd dán.
-  // De combined `fireAge` is de leeftijd van de OUDSTE partner (de head, wiens
-  // tijdas de gezamenlijke projectie volgt). Die los tonen naast ieders eigen
-  // leeftijd is appels-met-peren: het zijn leeftijden van verschillende mensen.
-  // We vertalen het daarom naar één kalenderjaar waarin beiden kunnen stoppen,
-  // met de leeftijd van elke partner in dat jaar.
-  const headCurrentAge = Math.max(...partners.map(p => p.settings.currentAge ?? 0))
+  // De combined `fireAge` is de leeftijd van de KIJKER (de head sinds TPR-07
+  // fase 2a; de gezamenlijke projectie volgt diens tijdas). Die los tonen naast
+  // de leeftijd van de partner is appels-met-peren: het zijn leeftijden van
+  // verschillende mensen. We vertalen het daarom naar één kalenderjaar waarin
+  // beiden kunnen stoppen, met de leeftijd van elke partner in dat jaar.
+  const headCurrentAge = currentUserPartner?.settings.currentAge ?? 0
   const combinedFireAge = combined.projection.fireAge
   const yearsToCombinedFire = combinedFireAge != null && headCurrentAge > 0 ? combinedFireAge - headCurrentAge : null
   const combinedFireYear = (() => {

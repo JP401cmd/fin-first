@@ -51,6 +51,7 @@ import {
   type CategoryHistoryData,
 } from '@/lib/load-category-history'
 import { AssetCategoryPage } from '@/components/core/asset-category-page'
+import { getRecentDailyExpenseRate } from '@/lib/expense-rate'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 
 // ── Type guards ──────────────────────────────────────────────
@@ -325,9 +326,16 @@ export default async function AssetCategoryServerPage({
     }
   }
 
-  const [kpiRefs, historyData] = await Promise.all([
+  const [kpiRefs, historyData, expenseRate] = await Promise.all([
     kpiRefsPromise,
     historyPromise,
+    // Het CANONIEKE dagtarief voor het bezit-detailvenster (ADR 0126 D1/D2).
+    // Reist als prop door naar `<AssetPane>`; tot 19 sep 2026 rekende die pane
+    // client-side een eigen tarief op de essentiële-budgetten-grondslag en gaf
+    // daarmee een langere vrijheidsduur dan elk ander oppervlak. Zelfde helper
+    // als `lib/assets-data-loader.ts`, dus één getal op beide ingangen.
+    // Niet-fataal: bij een fout vervalt alleen de vrijheidstijd in het venster.
+    getRecentDailyExpenseRate(supabase).catch(() => null),
   ])
 
   // ── Per-asset sparklines voor de items-tab ───────────────────
@@ -363,6 +371,8 @@ export default async function AssetCategoryServerPage({
         type={type}
         currentUserId={user.id}
         initialAssets={assets}
+        dailyExpenses={expenseRate?.dailyRate}
+        dailyExpensesSource={expenseRate?.source}
         initialBudgetsData={budgetsData ?? undefined}
         initialHoldingsData={holdingsData ?? undefined}
         initialCoreData={coreData ?? undefined}

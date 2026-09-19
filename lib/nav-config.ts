@@ -410,6 +410,62 @@ export const EXTRA_ROUTE_TITLES: Record<string, string> = {
 }
 
 /**
+ * MERKTAAL EN UITZONDERINGEN — waarom een route méér dan één naam mag dragen.
+ *
+ * Een label zit in deze app op vier tot zes plekken: deze nav-config, de
+ * zijbalk-literals, het commandopalet, het avatar-menu in de TopBar, het
+ * kruimelpad en de pagina zelf. Eén naam per concept is de regel (bevinding
+ * M14: de zijbalk zei drie weken "Nieuws" terwijl de rest "Krant" zei).
+ *
+ * `lib/nav-config.naamconsistentie.test.ts` dwingt die regel af en leest déze
+ * kaart als allowlist: staat een href hier niet, dan moeten alle bronnen exact
+ * hetzelfde label dragen. Een uitzondering toevoegen kan — maar alleen mét de
+ * reden erbij, zodat criterium 2 van UR3-30 ("is vastgelegd waarom dat label
+ * die uitzondering verdient") afdwingbaar is in plaats van beschrijvend.
+ *
+ * LET OP het verschil met `MERKTAAL_VERANTWOORDING` hieronder: dáár staat
+ * waaróm een metafoor als naam behouden blijft. Dat is géén vrijstelling —
+ * "Krant" moet juist overal exact "Krant" heten. Alleen een route die écht
+ * twee namen draagt hoort hieronder.
+ */
+export const LABEL_UITZONDERINGEN: Record<string, string> = {
+  // De vier deep-app-routes: sinds M41 draagt de app-tegel de KALE
+  // categorie-route als href, terwijl diezelfde route ook een gewone
+  // categoriepagina is met een eigen naam. Twee namen, maar geen drift: de
+  // pagina levert haar eigen <NavStackMeta title>, dus de gebruiker ziet altijd
+  // de categorienaam; de app-naam staat alleen op de tegel die ernaartoe wijst.
+  '/overzicht/bezittingen/investment':
+    'Pagina = "Beleggingen" (categorie), tegel = "Aandelen holdings" (verdiepende app op die categorie). Zie M41.',
+  '/overzicht/bezittingen/crypto':
+    'Pagina = "Crypto" (categorie), tegel = "Crypto holdings" (verdiepende app). Zie M41.',
+  '/overzicht/bezittingen/real_estate':
+    'Pagina = "Vastgoed" (categorie), tegel = "Verhuurrendement" (verdiepende app). Zie M41.',
+  '/overzicht/schulden/mortgage':
+    'Pagina = "Hypotheek" (categorie), tegel = "Hypotheekplanner" (verdiepende app). Zie M41.',
+}
+
+/**
+ * MERKTAAL — welke metaforen als naam blijven staan, en waarom.
+ *
+ * Besluit 6 sep 2026 (UR3-30), na het beginner-onderzoek: "vertalen, niet
+ * wegnemen". Vier metaforische menulabels lagen op tafel; precies één is
+ * hernoemd, één blijft, één was een restant en één bleek helemaal geen
+ * metafoor. Deze kaart legt de overgebleven merktaal vast — acceptatiecriterium
+ * 2 van die kaart vraagt letterlijk dat vastligt waarom een label de
+ * uitzondering verdient.
+ *
+ * Dit is NADRUKKELIJK geen vrijstelling van de naamconsistentie: een naam die
+ * blijft, moet op álle bronnen hetzelfde luiden. `resolveRouteTitle` is en
+ * blijft de canonieke naam; `nav-config.naamconsistentie.test.ts` toetst dat.
+ */
+export const MERKTAAL_VERANTWOORDING: Record<string, string> = {
+  '/nieuws':
+    'Blijft "Krant". De metafoor draagt de hele editorial-ontwerptaal (kicker, katern, colofon) en de landingbelofte; twee van de drie testpersona\'s noemden het woord onbekend, maar niemand liep vast. De twee botsingen zijn weggenomen: de masthead op /nieuws zegt nu zelf "De Krant", en het gelijknamige palet op /mijn/uiterlijk heet sinds UR3-30 "Redactioneel wit".',
+  '/toekomst':
+    'Heet in het menu en in de TopBar "Toekomst" / "De toekomst" — gewone taal, want daar zoekt een gebruiker. De metafoor "tijdas" leeft op de pagina zelf ("Je tijdas") en in het ⌘K-sublabel, waar hij pal naast het ding staat dat hij benoemt. De derde naam — een sub-item "Tijdas" dat naar zijn eigen ouder wees — is 15 sep 2026 verwijderd.',
+}
+
+/**
  * Strip querystring + hash + trailing slash van een pathname zodat de
  * exact-match-lookup robuust blijft tegen URL-varianten.
  */

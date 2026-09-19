@@ -15,40 +15,40 @@ describe('derivePlanReviewProgress — afgeleid, geen afvinklijst (A9/A10)', () 
   it('zonder markeringen staat alles open; eerste open stap = plan', () => {
     const p = derivePlanReviewProgress({}, ALLES_AANWEZIG)
     expect(p.bevestigd).toBe(0)
-    expect(p.totaal).toBe(5)
+    expect(p.totaal).toBe(6)
     expect(p.eersteOpen).toBe('plan')
     expect(p.voltooid).toBe(false)
   })
 
-  it('alle vijf gemarkeerd + profielstaat compleet → voltooid', () => {
-    const state: PlanReviewState = { plan: M, uitgaven: M, inkomsten: M, woning: M, potten: M }
+  it('alle stappen gemarkeerd + profielstaat compleet → voltooid', () => {
+    const state: PlanReviewState = { plan: M, uitgaven: M, inkomsten: M, woning: M, potten: M, grondslag: M }
     const p = derivePlanReviewProgress(state, ALLES_AANWEZIG)
-    expect(p.bevestigd).toBe(5)
+    expect(p.bevestigd).toBe(6)
     expect(p.voltooid).toBe(true)
     expect(p.eersteOpen).toBeNull()
   })
 
   it('A10 — AOW-event verwijderd heropent stap 3, ook mét oude markering', () => {
-    const state: PlanReviewState = { plan: M, uitgaven: M, inkomsten: M, woning: M, potten: M }
+    const state: PlanReviewState = { plan: M, uitgaven: M, inkomsten: M, woning: M, potten: M, grondslag: M }
     const p = derivePlanReviewProgress(state, { ...ALLES_AANWEZIG, hasAowEvent: false })
     const inkomsten = p.stappen.find((s) => s.stap === 'inkomsten')!
     expect(inkomsten.status).toBe('open')
     expect(inkomsten.reden).toBe('aow_ontbreekt')
     expect(p.voltooid).toBe(false)
     expect(p.eersteOpen).toBe('inkomsten')
-    expect(p.bevestigd).toBe(4)
+    expect(p.bevestigd).toBe(5)
   })
 
   it('A10 — eigen huis toegevoegd zonder woonstrategie heropent stap 4', () => {
-    const state: PlanReviewState = { plan: M, uitgaven: M, inkomsten: M, woning: M, potten: M }
+    const state: PlanReviewState = { plan: M, uitgaven: M, inkomsten: M, woning: M, potten: M, grondslag: M }
     const p = derivePlanReviewProgress(state, { ...ALLES_AANWEZIG, housingConfigured: false })
     const woning = p.stappen.find((s) => s.stap === 'woning')!
     expect(woning.status).toBe('open')
     expect(woning.reden).toBe('woning_zonder_strategie')
   })
 
-  it('A7 — zonder niet-liquide bezit is stap 4 n.v.t. en telt niet mee (4 van 4)', () => {
-    const state: PlanReviewState = { plan: M, uitgaven: M, inkomsten: M, potten: M }
+  it('A7 — zonder niet-liquide bezit is stap 4 n.v.t. en telt niet mee (5 van 5)', () => {
+    const state: PlanReviewState = { plan: M, uitgaven: M, inkomsten: M, potten: M, grondslag: M }
     const p = derivePlanReviewProgress(state, {
       hasAowEvent: true,
       hasEigenHuis: false,
@@ -56,15 +56,23 @@ describe('derivePlanReviewProgress — afgeleid, geen afvinklijst (A9/A10)', () 
       housingConfigured: false,
     })
     expect(p.stappen.find((s) => s.stap === 'woning')!.status).toBe('nvt')
-    expect(p.totaal).toBe(4)
-    expect(p.bevestigd).toBe(4)
+    expect(p.totaal).toBe(5)
+    expect(p.bevestigd).toBe(5)
     expect(p.voltooid).toBe(true)
   })
 
   it('bevestigde stappen blijven bevestigd wanneer een latere stap open staat (A6)', () => {
     const state: PlanReviewState = { plan: M, uitgaven: M }
     const p = derivePlanReviewProgress(state, ALLES_AANWEZIG)
-    expect(p.stappen.map((s) => s.status)).toEqual(['bevestigd', 'bevestigd', 'open', 'open', 'open'])
+    // Zes stappen sinds W-009: de grondslag-stap staat achteraan en blijft open.
+    expect(p.stappen.map((s) => s.status)).toEqual([
+      'bevestigd',
+      'bevestigd',
+      'open',
+      'open',
+      'open',
+      'open',
+    ])
     expect(p.eersteOpen).toBe('inkomsten')
   })
 })

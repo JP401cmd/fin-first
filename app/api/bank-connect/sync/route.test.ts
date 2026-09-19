@@ -24,7 +24,9 @@ const {
   mockSyncAccountBalance,
   mockCategorize,
   mockBuildFrequencyMap,
+  mockFetchConsentExpiry,
 } = vi.hoisted(() => ({
+  mockFetchConsentExpiry: vi.fn(),
   mockCreateClient: vi.fn(),
   mockIsEnabled: vi.fn(),
   mockGetBaseUrls: vi.fn(),
@@ -42,6 +44,10 @@ vi.mock('@/lib/truelayer/client', () => ({
   refreshAccessToken: vi.fn(),
 }))
 vi.mock('@/lib/truelayer/balance-sync', () => ({ syncAccountBalance: mockSyncAccountBalance }))
+// ADR 0161: het zelfherstel van `consent_expires_at` (één /me-call zolang de
+// datum ontbreekt). Default null = "TrueLayer meldde niets", dan schrijft de
+// route ook niets; de ADR-0161-suite onderaan geeft een datum.
+vi.mock('@/lib/truelayer/consent', () => ({ fetchConsentExpiry: mockFetchConsentExpiry }))
 vi.mock('@/lib/crypto/field-encryption', () => ({
   decryptField: (v: string | null) => (v ? v.replace(/^enc:/, '') : null),
   encryptField: (v: string) => `enc:${v}`,
@@ -147,6 +153,8 @@ function makeSupabase(existing: TxRow[], opts: SupabaseOpts = {}) {
   const crossSourceQueries: DedupQuery[] = []
   const syncLogs: Record<string, unknown>[] = []
   const connAccountUpdates: Record<string, unknown>[] = []
+  /** Elke UPDATE op de verbinding zelf (token-refresh, consent-zelfherstel). */
+  const connectionUpdates: Record<string, unknown>[] = []
   /** Elke niet-insert-mutatie op `transactions`. Moet altijd leeg blijven:
    *  dedup verhindert INSERTs en doet nooit een update, merge of delete. */
   const transactionMutations: string[] = []
@@ -193,6 +201,7 @@ function makeSupabase(existing: TxRow[], opts: SupabaseOpts = {}) {
       op = 'update'
       payload = row
       if (table === 'bank_connection_accounts') connAccountUpdates.push(row as Record<string, unknown>)
+      if (table === 'bank_connections') connectionUpdates.push(row as Record<string, unknown>)
       if (table === 'transactions') transactionMutations.push('update')
       return b
     }
@@ -347,6 +356,7 @@ function makeSupabase(existing: TxRow[], opts: SupabaseOpts = {}) {
     householdQueries,
     syncLogs,
     connAccountUpdates,
+    connectionUpdates,
     transactionMutations,
     /** Momentopname van de bestaande rijen — bewijst dat er niets aan is geraakt. */
     existing,
@@ -364,6 +374,7 @@ function request(body: Record<string, unknown> = { connection_account_id: 'conn-
 beforeEach(() => {
   vi.clearAllMocks()
   mockIsEnabled.mockResolvedValue(true)
+  mockFetchConsentExpiry.mockResolvedValue(null)
   mockGetBaseUrls.mockResolvedValue({ dataUrl: 'https://data.truelayer.test' })
   mockGetAccountTransactions.mockResolvedValue([TL_TX])
   mockSyncAccountBalance.mockResolvedValue({ synced: { balance: 42 } })
@@ -1372,5 +1383,100 @@ describe('POST /api/bank-connect/sync — huishoud-partnerlaag (laag 1b)', () =>
     mockCreateClient.mockResolvedValue(personal.client)
     await POST(request())
     expect(personal.inserted.flat()[0]).toMatchObject({ ownership: 'personal' })
+  })
+})
+
+/**
+ * ADR 0161 — zelfherstel van `consent_expires_at`. Koppelingen van vóór die
+ * kolom missen de consent-einddatum; de sync vult 'm éénmalig aan uit `/me`.
+ * Bewust alleen zolang hij ontbreekt: een bekende datum kost geen extra
+ * provider-verzoek. Het toegangstoken (`token_expires_at`) blijft daar buiten.
+ */
+describe('POST /api/bank-connect/sync — consent-einddatum aanvullen (ADR 0161)', () => {
+  const CONSENT = '2026-12-17T19:01:28.000Z'
+
+  it('vult consent_expires_at aan als de verbinding hem nog mist', async () => {
+    mockFetchConsentExpiry.mockResolvedValue(CONSENT)
+    const { client, connectionUpdates } = makeSupabase([], {
+      connAccount: {
+        bank_connections: {
+          id: 'conn-1',
+          access_token_encrypted: 'enc:tok',
+          refresh_token_encrypted: 'enc:rt',
+          token_expires_at: new Date(Date.now() + 3600_000).toISOString(),
+          consent_expires_at: null,
+        },
+      },
+    })
+    mockCreateClient.mockResolvedValue(client)
+
+    const res = await POST(request())
+    expect(res.status).toBe(200)
+
+    // Met het gedecrypte toegangstoken, tegen de data-URL van de omgeving.
+    expect(mockFetchConsentExpiry).toHaveBeenCalledWith('tok', 'https://data.truelayer.test')
+    const consentWrite = connectionUpdates.find((u) => 'consent_expires_at' in u)
+    expect(consentWrite).toMatchObject({ consent_expires_at: CONSENT })
+    // Alléén de consent: het token-refresh-pad is hier niet geraakt.
+    expect(consentWrite).not.toHaveProperty('token_expires_at')
+    expect(consentWrite).not.toHaveProperty('access_token_encrypted')
+  })
+
+  it('raakt TrueLayer niet aan zodra de consent-einddatum al bekend is', async () => {
+    const { client, connectionUpdates } = makeSupabase([], {
+      connAccount: {
+        bank_connections: {
+          id: 'conn-1',
+          access_token_encrypted: 'enc:tok',
+          refresh_token_encrypted: 'enc:rt',
+          token_expires_at: new Date(Date.now() + 3600_000).toISOString(),
+          consent_expires_at: CONSENT,
+        },
+      },
+    })
+    mockCreateClient.mockResolvedValue(client)
+
+    const res = await POST(request())
+    expect(res.status).toBe(200)
+    expect(mockFetchConsentExpiry).not.toHaveBeenCalled()
+    expect(connectionUpdates.find((u) => 'consent_expires_at' in u)).toBeUndefined()
+  })
+
+  it('schrijft niets als TrueLayer geen datum meldt — de sync slaagt gewoon', async () => {
+    mockFetchConsentExpiry.mockResolvedValue(null)
+    const { client, connectionUpdates } = makeSupabase([])
+    mockCreateClient.mockResolvedValue(client)
+
+    const res = await POST(request())
+    expect(res.status).toBe(200)
+    expect(mockFetchConsentExpiry).toHaveBeenCalledTimes(1)
+    expect(connectionUpdates.find((u) => 'consent_expires_at' in u)).toBeUndefined()
+  })
+})
+
+describe('POST /api/bank-connect/sync — verstreken consent-datum wordt herleid (ADR 0161)', () => {
+  it('haalt de datum opnieuw op als de opgeslagen consent in het verleden ligt terwijl de sync slaagt', async () => {
+    // De token-refresh slaagde (deze sync draait), dus de consent lééft; een
+    // opgeslagen datum in het verleden is dan per definitie fout en zou het
+    // scherm "verbinding kwijt" laten zeggen vlak nadat er data binnenkwam.
+    const VERSE = '2026-12-17T19:01:28.000Z'
+    mockFetchConsentExpiry.mockResolvedValue(VERSE)
+    const { client, connectionUpdates } = makeSupabase([], {
+      connAccount: {
+        bank_connections: {
+          id: 'conn-1',
+          access_token_encrypted: 'enc:tok',
+          refresh_token_encrypted: 'enc:rt',
+          token_expires_at: new Date(Date.now() + 3600_000).toISOString(),
+          consent_expires_at: '2026-01-01T00:00:00.000Z',
+        },
+      },
+    })
+    mockCreateClient.mockResolvedValue(client)
+
+    const res = await POST(request())
+    expect(res.status).toBe(200)
+    expect(mockFetchConsentExpiry).toHaveBeenCalledTimes(1)
+    expect(connectionUpdates.find((u) => 'consent_expires_at' in u)).toMatchObject({ consent_expires_at: VERSE })
   })
 })

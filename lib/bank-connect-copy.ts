@@ -14,7 +14,7 @@
  *  - `BANK_CONNECT_SAFETY_LONG` — bij een banner of instellingenblok met ruimte.
  *
  * De uitgebreide drie-bloks-uitleg op de bevestigstap van /core/cash/connect
- * (Veilige verbinding · 90 dagen geldig · Alleen lezen) blijft zoals hij is:
+ * (Veilige verbinding · 180 dagen geldig · Alleen lezen) blijft zoals hij is:
  * dat is het moment van beslissen, daar mag het langer.
  *
  * ── De claim-grens ──────────────────────────────────────────────────────────
@@ -49,7 +49,7 @@ export const BANK_CONNECT_SAFETY_SHORT =
  * gereguleerde partij en de geldigheidsduur toe.
  */
 export const BANK_CONNECT_SAFETY_LONG =
-  'Je logt in bij je eigen bank via TrueLayer, een betaaldienstverlener met een PSD2-vergunning; je wachtwoord komt hier nooit langs. Wij kunnen alleen meelezen, nooit betalen, en de toestemming verloopt na 90 dagen.'
+  'Je logt in bij je eigen bank via TrueLayer, een betaaldienstverlener met een PSD2-vergunning; je wachtwoord komt hier nooit langs. Wij kunnen alleen meelezen, nooit betalen, en de toestemming verloopt uiterlijk na 180 dagen.'
 
 /**
  * Formuleringen die nooit in een bank-uitnodiging mogen staan. De test toetst

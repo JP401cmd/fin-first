@@ -6,6 +6,7 @@ import { ChevronRight, Home } from 'lucide-react'
 import type { DomainColor } from '@/lib/navigation'
 import { ASSET_TYPE_LABELS } from '@/lib/asset-data'
 import { DEBT_TYPE_LABELS } from '@/lib/debt-data'
+import { resolveRouteTitle } from '@/lib/nav-config'
 
 /**
  * Breadcrumb segment type — each crumb in the trail.
@@ -18,6 +19,13 @@ type BreadcrumbSegment = {
 /**
  * Known route labels for Dutch breadcrumb display.
  * Maps URL path segments to human-readable Dutch labels.
+ *
+ * TWEEDE bron, niet de eerste (UR3-30). Sinds die kaart probeert
+ * `buildBreadcrumbs` eerst `resolveRouteTitle(href)` — de canonieke naam uit
+ * `lib/nav-config.ts`. Deze tabel dekt daarna nog de segmenten die géén eigen
+ * nav-route hebben (legacy `/core/**`, `/beheer`, `/onboarding`). Zet een nieuw
+ * label dus in nav-config, niet hier: deze tabel groeide anders naast de nav
+ * mee in plaats van ermee.
  */
 const segmentLabels: Record<string, string> = {
   dashboard: 'Dashboard',
@@ -97,7 +105,10 @@ export function Breadcrumb({
   return (
     <nav
       aria-label="Breadcrumb navigatie"
-      className="flex items-center gap-1.5 pt-4 text-sm"
+      // `flex-wrap`: sinds de crumbs de canonieke nav-naam dragen zijn ze langer
+      // ("Box 3 · Sparen + beleggen" i.p.v. "Box3"). Zonder wrap duwt zo'n trail
+      // op een 390px-scherm over de rechterrand heen.
+      className="flex flex-wrap items-center gap-x-1.5 gap-y-1 pt-4 text-sm"
     >
       {segments.map((segment, index) => {
         const isLast = index === segments.length - 1
@@ -178,9 +189,12 @@ const TYPE_LABELS_BY_PARENT: Record<string, Record<string, string>> = {
  * Val-terug voor een segment zonder bekend label: eerste letter kapitaal én
  * underscores als spatie. Zónder die vervanging lekte een multi-word enum als
  * `personal_loan` letterlijk door als "Personal_loan" (zelfde bevinding L3).
+ *
+ * UR3-30: óók koppeltekens, om dezelfde reden. Een slug als `lokale-chat` werd
+ * "Lokale-chat" — een half vertaald woord dat nergens anders in de app staat.
  */
 function humanizeSegment(part: string): string {
-  const spaced = part.replace(/_/g, ' ')
+  const spaced = part.replace(/[_-]/g, ' ')
   return spaced.charAt(0).toUpperCase() + spaced.slice(1)
 }
 
@@ -205,8 +219,17 @@ export function buildBreadcrumbs(pathname: string): BreadcrumbSegment[] {
     // en in de type-positie hoort de crumb hetzelfde te zeggen als de paginatitel
     // ("Cash / Betaalrekeningen"), niet het generieke route-woord.
     const typeLabel = i > 0 ? TYPE_LABELS_BY_PARENT[parts[i - 1]!]?.[part] : undefined
-    const label = typeLabel ?? segmentLabels[part] ?? humanizeSegment(part)
-    segments.push({ label, href: CANONICAL_ROOT_HREF[href] ?? href })
+    const canonicalHref = CANONICAL_ROOT_HREF[href] ?? href
+    // UR3-30: de nav kent de naam van deze route al — vraag het dáár, op de
+    // href waar de crumb ook echt naartoe linkt. Daarvóór viel het kruimelpad
+    // op 23 van de 41 crumb-dragende routes terug op `humanizeSegment`, en
+    // dreven acht labels weg van de naam die het menu en de mobiele TopBar
+    // gebruiken ("Box1" vs "Box 1 · Werk + woning", "Feedback" vs "Melden").
+    // Ná de type-lookup: in de type-positie is het URL-segment een rauwe
+    // database-enum en hoort de crumb hetzelfde te zeggen als de paginatitel.
+    const label =
+      typeLabel ?? resolveRouteTitle(canonicalHref) ?? segmentLabels[part] ?? humanizeSegment(part)
+    segments.push({ label, href: canonicalHref })
   })
 
   return segments

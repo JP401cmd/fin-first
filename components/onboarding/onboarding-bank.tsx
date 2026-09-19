@@ -185,8 +185,8 @@ export function OnboardingBank({
 
   const factsPanel = (
     <FactsPanel
-      stat="90 dagen"
-      sub="Zo lang blijft een koppeling geldig. Daarna verbind je met één klik opnieuw."
+      stat="180 dagen"
+      sub="Zo lang blijft een koppeling uiterlijk geldig (PSD2). Daarna verbind je met één klik opnieuw."
       source="PSD2-rekeninginformatie via TrueLayer"
     />
   )

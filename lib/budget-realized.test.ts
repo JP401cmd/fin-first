@@ -156,8 +156,8 @@ describe('transactionAnnualIncome — dezelfde deler als de budgetposten', () =>
     expect(transactionAnnualIncome(win(9000, 9000, 3))).toBe(36000)
   })
 
-  it('includeTransfers kiest de transfer-inclusieve som (horizon-FIRE-som)', () => {
-    expect(transactionAnnualIncome(win(36000, 40000, 12), { includeTransfers: true })).toBe(40000)
+  it('rekent ALTIJD op de transfer-gefilterde som — de inclusieve som (all) telt nergens meer (ADR 0169)', () => {
+    expect(transactionAnnualIncome(win(36000, 40000, 12))).toBe(36000)
   })
 
   it('het lege venster → 0, nooit NaN', () => {

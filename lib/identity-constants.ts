@@ -1,4 +1,4 @@
-import { Wallet, RefreshCw, Compass, Bell, CheckCircle2, Sparkles, Mail, Gauge, Lightbulb } from 'lucide-react'
+import { Wallet, RefreshCw, Compass, Bell, CheckCircle2, Sparkles, Mail, Gauge, Lightbulb, Scale } from 'lucide-react'
 
 // ── Temporal Balance levels ──────────────────────────────────────────
 
@@ -163,6 +163,9 @@ export const NOTIFICATION_TYPES = [
   // gebruiker kiest zelf hoe dit concept heet (grenzenpot/schaamtepot).
   { type: 'spend_limit', label: 'Je eigen grenzen', description: 'Als je een zelfgekozen uitgavengrens nadert, overschrijdt of juist volhoudt', icon: Gauge },
   { type: 'postponed_tip', label: 'Uitgestelde tips', description: 'Als de wachttijd van een tip die je uitstelde voorbij is', icon: Lightbulb },
+  // W-009 — bewust een eigen type en niet onder 'budget': dit gaat niet over een
+  // overschrijding maar over de HERKOMST van je cijfers (ADR 0103).
+  { type: 'grondslag', label: 'Waar je cijfers op rusten', description: 'Als je inkomen of uitgaven op eigen invoer rusten terwijl je budgetten hebt', icon: Scale },
 ] as const
 
 /**

@@ -35,9 +35,10 @@ import {
  * Toegankelijkheid: de twee tegels staan in een `role="group"`. De vraag zelf is
  * de headline van de shell (die draagt de `<h1>` — onboarding valt buiten de
  * app-shell), dus de groep krijgt `aria-label` met diezelfde vraag in plaats van
- * `aria-labelledby` naar een tweede, dubbele vraagkop. Afwijking t.o.v.
- * `onboarding-eindstrategie.tsx` is bewust: dáár draagt de headline een andere
- * tekst ("Jouw plan") en zijn de twee vragen wél eigen `<h2>`-koppen.
+ * `aria-labelledby` naar een tweede, dubbele vraagkop. Sinds W-011 (19 sep 2026)
+ * volgt `onboarding-eindstrategie.tsx` hetzelfde patroon voor zijn eerste vraag;
+ * die stap houdt alleen voor zijn TWEEDE vraag nog een eigen `<h2>`, want die
+ * valt buiten de kop.
  *
  * "Geld is opgeslagen tijd": deze keuze bepaalt of de stenen waarin je woont
  * meetellen als vrijheid die je kunt uitgeven, of pas op het moment dat je ze

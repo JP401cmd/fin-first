@@ -6,6 +6,8 @@ import { detectRecurringTransactions } from '@/lib/recurring-detection'
 import { buildBudgetSpendingMap, type SpendingTxRow } from '@/lib/budget-spending'
 import { buildAiBudgetTypeMap, loadSplitRows } from './budget-spending-source'
 import { getRecentDailyExpenseRate } from '@/lib/expense-rate'
+import { heeftEigenRendement } from '@/lib/asset-return'
+import { RENDEMENT_GEEN_EIGEN_AANNAME } from './horizon-context'
 
 const TEMPORAL_LABELS: Record<number, string> = {
   1: 'De Levensgenieter (level 1) — Comfort > Snelheid. Wil niet inleveren op comfort. FIRE is een leuke bonus, geen obsessie.',
@@ -277,8 +279,12 @@ export async function buildRecommendationContext(supabase: SupabaseClient, budge
     .eq('is_active', true)
 
   if (assets && assets.length > 0) {
+    // NULL = geen eigen rendementsaanname (ADR 0166) — dezelfde woorden als de
+    // horizon-context, nooit een rauwe "rendement: null%".
     const assetLines = assets.map(a =>
-      `${a.name} (${a.asset_type}): ${formatCurrency(Number(a.current_value))} | rendement: ${a.expected_return}% | bijdrage: ${formatCurrency(Number(a.monthly_contribution))}/mnd`
+      `${a.name} (${a.asset_type}): ${formatCurrency(Number(a.current_value))} | ${
+        heeftEigenRendement(a.expected_return) ? `rendement: ${a.expected_return}%` : RENDEMENT_GEEN_EIGEN_AANNAME
+      } | bijdrage: ${formatCurrency(Number(a.monthly_contribution))}/mnd`
     )
     parts.push(section('ACTIVA', bulletList(assetLines)))
   }

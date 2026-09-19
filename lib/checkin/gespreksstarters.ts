@@ -24,6 +24,9 @@ export interface Voice {
   subj: string      // 'je' | 'jullie'
   subjCap: string   // 'Je' | 'Jullie'
   poss: string      // 'je' | 'jullie'      → "{poss} vermogen"
+  possCap: string   // 'Je' | 'Jullie'      → zinsbegin: "{possCap} vermogen is …"
+                    // Bewust apart van subjCap: "${subjCap} ${poss} vermogen"
+                    // gaf "Je je vermogen" (kaart check-in-kolom, 19-09-2026).
   hebt: string      // 'hebt' | 'hebben'
   heb: string       // 'heb' | 'hebben'   (inversie: "heb je" / "hebben jullie")
   wilt: string      // 'wilt' | 'willen'
@@ -38,14 +41,14 @@ export function buildVoice(audience: Audience): Voice {
   if (audience === 'household') {
     return {
       audience,
-      subj: 'jullie', subjCap: 'Jullie', poss: 'jullie',
+      subj: 'jullie', subjCap: 'Jullie', poss: 'jullie', possCap: 'Jullie',
       hebt: 'hebben', heb: 'hebben', wilt: 'willen', wil: 'willen', bent: 'zijn', kun: 'kunnen',
       voelt: 'voelen jullie je', samen: 'samen',
     }
   }
   return {
     audience,
-    subj: 'je', subjCap: 'Je', poss: 'je',
+    subj: 'je', subjCap: 'Je', poss: 'je', possCap: 'Je',
     hebt: 'hebt', heb: 'heb', wilt: 'wilt', wil: 'wil', bent: 'bent', kun: 'kun',
     voelt: 'voel je je', samen: 'voor jezelf',
   }
@@ -300,7 +303,7 @@ const detectVermogen: Detector = (i) => {
       score: clamp(days * 1.5, 5, 100),
       variants: [
         (v) => ({
-          vraag: `${v.subjCap} ${v.poss} vermogen is gegroeid met ${eur} — dat zijn ${days} extra vrijheidsdagen. Waar ${v.wil} ${v.subj} die vrijheid aan besteden?`,
+          vraag: `${v.possCap} vermogen is gegroeid met ${eur} — dat zijn ${days} extra vrijheidsdagen. Waar ${v.wil} ${v.subj} die vrijheid aan besteden?`,
           context: `Netto vermogen steeg van ${formatEUR(i.prevNetWorth)} naar ${formatEUR(i.netWorth)}.`,
           actie: `Bespreek ${v.samen} wat de volgende financiële mijlpaal zou kunnen zijn.`,
           vrijheidstijd: freedomLabel(days),
@@ -312,7 +315,7 @@ const detectVermogen: Detector = (i) => {
           vrijheidstijd: freedomLabel(days),
         }),
         (v) => ({
-          vraag: `${v.subjCap} ${v.poss} vermogen groeide met ${eur}. Verandert dat hoe ${v.subj} naar ${v.poss} doelen ${v.wilt} kijken?`,
+          vraag: `${v.possCap} vermogen groeide met ${eur}. Verandert dat hoe ${v.subj} naar ${v.poss} doelen ${v.wilt} kijken?`,
           context: `Van ${formatEUR(i.prevNetWorth)} naar ${formatEUR(i.netWorth)}.`,
           actie: `Toets ${v.samen} of een doel sneller haalbaar is geworden.`,
           vrijheidstijd: freedomLabel(days),
@@ -326,7 +329,7 @@ const detectVermogen: Detector = (i) => {
     score: clamp(days * 1.5 + 10, 15, 100),
     variants: [
       (v) => ({
-        vraag: `${v.subjCap} ${v.poss} vermogen is deze maand ${eur} gedaald. Hoe ${v.voelt} daarover, en is er een oorzaak die ${v.subj} ${v.samen} ${v.wilt} aanpakken?`,
+        vraag: `${v.possCap} vermogen is deze maand ${eur} gedaald. Hoe ${v.voelt} daarover, en is er een oorzaak die ${v.subj} ${v.samen} ${v.wilt} aanpakken?`,
         context: `Netto vermogen daalde met ${eur} (${days} vrijheidsdagen).`,
         actie: `Kijk ${v.samen} of het eenmalig was of structureel.`,
         vrijheidstijd: freedomLabel(days),

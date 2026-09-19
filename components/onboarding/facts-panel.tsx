@@ -18,7 +18,8 @@ import type { ReactNode } from 'react'
  * meelopende vrijheidstijd-teller woont sinds bevinding H12 in de sticky kop
  * (`OnboardingShell` → `OnboardingProgressBar.tickerSlot`), zodat hij op élk
  * scherm staat in plaats van alleen op de stappen die dit paneel vullen.
- * Vandaag vult alleen `onboarding-spaardoel.tsx` de slot.
+ * Sinds de spaardoel-stap uit de onboarding is (19 sep 2026, ADR 0162) vult
+ * geen enkele stap de slot meer; hij blijft als uitbreidingsplek bestaan.
  *
  * **Renderstrategie**:
  * - Desktop (≥lg): rendert als rechter kolom van de split — wrapper levert

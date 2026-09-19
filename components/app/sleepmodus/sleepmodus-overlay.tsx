@@ -859,7 +859,7 @@ export function SleepmodusOverlay({
       ref={containerRef}
       role="dialog"
       aria-modal="true"
-      aria-label="Sleepmodus — transacties toewijzen"
+      aria-label="Sleepmodus — transacties categoriseren"
       className="fixed inset-0 z-[80] flex flex-col bg-[var(--bg)]"
     >
       {/* ── Header: kicker + ✕ + progress ── */}

@@ -43,6 +43,11 @@ export interface AfGebPost {
   readonly eindIndex: number
   /** Geb `bn` (Y/AB/AE) — bedrag in koopkracht-nu (+ bate / − kost); lege post → 0. */
   readonly bedrag: number
+  /**
+   * BUITEN ORACLE-DOMEIN (ADR 0167): `true` ⇒ `bedrag` is nominaal vast en telt zónder
+   * idx(m) mee. Afwezig/`false` ⇒ koopkracht-nu × idx(m) (Excel-gedrag).
+   */
+  readonly nominaalVast?: boolean
 }
 
 /**
@@ -75,17 +80,22 @@ export interface AfRow {
  */
 export function computeAf(input: KernelInput, dep: AfDep, m: MonthIndex): AfRow {
   // Som van de op maand m actieve posten met een negatief bedrag (kosten).
+  // Nominaal-vaste posten (ADR 0167, buiten oracle-domein) tellen apart, zónder index;
+  // zonder zulke posten is `negatieveSomVast === 0` en blijft D letterlijk het oude pad.
   let negatieveSom = 0
+  let negatieveSomVast = 0
   for (const post of dep.gebPosten) {
     if (post.bedrag < 0 && post.startIndex <= m && m <= post.eindIndex) {
-      negatieveSom += post.bedrag
+      if (post.nominaalVast === true) negatieveSomVast += post.bedrag
+      else negatieveSom += post.bedrag
     }
   }
 
-  // D = −(negatieve som) × index → positieve afname. `negatieveSom === 0` levert
-  // een schone 0 (voorkomt −0 en een overbodige index-vermenigvuldiging).
+  // D = −(negatieve som) × index − (negatieve vaste som) → positieve afname. Een som van
+  // 0 levert een schone 0 (voorkomt −0 en een overbodige index-vermenigvuldiging).
+  const afnameGeindexeerd = negatieveSom === 0 ? 0 : -negatieveSom * inflationIndex(input, m)
   const totaalAfname =
-    negatieveSom === 0 ? 0 : -negatieveSom * inflationIndex(input, m)
+    negatieveSomVast === 0 ? afnameGeindexeerd : afnameGeindexeerd - negatieveSomVast
 
   return {
     maand: m,

@@ -13,6 +13,7 @@
  * - Lege KPI = `undefined` retourneren — de strip filtert dat zelf weg.
  */
 import type { Asset, AssetType } from './asset-data'
+import { heeftEigenRendement } from './asset-return'
 import { formatCurrency } from './format'
 import type { CashAssetStats } from './kpi-context'
 
@@ -37,6 +38,24 @@ export interface KpiValue {
 export interface KpiPair {
   primary?: KpiValue
   secondary?: KpiValue
+}
+
+/**
+ * De KPI-cel voor een bezitting ZONDER eigen rendementsaanname
+ * (`assets.expected_return = null`, ADR 0166 / TPR-02 vervolg).
+ *
+ * Display-keuze (b): een NULL is geen 0% — `Number(null) === 0` liet zo'n
+ * bezitting hier "0,0% rente" tonen terwijl /toekomst er het profielrendement
+ * op rekent. De strip heeft geen profiel bij de hand (pure KPI-functies, geen
+ * loader-context), dus hij toont de grondslag expliciet in plaats van een
+ * verzonnen getal. Eén constante, gedeeld met `lib/category-kpi.ts`, zodat de
+ * item-strip en de categorie-strip dezelfde woorden gebruiken. Een ingevulde
+ * 0 blijft een bewuste 0% en valt hier NIET onder.
+ */
+export const KPI_GEEN_EIGEN_RENDEMENT: KpiValue = {
+  value: '—',
+  label: 'geen eigen rendement',
+  tone: 'neutral',
 }
 
 /**
@@ -119,7 +138,9 @@ function kpiCash(asset: Asset, ctx: AssetKpiContext): KpiPair {
   // de strip niet leeg blijft op edge-cases (bv. nieuwe rekening zonder
   // historie, contant geld zonder valuations).
   if (!stats) {
-    const rate = Number(asset.expected_return)
+    // NULL = geen eigen aanname → expliciet tonen, nooit als "0,0%" (keuze b).
+    const rate = heeftEigenRendement(asset.expected_return) ? Number(asset.expected_return) : null
+    if (rate === null) return { primary: KPI_GEEN_EIGEN_RENDEMENT }
     if (isFinite(rate) && rate > 0) {
       return {
         primary: {
@@ -185,10 +206,14 @@ function kpiCash(asset: Asset, ctx: AssetKpiContext): KpiPair {
 }
 
 function kpiSavings(asset: Asset, ctx: AssetKpiContext): KpiPair {
-  const rate = Number(asset.expected_return)
-  const primary: KpiValue | undefined = isFinite(rate)
-    ? { value: formatPercent(rate, { decimals: 1 }), label: 'rente', tone: 'neutral' }
-    : undefined
+  // NULL = geen eigen aanname → expliciet tonen (keuze b); `Number(null)` is 0
+  // en zou hier "0,0% rente" opleveren. Een ingevulde 0 blijft "0,0% rente".
+  const rate = heeftEigenRendement(asset.expected_return) ? Number(asset.expected_return) : null
+  const primary: KpiValue | undefined = rate === null
+    ? KPI_GEEN_EIGEN_RENDEMENT
+    : isFinite(rate)
+      ? { value: formatPercent(rate, { decimals: 1 }), label: 'rente', tone: 'neutral' }
+      : undefined
 
   // KPI 2 — vasttijd resterend (alleen voor deposito's met lock_end_date).
   let secondary: KpiValue | undefined
@@ -247,17 +272,21 @@ function kpiInvestment(asset: Asset, ctx: AssetKpiContext): KpiPair {
   const current = Number(asset.current_value)
   if (purchase > 0 && isFinite(current)) {
     const totalReturnPct = ((current - purchase) / purchase) * 100
+    const verwacht = heeftEigenRendement(asset.expected_return) ? Number(asset.expected_return) : null
     return {
       primary: {
         value: formatPercent(totalReturnPct, { decimals: 1, signed: true }),
         label: 'totaal',
         tone: toneFromSign(totalReturnPct),
       },
-      secondary: {
-        value: formatPercent(Number(asset.expected_return), { decimals: 1, signed: false }),
-        label: 'verwacht',
-        tone: 'neutral',
-      },
+      // NULL = geen eigen aanname → expliciet tonen (keuze b), geen "0,0% verwacht".
+      secondary: verwacht !== null
+        ? {
+            value: formatPercent(verwacht, { decimals: 1, signed: false }),
+            label: 'verwacht',
+            tone: 'neutral',
+          }
+        : KPI_GEEN_EIGEN_RENDEMENT,
     }
   }
   return {}
@@ -270,14 +299,18 @@ function kpiCrypto(asset: Asset, ctx: AssetKpiContext): KpiPair {
 
 function kpiRetirement(asset: Asset, _ctx: AssetKpiContext): KpiPair {
   const monthly = Number(asset.monthly_contribution)
-  const expected = Number(asset.expected_return)
+  const expected = heeftEigenRendement(asset.expected_return) ? Number(asset.expected_return) : null
   return {
     primary: monthly > 0
       ? { value: `${formatCurrency(monthly)}/mnd`, tone: 'neutral' }
       : undefined,
-    secondary: isFinite(expected) && expected > 0
-      ? { value: formatPercent(expected, { decimals: 1 }), label: 'verwacht', tone: 'neutral' }
-      : undefined,
+    // NULL = geen eigen aanname → expliciet (keuze b); een ingevulde 0 blijft
+    // zoals voorheen een lege cel (0% "verwacht" zegt niets).
+    secondary: expected === null
+      ? KPI_GEEN_EIGEN_RENDEMENT
+      : isFinite(expected) && expected > 0
+        ? { value: formatPercent(expected, { decimals: 1 }), label: 'verwacht', tone: 'neutral' }
+        : undefined,
   }
 }
 
@@ -433,11 +466,14 @@ function kpiLevensverzekering(asset: Asset, ctx: AssetKpiContext): KpiPair {
 }
 
 function kpiVordering(asset: Asset, ctx: AssetKpiContext): KpiPair {
-  const rate = Number(asset.expected_return)
-  // KPI 1 — rente
-  const primary: KpiValue | undefined = isFinite(rate) && rate > 0
-    ? { value: formatPercent(rate, { decimals: 1 }), label: 'rente', tone: 'pos' }
-    : undefined
+  const rate = heeftEigenRendement(asset.expected_return) ? Number(asset.expected_return) : null
+  // KPI 1 — rente. NULL = geen eigen aanname → expliciet (keuze b); een
+  // ingevulde 0 blijft zoals voorheen een lege cel.
+  const primary: KpiValue | undefined = rate === null
+    ? KPI_GEEN_EIGEN_RENDEMENT
+    : isFinite(rate) && rate > 0
+      ? { value: formatPercent(rate, { decimals: 1 }), label: 'rente', tone: 'pos' }
+      : undefined
 
   // KPI 2 — resterende looptijd
   let secondary: KpiValue | undefined

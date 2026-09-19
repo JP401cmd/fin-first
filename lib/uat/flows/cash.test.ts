@@ -88,8 +88,13 @@ describe('CASH_FLOW — curatie-integriteit', () => {
     // volledig uit de app verwijderd. Dit is dus een bewust gat, geen
     // verwijsregel-leemte — de nog-geldige versheidsmelding-dekking die op
     // dezelfde knoop stond is verhuisd naar WF-CASH-07 ('statusmelding').
+    // WF-CASH-20 ("Wat als ik opzeg"-schuif) en WF-CASH-21 (cashflow-kalender
+    // op de vaste-lastenpagina) zijn VERVALLEN op 19-09-2026 (W-017): beide
+    // oppervlakken zijn verwijderd. "Wanneer komt het" blijft via de
+    // Agenda-widget, die in OVZ zijn eigen knoop heeft.
+    const VERVALLEN = new Set([6, 20, 21])
     const expected = Array.from({ length: 61 }, (_, i) => i + 1)
-      .filter((n) => n !== 6)
+      .filter((n) => !VERVALLEN.has(n))
       .map((n) => `UAT-CASH-${String(n).padStart(2, '0')}`)
     for (const id of expected) {
       expect(covered.has(id), `${id} moet als flow-knoop voorkomen`).toBe(true)
@@ -111,7 +116,11 @@ describe('CASH_FLOW — curatie-integriteit', () => {
     // de KoppelRekeningBanner biedt koppelen/importeren bij nul rekeningen, en
     // dan laat de actie-rij ze juist weg) is als flow-knoop 'vulingangen'
     // onder 'geldstroom' toegevoegd.
-    expect(covered.size).toBe(66)
+    // 66 → 64: de knopen 'watals' (WF-CASH-20) en 'kalender' (WF-CASH-21) zijn
+    // verwijderd (W-017, 19-09-2026) — zie het VERVALLEN-gat hierboven.
+    // 64 → 65: WF-CASH-69 (waarschuwing bij overlap met een andere eigen
+    // rekening) is als flow-knoop 'andererekening' onder 'mt940' toegevoegd.
+    expect(covered.size).toBe(65)
   })
 
   it('de domeinoverschrijdende cross-knopen dekken BUDGET/OVZ/TOEK/WILL/BEZIT/MIJN', () => {

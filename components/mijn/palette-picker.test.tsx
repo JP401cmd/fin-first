@@ -6,8 +6,13 @@ import { DEFAULT_MODULE_COLORS } from '@/lib/color-palette'
 
 /**
  * Tests voor PalettePicker — preset-keuze met persistence via
- * localStorage (`tf-palette-theme`). Het "Krant"-palet zet daarnaast
+ * localStorage (`tf-palette-theme`). Het palet "Redactioneel wit" zet daarnaast
  * `data-palette` op <html> (label-typografie-scoping).
+ *
+ * UR3-30/K3: dat palet heette tot 19 sep 2026 "Krant" — hetzelfde woord als de
+ * nieuwsrubriek op /nieuws. Het LABEL is hernoemd, de SLEUTEL (`krant`) niet:
+ * die zit in localStorage en in `data-palette`, dus de assertions hieronder
+ * pinnen bewust het nieuwe label én de ongewijzigde sleutel.
  */
 
 beforeEach(() => {
@@ -29,7 +34,9 @@ describe('PalettePicker — render', () => {
     expect(screen.getByText('Cream')).toBeTruthy()
     expect(screen.getByText('Licht')).toBeTruthy()
     expect(screen.getByText('FD-bruin')).toBeTruthy()
-    expect(screen.getByText('Krant')).toBeTruthy()
+    expect(screen.getByText('Redactioneel wit')).toBeTruthy()
+    // Het homoniem is weg: de nieuwsrubriek is de enige "Krant" in de app.
+    expect(screen.queryByText('Krant')).toBeNull()
   })
 
   it('toont Palet-kicker label', () => {
@@ -67,9 +74,9 @@ describe('PalettePicker — switching', () => {
     expect(window.localStorage.getItem('tf-palette-theme')).toBe('fd-bruin')
   })
 
-  it('Krant zet data-palette op <html>; een ander palet wist het weer', () => {
+  it('Redactioneel wit zet data-palette op <html>; een ander palet wist het weer', () => {
     renderWithProvider()
-    fireEvent.click(screen.getByText('Krant'))
+    fireEvent.click(screen.getByText('Redactioneel wit'))
     expect(document.documentElement.dataset.palette).toBe('krant')
     // Terug naar een palet zonder eigen label-font → attribuut verdwijnt.
     fireEvent.click(screen.getByText('Cream'))

@@ -179,7 +179,7 @@ export async function POST(req: Request) {
       financialContext = await buildContext(supabase)
     } else {
       ;[systemPrompt, financialContext] = await Promise.all([
-        buildSystemPrompt(safeDomain, supabase),
+        buildSystemPrompt(safeDomain, { overrideUitBeheer: true }),
         buildContext(supabase),
       ])
     }

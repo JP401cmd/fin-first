@@ -5,7 +5,7 @@
  * Plan: docs/navigatie-redesign-plan.md §5.1 (pane)
  */
 
-import { useEffect, useState, useMemo, useCallback } from 'react'
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/lib/format'
@@ -140,6 +140,12 @@ type StrategyTab = 'eind' | 'onttrekking' | 'woning'
 interface StrategieModalProps {
   open: boolean
   onClose: () => void
+  /**
+   * B-057/B1 — aangeroepen ná elke GESLAAGDE autosave van het plan (PUT
+   * /api/fire-settings), zodat de grafiek al meebeweegt terwijl de pane open
+   * staat. Vóór dit besluit herlaadde /toekomst pas bij sluiten.
+   */
+  onSaved?: () => void
   /** Initiele eigen-woning-strategie voor het header-badge. Het paneel zelf
    *  laadt/saveert via /api/housing-strategy onafhankelijk. */
   housingStrategy?: HousingStrategyConfig
@@ -159,7 +165,11 @@ interface StrategieModalProps {
   kernelAowRows?: AowLeeftijdRow[]
 }
 
-export function StrategieModal({ open, onClose, housingStrategy, initialTab, kernelRawProfile, kernelAssets, kernelDebts, kernelLifeEvents, kernelAowRows }: StrategieModalProps) {
+export function StrategieModal({ open, onClose, onSaved, housingStrategy, initialTab, kernelRawProfile, kernelAssets, kernelDebts, kernelLifeEvents, kernelAowRows }: StrategieModalProps) {
+  // Ref zodat `savePlan` (useCallback, stabiel) altijd de laatste callback ziet
+  // zonder dat een inline-arrow van de ouder de autosave-keten laat herrennen.
+  const onSavedRef = useRef(onSaved)
+  useEffect(() => { onSavedRef.current = onSaved }, [onSaved])
   const [activeTab, setActiveTab] = useState<StrategyTab>(initialTab ?? 'eind')
 
   // Synchroniseer de actieve tab wanneer de modal opent met een expliciete
@@ -374,6 +384,8 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
       setSavedPlan(plan)
       setEndStrategyMessage({ type: 'success', text: 'Plan opgeslagen.' })
       setTimeout(() => setEndStrategyMessage(null), 3000)
+      // B-057/B1 — de ouder mag nu al herladen; de pane blijft open.
+      onSavedRef.current?.()
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Opslaan mislukt'
       setEndStrategyMessage({ type: 'error', text: message })

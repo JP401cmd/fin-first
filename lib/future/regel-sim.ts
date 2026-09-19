@@ -156,8 +156,25 @@ export interface RegelSimOverride {
    * TPR-15 laag 2 — kandidaat-rendement per bezitting-id (`assets.expected_return`, PERCENT:
    * 7 = 7%, dezelfde eenheid als de PATCH-body van `/api/assets/[id]/expected-return`). Alleen
    * de rij in de rauwe context wordt vervangen; een onbekend id verandert niets.
+   *
+   * `null` = "geen eigen rendement" (ADR 0166). De wizard hoeft daarvoor GEEN eigen som te
+   * doen: de rij gaat als `null` de kern in en `potRendement` past daar de terugval op het
+   * profielrendement toe — dezelfde ketting als bij opslaan. Zou de wizard hier zelf het
+   * profielrendement invullen, dan zou het live effect stil afwijken van het bewaarde plan
+   * zodra die twee grondslagen uiteenlopen.
    */
-  assetExpectedReturns?: Readonly<Record<string, number>>
+  assetExpectedReturns?: Readonly<Record<string, number | null>>
+  /**
+   * W-009 — een kandidaat-GRONDSLAG voor inkomen en uitgaven nu, als de twee
+   * kasstroomvelden die de adapter leest (`net_monthly_income` ×12 → `nettoJaarinkomen`,
+   * `estimated_monthly_expenses`). Beide in EURO PER MAAND, precies zoals
+   * `withResolvedKernelBedragen` (lib/horizon/kernel-profile-basis.ts) ze vóór elke
+   * kernel-run op de profielrij plakt — de app injecteert daar de geresolveerde
+   * effectieve bedragen; hier zet de wizard er de bedragen van een ándere grondslag
+   * neer. Er wordt hier dus niets herberekend: de kandidaat-bedragen komen uit
+   * `resolveAmountWithBasis` op de cashflow-bundel. `undefined` = kolommen ongewijzigd.
+   */
+  cashflow?: { monthlyIncome: number; monthlyExpenses: number }
 }
 
 /**
@@ -214,7 +231,8 @@ function applyDraftToRawContext(
     override?.assetSaleConfigs === undefined &&
     override?.lifeEvent === undefined &&
     override?.parameters === undefined &&
-    override?.assetExpectedReturns === undefined
+    override?.assetExpectedReturns === undefined &&
+    override?.cashflow === undefined
   ) {
     return base
   }
@@ -240,6 +258,12 @@ function applyDraftToRawContext(
     }
   }
   const lifeEvents = override.lifeEvent ? vervangLifeEvent(base.lifeEvents, override.lifeEvent) : base.lifeEvents
+  // W-009 — kandidaat-grondslag voor inkomen/uitgaven nu. Dezelfde twee velden die
+  // `withResolvedKernelBedragen` vult; de kern leest ze als kasstroom-basis.
+  if (override.cashflow !== undefined) {
+    profile.net_monthly_income = override.cashflow.monthlyIncome
+    profile.estimated_monthly_expenses = override.cashflow.monthlyExpenses
+  }
   // TPR-01 — kandidaat-uitgavengrondslag na stoppen (de kern leidt het jaarbedrag af).
   if (override.retirementExpense !== undefined) {
     profile.retirement_expense_method = override.retirementExpense.method

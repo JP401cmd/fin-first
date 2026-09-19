@@ -52,7 +52,7 @@ function knowledgeItem(over: Partial<LocalKnowledgeItem>): LocalKnowledgeItem {
 describe('buildLocalChatSystemPrompt — DNA + Wft-regels', () => {
   it('bevat de kernfilosofie, Wft-compliance en toon-regels', () => {
     const prompt = buildLocalChatSystemPrompt({ overview: OVERVIEW, question: 'hoi', knowledgeItems: [] })
-    expect(prompt).toContain('Geld is opgeslagen tijd')
+    expect(prompt).toContain('Geld levert tijd op')
     expect(prompt).toContain('COMPLIANCE')
     expect(prompt).toContain('Wft')
     expect(prompt).toContain('NOOIT individueel beleggingsadvies')
@@ -350,7 +350,12 @@ describe('LOCAL_CHAT_DNA — fin-actie-fence-instructie', () => {
   })
 
   it('behoudt de gemeten harde invarianten (filosofie, Wft, toon) letterlijk', () => {
-    expect(LOCAL_CHAT_DNA).toContain('Geld is opgeslagen tijd')
+    expect(LOCAL_CHAT_DNA).toContain('Geld levert tijd op')
+    // ADR 0165: de oude leus en het woord "vrijgekocht" staan er niet meer in,
+    // en het verbod op de koop-/verkoop-metafoor staat er expliciet wél in —
+    // impliciet weglaten is niet genoeg, de modellen schrijven 'm dan terug.
+    expect(LOCAL_CHAT_DNA).not.toMatch(/vrijgekocht|opgeslagen tijd/i)
+    expect(LOCAL_CHAT_DNA).toContain('zeg nooit dat iemand tijd koopt')
     expect(LOCAL_CHAT_DNA).toContain('NOOIT individueel beleggingsadvies')
     expect(LOCAL_CHAT_DNA).toContain('AFM-geregistreerd')
     expect(LOCAL_CHAT_DNA).toContain('max 120 woorden')

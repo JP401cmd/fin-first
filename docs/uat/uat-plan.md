@@ -71,10 +71,9 @@ Kriticiteit: **KERN** = raakt financiële uitkomsten of gebruikersdata · **BELA
 | WF-START-15 | Uitloggen | De sessie beëindigen en op de landingspagina (of login met blokkade-melding) uitkomen. | BELANGRIJK | nee | 2 |
 | WF-START-16 | Routebescherming ervaren (om-auth-heen-navigatie) | Verifiëren dat beveiligde pagina's zonder login onbereikbaar zijn en de gebruiker na inloggen terugkeert waar hij wilde zijn. | BELANGRIJK | nee | 3 |
 | WF-START-17 | Welkomstpopup bij eerste binnenkomst in onboarding | Eenmalig een welkomst-/filosofieboodschap lezen vóór de eerste onboarding-vraag. | OVERIG | nee | 2 |
-| WF-START-18 | Onboarding volledig doorlopen en in de app landen | In 7 groepen je profiel vullen (naam, geboortedatum, inkomen/uitgaven met spaarquote-preview, bezittingen, schulden, pensioen, spaardoel) en op /toekomst landen. | KERN | ja | 6 |
-| WF-START-19 | Bezittingen en schulden toevoegen tijdens onboarding | Via ja/nee-vragen bezittingen (incl. huis+hypotheek-koppeling) en schulden invoeren zodat het netto vermogen klopt. | KERN | ja | 5 |
+| WF-START-18 | Onboarding volledig doorlopen en in de app landen | In 8 groepen je profiel vullen (naam, geboortedatum, inkomen/uitgaven met spaarquote-preview, bezittingen, schulden, pensioen, eindstrategie) en op /toekomst landen. | KERN | ja | 6 |
+| WF-START-19 | Bezittingen en schulden toevoegen tijdens onboarding | Via ja/nee-vragen bezittingen (incl. huis+hypotheek-koppeling) en via één aanvinkraster schulden invoeren zodat het netto vermogen klopt. | KERN | ja | 5 |
 | WF-START-20 | Pensioen opgeven tijdens onboarding (schatting, upload of overslaan) | Opgebouwd pensioen meegeven zodat de toekomstprojectie ermee rekent. | KERN | ja | 5 |
-| WF-START-21 | Spaardoel kiezen of overslaan tijdens onboarding | Laagdrempelig één eerste spaardoel vastleggen via presets met prefill. | BELANGRIJK | ja | 3 |
 | WF-START-22 | Velden uitstellen met 'Later invullen' (defer-pad) | Onderdelen bewust overslaan en er later door de coach aan herinnerd worden. | BELANGRIJK | nee | 2 |
 | WF-START-23 | Onboarding onderbreken en hervatten (concept-herstel) | De onboarding verlaten en later verdergaan op dezelfde stap, zonder gevoelige gegevens in de browser. | BELANGRIJK | nee | 4 |
 | WF-START-24 | Fout bij het afronden van onboarding herstellen (retry) | Bij een mislukte eind-opslag de fout begrijpen en zonder gegevensverlies opnieuw proberen. | BELANGRIJK | nee | 2 |
@@ -220,8 +219,8 @@ Kriticiteit: **KERN** = raakt financiële uitkomsten of gebruikersdata · **BELA
 | WF-CASH-17 | Terugkerend item classificeren of bevestigen | Gedetecteerd item indelen als abonnement/vaste kosten of uitsluiten | KERN | ja | 3 |
 | WF-CASH-18 | Abonnement opzeggen via opzegbrief | Kant-en-klare opzegbrief maken en als actie bewaren | KERN | ja | 3 |
 | WF-CASH-19 | Vaste kosten laten analyseren door Will (AI) | AI-voorstellen voor abonnementen/vaste kosten in bulk beoordelen en opslaan | BELANGRIJK | nee | 3 |
-| WF-CASH-20 | Wat-als-opzeggen-schuif | Opzeg-bedrag omrekenen naar jaarlijkse besparing en vrijheidstijd | OVERIG | ja | 1 |
-| WF-CASH-21 | Cashflow-kalender: komende 5 weken | Per dag zien welke vaste afschrijvingen en inkomsten eraan komen | BELANGRIJK | ja | 3 |
+| ~~WF-CASH-20~~ | VERVALLEN 19-09-2026 (W-017): "Wat als ik opzeg"-schuif verwijderd van /overzicht/budget/vaste-lasten | — | — | — | — |
+| ~~WF-CASH-21~~ | VERVALLEN 19-09-2026 (W-017): cashflow-kalender verwijderd van /overzicht/budget/vaste-lasten; "wanneer komt het" via de Agenda-widget (OVZ) | — | — | — | — |
 | WF-CASH-22 | Zes maanden vooruitkijken met de cashflow-forecast | Saldoverloop per maand voorspellen op basis van 6m-gemiddelden en recurrings | KERN | ja | 4 |
 | WF-CASH-23 | Bankbestand importeren (MT940/OFX) van upload tot succes | Bankafschrift uploaden en transacties gecontroleerd importeren via de 4-staps-wizard | KERN | ja | 5 |
 | WF-CASH-24 | CSV importeren met bank-preset en kolom-toewijzing | CSV van ING/ABN/PayPal of eigen indeling correct laten inlezen via kolom-mapping en preview | KERN | ja | 3 |
@@ -249,7 +248,7 @@ Kriticiteit: **KERN** = raakt financiële uitkomsten of gebruikersdata · **BELA
 | WF-BUDGET-10 | Budget bewerken via het bewerk-paneel | Alle instellingen wijzigen, met bij bedragswijziging een expliciete ingangsmaand zodat de historie intact blijft. | KERN | ja | 5 |
 | WF-BUDGET-11 | Budget archiveren/verwijderen | Een budget met subbudgetten uit het plan verwijderen zonder de transactiehistorie te verliezen. | KERN | nee | 4 |
 | WF-BUDGET-12 | Budgetvolgorde aanpassen | De volgorde van budgetten binnen hun groep aanpassen via pijltjes of slepen. | OVERIG | nee | 3 |
-| WF-BUDGET-13 | Transacties koppelen aan budgetcategorieën (AI/handmatig/sleepmodus) | Ongecategoriseerde transacties aan de juiste budgetcategorie koppelen zodat de realisatie klopt. | KERN | ja | 5 |
+| WF-BUDGET-13 | Transacties categoriseren (AI/handmatig/sleepmodus) | Transacties zonder categorie bij het juiste budget zetten zodat de realisatie klopt. | KERN | ja | 5 |
 | WF-BUDGET-14 | Overschot doorschuiven (rollover) bekijken en overschrijven | Zien hoeveel niet-besteed budget is doorgeschoven en dat saldo handmatig kunnen corrigeren. | KERN | ja | 4 |
 | WF-BUDGET-15 | Voorspelling volgende maand raadplegen | Per budget de verwachte uitgaven, betrouwbaarheid en de transparante rekenuitleg (kassabon) zien. | BELANGRIJK | ja | 3 |
 | WF-BUDGET-16 | Budgetbedragen van vorige maand kopiëren | De maandspecifieke bedragen van de vorige maand in één klik overnemen. | KERN | ja | 3 |
@@ -869,23 +868,23 @@ Scope: de publieke marketing-site (landing + subpagina's), de publieke Vrijheids
 ---
 
 #### WF-START-18 — Onboarding volledig doorlopen en in de app landen
-- **Doel:** Als nieuwe gebruiker in 7 groepen (naam → geboortedatum → inkomen/uitgaven → bezittingen → schulden → pensioen → spaardoel → klaar) je profiel vullen zodat de app direct met jouw cijfers werkt.
+- **Doel:** Als nieuwe gebruiker in 8 groepen (naam/geboortedatum → inkomen/uitgaven → bezittingen → schulden → pensioen → eindstrategie ("Jouw plan") → budget/bank → klaar) je profiel vullen zodat de app direct met jouw cijfers werkt. De onboarding-stap "Spaardoel" is op 19-09-2026 geschrapt (ADR 0162); doelen leg je voortaan vast via /toekomst/doelen.
 - **Trigger/startpunt:** `/onboarding`, automatisch na eerste login zolang `onboarding_completed` false is.
-- **Eindresultaat:** Alle gegevens zijn via één POST opgeslagen (profiel, bezittingen, schulden, evt. doel en horizon-voorkeuren; pensioen apart naar life_events), het succes-scherm "Welkom bij TriFinity!" is getoond en de knop "Ga naar je toekomst" brengt de gebruiker met een harde navigatie naar /toekomst.
+- **Eindresultaat:** Alle gegevens zijn via één POST opgeslagen (profiel, bezittingen, schulden, evt. doel en horizon-voorkeuren; pensioen apart naar life_events), het succes-scherm "Welkom bij TriFinity!" is getoond en de knop "Naar je overzicht" brengt de gebruiker met een harde navigatie naar /dashboard, dat de middleware naar het gekozen homescherm vertaalt (ADR 0130).
 - **Stappen:**
   1. Stap "naam" (groep 1/7): vul je volledige naam in (minimaal 2 tekens) en klik verder.
   2. Stap "geboortedatum": vul je geboortedatum in (18–100 jaar afgedwongen).
   3. Stap "inkomen" (groep 2/7): vul je netto maandinkomen in (optioneel; met CBS-feitenpaneel "€3.350 mediaan") — of kies "Later invullen" (zie WF-START-23).
   4. Stap "uitgaven": vul je geschatte maanduitgaven in; zodra beide bekend zijn verschijnt de live spaarquote-preview ("Je spaarquote komt hiermee op X%").
   5. Stap "uitgaven na pensioen": accepteer of bewerk het voorgestelde jaarbedrag (80%-prefill op basis van je maanduitgaven), kies "zelfde als nu", of sla over ("Kan altijd later nog").
-  6. Stap "bezittingen" (groep 3/7): doorloop de ja/nee-vragen (zie WF-START-19).
-  7. Stap "schulden" (groep 4/7): doorloop de ja/nee-vragen (zie WF-START-19).
-  8. Stap "pensioen" (groep 5/7): schatting, upload of overslaan (zie WF-START-20).
-  9. Stap "spaardoel" (groep 6/7): kies een preset of sla over (zie WF-START-21).
-  10. Stap "klaar" (groep 7/7): controleer de recap (netto/mnd inkomen, netto vermogen, spaardoel; feitenpaneel met je startpositie) en klik "Begin met TriFinity" — of "Voeg nog iets toe →" om terug te springen naar bezittingen.
+  6. Stap "bezittingen" (groep 3/8): doorloop de ja/nee-vragen (zie WF-START-19).
+  7. Stap "schulden" (groep 4/8): vink op het raster aan wat van toepassing is, of ga verder zonder schulden (zie WF-START-19).
+  8. Stap "pensioen" (groep 5/8): schatting, upload of overslaan (zie WF-START-20).
+  9. Stap "eindstrategie" / "Jouw plan" (groep 6/8): stopmoment en eind-vorm kiezen (zie WF-START-28).
+  10. Stap "klaar" (groep 8/8): controleer de recap (netto/mnd inkomen, netto vermogen; feitenpaneel met je startpositie) en klik "Begin met TriFinity" — of "Voeg nog iets toe →" om terug te springen naar bezittingen.
   11. Het opslag-scherm toont een voortgangsbalk met wisselende berichten ("Profiel wordt opgeslagen…", …, "Bijna klaar…").
-  12. Succes-scherm met de twee module-kaarten (Het Overzicht / De Toekomst); klik "Ga naar je toekomst" → /toekomst.
-- **Schermen/componenten:** `/onboarding` — orchestrator `app/(onboarding)/onboarding/page.tsx`, stappen `components/onboarding/onboarding-identity.tsx`, `onboarding-inkomen.tsx`, `onboarding-uitgaven-pensioen.tsx`, `onboarding-bezittingen.tsx`, `onboarding-schulden.tsx`, `onboarding-pensioen.tsx`, `onboarding-spaardoel.tsx`, `onboarding-klaar.tsx`, `onboarding-success.tsx`, shell `onboarding-shell.tsx`; server `app/api/onboarding/save-own-data/route.ts`; pensioen-write `lib/pension/apply-parse-result.ts`.
+  12. Succes-scherm met de vier waardes (Wat je hebt · Wat er omgaat · Waar het op uitloopt · Waar je op kunt sturen, elk in zijn eigen accent; W-015, 19-09-2026 — de twee module-kaarten zijn vervallen); klik "Naar je overzicht" → je eigen homescherm.
+- **Schermen/componenten:** `/onboarding` — orchestrator `app/(onboarding)/onboarding/page.tsx`, stappen `components/onboarding/onboarding-identity.tsx`, `onboarding-inkomen.tsx`, `onboarding-uitgaven-pensioen.tsx`, `onboarding-bezittingen.tsx`, `onboarding-schulden.tsx`, `onboarding-pensioen.tsx`, `onboarding-eindstrategie.tsx`, `onboarding-klaar.tsx`, `onboarding-success.tsx`, shell `onboarding-shell.tsx`; server `app/api/onboarding/save-own-data/route.ts`; pensioen-write `lib/pension/apply-parse-result.ts`.
 - **Kriticiteit:** KERN
 - **Rekenend:** ja —
   - Spaarquote-preview: `Math.round(((maandinkomen − maanduitgaven) / maandinkomen) × 100)` in `components/onboarding/onboarding-inkomen.tsx` (previewRate). Het maandinkomen wordt als handmatige bron opgeslagen (`profiles.net_monthly_income`) en drijft daarna de spaarquote/FIRE-prognose via `resolveSavingsSource` (`lib/savings-source.ts`) — de preview moet dus sporen met de spaarquote die later op /overzicht/budget verschijnt.
@@ -894,16 +893,16 @@ Scope: de publieke marketing-site (landing + subpagina's), de publieke Vrijheids
 - **Varianten & randgevallen:**
   - Validatiefouten: naam leeg/te kort, geboortedatum leeg/toekomst/>100 jaar/<18 jaar; inkomen/uitgaven negatief of onrealistisch (> €170.000 p/m resp. > €1.000.000).
   - Alle groepen na "geboortedatum" zijn overslaanbaar; alleen naam + geboortedatum zijn verplicht (finish-guard `firstIncompleteRequiredStep` stuurt je terug als ze ontbreken).
-  - "Terug"-knop op elke stap (behalve de eerste); voortgang loopt per groep (X/7), niet per micro-vraag.
+  - "Terug"-knop op elke stap (behalve de eerste); voortgang loopt per groep (X/8), niet per micro-vraag.
   - Al-geonboarde gebruiker die /onboarding opent → redirect naar /overzicht.
   - Dubbelklik op afronden is beveiligd (saving-guard + idempotency-key over retries).
   - Mislukte pensioen-write breekt de geslaagde hoofd-save niet (best-effort, alleen console-warn).
-- **Cross-module effecten:** vult Overzicht (bezittingen, schulden, budgetteringsmodus, inkomen/uitgaven-bron voor spaarquote), Toekomst (horizon-voorkeuren, pensioen als life_events, FIRE-prognose) en Doelen (spaardoel-rij in `goals`). De succes-CTA landt bewust in de Toekomst-module.
+- **Cross-module effecten:** vult Overzicht (bezittingen, schulden, budgetteringsmodus, inkomen/uitgaven-bron voor spaarquote) en Toekomst (horizon-voorkeuren, pensioen als life_events, FIRE-prognose, stop-anker × eind-vorm). De succes-CTA landt bewust in de Toekomst-module. Doelen worden sinds ADR 0162 niet meer via de onboarding vastgelegd — dat gaat via /toekomst/doelen.
 
 ---
 
 #### WF-START-19 — Bezittingen en schulden toevoegen tijdens onboarding
-- **Doel:** Als nieuwe gebruiker via gerichte ja/nee-vragen je bezittingen (en gekoppelde hypotheek) en schulden invoeren zodat je netto vermogen vanaf dag één klopt.
+- **Doel:** Als nieuwe gebruiker via gerichte ja/nee-vragen je bezittingen (en gekoppelde hypotheek) en via één aanvinkraster je schulden invoeren zodat je netto vermogen vanaf dag één klopt.
 - **Trigger/startpunt:** De groepen "bezittingen" en "schulden" binnen de onboarding (WF-START-18, stappen 6–7).
 - **Eindresultaat:** Elke toegevoegde post staat in de sectie-review; huis + hypotheek zijn als paar gekoppeld; bij afronden worden de posten server-side als echte assets/debts aangemaakt.
 - **Stappen:**
@@ -912,13 +911,13 @@ Scope: de publieke marketing-site (landing + subpagina's), de publieke Vrijheids
   3. Bij "eigen huis" vraagt de wizard zelf door: "Heeft deze woning een hypotheek?" — huis en hypotheek worden als gekoppeld paar toegevoegd.
   4. Vraag "andere bezittingen?": kies via de type-kiezer een resterend type (crypto, vastgoed, …) en herhaal.
   5. Bekijk de sectie-review (lijst met bedragen), verwijder of ontkoppel desgewenst posten en klik verder.
-  6. Schulden: zelfde patroon met "Heb je een hypotheek?" (overgeslagen als er al een hypotheek aan je huis hangt), studielening, persoonlijke lening, doorlopend krediet, creditcardschuld, roodstand, autolening/private lease — met bij élke vraag de altijd-uitgang "Ik heb (verder) geen schulden".
+  6. Schulden (raster-first sinds 19-09-2026, B-054/ADR 0164): één aanvinkraster met de volledige catalogus — hypotheek, studielening, persoonlijke lening en autolening/private lease vooraan onder "Meest voorkomend", de rest (creditcard, doorlopend krediet, belastingschuld, afbetalingsregeling, familielening, lening bij eigen BV, overig) onder "Andere schulden". Een soort die al via een bezitting is opgegeven (hypotheek bij je woning, autolening bij je voertuig, RC bij je BV) staat uitgeschakeld in het raster met "al opgegeven via je woning". Per aangevinkte soort opent de wizard; na elke toevoeging volgt "Nog een …?" zodat meerdere schulden van hetzelfde type kunnen. Op elk scherm de altijd-uitgang "Ik heb geen schulden" / "Ik heb verder geen schulden".
 - **Schermen/componenten:** `components/onboarding/onboarding-bezittingen.tsx`, `components/onboarding/onboarding-schulden.tsx`, `components/onboarding/onboarding-vraag.tsx`, `components/onboarding/section-review.tsx`, `components/onboarding/onboarding-posten.tsx`, gedeelde `components/app/quick-add-wizard/quick-add-wizard.tsx` (mode 'collect'); server-side omzetting via `buildAssetDraft`/`buildDebtDraft` en de huis↔hypotheek-koppeling in `app/api/onboarding/save-own-data/route.ts`.
 - **Kriticiteit:** KERN
 - **Rekenend:** ja — de som van deze posten vormt het netto vermogen in de recap (klaar-stap) en daarna in de app; toetsbaar door bekende bedragen in te voeren en het netto vermogen op /overzicht te vergelijken. Sectie-totalen tonen via `formatCurrency` (`lib/format.ts`).
 - **Varianten & randgevallen:**
   - Alles met "nee" beantwoorden → sectie leeg overslaan; bij nul bezittingen wordt het veld als "later invullen" (defer 'assets') gemarkeerd.
-  - Hypotheek toegevoegd in de bezittingen-stap → hypotheekvraag in de schulden-stap wordt overgeslagen.
+  - Hypotheek toegevoegd in de bezittingen-stap → de hypotheek-tegel in het schulden-raster staat uitgeschakeld met "al opgegeven via je woning".
   - Post verwijderen uit de review; hypotheek ontkoppelen toont een melding (unlinkNotice).
   - Terugkeer van een PSD2-bankkoppeling (?bank_connected=1 / ?bank_error=1) forceert de bezittingen-stap met een groene succes- of foutbanner ("Bankverbinding mislukt — voeg je bezittingen handmatig toe"). Let op: een startknop voor die koppeling is binnen de onboarding-UI niet gevonden (zie Onbevestigd).
   - Server-side vangnet: kiest de gebruiker geen betaalrekening/beleggingsrekening terwijl de bijbehorende module actief is, dan seedt de server een placeholder met saldo 0.
@@ -932,7 +931,7 @@ Scope: de publieke marketing-site (landing + subpagina's), de publieke Vrijheids
 - **Eindresultaat:** Bij schatting of geslaagde upload wordt bij de eind-save een pensioenregeling als life_event weggeschreven; bij overslaan gebeurt niets.
 - **Stappen:**
   1. Kies bij "Heb je al pensioen opgebouwd?" één van de paden: "Schatting" (potlood) of "Upload" (upload-icoon), of klik "Kan altijd later nog" om over te slaan.
-  2. Schatting: vul het bruto maandbedrag in en optioneel de ingangsleeftijd (50–75; default 67).
+  2. Schatting: vul het bruto maandbedrag in en optioneel de ingangsleeftijd (50–75; default 67). Weet je het bedrag niet: de inschat-hulp rekent uit bruto jaarsalaris × jaren opbouw; zijn geboortedatum én netto inkomen bekend, dan vult "Schat het voor me" (B-055) beide velden vóór (bewerkbaar), toont het bedrag afgerond op € 25 en zegt in een aparte zin dat dit níet de AOW is (SVB-bedrag als contrast). "Neem over" markeert het veld als "(schatting)"; zelf typen haalt dat weg.
   3. Upload: lever je mijnpensioen.nl-overzicht aan — JSON wordt volledig in de browser verwerkt, PDF via de AI-parseroute; het resultaat verschijnt ter bevestiging.
   4. Klik "Verder" (alleen actief wanneer er een geldige schatting of upload is; anders is overslaan de uitweg).
 - **Schermen/componenten:** `components/onboarding/onboarding-pensioen.tsx`, `components/app/horizon/pension-pdf-upload.tsx` (hergebruikt), `app/api/pension/parse/route.ts` (PDF-parsing), write bij eind-save via `buildPensionParseResult` (in `app/(onboarding)/onboarding/page.tsx`) → `applyPensionParseResult` (`lib/pension/apply-parse-result.ts`, naar `life_events`).
@@ -948,32 +947,13 @@ Scope: de publieke marketing-site (landing + subpagina's), de publieke Vrijheids
 
 ---
 
-#### WF-START-21 — Spaardoel kiezen of overslaan tijdens onboarding
-- **Doel:** Als nieuwe gebruiker laagdrempelig één eerste spaardoel vastleggen.
-- **Trigger/startpunt:** De spaardoel-stap (groep 6/7) in de onboarding.
-- **Eindresultaat:** Bij keuze: één rij in de `goals`-tabel met naam, streefbedrag, optionele streefdatum, icoon en kleur van de preset. Bij overslaan: niets weggeschreven en het veld als "later" gemarkeerd.
-- **Stappen:**
-  1. Kies één van de zes preset-tegels: Noodfonds, Vakantie, Auto, Aanbetaling (huis), Groei of "Iets anders" (vrije invoer).
-  2. Het inline-formulier vult naam en bedrag voor (bij Noodfonds op basis van je uitgaven via `computeNoodfondsTarget`); pas naam/bedrag aan en kies optioneel een streefmaand (maand-kiezer via een uitklap-disclosure).
-  3. Klik "Verder" — of "Sla over →" om zonder doel door te gaan.
-- **Schermen/componenten:** `components/onboarding/onboarding-spaardoel.tsx`, presets + noodfonds-berekening in `lib/onboarding-presets.ts`, insert via `body.onboardingGoal` in `app/api/onboarding/save-own-data/route.ts`.
-- **Kriticiteit:** BELANGRIJK
-- **Rekenend:** ja — het voorgestelde noodfonds-streefbedrag komt uit `computeNoodfondsTarget` (`lib/onboarding-presets.ts`) op basis van maandinkomen/-uitgaven; het ingevoerde streefbedrag moet exact als doel in de app terugkomen (NL-notatie "12.500" → 12500; maand "YYYY-MM" wordt "YYYY-MM-01").
-- **Varianten & randgevallen:**
-  - Overslaan wist eerder ingevulde velden zodat er niets per ongeluk wordt weggeschreven.
-  - Bedrag 0/ongeldig of lege naam → doel wordt bij opslaan overgeslagen (alleen geldige combinaties worden geschreven).
-  - Streefdatum is optioneel (leeg = geen datum).
-- **Cross-module effecten:** het doel verschijnt in Toekomst/doelen (/toekomst/doelen).
-
----
-
 #### WF-START-22 — Velden uitstellen met "Later invullen" (defer-pad)
 - **Doel:** Als nieuwe gebruiker onderdelen bewust overslaan en er later in de app aan herinnerd worden.
-- **Trigger/startpunt:** De expliciete skip-knoppen in onboarding: "Later invullen" op de inkomen-stap, doorgaan zonder bezittingen, "Sla over →" op de spaardoel-stap (en de skip-uitgangen van uitgaven-na-pensioen en pensioen).
-- **Eindresultaat:** De overgeslagen velden ('income', 'assets', 'spaardoel') worden als deferred fields opgeslagen (in `profiles.feature_preferences.deferred_onboarding_fields`) en voeden na onboarding de coach-bubble met gerichte suggesties.
+- **Trigger/startpunt:** De expliciete skip-knoppen in onboarding: "Later invullen" op de inkomen-stap, doorgaan zonder bezittingen (en de skip-uitgangen van uitgaven-na-pensioen en pensioen). De stap "Spaardoel" en haar "Sla over →"-knop bestaan sinds 19-09-2026 niet meer (ADR 0162).
+- **Eindresultaat:** De overgeslagen velden ('income', 'assets') worden als deferred fields opgeslagen (in `profiles.feature_preferences.deferred_onboarding_fields`) en voeden na onboarding de coach-bubble met gerichte suggesties. De waarde `'spaardoel'` blijft geldig op het type voor bestaande profielen/concepten van vóór 19-09-2026, maar wordt niet meer nieuw geschreven.
 - **Stappen:**
   1. Kies op de inkomen-stap "Later invullen": beide inkomensvelden worden gewist en de flow springt direct naar bezittingen (de uitgaven- en pensioenuitgaven-schermen worden overgeslagen).
-  2. Rond de bezittingen-sectie af zonder iets toe te voegen en/of sla het spaardoel over.
+  2. Rond de bezittingen-sectie af zonder iets toe te voegen.
   3. Rond de onboarding af en controleer in de app dat de coach de overgeslagen onderwerpen als suggestie aanbiedt.
 - **Schermen/componenten:** defer-dispatches in `app/(onboarding)/onboarding/page.tsx` (DEFER_FIELD), doorvoer in `app/api/onboarding/save-own-data/route.ts`, consumptie in `app/(app)/layout.tsx` (coachDeferredFields).
 - **Kriticiteit:** BELANGRIJK
@@ -1041,14 +1021,14 @@ Scope: de publieke marketing-site (landing + subpagina's), de publieke Vrijheids
 
 #### WF-START-26 — Overgang onboarding → app (landing en poorten)
 - **Doel:** Als net-geonboarde gebruiker soepel in de app landen, en verifiëren dat de poorten in beide richtingen kloppen.
-- **Trigger/startpunt:** De knop "Ga naar je toekomst" op het succes-scherm; of het handmatig openen van /onboarding resp. app-routes in verschillende staten.
-- **Eindresultaat:** Na afronden land je op /toekomst (harde navigatie om een verouderde redirect-lus te voorkomen). Een niet-geonboarde gebruiker die een app-route opent wordt naar /onboarding gestuurd; een geonboarde gebruiker die /onboarding opent wordt naar /overzicht gestuurd.
+- **Trigger/startpunt:** De knop "Naar je overzicht" op het succes-scherm; of het handmatig openen van /onboarding resp. app-routes in verschillende staten.
+- **Eindresultaat:** Na afronden land je op je eigen homescherm (harde navigatie naar /dashboard, door de middleware vertaald via `profiles.home_screen` — standaard /overzicht; ADR 0130), om een verouderde redirect-lus te voorkomen. Een niet-geonboarde gebruiker die een app-route opent wordt naar /onboarding gestuurd; een geonboarde gebruiker die /onboarding opent wordt naar /overzicht gestuurd.
 - **Stappen:**
   1. Lees op het succes-scherm de regel onder de afsluiting van Fin: *"Rustig beginnen of meteen alle detail? Je weergave kies je later bij Mijn → Uiterlijk."* (APP-2). → *verwacht:* de regel staat er in élke situatie — hij is bewust NIET modus-afhankelijk — en "Mijn → Uiterlijk" is **geen link**: klikken doet niets. Dat is opzet, zie de randgevallen.
-  2. Klik na afloop op "Ga naar je toekomst" en controleer dat /toekomst met jouw net ingevoerde gegevens laadt (bezittingen, doel, projectie).
+  2. Controleer dat de vier waardes op het succes-scherm staan (2×2 op desktop, één kolom op mobiel, elk met een kicker-streep in het accent van deze gebruiker) en klik daarna op "Naar je overzicht"; controleer dat je eigen homescherm met je net ingevoerde gegevens laadt.
   3. Open daarna handmatig /onboarding → automatische redirect naar /overzicht.
   4. Controleer (met een verse, niet-geonboarde account) dat /overzicht direct doorstuurt naar /onboarding.
-- **Schermen/componenten:** `components/onboarding/onboarding-success.tsx` (CTA + de APP-2-regel), `window.location.assign('/toekomst')` in `app/(onboarding)/onboarding/page.tsx`, onboarding-poort in `app/(app)/layout.tsx` (redirect bij `onboarding_completed` false), al-geonboard-check in het check-effect van de onboarding-pagina.
+- **Schermen/componenten:** `components/onboarding/onboarding-success.tsx` (CTA + de APP-2-regel + de vier waardes uit `lib/onboarding/waardes.ts`), de harde navigatie naar /dashboard in `app/(onboarding)/onboarding/page.tsx`, onboarding-poort in `app/(app)/layout.tsx` (redirect bij `onboarding_completed` false), al-geonboard-check in het check-effect van de onboarding-pagina.
 - **Kriticiteit:** BELANGRIJK
 - **Rekenend:** nee (de getallen zelf zijn gedekt door WF-START-18/19; hier telt de landing).
 - **Varianten & randgevallen:**
@@ -3393,7 +3373,7 @@ Scope: `/overzicht/schulden`, `/overzicht/schulden/[type]`, `/core/debts`, `/cor
   - Lege naam → opslaan uitgeschakeld.
   - "Niet opnemen" → item verdwijnt uit alle vaste-lasten-cijfers.
   - Bevestigen zonder bankrekening: opslaan doet stilletjes niets (accountId ontbreekt).
-- **Cross-module effecten:** Bevestigde recurrings verschijnen in Kalender (WF-CASH-21) en Forecast (WF-CASH-22).
+- **Cross-module effecten:** Bevestigde recurrings verschijnen in de Agenda-widget op /overzicht en in de Forecast (WF-CASH-22). (De kalender op de vaste-lastenpagina, WF-CASH-21, is per 19-09-2026 vervallen — W-017.)
 
 #### WF-CASH-18 — Abonnement opzeggen via een opzegbrief
 - **Doel:** Voor een abonnement een kant-en-klare opzegbrief maken en als actie bewaren om later af te ronden.
@@ -3431,7 +3411,7 @@ Scope: `/overzicht/schulden`, `/overzicht/schulden/[type]`, `/core/debts`, `/cor
   - API-fout → foutmelding met opnieuw proberen.
 - **Cross-module effecten:** AI-gebruik telt mee in tokenverbruik (beheer); opgeslagen items voeden dezelfde vaste-lasten-cijfers.
 
-#### WF-CASH-20 — "Wat als ik opzeg"-schuif: besparing omrekenen naar vrijheid
+#### WF-CASH-20 — "Wat als ik opzeg"-schuif: besparing omrekenen naar vrijheid — VERVALLEN 19-09-2026 (W-017: sectie verwijderd)
 - **Doel:** Spelen met een opzeg-bedrag en direct zien wat dat per jaar oplevert in euro's en vrijheidstijd.
 - **Trigger/startpunt:** Blok "Wat als ik opzeg" onderaan /overzicht/budget/vaste-lasten (Volledig-modus).
 - **Eindresultaat:** Twee tegels (Per jaar / Vrijheid terug) rekenen live mee met de slider.
@@ -3445,7 +3425,7 @@ Scope: `/overzicht/schulden`, `/overzicht/schulden/[type]`, `/core/debts`, `/cor
   - Maanduitgaven 0 → vrijheid kan "∞" tonen (isInfinite).
 - **Cross-module effecten:** geen.
 
-#### WF-CASH-21 — Cashflow-kalender: komende 5 weken vooruitkijken
+#### WF-CASH-21 — Cashflow-kalender: komende 5 weken vooruitkijken — VERVALLEN 19-09-2026 (W-017: kalender verwijderd, Agenda-widget blijft)
 - **Doel:** Per dag zien welke vaste afschrijvingen en inkomsten eraan komen.
 - **Trigger/startpunt:** Kalender-grid onderaan /overzicht/budget/vaste-lasten (Volledig-modus).
 - **Eindresultaat:** 35-daags grid (ma-start) met per dag rode (−) en groene (+) bedragen uit terugkerende transacties; header toont totaal "Verwacht uit"/"Verwacht in"; vandaag is gemarkeerd.
@@ -3530,7 +3510,7 @@ Scope: `/overzicht/schulden`, `/overzicht/schulden/[type]`, `/core/debts`, `/cor
   1. Klik "Vraag Will" — een voortgangsbanner toont "Will categoriseert… X van Y" met balk en telling automatisch herkend/extra gematcht.
   2. Bekijk per rij het voorstel-blok (reden, budgetnaam) en klik "OK?" om te accepteren, of kies zelf iets anders in de dropdown.
   3. Klik "Alles goedkeuren" in de banner om alle voorstellen tegelijk over te nemen.
-  4. Filter desgewenst met de chips Alles / Lage confidence / Zonder budget.
+  4. Filter desgewenst met de chips Alles / Lage confidence / Zonder categorie.
   5. Bij gefaalde AI-batches: klik "Opnieuw proberen".
 - **Schermen/componenten:** /core/cash/import — app/(app)/core/cash/import/page.tsx (`enrichWithAI`); lib/auto-categorize.ts (`runCombinedCategorization` — één representant per genormaliseerde tegenpartij, propagatie naar soortgenoten); POST /api/ai/categorize
 - **Kriticiteit:** KERN
@@ -3940,12 +3920,12 @@ Scope: `/overzicht/schulden`, `/overzicht/schulden/[type]`, `/core/debts`, `/cor
 
 ---
 
-#### WF-BUDGET-13 — Transacties koppelen aan budgetcategorieën (AI / handmatig / sleepmodus)
+#### WF-BUDGET-13 — Transacties categoriseren (AI / handmatig / sleepmodus)
 - **Doel:** ongecategoriseerde transacties aan de juiste budgetcategorie koppelen zodat de budget-vs-realisatie klopt.
-- **Trigger/startpunt:** knop "Transacties koppelen" naast "Plan bewerken" (met aantal-badge op mobiel), of het hub-aandachtsitem "N transacties zonder categorie — €X".
-- **Eindresultaat:** de gekozen transacties hebben een budget (budget_id + herkomst-label); de bestede bedragen en de "ongecategoriseerd"-teller zijn bijgewerkt; zodra er over alle tijden niets meer open staat toont de knop-plek "Alles gekoppeld".
+- **Trigger/startpunt:** knop "Transacties categoriseren" naast "Plan bewerken" (met aantal-badge op mobiel), of het hub-aandachtsitem "N transacties zonder categorie — €X".
+- **Eindresultaat:** de gekozen transacties hebben een budget (budget_id + herkomst-label); de bestede bedragen en de "ongecategoriseerd"-teller zijn bijgewerkt; zodra er over alle tijden niets meer open staat toont de knop-plek "Alles gecategoriseerd".
 - **Stappen:**
-  1. Klik "Transacties koppelen" → sheet "Transacties categoriseren" opent in de keuzefase.
+  1. Klik "Transacties categoriseren" → sheet "Transacties categoriseren" opent in de keuzefase.
   2. Kies de scope: "Deze maand" (standaard) of "Alle tijden".
   3. Kies een werkwijze: automatische categorisatie (regels + overboekings-herkenning + Will/AI + afgeleide voorstellen), handmatig per rij, of "Sleepmodus" (fullscreen drag-&-drop van transacties naar potjes).
   4. Reviewfase: per transactie staat een voorstel met bron-label (Regel / Overboeking / Will / Afgeleid) en zekerheid; accepteer, wijzig de categorie via de dropdown (hoofdbudgetten als groepen; het archief-potje "Eigen rekening" als platte optie), of sla over.
@@ -3955,7 +3935,7 @@ Scope: `/overzicht/schulden`, `/overzicht/schulden/[type]`, `/core/debts`, `/cor
 - **Kriticiteit:** KERN
 - **Rekenend:** ja — de "ongecategoriseerd"-teller en het totaalbedrag (uitgaven zonder budget, exclusief transfers/inkomen; `budgets-client.tsx#loadSpending`); na koppelen moeten besteed-bedragen per budget exact met de transactiebedragen stijgen; de all-time teller telt per gebruiker met transfer-uitsluiting (NULL-veilige query).
 - **Varianten & randgevallen:**
-  - Geen enkele ongekoppelde transactie over alle tijden → statuslabel "Alles gekoppeld" i.p.v. de knop.
+  - Geen enkele transactie zonder categorie over alle tijden → statuslabel "Alles gecategoriseerd" i.p.v. de knop.
   - In eigen-blik tellen partner-persoonlijke ongecategoriseerde rijen niet mee (privacygrens).
   - Niets wordt stil toegepast: álle bronnen (ook regels/overboekingen) komen ter bevestiging langs.
   - "Alle tijden" pagineert per 1000 met een plafond van 10.000 rijen.
@@ -8821,7 +8801,7 @@ Alle scenario's, per deelgebied in uitvoervolgorde. Formaat en registratie: zie 
 
 ### UAT-scenario's — Publiek, registratie & onboarding (UAT-START)
 
-**Persona-/testaccount-strategie:** dit deelgebied gebruikt bewust GEEN van de vijf hoofdpersona's (`daan`/`lisa`/`willem`/`marijke`/`compleet`) — die bestaan pas ná onboarding en horen bij de andere deelgebieden. Hier zijn drie testvoertuigen leidend, precies zoals de opdracht voorschrijft: **(1)** voor de anonieme Vrijheidscheck-funnel (UAT-START-06 t/m 10) een doorlopende synthetische testpersoon **"Sanne Bakker"** — één samenhangende hand-uitgerekende invoer die we door de hele funnel (intake → rapport → activatie) volgen, zodat cijfers tussen scenario's consistent en herleidbaar blijven; **(2)** voor login/uitloggen/routebescherming/wachtwoord-reset het blok **"Landing page testaccounts"** op `/beheer/testdata` (4 gekoppelde testgebruikers, resetbaar, wachtwoord instelbaar via de "Wachtwoord"-knop — dus geen afhankelijkheid van uitgaande mail om in te loggen); **(3)** voor de onboarding-stappen zelf (UAT-START-18 t/m 26) de knop **"Onboarding starten"** op `/beheer/testdata`, die het eigen ingelogde (super)admin-account wist en terugzet naar de onboarding-flow — elke onboarding-precondition is een verse reset, dus scenario's zijn onderling onafhankelijk tenzij anders vermeld. **Bekende blocker:** uitgaande auth-e-mail is op de testomgeving beperkt; overal waar een scenario een e-mailbevestiging vereist (registratie, wachtwoord-reset) staat dat voorbehoud expliciet vermeld, met een werkbare omweg (bestaand testaccount, of stoppen bij het "Controleer je e-mail"-scherm als bewijs dat het formulier/de aanroep werkt). Alle bedragen/percentages hieronder zijn met de hand herleid uit `lib/format.ts`, `lib/savings-source.ts`, `lib/onboarding-presets.ts`, `lib/onboarding/retirement-prefill.ts`, `lib/check/intake-to-persona.ts` en `lib/health-score-input.ts` — nooit uit wat de app toont. Vandaag = **5 juli 2026**. Waar een cijfer door de horizon-kernel (FIRE-projectie) of het samengestelde gezondheidsgetal loopt, is dat expliciet vermeld en vervangen door een **richting-/consistentie-verwachting** in plaats van een cijfer tot op de cent — conform de opdracht.
+**Persona-/testaccount-strategie:** dit deelgebied gebruikt bewust GEEN van de vijf hoofdpersona's (`daan`/`lisa`/`willem`/`marijke`/`compleet`) — die bestaan pas ná onboarding en horen bij de andere deelgebieden. Hier zijn drie testvoertuigen leidend, precies zoals de opdracht voorschrijft: **(1)** voor de anonieme Vrijheidscheck-funnel (UAT-START-06 t/m 10) een doorlopende synthetische testpersoon **"Sanne Bakker"** — één samenhangende hand-uitgerekende invoer die we door de hele funnel (intake → rapport → activatie) volgen, zodat cijfers tussen scenario's consistent en herleidbaar blijven; **(2)** voor login/uitloggen/routebescherming/wachtwoord-reset het blok **"Landing page testaccounts"** op `/beheer/testdata` (4 gekoppelde testgebruikers, resetbaar, wachtwoord instelbaar via de "Wachtwoord"-knop — dus geen afhankelijkheid van uitgaande mail om in te loggen); **(3)** voor de onboarding-stappen zelf (UAT-START-18 t/m 26) de knop **"Onboarding starten"** op `/beheer/testdata`, die het eigen ingelogde (super)admin-account wist en terugzet naar de onboarding-flow — elke onboarding-precondition is een verse reset, dus scenario's zijn onderling onafhankelijk tenzij anders vermeld. **Bekende blocker:** uitgaande auth-e-mail is op de testomgeving beperkt; overal waar een scenario een e-mailbevestiging vereist (registratie, wachtwoord-reset) staat dat voorbehoud expliciet vermeld, met een werkbare omweg (bestaand testaccount, of stoppen bij het "Controleer je e-mail"-scherm als bewijs dat het formulier/de aanroep werkt). Alle bedragen/percentages hieronder zijn met de hand herleid uit `lib/format.ts`, `lib/savings-source.ts`, `lib/onboarding/retirement-prefill.ts`, `lib/check/intake-to-persona.ts` en `lib/health-score-input.ts` — nooit uit wat de app toont. (`lib/onboarding-presets.ts` bestaat sinds 19-09-2026 niet meer — met de spaardoel-stap verdween ook `computeNoodfondsTarget`, ADR 0162.) Vandaag = **5 juli 2026**. Waar een cijfer door de horizon-kernel (FIRE-projectie) of het samengestelde gezondheidsgetal loopt, is dat expliciet vermeld en vervangen door een **richting-/consistentie-verwachting** in plaats van een cijfer tot op de cent — conform de opdracht.
 
 ---
 
@@ -9009,15 +8989,14 @@ Alle scenario's, per deelgebied in uitvoervolgorde. Formaat en registratie: zie 
   4. Stap "uitgaven": vul geschatte maanduitgaven **€ 2.100** in → *verwacht:* live preview "Je spaarquote komt hiermee op **30%**."
   5. Stap "uitgaven na pensioen": accepteer het voorgestelde jaarbedrag ongewijzigd → *verwacht:* prefill **€ 20.160**.
   6. Stap "bezittingen": voeg toe — Betaalrekening € 2.500, Spaargeld € 18.000, Beleggingen € 12.000.
-  7. Stap "schulden": voeg toe — Studieschuld € 9.000; beantwoord de rest met "Ik heb (verder) geen schulden".
+  7. Stap "schulden": vink op het raster "Studielening (DUO)" aan → Verder → wizard: Studieschuld € 9.000; "Nog een studielening?" → nee → bevestig het overzicht (of kies "Ik heb verder geen schulden").
   8. Stap "pensioen": kies "Schatting", bruto maandbedrag **€ 1.400**, laat ingangsleeftijd op de default (67).
-  9. Stap "spaardoel": kies preset "Noodfonds" → *verwacht:* prefill-bedrag **€ 6.300**; accepteer.
+  9. Stap "eindstrategie" / "Jouw plan": klik direct "Verder" (standaardpad, zie WF-START-28).
   10. Stap "klaar": controleer de recap → *verwacht:* netto vermogen **€ 23.500**; klik "Begin met TriFinity" → laadscherm → succes-scherm "Welkom bij TriFinity!" → klik "Ga naar je toekomst" → *verwacht:* harde navigatie naar `/toekomst`.
   **Eindresultaat:** recap netto vermogen op de klaar-stap = **€ 23.500**; spaarquote-preview tijdens de inkomen-stap = **30%**.
   **Berekening verwachting:**
   - Spaarquote-preview: `Math.round(((3000 − 2100) / 3000) × 100)` = `Math.round(30)` = **30%** (`onboarding-inkomen.tsx`).
   - Pensioen-prefill: `computeRetirementPrefill({ monthlyExpenses: 2100 })` = `Math.round(2100 × 12 × 0,8)` = `Math.round(20.160)` = **€ 20.160/jaar** (basis: uitgaven, methode: eigen bedrag) (`lib/onboarding/retirement-prefill.ts`).
-  - Noodfonds-prefill: `computeNoodfondsTarget({ monthlyIncome: 3000, monthlyExpenses: 2100 })` = uitgaven > 0 dus basis = 2.100 × 3 = 6.300, afgerond op € 100 = **€ 6.300** (al een veelvoud van 100) (`lib/onboarding-presets.ts`).
   - Netto vermogen recap: bezittingen (2.500 + 18.000 + 12.000 = 32.500) − schulden (9.000) = **€ 23.500** (`netWorthForKlaar`, `app/(onboarding)/onboarding/page.tsx`).
   - Consistentie-check ná activatie: op `/overzicht/budget` moet de spaarquote via `resolveSavingsSource`/`savingsRateFromAggregates` opnieuw exact **30%** geven — `((3000 − 2100 + 0) / 3000) × 100` = **30%** — de preview tijdens onboarding en de cashflow-pagina mogen NOOIT uiteenlopen (SSoT-eis).
 - **b. Randgeval — extreme maar geldige invoer:** verse reset. Vul inkomen **€ 3.000** en uitgaven **€ 999.000** in (beide binnen hun eigen toegestane grenzen, maar samen onrealistisch) → *verwacht:* spaarquote-preview toont **"-33200%"** (`Math.round(((3000 − 999000)/3000)×100)` = `Math.round(-33200)` = **-33200**) zonder dat de pagina crasht of de layout breekt — een negatief drie-cijferig-duizendtallig percentage moet gewoon leesbaar getoond worden.
@@ -9031,7 +9010,7 @@ Alle scenario's, per deelgebied in uitvoervolgorde. Formaat en registratie: zie 
   1. Naam/geboortedatum/inkomen/uitgaven kort invullen (bv. inkomen € 2.500, uitgaven € 1.800 — niet rekenkritisch voor dit scenario).
   2. Bezittingen: "Heb je een betaalrekening?" → ja → **€ 1.800**. "Heb je spaargeld?" → ja → **€ 10.000**. "Heb je een eigen huis?" → ja → woningwaarde **€ 340.000**; wizard vraagt door "Heeft deze woning een hypotheek?" → ja → hypotheeksaldo **€ 280.000**, rente **3,2%**, maandlast **€ 1.100** → *verwacht:* huis en hypotheek worden als gekoppeld paar toegevoegd. "Heb je beleggingen?" → nee. "Andere bezittingen?" → nee.
   3. Bekijk de sectie-review → *verwacht:* 3 bezitting-posten (Betaalrekening, Spaargeld, Eigen huis) zichtbaar met de hypotheek als gekoppelde post.
-  4. Schulden: de hypotheekvraag wordt automatisch OVERGESLAGEN (al gekoppeld via bezittingen). Beantwoord studielening/persoonlijke lening/doorlopend krediet/creditcard/roodstand met "nee". Autolening/private lease → ja → **€ 8.000**. Kies daarna "Ik heb (verder) geen schulden".
+  4. Schulden: het raster toont de hypotheek-tegel UITGESCHAKELD met "al opgegeven via je woning" (al gekoppeld via bezittingen). Vink "Autolening" aan → Verder → wizard: **€ 8.000** → "Nog een autolening of private lease?" → nee → *verwacht:* het overzicht "Dit zijn je schulden" met hypotheek (via je woning) én autolening; bevestig met "Klopt het".
   5. Rond de rest van de onboarding af.
   **Eindresultaat:** totaal bezittingen = **€ 351.800**, totaal schulden = **€ 288.000**, netto vermogen (recap) = **€ 63.800**.
   **Berekening verwachting:** bezittingen = 1.800 + 10.000 + 340.000 = **351.800**; schulden = 280.000 (hypotheek) + 8.000 (autolease) = **288.000**; netto vermogen = 351.800 − 288.000 = **€ 63.800** (directe optelling, zichtbaar in de sectie-review en de klaar-stap-recap).
@@ -9041,25 +9020,18 @@ Alle scenario's, per deelgebied in uitvoervolgorde. Formaat en registratie: zie 
 
 #### UAT-START-20 — Pensioen opgeven tijdens onboarding (dekt WF-START-20)
 - **Kriticiteit:** KERN · **Platform:** webapp · **Rooktest:** nee · **Duur:** ~5 min
-- **Preconditie:** verse reset via "Onboarding starten", bereik de pensioen-stap (groep 5/7)
+- **Preconditie:** verse reset via "Onboarding starten", bereik de pensioen-stap (groep 5/8)
 - **a. Happy path:** kies "Schatting" → vul bruto maandbedrag **€ 1.600** in, laat ingangsleeftijd op de default → *verwacht:* veld toont/impliceert **67**. Klik "Verder" → rond de rest af.
   **Eindresultaat:** na afronden staat er een ouderdomspensioen-regeling in de levensgebeurtenissen met bedrag € 1.600/maand bruto en ingangsleeftijd 67.
 - **b. Randgeval — extreme maar geldige ingangsleeftijd:** kies "Schatting", bruto maandbedrag **€ 4.000**, ingangsleeftijd **75** (de bovengrens van het toegestane bereik) → *verwacht:* 75 wordt ONGEWIJZIGD overgenomen (geen terugval naar 67, want 75 valt binnen 50–75).
 - **c. Foutpad — leeg bedrag:** kies "Schatting" maar laat het bruto maandbedrag leeg → *verwacht:* de knop "Verder" blijft uitgeschakeld/inactief totdat er een geldig bedrag staat óf je alsnog "Kan altijd later nog" kiest.
 - **d. Persistentie:** rond de onboarding af met de happy-path-schatting (a), log uit en weer in, open de toekomst-/pensioeninstellingen → *verwacht:* de pensioenregeling (€ 1.600/maand, ingangsleeftijd 67) staat er nog en telt mee in de projectie.
-
-#### UAT-START-21 — Spaardoel kiezen of overslaan tijdens onboarding (dekt WF-START-21)
-- **Kriticiteit:** BELANGRIJK · **Platform:** webapp · **Rooktest:** nee · **Duur:** ~3 min
-- **Preconditie:** verse reset; vul in de eerdere stappen inkomen **€ 2.800** en uitgaven **€ 1.900** in, bereik de spaardoel-stap (groep 6/7)
-- **a. Happy path:** kies preset "Noodfonds" → *verwacht:* naam vooraf ingevuld "Noodfonds", bedrag vooraf ingevuld **€ 5.700**; open de maand-kiezer en kies "juli 2027" (12 maanden vooruit, de voorgestelde horizon); klik "Verder" → rond de onboarding af.
-  **Eindresultaat:** in `/toekomst/doelen` staat één doel "Noodfonds", streefbedrag **€ 5.700**, streefdatum **juli 2027**.
-  **Berekening verwachting:** `computeNoodfondsTarget({ monthlyIncome: 2800, monthlyExpenses: 1900 })` — uitgaven > 0, dus basis = 1.900, × 3 = 5.700, afgerond op € 100 = **€ 5.700** (al een veelvoud van 100) (`lib/onboarding-presets.ts`).
-- **c. Foutpad — ongeldige combinatie wordt stil overgeslagen:** kies preset "Auto" (prefill naam "Auto", bedrag € 10.000), wis het bedrag naar **€ 0** en klik toch "Verder" (geen blokkerende clientside-validatie) → rond de onboarding af → *verwacht:* er wordt GEEN doel aangemaakt in `/toekomst/doelen` (bedrag 0/ongeldig → bij opslaan stil overgeslagen, geen foutmelding, geen lege rij).
+- **e. "Schat het voor me" (B-055):** met geboortedatum (leeftijd 40) en netto inkomen € 3.000 ingevuld, kies "Schat het zelf" → *verwacht:* een knop "Schat het voor me"; klik → bruto jaarsalaris (≈ € 46.000, afgeleid van het netto) en 15 jaar opbouw staan vóórgevuld en zijn te overtypen; het bedrag is een veelvoud van € 25 en de tekst zegt in een aparte zin "Dit is niet je AOW" met € 1.581,55 (alleenstaand) als contrast. "Neem over" → het bedragveld toont "(schatting)"; typ zelf een bedrag → het label verdwijnt. Zonder geboortedatum of na "Later invullen" op inkomen → géén knop, wel de link "Geen idee? Help me schatten".
 
 #### UAT-START-22 — Velden uitstellen met "Later invullen" (defer-pad) (dekt WF-START-22)
 - **Kriticiteit:** BELANGRIJK · **Platform:** webapp · **Rooktest:** nee · **Duur:** ~4 min
 - **Preconditie:** verse reset via "Onboarding starten"
-- **a. Happy path:** op de inkomen-stap klik "Later invullen" → *verwacht:* beide inkomensvelden worden gewist en de flow springt direct naar bezittingen (uitgaven- en pensioenuitgaven-stappen worden overgeslagen); sla ook het spaardoel over ("Sla over →"); rond de onboarding af → open de app → *verwacht:* de coach-bubble (Will) biedt gerichte suggesties aan om inkomen en een spaardoel alsnog in te vullen.
+- **a. Happy path:** op de inkomen-stap klik "Later invullen" → *verwacht:* beide inkomensvelden worden gewist en de flow springt direct naar bezittingen (uitgaven- en pensioenuitgaven-stappen worden overgeslagen); rond de bezittingen-sectie af zonder een bezitting toe te voegen; rond de onboarding af → open de app → *verwacht:* de coach-bubble (Will) biedt gerichte suggesties aan om inkomen en bezittingen alsnog in te vullen. (De stap "Spaardoel" en haar "Sla over →"-knop bestaan sinds 19-09-2026 niet meer, ADR 0162.)
 - **c. Foutpad/randgeval — "Later invullen" wist een reeds ingevuld bedrag:** ga terug naar de inkomen-stap, vul eerst € 2.500 in, ga naar "uitgaven", ga terug naar "inkomen" en klik alsnog "Later invullen" → *verwacht:* het eerder ingevulde bedrag van € 2.500 wordt bewust gewist (geen "zijn we het bedrag kwijt"-bug — dit is de gedocumenteerde, opzettelijke aard van deze knop).
 
 #### UAT-START-23 — Onboarding onderbreken en hervatten (concept-herstel) (dekt WF-START-23)
@@ -10381,12 +10353,12 @@ Let op: `recurring_transactions` wordt door de testdata-seed **niet** gevuld —
 - **a. Happy path:** 1) Klik "Laat Will analyseren". → *verwacht:* laad-fase, dan voorstellen per rij met AI-classificatie + reden. 2) Beoordeel/pas aan waar nodig, klik "Opslaan". → *verwacht:* toast met aantal opgeslagen items; lijst en totalen verversen (KPI op WF-CASH-16 stijgt mee als er nieuwe items bevestigd zijn).
 - **c. AI niet geconfigureerd:** Herhaal met een account zonder AI-add-on (of AI-kill-switch aan). → *verwacht:* melding "AI is niet geconfigureerd…" (HTTP 422), geen crash, handmatige weg (WF-CASH-17) blijft beschikbaar.
 
-#### UAT-CASH-20 — "Wat als ik opzeg"-schuif: besparing omrekenen naar vrijheid (dekt WF-CASH-20)
+#### UAT-CASH-20 — "Wat als ik opzeg"-schuif (dekt WF-CASH-20) — VERVALLEN 19-09-2026 (W-017), niet meer uitvoeren
 - **Kriticiteit:** OVERIG · **Platform:** webapp · **Rooktest:** nee · **Duur:** ~4 min
 - **Preconditie:** Persona Daan Bakker, weergavemodus Volledig, ≥1 abonnement bevestigd (bv. Basic-Fit €44,90 uit WF-CASH-17a).
 - **a. Happy path:** 1) Versleep de slider naar €44,90 (Basic-Fit). → *verwacht:* "Per jaar" toont €538,80 (44,90×12) exact. 2) Lees "Vrijheid terug". **Berekening verwachting:** `cancelEffect` (lib/vaste-lasten-insights.ts): jaarbedrag = 44,90×12 = €538,80; dagtarief = maanduitgaven×12/365 (`dailyExpenseRate`); vrijheidsdagen = 538,80 ÷ dagtarief, afgerond op 1 decimaal. Verifieer dat het aantal dagen daalt naarmate Daans totale maanduitgaven (de noemer) hoger is, en omgekeerd.
 
-#### UAT-CASH-21 — Cashflow-kalender: komende 5 weken vooruitkijken (dekt WF-CASH-21)
+#### UAT-CASH-21 — Cashflow-kalender (dekt WF-CASH-21) — VERVALLEN 19-09-2026 (W-017), niet meer uitvoeren
 - **Kriticiteit:** BELANGRIJK · **Platform:** webapp · **Rooktest:** nee · **Duur:** ~5 min
 - **Preconditie:** Persona Daan Bakker met ≥1 bevestigde recurring (bv. Netflix maandelijks dag 7, uit WF-CASH-18).
 - **a. Happy path:** 1) Scroll naar "Komende 5 weken" op /overzicht/budget/vaste-lasten. → *verwacht:* 35-daags grid (ma-start), vandaag (5 juli) gemarkeerd. 2) Zoek de dag 7 (van de eerstvolgende maand indien 5 juli al voorbij dag 7 is, dus 7 augustus) — Netflix moet daar met -€15,99 staan. **Berekening verwachting:** `getNextOccurrence` voor een monthly recurring met `day_of_month=7`: als vandaag (5 juli) vóór dag 7 valt → eerstvolgende datum is 7 juli; header-totaal "Verwacht uit" moet minimaal dit bedrag bevatten.
@@ -10730,7 +10702,7 @@ Rooktest-nominaties: UAT-BUDGET-01a (eerste setup), UAT-BUDGET-02a (realisatie v
 > Het categoriseren zelf (AI/handmatig/sleepmodus) wordt getoetst in **UAT-CASH-25/26/28**; hier alleen de doorwerking op de budgetpagina.
 - **Kriticiteit:** KERN · **Platform:** webapp · **Rooktest:** nee · **Duur:** ~5 min
 - **Precondition:** Persona Lisa; (her)laad het Gezin-template. Voeg via Cash één transactie toe van −€50 ("Bioscoop Pathé", juli 2026) **zonder** budgetcategorie te kiezen (blijft ongecategoriseerd).
-- **a. Happy path:** noteer "Vrije tijd, hobby's & sport" — besteed €0/limiet €120 (0%). Open "Transacties koppelen" (of het hub-item), categoriseer de Bioscoop-transactie naar "Vrije tijd, hobby's & sport" en sla op.
+- **a. Happy path:** noteer "Vrije tijd, hobby's & sport" — besteed €0/limiet €120 (0%). Open "Transacties categoriseren" (of het hub-item), categoriseer de Bioscoop-transactie naar "Vrije tijd, hobby's & sport" en sla op.
   **Eindresultaat/berekening:** terug op de budgetpagina toont "Vrije tijd, hobby's & sport" nu exact besteed **€50/€120 (41,7%)** — precies de gekoppelde transactiewaarde, geen afronding of verschil; de bovenliggende sectie "Leuke dingen & lifestyle" telt de €50 evenredig mee in zijn totaal.
 
 ---

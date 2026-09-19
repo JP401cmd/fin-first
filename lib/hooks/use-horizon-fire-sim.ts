@@ -217,6 +217,15 @@ export interface HorizonFireSimResult {
    */
   stopPadPending?: boolean
   /**
+   * B-057 — True zolang een HERSOLVE van de hoofdlijn onderweg is: de live kernel-invoer
+   * loopt vóór op de deferred, of de worker heeft de laatst geposte hoofdrun nog niet
+   * opgeleverd. Anders dan `isRefining` (alleen de first paint, `result == null`) blijft
+   * dit waar terwijl er al een — verouderd — `result` staat. Consumenten tonen hiermee de
+   * wachtstand op de grafiek zelf ("Projectie bijwerken…") en dempen de oude lijn.
+   * Additief/optioneel in het TYPE — de hook zet altijd een concrete `boolean`.
+   */
+  mainPending?: boolean
+  /**
    * True zolang de worker de hoofd-run nog niet heeft opgeleverd (progressieve first paint,
    * Task 4.2). In de synchrone tak (jsdom/SSR — geen Worker) altijd `false` (de kernel draait
    * meteen in `useMemo`). Consumenten tonen hiermee een subtiele "bijwerken…"-staat terwijl de
@@ -639,6 +648,10 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
   const mainReqIdRef = useRef(0)
   const scenarioReqIdRef = useRef(0)
   const stopPadReqIdRef = useRef(0)
+  // B-057 — "hoofdrun onderweg": gezet bij het posten, gewist zodra het antwoord met
+  // het HOOGSTE reqId landt. Verouderde antwoorden raken 'm niet (reqId-guard), dus
+  // een reeks hersolves blijft één aaneengesloten pending-venster.
+  const [mainInFlight, setMainInFlight] = useState(false)
 
   // Hoofd-run (worker).
   useEffect(() => {
@@ -646,7 +659,7 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
     const reqId = (mainReqIdRef.current += 1)
     const p = deferredKernelInput
     const built = buildInputFromBundle(p)
-    if (!built || !kernelProfileWithBasis) { setAsyncSimMain(null); return }
+    if (!built || !kernelProfileWithBasis) { setAsyncSimMain(null); setMainInFlight(false); return }
     const { input: unifiedInput, cashflows } = built
     const rawContext: ConvergentieRawContext = {
       profile: kernelProfileWithBasis,
@@ -657,9 +670,13 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
       yearlyExpenses: unifiedInput.yearlyExpenses,
     }
     let cancelled = false
-    runKernelAsync(rawContext).then((outcome) => {
+    setMainInFlight(true)
+    // Rijstrook 'main' (B-057/B4): een nieuwere hoofdrun verdringt een nog niet
+    // geposte oudere in `run-in-worker` — verouderd werk bereikt de worker niet meer.
+    runKernelAsync(rawContext, { lane: 'main' }).then((outcome) => {
       if (cancelled || reqId !== mainReqIdRef.current) return
       setAsyncSimMain(mapMainOutcome(outcome, p.lifeEvents ?? [], cashflows))
+      setMainInFlight(false)
     })
     return () => { cancelled = true }
   }, [useWorker, deferredKernelInput])
@@ -685,7 +702,7 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
       yearlyExpenses: built.input.yearlyExpenses,
     }
     let cancelled = false
-    runKernelAsync(rawContext).then((outcome) => {
+    runKernelAsync(rawContext, { lane: 'scenario' }).then((outcome) => {
       if (cancelled || reqId !== scenarioReqIdRef.current) return
       setAsyncScenario(
         outcome.ok
@@ -712,7 +729,7 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
     if (!built) { setAsyncStopPad(null); return }
     const stopInput = buildStopPadInput(p, kernelProfileWithBasis, deferredScenarioOverrides, stopAge, built.input.yearlyExpenses)
     let cancelled = false
-    runForcedStopPathAsync(stopInput).then((res) => {
+    runForcedStopPathAsync(stopInput, { lane: 'stoppad' }).then((res) => {
       if (cancelled || reqId !== stopPadReqIdRef.current) return
       setAsyncStopPad(res)
     })
@@ -768,6 +785,13 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
   // berekenbare invoer is (progressieve first paint). In de synchrone tak nooit true.
   const isRefining = useWorker && simResult == null && canBuildKernelInput
 
+  // B-057 — HERSOLVE van de hoofdlijn onderweg: de live invoer loopt vóór op de deferred
+  // (React's stale-pattern) óf de worker heeft de laatst geposte hoofdrun nog niet
+  // opgeleverd. Anders dan `isRefining` blijft dit ook waar wanneer er al een (oud)
+  // `result` staat — precies het venster waarin de grafiek een verouderde lijn toont.
+  // In de synchrone tak (jsdom/SSR) valt alleen de deferred-vergelijking over.
+  const mainPending = deferredKernelInput !== kernelInput || (useWorker && mainInFlight)
+
   // Snapshot persistentie — debounced upsert naar net_worth_snapshots
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -811,7 +835,7 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
   }, [simResult])
 
   if (!params || !horizonInput) {
-    return { result: null, cashflows: [], isLoading: true, error: profileError ?? null, unifiedRows: null, effectiveLifeEvents: [], kernelStatus: null, kernelMaandHint: null, kernelHousingSale: null, kernelPensionPots: null, aowOntbreekt: false, scenario: null, stopPad: null, scenarioPending: false, stopPadPending: false, isRefining: false, firstPaintFireAge: null, firstPaintFreedomPct: null, firstPaintRequiredPortfolio: null, firstPaintRequiredNetWorth: null }
+    return { result: null, cashflows: [], isLoading: true, error: profileError ?? null, unifiedRows: null, effectiveLifeEvents: [], kernelStatus: null, kernelMaandHint: null, kernelHousingSale: null, kernelPensionPots: null, aowOntbreekt: false, scenario: null, stopPad: null, scenarioPending: false, stopPadPending: false, mainPending: false, isRefining: false, firstPaintFireAge: null, firstPaintFreedomPct: null, firstPaintRequiredPortfolio: null, firstPaintRequiredNetWorth: null }
   }
 
   return {
@@ -830,6 +854,7 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
     stopPad: stopPad ?? null,
     scenarioPending,
     stopPadPending,
+    mainPending,
     isRefining,
     // First-paint-scalars alléén zolang de worker-run nog niet geland is (`result === null`);
     // daarna wint `result`. In de synchrone tak is `result` er meteen → altijd null.

@@ -42,6 +42,12 @@ const ActionSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('guideShown') }),
   /** Eenmalige overname van de oude localStorage-lijst. */
   z.object({ action: z.literal('importLegacy'), keys: z.array(SuggestionKeySchema).max(200) }),
+  /**
+   * W-016 — mag Fin uit zichzelf een tip tonen? Alleen deze vlag; de weggeklikte
+   * sleutels en de dagstempel blijven staan, zodat weer aanzetten niet de hele
+   * catalogus opnieuw losmaakt.
+   */
+  z.object({ action: z.literal('setProactief'), enabled: z.boolean() }),
 ])
 
 export async function PUT(request: Request) {
@@ -79,6 +85,9 @@ export async function PUT(request: Request) {
       break
     case 'guideShown':
       next = { ...current, guideLastShownAt: nowIso }
+      break
+    case 'setProactief':
+      next = { ...current, proactief: parsed.data.enabled }
       break
     case 'importLegacy':
       // Bewust GEEN `lastDismissedAt`: het echte sluitmoment van die oude

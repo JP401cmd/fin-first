@@ -106,14 +106,21 @@ describe('vaste-lasten-loader — draait op de slanke KPI-laag (ADR 0083)', () =
     expect(src).not.toMatch(/monthlyExpenses:\s*kpis\.monthlyExpenses/)
   })
 
-  it('houdt de kalender in dezelfde grens — één wachtpunt op één load', () => {
-    expect(src).toContain('<CashflowKalender')
+  it('rendert alleen de client, zonder kalender en zonder eigen Suspense-grens', () => {
     expect(src).toContain('<VasteLastenClient')
-    // En géén tweede grens erómheen: de kalender hangt aan `cashflow.recurrings`
-    // uit dezelfde `loadCashflowData`, dus een eigen <Suspense> zou een tweede
-    // wachtpunt op één load zijn. Zonder deze regel houdt precies die wijziging
-    // de test groen.
+    // W-017: de cashflow-kalender is van deze pagina verwijderd (component is
+    // weg; "wanneer komt het" blijft via de Agenda-widget). Komt hij terug, dan
+    // hoort hij in DEZELFDE grens — een eigen <Suspense> zou een tweede
+    // wachtpunt op één load zijn.
+    expect(src).not.toContain('CashflowKalender')
     expect(src).not.toContain('<Suspense')
+  })
+
+  it('trekt de werktijd-noemer (loadCoreData-bundel) niet meer binnen (W-017)', () => {
+    // De werktijd-regel is van deze pagina verwijderd; `getCanonicalDailyIncomeRate`
+    // was hier de duurste loader (aandachtspunt `bruto-box1-grondslag-meervoudig`).
+    expect(src).not.toContain('getCanonicalDailyIncomeRate')
+    expect(src).not.toContain('dailyIncomeRate')
   })
 })
 

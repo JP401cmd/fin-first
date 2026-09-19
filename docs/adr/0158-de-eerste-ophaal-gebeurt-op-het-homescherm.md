@@ -175,3 +175,27 @@ app over de AI-keuze praat.
   eerste ophaal — ongewijzigd), ADR 0130 (rondleiding, aandachtsvolgorde),
   ADR 0134 (aandachtsregister), ADR 0155/0157 (AI-keuze), ADR 0156 (de stappen
   die dit gat openlieten).
+
+## Addendum — 19 september 2026: kopij hernoemd naar "categoriseren" (B-059)
+
+Een testgebruiker meldde dat de app twee woorden door elkaar gebruikt voor
+dezelfde handeling. Dit besluit beschreef het aanbod nog met "Nu koppelen",
+"Transacties koppelen" en "Alles gekoppeld" — terwijl de sheet die eronder
+opengaat "Transacties categoriseren" heet, de buurman op dezelfde pagina
+"Bank koppelen" zegt (een ándere handeling) en de rest van de app
+"categoriseren / zonder categorie" gebruikt.
+
+De norm is nu: de handeling heet **categoriseren**, het resultaat
+**gecategoriseerd**, het restant **zonder categorie**. Het woord "koppelen"
+blijft gereserveerd voor verbindingen naar buiten (bank, broker, rekening) of
+tussen objecten (hypotheek↔woning, budget↔spaardoel, grenzenpot↔budget). Het
+aanbod draagt bovendien één zin die de twee woordwerelden verbindt en uitlegt
+wat het oplevert: "Categoriseren is elke transactie bij het juiste budget
+zetten. Daarmee zie je per budget wat erin en eruit gaat."
+
+Alleen kopij, geen gedragswijziging. Twee dingen zijn bewust NIET hernoemd:
+het coachmark-id `budget-transacties-koppelen` (opgeslagen sleutel op de
+profielrij én lid van de dichte allowlist in `app/api/coachmark/route.ts` —
+hernoemen laat het aanbod terugkomen bij iedereen die het al had weggeklikt)
+en de componentnaam `BudgetKoppelNudge`, die daadwerkelijk over het koppelen
+van een bank gaat.

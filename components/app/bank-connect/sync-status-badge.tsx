@@ -11,7 +11,7 @@ import { BANK_DAILY_REQUEST_LIMIT, type BankLinkHealth } from '@/lib/bank-connec
  * ## Leidt niets zelf af (fase 7)
  *
  * Tot fase 7 stond hier een eigen kopie van de afleiding: `status === 'expired'
- * || 'revoked'` plus een `Math.ceil`-som op `token_expires_at` met een eigen
+ * || 'revoked'` plus een `Math.ceil`-som op `consent_expires_at` met een eigen
  * 14-dagendrempel. Diezelfde regels leefden óók op het herkomst-symbool
  * (`components/core/account-source-icon.tsx`) en op de detailkaart — drie
  * afleidingen, drie kansen dat de pil iets anders zegt dan het icoon over

@@ -739,8 +739,8 @@ export function SamenvattingScherm({ assigned, rules, bulkUpdated, skipped, rema
         </p>
         <p className="mt-2 text-sm text-[var(--ink-2)]">
           {assigned === 0
-            ? 'Niets toegewezen'
-            : <>Je hebt <strong className="font-[var(--font-dm-mono)] tabular-nums">{assigned}</strong> {assigned === 1 ? 'transactie' : 'transacties'} toegewezen</>}
+            ? 'Niets gecategoriseerd'
+            : <>Je hebt <strong className="font-[var(--font-dm-mono)] tabular-nums">{assigned}</strong> {assigned === 1 ? 'transactie' : 'transacties'} gecategoriseerd</>}
           {skipped > 0 && <> · {skipped} overgeslagen</>}
         </p>
         {rules > 0 && (
@@ -751,7 +751,7 @@ export function SamenvattingScherm({ assigned, rules, bulkUpdated, skipped, rema
         )}
         {remaining > 0 && (
           <p className="mt-1 text-xs text-[var(--ink-3)]">
-            Nog <strong className="font-[var(--font-dm-mono)] tabular-nums">{remaining}</strong> {remaining === 1 ? 'transactie' : 'transacties'} niet toegewezen — die staan er de volgende keer weer.
+            Nog <strong className="font-[var(--font-dm-mono)] tabular-nums">{remaining}</strong> {remaining === 1 ? 'transactie' : 'transacties'} zonder categorie — die staan er de volgende keer weer.
           </p>
         )}
       </div>

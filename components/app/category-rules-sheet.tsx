@@ -85,7 +85,7 @@ export function CategoryRulesSheet({ budgets, onClose }: CategoryRulesSheetProps
       <div className="p-5">
         {/* Uitleg */}
         <div className="mb-4 rounded-[var(--r)] border border-dashed border-[var(--border-ed)] bg-[var(--subtle)]/50 px-3 py-2 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">
-          Regels koppelen tegenpartijen of omschrijvingen automatisch aan een budget.
+          Regels categoriseren tegenpartijen of omschrijvingen automatisch.
           Nieuwe transacties die overeenkomen worden direct gecategoriseerd.
         </div>
 

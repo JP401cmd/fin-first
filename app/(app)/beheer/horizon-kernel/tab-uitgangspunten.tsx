@@ -76,7 +76,12 @@ export default function TabUitgangspunten({ raw }: { raw: RawInputSummary }) {
                   <td className="py-2 pr-4 text-[var(--ink)]">{a.naam}</td>
                   <td className="py-2 pr-4 text-[var(--ink-3)]">{a.type}</td>
                   <td className="py-2 pr-4 text-right font-mono tabular-nums text-[var(--ink)]">{eur(a.waarde)}</td>
-                  <td className="py-2 pr-4 text-right font-mono tabular-nums text-[var(--ink-2)]">{pct(a.rendementPct)}</td>
+                  <td className="py-2 pr-4 text-right font-mono tabular-nums text-[var(--ink-2)]">
+                    {pct(a.rendementPct)}
+                    {a.rendementBron === 'profiel' && (
+                      <span className="ml-1 text-[10px] text-[var(--ink-4)]">(profiel)</span>
+                    )}
+                  </td>
                   <td className="py-2 text-right font-mono tabular-nums text-[var(--ink-2)]">{eur(a.maandinleg)}</td>
                 </tr>
               ))}
@@ -84,7 +89,7 @@ export default function TabUitgangspunten({ raw }: { raw: RawInputSummary }) {
           </table>
         </div>
         <p className="mt-2 text-[10px] font-mono text-[var(--ink-4)]">
-          bron: assets.current_value / .expected_return / .monthly_contribution
+          bron: assets.current_value / .expected_return / .monthly_contribution — “(profiel)” = geen eigen rendement ingevuld, de kern rekent het profielrendement (profiles.expected_return)
         </p>
       </SectionCard>
 

@@ -23,7 +23,6 @@ function volledig(): OnboardingCompletenessInput {
     assetCount: 2,
     debtCount: 1,
     pensioenResultaat: { regelingen: [] },
-    spaardoel: { label: 'Buffer', amount: 5000 },
     eindstrategieBeantwoord: true,
   }
 }
@@ -38,22 +37,22 @@ function volledigGeskipt(): OnboardingCompletenessInput {
     assetCount: 0,
     debtCount: 0,
     pensioenResultaat: null,
-    spaardoel: null,
     eindstrategieBeantwoord: true,
   }
 }
 
 describe('computeOnboardingCompleteness', () => {
-  it('telt acht onderdelen — het besluit van de eigenaar (incl. pensioen en eindstrategie)', () => {
-    expect(ONBOARDING_TOTAAL_ONDERDELEN).toBe(8)
+  it('telt zeven onderdelen — het besluit van de eigenaar (incl. pensioen en eindstrategie), zonder de geschrapte spaardoel-stap (ADR 0162)', () => {
+    expect(ONBOARDING_TOTAAL_ONDERDELEN).toBe(7)
     expect(ONBOARDING_ONDERDELEN).toContain('pensioen')
     expect(ONBOARDING_ONDERDELEN).toContain('eindstrategie')
-    expect(computeOnboardingCompleteness(volledig()).totaal).toBe(8)
+    expect(ONBOARDING_ONDERDELEN as readonly string[]).not.toContain('spaardoel')
+    expect(computeOnboardingCompleteness(volledig()).totaal).toBe(7)
   })
 
-  it('geeft 8 van 8 en isCompleet bij een volledig ingevulde onboarding', () => {
+  it('geeft 7 van 7 en isCompleet bij een volledig ingevulde onboarding', () => {
     const result = computeOnboardingCompleteness(volledig())
-    expect(result.gevuld).toBe(8)
+    expect(result.gevuld).toBe(7)
     expect(result.open).toEqual([])
     expect(result.isCompleet).toBe(true)
   })
@@ -69,7 +68,6 @@ describe('computeOnboardingCompleteness', () => {
       'bezittingen',
       'schulden',
       'pensioen',
-      'spaardoel',
     ])
   })
 
@@ -85,7 +83,7 @@ describe('computeOnboardingCompleteness', () => {
   it('inkomen/uitgaven: 0 telt als niet ingevuld, een positief bedrag wel', () => {
     const zonderInkomen = computeOnboardingCompleteness({ ...volledig(), netMonthlyIncome: 0 })
     expect(zonderInkomen.perOnderdeel.inkomen).toBe(false)
-    expect(zonderInkomen.gevuld).toBe(7)
+    expect(zonderInkomen.gevuld).toBe(6)
 
     const zonderUitgaven = computeOnboardingCompleteness({ ...volledig(), monthlyExpenses: 0 })
     expect(zonderUitgaven.perOnderdeel.uitgaven).toBe(false)
@@ -107,19 +105,13 @@ describe('computeOnboardingCompleteness', () => {
     })
     expect(geenPosten.perOnderdeel.bezittingen).toBe(false)
     expect(geenPosten.perOnderdeel.schulden).toBe(false)
-    expect(geenPosten.gevuld).toBe(6)
+    expect(geenPosten.gevuld).toBe(5)
   })
 
   it('pensioen: null (overgeslagen) telt niet, een parse-resultaat wel', () => {
     expect(
       computeOnboardingCompleteness({ ...volledig(), pensioenResultaat: null })
         .perOnderdeel.pensioen,
-    ).toBe(false)
-  })
-
-  it('spaardoel: null (geskipt of onvolledig) telt niet', () => {
-    expect(
-      computeOnboardingCompleteness({ ...volledig(), spaardoel: null }).perOnderdeel.spaardoel,
     ).toBe(false)
   })
 
@@ -137,11 +129,11 @@ describe('computeOnboardingCompleteness', () => {
   it('open is altijd in flow-volgorde', () => {
     const result = computeOnboardingCompleteness({
       ...volledig(),
-      spaardoel: null,
+      pensioenResultaat: null,
       netMonthlyIncome: 0,
       debtCount: 0,
     })
-    expect(result.open).toEqual(['inkomen', 'schulden', 'spaardoel'])
+    expect(result.open).toEqual(['inkomen', 'schulden', 'pensioen'])
   })
 })
 

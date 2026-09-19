@@ -22,39 +22,45 @@ import type { DebtQuickInput, QuickAddInput } from '@/lib/quick-add/types'
 import { formatCurrency } from '@/lib/format'
 import { dataNoteFor } from '@/lib/onboarding/data-note-copy'
 import {
+  initialSchuldenPhases,
   phaseKey,
   useSectionPhaseNav,
   type SectionPhase,
 } from './section-phase'
 
 /**
- * Stap — Schulden, als HYBRIDE flow met ALTIJD-uitgang (Boldin-stijl kop,
- * aanvinkraster-staart).
+ * Stap — Schulden, RASTER-FIRST met ALTIJD-uitgang.
  *
- * Structuur (H13, besluit eigenaar 26 aug 2026 — optie C):
+ * Structuur (B-054, eigenaarsbesluit 19 sep 2026 — herziening van H13/26 aug,
+ * ADR 0164):
  *
- *   1. Gerichte ja/nee-vragen voor de meest voorkomende schuldsoorten
- *      (`DEBT_QUESTIONS`, max. 4). Bij "ja" opent de gedeelde `QuickAddWizard`
- *      (mode='collect') voorgeselecteerd op dat type; daarna "Nog een?" tot
- *      "nee".
- *   2. ÉÉN aanvinkraster (`pick-many`) met de volledige catalogus voor de
- *      staart: vink aan wat nog meer van toepassing is, daarna opent de wizard
- *      één keer per aangevinkt type (collect-queue, in rastervolgorde).
+ *   1. ÉÉN aanvinkraster (`pick-many`) met de volledige catalogus, de vier
+ *      meest voorkomende soorten (hypotheek, studielening, persoonlijke lening,
+ *      autolening — CBS/AFM) vooraan onder "Meest voorkomend". Schuldsoorten die
+ *      al via een bezitting zijn opgegeven (hypotheek bij je woning, autolening
+ *      bij je voertuig, RC bij je BV — `LINKED_DEBT_SUGGESTIONS`) staan er
+ *      uitgeschakeld in mét hun herkomst — zichtbaar, niet dubbel opvoerbaar.
+ *   2. De gedeelde `QuickAddWizard` (mode='collect') opent één keer per
+ *      aangevinkt type (collect-queue, in rastervolgorde); ná elke toevoeging
+ *      volgt "Nog een …?" zodat meerdere schulden van hetzelfde type kunnen
+ *      (twee creditcards, twee persoonlijke leningen).
  *   3. Review-overzicht zodra er íets te tonen is.
  *
- * Bij "alles nee" zijn dat 4-5 schermen (2-4 ja/nee + het raster), tegen 8
- * voorheen. Op élk scherm staat — naast "ja"/"nee" — de drempelloze knop
- * "Ik heb (verder) geen schulden" die de hele sectie in één tik afsluit.
+ * Bij "geen schulden" is dat 1 scherm (H13-hybride: 5; daarvóór: 8). Op élk
+ * scherm staat de drempelloze knop "Ik heb (verder) geen schulden" die de
+ * sectie in één tik afsluit.
  *
- * Een ja/nee-vraag wordt OVERGESLAGEN wanneer die schuldsoort al via een
- * bezitting gekoppeld is (hypotheek bij je woning, autolening bij je voertuig,
- * RC bij je BV — `LINKED_DEBT_SUGGESTIONS`). Voorheen gold dat alleen voor de
- * hypotheek; wie een auto mét autolening opgaf kreeg de autolening-vraag
- * alsnog.
+ * HARDE EIS: het herhaalbare blok is de bestaande wizard opnieuw openen, nooit
+ * een eigen inline type+saldo-formulier — dat zou rente/looptijd/aflossingsvorm
+ * op type-defaults zetten en daarmee `monthly_payment`, de box 1-aftrek en de
+ * kernel-uitkomst stil veranderen.
  *
- * De aangevinkte types leven uitsluitend in component-state en gaan bewust
- * NIET het draft in — zie `draft-persistence.ts` (`SENSITIVE_DRAFT_KEYS`,
- * 3 jul 2026: gevoelige onboarding-invoer wordt niet gepersisteerd).
+ * De aangevinkte types en de queue leven uitsluitend in component-state en
+ * gaan bewust NIET het draft in — zie `draft-persistence.ts`
+ * (`SENSITIVE_DRAFT_KEYS`, 3 jul 2026: gevoelige onboarding-invoer wordt niet
+ * gepersisteerd). Een hersteld concept van vóór raster-first (stack op
+ * `ask`/`more`) heelt naar het raster: `healSchuldenPhases` in de orchestrator,
+ * en hier als vangnet in `renderPhase`.
  *
  * "Geld is opgeslagen tijd": schulden zijn hier geframed als *vrijheid die je
  * terugkoopt* — geen nieuw €→tijd-cijfer verzonnen (onboarding kent geen
@@ -81,47 +87,48 @@ export interface OnboardingSchuldenProps {
   onPhasesChange?: (phases: SectionPhase[]) => void
 }
 
-// ── Vragen-volgorde ────────────────────────────────────────────────────
-
-interface DebtQuestion {
-  type: DebtType
-  question: string
-  /** Label voor de "nog een?"-prompt (default = quick-add-label). */
-  moreLabel?: string
-}
+// ── Raster-indeling ────────────────────────────────────────────────────
 
 /**
- * Gerichte ja/nee-vragen — de KOP van de flow: de meest voorkomende
- * schuldsoorten, in aflopende waarschijnlijkheid (CBS/AFM: hypotheek en
- * studielening via DUO zijn veruit de grootste groepen; persoonlijke lening en
- * autolening/private lease volgen). De staart van de catalogus zit in het
- * aanvinkraster (`pick-many`), niet in losse vragen.
- *
- * **Elk type komt hier hoogstens één keer voor.** De vragen "doorlopend
- * krediet" en "roodstand" leverden allebei `debt_type: 'revolving_credit'`
- * terwijl `DebtQuickInput` geen `subtype`-veld draagt (`buildDebtDraft` zet
- * `subtype: null`) — twee vragen, één ononderscheidbare uitkomst. De
- * roodstand-vraag kon dus geen enkel record of getal beïnvloeden en is
- * vervallen; `revolving_credit` is via het raster gewoon bereikbaar. Wordt
- * `subtype` ooit een echt veld op `DebtQuickInput`, dan kan het onderscheid
- * terugkomen — maar dan als subtype-keuze in de wizard, niet als tweede vraag.
- * De telltest in `onboarding-schulden.test.tsx` bewaakt de uniciteit.
+ * De vier meest voorkomende schuldsoorten (CBS/AFM: hypotheek en studielening
+ * via DUO zijn veruit de grootste groepen; persoonlijke lening en autolening/
+ * private lease volgen). Tot B-054 waren dit de vier ja/nee-kopvragen; sinds
+ * raster-first staan ze als "Meest voorkomend" vooraan in het raster, zodat een
+ * hypotheek of studielening niet in een lijst van elf tegels verdwijnt.
+ * Geëxporteerd voor de tests (uniciteit + volgorde).
  */
-const DEBT_QUESTIONS: DebtQuestion[] = [
-  { type: 'mortgage', question: 'Heb je een hypotheek?' },
-  // moreLabel: zonder override erft de vervolgvraag het quick-add-label
-  // 'Studielening (DUO)' en lekt de parenthetical de zin in
-  // ("Nog een studielening (duo)?"). De reeks houdt dezelfde term aan als de
-  // eerste vraag.
-  { type: 'student_loan', question: 'Heb je een studielening?', moreLabel: 'studielening' },
-  { type: 'personal_loan', question: 'Heb je een persoonlijke lening?' },
-  { type: 'car_loan', question: 'Heb je een autolening of private lease?' },
+export const FEATURED_DEBT_TYPES: readonly DebtType[] = [
+  'mortgage',
+  'student_loan',
+  'personal_loan',
+  'car_loan',
 ]
+
+/**
+ * Term in de vervolgvraag "Nog een …?". Zonder override erft die het
+ * quick-add-label en lekt bv. de parenthetical van 'Studielening (DUO)' de zin
+ * in ("Nog een studielening (duo)?"). `revolving_credit` en roodstand delen
+ * één type (`DebtQuickInput` draagt geen subtype) — bewust één tegel.
+ */
+const MORE_LABEL_OVERRIDES: Partial<Record<DebtType, string>> = {
+  student_loan: 'studielening',
+  car_loan: 'autolening of private lease',
+  dga_schuld: 'lening bij je eigen BV',
+  other: 'andere schuld',
+}
+const moreLabelFor = (type: DebtType) =>
+  MORE_LABEL_OVERRIDES[type] ?? DEBT_QUICK_ADD_LABELS[type].toLowerCase()
 
 /** Schuldsoorten die aan een bezitting gekoppeld kunnen zijn (asset → schuld). */
 const LINKABLE_DEBT_TYPES: readonly DebtType[] = Object.values(LINKED_DEBT_SUGGESTIONS)
 
-const SECTION_EXIT_LABEL = 'Ik heb (verder) geen schulden'
+/**
+ * Drempelloze sectie-uitgang. Scherp geformuleerd wanneer er nog niets staat
+ * ("Ik heb geen schulden") — de tegenhanger van elf tegels scannen — en met
+ * "verder" zodra er al een schuld in het overzicht staat.
+ */
+const sectionExitLabel = (hasAnyDebt: boolean) =>
+  hasAnyDebt ? 'Ik heb verder geen schulden' : 'Ik heb geen schulden'
 
 /**
  * Herkomst-label per gekoppeld schuld-type — spiegelt LINKED_DEBT_SUGGESTIONS
@@ -149,27 +156,30 @@ export function OnboardingSchulden({
 }: OnboardingSchuldenProps) {
   /**
    * Schuldsoorten die in de bezittingen-stap al aan een bezitting zijn
-   * gekoppeld — die vraag hoeft niet meer gesteld: de schuld staat al in het
-   * lopende overzicht ("via je woning" / "via je voertuig" / "via je BV").
-   * Geldt voor élk type uit `LINKED_DEBT_SUGGESTIONS`, niet alleen de hypotheek.
+   * gekoppeld — in het raster uitgeschakeld mét herkomst ("via je woning" /
+   * "via je voertuig" / "via je BV"): de schuld staat al in het lopende
+   * overzicht en mag niet dubbel worden opgevoerd. Geldt voor élk type uit
+   * `LINKED_DEBT_SUGGESTIONS`, niet alleen de hypotheek.
    */
-  const linkedQuestionTypes = useMemo(() => {
-    const linked = new Set<DebtType>()
+  const linkedTypeOrigins = useMemo(() => {
+    const linked: Partial<Record<DebtType, string>> = {}
     for (const d of quickDebts) {
-      if (d.linked_client_ref && LINKABLE_DEBT_TYPES.includes(d.debt_type as DebtType)) {
-        linked.add(d.debt_type as DebtType)
+      const type = d.debt_type as DebtType
+      if (d.linked_client_ref && LINKABLE_DEBT_TYPES.includes(type)) {
+        linked[type] = debtOrigin(type)
       }
     }
     return linked
   }, [quickDebts])
-  const questions = useMemo(
-    () => DEBT_QUESTIONS.filter((q) => !linkedQuestionTypes.has(q.type)),
-    [linkedQuestionTypes],
-  )
 
   // Fase-stack (controlled door de orchestrator, anders interne useState). Terug
   // popt één scherm; op de stack-bodem valt 'ie terug op de groep-`onBack`.
-  const { phase, push, back } = useSectionPhaseNav(phases, onPhasesChange, onBack)
+  const { phase: rawPhase, push, replace, back } = useSectionPhaseNav(
+    phases,
+    onPhasesChange,
+    onBack,
+    initialSchuldenPhases,
+  )
   const [wizardType, setWizardType] = useState<DebtType | null>(null)
 
   /**
@@ -180,6 +190,13 @@ export function OnboardingSchulden({
    */
   const [selectedTypes, setSelectedTypes] = useState<DebtType[]>([])
   const [queue, setQueue] = useState<DebtType[] | null>(null)
+
+  // Vangnet voor een niet-geheelde stack van vóór raster-first: de ja/nee-kop
+  // bestaat niet meer, en `more` hoort bij een queue die hier niet loopt.
+  const phase: SectionPhase =
+    rawPhase.kind === 'ask' || (rawPhase.kind === 'more' && queue === null)
+      ? { kind: 'pick-many' }
+      : rawPhase
 
   function toggleSelectedType(type: DebtType) {
     setSelectedTypes((prev) =>
@@ -220,13 +237,24 @@ export function OnboardingSchulden({
 
   // ── Collect-queue (aanvinkraster → wizard per aangevinkt type) ──────
   /**
-   * Start de queue voor de aangevinkte types, in rastervolgorde. De wizard
-   * opent meteen op het eerste type; `queue` houdt de rest vast.
+   * Rastervolgorde = eerst "Meest voorkomend", dan de rest van de catalogus in
+   * `QUICK_ADD_DEBT_ORDER` — de wizard loopt de tegels af zoals ze op het
+   * scherm stonden, niet in aanvink-volgorde.
+   */
+  const rasterOrder = useMemo(
+    () => [
+      ...FEATURED_DEBT_TYPES,
+      ...QUICK_ADD_DEBT_ORDER.filter((t) => !FEATURED_DEBT_TYPES.includes(t)),
+    ],
+    [],
+  )
+
+  /**
+   * Start de queue voor de aangevinkte types. De wizard opent meteen op het
+   * eerste type; `queue` houdt de rest vast.
    */
   function startQueue(types: DebtType[]) {
-    // Rastervolgorde, niet aanvink-volgorde: de wizard loopt de tegels af zoals
-    // ze op het scherm stonden (`QUICK_ADD_DEBT_ORDER`).
-    const ordered = QUICK_ADD_DEBT_ORDER.filter((t) => types.includes(t))
+    const ordered = rasterOrder.filter((t) => types.includes(t))
     if (ordered.length === 0) {
       finishSection()
       return
@@ -235,46 +263,72 @@ export function OnboardingSchulden({
     setWizardType(ordered[0])
   }
 
+  /** Sluit de queue af: review zodra er iets staat, anders blijf op het raster. */
+  function endQueue(collectedNow: boolean, via: 'push' | 'replace') {
+    setQueue(null)
+    setWizardType(null)
+    setSelectedTypes([])
+    // `hasAnyDebt` is in dezelfde render nog de oude waarde — daarom `collectedNow`.
+    if (collectedNow || hasAnyDebt) {
+      if (via === 'replace') replace({ kind: 'review' })
+      else push({ kind: 'review' })
+    } else if (via === 'replace') {
+      // "Nog een?" zonder dat er iets staat kan niet voorkomen; vangnet.
+      back()
+    }
+    // Niets toegevoegd (alles geannuleerd) → blijf op het raster staan i.p.v.
+    // de gebruiker ongevraagd de sectie uit te sturen.
+  }
+
   /**
-   * Volgende type uit de queue, of de queue afronden. `collectedNow` zegt of er
-   * zojuist een schuld is toegevoegd — `hasAnyDebt` is in dezelfde render nog
-   * de oude waarde, dus daar niet op leunen.
+   * Na "Nee" op "Nog een …?": het volgende type uit de queue, of afronden. De
+   * "nog een?"-fase gaat eraf (pop) resp. wordt het review (replace) — één
+   * state-update per pad, zodat er nooit op een verouderde stack wordt gerekend.
    */
-  function advanceQueue(collectedNow: boolean) {
+  function continueQueueAfterMore() {
+    const rest = queue ?? []
+    if (rest.length > 0) {
+      setQueue(rest.slice(1))
+      back() // "nog een?" eraf → het raster, met de wizard eroverheen
+      setWizardType(rest[0])
+      return
+    }
+    endQueue(true, 'replace')
+  }
+
+  /** De wizard geannuleerd midden in de queue = "sla dit type over". */
+  function skipQueuedType() {
     const rest = queue ?? []
     if (rest.length > 0) {
       setQueue(rest.slice(1))
       setWizardType(rest[0])
       return
     }
-    setQueue(null)
-    setWizardType(null)
-    setSelectedTypes([])
-    if (collectedNow || hasAnyDebt) push({ kind: 'review' })
-    // Niets toegevoegd (alles geannuleerd) → blijf op het raster staan i.p.v.
-    // de gebruiker ongevraagd de sectie uit te sturen.
+    endQueue(false, 'push')
   }
 
   // ── Wizard-collect ──────────────────────────────────────────────────
   function handleWizardCollect(item: QuickAddInput) {
-    if (item.kind === 'debt') {
-      onDebtsChange([...quickDebts, item.debt])
-    }
-    // 'asset' / 'asset_with_debt' kunnen in de schuld-sectie niet voorkomen.
+    if (item.kind !== 'debt') return // 'asset' kan in de schuld-sectie niet voorkomen.
+    onDebtsChange([...quickDebts, item.debt])
+    setWizardType(null)
     if (queue !== null) {
-      advanceQueue(true)
+      // Ná elke toevoeging in de queue: "Nog een …?" — zo kunnen twee schulden
+      // van hetzelfde type (de tweede helft van melding B-054). Vanuit de
+      // "nog een?"-fase zelf blijft die fase gewoon staan.
+      if (phase.kind !== 'more') {
+        push({ kind: 'more', qIndex: QUICK_ADD_DEBT_ORDER.indexOf(item.debt.debt_type as DebtType) })
+      }
       return
     }
-    setWizardType(null)
-    if (phase.kind === 'ask') push({ kind: 'more', qIndex: phase.qIndex })
-    else if (phase.kind === 'other-pick') back() // terug naar het review-overzicht
-    // 'more' → geen push, de "nog een?"-fase blijft staan.
+    if (phase.kind === 'other-pick') back() // terug naar het review-overzicht
   }
 
   function handleWizardClose() {
-    // Midden in een queue = "sla deze over", niet "stop alles".
-    if (queue !== null) {
-      advanceQueue(false)
+    // Midden in de queue (raster → wizard) = "sla deze over", niet "stop alles".
+    // Vanuit "Nog een?" → gewoon dicht, de vraag blijft staan.
+    if (queue !== null && phase.kind !== 'more') {
+      skipQueuedType()
       return
     }
     setWizardType(null)
@@ -284,17 +338,9 @@ export function OnboardingSchulden({
     onDebtsChange(quickDebts.filter((_, i) => i !== idx))
   }
 
-  function nextAfterQuestion(qIndex: number) {
-    if (qIndex + 1 < questions.length) {
-      push({ kind: 'ask', qIndex: qIndex + 1 })
-    } else {
-      push({ kind: 'pick-many' })
-    }
-  }
-
   // Sectie afronden: zodra er íets te tonen is (losse óf gekoppelde schuld)
   // eerst een bevestigend overzicht, anders direct door. De altijd-zichtbare
-  // drempelloze uitgang (`SECTION_EXIT_LABEL`) blijft bewust direct-naar-onNext.
+  // drempelloze uitgang (`sectionExitLabel`) blijft bewust direct-naar-onNext.
   function finishSection() {
     if (hasAnyDebt) push({ kind: 'review' })
     else onNext()
@@ -348,50 +394,42 @@ export function OnboardingSchulden({
     />
   )
 
-  const sharedVraagProps = {
-    kicker: 'Schuld',
-    romanNum: 'iv.',
-    factsPanel,
-    currentStep,
-    totalSteps,
-    onBack: back,
-    exitLabel: SECTION_EXIT_LABEL,
-    onExit: onNext,
-  }
+  const exitLabel = sectionExitLabel(hasAnyDebt)
 
   function renderPhase() {
-    if (phase.kind === 'ask' || phase.kind === 'more') {
-      const q = questions[phase.qIndex]
-      const isMore = phase.kind === 'more'
-      const moreLabel = q.moreLabel ?? DEBT_QUICK_ADD_LABELS[q.type].toLowerCase()
-      const title = isMore ? <span>Nog een {moreLabel}?</span> : <span>{q.question}</span>
+    // "Nog een …?" ná een toevoeging uit de queue: zelfde type nog eens (de
+    // wizard opnieuw — nooit een eigen formulier), of door met de queue.
+    if (phase.kind === 'more') {
+      const type = QUICK_ADD_DEBT_ORDER[phase.qIndex] ?? 'other'
       return (
         <OnboardingVraag
-          {...sharedVraagProps}
-          title={title}
-          deck={
-            isMore
-              ? 'Voeg er gerust meer toe — of ga door naar de volgende vraag.'
-              : 'Een schuld is vrijheid die je stap voor stap terugkoopt — met het bedrag en de rente reken ik uit wanneer je vrij bent. Heb je deze niet? Tik op "Nee".'
-          }
-          // Alleen bij de ingang van de sectie; op elke micro-vraag herhalen
-          // maakt er een refrein van (UR3-10, één ding tegelijk).
-          dataNote={
-            !isMore && phase.qIndex === 0 ? dataNoteFor('schulden') : undefined
-          }
-          onYes={() => setWizardType(q.type)}
-          onNo={() => nextAfterQuestion(phase.qIndex)}
+          kicker="Schuld"
+          romanNum="iv."
+          factsPanel={factsPanel}
+          currentStep={currentStep}
+          totalSteps={totalSteps}
+          title={<span>Nog een {moreLabelFor(type)}?</span>}
+          deck="Voeg er gerust meer toe — of ga door."
+          onBack={() => {
+            // Terug naar het raster = de lopende queue laten vallen; wat al is
+            // toegevoegd blijft in het overzicht staan.
+            setQueue(null)
+            setSelectedTypes([])
+            back()
+          }}
+          exitLabel={exitLabel}
+          onExit={onNext}
+          onYes={() => setWizardType(type)}
+          onNo={continueQueueAfterMore}
         >
           {runningList}
         </OnboardingVraag>
       )
     }
 
-    // Aanvinkraster — de STAART van de sectie in één scherm. Vervangt de losse
-    // ja/nee-vragen voor creditcard, doorlopend krediet, belastingschuld,
-    // familielening enz. plus de oude "Heb je nog een andere schuld?"-stap.
-    // Volledige catalogus (geen `exclude`): wie hierboven "nee" zei maar zich
-    // alsnog iets herinnert, vinkt het hier gewoon aan. De drempelloze
+    // Aanvinkraster — de INGANG van de sectie, in één scherm: de volledige
+    // catalogus met de vier meest voorkomende soorten vooraan en de al via een
+    // bezitting opgegeven soorten uitgeschakeld mét herkomst. De drempelloze
     // sectie-uitgang blijft bewust altijd bereikbaar.
     if (phase.kind === 'pick-many') {
       const count = selectedTypes.length
@@ -401,10 +439,11 @@ export function OnboardingSchulden({
           romanNum="iv."
           title={
             <span>
-              Welke van deze heb je <em className="font-normal italic">nog meer</em>?
+              Welke <em className="font-normal italic">schulden</em> heb je?
             </span>
           }
-          deck="Vink alles aan wat van toepassing is — daarna vul je per schuld het bedrag in. Elke schuld is vrijheid die je stap voor stap terugkoopt. Niets van toepassing? Ga gewoon verder."
+          deck="Vink alles aan wat van toepassing is — denk ook aan een hypotheek of studielening. Daarna vul je per schuld het bedrag in; elke schuld is vrijheid die je stap voor stap terugkoopt. Geen schulden? Ga gewoon verder."
+          dataNote={dataNoteFor('schulden')}
           factsPanel={factsPanel}
           currentStep={currentStep}
           totalSteps={totalSteps}
@@ -420,15 +459,15 @@ export function OnboardingSchulden({
                   ? `Verder met ${count} schuld${count === 1 ? '' : 'en'}`
                   : 'Verder — geen van deze'}
               </button>
-              {/* Drempelloze sectie-uitgang blijft — net als op elke ja/nee-vraag
-                  (slaat het review-overzicht bewust over → direct door). */}
+              {/* Drempelloze sectie-uitgang (slaat het review-overzicht bewust
+                  over → direct door). */}
               <button
                 type="button"
                 onClick={onNext}
                 className="min-h-11 text-xs italic text-[var(--ink-3)] underline-offset-4 transition-colors hover:text-[var(--ink-2)] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
                 style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
               >
-                {SECTION_EXIT_LABEL}
+                {exitLabel}
               </button>
             </div>
           }
@@ -436,6 +475,8 @@ export function OnboardingSchulden({
           <div className="space-y-6">
             {runningList}
             <DebtTypeMultiPicker
+              featured={FEATURED_DEBT_TYPES}
+              linked={linkedTypeOrigins}
               selected={selectedTypes}
               onToggle={toggleSelectedType}
             />

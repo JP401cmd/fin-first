@@ -40,7 +40,7 @@ type Situatie = {
   providerName?: string | null
   providerLogo?: string | null
   status?: string | null
-  tokenExpiresAt?: string | null
+  consentExpiresAt?: string | null
   lastSyncedAt?: string | null
   dailyRequests?: number
   rateLimitResetDate?: string | null
@@ -52,7 +52,7 @@ function makeAccount(s: Situatie = {}): Account {
     providerName = 'ING',
     providerLogo = null,
     status = 'active',
-    tokenExpiresAt = null,
+    consentExpiresAt = null,
     lastSyncedAt = '2026-07-01T08:00:00Z',
     dailyRequests = 0,
     rateLimitResetDate = null,
@@ -68,7 +68,7 @@ function makeAccount(s: Situatie = {}): Account {
     health: deriveBankLinkHealth({
       linkIsActive: true,
       connectionStatus: status,
-      tokenExpiresAt,
+      consentExpiresAt,
       lastSyncedAt,
     }),
     bank_account_id: 'ba-1',
@@ -101,7 +101,7 @@ const verlopen = makeAccount({ status: 'expired' })
 
 /** Een koppeling die nog werkt maar binnen de drempel verloopt. */
 function verlooptBinnenkort(days: number) {
-  return makeAccount({ tokenExpiresAt: new Date(Date.now() + days * DAY_MS).toISOString() })
+  return makeAccount({ consentExpiresAt: new Date(Date.now() + days * DAY_MS).toISOString() })
 }
 
 const HERSTEL_KNOP = /Verbind opnieuw/i
@@ -182,7 +182,7 @@ describe('ConnectedAccountCard — verbinding kwijt', () => {
   it('toont NIET de 14-dagen-vooraankondiging (die twee sluiten elkaar uit)', () => {
     renderCard(
       // Verlopen status én een datum binnen de drempel: de toestand wint.
-      makeAccount({ status: 'expired', tokenExpiresAt: new Date(Date.now() + 5 * DAY_MS).toISOString() }),
+      makeAccount({ status: 'expired', consentExpiresAt: new Date(Date.now() + 5 * DAY_MS).toISOString() }),
     )
 
     expect(screen.getByText(KWIJT_BAND)).toBeTruthy()

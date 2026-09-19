@@ -196,6 +196,40 @@ describe('ProjectieBlock — planeinde, euro-weergave en tekort-meldingen (B-043
     expect(blok).toContain(copy.lijn)
   })
 
+  // B-050 (19 sep 2026): het rapport toont dezelfde instelling-/knoppen-zinnen als het
+  // /toekomst-blok — óók de uitleg dat de lening onder een vast stopmoment blijft
+  // ondanks "Geen tekort-lening in mijn plan".
+  it('toont de instelling-zin (vast stopmoment + instelling aan), de knoppen-zin en de link naar de instelling', () => {
+    const copy = buildDeficitLoanCopy({
+      firstAge: 72,
+      clearedAge: null,
+      housing: null,
+      aowAge: 67,
+      displayEndAge: 90,
+      isPensioenMode: false,
+      homeExcludedFromFire: false,
+      geenTekortLeningAan: true,
+      vastStopmoment: true,
+      peakText: '€ 42.000',
+      freedomText: null,
+    })
+    render(
+      <ProjectieBlock
+        projectie={{ ...projectieOk, tekortLening: { firstAge: 72, peak: 42_000, copy } }}
+        dailyExpenseRate={100}
+        num="x."
+      />,
+    )
+    const blok = screen.getByTestId('tekort-lening-blok')
+    const tekst = blok.textContent ?? ''
+    expect(copy.instelling).toMatch(/gekozen stopmoment/)
+    expect(tekst).toContain(copy.instelling)
+    expect(tekst).toContain(copy.knoppen)
+    const link = blok.querySelector('a[href="/toekomst/voorkeuren?regel=eindstrategie"]')
+    expect(link).not.toBeNull()
+    expect(link?.textContent).toMatch(/tekort-lening mag/)
+  })
+
   it('zonder tekort: geen meldingen', () => {
     render(<ProjectieBlock projectie={projectieOk} dailyExpenseRate={100} num="x." />)
     expect(screen.queryByTestId('anchor-shortfall-blok')).toBeNull()

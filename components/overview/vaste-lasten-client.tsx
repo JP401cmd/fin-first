@@ -6,19 +6,28 @@
  * weergavemodus:
  *
  *   Eenvoudig → hoofdcijfer €/mnd + vrijheidstijd-onderschrift + OORDEELREGEL
- *               (deck) + quote-meter + abonnementen-sluipverbruik + top-5
- *               grootste posten; de volle lijst zit achter "Alle {n} posten".
- *   Volledig  → ONGEWIJZIGD: compacte aandeel-meter, de volle lijst direct, en
- *               daaronder de uitgebreide inzicht-blokken (VasteLastenInsights)
+ *               (deck, één regel) + de volle lijst (abonnementen + vaste
+ *               kosten) DIRECT + quote-meter + abonnementen-sluipverbruik.
+ *   Volledig  → compacte aandeel-meter, de volle lijst direct, quote-meter +
+ *               sluipverbruik, en daaronder de samenstelling (VasteLastenInsights)
  *               onder <HideInSimple>.
  *
- * ── S2 · duiding boven reductie (release R5) ────────────────────────────────
- * Eenvoudig hield hiervóór precies het verkeerde over: het lángste element (de
- * volle lijst met alle posten) bleef staan, terwijl de korte blokken die er
- * BETEKENIS aan gaven — de quote met Nibud-context en het abonnementen-
- * sluipverbruik mét opzegknop — achter <HideInSimple> verdwenen. De selectie is
- * omgedraaid: eerst het oordeel, dan de handeling, dan de vijf grootste posten;
- * de volledige lijst blijft één klik weg in een <DepthSection>.
+ * ── W-017 · de lijst bovenaan, óók in Eenvoudig (19-09-2026) ───────────────
+ * HERZIET het S2-besluit VL-1 ("duiding boven reductie", audit 28-08-2026,
+ * docs/eenvoudige-weergave-audit.md). S2 zette in Eenvoudig eerst drie
+ * duidingsblokken en daarna een top-5, met de volle lijst achter een
+ * <DepthSection>. Eigenaarsbesluit: de posten zelf zijn wat je hier komt
+ * bekijken — de lijst staat nu in beide modi direct onder het cijfer, de top-5
+ * is daarmee een duplicaat en vervalt, en de ene oordeelregel ervóór bewaart de
+ * S2-les zonder de lijst weg te drukken. Beide modi delen zo dezelfde
+ * ruggengraat (cijfer → lijst → quote → sluipverbruik); Eenvoudig mist alleen
+ * de compacte meter en de samenstelling. Tegelijk verwijderd (in beide modi):
+ * "In vrijheidstijd" (dubbelde het onderschrift van het hoofdcijfer), "Wat als
+ * ik opzeg" en de cashflow-kalender ("wanneer komt het" blijft via de
+ * Agenda-widget).
+ *
+ * ── S2 · de oordeelregel (release R5) ───────────────────────────────────────
+ * Wat van S2 blijft: het oordeel staat vóór de lijst, als één regel.
  *
  * TWEE COPY-ROLLEN, BEWUST GESCHEIDEN (risico 1 uit de S2-analyse). Bij
  * warn/bad staat de `PageStatusBanner` (mount: app/(app)/overzicht/layout.tsx,
@@ -49,7 +58,6 @@ import { useRouter } from 'next/navigation'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { EditorialDeck, PageOpeningFigure } from '@/components/editorial'
 import { HideInSimple } from '@/components/app/hide-in-simple'
-import { DepthSection } from '@/components/app/depth-section'
 import { BesprekMetWillButton } from '@/components/app/chat/bespreek-met-fin-button'
 import { OpzegModal } from '@/components/app/opzeg-modal'
 import {
@@ -60,7 +68,6 @@ import {
   VasteLastenInsights,
   VasteLastenAbonnementenBlok,
   VasteLastenQuoteBlok,
-  VasteLastenTopPostenBlok,
 } from '@/components/overview/vaste-lasten-insights'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import { formatCurrency } from '@/lib/format'
@@ -237,8 +244,8 @@ export function VasteLastenClient({
       (insights.largestItem ? ` Grootste post: ${insights.largestItem.name}.` : '')
     : 'Ik heb nog geen vaste lasten in beeld.'
 
-  // Eén definitie van de volle lijst; alleen zijn OMHULSEL verschilt per modus
-  // (zie hieronder). Zo kan de lijst niet uiteenlopen tussen Eenvoudig en
+  // Eén definitie van de volle lijst, in beide modi identiek en direct op de
+  // pagina (W-017). Zo kan de lijst niet uiteenlopen tussen Eenvoudig en
   // Volledig, en blijven de opzeg-/classificeer-flows in beide modi identiek.
   const lijst = (
     <VasteKostenAnalyse
@@ -328,39 +335,29 @@ export function VasteLastenClient({
         )}
       </div>
 
-      {/* ── Duiding vóór de lijst (alleen Eenvoudig) ──
-             Quote-meter (het oordeel mét zones), sluipverbruik (de enige directe
-             handeling op deze pagina) en de vijf grootste posten. Zonder inkomen
-             zegt de QuoteMeter alleen "vul je inkomen in" — dat staat dan al met
-             een werkende link in de deck hierboven, dus laten we 'm daar weg. */}
-      {isSimple && insights.hasData && (
+      {/* ── De volledige lijst — beide modi, direct onder het cijfer (W-017) ──
+             Bewust GEEN wikkel: DepthSection is zelf een bordered card en zou de
+             analyse-kaart in een tweede kaart zetten. */}
+      {lijst}
+
+      {/* ── Duiding ná de lijst (beide modi) ──
+             Quote-meter (het oordeel mét zones) en sluipverbruik (de enige
+             directe handeling op deze pagina). In Eenvoudig zegt de QuoteMeter
+             zonder inkomen alleen "vul je inkomen in" — dat staat daar al met een
+             werkende link in de deck bovenaan, dus laten we 'm dan weg; in
+             Volledig blijft hij staan zoals hij stond. */}
+      {insights.hasData && (
         <div className="space-y-4">
-          {insights.ratioPct != null && <VasteLastenQuoteBlok insights={insights} />}
+          {(!isSimple || insights.ratioPct != null) && (
+            <VasteLastenQuoteBlok insights={insights} />
+          )}
           <VasteLastenAbonnementenBlok insights={insights} onOpzeg={handleOpzegFromBlock} />
-          <VasteLastenTopPostenBlok insights={insights} />
         </div>
       )}
 
-      {/* ── De volledige lijst ──
-             Volledig: ongewijzigd, direct op de pagina. Eenvoudig: achter
-             "Alle {n} posten" (DepthSection — daar standaard ingeklapt). Bewust
-             GEEN wikkel in Volledig: DepthSection is zelf een bordered card en
-             zou de analyse-kaart in een tweede kaart zetten, terwijl "Volledig
-             verandert niet" het acceptatiecriterium van deze release is. */}
-      {isSimple ? (
-        <DepthSection
-          title={`Alle ${insights.count} posten`}
-          summary={`${insights.subscriptionCount} abonnementen · ${insights.vasteKostenCount} vaste kosten`}
-        >
-          {lijst}
-        </DepthSection>
-      ) : (
-        lijst
-      )}
-
-      {/* ── Uitgebreide inzichten (alleen Volledig) ── */}
+      {/* ── Verdieping (alleen Volledig): samenstelling per categorie ── */}
       <HideInSimple>
-        <VasteLastenInsights insights={insights} onOpzeg={handleOpzegFromBlock} />
+        <VasteLastenInsights insights={insights} />
       </HideInSimple>
 
       {/* ── Opzeg-flow ── */}

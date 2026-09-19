@@ -21,6 +21,7 @@ import {
   filterAssetsForFire,
   isHousingStrategyEvent,
   projectMortgageStateAt,
+  projectEigenHuisValuesAt,
   HOUSING_STRATEGY_EVENT_ID_PREFIX,
   HOUSING_STRATEGY_EVENT_SOURCE,
   DEFAULT_HOUSING_STRATEGY,
@@ -2195,5 +2196,71 @@ describe('fix #2: on_depletion trigger met portfolio-rendement', () => {
       config: baseInput.config,
     })
     expect(events[0].target_age).toBe(52)
+  })
+})
+
+// ── ADR 0166 — woning zonder eigen rendement (null) vs bewuste 0 ──────────────
+//
+// `Number(null) === 0`: een woning zonder eigen rendementsaanname groeide hier
+// stil 0% terwijl de kernel het huis-pot op het profielrendement laat groeien.
+// Keuze (a): `projectEigenHuisValuesAt` krijgt een optionele terugval in
+// procenten; `getHousingLifeEvents` leidt 'm af uit `grossReturn`. Weggelaten →
+// oude nul-basis. De vier "WOZ-groei wint"-fixtures hierboven leunen op
+// `expected_return: 0` als BEWUSTE nul — die mag nooit stil naar de terugval
+// (dat is meteen de regressietest op het niet-backfillen van de migratie).
+describe('ADR 0166: eigen woning zonder eigen rendement valt terug op het profielrendement', () => {
+  const nullHuis: Asset = makeEigenHuis({
+    id: 'asset-eigen-huis-null',
+    expected_return: null,
+    current_value: 500_000,
+    woz_value: 480_000,
+  })
+
+  it('null mét terugval (2,5%) groeit exact zoals een huis met eigen 2,5%', () => {
+    const viaTerugval = projectEigenHuisValuesAt([nullHuis], 240, 2.5)
+    const viaEigen = projectEigenHuisValuesAt([makeEigenHuis({ expected_return: 2.5, current_value: 500_000, woz_value: 480_000 })], 240)
+    expect(viaTerugval.wozValue).toBeCloseTo(viaEigen.wozValue, 6)
+    expect(viaTerugval.currentValue).toBeCloseTo(viaEigen.currentValue, 6)
+    expect(viaTerugval.wozValue).toBeCloseTo(480_000 * Math.pow(1.025, 20), 6)
+  })
+
+  it('null zónder terugval blijft de oude nul-basis (bestaande callers byte-identiek)', () => {
+    const r = projectEigenHuisValuesAt([nullHuis], 240)
+    expect(r.wozValue).toBe(480_000)
+    expect(r.currentValue).toBe(500_000)
+  })
+
+  it('een bewuste 0 groeit NIET, ook mét terugval — stableEigenHuis blijft de WOZ-fixture', () => {
+    const r = projectEigenHuisValuesAt([stableEigenHuis], 240, 2.5)
+    expect(r.wozValue).toBe(480_000)
+    expect(r.currentValue).toBe(500_000)
+  })
+
+  it('getHousingLifeEvents: downsize-opbrengst van een null-huis groeit op grossReturn', () => {
+    const ctx: HousingContext = { ...standardContext, eigenHuisAssets: [nullHuis] }
+    const config = {
+      mode: 'downsize' as const,
+      trigger: 'fixed_age' as const,
+      triggerAge: 65,
+      depletionThresholdYears: 2,
+      salePricePct: 1.0,
+      salesCostsPct: 0.04,
+      newMonthlyHousingCost: null,
+    }
+    type Meta = { saleProceeds: number; wozValueAtTrigger: number }
+    const zonder = getHousingLifeEvents({ context: ctx, currentAge: 45, endAge: 90, yearlyExpenses: 30_000, currentLiquidPortfolio: 200_000, config })
+    const met = getHousingLifeEvents({ context: ctx, currentAge: 45, endAge: 90, yearlyExpenses: 30_000, currentLiquidPortfolio: 200_000, config, grossReturn: 0.025 })
+    // Zonder grossReturn: oude nul-basis — WOZ blijft 480K, sale = 480K × 0,96 − 250K = 210.800.
+    const zonderMeta = zonder[0].metadata as Meta
+    expect(zonderMeta.wozValueAtTrigger).toBe(480_000)
+    expect(zonderMeta.saleProceeds).toBeCloseTo(210_800, 6)
+    // Mét grossReturn 2,5% over 20 jaar: exact het pad van het "eigen 2,5%"-huis hierboven.
+    // Tolerantie ABSOLUUT op 1e-6 euro: het is dezelfde formule op dezelfde invoer,
+    // alleen via een andere parameter — een ruimere marge zou een echte
+    // grondslagafwijking (bv. 1 jaar te weinig compounding) kunnen verbergen.
+    const metMeta = met[0].metadata as Meta
+    const verwachtWoz = 480_000 * Math.pow(1.025, 20)
+    expect(metMeta.wozValueAtTrigger).toBeCloseTo(verwachtWoz, 6)
+    expect(metMeta.saleProceeds).toBeCloseTo(verwachtWoz * 0.96 - 250_000, 6)
   })
 })

@@ -134,7 +134,7 @@ export async function POST(req: Request) {
     .map(s => `- ${sanitizeForAI(s.name, sanitizeOpts)}: €${s.monthlyAmount.toFixed(2)}/maand (${s.frequency}, zekerheid: ${s.confidence})`)
     .join('\n')
 
-  const systemPrompt = `Je bent Fin, de financiële vrijheidsassistent van TriFinity. Je filosofie: "Geld is opgeslagen tijd — elke euro vertegenwoordigt een stukje levenstijd."
+  const systemPrompt = `Je bent Fin, de financiële vrijheidsassistent van TriFinity. Je filosofie: "Geld levert tijd op — elk bedrag staat voor tijd waarin je uitgaven gedekt zijn." Schrijf nooit dat iemand tijd koopt, vrijkoopt of terugkoopt.
 
 Je taak: geef abonnementen-advies. Beoordeel elk abonnement als:
 - "nuttig": duidelijke waarde, geen overlap met andere abonnementen, behoud aanbevolen

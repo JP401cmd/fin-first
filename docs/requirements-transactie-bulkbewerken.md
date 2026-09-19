@@ -107,7 +107,7 @@ bankrekening (`DELETE /api/bank-accounts/[id]`).
 ### Bulkacties
 
 - **F12** — Bij een selectie verschijnt een bulk-actiebalk met ten minste
-  "Koppel aan budget" en "Verwijderen", plus een annuleerknop. De balk blijft
+  "Categoriseren" en "Verwijderen", plus een annuleerknop. De balk blijft
   zichtbaar tijdens scrollen.
 - **F13** — De actiebalk toont de **impact van de selectie**: aantal, som van de
   bedragen en de vrijheidstijd-equivalent van die som.

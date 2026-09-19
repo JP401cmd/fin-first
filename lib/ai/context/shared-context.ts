@@ -12,6 +12,7 @@ import { deflate, factorAtAge } from '@/lib/euro-display'
 import { buildWillFinancialFacts } from './fin-financial-facts'
 import { formatAowAge } from '@/lib/aow-leeftijd'
 import { buildDataFreshnessLine } from './data-freshness'
+import { buildPlanInstellingenLines } from './plan-context'
 import { section, formatCurrency, formatFreedomTime, formatPercentage } from './formatter'
 
 const TEMPORAL_LABELS: Record<number, string> = {
@@ -160,7 +161,14 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
     loadCoreData(supabase),
     supabase
       .from('profiles')
-      .select('temporal_balance, household_type, financial_context, housing_strategy_config')
+      // `fire_no_deficit_loan, deficit_loan_rate` erbij (kaart "Fin kent je
+      // plan-instellingen niet", laag A): ze horen bij de plan-regels hieronder en
+      // zijn de TERUGVAL voor het geval de kernel-run niet draaide — dan is er geen
+      // `horizonRun.rawContext.profile`. Twee kolommen op een select die er toch al
+      // was, dus geen extra round-trip.
+      .select(
+        'temporal_balance, household_type, financial_context, housing_strategy_config, fire_no_deficit_loan, deficit_loan_rate',
+      )
       .maybeSingle(),
     // DEZELFDE canonieke FIRE-run die `loadCoreData` al consumeert
     // (`computeHorizonFireTarget` → `computeHorizonFireSim`, React-`cache()`'d).
@@ -210,7 +218,7 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
   }
   const core = computeCoreData(coreInput, coreData.fireParams.effectiveSwr)
 
-  // Netto vermogen, vrijgekochte tijd, vrijheids-% en FIRE-doel komen ALLE uit de
+  // Netto vermogen, opgebouwde vrijheidstijd, vrijheids-% en FIRE-doel komen ALLE uit de
   // gedeelde extractor `buildWillFinancialFacts` — DEZELFDE bron die de lokale Fin
   // (`buildLocalChatOverview`) leest, zodat beide Fins exact dezelfde getallen op
   // dezelfde grondslag tonen. `facts.nettoVermogen/freedomYears/freedomMonths` zijn
@@ -236,7 +244,12 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
   // run, D7 — één extra bisectie, React-cache()'d, alléén onder een vast anker), tot
   // waar het liquide vermogen reikt, de eindleeftijd en de dekking. `firePlan` is
   // optioneel gelezen zodat een gemockte Kern-bundel zonder het veld `solved` blijft.
-  const anchor: StopAnchor = coreData.firePlan?.anchor ?? { kind: 'solved' }
+  // ÉÉN plan-lezing voor anker én plan-regels (review 19 sep 2026): las het anker
+  // alleen `coreData.firePlan` en de plan-regels óók de run, dan kon een gedegradeerde
+  // Kern-bundel met een vast anker in de run een plan-eindleeftijd printen zónder
+  // anker-regel — twee lezingen van hetzelfde plan in één prompt.
+  const firePlan = coreData.firePlan ?? horizonRun?.firePlan ?? null
+  const anchor: StopAnchor = firePlan?.anchor ?? { kind: 'solved' }
   const anchorFixed = isFixedAnchor({ anchor })
   const solvedFireAge = anchorFixed ? await computeHorizonSolvedFireAge(supabase).catch(() => null) : null
   const ankerRegel = anchorFixed
@@ -253,10 +266,27 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
               }),
             )
           : null,
-        endAge: horizonRun?.sim.displayEndAge ?? coreData.firePlan?.endAge ?? null,
+        endAge: horizonRun?.sim.displayEndAge ?? firePlan?.endAge ?? null,
         coveragePct: freedomPercentage,
       })
     : null
+
+  // ── De plan-instellingen (kaart "Fin kent je plan-instellingen niet") ────────
+  // Tekort-lening, opeethypotheek en eind-vorm bereikten het model in géén enkel
+  // geval; onder `solved` — precies het geval waar de eindsituatie-melding over gaat
+  // — bereikte zelfs geen enkel plan-veld het model. Nul extra queries en nul extra
+  // engine-runs: `horizonRun` is de al-gedraaide, React-`cache()`'de canonieke run en
+  // `rawContext.profile` is de EIGEN profielrij (nooit `rawContext.partner` — zie de
+  // moduledoc van plan-context.ts). Zonder run vallen we terug op de losse
+  // profiel-select, zodat de instellingen ook dan meegaan.
+  const planLines = buildPlanInstellingenLines({
+    firePlan,
+    // `rawContext?.` — dezelfde tolerantie als `unifiedRows ?? []` in de run zelf:
+    // gedegradeerde/stub-uitkomsten mogen het veld missen; dan telt de profiel-select.
+    profile: horizonRun?.rawContext?.profile ?? profile ?? null,
+    anchorFixed,
+    eindsituatie: horizonRun?.eindsituatie ?? null,
+  })
 
   const lines = [
     // HET VOORBEHOUD STAAT VÓÓR DE CIJFERS (UR3-22). Rusten de transactie-
@@ -266,7 +296,7 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
     // data, dus in het normale geval kost deze regel geen token.
     buildDataFreshnessLine(coreData.latestTransactionMonth),
     `Netto vermogen: ${formatCurrency(facts.nettoVermogen)}`,
-    `Vrijgekochte tijd: ${formatFreedomTime(facts.freedomYears, facts.freedomMonths)}`,
+    `Opgebouwde vrijheidstijd: ${formatFreedomTime(facts.freedomYears, facts.freedomMonths)}`,
     `Vrijheids-%: ${formatPercentage(freedomPercentage)}`,
     // Toon het FIRE-doel op dezelfde grondslag als het Vrijheids-% — zo zijn
     // teller, noemer en doelbedrag onderling consistent. Kwam het doel uit de
@@ -312,6 +342,9 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
     `Budgettering: ${coreData.budgetingActive !== false ? 'actief' : 'NIET actief — gebruiker budgetteert niet. Doe GEEN budget-gerelateerde voorstellen.'}`,
     // Het stop-anker (ADR 0129) — alleen onder een vast anker; zie hierboven.
     ankerRegel,
+    // De plan-instellingen — ná de anker-regel, binnen FINANCIEEL OVERZICHT (géén
+    // eigen sectie: dat scheelt een kop en houdt de grondslag bij elkaar).
+    ...planLines,
     // Levensfase-signaal (consume-only, ADR 0009/0129 D8): wanneer de gebruiker AL
     // financieel vrij is — onder `solved`: vrijheids-% ≥ 100 of leeftijd voorbij de
     // vrijheidsleeftijd; onder een vast anker: anker bereikt ∧ dekking ≥ 100 — moet

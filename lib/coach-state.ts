@@ -48,6 +48,18 @@ export interface CoachState {
   lastDismissedAt: string | null
   /** ISO-tijdstip waarop de gids-bubbel voor het laatst is getoond (dagregel). */
   guideLastShownAt: string | null
+  /**
+   * Mag Fin UIT ZICHZELF een tip tonen? (W-016)
+   *
+   * DEFAULT `true`, en bewust "afwezig = aan": iedereen die deze sleutel nog niet
+   * heeft, houdt het bestaande gedrag — nieuwe gebruikers leunen via ADR 0130 op de
+   * gids-laag. De vlag dempt ALLEEN de meldkaart; Fins bubbel, de chat, de
+   * welkomstgids en de tips op verzoek (chat-chip, /overzicht/tips) blijven staan.
+   *
+   * Dit is een GEBRUIKERSkeuze en staat los van de beheer-overrides in
+   * `app_settings.coach_config`, die app-breed per regel werken.
+   */
+  proactief: boolean
 }
 
 /** Lege staat — óók de uitkomst van een ontbrekende of corrupte sleutel. */
@@ -55,6 +67,8 @@ export const EMPTY_COACH_STATE: CoachState = {
   dismissed: [],
   lastDismissedAt: null,
   guideLastShownAt: null,
+  // Afwezig = aan: een lege of corrupte staat mag Fin niet stilzetten.
+  proactief: true,
 }
 
 /** `true` als `value` een bruikbaar ISO-tijdstip is. */
@@ -85,6 +99,9 @@ export function parseCoachState(raw: unknown): CoachState {
     dismissed,
     lastDismissedAt: asIsoOrNull(shaped.lastDismissedAt),
     guideLastShownAt: asIsoOrNull(shaped.guideLastShownAt),
+    // Alleen een letterlijke `false` zet Fin stil; afwezig, `null` of een
+    // corrupte waarde blijft "aan" (W-016).
+    proactief: shaped.proactief !== false,
   }
 }
 

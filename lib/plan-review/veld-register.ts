@@ -47,6 +47,14 @@ const AOW: VeldPlek = { wizard: 'inkomsten', editor: 'AowStrategieBody (Inkomste
 const WERK: VeldPlek = { wizard: 'inkomsten', editor: 'WerkStrategieBody (InkomstenEditor)' }
 const POT: VeldPlek = { wizard: 'inkomsten', editor: 'PensioenPotBody (InkomstenEditor)' }
 const MARKT: VeldPlek = { wizard: 'laag2', editor: 'VoorkeurBewerkenBody' }
+/**
+ * W-009 (19 sep 2026) — de vijf cashflow-velden verhuisden van `buitenWizard` ('brondata')
+ * naar de stap "Waar je cijfers op rusten". Reden: de grondslag is geen weergavekeuze maar
+ * de invoer waar élke andere stap mee rekent — `withResolvedKernelBedragen` plakt de
+ * geresolveerde bedragen vóór elke kernel-run op de profielrij, dus de keuze stuurt de
+ * vrijheidsleeftijd rechtstreeks. Dit is precies de krimp die de afbouwregel bedoelt.
+ */
+const GRONDSLAG: VeldPlek = { wizard: 'grondslag', editor: 'CashflowGrondslagBody (GrondslagEditor)' }
 const BOX3: VeldPlek = { wizard: 'laag2', editor: 'Box3MethodeBody' }
 const TECHNISCH: VeldPlek = { buitenWizard: 'Technisch veld van de rij (id/eigenaar/tijdstempel), geen instelling.' }
 
@@ -122,21 +130,11 @@ export const SCHRIJFROUTE_VELD_REGISTER = {
       expected_return: MARKT,
       box3_method: BOX3,
       box3_heffingvrij_inkomen: BOX3,
-      net_monthly_income: {
-        buitenWizard: 'Inkomen nu is brondata (cashflow-instellingen), geen plan-keuze — register: inkomenUitgaven.',
-      },
-      estimated_monthly_expenses: {
-        buitenWizard: 'Uitgaven nu zijn brondata (cashflow-instellingen), geen plan-keuze — register: inkomenUitgaven.',
-      },
-      income_source: {
-        buitenWizard: 'Grondslag van het inkomen nu (ADR 0103) — brondata-keuze op het cashflow-scherm.',
-      },
-      expenses_source: {
-        buitenWizard: 'Grondslag van de uitgaven nu (ADR 0103) — brondata-keuze op het cashflow-scherm.',
-      },
-      cashflow_basis_prefs: {
-        buitenWizard: 'Selectie binnen de budgetgrondslag (ADR 0103) — brondata-keuze op het cashflow-scherm.',
-      },
+      net_monthly_income: GRONDSLAG,
+      estimated_monthly_expenses: GRONDSLAG,
+      income_source: GRONDSLAG,
+      expenses_source: GRONDSLAG,
+      cashflow_basis_prefs: GRONDSLAG,
       pension_factor_a: {
         buitenWizard:
           'De route accepteert het, maar het pensioenscherm schrijft factor A client-direct (grandfathered, ADR 0058); jaarruimte blijft bewust buiten de wizard (TPR-15 stap 3).',

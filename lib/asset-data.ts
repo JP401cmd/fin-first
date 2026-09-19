@@ -3,6 +3,7 @@
  */
 
 import type { Shade } from './color-palette'
+import { heeftEigenRendement, resolveExpectedReturnPct } from './asset-return'
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -57,7 +58,20 @@ export interface Asset {
   current_value: number
   purchase_value: number
   purchase_date: string | null
-  expected_return: number // annual %
+  /**
+   * Verwacht jaarrendement in PROCENTEN (7 = 7%).
+   *
+   * `null` = GEEN eigen aanname → val terug op het profielrendement. Een
+   * ingevulde `0` is een BEWUSTE 0% (betaalrekening, crypto, afschrijvend
+   * bezit). Sinds migratie 20260919140000 / ADR 0166; de betekenis wordt
+   * uitsluitend bepaald door `heeftEigenRendement` / `resolveExpectedReturnPct`
+   * (lib/asset-return.ts) en `potRendement` (kern, decimale schaal).
+   *
+   * Schrijf hier NOOIT `Number(a.expected_return)` op: `Number(null) === 0` in
+   * JavaScript (géén NaN), dus dat leest NULL stil als 0% en laat dezelfde
+   * bezitting 7% rekenen in /toekomst en 0% in de bezittingenlijst.
+   */
+  expected_return: number | null
   monthly_contribution: number
   institution: string | null
   /**
@@ -556,8 +570,13 @@ export interface ProjectionMonth {
  */
 export function resolveDepreciation(a: Asset): { rate: number; baseValue: number } | null {
   const depRate = Number(a.depreciation_rate)
-  const hasNegReturn = Number(a.expected_return) < 0 && a.asset_type === 'vehicle'
-  const effectiveDepRate = depRate > 0 ? depRate : (hasNegReturn ? Math.abs(Number(a.expected_return)) : 0)
+  // GEEN terugval hier: afschrijving wordt afgeleid uit een EIGEN, negatieve
+  // aanname. Een bezitting zonder eigen rendement (NULL) heeft per definitie
+  // geen negatief eigen rendement en schrijft dus niet lineair af — die valt
+  // verderop terug op het profielrendement.
+  const eigen = heeftEigenRendement(a.expected_return) ? Number(a.expected_return) : null
+  const hasNegReturn = eigen != null && eigen < 0 && a.asset_type === 'vehicle'
+  const effectiveDepRate = depRate > 0 ? depRate : (hasNegReturn ? Math.abs(eigen) : 0)
   return effectiveDepRate > 0
     ? { rate: effectiveDepRate, baseValue: Number(a.purchase_value) || Number(a.current_value) }
     : null
@@ -570,12 +589,17 @@ export function resolveDepreciation(a: Asset): { rate: number; baseValue: number
  * Depreciërende assets tellen als 0; gewogen met net_worth_inclusion_pct zodat het
  * aansluit op de (gewogen) netto-vermogen-delta. Eén gedeelde bron voor beide loaders
  * zodat de eenheid niet kan driften.
+ *
+ * @param terugvalPct Profielrendement in PROCENTEN voor bezittingen zónder eigen
+ *   aanname (`expected_return = null`, ADR 0166). Weggelaten → 0: dan houdt een
+ *   aanroeper zonder profiel bij de hand de oude nul-basis in plaats van een
+ *   verzonnen rendement.
  */
-export function computeExpectedAnnualAppreciation(assets: Asset[]): number {
+export function computeExpectedAnnualAppreciation(assets: Asset[], terugvalPct = 0): number {
   let total = 0
   for (const a of assets) {
     if (resolveDepreciation(a)) continue
-    const ret = Number(a.expected_return ?? 0) / 100
+    const ret = resolveExpectedReturnPct(a.expected_return, terugvalPct) / 100
     if (!(ret > 0)) continue
     const incl = Number((a as { net_worth_inclusion_pct?: number | null }).net_worth_inclusion_pct ?? 100) / 100
     total += Number(a.current_value ?? 0) * ret * incl
@@ -640,6 +664,7 @@ export function projectAsset(
 export function projectPortfolio(
   assets: Asset[],
   months: number,
+  terugvalPct = 0,
 ): { month: number; date: string; total: number; byType: Record<AssetType, number> }[] {
   const activeAssets = assets.filter((a) => a.is_active)
   if (activeAssets.length === 0) return []
@@ -654,8 +679,15 @@ export function projectPortfolio(
         // (privacy='totals'), which carries only current_value. Without this an
         // undefined expected_return/monthly_contribution becomes NaN and poisons
         // every projected total.
+        //
+        // LET OP het verschil tussen die sparse rij en een NULL: een ontbrekend
+        // veld op een samengevoegd partnertotaal is "onbekend", een NULL op een
+        // echte rij is "geen eigen aanname" en hoort naar het profielrendement
+        // (ADR 0166). `resolveExpectedReturnPct` maakt van beide de terugval; de
+        // partnerrij krijgt daarmee dezelfde behandeling als de eigen kolom, wat
+        // precies de divergentie is die anders zou ontstaan.
         Number(a.current_value) || 0,
-        depreciation ? 0 : Number(a.expected_return) || 0,
+        depreciation ? 0 : resolveExpectedReturnPct(a.expected_return, terugvalPct),
         Number(a.monthly_contribution) || 0,
         months,
         undefined,

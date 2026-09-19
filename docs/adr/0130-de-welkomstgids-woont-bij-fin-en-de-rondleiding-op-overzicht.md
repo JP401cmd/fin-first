@@ -8,6 +8,8 @@ elements: [as-coach, sp-registreren, sp-inzicht, app-comp]
 
 # 0130 — De welkomstgids woont bij Fin; het welkom is een rondleiding op /overzicht
 
+> **Aangevuld 19 sep 2026 (W-016) — Fins proactiviteit is een gebruikerskeuze, default aan.** De meldkaart is het enige mechanisme dat ongevraagd namens Fin praat; sinds deze aanvulling kan de gebruiker hem dempen met `profiles.module_guide_state['coach:state'].proactief` (afwezig = `true`), te zetten via de rij "Tips van Fin uit zichzelf" op `/mijn/notificaties` of de link "Niet meer uit jezelf" op de kaart zelf (`PUT /api/coach-state`, actie `setProactief`). Uit betekent: geen selectie, geen timer, geen dagstempel en geen dismiss-schrijfactie — óók de deferred-onboarding-tips en de dagelijkse gidsstap-bubbel van fase 2 zwijgen dan, en die stappen blijven zichtbaar in de gids in de chat. Wat blijft: Fins bubbel/nav-segment, de welkomstgids in de chat, de vragenlijst-badge (ADR 0147), en tips op verzoek via de chat-chip en `/overzicht/tips`. Dit is een GEBRUIKERSkeuze en staat los van de beheer-overrides in `app_settings.coach_config`, die app-breed per regel werken. Geen migratie: een jsonb-sleutel in een bestaande kolom.
+
 > **Geamendeerd door ADR 0147 (15 sep 2026):** er bestaat sindsdien één tweede numerieke teller in de shell, bij Fin (nav-pill-segment en desktop-bubbel), voor "vragenlijsten die je nu kunt invullen". Die N is scherp gedefinieerd en daalt alleen door handelen; de regel "geen badge op Fins bubbel/icoon" geldt voor al het overige onverkort.
 
 ## Context

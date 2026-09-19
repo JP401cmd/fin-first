@@ -10,6 +10,7 @@
 
 import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import { CAPTION_AMOUNT_TOKEN } from '@/lib/benchmark-report-data'
+import { isUnknownBasis, savingsRateBasisPhrase, type ResolvedBasis } from '@/lib/budget-basis'
 import type {
   BenchmarkReportData,
   BenchmarkMetric,
@@ -50,7 +51,24 @@ export interface BenchmarkUserMetrics {
    * weggelaten ⇒ `solved` (bestaand gedrag).
    */
   fireStopAnchor?: 'solved' | 'aow' | 'now' | 'age'
-  savingsRate6m: number | null
+  /**
+   * HET spaarquote-getal: de EFFECTIEVE, grondslag-geresolveerde quote
+   * (`dashboardData.effectiveSavingsRatePct`, ADR 0121) — hetzelfde percentage
+   * als op /overzicht en in het instellingenblok. Heette tot 19 sep 2026
+   * `savingsRate6m` terwijl de route er sinds 31 aug (2526df0e5) al de effectieve
+   * quote in zette; die venster-naam zette een kaartauteur op het verkeerde been
+   * ("rapport vergelijkt op een andere spaarquote dan het scherm" — niet zo).
+   * Een 6-maands MÉTING hoort hier niet: de peer-mediaan wordt naast het getal
+   * gelegd dat de gebruiker als "jouw spaarquote" kent.
+   */
+  effectiveSavingsRatePct: number | null
+  /**
+   * De twee grondslagen waarop `effectiveSavingsRatePct` rust (ADR 0103), zodat
+   * de uitleg kan zeggen wáár het getal vandaan komt (`savingsRateBasisPhrase`)
+   * i.p.v. een venster te lenen dat er onder een handmatige/budget-grondslag niet
+   * is. Optioneel/additief: weggelaten ⇒ grondslag-neutrale uitleg.
+   */
+  savingsRateBasis?: { income: ResolvedBasis; expenses: ResolvedBasis }
   netWorth: number | null
   /** Geschat jaarinkomen — canoniek effectief inkomen (dashboardData.monthlyIncome×12), bruto jaarinkomen als fallback. */
   yearlyIncome: number | null
@@ -109,7 +127,7 @@ export function buildBenchmarkReport(args: BuildBenchmarkArgs): BenchmarkReportD
     metrics.push(buildFireAgeMetric(anchorFixed ? null : user.fireAgeFractional, peer.fireAge, anchorFixed))
 
     // 3. Spaarquote (indicatieve referentie)
-    metrics.push(buildSavingsMetric(user.savingsRate6m, ref.savingsRatePct))
+    metrics.push(buildSavingsMetric(user.effectiveSavingsRatePct, ref.savingsRatePct, user.savingsRateBasis))
     addSource(SOURCE_SPAARQUOTE)
 
     // 4. Netto vermogen (CBS-mediaan + gemiddeld)
@@ -196,7 +214,11 @@ function buildFireAgeMetric(userValue: number | null, ref: number | null, anchor
   }
 }
 
-function buildSavingsMetric(userValue: number | null, ref: number): BenchmarkMetric {
+function buildSavingsMetric(
+  userValue: number | null,
+  ref: number,
+  basis?: BenchmarkUserMetrics['savingsRateBasis'],
+): BenchmarkMetric {
   let caption = 'Onvoldoende gegevens voor je spaarquote.'
   if (userValue != null) {
     const d = Math.round(userValue - ref)
@@ -204,11 +226,20 @@ function buildSavingsMetric(userValue: number | null, ref: number): BenchmarkMet
       ? 'Gelijk aan de indicatieve NL-spaarquote voor jouw leeftijd.'
       : `${Math.abs(d)}%-punt ${d > 0 ? 'meer' : 'minder'} dan gemiddeld in jouw leeftijdsgroep.`
   }
+  // Het getal is de EFFECTIEVE quote (ADR 0121) en draagt dus GEEN venster-label
+  // — "(6-maands gemiddelde)" beschreef onder een handmatige of budget-grondslag
+  // de verkeerde grootheid (dezelfde fout als de weggehaalde "(6m)" op de
+  // forecast-kaart). In plaats daarvan benoemt de uitleg de GRONDSLAG, met
+  // dezelfde woorden als de check-in en de kaarten (`savingsRateBasisPhrase`);
+  // zonder grondslag-info blijft de zin grondslag-neutraal.
+  const grondslag = basis && !isUnknownBasis(basis.income) && !isUnknownBasis(basis.expenses)
+    ? `, ${savingsRateBasisPhrase(basis.income, basis.expenses)}`
+    : ''
   return {
     key: 'savings_rate', label: 'Spaarquote', unit: 'pct',
     userValue, referenceValue: ref, higherIsBetter: true, tier: 'modelled',
     caption,
-    explanation: 'Je spaarquote is het deel van je inkomen dat je opzijzet (6-maands gemiddelde). '
+    explanation: `Je spaarquote is het deel van je inkomen dat je opzijzet${grondslag}. `
       + 'De referentie is een indicatieve NL-spaarquote voor jouw leeftijd (CBS/DNB); per cohort '
       + 'niet exact gepubliceerd, daarom een richtcijfer.',
     source: SOURCE_SPAARQUOTE,

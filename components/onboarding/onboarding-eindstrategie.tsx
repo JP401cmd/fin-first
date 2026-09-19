@@ -35,8 +35,18 @@ import {
 } from '@/lib/horizon/plan-draft'
 
 /**
- * Stap vii — "Jouw plan" (laatste inhoudelijke vraag). Eén scherm, twee vragen,
- * gewone taal (ADR 0129, eigenaar-besluit 5 sep 2026):
+ * Stap vii — intern nog "Jouw plan" (laatste inhoudelijke vraag). Eén scherm,
+ * twee vragen, gewone taal (ADR 0129, eigenaar-besluit 5 sep 2026):
+ *
+ * ZICHTBARE KOP = VRAAG 1 (W-011, 19 sep 2026). Tot die datum stond hier de
+ * naam-kop "Jouw plan" — de enige stap in de onboarding die z'n NAAM als kop
+ * droeg in plaats van z'n vraag, terwijl de shell-docstring het huispatroon
+ * expliciet als kicker + vráág + deck beschrijft. De kop is nu
+ * `STOP_ANCHOR_QUESTION`, letterlijk dezelfde constante die Voorkeuren en de
+ * strategie-modal boven diezelfde tegels zetten. "Jouw plan" blijft bestaan als
+ * stap-HANDLE (stap-id, UAT-scenario's, ADR 0129) — alleen de zichtbare kop is
+ * veranderd. Omdat die kop maar één van de twee vragen dekt, kondigt het deck
+ * de tweede aan en houdt vraag 2 zijn eigen <h2>.
  *
  *   1. Wanneer wil je stoppen met werken?  → het STOP-ANKER
  *      · Zo vroeg als het kan          (`solved`)
@@ -82,7 +92,6 @@ export type OnboardingPlanValue = Pick<
 export const ONBOARDING_STOP_ANCHORS: readonly StopAnchorKind[] = ['solved', 'aow', 'age']
 
 const IDS = {
-  vraag1: 'ob-plan-vraag-1',
   vraag2: 'ob-plan-vraag-2',
   vraag2Rest: 'ob-plan-vraag-2-rest',
   stopAge: 'ob-plan-stop-age',
@@ -167,15 +176,6 @@ export function OnboardingEindstrategie({
     if (validatie.ok) onNext()
   }
 
-  const headline = (
-    <>
-      Jouw{' '}
-      <em className="font-normal italic" style={{ color: 'var(--module-active-700)' }}>
-        plan
-      </em>
-    </>
-  )
-
   const toontEindleeftijd = endFormShowsEndAge(draft.endForm)
   const stopAgeError = showError('stopAge')
   const endAgeError = showError('endAge')
@@ -185,8 +185,8 @@ export function OnboardingEindstrategie({
     <OnboardingShell
       kicker="Toekomst"
       romanNum="vii."
-      title={headline}
-      deck="Twee keuzes waarmee de app je toekomst doorrekent: wanneer je wilt stoppen met werken, en tot welke leeftijd je geld moet reiken. Je past ze later altijd aan."
+      title={STOP_ANCHOR_QUESTION}
+      deck="Vanaf dat moment rekent de app zonder inkomen uit werk en laat zien of je geld reikt. Daaronder nog één vraag: tot welke leeftijd moet het reiken? Je past beide later altijd aan."
       factsPanel={
         <FactsPanel
           stat={`${DEFAULT_FIRE_STRATEGY.endAge} jaar`}
@@ -219,9 +219,13 @@ export function OnboardingEindstrategie({
         )}
 
         {/* ── Vraag 1: wanneer stoppen ──────────────────────────────────── */}
-        <section aria-labelledby={IDS.vraag1} className="space-y-3">
-          <VraagKop id={IDS.vraag1}>{STOP_ANCHOR_QUESTION}</VraagKop>
-          <div role="group" aria-labelledby={IDS.vraag1} className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        {/* Geen eigen <h2> meer: sinds W-011 dráágt de shell-headline deze vraag,
+            en twee keer dezelfde zin onder elkaar (h1 én h2) leest als een fout.
+            De tegelgroep krijgt daarom `aria-label` met diezelfde constante —
+            het patroon van `onboarding-woning-keuze.tsx`. Vraag 2 hieronder
+            blijft wél een eigen h2; die valt buiten de kop. */}
+        <section aria-label={STOP_ANCHOR_QUESTION} className="space-y-3">
+          <div role="group" aria-label={STOP_ANCHOR_QUESTION} className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             {STOP_ANCHOR_OPTIONS.filter((opt) => ONBOARDING_STOP_ANCHORS.includes(opt.kind)).map(
               (opt) => (
                 <StrategyTile

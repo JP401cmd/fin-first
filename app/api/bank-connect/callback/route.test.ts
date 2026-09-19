@@ -32,8 +32,10 @@ const {
   mockSyncBudgetingActive,
   mockSetBudgetTracking,
   mockTierGate,
+  mockFetchConsentExpiry,
 } = vi.hoisted(() => ({
   mockTierGate: vi.fn(),
+  mockFetchConsentExpiry: vi.fn(),
   mockCreateClient: vi.fn(),
   mockExchangeCode: vi.fn(),
   mockGetAccounts: vi.fn(),
@@ -60,6 +62,12 @@ vi.mock('@/lib/truelayer/client', () => ({
   getAccounts: mockGetAccounts,
   getBaseUrls: mockGetBaseUrls,
 }))
+
+// ADR 0161: de consent-einddatum komt uit `/data/v1/me`, niet uit `expires_in`.
+vi.mock('@/lib/truelayer/consent', () => ({
+  fetchConsentExpiry: mockFetchConsentExpiry,
+}))
+const CONSENT_EXPIRES_AT = '2026-12-17T19:01:28.000Z'
 
 vi.mock('@/lib/truelayer/balance-sync', () => ({
   syncAccountBalance: mockSyncAccountBalance,
@@ -182,7 +190,7 @@ function makeQueuedSupabaseStub(queues: Record<string, Array<{ data: unknown; er
  * queue — de stub-queues zijn one-shot (shift-based) en kunnen niet hergebruikt
  * worden tussen tests.
  */
-function makeNewAccountHappyPathStub() {
+function makeNewAccountHappyPathStub(opts: { consentWrite?: boolean } = {}) {
   const connectionRow = { id: 'conn-1', user_id: 'user-1', provider_name: 'ING', status: 'pending' }
   const tokens = { access_token: 'tok-123', refresh_token: 'rt-123', expires_in: 3600 }
   const tlAccounts = [
@@ -199,6 +207,8 @@ function makeNewAccountHappyPathStub() {
     bank_connections: [
       { data: connectionRow }, // select ... .single() (connection lookup)
       { data: null }, // update(...).eq(...) bare await (token exchange write)
+      // ADR 0161: de losse consent-write, alléén als /me een datum gaf.
+      ...(opts.consentWrite ? [{ data: null }] : []),
       { data: [{ id: connectionRow.id, status: 'active', created_at: new Date().toISOString() }] }, // orphan cleanup source
     ],
     bank_connection_accounts: [
@@ -224,6 +234,10 @@ function makeNewAccountHappyPathStub() {
 
 beforeEach(() => {
   mockTierGate.mockReset().mockResolvedValue(null)
+  // Default: TrueLayer meldt geen datum → de callback schrijft geen tweede
+  // update en de bestaande stub-queues blijven kloppen. De ADR-0161-suite
+  // onderaan zet een datum én queue't de extra write.
+  mockFetchConsentExpiry.mockReset().mockResolvedValue(null)
   mockCreateClient.mockReset()
   mockExchangeCode.mockReset()
   mockGetAccounts.mockReset()
@@ -1661,5 +1675,92 @@ describe('GET /api/bank-connect/callback — fase 5: geschiktheid van de voorkeu
     )
     expect(consumed).toHaveLength(1)
     expect(consumed[0].data.target_bank_account_id).toBeNull()
+  })
+})
+
+/**
+ * ADR 0161: `token_expires_at` is het 1-uurs toegangstoken; de bankautorisatie
+ * krijgt haar eigen `consent_expires_at`, gevuld uit `/data/v1/me`. Vóór deze
+ * kolom las de gezondheidsafleiding het token als de autorisatie — "verloopt
+ * over 1 dag" na elke sync, "verbinding kwijt" na ~25 uur.
+ */
+describe('GET /api/bank-connect/callback — consent-einddatum (ADR 0161)', () => {
+  const isTokenWrite = (c: { table: string; op: string; data: Record<string, unknown> }) =>
+    c.table === 'bank_connections' && c.op === 'update' && 'status' in c.data
+  const isConsentWrite = (c: { table: string; op: string; data: Record<string, unknown> }) =>
+    c.table === 'bank_connections' && c.op === 'update' && 'consent_expires_at' in c.data
+
+  it('schrijft consent_expires_at uit /me in een LOSSE update, ná de token-write', async () => {
+    const { stub, tokens, tlAccounts } = makeNewAccountHappyPathStub({ consentWrite: true })
+    mockCreateClient.mockResolvedValue(stub)
+    mockExchangeCode.mockResolvedValue(tokens)
+    mockGetBaseUrls.mockResolvedValue({ authUrl: 'https://auth.truelayer.com', dataUrl: 'https://api.truelayer.com' })
+    mockGetAccounts.mockResolvedValue(tlAccounts)
+    // Volgorde-bewijs: op het moment dat /me wordt aangeroepen, staan de tokens
+    // al weggeschreven — een trage /me kan de autorisatie dus nooit kosten.
+    mockFetchConsentExpiry.mockImplementation(async () => {
+      expect(stub.calls.some(isTokenWrite)).toBe(true)
+      return CONSENT_EXPIRES_AT
+    })
+
+    const before = Date.now()
+    const res = await GET(requestFor('/api/bank-connect/callback?code=abc&state=conn-1:user1234-1710000000'))
+
+    expect(res.headers.get('location')).toBe(`${ORIGIN}/core/cash/connect/success`)
+    // Opgehaald met het VERSE toegangstoken tegen de data-URL van de omgeving.
+    expect(mockFetchConsentExpiry).toHaveBeenCalledWith('tok-123', 'https://api.truelayer.com')
+
+    const tokenWrite = stub.calls.find(isTokenWrite)!
+    // De token-write draagt de consent NIET: die is een verrijking, geen voorwaarde.
+    expect(tokenWrite.data).not.toHaveProperty('consent_expires_at')
+    // En het token blijft wat het was: ~een uur, geen 90 dagen.
+    const tokenExpiry = new Date(String(tokenWrite.data.token_expires_at)).getTime()
+    expect(tokenExpiry - before).toBeGreaterThan(3500_000)
+    expect(tokenExpiry - before).toBeLessThan(3700_000)
+
+    const consentWrite = stub.calls.find(isConsentWrite)!
+    expect(consentWrite.data).toEqual({ consent_expires_at: CONSENT_EXPIRES_AT })
+    expect(stub.calls.indexOf(consentWrite)).toBeGreaterThan(stub.calls.indexOf(tokenWrite))
+  })
+
+  it('zonder consent-datum (/me leeg of mislukt) is er geen tweede update — de koppeling slaagt gewoon', async () => {
+    mockFetchConsentExpiry.mockResolvedValue(null)
+    const { stub, tokens, tlAccounts } = makeNewAccountHappyPathStub()
+    mockCreateClient.mockResolvedValue(stub)
+    mockExchangeCode.mockResolvedValue(tokens)
+    mockGetBaseUrls.mockResolvedValue({ authUrl: 'https://auth.truelayer.com', dataUrl: 'https://api.truelayer.com' })
+    mockGetAccounts.mockResolvedValue(tlAccounts)
+
+    const res = await GET(requestFor('/api/bank-connect/callback?code=abc&state=conn-1:user1234-1710000000'))
+
+    expect(res.headers.get('location')).toBe(`${ORIGIN}/core/cash/connect/success`)
+    expect(stub.calls.some(isTokenWrite)).toBe(true)
+    expect(stub.calls.some(isConsentWrite)).toBe(false)
+  })
+
+  it('een mislukte token-write is fail-closed: callback_failed, geen rekeningen gekoppeld', async () => {
+    // Bv. de deploy vóór de migratie, een guard-trigger die raise't, of RLS 0
+    // rijen. Vóór ADR 0161 liep de route hier stil door: koppelrijen aan een
+    // `pending`-rij zonder tokens, "gelukt" op het scherm, 401 bij de eerste sync.
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const stub = makeQueuedSupabaseStub({
+      bank_connections: [
+        { data: { id: 'conn-1', user_id: 'user-1', provider_name: 'ING', status: 'pending' } },
+        { data: null, error: { code: '42703', message: 'column "x" of relation "bank_connections" does not exist' } },
+      ],
+      profiles: [
+        { data: { onboarding_completed: true } }, // hoortBijOnboarding in de catch
+      ],
+    })
+    mockCreateClient.mockResolvedValue(stub)
+    mockExchangeCode.mockResolvedValue({ access_token: 'tok-123', refresh_token: 'rt-123', expires_in: 3600 })
+
+    const res = await GET(requestFor('/api/bank-connect/callback?code=abc&state=conn-1:user1234-1710000000'))
+
+    expect(res.headers.get('location')).toBe(`${ORIGIN}/core/cash/connect?error=callback_failed`)
+    expect(mockFetchConsentExpiry).not.toHaveBeenCalled()
+    expect(mockGetAccounts).not.toHaveBeenCalled()
+    expect(stub.calls.filter((c) => c.table === 'bank_connection_accounts')).toEqual([])
+    consoleError.mockRestore()
   })
 })

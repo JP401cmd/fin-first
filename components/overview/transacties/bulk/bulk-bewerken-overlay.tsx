@@ -602,7 +602,7 @@ export function BulkBewerkenOverlay({
         primaryAction={
           hasSelection
             ? {
-                label: 'Koppel aan budget',
+                label: 'Categoriseren',
                 onClick: () => {
                   void openConfirm('budget')
                 },

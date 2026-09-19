@@ -20,7 +20,7 @@ function makeAccount(overrides: Partial<LinkedAccountView> = {}): LinkedAccountV
     health: deriveBankLinkHealth({
       linkIsActive: true,
       connectionStatus: 'active',
-      tokenExpiresAt: null,
+      consentExpiresAt: null,
       lastSyncedAt: null,
     }),
     bank_account_id: 'ba-1',
@@ -72,7 +72,7 @@ describe('toBankSyncTargets', () => {
       health: deriveBankLinkHealth({
         linkIsActive: true,
         connectionStatus: 'expired',
-        tokenExpiresAt: null,
+        consentExpiresAt: null,
         lastSyncedAt: null,
       }),
     })
@@ -80,7 +80,7 @@ describe('toBankSyncTargets', () => {
       health: deriveBankLinkHealth({
         linkIsActive: true,
         connectionStatus: 'active',
-        tokenExpiresAt: null,
+        consentExpiresAt: null,
         lastSyncedAt: null,
       }),
     })

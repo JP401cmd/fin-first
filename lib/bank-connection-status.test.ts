@@ -13,7 +13,7 @@ import {
 /**
  * De afleiding over ALLE VIER de signalen. Dit is de enige plek waar
  * `bank_connection_accounts.is_active`, `bank_connections.status`,
- * `token_expires_at` en `last_synced_at` tot één toestand worden samengevoegd —
+ * `consent_expires_at` en `last_synced_at` tot één toestand worden samengevoegd —
  * drie oppervlakken leunen erop, dus de regels staan hier vast en niet in een
  * component.
  */
@@ -28,7 +28,7 @@ function signals(over: Partial<BankLinkSignals> = {}): BankLinkSignals {
   return {
     linkIsActive: true,
     connectionStatus: 'active',
-    tokenExpiresAt: daysFromNow(60),
+    consentExpiresAt: daysFromNow(60),
     lastSyncedAt: '2026-07-29T08:00:00.000Z',
     ...over,
   }
@@ -49,7 +49,7 @@ describe('deriveBankLinkHealth — signaal 1: bank_connection_accounts.is_active
     // verbroken koppeling na 90 dagen alsnog om aandacht vragen — een melding
     // over iets dat de gebruiker zelf heeft uitgezet.
     const health = deriveBankLinkHealth(
-      signals({ linkIsActive: false, connectionStatus: 'expired', tokenExpiresAt: daysFromNow(-5) }),
+      signals({ linkIsActive: false, connectionStatus: 'expired', consentExpiresAt: daysFromNow(-5) }),
       NOW,
     )
     expect(health.state).toBe('manual')
@@ -81,12 +81,12 @@ describe('deriveBankLinkHealth — signaal 2: bank_connections.status', () => {
   })
 })
 
-describe('deriveBankLinkHealth — signaal 3: token_expires_at', () => {
+describe('deriveBankLinkHealth — signaal 3: consent_expires_at', () => {
   it('verstreken autorisatie → linked-broken, ook als de status nog "active" zegt', () => {
     // Nodig náást de statuscontrole: `status` gaat pas op `expired` bij een
     // mislukte refresh, en die draait alleen als iemand synchroniseert.
     const health = deriveBankLinkHealth(
-      signals({ connectionStatus: 'active', tokenExpiresAt: daysFromNow(-1) }),
+      signals({ connectionStatus: 'active', consentExpiresAt: daysFromNow(-1) }),
       NOW,
     )
     expect(health.state).toBe('linked-broken')
@@ -95,7 +95,7 @@ describe('deriveBankLinkHealth — signaal 3: token_expires_at', () => {
 
   it('binnen de vooraankondiging → linked mét expiringSoon (níet linked-broken)', () => {
     const health = deriveBankLinkHealth(
-      signals({ tokenExpiresAt: daysFromNow(BANK_LINK_EXPIRY_WARNING_DAYS - 1) }),
+      signals({ consentExpiresAt: daysFromNow(BANK_LINK_EXPIRY_WARNING_DAYS - 1) }),
       NOW,
     )
     expect(health.state).toBe('linked')
@@ -105,26 +105,26 @@ describe('deriveBankLinkHealth — signaal 3: token_expires_at', () => {
 
   it('precies op de drempel waarschuwt nog; één dag eerder in de tijd niet', () => {
     expect(
-      deriveBankLinkHealth(signals({ tokenExpiresAt: daysFromNow(BANK_LINK_EXPIRY_WARNING_DAYS) }), NOW)
+      deriveBankLinkHealth(signals({ consentExpiresAt: daysFromNow(BANK_LINK_EXPIRY_WARNING_DAYS) }), NOW)
         .expiringSoon,
     ).toBe(true)
     expect(
       deriveBankLinkHealth(
-        signals({ tokenExpiresAt: daysFromNow(BANK_LINK_EXPIRY_WARNING_DAYS + 1) }),
+        signals({ consentExpiresAt: daysFromNow(BANK_LINK_EXPIRY_WARNING_DAYS + 1) }),
         NOW,
       ).expiringSoon,
     ).toBe(false)
   })
 
   it('geen einddatum → geen oordeel over expiratie, wel gewoon linked', () => {
-    const health = deriveBankLinkHealth(signals({ tokenExpiresAt: null }), NOW)
+    const health = deriveBankLinkHealth(signals({ consentExpiresAt: null }), NOW)
     expect(health.state).toBe('linked')
     expect(health.daysUntilExpiry).toBeNull()
     expect(health.expiringSoon).toBe(false)
   })
 
   it('een onleesbare einddatum verklaart een rekening NIET kapot', () => {
-    const health = deriveBankLinkHealth(signals({ tokenExpiresAt: 'geen-datum' }), NOW)
+    const health = deriveBankLinkHealth(signals({ consentExpiresAt: 'geen-datum' }), NOW)
     expect(health.state).toBe('linked')
     expect(health.daysUntilExpiry).toBeNull()
   })

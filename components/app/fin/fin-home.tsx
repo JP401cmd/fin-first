@@ -124,7 +124,7 @@ export function FinHome({
   const rondleidingActive = useRondleidingActive()
   const paused = useAttentionQuiet({ self: 'fin-melding' })
 
-  const { suggestion, dismiss } = useCoachSuggestion({
+  const { suggestion, dismiss, setProactief } = useCoachSuggestion({
     coachState, dataGaps, deferredFields, overrides, activeModules, delayMs, paused, guide,
   })
 
@@ -212,6 +212,13 @@ export function FinHome({
   // reden, en een rechtstreeks doorgegeven handler zou het klik-event als reden
   // meegeven — dan is geen enkele tak meer voorspelbaar.
   const handleCloseMelding = useCallback(() => { dismiss('user') }, [dismiss])
+
+  /**
+   * W-016 — "Niet meer uit jezelf" op de kaart. Bewust NIET via `dismiss`: dit is
+   * geen "deze tip heb ik gezien" maar "doe dit voortaan niet meer uit jezelf", dus
+   * de sleutel wordt niet als weggeklikt gestempeld. De hook sluit de kaart zelf.
+   */
+  const handleStopProactief = useCallback(() => { setProactief(false) }, [setProactief])
 
   // ── De meldingstrook eist op mobiel haar eigen band op (UR2-08) ────────────
   //
@@ -351,6 +358,7 @@ export function FinHome({
                   onClose={handleCloseMelding}
                   onCtaActivate={handleCta}
                   onOpenChat={handleOpenChatFromMelding}
+                  onStopProactief={handleStopProactief}
                 />
               </div>
 

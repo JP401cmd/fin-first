@@ -26,7 +26,7 @@ import {
  * `computeRetirementExpenses` + de horizon-kernel. De 80%-suggestie komt uit de
  * pure, geteste helper `computeRetirementPrefill`.
  *
- * Skipbaar via "Kan altijd later nog →" (consistent met pensioen/spaardoel):
+ * Skipbaar via "Kan altijd later nog →" (consistent met pensioen):
  * bij skip stuurt de orchestrator niets mee → de impliciete server-default
  * (80%) blijft werken.
  *
@@ -134,13 +134,19 @@ export function OnboardingUitgavenPensioen({
     onNext()
   }
 
+  // De eenheid blijft bewust ín de vraag (B-053, variant A): de twee schermen
+  // ervóór vragen per MAAND, dit veld is een JAARbedrag en geen validatie vangt
+  // een maandbedrag — de italic-em "per jaar" is het signaal van die wissel
+  // (en de italic-em die WF-START-38 beschrijft). "Als je niet meer hoeft te
+  // werken" i.p.v. "na je pensioen": de kernel laat dit bedrag ingaan op het
+  // stopmoment, niet op de AOW (ADR 0129).
   const headline = (
     <>
-      Wat denk je straks{' '}
+      Wat denk je{' '}
       <em className="font-normal italic" style={{ color: 'var(--module-active-700)' }}>
         per jaar
       </em>{' '}
-      nodig te hebben?
+      nodig te hebben als je niet meer hoeft te werken?
     </>
   )
 
@@ -173,7 +179,9 @@ export function OnboardingUitgavenPensioen({
       kicker="Inkomen & uitgaven"
       romanNum="ii."
       title={headline}
-      deck="Dit gaat over je uitgaven straks, na je pensioen — niet over je pensioeninkomen. Geef een bedrag in prijspeil van vandaag; inflatie rekenen wij er later overheen. Je past het later altijd aan."
+      // Keuze · effect · waarom (eigenaarsnorm 13 sep): wat je invult, wat het
+      // stuurt, en de afbakening (uitgaven, geen pensioeninkomen).
+      deck="Een bedrag per jaar in euro's van nu — inflatie rekenen wij er later overheen. Dit getal stuurt hoeveel vermogen je nodig hebt en dus wanneer werken een keuze wordt. Het gaat om wat je dán uitgeeft, niet om je pensioeninkomen; je past het later altijd aan."
       dataNote={dataNoteFor('uitgaven-later')}
       factsPanel={
         <FactsPanel

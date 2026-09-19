@@ -229,16 +229,21 @@ export function reduceWindowByMonth(
  * vroegste inkomstendatum)` — die som liep tot en met de lopende maand terwijl
  * de deler alleen afgesloten maanden telde, en verschoof dus dagelijks.
  *
- * `includeTransfers: true` = de transfer-inclusieve variant voor de
- * FIRE-projectiesom van de horizon-loader (bewust niet gelijkgetrokken met de
- * spaarquote-grondslag; zie lib/horizon/raw-data-loader.ts). Default: gefilterd.
+ * ÉÉN GRONDSLAG (ADR 0169, eigenaarsbesluit 6 sep 2026): altijd de transfer-
+ * GEFILTERDE som (`windowIncome.real`). Tot 19 sep 2026 kende deze helper een
+ * `includeTransfers`-optie waarmee de horizon-FIRE-som (pensioenuitgave-methode
+ * `current_income`, FIRE-spaarbron) en de uitgaven-na-pensioen-sheet transfers
+ * bewust meetelden, terwijl dashboard/core/spaarquote ze filterden. Die per-
+ * module-splitsing heropende exact het repro-pad van WF-TOEK-02-bug2 (KPI ≠
+ * sheet na sluiten) zodra income_source ≠ manual, geen bruikbare budgetbasis
+ * en inkomsten-transfers samenkwamen. De optie is bewust weg — niet op
+ * default gezet — zodat een tweede waarheid niet stil terug kan komen
+ * (vangrail: lib/retirement-expense-basis.grondslag.test.ts).
  */
 export function transactionAnnualIncome(
   window: Pick<BudgetRealizedWindow, 'historyMonths' | 'windowIncome'>,
-  opts?: { includeTransfers?: boolean },
 ): number {
-  const sum = opts?.includeTransfers ? window.windowIncome.all : window.windowIncome.real
-  return annualizeHistorySum(sum, window.historyMonths)
+  return annualizeHistorySum(window.windowIncome.real, window.historyMonths)
 }
 
 /**

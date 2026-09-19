@@ -31,7 +31,7 @@ const NEW_ACTIVE_ORDER = [
   'bezittingen',
   'schulden',
   'pensioen',
-  'spaardoel',
+  // De spaardoel-stap stond hier tot 19 sep 2026 (ADR 0162).
   'eindstrategie',
   // Sinds 17 sep 2026 (ADR 0156): na eindstrategie meteen opslaan; budget, bank
   // en de samenvatting `klaar` volgen buiten de navigatievolgorde.
@@ -157,8 +157,7 @@ function makeRestoreDraft(overrides: Partial<OnboardingDraft> = {}): OnboardingD
     quickDebts: [],
     bezittingenPhases: [],
     schuldenPhases: [],
-    spaardoel: { presetKey: null, name: '', target_value: '', target_date: '', skipped: false },
-    pension: { mode: null, grossMonthly: '', startAge: '' },
+    pension: { mode: null, grossMonthly: '', startAge: '', isEstimate: false },
     retirementExpense: { method: 'custom_amount', customAmount: '', skipped: false },
     horizon: {
       fire_end_strategy: 'deplete',
@@ -246,7 +245,7 @@ describe('onboarding _reducer — RESTORE_STATE', () => {
       type: 'RESTORE_STATE',
       data: makeDraft({
         lastStep: 'pensioen',
-        pension: { mode: 'estimate', grossMonthly: '1500', startAge: '67' },
+        pension: { mode: 'estimate', grossMonthly: '1500', startAge: '67', isEstimate: false },
       }),
     })
     expect(result.pension.mode).toBe('estimate')
@@ -360,59 +359,6 @@ describe('onboarding _reducer — RESTORE_STATE', () => {
   })
 })
 
-describe('onboarding _reducer — SET_SPAARDOEL', () => {
-  it('replaces the spaardoel substate with the dispatched payload', () => {
-    const result = _reducer(_initialState, {
-      type: 'SET_SPAARDOEL',
-      data: {
-        presetKey: 'noodfonds',
-        name: 'Mijn buffer',
-        target_value: '7500',
-        target_date: '2027-01',
-        skipped: false,
-      },
-    })
-    expect(result.spaardoel).toEqual({
-      presetKey: 'noodfonds',
-      name: 'Mijn buffer',
-      target_value: '7500',
-      target_date: '2027-01',
-      skipped: false,
-    })
-  })
-
-  it('marks the spaardoel as skipped without persisting a partial entry', () => {
-    const result = _reducer(_initialState, {
-      type: 'SET_SPAARDOEL',
-      data: {
-        presetKey: null,
-        name: '',
-        target_value: '',
-        target_date: '',
-        skipped: true,
-      },
-    })
-    expect(result.spaardoel.skipped).toBe(true)
-    expect(result.spaardoel.presetKey).toBeNull()
-    expect(result.spaardoel.name).toBe('')
-  })
-
-  it('does not affect other state fields', () => {
-    const result = _reducer(_initialState, {
-      type: 'SET_SPAARDOEL',
-      data: {
-        presetKey: 'vakantie',
-        name: 'Zomer',
-        target_value: '2500',
-        target_date: '',
-        skipped: false,
-      },
-    })
-    expect(result.selectedGoals).toEqual(_initialState.selectedGoals)
-    expect(result.activeModules).toEqual(_initialState.activeModules)
-    expect(result.identity).toEqual(_initialState.identity)
-  })
-})
 
 describe('onboarding _reducer — SET_PENSION', () => {
   it('replaces the pension substate with the dispatched payload', () => {
@@ -482,7 +428,7 @@ describe('onboarding _resolveRestoredStep — uitgaven_pensioen', () => {
   })
 })
 
-describe('onboarding _resolveRestoredStep — spaardoel + klaar', () => {
+describe('onboarding _resolveRestoredStep — spaardoel (geschrapt) + klaar', () => {
   it('heals a klaar lastStep to eindstrategie: de samenvatting staat sinds 17 sep ná de opslag', () => {
     // Een concept op `klaar` is nog niet opgeslagen; landen op de samenvatting
     // zou de opslag overslaan. Terug naar de laatste vraag, van waaruit
@@ -491,9 +437,11 @@ describe('onboarding _resolveRestoredStep — spaardoel + klaar', () => {
     expect(result).toEqual({ step: 'eindstrategie', healed: true })
   })
 
-  it('restores a draft saved on spaardoel without warning', () => {
+  it('heals a spaardoel lastStep to eindstrategie: de stap is op 19 sep 2026 geschrapt (ADR 0162)', () => {
+    // Een concept dat op de verwijderde stap stond gaat door naar de
+    // eerstvolgende vraag — niet terug naar het begin.
     const result = _resolveRestoredStep('spaardoel', [...NEW_ACTIVE_ORDER])
-    expect(result).toEqual({ step: 'spaardoel', healed: false })
+    expect(result).toEqual({ step: 'eindstrategie', healed: true })
   })
 
   it('restores a draft saved on the new eindstrategie step verbatim', () => {
@@ -501,10 +449,11 @@ describe('onboarding _resolveRestoredStep — spaardoel + klaar', () => {
     expect(result).toEqual({ step: 'eindstrategie', healed: false })
   })
 
-  it('places eindstrategie between spaardoel and the save in the active order (klaar zit er niet meer in)', () => {
+  it('places eindstrategie between pensioen and the save in the active order (spaardoel en klaar zitten er niet meer in)', () => {
     const order: string[] = [...NEW_ACTIVE_ORDER]
-    expect(order.indexOf('eindstrategie')).toBeGreaterThan(order.indexOf('spaardoel'))
+    expect(order.indexOf('eindstrategie')).toBe(order.indexOf('pensioen') + 1)
     expect(order.indexOf('saving')).toBe(order.indexOf('eindstrategie') + 1)
+    expect(order).not.toContain('spaardoel')
     expect(order).not.toContain('klaar')
   })
 })
@@ -557,11 +506,11 @@ describe('onboarding _reducer — SET_HORIZON (stap "Jouw plan": stop-anker × e
       data: { ..._initialState.horizon, fire_stop_anchor: 'aow' },
     })
     expect(result.identity).toEqual(_initialState.identity)
-    expect(result.spaardoel).toEqual(_initialState.spaardoel)
+    expect(result.pension).toEqual(_initialState.pension)
   })
 })
 
-describe('onboarding _reducer — RESTORE_STATE keuzes (spaardoel + pensioen)', () => {
+describe('onboarding _reducer — RESTORE_STATE keuzes (pensioen + uitgaven na pensioen)', () => {
   const makeDraft = makeRestoreDraft
 
   let warnSpy: ReturnType<typeof vi.spyOn>
@@ -572,38 +521,20 @@ describe('onboarding _reducer — RESTORE_STATE keuzes (spaardoel + pensioen)', 
     warnSpy.mockRestore()
   })
 
-  it('herstelt de volledige spaardoel-substate — preset én naam/bedrag/datum', () => {
+  it('een concept op de geschrapte spaardoel-stap landt op eindstrategie mét behoud van de overige keuzes (ADR 0162)', () => {
     const result = _reducer(_initialState, {
       type: 'RESTORE_STATE',
       data: makeDraft({
         selectedGoals: ['noodfonds'],
-        spaardoel: {
-          presetKey: 'vakantie',
-          name: 'Italië 2027',
-          target_value: '3500',
-          target_date: '2027-06',
-          skipped: false,
-        },
+        deferredFields: ['income', 'spaardoel'],
         lastStep: 'spaardoel',
       }),
     })
-    expect(result.step).toBe('spaardoel')
-    expect(result.spaardoel.presetKey).toBe('vakantie')
-    expect(result.spaardoel.name).toBe('Italië 2027')
-    expect(result.spaardoel.target_value).toBe('3500')
-    expect(result.spaardoel.target_date).toBe('2027-06')
-  })
-
-  it('herstelt de spaardoel-skip-vlag', () => {
-    const result = _reducer(_initialState, {
-      type: 'RESTORE_STATE',
-      data: makeDraft({
-        spaardoel: { presetKey: null, name: '', target_value: '', target_date: '', skipped: true },
-        lastStep: 'spaardoel',
-      }),
-    })
-    expect(result.spaardoel.skipped).toBe(true)
-    expect(result.spaardoel.name).toBe('')
+    expect(result.step).toBe('eindstrategie')
+    expect(result.selectedGoals).toEqual(['noodfonds'])
+    // De oude deferral blijft in het concept; hij voedt alleen nog de
+    // coach-regel voor bestaande profielen en wordt niet meer gezet.
+    expect(result.deferredFields).toEqual(['income', 'spaardoel'])
   })
 
   it('herstelt de retirementExpense inclusief het ingevulde bedrag', () => {
@@ -632,7 +563,7 @@ describe('onboarding _reducer — RESTORE_STATE keuzes (spaardoel + pensioen)', 
     const result = _reducer(_initialState, {
       type: 'RESTORE_STATE',
       data: makeDraft({
-        pension: { mode: 'estimate', grossMonthly: '1500', startAge: '67' },
+        pension: { mode: 'estimate', grossMonthly: '1500', startAge: '67', isEstimate: false },
         lastStep: 'pensioen',
       }),
     })
@@ -648,7 +579,7 @@ describe('onboarding _reducer — RESTORE_STATE keuzes (spaardoel + pensioen)', 
     const result = _reducer(_initialState, {
       type: 'RESTORE_STATE',
       data: makeDraft({
-        pension: { mode: null, grossMonthly: '', startAge: '' },
+        pension: { mode: null, grossMonthly: '', startAge: '', isEstimate: false },
         lastStep: 'klaar',
       }),
     })
@@ -656,13 +587,13 @@ describe('onboarding _reducer — RESTORE_STATE keuzes (spaardoel + pensioen)', 
     expect(result.pension).toEqual(_initialState.pension)
   })
 
-  it('valt terug op de initiële spaardoel-shape bij geen keuze', () => {
+  it('valt terug op de initiële uitgaven-na-pensioen-shape bij geen keuze', () => {
     const result = _reducer(_initialState, {
       type: 'RESTORE_STATE',
       data: makeDraft({ lastStep: 'klaar' }),
     })
     expect(result.step).toBe('eindstrategie')
-    expect(result.spaardoel).toEqual(_initialState.spaardoel)
+    expect(result.retirementExpense).toEqual(_initialState.retirementExpense)
   })
 })
 

@@ -40,7 +40,7 @@ export function register(): void {
     id: CAT,
     label: 'UAT — Publiek & onboarding (engine)',
     description:
-      'Acceptatiecriteria domein Publiek/registratie/onboarding: échte rekenfuncties/constanten op de UAT-plan-testpersonen (Vrijheidscheck-preview + rapportcijfers, spaarquote-conversie, onboarding-prefills en -recap, pensioen-ingangsleeftijd-klem, noodfonds-prefill, prijs-consistentie). Gedeeld met start.engine.test.ts.',
+      'Acceptatiecriteria domein Publiek/registratie/onboarding: échte rekenfuncties/constanten op de UAT-plan-testpersonen (Vrijheidscheck-preview + rapportcijfers, spaarquote-conversie, onboarding-prefills en -recap, pensioen-ingangsleeftijd-klem, prijs-consistentie). Gedeeld met start.engine.test.ts.',
     icon: 'LogIn',
     testCount: 0,
     defaultRole: 'any',

@@ -48,9 +48,9 @@ export const BUDGET_FLOW: UatFlow = {
     // ── 1 · hub ───────────────────────────────────────────────────────────
     { id: 'hub', scenarioId: 'UAT-BUDGET-02', label: 'WF-BUDGET-02 · Budget-vs-realisatie van de maand', kind: 'screen', stage: 1 },
     { id: 'degraded', scenarioId: 'UAT-BUDGET-27', label: 'WF-BUDGET-27 · Mislukte her-fetch verbergt de pagina niet meer', kind: 'action', stage: 1, subOf: 'hub' },
-    // Eenmalig, en alleen bij ongekoppelde transacties — in de praktijk direct
+    // Eenmalig, en alleen bij transacties zonder categorie — in de praktijk direct
     // ná de automatische eerste ophaal van ADR 0158 (WF-START-40).
-    { id: 'koppelaanbod', scenarioId: 'UAT-BUDGET-29', label: 'WF-BUDGET-29 · Eenmalig aanbod: transacties aan budgetten hangen (ADR 0158)', kind: 'action', stage: 1, subOf: 'hub' },
+    { id: 'koppelaanbod', scenarioId: 'UAT-BUDGET-29', label: 'WF-BUDGET-29 · Eenmalig aanbod: transacties categoriseren (ADR 0158)', kind: 'action', stage: 1, subOf: 'hub' },
     { id: 'x-start-sync', label: 'Eerste ophaal na de onboarding levert de transacties (WF-START-40)', kind: 'cross', stage: 1, crossZone: 'START' },
 
     // ── 2 · verkennen ─────────────────────────────────────────────────────
@@ -115,9 +115,9 @@ export const BUDGET_FLOW: UatFlow = {
     { from: 'setupgedaan', to: 'hub', label: 'al ingesteld' },
     { from: 'setup', to: 'hub' },
 
-    // eerste bezoek: het eenmalige koppelaanbod
+    // eerste bezoek: het eenmalige categoriseeraanbod
     { from: 'hub', to: 'koppelaanbod' },
-    { from: 'x-start-sync', to: 'koppelaanbod', kind: 'cross', label: 'opgehaalde transacties zonder budget' },
+    { from: 'x-start-sync', to: 'koppelaanbod', kind: 'cross', label: 'opgehaalde transacties zonder categorie' },
 
     // hub → verkennen
     { from: 'hub', to: 'analysehub' },

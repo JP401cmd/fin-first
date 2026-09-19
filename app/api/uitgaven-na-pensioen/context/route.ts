@@ -102,13 +102,14 @@ async function handleGet() {
   // deler (`historyMonths`) — via `transactionAnnualIncome`. De eigen
   // 12-maands-transactiequery en de all-time vroegste-inkomstendatum die hier
   // stonden zijn daarmee weg: die som liep tot en met de lopende maand. Transfer-
-  // INCLUSIEF, zoals de horizon-loader (zelfde som, zelfde semantiek).
+  // EXCLUSIEF, op één grondslag met de horizon-loader, de client-herlading en de
+  // dashboard-bundel (ADR 0169; vangrail lib/retirement-expense-basis.grondslag.test.ts).
   const { income: budgetIncome, realized } = await loadBudgetBasis(
     supabase,
     profile as Record<string, unknown>,
     allBudgets as unknown as BudgetBasisRow[],
   )
-  const txAnnualIncome = transactionAnnualIncome(realized, { includeTransfers: true })
+  const txAnnualIncome = transactionAnnualIncome(realized)
   const effectiveAnnualIncome = resolveAmountWithBasis(
     (profile as { income_source?: string | null }).income_source,
     Number(profile.net_monthly_income ?? 0) * 12,

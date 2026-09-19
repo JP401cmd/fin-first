@@ -274,6 +274,17 @@ ongewijzigd als vakterm in code (rapporten, voetnoten); de gebruikersvraag
 zelf is per 5 sep 2026 herschreven, zie onder. Het eindleeftijd-veld heet: *"Tot
 welke leeftijd moet je geld reiken?"*
 
+**Aantekening 19 sep 2026 (W-011) — de onboarding-stap draagt vraag 1 als kop.**
+De stap heet intern nog "Jouw plan" (stap-id, UAT-scenario's, de tabel hieronder),
+maar de ZICHTBARE kop is sinds deze datum `STOP_ANCHOR_QUESTION` — "Wanneer wil je
+stoppen met werken?". Reden: elke andere onboarding-stap draagt zijn vraag als kop
+(kicker + vraag + deck, zie `onboarding-shell.tsx`); "Jouw plan" was de enige
+naam-kop. Vraag 1 heeft daardoor geen eigen `<h2>` meer — tweemaal dezelfde zin
+onder elkaar leest als een fout — en de tegelgroep draagt hem als `aria-label`.
+Vraag 2 valt buiten die kop en houdt zijn eigen `<h2>`; het deck kondigt hem aan.
+Het besluit "één scherm, twee vragen" van 5 sep 2026 blijft staan: dit is een
+kopwijziging, geen splitsing.
+
 **Herzien 5 sep 2026 (eigenaar-besluit) — gewone taal op alle oppervlakken.**
 De eind-vorm is eigenlijk twee getallen: *tot welke leeftijd moet je geld
 reiken, en wat moet er dan nog over zijn?* Die zin is de kop van vraag 2 in

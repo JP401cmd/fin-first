@@ -61,7 +61,7 @@ type ConnectionRow = {
   provider_logo: string | null
   provider_id: string | null
   status: string | null
-  token_expires_at: string | null
+  consent_expires_at: string | null
 }
 
 type LinkRow = {
@@ -104,7 +104,7 @@ export async function GET() {
       // de success-pagina haar hele correctiemoment verliezen. Nu de backfill rond
       // is (0 rijen zonder `iban_encrypted`) is de plaintext-terugval niet langer
       // een vangnet maar precies de afhankelijkheid die de drop opblaast.
-      // `is_active`, `status` en `token_expires_at` staan er sinds fase 7 bij: dat
+      // `is_active`, `status` en `consent_expires_at` staan er sinds fase 7 bij: dat
       // zijn drie van de vier signalen die `deriveBankLinkHealth` nodig heeft (het
       // vierde, `last_synced_at`, stond er al). `provider_id` is de bank waarmee
       // het herstelpad opnieuw autoriseert.
@@ -113,7 +113,7 @@ export async function GET() {
       // deze route inruilde — zonder die twee kon dat oppervlak niet verhuizen,
       // en zolang het bleef staan hield het de plaintext `iban`-kolom in leven.
       .select(
-        'id, account_name, iban_encrypted, bank_account_id, is_active, last_synced_at, daily_requests, rate_limit_reset_date, bank_connections(provider_name, provider_logo, provider_id, status, token_expires_at), bank_accounts(name, iban_encrypted, linked_asset_id)',
+        'id, account_name, iban_encrypted, bank_account_id, is_active, last_synced_at, daily_requests, rate_limit_reset_date, bank_connections(provider_name, provider_logo, provider_id, status, consent_expires_at), bank_accounts(name, iban_encrypted, linked_asset_id)',
       )
       .eq('user_id', user.id)
       .eq('is_active', true)
@@ -166,7 +166,7 @@ export async function GET() {
         health: deriveBankLinkHealth({
           linkIsActive: row.is_active !== false,
           connectionStatus: connection?.status ?? null,
-          tokenExpiresAt: connection?.token_expires_at ?? null,
+          consentExpiresAt: connection?.consent_expires_at ?? null,
           lastSyncedAt: row.last_synced_at,
         }),
         bank_account_id: row.bank_account_id,

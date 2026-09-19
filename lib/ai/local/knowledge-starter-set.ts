@@ -630,10 +630,10 @@ export const KNOWLEDGE_STARTER_SET: KnowledgeStarterTemplate[] = [
   },
   {
     titel: 'Sleepmodus',
-    tags: ['sleepmodus', 'drag and drop', 'transacties toewijzen', 'budget toewijzen', 'slepen'],
+    tags: ['sleepmodus', 'drag and drop', 'transacties categoriseren', 'categoriseren', 'slepen'],
     categorie: 'TriFinity-begrippen',
     tekst:
-      "Sleepmodus is een sleep-gebaseerde manier om nog niet-toegewezen transacties één voor één aan een budget te koppelen. Steeds staat er één transactie in het midden van het scherm, terwijl je budgetten er als bollen omheen hangen; je sleept (of tikt) de transactie naar het juiste budget om hem toe te wijzen. De app gloeit alvast een voorstel op, gebaseerd op je bestaande regels en eerdere keuzes voor vergelijkbare tegenpartijen, en herkent transacties die op elkaar lijken zodat je ze in één beweging samen kunt toewijzen. Een toewijzing wordt pas definitief weggeschreven nadat je hem hebt bevestigd — de app verandert dus nooit alvast iets voordat jij het besluit hebt genomen.",
+      "Sleepmodus is een sleep-gebaseerde manier om transacties zonder categorie één voor één te categoriseren. Steeds staat er één transactie in het midden van het scherm, terwijl je budgetten er als bollen omheen hangen; je sleept (of tikt) de transactie naar het juiste budget om hem te categoriseren. De app gloeit alvast een voorstel op, gebaseerd op je bestaande regels en eerdere keuzes voor vergelijkbare tegenpartijen, en herkent transacties die op elkaar lijken zodat je ze in één beweging samen kunt categoriseren. Een keuze wordt pas definitief weggeschreven nadat je hem hebt bevestigd — de app verandert dus nooit alvast iets voordat jij het besluit hebt genomen.",
   },
   {
     titel: 'Levensgebeurtenissen',

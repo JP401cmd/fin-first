@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import { useState } from 'react'
 import { render, fireEvent, screen } from '@testing-library/react'
 import type { AssetQuickInput, DebtQuickInput } from '@/lib/quick-add/types'
-import { initialSectionPhases, type SectionPhase } from './section-phase'
+import { initialSchuldenPhases, initialSectionPhases, type SectionPhase } from './section-phase'
 
 /**
  * Regressie voor de terugknop-bug (Notion "Onboarding – Terugknop springt naar
@@ -143,7 +143,7 @@ describe('Onboarding-terugknop — tussen groepen (gelifte fase-stack)', () => {
     const [assets, setAssets] = useState<AssetQuickInput[]>([])
     const [debts, setDebts] = useState<DebtQuickInput[]>([])
     const [bezPhases, setBezPhases] = useState<SectionPhase[]>(() => initialSectionPhases())
-    const [schPhases, setSchPhases] = useState<SectionPhase[]>(() => initialSectionPhases())
+    const [schPhases, setSchPhases] = useState<SectionPhase[]>(() => initialSchuldenPhases())
 
     return step === 'bezittingen' ? (
       <OnboardingBezittingen
@@ -168,7 +168,7 @@ describe('Onboarding-terugknop — tussen groepen (gelifte fase-stack)', () => {
     )
   }
 
-  it('Terug op Schulden-vraag-1 keert terug op het Bezittingen-review (niet vraag 1)', () => {
+  it('Terug op het schulden-raster keert terug op het Bezittingen-review (niet vraag 1)', () => {
     const { container } = render(<MiniOrchestrator />)
 
     // Voeg een betaalrekening toe en rond de bezittingen af tot het review.
@@ -181,11 +181,12 @@ describe('Onboarding-terugknop — tussen groepen (gelifte fase-stack)', () => {
     fireEvent.click(footerButton(/Nee, ik ben klaar/)) // → review
     expect(container.textContent).toContain('Dit zijn je bezittingen')
 
-    // Ga door naar Schulden (remount van de sectie-boom).
+    // Ga door naar Schulden (remount van de sectie-boom). De sectie opent sinds
+    // B-054 raster-first op het aanvinkraster.
     fireEvent.click(footerButton(/Klopt het/))
-    expect(container.textContent).toContain('Heb je een hypotheek?')
+    expect(container.textContent).toContain('Welke schulden heb je?')
 
-    // Terug op Schulden-vraag-1 → groep terug naar Bezittingen. Die remount,
+    // Terug op het schulden-raster (stack-bodem) → groep terug naar Bezittingen. Die remount,
     // maar de gelifte fase-stack brengt 'm terug op het review — niet op vraag 1.
     fireEvent.click(backButton())
     expect(container.textContent).toContain('Dit zijn je bezittingen')

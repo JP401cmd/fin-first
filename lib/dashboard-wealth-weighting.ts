@@ -10,6 +10,7 @@
 // runway/buffer). Zie kaart "Dashboard telt gedeeld bezit overal even zwaar".
 
 import { resolveDepreciation, type Asset } from './asset-data'
+import { resolveExpectedReturnPct } from './asset-return'
 
 /** Losse asset-rij zoals de dashboard-loader ze uit Supabase krijgt. */
 export type WeightableAssetRow = {
@@ -105,8 +106,19 @@ export interface AssetTypeGroup {
  * percent-schaal van `assets.expected_return` wordt hier genormaliseerd (`/100`),
  * gelijk aan het horizon-kernel-pad. Consumenten vermenigvuldigen zelf met 100
  * voor weergave.
+ *
+ * @param terugvalRendementPct Profielrendement in PROCENTEN
+ *   (`resolveFireParams(profile).grossReturn × 100`) als terugval voor een
+ *   bezitting ZONDER eigen rendementsaanname (`expected_return = null`, ADR
+ *   0165) — keuze (a): dezelfde ketting als `potRendement` in de kernel, zodat
+ *   de vermogensverdeling op /overzicht niet 0% weegt waar /toekomst het
+ *   profielrendement rekent. Weggelaten → 0 (oude nul-basis; bestaande
+ *   callers/tests byte-identiek). Een ingevulde 0 blijft een bewuste 0%.
  */
-export function computeAssetsByType(assets: readonly WeightableAssetRow[]): AssetTypeGroup[] {
+export function computeAssetsByType(
+  assets: readonly WeightableAssetRow[],
+  terugvalRendementPct = 0,
+): AssetTypeGroup[] {
   type Acc = Omit<AssetTypeGroup, 'expectedReturn'>
   const grouped = assets.reduce<Record<string, Acc>>((acc, a) => {
     const type = a.asset_type ?? 'other'
@@ -123,9 +135,10 @@ export function computeAssetsByType(assets: readonly WeightableAssetRow[]): Asse
     // doc-comment op `weightedExpectedReturn` belooft en zoals de widgets (die er
     // ×100 overheen doen voor weergave) aannemen. Vóór deze normalisatie liet het
     // percent-schaal getal doorlekken naar de weergave → "665,5%".
+    // NULL → terugval (ADR 0166), nooit stil 0% via `?? 0`/`Number(null)`.
     const assetReturn = resolveDepreciation(a as unknown as Asset)
       ? 0
-      : Number(a.expected_return ?? 0) / 100
+      : resolveExpectedReturnPct(a.expected_return, terugvalRendementPct) / 100
     acc[type].weightedReturn += weightedValue * assetReturn
     return acc
   }, {})

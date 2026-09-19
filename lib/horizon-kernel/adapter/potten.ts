@@ -26,6 +26,7 @@
  */
 
 import type { Asset, AssetType } from '@/lib/asset-data'
+import { heeftEigenRendement } from '@/lib/asset-return'
 import { type Debt, type DebtType, computeRenteAflossingsSplit } from '@/lib/debt-data'
 import { classifyAsset, classifyDebt, type Box3Category } from '@/lib/box3-data'
 import { parseSaleConfig } from '@/lib/sale-config'
@@ -264,20 +265,24 @@ export interface AssetPotOpties {
  *   bewuste keuze (betaalrekening, crypto, afschrijvend bezit — `TYPICAL_RETURNS`
  *   kent zes types met default 0) en blijft 0%. Een niet-eindige waarde (NaN uit een
  *   corrupte rij) is óók geen "ontbreken" en blijft 0, zoals vóór TPR-02.
- * - Geverifieerde reikwijdte (13 sep 2026): `assets.expected_return` is NOT NULL
- *   DEFAULT 0, het bezittingenformulier weigert een leeg veld (rendementsband-check)
- *   en stuurt anders altijd een getal, `POST /api/assets` eist `z.number()`, quick-add
- *   en de onboarding-RPC vullen `TYPICAL_RETURNS`/COALESCE(…, 0). Via de DB komt
- *   `null` dus vandaag niet binnen; de terugval dekt in-memory/synthetische/legacy-
- *   rijen en is het CONTRACT waarop de Voorkeuren-kaart "Bruto rendement" leunt.
- *   Wil de app "geen eigen rendement" ook voor gebruikersdata kunnen uitdrukken,
- *   dan is dat een aparte kaart (kolom nullable + formulier/API — schemawijziging).
+ * - Reikwijdte BIJGEWERKT 19-09-2026 (TPR-02 vervolg, ADR 0166): `null` komt nu
+ *   WÉL via de database binnen. Migratie 20260919140000 maakte
+ *   `assets.expected_return` nullable en liet de DEFAULT 0 vallen, en het
+ *   bezittingenformulier + de laag-2-editor van de plan-review bieden "geen eigen
+ *   rendement" als EXPLICIETE keuze. De terugval dekt dus niet langer alleen
+ *   in-memory/synthetische/legacy-rijen maar echte gebruikersdata.
+ * - Deze functie draagt de DECIMALE kant van de ketting. De beslissing zelf
+ *   ("is er een eigen aanname?") komt uit `heeftEigenRendement`
+ *   (lib/asset-return.ts) zodat kern en weergave niet uit elkaar kunnen lopen;
+ *   de percentage-kant is `resolveExpectedReturnPct` daar. Bewust géén gedeelde
+ *   resolver over beide schalen — zie de docblock dáár voor waarom (×100 ÷100 is
+ *   niet bit-identiek en zou de gouden matrix laten kantelen).
  */
 export function potRendement(
   expectedReturnPct: number | null | undefined,
   terugvalRendement: number | undefined,
 ): number {
-  if (expectedReturnPct == null) {
+  if (!heeftEigenRendement(expectedReturnPct)) {
     const t = Number(terugvalRendement ?? 0)
     return Number.isFinite(t) ? t : 0
   }

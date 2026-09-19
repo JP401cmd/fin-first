@@ -36,6 +36,11 @@ function makeSupabase(recurrings: RecurringRow[]): SupabaseClient {
       gte: () => b,
       order: () => b,
       eq: () => b,
+      // De recurring-ophaal filtert met `.or(REVIEWED_RECURRING_FILTER)` op
+      // bevestigd-óf-uitgesloten; ook passthrough. Deze mock levert dus ÁLLE
+      // recurring-rijen, ongeacht `is_active` — de echte filtertoets staat in
+      // lib/vaste-lasten-summary.excluded-resurfaces.test.ts (fake-supabase).
+      or: () => b,
       // De vingerafdrukronde telt apart hoeveel rijen als overboeking zijn
       // gemarkeerd (`.in('transaction_type', …)`); passthrough volstaat hier,
       // want deze mock levert toch nul transacties.

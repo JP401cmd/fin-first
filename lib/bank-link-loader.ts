@@ -50,8 +50,8 @@ type LinkRow = {
   bank_account_id: string | null
   last_synced_at: string | null
   bank_connections:
-    | { provider_name: string | null; status: string | null; token_expires_at: string | null }
-    | { provider_name: string | null; status: string | null; token_expires_at: string | null }[]
+    | { provider_name: string | null; status: string | null; consent_expires_at: string | null }
+    | { provider_name: string | null; status: string | null; consent_expires_at: string | null }[]
     | null
 }
 
@@ -89,7 +89,7 @@ export async function loadCashBankLinksUncached(supabase: SupabaseClient): Promi
       .limit(MAX_CASH_ACCOUNTS),
     supabase
       .from('bank_connection_accounts')
-      .select('id, bank_account_id, last_synced_at, bank_connections(provider_name, status, token_expires_at)')
+      .select('id, bank_account_id, last_synced_at, bank_connections(provider_name, status, consent_expires_at)')
       .eq('user_id', user.id)
       .eq('is_active', true)
       .not('bank_account_id', 'is', null),
@@ -118,7 +118,7 @@ export async function loadCashBankLinksUncached(supabase: SupabaseClient): Promi
         ? {
             linkIsActive: true,
             connectionStatus: connection?.status ?? null,
-            tokenExpiresAt: connection?.token_expires_at ?? null,
+            consentExpiresAt: connection?.consent_expires_at ?? null,
             lastSyncedAt: link.last_synced_at,
           }
         : null,

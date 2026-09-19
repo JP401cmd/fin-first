@@ -38,7 +38,7 @@
 // (geldstroom/kassabon/rekeningen/instellingen/status) →
 // analyse (periode/inzichten/zoeken) → transactiebeheer (toevoegen/bewerken/
 // splitsen/verwijderen/tegenpartij) → vaste lasten (bekijken/classificeren/
-// opzeggen/AI/wat-als/kalender/forecast/regelbeheer) → bankimport (MT940-CSV/
+// opzeggen/AI/forecast/regelbeheer) → bankimport (MT940-CSV/
 // AI-cat/handmatig-cat/eigen-rekening/sleepmodus/foutherstel) → bank koppelen
 // → uitkomst → cross-doorwerking.
 //
@@ -104,8 +104,6 @@ export const CASH_FLOW: UatFlow = {
     { id: 'classificeren', scenarioId: 'UAT-CASH-17', label: 'WF-CASH-17 · Terugkerend item classificeren/bevestigen', kind: 'action', stage: 4, lane: 'vastelasten', subOf: 'vastelasten' },
     { id: 'opzeggen', scenarioId: 'UAT-CASH-18', label: 'WF-CASH-18 · Abonnement opzeggen (opzegbrief)', kind: 'action', stage: 4, lane: 'vastelasten', subOf: 'vastelasten' },
     { id: 'aianalyse', scenarioId: 'UAT-CASH-19', label: 'WF-CASH-19 · Vaste kosten laten analyseren door Fin (AI)', kind: 'action', stage: 4, lane: 'vastelasten', subOf: 'vastelasten' },
-    { id: 'watals', scenarioId: 'UAT-CASH-20', label: 'WF-CASH-20 · "Wat als ik opzeg"-schuif', kind: 'action', stage: 4, lane: 'vastelasten', subOf: 'vastelasten' },
-    { id: 'kalender', scenarioId: 'UAT-CASH-21', label: 'WF-CASH-21 · Cashflow-kalender (5 weken)', kind: 'screen', stage: 4, lane: 'vastelasten' },
     { id: 'forecast', scenarioId: 'UAT-CASH-22', label: 'WF-CASH-22 · Cashflow-forecast (6 maanden)', kind: 'screen', stage: 4, lane: 'vastelasten' },
     { id: 'regelbeheer', scenarioId: 'UAT-CASH-31', label: 'WF-CASH-31 · Terugkerende regels beheren/stopzetten/verwijderen', kind: 'action', stage: 4, lane: 'vastelasten', subOf: 'vastelasten' },
 
@@ -119,13 +117,14 @@ export const CASH_FLOW: UatFlow = {
     { id: 'eigenrekening', scenarioId: 'UAT-CASH-27', label: 'WF-CASH-27 · Eigen-overboekingen herkennen/markeren', kind: 'action', stage: 5, lane: 'import', subOf: 'mt940' },
     { id: 'sleepmodus', scenarioId: 'UAT-CASH-28', label: 'WF-CASH-28 · Sleepmodus (drag-and-drop categoriseren)', kind: 'action', stage: 5, lane: 'import', subOf: 'mt940' },
     { id: 'importfout', scenarioId: 'UAT-CASH-29', label: 'WF-CASH-29 · Import-foutherstel (netwerk/batches/sessie)', kind: 'action', stage: 5, lane: 'import', subOf: 'mt940' },
+    { id: 'andererekening', scenarioId: 'UAT-CASH-69', label: 'WF-CASH-69 · Waarschuwing: regels staan al op een andere eigen rekening — "toch importeren?"', kind: 'action', stage: 5, lane: 'import', subOf: 'mt940' },
     { id: 'bankkoppelen', scenarioId: 'UAT-CASH-30', label: 'WF-CASH-30 · Bank koppelen: doelrekening kiezen (wizardstap 2) + eerste sync', kind: 'action', stage: 5, lane: 'import' },
     { id: 'doelrekeningonboarding', scenarioId: 'UAT-CASH-44', label: 'WF-CASH-44 · Doelrekening kiezen tijdens onboarding (nul kandidaten)', kind: 'action', stage: 5, lane: 'import', subOf: 'bankkoppelen' },
     { id: 'saldoeerstekoppeling', scenarioId: 'UAT-CASH-39', label: 'WF-CASH-39 · Saldo ook bij eerste koppeling opgehaald', kind: 'action', stage: 5, lane: 'import', subOf: 'bankkoppelen' },
     { id: 'tegenpartijmeta', scenarioId: 'UAT-CASH-38', label: 'WF-CASH-38 · Tegenpartij uit meta.counter_party_* (Rabobank/xs2a)', kind: 'action', stage: 5, lane: 'import', subOf: 'bankkoppelen' },
     { id: 'dedupscope', scenarioId: 'UAT-CASH-40', label: 'WF-CASH-40 · Duplicaatcontrole rekening-gescoped', kind: 'action', stage: 5, lane: 'import', subOf: 'bankkoppelen' },
     { id: 'dedupenof', scenarioId: 'UAT-CASH-66', label: 'WF-CASH-66 · Sync stempelt ownership + ontdubbelt tegen de partner op een en/of-rekening', kind: 'action', stage: 5, lane: 'import', subOf: 'bankkoppelen' },
-    { id: 'herautorisatie', scenarioId: 'UAT-CASH-37', label: 'WF-CASH-37 · Herautorisatie na 90 dagen (hergebruik via external_account_id)', kind: 'action', stage: 5, lane: 'import', subOf: 'bankkoppelen' },
+    { id: 'herautorisatie', scenarioId: 'UAT-CASH-37', label: 'WF-CASH-37 · Herautorisatie na verlopen consent (uiterlijk 180 dagen) (hergebruik via external_account_id)', kind: 'action', stage: 5, lane: 'import', subOf: 'bankkoppelen' },
     { id: 'ratelimit', scenarioId: 'UAT-CASH-35', label: 'WF-CASH-35 · Sync-rate-limit (10/dag)', kind: 'action', stage: 5, lane: 'import', subOf: 'bankkoppelen' },
     { id: 'legesync', scenarioId: 'UAT-CASH-36', label: 'WF-CASH-36 · Sync zonder nieuwe transacties', kind: 'action', stage: 5, lane: 'import', subOf: 'bankkoppelen' },
     { id: 'verbreken', scenarioId: 'UAT-CASH-33', label: 'WF-CASH-33 · Verbinding verbreken (zachte ontkoppeling)', kind: 'action', stage: 5, lane: 'import', subOf: 'bankkoppelen' },
@@ -194,8 +193,6 @@ export const CASH_FLOW: UatFlow = {
     { from: 'vastelasten', to: 'classificeren' },
     { from: 'classificeren', to: 'opzeggen' },
     { from: 'vastelasten', to: 'aianalyse' },
-    { from: 'vastelasten', to: 'watals' },
-    { from: 'vastelasten', to: 'kalender' },
     { from: 'vastelasten', to: 'forecast' },
     { from: 'vastelasten', to: 'regelbeheer' },
     { from: 'opzeggen', to: 'x-will', kind: 'cross', label: 'actielijst' },
@@ -211,6 +208,7 @@ export const CASH_FLOW: UatFlow = {
     { from: 'mt940', to: 'eigenrekening' },
     { from: 'mt940', to: 'sleepmodus' },
     { from: 'mt940', to: 'importfout' },
+    { from: 'mt940', to: 'andererekening' },
     { from: 'csv', to: 'aicat' },
     { from: 'bankkoppelen', to: 'x-mijn', kind: 'cross' },
     { from: 'bankkoppelen', to: 'doelrekeningonboarding' },
@@ -250,8 +248,6 @@ export const CASH_FLOW: UatFlow = {
     { from: 'bulkregelfeedback', to: 'uitkomst' },
     { from: 'opzeggen', to: 'uitkomst' },
     { from: 'aianalyse', to: 'uitkomst' },
-    { from: 'watals', to: 'uitkomst' },
-    { from: 'kalender', to: 'uitkomst' },
     { from: 'forecast', to: 'uitkomst' },
     { from: 'regelbeheer', to: 'uitkomst' },
     { from: 'aicat', to: 'uitkomst' },
@@ -260,6 +256,7 @@ export const CASH_FLOW: UatFlow = {
     { from: 'eigenrekening', to: 'uitkomst' },
     { from: 'sleepmodus', to: 'uitkomst' },
     { from: 'importfout', to: 'uitkomst' },
+    { from: 'andererekening', to: 'uitkomst' },
     { from: 'bankkoppelen', to: 'uitkomst' },
     { from: 'doelrekeningonboarding', to: 'uitkomst' },
     { from: 'saldoeerstekoppeling', to: 'uitkomst' },

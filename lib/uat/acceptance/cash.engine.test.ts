@@ -150,7 +150,13 @@ describe('UAT Cash — acceptatiecriteria dekking', () => {
     // volledig uit de app verwijderd. De nog-geldige versheidsmelding-dekking
     // (StaleDataGuard/-Banner/-Dot) die op datzelfde criterium stond is
     // verhuisd naar WF-CASH-07.
-    expect(workflows.length).toBe(67)
+    // 67 → 65: WF-CASH-20 ("Wat als ik opzeg"-schuif) en WF-CASH-21
+    // (cashflow-kalender op de vaste-lastenpagina) zijn VERVALLEN (W-017,
+    // 19-09-2026) — beide oppervlakken én `cancelEffect` zijn verwijderd; de
+    // Agenda-widget (OVZ) dekt "wanneer komt de afschrijving" nog.
+    // 65 → 66: WF-CASH-69 (import waarschuwt bij overlap met een andere eigen
+    // rekening — "toch importeren?", 19-09-2026).
+    expect(workflows.length).toBe(66)
   })
 
   it('elk criterium heeft een geldige assertion.kind', () => {
@@ -229,7 +235,10 @@ describe('UAT Cash — acceptatiecriteria dekking', () => {
     // CASH_ENGINE_CHECKS-rij.
     // 40 → 41: WF-CASH-67 (grenzenpot "Grens bereikt", ADR 0136) is 'exact' en
     // krijgt een CASH_ENGINE_CHECKS-rij.
-    expect(exactWorkflows.length).toBe(41)
+    // 41 → 39: WF-CASH-20 en WF-CASH-21 (beide 'exact') zijn vervallen (W-017).
+    // 39 → 40: WF-CASH-69 (overlap andere eigen rekening) is 'exact' op
+    // `countOtherAccountOverlaps` en krijgt een CASH_ENGINE_CHECKS-rij.
+    expect(exactWorkflows.length).toBe(40)
   })
 
   it('markeert de jitter-gebonden/AI/gebonden randgevallen met de juiste kind', () => {

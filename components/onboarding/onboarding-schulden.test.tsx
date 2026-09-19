@@ -2,6 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import { useState } from 'react'
 import { render, fireEvent, screen } from '@testing-library/react'
 import type { DebtQuickInput } from '@/lib/quick-add/types'
+import { QUICK_ADD_DEBT_ORDER } from '@/lib/debt-data'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 vi.mock('@/components/app/quick-add-wizard/quick-add-wizard', () => ({
@@ -28,7 +29,8 @@ vi.mock('@/components/app/quick-add-wizard/quick-add-wizard', () => ({
     ) : null,
 }))
 
-import { OnboardingSchulden } from './onboarding-schulden'
+import { OnboardingSchulden, FEATURED_DEBT_TYPES } from './onboarding-schulden'
+import { healSchuldenPhases, initialSchuldenPhases, type SectionPhase } from './section-phase'
 
 afterEach(() => vi.clearAllMocks())
 
@@ -37,21 +39,28 @@ const footerButton = (name: string | RegExp) =>
   screen.getAllByRole('button', { name })[0]
 const footerText = (text: string | RegExp) => screen.getAllByText(text)[0]
 const hasYesNo = () => screen.queryAllByRole('button', { name: 'Nee' }).length > 0
+const RASTER_TITLE = 'Welke schulden heb je?'
 
 function Host({
   initialDebts = [],
+  initialPhases,
   onNext = vi.fn(),
 }: {
   initialDebts?: DebtQuickInput[]
+  /** Gelifte (controlled) fase-stack — bv. een hersteld concept van vóór raster-first. */
+  initialPhases?: SectionPhase[]
   onNext?: () => void
 }) {
   const [debts, setDebts] = useState<DebtQuickInput[]>(initialDebts)
+  const [phases, setPhases] = useState<SectionPhase[] | undefined>(initialPhases)
   return (
     <OnboardingSchulden
       quickDebts={debts}
       onDebtsChange={setDebts}
       onNext={onNext}
       onBack={vi.fn()}
+      phases={phases}
+      onPhasesChange={initialPhases ? setPhases : undefined}
     />
   )
 }
@@ -68,59 +77,43 @@ const linkedDebt = (
   linked_client_ref: `ref-${debt_type}`,
 })
 
-/** Klikt "Nee" tot het aanvinkraster verschijnt en geeft de gelezen koppen terug. */
-function walkAllNo(container: HTMLElement): string[] {
-  const headings: string[] = []
-  for (let i = 0; i < 20; i++) {
-    const heading = container.querySelector('h1')?.textContent?.trim() ?? ''
-    headings.push(heading)
-    if (!hasYesNo()) break
-    fireEvent.click(footerButton('Nee'))
-  }
-  return headings
+/** Vink een type aan en start de queue. */
+function pickAndStart(types: string[]) {
+  for (const t of types) fireEvent.click(screen.getByRole('checkbox', { name: t }))
+  fireEvent.click(footerButton(/Verder met \d+ schuld/))
 }
 
-// ── Schermtelling (H13) ────────────────────────────────────────────────
+// ── Schermtelling (B-054 — raster-first, herziening van H13) ───────────
 
 describe('OnboardingSchulden — schermtelling', () => {
-  it('telt bij "alles nee" precies 5 schermen: 4 ja/nee-vragen + het aanvinkraster', () => {
-    // Regressietest voor H13: de sectie telde 8 schermen (7 ja/nee + raster).
-    // Deze test is de reden dat een terugkeer naar een lange vragenlijst niet
-    // ongemerkt kan gebeuren.
+  it('telt bij "geen schulden" precies 1 scherm: het aanvinkraster, zonder ja/nee-kop', () => {
+    // Regressietest: H13 (26 aug) telde 5 schermen (4 ja/nee + raster), de
+    // versie daarvóór 8. Sinds B-054 opent de sectie direct op het raster.
     const { container } = render(<Host />)
-    const headings = walkAllNo(container)
-    expect(headings).toEqual([
-      'Heb je een hypotheek?',
-      'Heb je een studielening?',
-      'Heb je een persoonlijke lening?',
-      'Heb je een autolening of private lease?',
-      'Welke van deze heb je nog meer?',
-    ])
+    expect(container.textContent).toContain(RASTER_TITLE)
+    expect(hasYesNo()).toBe(false)
+    expect(container.textContent).not.toContain('Heb je een hypotheek?')
   })
 
-  it('elke ja/nee-vraag levert een ánder schuldtype op (geen duplicaat-vraag)', () => {
-    // Regressietest voor defect (a): "doorlopend krediet" en "roodstand"
-    // leverden beide `revolving_credit` op — twee vragen, één ononderscheidbare
-    // uitkomst, omdat DebtQuickInput geen subtype draagt.
-    const seen: string[] = []
-    for (let i = 0; i < 20; i++) {
-      const { unmount } = render(<Host />)
-      for (let n = 0; n < i; n++) fireEvent.click(footerButton('Nee'))
-      if (!hasYesNo()) {
-        unmount()
-        break
-      }
-      fireEvent.click(footerButton('Ja'))
-      seen.push(screen.getByTestId('wizard-collect').getAttribute('data-debt-type') ?? '')
-      unmount()
-    }
-    expect(seen).toEqual(['mortgage', 'student_loan', 'personal_loan', 'car_loan'])
-    expect(new Set(seen).size).toBe(seen.length)
+  it('de vier meest voorkomende soorten staan als groep "Meest voorkomend" vooraan, elk hoogstens één keer', () => {
+    const { container } = render(<Host />)
+    expect(container.textContent).toContain('Meest voorkomend')
+    expect(container.textContent).toContain('Andere schulden')
+    expect(FEATURED_DEBT_TYPES).toEqual(['mortgage', 'student_loan', 'personal_loan', 'car_loan'])
+    expect(new Set(FEATURED_DEBT_TYPES).size).toBe(FEATURED_DEBT_TYPES.length)
+    // Vooraan: de eerste vier checkboxes zijn de uitgelichte soorten.
+    const names = screen.getAllByRole('checkbox').map((c) => c.getAttribute('aria-label') ?? (c.closest('label')?.textContent ?? ''))
+    expect(names[0]).toContain('Hypotheek')
+    expect(names[1]).toContain('Studielening')
+    expect(names[2]).toContain('Persoonlijke lening')
+    expect(names[3]).toContain('Autolening')
+    expect(screen.getAllByRole('checkbox')).toHaveLength(QUICK_ADD_DEBT_ORDER.length)
   })
 
-  it('slaat élke al gekoppelde schuldsoort over — hypotheek én autolening', () => {
-    // Regressietest voor defect (b): alleen de hypotheek werd overgeslagen; wie
-    // in stap 3 een auto mét autolening opgaf kreeg die vraag alsnog.
+  it('een al gekoppelde schuldsoort (hypotheek én autolening) staat uitgeschakeld in het raster mét herkomst', () => {
+    // Regressietest voor het oude defect (b): alleen de hypotheek werd
+    // overgeslagen. Nu: zichtbaar maar niet dubbel opvoerbaar, voor élk type
+    // uit LINKED_DEBT_SUGGESTIONS.
     const { container } = render(
       <Host
         initialDebts={[
@@ -129,25 +122,20 @@ describe('OnboardingSchulden — schermtelling', () => {
         ]}
       />,
     )
-    const headings = walkAllNo(container)
-    expect(headings).toEqual([
-      'Heb je een studielening?',
-      'Heb je een persoonlijke lening?',
-      'Welke van deze heb je nog meer?',
-    ])
+    const hypotheek = screen.getByRole('checkbox', { name: /Hypotheek/ }) as HTMLInputElement
+    const auto = screen.getByRole('checkbox', { name: /Autolening/ }) as HTMLInputElement
+    expect(hypotheek.disabled).toBe(true)
+    expect(auto.disabled).toBe(true)
+    expect(container.textContent).toContain('al opgegeven via je woning')
+    expect(container.textContent).toContain('al opgegeven via je voertuig')
+    // Niet-gekoppelde soorten blijven gewoon aanvinkbaar.
+    expect((screen.getByRole('checkbox', { name: /Studielening/ }) as HTMLInputElement).disabled).toBe(false)
+    // De gekoppelde schulden staan óók in het lopende overzicht.
+    expect(container.textContent).toContain('Al opgegeven bij je bezittingen')
+    expect(container.textContent).toContain('Hypotheek — Mijn woning')
   })
 
-  it('slaat de hypotheek-vraag over wanneer al een hypotheek aan het huis gekoppeld is', () => {
-    const { container } = render(
-      <Host initialDebts={[linkedDebt('mortgage', 'Hypotheek — Mijn woning', 250_000)]} />,
-    )
-    expect(container.textContent).toContain('Heb je een studielening?')
-    expect(container.textContent).not.toContain('Heb je een hypotheek?')
-  })
-
-  it('een niet-gekoppelde autolening slaat de autolening-vraag NIET over', () => {
-    // Alleen een koppeling aan een bezitting maakt de vraag overbodig; een los
-    // toegevoegde autolening niet (dan kun je er nog een tweede hebben).
+  it('een niet-gekoppelde autolening schakelt de autolening-tegel NIET uit (er kan een tweede zijn)', () => {
     const standalone: DebtQuickInput = {
       debt_type: 'car_loan',
       name: 'Autolening',
@@ -155,73 +143,28 @@ describe('OnboardingSchulden — schermtelling', () => {
       linked_asset_id: null,
       linked_client_ref: null,
     }
-    const { container } = render(<Host initialDebts={[standalone]} />)
-    const headings = walkAllNo(container)
-    expect(headings).toContain('Heb je een autolening of private lease?')
+    render(<Host initialDebts={[standalone]} />)
+    expect((screen.getByRole('checkbox', { name: /Autolening/ }) as HTMLInputElement).disabled).toBe(false)
   })
 })
 
-// ── Ja/nee-kop + drempelloze uitgang ───────────────────────────────────
+// ── Drempelloze uitgang ────────────────────────────────────────────────
 
-describe('OnboardingSchulden — begeleide ja/nee met altijd-uitgang', () => {
-  it('opent met de eerste schuld-vraag "Heb je een hypotheek?"', () => {
-    const { container } = render(<Host />)
-    expect(container.textContent).toContain('Heb je een hypotheek?')
-  })
-
-  it('biedt op elke vraag een drempelloze sectie-uitgang die de sectie afsluit', () => {
+describe('OnboardingSchulden — altijd-uitgang', () => {
+  it('biedt op het raster een scherpe uitgang "Ik heb geen schulden" die de sectie afsluit', () => {
     const onNext = vi.fn()
     render(<Host onNext={onNext} />)
-    fireEvent.click(footerText('Ik heb (verder) geen schulden'))
+    fireEvent.click(footerText('Ik heb geen schulden'))
     expect(onNext).toHaveBeenCalledOnce()
   })
 
-  it('de uitgang blijft beschikbaar op een latere vraag (en sluit de sectie)', () => {
+  it('met een schuld in het overzicht heet de uitgang "Ik heb verder geen schulden"', () => {
     const onNext = vi.fn()
-    const { container } = render(<Host onNext={onNext} />)
-    fireEvent.click(footerButton('Nee'))
-    expect(container.textContent).toContain('Heb je een studielening?')
-    fireEvent.click(footerText('Ik heb (verder) geen schulden'))
-    expect(onNext).toHaveBeenCalledOnce()
-  })
-
-  it('de uitgang staat óók op het aanvinkraster', () => {
-    const onNext = vi.fn()
-    const { container } = render(<Host onNext={onNext} />)
-    walkAllNo(container)
-    expect(container.textContent).toContain('Welke van deze heb je nog meer?')
-    fireEvent.click(footerText('Ik heb (verder) geen schulden'))
-    expect(onNext).toHaveBeenCalledOnce()
-  })
-
-  it('"Ja" → wizard → collect voegt een schuld toe en toont de "nog een?"-loop', () => {
-    const { container } = render(<Host />)
-    fireEvent.click(footerButton('Ja'))
-    fireEvent.click(screen.getByTestId('wizard-collect'))
-    expect(container.textContent).toContain('Test mortgage')
-    expect(container.textContent).toContain('Nog een')
-  })
-
-  // Regressie L2: de vervolgvraag houdt dezelfde term aan als de eerste vraag.
-  // Zonder `moreLabel`-override erft hij `DEBT_QUICK_ADD_LABELS.student_loan`
-  // ('Studielening (DUO)') en lekt de parenthetical de zin in.
-  it('de "nog een?"-vraag houdt de term van de eerste vraag aan (studielening)', () => {
-    const { container } = render(<Host />)
-    fireEvent.click(footerButton('Nee')) // hypotheek
-    expect(container.textContent).toContain('Heb je een studielening?')
-    fireEvent.click(footerButton('Ja'))
-    fireEvent.click(screen.getByTestId('wizard-collect'))
-    expect(container.textContent).toContain('Nog een studielening?')
-    expect(container.textContent).not.toContain('(duo)')
-  })
-
-  it('toont een gekoppelde schuld (hypotheek via de woning) óók in deze stap', () => {
-    const { container } = render(
-      <Host initialDebts={[linkedDebt('mortgage', 'Hypotheek — Mijn woning', 250_000)]} />,
+    render(
+      <Host onNext={onNext} initialDebts={[linkedDebt('mortgage', 'Hypotheek — Mijn woning', 250_000)]} />,
     )
-    expect(container.textContent).toContain('Hypotheek — Mijn woning')
-    expect(container.textContent).toContain('via je woning')
-    expect(container.textContent).toContain('Al opgegeven bij je bezittingen')
+    fireEvent.click(footerText('Ik heb verder geen schulden'))
+    expect(onNext).toHaveBeenCalledOnce()
   })
 
   it('een gekoppelde DGA-schuld toont de herkomst "via je BV"', () => {
@@ -230,20 +173,15 @@ describe('OnboardingSchulden — begeleide ja/nee met altijd-uitgang', () => {
     )
     expect(container.textContent).toContain('RC-schuld aan BV')
     expect(container.textContent).toContain('via je BV')
+    expect((screen.getByRole('checkbox', { name: /Lening bij eigen BV/ }) as HTMLInputElement).disabled).toBe(true)
   })
 })
 
 // ── Aanvinkraster + collect-queue ──────────────────────────────────────
 
-describe('OnboardingSchulden — aanvinkraster (staart)', () => {
-  function advanceToRaster(container: HTMLElement) {
-    walkAllNo(container)
-    expect(container.textContent).toContain('Welke van deze heb je nog meer?')
-  }
-
-  it('toont de volledige catalogus als aanvinkbare tegels — óók al gevraagde types', () => {
-    const { container } = render(<Host />)
-    advanceToRaster(container)
+describe('OnboardingSchulden — aanvinkraster + queue', () => {
+  it('toont de volledige catalogus als aanvinkbare tegels', () => {
+    render(<Host />)
     expect(screen.getByRole('checkbox', { name: 'Hypotheek' })).toBeInTheDocument()
     expect(screen.getByRole('checkbox', { name: 'Creditcard' })).toBeInTheDocument()
     expect(screen.getByRole('checkbox', { name: 'Belastingschuld' })).toBeInTheDocument()
@@ -252,25 +190,26 @@ describe('OnboardingSchulden — aanvinkraster (staart)', () => {
   it('zonder vinkjes gaat "Verder" direct door (geen review bij een lege lijst)', () => {
     const onNext = vi.fn()
     const { container } = render(<Host onNext={onNext} />)
-    advanceToRaster(container)
     fireEvent.click(footerButton(/Verder — geen van deze/))
     expect(onNext).toHaveBeenCalledOnce()
     expect(container.textContent).not.toContain('Dit zijn je schulden')
   })
 
-  it('opent de wizard één keer per aangevinkt type, in rastervolgorde', () => {
+  it('opent de wizard per aangevinkt type in rastervolgorde, met ná elke toevoeging "Nog een …?"', () => {
     const { container } = render(<Host />)
-    advanceToRaster(container)
-    // In omgekeerde rastervolgorde aanvinken; de queue moet tóch de
-    // rastervolgorde aanhouden (credit_card vóór belastingschuld).
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Belastingschuld' }))
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Creditcard' }))
-    fireEvent.click(footerButton(/Verder met 2 schulden/))
+    // In omgekeerde rastervolgorde aanvinken; de queue houdt tóch de
+    // rastervolgorde aan (credit_card vóór belastingschuld).
+    pickAndStart(['Belastingschuld', 'Creditcard'])
 
     expect(screen.getByTestId('wizard-collect')).toHaveAttribute('data-debt-type', 'credit_card')
     fireEvent.click(screen.getByTestId('wizard-collect'))
+    expect(container.textContent).toContain('Nog een creditcard?')
+    fireEvent.click(footerButton('Nee'))
+
     expect(screen.getByTestId('wizard-collect')).toHaveAttribute('data-debt-type', 'belastingschuld')
     fireEvent.click(screen.getByTestId('wizard-collect'))
+    expect(container.textContent).toContain('Nog een belastingschuld?')
+    fireEvent.click(footerButton('Nee'))
 
     // Queue leeg → review met beide schulden.
     expect(container.textContent).toContain('Dit zijn je schulden')
@@ -278,9 +217,42 @@ describe('OnboardingSchulden — aanvinkraster (staart)', () => {
     expect(container.textContent).toContain('Test belastingschuld')
   })
 
+  it('"Meest voorkomend" gaat in de queue vóór de andere soorten', () => {
+    render(<Host />)
+    pickAndStart(['Creditcard', 'Persoonlijke lening'])
+    // personal_loan staat in QUICK_ADD_DEBT_ORDER ná credit_card? Nee — maar
+    // in het raster staat hij bij "Meest voorkomend" en dus vooraan.
+    expect(screen.getByTestId('wizard-collect')).toHaveAttribute('data-debt-type', 'personal_loan')
+  })
+
+  it('twee schulden van hetzelfde type via "Nog een …?" → beide in de lijst (de gap uit melding B-054)', () => {
+    const { container } = render(<Host />)
+    pickAndStart(['Persoonlijke lening'])
+    fireEvent.click(screen.getByTestId('wizard-collect'))
+    expect(container.textContent).toContain('Nog een persoonlijke lening?')
+    fireEvent.click(footerButton('Ja'))
+    // De wizard opnieuw op hetzelfde type — nooit een eigen inline formulier.
+    expect(screen.getByTestId('wizard-collect')).toHaveAttribute('data-debt-type', 'personal_loan')
+    fireEvent.click(screen.getByTestId('wizard-collect'))
+    expect(container.textContent).toContain('Nog een persoonlijke lening?')
+    fireEvent.click(footerButton('Nee'))
+    expect(container.textContent).toContain('Dit zijn je schulden')
+    expect(screen.getAllByText('Test personal_loan')).toHaveLength(2)
+    expect(container.textContent).toContain('2 schulden')
+  })
+
+  // Regressie L2: de vervolgvraag houdt dezelfde term aan als de tegel, zonder
+  // de parenthetical van 'Studielening (DUO)'.
+  it('de "nog een?"-vraag zegt "studielening" zonder "(duo)"', () => {
+    const { container } = render(<Host />)
+    pickAndStart(['Studielening (DUO)'])
+    fireEvent.click(screen.getByTestId('wizard-collect'))
+    expect(container.textContent).toContain('Nog een studielening?')
+    expect(container.textContent).not.toContain('(duo)')
+  })
+
   it('het label van de primaire knop telt de aangevinkte schulden mee', () => {
     const { container } = render(<Host />)
-    advanceToRaster(container)
     fireEvent.click(screen.getByRole('checkbox', { name: 'Creditcard' }))
     expect(container.textContent).toContain('Verder met 1 schuld')
     fireEvent.click(screen.getByRole('checkbox', { name: 'Belastingschuld' }))
@@ -292,14 +264,11 @@ describe('OnboardingSchulden — aanvinkraster (staart)', () => {
 
   it('de wizard annuleren slaat dat type over en gaat door met de rest', () => {
     const { container } = render(<Host />)
-    advanceToRaster(container)
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Creditcard' }))
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Belastingschuld' }))
-    fireEvent.click(footerButton(/Verder met 2 schulden/))
-
+    pickAndStart(['Creditcard', 'Belastingschuld'])
     fireEvent.click(screen.getByTestId('wizard-close')) // creditcard overslaan
     expect(screen.getByTestId('wizard-collect')).toHaveAttribute('data-debt-type', 'belastingschuld')
     fireEvent.click(screen.getByTestId('wizard-collect'))
+    fireEvent.click(footerButton('Nee'))
     expect(container.textContent).toContain('Dit zijn je schulden')
     expect(container.textContent).not.toContain('Test credit_card')
   })
@@ -307,50 +276,74 @@ describe('OnboardingSchulden — aanvinkraster (staart)', () => {
   it('alles annuleren zonder schulden houdt de gebruiker op het raster', () => {
     const onNext = vi.fn()
     const { container } = render(<Host onNext={onNext} />)
-    advanceToRaster(container)
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Creditcard' }))
-    fireEvent.click(footerButton(/Verder met 1 schuld/))
+    pickAndStart(['Creditcard'])
     fireEvent.click(screen.getByTestId('wizard-close'))
-    expect(container.textContent).toContain('Welke van deze heb je nog meer?')
+    expect(container.textContent).toContain(RASTER_TITLE)
     expect(onNext).not.toHaveBeenCalled()
+  })
+
+  it('de wizard annuleren vanuit "Nog een?" laat die vraag staan (niets kwijt)', () => {
+    const { container } = render(<Host />)
+    pickAndStart(['Creditcard'])
+    fireEvent.click(screen.getByTestId('wizard-collect'))
+    fireEvent.click(footerButton('Ja'))
+    fireEvent.click(screen.getByTestId('wizard-close'))
+    expect(container.textContent).toContain('Nog een creditcard?')
+    expect(container.textContent).toContain('Test credit_card')
+  })
+
+  it('Terug vanaf "Nog een?" landt op het raster en houdt het al toegevoegde', () => {
+    const { container } = render(<Host />)
+    pickAndStart(['Creditcard', 'Belastingschuld'])
+    fireEvent.click(screen.getByTestId('wizard-collect'))
+    expect(container.textContent).toContain('Nog een creditcard?')
+    fireEvent.click(screen.getAllByRole('button', { name: /Vorige stap/ })[0])
+    expect(container.textContent).toContain(RASTER_TITLE)
+    expect(container.textContent).toContain('Test credit_card')
+    expect(screen.queryByTestId('wizard-collect')).toBeNull()
   })
 })
 
 // ── Afsluitend overzicht (review-fase) ─────────────────────────────────
 
 describe('OnboardingSchulden — afsluitend overzicht', () => {
-  it('toont na het raster het review-scherm wanneer er schulden zijn', () => {
+  it('toont na de queue het review-scherm en sluit via "Klopt het" af', () => {
     const onNext = vi.fn()
     const { container } = render(<Host onNext={onNext} />)
-    fireEvent.click(footerButton('Ja'))
+    pickAndStart(['Creditcard'])
     fireEvent.click(screen.getByTestId('wizard-collect'))
-    fireEvent.click(footerButton('Nee')) // verlaat hypotheek-more
-    walkAllNo(container)
-    fireEvent.click(footerButton(/Verder — geen van deze/))
+    fireEvent.click(footerButton('Nee'))
     expect(container.textContent).toContain('Dit zijn je schulden')
     expect(onNext).not.toHaveBeenCalled()
     fireEvent.click(footerButton(/Klopt het/))
     expect(onNext).toHaveBeenCalledOnce()
   })
 
+  it('"Verder — geen van deze" mét een gekoppelde schuld toont het review (er is iets te bevestigen)', () => {
+    const onNext = vi.fn()
+    const { container } = render(
+      <Host onNext={onNext} initialDebts={[linkedDebt('mortgage', 'Hypotheek — Mijn woning', 250_000)]} />,
+    )
+    fireEvent.click(footerButton(/Verder — geen van deze/))
+    expect(container.textContent).toContain('Dit zijn je schulden')
+    expect(onNext).not.toHaveBeenCalled()
+  })
+
   it('de drempelloze sectie-uitgang slaat het review-scherm bewust over', () => {
     const onNext = vi.fn()
     const { container } = render(<Host onNext={onNext} />)
-    fireEvent.click(footerButton('Ja'))
+    pickAndStart(['Creditcard'])
     fireEvent.click(screen.getByTestId('wizard-collect'))
-    fireEvent.click(footerButton('Nee')) // verlaat more → volgende vraag
-    fireEvent.click(footerText('Ik heb (verder) geen schulden'))
+    fireEvent.click(footerText('Ik heb verder geen schulden'))
     expect(onNext).toHaveBeenCalledOnce()
     expect(container.textContent).not.toContain('Dit zijn je schulden')
   })
 
   it('"Voeg nog iets toe" vanuit review opent de picker en keert erna terug', () => {
     const { container } = render(<Host />)
-    fireEvent.click(footerButton('Ja'))
+    pickAndStart(['Creditcard'])
     fireEvent.click(screen.getByTestId('wizard-collect'))
-    fireEvent.click(footerButton('Nee'))
-    walkAllNo(container)
-    fireEvent.click(footerButton(/Verder — geen van deze/)) // → review
+    fireEvent.click(footerButton('Nee')) // → review
     expect(container.textContent).toContain('Dit zijn je schulden')
     fireEvent.click(footerButton(/Voeg nog iets toe/))
     expect(container.textContent).toContain('Wat voor schuld?')
@@ -359,6 +352,29 @@ describe('OnboardingSchulden — afsluitend overzicht', () => {
     fireEvent.click(screen.getByTestId('wizard-collect'))
     expect(container.textContent).toContain('Dit zijn je schulden')
     expect(container.textContent).toContain('Test belastingschuld')
+  })
+})
+
+// ── Concept-herstel van vóór raster-first ──────────────────────────────
+
+describe('OnboardingSchulden — herstelde stack van vóór B-054', () => {
+  it('healSchuldenPhases: ask/more → raster, dubbele rasters gevouwen, review blijft, leeg → beginstack', () => {
+    expect(healSchuldenPhases([{ kind: 'ask', qIndex: 0 }])).toEqual([{ kind: 'pick-many' }])
+    expect(healSchuldenPhases([{ kind: 'ask', qIndex: 2 }, { kind: 'more', qIndex: 2 }])).toEqual([
+      { kind: 'pick-many' },
+    ])
+    expect(
+      healSchuldenPhases([{ kind: 'ask', qIndex: 3 }, { kind: 'pick-many' }, { kind: 'review' }]),
+    ).toEqual([{ kind: 'pick-many' }, { kind: 'review' }])
+    expect(healSchuldenPhases([])).toEqual(initialSchuldenPhases())
+  })
+
+  it('een niet-geheelde stack op "ask" rendert tóch het raster (vangnet in de component)', () => {
+    const { container } = render(
+      <Host initialPhases={[{ kind: 'ask', qIndex: 1 }]} initialDebts={[]} />,
+    )
+    expect(container.textContent).toContain(RASTER_TITLE)
+    expect(hasYesNo()).toBe(false)
   })
 })
 
@@ -380,25 +396,26 @@ describe('OnboardingSchulden — raakzones ≥44px', () => {
     }
   }
 
-  it('de ja/nee-vraag draagt overal min-h-11 — óók de drempelloze uitgang', () => {
-    // Regressietest voor defect (c): de uitgang stond op min-h-9 (36px).
-    const { container } = render(<Host />)
+  it('het aanvinkraster haalt de raakzone op elke tegel — óók de uitgeschakelde', () => {
+    const { container } = render(
+      <Host initialDebts={[linkedDebt('mortgage', 'Hypotheek — Mijn woning', 250_000)]} />,
+    )
     assertTouchTargets(container)
   })
 
-  it('het aanvinkraster haalt de raakzone op elke tegel', () => {
+  it('de "nog een?"-vraag draagt overal min-h-11 — óók de drempelloze uitgang', () => {
     const { container } = render(<Host />)
-    walkAllNo(container)
+    pickAndStart(['Creditcard'])
+    fireEvent.click(screen.getByTestId('wizard-collect'))
+    expect(container.textContent).toContain('Nog een creditcard?')
     assertTouchTargets(container)
   })
 
   it('het losse picker-scherm ("Wat voor schuld?") haalt de raakzone', () => {
     const { container } = render(<Host />)
-    fireEvent.click(footerButton('Ja'))
+    pickAndStart(['Creditcard'])
     fireEvent.click(screen.getByTestId('wizard-collect'))
     fireEvent.click(footerButton('Nee'))
-    walkAllNo(container)
-    fireEvent.click(footerButton(/Verder — geen van deze/))
     fireEvent.click(footerButton(/Voeg nog iets toe/))
     expect(container.textContent).toContain('Wat voor schuld?')
     assertTouchTargets(container)

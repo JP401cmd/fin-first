@@ -69,3 +69,34 @@ describe('admin seed — schema-drift preflight slaat de wipe over', () => {
     expect(returnIdx).toBeLessThan(wipeIdx)
   })
 })
+
+/**
+ * De wipe vóór de persona-seed krijgt de service-role mee (kaart "Accountreset
+ * laat vragenlijstantwoorden staan"): RLS staat de eigenaar terecht niet toe
+ * afgeronde vragenlijst-sessies, feedback, user_reports, net_worth_history en
+ * de bucket-prefix zelf te wissen — zonder `{ service }` is die stap in
+ * `deleteAllUserData` een stille no-op. Zelfde patroon als
+ * `app/api/onboarding/reset/route.ts`; géén fullErase (reseed, geen verwijdering).
+ */
+describe('admin seed — de wipe krijgt de service-client mee', () => {
+  const routePath = path.resolve(__dirname, 'route.ts')
+  const source = readSourceLF(routePath)
+  const codeOnly = source
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .split('\n')
+    .map((line) => line.replace(/\/\/.*$/, ''))
+    .join('\n')
+
+  it('importeert getServiceClient en geeft { service } door aan deleteAllUserData', () => {
+    expect(codeOnly).toMatch(/import \{ getServiceClient \} from '@\/lib\/supabase\/service'/)
+    expect(codeOnly).toMatch(/deleteAllUserData\(supabase, userId, progress, \{ service \}\)/)
+    expect(codeOnly).not.toMatch(/fullErase/)
+  })
+
+  it('de env-guard staat vóór de aanroep (best-effort zonder service-key, zoals onboarding/reset)', () => {
+    const guardIdx = codeOnly.indexOf('SUPABASE_SERVICE_ROLE_KEY')
+    const wipeIdx = codeOnly.indexOf('deleteAllUserData(')
+    expect(guardIdx).toBeGreaterThan(-1)
+    expect(guardIdx).toBeLessThan(wipeIdx)
+  })
+})

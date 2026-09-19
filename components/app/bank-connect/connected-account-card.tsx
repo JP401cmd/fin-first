@@ -18,7 +18,7 @@ import { BankAuthWaiting } from './bank-auth-waiting'
  * De toestand komt uit `deriveBankLinkHealth` (`lib/bank-connection-status.ts`),
  * net als op het herkomst-symbool en in de status-pil. Hier stond tot fase 7 een
  * eigen `status === 'expired' || 'revoked'`; die kopie is weg. Leid dus nergens
- * in dit bestand iets af uit `status`, `token_expires_at` of `is_active`.
+ * in dit bestand iets af uit `status`, `consent_expires_at` of `is_active`.
  *
  * Sinds de voorbereiding op het droppen van de plaintext IBAN-kolommen draait die
  * afleiding niet eens meer in deze client: de kaart consumeert een

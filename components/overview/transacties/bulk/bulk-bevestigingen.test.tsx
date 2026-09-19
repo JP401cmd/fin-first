@@ -311,7 +311,7 @@ describe('BulkBudgetSheet — AC7: Eigen rekening-notice en mutableCount', () =>
 
   it('de knoptekst gebruikt mutableCount (na aftrek van splits), niet de volledige selectie', () => {
     renderBudgetSheet({ count: 12, mutableCount: 9 })
-    expect(screen.getByRole('button', { name: 'Koppel 9 transacties' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Categoriseer 9 transacties' })).toBeTruthy()
   })
 
   it('meldt hoeveel geselecteerde transacties gesplitst zijn en dus buiten de wijziging blijven', () => {

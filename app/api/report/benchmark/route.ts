@@ -69,8 +69,11 @@ export async function GET() {
       // percentage dat de gebruiker op /overzicht en in het instellingenblok
       // ziet. Het benchmark-rapport zet 'm naast een peer-mediaan; op de rauwe
       // 6-maands meting zou hij met een ander getal vergeleken worden dan de app
-      // toont. Veldnaam volgt het `BenchmarkUserMetrics`-contract.
-      savingsRate6m: dashboardData.effectiveSavingsRatePct ?? null,
+      // toont. De grondslag gaat mee zodat de uitleg zegt waar het getal op rust.
+      effectiveSavingsRatePct: dashboardData.effectiveSavingsRatePct ?? null,
+      savingsRateBasis: dashboardData.savingsRateIncomeBasis && dashboardData.savingsRateExpensesBasis
+        ? { income: dashboardData.savingsRateIncomeBasis, expenses: dashboardData.savingsRateExpensesBasis }
+        : undefined,
       netWorth: dashboardData.netWorth ?? null,
       yearlyIncome,
       // CONSUMEER het canonieke bundelveld (12-mnd rolling, lib/expense-rate.ts).

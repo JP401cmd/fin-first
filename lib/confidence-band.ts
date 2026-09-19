@@ -11,8 +11,18 @@
  *
  * Formule (z-score bepaalt de percentielen):
  *   spread(year_idx) = sigma × √year_idx
- *   low  = mean × (1 − z × spread)
- *   high = mean × (1 + z × spread)
+ *   low  = mean − |mean| × z × spread
+ *   high = mean + |mean| × z × spread
+ *
+ * GEEN klem op nul (B-053, 19 sep 2026). De band volgt het teken van de lijn:
+ * een negatief netto vermogen (tekort-lening ná depletie — de kernel rekent
+ * bewust door, "geen halt-op-nul") krijgt een band rond die negatieve waarde,
+ * met `low ≤ mid ≤ high` behouden via |mean|. Tot dit besluit werd alléén de
+ * onderkant op `Math.max(0, …)` geklemd, waardoor de band bij een negatieve
+ * lijn omkeerde (low = 0 > mid > high) en "op nul bleef hangen" terwijl de
+ * lijn eronder zakte. Onder de default P40–P60 blijft de factor over elke
+ * planhorizon < 1 (0,2533 × 0,15 × √65 ≈ 0,31), dus een positieve lijn krijgt
+ * ook zonder klem nooit een negatieve onderrand.
  *
  * Default percentielen: **P40–P60** (z ≈ 0.2533) — een smalle band die
  * de kern van de verwachting toont zonder de grafiek te domineren. De
@@ -48,11 +58,12 @@ export function computeConfidenceBand(
     const yearsFromNow = idx
     const spread = sigma * Math.sqrt(yearsFromNow)
     const factor = zScore * spread
+    const halfWidth = Math.abs(row.endPortfolio) * factor
     return {
       age: row.age,
-      low: Math.max(0, row.endPortfolio * (1 - factor)),
+      low: row.endPortfolio - halfWidth,
       mid: row.endPortfolio,
-      high: row.endPortfolio * (1 + factor),
+      high: row.endPortfolio + halfWidth,
     }
   })
 }

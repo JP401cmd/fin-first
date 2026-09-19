@@ -6,6 +6,19 @@ import {
   INITIAL_PENSION_DRAFT,
   type PensionDraft,
 } from './onboarding-pensioen'
+import {
+  estimateAccruedPensionFromNet,
+  estimateAccruedPensionMonthly,
+  roundToEstimateStep,
+} from '@/lib/jaarruimte'
+import { grossFromNet } from '@/lib/box1-tax'
+import {
+  ESTIMATE_ROUNDING_STEP,
+  NL_AOW_MONTHLY,
+  NL_AOW_MONTHLY_SAMENWONEND,
+  NL_PENSIOENOPBOUW_STARTLEEFTIJD,
+} from '@/lib/constants'
+import { formatCurrency } from '@/lib/format'
 
 // Mock PensionPdfUpload: één knop die een PensionParseResult via onParseResult
 // teruggeeft — zo testen we het upload-pad zonder de echte file/fetch-flow.
@@ -34,6 +47,9 @@ vi.mock('@/components/app/horizon/pension-pdf-upload', () => ({
 
 afterEach(() => vi.clearAllMocks())
 
+/** Intl zet een harde spatie tussen € en het getal; vergelijk op gewone spaties. */
+const norm = (s: string | null | undefined) => (s ?? '').replace(/ /g, ' ')
+
 // OnboardingShell rendert de footer dubbel (desktop + mobiele sticky bar).
 const footerButton = (name: string | RegExp) =>
   screen.getAllByRole('button', { name })[0] as HTMLButtonElement
@@ -44,12 +60,18 @@ function Host({
   onSkip = vi.fn(),
   samenwonend = false,
   aowAge,
+  age,
+  netMonthlyIncome,
+  incomeIsEstimate,
   onData,
 }: {
   onNext?: () => void
   onSkip?: () => void
   samenwonend?: boolean
   aowAge?: number
+  age?: number | null
+  netMonthlyIncome?: number
+  incomeIsEstimate?: boolean
   /** Spy op elke draft-update — voor asserts op de toegepaste schatting. */
   onData?: (data: PensionDraft) => void
 }) {
@@ -63,6 +85,9 @@ function Host({
       }}
       samenwonend={samenwonend}
       aowAge={aowAge}
+      age={age}
+      netMonthlyIncome={netMonthlyIncome}
+      incomeIsEstimate={incomeIsEstimate}
       onNext={onNext}
       onSkip={onSkip}
       onBack={vi.fn()}
@@ -139,11 +164,111 @@ describe('OnboardingPensioen', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Neem over' }))
     const last = updates[updates.length - 1]
     // Zelfde canonieke helper als de component gebruikt (lib/jaarruimte):
-    // €50.000, 15 jaar → > 0 en gelijk aan het draft-bedrag.
-    expect(Number(last.grossMonthly)).toBeGreaterThan(0)
+    // €50.000, 15 jaar → 723 → op de schattingsstap €725 in het draft-bedrag.
+    expect(Number(last.grossMonthly)).toBe(
+      roundToEstimateStep(estimateAccruedPensionMonthly(50_000, 15)),
+    )
+    expect(Number(last.grossMonthly) % ESTIMATE_ROUNDING_STEP).toBe(0)
     expect(last.startAge).toBe('68')
+    expect(last.isEstimate).toBe(true)
     // "Verder" is nu enabled — de schatting telt als ingevulde waarde.
     expect(footerButton('Verder').disabled).toBe(false)
+  })
+
+  // ── "Schat het voor me" (B-055): leeftijd + netto inkomen → vóórvulling ───
+
+  it('"Schat het voor me" verschijnt alleen wanneer leeftijd én netto inkomen bekend zijn', () => {
+    const { unmount } = render(<Host age={40} netMonthlyIncome={3000} />)
+    fireEvent.click(screen.getByText('Schat het zelf'))
+    expect(screen.getByRole('button', { name: /Schat het voor me/ })).toBeTruthy()
+    expect(screen.queryByText(/Help me schatten/)).toBeNull()
+    unmount()
+
+    // Zonder geboortedatum: geen knop, wel de bescheiden link (geen verzonnen bedrag).
+    const zonderLeeftijd = render(<Host age={null} netMonthlyIncome={3000} />)
+    fireEvent.click(screen.getByText('Schat het zelf'))
+    expect(screen.queryByRole('button', { name: /Schat het voor me/ })).toBeNull()
+    expect(screen.getByText(/Help me schatten/)).toBeTruthy()
+    zonderLeeftijd.unmount()
+
+    // Zonder inkomen ("Later invullen"): idem.
+    render(<Host age={40} netMonthlyIncome={0} />)
+    fireEvent.click(screen.getByText('Schat het zelf'))
+    expect(screen.queryByRole('button', { name: /Schat het voor me/ })).toBeNull()
+  })
+
+  it('"Schat het voor me" vult bruto jaarsalaris en jaren zichtbaar en bewerkbaar vóór, uit de canonieke compositie', () => {
+    const { container } = render(<Host age={40} netMonthlyIncome={3000} aowAge={67} />)
+    fireEvent.click(screen.getByText('Schat het zelf'))
+    fireEvent.click(screen.getByRole('button', { name: /Schat het voor me/ }))
+
+    const verwacht = estimateAccruedPensionFromNet({ netMonthly: 3000, age: 40 })
+    const salary = screen.getByLabelText(/Bruto jaarsalaris/i) as HTMLInputElement
+    const years = screen.getByLabelText(/Jaren pensioenopbouw/i) as HTMLInputElement
+    // Bruto via grossFromNet — géén marginaal-tarief-benadering.
+    expect(Number(salary.value)).toBe(grossFromNet(36_000, 2026))
+    expect(Number(years.value)).toBe(40 - NL_PENSIOENOPBOUW_STARTLEEFTIJD)
+    // De aanname over de loopbaanstart staat er in gewone taal bij.
+    expect(screen.getByText(new RegExp(`vanaf je ${NL_PENSIOENOPBOUW_STARTLEEFTIJD}e`))).toBeTruthy()
+    // Zelfde bedrag als de pure helper.
+    expect(verwacht.monthly).toBeGreaterThan(0)
+    expect(norm(container.textContent)).toContain(norm(formatCurrency(verwacht.monthly)))
+
+    // Bewerkbaar: jaren overtypen verandert de uitkomst en haalt de voorvul-regel weg.
+    fireEvent.change(years, { target: { value: '5' } })
+    expect(screen.queryByText(/Voorgevuld:/)).toBeNull()
+    expect(norm(container.textContent)).not.toContain(norm(formatCurrency(verwacht.monthly)))
+  })
+
+  it('de uitkomst zegt expliciet dat dit niet de AOW is, met het SVB-bedrag als contrast — en noemt de AOW niet in de bedragzin', () => {
+    const { container } = render(<Host age={40} netMonthlyIncome={3000} aowAge={67} />)
+    fireEvent.click(screen.getByText('Schat het zelf'))
+    fireEvent.click(screen.getByRole('button', { name: /Schat het voor me/ }))
+
+    expect(screen.getByText('Dit is niet je AOW.')).toBeTruthy()
+    // De bedragzin zelf gaat over werkgeverspensioen en noemt de AOW niet.
+    const bedragzin = screen.getByText(/bruto per maand aan werkgeverspensioen/)
+    expect(bedragzin.textContent).not.toMatch(/AOW/)
+    // Het SVB-bedrag voor een alleenstaande (lib/constants.ts, nooit lokaal).
+    expect(norm(container.textContent)).toContain(norm(formatCurrency(NL_AOW_MONTHLY)))
+    expect(norm(container.textContent)).not.toContain(norm(formatCurrency(NL_AOW_MONTHLY_SAMENWONEND)))
+    expect(screen.getByText(/vanaf je AOW-leeftijd \(67 jaar\) bovenop/)).toBeTruthy()
+    // Geen imperatief / productverwijzing (Wft): de tekst noemt de bron, niet een actie.
+    expect(screen.getByText(/mijnpensioen\.nl-overzicht is de enige harde bron/)).toBeTruthy()
+  })
+
+  it('samenwonend: het AOW-contrast gebruikt het SVB-bedrag per persoon', () => {
+    const { container } = render(<Host age={40} netMonthlyIncome={3000} samenwonend />)
+    fireEvent.click(screen.getByText('Schat het zelf'))
+    fireEvent.click(screen.getByRole('button', { name: /Schat het voor me/ }))
+    expect(norm(container.textContent)).toContain(norm(formatCurrency(NL_AOW_MONTHLY_SAMENWONEND)))
+    expect(norm(container.textContent)).toContain('per persoon, samenwonend')
+  })
+
+  it('"Neem over" na "Schat het voor me" zet "(schatting)" op het bedragveld; overtypen haalt het weg (UR3-05 crit. 3)', () => {
+    const updates: PensionDraft[] = []
+    render(<Host age={40} netMonthlyIncome={3000} aowAge={67} onData={(d) => updates.push(d)} />)
+    fireEvent.click(screen.getByText('Schat het zelf'))
+    fireEvent.click(screen.getByRole('button', { name: /Schat het voor me/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Neem over' }))
+
+    const verwacht = estimateAccruedPensionFromNet({ netMonthly: 3000, age: 40 })
+    expect(Number(updates[updates.length - 1].grossMonthly)).toBe(verwacht.monthly)
+    expect(updates[updates.length - 1].isEstimate).toBe(true)
+    expect(screen.getByText('(schatting)')).toBeTruthy()
+
+    fireEvent.change(screen.getByLabelText(/Geschat bruto pensioen per maand/i), {
+      target: { value: '900' },
+    })
+    expect(updates[updates.length - 1].isEstimate).toBe(false)
+    expect(screen.queryByText('(schatting)')).toBeNull()
+    expect(screen.getByText('(huidige waarde)')).toBeTruthy()
+  })
+
+  it('een geschat inkomen maakt de hint "(geschatte)" — schatting op schatting wordt benoemd', () => {
+    render(<Host age={40} netMonthlyIncome={3075} incomeIsEstimate />)
+    fireEvent.click(screen.getByText('Schat het zelf'))
+    expect(screen.getByText(/het \(geschatte\) netto/)).toBeTruthy()
   })
 
   it('inschat-hulp: salaris onder de AOW-franchise toont de €0-uitleg zonder overneem-knop', () => {

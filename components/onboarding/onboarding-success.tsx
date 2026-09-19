@@ -1,6 +1,39 @@
+/**
+ * OnboardingSuccess — het scherm ná de opslag en ná de afrondingsstappen
+ * budget/bank (ADR 0156). Laatste halte vóór het homescherm en de rondleiding.
+ *
+ * ══ Wat hier staat en waarom (W-015, 19 sep 2026) ═════════════════════════
+ *
+ * Tot deze datum vertelde dit scherm dat "TriFinity uit twee modules bestaat",
+ * met twee feature-kaarten die een kopie waren van een landingssectie uit juni.
+ * Twee problemen: die indeling bestáát niet meer (het menu is sinds 15 sep plat
+ * — Home, vier hefbomen, De toekomst; `lib/nav-config.ts`), en de featurelijst
+ * was al van de landing weggedreven. Een nieuwe gebruiker kreeg dus een kaart
+ * van een gebouw dat één klik later anders blijkt te zijn.
+ *
+ * Nu staan hier de vier WAARDES uit `lib/onboarding/waardes.ts` — dezelfde vier
+ * die tot 19 sep in de welkomstpopup vóór stap 1 stonden. Ze zijn verhuisd naar
+ * dít moment omdat ze hier iets anders doen: vóór de onboarding zijn het
+ * beloftes zonder referentie, erna heeft de gebruiker ze net zelf gevuld
+ * (bezittingen/schulden/pensioen, inkomen/uitgaven, stop-anker, Fin) en de vier
+ * accenten per stapgroep ervaren (`STEP_ACCENT`). De winst is herkenning, en de
+ * brug naar de rondleiding op /overzicht, die dezelfde indeling mét eigen
+ * cijfers laat zien (ADR 0130).
+ *
+ * **Bewust STATISCH.** Geen eigen cijfer in "Wat je hebt": op het
+ * bank-herlaadpad (`recapAvailableRef === false`, de bankstap gaat dan direct
+ * naar `success`) zijn de sessie-antwoorden weg — precies het pad waar de
+ * klaar-recap óók al oversloeg. Bovendien stond het getal net op `klaar` en
+ * opent de rondleiding ermee.
+ *
+ * **Geen `colorVars`-prop**, anders dan bij de popup: dit scherm portalt niet
+ * maar staat in de page-wrapper met `stepTintStyle`, dus `var(--color-kern-500)`
+ * en de rest lossen vanzelf op naar de accenten van déze gebruiker.
+ */
+
 import { FinDots } from '@/components/app/fin-dots'
-import { Wallet, Compass, type LucideIcon } from 'lucide-react'
 import { Button } from '@/components/editorial'
+import { WAARDES } from '@/lib/onboarding/waardes'
 
 export function OnboardingSuccess({
   onDashboard,
@@ -27,48 +60,47 @@ export function OnboardingSuccess({
       {/* Editorial divider */}
       <div className="mx-auto mt-8 mb-8 h-px w-16 bg-[var(--border-md)]" />
 
-      {/* Twee modules — overzicht van vandaag + de toekomst */}
+      {/* Vandaag op orde, morgen in beeld — vandaag = wat je hebt + wat er
+          omgaat, morgen = waar het op uitloopt + waar je op kunt sturen. De
+          kop overspant dus precies de vier waardes hieronder. */}
       <h2 className="font-display text-xl font-semibold tracking-tight text-[var(--ink)] sm:text-2xl">
         Vandaag op orde, <em className="italic text-kern-600">morgen in beeld</em>
       </h2>
       <p className="mx-auto mt-3 max-w-md font-serif text-sm leading-relaxed text-[var(--ink-2)] sm:text-base">
-        TriFinity bestaat uit twee modules die naadloos op elkaar aansluiten. Samen geven ze inzicht in waar je nu staat én waar je naartoe gaat.
+        Je hebt net verteld wat je hebt, wat er omgaat en waar je naartoe wilt. Vier dingen
+        houdt TriFinity vanaf nu voor je bij.
       </p>
 
-      <div className="mt-8 grid w-full grid-cols-1 gap-4 sm:grid-cols-2">
-        <ModuleKaart
-          kleur="var(--color-kern-600)"
-          rubriek="Het Overzicht · Vandaag"
-          titel="Wat heb ik, wat geef ik uit?"
-          ondertitel="Alles wat je hebt en uitgeeft, in één rustig beeld."
-          features={[
-            'Bezittingen, schulden, cashflow en belasting',
-            'Dagelijkse briefing met zes inzichten',
-            'Doelen gekoppeld aan échte rekeningen',
-            'Samen-modus voor wie financiën deelt',
-          ]}
-          bgClass="bg-kern-50"
-          borderClass="border-kern-200"
-          iconColor="text-kern-600"
-          Icon={Wallet}
-        />
-        <ModuleKaart
-          kleur="var(--color-horizon-600)"
-          rubriek="De Toekomst · Morgen + later"
-          titel="Wat brengt mijn vrijheid dichterbij?"
-          ondertitel="Levensgebeurtenissen, scenario's en de Rekenhulp van Fin."
-          features={[
-            'Tijdas met levensgebeurtenissen (kinderen, verhuizing, pensioen)',
-            'FIRE-prognose met scenario-vergelijking',
-            'Rekenhulp-bibliotheek met 12 kant-en-klare rekenhulpen',
-            'Vraag Fin een eigen rekenhulp op maat',
-          ]}
-          bgClass="bg-horizon-50"
-          borderClass="border-horizon-200"
-          iconColor="text-horizon-600"
-          Icon={Compass}
-        />
-      </div>
+      {/* De vier waardes — elk met de kicker-streep in zijn eigen accent
+          (editorial patroon-kaart *Kicker-streep*), identiek aan hoe ze in de
+          welkomstpopup stonden. 2×2 op desktop, één kolom op mobiel;
+          `text-left` omdat de container gecentreerd is en lopende tekst links
+          hoort uit te lijnen. */}
+      <ul className="mt-8 grid w-full grid-cols-1 gap-x-8 gap-y-6 text-left sm:grid-cols-2">
+        {WAARDES.map((waarde) => (
+          <li key={waarde.kicker} className="flex gap-3">
+            <span
+              aria-hidden
+              className="mt-[9px] h-px w-5 shrink-0"
+              style={{ background: `var(--color-${waarde.accent}-500)` }}
+            />
+            <div className="min-w-0">
+              <p
+                className="font-mono text-[10px] uppercase tracking-[0.20em]"
+                style={{ color: `var(--color-${waarde.accent}-700)` }}
+              >
+                {waarde.kicker}
+              </p>
+              <p className="mt-1 font-serif text-[15px] font-semibold leading-snug text-[var(--ink)]">
+                {waarde.belofte}
+              </p>
+              <p className="mt-1 text-[13px] leading-snug text-[var(--ink-3)]">
+                {waarde.toelichting}
+              </p>
+            </div>
+          </li>
+        ))}
+      </ul>
 
       {/* Fin's closing — font-serif italic */}
       <div className="mx-auto mt-10 max-w-md border-y border-[var(--border-ed)] px-4 py-4">
@@ -97,10 +129,17 @@ export function OnboardingSuccess({
         <span className="font-semibold text-[var(--ink-2)]">Mijn &rarr; Weergave en uiterlijk</span>.
       </p>
 
-      {/* Decorative color bar — twee modules (Overzicht + Toekomst) */}
-      <div className="mt-8 flex w-full max-w-xs items-center gap-0">
-        <div className="h-0.5 flex-1 bg-kern-300" />
-        <div className="h-0.5 flex-1 bg-horizon-300" />
+      {/* Sierbalk — vier segmenten in de volgorde van de waardes hierboven,
+          zodat de kleurtaal die de gebruiker in de stappen zag hier als
+          geheel terugkomt. */}
+      <div className="mt-8 flex w-full max-w-xs items-center gap-0" aria-hidden="true">
+        {WAARDES.map((waarde) => (
+          <div
+            key={waarde.accent}
+            className="h-0.5 flex-1"
+            style={{ background: `var(--color-${waarde.accent}-300)` }}
+          />
+        ))}
       </div>
 
       {/* CTA — naar het eigen homescherm (ADR 0130).
@@ -115,77 +154,6 @@ export function OnboardingSuccess({
       >
         Naar je overzicht
       </Button>
-    </div>
-  )
-}
-
-/* ── Module-kaart — krantenrubriek-stijl (mirror van de landingspagina) ── */
-
-function ModuleKaart({
-  kleur,
-  rubriek,
-  titel,
-  ondertitel,
-  features,
-  bgClass,
-  borderClass,
-  iconColor,
-  Icon,
-}: {
-  kleur: string
-  rubriek: string
-  titel: string
-  ondertitel: string
-  features: string[]
-  bgClass: string
-  borderClass: string
-  iconColor: string
-  Icon: LucideIcon
-}) {
-  return (
-    <div
-      className={`overflow-hidden rounded-[var(--r-lg)] border ${borderClass} bg-[var(--paper)] text-left`}
-    >
-      {/* Kaart-header — krantenrubriek */}
-      <div
-        className={`flex items-center justify-between border-b-2 px-4 py-2.5 ${bgClass}`}
-        style={{ borderBottomColor: kleur }}
-      >
-        <p
-          className="font-sans text-[10px] font-bold uppercase tracking-[0.12em]"
-          style={{ color: kleur }}
-        >
-          {rubriek}
-        </p>
-        <Icon className={`h-4 w-4 ${iconColor}`} aria-hidden="true" />
-      </div>
-
-      {/* Titel + ondertitel */}
-      <div className="px-4 py-4">
-        <h3 className="mb-1 font-display text-lg font-bold leading-tight text-[var(--ink)]">
-          {titel}
-        </h3>
-        <p className="font-serif text-sm italic text-[var(--ink-3)]">{ondertitel}</p>
-      </div>
-
-      {/* Features */}
-      <div className="border-t border-dashed border-[var(--border-ed)] px-4 py-4">
-        <ul className="space-y-2">
-          {features.map((f) => (
-            <li
-              key={f}
-              className="flex items-start gap-2 font-serif text-sm text-[var(--ink-2)]"
-            >
-              <span
-                aria-hidden="true"
-                className="mt-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full"
-                style={{ backgroundColor: kleur }}
-              />
-              <span>{f}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
     </div>
   )
 }

@@ -13,7 +13,7 @@ export const KERN_PERSONALITY: DomainPersonality = {
     'Vrijheidstijd berekenen vanuit huidige situatie',
   ],
   examplePhrases: [
-    'Je netto vermogen is €108.400 — dat is 3 jaar en 7 maanden vrijgekocht.',
+    'Je netto vermogen is €108.400 — dat is 3 jaar en 7 maanden opgebouwde vrijheidstijd.',
     'Je boodschappenbudget zit op 92%. Nog €32 over, dat is iets meer dan 1 dag vrijheid.',
     'Deze maand heb je 8 dagen vrijheid verdiend door je besparingen.',
     'Laten we kijken naar de feiten van je uitgaven deze maand.',

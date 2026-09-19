@@ -133,7 +133,7 @@ export interface LocalChatOverview {
   hasData: boolean
   /** Netto vermogen in EUR (bezittingen − schulden). */
   nettoVermogen: number
-  /** Vrijgekochte tijd als leesbare string, bv. "2 jaar en 9 maanden". */
+  /** Opgebouwde vrijheidstijd als leesbare string, bv. "2 jaar en 9 maanden". */
   vrijheidstijd: string
   /** FIRE-doel (volledige vrijheid) in EUR, op dezelfde grondslag als het vrijheids-%. */
   fireDoel: number
@@ -204,7 +204,7 @@ export interface LocalChatTerugkerend {
   grootste: { naam: string; perMaand: number }[]
 }
 
-/** Vrijgekochte-tijd string uit hele jaren + maanden (zelfde vorm als de context-formatter). */
+/** Opgebouwde-vrijheidstijd string uit hele jaren + maanden (zelfde vorm als de context-formatter). */
 function formatVrijheidstijd(years: number, months: number): string {
   if (years <= 0 && months <= 0) return '0 maanden'
   const parts: string[] = []

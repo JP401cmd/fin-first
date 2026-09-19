@@ -45,6 +45,8 @@ describe('parseCoachState — defaults en corrupte invoer', () => {
       dismissed: ['gap_bank', 'path_core'],
       lastDismissedAt: '2026-09-05T10:00:00.000Z',
       guideLastShownAt: '2026-09-04T21:30:00.000Z',
+      // W-016: de sleutel ontbreekt in de invoer, dus Fin blijft proactief.
+      proactief: true,
     })
   })
 
@@ -145,5 +147,33 @@ describe('isSameLocalDay — rond middernacht in lokale tijd', () => {
     const nu = new Date(2026, 8, 5, 12, 0)
     // eslint-disable-next-line trifinity/geen-maandgrens-iso -- lokaal moment met uur; de UTC-conversie is hier het te testen gedrag, geen kalendergrens.
     expect(isSameLocalDay(vorigJaar.toISOString(), nu)).toBe(false)
+  })
+})
+
+/**
+ * W-016 — de vlag "mag Fin uit zichzelf een tip tonen?". Default AAN, en bewust
+ * "alleen een letterlijke false zet hem uit": een ontbrekende, lege of corrupte
+ * sleutel mag Fin nooit stilzetten (dat zou een stille functieverdwijning zijn).
+ */
+describe('parseCoachState — proactief (W-016)', () => {
+  it('is true bij een ontbrekende sleutel', () => {
+    expect(parseCoachState({ dismissed: ['gap_bank'] }).proactief).toBe(true)
+  })
+
+  it('is true bij een lege of corrupte staat', () => {
+    expect(parseCoachState(null).proactief).toBe(true)
+    expect(parseCoachState('kapot').proactief).toBe(true)
+    expect(parseCoachState([]).proactief).toBe(true)
+  })
+
+  it('is alleen false bij een letterlijke false', () => {
+    expect(parseCoachState({ proactief: false }).proactief).toBe(false)
+    for (const raar of [0, 'false', null, undefined, 'nee']) {
+      expect(parseCoachState({ proactief: raar }).proactief, String(raar)).toBe(true)
+    }
+  })
+
+  it('EMPTY_COACH_STATE draagt hem aan', () => {
+    expect(EMPTY_COACH_STATE.proactief).toBe(true)
   })
 })

@@ -243,6 +243,11 @@ export async function computePageStatusInfo(
         // ADR 0129 D8 — het anker is de sleutel voor de gate (anker bereikt ∧ dekking ≥
         // 100); de legacy-label hierboven blijft alleen als terugval voor oude bundels.
         anchor: planAnchor,
+        // B-058 — feitenbasis onder de vrijheidsconclusie. Dezelfde EFFECTIEVE
+        // maanduitgaven die de kernel at, zodat banner en Vrijheid-strip op één
+        // grondslag staan; zonder ingevulde uitgavenkant is het FIRE-doel ≈ 0 en
+        // zou de banner direct na de onboarding "je bent vrij" melden.
+        basis: { monthlyExpenses: horizonData?.effectiveInput?.monthlyExpenses ?? null },
       },
       anker,
     )

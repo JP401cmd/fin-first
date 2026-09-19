@@ -76,3 +76,43 @@ describe('createLookupTool — sanitizes tool-result strings', () => {
     expect(res.some((r) => r.counterparty === 'Albert Heijn')).toBe(true)
   })
 })
+
+// ── ADR 0166 — `expected_return = null` reist als grondslag mee, niet als 0 ──
+describe('createLookupTool — assets: geen eigen rendement (ADR 0166)', () => {
+  function makeSupabaseWithAssets(): SupabaseClient {
+    return {
+      auth: { getUser: async () => ({ data: { user: { id: 'u1' } }, error: null }) },
+      from: (table: string) => {
+        if (table === 'profiles') {
+          return makeBuilder({ data: { full_name: 'Jan de Vries', date_of_birth: null } })
+        }
+        if (table === 'assets') {
+          return makeBuilder({
+            data: [
+              { name: 'Wereldindex', asset_type: 'investment', current_value: 10000, expected_return: null, monthly_contribution: 0 },
+              { name: 'Betaalrekening', asset_type: 'cash', current_value: 500, expected_return: 0, monthly_contribution: 0 },
+            ],
+          })
+        }
+        return makeBuilder({ data: [] })
+      },
+    } as unknown as SupabaseClient
+  }
+
+  it('null → returnBasis zegt dat het profielrendement geldt; 0 blijft een eigen aanname', async () => {
+    const tool = createLookupTool(makeSupabaseWithAssets())
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const res = (await (tool as any).execute({ type: 'assets' }, {})) as Array<{
+      name: string
+      return: number | null
+      returnBasis: string
+    }>
+    const zonder = res.find((r) => r.name === 'Wereldindex')!
+    expect(zonder.return).toBeNull()
+    expect(zonder.returnBasis).toContain('geen eigen aanname')
+    const nul = res.find((r) => r.name === 'Betaalrekening')!
+    expect(nul.return).toBe(0)
+    expect(nul.returnBasis).toContain('eigen aanname')
+    expect(nul.returnBasis).not.toContain('geen eigen')
+  })
+})

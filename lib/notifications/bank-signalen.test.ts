@@ -25,7 +25,7 @@ function input(overrides: Partial<BankSignalInput> = {}): BankSignalInput {
     linkIsActive: true,
     connectionStatus: 'active',
     // Ver buiten het 14-daagse venster en vers gesynchroniseerd: standaard stil.
-    tokenExpiresAt: daysFromNow(60),
+    consentExpiresAt: daysFromNow(60),
     lastSyncedAt: daysAgo(0),
     ...overrides,
   }
@@ -33,11 +33,11 @@ function input(overrides: Partial<BankSignalInput> = {}): BankSignalInput {
 
 describe('buildBankSignalNotification — verloopt bijna', () => {
   it('zwijgt ruim vóór het venster', () => {
-    expect(buildBankSignalNotification(input({ tokenExpiresAt: daysFromNow(30) }), NOW)).toBeNull()
+    expect(buildBankSignalNotification(input({ consentExpiresAt: daysFromNow(30) }), NOW)).toBeNull()
   })
 
   it('waarschuwt vanaf 14 dagen vóór het verlopen', () => {
-    const signal = buildBankSignalNotification(input({ tokenExpiresAt: daysFromNow(14) }), NOW)
+    const signal = buildBankSignalNotification(input({ consentExpiresAt: daysFromNow(14) }), NOW)
     expect(signal).not.toBeNull()
     expect(signal!.id).toBe('bank_expiry_acc-1')
     expect(signal!.type).toBe('sync')
@@ -45,21 +45,21 @@ describe('buildBankSignalNotification — verloopt bijna', () => {
   })
 
   it('zwijgt nog net op 15 dagen', () => {
-    expect(buildBankSignalNotification(input({ tokenExpiresAt: daysFromNow(15) }), NOW)).toBeNull()
+    expect(buildBankSignalNotification(input({ consentExpiresAt: daysFromNow(15) }), NOW)).toBeNull()
   })
 
   it('zegt "morgen" op één dag en "vandaag" op de laatste dag', () => {
-    const morgen = buildBankSignalNotification(input({ tokenExpiresAt: daysFromNow(1) }), NOW)
+    const morgen = buildBankSignalNotification(input({ consentExpiresAt: daysFromNow(1) }), NOW)
     expect(morgen!.title).toContain('morgen')
 
     // Zelfde dag, later op de dag → Math.ceil levert 1 dag; pas een tijdstip in
     // het verleden telt als verlopen. Een vervaldatum exact NU is 0 dagen.
-    const vandaag = buildBankSignalNotification(input({ tokenExpiresAt: NOW.toISOString() }), NOW)
+    const vandaag = buildBankSignalNotification(input({ consentExpiresAt: NOW.toISOString() }), NOW)
     expect(vandaag!.title).toContain('vandaag')
   })
 
   it('zwijgt zonder bekende vervaldatum', () => {
-    expect(buildBankSignalNotification(input({ tokenExpiresAt: null }), NOW)).toBeNull()
+    expect(buildBankSignalNotification(input({ consentExpiresAt: null }), NOW)).toBeNull()
   })
 
   it('noemt de BANK, niet het IBAN-fragment', () => {
@@ -67,7 +67,7 @@ describe('buildBankSignalNotification — verloopt bijna', () => {
     // plaintext in de meldingen-historie bewaard. Een stukje rekeningnummer hoort
     // daar niet structureel in te landen; de banknaam identificeert net zo goed.
     const signal = buildBankSignalNotification(
-      input({ tokenExpiresAt: daysFromNow(5), providerName: 'Rabobank', label: '7 1643 00' }),
+      input({ consentExpiresAt: daysFromNow(5), providerName: 'Rabobank', label: '7 1643 00' }),
       NOW,
     )
     expect(signal!.title).toContain('Rabobank')
@@ -79,7 +79,7 @@ describe('buildBankSignalNotification — verloopt bijna', () => {
   it('valt terug op een generieke naam zonder bekende bank', () => {
     for (const providerName of [null, '   ']) {
       const signal = buildBankSignalNotification(
-        input({ tokenExpiresAt: daysFromNow(5), providerName }),
+        input({ consentExpiresAt: daysFromNow(5), providerName }),
         NOW,
       )
       expect(signal!.title).toContain('Je bankkoppeling')
@@ -91,7 +91,7 @@ describe('buildBankSignalNotification — verloopt bijna', () => {
 describe('buildBankSignalNotification — al verlopen is een andere toestand', () => {
   it('geeft GEEN verloop-waarschuwing als de datum verstreken is', () => {
     const signal = buildBankSignalNotification(
-      input({ tokenExpiresAt: daysAgo(2), lastSyncedAt: daysAgo(0) }),
+      input({ consentExpiresAt: daysAgo(2), lastSyncedAt: daysAgo(0) }),
       NOW,
     )
     // Wél verlopen, maar vers gesynchroniseerd → niets te melden in dit kanaal.
@@ -101,7 +101,7 @@ describe('buildBankSignalNotification — al verlopen is een andere toestand', (
   it('geeft GEEN verloop-waarschuwing bij status expired/revoked', () => {
     for (const status of ['expired', 'revoked']) {
       const signal = buildBankSignalNotification(
-        input({ connectionStatus: status, tokenExpiresAt: daysFromNow(5), lastSyncedAt: daysAgo(0) }),
+        input({ connectionStatus: status, consentExpiresAt: daysFromNow(5), lastSyncedAt: daysAgo(0) }),
         NOW,
       )
       expect(signal, `status ${status}`).toBeNull()
@@ -111,7 +111,7 @@ describe('buildBankSignalNotification — al verlopen is een andere toestand', (
   it('houdt wél het versheidsbericht als er niets meer binnenkomt', () => {
     // Een kapotte koppeling is juist het moment waarop een duwtje nodig is.
     const signal = buildBankSignalNotification(
-      input({ connectionStatus: 'expired', tokenExpiresAt: daysAgo(5), lastSyncedAt: daysAgo(10) }),
+      input({ connectionStatus: 'expired', consentExpiresAt: daysAgo(5), lastSyncedAt: daysAgo(10) }),
       NOW,
     )
     expect(signal!.id).toBe('sync_acc-1')
@@ -122,7 +122,7 @@ describe('buildBankSignalNotification — al verlopen is een andere toestand', (
 describe('buildBankSignalNotification — zacht ontkoppeld zwijgt', () => {
   it('zwijgt volledig, ook als de koppeling bijna verloopt én oud is', () => {
     const signal = buildBankSignalNotification(
-      input({ linkIsActive: false, tokenExpiresAt: daysFromNow(3), lastSyncedAt: daysAgo(30) }),
+      input({ linkIsActive: false, consentExpiresAt: daysFromNow(3), lastSyncedAt: daysAgo(30) }),
       NOW,
     )
     expect(signal).toBeNull()
@@ -151,7 +151,7 @@ describe('buildBankSignalNotification — versheid', () => {
 describe('buildBankSignalNotification — voorrang', () => {
   it('geeft ALLEEN de verloop-waarschuwing als beide signalen afgaan', () => {
     const signal = buildBankSignalNotification(
-      input({ tokenExpiresAt: daysFromNow(4), lastSyncedAt: daysAgo(20) }),
+      input({ consentExpiresAt: daysFromNow(4), lastSyncedAt: daysAgo(20) }),
       NOW,
     )
     expect(signal!.id).toBe('bank_expiry_acc-1')

@@ -696,10 +696,37 @@ export interface TransactionForDetection {
 }
 
 /**
+ * PostgREST-`.or()`-filter voor de `recurring_transactions`-rijen die de
+ * detectie als "al beoordeeld" moet zien — de enige juiste bron voor
+ * `existingRecurrings` op elke plek die `detectRecurringTransactions` voedt.
+ *
+ * Twee soorten rijen tellen als beoordeeld:
+ *  - bevestigd (`is_active = true`): de gebruiker heeft de post opgenomen;
+ *  - uitgesloten (`category_override = 'excluded'`): de gebruiker koos "Niet
+ *    opnemen". Zo'n rij wordt met `is_active = false` weggeschreven
+ *    (app/api/recurring/route.ts), dus een kale `.eq('is_active', true)` maakt
+ *    de uitsluiting onzichtbaar en de detector stelt het patroon bij elke scan
+ *    opnieuw voor als nieuw (B-054).
+ *
+ * Wat er bewust BUITEN valt: een regel die de gebruiker heeft gestopt zonder
+ * uitsluiting (`is_active = false` zonder override, via recurring-edit-sheet).
+ * Loopt dat patroon tóch door in de transacties, dan mag de detectie het weer
+ * aanbieden — "gestopt" is een uitspraak over de regel, "uitgesloten" over het
+ * patroon.
+ *
+ * Consumenten die uit dezelfde rijenset ook BEVESTIGDE posten afleiden (de
+ * samenvatting, detect-ai) filteren `category_override !== 'excluded'` zelf
+ * weg; de detector zelf hoeft dat onderscheid niet te kennen.
+ */
+export const REVIEWED_RECURRING_FILTER = 'is_active.eq.true,category_override.eq.excluded'
+
+/**
  * Main detection function: analyzes transactions and returns detected recurring patterns.
  *
  * @param transactions - All transactions to analyze (venster: `RECURRING_ANALYSIS_MONTHS`)
- * @param existingRecurrings - Already confirmed recurring transactions (to flag duplicates)
+ * @param existingRecurrings - Al beoordeelde recurring-rijen (bevestigd óf uitgesloten,
+ *   zie `REVIEWED_RECURRING_FILTER`); patronen met dezelfde genormaliseerde naam
+ *   krijgen `alreadyExists: true`
  * @param budgets - Budget list for category matching
  */
 export function detectRecurringTransactions(

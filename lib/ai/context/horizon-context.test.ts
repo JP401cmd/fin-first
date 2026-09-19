@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildHorizonContext } from './horizon-context'
+import { buildHorizonContext, RENDEMENT_GEEN_EIGEN_AANNAME } from './horizon-context'
 
 // ── De grondslag-regel van de horizon-context ────────────────────────────────
 //
@@ -141,5 +141,36 @@ describe('buildHorizonContext — schulden-totaal (UR3-06 geval 5)', () => {
   it('draagt geen totaalregel wanneer er geen schulden zijn', async () => {
     const ctx = await buildHorizonContext(makeSupabase([ASSET], []), 'user-1')
     expect(ctx).not.toContain('TOTAAL (')
+  })
+})
+
+// ── ADR 0166 — `expected_return = null` is "geen eigen aanname", geen 0% ────────
+//
+// Een rauwe interpolatie leverde "rendement null%/jr"; het model zou dat als 0
+// of als fout lezen. De context benoemt de grondslag letterlijk, en zegt bij de
+// 5-jaarsprojectie eerlijk dat zulke bezittingen daar op 0% staan (deze context
+// heeft het profiel niet bij de hand — zie horizon-context.ts).
+describe('buildHorizonContext — geen eigen rendement (ADR 0166)', () => {
+  const NULL_ASSET = { ...ASSET, name: 'Spaarpot', expected_return: null }
+  const ZERO_ASSET = { ...ASSET, name: 'Betaalrekening', expected_return: 0 }
+
+  it('null → letterlijke grondslag-tekst, nooit "null%" of "0%"', async () => {
+    const ctx = await buildHorizonContext(makeSupabase([NULL_ASSET], []), 'user-1')
+    expect(ctx).toContain(RENDEMENT_GEEN_EIGEN_AANNAME)
+    expect(ctx).not.toContain('null%')
+    expect(ctx).not.toContain('Spaarpot (Beleggingen): € 250.000 | rendement 0%')
+  })
+
+  it('een bewuste 0 blijft "rendement 0%/jr"', async () => {
+    const ctx = await buildHorizonContext(makeSupabase([ZERO_ASSET], []), 'user-1')
+    expect(ctx).toContain('rendement 0%/jr')
+    expect(ctx).not.toContain(RENDEMENT_GEEN_EIGEN_AANNAME)
+  })
+
+  it('de 5-jaarsprojectie draagt de kanttekening alléén als een bezitting geen eigen aanname heeft', async () => {
+    const met = await buildHorizonContext(makeSupabase([NULL_ASSET, ASSET], []), 'user-1')
+    expect(met).toContain('zonder eigen rendementsaanname zijn in dit bedrag op 0% gerekend')
+    const zonder = await buildHorizonContext(makeSupabase([ASSET], []), 'user-1')
+    expect(zonder).not.toContain('op 0% gerekend')
   })
 })

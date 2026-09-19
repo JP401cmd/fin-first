@@ -45,7 +45,7 @@ export function toBankSyncTargets(
     lastSyncedAt: account.last_synced_at,
     lastAttemptedAt: attempts[account.id] ?? null,
     // Het OORDEEL komt van de server (`deriveBankLinkHealth`), niet uit een
-    // eigen afleiding op `status`/`token_expires_at` — zie de noot bij
+    // eigen afleiding op `status`/`consent_expires_at` — zie de noot bij
     // `LinkedAccountView.health`.
     linkBroken: account.health.state === 'linked-broken',
     // Dagteller via de gedeelde regel — alleen geldig als hij over vandaag gaat

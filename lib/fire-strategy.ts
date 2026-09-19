@@ -416,6 +416,88 @@ export interface FreedomStateInput {
    * op `fireAge` (onder het aow-anker is `fireAge` ≡ de AOW-leeftijd).
    */
   aowAge?: number | null
+  /**
+   * De FEITENBASIS onder de vrijheidsconclusie (B-058). Zie {@link FreedomBasis}.
+   *
+   * Weggelaten ⇒ de aanroeper draagt de basis (nog) niet mee en de poort blijft
+   * dicht-gelaten: het oude gedrag. Dat is bewust en expliciet — niet elk
+   * oppervlak heeft de uitgavengrondslag bij de hand, en een stil `false` zou
+   * daar de vrijheidsframing laten verdwijnen. Welke aanroepers 'm wél dragen,
+   * staat bij {@link hasFreedomBasis}.
+   */
+  basis?: FreedomBasis | null
+}
+
+/**
+ * De feitenbasis waarop een "je bent financieel vrij"-conclusie rust (B-058).
+ *
+ * ══ Waarom dit bestaat ════════════════════════════════════════════════════
+ *
+ * `isFinanciallyFree` is een GATE op reeds berekende getallen. Vlak na de
+ * onboarding kunnen die getallen triviaal waar worden: is de uitgavenkant nog
+ * niet ingevuld, dan is het FIRE-doel ≈ 0 en haalt élke portefeuille de 100 %.
+ * Een testgebruiker kreeg zo binnen seconden na het onboarden "je hoeft niet
+ * meer te werken" te zien. Dat is geen rekenfout — het is een conclusie zonder
+ * grondslag, en die hoort niet getrokken te worden.
+ *
+ * ══ Welke velden, en waarom precies deze ══════════════════════════════════
+ *
+ *  - `monthlyExpenses` — DRAAGT de ondergrens. Het is de noemer onder het
+ *    FIRE-doel én onder de dekking; zonder uitgaven is "vrij" betekenisloos.
+ *    Geef de EFFECTIEVE grondslag die de kernel zelf at
+ *    (`horizonData.effectiveInput.monthlyExpenses`) — niet een eigen som en
+ *    niet het rauwe transactiegemiddelde.
+ *  - `freedomPct` (elders op {@link FreedomStateInput}) — heeft GEEN eigen
+ *    ondergrens nodig: `null`/`NaN` valt al buiten de gate.
+ *  - `currentAge` — idem: zonder leeftijd vuurt de leeftijd-trigger al niet, en
+ *    onder een vast anker is `isAnchorReached` dan per definitie onwaar.
+ *  - Vermogen is bewust GEEN apart veld. Het zit al in `freedomPct`, en een
+ *    tweede vermogensgetal hier zou de grondslag-val openen die CLAUDE.md
+ *    beschrijft (netto vermogen ≠ de FIRE-eligible portefeuille).
+ */
+export interface FreedomBasis {
+  /**
+   * Effectieve maanduitgaven (euro's per maand) — dezelfde waarde die de
+   * projectie voedt. `null` = onbekend ⇒ geen basis.
+   */
+  monthlyExpenses: number | null
+}
+
+/**
+ * De ONDERGRENS: onder deze maanduitgaven beschouwen we de uitgavenkant als
+ * "nog niet ingevuld" in plaats van "heel zuinig".
+ *
+ * Bewust CONSERVATIEF gekozen. Het laagste werkelijke maandbudget van een
+ * Nederlands eenpersoonshuishouden ligt een veelvoud hoger; €100 is dus geen
+ * zuinigheids-oordeel maar een leegte-detector. Hoger leggen zou echte,
+ * extreem-zuinige gebruikers hun vrijheidsframing afpakken — en een vals
+ * negatief ("je bent tóch niet vrij") is een ander soort fout dan het vals
+ * positief dat we hier dichten.
+ */
+export const FREEDOM_BASIS_MIN_MONTHLY_EXPENSES = 100
+
+/**
+ * Draagt de conclusie genoeg feiten? Zie {@link FreedomBasis} voor de velden en
+ * {@link FREEDOM_BASIS_MIN_MONTHLY_EXPENSES} voor de ondergrens.
+ *
+ * WIE GEEFT DE BASIS MEE (stand 19 sep 2026, B-058):
+ *  - `app/(app)/overzicht/page.tsx` — de Vrijheid-strip in de hero;
+ *  - `components/overview/overzicht-secondary-loader.tsx` — de strip in blok 2;
+ *  - `lib/page-status/compute.ts` — de vrijheidsbanner op /overzicht.
+ * Dat zijn de drie oppervlakken waarop de melding viel. De overige aanroepers
+ * (`lib/ai/context/shared-context.ts`, `components/app/horizon/horizon-client.tsx`)
+ * dragen 'm nog NIET; zij houden het oude gedrag tot ze zijn nagelopen.
+ */
+export function hasFreedomBasis(basis: FreedomBasis | null | undefined): boolean {
+  // Geen basis meegegeven = de aanroeper doet niet mee aan deze poort. Bewust
+  // `true`: stil `false` zou de framing op die oppervlakken laten verdwijnen.
+  if (basis == null) return true
+  const { monthlyExpenses } = basis
+  return (
+    monthlyExpenses != null &&
+    Number.isFinite(monthlyExpenses) &&
+    monthlyExpenses >= FREEDOM_BASIS_MIN_MONTHLY_EXPENSES
+  )
 }
 
 /**
@@ -459,8 +541,13 @@ export function isAnchorReached(input: FreedomStateInput, anchor: StopAnchor): b
  *
  * Vanaf dit punt is "% op weg naar vrijheid" niet meer de juiste framing — het beeld
  * toont onttrekking, geen opbouw.
+ *
+ * VOORPOORT (B-058): draagt de aanroeper een {@link FreedomBasis} en haalt die de
+ * ondergrens niet, dan is de gate dicht ongeacht de getallen. Een conclusie zonder
+ * feitenbasis is geen conclusie — zie {@link hasFreedomBasis}.
  */
 export function isFinanciallyFree(input: FreedomStateInput): boolean {
+  if (!hasFreedomBasis(input.basis)) return false
   const { freedomPct, currentAge, fireAge } = input
   const gedekt = freedomPct != null && Number.isFinite(freedomPct) && freedomPct >= 100
   const anchor = resolveFreedomAnchor(input)

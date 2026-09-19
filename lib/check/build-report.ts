@@ -623,7 +623,7 @@ export function buildReport(intake: CheckIntake, now: Date = new Date()): CheckR
     savingsHistory: {
       available: false,
       targetPct: round1(ctx.savingsRatePct),
-      note: 'Spaarquote-historie verschijnt zodra je transacties koppelt in de app.',
+      note: 'Spaarquote-historie verschijnt zodra je je transacties categoriseert in de app.',
     },
     twoFutures: buildTwoFutures(ctx, fireAge, fireReachable, dailyExpense),
     fireCards: buildFireCards(ctx, fireReachable, baseRun, dailyExpense),

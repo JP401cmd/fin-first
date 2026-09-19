@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { exchangeCode, getAccounts, getBaseUrls } from '@/lib/truelayer/client'
+import { fetchConsentExpiry } from '@/lib/truelayer/consent'
 import { syncAccountBalance } from '@/lib/truelayer/balance-sync'
 import { selectOrphanConnectionIds } from '@/lib/truelayer/orphan-connections'
 import { ensureCashAssetForBankAccount } from '@/lib/truelayer/cash-asset-backfill'
@@ -36,6 +37,15 @@ import { checkTierGate } from '@/lib/require-tier'
  * met een eigen uitweg, elke andere schrijffout niet.
  */
 const ONE_ACTIVE_LINK_PER_ACCOUNT_INDEX = 'bank_connection_accounts_one_active_per_bank_account'
+
+/**
+ * De callback doet vóór haar redirect tot vier providercalls (token-exchange,
+ * `/me`, accounts, per rekening het saldo met 8s-timeout elk). Dat past niet
+ * met zekerheid in de standaard-timeout; 60s is het huispatroon voor de langere
+ * routes (sync, holdings/refresh-prices). Een platform-timeout hier betekent
+ * een gateway-fout op een half geschreven koppeling.
+ */
+export const maxDuration = 60
 
 /**
  * Is deze gefaalde koppelrij-write de BEZET-botsing? (fase 7, overdracht van fase 6)
@@ -139,13 +149,22 @@ export async function GET(req: Request) {
 
     // Update connection with tokens
     const now = new Date()
+    // Het TOEGANGSTOKEN (`expires_in`, één uur; stil ververst in sync/balances)
+    // — níét de bankautorisatie, die krijgt hieronder haar eigen kolom (ADR 0161).
     const tokenExpiresAt = new Date(now.getTime() + tokens.expires_in * 1000)
 
     // Encrypted-only write (Stage A / PR2): tokens live solely in the
     // *_encrypted columns. The plaintext access_token/refresh_token columns are
     // no longer written and are dropped by a follow-up migration
     // (see supabase/migrations/*_drop_plaintext_bank_tokens.sql).
-    await supabase
+    //
+    // Fail-closed: een mislukte token-write (RLS 0 rijen, guard-trigger, kolom
+    // die op deze database nog niet bestaat) mag de route niet stil laten
+    // doorlopen — dan worden er koppelrijen aan een `pending`-verbinding zonder
+    // tokens gehangen, ziet de gebruiker "gelukt" en geeft de eerste sync een
+    // 401 → precies de herautorisatie-lus van ADR 0161 via een andere deur.
+    // Gooien landt in de catch onderaan (generieke `callback_failed`, ADR 0044).
+    const { error: tokenWriteError } = await supabase
       .from('bank_connections')
       .update({
         access_token_encrypted: encryptField(tokens.access_token),
@@ -156,9 +175,29 @@ export async function GET(req: Request) {
         updated_at: now.toISOString(),
       })
       .eq('id', connection.id)
+    if (tokenWriteError) throw tokenWriteError
+
+    const { dataUrl } = await getBaseUrls(supabase)
+
+    // De consent-einddatum (ADR 0161): de BANKAUTORISATIE leeft 90–180 dagen en
+    // alleen TrueLayer weet welke — de datum komt uit `/data/v1/me`, niet uit een
+    // aanname. Bewust ná de token-write en als losse update: het is een
+    // verrijking, geen voorwaarde. Een trage of falende /me kost de autorisatie
+    // dus nooit (`fetchConsentExpiry` gooit niet, 4s-timeout), en een mislukte
+    // write hier is niet-fataal — de sync-route vult 'm bij de volgende ronde aan.
+    const consentExpiresAt = await fetchConsentExpiry(tokens.access_token, dataUrl)
+    if (consentExpiresAt) {
+      const { error: consentWriteError } = await supabase
+        .from('bank_connections')
+        .update({ consent_expires_at: consentExpiresAt })
+        .eq('id', connection.id)
+        .eq('user_id', user.id)
+      if (consentWriteError) {
+        console.error('[bank-connect/callback] consent_expires_at niet weggeschreven:', consentWriteError.message)
+      }
+    }
 
     // Fetch accounts from TrueLayer
-    const { dataUrl } = await getBaseUrls(supabase)
     const tlAccounts = await getAccounts(tokens.access_token, dataUrl)
 
     // ══ DE PRECEDENTIEKETEN ═══════════════════════════════════════════════════

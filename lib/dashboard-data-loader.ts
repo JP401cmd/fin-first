@@ -642,6 +642,37 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // in dit bestand al geïmporteerd stond. Sinds het `net_worth`-doel dezelfde
   // grootheid live consumeert, moet er één formule zijn — anders toont de
   // doelkaart een ander netto vermogen dan de bundel.
+  // ── FIRE-marktaannames: jaarlaag-shadow (Optie 2, DB-override met TS-fallback) ──
+  // Vul rendement/inflatie ALLEEN aan met de jaar-geresolveerde markt-default wanneer
+  // de gebruiker zelf niets zette (null); een expliciete keuze wint. Lege/ontbrekende
+  // jaarlaag → TS-constanten → byte-identiek. We shadowen op een KOPIE — nooit de
+  // gedeelde getOwnProfile-rij muteren: die is cache()'d en gedeeld met de layout,
+  // waar expected_return/inflation_rate == null betekent "gebruiker heeft FIRE-params
+  // niet ingesteld" (coach-datagap). De kopie voedt de scalar/target-laag
+  // (resolveFireParams → fireTarget, fireRange, mijlpalen) — de FALLBACK-laag, alleen
+  // zichtbaar als de kernel-run niet kon draaien. De kernel-tak zelf leest deze shadow
+  // NIET meer uit deze loader: die draait via de gedeelde `computeHorizonFireSim`, waar
+  // horizon-data-loader dezelfde jaarlaag-shadow toepast (WF-WILL-01: één run, één
+  // grondslag voor /overzicht, /toekomst, de Kern en beide Fins).
+  // Staat sinds ADR 0166 VÓÓR de vermogensverdeling: `fireParams.grossReturn` is ook
+  // de terugval voor een bezitting zonder eigen rendement (`expected_return = null`),
+  // in de vermogensverdeling per type én in de spaarquote-delta-tak hieronder —
+  // dezelfde ketting als `potRendement` in de kernel.
+  const fireAssumptions = resolveFireAssumptions(
+    (fireAssumptionsResult.data ?? []) as FireAssumptionRow[],
+  )
+  const shadowedProfile = { ...(profileResult.data ?? {}) }
+  {
+    const sp = shadowedProfile as { expected_return?: number | null; inflation_rate?: number | null }
+    if (sp.expected_return == null) sp.expected_return = fireAssumptions.expectedReturn
+    if (sp.inflation_rate == null) sp.inflation_rate = fireAssumptions.inflation
+  }
+
+  const fireParams = resolveFireParams(shadowedProfile)
+  const fireSwr = fireParams.effectiveSwr
+  /** Profielrendement in PROCENTEN — terugval voor `assets.expected_return = null` (ADR 0166). */
+  const terugvalRendementPct = fireParams.grossReturn * 100
+
   const totalAssetsOnly = (assetsResult.data ?? []).reduce((s, a) => s + weightedAssetValue(a), 0)
   // Losse bankrekeningen via DE canonieke optelling (lib/unlinked-cash.ts),
   // gewogen op het huishoud-aandeel: een GEDEELDE rekening is voor beide
@@ -665,7 +696,8 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
 
   // Asset breakdown per type — inclusion-gewogen (gedeelde canonieke helper),
   // zodat som(assetsByType.value) == het headline-totaal (totalAssets/netWorth).
-  const assetsByType = computeAssetsByType(assetsResult.data ?? [])
+  // Terugval op het profielrendement voor bezittingen zonder eigen aanname (ADR 0166).
+  const assetsByType = computeAssetsByType(assetsResult.data ?? [], terugvalRendementPct)
 
   // ── Gerealiseerd rendement: DEZELFDE motor als /overzicht/bezittingen ────────
   // Kaart H7. Hiervóór stond hier `totalPurchaseValue = Σ purchaseValue over ÁLLE
@@ -1156,6 +1188,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     effectiveMonthlyExpenses,
     netWorthSnapshots: (netWorthSnapshotsResult.data ?? []) as unknown as NetWorthSnapshotRow[],
     assets: (assetsResult.data ?? []) as Asset[],
+    terugvalRendementPct,
   })
   const extIncome6 = savings6m.extIncome6
   const savingsRateIsEstimate = savings6m.isEstimate
@@ -1167,30 +1200,9 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // een `monthlySavingsFromRate(extIncome6/6, savingsRate6m)`-bedrag; dat hoorde
   // bij een percentage dat de widget sindsdien niet meer toont.
 
-  // ── FIRE-marktaannames: jaarlaag-shadow (Optie 2, DB-override met TS-fallback) ──
-  // Vul rendement/inflatie ALLEEN aan met de jaar-geresolveerde markt-default wanneer
-  // de gebruiker zelf niets zette (null); een expliciete keuze wint. Lege/ontbrekende
-  // jaarlaag → TS-constanten → byte-identiek. We shadowen op een KOPIE — nooit de
-  // gedeelde getOwnProfile-rij muteren: die is cache()'d en gedeeld met de layout,
-  // waar expected_return/inflation_rate == null betekent "gebruiker heeft FIRE-params
-  // niet ingesteld" (coach-datagap). De kopie voedt de scalar/target-laag
-  // (resolveFireParams → fireTarget, fireRange, mijlpalen) — de FALLBACK-laag, alleen
-  // zichtbaar als de kernel-run niet kon draaien. De kernel-tak zelf leest deze shadow
-  // NIET meer uit deze loader: die draait via de gedeelde `computeHorizonFireSim`, waar
-  // horizon-data-loader dezelfde jaarlaag-shadow toepast (WF-WILL-01: één run, één
-  // grondslag voor /overzicht, /toekomst, de Kern en beide Fins).
-  const fireAssumptions = resolveFireAssumptions(
-    (fireAssumptionsResult.data ?? []) as FireAssumptionRow[],
-  )
-  const shadowedProfile = { ...(profileResult.data ?? {}) }
-  {
-    const sp = shadowedProfile as { expected_return?: number | null; inflation_rate?: number | null }
-    if (sp.expected_return == null) sp.expected_return = fireAssumptions.expectedReturn
-    if (sp.inflation_rate == null) sp.inflation_rate = fireAssumptions.inflation
-  }
-
-  const fireParams = resolveFireParams(shadowedProfile)
-  const fireSwr = fireParams.effectiveSwr
+  // De FIRE-marktaannames (`fireParams`) zijn hierboven al geresolved — vóór de
+  // vermogensverdeling en de spaarquote-delta-tak, die het profielrendement als
+  // terugval voor bezittingen zonder eigen rendement nodig hebben (ADR 0166).
 
   const yearlyRetirementExpenses = computeRetirementExpenses(
     profileResult.data?.retirement_expense_method as RetirementExpenseMethod,
@@ -1455,6 +1467,8 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
           debts: dashboardDebtsArr,
           dateOfBirth: dob,
           startNettoLiquideByAge,
+          // Inert onder `houseInLedger`, maar dezelfde grondslag als de kernel (ADR 0166).
+          terugvalRendement: fireParams.grossReturn,
         })
         // De kernel verankert de pensioen-eindstrategie ZÉLF op AOW (solver-ES), en de bridge
         // levert per constructie firePortfolioAtFire === requiredFirePortfolio (bisectie stopt

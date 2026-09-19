@@ -80,7 +80,6 @@ describe('eindscherm — zelfde getal, met grondslag-label', () => {
       assetCount: 4,
       debtCount: 1,
       pensioenResultaat: null,
-      spaardoel: null,
       eindstrategieBeantwoord: true,
     }),
     assets: [],

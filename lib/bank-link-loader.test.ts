@@ -29,7 +29,7 @@ type AccountRow = { id: string; user_id: string; linked_asset_id: string | null 
 type ConnectionEmbed = {
   provider_name: string | null
   status: string | null
-  token_expires_at: string | null
+  consent_expires_at: string | null
 }
 
 type LinkRow = {
@@ -125,7 +125,7 @@ const HEALTHY: ConnectionEmbed = {
   provider_name: 'ING',
   status: 'active',
   // Ruim in de toekomst: buiten elke expiratie-tak.
-  token_expires_at: '2099-01-01T00:00:00.000Z',
+  consent_expires_at: '2099-01-01T00:00:00.000Z',
 }
 
 function account(id: string, assetId: string | null = `asset-${id}`, userId = USER): AccountRow {
@@ -204,7 +204,7 @@ describe('loadCashBankLinks — verbinding kwijt', () => {
       accounts: [account('acc-1')],
       links: [
         link({
-          connection: { ...HEALTHY, status: 'active', token_expires_at: '2020-01-01T00:00:00.000Z' },
+          connection: { ...HEALTHY, status: 'active', consent_expires_at: '2020-01-01T00:00:00.000Z' },
         }),
       ],
     })

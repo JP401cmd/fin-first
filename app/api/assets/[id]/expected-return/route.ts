@@ -32,12 +32,19 @@ import { assetReturnBandError, isWithinAssetReturnBand } from '@/lib/asset-param
  *   gelijktijdige typewissel niet onder de verkeerde band wordt geschreven (0 rijen → 404).
  * - Afschrijvend bezit (`depreciation_rate > 0`): het formulier zet `expected_return` dan op 0
  *   en toont het veld niet. Die invariant blijft staan → 409; ook in de update zelf gefilterd.
- * - "Geen eigen rendement" (NULL → terugvalrendement) is hier bewust NIET uit te drukken: de
- *   kolom is NOT NULL DEFAULT 0 (TPR-02, schemawijziging op een eigen kaart).
+ * - "Geen eigen rendement" is sinds migratie 20260919140000 (TPR-02 vervolg, ADR 0166) WÉL uit
+ *   te drukken: `expected_return: null`. Dat betekent "ik heb hier geen eigen aanname, reken
+ *   met mijn profielrendement" en is iets ánders dan een ingevulde 0 (een bewuste 0%).
+ *   De bandcheck wordt bij NULL OVERGESLAGEN — niet omdat NULL "altijd mag", maar omdat een
+ *   band een getal begrenst en er geen getal is. De terugval die er dan voor in de plaats komt
+ *   (het profielrendement) heeft zijn eigen grens op de profielparameter.
  */
 
 // zod 4: `z.number()` weigert zelf al NaN en ±Infinity.
-const BodySchema = z.object({ expected_return: z.number() }).strict()
+// `.nullable()` — NIET `.optional()`: het veld weglaten zou "laat ongemoeid" kunnen betekenen,
+// terwijl een expliciete `null` een KEUZE van de gebruiker is. Een gesloten schema hoort dat
+// onderscheid te bewaren; `.strict()` weigert daarnaast alles wat er niet in staat.
+const BodySchema = z.object({ expected_return: z.number().nullable() }).strict()
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -68,7 +75,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (Number(bezit.depreciation_rate) > 0) {
       return conflict('Deze bezitting schrijft af. Pas het afschrijvingspercentage aan in het bezittingenformulier.')
     }
-    if (!isWithinAssetReturnBand(bezit.asset_type, expectedReturn)) {
+    // NULL = "geen eigen rendement". Een band begrenst een getal; er is er geen.
+    if (expectedReturn !== null && !isWithinAssetReturnBand(bezit.asset_type, expectedReturn)) {
       return badRequest(assetReturnBandError(bezit.asset_type))
     }
 

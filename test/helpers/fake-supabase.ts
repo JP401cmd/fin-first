@@ -124,7 +124,16 @@ function splitTopLevel(expr: string): string[] {
  */
 type OrBranch = Filter[]
 
-/** `col.op.waarde` → een `Filter`. Onbekende operatoren geven `null`. */
+/**
+ * `col.op.waarde` → een `Filter`. Onbekende operatoren geven `null`.
+ *
+ * De literals `true`/`false` worden als boolean gelezen, zoals PostgREST ze
+ * tegen een boolean-kolom aanhoudt: `is_active.eq.true` moet een rij met
+ * `is_active: true` raken. Zonder die coercie vergelijkt `matches` de string
+ * `'true'` strikt met de boolean en valt élke rij stil weg — precies het soort
+ * vals-negatief dat deze mock hoort te vermijden (B-054: de
+ * bevestigd-óf-uitgesloten-filter op `recurring_transactions`).
+ */
 function parseCondition(cond: string): Filter | null {
   const first = cond.indexOf('.')
   const second = cond.indexOf('.', first + 1)
@@ -133,7 +142,8 @@ function parseCondition(cond: string): Filter | null {
   const op = cond.slice(first + 1, second)
   const raw = cond.slice(second + 1)
   if (!['eq', 'neq', 'gt', 'gte', 'lt', 'lte'].includes(op)) return null
-  return { op: op as Filter['op'], col, val: raw }
+  const val = raw === 'true' ? true : raw === 'false' ? false : raw
+  return { op: op as Filter['op'], col, val }
 }
 
 /**

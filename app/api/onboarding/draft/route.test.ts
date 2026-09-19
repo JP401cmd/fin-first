@@ -83,7 +83,6 @@ function makeDraft() {
     quickDebts: [],
     bezittingenPhases: [{ kind: 'review' }],
     schuldenPhases: [],
-    spaardoel: { presetKey: null, name: '', target_value: '', target_date: '', skipped: false },
     pension: { mode: null, grossMonthly: '', startAge: '', parseResult: null },
     retirementExpense: { method: 'custom_amount', customAmount: '', skipped: false },
     horizon: {

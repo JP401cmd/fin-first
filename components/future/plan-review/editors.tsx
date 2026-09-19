@@ -25,6 +25,7 @@ import { UitgavenEditor } from './uitgaven-editor'
 import { PottenEditor } from './potten-editor'
 import { WoningEditor } from './woning-editor'
 import { InkomstenEditor } from './inkomsten-editor'
+import { GrondslagEditor } from './grondslag-editor'
 
 export interface PlanReviewEditorProps {
   context: PlanReviewEditorContext
@@ -62,4 +63,5 @@ export const PLAN_REVIEW_EDITORS: Record<PlanReviewStap, ComponentType<PlanRevie
   inkomsten: InkomstenEditor,
   woning: WoningEditor,
   potten: PottenEditor,
+  grondslag: GrondslagEditor,
 }

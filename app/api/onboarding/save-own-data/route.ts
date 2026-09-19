@@ -462,16 +462,18 @@ const bodySchema = z.object({
     'bewust-leven',
   ])).optional(),
   /**
-   * Spaardoel-keuze van onboarding-stap v. Optioneel — gebruiker mag skippen.
-   * Wanneer aanwezig wordt één rij in de `goals`-tabel geïnserteerd na de
-   * profile-write (RLS-check faalt anders op de FK). Faalt deze insert om
-   * welke reden dan ook, dan wordt de fout gelogd en gaat de save door —
-   * onboarding mag niet stilvallen op een goal-insert error.
+   * Spaardoel-keuze van de voormalige onboarding-stap "Waar wil je voor
+   * sparen?". Die stap is op 19 sep 2026 geschrapt (ADR 0162); de huidige
+   * client stuurt dit veld niet meer. Het blijft als achterwaarts-compatibele
+   * tak staan voor een client-build van vóór die datum: wanneer aanwezig wordt
+   * één rij in de `goals`-tabel geïnserteerd na de profile-write (RLS-check
+   * faalt anders op de FK). Faalt die insert, dan wordt de fout gelogd en gaat
+   * de save door. Verwijderen kan bij de volgende retrofit van dit schema.
    *
    * Constraints spiegelen `goals`-tabel: `target_value > 0`, `name` niet
-   * leeg. `goal_type` is voor alle presets 'savings'; de Shield-icoon +
-   * naam dragen de semantiek "Noodfonds", niet de enum (zie
-   * `lib/onboarding-presets.ts` voor de motivatie).
+   * leeg. `goal_type` was voor alle presets 'savings'; de Shield-icoon +
+   * naam dragen de semantiek "Noodfonds", niet de enum (dezelfde keuze als
+   * `lib/goals/standaard-doelen.ts`).
    */
   onboardingGoal: z.object({
     name: z.string().min(1).max(200),
@@ -743,7 +745,7 @@ export async function POST(req: Request) {
     // description instead of filling in asset/debt/budget forms. We use AI
     // to extract structured financial data from that description.
     const isNewsOnly = activeModules?.length === 1 && activeModules[0] === 'nieuws'
-    let extractedAssets: Array<{ name: string; asset_type: string; current_value: number; expected_return: number; monthly_contribution: number; is_liquid: boolean; subtype: string | null; source: string }> = []
+    let extractedAssets: Array<{ name: string; asset_type: string; current_value: number; expected_return: number | null; monthly_contribution: number; is_liquid: boolean; subtype: string | null; source: string }> = []
     let extractedDebts: Array<{ name: string; debt_type: string; current_balance: number; interest_rate: number; monthly_payment: number; is_tax_deductible: boolean | null; subtype: string | null; source: string }> = []
     let extractedLifeEvents: Array<{ name: string; event_type: string; target_age: number | null; description?: string; one_time_cost: number; monthly_cost_change: number; monthly_income_change: number; duration_months: number; icon: string }> = []
     let financialContext: string | null = null
@@ -759,11 +761,20 @@ export async function POST(req: Request) {
         // oudere clients; `??` en niet `||`, zodat een legitieme 0 (rendement
         // van contant geld) of `false` (niet liquide) niet stilzwijgend wordt
         // overschreven.
+        //
+        // RENDEMENT: `?? null` en niet `?? 0` (ADR 0166). Een client die het veld
+        // niet meestuurt heeft géén rendement bepaald; dat als 0% wegschrijven is
+        // een verzonnen aanname die daarna niet meer van een bewuste 0 te
+        // onderscheiden is. `null` zegt wat er aan de hand is: geen eigen aanname,
+        // reken met het profielrendement. Het huidige (lokale) extractiepad vult
+        // het veld altijd deterministisch per type — zie
+        // lib/ai/local/local-extraction-defaults.ts — dus dit raakt alleen oudere
+        // clients.
         extractedAssets = (extractionData.assets ?? []).map((a) => ({
           name: a.name,
           asset_type: a.asset_type,
           current_value: a.estimated_value,
-          expected_return: a.expected_return ?? 0,
+          expected_return: a.expected_return ?? null,
           monthly_contribution: a.monthly_contribution ?? 0,
           is_liquid: a.is_liquid ?? true,
           subtype: a.subtype ?? null,
@@ -1286,7 +1297,17 @@ export async function POST(req: Request) {
         asset_type: a.asset_type,
         current_value: a.current_value,
         purchase_value: a.current_value,
-        expected_return: a.expected_return / 100, // Convert % to decimal
+        // NULL blijft NULL: "geen eigen rendementsaanname" (ADR 0166). Zonder deze
+        // guard zou `null / 100` → 0 worden en daarmee stil een bewuste 0%.
+        //
+        // LET OP — pre-existing SCHAALFOUT, hier BEWUST niet meegefixt omdat het
+        // buiten deze kaart valt: `assets.expected_return` staat in PROCENTEN
+        // (7 = 7%), maar deze insert deelt door 100. Een AI-geëxtraheerde 7%
+        // landt daardoor als 0,07% groei. De `quickAssets`-insert hierboven
+        // schrijft wél op procentschaal, dus de twee insertpaden van dit
+        // eindpunt zijn onderling inconsistent. Aparte kaart.
+        expected_return: a.expected_return == null ? null : a.expected_return / 100, // Convert % to decimal
+
         monthly_contribution: a.monthly_contribution,
         is_active: true,
         is_liquid: a.is_liquid,

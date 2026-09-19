@@ -57,8 +57,10 @@ export const TOEK_FLOW: UatFlow = {
     { id: 'maskering', scenarioId: 'UAT-TOEK-34', label: 'WF-TOEK-34 · Bedragmaskering op de grafiek', kind: 'action', stage: 2, lane: 'aflezen', subOf: 'grafiek' },
     { id: 'grondslaglijn', scenarioId: 'UAT-TOEK-36', label: 'WF-TOEK-36 · Grondslag hoofdlijn per woonstrategie', kind: 'screen', stage: 2, lane: 'aflezen', subOf: 'grafiek' },
     { id: 'grondslagdoorwerking', scenarioId: 'UAT-TOEK-37', label: 'WF-TOEK-37 · Stip, band, drempels, pill & kassabon bewegen mee', kind: 'screen', stage: 2, lane: 'aflezen', subOf: 'grondslaglijn' },
-    // ADR 0148 — schuld-segmenten per soort in de Opbouw-weergave.
-    { id: 'opbouwkleuren', scenarioId: 'UAT-TOEK-53', label: 'WF-TOEK-53 · Opbouw-grafiek kleurt schulden per soort', kind: 'screen', stage: 2, lane: 'aflezen', subOf: 'grafiek' },
+    // ADR 0148 — schuld-segmenten per soort in de Opbouw-weergave; sinds de
+    // bugfix van 18-09-2026 markeert diezelfde weergave ook het uitgesloten
+    // eigen huis én zijn hypotheek (subscenario b).
+    { id: 'opbouwkleuren', scenarioId: 'UAT-TOEK-53', label: 'WF-TOEK-53 · Schuldkleuren per soort + gemarkeerd eigen huis', kind: 'screen', stage: 2, lane: 'aflezen', subOf: 'grafiek' },
     // ADR 0150 — opname naar behoefte krijgt een eigen post (Inkomen & Uitgaven,
     // jaar-kassabon, opbouw-hover, tijdlijn-marker).
     { id: 'opeetopname', scenarioId: 'UAT-TOEK-54', label: 'WF-TOEK-54 · Opname uit je huis zichtbaar als eigen post', kind: 'screen', stage: 2, lane: 'aflezen', subOf: 'grafiek' },

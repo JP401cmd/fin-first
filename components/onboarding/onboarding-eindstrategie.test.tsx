@@ -62,15 +62,24 @@ describe('OnboardingEindstrategie — de twee vragen in gewone taal', () => {
     expect(tile(/Een bedrag voor later of voor anderen/)).toBeInTheDocument()
     expect(tile(/Mijn vermogen mag niet slinken/)).toBeInTheDocument()
 
-    expect(screen.getByText('Wanneer wil je stoppen met werken?')).toBeInTheDocument()
+    // W-011: de vraag is de KOP van de stap (h1, want onboarding valt buiten de
+    // app-shell) en staat er precies één keer — niet nog eens als h2 eronder.
     expect(
-      screen.getByText('Tot welke leeftijd moet je geld reiken, en wat moet er dan nog over zijn?'),
+      screen.getByRole('heading', { level: 1, name: 'Wanneer wil je stoppen met werken?' }),
+    ).toBeInTheDocument()
+    expect(screen.getAllByText('Wanneer wil je stoppen met werken?')).toHaveLength(1)
+    // Vraag 2 valt buiten die kop en houdt daarom z'n eigen h2.
+    expect(
+      screen.getByRole('heading', {
+        level: 2,
+        name: 'Tot welke leeftijd moet je geld reiken, en wat moet er dan nog over zijn?',
+      }),
     ).toBeInTheDocument()
     // Geen hardcoded AOW-leeftijd op de tegel: de onboarding kent de AOW-tabel niet.
     expect(tile(/Op mijn AOW-leeftijd/).textContent).not.toMatch(/\b67\b/)
   })
 
-  it('tegelrijen zijn groepen met een label naar hun vraagkop', () => {
+  it('tegelrijen zijn groepen met een label (vraag 1 via aria-label, vraag 2 via de kop)', () => {
     render(<Harness />)
     expect(screen.getByRole('group', { name: 'Wanneer wil je stoppen met werken?' })).toBeInTheDocument()
     expect(screen.getByRole('group', { name: 'Wat moet er dan nog over zijn?' })).toBeInTheDocument()

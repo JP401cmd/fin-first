@@ -469,3 +469,74 @@ describe('useCoachSuggestion — eenmalige legacy-migratie', () => {
     expect(localStorage.getItem('trifinity_coach_dismissed_suggestions')).toBeNull()
   })
 })
+
+/**
+ * W-016 — "Tips van Fin uit zichzelf". De poort zit VÓÓR de selectie: uit betekent
+ * geen kaart, geen timer, geen dagstempel en geen dismiss-schrijfactie. Dat laatste
+ * is de eigenschap die ertoe doet — een tip die nooit getoond is, mag niet als
+ * "gezien" in de jsonb belanden (dezelfde fout die `paused` ooit dichtte).
+ */
+describe('useCoachSuggestion — proactief uit (W-016)', () => {
+  it('toont niets en stempelt niets zolang proactief false is', () => {
+    const { result } = renderHook(() =>
+      useCoachSuggestion({
+        coachState: state({ proactief: false }),
+        dataGaps: fullGaps({ hasBank: false }),
+        delayMs: 1000,
+      }),
+    )
+    act(() => { vi.advanceTimersByTime(5000) })
+    expect(result.current.suggestion).toBeNull()
+    expect(result.current.proactief).toBe(false)
+    expect(puts).toEqual([])
+  })
+
+  it('een gidsstap verbruikt zijn dag niet wanneer de keuze uit staat', () => {
+    const guide: GuideSuggestionInput = {
+      status: 'active',
+      steps: [{ id: 's1-bezittingen', title: 'Zijn al je bezittingen geregistreerd?', href: '/overzicht' }],
+    }
+    renderHook(() =>
+      useCoachSuggestion({ coachState: state({ proactief: false }), dataGaps: fullGaps(), guide, delayMs: 1000 }),
+    )
+    act(() => { vi.advanceTimersByTime(5000) })
+    expect(puts.some((p) => p.action === 'guideShown')).toBe(false)
+  })
+
+  it('setProactief(false) sluit een openstaande melding en schrijft de keuze — geen dismiss', () => {
+    const { result } = renderHook(() =>
+      useCoachSuggestion({ coachState: state(), dataGaps: fullGaps({ hasBank: false }), delayMs: 1000 }),
+    )
+    act(() => { vi.advanceTimersByTime(1000) })
+    expect(result.current.suggestion).not.toBeNull()
+
+    act(() => { result.current.setProactief(false) })
+
+    expect(result.current.suggestion).toBeNull()
+    expect(result.current.proactief).toBe(false)
+    // De keuze is de reden, niet "deze tip heb ik gezien": geen dismiss-schrijfactie.
+    expect(puts).toEqual([{ action: 'setProactief', enabled: false }])
+
+    // En er komt deze mount niets meer op, ook niet na verder doortikken.
+    act(() => { vi.advanceTimersByTime(10_000) })
+    expect(result.current.suggestion).toBeNull()
+  })
+
+  it('een verse seed met proactief false zet een draaiende hook alsnog stil', () => {
+    const { result, rerender } = renderHook(
+      ({ proactief }: { proactief: boolean }) =>
+        useCoachSuggestion({
+          coachState: state({ proactief }),
+          dataGaps: fullGaps({ hasBank: false }),
+          delayMs: 1000,
+        }),
+      { initialProps: { proactief: true } },
+    )
+    act(() => { vi.advanceTimersByTime(1000) })
+    expect(result.current.suggestion).not.toBeNull()
+
+    rerender({ proactief: false })
+    act(() => { vi.advanceTimersByTime(5000) })
+    expect(result.current.proactief).toBe(false)
+  })
+})

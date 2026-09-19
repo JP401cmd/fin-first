@@ -162,14 +162,14 @@ describe('meldingen — de pure producenten', () => {
     providerName: 'Testbank',
     linkIsActive: true,
     connectionStatus: 'linked' as string | null,
-    tokenExpiresAt: null as string | null,
+    consentExpiresAt: null as string | null,
     lastSyncedAt: null as string | null,
   }
   const now = new Date('2026-09-07T12:00:00Z')
 
   it('een verlopende bankkoppeling stuurt naar de koppelingenpagina, mét id', () => {
     const signal = buildBankSignalNotification(
-      { ...baseInput, tokenExpiresAt: '2026-09-10T12:00:00Z' },
+      { ...baseInput, consentExpiresAt: '2026-09-10T12:00:00Z' },
       now,
     )
     expect(signal).not.toBeNull()

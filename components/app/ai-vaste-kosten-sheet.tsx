@@ -90,6 +90,7 @@ export function AiVasteKostenSheet({ open, onOpenChange, onComplete }: AiVasteKo
   const [upsellDialogOpen, setUpsellDialogOpen] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   const [savedCount, setSavedCount] = useState(0)
+  const [excludedCount, setExcludedCount] = useState(0)
 
   // ── Waar draait deze analyse? ──────────────────────────────
   //
@@ -303,18 +304,26 @@ export function AiVasteKostenSheet({ open, onOpenChange, onComplete }: AiVasteKo
     ))
   }
 
-  // ── Save accepted items ────────────────────────────────────
+  // ── Save reviewed items ────────────────────────────────────
+  //
+  // ELKE beoordeelde rij gaat naar de server, niet alleen de geaccepteerde.
+  // Een afgewezen rij (X-knop, "Niet opnemen") wordt als uitsluiting
+  // weggeschreven (`category_override: 'excluded'`, zelfde gewicht als "Niet
+  // opnemen" in RecurringClassifySheet — eigenaarsbesluit B-054). Voorheen
+  // bestond die afwijzing alleen in React-state en kwam het patroon bij de
+  // volgende analyse gewoon terug. De AI-eigen 'skip'-rijen (`skippedRows`)
+  // blijven buiten beschouwing: daar heeft de gebruiker niets over gezegd.
 
   async function handleSave() {
-    const accepted = rows.filter(r => r.accepted)
-    if (accepted.length === 0) return
+    if (rows.length === 0) return
 
     setPhase('saving')
 
     try {
       let saved = 0
+      let excluded = 0
 
-      for (const row of accepted) {
+      for (const row of rows) {
         const res = await fetch('/api/recurring', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -323,14 +332,17 @@ export function AiVasteKostenSheet({ open, onOpenChange, onComplete }: AiVasteKo
             amount: -Math.abs(row.suggestion.monthlyAmount),
             frequency: row.suggestion.frequency,
             counterparty_name: row.suggestion.name,
-            category_override: row.classification,
+            category_override: row.accepted ? row.classification : 'excluded',
           }),
         })
 
-        if (res.ok) saved++
+        if (!res.ok) continue
+        if (row.accepted) saved++
+        else excluded++
       }
 
       setSavedCount(saved)
+      setExcludedCount(excluded)
       setPhase('success')
     } catch {
       setErrorMessage('Er ging iets mis bij het opslaan. Probeer het opnieuw.')
@@ -477,7 +489,9 @@ export function AiVasteKostenSheet({ open, onOpenChange, onComplete }: AiVasteKo
             <button
               type="button"
               onClick={() => void handleSave()}
-              disabled={acceptedCount === 0}
+              // Ook een lijst met alléén afwijzingen is een beoordeling die
+              // opgeslagen moet worden — anders komt alles de volgende keer terug.
+              disabled={rows.length === 0}
               className="inline-flex items-center gap-1.5 rounded-[var(--r)] bg-wil-600 px-4 py-2 text-sm font-medium text-white hover:bg-wil-700 disabled:opacity-40"
             >
               <Check className="h-3.5 w-3.5" />
@@ -549,7 +563,8 @@ export function AiVasteKostenSheet({ open, onOpenChange, onComplete }: AiVasteKo
                         onClick={() => {
                           if (row.accepted) toggleAccepted(idx)
                         }}
-                        title="Overslaan"
+                        title="Niet opnemen"
+                        aria-label={`${row.suggestion.name} niet opnemen`}
                         className={`rounded-[var(--r-sm)] p-1.5 transition-colors ${
                           !row.accepted
                             ? 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
@@ -624,6 +639,11 @@ export function AiVasteKostenSheet({ open, onOpenChange, onComplete }: AiVasteKo
             <p className="mt-1 text-sm text-[var(--ink-2)]">
               {savedCount} {savedCount === 1 ? 'item' : 'items'} opgeslagen als vaste kost
             </p>
+            {excludedCount > 0 && (
+              <p className="mt-1 text-sm text-[var(--ink-3)]">
+                {excludedCount} {excludedCount === 1 ? 'item komt' : 'items komen'} niet meer terug in de detectie
+              </p>
+            )}
           </div>
           <button
             type="button"

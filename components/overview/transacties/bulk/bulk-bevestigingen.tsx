@@ -108,11 +108,11 @@ export function BulkBudgetSheet({
       }}
       kind="sheet"
       size="md"
-      title="Koppel aan budget"
+      title="Categoriseren"
       footer={
         <ModalFooter
           primary={{
-            label: `Koppel ${nlNumber.format(mutableCount)} ${mutableCount === 1 ? 'transactie' : 'transacties'}`,
+            label: `Categoriseer ${nlNumber.format(mutableCount)} ${mutableCount === 1 ? 'transactie' : 'transacties'}`,
             onClick: onConfirm,
             loading: busy,
             disabled: mutableCount === 0,
@@ -138,8 +138,8 @@ export function BulkBudgetSheet({
               {splitCount === 1
                 ? 'Eén geselecteerde transactie is gesplitst en blijft ongewijzigd'
                 : `${nlNumber.format(splitCount)} geselecteerde transacties zijn gesplitst en blijven ongewijzigd`}
-              : bij een split bepalen de deelregels het budget. Wil je die anders indelen, open ze
-              dan los.
+              : bij een split bepalen de deelregels het budget. Wil je die anders categoriseren,
+              open ze dan los.
             </span>
           </p>
         )}

@@ -126,7 +126,7 @@ export function BulkUitkomst({
         className="mt-1 font-display text-[16px] font-semibold leading-snug text-[var(--ink)] outline-none"
       >
         {nlNumber.format(data.changed)} van {nlNumber.format(data.requested)} {werkwoord}
-        {data.kind === 'budget' && compleet ? ` — nu gekoppeld aan ${data.budgetLabel}` : ''}
+        {data.kind === 'budget' && compleet ? ` — nu gecategoriseerd als ${data.budgetLabel}` : ''}
       </p>
 
       {data.kind === 'delete' && data.orphansCleared > 0 && (

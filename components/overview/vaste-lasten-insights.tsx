@@ -10,14 +10,18 @@
  * lopen via <MaskedAmount> (privacy-masking). Module-chrome = kern (amber);
  * status-semantiek gebruikt de stoplichtkleuren, geen module-accent.
  *
- * ── S2: drie blokken zijn óók los bruikbaar ──────────────────────────────
- * `VasteLastenQuoteBlok`, `VasteLastenAbonnementenBlok` en
- * `VasteLastenTopPostenBlok` worden door `vaste-lasten-client.tsx` in de
- * weergavemodus "Eenvoudig" apart gerenderd (richtingsbesluit R5: duiding boven
- * reductie — Eenvoudig kreeg de kale lijst en verloor juist de betekenis). Ze
+ * ── S2: twee blokken zijn óók los bruikbaar ──────────────────────────────
+ * `VasteLastenQuoteBlok` en `VasteLastenAbonnementenBlok` worden door
+ * `vaste-lasten-client.tsx` in de weergavemodus "Eenvoudig" apart gerenderd. Ze
  * staan hier, niet in de client, zodat er één definitie van elk blok bestaat:
  * `VasteLastenInsights` onderaan hergebruikt exact dezelfde functies. Zo kan
  * Volledig niet wegdrijven van Eenvoudig.
+ *
+ * ── W-017 (19-09-2026): drie blokken verwijderd ───────────────────────────
+ * "In vrijheidstijd" dubbelde het onderschrift van het hoofdcijfer (de
+ * tijdvertaling blijft dáár); "Wat als ik opzeg" en de top-5 "Grootste posten"
+ * zijn vervallen — de lijst staat in Eenvoudig nu direct onder het cijfer, dus
+ * een aparte top-5 was een duplicaat.
  *
  * ── S2: één oordeelswoordenlijst ─────────────────────────────────────────
  * `QuoteMeter` had een eigen lijstje ("Gezond"/"Aandacht"/"Risico") náást
@@ -29,15 +33,9 @@
  * /overzicht, niet over deze quote, en is hier dus bewust NIET de bron.
  */
 
-import { useState } from 'react'
-import { Gauge, Clock, CreditCard, PieChart, Scissors, Ban, ListOrdered } from 'lucide-react'
+import { Gauge, CreditCard, PieChart, Ban } from 'lucide-react'
 import { MaskedAmount } from '@/components/app/masked-amount'
-import { formatFreedomTimeString } from '@/lib/format'
-import { formatWorkTimeString } from '@/lib/work-time'
-import {
-  cancelEffect,
-  type VasteLastenInsights as Insights,
-} from '@/lib/vaste-lasten-insights'
+import type { VasteLastenInsights as Insights } from '@/lib/vaste-lasten-insights'
 import {
   LEVERAGE_STATUS_DOT,
   LEVERAGE_STATUS_LABEL,
@@ -147,51 +145,7 @@ function QuoteMeter({ insights }: { insights: Insights }) {
   )
 }
 
-// ── 2. Tijd-vertaling ─────────────────────────────────────────
-//
-// TWEE GROOTHEDEN, ELK MET EIGEN TAAL (ADR 0105):
-//  · vrijheidstijd (`freedom*`, deelt op het UITGAVEN-dagtarief) → "kost je …
-//    vrijheid";
-//  · werktijd (`workTimePerYear`, deelt op het BRUTO INKOMEN-dagtarief) → "je
-//    werkt … van je jaar hiervoor".
-// De tweede zin dróég hier werktijd-taal over een vrijheidstijd-getal ("… die je
-// werkt om je vaste lasten te betalen"). Twee zulke uitgaven-aandelen zijn geen
-// delen van hetzelfde werkjaar, waardoor deze pagina en /overzicht/belasting
-// samen achttien maanden per jaar claimden (bevinding C5). Zonder bekend bruto
-// jaarinkomen tonen we géén werktijd-claim, maar de vrijheidstijd-formulering.
-function FreedomTranslation({ insights }: { insights: Insights }) {
-  const { freedomDaysPerMonth, freedomPerYear, workTimePerYear } = insights
-  const yearStr = formatFreedomTimeString(freedomPerYear, 'long')
-  const workStr = formatWorkTimeString(workTimePerYear)
-  const showWorkTime = workTimePerYear.hasBasis && workTimePerYear.monthsPerYear > 0
-  return (
-    <div className="space-y-1.5">
-      <p className="text-sm leading-relaxed text-[var(--ink-2)]">
-        Je vaste lasten staan gelijk aan{' '}
-        <strong className="font-semibold text-[var(--ink)] tabular-nums">
-          ± {freedomDaysPerMonth} {freedomDaysPerMonth === 1 ? 'dag' : 'dagen'} vrijheid
-        </strong>{' '}
-        per maand.
-      </p>
-      {showWorkTime ? (
-        <p className="text-xs text-[var(--ink-3)]">
-          Je werkt <span className="font-medium text-[var(--ink-2)]">{workStr}</span> van je jaar om
-          ze te betalen
-          {workTimePerYear.exceedsWorkYear ? ' — meer dan een heel werkjaar' : ''}. Elke euro minder
-          is vrijheid die je terugkoopt.
-        </p>
-      ) : (
-        <p className="text-xs text-[var(--ink-3)]">
-          Over een heel jaar kost dat je{' '}
-          <span className="font-medium text-[var(--ink-2)]">{yearStr}</span> vrijheid. Elke euro
-          minder is vrijheid die je terugkoopt.
-        </p>
-      )}
-    </div>
-  )
-}
-
-// ── 3. Abonnementen-sluipverbruik ─────────────────────────────
+// ── 2. Abonnementen-sluipverbruik ─────────────────────────────
 function SubscriptionCreep({
   insights,
   onOpzeg,
@@ -268,7 +222,7 @@ function SubscriptionCreep({
   )
 }
 
-// ── 4. Samenstelling per categorie ────────────────────────────
+// ── 3. Samenstelling per categorie ────────────────────────────
 function Composition({ insights }: { insights: Insights }) {
   const { composition, totalMonthly } = insights
   if (composition.length === 0 || totalMonthly <= 0) {
@@ -318,91 +272,6 @@ function Composition({ insights }: { insights: Insights }) {
   )
 }
 
-// ── 5. "Wat als ik opzeg" mini-effect ─────────────────────────
-function WhatIfCancel({ insights }: { insights: Insights }) {
-  const start = insights.largestSubscription?.monthlyAmount ?? insights.largestItem?.monthlyAmount ?? 10
-  const [monthly, setMonthly] = useState<number>(Math.round(start))
-  // Canoniek dagtarief uit de insights-bundel (12-mnd rolling), niet de
-  // effective maanduitgaven — zelfde noemer als de vrijheidsregels erboven.
-  const { yearlyEuro, freedom } = cancelEffect(monthly, insights.dailyExpenseRate)
-  const freedomStr = formatFreedomTimeString(freedom, 'long')
-  return (
-    <div className="space-y-3">
-      <label className="block text-xs text-[var(--ink-3)]" htmlFor="whatif-cancel">
-        Stel dat je <span className="font-medium text-[var(--ink-2)]">€ {monthly}</span> per maand
-        aan vaste lasten opzegt:
-      </label>
-      <input
-        id="whatif-cancel"
-        type="range"
-        min={0}
-        max={Math.max(50, Math.round(insights.totalMonthly))}
-        step={1}
-        value={monthly}
-        onChange={(e) => setMonthly(Number(e.target.value))}
-        className="w-full accent-[var(--color-kern-600)]"
-      />
-      <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2.5">
-          <p className="text-[11px] uppercase tracking-wide text-[var(--ink-4)]">Per jaar</p>
-          <MaskedAmount
-            value={yearlyEuro}
-            tone="kern"
-            className="font-serif text-lg font-semibold text-[var(--ink)]"
-          />
-        </div>
-        <div className="rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2.5">
-          <p className="text-[11px] uppercase tracking-wide text-[var(--ink-4)]">Vrijheid terug</p>
-          <p className="font-serif text-lg font-semibold tabular-nums text-kern-700">
-            {freedom.isInfinite ? '∞' : freedomStr}
-          </p>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ── 6. Top-5 grootste posten (Eenvoudig) ──────────────────────
-//
-// Vervangt in Eenvoudig de volle lijst als eerste aanblik; de volle lijst blijft
-// bereikbaar achter "Alle {n} posten" (DepthSection in vaste-lasten-client.tsx).
-// Puur presentatie over `insights.topItems` — sort+slice in de motor, hier geen
-// eigen selectie of som. Bedragen via <MaskedAmount>.
-function TopPosten({ insights }: { insights: Insights }) {
-  const { topItems, count } = insights
-  if (topItems.length === 0) {
-    return <p className="text-sm text-[var(--ink-3)]">Nog geen posten om te tonen.</p>
-  }
-  return (
-    <div className="space-y-2">
-      <ul className="divide-y divide-[var(--border-ed)]">
-        {topItems.map((item) => (
-          <li key={item.id} className="flex items-center justify-between gap-3 py-2.5 first:pt-0">
-            <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-[var(--ink)]">{item.name}</p>
-              <p className="text-xs text-[var(--ink-4)]">{item.categoryLabel}</p>
-            </div>
-            <div className="shrink-0 text-right">
-              <MaskedAmount
-                value={item.monthlyAmount}
-                tone="kern"
-                className="text-sm text-[var(--ink)]"
-              />
-              <span className="ml-0.5 text-xs text-[var(--ink-4)]">/mnd</span>
-            </div>
-          </li>
-        ))}
-      </ul>
-      {count > topItems.length && (
-        <p className="text-xs text-[var(--ink-4)]">
-          Dit zijn je {topItems.length} grootste posten van in totaal {count}. De rest staat
-          hieronder onder &ldquo;Alle {count} posten&rdquo;.
-        </p>
-      )}
-    </div>
-  )
-}
-
 /**
  * De quote-meter als losstaand blok — gedeeld tussen Eenvoudig (los gerenderd)
  * en Volledig (via `VasteLastenInsights` hieronder). Eén definitie, twee modi.
@@ -435,40 +304,16 @@ export function VasteLastenAbonnementenBlok({
   )
 }
 
-/** De top-5 grootste posten als losstaand blok (alleen Eenvoudig). */
-export function VasteLastenTopPostenBlok({ insights }: { insights: Insights }) {
-  return (
-    <SectionShell icon={ListOrdered} kicker="Grootste posten">
-      <TopPosten insights={insights} />
-    </SectionShell>
-  )
-}
-
-export function VasteLastenInsights({
-  insights,
-  onOpzeg,
-}: {
-  insights: Insights
-  onOpzeg: (item: { name: string; monthlyAmount: number }) => void
-}) {
+/**
+ * De verdieping in Volledig: samenstelling per categorie. De quote-meter en het
+ * sluipverbruik staan in beide modi al direct onder de lijst
+ * (vaste-lasten-client.tsx), dus die komen hier niet nog eens.
+ */
+export function VasteLastenInsights({ insights }: { insights: Insights }) {
   if (!insights.hasData) return null
   return (
-    <div className="space-y-4">
-      <VasteLastenQuoteBlok insights={insights} />
-
-      <SectionShell icon={Clock} kicker="In vrijheidstijd">
-        <FreedomTranslation insights={insights} />
-      </SectionShell>
-
-      <VasteLastenAbonnementenBlok insights={insights} onOpzeg={onOpzeg} />
-
-      <SectionShell icon={PieChart} kicker="Samenstelling">
-        <Composition insights={insights} />
-      </SectionShell>
-
-      <SectionShell icon={Scissors} kicker="Wat als ik opzeg">
-        <WhatIfCancel insights={insights} />
-      </SectionShell>
-    </div>
+    <SectionShell icon={PieChart} kicker="Samenstelling">
+      <Composition insights={insights} />
+    </SectionShell>
   )
 }

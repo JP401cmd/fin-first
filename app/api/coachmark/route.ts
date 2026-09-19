@@ -31,7 +31,9 @@ import { serverError, unauthorized } from '@/lib/api/respond'
  * - `euro-view` — uitleg bij de weergave-pill.
  * - `overzicht-rondleiding` — de spotlight-tour (ADR 0130).
  * - `budget-transacties-koppelen` — het eenmalige aanbod op /overzicht/budget
- *   om je transacties aan budgetten te hangen (ADR 0158).
+ *   om je transacties te categoriseren (ADR 0158). De id draagt nog de oude
+ *   term 'koppelen': hernoemen zou het aanbod laten terugkeren bij iedereen
+ *   die 'm al had weggeklikt (B-059).
  */
 const COACHMARK_IDS = [
   'euro-view',

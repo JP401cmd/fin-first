@@ -24,8 +24,8 @@
 //   - Vrijheidsvoortgang: shows % progress to the FIRE goal. The bar itself
 //     communicates trajectory — forcing a CTA would be noise.
 //   - Trend widgets: show historical lines. The shape IS the information.
-//   - Vermogensgrafiek: the net-worth-projection-chart on /core is a pure
-//     SVG observation with no interactive elements at all.
+//   - Vermogensgrafiek: the MiniNetWorthChart on /overzicht ("Je plan") is a
+//     pure SVG observation with no interactive elements at all.
 //
 // These widgets optionally accept `href?: string` for "see more" navigation
 // but function correctly without it. The WidgetShell renders them as plain

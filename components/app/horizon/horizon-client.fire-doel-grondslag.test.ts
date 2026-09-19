@@ -116,6 +116,30 @@ describe('horizon-client — één beslisser voor de doelbedrag-grondslag', () =
     }
   })
 
+  it('kleurt geen van beide doelregels met een module-accent', () => {
+    // Bevinding L3 (19-09-2026): de tweede regel stond in `module-active-800`.
+    // Tot de leesvolgorde de grondslag ging volgen viel die regel altijd samen
+    // met het liquide doel; daarna markeerde de kleur niets meer — bij
+    // 'Uitsluiten' is de tweede regel juist het doel MÉT huis. Een accent is
+    // een gebruikersinstelbaar identiteitstoken en mag dus nooit een grondslag
+    // of hiërarchie dragen: grootte + inkt doen dat, de woorden doen de
+    // grondslag. Deze assertie grendelt dat de kleur niet terugkruipt.
+    const regels = codeRegels()
+    const treffers = regels
+      .map((l, i) => [l, i] as const)
+      .filter(([l]) => l.includes('dualDoelRegels['))
+    expect(treffers.length, 'de dubbele doeltegel moet in de bron te vinden zijn').toBeGreaterThan(0)
+    for (const [, i] of treffers) {
+      // Het bedrag staat in de <div> direct boven de MaskedAmount-regel; kijk
+      // daarom een klein venster terug én vooruit.
+      const venster = regels.slice(Math.max(0, i - 4), i + 2).join('\n')
+      expect(
+        /module-active-/.test(venster),
+        `een doelbedrag draagt geen module-accent (regel ${i + 1}): ${venster}`,
+      ).toBe(false)
+    }
+  })
+
   it('gebruikt de canonieke server-Prognose!I ook als noemer van de balk-vulling', () => {
     // Balk-vulling en balk-label moeten op dezelfde grondslag staan; de vulling
     // bouwde Prognose!I bij de eerste paint lokaal na uit Prognose!J terwijl de

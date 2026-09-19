@@ -10,9 +10,12 @@ import {
 /**
  * PalettePicker — visuele preset-keuze tussen de beschikbare paletten
  * (cream / licht / fd-bruin / krant) die in module-color-provider zijn
- * gedefinieerd. Eén klik wisselt het hele design-token-systeem. Het
- * "Krant"-palet draagt daarnaast een eigen label-typografie (Inter) — zie
- * `data-palette` in globals.css.
+ * gedefinieerd. Eén klik wisselt het hele design-token-systeem. Het palet
+ * "Redactioneel wit" (sleutel `krant`) draagt daarnaast een eigen
+ * label-typografie (Inter) — zie `data-palette` in globals.css.
+ *
+ * NB: het label van dat palet heette tot UR3-30 zélf "Krant" en botste toen
+ * met de nieuwsrubriek /nieuws. Label hernoemd, sleutel bewust ongemoeid.
  *
  * Plan-context: backlog-item "Module-color als instelbare accent".
  * Persistence loopt via localStorage (`tf-palette-theme`) in de bestaande

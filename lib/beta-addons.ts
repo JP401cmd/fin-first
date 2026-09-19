@@ -103,7 +103,13 @@ export const BETA_ADDON_COPY: Record<BetaAddonTier, BetaAddonCopy> = {
     bevestig: 'Aanzetten en verder',
     aan: {
       effect: 'Je koppelt je bank; je saldo en transacties komen daarna vanzelf binnen.',
-      waarom: 'Dan hoef je niets over te typen of een bankbestand te importeren.',
+      // "Uiterlijk 180 dagen": de PSD2-vrijstelling (EU 2022/2360, sinds
+      // 25-7-2023) laat een bank tot 180 dagen zonder nieuwe toestemming lezen;
+      // sommige banken kiezen korter (TrueLayer: 90 UK / 180 EU). De app leest
+      // de werkelijke einddatum per koppeling uit TrueLayer (`consent_expires_at`,
+      // ADR 0161) — dit getal is de regel, niet een belofte per bank.
+      waarom:
+        'Dan hoef je niets over te typen of een bankbestand te importeren. Je bank vraagt uiterlijk elke 180 dagen opnieuw om toestemming (PSD2); dat is één klik.',
     },
     uit: {
       effect: 'Je vult je uitgaven zelf in of importeert een bankbestand.',
@@ -112,12 +118,22 @@ export const BETA_ADDON_COPY: Record<BetaAddonTier, BetaAddonCopy> = {
   },
 }
 
-/** "Straks een abonnement, nu een keuze" — met de prijs uit de catalogus. */
+/**
+ * "Straks een abonnement, nu een keuze" — met de prijs uit de catalogus.
+ *
+ * Bij de bankkoppeling ook het WAAROM van de prijs (eigenaarsnorm keuze ·
+ * effect · waarom, W-014): het opvragen van gegevens bij banken loopt via
+ * TrueLayer en kost geld. Tier-specifiek gehouden — de AI-regel is gedeeld en
+ * wordt door `components/app/ai-subscription-upsell.test.tsx` bewaakt.
+ */
 export function betaAddonNotice(tier: BetaAddonTier): string {
   const plan = ADDON_PLANS.find((p) => p.tier === tier)
-  const naam = tier === 'ai' ? 'AI' : 'de bankkoppeling'
   const prijs = plan ? ` van ${formatPlanPrice(plan.priceEur)} per maand` : ''
-  return `Straks wordt ${naam} een abonnement${prijs}. Zolang TriFinity in beta is, kies je zelf of je het aanzet — zonder kosten.`
+  const staart = 'Zolang TriFinity in beta is, kies je zelf of je het aanzet — zonder kosten.'
+  if (tier === 'connected') {
+    return `Straks wordt de bankkoppeling een abonnement${prijs}: het opvragen van je gegevens bij je bank loopt via TrueLayer, en dat kost geld. ${staart}`
+  }
+  return `Straks wordt AI een abonnement${prijs}. ${staart}`
 }
 
 /** Voegt een add-on toe of haalt hem weg; andere entries blijven staan. */

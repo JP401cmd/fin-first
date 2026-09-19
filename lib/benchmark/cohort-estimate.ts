@@ -33,16 +33,13 @@
  * PUUR: geen I/O, geen Supabase — draait in de browser tijdens de onboarding.
  */
 
+import { ESTIMATE_ROUNDING_STEP } from '@/lib/constants'
 import { ageToBand, type AgeBandKey } from './cohort'
 import { getCohortReference, type CohortReference } from './nl-reference'
 
-/**
- * Afrondingsstap van een getoonde schatting. €25 is fijn genoeg om plausibel te
- * blijven (€3.075, niet €3.000) en grof genoeg om zichtbaar te maken dat het
- * een schatting is en geen meting — een bedrag als "€ 3.074,83" zou precisie
- * suggereren die er niet is.
- */
-const ESTIMATE_ROUNDING_STEP = 25
+// Afrondingsstap van een getoonde schatting: `ESTIMATE_ROUNDING_STEP` (€25) in
+// lib/constants.ts — gedeeld met de pensioenschatting in de onboarding. Een
+// bedrag als "€ 3.074,83" zou precisie suggereren die er niet is.
 
 /** Rond af op de schattingsstap; niet-eindige of negatieve invoer → 0. */
 function roundToStep(value: number): number {

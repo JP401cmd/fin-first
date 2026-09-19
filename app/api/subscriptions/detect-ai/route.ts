@@ -9,6 +9,7 @@ import { assertCloudAllowed } from '@/lib/ai/privacy-gate'
 import {
   detectRecurringTransactions,
   RECURRING_ANALYSIS_MONTHS,
+  REVIEWED_RECURRING_FILTER,
 } from '@/lib/recurring-detection'
 import { SUBSCRIPTION_DETECT_PROMPT } from '@/lib/ai/subscription-detect-prompt'
 import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
@@ -61,10 +62,13 @@ export async function POST() {
     // en levert dan alleen de oudste rijen (V-001).
     const [txResult, recurringResult, budgetResult] = await Promise.all([
       fetchAllRecurringTx(supabase, startDateStr),
+      // Bevestigd ÓF uitgesloten (B-054): een "Niet opnemen"-rij is
+      // `is_active:false` en moet de detector tóch bereiken. `category_override`
+      // gaat mee zodat de bevestigde lijst hieronder de uitsluitingen weglaat.
       supabase
         .from('recurring_transactions')
-        .select('id, counterparty_name, amount, name, frequency')
-        .eq('is_active', true),
+        .select('id, counterparty_name, amount, name, frequency, category_override')
+        .or(REVIEWED_RECURRING_FILTER),
       supabase
         .from('budgets')
         .select('id, name, parent_id, budget_type')
@@ -89,8 +93,12 @@ export async function POST() {
       }
     }
 
-    // Build confirmed subscriptions from DB (expenses only: amount < 0)
-    const confirmedSubscriptions = existingRecurrings.filter(r => Number(r.amount) < 0).map(r => ({
+    // Bevestigde abonnementen uit de DB (alleen uitgaven: amount < 0). De
+    // uitgesloten rijen zitten wél in `existingRecurrings` (voor de detector),
+    // maar zijn geen bevestigde post — die blijven hier buiten.
+    const confirmedSubscriptions = existingRecurrings
+      .filter(r => Number(r.amount) < 0 && r.category_override !== 'excluded')
+      .map(r => ({
       id: r.id,
       name: r.name || r.counterparty_name || 'Onbekend',
       averageAmount: Math.abs(Number(r.amount)),

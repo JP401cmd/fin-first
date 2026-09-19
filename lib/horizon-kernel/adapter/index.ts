@@ -250,6 +250,11 @@ export function buildKernelInputFromAppWithNotices(input: KernelAdapterInput): K
     // standaard AAN: NULL/afwezig/true ⇒ `true`; alleen een bewuste `false` laat het
     // veld `undefined` (oud gedrag). Het fixture-pad zet 'm nooit → parity onaangetast.
     geenTekortLening: profile.fire_no_deficit_loan !== false ? true : undefined,
+    // ADR 0167 (gap-besluit V25): eigen pensioen "Geïndexeerd = Nee" is op het app-pad een
+    // nominaal vast maandbedrag. De Excel-structuur de-indexeert één keer naar de ingang en
+    // laat CF!H daarna centraal indexeren (groei i.p.v. vast; strijdig met PT!K). Het
+    // fixture-pad (input-from-fixture) zet 'm nooit → Excel v5-oracle byte-identiek.
+    pensioenNominaalVast: true,
   }
 
   return {

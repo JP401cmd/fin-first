@@ -624,6 +624,11 @@ export interface UnifiedProjectionResult {
    */
   vastStopLeeftijd?: number | null
   /**
+   * AOW-leeftijd van de PARTNER op de as van deze run (TPR-07 fase 2a, uit de PT-laag
+   * van de kernel), of `null` zonder partnerblok. Doorgeven, niet afleiden.
+   */
+  partnerAowAge?: number | null
+  /**
    * Eerste AANHOUDENDE maand (maand 0 = nu) waarin Prognose!J op is, of `null`
    * (ADR 0126, `depletionMonth`). Alleen het kernel-pad zet dit; onder 'nu-stoppen'
    * voedt het de tijdsdekking-vrijheidsvoortgang (`computeRunwayCoveragePct`).
@@ -746,6 +751,7 @@ export function toSimResult(result: UnifiedProjectionResult): SimResult {
     stopAnker: result.stopAnker,
     ankerMaand: result.ankerMaand,
     vastStopLeeftijd: result.vastStopLeeftijd,
+    partnerAowAge: result.partnerAowAge,
     kernelDepletionMonth: result.kernelDepletionMonth,
     fireReachable: result.fireReachable,
     implicitWithdrawalRate: result.implicitWithdrawalRate,

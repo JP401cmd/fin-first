@@ -52,6 +52,21 @@ export const GEEN_TEKORT_LENING_UITLEG =
   'vrij zonder schuld.'
 
 /**
+ * B-050 (19 sep 2026) — de ankervoorwaarde bij "Geen tekort-lening in mijn plan".
+ * De instelling werkt alleen op het GESOLVEDE stopmoment ("zo vroeg als het kan"):
+ * daar zoekt de solver de vroegste leeftijd zonder blijvende tekort-lening. Onder een
+ * vast anker (leeftijd/AOW/nu) verschuift de leeftijd niet en is de uitkomst met de
+ * vlag aan of uit byte-identiek (kernel: `computeStatusBlok`, bewezen in
+ * `geen-tekort-lening.test.ts` (c)). Alleen getoond wanneer `draft.anchor !== 'solved'`
+ * (variant B, eigenaarsbesluit 19-09). Beschrijvend (Wft). Geëxporteerd voor de test.
+ */
+export const GEEN_TEKORT_LENING_VAST_ANKER_UITLEG =
+  'Let op: met een vast stopmoment (een gekozen leeftijd, je AOW-datum of nu) verschuift die ' +
+  'leeftijd niet. De berekening kan dan alsnog een tekort-lening laten zien; deze instelling ' +
+  'verandert daar niets aan. Alleen bij ‘zo vroeg als het kan’ zoekt de app het stopmoment ' +
+  'waarop geen lening nodig is.'
+
+/**
  * Regel 1 — de plan-regel als TWEE VRAGEN (ADR 0129 B13: Voorkeuren is de bron;
  * de strategie-modal op /toekomst spiegelt dezelfde twee vragen via hetzelfde
  * `StopPlanVragen`-component). Vraag 1 = het stop-anker, vraag 2 = de eind-vorm met
@@ -301,6 +316,16 @@ export function EindstrategieBody({
             <span className="mt-0.5 block text-[11px] leading-snug text-[var(--ink-2)]">
               {GEEN_TEKORT_LENING_UITLEG}
             </span>
+            {/* B-050 — de caveat volgt het gekozen anker in het concept (vraag 1 hierboven),
+                zodat de zin meteen verschijnt of verdwijnt bij het omzetten van het anker. */}
+            {draft.anchor !== 'solved' && (
+              <span
+                data-testid="geen-tekort-lening-vast-anker"
+                className="mt-1 block text-[11px] leading-snug text-[var(--ink-2)]"
+              >
+                {GEEN_TEKORT_LENING_VAST_ANKER_UITLEG}
+              </span>
+            )}
           </span>
         </button>
       </div>

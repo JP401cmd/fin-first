@@ -607,6 +607,13 @@ export interface GebPost {
    * nooit. Afwezig/`false` ⇒ exact het Excel-gedrag (byte-identiek).
    */
   readonly eindBijStopmoment?: boolean
+  /**
+   * BUITEN ORACLE-DOMEIN (ADR 0167): `true` ⇒ `bedrag` is een NOMINAAL VAST maandbedrag —
+   * de gebruiker zette "Stijgt mee met inflatie" uit. CF!H/Af!D tellen de post dan zónder
+   * de inflatie-index (koopkracht daalt over de jaren). Excel-Geb kent geen indexatievlag
+   * per post; afwezig/`false` ⇒ koopkracht-nu en centraal geïndexeerd (byte-identiek).
+   */
+  readonly nominaalVast?: boolean
 }
 
 /** Eén handmatige gebeurtenis-rij (Geb rij 4-13) met 0-3 gevulde posten. */
@@ -950,6 +957,21 @@ export interface KernelInput {
    * aanvulling); alleen bij een bewuste `false` laat hij het veld `undefined`.
    */
   readonly geenTekortLening?: boolean
+
+  /**
+   * ADR 0167 (gap-besluit, buiten oracle-domein) — eigen pensioen met "Geïndexeerd = Nee"
+   * is een NOMINAAL VAST maandbedrag. De Excel-structuur (Auto-gebeurtenissen M bij
+   * H="Nee": vooraf gede-indexeerd naar de ingangsleeftijd, daarna centraal geïndexeerd
+   * door CF!H) laat het bedrag ná de ingang tóch groeien — exact op de ingangsmaand,
+   * daarna ×(1+i)^(m/12−ingang); onbeproefd (geen fixture met H="Nee") en strijdig met het
+   * partnerpensioen PT!K, dat bij niet-geïndexeerd wél vlak nominaal blijft.
+   *
+   * `true` ⇒ `derivePensioenPot` geeft het ongedeelde maandbedrag door met
+   * `nominaalVast`, en CF!H telt het zónder index. Weggelaten/`false` ⇒ **byte-identiek
+   * aan de Excel-structuur**: `input-from-fixture` zet 'm nooit (parity groen); de
+   * app-adapter zet 'm altijd op `true`.
+   */
+  readonly pensioenNominaalVast?: boolean
 }
 
 /**

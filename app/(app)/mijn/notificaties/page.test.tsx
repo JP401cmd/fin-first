@@ -286,3 +286,50 @@ describe('MijnNotificatiesPage — belooft geen apparaat-push (UR3-21)', () => {
     })
   }
 })
+
+/**
+ * W-016 — de rij "Tips van Fin uit zichzelf". Default AAN, in beide weergavemodi
+ * precies één keer, en schrijvend via de BESTAANDE route `PUT /api/coach-state`
+ * (geen tweede schrijfpad naar dezelfde jsonb).
+ */
+describe('MijnNotificatiesPage — Fins proactieve tips (W-016)', () => {
+  for (const mode of ['simple', 'full'] as DisplayMode[]) {
+    it(`toont de rij precies één keer in '${mode}', standaard aan`, async () => {
+      setupMocksWithUser()
+      renderInMode(mode)
+      await waitFor(() => {
+        expect(screen.getByText('Tips van Fin uit zichzelf')).toBeTruthy()
+      })
+      expect(screen.getAllByText('Tips van Fin uit zichzelf')).toHaveLength(1)
+      // Default AAN: de knop biedt "Uit schakelen" aan.
+      expect(screen.getByRole('button', { name: /Uit schakelen: Tips van Fin uit zichzelf/i })).toBeTruthy()
+    })
+  }
+
+  it('uitzetten stuurt setProactief naar /api/coach-state', async () => {
+    setupMocksWithUser()
+    renderInMode('full')
+    await waitFor(() => {
+      expect(screen.getByText('Tips van Fin uit zichzelf')).toBeTruthy()
+    })
+
+    mockFetch.mockImplementation(async () => ({ ok: true, json: async () => ({ ok: true }) }))
+    screen.getByRole('button', { name: /Uit schakelen: Tips van Fin uit zichzelf/i }).click()
+
+    await waitFor(() => {
+      const call = mockFetch.mock.calls.find(([url]) => url === '/api/coach-state')
+      expect(call).toBeTruthy()
+      expect(JSON.parse(String(call![1].body))).toEqual({ action: 'setProactief', enabled: false })
+    })
+  })
+
+  it('de contextbanner noemt Fin apart en blijft weg van push-taal', async () => {
+    setupMocksWithUser()
+    renderInMode('full')
+    await waitFor(() => {
+      expect(screen.getByText('Budget alerts')).toBeTruthy()
+    })
+    expect(screen.getByText(/praat daarnaast zelf/i)).toBeTruthy()
+    expect(screen.queryByText(/push/i)).toBeNull()
+  })
+})

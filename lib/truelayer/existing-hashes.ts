@@ -497,6 +497,61 @@ export async function loadCrossSourceCandidates(
   return candidates
 }
 
+/** Bestaande rij op een ándere eigen rekening — de vier laag-2-velden plus waar hij staat. */
+export type OtherOwnAccountCandidate = CrossSourceCandidate & { account_id: string }
+
+/**
+ * Bestaande rijen op de ANDERE eigen rekeningen van de gebruiker, binnen het
+ * datumvenster van een import (± de laag-2-tolerantie) — de invoer voor de
+ * waarschuwing "X regels staan al op rekening Y" (`lib/parsers/other-account-overlap.ts`).
+ *
+ * Woont hier, naast `loadCrossSourceCandidates`, omdat het exact dezelfde
+ * scope-regel is met één omgedraaid filter: `.neq('account_id', …)` in plaats
+ * van `.eq(...)`. De `.eq('user_id', …)` blijft onverkort een PRIVACY-CONTROL
+ * (zie de kop van `ExistingHashScope`): "andere EIGEN rekening" is letterlijk —
+ * partnerrijen op een gedeelde rekening horen hier niet in, ook al zijn ze via
+ * RLS zichtbaar. Anders wordt de waarschuwing een inferentiekanaal over
+ * andermans uitgaven.
+ *
+ * Dit is géén dedup-laag: de uitkomst wordt geteld en getoond, nooit gebruikt
+ * om een INSERT tegen te houden.
+ */
+export async function loadOtherOwnAccountCandidates(
+  supabase: SupabaseClient,
+  scope: ExistingHashScope,
+): Promise<OtherOwnAccountCandidate[]> {
+  const from = shiftIsoDate(scope.minDate, -CROSS_SOURCE_DATE_TOLERANCE_DAYS)
+  const to = shiftIsoDate(scope.maxDate, CROSS_SOURCE_DATE_TOLERANCE_DAYS)
+  const candidates: OtherOwnAccountCandidate[] = []
+
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const offset = page * EXISTING_HASH_PAGE_SIZE
+    const { data, error } = await supabase
+      .from('transactions')
+      .select('account_id, date, amount, counterparty_iban, counterparty_name')
+      .eq('user_id', scope.userId)
+      .neq('account_id', scope.accountId)
+      .gte('date', from)
+      .lte('date', to)
+      .order('id', { ascending: true })
+      .range(offset, offset + EXISTING_HASH_PAGE_SIZE - 1)
+
+    if (error) {
+      console.error('[transactions-import:other-account-candidates] query mislukt:', error)
+      throw new Error('Bestaande transacties op andere rekeningen ophalen mislukt')
+    }
+
+    const rows = (data ?? []) as OtherOwnAccountCandidate[]
+    // `amount` komt als NUMERIC-string uit PostgREST — coerceren, anders wordt
+    // de centen-vergelijking in de matcher NaN en matcht er niets.
+    for (const r of rows) candidates.push({ ...r, amount: Number(r.amount) })
+
+    if (rows.length < EXISTING_HASH_PAGE_SIZE) break
+  }
+
+  return candidates
+}
+
 /**
  * Datum van de nieuwste transactie die al op DEZE rekening staat, of `null` bij
  * een lege rekening.

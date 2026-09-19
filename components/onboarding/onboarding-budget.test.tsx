@@ -26,6 +26,17 @@ function mockFetchOk() {
 }
 
 describe('OnboardingBudget', () => {
+  // W-012: de kop van fase 1 noemt de canonieke term ("budgetten"), niet de
+  // omschrijving "je geld verdelen". De <em> splitst de zin over drie tekstnodes,
+  // dus een getByText zou 'm niet vinden — de accessible name van de heading
+  // plakt ze wél aan elkaar.
+  it('fase 1 draagt "Stel je budgetten in" als kop', () => {
+    renderStep()
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Stel je budgetten in' }),
+    ).toBeInTheDocument()
+  })
+
   it('Nibud is voorgeselecteerd en er zijn vier startpunten', () => {
     renderStep()
     const group = screen.getByRole('group', { name: 'Kies een startpunt' })
@@ -69,6 +80,21 @@ describe('OnboardingBudget', () => {
     // Nibud: Salaris = het volledige netto inkomen, de rest in percentages ervan.
     expect(screen.getByDisplayValue('4000')).toBeTruthy()
     expect(screen.getByTestId('nog-te-verdelen').textContent).toMatch(/0/)
+
+    // W-013: fase 2 vertelt wáár die bedragen vandaan komen — en zegt er
+    // "vaste verdeling" bij, zodat de generieke sleutel niet als maatwerk leest.
+    expect(screen.getByText(/vaste verdeling van je netto-inkomen/)).toBeTruthy()
+    expect(screen.getByText(/Bijstellen kan later altijd onder Overzicht → Budget/)).toBeTruthy()
+  })
+
+  // Harde eis uit de kaart: de percentages zijn de eigen sleutel van de app,
+  // geen Nibud-referentiecijfers (dat is `nibud_reference_data`, een ander
+  // systeem). Het deck mag daarom geen templatenaam of Nibud-verwijzing dragen.
+  it('het deck van fase 2 noemt geen templatenaam en niet Nibud', () => {
+    renderStep()
+    fireEvent.click(footerButton('Verder'))
+    const deck = screen.getByText(/Koos je een opzet, dan zijn de bedragen al ingevuld/)
+    expect(deck.textContent).not.toMatch(/Nibud|Minimalistisch|Uitgebreid/)
   })
 
   it('"Leeg beginnen" levert alleen Eigen rekening', async () => {
@@ -79,6 +105,11 @@ describe('OnboardingBudget', () => {
 
     expect(screen.getAllByDisplayValue('Eigen rekening')).toHaveLength(2)
     expect(screen.getByTestId('nog-te-verdelen').textContent).toMatch(/3\.000/)
+
+    // W-013: één deck voor beide startpunten, dus de inkomenszin staat er ook
+    // hier — maar voorwaardelijk ("Koos je een opzet, dan …"), zodat hij niet
+    // belooft dat er iets is ingevuld terwijl je leeg begon.
+    expect(screen.getByText(/Koos je een opzet, dan zijn de bedragen al ingevuld/)).toBeTruthy()
 
     fireEvent.click(footerButton('Budget opslaan'))
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))

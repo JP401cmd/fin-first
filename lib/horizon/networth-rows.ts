@@ -181,6 +181,15 @@ export interface BuildSimNetWorthRowsParams {
    * voor de HELE reeks weggelaten (nooit een half gevulde reeks).
    */
   startNettoLiquideByAge?: ReadonlyMap<number, number>
+  /**
+   * Profielrendement (DECIMAAL, `resolveFireParams(profile).grossReturn`) als
+   * terugval voor een woning ZONDER eigen rendementsaanname (`expected_return =
+   * null`, ADR 0166) in de huiswaarde-projectie van de filterende modus —
+   * dezelfde ketting als `potRendement` op het huis-pot in de kernel. Onder de
+   * kernel-tak (`houseInLedger: true`) wordt de huisbijdrage niet berekend en is
+   * dit veld inert. Weggelaten → 0 (oude nul-basis).
+   */
+  terugvalRendement?: number
 }
 
 /**
@@ -210,7 +219,12 @@ export function buildSimNetWorthRows(p: BuildSimNetWorthRowsParams): SimNetWorth
   function houseEquityAt(age: number): number {
     if (!addsHouseEquity || currentAge == null) return 0
     const monthsForward = Math.max(0, (age - currentAge) * 12)
-    const { currentValue } = projectEigenHuisValuesAt(housingContext.eigenHuisAssets, monthsForward)
+    // Terugval (ADR 0166) op percentage-schaal — de helper rekent in procenten.
+    const { currentValue } = projectEigenHuisValuesAt(
+      housingContext.eigenHuisAssets,
+      monthsForward,
+      (p.terugvalRendement ?? 0) * 100,
+    )
     const { balance } = projectMortgageStateAt(housingContext.eigenHuisMortgages, monthsForward)
     return Math.max(0, currentValue - balance)
   }

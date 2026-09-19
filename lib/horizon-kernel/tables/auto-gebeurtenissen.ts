@@ -327,6 +327,8 @@ interface PensioenDerived {
   readonly gebBedrag: number
   /** H = "Ja" → geïndexeerd. */
   readonly geindexeerd: boolean
+  /** ADR 0167: H = "Nee" onder `KernelInput.pensioenNominaalVast` ⇒ M ongedeeld, vlak nominaal. */
+  readonly nominaalVast: boolean
 }
 
 /**
@@ -344,12 +346,26 @@ function derivePensioenPot(input: KernelInput, pot: PensioenPot): PensioenDerive
       ? pmt(input.inflatie / 12, duurModel * 12, -(pot.inlegPot ?? 0))
       : (pot.brutoPerMaand ?? 0)
   const geindexeerd = pot.geindexeerd === 'Ja'
-  // M — geïndexeerd ⇒ = K; niet-geïndexeerd (onbeproefd) ⇒ vooraf gede-indexeerd
-  // naar de ingangsleeftijd zodat CF!H centraal terug-indexeert.
-  const gebBedrag = geindexeerd
-    ? maandbedrag
-    : maandbedrag / Math.pow(1 + input.inflatie, ingang - input.startLeeftijd)
-  return { ingang, duurModel, maandbedrag, eindLeeftijd: ingang + duurModel, gebBedrag, geindexeerd }
+  // M — geïndexeerd ⇒ = K; niet-geïndexeerd (onbeproefd, geen fixture met H="Nee") ⇒
+  // vooraf gede-indexeerd naar de ingangsleeftijd zodat CF!H centraal terug-indexeert.
+  // Die Excel-structuur laat het bedrag ná de ingang tóch groeien (×(1+i)^(m/12−ingang)):
+  // exact op de ingangsmaand, daarna geen vast bedrag. ADR 0167 (app-pad,
+  // `input.pensioenNominaalVast`): niet-geïndexeerd = nominaal vast — het ongedeelde
+  // maandbedrag, door CF!H zónder index geteld. Fixture-pad zet de vlag nooit.
+  const nominaalVast = !geindexeerd && input.pensioenNominaalVast === true
+  const gebBedrag =
+    geindexeerd || nominaalVast
+      ? maandbedrag
+      : maandbedrag / Math.pow(1 + input.inflatie, ingang - input.startLeeftijd)
+  return {
+    ingang,
+    duurModel,
+    maandbedrag,
+    eindLeeftijd: ingang + duurModel,
+    gebBedrag,
+    geindexeerd,
+    nominaalVast,
+  }
 }
 
 /**
@@ -409,6 +425,11 @@ export interface AutoEvent {
   readonly bedrag: number
   /** Geïndexeerd? (bepaalt de bn-de-indexatie). */
   readonly geindexeerd: boolean
+  /**
+   * ADR 0167 (buiten oracle-domein): `true` ⇒ `bedrag` is nominaal vast — CF!H/Af!D tellen
+   * de post zónder idx(m). Alleen gezet onder `KernelInput.pensioenNominaalVast`.
+   */
+  readonly nominaalVast?: boolean
   readonly startLeeftijd: number
   readonly startMaand: number
   /** Eind-leeftijd (`null` = eenmalig / geen eind). */
@@ -498,6 +519,8 @@ export function computeAutoEvents(input: KernelInput): AutoEvent[] {
       type: 'Periodiek',
       bedrag: derived.gebBedrag,
       geindexeerd: derived.geindexeerd,
+      // Alleen gezet als waar, zodat het fixture-pad exact de oude event-vorm houdt.
+      ...(derived.nominaalVast ? { nominaalVast: true as const } : {}),
       startLeeftijd: derived.ingang,
       startMaand: 1,
       eindLeeftijd: derived.eindLeeftijd,

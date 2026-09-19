@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import {
   autolinkGoalCurrentValues,
   computeLinkedCurrentValue,
+  computeParameterWeightedReturnPct,
   splitActiveGoals,
   syncActiveGoalValues,
   MAX_HANDMATIGE_DOELEN,
@@ -372,5 +373,41 @@ describe('syncActiveGoalValues — tolerante degradatie op metric-waarden', () =
       taxBurdenPct: async () => value,
     })
     expect(goals[0].current_value).toBe(42)
+  })
+})
+
+// ── ADR 0166 — rendement-doel: `expected_return = null` valt terug op het profiel ──
+//
+// `Number(null ?? 0)` woog zo'n bezitting op 0% en liet de doelkaart een lager
+// rendement tonen dan /toekomst (doelGewogenRendement, potRendement met
+// fireParams.grossReturn). Zelfde ketting hier; weggelaten → oude nul-basis.
+describe('computeParameterWeightedReturnPct — null vs bewuste 0 (ADR 0166)', () => {
+  const rij = (expected_return: number | string | null, current_value = 100_000) => ({
+    current_value,
+    expected_return,
+    net_worth_inclusion_pct: 100,
+    asset_type: 'investment',
+    is_active: true,
+  })
+
+  it('null → terugval (7%) wanneer de terugval is meegegeven', () => {
+    expect(computeParameterWeightedReturnPct([rij(null)], 7)).toBe(7)
+  })
+
+  it('null zonder terugval → 0 (oude nul-basis, bestaande callers byte-identiek)', () => {
+    expect(computeParameterWeightedReturnPct([rij(null)])).toBe(0)
+  })
+
+  it('een ingevulde 0 blijft 0, ook mét terugval', () => {
+    expect(computeParameterWeightedReturnPct([rij(0)], 7)).toBe(0)
+  })
+
+  it('NUMERIC als string ("5") telt als eigen aanname, niet als ontbreken', () => {
+    expect(computeParameterWeightedReturnPct([rij('5')], 7)).toBe(5)
+  })
+
+  it('weegt gemengd: null op terugval, ingevuld op eigen aanname', () => {
+    // (100k × 7 + 100k × 3) / 200k = 5,0
+    expect(computeParameterWeightedReturnPct([rij(null), rij(3)], 7)).toBe(5)
   })
 })

@@ -1377,7 +1377,7 @@ describe('AICategorizeSheet — GWT-1 · wizard-modus zonder globale lijst-heade
 // ── GWT-16: sleepmodus-terugkeer landt weer in de wizard (stap 2), niet het
 //    keuzescherm en niet terug bij stap 1 ─────────────────────────────────────
 //
-// "Zelf indelen (sleepmodus)" vanuit een AI-groepkaart (splitGroup) opent de
+// "Zelf categoriseren (sleepmodus)" vanuit een AI-groepkaart (splitGroup) opent de
 // overlay met exact die groep; bij afsluiten (finishSleepSubset) verwijdert de
 // sheet die rijen uit `rows` en zet phase terug naar 'review' — de wizard-stap
 // (wizardStep) leeft in de sheet en overleeft dat uitstapje ongewijzigd.
@@ -1405,7 +1405,7 @@ describe('AICategorizeSheet — GWT-16 · sleepmodus-terugkeer naar stap 2', () 
       expect(screen.getByText('Sleep Winkel')).toBeInTheDocument()
     })
 
-    fireEvent.click(screen.getByRole('button', { name: /Zelf indelen \(sleepmodus\)/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Zelf categoriseren \(sleepmodus\)/i }))
     expect(await screen.findByTestId('sleepmodus-overlay')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: /Sluit sleepmodus/i }))
@@ -1523,7 +1523,7 @@ describe('AICategorizeSheet — zonder AI-abonnement (V-002)', () => {
     )
     expect(screen.queryByRole('button', { name: /Vraag Fin/i })).toBeNull()
     expect(screen.getByTestId('ai-upsell-headline').textContent).toBe(
-      'Transacties laten indelen door Fin werkt als je AI aanzet',
+      'Transacties laten categoriseren door Fin werkt als je AI aanzet',
     )
     // Beta (ADR 0157): de upsell biedt de keuze zelf aan.
     expect(screen.getByTestId('ai-upsell-cta')).toHaveTextContent('AI aanzetten')

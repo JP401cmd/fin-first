@@ -28,8 +28,8 @@ import { ShellOverlay, type PaneAction } from '@/components/app/shell/shell-over
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/components/app/toast-provider'
 import { ASSET_CLIENT_COLUMNS, type Asset } from '@/lib/asset-data'
-import { computeYearlyMustExpenses, type BudgetRow, type ChildBudgetRow } from '@/lib/budget-utils'
-import { dailyExpenseRate } from '@/lib/format'
+import type { FreedomRateSource } from '@/lib/format'
+import { VrijheidstijdVoetnoot } from '@/components/app/vrijheidstijd-voetnoot'
 import {
   loadConnectionForAsset,
   type AssetConnectionSummary,
@@ -76,9 +76,43 @@ interface AssetPaneProps {
   onClose: () => void
   /** Aangeroepen na save / herwaardering / delete (router.refresh of loader). */
   onChanged?: () => void
+  /**
+   * Het CANONIEKE dagtarief (euro per dag) van de host-pagina — `dailyExpenses`
+   * uit `AssetsPageData` respectievelijk de categorie-loader, dus
+   * `getRecentDailyExpenseRate` (12-mnd gerealiseerde consumptie, ADR 0126 D1/D2).
+   *
+   * WAAROM ALS PROP EN NIET ZELF BEREKEND. Tot 19 sep 2026 rekende deze pane zijn
+   * eigen tarief uit op de ESSENTIËLE-budgetten-grondslag
+   * (`computeYearlyMustExpenses / 365`, met de profielschatting als terugval). Dat
+   * is de must-basis van de FIRE-doelberekening en ligt structureel ónder de totale
+   * consumptie, dus het detailvenster toonde een LANGERE vrijheidsduur dan élk ander
+   * oppervlak — op dezelfde pagina, voor hetzelfde bezit (≈ €105 tegenover ≈ €107
+   * per dag). ADR 0126 D1 kent precies twee vrijheidstijd-grootheden (dagtarief =
+   * marginaal op consumptie, runway = totaal uit de kernel) en verbiedt een derde;
+   * de must-basis wás die derde. Consume, don't recompute — de host heeft het getal
+   * al in handen.
+   *
+   * Ontbreekt het (undefined of 0), dan vervalt de vrijheidstijd-regel in het
+   * detailvenster. Bewust GEEN eigen terugval hier: een tweede terugval in een
+   * component is precies hoe de tweede grondslag ontstond.
+   */
+  dailyExpenses?: number
+  /**
+   * Herkomst van dat tarief (`dailyExpensesSource` uit dezelfde bundel), zodat het
+   * detailvenster dezelfde bronvermelding kan dragen als de rest van de pagina
+   * (B-039). Ontbreekt = geen bronvermelding.
+   */
+  dailyExpensesSource?: FreedomRateSource
 }
 
-export function AssetPane({ asset, currentUserId, onClose, onChanged }: AssetPaneProps) {
+export function AssetPane({
+  asset,
+  currentUserId,
+  onClose,
+  onChanged,
+  dailyExpenses = 0,
+  dailyExpensesSource,
+}: AssetPaneProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { addToast } = useToast()
@@ -97,7 +131,6 @@ export function AssetPane({ asset, currentUserId, onClose, onChanged }: AssetPan
   const [linkedBankAccounts, setLinkedBankAccounts] = useState<
     Map<string, { id: string; linked_asset_id: string }>
   >(new Map())
-  const [dailyExpenses, setDailyExpenses] = useState(0)
   const [budgetingActive, setBudgetingActive] = useState(true)
   const [connection, setConnection] = useState<AssetConnectionSummary | null>(null)
   const [brokerConnection, setBrokerConnection] = useState<BrokerConnectionRow | null>(null)
@@ -168,8 +201,6 @@ export function AssetPane({ asset, currentUserId, onClose, onChanged }: AssetPan
       allAssetsRes,
       bankAccountsRes,
       profileRes,
-      essentialBudgetsRes,
-      childBudgetsRes,
       connectionResult,
       brokerResult,
       cryptoResult,
@@ -197,20 +228,11 @@ export function AssetPane({ asset, currentUserId, onClose, onChanged }: AssetPan
         .select('id, linked_asset_id')
         .eq('is_active', true)
         .not('linked_asset_id', 'is', null),
-      supabase
-        .from('profiles')
-        .select('budgeting_active, estimated_monthly_expenses')
-        .single(),
-      supabase
-        .from('budgets')
-        .select('id, name, default_limit, interval, budget_type')
-        .eq('is_essential', true)
-        .eq('budget_type', 'expense')
-        .is('parent_id', null),
-      supabase
-        .from('budgets')
-        .select('id, parent_id, default_limit, is_essential, interval, budget_type')
-        .not('parent_id', 'is', null),
+      // `estimated_monthly_expenses` is hier vervallen: het dagtarief komt sinds
+      // 19 sep 2026 als prop van de host (ADR 0126 D1) en deze pane heeft geen
+      // eigen terugval meer. De twee budget-queries eronder — de essentiële
+      // budgetten en hun kinderen — zijn om dezelfde reden weg.
+      supabase.from('profiles').select('budgeting_active').single(),
       connectionPromise,
       brokerPromise,
       cryptoPromise,
@@ -236,26 +258,7 @@ export function AssetPane({ asset, currentUserId, onClose, onChanged }: AssetPan
     }
     setLinkedBankAccounts(bankMap)
 
-    const profile = profileRes.data
-    setBudgetingActive(profile?.budgeting_active !== false)
-
-    // Dagtarief voor de vrijheidstijd-badge: ESSENTIËLE-uitgaven-grondslag
-    // (de must-basis van de FIRE-doelberekening, net als portfolio-value-chart)
-    // via de canonieke oprol `computeYearlyMustExpenses` (lib/budget-utils.ts).
-    // Hier stond een eigen kopie die álle kinderen met het PARENT-interval
-    // normaliseerde (de interval-mismatch uit aandachtspunt
-    // budget-kind-oprol-interval-mismatch) en de essential-kind-regel miste.
-    // Terugval: de profielschatting via de canonieke conversie (×12/365);
-    // 0 = geen eerlijke dagbasis.
-    const { yearlyMustExpenses } = computeYearlyMustExpenses(
-      (essentialBudgetsRes.data ?? []) as BudgetRow[],
-      (childBudgetsRes.data ?? []) as ChildBudgetRow[],
-    )
-    setDailyExpenses(
-      yearlyMustExpenses > 0
-        ? yearlyMustExpenses / 365
-        : dailyExpenseRate(Number(profile?.estimated_monthly_expenses ?? 0)),
-    )
+    setBudgetingActive(profileRes.data?.budgeting_active !== false)
   }, [])
 
   useEffect(() => {
@@ -491,6 +494,19 @@ export function AssetPane({ asset, currentUserId, onClose, onChanged }: AssetPan
             onRevalue={() => setRevaluationOpen(true)}
             onDelete={() => setConfirmDelete(true)}
             embedded
+          />
+        )}
+        {/* De wisselkoers één keer per oppervlak (UR3-08, eigenaarsbesluit A bij
+            B-039). Hij hoort waar het tijdgetal staat, en dat is hier: het
+            detailvenster vertaalt de waarde van dit bezit naar vrijheid. Bewust
+            in de PANE en niet in `AssetDetailModal` zelf — de pagina eromheen
+            (`assets-client.tsx`) draagt de koers sinds B-039 niet meer, en dat
+            bestand is daarop vergrendeld. De component leest maskering zelf. */}
+        {mode === 'view' && (
+          <VrijheidstijdVoetnoot
+            dailyRate={dailyExpenses}
+            source={dailyExpensesSource}
+            className="mt-2"
           />
         )}
         {mode === 'edit' && (

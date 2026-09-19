@@ -3,14 +3,25 @@
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { NOTIFICATION_TYPES, WEEKLY_BRIEFING_EMAIL_TOGGLE } from '@/lib/identity-constants'
-import { Bell, CalendarCheck, HandCoins, type LucideIcon } from 'lucide-react'
+import { Bell, CalendarCheck, HandCoins, Lightbulb, type LucideIcon } from 'lucide-react'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { PageInfoButton, PageOpening } from '@/components/editorial'
 import { DepthSection } from '@/components/app/depth-section'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import { getPageInfo } from '@/lib/page-info-content'
+import { COACH_STATE_KEY, parseCoachState } from '@/lib/coach-state'
 
 type PartnerNotifMode = 'all_shared' | 'threshold' | 'categories' | 'disabled'
+
+/**
+ * W-016 — één plek voor de kopij van de Fin-schakelaar (Eenvoudig én Volledig
+ * tonen dezelfde rij). De uitleg benoemt expliciet wat er stíl wordt: niet alleen
+ * de route-tips, maar ook de overgeslagen onboarding-velden en de dagelijkse
+ * gidsstap — die stappen blijven zichtbaar in de gids in Fins chat.
+ */
+const FIN_PROACTIEF_LABEL = 'Tips van Fin uit zichzelf'
+const FIN_PROACTIEF_UITLEG =
+  'Fin laat bij het openen van een pagina een tip zien. Uit: Fin geeft alleen tips als je erom vraagt — ook de overgeslagen onboarding-velden en de dagelijkse gidsstap blijven dan stil. Je vindt ze terug in de gids in Fins chat.'
 
 /**
  * Eén schakelrij: icoon + label + uitleg + switch. Was viermaal bijna-identiek
@@ -102,6 +113,11 @@ export default function MijnNotificatiesPage() {
   const [briefingEmailEnabled, setBriefingEmailEnabled] = useState(false)
   const [briefingEmailSaving, setBriefingEmailSaving] = useState(false)
 
+  // W-016 — mag Fin uit zichzelf een tip tonen? Eigen-rij pref in de jsonb-map
+  // `profiles.module_guide_state['coach:state']`; default AAN (afwezig = aan).
+  const [finProactief, setFinProactief] = useState(true)
+  const [finProactiefSaving, setFinProactiefSaving] = useState(false)
+
   // ─ Load alle data parallel ────────────────────────────────────────────────
   useEffect(() => {
     async function load() {
@@ -111,7 +127,7 @@ export default function MijnNotificatiesPage() {
         return
       }
 
-      const [notifData, checkinRes, householdRes, briefingEmailRes] = await Promise.all([
+      const [notifData, checkinRes, householdRes, briefingEmailRes, coachStateRes] = await Promise.all([
         supabase
           .from('app_settings')
           .select('value')
@@ -125,6 +141,10 @@ export default function MijnNotificatiesPage() {
         // niemand meer verscheen, ook niet bij een echt stel (S10).
         fetch('/api/household/status'),
         fetch('/api/briefing/email/pref'),
+        // W-016 — eigen-rij pref (datapad-conventie: own-row preferences mogen
+        // client-direct). Geen extra API-route: schrijven gaat via de bestaande
+        // `PUT /api/coach-state`, en de app-shell leest dezelfde sleutel al.
+        supabase.from('profiles').select('module_guide_state').eq('id', user.id).maybeSingle(),
       ])
 
       // Notif prefs
@@ -144,6 +164,12 @@ export default function MijnNotificatiesPage() {
           const data = await checkinRes.json()
           if (typeof data.enabled === 'boolean') setCheckinEnabled(data.enabled)
         } catch { /* default true */ }
+      }
+
+      // W-016 — Fins proactieve tips (afwezig/corrupt = aan)
+      {
+        const map = (coachStateRes?.data?.module_guide_state ?? {}) as Record<string, unknown>
+        setFinProactief(parseCoachState(map[COACH_STATE_KEY]).proactief)
       }
 
       // Briefing-per-e-mail opt-in
@@ -302,6 +328,29 @@ export default function MijnNotificatiesPage() {
     setCheckinSaving(false)
   }, [checkinEnabled])
 
+  /**
+   * W-016 — Fins proactieve tips aan/uit. Schrijft via de BESTAANDE route
+   * `PUT /api/coach-state` (own-row read-modify-write; de andere sleutels in de
+   * jsonb blijven staan). Optimistisch, met terugdraai bij een fout: een schakelaar
+   * die "uit" toont terwijl Fin blijft praten is erger dan een foutmelding.
+   */
+  const toggleFinProactief = useCallback(async () => {
+    const newVal = !finProactief
+    setFinProactief(newVal)
+    setFinProactiefSaving(true)
+    try {
+      const res = await fetch('/api/coach-state', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'setProactief', enabled: newVal }),
+      })
+      if (!res.ok) setFinProactief(!newVal)
+    } catch {
+      setFinProactief(!newVal)
+    }
+    setFinProactiefSaving(false)
+  }, [finProactief])
+
   const toggleBriefingEmail = useCallback(async () => {
     const newVal = !briefingEmailEnabled
     setBriefingEmailEnabled(newVal)
@@ -351,10 +400,9 @@ export default function MijnNotificatiesPage() {
           <span className="font-semibold text-[var(--ink)]">Deze meldingen verschijnen in de app</span>{' '}
           — onder het <em>belletje</em> op /berichten, zolang je de app open hebt.
           Er gaat niets naar je telefoon; alleen de briefing kun je hieronder apart
-          per e-mail aanzetten. De{' '}
-          <span className="font-semibold text-[var(--ink)]">Fin-coach</span> heeft
-          een eigen meldingen-stream onder &quot;Berichten&quot; in het hoofdmenu.
-          Die twee zijn los van elkaar.
+          per e-mail aanzetten. <span className="font-semibold text-[var(--ink)]">Fin</span>{' '}
+          praat daarnaast zelf: hij kan bij het openen van een pagina een tip laten
+          zien. Dat staat los van het belletje en zet je hieronder apart aan of uit.
         </p>
       </div>
 
@@ -395,6 +443,14 @@ export default function MijnNotificatiesPage() {
                     onToggle={() => void toggleCheckin()}
                     disabled={checkinSaving}
                   />
+                  <NotifToggleRow
+                    Icon={Lightbulb}
+                    label={FIN_PROACTIEF_LABEL}
+                    description={FIN_PROACTIEF_UITLEG}
+                    enabled={finProactief}
+                    onToggle={() => void toggleFinProactief()}
+                    disabled={finProactiefSaving}
+                  />
                 </div>
               ) : (
                 <>
@@ -432,6 +488,20 @@ export default function MijnNotificatiesPage() {
                       enabled={briefingEmailEnabled}
                       onToggle={() => void toggleBriefingEmail()}
                       disabled={briefingEmailSaving}
+                    />
+                  </div>
+
+                  {/* W-016 — Fins proactieve tips. Bewust een eigen kader naast de
+                      meldingstypen hierboven: dit gaat niet over het belletje maar
+                      over de kaart die Fin uit zichzelf op een pagina laat zien. */}
+                  <div className="mt-4 border border-[var(--border-ed)]">
+                    <NotifToggleRow
+                      Icon={Lightbulb}
+                      label={FIN_PROACTIEF_LABEL}
+                      description={FIN_PROACTIEF_UITLEG}
+                      enabled={finProactief}
+                      onToggle={() => void toggleFinProactief()}
+                      disabled={finProactiefSaving}
                     />
                   </div>
                 </>

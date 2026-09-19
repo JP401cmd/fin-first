@@ -12,6 +12,7 @@
  */
 
 import { projectAsset, resolveDepreciation, type Asset, type AssetType, ASSET_TYPE_COLORS, ASSET_TYPE_LABELS, ASSET_TYPE_ICONS } from './asset-data'
+import { resolveExpectedReturnPct } from './asset-return'
 import {
   amortizationSchedule,
   linearAmortization,
@@ -36,6 +37,15 @@ export interface BucketProjectionInput {
   monthlySurplus: number       // income - expenses (from transactions)
   monthlyIncome?: number       // for cash flow summary display
   incomeGrowthRate?: number    // annual decimal, default = inflationRate
+  /**
+   * Profielrendement in PROCENTEN (`resolveFireParams(profile).grossReturn × 100`)
+   * als terugval voor een bezitting ZONDER eigen rendementsaanname
+   * (`expected_return = null`, ADR 0166). Keuze (a): dezelfde ketting als de
+   * horizon-kernel (`potRendement`), zodat deze projectie niet 0% rekent waar
+   * /toekomst het profielrendement rekent. Weggelaten → 0 (oude nul-basis,
+   * byte-identiek voor bestaande callers/tests).
+   */
+  terugvalRendementPct?: number
 }
 
 export interface BucketRow {
@@ -139,6 +149,7 @@ const BOX3_YEAR = 2026 as const
 function computeBox3DragForAsset(
   asset: Asset,
   method: Box3Method,
+  terugvalRendementPct: number,
 ): number {
   const classification = classifyAsset(asset)
   if (!classification.category) return 0 // excluded from Box 3
@@ -152,8 +163,9 @@ function computeBox3DragForAsset(
     return forfait * params.tarief
   }
 
-  // werkelijk: tax on actual return
-  const actualReturn = Number(asset.expected_return) / 100
+  // werkelijk: tax on actual return — NULL valt terug op het profielrendement
+  // (ADR 0166), nooit stil op 0% via `Number(null)`.
+  const actualReturn = resolveExpectedReturnPct(asset.expected_return, terugvalRendementPct) / 100
   if (actualReturn <= 0) return 0
   return actualReturn * params.tarief
 }
@@ -272,6 +284,8 @@ function applyHeffingsvrij(
 
 export function computeBucketProjection(input: BucketProjectionInput): BucketProjectionResult {
   const { assets, debts, hasPartner, box3Method, months, monthlySurplus } = input
+  // Terugval voor bezittingen zonder eigen rendement (ADR 0166); default 0 = oude nul-basis.
+  const terugvalRendementPct = input.terugvalRendementPct ?? 0
 
   const activeAssets = assets.filter(a => a.is_active)
   const activeDebts = debts.filter(d => d.is_active && Number(d.current_balance) > 0)
@@ -281,7 +295,7 @@ export function computeBucketProjection(input: BucketProjectionInput): BucketPro
   // ── Per-asset projections (without Box 3 drag) ──
   const assetProjections = activeAssets.map(a => {
     const value = Number(a.current_value)
-    const ret = Number(a.expected_return)
+    const ret = resolveExpectedReturnPct(a.expected_return, terugvalRendementPct)
     const contrib = Number(a.monthly_contribution)
     const inclusionPct = Number(a.net_worth_inclusion_pct ?? 100) / 100
     const depreciation = resolveDepreciation(a)
@@ -292,7 +306,7 @@ export function computeBucketProjection(input: BucketProjectionInput): BucketPro
   // ── Per-asset Box 3 classification and drags ──
   const classifications = activeAssets.map(a => classifyAsset(a))
   const categories = classifications.map(c => c.category)
-  const rawAnnualDrags = activeAssets.map(a => computeBox3DragForAsset(a, box3Method))
+  const rawAnnualDrags = activeAssets.map(a => computeBox3DragForAsset(a, box3Method, terugvalRendementPct))
   const currentValues = activeAssets.map(a => Number(a.current_value) * (Number(a.net_worth_inclusion_pct ?? 100) / 100))
 
   // ── Per-debt balance schedules ──
@@ -302,7 +316,7 @@ export function computeBucketProjection(input: BucketProjectionInput): BucketPro
   function buildRows(method: Box3Method): BucketRow[] {
     const drags = method === box3Method
       ? rawAnnualDrags
-      : activeAssets.map(a => computeBox3DragForAsset(a, method))
+      : activeAssets.map(a => computeBox3DragForAsset(a, method, terugvalRendementPct))
 
     const rows: BucketRow[] = []
     // Track running asset values with drag applied
@@ -441,7 +455,7 @@ export function computeBucketProjection(input: BucketProjectionInput): BucketPro
     if (totalValue > 0) {
       for (const a of bucketAssets) {
         const inclValue = Number(a.current_value) * (Number(a.net_worth_inclusion_pct ?? 100) / 100)
-        weightedReturn += (Number(a.expected_return) / 100) * (inclValue / totalValue)
+        weightedReturn += (resolveExpectedReturnPct(a.expected_return, terugvalRendementPct) / 100) * (inclValue / totalValue)
       }
     }
 
@@ -463,7 +477,8 @@ export function computeBucketProjection(input: BucketProjectionInput): BucketPro
         id: a.id,
         name: a.name,
         currentValue: Number(a.current_value) * inclPct,
-        expectedReturn: Number(a.expected_return),
+        // Het EFFECTIEVE rendement waarmee deze rij is geprojecteerd (incl. terugval).
+        expectedReturn: resolveExpectedReturnPct(a.expected_return, terugvalRendementPct),
         monthlyContribution: Number(a.monthly_contribution),
         projected1y: (proj.rows[11]?.value ?? Number(a.current_value)) * inclPct,
         projected5y: (proj.rows[59]?.value ?? Number(a.current_value)) * inclPct,

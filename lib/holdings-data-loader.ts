@@ -24,6 +24,8 @@ import { cache } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getCachedUser } from '@/lib/supabase/cached-user'
 import { yearlyMustExpensesFromBudgets } from '@/lib/budget-utils'
+import { getRecentDailyExpenseRate } from '@/lib/expense-rate'
+import type { FreedomRateSource } from '@/lib/format'
 import { resolveFireParamsWithAssumptions } from '@/lib/fire-params'
 import type { FireAssumptionRow } from '@/lib/fire-assumptions'
 import { loadHoldingsPnL, attachPnLToHoldings } from '@/lib/holdings-pnl-enrichment'
@@ -52,6 +54,17 @@ export interface HoldingsPageData {
    * niet gebruikt wordt; UI verbergt de regel dan.
    */
   yearlyEssentialExpenses: number
+  /**
+   * Het CANONIEKE dagtarief (€/dag) — `getRecentDailyExpenseRate`, 12-mnd
+   * gerealiseerde consumptie (ADR 0126 D1/D2). Voedt de €→vrijheidstijd-vertaling
+   * in `PortfolioValueChart`, die tot 19 sep 2026 een eigen tarief afleidde uit
+   * `yearlyEssentialExpenses` (de must-grondslag van de FIRE-doelberekening) en
+   * daarmee een derde vrijheidstijd-grootheid introduceerde. 0 = geen eerlijke
+   * dagbasis, dan vervalt de regel.
+   */
+  dailyExpenses: number
+  /** Herkomst van dat tarief, voor de wisselkoers-voetnoot (B-039/UR3-08). */
+  dailyExpensesSource: FreedomRateSource
   /**
    * Gepersonaliseerde veilige onttrekkingsvoet (rendement − Box 3-drag −
    * inflatie) uit `resolveFireParamsWithAssumptions` — de ENIGE grondslag voor
@@ -96,6 +109,7 @@ export const loadHoldingsData = cache(async (supabase: SupabaseClient): Promise<
     { data: essentialBudgets },
     { data: profileRow },
     { data: fireAssumptionRows },
+    expenseRate,
   ] = await Promise.all([
     supabase
       .from('investment_holdings')
@@ -126,6 +140,13 @@ export const loadHoldingsData = cache(async (supabase: SupabaseClient): Promise<
       .select('year, expected_return, inflation, volatility, source, is_definitive')
       .order('year', { ascending: true })
       .then((r) => r, () => ({ data: null })),
+    // Het canonieke dagtarief voor de €→vrijheidstijd-vertaling in de
+    // waardegrafiek (ADR 0126 D1/D2) — dezelfde helper als de bezittingen-loader,
+    // dus één koers op beide oppervlakken. Niet-fataal: bij een fout vervalt
+    // alleen de vrijheidstijd-regel onder de grafiek.
+    getRecentDailyExpenseRate(supabase).catch(
+      () => ({ dailyRate: 0, monthlyExpenses: 0, dataMonths: 0, source: 'none' as FreedomRateSource }),
+    ),
   ])
 
   const yearlyEssentialExpenses = yearlyMustExpensesFromBudgets(essentialBudgets ?? [])
@@ -198,6 +219,8 @@ export const loadHoldingsData = cache(async (supabase: SupabaseClient): Promise<
     totalInvested,
     source: 'server',
     yearlyEssentialExpenses,
+    dailyExpenses: expenseRate.dailyRate,
+    dailyExpensesSource: expenseRate.source,
     effectiveSwr,
   }
 })

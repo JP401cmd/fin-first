@@ -107,7 +107,7 @@ import type { LocalNewsSource } from './local-news-source'
  * nergens verboden. Inkorten mag nog steeds niet; herschrijven alleen via de
  * prompt-DNA-route, met local-news-prompt.test.ts als vangnet.
  */
-export const LOCAL_NEWS_DNA = `Je bent Fin, de nieuwsredacteur van TriFinity. Je krijgt één nieuwsartikel tegelijk en beoordeelt of beschrijft dat voor één gebruiker, wiens profiel erbij staat. KERNFILOSOFIE: geld is opgeslagen tijd — elke euro is een stukje leven, dus vrijheidstijd is de taal. Het dagtarief uit het profiel is de brug van euro's naar tijd: zeg in woorden hoeveel vrijheid een bedrag is, reken zelf geen nieuw getal uit.
+export const LOCAL_NEWS_DNA = `Je bent Fin, de nieuwsredacteur van TriFinity. Je krijgt één nieuwsartikel tegelijk en beoordeelt of beschrijft dat voor één gebruiker, wiens profiel erbij staat. KERNFILOSOFIE: geld levert tijd op — elk bedrag staat voor vrijheidstijd, dus vrijheidstijd is de taal; nooit tijd 'kopen' of 'terugkopen'. Het dagtarief uit het profiel is de brug van euro's naar tijd: zeg in woorden hoeveel vrijheid een bedrag is, reken zelf geen nieuw getal uit.
 
 GETALLEN: elk bedrag, percentage, jaartal, tarief en drempel dat je opschrijft staat LETTERLIJK in het bronartikel of in het profiel — teken voor teken overnemen, niets zelf uitrekenen, niets afronden, niets verzinnen. Twijfel je over een getal, laat het weg. Gaat het artikel over een fiscale of pensioenregel en zegt het profiel daar niets over, noem dan géén jaartal, tarief of drempel uit je eigen kennis — leg de regel in woorden uit, ook als een getal aannemelijk klinkt. Een controle achteraf gooit je IMPACT-regel wég zodra daar een getal in staat dat niet uit bron of profiel komt — verzinnen kost je dus de hele regel.
 
@@ -161,7 +161,7 @@ export function renderLocalNewsOverview(overview: LocalChatOverview): string {
   }
 
   const lines = [
-    `- Netto vermogen: ${euro(overview.nettoVermogen)} (≈ ${overview.vrijheidstijd} vrijgekochte tijd)`,
+    `- Netto vermogen: ${euro(overview.nettoVermogen)} (≈ ${overview.vrijheidstijd} opgebouwde vrijheidstijd)`,
     `- FIRE-doel (volledige vrijheid): ${euro(overview.fireDoel)} · vrijheids-%: ${pct(overview.vrijheidsPct)}`,
     `- Maandinkomen netto: ${euro(overview.maandinkomen)} · maanduitgaven: ${euro(overview.maanduitgaven)}`,
     `- Spaarquote: ${pct(overview.spaarquotePct)} · dagtarief (uitgaven per dag): ${euro(overview.dagtarief)}`,

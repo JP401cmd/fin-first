@@ -225,7 +225,7 @@ describe('SleepmodusOverlay', () => {
 
     // Samenvatting verschijnt met de geruststellende resterende-regel.
     expect(await screen.findByText('Terug naar budgetten')).toBeInTheDocument()
-    expect(screen.getByText(/niet toegewezen/)).toBeInTheDocument()
+    expect(screen.getByText(/zonder categorie/)).toBeInTheDocument()
   })
 
   it('opent de nieuw-budget-kaart via de +-knop en verbergt de centrale bol', async () => {
@@ -280,7 +280,7 @@ describe('SleepmodusOverlay', () => {
     const card = await screen.findByRole('dialog', { name: 'Nieuw budget' })
     fireEvent.change(within(card).getByLabelText('Naam'), { target: { value: 'Vakantie' } })
     fireEvent.change(within(card).getByLabelText('Bedrag per maand'), { target: { value: '50' } })
-    fireEvent.click(within(card).getByText('Aanmaken en toewijzen'))
+    fireEvent.click(within(card).getByText('Aanmaken en categoriseren'))
 
     await waitFor(() => expect(applyAssignment).toHaveBeenCalledTimes(1))
     expect(fetchMock).toHaveBeenCalledTimes(1)
@@ -318,7 +318,7 @@ describe('SleepmodusOverlay', () => {
     fireEvent.click(within(card).getByLabelText('Deelbudget'))
     fireEvent.change(within(card).getByLabelText('Valt onder'), { target: { value: 'dagelijks' } })
     fireEvent.change(within(card).getByLabelText('Bedrag per maand'), { target: { value: '50' } })
-    fireEvent.click(within(card).getByText('Aanmaken en toewijzen'))
+    fireEvent.click(within(card).getByText('Aanmaken en categoriseren'))
 
     await waitFor(() => expect(applyAssignment).toHaveBeenCalledTimes(1))
     expect(applyAssignment.mock.calls[0][0]).toMatchObject({ budgetId: 'new-child' })
@@ -356,7 +356,7 @@ describe('SleepmodusOverlay', () => {
     const card = await screen.findByRole('dialog', { name: 'Nieuw budget' })
     fireEvent.change(within(card).getByLabelText('Naam'), { target: { value: 'Vakantie' } })
     fireEvent.change(within(card).getByLabelText('Bedrag per maand'), { target: { value: '50' } })
-    fireEvent.click(within(card).getByText('Aanmaken en toewijzen'))
+    fireEvent.click(within(card).getByText('Aanmaken en categoriseren'))
 
     // Beide knoppen op slot zolang de write loopt — Escape blijft de uitweg.
     await waitFor(() => expect(within(card).getByText('Annuleren')).toBeDisabled())
@@ -394,7 +394,7 @@ describe('SleepmodusOverlay', () => {
     const card = await screen.findByRole('dialog', { name: 'Nieuw budget' })
     fireEvent.change(within(card).getByLabelText('Naam'), { target: { value: 'Vakantie' } })
     fireEvent.change(within(card).getByLabelText('Bedrag per maand'), { target: { value: '50' } })
-    fireEvent.click(within(card).getByText('Aanmaken en toewijzen'))
+    fireEvent.click(within(card).getByText('Aanmaken en categoriseren'))
 
     expect(await screen.findByText('Ongeldige payload')).toBeInTheDocument()
     expect(screen.getByRole('dialog', { name: 'Nieuw budget' })).toBeInTheDocument()

@@ -1,14 +1,16 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { GebruikerContext } from './verspreiding'
 import { dominanteStroom, parseWaardestromen, WAARDESTROMEN_SLEUTEL } from '@/lib/waardestromen'
+import { leesBeheerInstelling } from '@/lib/app-settings/beheer-instelling'
 
 /**
  * De eigen-rij meta waarop verspreidingsregels worden getoetst (ADR 0147).
  *
- * Alles hier is leesbaar met de SESSIE-client van de gebruiker zelf: de eigen
- * profielrij, de eigen activiteitsdagen, de eigen module-dagen en de globale
- * waardestromen-config. Geen service-role, geen inhoud — precies dezelfde grens
- * als ADR 0146 aan de beheerkant.
+ * De eigen rijen zijn leesbaar met de SESSIE-client van de gebruiker zelf: de
+ * eigen profielrij, de eigen activiteitsdagen, de eigen module-dagen. Alleen de
+ * globale waardestromen-config is beheer-content en komt server-side via de
+ * service-role (`leesBeheerInstelling`, ADR 0163) — nog steeds geen inhoud van
+ * andere gebruikers, precies dezelfde grens als ADR 0146 aan de beheerkant.
  *
  * Tolerant: een tabel die nog niet is uitgerold (`user_activity_days`,
  * `user_activity_modules`) levert `null`, en een regel op null-meta matcht
@@ -32,7 +34,7 @@ export async function laadGebruikerContext(
 ): Promise<GebruikerContext> {
   const sinds30 = new Date(nu.getTime() - 30 * 86_400_000).toISOString().slice(0, 10)
 
-  const [profielRes, dagenRes, laatsteRes, modulesRes, stromenRes] = await Promise.all([
+  const [profielRes, dagenRes, laatsteRes, modulesRes, stromenWaarde] = await Promise.all([
     supabase.from('profiles').select('created_at').eq('id', userId).maybeSingle(),
     supabase
       .from('user_activity_days')
@@ -54,9 +56,9 @@ export async function laadGebruikerContext(
           // 31 dagen × 11 modules — ruim boven het maximum, dus nooit stil afgekapt.
           .limit(400)
       : Promise.resolve(null),
-    opties.metStromen
-      ? supabase.from('app_settings').select('value').eq('key', WAARDESTROMEN_SLEUTEL).maybeSingle()
-      : Promise.resolve(null),
+    // De waardestromen-indeling is beheer-content: server-side via de
+    // service-role (ADR 0163), niet via de sessie-client van de gebruiker.
+    opties.metStromen ? leesBeheerInstelling(WAARDESTROMEN_SLEUTEL) : Promise.resolve(null),
   ])
 
   const registratieIso = (profielRes.data as { created_at?: string | null } | null)?.created_at ?? null
@@ -70,9 +72,7 @@ export async function laadGebruikerContext(
   let dagenPerStroom: Record<string, number> | undefined
   if (modulesRes && !modulesRes.error && modulesRes.data) {
     // Een ontbrekende config-rij is geen fout: dan geldt de standaardindeling.
-    const config = parseWaardestromen(
-      stromenRes && !stromenRes.error ? (stromenRes.data as { value?: unknown } | null)?.value : null,
-    )
+    const config = parseWaardestromen(stromenWaarde)
     const uitkomst = dominanteStroom(modulesRes.data as { day: string; module: string }[], config)
     stroom = uitkomst.stroom
     dagenPerStroom = uitkomst.dagenPerStroom

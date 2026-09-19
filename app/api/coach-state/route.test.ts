@@ -68,6 +68,7 @@ function writtenState() {
     dismissed: string[]
     lastDismissedAt: string | null
     guideLastShownAt: string | null
+    proactief: boolean
   }
 }
 
@@ -232,5 +233,67 @@ describe('PUT /api/coach-state — importLegacy', () => {
     const res = await PUT(req({ action: 'importLegacy', keys: [] }))
     expect(res.status).toBe(200)
     expect(writtenState().dismissed).toEqual(['gap_bank'])
+  })
+})
+
+/**
+ * W-016 — de gebruikerskeuze "mag Fin uit zichzelf een tip tonen?". Dezelfde
+ * read-modify-write-eigenschap als hierboven: de vlag mag de weggeklikte sleutels en
+ * de dagstempel niet wegvagen, want dan zou weer aanzetten de hele catalogus opnieuw
+ * losmaken.
+ */
+describe('PUT /api/coach-state — setProactief', () => {
+  it('zet de vlag op false en laat de andere coach-sleutels staan', async () => {
+    mockCreateClient.mockResolvedValue(
+      buildClient({
+        'coach:state': {
+          dismissed: ['gap_bank', 'path_core'],
+          lastDismissedAt: '2026-09-18T10:00:00.000Z',
+          guideLastShownAt: '2026-09-18T09:00:00.000Z',
+        },
+        'welcome:guide': { status: 'active' },
+      }),
+    )
+
+    const res = await PUT(req({ action: 'setProactief', enabled: false }))
+
+    expect(res.status).toBe(200)
+    const state = writtenState()
+    expect(state.proactief).toBe(false)
+    expect(state.dismissed).toEqual(['gap_bank', 'path_core'])
+    expect(state.lastDismissedAt).toBe('2026-09-18T10:00:00.000Z')
+    expect(state.guideLastShownAt).toBe('2026-09-18T09:00:00.000Z')
+    // De andere top-level sleutels in dezelfde jsonb blijven ongemoeid.
+    expect(writtenMap()['welcome:guide']).toEqual({ status: 'active' })
+  })
+
+  it('weer aanzetten geeft precies de oude staat terug, met proactief true', async () => {
+    mockCreateClient.mockResolvedValue(
+      buildClient({ 'coach:state': { dismissed: ['gap_bank'], proactief: false } }),
+    )
+
+    const res = await PUT(req({ action: 'setProactief', enabled: true }))
+
+    expect(res.status).toBe(200)
+    expect(writtenState().proactief).toBe(true)
+    expect(writtenState().dismissed).toEqual(['gap_bank'])
+  })
+
+  it('400 zonder geldige boolean', async () => {
+    mockCreateClient.mockResolvedValue(buildClient({}))
+    for (const enabled of ['ja', 1, null, undefined]) {
+      const res = await PUT(req({ action: 'setProactief', enabled }))
+      expect(res.status, String(enabled)).toBe(400)
+    }
+    expect(updatePayloads).toHaveLength(0)
+  })
+
+  it('een dismiss ná het uitzetten laat de vlag staan', async () => {
+    mockCreateClient.mockResolvedValue(
+      buildClient({ 'coach:state': { dismissed: [], proactief: false } }),
+    )
+    const res = await PUT(req({ action: 'dismiss', key: 'gap_assets' }))
+    expect(res.status).toBe(200)
+    expect(writtenState().proactief).toBe(false)
   })
 })

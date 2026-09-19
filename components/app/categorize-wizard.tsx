@@ -513,7 +513,7 @@ export function CategorizeWizard({
               className="inline-flex items-center justify-center gap-1.5 rounded-[var(--r)] border border-[var(--border-md)] px-3 py-2 min-h-[44px] text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
             >
               <Hand className="h-3.5 w-3.5" />
-              Zelf indelen (sleepmodus)
+              Zelf categoriseren (sleepmodus)
             </button>
           </div>
         )}
@@ -1103,7 +1103,7 @@ function ManualFallback({
         className="mt-3 inline-flex items-center gap-1.5 rounded-[var(--r)] bg-wil-600 px-3 py-2 min-h-[44px] text-xs font-medium text-white hover:bg-wil-700 disabled:opacity-40"
       >
         <Check className="h-3.5 w-3.5" />
-        Deze groep indelen
+        Deze groep categoriseren
       </button>
     </div>
   )

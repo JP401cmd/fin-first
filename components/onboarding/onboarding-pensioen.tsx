@@ -1,13 +1,22 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Calculator, Pencil, Upload } from 'lucide-react'
 import { OnboardingShell } from './onboarding-shell'
 import { FactsPanel } from './facts-panel'
 import { PensionPdfUpload } from '@/components/app/horizon/pension-pdf-upload'
 import { parseBedragInput } from './onboarding-inkomen'
-import { estimateAccruedPensionMonthly } from '@/lib/jaarruimte'
-import { NL_AOW_AGE } from '@/lib/constants'
+import {
+  estimateAccruedPensionFromNet,
+  estimateAccruedPensionMonthly,
+  roundToEstimateStep,
+} from '@/lib/jaarruimte'
+import {
+  NL_AOW_AGE,
+  NL_AOW_MONTHLY,
+  NL_AOW_MONTHLY_SAMENWONEND,
+  NL_PENSIOENOPBOUW_STARTLEEFTIJD,
+} from '@/lib/constants'
 import { formatCurrency } from '@/lib/format'
 import type { PensionParseResult } from '@/app/api/pension/parse/route'
 
@@ -15,7 +24,10 @@ import type { PensionParseResult } from '@/app/api/pension/parse/route'
  * Stap — Pensioen (optioneel). Boldin-stijl: één vraag, drie uitwegen.
  *
  * "Heb je al pensioen opgebouwd?" met drie uitkomsten:
- *   (i)   Schatting — vrij bruto-maandbedrag (+ optioneel ingangsleeftijd).
+ *   (i)   Schatting — vrij bruto-maandbedrag (+ optioneel ingangsleeftijd), met
+ *         een inschat-hulp die bij bekende leeftijd + inkomen als "Schat het
+ *         voor me" vóórvult (B-055, zelfde patroon als de inkomenstap, ADR 0131:
+ *         een schatting is een zichtbare placeholder, nooit een stille keuze).
  *   (ii)  Upload je mijnpensioen.nl-overzicht (XML/JSON volledig client-side,
  *         zonder AI) — HERGEBRUIKT `PensionPdfUpload` met `context="onboarding"`:
  *         het PDF-pad (AI) is hier niet bruikbaar (V-002).
@@ -38,6 +50,12 @@ export interface PensionDraft {
   grossMonthly: string
   /** Optionele verwachte ingangsleeftijd (raw invoerstring). */
   startAge: string
+  /**
+   * Is `grossMonthly` door de inschat-hulp gevuld ("Schat het voor me" of
+   * "Neem over")? Dan draagt het veld een "(schatting)"-label; typen wist de
+   * vlag (criterium 3 van UR3-05). Optioneel: oudere concepten dragen 'm niet.
+   */
+  isEstimate?: boolean
   /** Resultaat van een JSON/PDF-upload — null wanneer (nog) niet geüpload. */
   parseResult: PensionParseResult | null
 }
@@ -46,6 +64,7 @@ export const INITIAL_PENSION_DRAFT: PensionDraft = {
   mode: null,
   grossMonthly: '',
   startAge: '',
+  isEstimate: false,
   parseResult: null,
 }
 
@@ -69,6 +88,17 @@ export interface OnboardingPensioenProps {
    * Default: "`aowAge` jaar".
    */
   aowAgeLabel?: string
+  /**
+   * Huidige leeftijd uit de geboortedatum (`null` zonder geboortedatum). Voedt
+   * samen met `netMonthlyIncome` de knop "Schat het voor me": ontbreekt een van
+   * beide, dan verschijnt die knop niet — liever geen knop dan een verzonnen
+   * bedrag (eigenaarsbesluit UR3-05).
+   */
+  age?: number | null
+  /** Netto maandinkomen zoals eerder in de wizard ingevuld of geschat (0 = onbekend). */
+  netMonthlyIncome?: number
+  /** Is dat inkomen zélf al een app-schatting? Dan zegt de hint dat erbij. */
+  incomeIsEstimate?: boolean
   onNext: () => void
   onBack: () => void
   /** "Kan altijd later nog" — wist de keuze en gaat door (deferred). */
@@ -83,6 +113,9 @@ export function OnboardingPensioen({
   samenwonend,
   aowAge = NL_AOW_AGE,
   aowAgeLabel,
+  age = null,
+  netMonthlyIncome = 0,
+  incomeIsEstimate = false,
   onNext,
   onBack,
   onSkip,
@@ -91,6 +124,17 @@ export function OnboardingPensioen({
 }: OnboardingPensioenProps) {
   const [error, setError] = useState<string | null>(null)
   const aowLabel = aowAgeLabel ?? `${aowAge} jaar`
+
+  /**
+   * Vóórvulling voor "Schat het voor me": alleen wanneer leeftijd én inkomen
+   * bruikbaar zijn. `grossFromNet` (60 bisecties) is goedkoop, maar hoort niet
+   * op elke toetsaanslag opnieuw te draaien — vandaar de memo.
+   */
+  const autoPrefill = useMemo(() => {
+    if (age === null || !Number.isFinite(age) || age <= 0) return null
+    if (!Number.isFinite(netMonthlyIncome) || netMonthlyIncome <= 0) return null
+    return estimateAccruedPensionFromNet({ netMonthly: netMonthlyIncome, age })
+  }, [age, netMonthlyIncome])
 
   function selectMode(mode: PensionMode) {
     setError(null)
@@ -181,7 +225,7 @@ export function OnboardingPensioen({
               >
                 Geschat bruto pensioen per maand{' '}
                 <span className="text-xs font-normal italic text-[var(--ink-3)]">
-                  (huidige waarde)
+                  {data.isEstimate ? '(schatting)' : '(huidige waarde)'}
                 </span>
               </label>
               <div className="relative">
@@ -197,6 +241,8 @@ export function OnboardingPensioen({
                     onChange({
                       ...data,
                       grossMonthly: e.target.value.replace(/[^0-9.,]/g, ''),
+                      // Typen is per definitie een eigen bedrag (UR3-05, crit. 3).
+                      isEstimate: false,
                     })
                   }
                   placeholder="0"
@@ -244,11 +290,15 @@ export function OnboardingPensioen({
             {/* Inschat-hulp: salaris × NL-opbouw × jaren → vult het bedrag in. */}
             <PensionEstimateHelper
               aowAgeLabel={aowLabel}
+              samenwonend={samenwonend}
+              prefill={autoPrefill}
+              incomeIsEstimate={incomeIsEstimate}
               onApply={(monthly) =>
                 onChange({
                   ...data,
                   grossMonthly: String(monthly),
                   startAge: String(aowAge),
+                  isEstimate: true,
                 })
               }
             />
@@ -295,29 +345,76 @@ export function OnboardingPensioen({
  * ingangsleeftijd op de AOW-leeftijd — schatten blijft een expliciete
  * gebruikersactie (zelfde filosofie als resolvePensionFactorA: nooit stil
  * een geraden getal als "bekend" presenteren).
+ *
+ * Met `prefill` (leeftijd + netto inkomen bekend, B-055) is de ingang een
+ * zichtbare knop "Schat het voor me" — letterlijk dezelfde woorden als op de
+ * inkomenstap — die beide velden vóórvult uit `estimateAccruedPensionFromNet`;
+ * de velden blijven bewerkbaar. Zonder prefill blijft de bescheiden link.
  */
 function PensionEstimateHelper({
   aowAgeLabel,
+  samenwonend,
+  prefill,
+  incomeIsEstimate,
   onApply,
 }: {
   /** Geformuleerde AOW-leeftijd ("67 jaar en 3 maanden") — alleen weergave. */
   aowAgeLabel: string
+  /** Bepaalt welk SVB-AOW-bedrag als contrast wordt genoemd. */
+  samenwonend: boolean
+  /** Vóórvulling uit leeftijd + netto inkomen; `null` = niet beschikbaar. */
+  prefill: { grossYearly: number; years: number } | null
+  /** Was het netto inkomen zelf al een app-schatting? */
+  incomeIsEstimate: boolean
   onApply: (monthly: number) => void
 }) {
   const [open, setOpen] = useState(false)
   const [salaryRaw, setSalaryRaw] = useState('')
   const [yearsRaw, setYearsRaw] = useState('')
   const [applied, setApplied] = useState(false)
+  /** Zijn de velden door "Schat het voor me" gevuld (en nog niet overtypt)? */
+  const [prefilled, setPrefilled] = useState(false)
 
   const salary = parseBedragInput(salaryRaw)
   const years = yearsRaw ? parseInt(yearsRaw, 10) : NaN
+  // Afgerond op de schattingsstap (€25): het getal moet lezen als schatting,
+  // niet als meting — dezelfde conventie als de cohort-schatting van het inkomen.
   const estimate =
     salary > 0 && isFinite(years) && years > 0
-      ? estimateAccruedPensionMonthly(salary, years)
+      ? roundToEstimateStep(estimateAccruedPensionMonthly(salary, years))
       : null
 
+  const aowContrast = formatCurrency(samenwonend ? NL_AOW_MONTHLY_SAMENWONEND : NL_AOW_MONTHLY)
+
+  function applyPrefill() {
+    if (!prefill) return
+    setSalaryRaw(String(prefill.grossYearly))
+    setYearsRaw(String(prefill.years))
+    setPrefilled(true)
+    setApplied(false)
+    setOpen(true)
+  }
+
   if (!open) {
-    return (
+    return prefill ? (
+      <div className="space-y-1.5">
+        <button
+          type="button"
+          onClick={applyPrefill}
+          className="inline-flex min-h-9 items-center gap-1.5 border border-[var(--module-active-500)] bg-[var(--module-active-50)]/50 px-3 py-1.5 text-xs font-medium text-[var(--module-active-800)] transition-colors hover:bg-[var(--module-active-100)]"
+        >
+          <Calculator className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+          Schat het voor me
+        </button>
+        <p
+          className="text-xs italic text-[var(--ink-3)]"
+          style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+        >
+          Op basis van je leeftijd en het {incomeIsEstimate ? '(geschatte) ' : ''}netto
+          maandinkomen dat je eerder invulde. Je kunt alles aanpassen.
+        </p>
+      </div>
+    ) : (
       <button
         type="button"
         onClick={() => setOpen(true)}
@@ -366,6 +463,7 @@ function PensionEstimateHelper({
               onChange={(e) => {
                 setSalaryRaw(e.target.value.replace(/[^0-9.,]/g, ''))
                 setApplied(false)
+                setPrefilled(false)
               }}
               placeholder="50.000"
               autoComplete="off"
@@ -389,6 +487,7 @@ function PensionEstimateHelper({
             onChange={(e) => {
               setYearsRaw(e.target.value.replace(/[^0-9]/g, ''))
               setApplied(false)
+              setPrefilled(false)
             }}
             placeholder="15"
             autoComplete="off"
@@ -396,6 +495,19 @@ function PensionEstimateHelper({
           />
         </div>
       </div>
+
+      {prefilled && (
+        <p
+          className="text-xs italic leading-relaxed text-[var(--ink-3)]"
+          style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+        >
+          Voorgevuld: het bruto jaarsalaris is afgeleid van het
+          {incomeIsEstimate ? ' (geschatte)' : ''} netto maandinkomen dat je eerder
+          invulde, en we gaan uit van opbouw vanaf je {NL_PENSIOENOPBOUW_STARTLEEFTIJD}e
+          &mdash; pas de jaren aan als je eerder of later begon, of jaren geen pensioen
+          opbouwde (studie, zzp, buitenland).
+        </p>
+      )}
 
       <p
         className="text-xs italic leading-relaxed text-[var(--ink-3)]"
@@ -410,24 +522,41 @@ function PensionEstimateHelper({
       </p>
 
       {estimate !== null && (
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border-ed)] pt-3">
-          <p className="text-sm text-[var(--ink-2)]">
-            {estimate > 0 ? (
-              <>
+        <div className="space-y-3 border-t border-[var(--border-ed)] pt-3">
+          {estimate > 0 ? (
+            <>
+              {/* Het bedrag en de AOW staan bewust in aparte zinnen: de AOW in
+                  dezelfde zin als het bedrag was precies de verwarring van
+                  melding B-055. */}
+              <p className="text-sm text-[var(--ink-2)]">
                 &asymp;{' '}
                 <span className="font-mono font-semibold tabular-nums text-[var(--ink)]">
                   {formatCurrency(estimate)}
                 </span>{' '}
-                bruto per maand, vanaf je AOW-leeftijd ({aowAgeLabel})
-              </>
-            ) : (
-              <>
-                Met dit salaris bouw je (bijna) geen pensioen op via je
-                werkgever: het ligt onder de drempel waar de AOW al voor
-                zorgt.
-              </>
-            )}
-          </p>
+                bruto per maand aan werkgeverspensioen.
+              </p>
+              <p
+                className="text-xs italic leading-relaxed text-[var(--ink-3)]"
+                style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+              >
+                <strong className="not-italic font-semibold text-[var(--ink-2)]">
+                  Dit is niet je AOW.
+                </strong>{' '}
+                De AOW ({aowContrast} netto per maand
+                {samenwonend ? ' per persoon, samenwonend' : ' voor een alleenstaande'}, SVB)
+                komt daar vanaf je AOW-leeftijd ({aowAgeLabel}) bovenop en rekent de app
+                apart mee. Neem je dit over, dan rekent je toekomstplan met dit bedrag als
+                extra inkomen vanaf je AOW-leeftijd; een derde erboven of eronder is
+                normaal &mdash; je mijnpensioen.nl-overzicht is de enige harde bron.
+              </p>
+            </>
+          ) : (
+            <p className="text-sm text-[var(--ink-2)]">
+              Met dit salaris bouw je (bijna) geen pensioen op via je
+              werkgever: het ligt onder de drempel waar de AOW al voor
+              zorgt.
+            </p>
+          )}
           {estimate > 0 && (
             <button
               type="button"

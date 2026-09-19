@@ -9,7 +9,7 @@ import { deriveCohort } from './cohort'
 const user: BenchmarkUserMetrics = {
   healthScoreTotal: 70,
   fireAgeFractional: 62,
-  savingsRate6m: 18,
+  effectiveSavingsRatePct: 18,
   netWorth: 250_000,
   yearlyIncome: 60_000,
   dailyExpenseRate: 80,

@@ -147,7 +147,13 @@ async function loadLaag2(
       id: a.id,
       name: a.name,
       asset_type: a.asset_type,
-      expected_return: Number(a.expected_return) || 0,
+      // NULL blijft NULL. `Number(a.expected_return) || 0` maakte er stil 0 van,
+      // terwijl `zonderEigenRendement` hieronder diezelfde rij wél als "zonder
+      // eigen rendement" telde — de lijst en de zin eronder spraken elkaar dus
+      // tegen zodra de kolom nullable werd (ADR 0166). De kolom komt als
+      // `number | string | null` binnen (PostgREST levert numeric als string),
+      // vandaar de expliciete driedeling.
+      expected_return: a.expected_return == null ? null : (Number(a.expected_return) || 0),
       afschrijvend: Number(a.depreciation_rate) > 0,
     })),
     // Over de eigen-rij-lezing, niet over `raw.assets` (huishoud-gedeelde SELECT): lijst en zin

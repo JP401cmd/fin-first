@@ -1,5 +1,7 @@
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { getNetWorthSnapshots12m } from '@/lib/server-data/base'
+import type { NetWorthSnapshotRow } from '@/lib/cashflow-kpis'
 import { computeFireAge } from '@/lib/checkin/fire-age'
 import { resolveFireParams } from '@/lib/fire-params'
 import { FIRE_PLAN_COLUMNS } from '@/lib/fire-strategy'
@@ -105,13 +107,12 @@ export async function GET() {
       .eq('is_income', false)
       .gte('date', window6m.fromDate)
       .lt('date', window6m.toDate),
-    // Net worth snapshots (last 2)
-    supabase
-      .from('net_worth_snapshots')
-      .select('value, snapshot_date')
-      .eq('user_id', claims.sub)
-      .order('snapshot_date', { ascending: false })
-      .limit(2),
+    // Net worth snapshots: de gedeelde 12-maands reeks (oplopend, kolom
+    // `net_worth`) — dezelfde bron als de dashboardbundel en de
+    // gespreksstarters. Hier stond een eigen query op `value`, een kolom die
+    // `net_worth_snapshots` nooit heeft gehad: PostgREST 42703 → `null → []` →
+    // `netWorthChange` structureel 0 %.
+    getNetWorthSnapshots12m(supabase),
     // Completed actions this month
     supabase
       .from('actions')
@@ -181,12 +182,15 @@ export async function GET() {
   const income6mAvg = income6m / dataMonths6
   const expenses6mAvg = expenses6m / dataMonths6
 
-  // Net worth change from snapshots
-  const snapshots = snapshotsRes.data || []
+  // Net worth change from snapshots — reeks is OPLOPEND: laatste = [n−1],
+  // vorige = [n−2].
+  const snapshots = (snapshotsRes.data ?? []) as unknown as NetWorthSnapshotRow[]
   let netWorthChange = 0
-  if (snapshots.length >= 2) {
-    const latest = snapshots[0].value
-    const previous = snapshots[1].value
+  const laatsteSnapshot = snapshots.at(-1)
+  const vorigeSnapshot = snapshots.at(-2)
+  if (laatsteSnapshot && vorigeSnapshot) {
+    const latest = Number(laatsteSnapshot.net_worth)
+    const previous = Number(vorigeSnapshot.net_worth)
     if (previous > 0) {
       netWorthChange = ((latest - previous) / previous) * 100
     }

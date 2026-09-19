@@ -10,7 +10,7 @@ import {
  *
  * De poort is het hele punt: dit is een popup die ongevraagd verschijnt, dus
  * elke toestand waarin hij NIET hoort te komen is even belangrijk als de
- * toestand waarin hij wél komt — geen transacties om te koppelen, de telling
+ * toestand waarin hij wél komt — geen transacties om te categoriseren, de telling
  * nog onderweg, al eens gezien, of een andere laag die de aandacht heeft.
  */
 
@@ -51,41 +51,41 @@ const onKoppelen = vi.fn()
 describe('BudgetTransactiesAanbod', () => {
   beforeEach(() => onKoppelen.mockReset())
 
-  it('verschijnt met het aantal als er transacties zonder budget staan', async () => {
+  it('verschijnt met het aantal als er transacties zonder categorie staan', async () => {
     render(<BudgetTransactiesAanbod ongekoppeld={187} onKoppelen={onKoppelen} />)
     expect(await screen.findByText(/187/)).toBeTruthy()
   })
 
-  it('blijft weg als er niets te koppelen valt', async () => {
+  it('blijft weg als er niets te categoriseren valt', async () => {
     render(<BudgetTransactiesAanbod ongekoppeld={0} onKoppelen={onKoppelen} />)
     await waitFor(() => expect(fetchMock).not.toHaveBeenCalled())
-    expect(screen.queryByRole('button', { name: 'Nu koppelen' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Nu categoriseren' })).toBeNull()
   })
 
   it('wacht tot de telling binnen is', async () => {
     render(<BudgetTransactiesAanbod ongekoppeld={null} onKoppelen={onKoppelen} />)
     await waitFor(() => expect(fetchMock).not.toHaveBeenCalled())
-    expect(screen.queryByRole('button', { name: 'Nu koppelen' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Nu categoriseren' })).toBeNull()
   })
 
   it('blijft weg als hij al eens is getoond', async () => {
     alGezien(true)
     render(<BudgetTransactiesAanbod ongekoppeld={12} onKoppelen={onKoppelen} />)
     await waitFor(() => expect(fetchMock).toHaveBeenCalled())
-    expect(screen.queryByRole('button', { name: 'Nu koppelen' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Nu categoriseren' })).toBeNull()
   })
 
   it('zwijgt zolang een andere laag de aandacht heeft', async () => {
     quiet = true
     render(<BudgetTransactiesAanbod ongekoppeld={12} onKoppelen={onKoppelen} />)
     await waitFor(() => expect(fetchMock).not.toHaveBeenCalled())
-    expect(screen.queryByRole('button', { name: 'Nu koppelen' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Nu categoriseren' })).toBeNull()
   })
 
-  it('"Nu koppelen" opent de bestaande koppelflow en schrijft de keuze weg', async () => {
+  it('"Nu categoriseren" opent de bestaande categoriseerflow en schrijft de keuze weg', async () => {
     render(<BudgetTransactiesAanbod ongekoppeld={187} onKoppelen={onKoppelen} />)
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Nu koppelen' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Nu categoriseren' }))
 
     expect(onKoppelen).toHaveBeenCalledTimes(1)
     await waitFor(() =>
@@ -104,31 +104,31 @@ describe('BudgetTransactiesAanbod', () => {
   //
   // `ongekoppeld` komt binnen als `null`, wordt een getal, en wordt opnieuw
   // geteld na elke serverronde. Zonder deze gevallen kon het aanbod openen met
-  // "Er staan 0 transacties zonder budget" — vlak nadat de gebruiker ze net
-  // allemaal had gekoppeld.
+  // "Er staan 0 transacties zonder categorie" — vlak nadat de gebruiker ze net
+  // allemaal had gecategoriseerd.
 
   it('opent niet alsnog als het aantal naar nul zakt terwijl het stil werd', async () => {
     quiet = true
     const { rerender } = render(
       <BudgetTransactiesAanbod ongekoppeld={12} onKoppelen={onKoppelen} />,
     )
-    // Andere laag klaar, maar intussen is alles gekoppeld.
+    // Andere laag klaar, maar intussen is alles gecategoriseerd.
     quiet = false
     rerender(<BudgetTransactiesAanbod ongekoppeld={0} onKoppelen={onKoppelen} />)
 
     await waitFor(() => expect(fetchMock).not.toHaveBeenCalled())
-    expect(screen.queryByRole('button', { name: 'Nu koppelen' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Nu categoriseren' })).toBeNull()
   })
 
   it('sluit zichzelf als het aantal naar nul zakt terwijl hij openstaat', async () => {
     const { rerender } = render(
       <BudgetTransactiesAanbod ongekoppeld={12} onKoppelen={onKoppelen} />,
     )
-    await screen.findByRole('button', { name: 'Nu koppelen' })
+    await screen.findByRole('button', { name: 'Nu categoriseren' })
 
     rerender(<BudgetTransactiesAanbod ongekoppeld={0} onKoppelen={onKoppelen} />)
     await waitFor(() =>
-      expect(screen.queryByRole('button', { name: 'Nu koppelen' })).toBeNull(),
+      expect(screen.queryByRole('button', { name: 'Nu categoriseren' })).toBeNull(),
     )
   })
 
@@ -144,7 +144,7 @@ describe('BudgetTransactiesAanbod', () => {
     expect(screen.queryByText(/42/)).toBeNull()
   })
 
-  it('"Later" sluit zonder de koppelflow te openen', async () => {
+  it('"Later" sluit zonder de categoriseerflow te openen', async () => {
     render(<BudgetTransactiesAanbod ongekoppeld={187} onKoppelen={onKoppelen} />)
 
     fireEvent.click(await screen.findByRole('button', { name: 'Later' }))

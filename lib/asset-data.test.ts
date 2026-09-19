@@ -36,6 +36,63 @@ describe('computeExpectedAnnualAppreciation', () => {
   it('lege lijst → 0', () => {
     expect(computeExpectedAnnualAppreciation([])).toBe(0)
   })
+
+  // ADR 0166 — NULL is "geen eigen aanname" en moet de terugval krijgen, niet 0.
+  // Zonder `resolveExpectedReturnPct` zou `Number(null)` hier 0 opleveren en zou
+  // de net-vermogen-delta-spaarquote de koerswinst van zulke bezittingen
+  // volledig als "gespaard" boeken.
+  const zonderEigen = [
+    { id: 'a', name: 'etf', current_value: 100_000, expected_return: null,
+      asset_type: 'etf', is_active: true } as unknown as Asset,
+  ]
+
+  it('NULL zonder terugval blijft de oude nul-basis', () => {
+    expect(computeExpectedAnnualAppreciation(zonderEigen)).toBe(0)
+  })
+
+  it('NULL mét terugval rekent op het profielrendement', () => {
+    expect(computeExpectedAnnualAppreciation(zonderEigen, 7)).toBeCloseTo(7000, 6)
+  })
+
+  it('een BEWUSTE 0 negeert de terugval — dit is de regressie op het niet-backfillen', () => {
+    // Een betaalrekening of bitcoin staat op 0 omdat dat de juiste waarde is.
+    // Zou de terugval hier winnen, dan gaat elke betaalrekening in ieders
+    // projectie renderen — precies waarom er géén backfill 0 → NULL is gedaan.
+    const bewusteNul = [
+      { id: 'c', name: 'betaalrekening', current_value: 100_000, expected_return: 0,
+        asset_type: 'checking', is_active: true } as unknown as Asset,
+    ]
+    expect(computeExpectedAnnualAppreciation(bewusteNul, 7)).toBe(0)
+  })
+})
+
+describe('projectPortfolio — terugval op het profielrendement (ADR 0166)', () => {
+  const rij = (expected_return: number | null) =>
+    ({ id: 'a', name: 'etf', current_value: 100_000, expected_return, monthly_contribution: 0,
+       asset_type: 'etf', is_active: true } as unknown as Asset)
+
+  it('NULL groeit op de meegegeven terugval, een bewuste 0 groeit niet', () => {
+    const metTerugval = projectPortfolio([rij(null)], 12, 7)
+    const bewusteNul = projectPortfolio([rij(0)], 12, 7)
+    expect(metTerugval[11].total).toBeGreaterThan(100_000)
+    expect(bewusteNul[11].total).toBeCloseTo(100_000, 6)
+  })
+
+  it('NULL zonder terugval-argument blijft byte-identiek aan een bewuste 0 (oude nul-basis)', () => {
+    // Zo blijven bestaande callers die de parameter niet meegeven ongewijzigd.
+    expect(projectPortfolio([rij(null)], 12)[11].total).toBeCloseTo(
+      projectPortfolio([rij(0)], 12)[11].total,
+      9,
+    )
+  })
+
+  it('NULL met terugval rekent hetzelfde als een expliciet ingevuld gelijk percentage', () => {
+    // De terugval mag geen ándere motor zijn dan een ingevulde waarde.
+    expect(projectPortfolio([rij(null)], 24, 7)[23].total).toBeCloseTo(
+      projectPortfolio([rij(7)], 24)[23].total,
+      9,
+    )
+  })
 })
 
 describe('projectPortfolio — column-sparse aggregated partner row', () => {

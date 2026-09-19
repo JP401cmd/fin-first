@@ -7,7 +7,14 @@
  * withdrawals over liquid categories.
  */
 
-import { type Asset, type AssetType, ASSET_TYPE_COLORS, resolveDepreciation } from './asset-data'
+import {
+  type Asset,
+  type AssetType,
+  ASSET_TYPE_COLORS,
+  ASSET_TYPE_LABELS,
+  resolveDepreciation,
+} from './asset-data'
+import { resolveExpectedReturnPct } from './asset-return'
 import {
   type Debt,
   type DebtType,
@@ -103,6 +110,36 @@ export const DEBT_LAYER_COLORS: Record<DebtLayer, string> = {
   opeethypotheek: 'oklch(0.78 0.06 25)',
   tekortLening: DEBT_LAYER_COLOR,
 }
+
+// ── Buiten-doel-markering (gedeeld over grafiek én kassabon) ─
+
+/**
+ * Eén zin voor "dit bezit staat er wel, maar telt niet mee voor je doel".
+ *
+ * Twee oppervlakken zeggen dit: de Opbouw-grafiek (duidingsregel onder de
+ * legenda) en de jaar-detail-kassabon (sub-regel bij de eigen woning). De
+ * DRAGER mag per oppervlak verschillen — een vlak en een tekstregel hebben
+ * andere middelen — maar de WOORDEN niet. Vandaar één constante.
+ * Besluit 19-09-2026 bij ADR 0114 D3.
+ */
+export const BUITEN_DOEL_ZIN = 'telt niet mee voor je doel — je woont er'
+
+/**
+ * Inkttoken voor alles wat "telt niet mee" is. `--ink-meta` (niet `--ink-3`):
+ * dat token is gemaakt voor kleine metadata-tekst en draagt een gemeten 5,41:1
+ * op `--paper`, mét print-fallback in globals.css.
+ */
+export const BUITEN_DOEL_INKT = 'var(--ink-meta)'
+
+/**
+ * Eén naam voor de eigen woning, app-breed. Eerder heette hetzelfde blok
+ * "Eigen huis" in de grafieklegenda en "Eigen woning" in de kassabon; dat is
+ * één begrip met twee namen. `ASSET_TYPE_LABELS` is de app-brede bron.
+ * (De kernel-CATEGORIE heet intern nog 'Eigen huis' — dat is een rekenbegrip,
+ * geen schermtekst, en blijft ongemoeid.)
+ */
+export const EIGEN_WONING_LABEL = ASSET_TYPE_LABELS.eigen_huis
+export const EIGEN_WONING_HYPOTHEEK_LABEL = `Hypotheek ${EIGEN_WONING_LABEL.toLowerCase()}`
 
 // ── Types ───────────────────────────────────────────────────
 
@@ -267,6 +304,12 @@ export interface ProjectWealthCompositionInput {
   inflation: number    // annual decimal, e.g. 0.02
   fireAge?: number     // if set, withdrawals start at this age
   annualExpenses?: number // yearly spending (needed for post-FIRE withdrawals)
+  /**
+   * Profielrendement in PROCENTEN als terugval voor een bezitting zonder eigen
+   * rendementsaanname (`expected_return = null`, ADR 0166) — keuze (a), dezelfde
+   * ketting als `potRendement` in de kernel. Weggelaten → 0 (oude nul-basis).
+   */
+  terugvalRendementPct?: number
 }
 
 /**
@@ -283,7 +326,7 @@ export interface ProjectWealthCompositionInput {
 export function projectWealthComposition(
   input: ProjectWealthCompositionInput,
 ): StackedRow[] {
-  const { assets, debts, currentAge, endAge, inflation, fireAge, annualExpenses } = input
+  const { assets, debts, currentAge, endAge, inflation, fireAge, annualExpenses, terugvalRendementPct = 0 } = input
 
   const years = Math.max(0, endAge - currentAge)
   if (years === 0) return []
@@ -298,7 +341,8 @@ export function projectWealthComposition(
       group: WEALTH_GROUPS[a.asset_type],
       values: projectAssetByYear(
         Number(a.current_value),
-        depreciation ? 0 : Number(a.expected_return) / 100,
+        // NULL → terugval (ADR 0166), nooit stil 0% via `Number(null)`.
+        depreciation ? 0 : resolveExpectedReturnPct(a.expected_return, terugvalRendementPct) / 100,
         Number(a.monthly_contribution),
         years,
         depreciation,
@@ -415,6 +459,8 @@ export function deriveWealthCompositionFromSim(
   debts: Debt[],
   fireAge?: number | null,
   annualExpenses?: number | null,
+  /** Profielrendement in PROCENTEN — terugval voor `expected_return = null` (ADR 0166); default 0. */
+  terugvalRendementPct = 0,
 ): StackedRow[] {
   if (!simRows.length) return []
 
@@ -440,7 +486,8 @@ export function deriveWealthCompositionFromSim(
   for (const a of activeAssets) {
     const g = WEALTH_GROUPS[a.asset_type]
     const val = Number(a.current_value)
-    const ret = Number(a.expected_return) / 100  // decimal
+    // decimal — NULL → terugval (ADR 0166), nooit stil 0% via `Number(null)`.
+    const ret = resolveExpectedReturnPct(a.expected_return, terugvalRendementPct) / 100
     const contrib = Number(a.monthly_contribution) * 12
     groupInfo[g].totalValue += val
     // Accumulate value × return for weighted average later

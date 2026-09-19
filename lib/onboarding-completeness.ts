@@ -1,5 +1,5 @@
 /**
- * Onboarding-compleetheid — "6 van 8 onderdelen ingevuld".
+ * Onboarding-compleetheid — "6 van 7 onderdelen ingevuld".
  *
  * Achtergrond (bevinding M11): het eindscherm van de onboarding toonde een
  * hardgecodeerde `100%` in de Voortgang-cel, náást twee cellen met "Vul je
@@ -10,16 +10,18 @@
  *
  * ## Definitie — welke onderdelen tellen mee
  *
- * Besluit eigenaar (26-08-2026): **alle acht onderdelen tellen mee**, inclusief
- * pensioen en eindstrategie — niet alleen de financiële kernvelden.
+ * Besluit eigenaar (26-08-2026): **alle data-onderdelen tellen mee**, inclusief
+ * pensioen en eindstrategie — niet alleen de financiële kernvelden. Dat waren
+ * er acht; sinds de spaardoel-stap uit de onboarding is (19-09-2026, ADR 0162)
+ * zijn het er zeven.
  *
  * De onboarding-orchestrator kent acht *groepen* (`STEP_GROUP_INDEX` in
- * `app/(onboarding)/onboarding/page.tsx`), maar groep 8 is het eindscherm
- * (`klaar`) zelf en draagt geen data; groep 2 (`inkomen`/`uitgaven`) draagt er
- * juist twee. De acht onderdelen hieronder zijn daarom de acht *data*-groepen:
- * groep 2 valt uiteen in inkomen en uitgaven, en het eindscherm telt niet als
- * "ingevuld". Zo blijft het totaal exact acht zoals besloten, zonder een
- * onderdeel te tellen dat per definitie altijd waar is.
+ * `app/(onboarding)/onboarding/page.tsx`), maar de groepen ná de eindstrategie
+ * (opslag/budget/bank en het eindscherm `klaar`) dragen geen data; groep 2
+ * (`inkomen`/`uitgaven`) draagt er juist twee. De zeven onderdelen hieronder
+ * zijn daarom de zeven *data*-groepen: groep 2 valt uiteen in inkomen en
+ * uitgaven, en het eindscherm telt niet als "ingevuld". Zo telt niets mee dat
+ * per definitie altijd waar is.
  *
  * ## Wat telt per onderdeel als "gevuld" (Given/When/Then)
  *
@@ -49,10 +51,7 @@
  *    resultaat oplevert (`buildPensionParseResult(...) !== null`: een upload,
  *    of een schatting met een bruto maandbedrag > 0), Then telt `pensioen` als
  *    gevuld. "Overslaan" zet de draft terug op de begintoestand → `null`.
- * 7. **spaardoel** — Given het eindscherm, When er een spaardoel-recap is
- *    (niet geskipt, mét preset én naam) — exact dezelfde bron als de
- *    Spaardoel-cel op het eindscherm — Then telt `spaardoel` als gevuld.
- * 8. **eindstrategie** — Given het eindscherm, When de gebruiker de
+ * 7. **eindstrategie** — Given het eindscherm, When de gebruiker de
  *    eindstrategie-stap heeft gepasseerd, Then telt `eindstrategie` als
  *    gevuld. De stap kent bewust géén overslaan-knop: de gebruiker ziet twee
  *    tegels (FIRE / pensioenleeftijd) met een voorselectie en bevestigt met
@@ -63,7 +62,7 @@
  *    er ooit een overslaan-knop, dan verandert alleen die ene doorgave.
  */
 
-/** De acht onderdelen, in de volgorde van de flow. */
+/** De zeven onderdelen, in de volgorde van de flow. */
 export const ONBOARDING_ONDERDELEN = [
   'naam',
   'inkomen',
@@ -71,13 +70,12 @@ export const ONBOARDING_ONDERDELEN = [
   'bezittingen',
   'schulden',
   'pensioen',
-  'spaardoel',
   'eindstrategie',
 ] as const
 
 export type OnboardingOnderdeelKey = (typeof ONBOARDING_ONDERDELEN)[number]
 
-/** Totaal aantal onderdelen — de noemer van "6 van 8". */
+/** Totaal aantal onderdelen — de noemer van "6 van 7". */
 export const ONBOARDING_TOTAAL_ONDERDELEN = ONBOARDING_ONDERDELEN.length
 
 /**
@@ -92,7 +90,6 @@ export const ONBOARDING_ONDERDEEL_LABELS: Record<OnboardingOnderdeelKey, string>
   bezittingen: 'je bezittingen',
   schulden: 'je schulden',
   pensioen: 'je pensioen',
-  spaardoel: 'je spaardoel',
   eindstrategie: 'je eindstrategie',
 }
 
@@ -118,17 +115,12 @@ export interface OnboardingCompletenessInput {
    * gebruiker de pensioenstap oversloeg of niets bruikbaars invulde.
    */
   pensioenResultaat: object | null
-  /**
-   * De spaardoel-recap zoals die aan het eindscherm wordt doorgegeven —
-   * `null` bij skip of onvolledige invoer.
-   */
-  spaardoel: object | null
-  /** Heeft de gebruiker de eindstrategie-stap gepasseerd? Zie punt 8 hierboven. */
+  /** Heeft de gebruiker de eindstrategie-stap gepasseerd? Zie punt 7 hierboven. */
   eindstrategieBeantwoord: boolean
 }
 
 export interface OnboardingCompleteness {
-  /** Aantal gevulde onderdelen — de teller van "6 van 8". */
+  /** Aantal gevulde onderdelen — de teller van "6 van 7". */
   gevuld: number
   /** Altijd `ONBOARDING_TOTAAL_ONDERDELEN`; meegegeven zodat de UI niets hardcodeert. */
   totaal: number
@@ -136,12 +128,12 @@ export interface OnboardingCompleteness {
   open: OnboardingOnderdeelKey[]
   /** Per onderdeel of het gevuld is — voedt eventuele detail-weergave. */
   perOnderdeel: Record<OnboardingOnderdeelKey, boolean>
-  /** True wanneer alle acht onderdelen gevuld zijn. */
+  /** True wanneer alle zeven onderdelen gevuld zijn. */
   isCompleet: boolean
 }
 
 /**
- * Berekent hoeveel van de acht onboarding-onderdelen daadwerkelijk data
+ * Berekent hoeveel van de zeven onboarding-onderdelen daadwerkelijk data
  * bevatten. Puur en synchroon — geen state, geen fetch: de aanroeper levert de
  * al afgeleide waarden aan.
  */
@@ -155,7 +147,6 @@ export function computeOnboardingCompleteness(
     bezittingen: input.assetCount > 0,
     schulden: input.debtCount > 0,
     pensioen: input.pensioenResultaat !== null,
-    spaardoel: input.spaardoel !== null,
     eindstrategie: input.eindstrategieBeantwoord,
   }
 
@@ -173,7 +164,7 @@ export function computeOnboardingCompleteness(
 
 /**
  * Zet de open onderdelen om naar een leesbare opsomming ("je uitgaven, je
- * pensioen en je spaardoel"). Kapt af na `max` items zodat de zin onder de
+ * pensioen en je eindstrategie"). Kapt af na `max` items zodat de zin onder de
  * recap-strip nooit een waslijst wordt: "je uitgaven, je pensioen en 3 andere".
  */
 export function formatOpenOnderdelen(

@@ -27,9 +27,10 @@
 // (`annualizeHistorySum`), met de all-time vroegste inkomstendatum als
 // deler-anker omdat de client het realisatievenster niet heeft.
 //
-// Grondslag van de horizon-som: transfer-INCLUSIEF (`includeTransfers: true`) —
-// bewust NIET gelijkgetrokken met de transfer-exclusieve spaarquote/gezondheids-
-// grondslag. Zie lib/horizon/raw-data-loader.ts voor de volledige motivatie.
+// Grondslag van de horizon-som: transfer-EXCLUSIEF — sinds ADR 0169 (eigenaars-
+// besluit 6 sep 2026) dezelfde som als de spaarquote-/gezondheids-/dashboard-
+// grondslag. De vroegere transfer-inclusieve uitzondering voor de FIRE-som is
+// opgeheven; vangrail: lib/retirement-expense-basis.grondslag.test.ts.
 
 import { computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
 import { annualizeHistorySum, clampHistoryMonths, closedMonthsSince } from '@/lib/history-basis'

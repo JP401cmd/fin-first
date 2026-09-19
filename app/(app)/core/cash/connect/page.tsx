@@ -450,9 +450,9 @@ export default function ConnectBankPage() {
             <div className="flex items-start gap-3 rounded-lg bg-[var(--subtle)] p-3">
               <Clock className="mt-0.5 h-4 w-4 shrink-0 text-kern-600" />
               <div>
-                <p className="text-sm font-medium text-[var(--ink-2)]">90 dagen geldig</p>
+                <p className="text-sm font-medium text-[var(--ink-2)]">180 dagen geldig</p>
                 <p className="text-xs text-[var(--ink-3)]">
-                  De autorisatie is 90 dagen geldig. Daarna kun je eenvoudig opnieuw verbinden.
+                  De toestemming is uiterlijk 180 dagen geldig (PSD2). Daarna verbind je met één klik opnieuw.
                 </p>
               </div>
             </div>

@@ -5,6 +5,7 @@ import { localMonthBounds } from '@/lib/month-range'
 import { buildBudgetSpendingMap, spentForBudget } from '@/lib/budget-spending'
 import { buildBudgetTypeMap } from '@/lib/budget-utils'
 import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
+import { heeftEigenRendement } from '@/lib/asset-return'
 
 /**
  * Creates a lookup tool that queries real financial data from Supabase.
@@ -196,7 +197,12 @@ export function createLookupTool(supabase: SupabaseClient) {
             name: clean(a.name, opts) ?? a.name,
             type: a.asset_type,
             value: a.current_value,
+            // NULL = geen eigen rendementsaanname (ADR 0166): laat het model dat
+            // lezen als grondslag, niet als 0% of als een kale `null`.
             return: a.expected_return,
+            returnBasis: heeftEigenRendement(a.expected_return)
+              ? 'eigen aanname (% per jaar)'
+              : 'geen eigen aanname — het profielrendement uit de voorkeuren geldt',
             monthlyContribution: a.monthly_contribution,
           }))
         }

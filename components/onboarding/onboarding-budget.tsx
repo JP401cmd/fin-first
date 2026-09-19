@@ -125,14 +125,19 @@ export function OnboardingBudget({
   const primaryCls =
     'w-full min-h-11 bg-[var(--ink)] px-6 py-3 text-sm font-medium text-[var(--paper)] transition-colors hover:bg-[var(--ink-2)] disabled:cursor-not-allowed disabled:opacity-40'
 
+  // W-011/W-012: fase 1 heet "Stel je budgetten in" — de canonieke term van de
+  // app ("budget" is het nav-label, de route en de app-brede CTA) in plaats van
+  // de omschrijving "je geld verdelen", die in Fins eigen kennis bovendien
+  // diérsificatie betekent en voor een beginner dus dubbelzinnig is.
+  // Eigenaarskeuze 19 sep 2026: letterlijk deze zin, niet de vraagvorm.
   const title: ReactNode =
     phase === 'start' ? (
       <>
-        Kies hoe je je{' '}
+        Stel je{' '}
         <em className="font-normal italic" style={{ color: 'var(--module-active-700)' }}>
-          geld
+          budgetten
         </em>{' '}
-        verdeelt
+        in
       </>
     ) : (
       <>
@@ -146,7 +151,23 @@ export function OnboardingBudget({
   const deck =
     phase === 'start'
       ? 'Een budget laat zien waar je vrijheidsdagen naartoe gaan. Kies een opzet als startpunt of begin leeg. De bedragen zijn daarna per categorie aan te passen.'
-      : 'Hernoem, voeg toe of haal weg wat niet bij je past. Eigen rekening blijft staan: daar landen overboekingen tussen je eigen rekeningen.'
+      // W-013: fase 2 vertelde niet waar de bedragen vandaan kwamen. Nu wél — met
+      // twee woorden die er bewust in staan. "VASTE VERDELING", want de
+      // percentages zijn een generieke sleutel van de app, niet iets dat op
+      // jouw uitgaven is afgestemd; "op basis van je inkomen" alleen zou
+      // maatwerk suggereren. En "EEN STARTPUNT, GEEN MAAT VOOR JOU", zodat de
+      // getallen niet als norm gelezen worden (beschrijvend, geen advies).
+      // Geen templatenaam en geen verwijzing naar Nibud: dat zou de sleutel
+      // laten klinken als de Nibud-referentiecijfers, en dat is een ander
+      // systeem (`nibud_reference_data`).
+      //
+      // ÉÉN deck voor beide startpunten (eigenaarskeuze 19 sep 2026, bewust geen
+      // vertakking). Onder "Leeg beginnen" staat er niets ingevuld, dus de
+      // inkomenszin staat in een voorwaardelijke vorm — "Koos je een opzet, dan
+      // …" — en blijft daarmee op beide paden waar. Het bedrag zelf herhalen we
+      // niet: dat staat in beide fasen al in het feitenpaneel hiernaast, inclusief
+      // de herkomst ("Jouw invoer bij Inkomen" / "Aangepast in deze stap").
+      : 'Koos je een opzet, dan zijn de bedragen al ingevuld als vaste verdeling van je netto-inkomen — een startpunt, geen maat voor jou. Hernoem, voeg toe of haal weg wat niet bij je past en zet er je eigen bedragen op; Eigen rekening blijft staan, daar landen overboekingen tussen je eigen rekeningen. Bijstellen kan later altijd onder Overzicht → Budget.'
 
   return (
     <>

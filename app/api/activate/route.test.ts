@@ -29,14 +29,18 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
  * try/catch aan; dit is dus geen nieuw patroon maar het dichten van een gat erin.
  */
 
-const { mockCreateClient, mockDeleteAllUserData, mockSeedPersonaData } = vi.hoisted(() => ({
+const { mockCreateClient, mockDeleteAllUserData, mockSeedPersonaData, mockGetServiceClient } = vi.hoisted(() => ({
   mockCreateClient: vi.fn(),
   mockDeleteAllUserData: vi.fn(),
   mockSeedPersonaData: vi.fn(),
+  mockGetServiceClient: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
   createClient: mockCreateClient,
+}))
+vi.mock('@/lib/supabase/service', () => ({
+  getServiceClient: mockGetServiceClient,
 }))
 vi.mock('@/lib/seed-persona', () => ({
   deleteAllUserData: mockDeleteAllUserData,
@@ -171,5 +175,55 @@ describe('POST /api/activate — succespad blijft ongemoeid', () => {
     expect((await res.json()).seeded).toBe(false)
     expect(mockDeleteAllUserData).not.toHaveBeenCalled()
     expect(mockSeedPersonaData).not.toHaveBeenCalled()
+  })
+})
+
+/**
+ * De wipe vóór een persona-(her)seed moet de service-role meekrijgen: RLS staat
+ * de eigenaar terecht niet toe afgeronde vragenlijst-sessies, feedback,
+ * user_reports, net_worth_history en de bucket-prefix zelf te wissen, dus
+ * zonder `{ service }` is die stap in `deleteAllUserData` een stille no-op en
+ * houdt een hergeseed testaccount de vrije-tekstantwoorden van vóór de reset.
+ * Zelfde patroon als `app/api/onboarding/reset/route.ts`.
+ */
+describe('POST /api/activate — de wipe krijgt de service-client mee', () => {
+  // vi.stubEnv i.p.v. directe toewijzing: `process.env.X = undefined` zou de
+  // string 'undefined' opleveren en de guard truthy houden.
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it('geeft { service } door aan deleteAllUserData zodra de service-key aanwezig is', async () => {
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://x.supabase.co')
+    vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'service-key')
+    const service = { tag: 'service' }
+    mockGetServiceClient.mockReturnValue(service)
+    mockCreateClient.mockResolvedValue(clientFor(PERSONA_KEY))
+    mockDeleteAllUserData.mockResolvedValue(undefined)
+    mockSeedPersonaData.mockResolvedValue(undefined)
+
+    const res = await POST()
+
+    expect(res.status).toBe(200)
+    expect(mockDeleteAllUserData).toHaveBeenCalledTimes(1)
+    const [, userId, , opts] = mockDeleteAllUserData.mock.calls[0]
+    expect(userId).toBe('user-a')
+    expect(opts).toEqual({ service })
+    // Reseed is geen accountverwijdering: nooit fullErase.
+    expect(opts).not.toHaveProperty('fullErase')
+  })
+
+  it('zonder service-key (dev) blijft de wipe best-effort: service undefined, geen throw', async () => {
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://x.supabase.co')
+    vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', '')
+    mockCreateClient.mockResolvedValue(clientFor(PERSONA_KEY))
+    mockDeleteAllUserData.mockResolvedValue(undefined)
+    mockSeedPersonaData.mockResolvedValue(undefined)
+
+    const res = await POST()
+
+    expect(res.status).toBe(200)
+    expect(mockGetServiceClient).not.toHaveBeenCalled()
+    expect(mockDeleteAllUserData.mock.calls[0][3]).toEqual({ service: undefined })
   })
 })

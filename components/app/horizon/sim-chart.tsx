@@ -43,6 +43,14 @@ function fmtAbs(val: number, masked: boolean): string {
   return `€${Math.round(abs)}`
 }
 
+/** Een STAND (geen delta) met teken: een negatief netto vermogen (tekort-lening,
+ *  B-053) toont als "−€80K", nooit als "€80K". Delta's houden hun eigen ±-prefix
+ *  bij de aanroep en blijven op `fmtAbs`. Onder maskering geen teken. */
+function fmtSigned(val: number, masked: boolean): string {
+  if (masked) return MASKED_AMOUNT_PLACEHOLDER
+  return `${val < 0 ? '−' : ''}${fmtAbs(val, masked)}`
+}
+
 // ── Crosshair-laag ────────────────────────────────────────────────────────────
 //
 // De ENIGE laag die op `hoveredAge` reageert: de onzichtbare hover-rect + de
@@ -268,6 +276,7 @@ export const SimChart = memo(function SimChart({
   baselineRows,
   scenarioOverlays,
   scenarioPending,
+  mainPending,
   monteCarloOverlay,
   baselineFireAge,
   dailyExpenseRate,
@@ -315,6 +324,8 @@ export const SimChart = memo(function SimChart({
   scenarioOverlays?: ScenarioOverlay[]
   /** Wat-als-run loopt achter op de live input → de scenario-lijn wordt gedempt met puls. */
   scenarioPending?: boolean
+  /** B-057 — hersolve/herlaad van de hoofdlijn onderweg → de hoofdpaden pulseren gedempt. */
+  mainPending?: boolean
   monteCarloOverlay?: MonteCarloOverlay
   /** Optional baseline FIRE age for delta annotation (what-if mode) */
   baselineFireAge?: number | null
@@ -539,11 +550,10 @@ export const SimChart = memo(function SimChart({
     // The allPts array maps age → value on the drawn line.
     // At x = hoveredAge the line shows the startPortfolio of that year
     // (which equals endPortfolio of the previous year).
+    // Geen klem op 0: de stip volgt de lijn ook onder de nullijn (B-053; het
+    // y-domein van de geometrie omvat negatieve waarden).
     const pt = allPts.find(([a]) => a === hoveredAge)
-    if (pt) return PAD.top + yScale(Math.max(pt[1], 0))
-    // Fallback: try the startPortfolio entry at the exact age
-    const ptStart = allPts.find(([a]) => a === hoveredAge)
-    if (ptStart) return PAD.top + yScale(Math.max(ptStart[1], 0))
+    if (pt) return PAD.top + yScale(pt[1])
     return null
   }, [hoveredAge, allPts, PAD.top, yScale])
 
@@ -577,6 +587,7 @@ export const SimChart = memo(function SimChart({
           baselineEmphasis={baselineEmphasis}
           showDepletionWarning={showDepletionWarning}
           scenarioPending={scenarioPending}
+          mainPending={mainPending}
           eventOverlay={eventOverlay}
           onEventClick={onEventClick}
           onEventDragEnd={onEventDragEnd}
@@ -706,7 +717,7 @@ export const SimChart = memo(function SimChart({
                   legenda en de doellijnen ("met je huis" / "zonder je huis"). */}
               <div className="flex items-baseline justify-between" style={{ fontSize: 10, color: 'var(--paper)' }}>
                 <span>{primaryLabel}</span>
-                <span className="font-mono tabular-nums font-semibold">{fmtAbs(primaryAtHover, masked)}</span>
+                <span className="font-mono tabular-nums font-semibold">{fmtSigned(primaryAtHover, masked)}</span>
               </div>
 
               {/* De ándere grondslag op dezelfde leeftijd — alleen wanneer de
@@ -720,7 +731,7 @@ export const SimChart = memo(function SimChart({
                     </svg>
                     {secondaryLabel}
                   </span>
-                  <span className="font-mono tabular-nums">{fmtAbs(secondaryAtHover, masked)}</span>
+                  <span className="font-mono tabular-nums">{fmtSigned(secondaryAtHover, masked)}</span>
                 </div>
               )}
 
@@ -793,7 +804,7 @@ export const SimChart = memo(function SimChart({
                           fontWeight: p.label === 'p50' ? 600 : 400,
                         }}
                       >
-                        {fmtAbs(p.value, masked)}
+                        {fmtSigned(p.value, masked)}
                       </span>
                     </div>
                   ))}
@@ -831,7 +842,7 @@ export const SimChart = memo(function SimChart({
                             <span className="truncate max-w-[80px]">{v.label}</span>
                           </span>
                           <span className="font-mono tabular-nums" style={{ color: 'var(--paper)' }}>
-                            {fmtAbs(v.value, masked)}
+                            {fmtSigned(v.value, masked)}
                             {isWatals && Math.abs(delta) >= 1 && (
                               // Ook hier: onder maskering blijft alleen de kleur
                               // de richting dragen, niet een los ±-teken.
@@ -997,6 +1008,13 @@ export const SCENARIO_VARIANTS = [
  * accumulates delta applied to the MAIN sim's portfolio each year.
  * This keeps optimist and pessimist equidistant from the main line
  * (main is always the exact midpoint).
+ *
+ * GEEN halt-op-nul (B-053, 19 sep 2026): de variantlijn loopt de hele reeks
+ * door en mag — net als de hoofdlijn en de kernel (`prognose.nettoVermogen`,
+ * tekort-lening-pot in `tables/s.ts`) — onder €0 zakken. Tot dit besluit werd
+ * de lijn op `Math.max(portfolio, 0)` geklemd én afgebroken zodra hij ≤ 0
+ * kwam, waardoor "Voorzichtig" bij een tekort plat op nul eindigde terwijl de
+ * hoofdlijn ernaast wél negatief tekende (twee grondslagen op één as).
  */
 export function buildScenarioVariants(
   rows: SimRow[],
@@ -1016,9 +1034,7 @@ export function buildScenarioVariants(
       // Extra divergence: existing extra grows at base rate,
       // plus delta applied to main sim's portfolio this year
       extra = extra * (1 + baseNetReturn) + row.startPortfolio * delta
-      const portfolio = row.endPortfolio + extra
-      points.push([row.age + 1, Math.max(portfolio, 0)])
-      if (portfolio <= 0) break
+      points.push([row.age + 1, row.endPortfolio + extra])
     }
 
     return { name, label, color, points }
@@ -1054,7 +1070,10 @@ export function buildScenarioPathsFromSim(
         month,
         date: date.toISOString().split('T')[0],
         netWorth: Math.round(pt.netWorth),
-        passiveIncome: Math.round((pt.netWorth * NL_SWR) / 12),
+        // Passief inkomen bestaat alleen uit een POSITIEF vermogen; een negatief
+        // netto vermogen (tekort-lening) levert geen onttrekking op, dus 0 — dit
+        // is géén klem op de lijn zelf (netWorth blijft ongeklemd).
+        passiveIncome: Math.round((Math.max(pt.netWorth, 0) * NL_SWR) / 12),
         age: pt.age,
         contributions: Math.round(pt.contributions),
         growth: Math.round(pt.growth),
@@ -1091,17 +1110,15 @@ export function buildScenarioPathsFromSim(
         : 0
       // Symmetric divergence: extra compounds at base rate + delta on main portfolio
       extra = extra * (1 + baseNetReturn) + row.startPortfolio * delta
+      // Geen klem, geen vroegtijdige afkap (B-053): zie `buildScenarioVariants`.
       const portfolio = row.endPortfolio + extra
-      const clamped = Math.max(portfolio, 0)
       const extraGrowth = Math.round(extra * baseNetReturn + row.startPortfolio * delta)
-      pts.push({ age: row.age + 1, netWorth: clamped, contributions: row.savings, growth: extraGrowth })
+      pts.push({ age: row.age + 1, netWorth: portfolio, contributions: row.savings, growth: extraGrowth })
 
-      if (varFireAge === null && clamped >= fireTarget && fireTarget > 0) {
+      if (varFireAge === null && portfolio >= fireTarget && fireTarget > 0) {
         varFireAge = row.age + 1
         varFireMonth = (row.age + 1 - startAge) * 12
       }
-
-      if (portfolio <= 0) break
     }
 
     return { name, label, color, months: rowsToMonths(pts), fireAge: varFireAge, fireMonth: varFireMonth }

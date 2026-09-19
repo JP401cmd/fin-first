@@ -70,8 +70,8 @@ type Props = {
    * Optionele props voor de scope-toggle in de choice-fase.
    * Wanneer accountId is gegeven (of currentUserId voor combined view),
    * krijgt de gebruiker de keuze tussen "Deze maand" (default, gebruikt
-   * `transactions`) en "Alle tijden" (lazy-fetch van álle ongekoppelde
-   * transacties op deze rekening of gebruiker).
+   * `transactions`) en "Alle tijden" (lazy-fetch van álle transacties zonder
+   * categorie op deze rekening of gebruiker).
    */
   accountId?: string | null
   monthLabel?: string
@@ -126,7 +126,7 @@ export function AICategorizeSheet({
   // Draait de motor nog AI-rondes? Stuurt de "Fin denkt na…"-laadstatus en de
   // wakelock in de wizard.
   const [aiRunning, setAiRunning] = useState(false)
-  // Deelverzameling voor de sleepmodus vanuit een wizard-groep ("Zelf indelen"):
+  // Deelverzameling voor de sleepmodus vanuit een wizard-groep ("Zelf categoriseren"):
   // de tx-id's van die groep. null = de gewone, volledige sleepmodus.
   const [sleepSubset, setSleepSubset] = useState<string[] | null>(null)
   // Budgetten die de gebruiker binnen de sleepmodus heeft aangemaakt. Ze staan
@@ -673,7 +673,7 @@ export function AICategorizeSheet({
       setSavedCount(result.ruleCount + result.transferCount)
       setPhase('success')
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Automatisch indelen lukte niet. Probeer het opnieuw.')
+      setActionError(err instanceof Error ? err.message : 'Automatisch categoriseren lukte niet. Probeer het opnieuw.')
       setPhase('choice')
     }
   }
@@ -867,7 +867,7 @@ export function AICategorizeSheet({
     }))
   }
 
-  /** Open de sleepmodus voor precies de tx-id's van een groep ("Zelf indelen"). */
+  /** Open de sleepmodus voor precies de tx-id's van een groep ("Zelf categoriseren"). */
   function splitGroup(txIds: string[]) {
     setSleepSubset(txIds)
     setPhase('sleep')
@@ -1119,7 +1119,7 @@ export function AICategorizeSheet({
               )}
               {scope === 'all' && allCapped && (
                 <p className="mt-2 text-[11px] italic text-[var(--ink-4)]">
-                  Maximaal {ALL_TIME_LIMIT} nieuwste ongekoppelde transacties meegenomen.
+                  Maximaal {ALL_TIME_LIMIT} nieuwste transacties zonder categorie meegenomen.
                 </p>
               )}
             </div>
@@ -1134,8 +1134,8 @@ export function AICategorizeSheet({
           {knownNoAi ? (
             <AiSubscriptionUpsell
               variant="inline"
-              feature="Transacties laten indelen door Fin"
-              note="Slimme regels, de Sleepmodus en handmatig indelen werken zonder abonnement."
+              feature="Transacties laten categoriseren door Fin"
+              note="Slimme regels, de Sleepmodus en handmatig categoriseren werken zonder abonnement."
               onDialogOpenChange={setUpsellDialogOpen}
             />
           ) : (
@@ -1238,7 +1238,7 @@ export function AICategorizeSheet({
             <div className="mb-4">
               <AiSubscriptionUpsell
                 variant="inline"
-                feature="Transacties laten indelen door Fin"
+                feature="Transacties laten categoriseren door Fin"
                 note="De voorstellen van je regels hieronder staan wel klaar."
                 onDialogOpenChange={setUpsellDialogOpen}
               />
@@ -1403,7 +1403,7 @@ export function AICategorizeSheet({
       {phase === 'applying' && (
         <div className="flex flex-col items-center justify-center px-5 py-16 gap-4 sm:px-6">
           <Loader2 className="h-7 w-7 animate-spin text-kern-500" />
-          <p className="text-sm text-[var(--ink-3)]">Bezig met indelen…</p>
+          <p className="text-sm text-[var(--ink-3)]">Bezig met categoriseren…</p>
         </div>
       )}
 
@@ -1463,7 +1463,7 @@ export function AICategorizeSheet({
 
     {/* ── Sleepmodus — fullscreen drag-&-drop boven de (gesloten) sheet ──
         Twee ingangen: het keuzescherm (volledige set) én een wizard-groep
-        ("Zelf indelen", sleepSubset = die tx-id's). Bij de wizard-variant keren
+        ("Zelf categoriseren", sleepSubset = die tx-id's). Bij de wizard-variant keren
         we ná afloop terug naar de wizard (volgende groep), niet naar het
         keuzescherm. */}
     {phase === 'sleep' && (

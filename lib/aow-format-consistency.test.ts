@@ -99,7 +99,6 @@ const WEERGAVE_OPPERVLAKKEN: Record<string, string> = {
   // op één grafiek terwijl de grafiek ernaast het oude getal rendert is geen fix.
   'inkomsten/uitgaven-grafiek (AOW-lijn)': 'components/app/horizon/income-expense-chart.tsx',
   'vermogensopbouw-grafiek (AOW-lijn)': 'components/app/horizon/wealth-composition-chart.tsx',
-  'netto-vermogen-projectie (/core)': 'components/core/net-worth-projection-chart.tsx',
   'overgangsfase — gap-analyse': 'components/app/horizon/phase-analysis/overgang/gap-analyse.tsx',
   'overgangsfase — monte carlo': 'components/app/horizon/phase-analysis/overgang/monte-carlo-overgang.tsx',
   'overgangsfase — modal-kop': 'components/app/horizon/phase-modal-overgang.tsx',

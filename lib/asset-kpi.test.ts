@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { computeAssetKpi } from './asset-kpi'
+import { computeAssetKpi, KPI_GEEN_EIGEN_RENDEMENT } from './asset-kpi'
 import { computeDebtKpi } from './debt-kpi'
 import {
   computeAssetCategoryKpis,
@@ -520,5 +520,78 @@ describe('computeDebtCategoryKpis', () => {
     expect(result.primary?.value).toBe('3')
     expect(result.primary?.label).toBe('aanslagen')
     expect(result.secondary?.value).toContain('1 met regeling')
+  })
+})
+
+// ── ADR 0166 — `expected_return = null` is GEEN 0% ───────────────────────────
+//
+// `Number(null) === 0`, dus vóór deze ronde toonde een bezitting zonder eigen
+// rendementsaanname hier "0,0% rente" terwijl /toekomst er het profielrendement
+// op rekent. De strip heeft geen profiel bij de hand (keuze b): hij toont de
+// grondslag expliciet. Een ingevulde 0 blijft een bewuste 0% — die twee mogen
+// nooit samenvallen.
+describe('computeAssetKpi — geen eigen rendement (null) vs bewuste 0', () => {
+  it('savings: null → expliciete "geen eigen rendement"-cel, nooit "0,0%"', () => {
+    const result = computeAssetKpi(makeAsset({ asset_type: 'savings', expected_return: null }))
+    expect(result.primary).toEqual(KPI_GEEN_EIGEN_RENDEMENT)
+    expect(result.primary?.value).not.toContain('0,0')
+  })
+
+  it('savings: een ingevulde 0 blijft "0,0% rente" (bewuste nul)', () => {
+    const result = computeAssetKpi(makeAsset({ asset_type: 'savings', expected_return: 0 }))
+    expect(result.primary?.value).toBe('0,0%')
+    expect(result.primary?.label).toBe('rente')
+  })
+
+  it('cash zonder stats: null → "geen eigen rendement", 0 → "Geen activiteit" (ongewijzigd)', () => {
+    expect(computeAssetKpi(makeAsset({ asset_type: 'cash', expected_return: null })).primary)
+      .toEqual(KPI_GEEN_EIGEN_RENDEMENT)
+    expect(computeAssetKpi(makeAsset({ asset_type: 'cash', expected_return: 0 })).primary?.value)
+      .toBe('Geen activiteit')
+  })
+
+  it('investment zonder holdings: secundaire "verwacht"-cel toont null expliciet, 0 als "0,0%"', () => {
+    const base = { asset_type: 'investment' as const, purchase_value: 8000, current_value: 10000 }
+    expect(computeAssetKpi(makeAsset({ ...base, expected_return: null })).secondary)
+      .toEqual(KPI_GEEN_EIGEN_RENDEMENT)
+    expect(computeAssetKpi(makeAsset({ ...base, expected_return: 0 })).secondary?.value).toBe('0,0%')
+  })
+
+  it('retirement en vordering: null → expliciet; 0 → lege cel (zoals voorheen)', () => {
+    for (const asset_type of ['retirement', 'vordering'] as const) {
+      const key = asset_type === 'retirement' ? 'secondary' : 'primary'
+      expect(computeAssetKpi(makeAsset({ asset_type, expected_return: null }))[key])
+        .toEqual(KPI_GEEN_EIGEN_RENDEMENT)
+      expect(computeAssetKpi(makeAsset({ asset_type, expected_return: 0 }))[key]).toBeUndefined()
+    }
+  })
+})
+
+describe('computeAssetCategoryKpis — null-rijen tellen niet mee in het gewogen gemiddelde', () => {
+  it('savings: een null-rij drukt het gemiddelde niet naar beneden', () => {
+    const a1 = makeAsset({ id: '1', asset_type: 'savings', current_value: 10_000, expected_return: 3 })
+    const a2 = makeAsset({ id: '2', asset_type: 'savings', current_value: 90_000, expected_return: null })
+    // Vóór ADR 0166: (3×10k + 0×90k)/100k = 0,3%. Nu: alleen de rij mét aanname → 3,0%.
+    expect(computeAssetCategoryKpis([a1, a2], 'savings').primary?.value).toBe('3,0%')
+  })
+
+  it('savings: een bewuste 0 telt WÉL mee (0 is een keuze, geen ontbreken)', () => {
+    const a1 = makeAsset({ id: '1', asset_type: 'savings', current_value: 10_000, expected_return: 3 })
+    const a2 = makeAsset({ id: '2', asset_type: 'savings', current_value: 90_000, expected_return: 0 })
+    expect(computeAssetCategoryKpis([a1, a2], 'savings').primary?.value).toBe('0,3%')
+  })
+
+  it('geen enkele rij met eigen aanname → expliciete cel, nooit "0,0%"', () => {
+    const rows = [
+      makeAsset({ id: '1', asset_type: 'savings', current_value: 10_000, expected_return: null }),
+      makeAsset({ id: '2', asset_type: 'savings', current_value: 5_000, expected_return: null }),
+    ]
+    expect(computeAssetCategoryKpis(rows, 'savings').primary).toEqual(KPI_GEEN_EIGEN_RENDEMENT)
+    expect(computeAssetCategoryKpis(rows.map(r => ({ ...r, asset_type: 'cash' as const })), 'cash').primary)
+      .toEqual(KPI_GEEN_EIGEN_RENDEMENT)
+    expect(computeAssetCategoryKpis(rows.map(r => ({ ...r, asset_type: 'retirement' as const })), 'retirement').secondary)
+      .toEqual(KPI_GEEN_EIGEN_RENDEMENT)
+    expect(computeAssetCategoryKpis(rows.map(r => ({ ...r, asset_type: 'vordering' as const })), 'vordering').primary)
+      .toEqual(KPI_GEEN_EIGEN_RENDEMENT)
   })
 })

@@ -25,6 +25,11 @@ import { runRegelProjection, type RegelSimSnapshot } from '@/lib/future/regel-si
 import { BOX3_METHOD_LABELS } from '@/lib/box3-method'
 import { TYPICAL_RETURNS } from '@/lib/asset-data'
 import {
+  ASSET_RENDEMENT_KEUZE_KOPIJ,
+  keuzeUitWaarde,
+  type AssetRendementKeuze,
+} from '@/lib/asset-return-keuze'
+import {
   assetReturnBand,
   assetReturnLabel,
   isWithinAssetReturnBand,
@@ -217,40 +222,54 @@ function BezittingRendementBody({
   onActionsChange: (s: RegelEditActionsState) => void
   onSaved: () => void
 }) {
-  const [waarde, setWaarde] = useState(String(bezit.expected_return))
-  const [opgeslagen, setOpgeslagen] = useState(bezit.expected_return)
+  // Zelfde keuze-contract als het bezittingenformulier — één body-kopij, twee
+  // hosts (lib/asset-return-keuze.ts, ADR 0166).
+  const [keuze, setKeuze] = useState<AssetRendementKeuze>(() => keuzeUitWaarde(bezit.expected_return))
+  const [waarde, setWaarde] = useState(String(bezit.expected_return ?? TYPICAL_RETURNS[bezit.asset_type]))
+  const [opgeslagen, setOpgeslagen] = useState<number | null>(bezit.expected_return)
   const [saving, setSaving] = useState(false)
   const [fout, setFout] = useState<string | null>(null)
 
   const label = assetReturnLabel(bezit.asset_type)
   const band = assetReturnBand(bezit.asset_type)
   const standaard = TYPICAL_RETURNS[bezit.asset_type]
+  const geenEigen = keuze === 'profiel'
   const pct = waarde.trim() === '' ? Number.NaN : Number(waarde.replace(',', '.'))
-  const invoerFout = bezit.afschrijvend
-    ? null
-    : !Number.isFinite(pct)
-      ? 'Vul een getal in.'
-      : isWithinAssetReturnBand(bezit.asset_type, pct)
-        ? null
-        : // Zelfde band als formulier en route, met de veldnaam die hier staat ("Rente" bij spaargeld).
-          `${label} moet tussen ${band.min}% en ${band.max}% per jaar liggen.`
-  const changed = !bezit.afschrijvend && invoerFout == null && pct !== opgeslagen
+  // Onder 'profiel' valt er niets te valideren: er gaat `null` naar de route en
+  // een band begrenst een getal dat er dan niet is.
+  const invoerFout =
+    bezit.afschrijvend || geenEigen
+      ? null
+      : !Number.isFinite(pct)
+        ? 'Vul een getal in.'
+        : isWithinAssetReturnBand(bezit.asset_type, pct)
+          ? null
+          : // Zelfde band als formulier en route, met de veldnaam die hier staat ("Rente" bij spaargeld).
+            `${label} moet tussen ${band.min}% en ${band.max}% per jaar liggen.`
+  /** Wat er daadwerkelijk opgeslagen wordt — `null` bij de profielkeuze. */
+  const teBewaren = geenEigen ? null : pct
+  const changed = !bezit.afschrijvend && invoerFout == null && teBewaren !== opgeslagen
   const canSave = !saving && !bezit.afschrijvend && invoerFout == null
 
   // Live effect: dezelfde kern-run als de Tijdas, met alleen het rendement van deze rij vervangen.
   // Kernel-runs pas zodra er iets gewijzigd is: zonder wijziging toont de footer geen effect.
-  const deferredPct = useDeferredValue(pct)
-  const deferredChanged = Number.isFinite(deferredPct) && deferredPct !== opgeslagen
+  const deferredTeBewaren = useDeferredValue(teBewaren)
+  const deferredChanged =
+    (deferredTeBewaren === null || Number.isFinite(deferredTeBewaren)) && deferredTeBewaren !== opgeslagen
   const baseline = useMemo(
     () => (snapshot && deferredChanged ? runRegelProjection(snapshot) : null),
     [snapshot, deferredChanged],
   )
   const draftProj = useMemo(
     () =>
-      snapshot && deferredChanged && isWithinAssetReturnBand(bezit.asset_type, deferredPct)
-        ? runRegelProjection(snapshot, { assetExpectedReturns: { [bezit.id]: deferredPct } })
+      // `null` mag rechtstreeks de kern in: die doet de terugval zelf. Een getal
+      // moet eerst binnen de band liggen, anders is het geen zinnig scenario.
+      snapshot &&
+      deferredChanged &&
+      (deferredTeBewaren === null || isWithinAssetReturnBand(bezit.asset_type, deferredTeBewaren))
+        ? runRegelProjection(snapshot, { assetExpectedReturns: { [bezit.id]: deferredTeBewaren } })
         : null,
-    [snapshot, deferredChanged, bezit.id, bezit.asset_type, deferredPct],
+    [snapshot, deferredChanged, bezit.id, bezit.asset_type, deferredTeBewaren],
   )
   const footerSleutel = baseline && draftProj ? fireFooterSleutel(baseline, draftProj) : null
 
@@ -264,14 +283,14 @@ function BezittingRendementBody({
         const res = await fetch(`/api/assets/${encodeURIComponent(bezit.id)}/expected-return`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ expected_return: pct }),
+          body: JSON.stringify({ expected_return: teBewaren }),
         })
         if (!res.ok) {
           const data = (await res.json().catch(() => ({}))) as { error?: unknown }
           setFout(typeof data.error === 'string' ? data.error : 'Opslaan is niet gelukt.')
           return
         }
-        setOpgeslagen(pct)
+        setOpgeslagen(teBewaren)
         onSaved()
       } catch {
         setFout('Opslaan is niet gelukt.')
@@ -320,9 +339,10 @@ function BezittingRendementBody({
             step={0.1}
             value={waarde}
             onChange={(e) => setWaarde(e.target.value)}
+            disabled={geenEigen}
             aria-invalid={invoerFout ? true : undefined}
             aria-describedby={invoerFout ? foutId : undefined}
-            className="flex-1 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm tabular-nums focus:outline-none focus:border-[var(--ink-3)]"
+            className="flex-1 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm tabular-nums focus:outline-none focus:border-[var(--ink-3)] disabled:opacity-50"
           />
           <span className="text-sm text-[var(--ink-3)]">%</span>
         </div>
@@ -332,7 +352,23 @@ function BezittingRendementBody({
           {invoerFout}
         </p>
       )}
-      {pct !== standaard && isWithinAssetReturnBand(bezit.asset_type, standaard) && (
+      {/* Dezelfde expliciete keuze als in het bezittingenformulier, uit dezelfde
+          kopij-bron — één body, twee hosts (ADR 0166). */}
+      <label className="flex items-start gap-2 text-xs leading-snug text-[var(--ink-2)]">
+        <input
+          type="checkbox"
+          checked={geenEigen}
+          onChange={(e) => setKeuze(e.target.checked ? 'profiel' : 'eigen')}
+          className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--module-active-600)]"
+        />
+        <span>{ASSET_RENDEMENT_KEUZE_KOPIJ.profiel.keuze}</span>
+      </label>
+      {geenEigen && (
+        <p className="text-[11px] italic leading-snug text-[var(--ink-3)]">
+          {ASSET_RENDEMENT_KEUZE_KOPIJ.profiel.effect} {ASSET_RENDEMENT_KEUZE_KOPIJ.profiel.waarom}
+        </p>
+      )}
+      {!geenEigen && pct !== standaard && isWithinAssetReturnBand(bezit.asset_type, standaard) && (
         <button
           type="button"
           onClick={() => setWaarde(String(standaard))}

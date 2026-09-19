@@ -22,7 +22,7 @@ const completeCohort: BenchmarkCohort = {
 const fullUser: BenchmarkUserMetrics = {
   healthScoreTotal: 72,
   fireAgeFractional: 58.5,
-  savingsRate6m: 18,
+  effectiveSavingsRatePct: 18,
   netWorth: 200_000,
   yearlyIncome: 50_000,
   // €50 per dag → €100 = 2 vrijheidsdagen
@@ -223,7 +223,7 @@ describe('buildBenchmarkReport — null user-waarden', () => {
   const nullUser: BenchmarkUserMetrics = {
     healthScoreTotal: null,
     fireAgeFractional: null,
-    savingsRate6m: null,
+    effectiveSavingsRatePct: null,
     netWorth: null,
     yearlyIncome: null,
     dailyExpenseRate: 0,
@@ -239,7 +239,7 @@ describe('buildBenchmarkReport — null user-waarden', () => {
     expect(health.caption).toMatch(/[Oo]nvoldoende/)
   })
 
-  it('caption savings_rate vermeldt "Onvoldoende" bij null savingsRate6m', () => {
+  it('caption savings_rate vermeldt "Onvoldoende" bij null effectiveSavingsRatePct', () => {
     const report = buildBenchmarkReport(makeArgs({ user: nullUser }))
     const m = report.metrics.find(m => m.key === 'savings_rate')!
     expect(m.caption).toMatch(/[Oo]nvoldoende/)
@@ -373,5 +373,42 @@ describe('buildBenchmarkReport — caption is maskeerbaar', () => {
     expect(m.captionAmountEur).toBeNull()
     expect(m.caption).not.toContain(CAPTION_AMOUNT_TOKEN)
     expect(resolveMetricCaption(m, v => formatMaskedCurrency(v, true))).toBe(m.caption)
+  })
+})
+
+// ── Test: de spaarquote-uitleg leent geen venster, maar noemt de grondslag ──
+//
+// Het getal op `effectiveSavingsRatePct` is de EFFECTIEVE quote (ADR 0121); de
+// uitleg zei tot 19 sep 2026 "(6-maands gemiddelde)" en beschreef daarmee onder
+// een handmatige of budget-grondslag de verkeerde grootheid (kaart "benchmark-
+// rapport vergelijkt op een andere spaarquote" — de misnomer `savingsRate6m` op
+// het contract zette de kaartauteur op het verkeerde been; het getal zelf was
+// al effectief).
+
+describe('buildBenchmarkReport — spaarquote-uitleg volgt de grondslag, niet een venster', () => {
+  const savingsMetric = (user: BenchmarkUserMetrics) =>
+    buildBenchmarkReport(makeArgs({ user })).metrics.find(m => m.key === 'savings_rate')!
+
+  it('zonder grondslag-info: grondslag-neutraal, zonder "6-maands"/"6m"', () => {
+    const m = savingsMetric(fullUser)
+    expect(m.explanation).not.toMatch(/6-maands|6m\b/)
+    expect(m.explanation).toContain('Je spaarquote is het deel van je inkomen dat je opzijzet.')
+  })
+
+  it('handmatige grondslag aan beide kanten: "volgens je eigen invoer"', () => {
+    const m = savingsMetric({ ...fullUser, savingsRateBasis: { income: 'manual', expenses: 'manual' } })
+    expect(m.explanation).toContain('dat je opzijzet, volgens je eigen invoer.')
+    expect(m.explanation).not.toMatch(/6-maands|6m\b/)
+  })
+
+  it('gemengde grondslag: benoemt dát het gemengd is, noemt niet één van beide', () => {
+    const m = savingsMetric({ ...fullUser, savingsRateBasis: { income: 'transaction', expenses: 'budget' } })
+    expect(m.explanation).toContain('volgens een gemengde grondslag')
+  })
+
+  it('onbekende grondslag aan één kant: geen grondslag-zin (geen zin over een gat)', () => {
+    const m = savingsMetric({ ...fullUser, savingsRateBasis: { income: 'transaction', expenses: 'unknown' } })
+    expect(m.explanation).toContain('Je spaarquote is het deel van je inkomen dat je opzijzet.')
+    expect(m.explanation).not.toContain('volgens')
   })
 })

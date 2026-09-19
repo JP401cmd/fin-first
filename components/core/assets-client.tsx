@@ -34,6 +34,12 @@ import { AmountInput } from '@/components/app/amount-input'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { parseAmountInput } from '@/lib/amount-input'
 import {
+  ASSET_RENDEMENT_KEUZE_KOPIJ,
+  keuzeUitWaarde,
+  resolveKeuzeWaarde,
+  type AssetRendementKeuze,
+} from '@/lib/asset-return-keuze'
+import {
   ASSET_AMOUNT_CONFIRM_THRESHOLD,
   PURCHASE_DATE_FUTURE_ERROR,
   assetAmountLimitError,
@@ -714,9 +720,16 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
       }),
     [activeAssets, shareFractionFor],
   )
+  // Terugval voor bezittingen zónder eigen rendement (ADR 0166). Zonder dit
+  // derde argument zou deze grafiek — en `futureValue`/`projectedGrowth`
+  // eronder — zo'n bezitting op 0% laten staan terwijl /toekomst het
+  // profielrendement rekent. De KPI-strip op dezelfde pagina toont bij NULL
+  // "geen eigen rendement"; de grafiek moet dan wél met de terugval rekenen,
+  // anders staan twee getallen op één scherm die elkaar tegenspreken.
+  const terugvalRendementPct = initialData?.terugvalRendementPct ?? 0
   const projection = useMemo(
-    () => projectPortfolio(projectionAssets, projectionYears * 12),
-    [projectionAssets, projectionYears],
+    () => projectPortfolio(projectionAssets, projectionYears * 12, terugvalRendementPct),
+    [projectionAssets, projectionYears, terugvalRendementPct],
   )
   const futureValue = projection.length > 0 ? projection[projection.length - 1].total : totalValue
   const projectedGrowth = futureValue - totalValue
@@ -1128,7 +1141,9 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
               <p className="mt-2 text-[11px] text-[var(--ink-3)] italic">
                 <GlossaryTerm term="diversificatie">Diversificatie</GlossaryTerm> over meerdere typen verlaagt risico.
               </p>
-              <div className="mt-4 flex items-center gap-6">
+              {/* `gap-3` op mobiel (W-010): de donut schaalt daar mee omlaag, maar de
+                  vier legend-regels hebben elke pixel nodig op ~360 px. */}
+              <div className="mt-4 flex items-center gap-3 sm:gap-6">
                 <AllocationPie byType={byType} total={totalValue} />
                 <div className="flex-1 space-y-2">
                   {(Object.keys(ASSET_TYPE_LABELS) as AssetType[]).map((type) => {
@@ -1152,7 +1167,11 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
             </section>
 
             {/* Projection chart */}
-            <section data-testid="portfolio-projection-section">
+            {/* Cap op de projectiekolom (W-010): zonder maximum rekt de fluïde chart op
+                een ultrabrede desktop door tot 800-900 px en domineert hij de verdeling
+                ernaast alsnog. De cap geldt voor de hele kolom (toggles, chart én
+                onderschrift), zodat het blok als geheel uitgelijnd blijft. */}
+            <section data-testid="portfolio-projection-section" className="max-w-[560px]">
               <div className="flex items-center justify-between">
                 <Kicker>Projectie</Kicker>
                 <div className="flex items-center gap-1" data-testid="projection-year-buttons">
@@ -1319,6 +1338,11 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
           daardoor in elke context worden ingezet. */}
       <AssetPane
         asset={selectedAsset}
+        // Consume, don't recompute (ADR 0126 D1): het detailvenster krijgt het
+        // canonieke 12-mnd consumptietarief van deze pagina mee en rekent er
+        // geen eigen (must-grondslag) tarief meer voor uit.
+        dailyExpenses={dailyExpenses}
+        dailyExpensesSource={dailyExpensesSource}
         // Eigenaar-guard op Bewerken/Verwijderen — die mutaties zijn strikt
         // eigen-rij. `SOLO_ASSETS_CONTEXT` valt terug op een lege string; die
         // moet `undefined` worden, anders matcht hij nooit een echte user_id.
@@ -1483,6 +1507,12 @@ export function AssetDetailModal({
   asset: Asset
   valuations: Valuation[] | undefined
   mortgage: { name: string; balance: number } | null
+  /**
+   * Het CANONIEKE dagtarief (ADR 0126 D1) — altijd doorgegeven door
+   * `<AssetPane>`, die het op zijn beurt van de host-pagina krijgt. Tot 19 sep
+   * 2026 rekende de pane hier een eigen must-grondslag-tarief voor uit; zie de
+   * `dailyExpenses`-prop op `AssetPaneProps` voor het waarom dat een defect was.
+   */
   dailyExpenses: number
   allAssets?: Asset[]
   /**
@@ -1706,7 +1736,13 @@ export function AssetDetailModal({
             </div>
             <div className="rounded-[var(--r)] bg-[var(--subtle)] p-3">
               <p className="text-xs text-[var(--ink-3)]">{asset.asset_type === 'vordering' ? 'Rentepercentage' : 'Verwacht rendement'}</p>
-              <p className="mt-0.5 text-sm font-medium text-[var(--ink)]">{Number(asset.expected_return)}% p.j.</p>
+              {/* NOOIT `Number(asset.expected_return)` hier: `Number(null) === 0`,
+                  en dan staat er "0% p.j." terwijl /toekomst met het
+                  profielrendement rekent — dezelfde bezitting, twee getallen
+                  (ADR 0166). */}
+              <p className="mt-0.5 text-sm font-medium text-[var(--ink)]">
+                {asset.expected_return == null ? 'Profielrendement' : `${Number(asset.expected_return)}% p.j.`}
+              </p>
             </div>
             {!isEigenHuis && (
               <div className="rounded-[var(--r)] bg-[var(--subtle)] p-3">
@@ -2955,6 +2991,21 @@ const AllocationPie = memo(function AllocationPie({
 }) {
   const fc = useFc()
   const { ref, hasEntered } = useInViewAnimation({ duration: 700 })
+  /**
+   * De coördinatenruimte van de donut — NIET zijn schermgrootte (W-010).
+   *
+   * Tot 19 sep 2026 stond dit getal óók als `width`/`height` op de `<svg>`, waardoor de
+   * donut op élk breakpoint 120 px bleef terwijl de projectie ernaast fluïde met de
+   * kolom meegroeide (`viewBox` + `w-full`, de gevestigde chart-conventie in deze
+   * codebase). Op een brede desktop werd de projectie daardoor 6-7× breder dan de
+   * verdeling — geen bewuste hiërarchie, een sizing-inconsistentie tussen twee
+   * zusterelementen.
+   *
+   * De `viewBox` blijft dus `0 0 120 120` en de schermgrootte komt uit de classes
+   * hieronder: radius, strokeWidth en de twee fontSizes schalen daardoor vanzelf
+   * evenredig mee. Bewust GEEN vast groter getal: de legend ernaast (`flex`, vier
+   * regels van ~170-190 px) breekt dan op een ~360-390 px viewport.
+   */
   const size = 120
   const cx = size / 2
   const cy = size / 2
@@ -2972,7 +3023,11 @@ const AllocationPie = memo(function AllocationPie({
 
   return (
     <div ref={ref} className="shrink-0">
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+    <svg
+      viewBox={`0 0 ${size} ${size}`}
+      className="h-28 w-28 sm:h-36 sm:w-36 lg:h-44 lg:w-44"
+      preserveAspectRatio="xMidYMid meet"
+    >
       {segments.map((seg, i) => {
         const dash = seg.pct * circumference
         const gap = circumference - dash
@@ -3271,6 +3326,13 @@ export function AssetForm({
     }
   }, [isEdit, asset?.id, asset?.asset_type, asset?.has_budget_tracking])
   const [purchaseDate, setPurchaseDate] = useState(asset?.purchase_date ?? '')
+  // Twee gekoppelde stukjes staat: de KEUZE (eigen rendement of profielrendement)
+  // en het getal. Het getal blijft staan wanneer je naar 'profiel' wisselt, zodat
+  // terugwisselen je invoer niet wist — maar het wordt dan NIET opgeslagen
+  // (`resolveKeuzeWaarde`, ADR 0166).
+  const [rendementKeuze, setRendementKeuze] = useState<AssetRendementKeuze>(() =>
+    isEdit ? keuzeUitWaarde(asset?.expected_return) : 'eigen',
+  )
   const [expectedReturn, setExpectedReturn] = useState(String(asset?.expected_return ?? TYPICAL_RETURNS.savings))
   const [monthlyContribution, setMonthlyContribution] = useState(String(asset?.monthly_contribution ?? '0'))
   const [institution, setInstitution] = useState(asset?.institution ?? '')
@@ -3497,7 +3559,12 @@ export function AssetForm({
     // Rendementsband per type. Wordt overgeslagen wanneer een afschrijvingspercentage
     // is ingevuld: dan is `expected_return` per definitie 0 (zie de payload hieronder)
     // en is het rendementsveld niet eens zichtbaar.
-    if (!(numDepreciationRate > 0)) {
+    // Onder de keuze 'profiel' is er geen getal om te begrenzen: de app rekent
+    // met het profielrendement, dat zijn eigen grens op de profielparameter
+    // heeft. De band geldt dus alleen voor een EIGEN ingevuld rendement — en
+    // blijft daar hard, zodat een leeg veld nog steeds een fout is en niet stil
+    // als "geen eigen rendement" wegglipt (ADR 0166).
+    if (!(numDepreciationRate > 0) && rendementKeuze === 'eigen') {
       if (numExpectedReturn === null) {
         errors.expectedReturn = assetReturnBandError(assetType)
       } else if (!isWithinAssetReturnBand(assetType, numExpectedReturn)) {
@@ -3575,7 +3642,12 @@ export function AssetForm({
       current_value: numCurrentValue ?? 0,
       purchase_value: isCashType ? (numCurrentValue ?? 0) : (numPurchaseValue ?? 0),
       purchase_date: isCashType ? null : purchaseDate || null,
-      expected_return: numDepreciationRate > 0 ? 0 : (numExpectedReturn ?? 0),
+      // Afschrijvend bezit rekent per definitie zonder rendement: een BEWUSTE 0,
+      // geen `null` (dat zou het op het profielrendement laten groeien).
+      // Daarbuiten beslist de expliciete keuze; `numExpectedReturn` is dan door
+      // de validatie hierboven gegarandeerd een getal.
+      expected_return:
+        numDepreciationRate > 0 ? 0 : resolveKeuzeWaarde(rendementKeuze, numExpectedReturn),
       monthly_contribution: isCashType ? 0 : (numMonthlyContribution ?? 0),
       institution: institution || null,
       notes: notes || null,
@@ -4006,8 +4078,31 @@ export function AssetForm({
                     sign="allow-negative"
                     inputRef={expectedReturnRef}
                     error={fieldErrors.expectedReturn ?? null}
+                    disabled={rendementKeuze === 'profiel'}
                     aria-label={`Rendement in procenten per jaar, tussen ${assetReturnBand(assetType).min} en ${assetReturnBand(assetType).max}`}
                   />
+                  {/* "Geen eigen rendement" is een EXPLICIETE keuze, nooit een leeg
+                      veld (ADR 0166) — anders wordt elke onvoltooide invoer stil een
+                      profielrendement-aanname op bijvoorbeeld een auto. */}
+                  <label className="mt-2 flex items-start gap-2 text-[11px] leading-snug text-[var(--ink-2)]">
+                    <input
+                      type="checkbox"
+                      checked={rendementKeuze === 'profiel'}
+                      onChange={(e) => {
+                        setRendementKeuze(e.target.checked ? 'profiel' : 'eigen')
+                        if (e.target.checked) {
+                          setFieldErrors((prev) => ({ ...prev, expectedReturn: undefined }))
+                        }
+                      }}
+                      className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--module-active-600)]"
+                    />
+                    <span>{ASSET_RENDEMENT_KEUZE_KOPIJ.profiel.keuze}</span>
+                  </label>
+                  {rendementKeuze === 'profiel' && (
+                    <p className="mt-1 text-[11px] italic leading-snug text-[var(--ink-3)]">
+                      {ASSET_RENDEMENT_KEUZE_KOPIJ.profiel.effect}
+                    </p>
+                  )}
                 </div>
                 )}
                 {assetType !== 'eigen_huis' && (

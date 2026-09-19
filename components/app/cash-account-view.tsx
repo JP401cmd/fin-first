@@ -68,6 +68,13 @@ import { MaskedAmount } from '@/components/app/masked-amount'
 import { ValuationModal } from '@/components/core/assets-client'
 import { DensityToggle, useListDensity } from '@/components/app/density-toggle'
 import type { CashBankLink } from '@/lib/bank-connection-status'
+import { isUncategorizedTransaction } from '@/lib/budget-uncategorized'
+import {
+  ASSET_RENDEMENT_KEUZE_KOPIJ,
+  keuzeUitWaarde,
+  resolveKeuzeWaarde,
+  type AssetRendementKeuze,
+} from '@/lib/asset-return-keuze'
 
 // Aantal rijen dat de transactielijst per keer toont; "Toon meer" voegt telkens
 // een pagina toe. Houdt de DOM klein bij een zware maand (100-400 rijen).
@@ -310,7 +317,8 @@ export function CashAccountView({
   const [linkedAsset, setLinkedAsset] = useState<{
     id: string; name: string; current_value: number; institution: string | null;
     subtype: string | null; net_worth_inclusion_pct: number;
-    expected_return: number
+    // `null` = geen eigen rendementsaanname (ADR 0166); dat is iets anders dan 0%.
+    expected_return: number | null
   } | null>(null)
   const [assetSaving, setAssetSaving] = useState(false)
   /** Zichtbaarheid/naam kon niet worden opgeslagen — het bewerkscherm blijft dan open. */
@@ -851,7 +859,9 @@ export function CashAccountView({
   // Calculate monthly totals — exclude transfers
   const nonTransferTx = transactions.filter((t) => t.transaction_type !== 'transfer')
   const transferTx = transactions.filter((t) => t.transaction_type === 'transfer')
-  const uncatTx = nonTransferTx.filter((t) => !t.budget_id)
+  // Hetzelfde predikaat als de Budget-hub (lib/budget-uncategorized.ts, B-055):
+  // een split-ouder is via zijn splitsingen gecategoriseerd en telt niet mee.
+  const uncatTx = transactions.filter(isUncategorizedTransaction)
 
   const totalIncome = nonTransferTx
     .filter((t) => Number(t.amount) > 0)
@@ -1216,7 +1226,7 @@ export function CashAccountView({
 
   useEffect(() => { loadLinkedAsset() }, [loadLinkedAsset])
 
-  async function handleSaveAsset(formData: { name: string; expected_return: number; partner_visibility: PartnerVisibility }) {
+  async function handleSaveAsset(formData: { name: string; expected_return: number | null; partner_visibility: PartnerVisibility }) {
     if (!linkedAsset || !account) return
     setAssetSaving(true)
     const supabase = createClient()
@@ -2822,7 +2832,7 @@ export function CashAccountView({
                                   setShowForm(true)
                                 }}
                                 className="flex h-5 items-center gap-1 rounded-full border border-kern-300 bg-kern-50 px-2 text-[9px] font-bold uppercase tracking-[.04em] text-kern-700 transition-colors hover:bg-kern-100 hover:border-kern-400"
-                                title="Categorie toewijzen"
+                                title="Categoriseren"
                                 aria-label={`Categoriseer ${tx.description}`}
                                 data-testid="quick-categorize-btn"
                               >
@@ -3491,7 +3501,7 @@ function AssetEditForm({
   onCancel,
   onDisconnect,
 }: {
-  asset: { id: string; name: string; current_value: number; institution: string | null; subtype: string | null; net_worth_inclusion_pct: number; expected_return: number }
+  asset: { id: string; name: string; current_value: number; institution: string | null; subtype: string | null; net_worth_inclusion_pct: number; expected_return: number | null }
   account: Account
   saving: boolean
   bankConnectEnabled: boolean
@@ -3508,11 +3518,18 @@ function AssetEditForm({
   onRevalue: () => void
   /** Melding wanneer opslaan mislukte; het scherm blijft dan open. */
   saveError?: string | null
-  onSave: (data: { name: string; expected_return: number; partner_visibility: PartnerVisibility }) => void
+  onSave: (data: { name: string; expected_return: number | null; partner_visibility: PartnerVisibility }) => void
   onCancel: () => void
   onDisconnect: () => void
 }) {
   const [name, setName] = useState(asset.name)
+  // Dezelfde expliciete keuze als in het bezittingenformulier en de plan-review
+  // (lib/asset-return-keuze.ts, ADR 0166). Zonder die keuze zou een rekening
+  // zónder eigen rendement hier als "0" verschijnen en bij het eerstvolgende
+  // opslaan stil een BEWUSTE 0% worden — een gebruikerskeuze die niemand maakte.
+  const [rendementKeuze, setRendementKeuze] = useState<AssetRendementKeuze>(() =>
+    keuzeUitWaarde(asset.expected_return),
+  )
   const [expectedReturn, setExpectedReturn] = useState(String(asset.expected_return ?? 0))
   const [visibility, setVisibility] = useState<PartnerVisibility>(() =>
     normalizePartnerVisibility(
@@ -3600,9 +3617,24 @@ function AssetEditForm({
           step="0.1"
           value={expectedReturn}
           onChange={(e) => setExpectedReturn(e.target.value)}
-          className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2.5 text-sm font-mono tabular-nums"
+          disabled={rendementKeuze === 'profiel'}
+          className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2.5 text-sm font-mono tabular-nums disabled:opacity-50"
           placeholder="0"
         />
+        <label className="mt-2 flex items-start gap-2 text-[11px] leading-snug text-[var(--ink-2)]">
+          <input
+            type="checkbox"
+            checked={rendementKeuze === 'profiel'}
+            onChange={(e) => setRendementKeuze(e.target.checked ? 'profiel' : 'eigen')}
+            className="mt-0.5 h-4 w-4 shrink-0 accent-kern-600"
+          />
+          <span>{ASSET_RENDEMENT_KEUZE_KOPIJ.profiel.keuze}</span>
+        </label>
+        {rendementKeuze === 'profiel' && (
+          <p className="mt-1 text-[11px] italic leading-snug text-[var(--ink-3)]">
+            {ASSET_RENDEMENT_KEUZE_KOPIJ.profiel.effect}
+          </p>
+        )}
       </div>
 
       {/* 5. Zichtbaarheid voor de partner (alleen met huishouden).
@@ -3682,7 +3714,7 @@ function AssetEditForm({
         <button
           onClick={() => onSave({
             name,
-            expected_return: Number(expectedReturn) || 0,
+            expected_return: resolveKeuzeWaarde(rendementKeuze, Number(expectedReturn) || 0),
             partner_visibility: visibility,
           })}
           disabled={saving || !name.trim()}

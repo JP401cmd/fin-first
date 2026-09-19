@@ -48,6 +48,7 @@ import {
   type Debt,
   type DebtType,
 } from '@/lib/debt-data'
+import { BUITEN_DOEL_ZIN, BUITEN_DOEL_INKT } from '@/lib/wealth-composition'
 import { syntheticDebtDescriptor } from '@/lib/horizon/synthetic-debts'
 import type { LifeEvent } from '@/lib/horizon-data'
 import type { SimCashflow, SimRow } from '@/lib/fire-simulation'
@@ -336,6 +337,7 @@ function AssetTypeRow({
   box3Drag,
   phase,
   factor,
+  buitenDoel = false,
 }: {
   type: AssetType
   endValue: number
@@ -345,6 +347,8 @@ function AssetTypeRow({
   phase: 'opbouw' | 'afbouw' | 'overgang'
   /** Kernelfactor van dit jaar (`row.inflationFactor`). */
   factor: number
+  /** Staat er wel, telt niet mee voor het doel — zie `BuitenDoelSubregel`. */
+  buitenDoel?: boolean
 }) {
   const fc = useYearFc(factor)
   const showContribution = phase !== 'afbouw' && contributions > 0
@@ -361,9 +365,13 @@ function AssetTypeRow({
           </span>
         </span>
         <div className="min-w-0">
-          <p className="truncate text-[13px] font-semibold text-[var(--ink)]">
+          <p
+            className="truncate text-[13px] font-semibold"
+            style={{ color: buitenDoel ? BUITEN_DOEL_INKT : 'var(--ink)' }}
+          >
             {ASSET_TYPE_LABELS[type]}
           </p>
+          {buitenDoel && <BuitenDoelSubregel />}
           {(growth !== 0 || contributions !== 0 || box3Drag !== 0) && (
             <p className="mt-1 text-[10px] text-[var(--ink-3)]">
               {showContribution && (
@@ -391,12 +399,31 @@ function AssetTypeRow({
         </div>
       </div>
       <div className="shrink-0 text-right">
-        <p className="font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">
+        <p
+          className="font-mono text-sm font-semibold tabular-nums"
+          style={{ color: buitenDoel ? BUITEN_DOEL_INKT : 'var(--ink)' }}
+        >
           {fc(endValue)}
         </p>
         <PvLine nominal={endValue} factor={factor} />
       </div>
     </li>
+  )
+}
+
+/**
+ * De tekstuele tegenhanger van de arcering + demping in de Opbouw-grafiek.
+ *
+ * Een bon is tekst; een dekking van 0,45 vertaalt daar niet naar. De DRAGER
+ * verschilt dus bewust per oppervlak — de WOORDEN, de toon en de naam niet:
+ * `BUITEN_DOEL_ZIN` en `BUITEN_DOEL_INKT` komen uit lib/wealth-composition.ts en
+ * worden door de grafiek en deze bon gedeeld (besluit 19-09-2026 bij ADR 0114 D3).
+ */
+function BuitenDoelSubregel() {
+  return (
+    <p className="mt-0.5 text-[10px] italic" style={{ color: BUITEN_DOEL_INKT }}>
+      {BUITEN_DOEL_ZIN}
+    </p>
   )
 }
 
@@ -420,6 +447,7 @@ function DebtRow({
   renteBijgeschreven = 0,
   opgenomen = 0,
   factor,
+  buitenDoel = false,
 }: {
   presentation: DebtRowPresentation
   endBalance: number
@@ -431,6 +459,13 @@ function DebtRow({
   opgenomen?: number
   /** Kernelfactor van dit jaar (`row.inflationFactor`). */
   factor: number
+  /**
+   * Hypotheek op de eigen woning terwijl die buiten het doel valt. Huis én
+   * hypotheek vallen samen uit Prognose!J (J = I − (L − M)), dus de markering
+   * moet op beide staan — anders zegt de bon "je huis telt niet mee" terwijl de
+   * schuld erop wél lijkt mee te tellen.
+   */
+  buitenDoel?: boolean
 }) {
   const fc = useYearFc(factor)
   // Mutatieregels onder de naam: eerst wat de schuld laat groeien (+), dan wat 'm verkleint (−).
@@ -452,12 +487,16 @@ function DebtRow({
           </span>
         </span>
         <div className="min-w-0">
-          <p className="truncate text-[13px] font-semibold text-[var(--ink)]">
+          <p
+            className="truncate text-[13px] font-semibold"
+            style={{ color: buitenDoel ? BUITEN_DOEL_INKT : 'var(--ink)' }}
+          >
             {presentation.name}
           </p>
           <p className="mt-0.5 text-[10px] uppercase tracking-wider text-[var(--ink-4)]">
             {presentation.typeLabel}
           </p>
+          {buitenDoel && <BuitenDoelSubregel />}
           {mutaties.length > 0 && (
             <p className="mt-1 text-[10px] text-[var(--ink-3)]">
               {mutaties.map((m, i) => (
@@ -472,7 +511,10 @@ function DebtRow({
         </div>
       </div>
       <div className="shrink-0 text-right">
-        <p className="font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">
+        <p
+          className="font-mono text-sm font-semibold tabular-nums"
+          style={{ color: buitenDoel ? BUITEN_DOEL_INKT : 'var(--ink)' }}
+        >
           {fc(endBalance)}
         </p>
         <PvLine nominal={endBalance} factor={factor} />
@@ -612,6 +654,24 @@ export interface HorizonYearDetailsSheetProps {
    * herkenbaar terugkomt in de bon die opent.
    */
   primaryBasis?: 'total' | 'liquid'
+  /**
+   * Id's van de hypotheken die aan de EIGEN WONING gekoppeld zijn
+   * (`housingContext.eigenHuisMortgages`) — dezelfde Set die horizon-client al
+   * aan `unifiedRowsToStackedRows` geeft. Consume-only: de bon leidt hier zelf
+   * geen `linked_asset_id` af.
+   *
+   * Waarvoor: bij `primaryBasis === 'liquid'` (woonstrategie "Uitsluiten")
+   * dempt de Opbouw-grafiek het huis én zijn hypotheek. Klik je op die band,
+   * dan hoort de bon dezelfde uitspraak te doen — anders zegt de grafiek "dit
+   * telt niet mee" en de bon niets. De markering staat óp de bestaande regels;
+   * de optelling blijft ongemoeid, want de bon sluit op I (ADR 0114 D3) en
+   * J staat er als "waarvan besteedbaar" naast.
+   *
+   * Bewust op `primaryBasis` gekeyd en niet op de kernelvlag: die staat óók bij
+   * Verkopen/Opeet aan, terwijl demping en besteedbaar-regel uitsluitend bij
+   * Uitsluiten gelden. Bon-intern consistent gaat hier vóór.
+   */
+  eigenHuisMortgageIds?: ReadonlySet<string>
 }
 
 export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
@@ -629,6 +689,7 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
   fireAge,
   onChangeAge,
   primaryBasis = 'total',
+  eigenHuisMortgageIds,
 }: HorizonYearDetailsSheetProps) {
   const row = useMemo(
     () => (age != null ? unifiedRows.find(r => r.age === age) : null),
@@ -875,6 +936,18 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
   const nettoLiquide = row?.nettoLiquide ?? 0
   const showBesteedbaar =
     primaryBasis === 'liquid' && row != null && Math.abs(netWorth - nettoLiquide) >= 0.5
+  /**
+   * Markeert deze bon het eigen-woningblok als "telt niet mee voor je doel"?
+   * Alleen zinvol zolang de bon óók de besteedbaar-regel toont: die regel is de
+   * J-tegenhanger die verklaart waaróm een regel wél in "Eind netto" zit maar
+   * niet in het doelbedrag. Zonder die regel zou de markering een grondslag
+   * beloven die nergens op de bon staat.
+   */
+  const markeerBuitenDoel = showBesteedbaar
+  const isBuitenDoelHypotheek = useCallback(
+    (id: string) => markeerBuitenDoel && (eigenHuisMortgageIds?.has(id) ?? false),
+    [markeerBuitenDoel, eigenHuisMortgageIds],
+  )
   const totalAssets = row?.totalAssets ?? 0
   const totalDebts = row?.totalDebts ?? 0
 
@@ -966,6 +1039,16 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
                 <span className="text-[var(--ink-4)]"> (zonder je huis)</span>
               </p>
             )}
+            {/* De grondslagzin uit ADR 0114 D3. Die was besloten maar nooit
+                gerenderd — en hij is precies de zin die verklaart waarom de
+                gemarkeerde regels hieronder wél in "Eind netto" meetellen en
+                niet in het vrijheidsdoel. */}
+            {markeerBuitenDoel && (
+              <p className="mt-1 text-[10px] italic" style={{ color: BUITEN_DOEL_INKT }}>
+                Je huis staat op deze bon omdat je het bezit — het telt alleen niet mee in je
+                vrijheidsdoel.
+              </p>
+            )}
           </div>
         </div>
 
@@ -1002,6 +1085,7 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
                       box3Drag={bucket.box3Drag}
                       phase={phase}
                       factor={factor}
+                      buitenDoel={markeerBuitenDoel && type === 'eigen_huis'}
                     />
                   ))}
                 </ul>
@@ -1032,6 +1116,7 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
                       renteBijgeschreven={detail.renteBijgeschreven ?? 0}
                       opgenomen={opgenomen}
                       factor={factor}
+                      buitenDoel={isBuitenDoelHypotheek(id)}
                     />
                   ))}
                   {debtRest !== 0 && (

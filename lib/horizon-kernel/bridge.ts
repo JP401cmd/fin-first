@@ -300,6 +300,13 @@ export interface KernelUnifiedResult extends UnifiedProjectionResult {
    */
   readonly vastStopLeeftijd: number | null
   /**
+   * AOW-leeftijd van de PARTNER op de as van deze run (TPR-07 fase 2a): de head-
+   * startleeftijd + PT!B11 (`computePartnerHead(...).aowStartMaand`) / 12. `null` zonder
+   * partnerblok. DOORGEVEN, niet herrekenen: de grafiek tekent de partner-AOW-marker uit
+   * dit veld i.p.v. een tweede `lookupAowAge` + DOB-offset in de client.
+   */
+  readonly partnerAowAge: number | null
+  /**
    * `true` ⇒ het stopmoment ligt VAST, dus `requiredFirePortfolio`/
    * `requiredFireNetWorth` zijn de GEPROJECTEERDE stand op het anker en géén
    * "benodigd vermogen" (ADR 0129 D4). De kernel bisecteert onder een vast anker op
@@ -1060,6 +1067,8 @@ export function kernelToUnifiedResult(
     stopAnker,
     ankerMaand,
     vastStopLeeftijd: solve.vastStopLeeftijd,
+    // TPR-07 fase 2a — partner-AOW op de head-as uit de PT-laag (consume, don't recompute).
+    partnerAowAge: input.partner.aanwezig ? input.startLeeftijd + proj.partnerHead.aowStartMaand / 12 : null,
     implicitWithdrawalRate,
     strategy,
     targetEndPortfolio: solve.doelbedrag,

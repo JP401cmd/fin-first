@@ -52,6 +52,8 @@ export interface GebPostHelpers {
   readonly sIdx: number
   readonly eIdx: number
   readonly bn: number
+  /** ADR 0167 (buiten oracle-domein): `bn` is nominaal vast ⇒ CF!H/Af!D tellen zónder idx(m). */
+  readonly nominaalVast?: boolean
 }
 
 /** De event-cellen A-H van een actieve post-1-rij (naam t/m eind-maand). */
@@ -93,8 +95,11 @@ function helpersFromEvent(input: KernelInput, ev: AutoEvent): GebPostHelpers {
       ? monthIndexOf(input, ev.eindLeeftijd, ev.eindMaand)
       : sIdx
   // bn = koopkracht-nu bedrag; CF!H past de maand-indexatie toe (geïndexeerde én
-  // reeds-gede-indexeerde posten dragen hun eigen basisbedrag).
-  return { sIdx, eIdx, bn: ev.bedrag }
+  // reeds-gede-indexeerde posten dragen hun eigen basisbedrag). Een nominaal-vaste post
+  // (ADR 0167, alleen onder `KernelInput.pensioenNominaalVast`) draagt de vlag door.
+  return ev.nominaalVast === true
+    ? { sIdx, eIdx, bn: ev.bedrag, nominaalVast: true }
+    : { sIdx, eIdx, bn: ev.bedrag }
 }
 
 /** Bouw de A-H event-cellen van een post-1-event (incl. geïndexeerd startbedrag). */

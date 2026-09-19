@@ -408,6 +408,8 @@ interface GebHelperPost {
   readonly sIdx: number
   readonly eIdx: number
   readonly bedrag: number
+  /** ADR 0167 (buiten oracle-domein): nominaal vast ⇒ CF!H/Af!D tellen zónder idx(m). */
+  readonly nominaalVast?: boolean
 }
 
 /**
@@ -440,14 +442,24 @@ function buildGebPosten(input: KernelInput, fireMonth: number): GebHelperPost[] 
       // maand = de maand vóór het stopmoment van déze run. eIdx < sIdx ⇒ de post vuurt
       // nooit (de CF/Af-lussen toetsen `sIdx ≤ m ≤ eIdx`). Zonder vlag byte-identiek.
       const eIdx = post.eindBijStopmoment === true ? Math.min(eIdxExcel, fireMonth - 1) : eIdxExcel
-      posten.push({ sIdx, eIdx, bedrag: post.bedrag })
+      // ADR 0167 (buiten oracle-domein): "stijgt niet mee met inflatie" → nominaal vast.
+      // Alleen doorgegeven als waar, zodat posten zonder die keuze exact de oude vorm houden.
+      posten.push(
+        post.nominaalVast === true
+          ? { sIdx, eIdx, bedrag: post.bedrag, nominaalVast: true }
+          : { sIdx, eIdx, bedrag: post.bedrag },
+      )
     }
   }
 
   // Automatische gebeurtenissen (Geb rij 14-30) — helper-drieluik per rij.
   for (const row of computeGebAutoRows(input)) {
     for (const h of row.helpers) {
-      posten.push({ sIdx: h.sIdx, eIdx: h.eIdx, bedrag: h.bn })
+      posten.push(
+        h.nominaalVast === true
+          ? { sIdx: h.sIdx, eIdx: h.eIdx, bedrag: h.bn, nominaalVast: true }
+          : { sIdx: h.sIdx, eIdx: h.eIdx, bedrag: h.bn },
+      )
     }
   }
 
@@ -487,11 +499,11 @@ export function runKernelProjection(
   const partnerHead = computePartnerHead(input)
   const gebPosten: readonly GebPostHelper[] = buildGebPosten(input, fireMonth) // {sIdx,eIdx,bedrag}
   const afGebPosten: AfDep = {
-    gebPosten: gebPosten.map((p) => ({
-      startIndex: p.sIdx,
-      eindIndex: p.eIdx,
-      bedrag: p.bedrag,
-    })),
+    gebPosten: gebPosten.map((p) =>
+      p.nominaalVast === true
+        ? { startIndex: p.sIdx, eindIndex: p.eIdx, bedrag: p.bedrag, nominaalVast: true }
+        : { startIndex: p.sIdx, eindIndex: p.eIdx, bedrag: p.bedrag },
+    ),
   }
 
   // Opeethypotheek: overwaarde (J − S!D) in de maand vóór opeet-start (auto-opname-basis).

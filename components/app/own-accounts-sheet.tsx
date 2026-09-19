@@ -555,7 +555,7 @@ export function OwnAccountsSheet({
       const json = await res.json().catch(() => null)
       if (!res.ok) {
         setError(
-          typeof json?.error === 'string' ? json.error : 'Opnieuw indelen is niet gelukt.',
+          typeof json?.error === 'string' ? json.error : 'Opnieuw categoriseren is niet gelukt.',
         )
         return
       }
@@ -567,7 +567,7 @@ export function OwnAccountsSheet({
       )
       if (n > 0) onSaved()
     } catch {
-      setError('Opnieuw indelen is niet gelukt. Controleer je verbinding.')
+      setError('Opnieuw categoriseren is niet gelukt. Controleer je verbinding.')
     } finally {
       setReclassifying(false)
     }
@@ -969,7 +969,7 @@ export function OwnAccountsSheet({
               className={`h-3.5 w-3.5 ${reclassifying ? 'animate-spin' : ''}`}
               aria-hidden="true"
             />
-            {reclassifying ? 'Bezig met opnieuw indelen…' : 'Bestaande transacties opnieuw indelen'}
+            {reclassifying ? 'Bezig met opnieuw categoriseren…' : 'Bestaande transacties opnieuw categoriseren'}
           </button>
           <p className="mt-1.5 text-[11px] leading-relaxed text-[var(--ink-4)]">
             Loopt je historie achter op je regels — bijvoorbeeld door een import van vóór het

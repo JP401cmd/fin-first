@@ -34,13 +34,14 @@ import dynamic from 'next/dynamic'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import {
   ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Plus, Pencil, Save, Trash2,
-  GitFork, CircleDot, AlertTriangle, CheckCircle2, Check, Heart, LayoutGrid, Link2,
+  GitFork, CircleDot, AlertTriangle, CheckCircle2, Check, Heart, LayoutGrid, Tags,
   TrendingUp, AlertCircle, BarChart3, EyeOff, MessageCircle, FileText, MoveRight, ArrowLeftRight,
   Pill, Settings2,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { BUDGET_SLUGS, type Budget, type BudgetWithChildren } from '@/lib/budget-data'
 import type { BudgetsPageData, BudgetGoal } from '@/lib/budgets-data-loader'
+import { summarizeUncategorized } from '@/lib/budget-uncategorized'
 import { BudgetIcon, formatCurrency, getTypeColors, isOverPositive, computeBarSegments, iconMap, iconOptions, type BudgetType } from '@/components/app/budget-shared'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { buildSegments, typeColors, childTypeColors } from '@/components/app/budget-donut'
@@ -115,9 +116,9 @@ const BudgetKoppelNudge = dynamic(() =>
   import('@/components/app/budget-koppel-nudge').then(m => ({ default: m.BudgetKoppelNudge })),
   { ssr: false }
 )
-// Het eenmalige aanbod om transacties aan budgetten te hangen (ADR 0158). Ook
-// lazy: hij verschijnt precies één keer per account, en zijn eigen poort
-// (ongekoppelde transacties + coachmark-staat) zit ín het component.
+// Het eenmalige aanbod om transacties te categoriseren (ADR 0158). Ook lazy:
+// hij verschijnt precies één keer per account, en zijn eigen poort (transacties
+// zonder categorie + coachmark-staat) zit ín het component.
 const BudgetTransactiesAanbod = dynamic(() =>
   import('@/components/app/budget-transacties-aanbod').then(m => ({ default: m.BudgetTransactiesAanbod })),
   { ssr: false }
@@ -814,7 +815,8 @@ export function BudgetHub({
   onOpenPlanEditor,
   onOpenBudget,
   uncategorizedCount,
-  uncategorizedTotal,
+  uncategorizedExpenseTotal,
+  uncategorizedIncomeTotal,
   onUncategorizedClick,
   coverageRatio,
   totalIncomeActual,
@@ -833,7 +835,9 @@ export function BudgetHub({
   onOpenPlanEditor: () => void
   onOpenBudget: (id: string) => void
   uncategorizedCount: number
-  uncategorizedTotal: number
+  /** Gesplitste eurosom (B-055): uitgaven en inkomsten apart, nooit door elkaar. */
+  uncategorizedExpenseTotal: number
+  uncategorizedIncomeTotal: number
   onUncategorizedClick: () => void
   coverageRatio: number
   totalIncomeActual: number
@@ -1114,7 +1118,13 @@ export function BudgetHub({
                     <span className={`${dotBase} bg-[var(--kern)]`} />
                     <div className="min-w-0 flex-1">
                       <p className={textBase}>
-                        <strong className="not-italic font-semibold">{uncategorizedCount} {uncategorizedCount === 1 ? 'transactie' : 'transacties'} zonder categorie</strong> — {fmt(uncategorizedTotal)}
+                        <strong className="not-italic font-semibold">{uncategorizedCount} {uncategorizedCount === 1 ? 'transactie' : 'transacties'} zonder categorie</strong>
+                        {/* Uitgaven en inkomsten apart (B-055) — één gemengde som zegt niets. */}
+                        {' — '}
+                        {[
+                          uncategorizedExpenseTotal > 0 ? `${fmt(uncategorizedExpenseTotal)} uitgaven` : null,
+                          uncategorizedIncomeTotal > 0 ? `${fmt(uncategorizedIncomeTotal)} inkomsten` : null,
+                        ].filter(Boolean).join(' · ') || fmt(0)}
                       </p>
                     </div>
                     <MoveRight className={arrowClasses} />
@@ -1368,7 +1378,8 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
   const [showArchive, setShowArchive] = useState(false)
   const [copyingMonth, setCopyingMonth] = useState(false)
   const [uncategorizedCount, setUncategorizedCount] = useState(initialData?.uncategorizedCount ?? 0)
-  const [uncategorizedTotal, setUncategorizedTotal] = useState(initialData?.uncategorizedTotal ?? 0)
+  const [uncategorizedExpenseTotal, setUncategorizedExpenseTotal] = useState(initialData?.uncategorizedExpenseTotal ?? 0)
+  const [uncategorizedIncomeTotal, setUncategorizedIncomeTotal] = useState(initialData?.uncategorizedIncomeTotal ?? 0)
   // Volledige uncategorized-transactierijen voor de AICategorizeSheet. We
   // houden ze los van `transactions` (die alleen categorized rijen bevat voor
   // spending-berekening) omdat de sheet álle velden nodig heeft, inclusief
@@ -1421,10 +1432,10 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
       .catch(() => {})
   }, [])
 
-  // All-time aantal ongekoppelde transacties — los van `uncategorizedCount`
+  // All-time aantal transacties zonder categorie — los van `uncategorizedCount`
   // (die is PERIODE-gebonden) zodat we kunnen beslissen of er ECHT niets meer
-  // te koppelen valt over alle tijden heen. `null` = nog aan het laden; in dat
-  // geval tonen we de actieknop (geen flikker naar "alles gekoppeld").
+  // te categoriseren valt over alle tijden heen. `null` = nog aan het laden; in
+  // dat geval tonen we de actieknop (geen flikker naar "alles gecategoriseerd").
   // Het `user_id`-filter is hier de DAADWERKELIJKE privacygrens, niet alleen
   // consistentie met de all-time fetch in de AICategorizeSheet: RLS op
   // `transactions` bevat ook een shared-SELECT-policy (huishouden), dus zónder
@@ -1451,10 +1462,10 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
   // draait — en dat gebeurt onder meer na een `router.refresh()`, die de
   // globale sync doet zodra er banktransacties binnen zijn (ADR 0158).
   // Zonder deze afhankelijkheid bleef de telling op de waarde van vóór de
-  // ophaal staan, met twee zichtbare gevolgen: het eenmalige koppelaanbod
+  // ophaal staan, met twee zichtbare gevolgen: het eenmalige categoriseeraanbod
   // verscheen nooit voor precies de gebruiker voor wie het bedoeld is, en de
-  // actiestrip meldde `role="status"` "Alles gekoppeld" boven een budget vol
-  // ongekoppelde transacties. De hertelling is één HEAD-count.
+  // actiestrip meldde `role="status"` "Alles gecategoriseerd" boven een budget
+  // vol transacties zonder categorie. De hertelling is één HEAD-count.
   useEffect(() => {
     void refreshAllTimeUncatCount()
   }, [refreshAllTimeUncatCount, initialData])
@@ -1586,17 +1597,14 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
         ...splitRows,
       ])
 
-      // Compute uncategorized expenses (no budget_id, not a transfer, not income).
-      // In eigen-blik tellen we partner-persoonlijke ongecategoriseerde rijen
+      // Ongecategoriseerd = het ENE gedeelde predikaat (lib/budget-uncategorized.ts,
+      // B-055): geen budget, geen split-ouder, geen overboeking — inkomsten
+      // tellen dus gewoon mee. De PERSPECTIEF-scoping staat hier los van:
+      // in eigen-blik tellen we partner-persoonlijke ongecategoriseerde rijen
       // (user_id !== currentUserId, ownership='personal') NIET mee — dat is geld
       // van de partner; eigen + gedeelde ongecategoriseerde rijen blijven staan.
-      const uncategorized = data.filter(
+      const inPerspective = data.filter(
         (t) =>
-          !t.budget_id &&
-          !t.is_split &&
-          t.transaction_type !== 'transfer' &&
-          t.transaction_type !== 'income' &&
-          Number(t.amount) < 0 &&
           !(
             perspective === 'personal' &&
             (t.ownership as string | undefined) !== 'shared' &&
@@ -1605,14 +1613,14 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
             (t.user_id as string) !== currentUserId
           ),
       )
-      setUncategorizedCount(uncategorized.length)
-      setUncategorizedTotal(
-        uncategorized.reduce((sum, t) => sum + Math.abs(Number(t.amount)), 0),
-      )
+      const uncategorized = summarizeUncategorized(inPerspective)
+      setUncategorizedCount(uncategorized.count)
+      setUncategorizedExpenseTotal(uncategorized.expenseTotal)
+      setUncategorizedIncomeTotal(uncategorized.incomeTotal)
       // Volledige rijen voor de AICategorizeSheet — dezelfde shape als in
       // cash-account-view.tsx wordt doorgegeven aan de sheet.
       setUncatTx(
-        uncategorized.map((t) => ({
+        uncategorized.rows.map((t) => ({
           id: t.id as string,
           date: t.date as string,
           description: (t.description ?? '') as string,
@@ -1632,7 +1640,8 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
       setSpendingSums(new Map())
       setTransactions([])
       setUncategorizedCount(0)
-      setUncategorizedTotal(0)
+      setUncategorizedExpenseTotal(0)
+      setUncategorizedIncomeTotal(0)
       setUncatTx([])
     }
 
@@ -2730,7 +2739,8 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
           onOpenPlanEditor={openPlanEditor}
           onOpenBudget={(id) => openBudgetModal(id)}
           uncategorizedCount={uncategorizedCount}
-          uncategorizedTotal={uncategorizedTotal}
+          uncategorizedExpenseTotal={uncategorizedExpenseTotal}
+          uncategorizedIncomeTotal={uncategorizedIncomeTotal}
           onUncategorizedClick={() => setShowAICategorize(true)}
           coverageRatio={coverageRatio}
           totalIncomeActual={totalIncomeActual}
@@ -2754,34 +2764,37 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
         {/* gap-1.5 (i.p.v. gap-0.5 van de toggle-group): twee losse acties
             mogen iets meer lucht hebben dan aaneengesloten toggle-segmenten. */}
         <div className="flex items-center gap-1.5 border border-[var(--border-ed)] bg-[var(--paper)] p-0.5">
-          {/* "Transacties koppelen" opent dezelfde AICategorizeSheet als elders.
-              Zodra er over ALLE tijden niets meer ongekoppeld is, tonen we in
-              dezelfde slot een gedempte, niet-klikbare "Alles gekoppeld"-status
-              i.p.v. de actie. Zolang de all-time count nog laadt (null) blijft
-              de actieknop staan (geen flikker). Op smalle schermen verbergen we
-              het label "Transacties" om de twee knoppen + drie toggles te laten
-              passen — het Link2-icoon blijft als affordance. */}
+          {/* "Transacties categoriseren" opent dezelfde AICategorizeSheet als
+              elders. Zodra er over ALLE tijden niets meer zonder categorie is,
+              tonen we in dezelfde slot een gedempte, niet-klikbare "Alles
+              gecategoriseerd"-status i.p.v. de actie. Zolang de all-time count
+              nog laadt (null) blijft de actieknop staan (geen flikker). Op
+              smalle schermen verbergen we het label "Transacties" om de twee
+              knoppen + drie toggles te laten passen — het Tags-icoon blijft als
+              affordance. Dat icoon was `Link2` (de koppel-metafoor); B-059
+              maakte de handeling app-breed "categoriseren", en dan hoort het
+              beeld mee te veranderen. */}
           {allTimeUncatCount === 0 ? (
             <span
               role="status"
-              aria-label="Alle transacties zijn gekoppeld"
+              aria-label="Alle transacties zijn gecategoriseerd"
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[var(--ink-3)]"
             >
               <Check className="h-3.5 w-3.5" aria-hidden="true" />
-              <span className="max-sm:hidden">Alles gekoppeld</span>
+              <span className="max-sm:hidden">Alles gecategoriseerd</span>
             </span>
           ) : (
             <button
               type="button"
               onClick={() => setShowAICategorize(true)}
-              aria-label="Transacties koppelen"
+              aria-label="Transacties categoriseren"
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[var(--ink-2)] hover:text-[var(--ink)] transition-colors"
             >
-              <Link2 className="h-3.5 w-3.5" />
-              <span className="max-sm:hidden">Transacties koppelen</span>
+              <Tags className="h-3.5 w-3.5" />
+              <span className="max-sm:hidden">Transacties categoriseren</span>
               {/* Op mobiel valt de tekst weg; een count-badge houdt zichtbaar
-                  hoeveel er nog te koppelen valt (all-time). Cap op 99 → ">99".
-                  Verborgen zolang het aantal nog laadt (null). */}
+                  hoeveel er nog te categoriseren valt (all-time). Cap op 99 →
+                  ">99". Verborgen zolang het aantal nog laadt (null). */}
               {allTimeUncatCount != null && allTimeUncatCount > 0 && (
                 <span className="sm:hidden inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-kern-600 px-1 text-[10px] font-semibold leading-none text-white tabular-nums">
                   {allTimeUncatCount > 99 ? '>99' : allTimeUncatCount}
@@ -3060,8 +3073,9 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
             setShowAICategorize(false)
             loadBudgets()
             loadSpending()
-            // Hertel de all-time count zodat de pill naar "Alles gekoppeld"
-            // kan omslaan zodra de laatste transactie gekoppeld is.
+            // Hertel de all-time count zodat de pill naar "Alles
+            // gecategoriseerd" kan omslaan zodra de laatste transactie een
+            // categorie heeft.
             void refreshAllTimeUncatCount()
           }}
           accountId={null}
@@ -3070,9 +3084,9 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
         />
       )}
 
-      {/* Eenmalig aanbod om de transacties aan budgetten te hangen (ADR 0158).
-          Regelt zelf of hij mag verschijnen: alleen bij ongekoppelde
-          transacties, alleen de eerste keer, en alleen als er niets anders de
+      {/* Eenmalig aanbod om de transacties te categoriseren (ADR 0158).
+          Regelt zelf of hij mag verschijnen: alleen bij transacties zonder
+          categorie, alleen de eerste keer, en alleen als er niets anders de
           aandacht vraagt. Opent dezelfde sheet als de knop hierboven. */}
       <BudgetTransactiesAanbod
         ongekoppeld={allTimeUncatCount}

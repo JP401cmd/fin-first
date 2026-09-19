@@ -1,5 +1,5 @@
-import type { SupabaseClient } from '@supabase/supabase-js'
 import type { AIDomain } from './types'
+import { leesBeheerInstelling } from '@/lib/app-settings/beheer-instelling'
 import { BASE_SYSTEM_PROMPT } from './base'
 import { KERN_PROMPT } from './kern'
 import { WIL_PROMPT } from './wil'
@@ -18,19 +18,21 @@ const DOMAIN_PROMPTS: Record<AIDomain, string> = {
 
 /**
  * Build the system prompt for a domain.
- * If an override exists in app_settings, it replaces the FULL prompt (base + domain).
+ *
+ * Met `overrideUitBeheer` vervangt een beheerder-override in `app_settings`
+ * (`ai_system_prompt_override`) het VOLLEDIGE prompt (base + domein). Die
+ * override is beheer-content en wordt server-side via de service-role gelezen
+ * (`lib/app-settings/beheer-instelling.ts`, ADR 0163) — niet via de
+ * sessie-client, want de allowlist-policy laat gebruikers die sleutel bewust
+ * niet lezen. Zonder de vlag (tests, tooling) altijd het in-code prompt.
  */
-export async function buildSystemPrompt(domain: AIDomain, supabase?: SupabaseClient): Promise<string> {
-  if (supabase) {
-    const { data } = await supabase
-      .from('app_settings')
-      .select('value')
-      .eq('key', 'ai_system_prompt_override')
-      .single()
-
-    if (data?.value) {
-      return data.value // Override = volledig prompt
-    }
+export async function buildSystemPrompt(
+  domain: AIDomain,
+  opts: { overrideUitBeheer?: boolean } = {},
+): Promise<string> {
+  if (opts.overrideUitBeheer) {
+    const override = await leesBeheerInstelling('ai_system_prompt_override')
+    if (override) return override // Override = volledig prompt
   }
 
   return BASE_SYSTEM_PROMPT + '\n' + DOMAIN_PROMPTS[domain]

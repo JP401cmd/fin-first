@@ -7,6 +7,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { WealthCompositionChart } from './wealth-composition-chart'
 import type { StackedRow } from '@/lib/wealth-composition'
+import { BUITEN_DOEL_ZIN } from '@/lib/wealth-composition'
 
 // ── Mocks ──────────────────────────────────────────────────────
 
@@ -491,11 +492,85 @@ describe('WealthCompositionChart — eigen huis gedempt bij uitgesloten woning',
         homeExcludedFromFire
       />
     )
-    expect(screen.getByText('Eigen huis'), 'het huis krijgt een eigen legenda-regel').toBeTruthy()
-    expect(screen.getByText('Hypotheek eigen huis')).toBeTruthy()
+    expect(screen.getByText('Eigen woning'), 'het huis krijgt een eigen legenda-regel').toBeTruthy()
+    expect(screen.getByText('Hypotheek eigen woning')).toBeTruthy()
     expect(
       screen.getByText(/telt niet mee voor je doel/i),
       'de demping wordt geduid, anders leest ze als renderfout',
+    ).toBeTruthy()
+  })
+
+  /**
+   * Bevinding M2 (eindreview 18-09-2026) + besluit eigenaar 19-09-2026: de
+   * demping mocht niet aan één as (dekking) blijven hangen. Nagerekend haalt
+   * 0,45 nergens de 3:1 van WCAG 1.4.11 — tegen de stapelbuur "Overig" zelfs
+   * maar 1,09–1,18:1. Arcering is daarom de tweede, kleuronafhankelijke drager
+   * (WCAG 1.4.1); tekst blijft de primaire op mobiel.
+   */
+  it('legt een arcering over precies de gedempte segmenten — niet over de meetellende', () => {
+    const { container } = render(
+      <WealthCompositionChart
+        stackedRows={rowsMetEigenHuis()}
+        currentAge={35}
+        endAge={36}
+        homeExcludedFromFire
+      />
+    )
+    const arceringen = [...container.querySelectorAll('rect[data-wealth-segment-arcering]')].map(r =>
+      r.getAttribute('data-wealth-segment-arcering'),
+    )
+    expect(new Set(arceringen), 'alleen het huis en zijn hypotheek zijn gearceerd').toEqual(
+      new Set(['eigen-huis', 'eigen-huis-hypotheek']),
+    )
+    // De arcering verwijst naar een pattern dat ook echt in <defs> staat.
+    for (const naam of ['eigen-huis', 'eigen-huis-hypotheek']) {
+      const rect = container.querySelector(`rect[data-wealth-segment-arcering="${naam}"]`)!
+      const fill = rect.getAttribute('fill') ?? ''
+      const id = fill.replace(/^url\(#/, '').replace(/\)$/, '')
+      expect(fill.startsWith('url(#'), `${naam} draagt een pattern-fill`).toBe(true)
+      expect(container.querySelector(`pattern[id="${CSS.escape(id)}"]`), `pattern ${id} bestaat`).toBeTruthy()
+    }
+  })
+
+  it('arceert niets wanneer de woning gewoon meetelt', () => {
+    const { container } = render(
+      <WealthCompositionChart stackedRows={rowsMetEigenHuis()} currentAge={35} endAge={36} />
+    )
+    expect(container.querySelectorAll('rect[data-wealth-segment-arcering]').length).toBe(0)
+    expect(container.querySelectorAll('pattern').length).toBe(0)
+  })
+
+  it('geeft de legenda-swatch hetzelfde patroon — anders is de legenda geen sleutel', () => {
+    const { container } = render(
+      <WealthCompositionChart
+        stackedRows={rowsMetEigenHuis()}
+        currentAge={35}
+        endAge={36}
+        homeExcludedFromFire
+      />
+    )
+    const swatches = [...container.querySelectorAll('[data-swatch-gedempt="true"]')]
+    expect(swatches.length, 'huis + hypotheek dragen elk een gedempte swatch').toBeGreaterThanOrEqual(2)
+    for (const s of swatches) {
+      expect(
+        (s as HTMLElement).style.backgroundImage,
+        'de swatch draagt de CSS-tegenhanger van het SVG-patroon',
+      ).toContain('repeating-linear-gradient')
+    }
+  })
+
+  it('benoemt in de duidingsregel de dragers die er echt staan', () => {
+    render(
+      <WealthCompositionChart
+        stackedRows={rowsMetEigenHuis()}
+        currentAge={35}
+        endAge={36}
+        homeExcludedFromFire
+      />
+    )
+    expect(
+      screen.getByText(`Gearceerd en gedempt = ${BUITEN_DOEL_ZIN}.`),
+      'de regel noemt arcering én demping, en gebruikt de gedeelde zin-constante',
     ).toBeTruthy()
   })
 

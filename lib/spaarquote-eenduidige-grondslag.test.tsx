@@ -45,6 +45,8 @@ import { SpaarquoteWidget } from '@/components/widgets/spaarquote-widget'
 import { CashflowSection } from '@/components/fin/cashflow-section'
 import { DisplayModeProvider } from '@/lib/hooks/use-display-mode'
 import { GET as checkinStartersGET } from '@/app/api/checkin/gespreksstarters/route'
+import { GET as checkinOverviewGET } from '@/app/api/checkin/overview/route'
+import { loadHorizonRaw } from '@/lib/horizon/raw-data-loader'
 
 // ── Render-randvoorwaarden ──────────────────────────────────────────────────
 vi.mock('@/components/app/perspective-provider', () => ({
@@ -285,5 +287,248 @@ describe('spaarquote — élk oppervlak toont de EFFECTIEVE quote', () => {
     const tekst = JSON.stringify(starters)
     expect(tekst).toContain('10%')      // (9.5).toFixed(0)
     expect(tekst).toContain('volgens je transacties')
+  })
+})
+
+/**
+ * CHECK-IN ↔ BUNDEL: DEZELFDE INVOER (kaart "restdivergentie na R2", 19 sep 2026,
+ * optie A). Na R2 deelden de check-in en /overzicht de FORMULE
+ * (`resolveSavingsSource`), maar niet de INVOER: de route assembleerde zijn
+ * 6-maands sommen uit rauwe `transactions`-rijen (kolom `is_income`, geen
+ * `.limit()`, dus stil afgekapt op PostgREST's max_rows = 1000), telde de
+ * datamaanden vanaf de vroegste datum BINNEN het venster, ankerde het
+ * jaarinkomen op `income6mAvg × 12` en kende de profiel-/delta-terugvallen
+ * niet. De bundel leest het maandaggregaat, telt vanaf de all-time vroegste
+ * inkomstendatum, ankert op `transactionAnnualIncome(realized)` (ADR 0138) en
+ * valt terug via `resolveSavingsRate6m`.
+ *
+ * Drie fixtures, gemeten vóór de fix (ONDERZOEK 17 sep 2026):
+ *   A · leeg 6m-venster, boekingen alleen in de lopende maand → 30 % op beide
+ *       (regressie-anker: hier was géén divergentie, en die mag er niet komen);
+ *   C · inkomsten+uitgaven alleen aug–dec 2025, niets in jan–jun 2026 →
+ *       /overzicht −54 % (12-maands anker ziet nog 'transaction', gemengd met
+ *       profiel-uitgaven), check-in +30 % "volgens je profiel" — ECHTE
+ *       divergentie, in omgekeerde richting;
+ *   D · 1.086 uitgavenrijen in het venster → bundel 9,5 % (`spaarquote-laag`
+ *       hoort te vuren), check-in zwijgt — de rauwe som kapte af op 1.000 rijen.
+ *
+ * De verwachting is steeds DE BUNDEL: de check-in vuurt precies de starter die
+ * bij `dashboardData.effectiveSavingsRatePct` hoort, met datzelfde getal in de
+ * tekst. Vergelijking EXACT via starter-id en de `toFixed(0)`-tekst (de route
+ * exporteert geen test-only helpers); geen relatieve marge, want het is één
+ * getal via twee assemblages.
+ */
+describe('spaarquote — check-in en bundel bouwen de meting uit dezelfde invoer', () => {
+  bevriesDeKlok()
+
+  /** Spiegel van de drempels in lib/checkin/gespreksstarters.ts (spaarquote-detector). */
+  const verwachteStarterId = (pct: number): 'spaarquote-sterk' | 'spaarquote-laag' | null =>
+    pct >= 25 ? 'spaarquote-sterk' : pct > 0 && pct < 10 ? 'spaarquote-laag' : null
+
+  async function meetBeide(db: FakeDb) {
+    const { dashboardData } = await loadDashboardData(makeSupabase(db).client)
+    routeClient.client = makeSupabase(db).client
+    const res = await checkinStartersGET()
+    const { starters } = (await res.json()) as { starters: { id: string }[] }
+    return { pct: dashboardData.effectiveSavingsRatePct, ids: starters.map((s) => s.id), tekst: JSON.stringify(starters) }
+  }
+
+  function eisPariteit(m: { pct: number; ids: string[]; tekst: string }) {
+    const verwacht = verwachteStarterId(m.pct)
+    for (const id of ['spaarquote-sterk', 'spaarquote-laag'] as const) {
+      if (id === verwacht) expect(m.ids).toContain(id)
+      else expect(m.ids).not.toContain(id)
+    }
+    if (verwacht) expect(m.tekst).toContain(`${m.pct.toFixed(0)}%`)
+  }
+
+  it('A · leeg 6m-venster (alleen boekingen in de lopende maand): beide 30 % — geen divergentie, ook niet na de fix', async () => {
+    const m = await meetBeide({
+      ...DB,
+      transactions: [
+        { amount: 6000, is_income: true, date: '2026-07-05', budget_id: B_INCOME, transaction_type: null },
+        { amount: -5430, is_income: false, date: '2026-07-12', budget_id: B_EXPENSE, transaction_type: null },
+      ],
+    })
+    expect(m.pct).toBe(EFFECTIEF_PCT)
+    eisPariteit(m)
+    expect(m.tekst).toContain('volgens je eigen invoer')
+  })
+
+  it('C · inkomsten alleen 7–12 maanden terug: de check-in volgt het 12-maands anker van de bundel (negatief, gemengd), niet "+30 % volgens je profiel"', async () => {
+    const rows: Row[] = []
+    for (const m of ['08', '09', '10', '11', '12']) {
+      rows.push({ amount: 6000, is_income: true, date: `2025-${m}-05`, budget_id: B_INCOME, transaction_type: null })
+      rows.push({ amount: -5430, is_income: false, date: `2025-${m}-12`, budget_id: B_EXPENSE, transaction_type: null })
+    }
+    const m = await meetBeide({
+      ...DB,
+      profile: { ...PROFILE, income_source: 'transaction', expenses_source: 'transaction' },
+      transactions: rows,
+    })
+    // De bundel: transactie-jaarinkomen 30.000 / 11 × 12 ≈ € 2.727/mnd op de
+    // historiebasis (basis 'transaction'), uitgaven uit het lege 6m-venster →
+    // profiel € 4.200 (basis 'profile') ⇒ gemengde formule, negatief.
+    expect(m.pct).toBeLessThan(0)
+    eisPariteit(m)
+    // De oude check-in-lezing — profiel aan beide kanten, +30 % — mag niet terugkomen.
+    expect(m.tekst).not.toContain('30%')
+    expect(m.tekst).not.toContain('volgens je profiel')
+  })
+
+  it('D · 1.086 uitgavenrijen in het venster: de check-in vuurt `spaarquote-laag` op 9,5 %, zoals de bundel — geen stille max_rows-afkap meer', async () => {
+    const rows: Row[] = []
+    for (const m of ['01', '02', '03', '04', '05', '06']) {
+      rows.push({ amount: 6000, is_income: true, date: `2026-${m}-05`, budget_id: B_INCOME, transaction_type: null })
+      // 181 × € 30 = € 5.430 per maand — dezelfde maandsom als de basisfixture,
+      // maar in 1.086 rijen: ruim boven de rij-cap van 1.000.
+      for (let i = 0; i < 181; i++) {
+        rows.push({ amount: -30, is_income: false, date: `2026-${m}-12`, budget_id: B_EXPENSE, transaction_type: null })
+      }
+    }
+    expect(rows.filter((r) => r.is_income === false)).toHaveLength(1086)
+    const m = await meetBeide({
+      ...DB,
+      profile: { ...PROFILE, income_source: 'transaction', expenses_source: 'transaction' },
+      transactions: rows,
+    })
+    expect(m.pct).toBe(GEMETEN_PCT)
+    eisPariteit(m)
+    expect(m.ids).toContain('spaarquote-laag')
+    expect(m.tekst).toContain('10%')      // (9.5).toFixed(0)
+  })
+})
+
+/**
+ * HORIZON ↔ BUNDEL ↔ FORECAST ↔ CHECK-IN: HETZELFDE JAARINKOMEN-ANKER (kaart
+ * "what-if-slider start op een andere spaarquote-grondslag", 19 sep 2026, optie A).
+ *
+ * De horizon-loader (`loadHorizonRaw` → `healthScoreInputBase.effectiveSavingsRatePct`,
+ * de bron van de tegel op /overzicht, de Rondkomen-pijler én de slider-start van
+ * het lab) ankerde het transactie-jaarinkomen transfer-INCLUSIEF — bedoeld voor
+ * de FIRE-projectiesom — en voerde dat óók aan `resolveSavingsSource`. Op de
+ * GEMENGDE grondslag (inkomen 'transaction', uitgaven handmatig/budget) rekent
+ * die de uniforme formule (I − E)/I op dat anker: gemeten 47,5 % waar dashboard,
+ * forecast en check-in 30 % gaven. Op tx/tx wint het rauwe `savingsRate6m`
+ * (transfer-exclusief, al vergrendeld in horizon-data-loader.spaarquote-parity)
+ * en op handmatig/handmatig het profiel — daar telde het anker niet mee, en
+ * precies dáár draaiden de bestaande suites.
+ *
+ * Het FIRE-anker blijft bewust inclusief (`baseAnnualSavingsFromCashflow`); die
+ * keuze staat hieronder als assertie, zodat het onderscheid rate-exclusief /
+ * FIRE-spaarbron-inclusief niet stil kan verdwijnen. Tolerantie: exact (`toBe`),
+ * gehele euro's — één getal via vier assemblages.
+ */
+describe('spaarquote — gemengde grondslag mét transfers: één jaarinkomen-anker op alle oppervlakken', () => {
+  bevriesDeKlok()
+
+  /** +€2.000/mnd eigen-rekening-overboeking náást het echte inkomen. */
+  const TRANSFER_PER_MAAND = 2000
+
+  function transactiesMetTransfers(): Row[] {
+    const rows = transacties()
+    for (const m of ['01', '02', '03', '04', '05', '06']) {
+      rows.push({ amount: TRANSFER_PER_MAAND, is_income: true, date: `2026-${m}-20`, budget_id: null, transaction_type: 'transfer' })
+      rows.push({ amount: -TRANSFER_PER_MAAND, is_income: false, date: `2026-${m}-20`, budget_id: null, transaction_type: 'transfer' })
+    }
+    return rows
+  }
+
+  /** Inkomen uit transacties, uitgaven handmatig → de gemengde tak van `resolveSavingsSource`. */
+  const DB_GEMENGD: FakeDb = {
+    ...DB,
+    profile: { ...PROFILE, income_source: 'transaction', expenses_source: 'manual' },
+    transactions: transactiesMetTransfers(),
+  }
+
+  it('B · horizon == dashboard == forecast == check-in op 30 % — niet 47,5 % op het transfer-inclusieve anker', async () => {
+    const { dashboardData } = await loadDashboardData(makeSupabase(DB_GEMENGD).client)
+    const slank = await loadForecastSectionData(makeSupabase(DB_GEMENGD).client)
+    const raw = await loadHorizonRaw(makeSupabase(DB_GEMENGD).client)
+    routeClient.client = makeSupabase(DB_GEMENGD).client
+    const { starters } = (await (await checkinStartersGET()).json()) as { starters: { id: string }[] }
+
+    // Transfer-exclusief: 36.000 over 6 historiemaanden → € 6.000/mnd; handmatige
+    // uitgaven € 4.200 ⇒ (6.000 − 4.200) / 6.000 = 30 %.
+    expect(dashboardData.effectiveSavingsRatePct).toBe(EFFECTIEF_PCT)
+    expect(slank.effectiveSavingsRatePct).toBe(EFFECTIEF_PCT)
+    expect(raw.healthScoreInputBase.effectiveSavingsRatePct).toBe(EFFECTIEF_PCT)
+    expect(starters.map((s) => s.id)).toContain('spaarquote-sterk')
+    expect(JSON.stringify(starters)).toContain('30%')
+  })
+
+  it('B · de fixture is aantoonbaar transfer-gevoelig: de FIRE-spaarbron van de horizon blijft op het inclusieve anker (bewust)', async () => {
+    const raw = await loadHorizonRaw(makeSupabase(DB_GEMENGD).client)
+    // Inclusief: (36.000 + 12.000) over 6 maanden → € 8.000/mnd; (8.000 − 4.200) / 8.000
+    // = 47,5 % × € 96.000 = € 45.600/jaar. Exclusief zou het € 21.600 zijn (30 % × 72.000).
+    // Dit is het gedocumenteerde besluit "FIRE-projectie-inputs zien alle kasstromen";
+    // verandert dit, dan verschuift de FIRE-leeftijd en hoort daar een eigen besluit bij.
+    expect(raw.baseAnnualSavingsFromCashflow).toBe(45600)
+    expect(raw.baseAnnualSavingsFromCashflow).not.toBe(EFFECTIEF_EUR_PER_MAAND * 12)
+  })
+})
+
+/**
+ * CHECK-IN — vermogenstrend uit de gedeelde snapshotreeks (kaart "check-in leest
+ * een niet-bestaande kolom", 19-09-2026). Beide check-in-routes lazen
+ * `net_worth_snapshots.value` — een kolom die de tabel nooit heeft gehad. Op
+ * productie: PostgREST 42703 → `null → []` → `netWorthTrend 0`, dus
+ * `vermogen-groei`/`-daling` vuurden nooit en `netWorthChange` stond structureel
+ * op 0 %. De fake-DB projecteert kolommen niet en gaf `undefined → NaN`, dus het
+ * defect was test-onzichtbaar; daarom hier een negatieve `NaN`-assertie over de
+ * hele JSON. Sinds de fix voedt `getNetWorthSnapshots12m` (kolom `net_worth`,
+ * oplopend) zowel de spaarquote-delta als de trend — één reeks, geen tweede lezer.
+ */
+describe('check-in — vermogenstrend uit de gedeelde snapshotreeks (kolom net_worth)', () => {
+  bevriesDeKlok()
+
+  async function starters(db: FakeDb) {
+    routeClient.client = makeSupabase(db).client
+    const res = await checkinStartersGET()
+    const { starters } = (await res.json()) as { starters: { id: string; vraag: string }[] }
+    return { starters, ids: starters.map((s) => s.id), tekst: JSON.stringify(starters) }
+  }
+
+  it('stijgend (100.000 → 102.000): vermogen-groei vuurt met € 2.000, zonder NaN en zonder "Je je"', async () => {
+    const m = await starters(DB)
+    expect(m.ids).toContain('vermogen-groei')
+    expect(m.ids).not.toContain('vermogen-daling')
+    expect(m.tekst).toMatch(/2\.000/)
+    expect(m.tekst).not.toContain('NaN')
+    // Alleen de vermogensstarter zelf: het "${subjCap} ${poss}"-patroon staat
+    // óók nog in vijf starters buiten deze kaart (o.a. spaarquote-sterk, die in
+    // deze fixture meevuurt) — dat is de aparte merkstem-kaart, niet deze.
+    const groei = m.starters.find((s) => s.id === 'vermogen-groei')!
+    expect(groei.vraag).not.toMatch(/\bJe je\b|\bJullie jullie\b/)
+    expect(groei.vraag).toMatch(/^(Je vermogen|Jullie vermogen|€)/)
+  })
+
+  it('dalend (102.000 → 100.000): vermogen-daling vuurt met € 2.000, zonder NaN', async () => {
+    const m = await starters({
+      ...DB,
+      netWorthSnapshots: [
+        { snapshot_date: '2026-05-01', net_worth: 102000, fire_age: null, savings_rate: 29 },
+        { snapshot_date: '2026-06-01', net_worth: 100000, fire_age: null, savings_rate: 28 },
+      ],
+    })
+    expect(m.ids).toContain('vermogen-daling')
+    expect(m.ids).not.toContain('vermogen-groei')
+    expect(m.tekst).toMatch(/2\.000/)
+    expect(m.tekst).not.toContain('NaN')
+  })
+
+  it('zonder snapshots: geen vermogensstarter en geen NaN-tekst', async () => {
+    const m = await starters({ ...DB, netWorthSnapshots: [] })
+    expect(m.ids).not.toContain('vermogen-groei')
+    expect(m.ids).not.toContain('vermogen-daling')
+    expect(m.tekst).not.toContain('NaN')
+  })
+
+  it('overzicht: netWorthChange is +2 % op dezelfde reeks — niet structureel 0', async () => {
+    routeClient.client = makeSupabase(DB).client
+    const res = await checkinOverviewGET()
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { netWorthChange: number }
+    expect(body.netWorthChange).toBeCloseTo(2, 6)
   })
 })

@@ -1,6 +1,6 @@
 ﻿'use client'
 
-import { useEffect, useState, useCallback, useRef, useMemo, useDeferredValue, type RefObject } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo, useDeferredValue, useTransition, type RefObject } from 'react'
 import Link from 'next/link'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import type { HorizonPageData } from '@/lib/horizon-data-loader'
@@ -180,6 +180,7 @@ import {
   type AnkerReach,
   type AnkerStop,
 } from '@/lib/horizon/anker-copy'
+import { describeEventDuration, eventStopAgeFromSim } from '@/lib/horizon/event-duration-copy'
 import type { HaalbareUitgave } from '@/lib/horizon/haalbare-uitgave'
 import { dekkingVanRun, resolveLabUitkomst, type LabUitkomst } from '@/lib/horizon/lab-uitkomst'
 import {
@@ -304,6 +305,7 @@ import { PensionPdfUpload, uploadPensionPdfToStorage } from '@/components/app/ho
 import { SimChart, buildScenarioVariants, SCENARIO_VARIANTS, type ScenarioOverlay, type MonteCarloOverlay, type HouseholdPartnerOverlay } from '@/components/app/horizon/sim-chart'
 import { computeVerwachtingsband } from '@/components/app/horizon/verwachtingsband'
 import { ZoomableChartContainer } from '@/components/app/horizon/zoomable-chart-container'
+import { ProjectieLaadlaag } from '@/components/app/horizon/projectie-laadlaag'
 import { EventsTimeline } from '@/components/app/horizon/events-timeline'
 import { EventClusterSheet } from '@/components/app/horizon/event-cluster-sheet'
 import { PhaseBar } from '@/components/app/horizon/phase-bar'
@@ -612,6 +614,8 @@ export default function HorizonPage({
     fireAge: number | null
     fireAgeFractional: number | null
     currentAge: number | null
+    /** Partner-AOW op de kijker-as uit de gecombineerde kernel-run (ADR 0168). */
+    partnerAowAge: number | null
   } | null>(null)
   // Partner-projectie-pad (voor het wisselen van de hoofdlijn in partner-view).
   // `rows` is leeg wanneer de partner alleen 'totals' deelt of z'n toekomst
@@ -626,7 +630,15 @@ export default function HorizonPage({
   // huishouden- + partner-view). Alleen naam + leeftijd + icoon — nooit
   // bewerkbaar (geen sourceId), nooit de partner's natuurlijke mijlpalen.
   const [partnerLifeEvents, setPartnerLifeEvents] = useState<
-    Array<{ id: string; name: string; targetAge: number | null; icon?: string }>
+    Array<{
+      id: string
+      name: string
+      /** Leeftijd op de as van de PARTNER (zoals opgeslagen). */
+      targetAge: number | null
+      /** Dezelfde gebeurtenis op de as van de KIJKER (DOB-verschoven; TPR-07 fase 2a). */
+      targetAgeOnOwnAxis: number | null
+      icon?: string
+    }>
   >([])
   const [fireParams, setFireParams] = useState<FireParams>(initialData.fireParams)
   const [wsConfig, setWsConfig] = useState<{ strategy: WithdrawalStrategyType; floor: number; ceiling: number } | null>(
@@ -1014,6 +1026,12 @@ export default function HorizonPage({
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
+  // B-057 — de twee vensters die de kernel-hook zelf niet ziet: (1) `loadData()`
+  // haalt de grondslag opnieuw op (try/finally in de functie), (2) `router.refresh()`
+  // rendert de server-context opnieuw. Samen met `mainPending` uit de hook vormen ze
+  // `projectiePending` → de Fin-laadlaag op de grafiek + gedempte hoofdlijn.
+  const [dataRefreshing, setDataRefreshing] = useState(false)
+  const [refreshPending, startRefresh] = useTransition()
   // /toekomst krijgt nieuwe overzicht-tekst; /horizon-fallback voor legacy bezoeken
   const pageInfoText = getPageInfo(pathname, '/horizon')
   useEffect(() => {
@@ -1189,7 +1207,7 @@ export default function HorizonPage({
   // Fase 2b (#495): gemigreerd naar runUnifiedProjection() met per-asset-type rendement
   // Task 4.2: de kernel-runs draaien in een web worker (met synchrone jsdom/SSR-fallback);
   // `firstPaint*` levert de server-scalars zolang de worker-run nog niet geland is.
-  const { result: simResult, cashflows: simCashflows, error: simError, unifiedRows, effectiveLifeEvents, kernelStatus, kernelMaandHint, kernelHousingSale, aowOntbreekt, scenario, stopPad, scenarioPending, stopPadPending, isRefining: kernelIsRefining, firstPaintFireAge, firstPaintFreedomPct, firstPaintRequiredPortfolio, firstPaintRequiredNetWorth } = useHorizonFireSim(
+  const { result: simResult, cashflows: simCashflows, error: simError, unifiedRows, effectiveLifeEvents, kernelStatus, kernelMaandHint, kernelHousingSale, aowOntbreekt, scenario, stopPad, scenarioPending, stopPadPending, mainPending, isRefining: kernelIsRefining, firstPaintFireAge, firstPaintFreedomPct, firstPaintRequiredPortfolio, firstPaintRequiredNetWorth } = useHorizonFireSim(
     input
       ? {
           horizonInput: input,
@@ -1223,6 +1241,12 @@ export default function HorizonPage({
         }
       : null,
   )
+
+  // B-057 — één signaal voor "de getoonde projectie is verouderd": grondslag-herlaad,
+  // server-refresh of hersolve van de hoofdlijn. Voedt de Fin-laadlaag op de grafiek
+  // én de demping van de hoofdpaden. Bewust NIET gekoppeld aan `kernelIsRefining`
+  // (first paint — de hero draagt die staat al).
+  const projectiePending = dataRefreshing || refreshPending || mainPending === true
 
   // Events voor weergave: echte events + client-side geregenereerde
   // housing-strategy-events uit de hook. De hook resolved het
@@ -1365,6 +1389,9 @@ export default function HorizonPage({
 
   // Client-side data reload (used after event CRUD operations)
   const loadData = useCallback(async () => {
+    // B-057 — "grondslag wordt herladen" voor de Fin-laadlaag op de grafiek; de
+    // finally-tak wist 'm ook bij een fout, anders blijft Fin eeuwig denken.
+    setDataRefreshing(true)
     try {
       const supabase = createClient()
       const now = new Date()
@@ -1385,7 +1412,12 @@ export default function HorizonPage({
       // (event-CRUD) konden verspringen t.o.v. de eerste render.
       const window6m = savingsRateWindow(now)
 
-      const [txResult, assetsResult, debtsResult, profileResult, essentialBudgetsResult, eventsResult, actionsResult, childBudgetsResult, fullDebtsResult, snapshotsResult, income12Result, earliestIncomeResult, tx6mResult, bankAccountsResult, cashflowSettings] = await Promise.all([
+      // B-057/B2 — ÉÉN commit: alle bronnen (ook fire-settings, de AOW-tabel en de
+      // onttrekkingsstrategie, die hier eerst drie losse `await`s ná de eerste
+      // setStates waren) komen in dezelfde `Promise.all`, en álle setStates staan
+      // onderaan in één synchrone continuation. React batcht die tot één render,
+      // dus één hoofdrun i.p.v. ~5 (elke tussen-commit raakte een kernel-dep).
+      const [txResult, assetsResult, debtsResult, profileResult, essentialBudgetsResult, eventsResult, actionsResult, childBudgetsResult, fullDebtsResult, snapshotsResult, income12Result, earliestIncomeResult, tx6mResult, bankAccountsResult, cashflowSettings, fireSettingsData, aowRes, withdrawalData] = await Promise.all([
         supabase.from('transactions').select('amount').gte('date', monthStart).lt('date', monthEnd),
         supabase.from('assets').select('current_value, monthly_contribution, net_worth_inclusion_pct').eq('is_active', true),
         supabase.from('debts').select('current_balance, net_worth_inclusion_pct').eq('is_active', true),
@@ -1407,7 +1439,9 @@ export default function HorizonPage({
           .select('snapshot_date, resilience_score, net_worth, freedom_percentage, fire_age, score_version')
           .order('snapshot_date', { ascending: true })
           .limit(60),
-        supabase.from('transactions').select('amount, date').gt('amount', 0).gte('date', twelveMonthsAgo).lt('date', monthStart),
+        // `transaction_type` erbij: de terugval-som filtert transfers, zoals de bundel
+        // (ADR 0169 — één inkomensgrondslag, ook op het pad zonder cashflow-settings).
+        supabase.from('transactions').select('amount, date, transaction_type').gt('amount', 0).gte('date', twelveMonthsAgo).lt('date', monthStart),
         // Vroegste inkomstendatum ALL-TIME (geen 12-maands-venster) — deler-anker
         // voor de extrapolatie. Spiegelt de canonieke getEarliestIncomeDate
         // (SSR-loader / API-route); een gecapt venster gaf een te recente datum →
@@ -1425,6 +1459,20 @@ export default function HorizonPage({
         // deze refresh nog puur op de transactie-extrapolatie.
         fetch('/api/overzicht/cashflow-settings')
           .then((r) => (r.ok ? (r.json() as Promise<CashflowSettingsData>) : null))
+          .catch(() => null),
+        // FIRE-strategie via de API (pensioen-terugval); null ⇒ profiel-parse.
+        fetch('/api/fire-settings')
+          .then((r) => (r.ok ? (r.json() as Promise<Record<string, unknown>>) : null))
+          .catch(() => null),
+        // AOW-tabel voor de kern-tijdas (FASE 5, stap 2b); fout ⇒ terugval 67.
+        supabase
+          .from('aow_leeftijd')
+          .select('id, birth_date_from, birth_date_through, aow_years, aow_months, is_definitive, source')
+          .order('birth_date_from', { ascending: true })
+          .then((r) => r, () => ({ data: null })),
+        // Onttrekkingsstrategie (ververst de server-side initial data); null ⇒ defaults.
+        fetch('/api/withdrawal-strategy')
+          .then((r) => (r.ok ? (r.json() as Promise<Record<string, unknown>>) : null))
           .catch(() => null),
       ])
 
@@ -1479,8 +1527,7 @@ export default function HorizonPage({
       }
       const avgInc6 = totalIncome6m > 0 ? totalIncome6m / SAVINGS_RATE_WINDOW_MONTHS : effectiveMonthlyIncome
       const avgExp6 = totalExpenses6m > 0 ? totalExpenses6m / SAVINGS_RATE_WINDOW_MONTHS : effectiveMonthlyExpenses
-      setAvgIncome6m(avgInc6)
-      setAvgExpenses6m(avgExp6)
+      // (setAvgIncome6m/setAvgExpenses6m staan onderaan, in het ene commit-blok — B2.)
 
       const totalAssetsOnly = (assetsResult.data ?? []).reduce((s, a) =>
         s + Number(a.current_value) * ((a.net_worth_inclusion_pct ?? 100) / 100), 0)
@@ -1495,7 +1542,14 @@ export default function HorizonPage({
         s + Number(d.current_balance) * ((d.net_worth_inclusion_pct ?? 100) / 100), 0)
       const monthlyContributions = (assetsResult.data ?? []).reduce((s, a) => s + Number(a.monthly_contribution), 0)
 
-      const last12Income = income12Result.data?.reduce((s, t) => s + Number(t.amount), 0) ?? 0
+      // Transfer-EXCLUSIEF (ADR 0169): dezelfde grondslag als `cashflowSettings.
+      // effectiveAnnualIncome` en de SSR-loader — de terugval mag niet stil van
+      // semantiek wisselen zodra de bundel er even niet is.
+      const last12Income =
+        income12Result.data?.reduce(
+          (s, t) => (isTransferType(t.transaction_type) ? s : s + Number(t.amount)),
+          0,
+        ) ?? 0
       const earliestIncomeDate = earliestIncomeResult.data?.[0]?.date
 
       const allChildren = childBudgetsResult.data ?? []
@@ -1538,75 +1592,22 @@ export default function HorizonPage({
           )
         : fallbackBasis.yearlyRetirementExpenses
 
-      setRetirementMethod((profileResult.data?.retirement_expense_method ?? 'essential_budgets') as RetirementExpenseMethod)
-
-      // Store raw profile + extrapolated income for doorrekening-inline
-      setProfileRaw((profileResult.data as Record<string, unknown>) ?? null)
-      setEstimatedYearlyIncome(extrapolatedIncome)
-
-      // Kernel-context ná elke loadData verversen (los van profileRaw hierboven).
-      // yearly_essential_expenses = de al-berekende essentiële jaaruitgaven (NIET de
-      // retirement-expenses) zodat de kernel dezelfde grondslag gebruikt.
-      setKernelRawProfile({
-        ...(profileResult.data as ConvergentieRawProfileRow),
-        yearly_essential_expenses: yearlyMustExpenses,
-      })
-
       const dob = profileResult.data?.date_of_birth ?? null
 
-      // FIRE strategy from profile — use API for pensioen fallback
-      try {
-        const fsRes = await fetch('/api/fire-settings')
-        if (fsRes.ok) {
-          const fsData = await fsRes.json()
-          if (['perpetual', 'legacy', 'deplete', 'pensioen'].includes(fsData.fire_end_strategy)) {
-            setFireStrategy({ strategy: fsData.fire_end_strategy, endAge: fsData.fire_end_age ?? 90, legacyAmount: Number(fsData.fire_legacy_amount ?? 0) })
-          } else {
-            setFireStrategy(parseFireStrategy(profileResult.data ?? {}))
-          }
-        } else {
-          setFireStrategy(parseFireStrategy(profileResult.data ?? {}))
-        }
-      } catch {
-        setFireStrategy(parseFireStrategy(profileResult.data ?? {}))
-      }
+      // FIRE strategy from profile — use API for pensioen fallback (al opgehaald in
+      // de Promise.all hierboven; null ⇒ profiel-parse, identiek aan de oude terugval).
+      const fsStrategy = fireSettingsData?.fire_end_strategy
+      const nextFireStrategy =
+        typeof fsStrategy === 'string' && ['perpetual', 'legacy', 'deplete', 'pensioen'].includes(fsStrategy)
+          ? { strategy: fsStrategy as FireStrategyConfig['strategy'], endAge: (fireSettingsData?.fire_end_age as number | null | undefined) ?? 90, legacyAmount: Number(fireSettingsData?.fire_legacy_amount ?? 0) }
+          : parseFireStrategy(profileResult.data ?? {})
 
-      // Berekeningsparameters uit profiel
-      setFireParams(resolveFireParams(profileResult.data ?? {}))
+      // AOW-leeftijd op basis van geboortedatum (tabel al opgehaald; leeg ⇒ terugval 67).
+      const aowTabel = (aowRes?.data ?? null) as AowLeeftijdRow[] | null
+      const heeftAowTabel = aowTabel != null && aowTabel.length > 0
 
-      // AOW-leeftijd ophalen op basis van geboortedatum
-      try {
-        const aowRes = await supabase
-          .from('aow_leeftijd')
-          .select('id, birth_date_from, birth_date_through, aow_years, aow_months, is_definitive, source')
-          .order('birth_date_from', { ascending: true })
-        if (aowRes.data && aowRes.data.length > 0) {
-          setUserAowAge(lookupAowAge(aowRes.data as AowLeeftijdRow[], dob))
-          // FASE 5, stap 2b — rauwe AOW-tabel voor de kern-tijdas (adapter).
-          setAowRows(aowRes.data as AowLeeftijdRow[])
-        }
-      } catch {
-        // Non-critical — fallback to 67
-      }
-
-      // Load withdrawal strategy config (refreshes server-side initial data)
-      try {
-        const wsRes = await fetch('/api/withdrawal-strategy')
-        if (wsRes.ok) {
-          const wsData = await wsRes.json()
-          setWsConfig({
-            strategy: wsData.withdrawal_strategy ?? 'static',
-            floor: wsData.guardrail_floor ?? 0.80,
-            ceiling: wsData.guardrail_ceiling ?? 1.20,
-          })
-          setWithdrawalStrategyConfig({
-            strategy: wsData.withdrawal_strategy ?? WITHDRAWAL_DEFAULTS.strategy,
-            guardrailFloor: wsData.guardrail_floor ?? WITHDRAWAL_DEFAULTS.guardrailFloor,
-            guardrailCeiling: wsData.guardrail_ceiling ?? WITHDRAWAL_DEFAULTS.guardrailCeiling,
-            guardrailCutStep: wsData.guardrail_cut_step ?? WITHDRAWAL_DEFAULTS.guardrailCutStep,
-          })
-        }
-      } catch { /* defaults */ }
+      // Onttrekkingsstrategie (al opgehaald; null ⇒ bestaande defaults blijven staan).
+      const wsData = withdrawalData
 
       const horizonInput: FinancialInput = {
         totalAssets, totalDebts, monthlyIncome: effectiveMonthlyIncome, monthlyExpenses: effectiveMonthlyExpenses,
@@ -1616,9 +1617,6 @@ export default function HorizonPage({
       // Snapshots voeden uitsluitend de historische trendlijn; het huidige
       // gezondheidsgetal komt van de live score (SSoT, Defect A).
       const allSnapshots = (snapshotsResult.data ?? []) as SnapshotForTrend[]
-      setResilienceSnapshots(allSnapshots)
-
-      setInput(horizonInput)
 
       const loadedEvents = (eventsResult.data ?? []) as LifeEvent[]
       // Virtuele housing-strategy events leven in initialData (server-side
@@ -1626,14 +1624,53 @@ export default function HorizonPage({
       // zodat ze blijven verschijnen na een loadData() refresh.
       const housingFromInitial = initialData.events.filter(isHousingStrategyEvent)
       const merged: LifeEvent[] = [...loadedEvents, ...housingFromInitial]
+      const cumImpacts = computeCumulativeImpacts(horizonInput, merged)
+
+      // ── ÉÉN commit-blok (B-057/B2): geen `await` meer tussen deze setStates ──
+      setAvgIncome6m(avgInc6)
+      setAvgExpenses6m(avgExp6)
+      setRetirementMethod((profileResult.data?.retirement_expense_method ?? 'essential_budgets') as RetirementExpenseMethod)
+      // Store raw profile + extrapolated income for doorrekening-inline
+      setProfileRaw((profileResult.data as Record<string, unknown>) ?? null)
+      setEstimatedYearlyIncome(extrapolatedIncome)
+      // Kernel-context ná elke loadData verversen (los van profileRaw hierboven).
+      // yearly_essential_expenses = de al-berekende essentiële jaaruitgaven (NIET de
+      // retirement-expenses) zodat de kernel dezelfde grondslag gebruikt.
+      setKernelRawProfile({
+        ...(profileResult.data as ConvergentieRawProfileRow),
+        yearly_essential_expenses: yearlyMustExpenses,
+      })
+      setFireStrategy(nextFireStrategy)
+      // Berekeningsparameters uit profiel
+      setFireParams(resolveFireParams(profileResult.data ?? {}))
+      if (heeftAowTabel) {
+        setUserAowAge(lookupAowAge(aowTabel, dob))
+        // FASE 5, stap 2b — rauwe AOW-tabel voor de kern-tijdas (adapter).
+        setAowRows(aowTabel)
+      }
+      if (wsData) {
+        setWsConfig({
+          strategy: (wsData.withdrawal_strategy as WithdrawalStrategyConfig['strategy'] | undefined) ?? 'static',
+          floor: (wsData.guardrail_floor as number | undefined) ?? 0.80,
+          ceiling: (wsData.guardrail_ceiling as number | undefined) ?? 1.20,
+        })
+        setWithdrawalStrategyConfig({
+          strategy: (wsData.withdrawal_strategy as WithdrawalStrategyConfig['strategy'] | undefined) ?? WITHDRAWAL_DEFAULTS.strategy,
+          guardrailFloor: (wsData.guardrail_floor as number | undefined) ?? WITHDRAWAL_DEFAULTS.guardrailFloor,
+          guardrailCeiling: (wsData.guardrail_ceiling as number | undefined) ?? WITHDRAWAL_DEFAULTS.guardrailCeiling,
+          guardrailCutStep: (wsData.guardrail_cut_step as number | undefined) ?? WITHDRAWAL_DEFAULTS.guardrailCutStep,
+        })
+      }
+      setResilienceSnapshots(allSnapshots)
+      setInput(horizonInput)
       setEvents(merged)
       setActions((actionsResult.data ?? []) as Action[])
       setDebts((fullDebtsResult.data ?? []) as Debt[])
-
-      const cumImpacts = computeCumulativeImpacts(horizonInput, merged)
       setImpacts(cumImpacts)
     } catch (err) {
       console.error('Error reloading horizon data:', err)
+    } finally {
+      setDataRefreshing(false)
     }
   }, [initialData.events])
 
@@ -1709,10 +1746,9 @@ export default function HorizonPage({
           // Gecombineerde FinancialInput voor het backtesting-/Monte-Carlo-modal
           // (huishouden-perspectief). Afgeleid uit dezelfde combined-projectie
           // zodat het modal het gezamenlijke vermogen backtest i.p.v. eigen-data.
-          const oldestDob = result.partners
-            .map(p => p.financials.dateOfBirth)
-            .filter((d): d is string => !!d)
-            .sort((a, b) => a.localeCompare(b))[0] ?? null
+          // Head = de KIJKER (TPR-07 fase 2a): de gecombineerde projectie loopt op de
+          // eigen as, dus het backtest-/MC-modal krijgt de eigen geboortedatum.
+          const headDob = result.partners.find(p => p.isCurrentUser)?.financials.dateOfBirth ?? null
           setHouseholdInput({
             totalAssets: result.comparison.combinedNetWorth,
             totalDebts: 0,
@@ -1720,7 +1756,7 @@ export default function HorizonPage({
             monthlyExpenses: result.comparison.combinedMonthlyExpenses,
             yearlyMustExpenses: result.comparison.combinedRetirementExpenses,
             monthlyContributions: cp.monthlySavings,
-            dateOfBirth: oldestDob,
+            dateOfBirth: headDob,
           })
           // Huishouden-view: de GECOMBINEERDE lijn is de HOOFDLIJN (matcht de
           // hero-FIRE-leeftijd), zodat de prominente lijn + marker het huishouden
@@ -1732,18 +1768,18 @@ export default function HorizonPage({
               fireAge: cp.fireAge,
               fireAgeFractional: result.combined.fireAgeFractional,
               currentAge: cp.currentAge,
+              partnerAowAge: result.combined.partnerAowAge,
             })
           } else {
             setHouseholdMainLine(null)
           }
-          // Eigen lijn als overlay — ALLEEN wanneer de huidige gebruiker de oudste
-          // partner (head) is, zodat de leeftijds-as klopt (de gecombineerde lijn
-          // loopt op de head-as). Bron = household-projectie (matcht de partnerkaart),
-          // niet de losse pagina-sim. Anders tonen we enkel de gezamenlijke lijn.
+          // Eigen lijn als overlay. Sinds TPR-07 fase 2a is de kijker altijd de head
+          // (de gecombineerde lijn loopt op de eigen as), dus de overlay klopt voor
+          // élke partner — de oude "alleen als je de oudste bent"-regel is vervallen.
+          // Bron = household-projectie (matcht de partnerkaart), niet de losse pagina-sim.
           const me = result.partners.find(p => p.isCurrentUser)
-          const headCurrentAge = Math.max(...result.partners.map(p => p.settings.currentAge ?? 0))
           const ownOverlays: HouseholdPartnerOverlay[] = []
-          if (me && me.rows.length > 0 && (me.settings.currentAge ?? 0) >= headCurrentAge) {
+          if (me && me.rows.length > 0) {
             ownOverlays.push({
               name: 'Jouw projectie',
               color: '#b89968', // lichter horizon
@@ -1797,12 +1833,24 @@ export default function HorizonPage({
 
         // Partner-levensgebeurtenissen (read-only markers) — in zowel
         // huishouden- als partner-view. Alleen de PERSOONLIJKE events van de
-        // partner (gedeelde events tonen we al via de eigen overlay).
+        // partner (gedeelde events tonen we al via de eigen overlay). De
+        // `target_age` staat op de as van de PARTNER; voor de huishoudblik (eigen
+        // as, TPR-07 fase 2a) schuiven we 'm met het leeftijdsverschil op. Zonder
+        // beide leeftijden geen verschuiving mogelijk → geen marker op de eigen as.
+        const myAge = result.partners.find(p => p.isCurrentUser)?.settings.currentAge ?? null
+        const partnerAge = partnerEntry?.settings.currentAge ?? null
+        const ageShift = myAge != null && partnerAge != null ? partnerAge - myAge : null
         setPartnerLifeEvents(
           partnerEntry
             ? partnerEntry.lifeEvents
                 .filter(ev => ev.ownership !== 'shared')
-                .map(ev => ({ id: ev.id, name: ev.name, targetAge: ev.targetAge, icon: ev.icon }))
+                .map(ev => ({
+                  id: ev.id,
+                  name: ev.name,
+                  targetAge: ev.targetAge,
+                  targetAgeOnOwnAxis: ev.targetAge != null && ageShift != null ? ev.targetAge - ageShift : null,
+                  icon: ev.icon,
+                }))
             : [],
         )
       } catch {
@@ -2096,7 +2144,12 @@ export default function HorizonPage({
       fireEndAge: strat.endAge,
       hasEigenHuis: initialData.housingContext.hasEigenHuis,
       downsizeStrategyActief: downsizeActief,
-    })
+    }, { lane: 'presets' })
+      // B-057/B4 — rijstrook: een nieuwere batch verdringt een nog niet geposte
+      // oudere (de batch is ~20 kernel-runs; per commit én per gelande hoofdrun
+      // opnieuw gepost). Verdrongen batches landen als lege batch op een al
+      // gecancelde effect-run → genegeerd. De debounce/guard zelf (B3) staat op een
+      // aparte kaart.
       // ADR 0129 D7 — de batch draagt naast de kaarten ook `solvedFireAge` ("vrij
       // mogelijk vanaf", de tweede run onder een vast anker). F3b toont dat getal in de
       // hero-drieslag; hier wordt alleen de kaartenlijst uitgepakt.
@@ -2245,6 +2298,12 @@ export default function HorizonPage({
     [goals, effectiveInput?.dateOfBirth, currentAge],
   )
 
+  // Stopmoment van de HOOFDRUN voor de looptijd-tekst van "tot ik stop met werken"-
+  // gebeurtenissen (Notion 3daf9e8d): vast anker ?? gevonden vrijheidsleeftijd, nooit
+  // fireAge (ceil). Bewust de hoofdrun, niet de lab-/stop-slider-run — anders verspringt
+  // de tekst bij elke schuifbeweging. null = geen bereikbaar stopmoment (geen leeftijd tonen).
+  const eventStopAge = useMemo(() => eventStopAgeFromSim(simResult), [simResult])
+
   const chartEventOverlay = useMemo<ChartEventOverlay[]>(() => {
     const out: ChartEventOverlay[] = []
     // Partner-view met een precies partner-pad: de hoofdlijn IS de partner z'n
@@ -2264,6 +2323,11 @@ export default function HorizonPage({
           color: side === 'above' ? COLOR_LIFE_INCOME : COLOR_LIFE_EXPENSE,
           icon: ev.icon || 'Calendar',
           kind: 'life_event',
+          // Looptijd van het maandbedrag als tooltip-detail (gedeelde helper) — alleen
+          // bij een maandbedrag; een eenmalige post heeft geen looptijd.
+          ...(ev.monthly_cost_change > 0 || ev.monthly_income_change > 0
+            ? { detail: describeEventDuration(ev, eventStopAge) }
+            : {}),
           // F-1 drag-handler heeft sourceId nodig om de supabase-update
           // te kunnen routeren. Voor life_events is dat de event-id zelf.
           sourceId: ev.id,
@@ -2305,13 +2369,18 @@ export default function HorizonPage({
     // mijlpalen. Géén sourceId → de click/drag-handlers raken niets aan
     // (de viewer kan de events van de partner niet bewerken). Alleen
     // PERSOONLIJKE partner-events; gedeelde + natuurlijke mijlpalen niet.
+    // As-keuze (TPR-07 fase 2a): loopt de hoofdlijn op de as van de partner
+    // (partner-view mét partner-pad), dan de opgeslagen leeftijd; anders — huishoud-
+    // blik of privacy-degrade naar de eigen lijn — de DOB-verschoven eigen as.
+    const partnerAxis = isPartnerView && partnerLine !== null
     if ((isHouseholdView || isPartnerView) && partnerLifeEvents.length > 0) {
       for (const ev of partnerLifeEvents) {
-        if (ev.targetAge == null) continue
+        const age = partnerAxis ? ev.targetAge : ev.targetAgeOnOwnAxis
+        if (age == null) continue
         out.push({
           id: `partner-${ev.id}`,
           label: ev.name,
-          age: ev.targetAge,
+          age,
           side: 'above',
           color: COLOR_PARTNER_EVENT,
           icon: ev.icon || 'Calendar',
@@ -2320,6 +2389,27 @@ export default function HorizonPage({
           readOnly: true,
         })
       }
+    }
+    // Partner-AOW op de eigen as (TPR-07 fase 2a) — uit de PT-laag van de kernel
+    // via de bridge (consume, don't recompute). De BROWSER-hoofdrun draagt geen
+    // partnerblok (rawContextZonderPartner), dus de bron is de gecombineerde run
+    // van de huishoud-sectie (`householdMainLine.partnerAowAge`), met de eigen
+    // `simResult` als terugval voor een run die het blok wél draagt. Alleen in de
+    // huishoudblik; read-only, geen sourceId → geen klik-/sleeproute. Kind 'natural'
+    // zodat de zichtbaarheid de natuurlijke mijlpalen volgt (net als de tekort-lening-marker).
+    const partnerAowAge = householdMainLine?.partnerAowAge ?? simResult?.partnerAowAge
+    if (isHouseholdView && showNaturalMilestones && partnerAowAge != null && Number.isFinite(partnerAowAge)) {
+      out.push({
+        id: 'partner-aow',
+        label: 'AOW partner',
+        age: partnerAowAge,
+        side: 'above',
+        color: COLOR_PARTNER_EVENT,
+        icon: 'Landmark',
+        kind: 'natural',
+        detail: `Je partner bereikt de AOW-leeftijd — op jouw as ${formatStopAge(Math.round(partnerAowAge * 10) / 10)}`,
+        readOnly: true,
+      })
     }
     // V7 — tekort-lening als read-only waarschuwingsmarker op de eerste leeftijd
     // waarop de lening wordt aangesproken (stoplicht-rood, geen module-accent). Kind
@@ -2350,7 +2440,7 @@ export default function HorizonPage({
       })
     }
     return out
-  }, [showLifeEvents, showNaturalMilestones, showGoals, goalChartMarkers, displayEvents, naturalMilestones, isHouseholdView, isPartnerView, partnerLine, partnerLifeEvents, deficitLoanNotice, reverseMortgageStartAge])
+  }, [showLifeEvents, showNaturalMilestones, showGoals, goalChartMarkers, displayEvents, naturalMilestones, isHouseholdView, isPartnerView, partnerLine, partnerLifeEvents, deficitLoanNotice, reverseMortgageStartAge, eventStopAge, householdMainLine?.partnerAowAge, simResult?.partnerAowAge])
 
   // ── Natuurlijke-mijlpaal info-sheet state ─────────────────────────────
   const [selectedNaturalMilestone, setSelectedNaturalMilestone] =
@@ -3489,16 +3579,25 @@ export default function HorizonPage({
   // betekent. `filterAssetsForFire` haalt eigen_huis + linked mortgage uit
   // de engine-projectie voor exclude/downsize; voor display willen we ze
   // wél tonen (anders verdwijnt het vastgoed/hypotheek-balkje).
+  /**
+   * Alleen de hypotheken OP DE EIGEN WONING — dezelfde koppeling die
+   * `filterAssetsForFire` gebruikt om ze mét het huis uit de FIRE-pot te halen;
+   * een hypotheek op een ander pand telt gewoon mee. Eén bron voor twee
+   * oppervlakken: de demping in de Opbouw-grafiek en de buiten-doel-markering
+   * in de jaar-kassabon moeten per definitie dezelfde regels raken.
+   */
+  const eigenHuisMortgageIds = useMemo(
+    () => new Set(initialData.housingContext.eigenHuisMortgages.map((d) => d.id)),
+    [initialData.housingContext.eigenHuisMortgages],
+  )
+
   const wealthCompositionRows: StackedRow[] = useMemo(() => {
     if (chartMode !== 'vermogensopbouw') return []
     if (!displayUnifiedRows.length) return []
     const baseRows = unifiedRowsToStackedRows(
       displayUnifiedRows,
       new Map(debts.map((d) => [d.id, d.debt_type])),
-      // Alleen de hypotheken OP DE EIGEN WONING — dezelfde koppeling die
-      // `filterAssetsForFire` gebruikt om ze met het huis uit de FIRE-pot te
-      // halen; een hypotheek op een ander pand telt gewoon mee.
-      new Set(initialData.housingContext.eigenHuisMortgages.map((d) => d.id)),
+      eigenHuisMortgageIds,
     )
 
     const currentAgeFloor = initialData.effectiveInput.dateOfBirth
@@ -3518,8 +3617,11 @@ export default function HorizonPage({
       fireEndAge: initialData.fireStrategy.endAge,
       isV2: true,
       houseInLedger: true,
+      // Terugval voor een woning zonder eigen rendement (ADR 0166) — inert onder
+      // `houseInLedger`, maar dezelfde grondslag als de kernel zodra het pad leeft.
+      terugvalRendement: initialData.fireParams.grossReturn,
     })
-  }, [chartMode, displayUnifiedRows, initialData, displayEvents, debts])
+  }, [chartMode, displayUnifiedRows, initialData, displayEvents, debts, eigenHuisMortgageIds])
 
   // Lazy compute income/expense breakdown only when user toggles to 'breakdown' mode.
   // Consume de geclipte weergaverijen zodat de bronnen-breakdown niet tot het
@@ -4056,7 +4158,7 @@ export default function HorizonPage({
         message: `Je plan rekent nu met stoppen op ${formatStopAge(effectiveStopAge)}.`,
       })
       loadData()
-      router.refresh()
+      startRefresh(() => router.refresh())
     } catch {
       setStopPlanError('Opslaan mislukt. Probeer het zo nog eens.')
     } finally {
@@ -5643,10 +5745,17 @@ export default function HorizonPage({
                       {dualDoelRegels[0].kwalificatie}
                     </span>
                   </div>
-                  {/* Het doel op de ándere grondslag — kleiner, in horizon-accent */}
+                  {/* Het doel op de ándere grondslag — kleiner en lichter, bewust ZONDER
+                      module-accent. Een accent is een gebruikersinstelbaar identiteits-
+                      token en draagt daarom nooit een grondslag of hiërarchie (besluit
+                      19-09-2026). Tot 19-09 viel de tweede regel altijd samen met het
+                      liquide doel; sinds de leesvolgorde de grondslag volgt is dat bij
+                      Uitsluiten juist het doel MÉT huis, en markeerde de kleur dus niets
+                      meer. Hiërarchie loopt nu via grootte + inkt, de grondslag via de
+                      kwalificatie-woorden ernaast. */}
                   <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 mt-1.5">
                     <div
-                      className="text-[16px] sm:text-[18px] font-black leading-none tracking-[-0.02em] text-[var(--module-active-800)]"
+                      className="text-[16px] sm:text-[18px] font-black leading-none tracking-[-0.02em] text-[var(--ink-2)]"
                       style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
                     >
                       <MaskedAmount value={dualDoelRegels[1].bedrag} tone="horizon" monoWhenVisible={false} approx />
@@ -5972,10 +6081,17 @@ export default function HorizonPage({
                       {dualDoelRegels[0].kwalificatie}
                     </span>
                   </div>
-                  {/* Het doel op de ándere grondslag — kleiner, in horizon-accent */}
+                  {/* Het doel op de ándere grondslag — kleiner en lichter, bewust ZONDER
+                      module-accent. Een accent is een gebruikersinstelbaar identiteits-
+                      token en draagt daarom nooit een grondslag of hiërarchie (besluit
+                      19-09-2026). Tot 19-09 viel de tweede regel altijd samen met het
+                      liquide doel; sinds de leesvolgorde de grondslag volgt is dat bij
+                      Uitsluiten juist het doel MÉT huis, en markeerde de kleur dus niets
+                      meer. Hiërarchie loopt nu via grootte + inkt, de grondslag via de
+                      kwalificatie-woorden ernaast. */}
                   <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 mt-1">
                     <div
-                      className="text-[13px] font-black leading-none tracking-[-0.02em] text-[var(--module-active-800)]"
+                      className="text-[13px] font-black leading-none tracking-[-0.02em] text-[var(--ink-2)]"
                       style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
                     >
                       <MaskedAmount value={dualDoelRegels[1].bedrag} tone="horizon" monoWhenVisible={false} approx />
@@ -6820,6 +6936,10 @@ export default function HorizonPage({
                 <ZoomableChartContainer currentAge={currentAge ?? 30} endAge={chartEndAge!}>
                   {(visibleMin, visibleMax, controls) => (
                     <>
+                      {/* B-057 — Fin's wachtstand op de grafiek zolang de projectie
+                          verouderd is (herlaad / refresh / hersolve). Eerst in de
+                          fragment zodat de zoom-knoppen (zelfde z-10) erboven blijven. */}
+                      <ProjectieLaadlaag pending={projectiePending} />
                       {/* STEP 3b/4: tips-laag wikkelt de grafiek — markers in een rij
                           boven + onder; de grafiek vervaagt zolang de tips aan staan. */}
                       <ToekomstOverlay
@@ -6929,6 +7049,7 @@ export default function HorizonPage({
                             mainLineColor={(usePartnerMainLine || useHouseholdMainLine) ? COLOR_PARTNER_EVENT : undefined}
                             scenarioOverlays={(usePartnerMainLine || useHouseholdMainLine) ? undefined : viewCombinedScenarioOverlays}
                             scenarioPending={scenarioPending || stopPadPending}
+                            mainPending={projectiePending}
                             monteCarloOverlay={(usePartnerMainLine || useHouseholdMainLine) ? undefined : viewMonteCarloOverlay}
                             // euro-view: exempt — het dagtarief (€→vrijheidstijd) is per
                             // definitie een grootheid van VANDAAG en deflateert nooit (D15).
@@ -7098,6 +7219,7 @@ export default function HorizonPage({
                             setEventPaneOpen(true)
                           }}
                           onEventDragEnd={handleEventDragEnd}
+                          stopAge={eventStopAge}
                         />
                       )}
 
@@ -10760,7 +10882,11 @@ export default function HorizonPage({
       )}
       <StrategieModal
         open={activeModal === 'strategie'}
-        onClose={() => { setActiveModal(null); setStrategieInitialTab(null); loadData(); router.refresh() }}
+        onClose={() => { setActiveModal(null); setStrategieInitialTab(null); loadData(); startRefresh(() => router.refresh()) }}
+        // B-057/B1 — na een geslaagde autosave van het plan herlaadt de grafiek
+        // meteen (pane blijft open); `router.refresh()` volgt pas bij sluiten (B5
+        // — of die nog nodig is — staat op een aparte kaart).
+        onSaved={() => { void loadData() }}
         housingStrategy={initialData.housingStrategy}
         initialTab={strategieInitialTab}
         // Kernel-context: de onttrekking-tab vergelijkt de vier PROFIELEN via de kernel.
@@ -10829,6 +10955,7 @@ export default function HorizonPage({
         open={clusterSheet !== null}
         events={clusterSheet?.events ?? []}
         centerAge={clusterSheet?.centerAge ?? 0}
+        stopAge={eventStopAge}
         onClose={() => setClusterSheet(null)}
         onSelectEvent={(id) => {
           if (id.startsWith('nat-')) {
@@ -10867,6 +10994,10 @@ export default function HorizonPage({
         // zorgt alleen dat het getal waarop de gebruiker klikte er als
         // "waarvan besteedbaar"-regel bij staat (ADR 0114 D3).
         primaryBasis={effectiveChartPrimaryBasis}
+        // Zelfde Set als de Opbouw-grafiek: klikt de gebruiker op een gedempte
+        // band, dan markeert de bon exact dezelfde regels als "telt niet mee
+        // voor je doel". De optelling blijft ongemoeid — de bon sluit op I.
+        eigenHuisMortgageIds={eigenHuisMortgageIds}
         onChangeAge={(newAge) => {
           // Clamp op de geclipte weergaverijen: de gebruiker mag niet naar het
           // (verborgen) laatste jaar bladeren.

@@ -201,19 +201,18 @@ describe('PortfolioValueChart — met data', () => {
     expect(label).toContain('1 feb 2026')
   })
 
-  it('vertaalt de eindwaarde naar vrijheidstijd wanneer de uitgaven bekend zijn', async () => {
+  it('vertaalt de eindwaarde naar vrijheidstijd met het CANONIEKE dagtarief uit de loader', async () => {
     mockHistory(response())
-    const yearlyEssentialExpenses = 18_250
-    render(<PortfolioValueChart onOpenHolding={noopOpenHolding} yearlyEssentialExpenses={yearlyEssentialExpenses} />)
+    // Sinds 19 sep 2026 komt het dagtarief als prop binnen (getRecentDailyExpenseRate,
+    // ADR 0126 D1). Het component leidt er zelf niets meer uit af — de oude
+    // `yearlyEssentialExpenses`-prop was de must-grondslag en dus een derde
+    // vrijheidstijd-grootheid naast dagtarief en runway.
+    const dailyExpenses = dailyExpenseRate(18_250 / 12)
+    render(<PortfolioValueChart onOpenHolding={noopOpenHolding} dailyExpenses={dailyExpenses} />)
 
-    // Pin de gerénderde tekst tegen de canonieke motor voor dezelfde input:
-    // dagtarief via dailyExpenseRate (×12/365), tijd via calculateFreedomTime.
-    // Zo valt weergave-drift (verkeerde grondslag, eigen som) direct om.
+    // Pin de gerénderde tekst tegen de canonieke motor voor dezelfde input.
     const expected = formatFreedomTimeString(
-      calculateFreedomTime(
-        POINTS[POINTS.length - 1].marketValue,
-        dailyExpenseRate(yearlyEssentialExpenses / 12),
-      ),
+      calculateFreedomTime(POINTS[POINTS.length - 1].marketValue, dailyExpenses),
       'long',
     )
     const freedom = await screen.findByTestId('portfolio-value-freedom')
@@ -222,7 +221,21 @@ describe('PortfolioValueChart — met data', () => {
     expect(freedom).toHaveTextContent('vrijheid')
   })
 
-  it('laat de vrijheidsregel weg zonder bekende uitgaven', async () => {
+  it('draagt de wisselkoers-voetnoot met de herkomst van het tarief', async () => {
+    mockHistory(response())
+    render(
+      <PortfolioValueChart
+        onOpenHolding={noopOpenHolding}
+        dailyExpenses={50}
+        dailyExpensesSource="estimate"
+      />,
+    )
+    await screen.findByTestId('portfolio-value-freedom')
+    // Een schatting mag niet als meting lezen (B-039).
+    expect(await screen.findByText(/schatting/i)).toBeTruthy()
+  })
+
+  it('laat de vrijheidsregel weg zonder bekend dagtarief', async () => {
     mockHistory(response())
     render(<PortfolioValueChart onOpenHolding={noopOpenHolding} />)
 

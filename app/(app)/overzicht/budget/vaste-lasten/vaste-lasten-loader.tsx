@@ -1,18 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
-import { getCachedUser } from '@/lib/supabase/cached-user'
-import {
-  getCanonicalDailyIncomeRate,
-  EMPTY_DAILY_INCOME_RATE,
-  type DailyIncomeRate,
-} from '@/lib/income-rate'
 import { loadCashflowKpis } from '@/lib/cashflow-kpis'
 import { loadCashflowData } from '@/lib/cashflow-data-loader'
 import { loadVasteLastenSummary } from '@/lib/vaste-lasten-summary'
 import { RECURRING_ANALYSIS_MONTHS } from '@/lib/recurring-detection'
 import { buildVasteLastenInsights } from '@/lib/vaste-lasten-insights'
 import { VasteLastenClient } from '@/components/overview/vaste-lasten-client'
-import { CashflowKalender } from '@/components/overview/cashflow-kalender'
-import { HideInSimple } from '@/components/app/hide-in-simple'
 import type { Perspective } from '@/lib/household-data'
 
 /**
@@ -32,9 +24,12 @@ import type { Perspective } from '@/lib/household-data'
  * een aparte, latere stap — hier verhuist hij alleen achter de Suspense-grens,
  * zodat hij de titel niet meer ophoudt.
  *
- * De kalender ligt in DEZELFDE grens: hij hangt aan `cashflow.recurrings` uit
- * diezelfde `loadCashflowData`. Een eigen `<Suspense>` zou een tweede wachtpunt
- * op één load zijn; `cache()` deelt de load toch al, dus meeliften kost niets.
+ * W-017 (19-09-2026): de cashflow-kalender en de werktijd-regel zijn van deze
+ * pagina verwijderd. Daarmee verdween ook de vierde loader
+ * (`getCanonicalDailyIncomeRate`, die de `loadCoreData`-bundel binnentrok —
+ * aandachtspunt `bruto-box1-grondslag-meervoudig`): drie loaders is nu écht drie.
+ * "Wanneer komt de afschrijving" blijft beschikbaar via de Agenda-widget
+ * (lib/upcoming-events.ts), op dezelfde bron.
  */
 export async function VasteLastenLoader({ perspective }: { perspective: Perspective }) {
   // `createClient()` is React-`cache()`-gewrapt → dezelfde instantie als elders in
@@ -42,29 +37,10 @@ export async function VasteLastenLoader({ perspective }: { perspective: Perspect
   // boven zijn return (zie de kop van page.tsx).
   const supabase = await createClient()
 
-  // De WERKTIJD-noemer hangt aan de ingelogde gebruiker (handmatige Box 1-
-  // override staat op zijn profielrij). `getCachedUser` is `cache()`-gewrapt en
-  // deelt de auth-roundtrip die de loaders hieronder toch al doen.
-  const user = await getCachedUser(supabase)
-
-  const [kpis, cashflow, summary, incomeRate] = await Promise.all([
+  const [kpis, cashflow, summary] = await Promise.all([
     loadCashflowKpis(supabase),
     loadCashflowData(supabase, perspective),
     loadVasteLastenSummary(supabase),
-    // WERKTIJD-basis (ADR 0105) — bruto dagtarief uit de CANONIEKE bruto Box 1-
-    // grondslag (`resolveBox1GrossIncome`, ADR 0086/0103), dezelfde bron als de
-    // belasting-hub. Bewust géén tweede afleiding uit `kpis.monthlyIncome`: dat
-    // is netto én een andere grondslag, en zou dit scherm een ander werkjaar
-    // geven dan /overzicht/belasting — precies de fout die C5 blootlegde.
-    // KOSTEN: deze bron trekt de `loadCoreData`-bundel binnen (aandachtspunt
-    // `bruto-box1-grondslag-meervoudig`); hij draait daarom PARALLEL met de drie
-    // loaders hierboven, en faalt zacht → geen werktijd-regel i.p.v. geen pagina.
-    user
-      ? getCanonicalDailyIncomeRate(supabase, user.id).catch((err): DailyIncomeRate => {
-          console.error('vaste-lasten:income-rate', err)
-          return EMPTY_DAILY_INCOME_RATE
-        })
-      : Promise.resolve(EMPTY_DAILY_INCOME_RATE),
   ])
 
   // TWEE VERSCHILLENDE GRONDSLAGEN, allebei bewust:
@@ -83,58 +59,28 @@ export async function VasteLastenLoader({ perspective }: { perspective: Perspect
     // `?? 0` = "geen eerlijke dagbasis" (het veld is additief/optioneel op het
     // gedeelde scalars-type); de motor laat de tijdregels dan weg.
     dailyExpenseRate: kpis.dailyExpenseRate ?? 0,
-    //  · `dailyIncomeRate` — CANONIEK bruto dagtarief (ADR 0105). Een DERDE
-    //    grondslag naast de twee hierboven, en bewust: werktijd ("hoeveel van je
-    //    werkjaar gaat hiernaartoe") deelt op het inkomen, vrijheidstijd op de
-    //    uitgaven. 0 = geen werkjaar-basis → het scherm laat de werktijd-zin weg.
-    dailyIncomeRate: incomeRate.dailyRate,
   })
 
   return (
-    <div className="space-y-6">
-      <VasteLastenClient
-        insights={insights}
-        subscriptions={summary.subscriptions}
-        vasteKosten={summary.vasteKosten}
-        terugkerendVariabel={summary.terugkerendVariabel}
-        fullName={cashflow.fullName}
-        // GRONDSLAG-REGEL (V-001). De melding was niet "het getal klopt niet"
-        // maar "ik verwacht er meer" — dus hoort het scherm te zeggen waar het
-        // naar kéék. `accountCount` komt uit dezelfde perspectief-gescoopte
-        // `loadCashflowData` als de rest van deze pagina (kalender, saldo), dus
-        // de regel telt dezelfde rekeningen als de cijfers eromheen; de maanden
-        // zijn het canonieke detectievenster. Bewust géén extra query en geen
-        // extra kolom in de keyset-ophaal: dit is een duidingsregel, geen
-        // meting die zijn eigen datapad verdient.
-        detectionBasis={{
-          accountCount: cashflow.accountCount,
-          months: RECURRING_ANALYSIS_MONTHS,
-        }}
-      />
-      {/* Kalender = secundaire diepte ("wanneer komt het"): in Eenvoudig
-          verborgen, in Volledig zichtbaar. De primaire analyse + het
-          hoofdcijfer (VasteLastenClient) blijven altijd staan.
-
-          TWEE POPULATIES, ÉÉN KALENDER (M21). `cashflow.recurrings` is de
-          bevestigde tabel; `detections` zijn de posten die de analyse hierboven
-          wél meetelt maar die nog niet bevestigd zijn. Zonder die tweede stroom
-          stond er "geen vaste afschrijvingen" onder een kaart die er 21 telde.
-          `terugkerendVariabel` (boodschappen/tanken) blijft er bewust BUITEN:
-          die staat ook buiten `totalMonthly` en heeft geen vaste afschrijfdag. */}
-      <HideInSimple>
-        <CashflowKalender
-          recurrings={cashflow.recurrings}
-          detections={[...summary.subscriptions, ...summary.vasteKosten]
-            .filter((item) => !item.alreadyConfirmed && item.schedule)
-            .map((item) => ({
-              id: item.id,
-              name: item.name,
-              amount: item.averageAmount,
-              schedule: item.schedule ?? null,
-            }))}
-        />
-      </HideInSimple>
-    </div>
+    <VasteLastenClient
+      insights={insights}
+      subscriptions={summary.subscriptions}
+      vasteKosten={summary.vasteKosten}
+      terugkerendVariabel={summary.terugkerendVariabel}
+      fullName={cashflow.fullName}
+      // GRONDSLAG-REGEL (V-001). De melding was niet "het getal klopt niet"
+      // maar "ik verwacht er meer" — dus hoort het scherm te zeggen waar het
+      // naar kéék. `accountCount` komt uit dezelfde perspectief-gescoopte
+      // `loadCashflowData` als de rest van deze pagina, dus de regel telt
+      // dezelfde rekeningen als de cijfers eromheen; de maanden zijn het
+      // canonieke detectievenster. Bewust géén extra query en geen extra kolom
+      // in de keyset-ophaal: dit is een duidingsregel, geen meting die zijn
+      // eigen datapad verdient.
+      detectionBasis={{
+        accountCount: cashflow.accountCount,
+        months: RECURRING_ANALYSIS_MONTHS,
+      }}
+    />
   )
 }
 
@@ -167,10 +113,9 @@ export async function VasteLastenLoader({ perspective }: { perspective: Perspect
  *    veelvoorkomende orde van grootte, geen belofte. De rij-HOOGTE (62px:
  *    py-3 + `text-sm`-regel + `text-xs`-regel + 1px randen) is wél nageteld, dus
  *    een afwijking kost een veelvoud van één rij en geen willekeurig verschil.
- *  · De KALENDER (`HideInSimple` — in Eenvoudig rendert hij helemaal niet) en de
- *    inzicht-blokken. Allebei ver onder de vouw; een vaste reservering zou voor
- *    de Eenvoudig-modus een permanent gat zijn (dezelfde afweging als de
- *    inflatiekaart op de hub).
+ *  · De inzicht-blokken onder de lijst. Ver onder de vouw; een vaste
+ *    reservering zou voor de Eenvoudig-modus (die de samenstelling mist) een
+ *    permanent gat zijn (dezelfde afweging als de inflatiekaart op de hub).
  *
  * WAT WÉL GERESERVEERD WORDT HOEWEL HET KAN ONTBREKEN — de strook direct onder
  * het cijferblok. `CompactMeter` rendert alleen bij `insights.hasData`
@@ -181,17 +126,15 @@ export async function VasteLastenLoader({ perspective }: { perspective: Perspect
  *
  * S2 — DE OUDE AANNAME "in Eenvoudig rendert daar niets" IS VERVALLEN. Sinds S2
  * staat in Eenvoudig op precies deze plek de OORDEELREGEL (`OordeelDeck`, ±2
- * regels ≈ 46px) in plaats van de compacte meter (±28px), en dáár weer onder de
- * quote-meter, het sluipverbruik en de top-5. Deze fallback is bewust
- * modus-AGNOSTISCH gebleven: hij is een server-component en kan
+ * regels ≈ 46px) in plaats van de compacte meter (±28px). Deze fallback is
+ * bewust modus-AGNOSTISCH gebleven: hij is een server-component en kan
  * `useDisplayMode()` niet lezen, en een tweede, modus-afhankelijke skeleton zou
  * de modus alsnog naar de serverrender moeten prop-drillen (drift-risico dat
  * ADR 0026 juist wegneemt). Boven de vouw kost dat ~18px verschil (deck i.p.v.
  * meter) — kleiner dan de bestaande onzekerheid over het aantal lijstrijen.
- * Onder de vouw schuift de analyse-kaart in Eenvoudig verder omlaag (de drie
- * duidingsblokken komen ertussen) en klapt hij bovendien in tot de
- * DepthSection-kop; die twee heffen elkaar deels op en spelen zich af buiten
- * het eerste scherm, waar een skeleton geen shift meer voorkomt die iemand ziet.
+ * Sinds W-017 (19-09-2026) staat de analyse-kaart in BEIDE modi direct onder
+ * dit blok (geen duidingsblokken ertussen, geen DepthSection meer), dus de
+ * skeleton hieronder klopt voor Eenvoudig juist béter dan voorheen.
  */
 export function VasteLastenFallback() {
   return (

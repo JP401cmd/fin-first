@@ -13,10 +13,13 @@
 // PARITY-CONTRACT
 //   • De functie geeft één rij per (maand 'YYYY-MM', budget_id, transaction_type)
 //     met de som van de positieve en de negatieve bedragen + de telling.
-//   • De transfer-filter (`isRealTx`) blijft in JS en verschilt PER LOADER:
-//     dashboard/lever filteren transfers eruit, horizon telt ze bewust mee. De
-//     reducers hieronder nemen daarom een expliciete `realOnly`-vlag — nooit een
-//     verborgen default die één loader stilzwijgend verandert.
+//   • De transfer-filter (`isRealTx`) blijft in JS. Sinds ADR 0169 (19 sep 2026)
+//     filteren ÁLLE inkomens-/uitgavensommen transfers eruit — ook de horizon-
+//     FIRE-som, die ze tot dan bewust meetelde (per-module-splitsing opgeheven,
+//     WF-TOEK-02-bug2). De reducers houden een expliciete `realOnly`-vlag zodat
+//     een afwijking zichtbaar in de aanroep staat; `realOnly:false` is alleen nog
+//     voor "bestaat er een boeking?"-vragen (versheid), nooit voor een som die
+//     een cijfer voedt.
 //   • `buildMonthAggregatesFromRows` reproduceert de SQL in TS zodat de
 //     parity-test kan bewijzen: oude JS-reductie(ruwe rijen) ==
 //     nieuwe reductie(aggregaat) — inclusief een >1000-rijen-getuige.

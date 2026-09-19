@@ -82,6 +82,23 @@ describe('user-data-tables — AVG-partitie dekt de volledige schema-inventaris'
   })
 
   /**
+   * B-058: de mijlpalenlog moet bij een RESET mee. Blijft hij staan, dan viert de
+   * motor na het heronboarden de eerste triviale drempel (`totalDebts === 0` op
+   * een net gewist profiel) als verse mijlpaal — de gemelde "je bent
+   * schuldenvrij"-melding vlak na de onboarding.
+   *
+   * SERVICE en niet SESSION: migratie 20260831160000 geeft bewust géén eigen-rij
+   * DELETE-policy, dus via de sessie-client zou de wis een STILLE no-op zijn —
+   * precies het foutbeeld dat deze partitie moet voorkomen.
+   */
+  it('de mijlpalenlog wordt bij reset gewist via de service-role, niet via de sessie (B-058)', () => {
+    expect(ALL_USER_SCOPED_TABLES).toContain('achieved_milestones')
+    expect(SERVICE_WIPE_TABLES).toContain('achieved_milestones')
+    expect(SESSION_WIPE_TABLES).not.toContain('achieved_milestones')
+    expect(Object.keys(RETENTION_ALLOWLIST)).not.toContain('achieved_milestones')
+  })
+
+  /**
    * ADR 0155: het toestemmingsbewijs is eigen-rij LEESBAAR maar niet WISBAAR
    * (append-only). Het valt dus buiten SESSION_WIPE, maar het inzagerecht (art.
    * 15) eist het wél in de export — via de extra eigen-rij-leeslijst, en nooit
@@ -118,6 +135,46 @@ describe('user-data-tables — AVG-partitie dekt de volledige schema-inventaris'
       expect(SESSION_WIPE_TABLES).toContain(table)
       expect(EXPORT_SESSION_TABLES).toContain(table)
       expect(EXPORT_SERVICE_TABLES).not.toContain(table)
+    }
+  })
+
+  /**
+   * Security-review B-058 (19-09-2026), gemeten tegen pg_policies: deze tabellen
+   * hebben live GEEN eigen-rij DELETE-policy (alleen SELECT/INSERT/UPDATE of
+   * minder). Een `delete().eq('user_id', …)` via de sessie-client levert dan 0
+   * rijen zonder fout — een stille no-op, exact het B-058-foutbeeld. Ze horen
+   * dus in de SERVICE-partitie, nooit in de sessie-partitie. De lijst is een
+   * schema-feit, geen keuze: verplaats een tabel pas terug nadat een migratie
+   * de DELETE-policy heeft toegevoegd én pg_policies dat bevestigt.
+   */
+  it('tabellen zonder eigen-rij DELETE-policy staan in de service-partitie, nooit in de sessie (pg_policies 19-09-2026)', () => {
+    const geenEigenRijDelete = [
+      'next_step_completions',
+      'user_feature_visits',
+      'achieved_milestones',
+      'feedback',
+      'user_reports',
+      'questionnaire_invitations',
+      'user_group_members',
+    ]
+    for (const t of geenEigenRijDelete) {
+      expect(SERVICE_WIPE_TABLES, `${t} hoort in SERVICE_WIPE_TABLES`).toContain(t)
+      expect(SESSION_WIPE_TABLES, `${t} mag niet in SESSION_WIPE_TABLES`).not.toContain(t)
+    }
+  })
+
+  /**
+   * Security-review B-058 (19-09-2026), gemeten tegen information_schema: de
+   * inventaris was "laatst 08-08-2026" en miste élke user_id-tabel van daarna
+   * die niet met de hand vooruit was toegevoegd. Deze drie hebben live een
+   * eigen-rij DELETE-policy en horen dus in de sessie-partitie (en daarmee in
+   * de zelf-export). `spend_limit_rules` draagt `counterparty_labels` — dezelfde
+   * persoonsnaam-mogelijkheid die `spend_limits` in de export bracht.
+   */
+  it('de inventaris draagt de user_id-tabellen van ná 08-08-2026 (information_schema 19-09-2026)', () => {
+    for (const t of ['goal_links', 'import_idempotency', 'spend_limit_rules']) {
+      expect(ALL_USER_SCOPED_TABLES, `${t} ontbreekt in de inventaris`).toContain(t)
+      expect(SESSION_WIPE_TABLES, `${t} hoort in SESSION_WIPE_TABLES`).toContain(t)
     }
   })
 })
