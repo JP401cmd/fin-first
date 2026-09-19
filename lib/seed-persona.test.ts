@@ -80,6 +80,27 @@ describe('deleteAllUserData — fail-fast bij delete-fouten', () => {
     expect(deletedTables).toContain('app_settings')
   })
 
+  /**
+   * Security-review 19-09-2026: `import_idempotency` stond wél in de inventaris
+   * en in de export, maar werd NERGENS gewist — de tabel hangt alleen met een
+   * FK aan `auth.users`, dus er cascadeert niets vanuit `public`. Gevolg van dat
+   * gat: een claim met status 'done' overleeft een reset, waarna een her-import
+   * van dezelfde aangifte als replay wordt beantwoord (`already_imported: true`,
+   * oude id's) zonder iets te schrijven. Een gebruiker die na een reset zijn
+   * aangifte opnieuw uploadt, krijgt dan een leeg account terug.
+   *
+   * Sessie-partitie en dus `deleteTable` (niet de service-tak): de tabel heeft
+   * een eigen-rij DELETE-policy ("import_idempotency own delete",
+   * `user_id = (select auth.uid())`, TO authenticated) — gemeten tegen
+   * pg_policies op 19-09-2026, niet uit de migratie overgenomen.
+   */
+  it('wist import_idempotency (anders overleeft een "al geïmporteerd"-claim de reset)', async () => {
+    const { client, deletedTables } = makeSupabaseMock()
+    const summary = await deleteAllUserData(client, 'user-123')
+    expect(deletedTables).toContain('import_idempotency')
+    expect(summary).toMatchObject({ import_idempotency: 2 })
+  })
+
   it('slaat een nog niet uitgerolde tabel over (PGRST205) en wist de rest gewoon — AVG-verwijderen mag daar niet op breken', async () => {
     // user_activity_days/-modules wachten bewust op de /privacy-aanpassing
     // (ADR 0146/0147); de code staat er al. Een ontbrekende tabel bevat niets.

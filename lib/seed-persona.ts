@@ -377,8 +377,16 @@ export async function deleteAllUserData(
     deleteTable(supabase, 'user_activity_days', userId),
     // Gebruikte app-delen per dag (ADR 0147, fase 2): blad-tabel, eigen-rij DELETE.
     deleteTable(supabase, 'user_activity_modules', userId),
+    // Idempotentie-claims van de aangifte-import (migratie 20260827170000):
+    // blad-tabel met als enige FK `user_id → auth.users`, dus er cascadeert
+    // NIETS vanuit public — zonder deze regel overleeft een claim met status
+    // 'done' een reset en wordt een her-import van dezelfde aangifte als replay
+    // beantwoord (`already_imported: true`) zonder iets te schrijven. Sessie-
+    // client volstaat: eigen-rij DELETE-policy ("import_idempotency own
+    // delete"), gemeten tegen pg_policies op 19-09-2026.
+    deleteTable(supabase, 'import_idempotency', userId),
   ])
-  const batch0Tables = ['investment_transactions', 'crypto_transactions', 'holding_alerts', 'target_allocations', 'user_feature_visits', 'next_step_completions', 'user_activity_days', 'user_activity_modules']
+  const batch0Tables = ['investment_transactions', 'crypto_transactions', 'holding_alerts', 'target_allocations', 'user_feature_visits', 'next_step_completions', 'user_activity_days', 'user_activity_modules', 'import_idempotency']
   for (let i = 0; i < batch0Tables.length; i++) {
     summary[batch0Tables[i]] = batch0Results[i]
   }

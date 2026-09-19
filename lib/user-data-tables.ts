@@ -126,14 +126,14 @@ export const SESSION_WIPE_TABLES: readonly string[] = [
   // `response` = de id-lijsten van de geschreven rijen (geen klaartekst).
   // Eigen-rij DELETE-policy ("import_idempotency own delete", gemeten
   // 19-09-2026) → sessie-partitie; de export neemt 'm generiek mee.
-  // LET OP — net als bij `spend_limits` destijds maakt deze entry de EXPORT
-  // compleet, de WIS nog niet: `deleteAllUserData` (lib/seed-persona.ts) roept
-  // voor deze tabel géén deleteTable aan en er is geen FK naar een public-tabel
-  // die cascadeert. Gevolg: een claim met status 'done' overleeft een reset, en
-  // een her-import van dezelfde aangifte na een reset wordt als replay
-  // beantwoord (`already_imported: true`, oude id's) zonder iets te schrijven.
-  // Bij full-delete cascadeert hij wél via auth.users. Gemeld in de
-  // security-review B-058 (19-09-2026); de deleteTable-regel hoort in batch 0.
+  // WIS: sinds 19-09-2026 expliciet in batch 0 van `deleteAllUserData`
+  // (lib/seed-persona.ts). Die regel is niet optioneel — de enige FK is
+  // `user_id → auth.users`, dus er cascadeert NIETS vanuit public. Zonder hem
+  // overleefde een claim met status 'done' een reset, waarna een her-import van
+  // dezelfde aangifte als replay werd beantwoord (`already_imported: true`,
+  // oude id's) zonder iets te schrijven. Bij een volledige accountverwijdering
+  // cascadeert hij wél via auth.users. Gat gemeld in de security-review B-058
+  // (19-09-2026); vastgepind in lib/seed-persona.test.ts.
   'import_idempotency',
   // Gespreksgeschiedenis met Fin (migratie 20260908120000, ADR 0137). Beide
   // tabellen dragen `user_id` én een eigen-rij DELETE-policy
