@@ -21,7 +21,7 @@
 
 import type { ReactNode } from 'react'
 import { rangeTouchSeekProps } from '@/lib/range-touch-seek'
-import { labGrensRegel, labZoneWoord } from '@/lib/horizon/anker-copy'
+import { LAB_COPY, labGrensRegel, labZoneWoord } from '@/lib/horizon/anker-copy'
 import {
   zoneVanWaarde,
   type HefboomBereik,
@@ -155,6 +155,17 @@ export function LabSlider({
   // nooit een grens die je niet kunt aanwijzen, en nooit een lege regel.
   const gedektBinnen = binnen(grenzen?.gedekt ?? null, bereik)
   const ruimBinnen = binnen(grenzen?.ruim ?? null, bereik)
+
+  // Merkteken op de grens rood→oranje: het punt waar het plan precies gedekt is (of, onder
+  // "zo vroeg als het kan", de haalbare vrijheidsleeftijd). Diezelfde grens staat al in de
+  // regel eronder als BEDRAG; dit merkteken zet 'm op de as, zodat je ziet hoe ver je er
+  // vandaan staat en — omdat elke andere knop de grens verschuift — hoe hij meebeweegt.
+  // Zelfde vorm als het "nu"-streepje, maar in volle inkt: "nu" is waar je staat, dit is
+  // waar je moet komen.
+  const gedektPct = gedektBinnen ? posOf(grenzen!.gedekt!, bereik) : null
+  // Het label wijkt voor het "nu"-label: twee woorden op dezelfde plek leest als één.
+  const toonGedektLabel =
+    gedektPct != null && gedektPct > 8 && gedektPct < 92 && Math.abs(gedektPct - notchPct) > 9
   const reden: Parameters<typeof labGrensRegel>[0]['reden'] =
     grenzen == null
       ? 'onbekend'
@@ -221,6 +232,16 @@ export function LabSlider({
           className="pointer-events-none absolute top-1/2 z-20 h-[18px] w-0.5 -translate-x-1/2 -translate-y-1/2 bg-[var(--ink-3)]"
           style={{ left: `${notchPct}%` }}
         />
+        {/* De gedekt-grens: hoger en in volle inkt, en hij schuift mee (zelfde duur als de
+            segmenten, zodat merkteken en kleurgrens als één beweging lezen). */}
+        {gedektPct != null && (
+          <span
+            aria-hidden
+            data-testid={`lab-knop-${id}-grensmerk`}
+            className="pointer-events-none absolute top-1/2 z-20 h-[22px] w-px -translate-x-1/2 -translate-y-1/2 bg-[var(--ink)] motion-safe:transition-[left] motion-safe:duration-300"
+            style={{ left: `${gedektPct}%` }}
+          />
+        )}
         <input
           type="range"
           id={id}
@@ -247,6 +268,15 @@ export function LabSlider({
             style={{ left: `${notchPct}%` }}
           >
             nu
+          </span>
+        )}
+        {toonGedektLabel && (
+          <span
+            aria-hidden
+            className="absolute -translate-x-1/2 font-sans text-[10px] font-semibold text-[var(--ink)] motion-safe:transition-[left] motion-safe:duration-300"
+            style={{ left: `${gedektPct}%` }}
+          >
+            {LAB_COPY.grensGedekt}
           </span>
         )}
         <span>{formatGrens(bereik.max)}</span>

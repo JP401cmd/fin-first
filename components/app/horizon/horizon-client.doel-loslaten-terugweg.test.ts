@@ -8,11 +8,14 @@ import { join } from 'node:path'
  * WAAROM EEN BRON-TEST (precedent: horizon-client.nu-stoppen.test.ts /
  * .hero-fire-age.test.ts / .euro-view.test.ts): dit bestand is >9000 regels en
  * het defect is geen verkeerd getal maar een RENDERCONDITIE die zichzelf
- * afsluit. In Eenvoudig rendert KATERN II alleen bij een vastgelegd doel; de
- * knop "Doel loslaten" zet `doelBlok` op null, waarmee diezelfde sectie — en
- * dus de enige weg terug ("Maak dit mijn doel") — uit beeld verdwijnt. Een
- * render-test op dit component is niet haalbaar; de conditie zelf is het
- * bewijs.
+ * afsluit. In Eenvoudig rendeerde het doelscenario alleen bij een vastgelegd
+ * doel; de knop "Doel loslaten" zet `doelBlok` op null, waarmee diezelfde sectie
+ * — en dus de enige weg terug ("Maak dit mijn doel") — uit beeld verdween. Een
+ * render-test op dit component is niet haalbaar; de conditie zelf is het bewijs.
+ *
+ * Sinds 20 sep 2026 staat het blok áltijd in de grafiekkaart (ook in Eenvoudig),
+ * dus is de terugweg structureel. Deze grendel bewaakt dat: hij faalt zodra de
+ * zichtbaarheid weer aan het doel of aan de weergavemodus gaat hangen.
  *
  * Given  een gebruiker in Eenvoudige weergave met een vastgelegd doel
  * When   hij onder de grafiek op "Doel loslaten" klikt
@@ -49,31 +52,24 @@ describe('KATERN II blijft bereikbaar na "Doel loslaten" (B-031)', () => {
     expect(losseKopieen.length).toBeLessThanOrEqual(1)
   })
 
-  it('loslaten houdt de sectie deze sessie open, zodat de weg terug niet mee verdwijnt', () => {
+  it('de zichtbaarheid hangt NIET aan het doel of aan de weergavemodus — anders sluit loslaten de weg terug af', () => {
+    // Tot 20 sep 2026 hing de sectie in Eenvoudig aan `doelActief`, en hield een
+    // sessie-vlag (`doelLosgelatenDezeSessie`) 'm na loslaten alsnog in beeld. Die
+    // omweg is vervallen: het doelscenario staat nu áltijd in de grafiekkaart, ook
+    // in Eenvoudig. Dat maakt de terugweg structureel in plaats van geplakt — maar
+    // alleen zolang de afleiding niet opnieuw aan het doel of de modus gaat hangen.
     const src = bron()
-    // De vlag bestaat, zit in de zichtbaarheidsafleiding én wordt door de
-    // loslaat-actie gezet.
-    expect(src).toContain('doelLosgelatenDezeSessie')
     const afleiding = src.slice(
       src.indexOf('const verkenSectieZichtbaar ='),
-      src.indexOf('const verkenSectieZichtbaar =') + 400,
+      src.indexOf('const verkenSectieZichtbaar =') + 200,
     )
-    expect(afleiding).toContain('doelLosgelatenDezeSessie')
+    expect(afleiding).not.toContain('doelActief')
+    expect(afleiding).not.toContain('displayMode')
+    // De perspectief-gate blijft wél: op een partner-/huishoudlijn rekent het lab niet.
+    expect(afleiding).toContain('usePartnerMainLine')
 
-    const loslaten = src.slice(
-      src.indexOf('const handleDoelLoslaten'),
-      src.indexOf('const handleDoelHerstellen'),
-    )
-    expect(loslaten).toContain('setDoelLosgelatenDezeSessie(true)')
-  })
-
-  it('opnieuw vastleggen zet de vlag terug — de sectie hangt dan weer aan het doel zelf', () => {
-    const src = bron()
-    const vastleggen = src.slice(
-      src.indexOf('const handleDoelVastleggen'),
-      src.indexOf('const handleDoelVastleggen') + 3000,
-    )
-    expect(vastleggen).toContain('setDoelLosgelatenDezeSessie(false)')
+    // De vlag is weg, en daarmee ook de setters die 'm onderhielden.
+    expect(src).not.toContain('doelLosgelatenDezeSessie')
   })
 
   it('"Maak dit mijn doel" verschijnt óók bij een kale stopkeuze, niet alleen bij sliders', async () => {

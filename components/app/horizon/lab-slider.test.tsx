@@ -97,6 +97,26 @@ describe('LabSlider — weergave en toegankelijkheid', () => {
     expect(screen.getByTestId('lab-knop-verdienen-grens').textContent).toBe('gedekt vanaf +€ 40')
   })
 
+  it('het merkteken staat op de berekende gedekt-grens, niet op "nu"', () => {
+    renderKnop({ grenzen: { gedekt: 40, ruim: 70, heel: null }, baseValue: 0 })
+    const merk = screen.getByTestId('lab-knop-verdienen-grensmerk')
+    // Bereik 0–100, grens op 40 ⇒ 40% van de as. Het "nu"-streepje staat op 0%.
+    expect(merk.getAttribute('style')).toContain('left: 40%')
+  })
+
+  it('het merkteken beweegt mee wanneer een andere knop de grens verschuift', () => {
+    const eerst = renderKnop({ grenzen: { gedekt: 40, ruim: 70, heel: null } })
+    expect(screen.getByTestId('lab-knop-verdienen-grensmerk').getAttribute('style')).toContain('left: 40%')
+    eerst.unmount()
+    renderKnop({ grenzen: { gedekt: 25, ruim: 55, heel: null } })
+    expect(screen.getByTestId('lab-knop-verdienen-grensmerk').getAttribute('style')).toContain('left: 25%')
+  })
+
+  it('geen merkteken wanneer de grens buiten het bereik van de knop ligt', () => {
+    renderKnop({ grenzen: { gedekt: 250, ruim: 300, heel: null } })
+    expect(screen.queryByTestId('lab-knop-verdienen-grensmerk')).toBeNull()
+  })
+
   it('een grens buiten het bereik wordt niet genoemd — de reden staat er in plaats van', () => {
     renderKnop({ grenzen: { gedekt: 250, ruim: 300, heel: null } })
     expect(screen.getByTestId('lab-knop-verdienen-grens').textContent).toBe(

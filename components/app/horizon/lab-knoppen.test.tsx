@@ -160,6 +160,16 @@ describe('LabKnoppen — de twee vormen (ADR 0170, 20 sep 2026)', () => {
     expect(screen.getByTestId('lab-knop-verdienen-segment-groen')).toBeTruthy()
   })
 
+  it('de greep houdt een vaste maat van 44px, dus niet meeschalend met de meter', () => {
+    renderBlok()
+    const greep = screen.getByTestId('lab-knop-verdienen-greep')
+    // Een SVG-cirkel zou met de viewBox meeschalen en in het twee-koloms raster op een
+    // telefoon terugzakken tot ~32px — precies waar de vinger 'm nodig heeft.
+    expect(greep.tagName).toBe('DIV')
+    expect(greep.className).toContain('h-11')
+    expect(greep.className).toContain('w-11')
+  })
+
   it('weergave "balk" geeft elke knop een gekleurde as in plaats van een meter', () => {
     renderBlok({ weergave: 'balk' })
     expect(screen.getByTestId('lab-knop-verdienen-as')).toBeTruthy()

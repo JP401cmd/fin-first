@@ -46,6 +46,14 @@ gedekt is, met de andere vier knoppen op hun huidige stand. Beweegt één knop, 
 de grenzen op **alle** knoppen mee — dat is de kern van het ontwerp: de schaal ís de duiding,
 dus de antwoordregels, de marge-band en de tegels kunnen weg.
 
+Op die grens staat een **merkteken** (eigenaarswens 20 sep 2026): dezelfde vorm als het
+"nu"-streepje, maar in volle inkt en met het label "gedekt" — "nu" is waar je staat, dit is
+waar je moet komen. Het schuift mee met dezelfde duur als de kleursegmenten, zodat merkteken
+en kleurgrens één beweging zijn wanneer een andere knop de grens verschuift. Op de wijzer
+steekt het aan de buitenkant van de band uit (het "nu"-streepje valt er juist binnen).
+Ligt de grens buiten het bereik van de knop, dan staat er géén merkteken: een grens die je
+niet kunt aanwijzen, wijs je niet aan — de regel eronder zegt dan waaróm.
+
 **B3 — De 10 %-marge meet de uitkomstmaat van het plan.** Onder een **vast stopmoment**
 (`aow`/`age`/`now`) is dat de **dekking**, uitgedrukt in tijd: het plan moet ook reiken tot
 `eind + 10 % × (eind − planStop)` — bij stop 62 en eindleeftijd 90 dus tot ~93. Onder **"zo
@@ -83,6 +91,26 @@ zijn precies de drie waar zulke knoppen in de praktijk op stuklopen. In wijzer-v
 plan-acties ("Maak X mijn stopmoment", "Je plan-keuzes") onder het hele blok in plaats van onder
 de stop-knop: de cel is daar te smal, en ze gaan over het plan als geheel.
 
+Op de band zit wél een **greep**: een bolletje op de stand van de naald, om met de vinger aan te
+draaien (eigenaarswens 20 sep 2026) — zonder zichtbaar handvat ziet een meter eruit als een
+plaatje, niet als een knop. Dat is geen tweede schrijfpad: de greep sleept op **hoek** t.o.v. het
+middelpunt (op een boog lopen hoek en x-positie uiteen, aan de uiteinden tot een tiende van het
+bereik) en schrijft door dezelfde `onChange` als het invoerveld, dat de bediening voor muis en
+toetsenbord én de toegankelijkheid blijft dragen. De greep ligt in een eigen laag ná dat
+invoerveld, want aan de uiteinden van de boog dekt het 44 px-sleepvlak de band af; alleen het
+bolletje vangt aanrakingen, zodat een veeg die elders op de meter begint gewoon de pagina scrollt.
+Het aanraakvlak is een HTML-element met een vaste maat, géén SVG-cirkel: die schaalt mee met de
+viewBox en zakt in het twee-koloms raster op een telefoon terug naar ~32 px — onder de norm, en
+precies waar de vinger 'm nodig heeft. Dat de greep in een `aria-hidden`-boom hangt is hier
+bewust: het invoerveld draagt de volwaardige bediening, dus een schermlezer hoort de knop één
+keer. Dat is een toegevoegde laag voor wie kan slepen, geen tweede ingang — en nadrukkelijk geen
+vrijbrief om elders interactie in een verborgen boom te hangen.
+
+De greep draagt de **module-accentkleur** van de balk-duim (`--module-active-500`, bij
+vastpakken `-700` en groter — wat `.slider-module` met `scale(1,2)` doet). Twee vormen van
+dezelfde bediening horen één kleurtaal te spreken; de driekleurige schaal eronder draagt de
+semantiek, de greep zegt alleen "hier pak je 'm vast".
+
 **B8 — De kleuren komen uit de score-ladder, niet uit de editorial value-change-tokens.**
 `--positive`/`--warning`/`--negative` staan bewust op lage chroma (0,09–0,11): ze zijn gemaakt
 om als tékst naast een bedrag te staan. Als vlak van 12 px leest dat als bruin–olijf–donkergroen
@@ -113,6 +141,17 @@ is. (3) De kleuren zijn hier de **value-change-tokens** (`--positive`/`--negativ
 dekking, niet de fellere score-ladder van de knoppen: een vlak op deze schaal moet de lijnen
 ondersteunen, niet overstemmen. Alleen de LIVE wat-als krijgt een vlak; opgeslagen
 ghost-scenario's niet, anders wordt de grafiek een lappendeken.
+
+**B10 — Het doelscenario staat ook in de eenvoudige weergave** (eigenaarskeuze 20 sep 2026). De
+oude gate toonde het blok in Eenvoudig alleen bij een vastgelegd doel. Dat paste bij de vorm
+van vóór dit besluit — twee genummerde panelen met duidingslagen — maar niet bij vijf knoppen
+die zelf hun grens dragen: dat ís de eenvoudige vorm, en achterhouden verbergt de manier waaróp
+je een doel maakt voor precies de lezer die Eenvoudig koos. `verkenSectieZichtbaar` hangt
+daarmee nog alleen aan het perspectief (solo — op een partner-/huishoudlijn rekent het lab
+niet). Twee dingen vielen daardoor weg: de sessie-vlag `doelLosgelatenDezeSessie`, die bestond
+om te voorkomen dat "Doel loslaten" in Eenvoudig de enige weg terug meenam (melding B-031, nu
+structureel opgelost), en de koppeling van katern III aan het in-/uitklappen van dit blok — dat
+inklappen bestaat niet meer, en de koppeling hield "Wat het betekent" permanent verborgen.
 
 ## Wat dit vervangt
 
@@ -174,7 +213,8 @@ schaal op dezelfde stand rekenen.
 bracket kortsluiten. De engine cachet de probes BÍNNEN één bisectie; een cache per knop over
 batches heen (zodat één sleep-beweging alleen de vier ándere knoppen herrekent) is bewust NIET
 gebouwd — de gemeten tijd bleef binnen de debounce, en een cache die op de verkeerde sleutel
-hangt zou een grens laten staan die niet meer klopt. De batch draait in een eigen worker-lane (`'grenzen'`, één in-flight +
+hangt zou een grens laten staan die niet meer klopt. De batch draait in een eigen worker-lane
+(`'grenzen'`, één in-flight +
 één gequeued, nieuwer verdringt) met 300 ms debounce, zodat de hoofdrun, de scenario-run en de
 presets-batch niet wachten. Tijdens het rekenen blijven de vorige grenzen zichtbaar op halve
 dekking — geen layoutsprong, en geen lege schaal.

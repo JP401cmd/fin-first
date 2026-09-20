@@ -963,14 +963,6 @@ export default function HorizonPage({
   const [whatIfInlineOpen, setWhatIfInlineOpen] = useState(false)
 
   // Heeft de gebruiker deze sessie zijn doel losgelaten? (melding B-031)
-  // In Eenvoudig hangt KATERN II aan `doelActief`; loslaten zet dat op false en
-  // nam daarmee óók de enige weg terug ("Maak dit mijn doel") uit beeld — de
-  // toast beloofde "je verkent weer vrij" terwijl de sectie zojuist was
-  // verdwenen. Deze vlag houdt de sectie open zolang de gebruiker op de pagina
-  // blijft; legt hij opnieuw vast, dan hangt de zichtbaarheid weer aan het doel
-  // zelf en gaat de vlag uit.
-  const [doelLosgelatenDezeSessie, setDoelLosgelatenDezeSessie] = useState(false)
-
   // ── Wat-als-scenariolaag (2e projectielijn, plan §B — stap 4) ─────────────
   // Slider-events leven hier GESCHEIDEN van de DB-events (`events`, :257) zodat de
   // hoofdlijn ongemoeid blijft; ze voeden uitsluitend de scenario-run. Hydratie uit
@@ -1024,20 +1016,13 @@ export default function HorizonPage({
   const [stopPlanConfirmOpen, setStopPlanConfirmOpen] = useState(false)
   const [stopPlanSaving, setStopPlanSaving] = useState(false)
   const [stopPlanError, setStopPlanError] = useState('')
-  // KATERN II ("Jouw doel" / "Wat als je draait") — standaard INGEKLAPT, in
-  // béíde weergavemodi (bewuste afwijking van het DepthSection-gedrag waar
-  // Volledig standaard opent): de sectie is een werkbank, geen leesstof. De
-  // ingeklapte regel toont een 1-regel-samenvatting; ?whatif=open en de
-  // ScenarioChip klappen eerst open vóór de scroll. Ephemeral, geen persist.
-  const [verkenOpen, setVerkenOpen] = useState(false)
-
-  // Zichtbaarheids-gate voor de zware duiding-secties (scenario-presets):
-  // die rekenen pas via de worker wanneer de "Wat het betekent"-sectie (bijna) in beeld komt
-  // (Task 4.2), i.p.v. eager in idle. De duiding-sectie klapt mee met KATERN II
-  // (doel dicht = duiding dicht) en mount dus pas bij openklappen — verkenOpen
-  // als remountKey laat de observer dan alsnog aanhaken.
+  // Zichtbaarheids-gate voor de zware duiding-secties (scenario-presets): die rekenen pas via
+  // de worker wanneer de "Wat het betekent"-sectie (bijna) in beeld komt (Task 4.2), i.p.v.
+  // eager in idle. De sectie klapte tot ADR 0170 mee met het in-/uitklappen van KATERN II;
+  // dat inklappen bestaat niet meer (het doelscenario staat altijd open in de grafiekkaart),
+  // dus is er ook geen remountKey meer nodig.
   const duidingSectionRef = useRef<HTMLElement | null>(null)
-  const duidingInView = useInViewOnce(duidingSectionRef, '600px', verkenOpen)
+  const duidingInView = useInViewOnce(duidingSectionRef)
 
   // ── Toekomst-overlay (ballonnen) ─────────────────────────────────
   // De grafiek wordt sinds juni 2026 altijd getoond (de oude setup-pane is
@@ -2217,12 +2202,10 @@ export default function HorizonPage({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [displayMode, duidingInView, isFixedAnchorMode, kernelRawProfile, effectiveInput?.monthlyIncome, effectiveInput?.monthlyExpenses, simResult?.fireAgeFractional, currentAge, debts, events, aowRows, fireStrategy, initialData])
 
-  // Deeplink `?whatif=open` (en ScenarioChip-klik) → scroll naar de slider-lab.
-  // De sectie start ingeklapt — eerst openklappen, dan scrollen, anders landt
-  // de gebruiker op een dichte regel zonder sliders.
+  // Deeplink `?whatif=open` (en ScenarioChip-klik) → scroll naar het doelscenario.
+  // Sinds ADR 0170 staat dat blok altijd open, dus alleen nog scrollen.
   useEffect(() => {
     if (!whatIfInlineOpen) return
-    setVerkenOpen(true)
     const t = setTimeout(
       () => verkenSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
       120,
@@ -3341,14 +3324,17 @@ export default function HorizonPage({
   // loopt zodra er een tak bijkomt.
   //
   // Perspectief-gate: alleen solo (géén partner/huishouden), spiegelt de
-  // chart-overlay. Daarbinnen: in Volledig altijd; in Eenvoudig alleen wanneer
-  // er iets is om naar te kíjken — een vastgelegd doel (kernfunctionaliteit
-  // waar de Doelen-tab naartoe deep-linkt), een expliciete deeplink naar het
-  // wat-als-lab, of een doel dat de gebruiker zojuist heeft losgelaten en dus
-  // opnieuw moet kunnen vastleggen.
-  const verkenSectieZichtbaar =
-    !(usePartnerMainLine || useHouseholdMainLine) &&
-    (displayMode === 'full' || doelActief || whatIfInlineOpen || doelLosgelatenDezeSessie)
+  // chart-overlay. Op een partner-/huishoudlijn slaan de knoppen nergens op —
+  // die tekent andere rijen dan waar het lab op rekent.
+  //
+  // Verder GEEN gate meer op de weergavemodus (eigenaarskeuze 20 sep 2026): het
+  // doelscenario staat óók in Eenvoudig. De oude voorwaarde ("alleen als er al
+  // een doel is") paste bij het blok van vóór ADR 0170 — twee genummerde panelen
+  // met duidingslagen. Wat er nu staat zijn vijf knoppen die zélf hun grens
+  // dragen; dat is juist de eenvoudige vorm, en het achterhouden ervan verbergt
+  // de manier waaróp je een doel maakt voor precies de lezer die de eenvoudige
+  // weergave koos.
+  const verkenSectieZichtbaar = !(usePartnerMainLine || useHouseholdMainLine)
 
   // ── Welke grondslagen tekent de grafiek? (ADR 0114 D1/D6) ───────────────
   //
@@ -4151,9 +4137,6 @@ export default function HorizonPage({
           ...(json.goalIds ? { goalIds: json.goalIds } : {}),
         })
         setShowScenarioLine(true)
-        // Er is weer een doel — de zichtbaarheid hangt vanaf nu weer aan
-        // `doelActief` en niet meer aan de losgelaten-vlag (B-031).
-        setDoelLosgelatenDezeSessie(false)
         setDoelSheetOpen(false)
         addToast({
           type: 'success',
@@ -4191,10 +4174,6 @@ export default function HorizonPage({
         return
       }
       setDoelBlok(null)
-      // Houd de doelsectie deze sessie in beeld (B-031). In Eenvoudig hangt hij
-      // aan `doelActief`; zonder deze vlag verdwijnt de sectie op hetzelfde
-      // moment als het doel, en daarmee de knop om er weer één vast te leggen.
-      setDoelLosgelatenDezeSessie(true)
       setDoelLoslatenOpen(false)
       addToast({ type: 'success', title: 'Doel losgelaten', message: 'Je verkent weer vrij.' })
     } catch {
@@ -7799,11 +7778,10 @@ export default function HorizonPage({
           scenarioPresets !== null ||
           scenarioPresetsLoading
         if (!heeftKaternIII) return null
-        // De duiding klapt mee met KATERN II ("Jouw doel"): is die sectie
-        // zichtbaar maar dichtgeklapt, dan blijft ook "Wat het betekent"
-        // verborgen — doel dicht = alles dicht. In partner-/huishouden-view
-        // bestaat KATERN II niet; dan blijft de duiding gewoon staan.
-        if (verkenSectieZichtbaar && !verkenOpen) return null
+        // Tot ADR 0170 klapte deze duiding mee met KATERN II ("doel dicht = alles
+        // dicht"). Dat inklappen bestaat niet meer — het doelscenario staat altijd
+        // open in de grafiekkaart — dus is die koppeling vervallen; ze hield de
+        // duiding anders permanent verborgen.
         return (
           <>
             <HideInSimple>
@@ -7819,7 +7797,7 @@ export default function HorizonPage({
                         <Kicker className="mb-1">Levensinkomenstrook</Kicker>
                         <div className="flex items-center gap-2">
                           <h2 className="font-display text-[14px] font-semibold leading-snug text-[var(--ink)]">Dekt je inkomen straks je uitgaven?</h2>
-                          {(hasScenario || hasStopKeuze) && !(usePartnerMainLine || useHouseholdMainLine) && <ScenarioChip doelActief={doelActief} hasScenario={hasScenario} onBeforeScroll={() => setVerkenOpen(true)} />}
+                          {(hasScenario || hasStopKeuze) && !(usePartnerMainLine || useHouseholdMainLine) && <ScenarioChip doelActief={doelActief} hasScenario={hasScenario} />}
                         </div>
                       </div>
                       <p className="mb-3 font-sans text-[12px] text-[var(--ink-3)]">
@@ -7863,7 +7841,7 @@ export default function HorizonPage({
                         <Kicker className="mb-1">Dekkingsradar</Kicker>
                         <div className="flex items-center gap-2">
                           <h2 className="font-display text-[14px] font-semibold leading-snug text-[var(--ink)]">Hoe stevig staat je plan?</h2>
-                          {(hasScenario || hasStopKeuze) && !(usePartnerMainLine || useHouseholdMainLine) && <ScenarioChip doelActief={doelActief} hasScenario={hasScenario} onBeforeScroll={() => setVerkenOpen(true)} />}
+                          {(hasScenario || hasStopKeuze) && !(usePartnerMainLine || useHouseholdMainLine) && <ScenarioChip doelActief={doelActief} hasScenario={hasScenario} />}
                         </div>
                       </div>
                       {/* De grondslag hoort in beeld: op wélk scenario (en welke stopleeftijd) rekenen
