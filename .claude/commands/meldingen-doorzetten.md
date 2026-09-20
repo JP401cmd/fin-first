@@ -21,6 +21,7 @@ Staat het token er wél, dan is dit commando een **vangnet**: het pakt alleen op
 6. **Geen persoonsgegevens in de terminaluitvoer.** Vat samen op aantallen en titels; citeer geen omschrijvingen of e-mailadressen in de hoofdchat.
 7. **Het volgnummer komt uít het script, je verzint het niet.** Elke melding krijgt van het script een veld `volgnummer` (`B-001` / `V-004` / `W-012`) — neem dat letterlijk over in de titel. Zelf tellen (of "even doortellen vanaf het vorige kaartje") loopt gegarandeerd uit de pas met de automatische route, die zijn nummer uit dezelfde telling in `lib/user-reports/notion.ts` haalt. Is `volgnummer` `null` (telling mislukt), maak het kaartje dan zónder nummer — een kaartje zonder nummer is beter dan een verkeerd nummer.
 8. **Meldingen zonder inhoud gaan niet door.** Het script laat ze al weg; kom je er tóch één tegen (bv. via `--incl-leeg`), maak er dan géén kaartje van en laat de rij op `pending` staan.
+9. **Een melding landt altijd op onderzoek, nooit op de backlog.** `CC-actie` = `1. Onderzoek gevraagd`. Een melding komt uit echt gebruik en is bij binnenkomst nog niet begrepen — wat er precies misgaat, of het één of drie dingen zijn, en of het opgelost moet worden, blijkt pas uit onderzoek. `Backlog` is in deze database bovendien géén wachtrij maar een dood spoor: `/trifinity-next` en `/trifinity-drain` pakken uitsluitend `1. Onderzoek gevraagd`, `3. Implementatie akkoord` en `6. Testen door Claude` op, dus een kaartje op `Backlog` wordt nooit vanzelf opgepakt. Triage mag een kaartje daarna alsnog naar `Backlog` of `Geannuleerd` verplaatsen — dat is een besluit ná onderzoek, niet ervoor.
 
 ## Stappen
 
@@ -45,7 +46,7 @@ Gebruik `mcp__notion__notion-create-pages` op data source `d87e54c5-fb52-4607-a7
 | `Feature` (titel) | `<volgnummer> · <YYYY-MM-DD>-testbug-<id6> — <scherm>` · bij vraag `testvraag`, bij aanbeveling `testwens` (die laatste zonder ` — <scherm>`). `<volgnummer>` komt kant-en-klaar uit het script (`B-001`/`V-004`/`W-012`), gevolgd door een spatie-middot-spatie; is het `null`, laat dan het hele voorvoegsel weg. Datum uit `created_at` in Europe/Amsterdam; `id6` = eerste 6 tekens van `id`. |
 | `Type` (select) | bug → `Bug` · vraag → `Vraag` · aanbeveling → `Feature` |
 | `Status` (status) | `Nieuw` |
-| `CC-actie` (select) | `Backlog` |
+| `CC-actie` (select) | `1. Onderzoek gevraagd` — nooit `Backlog` (zie harde regel 9) |
 | `Prioriteit` (select) | op élk kaartje — bug → `P1` · vraag → `P3` · aanbeveling → `P3` |
 | `Severity` (select) | alleen bij bug: `S2 - medium` |
 | `Tags` (multi_select) | `Testgebruiker` + één zone-tag uit `route`, alleen als die bestaat: `/beheer`→`BEHEER`, budget→`BUDGET`, belasting→`BELAST`, schuld→`SCHULD`, cash→`CASH`, `/toekomst`→`TOEK`, `/mijn`→`MIJN`, `/nieuws` of `/berichten`→`WILL`, `/onboarding`→`START`, `/overzicht`→`OVZ`. Geen match → alleen `Testgebruiker`. |
