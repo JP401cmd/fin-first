@@ -96,6 +96,50 @@ export const RELEASE_NOTE_NORM = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.91.1',
+    date: '2026-09-20',
+    title: 'Eén telling bij je gebeurtenissen en een greep op de meter',
+    sections: [
+      {
+        module: 'Je plan',
+        color: 'purple',
+        items: [
+          {
+            title: 'Eén telling bij je gebeurtenissen',
+            description:
+              'De titel telde twee gebeurtenissen terwijl er drie op de tijdlijn stonden. Het aantal staat nu één keer en klopt met de lijst, ook met de verkoop van je woning.',
+          },
+          {
+            title: 'Een merkteken op de grens van je plan',
+            description:
+              'Op elke knop staat waar je plan gedekt is, met het label "gedekt". Je ziet wat je moet halen, naast waar je nu staat.',
+          },
+          {
+            title: 'Draai aan de meter met je vinger',
+            description:
+              'Elke meter heeft een greepje dat je kunt verslepen. Het invoerveld werkt nog steeds, ook met het toetsenbord.',
+          },
+          {
+            title: 'Het doelscenario staat ook in de eenvoudige weergave',
+            description:
+              'Ook wie de eenvoudige weergave kiest ziet de vijf knoppen. Eerder zat dat alleen achter een vastgelegd doel.',
+          },
+        ],
+      },
+      {
+        module: 'Platform',
+        color: 'zinc',
+        items: [
+          {
+            title: 'De startpagina begroet je weer met je naam',
+            description:
+              'Bovenaan staat je begroeting. Hoe je ervoor staat lees je eronder, in één zin.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: '0.91.0',
     date: '2026-09-20',
     title: 'Elke pagina zegt meteen hoe je ervoor staat',
