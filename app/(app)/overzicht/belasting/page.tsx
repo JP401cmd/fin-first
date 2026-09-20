@@ -12,8 +12,11 @@ import {
 import { buildBelastingBoxCards } from './box-cards'
 import { buildBelastingHubOpening } from './hub-opening-copy'
 import { hasBox2Relevance } from '@/lib/box2-relevance'
-import { computeBox3TaxableInput, box3TaxStatus } from '@/lib/box3-taxable-input'
+import { box1JaarruimteVerdict } from '@/lib/jaarruimte'
+import { computeBox3TaxableInput, box3TaxStatus, box3StatusVerdict } from '@/lib/box3-taxable-input'
+import { resolveRouteTitle } from '@/lib/nav-config'
 import { CURRENT_TAX_YEAR } from '@/lib/box3-data'
+import { loadHefboomPageVerdict } from '@/lib/hefboom-page-verdict'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { PageStatusDot } from '@/components/app/page-status-dot'
 import { getPageInfo } from '@/lib/page-info-content'
@@ -36,7 +39,7 @@ import {
   SectionLabel,
   ScenarioCallout,
   OrnamentColophon,
-  PageOpening,
+  PageVerdictOpening,
 } from '@/components/editorial'
 
 export const metadata: Metadata = {
@@ -194,11 +197,13 @@ export default async function OverzichtBelastingPage() {
   // Status EN statustekst uit één afleiding: de dot en het bijschrift op
   // dezelfde kaart mogen elkaar nooit tegenspreken (precies de fout die deze
   // wijziging opheft).
-  const [box1Status, box1StatusText]: [LeverageStatus, string] = !jaarruimte?.hasData
-    ? ['neutral', 'Inkomen onbekend']
-    : jaarruimte.jaarruimte > 0
-      ? ['warn', 'Onbenutte jaarruimte']
-      : ['good', 'Ruimte benut']
+  // De drieweg-vertaling zelf staat in `box1JaarruimteVerdict` (lib/jaarruimte.ts),
+  // gedeeld met de paginatitel van /overzicht/belasting/box1 — één zin, twee
+  // oppervlakken. Hier stond die ternary tot sep 2026 inline, náást een
+  // gelijkluidende in `box1JaarruimteStatus`.
+  const box1Verdict = box1JaarruimteVerdict(jaarruimte)
+  const box1Status: LeverageStatus = box1Verdict.status
+  const box1StatusText = box1Verdict.label
 
   // Box 3-status uit de canonieke tax-lever-bron (box3-taxable-input.ts) —
   // dezelfde helper die de sidebar-Box-3-dot voedt, zodat kaart == sidebar.
@@ -211,14 +216,12 @@ export default async function OverzichtBelastingPage() {
     householdType,
   )
   const box3Status = box3TaxStatus(box3TaxableInput)
-  const box3StatusText =
-    box3Status === 'good'
-      ? 'Geen actie nodig'
-      : box3Status === 'warn'
-        ? 'Optimaliseer Box 3'
-        : box3Status === 'bad'
-          ? 'Box 3-actie nodig'
-          : null
+  // Eén oordeelszin voor drie oppervlakken: de kaart hieronder, de titel van
+  // deze hub en de titel van /overzicht/belasting/box3 (zie
+  // `box3StatusVerdict`). De vorige, hier inline geschreven teksten waren
+  // handelings-geframed — "Optimaliseer Box 3" is een gebiedende wijs en
+  // daarmee een aansporing i.p.v. een constatering (Wft-grens).
+  const box3StatusText = box3StatusVerdict(box3Status)
 
   // ── Hub-overzicht (C1/C2/C7) — alleen de DRUK ──────────────────
   // `buildTaxOverview` aggregeert nog uitsluitend de belastingdruk; de kansen
@@ -261,34 +264,50 @@ export default async function OverzichtBelastingPage() {
     hasAanmerkelijkBelang,
   })
 
-  // Kop + deck uit dezelfde boolean als de kaarten (bevinding H22): de opening
-  // telt wat er werkelijk op het scherm staat — twee boxen in één som, of drie
-  // boxen in twee rekeningen wanneer Box 2 meespeelt. Zie hub-opening-copy.ts.
-  const opening = buildBelastingHubOpening({
-    hasAanmerkelijkBelang,
-    year: new Date().getFullYear(),
-  })
+  // Deck + colophon uit dezelfde boolean als de kaarten (bevinding H22): de
+  // opening telt wat er werkelijk op het scherm staat — twee boxen in één som,
+  // of drie boxen in twee rekeningen wanneer Box 2 meespeelt. Sinds de
+  // kop-herziening draagt de DECK die belofte (de titel spreekt het oordeel
+  // uit); zie hub-opening-copy.ts.
+  const opening = buildBelastingHubOpening({ hasAanmerkelijkBelang })
+  // Oordeel voor de titel uit dezelfde hefboom-score als het statuspunt.
+  const belastingVerdict = await loadHefboomPageVerdict(supabase, perspective, 'belasting')
 
   return (
     <>
       <NavStackMeta title="Belasting" bottomBar={{ kind: 'tabs' }} />
 
-      {/* ── Editorial pagina-opening (standaard-aanhef) ────────────────
-          Canonieke PageOpening: hairline-kicker → narratieve Playfair-H1 met
-          één <em>-accent → deck. De belasting-layout mapt --module-active op
-          ink (neutraal), dus de accenttokens renderen bewust neutraal. */}
+      {/* ── Editorial pagina-opening die het OORDEEL uitspreekt ──────────
+          Kop-herziening sep 2026: kicker vervallen, titel = "Belasting |
+          <oordeel>" (op mobiel alleen het oordeel — de TopBar draagt de naam).
+          Het oordeel is de Box 3-stand: de enige box waar deze hub een
+          stoplicht voor heeft, en dezelfde zin als op de Box 3-kaart hieronder
+          en op /overzicht/belasting/box3. Het oordeelswoord kleurt met de
+          stoplichtkleur (semantiek), niet met een accent. */}
       <div className="relative mx-auto max-w-6xl px-4 pt-6 sm:px-6 sm:pt-8">
         <PageStatusDot className="absolute right-[52px] top-6 sm:right-[60px] sm:top-8" />
         <PageInfoButton
           content={getPageInfo('/overzicht/belasting')}
           className="absolute right-4 top-6 sm:right-6 sm:top-8"
         />
-        <PageOpening
+        {/* TITEL EN STATUSPUNT UIT ÉÉN BRON.
+
+            Hier stond het Box 3-oordeel uit de bundel van deze pagina. Het
+            statuspunt naast de `i` komt echter uit de BELASTING-HEFBOOM
+            (`leverInfo('/overzicht/belasting', scores.tax)`), en die leest een
+            andere assetset — `loadLeverScores` haalt bezittingen RLS-breed op,
+            dus in een huishouden telt partner-vermögen mee waar de bundel
+            perspectief-gescoped is. Twee oordelen over dezelfde vraag, twee
+            centimeter uit elkaar.
+
+            De titel volgt nu de hefboom, net als /overzicht/bezittingen,
+            /schulden en /budget. Het Box 3-oordeel blijft staan waar het thuis
+            hoort: op de Box 3-kaart hieronder en op /overzicht/belasting/box3. */}
+        <PageVerdictOpening
           gutterClassName="pr-20 sm:pr-24"
-          kicker={opening.kicker}
-          titleBefore={opening.titleBefore}
-          emphasis={opening.emphasis}
-          titleAfter={opening.titleAfter}
+          pageName={resolveRouteTitle('/overzicht/belasting') ?? 'Belasting'}
+          verdict={belastingVerdict.label}
+          tone={belastingVerdict.status}
           deck={opening.deck}
         />
       </div>

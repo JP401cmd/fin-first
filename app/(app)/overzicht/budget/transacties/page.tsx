@@ -15,8 +15,12 @@ import { loadTransactionFlags } from '@/lib/household/transaction-flags'
 import type { WidgetPrefs } from '@/lib/widget-catalog'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { PageStatusDot } from '@/components/app/page-status-dot'
-import { PageOpening } from '@/components/editorial'
+import { PageVerdictOpening } from '@/components/editorial'
 import { getPageInfo } from '@/lib/page-info-content'
+import { resolveRouteTitle } from '@/lib/nav-config'
+import { loadCashflowKpis } from '@/lib/cashflow-kpis'
+import { loadCashflowData } from '@/lib/cashflow-data-loader'
+import { transactiesVerdictFromSources } from '@/lib/cashflow-cards'
 
 export const metadata: Metadata = {
   title: 'Transacties — TriFinity',
@@ -62,6 +66,33 @@ export default async function OverzichtCashflowTransactiesPage({
 
   const supabase = await createClient()
   const perspective = await getServerPerspective()
+
+  // OORDEEL IN DE PAGINATITEL — bewust op het kritieke pad.
+  //
+  // De titel van deze pagina ÍS het oordeel ("Krap deze maand"). Een
+  // client-fetch zou betekenen dat de grootste tekst op het scherm na een tel
+  // omspringt; bij een suffix is dat te verdragen, bij de titel niet.
+  //
+  // WAT DIT KOST: geen extra queries. `loadCashflowData` draait op deze route
+  // toch al — `TransactiesNoticesLoader` roept 'm aan voor de €500-drempel van
+  // de inflatiekaart — en beide loaders zijn React-`cache()`-gewrapt, dus het
+  // gestreamde blok pakt hetzelfde resultaat op. Wat het wél kost is latency
+  // vóór de eerste paint: de besparing uit de kop van dit bestand gold het
+  // KRITIEKE pad, en dit zet er bewust iets op terug voor iets dat pas ná die
+  // paint nog kan verschijnen. Wordt dat merkbaar, dan is de terugval: titel =
+  // paginanaam server-side, oordeel erbij via de bestaande
+  // `CashflowStatusProvider` (die op deze route toch al fetcht voor de
+  // sidebar-stippen).
+  //
+  // `loadVasteLastenSummary` blijft er bewust buiten: `transactiesVerdictFromSources`
+  // heeft 'm niet nodig, en een volle `buildCashflowCards` zou hier een derde
+  // loader optrekken voor kaarten die deze pagina niet rendert.
+  const [cashflowKpis, cashflowData] = await Promise.all([
+    loadCashflowKpis(supabase),
+    loadCashflowData(supabase, perspective),
+  ])
+  const txVerdict = transactiesVerdictFromSources(cashflowKpis, cashflowData)
+
   const accountCount = await loadAccountCount(supabase, perspective)
   // Grenzenpotten worden SERVER-SIDE geladen (ADR 0058) en als props doorgegeven;
   // de sectie herrekent zelf niets. De loader is goedkoop voor wie geen pot heeft:
@@ -114,13 +145,19 @@ export default async function OverzichtCashflowTransactiesPage({
         />
       </div>
       <div className="mx-auto max-w-6xl space-y-6 px-4 pt-4 sm:px-6">
-        {/* Editorial header — gedeeld kop-patroon met de cashflow-familie. */}
-        <PageOpening
-          kicker="Je geldstroom"
-          titleBefore="Waar gaat je "
-          emphasis="tijd"
-          titleAfter=" naartoe?"
-          deck="Elke transactie is gekochte of verkochte tijd — bekijk waar je uren heen gaan."
+        {/* Pagina-aanhef die het OORDEEL uitspreekt (kop-herziening sep 2026).
+            De kicker is vervallen; de paginanaam staat op mobiel in de TopBar en
+            op desktop in de titel zelf — zie `PageVerdictOpening`.
+
+            Het oordeelswoord komt uit `transactiesVerdict`, dezelfde bron als de
+            `subText` van de Transacties-kaart op /overzicht/budget. De vorige
+            deck ("gekochte of verkochte tijd") was een koop-/verkoopmetafoor en
+            daarmee in strijd met ADR 0165. */}
+        <PageVerdictOpening
+          pageName={resolveRouteTitle('/overzicht/budget/transacties') ?? 'Transacties'}
+          verdict={txVerdict.label}
+          tone={txVerdict.status}
+          deck="Waar je geld heen gaat, per periode en tegenpartij. Het oordeel volgt je spaarquote deze maand: vanaf 20% op koers."
         />
         <KoppelRekeningBanner accountCount={accountCount} />
         {/* Versheidsmelding: alles hieronder rust op transacties, dus als die

@@ -89,7 +89,7 @@
  * tegel is de md-rij nu exact vol (er stonden er drie sinds `budgetSubCards`)
  * en is mobiel een schone 2×2. `grid-cols-3` — de letterlijke /toekomst-vorm —
  * is overwogen en afgevallen: dat zet de vierde tegel als wees op een eigen
- * rij, en een verdict-regel ("Goed gespaard deze maand") is op een derde van
+ * rij, en een verdict-regel ("Goed aan het sparen deze maand") is op een derde van
  * een telefoonscherm een muur van tekst. De verkleining zit dus in de tegel,
  * niet in het raster.
  */

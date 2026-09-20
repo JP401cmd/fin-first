@@ -48,13 +48,19 @@ export default async function ToekomstRekenhulpPage() {
 
   return (
     <>
+      {/* Kerncijfer in de titel: het aantal EIGEN rekenhulpen — exact de rijen
+          die de view hieronder toont, en dezelfde telling als de Rekenhulp-
+          navkaart op /toekomst (die telt `custom_calculators` van de gebruiker).
+          Neutrale inkt: een aantal is geen oordeel. */}
       <ToekomstSubpageShell
-        kicker="Toekomst · Rekenhulp"
-        titleBefore="Wat kost een keuze je aan "
-        emphasis="tijd"
-        titleAfter="?"
-        deck="Fin-ondersteunde rekenhulpen — vergelijk financiële keuzes en bewaar je eigen berekeningen."
-        infoKey="/toekomst/rekenhulp"
+        route="/toekomst/rekenhulp"
+        fallbackName="Rekenhulp"
+        verdict={
+          savedCalculators.length > 0
+            ? `${savedCalculators.length} ${savedCalculators.length === 1 ? 'rekenhulp' : 'rekenhulpen'}`
+            : null
+        }
+        deck="Vergelijk een keuze in euro's en in tijd. Fin rekent mee en bewaart wat je maakt."
       />
       <RekenhulpView saved={savedCalculators} prefill={prefill} />
     </>

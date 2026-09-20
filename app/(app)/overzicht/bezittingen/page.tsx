@@ -4,6 +4,7 @@ import { loadAssetsData } from '@/lib/assets-data-loader'
 import { getServerPerspective } from '@/lib/household/server-perspective'
 import type { Perspective } from '@/lib/household-data'
 import { BezittingenView } from '@/components/overview/bezittingen-view'
+import { loadHefboomPageVerdict } from '@/lib/hefboom-page-verdict'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { PageStatusDot } from '@/components/app/page-status-dot'
@@ -69,6 +70,10 @@ export default async function OverzichtBezittingenPage() {
   // `loadHorizonRaw` aanriep (drempel-data: liquide cash en belegd vermogen).
   // Die extra laadslag is dus mee verdwenen.
   const assetsData = await tryLoadAssetsData(supabase, perspective)
+  // Oordeel in de paginatitel — uit DEZELFDE hefboom-score als het statuspunt
+  // hierboven, zodat titel en stip niet uit elkaar kunnen lopen.
+  // `loadLeverScores` is React-`cache()`-gewrapt en draait op deze route toch al.
+  const verdict = await loadHefboomPageVerdict(supabase, perspective, 'bezittingen')
 
   return (
     <>
@@ -80,7 +85,11 @@ export default async function OverzichtBezittingenPage() {
           className="absolute right-4 top-4 sm:right-6"
         />
       </div>
-      <BezittingenView initialData={assetsData} />
+      <BezittingenView
+        initialData={assetsData}
+        verdict={verdict.label}
+        verdictTone={verdict.status}
+      />
     </>
   )
 }

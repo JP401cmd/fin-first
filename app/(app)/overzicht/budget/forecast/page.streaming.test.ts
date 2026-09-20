@@ -69,11 +69,20 @@ describe('/overzicht/budget/forecast — de zware loaders staan achter Suspense'
     expect(src).toMatch(/<Suspense\s+fallback=\{<ForecastFallback\s*\/>\}>\s*<ForecastLoader/)
   })
 
-  it('rendert de aanhef (LCP-kandidaat) direct, buiten de Suspense-grens', () => {
-    const beforeSuspense = src.slice(0, src.indexOf('<Suspense'))
-    expect(beforeSuspense).toContain('<PageOpening')
-    expect(beforeSuspense).toContain('<PageStatusDot')
-    expect(beforeSuspense).toContain('<PageInfoButton')
+  it('rendert de aanhef (LCP-kandidaat) direct, vóór het gestreamde inhoudsblok', () => {
+    // MAATSTAF GEWIJZIGD MET DE KOP-HERZIENING (sep 2026), bedoeling niet: de
+    // kop draagt nu zélf een <Suspense> voor het stromende oordeel, dus "alles
+    // vóór de eerste <Suspense>" zou de kop buitensluiten en deze test om de
+    // verkeerde reden rood maken. Dat de kop dataloos blijft, dwingen de
+    // import-asserties hierboven al hard af.
+    const beforeContent = src.slice(0, src.indexOf('<ForecastLoader'))
+    expect(beforeContent).toContain('<PageVerdictOpening')
+    expect(beforeContent).toContain('<PageStatusDot')
+    expect(beforeContent).toContain('<PageInfoButton')
+  })
+
+  it('laadt het oordeel in de kop apart, zodat de titel zelf dataloos blijft', () => {
+    expect(src).toMatch(/verdictSlot=\{\s*<Suspense fallback=\{null\}>\s*<ForecastVerdict/)
   })
 
   it('houdt de header-controls op de vaste offsets', () => {

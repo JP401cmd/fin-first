@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { SchuldenView } from '@/components/overview/schulden-view'
+import { loadHefboomPageVerdict } from '@/lib/hefboom-page-verdict'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { PageStatusDot } from '@/components/app/page-status-dot'
 import { getPageInfo } from '@/lib/page-info-content'
@@ -30,6 +31,8 @@ export default async function OverzichtSchuldenPage() {
   const supabase = await createClient()
   const perspective = await getServerPerspective()
   const initialData = await loadDebtsPageData(supabase, perspective).catch(() => undefined)
+  // Oordeel in de titel uit DEZELFDE hefboom-score als het statuspunt hierboven.
+  const verdict = await loadHefboomPageVerdict(supabase, perspective, 'schulden')
 
   return (
     <>
@@ -41,7 +44,11 @@ export default async function OverzichtSchuldenPage() {
           className="absolute right-4 top-4 sm:right-6"
         />
       </div>
-      <SchuldenView initialData={initialData} />
+      <SchuldenView
+        initialData={initialData}
+        verdict={verdict.label}
+        verdictTone={verdict.status}
+      />
     </>
   )
 }

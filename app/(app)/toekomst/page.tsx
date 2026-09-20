@@ -8,7 +8,9 @@ import HorizonPage from '@/components/app/horizon/horizon-client'
 import { ToekomstNavCards } from '@/components/future/toekomst-nav-cards'
 import { resolveWithdrawalProfiel } from '@/lib/withdrawal-strategy'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
-import { PageOpening, EditorialDeck, OrnamentColophon } from '@/components/editorial'
+import { PageVerdictOpening, EditorialDeck, OrnamentColophon } from '@/components/editorial'
+import { resolveRouteTitle } from '@/lib/nav-config'
+import { loadPlanVerdict } from '@/lib/horizon/plan-status-loader'
 import { getPageInfo } from '@/lib/page-info-content'
 import {
   DeficitNoticeProvider,
@@ -118,7 +120,7 @@ export default async function ToekomstPage({
     data: { user },
   } = await supabase.auth.getUser()
 
-  const [horizonData, finData, calcCountRes, minimizedMap, planReviewState, eigenStrategieEvents] = await Promise.all([
+  const [horizonData, finData, calcCountRes, minimizedMap, planReviewState, eigenStrategieEvents, planVerdict] = await Promise.all([
     loadHorizonData(supabase),
     loadFinData(supabase),
     user
@@ -145,6 +147,12 @@ export default async function ToekomstPage({
           return []
         })
       : Promise.resolve([]),
+    // OORDEEL IN DE PAGINATITEL — de dekking van je plan. Consume-only: dezelfde
+    // `loadPlanVerdict` die de plankaart op /overzicht en het menupunt "De toekomst"
+    // als stoplicht lezen, dus per constructie hetzelfde oordeel. Kost hier niets
+    // extra: `loadHorizonData` en `computeHorizonFireSim` zijn React-`cache()`'d en
+    // draaien op deze route toch al (zelfde 'personal'-perspectief als hierboven).
+    loadPlanVerdict(supabase, 'personal'),
   ])
   // TPR-01 — voortgang AFGELEID uit markering + profielstaat (A9/A10). Alleen de eigen
   // bezittingen en gebeurtenissen: de policies zijn huishoud-gedeeld en de review gaat over
@@ -202,12 +210,16 @@ export default async function ToekomstPage({
               kolom en reserveert de knoppen-cluster rechts zijn breedte over
               de vólle hoogte — op mobiel wikkelde de intro daardoor in vier
               smalle regels. De deck rendert hieronder vol-breed. */}
-          <PageOpening
+          {/* Aanhef die het OORDEEL uitspreekt (kop-herziening sep 2026): onder
+              een vast stopmoment de dekking van je plan ("Plan dekt 96%"), onder
+              "zo vroeg mogelijk" de haalbaarheid. De kicker is vervallen; de
+              paginanaam staat op mobiel in de TopBar en op desktop in de titel
+              zelf — zie `PageVerdictOpening`. */}
+          <PageVerdictOpening
             className="min-w-0 flex-1"
-            kicker="De Toekomst"
-            titleBefore="Je "
-            emphasis="tijdas"
-            titleAfter=""
+            pageName={resolveRouteTitle('/toekomst') ?? 'Toekomst'}
+            verdict={planVerdict.label}
+            tone={planVerdict.status}
           />
           <div className="flex shrink-0 items-center gap-2">
             {/* Statuspunt van een geminimaliseerde melding: links naast de 'i',
@@ -223,8 +235,18 @@ export default async function ToekomstPage({
         </div>
 
         {/* Vol-breed onder de kop-rij (zie de aantekening hierboven). */}
+        {/* Deck blijft bewust buiten de `deck`-prop van de aanhef: dan zit hij
+            in de flex-kolom hierboven en reserveert de knoppen-cluster rechts
+            zijn breedte over de vólle hoogte — op mobiel wikkelde de intro
+            daardoor in vier smalle regels. Vol-breed dus, en kort (twee zinnen).
+
+            LET OP: /toekomst is een tab-root, en daar houdt de TopBar zich
+            bewust leeg. De paginanaam die `PageVerdictOpening` op mobiel aan de
+            shell overlaat, wordt daar dus gedragen door de actieve tab onderin
+            ("Toekomst") — niet door de bovenbalk. */}
         <EditorialDeck className="mb-4">
-          Geld is opgeslagen tijd — kies wat je later met die tijd doet.
+          Je tijdas met doelen, gebeurtenissen en voorkeuren. Geld is opgeslagen tijd; kies wat je
+          ermee doet.
         </EditorialDeck>
 
         {/* Navkaarten staan nu altijd boven de altijd-zichtbare tijdas. */}

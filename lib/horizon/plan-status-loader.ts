@@ -20,17 +20,23 @@ import type { LeverageStatus } from '@/lib/leverage-status'
 import { loadHorizonData } from '@/lib/horizon-data-loader'
 import { computeHorizonFireSim } from '@/lib/fire-target-shared'
 import { isFixedAnchor } from '@/lib/fire-strategy'
-import { resolvePlanStatus } from '@/lib/horizon/plan-status'
+import { resolvePlanVerdict, type PlanVerdict } from '@/lib/horizon/plan-status'
 
-export async function loadPlanStatus(
+/**
+ * Het plan-oordeel in woorden én kleur — de paginatitel van /toekomst
+ * (`PageVerdictOpening`) leest deze functie, de plankaart en het menupunt lezen
+ * `loadPlanStatus` hieronder, dat er een dunne wrapper omheen is. Eén
+ * invoer-verzameling, dus per constructie nooit twee oordelen.
+ */
+export async function loadPlanVerdict(
   supabase: SupabaseClient,
   perspective: Perspective,
-): Promise<LeverageStatus> {
+): Promise<PlanVerdict> {
   const [horizonData, run] = await Promise.all([
     loadHorizonData(supabase, perspective).catch(() => null),
     computeHorizonFireSim(supabase, perspective).catch(() => null),
   ])
-  if (!horizonData) return 'neutral'
+  if (!horizonData) return { label: null, status: 'neutral' }
   const planAnchor = horizonData.firePlan?.anchor ?? null
   const anchorFixed = planAnchor != null && isFixedAnchor({ anchor: planAnchor })
   // Onder een vast anker is `freedomPct` alleen een échte dekking mét kernel-run én
@@ -38,9 +44,16 @@ export async function loadPlanStatus(
   // (`computeFreedomPctForPlan`, gepind in horizon-data-loader.anker.test.ts). Die 0
   // mag hier geen rood worden — geen run = geen oordeel.
   const dekkingBekend = run != null && Boolean(horizonData.effectiveInput?.dateOfBirth)
-  return resolvePlanStatus({
+  return resolvePlanVerdict({
     anchorFixed,
     coveragePct: dekkingBekend ? (horizonData.healthScoreInput?.freedomPct ?? null) : null,
     solvedReachable: run?.sim.fireReachable ?? null,
   })
+}
+
+export async function loadPlanStatus(
+  supabase: SupabaseClient,
+  perspective: Perspective,
+): Promise<LeverageStatus> {
+  return (await loadPlanVerdict(supabase, perspective)).status
 }

@@ -45,3 +45,37 @@ export function resolvePlanStatus(input: PlanStatusInput): LeverageStatus {
   if (input.solvedReachable == null) return 'neutral'
   return input.solvedReachable ? 'good' : 'bad'
 }
+
+/** Het plan-oordeel als één zin + zijn stoplichtstand. */
+export interface PlanVerdict {
+  /** Uitspraak voor de paginatitel, bv. "Plan dekt 96%". `null` = geen oordeel. */
+  label: string | null
+  status: LeverageStatus
+}
+
+/**
+ * Dezelfde regel als `resolvePlanStatus`, nu óók in woorden — voor de
+ * paginatitel van /toekomst (`PageVerdictOpening`). Consume-only: geen tweede
+ * drempel, geen eigen som; de status komt letterlijk uit `resolvePlanStatus`
+ * en het percentage is het canonieke `freedomPct` dat hier alleen wordt
+ * afgerond zoals de plankaart het al toont.
+ *
+ * Twee modi, exact de twee takken hierboven:
+ *  - vast stopmoment → de DEKKING van het plan ("Plan dekt 96%");
+ *  - zo vroeg mogelijk → geen dekking maar de haalbaarheid van de hoofdrun.
+ *
+ * Beschrijvend, nooit aansporend (Wft-grens).
+ */
+export function resolvePlanVerdict(input: PlanStatusInput): PlanVerdict {
+  const status = resolvePlanStatus(input)
+  if (input.anchorFixed) {
+    const pct = input.coveragePct
+    if (pct == null || !Number.isFinite(pct)) return { label: null, status }
+    return { label: `Plan dekt ${Math.round(pct)}%`, status }
+  }
+  if (input.solvedReachable == null) return { label: null, status }
+  return {
+    label: input.solvedReachable ? 'Plan is haalbaar' : 'Plan nog niet haalbaar',
+    status,
+  }
+}

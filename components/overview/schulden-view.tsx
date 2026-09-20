@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { DebtsClient, type DebtsInitialData } from '@/app/(app)/core/debts/debts-client'
 import { SchuldenFilter } from '@/components/overview/schulden-filter'
 import type { DebtType } from '@/lib/debt-data'
+import type { LeverageStatus } from '@/lib/leverage-status'
 
 /**
  * SchuldenView — client-wrapper rond `<DebtsClient>` die de filter-state
@@ -16,7 +17,16 @@ import type { DebtType } from '@/lib/debt-data'
  * `overzicht/schulden/page.tsx`); wordt doorgegeven aan `<DebtsClient>` voor
  * de content-first render.
  */
-export function SchuldenView({ initialData }: { initialData?: DebtsInitialData }) {
+export function SchuldenView({
+  initialData,
+  verdict,
+  verdictTone,
+}: {
+  initialData?: DebtsInitialData
+  /** Server-bepaald hefboom-oordeel voor de paginatitel. */
+  verdict?: string | null
+  verdictTone?: LeverageStatus
+}) {
   const [filter, setFilter] = useState<DebtType | null>(null)
 
   return (
@@ -24,6 +34,9 @@ export function SchuldenView({ initialData }: { initialData?: DebtsInitialData }
       toolbarFilter={<SchuldenFilter value={filter} onChange={setFilter} />}
       debtTypeFilter={filter}
       initialData={initialData}
+      route="/overzicht/schulden"
+      verdict={verdict}
+      verdictTone={verdictTone}
       // De page-shell (`overzicht/schulden/page.tsx`) rendert de i +
       // statuspunt; onderdruk de ingebouwde i hier.
       showPageInfo={false}

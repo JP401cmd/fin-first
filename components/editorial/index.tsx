@@ -33,6 +33,8 @@ export { InfoIconTooltip, InfoTooltip } from './info-icon-tooltip'
 export { PageInfoButton } from './page-info-button'
 // Re-export PageOpening (canonieke editorial pagina-aanhef — standaard-aanhef)
 export { PageOpening, PageOpeningFigure } from './page-opening'
+// Re-export PageVerdictOpening (aanhef die het oordeel uitspreekt i.p.v. een vraag)
+export { PageVerdictOpening, PageVerdictSuffix } from './page-verdict-opening'
 // Re-export TapTarget (gedeelde raakgebied-primitive, 44×44; bewaakt door check-tap-targets.mjs)
 export {
   TapTarget,

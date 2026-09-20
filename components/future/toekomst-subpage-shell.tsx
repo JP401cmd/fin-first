@@ -2,10 +2,19 @@
  * ToekomstSubpageShell — gedeelde header voor de vier /toekomst-subpagina's
  * (Doelen, Gebeurtenissen, Voorkeuren, Rekenhulp).
  *
- * Zorgt voor een consistente terugweg naar de tijdas-landing en de canonieke
- * editorial pagina-aanhef (`PageOpening`) in dezelfde stijl als de rest van de
- * app. Module-identiteit loopt uitsluitend via `--module-active-*` (op /toekomst
- * = horizon via de route-layout) — nooit vaste kleurnamen. Optionele extra rijen
+ * Zorgt voor een consistente terugweg naar de tijdas-landing en de pagina-aanhef.
+ * Die aanhef is sinds de kop-herziening (sep 2026) een `PageVerdictOpening`: de
+ * titel spreekt het OORDEEL of het KERNCIJFER uit in plaats van een narratieve
+ * vraag te stellen. De kicker is daarmee vervallen.
+ *
+ * ÉÉN signature voor vier routes: de shell neemt de `route` en leidt daar zowel
+ * de paginanaam (`resolveRouteTitle` — dezelfde bron als de shell-`h1` en de
+ * mobiele TopBar) als de PAGE_INFO-sleutel uit af. Geen losse strings per
+ * pagina, dus geen drift tussen titelbalk en kop.
+ *
+ * Module-identiteit loopt uitsluitend via `--module-active-*` (op /toekomst =
+ * horizon via de route-layout); de statuskleur van het oordeel is semantiek en
+ * wordt door `PageVerdictOpening` geregeld — nooit hier. Optionele extra rijen
  * onder de kop komen via `children`.
  *
  * Server component — geen 'use client', geen hooks.
@@ -14,44 +23,44 @@
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
-import { PageOpening, PageInfoButton } from '@/components/editorial'
-import { getPageInfo } from '@/lib/page-info-content'
+import { PageVerdictOpening, PageInfoButton } from '@/components/editorial'
+import { getPageInfo, hasPageInfo } from '@/lib/page-info-content'
+import { resolveRouteTitle } from '@/lib/nav-config'
+import type { LeverageStatus } from '@/lib/leverage-status'
 
 export function ToekomstSubpageShell({
-  kicker,
-  titleBefore,
-  emphasis,
-  titleAfter,
+  route,
+  fallbackName,
+  verdict,
+  tone = 'neutral',
   deck,
   infoKey,
   children,
 }: {
-  /** Hairline-kicker boven de kop (tekst of nodes). */
-  kicker: ReactNode
-  /** Kop-tekst vóór het accent-woord (incl. eventuele spatie). */
-  titleBefore: string
-  /** Het italic-em-accentwoord in module-accentkleur (precies één). */
-  emphasis: string
-  /** Kop-tekst ná het accent-woord (incl. eventuele spatie). */
-  titleAfter: string
-  /** Optionele redactionele deck onder de kop. */
+  /** Canonieke route, bv. '/toekomst/doelen'. Bron van paginanaam én info-sleutel. */
+  route: string
+  /** Terugval als de route (nog) geen titel in nav-config heeft. */
+  fallbackName: string
+  /** Het oordeel of kerncijfer in de titel. `null` ⇒ alleen de paginanaam. */
+  verdict: string | null
+  /** Stoplichtstand van het oordeel — bepaalt uitsluitend de kleur. */
+  tone?: LeverageStatus
+  /** Korte redactionele deck onder de kop (twee zinnen, ~20 woorden). */
   deck?: ReactNode
   /**
-   * Optionele PAGE_INFO-sleutel (bv. '/toekomst/doelen') — rendert de
-   * "Wat zie ik hier?"-i-knop rechtsboven, op de canonieke offsets
-   * (right-4 top-4 sm:right-6). Zonder sleutel geen knop (K-04).
+   * PAGE_INFO-sleutel voor de "Wat zie ik hier?"-i-knop rechtsboven, op de
+   * canonieke offsets (right-4 top-4 sm:right-6). Default = `route`.
    */
   infoKey?: string
   /** Optioneel blok onder de kop (extra rijen / acties). */
   children?: ReactNode
 }) {
+  const pageInfo = getPageInfo(infoKey ?? route)
+
   return (
     <div className="relative mx-auto max-w-6xl px-4 sm:px-6 pt-4">
-      {infoKey && (
-        <PageInfoButton
-          content={getPageInfo(infoKey)}
-          className="absolute right-4 top-4 sm:right-6"
-        />
+      {hasPageInfo(pageInfo) && (
+        <PageInfoButton content={pageInfo} className="absolute right-4 top-4 sm:right-6" />
       )}
       <Link
         href="/toekomst"
@@ -61,16 +70,16 @@ export function ToekomstSubpageShell({
         Terug naar tijdas
       </Link>
 
-      <PageOpening
-        className="mt-3 pr-12 sm:pr-14"
-        kicker={kicker}
-        titleBefore={titleBefore}
-        emphasis={emphasis}
-        titleAfter={titleAfter}
+      <PageVerdictOpening
+        className="mt-3"
+        gutterClassName="pr-12 sm:pr-14"
+        pageName={resolveRouteTitle(route) ?? fallbackName}
+        verdict={verdict}
+        tone={tone}
         deck={deck}
       >
         {children}
-      </PageOpening>
+      </PageVerdictOpening>
     </div>
   )
 }

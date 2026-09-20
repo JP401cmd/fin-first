@@ -15,6 +15,8 @@ import {
   resolveEigenWoningBox1Input,
   type Box1IncomeResolution,
 } from '@/lib/box1-income'
+import { box1JaarruimteVerdictFromStatus } from '@/lib/jaarruimte'
+import { loadLeverScores } from '@/lib/lever-scores-loader'
 import { Box1GrossIncomeEditor } from '@/components/overview/belasting/box1-gross-income-editor'
 import { Box1Waterfall } from '@/components/overview/belasting/box1-waterfall'
 import { Box1MarginaleCurveCard } from '@/components/overview/belasting/box1-marginale-curve-card'
@@ -132,15 +134,35 @@ export default async function BelastingBox1Page() {
   }
   const showTwoCards = isHousehold && perspective !== 'partner'
 
+  // OORDEEL IN DE PAGINATITEL (kop-herziening sep 2026). Box 1 heeft geen eigen
+  // stoplicht; het oordeel dat deze pagina draagt is de onbenutte jaarruimte —
+  // exact het signaal dat de Box 1-kaart op de hub en de sidebar-dot tonen.
+  //
+  // TITEL EN STATUSPUNT UIT ÉÉN BRON.
+  //
+  // Hier stond `box1JaarruimteVerdict(computeJaarruimte(grossYearly, …))` — de
+  // canonieke bruto, mét handmatige override. Dat is het NAUWKEURIGSTE getal,
+  // maar het statuspunt naast de `i` komt uit `loadLeverScores.box1Status`, en
+  // die helper leidt bruto af uit netto en kent die override niet. Gevolg: wie
+  // zijn bruto zó overschrijft dat de jaarruimte op nul uitkomt, las een groene
+  // titel ("Ruimte benut") naast een oranje stip — twee oordelen over dezelfde
+  // vraag, twee centimeter uit elkaar.
+  //
+  // Het restverschil tussen beide helpers blijft bestaan (de hub documenteert
+  // het), maar het mag niet meer ZICHTBAAR zijn op één regel. De titel volgt
+  // daarom de stip. Wil je het verschil oplossen in plaats van verbergen, dan
+  // is dat een wijziging aan `box1JaarruimteStatus` — niet aan deze kop.
+  const { box1Status } = await loadLeverScores(supabase, perspective)
+
   return (
     <>
       <NavStackMeta title="Box 1" bottomBar={{ kind: 'tabs' }} />
       <JaarruimteDeeplinkScroll />
       <BelastingBoxPageHeader
-        number="1"
-        title="Werk + woning"
-        subtitle="Inkomen uit loon, ondernemerswinst en je eigen woning. Je onbenutte jaarruimte is hier de belangrijkste besparingskans."
-        infoKey="/overzicht/belasting/box1"
+        route="/overzicht/belasting/box1"
+        verdict={box1JaarruimteVerdictFromStatus(box1Status)}
+        tone={box1Status}
+        deck="Belasting over loon, winst en je eigen woning. Het oordeel volgt je onbenutte jaarruimte voor extra pensioenopbouw."
       />
 
       {box1Result != null && (

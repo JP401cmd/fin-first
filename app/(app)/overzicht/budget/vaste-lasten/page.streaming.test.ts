@@ -64,11 +64,24 @@ describe('/overzicht/budget/vaste-lasten — de zware loaders staan achter Suspe
     expect(src).toMatch(/<Suspense\s+fallback=\{<VasteLastenFallback\s*\/>\}>\s*<VasteLastenLoader/)
   })
 
-  it('rendert de aanhef (LCP-kandidaat) direct, buiten de Suspense-grens', () => {
-    const beforeSuspense = src.slice(0, src.indexOf('<Suspense'))
-    expect(beforeSuspense).toContain('<PageOpening')
-    expect(beforeSuspense).toContain('<PageStatusDot')
-    expect(beforeSuspense).toContain('<PageInfoButton')
+  it('rendert de aanhef (LCP-kandidaat) direct, vóór het gestreamde inhoudsblok', () => {
+    // MAATSTAF GEWIJZIGD MET DE KOP-HERZIENING (sep 2026), bedoeling niet.
+    // De kop draagt nu zélf een <Suspense> voor het stromende oordeel, dus
+    // "alles vóór de eerste <Suspense>" zou hier de kop buitensluiten en de test
+    // om de verkeerde reden rood maken. Wat bewaakt moet blijven is dat kop en
+    // header-controls vóór het INHOUDSBLOK staan — en dat de kop zelf van geen
+    // loader afhangt, wat de import-asserties hierboven al hard afdwingen.
+    const beforeContent = src.slice(0, src.indexOf('<VasteLastenLoader'))
+    expect(beforeContent).toContain('<PageVerdictOpening')
+    expect(beforeContent).toContain('<PageStatusDot')
+    expect(beforeContent).toContain('<PageInfoButton')
+  })
+
+  it('laadt het oordeel in de kop apart, zodat de titel zelf dataloos blijft', () => {
+    // De titel moet in de eerste byte staan; het oordeel mag nakomen. Zonder
+    // deze grens zou iemand het oordeel alsnog boven de return kunnen awaiten —
+    // dan is de kop weer zo traag als de traagste loader.
+    expect(src).toMatch(/verdictSlot=\{\s*<Suspense fallback=\{null\}>\s*<VasteLastenVerdict/)
   })
 
   it('houdt de pagina dynamisch — geen revalidate/ISR', () => {
@@ -139,6 +152,11 @@ describe('/overzicht/budget/vaste-lasten — precies één pagina-aanhef', () =>
     // een prefix van `<PageOpeningFigure`, en dát sub-composiet hoort hier juist
     // wél te staan (het cijferblok). Een kale substring-check zou de test
     // permanent rood houden om de verkeerde reden.
+    // Beide aanhef-varianten, om dezelfde reden: de kop woont sinds T2.4 op de
+    // server-pagina. Een tweede aanhef in de client zou twee <h2>'s shippen
+    // (ADR 0110) zonder dat de asserties hierboven — die alleen page.tsx en de
+    // loader lezen — iets merken.
     expect(stripComments(CLIENT_SRC)).not.toMatch(/<PageOpening[\s/>]/)
+    expect(stripComments(CLIENT_SRC)).not.toMatch(/<PageVerdictOpening[\s/>]/)
   })
 })

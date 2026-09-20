@@ -2,7 +2,8 @@ import type { Metadata } from 'next'
 import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
-import { PageOpening } from '@/components/editorial'
+import { PageVerdictOpening } from '@/components/editorial'
+import { resolveRouteTitle } from '@/lib/nav-config'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { getPageInfo } from '@/lib/page-info-content'
 import { loadBudgetCashSources } from '@/lib/budget-cash-sources'
@@ -68,12 +69,13 @@ export default async function BudgetInstellingenPage() {
       </div>
 
       <div className="mx-auto max-w-6xl space-y-6 px-4 pt-4 sm:px-6">
-        <PageOpening
-          kicker="Budgetteren"
-          titleBefore="Waar je cijfers op "
-          emphasis="rusten"
-          titleAfter=""
-          deck="Je schatting van wat er binnenkomt en uitgaat, en welke rekeningen daarin meetellen. Verander je hier iets, dan rekent je budget meteen mee."
+        {/* Geen oordeel op deze route: een instelling is een keuze, geen score
+            (er staat hierboven dan ook bewust geen statuspunt). `verdict={null}`
+            maakt de titel de kale paginanaam, op beide breakpoints zichtbaar. */}
+        <PageVerdictOpening
+          pageName={resolveRouteTitle('/overzicht/budget/instellingen') ?? 'Instellingen'}
+          verdict={null}
+          deck="Welke rekeningen meetellen en waarop je cijfers rusten. Wat je hier wijzigt, rekent je budget meteen mee."
         />
 
         <section className="space-y-3">

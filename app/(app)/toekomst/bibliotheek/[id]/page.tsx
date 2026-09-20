@@ -15,7 +15,8 @@ import { CalculatorRunner } from '@/components/future/calculator-runner'
 import { RequirementsChecklist } from '@/components/future/requirements-checklist'
 import { DisclaimerStrip } from '@/components/future/disclaimer-strip'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
-import { PageOpening } from '@/components/editorial'
+import { PageVerdictOpening } from '@/components/editorial'
+import { resolveRouteTitle } from '@/lib/nav-config'
 import { DetailActions } from './detail-actions'
 
 /**
@@ -176,22 +177,16 @@ export default async function BibliotheekDetailPage({
         Terug naar bibliotheek
       </Link>
 
-      {/* Editorial pagina-opening — dynamische naam als accent, module-accent
-          via --module-active-* (horizon). */}
-      <PageOpening
+      {/* Pagina-aanhef: de NAAM van de rekenhulp ís hier het kerncijfer — dat is
+          waar deze pagina over gaat. Neutrale inkt, geen oordeel. De paginanaam
+          ernaast komt van de OUDER-route: deze route is dynamisch en staat
+          daarom bewust niet in de statische titel-resolver (de mobiele TopBar
+          krijgt de naam via <NavStackMeta> hierboven). */}
+      <PageVerdictOpening
         className="mb-6"
-        kicker="Toekomst · Bibliotheek"
-        titleBefore="Alvast voor je "
-        emphasis="nagerekend"
-        titleAfter="."
-        deck={
-          <>
-            <strong className="font-semibold not-italic text-[var(--ink)]">
-              {calculator.name}
-            </strong>
-            {description ? ` — ${description}` : ''}
-          </>
-        }
+        pageName={resolveRouteTitle('/toekomst/bibliotheek') ?? 'Rekenhulp-bibliotheek'}
+        verdict={calculator.name}
+        deck={description || 'Bekijk wat deze rekenhulp doet, en dupliceer hem op je eigen cijfers.'}
       >
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-[var(--ink-3)]">
           <span className="inline-flex items-center gap-1">
@@ -214,7 +209,7 @@ export default async function BibliotheekDetailPage({
             duplicaten
           </span>
         </div>
-      </PageOpening>
+      </PageVerdictOpening>
 
       {/* Acties (Like/Dupliceer/Melden) — client-component met sheets */}
       <DetailActions

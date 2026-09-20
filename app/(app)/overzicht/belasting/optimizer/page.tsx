@@ -1,8 +1,10 @@
 import type { Metadata } from 'next'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
-import { PageOpening } from '@/components/editorial'
+import { PageVerdictOpening } from '@/components/editorial'
 import { getPageInfo } from '@/lib/page-info-content'
+import { resolveRouteTitle } from '@/lib/nav-config'
+import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import { createClient } from '@/lib/supabase/server'
 import { getServerPerspective } from '@/lib/household/server-perspective'
 import { loadFiscaleKansen } from '@/lib/tax-opportunities-loader'
@@ -41,6 +43,25 @@ export default async function BelastingOptimizerPage() {
 
   const kansen = await loadFiscaleKansen(supabase, perspective, CURRENT_TAX_YEAR)
 
+  // KERNCIJFER IN DE PAGINATITEL (kop-herziening sep 2026). Deze pagina heeft
+  // GEEN paginastoplicht — een fiscale kans is geen "op koers / aandacht /
+  // actie" — dus de titel draagt een KPI met tone `neutral`: het netto effect
+  // per jaar van de leidende kans.
+  //
+  // CONSUME, DON'T RECOMPUTE: `kansen.topChoice` is de door `pickTopChoice`
+  // gekozen winnaar uit dezelfde loader die de vergelijking hieronder vult; we
+  // ranken hier niets zelf. `netEffect` (besparing − verwacht rendementsverlies)
+  // is het cijfer dat de client als leidend toont — niet de bruto `savings`.
+  // Niets of niet-positief → geen oordeel, dan is de titel de kale paginanaam.
+  const topNetEffect = kansen.topChoice?.netEffect ?? 0
+  const kpi = topNetEffect > 0 ? `${formatCurrency(Math.round(topNetEffect))} per jaar` : null
+  // Geen kaal groot bedrag: de vrijheidstijd-vertaling staat in de deck,
+  // gerekend met het canonieke dagtarief uit dezelfde loader-bundel.
+  const kpiFreedom =
+    kpi && kansen.dailyExpenses > 0
+      ? formatFreedomTimeString(calculateFreedomTime(topNetEffect, kansen.dailyExpenses))
+      : null
+
   return (
     <>
       <NavStackMeta title="Fiscale kansen" bottomBar={{ kind: 'tabs' }} />
@@ -50,13 +71,16 @@ export default async function BelastingOptimizerPage() {
           content={getPageInfo('/overzicht/belasting/optimizer')}
           className="absolute right-4 top-6 sm:right-6 sm:top-8"
         />
-        <PageOpening
-          className="pr-20 sm:pr-24"
-          kicker="Belasting · Kansen"
-          titleBefore="Van belasting berekenen naar "
-          emphasis="optimaliseren"
-          titleAfter=""
-          deck="Eerst zie je waar je nu staat en wat elke fiscale keuze per saldo oplevert — in euro’s én in vrijheidsdagen. Daarna zoom je per keuze in op de uitwerking."
+        <PageVerdictOpening
+          gutterClassName="pr-20 sm:pr-24"
+          pageName={resolveRouteTitle('/overzicht/belasting/optimizer') ?? 'Fiscale kansen'}
+          verdict={kpi}
+          tone="neutral"
+          deck={
+            kpiFreedom
+              ? `Elke fiscale keuze doorgerekend. De grootste kans levert je zo’n ${kpiFreedom} vrijheidstijd per jaar op.`
+              : 'Elke fiscale keuze doorgerekend, in euro’s en vrijheidsdagen. Daarna zoom je per keuze in op de uitwerking.'
+          }
         />
       </div>
 

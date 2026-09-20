@@ -71,7 +71,7 @@ describe('BudgetEditorialHeader — Eenvoudig vs Volledig', () => {
     expect(screen.queryByText('Nog te besteden')).toBeNull()
     expect(screen.queryByText('Nog te verdelen')).toBeNull()
     // Headline (kicker/titel) blijft staan.
-    expect(screen.getByText(/heb je nog/i)).toBeTruthy()
+    expect(screen.getByRole('heading', { level: 2 }).textContent).toContain('Budget')
   })
 
   it('full: toont de hoofdgetallen "Nog te besteden" en "Nog te verdelen"', () => {
@@ -161,7 +161,7 @@ describe('BudgetHeaderSlot — aanhef bóven de kaarten', () => {
         </BudgetHeaderSlotProvider>
       </DisplayModeProvider>,
     )
-    expect(screen.getByText(/heb je nog/i)).toBeTruthy()
+    expect(screen.getByRole('heading', { level: 2 }).textContent).toContain('Budget')
     expect(screen.queryByText('Nog te besteden')).toBeNull()
   })
 
@@ -191,7 +191,7 @@ describe('BudgetHeaderSlot — aanhef bóven de kaarten', () => {
         </BudgetHeaderSlotProvider>
       </DisplayModeProvider>,
     )
-    expect(screen.getByText(/heb je nog/i)).toBeTruthy()
+    expect(screen.getByRole('heading', { level: 2 }).textContent).toContain('Budget')
     expect(screen.queryByText('Nog te besteden')).toBeNull()
     expect(screen.queryByText('Nog te verdelen')).toBeNull()
   })

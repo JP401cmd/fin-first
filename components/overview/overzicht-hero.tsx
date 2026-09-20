@@ -2,10 +2,11 @@
 
 import { useState, type ReactNode } from 'react'
 import dynamic from 'next/dynamic'
-import { EditorialHeadline, Kicker } from '@/components/editorial'
+import { PageVerdictOpening, Kicker } from '@/components/editorial'
+import { resolveRouteTitle } from '@/lib/nav-config'
 import { SectionDivider } from '@/components/app/section-divider'
 import { BottomSheet } from '@/components/app/bottom-sheet'
-import type { HealthScore } from '@/lib/financial-health'
+import { healthScoreTone, healthScoreVerdict, type HealthScore } from '@/lib/financial-health'
 import {
   HefbomenNav,
   type HefbomenHousingSplit,
@@ -126,23 +127,39 @@ export function OverzichtHeroPrimary({
   // Europe/Amsterdam) — één bron van waarheid voor de tijd, zodat SSR en de
   // eerste client-render identiek zijn (geen hydration-mismatch #418).
 
+  // Bandwoord voor de titel. `healthScoreVerdict` vangt de
+  // grondslag-onbekend-staat af, zodat de kop daar geen oordeel verzint.
+  const healthVerdict = health ? healthScoreVerdict(health) : null
+
   return (
     <section className="relative mx-auto max-w-6xl px-4 sm:px-6 pt-6 pb-2 md:pt-8 md:pb-4">
-      <header className="mb-6 pr-12 sm:pr-16">
+      {/* Kop-herziening sep 2026: de titel spreekt het OORDEEL uit (het
+          bandwoord van de gezondheidsscore) in plaats van de begroeting.
+
+          DE GROET SNEUVELT NIET, hij verhuist naar de deck. Hij is het enige
+          persoonlijke op deze pagina en verdwijnen zou een verarming zijn; als
+          títel kon hij niet blijven, want dan zegt de belangrijkste regel van de
+          startpagina niets over hoe je ervoor staat.
+
+          Bij een onbekende grondslag geeft `healthScoreVerdict` geen score —
+          dan is `verdict` null en is de titel de kale paginanaam. */}
+      {/* Een `<div>`, geen `<header>`: `PageVerdictOpening` rendert zélf een
+          `<header>` en header-in-header is ongeldige HTML. De vorige
+          `EditorialHeadline` had dat probleem niet (die rendert een kale kop). */}
+      <div className="mb-6 pr-12 sm:pr-16">
         <div className="flex flex-wrap items-center gap-2">
           <Kicker size="large">{dateLabel}</Kicker>
           {/* Maakt duidelijk wanneer de getallen van het huishouden/partner zijn. */}
           <PerspectiveContextLabel />
         </div>
-        <EditorialHeadline
-          level="h2"
-          size="sm"
-          emphasis={userName || undefined}
-          className="mt-1 text-[var(--ink)]"
-        >
-          {`${greeting}${userName ? `, ${userName}` : ''}`}
-        </EditorialHeadline>
-      </header>
+        <PageVerdictOpening
+          className="mt-1"
+          pageName={resolveRouteTitle('/overzicht') ?? 'Overzicht'}
+          verdict={healthVerdict?.kind === 'score' ? healthVerdict.label : null}
+          tone={health ? healthScoreTone(health) : 'neutral'}
+          deck={`${greeting}${userName ? `, ${userName}` : ''}. Je gezondheidsscore weegt rondkomen, buffer, schuld en vrijheid.`}
+        />
+      </div>
 
       {/* H20 — gids/check-in ná de begroeting. Bewust hier en niet ná het
           hefbomen-kompas: het kompas is de eerste inhoudelijke rij van de hero,

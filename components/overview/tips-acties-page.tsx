@@ -8,7 +8,8 @@ import { FreedomDaysAnimationProvider } from '@/components/app/freedom-days-anim
 import { OpzegModal } from '@/components/app/opzeg-modal'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { hasPageInfo, type PageInfoContent } from '@/lib/page-info-content'
-import { PageOpening } from '@/components/editorial'
+import { PageVerdictOpening } from '@/components/editorial'
+import { resolveRouteTitle } from '@/lib/nav-config'
 import { TipsLijst } from './tips-lijst'
 import type { Action, Recommendation } from '@/lib/recommendation-data'
 import type { CancellationMetadata } from '@/lib/cancellation-types'
@@ -66,13 +67,19 @@ export function TipsActiesPage({
           />
         )}
 
-        <PageOpening
+        {/* Bewust GEEN oordeel op deze route (er staat hierboven dan ook geen
+            statuspunt): een tip is een suggestie, geen score over jou. De titel
+            draagt daarom een KERNCIJFER in neutrale inkt — het aantal open
+            tips — of alleen de paginanaam als er niets openstaat. */}
+        <PageVerdictOpening
           className="mb-6 pr-12 sm:pr-16"
-          kicker="Tips & acties"
-          titleBefore="Wat zou je "
-          emphasis="nu"
-          titleAfter=" kunnen doen?"
-          deck="Toptips van Fin bovenaan; open acties eronder. Beslis op een tip met Doe nu, Later of Negeren — accepteer je 'm, dan verschijnt 'ie op je actielijst."
+          pageName={resolveRouteTitle('/overzicht/tips') ?? 'Tips & acties'}
+          verdict={
+            recommendations.length > 0
+              ? `${recommendations.length} open ${recommendations.length === 1 ? 'tip' : 'tips'}`
+              : null
+          }
+          deck="Beslis per tip: Doe nu, Later of Negeren. Accepteer je er een, dan verschijnt hij op je actielijst."
         />
 
         <TipsLijst

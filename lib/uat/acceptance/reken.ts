@@ -62,11 +62,11 @@ const criteria: AcceptanceCriterion[] = [
     persona: 'tessa',
     given: 'Persona Tessa Compleet, prefab "Aflossen vs. beleggen" (schuld>0 dus scenario "Aflossen" van toepassing). Invoer: maandbedrag=€500 (getypt), hypotheekrente=4% en jaren=15 (standaardwaarden, geen "uit jouw data"-badge).',
     when: 'De drie scenario-uitkomsten (Aflossen, Beleggen 5%, Beleggen 8%) worden berekend via `fvAnnuity(maandbedrag, rente, jaren)` met maandelijkse compounding, en het winnende scenario wordt bepaald op de hoogste eindwaarde.',
-    then: 'Aflossen (4%) = €123.045, Beleggen 5% = €133.644, Beleggen 8% = €173.019 — Beleggen 8% wint (trofee-icoon + conclusiezin). De Wft-disclaimer staat altijd onderaan.',
+    then: 'Aflossen (4%) = €123.045, Beleggen 5% = €133.644, Beleggen 8% = €173.019 — Beleggen 8% wint (trofee-icoon + conclusiezin). De Wft-disclaimer staat altijd onderaan. TITEL (kop-herziening 19-09-2026, `ToekomstSubpageShell`): de vervallen kicker/H1 ("Wat kost een keuze je aan tijd?") is vervangen door een kerncijfer, GEEN oordeel — "N rekenhulpen" (enkelvoud bij 1) op `savedCalculators.length`, dezelfde rijen als de view rendert en dezelfde telling als de Rekenhulp-navkaart op /toekomst; zonder eigen rekenhulpen is de titel de kale paginanaam "Rekenhulp" (`verdict={null}`). Neutrale inkt — een aantal is geen stoplicht-oordeel.',
     assertion: {
       kind: 'exact',
       expected: 'aflossen=123045; beleggen5=133644; beleggen8=173019; winner=beleggen_8',
-      source: 'lib/calculator/evaluate.ts#evaluateCalculator (échte productiefunctie) op de échte prefab-definitie `aflossen-vs-beleggen` (lib/calculator/prefab-definitions.ts) — zie reken-checks.ts',
+      source: 'lib/calculator/evaluate.ts#evaluateCalculator (échte productiefunctie) op de échte prefab-definitie `aflossen-vs-beleggen` (lib/calculator/prefab-definitions.ts) — zie reken-checks.ts. Titel: app/(app)/toekomst/rekenhulp/page.tsx (savedCalculators.length → ToekomstSubpageShell.verdict).',
     },
   },
   {
@@ -148,10 +148,10 @@ const criteria: AcceptanceCriterion[] = [
     persona: 'willem',
     given: 'Persona Willem Jansen (geen hypotheek/eigen huis meer).',
     when: 'De gebruiker opent /toekomst/bibliotheek en zet de toggle "Alleen tonen wat ik kan gebruiken" aan.',
-    then: 'Tier-koppen Starters/Verdieping/Specialist/"Van de community"; hypotheek-gerelateerde kaarten tonen een amber "mist data"-badge; filter aan → `?filter=usable`, hypotheek-kaarten vallen weg (bookmarkbaar, server-side). Niets matcht → reset-kaart; bibliotheek leeg → uitnodigingskaart.',
+    then: 'Tier-koppen Starters/Verdieping/Specialist/"Van de community"; hypotheek-gerelateerde kaarten tonen een amber "mist data"-badge; filter aan → `?filter=usable`, hypotheek-kaarten vallen weg (bookmarkbaar, server-side). Niets matcht → reset-kaart; bibliotheek leeg → uitnodigingskaart. TITEL (kop-herziening 19-09-2026, `PageVerdictOpening`): de vervallen kicker/H1 ("Wat anderen al hebben uitgerekend") is vervangen door een kerncijfer, GEEN oordeel — "N van M passen bij jou", waarbij N/M uit `enriched`/`enriched.filter(e => e.userMeetsAll)` komen — dezelfde vereisten-check die de kaarten en de filter op deze pagina gebruiken, geen tweede telling. Lege bibliotheek → titel is de kale paginanaam.',
     assertion: {
       kind: 'ui-only',
-      source: 'lib/calculator/requirements.ts#inferRequirements/checkRequirements — boolean vereisten-logica, geen bedragen',
+      source: 'lib/calculator/requirements.ts#inferRequirements/checkRequirements — boolean vereisten-logica, geen bedragen. Titel: app/(app)/toekomst/bibliotheek/page.tsx (enriched.filter(userMeetsAll) → PageVerdictOpening.verdict).',
     },
   },
   {
@@ -162,10 +162,10 @@ const criteria: AcceptanceCriterion[] = [
     persona: 'willem',
     given: 'Persona Willem Jansen, een bibliotheekkaart met een ontbrekende vereiste (hypotheek).',
     when: 'De gebruiker opent de detailpagina en speelt met sliders/scenario-tabs in het "Voorbeeld"-blok.',
-    then: 'Uitkomsten-tabel en winnaar reageren live (zelfde evaluator als WF-REKEN-01, hier read-only: GEEN Opslaan/levensgebeurtenis-knop); vereisten-checklist met deeplink naar bv. /overzicht/schulden; onbestaand/niet-publiek id → nette 404, ook voor de eigenaar zelf.',
+    then: 'Uitkomsten-tabel en winnaar reageren live (zelfde evaluator als WF-REKEN-01, hier read-only: GEEN Opslaan/levensgebeurtenis-knop); vereisten-checklist met deeplink naar bv. /overzicht/schulden; onbestaand/niet-publiek id → nette 404, ook voor de eigenaar zelf. TITEL (kop-herziening 19-09-2026, `PageVerdictOpening`): op deze dynamische route ÍS `calculator.name` het kerncijfer (neutrale inkt, geen oordeel) — de vervallen kicker/H1 ("Alvast voor je nagerekend.") + de vorige deck (naam + omschrijving) vervalt; de omschrijving staat nu in de deck zelf. De statische paginanaam komt bewust niet uit `resolveRouteTitle` (dynamische route) maar uit de ouder-route via `<NavStackMeta>` — dat voedt de mobiele TopBar.',
     assertion: {
       kind: 'ui-only',
-      source: 'components/future/calculator-runner.tsx (readOnly) — zelfde evaluator als WF-REKEN-01, hier alleen de read-only-restrictie getoetst',
+      source: 'components/future/calculator-runner.tsx (readOnly) — zelfde evaluator als WF-REKEN-01, hier alleen de read-only-restrictie getoetst. Titel: app/(app)/toekomst/bibliotheek/[id]/page.tsx (calculator.name → PageVerdictOpening.verdict).',
     },
   },
   {

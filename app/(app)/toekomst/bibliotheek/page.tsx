@@ -19,8 +19,9 @@ import { LibraryCard } from '@/components/future/library-card'
 import { LibraryFilter } from '@/components/future/library-filter'
 import { DisclaimerStrip } from '@/components/future/disclaimer-strip'
 import { Button } from '@/components/editorial/button'
-import { PageOpening, PageInfoButton } from '@/components/editorial'
+import { PageVerdictOpening, PageInfoButton } from '@/components/editorial'
 import { getPageInfo } from '@/lib/page-info-content'
+import { resolveRouteTitle } from '@/lib/nav-config'
 
 /**
  * /toekomst/bibliotheek — publieke Rekenhulp-bibliotheek.
@@ -205,15 +206,21 @@ export default async function BibliotheekPage({
         Terug naar rekenhulpen
       </Link>
 
-      {/* Editorial pagina-opening — module-accent via --module-active-* (horizon) */}
+      {/* Pagina-aanhef met het KERNCIJFER in de titel (kop-herziening sep 2026):
+          hoeveel van de zichtbare rekenhulpen volledig op jouw gegevens passen.
+          Beide getallen komen uit `enriched` — dezelfde vereisten-check die de
+          kaarten en de filter hieronder gebruiken, geen tweede telling.
+          Neutrale inkt: een aantal is geen oordeel over je situatie. */}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <PageOpening
+        <PageVerdictOpening
           className="min-w-0"
-          kicker="Toekomst · Bibliotheek"
-          titleBefore="Wat anderen al hebben "
-          emphasis="uitgerekend"
-          titleAfter=""
-          deck="Bekijk rekenhulpen die andere TriFinity-gebruikers met Fin hebben gemaakt en gedeeld. Dupliceer wat je raakt — je eigen cijfers worden meteen ingevuld zodat je 'm op jouw situatie kunt beoordelen."
+          pageName={resolveRouteTitle('/toekomst/bibliotheek') ?? 'Rekenhulp-bibliotheek'}
+          verdict={
+            enriched.length > 0
+              ? `${enriched.filter((e) => e.userMeetsAll).length} van ${enriched.length} passen bij jou`
+              : null
+          }
+          deck="Rekenhulpen die anderen met Fin maakten. Dupliceer er een; je eigen cijfers staan er meteen in."
         />
         <LibraryFilter defaultEnabled={showOnlyUsable} />
       </div>

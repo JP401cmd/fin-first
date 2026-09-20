@@ -101,13 +101,19 @@ export default async function ToekomstGebeurtenissenPage({
 
   return (
     <>
+      {/* Kerncijfer in de titel: het aantal gebeurtenissen dat op de tijdas
+          staat — geteld op exact dezelfde rijen die de view rendert, en
+          dezelfde telling als de Gebeurtenissen-navkaart op /toekomst. Geen
+          stoplicht: een gebeurtenis is geen oordeel, dus neutrale inkt. */}
       <ToekomstSubpageShell
-        kicker="Toekomst · Gebeurtenissen"
-        titleBefore="Welke gebeurtenissen verschuiven je "
-        emphasis="vrijheid"
-        titleAfter="?"
-        deck="Kind, erfenis, verhuizing of minder werken — momenten die je tijdas naar voren of naar achteren duwen."
-        infoKey="/toekomst/gebeurtenissen"
+        route="/toekomst/gebeurtenissen"
+        fallbackName="Gebeurtenissen"
+        verdict={
+          horizonData.events.length > 0
+            ? `${horizonData.events.length} ${horizonData.events.length === 1 ? 'gebeurtenis' : 'gebeurtenissen'}`
+            : null
+        }
+        deck="Kind, erfenis, verhuizing of minder werken. Momenten die je tijdas verschuiven."
       />
       <GebeurtenissenView
         events={horizonData.events}

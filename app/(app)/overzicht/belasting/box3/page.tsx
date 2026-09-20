@@ -6,6 +6,8 @@ import { createClient } from '@/lib/supabase/server'
 import { getServerPerspective } from '@/lib/household/server-perspective'
 import { loadPerspectiveBox3 } from '@/lib/household-tax'
 import { CURRENT_TAX_YEAR } from '@/lib/box3-data'
+import { loadLeverScores } from '@/lib/lever-scores-loader'
+import { box3StatusVerdict } from '@/lib/box3-taxable-input'
 
 export const metadata: Metadata = {
   title: 'Box 3 · Sparen + beleggen — TriFinity',
@@ -42,14 +44,25 @@ export default async function BelastingBox3Page() {
 
   const box3 = await loadPerspectiveBox3(supabase, perspective, YEAR, currentUserName)
 
+  // OORDEEL IN DE PAGINATITEL (kop-herziening sep 2026) — `box3Status` uit
+  // `loadLeverScores`, dezelfde `box3TaxStatus`-uitkomst die de sidebar-dot en
+  // de Box 3-kaart op de hub voeden. CONSUME, DON'T RECOMPUTE: geen tweede
+  // `computeBox3TaxableInput` hier, en de zin komt uit `box3StatusVerdict` die
+  // de hub-kaart óók gebruikt.
+  //
+  // Wat dit kost: niets. `loadLeverScores` is `cache()`-gewrapt en draait op
+  // élke app-route al in `app/(app)/layout.tsx` voor de sidebar-statuspunten;
+  // binnen dezelfde request pakt deze aanroep dat resultaat op.
+  const { box3Status } = await loadLeverScores(supabase, perspective)
+
   return (
     <>
       <NavStackMeta title="Box 3" bottomBar={{ kind: 'tabs' }} />
       <BelastingBoxPageHeader
-        number="3"
-        title="Sparen + beleggen"
-        subtitle="Cash, beleggingen en crypto. De Belastingdienst rekent met een forfaitair (fictief) rendement boven je heffingsvrije vermogen."
-        infoKey="/overzicht/belasting/box3"
+        route="/overzicht/belasting/box3"
+        verdict={box3StatusVerdict(box3Status)}
+        tone={box3Status}
+        deck="Vermogensheffing over sparen en beleggen, forfaitair berekend. Het oordeel volgt je vermogen boven de vrijstelling."
       />
       <Box3Detail year={YEAR} initialData={box3} />
     </>

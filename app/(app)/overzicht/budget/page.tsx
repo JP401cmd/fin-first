@@ -11,6 +11,7 @@ import {
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { PageStatusDot } from '@/components/app/page-status-dot'
 import { BudgetHeaderSlot, BudgetHeaderSlotProvider } from '@/components/app/budgets-client'
+import { BudgetVerdict } from './budget-verdict'
 import { Kicker } from '@/components/editorial'
 import { getPageInfo } from '@/lib/page-info-content'
 
@@ -84,7 +85,16 @@ export default async function OverzichtBudgetPage() {
             content={getPageInfo('/overzicht/budget')}
             className="absolute right-4 top-4 sm:right-6"
           />
-          <BudgetHeaderSlot />
+          {/* Het oordeel stroomt de titel in (zie `budget-verdict.tsx`); de
+              kop zelf blijft dataloos, zodat er geen await boven de return
+              komt. */}
+          <BudgetHeaderSlot
+            verdictSlot={
+              <Suspense fallback={null}>
+                <BudgetVerdict perspective={perspective} />
+              </Suspense>
+            }
+          />
         </section>
 
         {/* De drie onderdelen als kaarten met hun kerngetal en status —

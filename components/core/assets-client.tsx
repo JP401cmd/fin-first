@@ -11,7 +11,9 @@ import { BottomSheet } from '@/components/app/bottom-sheet'
 // `ToastProvider` gerenderd (onboarding-achtige contexten, tests). De defensieve
 // variant degradeert daar stil in plaats van te gooien.
 import { useOptionalToast } from '@/components/app/toast-provider'
-import { Kicker, FiguresStrip, PageInfoButton, GlossaryTerm, PageOpening, type FigureProps } from '@/components/editorial'
+import { Kicker, FiguresStrip, PageInfoButton, GlossaryTerm, PageVerdictOpening, type FigureProps } from '@/components/editorial'
+import { resolveRouteTitle } from '@/lib/nav-config'
+import type { LeverageStatus } from '@/lib/leverage-status'
 import { buildAssetReturnBreakdown, formatGainPct, RETURN_BASIS_LABELS } from '@/lib/asset-return'
 import { OVERLAY_QUERY_KEYS } from '@/lib/navigation'
 import { createPaneUrlHistory } from '@/lib/pane-url-history'
@@ -231,9 +233,24 @@ type AssetsPageProps = {
    *  `/overzicht/bezittingen` rendert de page-shell zélf de `i` en het
    *  statuspunt; dan `false` om een dubbele info-knop te voorkomen. */
   showPageInfo?: boolean
+  /**
+   * Canonieke route van het OPPERVLAK dat deze component mount — bron van de
+   * paginanaam in de titel. `/overzicht/bezittingen` en de legacy `/core/assets`
+   * delen deze component; zonder deze prop zou de titel op beide hetzelfde
+   * heten terwijl de nav ze anders noemt.
+   */
+  route?: string
+  /**
+   * Het oordeel achter de titel, server-bepaald door de mountende pagina
+   * (hefboom-score → `hefboomVerdict`). `undefined`/`null` ⇒ de titel is alleen
+   * de paginanaam — zo houdt de legacy-route zonder oordeel een geldige kop.
+   */
+  verdict?: string | null
+  /** Stoplichtstand bij `verdict`; bepaalt uitsluitend de kleur. */
+  verdictTone?: LeverageStatus
 }
 
-export default function AssetsPage({ initialAssetId, initialData, toolbarFilter, assetTypeFilter, showPageInfo = true }: AssetsPageProps = {}) {
+export default function AssetsPage({ initialAssetId, initialData, toolbarFilter, assetTypeFilter, showPageInfo = true, route = '/overzicht/bezittingen', verdict, verdictTone = 'neutral' }: AssetsPageProps = {}) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
@@ -949,29 +966,33 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
-      {/* ═══ Editorial pagina-opening (standaard-aanhef) ════════════
-          Canonieke PageOpening: hairline-kicker → narratieve Playfair-H1
-          met één <em>-accent → deck. Alles eronder (FiguresStrip, toolbar,
-          grid) ongewijzigd. */}
-      <PageOpening
+      {/* ═══ Pagina-aanhef die het oordeel uitspreekt ═══════════════
+          Kop-herziening sep 2026: de kicker is vervallen en de titel draagt
+          "Bezittingen | <oordeel>" (op mobiel alleen het oordeel — de TopBar
+          draagt de naam daar). Alles eronder (FiguresStrip, toolbar, grid)
+          ongewijzigd.
+
+          Het perspectief-label zat in de vervallen kicker. Het is niet verloren:
+          bij een huishouden staat het in de deck hieronder, waar het bij de
+          uitleg over de gewogen waarde hoort. */}
+      <PageVerdictOpening
         // Rechter-gutter blijft óók bij showPageInfo=false: de overzicht-shell
         // rendert daar zijn eigen i-cluster (i + statuspunt + insight-toggle),
-        // dus de kicker/H1 mogen die zone niet in lopen. De deck valt búiten de
+        // dus de titel mag die zone niet in lopen. De deck valt búiten de
         // gutter (staat onder de knoppen) en houdt de volle breedte.
         className="mb-5"
         gutterClassName="pr-24 sm:pr-28"
-        kicker={
-          <>
-            Bezittingen · opgeslagen vrijheid
-            <PerspectiveContextLabel />
-          </>
-        }
-        titleBefore="Wat je bezit, is opgeslagen "
-        emphasis="vrijheid"
-        titleAfter="."
+        pageName={resolveRouteTitle(route) ?? 'Bezittingen'}
+        verdict={verdict ?? null}
+        tone={verdictTone}
         deck={
           <>
-            Elke bezitting is opgeslagen tijd — geld dat voor je werkt in plaats van andersom.
+            {/* ADR 0165: "elke bezitting is opgeslagen tijd" was de oude leus
+                ("geld is opgeslagen tijd") en is vervallen — geld lévert tijd
+                op. De zin is meteen ingekort tot de nieuwe deck-lengte. */}
+            Alles wat je bezit, per soort. Het oordeel volgt je spreiding: meer soorten, minder
+            afhankelijk van één.
+            <PerspectiveContextLabel />
             {/* De strip hieronder telt élke bezitting voor zijn VOLLE waarde op:
                 `perspectiveAssetValue` weegt alleen het huishoud-aandeel, niet
                 `net_worth_inclusion_pct`. De deck beloofde het omgekeerde
@@ -998,7 +1019,7 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
         {partnerAssetsHidden && (
           <PrivacyHiddenNotice hiddenCategories={['assets']} forCategories={['assets']} />
         )}
-      </PageOpening>
+      </PageVerdictOpening>
 
       {/* Figures-strip (mini-hero) — Totale waarde krijgt highlight-marker.
           ÉÉN strip, geen mode-ternary (S11). Hier stonden twee losse arrays:

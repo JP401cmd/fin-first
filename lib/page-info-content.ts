@@ -317,9 +317,16 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
   },
   '/overzicht/budget/transacties': {
     insight:
-      'Alles wat er deze maand in en uit gaat, met je geldstroom per categorie en je spaarquote van de maand.',
+      'Alles wat er deze maand in en uit gaat, met je geldstroom per categorie en je spaarquote van de maand. Elke transactie kost of levert tijd op — daarom staat er bij bedragen ook wat ze aan vrijheidstijd betekenen.',
     grip: 'Filter en doorzoek je boekingen, of koppel een rekening zodat nieuwe transacties automatisch binnenkomen. Deel je een huishouden, dan zet je een gedeelde boeking met één klik op jullie lijst "Te bespreken" — alleen boekingen die je partner ook ziet.',
     werking: [
+      {
+        // Draagt wat de pagina-aanhef sinds de kop-herziening (sep 2026) niet
+        // meer kwijt kan: de drempels achter het oordeel in de titel, en waarom
+        // dat oordeel halverwege de maand kan uitblijven.
+        title: 'Het oordeel in de titel',
+        text: 'De titel toont je spaarquote-oordeel over de lopende kalendermaand: vanaf 20% ben je goed op koers, tussen 0% en 20% is het krap, daaronder is er een tekort. Is je inkomen deze maand nog niet binnen, dan blijft het oordeel uit in plaats van een tekort te melden dat er aan het eind van de maand niet is.',
+      },
       {
         title: 'Filteren en zoeken',
         text: 'Zoek op tekst, bedrag of periode, en beperk de lijst tot één categorie of rekening.',
@@ -329,12 +336,12 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
         text: 'Open een boeking en kies een andere categorie. Je budgetten en je spaarquote rekenen meteen mee — je hoeft niets opnieuw te laden.',
       },
       {
-        title: 'Rekening koppelen',
-        text: 'Koppel je bank en nieuwe transacties komen vanzelf binnen. Handmatig invoeren blijft altijd mogelijk; een koppeling is nooit verplicht.',
-      },
-      {
-        title: 'Bestand importeren',
-        text: 'Een export van je bank (CSV, MT940 of OFX) lees je hier in. Boekingen die je al had worden herkend, ook als ze via een andere bron binnenkwamen.',
+        // Koppelen en importeren samengevoegd: de WERKING-lijst telt maximaal
+        // vier items, en het oordeel-item hierboven draagt sinds de
+        // kop-herziening de uitleg die de pagina-aanhef niet meer kwijt kan.
+        // Beide gaan over hetzelfde: transacties de app in krijgen.
+        title: 'Transacties binnenkrijgen',
+        text: 'Koppel je bank en nieuwe transacties komen vanzelf binnen. Of lees een export van je bank in (CSV, MT940 of OFX) — boekingen die je al had worden herkend, ook als ze via een andere bron binnenkwamen. Handmatig invoeren blijft altijd mogelijk; een koppeling is nooit verplicht.',
       },
     ],
     terms: ['spaarquote', 'psd2'],
@@ -503,7 +510,7 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
       },
       {
         title: 'Aannames erachter',
-        text: 'Rendement, inflatie, je uitgaven na pensioen en je eindleeftijd bepalen samen de uitkomst. Je stelt ze zelf in bij Voorkeuren — een kleine bijstelling kan jaren schelen. Onder de grafiek, bij Verken je aannames, draai je eraan zonder je plan te wijzigen: zoekt de app je stopmoment zelf, dan zie je je vrijheidsleeftijd verschuiven; ligt je stopmoment vast, dan zie je op de dekkingsas of je plan tot je eindleeftijd reikt, en bij een tekort wat het haalbaar maakt: doorwerken tot een leeftijd, meer opzij, of minder uitgeven. Je AOW telt alleen mee als er een actieve AOW-gebeurtenis op je tijdas staat; ontbreekt die, dan rekent de projectie met €0 AOW en zegt een melding boven de grafiek dat. Standaard rekent je plan zonder blijvende tekort-lening: je vrijheidsleeftijd is het vroegste moment waarop je zonder zo’n lening rondkomt. Kies je een vast stopmoment en is je vermogen onderweg op, dan overbrugt de projectie het gat met een tekort-lening en meldt dat boven de grafiek; bij Voorkeuren stel je in of je plan zo’n lening mag gebruiken. Blijft er aan het eind van je plan veel meer over dan je gekozen eind-vorm doet verwachten, dan legt een melding boven de grafiek uit welke regels dat in deze berekening veroorzaken.',
+        text: 'Rendement, inflatie, je uitgaven na pensioen en je eindleeftijd bepalen samen de uitkomst. Je stelt ze zelf in bij Voorkeuren — een kleine bijstelling kan jaren schelen. Onder de grafiek staat je doelscenario: vijf knoppen — meer verdienen, minder uitgeven, je uitgave na pensioen, je nalatenschap en je stopleeftijd — waaraan je draait zonder je plan te wijzigen. Elke knop kleurt rood, oranje of groen: rood betekent dat je plan het niet haalt, oranje dat het net haalt, groen dat er ruim marge in zit. De regel onder een knop zegt vanaf welke stand die grens ligt, en zodra je één knop verschuift, bewegen de grenzen op de andere knoppen mee — ze hangen immers van elkaar af. Onderaan staat of je verkenning al als doel is opgeslagen. Je AOW telt alleen mee als er een actieve AOW-gebeurtenis op je tijdas staat; ontbreekt die, dan rekent de projectie met €0 AOW en zegt een melding boven de grafiek dat. Standaard rekent je plan zonder blijvende tekort-lening: je vrijheidsleeftijd is het vroegste moment waarop je zonder zo’n lening rondkomt. Kies je een vast stopmoment en is je vermogen onderweg op, dan overbrugt de projectie het gat met een tekort-lening en meldt dat boven de grafiek; bij Voorkeuren stel je in of je plan zo’n lening mag gebruiken. Blijft er aan het eind van je plan veel meer over dan je gekozen eind-vorm doet verwachten, dan legt een melding boven de grafiek uit welke regels dat in deze berekening veroorzaken.',
       },
     ],
     terms: ['fire', 'vrijheidstijd', 'swr', 'inflatie', 'omslagpunt', 'stopmoment', 'bandbreedte', 'tekort_lening'],

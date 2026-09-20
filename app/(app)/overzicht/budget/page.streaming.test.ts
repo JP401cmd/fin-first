@@ -74,7 +74,7 @@ describe('/overzicht/budget — de aanhef staat bóven de kaarten', () => {
   const src = stripComments(PAGE_SRC)
 
   it('rendert de aanhef-plek vóór het kaartenblok en dat vóór de budgetten', () => {
-    const header = src.indexOf('<BudgetHeaderSlot />')
+    const header = src.search(/<BudgetHeaderSlot[\s/>]/)
     const cards = src.indexOf('<CashflowCardsLoader')
     const budgets = src.indexOf('<BudgetsLoader')
     expect(header).toBeGreaterThan(-1)
@@ -86,7 +86,7 @@ describe('/overzicht/budget — de aanhef staat bóven de kaarten', () => {
     const open = src.indexOf('<BudgetHeaderSlotProvider>')
     const close = src.indexOf('</BudgetHeaderSlotProvider>')
     expect(open).toBeGreaterThan(-1)
-    expect(open).toBeLessThan(src.indexOf('<BudgetHeaderSlot />'))
+    expect(open).toBeLessThan(src.search(/<BudgetHeaderSlot[\s/>]/))
     expect(close).toBeGreaterThan(src.indexOf('<BudgetsLoader'))
   })
 

@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { loadFinData, loadEffectiveMonthlyFigures } from '@/lib/fin-data-loader'
 import { ToekomstSubpageShell } from '@/components/future/toekomst-subpage-shell'
 import { DoelenView } from '@/components/future/doelen-view'
+import { doelenVerdict } from '@/components/future/doelen-verdict'
 
 export const metadata: Metadata = {
   title: 'Doelen — TriFinity',
@@ -28,15 +29,20 @@ export default async function ToekomstDoelenPage() {
     loadEffectiveMonthlyFigures(supabase),
   ])
 
+  // Het oordeel in de titel komt uit `doelenVerdict` — DEZELFDE telling die de
+  // Doelen-navkaart op /toekomst als KPI en statuspunt toont. Eén bron, dus de
+  // kaart en deze titel kunnen niet uit elkaar lopen. Geen eigen drempel: de
+  // stoplichtstand volgt het slechtste beoordeelde doel.
+  const verdict = doelenVerdict(finData.goals, finData.goalProgresses)
+
   return (
     <>
       <ToekomstSubpageShell
-        kicker="Toekomst · Doelen"
-        titleBefore="Waar spaar je je "
-        emphasis="vrijheid"
-        titleAfter=" voor?"
-        deck="Je doelen met status — sparen, aflossen en groeien richting je vrijheidsgetal."
-        infoKey="/toekomst/doelen"
+        route="/toekomst/doelen"
+        fallbackName="Doelen"
+        verdict={verdict.label}
+        tone={verdict.status}
+        deck="Je doelen met hun tempo. Sparen, aflossen en groeien richting je vrijheidsgetal."
       />
       <DoelenView
         goals={finData.goals}

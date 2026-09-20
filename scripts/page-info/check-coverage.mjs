@@ -170,6 +170,15 @@ function scanFile(path, referenced, buttonSites) {
   // Literal keys threaded via an `infoKey="..."` prop (BelastingBoxPageHeader,
   // ToekomstSubpageShell) — these resolve to getPageInfo(infoKey) internally.
   for (const m of src.matchAll(/infoKey=["']([^"']+)["']/g)) referenced.add(m[1])
+  // …en via de `route="/…"`-prop van diezelfde twee shells. Sinds de
+  // kop-herziening (sep 2026) leiden ze de paginanaam én de PAGE_INFO-sleutel
+  // uit ÉÉN route-prop af, juist zodat die twee niet kunnen wegdrijven; een
+  // aparte `infoKey` op elke call-site zou dat weer mogelijk maken. Gebonden aan
+  // de shellnaam in hetzelfde bestand, zodat een willekeurige `route="…"`-prop
+  // elders geen valse dekking oplevert.
+  if (/<(?:ToekomstSubpageShell|BelastingBoxPageHeader)\b/.test(src)) {
+    for (const m of src.matchAll(/route=["'](\/[^"']*)["']/g)) referenced.add(m[1])
+  }
 
   // <PageInfoButton ...> (and its infoContent-threading wrappers PhaseIntro/
   // RegimeKaart/TipsActiesPage) call sites: flag only a genuine inline-literal
@@ -237,8 +246,17 @@ function resolveImport(spec, fromFile) {
   return null
 }
 
-/** Écht gebruik van de knop — geen re-export, geen definitie. */
-const USES_PAGE_INFO = /<PageInfoButton|infoKey\s*[=:]|getPageInfo\s*\(/
+/**
+ * Écht gebruik van de knop — geen re-export, geen definitie.
+ *
+ * `ToekomstSubpageShell`/`BelastingBoxPageHeader` staan erbij omdat ze de knop
+ * zélf renderen op basis van hun `route`-prop: een pagina die zo'n shell mount
+ * heeft een info-knop, ook al staat er geen `<PageInfoButton` of `infoKey` in
+ * haar eigen bron. Zonder deze twee namen meldt de detector die pagina's als
+ * "route zonder info-knop" terwijl de knop er gewoon staat.
+ */
+const USES_PAGE_INFO =
+  /<PageInfoButton|infoKey\s*[=:]|getPageInfo\s*\(|<(?:ToekomstSubpageShell|BelastingBoxPageHeader)\b/
 const IMPORT_SPEC_RE = /(?:from\s*|import\s*\(\s*)['"]([^'"]+)['"]/g
 
 export function routeHasInfoButton(entryFile) {

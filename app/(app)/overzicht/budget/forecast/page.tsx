@@ -4,7 +4,9 @@ import { getServerPerspective } from '@/lib/household/server-perspective'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { ForecastLoader } from './forecast-loader'
 import { ForecastFallback } from './forecast-fallback'
-import { PageOpening } from '@/components/editorial'
+import { PageVerdictOpening } from '@/components/editorial'
+import { resolveRouteTitle } from '@/lib/nav-config'
+import { ForecastVerdict } from './forecast-verdict'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { PageStatusDot } from '@/components/app/page-status-dot'
 import { getPageInfo } from '@/lib/page-info-content'
@@ -59,12 +61,17 @@ export default async function OverzichtCashflowForecastPage() {
         />
       </div>
       <div className="mx-auto max-w-6xl space-y-6 px-4 pt-4 sm:px-6">
-        <PageOpening
-          kicker="Vooruitblik"
-          titleBefore="Hoeveel "
-          emphasis="vrijheid"
-          titleAfter=" bouw je op?"
-          deck="Je spaarquote, je maandelijkse overschot en de komende zes maanden — samen laten ze zien hoe snel je vrijheid groeit."
+        {/* Dataloze kop (LCP); het oordeel stroomt erachteraan via zijn eigen
+            Suspense — zie `forecast-verdict.tsx`. */}
+        <PageVerdictOpening
+          pageName={resolveRouteTitle('/overzicht/budget/forecast') ?? 'Vooruitblik'}
+          verdict={null}
+          verdictSlot={
+            <Suspense fallback={null}>
+              <ForecastVerdict perspective={perspective} />
+            </Suspense>
+          }
+          deck="De komende zes maanden op je huidige tempo. Blijft er netto geld over, dan ben je op koers."
         />
 
         {/* Het gestreamde blok draagt zijn eigen `space-y-6`, zodat de afstand

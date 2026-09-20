@@ -156,7 +156,8 @@ import {
 import { buildBudgetTypeMap } from '@/lib/budget-utils'
 import { Users } from 'lucide-react'
 import { MaskedAmount } from '@/components/app/masked-amount'
-import { PageOpening } from '@/components/editorial'
+import { PageVerdictOpening } from '@/components/editorial'
+import { resolveRouteTitle } from '@/lib/nav-config'
 import { MASKED_AMOUNT_PLACEHOLDER } from '@/lib/format'
 import { formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
@@ -202,7 +203,14 @@ export function BudgetEditorialHeader({
   totalExpenseSpent,
   simple = false,
   gutterClassName = '',
+  verdictSlot,
 }: {
+  /**
+   * Het stromende oordeel achter de titel, aangeleverd door de server-pagina
+   * (zie `budget-verdict.tsx`). Optioneel: de legacy-route /core/budgets mount
+   * deze aanhef zonder slot en houdt dan een titel zonder oordeel.
+   */
+  verdictSlot?: ReactNode
   monthLabel: string
   teVerdelen: number
   totalIncome: number
@@ -251,18 +259,23 @@ export function BudgetEditorialHeader({
   const verdelenBedrag = formatMaskedCurrency(Math.abs(teVerdelen), masked)
 
   return (
-    <PageOpening
+    <PageVerdictOpening
       className="mb-6"
       gutterClassName={gutterClassName}
-      kicker={
-        <>
-          Budgetteren {periodKicker && `· ${periodKicker}`}
-          <PerspectiveContextLabel className="normal-case tracking-normal" />
-        </>
+      pageName={resolveRouteTitle('/overzicht/budget') ?? 'Budget'}
+      verdict={null}
+      verdictSlot={verdictSlot}
+      // De maand stond in de vervallen kicker ("Budgetteren · augustus"). Hij
+      // hoort niet wég: het cijferblok hieronder ("Nog te besteden") is een
+      // maandstand, en zonder venster is dat precies het cijfer-zonder-grondslag
+      // dat CF-3 heeft afgeschaft. Hij verhuist daarom naar de deck.
+      // Het perspectief-label is niet verloren: de pagina draagt het in de
+      // kicker boven de drie kaarten.
+      deck={
+        periodKicker
+          ? `Je inkomen en uitgaven in ${periodKicker}. Het oordeel weegt je spaarquote en je budgetten samen.`
+          : 'Je inkomen en uitgaven deze maand. Het oordeel weegt je spaarquote en je budgetten samen.'
       }
-      titleBefore="Hoeveel "
-      emphasis="ruimte"
-      titleAfter=" heb je nog?"
     >
       {/* Twee kolommen: besteden vs. verdelen. "Nog te besteden" draagt de
           highlight-marker en is het anker — hetzelfde getal als de Budget-
@@ -321,7 +334,7 @@ export function BudgetEditorialHeader({
         </div>
       </div>
       )}
-    </PageOpening>
+    </PageVerdictOpening>
   )
 }
 
@@ -388,23 +401,34 @@ export function useBudgetHeaderSlot(): BudgetHeaderSlotValue | null {
  * is. De wachtvorm heeft dezelfde opbouw (kicker + kop + cijferblok-hoogte),
  * zodat de kaarten eronder niet verspringen als de cijfers instromen.
  */
-export function BudgetHeaderSlot() {
+export function BudgetHeaderSlot({ verdictSlot }: { verdictSlot?: ReactNode }) {
   const slot = useBudgetHeaderSlot()
   const simple = useDisplayMode().mode === 'simple'
   const figures = slot?.figures ?? null
 
   if (figures) {
-    return <BudgetEditorialHeader {...figures} gutterClassName="pr-20 sm:pr-24" />
+    return (
+      <BudgetEditorialHeader
+        {...figures}
+        gutterClassName="pr-20 sm:pr-24"
+        verdictSlot={verdictSlot}
+      />
+    )
   }
 
   return (
-    <PageOpening
+    // WACHTVORM — draagt hetzelfde oordeel-slot als de echte aanhef. Het oordeel
+    // komt van de server en hangt niet van de gepubliceerde cijfers af; het mag
+    // dus al staan terwijl het cijferblok nog inlaadt. Zou de wachtvorm het slot
+    // weglaten, dan zou de titel twee keer veranderen (naam → naam+oordeel →
+    // naam+oordeel) in plaats van één keer.
+    <PageVerdictOpening
       className="mb-6"
       gutterClassName="pr-20 sm:pr-24"
-      kicker="Budgetteren"
-      titleBefore="Hoeveel "
-      emphasis="ruimte"
-      titleAfter=" heb je nog?"
+      pageName={resolveRouteTitle('/overzicht/budget') ?? 'Budget'}
+      verdict={null}
+      verdictSlot={verdictSlot}
+      deck="Je inkomen en uitgaven deze maand. Het oordeel weegt je spaarquote en je budgetten samen."
     >
       {/* Zelfde raster als het echte cijferblok. In Eenvoudig toont de aanhef
           geen cijferblok, dus reserveert de wachtvorm daar ook geen hoogte.
@@ -434,7 +458,7 @@ export function BudgetHeaderSlot() {
           </div>
         </div>
       )}
-    </PageOpening>
+    </PageVerdictOpening>
   )
 }
 

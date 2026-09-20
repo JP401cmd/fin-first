@@ -5,7 +5,12 @@ import { createClient } from '@/lib/supabase/server'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { Box2Detail } from '@/components/overview/box2-detail'
 import { BelastingBoxPageHeader } from '@/components/overview/belasting-box-page-header'
-import { hasBox2Relevance } from '@/lib/box2-relevance'
+import { loadBox2Materiality } from '@/lib/box2-relevance'
+// CURRENT_TAX_YEAR en niet een los 2026: de hub en de page-status-keten
+// gebruiken die constante al, en een tweede geschreven jaartal drijft weg zodra
+// het belastingjaar verspringt.
+import { CURRENT_TAX_YEAR } from '@/lib/box3-data'
+import type { LeverageStatus } from '@/lib/leverage-status'
 
 export const metadata: Metadata = {
   title: 'Box 2 · Aanmerkelijk belang — TriFinity',
@@ -30,16 +35,38 @@ export default async function BelastingBox2Page() {
   // Detecteer Box 2-relevantie met dezelfde breedte als de Box 2-engine
   // (deelneming / DGA-vordering / DGA-schuld) zodat een DGA met excessief-
   // lenen-positie de échte berekening krijgt i.p.v. de empty-state.
-  const hasAanmerkelijkBelang = user ? await hasBox2Relevance(supabase, user.id) : false
+  //
+  // `loadBox2Materiality` i.p.v. `hasBox2Relevance`: dezelfde detectie-breedte
+  // (`relevant`), maar hij draait óók de canonieke `calculateBox2` en zegt
+  // daarmee of er dáádwerkelijk heffing is (`material`) — het oordeel dat de
+  // paginatitel uitspreekt. Eén loader i.p.v. twee; het is dezelfde bron als de
+  // Box 2-statusbanner (bevinding L8), dus banner en titel kunnen niet
+  // uiteenlopen.
+  const box2 = user
+    ? await loadBox2Materiality(supabase, user.id, CURRENT_TAX_YEAR)
+    : { relevant: false, material: false }
+  const hasAanmerkelijkBelang = box2.relevant
+
+  // BEWUST GEEN BEDRAG IN DE TITEL. `loadBox2Materiality` is user-scoped (eigen
+  // rijen), terwijl `Box2Detail` hieronder in huishoud-weergave het
+  // gecombineerde bedrag toont — een euro in de kop zou daar de grondslag van
+  // het blok eronder tegenspreken. Het oordeel is daarom de materialiteit:
+  // oranje zodra er heffing is, verder neutraal. Het bedrag (met
+  // vrijheidsdagen) staat in `Box2Detail` zelf.
+  const [box2Verdict, box2Tone]: [string, LeverageStatus] = !box2.relevant
+    ? ['Niet van toepassing', 'neutral']
+    : box2.material
+      ? ['Heffing over je belang', 'warn']
+      : ['Geen heffing dit jaar', 'neutral']
 
   return (
     <>
       <NavStackMeta title="Box 2" bottomBar={{ kind: 'tabs' }} />
       <BelastingBoxPageHeader
-        number="2"
-        title="Aanmerkelijk belang"
-        subtitle="Bezit je 5% of meer van de aandelen in een vennootschap (bijvoorbeeld een eigen BV)? Dan worden dividend en vervreemdingswinst in Box 2 belast."
-        infoKey="/overzicht/belasting/box2"
+        route="/overzicht/belasting/box2"
+        verdict={box2Verdict}
+        tone={box2Tone}
+        deck="Belasting over een aanmerkelijk belang van 5% of meer. Het oordeel volgt de heffing over dividend en DGA-leningen."
       />
       {hasAanmerkelijkBelang ? <Box2Detail year={2026} /> : <Box2EmptyState />}
     </>

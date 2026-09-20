@@ -144,7 +144,12 @@ describe('TransactiesAnalyse — bron van de heatmap', () => {
     await waitFor(() => expect(screen.getByTestId('heatmap-ids')).toBeInTheDocument())
 
     expect(loadPerspectiveTransactions).toHaveBeenCalledTimes(1)
-    const expected = resolveFetchWindow(resolvePeriodWindow('30d', 0, NOW))
+    // 'month', niet '30d': de standaardperiode van de pagina is sinds de
+    // kop-herziening (sep 2026) de kalendermaand, zodat de cijfers hetzelfde
+    // venster beschrijven als het oordeel in de titel. Deze test gaat over het
+    // AANTAL downloads en de snit van de heatmap — niet over welke periode
+    // standaard is; de verwachting volgt dus gewoon de default.
+    const expected = resolveFetchWindow(resolvePeriodWindow('month', 0, NOW))
     expect(loadPerspectiveTransactions.mock.calls[0][2]).toEqual(expected)
     // Géén tweede aanroep op het heatmap-venster.
     expect(

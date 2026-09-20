@@ -24,6 +24,7 @@
 
 import type { DashboardData } from '@/lib/types/dashboard'
 import type { ModuleId } from '@/lib/module-registry'
+import type { LeverageStatus } from '@/lib/leverage-status'
 import { TARGET_EMERGENCY_SALARY_MONTHS, emergencyScoreTargetMonths } from '@/lib/emergency-fund'
 import { budgetLimitStatus } from '@/lib/budget-alerts'
 import { DEFAULT_RETURN } from '@/lib/constants'
@@ -1101,4 +1102,25 @@ export function healthScoreVerdict(health: HealthScore): HealthScoreVerdict {
   const onbekend = health.onbekend ?? null
   if (onbekend) return { kind: 'onbekend', onbekend }
   return { kind: 'score', total: health.total, label: health.label }
+}
+
+/**
+ * De gezondheidsscore afgebeeld op de stoplicht-schaal, voor oppervlakken die
+ * een status-KLEUR nodig hebben in plaats van het bandwoord — sinds de
+ * kop-herziening (sep 2026) de paginatitel van /overzicht.
+ *
+ * WAAROM HIER EN NIET IN DE UI: de score kent vijf banden (Uitstekend / Sterk /
+ * Redelijk / Kwetsbaar / Kritiek) en het stoplicht er drie. Die versmalling is
+ * een keuze, en een keuze hoort bij de bron te staan — niet als losse
+ * drempelreeks in een component, waar hij stil kan wegdrijven van de banden.
+ *
+ * De grenzen zijn die van de bestaande subscore-balken (80/60/40, zie
+ * `health-score-card.tsx`), met `good` en `ok` samengevouwen: de kaart heeft
+ * vier kleuren, het stoplicht drie.
+ */
+export function healthScoreTone(health: HealthScore): LeverageStatus {
+  if (health.onbekend) return 'neutral'
+  if (health.total >= 60) return 'good'
+  if (health.total >= 40) return 'warn'
+  return 'bad'
 }

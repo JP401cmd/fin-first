@@ -364,7 +364,7 @@ describe('UR2-13 — Transacties-kaart bij een leeg maandvenster', () => {
         latestTransactionMonth: '2026-03',
       }),
     )
-    expect(card.subText).toBe('Goed gespaard deze maand')
+    expect(card.subText).toBe('Goed aan het sparen deze maand')
     expect(card.detail.tip).toContain('Inkomen')
   })
 })

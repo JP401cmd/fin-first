@@ -56,7 +56,9 @@ import {
 import { DebtLeningdeelGroep } from '@/components/core/debt-leningdeel-groep'
 import { groepeerLeningdelen } from '@/lib/debt-leningdelen'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
-import { Kicker, FiguresStrip, PageInfoButton, GlossaryTerm, PageOpening, SubtotalLine } from '@/components/editorial'
+import { Kicker, FiguresStrip, PageInfoButton, GlossaryTerm, PageVerdictOpening, SubtotalLine } from '@/components/editorial'
+import { resolveRouteTitle } from '@/lib/nav-config'
+import type { LeverageStatus } from '@/lib/leverage-status'
 import { getPageInfo } from '@/lib/page-info-content'
 import { loadEntitySparklines } from '@/lib/load-entity-sparklines'
 import { buildKpiContext } from '@/lib/kpi-context'
@@ -159,9 +161,22 @@ type DebtsPageProps = {
    *  `/overzicht/schulden` rendert de page-shell zélf de `i` (+ statuspunt);
    *  dan `false` om een dubbele info-knop te voorkomen. */
   showPageInfo?: boolean
+  /**
+   * Canonieke route van het oppervlak dat deze component mount — bron van de
+   * paginanaam in de titel. `/overzicht/schulden` en de legacy `/core/debts`
+   * delen deze component.
+   */
+  route?: string
+  /**
+   * Het oordeel achter de titel, server-bepaald door de mountende pagina
+   * (`loadHefboomPageVerdict`). Zonder oordeel toont de titel alleen de naam.
+   */
+  verdict?: string | null
+  /** Stoplichtstand bij `verdict`; bepaalt uitsluitend de kleur. */
+  verdictTone?: LeverageStatus
 }
 
-export function DebtsClient({ toolbarFilter, debtTypeFilter, initialData, showPageInfo = true }: DebtsPageProps = {}) {
+export function DebtsClient({ toolbarFilter, debtTypeFilter, initialData, showPageInfo = true, route = '/overzicht/schulden', verdict, verdictTone = 'neutral' }: DebtsPageProps = {}) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
@@ -675,29 +690,28 @@ export function DebtsClient({ toolbarFilter, debtTypeFilter, initialData, showPa
       <NavStackMeta title="Schulden" bottomBar={{ kind: 'tabs' }} />
 
       {/* ═══ Editorial pagina-opening (standaard-aanhef) ════════════
-          Canonieke PageOpening: hairline-kicker → narratieve Playfair-H1
+          Aanhef die het oordeel uitspreekt (kop-herziening sep 2026)
           met één <em>-accent → deck. Alles eronder (FiguresStrip, aflos-
           route, grid) ongewijzigd. */}
-      <PageOpening
+      <PageVerdictOpening
         // Rechter-gutter blijft óók bij showPageInfo=false: de overzicht-shell
         // rendert daar zijn eigen i-cluster (i + statuspunt), dus de kicker/H1
         // mogen die zone niet in lopen. De deck valt búiten de gutter (staat
         // onder de knoppen) en houdt de volle breedte.
         className="mb-5"
         gutterClassName="pr-20 sm:pr-24"
-        kicker={
-          <>
-            Schulden · vrijheid die je terugkoopt
-            <PerspectiveContextLabel className="normal-case tracking-normal" />
-          </>
-        }
-        titleBefore="Elke schuld is vrijheid die je "
-        emphasis="terugkoopt"
-        titleAfter="."
+        pageName={resolveRouteTitle(route) ?? 'Schulden'}
+        verdict={verdict ?? null}
+        tone={verdictTone}
         deck={
           <>
-            Elke schuld is een claim op je toekomst. Door af te lossen koop je vrijheid terug — euro voor euro,
-            maand na maand. Een lagere <GlossaryTerm term="schuldgraad">schuldgraad</GlossaryTerm> betekent meer financiële speelruimte.
+            {/* ADR 0165: de kicker en de oude deck droegen de koop-metafoor
+                ("vrijheid die je terugkoopt", "koop je vrijheid terug") drie
+                keer. Die is vervallen — schulden benoem je neutraal, met de
+                positieve regel dat aflossen tijd oplevert. */}
+            Al je schulden, met maandlast en rente. Elke aflossing levert je tijd op; een lagere{' '}
+            <GlossaryTerm term="schuldgraad">schuldgraad</GlossaryTerm> geeft meer speelruimte.
+            <PerspectiveContextLabel className="normal-case tracking-normal" />
           </>
         }
       >
@@ -710,7 +724,7 @@ export function DebtsClient({ toolbarFilter, debtTypeFilter, initialData, showPa
         {partnerDebtsHidden && (
           <PrivacyHiddenNotice hiddenCategories={['debts']} forCategories={['debts']} />
         )}
-      </PageOpening>
+      </PageVerdictOpening>
 
       {/* Figures-strip (mini-hero) — Type 2 blueprint sectie 2 */}
       {/* BEZ-3 / APP-7: de reductie zit in de primitive, niet hier. In

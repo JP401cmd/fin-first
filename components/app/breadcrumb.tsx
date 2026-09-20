@@ -63,6 +63,42 @@ const segmentLabels: Record<string, string> = {
 }
 
 /**
+ * Routes waarvan de PAGINATITEL de naam zelf al draagt (kop-herziening sep 2026,
+ * `PageVerdictOpening`). Daar zou het kruimelpad een derde drager zijn naast de
+ * mobiele TopBar en de titel.
+ *
+ * BEWUST EEN LIJST EN GEEN GLOBALE UITSCHAKELING. De breadcrumb staat in de
+ * route-layout en dekt álle /overzicht-routes; de nog niet omgezette pagina's
+ * dragen een narratieve kop ("Waar gaat je tijd naartoe?") die de paginanaam
+ * NIET noemt. Op desktop — waar geen TopBar is — zou het kruimelpad weghalen daar
+ * dus de enige naamdrager wegnemen. De lijst groeit mee met de uitrol; is hij
+ * compleet, dan verdwijnen de breadcrumb én deze lijst samen.
+ */
+const ROUTES_WITH_NAME_IN_TITLE = new Set<string>([
+  // Budget-familie
+  '/overzicht/budget',
+  '/overzicht/budget/transacties',
+  '/overzicht/budget/vaste-lasten',
+  '/overzicht/budget/forecast',
+  '/overzicht/budget/instellingen',
+  // Belasting-familie
+  '/overzicht/belasting',
+  '/overzicht/belasting/box1',
+  '/overzicht/belasting/box2',
+  '/overzicht/belasting/box3',
+  '/overzicht/belasting/optimizer',
+  // Hefbomen + tips
+  '/overzicht/bezittingen',
+  '/overzicht/schulden',
+  '/overzicht/tips',
+  // NOG NIET OMGEZET (kruimelpad blijft dus staan): de [type]-subroutes van
+  // bezittingen en schulden — die hebben geen narratieve kop maar een
+  // categorielabel + bedrag, dus daar valt niets om te zetten. De
+  // /toekomst-routes staan hier niet omdat die layout sowieso geen breadcrumb
+  // rendert.
+])
+
+/**
  * Color styles matching the module theme.
  */
 const colorAccent: Record<DomainColor, { text: string; hover: string }> = {
@@ -101,6 +137,9 @@ export function Breadcrumb({
   // These pages have their own back navigation
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
   if (pathname.split('/').some((s) => UUID_RE.test(s))) return null
+
+  // Pagina's waarvan de titel de naam al draagt — zie ROUTES_WITH_NAME_IN_TITLE.
+  if (ROUTES_WITH_NAME_IN_TITLE.has(pathname)) return null
 
   return (
     <nav

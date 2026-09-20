@@ -2,9 +2,14 @@ import type { ReactNode } from 'react'
 import { EditorialDeck } from './index'
 
 /**
- * PageOpening — de canonieke editorial pagina-aanhef (standaard-aanhef) van
- * TriFinity-app-pagina's. Zie de ui-ux-skill: `pattern-cards.md` → kaart
- * "Editorial pagina-opening (standaard-aanhef)".
+ * PageOpening — de narratieve editorial pagina-aanhef.
+ *
+ * NIET MEER DE STANDAARD (kop-herziening sep 2026). De pagina's onder
+ * `/overzicht/**` en `/toekomst/**` openen met `PageVerdictOpening`: die zet het
+ * OORDEEL in de titel in plaats van een narratieve vraag. Deze component blijft
+ * bestaan voor de call-sites daarbuiten; gebruik hem niet voor nieuw werk op die
+ * twee routefamilies. Zie de ui-ux-skill: `pattern-cards.md` → kaart
+ * "Pagina-aanhef die het oordeel uitspreekt".
  *
  * Opbouw (in deze volgorde, container `<header className="relative space-y-3">`):
  *   1. Hairline-kicker-rij (mono 10px, module-accent, streep ervoor).

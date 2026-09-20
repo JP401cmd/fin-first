@@ -237,6 +237,93 @@ export function transactiesCardStatus(input: {
 }
 
 /**
+ * Status én oordeelswoord van de Transacties-kaart in één uitkomst.
+ *
+ * WAAROM DIT EEN EIGEN FUNCTIE IS (ADR 0110-vervolg, kop-herziening sep 2026):
+ * dezelfde vier zinnen dragen nu TWEE oppervlakken — de `subText` van de kaart op
+ * /overzicht/budget én de PAGINATITEL van /overzicht/budget/transacties. Stonden
+ * ze op beide plekken los uitgeschreven, dan is dat exact de vorm waarin drift
+ * ontstaat: de kaart zegt "Krap deze maand" terwijl de titel er nog "Aandacht"
+ * van maakt. Eén bron, twee consumenten.
+ *
+ * De status komt onverkort uit `transactiesCardStatus` — hier wordt geen drempel
+ * herhaald of heroverwogen.
+ *
+ * LEGE MAAND ≠ LEGE ADMINISTRATIE (UR2-13): `hasHistory` onderscheidt "deze maand
+ * nog niets geboekt" van "nog nooit iets geboekt". Die nuance zit niet in de
+ * status (beide zijn 'neutral') en is daarom een eigen parameter.
+ */
+export function transactiesVerdict(input: {
+  currentMonthIncome: number
+  currentMonthExpenses: number
+  /** EFFECTIVE maandinkomen (ADR 0073) — meetlat voor "is de maand af?". */
+  expectedMonthlyIncome: number
+  /** Netto per maand uit `buildForecast` (rij 1), of null zonder prognose. */
+  forecastNetPerMonth: number | null
+  /** Is er überhaupt transactiehistorie? (`transactionFreshness().hasHistory`) */
+  hasHistory: boolean
+  /** Venster-label van de lopende maand, bv. "september tot nu toe". */
+  monthWindow: string
+}): { status: LeverageStatus; label: string } {
+  const { currentMonthIncome, currentMonthExpenses, hasHistory, monthWindow } = input
+  const hasTx = currentMonthIncome > 0 || currentMonthExpenses > 0
+  const status = transactiesCardStatus({
+    currentMonthIncome,
+    currentMonthExpenses,
+    expectedMonthlyIncome: input.expectedMonthlyIncome,
+    forecastNetPerMonth: input.forecastNetPerMonth,
+  })
+  const label = !hasTx
+    ? hasHistory
+      ? `Geen transacties in ${monthWindow}`
+      : 'Nog geen transacties'
+    : status === 'good'
+      ? // TEGENWOORDIGE TIJD, want de maand lóópt nog (eigenaar, 19-09-2026).
+        // "Goed gespaard" las als een afgeronde uitkomst terwijl het cijfer tot
+        // de 1e nog groeit — zie `currentMonthWindowLabel`, dat om dezelfde
+        // reden "tot nu toe" zegt en niet "deze maand".
+        'Goed aan het sparen deze maand'
+      : status === 'warn'
+        ? 'Krap deze maand'
+        : status === 'neutral'
+          ? 'Inkomen nog niet compleet'
+          : 'Tekort deze maand'
+  return { status, label }
+}
+
+/**
+ * Hetzelfde oordeel, maar vanaf de twee loaders — voor oppervlakken die géén
+ * volledige `buildCashflowCards` nodig hebben.
+ *
+ * De paginatitel van /overzicht/budget/transacties gebruikt dit: die pagina heeft
+ * de vaste-lasten-samenvatting niet nodig, dus een volle kaartenbouw zou daar een
+ * derde loader optrekken voor een kaart die niemand rendert.
+ */
+export function transactiesVerdictFromSources(
+  kpis: CashflowCardScalars,
+  cashflow: CashflowData,
+  now: Date = new Date(),
+): { status: LeverageStatus; label: string } {
+  const rows = buildForecast(
+    cashflow.recurrings,
+    cashflow.baselineIncome,
+    cashflow.baselineExpenses,
+    cashflow.startingBalance,
+    now,
+  )
+  const hasForecast =
+    cashflow.baselineIncome > 0 || cashflow.baselineExpenses > 0 || cashflow.recurrings.length > 0
+  return transactiesVerdict({
+    currentMonthIncome: kpis.currentMonthIncome,
+    currentMonthExpenses: kpis.currentMonthExpenses,
+    expectedMonthlyIncome: kpis.monthlyIncome,
+    forecastNetPerMonth: hasForecast ? (rows[0]?.net ?? 0) : null,
+    hasHistory: transactionFreshness(kpis.latestTransactionMonth, now).hasHistory,
+    monthWindow: currentMonthWindowLabel(now),
+  })
+}
+
+/**
  * Vaste-lasten-aandeeldrempels (fractie van maandinkomen).
  *
  * Gedeeld tussen `vasteLastenCardStatus` (de statussemantiek) én de
@@ -283,6 +370,30 @@ export function vasteLastenCardStatus(input: {
   return ratio < VASTE_LASTEN_GOOD_MAX ? 'good' : ratio <= VASTE_LASTEN_WARN_MAX ? 'warn' : 'bad'
 }
 
+/**
+ * Status én kerncijfer van de Vaste-lasten-kaart in één uitkomst — zelfde reden
+ * als `transactiesVerdict`: deze zin draagt sinds de kop-herziening (sep 2026)
+ * zowel de `subText` van de kaart op /overzicht/budget als de PAGINATITEL van
+ * /overzicht/budget/vaste-lasten. Eén bron, twee consumenten.
+ *
+ * Status en drempels komen onverkort uit `vasteLastenCardStatus`.
+ */
+export function vasteLastenVerdict(input: {
+  totalMonthly: number
+  count: number
+  monthlyIncome: number
+}): { status: LeverageStatus; label: string } {
+  const ratio = vasteLastenRatio(input)
+  const status = vasteLastenCardStatus(input)
+  const label =
+    input.count === 0
+      ? 'Nog geen vaste lasten'
+      : ratio != null
+        ? `${Math.round(ratio * 100)}% van je inkomen`
+        : `${input.count} ${input.count === 1 ? 'post' : 'posten'}`
+  return { status, label }
+}
+
 /** Forecast: netto per maand. >0 good, <0 bad, ==0 warn; geen forecast → neutral. */
 export function forecastCardStatus(input: {
   netPerMonth: number
@@ -290,6 +401,29 @@ export function forecastCardStatus(input: {
 }): LeverageStatus {
   if (!input.hasForecast) return 'neutral'
   return input.netPerMonth > 0 ? 'good' : input.netPerMonth < 0 ? 'bad' : 'warn'
+}
+
+/**
+ * Status én oordeelswoord van de Vooruitblik-kaart in één uitkomst — zelfde
+ * reden als `transactiesVerdict`: deze zin draagt sinds de kop-herziening (sep
+ * 2026) zowel de `subText` van de kaart op /overzicht/budget als de PAGINATITEL
+ * van /overzicht/budget/forecast.
+ *
+ * Status en drempels komen onverkort uit `forecastCardStatus`.
+ */
+export function forecastVerdict(input: {
+  netPerMonth: number
+  hasForecast: boolean
+}): { status: LeverageStatus; label: string } {
+  const status = forecastCardStatus(input)
+  const label = !input.hasForecast
+    ? 'Nog geen vooruitblik'
+    : input.netPerMonth > 0
+      ? 'Saldo groeit'
+      : input.netPerMonth < 0
+        ? 'Saldo daalt'
+        : 'Stabiel'
+  return { status, label }
 }
 
 /**
@@ -421,12 +555,17 @@ export function buildCashflowCards(
     currentMonthIncome,
     expectedMonthlyIncome: kpis.monthlyIncome,
   })
-  const txStatus: LeverageStatus = transactiesCardStatus({
+  // Status én oordeelswoord uit één bron (`transactiesVerdict`), omdat de
+  // paginatitel van /overzicht/budget/transacties exact dezelfde zin draagt.
+  const txVerdict = transactiesVerdict({
     currentMonthIncome,
     currentMonthExpenses,
     expectedMonthlyIncome: kpis.monthlyIncome,
     forecastNetPerMonth: hasForecast ? netPerMonth : null,
+    hasHistory: txFreshness.hasHistory,
+    monthWindow,
   })
+  const txStatus: LeverageStatus = txVerdict.status
   const transacties: CashflowCard = {
     key: 'transacties',
     label: 'Transacties',
@@ -441,17 +580,7 @@ export function buildCashflowCards(
     // 31 aug 2026 de enige lege-tekst, en dus ook wat een account met 407
     // transacties las zodra de lopende maand toevallig leeg was. De kaart zegt nu
     // wélk venster leeg is; alleen zonder énige historie blijft de oude tekst.
-    subText: !hasTx
-      ? txFreshness.hasHistory
-        ? `Geen transacties in ${monthWindow}`
-        : 'Nog geen transacties'
-      : txStatus === 'good'
-        ? 'Goed gespaard deze maand'
-        : txStatus === 'warn'
-          ? 'Krap deze maand'
-          : txStatus === 'neutral'
-            ? 'Inkomen nog niet compleet'
-            : 'Tekort deze maand',
+    subText: txVerdict.label,
     status: txStatus,
     // DE KAART WAAR CF-3 OM BEGONNEN IS. Dit netto-cijfer staat één klik
     // verwijderd van de 30-dagen-cijfers op /overzicht/budget/transacties en
@@ -493,26 +622,21 @@ export function buildCashflowCards(
   // niet tegen een half-afgelopen kalendermaand (die het aandeel vroeg in de
   // maand kunstmatig naar 100%+ zou duwen).
   const effectiveMonthlyIncome = kpis.monthlyIncome
-  const vasteRatio = vasteLastenRatio({
-    totalMonthly: vastePerMonth,
-    monthlyIncome: effectiveMonthlyIncome,
-  })
-  const vasteStatus: LeverageStatus = vasteLastenCardStatus({
+  // Status én kerncijfer uit één bron — de paginatitel van
+  // /overzicht/budget/vaste-lasten draagt dezelfde zin.
+  const vasteVerdict = vasteLastenVerdict({
     totalMonthly: vastePerMonth,
     count: vasteCount,
     monthlyIncome: effectiveMonthlyIncome,
   })
+  const vasteStatus: LeverageStatus = vasteVerdict.status
   const vasteLasten: CashflowCard = {
     key: 'vaste-lasten',
     label: 'Vaste lasten',
     href: `${BASE}/vaste-lasten`,
     tooltip: 'Abonnementen en terugkerende kosten.',
     kpi: hasVaste ? `${formatCurrency(Math.round(vastePerMonth))}/mnd` : null,
-    subText: !hasVaste
-      ? 'Nog geen vaste lasten'
-      : vasteRatio != null
-        ? `${Math.round(vasteRatio * 100)}% van inkomen`
-        : `${vasteCount} ${vasteCount === 1 ? 'post' : 'posten'}`,
+    subText: vasteVerdict.label,
     status: vasteStatus,
     // De KPI draagt zijn venster al in de eenheid ("/mnd") — een tweede regel
     // zou hetzelfde nog eens zeggen.
@@ -530,7 +654,10 @@ export function buildCashflowCards(
   // ── Forecast ────────────────────────────────────────────────
   // `rows`/`netPerMonth`/`endBalance`/`hasForecast` zijn hierboven al berekend
   // (de Transacties-kaart leest de prognose).
-  const fcStatus: LeverageStatus = forecastCardStatus({ netPerMonth, hasForecast })
+  // Status én oordeelswoord uit één bron — de paginatitel van
+  // /overzicht/budget/forecast draagt dezelfde zin.
+  const fcVerdict = forecastVerdict({ netPerMonth, hasForecast })
+  const fcStatus: LeverageStatus = fcVerdict.status
   const forecast: CashflowCard = {
     key: 'forecast',
     // Sleutel + route blijven 'forecast' (data-slug); het zichtbare label is
@@ -539,13 +666,7 @@ export function buildCashflowCards(
     href: `${BASE}/forecast`,
     tooltip: 'Verwachte kasstroom 6 maanden vooruit.',
     kpi: hasForecast ? formatCurrency(endBalance) : null,
-    subText: !hasForecast
-      ? 'Nog geen vooruitblik'
-      : netPerMonth > 0
-        ? 'Saldo groeit'
-        : netPerMonth < 0
-          ? 'Saldo daalt'
-          : 'Stabiel',
+    subText: fcVerdict.label,
     status: fcStatus,
     // Vooruitkijkend cijfer, geen maandcijfer: het venster ("na N maanden")
     // staat in `detail.tip`, waar het bij de horizon hoort.

@@ -3,6 +3,8 @@ import Link from 'next/link'
 import { ListChecks } from 'lucide-react'
 import { PLAN_REVIEW_HREF, PLAN_REVIEW_NAAM } from '@/lib/plan-review/types'
 import { readPlanReviewState } from '@/lib/plan-review/read-state'
+import { buildPlanReviewFacts, derivePlanReviewProgress } from '@/lib/plan-review/progress'
+import { loadEigenStrategieEvents } from '@/lib/plan-review/eigen-strategie-events'
 import { getCachedUser } from '@/lib/supabase/cached-user'
 import { createClient } from '@/lib/supabase/server'
 import { loadHorizonRaw } from '@/lib/horizon-data-loader'
@@ -33,12 +35,40 @@ export const metadata: Metadata = {
 export default async function ToekomstVoorkeurenPage() {
   const supabase = await createClient()
   const user = await getCachedUser(supabase)
-  const [horizonData, dashboardResult, planReviewState] = await Promise.all([
+  const [horizonData, dashboardResult, planReviewState, eigenStrategieEvents] = await Promise.all([
     loadHorizonRaw(supabase),
     loadDashboardData(supabase),
     // TPR-01 — alleen om te weten of de review iets kan bewaren (kolom uitgerold).
     user ? readPlanReviewState(supabase, user.id) : Promise.resolve(null),
+    // TPR-15 — de EIGEN AOW/werk/pensioen-rijen voor de review-voortgang in de
+    // paginatitel. Identiek aan /toekomst: de life_events-policy is huishoud-gedeeld
+    // en een gedeeld partner-event mag de AOW-stap niet dichtzetten; faalt de lezing,
+    // dan fail-closed (geen rijen), nooit de gedeelde bundelrijen.
+    user
+      ? loadEigenStrategieEvents(supabase, user.id).catch((err: unknown) => {
+          console.error('[toekomst:voorkeuren:plan-review:eigen-events]', err)
+          return []
+        })
+      : Promise.resolve([]),
   ])
+
+  // Kerncijfer in de titel: hoever de plan-review staat. AFGELEID uit markering +
+  // profielstaat met dezelfde helpers als /toekomst (`derivePlanReviewProgress` op
+  // `buildPlanReviewFacts`) — geen tweede telling, geen eigen drempel. Geen review
+  // beschikbaar (kolom niet uitgerold / uitgelogd) → geen oordeel, dus kale
+  // paginanaam. Neutrale inkt: voortgang is een stand, geen stoplicht.
+  const planReviewProgress =
+    user && planReviewState
+      ? derivePlanReviewProgress(
+          planReviewState,
+          buildPlanReviewFacts({
+            events: eigenStrategieEvents,
+            assets: horizonData.assets,
+            housingStrategyRaw: horizonData.rawProfile?.housing_strategy_config,
+            ownerId: user.id,
+          }),
+        )
+      : null
 
   // Levensstrategie-editors (AOW/Pensioen/Huis/Werk) — gedeelde server-opbouw.
   const { strategieData } = buildStrategieEditorsData(horizonData)
@@ -62,12 +92,14 @@ export default async function ToekomstVoorkeurenPage() {
   return (
     <>
       <ToekomstSubpageShell
-        kicker="Toekomst · Voorkeuren"
-        titleBefore="Onder welke "
-        emphasis="aannames"
-        titleAfter=" reken je?"
-        deck="Eindstrategie, onttrekking, je AOW, pensioen, huis en werk, en de markt-aannames die over je hele tijdas gelden."
-        infoKey="/toekomst/voorkeuren"
+        route="/toekomst/voorkeuren"
+        fallbackName="Voorkeuren"
+        verdict={
+          planReviewProgress
+            ? `Plan-review ${planReviewProgress.bevestigd} van ${planReviewProgress.totaal}`
+            : null
+        }
+        deck="Eindstrategie, onttrekking, AOW, pensioen, huis en werk. De aannames onder je hele tijdas."
       >
         {/* TPR-01 — de plan-review heropenen (A6): start bij stap 1 zodat ook een
             voltooide review opnieuw te doorlopen is. De pane leeft op /toekomst,

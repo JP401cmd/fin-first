@@ -546,10 +546,54 @@ export function box1JaarruimteStatus(input: {
       ? (netMonthly * 12) / (1 - marginaalTarief)
       : 0
   const jaarruimte = computeJaarruimte(grossYearly, factorA)
-  const status: LeverageStatus = !jaarruimte.hasData
-    ? 'neutral'
-    : jaarruimte.jaarruimte > 0
-      ? 'warn'
-      : 'good'
-  return { status, grossYearly }
+  return { status: box1JaarruimteVerdict(jaarruimte).status, grossYearly }
+}
+
+/**
+ * De OORDEELSZIN bij een `JaarruimteResult` — één afleiding, twee oppervlakken.
+ *
+ * Gedeeld door de Box 1-kaart op /overzicht/belasting (status + statustekst) en
+ * de paginatitel van /overzicht/belasting/box1. De hub leidde dit tot sep 2026
+ * met een eigen ternary af; die stond los van de gelijkluidende ternary in
+ * `box1JaarruimteStatus` hierboven, en met een tweede consument erbij zou een
+ * derde kopie ontstaan. Nu heeft de app er nog één.
+ *
+ * De drempel zelf is en blijft `computeJaarruimte` — hier staat geen enkele
+ * fiscale constante; deze functie leest alleen `hasData` en `jaarruimte > 0`.
+ *
+ * WFT — "Onbenutte jaarruimte" is een CONSTATERING (er is fiscale ruimte die je
+ * dit jaar niet gebruikt), geen aansporing. Schrijf hier nooit "benut je
+ * jaarruimte" of iets anders in de gebiedende wijs.
+ *
+ * `null` (geen berekening beschikbaar) telt als "inkomen onbekend" — dezelfde
+ * uitkomst als `hasData === false`.
+ */
+export function box1JaarruimteVerdict(
+  jaarruimte: Pick<JaarruimteResult, 'hasData' | 'jaarruimte'> | null,
+): { status: LeverageStatus; label: string } {
+  if (!jaarruimte?.hasData) return { status: 'neutral', label: 'Inkomen onbekend' }
+  return jaarruimte.jaarruimte > 0
+    ? { status: 'warn', label: 'Onbenutte jaarruimte' }
+    : { status: 'good', label: 'Ruimte benut' }
+}
+
+/**
+ * Dezelfde drie zinnen, maar vanaf een reeds bepaalde STATUS.
+ *
+ * Nodig omdat de paginatitel van /overzicht/belasting/box1 en het statuspunt
+ * ernaast uit dezelfde bron moeten komen, en die bron een status levert
+ * (`box1Status` uit `loadLeverScores`), geen jaarruimte-bedrag. Titel en stip
+ * liepen anders uiteen zodra de gebruiker zijn bruto handmatig overschrijft:
+ * `box1JaarruimteStatus` leidt bruto af uit netto en kent die override niet,
+ * terwijl `computeJaarruimte` op de canonieke bruto draait.
+ *
+ * Eén tabel met `box1JaarruimteVerdict` hierboven, zodat de zinnen niet kunnen
+ * wegdrijven.
+ */
+export function box1JaarruimteVerdictFromStatus(status: LeverageStatus): string {
+  return status === 'warn'
+    ? 'Onbenutte jaarruimte'
+    : status === 'good'
+      ? 'Ruimte benut'
+      : 'Inkomen onbekend'
 }

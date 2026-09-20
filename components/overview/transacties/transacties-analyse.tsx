@@ -189,13 +189,18 @@ export function TransactiesAnalyse({
   const { mode } = useDisplayMode()
   const simple = mode === 'simple'
 
-  // Deeplink vanaf de geldstroom-banner (/overzicht/budget) opent een
-  // specifieke kalendermaand via `?maand=YYYY-MM` → periode 'month' + de offset
-  // (aantal maanden) t.o.v. de huidige maand. Eénmalig bij mount uitgelezen;
-  // daarna stuurt de periode-selector de state. Geen param → huidig gedrag (30d).
-  const [selectedPeriod, setSelectedPeriod] = useState<PeriodKind>(() =>
-    /^\d{4}-\d{2}$/.test(searchParams.get('maand') ?? '') ? 'month' : '30d',
-  )
+  // STANDAARD DE KALENDERMAAND (kop-herziening sep 2026). Stond tot dan op het
+  // rollende 30-dagenvenster, terwijl het oordeel in de paginatitel én het
+  // statuspunt op de GEREALISEERDE kalendermaand rekenen. Die twee vensters
+  // konden elkaar op hetzelfde scherm tegenspreken — titel "Krap deze maand"
+  // boven een meter die +22% over de laatste 30 dagen liet zien. De meter
+  // benoemt zijn venster al (zie `geldstroom-gauge.tsx`); dit haalt de
+  // tegenspraak bij de bron weg in plaats van hem uit te leggen.
+  //
+  // De `?maand=YYYY-MM`-deeplink vanaf de geldstroom-banner (/overzicht/budget)
+  // blijft werken: die zet dezelfde periode en stuurt alleen de offset hieronder.
+  // 30 dagen blijft gewoon kiesbaar in de periode-selector.
+  const [selectedPeriod, setSelectedPeriod] = useState<PeriodKind>('month')
   const [selectedOffset, setSelectedOffset] = useState(() => {
     const maand = searchParams.get('maand')
     if (!maand || !/^\d{4}-\d{2}$/.test(maand)) return 0

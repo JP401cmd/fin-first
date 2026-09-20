@@ -54,13 +54,18 @@ describe('/overzicht — de banners staan ná de begroeting (H20)', () => {
   })
 
   it('de hero rendert het slot ná de begroeting en vóór het hefbomen-kompas', () => {
-    const headline = at(heroSource, '<EditorialHeadline', 'overzicht-hero.tsx')
-    const headerEnd = at(heroSource, '</header>', 'overzicht-hero.tsx')
+    // Sinds de kop-herziening (sep 2026) is de aanhef een `PageVerdictOpening`
+    // die het oordeel uitspreekt; de groet is naar de deck verhuisd. Alleen de
+    // naam van de drager wijzigt — de bewaakte VOLGORDE (aanhef → banners →
+    // hefbomen) is ongewijzigd.
+    // De wrapper is een `<div>` en geen `<header>` meer: `PageVerdictOpening`
+    // rendert zélf een `<header>`, en header-in-header is ongeldige HTML. Een
+    // `</header>`-anker bestaat hier dus niet meer; de aanhef zelf is het anker.
+    const headline = at(heroSource, '<PageVerdictOpening', 'overzicht-hero.tsx')
     const banners = at(heroSource, '{banners}', 'overzicht-hero.tsx')
     const hefbomen = at(heroSource, '<HefbomenNav', 'overzicht-hero.tsx')
 
-    expect(headerEnd).toBeGreaterThan(headline)
-    expect(banners, 'de banners horen ná de begroeting').toBeGreaterThan(headerEnd)
+    expect(banners, 'de banners horen ná de begroeting').toBeGreaterThan(headline)
     expect(banners, 'de banners horen vóór het hefbomen-kompas').toBeLessThan(hefbomen)
   })
 

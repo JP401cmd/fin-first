@@ -166,3 +166,36 @@ export function box3TaxStatus(input: Box3TaxableInput): LeverageStatus {
   if (above <= 500_000) return hasPartner ? 'warn' : 'bad'
   return 'bad'
 }
+
+/**
+ * De OORDEELSZIN bij `box3TaxStatus` — één tekst, drie oppervlakken.
+ *
+ * Gedeeld door de Box 3-kaart op /overzicht/belasting (`statusText`), de
+ * paginatitel van diezelfde hub en de paginatitel van
+ * /overzicht/belasting/box3. Drie plekken die hetzelfde oordeel uitspreken
+ * horen dezelfde zin te gebruiken; zonder deze functie is drift onvermijdelijk
+ * (zelfde reden als `transactiesVerdict` in lib/cashflow-cards.ts).
+ *
+ * De zinnen BESCHRIJVEN de stand, ze sporen niet aan (Wft: inzicht mag,
+ * advies niet). Ze vervangen daarmee bewust de oude kaartteksten "Geen actie
+ * nodig" / "Optimaliseer Box 3" / "Box 3-actie nodig": "Optimaliseer Box 3"
+ * was een gebiedende wijs en daarmee een handelingsaansporing.
+ *
+ * Bewust géén bedrag in de zin — de drempels zitten in `box3TaxStatus`, de
+ * heffing zelf staat als KPI op de kaart en op de subpagina (in euro's én
+ * vrijheidstijd).
+ */
+export function box3StatusVerdict(status: LeverageStatus): string {
+  switch (status) {
+    case 'good':
+      // `above <= 0`, of `<= €100k` mét fiscale partner (die verdubbelt de
+      // vrijstelling) — in beide gevallen dekt de vrijstellingsruimte het beeld.
+      return 'Binnen de vrijstellingsruimte'
+    case 'warn':
+      return 'Boven de vrijstelling'
+    case 'bad':
+      return 'Ruim boven de vrijstelling'
+    default:
+      return 'Geen Box 3-vermogen'
+  }
+}

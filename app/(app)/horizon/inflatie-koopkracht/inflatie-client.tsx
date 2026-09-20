@@ -1,10 +1,11 @@
 'use client'
 
-import { ArrowLeft, TrendingDown } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { PageOpening, PullQuote, HL, HLNeg, GlossaryTerm, PageInfoButton } from '@/components/editorial'
+import { PageVerdictOpening, PullQuote, HL, HLNeg, GlossaryTerm, PageInfoButton } from '@/components/editorial'
 import { getPageInfo } from '@/lib/page-info-content'
+import { resolveRouteTitle } from '@/lib/nav-config'
 import { InflationErosionChart } from '@/components/app/horizon/inflation-erosion-chart'
 
 export function InflatieKoopkrachtClient({
@@ -21,6 +22,23 @@ export function InflatieKoopkrachtClient({
   // Back-link wijst naar canonieke route /toekomst (was /horizon)
   const backHref = pathname?.startsWith('/toekomst') ? '/toekomst' : '/horizon'
   const backLabel = pathname?.startsWith('/toekomst') ? 'De Toekomst' : 'Toekomst'
+  // Paginanaam altijd uit de canonieke titel-resolver — dezelfde bron als de
+  // shell-`h1` en de mobiele TopBar. Deze component draait op twee paden (de
+  // /toekomst-route is een re-export van de /horizon-page); het legacy
+  // /horizon-pad staat niet in de resolver en valt terug op de canonieke naam.
+  const pageName =
+    resolveRouteTitle(pathname ?? '') ??
+    resolveRouteTitle('/toekomst/inflatie-koopkracht') ??
+    'Inflatie & koopkracht'
+  // KERNCIJFER in de titel, géén oordeel: dit is een rekenvoorbeeld, geen
+  // beoordeling van jouw situatie. Het getal is de inflatie waarmee de app voor
+  // jou rekent (`resolveFireParams`, server-geladen) — dezelfde waarde die de
+  // grafiek hieronder als startstand krijgt. Neutrale inkt.
+  const inflatieLabel = `${new Intl.NumberFormat('nl-NL', {
+    style: 'percent',
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  }).format(defaultInflationRate)} inflatie per jaar`
   return (
     <div className="relative max-w-3xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
       <PageInfoButton
@@ -36,24 +54,19 @@ export function InflatieKoopkrachtClient({
         {backLabel}
       </Link>
 
-      {/* Editorial pagina-opening — module-accent via --module-active-* (horizon) */}
-      <PageOpening
+      {/* Pagina-aanhef met het kerncijfer in de titel (kop-herziening sep 2026).
+          De kicker is vervallen; de paginanaam staat op mobiel in de TopBar en
+          op desktop in de titel zelf — zie `PageVerdictOpening`. */}
+      <PageVerdictOpening
         className="mb-8"
-        kicker={
-          <>
-            <TrendingDown size={12} className="inline -mt-0.5 mr-1" />
-            Inflatie en koopkracht
-          </>
-        }
-        titleBefore="De "
-        emphasis="onzichtbare"
-        titleAfter=" belasting op je spaargeld"
+        gutterClassName="pr-12 sm:pr-14"
+        pageName={pageName}
+        verdict={inflatieLabel}
         deck={
           <>
-            <GlossaryTerm term="inflatie">Inflatie</GlossaryTerm> vreet stilletjes aan je <GlossaryTerm term="koopkracht">koopkracht</GlossaryTerm>. Wat je vandaag kunt
-            kopen voor &euro;1.000, kost over twintig jaar aanzienlijk meer.
-            Elke euro die stil op je rekening staat, verliest elke dag een
-            beetje vrijheid.
+            <GlossaryTerm term="inflatie">Inflatie</GlossaryTerm> vreet stilletjes aan je{' '}
+            <GlossaryTerm term="koopkracht">koopkracht</GlossaryTerm>. Elke euro die stilstaat,
+            levert elk jaar minder tijd op.
           </>
         }
       />

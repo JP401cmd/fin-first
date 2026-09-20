@@ -5,8 +5,10 @@ import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { VasteLastenLoader, VasteLastenFallback } from './vaste-lasten-loader'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { PageStatusDot } from '@/components/app/page-status-dot'
-import { PageOpening } from '@/components/editorial'
+import { PageVerdictOpening } from '@/components/editorial'
 import { getPageInfo } from '@/lib/page-info-content'
+import { resolveRouteTitle } from '@/lib/nav-config'
+import { VasteLastenVerdict } from './vaste-lasten-verdict'
 
 export const metadata: Metadata = {
   title: 'Vaste lasten — TriFinity',
@@ -61,11 +63,18 @@ export default async function OverzichtCashflowVasteLastenPage() {
           `<PageOpening>`-header al hadden; het gestreamde blok draagt zijn eigen
           `space-y-6` voor de rest van de pagina. */}
       <div className="mx-auto max-w-6xl space-y-3 px-4 pt-4 sm:px-6">
-        <PageOpening
-          kicker="Vaste lasten"
-          titleBefore="Hoeveel "
-          emphasis="vrijheid"
-          titleAfter=" ligt er maandelijks vast?"
+        {/* De kop blijft dataloos (LCP): de naam staat er meteen, het oordeel
+            stroomt erachteraan via zijn eigen Suspense. Zie
+            `vaste-lasten-verdict.tsx` voor waarom dat een eigen bestand is. */}
+        <PageVerdictOpening
+          pageName={resolveRouteTitle('/overzicht/budget/vaste-lasten') ?? 'Vaste lasten'}
+          verdict={null}
+          verdictSlot={
+            <Suspense fallback={null}>
+              <VasteLastenVerdict />
+            </Suspense>
+          }
+          deck="Alles wat elke maand vastligt. Onder de helft van je inkomen is op koers, boven 70% is het risico."
         />
 
         <Suspense fallback={<VasteLastenFallback />}>
