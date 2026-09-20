@@ -2,8 +2,8 @@
 
 import { useState, type ReactNode } from 'react'
 import dynamic from 'next/dynamic'
-import { PageVerdictOpening, Kicker } from '@/components/editorial'
-import { resolveRouteTitle } from '@/lib/nav-config'
+import { EditorialHeadline, EditorialDeck, Kicker } from '@/components/editorial'
+import { leverageStatusTextClass } from '@/lib/leverage-status'
 import { SectionDivider } from '@/components/app/section-divider'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { healthScoreTone, healthScoreVerdict, type HealthScore } from '@/lib/financial-health'
@@ -127,39 +127,56 @@ export function OverzichtHeroPrimary({
   // Europe/Amsterdam) — één bron van waarheid voor de tijd, zodat SSR en de
   // eerste client-render identiek zijn (geen hydration-mismatch #418).
 
-  // Bandwoord voor de titel. `healthScoreVerdict` vangt de
-  // grondslag-onbekend-staat af, zodat de kop daar geen oordeel verzint.
+  // Bandwoord voor de deck. `healthScoreVerdict` vangt de
+  // grondslag-onbekend-staat af, zodat de uitleg daar geen oordeel verzint maar
+  // terugvalt op een neutrale beschrijving van de pagina.
   const healthVerdict = health ? healthScoreVerdict(health) : null
 
   return (
     <section className="relative mx-auto max-w-6xl px-4 sm:px-6 pt-6 pb-2 md:pt-8 md:pb-4">
-      {/* Kop-herziening sep 2026: de titel spreekt het OORDEEL uit (het
-          bandwoord van de gezondheidsscore) in plaats van de begroeting.
+      {/* DE HUB IS DE UITZONDERING OP DE OORDEEL-AANHEF (eigenaar, 20-09-2026).
+          Elders draagt de titel het oordeel; hier draagt hij de begroeting met
+          je naam. Dit is de startpagina — het enige scherm waar de app je
+          aanspreekt in plaats van je cijfers samenvat, en die persoonlijke
+          opening weegt hier zwaarder dan een bandwoord. Het gezondheidsoordeel
+          staat daarom in de deck eronder, waar het de begroeting niet verdringt.
 
-          DE GROET SNEUVELT NIET, hij verhuist naar de deck. Hij is het enige
-          persoonlijke op deze pagina en verdwijnen zou een verarming zijn; als
-          títel kon hij niet blijven, want dan zegt de belangrijkste regel van de
-          startpagina niets over hoe je ervoor staat.
-
-          Bij een onbekende grondslag geeft `healthScoreVerdict` geen score —
-          dan is `verdict` null en is de titel de kale paginanaam. */}
-      {/* Een `<div>`, geen `<header>`: `PageVerdictOpening` rendert zélf een
-          `<header>` en header-in-header is ongeldige HTML. De vorige
-          `EditorialHeadline` had dat probleem niet (die rendert een kale kop). */}
-      <div className="mb-6 pr-12 sm:pr-16">
+          Bewust `EditorialHeadline` en niet `PageVerdictOpening`: die laatste
+          verwacht een routenaam plus een oordeel, en een begroeting is geen van
+          beide. Een groet als `pageName` doorgeven zou het contract van dat
+          component uithollen. */}
+      <header className="mb-6 pr-12 sm:pr-16">
         <div className="flex flex-wrap items-center gap-2">
           <Kicker size="large">{dateLabel}</Kicker>
           {/* Maakt duidelijk wanneer de getallen van het huishouden/partner zijn. */}
           <PerspectiveContextLabel />
         </div>
-        <PageVerdictOpening
-          className="mt-1"
-          pageName={resolveRouteTitle('/overzicht') ?? 'Overzicht'}
-          verdict={healthVerdict?.kind === 'score' ? healthVerdict.label : null}
-          tone={health ? healthScoreTone(health) : 'neutral'}
-          deck={`${greeting}${userName ? `, ${userName}` : ''}. Je gezondheidsscore weegt rondkomen, buffer, schuld en vrijheid.`}
-        />
-      </div>
+        <EditorialHeadline
+          level="h2"
+          size="sm"
+          emphasis={userName || undefined}
+          className="mt-1 text-[var(--ink)]"
+        >
+          {`${greeting}${userName ? `, ${userName}` : ''}`}
+        </EditorialHeadline>
+        <EditorialDeck className="mt-3">
+          {healthVerdict?.kind === 'score' && health ? (
+            <>
+              {/* Het oordeelswoord draagt de stoplichtkleur, de rest niet —
+                  zelfde scheiding als `OordeelDeck` op /overzicht/budget/
+                  vaste-lasten. Het getal zelf staat in de gezondheidskaart
+                  hieronder; dat herhalen we hier niet. */}
+              Je financiële gezondheid is{' '}
+              <span className={leverageStatusTextClass(healthScoreTone(health))}>
+                {healthVerdict.label.toLowerCase()}
+              </span>
+              . De score weegt rondkomen, buffer, schuld en vrijheid.
+            </>
+          ) : (
+            'Hoe je ervoor staat, in één blik: je vier hefbomen, je gezondheid en je plan.'
+          )}
+        </EditorialDeck>
+      </header>
 
       {/* H20 — gids/check-in ná de begroeting. Bewust hier en niet ná het
           hefbomen-kompas: het kompas is de eerste inhoudelijke rij van de hero,
