@@ -218,8 +218,7 @@ import {
   isDoelConceptGewijzigd,
   stripStopKeuze,
   type DoelParameter,
-  type ToekomstScenarioDoel,
-} from '@/lib/horizon/toekomst-scenario'
+  type ToekomstScenarioDoel, KNOP_WEERGAVE_STANDAARD } from '@/lib/horizon/toekomst-scenario'
 import { doelGewogenRendement } from '@/lib/horizon/toekomst-doel'
 import {
   DoelVastlegSheet,
@@ -237,6 +236,7 @@ import {
   computeSliderUiRange,
   readSliderValueFromEvents,
   savingsEuroForPp,
+  stopKnopBereik,
   uitgaveNaPensioenRange,
   UITGAVE_NA_PENSIOEN_STAP,
   type SliderKey,
@@ -984,7 +984,7 @@ export default function HorizonPage({
    * over hoe je je plan wilt lezen, niet een "even niet tonen" per apparaat.
    */
   const [knopWeergave, setKnopWeergave] = useState<LabKnopWeergave>(
-    () => initialData.toekomstScenarioPrefs?.knopWeergave ?? 'wijzer',
+    () => initialData.toekomstScenarioPrefs?.knopWeergave ?? KNOP_WEERGAVE_STANDAARD,
   )
   const scenarioHydratedRef = useRef(false)
   // ADR 0170 — de koppelmodus (`stopKoppel`/`stopMarge`, `lockedMargeRef`) verviel met de
@@ -3708,6 +3708,16 @@ export default function HorizonPage({
   const doelMargeRuw = scenarioVerwachtFireAge !== null ? effectiveStopAge - scenarioVerwachtFireAge : null
 
   // ── ADR 0170 — de vijf knoppen: bereik, grenzen-batch, zone ──────────────────────────
+  /**
+   * De "nu"-waarde van de stop-knop: waar het plan mee rekent. Onder een vast anker het
+   * stopmoment van het plan, anders de gesolvede vrijheidsleeftijd. ÉÉN afleiding, twee
+   * lezers (het bereik hieronder en het "nu"-streepje op de knop) — twee kopieën zouden het
+   * streepje uit het midden van de schaal laten lopen zodra er één tak bijkomt.
+   */
+  const stopKnopBasis =
+    isFixedAnchorMode && planStopAgeDefault != null && Number.isFinite(planStopAgeDefault)
+      ? Math.round(planStopAgeDefault * 2) / 2
+      : (scenarioBaseFireAge ?? effectiveStopAge)
   // De basiswaarden ("nu") van de twee profielparameter-knoppen. `haalbareUitgave` levert de
   // uitgave waarmee het plan rekent (ADR 0160) met de bundel-uitgaven als terugval; de
   // nalatenschap komt uit het plan zelf en is 0 zodra de eind-vorm er geen kent.
@@ -3745,13 +3755,16 @@ export default function HorizonPage({
       out.nalatenschap = { min: 0, max: Math.ceil(bovenkant / stap) * stap, stap }
     }
     if (currentAge != null && planAnchor.kind !== 'now') {
-      const kandidaten = [
-        simResult?.displayEndAge ?? null,
-        userAowAge.fractional,
-        effectiveStopAge,
-        Math.round(currentAge) + 20,
-      ].filter((v): v is number => v != null && Number.isFinite(v))
-      out.stop = { min: Math.round(currentAge * 2) / 2, max: Math.max(...kandidaten), stap: 0.5 }
+      // Tien jaar naar beide kanten rond waar het plan mee rekent, hard geklemd op de huidige
+      // leeftijd en de eindleeftijd. De schaal woont bij haar zusters in `scenario-events.ts`
+      // (één plek voor alle knopbereiken) en is daar apart getest.
+      const r = stopKnopBereik({
+        basis: stopKnopBasis,
+        huidig: effectiveStopAge,
+        huidigeLeeftijd: currentAge,
+        eindLeeftijd: simResult?.displayEndAge ?? null,
+      })
+      if (r) out.stop = { ...r, stap: 0.5 }
     }
     return out
   }, [
@@ -3765,7 +3778,7 @@ export default function HorizonPage({
     currentAge,
     planAnchor.kind,
     simResult?.displayEndAge,
-    userAowAge.fractional,
+    stopKnopBasis,
     effectiveStopAge,
   ])
 
@@ -4316,7 +4329,7 @@ export default function HorizonPage({
       hasScenario ||
       scenarioStopAge !== null ||
       !showScenarioLine ||
-      knopWeergave !== 'balk' ||
+      knopWeergave !== KNOP_WEERGAVE_STANDAARD ||
       doelBlok != null
     if (!deviatesFromDefaults && initialData.toekomstScenarioPrefs == null) return
     const handle = setTimeout(() => {
@@ -5329,10 +5342,8 @@ export default function HorizonPage({
     if (labKnopBereik.stop) {
       out.stop = {
         value: effectiveStopAge,
-        basis:
-          isFixedAnchorMode && planStopAgeDefault != null
-            ? Math.round(planStopAgeDefault * 2) / 2
-            : (scenarioBaseFireAge ?? effectiveStopAge),
+        // Zelfde bron als het midden van de schaal — zie `stopKnopBasis`.
+        basis: stopKnopBasis,
         bereik: labKnopBereik.stop,
         grenzen: grens('stop'),
         onChange: handleStopAgeChange,
@@ -5350,9 +5361,7 @@ export default function HorizonPage({
     scenarioNalatenschap,
     nalatenschapBasis,
     effectiveStopAge,
-    isFixedAnchorMode,
-    planStopAgeDefault,
-    scenarioBaseFireAge,
+    stopKnopBasis,
     handleStopAgeChange,
     masked,
   ])

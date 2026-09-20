@@ -320,6 +320,20 @@ export const LAB_COPY = {
   weergaveLabel: 'Vorm van de knoppen',
   weergaveBalk: 'Balken',
   weergaveWijzer: 'Wijzers',
+  /** De compacte vorm: één draairad dat het onderwerp kiest, met ernaast één balk (B11). */
+  weergaveRad: 'Rad',
+  /** Een naam, geen instructie: een schermlezergebruiker veegt niet, die gebruikt pijlen. */
+  radLabel: 'Onderwerp van de knop',
+  /** Vijf stroken met twee lijnen erdoorheen: jouw plan en de gedekte grens (B12, mobiel). */
+  weergaveHarp: 'Harp',
+  harpPlanLijn: 'jouw plan',
+  harpGrensLijn: 'gedekt',
+  /** Eén pentagram met sleepbare hoekpunten en een legenda met de echte getallen (B12, laptop). */
+  weergaveVijfhoek: 'Vijfhoek',
+  /** Ook hier een naam; de bediening (hoekpunt slepen, getal klikken of slepen) spreekt uit de vorm. */
+  vijfhoekLabel: 'Je plan als vijfhoek',
+  vijfhoekPlan: 'jouw plan',
+  vijfhoekGedekt: 'gedekt',
 
   /** De knop Nalatenschap bestaat niet bij een eind-vorm die er geen kent. */
   nalatenschapPerpetual:

@@ -162,15 +162,28 @@ export interface ToekomstScenarioPrefs {
   /** Toont de gestippelde 2e (wat-als)lijn in de grafiek. */
   showScenarioLine?: boolean
   /**
-   * De vorm van de doelscenario-knoppen: `'balk'` (standaard) of `'wijzer'` (de halfronde
-   * meter). Pure WEERGAVE, net als `showScenarioLine` — bewust GÉÉN onderdeel van
+   * De vorm van de doelscenario-knoppen — één van `KNOP_WEERGAVEN` (wijzer = standaard, balk,
+   * rad, harp, vijfhoek; ADR 0170 B7/B11/B12). Pure WEERGAVE, net als `showScenarioLine` — bewust GÉÉN onderdeel van
    * `ToekomstScenarioStand`: wie van vorm wisselt verandert zijn plan niet, en de opslaan-balk
    * mag daar dus niet "gewijzigd" van zeggen.
    */
-  knopWeergave?: 'balk' | 'wijzer'
+  knopWeergave?: KnopWeergave
   /** Vastgelegd doelscenario (ronde 4). Ontbreekt zolang de gebruiker niets promoveerde. */
   doel?: ToekomstScenarioDoel
 }
+
+/**
+ * De vormen van de doelscenario-knoppen (ADR 0170 B7/B11/B12). Eén lijst voor het type, de
+ * parser en de schakelaar in de kop — een vorm die hier ontbreekt kan niet worden bewaard.
+ */
+export const KNOP_WEERGAVEN = ['balk', 'wijzer', 'rad', 'harp', 'vijfhoek'] as const
+export type KnopWeergave = (typeof KNOP_WEERGAVEN)[number]
+/**
+ * De standaardvorm (B7). Eén constante voor de beginstand én de persist-poort in
+ * horizon-client: die twee stonden op 'wijzer' resp. 'balk', waardoor de poort "geen
+ * default-blob schrijven" voor iedereen altijd open stond.
+ */
+export const KNOP_WEERGAVE_STANDAARD: KnopWeergave = 'wijzer'
 
 // ── Parser ───────────────────────────────────────────────────────────────────
 
@@ -299,7 +312,9 @@ export function parseToekomstScenarioPrefs(raw: unknown): ToekomstScenarioPrefs 
 
   // ── Weergavevlaggen (geen onderdeel van de goal-stand) ──
   if (typeof raw.showScenarioLine === 'boolean') out.showScenarioLine = raw.showScenarioLine
-  if (raw.knopWeergave === 'balk' || raw.knopWeergave === 'wijzer') out.knopWeergave = raw.knopWeergave
+  if ((KNOP_WEERGAVEN as readonly unknown[]).includes(raw.knopWeergave)) {
+    out.knopWeergave = raw.knopWeergave as KnopWeergave
+  }
 
   // ── Doel-blok (alleen bij v2-input; v1 draagt per definitie geen doel) ──
   if (raw.v === 2 && isPlainObject(raw.doel)) {

@@ -58,6 +58,12 @@ const SEGMENT: Record<LabZone, string> = {
 export interface LabSliderProps {
   /** Stabiele id — voedt het range-element en de `aria-describedby` van de grensregel. */
   id: string
+  /**
+   * Verbergt het zichtbare label: in de rad-vorm (B11) draagt het draairad ernaast de naam
+   * al, en twee keer dezelfde naam op 90 px leest als een fout. Het `aria-label` op het
+   * range-element blijft — de naam verdwijnt uit beeld, niet uit de toegankelijkheidsboom.
+   */
+  labelVerborgen?: boolean
   label: string
   value: number
   /** De waarde waarmee het plan nu rekent ("nu"-notch). */
@@ -136,6 +142,7 @@ export function LabSlider({
   richting,
   grenzen,
   pending = false,
+  labelVerborgen = false,
   formatValue,
   formatDelta,
   formatGrens,
@@ -186,10 +193,12 @@ export function LabSlider({
 
   return (
     <div className="py-3" data-testid={`lab-knop-${id}`}>
-      <div className="flex items-baseline justify-between gap-3">
-        <span className="font-sans text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">
-          {label}
-        </span>
+      <div className={`flex items-baseline gap-3 ${labelVerborgen ? 'justify-end' : 'justify-between'}`}>
+        {!labelVerborgen && (
+          <span className="font-sans text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">
+            {label}
+          </span>
+        )}
         <span className="flex shrink-0 items-baseline">
           <span className="font-mono text-sm tabular-nums text-[var(--ink)]">{formatValue(value)}</span>
           {toonDelta && (

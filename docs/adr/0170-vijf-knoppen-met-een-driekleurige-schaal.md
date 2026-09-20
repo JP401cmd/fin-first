@@ -153,6 +153,96 @@ om te voorkomen dat "Doel loslaten" in Eenvoudig de enige weg terug meenam (meld
 structureel opgelost), en de koppeling van katern III aan het in-/uitklappen van dit blok — dat
 inklappen bestaat niet meer, en de koppeling hield "Wat het betekent" permanent verborgen.
 
+**B11 — Een derde vorm: het rad** (eigenaarskeuze 20 sep 2026). Op een telefoon is verticale
+ruimte het schaarse goed: vijf wijzers kosten ~600 px, vijf balken ~500. De rad-vorm is één
+element van ~90 px: links een verticaal draairad (de kiezer van iOS — het gekozen onderwerp in
+inkt in het midden, de buren gedempt erboven en eronder, en het woord rólt naar het volgende),
+rechts één balk voor dat onderwerp. De balk is de bestaande `LabSlider` met verborgen label;
+het rad is het label.
+
+Wat het rad méér is dan een keuzemenu: naast elke naam staat een stoplichtpunt met de zone van
+dát onderwerp, uit dezelfde `zoneVanWaarde`-afleiding als de knop zelf. De kern van dit ADR
+(B2) is dat de grens op álle knoppen meebeweegt als je aan één draait; met één balk in beeld
+zou dat inzicht verdwijnen. Vijf namen met vijf punten laten de hele stand zien, en een punt
+dat verspringt terwijl je aan een andere knop draait laat de koppeling nog steeds zien.
+
+Drie keuzes van de eigenaar. (1) **Bediening is vegen**, geen tik-op-een-rij: het rad is een
+echte scroll-container met `scroll-snap` en `overscroll-behavior: contain`, zodat de browser
+het snappen doet en een veeg voorbij het einde de pagina niet meetrekt; het toetsenbord (pijl
+omhoog/omlaag) blijft als toegankelijkheid, niet als tweede bediening. (2) **Rad links, balk
+rechts**: één rij; de balk krijgt ~60 % van de breedte, op 360 px zo'n 200 px. (3) **Een derde
+keuze naast Wijzers en Balken**, geen automatische standaard op smal: de wijzer blijft overal
+de standaard, `knopWeergave` krijgt de waarde `'rad'` erbij (zelfde pref, zelfde parser, geen
+migratie). Welk onderwerp het rad toont is ephemeral — kijken is geen plan-keuze — en valt
+terug op het eerste beschikbare onderwerp zodra het gekozen onderwerp verdwijnt. De plan-acties
+staan in rad-vorm onder het blok, net als bij de wijzers: de stop-knop is niet altijd in beeld.
+
+**B12 — Twee vormen die de koppeling tékenen: de harp (mobiel) en de vijfhoek (laptop)**
+(eigenaarswens 20 sep 2026: "verras me in vorm, niet in functie"). Dezelfde vijf standen,
+dezelfde grenzen, dezelfde `onChange` en dezelfde toegankelijkheid als de andere vormen; alleen
+de tekening verschilt. Beide vormen zijn gekozen na een verkenning van gevestigde patronen
+(radar met sleepbare hoekpunten, parallelle coördinaten, nomogram, faders, ringen,
+kaartenstapel, 2D-pad, scrubbable getallen). Kaartenstapel, story-navigatie en 2D-pad vielen af
+omdat ze de koppeling uit B2 niet kunnen tonen; concentrische ringen omdat vijf ringen op een
+telefoon geen 44 px raakvlak halen; het nomogram omdat de relatie niet lineair is.
+
+De **harp** (`lab-harp.tsx`, mobiel, ~270 px): vijf stroken van 44 px onder elkaar, elk met de
+bestaande band, het "nu"-streepje en het gedekt-merk, en dwars door alle vijf twee lijnen —
+doorgetrokken door de duimen (jouw plan als één vorm, module-accent) en gestreept door de
+gedekt-merken (de grens als één vorm, inkt). Draai je aan één strook, dan knikt de gestreepte
+lijn op de andere vier: de koppeling staat letterlijk in beeld. De gestreepte lijn breekt waar
+een grens buiten bereik ligt (dezelfde regel als het merkteken). Elke strook is een echte
+`<input type="range">` op de band; er is géén eigen sleep-handler — de browser doet de
+gesture-arbitrage, dus geen scrollconflict. De lijnen zijn één `aria-hidden` SVG-laag met
+`pointer-events: none` en EXPLICIETE breedte/hoogte (een absoluut gepositioneerde SVG neemt bij
+`auto` zijn intrinsieke maat, niet top/bottom — daar liep de eerste versie op stuk).
+Normalisatie: elke strook loopt 0–100 % van zijn eigen bereik en het echte getal staat rechts;
+anders domineert de nalatenschap alles. Onder de figuur staat één grensregel, van de laatst
+aangeraakte strook; elke strook heeft daarnaast een sr-only regel voor `aria-describedby`.
+
+De **vijfhoek** (`lab-vijfhoek.tsx`, laptop, ~400 px hoog): één pentagram met per spaak de
+driekleurige band, jouw stand als sleepbaar hoekpunt en de vijf gedekt-merken verbonden tot een
+gestreepte "gedekte" vijfhoek. De vraag "haalt mijn plan het?" wordt één blik: ligt mijn
+vijfhoek buiten de gedekte? Drie regels tegen de bekende radar-vertekening: géén gevuld vlak
+(oppervlak groeit kwadratisch), vaste as-volgorde (B1), en het getal staat altijd in cijfers in
+de legenda — de vijfhoek is de bediening, het getal is de waarheid. Bediening is grof + fijn
+(NN/g): grof door het hoekpunt te slepen (44 px HTML-greep in een laag ná de inputs, projectie
+van de cursor op de spaak, `standUitVinger` tegen verspringen bij vastpakken — de constructie
+van de wijzer), fijn door horizontaal over een legenda-regel te slepen: daar ligt de echte
+`<input type="range">` (het Figma-patroon van het scrubbable getal), die óók pijltoetsen en
+`aria-valuetext` draagt.
+
+Beide zijn keuzes in de schakelaar (`knopWeergave`: `harp`, `vijfhoek`), geen standaard; de
+lijst `KNOP_WEERGAVEN` is één bron voor type, parser en schakelaar. Open punt uit de
+verkenning, bewust niet in deze ronde: bij een sleep verschuift de grens ónder de
+knop-in-je-hand mee (target escape) — de grens van de actieve knop bevriezen tijdens de sleep
+en alleen de vier andere animeren zou de "ripple" leesbaarder maken. Dat raakt alle vormen en
+de grenzen-batch, en is een eigen besluit.
+
+In harp en vijfhoek geldt, net als op het rad, dat een onderwerp dat er niet is gewoon niet op
+de figuur staat: de nalatenschap-notitie ("je plan houdt je vermogen in stand") hoort bij de
+losse knop-cel van balk en wijzer en verschijnt in de drie figuur-vormen niet. Op de vijfhoek
+geldt "verder naar buiten = beter" op álle spaken: bij een dalende knop (uitgave na pensioen,
+nalatenschap) wordt de positie gespiegeld (`opSpaak`), anders zeggen drie assen "buiten =
+gedekt" en twee "binnen = gedekt" en houdt de één-blik-lezing niet stand terwijl elke spaak
+apart wél goed kleurt. De harp houdt bewust de richting van de balk (links = minimum): daar is
+de belofte niet "rechts = beter" maar "één lijn door de duimen, één door de merken". In de
+vijfhoek-legenda ligt het invoerveld alleen over het getal, niet over de hele rij: het element
+springt native naar de klikpositie, en een klik op het label zou de stand anders naar het
+minimum zetten.
+
+**B13 — De stop-knop loopt tien jaar naar beide kanten** (eigenaarskeuze 20 sep 2026). De
+schaal van de stopleeftijd is `basis ± 10` jaar rond waar het plan mee rekent, hard geklemd op
+de huidige leeftijd en de eindleeftijd (`stopKnopBereik` in `lib/scenario-events.ts`, naast de
+andere knopbereiken). Daarvóór liep hij van de huidige leeftijd tot voorbij de eindleeftijd —
+op een band van 60 jaar is een halve stap nauwelijks zichtbaar. Gevolg dat erbij hoort: de
+bisectie zoekt de grens bínnen dit venster. Ligt de gedekt-leeftijd verder dan tien jaar van
+het plan (plan 62, pas gedekt op 75), dan zegt de knop "over het hele bereik niet gedekt" waar
+hij vroeger het merkteken op 75 toonde. Dat is consistent met B2 (de schaal ís het bereik van
+de knop) en met de regel dat een grens die je niet kunt aanwijzen niet wordt aangewezen. Een
+bewaarde stand buiten het venster blijft aanwijsbaar (de schaal rekt tot en met de stand),
+nooit voorbij de twee harde grenzen.
+
 ## Wat dit vervangt
 
 - **ADR 0145 D8–D10** (de dekkingsas, de drie draaiknoppen, de antwoorden naast de knoppen).

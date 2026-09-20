@@ -214,3 +214,77 @@ describe('LabKnoppen — live-regio', () => {
     expect(screen.getByTestId('lab-knop-melding').textContent).toBe('Meer verdienen staat nu op +€ 80.')
   })
 })
+
+describe('LabKnoppen — de rad-vorm (ADR 0170 B11)', () => {
+  it('toont één balk naast het rad, met alle beschikbare onderwerpen op het rad', () => {
+    renderBlok({ weergave: 'rad' })
+    expect(screen.getByTestId('lab-rad-rij')).toBeTruthy()
+    expect(screen.getAllByRole('slider')).toHaveLength(1)
+    expect(screen.getAllByRole('option').map((el) => el.id)).toEqual(
+      HEFBOOM_KEYS.map((k) => `lab-rad-${k}`),
+    )
+    // De balk verbergt zijn eigen label — het rad ís het label. De naam blijft wél op het
+    // range-element staan (aria-label), dus de toegankelijkheidsboom verliest niets.
+    expect(screen.queryByTestId('lab-knop-verdienen-as')).toBeTruthy()
+    expect(screen.getByTestId('lab-knop-verdienen').textContent).not.toContain('Meer verdienen')
+    expect(screen.getByRole('slider').getAttribute('aria-label')).toBe('Meer verdienen')
+  })
+
+  it('het rad draagt per onderwerp de zone van dát onderwerp — dezelfde afleiding als de knop', () => {
+    renderBlok({
+      weergave: 'rad',
+      knoppen: {
+        verdienen: knop({ value: 20 }), // onder gedekt (40) ⇒ rood
+        stop: knop({ value: 80, basis: 62, bereik: { min: 40, max: 90, stap: 0.5 } }), // boven ruim ⇒ groen
+      },
+    })
+    expect(screen.getByTestId('lab-rad-verdienen-punt').getAttribute('data-zone')).toBe('rood')
+    expect(screen.getByTestId('lab-rad-stop-punt').getAttribute('data-zone')).toBe('groen')
+  })
+
+  it('van onderwerp wisselen wisselt de balk', () => {
+    renderBlok({ weergave: 'rad' })
+    expect(screen.getByRole('slider').getAttribute('id')).toBe('verdienen')
+    fireEvent.keyDown(screen.getByRole('listbox'), { key: 'ArrowDown' })
+    expect(screen.getByRole('slider').getAttribute('id')).toBe('uitgeven')
+  })
+
+  it('een verdwenen onderwerp valt terug op het eerste dat er wél is, en de notitie staat niet op het rad', () => {
+    renderBlok({
+      weergave: 'rad',
+      knoppen: { uitgeven: knop(), stop: knop() },
+      nalatenschapNotitie: 'Je plan houdt je vermogen in stand.',
+    })
+    expect(screen.getByRole('slider').getAttribute('id')).toBe('uitgeven')
+    expect(screen.queryByTestId('lab-knop-nalatenschap-notitie')).toBeNull()
+  })
+
+  it('de schakelaar kent alle vormen uit KNOP_WEERGAVEN en de plan-acties staan onder het blok', () => {
+    renderBlok({ weergave: 'rad', onWeergaveChange: vi.fn(), stopSlot: <a href="#">Je plan-keuzes</a> })
+    const knoppen = screen.getByTestId('lab-weergave').querySelectorAll('button')
+    expect([...knoppen].map((b) => b.textContent)).toEqual(['Balken', 'Wijzers', 'Rad', 'Harp', 'Vijfhoek'])
+    expect(screen.getByText('Je plan-keuzes')).toBeTruthy()
+  })
+})
+
+describe('LabKnoppen — de harp-vorm (ADR 0170 B12)', () => {
+  it('toont alle vijf stroken als één figuur, met de plan-acties onder het blok', () => {
+    renderBlok({ weergave: 'harp', stopSlot: <span data-testid="plan-actie">Maak dit mijn stopmoment</span> })
+    expect(screen.getByTestId('lab-harp')).toBeTruthy()
+    expect(screen.getAllByRole('slider').map((el) => el.id)).toEqual([...HEFBOOM_KEYS])
+    expect(screen.getByTestId('lab-harp-plan')).toBeTruthy()
+    expect(screen.getByTestId('lab-harp').contains(screen.getByTestId('plan-actie'))).toBe(false)
+    expect(screen.getByTestId('plan-actie')).toBeTruthy()
+  })
+})
+
+describe('LabKnoppen — de vijfhoek-vorm (ADR 0170 B12)', () => {
+  it('toont één pentagram met alle vijf inputs in de legenda, en de plan-acties onder het blok', () => {
+    renderBlok({ weergave: 'vijfhoek', stopSlot: <span data-testid="plan-actie">Maak dit mijn stopmoment</span> })
+    expect(screen.getByTestId('lab-vijfhoek')).toBeTruthy()
+    expect(screen.getByTestId('lab-vijfhoek-plan')).toBeTruthy()
+    expect(screen.getAllByRole('slider').map((el) => el.id)).toEqual([...HEFBOOM_KEYS])
+    expect(screen.getByTestId('lab-vijfhoek').contains(screen.getByTestId('plan-actie'))).toBe(false)
+    expect(screen.getByTestId('plan-actie')).toBeTruthy()
+  })
+})

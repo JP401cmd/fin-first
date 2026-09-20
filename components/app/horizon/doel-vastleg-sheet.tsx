@@ -85,7 +85,7 @@ export function buildScenarioPersistPayload(args: {
   stand: ToekomstScenarioStand
   showScenarioLine: boolean
   /** Weergave-keuze van de knoppen (ADR 0170); afwezig = de standaard (balken). */
-  knopWeergave?: 'balk' | 'wijzer'
+  knopWeergave?: import('@/lib/horizon/toekomst-scenario').KnopWeergave
   doel: ToekomstScenarioDoel | null
 }): ToekomstScenarioPrefs {
   const { stand, showScenarioLine, knopWeergave, doel } = args

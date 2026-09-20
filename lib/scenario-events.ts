@@ -327,3 +327,51 @@ export function uitgaveNaPensioenRange(basis: number, saved: number): { min: num
   const max = Math.max(stap, Math.round((veilig * 1.4) / stap) * stap)
   return { min: Math.min(min, saved), max: Math.max(max, saved) }
 }
+
+/** Halve jaren — het raster waarop de stop-knop staat. */
+function halfJaarRaster(v: number): number {
+  return Math.round(v * 2) / 2
+}
+
+/** Hoeveel jaar de stop-knop naar beide kanten reikt, gerekend vanaf waar het plan mee rekent. */
+export const STOP_KNOP_VENSTER_JAAR = 10
+
+/**
+ * Het zichtbare bereik van de stop-knop: tien jaar naar beide kanten rond `basis` — de
+ * leeftijd waar het plan nu mee rekent (eigenaarskeuze 20 sep 2026).
+ *
+ * Daarvóór liep de schaal van de huidige leeftijd tot voorbij de eindleeftijd; op een band van
+ * 60 jaar is een halve stap nauwelijks zichtbaar en zegt de driekleurige schaal weinig.
+ *
+ * `huidigeLeeftijd` en `eindLeeftijd` zijn HARDE grenzen en winnen van het venster: eerder
+ * stoppen dan vandaag bestaat niet, en voorbij de eindleeftijd rekent de kern niet meer
+ * (`resolveVastAnker` klemt daar zelf op `eind − 1/12`, dus een knop die eroverheen gaat zou
+ * een stand tonen die de motor niet aanneemt).
+ *
+ * Anders dan `computeSliderUiRange`/`uitgaveNaPensioenRange` verbreedt dit bereik NIET voorbij
+ * die twee grenzen — wél tot en met de huidige stand (`huidig`), zodat een bewaard doel dat
+ * verder dan het venster ligt nog steeds op zijn eigen schaal te zien is. Een knop die zijn
+ * eigen waarde niet kan aanwijzen, liegt.
+ *
+ * Geeft `null` wanneer er geen bruikbaar venster overblijft (bv. huidige leeftijd ≥ eind).
+ */
+export function stopKnopBereik(args: {
+  basis: number
+  huidig: number
+  huidigeLeeftijd: number
+  eindLeeftijd: number | null
+}): { min: number; max: number } | null {
+  const { basis, huidig, huidigeLeeftijd, eindLeeftijd } = args
+  if (!Number.isFinite(huidigeLeeftijd)) return null
+  const onder = halfJaarRaster(huidigeLeeftijd)
+  const boven = halfJaarRaster(
+    eindLeeftijd != null && Number.isFinite(eindLeeftijd)
+      ? eindLeeftijd
+      : Math.round(huidigeLeeftijd) + 60,
+  )
+  const midden = Number.isFinite(basis) ? halfJaarRaster(basis) : onder
+  const stand = Number.isFinite(huidig) ? halfJaarRaster(huidig) : midden
+  const min = Math.max(onder, Math.min(midden - STOP_KNOP_VENSTER_JAAR, stand))
+  const max = Math.min(boven, Math.max(midden + STOP_KNOP_VENSTER_JAAR, stand))
+  return max > min ? { min, max } : null
+}

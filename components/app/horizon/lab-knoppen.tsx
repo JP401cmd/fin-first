@@ -21,11 +21,16 @@ import { LAB_COPY, HEFBOOM_COPY, labKnopGezetMelding, labZoneWoord } from '@/lib
 import {
   HEFBOOM_KEYS,
   HEFBOOM_RICHTING,
+  zoneVanWaarde,
   type HefboomBereik,
   type HefboomGrenzen,
   type HefboomKey,
   type LabZone,
 } from '@/lib/horizon/lab-grenzen-types'
+import { KNOP_WEERGAVEN, type KnopWeergave } from '@/lib/horizon/toekomst-scenario'
+import { LabHarp } from './lab-harp'
+import { LabVijfhoek } from './lab-vijfhoek'
+import { LabRad, type LabRadItem } from './lab-rad'
 import { LabSlider } from './lab-slider'
 import { LabWijzer } from './lab-wijzer'
 
@@ -92,17 +97,28 @@ export interface LabKnoppenProps {
   marktbias?: ReactNode
   /**
    * In welke vorm de knoppen staan: als WIJZER (de standaard — de halfronde meter uit de
-   * geldstroom-kaart, vijf naast elkaar) of als BALK (breder, precieser af te lezen bij een
-   * grens dicht bij je stand). Puur weergave: dezelfde grenzen, dezelfde standen, dezelfde
-   * bediening eronder.
+   * geldstroom-kaart, vijf naast elkaar), als BALK (breder, precieser af te lezen bij een
+   * grens dicht bij je stand), als RAD (compact: één draairad kiest het onderwerp, ernaast
+   * één balk — ~90 px hoog, voor de telefoon), als HARP (vijf stroken als één figuur met de
+   * plan- en gedekt-lijn, mobiel) of als VIJFHOEK (pentagram met sleepbare hoekpunten, laptop).
+   * Puur weergave: dezelfde grenzen, dezelfde standen, dezelfde bediening eronder.
    */
   weergave?: LabKnopWeergave
   /** Afwezig ⇒ geen schakelaar (de host bewaart de keuze niet). */
   onWeergaveChange?: (v: LabKnopWeergave) => void
 }
 
-/** De twee vormen waarin een knop kan staan. */
-export type LabKnopWeergave = 'balk' | 'wijzer'
+/** De vormen waarin de knoppen kunnen staan — één lijst met de voorkeur (`KNOP_WEERGAVEN`). */
+export type LabKnopWeergave = KnopWeergave
+
+const WEERGAVE_VOLGORDE = KNOP_WEERGAVEN
+const WEERGAVE_LABEL: Record<LabKnopWeergave, string> = {
+  balk: LAB_COPY.weergaveBalk,
+  wijzer: LAB_COPY.weergaveWijzer,
+  rad: LAB_COPY.weergaveRad,
+  harp: LAB_COPY.weergaveHarp,
+  vijfhoek: LAB_COPY.weergaveVijfhoek,
+}
 
 /** Zelfde ladder als de segmenten op de knoppen (zie `lab-slider.tsx`). */
 const ZONE_PILL: Record<LabZone, string> = {
@@ -146,7 +162,60 @@ export function LabKnoppen({
   marktbias,
 }: LabKnoppenProps) {
   const isWijzer = weergave === 'wijzer'
+  const isRad = weergave === 'rad'
   const [marktbiasOpen, setMarktbiasOpen] = useState(false)
+
+  // Rad-vorm (B11): welk onderwerp de ene balk toont. Ephemeral — van onderwerp wisselen is
+  // kijken, geen plan-keuze. Verdwijnt het gekozen onderwerp (nalatenschap onder een andere
+  // eind-vorm), dan valt de keuze terug op het eerste dat er wél is.
+  const [radKeuze, setRadKeuze] = useState<HefboomKey | null>(null)
+  const beschikbaar = HEFBOOM_KEYS.filter((k) => knoppen[k] != null)
+  const radActief: HefboomKey | null = radKeuze && knoppen[radKeuze] ? radKeuze : (beschikbaar[0] ?? null)
+  // Het stoplichtpunt per onderwerp: dezelfde zone-afleiding als de knop zelf gebruikt, zodat
+  // rad en balk nooit een andere kleur kunnen zeggen.
+  const radItems: LabRadItem[] = beschikbaar.map((k) => ({
+    key: k,
+    label: LABEL[k],
+    zone: zoneVanWaarde(knoppen[k]!.value, knoppen[k]!.grenzen, HEFBOOM_RICHTING[k]),
+  }))
+
+  /**
+   * Eén item voor harp en vijfhoek: expliciet geplukt, geen spread. Een spread omzeilt de
+   * excess-property-check en smokkelde `id` en een per-item `pending` mee die niemand leest —
+   * precies de vorm waarin een toekomstig veld stil op de verkeerde plek landt.
+   */
+  const itemVoor = (k: HefboomKey) => {
+    const knop = knoppen[k]!
+    return {
+      key: k,
+      label: LABEL[k],
+      value: knop.value,
+      baseValue: knop.basis,
+      bereik: knop.bereik,
+      richting: HEFBOOM_RICHTING[k],
+      grenzen: knop.grenzen,
+      formatValue: formatters[k].value,
+      formatGrens: formatters[k].grens,
+      detail: knop.detail ?? null,
+      onChange: knop.onChange,
+    }
+  }
+
+  /** De props die balk en wijzer delen — één plek, ongeacht in welke vorm de knop staat. */
+  const propsVoor = (key: HefboomKey, knop: LabKnopConfig) => ({
+    id: key,
+    label: LABEL[key],
+    value: knop.value,
+    baseValue: knop.basis,
+    bereik: knop.bereik,
+    richting: HEFBOOM_RICHTING[key],
+    grenzen: knop.grenzen,
+    pending,
+    formatValue: formatters[key].value,
+    formatGrens: formatters[key].grens,
+    detail: knop.detail ?? null,
+    onChange: knop.onChange,
+  })
   // Eén gedeelde sr-only live-regio: de focus blijft op de knop, dus niets anders kondigt de
   // nieuwe stand aan. De teller als `key` laat een herhaalde beweging opnieuw voorlezen.
   const [melding, setMelding] = useState<{ tekst: string; n: number }>({ tekst: '', n: 0 })
@@ -187,7 +256,7 @@ export function LabKnoppen({
               data-testid="lab-weergave"
               className="inline-flex overflow-hidden border border-[var(--border-md)]"
             >
-              {(['balk', 'wijzer'] as const).map((v) => (
+              {WEERGAVE_VOLGORDE.map((v) => (
                 <button
                   key={v}
                   type="button"
@@ -199,7 +268,7 @@ export function LabKnoppen({
                       : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
                   }`}
                 >
-                  {v === 'balk' ? LAB_COPY.weergaveBalk : LAB_COPY.weergaveWijzer}
+                  {WEERGAVE_LABEL[v]}
                 </button>
               ))}
             </div>
@@ -250,11 +319,48 @@ export function LabKnoppen({
         <span className="font-semibold text-score-good">groen</span> {LAB_COPY.schaalGroen}
       </p>
 
-      {/* De vijf knoppen naast elkaar. De WIJZERS zijn smal en vierkant, dus ze passen op een
+      {/* RAD (B11): één rij — links het draairad dat het onderwerp kiest, rechts de balk van
+          dát onderwerp. De balk verbergt zijn eigen label: het rad ís het label. De
+          nalatenschap-notitie hoort hier niet: een onderwerp dat er niet is, staat gewoon
+          niet op het rad. */}
+      {/* HARP (B12, mobiel): vijf stroken als één figuur — de plan-lijn door de duimen, de
+          gedekt-lijn door de merken. Alle vijf blijven bedienbaar; de plan-acties hangen
+          eronder, want de stop-strook is te smal voor twee tekstlinks. */}
+      {/* VIJFHOEK (B12, laptop): één pentagram met sleepbare hoekpunten; de legenda draagt de
+          echte inputs (fijnregeling + toetsenbord). Zelfde item-vorm als de harp. */}
+      {weergave === 'vijfhoek' ? (
+        <div className="mt-2">
+          <LabVijfhoek
+            pending={pending}
+            items={beschikbaar.map(itemVoor)}
+          />
+        </div>
+      ) : weergave === 'harp' ? (
+        <div className="mt-2">
+          <LabHarp
+            pending={pending}
+            items={beschikbaar.map(itemVoor)}
+          />
+        </div>
+      ) : isRad && radActief ? (
+        <div className="mt-2 flex items-center gap-4" data-testid="lab-rad-rij">
+          <div className="w-[42%] max-w-[180px] shrink-0">
+            <LabRad items={radItems} actief={radActief} onChange={setRadKeuze} pending={pending} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <LabSlider
+              {...propsVoor(radActief, knoppen[radActief]!)}
+              labelVerborgen
+              formatDelta={formatters[radActief].delta}
+            />
+          </div>
+        </div>
+      ) : (
+      /* De vijf knoppen naast elkaar. De WIJZERS zijn smal en vierkant, dus ze passen op een
           breed scherm alle vijf op één rij; op de telefoon twee per rij. De BALKEN hebben
           breedte nodig om hun schaal af te lezen — daar blijft het één kolom op de telefoon
           en twee vanaf tablet, met de stopleeftijd over de volle breedte omdat daar de
-          plan-acties onder hangen. */}
+          plan-acties onder hangen. */
       <div
         className={`mt-2 grid gap-x-5 ${
           isWijzer ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5' : 'grid-cols-1 gap-x-6 sm:grid-cols-2'
@@ -285,20 +391,7 @@ export function LabKnoppen({
             }
             return null
           }
-          const gedeeld = {
-            id: key,
-            label: LABEL[key],
-            value: knop.value,
-            baseValue: knop.basis,
-            bereik: knop.bereik,
-            richting: HEFBOOM_RICHTING[key],
-            grenzen: knop.grenzen,
-            pending,
-            formatValue: formatters[key].value,
-            formatGrens: formatters[key].grens,
-            detail: knop.detail ?? null,
-            onChange: knop.onChange,
-          }
+          const gedeeld = propsVoor(key, knop)
           // In wijzer-vorm is de cel te smal voor de plan-acties; die staan dan onder het
           // hele blok (zie hieronder) in plaats van geknepen onder één meter.
           const slot = !isWijzer && key === 'stop' && stopSlot ? <div className="mt-1">{stopSlot}</div> : null
@@ -315,10 +408,12 @@ export function LabKnoppen({
           )
         })}
       </div>
+      )}
 
-      {/* In wijzer-vorm staan de plan-acties onder het blok: de cel van één meter is te smal
-          voor twee tekstlinks, en ze gaan over het plan als geheel — niet over die ene knop. */}
-      {isWijzer && stopSlot && (
+      {/* In wijzer- en rad-vorm staan de plan-acties onder het blok: de cel van één meter is te
+          smal voor twee tekstlinks, in rad-vorm is de stop-knop niet altijd in beeld, en ze
+          gaan over het plan als geheel — niet over die ene knop. */}
+      {weergave === 'balk' ? null : stopSlot && (
         <div className="mt-1 border-t border-dashed border-[var(--border-ed)] pt-2">{stopSlot}</div>
       )}
 

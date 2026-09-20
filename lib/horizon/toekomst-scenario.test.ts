@@ -206,9 +206,12 @@ describe('parseToekomstScenarioPrefs', () => {
     expect(parseToekomstScenarioPrefs({ v: 1, stopAge: 55.7 })?.stopAge).toBe(56)
   })
 
-  it('knopWeergave: alleen de twee bekende vormen (ADR 0170)', () => {
+  it('knopWeergave: alleen de vormen uit KNOP_WEERGAVEN (ADR 0170 B7 + B11 + B12)', () => {
     expect(parseToekomstScenarioPrefs({ v: 2, knopWeergave: 'wijzer' })?.knopWeergave).toBe('wijzer')
     expect(parseToekomstScenarioPrefs({ v: 2, knopWeergave: 'balk' })?.knopWeergave).toBe('balk')
+    expect(parseToekomstScenarioPrefs({ v: 2, knopWeergave: 'rad' })?.knopWeergave).toBe('rad')
+    expect(parseToekomstScenarioPrefs({ v: 2, knopWeergave: 'harp' })?.knopWeergave).toBe('harp')
+    expect(parseToekomstScenarioPrefs({ v: 2, knopWeergave: 'vijfhoek' })?.knopWeergave).toBe('vijfhoek')
     expect(parseToekomstScenarioPrefs({ v: 2, knopWeergave: 'knop' })?.knopWeergave).toBeUndefined()
     expect(parseToekomstScenarioPrefs({ v: 2 })?.knopWeergave).toBeUndefined()
   })
