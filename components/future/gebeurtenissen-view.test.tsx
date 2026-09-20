@@ -408,6 +408,28 @@ describe('GebeurtenissenView — kernel-afgeleide strategiemomenten (feature #87
     expect(mockPush).toHaveBeenCalledWith('/toekomst/voorkeuren?strategie=huis')
   })
 
+  it('telt de kernel-afgeleide verkooprij mee en toont de telling precies één keer', () => {
+    // Given: de server kent alleen AOW + pensioen; de kernel voegt het verkoopmoment toe.
+    // When: de tijdlijn rendert 3 kaarten.
+    // Then: de telling zegt 3 (niet de server-geteld 2) en staat maar op één plek — geen
+    // tweede telling of kicker-echo erboven (defect: kop "2" naast sectiekop "3").
+    const aow = mockEvent({ id: 'aow', name: 'AOW', target_date: null, target_age: 69 })
+    const pensioen = mockEvent({
+      id: 'pensioen',
+      name: 'Geschat pensioen',
+      target_date: null,
+      target_age: 69,
+    })
+    mockSimResult = loadedSim({
+      effectiveLifeEvents: [aow, pensioen, kernelSaleEvent(62, 1_978_447)],
+      kernelHousingSale: { month: 192, age: 62, proceeds: 1_978_447 },
+    })
+    renderKernelView([aow, pensioen])
+    expect(screen.getAllByText(/^\d+ gebeurtenis/)).toHaveLength(1)
+    expect(screen.getByText('3 gebeurtenissen')).toBeTruthy()
+    expect(screen.queryByText('Toekomst — levensgebeurtenissen')).toBeNull()
+  })
+
   it('opeet-rijen (start + uitputting) renderen uit de rijen en navigeren naar de Huis-strategie', () => {
     mockSimResult = loadedSim({
       effectiveLifeEvents: [mockEvent({ target_date: null, target_age: 60 })],

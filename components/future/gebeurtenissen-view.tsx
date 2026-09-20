@@ -423,16 +423,14 @@ export function GebeurtenissenView({
       {/* Levensgebeurtenissen */}
       <div>
         <header className="mb-4 flex items-end justify-between gap-3 flex-wrap">
-          <div>
-            <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
-              Toekomst — levensgebeurtenissen
-            </div>
-            <h2 className="font-serif text-xl text-[var(--ink)] mt-1">
-              {sorted.length === 0
-                ? 'Geen gebeurtenissen'
-                : `${sorted.length} gebeurtenis${sorted.length === 1 ? '' : 'sen'}`}
-            </h2>
-          </div>
+          {/* De énige telling op de pagina: geteld op de rijen die deze tijdlijn
+              rendert (server-events + het kernel-afgeleide verkoopmoment). De
+              paginatitel draagt bewust geen getal (zie page.tsx). */}
+          <h2 className="font-serif text-xl text-[var(--ink)]">
+            {sorted.length === 0
+              ? 'Geen gebeurtenissen'
+              : `${sorted.length} gebeurtenis${sorted.length === 1 ? '' : 'sen'}`}
+          </h2>
           <button
             type="button"
             onClick={openCatalog}

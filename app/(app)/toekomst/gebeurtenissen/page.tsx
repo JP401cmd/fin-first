@@ -101,18 +101,16 @@ export default async function ToekomstGebeurtenissenPage({
 
   return (
     <>
-      {/* Kerncijfer in de titel: het aantal gebeurtenissen dat op de tijdas
-          staat — geteld op exact dezelfde rijen die de view rendert, en
-          dezelfde telling als de Gebeurtenissen-navkaart op /toekomst. Geen
-          stoplicht: een gebeurtenis is geen oordeel, dus neutrale inkt. */}
+      {/* Titel = de kale paginanaam, bewust zonder kerncijfer. Het aantal
+          gebeurtenissen woont in de sectiekop van de view: de tijdlijn daar bevat
+          óók het door de kernel afgeleide verkoopmoment (alleen client-side
+          bekend, `useHorizonFireSim`), dus een hier server-geteld getal telt dat
+          moment niet mee ("2" in de kop, drie kaarten eronder) en staat dubbel
+          naast de sectiekop. Geborgd in page.titel.test.ts. */}
       <ToekomstSubpageShell
         route="/toekomst/gebeurtenissen"
         fallbackName="Gebeurtenissen"
-        verdict={
-          horizonData.events.length > 0
-            ? `${horizonData.events.length} ${horizonData.events.length === 1 ? 'gebeurtenis' : 'gebeurtenissen'}`
-            : null
-        }
+        verdict={null}
         deck="Kind, erfenis, verhuizing of minder werken. Momenten die je tijdas verschuiven."
       />
       <GebeurtenissenView
