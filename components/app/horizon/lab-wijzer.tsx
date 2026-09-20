@@ -88,6 +88,43 @@ export function fractieUitPunt(dx: number, dyOmhoog: number): number {
   return Math.max(0, Math.min(1, (HOEK_MIN - hoek) / (HOEK_MIN - HOEK_MAX)))
 }
 
+/**
+ * Hoeveel ruimte het pakpunt minimaal van een uiteinde houdt.
+ *
+ * De greep is 44 px en steekt bij een stand vlak bij een uiteinde ÓNDER de boog uit; daar leest
+ * `fractieUitPunt` verzadigd 0 of 1. Valt `pak` op zo'n uiteinde, dan heeft de afbeelding aan
+ * die kant geen ruimte meer om te rekken en wordt dat uiteinde onbereikbaar — je kunt de knop
+ * dan alleen nog de andere kant op draaien. Met deze marge blijft het uiteinde haalbaar.
+ */
+const PAK_MARGE = 0.02
+
+/**
+ * Fractie onder de vinger → fractie van de stand, met behoud van het punt waar je 'm vastpakte.
+ *
+ * `pak` is de fractie onder de vinger op het moment van vastpakken, `stand` die van de waarde
+ * op datzelfde moment. Zonder deze correctie sprong de stand bij vastpakken naar de vinger: de
+ * greep is 44 px (a11y-norm) en de boog op een telefoon ~200 px lang, dus een aanraking aan de
+ * rand van de greep zit ~een tiende van het bereik naast het hart.
+ *
+ * WAAROM GEEN VASTE OFFSET (`f - (pak - stand)`). Dan schuift het hele bereik mee en is het
+ * laatste stukje aan één kant onbereikbaar: de vinger klemt bij 0 en 1, dus de stand blijft
+ * daar steken op `1 - offset`. Deze afbeelding rekt elke helft van de boog apart uit — beide
+ * uiteinden blijven bereikbaar en de stand verspringt nergens.
+ *
+ * DE ÉNE PLEK WAAR ZE NIET ALLEBEI KUNNEN. Pak je de greep vást terwijl je vinger buiten de
+ * boog valt (mogelijk zodra de naald binnen ~een tiende van een uiteinde staat), dan leest
+ * `pak` verzadigd 0 of 1 en botsen de twee eisen: de stand op het pakpunt houden zou dat
+ * uiteinde onbereikbaar maken. `PAK_MARGE` kiest dan bewust voor bereikbaarheid — zo'n greep
+ * trekt de stand bij de eerste beweging éénmalig bij, hooguit de breedte van de greep. Dat is
+ * de minst erge van de twee: een knop die niet meer naar het uiteinde wil, leest als stuk.
+ */
+export function standUitVinger(fVinger: number, pak: number, stand: number): number {
+  const f = Math.max(0, Math.min(1, fVinger))
+  const p = Math.max(PAK_MARGE, Math.min(1 - PAK_MARGE, pak))
+  if (f <= p) return (f / p) * stand
+  return stand + ((f - p) / (1 - p)) * (1 - stand)
+}
+
 function decimalen(stap: number): number {
   const tekst = String(stap)
   const punt = tekst.indexOf('.')
@@ -146,6 +183,12 @@ export function LabWijzer({
   const grensId = `${id}-grens`
   const meterRef = useRef<SVGSVGElement | null>(null)
   const invoerRef = useRef<HTMLInputElement | null>(null)
+  /**
+   * Waar de vinger de boog raakte bij vastpakken, en waar de stand toen stond. `null` = er
+   * sleept niets. Bewust een ref en niet `sleept`: de eerste `pointermove` kan vóór de
+   * re-render van die state binnenkomen, en dan zou die beweging verloren gaan.
+   */
+  const pakRef = useRef<{ pak: number; stand: number } | null>(null)
   const [sleept, setSleept] = useState(false)
   const zone = zoneVanWaarde(value, grenzen, richting)
   // Dezelfde segment-afleiding als de balk — één bron, zodat de twee vormen niet kunnen
@@ -160,18 +203,31 @@ export function LabWijzer({
     return { zone: seg.zone, van, tot: hoekVanFractie(cursor / 100) }
   })
 
-  /** Waarde onder de vinger: hoek t.o.v. het middelpunt van de boog, niet de x-positie. */
-  const waardeBijPunt = (clientX: number, clientY: number): number | null => {
+  /** Fractie onder de vinger: hoek t.o.v. het middelpunt van de boog, niet de x-positie. */
+  const fractieBijPunt = (clientX: number, clientY: number): number | null => {
     const kader = meterRef.current?.getBoundingClientRect()
     if (!kader || !(kader.width > 0)) return null
     const schaal = kader.width / 200
-    const f = fractieUitPunt(clientX - (kader.left + CX * schaal), kader.top + CY * schaal - clientY)
-    return snapNaarStap(bereik.min + f * (bereik.max - bereik.min), bereik)
+    return fractieUitPunt(clientX - (kader.left + CX * schaal), kader.top + CY * schaal - clientY)
   }
 
   const volgVinger = (clientX: number, clientY: number) => {
-    const v = waardeBijPunt(clientX, clientY)
-    if (v != null && v !== value) onChange(v)
+    // Eerst de sleep-toets, dán pas meten: `fractieBijPunt` doet een
+    // `getBoundingClientRect()`, en die hoort niet bij elke muisbeweging over de greep te
+    // draaien wanneer er niets gesleept wordt.
+    const greep = pakRef.current
+    if (greep == null) return
+    const f = fractieBijPunt(clientX, clientY)
+    if (f == null) return
+    const fractie = standUitVinger(f, greep.pak, greep.stand)
+    const v = snapNaarStap(bereik.min + fractie * (bereik.max - bereik.min), bereik)
+    if (v !== value) onChange(v)
+  }
+
+  /** Einde van de sleep — óók als de browser de capture zelf intrekt. */
+  const laatLos = () => {
+    pakRef.current = null
+    setSleept(false)
   }
 
   const naaldHoek = hoekVanFractie(fractieVan(value, bereik))
@@ -343,16 +399,29 @@ export function LabWijzer({
             cursor: sleept ? 'grabbing' : 'grab',
           }}
           onPointerDown={(e) => {
-            e.currentTarget.setPointerCapture(e.pointerId)
+            // Alleen de primaire knop sleept: een rechts- of middenklik hoort het contextmenu
+            // toe, niet de meter. (Aanraking en pen melden zich óók als knop 0.)
+            if (e.button !== 0) return
+            e.currentTarget.setPointerCapture?.(e.pointerId)
             invoerRef.current?.focus({ preventScroll: true })
+            // Vastpakken verzet de stand NIET; we onthouden alleen wáár je 'm pakte, zodat de
+            // sleep daarna vanaf dat punt meeloopt (zie `standUitVinger`).
+            const pak = fractieBijPunt(e.clientX, e.clientY)
+            // Geen meetbare meter (nog niet gelayout, of uit-animerend): dan begint er geen
+            // sleep. Terugvallen op de stand zou `pak === stand` geven, en dáár is
+            // `standUitVinger` de identiteit — precies het absolute springen dat hier weg moet.
+            // Het invoerveld eronder blijft gewoon bedienbaar.
+            if (pak == null) return
+            pakRef.current = { pak, stand: fractieVan(value, bereik) }
             setSleept(true)
-            volgVinger(e.clientX, e.clientY)
           }}
-          onPointerMove={(e) => {
-            if (sleept) volgVinger(e.clientX, e.clientY)
-          }}
-          onPointerUp={() => setSleept(false)}
-          onPointerCancel={() => setSleept(false)}
+          onPointerMove={(e) => volgVinger(e.clientX, e.clientY)}
+          onPointerUp={laatLos}
+          onPointerCancel={laatLos}
+          // Zonder deze bleef `sleept` hangen als de browser de capture introk (scroll-gesture,
+          // systeemmelding, weggenomen focus): de greep bleef dik en elke muisbeweging erover
+          // verzette de stand alsof de knop nog ingedrukt was.
+          onLostPointerCapture={laatLos}
         />
       </div>
 

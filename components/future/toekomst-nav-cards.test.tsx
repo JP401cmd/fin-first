@@ -5,6 +5,7 @@ import { render, screen, within, fireEvent } from '@testing-library/react'
 import {
   ToekomstNavCards,
   deriveDoelenStatus,
+  nextEvent,
   nextEventLabel,
   formatPct,
   type GoalProgress,
@@ -338,16 +339,52 @@ describe('ToekomstNavCards — Doelen-kaart', () => {
 // ── Gebeurtenissen-kaart: count + volgende event ──────────────────────────
 
 describe('ToekomstNavCards — Gebeurtenissen-kaart', () => {
-  it('toont count + "Volgende: ..." voor een toekomstig event', () => {
+  it('toont het eerstvolgende moment als KPI en de naam in de subtekst', () => {
     const { container } = renderCards({
       events: [mockEvent({ name: 'Kind', target_date: '2028-01-01' })],
     })
     const card = cardByHref(container, '/toekomst/gebeurtenissen')
-    expect(within(card).getByText('1 gebeurtenis')).toBeTruthy()
-    expect(within(card).getByText('Volgende: Kind · 2028')).toBeTruthy()
+    expect(within(card).getByText('2028')).toBeTruthy()
+    expect(within(card).getByText('Volgende: Kind')).toBeTruthy()
   })
 
-  it('toont "Geen" + "Nog niets gepland" zonder events', () => {
+  /**
+   * De KPI-plek is een cijfer-slot (`font-serif tabular-nums`) zonder truncate of
+   * line-clamp; een eventnaam mag 100 tekens zijn. Stond de naam daar, dan trok één
+   * lange gebeurtenis de kaart over meerdere regels en rekte de kaart ernaast mee.
+   */
+  it('zet de vrije eventnaam niet in het cijfer-slot', () => {
+    const naam = 'Verbouwing zolder en dakkapel inclusief isolatie'
+    const { container } = renderCards({
+      events: [mockEvent({ name: naam, target_date: '2029-01-01' })],
+    })
+    const card = cardByHref(container, '/toekomst/gebeurtenissen')
+    expect(within(card).getByText('2029')).toBeTruthy()
+    expect(within(card).queryByText(`${naam} · 2029`)).toBeNull()
+  })
+
+  /**
+   * Given: de tijdas rendert naast de server-events ook momenten die de kernel zelf
+   *   uit het plan afleidt ("Berekend door je plan") — die bestaan pas na hydration.
+   * When: deze kaart server-side `events.length` zou tonen.
+   * Then: staat er een lager getal dan de pagina eronder laat zien. Eigenaarskeuze
+   *   20 sep 2026: de kaart telt niet meer; de enige telling woont in de view.
+   */
+  it('zet geen aantal op de kaart — die telling zou de afgeleide momenten missen', () => {
+    const { container } = renderCards({
+      events: [
+        mockEvent({ id: 'a', name: 'AOW', target_date: '2041-01-01' }),
+        mockEvent({ id: 'b', name: 'Pensioen', target_date: '2045-01-01' }),
+      ],
+    })
+    const card = cardByHref(container, '/toekomst/gebeurtenissen')
+    expect(
+      card.textContent,
+      'een server-geteld aantal spreekt de telling in GebeurtenissenView tegen',
+    ).not.toMatch(/\d+\s+gebeurtenis/i)
+  })
+
+  it('toont "Geen" + "Nog niets gepland" zonder events, zoals de buurkaarten', () => {
     const { container } = renderCards({ events: [] })
     const card = cardByHref(container, '/toekomst/gebeurtenissen')
     expect(within(card).getByText('Geen')).toBeTruthy()
@@ -685,6 +722,31 @@ describe('nextEventLabel', () => {
     expect(
       nextEventLabel([mockEvent({ target_date: '2020-01-01', target_age: null })], NOW),
     ).toBeNull()
+  })
+
+  /**
+   * De KPI-plek is een cijfer-slot zonder afkapping: daar mag alleen `wanneer` in,
+   * nooit de vrije naam (tot 100 tekens). `nextEventLabel` blijft de volzin voor de tip.
+   */
+  it('splitst naam en moment, zodat elk deel zijn eigen plek op de kaart krijgt', () => {
+    const gedateerd = [mockEvent({ id: 'vroeg', name: 'Vroeg', target_date: '2027-03-01' })]
+    expect(nextEvent(gedateerd, NOW)).toEqual({ naam: 'Vroeg', wanneer: '2027' })
+
+    const opLeeftijd = [mockEvent({ id: 'aow', name: 'AOW', target_date: null, target_age: 67 })]
+    expect(nextEvent(opLeeftijd, NOW)).toEqual({ naam: 'AOW', wanneer: 'leeftijd 67' })
+
+    expect(nextEvent([], NOW)).toBeNull()
+  })
+
+  it('houdt `wanneer` kort genoeg voor het cijfer-slot, ook bij een lange eventnaam', () => {
+    const lang = mockEvent({
+      id: 'lang',
+      name: 'Verbouwing zolder en dakkapel inclusief isolatie',
+      target_date: '2029-01-01',
+    })
+    const v = nextEvent([lang], NOW)
+    expect(v?.wanneer).toBe('2029')
+    expect(v?.wanneer.length, 'de KPI-plek kapt niet af — een lange naam hoort hier niet').toBeLessThanOrEqual(11)
   })
 })
 

@@ -144,13 +144,26 @@ function withGlossary(term: string | undefined, label: string): ReactNode {
   return <GlossaryTerm term={term}>{label}</GlossaryTerm>
 }
 
+/** De eerstvolgende gebeurtenis, uit elkaar getrokken zodat elk deel zijn eigen plek krijgt. */
+export interface VolgendeGebeurtenis {
+  /** Naam zoals de gebruiker 'm invoerde — vrije tekst, tot 100 tekens. */
+  naam: string
+  /** Wanneer, kort en cijfermatig: "2028" of "leeftijd 67". */
+  wanneer: string
+}
+
 /**
- * Eerstvolgende toekomstige gebeurtenis op `target_date` na nu, met jaartal.
- * Events met alleen `target_age` (geen datum) kunnen zonder geboortedatum niet
- * naar een kalenderjaar worden omgezet; die tonen we als "Leeftijd N".
- * Geeft `null` wanneer er geen geplande events zijn.
+ * Eerstvolgende toekomstige gebeurtenis. Events met alleen `target_age` (geen
+ * datum) kunnen zonder geboortedatum niet naar een kalenderjaar worden omgezet;
+ * die geven "leeftijd N" als `wanneer`. `null` wanneer er niets gepland staat.
+ *
+ * WAAROM UIT ELKAAR. De KPI-plek van een navkaart is een cijfer-slot
+ * (`font-serif tabular-nums`, zonder afkapping — zie `LeverageCard`); daar hoort
+ * `wanneer` en nooit de vrije naam, die een halve-breedte kaart op mobiel over
+ * drie regels zou trekken en de kaart ernaast mee laat rekken. De naam gaat naar
+ * de subtekst, die die vrije tekst voorheen ook al droeg.
  */
-export function nextEventLabel(events: LifeEvent[], now: Date = new Date()): string | null {
+export function nextEvent(events: LifeEvent[], now: Date = new Date()): VolgendeGebeurtenis | null {
   const nowMs = now.getTime()
 
   // 1) Events met een echte datum in de toekomst → chronologisch eerst.
@@ -162,7 +175,7 @@ export function nextEventLabel(events: LifeEvent[], now: Date = new Date()): str
 
   if (dated.length > 0) {
     const { event, when } = dated[0]
-    return `Volgende: ${event.name} · ${new Date(when).getFullYear()}`
+    return { naam: event.name, wanneer: String(new Date(when).getFullYear()) }
   }
 
   // 2) Geen gedateerde events → val terug op het eerste leeftijd-event.
@@ -172,10 +185,16 @@ export function nextEventLabel(events: LifeEvent[], now: Date = new Date()): str
 
   if (aged.length > 0) {
     const event = aged[0]
-    return `Volgende: ${event.name} · leeftijd ${event.target_age}`
+    return { naam: event.name, wanneer: `leeftijd ${event.target_age}` }
   }
 
   return null
+}
+
+/** Dezelfde gebeurtenis als volzin voor een tip: "Volgende: Kind · 2028". */
+export function nextEventLabel(events: LifeEvent[], now: Date = new Date()): string | null {
+  const v = nextEvent(events, now)
+  return v == null ? null : `Volgende: ${v.naam} · ${v.wanneer}`
 }
 
 /** "N gebeurtenissen" / "Geen", "N doelen" / "Geen", etc. */
@@ -277,8 +296,16 @@ export function buildNavCards({
           ? 'Nog niets te meten'
           : 'Allemaal op koers'
 
-  // Gebeurtenissen — neutrale dot, substext = eerstvolgende geplande event.
-  const eventCount = events.length
+  // Gebeurtenissen — neutrale dot. Bewust GÉÉN telling op deze kaart: de tijdas
+  // toont naast deze server-events ook momenten die de kernel zélf uit het plan
+  // afleidt ("Berekend door je plan", `lib/horizon/kernel-strategy-moments.ts`).
+  // Die bestaan alleen client-side, na hydration, dus een server-telling hier
+  // stond structureel lager dan wat de pagina eronder laat zien — "2" op de
+  // kaart, drie kaarten op de tijdas. Zelfde keuze als op de paginatitel
+  // (b0ed31eb9): bij twee tellingen die elkaar tegenspreken blijft er één over,
+  // en die woont in de view die de rijen ook echt rendert. De kaart wijst nu
+  // naar het eerstvolgende moment in plaats van naar een aantal.
+  const volgende = nextEvent(events)
   const next = nextEventLabel(events)
 
   // Voorkeuren — neutrale dot, KPI = eindstrategie-naam.
@@ -358,12 +385,15 @@ export function buildNavCards({
       href: '/toekomst/gebeurtenissen',
       Icon: CalendarClock,
       tint: tintForStatus('neutral'),
-      kpi: countKpi(eventCount, 'gebeurtenis', 'gebeurtenissen'),
+      // KPI = alleen het moment (cijfer-slot); de naam staat in de subtekst, die
+      // vrije gebruikerstekst voorheen ook al droeg. "Geen" spiegelt de lege
+      // staat van de Doelen- en Rekenhulp-kaart in dezelfde rij.
+      kpi: volgende?.wanneer ?? 'Geen',
       status: 'neutral',
-      subText: next ?? 'Nog niets gepland',
+      subText: volgende ? `Volgende: ${volgende.naam}` : 'Nog niets gepland',
       detail: {
-        detailLabel: 'Gepland',
-        value: countKpi(eventCount, 'gebeurtenis', 'gebeurtenissen'),
+        detailLabel: 'Volgende',
+        value: volgende?.wanneer ?? '—',
         tip: next ?? 'Plan je eerste gebeurtenis in op de tijdas.',
         actionLabel: 'Bekijk tijdas',
       },

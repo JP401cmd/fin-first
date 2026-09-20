@@ -28,20 +28,23 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { readSourceLF } from '@/lib/test-utils/read-source'
 
-const clientSource = readFileSync(
+// Via `readSourceLF`, niet `readFileSync`: de grendel hieronder zoekt een
+// fragment dat over twee regels loopt (`activeAssets\n        .filter(…)`). Op
+// een checkout die van vóór de `eol=lf`-regel in `.gitattributes` dateert staat
+// het bestand nog met CRLF op schijf — git hernormaliseert bestaande bestanden
+// niet — en dan vindt een `\n`-naald niets, terwijl de gecommitte blob wél
+// klopt. Zie de toelichting in `lib/test-utils/read-source.ts`.
+const clientSource = readSourceLF(
   join(process.cwd(), 'components', 'core', 'assets-client.tsx'),
-  'utf8',
 )
-const modalSource = readFileSync(
+const modalSource = readSourceLF(
   join(process.cwd(), 'components', 'core', 'asset-return-modal.tsx'),
-  'utf8',
 )
-const loaderSource = readFileSync(
+const loaderSource = readSourceLF(
   join(process.cwd(), 'lib', 'assets-data-loader.ts'),
-  'utf8',
 )
 
 /** Index van een fragment, met een sprekende fout als het ontbreekt. */
