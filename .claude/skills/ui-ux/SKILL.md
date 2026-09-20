@@ -14,7 +14,7 @@ description: Use when building, restyling or reviewing ANY TriFinity UI — pagi
 ## Ontwerpfilosofie (altijd van toepassing)
 
 - **Krant-esthetiek**: Playfair Display koppen, Source Serif body, redactionele witruimte.
-- **Editorial pagina-opening**: elke app-pagina opent met de standaard-aanhef — hairline-kicker → narratieve Playfair-H1 met één italic-`<em>`-accent (28/36/44px) → optionele deck → optioneel hairline-cijferblok. Nooit een gradient-kaart-doos als kop. Volledige spec: `pattern-cards.md` → *Editorial pagina-opening*.
+- **Pagina-aanhef die het oordeel uitspreekt** (sinds sep 2026): elke app-pagina onder `/overzicht/**` en `/toekomst/**` opent met `PageVerdictOpening` — titel = paginanaam + oordeel (op mobiel alleen het oordeel; de TopBar draagt daar de naam) → korte deck van twee zinnen. Geen kicker. Het oordeel wordt geconsumeerd uit de bestaande bron, nooit herberekend, en draagt de stoplichtkleur — nooit het module-accent. De narratieve aanhef met kicker en italic-`<em>` (`PageOpening`) is dáármee vervangen. Nooit een gradient-kaart-doos als kop. Volledige spec: `pattern-cards.md` → *Pagina-aanhef die het oordeel uitspreekt*.
 - **Inkt-op-papier**: warm off-white (`--bg`/`--paper`), nooit klinisch wit of donker.
 - **Typografische hiërarchie**: font-keuze en gewicht bepalen prioriteit, niet kleur.
 - **Drie modules = drie gebruikersinstelbare accenten**: de gebruiker kiest de kern-/wil-/horizon-kleur op `/mijn/uiterlijk` — noem dus nooit een vaste kleurnaam als regel. Module-identiteit altijd via `--module-active-*` / `kern-*`/`wil-*`/`horizon-*`-tokens; charts/canvas die een echte hex nodig hebben via `useModuleHex()`. Nooit Tailwind-standaardkleuren of losse hexen voor module-identiteit.

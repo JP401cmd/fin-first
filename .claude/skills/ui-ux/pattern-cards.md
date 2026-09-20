@@ -8,8 +8,25 @@ Bewuste, niet-universele patronen. Activeer alleen wanneer het paginatype erom v
 
 **Component eerst, recept als toets.** Veel kaarten zijn geïmplementeerd in `components/editorial/` — gebruik dan de component en schrijf het recept niet opnieuw inline: Pull-quote → `PullQuote` + `HL`/`HLNeg` · Figures-strip → `FiguresStrip` · Scenario-callout → `ScenarioCallout` · Rekening-tag → `RekeningTag` · Toggle-pill → `TogglePill` · Comparison-row → `ComparisonRow` · Romeinse numbering → `RomanSection`/`SectionLabel` · Ornament-colophon → `OrnamentColophon` · kicker/headline/deck/highlight → `Kicker`/`EditorialHeadline`/`EditorialDeck`/`HighlightMark`. De CSS-details hieronder zijn de specificatie (voor review en voor de zeldzame plek zonder component).
 
-### Editorial pagina-opening (standaard-aanhef) ⭐
-- **Toepassen op**: **elke app-pagina-opening** — dit is de standaard (door de gebruiker gevalideerd op budget, vaste-lasten, forecast, transacties, jul 2026). Hub-, lijst- en analyse-pagina's openen zó, niet met een kaart/doos.
+### Pagina-aanhef die het oordeel uitspreekt ⭐ (nieuwe standaard, sep 2026)
+- **Component**: `PageVerdictOpening` (`components/editorial/page-verdict-opening.tsx`), met `PageVerdictSuffix` voor een oordeel dat nakomt.
+- **Toepassen op**: **elke app-pagina-opening** onder `/overzicht/**` en `/toekomst/**`. De titel bestaat uit twee delen — paginanaam + oordeel:
+  - **desktop (≥lg)**: "Transacties | Krap deze maand" — daar is geen TopBar, dus de titel draagt de naam zelf.
+  - **mobiel (<lg)**: alleen "Krap deze maand" — de TopBar van de shell draagt de naam al.
+  - Het verschil is **CSS-only** (`hidden lg:inline`), nooit een JS-breakpoint-branch: de shell eist identieke server-/client-HTML.
+- **De titel-keten**: oordeel → kerncijfer → paginanaam. Zodra een stap een waarde heeft, stopt de keten. Is er geen oordeel én geen cijfer, dan is de titel de kale paginanaam, zichtbaar op **beide** breakpoints (anders is de titel op mobiel leeg).
+- **`pageName` komt altijd uit `resolveRouteTitle(route)`** (`lib/nav-config.ts`) — dezelfde bron als de shell-`h1`, de TopBar en de breadcrumb. Nooit een losse string.
+- **Het oordeel wordt geconsumeerd, nooit herberekend.** Deelt de zin twee oppervlakken (een kaart én de titel), dan staat hij in één geëxporteerde functie — zie `transactiesVerdict`/`vasteLastenVerdict`/`forecastVerdict` in `lib/cashflow-cards.ts` en `loadHefboomPageVerdict` in `lib/hefboom-page-verdict.ts`.
+- **Kleur**: het oordeelswoord draagt de stoplichtkleur (`leverageStatusTextClass`), nooit het module-accent — status is semantiek. De paginanaam blijft neutrale inkt.
+- **Kicker vervalt wanneer hij het onderwerp herhaalt** — en dat deed hij bijna altijd ("Je geldstroom" boven Transacties, "Budgetteren" boven Budget, "Bezittingen · opgeslagen vrijheid" boven Bezittingen). Draagt hij informatie die niet weg mag (maandvenster, perspectief-label), verhuis die naar de deck. **Uitzondering:** een kicker die iets draagt wat de titel níét zegt, mag blijven — op `/overzicht` is dat de datum ("ZONDAG 20 SEPTEMBER 2026"), die nergens anders op de pagina staat.
+- **Deck**: twee korte zinnen, samen ~20 woorden. Eerste zin: wat de pagina is. Tweede zin: wat het oordeel betekent.
+- **Kop bewust dataloos (LCP)?** Gebruik `verdictSlot` met een eigen `<Suspense>`; de naam blijft dan op beide breakpoints staan en de titel groeit in plaats van te verspringen. Zie `/overzicht/budget/vaste-lasten` en `/forecast`.
+- **Verboden**: gradient-kaart-dozen als pagina-kop; Tailwind-standaardkleuren; het module-accent op het oordeelswoord; een tweede kop-variant naast deze binnen dezelfde routefamilie.
+- **Referentie-implementaties**: `app/(app)/overzicht/budget/transacties/page.tsx` (direct oordeel), `app/(app)/overzicht/budget/vaste-lasten/` (stromend oordeel), `components/future/toekomst-subpage-shell.tsx` en `components/overview/belasting-box-page-header.tsx` (gedeelde shells, één `route`-prop).
+
+### Editorial pagina-opening (narratieve aanhef) — HISTORISCH
+> Vervangen door de oordeel-aanhef hierboven (kop-herziening sep 2026). Deze spec blijft staan zolang `PageOpening` nog call-sites heeft buiten `/overzicht/**` en `/toekomst/**`; nieuwe pagina's gebruiken hem niet meer.
+- **Toepassen op**: **elke app-pagina-opening** — dit was de standaard (door de gebruiker gevalideerd op budget, vaste-lasten, forecast, transacties, jul 2026). Hub-, lijst- en analyse-pagina's openen zó, niet met een kaart/doos.
 - **Niet toepassen op**: modals/sheets (eigen header-spec), forms/wizard-stappen (Type 4), de marketing-/landingpagina (eigen clamp-maatvoering) en dashboard-widgets (`WidgetShell`).
 - **Opbouw** (in deze volgorde, container `<header className="relative space-y-3">`):
   1. **Hairline-kicker-rij**: `flex flex-wrap items-center gap-2.5 font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--module-active-700)]` met vóór de tekst een streep `inline-block h-px w-7 shrink-0` in `var(--module-active-500)` (`aria-hidden`).
