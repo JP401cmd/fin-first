@@ -14,7 +14,7 @@ import {
   type HouseholdPartnerOverlay,
 } from '@/lib/horizon/sim-chart-geometry'
 import { ChartStaticLayers } from './chart-static-layers'
-import { formatAge } from './vrijheidsas'
+import { formatAge } from '@/lib/horizon/fire-format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { MASKED_AMOUNT_PLACEHOLDER } from '@/lib/format'
 

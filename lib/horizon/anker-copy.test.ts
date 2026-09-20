@@ -30,6 +30,11 @@ import {
   antwoordDoorwerken,
   antwoordMeerSalaris,
   HEFBOOM_COPY,
+  LAB_COPY,
+  labGrensRegel,
+  labKnopGezetMelding,
+  labOpgeslagenOp,
+  labZoneWoord,
   spaarquoteEuroRegel,
   antwoordMinderUitgeven,
   haalbaarBijUitgaveRegel,
@@ -364,19 +369,49 @@ describe('dekking-zinnen — de vastgestelde kopij', () => {
     )
   })
 
-  it('draaiknoppen: vaste namen en de euro-regel onder de spaarquote (eigenaarskeuze 15 sep)', () => {
+  it('de vijf knoppen: vaste namen en de euro-regel onder de spaarquote (ADR 0170)', () => {
+    // De vijf van ADR 0170, plus twee namen die buiten het lab nog leven (KPI-duiding en
+    // oudere teksten). "Minder werken" en "Later of eerder stoppen" vervielen als knop.
     expect(HEFBOOM_COPY).toEqual({
+      meerVerdienen: 'Meer verdienen',
+      minderUitgeven: 'Minder uitgeven',
+      uitgaveNaPensioen: 'Uitgave na pensioen',
+      nalatenschap: 'Nalatenschap',
+      stopleeftijd: 'Stopleeftijd',
       meerSalaris: 'Meer salaris',
       spaarquote: 'Spaarquote',
-      minderWerken: 'Minder werken',
-      uitgaveNaPensioen: 'Uitgave na pensioen',
-      laterEerder: 'Later of eerder stoppen',
     })
     expect(spaarquoteEuroRegel(0)).toBeNull()
     expect(spaarquoteEuroRegel(0.4)).toBeNull()
     expect(spaarquoteEuroRegel(1290.2)).toBe('+€ 1.290/mnd minder uitgeven')
     expect(spaarquoteEuroRegel(-160)).toBe('−€ 160/mnd meer uitgeven')
     expect(spaarquoteEuroRegel(1290, true)).toBe(`+${MASKED_AMOUNT_PLACEHOLDER}/mnd minder uitgeven`)
+  })
+
+  it('LAB_COPY blijft binnen de toon-invarianten (ADR 0170)', () => {
+    const alle = Object.values(LAB_COPY).join(' | ')
+    // Beschrijvend, nooit aansporend of belovend; geen "AOW" in een tekort-/marge-zin; en
+    // nooit de koop-/verkoop-metafoor (ADR 0165) — vrijheidstijd bouw je op.
+    expect(alle).not.toMatch(/je moet|je kunt stoppen|oneindig/i)
+    expect(alle).not.toMatch(/AOW/)
+    expect(alle).not.toMatch(/vrijgekocht|terugkopen|vrijkopen|gekochte tijd/i)
+    // De drie zone-woorden en de drie schaal-woorden bestaan en verschillen van elkaar.
+    expect(new Set([LAB_COPY.zoneRood, LAB_COPY.zoneOranje, LAB_COPY.zoneGroen]).size).toBe(3)
+    expect(labZoneWoord(null)).toBe(LAB_COPY.zoneOnbekend)
+    expect(labZoneWoord('groen')).toBe(LAB_COPY.zoneGroen)
+    expect(labOpgeslagenOp('19 september')).toBe('Opgeslagen als je doel op 19 september.')
+    expect(labKnopGezetMelding('Meer verdienen', '+€ 300/mnd')).toBe('Meer verdienen staat nu op +€ 300/mnd.')
+  })
+
+  it('labGrensRegel: beide grenzen, één grens, samenvallend, of de reden', () => {
+    expect(labGrensRegel({ gedekt: '+€ 310', ruim: '+€ 480', reden: null })).toBe(
+      'gedekt vanaf +€ 310 · ruim vanaf +€ 480',
+    )
+    // Samenvallend = één eis, dus één regel (eind-vorm zonder eindleeftijd om op te rekken).
+    expect(labGrensRegel({ gedekt: '+€ 310', ruim: '+€ 310', reden: null })).toBe('gedekt vanaf +€ 310')
+    expect(labGrensRegel({ gedekt: null, ruim: null, reden: 'boven-bereik' })).toBe(LAB_COPY.grensBovenBereik)
+    expect(labGrensRegel({ gedekt: null, ruim: null, reden: 'heel-gedekt' })).toBe(LAB_COPY.grensHeelGedekt)
+    expect(labGrensRegel({ gedekt: null, ruim: null, reden: null })).toBe(LAB_COPY.grensOnbekend)
   })
 
   // Apostrof: hetzelfde rechte teken (') als de rest van dit bestand ("zo'n", "ratio's").

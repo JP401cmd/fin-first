@@ -22,7 +22,7 @@ import { ShieldCheck } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { readSliderValueFromEvents } from '@/lib/scenario-events'
 import type { WhatIfEvent } from '@/lib/types/horizon-whatif'
-import type { WhatIfOverrides } from '@/components/app/horizon/whatif-sliders'
+import type { WhatIfOverrides } from '@/lib/types/horizon-whatif'
 import type { AssetCategorie } from '@/lib/horizon-kernel/types'
 import {
   DOEL_PARAMETERS,
@@ -36,10 +36,12 @@ import {
 
 /**
  * Bouw de GOAL-RELEVANTE lab-stand (`ToekomstScenarioStand`) uit de live scenario-state.
- * Spiegelt EXACT de inclusie-/afrondingsregels die het persist-effect gebruikte (income/
- * savings afgerond vergeleken; workdays/extraInleg exact; nul-delta's al gedropt door de
- * WhatIfMarketAssumptions-component). `stopAge`/`stopKoppel` staan altijd in de stand
- * (net als de oude payload); `stopMarge` alleen in koppelmodus met een vastgehouden marge.
+ * Spiegelt EXACT de inclusie-/afrondingsregels van het persist-effect (savings afgerond
+ * vergeleken, extraInleg exact; nul-delta's al gedropt door de WhatIfMarketAssumptions-
+ * component). `stopAge` staat altijd in de stand; `uitgaveNaPensioen` en `nalatenschap`
+ * alleen wanneer de knop van de plan-waarde afwijkt (`null` = plan-waarde → veld weg), zodat
+ * "afwezig" één betekenis heeft: wat het plan rekent. De knoppen Maandinkomen (spec §2) en
+ * Minder werken (ADR 0170) bestaan niet meer en worden dus niet meer weggeschreven.
  * Zonder baseline kunnen sliders niet worden gelezen → geen slider-velden.
  */
 export function buildLiveStand(args: {
@@ -47,18 +49,16 @@ export function buildLiveStand(args: {
   sliderEvents: WhatIfEvent[]
   returnDeltas: Record<string, number>
   stopAge: number | null
-  stopKoppel: boolean
-  lockedMarge: number | null
+  uitgaveNaPensioen: number | null
+  nalatenschap: number | null
 }): ToekomstScenarioStand {
-  const { baseline, sliderEvents, returnDeltas, stopAge, stopKoppel, lockedMarge } = args
+  const { baseline, sliderEvents, returnDeltas, stopAge, uitgaveNaPensioen, nalatenschap } = args
   const stand: ToekomstScenarioStand = {}
 
   if (baseline) {
     const sliders: NonNullable<ToekomstScenarioStand['sliders']> = {}
-    const workdays = readSliderValueFromEvents('workdays', sliderEvents, baseline)
     const savings = readSliderValueFromEvents('savings', sliderEvents, baseline)
     const extraInleg = readSliderValueFromEvents('extra_inleg', sliderEvents, baseline)
-    if (workdays !== baseline.workDaysPerWeek) sliders.workdays = workdays
     if (Math.round(savings) !== Math.round(baseline.savingsRate)) sliders.savings = savings
     if (extraInleg !== 0) sliders.extraInleg = extraInleg
     if (Object.keys(sliders).length > 0) stand.sliders = sliders
@@ -69,8 +69,8 @@ export function buildLiveStand(args: {
   }
 
   stand.stopAge = stopAge
-  stand.stopKoppel = stopKoppel
-  if (stopKoppel && lockedMarge !== null) stand.stopMarge = lockedMarge
+  if (uitgaveNaPensioen !== null) stand.uitgaveNaPensioen = uitgaveNaPensioen
+  if (nalatenschap !== null) stand.nalatenschap = nalatenschap
 
   return stand
 }
@@ -84,9 +84,11 @@ export function buildLiveStand(args: {
 export function buildScenarioPersistPayload(args: {
   stand: ToekomstScenarioStand
   showScenarioLine: boolean
+  /** Weergave-keuze van de knoppen (ADR 0170); afwezig = de standaard (balken). */
+  knopWeergave?: 'balk' | 'wijzer'
   doel: ToekomstScenarioDoel | null
 }): ToekomstScenarioPrefs {
-  const { stand, showScenarioLine, doel } = args
+  const { stand, showScenarioLine, knopWeergave, doel } = args
   return {
     v: 2,
     ...(stand.sliders ? { sliders: stand.sliders } : {}),
@@ -94,9 +96,10 @@ export function buildScenarioPersistPayload(args: {
       ? { returnDeltaByCategorie: stand.returnDeltaByCategorie }
       : {}),
     stopAge: stand.stopAge ?? null,
-    stopKoppel: stand.stopKoppel ?? false,
-    ...(stand.stopMarge !== undefined ? { stopMarge: stand.stopMarge } : {}),
+    ...(stand.uitgaveNaPensioen !== undefined ? { uitgaveNaPensioen: stand.uitgaveNaPensioen } : {}),
+    ...(stand.nalatenschap !== undefined ? { nalatenschap: stand.nalatenschap } : {}),
     showScenarioLine,
+    ...(knopWeergave ? { knopWeergave } : {}),
     ...(doel ? { doel } : {}),
   }
 }

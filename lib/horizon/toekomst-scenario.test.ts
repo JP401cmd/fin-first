@@ -9,6 +9,7 @@ import {
   buildCategorieReturnGroups,
   scenarioMonthlySpendDelta,
   DOEL_PARAMETERS,
+  DOELWAARDE_BEDRAG_MAX,
   type ToekomstScenarioStand,
 } from './toekomst-scenario'
 
@@ -53,6 +54,9 @@ describe('parseToekomstScenarioPrefs', () => {
   it('v1-input normaliseert naar v2 — behoudt alle bekende velden, voegt geen doel toe', () => {
     // v1-fixture (de oude opgeslagen shape). De parser normaliseert ALTIJD naar v:2 met
     // identieke veldwaarden en zonder doel-blok (v1 kende geen doel).
+    // De koppelvelden (`stopKoppel`/`stopMarge`) vervielen met ADR 0170 — er is geen
+    // verwacht-streep meer om een marge tegen aan te houden. Een oude pref draagt ze nog; de
+    // parser neemt ze bewust NIET over, dus ze worden ook nooit herschreven.
     const v1input = {
       v: 1,
       sliders: { income: 4000, workdays: 4, savings: 30, extraInleg: 500 },
@@ -62,7 +66,8 @@ describe('parseToekomstScenarioPrefs', () => {
       stopMarge: 1.5,
       showScenarioLine: false,
     }
-    expect(parseToekomstScenarioPrefs(v1input)).toEqual({ ...v1input, v: 2 })
+    const { stopKoppel: _k, stopMarge: _m, ...verwacht } = v1input
+    expect(parseToekomstScenarioPrefs(v1input)).toEqual({ ...verwacht, v: 2 })
   })
 
   it('v2-roundtrip mét doel — behoudt stand/parameters/gezetOp/goalIds', () => {
@@ -71,7 +76,9 @@ describe('parseToekomstScenarioPrefs', () => {
       sliders: { income: 4000, savings: 35 },
       returnDeltaByCategorie: { Beleggingen: 0.02 },
       stopAge: 55,
-      stopKoppel: false,
+      // De twee profielparameter-knoppen (ADR 0170) reizen mee in pref én stand.
+      uitgaveNaPensioen: 31_200,
+      nalatenschap: 75_000,
       showScenarioLine: true,
       doel: {
         gezetOp: '2026-07-11T10:00:00.000Z',
@@ -80,7 +87,8 @@ describe('parseToekomstScenarioPrefs', () => {
           sliders: { income: 4000, savings: 35 },
           returnDeltaByCategorie: { Beleggingen: 0.02 },
           stopAge: 55,
-          stopKoppel: false,
+          uitgaveNaPensioen: 31_200,
+          nalatenschap: 75_000,
         },
         goalIds: { spaarquote: 'goal-abc', fire: 'goal-xyz' },
       },
@@ -88,13 +96,46 @@ describe('parseToekomstScenarioPrefs', () => {
     expect(parseToekomstScenarioPrefs(v2input)).toEqual(v2input)
   })
 
-  it('clampt stopMarge op ±30 en negeert niet-eindige/afwezige waarden', () => {
-    expect(parseToekomstScenarioPrefs({ v: 1, stopMarge: 2.5 })?.stopMarge).toBe(2.5)
-    expect(parseToekomstScenarioPrefs({ v: 1, stopMarge: -80 })?.stopMarge).toBe(-30)
-    expect(parseToekomstScenarioPrefs({ v: 1, stopMarge: 80 })?.stopMarge).toBe(30)
-    expect(parseToekomstScenarioPrefs({ v: 1, stopMarge: 'veel' })?.stopMarge).toBeUndefined()
-    expect(parseToekomstScenarioPrefs({ v: 1, stopMarge: null })?.stopMarge).toBeUndefined()
-    expect(parseToekomstScenarioPrefs({ v: 1 })?.stopMarge).toBeUndefined()
+  it('clampt uitgaveNaPensioen en nalatenschap; negeert niet-eindige/afwezige waarden', () => {
+    expect(parseToekomstScenarioPrefs({ v: 2, uitgaveNaPensioen: 31_200 })?.uitgaveNaPensioen).toBe(31_200)
+    expect(parseToekomstScenarioPrefs({ v: 2, uitgaveNaPensioen: -5 })?.uitgaveNaPensioen).toBe(0)
+    expect(parseToekomstScenarioPrefs({ v: 2, uitgaveNaPensioen: 9e9 })?.uitgaveNaPensioen).toBe(1_000_000)
+    expect(parseToekomstScenarioPrefs({ v: 2, uitgaveNaPensioen: 'veel' })?.uitgaveNaPensioen).toBeUndefined()
+    expect(parseToekomstScenarioPrefs({ v: 2, uitgaveNaPensioen: null })?.uitgaveNaPensioen).toBeUndefined()
+    expect(parseToekomstScenarioPrefs({ v: 2 })?.uitgaveNaPensioen).toBeUndefined()
+
+    expect(parseToekomstScenarioPrefs({ v: 2, nalatenschap: 75_000 })?.nalatenschap).toBe(75_000)
+    expect(parseToekomstScenarioPrefs({ v: 2, nalatenschap: -1 })?.nalatenschap).toBe(0)
+    expect(parseToekomstScenarioPrefs({ v: 2, nalatenschap: 1e300 })?.nalatenschap).toBe(DOELWAARDE_BEDRAG_MAX)
+    expect(parseToekomstScenarioPrefs({ v: 2, nalatenschap: Number.NaN })?.nalatenschap).toBeUndefined()
+  })
+
+  it('een LEGACY koppel-doel overleeft de opruiming (geen stil doel-verlies)', () => {
+    // De koppelvelden vervallen, maar `buildLiveStand` schreef `stopAge` altijd mee — ook
+    // `null` — en de parser bewaart die sleutel expliciet. Een oud doel parseert dus nooit
+    // naar een LEGE stand, en `parseDoel` laat 'm niet vallen. Zonder deze grendel zou de
+    // opruiming een vastgelegd doel (én zijn `goalIds`) stil kunnen wissen, met wees-rijen
+    // in `goals` als gevolg.
+    const parsed = parseToekomstScenarioPrefs({
+      v: 2,
+      doel: {
+        gezetOp: '2026-08-01T10:00:00.000Z',
+        parameters: { fire: true },
+        stand: { stopAge: null, stopKoppel: true, stopMarge: 3, sliders: { workdays: 4 } },
+        goalIds: { fire: 'goal-1' },
+      },
+    })
+    expect(parsed?.doel?.gezetOp).toBe('2026-08-01T10:00:00.000Z')
+    expect(parsed?.doel?.goalIds).toEqual({ fire: 'goal-1' })
+    expect(parsed?.doel?.stand.stopAge).toBeNull()
+    expect('stopKoppel' in (parsed?.doel?.stand ?? {})).toBe(false)
+  })
+
+  it('neemt de vervallen koppelvelden niet over (ADR 0170)', () => {
+    const parsed = parseToekomstScenarioPrefs({ v: 2, stopKoppel: true, stopMarge: 2.5, stopAge: 58 })
+    expect(parsed?.stopAge).toBe(58)
+    expect('stopKoppel' in (parsed ?? {})).toBe(false)
+    expect('stopMarge' in (parsed ?? {})).toBe(false)
   })
 
   it('niet-object of onbekende versie → null', () => {
@@ -165,9 +206,14 @@ describe('parseToekomstScenarioPrefs', () => {
     expect(parseToekomstScenarioPrefs({ v: 1, stopAge: 55.7 })?.stopAge).toBe(56)
   })
 
-  it('parseert stopKoppel + showScenarioLine alleen als boolean', () => {
-    expect(parseToekomstScenarioPrefs({ v: 1, stopKoppel: true })?.stopKoppel).toBe(true)
-    expect(parseToekomstScenarioPrefs({ v: 1, stopKoppel: 'yes' })?.stopKoppel).toBeUndefined()
+  it('knopWeergave: alleen de twee bekende vormen (ADR 0170)', () => {
+    expect(parseToekomstScenarioPrefs({ v: 2, knopWeergave: 'wijzer' })?.knopWeergave).toBe('wijzer')
+    expect(parseToekomstScenarioPrefs({ v: 2, knopWeergave: 'balk' })?.knopWeergave).toBe('balk')
+    expect(parseToekomstScenarioPrefs({ v: 2, knopWeergave: 'knop' })?.knopWeergave).toBeUndefined()
+    expect(parseToekomstScenarioPrefs({ v: 2 })?.knopWeergave).toBeUndefined()
+  })
+
+  it('parseert showScenarioLine alleen als boolean', () => {
     expect(parseToekomstScenarioPrefs({ v: 1, showScenarioLine: false })?.showScenarioLine).toBe(false)
     expect(parseToekomstScenarioPrefs({ v: 1, showScenarioLine: 1 })?.showScenarioLine).toBeUndefined()
   })
@@ -216,7 +262,7 @@ describe('parseToekomstScenarioPrefs — doel-blok', () => {
       doel: {
         gezetOp: GEZET_OP,
         parameters: { spaarquote: true, salaris: 'yes', fire: 1, rendement: true, onzin: true },
-        stand: { stopAge: 55, stopKoppel: false },
+        stand: { stopAge: 55 },
       },
     })
     expect(parsed?.doel?.parameters).toEqual({ spaarquote: true, rendement: true })
@@ -228,7 +274,7 @@ describe('parseToekomstScenarioPrefs — doel-blok', () => {
       doel: {
         gezetOp: GEZET_OP,
         parameters: { fire: true },
-        stand: { stopAge: 55, stopKoppel: false },
+        stand: { stopAge: 55 },
         goalIds: { fire: 'goal-1', spaarquote: '', salaris: 42, onzin: 'x' },
       },
     })
@@ -245,7 +291,8 @@ describe('parseToekomstScenarioPrefs — doel-blok', () => {
           sliders: { income: 99999, savings: 200, extraInleg: -99999 },
           returnDeltaByCategorie: { Beleggingen: 0.9, Onzin: 0.03 },
           stopAge: 250,
-          stopMarge: 80,
+          uitgaveNaPensioen: 9e9,
+          nalatenschap: -5,
         },
       },
     })
@@ -253,7 +300,8 @@ describe('parseToekomstScenarioPrefs — doel-blok', () => {
       sliders: { income: 15000, savings: 80, extraInleg: -5000 },
       returnDeltaByCategorie: { Beleggingen: 0.05 },
       stopAge: 100,
-      stopMarge: 30,
+      uitgaveNaPensioen: 1_000_000,
+      nalatenschap: 0,
     })
   })
 
@@ -324,13 +372,13 @@ describe('parseToekomstScenarioPrefs — doel-blok', () => {
       doel: {
         gezetOp: GEZET_OP,
         parameters: { fire: true },
-        stand: { stopAge: 55, stopKoppel: false },
+        stand: { stopAge: 55 },
       },
     })
     expect(parsed?.doel).toEqual({
       gezetOp: GEZET_OP,
       parameters: { fire: true },
-      stand: { stopAge: 55, stopKoppel: false },
+      stand: { stopAge: 55 },
     })
     expect(parsed?.doel && 'goalIds' in parsed.doel).toBe(false)
   })
@@ -343,7 +391,6 @@ describe('isDoelConceptGewijzigd', () => {
     sliders: { income: 4000, workdays: 4, savings: 30, extraInleg: 500 },
     returnDeltaByCategorie: { Beleggingen: 0.02 },
     stopAge: 55,
-    stopKoppel: false,
   }
 
   it('identieke stand → niet gewijzigd', () => {
@@ -363,9 +410,11 @@ describe('isDoelConceptGewijzigd', () => {
     expect(isDoelConceptGewijzigd(live, stand)).toBe(true)
   })
 
-  it('workdays exact vergeleken → elk verschil gewijzigd', () => {
+  // ADR 0170 — de knop "Minder werken" bestaat niet meer; een legacy-stand die `workdays`
+  // nog draagt mag geen eeuwige "gewijzigd" geven (zelfde regel als `income`, spec §2).
+  it('een workdays-verschil telt niet meer mee (knop vervallen)', () => {
     const live = { ...stand, sliders: { ...stand.sliders!, workdays: 3 } }
-    expect(isDoelConceptGewijzigd(live, stand)).toBe(true)
+    expect(isDoelConceptGewijzigd(live, stand)).toBe(false)
   })
 
   it('extraInleg exact vergeleken → elk verschil gewijzigd', () => {
@@ -394,28 +443,30 @@ describe('isDoelConceptGewijzigd', () => {
   })
 
   it('stopAge undefined ≡ null (beide "geen stop") → niet gewijzigd', () => {
-    const s: ToekomstScenarioStand = { stopKoppel: false, stopAge: null }
-    const live: ToekomstScenarioStand = { stopKoppel: false } // stopAge afwezig
+    const s: ToekomstScenarioStand = { stopAge: null }
+    const live: ToekomstScenarioStand = {} // stopAge afwezig
     expect(isDoelConceptGewijzigd(live, s)).toBe(false)
   })
 
-  it('stopKoppel-verschil → gewijzigd', () => {
-    const live = { ...stand, stopKoppel: true, stopMarge: 1 }
-    expect(isDoelConceptGewijzigd(live, stand)).toBe(true)
+  // ADR 0170 — de twee profielparameter-knoppen. Afwezig = "wat het plan rekent", dus
+  // afwezig-vs-waarde is een echte wijziging.
+  it('uitgaveNaPensioen-verschil → gewijzigd; gelijk → niet', () => {
+    expect(isDoelConceptGewijzigd({ ...stand, uitgaveNaPensioen: 31_200 }, stand)).toBe(true)
+    const met = { ...stand, uitgaveNaPensioen: 31_200 }
+    expect(isDoelConceptGewijzigd({ ...met }, met)).toBe(false)
+    expect(isDoelConceptGewijzigd({ ...met, uitgaveNaPensioen: 31_800 }, met)).toBe(true)
   })
 
-  it('koppel aan in beide: marge is de waarheid — margeverschil → gewijzigd', () => {
-    const s: ToekomstScenarioStand = { stopKoppel: true, stopAge: 55, stopMarge: 2 }
-    const live: ToekomstScenarioStand = { stopKoppel: true, stopAge: 55, stopMarge: 3 }
-    expect(isDoelConceptGewijzigd(live, s)).toBe(true)
+  it('nalatenschap-verschil → gewijzigd; gelijk → niet', () => {
+    expect(isDoelConceptGewijzigd({ ...stand, nalatenschap: 75_000 }, stand)).toBe(true)
+    const met = { ...stand, nalatenschap: 75_000 }
+    expect(isDoelConceptGewijzigd({ ...met }, met)).toBe(false)
+    expect(isDoelConceptGewijzigd({ ...met, nalatenschap: 80_000 }, met)).toBe(true)
   })
 
-  it('koppel aan: afgeleide stopAge schuift maar marge gelijk → niet gewijzigd', () => {
-    // Bij koppel is de stopAge afgeleid (verwacht + marge) en schuift met de sim;
-    // gelijke marge = hetzelfde doel, ongeacht de absolute stopAge.
-    const s: ToekomstScenarioStand = { stopKoppel: true, stopAge: 55, stopMarge: 2 }
-    const live: ToekomstScenarioStand = { stopKoppel: true, stopAge: 53, stopMarge: 2 }
-    expect(isDoelConceptGewijzigd(live, s)).toBe(false)
+  it('de twee knoppen tellen óók mee onder stopKeuzeTelt: false (ze zijn geen stopkeuze)', () => {
+    const live = { ...stand, nalatenschap: 75_000 }
+    expect(isDoelConceptGewijzigd(live, stand, { stopKeuzeTelt: false })).toBe(true)
   })
 
   it('ontbrekende stand (geen doel) → niet gewijzigd', () => {
@@ -433,8 +484,8 @@ describe('isDoelConceptGewijzigd', () => {
   })
 
   // ── ADR 0145 D4: onder een vast anker telt de stopkeuze niet als doelstand ──
-  it('stopKeuzeTelt: false — een stopAge-/koppel-/margeverschil is dan géén wijziging', () => {
-    const live = { ...stand, stopAge: 62, stopKoppel: true, stopMarge: 4 }
+  it('stopKeuzeTelt: false — een stopAge-verschil is dan géén wijziging', () => {
+    const live = { ...stand, stopAge: 62 }
     expect(isDoelConceptGewijzigd(live, stand, { stopKeuzeTelt: false })).toBe(false)
     // Default (weggelaten of true) = het bestaande gedrag: wél gewijzigd.
     expect(isDoelConceptGewijzigd(live, stand)).toBe(true)
@@ -450,13 +501,11 @@ describe('isDoelConceptGewijzigd', () => {
 })
 
 describe('stripStopKeuze (ADR 0145 D4)', () => {
-  it('laat stopAge/stopKoppel/stopMarge weg en houdt de rest; muteert de invoer niet', () => {
+  it('laat de stopkeuze weg en houdt de rest; muteert de invoer niet', () => {
     const stand: ToekomstScenarioStand = {
       sliders: { savings: 45 },
       returnDeltaByCategorie: { Beleggingen: 0.02 },
       stopAge: 58,
-      stopKoppel: true,
-      stopMarge: 2,
     }
     const gestript = stripStopKeuze(stand)
     expect(gestript).toEqual({ sliders: { savings: 45 }, returnDeltaByCategorie: { Beleggingen: 0.02 } })
@@ -470,7 +519,9 @@ describe('stripStopKeuze (ADR 0145 D4)', () => {
   })
 
   it('een stand met alléén een stopkeuze wordt leeg — de parser laat zo\'n doel dan vallen', () => {
-    expect(stripStopKeuze({ stopAge: 58, stopKoppel: false })).toEqual({})
+    // Ook een RAUWE legacy-body met koppelvelden wordt leeg: die velden vervielen met
+    // ADR 0170 en mogen niet via de doel-stand terug in de pref lekken.
+    expect(stripStopKeuze({ stopAge: 58, stopKoppel: false, stopMarge: 2 })).toEqual({})
     const parsed = parseToekomstScenarioPrefs({
       v: 2,
       doel: { gezetOp: '2026-09-14T10:00:00.000Z', parameters: { dekking: true }, stand: stripStopKeuze({ stopAge: 58 }) },

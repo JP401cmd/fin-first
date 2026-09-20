@@ -22,6 +22,7 @@
  * en y-domein alle vier achter hangen.
  */
 import type { SimRow } from '@/lib/fire-simulation'
+import { buildDiffVlakken } from './scenario-diff-vlakken'
 import type { FireEndStrategy } from '@/lib/fire-strategy'
 import type { ChartEventOverlay } from '@/lib/chart-event-overlay'
 import { CHART_PAD } from '@/lib/chart-constants'
@@ -187,6 +188,13 @@ export type TargetLineGeometry = {
   labelVal: number
 }
 
+/** Eén gearceerd verschilvlak, klaar om te tekenen. */
+export interface DiffVlakGeometry {
+  /** `boven` = de wat-als ligt hoger dan de basislijn (groen); `onder` = lager (rood). */
+  kant: 'boven' | 'onder'
+  d: string
+}
+
 export type SimChartGeometry = {
   // Afmetingen
   W: number
@@ -258,6 +266,8 @@ export type SimChartGeometry = {
   secondaryBasis: 'total' | 'liquid' | null
   allPath: string | null
   scenarioPaths: ScenarioPathGeometry[]
+  /** Vlakken tussen de hoofdlijn en de wat-als-lijn (ADR 0170, 20 sep 2026). */
+  scenarioDiffVlakken: DiffVlakGeometry[]
   householdPaths: HouseholdPathGeometry[]
   mcPaths: MonteCarloPathGeometry | null
   targetLine: TargetLineGeometry | null
@@ -790,6 +800,26 @@ export function buildSimChartGeometry(input: SimChartGeometryInput): SimChartGeo
     return { ...base, fireDot, variant: 'scenario' as const }
   })
 
+  /**
+   * VERSCHILVLAK tussen de hoofdlijn en de wat-als-lijn: groen waar de wat-als hoger ligt,
+   * rood waar hij lager ligt. Beide reeksen dragen dezelfde grootheid (`allPts` volgt
+   * `effectivePrimaryBasis`, de overlay komt uit dezelfde keuze), dus er wordt hier geen
+   * grondslag gemengd. Alleen voor de LIVE wat-als-lijn — opgeslagen ghost-scenario's krijgen
+   * geen vlak, anders wordt de grafiek een lappendeken.
+   *
+   * De drempel is een half procent van de y-span: twee lijnen die praktisch samenvallen
+   * leveren dan geen haarfijne sliver op die als kleurvlek leest.
+   */
+  const scenarioDiffVlakken: DiffVlakGeometry[] = (() => {
+    const watAls = (scenarioOverlays ?? []).find((o) => o.variant === 'scenario')
+    if (!watAls || allPts.length < 2 || watAls.points.length < 2) return []
+    const drempel = ySpan > 0 ? ySpan * 0.005 : 0
+    return buildDiffVlakken(allPts, watAls.points, drempel).map((vlak) => ({
+      kant: vlak.kant,
+      d: `${pointsToPath(vlak.punten as [number, number][])} Z`,
+    }))
+  })()
+
   // Household-partner-overlay-paden + FIRE-stip. De stip valt op de fractionele
   // leeftijd (geïnterpoleerde y), net als de hoofdlijn.
   const householdPaths: HouseholdPathGeometry[] = (householdOverlays ?? []).map(overlay => {
@@ -883,6 +913,7 @@ export function buildSimChartGeometry(input: SimChartGeometryInput): SimChartGeo
     secondaryBasis,
     allPath,
     scenarioPaths,
+    scenarioDiffVlakken,
     householdPaths,
     mcPaths,
     targetLine,

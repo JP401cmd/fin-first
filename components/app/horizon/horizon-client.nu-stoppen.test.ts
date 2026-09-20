@@ -106,10 +106,15 @@ describe('planningMode blijft tweewaardig en volgt het anker (D6/B11)', () => {
 })
 
 describe('de stopkeuze (vrijheidsas)', () => {
-  it('de stop-slider is alleen onder het nu-anker verborgen; onder aow/age is hij verkenning', () => {
+  it('de stop-knop is alleen onder het nu-anker verborgen; onder aow/age is hij verkenning', () => {
+    // ADR 0170 — de zichtbaarheid van een knop is dát hij in `labKnopBereik` staat; de host
+    // laat de stop-knop weg onder het nu-anker (het plan rekent daar met vandaag).
     const src = bron()
-    expect(src).toContain('stopKeuzeVerborgen={isNuStoppenMode}')
-    expect(src).toContain('ankerVast={isFixedAnchorMode}')
+    const start = src.indexOf('const labKnopBereik = useMemo')
+    expect(start).toBeGreaterThan(-1)
+    const blok = src.slice(start, src.indexOf('}, [', start))
+    expect(blok).toContain("planAnchor.kind !== 'now'")
+    expect(blok).toContain('out.stop = {')
   })
 
   /**
@@ -126,7 +131,9 @@ describe('de stopkeuze (vrijheidsas)', () => {
    */
   it('de as verwijst naar de strategie-modal én schrijft het plan alleen volledig (plan-draft)', () => {
     const src = bron()
-    expect(src).toContain("onKeuzesOpenen={() => setActiveModal('strategie')}")
+    // ADR 0170 — de verwijzing staat in het stop-slot onder de stop-knop.
+    expect(src).toContain("onClick={() => setActiveModal('strategie')}")
+    expect(src).toContain('Je plan-keuzes')
     expect(src, 'de CTA schrijft via de plan-draft-helper, niet met een eigen body').toContain(
       'planDraftToFireSettingsBody(',
     )

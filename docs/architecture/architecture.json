@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-09-19T14:18:00.491Z",
-  "generatedDate": "2026-09-19",
+  "generatedAt": "2026-09-20T09:25:43.067Z",
+  "generatedDate": "2026-09-20",
   "repo": {
     "name": "fin",
-    "version": "0.90.0"
+    "version": "0.91.0"
   },
   "annotations": {
     "philosophy": "Geld is opgeslagen tijd — elke euro vertegenwoordigt een stukje levenstijd.",
@@ -195,7 +195,7 @@
     "tables": 102,
     "migrations": 257,
     "integrations": 25,
-    "components": 1146,
+    "components": 1150,
     "providers": 19,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -9159,11 +9159,11 @@
     }
   ],
   "components": {
-    "total": 1146,
+    "total": 1150,
     "groups": [
       {
         "group": "app",
-        "count": 464,
+        "count": 465,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -9305,8 +9305,6 @@
           "deeltijdwerk-impact",
           "deficit-notice-provider",
           "deficit-notice-provider.test",
-          "dekkingsbalk",
-          "dekkingsbalk.test",
           "dekkingsradar",
           "dekkingsradar.test",
           "density-toggle",
@@ -9407,6 +9405,13 @@
           "kassabon-shell",
           "koopkracht-erosie",
           "koopkracht-erosie-onttrekken",
+          "lab-knoppen",
+          "lab-knoppen.test",
+          "lab-opslaan-balk",
+          "lab-opslaan-balk.test",
+          "lab-slider",
+          "lab-slider.test",
+          "lab-wijzer",
           "levensinkomen-strook",
           "lever-compass",
           "lever-compass.deeplinks.test",
@@ -9613,8 +9618,6 @@
           "vragenlijst-uitnodiging.test",
           "vragenlijst-view",
           "vragenlijst-view.test",
-          "vrijheidsas",
-          "vrijheidsas.test",
           "vrijheidstijd-voetnoot",
           "vrijheidstijd-voetnoot.test",
           "waardestromen-editor",
@@ -9625,8 +9628,6 @@
           "web-vitals-trend",
           "welcome-guide-provider",
           "whatif-market-assumptions",
-          "whatif-sliders",
-          "whatif-sliders.test",
           "withdrawal-modal",
           "zoomable-chart-container"
         ]
@@ -10032,7 +10033,7 @@
       },
       {
         "group": "core",
-        "count": 82,
+        "count": 83,
         "items": [
           "account-source-icon",
           "account-source-icon.test",
@@ -10046,6 +10047,7 @@
           "asset-form-iban.test",
           "asset-return-modal",
           "assets-client",
+          "assets-client.rendement-leeg.test",
           "box3-comparison",
           "card-kpi-strip",
           "card-tint-overlay",
@@ -10263,7 +10265,7 @@
       },
       {
         "group": "editorial",
-        "count": 19,
+        "count": 21,
         "items": [
           "aanname-hint",
           "button",
@@ -10279,6 +10281,8 @@
           "page-info-button",
           "page-info-button.test",
           "page-opening",
+          "page-verdict-opening",
+          "page-verdict-opening.test",
           "progress-milestones",
           "subtotal-line",
           "subtotal-line.test",
@@ -18490,6 +18494,19 @@
       ],
       "summary": "Het transactie-jaarinkomen (`transactionAnnualIncome`, lib/budget-realized.ts) voedt bij `retirement_expense_method = 'current_income'` de pensioenuitgave en daarmee het FIRE-doel. Tot 19 sep 2026 kende die helper een `includeTransfers`-optie: de horizon-FIRE-som (SSR-loader van ",
       "file": "docs/adr/0169-een-inkomensgrondslag-voor-alle-paden.md"
+    },
+    {
+      "id": "0170-vijf-knoppen-met-een-driekleurige-schaal",
+      "title": "Het doelscenario is vijf knoppen met een driekleurige schaal: de grens staat op de knop, niet in een antwoordregel",
+      "status": "aanvaard",
+      "date": "2026-09-19",
+      "elements": [
+        "as-planning",
+        "fn-toekomstplannen",
+        "sp-plannen"
+      ],
+      "summary": "Het doelscenario-lab onder de grafiek op /toekomst (katern II \"Verken je aannames\") is in vijf rondes gegroeid: ADR 0129 (stop-anker × eind-vorm), ADR 0144 (het lab is de énige wat-als-verkenning), ADR 0145 + D12 (dekking en eindvermogen als uitkomst onder een vast anker), de spe",
+      "file": "docs/adr/0170-vijf-knoppen-met-een-driekleurige-schaal.md"
     }
   ],
   "churn": {
@@ -18497,15 +18514,15 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 76
+        "commits": 77
       },
       {
         "path": "lib/ai",
-        "commits": 58
+        "commits": 59
       },
       {
         "path": "app/(app)/toekomst",
-        "commits": 32
+        "commits": 33
       },
       {
         "path": "app/api/ai",
@@ -18539,28 +18556,28 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 11015,
+        "loc": 10988,
         "commits": 99
       },
       {
         "file": "components/app/budgets-client.tsx",
-        "loc": 5675,
-        "commits": 34
+        "loc": 5699,
+        "commits": 35
       },
       {
         "file": "components/core/assets-client.tsx",
-        "loc": 4837,
-        "commits": 40
+        "loc": 4865,
+        "commits": 42
       },
       {
         "file": "components/app/cash-account-view.tsx",
-        "loc": 3730,
-        "commits": 21
+        "loc": 3777,
+        "commits": 22
       },
       {
         "file": "lib/release-notes.ts",
-        "loc": 3183,
-        "commits": 2
+        "loc": 3264,
+        "commits": 3
       },
       {
         "file": "lib/dashboard-data-loader.ts",
@@ -20213,7 +20230,14 @@
     {
       "date": "2026-09-19",
       "api": 327,
-      "components": 1146,
+      "components": 1149,
+      "tables": 102,
+      "routesProduction": 90
+    },
+    {
+      "date": "2026-09-20",
+      "api": 327,
+      "components": 1150,
       "tables": 102,
       "routesProduction": 90
     }

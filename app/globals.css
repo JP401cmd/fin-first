@@ -1545,6 +1545,37 @@ body.sleepmodus-dragging * {
   border: none;
   border-radius: 1px;
 }
+/* ADR 0170 — de WIJZER-variant: het range-element ligt onzichtbaar over de meter en draagt
+   alleen de bediening (muis/touch/toetsenbord) en de toegankelijkheid. De tekening is de SVG
+   eronder; zichtbare duim en track zouden die dubbelen. De focus-ring blijft wél staan —
+   toetsenbordgebruik moet zichtbaar zijn. */
+.slider-module.slider-onzichtbaar::-webkit-slider-runnable-track {
+  background: transparent;
+}
+.slider-module.slider-onzichtbaar::-moz-range-track {
+  background: transparent;
+}
+.slider-module.slider-onzichtbaar::-webkit-slider-thumb {
+  opacity: 0;
+}
+.slider-module.slider-onzichtbaar::-moz-range-thumb {
+  opacity: 0;
+}
+.slider-module.slider-onzichtbaar:focus-visible {
+  /* De zichtbare ring staat op de meter-container (`has-[:focus-visible]`): dit element is
+     het onzichtbare sleepvlak van 44 px en zou een kader dwars over de aflezing tekenen. */
+  outline: none;
+}
+
+/* ADR 0170 — de knoppen van het doelscenario tekenen hun eigen driekleurige as ÓNDER het
+   range-element. De inkt-track zou daar als zwarte streep dwars door rood/oranje/groen
+   lopen; deze variant laat 'm weg en houdt alleen de duim. */
+.slider-module.slider-op-band::-webkit-slider-runnable-track {
+  background: transparent;
+}
+.slider-module.slider-op-band::-moz-range-track {
+  background: transparent;
+}
 .slider-module::-moz-range-track {
   height: 2px;
   background: var(--ink);

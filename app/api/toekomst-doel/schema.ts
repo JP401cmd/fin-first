@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { DoelParameter } from '@/lib/horizon/toekomst-scenario'
+import { DOELWAARDE_BEDRAG_MAX, type DoelParameter } from '@/lib/horizon/toekomst-scenario'
 
 /**
  * Schrijfpoort-schema voor `PUT /api/toekomst-doel` (ADR 0044 — zod op mutatie-routes).
@@ -49,8 +49,11 @@ const doelwaarde = z
   .nullish()
   .transform((v) => v ?? undefined)
 
-/** Bovengrens voor het eindvermogen-doelbedrag (€ 10 mld, nominaal) — eindreview M9. */
-export const EINDVERMOGEN_DOELWAARDE_MAX = 1e10
+/**
+ * Bovengrens voor het eindvermogen-doelbedrag (€ 10 mld, nominaal) — eindreview M9. Één waarde
+ * met de pref-clamp op de knop "Nalatenschap" (ADR 0170), die hetzelfde bedrag begrenst.
+ */
+export const EINDVERMOGEN_DOELWAARDE_MAX = DOELWAARDE_BEDRAG_MAX
 
 const DoelwaardenSchema = z.object({
   spaarquotePct: doelwaarde,

@@ -80,7 +80,7 @@ export const TOEK_FLOW: UatFlow = {
     { id: 'sliders', scenarioId: 'UAT-TOEK-10', label: 'WF-TOEK-10 · Wat-als-sliders inline ("Verken je aannames", enige wat-als-ervaring sinds ADR 0144)', kind: 'action', stage: 3, lane: 'simuleren' },
     { id: 'aowbeslis', label: 'Shortfall — FIRE pas ná AOW?', kind: 'decision', stage: 3, lane: 'simuleren' },
     { id: 'aowstop', scenarioId: 'UAT-TOEK-11', label: 'WF-TOEK-11 · AOW-stop-simulatie (doorwerken)', kind: 'action', stage: 3, lane: 'simuleren', subOf: 'aowbeslis' },
-    // TPR-09 — de verkende stopleeftijd op de vrijheidsas tot plan maken (schrijft het volledige plan).
+    // TPR-09 — de verkende stopleeftijd van de stop-knop tot plan maken (schrijft het volledige plan).
     { id: 'maakplan', scenarioId: 'UAT-TOEK-46', label: 'WF-TOEK-46 · Verkenning tot plan maken ("Maak dit mijn plan")', kind: 'action', stage: 3, lane: 'simuleren', subOf: 'sliders' },
     // TPR-04 — geen actief AOW-event: de €0 AOW benoemd, minimaliseerbaar naar een statuspunt.
     { id: 'aowmelding', scenarioId: 'UAT-TOEK-45', label: 'WF-TOEK-45 · Melding "Geen AOW op je tijdas" (minimaliseren/heropenen)', kind: 'screen', stage: 2, lane: 'aflezen' },
@@ -130,6 +130,7 @@ export const TOEK_FLOW: UatFlow = {
     // plan_coverage) die vanuit het lab (`sliders`, WF-TOEK-10) vastgelegd kan
     // worden — vandaar de cross-lane edge vanuit `sliders` hieronder.
     { id: 'labuitkomst', scenarioId: 'UAT-TOEK-49', label: 'WF-TOEK-49 · Lab volgt het anker: dekking als uitkomst onder een vast stopmoment', kind: 'action', stage: 4, lane: 'doelen', subOf: 'doelen' },
+    { id: 'labknoppen', scenarioId: 'UAT-TOEK-58', label: 'WF-TOEK-58 · Vijf knoppen met een driekleurige schaal; de grens staat op de knop', kind: 'action', stage: 4, lane: 'doelen', subOf: 'doelen' },
     { id: 'doelenmelding', scenarioId: 'UAT-TOEK-50', label: 'WF-TOEK-50 · Doelen volgen het plan: melding bij lab-doelen buiten het plan', kind: 'screen', stage: 4, lane: 'doelen', subOf: 'doelen' },
 
     { id: 'pillenrij', scenarioId: 'UAT-TOEK-41', label: 'WF-TOEK-41 · Pillenrij-invariant (label + badge samen) & het md-breekpunt van de cijferstrip', kind: 'screen', stage: 2, lane: 'aflezen', subOf: 'grafiek' },

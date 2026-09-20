@@ -80,9 +80,13 @@ describe('KATERN II blijft bereikbaar na "Doel loslaten" (B-031)', () => {
     // ADR 0145 — de promotie-gate woont sinds de lab-uitkomst in ÉÉN pure helper. De
     // B-031-eis (sliders ÓF een kale stopkeuze) staat daar in de `solved`-tak; de
     // component leest de gate uitsluitend via `doelVastleggenMogelijk`.
-    const code = codeRegels().join('\n')
-    const knopBlok = code.slice(code.indexOf('Maak dit mijn doel') - 700, code.indexOf('Maak dit mijn doel'))
-    expect(knopBlok).toContain('doelVastleggenMogelijk')
+    // ADR 0170 — het knoplabel woont in `LAB_COPY`; de host geeft de gate aan de balk mee.
+    const src = bron()
+    expect(src).toContain('vastleggenMogelijk={doelVastleggenMogelijk}')
+    expect(src).toContain('bijwerkenMogelijk={doelBijwerkenMogelijk}')
+    const gateStart = src.indexOf('const labOpslaanToestand')
+    expect(gateStart).toBeGreaterThan(-1)
+    expect(src.slice(gateStart, gateStart + 600)).toContain('hasScenario || hasStopKeuze')
 
     const { resolveLabUitkomst } = await import('@/lib/horizon/lab-uitkomst')
     const basis = { fireAgeFractional: 58 } as unknown as Parameters<typeof resolveLabUitkomst>[0]['basis']

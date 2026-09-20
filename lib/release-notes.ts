@@ -96,6 +96,87 @@ export const RELEASE_NOTE_NORM = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.91.0',
+    date: '2026-09-20',
+    title: 'Elke pagina zegt meteen hoe je ervoor staat',
+    sections: [
+      {
+        module: 'Je plan',
+        color: 'purple',
+        items: [
+          {
+            title: 'Vijf knoppen met een kleurenschaal',
+            description:
+              'Elke knop kleurt rood, oranje of groen, zodat je op de knop zelf ziet waar je plan het houdt. Draai aan één knop en de grenzen op de andere schuiven mee.',
+          },
+          {
+            title: 'Minder uitgeven staat in euro per maand',
+            description:
+              'Die knop vroeg eerder om een percentage. Nu vul je een bedrag in, net als bij meer verdienen; je spaarquote staat eronder.',
+          },
+          {
+            title: 'De losse antwoordregels zijn weg',
+            description:
+              'De kleur op de knop vertelt hetzelfde. Eén blok in plaats van twee genummerde stappen.',
+          },
+          {
+            title: 'De titel zegt of je plan je stopmoment dekt',
+            description: 'Boven je tijdas staat meteen hoeveel procent van je plan gedekt is.',
+          },
+        ],
+      },
+      {
+        module: 'Budget',
+        color: 'purple',
+        items: [
+          {
+            title: 'De titel zegt hoe je maand loopt',
+            description:
+              'In plaats van een vraag staat er een oordeel: op koers, krap of een tekort. Is je inkomen nog niet binnen, dan meldt hij dát.',
+          },
+          {
+            title: 'Transacties opent op de maand',
+            description:
+              'Je zag standaard dertig dagen terwijl het oordeel over de kalendermaand ging. Dertig dagen blijft kiesbaar.',
+          },
+        ],
+      },
+      {
+        module: 'Bezittingen',
+        color: 'amber',
+        items: [
+          {
+            title: 'De titel zegt hoe je gespreid staat',
+            description:
+              'Goed gespreid, beperkt gespreid of sterk geconcentreerd — je ziet het bovenaan, niet meer alleen in een stipje.',
+          },
+        ],
+      },
+      {
+        module: 'Schulden',
+        color: 'teal',
+        items: [
+          {
+            title: 'De titel zegt waar je schulden staan',
+            description:
+              'Aflossing op schema, aandacht of een hoge schuldenlast. En aflossen levert je tijd op; dat zeggen we nu ook zo.',
+          },
+        ],
+      },
+      {
+        module: 'Platform',
+        color: 'zinc',
+        items: [
+          {
+            title: 'Kortere uitleg onder elke titel',
+            description:
+              'Waren twee lange zinnen, nu twee korte: wat je ziet en wat het oordeel betekent. De rest staat in het vraagteken rechtsboven.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: '0.90.0',
     date: '2026-09-19',
     title: 'Dezelfde cijfers overal, en een kortere start',

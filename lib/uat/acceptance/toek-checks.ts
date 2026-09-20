@@ -47,7 +47,7 @@
  *   - `lib/horizon/lab-uitkomst.ts` + `lib/horizon/toekomst-doel.ts` — pure
  *                                uitkomst-switch + parameter-doel-bouwer (WF-TOEK-49,
  *                                ADR 0145); geen `'use client'`/Supabase/kernel-run.
- *   - `lib/horizon/lab-antwoorden.ts` — pure antwoordenblok (WF-TOEK-49, spec
+ *   - `lib/horizon/lab-grenzen.ts` — de twee grenzen per knop (WF-TOEK-49, ADR 0170; de
  *                                lab-haalbaarheid §3, 15 sep 2026); importeert alleen
  *                                lib/scenario-events + lib/horizon/anker-copy.
  *   - `lib/goals/lab-doelen-buiten-plan.ts` — pure filter (WF-TOEK-50, spec
@@ -101,9 +101,8 @@ import {
 import type { SimResult } from '@/lib/fire-simulation'
 import { resolveLabUitkomst, type LabEindvermogen, type LabUitkomst } from '@/lib/horizon/lab-uitkomst'
 import { buildParameterGoalRows } from '@/lib/horizon/toekomst-doel'
-import { resolveLabAntwoorden } from '@/lib/horizon/lab-antwoorden'
 import { selectLabDoelenBuitenPlan } from '@/lib/goals/lab-doelen-buiten-plan'
-import { doelenPlanGewijzigdMelding, haalbaarBijUitgaveRegel, antwoordUitgaveNaPensioen } from '@/lib/horizon/anker-copy'
+import { doelenPlanGewijzigdMelding, haalbaarBijUitgaveRegel } from '@/lib/horizon/anker-copy'
 import { HAALBARE_UITGAVE_DREMPEL, type HaalbareUitgave } from '@/lib/horizon/haalbare-uitgave'
 import { UITGAVE_NA_PENSIOEN_STAP } from '@/lib/scenario-events'
 import { buildDeficitLoanCopy } from '@/lib/horizon/deficit-loan-copy'
@@ -700,26 +699,16 @@ export const TOEK_ENGINE_CHECKS: ToekEngineCheck[] = [
         },
       }).rows[0]
 
-      // Antwoordenblok op toestand (2): tweede run solvedFireAge 70, planMaandHint €500 op
-      // een basis van €4.000/mnd (aowTekortMetScenario.kind is 'dekking' — de fixture
-      // draagt al vastStopLeeftijd:67, dus `.stop` is `{kind:'aow', stopAge:67}`, geen
-      // gok nodig vóór de spread).
-      const antwoorden = resolveLabAntwoorden({
-        dekking: aowTekortMetScenario.kind === 'dekking' ? aowTekortMetScenario : null,
-        solvedFireAge: 70,
-        // De plan-hint (P!B96 van de hoofd-run) — niet labDekking.maandHint (eindreview I1).
-        planMaandHint: 500,
-        baseline: { monthlyIncome: 4000, workDaysPerWeek: 5, savingsRate: 20, expectedReturn: 6, extraContribution: 0 },
-      })
-      const antwoordKinds = antwoorden.map((a) => a.kind).join(',')
-      const doorwerkenTot = antwoorden[0]?.actie.kind === 'stop' ? antwoorden[0].actie.stopAge : null
-      const extraActie = antwoorden[1]?.actie.kind === 'slider' ? `slider:${antwoorden[1].actie.key}:${antwoorden[1].actie.value}` : null
+      // ADR 0170 — het antwoordenblok ("doorwerken tot X", "€ X extra opzij") verviel: de
+      // grens staat nu op de knop zelf, uit `computeLabGrenzen`. Wat hier getoetst blijft is de
+      // uitkomst-switch + de promotie-gate; de grenzen zelf hebben hun eigen kernel-test
+      // (`lib/horizon/lab-grenzen.kernel.test.ts`).
 
       return {
         expected:
-          'solved=vrijheidsleeftijd:vrijheidsleeftijd; aowTekortMetScenario=dekking:dekking; aowTekortZonderScenario=dekking:geen/geen-verkenning; aowGedekt=dekking:eindvermogen; aowGedektEindvermogen=100000→180000; aowGedektScenarioTekort=dekking:dekking; aowGedektScenarioTekortEindvermogen=100000→op; nu=dekking:geen/nu-anker; dekkingGoalType=plan_coverage; dekkingNaam=Plan gedekt tot 90 jaar; dekkingTarget=100; eindvermogenGoalType=end_balance; eindvermogenNaam=Eindvermogen op je 90e; eindvermogenTarget=180000; antwoorden=doorwerken,extra_opzij,minder_uitgeven; doorwerkenTot=70; extraOpzijActie=slider:extra_inleg:500',
+          'solved=vrijheidsleeftijd:vrijheidsleeftijd; aowTekortMetScenario=dekking:dekking; aowTekortZonderScenario=dekking:geen/geen-verkenning; aowGedekt=dekking:eindvermogen; aowGedektEindvermogen=100000→180000; aowGedektScenarioTekort=dekking:dekking; aowGedektScenarioTekortEindvermogen=100000→op; nu=dekking:geen/nu-anker; dekkingGoalType=plan_coverage; dekkingNaam=Plan gedekt tot 90 jaar; dekkingTarget=100; eindvermogenGoalType=end_balance; eindvermogenNaam=Eindvermogen op je 90e; eindvermogenTarget=180000',
         actual:
-          `solved=${solved.kind}:${promotieLabel(solved)}; aowTekortMetScenario=${aowTekortMetScenario.kind}:${promotieLabel(aowTekortMetScenario)}; aowTekortZonderScenario=${aowTekortZonderScenario.kind}:${promotieLabel(aowTekortZonderScenario)}; aowGedekt=${aowGedekt.kind}:${promotieLabel(aowGedekt)}; aowGedektEindvermogen=${evLabel(aowGedektDekking?.basisEindvermogen)}→${evLabel(aowGedektDekking?.scenarioEindvermogen)}; aowGedektScenarioTekort=${aowGedektScenarioTekort.kind}:${promotieLabel(aowGedektScenarioTekort)}; aowGedektScenarioTekortEindvermogen=${evLabel(aowGedektScenarioTekortDekking?.basisEindvermogen)}→${evLabel(aowGedektScenarioTekortDekking?.scenarioEindvermogen)}; nu=${nu.kind}:${promotieLabel(nu)}; dekkingGoalType=${dekkingRow?.goal_type}; dekkingNaam=${dekkingRow?.name}; dekkingTarget=${dekkingRow?.target_value}; eindvermogenGoalType=${eindvermogenRow?.goal_type}; eindvermogenNaam=${eindvermogenRow?.name}; eindvermogenTarget=${eindvermogenRow?.target_value}; antwoorden=${antwoordKinds}; doorwerkenTot=${doorwerkenTot}; extraOpzijActie=${extraActie}`,
+          `solved=${solved.kind}:${promotieLabel(solved)}; aowTekortMetScenario=${aowTekortMetScenario.kind}:${promotieLabel(aowTekortMetScenario)}; aowTekortZonderScenario=${aowTekortZonderScenario.kind}:${promotieLabel(aowTekortZonderScenario)}; aowGedekt=${aowGedekt.kind}:${promotieLabel(aowGedekt)}; aowGedektEindvermogen=${evLabel(aowGedektDekking?.basisEindvermogen)}→${evLabel(aowGedektDekking?.scenarioEindvermogen)}; aowGedektScenarioTekort=${aowGedektScenarioTekort.kind}:${promotieLabel(aowGedektScenarioTekort)}; aowGedektScenarioTekortEindvermogen=${evLabel(aowGedektScenarioTekortDekking?.basisEindvermogen)}→${evLabel(aowGedektScenarioTekortDekking?.scenarioEindvermogen)}; nu=${nu.kind}:${promotieLabel(nu)}; dekkingGoalType=${dekkingRow?.goal_type}; dekkingNaam=${dekkingRow?.name}; dekkingTarget=${dekkingRow?.target_value}; eindvermogenGoalType=${eindvermogenRow?.goal_type}; eindvermogenNaam=${eindvermogenRow?.name}; eindvermogenTarget=${eindvermogenRow?.target_value}`,
       }
     },
   },
@@ -826,29 +815,21 @@ export const TOEK_ENGINE_CHECKS: ToekEngineCheck[] = [
       const regelMinder = haalbaarBijUitgaveRegel(minder)
       const regelMeer = haalbaarBijUitgaveRegel(meer)
       const regelGelijk = haalbaarBijUitgaveRegel(gelijk)
-      const antwoordMinder = antwoordUitgaveNaPensioen(minder.perJaar)
 
       // Klassekeuze — spiegelt exact de regel in horizon-client.tsx: richting bepaalt
       // de semantische kleurtoken, nooit het accent van de gebruiker (CLAUDE.md).
       const klasse = (h: HaalbareUitgave): string =>
         h.richting === 'minder' ? 'text-negative' : h.richting === 'meer' ? 'text-positive' : 'geen-regel'
 
-      // Antwoord 4 klemt nooit (ADR 0160 besluit 4): bovenBereik is altijd false, ook
-      // wanneer het bedrag buiten een fictief sliderbereik zou vallen.
-      const antwoorden = resolveLabAntwoorden({
-        dekking: null,
-        solvedFireAge: null,
-        planMaandHint: null,
-        baseline: null,
-        haalbareUitgave: minder,
-      })
-      const uitgaveAntwoord = antwoorden.find((a) => a.kind === 'uitgave_na_pensioen')
+      // ADR 0170 — de antwoordregel onder de knop verviel; de knop draagt zijn grens nu zelf
+      // (`computeLabGrenzen`). De duidingsregel in de KPI-tegel "Na pensioen" blijft, en dat is
+      // wat deze check nog bewaakt.
 
       return {
         expected:
-          'drempel=250; sliderstap=600; regelMinder=haalbaar tot 90 bij uitgave: € 31.200; klasseMinder=text-negative; regelMeer=haalbaar tot 90 bij uitgave: € 54.000; klasseMeer=text-positive; regelGelijk=null; antwoordMinder=Zo\'n € 31.200 per jaar uitgeven hoort bij een gedekt plan.; antwoordBovenBereikMinder=false',
+          'drempel=250; sliderstap=600; regelMinder=haalbaar tot 90 bij uitgave: € 31.200; klasseMinder=text-negative; regelMeer=haalbaar tot 90 bij uitgave: € 54.000; klasseMeer=text-positive; regelGelijk=null',
         actual:
-          `drempel=${HAALBARE_UITGAVE_DREMPEL}; sliderstap=${UITGAVE_NA_PENSIOEN_STAP}; regelMinder=${regelMinder}; klasseMinder=${klasse(minder)}; regelMeer=${regelMeer}; klasseMeer=${klasse(meer)}; regelGelijk=${regelGelijk}; antwoordMinder=${antwoordMinder}; antwoordBovenBereikMinder=${uitgaveAntwoord?.bovenBereik}`,
+          `drempel=${HAALBARE_UITGAVE_DREMPEL}; sliderstap=${UITGAVE_NA_PENSIOEN_STAP}; regelMinder=${regelMinder}; klasseMinder=${klasse(minder)}; regelMeer=${regelMeer}; klasseMeer=${klasse(meer)}; regelGelijk=${regelGelijk}`,
       }
     },
   },

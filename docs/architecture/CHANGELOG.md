@@ -1134,3 +1134,11 @@
 ## 2026-09-19
 
 - **Componenten (aantal)** toegevoegd: +1
+
+## 2026-09-19
+
+- **Componenten (aantal)** toegevoegd: +3
+
+## 2026-09-20
+
+- **Componenten (aantal)** toegevoegd: +1

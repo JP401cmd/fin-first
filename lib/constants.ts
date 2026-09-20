@@ -492,6 +492,18 @@ export const WEERBAARHEID_DISPLAY_MAX = 99
  */
 export const HORIZON_PLAFOND_LEEFTIJD: number = KERNEL_MAX_AGE
 
+/**
+ * De marge van de driekleurige lab-schaal (ADR 0170 B3) — de grens oranje → groen.
+ *
+ * Onder een VAST stopmoment moet het plan óók reiken tot
+ * `eind + LAB_RUIM_MARGE × (eind − planStop)` (bij stop 62 en eind 90 dus tot ~93);
+ * onder `solved` mag de vrijheidsleeftijd hooguit `LAB_RUIM_MARGE × (vrij − nu)` vóór de
+ * gekozen stopleeftijd liggen. De span hangt aan het PLAN, niet aan de stand van de
+ * stop-knop. Eén bron voor de rekenlaag (`lib/horizon/lab-grenzen.ts`); de kopij
+ * "minder dan 10% marge" (`LAB_COPY.schaalOranje`) beschrijft dezelfde aanname.
+ */
+export const LAB_RUIM_MARGE = 0.1
+
 // ── Volgende Stap — signaaldrempels (nudge) ─────────────────────
 //
 // Drempels waarboven/waaronder de Volgende Stap-motor een groei-stap voorstelt.

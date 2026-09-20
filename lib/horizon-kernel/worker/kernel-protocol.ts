@@ -17,11 +17,15 @@
  *
  * ## Serialisatie
  * Alle request-payloads (`rawContext`, `ForcedStopPathInput`, `ScenarioPresetContext`,
- * `FinancialInput` + MC-parameters) en alle responses (`ConvergentieProjectionOutcome`,
- * `ForcedStopPathResult`, `ScenarioPresetResult[]`, `MonteCarloResult`) zijn plain-
- * serializable (getallen/strings/plain objects/arrays/null) → structured-clone-veilig
- * over de `postMessage`-grens. De worker-parity-test bewijst dit met een
- * `structuredClone`-round-trip.
+ * `LabGrenzenContext`, `FinancialInput` + MC-parameters) en alle responses
+ * (`ConvergentieProjectionOutcome`, `ForcedStopPathResult`, `ScenarioPresetResult[]`,
+ * `LabGrenzenResultaat`, `MonteCarloResult`) zijn plain-serializable (getallen/strings/
+ * plain objects/arrays/null) → structured-clone-veilig over de `postMessage`-grens. De
+ * worker-parity-test bewijst dit met een `structuredClone`-round-trip. `LabGrenzenContext`
+ * (ADR 0170) draagt bewust alleen plain data — de profielrij mét ADR 0103-injectie, assets
+ * mét marktbias-delta, DB-gebeurtenissen zónder slider-events, de vijf standen en de
+ * bereiken — zodat de engine de slider-events zélf bouwt en er niets niet-kloonbaars mee
+ * de worker in hoeft.
  */
 
 import {
@@ -50,6 +54,8 @@ import {
   type VariantenSweepResultaat,
   type VariantenSweepSnapshot,
 } from '@/lib/tax-lifetime/varianten-sweep'
+import { computeLabGrenzen } from '@/lib/horizon/lab-grenzen'
+import type { LabGrenzenContext, LabGrenzenResultaat } from '@/lib/horizon/lab-grenzen-types'
 
 /**
  * Eén reken-verzoek aan de kernel-worker. `id` multiplext parallelle runs
@@ -69,6 +75,12 @@ export type KernelWorkerRequest =
    * de `postMessage`-grens — niet 3 × ~50 vette `UnifiedProjectionRow`s.
    */
   | { readonly id: number; readonly kind: 'taxvarianten'; readonly snapshot: VariantenSweepSnapshot }
+  /**
+   * De grenzen-batch van het doelscenario-lab (ADR 0170): per zichtbare knop de
+   * gedekt- en ruim-grens plus het oordeel over de huidige stand — ~90 geankerde
+   * kernel-runs in één oversteek, op de eigen rijstrook `'grenzen'`.
+   */
+  | { readonly id: number; readonly kind: 'grenzen'; readonly ctx: LabGrenzenContext }
   | {
       readonly id: number
       readonly kind: 'mc'
@@ -100,6 +112,7 @@ export type KernelWorkerResponse =
   | { readonly id: number; readonly ok: true; readonly kind: 'stoppad'; readonly result: ForcedStopPathResult | null }
   | { readonly id: number; readonly ok: true; readonly kind: 'presets'; readonly result: ScenarioPresetBatch }
   | { readonly id: number; readonly ok: true; readonly kind: 'taxvarianten'; readonly result: VariantenSweepResultaat }
+  | { readonly id: number; readonly ok: true; readonly kind: 'grenzen'; readonly result: LabGrenzenResultaat }
   | { readonly id: number; readonly ok: true; readonly kind: 'mc'; readonly result: MonteCarloResult }
   | { readonly id: number; readonly ok: true; readonly kind: 'marktcheck'; readonly result: MarktcheckOutcome }
   | { readonly id: number; readonly ok: false; readonly error: string }
@@ -135,6 +148,10 @@ export function executeKernelRequest(req: KernelWorkerRequest): KernelWorkerResp
           kind: 'taxvarianten',
           result: runVariantenSweep(req.snapshot),
         }
+      case 'grenzen':
+        // ADR 0170 — de vijf knoppen × twee predicaten in ÉÉN oversteek; kern-fouten
+        // per knop vangt `computeLabGrenzen` zelf af (die knop wordt `null`).
+        return { id: req.id, ok: true, kind: 'grenzen', result: computeLabGrenzen(req.ctx) }
       case 'mc':
         return {
           id: req.id,

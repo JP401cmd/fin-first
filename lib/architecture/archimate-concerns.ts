@@ -79,15 +79,6 @@ export const ARCHI_CONCERNS: ArchiConcern[] = [
     reviewedAt: '2026-08-29',
   },
   {
-    id: 'onzekerheid-twee-grondslagen-op-toekomst',
-    title: '/toekomst doet twee onzekerheidsuitspraken op twee grondslagen',
-    detail:
-      'Sinds ADR 0117 schaalt de kernel-scenarioband (lib/horizon-kernel/wrappers/band.ts), de Monte-Carlo (wrappers/mc.ts) en de rendement-marge (rendement-marge.ts) hun verstoring PER POT met een markt-risicofactor: een obligatiepot krijgt 0,3× de uitslag van een breed gespreide aandelenpot, een premieregeling-pensioenpot beweegt voor het eerst überhaupt mee. De verwachtingsband achter "waarschijnlijk vrij tussen X en Y" doet dat NIET: die draait op SCENARIO_VARIANTS (components/app/horizon/sim-chart.tsx, delta ±0,02) via buildScenarioPathsFromSim → components/app/horizon/verwachtingsband.ts#computeVerwachtingsband, en past die ±2 procentpunt toe op `row.startPortfolio` — het AGGREGAAT netto vermogen, dus inclusief eigen woning en spaargeld. Twee gevolgen op één scherm: (1) de marktcheck-band volgt de mix en de verwachtingsband niet, dus dezelfde gebruiker krijgt twee onzekerheidsuitspraken die het oneens zijn over wie marktrisico loopt; (2) de aggregaat-benadering is de grovere van de twee — zij belast ook spaargeld en de eigen woning met een rendementsschok, wat de kernel-band (die spaargeld/woning op factor 0 zet) juist niet doet. BEWUST NIET in snede 1 opgelost: deze laag heeft per constructie geen pot-samenstelling (hij rekent op de al-geaggregeerde SimRow-reeks), dus gelijktrekken betekent hem vervangen door runScenarioBand — drie volledige FIRE-bisecties per render, waar nu een goedkope naloop op bestaande rijen staat. Dat is een prestatie-besluit én een herziening van de ADR 0085-semantiek van laatst/vroegst-FIRE, geen zijeffect van de risicofactor. Verwijder dit punt zodra de verwachtingsband op dezelfde per-pot-grondslag staat als de marktcheck, of zodra expliciet is vastgelegd dat de aggregaat-benadering daar bewust blijft.',
-    severity: 'debt',
-    elementIds: ['as-planning', 'app-comp'],
-    reviewedAt: '2026-08-29',
-  },
-  {
     id: 'budgetteren-uit-geldt-alleen-op-het-maandaggregaat',
     title: '"Budgetteren uit" wordt alleen door het maandaggregaat gehonoreerd, niet door de rauwe transactie-lezers',
     detail:

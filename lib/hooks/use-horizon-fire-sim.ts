@@ -43,15 +43,15 @@ import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
 import type { Box3Method } from '@/lib/bucket-projection'
 import { type HousingStrategyConfig } from '@/lib/housing-strategy'
-import { withResolvedKernelBedragen } from '@/lib/horizon/kernel-profile-basis'
+import { withResolvedKernelBedragen, patchNalatenschap } from '@/lib/horizon/kernel-profile-basis'
 
 /**
  * Wat-als-scenario-overrides (2e projectielijn op /toekomst, plan §A/§B). Additief en
  * volledig optioneel: afwezig/null ⇒ geen scenario-run. De scenario-run draait via exact
  * dezelfde `computeConvergentieProjection`-context als de hoofdlijn — alléén (a) de assets
  * gaan vooraf door `applyReturnDeltasToAssets(expandCategorieReturnDeltas(...))`, (b) de
- * scenario-events komen bovenop de hoofd-`lifeEvents` en (c) de uitgave na pensioen landt
- * als profielparameter. Nul overrides ⇒ identieke context ⇒ identieke uitkomst (golden:
+ * scenario-events komen bovenop de hoofd-`lifeEvents` en (c) de uitgave na pensioen én de
+ * nalatenschap landen als profielparameter. Nul overrides ⇒ identieke context ⇒ identieke uitkomst (golden:
  * `lib/horizon/scenario-baseline-parity.test.ts`).
  */
 export interface HorizonScenarioOverrides {
@@ -67,6 +67,15 @@ export interface HorizonScenarioOverrides {
    * Afwezig ⇒ het profiel bepaalt de uitgave (ongewijzigd, referentie behouden).
    */
   uitgaveNaPensioenPerJaar?: number
+  /**
+   * Nalatenschap (€) voor de verkenning — de knop "Nalatenschap" (ADR 0170). Net als de
+   * uitgave na pensioen een PROFIELPARAMETER, geen `WhatIfEvent`: de kern leest het bedrag als
+   * `eindstrategie.nalatenschapBedrag` (B53) en leidt het doelbedrag op de eindleeftijd eruit af.
+   * De patch loopt via `patchNalatenschap`, dezelfde helper die de grenzen-batch gebruikt — zo
+   * rekenen de wat-als-lijn en de driekleurige schaal op dezelfde stand.
+   * Afwezig ⇒ het plan bepaalt de nalatenschap (ongewijzigd, referentie behouden).
+   */
+  nalatenschap?: number
 }
 
 /** Resultaat van de gescheiden scenario-run — spiegelt het hoofd-pad minimaal. */
@@ -104,7 +113,8 @@ export function heeftScenarioOverrides(ov: HorizonScenarioOverrides | null): boo
   if (!ov) return false
   if ((ov.extraLifeEvents?.length ?? 0) > 0) return true
   if (ov.returnDeltaByCategorie && Object.keys(ov.returnDeltaByCategorie).length > 0) return true
-  return ov.uitgaveNaPensioenPerJaar != null && Number.isFinite(ov.uitgaveNaPensioenPerJaar)
+  if (ov.uitgaveNaPensioenPerJaar != null && Number.isFinite(ov.uitgaveNaPensioenPerJaar)) return true
+  return ov.nalatenschap != null && Number.isFinite(ov.nalatenschap)
 }
 
 /**
@@ -142,10 +152,18 @@ export function resolveScenarioContext(
   // `lib/horizon/haalbare-uitgave.ts` (`inputMet`): de kern leidt bij `custom_amount` alles
   // consistent af (incl. de nice-fractie), dus dit is de ENE plek die het bedrag vertaalt.
   const bedrag = ov?.uitgaveNaPensioenPerJaar
-  const scenarioProfile =
+  const metUitgave =
     bedrag != null && Number.isFinite(bedrag)
       ? { ...profile, retirement_expense_method: 'custom_amount', retirement_expense_custom_amount: bedrag }
       : profile
+  // (d) nalatenschap als profielparameter — via `patchNalatenschap` (ADR 0170), die ook het
+  // stop-anker en een eventuele strategie-override intact houdt. Dezelfde helper als de
+  // grenzen-batch, zodat de lijn en de driekleurige schaal op dezelfde stand rekenen.
+  const nalatenschap = ov?.nalatenschap
+  const scenarioProfile =
+    nalatenschap != null && Number.isFinite(nalatenschap)
+      ? patchNalatenschap(metUitgave, nalatenschap)
+      : metUitgave
   return { assets: scenarioAssets, lifeEvents: scenarioLifeEvents, profile: scenarioProfile }
 }
 

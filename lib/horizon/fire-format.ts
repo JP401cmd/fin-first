@@ -36,3 +36,14 @@ export function formatCountdown(days: number): string {
   if (years > 0) return `${years}j`
   return `${months}mnd`
 }
+
+/**
+ * Leeftijd als één decimaal met komma, hele getallen zonder decimaal: `45`, `58,5`, `—`.
+ * Verhuisd uit `components/app/horizon/vrijheidsas.tsx` (ADR 0170: dat component verviel met
+ * de marge-band), zodat de grafiek-as, de knoppen en de doel-teksten één formatter delen.
+ */
+export function formatAge(v: number | null): string {
+  if (v === null) return '—'
+  const rounded = Math.round(v * 10) / 10
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1).replace('.', ',')
+}

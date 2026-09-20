@@ -18,7 +18,7 @@
 /** Rijstrook-sleutels. Hoofd- en scenario-run delen `kind: 'projection'` maar
  *  zijn ANDERE stromen: elk zijn eigen strook, anders zou een scenario-run de
  *  hoofdrun verdringen. */
-export type KernelLane = 'main' | 'scenario' | 'stoppad' | 'presets'
+export type KernelLane = 'main' | 'scenario' | 'stoppad' | 'presets' | 'grenzen'
 
 /** `error`-waarde van een verdrongen (nooit gepost) verzoek. */
 export const KERNEL_SUPERSEDED = 'superseded'

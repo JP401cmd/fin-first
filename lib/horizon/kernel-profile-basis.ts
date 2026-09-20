@@ -20,6 +20,8 @@
 // daar los werd overgeschreven, kon SSR een andere FIRE-datum tonen dan de
 // client na hydratie. Eén helper, drie call-sites, geen drift.
 
+import { legacyAnchorOf, resolveFireStrategyWithOverride } from '@/lib/fire-strategy'
+
 /** De twee velden die de kernel als kasstroom-basis leest. */
 export interface KernelProfileBedragen {
   net_monthly_income?: number | null
@@ -55,4 +57,55 @@ export function withResolvedKernelBedragen<T extends KernelProfileBedragen>(
     net_monthly_income: effective.monthlyIncome,
     estimated_monthly_expenses: effective.monthlyExpenses,
   }
+}
+
+/** De velden die de nalatenschap-patch leest en schrijft (eind-vorm, bedrag, anker, override). */
+export interface KernelProfileNalatenschapVelden {
+  fire_end_strategy?: string | null
+  fire_legacy_amount?: number | string | null
+  fire_stop_anchor?: string | null
+  feature_preferences?: Record<string, unknown> | null
+}
+
+/**
+ * Zet de profielrij op eind-vorm NALATENSCHAP met dit bedrag (ADR 0170) — de knop
+ * "Nalatenschap" in het lab én de scenario-run in `use-horizon-fire-sim` delen deze ene
+ * patch, zodat de wat-als-lijn en de driekleurige schaal op dezelfde stand rekenen.
+ *
+ * WAAROM EEN HELPER EN GEEN KALE `{ fire_end_strategy: 'legacy', fire_legacy_amount }`:
+ *  (a) `feature_preferences.fire_strategy_override` (het pensioen-parkeerpad) wordt in de
+ *      adapter éérst opgelost (`resolveFireStrategyWithOverride`) en kan de kolom
+ *      overschrijven — de helper stript die override (kopie, niet muteren);
+ *  (b) een oud ankerlabel `'pensioen'`/`'nu-stoppen'` in `fire_end_strategy` — of in
+ *      die override — draagt het STOP-ANKER (ADR 0129 D2). Wie het label overschrijft,
+ *      laat het anker stil terugvallen op `fire_stop_anchor`. De helper leest het
+ *      effectieve label via dezelfde resolver als de adapter en zet dan
+ *      `fire_stop_anchor: 'aow'` resp. `'now'` mee, zodat het anker blijft staan.
+ *
+ * Idempotent: een tweede toepassing (zelfde bedrag) geeft een gelijke rij — er is dan
+ * geen legacy-label meer om te vertalen en geen override meer om te strippen.
+ */
+export function patchNalatenschap<T extends KernelProfileNalatenschapVelden>(row: T, bedrag: number): T {
+  // Het EFFECTIEVE label zoals de adapter het leest (kolom + override), zodat een via de
+  // override geparkeerd pensioen-anker niet verloren gaat.
+  const effectief = resolveFireStrategyWithOverride(row).strategy
+  const anker = legacyAnchorOf(effectief)
+  const fp = row.feature_preferences
+  const featurePreferences =
+    fp != null && Object.prototype.hasOwnProperty.call(fp, 'fire_strategy_override')
+      ? stripKey(fp, 'fire_strategy_override')
+      : fp
+  return {
+    ...row,
+    fire_end_strategy: 'legacy',
+    fire_legacy_amount: bedrag,
+    ...(anker != null ? { fire_stop_anchor: anker.kind === 'aow' ? 'aow' : 'now' } : {}),
+    ...(featurePreferences !== fp ? { feature_preferences: featurePreferences } : {}),
+  }
+}
+
+function stripKey(obj: Record<string, unknown>, key: string): Record<string, unknown> {
+  const rest: Record<string, unknown> = {}
+  for (const k of Object.keys(obj)) if (k !== key) rest[k] = obj[k]
+  return rest
 }

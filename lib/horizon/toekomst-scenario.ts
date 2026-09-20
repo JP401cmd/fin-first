@@ -8,7 +8,8 @@
  * de hoofdlijn; deze module levert enkel:
  *   - de pref-parser (`parseToekomstScenarioPrefs`) voor de server-side JSONB-pref —
  *     normaliseert v1 én v2 ALTIJD naar de v2-shape (met optioneel vastgelegd `doel`-blok);
- *   - de pure concept-detectie (`isDoelConceptGewijzigd`) voor de "je draait aan je doel"-banner;
+ *   - de pure concept-detectie (`isDoelConceptGewijzigd`) voor de opslaan-balk van het
+ *     doelscenario (ADR 0170; voorheen de "je draait aan je doel"-banner);
  *   - de categorie→asset_type rendement-delta-expansie voor `applyReturnDeltasToAssets`;
  *   - de gewogen baseline-rendementen per bezeten categorie voor de Marktbias-UI;
  *   - de som van de scenario-bestedingsdelta (dekkingsradar), met
@@ -49,9 +50,19 @@ const SLIDER_RANGES = {
 const RETURN_DELTA_MIN = -0.05
 const RETURN_DELTA_MAX = 0.05
 
-/** Vastgehouden koppel-marge-clamps (jaren t.o.v. de verwacht-FIRE). */
-const STOP_MARGE_MIN = -30
-const STOP_MARGE_MAX = 30
+/**
+ * Bovengrens van de knop "Uitgave na pensioen" in de pref (€/jaar). Ruim boven het
+ * sliderbereik (`uitgaveNaPensioenRange`: ±40% rond de plan-waarde) — dit is een
+ * vervuilings-clamp, geen UI-grens.
+ */
+const UITGAVE_NA_PENSIOEN_MAX = 1_000_000
+
+/**
+ * Bovengrens van de knop "Nalatenschap" in de pref (€ 10 mld, nominaal). Zelfde waarde als
+ * de zod-grens op het eindvermogen-doelbedrag (`app/api/toekomst-doel/schema.ts` importeert
+ * 'm hier): een eigen rij, dus geen lek, maar onzin (1e300) hoort er niet in.
+ */
+export const DOELWAARDE_BEDRAG_MAX = 1e10
 
 /** De zes kern-categorieën (bens kolom E) — whitelist voor de rendement-delta-keys. */
 const VALID_CATEGORIES: readonly AssetCategorie[] = [
@@ -91,15 +102,19 @@ export type DoelParameter = (typeof DOEL_PARAMETERS)[number]
  */
 export interface ToekomstScenarioStand {
   sliders?: {
+    /** Legacy (knop vervallen, spec §2 15 sep 2026): tolerant gelezen, nooit meer geschreven. */
     income?: number
+    /** Legacy (knop vervallen, ADR 0170): tolerant gelezen, nooit meer geschreven. */
     workdays?: number
     savings?: number
     extraInleg?: number
   }
   returnDeltaByCategorie?: Partial<Record<AssetCategorie, number>>
   stopAge?: number | null
-  stopKoppel?: boolean
-  stopMarge?: number
+  /** Knop "Uitgave na pensioen" (€/jaar, ADR 0160 × 0170); afwezig = wat het plan rekent. */
+  uitgaveNaPensioen?: number
+  /** Knop "Nalatenschap" (€, ADR 0170); afwezig = wat het plan rekent. */
+  nalatenschap?: number
 }
 
 /**
@@ -138,20 +153,21 @@ export interface ToekomstScenarioPrefs {
   }
   /** Per-categorie rendement-delta (decimaal, ±0,05). Alleen bezeten categorieën zetten iets. */
   returnDeltaByCategorie?: Partial<Record<AssetCategorie, number>>
-  /** Gekozen stopleeftijd (marge-marker); null = niet gezet. */
+  /** Gekozen stopleeftijd (de knop "Stopleeftijd"); null = niet gezet. */
   stopAge?: number | null
-  /** Stopkeuze schuift mee met de verwacht-streep (marge blijft constant). Pure vlag — geen logica hier. */
-  stopKoppel?: boolean
-  /**
-   * De vastgehouden marge (jaren t.o.v. de verwacht-FIRE) wanneer `stopKoppel` aan staat.
-   * DIT is bij koppelmodus de bewaarde waarheid ("dan blijft je marge gelijk") — de
-   * stopleeftijd zelf is dan afgeleid. Zonder gepersisteerde marge zou de client de marge
-   * na herlaad moeten herleiden uit een nog niet bezonken scenario-run (twee-fasen-
-   * hydratie: rendement-delta's direct, slider-events async) — dat joeg de stopleeftijd weg.
-   */
-  stopMarge?: number
+  /** Knop "Uitgave na pensioen" (€/jaar, ADR 0160 × 0170); afwezig = wat het plan rekent. */
+  uitgaveNaPensioen?: number
+  /** Knop "Nalatenschap" (€, ADR 0170); afwezig = wat het plan rekent. */
+  nalatenschap?: number
   /** Toont de gestippelde 2e (wat-als)lijn in de grafiek. */
   showScenarioLine?: boolean
+  /**
+   * De vorm van de doelscenario-knoppen: `'balk'` (standaard) of `'wijzer'` (de halfronde
+   * meter). Pure WEERGAVE, net als `showScenarioLine` — bewust GÉÉN onderdeel van
+   * `ToekomstScenarioStand`: wie van vorm wisselt verandert zijn plan niet, en de opslaan-balk
+   * mag daar dus niet "gewijzigd" van zeggen.
+   */
+  knopWeergave?: 'balk' | 'wijzer'
   /** Vastgelegd doelscenario (ronde 4). Ontbreekt zolang de gebruiker niets promoveerde. */
   doel?: ToekomstScenarioDoel
 }
@@ -209,14 +225,21 @@ function parseScenarioBaseFields(raw: Record<string, unknown>, out: ToekomstScen
     if (clamped !== undefined) out.stopAge = Math.round(clamped)
   }
 
-  // ── Vastgehouden koppel-marge (jaren; clamp ±30) ──
-  if (raw.stopMarge !== undefined && raw.stopMarge !== null) {
-    const clamped = clampNumber(raw.stopMarge, STOP_MARGE_MIN, STOP_MARGE_MAX)
-    if (clamped !== undefined) out.stopMarge = clamped
+  // ── Uitgave na pensioen (€/jaar; knop 3) ──
+  if (raw.uitgaveNaPensioen !== undefined && raw.uitgaveNaPensioen !== null) {
+    const clamped = clampNumber(raw.uitgaveNaPensioen, 0, UITGAVE_NA_PENSIOEN_MAX)
+    if (clamped !== undefined) out.uitgaveNaPensioen = clamped
   }
 
-  // ── Koppel-boolean ──
-  if (typeof raw.stopKoppel === 'boolean') out.stopKoppel = raw.stopKoppel
+  // ── Nalatenschap (€; knop 4) ──
+  if (raw.nalatenschap !== undefined && raw.nalatenschap !== null) {
+    const clamped = clampNumber(raw.nalatenschap, 0, DOELWAARDE_BEDRAG_MAX)
+    if (clamped !== undefined) out.nalatenschap = clamped
+  }
+
+  // De koppelmodus (`stopKoppel`/`stopMarge`) verviel met ADR 0170: er is geen verwacht-streep
+  // meer om een marge tegen aan te houden. Oude prefs dragen die velden nog; ze worden bewust
+  // NIET overgenomen (een onbekende sleutel negeert de parser al) en dus ook nooit herschreven.
 }
 
 /**
@@ -274,8 +297,9 @@ export function parseToekomstScenarioPrefs(raw: unknown): ToekomstScenarioPrefs 
   const out: ToekomstScenarioPrefs = { v: 2 }
   parseScenarioBaseFields(raw, out)
 
-  // ── Weergavevlag (geen onderdeel van de goal-stand) ──
+  // ── Weergavevlaggen (geen onderdeel van de goal-stand) ──
   if (typeof raw.showScenarioLine === 'boolean') out.showScenarioLine = raw.showScenarioLine
+  if (raw.knopWeergave === 'balk' || raw.knopWeergave === 'wijzer') out.knopWeergave = raw.knopWeergave
 
   // ── Doel-blok (alleen bij v2-input; v1 draagt per definitie geen doel) ──
   if (raw.v === 2 && isPlainObject(raw.doel)) {
@@ -305,18 +329,17 @@ function numGelijk(a: number | undefined, b: number | undefined): boolean {
   return Math.abs(a - b) < 1e-9
 }
 
-/** Sliders gelijk volgens de persist-effect-regels (income/savings afgerond, workdays/extraInleg exact). */
+/** Sliders gelijk volgens de persist-effect-regels (savings afgerond, extraInleg exact). */
 function slidersGelijk(
   a: ToekomstScenarioStand['sliders'],
   b: ToekomstScenarioStand['sliders'],
 ): boolean {
-  // income telt niet meer (knop vervallen, spec §2) — een legacy-stand met income mag geen
-  // "gewijzigd" geven.
+  // `income` (spec §2) en `workdays` (ADR 0170) tellen niet meer mee: die knoppen bestaan niet
+  // meer, dus een legacy-stand die ze nog draagt mag geen eeuwige "gewijzigd" geven.
   // savings: het persist-effect bepaalt inclusie via `Math.round` — spiegel dat, zodat
   // een sub-euro drag-en-terug (rondt naar hetzelfde geheel getal) géén "gewijzigd" oplevert.
   if (roundOrUndef(a?.savings) !== roundOrUndef(b?.savings)) return false
-  // workdays & extraInleg: het persist-effect vergelijkt exact (`!==` resp. `!== 0`) — spiegel exact.
-  if (a?.workdays !== b?.workdays) return false
+  // extraInleg: het persist-effect vergelijkt exact (`!== 0`) — spiegel exact.
   if (a?.extraInleg !== b?.extraInleg) return false
   return true
 }
@@ -333,21 +356,22 @@ function deltaMapGelijk(
 }
 
 /**
- * Laat de STOPKEUZE-velden (`stopAge`/`stopKoppel`/`stopMarge`) weg uit een stand.
- * Onder een VAST stopmoment (ADR 0145 D4) is de stopkeuze geen doelstand: het plan
- * rekent met het anker, de slider is daar puur verkenning. De route strips 'm vóór de
- * pref-write (zodat een verkende stop nooit in `doel.stand` landt) en de client vóór
- * de concept-vergelijking. Generiek over de getypte stand én de rauwe body-record:
- * beide zijn plain objects met dezelfde sleutels. Geeft een KOPIE terug, muteert niets.
+ * Laat de STOPKEUZE (`stopAge`) weg uit een stand. Onder een VAST stopmoment (ADR 0145 D4) is
+ * de stopkeuze geen doelstand: het plan rekent met het anker, de knop is daar puur verkenning.
+ * De route strips 'm vóór de pref-write (zodat een verkende stop nooit in `doel.stand` landt)
+ * en de client vóór de concept-vergelijking. Generiek over de getypte stand én de rauwe
+ * body-record: beide zijn plain objects met dezelfde sleutels. Geeft een KOPIE terug, muteert
+ * niets. De koppelvelden (`stopKoppel`/`stopMarge`) vervielen met ADR 0170; ze worden hier nog
+ * wél weggelaten, zodat een rauwe legacy-body ze niet alsnog terug in de pref schrijft.
  */
 export function stripStopKeuze<T extends object>(
   stand: T,
-): Omit<T, 'stopAge' | 'stopKoppel' | 'stopMarge'> {
+): Omit<T, 'stopAge'> {
   const rest = { ...stand }
   delete (rest as Record<string, unknown>).stopAge
   delete (rest as Record<string, unknown>).stopKoppel
   delete (rest as Record<string, unknown>).stopMarge
-  return rest
+  return rest as Omit<T, 'stopAge'>
 }
 
 /** Opties voor `isDoelConceptGewijzigd`. */
@@ -363,22 +387,22 @@ export interface DoelConceptOpties {
 
 /**
  * Pure concept-detectie: wijkt de LIVE goal-relevante stand af van de vastgelegde `doel.stand`?
- * Voedt de "je draait aan je doel"-banner (stap 5). Spiegelt de afronding/normalisatie van het
- * persist-effect in horizon-client zodat een no-op géén valse "gewijzigd" geeft. Vergelijkingsregel
- * per veld:
- *   - `sliders.income` telt niet meer mee (knop vervallen, spec §2) — een legacy-stand met
- *     income mag geen eeuwige "gewijzigd" geven.
+ * Voedt de opslaan-balk (ADR 0170; voorheen de "je draait aan je doel"-banner). Spiegelt de
+ * afronding/normalisatie van het persist-effect in horizon-client zodat een no-op géén valse
+ * "gewijzigd" geeft. Vergelijkingsregel per veld:
+ *   - `sliders.income`/`sliders.workdays` tellen niet meer mee (knoppen vervallen, spec §2 resp.
+ *     ADR 0170) — een legacy-stand die ze nog draagt mag geen eeuwige "gewijzigd" geven.
  *   - `sliders.savings` : AFGEROND vergeleken (persist bepaalt inclusie via
  *     `Math.round(x) !== Math.round(baseline)`); een sub-euro drag-en-terug telt dus als gelijk.
- *   - `sliders.workdays` / `sliders.extraInleg` : EXACT (persist vergelijkt exact).
+ *   - `sliders.extraInleg` : EXACT (persist vergelijkt exact).
  *   - `returnDeltaByCategorie` : per-categorie binnen 1e-9, zelfde effectieve key-set (de parser
  *     dropt sub-1e-9/nul-delta's al, dus dit spiegelt wat er zou worden weggeschreven).
- *   - stop (koppel-bewust): `stopKoppel` verschilt ⇒ gewijzigd. Anders — koppel AAN in beide ⇒
- *     vergelijk `stopMarge` (bij koppel is de marge de bewaarde waarheid; de stopAge is afgeleid
- *     en schuift met de sim, dus die niet vergelijken). Koppel UIT in beide ⇒ vergelijk de
- *     absolute `stopAge` (undefined ≡ null; beide "geen stop").
+ *   - `uitgaveNaPensioen` / `nalatenschap` : binnen 1e-9 (afwezig ≡ "wat het plan rekent", dus
+ *     afwezig-vs-waarde telt als gewijzigd).
+ *   - `stopAge` : absoluut (undefined ≡ null; beide "geen stop"), alleen wanneer de stopkeuze
+ *     meetelt. De koppelmodus verviel met ADR 0170.
  * Ontbrekende `stand` (geen doel) ⇒ `false` (er is niets om van af te wijken).
- * `opts.stopKeuzeTelt: false` ⇒ de stop-velden worden overgeslagen (vast anker, ADR 0145).
+ * `opts.stopKeuzeTelt: false` ⇒ de stopkeuze wordt overgeslagen (vast anker, ADR 0145 D4).
  */
 export function isDoelConceptGewijzigd(
   live: ToekomstScenarioStand,
@@ -389,21 +413,12 @@ export function isDoelConceptGewijzigd(
 
   if (!slidersGelijk(live.sliders, stand.sliders)) return true
   if (!deltaMapGelijk(live.returnDeltaByCategorie, stand.returnDeltaByCategorie)) return true
+  if (!numGelijk(live.uitgaveNaPensioen, stand.uitgaveNaPensioen)) return true
+  if (!numGelijk(live.nalatenschap, stand.nalatenschap)) return true
 
   if (opts?.stopKeuzeTelt === false) return false
 
-  const koppelLive = live.stopKoppel ?? false
-  const koppelStand = stand.stopKoppel ?? false
-  if (koppelLive !== koppelStand) return true
-  if (koppelStand) {
-    // Koppel aan in beide: marge is de bewaarde waarheid; de afgeleide stopAge negeren.
-    if (!numGelijk(live.stopMarge, stand.stopMarge)) return true
-  } else {
-    // Koppel uit in beide: de absolute stopAge is de waarheid.
-    if (normStopAge(live.stopAge) !== normStopAge(stand.stopAge)) return true
-  }
-
-  return false
+  return normStopAge(live.stopAge) !== normStopAge(stand.stopAge)
 }
 
 // ── Categorie → asset_type rendement-delta-expansie ──────────────────────────

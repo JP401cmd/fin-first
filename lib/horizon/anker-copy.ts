@@ -256,19 +256,149 @@ export function rapportAnkerVoortgang(
 export const RAPPORT_ANKER_KICKER = 'Stopmoment'
 
 /**
- * De draaiknoppen van het lab, in deze volgorde (eigenaarskeuze 15 sep 2026, bijstelling van
- * spec lab-haalbaarheid §2): 1 Meer salaris (het extra-inleg-event — rekenkundig dezelfde
- * hefboom), 2 Spaarquote (in % met het bedrag minder uitgeven eronder), 3 Minder werken,
- * 4 Uitgave na pensioen (spec 2026-09-18, ADR 0160). "Later of eerder stoppen" is de
- * stop-schuif in sectie 2 van de Vrijheidsas.
+ * De vijf knoppen van het doelscenario (ADR 0170, 19 sep 2026), in schermvolgorde. De oude
+ * namen blijven staan waar ze nog buiten het lab gebruikt worden: `uitgaveNaPensioen` is
+ * dezelfde knop als in ADR 0160, `spaarquote` leeft nog in de KPI-tegel-duiding.
+ * "Meer salaris" werd "Meer verdienen" en "Spaarquote" werd als KNOP "Minder uitgeven":
+ * de knop toont sinds ADR 0170 B4 euro's per maand, niet het percentage.
  */
 export const HEFBOOM_COPY = {
+  meerVerdienen: 'Meer verdienen',
+  minderUitgeven: 'Minder uitgeven',
+  uitgaveNaPensioen: 'Uitgave na pensioen',
+  nalatenschap: 'Nalatenschap',
+  stopleeftijd: 'Stopleeftijd',
+  // Nog in gebruik buiten het lab (KPI-duiding, oudere teksten).
   meerSalaris: 'Meer salaris',
   spaarquote: 'Spaarquote',
-  minderWerken: 'Minder werken',
-  uitgaveNaPensioen: 'Uitgave na pensioen',
-  laterEerder: 'Later of eerder stoppen',
 } as const
+
+/**
+ * Alle zinnen van het doelscenario-blok (ADR 0170). Eén plek, zodat de compliance-poort en de
+ * merkstem-toets één bestand hoeven te lezen. Toon-invarianten van dit bestand gelden onverkort:
+ * beschrijvend, nooit "je moet" of "je kunt stoppen", geen "AOW" in een tekortzin, en nooit de
+ * koop-/verkoop-metafoor (ADR 0165) — vrijheidstijd bouw je op.
+ */
+export const LAB_COPY = {
+  kicker: 'Doelscenario',
+
+  /** De legenda onder de uitkomstregel — wat de drie kleuren op elke knop betekenen. */
+  schaalRood: 'je plan reikt niet',
+  schaalOranje: 'gedekt, minder dan 10% marge',
+  schaalGroen: 'ruim gedekt',
+
+  /** Het zone-woord van de HUIDIGE stand, naast de vraag. */
+  zoneRood: 'reikt niet',
+  zoneOranje: 'gedekt · krappe marge',
+  zoneGroen: 'ruim gedekt',
+  zoneOnbekend: 'nog aan het rekenen',
+
+  /** De grensregel onder een knop. */
+  grensGedekt: 'gedekt',
+  grensRuim: 'ruim',
+  grensVanaf: 'vanaf',
+  /** De grens ligt buiten wat de knop toelaat — de knop kan er dus niet naartoe. */
+  grensBovenBereik: 'de grens ligt boven het bereik van deze knop',
+  grensOnderBereik: 'de grens ligt onder het bereik van deze knop',
+  /** Over het hele bereik van deze knop is het plan al gedekt, resp. nergens. */
+  grensHeelGedekt: 'over het hele bereik gedekt',
+  grensHeelOngedekt: 'over het hele bereik niet gedekt',
+  /** Nog geen grens bekend (eerste batch loopt, of de dekking is niet monotoon). */
+  grensOnbekend: 'grens nog niet bekend',
+
+  /** Kickers van de uitkomstregel. */
+  uitkomstReikt: 'Reikt tot',
+  uitkomstGedekt: 'Gedekt',
+  uitkomstEindvermogen: 'Eindvermogen',
+  uitkomstVrijOp: 'Vrij op',
+  uitkomstVerschil: 'Verschil',
+
+  /** Het ingeklapte blok met de rendement-aannames per categorie. */
+  marktbiasTitel: 'Rendement per categorie',
+
+  /** De schakelaar tussen de twee vormen van de knoppen (ADR 0170, 20 sep 2026). */
+  weergaveLabel: 'Vorm van de knoppen',
+  weergaveBalk: 'Balken',
+  weergaveWijzer: 'Wijzers',
+
+  /** De knop Nalatenschap bestaat niet bij een eind-vorm die er geen kent. */
+  nalatenschapPerpetual:
+    'Je plan houdt je vermogen in stand, dus er is geen nalatenschap om aan te draaien.',
+
+  /** De opslaan-balk: vier standen plus de nu-anker-uitzondering (ADR 0145 D6). */
+  opslaanRust: 'Verschuif een knop om een doel te maken.',
+  opslaanNieuw: 'Nog niet opgeslagen.',
+  /**
+   * Er staat wél een verkenning, maar er valt (nog) niets vast te leggen: onder een vast
+   * stopmoment is een kale stopkeuze geen doelstand (ADR 0145 D4), en een eindvermogen-doel
+   * wacht op de doorrekening (D12/M10). Zeg dát, in plaats van een knop naar een leeg venster.
+   */
+  opslaanNogNietVastTeLeggen: 'Verschuif ook een van de andere knoppen; een stopmoment alleen legt nog geen doel vast.',
+  opslaanGewijzigd: 'Gewijzigd ten opzichte van je doel.',
+  opslaanGewijzigdWacht:
+    'Gewijzigd ten opzichte van je doel — herstel je doel, of wacht tot de doorrekening klaar is.',
+  opslaanNuAnker: 'Je plan rekent alsof je nu stopt; daar legt het lab geen doel van vast.',
+  opslaanActieVastleggen: 'Maak dit mijn doel',
+  opslaanActieBijwerken: 'Doel bijwerken',
+  opslaanActieHerstel: 'Herstel mijn doel',
+  opslaanActieLoslaten: 'Doel loslaten',
+  opslaanActieReset: 'Terug naar basis',
+
+  /** De compliance-regel onder de balk — één keer per blok. */
+  indicatie: 'Indicatie, geen advies — een rekenuitkomst bij je huidige aannames.',
+} as const
+
+/** "Opgeslagen als je doel op 19 september." — de datum komt van de aanroeper. */
+export function labOpgeslagenOp(datum: string): string {
+  return `Opgeslagen als je doel op ${datum}.`
+}
+
+/**
+ * De grensregel onder een knop: "gedekt vanaf +€ 310 · ruim vanaf +€ 480". De aanroeper
+ * formatteert de getallen (elke knop heeft zijn eigen eenheid) en bepaalt welke grenzen
+ * binnen het bereik liggen; deze functie zet er de woorden om. Geen grens binnen bereik →
+ * de reden, zodat er nooit een lege regel onder een knop staat.
+ */
+export function labGrensRegel(input: {
+  gedekt: string | null
+  ruim: string | null
+  reden: 'boven-bereik' | 'onder-bereik' | 'heel-gedekt' | 'heel-ongedekt' | 'onbekend' | null
+}): string {
+  const delen: string[] = []
+  if (input.gedekt != null) delen.push(`${LAB_COPY.grensGedekt} ${LAB_COPY.grensVanaf} ${input.gedekt}`)
+  // Vallen de twee grenzen samen, dan staat er één regel — "gedekt vanaf X · ruim vanaf X" leest
+  // als twee eisen terwijl het er één is. Dat gebeurt onder eind-vorm "vermogen in stand houden":
+  // er is geen eindleeftijd om op te rekken, dus gedekt én ruim liggen op hetzelfde punt (ADR 0170).
+  if (input.ruim != null && input.ruim !== input.gedekt) {
+    delen.push(`${LAB_COPY.grensRuim} ${LAB_COPY.grensVanaf} ${input.ruim}`)
+  }
+  if (delen.length > 0) return delen.join(' · ')
+  switch (input.reden) {
+    case 'boven-bereik':
+      return LAB_COPY.grensBovenBereik
+    case 'onder-bereik':
+      return LAB_COPY.grensOnderBereik
+    case 'heel-gedekt':
+      return LAB_COPY.grensHeelGedekt
+    case 'heel-ongedekt':
+      return LAB_COPY.grensHeelOngedekt
+    default:
+      return LAB_COPY.grensOnbekend
+  }
+}
+
+/** Het zone-woord bij een stand; `null` = nog geen oordeel (de batch loopt). */
+export function labZoneWoord(zone: 'rood' | 'oranje' | 'groen' | null): string {
+  if (zone === 'rood') return LAB_COPY.zoneRood
+  if (zone === 'oranje') return LAB_COPY.zoneOranje
+  if (zone === 'groen') return LAB_COPY.zoneGroen
+  return LAB_COPY.zoneOnbekend
+}
+
+/** De sr-only melding na een knopbeweging: "Meer verdienen staat nu op + € 300/mnd." */
+export function labKnopGezetMelding(label: string, waarde: string): string {
+  return `${label} staat nu op ${waarde}.`
+}
 
 /** De euro-regel onder de spaarquote-knop: "+€ 1.290/mnd minder uitgeven" (0 op de basis → leeg). */
 export function spaarquoteEuroRegel(euroPerMaand: number, masked = false): string | null {

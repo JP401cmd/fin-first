@@ -13,8 +13,11 @@ import {
   runKernelAsync,
   runForcedStopPathAsync,
   runScenarioPresetsAsync,
+  runLabGrenzenAsync,
   runMonteCarloAsync,
 } from '@/lib/horizon-kernel/worker/run-in-worker'
+import { computeLabGrenzen } from '@/lib/horizon/lab-grenzen'
+import type { LabGrenzenContext } from '@/lib/horizon/lab-grenzen-types'
 
 /**
  * Task 4.2 — worker-abstractie parity. In jsdom bestaat `Worker` niet, dus deze
@@ -97,6 +100,25 @@ const PRESET_CTX: ScenarioPresetContext = {
   downsizeStrategyActief: false,
 }
 
+/** ADR 0170 — een kleine grenzen-batch (twee knoppen, klein raster) op hetzelfde profiel. */
+const GRENZEN_CTX: LabGrenzenContext = {
+  profile: PROFILE,
+  assets: makeAssets(),
+  debts: [],
+  lifeEvents: [],
+  aowRows: [],
+  baseline: { monthlyIncome: 4000, workDaysPerWeek: 5, savingsRate: 37, expectedReturn: 0.07, extraContribution: 0 },
+  currentAge: 40,
+  waarden: { verdienen: 0, uitgeven: 37, uitgaveNaPensioen: null, nalatenschap: null, stop: 60 },
+  planAnkerVast: false,
+  planStopAge: null,
+  eindVorm: 'perpetual',
+  bereik: {
+    verdienen: { min: -400, max: 400, stap: 200 },
+    stop: { min: 50, max: 70, stap: 2 },
+  },
+}
+
 describe('run-in-worker — synchrone fallback in jsdom', () => {
   it('jsdom heeft geen Worker → isKernelWorkerAvailable() === false', () => {
     expect(isKernelWorkerAvailable()).toBe(false)
@@ -132,6 +154,16 @@ describe('run-in-worker — synchrone fallback in jsdom', () => {
     expect(got).toHaveProperty('solvedFireAge')
   })
 
+  it('runLabGrenzenAsync === directe computeLabGrenzen (ADR 0170, lane grenzen)', async () => {
+    const expected = computeLabGrenzen(GRENZEN_CTX)
+    const got = await runLabGrenzenAsync(GRENZEN_CTX)
+    expect(got).toEqual(expected)
+    // De batch heeft echt gerekend: beide knoppen dragen een uitkomst en huidig is gezet.
+    expect(got?.runs).toBeGreaterThan(0)
+    expect(Object.keys(got?.grenzen ?? {}).sort()).toEqual(['stop', 'verdienen'])
+    expect(got?.huidig).not.toBeNull()
+  })
+
   it('runMonteCarloAsync === directe runMonteCarlo (deterministisch seed)', async () => {
     const expected = runMonteCarlo(MC_INPUT, 200, 30)
     const got = await runMonteCarloAsync(MC_INPUT, 200, 30)
@@ -154,5 +186,14 @@ describe('run-in-worker — structured-clone-veiligheid (postMessage-grens)', ()
     expect(structuredClone(mcRes)).toEqual(mcRes)
     const presetRes = executeKernelRequest({ id: 3, kind: 'presets', ctx: PRESET_CTX })
     expect(structuredClone(presetRes)).toEqual(presetRes)
+  })
+
+  it('grenzen-request (LabGrenzenContext) én -response overleven een structuredClone-round-trip', () => {
+    const req = { id: 4, kind: 'grenzen' as const, ctx: GRENZEN_CTX }
+    const clonedReq = structuredClone(req)
+    expect(clonedReq).toEqual(req)
+    const res = executeKernelRequest(clonedReq)
+    expect(res.ok).toBe(true)
+    expect(structuredClone(res)).toEqual(executeKernelRequest(req))
   })
 })

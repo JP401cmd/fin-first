@@ -125,15 +125,29 @@ import { PerspectiveContextLabel } from '@/components/app/perspective-context-la
 import { PensionParseSummaryCard, PensionInstructionPanel, computeCumulativeImpacts, type SnapshotForTrend } from '@/components/app/horizon/horizon-helpers'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { PageInfoButton, GlossaryTerm, SectionLabel, Kicker } from '@/components/editorial'
-import { Vrijheidsas, computeCoupledStopAge, formatAge, formatMargeShort } from '@/components/app/horizon/vrijheidsas'
-import type { DekkingsasData, EindvermogenTegelWaarde } from '@/components/app/horizon/dekkingsbalk'
+import { formatAge } from '@/lib/horizon/fire-format'
+import {
+  zoneVanHuidig,
+  type HefboomBereik,
+  type HefboomKey,
+  type LabGrenzenResultaat,
+} from '@/lib/horizon/lab-grenzen-types'
+// ADR 0170 — het doelscenario is vijf knoppen met een driekleurige schaal. `Vrijheidsas`
+// (marge-band) en `Dekkingsbalk` (drie tegels) vervielen daarmee.
+import {
+  LabKnoppen,
+  type LabKnopConfig,
+  type LabKnopFormatters,
+  type LabKnopWeergave,
+  type LabUitkomstRegel,
+} from '@/components/app/horizon/lab-knoppen'
+import { LabIndicatieRegel, LabOpslaanBalk, type LabOpslaanToestand } from '@/components/app/horizon/lab-opslaan-balk'
 import { ScenarioChip, VERKEN_SECTION_ID } from '@/components/app/horizon/scenario-chip'
 import { Dekkingsradar } from '@/components/app/horizon/dekkingsradar'
 import { ScenarioKaarten } from '@/components/app/horizon/scenario-kaarten'
 import { computeDekkingsradar, type RadarAs } from '@/lib/horizon/dekkingsradar'
 import { type ScenarioPresetResult } from '@/lib/horizon/scenario-presets'
 import { withResolvedKernelBedragen } from '@/lib/horizon/kernel-profile-basis'
-import { computeStopMarge } from '@/lib/horizon/stop-marge'
 import { buildVrijheidsleeftijdZin } from '@/lib/horizon/vrijheidsleeftijd-zin'
 import { selectDoelLijnBron } from '@/lib/horizon/doel-lijn-bron'
 import {
@@ -161,13 +175,14 @@ import {
   ankerZin,
   ankerZinKort,
   ankerReachYear,
-  dekkingAsNotitie,
+  ankerKort,
   dekkingBadge,
   dekkingDeltaBadge,
   dekkingPreviewWaarde,
   dekkingSheetToelichting,
   dekkingVastgelegdToast,
-  dekkingVerkenZin,
+  eindvermogenOpTegel,
+  LAB_COPY,
   EINDVERMOGEN_DELTA_DREMPEL,
   eindvermogenDeltaBadge,
   eindvermogenOpgeslagenNoot,
@@ -182,13 +197,12 @@ import {
 } from '@/lib/horizon/anker-copy'
 import { describeEventDuration, eventStopAgeFromSim } from '@/lib/horizon/event-duration-copy'
 import type { HaalbareUitgave } from '@/lib/horizon/haalbare-uitgave'
-import { dekkingVanRun, resolveLabUitkomst, type LabUitkomst } from '@/lib/horizon/lab-uitkomst'
 import {
-  labAntwoordenPerSlider,
-  labAntwoordGezetMelding,
-  resolveLabAntwoorden,
-  type LabAntwoordActie,
-} from '@/lib/horizon/lab-antwoorden'
+  dekkingVanRun,
+  resolveLabUitkomst,
+  type LabEindvermogen,
+  type LabUitkomst,
+} from '@/lib/horizon/lab-uitkomst'
 import { GOAL_TYPE_LABELS } from '@/lib/goal-data'
 import { AnkerDrieslag } from '@/components/app/horizon/anker-drieslag'
 import {
@@ -220,13 +234,17 @@ import { planDraftFromSettings, planDraftToFireSettingsBody, validatePlanDraft }
 import {
   applySliderEvent,
   buildSliderEvent,
+  computeSliderUiRange,
   readSliderValueFromEvents,
+  savingsEuroForPp,
+  uitgaveNaPensioenRange,
   UITGAVE_NA_PENSIOEN_STAP,
   type SliderKey,
 } from '@/lib/scenario-events'
-import type { HorizonScenarioOverrides } from '@/lib/hooks/use-horizon-fire-sim'
+import { resolveScenarioContext, type HorizonScenarioOverrides } from '@/lib/hooks/use-horizon-fire-sim'
 import type { AssetCategorie } from '@/lib/horizon-kernel/types'
-import { runMarktcheckAsync, runScenarioPresetsAsync } from '@/lib/horizon-kernel/worker/run-in-worker'
+import { runLabGrenzenAsync, runMarktcheckAsync, runScenarioPresetsAsync } from '@/lib/horizon-kernel/worker/run-in-worker'
+import { MASKED_AMOUNT_PLACEHOLDER } from '@/lib/format'
 import { getPageInfo } from '@/lib/page-info-content'
 
 const ScenariosModal = dynamic(() =>
@@ -303,7 +321,6 @@ const HealthScoreReceipt = dynamic(() =>
 )
 import { PensionPdfUpload, uploadPensionPdfToStorage } from '@/components/app/horizon/pension-pdf-upload'
 import { SimChart, buildScenarioVariants, SCENARIO_VARIANTS, type ScenarioOverlay, type MonteCarloOverlay, type HouseholdPartnerOverlay } from '@/components/app/horizon/sim-chart'
-import { computeVerwachtingsband } from '@/components/app/horizon/verwachtingsband'
 import { ZoomableChartContainer } from '@/components/app/horizon/zoomable-chart-container'
 import { ProjectieLaadlaag } from '@/components/app/horizon/projectie-laadlaag'
 import { EventsTimeline } from '@/components/app/horizon/events-timeline'
@@ -332,7 +349,7 @@ import { buildHorizonInput } from '@/lib/horizon/build-input'
 import { buildDeeplinkCleanupUrl } from '@/lib/horizon/deeplink-cleanup'
 import type { PreviewBaseline } from '@/lib/strategy-preview'
 import { buildBaselineOverrides } from '@/lib/whatif-overrides'
-import { WhatIfSliders, DeltaBadge, type WhatIfOverrides } from '@/components/app/horizon/whatif-sliders'
+import type { WhatIfOverrides } from '@/lib/types/horizon-whatif'
 import type { WhatIfEvent } from '@/lib/types/horizon-whatif'
 import { ChartOverlayExplainer } from '@/components/app/horizon/chart-overlay-explainer'
 import { ChartTips } from '@/components/editorial/chart-tips'
@@ -740,8 +757,14 @@ export default function HorizonPage({
   const [solvedRun, setSolvedRun] = useState<{ fireAge: number | null; endAge: number | null } | null>(null)
   /** De gesolvede uitgave na pensioen uit de scenario-batch (spec 2026-09-18). */
   const [haalbareUitgave, setHaalbareUitgave] = useState<HaalbareUitgave | null>(null)
-  /** Sliderstand van de vierde draaiknop (€/jaar); null = op de basis, geen override. */
-  const [scenarioUitgaveNaPensioen, setScenarioUitgaveNaPensioen] = useState<number | null>(null)
+  /**
+   * Knop "Uitgave na pensioen" (€/jaar); `null` = wat het plan rekent, geen override.
+   * Sinds ADR 0170 reist deze knop méé in de scenario-pref (`uitgaveNaPensioen`), zodat een
+   * herlaad de verkenning terugbrengt — net als de slider-events en de rendement-delta's.
+   */
+  const [scenarioUitgaveNaPensioen, setScenarioUitgaveNaPensioen] = useState<number | null>(
+    () => initialData.toekomstScenarioPrefs?.uitgaveNaPensioen ?? null,
+  )
 
   // Scenario overlay state
   const [scenariosExpanded, setScenariosExpanded] = useState(false)
@@ -960,21 +983,27 @@ export default function HorizonPage({
   const [scenarioStopAge, setScenarioStopAge] = useState<number | null>(
     () => initialData.toekomstScenarioPrefs?.stopAge ?? null,
   )
-  const [scenarioStopKoppel, setScenarioStopKoppel] = useState<boolean>(
-    () => initialData.toekomstScenarioPrefs?.stopKoppel ?? false,
-  )
   const [showScenarioLine, setShowScenarioLine] = useState<boolean>(
     () => initialData.toekomstScenarioPrefs?.showScenarioLine ?? true,
   )
+  /**
+   * De vorm van de doelscenario-knoppen (ADR 0170): balken of wijzers. Server-side bewaard
+   * naast de andere weergavevlag (`showScenarioLine`), dus cross-device — het is een keuze
+   * over hoe je je plan wilt lezen, niet een "even niet tonen" per apparaat.
+   */
+  const [knopWeergave, setKnopWeergave] = useState<LabKnopWeergave>(
+    () => initialData.toekomstScenarioPrefs?.knopWeergave ?? 'wijzer',
+  )
   const scenarioHydratedRef = useRef(false)
-  // Vastgehouden koppel-marge — bij koppelmodus is DIT de bewaarde waarheid (pref
-  // `stopMarge`); de stopleeftijd is dan afgeleid (verwacht + marge). Direct uit de
-  // pref initialiseren: herleiden uit een nog niet bezonken scenario-run is onmogelijk
-  // (twee-fasen-hydratie) en joeg de stopleeftijd weg.
-  const lockedMargeRef = useRef<number | null>(
-    initialData.toekomstScenarioPrefs?.stopKoppel
-      ? (initialData.toekomstScenarioPrefs?.stopMarge ?? null)
-      : null,
+  // ADR 0170 — de koppelmodus (`stopKoppel`/`stopMarge`, `lockedMargeRef`) verviel met de
+  // marge-band: er is geen verwacht-streep meer om een marge tegen aan te houden. De
+  // stopleeftijd is voortaan altijd een absolute keuze.
+  //
+  // Knop 4 — nalatenschap (€) als VERKENNING; `null` = wat het plan rekent. Spiegel van
+  // `scenarioUitgaveNaPensioen`: beide zijn profielparameters, geen slider-events, en reizen
+  // dus niet in `scenarioSliderEvents` mee maar via `scenarioOverrides`.
+  const [scenarioNalatenschap, setScenarioNalatenschap] = useState<number | null>(
+    () => initialData.toekomstScenarioPrefs?.nalatenschap ?? null,
   )
   const verkenSectionRef = useRef<HTMLElement | null>(null)
 
@@ -1169,8 +1198,27 @@ export default function HorizonPage({
   const hasScenario =
     scenarioSliderEvents.length > 0 ||
     Object.keys(scenarioReturnDeltas).length > 0 ||
-    scenarioUitgaveNaPensioen != null
-  /** Staat er een gekozen stopleeftijd? (Koppelmodus schrijft óók `scenarioStopAge`.) */
+    scenarioUitgaveNaPensioen != null ||
+    scenarioNalatenschap != null
+  /**
+   * De gestippelde wat-als-lijn verschijnt zodra je aan een knop draait (ADR 0170, 20 sep
+   * 2026). Zonder die lijn zie je de knoppen wél kleuren maar niet wát er in de grafiek
+   * verandert — en juist die lijn is waar de knoppen over gaan.
+   *
+   * Alleen op de OVERGANG van "geen verkenning" naar "wel een verkenning", niet bij elke
+   * knopbeweging: zet de gebruiker de lijn daarna bewust uit, dan blijft dat zo tot hij
+   * terug naar basis gaat en opnieuw begint. Een ref houdt de vorige stand vast, zodat het
+   * effect bij het laden van een bewaarde verkenning niet alsnog een opgeslagen "uit"
+   * overschrijft.
+   */
+  const hadScenarioRef = useRef(hasScenario)
+  useEffect(() => {
+    const had = hadScenarioRef.current
+    hadScenarioRef.current = hasScenario
+    if (!had && hasScenario) setShowScenarioLine(true)
+  }, [hasScenario])
+
+  /** Staat er een gekozen stopleeftijd? */
   const hasStopKeuze = scenarioStopAge != null
   // Is er een doel vastgelegd? Stuurt de doel-taal (kop/chip/as/legenda) en de sectie-states.
   const doelActief = doelBlok != null
@@ -1186,8 +1234,15 @@ export default function HorizonPage({
       ...(scenarioUitgaveNaPensioen != null
         ? { uitgaveNaPensioenPerJaar: scenarioUitgaveNaPensioen }
         : {}),
+      ...(scenarioNalatenschap != null ? { nalatenschap: scenarioNalatenschap } : {}),
     }
-  }, [hasScenario, scenarioSliderEvents, scenarioReturnDeltas, scenarioUitgaveNaPensioen])
+  }, [
+    hasScenario,
+    scenarioSliderEvents,
+    scenarioReturnDeltas,
+    scenarioUitgaveNaPensioen,
+    scenarioNalatenschap,
+  ])
 
   // Server FIRE-leeftijd voor de progressieve first paint (Task 4.2): de
   // kernel-leeftijd uit de canonieke server-run (`computeHorizonFireSim` via
@@ -2057,7 +2112,6 @@ export default function HorizonPage({
     // sliders.income wordt hier bewust genegeerd (de parser leest 'm tolerant, deze
     // hydratie bouwt er geen event meer voor).
     const KEY_MAP: Record<string, SliderKey> = {
-      workdays: 'workdays',
       savings: 'savings',
       extraInleg: 'extra_inleg',
     }
@@ -2081,16 +2135,6 @@ export default function HorizonPage({
     ? (scenario != null ? scenario.result.fireAgeFractional : null)
     : (simResult?.fireAgeFractional ?? null)
   const scenarioVerwachtFireAge = scenarioVerwachtSettled ?? simResult?.fireAgeFractional ?? null
-
-  // Koppelmodus: als de verwacht-FIRE verschuift terwijl "schuift mee" aan staat, beweegt
-  // de stopleeftijd zó dat de vastgehouden marge (`lockedMargeRef`) constant blijft.
-  useEffect(() => {
-    if (!scenarioStopKoppel) return
-    if (scenarioVerwachtSettled === null || lockedMargeRef.current === null) return
-    const next = computeCoupledStopAge(scenarioVerwachtSettled, lockedMargeRef.current)
-    if (next === null) return
-    setScenarioStopAge(prev => (prev !== next ? next : prev))
-  }, [scenarioVerwachtSettled, scenarioStopKoppel])
 
   // ── Scenario's naast elkaar: 5 preset-kaarten, via de worker bij zichtbaarheid ─────────
   // De context hangt UITSLUITEND van de basis-data af (geen scenario-overrides): profiel +
@@ -2999,31 +3043,6 @@ export default function HorizonPage({
   // les als doel-lijn-bron.ts: alles uit hetzelfde result-object). Fallback op de
   // slider-stand voor het theoretische geval dat de geforceerde run geen leeftijd meldt.
   const duidingStopAge = stopPad != null ? (stopPad.result.fireAgeFractional ?? scenarioStopAge) : null
-  // ── "Wat hoort daarbij?" — het omgekeerde antwoord op de gekozen stopleeftijd (M2) ──
-  // De pagina beantwoordde drie vragen (kan ik dit · wanneer · wat als) en liet de vierde
-  // liggen: wat hoort er dan bij? Het getal bestónd al — de solver rekent voor élke
-  // doorgerekende stand P!B96 uit — maar het stop-pad gooide het weg, dus het bereikte het
-  // scherm alleen in de zeldzame hoofdrun-status `unreachable_within_horizon`.
-  //
-  // PURE CONSUME-LAAG: leest `stopPad.maandHint` (dezelfde run die de radar, de strook en de
-  // doel-lijn al voeden) en `canonicalDailyRate` uit de bundel. Geen eigen som, geen tweede
-  // bron — precies de drift die CLAUDE.md's "consume, don't recompute" verbiedt.
-  //
-  // GATE = `maandHint > 0`. Dat ÍS per constructie "dekking onder 100% op de gekozen
-  // stopleeftijd": de solver zet de hint op `−gap ÷ maanden`, dus positief ⟺ gap < 0 ⟺ de
-  // modelwaarde blijft onder het doelbedrag. Bewust géén eigen dekkingspercentage afleiden:
-  // dat zou een tweede lezing van dezelfde vraag zijn, naast de radar.
-  const stopPadTekortHint = useMemo(() => {
-    if (stopPad == null || duidingStopAge == null) return null
-    const perMaand = stopPad.maandHint
-    if (!Number.isFinite(perMaand) || perMaand <= 0) return null
-    // €→vrijheidstijd via de canonieke helper op de canonieke dagbasis (bundel-veld).
-    // `totalDays` is de eigen uitvoer van die helper — geen deling met de hand.
-    const dagen = canonicalDailyRate > 0
-      ? Math.round(calculateFreedomTime(perMaand, canonicalDailyRate).totalDays)
-      : 0
-    return { stopAge: duidingStopAge, perMaand, dagen }
-  }, [stopPad, duidingStopAge, canonicalDailyRate])
   // ── Lab-uitkomst — ÉÉN uitkomst-switch per anker (ADR 0145) ─────────────────────────
   // Onder `solved` bewegen de knoppen de vrijheidsleeftijd (passthrough van vandaag);
   // onder een vast stopmoment de DEKKING. De switch bepaalt óók de promotie-gate
@@ -3062,31 +3081,6 @@ export default function HorizonPage({
   // De dekking-uitkomst als losse afleiding (null onder `solved`) — alle dekking-
   // oppervlakken hieronder lezen deze ene waarde.
   const labDekking = labUitkomst.kind === 'dekking' ? labUitkomst : null
-  // Spec lab-haalbaarheid §1 — de dekkingsas leest uitsluitend de lab-uitkomst (ADR 0145).
-  // NOMINAAL en zonder eindvermogen: de euro-kolom (D12) wordt in het euro-weergave-blok
-  // hieronder gedeflateerd en daar aan `viewDekkingsasData` toegevoegd.
-  const dekkingsasData = useMemo<Omit<DekkingsasData, 'basisEindvermogen' | 'scenarioEindvermogen' | 'euroView'> | null>(() => {
-    if (labDekking == null) return null
-    const stopAge = labDekking.stop == null ? null : labDekking.stop.kind === 'now' ? currentAge : labDekking.stop.stopAge
-    return {
-      stopAge,
-      eindAge: labDekking.eind,
-      basisReach: labDekking.basisReach,
-      basisPct: labDekking.basisPct,
-      scenarioReach: labDekking.scenarioReach,
-      scenarioPct: labDekking.scenarioPct,
-      verkendReach: labDekking.verkendReach,
-      verkendStopAge: labDekking.verkendStopAge,
-    }
-  }, [labDekking, currentAge])
-  // Spec lab-haalbaarheid §3 — de drie hefbomen als antwoorden bij een tekort. Consumeert
-  // labDekking (ADR 0145) en de tweede run (solvedRun, ADR 0129 D7); klemt alleen op het
-  // slider-bereik. Het bedrag is de PLAN-hint (`kernelMaandHint`), nooit `labDekking.maandHint`
-  // — dat laat het verkende stop-pad voorgaan (eindreview I1). De klik-handler (`handleLabAntwoord`) staat ná `handleStopAgeChange`.
-  const labAntwoorden = useMemo(
-    () => resolveLabAntwoorden({ dekking: labDekking, solvedFireAge: solvedRun?.fireAge ?? null, planMaandHint: kernelMaandHint, baseline: whatIfBaseline, masked, haalbareUitgave }),
-    [labDekking, solvedRun, kernelMaandHint, whatIfBaseline, masked, haalbareUitgave],
-  )
   // ── Dekkingsradar-assen — pure consume-laag over de duiding-rijen ──────
   // Alle grootheden komen elders vandaan: de duiding-rijen (stop-pad wint), de actieve-pad
   // FIRE/benodigd-vermogen/doel-eindvermogen en de canonieke bestedingsgrondslag
@@ -3695,28 +3689,12 @@ export default function HorizonPage({
   )
 
   // ── Vrijheidsas + stop-marge (plan §D) ──────────────────────────────────────
-  // De verwachtingsband ("waarschijnlijk vrij tussen vroegst en laatst") van het ACTIEVE
-  // pad — ÉÉN memo, ÉÉN `buildScenarioPathsFromSim`-aanroep, beide randen eruit (consume,
-  // géén extra kernel-run). De grondslag-keuze (drempel = requiredFireNetWorth, want de
-  // rijen dragen netto vermogen INCL. eigen woning) leeft in `computeVerwachtingsband`.
   const scenarioBaseFireAge = simResult?.fireAgeFractional ?? null
-  const verwachtingsband = useMemo(
-    () =>
-      computeVerwachtingsband(
-        hasScenario && scenario != null ? scenario.result : simResult,
-        fireParams.grossReturn,
-      ),
-    [hasScenario, scenario, simResult, fireParams.grossReturn],
-  )
-  /** Late rand: FIRE-leeftijd van de VOORZICHTIGE variant (pessimist, −0,02). */
-  const laatstFireAge = verwachtingsband.laatstFireAge
-  /** Vroege rand: FIRE-leeftijd van de OPTIMISTISCHE variant (+0,02). */
-  const vroegstFireAge = verwachtingsband.vroegstFireAge
 
-  // Effectieve stopleeftijd — de slider werkt controlled op dit getal; is er nog niets
+  // Effectieve stopleeftijd — de knop werkt controlled op dit getal; is er nog niets
   // gekozen dan default naar de (afgeronde) verwacht-FIRE, anders currentAge+1.
   // ADR 0129 F3b — onder een vast anker is de default het STOPMOMENT VAN HET PLAN
-  // (halve jaren): de slider is dan een verkenning tegen het plan, niet tegen de
+  // (halve jaren): de knop is dan een verkenning tegen het plan, niet tegen de
   // gesolvede FIRE-leeftijd.
   const planStopAgeDefault: number | null =
     simResult?.vastStopLeeftijd ??
@@ -3726,62 +3704,203 @@ export default function HorizonPage({
     (isFixedAnchorMode && planStopAgeDefault != null && Number.isFinite(planStopAgeDefault)
       ? Math.round(planStopAgeDefault * 2) / 2
       : scenarioVerwachtFireAge !== null
-        ? Math.round(scenarioVerwachtFireAge)
+        // Naar BOVEN op het 0,5-raster van de knop, nooit `Math.round`: sinds ADR 0170 voedt
+        // deze waarde het kern-oordeel (de geankerde run op de stop-stand), niet meer alleen
+        // een marker. Een fractionele vrijheidsleeftijd van 55,417 naar beneden afronden zet
+        // het anker vóór het gesolvede punt en levert `anchor_shortfall` — dan zou de schaal
+        // "reikt niet" zeggen puur door de afronding, en per gebruiker verschillend.
+        ? Math.ceil(scenarioVerwachtFireAge * 2) / 2
         : currentAge !== null
           ? Math.round(currentAge) + 1
           : 60)
 
-  const stopMarge = useMemo(
-    () =>
-      computeStopMarge({
-        stopAge: effectiveStopAge,
-        verwachtFireAgeFractional: scenarioVerwachtFireAge,
-        laatstFireAgeFractional: laatstFireAge,
-        baseFireAgeFractional: scenarioBaseFireAge,
-      }),
-    [effectiveStopAge, scenarioVerwachtFireAge, laatstFireAge, scenarioBaseFireAge],
-  )
+  // Marge-criterium van het vrijheidsleeftijd-doel (`fire_age`-metadata): de afstand tussen
+  // de gekozen stopleeftijd en de verwachte vrijheidsleeftijd. ADR 0170 haalde de marge-BAND
+  // weg (er is geen driezone tegen een voorzichtige variant meer), maar het doel-criterium
+  // "vrij op X, met ten minste Y jaar marge" blijft — nu als losse afleiding in plaats van
+  // via `computeStopMarge`.
+  const doelMargeRuw = scenarioVerwachtFireAge !== null ? effectiveStopAge - scenarioVerwachtFireAge : null
 
-  // 1-regel-samenvatting voor de ingeklapte KATERN II-regel ("Jouw doel" /
-  // "Wat als je draait"). Consumeert uitsluitend al afgeleide waarden —
-  // verwachte vrijheidsleeftijd, gekozen stopleeftijd, marge — met dezelfde
-  // formatters als de Vrijheidsas-cijferrij (formatAge/formatMargeShort):
-  // geen eigen som, geen tweede weergave van hetzelfde getal.
-  const verkenSamenvatting = useMemo(() => {
-    if (currentAge === null) {
-      return doelActief
-        ? 'Je vastgelegde doel — klap uit voor de details'
-        : 'Draai aan je aannames — je basislijn blijft staan'
+  // ── ADR 0170 — de vijf knoppen: bereik, grenzen-batch, zone ──────────────────────────
+  // De basiswaarden ("nu") van de twee profielparameter-knoppen. `haalbareUitgave` levert de
+  // uitgave waarmee het plan rekent (ADR 0160) met de bundel-uitgaven als terugval; de
+  // nalatenschap komt uit het plan zelf en is 0 zodra de eind-vorm er geen kent.
+  const uitgaveNaPensioenBasis = haalbareUitgave?.huidigPerJaar ?? input?.yearlyMustExpenses ?? 0
+  const planEindVorm = initialData.firePlan?.endForm ?? 'deplete'
+  const nalatenschapBasis =
+    planEindVorm === 'legacy' ? Math.max(0, initialData.firePlan?.legacyAmount ?? 0) : 0
+
+  /**
+   * Zichtbaar bereik per knop, in de eenheid van de knop. Eén bron voor de UI-schaal én voor
+   * de bisectie (het bereik reist mee in de grenzen-context, en de stap ís de precisie).
+   * Een knop die hier ONTBREEKT wordt niet getoond en niet gesolved: de stopleeftijd onder het
+   * nu-anker (het plan rekent met vandaag) en de nalatenschap onder een eind-vorm die er geen
+   * kent (opeten of in stand houden).
+   */
+  const labKnopBereik = useMemo<Partial<Record<HefboomKey, HefboomBereik>>>(() => {
+    const out: Partial<Record<HefboomKey, HefboomBereik>> = {}
+    if (whatIfBaseline) {
+      const extraNu = readSliderValueFromEvents('extra_inleg', scenarioSliderEvents, whatIfBaseline)
+      const verdienen = computeSliderUiRange('extra_inleg', whatIfBaseline.monthlyIncome, extraNu)
+      out.verdienen = { ...verdienen, stap: 50 }
+      const savingsNu = readSliderValueFromEvents('savings', scenarioSliderEvents, whatIfBaseline)
+      const uitgeven = computeSliderUiRange('savings', whatIfBaseline.savingsRate, savingsNu)
+      // In procentpunten onder de motorkap (het spaarquote-event en het `savings_rate`-doel
+      // blijven ongewijzigd); de knop TOONT euro per maand (ADR 0170 B4).
+      out.uitgeven = { ...uitgeven, stap: 1 }
     }
-    const delen: string[] = []
-    // ADR 0129 — onder een VAST anker zijn "vrij op X", "stop X" en "marge" uitspraken
-    // over een stopKEUZE die het plan al heeft gemaakt. De ingeklapte kop noemt dan
-    // het bereik, uit dezelfde bron als de hero-KPI — geen tweede weergave van
-    // hetzelfde getal.
-    if (isFixedAnchorMode) {
-      const reikwijdte =
-        ankerReach != null ? ankerZinKort(ankerReach, ankerStop ?? { kind: 'now' }) : 'je bereik'
-      if (doelActief) return `Vastgelegd doel — ${reikwijdte}`
-      // ADR 0145 — met een actieve verkenning is de uitkomstmaat de DEKKING (basis → scenario).
-      if (hasScenario && labDekking != null && labDekking.basisPct != null && labDekking.scenarioPct != null) {
-        return dekkingVerkenZin({
-          basisPct: labDekking.basisPct,
-          scenarioPct: labDekking.scenarioPct,
-          reikt: labDekking.scenarioReach != null ? ankerReachYear(labDekking.scenarioReach) : null,
+    if (uitgaveNaPensioenBasis > 0) {
+      const r = uitgaveNaPensioenRange(uitgaveNaPensioenBasis, scenarioUitgaveNaPensioen ?? uitgaveNaPensioenBasis)
+      out.uitgaveNaPensioen = { ...r, stap: UITGAVE_NA_PENSIOEN_STAP }
+    }
+    if (planEindVorm === 'legacy') {
+      const stap = 5_000
+      const bovenkant = Math.max(nalatenschapBasis * 2, 250_000, scenarioNalatenschap ?? 0)
+      out.nalatenschap = { min: 0, max: Math.ceil(bovenkant / stap) * stap, stap }
+    }
+    if (currentAge != null && planAnchor.kind !== 'now') {
+      const kandidaten = [
+        simResult?.displayEndAge ?? null,
+        userAowAge.fractional,
+        effectiveStopAge,
+        Math.round(currentAge) + 20,
+      ].filter((v): v is number => v != null && Number.isFinite(v))
+      out.stop = { min: Math.round(currentAge * 2) / 2, max: Math.max(...kandidaten), stap: 0.5 }
+    }
+    return out
+  }, [
+    whatIfBaseline,
+    scenarioSliderEvents,
+    uitgaveNaPensioenBasis,
+    scenarioUitgaveNaPensioen,
+    planEindVorm,
+    nalatenschapBasis,
+    scenarioNalatenschap,
+    currentAge,
+    planAnchor.kind,
+    simResult?.displayEndAge,
+    userAowAge.fractional,
+    effectiveStopAge,
+  ])
+
+  /**
+   * De twee grenzen per knop (rood→oranje = precies gedekt, oranje→groen = 10 % marge) plus
+   * het oordeel over de huidige stand. ÉÉN batch in de worker (lane `grenzen`), debounced op
+   * 300 ms: elke knopbeweging verschuift de grenzen van álle knoppen, dus dat hoort in één run.
+   * Consume-only voor de UI — hier wordt niets herrekend.
+   */
+  const [labGrenzen, setLabGrenzen] = useState<LabGrenzenResultaat | null>(null)
+  const [labGrenzenPending, setLabGrenzenPending] = useState(false)
+  /**
+   * Volgnummer van de LAATST gedispatchte batch. `runLabGrenzenAsync` geeft `null` voor
+   * zowel een verdrongen batch als een kern-/worker-FOUT (kernel-protocol vangt een throw als
+   * `{ ok: false }`), en die twee moeten verschillend aflopen: bij verdringing is er een
+   * nieuwere run onderweg en blijft de rekenstand staan, bij een fout niet — dan bleef
+   * `aria-busy` eeuwig aan. Is de landende batch de laatste, dan eindigt de rekenstand altijd.
+   */
+  const labGrenzenSeqRef = useRef(0)
+  useEffect(() => {
+    const kanRekenen =
+      kernelRawProfile != null &&
+      effectiveInput != null &&
+      currentAge != null &&
+      whatIfBaseline != null &&
+      Object.keys(labKnopBereik).length > 0
+    if (!kanRekenen) {
+      setLabGrenzen(null)
+      setLabGrenzenPending(false)
+      return
+    }
+    setLabGrenzenPending(true)
+    let cancelled = false
+    const handle = setTimeout(() => {
+      const seq = ++labGrenzenSeqRef.current
+      // De marktbias-delta's horen in de assets van élke iteratie — via de canonieke
+      // scenario-context-assemblage (`resolveScenarioContext`), niet via een tweede afleiding
+      // hier. De slider-events en de twee profielparameter-knoppen zet de engine zélf uit
+      // `waarden`, dus die geven we NIET voorgekauwd mee: anders staan ze er dubbel in en zou
+      // de bisectie tegen een al verschoven stand rekenen.
+      const marktbiasAssets = resolveScenarioContext(
+        initialData.assets ?? [],
+        [],
+        scenarioOverrides,
+        kernelRawProfile,
+      ).assets
+      runLabGrenzenAsync(
+        {
+          // ADR 0103 — dezelfde grondslag-injectie als elke andere kernel-run.
+          profile: withResolvedKernelBedragen(kernelRawProfile, {
+            monthlyIncome: effectiveInput.monthlyIncome,
+            monthlyExpenses: effectiveInput.monthlyExpenses,
+          }),
+          assets: marktbiasAssets,
+          debts,
+          lifeEvents: events,
+          aowRows,
+          baseline: whatIfBaseline,
+          currentAge,
+          waarden: {
+            verdienen: readSliderValueFromEvents('extra_inleg', scenarioSliderEvents, whatIfBaseline),
+            uitgeven: readSliderValueFromEvents('savings', scenarioSliderEvents, whatIfBaseline),
+            uitgaveNaPensioen: scenarioUitgaveNaPensioen,
+            nalatenschap: scenarioNalatenschap,
+            stop: effectiveStopAge,
+          },
+          planAnkerVast: isFixedAnchorMode,
+          planStopAge: planAnchor.kind === 'now' ? currentAge : planStopAgeDefault,
+          eindVorm: planEindVorm,
+          bereik: labKnopBereik,
+        },
+        { lane: 'grenzen' },
+      )
+        .then((res) => {
+          if (cancelled) return
+          // `null` = verdrongen óf een kern-/worker-fout. Alleen een echt resultaat overschrijft
+          // de grenzen (bij verdringing blijven de vorige staan i.p.v. leeg te knipperen).
+          if (res != null) setLabGrenzen(res)
+          // De rekenstand eindigt zodra de LAATST gedispatchte batch landt — ook als die niets
+          // opleverde. Was dit een oudere, verdrongen batch, dan blijft pending aan voor de
+          // nieuwere die nog onderweg is.
+          if (seq === labGrenzenSeqRef.current) setLabGrenzenPending(false)
         })
-      }
-      return hasScenario ? `Wat-als actief — ${reikwijdte}` : `Verken je pad — ${reikwijdte}`
+        .catch((err) => {
+          console.warn('[horizon-worker] grenzen-run faalde', err)
+          if (cancelled) return
+          if (seq === labGrenzenSeqRef.current) setLabGrenzenPending(false)
+        })
+    }, 300)
+    return () => {
+      cancelled = true
+      clearTimeout(handle)
     }
-    if (scenarioVerwachtFireAge !== null) delen.push(`vrij op ${formatAge(scenarioVerwachtFireAge)} jr`)
-    delen.push(`stop ${effectiveStopAge}`)
-    if (stopMarge.margeJaren !== null) delen.push(`marge ${formatMargeShort(stopMarge.margeJaren)}`)
-    const cijfers = delen.join(' · ')
-    if (doelActief) return `Vastgelegd doel — ${cijfers}`
-    return hasScenario ? `Wat-als actief — ${cijfers}` : `Verken je pad — ${cijfers}`
-  }, [currentAge, doelActief, hasScenario, scenarioVerwachtFireAge, effectiveStopAge, stopMarge, isFixedAnchorMode, ankerReach, ankerStop, labDekking])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    kernelRawProfile,
+    effectiveInput,
+    currentAge,
+    whatIfBaseline,
+    labKnopBereik,
+    scenarioSliderEvents,
+    scenarioReturnDeltas,
+    scenarioUitgaveNaPensioen,
+    scenarioNalatenschap,
+    effectiveStopAge,
+    isFixedAnchorMode,
+    planAnchor.kind,
+    planStopAgeDefault,
+    planEindVorm,
+    debts,
+    events,
+    aowRows,
+  ])
 
-  // Slepen aan de stop-slider legt (bij koppel aan) een nieuwe vast te houden marge vast.
-  // Vergrendelen alléén tegen de bezonken verwacht-waarde (nooit de basis-fallback).
+  /** Zone van de HUIDIGE stand (rood/oranje/groen) — kleurt het zone-woord en de delta's. */
+  const labZone = zoneVanHuidig(labGrenzen?.huidig ?? null)
+
+  /** De verkende stopleeftijd ÍS al het plan-anker — dan valt "maak dit mijn stopmoment" weg. */
+  const planIsDezeStop = planAnchor.kind === 'age' && planAnchor.age === effectiveStopAge
+
+
   // ── Stopmoment vastzetten: uitsluitend via de strategie-modal ──────────────
   // Hier stond de handler achter de CTA onder de vrijheidsas, die een PUT deed
   // van het volledige plan met anker `age` en de sliderwaarde. (Zijn naam staat
@@ -3794,73 +3913,22 @@ export default function HorizonPage({
   // volledige plan via `planDraftToFireSettingsBody` — één schrijfpad in plaats
   // van twee, en het pad dat álle keuzes toont.
 
-  const handleStopAgeChange = useCallback(
-    (v: number) => {
-      setScenarioStopAge(v)
-      if (scenarioStopKoppel && scenarioVerwachtSettled !== null) {
-        lockedMargeRef.current = v - scenarioVerwachtSettled
-      }
-    },
-    [scenarioStopKoppel, scenarioVerwachtSettled],
-  )
-  // "Reken hiermee" / "Reken met maximum" (antwoorden naast de knoppen, spec lab-haalbaarheid
-  // §3 + antwoorden-naast-sliders): zet de hefboom als VERKENNING — nooit het plan, en alleen
-  // op klik (ADR 0145 D7: een seed bij laden zou `hasScenario` omzetten en het
-  // persist-effect laten schrijven). De stop gaat via `handleStopAgeChange`, zodat een
-  // gekoppelde marge meebeweegt zoals bij de slider. De sr-only melding kondigt de nieuwe
-  // stand aan (de focus blijft op de knop). Eindreview M11: een teller per klik draagt de
-  // `key` van de meldingstekst, zodat een tweede klik op dezelfde knop (zelfde tekst) de
-  // tekst opnieuw mount en de live-regio 'm opnieuw voorleest.
-  const [labAntwoordMelding, setLabAntwoordMelding] = useState<{ tekst: string; n: number }>({ tekst: '', n: 0 })
-  const handleLabAntwoord = useCallback(
-    (actie: LabAntwoordActie) => {
-      const meld = () => setLabAntwoordMelding((prev) => ({ tekst: labAntwoordGezetMelding(actie), n: prev.n + 1 }))
-      if (actie.kind === 'stop') {
-        handleStopAgeChange(actie.stopAge)
-        meld()
-        return
-      }
-      if (actie.kind === 'uitgave') {
-        setScenarioUitgaveNaPensioen(actie.perJaar)
-        meld()
-        return
-      }
+  const handleStopAgeChange = useCallback((v: number) => setScenarioStopAge(v), [])
+  /**
+   * Zet één knop-waarde als slider-event. De twee euro-knoppen (`verdienen` = extra inleg,
+   * `uitgeven` = spaarquote in procentpunten) reizen als `WhatIfEvent` naar de kern; de andere
+   * drie zijn profielparameters en hebben hun eigen setter. Zelfde bouwer als de grenzen-batch
+   * (`buildSliderEvent`/`applySliderEvent`), zodat de knop en zijn schaal één parameterisatie delen.
+   */
+  const handleScenarioSliderValue = useCallback(
+    (key: 'extra_inleg' | 'savings', value: number) => {
       if (!whatIfBaseline || currentAge === null) return
-      const ev = buildSliderEvent(actie.key, actie.value, whatIfBaseline, currentAge)
-      setScenarioSliderEvents((prev) => applySliderEvent(prev, actie.key, ev))
-      meld()
+      markFirstSliderDrag()
+      const ev = buildSliderEvent(key, value, whatIfBaseline, currentAge)
+      setScenarioSliderEvents((prev) => applySliderEvent(prev, key, ev))
     },
-    [whatIfBaseline, currentAge, handleStopAgeChange],
+    [whatIfBaseline, currentAge, markFirstSliderDrag],
   )
-  // Elk antwoord onder zijn eigen knop (pure verdeling in lib). `handleLabAntwoord` zit
-  // alleen in de onClick van de knop; onder `now` en in de privacy-weergave geen knop.
-  const labAntwoordenPerKnop = useMemo(
-    () => labAntwoordenPerSlider(isNuStoppenMode ? [] : labAntwoorden, (actie) => handleLabAntwoord(actie), { masked }),
-    [isNuStoppenMode, labAntwoorden, handleLabAntwoord, masked],
-  )
-  // `labAntwoordenPerSlider` levert de vierde knop onder het veld `uitgave` (spec
-  // antwoorden-naast-sliders); `WhatIfSliders` verwacht 'm onder de eigen `antwoorden`-
-  // sleutel `uitgave_na_pensioen` (spec 2026-09-18). Eén samenvoegpunt hier — niet in de
-  // JSX — zodat de seam-mapping op dezelfde plek woont als de rest van de lab-antwoorden-
-  // afleiding, en de render-prop weer één benoemde expressie is.
-  const whatIfSliderAntwoorden = useMemo(
-    () => ({
-      ...labAntwoordenPerKnop.sliders,
-      ...(labAntwoordenPerKnop.uitgave ? { uitgave_na_pensioen: labAntwoordenPerKnop.uitgave } : {}),
-    }),
-    [labAntwoordenPerKnop],
-  )
-  // Aanzetten van de koppeling legt de HUIDIGE marge vast; uitzetten laat de stop staan.
-  const handleStopKoppelChange = useCallback(
-    (v: boolean) => {
-      setScenarioStopKoppel(v)
-      if (v && scenarioVerwachtSettled !== null) {
-        lockedMargeRef.current = effectiveStopAge - scenarioVerwachtSettled
-      }
-    },
-    [effectiveStopAge, scenarioVerwachtSettled],
-  )
-
   // Globale reset "Terug naar basis": wist sliders + rendement-delta's (stopAge/koppel/
   // toggle blijven bewust staan). Reset blijft één klik (geen bevestigingsvraag),
   // maar een snapshot + undo-toast (5s) maakt 'm binnen dat venster exact
@@ -3874,15 +3942,18 @@ export default function HorizonPage({
       sliderEvents: scenarioSliderEvents,
       returnDeltas: scenarioReturnDeltas,
       uitgaveNaPensioen: scenarioUitgaveNaPensioen,
+      nalatenschap: scenarioNalatenschap,
     }
     const hadSomething =
       snapshot.sliderEvents.length > 0 ||
       Object.keys(snapshot.returnDeltas).length > 0 ||
-      snapshot.uitgaveNaPensioen != null
+      snapshot.uitgaveNaPensioen != null ||
+      snapshot.nalatenschap != null
 
     setScenarioSliderEvents([])
     setScenarioReturnDeltas({})
     setScenarioUitgaveNaPensioen(null)
+    setScenarioNalatenschap(null)
 
     // Niets te wissen → geen undo-toast (voorkomt een misleidende "Ongedaan maken").
     if (!hadSomething) return
@@ -3894,14 +3965,16 @@ export default function HorizonPage({
       action: {
         label: 'Ongedaan maken',
         onClick: () => {
-          // Exact terug wat de reset wiste: sliders + rendement-delta's + de vierde knop.
+          // Exact terug wat de reset wiste: sliders + rendement-delta's + de twee
+          // profielparameter-knoppen (uitgave na pensioen, nalatenschap).
           setScenarioSliderEvents(snapshot.sliderEvents)
           setScenarioReturnDeltas(snapshot.returnDeltas)
           setScenarioUitgaveNaPensioen(snapshot.uitgaveNaPensioen)
+          setScenarioNalatenschap(snapshot.nalatenschap)
         },
       },
     })
-  }, [scenarioSliderEvents, scenarioReturnDeltas, scenarioUitgaveNaPensioen, addToast])
+  }, [scenarioSliderEvents, scenarioReturnDeltas, scenarioUitgaveNaPensioen, scenarioNalatenschap, addToast])
 
   // ── Doel: één stand-bouwer (gedeeld met persist), concept-detectie, previews ──────
   // EXACT dezelfde inclusie-/afrondingsregels als het (oude) persist-effect — nu via de
@@ -3914,26 +3987,47 @@ export default function HorizonPage({
         sliderEvents: scenarioSliderEvents,
         returnDeltas: scenarioReturnDeltas,
         stopAge: scenarioStopAge,
-        stopKoppel: scenarioStopKoppel,
-        lockedMarge: lockedMargeRef.current,
+        uitgaveNaPensioen: scenarioUitgaveNaPensioen,
+        nalatenschap: scenarioNalatenschap,
       }),
-    [whatIfBaseline, scenarioSliderEvents, scenarioReturnDeltas, scenarioStopAge, scenarioStopKoppel],
+    [
+      whatIfBaseline,
+      scenarioSliderEvents,
+      scenarioReturnDeltas,
+      scenarioStopAge,
+      scenarioUitgaveNaPensioen,
+      scenarioNalatenschap,
+    ],
   )
 
-  // "Je draait aan je doel"-banner: wijkt de live-stand af van het vastgelegde doel?
-  // Onder een vast stopmoment telt de stopkeuze niet mee (ADR 0145 D4): de slider
-  // verkent daar alleen en mag de banner niet laten afgaan.
-  // `buildLiveStand`/`doel.stand` kennen de vierde knop nog niet (spec 2026-09-18): een
-  // vastgelegd doel heeft er dus per definitie geen — elke actieve override IS drift,
-  // ongeacht de waarde, en die telt hier apart mee (anders ziet `isDoelConceptGewijzigd`
-  // 'm nooit, want hij vergelijkt een veld dat aan geen van beide kanten bestaat).
+  // Opslaan-balk (ADR 0170): wijkt de live-stand af van het vastgelegde doel? Onder een vast
+  // stopmoment telt de stopkeuze niet mee (ADR 0145 D4): de knop verkent daar alleen.
+  // Sinds ADR 0170 dragen `buildLiveStand` en `doel.stand` óók de twee profielparameter-knoppen
+  // (uitgave na pensioen, nalatenschap), dus de losse noodgreep-vergelijking die daarvóór
+  // "elke actieve override IS drift" moest afdwingen is vervallen — `isDoelConceptGewijzigd`
+  // ziet ze nu zelf, en een doel dat mét die knoppen is vastgelegd blijft dus "ongewijzigd".
   const conceptGewijzigd = useMemo(
     () =>
       doelActief &&
-      (scenarioUitgaveNaPensioen != null ||
-        isDoelConceptGewijzigd(buildLiveStandNow(), doelBlok?.stand, { stopKeuzeTelt: !isFixedAnchorMode })),
-    [doelActief, doelBlok, buildLiveStandNow, isFixedAnchorMode, scenarioUitgaveNaPensioen],
+      isDoelConceptGewijzigd(buildLiveStandNow(), doelBlok?.stand, { stopKeuzeTelt: !isFixedAnchorMode }),
+    [doelActief, doelBlok, buildLiveStandNow, isFixedAnchorMode],
   )
+
+  /**
+   * De vier standen van de opslaan-balk (ADR 0170), afgeleid uit wat er al is: ligt er een
+   * doel, staat er een verkenning, en wijkt die af van het doel. Onder het nu-anker legt het
+   * lab nooit een doel vast (ADR 0145 D6) — dan zegt de balk dát, in plaats van een knop aan
+   * te bieden die de route zou weigeren.
+   */
+  const labOpslaanToestand: LabOpslaanToestand = doelActief
+    ? conceptGewijzigd
+      ? 'gewijzigd'
+      : 'opgeslagen'
+    : labPromotie.kind === 'geen' && labPromotie.reden === 'nu-anker'
+      ? 'nu-anker'
+      : hasScenario || hasStopKeuze
+        ? 'nieuw'
+        : 'rust'
 
   // Doel-gewogen totaalrendement (%) uit de live rendement-delta's; null → geen rendement-doel.
   const doelRendementPct = useMemo(
@@ -3949,7 +4043,7 @@ export default function HorizonPage({
   const doelFireLeeftijd =
     scenarioStopAge ??
     (scenarioVerwachtFireAge !== null ? Math.ceil(scenarioVerwachtFireAge * 2) / 2 : null)
-  const doelMargeJaren = Math.max(0, Math.round((stopMarge.margeJaren ?? 0) * 2) / 2)
+  const doelMargeJaren = Math.max(0, Math.round((doelMargeRuw ?? 0) * 2) / 2)
 
   // De afwijkende parameters → sheet-previews (label + waarde-string). Rendement verdwijnt
   // als het doel-rendement null is (geen bezittingen); FIRE verschijnt zodra er een stopkeuze
@@ -3969,7 +4063,7 @@ export default function HorizonPage({
       })
     }
     // Onder een vast stopmoment is er geen vrijheidsleeftijd om vast te leggen (ADR 0145).
-    if (!isFixedAnchorMode && (stand.stopAge != null || stand.stopKoppel) && doelFireLeeftijd !== null) {
+    if (!isFixedAnchorMode && stand.stopAge != null && doelFireLeeftijd !== null) {
       const fmt = (v: number) => v.toLocaleString('nl-NL', { maximumFractionDigits: 1 })
       previews.push({
         parameter: 'fire',
@@ -4150,7 +4244,6 @@ export default function HorizonPage({
         return
       }
       setScenarioStopAge(null)
-      setScenarioStopKoppel(false)
       setStopPlanConfirmOpen(false)
       addToast({
         type: 'success',
@@ -4167,8 +4260,8 @@ export default function HorizonPage({
   }, [effectiveStopAge, userAowAge.fractional, addToast, loadData, router])
 
   // "Herstel mijn doel": kopieer de vastgelegde `doel.stand` terug naar de live-states.
-  // Sliders reconstrueren zoals de pref-hydratie (buildSliderEvent per key); rendement-delta's,
-  // stopAge/koppel en de koppel-marge direct terugzetten.
+  // Sliders reconstrueren zoals de pref-hydratie (buildSliderEvent per key); de rendement-delta's,
+  // de stopkeuze en de twee profielparameter-knoppen direct terugzetten.
   const handleDoelHerstellen = useCallback(() => {
     const stand = doelBlok?.stand
     if (!stand) return
@@ -4176,7 +4269,6 @@ export default function HorizonPage({
       // income is geen lab-parameter meer (spec §2) — een legacy doel.stand met
       // sliders.income wordt hier genegeerd, net als bij de pref-hydratie.
       const KEY_MAP: Record<string, SliderKey> = {
-        workdays: 'workdays',
         savings: 'savings',
         extraInleg: 'extra_inleg',
       }
@@ -4196,12 +4288,11 @@ export default function HorizonPage({
     // verkende stop blijft staan waar hij staat.
     if (!isFixedAnchorMode) {
       setScenarioStopAge(stand.stopAge ?? null)
-      setScenarioStopKoppel(stand.stopKoppel ?? false)
-      lockedMargeRef.current = stand.stopMarge ?? null
     }
-    // `doel.stand` kent de vierde knop nog niet (spec 2026-09-18 is ná de doel-persistentie
-    // gekomen) — "herstellen naar een doel zonder dat veld" betekent dus "geen override".
-    setScenarioUitgaveNaPensioen(null)
+    // ADR 0170 — de twee profielparameter-knoppen reizen wél mee in `doel.stand`. Afwezig
+    // betekent daar "wat het plan rekent", dus `null`: dan staat de knop weer op de plan-waarde.
+    setScenarioUitgaveNaPensioen(stand.uitgaveNaPensioen ?? null)
+    setScenarioNalatenschap(stand.nalatenschap ?? null)
   }, [doelBlok, whatIfBaseline, currentAge, isFixedAnchorMode])
 
   // Compacte FIRE-delta voor de toggle-pill ("−30 mnd" = eerder vrij; beslishulp-conventie).
@@ -4243,7 +4334,11 @@ export default function HorizonPage({
     // Ook schrijven zodra er een doel ligt (dat moet in elke PUT mee — anders wist de
     // volledige-overwrite-route het bij de eerstvolgende sliderbeweging).
     const deviatesFromDefaults =
-      hasScenario || scenarioStopAge !== null || scenarioStopKoppel || !showScenarioLine || doelBlok != null
+      hasScenario ||
+      scenarioStopAge !== null ||
+      !showScenarioLine ||
+      knopWeergave !== 'balk' ||
+      doelBlok != null
     if (!deviatesFromDefaults && initialData.toekomstScenarioPrefs == null) return
     const handle = setTimeout(() => {
       // KRITIEK: het doel-blok gaat via `buildScenarioPersistPayload` in ELKE PUT mee.
@@ -4253,13 +4348,11 @@ export default function HorizonPage({
           sliderEvents: scenarioSliderEvents,
           returnDeltas: scenarioReturnDeltas,
           stopAge: scenarioStopAge,
-          stopKoppel: scenarioStopKoppel,
-          // Bij koppelmodus is de marge de bewaarde waarheid (zie lockedMargeRef-doc);
-          // ref lezen op schrijfmoment — elke marge-wijziging loopt via een handler die
-          // ook state zet, dus dit effect vuurt dan sowieso.
-          lockedMarge: lockedMargeRef.current,
+          uitgaveNaPensioen: scenarioUitgaveNaPensioen,
+          nalatenschap: scenarioNalatenschap,
         }),
         showScenarioLine,
+        knopWeergave,
         doel: doelBlok,
       })
       fetch('/api/toekomst-scenario', {
@@ -4285,7 +4378,7 @@ export default function HorizonPage({
       })
     }, 600)
     return () => clearTimeout(handle)
-  }, [scenarioSliderEvents, scenarioReturnDeltas, scenarioStopAge, scenarioStopKoppel, showScenarioLine, whatIfBaseline, currentAge, hasScenario, doelBlok, initialData.toekomstScenarioPrefs, addToast])
+  }, [scenarioSliderEvents, scenarioReturnDeltas, scenarioStopAge, scenarioUitgaveNaPensioen, scenarioNalatenschap, showScenarioLine, knopWeergave, whatIfBaseline, currentAge, hasScenario, doelBlok, initialData.toekomstScenarioPrefs, addToast])
 
   async function handleActionStatusChange(id: string, status: ActionStatus, data?: Record<string, unknown>) {
     const res = await fetch(`/api/ai/actions/${id}`, {
@@ -5142,21 +5235,196 @@ export default function HorizonPage({
     scenarioEindvermogenUitkomst?.kind === 'bedrag'
       ? deflate(scenarioEindvermogenUitkomst.nominaal, eindvermogenFactor, euroView)
       : null
-  // De dekkingsas krijgt de euro-kolom erbij. Gemaskeerd ⇒ `null` voor een bedrag: de tegel
-  // toont puntjes, zodat er geen tweede maskeer-pad in het component ontstaat. `op` draagt geen
-  // bedrag en blijft dus ook gemaskeerd staan. De euro-weergave reist mee als LABEL voor het
-  // onderschrift (I3) — geen tweede omzetting.
-  const viewDekkingsasData = useMemo<DekkingsasData | null>(() => {
-    if (dekkingsasData == null) return null
-    const tegel = (uitkomst: typeof basisEindvermogenUitkomst, view: number | null): EindvermogenTegelWaarde =>
-      uitkomst == null ? null : uitkomst.kind === 'op' ? { kind: 'op' } : masked || view == null ? null : { kind: 'bedrag', euro: view }
-    return {
-      ...dekkingsasData,
-      basisEindvermogen: tegel(basisEindvermogenUitkomst, viewBasisEindvermogen),
-      scenarioEindvermogen: tegel(scenarioEindvermogenUitkomst, viewScenarioEindvermogen),
-      euroView,
+  /**
+   * De uitkomstregel boven de knoppen — AL GEFORMATTEERD (het component formatteert niets).
+   * Onder een vast stopmoment de drie grootheden die de dekkingsbalk-tegels toonden
+   * (reikt tot · gedekt · eindvermogen), onder `solved` de vrijheidsleeftijd en het verschil.
+   * Consume-only: elk getal komt uit `labUitkomst` (ADR 0145) en de euro's uit het
+   * euro-weergave-blok hierboven — hier wordt niets herrekend en niets gedeflateerd.
+   */
+  const labUitkomstRegel = useMemo<LabUitkomstRegel | null>(() => {
+    const pijl = (a: string, b: string | null) => (b != null && b !== a ? `${a} → ${b}` : a)
+    if (labDekking != null) {
+      if (labDekking.basisPct == null) return null
+      const euro = (v: number | null, uitkomst: LabEindvermogen | null): string | null => {
+        if (uitkomst == null) return null
+        if (uitkomst.kind === 'op') return eindvermogenOpTegel(labDekking.eind)
+        if (masked || v == null) return MASKED_AMOUNT_PLACEHOLDER
+        return formatCurrency(v)
+      }
+      const basisEuro = euro(viewBasisEindvermogen, basisEindvermogenUitkomst)
+      return {
+        kind: 'dekking',
+        reikt: pijl(
+          ankerKort(labDekking.basisReach),
+          labDekking.scenarioReach != null ? ankerKort(labDekking.scenarioReach) : null,
+        ),
+        gedekt: pijl(
+          dekkingBadge(labDekking.basisPct),
+          labDekking.scenarioPct != null ? dekkingBadge(labDekking.scenarioPct) : null,
+        ),
+        eindvermogen:
+          basisEuro == null
+            ? null
+            : pijl(basisEuro, euro(viewScenarioEindvermogen, scenarioEindvermogenUitkomst)),
+      }
     }
-  }, [dekkingsasData, masked, basisEindvermogenUitkomst, scenarioEindvermogenUitkomst, viewBasisEindvermogen, viewScenarioEindvermogen, euroView])
+    if (labUitkomst.kind !== 'vrijheidsleeftijd' || labUitkomst.basisFireAge == null) return null
+    const { basisFireAge, scenarioFireAge, deltaMaanden } = labUitkomst
+    return {
+      kind: 'vrijheidsleeftijd',
+      vrijOp: pijl(formatAge(basisFireAge), scenarioFireAge != null ? formatAge(scenarioFireAge) : null),
+      verschil:
+        deltaMaanden == null || Math.abs(deltaMaanden) < 1
+          ? 'gelijk'
+          : `${Math.abs(deltaMaanden)} mnd ${deltaMaanden < 0 ? 'eerder' : 'later'} vrij`,
+    }
+  }, [
+    labDekking,
+    labUitkomst,
+    masked,
+    viewBasisEindvermogen,
+    viewScenarioEindvermogen,
+    basisEindvermogenUitkomst,
+    scenarioEindvermogenUitkomst,
+  ])
+
+  /**
+   * De vijf knoppen als props: huidige waarde, basiswaarde ("nu"), bereik, de twee grenzen en
+   * de detailregel. Een knop die niet in `labKnopBereik` staat, staat hier ook niet — dan is
+   * hij verborgen (stopleeftijd onder het nu-anker, nalatenschap zonder nalatenschap-eindvorm).
+   * De twee euro-knoppen draaien onder de motorkap op hun bestaande grootheid: `verdienen` is
+   * het extra-inleg-event, `uitgeven` de spaarquote in procentpunten (ADR 0170 B4).
+   */
+  const labKnoppen = useMemo<Partial<Record<HefboomKey, LabKnopConfig>>>(() => {
+    const out: Partial<Record<HefboomKey, LabKnopConfig>> = {}
+    const grens = (k: HefboomKey) => labGrenzen?.grenzen?.[k] ?? null
+    if (whatIfBaseline && labKnopBereik.verdienen) {
+      out.verdienen = {
+        value: readSliderValueFromEvents('extra_inleg', scenarioSliderEvents, whatIfBaseline),
+        basis: 0,
+        bereik: labKnopBereik.verdienen,
+        grenzen: grens('verdienen'),
+        onChange: (v) => handleScenarioSliderValue('extra_inleg', v),
+      }
+    }
+    if (whatIfBaseline && labKnopBereik.uitgeven) {
+      const pp = readSliderValueFromEvents('savings', scenarioSliderEvents, whatIfBaseline)
+      out.uitgeven = {
+        value: pp,
+        basis: whatIfBaseline.savingsRate,
+        bereik: labKnopBereik.uitgeven,
+        grenzen: grens('uitgeven'),
+        // De spaarquote hoort erbij als duiding: de knop TOONT euro's, maar het doel dat het
+        // lab schrijft is een spaarquote-doel (`savings_rate`) — dan moet dat getal in beeld.
+        detail: `spaarquote ${Math.round(whatIfBaseline.savingsRate)}% → ${Math.round(pp)}%`,
+        onChange: (v) => handleScenarioSliderValue('savings', v),
+      }
+    }
+    if (labKnopBereik.uitgaveNaPensioen) {
+      const waarde = scenarioUitgaveNaPensioen ?? uitgaveNaPensioenBasis
+      out.uitgaveNaPensioen = {
+        value: waarde,
+        basis: uitgaveNaPensioenBasis,
+        bereik: labKnopBereik.uitgaveNaPensioen,
+        grenzen: grens('uitgaveNaPensioen'),
+        detail: masked ? null : `≈ ${formatCurrency(Math.round(waarde / 12))}/mnd`,
+        // Binnen een halve stap van de plan-waarde terug naar `null`: de knop staat dan weer
+        // op "wat het plan rekent" en zet geen override (spiegel ADR 0160 F1).
+        onChange: (v) =>
+          setScenarioUitgaveNaPensioen(
+            Math.abs(v - uitgaveNaPensioenBasis) < UITGAVE_NA_PENSIOEN_STAP / 2 ? null : v,
+          ),
+      }
+    }
+    if (labKnopBereik.nalatenschap) {
+      const stap = labKnopBereik.nalatenschap.stap
+      out.nalatenschap = {
+        value: scenarioNalatenschap ?? nalatenschapBasis,
+        basis: nalatenschapBasis,
+        bereik: labKnopBereik.nalatenschap,
+        grenzen: grens('nalatenschap'),
+        onChange: (v) => setScenarioNalatenschap(Math.abs(v - nalatenschapBasis) < stap / 2 ? null : v),
+      }
+    }
+    if (labKnopBereik.stop) {
+      out.stop = {
+        value: effectiveStopAge,
+        basis:
+          isFixedAnchorMode && planStopAgeDefault != null
+            ? Math.round(planStopAgeDefault * 2) / 2
+            : (scenarioBaseFireAge ?? effectiveStopAge),
+        bereik: labKnopBereik.stop,
+        grenzen: grens('stop'),
+        onChange: handleStopAgeChange,
+      }
+    }
+    return out
+  }, [
+    whatIfBaseline,
+    labKnopBereik,
+    labGrenzen,
+    scenarioSliderEvents,
+    handleScenarioSliderValue,
+    scenarioUitgaveNaPensioen,
+    uitgaveNaPensioenBasis,
+    scenarioNalatenschap,
+    nalatenschapBasis,
+    effectiveStopAge,
+    isFixedAnchorMode,
+    planStopAgeDefault,
+    scenarioBaseFireAge,
+    handleStopAgeChange,
+    masked,
+  ])
+
+  /**
+   * Per knop de drie formatters (waarde, delta, grens). De privacy-weergave maskeert hier —
+   * één plek, zodat er geen tweede maskeer-pad in de knop-component ontstaat.
+   * `uitgeven` rekent van procentpunten naar euro's per maand via `savingsEuroForPp`
+   * (één som, ADR 0170 B4): de knop toont wat je minder uitgeeft, niet het percentage.
+   */
+  const labFormatters = useMemo<Record<HefboomKey, LabKnopFormatters>>(() => {
+    const geld = (v: number) => (masked ? MASKED_AMOUNT_PLACEHOLDER : formatCurrency(Math.round(v)))
+    const perMaand = (v: number) => `${geld(v)}/mnd`
+    const ppNaarEuro = (pp: number) =>
+      whatIfBaseline ? savingsEuroForPp(whatIfBaseline, pp) : 0
+    return {
+      // Geen `delta` op deze twee: hun WAARDE is al relatief aan "nu" (verdienen staat op 0 op
+      // de basis, uitgeven toont het verschil in euro's), dus een badge zou hetzelfde getal
+      // een tweede keer laten zien.
+      verdienen: {
+        value: (v) => (v === 0 ? `${geld(0)}/mnd` : `${v > 0 ? '+' : '−'}${geld(Math.abs(v))}/mnd`),
+        grens: (v) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${geld(Math.abs(v))}`,
+      },
+      uitgeven: {
+        value: (pp) => {
+          const euro = ppNaarEuro(pp)
+          return euro === 0 ? `${geld(0)}/mnd` : `${euro > 0 ? '−' : '+'}${geld(Math.abs(euro))}/mnd`
+        },
+        grens: (pp) => {
+          const euro = ppNaarEuro(pp)
+          return `${euro > 0 ? '−' : '+'}${geld(Math.abs(euro))}`
+        },
+      },
+      uitgaveNaPensioen: {
+        value: (v) => `${geld(v)}/jr`,
+        delta: (d) => `${d > 0 ? '+' : '−'}${geld(Math.abs(d))}`,
+        grens: (v) => geld(v),
+      },
+      nalatenschap: {
+        value: (v) => geld(v),
+        delta: (d) => `${d > 0 ? '+' : '−'}${geld(Math.abs(d))}`,
+        grens: (v) => geld(v),
+      },
+      stop: {
+        value: (v) => `${formatAge(v)} jr`,
+        delta: (d) => `${d > 0 ? '+' : '−'}${formatAge(Math.abs(d))} jr`,
+        grens: (v) => formatAge(v),
+      },
+    }
+  }, [masked, whatIfBaseline])
+
   // De delta-badge naast `lab-dekking-badge`: alleen als basis ÉN wat-als allebei een bedrag
   // hebben (I1 — bij een (dreigend) tekort draagt de dekkings-badge de beweging al), weg bij
   // maskeren, en weg onder de drempel (M5: een paar euro verschil is ruis).
@@ -5482,7 +5750,7 @@ export default function HorizonPage({
    * grondslag (herleid via de nice-fractie-aware profielrij); zonder anker valt hij
    * terug op dezelfde ruwe grondslag als `retirementExpenseGuard` hierboven.
    */
-  const uitgaveNaPensioenBasis = haalbareUitgave?.huidigPerJaar ?? input?.yearlyMustExpenses ?? 0
+  // (`uitgaveNaPensioenBasis` staat bij de knop-afleidingen hierboven — één declaratie.)
 
   const hasNoDob = !effectiveInput?.dateOfBirth
   const fireNotReachable = effectiveCountdown.fireDate === 'Niet haalbaar'
@@ -7248,6 +7516,99 @@ export default function HorizonPage({
                 </ZoomableChartContainer>
               </div>
 
+              {/* ── Doelscenario: vijf knoppen met een driekleurige schaal (ADR 0170) ──
+                  Staat IN de grafiekkaart, direct onder de fasering: de knoppen bewegen de
+                  gestippelde lijn hierboven, dus ze horen bij die grafiek en niet in een eigen
+                  katern eronder. Wat hier stond — twee genummerde panelen, de marge-band, de
+                  dekkingsbalk met drie tegels, per-knop antwoordregels, "Wat hoort daarbij?",
+                  een uitleg-disclosure en een concept-banner — is vervangen door één blok:
+                  uitkomstregel → vijf gekleurde knoppen → opslaan-balk. De grens staat op de
+                  knop; dat maakt de duidingslagen overbodig. */}
+              {verkenSectieZichtbaar && (
+                <section
+                  id={VERKEN_SECTION_ID}
+                  ref={verkenSectionRef}
+                  className="mt-6 scroll-mt-24 border-t border-[var(--border-ed)] pt-4"
+                >
+                  {/* Eerste-sleep-hint: éénmalig per apparaat een pijl naar de gestippelde
+                      lijn, zodat de eerste knopbeweging niet onopgemerkt blijft. */}
+                  {firstDragHintVisible && (
+                    <p className="mb-2 flex flex-wrap items-baseline gap-x-2 font-sans text-[11px] text-[var(--ink-3)]">
+                      <span>Kijk naar de gestippelde lijn in de grafiek ↑ — dat is jouw wat-als.</span>
+                      <button
+                        type="button"
+                        onClick={dismissFirstDragHint}
+                        className="font-semibold text-horizon-700 underline underline-offset-2 transition-colors hover:text-[var(--ink)]"
+                      >
+                        Begrepen
+                      </button>
+                    </p>
+                  )}
+
+                  <LabKnoppen
+                    vraag={heroVraag}
+                    knoppen={labKnoppen}
+                    nalatenschapNotitie={planEindVorm === 'perpetual' ? LAB_COPY.nalatenschapPerpetual : null}
+                    uitkomst={labUitkomstRegel}
+                    zone={labZone}
+                    pending={labGrenzenPending}
+                    weergave={knopWeergave}
+                    onWeergaveChange={setKnopWeergave}
+                    formatters={labFormatters}
+                    stopSlot={
+                      // TPR-09 + melding B-038 — de stop-knop is een VERKENNING. Hier staat de
+                      // enige plek waar die verkenning het plan kan worden (het volledige plan,
+                      // via `planDraftToFireSettingsBody`), náást de verwijzing naar de plek waar
+                      // álle plan-keuzes staan. Alleen zichtbaar als de knop van het plan afwijkt.
+                      <div className="flex flex-wrap items-center gap-x-4">
+                        {!planIsDezeStop && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setStopPlanError('')
+                              setStopPlanConfirmOpen(true)
+                            }}
+                            disabled={stopPlanSaving}
+                            className="inline-flex min-h-[44px] items-center font-sans text-[11px] font-semibold text-horizon-700 underline underline-offset-2 transition-colors hover:text-horizon-800 disabled:no-underline disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+                          >
+                            {stopPlanSaving ? 'Opslaan…' : `Maak ${formatAge(effectiveStopAge)} mijn stopmoment`}
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setActiveModal('strategie')}
+                          className="inline-flex min-h-[44px] items-center font-sans text-[11px] font-medium text-[var(--ink-2)] underline underline-offset-2 transition-colors hover:text-horizon-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+                        >
+                          Je plan-keuzes &rarr;
+                        </button>
+                      </div>
+                    }
+                    marktbias={
+                      whatIfBaseline && categorieReturnGroups.length > 0 ? (
+                        <WhatIfMarketAssumptions
+                          value={scenarioReturnDeltas}
+                          onChange={setScenarioReturnDeltas}
+                          assetGroups={categorieReturnGroups}
+                        />
+                      ) : null
+                    }
+                  />
+
+                  <LabOpslaanBalk
+                    toestand={labOpslaanToestand}
+                    gezetOp={doelBlok?.gezetOp ?? null}
+                    busy={doelSaving}
+                    vastleggenMogelijk={doelVastleggenMogelijk}
+                    bijwerkenMogelijk={doelBijwerkenMogelijk}
+                    onVastleggen={() => setDoelSheetOpen(true)}
+                    onHerstel={handleDoelHerstellen}
+                    onLoslaten={() => setDoelLoslatenOpen(true)}
+                    onReset={handleScenarioReset}
+                  />
+                  <LabIndicatieRegel />
+                </section>
+              )}
+
               {/* ── Legenda + detail-links onder de grafiek ── */}
               <div className="mt-2 space-y-2">
                 {/* Scenario legenda */}
@@ -7379,392 +7740,6 @@ export default function HorizonPage({
           `whatIfInlineOpen` kan alleen wáár worden via die deeplink of via een
           control binnen deze sectie zelf, dus de gate blijft dicht zolang er
           niemand hierheen verwezen heeft. */}
-      {verkenSectieZichtbaar && (
-      <>
-        <section
-          id={VERKEN_SECTION_ID}
-          ref={verkenSectionRef}
-          className="mt-8 scroll-mt-24 sm:mt-10"
-        >
-          <SectionLabel num="II">{doelActief ? 'Jouw doel' : 'Wat als je draait'}</SectionLabel>
-          <div className="mb-1 flex flex-wrap items-start justify-between gap-3">
-            {/* Kop = toggle. De sectie start INGEKLAPT (beide weergavemodi);
-                het chevron volgt het DepthSection-gebaar, de typografie blijft
-                de editorial sectiekop. Actieknoppen alleen in open stand. */}
-            <button
-              type="button"
-              onClick={() => setVerkenOpen(prev => !prev)}
-              aria-expanded={verkenOpen}
-              className="group flex min-w-0 items-center gap-1.5 text-left"
-            >
-              <h2 className="label-editorial text-[var(--ink-2)]">
-                {doelActief ? 'Jouw doelsituatie' : 'Verken je aannames'}
-              </h2>
-              <ChevronDown
-                aria-hidden
-                className={`h-3.5 w-3.5 shrink-0 text-[var(--ink-3)] transition-transform duration-200 motion-reduce:transition-none group-hover:text-[var(--ink-2)] ${verkenOpen ? 'rotate-180' : ''}`}
-              />
-            </button>
-            {verkenOpen && (
-            <div className="flex shrink-0 flex-wrap items-center gap-1.5">
-              {doelActief ? (
-                <>
-                  {/* ADR 0145 — bijwerken niet onder het nu-anker of een gedekt plan;
-                      loslaten blijft in élke ankertoestand beschikbaar. */}
-                  {doelBijwerkenMogelijk && (
-                  <button
-                    type="button"
-                    onClick={() => setDoelSheetOpen(true)}
-                    disabled={doelSaving}
-                    className="rounded-[var(--r)] border border-horizon-300 px-2.5 py-1 font-sans text-[11px] font-medium text-horizon-700 transition-colors hover:bg-horizon-50 disabled:opacity-50"
-                  >
-                    Doel bijwerken
-                  </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setDoelLoslatenOpen(true)}
-                    disabled={doelSaving}
-                    className="rounded-[var(--r)] border border-dashed border-[var(--border-md)] px-2.5 py-1 font-sans text-[11px] font-medium text-[var(--ink-3)] transition-colors hover:border-[var(--ink-3)] hover:text-[var(--ink-2)] disabled:opacity-50"
-                  >
-                    Doel loslaten
-                  </button>
-                </>
-              ) : (
-                <>
-                  {/* De promotie-gate komt uit de lab-uitkomst (ADR 0145). Onder
-                      `solved` is dat het oude "er is iets vast te leggen"-oordeel:
-                      sliders ÓF een kale stopkeuze (melding B-031 — een doel dat puur
-                      een stopmoment was bleef anders na loslaten onherstelbaar).
-                      Onder aow/age alleen mét verkenning — bij een tekort de dekking,
-                      bij een gedekt plan het eindvermogen (D12); onder het nu-anker nooit. */}
-                  {doelVastleggenMogelijk && (
-                    <button
-                      type="button"
-                      onClick={() => setDoelSheetOpen(true)}
-                      className="rounded-[var(--r)] border border-horizon-300 px-2.5 py-1 font-sans text-[11px] font-medium text-horizon-700 transition-colors hover:bg-horizon-50"
-                    >
-                      Maak dit mijn doel
-                    </button>
-                  )}
-                  {hasScenario && (
-                    <button
-                      type="button"
-                      onClick={handleScenarioReset}
-                      className="rounded-[var(--r)] border border-dashed border-[var(--border-md)] px-2.5 py-1 font-sans text-[11px] font-medium text-[var(--ink-3)] transition-colors hover:border-horizon-300 hover:text-horizon-700"
-                    >
-                      Terug naar basis
-                    </button>
-                  )}
-                </>
-              )}
-            </div>
-            )}
-          </div>
-          {verkenOpen ? (
-            <p className="mb-3 font-sans text-[12px] text-[var(--ink-3)]">
-              {doelActief
-                ? 'Dit is je vastgelegde doel — de gestippelde lijn in de grafiek is Jouw doel en loopt door tot je gekozen stopleeftijd. Draai gerust verder; leg opnieuw vast of herstel je doel wanneer je klaar bent.'
-                : 'Draai aan je aannames — je basislijn blijft staan; je wat-als verschijnt als gestippelde lijn in de grafiek en kleurt de blokken hieronder.'}
-            </p>
-          ) : (
-            /* Ingeklapte regel — 1-regel-samenvatting, klik = uitklappen. */
-            <button
-              type="button"
-              onClick={() => setVerkenOpen(true)}
-              aria-label="Doelsectie uitklappen"
-              className="mb-1 block w-full text-left font-sans text-[12px] text-[var(--ink-3)] transition-colors hover:text-[var(--ink-2)]"
-            >
-              {verkenSamenvatting}
-            </button>
-          )}
-
-          {/* (c) Concept gewijzigd — smalle banner boven de sectie-inhoud.
-              role="status" + aria-live="polite" zodat de wijziging voor
-              screenreaders wordt aangekondigd zonder de focus te stelen. */}
-          {conceptGewijzigd && (
-            <div
-              role="status"
-              aria-live="polite"
-              className="mb-3 flex flex-wrap items-center justify-between gap-2 border border-[var(--ink-2)] border-l-4 border-l-horizon-500 bg-[var(--paper)] px-3 py-2"
-            >
-              <p className="font-serif text-[12px] leading-snug text-[var(--ink-2)]">
-                {doelBijwerkenMogelijk
-                  ? 'Je draait aan je doel — leg opnieuw vast of herstel je doel.'
-                  : 'Je draait aan je doel — herstel je doel wanneer je klaar bent met verkennen.'}
-              </p>
-              <div className="flex shrink-0 items-center gap-1.5">
-                {doelBijwerkenMogelijk && (
-                <button
-                  type="button"
-                  onClick={() => setDoelSheetOpen(true)}
-                  disabled={doelSaving}
-                  className="rounded-[var(--r)] bg-[var(--ink)] px-2.5 py-1 font-sans text-[11px] font-semibold text-[var(--paper)] transition-opacity hover:opacity-90 disabled:opacity-50"
-                >
-                  Leg opnieuw vast
-                </button>
-                )}
-                <button
-                  type="button"
-                  onClick={handleDoelHerstellen}
-                  className="rounded-[var(--r)] border border-[var(--border-md)] px-2.5 py-1 font-sans text-[11px] font-medium text-[var(--ink-2)] transition-colors hover:border-[var(--ink-3)]"
-                >
-                  Herstel mijn doel
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Uitgeklapte sectie-inhoud: afwijkings-badges + de werkbank-kaart.
-              De concept-gewijzigd-banner hierboven blijft bewust ALTIJD zichtbaar
-              (ook ingeklapt): die draagt de herstel-/vastleg-acties. */}
-          {verkenOpen && (
-          <>
-          {/* Dichtgeklapte-kop-afwijkingssamenvatting (DeltaBadge-hergebruik). */}
-          {hasScenario && whatIfBaseline && (
-            <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1.5">
-              <DeltaBadge
-                current={readSliderValueFromEvents('savings', scenarioSliderEvents, whatIfBaseline)}
-                base={whatIfBaseline.savingsRate}
-                format={v => `${Math.round(v)}% spaarquote`}
-              />
-              <DeltaBadge
-                current={readSliderValueFromEvents('extra_inleg', scenarioSliderEvents, whatIfBaseline)}
-                base={0}
-                format={v => `${formatCurrency(Math.abs(v))}/mnd ${v > 0 ? 'meer' : 'minder'} salaris`}
-              />
-              {/* ADR 0145 — onder een vast stopmoment de uitkomst zelf: dekking van de
-                  verkenning + de delta t.o.v. de basis. Stoplichtkleur (gedekt/tekort),
-                  nooit het module-accent. */}
-              {labDekkingDelta && (
-                <span
-                  data-testid="lab-dekking-badge"
-                  className={`rounded-full px-1.5 py-0.5 font-mono text-[10px] font-medium tabular-nums ${
-                    labDekkingDelta.scenarioPct >= 100 ? 'bg-positive-bg text-positive' : 'bg-warning-bg text-warning'
-                  }`}
-                >
-                  {dekkingBadge(labDekkingDelta.scenarioPct)}
-                  {labDekkingDelta.label !== 'gelijk' && <> · {labDekkingDelta.label}</>}
-                </span>
-              )}
-              {/* ADR 0145 D12 — het derde component: wat de verkenning met het eindvermogen
-                  doet (gedeflateerd, zie het euro-weergave-blok). Neutraal, geen stoplicht:
-                  meer of minder eindvermogen is geen oordeel over het plan. */}
-              {labDekkingDelta && viewLabEindvermogenDelta !== 0 && (
-                <span
-                  data-testid="lab-eindvermogen-badge"
-                  className="rounded-full bg-[var(--subtle)] px-1.5 py-0.5 font-mono text-[10px] font-medium tabular-nums text-[var(--ink-2)]"
-                >
-                  {eindvermogenDeltaBadge(viewLabEindvermogenDelta)}
-                </span>
-              )}
-            </div>
-          )}
-
-          <div
-            className={`card-editorial space-y-6 p-4 sm:p-5 ${
-              hasScenario ? 'border-dashed border-[var(--ink-2)]' : ''
-            }`}
-          >
-            {/* Vrijheidsas — twee vragen (streep + marge), netjes gescheiden.
-                De draaiknoppen + rendement-per-groep vullen het linker vlak via de
-                `draaiknoppen`-slot; de stop-slider/marge het rechter vlak. */}
-            {currentAge !== null && (
-              <div>
-                <div className="mb-3">
-                  <Kicker className="mb-1">Vrijheidsas</Kicker>
-                  {/* ADR 0127 — onder 'Nu stoppen' is "wanneer ben je vrij?" al beantwoord
-                      (vandaag); de open vraag is hoe ver je vermogen reikt. */}
-                  {/* ADR 0129 B10 — de sectiekop volgt de hero-kop: de vraag draagt de modus. */}
-                  <h2 className="font-display text-[14px] font-semibold leading-snug text-[var(--ink)]">
-                    {heroVraag}
-                  </h2>
-                </div>
-                <Vrijheidsas
-                  currentAge={currentAge}
-                  baseFireAge={scenarioBaseFireAge}
-                  verwachtFireAge={scenarioVerwachtFireAge}
-                  laatstFireAge={laatstFireAge}
-                  vroegstFireAgeFractional={vroegstFireAge}
-                  hasScenario={hasScenario}
-                  stopAge={effectiveStopAge}
-                  onStopAgeChange={handleStopAgeChange}
-                  stopKoppel={scenarioStopKoppel}
-                  onStopKoppelChange={handleStopKoppelChange}
-                  zone={stopMarge.zone}
-                  margeJaren={stopMarge.margeJaren}
-                  doelActief={doelActief}
-                  // ADR 0129 — onder het NU-anker is het stopmoment vandaag: geen schuif.
-                  // Onder aow/age blijft de slider een VERKENNING tegen het plan (default =
-                  // het stopmoment van het plan); vastzetten gebeurt in de strategie-modal.
-                  stopKeuzeVerborgen={isNuStoppenMode}
-                  stopKeuzeNotitie={
-                    ankerReach != null ? (
-                      <p className="font-sans text-[12px] leading-snug text-[var(--ink-2)]">
-                        {ankerZin(ankerReach, ankerStop ?? { kind: 'now' })}
-                      </p>
-                    ) : null
-                  }
-                  ankerVast={isFixedAnchorMode}
-                  // Spec lab-haalbaarheid §1 — onder een vast anker is sectie 2 de dekkingsas.
-                  dekking={viewDekkingsasData}
-                  // Spec antwoorden-naast-sliders — "Doorwerken tot X dekt je plan." onder de stop-slider.
-                  stopAntwoord={labAntwoordenPerKnop.stop}
-                  // ADR 0145 — onder aow/age de uitkomst van het plan: reikt het, voor
-                  // hoeveel procent, en of er iets vast te leggen valt.
-                  uitkomstNotitie={(() => {
-                    if (labDekking == null || planAnchor.kind === 'now') return null
-                    const notitie = dekkingAsNotitie(labDekking.basisReach, labDekking.basisPct, labDekking.eind)
-                    return notitie != null ? (
-                      <p data-testid="vrijheidsas-dekking-notitie" className="font-sans text-[12px] leading-snug text-[var(--ink-2)]">
-                        {notitie}
-                      </p>
-                    ) : null
-                  })()}
-                  planStopAge={simResult?.vastStopLeeftijd ?? (planAnchor.kind === 'age' ? planAnchor.age : null)}
-                  aowAge={userAowAge.fractional}
-                  // B-038 — de sectie wijst naar de plek waar het stopmoment én
-                  // de rest van het plan staat, in plaats van er zelf twee
-                  // snelknoppen voor te bieden. Dezelfde modal als de
-                  // "Stopmoment wijzigen"-link onder de grafiek.
-                  onKeuzesOpenen={() => setActiveModal('strategie')}
-                  // TPR-09 — de verkenning tot plan maken: bevestiging eerst (keuze ·
-                  // effect · waarom), dan het volledige plan via /api/fire-settings.
-                  onMaakPlan={() => {
-                    setStopPlanError('')
-                    setStopPlanConfirmOpen(true)
-                  }}
-                  maakPlanBusy={stopPlanSaving}
-                  planIsDezeStop={planAnchor.kind === 'age' && planAnchor.age === effectiveStopAge}
-                  draaiknoppen={
-                    <>
-                      {/* De vier bestaande sliders (alleen de grid-variant) */}
-                      {whatIfBaseline && (
-                        <div>
-                          <p className="mb-2 label-editorial text-[var(--ink-3)]">Draaiknoppen</p>
-                          {/* Eerste-sleep-hint — wijst naar de gestippelde grafieklijn (boven). */}
-                          {firstDragHintVisible && (
-                            <div
-                              role="status"
-                              className="animate-fade-in mb-3 flex items-start justify-between gap-2 border border-[var(--ink-2)] border-l-4 border-l-horizon-500 bg-[var(--paper)] px-3 py-2"
-                            >
-                              <p className="font-sans text-[11px] leading-snug text-[var(--ink-2)]">
-                                Kijk naar de gestippelde lijn in de grafiek ↑ — dat is jouw wat-als.
-                              </p>
-                              <button
-                                type="button"
-                                onClick={dismissFirstDragHint}
-                                aria-label="Tip sluiten"
-                                className="-m-2 shrink-0 p-2 text-[var(--ink-4)] transition-colors hover:text-[var(--ink-2)]"
-                              >
-                                <X className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-                          )}
-                          <WhatIfSliders
-                            baseline={whatIfBaseline}
-                            events={scenarioSliderEvents}
-                            setEvents={handleScenarioSliderEvents}
-                            currentAge={currentAge}
-                            antwoorden={whatIfSliderAntwoorden}
-                            uitgaveNaPensioen={
-                              // F2a (eindreview 19 sep) — huishoud-/partnerweergave heeft
-                              // een ander "uitgave na pensioen"-getal (perspectiveHero.
-                              // retirementExpense, huishouden) dan deze knop (eigen); dat
-                              // is precies de grondslagvermenging die de spec uitsluit.
-                              !hasPerspectiveHero && uitgaveNaPensioenBasis > 0
-                                ? {
-                                    waarde: scenarioUitgaveNaPensioen ?? uitgaveNaPensioenBasis,
-                                    basis: uitgaveNaPensioenBasis,
-                                    // F1 (eindreview 19 sep) — de bereikbare sliderstanden
-                                    // liggen op een € 600-raster vanaf een afgerond minimum
-                                    // (uitgaveNaPensioenRange); de neutrale stand (basis)
-                                    // ligt daar meestal niet exact op. Exacte gelijkheid
-                                    // liet de override dan nooit meer op `null` vallen, ook
-                                    // niet na "terugslepen" — vandaar een halve-stap-marge.
-                                    onChange: (v: number) =>
-                                      setScenarioUitgaveNaPensioen(
-                                        Math.abs(v - uitgaveNaPensioenBasis) < UITGAVE_NA_PENSIOEN_STAP / 2
-                                          ? null
-                                          : v,
-                                      ),
-                                  }
-                                : undefined
-                            }
-                          />
-                        </div>
-                      )}
-                      {/* Eén gedeelde live-regio voor de antwoordknoppen (ook die onder de
-                          stop-slider): altijd gemount, anders mist de eerste melding. */}
-                      <p aria-live="polite" className="sr-only" data-testid="lab-antwoord-melding">
-                        {labAntwoordMelding.tekst !== '' && <span key={labAntwoordMelding.n}>{labAntwoordMelding.tekst}</span>}
-                      </p>
-
-                      {/* Rendement per groep (genest collapsible; default dicht) */}
-                      <div className="border-t border-[var(--border-ed)] pt-5">
-                        <p className="mb-2 label-editorial text-[var(--ink-3)]">Rendement per groep</p>
-                        <WhatIfMarketAssumptions
-                          value={scenarioReturnDeltas}
-                          onChange={setScenarioReturnDeltas}
-                          assetGroups={categorieReturnGroups}
-                        />
-                      </div>
-                    </>
-                  }
-                />
-                {/* ── Wat hoort daarbij? (bevinding M2) ──────────────────────────────
-                    Permanent tekstblok, direct ónder de stop-slider: dáár kiest de
-                    gebruiker het doel, dus dáár hoort het omgekeerde antwoord. Verschijnt
-                    zodra de gekozen stopleeftijd niet gedekt is (`maandHint > 0`) en
-                    verdwijnt zodra hij dat wél is — geen edge-case-gate op de hoofdrun.
-                    TOON (Wft): feitelijk inzicht, geen aanbeveling. "hoort daar … bij" is
-                    een rekenuitkomst; bewust géén "je moet", geen "verhoog je spaarquote",
-                    geen belofte dat het doel dan gehaald wordt. Sluitregel volgt de
-                    bestaande app-conventie ("Indicatie, geen advies — …"). */}
-                {/* ADR 0127 — een "om op X te stoppen"-hint hoort niet bij een plan
-                    waarin het stopmoment al vastligt op vandaag. Onder een vast anker
-                    (aow/age) vervangt het antwoordenblok hieronder dit blok (spec
-                    lab-haalbaarheid §7.3): alleen onder solved blijft het staan. */}
-                {stopPadTekortHint !== null && !isNuStoppenMode && !isFixedAnchorMode && (
-                  <div className="mt-4 border border-[var(--ink-2)] border-l-4 border-l-horizon-500 bg-[var(--paper)] px-3 py-2.5">
-                    <p className="mb-1 label-editorial text-[var(--ink-3)]">Wat hoort daarbij?</p>
-                    <p className="font-sans text-[12px] leading-snug text-[var(--ink-2)]">
-                      Om op {formatAge(stopPadTekortHint.stopAge)} jr te stoppen hoort daar{' '}
-                      <span className="font-mono tabular-nums">
-                        {formatMaskedApproxCurrency(stopPadTekortHint.perMaand, masked)}
-                      </span>{' '}
-                      per maand extra sparen bij, bovenop wat je nu opzij zet
-                      {!masked && stopPadTekortHint.dagen >= 1 && (
-                        <> — omgerekend {stopPadTekortHint.dagen} {stopPadTekortHint.dagen === 1 ? 'dag' : 'dagen'} vrijheid per maand</>
-                      )}.
-                    </p>
-                    <p className="mt-1.5 font-sans text-[11px] leading-snug text-[var(--ink-3)]">
-                      Indicatie, geen advies — een rekenuitkomst bij je huidige aannames, uitgesmeerd over de maanden tot je eindleeftijd.
-                    </p>
-                  </div>
-                )}
-                {/* ── Sluitregel bij de antwoorden (spec antwoorden-naast-sliders §3) ──
-                    De antwoorden zelf staan onder hun knop (WhatIfSliders `antwoorden`,
-                    Vrijheidsas `stopAntwoord`); het losse antwoordenblok met kop is
-                    weg. Eén regel volle breedte, alleen bij ≥1 €-antwoord (meer salaris /
-                    minder uitgeven; eindreview M4 — "doorwerken tot" alleen smeert niets
-                    uit): hier staat één keer dat de bedragen uitgesmeerd zijn tot de
-                    eindleeftijd. */}
-                {labAntwoorden.some((a) => a.kind !== 'doorwerken') && !isNuStoppenMode && (
-                  <p
-                    data-testid="lab-antwoorden-sluitregel"
-                    className="mt-4 border-t border-[var(--border-ed)] pt-2 font-sans text-[11px] leading-snug text-[var(--ink-3)]"
-                  >
-                    Indicatie, geen advies — een rekenuitkomst bij je huidige aannames, uitgesmeerd over de maanden tot je eindleeftijd.
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-          </>
-          )}
-        </section>
-
         {/* Vastleg-/bijwerk-sheet (BottomSheet, boven de nav-pill). */}
         <DoelVastlegSheet
           open={doelSheetOpen}
@@ -7811,8 +7786,6 @@ export default function HorizonPage({
           onConfirm={handleStopPlanBevestigen}
           onClose={() => setStopPlanConfirmOpen(false)}
         />
-      </>
-      )}
 
       {/* === KATERN III — Wat het betekent ===
           Eén katern-kaart: SectionLabel + één card-editorial met de drie delen

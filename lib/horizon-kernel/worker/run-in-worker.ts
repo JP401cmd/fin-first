@@ -5,6 +5,7 @@
  *  - `runKernelAsync(rawContext)`   → hoofd- én scenario-projectie
  *  - `runForcedStopPathAsync(input)`→ het gekozen-stop-pad
  *  - `runScenarioPresetsAsync(ctx)` → de zes preset-kaarten + de tweede run (ADR 0129 D7)
+ *  - `runLabGrenzenAsync(ctx)`      → de grenzen op de vijf lab-knoppen (ADR 0170)
  *  - `runMarktcheckAsync(ctx)`      → kernel-marktcheck (percentielband /toekomst)
  *  - `runMonteCarloAsync(...)`      → losstaande legacy-MC (fase-modals/radar)
  *
@@ -44,6 +45,7 @@ import type {
   VariantenSweepResultaat,
   VariantenSweepSnapshot,
 } from '@/lib/tax-lifetime/varianten-sweep'
+import type { LabGrenzenContext, LabGrenzenResultaat } from '@/lib/horizon/lab-grenzen-types'
 import {
   createLaneDispatcher,
   KERNEL_SUPERSEDED,
@@ -241,6 +243,26 @@ export async function runScenarioPresetsAsync(
   const res = await dispatch({ id: claimId(), kind: 'presets', ctx }, { lane: opts?.lane })
   if (res.ok && res.kind === 'presets') return res.result
   return { presets: [], solvedFireAge: null, solvedFireEndAge: null, haalbareUitgave: null }
+}
+
+/**
+ * De grenzen-batch van het doelscenario-lab (ADR 0170) via de worker, of — zonder
+ * worker (jsdom/SSR/oude runtime) — synchroon via dezelfde dispatch. Bewust NIET
+ * `workerOnly`: de contract-tests draaien dan synchroon en byte-identiek.
+ *
+ * Eigen rijstrook `'grenzen'` (default): één in vlucht + één in de wachtkamer, een
+ * nieuwere batch verdringt de wachtende. Een VERDRONGEN batch levert `null` — de
+ * aanroeper laat dan de vorige grenzen staan (de nieuwere run is al onderweg). Ook
+ * `null` bij een worker-fout of onverwachte response-vorm: geen synchroon vangnet,
+ * dat zou ~90 kernel-runs alsnog op de main thread zetten.
+ */
+export async function runLabGrenzenAsync(
+  ctx: LabGrenzenContext,
+  opts?: { lane?: KernelLane },
+): Promise<LabGrenzenResultaat | null> {
+  const res = await dispatch({ id: claimId(), kind: 'grenzen', ctx }, { lane: opts?.lane ?? 'grenzen' })
+  if (res.ok && res.kind === 'grenzen') return res.result
+  return null
 }
 
 /**

@@ -8,7 +8,7 @@ import {
 } from './doel-vastleg-sheet'
 import { buildSliderEvent } from '@/lib/scenario-events'
 import { isDoelConceptGewijzigd, type ToekomstScenarioDoel } from '@/lib/horizon/toekomst-scenario'
-import type { WhatIfOverrides } from '@/components/app/horizon/whatif-sliders'
+import type { WhatIfOverrides } from '@/lib/types/horizon-whatif'
 
 /**
  * Unit-tests voor de doel-vastleg-laag (ronde 4 stap 5):
@@ -35,18 +35,19 @@ const incomeEvent = buildSliderEvent('income', 4000, BASELINE, 40)!
 const savingsEvent = buildSliderEvent('savings', 30, BASELINE, 40)!
 
 describe('buildLiveStand (persist-inclusieregels)', () => {
-  it('zonder baseline: geen slider-velden, wél stopAge/stopKoppel', () => {
+  it('zonder baseline: geen slider-velden, wél stopAge', () => {
     const stand = buildLiveStand({
       baseline: null,
       sliderEvents: [],
       returnDeltas: {},
       stopAge: null,
-      stopKoppel: false,
-      lockedMarge: null,
+      uitgaveNaPensioen: null,
+      nalatenschap: null,
     })
     expect(stand.sliders).toBeUndefined()
     expect(stand.stopAge).toBeNull()
-    expect(stand.stopKoppel).toBe(false)
+    expect(stand.uitgaveNaPensioen).toBeUndefined()
+    expect(stand.nalatenschap).toBeUndefined()
   })
 
   it('income-slider-afwijking landt niet meer in de stand (knop vervallen, spec §2)', () => {
@@ -55,8 +56,8 @@ describe('buildLiveStand (persist-inclusieregels)', () => {
       sliderEvents: [incomeEvent],
       returnDeltas: {},
       stopAge: null,
-      stopKoppel: false,
-      lockedMarge: null,
+      uitgaveNaPensioen: null,
+      nalatenschap: null,
     })
     expect(stand.sliders).toBeUndefined()
   })
@@ -67,8 +68,8 @@ describe('buildLiveStand (persist-inclusieregels)', () => {
       sliderEvents: [savingsEvent],
       returnDeltas: {},
       stopAge: null,
-      stopKoppel: false,
-      lockedMarge: null,
+      uitgaveNaPensioen: null,
+      nalatenschap: null,
     })
     expect(stand.sliders?.savings).toBe(30)
   })
@@ -79,23 +80,40 @@ describe('buildLiveStand (persist-inclusieregels)', () => {
       sliderEvents: [],
       returnDeltas: { Beleggingen: 0.02 },
       stopAge: null,
-      stopKoppel: false,
-      lockedMarge: null,
+      uitgaveNaPensioen: null,
+      nalatenschap: null,
     })
     expect(stand.returnDeltaByCategorie).toEqual({ Beleggingen: 0.02 })
   })
 
-  it('koppel + vastgehouden marge landt in stand.stopMarge', () => {
-    const stand = buildLiveStand({
+  // ADR 0170 — de twee profielparameter-knoppen. `null` = "wat het plan rekent", en dat moet
+  // als AFWEZIG veld landen: anders leest een stand met `uitgaveNaPensioen: null` straks als een
+  // bewuste keuze en meldt de opslaan-balk eeuwig "gewijzigd".
+  it('uitgave na pensioen en nalatenschap landen alleen wanneer ze gezet zijn', () => {
+    const basis = buildLiveStand({
       baseline: BASELINE,
       sliderEvents: [],
       returnDeltas: {},
       stopAge: 58,
-      stopKoppel: true,
-      lockedMarge: 2.5,
+      uitgaveNaPensioen: null,
+      nalatenschap: null,
     })
-    expect(stand.stopMarge).toBe(2.5)
-    expect(stand.stopAge).toBe(58)
+    expect('uitgaveNaPensioen' in basis).toBe(false)
+    expect('nalatenschap' in basis).toBe(false)
+    expect(basis.stopAge).toBe(58)
+
+    const gezet = buildLiveStand({
+      baseline: BASELINE,
+      sliderEvents: [],
+      returnDeltas: {},
+      stopAge: 58,
+      uitgaveNaPensioen: 31_200,
+      nalatenschap: 75_000,
+    })
+    expect(gezet.uitgaveNaPensioen).toBe(31_200)
+    expect(gezet.nalatenschap).toBe(75_000)
+    // … en die twee velden maken het concept gewijzigd t.o.v. de basis-stand.
+    expect(isDoelConceptGewijzigd(gezet, basis)).toBe(true)
   })
 })
 
@@ -105,7 +123,7 @@ describe('buildScenarioPersistPayload (doel in ELKE PUT — VERPLICHT)', () => {
     parameters: { spaarquote: true },
     // Legacy-vastgelegde stand met sliders.income: de parser leest dat veld tolerant
     // (spec §2), en het doel-blok mag zo'n oude stand gewoon dragen.
-    stand: { stopAge: null, stopKoppel: false, sliders: { income: 4000 } },
+    stand: { stopAge: null, sliders: { income: 4000 } },
   }
 
   it('na een sliderbeweging bevat de payload het doel-blok én de gewijzigde slider', () => {
@@ -115,13 +133,25 @@ describe('buildScenarioPersistPayload (doel in ELKE PUT — VERPLICHT)', () => {
       sliderEvents: [savingsEvent],
       returnDeltas: {},
       stopAge: null,
-      stopKoppel: false,
-      lockedMarge: null,
+      uitgaveNaPensioen: null,
+      nalatenschap: null,
     })
     const payload = buildScenarioPersistPayload({ stand, showScenarioLine: true, doel })
     expect(payload.v).toBe(2)
     expect(payload.sliders?.savings).toBe(30)
     expect(payload.doel).toEqual(doel) // ← het doel overleeft de sliderbeweging
+
+    // De twee profielparameter-knoppen reizen mee wanneer ze gezet zijn, en blijven weg
+    // wanneer ze op de plan-waarde staan (zie buildLiveStand).
+    const metKnoppen = buildScenarioPersistPayload({
+      stand: { ...stand, uitgaveNaPensioen: 31_200, nalatenschap: 75_000 },
+      showScenarioLine: true,
+      doel,
+    })
+    expect(metKnoppen.uitgaveNaPensioen).toBe(31_200)
+    expect(metKnoppen.nalatenschap).toBe(75_000)
+    expect('uitgaveNaPensioen' in payload).toBe(false)
+    expect('nalatenschap' in payload).toBe(false)
   })
 
   it('zonder doel géén doel-key in de payload', () => {
@@ -130,8 +160,8 @@ describe('buildScenarioPersistPayload (doel in ELKE PUT — VERPLICHT)', () => {
       sliderEvents: [],
       returnDeltas: {},
       stopAge: null,
-      stopKoppel: false,
-      lockedMarge: null,
+      uitgaveNaPensioen: null,
+      nalatenschap: null,
     })
     const payload = buildScenarioPersistPayload({ stand, showScenarioLine: true, doel: null })
     expect(payload.doel).toBeUndefined()
@@ -147,8 +177,8 @@ describe('conceptGewijzigd-flow (buildLiveStand + isDoelConceptGewijzigd)', () =
       sliderEvents: [],
       returnDeltas: {},
       stopAge: null,
-      stopKoppel: false,
-      lockedMarge: null,
+      uitgaveNaPensioen: null,
+      nalatenschap: null,
     })
     // Live draait de savings-slider → concept wijkt af.
     const gedraaid = buildLiveStand({
@@ -156,8 +186,8 @@ describe('conceptGewijzigd-flow (buildLiveStand + isDoelConceptGewijzigd)', () =
       sliderEvents: [savingsEvent],
       returnDeltas: {},
       stopAge: null,
-      stopKoppel: false,
-      lockedMarge: null,
+      uitgaveNaPensioen: null,
+      nalatenschap: null,
     })
     expect(isDoelConceptGewijzigd(gedraaid, doelStand)).toBe(true)
 
@@ -167,8 +197,8 @@ describe('conceptGewijzigd-flow (buildLiveStand + isDoelConceptGewijzigd)', () =
       sliderEvents: [],
       returnDeltas: {},
       stopAge: null,
-      stopKoppel: false,
-      lockedMarge: null,
+      uitgaveNaPensioen: null,
+      nalatenschap: null,
     })
     expect(isDoelConceptGewijzigd(hersteld, doelStand)).toBe(false)
   })

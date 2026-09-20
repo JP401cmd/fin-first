@@ -197,4 +197,27 @@ describe('/api/onboarding/reset', () => {
       expect(retry).toHaveProperty('fire_end_strategy')
     })
   })
+
+  /**
+   * B-058 (bug-reporter, 19 sep 2026) — repro voor de "premature succes-melding
+   * vlak na onboarding" (schuldenvrij / "je hoeft niet meer te werken").
+   *
+   * Root cause: `profiles.milestones_seeded_at` markeert volgens ADR 0123 §5 dat
+   * de mijlpaal-motor ooit voor deze user heeft gedraaid — "de eerste run viert
+   * niets" (lib/milestones/run.ts, seed-pad). Deze reset-route zet het profiel
+   * "terug naar de onboarding-startstaat" (zie het routedoc-comment) maar laat
+   * `milestones_seeded_at` ONGEMOEID. Een gereset + opnieuw doorlopen onboarding
+   * (het normale QA-testpatroon — zie testaccount-memory) slaat de stille
+   * seed-run dus over: elke drempel die de verse (leeg-gewiste) financiële staat
+   * toevallig raakt — `totalDebts === 0` is de triviale default van een net-
+   * gewist profiel — wordt bij het eerstvolgende /overzicht-bezoek META een
+   * "verse" mijlpaal en dus ONMIDDELLIJK gevierd (acknowledged_at: null) in
+   * plaats van stil gelogd. Dit faalt zolang de fix er niet is.
+   */
+  it('reset zet profiles.milestones_seeded_at terug naar null (ADR 0123 §5: een reset-account moet weer als "nooit geseed" gelden)', async () => {
+    await POST(resetRequest({ confirm: true }))
+    const seedPayload = profileUpdatePayloads.find((p) => 'milestones_seeded_at' in p)
+    expect(seedPayload).toBeDefined()
+    expect(seedPayload?.milestones_seeded_at).toBeNull()
+  })
 })

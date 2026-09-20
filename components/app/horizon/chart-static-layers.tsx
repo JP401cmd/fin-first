@@ -133,6 +133,7 @@ export function ChartStaticLayersInner({
     secondaryBasis,
     allPath,
     scenarioPaths,
+    scenarioDiffVlakken,
     householdPaths,
     mcPaths,
     depletion,
@@ -518,6 +519,23 @@ export function ChartStaticLayersInner({
           )}
         </g>
       )}
+
+      {/* VERSCHILVLAK tussen de hoofdlijn en de wat-als-lijn (ADR 0170). Achter beide lijnen,
+          dus de lijnen zelf blijven scherp. Groen waar de wat-als meer oplevert, rood waar hij
+          minder oplevert — semantiek, geen module-accent, en daarom de value-change-tokens
+          (`--positive`/`--negative`) en niet de fellere score-ladder van de knoppen: een vlak
+          op deze schaal moet de lijnen ondersteunen, niet overstemmen. */}
+      {scenarioDiffVlakken.map((vlak, i) => (
+        <path
+          key={`diff-${i}`}
+          data-testid={`scenario-diff-${vlak.kant}`}
+          d={vlak.d}
+          fill={vlak.kant === 'boven' ? 'var(--positive)' : 'var(--negative)'}
+          stroke="none"
+          opacity={hasEntered ? 0.16 : 0}
+          style={{ transition: hasEntered ? 'opacity 0.5s ease 0.25s' : 'none' }}
+        />
+      ))}
 
       {/* Scenario overlay paths (behind main line) */}
       {scenarioPaths.map((s, i) => {

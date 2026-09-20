@@ -79,34 +79,41 @@ describe('haalbare uitgave — bron-grendel', () => {
     expect(match, 'hasScenario mist de scenarioUitgaveNaPensioen-disjunct').not.toBeNull()
   })
 
-  it('de vierde knop mapt door naar de eigen antwoorden-sleutel van WhatIfSliders', () => {
-    // `labAntwoordenPerSlider` levert het veld `uitgave`; `WhatIfSliders` verwacht
-    // `uitgave_na_pensioen`. Zonder deze regel verdwijnt het antwoord onder de knop
-    // terwijl de tegelregel intact blijft — twee tegels, twee waarheden.
-    expect(source).toMatch(/uitgave_na_pensioen: labAntwoordenPerKnop\.uitgave/)
+  it('de knop staat als derde in de vijf van het doelscenario (ADR 0170)', () => {
+    // De antwoordregel met "Reken hiermee" verviel: de knop draagt zijn grens nu zelf
+    // (`computeLabGrenzen`). Wat blijft is dát deze knop bestaat, met zijn basis uit
+    // `haalbareUitgave` — één grondslag met de tegelregel erboven.
+    const start = source.indexOf('const labKnoppen = useMemo')
+    expect(start).toBeGreaterThan(-1)
+    const blok = source.slice(start, source.indexOf('const labFormatters', start))
+    expect(blok).toContain('out.uitgaveNaPensioen = {')
+    expect(blok).toContain('basis: uitgaveNaPensioenBasis')
+    expect(blok).toContain("grenzen: grens('uitgaveNaPensioen')")
   })
 
-  it('de klik op "Reken hiermee" zet de sliderstand (geen kale no-op)', () => {
-    expect(source).toMatch(/setScenarioUitgaveNaPensioen\(actie\.perJaar\)/)
+  it('"Herstel mijn doel" zet de knop terug UIT de stand (ADR 0170: hij reist nu mee)', () => {
+    const start = source.indexOf('const handleDoelHerstellen = useCallback')
+    expect(start).toBeGreaterThan(-1)
+    const body = source.slice(start, source.indexOf('}, [doelBlok', start))
+    // Vóór ADR 0170 kende `doel.stand` dit veld niet en viel herstel hard op `null` terug;
+    // nu heeft "afwezig in de stand" één betekenis: wat het plan rekent.
+    expect(body).toContain('setScenarioUitgaveNaPensioen(stand.uitgaveNaPensioen ?? null)')
+    expect(body).toContain('setScenarioNalatenschap(stand.nalatenschap ?? null)')
   })
 
-  it('"Herstel mijn doel" zet de vierde knop terug — het doel kent het veld niet', () => {
-    const match = source.match(
-      /const handleDoelHerstellen = useCallback\(\(\) => \{([\s\S]*?)\n {2}\}, \[doelBlok, whatIfBaseline, currentAge, isFixedAnchorMode\]\)/,
+  it('de drift-detectie ziet de knop via de stand, niet via een losse noodgreep', () => {
+    const start = source.indexOf('const conceptGewijzigd = useMemo')
+    expect(start).toBeGreaterThan(-1)
+    const body = source.slice(start, source.indexOf('}, [doelActief', start))
+    // ADR 0170 — `buildLiveStand` draagt de knop nu zelf, dus de noodgreep ("elke actieve
+    // override IS drift") is weg: een doel dát mét de knop is vastgelegd blijft nu terecht
+    // "ongewijzigd" staan.
+    expect(body).not.toContain('scenarioUitgaveNaPensioen != null ||')
+    expect(body).toContain('isDoelConceptGewijzigd(buildLiveStandNow()')
+    const standStart = source.indexOf('const buildLiveStandNow = useCallback')
+    expect(source.slice(standStart, source.indexOf('const conceptGewijzigd', standStart))).toContain(
+      'uitgaveNaPensioen: scenarioUitgaveNaPensioen',
     )
-    expect(match, 'handleDoelHerstellen niet gevonden').not.toBeNull()
-    expect(match![1]).toMatch(/setScenarioUitgaveNaPensioen\(null\)/)
-  })
-
-  it('de doel-driftbanner ziet een actieve vierde knop als drift', () => {
-    const match = source.match(
-      /const conceptGewijzigd = useMemo\(([\s\S]*?)\n {2}\)/,
-    )
-    expect(match, 'conceptGewijzigd niet gevonden').not.toBeNull()
-    const [, body] = match!
-    expect(body).toMatch(/scenarioUitgaveNaPensioen != null/)
-    // Zonder de dependency zou de memo op een stale waarde blijven staan.
-    expect(body).toMatch(/\[doelActief, doelBlok, buildLiveStandNow, isFixedAnchorMode, scenarioUitgaveNaPensioen\]/)
   })
 
   // ── F1 (eindreview 19 sep) — terugdraaien naar neutraal ondanks raster-afronding ──
@@ -130,14 +137,11 @@ describe('haalbare uitgave — bron-grendel', () => {
     expect(Math.abs(dichtstbijzijnde - basis)).toBeLessThan(UITGAVE_NA_PENSIOEN_STAP / 2)
   })
 
-  it('F1 — de override valt terug op null binnen een halve sliderstap van de basis, niet alleen bij exacte gelijkheid', () => {
-    // Zonder deze tolerantie blijft `hasScenario` waar en blijft de "doel
-    // gewijzigd"-banner staan nadat de gebruiker precies terugsleepte naar de
-    // dichtstbijzijnde bereikbare stand (bovenstaande test bewijst dat die stand
-    // vrijwel nooit exact de basis is).
-    expect(source).toMatch(
-      /Math\.abs\(v - uitgaveNaPensioenBasis\) < UITGAVE_NA_PENSIOEN_STAP \/ 2\s*\n\s*\? null\s*\n\s*: v,/,
-    )
+  it('F1 — de override valt terug op null binnen een halve sliderstap van de basis', () => {
+    // Zonder deze tolerantie blijft `hasScenario` waar en blijft de opslaan-balk "gewijzigd"
+    // melden nadat de gebruiker precies terugsleepte naar de dichtstbijzijnde bereikbare stand
+    // (de test hierboven bewijst dat die stand vrijwel nooit exact de basis is).
+    expect(source).toContain('Math.abs(v - uitgaveNaPensioenBasis) < UITGAVE_NA_PENSIOEN_STAP / 2 ? null : v')
     // De oude, te-strenge vorm (exacte gelijkheid) mag nergens meer voorkomen.
     expect(source).not.toMatch(/v === (haalbareUitgave\.huidigPerJaar|uitgaveNaPensioenBasis) \? null : v/)
   })
@@ -154,12 +158,11 @@ describe('haalbare uitgave — bron-grendel', () => {
   })
 
   // ── F2a + F3 (eindreview 19 sep) — de vierde knop, grondslag en zichtbaarheid ──
-  it('F2a — de knop-prop deelt de grondslagregel van de tegel: alleen in de eigen weergave', () => {
-    // Huishoud-/partnerweergave heeft een ANDER "uitgave na pensioen"-getal
-    // (perspectiveHero.retirementExpense) dan wat deze knop als basis zet
-    // (huidigPerJaar/yearlyMustExpenses, altijd de EIGEN invoer) — dezelfde
-    // grondslagvermenging die de tegelregel al uitsluit met `!hasPerspectiveHero`.
-    expect(source).toMatch(/!hasPerspectiveHero && uitgaveNaPensioenBasis > 0/)
+  it('F2a — de zichtbaarheid van de knop hangt aan zijn grondslag, de sectie aan het perspectief', () => {
+    // ADR 0170 — een knop bestaat zodra hij een bereik heeft; de perspectief-gate zit op de
+    // sectie als geheel (`verkenSectieZichtbaar`, solo-weergave), niet meer per knop-prop.
+    expect(source).toContain('if (uitgaveNaPensioenBasis > 0) {')
+    expect(source).toContain('const verkenSectieZichtbaar')
   })
 
   it('F3 — de knop bestaat onafhankelijk van een opgelost antwoord (verkenning blijft mogelijk zonder vast stopmoment)', () => {
