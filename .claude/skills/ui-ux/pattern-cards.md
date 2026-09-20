@@ -10,7 +10,7 @@ Bewuste, niet-universele patronen. Activeer alleen wanneer het paginatype erom v
 
 ### Pagina-aanhef die het oordeel uitspreekt ⭐ (nieuwe standaard, sep 2026)
 - **Component**: `PageVerdictOpening` (`components/editorial/page-verdict-opening.tsx`), met `PageVerdictSuffix` voor een oordeel dat nakomt.
-- **Toepassen op**: **elke app-pagina-opening** onder `/overzicht/**` en `/toekomst/**`. De titel bestaat uit twee delen — paginanaam + oordeel:
+- **Toepassen op**: **elke app-pagina-opening** onder `/overzicht/**` en `/toekomst/**`, met één uitzondering (de hub `/overzicht` zelf, zie onder). De titel bestaat uit twee delen — paginanaam + oordeel:
   - **desktop (≥lg)**: "Transacties | Krap deze maand" — daar is geen TopBar, dus de titel draagt de naam zelf.
   - **mobiel (<lg)**: alleen "Krap deze maand" — de TopBar van de shell draagt de naam al.
   - Het verschil is **CSS-only** (`hidden lg:inline`), nooit een JS-breakpoint-branch: de shell eist identieke server-/client-HTML.
@@ -21,6 +21,7 @@ Bewuste, niet-universele patronen. Activeer alleen wanneer het paginatype erom v
 - **Kicker vervalt wanneer hij het onderwerp herhaalt** — en dat deed hij bijna altijd ("Je geldstroom" boven Transacties, "Budgetteren" boven Budget, "Bezittingen · opgeslagen vrijheid" boven Bezittingen). Draagt hij informatie die niet weg mag (maandvenster, perspectief-label), verhuis die naar de deck. **Uitzondering:** een kicker die iets draagt wat de titel níét zegt, mag blijven — op `/overzicht` is dat de datum ("ZONDAG 20 SEPTEMBER 2026"), die nergens anders op de pagina staat.
 - **Deck**: twee korte zinnen, samen ~20 woorden. Eerste zin: wat de pagina is. Tweede zin: wat het oordeel betekent.
 - **Kop bewust dataloos (LCP)?** Gebruik `verdictSlot` met een eigen `<Suspense>`; de naam blijft dan op beide breakpoints staan en de titel groeit in plaats van te verspringen. Zie `/overzicht/budget/vaste-lasten` en `/forecast`.
+- **Uitzondering — de hub `/overzicht` zelf** (eigenaarsbesluit 20 sep 2026): daar draagt de kop de **begroeting met je naam**, niet het oordeel. Het gezondheidsoordeel verhuist naar de deck eronder, met het oordeelswoord in de stoplichtkleur; bij een onbekende grondslag valt de deck terug op een neutrale beschrijving in plaats van een verzonnen oordeel. Reden: de hub is het eerste scherm van de dag en opent met een aanspreking, niet met een verdict. Dit geldt alléén voor de hub-route zelf — élke subpagina onder `/overzicht/**` houdt de oordeel-aanhef. Implementatie: `components/overview/overzicht-hero.tsx`. Let op: `overzicht-hero.block-order.test.ts` bewaakt de blokvólgorde, niet de uitzondering zelf — hij houdt 'm alleen indirect vast doordat zijn anker op `<EditorialHeadline` faalt zodra iemand er `PageVerdictOpening` van maakt. Een expliciete assertie ontbreekt nog.
 - **Verboden**: gradient-kaart-dozen als pagina-kop; Tailwind-standaardkleuren; het module-accent op het oordeelswoord; een tweede kop-variant naast deze binnen dezelfde routefamilie.
 - **Referentie-implementaties**: `app/(app)/overzicht/budget/transacties/page.tsx` (direct oordeel), `app/(app)/overzicht/budget/vaste-lasten/` (stromend oordeel), `components/future/toekomst-subpage-shell.tsx` en `components/overview/belasting-box-page-header.tsx` (gedeelde shells, één `route`-prop).
 
