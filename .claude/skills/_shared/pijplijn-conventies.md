@@ -34,6 +34,12 @@ Een gedispatchte sub-agent draait zijn eigen verificatie- en review-gates (bv. `
 
 **Geen geneste achtergrond-fan-out.** Een sub-agent mag zelf géén verdere Agent-aanroepen doen met `run_in_background: true`. Een sub-agent kan — anders dan de hoofdchat — niet betrouwbaar over meerdere beurten heen blokkerend wachten op zijn eigen achtergrond-children: hij eindigt zijn beurt, en "ik wacht op hun notificatie" is dan een dode belofte die de orchestrator alsnog handmatig moet detecteren en overnemen (agent-ID's opvragen, children hervatten) — precies de kostbare halve-afronding die deze sectie al verbiedt. Moet een sub-agent werk laten fan-outen naar meerdere andere agents: doe dat **synchroon/foreground binnen dezelfde beurt** (wacht zelf op elk resultaat vóór je verdergaat), of geef de fan-out expliciet terug aan de orchestrator in plaats van 'm zelf in de achtergrond te starten.
 
+## Tests op een pure functie — élke tak, béíde uiteinden
+
+Schrijf je een pure functie met **klem-grenzen of piecewise-takken** (een afbeelding die links anders rekent dan rechts, een clamp, een `?:`-vangnet op een randwaarde), toets die dan op élke tak aan béíde uiteinden. Een test die alleen het middengeval dekt, dekt precies de hoek niet waarvoor de functie geschreven is — en blijft dan groen over de bug heen.
+
+Gemeten 20 sep 2026 (`standUitVinger`, `components/app/horizon/lab-wijzer.tsx`): de functie bestond om beide uiteinden van een schaal bereikbaar te houden, en de test heette letterlijk *"houdt beide uiteinden bereikbaar, ook bij een scheef pakpunt"* — maar voerde alleen het middengeval (`pak = 0.54`) op. De randwaarde `pak = 1` maakte een hele tak dood en het maximum onbereikbaar; de suite bleef groen, en pas de eindreview ving het. Toets dus niet dát de eigenschap geldt, maar dát hij geldt wáár hij kan breken.
+
 ## Leak-checks — altijd óók de anon-rol
 
 Een RLS-leak-check die alleen eigenaar-isolatie test (gebruiker A ziet geen rijen van gebruiker B) is onvolledig: test voortaan ALTIJD ook de `anon`-rol — verwacht 0 rijen én géén fout. Een policy-fout in plaats van een lege set duidt op een rolset-/execute-rechten-regressie, niet op correcte afscherming (zo gevangen bij ADR 0048, waar een SECURITY DEFINER-helper zonder anon-execute-recht anders per ongeluk een harde fout had kunnen geven i.p.v. stil 0 rijen).
