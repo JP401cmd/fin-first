@@ -209,6 +209,14 @@ export type ConvergentieProjectionOutcome =
        * matchen op `code`, nooit op tekst (`hasAowOntbreektNotice`).
        */
       readonly notices: readonly EventMappingNotice[]
+      /**
+       * De uitgave na pensioen (€/jaar, nominaal) waar DEZE run mee gerekend heeft —
+       * zie `RunKernelUnifiedResult.uitgaveNaPensioenPerJaar`. Reist mee zodat het
+       * `retirement_expense`-doel zich aan het plan-getal kan meten zonder de
+       * grondslag (essentiële budgetten / jaarinkomen / eigen bedrag) een tweede keer
+       * samen te stellen.
+       */
+      readonly uitgaveNaPensioenPerJaar: number
     }
   | {
       readonly ok: false
@@ -231,7 +239,7 @@ export function computeConvergentieProjection(
   const { rawContext } = params
   try {
     const adapterInput = buildConvergentieAdapterInput(rawContext)
-    const { result, notices } = runKernelUnified({
+    const { result, notices, uitgaveNaPensioenPerJaar } = runKernelUnified({
       adapterInput,
       yearlyExpenses: rawContext.yearlyExpenses,
     })
@@ -242,6 +250,7 @@ export function computeConvergentieProjection(
       kernelMaandHint: result.kernelMaandHint,
       kernelHousingSale: result.kernelHousingSale,
       notices,
+      uitgaveNaPensioenPerJaar,
     }
   } catch (err) {
     // Een kern-fout (bv. ontbrekende geboortedatum) mag het oppervlak nooit laten

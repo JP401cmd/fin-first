@@ -4,11 +4,16 @@ import { createClient } from '@/lib/supabase/server'
 import { isSuperAdmin } from '@/lib/admin'
 import { getModel } from '@/lib/ai/config'
 import { runNewsIngest } from '@/lib/news-ingest'
+import { DUIDING_MAX_PER_RUN_HANDMATIG, DUIDING_TIJDBUDGET_MS_HANDMATIG } from '@/lib/krant/duiding'
 
 // ── POST — Manual news ingestion (admin-triggered) ───────────────────
 //
 // Dunne wrapper om de gedeelde pipeline in lib/news-ingest.ts — dezelfde
-// code draait in de dagelijkse cron (/api/news-ingest/cron).
+// code draait in de dagelijkse cron (/api/news-ingest/cron). De duidingsstap
+// krijgt hier een kleinere batch en een tijdbudget van 60 s (ADR 0171): de
+// ingest zelf kost 70–90 s, dus de knop komt ruim binnen de duur terug.
+
+export const maxDuration = 300
 
 export async function POST() {
   const supabase = await createClient()
@@ -27,7 +32,19 @@ export async function POST() {
       // AI model not configured — proceed without enrichment
     }
 
-    const { summary } = await runNewsIngest(supabase, model)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let duidingModel: any = null
+    try {
+      duidingModel = await getModel(supabase, 'nieuws_duiding')
+    } catch {
+      // Zonder model wordt alleen de wachtrij geteld
+    }
+
+    const { summary } = await runNewsIngest(supabase, model, {
+      duidingModel,
+      duidingMaxPerRun: DUIDING_MAX_PER_RUN_HANDMATIG,
+      duidingTijdBudgetMs: DUIDING_TIJDBUDGET_MS_HANDMATIG,
+    })
 
     return NextResponse.json({ success: true, summary })
   } catch (err) {

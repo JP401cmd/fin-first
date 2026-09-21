@@ -91,6 +91,15 @@ export interface Box1Input {
   hypotheekRente?: number // jaarlijkse aftrekbare rente eigen woning
   heeftKinderenOnder12?: boolean // voor IACK (optioneel)
   dailyExpenses?: number // voor freedomDays
+  /**
+   * Parameter-override (Krant 1B, keuze 9, 21 sep 2026): rekent met déze
+   * parameters in plaats van `BOX1_PARAMS[year]`. Bedoeld voor "wat betekent
+   * een AANGEKONDIGDE wijziging" — een schijfgrens of korting die nog in geen
+   * jaar-tabel staat — zodat oud en nieuw op dezelfde motor naast elkaar
+   * gelegd kunnen worden. Weglaten = byte-identiek aan vóór 21 sep 2026;
+   * `year` blijft verplicht en wordt als label meegegeven in het resultaat.
+   */
+  params?: Box1Params
 }
 
 export interface Box1Result {
@@ -496,7 +505,7 @@ function computeTariefsaanpassing(
 function computeBox1Core(
   input: Box1Input,
 ): Omit<Box1Result, 'marginalRate' | 'eigenwoningBelastingEffect'> {
-  const params = BOX1_PARAMS[input.year]
+  const params = input.params ?? BOX1_PARAMS[input.year]
   const aow = input.aow ?? false
   const schijven = aow ? params.schijvenAow : params.schijven
   const gross = Math.max(0, input.grossYearlyIncome)
@@ -584,6 +593,7 @@ export function computeBox1Tax(input: Box1Input): Box1Result {
   // terugval terug — daarom is de uitkomst dan bit-identiek aan vóór aug 2026.
   const marginalRate = marginalRateAt(core.grossYearlyIncome, input.year, input.aow, {
     arbeidsinkomen: input.arbeidsinkomen,
+    params: input.params,
   })
 
   // Het werkelijke belastingeffect van de eigen woning = de heffingsdelta t.o.v.
@@ -624,12 +634,13 @@ export function marginalRateAt(
   income: number,
   year: Box1TaxYear,
   aow?: boolean,
-  opts?: { arbeidsinkomen?: number },
+  opts?: { arbeidsinkomen?: number; params?: Box1Params },
 ): number {
   if (income < 0) return 0
   const arbeidsinkomen = opts?.arbeidsinkomen
-  const lo = computeBox1Core({ grossYearlyIncome: income, year, aow, arbeidsinkomen })
-  const hi = computeBox1Core({ grossYearlyIncome: income + 1, year, aow, arbeidsinkomen })
+  const params = opts?.params
+  const lo = computeBox1Core({ grossYearlyIncome: income, year, aow, arbeidsinkomen, params })
+  const hi = computeBox1Core({ grossYearlyIncome: income + 1, year, aow, arbeidsinkomen, params })
   return hi.tax - lo.tax
 }
 
@@ -731,7 +742,7 @@ export function hraAftrekTarief(
 export function grossFromNet(
   targetNetYearly: number,
   year: Box1TaxYear,
-  opts?: { aow?: boolean; arbeidsinkomen?: number },
+  opts?: { aow?: boolean; arbeidsinkomen?: number; params?: Box1Params },
 ): number {
   if (!(targetNetYearly > 0)) return 0
   // `arbeidsinkomen` staat VAST over de hele bisectie: het is een eigenschap van
@@ -739,12 +750,14 @@ export function grossFromNet(
   // pensioenbedrag hoort hier 0 — anders zoekt de inversie het bruto waarbij een
   // arbeidskorting meetelt die de ontvanger niet krijgt, en valt het bruto (en
   // daarmee elke heffing die erop volgt) te laag uit.
+  // `params` (optioneel) inverteert met een parameter-override — zie Box1Input.
   const netAt = (gross: number): number =>
     computeBox1Core({
       grossYearlyIncome: gross,
       year,
       aow: opts?.aow,
       arbeidsinkomen: opts?.arbeidsinkomen,
+      params: opts?.params,
     }).nettoBesteedbaar
 
   // Bruto ≥ netto (belasting ≥ 0). Onder de bovengrens van een ruime gok

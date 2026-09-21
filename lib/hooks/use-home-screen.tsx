@@ -33,8 +33,10 @@ import {
 import {
   DEFAULT_HOME_SCREEN,
   HOME_SCREEN_HREFS,
+  resolveHomeHref,
   type HomeScreen,
 } from '@/lib/home-screen'
+import type { ModuleId } from '@/lib/module-registry'
 
 export type { HomeScreen }
 
@@ -71,9 +73,17 @@ async function persistHomeScreen(screen: HomeScreen): Promise<boolean> {
 
 export function HomeScreenProvider({
   initialHomeScreen,
+  activeModules,
   children,
 }: {
   initialHomeScreen: HomeScreen
+  /**
+   * De opgeloste moduleset (`resolveActiveModules`, server-side in de layout).
+   * `homeHref` komt uit dezelfde `resolveHomeHref` als de proxy, zodat een
+   * account met alleen 'nieuws' ook via top-bar ← en de waffle op /nieuws
+   * landt. Weggelaten = alle modules = alleen de homescherm-keuze telt.
+   */
+  activeModules?: readonly ModuleId[]
   children: ReactNode
 }) {
   // Seed uit de server-prop (NIET altijd-default) zodat SSR == client → geen flash.
@@ -97,11 +107,11 @@ export function HomeScreenProvider({
   const value = useMemo<HomeScreenContextValue>(
     () => ({
       homeScreen,
-      homeHref: HOME_SCREEN_HREFS[homeScreen],
+      homeHref: resolveHomeHref({ home_screen: homeScreen, active_modules: activeModules }),
       setHomeScreen,
       toggle,
     }),
-    [homeScreen, setHomeScreen, toggle],
+    [homeScreen, activeModules, setHomeScreen, toggle],
   )
 
   return <HomeScreenContext.Provider value={value}>{children}</HomeScreenContext.Provider>

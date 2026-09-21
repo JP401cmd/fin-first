@@ -1,6 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
-import { HOME_SCREEN_HREFS, homeHrefFor } from '@/lib/home-screen'
+import { HOME_SCREEN_HREFS, resolveHomeHref } from '@/lib/home-screen'
 
 /**
  * Cron-routes: headless aangeroepen, dus GEEN sessiecookie. Het echte auth-slot
@@ -178,7 +178,7 @@ export async function updateSession(request: NextRequest) {
   const authPages = ['/', '/login', '/signup', '/forgot-password']
   if (user && (authPages.includes(pathname) || pathname === '/dashboard')) {
     const url = request.nextUrl.clone()
-    url.pathname = await resolveHomeHref(supabase, user.sub)
+    url.pathname = await lookupHomeHref(supabase, user.sub)
     // Draag de door setAll ververste sessiecookies over op de redirect: een
     // kale NextResponse.redirect draagt de Set-Cookie-headers van
     // `supabaseResponse` niet, en juist de PWA-koudstart (start_url =
@@ -226,27 +226,35 @@ export async function updateSession(request: NextRequest) {
 const HOME_LOOKUP_TIMEOUT_MS = 800
 
 /**
- * Gekozen homescherm van de ingelogde gebruiker (profiles.home_screen) →
- * route. De `.eq('id', userId)` maakt de eigen-rij-scoping expliciet i.p.v.
+ * Home van de ingelogde gebruiker → route. Eén eigen-rij-query op
+ * `home_screen, active_modules`; `resolveHomeHref` (lib/home-screen.ts) laat
+ * een account met alleen 'nieuws' op /nieuws landen en volgt verder de
+ * homescherm-keuze (Krant 2A). De `.eq('id', userId)` maakt de eigen-rij-scoping expliciet i.p.v.
  * alleen op de (vandaag own-row) RLS-policy te leunen — een toekomstige
  * bredere SELECT-policy op profiles kan deze lookup dan niet verleggen.
  * Fail-open naar /overzicht: een query-fout, timeout, ontbrekende rij
  * (verse signup) of onbekende waarde mag de login-landing nooit breken.
  */
-async function resolveHomeHref(
+async function lookupHomeHref(
   supabase: ReturnType<typeof createServerClient>,
   userId: unknown,
 ): Promise<string> {
   if (typeof userId !== 'string' || !userId) return HOME_SCREEN_HREFS.overzicht
   try {
     const result = await Promise.race([
-      supabase.from('profiles').select('home_screen').eq('id', userId).single(),
+      supabase
+        .from('profiles')
+        .select('home_screen, active_modules')
+        .eq('id', userId)
+        .single(),
       new Promise<null>((resolve) =>
         setTimeout(() => resolve(null), HOME_LOOKUP_TIMEOUT_MS),
       ),
     ])
     if (!result || result.error) return HOME_SCREEN_HREFS.overzicht
-    return homeHrefFor((result.data as { home_screen?: unknown } | null)?.home_screen)
+    return resolveHomeHref(
+      result.data as { home_screen?: unknown; active_modules?: unknown } | null,
+    )
   } catch {
     return HOME_SCREEN_HREFS.overzicht
   }

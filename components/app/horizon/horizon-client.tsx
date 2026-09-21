@@ -128,6 +128,8 @@ import { PageInfoButton, GlossaryTerm, SectionLabel, Kicker } from '@/components
 import { formatAge } from '@/lib/horizon/fire-format'
 import {
   zoneVanHuidig,
+  zoneVanWaarde,
+  HEFBOOM_RICHTING,
   type HefboomBereik,
   type HefboomKey,
   type LabGrenzenResultaat,
@@ -4050,9 +4052,41 @@ export default function HorizonPage({
   const doelPreviews = useMemo<DoelParameterPreview[]>(() => {
     const stand = buildLiveStandNow()
     const previews: DoelParameterPreview[] = []
+    // DE DRIE KNOP-DOELEN (20 sep 2026 — vijf knoppen, vijf doelen). Zelfde conditie-stijl
+    // als de buren: `buildLiveStand` zet deze velden ALLEEN wanneer de knop van de
+    // plan-waarde afwijkt, dus "veld aanwezig" ís de afwijkingstoets — geen tweede
+    // vergelijking hier. De extra `> 0`-toets spiegelt de weigering in `buildRow`: een
+    // knop op nul (of negatief: "minder salaris") levert geen doelrij, dus beloof 'm ook
+    // niet in de sheet. Bedragen volgen de privacy-weergave zoals elders op deze pagina
+    // (`formatMaskedCurrency`) en zijn op hele euro's afgerond, net als in de builder.
+    //
+    // DE RIJ-ORDE VOLGT DE KNOPPEN OP HET SCHERM (`HEFBOOM_KEYS`: verdienen · uitgeven ·
+    // uitgave na pensioen · nalatenschap · stop), niet de `DOEL_PARAMETERS`-orde waarin de
+    // server de rijen bouwt — de sheet is wat de gebruiker net heeft aangeraakt.
+    if (whatIfBaseline && stand.sliders?.extraInleg !== undefined && stand.sliders.extraInleg > 0) {
+      previews.push({
+        parameter: 'extraInleg',
+        label: GOAL_TYPE_LABELS.extra_deposit,
+        waarde: `${formatMaskedCurrency(Math.round(stand.sliders.extraInleg), masked)}/mnd`,
+      })
+    }
     if (whatIfBaseline && stand.sliders?.savings !== undefined) {
       const savings = readSliderValueFromEvents('savings', scenarioSliderEvents, whatIfBaseline)
       previews.push({ parameter: 'spaarquote', label: 'Spaarquote', waarde: `${Math.round(savings)}%` })
+    }
+    if (stand.uitgaveNaPensioen !== undefined && stand.uitgaveNaPensioen > 0) {
+      previews.push({
+        parameter: 'uitgaveNaPensioen',
+        label: GOAL_TYPE_LABELS.retirement_expense,
+        waarde: `${formatMaskedCurrency(Math.round(stand.uitgaveNaPensioen), masked)}/jaar`,
+      })
+    }
+    if (stand.nalatenschap !== undefined && stand.nalatenschap > 0) {
+      previews.push({
+        parameter: 'nalatenschap',
+        label: GOAL_TYPE_LABELS.legacy_amount,
+        waarde: formatMaskedCurrency(Math.round(stand.nalatenschap), masked),
+      })
     }
     if (stand.returnDeltaByCategorie !== undefined && doelRendementPct !== null) {
       previews.push({
@@ -4094,6 +4128,7 @@ export default function HorizonPage({
     isFixedAnchorMode,
     labPromotie,
     labDekking,
+    masked,
   ])
 
   // Vastleggen/bijwerken: bouw de doelwaarden voor de aangevinkte parameters en promoveer via
@@ -4119,6 +4154,13 @@ export default function HorizonPage({
           gekozen.eindvermogen && labDekking?.scenarioEindvermogen?.kind === 'bedrag'
             ? labDekking.scenarioEindvermogen.nominaal
             : undefined,
+        // De drie KNOP-doelwaarden (20 sep 2026): recht uit dezelfde `stand` die ook de
+        // preview voedde en als `doel.stand` wordt vastgelegd — één bron, dus de rij in
+        // de sheet en de rij in `goals` kunnen niet uiteenlopen. Staat de knop op de
+        // plan-waarde, dan ontbreekt het veld in de stand en is er niets te promoveren.
+        extraInlegMnd: gekozen.extraInleg ? stand.sliders?.extraInleg : undefined,
+        uitgaveNaPensioenJaar: gekozen.uitgaveNaPensioen ? stand.uitgaveNaPensioen : undefined,
+        nalatenschapBedrag: gekozen.nalatenschap ? stand.nalatenschap : undefined,
       }
       setDoelSaving(true)
       try {
@@ -5365,6 +5407,21 @@ export default function HorizonPage({
     handleStopAgeChange,
     masked,
   ])
+
+  /**
+   * De nalatenschap-marker voor de grafiek: de bol op het eind van de wat-als-lijn
+   * (eigenaarsbesluit 20 sep 2026). Alleen wanneer de knop BESTAAT — onder eind-vorm
+   * `perpetual` staat hij niet in `labKnoppen` en dan hoort er ook geen bol te zijn.
+   *
+   * Consume, don't recompute: het oordeel wordt hier geveld (dezelfde `zoneVanWaarde` op
+   * dezelfde kernel-grenzen als de knop zelf) en reist als kale zone naar de grafiek; de
+   * geometrie bepaalt alleen nog de positie. Zo kunnen de bol en de knop niet uit elkaar lopen.
+   */
+  const nalatenschapMarker = useMemo(() => {
+    const knop = labKnoppen.nalatenschap
+    if (!knop) return undefined
+    return { zone: zoneVanWaarde(knop.value, knop.grenzen, HEFBOOM_RICHTING.nalatenschap) }
+  }, [labKnoppen])
 
   /**
    * Per knop de drie formatters (waarde, delta, grens). De privacy-weergave maskeert hier —
@@ -7304,6 +7361,13 @@ export default function HorizonPage({
                             // visueel bij elkaar horen. FIRE-annotaties blijven goud (COLOR_OPBOUW).
                             mainLineColor={(usePartnerMainLine || useHouseholdMainLine) ? COLOR_PARTNER_EVENT : undefined}
                             scenarioOverlays={(usePartnerMainLine || useHouseholdMainLine) ? undefined : viewCombinedScenarioOverlays}
+                            // Het verschilvlak onder de basislijn kleurt neutraal zolang het
+                            // plan gedekt is, en alleen rood als het plan niet reikt.
+                            planZone={labZone}
+                            // Bol op het eind van de wat-als-lijn in de stoplichtkleur van de
+                            // nalatenschap-knop. Op een partner-/huishoudlijn rekent het lab
+                            // niet, dus daar staat ook geen wat-als-lijn om 'm op te zetten.
+                            nalatenschapMarker={(usePartnerMainLine || useHouseholdMainLine) ? undefined : nalatenschapMarker}
                             scenarioPending={scenarioPending || stopPadPending}
                             mainPending={projectiePending}
                             monteCarloOverlay={(usePartnerMainLine || useHouseholdMainLine) ? undefined : viewMonteCarloOverlay}

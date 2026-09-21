@@ -647,3 +647,51 @@ export const GOAL_PACE_MIN_MEASURE_MONTHS = 1
  * WERKELIJKE Box 2-inkomen, zodat de schaal geen impliciete aanbeveling meer is.
  */
 export const BOX2_SIMULATOR_SCHAAL_FACTOR = 1.3
+
+// ── Krant — de HUIDIGE waarde van een regel (jaargebonden) ──────
+//
+// De Krant (lib/krant, ADR 0172) legt een aangekondigde waarde uit een
+// nieuwsartikel naast de waarde die nú geldt. Voor box 1 en box 3 komt die
+// huidige waarde uit BOX1_PARAMS/BOX3_PARAMS; voor het eigen risico en de
+// DUO-rente bestond er geen canonieke plek (keuze 11, 21 sep 2026). Ze staan
+// hier, per jaar, zodat het mechanisme "nieuw − huidig" kan rekenen. Ontbreekt
+// een jaar, dan GOKT de Krant niet: het mechanisme degradeert naar de
+// gevoeligheidsvorm (studieschuld) of naar "relevant zonder bedrag" (eigen
+// risico). Bijhouden via de fiscale-wijzigingslog, samen met BOX3_PARAMS.
+
+/**
+ * Verplicht eigen risico basisverzekering per kalenderjaar — €385 in 2025 en
+ * 2026 (bevroren). Bron: Rijksoverheid/Zorginstituut, geverifieerd 21 sep 2026.
+ * 2027 is op die datum NIET besloten (begroting rekent met €400 door
+ * indexatie; er liggen wetsvoorstellen voor €165 en €455) — bewust niet
+ * opgenomen: een aangekondigde waarde komt uit het artikel, niet van hier.
+ */
+export const ZORG_EIGEN_RISICO: Readonly<Record<number, number>> = {
+  2025: 385,
+  2026: 385,
+}
+
+/** Het verplicht eigen risico geldt vanaf deze leeftijd (Zvw: verzekerden van 18 jaar en ouder). */
+export const ZORG_EIGEN_RISICO_VANAF_LEEFTIJD = 18
+
+/**
+ * Rente op studieschuld bij DUO per kalenderjaar, in PROCENTEN, per stelsel:
+ * `sf35` (leningen met 35 jaar terugbetaaltermijn, het huidige stelsel) en
+ * `sf15` (15 jaar, oud stelsel). Bron: DUO, "Rentepercentages
+ * studiefinanciering voor 2026 bekend", geverifieerd 21 sep 2026. Het profiel
+ * van de Krant kent het stelsel niet; het mechanisme rekent daarom met beide
+ * en toont het bereik.
+ */
+export const DUO_RENTE_PCT: Readonly<Record<number, { readonly sf15: number; readonly sf35: number }>> = {
+  2025: { sf15: 2.21, sf35: 2.57 },
+  2026: { sf15: 2.29, sf35: 2.33 },
+}
+
+/**
+ * De stap waarin de Krant een MARKTbeweging uitdrukt (B5): "elke 0,25
+ * procentpunt is op jouw band € x tot € y per jaar". Geen voorspelling — de
+ * bank hoeft een ECB-besluit niet te volgen — maar een blootstellingsmaat.
+ * In PROCENTPUNTEN; één plek, zodat de sjabloontekst en de som dezelfde stap
+ * dragen.
+ */
+export const KRANT_GEVOELIGHEID_STAP_PP = 0.25

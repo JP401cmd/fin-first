@@ -202,6 +202,12 @@ async function handleVastleggen(
       margeJaren: dw.margeJaren,
       // D12 — NOMINAAL eindvermogen van de verkenning (client-waarde; de builder weigert < 0).
       eindvermogen: dw.eindvermogen,
+      // De drie KNOP-doelwaarden (20 sep 2026): recht doorgegeven client-standen. Geen
+      // plan-velden en geen anker-logica — dit zijn plan-PARAMETERS, geen uitkomsten, dus
+      // ze hangen niet aan het stopmoment (de builder weigert ≤ 0 en meldt 'm overgeslagen).
+      extraInlegMnd: dw.extraInlegMnd,
+      uitgaveNaPensioenJaar: dw.uitgaveNaPensioenJaar,
+      nalatenschapBedrag: dw.nalatenschapBedrag,
       ...(anchorFixed && plan.anchor.kind !== 'solved'
         ? {
             // Zelfde eindleeftijd als de kernel (`eindleeftijdVan`): onder `perpetual`

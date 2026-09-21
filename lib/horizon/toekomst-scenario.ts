@@ -88,8 +88,26 @@ const VALID_CATEGORIES: readonly AssetCategorie[] = [
  * stopmoment wanneer het plan GEDEKT is: dekking en bereik bewegen dan niet meer, wat er op
  * je eindleeftijd over is wél. Ook die vereist een vast anker (de route weigert 'm onder
  * `solved`).
+ *
+ * `extraInleg`, `uitgaveNaPensioen` en `nalatenschap` (20 sep 2026) sluiten het gat dat ADR
+ * 0170 bewust open liet ("uitgave na pensioen en nalatenschap worden géén doeltype"): de
+ * eigenaar draaide die aanname terug, want de vijf knoppen verschoven wél alle vijf terwijl
+ * "Werk je doel bij" er maar twee aanbood. Het zijn KNOP-doelen zoals `spaarquote` — een
+ * vastgelegde plan-parameter, géén uitkomst — en ze gelden dus onder ÉLK stop-anker; alleen
+ * de drie uitkomstdoelen (`fire`/`dekking`/`eindvermogen`) zijn anker-gebonden.
+ * De sleutelnamen spiegelen bewust `ToekomstScenarioStand` (`sliders.extraInleg`,
+ * `uitgaveNaPensioen`, `nalatenschap`): één vocabulaire van knop tot doelrij.
  */
-export const DOEL_PARAMETERS = ['spaarquote', 'rendement', 'fire', 'dekking', 'eindvermogen'] as const
+export const DOEL_PARAMETERS = [
+  'spaarquote',
+  'rendement',
+  'fire',
+  'dekking',
+  'eindvermogen',
+  'extraInleg',
+  'uitgaveNaPensioen',
+  'nalatenschap',
+] as const
 export type DoelParameter = (typeof DOEL_PARAMETERS)[number]
 
 /**

@@ -1412,7 +1412,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
         const simResult = shared.sim
         // Snapshot voor de /toekomst Voorkeuren-editors: exact de rauwe context die
         // DEZE run voedde, zodat de editor-baseline per constructie de Tijdas-curve is.
-        // Client-veilig (TPR-15): zonder partnerblok en zonder *_encrypted/*_hash.
+        // Client-veilig (TPR-15): zonder partnerblok en zonder *_encrypted- en *_hash-kolommen.
         regelSimSnapshot = buildClientRegelSimSnapshot(shared)
         // Kernel-eindleeftijd voor het weergavelabel + clip-grens (spiegel van
         // horizon-client.tsx `displaySimRows`).
@@ -2850,6 +2850,8 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     metadata?: Record<string, unknown> | null
     linked_asset_id?: string | null
     linked_debt_id?: string | null
+    /** Gezet door `syncActiveGoalValues` (in-memory, geen kolom) — zie `TopGoal`. */
+    notApplicableReason?: string | null
   }
   const goalsForWidget: WidgetGoalRow[] = ((goalsResult.data ?? []) as WidgetGoalRow[]).map(g => ({
     ...g,
@@ -2891,6 +2893,8 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     color: g.color ?? 'teal',
     icon: g.icon ?? 'Target',
     custom_unit: g.custom_unit ?? null,
+    // Zonder dit veld verliest de widget het "niet gemeten"-oordeel dat de sync zojuist zette.
+    notApplicableReason: g.notApplicableReason ?? null,
     eta: isVrijheidsgetalGoal(g) ? widgetFireEta : null,
   }))
 

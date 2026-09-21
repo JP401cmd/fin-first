@@ -17,7 +17,13 @@ import type { Asset, AssetType } from '@/lib/asset-data'
 import type { AssetCategorie } from '@/lib/horizon-kernel/types'
 import { ASSET_TYPE_TO_CATEGORIE, potRendement } from '@/lib/horizon-kernel/adapter/potten'
 import { GOAL_TYPE_META, GOAL_TYPE_ICONS, type GoalType } from '@/lib/goal-data'
+// Pure nl-NL-formatter (geen React/Intl-wrapper met state) — dezelfde die de kaarten
+// gebruiken, zodat de doelnaam en het bedrag op het scherm identiek zijn opgemaakt.
+import { formatCurrency } from '@/lib/format'
 import { DOEL_PARAMETERS, type DoelParameter } from '@/lib/horizon/toekomst-scenario'
+// Alleen de plain-data knoplijst (structured-clone-veilig, geen React/Supabase) — zodat de
+// koppeling knop → doelparameter afdwingbaar in één bestand staat.
+import { type HefboomKey } from '@/lib/horizon/lab-grenzen-types'
 // De "Plan gedekt"- en "Eindvermogen"-namen zijn gedeeld met de (client-)doelkaart en wonen
 // daarom in anker-copy.
 import { planCoverageGoalName, eindvermogenGoalName } from '@/lib/horizon/anker-copy'
@@ -39,6 +45,35 @@ export const PARAM_TO_GOAL_TYPE: Record<DoelParameter, GoalType> = {
   fire: 'fire_age',
   dekking: 'plan_coverage',
   eindvermogen: 'end_balance',
+  // De drie KNOP-doelen (20 sep 2026). Elk een EIGEN goal_type, bewust geen hergebruik:
+  // `salary` is salaris (een ander bedrag dan extra inleg) en `end_balance` is het
+  // geprojecteerde eindvermogen (een uitkomst, niet een gereserveerd streefbedrag).
+  // De typenamen spiegelen de canonieke plan-velden waar ze over gaan —
+  // `retirement_expense_method`/`-custom_amount` resp. `fire_legacy_amount` — zodat het
+  // doeltype en de instelling die het beschrijft dezelfde naam dragen.
+  extraInleg: 'extra_deposit',
+  uitgaveNaPensioen: 'retirement_expense',
+  nalatenschap: 'legacy_amount',
+}
+
+/**
+ * ELKE HEFBOOM-KNOP HEEFT EEN DOELPARAMETER — het contract dat het defect van 20 sep 2026
+ * had gevangen. De gebruiker verschoof alle vijf knoppen, maar "Werk je doel bij" bood er
+ * maar twee aan: `verdienen`, `uitgaveNaPensioen` en `nalatenschap` hadden geen parameter,
+ * en niets in de code zei daar iets over.
+ *
+ * De waarde is een NIET-LEGE tuple, dus het type dwingt per knop minstens één parameter af;
+ * `stop` draagt er drie omdat het uitkomstdoel van het anker afhangt (`fire` onder `solved`,
+ * `dekking`/`eindvermogen` onder een vast stopmoment — de route kiest, nooit de client).
+ *
+ * `rendement` staat hier bewust niet: dat is geen knop maar het marktaannames-blok.
+ */
+export const HEFBOOM_DOEL_PARAMETERS: Record<HefboomKey, readonly [DoelParameter, ...DoelParameter[]]> = {
+  verdienen: ['extraInleg'],
+  uitgeven: ['spaarquote'],
+  uitgaveNaPensioen: ['uitgaveNaPensioen'],
+  nalatenschap: ['nalatenschap'],
+  stop: ['fire', 'dekking', 'eindvermogen'],
 }
 
 /** De goal-typen die door het lab-doelscenario worden beheerd (in DOEL_PARAMETERS-volgorde). */
@@ -143,6 +178,18 @@ export interface ParameterGoalInput {
      * eindleeftijd haalt levert dit bedrag (eindreview I1).
      */
     eindvermogen?: number
+    /**
+     * DE DRIE KNOP-DOELEN (20 sep 2026) — alle drie CLIENT-waarden: het zijn precies de
+     * standen van de knoppen, en die kent alleen het lab. De builder clampt/weigert, hij
+     * herleidt niets: een niet-eindig of niet-positief bedrag levert géén rij (zie
+     * `buildRow`). De bovengrens staat op de zod-poort, niet hier.
+     */
+    /** Knop "Meer verdienen": extra inleg in €/maand. Moet > 0 zijn om een doel te zijn. */
+    extraInlegMnd?: number
+    /** Knop "Uitgave na pensioen": €/jaar. */
+    uitgaveNaPensioenJaar?: number
+    /** Knop "Nalatenschap": streefbedrag in €. */
+    nalatenschapBedrag?: number
   }
 }
 
@@ -301,6 +348,58 @@ function buildRow(parameter: DoelParameter, dw: ParameterGoalInput['doelwaarden'
         icon: GOAL_TYPE_ICONS.end_balance,
         color: PARAMETER_GOAL_COLOR,
         metadata: { ...BASE_METADATA, eindleeftijd, stopAnker, stopLeeftijd },
+      }
+    }
+    // ── De drie KNOP-doelen (20 sep 2026) ────────────────────────────────────
+    // Alle drie hetzelfde patroon: eindig én > 0, afgerond op hele euro's, geen
+    // META-clamp (die typen hebben net als `end_balance` geen min/max — de bovengrens
+    // staat op de zod-poort). WAAROM AFRONDEN: `formatCurrency` toont nul decimalen, dus
+    // een onafgerond `target_value` zou op de kaart iets ánders tonen dan er is opgeslagen.
+    // WAAROM `> 0` EN NIET `>= 0`: `computeGoalProgress` en `isGoalReached` lezen
+    // `target <= 0` als "geen doel gesteld", dus een rij van €0 is een dode kaart. Bij de
+    // knop "Meer verdienen" is dat bovendien inhoudelijk juist: die schuift ook naar
+    // NEGATIEF (minder salaris), en "leg vast dat ik minder ga inleggen" is geen doel.
+    // De parameter komt dan terug in `overgeslagen`.
+    case 'extraInleg': {
+      if (!isFiniteNumber(dw.extraInlegMnd) || dw.extraInlegMnd <= 0) return null
+      const value = Math.round(dw.extraInlegMnd)
+      if (value <= 0) return null
+      return {
+        parameter,
+        goal_type: 'extra_deposit',
+        name: `Extra inleg naar ${formatCurrency(value)}/mnd`,
+        target_value: value,
+        icon: GOAL_TYPE_ICONS.extra_deposit,
+        color: PARAMETER_GOAL_COLOR,
+        metadata: { ...BASE_METADATA },
+      }
+    }
+    case 'uitgaveNaPensioen': {
+      if (!isFiniteNumber(dw.uitgaveNaPensioenJaar) || dw.uitgaveNaPensioenJaar <= 0) return null
+      const value = Math.round(dw.uitgaveNaPensioenJaar)
+      if (value <= 0) return null
+      return {
+        parameter,
+        goal_type: 'retirement_expense',
+        name: `Uitgave na pensioen naar ${formatCurrency(value)}/jaar`,
+        target_value: value,
+        icon: GOAL_TYPE_ICONS.retirement_expense,
+        color: PARAMETER_GOAL_COLOR,
+        metadata: { ...BASE_METADATA },
+      }
+    }
+    case 'nalatenschap': {
+      if (!isFiniteNumber(dw.nalatenschapBedrag) || dw.nalatenschapBedrag <= 0) return null
+      const value = Math.round(dw.nalatenschapBedrag)
+      if (value <= 0) return null
+      return {
+        parameter,
+        goal_type: 'legacy_amount',
+        name: `Nalatenschap naar ${formatCurrency(value)}`,
+        target_value: value,
+        icon: GOAL_TYPE_ICONS.legacy_amount,
+        color: PARAMETER_GOAL_COLOR,
+        metadata: { ...BASE_METADATA },
       }
     }
   }

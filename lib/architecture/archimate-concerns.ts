@@ -25,6 +25,15 @@ export interface ArchiConcern {
 
 export const ARCHI_CONCERNS: ArchiConcern[] = [
   {
+    id: 'nieuws-duiding-systemisch-risico',
+    title: 'Eén verkeerde duiding raakt straks iedereen in de doelgroep tegelijk',
+    detail:
+      'Sinds ADR 0171 duidt de ingest elk nieuwsartikel één keer in de achterkant naar parameters (lib/krant/duiding.ts) en gaat die duiding na de codecontroles automatisch vrij (B4). Waar een fout in de LLM-editie één lezer raakte, raakt een verkeerde parameter hier straks (1B) iedereen in de doelgroep: een systemische fout. Mitigatie: gesloten schema, grondingstoets op elk getal (lib/nummer-grond.ts), plausibiliteit per mechanisme, fail-closed (afgewezen bij twijfel; mechanisme vervalt bij een ongegrond getal), terugtrekken met reden in beheer, en de K1-meting van twee weken nul foute getallen bij rekenende mechanismen. In K1 leest nog niets de duiding (schaduw). Drie restpunten uit de security-run van 21-09-2026 horen vóór 1B/1C dicht: (1) de Wft-woordenlijst (aanbieders, gebiedende wijs) wordt alleen in de prompt gevraagd, niet in code getoetst — een geïnjecteerde zin zonder cijfers en zonder URL passeert; (2) `fetchWebContent` (lib/news-sources.ts) volgt redirects zonder het eindadres tegen `isRegelbron` te hertoetsen en leest de volledige body vóór het afkappen op 8.000 tekens; (3) een versie-bump zet álle geduide rijen terug op wacht en draint op 60/dag — een bump vraagt een tijdelijk hogere cap. Verwijder dit punt zodra de K1-poort is gehaald én de terugtrek-route en het meting-paneel (fase 2) live zijn; verzwaar het naar risk zodra 1B/1C de duiding aan lezers toont voordat die poort en de drie restpunten zijn gehaald.',
+    severity: 'debt',
+    elementIds: ['as-nieuws'],
+    reviewedAt: '2026-09-21',
+  },
+  {
     id: 'gesprek-op-apparaat-zonder-backup-of-wisgarantie',
     title: 'Een gesprek dat op het apparaat staat heeft geen back-up en geen server-side wisgarantie',
     detail:

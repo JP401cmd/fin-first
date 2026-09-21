@@ -533,9 +533,34 @@ describe('stripStopKeuze (ADR 0145 D4)', () => {
   })
 })
 
-describe('DOEL_PARAMETERS — vijf parameters: spaarquote, rendement, fire, dekking, eindvermogen (spec §2: salaris vervalt; ADR 0145 D12)', () => {
-  it('bevat geen salaris meer en houdt de volgorde spaarquote → rendement → fire → dekking → eindvermogen', () => {
-    expect([...DOEL_PARAMETERS]).toEqual(['spaarquote', 'rendement', 'fire', 'dekking', 'eindvermogen'])
+describe('DOEL_PARAMETERS — acht parameters sinds 20 sep 2026 (spec §2: salaris vervalt; ADR 0145 D12; de drie knop-doelen)', () => {
+  it('bevat geen salaris meer en houdt de volgorde: eerst de vijf bestaande, dan de drie knop-doelen', () => {
+    expect([...DOEL_PARAMETERS]).toEqual([
+      'spaarquote',
+      'rendement',
+      'fire',
+      'dekking',
+      'eindvermogen',
+      'extraInleg',
+      'uitgaveNaPensioen',
+      'nalatenschap',
+    ])
+  })
+
+  it('een vastgelegd knop-doel overleeft de pref-parser (parameters + goalIds)', () => {
+    // Regressie op het defect van 20 sep 2026: de parser whitelist op DOEL_PARAMETERS,
+    // dus een onbekende sleutel zou hier stil wegvallen en het doel zou "leeg" heten.
+    const p = parseToekomstScenarioPrefs({
+      v: 2,
+      doel: {
+        gezetOp: '2026-09-20T10:00:00.000Z',
+        parameters: { extraInleg: true, uitgaveNaPensioen: true, nalatenschap: true },
+        stand: { sliders: { extraInleg: 500 }, uitgaveNaPensioen: 31800, nalatenschap: 100000 },
+        goalIds: { extraInleg: 'g1', uitgaveNaPensioen: 'g2', nalatenschap: 'g3' },
+      },
+    })
+    expect(p?.doel?.parameters).toEqual({ extraInleg: true, uitgaveNaPensioen: true, nalatenschap: true })
+    expect(p?.doel?.goalIds).toEqual({ extraInleg: 'g1', uitgaveNaPensioen: 'g2', nalatenschap: 'g3' })
   })
 
   it('een vastgelegd eindvermogen-doel overleeft de pref-parser (parameters + goalIds)', () => {

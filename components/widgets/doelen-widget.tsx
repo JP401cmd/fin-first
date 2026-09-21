@@ -28,13 +28,25 @@ interface Props {
  * Deze widget toont dan ook alléén `pct` — wil je hier ooit een status tonen,
  * neem `created_at` mee in `TopGoal` i.p.v. een eigen oordeel te bouwen.
  */
-function goalPct(goal: TopGoal): number {
+function goalProgress(goal: TopGoal) {
   return computeGoalProgress({
     goal_type: goal.goal_type as GoalType,
     current_value: goal.current_value,
     target_value: goal.target_value,
     target_date: goal.target_date,
-  }).pct
+    notApplicableReason: goal.notApplicableReason ?? null,
+  })
+}
+
+/**
+ * Het percentage — alleen zinvol als er écht gemeten is. Een doel zonder meting
+ * (`measured: false`: extra inleg, of een uitkomstdoel dat niet bij het huidige anker
+ * hoort) geeft `null`; het oppervlak toont dan "—" in plaats van een 0% die beweert
+ * dat de gebruiker niets doet.
+ */
+function goalPct(goal: TopGoal): number | null {
+  const p = goalProgress(goal)
+  return p.measured === false ? null : p.pct
 }
 
 /**
@@ -69,9 +81,10 @@ function etaLabel(goal: TopGoal): string | null {
 function GoalProgressRow({ goal, index, hasEntered }: { goal: TopGoal; index: number; hasEntered: boolean }) {
   const colors = getGoalColorClasses(goal.color)
   const pct = goalPct(goal)
-  const overdue = isOverdue(goal)
+  const gemeten = pct !== null
+  const overdue = gemeten && isOverdue(goal)
   const eta = etaLabel(goal)
-  const nearlyDone = pct >= 90 && pct < 100
+  const nearlyDone = gemeten && pct >= 90 && pct < 100
 
   return (
     <div
@@ -91,12 +104,17 @@ function GoalProgressRow({ goal, index, hasEntered }: { goal: TopGoal; index: nu
             Bijna!
           </span>
         )}
-        <span className={`shrink-0 font-mono text-sm tabular-nums ${overdue ? 'text-negative' : 'text-[var(--ink)]'}`}>
-          {pct}%
+        <span
+          className={`shrink-0 font-mono text-sm tabular-nums ${
+            overdue ? 'text-negative' : gemeten ? 'text-[var(--ink)]' : 'text-[var(--ink-3)]'
+          }`}
+        >
+          {gemeten ? `${pct}%` : '—'}
         </span>
       </div>
 
-      {/* Voortgangsbalk */}
+      {/* Voortgangsbalk — alleen bij een echte meting; een lege balk leest als 0%. */}
+      {gemeten && (
       <div
         role="progressbar"
         aria-label={`Voortgang ${goal.name}`}
@@ -115,6 +133,7 @@ function GoalProgressRow({ goal, index, hasEntered }: { goal: TopGoal; index: nu
           }}
         />
       </div>
+      )}
 
       {/* Deadline */}
       {eta && (
@@ -171,7 +190,10 @@ export const DoelenWidget = memo(function DoelenWidget({ size, data, href }: Pro
   // `goalPct` leunt op de richting-bewuste `computeGoalProgress`, dus dit klopt
   // ook voor `direction:'down'`-doelen. Losse kopie — `topGoals` (canonieke
   // sort_order-volgorde uit de bundel) blijft ongemoeid.
-  const sortedGoals = [...topGoals].sort((a, b) => goalPct(a) - goalPct(b))
+  // Een doel ZÓNDER meting (`goalPct` → null) hoort niet vooraan als "meest achterlopend":
+  // het loopt nergens op achter, er is alleen geen cijfer. Die zakken naar achteren.
+  const pctVoorSortering = (g: TopGoal) => goalPct(g) ?? Number.POSITIVE_INFINITY
+  const sortedGoals = [...topGoals].sort((a, b) => pctVoorSortering(a) - pctVoorSortering(b))
 
   // ── Quarter-size: eerste doel compact ───────────────────────
   if (size === 'quarter') {
@@ -189,18 +211,22 @@ export const DoelenWidget = memo(function DoelenWidget({ size, data, href }: Pro
     }
 
     const pct = goalPct(goal)
-    const overdue = isOverdue(goal)
+    const gemeten = pct !== null
+    const overdue = gemeten && isOverdue(goal)
     const eta = etaLabel(goal)
     const colors = getGoalColorClasses(goal.color)
-    const pctColor = overdue ? 'text-negative' : pct >= 90 ? 'text-positive' : pct >= 50 ? 'text-[var(--ink-2)]' : 'text-[var(--ink)]'
+    const pctColor = !gemeten
+      ? 'text-[var(--ink-3)]'
+      : overdue ? 'text-negative' : pct >= 90 ? 'text-positive' : pct >= 50 ? 'text-[var(--ink-2)]' : 'text-[var(--ink)]'
 
     return (
       <WidgetShell module="wil" size={size} kicker="Doelen" href={href}>
         <div ref={containerRef}>
           <p className="text-sm text-[var(--ink)] font-medium truncate">{goal.name}</p>
           <p className={`mt-0.5 font-mono text-lg font-semibold tabular-nums ${pctColor}`}>
-            {pct}%
+            {gemeten ? `${pct}%` : '—'}
           </p>
+          {gemeten && (
           <div
             role="progressbar"
             aria-label={`Voortgang ${goal.name}`}
@@ -217,6 +243,7 @@ export const DoelenWidget = memo(function DoelenWidget({ size, data, href }: Pro
               }}
             />
           </div>
+          )}
           {eta && (
             <p className={`mt-0.5 font-mono text-[10px] tabular-nums ${overdue ? 'text-negative' : 'text-[var(--ink-4)]'}`}>
               {overdue ? 'Verlopen — ' : ''}{eta}
@@ -230,8 +257,11 @@ export const DoelenWidget = memo(function DoelenWidget({ size, data, href }: Pro
   // ── Half-size: horizontal layout — left stats, right goal bars ────
   if (size === 'half') {
     const halfGoals = sortedGoals.slice(0, 2)
-    const avgPctHalf = topGoals.length > 0
-      ? Math.round(topGoals.reduce((sum, g) => sum + goalPct(g), 0) / topGoals.length)
+    // Alleen gemeten doelen tellen mee: een ongemeten doel als 0% zou het gemiddelde
+    // omlaag trekken en een achterstand suggereren die niemand heeft.
+    const gemetenPcts = topGoals.map(goalPct).filter((p): p is number => p !== null)
+    const avgPctHalf = gemetenPcts.length > 0
+      ? Math.round(gemetenPcts.reduce((sum, p) => sum + p, 0) / gemetenPcts.length)
       : 0
     return (
       <WidgetShell module="wil" size={size} kicker="Doelen" href={href}>
@@ -253,15 +283,17 @@ export const DoelenWidget = memo(function DoelenWidget({ size, data, href }: Pro
                 {halfGoals.map((goal, i) => {
                   const colors = getGoalColorClasses(goal.color)
                   const pct = goalPct(goal)
-                  const overdue = isOverdue(goal)
+                  const gemeten = pct !== null
+                  const overdue = gemeten && isOverdue(goal)
                   return (
                     <div key={goal.id}>
                       <div className="flex items-center gap-1.5">
                         <span className="flex-1 min-w-0 text-[11px] text-[var(--ink)] truncate">{goal.name}</span>
                         <span className={`shrink-0 font-mono text-[10px] tabular-nums ${overdue ? 'text-negative' : 'text-[var(--ink-3)]'}`}>
-                          {pct}%
+                          {gemeten ? `${pct}%` : '—'}
                         </span>
                       </div>
+                      {gemeten && (
                       <div
                         role="progressbar"
                         aria-label={`Voortgang ${goal.name}`}
@@ -278,6 +310,7 @@ export const DoelenWidget = memo(function DoelenWidget({ size, data, href }: Pro
                           }}
                         />
                       </div>
+                      )}
                     </div>
                   )
                 })}
@@ -291,8 +324,10 @@ export const DoelenWidget = memo(function DoelenWidget({ size, data, href }: Pro
 
   // ── Full-size: summary + vertical goal list (336px height) ────
   const completedGoals = topGoals.filter(goalDone).length
-  const avgPct = topGoals.length > 0
-    ? Math.round(topGoals.reduce((sum, g) => sum + goalPct(g), 0) / topGoals.length)
+  // Zie `avgPctHalf`: alleen gemeten doelen tellen mee in het gemiddelde.
+  const gemetenPctsFull = topGoals.map(goalPct).filter((p): p is number => p !== null)
+  const avgPct = gemetenPctsFull.length > 0
+    ? Math.round(gemetenPctsFull.reduce((sum, p) => sum + p, 0) / gemetenPctsFull.length)
     : 0
 
   // Find the goal with the nearest future deadline
@@ -317,7 +352,11 @@ export const DoelenWidget = memo(function DoelenWidget({ size, data, href }: Pro
                 <span className="text-[10px] uppercase tracking-wide text-[var(--ink-3)] font-sans text-center">DOELEN</span>
               </div>
               <div className="flex flex-col items-center px-3">
-                <span className="font-mono text-xl font-semibold tabular-nums text-[var(--ink)]">{avgPct}%</span>
+                {/* Geen enkel doel gemeten ⇒ er is geen gemiddelde. "0%" zou daar hetzelfde
+                    beweren als een 0%-balk op een losse kaart: dat er geen voortgang is. */}
+                <span className="font-mono text-xl font-semibold tabular-nums text-[var(--ink)]">
+                  {gemetenPctsFull.length > 0 ? `${avgPct}%` : '—'}
+                </span>
                 <span className="text-[10px] uppercase tracking-wide text-[var(--ink-3)] font-sans text-center leading-tight">GEM. VOORTGANG</span>
               </div>
               <div className="flex flex-col items-center pl-3">

@@ -2,12 +2,13 @@ import { registerCategory, registerTests } from '../test-registry'
 import {
   validateModules,
   getActiveNavModules,
-  getHomePath,
   ALL_MODULES,
   PERSONA_MODULE_PRESETS,
 } from '@/lib/module-registry'
 import type { ModuleId, PersonaId } from '@/lib/module-registry'
 import { isWidgetVisible } from '@/lib/compute-module-access'
+import { isNewsOnly, resolveActiveModules } from '@/lib/modules/resolve'
+import { homeHrefFor, resolveHomeHref } from '@/lib/home-screen'
 import { assert, assertEqual } from '../assert'
 import type { TestCase } from '../test-types'
 
@@ -167,75 +168,162 @@ const tests: TestCase[] = [
 
   // ── Startpagina routing ──────────────────────────────────────────────────
 
-  // getHomePath is nu de simpele, canonieke variant in lib/module-registry.ts:
-  //   nieuws-only → '/nieuws' (dedicated news-only page), alle andere combinaties
-  //   → '/overzicht'. De oude IA (/core, /will, /berichten) en de inzicht_acties-
-  //   prioriteit bestaan niet meer (canonieke routes: lib/nav-config.ts).
+  // De landingsroute weegt moduleset én homescherm-keuze samen:
+  // `resolveHomeHref` in lib/home-screen.ts (Krant 2A, vervangt getHomePath).
+  // Alleen 'nieuws' → /nieuws (productgrens wint van voorkeur); elke andere set
+  // volgt `home_screen`. De oude IA (/core, /will, /berichten) en de
+  // inzicht_acties-prioriteit bestaan niet meer (canonieke routes: lib/nav-config.ts).
   {
     id: 'mod-home-budget',
-    name: "getHomePath(['budgetteren']) === '/overzicht'",
-    description: 'Alleen budgetteren actief → startpagina is /overzicht',
+    name: "resolveHomeHref(['budgetteren']) === '/overzicht'",
+    description: 'Alleen budgetteren actief, geen homescherm-keuze → startpagina is /overzicht',
     category: CAT,
     priority: 'high',
     estimatedDurationMs: 50,
     fn() {
-      const path = getHomePath(['budgetteren'])
+      const path = resolveHomeHref({ active_modules: ['budgetteren'] })
       assertEqual(path, '/overzicht', 'home path for budgetteren')
     },
   },
 
   {
     id: 'mod-home-assets',
-    name: "getHomePath(['vermogensregistratie']) === '/overzicht'",
-    description: 'Alleen vermogensregistratie actief → startpagina is /overzicht',
+    name: "resolveHomeHref(['vermogensregistratie']) === '/overzicht'",
+    description: 'Alleen vermogensregistratie actief, geen homescherm-keuze → startpagina is /overzicht',
     category: CAT,
     priority: 'high',
     estimatedDurationMs: 50,
     fn() {
-      const path = getHomePath(['vermogensregistratie'])
+      const path = resolveHomeHref({ active_modules: ['vermogensregistratie'] })
       assertEqual(path, '/overzicht', 'home path for vermogensregistratie')
     },
   },
 
   {
     id: 'mod-home-dashboard',
-    name: 'getHomePath met inzicht_acties === /overzicht',
+    name: 'resolveHomeHref met inzicht_acties === /overzicht',
     description: 'inzicht_acties heeft geen aparte startpagina meer (/will bestaat niet meer, ADR 0001) — landt op /overzicht zoals elke andere combinatie',
     category: CAT,
     priority: 'high',
     estimatedDurationMs: 50,
     fn() {
-      // inzicht_acties had ooit voorrang naar /will; die route en prioriteit
-      // zijn verwijderd. getHomePath kent geen speciale casus meer buiten
-      // nieuws-only — alles landt op /overzicht.
       const withInzicht: ModuleId[] = ['budgetteren', 'inzicht_acties']
-      assertEqual(getHomePath(withInzicht), '/overzicht', 'home path with inzicht_acties')
+      assertEqual(resolveHomeHref({ active_modules: withInzicht }), '/overzicht', 'home path with inzicht_acties')
 
-      // Also works with vermogensregistratie
       const withAssets: ModuleId[] = ['vermogensregistratie', 'inzicht_acties']
-      assertEqual(getHomePath(withAssets), '/overzicht', 'home path with inzicht_acties + assets')
+      assertEqual(resolveHomeHref({ active_modules: withAssets }), '/overzicht', 'home path with inzicht_acties + assets')
     },
   },
 
   {
     id: 'mod-home-news-only',
-    name: "getHomePath(['nieuws']) === '/nieuws'",
-    description: 'Alleen nieuws actief → startpagina is /nieuws (nieuws-only pad, lib/nav-config.ts)',
+    name: "resolveHomeHref(['nieuws']) === '/nieuws', ook tegen home_screen in",
+    description: 'Alleen nieuws actief → startpagina is /nieuws, ongeacht een (stale) homescherm-keuze; elke andere set volgt de keuze',
+    category: CAT,
+    priority: 'critical',
+    estimatedDurationMs: 50,
+    fn() {
+      assertEqual(resolveHomeHref({ active_modules: ['nieuws'] }), '/nieuws', 'home path for news-only')
+      // De productgrens wint van de voorkeur.
+      assertEqual(
+        resolveHomeHref({ active_modules: ['nieuws'], home_screen: 'budget' }),
+        '/nieuws',
+        'news-only wins over home_screen=budget',
+      )
+
+      // nieuws naast een andere module is géén Krant-account.
+      const withInzicht: ModuleId[] = ['nieuws', 'budgetteren', 'inzicht_acties']
+      assertEqual(resolveHomeHref({ active_modules: withInzicht }), '/overzicht', 'nieuws + inzicht_acties routes to /overzicht')
+      const withBudget: ModuleId[] = ['nieuws', 'budgetteren']
+      assertEqual(
+        resolveHomeHref({ active_modules: withBudget, home_screen: 'budget' }),
+        '/overzicht/budget',
+        'nieuws + budgetteren volgt home_screen',
+      )
+    },
+  },
+
+  // ── Gedragsbehoud voor bestaande profielen (poort K1, Krant 2A) ──────────
+  //
+  // Productie op 21 sep 2026: 26 × alle zes modules, 3 × null, 0 × alleen
+  // nieuws, 0 × andere subset. Vóór 2A las de shell de kolom niet
+  // (`[...ALL_MODULES]`) en volgde de proxy alleen `home_screen`
+  // (`homeHrefFor`). Deze cases bewijzen dat elke bestaande waarde exact
+  // dezelfde uitkomst geeft als vóór de wijziging.
+  {
+    id: 'mod-resolve-existing-null',
+    name: 'active_modules null → alle modules (zoals vóór 2A)',
+    description: 'De 3 null-profielen op productie zien dezelfde moduleset als toen de shell de kolom negeerde',
+    category: CAT,
+    priority: 'critical',
+    estimatedDurationMs: 50,
+    fn() {
+      assertEqual(JSON.stringify(resolveActiveModules({ active_modules: null })), JSON.stringify(ALL_MODULES), 'null → ALL_MODULES')
+      assertEqual(JSON.stringify(resolveActiveModules({})), JSON.stringify(ALL_MODULES), 'kolom afwezig → ALL_MODULES')
+      assertEqual(JSON.stringify(resolveActiveModules(null)), JSON.stringify(ALL_MODULES), 'geen profielrij → ALL_MODULES')
+    },
+  },
+
+  {
+    id: 'mod-resolve-existing-all',
+    name: 'active_modules = alle zes → alle modules, volgorde-onafhankelijk',
+    description: 'De 26 profielen met alle zes modules zien dezelfde moduleset, ongeacht de volgorde in de DB',
+    category: CAT,
+    priority: 'critical',
+    estimatedDurationMs: 50,
+    fn() {
+      assertEqual(
+        JSON.stringify(resolveActiveModules({ active_modules: [...ALL_MODULES] })),
+        JSON.stringify(ALL_MODULES),
+        'alle zes → ALL_MODULES',
+      )
+      assertEqual(
+        JSON.stringify(resolveActiveModules({ active_modules: [...ALL_MODULES].reverse() })),
+        JSON.stringify(ALL_MODULES),
+        'alle zes omgekeerd → ALL_MODULES in catalogusvolgorde',
+      )
+    },
+  },
+
+  {
+    id: 'mod-resolve-existing-home',
+    name: 'Bestaande profielen landen op dezelfde home als vóór 2A',
+    description: 'Voor null en alle zes modules is resolveHomeHref gelijk aan homeHrefFor(home_screen) — de proxy-uitkomst vóór de wijziging',
+    category: CAT,
+    priority: 'critical',
+    estimatedDurationMs: 50,
+    fn() {
+      const moduleValues: unknown[] = [null, undefined, [...ALL_MODULES], [...ALL_MODULES].reverse()]
+      const homeValues: unknown[] = [null, undefined, 'overzicht', 'budget', 'onbekend']
+      for (const active_modules of moduleValues) {
+        for (const home_screen of homeValues) {
+          assertEqual(
+            resolveHomeHref({ active_modules, home_screen }),
+            homeHrefFor(home_screen),
+            `home voor modules=${JSON.stringify(active_modules)} home_screen=${String(home_screen)}`,
+          )
+        }
+      }
+    },
+  },
+
+  {
+    id: 'mod-resolve-fail-open',
+    name: 'Lege of onbekende moduleset valt terug op alle modules',
+    description: 'Een lege array of alleen onbekende ids maakt de shell nooit leeg (validateModules([]) is ongeldig, dus nooit een bewuste keuze)',
     category: CAT,
     priority: 'high',
     estimatedDurationMs: 50,
     fn() {
-      // A user with only the nieuws module active lands on /nieuws
-      assertEqual(getHomePath(['nieuws']), '/nieuws', 'home path for news-only')
-
-      // nieuws-only is the ONLY special case; any other combination (even with
-      // inzicht_acties) is just the fallback '/overzicht'.
-      const withInzicht: ModuleId[] = ['nieuws', 'budgetteren', 'inzicht_acties']
-      assertEqual(getHomePath(withInzicht), '/overzicht', 'nieuws + inzicht_acties routes to /overzicht (not news-only: length > 1)')
-
-      // nieuws + budgetteren (no inzicht_acties) also routes to /overzicht
-      const withBudget: ModuleId[] = ['nieuws', 'budgetteren']
-      assertEqual(getHomePath(withBudget), '/overzicht', 'nieuws + budgetteren routes to /overzicht')
+      assertEqual(JSON.stringify(resolveActiveModules({ active_modules: [] })), JSON.stringify(ALL_MODULES), '[] → ALL_MODULES')
+      assertEqual(JSON.stringify(resolveActiveModules({ active_modules: ['x', 42] })), JSON.stringify(ALL_MODULES), 'onbekend → ALL_MODULES')
+      assertEqual(
+        JSON.stringify(resolveActiveModules({ active_modules: ['nieuws', 'x'] })),
+        JSON.stringify(['nieuws']),
+        'onbekende id weggefilterd, bekende blijft',
+      )
+      assert(isNewsOnly(resolveActiveModules({ active_modules: ['nieuws'] })), "['nieuws'] is news-only")
+      assert(!isNewsOnly(resolveActiveModules({ active_modules: null })), 'null is niet news-only')
     },
   },
 

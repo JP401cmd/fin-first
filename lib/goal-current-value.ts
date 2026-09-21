@@ -57,6 +57,8 @@ import {
 } from '@/lib/goals/vrijheidsgetal-goal'
 import {
   eindvermogenGoalNotApplicableReason,
+  extraInlegGoalNoMetricNote,
+  legacyGoalNotApplicableReason,
   fireAgeGoalNotApplicableReason,
   planCoverageGoalNotApplicableReason,
   vrijheidsgetalGoalNotApplicableReason,
@@ -760,11 +762,20 @@ export async function syncActiveGoalValues<T extends SyncableGoal>(
   // het vrijheidsgetal-doel (bevinding C10), het fire_age-doel, het eindsaldo-doel
   // en het dekkingsdoel (`plan_coverage`, ADR 0145). Wie er geen heeft betaalt geen
   // kernel-run.
+  // Sinds 20 sep 2026 hangen ook de twee MEETBARE knop-doelen aan deze run: hun stand is
+  // een plan-instelling die de kernel-invoer resp. het plan van diezelfde run draagt.
+  // `extra_deposit` staat er bewust niet bij — dat type heeft geen bron (zie GOAL_TYPE_META)
+  // en mag dus ook geen kernel-run uitlokken.
   const wantsFire =
     Boolean(loadFireSnapshot) &&
     (goals.some(isVrijheidsgetalGoal) ||
       injectionSet.some(
-        gl => gl.goal_type === 'fire_age' || gl.goal_type === 'end_balance' || gl.goal_type === 'plan_coverage',
+        gl =>
+          gl.goal_type === 'fire_age' ||
+          gl.goal_type === 'end_balance' ||
+          gl.goal_type === 'plan_coverage' ||
+          gl.goal_type === 'retirement_expense' ||
+          gl.goal_type === 'legacy_amount',
       ))
 
   // Per-type gating: elke metric-thunk draait alleen bij een actief doel van dat
@@ -860,6 +871,54 @@ export async function syncActiveGoalValues<T extends SyncableGoal>(
         gl.notApplicableReason = planCoverageGoalNotApplicableReason()
       }
     }
+  }
+
+  // DE TWEE MEETBARE KNOP-DOELEN (20 sep 2026): `retirement_expense` en `legacy_amount`
+  // meten geen uitkomst maar de PLAN-INSTELLING waar het lab-doel over gaat — het doel
+  // sluit zodra het plan de verandering draagt die je vastlegde.
+  //
+  // Over `injectionSet` (parameter- én ongekoppelde auto-sync-doelen), zoals de
+  // `end_balance`-lus hieronder. GEEN anker-gate: dit zijn plan-instellingen, dus ze
+  // betekenen onder élk stopmoment hetzelfde — anders dan `plan_coverage`/`fire_age`, die
+  // per anker hun betekenis verliezen. En géén n.v.t.-tak: een plan-instelling bestaat
+  // altijd, ook wanneer het plan niet reikt.
+  //
+  // `extra_deposit` ontbreekt hier bewust en dat is geen omissie: er is geen canonieke
+  // "werkelijk gedane extra inleg" (zie GOAL_TYPE_META in lib/goal-data.ts). Die kaart
+  // toont zijn streefbedrag zonder gemeten stand.
+  if (fireSnapshot) {
+    const uitgaveNaPensioen = fireSnapshot.uitgaveNaPensioenPerJaar
+    const legacy = fireSnapshot.planLegacyAmount
+    for (const gl of injectionSet) {
+      if (gl.goal_type === 'retirement_expense') {
+        // Alleen een eindige uitspraak overschrijft; de bouwer heeft 0 al tot `null`
+        // gemaakt (geen grondslag = niets te zeggen, niet "je geeft niets uit").
+        if (uitgaveNaPensioen != null && Number.isFinite(uitgaveNaPensioen)) {
+          gl.current_value = uitgaveNaPensioen
+        }
+      } else if (gl.goal_type === 'legacy_amount') {
+        // Drie uitkomsten, bewust gescheiden. `undefined` = geen run ⇒ laat de opgeslagen
+        // stand staan. `null` = het plan kent geen nalatenschap (andere eind-vorm) ⇒ er valt
+        // niets te meten en het doel past niet meer bij het plan: een reden, geen 0. Een
+        // GETAL (ook 0) is wel een meting: dan stáát de nalatenschap op dat bedrag.
+        if (legacy === null) {
+          gl.notApplicableReason = legacyGoalNotApplicableReason()
+        } else if (legacy != null && Number.isFinite(legacy)) {
+          gl.current_value = legacy
+        }
+      }
+    }
+  }
+
+  // `extra_deposit`: de énige knop-doelsoort ZONDER meting, en de kaart moet dat zeggen.
+  // Zonder notitie zou hij "€0 van €500" tonen — de up-tak van `computeGoalProgress` kent
+  // geen "current <= 0 ⇒ niet gemeten"-guard, dus die 0 zou als een échte meting lezen en
+  // beweren dat de gebruiker niets extra inlegt. Dat weet de app niet. De notitie zet
+  // `measured` op false (doelen-view r. 212), waarmee de 0%-balk en de rode status wegvallen.
+  // Onafhankelijk van de kernel-run: er is nooit een stand te meten, dus ook geen run nodig.
+  for (const gl of parameterGoals) {
+    if (gl.goal_type !== 'extra_deposit') continue
+    gl.notApplicableReason = extraInlegGoalNoMetricNote()
   }
 
   // ── Auto-sync metric-waarden toepassen ──

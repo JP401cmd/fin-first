@@ -8,7 +8,8 @@ import { buildBudgetInsightsContext } from './budget-insights-context'
 import { buildTaxContext } from './tax-context'
 import { buildSubscriptionsContext } from './subscriptions-context'
 import { buildAandachtspuntenContext } from './aandachtspunten-context'
-import { ALL_MODULES, MODULE_CATALOG, type ModuleId } from '@/lib/module-registry'
+import { MODULE_CATALOG, type ModuleId } from '@/lib/module-registry'
+import { resolveActiveModules } from '@/lib/modules/resolve'
 
 /**
  * Build the full financial context for Fin.
@@ -19,7 +20,7 @@ import { ALL_MODULES, MODULE_CATALOG, type ModuleId } from '@/lib/module-registr
 export async function buildContext(supabase: SupabaseClient): Promise<string> {
   const { data: { user } } = await supabase.auth.getUser()
   let budgetingActive = true
-  let activeModules: ModuleId[] = ALL_MODULES
+  let activeModules: ModuleId[] = resolveActiveModules(null)
   if (user) {
     const { data: profile } = await supabase
       .from('profiles')
@@ -27,7 +28,7 @@ export async function buildContext(supabase: SupabaseClient): Promise<string> {
       .eq('id', user.id)
       .single()
     budgetingActive = profile?.budgeting_active !== false
-    activeModules = (profile?.active_modules as ModuleId[] | null) ?? ALL_MODULES
+    activeModules = resolveActiveModules(profile)
   }
 
   const [shared, kern, wil, horizon, patterns, budgetInsights, tax, subscriptions, aandachtspunten] = await Promise.all([

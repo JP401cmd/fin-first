@@ -86,3 +86,62 @@ describe('DoelenWidget — doelvoortgang (Bevinding 1, richting-bewust)', () => 
     expect(screen.getAllByText('50%').length).toBeGreaterThan(0)
   })
 })
+
+/**
+ * REGRESSIE (review-bevinding B1, 20 sep 2026): een doel ZÓNDER meting mag op /overzicht
+ * geen "0%" met een lege balk tonen.
+ *
+ * Het gat zat niet in de weergave maar in de PROJECTIE: `syncActiveGoalValues` zet
+ * `notApplicableReason` in-memory (er is geen kolom), en de `TopGoal`-projectie in
+ * dashboard-data-loader liet dat veld weg. `computeGoalProgress` viel dan terug op de
+ * omhoog-tak — die ként geen "current <= 0 ⇒ niet gemeten"-guard — en de widget
+ * beweerde dat de gebruiker niets extra inlegt. Compile- én test-onzichtbaar, want de
+ * widget krijgt het doel als prop.
+ *
+ * Given een doel zonder meting (extra inleg, of een uitkomstdoel buiten zijn anker)
+ * When  de doelen-widget het rendert
+ * Then  staat er "—" in plaats van een percentage, en is er geen voortgangsbalk.
+ */
+function doel(over: Partial<TopGoal> = {}): TopGoal {
+  return {
+    id: 'g1',
+    name: 'Extra inleg naar € 500/mnd',
+    goal_type: 'extra_deposit',
+    current_value: 0,
+    target_value: 500,
+    target_date: null,
+    color: 'teal',
+    icon: 'Target',
+    ...over,
+  } as TopGoal
+}
+
+const metDoelen = (goals: TopGoal[]) => ({ topGoals: goals, goals: goals.length }) as unknown as DashboardData
+
+describe('DoelenWidget — een doel zonder meting (B1)', () => {
+  it('toont een streepje in plaats van 0% en tekent geen balk', () => {
+    const { container } = render(
+      <DoelenWidget size="full" data={metDoelen([doel({ notApplicableReason: 'Hier meet de app niets.' })])} />,
+    )
+    expect(screen.queryByText('0%')).toBeNull()
+    expect(screen.getAllByText('—').length).toBeGreaterThan(0)
+    expect(container.querySelector('[aria-label="Voortgang Extra inleg naar € 500/mnd"]')).toBeNull()
+  })
+
+  it('een doel MÉT meting houdt zijn percentage en balk', () => {
+    const { container } = render(
+      <DoelenWidget
+        size="full"
+        data={metDoelen([doel({ goal_type: 'savings_rate', name: 'Spaarquote naar 72%', current_value: 36, target_value: 72 })])}
+      />,
+    )
+    expect(screen.getAllByText('50%').length).toBeGreaterThan(0)
+    expect(container.querySelector('[aria-label="Voortgang Spaarquote naar 72%"]')).toBeTruthy()
+  })
+
+  it('quarter-size doet hetzelfde — het gat zat in élke variant', () => {
+    render(<DoelenWidget size="quarter" data={metDoelen([doel({ notApplicableReason: 'Hier meet de app niets.' })])} />)
+    expect(screen.queryByText('0%')).toBeNull()
+    expect(screen.getAllByText('—').length).toBeGreaterThan(0)
+  })
+})

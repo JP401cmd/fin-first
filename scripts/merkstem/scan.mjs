@@ -125,6 +125,14 @@ const SURFACES = [
       'Alleen de chrome. De berichten zelf worden door het model geschreven; die stem zit in lib/news-system-prompt.ts en is al bron in het DNA-parity-manifest.',
   },
   {
+    id: 'krant-sjablonen',
+    label: 'Krant — sjablooncatalogus',
+    dirs: [],
+    files: ['lib/krant/sjablonen-catalogus.ts'],
+    caveat:
+      'Alleen euro’s (B2, ADR 0172): dit oppervlak vertaalt bewust NIET naar vrijheidstijd — de enige gedocumenteerde uitzondering op "bedragen van betekenis ook in tijd". Per sjabloon ligt daarnaast een eigen attest in lib/krant/sjablonen-attest.json (scripts/krant/attest-sjablonen.mjs), met de uitkomst van de compliance-check.',
+  },
+  {
     id: 'briefing',
     label: 'Briefing-mail',
     dirs: [],

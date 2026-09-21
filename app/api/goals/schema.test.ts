@@ -127,7 +127,16 @@ describe('goals-schema — doeltypen', () => {
 
   it('POST weigert elk lab-type (viaLab) met de lab-tekst, zonder veldprefix', () => {
     const labTypes = GOAL_TYPES.filter((t) => GOAL_TYPE_META[t].viaLab === true)
-    expect([...labTypes].sort()).toEqual(['expected_return', 'fire_age', 'plan_coverage'])
+    // Uitgebreid 20 sep 2026 met de drie knop-doelen: ook die ontstaan uitsluitend via
+    // /api/toekomst-doel, dus een directe POST hoort er evengoed op af te ketsen.
+    expect([...labTypes].sort()).toEqual([
+      'expected_return',
+      'extra_deposit',
+      'fire_age',
+      'legacy_amount',
+      'plan_coverage',
+      'retirement_expense',
+    ])
     for (const t of labTypes) {
       expect(isLabOnlyGoalType(t)).toBe(true)
       const parsed = CreateGoalSchema.safeParse({ name: 'x', goal_type: t, target_value: 50 })

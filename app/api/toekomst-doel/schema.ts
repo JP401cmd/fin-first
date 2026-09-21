@@ -37,6 +37,12 @@ const ParametersSchema = z.object({
   dekking: gekozen,
   // ADR 0145 D12 — het eindvermogen-doel bij een gedekt plan onder een vast stopmoment.
   eindvermogen: gekozen,
+  // De drie KNOP-doelen (20 sep 2026). Anders dan `dekking`/`eindvermogen` zijn dit
+  // plan-parameters en niet uitkomsten, dus de route gaat er NIET op ankeren: ze mogen
+  // onder elk stopmoment behalve `now` (waar het lab helemaal geen doel vastlegt).
+  extraInleg: gekozen,
+  uitgaveNaPensioen: gekozen,
+  nalatenschap: gekozen,
 } satisfies Record<DoelParameter, typeof gekozen>)
 
 /**
@@ -55,6 +61,20 @@ const doelwaarde = z
  */
 export const EINDVERMOGEN_DOELWAARDE_MAX = DOELWAARDE_BEDRAG_MAX
 
+/**
+ * Een doelwaarde in EURO'S: eindig, met dezelfde bovengrens als het eindvermogen-doel.
+ * Eén vorm voor alle vier de bedrag-doelwaarden (eindvermogen + de drie knop-doelen, 20 sep
+ * 2026) — anders krijgt elk nieuw bedrag zijn eigen, net iets andere grens. Een negatief of
+ * nul-bedrag wordt hier NIET geweigerd maar in de builder overgeslagen (zelfde tolerantie
+ * als `eindvermogen` had: de route meldt 'm dan als `overgeslagen`, geen 400).
+ */
+const bedragDoelwaarde = z
+  .number({ error: 'Ongeldige doelwaarde' })
+  .finite()
+  .max(EINDVERMOGEN_DOELWAARDE_MAX, { error: 'Ongeldige doelwaarde' })
+  .nullish()
+  .transform((v) => v ?? undefined)
+
 const DoelwaardenSchema = z.object({
   spaarquotePct: doelwaarde,
   rendementPct: doelwaarde,
@@ -64,12 +84,13 @@ const DoelwaardenSchema = z.object({
   // live-sim kent 'm). Negatief wordt in de builder overgeslagen, niet hier geweigerd.
   // Eindreview M9 — wél een bovengrens: een eigen rij, dus geen lek, maar onzin (1e300) hoort
   // niet in `goals.target_value`.
-  eindvermogen: z
-    .number({ error: 'Ongeldige doelwaarde' })
-    .finite()
-    .max(EINDVERMOGEN_DOELWAARDE_MAX, { error: 'Ongeldige doelwaarde' })
-    .nullish()
-    .transform((v) => v ?? undefined),
+  eindvermogen: bedragDoelwaarde,
+  // De drie KNOP-doelwaarden (20 sep 2026) — client-waarden (alleen het lab kent de
+  // knopstanden), begrensd zoals elk bedrag hier. `extraInlegMnd` mag negatief binnenkomen
+  // (die knop schuift ook naar "minder salaris"); de builder maakt daar géén doel van.
+  extraInlegMnd: bedragDoelwaarde,
+  uitgaveNaPensioenJaar: bedragDoelwaarde,
+  nalatenschapBedrag: bedragDoelwaarde,
 })
 
 const VastleggenSchema = z.object({

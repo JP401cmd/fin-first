@@ -137,6 +137,17 @@ export type SimChartGeometryInput = {
    * `liquidPoints` helemaal weglaat krijgt uiteraard sowieso geen tweede lijn.)
    */
   secondaryLineVisible?: boolean
+  /**
+   * De nalatenschap-knop van het doelscenario-lab, zodra die knop BESTAAT (onder eind-vorm
+   * `perpetual` is er geen nalatenschap, dan blijft dit undefined). Zet je 'm, dan krijgt de
+   * wat-als-lijn een bol op zijn laatste punt — de eindleeftijd, waar de nalatenschap aangrijpt.
+   *
+   * Alleen de ZONE komt mee: het oordeel is al geveld in de host (`zoneVanWaarde` op de
+   * knop-grenzen) en wordt hier niet herrekend. Het BEDRAG leest de geometrie van de
+   * wat-als-lijn zelf af, zodat het per constructie in dezelfde euro-weergave staat als de
+   * rest van de grafiek (de aanroeper levert de overlay al in de gekozen weergave).
+   */
+  nalatenschapMarker?: { zone: 'rood' | 'oranje' | 'groen' | null }
   /** Gemeten containerbreedte (px, uit de ResizeObserver in de component). */
   containerW: number
 }
@@ -186,6 +197,22 @@ export type TargetLineGeometry = {
   realTargetNow: number
   labelAge: number
   labelVal: number
+}
+
+/**
+ * De nalatenschap-bol op het eind van de wat-als-lijn (eigenaarsbesluit 20 sep 2026).
+ *
+ * De nalatenschap-knop grijpt aan op het EINDE van de horizon, dus het verschil tussen basis
+ * en wat-als is daar vlak vóór nauwelijks te zien. Een bol op het laatste punt van de
+ * wat-als-lijn maakt zichtbaar wáár die knop aan draait; `bedrag` is de waarde van díe lijn op
+ * dat punt (dus dezelfde grondslag en dezelfde euro-weergave als de lijn), `zone` de
+ * stoplichtkleur van de knop zoals de host die al bepaalde.
+ */
+export interface NalatenschapDotGeometry {
+  cx: number
+  cy: number
+  bedrag: number
+  zone: 'rood' | 'oranje' | 'groen' | null
 }
 
 /** Eén gearceerd verschilvlak, klaar om te tekenen. */
@@ -268,6 +295,8 @@ export type SimChartGeometry = {
   scenarioPaths: ScenarioPathGeometry[]
   /** Vlakken tussen de hoofdlijn en de wat-als-lijn (ADR 0170, 20 sep 2026). */
   scenarioDiffVlakken: DiffVlakGeometry[]
+  /** De nalatenschap-bol op het eind van de wat-als-lijn; null als er niets aan te wijzen is. */
+  nalatenschapDot: NalatenschapDotGeometry | null
   householdPaths: HouseholdPathGeometry[]
   mcPaths: MonteCarloPathGeometry | null
   targetLine: TargetLineGeometry | null
@@ -356,6 +385,7 @@ export function buildSimChartGeometry(input: SimChartGeometryInput): SimChartGeo
     liquidPoints,
     primaryBasis = 'total',
     secondaryLineVisible = true,
+    nalatenschapMarker,
     containerW,
   } = input
 
@@ -820,6 +850,33 @@ export function buildSimChartGeometry(input: SimChartGeometryInput): SimChartGeo
     }))
   })()
 
+  /**
+   * NALATENSCHAP-BOL op het laatste punt van de wat-als-lijn (eigenaarsbesluit 20 sep 2026).
+   *
+   * Dezelfde verankering als de FIRE-/AOW-stip: een punt ván de lijn, in grafiek-coördinaten —
+   * geen tweede afleiding. Het bedrag is de waarde van de lijn op dat punt, dus per constructie
+   * dezelfde grondslag en dezelfde euro-weergave als de lijn zelf.
+   *
+   * Drie keer géén bol: zonder nalatenschap-knop (eind-vorm `perpetual`), zonder wat-als-lijn
+   * (er is niets om een eindpunt op te zetten), en wanneer dat eindpunt buiten het zichtbare
+   * leeftijdsbereik valt — dezelfde regel als het gedekt-merk op de knoppen: een punt dat je
+   * niet kunt aanwijzen, wijs je niet aan.
+   */
+  const nalatenschapDot: NalatenschapDotGeometry | null = (() => {
+    if (!nalatenschapMarker) return null
+    const watAls = (scenarioOverlays ?? []).find((o) => o.variant === 'scenario')
+    if (!watAls || watAls.points.length < 2) return null
+    const eind = watAls.points[watAls.points.length - 1]
+    if (!eind || !Number.isFinite(eind[0]) || !Number.isFinite(eind[1])) return null
+    if (eind[0] < minAge || eind[0] > maxAge) return null
+    return {
+      cx: PAD.left + xScale(eind[0]),
+      cy: PAD.top + yScale(eind[1]),
+      bedrag: eind[1],
+      zone: nalatenschapMarker.zone,
+    }
+  })()
+
   // Household-partner-overlay-paden + FIRE-stip. De stip valt op de fractionele
   // leeftijd (geïnterpoleerde y), net als de hoofdlijn.
   const householdPaths: HouseholdPathGeometry[] = (householdOverlays ?? []).map(overlay => {
@@ -914,6 +971,7 @@ export function buildSimChartGeometry(input: SimChartGeometryInput): SimChartGeo
     allPath,
     scenarioPaths,
     scenarioDiffVlakken,
+    nalatenschapDot,
     householdPaths,
     mcPaths,
     targetLine,

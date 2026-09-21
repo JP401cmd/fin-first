@@ -337,8 +337,8 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
     {
       id: 'as-nieuws', x: 560, y: row(6), w: 220, h: 66, kind: 'appsvc',
       title: 'Nieuws- & berichtendienst',
-      lead: 'Gepersonaliseerde nieuwsfeed en het meldingen-/berichtencentrum met voorkeuren. De persoonlijke editie kan sinds de uitvoergroep "nieuws" op lokaal staat ook on-device draaien via t-lokale-ai — de ingest zelf (dagelijkse cron, publieke bronnen) blijft altijd cloud (ADR 0079).',
-      items: ['/api/news', '/api/notifications', '/api/local-news-sources', '/api/local-news-edition'],
+      lead: 'Gepersonaliseerde nieuwsfeed en het meldingen-/berichtencentrum met voorkeuren. De persoonlijke editie kan sinds de uitvoergroep "nieuws" op lokaal staat ook on-device draaien via t-lokale-ai — de ingest zelf (dagelijkse cron, publieke bronnen) blijft altijd cloud (ADR 0079). Sinds ADR 0171 duidt de ingest elk artikel in de schaduw naar parameters (lib/krant), het fundament van de Krant zonder AI; de pure matcher en sjablonen daarop (ADR 0172, alleen euro\'s) staan in lib/krant/matcher.ts en rekenen nog nergens live.',
+      items: ['/api/news', '/api/notifications', '/api/local-news-sources', '/api/local-news-edition', '/api/news-ingest/cron'],
     },
     {
       id: 'as-rapport', x: 560, y: row(7), w: 220, h: 66, kind: 'appsvc',

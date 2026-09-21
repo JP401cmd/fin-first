@@ -256,7 +256,7 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'BELANGRIJK',
     given: 'Afwisselend uitgelogde en ingelogde staat.',
     when: 'De tester opent beveiligde routes uitgelogd, publieke check-routes uitgelogd, en publieke auth-pagina\'s ingelogd; roept een beveiligde API-route uitgelogd rechtstreeks aan.',
-    then: 'Beveiligde routes → login-redirect met `redirectTo` (en terugkeer na inloggen); /check en /check/rapport blijven publiek bereikbaar; ingelogd op /, /login, /signup, /forgot-password of /dashboard → automatische redirect naar het gekozen homescherm (profiles.home_screen; default /overzicht, keuze "budget" → /overzicht/budget); een beveiligde API-route geeft uitgelogd JSON 401, geen HTML-redirect.',
+    then: 'Beveiligde routes → login-redirect met `redirectTo` (en terugkeer na inloggen); /check en /check/rapport blijven publiek bereikbaar; ingelogd op /, /login, /signup, /forgot-password of /dashboard → automatische redirect naar het gekozen homescherm (profiles.home_screen; default /overzicht, keuze "budget" → /overzicht/budget), behalve voor een account met alleen de module nieuws (profiles.active_modules) → /nieuws; een beveiligde API-route geeft uitgelogd JSON 401, geen HTML-redirect.',
     assertion: {
       kind: 'ui-only',
       source: 'proxy.ts + lib/supabase/proxy.ts publieke/beschermde padenlijst, geen cijfermatige uitkomst',

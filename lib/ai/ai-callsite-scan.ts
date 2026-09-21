@@ -66,6 +66,11 @@ export const AI_CALLSITE_ALLOWLIST: CallsiteAllowlistEntry[] = [
       'Server-side nieuwsbronnen (RSS/webpagina-tekst), geen gebruikers-PII in de prompt.',
   },
   {
+    file: 'lib/krant/duiding.ts',
+    reason:
+      'Duidingsstap van de Krant (ADR 0171): dezelfde openbare nieuwsbronnen als news-enrich.ts, gesloten schema, geen gebruikers-PII in de prompt.',
+  },
+  {
     file: 'lib/ai/local/local-categorize-resolver.ts',
     reason:
       'On-device inferentie (Gemma 4 E2B/WebGPU), geen egress; sanitize zou legitiem on-device-signaal strippen (ADR 0043, FR-3.5).',
@@ -174,6 +179,7 @@ const EXTRA_FILES = [
   // hoort te dichten.
   'lib/aangifte/local/extract-aangifte-local.ts',
   'lib/news-enrich.ts',
+  'lib/krant/duiding.ts',
 ]
 
 function walk(dir: string, onFile: (absPath: string) => void): void {

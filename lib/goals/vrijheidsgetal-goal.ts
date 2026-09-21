@@ -140,6 +140,33 @@ export interface VrijheidsgetalSnapshot {
    * als "geen uitspraak" (opgeslagen waarde blijft staan).
    */
   planCoveragePct?: number | null
+  /**
+   * DE TWEE KNOP-DOEL-METINGEN (20 sep 2026). Anders dan de velden hierboven meten deze
+   * geen UITKOMST van de projectie maar de PLAN-INSTELLING waar het lab-doel over gaat:
+   * je legt vast wélke verandering je gaat maken, en het doel sluit zodra het plan die
+   * verandering draagt.
+   *
+   * Beide CONSUME-ONLY, uit de run die de sync tóch al doet:
+   *   - `uitgaveNaPensioenPerJaar` ← `HorizonFireSim.uitgaveNaPensioenPerJaar`, dat op zijn
+   *     beurt `KernelInput.inkomenUitgaven.uitgaveNaPensioenPerJaar` van diezelfde run is.
+   *     NOOIT `computeRetirementExpenses` hier opnieuw voeden: die grondslag (essentiële
+   *     budgetten / jaarinkomen / eigen bedrag) hoort in de adapter.
+   *   - `planLegacyAmount` ← `FirePlan.legacyAmount` (`resolveFirePlanWithOverride`), maar
+   *     ALLEEN bij eind-vorm `legacy`: bij elke andere eind-vorm reserveert het plan niets
+   *     om na te laten en is de stand dus 0 — niet "het bedrag dat toevallig nog in de
+   *     kolom staat".
+   *
+   * Er is BEWUST geen derde veld voor `extra_deposit`. De knop "Meer verdienen" is per
+   * constructie een delta bóvenop het plan (baseline 0) en de app kent geen canoniek cijfer
+   * "extra inleg die je werkelijk doet" — een gestorte euro is in de transactiehistorie niet
+   * te onderscheiden van sparen, en dát cijfer heeft al zijn eigen doeltype (`savings_rate`).
+   * Zoek er dus geen bron voor; die bestaat niet.
+   *
+   * Optioneel/additief: `undefined`/`null` = "geen uitspraak" ⇒ de opgeslagen doelwaarde
+   * blijft staan. NUL IS WÉL EEN UITSPRAAK (een plan dat niets nalaat staat echt op 0).
+   */
+  uitgaveNaPensioenPerJaar?: number | null
+  planLegacyAmount?: number | null
 }
 
 /** Minimale rij-/resultaatvorm die `pickEndBalanceAtEndAge` leest. */
@@ -207,6 +234,10 @@ export interface VrijheidsgetalSnapshotInput {
   endAge?: number | null
   /** `HorizonPageData.freedomPct` — alléén betekenisvol als dekking onder een vast anker. */
   planCoveragePct?: number | null
+  /** `HorizonFireSim.uitgaveNaPensioenPerJaar` — de plan-uitgave na pensioen (€/jaar, nominaal). */
+  uitgaveNaPensioenPerJaar?: number | null
+  /** `FirePlan.legacyAmount` bij eind-vorm `legacy`, anders 0 (het plan laat dan niets na). */
+  planLegacyAmount?: number | null
 }
 
 /**
@@ -271,6 +302,22 @@ export function buildVrijheidsgetalSnapshot(
     endBalanceAtEndAge:
       input.endBalanceAtEndAge != null && Number.isFinite(input.endBalanceAtEndAge)
         ? input.endBalanceAtEndAge
+        : null,
+    // De twee knop-doel-metingen: puur doorgeven met de standaard eindigheidstoets.
+    // GEEN anker-gate zoals `planCoveragePct` heeft — dit zijn plan-instellingen, niet
+    // uitkomsten, dus ze betekenen onder élk stopmoment hetzelfde. Wél `> 0` op de
+    // uitgave: een plan dat 0 aan uitgaven na pensioen rekent heeft geen grondslag
+    // (geen budgetten, geen inkomen), en dat is "niets te zeggen" — niet "je geeft niets
+    // uit". Bij de nalatenschap is 0 juist wél een echte stand (eind-vorm ≠ legacy).
+    uitgaveNaPensioenPerJaar:
+      input.uitgaveNaPensioenPerJaar != null &&
+      Number.isFinite(input.uitgaveNaPensioenPerJaar) &&
+      input.uitgaveNaPensioenPerJaar > 0
+        ? input.uitgaveNaPensioenPerJaar
+        : null,
+    planLegacyAmount:
+      input.planLegacyAmount != null && Number.isFinite(input.planLegacyAmount) && input.planLegacyAmount >= 0
+        ? input.planLegacyAmount
         : null,
   }
 }

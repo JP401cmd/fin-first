@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { syncActiveGoalValues, type SyncableGoal } from './goal-current-value'
 import { computeGoalProgress, type GoalType } from './goal-data'
 import { buildVrijheidsgetalSnapshot } from './goals/vrijheidsgetal-goal'
+import { selectLabDoelenBuitenPlan } from './goals/lab-doelen-buiten-plan'
 
 /**
  * ADR 0129 F3a (E) — het `fire_age`-doel onder een VAST stop-anker heeft geen
@@ -219,6 +220,169 @@ describe('syncActiveGoalValues — eindvermogen uit het lab (end_balance, ADR 01
       planCoveragePct: 17, endBalanceAtEndAge: -34_388_335,
     }))
     expect(goals[0].notApplicableReason).toBeUndefined()
+  })
+})
+
+/**
+ * DE TWEE MEETBARE KNOP-DOELEN (20 sep 2026). Hun stand is een PLAN-INSTELLING uit de
+ * kernel-run, niet een uitkomst — dus anders dan `planCoveragePct` hangen ze NIET aan het
+ * anker. Consume-only: de bouwer geeft door, hij leidt niets af.
+ */
+describe('buildVrijheidsgetalSnapshot — de twee knop-doel-metingen', () => {
+  it('geeft de plan-uitgave na pensioen en de plan-nalatenschap door, onder élk anker', () => {
+    const solved = buildVrijheidsgetalSnapshot({
+      ...basis,
+      fireAgeFractional: 52.1,
+      uitgaveNaPensioenPerJaar: 31_800,
+      planLegacyAmount: 100_000,
+    })
+    expect(solved.uitgaveNaPensioenPerJaar).toBe(31_800)
+    expect(solved.planLegacyAmount).toBe(100_000)
+
+    // Géén anker-gate (dit is precies het verschil met planCoveragePct hieronder).
+    const vast = buildVrijheidsgetalSnapshot({
+      ...basis,
+      fireAgeFractional: 58,
+      stopAnchor: 'aow',
+      stopAge: 67,
+      endAge: 90,
+      uitgaveNaPensioenPerJaar: 31_800,
+      planLegacyAmount: 100_000,
+    })
+    expect(vast.uitgaveNaPensioenPerJaar).toBe(31_800)
+    expect(vast.planLegacyAmount).toBe(100_000)
+  })
+
+  it('nul is bij de nalatenschap een METING (plan laat niets na) en bij de uitgave GEEN uitspraak', () => {
+    const snap = buildVrijheidsgetalSnapshot({
+      ...basis,
+      fireAgeFractional: 52.1,
+      // Geen grondslag (geen budgetten, geen inkomen) ⇒ niets te zeggen, niet "€0 uitgaven".
+      uitgaveNaPensioenPerJaar: 0,
+      // Een plan MÉT eind-vorm legacy en bedrag 0: een echte 0 (de gebruiker zette 'm zo).
+      // Eind-vorm ≠ legacy geeft `null` — dat pad loopt via `legacyAmountVanPlan` in
+      // vrijheidsgetal-source en wordt hieronder op sync-niveau getoetst.
+      planLegacyAmount: 0,
+    })
+    expect(snap.uitgaveNaPensioenPerJaar).toBeNull()
+    expect(snap.planLegacyAmount).toBe(0)
+  })
+
+  it('ontbrekende of niet-eindige velden → null (opgeslagen doelwaarde blijft staan)', () => {
+    const leeg = buildVrijheidsgetalSnapshot({ ...basis, fireAgeFractional: 52.1 })
+    expect(leeg.uitgaveNaPensioenPerJaar).toBeNull()
+    expect(leeg.planLegacyAmount).toBeNull()
+    const nan = buildVrijheidsgetalSnapshot({
+      ...basis,
+      fireAgeFractional: 52.1,
+      uitgaveNaPensioenPerJaar: Number.NaN,
+      planLegacyAmount: Number.NaN,
+    })
+    expect(nan.uitgaveNaPensioenPerJaar).toBeNull()
+    expect(nan.planLegacyAmount).toBeNull()
+  })
+})
+
+describe('syncActiveGoalValues — de drie knop-doelen', () => {
+  const snap = (over: Record<string, unknown> = {}) => ({
+    currentValue: 500_000,
+    targetValue: 900_000,
+    eta: 'mrt 2039',
+    fireAgeFractional: 52.1,
+    stopAnchor: 'solved' as const,
+    uitgaveNaPensioenPerJaar: 31_800,
+    planLegacyAmount: 100_000,
+    ...over,
+  })
+
+  it('retirement_expense krijgt de plan-uitgave; de omlaag-voortgang klopt in beide gevallen', async () => {
+    // Doel: terug naar €30.000/jaar. Plan rekent nu €31.800 ⇒ nog niet bereikt.
+    const doel = g({ goal_type: 'retirement_expense', target_value: 30_000, metadata: { bron: 'parameter' } })
+    const { goals } = await syncActiveGoalValues(makeSupabase([]), [doel], [], [], 'u1', async () => snap())
+    expect(goals[0].current_value).toBe(31_800)
+    const p = computeGoalProgress({ ...goals[0], target_date: null })
+    expect(p.measured).toBe(true)
+    expect(p.onTrack).toBe(false)
+
+    // "Al beter dan het doel": het plan rekent €28.000 ⇒ bereikt én op koers.
+    const gehaald = g({ goal_type: 'retirement_expense', target_value: 30_000, metadata: { bron: 'parameter' } })
+    const res = await syncActiveGoalValues(makeSupabase([]), [gehaald], [], [], 'u1', async () =>
+      snap({ uitgaveNaPensioenPerJaar: 28_000 }),
+    )
+    expect(res.goals[0].current_value).toBe(28_000)
+    const p2 = computeGoalProgress({ ...res.goals[0], target_date: null })
+    expect(p2.onTrack).toBe(true)
+    expect(p2.pct).toBe(100)
+  })
+
+  it('legacy_amount krijgt het plan-bedrag; 0 (plan laat niets na) is een echte 0%', async () => {
+    const doel = g({ goal_type: 'legacy_amount', target_value: 100_000, metadata: { bron: 'parameter' } })
+    const { goals } = await syncActiveGoalValues(makeSupabase([]), [doel], [], [], 'u1', async () => snap())
+    expect(goals[0].current_value).toBe(100_000)
+    expect(computeGoalProgress({ ...goals[0], target_date: null }).pct).toBe(100)
+
+    const niets = g({ goal_type: 'legacy_amount', target_value: 100_000, metadata: { bron: 'parameter' } })
+    const res = await syncActiveGoalValues(makeSupabase([]), [niets], [], [], 'u1', async () =>
+      snap({ planLegacyAmount: 0 }),
+    )
+    expect(res.goals[0].current_value).toBe(0)
+    expect(computeGoalProgress({ ...res.goals[0], target_date: null }).pct).toBe(0)
+  })
+
+  it('legacy_amount zonder nalatenschap in het plan: een n.v.t.-reden, geen 0%-meting', async () => {
+    // REVIEW-BEVINDING A1 (20 sep 2026). `planLegacyAmount: null` = het plan kent GEEN
+    // nalatenschap (andere eind-vorm) — anders dan 0, dat een plan mét nalatenschap op nul
+    // betekent. Eerder schreef de sync hier een 0; de kaart las dat als "nog geen meting —
+    // bekijk live in het lab", terwijl de nalatenschap-knop daar dan niet eens bestaat.
+    const doel = g({ goal_type: 'legacy_amount', target_value: 150_000, metadata: { bron: 'parameter' } })
+    const { goals } = await syncActiveGoalValues(makeSupabase([]), [doel], [], [], 'u1', async () =>
+      snap({ planLegacyAmount: null }),
+    )
+    expect(goals[0].notApplicableReason).toMatch(/laat nu niets na/)
+    // De opgeslagen stand blijft staan; er wordt geen 0 overheen geschreven.
+    expect(goals[0].current_value).toBe(doel.current_value)
+  })
+
+  it('extra_deposit krijgt ALTIJD de niet-meetbaar-notitie en dus geen misleidende 0%', async () => {
+    const doel = g({ goal_type: 'extra_deposit', target_value: 500, metadata: { bron: 'parameter' } })
+    const { goals } = await syncActiveGoalValues(makeSupabase([]), [doel], [], [], 'u1', async () => snap())
+    expect(goals[0].current_value).toBe(0)
+    expect(goals[0].notApplicableReason).toMatch(/niet te onderscheiden van sparen/)
+    const p = computeGoalProgress({ ...goals[0], target_date: null })
+    // n.v.t. is géén oordeel: geen "vraagt aandacht", geen gemeten stand.
+    expect(p.measured).toBe(false)
+    expect(p.onTrack).toBe(true)
+    expect(p.paceSkipped).toBe(true)
+  })
+
+  it('een extra_deposit-doel is GEEN "doel buiten je plan" — de notitie zegt iets anders', async () => {
+    const doel = g({ goal_type: 'extra_deposit', target_value: 500, metadata: { bron: 'parameter' } })
+    const { goals } = await syncActiveGoalValues(makeSupabase([]), [doel], [], [], 'u1', async () => snap())
+    expect(selectLabDoelenBuitenPlan(goals)).toEqual([])
+    // Contrast: een fire_age-doel onder een vast anker hoort er juist WEL in.
+    const fire = g({ goal_type: 'fire_age', target_value: 53, metadata: { bron: 'parameter' } })
+    const vast = await syncActiveGoalValues(makeSupabase([]), [fire], [], [], 'u1', async () =>
+      snap({ stopAnchor: 'aow' as const, stopAge: 67, endAge: 90, fireAgeFractional: 67 }),
+    )
+    expect(selectLabDoelenBuitenPlan(vast.goals)).toHaveLength(1)
+  })
+
+  it('zonder knop-doel draait de kernel-thunk niet (lazy, zoals de andere bronnen)', async () => {
+    let aanroepen = 0
+    const gewoon = g({ goal_type: 'savings', target_value: 1000, metadata: null })
+    await syncActiveGoalValues(makeSupabase([]), [gewoon], [], [], 'u1', async () => {
+      aanroepen += 1
+      return snap()
+    })
+    expect(aanroepen).toBe(0)
+
+    // Mét een meetbaar knop-doel draait hij wél.
+    const meetbaar = g({ goal_type: 'legacy_amount', target_value: 100_000, metadata: { bron: 'parameter' } })
+    await syncActiveGoalValues(makeSupabase([]), [meetbaar], [], [], 'u1', async () => {
+      aanroepen += 1
+      return snap()
+    })
+    expect(aanroepen).toBe(1)
   })
 })
 

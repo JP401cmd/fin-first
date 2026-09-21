@@ -150,6 +150,22 @@ export interface HorizonFireSim {
    */
   unifiedRows: HorizonFireSimRow[]
   /**
+   * De uitgave na pensioen (€/jaar, NOMINAAL) waar DEZE run mee gerekend heeft:
+   * `KernelInput.inkomenUitgaven.uitgaveNaPensioenPerJaar`, doorgegeven uit
+   * `computeConvergentieProjection` (20 sep 2026).
+   *
+   * Bestaansreden: het `retirement_expense`-doel uit het /toekomst-lab moet zijn
+   * streefbedrag afzetten tegen wát het plan nú rekent. Dat getal komt uit
+   * `computeRetirementExpenses` op de adapter-grondslag (essentiële budgetten /
+   * jaarinkomen / eigen bedrag) en is buiten de kernel-keten niet zonder die hele
+   * grondslag te reproduceren — precies de tweede berekening die CLAUDE.md verbiedt.
+   * CONSUME-ONLY: lees dit veld, stel het nooit zelf samen.
+   *
+   * OPTIONEEL/ADDITIEF (zelfde patroon als `eindsituatie`): `undefined` betekent
+   * "deze run kon het niet leveren" ⇒ de consument laat de opgeslagen doelwaarde staan.
+   */
+  uitgaveNaPensioenPerJaar?: number
+  /**
    * Duiding van de eindsituatie ("waarom blijft er aan het eind zoveel over?") uit
    * DEZELFDE run — `null` wanneer er niets te duiden valt.
    *
@@ -353,6 +369,8 @@ const computeHorizonFireSimCached = cache(async function computeHorizonFireSimIn
     aowAgeInt: built.aowAgeInt,
     aowAgeFractional,
     unifiedRows,
+    // De uitgave na pensioen van DEZE run — doorgegeven, niet herleid (zie het veld).
+    uitgaveNaPensioenPerJaar: outcome.uitgaveNaPensioenPerJaar,
     eindsituatie,
   }
 })

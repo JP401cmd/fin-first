@@ -106,7 +106,9 @@ export function DoelBewerkenSheet({
   const meta = GOAL_TYPE_META[goalType] as (typeof GOAL_TYPE_META)[keyof typeof GOAL_TYPE_META] | undefined
   const fmtValue = (v: number) => (meta ? formatGoalValue(v, goalType, goal.custom_unit) : formatCurrency(v))
   const valueLabels = goalValueLabels(goalType)
-  const isEuroGoal = !meta || meta.unit === 'EUR' || meta.unit === 'EUR/mnd'
+  // 'EUR/jaar' (`retirement_expense`, 20 sep 2026) hoort hier bij: het is een bedrag, dus
+  // de €100-stap en de euro-drempel hieronder gelden er net zo goed voor.
+  const isEuroGoal = !meta || meta.unit === 'EUR' || meta.unit === 'EUR/mnd' || meta.unit === 'EUR/jaar'
   // Euro-doelen houden hun bestaande stap van €100; andere eenheden (procenten,
   // maanden, jaren) volgen de stap van hun type — 100 zou daar onzin zijn.
   const stepForInput = isEuroGoal ? 100 : (meta?.step ?? 1)

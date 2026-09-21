@@ -22,7 +22,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { computeHorizonFireSim } from '@/lib/fire-target-shared'
 import { loadHorizonData } from '@/lib/horizon-data-loader'
 import { inclHomeTargetFromScalar } from '@/lib/core-metrics'
-import { isFixedAnchor } from '@/lib/fire-strategy'
+import { isFixedAnchor, type FirePlan } from '@/lib/fire-strategy'
 import { isHomeExcludedFromFire } from '@/lib/housing-strategy'
 import { ageAtDate } from '@/lib/horizon-data'
 import {
@@ -30,6 +30,29 @@ import {
   pickEndBalanceAtEndAge,
   type VrijheidsgetalSnapshot,
 } from '@/lib/goals/vrijheidsgetal-goal'
+
+/**
+ * Wat het plan RESERVEERT om na te laten (€, nominaal) — de stand waar het
+ * `legacy_amount`-doel zich aan meet.
+ *
+ * `FirePlan.legacyAmount` draagt het bedrag uit `profiles.fire_legacy_amount`, maar dat
+ * veld blijft staan wanneer de gebruiker naar een andere eind-vorm wisselt (de kolom wordt
+ * niet leeggemaakt). Het type zegt dat zelf: "Alleen betekenisvol bij `endForm: 'legacy'`".
+ * Zonder deze gate zou een plan dat bewust álles opmaakt tóch een nalatenschap van het
+ * laatst-ingevulde bedrag rapporteren — en dan zou het doel "behaald" lezen zonder dat het
+ * plan iets nalaat.
+ */
+function legacyAmountVanPlan(plan: FirePlan): number | null {
+  // `null` = het plan kent GEEN nalatenschap (een andere eind-vorm) — niet "0 nagelaten".
+  // Dat onderscheid is de hele functie: `profiles.fire_legacy_amount` blíjft staan na een
+  // vormwissel, dus zonder deze gate zou een plan dat alles opmaakt het laatst ingevulde
+  // bedrag rapporteren. En 0 teruggeven zou net zo fout zijn: de kaart leest dat als een
+  // meting die nog moet komen, terwijl de knop in het lab dan niet eens bestaat. De sync
+  // zet bij `null` een n.v.t.-reden ("je plan laat nu niets na").
+  if (plan.endForm !== 'legacy') return null
+  const bedrag = Number(plan.legacyAmount)
+  return Number.isFinite(bedrag) && bedrag > 0 ? bedrag : 0
+}
 
 /**
  * De canonieke FIRE-stand voor het vrijheidsgetal-doel. `null` wanneer de
@@ -105,5 +128,17 @@ export const loadVrijheidsgetalSnapshot = cache(async function loadVrijheidsgeta
       anchorFixed && run != null && dob != null && run.sim.kernelDepletionMonth !== undefined
         ? horizon.freedomPct
         : null,
+    // ── De twee knop-doel-metingen (20 sep 2026) ───────────────────────────────
+    // De uitgave na pensioen komt uit DEZELFDE run: het is letterlijk
+    // `KernelInput.inkomenUitgaven.uitgaveNaPensioenPerJaar` die deze projectie voedde.
+    // Zonder run geen uitspraak — de scalar-terugval draagt dit getal niet, en
+    // `computeRetirementExpenses` hier opnieuw voeden zou de adapter-grondslag
+    // (essentiële budgetten / jaarinkomen / eigen bedrag) een tweede keer samenstellen.
+    uitgaveNaPensioenPerJaar: run?.uitgaveNaPensioenPerJaar ?? null,
+    // Nalatenschap: het plan van DEZE run (`run.firePlan`), met dezelfde terugval op de
+    // horizon-bundel als `anchorFixed` hierboven. Alleen bij eind-vorm `legacy` reserveert
+    // het plan een bedrag; bij elke andere eind-vorm is de stand 0 — een echte 0, niet
+    // "geen uitspraak", want dan is er bewust niets om na te laten.
+    planLegacyAmount: legacyAmountVanPlan(run?.firePlan ?? horizon.firePlan),
   })
 })

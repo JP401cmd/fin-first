@@ -124,6 +124,44 @@ function convergentieContext(withPartner: boolean): ConvergentieRawContext {
   }
 }
 
+/**
+ * 20 sep 2026 — de uitgave na pensioen verlaat de kernel-keten als scalar, zodat het
+ * `retirement_expense`-doel zich aan het plan-getal kan meten. DE ANTI-DRIFT-EIS: wat de
+ * router doorgeeft moet EXACT de waarde zijn die de kernel zelf gebruikte. Zodra iemand
+ * hem ergens opnieuw samenstelt (uit budgetten, uit inkomen) valt deze test om.
+ */
+describe('computeConvergentieProjection — uitgaveNaPensioenPerJaar reist mee (consume, don\'t recompute)', () => {
+  it('is byte-identiek aan `KernelInput.inkomenUitgaven.uitgaveNaPensioenPerJaar` van dezelfde invoer', () => {
+    const ctx = convergentieContext(false)
+    const verwacht = buildKernelInputFromApp(buildConvergentieAdapterInput(ctx)).inkomenUitgaven
+      .uitgaveNaPensioenPerJaar
+
+    const outcome = computeConvergentieProjection({ rawContext: ctx })
+    expect(outcome.ok).toBe(true)
+    if (!outcome.ok) return
+    // Absolute gelijkheid: dezelfde adapter op dezelfde rij, dus elk verschil is drift.
+    expect(outcome.uitgaveNaPensioenPerJaar).toBe(verwacht)
+    // En het is een echt bedrag, geen 0-placeholder (deze fixture heeft een grondslag).
+    expect(outcome.uitgaveNaPensioenPerJaar).toBeGreaterThan(0)
+  })
+
+  it('volgt de grondslagkeuze van het profiel (eigen bedrag wint van de essentiële budgetten)', () => {
+    const basis = convergentieContext(false)
+    const eigenBedrag: ConvergentieRawContext = {
+      ...basis,
+      profile: {
+        ...basis.profile,
+        retirement_expense_method: 'custom_amount',
+        retirement_expense_custom_amount: 27_500,
+      },
+    }
+    const outcome = computeConvergentieProjection({ rawContext: eigenBedrag })
+    expect(outcome.ok).toBe(true)
+    if (!outcome.ok) return
+    expect(outcome.uitgaveNaPensioenPerJaar).toBe(27_500)
+  })
+})
+
 describe('buildConvergentieAdapterInput — partnerblok (TPR-07)', () => {
   it('solo: géén `partner`-sleutel op de adapter-invoer, kern rekent met personen = 1', () => {
     const adapterInput = buildConvergentieAdapterInput(convergentieContext(false))

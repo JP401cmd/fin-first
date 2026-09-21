@@ -32,6 +32,20 @@ export type GoalType =
    * PUT /api/toekomst-doel geschreven.
    */
   | 'plan_coverage'
+  /**
+   * DE DRIE KNOP-DOELEN uit het lab (ADR 0170, defect 20 sep 2026: vijf knoppen boden
+   * maar twee doelen). Het zijn PLAN-PARAMETERS, geen uitkomsten: je legt vast wélke
+   * verandering je gaat maken, niet welk cijfer de motor moet halen.
+   *
+   * Alle drie lab-only (`viaLab`) en bewust ZONDER doelbasis (`metricBasis: false`) én
+   * zonder `metricSource` — zie de toelichting per type in `GOAL_TYPE_META`. Ze staan
+   * los van de gelijknamige UITKOMST-doelen: `extra_deposit` is niet `salary` (dat is
+   * salaris, een ander bedrag) en `legacy_amount` is niet `end_balance` (dat is het
+   * geprojecteerde eindvermogen — een uitkomst, geen gereserveerd streefbedrag).
+   */
+  | 'extra_deposit'
+  | 'retirement_expense'
+  | 'legacy_amount'
   | 'custom'
 
 export type GoalOwnership = 'personal' | 'shared'
@@ -113,6 +127,9 @@ export const GOAL_TYPE_LABELS: Record<GoalType, string> = {
   debt_free_date: 'Schuldenvrij',
   tax_burden: 'Belastingdruk',
   plan_coverage: 'Plan gedekt',
+  extra_deposit: 'Extra inleg',
+  retirement_expense: 'Uitgave na pensioen',
+  legacy_amount: 'Nalatenschap',
   custom: 'Vrij doel',
 }
 
@@ -135,6 +152,10 @@ export const GOAL_TYPE_ICONS: Record<GoalType, string> = {
   tax_burden: 'Receipt',
   // Bestaat in de gedeelde `iconMap` (zelfde icoon als emergency_fund — "geborgd").
   plan_coverage: 'ShieldCheck',
+  // Alle drie bestaan in de gedeelde `iconMap`; de regressietest hieronder pint dat vast.
+  extra_deposit: 'HandCoins',
+  retirement_expense: 'Palmtree',
+  legacy_amount: 'Gift',
   custom: 'Target',
 }
 
@@ -163,6 +184,16 @@ export type GoalTypeMeta = {
    * gezet waar het van 'up' afwijkt — zie `computeGoalProgress`.
    */
   direction?: 'up' | 'down'
+  /**
+   * true = dit doel is een plan-INSTELLING (een knop uit het lab), geen uitkomst.
+   * Behaald betekent dan: het plan staat óp de doelwaarde — niet "voorbij" in de
+   * `direction`. De knoppen bewegen naar twee kanten (nalatenschap vooral omlaag
+   * om het plan gedekt te krijgen, uitgave na pensioen ook omhoog), dus een
+   * richtingstoets zou een doel dat de oude plan-stand al "voorbij" is meteen
+   * behaald noemen, terwijl het plan nog niets van de vastgelegde verandering
+   * draagt. Zie `isGoalReached`.
+   */
+  planInstelling?: boolean
   /**
    * true = dit doel-type wordt via het /toekomst-lab ("verkennen wordt richten")
    * gegenereerd en is NIET vrij aanmaakbaar in GoalForm. Afwezig/false = normaal
@@ -235,6 +266,48 @@ export const GOAL_TYPE_META: Record<GoalType, GoalTypeMeta> = {
   // Richting 'up' = de default (bewust niet expliciet: de regressietest pint `direction`
   // op undefined voor elk niet-'down'-type).
   plan_coverage:   { unit: '%', group: 'Financieel', step: '1', min: 0, max: 100, supportsAssetLink: false, supportsDebtLink: false, freedomTimeRelevant: false, viaLab: true, metricBasis: false, metricSource: 'horizon-kernel' },
+  // ── DE DRIE KNOP-DOELEN (ADR 0170, defect 20 sep 2026) ────────────────────────
+  // Plan-PARAMETERS, geen uitkomsten: hun tegenhanger is niet een gemeten werkelijkheid
+  // maar een INSTELLING in het plan. Het doel sluit dus zodra het plan de verandering
+  // draagt die je in het lab vastlegde. Alle drie lab-only (`viaLab`) en géén doelbasis
+  // (`metricBasis: false` — ze horen niet in de doelbasis-kiezer, zelfde eigenaarslijn
+  // als `plan_coverage`).
+  //
+  // TWEE VAN DE DRIE WORDEN GEMETEN, uit de kernel-run die `syncActiveGoalValues` tóch al
+  // doet (`metricSource: 'horizon-kernel'`), langs de naad die `planCoveragePct` en
+  // `endBalanceAtEndAge` al gebruiken:
+  //   - retirement_expense ← `VrijheidsgetalSnapshot.uitgaveNaPensioenPerJaar`, dat
+  //     `KernelInput.inkomenUitgaven.uitgaveNaPensioenPerJaar` van díe run ís (uitkomst van
+  //     `computeRetirementExpenses` op de adapter-grondslag: essentiële budgetten /
+  //     jaarinkomen / eigen bedrag). CONSUME — nooit die grondslag tweede keer samenstellen.
+  //   - legacy_amount ← `VrijheidsgetalSnapshot.planLegacyAmount` = `FirePlan.legacyAmount`
+  //     bij eind-vorm `legacy`, anders 0 (het plan laat dan bewust niets na).
+  //
+  // EXTRA_DEPOSIT WORDT NIET GEMETEN, en dat is een vastgesteld feit, geen openstaand
+  // werkje: de knop "Meer verdienen" is per constructie een delta BOVENOP het plan
+  // (baseline 0, `buildSliderEvent('extra_inleg', …)`) en de app kent geen canoniek cijfer
+  // "extra inleg die je werkelijk doet" — een gestorte euro is in de transactiehistorie
+  // niet te onderscheiden van sparen, en dát cijfer heeft al zijn eigen doeltype
+  // (`savings_rate`). ZOEK ER DUS GEEN BRON VOOR; die bestaat niet. Vandaar geen
+  // `metricSource` op dit ene type: een sleutel zonder aanroep is per de docstring
+  // hierboven "een belofte zonder dekking". Zijn kaart toont het streefbedrag met een
+  // stand van 0 en een expliciete notitie (`extraInlegGoalNoMetricNote`), zodat die 0
+  // niet leest als "je legt niets extra in".
+  //
+  // RANGES: geen META-min/max, net als `end_balance` — euro's hebben hier geen
+  // natuurlijke band. De bovengrens staat op de schrijfpoort
+  // (`EINDVERMOGEN_DOELWAARDE_MAX`/`DOELWAARDE_BEDRAG_MAX` in app/api/toekomst-doel/schema.ts)
+  // en de ondergrens is een harde weigering in `buildRow`: een doel van €0 of minder is
+  // geen doel (`computeGoalProgress` leest `target <= 0` als "geen doel gesteld").
+  extra_deposit:      { unit: 'EUR/mnd',  group: 'Financieel', step: '0.01', supportsAssetLink: false, supportsDebtLink: false, freedomTimeRelevant: true, planInstelling: true, viaLab: true, metricBasis: false },
+  // 'down': je legt vast dat je ná je pensioen met MINDER rondkomt (zelfde kant als
+  // `HEFBOOM_RICHTING.uitgaveNaPensioen = 'dalend'`).
+  retirement_expense: { unit: 'EUR/jaar', group: 'Financieel', step: '0.01', supportsAssetLink: false, supportsDebtLink: false, freedomTimeRelevant: true, direction: 'down', planInstelling: true, viaLab: true, metricBasis: false, metricSource: 'horizon-kernel' },
+  // Richting 'up' (default) — en dat wijkt BEWUST af van `HEFBOOM_RICHTING.nalatenschap
+  // = 'dalend'`. Die twee meten niet hetzelfde: minder nalaten maakt je PLAN haalbaarder
+  // (hefboom), maar het DOEL is "dit wil ik nalaten" en dat bereik je door méér te
+  // reserveren. Zelfde richting als `end_balance`, de uitkomst-tegenhanger.
+  legacy_amount:      { unit: 'EUR',      group: 'Financieel', step: '0.01', supportsAssetLink: false, supportsDebtLink: false, freedomTimeRelevant: true, planInstelling: true, viaLab: true, metricBasis: false, metricSource: 'horizon-kernel' },
   custom:          { unit: 'custom', group: 'Persoonlijk', step: '1',  supportsAssetLink: true, supportsDebtLink: true, allowsMixedLinks: true, freedomTimeRelevant: false },
 }
 
@@ -277,6 +350,10 @@ export function formatGoalValue(value: number, goalType: GoalType, customUnit?: 
       return `€${value.toLocaleString('nl-NL', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
     case 'EUR/mnd':
       return `€${value.toLocaleString('nl-NL', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}/mnd`
+    // Jaarbedrag (`retirement_expense`). De eenheid staat ER BEWUST BIJ: zonder "/jaar"
+    // leest €31.800 op een uitgaven-kaart als een maandbedrag, en dat is een factor 12.
+    case 'EUR/jaar':
+      return `€${value.toLocaleString('nl-NL', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}/jaar`
     case '%':
       return `${value.toLocaleString('nl-NL', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`
     case 'dagen':
@@ -334,6 +411,14 @@ export function goalValueLabels(goalType: GoalType): { target: string; current: 
       return { target: 'Doel-belastingdruk (%)', current: 'Huidige belastingdruk (%)' }
     case 'plan_coverage':
       return { target: 'Doel-dekking (%)', current: 'Huidige dekking (%)' }
+    // De drie knop-doelen dragen geen live meting (zie GOAL_TYPE_META), dus het
+    // "current"-label zegt wat het plan doet — niet wat er gemeten is.
+    case 'extra_deposit':
+      return { target: 'Doel-inleg (€/mnd)', current: 'Nu extra ingelegd (€/mnd)' }
+    case 'retirement_expense':
+      return { target: 'Doel-uitgave na pensioen (€/jaar)', current: 'Nu in je plan (€/jaar)' }
+    case 'legacy_amount':
+      return { target: 'Doel-nalatenschap (€)', current: 'Nu in je plan (€)' }
     case 'custom':
       return { target: 'Doelwaarde', current: 'Huidige waarde' }
     default:
@@ -362,8 +447,52 @@ export const GOAL_COLORS = [
  * 0,25 procentpunt. "Toevallig verdedigbaar" is geen ontwerp — komt er een vierde
  * eenheid bij, dan hoort de marge per type in `GOAL_TYPE_META` te staan en niet
  * hier gedeeld te worden.
+ *
+ * DIE VIERDE EENHEID IS ER (ADR 0170, 20 sep 2026): `retirement_expense` is een
+ * `down`-doel in EURO'S PER JAAR, en het draagt sinds die datum een ECHTE meting
+ * (de plan-uitgave uit de kernel-run). Daarmee is de voorwaarde die dit nog even
+ * onschadelijk maakte vervallen: 0,25 euro speling op €31.800 is materieel géén
+ * speling, dus een plan dat één euro boven het doel ligt zou "niet op koers" heten.
+ * Vandaar `downGoalOnTrackTolerance` hieronder — de marge is nu EENHEID-BEWUST,
+ * precies wat deze docstring al voorschreef. Deze constante blijft de marge voor de
+ * niet-bedrag-eenheden (jaren, decimale jaren, procentpunten) en is daar ONGEWIJZIGD.
  */
 const DOWN_GOAL_ONTRACK_TOLERANCE = 0.25
+
+/**
+ * Relatieve "op koers"-speling voor een `down`-doel in een BEDRAG-eenheid: 0,5% van de
+ * doelwaarde (€159 op €31.800 ≈ €13/mnd).
+ *
+ * WAAROM HIER RELATIEF EN BIJ EEN LEEFTIJD ABSOLUUT — dat is geen inconsistentie maar
+ * precies het punt van de docstring hierboven. Een leeftijd heeft een natuurlijke
+ * absolute speling (0,25 jaar ≈ 3 maanden) en een relatieve marge zou daar meebewegen
+ * met de leeftijd, wat onlogisch is. Een BEDRAG heeft het omgekeerde probleem: er
+ * bestaat geen absoluut bedrag dat zowel bij €5.000 als bij €500.000 een redelijke
+ * speling is, terwijl een percentage dat wél is. De eenheid bepaalt de vorm.
+ */
+const DOWN_GOAL_AMOUNT_ONTRACK_FRACTION = 0.005
+
+/** Bedrag-eenheden: hun speling is relatief (zie `DOWN_GOAL_AMOUNT_ONTRACK_FRACTION`). */
+function isAmountUnit(unit: string): boolean {
+  return unit === 'EUR' || unit === 'EUR/mnd' || unit === 'EUR/jaar'
+}
+
+/**
+ * De "op koers"-speling van één `down`-doel, in de eenheid van dat doel. Eén plek, zodat
+ * een nieuw omlaag-doel niet stil de marge van een andere eenheid erft.
+ *
+ * Bedrag-eenheden krijgen een relatieve marge op de DOELWAARDE (niet op de huidige
+ * stand: de doelwaarde is de vaste referentie, zodat de speling niet meebeweegt met hoe
+ * ver je er nog vanaf zit). Alle andere eenheden houden de bestaande absolute 0,25 —
+ * `fire_age`, `debt_free_date` en `tax_burden` gedragen zich dus byte-identiek aan vóór
+ * deze wijziging.
+ */
+function downGoalOnTrackTolerance(goalType: GoalType, target: number): number {
+  const unit = GOAL_TYPE_META[goalType]?.unit ?? ''
+  if (!isAmountUnit(unit)) return DOWN_GOAL_ONTRACK_TOLERANCE
+  const t = Math.abs(Number(target))
+  return Number.isFinite(t) ? t * DOWN_GOAL_AMOUNT_ONTRACK_FRACTION : 0
+}
 
 /**
  * Is dit doel BEREIKT? De ene richting-bewuste toets die elk oppervlak
@@ -388,6 +517,12 @@ export function isGoalReached(goalType: GoalType, current: number, target: numbe
   const c = Number(current)
   const t = Number(target)
   if (!Number.isFinite(c) || !Number.isFinite(t) || t <= 0) return false
+  if (GOAL_TYPE_META[goalType]?.planInstelling) {
+    // Plan-instelling: behaald = het plan staat óp de doelwaarde (zie `planInstelling`).
+    // `c <= 0` is "geen meting" (extra_deposit meet nooit; nalatenschap buiten eind-vorm
+    // `legacy`), nooit behaald.
+    return c > 0 && Math.abs(c - t) <= planInstellingMarge(t)
+  }
   if ((GOAL_TYPE_META[goalType]?.direction ?? 'up') === 'down') {
     // `current <= 0` is bij een omlaag-doel GEEN nul-meting maar "de bron kon
     // niets zeggen" — precies zoals `computeGoalProgress` hieronder het leest
@@ -415,6 +550,18 @@ export function isGoalReached(goalType: GoalType, current: number, target: numbe
  * uit. Oppervlakken die op dat getal afgaan zeggen "Behaald" tegen een doel dat
  * de canonieke toets afwijst, en vieren het zelfs.
  */
+/**
+ * Hoe dicht een plan-instelling bij de doelwaarde moet staan om als "op je doel" te
+ * gelden: 0,5% van het doel, minimaal €1. Niet exact-gelijk, want de kernel levert
+ * de uitgave na pensioen als afgeleide (bv. een percentage van je inkomen) en het doel
+ * is bij het vastleggen afgerond — exacte gelijkheid zou dan nooit meer waar worden.
+ */
+export const PLAN_INSTELLING_MARGE_FRACTIE = 0.005
+
+function planInstellingMarge(target: number): number {
+  return Math.max(1, target * PLAN_INSTELLING_MARGE_FRACTIE)
+}
+
 export function goalReachedFromProgress(
   goalType: GoalType,
   progress: Pick<GoalProgress, 'current' | 'target'>,
@@ -603,7 +750,7 @@ export function computeGoalProgress(goal: GoalProgressInput, options?: GoalProgr
       return { current, target, pct: 0, onTrack: false, measured: false, requiredMonthly: null, eta: null, paceSkipped: false }
     }
     const pct = Math.max(0, Math.min(Math.round((target / current) * 100), 100))
-    const onTrack = current <= target + DOWN_GOAL_ONTRACK_TOLERANCE
+    const onTrack = current <= target + downGoalOnTrackTolerance(goal.goal_type, target)
     // target_date-tijdlijnlogica (en dus ook `etaOverride`) is alleen zinvol voor
     // 'up'-doelen; een `down`-doel is zelf al een leeftijd, geen datum — en dus
     // ook geen benodigde maandinleg. Het richting-/tolerantie-oordeel blijft een

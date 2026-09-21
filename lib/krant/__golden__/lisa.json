@@ -1,0 +1,136 @@
+{
+  "matcherVersie": 1,
+  "sjabloonVersie": 1,
+  "profielType": "35-49·koop·partner-onbekend",
+  "items": [
+    {
+      "artikelId": "a05-eigen-risico",
+      "titel": "Eigen risico in 2027 naar 165 euro",
+      "rubriek": "macro",
+      "bron": "Voorbeeldbron",
+      "url": "https://voorbeeld.nl/a05-eigen-risico",
+      "gepubliceerd": "2026-09-19T05:10:00Z",
+      "vorm": "direct",
+      "score": 4,
+      "mechanisme": "eigen-risico",
+      "impact": {
+        "soort": "bereik",
+        "lo": 220,
+        "hi": 220,
+        "eenheid": "eur-per-jaar",
+        "richting": "minder",
+        "vorm": "direct",
+        "jaar": 2027,
+        "eigenRisico": {
+          "oud": 385,
+          "nieuw": 165
+        }
+      },
+      "sjabloonId": "direct-eigen-risico",
+      "variant": 0,
+      "slots": {
+        "oud": "€ 385",
+        "nieuw": "€ 165",
+        "bedrag": "€ 220",
+        "richting": "minder"
+      },
+      "tekst": "Als dit voorstel doorgaat: het verplicht eigen risico gaat van € 385 naar € 165: hoogstens € 220 per jaar minder zorgkosten.",
+      "deadline": null,
+      "watMist": [],
+      "waarom": [
+        "doelgroep:geboortejaar",
+        "impact:direct"
+      ],
+      "samenvatting": "Het verplicht eigen risico gaat in 2027 naar 165 euro per jaar. Het voorstel ligt bij de Kamer."
+    },
+    {
+      "artikelId": "a02-box1-schijf1",
+      "titel": "Tarief eerste schijf inkomstenbelasting naar 36 procent",
+      "rubriek": "fiscaal",
+      "bron": "Voorbeeldbron",
+      "url": "https://voorbeeld.nl/a02-box1-schijf1",
+      "gepubliceerd": "2026-09-19T05:10:00Z",
+      "vorm": "direct",
+      "score": 3,
+      "mechanisme": "box1-parameter",
+      "impact": {
+        "soort": "bereik",
+        "lo": 97,
+        "hi": 97,
+        "eenheid": "eur-per-jaar",
+        "richting": "meer",
+        "vorm": "direct",
+        "jaar": 2027
+      },
+      "sjabloonId": "direct-box1",
+      "variant": 0,
+      "slots": {
+        "inkomen": "€ 4.250 tot € 5.500",
+        "bedrag": "€ 97",
+        "richting": "meer",
+        "jaar": "2027"
+      },
+      "tekst": "Als dit voorstel doorgaat: bij een netto inkomen van € 4.250 tot € 5.500 per maand betekent dit vanaf 2027 € 97 per jaar meer inkomstenbelasting.",
+      "deadline": null,
+      "watMist": [],
+      "waarom": [
+        "doelgroep:werk",
+        "impact:direct"
+      ],
+      "samenvatting": "Het tarief in de eerste schijf van box 1 gaat in 2027 naar 36 procent. De schijfgrenzen blijven gelijk."
+    }
+  ],
+  "algemeen": {
+    "kop": "Ook in het nieuws",
+    "label": "Niet op jouw situatie afgestemd.",
+    "items": [
+      {
+        "artikelId": "a01-box3-heffingsvrij",
+        "titel": "Heffingsvrij vermogen box 3 naar 60.000 euro in 2027",
+        "rubriek": "fiscaal",
+        "bron": "Voorbeeldbron",
+        "url": "https://voorbeeld.nl/a01-box3-heffingsvrij",
+        "gepubliceerd": "2026-09-19T05:10:00Z",
+        "samenvatting": "Het heffingsvrij vermogen in box 3 gaat in 2027 naar 60.000 euro. Het tarief blijft 36 procent."
+      },
+      {
+        "artikelId": "a03-aow-leeftijd",
+        "titel": "AOW-leeftijd in 2033 drie maanden omhoog",
+        "rubriek": "pensioen",
+        "bron": "Voorbeeldbron",
+        "url": "https://voorbeeld.nl/a03-aow-leeftijd",
+        "gepubliceerd": "2026-09-19T05:10:00Z",
+        "samenvatting": "De AOW-leeftijd stijgt in 2033 met drie maanden. Dat volgt uit de nieuwe levensverwachting."
+      },
+      {
+        "artikelId": "a04-studieschuld-rente",
+        "titel": "Rente op studieschuld in 2027 naar 3 procent",
+        "rubriek": "rente",
+        "bron": "Voorbeeldbron",
+        "url": "https://voorbeeld.nl/a04-studieschuld-rente",
+        "gepubliceerd": "2026-09-19T05:10:00Z",
+        "samenvatting": "De rente op studieschulden wordt in 2027 vastgesteld op 3 procent. Dat geldt voor wie dan een nieuwe rentevaste periode ingaat."
+      },
+      {
+        "artikelId": "a06-spaarrente",
+        "titel": "Spaarrentes dalen na rentebesluit ECB",
+        "rubriek": "rente",
+        "bron": "Voorbeeldbron",
+        "url": "https://voorbeeld.nl/a06-spaarrente",
+        "gepubliceerd": "2026-09-19T05:10:00Z",
+        "samenvatting": "Na het rentebesluit van de ECB verlagen banken de spaarrente met 0,25 procentpunt. Niet elke bank volgt."
+      },
+      {
+        "artikelId": "a07-hypotheekrente",
+        "titel": "Hypotheekrente stijgt licht",
+        "rubriek": "woningmarkt",
+        "bron": "Voorbeeldbron",
+        "url": "https://voorbeeld.nl/a07-hypotheekrente",
+        "gepubliceerd": "2026-09-19T05:10:00Z",
+        "samenvatting": "De gemiddelde hypotheekrente voor tien jaar vast steeg naar 4,1 procent. Het verschil met vorige maand is 0,1 procentpunt."
+      }
+    ]
+  },
+  "leeg": false,
+  "legeTekst": null
+}

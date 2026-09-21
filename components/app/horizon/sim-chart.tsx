@@ -13,6 +13,7 @@ import {
   type MonteCarloOverlay,
   type HouseholdPartnerOverlay,
 } from '@/lib/horizon/sim-chart-geometry'
+import type { LabZone } from '@/lib/horizon/lab-grenzen-types'
 import { ChartStaticLayers } from './chart-static-layers'
 import { formatAge } from '@/lib/horizon/fire-format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
@@ -300,6 +301,8 @@ export const SimChart = memo(function SimChart({
   liquidPoints,
   primaryBasis = 'total',
   secondaryLineVisible = true,
+  planZone = null,
+  nalatenschapMarker,
   disableCrosshair = false,
   hoverAge,
   onHoverAge,
@@ -413,6 +416,13 @@ export const SimChart = memo(function SimChart({
    *  het Doel-label zet 'm uit; welke van de twee lijnen dat betreft volgt uit
    *  `primaryBasis`. */
   secondaryLineVisible?: boolean
+  /** Zone van het plan op de huidige lab-knop-stand (`zoneVanHuidig`, ADR 0170 B2). Bepaalt of
+   *  een wat-als ónder de basislijn rood (plan reikt niet) of neutraal grijs (gedekt, alleen
+   *  minder vermogen) leest. Consume-only: het oordeel komt uit de kernel-grenzen in de host. */
+  planZone?: LabZone | null
+  /** Bestaat er een nalatenschap-knop in het lab? Zo ja, dan krijgt de wat-als-lijn een bol op
+   *  zijn eindpunt in de stoplichtkleur van die knop (zie `SimChartGeometryInput`). */
+  nalatenschapMarker?: { zone: LabZone | null }
   /** Onderdruk de crosshair-tooltip (bv. in de tips-modus van /toekomst). */
   disableCrosshair?: boolean
   /** Controlled hover-leeftijd. Aanwezig → parent bezit de hover-state (cijferbar/
@@ -480,6 +490,7 @@ export const SimChart = memo(function SimChart({
         liquidPoints,
         primaryBasis,
         secondaryLineVisible,
+        nalatenschapMarker,
         containerW,
       }),
     [
@@ -506,6 +517,7 @@ export const SimChart = memo(function SimChart({
       liquidPoints,
       primaryBasis,
       secondaryLineVisible,
+      nalatenschapMarker,
       containerW,
     ],
   )
@@ -583,6 +595,7 @@ export const SimChart = memo(function SimChart({
           geometry={geometry}
           hasEntered={hasEntered}
           masked={masked}
+          planZone={planZone}
           emphasis={emphasis}
           baselineEmphasis={baselineEmphasis}
           showDepletionWarning={showDepletionWarning}

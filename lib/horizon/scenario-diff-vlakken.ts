@@ -9,7 +9,8 @@
  * verschil is, maar niet hoeveel en niet welke kant op. Het gearceerde vlak beantwoordt de
  * vraag die de knoppen stellen — levert dit meer of minder op? — zonder dat de lezer twee
  * curves met het oog hoeft af te trekken. Groen waar de wat-als BOVEN de basislijn ligt
- * (meer vermogen), rood waar hij eronder ligt.
+ * (meer vermogen); ligt hij eronder, dan bepaalt de zone van het plan of dat een alarm is
+ * (rood) of alleen "minder vermogen" (neutraal grijs) — zie `vlakKleurVoor`.
  *
  * DE KRUISING IS HET HELE PUNT. Waar de twee lijnen elkaar snijden moet het vlak van kleur
  * wisselen op precies dat punt, niet op het eerstvolgende meetpunt: anders steekt er een
@@ -21,6 +22,8 @@
  * grondslagen zou een verschil tonen dat er niet is (CLAUDE.md: meng ze nooit op één as).
  */
 
+import type { LabZone } from './lab-grenzen-types'
+
 /** Een punt op de tijdas: `[leeftijd, waarde]`. */
 export type ChartPunt = readonly [number, number]
 
@@ -30,6 +33,34 @@ export interface DiffVlak {
   readonly kant: 'boven' | 'onder'
   /** De omtrek in grafiek-coördinaten: heen over de wat-als, terug over de basis. */
   readonly punten: ChartPunt[]
+}
+
+/**
+ * Kleur van één verschilvlak, als CSS-token. PURE beslisregel — bewust hier en niet als
+ * ternary in de JSX, zodat hij toetsbaar is op elke tak.
+ *
+ * WAAROM DE ZONE MEEDOET (eigenaarsbesluit 20 sep 2026). Vóór deze regel was élk vlak onder
+ * de basislijn rood. Verlaag je de nalatenschap, dan ligt de wat-als per definitie lager —
+ * maar minder nalaten is geen alarm zolang je plan gewoon gedekt is. Rood naast een zone die
+ * "ruim gedekt" zegt, zijn twee uitspraken die elkaar tegenspreken; precies wat de
+ * driekleurige schaal moest oplossen (ADR 0170 B2).
+ *
+ *  - `boven` (de wat-als levert MÉÉR op) → groen, ongewijzigd;
+ *  - `onder` + het plan reikt niet (zone rood) → rood, ongewijzigd: dan ís het een alarm;
+ *  - `onder` + gedekt (zone groen of oranje) → neutraal grijs: minder vermogen, geen oordeel.
+ *
+ * ZONE ONBEKEND (`null`) valt bewust óók op grijs. `null` is niet "het gaat slecht" maar
+ * "we hebben nog geen oordeel" — de grenzen-batch is de eerste keer nog onderweg. Rood tonen
+ * zou een alarm claimen dat de kernel niet heeft gegeven, en een seconde later omslaan naar
+ * grijs; de omgekeerde volgorde (grijs → rood) toont nooit een alarm dat er niet blijkt te zijn.
+ *
+ * Grijs is `--ink-3` (de mid-inkt van de assen), niet `--ink-4`/`--border-ed`: die twee zijn
+ * papiertinten en zouden op de lage vlak-dekking wegvallen — dan lijkt het vlak weg i.p.v.
+ * neutraal. Geen module-accent: dit is semantiek, en die is niet instelbaar.
+ */
+export function vlakKleurVoor(kant: DiffVlak['kant'], planZone: LabZone | null): string {
+  if (kant === 'boven') return 'var(--positive)'
+  return planZone === 'rood' ? 'var(--negative)' : 'var(--ink-3)'
 }
 
 /** Waarde van een reeks op een leeftijd; `null` als die leeftijd er niet in zit. */

@@ -203,6 +203,15 @@ function ParameterGoalCard({ goal, progress, labPlan }: GoalDisplay & { labPlan:
   // naam en subregel volgen het plan zoals bij "Plan gedekt".
   const isEindvermogen = goal.goal_type === 'end_balance'
   const volgtPlan = isCoverage || isEindvermogen
+  // De drie KNOP-doelen zijn plan-INSTELLINGEN, geen tempo: je zet ze, je loopt er niet
+  // op achter. Zonder deze gate krijgt `retirement_expense` (het enige omlaag-type ertussen)
+  // een rode "Achter op planning"-pill zodra het plan nog op de oude uitgave staat — een
+  // tempo-oordeel over een instelling zonder streefdatum. `savings_rate` staat in dezelfde
+  // lijst al neutraal; dit trekt de drie nieuwe daarmee gelijk.
+  const isPlanInstelling =
+    goal.goal_type === 'extra_deposit' ||
+    goal.goal_type === 'retirement_expense' ||
+    goal.goal_type === 'legacy_amount'
   const current = progress.current
   // "Nog geen meting": de consume-only bron kon (nog) geen actuele
   // stand leveren (0/null op dag 0). Toon dat eerlijk i.p.v. een
@@ -242,7 +251,7 @@ function ParameterGoalCard({ goal, progress, labPlan }: GoalDisplay & { labPlan:
   const behaald = measured && goalReachedFromProgress(goal.goal_type, progress)
   const status = behaald
     ? { label: 'Behaald', color: 'text-positive', bg: 'bg-positive/10' }
-    : !isFire && !volgtPlan && measured
+    : !isFire && !volgtPlan && !isPlanInstelling && measured
       ? statusFor(progress)
       : null
   const pct = Math.min(100, Math.max(0, Math.round(progress.pct)))

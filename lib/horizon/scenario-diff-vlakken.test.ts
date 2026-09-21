@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildDiffVlakken, type ChartPunt } from './scenario-diff-vlakken'
+import { buildDiffVlakken, vlakKleurVoor, type ChartPunt } from './scenario-diff-vlakken'
 
 /**
  * Het verschilvlak tussen de basislijn en de wat-als-lijn. De inzet van deze tests is de
@@ -105,5 +105,38 @@ describe('buildDiffVlakken — randgevallen', () => {
     const watAls: ChartPunt[] = basis.map(([a, v]) => [a, v + 1])
     expect(buildDiffVlakken(basis, watAls, 5)).toEqual([])
     expect(buildDiffVlakken(basis, watAls, 0)).toHaveLength(1)
+  })
+})
+
+/**
+ * De KLEURREGEL van het vlak (eigenaarsbesluit 20 sep 2026). Puur getest omdat precies hier
+ * de tegenspraak zat die de eigenaar meldde: het vlak schreeuwde rood terwijl de zone
+ * "ruim gedekt" zei. Alle vier de takken, aan beide uiteinden.
+ */
+describe('vlakKleurVoor — rood is alleen alarm als het plan niet reikt', () => {
+  it('boven de basislijn blijft altijd groen, wat de zone ook zegt', () => {
+    for (const zone of ['rood', 'oranje', 'groen', null] as const) {
+      expect(vlakKleurVoor('boven', zone)).toBe('var(--positive)')
+    }
+  })
+
+  it('onder de basislijn met een gedekt plan is neutraal, niet rood', () => {
+    expect(vlakKleurVoor('onder', 'groen')).toBe('var(--ink-3)')
+    expect(vlakKleurVoor('onder', 'oranje')).toBe('var(--ink-3)')
+  })
+
+  it('onder de basislijn met een plan dat niet reikt blijft rood', () => {
+    expect(vlakKleurVoor('onder', 'rood')).toBe('var(--negative)')
+  })
+
+  it('zonder oordeel (nog aan het rekenen) neutraal, geen alarm dat de kernel niet gaf', () => {
+    expect(vlakKleurVoor('onder', null)).toBe('var(--ink-3)')
+  })
+
+  it('gebruikt alleen semantische tokens, nooit een instelbaar module-accent', () => {
+    const kleuren = (['boven', 'onder'] as const).flatMap((kant) =>
+      (['rood', 'oranje', 'groen', null] as const).map((z) => vlakKleurVoor(kant, z)),
+    )
+    expect(kleuren.every((k) => /^var\(--(positive|negative|ink-3)\)$/.test(k))).toBe(true)
   })
 })

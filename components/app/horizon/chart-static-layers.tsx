@@ -20,6 +20,8 @@ import { memo } from 'react'
 import { ChartEventMarkers } from './chart-event-markers'
 import type { ChartEventOverlay, ChartEventKind } from '@/lib/chart-event-overlay'
 import type { SimChartGeometry } from '@/lib/horizon/sim-chart-geometry'
+import { vlakKleurVoor } from '@/lib/horizon/scenario-diff-vlakken'
+import type { LabZone } from '@/lib/horizon/lab-grenzen-types'
 import { formatAowAgeKort } from '@/lib/aow-leeftijd'
 
 export type ChartStaticLayersProps = {
@@ -30,6 +32,10 @@ export type ChartStaticLayersProps = {
    *  meeneemt (geen stale maskering na een flip van de privacy-toggle).
    *  Geometrie blijft onder maskering identiek; alleen euro-LABELS verdwijnen. */
   masked: boolean
+  /** Zone van het PLAN op de huidige knop-stand (`zoneVanHuidig`, ADR 0170 B2). Bepaalt of een
+   *  wat-als ónder de basislijn als alarm (rood) of als neutraal verschil leest — het oordeel
+   *  komt uit de kernel-grenzen in de host, hier wordt niets herrekend. */
+  planZone?: LabZone | null
   emphasis: 'accumulation' | 'withdrawal' | 'fire' | null
   baselineEmphasis: 'ghost' | 'compare'
   showDepletionWarning?: boolean
@@ -62,6 +68,18 @@ export type ChartStaticLayersProps = {
  *  niet puur op kleur/contrast leunt (a11y). */
 const DIMMED = 0.30
 
+/**
+ * Stoplichtkleur van de nalatenschap-bol. Dezelfde score-ladder als de knoppen zelf (ADR 0170
+ * B8: `--positive/--warning/--negative` staan op lage chroma en lezen als vlak/stip niet als
+ * stoplicht), zodat de bol en de knop waar hij bij hoort één kleurtaal spreken. `null` = geen
+ * oordeel uit de kernel → de mid-inkt, geen stoplichtkleur die niets te zeggen heeft.
+ */
+const ZONE_VULLING: Record<'rood' | 'oranje' | 'groen', string> = {
+  rood: 'var(--score-bad)',
+  oranje: 'var(--score-warn)',
+  groen: 'var(--score-good)',
+}
+
 /** Bedrag-notatie van het erfenis-/koopkracht-doellijnLABEL: miljoenen met één
  *  decimaal, anders hele duizendtallen.
  *
@@ -80,6 +98,7 @@ export function ChartStaticLayersInner({
   geometry,
   hasEntered,
   masked,
+  planZone = null,
   emphasis,
   baselineEmphasis,
   showDepletionWarning,
@@ -99,6 +118,7 @@ export function ChartStaticLayersInner({
     innerW,
     innerH,
     H,
+    isDesktop,
     minAge,
     maxAge,
     xScale,
@@ -134,6 +154,7 @@ export function ChartStaticLayersInner({
     allPath,
     scenarioPaths,
     scenarioDiffVlakken,
+    nalatenschapDot,
     householdPaths,
     mcPaths,
     depletion,
@@ -521,16 +542,18 @@ export function ChartStaticLayersInner({
       )}
 
       {/* VERSCHILVLAK tussen de hoofdlijn en de wat-als-lijn (ADR 0170). Achter beide lijnen,
-          dus de lijnen zelf blijven scherp. Groen waar de wat-als meer oplevert, rood waar hij
-          minder oplevert — semantiek, geen module-accent, en daarom de value-change-tokens
-          (`--positive`/`--negative`) en niet de fellere score-ladder van de knoppen: een vlak
-          op deze schaal moet de lijnen ondersteunen, niet overstemmen. */}
+          dus de lijnen zelf blijven scherp. Groen waar de wat-als meer oplevert; ligt hij lager,
+          dan beslist de zone van het plan of dat een alarm is (rood) of alleen minder vermogen
+          (neutraal grijs) — die beslisregel staat puur en getest in `vlakKleurVoor`, niet als
+          ternary hier. Semantiek, geen module-accent, en bewust de value-change-tokens en niet
+          de fellere score-ladder van de knoppen: een vlak op deze schaal moet de lijnen
+          ondersteunen, niet overstemmen. */}
       {scenarioDiffVlakken.map((vlak, i) => (
         <path
           key={`diff-${i}`}
           data-testid={`scenario-diff-${vlak.kant}`}
           d={vlak.d}
-          fill={vlak.kant === 'boven' ? 'var(--positive)' : 'var(--negative)'}
+          fill={vlakKleurVoor(vlak.kant, planZone)}
           stroke="none"
           opacity={hasEntered ? 0.16 : 0}
           style={{ transition: hasEntered ? 'opacity 0.5s ease 0.25s' : 'none' }}
@@ -594,6 +617,53 @@ export function ChartStaticLayersInner({
           />
         )
       })}
+
+      {/* NALATENSCHAP-BOL op het eind van de wat-als-lijn (eigenaarsbesluit 20 sep 2026).
+          De nalatenschap-knop grijpt aan op het EINDE van de horizon: het verschil met de
+          basislijn is daar vlak vóór nauwelijks zichtbaar, dus zonder marker lijkt de knop
+          niets te doen. BOVEN de wat-als-lijn getekend (erna in de DOM) zodat de bol op de
+          lijn ligt en niet erachter.
+          Kleur = de stoplichtkleur van de knop zelf, dus semantiek en nooit een module-accent.
+          Het bedrag is de waarde van de lijn op dat punt: zelfde grondslag én zelfde
+          euro-weergave als de lijn, en het verdwijnt onder de privacy-weergave net als elk
+          ander bedrag in deze grafiek. Op een smal scherm valt het label weg en blijft de bol
+          — daar staan de eind-labels ("erfenis", "doel") al dicht op elkaar. */}
+      {nalatenschapDot && (
+        <g data-testid="nalatenschap-dot">
+          <circle
+            cx={nalatenschapDot.cx}
+            cy={nalatenschapDot.cy}
+            r={5}
+            fill={nalatenschapDot.zone ? ZONE_VULLING[nalatenschapDot.zone] : 'var(--ink-3)'}
+            stroke="var(--paper)"
+            strokeWidth={1.5}
+            opacity={hasEntered ? 1 : 0}
+            style={{ transition: hasEntered ? 'opacity 0.4s ease 0.9s' : 'none' }}
+          />
+          {!masked && isDesktop && (
+            <text
+              x={nalatenschapDot.cx - 8}
+              /* Onder de bol, terwijl de doellabels boven hun lijn staan — zo kruist dit
+                 label die niet, ook niet wanneer de wat-als op de erfenis-doellijn eindigt.
+                 Geklemd binnen het plot, anders zakt het door de x-as. */
+              y={Math.min(PAD.top + innerH - 3, nalatenschapDot.cy + 17)}
+              textAnchor="end"
+              fontSize={11}
+              fill={nalatenschapDot.zone ? ZONE_VULLING[nalatenschapDot.zone] : 'var(--ink-3)'}
+              fontFamily="var(--font-dm-mono, monospace)"
+              fontWeight={600}
+              opacity={hasEntered ? 1 : 0}
+              style={{ transition: hasEntered ? 'opacity 0.4s ease 0.9s' : 'none' }}
+            >
+              {/* Een leeggelopen plan eindigt onder nul; het minteken staat vóór het
+                  euroteken, zoals bij de y-as-ticks. */}
+              {nalatenschapDot.bedrag < 0
+                ? `−${targetAmountLabel(-nalatenschapDot.bedrag)}`
+                : targetAmountLabel(nalatenschapDot.bedrag)}
+            </text>
+          )}
+        </g>
+      )}
 
       {/* Household partner overlay paths */}
       {householdPaths.map((hp, i) =>

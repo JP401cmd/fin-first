@@ -48,6 +48,22 @@ export interface RunKernelUnifiedParams {
 export interface RunKernelUnifiedResult {
   readonly result: KernelUnifiedResult
   readonly notices: readonly EventMappingNotice[]
+  /**
+   * `KernelInput.inkomenUitgaven.uitgaveNaPensioenPerJaar` van DEZE run (20 sep 2026) —
+   * de uitgave na pensioen waar het plan daadwerkelijk mee gerekend heeft, in nominale
+   * euro's per jaar.
+   *
+   * WAAROM DOORGEVEN EN NIET LATEN HERLEIDEN: dit getal is de uitkomst van
+   * `computeRetirementExpenses` op de kernel-adapter-grondslag (essentiële budgetten /
+   * jaarinkomen / eigen bedrag, `buildInkomenUitgaven` in adapter/params.ts) en het voedt
+   * via de bridge de hele onttrekkingskant (`CLAUDE.md`: consume, don't recompute). Het
+   * `retirement_expense`-doel moet zich aan exact dít getal meten; elke tweede
+   * samenstelling in een loader zou een tweede waarheid zijn die stil uiteendrijft.
+   *
+   * ÉÉN SCALAR EN NIET DE HELE `KernelInput`: deze uitkomst reist structured-clone over de
+   * worker-grens, dus alleen wat een consument nodig heeft gaat mee.
+   */
+  readonly uitgaveNaPensioenPerJaar: number
 }
 
 /**
@@ -70,5 +86,6 @@ export function runKernelUnified(p: RunKernelUnifiedParams): RunKernelUnifiedRes
     assetSlotMeta,
     debtSlotMeta,
   })
-  return { result, notices }
+  // Rechtstreeks van de kernel-invoer die hierboven is gebouwd — geen tweede afleiding.
+  return { result, notices, uitgaveNaPensioenPerJaar: kernelInput.inkomenUitgaven.uitgaveNaPensioenPerJaar }
 }

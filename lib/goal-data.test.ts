@@ -489,7 +489,11 @@ describe('GOAL_TYPE_META — vlaggen op bestaande types (regressie)', () => {
     // `tax_burden` (minder belasting is beter) kwamen erbij naast `fire_age`.
     // De lijst blijft bewust een WITTE lijst: een nieuw type erft 'up' tenzij het
     // hier expliciet wordt opgevoerd.
-    const downTypes: GoalType[] = ['fire_age', 'debt_free_date', 'tax_burden']
+    // Uitgebreid 20 sep 2026: `retirement_expense` — minder uitgeven ná je pensioen maakt
+    // het plan haalbaarder, dus lager is beter. `legacy_amount` staat hier bewust NIET:
+    // dat is een streefBEDRAG dat je opbouwt (zelfde richting als `end_balance`), ook al is
+    // de hefboom-richting van dezelfde knop 'dalend'.
+    const downTypes: GoalType[] = ['fire_age', 'debt_free_date', 'tax_burden', 'retirement_expense']
     for (const type of Object.keys(GOAL_TYPE_META) as GoalType[]) {
       if (downTypes.includes(type)) {
         expect(GOAL_TYPE_META[type].direction, type).toBe('down')
@@ -520,8 +524,16 @@ describe('GOAL_TYPE_META — vlaggen op bestaande types (regressie)', () => {
     expect(isGoalReached('plan_coverage', 78, 100)).toBe(false)
   })
 
-  it('viaLab alleen op de drie lab-types; savings_rate/salary blijven vrij aanmaakbaar', () => {
-    const labTypes: GoalType[] = ['expected_return', 'fire_age', 'plan_coverage']
+  it('viaLab alleen op de lab-types; savings_rate/salary blijven vrij aanmaakbaar', () => {
+    const labTypes: GoalType[] = [
+      'expected_return',
+      'fire_age',
+      'plan_coverage',
+      // De drie knop-doelen (20 sep 2026) ontstaan uitsluitend via /api/toekomst-doel.
+      'extra_deposit',
+      'retirement_expense',
+      'legacy_amount',
+    ]
     for (const type of Object.keys(GOAL_TYPE_META) as GoalType[]) {
       const expected = labTypes.includes(type)
       expect(Boolean(GOAL_TYPE_META[type].viaLab)).toBe(expected)
@@ -529,6 +541,138 @@ describe('GOAL_TYPE_META — vlaggen op bestaande types (regressie)', () => {
     // Expliciet: de instelbare parameter-achtige types blijven handmatig.
     expect(GOAL_TYPE_META.savings_rate.viaLab).toBeFalsy()
     expect(GOAL_TYPE_META.salary.viaLab).toBeFalsy()
+  })
+
+  it('de drie knop-doelen (20 sep 2026): lab-only, GEEN doelbasis; twee gemeten uit de kernel, extra inleg bewust niet', () => {
+    const knopTypes: GoalType[] = ['extra_deposit', 'retirement_expense', 'legacy_amount']
+    for (const type of knopTypes) {
+      const m = GOAL_TYPE_META[type]
+      expect(m.viaLab, type).toBe(true)
+      expect(m.metricBasis, type).toBe(false)
+      // Euro-types: geen META-range (net als end_balance); de grens staat op de zod-poort.
+      expect(m.min, type).toBeUndefined()
+      expect(m.max, type).toBeUndefined()
+      expect(m.supportsAssetLink, type).toBe(false)
+      expect(m.supportsDebtLink, type).toBe(false)
+    }
+
+    // De twee MEETBARE: hun stand komt uit de canonieke kernel-run (VrijheidsgetalSnapshot).
+    expect(GOAL_TYPE_META.retirement_expense.metricSource).toBe('horizon-kernel')
+    expect(GOAL_TYPE_META.legacy_amount.metricSource).toBe('horizon-kernel')
+    // HARDE EIS, niet cosmetisch: `metricSource` is per docstring "een belofte zonder
+    // dekking" zolang er geen aanroep achter zit. Voor extra inleg BESTAAT die bron niet
+    // (een storting is niet van sparen te onderscheiden), dus de sleutel blijft leeg.
+    expect(GOAL_TYPE_META.extra_deposit.metricSource).toBeUndefined()
+
+    expect(GOAL_TYPE_META.extra_deposit.unit).toBe('EUR/mnd')
+    expect(GOAL_TYPE_META.retirement_expense.unit).toBe('EUR/jaar')
+    expect(GOAL_TYPE_META.legacy_amount.unit).toBe('EUR')
+    expect(GOAL_TYPE_LABELS.extra_deposit).toBe('Extra inleg')
+    expect(GOAL_TYPE_LABELS.retirement_expense).toBe('Uitgave na pensioen')
+    expect(GOAL_TYPE_LABELS.legacy_amount).toBe('Nalatenschap')
+    // De eenheid moet uit de weergave blijken: €31.800 zonder "/jaar" leest als maandbedrag.
+    expect(formatGoalValue(31800, 'retirement_expense')).toContain('/jaar')
+    expect(formatGoalValue(500, 'extra_deposit')).toContain('/mnd')
+    expect(formatGoalValue(100000, 'legacy_amount')).not.toContain('/')
+
+    // Zonder meting (0) mag geen enkel type "bereikt" heten — ook de 'down'-tak niet,
+    // die anders een vers doel meteen zou afsluiten (mét viering en een onomkeerbare
+    // regel in het mijlpalenlogboek).
+    expect(isGoalReached('retirement_expense', 0, 31800)).toBe(false)
+    expect(isGoalReached('legacy_amount', 0, 100000)).toBe(false)
+    expect(isGoalReached('extra_deposit', 0, 500)).toBe(false)
+  })
+
+  it('plan-instelling: behaald = het plan staat óp het doel, niet "voorbij" in de richting (review 22 sep 2026)', () => {
+    for (const t of ['extra_deposit', 'retirement_expense', 'legacy_amount'] as const) {
+      expect(GOAL_TYPE_META[t].planInstelling).toBe(true)
+    }
+    // Het defect: plan reserveert €100.000, de knop legt €50.000 vast → mocht NIET meteen
+    // "behaald" heten (100.000 >= 50.000), want het plan draagt de verandering nog niet.
+    expect(isGoalReached('legacy_amount', 100000, 50000)).toBe(false)
+    // Gespiegeld voor de uitgave: plan €36.000, knop €40.000 → niet behaald (36.000 <= 40.000).
+    expect(isGoalReached('retirement_expense', 36000, 40000)).toBe(false)
+
+    // Marge = 0,5% van het doel (40.000 → €200), aan béíde kanten, op de rand zelf wél binnen.
+    expect(isGoalReached('retirement_expense', 40000, 40000)).toBe(true)
+    expect(isGoalReached('retirement_expense', 39800, 40000)).toBe(true)
+    expect(isGoalReached('retirement_expense', 40200, 40000)).toBe(true)
+    expect(isGoalReached('retirement_expense', 39799, 40000)).toBe(false)
+    expect(isGoalReached('retirement_expense', 40201, 40000)).toBe(false)
+    expect(isGoalReached('legacy_amount', 50250, 50000)).toBe(true)
+    expect(isGoalReached('legacy_amount', 49749, 50000)).toBe(false)
+    expect(isGoalReached('legacy_amount', 50251, 50000)).toBe(false)
+
+    // Ondergrens van de marge: minimaal €1 (0,5% van €100 = €0,50 zou te krap zijn).
+    expect(isGoalReached('legacy_amount', 101, 100)).toBe(true)
+    expect(isGoalReached('legacy_amount', 99, 100)).toBe(true)
+    expect(isGoalReached('legacy_amount', 101.01, 100)).toBe(false)
+    expect(isGoalReached('legacy_amount', 98.99, 100)).toBe(false)
+
+    // Geen meting blijft nooit behaald, ook niet bij een doel onder de marge-ondergrens.
+    expect(isGoalReached('legacy_amount', 0, 0.5)).toBe(false)
+    expect(isGoalReached('extra_deposit', 0, 500)).toBe(false)
+
+    // Uitkomst-doelen houden de richtingstoets (geen regressie op end_balance).
+    expect(isGoalReached('end_balance', 120000, 100000)).toBe(true)
+    expect(isGoalReached('end_balance', 80000, 100000)).toBe(false)
+  })
+})
+
+describe('down-doel "op koers"-speling is EENHEID-BEWUST (20 sep 2026)', () => {
+  /**
+   * `retirement_expense` is het eerste `down`-doel in een BEDRAG-eenheid, en het eerste
+   * dat een echte meting draagt. Met de oude gedeelde marge van 0,25 (bedoeld voor jaren
+   * en procentpunten) zou een plan dat één euro boven het doel ligt "niet op koers" heten
+   * — 0,25 euro op €31.800 is geen speling. De marge is daarom relatief voor bedragen.
+   */
+  it('een bedrag-doel krijgt een relatieve marge (0,5%), niet de absolute 0,25', () => {
+    const doel = (current: number) =>
+      computeGoalProgress({
+        goal_type: 'retirement_expense',
+        current_value: current,
+        target_value: 31_800,
+        target_date: null,
+      })
+    // 0,5% van €31.800 = €159 speling.
+    expect(doel(31_800 + 100).onTrack).toBe(true)
+    expect(doel(31_800 + 159).onTrack).toBe(true)
+    expect(doel(31_800 + 200).onTrack).toBe(false)
+    // Met de oude absolute 0,25 zou €31.801 al "niet op koers" zijn — dat is de regressie.
+    expect(doel(31_801).onTrack).toBe(true)
+  })
+
+  it('de drie bestaande omlaag-doelen houden hun absolute 0,25 (geen regressie)', () => {
+    // fire_age (jaren): 0,25 jaar ≈ 3 maanden speling, exact als voorheen.
+    const fire = (current: number) =>
+      computeGoalProgress({ goal_type: 'fire_age', current_value: current, target_value: 55, target_date: null })
+    expect(fire(55.25).onTrack).toBe(true)
+    expect(fire(55.3).onTrack).toBe(false)
+    // tax_burden (procentpunten): 0,25 pp.
+    const tax = (current: number) =>
+      computeGoalProgress({ goal_type: 'tax_burden', current_value: current, target_value: 30, target_date: null })
+    expect(tax(30.25).onTrack).toBe(true)
+    expect(tax(30.5).onTrack).toBe(false)
+    // debt_free_date (decimale jaren): 0,25 jaar.
+    const debt = (current: number) =>
+      computeGoalProgress({ goal_type: 'debt_free_date', current_value: current, target_value: 2031, target_date: null })
+    expect(debt(2031.25).onTrack).toBe(true)
+    expect(debt(2031.5).onTrack).toBe(false)
+  })
+
+  it('de relatieve marge schaalt mee met de doelwaarde (geen vaste euro die overal fout is)', () => {
+    const bij = (target: number, current: number) =>
+      computeGoalProgress({
+        goal_type: 'retirement_expense',
+        current_value: current,
+        target_value: target,
+        target_date: null,
+      }).onTrack
+    // Klein doel: €5.000 → €25 speling. Groot doel: €500.000 → €2.500.
+    expect(bij(5_000, 5_025)).toBe(true)
+    expect(bij(5_000, 5_100)).toBe(false)
+    expect(bij(500_000, 502_400)).toBe(true)
+    expect(bij(500_000, 510_000)).toBe(false)
   })
 })
 

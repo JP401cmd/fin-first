@@ -5,10 +5,15 @@
 // 1. RSS-feeds → gestructureerde artikelen → AI-categorisatie + impact
 // 2. Webbronnen → ruwe tekst → AI-extractie → gestructureerde artikelen
 // 3. Synthetische unieke URL's voor web-items zonder eigen link
-// 4. Inhoudelijke titel-dedupe (batch + bestaande artikelen)
-// 5. Upsert met URL-dedupe, daarna harde cap: maximaal 100 artikelen
-//    bewaard, nieuwste eerst (en een 90-dagen-vangnet)
-// 6. Per-bron gezondheid naar app_settings (key: news_source_health)
+// 4. Inhoudelijke titel-dedupe (batch + bestaande artikelen van de laatste
+//    30 dagen)
+// 5. Upsert met URL-dedupe, daarna bewaren op TIJD: alles ouder dan
+//    ARTICLE_RETENTION_DAYS gaat weg. Geen harde grens op aantal meer — die
+//    (100) besloeg in sep 2026 maar twee à drie dagen nieuws (ADR 0171).
+// 6. Duidingsstap (Krant, ADR 0171): één generateObject per wachtend artikel,
+//    idempotent op id + status, in de schaduw. Optioneel: zonder duidingsmodel
+//    wordt alleen de wachtrij geteld. Faalt NOOIT de ingest.
+// 7. Per-bron gezondheid naar app_settings (key: news_source_health)
 //
 // AI-verrijking is optioneel: zonder model worden artikelen wel opgeslagen,
 // maar zonder categorie/impact en zonder web-extractie.
@@ -22,8 +27,18 @@ import {
 } from '@/lib/news-sources'
 import { extractNewsFromWebPage, categorizeArticles } from '@/lib/news-enrich'
 import { dedupeSimilarTitles, ensureUniqueArticleUrl } from '@/lib/news-selection'
+import {
+  duidWachtendeArtikelen,
+  LEGE_DUIDING_SUMMARY,
+  type DuidingSummary,
+} from '@/lib/krant/duiding'
 
-export const MAX_STORED_ARTICLES = 100
+/** Bewaartermijn van de artikelbak. Het editievenster (30 dagen) valt hier ruim binnen. */
+export const ARTICLE_RETENTION_DAYS = 120
+/** Venster van bestaande titels waartegen nieuwe kandidaten inhoudelijk gededupet worden. */
+export const TITLE_DEDUPE_WINDOW_DAYS = 30
+/** Bovengrens op het aantal titels dat de dedupe leest (~50/dag × 30 dagen, met marge). */
+const TITLE_DEDUPE_LIMIT = 2_000
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -34,6 +49,18 @@ export interface IngestSummary {
   duplicatesSkipped: number
   inserted: number
   skipped: number
+  /** Uitkomst van de duidingsstap (zichtbaar in job_runs en op de beheerpagina). */
+  duiding: DuidingSummary
+}
+
+export interface IngestOpties {
+  /** Model voor de duidingsstap (`getModel(service, 'nieuws_duiding')`); null = alleen wachtrij tellen. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  duidingModel?: any | null
+  /** Batch-cap van de duidingsstap in deze run. */
+  duidingMaxPerRun?: number
+  /** Tijdbudget van de duidingsstap (ms); daarna pakt geen werker een nieuwe rij. */
+  duidingTijdBudgetMs?: number
 }
 
 export interface SourceHealthEntry {
@@ -66,6 +93,7 @@ export async function runNewsIngest(
   supabase: SupabaseClient,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   model: any | null,
+  opties: IngestOpties = {},
 ): Promise<{ summary: IngestSummary; health: SourceHealth }> {
   const sources = await loadNewsSources(supabase)
   const health: SourceHealthEntry[] = []
@@ -92,6 +120,16 @@ export async function runNewsIngest(
   const webResults = await Promise.allSettled(
     sources.webSources.map((source) => fetchWebContent(source)),
   )
+
+  // Paginatekst per pagina-URL, voor de duidingsstap: web-items uit deze run
+  // dragen een synthetische URL naar de themapagina (`ensureUniqueArticleUrl`),
+  // dus de run-tekst is voor hen de enige échte bron — zonder tweede fetch.
+  // Gesleuteld op URL, niet op label: een label kan botsen met een RSS-feed.
+  const runTekstByPaginaUrl = new Map<string, string>()
+  sources.webSources.forEach((source, i) => {
+    const result = webResults[i]
+    if (result.status === 'fulfilled' && result.value) runTekstByPaginaUrl.set(source.url, result.value)
+  })
 
   type WebArticle = SourceArticle & { category?: string; potentialImpact?: string }
   const webArticles: WebArticle[] = []
@@ -171,13 +209,18 @@ export async function runNewsIngest(
     rssArticles.filter((a) => !a.url).length + webArticles.filter((a) => !a.url).length
 
   // ── Inhoudelijke dedupe op titel (batch + bestaande artikelen) ─
+  // Venster van 30 dagen i.p.v. "de N nieuwste": met een bak van 120 dagen
+  // zou een vaste N tegen een steeds kleiner aandeel van de bak dedupen.
   let existingTitles: string[] = []
   try {
+    const dedupeSince = new Date()
+    dedupeSince.setDate(dedupeSince.getDate() - TITLE_DEDUPE_WINDOW_DAYS)
     const { data } = await supabase
       .from('news_articles')
       .select('title')
+      .gte('fetched_at', dedupeSince.toISOString())
       .order('fetched_at', { ascending: false })
-      .limit(MAX_STORED_ARTICLES)
+      .limit(TITLE_DEDUPE_LIMIT)
     existingTitles = (data || []).map((r) => r.title)
   } catch {
     // Zonder bestaande titels dedupen we alleen binnen de batch
@@ -201,26 +244,17 @@ export async function runNewsIngest(
     else skipped++
   }
 
-  // ── Harde cap: bewaar maximaal MAX_STORED_ARTICLES, nieuwste eerst ─
-  const { data: allRows } = await supabase
-    .from('news_articles')
-    .select('id')
-    .order('fetched_at', { ascending: false })
-
-  if (allRows && allRows.length > MAX_STORED_ARTICLES) {
-    const toDelete = allRows.slice(MAX_STORED_ARTICLES).map((r) => r.id)
-    await supabase.from('news_articles').delete().in('id', toDelete)
-  }
-
-  // ── Vangnet: artikelen ouder dan 90 dagen opruimen ─────────────
-  const ninetyDaysAgo = new Date()
-  ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90)
+  // ── Bewaren op tijd: artikelen ouder dan ARTICLE_RETENTION_DAYS opruimen ─
+  const retentionCutoff = new Date()
+  retentionCutoff.setDate(retentionCutoff.getDate() - ARTICLE_RETENTION_DAYS)
   await supabase
     .from('news_articles')
     .delete()
-    .lt('fetched_at', ninetyDaysAgo.toISOString())
+    .lt('fetched_at', retentionCutoff.toISOString())
 
   // ── Per-bron gezondheid opslaan (voor de beheerpagina) ─────────
+  // Vóór de duidingsstap: wordt de run door maxDuration afgebroken, dan is
+  // de brongezondheid al geschreven.
   const sourceHealth: SourceHealth = {
     checkedAt: new Date().toISOString(),
     sources: health,
@@ -238,6 +272,20 @@ export async function runNewsIngest(
     // Gezondheid is informatief — mag de ingest nooit laten falen
   }
 
+  // ── Duidingsstap (Krant, in de schaduw) ───────────────────────
+  // Eigen model, eigen batch-cap en tijdbudget; zonder model alleen de
+  // wachtrij tellen. `duidWachtendeArtikelen` werpt nooit — de ingest faalt
+  // niet op de duiding.
+  let duiding: DuidingSummary = { ...LEGE_DUIDING_SUMMARY }
+  if (opties.duidingMaxPerRun !== undefined) {
+    duiding = await duidWachtendeArtikelen(supabase, opties.duidingModel ?? null, {
+      maxPerRun: opties.duidingMaxPerRun,
+      tijdBudgetMs: opties.duidingTijdBudgetMs,
+      runTekstByPaginaUrl,
+      webPaginaUrls: sources.webSources.map((s) => s.url),
+    })
+  }
+
   return {
     summary: {
       sourcesChecked: sources.rssFeeds.length + sources.webSources.length,
@@ -246,6 +294,7 @@ export async function runNewsIngest(
       duplicatesSkipped: duplicates.length,
       inserted,
       skipped,
+      duiding,
     },
     health: sourceHealth,
   }

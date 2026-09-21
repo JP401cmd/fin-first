@@ -71,6 +71,14 @@ export interface TopGoal {
   icon: string
   custom_unit?: string | null
   /**
+   * Waaróm dit doel (nog) geen meting heeft — gezet door `syncActiveGoalValues`, in-memory
+   * (geen kolom). MOET mee in de projectie: zonder dit veld valt `computeGoalProgress` terug
+   * op de omhoog-tak, die géén `current <= 0`-guard heeft, en toont de widget "0%" met een
+   * lege balk — een bewering dat de gebruiker niets doet, terwijl de app het simpelweg niet
+   * meet (extra inleg, of een uitkomstdoel dat niet bij het huidige anker hoort).
+   */
+  notApplicableReason?: string | null
+  /**
    * Door een canonieke motor GEPROJECTEERDE datum ("aug 2039"), die de uit
    * `target_date` afgeleide datum vervangt (bevinding C10). Vandaag alleen gezet
    * voor het vrijheidsgetal-doel, waar hij uit dezelfde FIRE-countdown komt als

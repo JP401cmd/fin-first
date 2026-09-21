@@ -652,3 +652,72 @@ describe('simRowsToChartPoints — tijdstip-conventie', () => {
     expect(oudeVorm[0]).toEqual([40, 110_000]) // stand van leeftijd 41 op x=40
   })
 })
+
+// ── Nalatenschap-bol op het eind van de wat-als-lijn ─────────────────────────
+//
+// Eigenaarsbesluit 20 sep 2026: de nalatenschap-knop grijpt aan op het EINDE van de horizon,
+// dus zonder marker lijkt die knop niets te doen. De bol hangt aan de wat-als-lijn zelf —
+// één verankering, net als de FIRE-/AOW-stip — en draagt het oordeel dat de host aanlevert.
+
+const watAlsOverlay = {
+  name: 'watals',
+  label: 'Jouw wat-als',
+  color: '#9e6b50',
+  variant: 'scenario' as const,
+  points: [[40, 100000], [54, 600000], [55, 650000], [65, 1200000]] as [number, number][],
+}
+
+describe('buildSimChartGeometry — nalatenschap-bol', () => {
+  it('ligt op het laatste punt van de wat-als-lijn, met het bedrag van díe lijn', () => {
+    const g = buildSimChartGeometry({
+      ...baseInput,
+      scenarioOverlays: [watAlsOverlay],
+      nalatenschapMarker: { zone: 'groen' },
+    })
+    expect(g.nalatenschapDot).not.toBeNull()
+    // Geen tweede verankering: exact de x/y van de lijn op leeftijd 65.
+    expect(g.nalatenschapDot!.cx).toBeCloseTo(g.PAD.left + g.xScale(65), 6)
+    expect(g.nalatenschapDot!.cy).toBeCloseTo(g.PAD.top + g.yScale(1200000), 6)
+    // Het bedrag is de waarde van de lijn, niet een apart doorgegeven getal: zo staat het
+    // per constructie in dezelfde grondslag én euro-weergave als de lijn.
+    expect(g.nalatenschapDot!.bedrag).toBe(1200000)
+    expect(g.nalatenschapDot!.zone).toBe('groen')
+  })
+
+  it('geen knop (eind-vorm perpetual) → geen bol', () => {
+    const g = buildSimChartGeometry({ ...baseInput, scenarioOverlays: [watAlsOverlay] })
+    expect(g.nalatenschapDot).toBeNull()
+  })
+
+  it('geen wat-als-lijn → geen bol, ook niet op een ghost-scenario', () => {
+    const g = buildSimChartGeometry({
+      ...baseInput,
+      scenarioOverlays: [
+        { name: 'pessimist', label: 'Voorzichtig', color: '#9e6b50', points: [[40, 100000], [65, 500000]] },
+      ],
+      nalatenschapMarker: { zone: 'rood' },
+    })
+    expect(g.nalatenschapDot).toBeNull()
+  })
+
+  it('eindpunt buiten het zichtbare bereik → geen bol (niet aanwijsbaar, dus niet aanwijzen)', () => {
+    const g = buildSimChartGeometry({
+      ...baseInput,
+      visibleMinAge: 40,
+      visibleMaxAge: 60,
+      scenarioOverlays: [watAlsOverlay],
+      nalatenschapMarker: { zone: 'groen' },
+    })
+    expect(g.maxAge).toBe(60)
+    expect(g.nalatenschapDot).toBeNull()
+  })
+
+  it('zonder oordeel blijft de bol staan met zone null (de positie is er wel)', () => {
+    const g = buildSimChartGeometry({
+      ...baseInput,
+      scenarioOverlays: [watAlsOverlay],
+      nalatenschapMarker: { zone: null },
+    })
+    expect(g.nalatenschapDot!.zone).toBeNull()
+  })
+})

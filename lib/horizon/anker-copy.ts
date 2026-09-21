@@ -718,6 +718,32 @@ export function planCoverageGoalNotApplicableReason(): string {
 }
 
 /**
+ * De notitie op een `extra_deposit`-doelkaart (20 sep 2026). Dit doel is het énige
+ * knop-doel zonder meting: een extra storting is in je transactiehistorie niet te
+ * onderscheiden van gewoon sparen, dus de app kán niet zeggen hoeveel je er werkelijk
+ * bij inlegt.
+ *
+ * WAAROM DEZE NOTITIE BESTAAT — zonder haar zou de kaart "€0 van €500" tonen, en dat
+ * leest als de bewering "je legt niets extra in". Dat weet de app niet; het verschil
+ * tussen "nul gemeten" en "niet te meten" hoort op het scherm te staan. De notitie zet
+ * `measured` op false, waardoor de kaart géén 0%-balk en géén rode status toont.
+ *
+ * Bewust GEEN verwijzing naar het spaarquote-doel als alternatief: dat is een advies, en
+ * deze regel is een verantwoording van een ontbrekend getal.
+ */
+/**
+ * Waarom een `legacy_amount`-doel niet te meten is: het plan kent geen nalatenschap meer
+ * (een andere eind-vorm). Beschrijvend, met de weg terug — nooit aansporend.
+ */
+export function legacyGoalNotApplicableReason(): string {
+  return 'Je plan laat nu niets na. Kies bij je plan-keuzes de eind-vorm „nalatenschap” om dit doel te meten.'
+}
+
+export function extraInlegGoalNoMetricNote(): string {
+  return 'Een extra storting is in je transacties niet te onderscheiden van sparen, dus je stand hierop houden we niet bij. Je ziet wat je jezelf voornam; wat het oplevert staat in je plan.'
+}
+
+/**
  * Zin 5 — de notitie op het VRIJHEIDSGETAL-doel onder een vast anker: er is geen
  * doelvermogen om naartoe te sparen (bridge-vlag `requiredFireIsAnchorPortfolio`, D4).
  * Vóór ADR 0145 viel dit doel stil terug op de opgeslagen waarde zonder notitie.

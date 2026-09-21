@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-09-19T08:46:07.275Z",
-  "attestedAt": "2026-09-19T08:46:07.246Z",
+  "generatedAt": "2026-09-21T21:20:02.818Z",
+  "attestedAt": "2026-09-21T21:20:02.782Z",
   "toneStatus": "attested",
   "copyStatus": "attested",
   "toneSources": [
@@ -274,6 +274,24 @@
           "liveSha256": "ad14ab1a6088fc72e4ba3a99d6ae211ea7420a6d6e38855f85b4a99b76cedd7c",
           "copyLines": 54,
           "attestedCopyLines": 54,
+          "extractionCollapsed": false,
+          "status": "attested"
+        }
+      ]
+    },
+    {
+      "id": "krant-sjablonen",
+      "label": "Krant — sjablooncatalogus",
+      "caveat": "Alleen euro’s (B2, ADR 0172): dit oppervlak vertaalt bewust NIET naar vrijheidstijd — de enige gedocumenteerde uitzondering op \"bedragen van betekenis ook in tijd\". Per sjabloon ligt daarnaast een eigen attest in lib/krant/sjablonen-attest.json (scripts/krant/attest-sjablonen.mjs), met de uitkomst van de compliance-check.",
+      "fileCount": 1,
+      "copyLines": 27,
+      "files": [
+        {
+          "file": "lib/krant/sjablonen-catalogus.ts",
+          "attestedSha256": "e7f1b226cd1d74a73de5aa815ae0031344e6cd9bc22f65cc147133cf538b403c",
+          "liveSha256": "e7f1b226cd1d74a73de5aa815ae0031344e6cd9bc22f65cc147133cf538b403c",
+          "copyLines": 27,
+          "attestedCopyLines": 27,
           "extractionCollapsed": false,
           "status": "attested"
         }

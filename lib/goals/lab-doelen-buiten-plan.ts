@@ -25,12 +25,18 @@ export interface LabPlanContext {
  * Knop-doelen (spaarquote, rendement) krijgen nooit een reden (§4.3) en tellen dus nooit.
  * Het vrijheidsgetal-doel is geen lab-doel en telt hier niet, ook al draagt het een reden.
  */
-export function selectLabDoelenBuitenPlan<T extends { metadata?: unknown; notApplicableReason?: string | null }>(
-  goals: readonly T[],
-): T[] {
+export function selectLabDoelenBuitenPlan<
+  T extends { goal_type?: string; metadata?: unknown; notApplicableReason?: string | null },
+>(goals: readonly T[]): T[] {
   return goals.filter((g) => {
     const m = g.metadata
     const lab = typeof m === 'object' && m !== null && (m as Record<string, unknown>).bron === 'parameter'
+    // `extra_deposit` (20 sep 2026) draagt ALTIJD een notitie, maar die zegt iets anders:
+    // "deze stand is niet te meten", niet "dit doel past niet meer bij je plan". Het doel
+    // past juist wél — er is alleen geen cijfer om ernaar te kijken. Zonder deze
+    // uitzondering zou élk extra-inleg-doel permanent in de "buiten je plan"-melding
+    // staan en die melding daarmee waardeloos maken.
+    if (g.goal_type === 'extra_deposit') return false
     return lab && typeof g.notApplicableReason === 'string' && g.notApplicableReason.length > 0
   })
 }

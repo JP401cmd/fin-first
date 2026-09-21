@@ -43,8 +43,7 @@ import { hasSubscription } from '@/lib/feature-registry'
 import { parsePlatformStatus } from '@/lib/platform-status'
 import { CommandPaletteProvider } from '@/components/command-palette/command-palette-provider'
 import { computeFeatureAccess } from '@/lib/compute-feature-access'
-import { ALL_MODULES } from '@/lib/module-registry'
-import type { ModuleId } from '@/lib/module-registry'
+import { resolveActiveModules } from '@/lib/modules/resolve'
 import { getActiveAppKeys } from '@/lib/category-deepening-keys'
 import {
   buildCategoryAppLinks,
@@ -141,22 +140,6 @@ export default async function AppLayout({
   const threeMonthsAgo = new Date()
   threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
   const dateStr = threeMonthsAgo.toISOString().split('T')[0]
-
-    // ── Active modules ────────────────────────────────────
-  // Module-toggle is verwijderd uit Trifinity (zie /mijn/geavanceerd).
-  // App-zichtbaarheid wordt voortaan per individuele app afgeleid van
-  // tracking-flags op assets/debts (zie `sidebarActiveAppKeys` hieronder).
-  // Op module-niveau zijn voortaan alle modules altijd beschikbaar; de DB-
-  // kolom `profiles.active_modules` blijft staan voor migratie-doeleinden
-  // maar wordt hier bewust genegeerd.
-  //
-  // Bewust bóvenaan gedefinieerd (vóór de main-batch): de coach-data-gap-queries
-  // hieronder hangen UITSLUITEND aan deze constante — niet aan batch-uitkomsten —
-  // en kunnen daarom in dezelfde parallelle batch mee (scheelt één waterfall-stap).
-  const activeModules: ModuleId[] = [...ALL_MODULES]
-  const coachHasTransactionsModule = activeModules.includes('budgetteren')
-  const coachHasHoldingsModule = activeModules.includes('aandelenregistratie')
-  const coachHasFireModule = activeModules.includes('toekomstplannen')
 
   const [
     profileRes,
@@ -261,10 +244,8 @@ export default async function AppLayout({
     // (De vier coach-data-gap-queries zijn verhuisd naar `lib/account-status.ts`
     // — zie `loadAccountStatusCore` hierboven. De module-gating is meeverhuisd
     // naar `toCoachDataGaps`: die zet het signaal op `true` wanneer de module
-    // uit staat, zodat de gap niet vuurt. Dat de queries nu óók draaien bij een
-    // uitgeschakelde module is geen gedragswijziging op productie — de
-    // module-toggle is uit TriFinity verwijderd, `activeModules` is altijd
-    // `ALL_MODULES`.)
+    // uit staat, zodat de gap niet vuurt. De queries draaien ongegate; de
+    // module-vlaggen komen ná deze batch uit `resolveActiveModules(profile)`.)
     // Holdings-staleness (sidebar-dot). ONGEGATE meegenomen in de hoofdbatch;
     // de app-gate verschuift naar de boolean-afleiding hieronder.
     //
@@ -315,8 +296,19 @@ export default async function AppLayout({
     userFeaturePrefs: (profile?.feature_preferences as Record<string, boolean>) ?? null,
   })
 
-  // (`activeModules` + coach-module-flags zijn bovenaan gedefinieerd, vóór de
-  // main-batch, zodat de coach-queries in diezelfde parallelle batch mee kunnen.)
+  // ── Actieve modules (Krant 2A) ─────────────────────────
+  // De kolom `profiles.active_modules` is weer leidend, gelezen via de ene
+  // helper die ook de proxy en de AI-context gebruiken. `null`/leeg/onbekend →
+  // alle modules, dus bestaande profielen (alle zes of null) zien exact
+  // dezelfde shell als toen deze regel nog `[...ALL_MODULES]` was. Geen extra
+  // query: `getOwnProfile` selecteert al `*` in de main-batch.
+  //
+  // App-zichtbaarheid binnen een module volgt los hiervan de tracking-flags op
+  // assets/debts (zie `sidebarActiveAppKeys` hieronder).
+  const activeModules = resolveActiveModules(profile)
+  const coachHasTransactionsModule = activeModules.includes('budgetteren')
+  const coachHasHoldingsModule = activeModules.includes('aandelenregistratie')
+  const coachHasFireModule = activeModules.includes('toekomstplannen')
 
   // ── Sidebar-metrics (Kern/Wil/Horizon kerncijfers) ─────
   // Net-worth: NIET meer inline gesommeerd in de shell. Het cijfer komt
@@ -593,6 +585,7 @@ export default async function AppLayout({
             en valt terug op de default ('overzicht' = huidig gedrag). */}
         <HomeScreenProvider
           initialHomeScreen={isHomeScreen(profile?.home_screen) ? profile.home_screen : DEFAULT_HOME_SCREEN}
+          activeModules={activeModules}
         >
         <ToastProvider>
           <SessionMonitor />

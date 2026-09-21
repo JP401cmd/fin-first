@@ -3,11 +3,16 @@ import type { Asset, AssetType } from '@/lib/asset-data'
 import {
   buildParameterGoalRows,
   doelGewogenRendement,
+  HEFBOOM_DOEL_PARAMETERS,
   PARAM_TO_GOAL_TYPE,
   PARAMETER_GOAL_TYPES,
   LEGACY_PARAMETER_GOAL_TYPES,
   type ParameterGoalInput,
 } from './toekomst-doel'
+import { HEFBOOM_KEYS } from './lab-grenzen-types'
+import { DOEL_PARAMETERS } from './toekomst-scenario'
+import { GOAL_TYPE_ICONS } from '@/lib/goal-data'
+import { formatCurrency } from '@/lib/format'
 
 /**
  * Tests voor de pure doelscenario-bouwlaag (ronde 4 stap 3):
@@ -169,17 +174,136 @@ describe('buildParameterGoalRows', () => {
 })
 
 describe('PARAM_TO_GOAL_TYPE / PARAMETER_GOAL_TYPES', () => {
-  it('koppelt elke parameter aan het juiste goal_type (vijf, incl. dekking en eindvermogen — ADR 0145/D12); salaris blijft als legacy-type bestaan', () => {
+  it('koppelt elke parameter aan het juiste goal_type (acht sinds 20 sep 2026: + de drie knop-doelen); salaris blijft als legacy-type bestaan', () => {
     expect(PARAM_TO_GOAL_TYPE).toEqual({
       spaarquote: 'savings_rate',
       rendement: 'expected_return',
       fire: 'fire_age',
       dekking: 'plan_coverage',
       eindvermogen: 'end_balance',
+      extraInleg: 'extra_deposit',
+      uitgaveNaPensioen: 'retirement_expense',
+      nalatenschap: 'legacy_amount',
     })
-    expect(PARAMETER_GOAL_TYPES).toEqual(['savings_rate', 'expected_return', 'fire_age', 'plan_coverage', 'end_balance'])
-    expect(PARAMETER_GOAL_TYPES).toHaveLength(5)
+    expect(PARAMETER_GOAL_TYPES).toEqual([
+      'savings_rate',
+      'expected_return',
+      'fire_age',
+      'plan_coverage',
+      'end_balance',
+      'extra_deposit',
+      'retirement_expense',
+      'legacy_amount',
+    ])
+    expect(PARAMETER_GOAL_TYPES).toHaveLength(8)
     expect(LEGACY_PARAMETER_GOAL_TYPES).toEqual(['salary'])
+  })
+
+  /**
+   * DE REGRESSIE DIE HET DEFECT VAN 20 SEP 2026 HAD GEVANGEN. De gebruiker kon alle vijf
+   * lab-knoppen verschuiven, maar "Werk je doel bij" bood er twee aan: `verdienen`,
+   * `uitgaveNaPensioen` en `nalatenschap` hadden geen doelparameter en niets zei daar iets
+   * over. Deze toets koppelt de twee lijsten hard aan elkaar.
+   */
+  it('ELKE hefboom-knop heeft minstens één doelparameter, en die bestaat', () => {
+    for (const knop of HEFBOOM_KEYS) {
+      const params = HEFBOOM_DOEL_PARAMETERS[knop]
+      expect(params.length, `knop '${knop}' heeft geen doelparameter`).toBeGreaterThan(0)
+      for (const p of params) {
+        expect(DOEL_PARAMETERS, `knop '${knop}' wijst naar onbekende parameter '${p}'`).toContain(p)
+        expect(PARAM_TO_GOAL_TYPE[p], `parameter '${p}' heeft geen goal_type`).toBeTruthy()
+      }
+    }
+  })
+
+  it('geen twee knoppen delen een doelparameter (behalve dat `stop` er drie draagt)', () => {
+    const alle = HEFBOOM_KEYS.flatMap((k) => [...HEFBOOM_DOEL_PARAMETERS[k]])
+    expect(new Set(alle).size).toBe(alle.length)
+    // `stop` draagt drie parameters omdat het uitkomstdoel van het anker afhangt.
+    expect(HEFBOOM_DOEL_PARAMETERS.stop).toEqual(['fire', 'dekking', 'eindvermogen'])
+    // `rendement` hoort bij geen enkele knop (het is het marktaannames-blok).
+    expect(alle).not.toContain('rendement')
+  })
+})
+
+describe('buildParameterGoalRows — de drie knop-doelen (20 sep 2026)', () => {
+  it('bouwt de drie rijen met nl-NL-bedragnamen, hele euro’s en de juiste goal_types', () => {
+    const { rows, overgeslagen } = buildParameterGoalRows(
+      input(
+        { extraInleg: true, uitgaveNaPensioen: true, nalatenschap: true },
+        { extraInlegMnd: 500, uitgaveNaPensioenJaar: 31800, nalatenschapBedrag: 100000 },
+      ),
+    )
+    expect(overgeslagen).toEqual([])
+    expect(rows.map((r) => r.goal_type)).toEqual(['extra_deposit', 'retirement_expense', 'legacy_amount'])
+    // De naam draagt de eenheid: zonder "/jaar" leest €31.800 als een maandbedrag.
+    expect(rows.map((r) => r.name)).toEqual([
+      `Extra inleg naar ${formatCurrency(500)}/mnd`,
+      `Uitgave na pensioen naar ${formatCurrency(31800)}/jaar`,
+      `Nalatenschap naar ${formatCurrency(100000)}`,
+    ])
+    expect(rows.map((r) => r.target_value)).toEqual([500, 31800, 100000])
+    // Server-side velden, net als bij de bestaande parameters.
+    for (const r of rows) {
+      expect(r.color).toBe('purple')
+      expect(r.metadata).toEqual({ bron: 'parameter', oorsprong: 'lab' })
+    }
+    expect(rows.map((r) => r.icon)).toEqual([
+      GOAL_TYPE_ICONS.extra_deposit,
+      GOAL_TYPE_ICONS.retirement_expense,
+      GOAL_TYPE_ICONS.legacy_amount,
+    ])
+  })
+
+  it('rondt af op hele euro’s zodat naam en opgeslagen waarde niet uiteenlopen', () => {
+    const { rows } = buildParameterGoalRows(
+      input({ nalatenschap: true }, { nalatenschapBedrag: 100000.6 }),
+    )
+    expect(rows[0].target_value).toBe(100001)
+    expect(rows[0].name).toBe(`Nalatenschap naar ${formatCurrency(100001)}`)
+  })
+
+  it('slaat nul en negatief over: `target <= 0` leest app-breed als "geen doel gesteld"', () => {
+    // De knop "Meer verdienen" schuift ook naar negatief (minder salaris) — geen doel.
+    const negatief = buildParameterGoalRows(input({ extraInleg: true }, { extraInlegMnd: -200 }))
+    expect(negatief.rows).toEqual([])
+    expect(negatief.overgeslagen).toEqual(['extraInleg'])
+
+    const nul = buildParameterGoalRows(
+      input(
+        { uitgaveNaPensioen: true, nalatenschap: true },
+        { uitgaveNaPensioenJaar: 0, nalatenschapBedrag: 0 },
+      ),
+    )
+    expect(nul.rows).toEqual([])
+    expect(nul.overgeslagen).toEqual(['uitgaveNaPensioen', 'nalatenschap'])
+
+    // Afronden mag geen 0 laten ontsnappen: €0,40 → €0 is evenmin een doel.
+    const bijnaNul = buildParameterGoalRows(input({ extraInleg: true }, { extraInlegMnd: 0.4 }))
+    expect(bijnaNul.rows).toEqual([])
+    expect(bijnaNul.overgeslagen).toEqual(['extraInleg'])
+  })
+
+  it('slaat een aangevinkte knop zonder (eindige) doelwaarde tolerant over', () => {
+    const leeg = buildParameterGoalRows(input({ uitgaveNaPensioen: true }, {}))
+    expect(leeg.rows).toEqual([])
+    expect(leeg.overgeslagen).toEqual(['uitgaveNaPensioen'])
+
+    const nan = buildParameterGoalRows(
+      input({ nalatenschap: true }, { nalatenschapBedrag: Number.NaN }),
+    )
+    expect(nan.rows).toEqual([])
+    expect(nan.overgeslagen).toEqual(['nalatenschap'])
+  })
+
+  it('hangt NIET aan het stop-anker: de drie rijen ontstaan zonder plan-velden', () => {
+    // Anders dan `dekking`/`eindvermogen` zijn dit plan-parameters, geen uitkomsten. Er
+    // gaat dus geen `planEindleeftijd` in en de rijen dragen geen anker-metadata.
+    const { rows } = buildParameterGoalRows(
+      input({ extraInleg: true }, { extraInlegMnd: 250 }),
+    )
+    expect(rows).toHaveLength(1)
+    expect(rows[0].metadata).not.toHaveProperty('eindleeftijd')
   })
 })
 

@@ -14,6 +14,12 @@
  *  - `lib/hooks/use-home-screen.tsx` (client-provider, geseed uit de layout)
  */
 
+import {
+  isNewsOnly,
+  resolveActiveModules,
+  type ActiveModulesRow,
+} from '@/lib/modules/resolve'
+
 export const HOME_SCREEN_VALUES = ['overzicht', 'budget'] as const
 
 export type HomeScreen = (typeof HOME_SCREEN_VALUES)[number]
@@ -46,4 +52,23 @@ export function homeHrefFor(value: unknown): string {
   return isHomeScreen(value)
     ? HOME_SCREEN_HREFS[value]
     : HOME_SCREEN_HREFS[DEFAULT_HOME_SCREEN]
+}
+
+/** Home van een account met alleen de module 'nieuws' (de Krant). */
+export const NEWS_ONLY_HOME_HREF = '/nieuws'
+
+/**
+ * Home-route uit de profielrij: de productgrens wint van de voorkeur.
+ *
+ * Een account met alleen 'nieuws' (via `resolveActiveModules`) landt op
+ * /nieuws, ongeacht een (mogelijk stale) `home_screen`. Elk ander account volgt
+ * zijn homescherm-keuze via `homeHrefFor`. Vervangt `getHomePath` uit
+ * `lib/module-registry.ts` (Krant 2A). Leest beide kolommen uit één rij, zodat
+ * de proxy geen extra query nodig heeft.
+ */
+export function resolveHomeHref(
+  row: (ActiveModulesRow & { home_screen?: unknown }) | null | undefined,
+): string {
+  if (isNewsOnly(resolveActiveModules(row))) return NEWS_ONLY_HOME_HREF
+  return homeHrefFor(row?.home_screen)
 }

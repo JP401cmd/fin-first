@@ -185,6 +185,11 @@ export const FEATURE_GROUP: Record<AiTokenFeature, AiExecutionScope> = {
   // Centrale bronverzameling: cron, service-role, uitsluitend openbaar nieuws.
   // Geen gebruikersgegevens → geen gebruikerskeuze. Zie de kop van dit bestand.
   nieuws_ingest: 'platform',
+  // De duidingsstap van de Krant (ADR 0171) draait in dezelfde cron/route als
+  // de ingest, op dezelfde openbare bronnen, met een eigen sleutel zodat de
+  // kostenpost apart zichtbaar is. Geen eigen route-binding: de registry is
+  // uniek per routepad en de twee bindings hieronder dekken beide sleutels.
+  nieuws_duiding: 'platform',
 }
 
 // ── Route → groep ───────────────────────────────────────────────────────────

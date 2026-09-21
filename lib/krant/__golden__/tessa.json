@@ -1,0 +1,338 @@
+{
+  "matcherVersie": 1,
+  "sjabloonVersie": 1,
+  "profielType": "35-49·koop·partner",
+  "items": [
+    {
+      "artikelId": "a13-box3-forfait",
+      "titel": "Forfait beleggingen box 3 in 2027 naar 6,5 procent",
+      "rubriek": "fiscaal",
+      "bron": "Voorbeeldbron",
+      "url": "https://voorbeeld.nl/a13-box3-forfait",
+      "gepubliceerd": "2026-09-19T05:10:00Z",
+      "vorm": "direct",
+      "score": 5,
+      "mechanisme": "box3-parameter",
+      "impact": {
+        "soort": "bereik",
+        "lo": 267,
+        "hi": null,
+        "eenheid": "eur-per-jaar",
+        "richting": "meer",
+        "vorm": "direct",
+        "jaar": 2027
+      },
+      "sjabloonId": "direct-box3",
+      "variant": 1,
+      "slots": {
+        "spaargeld": "€ 50.000 tot € 100.000",
+        "beleggingen": "€ 250.000 of meer",
+        "partner": " (samen met je fiscale partner)",
+        "bedrag": "minstens € 267",
+        "richting": "meer",
+        "jaar": "2027"
+      },
+      "tekst": "Als dit voorstel doorgaat: vanaf 2027 scheelt dit jou minstens € 267 per jaar meer box 3-heffing, gerekend op € 50.000 tot € 100.000 spaargeld en € 250.000 of meer beleggingen (samen met je fiscale partner).",
+      "deadline": null,
+      "watMist": [],
+      "waarom": [
+        "doelgroep:beleggingen",
+        "impact:direct",
+        "rubriek-voorkeur"
+      ],
+      "samenvatting": "Het forfaitair rendement op beleggingen in box 3 gaat in 2027 naar 6,5 procent."
+    },
+    {
+      "artikelId": "a16-box3-tarief",
+      "titel": "Box 3-tarief in 2027 naar 38 procent",
+      "rubriek": "fiscaal",
+      "bron": "Voorbeeldbron",
+      "url": "https://voorbeeld.nl/a16-box3-tarief",
+      "gepubliceerd": "2026-09-19T05:10:00Z",
+      "vorm": "direct",
+      "score": 5,
+      "mechanisme": "box3-parameter",
+      "impact": {
+        "soort": "bereik",
+        "lo": 184,
+        "hi": null,
+        "eenheid": "eur-per-jaar",
+        "richting": "meer",
+        "vorm": "direct",
+        "jaar": 2027
+      },
+      "sjabloonId": "direct-box3",
+      "variant": 0,
+      "slots": {
+        "spaargeld": "€ 50.000 tot € 100.000",
+        "beleggingen": "€ 250.000 of meer",
+        "partner": " (samen met je fiscale partner)",
+        "bedrag": "minstens € 184",
+        "richting": "meer",
+        "jaar": "2027"
+      },
+      "tekst": "Als dit voorstel doorgaat: met € 50.000 tot € 100.000 spaargeld en € 250.000 of meer beleggingen (samen met je fiscale partner) komt dit voor jou neer op minstens € 184 per jaar meer box 3-heffing vanaf 2027.",
+      "deadline": null,
+      "watMist": [],
+      "waarom": [
+        "doelgroep:spaargeld",
+        "impact:direct",
+        "rubriek-voorkeur"
+      ],
+      "samenvatting": "Het tarief in box 3 gaat in 2027 van 36 naar 38 procent."
+    },
+    {
+      "artikelId": "a02-box1-schijf1",
+      "titel": "Tarief eerste schijf inkomstenbelasting naar 36 procent",
+      "rubriek": "fiscaal",
+      "bron": "Voorbeeldbron",
+      "url": "https://voorbeeld.nl/a02-box1-schijf1",
+      "gepubliceerd": "2026-09-19T05:10:00Z",
+      "vorm": "direct",
+      "score": 4,
+      "mechanisme": "box1-parameter",
+      "impact": {
+        "soort": "bereik",
+        "lo": 97,
+        "hi": null,
+        "eenheid": "eur-per-jaar",
+        "richting": "meer",
+        "vorm": "direct",
+        "jaar": 2027
+      },
+      "sjabloonId": "direct-box1",
+      "variant": 0,
+      "slots": {
+        "inkomen": "€ 5.500 of meer",
+        "bedrag": "minstens € 97",
+        "richting": "meer",
+        "jaar": "2027"
+      },
+      "tekst": "Als dit voorstel doorgaat: bij een netto inkomen van € 5.500 of meer per maand betekent dit vanaf 2027 minstens € 97 per jaar meer inkomstenbelasting.",
+      "deadline": null,
+      "watMist": [],
+      "waarom": [
+        "doelgroep:werk",
+        "impact:direct",
+        "rubriek-voorkeur"
+      ],
+      "samenvatting": "Het tarief in de eerste schijf van box 1 gaat in 2027 naar 36 procent. De schijfgrenzen blijven gelijk."
+    },
+    {
+      "artikelId": "a05-eigen-risico",
+      "titel": "Eigen risico in 2027 naar 165 euro",
+      "rubriek": "macro",
+      "bron": "Voorbeeldbron",
+      "url": "https://voorbeeld.nl/a05-eigen-risico",
+      "gepubliceerd": "2026-09-19T05:10:00Z",
+      "vorm": "direct",
+      "score": 4,
+      "mechanisme": "eigen-risico",
+      "impact": {
+        "soort": "bereik",
+        "lo": 220,
+        "hi": 220,
+        "eenheid": "eur-per-jaar",
+        "richting": "minder",
+        "vorm": "direct",
+        "jaar": 2027,
+        "eigenRisico": {
+          "oud": 385,
+          "nieuw": 165
+        }
+      },
+      "sjabloonId": "direct-eigen-risico",
+      "variant": 0,
+      "slots": {
+        "oud": "€ 385",
+        "nieuw": "€ 165",
+        "bedrag": "€ 220",
+        "richting": "minder"
+      },
+      "tekst": "Als dit voorstel doorgaat: het verplicht eigen risico gaat van € 385 naar € 165: hoogstens € 220 per jaar minder zorgkosten.",
+      "deadline": null,
+      "watMist": [],
+      "waarom": [
+        "doelgroep:geboortejaar",
+        "impact:direct"
+      ],
+      "samenvatting": "Het verplicht eigen risico gaat in 2027 naar 165 euro per jaar. Het voorstel ligt bij de Kamer."
+    },
+    {
+      "artikelId": "a06-spaarrente",
+      "titel": "Spaarrentes dalen na rentebesluit ECB",
+      "rubriek": "rente",
+      "bron": "Voorbeeldbron",
+      "url": "https://voorbeeld.nl/a06-spaarrente",
+      "gepubliceerd": "2026-09-19T05:10:00Z",
+      "vorm": "gevoeligheid",
+      "score": 3,
+      "mechanisme": "spaarrente-markt",
+      "impact": {
+        "soort": "bereik",
+        "lo": 125,
+        "hi": 250,
+        "eenheid": "eur-per-jaar",
+        "richting": "geen",
+        "vorm": "gevoeligheid",
+        "jaar": null
+      },
+      "sjabloonId": "gevoeligheid-spaarrente",
+      "variant": 0,
+      "slots": {
+        "stap": "0,25 procentpunt",
+        "spaargeld": "€ 50.000 tot € 100.000",
+        "bedrag": "€ 125 tot € 250"
+      },
+      "tekst": "Elke 0,25 procentpunt spaarrente is op € 50.000 tot € 100.000 spaargeld € 125 tot € 250 per jaar. Of jouw bank meebeweegt, staat hier niet.",
+      "deadline": null,
+      "watMist": [],
+      "waarom": [
+        "doelgroep:spaargeld",
+        "impact:gevoeligheid"
+      ],
+      "samenvatting": "Na het rentebesluit van de ECB verlagen banken de spaarrente met 0,25 procentpunt. Niet elke bank volgt."
+    },
+    {
+      "artikelId": "a07-hypotheekrente",
+      "titel": "Hypotheekrente stijgt licht",
+      "rubriek": "woningmarkt",
+      "bron": "Voorbeeldbron",
+      "url": "https://voorbeeld.nl/a07-hypotheekrente",
+      "gepubliceerd": "2026-09-19T05:10:00Z",
+      "vorm": "gevoeligheid",
+      "score": 3,
+      "mechanisme": "hypotheekrente-markt",
+      "impact": {
+        "soort": "bereik",
+        "lo": 750,
+        "hi": 1125,
+        "eenheid": "eur-per-jaar",
+        "richting": "geen",
+        "vorm": "gevoeligheid",
+        "jaar": null
+      },
+      "sjabloonId": "gevoeligheid-hypotheekrente",
+      "variant": 1,
+      "slots": {
+        "stap": "0,25 procentpunt",
+        "schuld": "€ 300.000 tot € 450.000",
+        "bedrag": "€ 750 tot € 1.125"
+      },
+      "tekst": "Elke 0,25 procentpunt hypotheekrente is op jouw restschuld (€ 300.000 tot € 450.000) € 750 tot € 1.125 per jaar, zodra je rente opnieuw wordt vastgezet.",
+      "deadline": null,
+      "watMist": [],
+      "waarom": [
+        "doelgroep:wonen",
+        "impact:gevoeligheid"
+      ],
+      "samenvatting": "De gemiddelde hypotheekrente voor tien jaar vast steeg naar 4,1 procent. Het verschil met vorige maand is 0,1 procentpunt."
+    },
+    {
+      "artikelId": "a08-kinderopvangtoeslag",
+      "titel": "Kinderopvangtoeslag: aanvraag voor 2027 vóór 31 oktober",
+      "rubriek": "fiscaal",
+      "bron": "Voorbeeldbron",
+      "url": "https://voorbeeld.nl/a08-kinderopvangtoeslag",
+      "gepubliceerd": "2026-09-01T05:10:00Z",
+      "vorm": "relevant",
+      "score": 4,
+      "mechanisme": "toeslag-regel",
+      "impact": null,
+      "sjabloonId": "relevant",
+      "variant": 0,
+      "slots": {},
+      "tekst": "Dit raakt jouw situatie; een bedrag valt er nu niet aan te hangen.",
+      "deadline": {
+        "datum": "2026-10-31",
+        "soort": "aanvraag",
+        "tekst": "De aanvraag moet vóór 31 oktober 2026 binnen zijn."
+      },
+      "watMist": [],
+      "waarom": [
+        "doelgroep:kinderen",
+        "impact:niet-rekenend",
+        "deadline",
+        "rubriek-voorkeur"
+      ],
+      "samenvatting": "Wie in 2027 kinderopvangtoeslag wil, moet de aanvraag vóór 31 oktober 2026 indienen. De regels voor het inkomen veranderen niet."
+    },
+    {
+      "artikelId": "a01-box3-heffingsvrij",
+      "titel": "Heffingsvrij vermogen box 3 naar 60.000 euro in 2027",
+      "rubriek": "fiscaal",
+      "bron": "Voorbeeldbron",
+      "url": "https://voorbeeld.nl/a01-box3-heffingsvrij",
+      "gepubliceerd": "2026-09-19T05:10:00Z",
+      "vorm": "relevant",
+      "score": 3,
+      "mechanisme": "box3-parameter",
+      "impact": null,
+      "sjabloonId": "relevant",
+      "variant": 0,
+      "slots": {},
+      "tekst": "Dit raakt jouw situatie; een bedrag valt er nu niet aan te hangen.",
+      "deadline": null,
+      "watMist": [],
+      "waarom": [
+        "doelgroep:spaargeld",
+        "impact:drempel-in-band",
+        "rubriek-voorkeur"
+      ],
+      "samenvatting": "Het heffingsvrij vermogen in box 3 gaat in 2027 naar 60.000 euro. Het tarief blijft 36 procent."
+    }
+  ],
+  "algemeen": {
+    "kop": "Ook in het nieuws",
+    "label": "Niet op jouw situatie afgestemd.",
+    "items": [
+      {
+        "artikelId": "a03-aow-leeftijd",
+        "titel": "AOW-leeftijd in 2033 drie maanden omhoog",
+        "rubriek": "pensioen",
+        "bron": "Voorbeeldbron",
+        "url": "https://voorbeeld.nl/a03-aow-leeftijd",
+        "gepubliceerd": "2026-09-19T05:10:00Z",
+        "samenvatting": "De AOW-leeftijd stijgt in 2033 met drie maanden. Dat volgt uit de nieuwe levensverwachting."
+      },
+      {
+        "artikelId": "a04-studieschuld-rente",
+        "titel": "Rente op studieschuld in 2027 naar 3 procent",
+        "rubriek": "rente",
+        "bron": "Voorbeeldbron",
+        "url": "https://voorbeeld.nl/a04-studieschuld-rente",
+        "gepubliceerd": "2026-09-19T05:10:00Z",
+        "samenvatting": "De rente op studieschulden wordt in 2027 vastgesteld op 3 procent. Dat geldt voor wie dan een nieuwe rentevaste periode ingaat."
+      },
+      {
+        "artikelId": "a09-huurverhoging",
+        "titel": "Maximale huurverhoging vrije sector 2027 vastgesteld",
+        "rubriek": "woningmarkt",
+        "bron": "Voorbeeldbron",
+        "url": "https://voorbeeld.nl/a09-huurverhoging",
+        "gepubliceerd": "2026-09-19T05:10:00Z",
+        "samenvatting": "De maximale huurverhoging in de vrije sector is voor 2027 vastgesteld op 4,1 procent."
+      },
+      {
+        "artikelId": "a10-wtp",
+        "titel": "Pensioenfondsen stappen over op nieuw stelsel",
+        "rubriek": "pensioen",
+        "bron": "Voorbeeldbron",
+        "url": "https://voorbeeld.nl/a10-wtp",
+        "gepubliceerd": "2026-09-19T05:10:00Z",
+        "samenvatting": "Grote pensioenfondsen zetten hun regelingen om naar het nieuwe stelsel. Deelnemers krijgen een persoonlijk pensioenvermogen."
+      },
+      {
+        "artikelId": "a11-inflatie",
+        "titel": "Inflatie in augustus 2,6 procent",
+        "rubriek": "macro",
+        "bron": "Voorbeeldbron",
+        "url": "https://voorbeeld.nl/a11-inflatie",
+        "gepubliceerd": "2026-09-19T05:10:00Z",
+        "samenvatting": "De inflatie kwam in augustus uit op 2,6 procent. Vooral de huren en energie stegen."
+      }
+    ]
+  },
+  "leeg": false,
+  "legeTekst": null
+}

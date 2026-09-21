@@ -410,8 +410,19 @@ describe('PUT /api/toekomst-doel — loslaten', () => {
     expect(res.status).toBe(200)
     const del = deleted.find((d) => d.table === 'goals')
     expect(del).toBeTruthy()
-    // ADR 0145 D12 — het lab-eindvermogen (end_balance) hoort er óók bij.
-    expect(del!.filters.goal_type).toEqual(['savings_rate', 'expected_return', 'fire_age', 'plan_coverage', 'end_balance', 'salary'])
+    // ADR 0145 D12 — het lab-eindvermogen (end_balance) hoort er óók bij, en sinds
+    // 20 sep 2026 de drie knop-doelen: "Doel loslaten" ruimt élk lab-doeltype op.
+    expect(del!.filters.goal_type).toEqual([
+      'savings_rate',
+      'expected_return',
+      'fire_age',
+      'plan_coverage',
+      'end_balance',
+      'extra_deposit',
+      'retirement_expense',
+      'legacy_amount',
+      'salary',
+    ])
     expect(del!.filters.user_id).toBe('user-1')
   })
 
@@ -588,6 +599,56 @@ describe('PUT /api/toekomst-doel — vastleggen volgt het anker (ADR 0145)', () 
     expect(row.metadata).toEqual({ bron: 'parameter', oorsprong: 'lab', eindleeftijd: 90, stopAnker: 'age', stopLeeftijd: 60 })
     const doel = updated.find((u) => u.table === 'profiles')!.payload.toekomst_scenario_prefs.doel
     expect(doel.parameters).toEqual({ eindvermogen: true })
+  })
+
+  it('de drie knop-doelen hangen NIET aan het anker: onder `solved` (waar dekking 400 geeft) landen ze gewoon', async () => {
+    // Defect 20 sep 2026 — vijf knoppen, vijf doelen. Anders dan dekking/eindvermogen zijn
+    // dit plan-PARAMETERS, geen uitkomsten: ze horen onder elk stopmoment behalve `now`.
+    results.profilesSelect.mockReturnValueOnce(planRow())
+    const res = await PUT(
+      putRequest(
+        JSON.stringify({
+          action: 'vastleggen',
+          parameters: { extraInleg: true, uitgaveNaPensioen: true, nalatenschap: true },
+          doelwaarden: { extraInlegMnd: 500, uitgaveNaPensioenJaar: 31_800, nalatenschapBedrag: 100_000 },
+          stand: { sliders: { extraInleg: 500 }, uitgaveNaPensioen: 31_800, nalatenschap: 100_000 },
+        }),
+      ),
+    )
+    expect(res.status).toBe(200)
+    expect(inserted).toHaveLength(3)
+    expect(inserted.map((i) => i.row.goal_type)).toEqual([
+      'extra_deposit',
+      'retirement_expense',
+      'legacy_amount',
+    ])
+    expect(inserted.map((i) => i.row.target_value)).toEqual([500, 31_800, 100_000])
+    // Geen plan-velden in de metadata: deze doelen kennen geen eindleeftijd/anker.
+    for (const i of inserted) {
+      expect(i.row.metadata).toEqual({ bron: 'parameter', oorsprong: 'lab' })
+    }
+    const doel = updated.find((u) => u.table === 'profiles')!.payload.toekomst_scenario_prefs.doel
+    expect(doel.parameters).toEqual({ extraInleg: true, uitgaveNaPensioen: true, nalatenschap: true })
+  })
+
+  it('een knop op nul/negatief levert geen rij: de pref noemt alleen wat er werkelijk geschreven is', async () => {
+    results.profilesSelect.mockReturnValueOnce(planRow())
+    const res = await PUT(
+      putRequest(
+        JSON.stringify({
+          action: 'vastleggen',
+          parameters: { extraInleg: true, nalatenschap: true },
+          // "Minder salaris" is geen doel; €100.000 nalaten wél.
+          doelwaarden: { extraInlegMnd: -200, nalatenschapBedrag: 100_000 },
+          stand: { sliders: { extraInleg: -200 }, nalatenschap: 100_000 },
+        }),
+      ),
+    )
+    expect(res.status).toBe(200)
+    expect(inserted.map((i) => i.row.goal_type)).toEqual(['legacy_amount'])
+    // Pref ↔ rijen consistent: de overgeslagen parameter staat niet in het doel-blok.
+    const doel = updated.find((u) => u.table === 'profiles')!.payload.toekomst_scenario_prefs.doel
+    expect(doel.parameters).toEqual({ nalatenschap: true })
   })
 
   it('M8 · eindvermogen vastleggen onder een vast anker ruimt fire_age én de lab-plan_coverage-rij op (één uitkomstdoel)', async () => {

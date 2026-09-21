@@ -3,7 +3,13 @@ import { NextResponse } from 'next/server'
 import { errorResponse, serverError } from '@/lib/api/respond'
 import { getModel } from '@/lib/ai/config'
 import { runNewsIngest } from '@/lib/news-ingest'
+import { DUIDING_MAX_PER_RUN_CRON, DUIDING_TIJDBUDGET_MS_CRON } from '@/lib/krant/duiding'
 import { recordJobRun } from '@/lib/job-runs'
+
+// De duidingsstap (ADR 0171) doet tot DUIDING_MAX_PER_RUN_CRON modelcalls van
+// 3–5 s; dat past niet in de standaardduur. Zelfde conventie als
+// app/api/holdings/refresh-prices/cron/route.ts.
+export const maxDuration = 300
 
 /**
  * GET /api/news-ingest/cron
@@ -102,7 +108,22 @@ export async function GET(request: Request) {
       // AI model not configured — proceed without enrichment
     }
 
-    const { summary } = await runNewsIngest(service, model)
+    // Eigen feature-sleutel voor de duiding: aparte kostenpost op
+    // /beheer/ai-verbruik, zelfde kill-switch en token-logging (ADR 0171).
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let duidingModel: any = null
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      duidingModel = await getModel(service as any, 'nieuws_duiding')
+    } catch {
+      // Zonder model wordt alleen de wachtrij geteld — de ingest draait door
+    }
+
+    const { summary } = await runNewsIngest(service, model, {
+      duidingModel,
+      duidingMaxPerRun: DUIDING_MAX_PER_RUN_CRON,
+      duidingTijdBudgetMs: DUIDING_TIJDBUDGET_MS_CRON,
+    })
 
     await recordJobRun(service, { job: 'news-ingest', status: 'success', startedAt, summary })
 

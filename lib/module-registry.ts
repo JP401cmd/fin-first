@@ -302,15 +302,7 @@ export function getActiveNavModules(activeModules: ModuleId[]): NavModule[] {
   return navOrder.filter((nav) => activeNavSet.has(nav))
 }
 
-/**
- * Determine the landing page path based on active modules.
- *
- * Priority:
- * 1. nieuws only → '/nieuws' (dedicated news-only page)
- * 2. fallback    → '/overzicht'
- */
-export function getHomePath(activeModules: ModuleId[]): string {
-  const isNewsOnly = activeModules.length === 1 && activeModules[0] === 'nieuws'
-  if (isNewsOnly) return '/nieuws'
-  return '/overzicht'
-}
+// (De landingsroute leest niet langer alleen modules: zie `resolveHomeHref` in
+// `lib/home-screen.ts`, dat de moduleset én de homescherm-keuze samen weegt.
+// De opgeslagen set zelf lees je via `resolveActiveModules` in
+// `lib/modules/resolve.ts`.)

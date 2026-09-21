@@ -1,0 +1,90 @@
+{
+  "note": "Attest van de Krant-sjablooncatalogus (ADR 0172). Per sjabloon-id een sha256 per formulering. Bijwerken = de catalogus is opnieuw door merkstem en compliance-check gegaan: node scripts/krant/attest-sjablonen.mjs --attest …",
+  "attestedAt": "2026-09-21T21:20:02.980Z",
+  "attestedBy": "Claude Code (senior-developer), kaart Krant 1B, 21 sep 2026 — compliance-check-skill; herbevestiging door de eigenaar/Grenswachter open",
+  "sjabloonVersie": 1,
+  "merkstem": {
+    "manifestAttestedAt": "2026-09-21T21:20:02.782Z",
+    "oppervlak": {
+      "id": "krant-sjablonen",
+      "files": [
+        {
+          "file": "lib/krant/sjablonen-catalogus.ts",
+          "sha256": "e7f1b226cd1d74a73de5aa815ae0031344e6cd9bc22f65cc147133cf538b403c"
+        }
+      ]
+    }
+  },
+  "compliance": {
+    "verdict": "goedgekeurd",
+    "at": "2026-09-21T21:20:02.980Z",
+    "motivering": "Compliance-check 21 sep 2026 op alle 19 sjabloon-ids (26 formuleringen): elke tekst is een som op de eigen band (inzicht) of een beschrijvende regel; geen product of aanbieder bij naam, geen gebiedende wijs, geen sparen-of-beleggen, geen rendementsbelofte; een voorstel of verwachting krijgt een voorbehoud voor de regel; elke gevoeligheidsvorm (B5) zegt expliciet dat de Krant de bank/rente niet voorspelt; deadlines beschrijvend; alleen euro's (B2) - bewuste, gedocumenteerde uitzondering op de vrijheidstijd-regel (ADR 0172). Merkstem: je/jij, kort, concreet, kansen niet schaarste; oppervlak krant-sjablonen geattesteerd in het merkstem-manifest."
+  },
+  "sjablonen": {
+    "algemeen-kop": [
+      "9f91065d96e55aec6761ed55ca4277f314f77f1d4b08af4de0d2086342bde0d4"
+    ],
+    "algemeen-label": [
+      "32c6f4342ebef30790b9ecd7e21a06fe862721ade43016c1619f4ffde40e4825"
+    ],
+    "deadline-aangifte": [
+      "1784b7235b4012fb3957f25859386d30a0f01a3029a9640de4e13c4304106610"
+    ],
+    "deadline-aanvraag": [
+      "f39de197ec141b71232ec228b2c3b91215649f9a16fe601469851db8e2384852"
+    ],
+    "deadline-bezwaar": [
+      "12aaac5d56f69aac354856d45e69f9f6398106f41fcdfdd76c289685bb472c5b"
+    ],
+    "deadline-einde-regeling": [
+      "8451e802ed860e62135bf022d9cf0171c977f1d2fb0ce2059297e8f45f1c8c95"
+    ],
+    "direct-aow": [
+      "b35320fd8b1291ac3b196db58fd20f29baf520628f755d9b2c55f41a11573727",
+      "0df9cd22c8960b108b18a33fadfe9cd403221df99a7f1900af824e92384c544a"
+    ],
+    "direct-box1": [
+      "86d17384977b83d396326312a9be294f968e75ee02b6c5bf8f5a1e881ef080cb",
+      "0ce42dbf00ebaca2a73c3a7a2b7ee449aa81248d8acfa151013ddb12538af82f"
+    ],
+    "direct-box3": [
+      "1a1222f6c1c0eb0fb27691d05414c1c60e228374224c3c783b8c61c0b4f35815",
+      "a301c6a00ced43d48f7672decf2b69d6e3da7360f23bbb23d0c1717b5ff9fe8f"
+    ],
+    "direct-eigen-risico": [
+      "5cc098f4d710963bbe965b0d8648604ed343d764c613cc021b93742991e39f0f",
+      "925162d690eeafb3f6835d9cd571b1143b21e3aa5f5d0efd80664adcdb017408"
+    ],
+    "direct-studieschuld": [
+      "6b515f40838c04196d929e461ece59c7949541c5e92b24b15f4d73a14e131623",
+      "d68f0d2f1e661c78fdaadbeec9c81aa74ef1f7adc09edb086f9083afb1db27e5"
+    ],
+    "editie-leeg": [
+      "0bc7d412cfe837fc993249a31a87eff15c69152eb2cbcbd0b565903e2fb3787b"
+    ],
+    "gevoeligheid-hypotheekrente": [
+      "903b38e51b18ce4f751c4d331fa154009e2148089bd70b8d7531de0f9f89e90a",
+      "c54285c5f9278ae54d637ef3141de068e526cce7f399db02242d93cc4e00e20f"
+    ],
+    "gevoeligheid-spaarrente": [
+      "1222a88b4256a76c2f478676cee922975d2e7cc93aeb5d098015e6eb0df7764d",
+      "4c3c1f093875d71dfa46fc72bf406c500765cf36f59054c595d7356df1755add"
+    ],
+    "gevoeligheid-studieschuld": [
+      "72bde896952fd5ba2e80ee90d5c2744f910d45709b295941a7f36756a307a4f2"
+    ],
+    "relevant": [
+      "c0b03a8c9c4d8c3fba20c3c1cb4ae9a46c5add44d7425986631cb0aec70614bc",
+      "ced9edbb119b5fea44ceac76d84e8d48a4e50babdb4fdf4ce4b3aacc6462fdd8"
+    ],
+    "voorbehoud-verwachting": [
+      "f6f30a7a48bcd20246489f7b2cd73bf00ff53283e407df847dae01ed7aac32d1"
+    ],
+    "voorbehoud-voorstel": [
+      "f0b6da8c424aa110edda71ac97f28e86fe7dce173e693139871e570ccdb00576"
+    ],
+    "wat-mist": [
+      "7f5ccf1f2b4ccb674025fedb2feb01a2cf9ab4e01b7e75f4c8fb4810d415f03d"
+    ]
+  }
+}
