@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-09-20T09:25:43.067Z",
-  "generatedDate": "2026-09-20",
+  "generatedAt": "2026-09-21T21:57:49.285Z",
+  "generatedDate": "2026-09-21",
   "repo": {
     "name": "fin",
-    "version": "0.91.0"
+    "version": "0.92.0"
   },
   "annotations": {
     "philosophy": "Geld is opgeslagen tijd — elke euro vertegenwoordigt een stukje levenstijd.",
@@ -193,9 +193,9 @@
     "routesProduction": 90,
     "api": 327,
     "tables": 102,
-    "migrations": 257,
+    "migrations": 258,
     "integrations": 25,
-    "components": 1150,
+    "components": 1157,
     "providers": 19,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -8613,7 +8613,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 257
+    "migrationCount": 258
   },
   "tablesByDomain": [
     {
@@ -9159,11 +9159,11 @@
     }
   ],
   "components": {
-    "total": 1150,
+    "total": 1157,
     "groups": [
       {
         "group": "app",
-        "count": 465,
+        "count": 472,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -9405,13 +9405,20 @@
           "kassabon-shell",
           "koopkracht-erosie",
           "koopkracht-erosie-onttrekken",
+          "lab-harp",
+          "lab-harp.test",
           "lab-knoppen",
           "lab-knoppen.test",
           "lab-opslaan-balk",
           "lab-opslaan-balk.test",
+          "lab-rad",
+          "lab-rad.test",
           "lab-slider",
           "lab-slider.test",
+          "lab-vijfhoek",
+          "lab-vijfhoek.test",
           "lab-wijzer",
+          "lab-wijzer.greep.test",
           "levensinkomen-strook",
           "lever-compass",
           "lever-compass.deeplinks.test",
@@ -15985,7 +15992,7 @@
         "rls": true
       },
       "news_articles": {
-        "user": false,
+        "user": true,
         "household": false,
         "rls": true
       },
@@ -18507,6 +18514,28 @@
       ],
       "summary": "Het doelscenario-lab onder de grafiek op /toekomst (katern II \"Verken je aannames\") is in vijf rondes gegroeid: ADR 0129 (stop-anker × eind-vorm), ADR 0144 (het lab is de énige wat-als-verkenning), ADR 0145 + D12 (dekking en eindvermogen als uitkomst onder een vast anker), de spe",
       "file": "docs/adr/0170-vijf-knoppen-met-een-driekleurige-schaal.md"
+    },
+    {
+      "id": "0171-duiding-van-nieuwsartikelen-gesloten-schema-controles-in-code",
+      "title": "Duiding van nieuwsartikelen: gesloten schema, controles in code, automatische vrijgave met terugtrekken",
+      "status": "aanvaard",
+      "date": "2026-09-21",
+      "elements": [
+        "as-nieuws"
+      ],
+      "summary": "Elk nieuw geïngest artikel wordt in de achterkant één keer door AI geduid naar een vaste set parameters (soort, ingangsdatum, deadline, doelgroep, mechanisme, samenvatting, grond) volgens een gesloten zod-schema in `lib/krant/`. Niet de prompt maar de code dwingt af: elk getal in",
+      "file": "docs/adr/0171-duiding-van-nieuwsartikelen-gesloten-schema-controles-in-code.md"
+    },
+    {
+      "id": "0172-de-krant-matcher-deterministische-editie-alleen-euros-sjablonen-met-attest",
+      "title": "De Krant-matcher: deterministische editie in de schaduw, alleen euro''s (B2), sjablonen met attest",
+      "status": "aanvaard",
+      "date": "2026-09-21",
+      "elements": [
+        "as-nieuws"
+      ],
+      "summary": "Op de duiding van ADR 0171 legt een pure, deterministische matcher (`lib/krant/matcher.ts`) per lezer een editie samen: doelgroepregels toetsen op een profiel van dertien velden in banden, de impact op de twee bandranden rekenen met de canonieke motoren (box 3, box 1 via een para",
+      "file": "docs/adr/0172-de-krant-matcher-deterministische-editie-alleen-euros-sjablonen-met-attest.md"
     }
   ],
   "churn": {
@@ -18514,15 +18543,15 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 77
+        "commits": 74
       },
       {
         "path": "lib/ai",
-        "commits": 59
+        "commits": 58
       },
       {
         "path": "app/(app)/toekomst",
-        "commits": 33
+        "commits": 34
       },
       {
         "path": "app/api/ai",
@@ -18546,7 +18575,7 @@
       },
       {
         "path": "lib/horizon-data.ts",
-        "commits": 6
+        "commits": 5
       },
       {
         "path": "components/horizon",
@@ -18556,18 +18585,18 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 10988,
+        "loc": 11039,
         "commits": 99
       },
       {
         "file": "components/app/budgets-client.tsx",
         "loc": 5699,
-        "commits": 35
+        "commits": 33
       },
       {
         "file": "components/core/assets-client.tsx",
         "loc": 4865,
-        "commits": 42
+        "commits": 38
       },
       {
         "file": "components/app/cash-account-view.tsx",
@@ -18576,12 +18605,12 @@
       },
       {
         "file": "lib/release-notes.ts",
-        "loc": 3264,
-        "commits": 3
+        "loc": 3352,
+        "commits": 5
       },
       {
         "file": "lib/dashboard-data-loader.ts",
-        "loc": 3140,
+        "loc": 3144,
         "commits": 61
       },
       {
@@ -19780,17 +19809,9 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-09-19",
-    "hasChanges": true,
-    "sections": [
-      {
-        "label": "Componenten (aantal)",
-        "added": [
-          "+1"
-        ],
-        "removed": []
-      }
-    ]
+    "previousDate": "2026-09-21",
+    "hasChanges": false,
+    "sections": []
   },
   "statsHistory": [
     {
@@ -20238,6 +20259,13 @@
       "date": "2026-09-20",
       "api": 327,
       "components": 1150,
+      "tables": 102,
+      "routesProduction": 90
+    },
+    {
+      "date": "2026-09-21",
+      "api": 327,
+      "components": 1157,
       "tables": 102,
       "routesProduction": 90
     }

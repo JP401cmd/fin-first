@@ -96,6 +96,50 @@ export const RELEASE_NOTE_NORM = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.92.0',
+    date: '2026-09-21',
+    title: 'Elke knop in het lab wordt een doel',
+    sections: [
+      {
+        module: 'Je plan',
+        color: 'purple',
+        items: [
+          {
+            title: 'Vijf knoppen, vijf doelen',
+            description:
+              'Maak je van je stand een doel, dan krijgt elke knop die je verschoof een eigen doel. Ook je uitgave na pensioen en je nalatenschap.',
+          },
+          {
+            title: 'Je doel beweegt mee met je plan',
+            description:
+              'Een doel over je uitgave na pensioen of je nalatenschap volgt wat je plan nu rekent. Pas je het plan aan, dan schuift de doelkaart mee.',
+          },
+          {
+            title: 'Minder nalaten is geen alarm',
+            description:
+              'Ligt je wat-als lager maar is je plan gedekt, dan kleurt het verschil grijs in plaats van rood. Rood blijft voor een plan dat niet reikt.',
+          },
+        ],
+      },
+      {
+        module: 'Platform',
+        color: 'zinc',
+        items: [
+          {
+            title: 'Wie alleen het nieuws volgt, landt op het nieuws',
+            description:
+              'Heb je alleen de nieuwsmodule aan, dan opent de app meteen op het nieuws in plaats van op een overzicht dat je niet gebruikt.',
+          },
+          {
+            title: 'Het nieuws wordt langer bewaard',
+            description:
+              'Nieuwsberichten blijven vier maanden staan in plaats van alleen de laatste honderd. Verder geen zichtbare verandering.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: '0.91.1',
     date: '2026-09-20',
     title: 'Eén telling bij je gebeurtenissen en een greep op de meter',
