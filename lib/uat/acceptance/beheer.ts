@@ -256,15 +256,15 @@ const criteria: AcceptanceCriterion[] = [
     scenarioId: 'UAT-BEHEER-13',
     titel: 'Nieuwsbronnen beheren, ingest draaien en artikelen modereren',
     kriticiteit: 'BELANGRIJK',
-    given: '/beheer/nieuws (web-/RSS-bronnen, ingest-status, artikelendatabase, en onderaan het alleen-lezen venster Feedback op nieuwsitems).',
+    given: '/beheer/nieuws (web-/RSS-bronnen, ingest-status, het paneel Meting duiding, de artikelendatabase met duidingsstatus, en onderaan het alleen-lezen venster Feedback op nieuwsitems).',
     when:
-      'De beheerder bewerkt bronnen (URL/label toevoegen/verwijderen), draait een ingest-ronde (POST), bekijkt de bron-gezondheid en doorzoekt/verwijdert artikelen.',
+      'De beheerder bewerkt bronnen (URL/label toevoegen/verwijderen), draait een ingest-ronde (POST), bekijkt de bron-gezondheid, doorzoekt/filtert/verwijdert artikelen, klapt een geduid artikel open en trekt de duiding terug met een reden, of zet een afgewezen/mislukt artikel met Opnieuw duiden terug in de wachtrij.',
     then:
-      'Bronnen opgeslagen (of Reset naar DEFAULT_WEB_SOURCES/DEFAULT_RSS_FEEDS); de ingest ververst de artikelen met zichtbaar resultaat (gecontroleerd/gevonden/geëxtraheerd/duplicaten/ingevoegd); dit bepaalt de Krant/nieuws-inhoud. Geen eigen berekening. De sectie Feedback op nieuwsitems (ADR 0113) is BEWUST alleen-lezen: minder/meer per categorie, aantal lezers, en per lezer de demotiestand (vanaf 2x "minder" in 90 dagen). Er hóórt daar geen status- of afvinkknop te staan — verschijnt die wel, dan is dat een bevinding. Bij een lege tabel toont hij een eerlijke lege staat, geen nul-rijen-inbox.',
+      'Bronnen opgeslagen (of Reset naar DEFAULT_WEB_SOURCES/DEFAULT_RSS_FEEDS); de ingest ververst de artikelen met zichtbaar resultaat (gecontroleerd/gevonden/geëxtraheerd/duplicaten/ingevoegd); dit bepaalt de Krant/nieuws-inhoud. Geen eigen berekening. De sectie Feedback op nieuwsitems (ADR 0113) is BEWUST alleen-lezen: minder/meer per categorie, aantal lezers, en per lezer de demotiestand (vanaf 2x "minder" in 90 dagen). Er hóórt daar geen status- of afvinkknop te staan — verschijnt die wel, dan is dat een bevinding. Bij een lege tabel toont hij een eerlijke lege staat, geen nul-rijen-inbox. Duiding (ADR 0171): uitgeklapt staat per getal het letterlijke grond-citaat naast de waarde; Terugtrekken vraagt een bevestiging met reden (bij Anders een toelichting), zet de status op Teruggetrokken en is niet met een knop terug te draaien; het paneel Meting duiding toont per week binnen/geduid/dekking/teruggetrokken/fout getal (rekenend). De artikellijst pagineert met Meer laden (120 dagen bewaren, geen grens van 100).',
     assertion: {
       kind: 'ui-only',
       source:
-        'app/(app)/beheer/nieuws/page.tsx + lib/news-sources.ts + components/app/beheer/news-feedback-panel.tsx (lib/news-feedback-summary.ts); API /api/admin/news-ingest en /api/admin/news-feedback — bronbeheer/ingest/moderatie + alleen-lezen feedbackvenster, geen cijfermatige uitkomst',
+        'app/(app)/beheer/nieuws/page.tsx + lib/news-sources.ts + components/app/beheer/news-feedback-panel.tsx (lib/news-feedback-summary.ts) + components/app/beheer/news-duiding-detail.tsx + components/app/beheer/news-duiding-meting-panel.tsx (lib/krant/duiding-beheer.ts); API /api/admin/news-ingest, /api/admin/news-articles, /api/admin/news-feedback en /api/admin/news-duiding/{terugtrekken,opnieuw,meting} — bronbeheer/ingest/moderatie, duiding nalopen en terugtrekken, alleen-lezen feedbackvenster; de meting telt artikelen (geen bedrag)',
     },
   },
   {
@@ -565,7 +565,7 @@ const criteria: AcceptanceCriterion[] = [
     assertion: {
       kind: 'ui-only',
       source:
-        'app/(app)/beheer/audit/page.tsx + app/(app)/beheer/errors/page.tsx (+ app/api/admin/error-groups/route.ts, lib/error-groups.ts) + app/(app)/beheer/email/page.tsx + app/(app)/beheer/jobs/page.tsx (taken uit lib/job-catalog.ts, incl. "Meldingen → Notion-sync" en "Meldingen-sweep") — drie alleen-lezen logboeken plus één afvinkbare foutenwerkvoorraad, geen cijfermatige uitkomst',
+        'app/(app)/beheer/audit/page.tsx + app/(app)/beheer/errors/page.tsx (+ app/api/admin/error-groups/route.ts, lib/error-groups.ts) + app/(app)/beheer/email/page.tsx + app/(app)/beheer/jobs/page.tsx (taken uit lib/job-catalog.ts, incl. "Meldingen → Notion-sync", "Meldingen-sweep" en sinds ADR 0173 de wekelijkse "krant-editie" (ma 06:00 UTC, telt edities/lege edities per profieltype, geen inhoud)) — drie alleen-lezen logboeken plus één afvinkbare foutenwerkvoorraad, geen cijfermatige uitkomst',
     },
   },
   {

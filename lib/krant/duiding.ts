@@ -53,8 +53,12 @@ export const DUIDING_MAX_POGINGEN = 3
 /**
  * Tijdbudget per run: de ingest zelf kost 70–90 s; met dit budget blijft de
  * cron (maxDuration 300) en de handmatige knop ruim binnen hun plafond.
+ * Het budget stopt alleen het OPPAKKEN van nieuwe rijen: tot
+ * DUIDING_CONCURRENCY calls lopen daarna nog uit. Met 180 s kwam de cron op
+ * ~275–285 s van de 300 (release-review 0.92.0, L3); 150 s laat ~45 s marge
+ * voor die staart. Wat niet past, blijft 'wacht' voor de volgende dag.
  */
-export const DUIDING_TIJDBUDGET_MS_CRON = 180_000
+export const DUIDING_TIJDBUDGET_MS_CRON = 150_000
 export const DUIDING_TIJDBUDGET_MS_HANDMATIG = 60_000
 /** Gelijktijdige modelcalls; meer levert weinig op en raakt rate-limits. */
 const DUIDING_CONCURRENCY = 4

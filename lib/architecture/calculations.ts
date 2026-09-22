@@ -2234,7 +2234,7 @@ export const CALCULATIONS: Calculation[] = [
     title: 'Nieuwsimpact — wat een geduid artikel op jouw profielband scheelt (de Krant, 1B)',
     domain: 'Nieuws',
     summary:
-      'De deterministische kern van de Krant zonder AI (Krant 1B fase 1, 21 sep 2026): een pure matcher legt per geduid artikel (1A, ADR 0171: mechanisme + gegronde NIEUWE params) de aangekondigde waarde naast de HUIDIGE canonieke waarde en rekent op de twee randen van de profielband uit wat het scheelt — een BEREIK {lo, hi} in euro\'s per jaar (of maanden bij de AOW-leeftijd), nooit een puntschatting. Daarop volgt een score 1–5 op de ondergrens per maand, de selectie (drempel 3, max 8, max 3 per rubriek, direct eerst) en het sjabloon met gevulde slots. ALLEEN EURO\'S (B2, ADR 0172): geen dagtarief, geen vrijheidstijd, geen uitgavenband — de bewuste, gedocumenteerde uitzondering op de app-brede regel, bewaakt door lib/krant/euro-only.test.ts. Draait in fase 1 nog nergens (geen tabel, cron of UI): verifieerbaar via vitest en de golden edities per persona.',
+      'De deterministische kern van de Krant zonder AI (Krant 1B fase 1, 21 sep 2026): een pure matcher legt per geduid artikel (1A, ADR 0171: mechanisme + gegronde NIEUWE params) de aangekondigde waarde naast de HUIDIGE canonieke waarde en rekent op de twee randen van de profielband uit wat het scheelt — een BEREIK {lo, hi} in euro\'s per jaar (of maanden bij de AOW-leeftijd), nooit een puntschatting. Daarop volgt een score 1–5 op de ondergrens per maand, de selectie (drempel 3, max 8, max 3 per rubriek, direct eerst) en het sjabloon met gevulde slots. ALLEEN EURO\'S (B2, ADR 0172): geen dagtarief, geen vrijheidstijd, geen uitgavenband — de bewuste, gedocumenteerde uitzondering op de app-brede regel, bewaakt door lib/krant/euro-only.test.ts. Sinds fase 2 (ADR 0173) draait hij wekelijks in de schaduw via /api/krant/cron op een profiel dat uit de eigen data is afgeleid; niemand ziet de editie tot 1C. Verifieerbaar via vitest, de golden edities per persona en job_runs.',
     inputs: [
       'NieuwsprofielV1 (lib/krant/profiel.ts): 13 velden in banden, null = onbekend; banden halfopen [lo, hi), bovenste open (hi = null → "minstens")',
       'DuidingV1 per artikel (news_articles.duiding, 1A): mechanisme.soort + params (alleen nieuw aangekondigde, gegronde waarden), doelgroep-regels, deadline, ingangsdatum; leescontract: duiding_status = geduid, category als rubriek, fetched_at binnen 7 dagen of deadline in de toekomst',
@@ -2256,12 +2256,16 @@ export const CALCULATIONS: Calculation[] = [
       'lib/krant/wft-woordenlijst.ts',
       'lib/krant/mechanismen.ts',
       'lib/krant/drempels.ts',
+      'lib/krant/profiel-afleiding.ts',
+      'lib/krant/editie-run.ts',
       'lib/box3-data.ts',
       'lib/box1-tax.ts',
       'lib/aow-leeftijd.ts',
       'lib/constants.ts',
     ],
     functions: [
+      'leidProfielAf',
+      'runEditieVoor',
       'matchEditie',
       'voldoetAanLeescontract',
       'toetsRegel',
@@ -2290,7 +2294,7 @@ export const CALCULATIONS: Calculation[] = [
       { label: 'Fiscaal partner bij Geheel-gebruikers', value: 'ONBEKEND tenzij zelf ingevuld (keuze 10): huishouden null → box 3 ontbreekt → "wat mist"; nooit gokken op de partnerdrempel' },
     ],
     elementIds: ['as-nieuws'],
-    note: 'Grondslag-regel (zwaarste reviewbevinding van 1A): elk getal in een editie komt uit (a) de canonieke motoren/constanten of (b) mechanisme-params die de 1A-codecontroles doorstonden — nooit uit summary of andere modeltekst; de `samenvatting` op een item is de door 1A gecontroleerde artikeltekst, geen persoonlijke som. De catalogus (sjablonen-catalogus.ts) is merkstem-oppervlak `krant-sjablonen` én draagt een eigen attest per formulering (lib/krant/sjablonen-attest.json, scripts/krant/attest-sjablonen.mjs) met de uitkomst van de compliance-check; sjablonen-attest.test.ts weigert een niet-getoetst sjabloon. Wft-woordenlijst in code (wft-woordenlijst.ts) toetst de catalogus; 1A/1C kunnen \'m op de samenvatting inhaken. Fase 2 (open): eigen tabellen voor de schaduweditie (keuze 8: news_editions onaangeraakt tot 1C), profiel-afleiding uit eigen data (B8, .eq(user_id) op élke tabel), weekcron, herberekening na terugtrekken (B4), security-run. Fase 3: de meting (overlap met de LLM-editie op de testaccounts, foute getallen = 0, lege edities per profieltype).',
+    note: 'Grondslag-regel (zwaarste reviewbevinding van 1A): elk getal in een editie komt uit (a) de canonieke motoren/constanten of (b) mechanisme-params die de 1A-codecontroles doorstonden — nooit uit summary of andere modeltekst; de `samenvatting` op een item is de door 1A gecontroleerde artikeltekst, geen persoonlijke som. De catalogus (sjablonen-catalogus.ts) is merkstem-oppervlak `krant-sjablonen` én draagt een eigen attest per formulering (lib/krant/sjablonen-attest.json, scripts/krant/attest-sjablonen.mjs) met de uitkomst van de compliance-check; sjablonen-attest.test.ts weigert een niet-getoetst sjabloon. Wft-woordenlijst in code (wft-woordenlijst.ts) toetst de catalogus; 1A/1C kunnen \'m op de samenvatting inhaken. Fase 2 (ADR 0173, 22 sep 2026): de matcher draait wekelijks in de schaduw — /api/krant/cron leidt per lezer het profiel af uit de eigen data (lib/krant/profiel-afleiding.ts: leidProfielAf is puur; élke tabellezing draagt .eq(user_id), de inkomensband komt uit de canonieke resolveEffectiveIncomeExpenses op de eigen transacties, de Box 3-indeling uit classifyAsset, de AOW-grens uit lookupAowAge; fiscaal partnerschap, huursoort, kindleeftijd en werk worden nooit gegokt) en schrijft de editie in eigen tabellen (krant_edities/krant_editie_items, keuze 8: news_editions onaangeraakt tot 1C); herberekening na terugtrekken (B4) via article_id → item → editie. De meting landt als tellingen in job_runs (lege edities per profieltype, overlap met de LLM-editie op testaccounts). Fase 3 (open): het meting-paneel op /beheer/nieuws en de testsectie op /nieuws (foute getallen = 0).',
   },
 ]
 

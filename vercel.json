@@ -32,6 +32,10 @@
     {
       "path": "/api/cron/alerts-sweep",
       "schedule": "0 19 * * *"
+    },
+    {
+      "path": "/api/krant/cron",
+      "schedule": "0 6 * * 1"
     }
   ]
 }

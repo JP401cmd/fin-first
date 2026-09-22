@@ -9,14 +9,20 @@ import {
   type RssFeed,
 } from '@/lib/news-sources'
 import { NewsFeedbackPanel } from '@/components/app/beheer/news-feedback-panel'
+import { NewsDuidingDetail, DUIDING_STATUS_LABEL, statusKleur, type DuidingVelden } from '@/components/app/beheer/news-duiding-detail'
+import { NewsDuidingMetingPanel } from '@/components/app/beheer/news-duiding-meting-panel'
+import { ShellOverlay } from '@/components/app/shell/shell-overlay'
+import { ModalFooter } from '@/components/app/modal-footer'
+import { DUIDING_STATUSSEN } from '@/lib/krant/duiding-schema'
 
 // ── Types for news sources ───────────────────────────────────────────
 
-interface DbArticle {
+interface DbArticle extends DuidingVelden {
   id: string
   title: string
   summary: string | null
-  source_url: string
+  /** null als de bron-URL geen http(s) is — dan geen klikbare link. */
+  source_url: string | null
   source_name: string
   category: string | null
   published_at: string | null
@@ -37,6 +43,8 @@ interface JobRun {
     duplicatesSkipped?: number
     inserted?: number
     skipped?: number
+    /** ADR 0171: uitkomst van de duidingsstap in deze run. */
+    duiding?: { geduid?: number; afgewezen?: number; mislukt?: number; overgeslagen?: number; wacht?: number }
   } | null
   error: string | null
 }
@@ -79,6 +87,22 @@ export default function BeheerNieuwsPage() {
   const [dbSearch, setDbSearch] = useState('')
   const [ingesting, setIngesting] = useState(false)
   const [expandedArticleId, setExpandedArticleId] = useState<string | null>(null)
+  const [statusFilter, setStatusFilter] = useState('')
+  const [alleenRekenend, setAlleenRekenend] = useState(false)
+  const [dbPagina, setDbPagina] = useState(0)
+  const [dbHeeftMeer, setDbHeeftMeer] = useState(false)
+  const [dbMeerLaden, setDbMeerLaden] = useState(false)
+  // Verhoogd na een terugtrek-/herduidactie, zodat de meting opnieuw laadt.
+  const [metingVervers, setMetingVervers] = useState(0)
+  // Welke zoek-/filtercombinatie de lijst nu toont. "Meer laden" verschijnt
+  // alleen als die gelijk is aan wat er op het scherm staat — tijdens de
+  // debounce na een filterwissel zou hij anders een pagina van het oude filter
+  // achter de nieuwe lijst plakken.
+  const [geladenSleutel, setGeladenSleutel] = useState<string | null>(null)
+  // Volgnummer per lading: een antwoord dat na een nieuwere aanvraag binnenkomt, wordt genegeerd.
+  const laadSeq = useRef(0)
+  const [teVerwijderen, setTeVerwijderen] = useState<{ id: string; title: string } | null>(null)
+  const [verwijderen, setVerwijderen] = useState(false)
 
   // Active system prompt state
   const [activePrompt, setActivePrompt] = useState('')
@@ -104,31 +128,55 @@ export default function BeheerNieuwsPage() {
 
   // ── Load articles from DB ──────────────────────────────────────────
 
-  const loadArticles = useCallback(async (search?: string) => {
-    setDbLoading(true)
+  // Pagina 0 vervangt de lijst; een volgende pagina ("Meer laden") voegt toe.
+  const loadArticles = useCallback(async (
+    search: string,
+    filter: { status: string; rekenend: boolean },
+    pagina = 0,
+  ) => {
+    const seq = ++laadSeq.current
+    const sleutel = JSON.stringify([search, filter.status, filter.rekenend])
+    if (pagina === 0) setDbLoading(true)
+    else setDbMeerLaden(true)
     try {
-      const params = new URLSearchParams({ limit: '100' })
+      const params = new URLSearchParams({ pagina: String(pagina) })
       if (search) params.set('search', search)
+      if (filter.status) params.set('status', filter.status)
+      if (filter.rekenend) params.set('rekenend', '1')
       const res = await fetch(`/api/admin/news-articles?${params}`)
       if (!res.ok) throw new Error('Failed to load')
       const data = await res.json()
-      setDbArticles(data.articles || [])
+      if (seq !== laadSeq.current) return
+      const nieuw: DbArticle[] = data.articles || []
+      setDbArticles(prev => {
+        if (pagina === 0) return nieuw
+        // Schuift een ingest de sortering tussen twee pagina's door, dan komt
+        // een rij twee keer: niet dubbel tonen.
+        const gezien = new Set(prev.map(a => a.id))
+        return [...prev, ...nieuw.filter(a => !gezien.has(a.id))]
+      })
       setDbTotal(data.total || 0)
+      setDbPagina(pagina)
+      setDbHeeftMeer(Boolean(data.heeftMeer))
+      setGeladenSleutel(sleutel)
     } catch {
-      setDbArticles([])
+      if (seq === laadSeq.current && pagina === 0) setDbArticles([])
     } finally {
-      setDbLoading(false)
+      if (seq === laadSeq.current) {
+        setDbLoading(false)
+        setDbMeerLaden(false)
+      }
     }
   }, [])
 
-  // Debounced search — reload articles when search term changes
+  // Debounced search/filter — reload articles when search term or filter changes
   useEffect(() => {
     clearTimeout(searchTimeoutRef.current)
     searchTimeoutRef.current = setTimeout(() => {
-      loadArticles(dbSearch)
+      loadArticles(dbSearch, { status: statusFilter, rekenend: alleenRekenend })
     }, 400)
     return () => clearTimeout(searchTimeoutRef.current)
-  }, [dbSearch, loadArticles])
+  }, [dbSearch, statusFilter, alleenRekenend, loadArticles])
 
   // ── Load pipeline status (cron-runs + bron-health) ────────────────
 
@@ -178,9 +226,8 @@ export default function BeheerNieuwsPage() {
     }
 
     loadSources()
-    loadArticles()
     loadIngestStatus()
-  }, [loadArticles, loadIngestStatus])
+  }, [loadIngestStatus])
 
   // ── Sources handlers ─────────────────────────────────────────────
 
@@ -276,8 +323,9 @@ export default function BeheerNieuwsPage() {
         type: 'success',
         message: `${data.summary.inserted} nieuwe artikelen (${data.summary.rssArticlesFound ?? '?'} RSS, ${data.summary.webArticlesExtracted ?? '?'} web, ${data.summary.duplicatesSkipped ?? 0} duplicaten overgeslagen) uit ${data.summary.sourcesChecked} bronnen`,
       })
-      loadArticles(dbSearch)
+      loadArticles(dbSearch, { status: statusFilter, rekenend: alleenRekenend })
       loadIngestStatus()
+      setMetingVervers(v => v + 1)
     } catch (err) {
       setStatus({ type: 'error', message: err instanceof Error ? err.message : 'Ophalen mislukt' })
     } finally {
@@ -285,19 +333,34 @@ export default function BeheerNieuwsPage() {
     }
   }
 
-  async function handleDeleteArticle(id: string) {
+  async function bevestigVerwijderen() {
+    if (!teVerwijderen) return
+    const { id } = teVerwijderen
+    setVerwijderen(true)
     try {
       const res = await fetch('/api/admin/news-articles', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id }),
       })
-      if (!res.ok) throw new Error('Verwijderen mislukt')
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        throw new Error(typeof data?.error === 'string' ? data.error : 'Verwijderen mislukt')
+      }
       setDbArticles(prev => prev.filter(a => a.id !== id))
       setDbTotal(prev => prev - 1)
+      setMetingVervers(v => v + 1)
     } catch (err) {
       setStatus({ type: 'error', message: err instanceof Error ? err.message : 'Verwijderen mislukt' })
+    } finally {
+      setVerwijderen(false)
+      setTeVerwijderen(null)
     }
+  }
+
+  /** Een geduid of teruggetrokken artikel verwijder je niet (ADR 0171): de route weigert het ook. */
+  function isVerwijderbaar(status: string): boolean {
+    return status !== 'geduid' && status !== 'teruggetrokken'
   }
 
   // ── Render ───────────────────────────────────────────────────────
@@ -405,6 +468,13 @@ export default function BeheerNieuwsPage() {
                   <span className="text-[var(--ink-3)]">
                     {run.summary.inserted ?? 0} nieuw · {run.summary.duplicatesSkipped ?? 0} duplicaten ·{' '}
                     {run.summary.sourcesChecked ?? 0} bronnen
+                    {run.summary.duiding && (
+                      <>
+                        {' '}· duiding: {run.summary.duiding.geduid ?? 0} geduid, {run.summary.duiding.afgewezen ?? 0}{' '}
+                        afgewezen, {run.summary.duiding.mislukt ?? 0} mislukt, {run.summary.duiding.overgeslagen ?? 0}{' '}
+                        overgeslagen, {run.summary.duiding.wacht ?? 0} wacht
+                      </>
+                    )}
                   </span>
                 ) : run.error ? (
                   <span className="text-red-700">{run.error}</span>
@@ -597,6 +667,9 @@ export default function BeheerNieuwsPage() {
       {/* ── Divider ─────────────────────────────────────────────────── */}
       <div className="mt-10 mb-6 h-px bg-[var(--border-ed)]" />
 
+      {/* ── Section: Meting duiding (K1-poort, ADR 0171) ──────────── */}
+      <NewsDuidingMetingPanel ververs={metingVervers} />
+
       {/* ── Section: Nieuws Database ──────────────────────────────── */}
       <div className="mb-8">
         <div className="mb-4 flex items-center gap-2">
@@ -605,8 +678,9 @@ export default function BeheerNieuwsPage() {
           <span className="ml-auto text-xs text-[var(--ink-4)]">{dbTotal} artikelen</span>
         </div>
         <p className="mb-4 text-sm text-[var(--ink-3)]">
-          Alle opgehaalde nieuwsartikelen uit de bronnen. Er worden maximaal 100 artikelen bewaard
-          (nieuwste eerst) — oudere worden bij elke ingest automatisch verwijderd.
+          Alle opgehaalde nieuwsartikelen uit de bronnen, nieuwste eerst. Artikelen worden 120 dagen
+          bewaard en daarna bij de ingest automatisch verwijderd. Klik een artikel open voor de duiding
+          met per getal het citaat uit de bron.
         </p>
 
         {/* Search + Ingest controls */}
@@ -631,6 +705,27 @@ export default function BeheerNieuwsPage() {
           </button>
         </div>
 
+        {/* Duiding-filters */}
+        <div className="mb-4 flex flex-wrap items-center gap-4 text-sm">
+          <label className="flex items-center gap-2 text-[var(--ink-3)]">
+            Duiding
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="min-h-[44px] border border-[var(--border-ed)] bg-[var(--paper)] px-2 py-1.5 text-sm text-[var(--ink)]"
+            >
+              <option value="">Alle</option>
+              {DUIDING_STATUSSEN.map(s => (
+                <option key={s} value={s}>{DUIDING_STATUS_LABEL[s] ?? s}</option>
+              ))}
+            </select>
+          </label>
+          <label className="flex min-h-[44px] items-center gap-2 text-[var(--ink-3)]">
+            <input type="checkbox" checked={alleenRekenend} onChange={(e) => setAlleenRekenend(e.target.checked)} />
+            Alleen rekenende mechanismen (nalopen voor de poort)
+          </label>
+        </div>
+
         {/* Table */}
         {dbLoading ? (
           <p className="text-sm text-[var(--ink-4)]">Laden...</p>
@@ -648,6 +743,7 @@ export default function BeheerNieuwsPage() {
                   <th className="px-3 py-2.5 text-left font-medium text-[var(--ink-3)]">Titel</th>
                   <th className="px-3 py-2.5 text-left font-medium text-[var(--ink-3)]">Bron</th>
                   <th className="hidden px-3 py-2.5 text-left font-medium text-[var(--ink-3)] sm:table-cell">Categorie</th>
+                  <th className="px-3 py-2.5 text-left font-medium text-[var(--ink-3)]">Duiding</th>
                   <th className="hidden px-3 py-2.5 text-left font-medium text-[var(--ink-3)] lg:table-cell">Impact</th>
                   <th className="px-3 py-2.5 text-left font-medium text-[var(--ink-3)]">Datum</th>
                   <th className="w-16 px-3 py-2.5 text-center font-medium text-[var(--ink-3)]">Gebruikt</th>
@@ -670,6 +766,12 @@ export default function BeheerNieuwsPage() {
                         <td className="hidden px-3 py-2.5 text-[var(--ink-3)] sm:table-cell">
                           {article.category || '\u2014'}
                         </td>
+                        <td className={`whitespace-nowrap px-3 py-2.5 text-xs font-medium ${statusKleur(article.duiding_status)}`}>
+                          {DUIDING_STATUS_LABEL[article.duiding_status] ?? article.duiding_status}
+                          {article.duiding?.ok && article.duiding.duiding.mechanisme ? (
+                            <span className="block font-normal text-[var(--ink-4)]">{article.duiding.duiding.mechanisme.label}</span>
+                          ) : null}
+                        </td>
                         <td className="hidden px-3 py-2.5 text-xs text-[var(--ink-3)] lg:table-cell">
                           <span className="line-clamp-2">{article.potential_impact || '\u2014'}</span>
                         </td>
@@ -686,19 +788,22 @@ export default function BeheerNieuwsPage() {
                           )}
                         </td>
                         <td className="px-3 py-2.5">
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); handleDeleteArticle(article.id) }}
-                            className="rounded p-1 text-[var(--ink-4)] transition-colors hover:bg-red-50 hover:text-red-600"
-                            title="Verwijderen"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
+                          {isVerwijderbaar(article.duiding_status) && (
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setTeVerwijderen({ id: article.id, title: article.title }) }}
+                              className="rounded p-1 text-[var(--ink-4)] transition-colors hover:bg-red-50 hover:text-red-600"
+                              title="Verwijderen"
+                              aria-label={`Verwijder ${article.title}`}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
                         </td>
                       </tr>
                       {isExpanded && (
                         <tr>
-                          <td colSpan={7} className="border-t border-dashed border-[var(--border-ed)] bg-[var(--subtle)]/50 px-4 py-3">
+                          <td colSpan={8} className="border-t border-dashed border-[var(--border-ed)] bg-[var(--subtle)]/50 px-4 py-3">
                             <div className="space-y-2 text-sm">
                               {article.summary && (
                                 <div>
@@ -716,16 +821,32 @@ export default function BeheerNieuwsPage() {
                                 <span>Bron: {article.source_name}</span>
                                 {article.category && <span>Categorie: {article.category}</span>}
                                 <span>Opgehaald: {new Date(article.fetched_at).toLocaleDateString('nl-NL')}</span>
-                                <a
-                                  href={article.source_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="underline decoration-[var(--ink-4)]/30 underline-offset-2 hover:text-[var(--ink-2)]"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  Bekijk origineel &rarr;
-                                </a>
+                                {article.source_url && (
+                                  <a
+                                    href={article.source_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="underline decoration-[var(--ink-4)]/30 underline-offset-2 hover:text-[var(--ink-2)]"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    Bekijk origineel &rarr;
+                                  </a>
+                                )}
                               </div>
+                              <NewsDuidingDetail
+                                articleId={article.id}
+                                titel={article.title}
+                                velden={article}
+                                onGewijzigd={(melding, wijziging) => {
+                                  setStatus(melding)
+                                  // Rij ter plekke bijwerken: de lijst blijft op dezelfde
+                                  // pagina en het artikel blijft open (naloop per artikel).
+                                  if (wijziging) {
+                                    setDbArticles(prev => prev.map(a => (a.id === article.id ? { ...a, ...wijziging } : a)))
+                                  }
+                                  setMetingVervers(v => v + 1)
+                                }}
+                              />
                             </div>
                           </td>
                         </tr>
@@ -737,6 +858,19 @@ export default function BeheerNieuwsPage() {
             </table>
           </div>
         )}
+        {dbHeeftMeer && !dbLoading && geladenSleutel === JSON.stringify([dbSearch, statusFilter, alleenRekenend]) && (
+          <div className="mt-4 flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => loadArticles(dbSearch, { status: statusFilter, rekenend: alleenRekenend }, dbPagina + 1)}
+              disabled={dbMeerLaden}
+              className="inline-flex min-h-[44px] items-center gap-2 border border-[var(--border-ed)] px-5 py-2.5 text-sm font-medium text-[var(--ink-2)] transition-colors hover:bg-[var(--subtle)] disabled:opacity-40"
+            >
+              {dbMeerLaden ? 'Laden...' : 'Meer laden'}
+            </button>
+            <span className="text-xs text-[var(--ink-4)]">{dbArticles.length} van {dbTotal}</span>
+          </div>
+        )}
       </div>
 
       {/* ── Divider ─────────────────────────────────────────────────── */}
@@ -744,6 +878,29 @@ export default function BeheerNieuwsPage() {
 
       {/* ── Section: Feedback op nieuwsitems (alleen-lezen, ADR 0113) ─ */}
       <NewsFeedbackPanel />
+
+      <ShellOverlay
+        kind="confirm"
+        destructive
+        open={teVerwijderen !== null}
+        onClose={() => setTeVerwijderen(null)}
+        onRequestClose={() => !verwijderen}
+        title="Artikel verwijderen?"
+        footer={
+          <ModalFooter
+            layout="stacked"
+            primary={{ label: 'Verwijderen', onClick: () => void bevestigVerwijderen(), loading: verwijderen }}
+            secondary={{ label: 'Annuleren', onClick: () => setTeVerwijderen(null), disabled: verwijderen }}
+          />
+        }
+      >
+        <div className="space-y-2 p-6 text-sm text-[var(--ink-2)]">
+          <p>
+            Je verwijdert <span className="font-semibold text-[var(--ink)]">{teVerwijderen?.title}</span> uit de artikelbak.
+          </p>
+          <p>Staat het artikel nog in de bron, dan kan de volgende ingest het opnieuw ophalen.</p>
+        </div>
+      </ShellOverlay>
     </div>
   )
 }

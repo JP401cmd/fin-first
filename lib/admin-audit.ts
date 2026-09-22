@@ -15,6 +15,10 @@ export type AdminActionName =
   | 'group.leden'
   | 'allowlist.add'
   | 'allowlist.remove'
+  // ADR 0171 / Krant 1A fase 2: beheer trekt een duiding terug (B4) of laat hem opnieuw duiden.
+  | 'nieuws.duiding.terugtrekken'
+  | 'nieuws.duiding.opnieuw'
+  | 'nieuws.artikel.verwijderen'
 
 /**
  * Schrijf één beheeractie weg in `admin_actions_log`.

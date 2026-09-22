@@ -177,4 +177,20 @@ describe('user-data-tables — AVG-partitie dekt de volledige schema-inventaris'
       expect(SESSION_WIPE_TABLES, `${t} hoort in SESSION_WIPE_TABLES`).toContain(t)
     }
   })
+
+  /**
+   * ADR 0173 (Krant 1B fase 2): het nieuwsprofiel is financiële informatie in
+   * banden en de schaduweditie draagt gerenderde bedragen over de eigen
+   * situatie — persoonsgegevens, dus in de wis én in de zelfexport. De
+   * migratie geeft alle drie een eigen-rij DELETE-policy (sessie-partitie);
+   * beheer heeft er geen leespad op (ADR 0146), dus nooit via de service-lijst.
+   */
+  it('de Krant-tabellen (nieuwsprofiel, krant_edities, krant_editie_items) zitten in wis én zelfexport via de sessie (ADR 0173)', () => {
+    for (const t of ['nieuwsprofiel', 'krant_edities', 'krant_editie_items']) {
+      expect(ALL_USER_SCOPED_TABLES, `${t} ontbreekt in de inventaris`).toContain(t)
+      expect(SESSION_WIPE_TABLES, `${t} hoort in SESSION_WIPE_TABLES`).toContain(t)
+      expect(EXPORT_SESSION_TABLES, `${t} hoort in de zelfexport`).toContain(t)
+      expect(EXPORT_SERVICE_TABLES, `${t} mag niet via de service-role`).not.toContain(t)
+    }
+  })
 })

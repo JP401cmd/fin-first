@@ -17,6 +17,7 @@ export type JobKey =
   | 'retention'
   | 'user-reports-notion-sync'
   | 'alerts-sweep'
+  | 'krant-editie'
 
 /**
  * Schrijf één uitvoering van een achtergrondtaak weg in `job_runs`.

@@ -105,3 +105,54 @@ langere bewaartermijn hen niet raakt.
 - **Vervolg**: fase 2 (`/beheer/nieuws` met grond, terugtrekken-route met audit, meting-
   paneel, paginering) en fase 3 (1B vult de herberekening). De beheerpagina zegt tot fase 2
   nog "maximaal 100 artikelen".
+
+## Aanvulling 22 sep 2026 — fase 2: beheer ziet, trekt terug en meet
+
+- **`/beheer/nieuws`** toont per artikel de duidingsstatus en, uitgeklapt, de duiding met per
+  param de waarde naast het letterlijke grond-citaat, de doelgroep, de samenvatting en de
+  brontekst-soort. De opgeslagen jsonb gaat alleen via `duidingWeergave`
+  (`lib/krant/duiding-beheer.ts`, geparsed tegen `duidingV1Schema`) naar de client; een rij die
+  het leescontract niet haalt wordt niet getoond, alleen gemeld. Alles rendert als platte
+  tekst. `GET /api/admin/news-articles` pagineert (50 per pagina), filtert op status en op
+  rekenende mechanismen, en maakt de zoekterm vrij van PostgREST-syntax.
+- **Terugtrekken** (`POST /api/admin/news-duiding/terugtrekken`): superadmin-gate op de
+  ingelogde client, zod via `parseBody`, één geconditioneerde UPDATE (`id` + status `geduid`)
+  die status, `teruggetrokken_at`, `teruggetrokken_door` en `teruggetrokken_reden` samen
+  schrijft — de audit van B4 staat op de rij zelf. Daarnaast `admin_actions_log`
+  (`nieuws.duiding.terugtrekken`, met een optionele toelichting die bij reden *anders*
+  verplicht is). Idempotent: al teruggetrokken → 200 zonder tweede audit; elke andere status
+  → 409. De duiding-jsonb blijft staan (de meting leest er het mechanisme van). Daarna
+  `herberekenNaTerugtrekking` (1B) op de service-role; die geeft beheer alleen een aantal
+  edities terug. Faalt hij, dan blijft de terugtrekking staan.
+- **Geen terugweg naar `geduid`.** De analyse legt die niet, en een knop terug zou de enige
+  menselijke beslissing in de keten (B4) omkeerbaar maken zonder spoor. Ook een versie-bump
+  laat `teruggetrokken` bewust staan (`lib/krant/duiding.ts`); een foute terugtrekking herstel
+  je dus alleen met een bewuste SQL-correctie. Een herhaalde terugtrek-klik is idempotent
+  (geen tweede audit) maar draait de herberekening wél opnieuw, zodat een time-out of een
+  mislukte herberekening zich laat herstellen. Wel: **Opnieuw
+  duiden** (`POST /api/admin/news-duiding/opnieuw`) zet een `afgewezen`/`mislukt` rij terug op
+  `wacht` met `duiding_pogingen = 0` (en `geduid_at`/`duiding_versie` leeg); de volgende
+  ingest-run duidt hem. Ook gelogd.
+- **Verwijderen** (`DELETE /api/admin/news-articles`) weigert sinds deze fase een `geduid` of
+  `teruggetrokken` artikel (409): verwijderen omzeilde de terugtrek-audit, liet een fout getal
+  uit de meting verdwijnen, liet een gat in de schaduweditie, en de ingest haalde het artikel
+  de volgende dag terug op `wacht` — een stille reset. Elke verwijdering gaat via zod en
+  `admin_actions_log` (`nieuws.artikel.verwijderen`).
+- **Meting** (`GET /api/admin/news-duiding/meting`, paneel *Meting duiding*): per Amsterdamse
+  ISO-week, cohort op `fetched_at`, afgeleid bij elke lezing (`bouwDuidingMeting`) uit
+  `duiding_status`, `duiding_fout`, `teruggetrokken_reden`, `category` en de mechanisme-soort/
+  brontekst uit de jsonb. Of een soort rekent komt uit `MECHANISMEN` in code, nooit uit de
+  modeluitvoer. De poortmaat is *teruggetrokken met reden fout-getal bij een rekenend
+  mechanisme*. De route pagineert over de PostgREST-cap (`max_rows`) met de exacte telling als
+  stopcriterium en ontdubbelt op id; zonder dat zou de dekking na drie weken stil te laag
+  uitvallen. `category` is een dimensie (door de ingest-categorisatie toegekend, keuze 5),
+  geen controle-uitkomst.
+- **ADR 0146**: `news_articles` blijft op `VRIJ_LEESBAAR`, nu mét expliciete reden in
+  `lib/beheer/geen-inhoud.test.ts`. De per-lezer-tabellen van 1B blijven op de strenge regel.
+- **Duidingsbudget cron 180 s → 150 s** (release-review 0.92.0, L3): het budget stopt alleen
+  het oppakken; de uitlopende calls hielden de cron op ~275–285 s van 300.
+- **Nog open** (buiten fase 2): de Wft-woordenlijst in code, de redirect-hertoets en
+  body-cap in `fetchWebContent`, `/nieuws` in `protectedPrefixes` van de proxy, een
+  `revoke all … from anon` op `news_articles` (alleen RLS keert anon nu), de toelichting bij
+  reden *anders* staat alleen in het best-effort-auditlog (niet op de rij), en de CHECK dwingt
+  `teruggetrokken_door` niet af (botst met de FK `on delete set null`).

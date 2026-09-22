@@ -40,6 +40,16 @@ const VRIJ_LEESBAAR = new Set([
   'app_settings',
   'aow_leeftijd',
   'fire_assumptions',
+  // `news_articles`: platform-brede artikelbak met openbaar nieuws uit publieke
+  // bronnen plus de daarvan afgeleide duiding (ADR 0171) — geen user_id, geen
+  // gebruikersdata, niets wat een gebruiker invoerde. De enige persoonsverwijzing
+  // is `teruggetrokken_door`: de beheerder zélf die een duiding terugtrok (B4,
+  // dezelfde soort als `admin_actions_log.actor_id`). /beheer/nieuws leest hem
+  // met alle kolommen voor de grond, het terugtrekken en de K1-meting.
+  // Wat NIET onder deze reden valt: de per-lezer-tabellen van de Krant
+  // (`nieuwsprofiel`, `krant_edities`, `krant_editie_items`, ADR 0173) — die
+  // blijven op de strenge regel; de herberekening na terugtrekken leest ze in
+  // lib/krant via de service-role en geeft beheer alleen een aantal terug.
   'news_articles',
   'questionnaires',
   'questionnaire_questions',

@@ -337,8 +337,8 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
     {
       id: 'as-nieuws', x: 560, y: row(6), w: 220, h: 66, kind: 'appsvc',
       title: 'Nieuws- & berichtendienst',
-      lead: 'Gepersonaliseerde nieuwsfeed en het meldingen-/berichtencentrum met voorkeuren. De persoonlijke editie kan sinds de uitvoergroep "nieuws" op lokaal staat ook on-device draaien via t-lokale-ai — de ingest zelf (dagelijkse cron, publieke bronnen) blijft altijd cloud (ADR 0079). Sinds ADR 0171 duidt de ingest elk artikel in de schaduw naar parameters (lib/krant), het fundament van de Krant zonder AI; de pure matcher en sjablonen daarop (ADR 0172, alleen euro\'s) staan in lib/krant/matcher.ts en rekenen nog nergens live.',
-      items: ['/api/news', '/api/notifications', '/api/local-news-sources', '/api/local-news-edition', '/api/news-ingest/cron'],
+      lead: 'Gepersonaliseerde nieuwsfeed en het meldingen-/berichtencentrum met voorkeuren. De persoonlijke editie kan sinds de uitvoergroep "nieuws" op lokaal staat ook on-device draaien via t-lokale-ai — de ingest zelf (dagelijkse cron, publieke bronnen) blijft altijd cloud (ADR 0079). Sinds ADR 0171 duidt de ingest elk artikel in de schaduw naar parameters (lib/krant), het fundament van de Krant zonder AI; de pure matcher en sjablonen daarop (ADR 0172, alleen euro\'s) staan in lib/krant/matcher.ts. Sinds ADR 0173 draait die matcher wekelijks in de schaduw: /api/krant/cron leidt per lezer een nieuwsprofiel af uit de eigen data (B8, expliciete user_id-scope per tabel) en schrijft de editie in eigen tabellen (do-krant) die niemand leest tot 1C; de K1-meting landt als tellingen in job_runs. Beheer loopt de duiding na op /beheer/nieuws: grond per getal, terugtrekken met audit (B4, herberekent de edities van de week) en de meting van de duiding per week (ADR 0171, fase 2).',
+      items: ['/api/news', '/api/notifications', '/api/local-news-sources', '/api/local-news-edition', '/api/news-ingest/cron', '/api/krant/cron', '/api/admin/news-duiding/*', 'lib/krant/matcher', 'lib/krant/profiel-afleiding', 'lib/krant/duiding-beheer'],
     },
     {
       id: 'as-rapport', x: 560, y: row(7), w: 220, h: 66, kind: 'appsvc',
@@ -507,6 +507,12 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
       lead: 'Het transcript van een gesprek met Fin — uitsluitend tekst, geen grafieken of actievoorstellen (die zouden bevroren cijfers naast de actuele zetten). Eigen-rij RLS, géén huishoud-deling; `chat_messages` is onveranderlijk en heeft geen INSERT-recht: de RPC `append_chat_turn` is de enige schrijver en bepaalt ook het volgnummer van de beurt. De gebruiker kiest de bestemming (`profiles.chat_history_mode`: account / apparaat / uit); bij "apparaat" staat het transcript in IndexedDB en raken deze tabellen niet. Beheer heeft geen inzage — afgedwongen in de applicatielaag: er bestaat geen service-role-leespad, en de beheer-bron-gate (lib/beheer/geen-inhoud.test.ts) verbiedt elke chat-lezing, want een service-role omzeilt RLS per definitie (ADR 0137, 0146).',
       items: ['chat_conversations', 'chat_messages'],
     },
+    {
+      id: 'do-krant', x: 904, y: 1318 + DATA_Y_SHIFT, w: 180, h: 56, kind: 'data',
+      title: 'Krant-profiel & editie',
+      lead: 'Het nieuwsprofiel van een lezer (dertien velden in banden, geen bedragen, per veld de herkomst zelf/afgeleid) en de weekeditie van de Krant zonder AI met haar regels (ADR 0172/0173). Eigen-rij RLS, géén huishoud-deling; de editie en de items hebben geen INSERT-policy — alleen de service-role (weekcron, herberekening na terugtrekken) schrijft. In K1 met bron "schaduw": geen route, geen loader, geen UI leest ze; los van news_editions (het LLM-archief) tot 1C. Beheer ziet alleen tellingen in job_runs (ADR 0146). In wis én zelfexport (lib/user-data-tables.ts).',
+      items: ['nieuwsprofiel', 'krant_edities', 'krant_editie_items'],
+    },
 
     // ── Externe partijen ──
     {
@@ -609,6 +615,7 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
     'as-coach->do-melding': { payload: 'Gebruikersmelding (bug/vraag/aanbeveling) + optionele screenshot-referentie; leest de eigen syncstatus terug', mechanism: 'rest', cadence: 'on-demand', contractDomains: ['user-reports'], note: 'RPC reserve_user_report_slot begrenst het aantal per gebruiker; own-row RLS.' },
     'as-coach->do-doel': { payload: 'gepasseerde mijlpalen + bevestigingsstatus', mechanism: 'rest', cadence: 'on-demand', contractDomains: ['milestones'], note: 'In-band RSC-append + acknowledge-route: detectie draait in-band in OverzichtSecondaryLoader per /overzicht-load (geen cron), idempotent via UNIQUE(user_id, milestone_key). De acknowledge-mutatie loopt wél via POST /api/milestones/acknowledge (ADR 0123).' },
     'as-coach->do-gesprek': { payload: 'Gesprekstitel en de beurten (rol + tekst) van een gesprek met Fin; leest het transcript terug bij hervatten', mechanism: 'rpc', cadence: 'on-demand', contractDomains: ['chat'], note: 'Schrijven kan alleen via RPC append_chat_turn (SECURITY DEFINER): chat_messages heeft geen INSERT-policy, en het volgnummer komt uit de rug — een clientteller loopt na één afgebroken verbinding uit de pas. De bestemming volgt profiles.chat_history_mode (account / apparaat / uit, default account) via PUT /api/chat/history-settings; bij "apparaat" loopt dit pad niet en staat het transcript in IndexedDB. Boven die keuze ligt de privacyvloer: een beurt via t-lokale-ai bereikt deze tabellen nooit, en die toets draait óók op de hervat-tak, niet alleen bij aanmaak (ADR 0137).' },
+    'as-nieuws->do-krant': { payload: 'Nieuwsprofiel in banden (afgeleid uit de eigen data van de lezer, B8) en de weekeditie met haar regels; leest de eigen profielrij terug voor de zelf-ingevulde velden', mechanism: 'rest', cadence: 'weekly', note: 'Weekcron maandag 06:00 UTC (/api/krant/cron, CRON_SECRET, service-role). Elke lezing van profiles/assets/debts/transactions draagt een expliciete user_id-scope: de service-role omzeilt RLS en de SELECT-policy op assets is huishoud-gedeeld. Schrijven alleen service-role (geen INSERT-policy voor sessies); bron "schaduw" in K1, niemand leest de editie tot 1C. Herberekening na terugtrekken (B4) via article_id → item → editie (ADR 0173).' },
     // Actor → proces
     'b-actor->b-main': { payload: 'Stuurt het proces, kiest modules', mechanism: 'process', cadence: 'on-demand' },
     'b-partner->b-main': { payload: 'Deelt financiën via huishouden-koppeling', mechanism: 'process', cadence: 'on-demand' },
@@ -732,6 +739,9 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
 
   // Inzicht- & coachingsdienst bewaart en hervat het gesprek met Fin (ADR 0137)
   addEdge({ from: 'as-coach', to: 'do-gesprek', type: 'access', fromSide: 'B', toSide: 'L', readWrite: true, via: [[680, 1346 + DATA_Y_SHIFT]] })
+
+  // Nieuwsdienst schrijft (weekcron) en leest het Krant-profiel en de schaduweditie (ADR 0173)
+  addEdge({ from: 'as-nieuws', to: 'do-krant', type: 'access', fromSide: 'B', toSide: 'T', readWrite: true, via: [[690, 1300 + DATA_Y_SHIFT], [994, 1300 + DATA_Y_SHIFT]] })
 
   return { width: 1660, height: 1436 + DATA_Y_SHIFT, nodes, edges }
 }

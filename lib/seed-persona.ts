@@ -433,8 +433,16 @@ export async function deleteAllUserData(
     deleteTable(supabase, 'life_events', userId),
     deleteTable(supabase, 'goals', userId),
     deleteTable(supabase, 'news_editions', userId),
+    // De Krant zonder AI (ADR 0173): alle drie dragen user_id en een eigen-rij
+    // DELETE-policy. Ze staan in deze parallelle batch omdat niets anders naar
+    // ze wijst; de FK items → edities cascadeert, dus de volgorde binnen de
+    // Promise.all is onbelangrijk (hoogstens leest de items-telling 0 als de
+    // edities-delete eerder klaar is).
+    deleteTable(supabase, 'krant_editie_items', userId),
+    deleteTable(supabase, 'krant_edities', userId),
+    deleteTable(supabase, 'nieuwsprofiel', userId),
   ])
-  const batch1bTables = ['recommendation_feedback', 'budget_rollovers', 'recurring_transactions', 'valuations', 'net_worth_snapshots', 'balance_snapshots', 'life_events', 'goals', 'news_editions']
+  const batch1bTables = ['recommendation_feedback', 'budget_rollovers', 'recurring_transactions', 'valuations', 'net_worth_snapshots', 'balance_snapshots', 'life_events', 'goals', 'news_editions', 'krant_editie_items', 'krant_edities', 'nieuwsprofiel']
   for (let i = 0; i < batch1bTables.length; i++) {
     summary[batch1bTables[i]] = batch1bResults[i]
   }

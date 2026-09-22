@@ -144,6 +144,20 @@ export const JOB_CATALOG: Record<JobKey, JobCatalogEntry> = {
     // taak van de externe dead man's switch (zie beheerders-runbook).
     maxAgeHours: null,
   },
+  'krant-editie': {
+    key: 'krant-editie',
+    label: 'Krant — schaduweditie',
+    // Maandag 06:00 UTC: ná de dagelijkse ingest + duiding van 05:00 (tot 5
+    // min), zodat de weekeditie de laatste duidingen meeneemt. Loopt de
+    // duiding uit, dan mist de editie hoogstens de laatste dag (leescontract:
+    // `wacht` telt niet mee).
+    schedule: 'Wekelijks maandag 06:00 UTC',
+    path: '/api/krant/cron',
+    description:
+      'Bouwt per lezer met de module nieuws de deterministische weekeditie van de Krant zonder AI (ADR 0172/0173) en schrijft die in de schaduw (krant_edities, bron schaduw). Meet lege edities per profieltype en, op testaccounts, de overlap met de LLM-editie. Niemand ziet deze editie tot 1C.',
+    // Wekelijkse cadans: een week plus de dag-jitter van Vercel.
+    maxAgeHours: 7 * 24 + 26,
+  },
 }
 
 /** Catalogus in weergavevolgorde (insertion order van het Record). */

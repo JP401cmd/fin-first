@@ -175,6 +175,24 @@ export const SESSION_WIPE_TABLES: readonly string[] = [
   // SESSIE-partitie: eigen-rij DELETE-policy en eigen-rij SELECT, net als
   // user_activity_days. Retentie 400 dagen via de retentie-cron.
   'user_activity_modules',
+  // De Krant zonder AI (migratie 20260922120000, ADR 0173). Drie tabellen met
+  // `user_id` en een eigen-rij DELETE-policy (SESSIE-partitie):
+  //   nieuwsprofiel        — dertien profielvelden in BANDEN (geen bedragen,
+  //                          geen namen) + de herkomst per veld. Financiële
+  //                          informatie over de gebruiker → wis én zelfexport.
+  //   krant_edities        — de weekeditie die de matcher voor hem bouwde,
+  //                          met een snapshot van zijn profielbanden.
+  //   krant_editie_items   — de regels daarin (gerenderde tekst met bedragen
+  //                          in euro's over zíjn situatie).
+  // Schrijven kan alleen de service-role (geen INSERT-policy), lezen en wissen
+  // de eigenaar zelf. Volgorde kind-vóór-ouder, zoals bij chat_*; de FK van
+  // items naar edities cascadeert. Gewist in batch 1b van deleteAllUserData.
+  // LET OP — niet tegen information_schema gemeten: de migratie was op
+  // 22-09-2026 geschreven maar nog niet uitgerold. Meten bij de eerstvolgende
+  // regeneratie van ALL_USER_SCOPED_TABLES.
+  'krant_editie_items',
+  'krant_edities',
+  'nieuwsprofiel',
 ] as const
 
 /**
@@ -393,12 +411,19 @@ export const ALL_USER_SCOPED_TABLES: readonly string[] = [
   'import_idempotency',
   'investment_holdings',
   'investment_transactions',
+  // Nieuw in migratie 20260922120000 (ADR 0173). Net als chat_* NIET tegen
+  // information_schema gemeten: geschreven op 22-09-2026, nog niet uitgerold.
+  // Meten bij de eerstvolgende regeneratie.
+  'krant_editie_items',
+  'krant_edities',
   'life_events',
   'net_worth_history',
   'net_worth_snapshots',
   'news_editions',
   'news_feedback',
   'next_step_completions',
+  // Migratie 20260922120000 (ADR 0173) — zie krant_* hierboven.
+  'nieuwsprofiel',
   // Nieuw in migratie 20260915* (ADR 0147). LET OP — net als chat_* en
   // user_activity_days NIET tegen information_schema gemeten: de migratie was op
   // 15-09-2026 geschreven maar nog niet uitgerold. Meten bij de eerstvolgende
