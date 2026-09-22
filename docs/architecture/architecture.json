@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-09-22T16:18:19.725Z",
+  "generatedAt": "2026-09-22T16:55:07.203Z",
   "generatedDate": "2026-09-22",
   "repo": {
     "name": "fin",
-    "version": "0.92.3"
+    "version": "0.92.4"
   },
   "annotations": {
     "philosophy": "Geld levert tijd op — elk bedrag staat voor tijd waarin je uitgaven gedekt zijn.",
@@ -18740,6 +18740,18 @@
       ],
       "summary": "Testgebruikers vinden de teksten boven aan de pagina's moeilijk (B-069, B-071). De kop van een subpagina bestaat sinds de kop-herziening van september uit twee delen, \"Paginanaam | oordeel\". Op mobiel toont hij alleen het oordeel, omdat de TopBar de naam al draagt (`PageVerdictOp",
       "file": "docs/adr/0174-de-topbar-draagt-de-paginanaam.md"
+    },
+    {
+      "id": "0175-het-plan-stoplicht-weegt-het-vastgelegde-doel-mee",
+      "title": "Onder \"zo vroeg mogelijk\" weegt het plan-stoplicht het vastgelegde doel mee: haalbaar maar het doel reikt niet is oranje",
+      "status": "aanvaard",
+      "date": "2026-09-22",
+      "elements": [
+        "as-planning",
+        "fn-toekomstplannen"
+      ],
+      "summary": "Eén regel kleurt het plan: `resolvePlanStatus` (`lib/horizon/plan-status.ts`, eigenaarsbesluit 15 sep 2026). Die regel voedt de kop op /toekomst (\"Je toekomstplan is *haalbaar*.\", ADR 0174 D6), de plankaart en het statuspunt op /overzicht en het menupunt \"De toekomst\".",
+      "file": "docs/adr/0175-het-plan-stoplicht-weegt-het-vastgelegde-doel-mee.md"
     }
   ],
   "churn": {
@@ -18789,8 +18801,8 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 11039,
-        "commits": 101
+        "loc": 11030,
+        "commits": 102
       },
       {
         "file": "components/app/budgets-client.tsx",
@@ -18809,8 +18821,8 @@
       },
       {
         "file": "lib/release-notes.ts",
-        "loc": 3466,
-        "commits": 8
+        "loc": 3484,
+        "commits": 9
       },
       {
         "file": "lib/dashboard-data-loader.ts",

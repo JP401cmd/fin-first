@@ -97,6 +97,24 @@ export const RELEASE_NOTE_NORM = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.92.4',
+    date: '2026-09-22',
+    title: 'Je plan zegt ook of je doel reikt',
+    sections: [
+      {
+        module: 'Je plan',
+        color: 'purple',
+        items: [
+          {
+            title: 'Het stoplicht kijkt ook naar je doel',
+            description:
+              'Heb je een doel vastgelegd, dan zegt je plan nu "haalbaar, je doel nog niet" als het plan klopt maar je doel nog niet reikt.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: '0.92.3',
     date: '2026-09-22',
     title: 'Elke pagina zegt in één zin hoe je ervoor staat',
