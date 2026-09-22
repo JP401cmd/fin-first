@@ -171,7 +171,7 @@ function TopBarUtilities({ email, initials, role }: { email: string; initials?: 
       {/* Weergave-badge (eigen/huishouden/partner) — alleen voor huishoudens. */}
       <PerspectiveSwitcher compact menuAlign="right" />
 
-      {/* Vier-hefbomen-kompas — compact dots, expand on tap */}
+      {/* Kompas: vier hefbomen + plan-stoplicht Toekomst — compact dots, expand on tap */}
       <LeverCompassMobile scores={leverScores} />
 
       {/* "Krant", niet "Nieuws" — dezelfde regel als de zijbalk-rij en het

@@ -11,6 +11,7 @@ import { render, screen, fireEvent, cleanup, within } from '@testing-library/rea
 import { LeverCompassMobile, worstLeverStatus } from './lever-compass'
 import { DisplayModeProvider, type DisplayMode } from '@/lib/hooks/use-display-mode'
 import type { LeverScores, LeverStatus } from '@/components/app/shell/lever-scores'
+import { PlanStatusProvider, PlanStatusSeed } from '@/components/app/plan-status-provider'
 
 function scoresWith(statuses: Partial<Record<keyof LeverScores, LeverStatus>>): LeverScores {
   const base = (status: LeverStatus) => ({ score: 50, status, detail: 'detail' })
@@ -88,6 +89,48 @@ describe('LeverCompassMobile — NAV-6 statuspunt-reductie', () => {
     expect(panel.className).toMatch(/left-1\/2/)
     expect(panel.className).toMatch(/-translate-x-1\/2/)
     expect(panel.className).toMatch(/max-w-\[calc\(100vw-2rem\)\]/)
+  })
+})
+
+// Wens 22 sep: De toekomst als vijfde punt in het TopBar-kompas, gevoed door
+// het plan-stoplicht (dezelfde bron als het menupunt). Zolang die status nog
+// nastreamt (`neutral`) blijven het er vier — zie useMobileCompassPoints.
+describe('LeverCompassMobile — Toekomst als vijfde punt', () => {
+  afterEach(cleanup)
+
+  function renderWithPlan(mode: DisplayMode, plan: 'good' | 'warn' | 'bad' | null) {
+    return render(
+      <DisplayModeProvider initialMode={mode}>
+        <PlanStatusProvider>
+          {plan && <PlanStatusSeed status={plan} />}
+          <LeverCompassMobile scores={scoresWith({})} />
+        </PlanStatusProvider>
+      </DisplayModeProvider>,
+    )
+  }
+
+  it("toont in 'full' vijf stippen zodra het plan-stoplicht er is", () => {
+    renderWithPlan('full', 'warn')
+    const dots = triggerDots(screen.getByRole('button', { name: 'Kompas openen' }))
+    expect(dots).toHaveLength(5)
+    expect(dots[4].className).toContain('bg-amber-500')
+  })
+
+  it('blijft op vier stippen zolang de plan-status nog niet binnen is', () => {
+    renderWithPlan('full', null)
+    expect(triggerDots(screen.getByRole('button', { name: 'Kompas openen' }))).toHaveLength(4)
+  })
+
+  it("telt het plan mee in het samengevatte punt van 'simple'", () => {
+    renderWithPlan('simple', 'bad')
+    expect(screen.getByRole('button', { name: /Kompas: risico/ })).toBeInTheDocument()
+  })
+
+  it('noemt Toekomst in het paneel, met een link naar /toekomst', () => {
+    renderWithPlan('full', 'good')
+    fireEvent.click(screen.getByRole('button', { name: 'Kompas openen' }))
+    const panel = screen.getByRole('dialog', { name: 'Financieel kompas' })
+    expect(within(panel).getByText('Toekomst').closest('a')).toHaveAttribute('href', '/toekomst')
   })
 })
 

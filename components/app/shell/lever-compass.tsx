@@ -2,7 +2,8 @@
  * Vier-hefbomen-kompas — compact component voor shell header.
  *
  * Toont 4 hefboom-indicatoren (bezittingen, schulden, cashflow, belasting)
- * in één oogopslag. Elke indicator heeft een kleurcode:
+ * in één oogopslag; de mobiele TopBar-variant voegt daar het plan-stoplicht
+ * van De toekomst aan toe. Elke indicator heeft een kleurcode:
  *   - Groen  (score ≥ 60): gezond
  *   - Amber  (score 30–59): aandacht nodig
  *   - Rood   (score < 30): zorg
@@ -23,6 +24,7 @@ import {
   CreditCard,
   ArrowUpDown,
   Receipt,
+  Compass,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
@@ -35,7 +37,8 @@ import { tapTargetClass, TAP_TARGET_ROW_MIN } from '@/components/editorial/tap-t
 export { computeLeverScores } from '@/components/app/shell/lever-scores'
 export type { LeverStatus, LeverScores, LeverEntry } from '@/components/app/shell/lever-scores'
 
-import { leverStatusLabel } from '@/components/app/shell/lever-scores'
+import { leverStatusLabel, leverageToLeverStatus } from '@/components/app/shell/lever-scores'
+import { usePlanStatus } from '@/components/app/plan-status-provider'
 import type { LeverStatus, LeverScores } from '@/components/app/shell/lever-scores'
 
 // ── Lever config ─────────────────────────────────────────────────────────────
@@ -44,8 +47,8 @@ type LeverConfig = {
   key: keyof LeverScores
   label: string
   Icon: LucideIcon
-  /** Optional navigation target when the lever is clicked. */
-  href?: string
+  /** Navigation target when the lever is clicked. */
+  href: string
 }
 
 // Deeplinks naar de canonieke /overzicht/*-routes (bron: lib/nav-config.ts).
@@ -84,15 +87,21 @@ const STATUS_SEVERITY: Record<LeverStatus, number> = {
 }
 
 /**
- * De zwaarste status over alle vier de hefbomen — het ene punt dat in
- * Eenvoudig-weergave in de plaats komt van de vier losse stippen. Exporteerbaar
- * zodat de test hem tegen dezelfde bron kan houden.
+ * De zwaarste van een rij statussen — het ene punt dat in Eenvoudig-weergave
+ * in de plaats komt van de losse stippen in de TopBar (de vier hefbomen plus,
+ * zodra binnen, het plan). Exporteerbaar zodat de test hem tegen dezelfde bron
+ * kan houden.
  */
+export function worstStatus(statuses: ReadonlyArray<LeverStatus>): LeverStatus {
+  return statuses.reduce<LeverStatus>(
+    (worst, status) => (STATUS_SEVERITY[status] > STATUS_SEVERITY[worst] ? status : worst),
+    'neutral',
+  )
+}
+
+/** `worstStatus` over alleen de vier hefbomen. */
 export function worstLeverStatus(scores: LeverScores): LeverStatus {
-  return LEVERS.reduce<LeverStatus>((worst, { key }) => {
-    const status = scores[key].status
-    return STATUS_SEVERITY[status] > STATUS_SEVERITY[worst] ? status : worst
-  }, 'neutral')
+  return worstStatus(LEVERS.map(({ key }) => scores[key].status))
 }
 
 // ── Mini-tooltip (CSS-based, no portal) ─────────────────────────────────────
@@ -378,9 +387,52 @@ export function LeverCompassCollapsed({ scores }: { scores: LeverScores }) {
 
 // ── Mobile collapsed + expand (responsive <768px) ──────────────────────────
 
+type CompassPoint = {
+  key: keyof LeverScores | 'plan'
+  label: string
+  Icon: LucideIcon
+  href: string
+  status: LeverStatus
+  detail: string
+  progress?: number | null
+}
+
 /**
- * Mobile-responsive kompas: toont 4 compacte gekleurde dots als een
- * tappable trigger. Bij tap opent een expanded panel met volledige lever-
+ * De punten van het TopBar-kompas: de vier hefbomen plus De toekomst als
+ * vijfde (wens eigenaar 22 sep). Het vijfde punt is het plan-stoplicht uit
+ * `usePlanStatus` — dezelfde bron als het punt naast "De toekomst" in zijbalk
+ * en nav-sheet, dus geen eigen oordeel. Zolang die status nog nastreamt
+ * (`neutral`) valt het punt weg, zoals in de menu's: liever even vier punten
+ * dan een grijze flits die daarna rood wordt.
+ *
+ * Alleen de mobiele variant: op desktop staat het plan-punt al naast
+ * "De toekomst" in de zijbalk.
+ */
+function useMobileCompassPoints(scores: LeverScores): CompassPoint[] {
+  const planStatus = usePlanStatus()
+  const points: CompassPoint[] = LEVERS.map(({ key, label, Icon, href }) => ({
+    key,
+    label,
+    Icon,
+    href,
+    ...scores[key],
+  }))
+  if (planStatus !== 'neutral') {
+    points.push({
+      key: 'plan',
+      label: 'Toekomst',
+      Icon: Compass,
+      href: '/toekomst',
+      status: leverageToLeverStatus(planStatus),
+      detail: 'Dekking en haalbaarheid van je toekomstplan',
+    })
+  }
+  return points
+}
+
+/**
+ * Mobile-responsive kompas: toont 4 compacte gekleurde dots (de hefbomen)
+ * plus een vijfde voor De toekomst als tappable trigger. Bij tap opent een expanded panel met volledige lever-
  * informatie (icoon + label + status + detail + voortgang). Panel sluit
  * bij buiten-tap, Escape, of tweede tap op de trigger.
  *
@@ -396,7 +448,8 @@ export function LeverCompassMobile({ scores }: { scores: LeverScores }) {
   // zonder ze aan te tikken; één punt zegt hetzelfde ("is er iets aan de hand?")
   // en de vier namen staan waar ze thuishoren: in het paneel eronder.
   const simple = useDisplayMode().mode === 'simple'
-  const worst = worstLeverStatus(scores)
+  const points = useMobileCompassPoints(scores)
+  const worst = worstStatus(points.map((p) => p.status))
 
   // Close on outside click
   useEffect(() => {
@@ -450,8 +503,8 @@ export function LeverCompassMobile({ scores }: { scores: LeverScores }) {
             aria-hidden
           />
         ) : (
-          LEVERS.map(({ key }) => {
-            const entry = scores[key]
+          points.map((entry) => {
+            const { key } = entry
             const colors = STATUS_COLORS[entry.status]
             // Op de leisteen-TopBar (ADR 0174) haalt rood-500 maar 2,37:1, onder
             // de 3:1 voor een grafisch object, en juist rood is "actie". Een
@@ -483,8 +536,8 @@ export function LeverCompassMobile({ scores }: { scores: LeverScores }) {
               Kompas
             </span>
           </div>
-          {LEVERS.map(({ key, label, Icon, href }) => {
-            const entry = scores[key]
+          {points.map((entry) => {
+            const { key, label, Icon, href } = entry
             const colors = STATUS_COLORS[entry.status]
             const hasProgress = key === 'debts' && entry.progress != null
 
