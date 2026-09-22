@@ -226,6 +226,12 @@ export function ModuleColorProvider({
   // inmiddels veranderd kunnen zijn, en andersom.
   const pendingPersistRef = useRef<PendingPersist | null>(null)
 
+  // Groepen met een eigen keuze die nog niet bij de server is: in de debounce,
+  // of met een PUT onderweg. Een server-render die daarvóór begon (een
+  // `router.refresh()` elders in de app), draagt voor die groep nog de oude
+  // waarde, en mag de keuze niet terugdraaien — zie de server-sync hieronder.
+  const unsyncedRef = useRef(new Set<keyof PendingPersist>())
+
   /**
    * Verstuurt de gesnapshotte kleur-keuze direct naar profiles via
    * /api/appearance. `keepalive: true` zorgt dat de request óók afrondt als de
@@ -243,8 +249,22 @@ export function ModuleColorProvider({
     const payload = pendingPersistRef.current
     if (!payload) return
     pendingPersistRef.current = null
+    // Een requeue zet geen eigen timer: de groep gaat pas mee met de volgende
+    // keuze, en blijft tot dan `unsynced` — de server-sync slaat hem zo lang
+    // over. Bewust: de lokale keuze is nog niet opgeslagen, dus de server heeft
+    // voor deze groep nog geen gelijk.
     const requeue = () => {
       pendingPersistRef.current = { ...payload, ...pendingPersistRef.current }
+    }
+    // De server heeft het antwoord gegeven (opgeslagen, of 4xx: ongeldig en dus
+    // niet opgeslagen). Vanaf hier mag de server-waarde voor deze groepen weer
+    // winnen, tenzij er intussen een nieuwere keuze in de wachtrij staat.
+    const settle = () => {
+      for (const key of Object.keys(payload) as (keyof PendingPersist)[]) {
+        if (!pendingPersistRef.current || !(key in pendingPersistRef.current)) {
+          unsyncedRef.current.delete(key)
+        }
+      }
     }
     void fetch('/api/appearance', {
       method: 'PUT',
@@ -252,7 +272,7 @@ export function ModuleColorProvider({
       body: JSON.stringify(payload),
       keepalive: true,
     })
-      .then((res) => { if (res.status >= 500) requeue() })
+      .then((res) => { if (res.status >= 500) requeue(); else settle() })
       .catch(requeue)
   }, [])
 
@@ -264,6 +284,7 @@ export function ModuleColorProvider({
    */
   const schedulePersist = useCallback((patch: PendingPersist) => {
     pendingPersistRef.current = { ...pendingPersistRef.current, ...patch }
+    for (const key of Object.keys(patch) as (keyof PendingPersist)[]) unsyncedRef.current.add(key)
     if (persistTimer.current) clearTimeout(persistTimer.current)
     persistTimer.current = setTimeout(() => {
       persistTimer.current = null
@@ -399,6 +420,81 @@ export function ModuleColorProvider({
       }
     } catch { /* ignore */ }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Server-sync na `router.refresh()` (F2 🟡-2) ──────────────────────────
+  // `useState(initialX)` leest zijn startwaarde één keer. Na een
+  // `router.refresh()` rendert de (app)-layout opnieuw met de actuele
+  // profielrij: de SSR-inline op `[data-app-root]` volgt die, maar state en refs
+  // bleven op de oude waarde. Gevolg: `useTopbarColor()` (browserchrome),
+  // `useModuleHex` (grafieken) en de picker liepen achter, en de eerstvolgende
+  // `applyVars()` schreef de oude kleuren weer over de nieuwe heen. Zichtbaar na
+  // een wijziging op een ander apparaat.
+  //
+  // Per groep en op WAARDE, niet op object-identiteit: de layout geeft elke
+  // render nieuwe objecten mee. Alleen een groep waarvan de serverwaarde echt
+  // veranderde, wordt overgenomen — een refresh met dezelfde waarden laat een
+  // lokale preview dus staan. En een groep met een eigen keuze die nog niet bij
+  // de server is (`unsyncedRef`), slaat de sync over: die server-render begon
+  // vóór de PUT.
+  //
+  // Bekende grens: de vergelijking loopt tegen de VORIGE SERVERWAARDE, niet
+  // tegen de eigen keuze. Kiest de gebruiker hier B (server stond op A) en zet
+  // een ander apparaat de kleur daarna terug op A, dan ziet de sync geen
+  // verschil en blijft B hier staan tot een reload. De ref bij een geslaagde
+  // PUT op B zetten zou dat oplossen, maar opent de race weer waarin een
+  // RSC-antwoord met de oude props ná de PUT binnenkomt en de keuze terugdraait.
+  const serverModules = JSON.stringify(initialConfig)
+  const serverBudget = JSON.stringify(initialBudgetConfig ?? DEFAULT_BUDGET_COLORS)
+  const serverPhase = JSON.stringify(initialPhaseConfig ?? DEFAULT_PHASE_COLORS)
+  const serverTopbar = normalizeTopbarColor(initialTopbarColor)
+  const lastServerRef = useRef({
+    modules: serverModules,
+    budget: serverBudget,
+    phase: serverPhase,
+    topbar: serverTopbar,
+  })
+  useEffect(() => {
+    const last = lastServerRef.current
+    const unsynced = unsyncedRef.current
+    let changed = false
+    if (serverModules !== last.modules) {
+      last.modules = serverModules
+      if (!unsynced.has('module_colors')) {
+        const next = JSON.parse(serverModules) as ModuleColorConfig
+        moduleRef.current = next
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- sync van een externe bron (server-props na router.refresh) naar state, refs én DOM-vars; kan niet tijdens de render
+        setConfigState(next)
+        changed = true
+      }
+    }
+    if (serverBudget !== last.budget) {
+      last.budget = serverBudget
+      if (!unsynced.has('budget_colors')) {
+        const next = JSON.parse(serverBudget) as BudgetColorConfig
+        budgetRef.current = next
+        setBudgetConfigState(next)
+        changed = true
+      }
+    }
+    // Fasekleuren persisteert deze provider niet (geen picker, zie CLAUDE.md),
+    // dus er is geen eigen keuze die kan winnen.
+    if (serverPhase !== last.phase) {
+      last.phase = serverPhase
+      const next = JSON.parse(serverPhase) as PhaseColorConfig
+      phaseRef.current = next
+      setPhaseConfigState(next)
+      changed = true
+    }
+    if (serverTopbar !== last.topbar) {
+      last.topbar = serverTopbar
+      if (!unsynced.has('topbar_color')) {
+        topbarRef.current = serverTopbar
+        setTopbarChoice(serverTopbar)
+        changed = true
+      }
+    }
+    if (changed) applyVars()
+  }, [serverModules, serverBudget, serverPhase, serverTopbar, applyVars])
 
   // Flush-hardening: een full reload / tab-sluit / app-switch binnen het 400ms
   // debounce-window zou een net-gemaakte kleurkeuze verliezen. We flushen een

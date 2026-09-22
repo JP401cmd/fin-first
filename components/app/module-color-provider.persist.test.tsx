@@ -513,6 +513,105 @@ describe('ModuleColorProvider — TopBar-kleur', () => {
     expect(JSON.parse(appearancePuts()[1].body)).toEqual({ topbar_color: '#1f2a44' })
   })
 
+  /**
+   * F2 🟡-2 — de provider volgt de server na `router.refresh()`.
+   *
+   * Given: de kleur is op een ánder apparaat gewijzigd, en hier loopt een
+   *   `router.refresh()`. De (app)-layout rendert opnieuw en geeft nieuwe
+   *   `initial*`-props door; de SSR-inline op `[data-app-root]` volgt die al.
+   * When: de provider rendert met die nieuwe props.
+   * Then: zijn state, `useTopbarColor()` en de vars volgen mee, zonder PUT.
+   *   Tot deze fix bleef de state op de oude waarde hangen (`useState` leest zijn
+   *   startwaarde één keer), en de eerstvolgende `applyVars()` schreef de oude
+   *   kleuren weer over de nieuwe heen.
+   * Maar: een eigen keuze die nog niet bij de server is (debounce of PUT
+   *   onderweg) wint van een server-render die daarvóór begon.
+   */
+  describe('volgt de server na router.refresh() (F2 🟡-2)', () => {
+    function tree(props: { topbar?: string | null; modules?: ModuleColorConfig }) {
+      return (
+        <ModuleColorProvider
+          initialConfig={props.modules ?? DEFAULT_MODULE_COLORS}
+          initialTopbarColor={props.topbar}
+        >
+          <div data-app-root>
+            <Capture />
+          </div>
+        </ModuleColorProvider>
+      )
+    }
+
+    it('neemt een nieuwe balkkleur van de server over, zonder PUT', async () => {
+      let view!: ReturnType<typeof render>
+      await act(async () => { view = render(tree({ topbar: '#1f2a44' })) })
+      await act(async () => { view.rerender(tree({ topbar: '#1D4E6B' })) })
+
+      expect(api.topbarColor).toBe('#1d4e6b')
+      const appRoot = document.querySelector<HTMLElement>('[data-app-root]')!
+      expect(document.documentElement.style.getPropertyValue('--topbar-bg')).toBe('#1d4e6b')
+      expect(appRoot.style.getPropertyValue('--topbar-bg')).toBe('#1d4e6b')
+      await act(async () => { vi.advanceTimersByTime(500) })
+      expect(appearancePuts()).toHaveLength(0)
+    })
+
+    it('neemt nieuwe accenten over, en een latere keuze in een andere groep schrijft ze niet terug', async () => {
+      const nieuw = { ...DEFAULT_MODULE_COLORS, kern: '#123456' }
+      let view!: ReturnType<typeof render>
+      await act(async () => { view = render(tree({})) })
+      await act(async () => { view.rerender(tree({ modules: nieuw })) })
+      expect(api.config.kern).toBe('#123456')
+
+      const kernNa = document.documentElement.style.getPropertyValue('--color-kern-500')
+      // setBudgetConfig draait `applyVars()` over álle groepen: daar kwamen tot de
+      // fix de oude accenten uit de refs terug.
+      act(() => { api.setBudgetConfig(api.budgetConfig) })
+      expect(document.documentElement.style.getPropertyValue('--color-kern-500')).toBe(kernNa)
+      await act(async () => { vi.advanceTimersByTime(500) })
+      expect(appearancePuts().map((p) => JSON.parse(p.body))).toEqual([{ budget_colors: api.budgetConfig }])
+    })
+
+    it('een eigen keuze binnen de debounce wint van een oudere server-render', async () => {
+      let view!: ReturnType<typeof render>
+      await act(async () => { view = render(tree({ topbar: '#1f2a44' })) })
+      act(() => { api.setTopbarColor('#4a2a45') })
+      // Een refresh die vóór de PUT begon: de server kent de keuze nog niet.
+      await act(async () => { view.rerender(tree({ topbar: '#1d4e6b' })) })
+
+      expect(api.topbarColor).toBe('#4a2a45')
+      await act(async () => { vi.advanceTimersByTime(500) })
+      expect(JSON.parse(appearancePuts()[0].body)).toEqual({ topbar_color: '#4a2a45' })
+    })
+
+    it('een eigen keuze waarvan de PUT nog onderweg is, wint ook', async () => {
+      let release!: () => void
+      vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        fetchCalls.push({ method: (init?.method ?? 'GET').toUpperCase(), url: String(input), body: String(init?.body ?? '') })
+        return new Promise<Response>((resolve) => { release = () => resolve(new Response('{}', { status: 200 })) })
+      }))
+      let view!: ReturnType<typeof render>
+      await act(async () => { view = render(tree({ topbar: '#1f2a44' })) })
+      act(() => { api.setTopbarColor('#4a2a45') })
+      await act(async () => { vi.advanceTimersByTime(500) })
+      expect(appearancePuts()).toHaveLength(1)
+
+      await act(async () => { view.rerender(tree({ topbar: '#1d4e6b' })) })
+      expect(api.topbarColor).toBe('#4a2a45')
+
+      // Is de PUT binnen, dan volgt de provider de server weer.
+      await act(async () => { release() })
+      await act(async () => { view.rerender(tree({ topbar: '#234a35' })) })
+      expect(api.topbarColor).toBe('#234a35')
+    })
+
+    it('een refresh met dezelfde waarden (nieuw object) laat een lokale preview staan', async () => {
+      let view!: ReturnType<typeof render>
+      await act(async () => { view = render(tree({ modules: { ...DEFAULT_MODULE_COLORS } })) })
+      act(() => { hydrate({ modules: { ...DEFAULT_MODULE_COLORS, wil: '#abcdef' } }) })
+      await act(async () => { view.rerender(tree({ modules: { ...DEFAULT_MODULE_COLORS } })) })
+      expect(api.config.wil).toBe('#abcdef')
+    })
+  })
+
   it('useTopbarColor volgt de keuze, en valt zonder provider terug op de standaard', async () => {
     let seen = ''
     function Reader() {
