@@ -1,12 +1,12 @@
 {
-  "generatedAt": "2026-09-22T12:49:05.596Z",
+  "generatedAt": "2026-09-22T14:56:16.742Z",
   "generatedDate": "2026-09-22",
   "repo": {
     "name": "fin",
     "version": "0.92.2"
   },
   "annotations": {
-    "philosophy": "Geld is opgeslagen tijd — elke euro vertegenwoordigt een stukje levenstijd.",
+    "philosophy": "Geld levert tijd op — elk bedrag staat voor tijd waarin je uitgaven gedekt zijn.",
     "tagline": "Eén samenhangende filosofie over elk scherm, geen \"financiële data + losse AI-coaching\".",
     "mechanismsIntro": "Drie generieke mechanismen dragen de hele app. Een nieuw domein sluit aan zonder nieuwe infrastructuur — je voegt alleen een regel toe aan een bestaand patroon.",
     "modules": {
@@ -195,7 +195,7 @@
     "tables": 105,
     "migrations": 260,
     "integrations": 25,
-    "components": 1165,
+    "components": 1166,
     "providers": 19,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -9286,7 +9286,7 @@
     }
   ],
   "components": {
-    "total": 1165,
+    "total": 1166,
     "groups": [
       {
         "group": "app",
@@ -9773,7 +9773,7 @@
       },
       {
         "group": "overview",
-        "count": 199,
+        "count": 200,
         "items": [
           "aandachtspunt-actie-button",
           "atomic-cards",
@@ -9912,6 +9912,7 @@
           "optimizer-levenslang.test",
           "optimizer-standing",
           "overzicht-hero",
+          "overzicht-hero.deck.test",
           "overzicht-secondary",
           "overzicht-secondary-loader",
           "overzicht-streaming.test",
@@ -18746,15 +18747,15 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 74
+        "commits": 78
       },
       {
         "path": "lib/ai",
-        "commits": 59
+        "commits": 60
       },
       {
         "path": "app/(app)/toekomst",
-        "commits": 35
+        "commits": 36
       },
       {
         "path": "app/api/ai",
@@ -18789,17 +18790,17 @@
       {
         "file": "components/app/horizon/horizon-client.tsx",
         "loc": 11039,
-        "commits": 100
+        "commits": 101
       },
       {
         "file": "components/app/budgets-client.tsx",
-        "loc": 5699,
-        "commits": 33
+        "loc": 5717,
+        "commits": 35
       },
       {
         "file": "components/core/assets-client.tsx",
-        "loc": 4865,
-        "commits": 38
+        "loc": 4878,
+        "commits": 40
       },
       {
         "file": "components/app/cash-account-view.tsx",
@@ -18814,7 +18815,7 @@
       {
         "file": "lib/dashboard-data-loader.ts",
         "loc": 3144,
-        "commits": 62
+        "commits": 63
       },
       {
         "file": "app/(app)/core/cash/import/page.tsx",
@@ -20018,7 +20019,7 @@
       {
         "label": "Componenten (aantal)",
         "added": [
-          "+4"
+          "+1"
         ],
         "removed": []
       }
@@ -20483,7 +20484,7 @@
     {
       "date": "2026-09-22",
       "api": 333,
-      "components": 1165,
+      "components": 1166,
       "tables": 105,
       "routesProduction": 90
     }
