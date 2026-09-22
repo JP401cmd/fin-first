@@ -96,7 +96,7 @@
 - [ ] Geen ingebakken back-knop in pagina-content — shell levert die via mobile TopBar of desktop pane-header. Zie patroon-kaart *Mobile TopBar* en page-type 11.
 - [ ] Sidebar-active-state via `--module-active-*` (zelfde tokens als kicker-streep): linker accent 3px in `-500` + bg-tint `-50/40`. Niet hardcoden naar `kern`/`wil`/`horizon`-hex.
 - [ ] Modal-keuze altijd via `<ShellOverlay kind="...">` driewegregel — geen directe `BottomSheet`-imports buiten de wrapper.
-- [ ] **Mobiele TopBar-titel** (elke nieuwe route onder `app/(app)/**` behalve tab-hoofdpagina's, die zijn bewust titelloos): route in `lib/nav-config.ts` opnemen (dan vult `resolveRouteTitle()` automatisch), anders `EXTRA_ROUTE_TITLES`; runtime-titel op `[type]`/`[id]`-detailpagina's via `<NavStackMeta title={…} />`. Titel-styling zit centraal in `components/app/shell/top-bar.tsx` — niet per pagina regelen. Verifieer op smal viewport.
+- [ ] **Mobiele TopBar-titel** (elke nieuwe route onder `app/(app)/**`): de balk toont de paginanaam links (ADR 0174). Route in `lib/nav-config.ts` opnemen (dan vult `resolveRouteTitle()` automatisch), anders `EXTRA_ROUTE_TITLES`; runtime-titel op `[type]`/`[id]`-detailpagina's via `<NavStackMeta title={…} />`. Tab-hoofdpagina's vallen níet terug op de nav-config: die zetten hun naam zelf via `<NavStackMeta title=… topBar={{ kind: 'rich' }}>` (bewaakt door `tab-root-topbar-title.test.ts`). Titel-styling en -kleur zitten centraal in `components/app/shell/top-bar.tsx` en de `--topbar-*`-tokens, dus niet per pagina regelen. Verifieer op smal viewport.
 
 ### Happy Flow & Voorwaartse Beweging
 - [ ] Bij elke succesvolle actie beantwoordt de UI drie vragen: (1) Is het gelukt? (2) Wat nu? (3) Wat als fout? — NOOIT een kale "OK"/"Sluiten".

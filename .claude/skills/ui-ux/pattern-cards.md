@@ -152,13 +152,16 @@ Bewuste, niet-universele patronen. Activeer alleen wanneer het paginatype erom v
 - **Portal-mount**: Sidebar wordt via `createPortal(document.body)` gerenderd vanuit `ResponsiveShell` om `ChatLayoutWrapper`'s `contain: layout` te ontwijken. Anders zou `position: fixed` relatief aan de wrapper komen te staan.
 
 ### Mobile TopBar (binnen tray-of-three)
-- **Toepassen op**: bovenrand van mobile-stack-shell (<lg). Productie-implementatie in `components/app/shell/top-bar.tsx`.
+- **Toepassen op**: bovenrand van mobile-stack-shell (<lg). Productie-implementatie in `components/app/shell/top-bar.tsx`; besluit in ADR 0174.
 - **Niet toepassen op**: desktop — daar levert de Sidebar oriëntatie.
-- **Implementatie**: hoogte 48px (zonder meta-strook) of 72-80px (met module-meta-strook op tab-roots). Safe-area-padding boven via `env(safe-area-inset-top)`.
-- **Lay-out**: ←-knop links (44×44 touch, alleen bij stack-diepte > 1) → titel midden → max 2 actions rechts.
-- **Titel-typografie**: Inter 14px medium met `tabular-nums` indien numeriek. **Niet Playfair** — voelde te zwaar in Fase 0.0-validatie. Module-meta-strook (saldo of subtitel) eronder gebruikt italic Source Serif 13px.
+- **Implementatie**: rij van 48px (`h-12`). Safe-area-padding boven via `env(safe-area-inset-top)`; de balkkleur loopt zo onder de iOS-statusbalk door.
+- **Lay-out**: [terug?] [paginanaam] [utility-cluster]. De terugknop is een `ChevronLeft` (h-7, stroke 1,5) in een 44×44 `touch-target`, alleen bij stack-diepte > 1 of als "← home" op de secundaire tab-roots. Zonder knop staat er géén placeholder: de naam lijnt dan op de gutter (`pl-1` op de rij + `pl-3` op de naam = 16px). De naam staat links uitgelijnd, met `truncate`.
+- **Titel-typografie**: de `font-serif`-class (Source Serif, volgt het typografie-thema), 18px, `font-normal`, in `--topbar-fg`. Nooit een inline `var(--font-serif)`: `@theme inline` schrijft die variabele niet uit, en dan valt de titel stil terug op Georgia. De naam is een `<p aria-hidden>`, nooit een kop (ADR 0110).
+- **Kleur**: via de `--topbar-*`-tokens: `--topbar-bg` (standaard leisteen `#3f4a5e`), `--topbar-fg`, `--topbar-fg-muted` (iconen) en `--topbar-hover` (drukvlak). Ze worden gegenereerd met `topbarColorVars()` in `lib/color-palette.ts`. De balk is chrome, geen module-identiteit: geen module-accent op de naam en geen onderlijn. Zet de kleur per element. Nooit `text-*` op de header en nooit `--ink`/`--subtle` op de header overschrijven: het accountmenu, het kompas-paneel en het weergavemenu hangen ín de header en blijven op papier. Een lichte pil (het kompas in Eenvoudig, de weergave-badge) mag op de balk staan. Stoplicht-rood haalt op leisteen geen 3:1; de rode kompasstip en de ongelezen-badge krijgen daarom een `ring-1 ring-[var(--topbar-fg)]`. Alléén rood: een witte ring zou amber juist onder de grens trekken (ADR 0174 D5b).
+- **Focus**: binnen `[data-topbar]` krijgt de focusring `--topbar-fg`; menu's (`role=menu`/`dialog`) houden de inkt-ring (`app/globals.css`). Geef een balk-control dus geen eigen `focus-visible:outline-[var(--ink)]`.
+- **Browserchrome**: `ThemeColorSync` zet onder `lg` een `theme-color` in de balkkleur. Op desktop en buiten de shell blijft het papier.
 - **Animatie**: TopBar zit *binnen* de animation-layer van de tray, niet sticky t.o.v. viewport. Schuift mee bij stack-push/pop. Bij scroll van content blijft hij aan de top van zijn tray.
-- **A11y**: `aria-live="polite"` op de titel zodat screen-readers de nieuwe pagina aankondigen na transitie. ←-knop heeft `aria-label="Terug"` + native button.
+- **A11y**: de `aria-live` zit op de sr-only `<h1>` in `MobileStackShell`, niet op de balk. De ←-knop heeft `aria-label="Terug"` (of "Terug naar overzicht"/"Terug naar budgetteren" als home-knop).
 
 ### TapTarget (raakgebied-primitive) ⭐
 - **Toepassen op**: elke icoon-only knop of link. Productie-implementatie in `components/editorial/tap-target.tsx` (`<TapTarget>`, `tapTargetClass()`, `TAP_TARGET_*`).
