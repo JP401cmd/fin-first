@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-09-22T14:56:16.742Z",
+  "generatedAt": "2026-09-22T16:18:19.725Z",
   "generatedDate": "2026-09-22",
   "repo": {
     "name": "fin",
-    "version": "0.92.2"
+    "version": "0.92.3"
   },
   "annotations": {
     "philosophy": "Geld levert tijd op — elk bedrag staat voor tijd waarin je uitgaven gedekt zijn.",
@@ -18809,7 +18809,7 @@
       },
       {
         "file": "lib/release-notes.ts",
-        "loc": 3394,
+        "loc": 3466,
         "commits": 8
       },
       {
@@ -20014,16 +20014,8 @@
   "diff": {
     "baseline": false,
     "previousDate": "2026-09-22",
-    "hasChanges": true,
-    "sections": [
-      {
-        "label": "Componenten (aantal)",
-        "added": [
-          "+1"
-        ],
-        "removed": []
-      }
-    ]
+    "hasChanges": false,
+    "sections": []
   },
   "statsHistory": [
     {
