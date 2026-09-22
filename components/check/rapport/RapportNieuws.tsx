@@ -1,4 +1,6 @@
 import type { ReportNews, ReportNewsItem } from '@/lib/check/types'
+// Alleen http(s) als link — guard tegen `javascript:`/`data:` uit externe bronnen (gedeeld, ADR 0176).
+import { safeHttpUrl } from '@/lib/safe-url'
 
 /**
  * Sectie 5 — "Uit het nieuws". Tot 3 actuele financiële nieuwsitems in
@@ -91,17 +93,3 @@ function NewsCard({ item }: { item: ReportNewsItem }) {
   )
 }
 
-/**
- * Geef de URL alleen terug als 'ie een geldig http(s)-scheme heeft — guard tegen
- * `javascript:`/`data:`/relatieve rommel uit externe RSS-bronnen.
- */
-function safeHttpUrl(raw: string): string | null {
-  if (!raw) return null
-  try {
-    const u = new URL(raw)
-    if (u.protocol === 'http:' || u.protocol === 'https:') return u.toString()
-    return null
-  } catch {
-    return null
-  }
-}

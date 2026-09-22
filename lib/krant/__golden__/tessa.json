@@ -1,5 +1,5 @@
 {
-  "matcherVersie": 1,
+  "matcherVersie": 2,
   "sjabloonVersie": 1,
   "profielType": "35-49·koop·partner",
   "items": [
@@ -296,15 +296,6 @@
         "samenvatting": "De AOW-leeftijd stijgt in 2033 met drie maanden. Dat volgt uit de nieuwe levensverwachting."
       },
       {
-        "artikelId": "a04-studieschuld-rente",
-        "titel": "Rente op studieschuld in 2027 naar 3 procent",
-        "rubriek": "rente",
-        "bron": "Voorbeeldbron",
-        "url": "https://voorbeeld.nl/a04-studieschuld-rente",
-        "gepubliceerd": "2026-09-19T05:10:00Z",
-        "samenvatting": "De rente op studieschulden wordt in 2027 vastgesteld op 3 procent. Dat geldt voor wie dan een nieuwe rentevaste periode ingaat."
-      },
-      {
         "artikelId": "a09-huurverhoging",
         "titel": "Maximale huurverhoging vrije sector 2027 vastgesteld",
         "rubriek": "woningmarkt",
@@ -314,13 +305,13 @@
         "samenvatting": "De maximale huurverhoging in de vrije sector is voor 2027 vastgesteld op 4,1 procent."
       },
       {
-        "artikelId": "a10-wtp",
-        "titel": "Pensioenfondsen stappen over op nieuw stelsel",
-        "rubriek": "pensioen",
+        "artikelId": "a04-studieschuld-rente",
+        "titel": "Rente op studieschuld in 2027 naar 3 procent",
+        "rubriek": "rente",
         "bron": "Voorbeeldbron",
-        "url": "https://voorbeeld.nl/a10-wtp",
+        "url": "https://voorbeeld.nl/a04-studieschuld-rente",
         "gepubliceerd": "2026-09-19T05:10:00Z",
-        "samenvatting": "Grote pensioenfondsen zetten hun regelingen om naar het nieuwe stelsel. Deelnemers krijgen een persoonlijk pensioenvermogen."
+        "samenvatting": "De rente op studieschulden wordt in 2027 vastgesteld op 3 procent. Dat geldt voor wie dan een nieuwe rentevaste periode ingaat."
       },
       {
         "artikelId": "a11-inflatie",
@@ -330,6 +321,15 @@
         "url": "https://voorbeeld.nl/a11-inflatie",
         "gepubliceerd": "2026-09-19T05:10:00Z",
         "samenvatting": "De inflatie kwam in augustus uit op 2,6 procent. Vooral de huren en energie stegen."
+      },
+      {
+        "artikelId": "a12-beurs",
+        "titel": "AEX sluit week hoger af",
+        "rubriek": "beleggingen",
+        "bron": "Voorbeeldbron",
+        "url": "https://voorbeeld.nl/a12-beurs",
+        "gepubliceerd": "2026-09-19T05:10:00Z",
+        "samenvatting": "De AEX sloot de week 1,4 procent hoger af. Vooral chipbedrijven stegen."
       }
     ]
   },

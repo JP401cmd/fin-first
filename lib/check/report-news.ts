@@ -81,7 +81,11 @@ export async function loadCheckNewsArticles(
     .from('news_articles')
     .select('id, title, summary, source_url, source_name, category, published_at, potential_impact, is_used')
     .gte('fetched_at', windowStart.toISOString())
-    .order('published_at', { ascending: false })
+    // Zelfde tiebreak als `loadNewsSourceArticles` (ADR 0176): NULL achteraan,
+    // dan recentst opgehaald, dan de sleutel — nooit de database-volgorde.
+    .order('published_at', { ascending: false, nullsFirst: false })
+    .order('fetched_at', { ascending: false })
+    .order('source_url', { ascending: true })
     .limit(SOURCE_CANDIDATE_LIMIT)
 
   if (error) {

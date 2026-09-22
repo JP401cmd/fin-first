@@ -1,0 +1,67 @@
+{
+  "fixtureVersie": 1,
+  "geval": "7ce838c7",
+  "klasse": "P1 — samenvatting niet gegrond in het eigen bronfragment (Krant 1F, regressiedata voor fase 2)",
+  "toelichting": "Vastgelegd vóór het wissen van news_articles (B29). De rij is read-only uit productie gelezen; de bron is opnieuw opgehaald met dezelfde User-Agent als de ingest. Modeltekst in \"rij\" (title, summary, raw_content, potential_impact, duiding) is nooit grondslag — alleen \"bron\" is dat.",
+  "fout": "De samenvatting zegt \"De stijging geldt voor zowel de sociale als de vrije sector\" en de doelgroep is huur-sociaal + huur-vrije-sector. In de bron staat alleen de kop in een nieuwslijst; de sectorverdeling staat er niet.",
+  "grondslagA_hele_pagina": "door",
+  "grondslagB_eigen_fragment": "door (de fout is niet-numeriek)",
+  "vangtHet": [
+    "G6"
+  ],
+  "rij": {
+    "id": "7ce838c7-c095-4dfb-b8dc-aa7654e89950",
+    "title": "Woninghuur stijgt gemiddeld met 4,4 procent",
+    "summary": "De huurprijzen in Nederland zijn gemiddeld met 4,4 procent gestegen. Dit heeft directe gevolgen voor huurders en de woonlasten in Nederland.",
+    "source_url": "https://www.cbs.nl/nl-nl/economie/prijzen#tf-18wdin8",
+    "source_name": "CBS — Prijzen (CPI / inflatie)",
+    "category": "woningmarkt",
+    "potential_impact": "Huurstijging van 4,4% → vaste lasten stijgen voor huurders, spaarquote daalt, minder ruimte voor vermogensopbouw. Budget & cashflow: woonlasten nemen toe.",
+    "published_at": "2026-09-04 00:00:00+00",
+    "fetched_at": "2026-09-22 05:25:09.564+00",
+    "raw_content": "De huurprijzen in Nederland zijn gemiddeld met 4,4 procent gestegen. Dit heeft directe gevolgen voor huurders en de woonlasten in Nederland.",
+    "duiding_status": "geduid",
+    "duiding_fout": null,
+    "duiding_versie": 1,
+    "duiding": {
+      "meta": {
+        "model": "claude-sonnet-4-5-20250929",
+        "tekens": 7800,
+        "brontekst": "volledig"
+      },
+      "grond": {},
+      "soort": "cijfer",
+      "versie": 1,
+      "deadline": null,
+      "doelgroep": [
+        {
+          "op": "in",
+          "veld": "wonen",
+          "waarden": [
+            "huur-sociaal",
+            "huur-vrije-sector"
+          ]
+        }
+      ],
+      "mechanisme": null,
+      "ingangsdatum": "2026-09-04",
+      "samenvatting": "Het CBS meldt dat de woninghuur gemiddeld met 4,4 procent is gestegen. Dit cijfer betreft de gemiddelde huurstijging voor huurwoningen. De stijging geldt voor zowel de sociale als de vrije sector."
+    }
+  },
+  "bron": {
+    "paginaUrl": "https://www.cbs.nl/nl-nl/economie/prijzen",
+    "detailUrl": "https://www.cbs.nl/nl-nl/nieuws/2026/36/woninghuur-stijgt-gemiddeld-met-4-4-procent",
+    "detailUrlAlsHrefOpPagina": true,
+    "opgehaaldOp": "2026-09-22T16:06:33Z",
+    "userAgent": "TriFinity/1.0 NewsAggregator",
+    "httpStatus": 200,
+    "htmlSha256": "fcebf066d9fab618d35242ce0f46e55a8f1757594d7ef706fc862af9859889df",
+    "htmlBytes": 90363,
+    "paginaTekstMethode": "HTML zonder script/style/noscript/template/commentaar, tags weg, entiteiten gedecodeerd, witruimte samengevoegd",
+    "paginaTekstSha256": "d982eb10e77aec8523a19d8b76c7f5623b03901f1fd9542d5b8157e0266fe4cb",
+    "fragment": "Woninghuur stijgt gemiddeld met 4,4 procent 4-9-2026 06:30",
+    "fragmentSha256": "097e9a15770b44acde54fc59f2ad6edfa9ec81b8cf379630f5f68be7e8164720",
+    "paginaTekst": "Prijzen | CBS Ga naar hoofdinhoud Toon navigatie menu Sluit navigatie menu Waar ben je naar op zoek? English Cijfers StatLine Vernieuwing StatLine Info over StatLine StatLine voor samenwerkingspartners Open data Aanvullend statistisch onderzoek Arbeid en inkomen Arbeid en sociale zekerheid Inkomen en bestedingen Economie Bedrijven Bouwen en wonen Financiële en zakelijke diensten Handel en horeca Industrie en energie Internationale handel Landbouw Macro-economie Overheid en politiek Prijzen Maatschappij Bevolking Gezondheid en welzijn Natuur en milieu Onderwijs Veiligheid en recht Verkeer en vervoer Vrije tijd en cultuur Regio Over ons Taal: English (EN) Home Home Prijzen Nieuws Prijsstijging koopwoningen vlakt in augustus verder af 22-9-2026 06:30 Inflatie stijgt naar 3,3 procent in augustus 8-9-2026 06:30 Woninghuur stijgt gemiddeld met 4,4 procent 4-9-2026 06:30 Inflatie in augustus 3,3 procent bij snelle raming 1-9-2026 06:30 Afzetprijzen industrie ruim 5 procent hoger in juli 28-8-2026 06:30 Koopwoningen in juli bijna 4 procent duurder dan jaar eerder 21-8-2026 06:30 Toon meer nieuws Afzetprijzen landbouw lager, vooral in de veehouderij 17-8-2026 06:30 In 6 gemeenten daalden prijzen bestaande koopwoningen 11-8-2026 06:30 Inflatie stijgt in juli naar 3,2 procent 11-8-2026 06:30 Inflatie in juli 3,1 procent bij snelle raming 31-7-2026 06:30 Afzetprijzen industrie ruim 4 procent hoger in juni 30-7-2026 06:30 Inflatie Caribisch Nederland stijgt verder in tweede kwartaal 2026 22-7-2026 15:30 Cijfers Dienstenprijzen Consumentenprijzen Inflatie van consumentenprijzen Europees geharmoniseerde consumentenprijsindex Producentenprijzen; bedrijfsklasse Producentenprijzen; afzet-, invoer- en verbruiksprijzen Meer cijfers van dit thema Meer cijfers over Prijzen Cijfers in beeld Bereken een huurverhoging 15-7-2026 10:37 Dashboard consumentenprijzen 12-2-2026 06:30 Bereken jouw persoonlijke inflatie 12-2-2026 06:30 Inflatie 12-2-2026 06:30 Armoede en schulden 17-12-2024 06:30 Verdiepingspagina's 17-12-2024 06:30 Prijzen toen en nu 10-12-2020 10:12 Huizenmarkt in beeld 12-2-2020 00:00 Verdieping De consumentenprijsindex vanaf 2026 12-2-2026 06:30 CPI - Lange onderzoeksbeschrijving 12-2-2026 06:30 Monitor invoering hypotheekgarantie op Bonaire 9-9-2026 15:30 De Nederlandse economie in 2025 21-4-2026 06:30 De energierekening – januari 2026 26-2-2026 06:30 Indexeringen voor nieuwe contracten 12-2-2026 06:30 Toon meer verdieping Indexmethoden voor transactiedata in de Consumentenprijsindex 12-2-2026 06:30 De ECOICOPv2 indeling 12-2-2026 06:30 Prijsontwikkeling van warmtepompen 2023-2024 12-9-2025 09:00 Monitor invoering hypotheekgarantie op Bonaire 2024 12-9-2025 06:30 Basisverlegging inputprijsindexcijfers Grond-, weg- en waterbouw van 2015=100 naar 2020=100 14-7-2025 13:00 Steekproefmarges Huurmutaties 16-6-2025 11:55 Uitgelicht Indexeringsmodule huurprijsaanpassing Huurmodule De consumentenprijsindex vanaf 2026 CBS-video Voedingsprijzen [video: https://www.cbs.nl/nl-nl/video/1c8a61d31c44452cb8a862b05dd486d7] Recente cijfers Bestaande koopwoningen; verkoopprijzen prijsindex 2020=100 22-9-2026 06:30 Pompprijzen motorbrandstoffen; brandstofsoort, per dag 17-9-2026 02:00 Gemiddelde energietarieven voor consumenten 8-9-2026 06:30 Consumentenprijzen; CPI 2025=100, index en mutaties 8-9-2026 06:30 Overzicht recente cijfers Links Link Prijsniveaus in Europa Link StatLine Themapagina Prijzen Externe link Consumentenprijzen in Europa Externe link Producentenprijzen in Europa Externe link Bouwkosten van woningen in Europa Externe link Huizenprijzen in Europa (HPI) Externe link Dienstenprijzen in Europa Externe link Electriciteitsprijzen in Europa Externe link Klimaat- en Energieverkenning Link Archief nieuwsberichten prijzen Onze diensten Cijfers/StatLine Bereken huurverhoging Open data Microdata Aanvullend statistisch onderzoek Regionale data Publicaties Methoden Blaise Voor deelnemers enquêtes Bedrijven Centrale overheid Decentrale overheden Personen Privacy Beloningen Over ons Contact Pers Dit zijn wij Onderzoek en innovatie Werken bij Leren met het CBS Correcties Over deze site Website Copyright Cookies Toegankelijkheid Kwetsbaarheid melden Archief Abonnementen Volg het CBS LinkedIn Facebook Instagram YouTube RSS Publicatieplanning Privacy Voor wat er feitelijk gebeurt © CBS 2026 Uw mening"
+  },
+  "kruiscontrole": "Fragment ook aanwezig in de ~6 kB-paginakopie van de onderzoekssessie (22 sep ~14:40 UTC); geen inhoudelijke wijziging van dit fragment tussen beide ophaalmomenten vastgesteld."
+}

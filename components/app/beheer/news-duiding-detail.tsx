@@ -212,15 +212,23 @@ export function NewsDuidingDetail({ articleId, titel, velden, onGewijzigd }: Pro
                 ? 'algemeen'
                 : weergave.doelgroep.map((r) => `${r.veld} ${r.op} ${r.waarden.join(' / ')}`).join(' · ')}
             </dd>
-            <dt className="text-[var(--ink-4)]">Brontekst</dt>
+            <dt className="text-[var(--ink-4)]">Grondslag</dt>
             <dd className="text-[var(--ink-2)]">
-              {weergave.brontekst} ({weergave.tekens.toLocaleString('nl-NL')} tekens) · {weergave.model}
+              {weergave.grondslag} ({weergave.tekens.toLocaleString('nl-NL')} tekens) · {weergave.model}
             </dd>
           </dl>
 
           <div>
             <span className="text-xs font-medium text-[var(--ink-3)]">Samenvatting (duiding)</span>
-            <p className="mt-0.5 text-[var(--ink-2)]">{weergave.samenvatting}</p>
+            {weergave.samenvatting === null ? (
+              /* B26: de tekst is niet vrijgegeven — de lezer ziet bronkop + link. */
+              <p className="mt-0.5 text-[var(--ink-4)]">
+                Geen samenvatting vrijgegeven
+                {weergave.poort.reden ? ` — poort: ${weergave.poort.reden}` : ' — het model schreef er geen'}
+              </p>
+            ) : (
+              <p className="mt-0.5 text-[var(--ink-2)]">{weergave.samenvatting}</p>
+            )}
           </div>
 
           <div>

@@ -105,11 +105,12 @@ describe('matcher — doelgroepregels', () => {
     expect(alg.algemeen.items[0].samenvatting).toBeNull()
   })
 
-  it('het algemene katern sorteert op recency en id, onafhankelijk van het AI-editiepad', () => {
+  it('het algemene katern sorteert op recency, dan soort en kop — niet op id — onafhankelijk van het AI-editiepad', () => {
     const u = matchEditie(LEEG_PROFIEL, ARTIKELEN, context())
     const ids = u.algemeen.items.map((i) => i.artikelId)
     expect(ids.length).toBeLessThanOrEqual(5)
-    expect(ids).toEqual([...ids].sort()) // zelfde publicatiedatum in de fixture → op id
+    // Zelfde publicatiedatum in de fixture → eerst de besluiten (op kop), dan het cijfer (MATCHER_VERSIE 2).
+    expect(ids).toEqual(['a03-aow-leeftijd', 'a01-box3-heffingsvrij', 'a09-huurverhoging', 'a04-studieschuld-rente', 'a11-inflatie'])
     expect(ids).not.toContain('a08-kinderopvangtoeslag') // ouder dan de rest
   })
 
@@ -192,6 +193,31 @@ describe('matcher — score en selectie', () => {
     expect(u.algemeen.label).toBe('Niet op jouw situatie afgestemd.')
   })
 
+  it('algemeen katern bij gelijke datum: soort en kop beslissen, niet het artikel-id (bugkaart P2)', () => {
+    // Drie items uit één run met exact dezelfde published_at en fetched_at, de
+    // id's bewust in de "verkeerde" volgorde: vóór MATCHER_VERSIE 2 won 'a'.
+    const basis = fixture('a12-beurs')
+    const zelfdeMoment = { published_at: '2026-09-22T05:25:09.000Z', fetched_at: '2026-09-22T05:25:09.000Z' }
+    const metSoort = (id: string, title: string, soort: 'achtergrond' | 'cijfer' | 'besloten') => ({
+      ...basis,
+      ...zelfdeMoment,
+      id,
+      title,
+      duiding: { ...basis.duiding!, soort },
+    })
+    const invoer = [
+      metSoort('a-achtergrond', 'Achtergrond bij het pensioenstelsel', 'achtergrond'),
+      metSoort('b-cijfer', 'Inflatie stijgt naar 3,3 procent', 'cijfer'),
+      metSoort('c-besloten', 'Box 3-tarief vastgesteld', 'besloten'),
+      metSoort('0-cijfer-z', 'Woninghuur stijgt 4,4 procent', 'cijfer'),
+    ]
+    const volgorde = (arts: typeof invoer) => matchEditie(PROFIEL_TESSA, arts, context()).algemeen.items.map((i) => i.artikelId)
+    expect(volgorde(invoer)).toEqual(['c-besloten', 'b-cijfer', '0-cijfer-z', 'a-achtergrond'])
+    // Andere id's, zelfde inhoud → zelfde volgorde: het id beslist niet.
+    const hernoemd = invoer.map((a, i) => ({ ...a, id: `z${9 - i}-${a.id}` }))
+    expect(volgorde(hernoemd).map((id) => id.replace(/^z\d-/, ''))).toEqual(['c-besloten', 'b-cijfer', '0-cijfer-z', 'a-achtergrond'])
+  })
+
   it('een gezien artikel telt niet, ook niet voor het algemene katern', () => {
     const u = matchEditie(PROFIEL_TESSA, ARTIKELEN, context({ gezienArtikelIds: new Set(['a12-beurs', 'a16-box3-tarief']) }))
     const ids = [...u.items.map((i) => i.artikelId), ...u.algemeen.items.map((i) => i.artikelId)]
@@ -226,7 +252,7 @@ describe('matcher — uitkomst', () => {
 
   it('draagt de matcher- en sjabloonversie en het profieltype, zonder id', () => {
     const u = matchEditie(PROFIEL_DAAN, ARTIKELEN, context())
-    expect(u.matcherVersie).toBe(1)
+    expect(u.matcherVersie).toBe(2)
     expect(u.sjabloonVersie).toBe(1)
     expect(u.profielType).toBe('onder-35·wonen-onbekend·alleen')
     expect(JSON.stringify(u)).not.toMatch(/user_id|userId/)

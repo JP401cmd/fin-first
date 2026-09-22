@@ -206,25 +206,9 @@ export function dedupeSimilarTitles<T extends { title: string }>(
   return { kept, duplicates }
 }
 
-// ── 4. Synthetische artikel-URL ──────────────────────────────────────
-
-/** Klein, stabiel hash-suffix (djb2) voor synthetische artikel-URL's. */
-function titleHash(title: string): string {
-  let hash = 5381
-  for (let i = 0; i < title.length; i++) {
-    hash = ((hash << 5) + hash + title.charCodeAt(i)) >>> 0
-  }
-  return hash.toString(36)
-}
-
-/**
- * Web-geëxtraheerde artikelen zonder eigen item-URL vallen terug op de
- * paginale URL — de unique constraint op source_url liet daardoor maar één
- * artikel per bronpagina toe. Maak de URL uniek met een titel-hash-fragment;
- * de link landt nog steeds op de juiste pagina.
- */
-export function ensureUniqueArticleUrl(articleUrl: string, pageUrl: string, title: string): string {
-  if (normalizeUrl(articleUrl) !== normalizeUrl(pageUrl)) return articleUrl
-  const base = articleUrl.split('#')[0]
-  return `${base}#tf-${titleHash(title)}`
-}
+// ── 4. (vervallen) Synthetische artikel-URL ──────────────────────────
+//
+// `ensureUniqueArticleUrl` maakte een web-item uniek met een djb2-hash van de
+// MODELKOP: elke parafrase werd een nieuw artikel (81 % van de bak op
+// 22-09-2026). Vervangen door server-bepaalde sleutels in lib/news-ingest.ts
+// (`sectieArtikelUrl`, de `href` van een lijstpagina, de feed-link) — ADR 0176.

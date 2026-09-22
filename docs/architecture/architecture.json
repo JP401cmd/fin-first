@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-22T16:55:07.203Z",
+  "generatedAt": "2026-09-22T20:19:50.300Z",
   "generatedDate": "2026-09-22",
   "repo": {
     "name": "fin",
@@ -191,11 +191,11 @@
   "stats": {
     "routes": 136,
     "routesProduction": 90,
-    "api": 333,
+    "api": 334,
     "tables": 105,
-    "migrations": 260,
+    "migrations": 262,
     "integrations": 25,
-    "components": 1166,
+    "components": 1167,
     "providers": 19,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -2077,6 +2077,14 @@
     {
       "url": "/api/admin/news-duiding/opnieuw",
       "file": "app/api/admin/news-duiding/opnieuw/route.ts",
+      "domain": "admin",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "url": "/api/admin/news-duiding/steekproef",
+      "file": "app/api/admin/news-duiding/steekproef/route.ts",
       "domain": "admin",
       "methods": [
         "POST"
@@ -4657,7 +4665,7 @@
     {
       "domain": "admin",
       "label": "Beheer",
-      "count": 53,
+      "count": 54,
       "routes": [
         {
           "url": "/api/admin/ai-features",
@@ -4840,6 +4848,14 @@
         {
           "url": "/api/admin/news-duiding/opnieuw",
           "file": "app/api/admin/news-duiding/opnieuw/route.ts",
+          "domain": "admin",
+          "methods": [
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/admin/news-duiding/steekproef",
+          "file": "app/api/admin/news-duiding/steekproef/route.ts",
           "domain": "admin",
           "methods": [
             "POST"
@@ -8728,7 +8744,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 260
+    "migrationCount": 262
   },
   "tablesByDomain": [
     {
@@ -9286,11 +9302,11 @@
     }
   ],
   "components": {
-    "total": 1166,
+    "total": 1167,
     "groups": [
       {
         "group": "app",
-        "count": 477,
+        "count": 478,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -9591,6 +9607,7 @@
           "net-worth-projection-chart",
           "news-duiding-detail",
           "news-duiding-meting-panel",
+          "news-duiding-meting-panel.test",
           "news-feedback-panel",
           "nibud-benchmark",
           "nibud-benchmark.test",
@@ -13603,6 +13620,8 @@
             "/api/admin/extraction-prompt",
             "/api/admin/local-ai-gate",
             "/api/admin/local-knowledge",
+            "/api/admin/news-duiding/meting",
+            "/api/admin/news-duiding/steekproef",
             "/api/admin/news-ingest",
             "/api/admin/news-prompt",
             "/api/admin/news-sources",
@@ -18752,6 +18771,32 @@
       ],
       "summary": "Eén regel kleurt het plan: `resolvePlanStatus` (`lib/horizon/plan-status.ts`, eigenaarsbesluit 15 sep 2026). Die regel voedt de kop op /toekomst (\"Je toekomstplan is *haalbaar*.\", ADR 0174 D6), de plankaart en het statuspunt op /overzicht en het menupunt \"De toekomst\".",
       "file": "docs/adr/0175-het-plan-stoplicht-weegt-het-vastgelegde-doel-mee.md"
+    },
+    {
+      "id": "0176-wat-is-een-artikel",
+      "title": "Wat is een artikel: vaste bronsoort per bron, sleutel door de server, brontekst bewaard",
+      "status": "aanvaard",
+      "date": "2026-09-22",
+      "elements": [
+        "as-nieuws",
+        "sp-nieuws",
+        "do-krant",
+        "t-supabase"
+      ],
+      "summary": "Een artikel in `news_articles` is een item met een eigen, **server-bepaalde identiteit**, een **bronkop** en een **bewaard bronfragment**. Elke bron heeft een vaste bronsoort: `rss` (elk feed-item; sleutel = de feed-link), `web_lijst` (een link die letterlijk als `href` op de ove",
+      "file": "docs/adr/0176-wat-is-een-artikel.md"
+    },
+    {
+      "id": "0177-de-belastinghefboom-oordeelt-op-onbenutte-ruimte",
+      "title": "De hefboom Belasting oordeelt op onbenutte fiscale ruimte, niet op de hoogte van de heffing",
+      "status": "aanvaard",
+      "date": "2026-09-22",
+      "elements": [
+        "as-belasting",
+        "as-budget"
+      ],
+      "summary": "De status van de hefboom Belasting was een vermogensmeter in absolute euro's: boven € 500.000 boven de heffingsvrije voet altijd rood, zonder bovengrens en zonder weg terug. Vanaf nu meet hij hoeveel fiscale ruimte onbenut blijft, uitgedrukt als aandeel van de eigen heffing over ",
+      "file": "docs/adr/0177-de-belastinghefboom-oordeelt-op-onbenutte-ruimte.md"
     }
   ],
   "churn": {
@@ -18759,7 +18804,7 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 78
+        "commits": 79
       },
       {
         "path": "lib/ai",
@@ -18822,7 +18867,7 @@
       {
         "file": "lib/release-notes.ts",
         "loc": 3484,
-        "commits": 9
+        "commits": 10
       },
       {
         "file": "lib/dashboard-data-loader.ts",
@@ -20026,8 +20071,23 @@
   "diff": {
     "baseline": false,
     "previousDate": "2026-09-22",
-    "hasChanges": false,
-    "sections": []
+    "hasChanges": true,
+    "sections": [
+      {
+        "label": "API-routes",
+        "added": [
+          "/api/admin/news-duiding/steekproef"
+        ],
+        "removed": []
+      },
+      {
+        "label": "Componenten (aantal)",
+        "added": [
+          "+1"
+        ],
+        "removed": []
+      }
+    ]
   },
   "statsHistory": [
     {
@@ -20487,8 +20547,8 @@
     },
     {
       "date": "2026-09-22",
-      "api": 333,
-      "components": 1166,
+      "api": 334,
+      "components": 1167,
       "tables": 105,
       "routesProduction": 90
     }

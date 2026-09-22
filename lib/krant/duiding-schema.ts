@@ -28,7 +28,14 @@ import { DOELGROEP_SLEUTEL_LIJST } from './profiel-velden'
 import { MECHANISMEN, type MechanismeId } from './mechanismen'
 import { DREMPEL_SLEUTELS } from './drempels'
 
-export const DUIDING_VERSIE = 1
+/**
+ * 2 (22-09-2026, ADR 0176 · 1F fase 2): de grondslag is het EIGEN bronfragment
+ * + de bronkop in plaats van de hele opgehaalde paginatekst, `samenvatting` is
+ * nullable (de tekstpoort, B26) en `meta` draagt de grondslag met haar hash en
+ * de poortuitslag. De bump zet elke v1-rij via `duidWachtendeArtikelen` terug
+ * op 'wacht' — herleiden, niet ophogen.
+ */
+export const DUIDING_VERSIE = 2
 
 export const DUIDING_SOORTEN = [
   'besloten',
@@ -95,7 +102,15 @@ export const mechanismeSchema = z.discriminatedUnion('soort', [
 ])
 export type Mechanisme = z.infer<typeof mechanismeSchema>
 
-const samenvatting = z.string().min(20).max(600)
+/**
+ * NULLABLE sinds v2 (B26/B27): een lege samenvatting mag. Het model mag zelf
+ * null teruggeven wanneer het eigen fragment niets te zeggen heeft, en de
+ * tekstpoort (`duiding-controles.ts`) zet 'm op null wanneer de tekst een
+ * controle niet haalt. De lezer krijgt dan de BRONKOP + de link, zonder
+ * samenvatting; de rij blijft 'geduid'. Er komt nooit een modelkop in de
+ * Krant — vandaar dat dit schema geen kop-/titelveld heeft (G4).
+ */
+const samenvatting = z.string().min(20).max(600).nullable()
 
 /** Wat het model teruggeeft. */
 export const duidingModelSchema = z.strictObject({
@@ -115,15 +130,50 @@ export const duidingModelSchema = z.strictObject({
 })
 export type DuidingModelUitvoer = z.infer<typeof duidingModelSchema>
 
-export const BRONTEKST_SOORTEN = ['teaser', 'volledig'] as const
-export type BrontekstSoort = (typeof BRONTEKST_SOORTEN)[number]
+/**
+ * WAAR DE GRONDSLAG VANDAAN KWAM. De duiding leest sinds v2 uitsluitend de twee
+ * eigen kolommen van de rij:
+ *   fragment  `bron_fragment` (+ `bron_kop`) — het eigen stuk brontekst;
+ *   kop       er was geen fragment, alleen de bronkop (een ECB-RSS-item zonder
+ *             description bijvoorbeeld).
+ * De oude soorten ('teaser' · 'volledig') bestaan niet meer: er is geen
+ * paginatekst meer en geen opgehaalde volledige tekst.
+ */
+export const GRONDSLAG_SOORTEN = ['fragment', 'kop'] as const
+export type GrondslagSoort = (typeof GRONDSLAG_SOORTEN)[number]
 
+/** Waar `published_at` vandaan komt (kolom `news_articles.published_bron`, ADR 0176). */
+export const PUBLISHED_BRONNEN = ['feed', 'meta', 'eerste_gezien'] as const
+export type PublishedBron = (typeof PUBLISHED_BRONNEN)[number]
+
+/** De uitslag van de TEKSTPOORT (B26). Alleen de code, nooit modeltekst. */
+export const poortSchema = z.strictObject({
+  status: z.enum(['groen', 'gedegradeerd']),
+  /** De controlecode die degradeerde (`g1:…`, `g2:datum`, `g3:meta`, `g6:lexicon`); null bij groen. */
+  reden: z.string().max(80).nullable(),
+})
+export type Poort = z.infer<typeof poortSchema>
+
+/**
+ * Door CODE gezet, nooit door het model. `kopBron` en `modeltekst` zijn
+ * literals: ze leggen vast dat de kop van de bron komt en dat er geen
+ * modeltekst in de grondslag zat. Dat lijkt overbodig — het is precies wat de
+ * meting op G4 telt, zodat drift zichtbaar wordt in plaats van aangenomen.
+ */
 export const duidingMetaSchema = z.strictObject({
-  brontekst: z.enum(BRONTEKST_SOORTEN),
+  grondslag: z.enum(GRONDSLAG_SOORTEN),
+  /** sha256 (hex) van exact de grondslagtekst die in de prompt ging. De tekst zelf staat in `news_articles.bron_fragment`. */
+  grondslagSha256: z.string().regex(/^[0-9a-f]{64}$/),
   tekens: z.number().int().nonnegative(),
   model: z.string(),
+  kopBron: z.literal('bron'),
+  modeltekst: z.literal(false),
+  poort: poortSchema,
 })
 export type DuidingMeta = z.infer<typeof duidingMetaSchema>
+
+/** Alles behalve de poort: wat de aanroeper aanlevert; `controleerDuiding` vult de poort. */
+export type DuidingMetaZonderPoort = Omit<DuidingMeta, 'poort'>
 
 /** Wat in `news_articles.duiding` staat — het leescontract voor 1B. */
 export const duidingV1Schema = z.strictObject({

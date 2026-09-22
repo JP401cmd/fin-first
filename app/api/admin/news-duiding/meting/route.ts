@@ -5,9 +5,12 @@ import { isSuperAdmin } from '@/lib/admin'
 import { amsterdamWeekKey } from '@/lib/briefing/snapshot'
 import {
   bouwDuidingMeting,
+  g7Gehaald,
+  leesSteekproefRegister,
   METING_KOLOMMEN,
   METING_WEKEN_MAX,
   METING_WEKEN_STANDAARD,
+  POORT_STEEKPROEF_KEY,
   type MetingRij,
 } from '@/lib/krant/duiding-beheer'
 
@@ -75,5 +78,22 @@ export async function GET(request: Request) {
   const afgekapt = totaal === null || rijen.length < totaal
 
   const perWeek = bouwDuidingMeting(rijen).filter((w) => w.week >= eersteWeek)
-  return NextResponse.json({ weken: perWeek, eersteWeek, afgekapt })
+
+  // G7 (de handmatige steekproef) is invoer, geen telling over de rijen: hij
+  // komt uit `app_settings` en wordt hier alleen GELEZEN. Een leesfout mag de
+  // meting niet omverhalen — dan is G7 simpelweg niet gehaald (fail-closed).
+  const { data: steekproefRij } = await supabase
+    .from('app_settings')
+    .select('value')
+    .eq('key', POORT_STEEKPROEF_KEY)
+    .maybeSingle()
+  const steekproef = leesSteekproefRegister(steekproefRij?.value)
+
+  return NextResponse.json({
+    weken: perWeek,
+    eersteWeek,
+    afgekapt,
+    steekproef,
+    g7Gehaald: g7Gehaald(steekproef, perWeek.map((w) => w.week)),
+  })
 }

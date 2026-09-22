@@ -11,8 +11,20 @@ import {
   artikelVerwijderBodySchema,
   NIET_TE_VERWIJDEREN,
   veiligeZoekterm,
+  g7Gehaald,
+  leesSteekproefRegister,
+  steekproefBodySchema,
+  steekproefWeekGehaald,
+  STEEKPROEF_MAX_FOUTEN,
+  STEEKPROEF_OMVANG,
+  STEEKPROEF_WEKEN_OP_RIJ,
+  STEEKPROEF_VELD_UITLEG,
+  POORT_REDEN_LABEL,
+  poortRedenLabel,
+  doelgroepAfwijzingen,
   type MetingRij,
 } from './duiding-beheer'
+import { POORT_CODE } from './duiding-controles'
 import { GELDIGE_UITVOER } from './duiding.fixture'
 import { DUIDING_VERSIE, type DuidingV1 } from './duiding-schema'
 import { MECHANISMEN, MECHANISME_IDS } from './mechanismen'
@@ -30,7 +42,15 @@ function opgeslagen(over: Partial<DuidingV1> = {}): DuidingV1 {
     mechanisme: GELDIGE_UITVOER.mechanisme,
     samenvatting: GELDIGE_UITVOER.samenvatting,
     grond: Object.fromEntries(GELDIGE_UITVOER.grond.map((g) => [g.param, g.citaat])),
-    meta: { brontekst: 'volledig', tekens: 1234, model: 'test-model' },
+    meta: {
+      grondslag: 'fragment',
+      grondslagSha256: 'c'.repeat(64),
+      tekens: 1234,
+      model: 'test-model',
+      kopBron: 'bron',
+      modeltekst: false,
+      poort: { status: 'groen', reden: null },
+    },
     ...over,
   }
 }
@@ -119,8 +139,9 @@ describe('duidingWeergave', () => {
     expect(hv).toEqual({ naam: 'heffingsvrij_single', waarde: 60000, eenheid: 'eur', citaat: 'stijgt in 2027 naar € 60.000' })
     const tarief = m?.params.find((p) => p.naam === 'tarief_pct')
     expect(tarief).toEqual({ naam: 'tarief_pct', waarde: null, eenheid: 'pct', citaat: null })
-    expect(u.duiding.brontekst).toBe('volledig')
+    expect(u.duiding.grondslag).toBe('fragment')
     expect(u.duiding.tekens).toBe(1234)
+    expect(u.duiding.poort).toEqual({ status: 'groen', reden: null })
   })
 
   it('zonder mechanisme: mechanisme null', () => {
@@ -150,7 +171,11 @@ function rij(over: Partial<MetingRij>): MetingRij {
     duiding_fout: null,
     teruggetrokken_reden: null,
     mechanisme: null,
-    brontekst: 'teaser',
+    grondslag: 'fragment',
+    poort_status: 'groen',
+    poort_reden: null,
+    kop_bron: 'bron',
+    modeltekst: 'false',
     ...over,
   }
 }
@@ -162,18 +187,18 @@ describe('bouwDuidingMeting', () => {
 
   it('telt elke tak per week, cohort op fetched_at', () => {
     const [w] = bouwDuidingMeting([
-      rij({ mechanisme: 'box3-parameter', brontekst: 'volledig' }),
+      rij({ mechanisme: 'box3-parameter', grondslag: 'kop' }),
       rij({ mechanisme: 'beursbeweging', category: 'macro' }),
       rij({ mechanisme: null }),
       rij({ mechanisme: null, duiding_fout: 'ongegrond:rente_pct' }),
       rij({ duiding_status: 'teruggetrokken', teruggetrokken_reden: 'fout-getal', mechanisme: 'studieschuld-rente' }),
       rij({ duiding_status: 'teruggetrokken', teruggetrokken_reden: 'fout-getal', mechanisme: 'beursbeweging', category: 'macro' }),
       rij({ duiding_status: 'teruggetrokken', teruggetrokken_reden: 'verkeerde-doelgroep', mechanisme: null }),
-      rij({ duiding_status: 'afgewezen', duiding_fout: 'schema', mechanisme: null, brontekst: null }),
-      rij({ duiding_status: 'afgewezen', duiding_fout: 'schema', mechanisme: null, brontekst: null }),
-      rij({ duiding_status: 'afgewezen', duiding_fout: null, mechanisme: null, brontekst: null }),
-      rij({ duiding_status: 'wacht', mechanisme: null, brontekst: null }),
-      rij({ duiding_status: 'mislukt', mechanisme: null, brontekst: null }),
+      rij({ duiding_status: 'afgewezen', duiding_fout: 'schema', mechanisme: null, grondslag: null, poort_status: null, kop_bron: null }),
+      rij({ duiding_status: 'afgewezen', duiding_fout: 'schema', mechanisme: null, grondslag: null, poort_status: null, kop_bron: null }),
+      rij({ duiding_status: 'afgewezen', duiding_fout: null, mechanisme: null, grondslag: null, poort_status: null, kop_bron: null }),
+      rij({ duiding_status: 'wacht', mechanisme: null, grondslag: null, poort_status: null, kop_bron: null }),
+      rij({ duiding_status: 'mislukt', mechanisme: null, grondslag: null, poort_status: null, kop_bron: null }),
     ])
     expect(w.week).toBe('2026-W38')
     expect(w.binnen).toBe(12)
@@ -184,7 +209,7 @@ describe('bouwDuidingMeting', () => {
     // rekenend: box3 + studieschuld (beursbeweging rekent niet)
     expect(w.rekenend).toBe(2)
     expect(w.mechanismeVervallen).toBe(1)
-    expect(w.perBrontekst).toEqual({ teaser: 6, volledig: 1 })
+    expect(w.perGrondslag).toEqual({ fragment: 6, kop: 1 })
     expect(w.teruggetrokken).toEqual({ 'fout-getal': 2, 'verkeerde-doelgroep': 1, 'verkeerd-mechanisme': 0, anders: 0 })
     // De poortmaat: alleen fout-getal bij een REKENEND mechanisme.
     expect(w.foutGetalRekenend).toBe(1)
@@ -197,6 +222,28 @@ describe('bouwDuidingMeting', () => {
     expect(w.afgewezenTotaal).toBe(3)
     expect(w.perCategorie.fiscaal).toEqual({ geduid: 5, metMechanisme: 2, dekking: 2 / 5 })
     expect(w.perCategorie.macro).toEqual({ geduid: 2, metMechanisme: 2, dekking: 1 })
+  })
+
+  it('telt de tekstpoort per reden (G1/G2/G3/G6) en de herkomst-drift (G4/G5)', () => {
+    const [w] = bouwDuidingMeting([
+      rij({}),
+      rij({ poort_status: 'gedegradeerd', poort_reden: 'g1:ongegrond-getal' }),
+      rij({ poort_status: 'gedegradeerd', poort_reden: 'g1:ongegrond-getal' }),
+      rij({ poort_status: 'gedegradeerd', poort_reden: 'g2:datum' }),
+      rij({ poort_status: 'gedegradeerd', poort_reden: null }),
+      // G4/G5: by construction 0 — maar we tellen ze, zodat drift zichtbaar
+      // wordt in plaats van aangenomen.
+      rij({ kop_bron: 'model' }),
+      rij({ modeltekst: 'true' }),
+      rij({ duiding_status: 'afgewezen', duiding_fout: 'doelgroep:ongegrond:wonen', poort_status: null, kop_bron: null }),
+    ])
+    expect(w.poort.groen).toBe(3)
+    expect(w.poort.gedegradeerd).toBe(4)
+    expect(w.poort.perReden).toEqual({ 'g1:ongegrond-getal': 2, 'g2:datum': 1, onbekend: 1 })
+    expect(w.kopNietVanBron).toBe(1)
+    expect(w.metModeltekst).toBe(1)
+    // De andere helft van G6 wijst hard af en komt dus nooit langs de poort.
+    expect(w.afgewezenPerCode).toEqual({ 'doelgroep:ongegrond:wonen': 1 })
   })
 
   it('ontdubbelt op id (een rij die bij het pagineren op twee pagina\'s landt telt één keer)', () => {
@@ -246,5 +293,108 @@ describe('bouwDuidingMeting', () => {
     const [w] = bouwDuidingMeting([rij({ duiding_status: 'vrijgegeven' })])
     expect(w.binnen).toBe(1)
     expect(w.geduid + w.wacht + w.mislukt).toBe(0)
+  })
+})
+
+// ── G7: de handmatige steekproef ─────────────────────────────────────────────
+
+describe('steekproefBodySchema', () => {
+  it('accepteert een ISO-week met tellingen en weigert de rest', () => {
+    expect(steekproefBodySchema.safeParse({ week: '2026-W38', gecontroleerd: 20, fouten: 1 }).success).toBe(true)
+    expect(steekproefBodySchema.safeParse({ week: '2026-38', gecontroleerd: 20, fouten: 1 }).success).toBe(false)
+    expect(steekproefBodySchema.safeParse({ week: '2026-W38', gecontroleerd: 20, fouten: 1.5 }).success).toBe(false)
+    // strictObject: `op` zet de server zelf, dus de client mag hem niet meesturen.
+    expect(steekproefBodySchema.safeParse({ week: '2026-W38', gecontroleerd: 20, fouten: 1, op: 'nu' }).success).toBe(false)
+  })
+
+  it('weigert meer fouten dan gecontroleerde samenvattingen', () => {
+    expect(steekproefBodySchema.safeParse({ week: '2026-W38', gecontroleerd: 20, fouten: 21 }).success).toBe(false)
+  })
+})
+
+describe('leesSteekproefRegister — fail-closed', () => {
+  const regel = { gecontroleerd: 20, fouten: 0, op: '2026-09-21T10:00:00Z' }
+
+  it('leest een JSON-string én een al geparst object', () => {
+    expect(leesSteekproefRegister(JSON.stringify({ '2026-W38': regel }))).toEqual({ '2026-W38': regel })
+    expect(leesSteekproefRegister({ '2026-W38': regel })).toEqual({ '2026-W38': regel })
+  })
+
+  it('wat niet parst is leeg — nooit "gehaald" op een kapotte waarde', () => {
+    expect(leesSteekproefRegister(null)).toEqual({})
+    expect(leesSteekproefRegister('{kapot')).toEqual({})
+    expect(leesSteekproefRegister({ '2026-W38': { gecontroleerd: 'veel' } })).toEqual({})
+    expect(leesSteekproefRegister({ 'week 38': regel })).toEqual({})
+  })
+})
+
+describe('g7Gehaald — afgeleid, geen teller', () => {
+  const week = (gecontroleerd: number, fouten: number) => ({ gecontroleerd, fouten, op: '2026-09-21T10:00:00Z' })
+  const WEKEN = ['2026-W39', '2026-W38', '2026-W37']
+
+  it('twee aaneengesloten weken met hoogstens één fout per twintig', () => {
+    expect(g7Gehaald({ '2026-W39': week(20, 1), '2026-W38': week(20, 0) }, WEKEN)).toBe(true)
+    expect(g7Gehaald({ '2026-W38': week(20, 0), '2026-W37': week(25, 1) }, WEKEN)).toBe(true)
+  })
+
+  it('één week, een te kleine steekproef of een gat telt niet', () => {
+    expect(g7Gehaald({ '2026-W39': week(20, 0) }, WEKEN)).toBe(false)
+    expect(g7Gehaald({ '2026-W39': week(19, 0), '2026-W38': week(20, 0) }, WEKEN)).toBe(false)
+    expect(g7Gehaald({ '2026-W39': week(20, 2), '2026-W38': week(20, 0) }, WEKEN)).toBe(false)
+    // W39 en W37 zijn niet aaneengesloten in de getoonde reeks.
+    expect(g7Gehaald({ '2026-W39': week(20, 0), '2026-W37': week(20, 0) }, WEKEN)).toBe(false)
+    expect(g7Gehaald({}, WEKEN)).toBe(false)
+  })
+
+  it('de norm staat in constanten, niet in losse getallen', () => {
+    expect(STEEKPROEF_OMVANG).toBe(20)
+    expect(STEEKPROEF_MAX_FOUTEN).toBe(1)
+    expect(STEEKPROEF_WEKEN_OP_RIJ).toBe(2)
+    expect(steekproefWeekGehaald(undefined)).toBe(false)
+    expect(steekproefWeekGehaald(week(STEEKPROEF_OMVANG, STEEKPROEF_MAX_FOUTEN))).toBe(true)
+    expect(steekproefWeekGehaald(week(STEEKPROEF_OMVANG, STEEKPROEF_MAX_FOUTEN + 1))).toBe(false)
+  })
+})
+
+describe('poortweergave — labels en de G6-splitsing', () => {
+  it('vertaalt elke poortcode, en laat een onbekende code staan zoals hij is', () => {
+    expect(poortRedenLabel('g1:ongegrond-getal')).toMatch(/^G1 ·/)
+    expect(poortRedenLabel('g2:datum')).toMatch(/^G2 ·/)
+    expect(poortRedenLabel('g3:meta')).toMatch(/^G3 ·/)
+    expect(poortRedenLabel('g6:lexicon')).toMatch(/^G6 ·/)
+    // Fail-open op de WEERGAVE: een nieuwe controle mag nooit stil verdwijnen.
+    expect(poortRedenLabel('g9:nieuw')).toBe('g9:nieuw')
+  })
+
+  it('elke code die de poort kan schrijven heeft een label', () => {
+    for (const code of Object.values(POORT_CODE)) {
+      expect(POORT_REDEN_LABEL[code], code).toBeTruthy()
+    }
+  })
+
+  it('haalt de hard afgewezen G6-helft uit de foutcodes', () => {
+    expect(
+      doelgroepAfwijzingen({ schema: 3, 'doelgroep:ongegrond:wonen': 2, 'doelgroep:ongegrond:werk': 5, 'datum:deadline': 1 }),
+    ).toEqual([
+      ['doelgroep:ongegrond:werk', 5],
+      ['doelgroep:ongegrond:wonen', 2],
+    ])
+    expect(doelgroepAfwijzingen({ schema: 3 })).toEqual([])
+  })
+})
+
+describe('STEEKPROEF_VELD_UITLEG — de formulier-uitlegnorm', () => {
+  it('draagt voor elk veld een label, een effect en een waarom', () => {
+    for (const sleutel of ['week', 'gecontroleerd', 'fouten'] as const) {
+      const u = STEEKPROEF_VELD_UITLEG[sleutel]
+      expect(u.label.length, sleutel).toBeGreaterThan(0)
+      expect(u.effect.length, sleutel).toBeGreaterThan(20)
+      expect(u.waarom.length, sleutel).toBeGreaterThan(20)
+    }
+  })
+
+  it('noemt de grenzen uit de constanten, niet een los getal', () => {
+    expect(STEEKPROEF_VELD_UITLEG.gecontroleerd.effect).toContain(String(STEEKPROEF_OMVANG))
+    expect(STEEKPROEF_VELD_UITLEG.fouten.effect).toContain(String(STEEKPROEF_MAX_FOUTEN))
   })
 })

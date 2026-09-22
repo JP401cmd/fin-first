@@ -1,0 +1,58 @@
+{
+  "fixtureVersie": 1,
+  "geval": "41ed4267",
+  "klasse": "P1 — samenvatting niet gegrond in het eigen bronfragment (Krant 1F, regressiedata voor fase 2)",
+  "toelichting": "Vastgelegd vóór het wissen van news_articles (B29). De rij is read-only uit productie gelezen; de bron is opnieuw opgehaald met dezelfde User-Agent als de ingest. Modeltekst in \"rij\" (title, summary, raw_content, potential_impact, duiding) is nooit grondslag — alleen \"bron\" is dat.",
+  "fout": "De samenvatting schrijft de bijstelling van de MEV 2027 ten opzichte van de cMEV (0,2 / 0,1 procentpunt) toe aan de cMEV zelf.",
+  "grondslagA_hele_pagina": "door",
+  "grondslagB_eigen_fragment": "afgewezen",
+  "vangtHet": [
+    "G1"
+  ],
+  "rij": {
+    "id": "41ed4267-25ff-40fe-893c-1b727a3eab70",
+    "title": "cMEV 2027 gepubliceerd met conceptramingen",
+    "summary": "Op 14 augustus 2026 verscheen de Concept-Macro Economische Verkenning (cMEV) 2027 met de eerste economische ramingen voor 2027, voorafgaand aan de definitieve MEV.",
+    "source_url": "https://www.cpb.nl/ramingen#tf-q6eotl",
+    "source_name": "CPB — Ramingen",
+    "category": "macro",
+    "potential_impact": "Conceptramingen geven vroeg inzicht in verwachte economische ontwikkelingen 2027 → helpt bij FIRE-prognose en vermogenspadberekeningen voor komend jaar.",
+    "published_at": "2026-08-14 00:00:00+00",
+    "fetched_at": "2026-09-22 05:25:09.273+00",
+    "raw_content": "Op 14 augustus 2026 verscheen de Concept-Macro Economische Verkenning (cMEV) 2027 met de eerste economische ramingen voor 2027, voorafgaand aan de definitieve MEV.",
+    "duiding_status": "geduid",
+    "duiding_fout": null,
+    "duiding_versie": 1,
+    "duiding": {
+      "meta": {
+        "model": "claude-sonnet-4-5-20250929",
+        "tekens": 5558,
+        "brontekst": "volledig"
+      },
+      "grond": {},
+      "soort": "achtergrond",
+      "versie": 1,
+      "deadline": null,
+      "doelgroep": [],
+      "mechanisme": null,
+      "ingangsdatum": null,
+      "samenvatting": "Het CPB heeft de conceptramingen voor 2027 gepubliceerd in de cMEV 2027. De koopkracht van huishoudens komt in 2027 naar verwachting 0,2 procentpunt hoger uit door maatregelen in de miljoenennota. Het overheidssaldo komt 0,1 procentpunt lager uit dan eerder verwacht."
+    }
+  },
+  "bron": {
+    "paginaUrl": "https://www.cpb.nl/ramingen",
+    "detailUrl": "https://www.cpb.nl/raming/concept-macro-economische-verkenning-cmev-2027",
+    "detailUrlAlsHrefOpPagina": true,
+    "opgehaaldOp": "2026-09-22T16:06:33Z",
+    "userAgent": "TriFinity/1.0 NewsAggregator",
+    "httpStatus": 200,
+    "htmlSha256": "309ca287a5d2071d100c6f5d50235759fb90bfe0711c23a5a1139226a2bf6d20",
+    "htmlBytes": 96017,
+    "paginaTekstMethode": "HTML zonder script/style/noscript/template/commentaar, tags weg, entiteiten gedecodeerd, witruimte samengevoegd",
+    "paginaTekstSha256": "e3ab52397c80cd16794da96c752d69751c305d8c346a2ff28e139785d5d18104",
+    "fragment": "14 augustus 2026 Concept-Macro Economische Verkenning (cMEV) 2027",
+    "fragmentSha256": "8ca09dfa83bbb13915bd3277d83a14b82574a4afb7bb466237f1cbbf7e3dc2f4",
+    "paginaTekst": "Ramingen | CPB Website Overslaan en naar de inhoud gaan CPB | English Menu Sluiten CPB | Economische beleidsanalyse Centraal Planbureau A A A Contact English Home Ramingen Publicaties + Thema's Thema's Arbeid Belastingen Brede welvaart Data science team Gebouwde omgeving Internationale analyse Kennis en Innovatie Klimaat en Milieu Langetermijnverkenning Macro-economie Modelkwaliteit Overheidsfinanciën Risico en regulering Verkiezingen Zorg Agenda + Kennis & context Kennis & context Columns, artikelen en lezingen Columns Video's & Podcasts In de media CPB lectures Meer over modellen Modellen op het CPB Zelf rekenen met Saffier 3.0 Achtergrondinformatie Ramingen FAQ Interactieve dialoog over ongelijkheid Koopkracht FAQ Historische collectie Zelf rekenen met CPB-model Saffier De Nederlandse economie in historisch perspectief Verkiezingen + Over ons Over ons Wat doet het CPB? Over het CPB Geschiedenis van het CPB Publicatiekalender De mensen bij het CPB Onze medewerkers Met wie werkt het CPB samen? Werken bij het CPB Vacatures Vragen of toelichting nodig? Contact Veelgestelde vragen Woo verzoeken & wetenschappelijke integriteit Voor de pers Zoekterm Home Ramingen Publicaties Thema's Agenda Kennis & context Over ons Voor de pers Menu Sluiten Waar bent u naar op zoek? Zoekterm Sluiten CPB | Economische beleidsanalyse Sluiten Home Ramingen Publicaties + Thema's Arbeid Belastingen Brede welvaart Data science team Gebouwde omgeving Internationale analyse Kennis en Innovatie Klimaat en Milieu Langetermijnverkenning Macro-economie Modelkwaliteit Overheidsfinanciën Risico en regulering Verkiezingen Zorg Agenda + Kennis & context Columns, artikelen en lezingen Columns Video's & Podcasts In de media CPB lectures Meer over modellen Modellen op het CPB Zelf rekenen met Saffier 3.0 Achtergrondinformatie Ramingen FAQ Interactieve dialoog over ongelijkheid Koopkracht FAQ Historische collectie Zelf rekenen met CPB-model Saffier De Nederlandse economie in historisch perspectief Verkiezingen + Over ons Wat doet het CPB? Over het CPB Geschiedenis van het CPB Publicatiekalender De mensen bij het CPB Onze medewerkers Met wie werkt het CPB samen? Werken bij het CPB Vacatures Vragen of toelichting nodig? Contact Veelgestelde vragen Woo verzoeken & wetenschappelijke integriteit Voor de pers Over het CPB Contact Laatste raming Raming september 2026 (MEV 2027) De koopkracht van huishoudens komt in 2027 0,2%-punt hoger uit dan in de cMEV door de maatregelen in de miljoenennota. Het overheidssaldo komt juist 0,1%-punt lager uit dan in de cMEV werd verwacht. Kenmerken van de primaire download Beschrijving File type Bestandsgrootte Download link Macro Economische Verkenning 2027 Pdf 1.15 MB ⇣ Lees volledige publicatie Container paragraphs Wat zijn Ramingen? Een raming is een projectie van de economie. Het CPB maakt ieder jaar drie ramingen: het Centraal Economisch Plan (CEP), de Concept-Macro Economische Verkenning (cMEV) en de Macro Economische Verkenning (MEV). Hoe gaat het maken van ramignen in zijn werk? En hoe wordt het verhaal achter de cijfers geduid? Dat leggen wij uit in deze video. Veelgestelde vragen over ramingen Voorgaande ramingen 14 augustus 2026 Concept-Macro Economische Verkenning (cMEV) 2027 12 maart 2026 Centraal Economisch Plan (CEP) 2026 12 maart 2026 Actualisatie Verkenning middellange termijn tot en met 2034 (maart 2026) 16 september 2025 Raming september 2025 (MEV 2026) 10 juli 2025 Concept-Macro Economische Verkenning 2026 10 juli 2025 Actualisatie Verkenning middellange termijn tot en met 2030 (juli 2025) 26 februari 2025 Actualisatie Verkenning middellange termijn tot en met 2033 (februari 2025) 26 februari 2025 Raming februari 2025 (CEP 2025) Abonneer je op CPB-nieuwsberichten via e-mail. Je gegevens worden alleen gebruikt voor de geselecteerde lijst(en). Abonneren op nieuwsbrieven Home Ramingen Publicaties Thema's Agenda Kennis & context Over ons Voor de pers Publicaties Wereldhandelsmonitor Laatste raming CEP MEV Alle Publicaties Thema's Arbeid Internationale analyse Belastingen Brede welvaart Data science Gebouwde omgeving Alle Thema's Andere Contact Woo-verzoeken & wetenschappelijke integriteit Kwetsbaarheid melden (CVD) Sitemap CPB | Economische beleidsanalyse © 2026 Centraal Planbureau (CPB), alle rechten voorbehouden | Cookies | Copyright | Privacy Statement | Toegankelijkheid"
+  },
+  "kruiscontrole": "Fragment ook aanwezig in de ~6 kB-paginakopie van de onderzoekssessie (22 sep ~14:40 UTC); geen inhoudelijke wijziging van dit fragment tussen beide ophaalmomenten vastgesteld."
+}

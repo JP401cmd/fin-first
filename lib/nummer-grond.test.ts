@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import {
+  datumTokens,
   isNumericGrounded,
   normalizeNumericToken,
   numericUnitPairs,
   numericValueSet,
+  zonderDatums,
 } from './nummer-grond'
 import * as guard from './ai/local/local-news-guard'
 
@@ -68,11 +70,72 @@ describe('isNumericGrounded — eenheidsbewust', () => {
   })
 })
 
+describe('isNumericGrounded — kaalStreng (opt-in, 1F fase 2)', () => {
+  const grondslag = numericValueSet('Het tarief is 36 procent en het bedrag is €450.')
+
+  it('zonder de vlag gront een kale claim óók op een € of % uit de bron (ongewijzigd gedrag)', () => {
+    expect(isNumericGrounded(grondslag, '36', 'bare')).toBe(true)
+    expect(isNumericGrounded(grondslag, '450', 'bare')).toBe(true)
+    expect(isNumericGrounded(grondslag, '36', 'bare', {})).toBe(true)
+  })
+
+  it('mét de vlag steunt een kale claim alleen op een kaal brongetal', () => {
+    expect(isNumericGrounded(grondslag, '36', 'bare', { kaalStreng: true })).toBe(false)
+    expect(isNumericGrounded(grondslag, '450', 'bare', { kaalStreng: true })).toBe(false)
+    const metJaartal = numericValueSet('In 2027 verandert de regel; 12 gemeenten doen mee.')
+    expect(isNumericGrounded(metJaartal, '2027', 'bare', { kaalStreng: true })).toBe(true)
+    expect(isNumericGrounded(metJaartal, '12', 'bare', { kaalStreng: true })).toBe(true)
+  })
+
+  it('de vlag verandert niets aan een claim MÉT eenheid', () => {
+    for (const streng of [false, true]) {
+      expect(isNumericGrounded(grondslag, '36', 'pct', { kaalStreng: streng })).toBe(true)
+      expect(isNumericGrounded(grondslag, '36', 'eur', { kaalStreng: streng })).toBe(false)
+      expect(isNumericGrounded(grondslag, '450', 'eur', { kaalStreng: streng })).toBe(true)
+    }
+  })
+})
+
+describe('datumTokens', () => {
+  it('herkent de vier schrijfwijzen en normaliseert naar ISO', () => {
+    const t = datumTokens('Per 2026-01-01, uiterlijk 4-9-2026, ingang 01-01-2026 en op 1 januari 2026.')
+    expect(t.map((d) => d.iso)).toEqual(['2026-01-01', '2026-09-04', '2026-01-01', '2026-01-01'])
+    expect(t.map((d) => d.tekst)).toEqual(['2026-01-01', '4-9-2026', '01-01-2026', '1 januari 2026'])
+  })
+
+  it('een onmogelijke datum is geen datum', () => {
+    expect(datumTokens('op 31-02-2026 en 2026-13-01')).toEqual([])
+  })
+
+  it('markeert een datum naast een publicatiewerkwoord', () => {
+    const [d] = datumTokens('Het kabinet heeft op 1 januari 2026 het pakket Belastingplan 2026 gepubliceerd.')
+    expect(d.bijPublicatie).toBe(true)
+    const [e] = datumTokens('De regeling gaat op 1 januari 2026 in en geldt voor iedereen met een huurwoning.')
+    expect(e.bijPublicatie).toBe(false)
+  })
+
+  it('zonderDatums laat de overige getallen op hun plek staan', () => {
+    const zonder = zonderDatums('Op 1 januari 2026 gaat het tarief naar 36 procent.')
+    expect(zonder).not.toMatch(/januari/)
+    expect(zonder).toHaveLength('Op 1 januari 2026 gaat het tarief naar 36 procent.'.length)
+    expect(numericUnitPairs(zonder)).toEqual([{ value: '36', unit: 'pct' }])
+  })
+})
+
 describe('re-export vanuit local-news-guard (B10: lokale pad ongebroken)', () => {
   it('exporteert dezelfde functies, niet een kopie', () => {
     expect(guard.normalizeNumericToken).toBe(normalizeNumericToken)
     expect(guard.numericUnitPairs).toBe(numericUnitPairs)
     expect(guard.numericValueSet).toBe(numericValueSet)
     expect(typeof guard.guardPersonalImpact).toBe('function')
+  })
+
+  it('guardPersonalImpact draagt het losse (niet-strenge) gedrag ongewijzigd door', () => {
+    // De lokale guard geeft géén opties mee: een kale claim mag op een
+    // €-bron steunen, precies zoals vóór 1F fase 2.
+    expect(guard.guardPersonalImpact('Dat scheelt 450 per maand.', ['Je betaalt €450 per maand.'])).toBe(
+      'Dat scheelt 450 per maand.',
+    )
+    expect(guard.guardPersonalImpact('Dat scheelt 451 per maand.', ['Je betaalt €450 per maand.'])).toBeNull()
   })
 })

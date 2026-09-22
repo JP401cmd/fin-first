@@ -16,6 +16,10 @@
  * oppervlak náást het bestaande WF-BEHEER-02 (AI-configuratie) en
  * WF-BEHEER-04 (AI-verbruik/KPI's). 39 (Gebruik per waardestroom, ADR 0153)
  * voegde de geanonimiseerde, k-anonieme gebruiksanalyse op /beheer/gebruik toe.
+ * 40 (Tekstpoort meten + steekproef, ADR 0176 / Krant 1F fase 2) splitst het
+ * meet- en registratiedeel van /beheer/nieuws af van WF-BEHEER-13: dat laatste
+ * blijft bronbeheer/ingest/moderatie, 40 toetst de meting van G1–G5 uit de
+ * artikelrijen en de handmatige G7-steekproef met haar auditregel.
  *
  * KERN-BEVINDING (bepaalt exact/consistency/oracle/ui-only): BEHEER is
  * admin-tooling achter superadmin-gating — de motoren wonen elders (Kern/
@@ -24,7 +28,7 @@
  * geforceerd (0 exact-criteria, lege BEHEER_ENGINE_CHECKS). De verdeling:
  *
  *  - 0  'exact'       — BEHEER heeft geen eigen hand-narekenbare rekenformule.
- *  - 15 'consistency' — een getoond getal komt aantoonbaar ergens anders vandaan
+ *  - 16 'consistency' — een getoond getal komt aantoonbaar ergens anders vandaan
  *                        (A=B): AI-credit-/token-/KPI-aggregaten = som van de
  *                        usage-/DB-rijen (03/04), gebruiksprofiel-tellingen =
  *                        de rijen van de doelgebruiker (08), AOW-tabel =
@@ -41,7 +45,9 @@
  *                        computeMigrationDrift() (36), AI-gezondheid = dezelfde
  *                        ai_token_usage-/error_logs-afleiding (38),
  *                        gebruiksanalyse-tellingen = de k-onderdrukte
- *                        database-aggregatie (39).
+ *                        database-aggregatie (39), duiding-meting = een telling
+ *                        over dezelfde artikelrijen + een afleiding uit het
+ *                        steekproefregister (40).
  *  - 2  'oracle'      — een zware-rekenmotor-uitkomst die NIET met de hand na te
  *                        rekenen is (de horizon-kernel). types.ts noemt precies
  *                        déze twee beheer-UI's als de oracle-UI: de
@@ -256,15 +262,15 @@ const criteria: AcceptanceCriterion[] = [
     scenarioId: 'UAT-BEHEER-13',
     titel: 'Nieuwsbronnen beheren, ingest draaien en artikelen modereren',
     kriticiteit: 'BELANGRIJK',
-    given: '/beheer/nieuws (web-/RSS-bronnen, ingest-status, het paneel Meting duiding, de artikelendatabase met duidingsstatus, en onderaan het alleen-lezen venster Feedback op nieuwsitems).',
+    given: '/beheer/nieuws (één bronnenlijst met per bron een vaste soort — RSS-feed, Web-lijstpagina of Web-themapagina — en de oorzaak uit de laatste run, ingest-status, het paneel Meting duiding, de artikelendatabase met duidingsstatus, en onderaan het alleen-lezen venster Feedback op nieuwsitems).',
     when:
-      'De beheerder bewerkt bronnen (URL/label toevoegen/verwijderen), draait een ingest-ronde (POST), bekijkt de bron-gezondheid, doorzoekt/filtert/verwijdert artikelen, klapt een geduid artikel open en trekt de duiding terug met een reden, of zet een afgewezen/mislukt artikel met Opnieuw duiden terug in de wachtrij.',
+      'De beheerder bewerkt bronnen (label/URL/soort toevoegen, wijzigen, verwijderen en opslaan), draait een ingest-ronde (POST), bekijkt de bron-gezondheid, doorzoekt/filtert/verwijdert artikelen, klapt een geduid artikel open en trekt de duiding terug met een reden, of zet een afgewezen/mislukt artikel met Opnieuw duiden terug in de wachtrij. De meting van de tekstpoort en de wekelijkse steekproef staan op hetzelfde scherm maar zijn een eigen workflow: WF-BEHEER-40.',
     then:
-      'Bronnen opgeslagen (of Reset naar DEFAULT_WEB_SOURCES/DEFAULT_RSS_FEEDS); de ingest ververst de artikelen met zichtbaar resultaat (gecontroleerd/gevonden/geëxtraheerd/duplicaten/ingevoegd); dit bepaalt de Krant/nieuws-inhoud. Geen eigen berekening. De sectie Feedback op nieuwsitems (ADR 0113) is BEWUST alleen-lezen: minder/meer per categorie, aantal lezers, en per lezer de demotiestand (vanaf 2x "minder" in 90 dagen). Er hóórt daar geen status- of afvinkknop te staan — verschijnt die wel, dan is dat een bevinding. Bij een lege tabel toont hij een eerlijke lege staat, geen nul-rijen-inbox. Duiding (ADR 0171): uitgeklapt staat per getal het letterlijke grond-citaat naast de waarde; Terugtrekken vraagt een bevestiging met reden (bij Anders een toelichting), zet de status op Teruggetrokken en is niet met een knop terug te draaien; het paneel Meting duiding toont per week binnen/geduid/dekking/teruggetrokken/fout getal (rekenend). De artikellijst pagineert met Meer laden (120 dagen bewaren, geen grens van 100).',
+      'Bronnen opgeslagen (of Reset naar DEFAULT_WEB_SOURCES/DEFAULT_RSS_FEEDS). Het schrijfpad is `PUT /api/admin/news-sources` met zod + de gedeelde error-envelope (ADR 0044/0176): een bron zonder label, een adres dat niet https is, een IP-literal, localhost/.local/.internal, een eigen poort of inloggegevens in de URL wordt geweigerd met een 400 en een leesbare reden (`bronUrlBezwaar`, dezelfde toets als elke fetch-hop — het schrijfpad is dus geen SSRF-ingang), en er wordt dan NIETS opgeslagen; de rij die het opslaan tegenhield is in het formulier gemarkeerd. Elke bron draagt sinds ADR 0176 een vaste soort (RSS-feed · Web-lijstpagina · Web-themapagina) die bepaalt wat de ingest als één artikel ziet; een opgeslagen webbron van vóór ADR 0176 zonder soort leest terug als Web-themapagina (dezelfde standaard als de ingest), zodat het scherm toont wat er werkelijk draait. De ingest ververst de artikelen met een eerlijke telling: nieuw · al bekend · dubbel · (niet geschreven) · uitgesteld naar de volgende run — "uitgesteld" is geen fout maar het restant buiten het categorisatie-tijdbudget, dat de volgende run gewoon wordt opgepakt. Per bron toont de gezondheid de oorzaak uit de laatste run (levert / leeg / HTTP-fout 404 / domein bestaat niet / doorverwezen / adres geweigerd), het aantal gevonden items, hoeveel daarvan nieuw waren, en "gedraaid als …" wanneer de laatste run een andere soort gebruikte dan nu is ingesteld. Kop, datum en bronfragment komen ALTIJD van de bron, nooit van het model; de sleutel is server-bepaald, dus een tweede run op ongewijzigde bronnen geeft 0 nieuw (ADR 0176). BELANGRIJK voor de tester bij de eerste run ná de 1F-release: de artikelen van vóór ADR 0176 (rijen zonder bron_soort) zijn eenmalig gewist (migratie 20260922161000, besluit B29) — een lege of korte artikellijst vlak na de release is het verwachte gedrag, geen storing; de lijst vult zich met de eerste nieuwe ingest. Dit bepaalt de Krant/nieuws-inhoud. Geen eigen berekening. De sectie Feedback op nieuwsitems (ADR 0113) is BEWUST alleen-lezen: minder/meer per categorie, aantal lezers, en per lezer de demotiestand (vanaf 2x "minder" in 90 dagen). Er hóórt daar geen status- of afvinkknop te staan — verschijnt die wel, dan is dat een bevinding. Bij een lege tabel toont hij een eerlijke lege staat, geen nul-rijen-inbox. Duiding (ADR 0171): uitgeklapt staat per getal het letterlijke grond-citaat naast de waarde; Terugtrekken vraagt een bevestiging met reden (bij Anders een toelichting), zet de status op Teruggetrokken en is niet met een knop terug te draaien. BELANGRIJK voor de tester: een geduid artikel ZONDER samenvatting is sinds 1F fase 2 een GELDIGE uitkomst, geen storing — de tekstpoort houdt dan een ongegronde bewering tegen en de lezer krijgt de bronkop met de link (ADR 0176, B26/B27). Het paneel Meting duiding en het formulier Steekproef vastleggen (G7) staan op ditzelfde scherm; die worden in WF-BEHEER-40 getoetst. De artikellijst pagineert met Meer laden (120 dagen bewaren, geen grens van 100).',
     assertion: {
       kind: 'ui-only',
       source:
-        'app/(app)/beheer/nieuws/page.tsx + lib/news-sources.ts + components/app/beheer/news-feedback-panel.tsx (lib/news-feedback-summary.ts) + components/app/beheer/news-duiding-detail.tsx + components/app/beheer/news-duiding-meting-panel.tsx (lib/krant/duiding-beheer.ts); API /api/admin/news-ingest, /api/admin/news-articles, /api/admin/news-feedback en /api/admin/news-duiding/{terugtrekken,opnieuw,meting} — bronbeheer/ingest/moderatie, duiding nalopen en terugtrekken, alleen-lezen feedbackvenster; de meting telt artikelen (geen bedrag)',
+        'app/(app)/beheer/nieuws/page.tsx + lib/news-sources.ts + lib/news-ingest.ts + lib/safe-url.ts (bronUrlBezwaar/isVeiligeBronUrl) + app/api/admin/news-sources/route.ts (GET/PUT/DELETE, zod + error-envelope) + components/app/beheer/news-feedback-panel.tsx (lib/news-feedback-summary.ts) + components/app/beheer/news-duiding-detail.tsx; API /api/admin/news-ingest, /api/admin/news-articles, /api/admin/news-feedback en /api/admin/news-duiding/{terugtrekken,opnieuw} — bronbeheer (soort, adres-toets, gezondheid), ingest met eerlijke telling, moderatie en duiding terugtrekken; alleen-lezen feedbackvenster; tellingen van artikelen, geen bedrag',
     },
   },
   {
@@ -684,6 +690,23 @@ const criteria: AcceptanceCriterion[] = [
       kind: 'consistency',
       source:
         'app/(app)/beheer/gebruik/page.tsx (superadmin-redirect) + lib/beheer/gebruik-analyse/loader.ts#laadGebruikAnalyse/naarViewModel (RPC admin_gebruik_analyse, GebruikAnalyseRuwSchema) + lib/beheer/gebruik-analyse/onderdrukking.ts (GEBRUIK_K=5, onderdrukCel/onderdrukVerdeling) + lib/beheer/gebruik-analyse/doorstroom.ts (naarSankey, RPC admin_gebruik_doorstroom) — getoonde tellingen = k-onderdrukte database-aggregatie (A=B), geen losse berekening; afwezigheid van gebruikers-id/e-mail/datum bewaakt door lib/beheer/geen-inhoud.test.ts (docs/adr/0153-gebruik-per-waardestroom-geteld-met-k-anonimiteit.md)',
+    },
+  },
+  {
+    workflow: 'WF-BEHEER-40',
+    scenarioId: 'UAT-BEHEER-40',
+    titel: 'Tekstpoort van de duiding meten (G1–G5) en de wekelijkse steekproef (G7) vastleggen',
+    kriticiteit: 'BELANGRIJK',
+    given:
+      'Het paneel Meting duiding op /beheer/nieuws (standaard 8 weken, ten hoogste 17), gevoed door GET /api/admin/news-duiding/meting; daaronder het formulier Steekproef vastleggen (G7), dat schrijft via POST /api/admin/news-duiding/steekproef. Nieuw in 1F fase 2 (ADR 0176): G1–G6 zijn controles die de code zelf draait en dus MEETBAAR zijn uit de rijen; G7 is een menselijk oordeel en daarom invoer.',
+    when:
+      'De beheerder leest de weektabel, klapt een week open voor de details, en legt daarna voor een week vast hoeveel vrijgegeven samenvattingen hij heeft nagelezen en hoeveel daarvan niet door de beugel konden (ook een tweede keer voor dezelfde week — de correctie).',
+    then:
+      'Elke week toont binnen · geduid · dekking · rekenend · Poort (gedegradeerd van het totaal) · teruggetrokken · fout getal · afgewezen · wacht/mislukt · G7 (fout/nagelezen). Die cijfers zijn een telling over de artikelrijen (`bouwDuidingMeting`), geen bewaarde stand — dezelfde week twee keer laden geeft hetzelfde getal, en een teller wordt nergens opgehoogd. In de weekdetails staat de reden per poortcode (G1 ongegrond getal/verwijzing · G2 datum · G3 meta-commentaar · G6 lexicon), plus de `doelgroep:ongegrond:*`-afwijzingen die bij G6 horen maar hard afwijzen en dus nooit langs de poort komen; een onbekende code wordt letterlijk getoond, nooit stil vertaald. Het blok Herkomst van de grondslag toont G5 (eigen bronfragment versus alleen de bronkop) en telt G4 (kop niet van de bron) en modeltekst-als-grondslag: die twee horen 0 te zijn — staat er iets anders dan 0, dan is dat een bevinding die niet zonder schemawijziging kan ontstaan. Boven de tabel staan twee poortstand-regels die hetzelfde oordeel in woorden geven: "G4 · G5" is gehaald bij precies 0 drift, en "G7" is gehaald bij ten hoogste 1 fout per 20 nagelezen samenvattingen, 2 weken op rij (`STEEKPROEF_MAX_FOUTEN` / `STEEKPROEF_OMVANG` / `STEEKPROEF_WEKEN_OP_RIJ`) — afgeleid uit het register met `g7Gehaald`, dus opnieuw geen bewaarde stand. Een leesfout op het register is fail-closed: G7 staat dan op "nog niet gehaald", niet stil op groen. Het formulier draagt bij elk veld keuze · effect · waarom (`STEEKPROEF_VELD_UITLEG`); een week met minder dan 20 nagelezen MAG worden vastgelegd en telt alleen niet mee voor de poort (geen 400) — méér fouten dan nagelezen wordt wél geweigerd. Een tweede registratie van dezelfde week overschrijft die week en laat andere weken staan; elke schrijving landt met de vorige telling ernaast in het auditlogboek (`nieuws.duiding.steekproef`), zodat een gefaalde week niet spoorloos op "gehaald" te zetten is. ADR 0146 blijft gerespecteerd: het paneel leest tellingen en statuscodes, geen samenvattingen, geen params en geen modeltekst; het register in `app_settings` bewaart alleen tellingen (bewust géén `door`-veld — wie het vastlegde staat in het auditlogboek). Niet-superadmin krijgt 403; niet ingelogd 401.',
+    assertion: {
+      kind: 'consistency',
+      source:
+        'components/app/beheer/news-duiding-meting-panel.tsx + lib/krant/duiding-beheer.ts#bouwDuidingMeting + g7Gehaald + steekproefWeekGehaald + leesSteekproefRegister + METING_KOLOMMEN + app/api/admin/news-duiding/meting/route.ts + app/api/admin/news-duiding/steekproef/route.ts (zod steekproefBodySchema, logAdminAction) — de getoonde weekcijfers zijn een telling over dezelfde artikelrijen (A=B) en het poortoordeel is een afleiding uit het steekproefregister; geen hand-narekenbaar bedrag, geen bewaarde teller (docs/adr/0176-wat-is-een-artikel.md)',
     },
   },
 ]

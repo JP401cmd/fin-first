@@ -1,5 +1,5 @@
 {
-  "matcherVersie": 1,
+  "matcherVersie": 2,
   "sjabloonVersie": 1,
   "profielType": "onder-35·wonen-onbekend·alleen",
   "items": [
@@ -85,6 +85,15 @@
     "label": "Niet op jouw situatie afgestemd.",
     "items": [
       {
+        "artikelId": "a03-aow-leeftijd",
+        "titel": "AOW-leeftijd in 2033 drie maanden omhoog",
+        "rubriek": "pensioen",
+        "bron": "Voorbeeldbron",
+        "url": "https://voorbeeld.nl/a03-aow-leeftijd",
+        "gepubliceerd": "2026-09-19T05:10:00Z",
+        "samenvatting": "De AOW-leeftijd stijgt in 2033 met drie maanden. Dat volgt uit de nieuwe levensverwachting."
+      },
+      {
         "artikelId": "a01-box3-heffingsvrij",
         "titel": "Heffingsvrij vermogen box 3 naar 60.000 euro in 2027",
         "rubriek": "fiscaal",
@@ -94,13 +103,13 @@
         "samenvatting": "Het heffingsvrij vermogen in box 3 gaat in 2027 naar 60.000 euro. Het tarief blijft 36 procent."
       },
       {
-        "artikelId": "a03-aow-leeftijd",
-        "titel": "AOW-leeftijd in 2033 drie maanden omhoog",
-        "rubriek": "pensioen",
+        "artikelId": "a09-huurverhoging",
+        "titel": "Maximale huurverhoging vrije sector 2027 vastgesteld",
+        "rubriek": "woningmarkt",
         "bron": "Voorbeeldbron",
-        "url": "https://voorbeeld.nl/a03-aow-leeftijd",
+        "url": "https://voorbeeld.nl/a09-huurverhoging",
         "gepubliceerd": "2026-09-19T05:10:00Z",
-        "samenvatting": "De AOW-leeftijd stijgt in 2033 met drie maanden. Dat volgt uit de nieuwe levensverwachting."
+        "samenvatting": "De maximale huurverhoging in de vrije sector is voor 2027 vastgesteld op 4,1 procent."
       },
       {
         "artikelId": "a04-studieschuld-rente",
@@ -112,22 +121,13 @@
         "samenvatting": "De rente op studieschulden wordt in 2027 vastgesteld op 3 procent. Dat geldt voor wie dan een nieuwe rentevaste periode ingaat."
       },
       {
-        "artikelId": "a06-spaarrente",
-        "titel": "Spaarrentes dalen na rentebesluit ECB",
-        "rubriek": "rente",
+        "artikelId": "a11-inflatie",
+        "titel": "Inflatie in augustus 2,6 procent",
+        "rubriek": "macro",
         "bron": "Voorbeeldbron",
-        "url": "https://voorbeeld.nl/a06-spaarrente",
+        "url": "https://voorbeeld.nl/a11-inflatie",
         "gepubliceerd": "2026-09-19T05:10:00Z",
-        "samenvatting": "Na het rentebesluit van de ECB verlagen banken de spaarrente met 0,25 procentpunt. Niet elke bank volgt."
-      },
-      {
-        "artikelId": "a07-hypotheekrente",
-        "titel": "Hypotheekrente stijgt licht",
-        "rubriek": "woningmarkt",
-        "bron": "Voorbeeldbron",
-        "url": "https://voorbeeld.nl/a07-hypotheekrente",
-        "gepubliceerd": "2026-09-19T05:10:00Z",
-        "samenvatting": "De gemiddelde hypotheekrente voor tien jaar vast steeg naar 4,1 procent. Het verschil met vorige maand is 0,1 procentpunt."
+        "samenvatting": "De inflatie kwam in augustus uit op 2,6 procent. Vooral de huren en energie stegen."
       }
     ]
   },

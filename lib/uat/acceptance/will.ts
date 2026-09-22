@@ -280,11 +280,11 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'BELANGRIJK',
     given: 'Gebruiker zonder eerdere edities (hoogste bestaand edition_nr = 0/geen); huidig kalenderjaar 2026.',
     when: 'De gebruiker opent /nieuws voor het eerst.',
-    then: 'Editienummer = 0 + 1 = 1; jaargang = 2026 − 2025 = 1. Colofon "N artikelen"/"M bronartikelen" zijn directe lengtes van de editie resp. het getoetste bronmateriaal (geen aparte formule). De artikeltekst zelf is AI-inhoud, niet deterministisch toetsbaar.',
+    then: 'Editienummer = 0 + 1 = 1; jaargang = 2026 − 2025 = 1. Colofon "N artikelen"/"M bronartikelen" zijn directe lengtes van de editie resp. het getoetste bronmateriaal (geen aparte formule). De artikeltekst zelf is AI-inhoud, niet deterministisch toetsbaar. BRONLINK PER 1F FASE 2 (ADR 0176): de "Bron"-link achter de datum verschijnt alléén wanneer de bron-URL een geldige http(s)-URL is (`safeHttpUrl`); een `javascript:`/`data:`-adres of onleesbare rommel uit een externe bron levert géén link — alleen de datum blijft staan, en er komt nooit een klikbaar niet-http-adres in de editie. Een artikel zonder "Bron"-link is dus een geldige uitkomst, geen storing.',
     assertion: {
       kind: 'exact',
       expected: 'editionNr=1; jaargang=1',
-      source: 'app/api/news/route.ts#getNextEditionNr + jaargang-formule (r136-145, r172-173, gemirrord) — zie will-checks.ts',
+      source: 'app/api/news/route.ts#getNextEditionNr + jaargang-formule (r136-145, r172-173, gemirrord) — zie will-checks.ts; de bronlink-toets zit in components/berichten/news-components.tsx (HeroNewsArticle/NewsArticle) via lib/safe-url.ts#safeHttpUrl — een render-grens, geen cijfer',
     },
   },
   {

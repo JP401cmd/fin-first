@@ -566,6 +566,7 @@ export const UAT_SCENARIOS: UatScenario[] = [
   { id: 'UAT-BEHEER-37', wf: 'WF-BEHEER-37', zone: 'BEHEER', band: 'randvoorwaarden', naam: 'Kennisbank-items beheren + lokale prompt-parity-status raadplegen', kriticiteit: 'OVERIG', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'c'], volgorde: 37, duurMin: 7 },
   { id: 'UAT-BEHEER-38', wf: 'WF-BEHEER-38', zone: 'BEHEER', band: 'randvoorwaarden', naam: 'AI-gezondheid (storing/hapering) zichtbaar op /beheer en /beheer/ai', kriticiteit: 'BELANGRIJK', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'b'], volgorde: 38, duurMin: 6 },
   { id: 'UAT-BEHEER-39', wf: 'WF-BEHEER-39', zone: 'BEHEER', band: 'randvoorwaarden', naam: 'Gebruik per waardestroom bekijken — geanonimiseerd, k-anoniem (ADR 0153)', kriticiteit: 'BELANGRIJK', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'c'], volgorde: 39, duurMin: 8 },
+  { id: 'UAT-BEHEER-40', wf: 'WF-BEHEER-40', zone: 'BEHEER', band: 'randvoorwaarden', naam: 'Tekstpoort van de duiding meten (G1–G5) en de wekelijkse steekproef (G7) vastleggen', kriticiteit: 'BELANGRIJK', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'b'], volgorde: 40, duurMin: 8 },
 ]
 
 /** Alle scenario-ID's die tot de canonieke rooktest (§2.6) behoren. */

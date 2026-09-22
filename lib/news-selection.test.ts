@@ -3,7 +3,6 @@ import {
   selectSourceArticles,
   filterGroundedItems,
   dedupeSimilarTitles,
-  ensureUniqueArticleUrl,
   normalizeUrl,
   type SelectableArticle,
 } from './news-selection'
@@ -126,30 +125,6 @@ describe('dedupeSimilarTitles', () => {
       { title: 'Hypotheekrente stijgt naar hoogste punt sinds 2024' },
     ])
     expect(kept).toHaveLength(2)
-  })
-})
-
-describe('ensureUniqueArticleUrl', () => {
-  it('laat een echte item-URL ongemoeid', () => {
-    const url = ensureUniqueArticleUrl(
-      'https://dnb.nl/nieuws/artikel-x',
-      'https://dnb.nl/nieuws/',
-      'Titel',
-    )
-    expect(url).toBe('https://dnb.nl/nieuws/artikel-x')
-  })
-
-  it('maakt een paginale URL uniek met een titel-hash-fragment', () => {
-    const a = ensureUniqueArticleUrl('https://dnb.nl/nieuws/', 'https://dnb.nl/nieuws/', 'Titel A')
-    const b = ensureUniqueArticleUrl('https://dnb.nl/nieuws/', 'https://dnb.nl/nieuws/', 'Titel B')
-    expect(a).not.toBe(b)
-    expect(a.startsWith('https://dnb.nl/nieuws/#tf-')).toBe(true)
-  })
-
-  it('is stabiel voor dezelfde titel (idempotente upsert-dedupe)', () => {
-    const a1 = ensureUniqueArticleUrl('https://x.nl/p', 'https://x.nl/p', 'Zelfde titel')
-    const a2 = ensureUniqueArticleUrl('https://x.nl/p', 'https://x.nl/p', 'Zelfde titel')
-    expect(a1).toBe(a2)
   })
 })
 

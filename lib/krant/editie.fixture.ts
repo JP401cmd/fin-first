@@ -14,7 +14,7 @@
 // De AOW-rijen zijn de seed uit supabase/migrations/20260315000001_create_aow_leeftijd.sql.
 
 import type { AowLeeftijdRow } from '@/lib/aow-leeftijd'
-import type { DuidingV1 } from './duiding-schema'
+import { DUIDING_VERSIE, type DuidingV1 } from './duiding-schema'
 import { PROFIEL_VERSIE, type NieuwsprofielV1 } from './profiel'
 import type { KandidaatArtikel } from './matcher'
 
@@ -144,10 +144,18 @@ export const PERSONA_PROFIELEN = {
 
 // ── Artikelen ────────────────────────────────────────────────────────────────
 
-const META = { brontekst: 'teaser', tekens: 300, model: 'fixture' } as const
+const META = {
+  grondslag: 'fragment',
+  grondslagSha256: 'f'.repeat(64),
+  tekens: 300,
+  model: 'fixture',
+  kopBron: 'bron',
+  modeltekst: false,
+  poort: { status: 'groen', reden: null },
+} as const
 
 function duiding(d: Omit<DuidingV1, 'versie' | 'meta' | 'grond'> & { grond?: Record<string, string> }): DuidingV1 {
-  return { versie: 1, grond: {}, meta: META, ...d }
+  return { versie: DUIDING_VERSIE, grond: {}, meta: META, ...d }
 }
 
 interface ArtikelOpties {

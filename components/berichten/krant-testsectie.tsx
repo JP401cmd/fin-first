@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { ChevronDown, ChevronUp, FlaskConical } from 'lucide-react'
 import type { Testeditie, TesteditieItem } from '@/lib/krant/testeditie'
+import { safeHttpUrl } from '@/lib/safe-url'
 
 /**
  * Testsectie op /nieuws — de schaduweditie naast de LLM-editie (keuze 12 op
@@ -198,11 +199,11 @@ function TestItem({ item }: { item: TesteditieItem }) {
         {item.bronnaam ?? 'onbekende bron'}
         {item.rubriek ? ` · ${item.rubriek}` : ''}
         {item.gepubliceerd ? ` · ${item.gepubliceerd.slice(0, 10)}` : ''}
-        {item.url && (
+        {safeHttpUrl(item.url) && (
           <>
             {' · '}
             <a
-              href={item.url}
+              href={safeHttpUrl(item.url) ?? undefined}
               target="_blank"
               rel="noopener noreferrer"
               className="underline decoration-dotted underline-offset-2 hover:text-[var(--ink-2)]"

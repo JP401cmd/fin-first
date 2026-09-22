@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react'
 import { TrendingUp, TrendingDown, Lightbulb, MessageSquare, CheckCheck, Loader2, ExternalLink, CalendarClock, ListPlus, Check, EyeOff } from 'lucide-react'
 import { useChatContext } from '@/components/app/chat/chat-provider'
 import type { NewsItem } from '@/app/api/news/route'
+import { safeHttpUrl } from '@/lib/safe-url'
 
 // ── Category config ──────────────────────────────────────────────────
 
@@ -261,11 +262,11 @@ export function HeroNewsArticle({ item, isRead, onMarkRead, readOnly }: {
         <span className="font-inter text-[11px] text-[var(--ink-4)]">
           {formatNewsDate(item.date)}
         </span>
-        {item.sourceUrl && (
+        {safeHttpUrl(item.sourceUrl) && (
           <>
             <span className="text-[var(--ink-4)]">&middot;</span>
             <a
-              href={item.sourceUrl}
+              href={safeHttpUrl(item.sourceUrl) ?? undefined}
               target="_blank"
               rel="noopener noreferrer"
               className="ml-0.5 font-inter text-[11px] text-[var(--ink-4)] underline decoration-[var(--ink-4)]/30 underline-offset-2 transition-colors hover:text-[var(--ink-2)]"
@@ -322,11 +323,11 @@ export function NewsArticle({ item, isRead, onMarkRead, readOnly }: {
         <span className="font-inter text-[11px] text-[var(--ink-4)]">
           {formatNewsDate(item.date)}
         </span>
-        {item.sourceUrl && (
+        {safeHttpUrl(item.sourceUrl) && (
           <>
             <span className="text-[var(--ink-4)]">&middot;</span>
             <a
-              href={item.sourceUrl}
+              href={safeHttpUrl(item.sourceUrl) ?? undefined}
               target="_blank"
               rel="noopener noreferrer"
               className="ml-0.5 font-inter text-[11px] text-[var(--ink-4)] underline decoration-[var(--ink-4)]/30 underline-offset-2 transition-colors hover:text-[var(--ink-2)]"

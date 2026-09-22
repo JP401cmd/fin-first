@@ -76,8 +76,21 @@ import {
 
 // ── Versie en selectieregels ─────────────────────────────────────────────────
 
-/** Bumpt bij elke wijziging van de regels hieronder; landt op de editie zodat een regelwijziging zichtbaar is. */
-export const MATCHER_VERSIE = 1
+/**
+ * Bumpt bij elke wijziging van de regels hieronder; landt op de editie zodat een regelwijziging zichtbaar is.
+ * 2 (22-09-2026, ADR 0176): tiebreak van het algemeen katern op duidingssoort en kop in plaats van id.
+ */
+export const MATCHER_VERSIE = 2
+
+/** Volgorde bij gelijke datum in het algemeen katern: wat vastligt of gemeten is, vóór verwachting en uitleg. */
+const KATERN_SOORT_RANG: Record<DuidingV1['soort'], number> = {
+  besloten: 0,
+  cijfer: 1,
+  voorstel: 2,
+  verwachting: 3,
+  marktbeweging: 4,
+  achtergrond: 5,
+}
 
 /** Een artikel haalt de editie vanaf deze score (LOCAL_NEWS_MIN_SCORE-lijn). */
 export const SCORE_DREMPEL = 3
@@ -459,8 +472,23 @@ function naVoorbehoud(regel: string): string {
   return /^[A-Z][a-z]/.test(regel) ? `${regel.charAt(0).toLowerCase()}${regel.slice(1)}` : regel
 }
 
-/** De 1A-samenvatting, of null als ze de Wft-woordenlijst raakt (met een grep-bare reden in `waarom`). */
+/**
+ * De 1A-samenvatting, of null — met een grep-bare reden in `waarom`. Drie
+ * uitkomsten, bewust te onderscheiden in de meting:
+ *   (geen reden)                 de gecontroleerde tekst gaat mee;
+ *   `samenvatting-leeg:<reden>`  er is geen tekst: de duiding leverde null,
+ *                                omdat het model zelf niets schreef of omdat
+ *                                de tekstpoort degradeerde (B26). De lezer
+ *                                krijgt dan de bronkop + de link — dat is de
+ *                                bedoelde uitkomst, geen storing;
+ *   `samenvatting-geweerd:<wft>` er wás tekst, maar ze raakt de
+ *                                Wft-woordenlijst.
+ */
 function samenvattingVoor(duiding: DuidingV1, waarom: string[]): string | null {
+  if (duiding.samenvatting === null) {
+    waarom.push(`samenvatting-leeg:${duiding.meta.poort.reden ?? 'model'}`)
+    return null
+  }
   const overtreding = vindWftOvertreding(duiding.samenvatting)
   if (!overtreding) return duiding.samenvatting
   waarom.push(`samenvatting-geweerd:${overtreding.soort}`)
@@ -506,14 +534,22 @@ export function matchEditie(profiel: NieuwsprofielV1, artikelen: readonly Kandid
   const gekozen = new Set(items.map((i) => i.artikelId))
 
   // Het algemene katern: wat leesbaar was maar de editie niet haalde, nieuwste
-  // eerst (published_at, dan fetched_at, dan id), gelabeld (B7). Geen
-  // koppeling met `is_used`/`potential_impact` van het AI-pad.
+  // eerst, gelabeld (B7). Geen koppeling met `is_used`/`potential_impact` van
+  // het AI-pad. Bij gelijke datum (items uit één run delen hun "eerste
+  // gezien"-moment) beslist de SOORT van de duiding — een besluit of cijfer
+  // vóór achtergrond — dan de kop, en pas als laatste het id (bugkaart P2:
+  // vóór MATCHER_VERSIE 2 besliste feitelijk de UUID).
   const algemeenItems: AlgemeenItem[] = leesbaar
     .filter((a) => !gekozen.has(a.id))
     .sort((a, b) => {
       const ta = a.published_at ?? a.fetched_at
       const tb = b.published_at ?? b.fetched_at
-      return ta < tb ? 1 : ta > tb ? -1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0
+      if (ta !== tb) return ta < tb ? 1 : -1
+      const sa = KATERN_SOORT_RANG[a.duiding.soort]
+      const sb = KATERN_SOORT_RANG[b.duiding.soort]
+      if (sa !== sb) return sa - sb
+      if (a.title !== b.title) return a.title < b.title ? -1 : 1
+      return a.id < b.id ? -1 : a.id > b.id ? 1 : 0
     })
     .slice(0, ALGEMEEN_MAX)
     .map((a) => ({

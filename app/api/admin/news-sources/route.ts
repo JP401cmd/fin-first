@@ -1,7 +1,39 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { forbidden, serverError } from '@/lib/api/respond'
+import { parseBody } from '@/lib/api/parse-body'
 import { createClient } from '@/lib/supabase/server'
 import { isSuperAdmin } from '@/lib/admin'
+import { normaliseerRssFeeds, normaliseerWebBronnen, WEB_BRON_SOORTEN } from '@/lib/news-sources'
+import { bronUrlBezwaar } from '@/lib/safe-url'
+
+// ── Validatie (ADR 0044 + ADR 0176) ──────────────────────────────────
+//
+// Een bron is een http(s)-URL met een label; een webbron draagt verplicht zijn
+// vaste bronsoort (`web_lijst` of `web_pagina`) — die bepaalt wat de ingest
+// als artikel ziet. RSS-feeds zijn per definitie `rss`.
+
+// Dezelfde toets als elke fetch-hop in lib/news-sources.ts (`isVeiligeBronUrl`):
+// https, een DNS-naam (geen IP-literal, geen localhost/.local/.internal), geen
+// eigen poort, geen inloggegevens. Zo is het schrijfpad geen SSRF-ingang
+// (security-review 1F, S1).
+const bronUrl = z
+  .string()
+  .trim()
+  .max(500)
+  .superRefine((u, ctx) => {
+    const bezwaar = bronUrlBezwaar(u)
+    if (bezwaar) ctx.addIssue({ code: 'custom', message: bezwaar })
+  })
+
+const label = z.string().trim().min(1, 'label is verplicht').max(120)
+
+const NewsSourcesBodySchema = z.object({
+  webSources: z
+    .array(z.object({ url: bronUrl, label, soort: z.enum(WEB_BRON_SOORTEN) }).strict())
+    .max(100),
+  rssFeeds: z.array(z.object({ url: bronUrl, label }).strict()).max(100),
+})
 
 // ── GET — Return current news sources ────────────────────────────────
 
@@ -24,27 +56,21 @@ export async function GET() {
     return serverError(rssRes.error, 'admin-news-sources:GET')
   }
 
-  // Parse stored values — they may be strings or already-parsed objects
-  let webSources = []
-  let rssFeeds = []
-
-  try {
-    if (webRes.data?.value) {
-      webSources = typeof webRes.data.value === 'string'
-        ? JSON.parse(webRes.data.value)
-        : webRes.data.value
+  // Opgeslagen waarden kunnen strings of al-geparste objecten zijn. Een
+  // webbron van vóór ADR 0176 zonder soort krijgt dezelfde standaard als de
+  // ingest (`web_pagina`), zodat de beheerpagina toont wat er werkelijk draait.
+  const parse = (value: unknown): unknown => {
+    try {
+      return typeof value === 'string' ? JSON.parse(value) : value
+    } catch {
+      return []
     }
-  } catch { /* keep empty array */ }
+  }
 
-  try {
-    if (rssRes.data?.value) {
-      rssFeeds = typeof rssRes.data.value === 'string'
-        ? JSON.parse(rssRes.data.value)
-        : rssRes.data.value
-    }
-  } catch { /* keep empty array */ }
-
-  return NextResponse.json({ webSources, rssFeeds })
+  return NextResponse.json({
+    webSources: normaliseerWebBronnen(parse(webRes.data?.value ?? [])),
+    rssFeeds: normaliseerRssFeeds(parse(rssRes.data?.value ?? [])),
+  })
 }
 
 // ── PUT — Save news sources ──────────────────────────────────────────
@@ -56,16 +82,11 @@ export async function PUT(req: Request) {
     return forbidden()
   }
 
-  const body = await req.json()
+  const parsed = await parseBody(NewsSourcesBodySchema, req)
+  if (!parsed.ok) return parsed.response
+  const { webSources, rssFeeds } = parsed.data
+
   const { data: { user } } = await supabase.auth.getUser()
-
-  if (!Array.isArray(body.webSources) || !Array.isArray(body.rssFeeds)) {
-    return NextResponse.json(
-      { error: 'webSources and rssFeeds must be arrays' },
-      { status: 400 },
-    )
-  }
-
   const now = new Date().toISOString()
   const updatedBy = user?.id
 
@@ -73,7 +94,7 @@ export async function PUT(req: Request) {
     supabase.from('app_settings').upsert(
       {
         key: 'news_web_sources',
-        value: JSON.stringify(body.webSources),
+        value: JSON.stringify(webSources),
         updated_at: now,
         updated_by: updatedBy,
       },
@@ -82,7 +103,7 @@ export async function PUT(req: Request) {
     supabase.from('app_settings').upsert(
       {
         key: 'news_rss_feeds',
-        value: JSON.stringify(body.rssFeeds),
+        value: JSON.stringify(rssFeeds),
         updated_at: now,
         updated_by: updatedBy,
       },

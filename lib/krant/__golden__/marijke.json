@@ -1,5 +1,5 @@
 {
-  "matcherVersie": 1,
+  "matcherVersie": 2,
   "sjabloonVersie": 1,
   "profielType": "67-plus·koop·partner-onbekend",
   "items": [
@@ -49,6 +49,15 @@
     "label": "Niet op jouw situatie afgestemd.",
     "items": [
       {
+        "artikelId": "a03-aow-leeftijd",
+        "titel": "AOW-leeftijd in 2033 drie maanden omhoog",
+        "rubriek": "pensioen",
+        "bron": "Voorbeeldbron",
+        "url": "https://voorbeeld.nl/a03-aow-leeftijd",
+        "gepubliceerd": "2026-09-19T05:10:00Z",
+        "samenvatting": "De AOW-leeftijd stijgt in 2033 met drie maanden. Dat volgt uit de nieuwe levensverwachting."
+      },
+      {
         "artikelId": "a01-box3-heffingsvrij",
         "titel": "Heffingsvrij vermogen box 3 naar 60.000 euro in 2027",
         "rubriek": "fiscaal",
@@ -58,22 +67,13 @@
         "samenvatting": "Het heffingsvrij vermogen in box 3 gaat in 2027 naar 60.000 euro. Het tarief blijft 36 procent."
       },
       {
-        "artikelId": "a02-box1-schijf1",
-        "titel": "Tarief eerste schijf inkomstenbelasting naar 36 procent",
-        "rubriek": "fiscaal",
+        "artikelId": "a09-huurverhoging",
+        "titel": "Maximale huurverhoging vrije sector 2027 vastgesteld",
+        "rubriek": "woningmarkt",
         "bron": "Voorbeeldbron",
-        "url": "https://voorbeeld.nl/a02-box1-schijf1",
+        "url": "https://voorbeeld.nl/a09-huurverhoging",
         "gepubliceerd": "2026-09-19T05:10:00Z",
-        "samenvatting": "Het tarief in de eerste schijf van box 1 gaat in 2027 naar 36 procent. De schijfgrenzen blijven gelijk."
-      },
-      {
-        "artikelId": "a03-aow-leeftijd",
-        "titel": "AOW-leeftijd in 2033 drie maanden omhoog",
-        "rubriek": "pensioen",
-        "bron": "Voorbeeldbron",
-        "url": "https://voorbeeld.nl/a03-aow-leeftijd",
-        "gepubliceerd": "2026-09-19T05:10:00Z",
-        "samenvatting": "De AOW-leeftijd stijgt in 2033 met drie maanden. Dat volgt uit de nieuwe levensverwachting."
+        "samenvatting": "De maximale huurverhoging in de vrije sector is voor 2027 vastgesteld op 4,1 procent."
       },
       {
         "artikelId": "a04-studieschuld-rente",
@@ -85,13 +85,13 @@
         "samenvatting": "De rente op studieschulden wordt in 2027 vastgesteld op 3 procent. Dat geldt voor wie dan een nieuwe rentevaste periode ingaat."
       },
       {
-        "artikelId": "a06-spaarrente",
-        "titel": "Spaarrentes dalen na rentebesluit ECB",
-        "rubriek": "rente",
+        "artikelId": "a16-box3-tarief",
+        "titel": "Box 3-tarief in 2027 naar 38 procent",
+        "rubriek": "fiscaal",
         "bron": "Voorbeeldbron",
-        "url": "https://voorbeeld.nl/a06-spaarrente",
+        "url": "https://voorbeeld.nl/a16-box3-tarief",
         "gepubliceerd": "2026-09-19T05:10:00Z",
-        "samenvatting": "Na het rentebesluit van de ECB verlagen banken de spaarrente met 0,25 procentpunt. Niet elke bank volgt."
+        "samenvatting": "Het tarief in box 3 gaat in 2027 van 36 naar 38 procent."
       }
     ]
   },

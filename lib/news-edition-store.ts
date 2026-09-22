@@ -254,7 +254,14 @@ export async function loadNewsSourceArticles(limit: number): Promise<SelectableA
       'id, title, summary, source_url, source_name, category, published_at, potential_impact, is_used',
     )
     .gte('fetched_at', windowStart.toISOString())
-    .order('published_at', { ascending: false })
+    // Tiebreak (ADR 0176, bugkaart P2): vóór 1F stonden alle rijen op 00:00,
+    // dus besliste de database-volgorde welke 120 erin kwamen. Nu: nieuwste
+    // publicatie eerst (NULL achteraan — Postgres zet die bij DESC standaard
+    // vóóraan), dan het recentst opgehaald, dan de sleutel: deterministisch en
+    // nooit op artikel-UUID.
+    .order('published_at', { ascending: false, nullsFirst: false })
+    .order('fetched_at', { ascending: false })
+    .order('source_url', { ascending: true })
     .limit(SOURCE_CANDIDATE_LIMIT)
 
   if (error) {

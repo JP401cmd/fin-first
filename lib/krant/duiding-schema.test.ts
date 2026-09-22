@@ -46,16 +46,61 @@ describe('duidingModelSchema — gesloten', () => {
   })
 })
 
-describe('duidingV1Schema — het leescontract voor 1B', () => {
-  it('accepteert de opgeslagen vorm met versie, grond-record en meta', () => {
-    const opgeslagen = {
-      ...GELDIGE_UITVOER,
-      versie: DUIDING_VERSIE,
-      grond: { jaar: 'x', heffingsvrij_single: 'y' },
-      meta: { brontekst: 'teaser', tekens: 120, model: 'test' },
+describe('duidingModelSchema — het model levert geen kop (G4 is structureel opgelost)', () => {
+  it('heeft geen kop-, titel- of URL-veld: wat de lezer ziet is de BRONkop', () => {
+    const velden = Object.keys(duidingModelSchema.shape)
+    for (const verboden of ['kop', 'titel', 'title', 'headline', 'url', 'bron']) {
+      expect(velden, verboden).not.toContain(verboden)
     }
+    // En het schema is gesloten: een kop erbij verzinnen wordt geweigerd, niet genegeerd.
+    for (const veld of ['kop', 'titel', 'title']) {
+      expect(duidingModelSchema.safeParse({ ...GELDIGE_UITVOER, [veld]: 'Een modelkop' }).success, veld).toBe(false)
+    }
+  })
+
+  it('accepteert een lege samenvatting (B27) maar geen te korte tekst', () => {
+    expect(duidingModelSchema.safeParse({ ...GELDIGE_UITVOER, samenvatting: null }).success).toBe(true)
+    expect(duidingModelSchema.safeParse({ ...GELDIGE_UITVOER, samenvatting: 'te kort' }).success).toBe(false)
+  })
+})
+
+describe('duidingV1Schema — het leescontract voor 1B', () => {
+  const meta = {
+    grondslag: 'fragment',
+    grondslagSha256: 'a'.repeat(64),
+    tekens: 120,
+    model: 'test',
+    kopBron: 'bron',
+    modeltekst: false,
+    poort: { status: 'groen', reden: null },
+  }
+  const opgeslagen = {
+    ...GELDIGE_UITVOER,
+    versie: DUIDING_VERSIE,
+    grond: { jaar: 'x', heffingsvrij_single: 'y' },
+    meta,
+  }
+
+  it('accepteert de opgeslagen vorm met versie, grond-record en meta', () => {
     expect(duidingV1Schema.safeParse(opgeslagen).success).toBe(true)
-    expect(duidingV1Schema.safeParse({ ...opgeslagen, versie: 2 }).success).toBe(false)
-    expect(duidingV1Schema.safeParse({ ...opgeslagen, meta: { ...opgeslagen.meta, dagen: 3 } }).success).toBe(false)
+    expect(duidingV1Schema.safeParse({ ...opgeslagen, samenvatting: null }).success).toBe(true)
+    expect(duidingV1Schema.safeParse({ ...opgeslagen, versie: DUIDING_VERSIE + 1 }).success).toBe(false)
+    expect(duidingV1Schema.safeParse({ ...opgeslagen, meta: { ...meta, dagen: 3 } }).success).toBe(false)
+  })
+
+  it('v1-rijen parsen niet meer: de versie-bump duidt ze opnieuw in plaats van ze te vertrouwen', () => {
+    expect(duidingV1Schema.safeParse({ ...opgeslagen, versie: 1, meta: { brontekst: 'teaser', tekens: 1, model: 'x' } }).success).toBe(false)
+  })
+
+  it('meta is door code gezet: kopBron en modeltekst zijn literals, de hash is hex', () => {
+    expect(duidingV1Schema.safeParse({ ...opgeslagen, meta: { ...meta, kopBron: 'model' } }).success).toBe(false)
+    expect(duidingV1Schema.safeParse({ ...opgeslagen, meta: { ...meta, modeltekst: true } }).success).toBe(false)
+    expect(duidingV1Schema.safeParse({ ...opgeslagen, meta: { ...meta, grondslagSha256: 'kort' } }).success).toBe(false)
+    expect(duidingV1Schema.safeParse({ ...opgeslagen, meta: { ...meta, grondslag: 'volledig' } }).success).toBe(false)
+    expect(
+      duidingV1Schema.safeParse({ ...opgeslagen, meta: { ...meta, poort: { status: 'gedegradeerd', reden: 'g1:ongegrond-getal' } } })
+        .success,
+    ).toBe(true)
+    expect(duidingV1Schema.safeParse({ ...opgeslagen, meta: { ...meta, poort: { status: 'onbekend', reden: null } } }).success).toBe(false)
   })
 })

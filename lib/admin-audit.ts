@@ -19,6 +19,10 @@ export type AdminActionName =
   | 'nieuws.duiding.terugtrekken'
   | 'nieuws.duiding.opnieuw'
   | 'nieuws.artikel.verwijderen'
+  // Krant 1F fase 2: beheer legt de wekelijkse G7-steekproef vast. Het register
+  // bewaart alleen de laatste telling per week, dus een overschrijving moet hier
+  // een spoor achterlaten — G7 is de menselijke helft van een release-poort.
+  | 'nieuws.duiding.steekproef'
 
 /**
  * Schrijf één beheeractie weg in `admin_actions_log`.

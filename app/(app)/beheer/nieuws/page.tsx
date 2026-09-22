@@ -1,10 +1,16 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef, Fragment } from 'react'
-import { Newspaper, Save, RotateCcw, Check, AlertCircle, ChevronDown, ChevronUp, Globe, Rss, Plus, Trash2, Database, Search, RefreshCw, FileText, Activity } from 'lucide-react'
+import { Newspaper, Save, RotateCcw, Check, AlertCircle, ChevronDown, ChevronUp, Globe, Plus, Trash2, Database, Search, RefreshCw, FileText, Activity } from 'lucide-react'
 import {
   DEFAULT_WEB_SOURCES,
   DEFAULT_RSS_FEEDS,
+  BRON_SOORTEN,
+  BRON_SOORT_LABEL,
+  BRON_SOORT_UITLEG,
+  BRON_OORZAAK_LABEL,
+  type BronOorzaak,
+  type BronSoort,
   type WebSource,
   type RssFeed,
 } from '@/lib/news-sources'
@@ -15,6 +21,8 @@ import { KrantMetingPanel } from '@/components/app/beheer/krant-meting-panel'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { ModalFooter } from '@/components/app/modal-footer'
 import { DUIDING_STATUSSEN } from '@/lib/krant/duiding-schema'
+import { LEVERAGE_STATUS_DOT } from '@/lib/leverage-status'
+import { safeHttpUrl } from '@/lib/safe-url'
 
 // ── Types for news sources ───────────────────────────────────────────
 
@@ -42,6 +50,10 @@ interface JobRun {
     rssArticlesFound?: number
     webArticlesExtracted?: number
     duplicatesSkipped?: number
+    /** ADR 0176: sleutel bestond al — de verwachte uitkomst bij een tweede run. */
+    alBekend?: number
+    /** ADR 0176: nieuw, maar buiten het tijdbudget — komt de volgende run. */
+    uitgesteld?: number
     inserted?: number
     skipped?: number
     /** ADR 0171: uitkomst van de duidingsstap in deze run. */
@@ -53,9 +65,92 @@ interface JobRun {
 interface SourceHealthEntry {
   label: string
   url: string
+  /** ADR 0176; ontbreekt op gezondheid van vóór 1F. */
+  soort?: BronSoort
   type: 'rss' | 'web'
   items: number
+  nieuw?: number
+  /** ADR 0176; ontbreekt op gezondheid van vóór 1F. */
+  oorzaak?: BronOorzaak
+  httpStatus?: number
+  afgekapt?: number
+  geweigerd?: number
   error?: string
+}
+
+/** Eén bron in de editor: web (lijst/pagina) en RSS in één lijst, gesplitst bij opslaan. */
+interface Bron {
+  url: string
+  label: string
+  soort: BronSoort
+}
+
+function naarBronnen(web: WebSource[], rss: RssFeed[]): Bron[] {
+  return [
+    ...web.map((w) => ({ url: w.url, label: w.label, soort: w.soort })),
+    ...rss.map((r) => ({ url: r.url, label: r.label, soort: 'rss' as const })),
+  ]
+}
+
+/**
+ * Splits de editorlijst in de twee opslagsleutels. `herkomst` onthoudt per
+ * opgeslagen positie de rij in de editor, zodat een zod-fout als
+ * "webSources.3.url: …" naar de juiste rij wijst.
+ */
+function splitsBronnen(bronnen: Bron[]): {
+  body: { webSources: WebSource[]; rssFeeds: RssFeed[] }
+  herkomst: { webSources: number[]; rssFeeds: number[] }
+} {
+  const webSources: WebSource[] = []
+  const rssFeeds: RssFeed[] = []
+  const herkomst = { webSources: [] as number[], rssFeeds: [] as number[] }
+  bronnen.forEach((b, i) => {
+    if (b.soort === 'rss') {
+      rssFeeds.push({ url: b.url.trim(), label: b.label.trim() })
+      herkomst.rssFeeds.push(i)
+    } else {
+      webSources.push({ url: b.url.trim(), label: b.label.trim(), soort: b.soort })
+      herkomst.webSources.push(i)
+    }
+  })
+  return { body: { webSources, rssFeeds }, herkomst }
+}
+
+/** Zet een veldpad uit de 400-melding ("webSources.3.url: alleen https") om naar de editorrij + leesbare melding. */
+function foutNaarRij(
+  melding: string,
+  herkomst: { webSources: number[]; rssFeeds: number[] },
+): { rij: number; tekst: string } | null {
+  const m = /^(webSources|rssFeeds)\.(\d+)\.(url|label|soort):\s*(.*)$/.exec(melding)
+  if (!m) return null
+  const rij = herkomst[m[1] as 'webSources' | 'rssFeeds'][Number(m[2])]
+  if (rij === undefined) return null
+  const veld = m[3] === 'url' ? 'adres' : m[3] === 'label' ? 'label' : 'soort'
+  return { rij, tekst: `Bron ${rij + 1}: ${veld} — ${m[4]}` }
+}
+
+const STANDAARD_BRONNEN: Bron[] = naarBronnen(DEFAULT_WEB_SOURCES, DEFAULT_RSS_FEEDS)
+
+/** De oorzaak van een gezondheidsregel, ook voor regels van vóór ADR 0176. */
+function oorzaakVan(s: SourceHealthEntry): BronOorzaak | null {
+  if (s.oorzaak) return s.oorzaak
+  return s.items > 0 ? 'ok' : null
+}
+
+function oorzaakTekst(s: SourceHealthEntry): string {
+  const o = oorzaakVan(s)
+  if (!o) return s.error ? 'fout (oorzaak onbekend, run van vóór 1F)' : 'niets geleverd (oorzaak onbekend, run van vóór 1F)'
+  const basis = BRON_OORZAAK_LABEL[o]
+  return o === 'http_fout' && s.httpStatus ? `${basis} ${s.httpStatus}` : basis
+}
+
+/** Stoplichtsemantiek via de gedeelde status-tokens, niet via losse Tailwind-kleuren. */
+function oorzaakStip(s: SourceHealthEntry): string {
+  const o = oorzaakVan(s)
+  if (o === 'ok') return LEVERAGE_STATUS_DOT.good
+  if (o === 'leeg' || o === 'geen_model') return LEVERAGE_STATUS_DOT.warn
+  if (o === null) return LEVERAGE_STATUS_DOT.neutral
+  return LEVERAGE_STATUS_DOT.bad
 }
 
 interface IngestStatus {
@@ -74,10 +169,11 @@ export default function BeheerNieuwsPage() {
   const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   // Sources state
-  const [webSources, setWebSources] = useState<WebSource[]>([])
-  const [rssFeeds, setRssFeeds] = useState<RssFeed[]>([])
-  const [savedWebSources, setSavedWebSources] = useState<WebSource[] | null>(null)
-  const [savedRssFeeds, setSavedRssFeeds] = useState<RssFeed[] | null>(null)
+  const [bronnen, setBronnen] = useState<Bron[]>([])
+  // null = niets opgeslagen: de ingest draait dan op de standaardlijst.
+  const [savedBronnen, setSavedBronnen] = useState<Bron[] | null>(null)
+  // De editorrij waar de laatste opslagfout over ging (zod-pad teruggerekend).
+  const [foutRij, setFoutRij] = useState<number | null>(null)
   const [sourcesLoading, setSourcesLoading] = useState(true)
   const [sourcesSaving, setSourcesSaving] = useState(false)
 
@@ -204,23 +300,18 @@ export default function BeheerNieuwsPage() {
 
         if (hasWeb || hasRss) {
           // Saved sources exist — use them
-          setWebSources(data.webSources || [])
-          setRssFeeds(data.rssFeeds || [])
-          setSavedWebSources(data.webSources || [])
-          setSavedRssFeeds(data.rssFeeds || [])
+          const opgeslagen = naarBronnen(data.webSources || [], data.rssFeeds || [])
+          setBronnen(opgeslagen)
+          setSavedBronnen(opgeslagen)
         } else {
           // No saved sources — show defaults for initial setup
-          setWebSources(DEFAULT_WEB_SOURCES)
-          setRssFeeds(DEFAULT_RSS_FEEDS)
-          setSavedWebSources(null)
-          setSavedRssFeeds(null)
+          setBronnen(STANDAARD_BRONNEN)
+          setSavedBronnen(null)
         }
       } catch {
         // On failure, show defaults
-        setWebSources(DEFAULT_WEB_SOURCES)
-        setRssFeeds(DEFAULT_RSS_FEEDS)
-        setSavedWebSources(null)
-        setSavedRssFeeds(null)
+        setBronnen(STANDAARD_BRONNEN)
+        setSavedBronnen(null)
       } finally {
         setSourcesLoading(false)
       }
@@ -233,28 +324,19 @@ export default function BeheerNieuwsPage() {
   // ── Sources handlers ─────────────────────────────────────────────
 
   /** Check if sources have unsaved changes compared to saved state */
-  const hasSourceChanges = (() => {
-    const currentWeb = JSON.stringify(webSources)
-    const currentRss = JSON.stringify(rssFeeds)
-    const savedWeb = savedWebSources !== null
-      ? JSON.stringify(savedWebSources)
-      : JSON.stringify(DEFAULT_WEB_SOURCES)
-    const savedRss = savedRssFeeds !== null
-      ? JSON.stringify(savedRssFeeds)
-      : JSON.stringify(DEFAULT_RSS_FEEDS)
-    return currentWeb !== savedWeb || currentRss !== savedRss
-  })()
+  const hasSourceChanges = JSON.stringify(bronnen) !== JSON.stringify(savedBronnen ?? STANDAARD_BRONNEN)
+
+  /** De laatste gezondheid per bron-URL, zodat elke bron in de editor zijn oorzaak toont. */
+  const gezondheidPerUrl = new Map((ingestStatus?.sourceHealth?.sources ?? []).map((s) => [s.url, s]))
 
   async function handleResetSources() {
     setStatus(null)
     try {
       const res = await fetch('/api/admin/news-sources', { method: 'DELETE' })
       if (!res.ok) throw new Error('Reset mislukt')
-      setWebSources(DEFAULT_WEB_SOURCES)
-      setRssFeeds(DEFAULT_RSS_FEEDS)
-      setSavedWebSources(null)
-      setSavedRssFeeds(null)
-      setStatus({ type: 'success', message: 'Standaard bronnen hersteld — klik "Bronnen opslaan" om op te slaan' })
+      setBronnen(STANDAARD_BRONNEN)
+      setSavedBronnen(null)
+      setStatus({ type: 'success', message: 'Opgeslagen bronnen gewist — de ingest draait weer op de standaardlijst' })
     } catch (err) {
       setStatus({ type: 'error', message: err instanceof Error ? err.message : 'Reset mislukt' })
     }
@@ -264,18 +346,22 @@ export default function BeheerNieuwsPage() {
     setSourcesSaving(true)
     setStatus(null)
     try {
+      const { body, herkomst } = splitsBronnen(bronnen)
+      setFoutRij(null)
       const res = await fetch('/api/admin/news-sources', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ webSources, rssFeeds }),
+        body: JSON.stringify(body),
       })
       if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error || 'Bronnen opslaan mislukt')
+        const data = await res.json().catch(() => null)
+        const melding = typeof data?.error === 'string' ? data.error : 'Bronnen opslaan mislukt'
+        const naarRij = foutNaarRij(melding, herkomst)
+        if (naarRij) setFoutRij(naarRij.rij)
+        throw new Error(naarRij ? naarRij.tekst : melding)
       }
-      setSavedWebSources([...webSources])
-      setSavedRssFeeds([...rssFeeds])
-      setStatus({ type: 'success', message: 'Nieuwsbronnen opgeslagen' })
+      setSavedBronnen(bronnen.map((b) => ({ ...b })))
+      setStatus({ type: 'success', message: 'Nieuwsbronnen opgeslagen — de volgende ingest gebruikt deze lijst' })
     } catch (err) {
       setStatus({ type: 'error', message: err instanceof Error ? err.message : 'Bronnen opslaan mislukt' })
     } finally {
@@ -283,32 +369,23 @@ export default function BeheerNieuwsPage() {
     }
   }
 
-  // ── Web source list helpers ──────────────────────────────────────
+  // ── Bronnen-editor ───────────────────────────────────────────────
 
-  function updateWebSource(index: number, field: 'url' | 'label', value: string) {
-    setWebSources(prev => prev.map((s, i) => i === index ? { ...s, [field]: value } : s))
+  function updateBron(index: number, veld: 'url' | 'label', value: string) {
+    setBronnen(prev => prev.map((b, i) => (i === index ? { ...b, [veld]: value } : b)))
   }
 
-  function removeWebSource(index: number) {
-    setWebSources(prev => prev.filter((_, i) => i !== index))
+  function updateBronSoort(index: number, soort: BronSoort) {
+    setBronnen(prev => prev.map((b, i) => (i === index ? { ...b, soort } : b)))
   }
 
-  function addWebSource() {
-    setWebSources(prev => [...prev, { url: '', label: '' }])
+  function removeBron(index: number) {
+    setBronnen(prev => prev.filter((_, i) => i !== index))
   }
 
-  // ── RSS feed list helpers ────────────────────────────────────────
-
-  function updateRssFeed(index: number, field: 'url' | 'label', value: string) {
-    setRssFeeds(prev => prev.map((f, i) => i === index ? { ...f, [field]: value } : f))
-  }
-
-  function removeRssFeed(index: number) {
-    setRssFeeds(prev => prev.filter((_, i) => i !== index))
-  }
-
-  function addRssFeed() {
-    setRssFeeds(prev => [...prev, { url: '', label: '' }])
+  function addBron() {
+    // Standaard de veilige lezing: een themapagina kiest geen links en maakt alleen bij een wijziging een artikel.
+    setBronnen(prev => [...prev, { url: '', label: '', soort: 'web_pagina' }])
   }
 
   // ── DB article handlers ──────────────────────────────────────────
@@ -320,9 +397,10 @@ export default function BeheerNieuwsPage() {
       const res = await fetch('/api/admin/news-ingest', { method: 'POST' })
       if (!res.ok) throw new Error('Ophalen mislukt')
       const data = await res.json()
+      const s = data.summary
       setStatus({
         type: 'success',
-        message: `${data.summary.inserted} nieuwe artikelen (${data.summary.rssArticlesFound ?? '?'} RSS, ${data.summary.webArticlesExtracted ?? '?'} web, ${data.summary.duplicatesSkipped ?? 0} duplicaten overgeslagen) uit ${data.summary.sourcesChecked} bronnen`,
+        message: `${s.inserted} nieuw · ${s.alBekend ?? 0} al bekend · ${s.duplicatesSkipped ?? 0} dubbel${s.skipped ? ` · ${s.skipped} niet geschreven` : ''}${s.uitgesteld ? ` · ${s.uitgesteld} uitgesteld naar de volgende run` : ''} (${s.rssArticlesFound ?? 0} uit RSS, ${s.webArticlesExtracted ?? 0} uit web) uit ${s.sourcesChecked} bronnen`,
       })
       loadArticles(dbSearch, { status: statusFilter, rekenend: alleenRekenend })
       loadIngestStatus()
@@ -459,7 +537,7 @@ export default function BeheerNieuwsPage() {
                     run.status === 'success' ? 'text-green-700' : 'text-red-700'
                   }`}
                 >
-                  <span className={`h-2 w-2 rounded-full ${run.status === 'success' ? 'bg-green-400' : 'bg-red-400'}`} />
+                  <span className={`h-2 w-2 rounded-full ${run.status === 'success' ? LEVERAGE_STATUS_DOT.good : LEVERAGE_STATUS_DOT.bad}`} />
                   {run.status === 'success' ? 'Geslaagd' : 'Mislukt'}
                 </span>
                 <span className="font-mono text-xs text-[var(--ink-4)]">
@@ -467,7 +545,10 @@ export default function BeheerNieuwsPage() {
                 </span>
                 {run.status === 'success' && run.summary ? (
                   <span className="text-[var(--ink-3)]">
-                    {run.summary.inserted ?? 0} nieuw · {run.summary.duplicatesSkipped ?? 0} duplicaten ·{' '}
+                    {run.summary.inserted ?? 0} nieuw
+                    {run.summary.alBekend !== undefined && <> · {run.summary.alBekend} al bekend</>}
+                    {run.summary.uitgesteld ? <> · {run.summary.uitgesteld} uitgesteld</> : null}
+                    {' '}· {run.summary.duplicatesSkipped ?? 0} dubbel ·{' '}
                     {run.summary.sourcesChecked ?? 0} bronnen
                     {run.summary.duiding && (
                       <>
@@ -507,20 +588,24 @@ export default function BeheerNieuwsPage() {
                 <table className="w-full text-sm">
                   <tbody className="divide-y divide-[var(--border-ed)]">
                     {[...ingestStatus.sourceHealth.sources]
-                      .sort((a, b) => a.items - b.items)
+                      .sort((a, b) => a.items - b.items || a.label.localeCompare(b.label, 'nl'))
                       .map((source, i) => (
                         <tr key={i}>
                           <td className="px-4 py-2">
-                            <span
-                              className={`mr-2 inline-block h-2 w-2 rounded-full ${
-                                source.error ? 'bg-red-400' : source.items === 0 ? 'bg-amber-400' : 'bg-green-400'
-                              }`}
-                            />
+                            <span className={`mr-2 inline-block h-2 w-2 rounded-full ${oorzaakStip(source)}`} />
                             {source.label}
+                            <span className="block pl-4 text-xs text-[var(--ink-4)]">
+                              {oorzaakTekst(source)}
+                              {source.afgekapt ? ` · ${source.afgekapt} boven de cap niet meegenomen` : ''}
+                              {source.geweigerd ? ` · ${source.geweigerd} linkkeuzes geweigerd` : ''}
+                            </span>
                           </td>
-                          <td className="px-3 py-2 font-mono text-xs uppercase text-[var(--ink-4)]">{source.type}</td>
+                          <td className="px-3 py-2 text-xs text-[var(--ink-4)]">
+                            {source.soort ? BRON_SOORT_LABEL[source.soort] : source.type.toUpperCase()}
+                          </td>
                           <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-[var(--ink-3)]">
-                            {source.items} items
+                            {source.items} gevonden
+                            {source.nieuw !== undefined && <span className="block text-xs text-[var(--ink-4)]">{source.nieuw} nieuw</span>}
                           </td>
                         </tr>
                       ))}
@@ -532,109 +617,100 @@ export default function BeheerNieuwsPage() {
         )}
       </div>
 
-      {/* ── Section: Nieuwsbronnen — Websites ─────────────────────── */}
+      {/* ── Section: Nieuwsbronnen (één lijst, vaste bronsoort per bron — ADR 0176) ── */}
       <div className="mb-8">
         <div className="mb-4 flex items-center gap-2">
           <Globe className="h-5 w-5 text-[var(--ink-3)]" />
-          <h3 className="text-lg font-bold text-[var(--ink)]">Nieuwsbronnen — Websites</h3>
+          <h3 className="text-lg font-bold text-[var(--ink)]">Nieuwsbronnen</h3>
+          <span className="ml-auto text-xs text-[var(--ink-4)]">
+            {savedBronnen === null ? 'standaardlijst (niets opgeslagen)' : 'opgeslagen lijst'}
+          </span>
         </div>
-        <p className="mb-4 text-sm text-[var(--ink-3)]">
-          Webpagina&apos;s waarvan context wordt opgehaald als aanvulling op de nieuwsgeneratie.
+        <p className="mb-2 text-sm text-[var(--ink-3)]">
+          Elke bron levert artikelen voor beide edities (de AI-editie op /nieuws en de Krant). De soort bepaalt
+          wat de ingest als één artikel ziet; de kop en de datum komen altijd van de bron, nooit van het model.
         </p>
+        <ul className="mb-4 space-y-1 text-xs text-[var(--ink-3)]">
+          {BRON_SOORTEN.map((s) => (
+            <li key={s}>
+              <span className="font-medium text-[var(--ink-2)]">{BRON_SOORT_LABEL[s]}</span> — {BRON_SOORT_UITLEG[s].effect}{' '}
+              <span className="text-[var(--ink-4)]">{BRON_SOORT_UITLEG[s].waarom}</span>
+            </li>
+          ))}
+        </ul>
 
         {sourcesLoading ? (
           <p className="text-sm text-[var(--ink-4)]">Laden...</p>
         ) : (
           <div className="space-y-3">
-            {webSources.map((source, index) => (
-              <div key={index} className="flex items-start gap-2">
-                <div className="flex flex-1 flex-col gap-2 sm:flex-row">
-                  <input
-                    type="text"
-                    value={source.label}
-                    onChange={(e) => updateWebSource(index, 'label', e.target.value)}
-                    placeholder="Label (bijv. Rijksoverheid)"
-                    className={`${inputClassName} sm:w-1/3`}
-                  />
-                  <input
-                    type="url"
-                    value={source.url}
-                    onChange={(e) => updateWebSource(index, 'url', e.target.value)}
-                    placeholder="https://..."
-                    className={`${inputClassName} flex-1`}
-                  />
+            {bronnen.map((bron, index) => {
+              const gezondheid = gezondheidPerUrl.get(bron.url)
+              return (
+                <div key={index} className="flex items-start gap-2">
+                  <div className="flex flex-1 flex-col gap-2">
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <input
+                        type="text"
+                        value={bron.label}
+                        onChange={(e) => updateBron(index, 'label', e.target.value)}
+                        placeholder="Label (bijv. CBS — Prijzen)"
+                        aria-label={`Label van bron ${index + 1}${bron.label ? ` (${bron.label})` : ''}`}
+                        aria-invalid={foutRij === index || undefined}
+                        className={`${inputClassName} sm:w-1/4`}
+                      />
+                      <input
+                        type="url"
+                        value={bron.url}
+                        onChange={(e) => updateBron(index, 'url', e.target.value)}
+                        placeholder="https://..."
+                        aria-label={`Adres van bron ${index + 1}${bron.label ? ` (${bron.label})` : ''}`}
+                        aria-invalid={foutRij === index || undefined}
+                        className={`${inputClassName} flex-1`}
+                      />
+                      <select
+                        value={bron.soort}
+                        onChange={(e) => updateBronSoort(index, e.target.value as BronSoort)}
+                        aria-label={`Soort van bron ${index + 1}${bron.label ? ` (${bron.label})` : ''}`}
+                        className={`${inputClassName} sm:w-48`}
+                      >
+                        {BRON_SOORTEN.map((s) => (
+                          <option key={s} value={s}>{BRON_SOORT_LABEL[s]}</option>
+                        ))}
+                      </select>
+                    </div>
+                    {foutRij === index && (
+                      <p className="pl-1 text-xs text-negative" role="alert">
+                        Deze bron hield het opslaan tegen — zie de melding bovenaan.
+                      </p>
+                    )}
+                    {gezondheid && (
+                      <p className="flex items-center gap-2 pl-1 text-xs text-[var(--ink-4)]">
+                        <span className={`inline-block h-2 w-2 rounded-full ${oorzaakStip(gezondheid)}`} />
+                        Laatste run: {oorzaakTekst(gezondheid)} · {gezondheid.items} gevonden
+                        {gezondheid.nieuw !== undefined ? ` · ${gezondheid.nieuw} nieuw` : ''}
+                        {gezondheid.soort && gezondheid.soort !== bron.soort ? ` · gedraaid als ${BRON_SOORT_LABEL[gezondheid.soort]}` : ''}
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeBron(index)}
+                    className="mt-2.5 flex-shrink-0 rounded-lg p-2 text-[var(--ink-4)] transition-colors hover:bg-red-50 hover:text-red-600"
+                    title="Verwijderen"
+                    aria-label={`Verwijder bron ${index + 1}${bron.label ? ` (${bron.label})` : bron.url ? ` (${bron.url})` : ''}`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => removeWebSource(index)}
-                  className="mt-2.5 flex-shrink-0 rounded-lg p-2 text-[var(--ink-4)] transition-colors hover:bg-red-50 hover:text-red-600"
-                  title="Verwijderen"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
-            ))}
+              )
+            })}
             <button
               type="button"
-              onClick={addWebSource}
+              onClick={addBron}
               className="inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-dashed border-[var(--border-ed)] px-4 py-2.5 text-sm font-medium text-[var(--ink-3)] transition-colors hover:border-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)]"
             >
               <Plus className="h-4 w-4" />
               Bron toevoegen
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* ── Section: Nieuwsbronnen — RSS Feeds ────────────────────── */}
-      <div className="mb-8">
-        <div className="mb-4 flex items-center gap-2">
-          <Rss className="h-5 w-5 text-[var(--ink-3)]" />
-          <h3 className="text-lg font-bold text-[var(--ink)]">Nieuwsbronnen — RSS Feeds</h3>
-        </div>
-        <p className="mb-4 text-sm text-[var(--ink-3)]">
-          RSS-feeds waarvan artikelen worden opgehaald en als basis dienen voor de nieuwsberichten.
-        </p>
-
-        {sourcesLoading ? (
-          <p className="text-sm text-[var(--ink-4)]">Laden...</p>
-        ) : (
-          <div className="space-y-3">
-            {rssFeeds.map((feed, index) => (
-              <div key={index} className="flex items-start gap-2">
-                <div className="flex flex-1 flex-col gap-2 sm:flex-row">
-                  <input
-                    type="text"
-                    value={feed.label}
-                    onChange={(e) => updateRssFeed(index, 'label', e.target.value)}
-                    placeholder="Label (bijv. NOS Economie)"
-                    className={`${inputClassName} sm:w-1/3`}
-                  />
-                  <input
-                    type="url"
-                    value={feed.url}
-                    onChange={(e) => updateRssFeed(index, 'url', e.target.value)}
-                    placeholder="https://..."
-                    className={`${inputClassName} flex-1`}
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={() => removeRssFeed(index)}
-                  className="mt-2.5 flex-shrink-0 rounded-lg p-2 text-[var(--ink-4)] transition-colors hover:bg-red-50 hover:text-red-600"
-                  title="Verwijderen"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
-            ))}
-            <button
-              type="button"
-              onClick={addRssFeed}
-              className="inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-dashed border-[var(--border-ed)] px-4 py-2.5 text-sm font-medium text-[var(--ink-3)] transition-colors hover:border-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)]"
-            >
-              <Plus className="h-4 w-4" />
-              Feed toevoegen
             </button>
           </div>
         )}
@@ -825,9 +901,9 @@ export default function BeheerNieuwsPage() {
                                 <span>Bron: {article.source_name}</span>
                                 {article.category && <span>Categorie: {article.category}</span>}
                                 <span>Opgehaald: {new Date(article.fetched_at).toLocaleDateString('nl-NL')}</span>
-                                {article.source_url && (
+                                {safeHttpUrl(article.source_url) && (
                                   <a
-                                    href={article.source_url}
+                                    href={safeHttpUrl(article.source_url) ?? undefined}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="underline decoration-[var(--ink-4)]/30 underline-offset-2 hover:text-[var(--ink-2)]"
