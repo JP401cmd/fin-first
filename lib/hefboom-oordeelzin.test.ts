@@ -102,6 +102,13 @@ describe('HEFBOOM_OORDEELZIN — beweert niet meer dan de score meet', () => {
   it('schulden.good zegt niets over aflossen: schuldenvrij mét vermogen staat ook op groen', () => {
     expect(volledig(HEFBOOM_OORDEELZIN.schulden.good)).not.toMatch(/aflos|afgelost|schema/i)
   })
+
+  // De cashflow-status mengt spaarquote en budgetoverschrijding 50/50. Alleen
+  // budgetten met drie overschrijdingen is rood zonder gemeten tekort; 0% sparen
+  // met alle budgetten binnen de limiet is groen. Noem dus geen van beide apart.
+  it.each(['good', 'warn', 'bad'] as const)('budget.%s noemt geen van beide oorzaken apart', (s) => {
+    expect(volledig(HEFBOOM_OORDEELZIN.cashflow[s])).not.toMatch(/spa(ar|ren)|doel|tekort/i)
+  })
 })
 
 describe('HEFBOOM_OORDEELZIN — eenvoud, Wft en ADR 0165', () => {
@@ -153,7 +160,10 @@ describe('HEFBOOM_OORDEELZIN — zegt hetzelfde als de tegel', () => {
     ['bezittingen', 'good', 'goed gespreid'],
     ['bezittingen', 'warn', 'beperkt gespreid'],
     ['bezittingen', 'bad', 'sterk geconcentreerd'],
-    ['cashflow', 'good', 'op koers met sparen'],
+    ['schulden', 'warn', 'aandacht'],
+    ['cashflow', 'good', 'op koers'],
+    ['cashflow', 'warn', 'aandacht'],
+    ['cashflow', 'bad', 'onder druk'],
     ['belasting', 'warn', 'mogelijk'],
   ] as const)('%s.%s deelt de kern "%s" met HEFBOOM_VERDICT', (h, s, kern) => {
     expect(HEFBOOM_OORDEELZIN[h][s].oordeel.toLowerCase()).toContain(kern)

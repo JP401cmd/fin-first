@@ -131,7 +131,7 @@ export function LeverageCard({
   kpi?: string | null
   status: LeverageStatus
   /**
-   * Het OORDEEL in gewone taal — "Hoge schuldenlast", "Op koers met sparen".
+   * Het OORDEEL in gewone taal — "Hoge schuldenlast", "Budget op koers".
    * Domeinspecifieke bronnen: `lib/hefboom-status-copy.ts` (de vier hefbomen)
    * en `lib/cashflow-cards.ts` (de cashflow-kaarten). Laat 'm nooit leeg in
    * `verdict`: de shell valt dan terug op het generieke

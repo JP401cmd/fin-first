@@ -67,7 +67,9 @@ describe('Schulden-hefboom — leeg account draagt geen waarschuwing (UR2-10)', 
     expect(debts.status).toBe('green')
     expect(debts.score).toBe(100)
     expect(debts.detail).toBe('Schuldenvrij')
-    expect(hefboomVerdict('schulden', leverToLeverageStatus(debts.status))).toBe('Aflossing op schema')
+    // "Lage schuldenlast", niet meer "Aflossing op schema": wie schuldenvrij is,
+    // heeft geen schema om op te lopen — de score meet schuld/bezit.
+    expect(hefboomVerdict('schulden', leverToLeverageStatus(debts.status))).toBe('Lage schuldenlast')
   })
 
   it('zware schuldenlast blijft rood mét oordeel (contrastgeval van de kaart)', () => {

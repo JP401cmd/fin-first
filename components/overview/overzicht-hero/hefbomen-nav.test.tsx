@@ -144,10 +144,11 @@ describe('HefbomenNav', () => {
     expect(screen.queryByText(/Schuldratio/)).toBeNull()
   })
 
-  it('status-substext "Tekort op rekening" bij cashflow bad', () => {
+  it('status-substext "Budget onder druk" bij cashflow bad', () => {
     render(<HefbomenNav health={mockHealth()} />)
-    // savings_rate = 30 → 'bad' → "Tekort op rekening"
-    expect(screen.getByText('Tekort op rekening')).toBeTruthy()
+    // savings_rate = 30 → 'bad' → "Budget onder druk" (was "Tekort op rekening";
+    // de cashflow-status mengt spaarquote en budgetten, dus geen oorzaak in het woord)
+    expect(screen.getByText('Budget onder druk')).toBeTruthy()
   })
 
   it('belasting-oordeel volgt de status i.p.v. één vaste waarschuwing (UR2-04)', () => {
@@ -194,8 +195,8 @@ describe('HefbomenNav', () => {
     render(<HefbomenNav health={null} />)
     // Alle 4 tegels → status neutral → geen substext
     expect(screen.queryByText('Diversificatie ok')).toBeNull()
-    expect(screen.queryByText('Aflossing op schema')).toBeNull()
-    expect(screen.queryByText('Op koers met sparen')).toBeNull()
+    expect(screen.queryByText('Lage schuldenlast')).toBeNull()
+    expect(screen.queryByText('Budget op koers')).toBeNull()
     expect(screen.queryByText('Geen actie nodig')).toBeNull()
   })
 
@@ -580,7 +581,7 @@ describe('HefbomenNav — eenvoudige weergave (S1: oordeel primair)', () => {
     )
     expect(screen.getByText('Belastingdruk beperkt')).toBeTruthy()
     expect(screen.getByText('Schuldenlast vraagt aandacht')).toBeTruthy()
-    expect(screen.getByText('Tekort op rekening')).toBeTruthy()
+    expect(screen.getByText('Budget onder druk')).toBeTruthy()
   })
 
   it('houdt het bedrag zichtbaar maar secundair (gedempt, niet weg)', () => {
@@ -765,7 +766,7 @@ describe('HefbomenNav — neutrale tegel naast een getal (#8)', () => {
       />,
     )
     // cashflow staat op 'red' → een echt oordeel, geen neutrale terugval.
-    expect(screen.getByText('Tekort op rekening')).toBeTruthy()
+    expect(screen.getByText('Budget onder druk')).toBeTruthy()
     expect(screen.queryByText('Nog geen oordeel')).toBeNull()
   })
 })

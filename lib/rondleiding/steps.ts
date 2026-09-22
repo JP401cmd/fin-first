@@ -508,18 +508,25 @@ const STAPPEN: readonly RondleidingStap[] = [
       // `savingsRate6m` is een GETAL, geen null: zonder inkomen levert de bron
       // 0 (`savingsRateFromAggregates`). "Nog geen boekingen" lees je dus niet
       // aan het getal af maar aan de tegel: die staat zonder gegevens op
-      // 'neutral'. Een quote ≤ 0 mét oordeel is een TEKORT — de tegel zegt dan
-      // "Tekort op rekening", en de rondleiding hoort niet te doen alsof er nog
-      // niets binnen is.
+      // 'neutral'. Een quote ≤ 0 mét oordeel betekent dat er niets overblijft,
+      // en de rondleiding hoort niet te doen alsof er nog niets binnen is.
+      //
+      // Het tegelwoord hangt er alleen achter als het niet groen is. De
+      // cashflow-status mengt spaarquote en budgetten 50/50: 0% sparen met alle
+      // budgetten binnen de limiet staat op groen, en "niets over: budget op
+      // koers" spreekt zichzelf tegen.
       const leeg = {
         tekst: 'Zodra je boekingen binnenkomen, zie ik hier wat je overhoudt. Dat deel van je inkomen bepaalt je tempo naar vrijheid.',
       }
       if (quote == null || !Number.isFinite(quote)) return leeg
       if (quote <= 0) {
         if (data.leverStatus.cashflow === 'neutral') return leeg
+        const nietsOver = data.leverStatus.cashflow === 'good' ? null : oordeel('cashflow', data)
         return {
           tekst: zinnen(
-            `Je houdt nu niets van je inkomen over: ${oordeel('cashflow', data) ?? 'nog zonder oordeel'}.`,
+            nietsOver
+              ? `Je houdt nu niets van je inkomen over: ${nietsOver}.`
+              : 'Je houdt nu niets van je inkomen over.',
             'Dat deel bepaalt je tempo naar vrijheid.',
             'Hier zie je wat er in en uit gaat, en waar het heen gaat.',
           ),

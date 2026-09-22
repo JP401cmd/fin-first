@@ -10,7 +10,7 @@ import type { Perspective } from '@/lib/household-data'
  * achter een `<Suspense>` ín de kop (ADR 0174 D6).
  *
  * De kop staat met het onderwerp "Je budget" al in de eerste byte; dit
- * component levert de rest ("is *op koers met sparen*."). Zo groeit de kop tot
+ * component levert de rest ("is *op koers*."). Zo groeit de kop tot
  * een zin in plaats van te verspringen, en blijft de LCP-kandidaat dataloos.
  *
  * DEZELFDE BRON ALS HET STATUSPUNT ERNAAST. De stip op deze route komt uit

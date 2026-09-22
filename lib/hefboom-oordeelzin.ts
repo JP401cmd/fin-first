@@ -79,10 +79,18 @@ export const HEFBOOM_ONDERWERP: Record<Hefboom, string> = {
  * `HEFBOOM_VERDICT_NEUTRAL_MET_CIJFER`, UR3-17 #8).
  *
  * Schulden zegt bij `good` "wegen licht" en níet "worden op schema afgelost"
- * (het concept, en `HEFBOOM_VERDICT.schulden.good`): de score is de verhouding
- * schuld/bezit (`scoreDebtRatio`), geen aflosschema. Wie schuldenvrij is maar
- * wel vermogen heeft, staat op groen — en had anders gelezen dat schulden die
- * hij niet heeft "op schema" worden afgelost (eindreview F3).
+ * (het concept): de score is de verhouding schuld/bezit (`scoreDebtRatio`),
+ * geen aflosschema. Wie schuldenvrij is maar wel vermogen heeft, staat op groen
+ * — en had anders gelezen dat schulden die hij niet heeft "op schema" worden
+ * afgelost (eindreview F3). De tegel zegt sinds 22 sep "Lage schuldenlast".
+ *
+ * Budget noemt bij good/warn/bad geen oorzaak ("op koers", "vraagt aandacht",
+ * "staat onder druk"). Het concept zei "op koers met sparen · onder je
+ * spaardoel · laat een tekort zien", maar de cashflow-status mengt spaarquote
+ * en budgetoverschrijding 50/50 (`computeLeverScores`): alleen budgetten met
+ * drie overschrijdingen is rood zonder gemeten tekort, 0% sparen met alle
+ * budgetten binnen de limiet is groen. De deck eronder noemt beide oorzaken
+ * ("We kijken hoeveel je spaart en of je binnen je budgetten blijft").
  */
 export const HEFBOOM_OORDEELZIN: Record<Hefboom, Record<LeverageStatus, Oordeelzin>> = {
   bezittingen: {
@@ -98,9 +106,9 @@ export const HEFBOOM_OORDEELZIN: Record<Hefboom, Record<LeverageStatus, Oordeelz
     neutral: { voor: 'Je schulden zijn', oordeel: 'nog niet in beeld' },
   },
   cashflow: {
-    good: { voor: 'Je budget is', oordeel: 'op koers met sparen' },
-    warn: { voor: 'Je budget blijft', oordeel: 'onder je spaardoel' },
-    bad: { voor: 'Je budget laat', oordeel: 'een tekort', na: 'zien' },
+    good: { voor: 'Je budget is', oordeel: 'op koers' },
+    warn: { voor: 'Je budget', oordeel: 'vraagt aandacht' },
+    bad: { voor: 'Je budget staat', oordeel: 'onder druk' },
     neutral: { voor: 'Je budget is', oordeel: 'nog niet te beoordelen' },
   },
   // `good` dekt ook "beperkt boven de vrijstelling mét fiscaal partner"

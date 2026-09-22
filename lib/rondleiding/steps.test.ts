@@ -502,9 +502,23 @@ describe('rondleiding — de cashflowstap onderscheidt "geen boekingen" van een 
     }
     const b = cashflow(tekort)
     expect(b.tekst).not.toMatch(/boekingen binnenkomen/)
-    expect(b.tekst).toContain('tekort op rekening')
+    expect(b.tekst).toContain('budget onder druk')
     expect(b.tekst).not.toContain('-6%')
     expect(telWoorden(b.tekst)).toBeLessThanOrEqual(RONDLEIDING_MAX_WOORDEN)
+  })
+
+  // De cashflow-status mengt spaarquote en budgetten 50/50: 0% sparen met alle
+  // budgetten binnen de limiet staat op groen. "Je houdt nu niets over: budget
+  // op koers" spreekt zichzelf tegen, dus bij groen noemt de zin alleen het feit.
+  it('noemt bij 0% sparen op een groene tegel geen oordeel achter "niets over"', () => {
+    const nul: RondleidingData = {
+      ...VOL,
+      totals: { ...VOL.totals!, cashflow: 0 },
+      leverStatus: { ...VOL.leverStatus, cashflow: 'good' },
+    }
+    const b = cashflow(nul)
+    expect(b.tekst).toMatch(/^Je houdt nu niets van je inkomen over\. /)
+    expect(b.tekst).not.toMatch(/op koers/i)
   })
 })
 

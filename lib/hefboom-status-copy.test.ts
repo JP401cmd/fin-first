@@ -48,6 +48,27 @@ describe('HEFBOOM_VERDICT — elk oordeel volgt zijn eigen status', () => {
     }
   })
 
+  /**
+   * Het tegelwoord mag niet méér beweren dan de status meet (kaart "Hefboomtegels
+   * en budgetzinnen beweren meer dan de score meet", 22 sep).
+   *
+   * Schulden: de score is de verhouding schuld/bezit (`scoreDebtRatio`), geen
+   * aflosschema — en wie schuldenvrij is mét vermogen staat op groen.
+   *
+   * Budget (cashflow): de status mengt spaarquote en budgetoverschrijding 50/50
+   * (`computeLeverScores`). Alleen budgetten met drie overschrijdingen geeft rood
+   * zonder dat er een tekort gemeten is; 0% sparen met alle budgetten binnen de
+   * limiet geeft groen. Een woord dat één van de twee oorzaken noemt ("sparen",
+   * "doel", "tekort", "rekening") is dus voor een deel van de gebruikers onwaar.
+   */
+  it('schulden.good zegt niets over aflossen of een schema', () => {
+    expect(HEFBOOM_VERDICT.schulden.good).not.toMatch(/aflos|afgelost|schema/i)
+  })
+
+  it.each(OORDEEL_STATUSSEN)('cashflow.%s noemt geen van beide oorzaken apart', (s) => {
+    expect(HEFBOOM_VERDICT.cashflow[s]).not.toMatch(/spa(ar|ren)|doel|tekort|rekening/i)
+  })
+
   it('neutral levert geen oordeel — de call-site kiest de neutrale tekst', () => {
     for (const key of HEFBOMEN) expect(hefboomVerdict(key, 'neutral')).toBeNull()
     expect(HEFBOOM_VERDICT_NEUTRAL).toBe('Nog geen gegevens')

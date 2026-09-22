@@ -22,8 +22,9 @@ import type { Oordeelzin } from '@/lib/hefboom-oordeelzin'
  *
  * Stromend (`sentenceSlot`): het vaste onderwerp ("Je budget") staat in de eerste
  * byte, en de rest van de zin stroomt erachteraan via `PageVerdictSentence` met
- * `subject`. De kop groeit dan van "Je budget" naar "Je budget is *op koers met
- * sparen*." in plaats van te verspringen.
+ * `subject`. De kop groeit dan van "Je budget" naar "Je budget *vraagt
+ * aandacht*." in plaats van te verspringen. `voor` mag gelijk zijn aan het
+ * onderwerp: dan blijft er na het afknippen alleen de spatie vóór het oordeel.
  *
  * ── "NAAM | OORDEEL": DE TITEL BESTAAT UIT TWEE DELEN ────────────────────────
  * Paginanaam + oordeel. Wie de naam toont, verschilt per breakpoint:

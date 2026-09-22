@@ -72,15 +72,25 @@ export const HEFBOOM_VERDICT: Record<
     warn: 'Beperkt gespreid',
     bad: 'Sterk geconcentreerd',
   },
+  // `good` was "Aflossing op schema". De score is de verhouding schuld/bezit
+  // (`scoreDebtRatio`), geen aflosschema, en wie schuldenvrij is mét vermogen
+  // staat op groen: die las dat schulden die hij niet heeft op schema liepen.
+  // "Lage schuldenlast" is het spiegelbeeld van `bad` en klopt voor beide.
   schulden: {
-    good: 'Aflossing op schema',
+    good: 'Lage schuldenlast',
     warn: 'Schuldenlast vraagt aandacht',
     bad: 'Hoge schuldenlast',
   },
+  // Was "Op koers met sparen · Lager dan doel · Tekort op rekening". De status
+  // mengt spaarquote en budgetoverschrijding 50/50 (`computeLeverScores`), dus
+  // een woord dat één oorzaak noemt, is voor een deel van de gebruikers onwaar:
+  // alleen budgetten met drie overschrijdingen is rood zonder gemeten tekort, en
+  // 0% sparen met alle budgetten binnen de limiet is groen. De oorzaak staat op
+  // de tegel zelf, in de detailregel ("3/5 op schema · Spaarquote 12%").
   cashflow: {
-    good: 'Op koers met sparen',
-    warn: 'Lager dan doel',
-    bad: 'Tekort op rekening',
+    good: 'Budget op koers',
+    warn: 'Budget vraagt aandacht',
+    bad: 'Budget onder druk',
   },
   // Elk van de drie is een CONSTATERING over de eigen Box 3-positie, geen
   // imperatief en geen besparingsbelofte (Wft). `good` dekt twee gevallen —
