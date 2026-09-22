@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-22T06:40:45.596Z",
+  "generatedAt": "2026-09-22T12:49:05.596Z",
   "generatedDate": "2026-09-22",
   "repo": {
     "name": "fin",
@@ -193,9 +193,9 @@
     "routesProduction": 90,
     "api": 333,
     "tables": 105,
-    "migrations": 259,
+    "migrations": 260,
     "integrations": 25,
-    "components": 1161,
+    "components": 1165,
     "providers": 19,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -8728,7 +8728,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 259
+    "migrationCount": 260
   },
   "tablesByDomain": [
     {
@@ -9286,11 +9286,11 @@
     }
   ],
   "components": {
-    "total": 1161,
+    "total": 1165,
     "groups": [
       {
         "group": "app",
-        "count": 475,
+        "count": 477,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -9725,11 +9725,13 @@
           "sync-status-badge.test",
           "target-account-choice",
           "target-account-choice.test",
+          "theme-color-sync",
           "toast-provider",
           "toekomst-overlay",
           "toekomst-overlay-balloons",
           "toekomst-overlay.test",
           "top-bar",
+          "top-bar.render.test",
           "transacties-feed",
           "transacties-feed.test",
           "transaction-form",
@@ -10259,7 +10261,7 @@
       },
       {
         "group": "mijn",
-        "count": 50,
+        "count": 52,
         "items": [
           "abonnement-section",
           "abonnement-section.test",
@@ -10310,7 +10312,9 @@
           "palette-picker.test",
           "privacy-overview",
           "privacy-overview.test",
-          "spend-limit-alias-picker"
+          "spend-limit-alias-picker",
+          "topbar-color-picker",
+          "topbar-color-picker.test"
         ]
       },
       {
@@ -18724,6 +18728,17 @@
       ],
       "summary": "De matcher van ADR 0172 gaat draaien zonder dat een lezer iets ziet: een weekcron (maandag 06:00 UTC, `/api/krant/cron`) leidt per gebruiker met de module nieuws een nieuwsprofiel af uit zijn eigen data (B8; expliciete `.eq('user_id', …)` op elke tabel, banden in plaats van bedra",
       "file": "docs/adr/0173-de-schaduweditie-van-de-krant-eigen-tabellen-profielafleiding-weekcron.md"
+    },
+    {
+      "id": "0174-de-topbar-draagt-de-paginanaam",
+      "title": "De mobiele TopBar draagt de paginanaam op een eigen, instelbare kleur; de kop op de pagina wordt een oordeelzin",
+      "status": "aanvaard",
+      "date": "2026-09-22",
+      "elements": [
+        "app-comp"
+      ],
+      "summary": "Testgebruikers vinden de teksten boven aan de pagina's moeilijk (B-069, B-071). De kop van een subpagina bestaat sinds de kop-herziening van september uit twee delen, \"Paginanaam | oordeel\". Op mobiel toont hij alleen het oordeel, omdat de TopBar de naam al draagt (`PageVerdictOp",
+      "file": "docs/adr/0174-de-topbar-draagt-de-paginanaam.md"
     }
   ],
   "churn": {
@@ -18739,7 +18754,7 @@
       },
       {
         "path": "app/(app)/toekomst",
-        "commits": 34
+        "commits": 35
       },
       {
         "path": "app/api/ai",
@@ -18794,7 +18809,7 @@
       {
         "file": "lib/release-notes.ts",
         "loc": 3394,
-        "commits": 7
+        "commits": 8
       },
       {
         "file": "lib/dashboard-data-loader.ts",
@@ -19998,8 +20013,16 @@
   "diff": {
     "baseline": false,
     "previousDate": "2026-09-22",
-    "hasChanges": false,
-    "sections": []
+    "hasChanges": true,
+    "sections": [
+      {
+        "label": "Componenten (aantal)",
+        "added": [
+          "+4"
+        ],
+        "removed": []
+      }
+    ]
   },
   "statsHistory": [
     {
@@ -20460,7 +20483,7 @@
     {
       "date": "2026-09-22",
       "api": 333,
-      "components": 1161,
+      "components": 1165,
       "tables": 105,
       "routesProduction": 90
     }
