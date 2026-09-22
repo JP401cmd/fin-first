@@ -33,8 +33,8 @@ van het stelsel.
 
 Bij het zoeken naar een betere grondslag is eerst de effectieve druk
 (`estimateBox3TaxDrag` = heffing / box 3-vermogen) overwogen. Die valt af om dezelfde
-reden. Gemeten op de canonieke forfait-keten (`computeBox3Heffing`, solo, geen schulden,
-2026):
+reden. Doorgerekend op de canonieke forfait-keten (`computeBox3Heffing`, solo, geen
+schulden, 2026) voor een reeks synthetische vermogensniveaus — geen productieaccount:
 
 | box 3-vermogen | 100% sparen | 100% beleggen |
 |---|---|---|
