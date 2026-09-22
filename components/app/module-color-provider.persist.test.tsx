@@ -24,9 +24,11 @@ import {
   ModuleColorProvider,
   useModuleColors,
   useColorHydration,
+  useTopbarColor,
 } from './module-color-provider'
 import {
   DEFAULT_MODULE_COLORS,
+  DEFAULT_TOPBAR_COLOR,
   type ModuleColorConfig,
   type BudgetColorConfig,
 } from '@/lib/color-palette'
@@ -372,4 +374,161 @@ describe('ModuleColorProvider — persist-gedrag bij partieel budget-only hydrat
       expect(appearancePuts).toHaveLength(0)
     },
   )
+})
+
+// ─── Scenario 5: TopBar-kleur (ADR 0174 D3, F2) ───────────────────────────
+
+describe('ModuleColorProvider — TopBar-kleur', () => {
+  type Api = ReturnType<typeof useModuleColors>
+  let api!: Api
+  let hydrate!: ReturnType<typeof useColorHydration>
+
+  function Capture() {
+    api = useModuleColors()
+    hydrate = useColorHydration()
+    return null
+  }
+
+  async function renderProvider(initialTopbarColor?: string | null) {
+    await act(async () => {
+      render(
+        <ModuleColorProvider initialConfig={DEFAULT_MODULE_COLORS} initialTopbarColor={initialTopbarColor}>
+          <div data-app-root>
+            <Capture />
+          </div>
+        </ModuleColorProvider>,
+      )
+    })
+  }
+
+  function appearancePuts() {
+    return fetchCalls.filter((c) => c.method === 'PUT' && c.url.includes('/api/appearance'))
+  }
+
+  it('seedt uit de profielrij en vuurt bij mount geen PUT', async () => {
+    await renderProvider('#1F2A44')
+    expect(api.topbarColor).toBe('#1f2a44')
+    await act(async () => { vi.advanceTimersByTime(500) })
+    expect(appearancePuts()).toHaveLength(0)
+  })
+
+  it('zonder keuze (null) is de kleur de standaard', async () => {
+    await renderProvider(null)
+    expect(api.topbarColor).toBe(DEFAULT_TOPBAR_COLOR)
+  })
+
+  it('een keuze stuurt ALLEEN topbar_color, lowercase — de andere groepen niet', async () => {
+    await renderProvider()
+    act(() => { api.setTopbarColor('#1D4E6B') })
+    expect(api.topbarColor).toBe('#1d4e6b')
+    await act(async () => { vi.advanceTimersByTime(500) })
+
+    const puts = appearancePuts()
+    expect(puts).toHaveLength(1)
+    expect(JSON.parse(puts[0].body)).toEqual({ topbar_color: '#1d4e6b' })
+  })
+
+  it('reset (de standaard of null) persisteert null', async () => {
+    await renderProvider('#1f2a44')
+    act(() => { api.setTopbarColor(DEFAULT_TOPBAR_COLOR) })
+    await act(async () => { vi.advanceTimersByTime(500) })
+    expect(JSON.parse(appearancePuts()[0].body)).toEqual({ topbar_color: null })
+    expect(api.topbarColor).toBe(DEFAULT_TOPBAR_COLOR)
+  })
+
+  it('een accent en een balkkleur binnen één debounce gaan samen in één PUT, zonder budget_colors', async () => {
+    await renderProvider()
+    const accent = { ...DEFAULT_MODULE_COLORS, kern: '#123456' }
+    act(() => { api.setConfig(accent) })
+    act(() => { api.setTopbarColor('#4a2a45') })
+    await act(async () => { vi.advanceTimersByTime(500) })
+
+    const puts = appearancePuts()
+    expect(puts).toHaveLength(1)
+    const body = JSON.parse(puts[0].body)
+    expect(body).toEqual({ module_colors: accent, topbar_color: '#4a2a45' })
+    expect(body).not.toHaveProperty('budget_colors')
+  })
+
+  it('een hydratatie binnen de debounce voegt geen groep toe aan de lopende persist', async () => {
+    await renderProvider()
+    act(() => { api.setTopbarColor('#2f2f33') })
+    act(() => { hydrate({ modules: { ...DEFAULT_MODULE_COLORS, kern: '#aaaaaa' } }) })
+    await act(async () => { vi.advanceTimersByTime(500) })
+
+    expect(JSON.parse(appearancePuts()[0].body)).toEqual({ topbar_color: '#2f2f33' })
+  })
+
+  it('zet de --topbar-*-vars op documentElement ÉN op [data-app-root] (daar wint de SSR-inline)', async () => {
+    await renderProvider()
+    act(() => { api.setTopbarColor('#faf9f6') })
+
+    const appRoot = document.querySelector<HTMLElement>('[data-app-root]')!
+    for (const el of [document.documentElement, appRoot]) {
+      expect(el.style.getPropertyValue('--topbar-bg')).toBe('#faf9f6')
+      // Lichte balk → inkt als voorgrond.
+      expect(el.style.getPropertyValue('--topbar-fg')).toBe('#1a1916')
+    }
+    // Ook de accenten landen op de app-root, anders blijft hun live preview
+    // achter de SSR-waarde hangen.
+    act(() => { api.setConfig({ ...DEFAULT_MODULE_COLORS, kern: '#123456' }) })
+    expect(appRoot.style.getPropertyValue('--color-kern-500')).not.toBe('')
+    await act(async () => { vi.advanceTimersByTime(500) })
+  })
+
+  it('een save die op de server of het netwerk mislukt, gaat mee met de volgende keuze', async () => {
+    await renderProvider()
+    const accent = { ...DEFAULT_MODULE_COLORS, kern: '#123456' }
+    let calls = 0
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      fetchCalls.push({ method: (init?.method ?? 'GET').toUpperCase(), url: String(input), body: String(init?.body ?? '') })
+      calls += 1
+      return new Response('{}', { status: calls === 1 ? 500 : 200 })
+    }))
+
+    act(() => { api.setConfig(accent) })
+    await act(async () => { vi.advanceTimersByTime(500) })
+    act(() => { api.setTopbarColor('#1f2a44') })
+    await act(async () => { vi.advanceTimersByTime(500) })
+
+    const puts = appearancePuts()
+    expect(puts).toHaveLength(2)
+    expect(JSON.parse(puts[1].body)).toEqual({ module_colors: accent, topbar_color: '#1f2a44' })
+  })
+
+  it('een 4xx wordt niet opnieuw verstuurd (ongeldige invoer blijft ongeldig)', async () => {
+    await renderProvider()
+    let calls = 0
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      fetchCalls.push({ method: (init?.method ?? 'GET').toUpperCase(), url: String(input), body: String(init?.body ?? '') })
+      calls += 1
+      return new Response('{}', { status: calls === 1 ? 400 : 200 })
+    }))
+
+    act(() => { api.setConfig({ ...DEFAULT_MODULE_COLORS, kern: '#654321' }) })
+    await act(async () => { vi.advanceTimersByTime(500) })
+    act(() => { api.setTopbarColor('#1f2a44') })
+    await act(async () => { vi.advanceTimersByTime(500) })
+
+    expect(JSON.parse(appearancePuts()[1].body)).toEqual({ topbar_color: '#1f2a44' })
+  })
+
+  it('useTopbarColor volgt de keuze, en valt zonder provider terug op de standaard', async () => {
+    let seen = ''
+    function Reader() {
+      seen = useTopbarColor()
+      return null
+    }
+    await act(async () => { render(<Reader />) })
+    expect(seen).toBe(DEFAULT_TOPBAR_COLOR)
+
+    await act(async () => {
+      render(
+        <ModuleColorProvider initialConfig={DEFAULT_MODULE_COLORS} initialTopbarColor="#234a35">
+          <Reader />
+        </ModuleColorProvider>,
+      )
+    })
+    expect(seen).toBe('#234a35')
+  })
 })

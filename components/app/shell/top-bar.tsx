@@ -29,7 +29,8 @@
  *    titel (via NavStackMeta op de pagina) NAAST het utility/icoon-cluster
  *    rechts. De `kind === 'simple'` fallback met resolveRouteTitle springt
  *    bewust niet voor 'rich'; de titel komt daar dus van de NavStackMeta-prop.
- *  - De browserchrome volgt de balkkleur via `ThemeColorSync`.
+ *  - De browserchrome volgt de balkkleur via `ThemeColorSync`, gevoed met de
+ *    keuze van de gebruiker uit de ModuleColorProvider (ADR 0174 D3).
  *  - 44×44px touch-targets voor ←-knop en actions (a11y minimum).
  *  - `safe-area-inset-top` padding voor iOS-notch.
  *  - Optionele `title` + `showBackOverride` props voor de outgoing-tray:
@@ -60,7 +61,7 @@ import { LeverCompassMobile } from '@/components/app/shell/lever-compass'
 import { useLeverScores } from '@/components/app/shell/shell-contexts'
 import { useHomeScreen } from '@/lib/hooks/use-home-screen'
 import { TAP_TARGET_EXTEND_BLOCK } from '@/components/editorial/tap-target'
-import { DEFAULT_TOPBAR_COLOR } from '@/lib/color-palette'
+import { useTopbarColor } from '@/components/app/module-color-provider'
 import { ThemeColorSync } from './theme-color-sync'
 
 type TopBarProps = {
@@ -345,6 +346,7 @@ export function TopBar({
   // Gekozen homescherm — voedt de "← home"-knop op de secundaire tab-roots.
   // Vóór de conditionele returns (rules of hooks).
   const { homeScreen, homeHref } = useHomeScreen()
+  const topbarColor = useTopbarColor()
 
   const top = currentStack[currentStack.length - 1]
   const kind = resolveTopBarKind(kindOverride, top?.topBar?.kind, currentStack.length)
@@ -423,7 +425,7 @@ export function TopBar({
       // zo dóór onder de statusbalk (`statusBarStyle: 'black-translucent'`).
       style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
     >
-      <ThemeColorSync color={DEFAULT_TOPBAR_COLOR} />
+      <ThemeColorSync color={topbarColor} />
 
       {/* Inner-row vaste hoogte 48px. Lay-out: [terug?] [naam (truncate)] [actions].
           `pl-1` + de 44px-knop zet de chevron dicht bij de schermrand; zonder

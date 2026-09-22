@@ -5,9 +5,12 @@ import type { ModuleColorConfig, ModuleName, Shade, BudgetColorConfig, BudgetTyp
 import {
   generateAllColorVars,
   generatePalette,
+  topbarColorVars,
+  normalizeTopbarColor,
   DEFAULT_MODULE_COLORS,
   DEFAULT_BUDGET_COLORS,
   DEFAULT_PHASE_COLORS,
+  DEFAULT_TOPBAR_COLOR,
 } from '@/lib/color-palette'
 
 export type FontTheme = 'editorial' | 'andada' | 'digital'
@@ -111,6 +114,11 @@ type ModuleColorContextType = {
   setPhaseConfig: (config: PhaseColorConfig) => void
   getPhaseHex: (phase: PhaseColorName, shade?: Shade) => string
 
+  // TopBar-kleur (ADR 0174 D3). `topbarColor` is altijd een geldige hex: de
+  // keuze, of de standaard. `setTopbarColor(null)` zet hem terug.
+  topbarColor: string
+  setTopbarColor: (hex: string | null) => void
+
   /**
    * Niet-persisterende hydratatie vanuit een DB-leesroute. Zet refs + state +
    * CSS-vars, maar triggert NOOIT schedulePersist(). Gebruik dit overal waar
@@ -136,22 +144,49 @@ type ModuleColorContextType = {
 const ModuleColorContext = createContext<ModuleColorContextType | null>(null)
 
 /**
- * Applies all color CSS variables to document.documentElement.
- * Covers module (33) + budget (55) + phase (44) = 132 variables.
+ * Schrijft CSS-vars op `documentElement` én op `[data-app-root]`. Op die
+ * laatste staan de SSR-waarden inline, en die winnen daar van `documentElement`.
+ */
+function writeRootVars(vars: Record<string, string>) {
+  const targets = [document.documentElement, document.querySelector<HTMLElement>('[data-app-root]')]
+  for (const el of targets) {
+    if (!el) continue
+    for (const [key, value] of Object.entries(vars)) {
+      el.style.setProperty(key, value)
+    }
+  }
+}
+
+/** Wat er bij de eerstvolgende persist naar /api/appearance gaat, per groep. */
+type PendingPersist = {
+  module_colors?: ModuleColorConfig
+  budget_colors?: BudgetColorConfig
+  topbar_color?: string | null
+}
+
+/**
+ * Applies all color CSS variables to document.documentElement AND the
+ * `[data-app-root]` wrapper. Covers module + budget + phase + de vier
+ * `--topbar-*`-tokens.
  *
- * Server-side inline styles handle initial render (no flash).
- * This provider handles dynamic updates after hydration.
+ * Server-side inline styles handle initial render (no flash). Die staan op
+ * `[data-app-root]` en winnen daar van `documentElement`; daarom schrijft de
+ * provider óók op dat element (zoals `applyFontVars`). This provider handles
+ * dynamic updates after hydration.
  */
 export function ModuleColorProvider({
   initialConfig,
   initialBudgetConfig,
   initialPhaseConfig,
+  initialTopbarColor = null,
   initialFontTheme = 'editorial',
   children,
 }: {
   initialConfig: ModuleColorConfig
   initialBudgetConfig?: BudgetColorConfig
   initialPhaseConfig?: PhaseColorConfig
+  /** `profiles.topbar_color`; `null` = de standaard. */
+  initialTopbarColor?: string | null
   initialFontTheme?: FontTheme
   children: React.ReactNode
 }) {
@@ -162,6 +197,10 @@ export function ModuleColorProvider({
   const [phaseConfig, setPhaseConfigState] = useState<PhaseColorConfig>(
     initialPhaseConfig ?? DEFAULT_PHASE_COLORS
   )
+  // `null` = de standaardkleur, net als in `profiles.topbar_color`.
+  const [topbarChoice, setTopbarChoice] = useState<string | null>(() =>
+    normalizeTopbarColor(initialTopbarColor)
+  )
   const [fontTheme, setFontThemeState] = useState<FontTheme>(initialFontTheme)
   const [paletteTheme, setPaletteThemeState] = useState<PaletteTheme>('cream')
 
@@ -169,6 +208,7 @@ export function ModuleColorProvider({
   const moduleRef = useRef(config)
   const budgetRef = useRef(budgetConfig)
   const phaseRef = useRef(phaseConfig)
+  const topbarRef = useRef(topbarChoice)
 
   // Debounce-timer voor het persisteren van kleur-keuzes naar profiles.
   // Eén gedeelde timer: snel achter elkaar klikken levert één PUT op.
@@ -180,40 +220,50 @@ export function ModuleColorProvider({
   // nodig). De persist mag echter UITSLUITEND de gebruikerskeuze versturen, ook
   // als er binnen het debounce-window stale DB-waarden gehydrateerd worden —
   // anders clobbert die hydratatie de keuze alsnog via de pending timer.
-  const pendingPersistRef = useRef<{
-    module_colors: ModuleColorConfig
-    budget_colors: BudgetColorConfig
-  } | null>(null)
+  //
+  // Per groep (F2): alleen de groep die de gebruiker aanraakte gaat mee. Wie de
+  // balkkleur kiest, stuurt dus geen accenten mee die op een ander apparaat
+  // inmiddels veranderd kunnen zijn, en andersom.
+  const pendingPersistRef = useRef<PendingPersist | null>(null)
 
   /**
    * Verstuurt de gesnapshotte kleur-keuze direct naar profiles via
    * /api/appearance. `keepalive: true` zorgt dat de request óók afrondt als de
    * pagina sluit/navigeert (browser houdt 'm in leven). Fire-and-forget: een
    * mislukte save mag de UI nooit blokkeren.
+   *
+   * Mislukt de save door het netwerk of de server (geen 4xx), dan gaat de
+   * payload terug in de wachtrij, ónder eventuele nieuwere keuzes. De volgende
+   * keuze neemt hem dan mee. Zonder dat zou een mislukte accentkeuze stil
+   * verloren gaan zodra de gebruiker daarna alleen een andere groep aanraakt,
+   * nu er per groep wordt verstuurd. Geen eigen retry-lus: offline blijft
+   * offline.
    */
   const sendPersist = useCallback(() => {
     const payload = pendingPersistRef.current
     if (!payload) return
     pendingPersistRef.current = null
+    const requeue = () => {
+      pendingPersistRef.current = { ...payload, ...pendingPersistRef.current }
+    }
     void fetch('/api/appearance', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
       keepalive: true,
-    }).catch(() => { /* offline / transient — CSS-vars blijven staan */ })
+    })
+      .then((res) => { if (res.status >= 500) requeue() })
+      .catch(requeue)
   }, [])
 
   /**
-   * Snapshot de huidige keuze en persisteer 'm debounced (400ms) naar profiles.
-   * CSS-vars zijn al direct toegepast; deze call zorgt dat de keuze een refresh
-   * overleeft (layout laadt ze weer in). Een lopende timer wordt door de
-   * pagehide/visibilitychange-flush hieronder direct verzilverd.
+   * Voeg de gekozen groep toe aan de snapshot en persisteer 'm debounced (400ms)
+   * naar profiles. CSS-vars zijn al direct toegepast; deze call zorgt dat de
+   * keuze een refresh overleeft (layout laadt ze weer in). Een lopende timer
+   * wordt door de pagehide/visibilitychange-flush hieronder direct verzilverd.
    */
-  const schedulePersist = useCallback(() => {
-    pendingPersistRef.current = {
-      module_colors: moduleRef.current,
-      budget_colors: budgetRef.current,
-    }
+  const schedulePersist = useCallback((patch: PendingPersist) => {
+    pendingPersistRef.current = { ...pendingPersistRef.current, ...patch }
     if (persistTimer.current) clearTimeout(persistTimer.current)
     persistTimer.current = setTimeout(() => {
       persistTimer.current = null
@@ -222,30 +272,39 @@ export function ModuleColorProvider({
   }, [sendPersist])
 
   const applyVars = useCallback(() => {
-    const vars = generateAllColorVars({
-      modules: moduleRef.current,
-      budget: budgetRef.current,
-      phase: phaseRef.current,
+    writeRootVars({
+      ...generateAllColorVars({
+        modules: moduleRef.current,
+        budget: budgetRef.current,
+        phase: phaseRef.current,
+      }),
+      ...topbarColorVars(topbarRef.current ?? DEFAULT_TOPBAR_COLOR),
     })
-    const root = document.documentElement
-    for (const [key, value] of Object.entries(vars)) {
-      root.style.setProperty(key, value)
-    }
   }, [])
 
   const setConfig = useCallback((newConfig: ModuleColorConfig) => {
     moduleRef.current = newConfig
     setConfigState(newConfig)
     applyVars()
-    schedulePersist()
+    schedulePersist({ module_colors: newConfig })
   }, [applyVars, schedulePersist])
 
   const setBudgetConfig = useCallback((newConfig: BudgetColorConfig) => {
     budgetRef.current = newConfig
     setBudgetConfigState(newConfig)
     applyVars()
-    schedulePersist()
+    schedulePersist({ budget_colors: newConfig })
   }, [applyVars, schedulePersist])
+
+  const setTopbarColor = useCallback((hex: string | null) => {
+    const next = normalizeTopbarColor(hex)
+    topbarRef.current = next
+    setTopbarChoice(next)
+    // Alleen de vier balk-tokens: de native color-input vuurt tijdens slepen
+    // tientallen keren per seconde, en de accentpaletten veranderen hier niet.
+    writeRootVars(topbarColorVars(next ?? DEFAULT_TOPBAR_COLOR))
+    schedulePersist({ topbar_color: next })
+  }, [schedulePersist])
 
   const setPhaseConfig = useCallback((newConfig: PhaseColorConfig) => {
     phaseRef.current = newConfig
@@ -382,6 +441,8 @@ export function ModuleColorProvider({
     return palette[shade].hex
   }, [phaseConfig])
 
+  const topbarColor = topbarChoice ?? DEFAULT_TOPBAR_COLOR
+
   // Gememoized context-value: alle setters/getters zijn al useCallback, dus
   // zonder deze memo kreeg élke provider-render een nieuwe object-identiteit
   // en herrenderden alle useModuleColors/useModuleHex-consumers app-breed —
@@ -391,11 +452,12 @@ export function ModuleColorProvider({
     config, setConfig, getHex,
     budgetConfig, setBudgetConfig, getBudgetHex,
     phaseConfig, setPhaseConfig, getPhaseHex,
+    topbarColor, setTopbarColor,
     hydrateColors,
     fontTheme, setFontTheme,
     paletteTheme, setPaletteTheme,
   }), [config, setConfig, getHex, budgetConfig, setBudgetConfig, getBudgetHex,
-    phaseConfig, setPhaseConfig, getPhaseHex, hydrateColors,
+    phaseConfig, setPhaseConfig, getPhaseHex, topbarColor, setTopbarColor, hydrateColors,
     fontTheme, setFontTheme, paletteTheme, setPaletteTheme])
 
   return (
@@ -421,6 +483,15 @@ export function usePhaseColors() {
   const ctx = useContext(ModuleColorContext)
   if (!ctx) throw new Error('usePhaseColors must be used within ModuleColorProvider')
   return { phaseConfig: ctx.phaseConfig, setPhaseConfig: ctx.setPhaseConfig, getPhaseHex: ctx.getPhaseHex }
+}
+
+/**
+ * De actuele TopBar-kleur als geldige hex (de keuze of de standaard), voor
+ * `ThemeColorSync`. Zonder provider (tests, losse renders) de standaard.
+ */
+export function useTopbarColor(): string {
+  const ctx = useContext(ModuleColorContext)
+  return ctx?.topbarColor ?? DEFAULT_TOPBAR_COLOR
 }
 
 /**

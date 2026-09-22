@@ -72,9 +72,12 @@ import { WELCOME_GUIDE_MODULE_KEY, openGuideSteps, summarizeGuide } from '@/lib/
 import { AccountStorageGuard } from '@/components/app/account-storage-guard'
 import {
   generateAllColorVars,
+  topbarColorVars,
+  normalizeTopbarColor,
   DEFAULT_MODULE_COLORS,
   DEFAULT_BUDGET_COLORS,
   DEFAULT_PHASE_COLORS,
+  DEFAULT_TOPBAR_COLOR,
 } from '@/lib/color-palette'
 import type { ModuleColorConfig, BudgetColorConfig, PhaseColorConfig } from '@/lib/color-palette'
 import type { FontTheme } from '@/components/app/module-color-provider'
@@ -563,9 +566,14 @@ export default async function AppLayout({
     phase_mastery:   pc?.phase_mastery   || DEFAULT_PHASE_COLORS.phase_mastery,
   }
 
+  // TopBar-kleur (ADR 0174 D3): `null` = de standaard. De waarde gaat
+  // rechtstreeks een style-attribuut in; `normalizeTopbarColor` en
+  // `topbarColorVars` laten daarom alleen `#rrggbb` door.
+  const topbarColor = normalizeTopbarColor(profile?.topbar_color as string | null | undefined)
+
   const colorVars = generateAllColorVars({ modules: moduleColors, budget: budgetColors, phase: phaseColors })
   const fontVars = generateFontVars(profile?.typography_theme ?? 'editorial')
-  const allVars = { ...colorVars, ...fontVars }
+  const allVars = { ...colorVars, ...topbarColorVars(topbarColor ?? DEFAULT_TOPBAR_COLOR), ...fontVars }
 
   return (
     <MobilePreviewProvider>
@@ -622,7 +630,7 @@ export default async function AppLayout({
               <VragenlijstSignaalProvider>
               <NotificationProvider>
               <GlobalSyncProvider>
-                <ModuleColorProvider initialConfig={moduleColors} initialBudgetConfig={budgetColors} initialPhaseConfig={phaseColors} initialFontTheme={(profile?.typography_theme as FontTheme) ?? 'editorial'}>
+                <ModuleColorProvider initialConfig={moduleColors} initialBudgetConfig={budgetColors} initialPhaseConfig={phaseColors} initialTopbarColor={topbarColor} initialFontTheme={(profile?.typography_theme as FontTheme) ?? 'editorial'}>
                   {/* Deelt de slot-plek in de mobiele nav-pill met FinHome: de
                       pill zit in de ResponsiveShell, FinHome hangt er als
                       sibling naast. Zie lib/shell/fin-slot.tsx. */}

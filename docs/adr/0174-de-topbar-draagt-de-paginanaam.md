@@ -65,6 +65,18 @@ de standaard terwijl de balk de keuze van de gebruiker toont. Rond een balk-lumi
 ~0,2 halen wit én inkt maar ~4,2:1. Daar hoort de picker te waarschuwen, zoals de
 WCAG-hint bij de accenten.
 
+Uitgevoerd in F2 (22 sep), met drie keuzes die hier niet stonden:
+- **`null` is de standaard.** Ook wie leisteen zelf kiest of reset, krijgt `null`
+  (`normalizeTopbarColor`). Zo volgt die gebruiker een latere wijziging van de standaard.
+- **De provider persisteert per groep.** Een PUT bevat alleen de groep die de gebruiker
+  aanraakte. Wie de balkkleur kiest, stuurt dus geen accenten mee die op een ander
+  apparaat inmiddels veranderd kunnen zijn, en andersom. Tot F2 ging bij elke keuze
+  `{module_colors, budget_colors}` samen mee. Een save die op het netwerk of de server
+  (5xx) mislukt, gaat terug in de wachtrij en reist mee met de volgende keuze. Zo
+  herstelt een mislukte save zich nog steeds, zoals toen alles samen ging.
+- **De kleur-vars komen óók op `[data-app-root]`.** Daar wint de SSR-inline van
+  `documentElement`. Dat geldt voor alle kleurgroepen, niet alleen de balk.
+
 **D4 — De browserchrome volgt de balk.** `ThemeColorSync` hangt in de TopBar en zet een
 tweede `<meta name="theme-color">` vóór de statische papier-meta van de root-layout, met
 `media="(max-width: 1023.98px)"`. De browser kiest de eerste passende meta. Onder `lg`

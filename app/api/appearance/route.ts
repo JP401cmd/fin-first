@@ -1,29 +1,53 @@
+import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
-import { NextRequest, NextResponse } from 'next/server'
+import { unauthorized, badRequest, serverError } from '@/lib/api/respond'
+import { parseBody } from '@/lib/api/parse-body'
 import {
   DEFAULT_MODULE_COLORS,
   DEFAULT_BUDGET_COLORS,
+  normalizeTopbarColor,
   type ModuleColorConfig,
   type BudgetColorConfig,
 } from '@/lib/color-palette'
 
 /**
  * /api/appearance — persistentie van de kleur-personalisatie die op
- * /mijn/uiterlijk wordt gekozen. Schrijft de accentkleuren (module_colors)
- * en budget-tints (budget_colors) naar de eigen profiles-rij.
+ * /mijn/uiterlijk wordt gekozen. Schrijft de accentkleuren (module_colors),
+ * budget-tints (budget_colors) en de TopBar-kleur (topbar_color, ADR 0174 D3)
+ * naar de eigen profiles-rij.
  *
  * De ModuleColorProvider roept dit debounced aan bij elke kleurkeuze; de
  * layout laadt de opgeslagen waardes weer in bij de volgende render zodat
  * het rondje klopt: kiezen → opslaan → refresh → behouden.
  *
+ * Elke groep is optioneel en wordt alleen geschreven als hij meekomt. Wie
+ * alleen `topbar_color` stuurt, raakt de accenten en budget-tints dus niet.
+ *
  * Eigen rij only — RLS op profiles dwingt af dat een gebruiker alleen zijn
- * eigen accentkleuren kan schrijven (auth.uid()). Geen service-role.
+ * eigen kleuren kan schrijven (auth.uid()). Geen service-role.
  */
 
 const HEX_RE = /^#[0-9a-fA-F]{6}$/
 
 const MODULE_KEYS = Object.keys(DEFAULT_MODULE_COLORS) as (keyof ModuleColorConfig)[]
 const BUDGET_KEYS = Object.keys(DEFAULT_BUDGET_COLORS) as (keyof BudgetColorConfig)[]
+
+/**
+ * De kleur-maps blijven bewust ruim (`unknown`) en gaan door
+ * `sanitizeColorMap`: een onbekende sleutel of één ongeldige waarde laat de
+ * rest van de map gewoon opslaan, zoals vóór de zod-retrofit. De TopBar-kleur
+ * is één waarde en is streng: `#rrggbb` of `null` (= de standaard), anders 400.
+ */
+const AppearanceSchema = z.object({
+  module_colors: z.unknown().optional(),
+  budget_colors: z.unknown().optional(),
+  topbar_color: z
+    .string()
+    .regex(HEX_RE, 'moet een kleur als #rrggbb zijn')
+    .nullable()
+    .optional(),
+})
 
 /**
  * Sanitiseert een binnenkomende kleur-map: alleen bekende keys, alleen
@@ -49,26 +73,25 @@ function sanitizeColorMap<K extends string>(
   return any ? out : undefined
 }
 
-export async function PUT(request: NextRequest) {
+export async function PUT(request: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
-  }
+  if (!user) return unauthorized()
 
-  let body: Record<string, unknown>
-  try {
-    body = await request.json()
-  } catch {
-    return NextResponse.json({ error: 'Ongeldig verzoek' }, { status: 400 })
-  }
+  const parsed = await parseBody(AppearanceSchema, request)
+  if (!parsed.ok) return parsed.response
+  const body = parsed.data
 
   const moduleColors = sanitizeColorMap(body.module_colors, MODULE_KEYS)
   const budgetColors = sanitizeColorMap(body.budget_colors, BUDGET_KEYS)
+  const hasTopbar = body.topbar_color !== undefined
+  // Lowercase vóór de upsert: de DB-check is `^#[0-9a-f]{6}$`. De standaard
+  // zelf wordt null, zodat een reset een latere wijziging van de standaard volgt.
+  const topbarColor = hasTopbar ? normalizeTopbarColor(body.topbar_color) : undefined
 
-  if (!moduleColors && !budgetColors) {
-    return NextResponse.json({ error: 'Geen geldige kleuren ontvangen' }, { status: 400 })
+  if (!moduleColors && !budgetColors && !hasTopbar) {
+    return badRequest('Geen geldige kleuren ontvangen')
   }
 
   const updateData: Record<string, unknown> = {
@@ -77,16 +100,16 @@ export async function PUT(request: NextRequest) {
   }
   if (moduleColors) updateData.module_colors = moduleColors
   if (budgetColors) updateData.budget_colors = budgetColors
+  if (hasTopbar) updateData.topbar_color = topbarColor
 
   const { error } = await supabase.from('profiles').upsert(updateData)
 
-  if (error) {
-    return NextResponse.json({ error: 'Fout bij opslaan kleuren' }, { status: 500 })
-  }
+  if (error) return serverError(error, 'appearance:PUT', 'Fout bij opslaan kleuren')
 
   return NextResponse.json({
     success: true,
     module_colors: moduleColors ?? null,
     budget_colors: budgetColors ?? null,
+    ...(hasTopbar ? { topbar_color: topbarColor } : {}),
   })
 }

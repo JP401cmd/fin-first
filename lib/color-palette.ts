@@ -556,7 +556,8 @@ export function generatePhaseColorVars(
  * `:root` in `app/globals.css` draagt precies
  * `topbarColorVars(DEFAULT_TOPBAR_COLOR)`. Wijzig je deze waarde, regenereer
  * dan die vier regels; `color-palette.topbar.test.ts` wordt anders rood.
- * Fase F2 maakt de kleur per gebruiker instelbaar (`profiles.topbar_color`).
+ * Per gebruiker instelbaar sinds F2: `profiles.topbar_color`, waarin `null`
+ * deze standaard betekent.
  */
 export const DEFAULT_TOPBAR_COLOR = '#3f4a5e'
 
@@ -593,6 +594,69 @@ export function topbarColorVars(hex: string = DEFAULT_TOPBAR_COLOR): Record<stri
     '--topbar-fg': light ? TOPBAR_FG_LIGHT : TOPBAR_FG_DARK,
     '--topbar-fg-muted': `rgba(${rgb}, 0.75)`,
     '--topbar-hover': `rgba(${rgb}, ${light ? 0.12 : 0.08})`,
+  }
+}
+
+/**
+ * De voorkeuzen van de TopBar-picker op /mijn/uiterlijk (F2). Allemaal donker
+ * genoeg voor een witte naam op AA, behalve papier: dat is de oude lichte balk,
+ * met inkt als voorgrond. Getoetst in `color-palette.topbar.test.ts`.
+ */
+export const TOPBAR_PRESETS: readonly { name: string; hex: string }[] = [
+  { name: 'Leisteen (standaard)', hex: DEFAULT_TOPBAR_COLOR },
+  { name: 'Inktblauw', hex: '#1f2a44' },
+  { name: 'Staalblauw', hex: '#1d4e6b' },
+  { name: 'Donkergroen', hex: '#234a35' },
+  { name: 'Aubergine', hex: '#4a2a45' },
+  { name: 'Antraciet', hex: '#2f2f33' },
+  { name: 'Papier', hex: '#faf9f6' },
+]
+
+/**
+ * Brengt een TopBar-keuze terug tot wat er in `profiles.topbar_color` hoort:
+ * lowercase `#rrggbb`, of `null` voor de standaard. De standaardkleur zelf wordt
+ * óók `null`, zodat wie hem (terug)kiest een latere wijziging van de standaard
+ * vanzelf volgt. Ongeldige invoer is eveneens `null`, net als de terugval in
+ * `topbarColorVars`.
+ */
+export function normalizeTopbarColor(hex: string | null | undefined): string | null {
+  if (typeof hex !== 'string' || !HEX6.test(hex)) return null
+  const lower = hex.toLowerCase()
+  return lower === DEFAULT_TOPBAR_COLOR ? null : lower
+}
+
+/**
+ * De stoplichtpunten van het kompas op de balk: Tailwind v4 emerald-500 en
+ * amber-500 (`lever-compass.tsx`), naar sRGB. Rood-500 staat er bewust niet
+ * in: dat punt heeft een ring in `--topbar-fg` (ADR 0174 D5b) en leunt dus op
+ * het contrast van de voorgrond, niet op dat van de stip zelf.
+ */
+const TOPBAR_STATUS_DOTS = [
+  oklchToHex(0.696, 0.17, 162.48),
+  oklchToHex(0.769, 0.188, 70.08),
+] as const
+
+export interface TopbarLegibility {
+  /** Contrast van de naam (`--topbar-fg`) op de balk. */
+  textContrast: number
+  /** De naam haalt geen WCAG AA (4,5:1). Rond een balk-luminantie van ~0,2. */
+  textLow: boolean
+  /** Groen of amber zakt onder 3:1 (WCAG 1.4.11), zoals op een lichte balk. */
+  statusDotsLow: boolean
+}
+
+/**
+ * Leesbaarheid van een balkkleur, voor de hint in de picker. Waarschuwt,
+ * blokkeert nooit: zelfde lijn als de WCAG-hint bij de accenten.
+ */
+export function topbarLegibility(hex: string): TopbarLegibility {
+  const vars = topbarColorVars(hex)
+  const bg = vars['--topbar-bg']
+  const textContrast = contrastRatio(vars['--topbar-fg'], bg)
+  return {
+    textContrast,
+    textLow: textContrast < 4.5,
+    statusDotsLow: TOPBAR_STATUS_DOTS.some((dot) => contrastRatio(dot, bg) < 3),
   }
 }
 

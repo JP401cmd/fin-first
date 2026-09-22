@@ -1,7 +1,16 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { contrastRatio, DEFAULT_TOPBAR_COLOR, topbarColorVars } from './color-palette'
+import {
+  accentClashesWithStatus,
+  contrastRatio,
+  DEFAULT_TOPBAR_COLOR,
+  normalizeTopbarColor,
+  TOPBAR_PRESETS,
+  topbarColorVars,
+  topbarLegibility,
+} from './color-palette'
+import { LEVERAGE_STATUS_DOT } from './leverage-status'
 
 /**
  * De kleur van de mobiele TopBar (ADR 0174). `topbarColorVars` levert de vier
@@ -119,4 +128,98 @@ describe('globals.css :root draagt topbarColorVars(DEFAULT_TOPBAR_COLOR)', () =>
       expect(m![1].trim()).toBe(waarde)
     })
   }
+})
+
+describe('TOPBAR_PRESETS — de voorkeuzen van de picker (F2)', () => {
+  it('begint met de standaard en heeft geen dubbele kleuren', () => {
+    expect(TOPBAR_PRESETS[0].hex).toBe(DEFAULT_TOPBAR_COLOR)
+    const hexen = TOPBAR_PRESETS.map(p => p.hex)
+    expect(new Set(hexen).size).toBe(hexen.length)
+  })
+
+  for (const { name, hex } of TOPBAR_PRESETS) {
+    it(`${name} (${hex}) haalt AA voor de naam, en is een geldige lowercase hex`, () => {
+      expect(hex).toMatch(/^#[0-9a-f]{6}$/)
+      const vars = topbarColorVars(hex)
+      expect(vars['--topbar-bg']).toBe(hex)
+      expect(contrastRatio(vars['--topbar-fg'], hex)).toBeGreaterThanOrEqual(4.5)
+      expect(topbarLegibility(hex).textLow).toBe(false)
+    })
+
+    it(`${name} (${hex}) botst niet met de stoplichtkleuren`, () => {
+      expect(accentClashesWithStatus(hex)).toBe('ok')
+    })
+  }
+
+  it('alleen papier laat de statuspunten wegvallen (bewust: de oude lichte balk)', () => {
+    const laag = TOPBAR_PRESETS.filter(p => topbarLegibility(p.hex).statusDotsLow).map(p => p.name)
+    expect(laag).toEqual(['Papier'])
+  })
+})
+
+describe('normalizeTopbarColor — wat er in profiles.topbar_color hoort', () => {
+  it('een geldige kleur wordt lowercase', () => {
+    expect(normalizeTopbarColor('#1F2A44')).toBe('#1f2a44')
+  })
+
+  it('de standaard wordt null, in elke schrijfwijze', () => {
+    expect(normalizeTopbarColor(DEFAULT_TOPBAR_COLOR)).toBeNull()
+    expect(normalizeTopbarColor(DEFAULT_TOPBAR_COLOR.toUpperCase())).toBeNull()
+  })
+
+  it('null en undefined blijven null', () => {
+    expect(normalizeTopbarColor(null)).toBeNull()
+    expect(normalizeTopbarColor(undefined)).toBeNull()
+  })
+
+  for (const invoer of ['', 'red', '#fff', '#1f2a44ff', ' #1f2a44', '#1f2a44\n', '#1f2a44; x']) {
+    it(`ongeldig ${JSON.stringify(invoer)} → null (= de standaard)`, () => {
+      expect(normalizeTopbarColor(invoer)).toBeNull()
+    })
+  }
+})
+
+describe('topbarLegibility — de hint in de picker', () => {
+  // Beide takken van beide toetsen, aan beide uiteinden.
+  it('donkere balk: naam en statuspunten goed', () => {
+    const l = topbarLegibility('#000000')
+    expect(l.textLow).toBe(false)
+    expect(l.statusDotsLow).toBe(false)
+  })
+
+  it('witte balk: naam goed (inkt), statuspunten weg', () => {
+    const l = topbarLegibility('#ffffff')
+    expect(l.textLow).toBe(false)
+    expect(l.statusDotsLow).toBe(true)
+  })
+
+  it('middentoon rond luminantie 0,2: de naam haalt geen AA', () => {
+    const l = topbarLegibility('#777777')
+    expect(l.textContrast).toBeLessThan(4.5)
+    expect(l.textLow).toBe(true)
+  })
+
+  it('net donker genoeg: de naam haalt wél AA', () => {
+    const l = topbarLegibility('#6e7682')
+    expect(l.textContrast).toBeGreaterThanOrEqual(4.5)
+    expect(l.textLow).toBe(false)
+  })
+
+  it('de standaard: groen en amber halen 3:1 op leisteen (zoals gemeten in F1)', () => {
+    expect(topbarLegibility(DEFAULT_TOPBAR_COLOR).statusDotsLow).toBe(false)
+  })
+
+  it('ongeldige invoer wordt beoordeeld als de standaard', () => {
+    expect(topbarLegibility('rood')).toEqual(topbarLegibility(DEFAULT_TOPBAR_COLOR))
+  })
+
+  it('toetst de kleuren die het kompas echt tekent: emerald-500 en amber-500', () => {
+    // TOPBAR_STATUS_DOTS staat als oklch naast deze klassen. Wisselt een
+    // kompaspunt ooit van klasse, dan hoort de hint mee te bewegen.
+    expect(LEVERAGE_STATUS_DOT.good).toBe('bg-emerald-500')
+    expect(LEVERAGE_STATUS_DOT.warn).toBe('bg-amber-500')
+    const kompas = readFileSync(join(process.cwd(), 'components/app/shell/lever-compass.tsx'), 'utf8')
+    expect(kompas).toMatch(/green:\s*\{\s*dot:\s*'bg-emerald-500'/)
+    expect(kompas).toMatch(/amber:\s*\{\s*dot:\s*'bg-amber-500'/)
+  })
 })

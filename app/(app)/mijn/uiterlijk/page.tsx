@@ -4,6 +4,7 @@ import { PageOpening } from '@/components/editorial'
 import { PalettePicker } from '@/components/mijn/palette-picker'
 import { FontPicker } from '@/components/mijn/font-picker'
 import { ModuleAccentPicker } from '@/components/mijn/module-accent-picker'
+import { TopbarColorPicker } from '@/components/mijn/topbar-color-picker'
 import { BudgetTintPicker } from '@/components/mijn/budget-tint-picker'
 import { CategoryTintPicker } from '@/components/mijn/category-tint-picker'
 import { SpendLimitAliasPicker } from '@/components/mijn/spend-limit-alias-picker'
@@ -22,7 +23,7 @@ export const metadata: Metadata = {
  * Alle weergave-blokken van de oude monolith leven hier. De PAGINA leidt
  * met de twee essentiële keuzes — Palet (wisselt het hele token-systeem)
  * en Typografie (leesbaarheid) — en stopt de diepe maatwerk-pickers
- * (module-accenten, budget-tints, fase-kleuren, categoriekaart-tinten)
+ * (module-accenten, balkkleur, budget-tints, fase-kleuren, categoriekaart-tinten)
  * weg in een standaard-dichte "Geavanceerd"-disclosure. Niets is
  * verwijderd: alle providers, persistence en standaard-knoppen blijven;
  * de diepe instellingen zijn één klik onder "Geavanceerd" bereikbaar.
@@ -79,8 +80,8 @@ export default function MijnUiterlijkPage() {
                 Geavanceerd
               </span>
               <span className="mt-0.5 block text-sm text-[var(--ink-2)]">
-                Accentkleuren, budget-tints, categoriekaart-tinten en naamgeving
-                fijnregelen
+                Accentkleuren, balkkleur, budget-tints, categoriekaart-tinten en
+                naamgeving fijnregelen
               </span>
             </span>
             <span
@@ -95,6 +96,11 @@ export default function MijnUiterlijkPage() {
 
           <div className="mt-4 border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
             <ModuleAccentPicker />
+          </div>
+
+          {/* Balkkleur — de mobiele TopBar (ADR 0174 D3). Chrome, geen accent. */}
+          <div className="mt-4 border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
+            <TopbarColorPicker />
           </div>
 
           <div className="mt-4 border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">

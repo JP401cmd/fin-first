@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef } from 'react'
+import { useRef, type ReactNode } from 'react'
 import { RotateCcw, AlertTriangle } from 'lucide-react'
 import { generatePalette, SHADES, contrastRatio, accentClashesWithStatus } from '@/lib/color-palette'
 import { TapTarget } from '@/components/editorial/tap-target'
@@ -34,6 +34,16 @@ interface ColorPickerCardProps {
    * `accentClashesWithStatus` in lib/color-palette.ts.
    */
   statusHint?: boolean
+  /**
+   * Vervangt de 11-tint-strip door een eigen voorbeeld. Voor een kleur die
+   * geen palet voedt (de TopBar is chrome, geen accent) zegt de strip niets.
+   */
+  preview?: ReactNode
+  /**
+   * Eigen waarschuwingen, in dezelfde stijl als de ingebouwde hints. Alleen
+   * waarschuwen, nooit blokkeren.
+   */
+  warnings?: readonly string[]
 }
 
 /**
@@ -54,6 +64,8 @@ export function ColorPickerCard({
   activeBadge,
   contrastHint = false,
   statusHint = false,
+  preview,
+  warnings = [],
 }: ColorPickerCardProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const palette = generatePalette(value)
@@ -107,36 +119,51 @@ export function ColorPickerCard({
         )}
       </div>
 
-      {/* Palette strip */}
-      <div className="mb-2 flex gap-0.5 overflow-hidden rounded-[var(--r-sm)]">
-        {SHADES.map((shade) => (
-          <div
-            key={shade}
-            className="h-4 flex-1"
-            style={{ backgroundColor: palette[shade].hex }}
-            title={`${label}-${shade}`}
-          />
+      {/* Palette strip — of het eigen voorbeeld van de afnemer */}
+      {preview ?? (
+        <div className="mb-2 flex gap-0.5 overflow-hidden rounded-[var(--r-sm)]">
+          {SHADES.map((shade) => (
+            <div
+              key={shade}
+              className="h-4 flex-1"
+              style={{ backgroundColor: palette[shade].hex }}
+              title={`${label}-${shade}`}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Hints — alleen waarschuwen, nooit blokkeren. Eén status-regio die
+          altijd gemount blijft, zodat een screenreader een hint voorleest die
+          verschijnt nadat je een kleur kiest. */}
+      <div role="status">
+        {/* Contrast-waarschuwing */}
+        {lowContrast && (
+          <p className="mb-2 flex items-start gap-1 text-[10px] italic text-[var(--ink-3)]">
+            <AlertTriangle className="mt-0.5 h-2.5 w-2.5 shrink-0" aria-hidden="true" />
+            <span>Lichte kleur — tekst op deze tint kan slecht leesbaar worden.</span>
+          </p>
+        )}
+
+        {/* Status-waarschuwing — identiteit vs. stoplicht. Alleen waarschuwen. */}
+        {clashesWithStatus && (
+          <p className="mb-2 flex items-start gap-1 text-[10px] italic text-[var(--ink-3)]">
+            <AlertTriangle className="mt-0.5 h-2.5 w-2.5 shrink-0" aria-hidden="true" />
+            <span>
+              Deze kleur lijkt op een statuskleur (op koers, aandacht of actie).
+              Kies iets rustigers, dan blijft status in één oogopslag leesbaar.
+            </span>
+          </p>
+        )}
+
+        {/* Eigen waarschuwingen van de afnemer */}
+        {warnings.map((warning) => (
+          <p key={warning} className="mb-2 flex items-start gap-1 text-[10px] italic text-[var(--ink-3)]">
+            <AlertTriangle className="mt-0.5 h-2.5 w-2.5 shrink-0" aria-hidden="true" />
+            <span>{warning}</span>
+          </p>
         ))}
       </div>
-
-      {/* Contrast-waarschuwing — alleen waarschuwen, nooit blokkeren */}
-      {lowContrast && (
-        <p className="mb-2 flex items-start gap-1 text-[10px] italic text-[var(--ink-3)]">
-          <AlertTriangle className="mt-0.5 h-2.5 w-2.5 shrink-0" aria-hidden="true" />
-          <span>Lichte kleur — tekst op deze tint kan slecht leesbaar worden.</span>
-        </p>
-      )}
-
-      {/* Status-waarschuwing — identiteit vs. stoplicht. Alleen waarschuwen. */}
-      {clashesWithStatus && (
-        <p className="mb-2 flex items-start gap-1 text-[10px] italic text-[var(--ink-3)]">
-          <AlertTriangle className="mt-0.5 h-2.5 w-2.5 shrink-0" aria-hidden="true" />
-          <span>
-            Deze kleur lijkt op een statuskleur (op koers, aandacht of actie).
-            Kies iets rustigers, dan blijft status in één oogopslag leesbaar.
-          </span>
-        </p>
-      )}
 
       {/* Preset swatches. Raakgebied: de swatch blijft visueel 20×20, maar de
           knop eromheen reserveert 44×44 (M19). `reserve` i.p.v. `extend` omdat
