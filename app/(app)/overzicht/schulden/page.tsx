@@ -31,7 +31,8 @@ export default async function OverzichtSchuldenPage() {
   const supabase = await createClient()
   const perspective = await getServerPerspective()
   const initialData = await loadDebtsPageData(supabase, perspective).catch(() => undefined)
-  // Oordeel in de titel uit DEZELFDE hefboom-score als het statuspunt hierboven.
+  // Oordeel in de titel uit DEZELFDE hefboom-score als het statuspunt hierboven,
+  // sinds ADR 0174 D6 als zin (`verdict.sentence`).
   const verdict = await loadHefboomPageVerdict(supabase, perspective, 'schulden')
 
   return (
@@ -46,7 +47,7 @@ export default async function OverzichtSchuldenPage() {
       </div>
       <SchuldenView
         initialData={initialData}
-        verdict={verdict.label}
+        verdictSentence={verdict.sentence}
         verdictTone={verdict.status}
       />
     </>

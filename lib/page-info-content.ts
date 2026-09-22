@@ -108,8 +108,12 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
         text: 'Klik een bezitting open voor de waardeontwikkeling, het rendement en — bij beleggingen — de losse posities eronder.',
       },
       {
-        title: 'Niet alles is even opneembaar',
-        text: 'Je eigen huis en je pensioenpotten kun je niet zomaar aanspreken. In Toekomst leg je vast hoe ze meetellen in je vrijheidsberekening.',
+        // Samengevoegd met de uitleg over het inclusiepercentage, die tot F3
+        // (ADR 0174 D6) in de deck van de pagina stond: de deck is sindsdien
+        // twee korte zinnen, en de WERKING-lijst telt maximaal vier items. Beide
+        // gaan over hetzelfde: hoe een bezitting meetelt.
+        title: 'Hoe je bezittingen meetellen',
+        text: 'Het totaal op deze pagina telt elke bezitting voor zijn volle waarde. Je netto vermogen weegt ze naar hun inclusiepercentage en valt daardoor anders uit. Je eigen huis en je pensioenpotten kun je bovendien niet zomaar aanspreken; in Toekomst leg je vast hoe ze meetellen in je vrijheidsberekening.',
       },
     ],
     terms: ['netto_vermogen', 'per_asset_rendement', 'asset_allocatie', 'liquiditeit', 'inclusiepercentage'],

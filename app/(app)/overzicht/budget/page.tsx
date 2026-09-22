@@ -85,11 +85,12 @@ export default async function OverzichtBudgetPage() {
             content={getPageInfo('/overzicht/budget')}
             className="absolute right-4 top-4 sm:right-6"
           />
-          {/* Het oordeel stroomt de titel in (zie `budget-verdict.tsx`); de
-              kop zelf blijft dataloos, zodat er geen await boven de return
-              komt. */}
+          {/* De kop is een zin (ADR 0174 D6): "Je budget" staat in de eerste
+              byte, de rest van de zin stroomt erachteraan (zie
+              `budget-verdict.tsx`). De kop zelf blijft dataloos, zodat er geen
+              await boven de return komt. */}
           <BudgetHeaderSlot
-            verdictSlot={
+            sentenceSlot={
               <Suspense fallback={null}>
                 <BudgetVerdict perspective={perspective} />
               </Suspense>

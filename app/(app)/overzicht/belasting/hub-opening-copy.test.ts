@@ -100,10 +100,14 @@ describe.each([
     expect(opening.deck.match(/\./g)?.length).toBe(2)
   })
 
-  it('benoemt het oordeel dat de titel uitspreekt', () => {
-    // De titel toont de Box 3-stand; de tweede deck-zin legt uit waaróp dat
-    // oordeel slaat, zodat de lezer niet denkt dat het over alle boxen gaat.
+  it('legt uit waar de kop-zin op slaat', () => {
+    // De kop-zin volgt de Box 3-stand; de tweede deck-zin legt uit wat die stand
+    // bepaalt, zodat de lezer niet denkt dat het over alle boxen gaat.
     expect(opening.deck).toContain('Box 3-vermogen boven de vrijstelling')
+  })
+
+  it('gebruikt het woord "oordeel" niet (eenvoud-check B-071)', () => {
+    expect(opening.deck.toLowerCase()).not.toMatch(/\boordeel/)
   })
 
   it('spoort nergens aan (Wft: beschrijven mag, aansporen niet)', () => {

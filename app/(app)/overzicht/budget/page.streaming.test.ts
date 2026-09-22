@@ -90,6 +90,13 @@ describe('/overzicht/budget — de aanhef staat bóven de kaarten', () => {
     expect(close).toBeGreaterThan(src.indexOf('<BudgetsLoader'))
   })
 
+  it('laat de kop-zin achter een eigen Suspense instromen (ADR 0174 D6)', () => {
+    // "Je budget" staat in de eerste byte (het onderwerp in `BudgetHeaderSlot`);
+    // `BudgetVerdict` levert de rest van de zin na. Zonder deze Suspense zou de
+    // kop op de lever-scores wachten.
+    expect(src).toMatch(/sentenceSlot=\{\s*<Suspense fallback=\{null\}>\s*<BudgetVerdict/)
+  })
+
   it('schrijft hier géén tweede pagina-aanhef — één opening (ADR 0135)', () => {
     expect(src).not.toContain('<PageOpening')
     expect(src).not.toContain('<EditorialHeadline')

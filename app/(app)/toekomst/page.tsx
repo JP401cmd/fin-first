@@ -10,7 +10,7 @@ import { resolveWithdrawalProfiel } from '@/lib/withdrawal-strategy'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { PageVerdictOpening, EditorialDeck, OrnamentColophon } from '@/components/editorial'
 import { resolveRouteTitle } from '@/lib/nav-config'
-import { loadPlanVerdict } from '@/lib/horizon/plan-status-loader'
+import { loadPlanVerdictSentence } from '@/lib/horizon/plan-status-loader'
 import { getPageInfo } from '@/lib/page-info-content'
 import {
   DeficitNoticeProvider,
@@ -147,12 +147,13 @@ export default async function ToekomstPage({
           return []
         })
       : Promise.resolve([]),
-    // OORDEEL IN DE PAGINATITEL — de dekking van je plan. Consume-only: dezelfde
-    // `loadPlanVerdict` die de plankaart op /overzicht en het menupunt "De toekomst"
-    // als stoplicht lezen, dus per constructie hetzelfde oordeel. Kost hier niets
-    // extra: `loadHorizonData` en `computeHorizonFireSim` zijn React-`cache()`'d en
-    // draaien op deze route toch al (zelfde 'personal'-perspectief als hierboven).
-    loadPlanVerdict(supabase, 'personal'),
+    // OORDEEL IN DE PAGINATITEL — de dekking van je plan, als zin (ADR 0174 D6).
+    // Consume-only: dezelfde invoer als `loadPlanVerdict`, die de plankaart op
+    // /overzicht en het menupunt "De toekomst" als stoplicht lezen, dus per
+    // constructie hetzelfde oordeel. Kost hier niets extra: `loadHorizonData` en
+    // `computeHorizonFireSim` zijn React-`cache()`'d en draaien op deze route toch
+    // al (zelfde 'personal'-perspectief als hierboven).
+    loadPlanVerdictSentence(supabase, 'personal'),
   ])
   // TPR-01 — voortgang AFGELEID uit markering + profielstaat (A9/A10). Alleen de eigen
   // bezittingen en gebeurtenissen: de policies zijn huishoud-gedeeld en de review gaat over
@@ -210,15 +211,14 @@ export default async function ToekomstPage({
               kolom en reserveert de knoppen-cluster rechts zijn breedte over
               de vólle hoogte — op mobiel wikkelde de intro daardoor in vier
               smalle regels. De deck rendert hieronder vol-breed. */}
-          {/* Aanhef die het OORDEEL uitspreekt (kop-herziening sep 2026): onder
-              een vast stopmoment de dekking van je plan ("Plan dekt 96%"), onder
-              "zo vroeg mogelijk" de haalbaarheid. De kicker is vervallen; de
-              paginanaam staat op mobiel in de TopBar en op desktop in de titel
-              zelf — zie `PageVerdictOpening`. */}
+          {/* Aanhef als ZIN (ADR 0174 D6): onder een vast stopmoment de dekking
+              van je plan ("Je toekomstplan is *voor 96% gedekt*."), onder "zo
+              vroeg mogelijk" de haalbaarheid. Zonder oordeel blijft de kale
+              paginanaam staan. Zie `PageVerdictOpening`. */}
           <PageVerdictOpening
             className="min-w-0 flex-1"
             pageName={resolveRouteTitle('/toekomst') ?? 'Toekomst'}
-            verdict={planVerdict.label}
+            sentence={planVerdict.sentence}
             tone={planVerdict.status}
           />
           <div className="flex shrink-0 items-center gap-2">
@@ -243,10 +243,13 @@ export default async function ToekomstPage({
             De paginanaam die `PageVerdictOpening` op mobiel aan de shell
             overlaat, staat in de TopBar: links naast de "← home"-knop, gezet
             door de `<NavStackMeta title="Toekomst">` hierboven (ADR 0174;
-            tab-root-topbar-title.test.ts pint dat). */}
+            tab-root-topbar-title.test.ts pint dat).
+
+            ADR 0165: de oude leus over geld als opgeslagen tijd is vervallen —
+            geld lévert tijd op. Deck en colophon hieronder volgen dat. */}
         <EditorialDeck className="mb-4">
-          Je tijdas met doelen, gebeurtenissen en voorkeuren. Geld is opgeslagen tijd; kies wat je
-          ermee doet.
+          Je tijdas met doelen, gebeurtenissen en voorkeuren. Zo zie je hoeveel tijd je geld
+          oplevert.
         </EditorialDeck>
 
         {/* Navkaarten staan nu altijd boven de altijd-zichtbare tijdas. */}
@@ -282,7 +285,7 @@ export default async function ToekomstPage({
           de eigen printknop is weg (B-021), maar de browser-print van de
           gebruiker (Ctrl+P) hoort deze footer nog steeds niet mee te nemen. */}
       <div className="print:hidden">
-        <OrnamentColophon text="Geld is opgeslagen tijd" module="De Toekomst" />
+        <OrnamentColophon text="Geld levert tijd op" module="De Toekomst" />
       </div>
       </PlanReviewProvider>
       </EindsituatieNoticeProvider>

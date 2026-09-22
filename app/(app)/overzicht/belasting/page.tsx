@@ -302,11 +302,14 @@ export default async function OverzichtBelastingPage() {
 
             De titel volgt nu de hefboom, net als /overzicht/bezittingen,
             /schulden en /budget. Het Box 3-oordeel blijft staan waar het thuis
-            hoort: op de Box 3-kaart hieronder en op /overzicht/belasting/box3. */}
+            hoort: op de Box 3-kaart hieronder en op /overzicht/belasting/box3.
+
+            Sinds ADR 0174 D6 is de titel een zin ("Je Box 3-belasting blijft
+            *beperkt*."), uit dezelfde hefboomstatus. */}
         <PageVerdictOpening
           gutterClassName="pr-20 sm:pr-24"
           pageName={resolveRouteTitle('/overzicht/belasting') ?? 'Belasting'}
-          verdict={belastingVerdict.label}
+          sentence={belastingVerdict.sentence}
           tone={belastingVerdict.status}
           deck={opening.deck}
         />

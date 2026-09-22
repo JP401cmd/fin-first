@@ -6,6 +6,7 @@ import { BezittingenFilter } from '@/components/overview/bezittingen-filter'
 import type { AssetType } from '@/lib/asset-data'
 import type { AssetsPageData } from '@/lib/assets-data-loader'
 import type { LeverageStatus } from '@/lib/leverage-status'
+import type { Oordeelzin } from '@/lib/hefboom-oordeelzin'
 
 /**
  * BezittingenView — client-wrapper rond `<AssetsPage>` die de filter-state
@@ -27,19 +28,19 @@ import type { LeverageStatus } from '@/lib/leverage-status'
  */
 interface BezittingenViewProps {
   initialData?: AssetsPageData
-  /** Server-bepaald hefboom-oordeel voor de paginatitel (zie `loadHefboomPageVerdict`). */
-  verdict?: string | null
+  /** Server-bepaalde kop-zin voor de paginatitel (zie `loadHefboomPageVerdict`). */
+  verdictSentence?: Oordeelzin | null
   verdictTone?: LeverageStatus
 }
 
-export function BezittingenView({ initialData, verdict, verdictTone }: BezittingenViewProps) {
+export function BezittingenView({ initialData, verdictSentence, verdictTone }: BezittingenViewProps) {
   const [filter, setFilter] = useState<AssetType | null>(null)
 
   return (
     <AssetsPage
       initialData={initialData}
       route="/overzicht/bezittingen"
-      verdict={verdict}
+      verdictSentence={verdictSentence}
       verdictTone={verdictTone}
       toolbarFilter={({ assetCount }: { assetCount: number }) => (
         <BezittingenFilter value={filter} onChange={setFilter} assetCount={assetCount} />

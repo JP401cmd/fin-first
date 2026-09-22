@@ -71,7 +71,8 @@ export default async function OverzichtBezittingenPage() {
   // Die extra laadslag is dus mee verdwenen.
   const assetsData = await tryLoadAssetsData(supabase, perspective)
   // Oordeel in de paginatitel — uit DEZELFDE hefboom-score als het statuspunt
-  // hierboven, zodat titel en stip niet uit elkaar kunnen lopen.
+  // hierboven, zodat titel en stip niet uit elkaar kunnen lopen. Sinds ADR 0174
+  // D6 als zin (`verdict.sentence`).
   // `loadLeverScores` is React-`cache()`-gewrapt en draait op deze route toch al.
   const verdict = await loadHefboomPageVerdict(supabase, perspective, 'bezittingen')
 
@@ -87,7 +88,7 @@ export default async function OverzichtBezittingenPage() {
       </div>
       <BezittingenView
         initialData={assetsData}
-        verdict={verdict.label}
+        verdictSentence={verdict.sentence}
         verdictTone={verdict.status}
       />
     </>

@@ -18,6 +18,7 @@
 // kan stoppen rood kleuren.
 
 import type { LeverageStatus } from '@/lib/leverage-status'
+import type { Oordeelzin } from '@/lib/hefboom-oordeelzin'
 import { coverageStatus } from '@/lib/horizon/coverage-strip'
 
 export interface PlanStatusInput {
@@ -76,6 +77,43 @@ export function resolvePlanVerdict(input: PlanStatusInput): PlanVerdict {
   if (input.solvedReachable == null) return { label: null, status }
   return {
     label: input.solvedReachable ? 'Plan is haalbaar' : 'Plan nog niet haalbaar',
+    status,
+  }
+}
+
+/** Het plan-oordeel als kop-ZIN + zijn stoplichtstand. */
+export interface PlanVerdictSentence {
+  /** "Je toekomstplan is *voor 96% gedekt*." `null` = geen oordeel, kale paginanaam. */
+  sentence: Oordeelzin | null
+  status: LeverageStatus
+}
+
+/** Vast onderwerp van de /toekomst-kop — draagt het paginawoord. */
+export const PLAN_ONDERWERP = 'Je toekomstplan'
+
+/**
+ * De kop van /toekomst als zin (ADR 0174 D6). Staat náást `resolvePlanVerdict`
+ * en volgt exact dezelfde twee takken: dezelfde status (letterlijk uit
+ * `resolvePlanStatus`) en hetzelfde afgeronde percentage. Er is geen tweede
+ * drempel en geen eigen som.
+ *
+ *  - vast stopmoment → "Je toekomstplan is *voor 96% gedekt*.", in de kleur van
+ *    de dekking (≥100 groen, 90–99 oranje, <90 rood);
+ *  - zo vroeg mogelijk → "is *haalbaar*" of "is *nog niet haalbaar*".
+ *
+ * Beschrijvend, nooit aansporend (Wft-grens).
+ */
+export function resolvePlanVerdictSentence(input: PlanStatusInput): PlanVerdictSentence {
+  const status = resolvePlanStatus(input)
+  const voor = `${PLAN_ONDERWERP} is`
+  if (input.anchorFixed) {
+    const pct = input.coveragePct
+    if (pct == null || !Number.isFinite(pct)) return { sentence: null, status }
+    return { sentence: { voor, oordeel: `voor ${Math.round(pct)}% gedekt` }, status }
+  }
+  if (input.solvedReachable == null) return { sentence: null, status }
+  return {
+    sentence: { voor, oordeel: input.solvedReachable ? 'haalbaar' : 'nog niet haalbaar' },
     status,
   }
 }

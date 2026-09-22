@@ -16,16 +16,17 @@
  *   · wél aanmerkelijk belang  → drie kaarten, twee sommen → "Drie boxen, twee rekeningen"
  *
  * VERHUISD VAN DE KOP NAAR DE DECK (kop-herziening sep 2026). De hub-aanhef is
- * sinds die herziening een `PageVerdictOpening`: de titel is "Belasting |
- * <oordeel>" en draagt dus geen telwoord meer. De H22-belofte is daarmee niet
- * vervallen maar verplaatst — hij staat nu in de eerste zin van de deck en in
- * de colophon, en `hub-opening-copy.test.ts` pint 'm daar tegen hetzelfde
- * canonieke kaart-/som-aantal. De `year`-parameter is weg met de kicker.
+ * sinds die herziening een `PageVerdictOpening`: de titel is een oordeel (sinds
+ * ADR 0174 D6 de zin "Je Box 3-belasting blijft *beperkt*.") en draagt dus geen
+ * telwoord meer. De H22-belofte is daarmee niet vervallen maar verplaatst — hij
+ * staat nu in de eerste zin van de deck en in de colophon, en
+ * `hub-opening-copy.test.ts` pint 'm daar tegen hetzelfde canonieke
+ * kaart-/som-aantal. De `year`-parameter is weg met de kicker.
  *
- * Het OORDEEL zelf staat bewust NIET in dit bestand: dat is de Box 3-status
- * (`box3TaxStatus` → `box3StatusVerdict`, lib/box3-taxable-input.ts), gedeeld
- * met de Box 3-kaart op deze hub en met de titel van /overzicht/belasting/box3.
- * Eén oordeelszin, drie oppervlakken.
+ * Het OORDEEL zelf staat bewust NIET in dit bestand: de kop-zin komt uit de
+ * belasting-hefboom (`loadHefboomPageVerdict` → `lib/hefboom-oordeelzin.ts`),
+ * dezelfde bron als het statuspunt naast de `i` — zie de aantekening in
+ * `page.tsx`.
  *
  * Bewust puur en synchroon (geen React, geen data-toegang): zo is de belofte
  * met een unit-test te pinnen zonder de server-pagina met haar loaders na te
@@ -36,7 +37,7 @@
 export type BelastingHubOpening = {
   /**
    * Redactionele deck onder de kop. Twee zinnen: wat deze pagina optelt (de
-   * H22-belofte) en wat het oordeel in de titel betekent.
+   * H22-belofte) en waar de kop-zin op slaat.
    */
   deck: string
   /**
@@ -48,14 +49,17 @@ export type BelastingHubOpening = {
 }
 
 /**
- * Tweede zin van de deck — identiek in beide takken: het oordeel in de titel is
- * de Box 3-stand, ongeacht of Box 2 meespeelt. Eén constante zodat de twee
- * takken niet los van elkaar kunnen wegdriften.
+ * Tweede zin van de deck — identiek in beide takken: de kop-zin ("Je belasting
+ * blijft *beperkt*.") volgt de Box 3-stand, ongeacht of Box 2 meespeelt. Eén
+ * constante zodat de twee takken niet los van elkaar kunnen wegdriften.
  *
- * WFT — beschrijvend ("volgt je vermogen boven de vrijstelling"), geen
- * aansporing om iets aan dat vermogen te doen.
+ * Eenvoud-check B-071 (F3, ADR 0174 D6): het woord "oordeel" is eruit. De zin
+ * zegt nu gewoon wat de stand bepaalt.
+ *
+ * WFT — beschrijvend (hoe meer vermogen, hoe meer belasting), geen aansporing om
+ * iets aan dat vermogen te doen.
  */
-const OORDEEL_ZIN = 'Het oordeel volgt je Box 3-vermogen boven de vrijstelling.'
+const KOP_UITLEG = 'Hoe meer Box 3-vermogen boven de vrijstelling, hoe meer je betaalt.'
 
 export function buildBelastingHubOpening({
   hasAanmerkelijkBelang,
@@ -66,14 +70,14 @@ export function buildBelastingHubOpening({
   if (hasAanmerkelijkBelang) {
     const colophon = 'Drie boxen, twee rekeningen'
     return {
-      deck: `${colophon}: Box 2 telt apart, in euro’s en vrijheidstijd. ${OORDEEL_ZIN}`,
+      deck: `${colophon}: Box 2 telt apart, in euro’s en vrijheidstijd. ${KOP_UITLEG}`,
       colophon,
     }
   }
 
   const colophon = 'Twee boxen, één rekening'
   return {
-    deck: `${colophon}: Box 1 en Box 3, in euro’s en vrijheidstijd. ${OORDEEL_ZIN}`,
+    deck: `${colophon}: Box 1 en Box 3, in euro’s en vrijheidstijd. ${KOP_UITLEG}`,
     colophon,
   }
 }

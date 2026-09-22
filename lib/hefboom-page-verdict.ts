@@ -11,12 +11,17 @@
 //
 // Consume, don't recompute: hier wordt geen drempel herhaald en geen score
 // afgeleid — alleen opgezocht en van een zin voorzien.
+//
+// Sinds ADR 0174 D6 (F3) draagt de kop van bezittingen, schulden en belasting de
+// ZIN ("Je bezittingen zijn *goed gespreid*.", `sentence`). De korte vorm
+// ("Naam | Goed gespreid", het oude `label`) had daarna geen lezer meer en is
+// weg; de tegels lezen hun woord rechtstreeks uit `hefboomVerdict`.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Perspective } from '@/lib/household-data'
 import { loadLeverScores } from '@/lib/lever-scores-loader'
 import { leverToLeverageStatus } from '@/lib/page-status/resolve'
-import { hefboomVerdict, HEFBOOM_VERDICT_NEUTRAL } from '@/lib/hefboom-status-copy'
+import { hefboomOordeelzin, type Oordeelzin } from '@/lib/hefboom-oordeelzin'
 import type { Hefboom } from '@/lib/hefboom-config'
 import type { LeverageStatus } from '@/lib/leverage-status'
 
@@ -37,15 +42,16 @@ const SCORE_KEY = {
 
 export interface HefboomPageVerdict {
   status: LeverageStatus
-  label: string
+  /** De kop als zin, bij dezelfde `status` (lib/hefboom-oordeelzin.ts). */
+  sentence: Oordeelzin
 }
 
 /**
- * Status + oordeelszin voor de titel van een hefboompagina.
+ * Status + kop-zin voor de titel van een hefboompagina.
  *
- * Bij `neutral` valt de zin terug op "Nog geen gegevens" — niet op het
- * app-jargon "Geen score", dat een beginner leest als een storing in plaats van
- * als iets dat hij zelf kan aanvullen.
+ * Ook bij `neutral` is er een zin ("Je bezittingen zijn *nog niet in beeld*.")
+ * — niet het app-jargon "Geen score", dat een beginner leest als een storing in
+ * plaats van als iets dat hij zelf kan aanvullen.
  */
 export async function loadHefboomPageVerdict(
   supabase: SupabaseClient,
@@ -54,5 +60,5 @@ export async function loadHefboomPageVerdict(
 ): Promise<HefboomPageVerdict> {
   const { scores } = await loadLeverScores(supabase, perspective)
   const status = leverToLeverageStatus(scores[SCORE_KEY[hefboom]].status)
-  return { status, label: hefboomVerdict(hefboom, status) ?? HEFBOOM_VERDICT_NEUTRAL }
+  return { status, sentence: hefboomOordeelzin(hefboom, status) }
 }

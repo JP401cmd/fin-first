@@ -5,6 +5,7 @@ import { DebtsClient, type DebtsInitialData } from '@/app/(app)/core/debts/debts
 import { SchuldenFilter } from '@/components/overview/schulden-filter'
 import type { DebtType } from '@/lib/debt-data'
 import type { LeverageStatus } from '@/lib/leverage-status'
+import type { Oordeelzin } from '@/lib/hefboom-oordeelzin'
 
 /**
  * SchuldenView — client-wrapper rond `<DebtsClient>` die de filter-state
@@ -19,12 +20,12 @@ import type { LeverageStatus } from '@/lib/leverage-status'
  */
 export function SchuldenView({
   initialData,
-  verdict,
+  verdictSentence,
   verdictTone,
 }: {
   initialData?: DebtsInitialData
-  /** Server-bepaald hefboom-oordeel voor de paginatitel. */
-  verdict?: string | null
+  /** Server-bepaalde kop-zin voor de paginatitel (zie `loadHefboomPageVerdict`). */
+  verdictSentence?: Oordeelzin | null
   verdictTone?: LeverageStatus
 }) {
   const [filter, setFilter] = useState<DebtType | null>(null)
@@ -35,7 +36,7 @@ export function SchuldenView({
       debtTypeFilter={filter}
       initialData={initialData}
       route="/overzicht/schulden"
-      verdict={verdict}
+      verdictSentence={verdictSentence}
       verdictTone={verdictTone}
       // De page-shell (`overzicht/schulden/page.tsx`) rendert de i +
       // statuspunt; onderdruk de ingebouwde i hier.

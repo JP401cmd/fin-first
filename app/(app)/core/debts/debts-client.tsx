@@ -59,6 +59,7 @@ import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import { Kicker, FiguresStrip, PageInfoButton, GlossaryTerm, PageVerdictOpening, SubtotalLine } from '@/components/editorial'
 import { resolveRouteTitle } from '@/lib/nav-config'
 import type { LeverageStatus } from '@/lib/leverage-status'
+import type { Oordeelzin } from '@/lib/hefboom-oordeelzin'
 import { getPageInfo } from '@/lib/page-info-content'
 import { loadEntitySparklines } from '@/lib/load-entity-sparklines'
 import { buildKpiContext } from '@/lib/kpi-context'
@@ -168,15 +169,16 @@ type DebtsPageProps = {
    */
   route?: string
   /**
-   * Het oordeel achter de titel, server-bepaald door de mountende pagina
-   * (`loadHefboomPageVerdict`). Zonder oordeel toont de titel alleen de naam.
+   * De kop als zin ("Je schulden *vragen aandacht*."), server-bepaald door de
+   * mountende pagina (`loadHefboomPageVerdict`, ADR 0174 D6). Zonder zin toont de
+   * titel alleen de naam — zo houdt de legacy-route een geldige kop.
    */
-  verdict?: string | null
-  /** Stoplichtstand bij `verdict`; bepaalt uitsluitend de kleur. */
+  verdictSentence?: Oordeelzin | null
+  /** Stoplichtstand bij `verdictSentence`; bepaalt uitsluitend de kleur. */
   verdictTone?: LeverageStatus
 }
 
-export function DebtsClient({ toolbarFilter, debtTypeFilter, initialData, showPageInfo = true, route = '/overzicht/schulden', verdict, verdictTone = 'neutral' }: DebtsPageProps = {}) {
+export function DebtsClient({ toolbarFilter, debtTypeFilter, initialData, showPageInfo = true, route = '/overzicht/schulden', verdictSentence, verdictTone = 'neutral' }: DebtsPageProps = {}) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
@@ -690,9 +692,9 @@ export function DebtsClient({ toolbarFilter, debtTypeFilter, initialData, showPa
       <NavStackMeta title="Schulden" bottomBar={{ kind: 'tabs' }} />
 
       {/* ═══ Editorial pagina-opening (standaard-aanhef) ════════════
-          Aanhef die het oordeel uitspreekt (kop-herziening sep 2026)
-          met één <em>-accent → deck. Alles eronder (FiguresStrip, aflos-
-          route, grid) ongewijzigd. */}
+          Aanhef die het oordeel uitspreekt (kop-herziening sep 2026), sinds
+          ADR 0174 D6 als één zin met één <em>-accent → deck. Alles eronder
+          (FiguresStrip, aflosroute, grid) ongewijzigd. */}
       <PageVerdictOpening
         // Rechter-gutter blijft óók bij showPageInfo=false: de overzicht-shell
         // rendert daar zijn eigen i-cluster (i + statuspunt), dus de kicker/H1
@@ -701,16 +703,18 @@ export function DebtsClient({ toolbarFilter, debtTypeFilter, initialData, showPa
         className="mb-5"
         gutterClassName="pr-20 sm:pr-24"
         pageName={resolveRouteTitle(route) ?? 'Schulden'}
-        verdict={verdict ?? null}
+        sentence={verdictSentence ?? null}
         tone={verdictTone}
         deck={
           <>
             {/* ADR 0165: de kicker en de oude deck droegen de koop-metafoor
                 ("vrijheid die je terugkoopt", "koop je vrijheid terug") drie
                 keer. Die is vervallen — schulden benoem je neutraal, met de
-                positieve regel dat aflossen tijd oplevert. */}
-            Al je schulden, met maandlast en rente. Elke aflossing levert je tijd op; een lagere{' '}
-            <GlossaryTerm term="schuldgraad">schuldgraad</GlossaryTerm> geeft meer speelruimte.
+                positieve regel dat aflossen tijd oplevert.
+                Eenvoud-check B-071 (F3): één lopende zin in plaats van twee
+                losse helften rond een puntkomma. */}
+            Al je schulden, met hun maandlast en rente. Elke aflossing levert tijd op, en hoe lager
+            je <GlossaryTerm term="schuldgraad">schuldgraad</GlossaryTerm>, hoe meer ruimte je hebt.
             <PerspectiveContextLabel className="normal-case tracking-normal" />
           </>
         }

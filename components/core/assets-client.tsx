@@ -14,6 +14,7 @@ import { useOptionalToast } from '@/components/app/toast-provider'
 import { Kicker, FiguresStrip, PageInfoButton, GlossaryTerm, PageVerdictOpening, type FigureProps } from '@/components/editorial'
 import { resolveRouteTitle } from '@/lib/nav-config'
 import type { LeverageStatus } from '@/lib/leverage-status'
+import type { Oordeelzin } from '@/lib/hefboom-oordeelzin'
 import { buildAssetReturnBreakdown, formatGainPct, RETURN_BASIS_LABELS } from '@/lib/asset-return'
 import { OVERLAY_QUERY_KEYS } from '@/lib/navigation'
 import { createPaneUrlHistory } from '@/lib/pane-url-history'
@@ -241,16 +242,17 @@ type AssetsPageProps = {
    */
   route?: string
   /**
-   * Het oordeel achter de titel, server-bepaald door de mountende pagina
-   * (hefboom-score → `hefboomVerdict`). `undefined`/`null` ⇒ de titel is alleen
-   * de paginanaam — zo houdt de legacy-route zonder oordeel een geldige kop.
+   * De kop als zin ("Je bezittingen zijn *goed gespreid*."), server-bepaald door
+   * de mountende pagina (`loadHefboomPageVerdict` → `lib/hefboom-oordeelzin.ts`,
+   * ADR 0174 D6). `undefined`/`null` ⇒ de titel is alleen de paginanaam — zo
+   * houdt de legacy-route zonder oordeel een geldige kop.
    */
-  verdict?: string | null
-  /** Stoplichtstand bij `verdict`; bepaalt uitsluitend de kleur. */
+  verdictSentence?: Oordeelzin | null
+  /** Stoplichtstand bij `verdictSentence`; bepaalt uitsluitend de kleur. */
   verdictTone?: LeverageStatus
 }
 
-export default function AssetsPage({ initialAssetId, initialData, toolbarFilter, assetTypeFilter, showPageInfo = true, route = '/overzicht/bezittingen', verdict, verdictTone = 'neutral' }: AssetsPageProps = {}) {
+export default function AssetsPage({ initialAssetId, initialData, toolbarFilter, assetTypeFilter, showPageInfo = true, route = '/overzicht/bezittingen', verdictSentence, verdictTone = 'neutral' }: AssetsPageProps = {}) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
@@ -967,9 +969,9 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
   return (
     <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
       {/* ═══ Pagina-aanhef die het oordeel uitspreekt ═══════════════
-          Kop-herziening sep 2026: de kicker is vervallen en de titel draagt
-          "Bezittingen | <oordeel>" (op mobiel alleen het oordeel — de TopBar
-          draagt de naam daar). Alles eronder (FiguresStrip, toolbar, grid)
+          Kop-herziening sep 2026: de kicker is vervallen. Sinds ADR 0174 D6 is
+          de titel één zin, "Je bezittingen zijn *goed gespreid*.", op mobiel
+          en desktop gelijk. Alles eronder (FiguresStrip, toolbar, grid)
           ongewijzigd.
 
           Het perspectief-label zat in de vervallen kicker. Het is niet verloren:
@@ -983,23 +985,34 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
         className="mb-5"
         gutterClassName="pr-24 sm:pr-28"
         pageName={resolveRouteTitle(route) ?? 'Bezittingen'}
-        verdict={verdict ?? null}
+        sentence={verdictSentence ?? null}
         tone={verdictTone}
         deck={
           <>
             {/* ADR 0165: "elke bezitting is opgeslagen tijd" was de oude leus
-                ("geld is opgeslagen tijd") en is vervallen — geld lévert tijd
-                op. De zin is meteen ingekort tot de nieuwe deck-lengte. */}
-            Alles wat je bezit, per soort. Het oordeel volgt je spreiding: meer soorten, minder
-            afhankelijk van één.
+                en is vervallen — geld lévert tijd op.
+                Eenvoud-check B-071 (F3): de tweede zin zegt nu zonder het woord
+                "oordeel" wat de kop-zin bepaalt. Alléén het aantal soorten: de
+                score telt `assetTypeCount` en weegt niet hoeveel er in één soort
+                zit (lib/lever-scores.ts). "Hoe minder je van één soort afhangt"
+                beweerde dus iets wat de kop niet meet (eindreview F3). */}
+            Alles wat je bezit, per soort. Hoe meer soorten bezittingen je hebt, hoe beter je
+            spreiding.
             <PerspectiveContextLabel />
-            {/* De strip hieronder telt élke bezitting voor zijn VOLLE waarde op:
-                `perspectiveAssetValue` weegt alleen het huishoud-aandeel, niet
-                `net_worth_inclusion_pct`. De deck beloofde het omgekeerde
-                ("gewogen naar inclusiepercentage") en was daarmee onwaar — een
-                woning op 50% inclusie telde hier gewoon vol mee. Netto vermogen
-                weegt wél (lib/asset-data.ts), vandaar de verwijzing. */}
-            {activeAssets.length > 0 && ` ${activeAssets.length} bezitting${activeAssets.length === 1 ? '' : 'en'} bij elkaar, elk voor zijn volle waarde — je netto vermogen weegt ze naar inclusiepercentage en valt daardoor anders uit.`}
+            {/* De telzin telt BEZITTINGEN, niet soorten — vandaar het woord erbij.
+                Het concept "Je hebt er {n} bij elkaar" las direct na "hoe meer
+                soorten" als n soorten.
+
+                De uitleg dat de strip hieronder élke bezitting voor zijn VOLLE
+                waarde optelt, terwijl netto vermogen naar inclusiepercentage
+                weegt, staat sinds F3 in PAGE_INFO '/overzicht/bezittingen'
+                ("Hoe je bezittingen meetellen"). Hij blijft waar: de strip weegt
+                via `perspectiveAssetValue` alleen het huishoud-aandeel, niet
+                `net_worth_inclusion_pct` (lib/asset-data.ts). */}
+            {activeAssets.length > 0 &&
+              (activeAssets.length === 1
+                ? ' Je hebt één bezitting.'
+                : ` Je hebt ${activeAssets.length} bezittingen bij elkaar.`)}
             {/* GEEN runway-zin meer in deze deck (melding B-035, 8 sep 2026).
                 UR3-19 zette hem hier neer als vervanging van zes handgerolde
                 "bruto totaal ÷ dagtarief"-sommen; die vervanging blijft — de

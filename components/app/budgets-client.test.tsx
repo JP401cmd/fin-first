@@ -197,6 +197,77 @@ describe('BudgetHeaderSlot — aanhef bóven de kaarten', () => {
   })
 })
 
+/**
+ * De kop als stromende ZIN (ADR 0174 D6). "Je budget" staat in de wachtvorm én
+ * in de gepubliceerde aanhef: de kop verandert bij het instromen van de cijfers
+ * dus niet, alleen de rest van de zin groeit aan.
+ */
+describe('BudgetHeaderSlot — de kop als stromende zin', () => {
+  function Publisher({ figures }: { figures: BudgetHeaderFigures }) {
+    const slot = useBudgetHeaderSlot()
+    const publish = slot?.publish
+    useEffect(() => {
+      publish?.(figures)
+    }, [publish, figures])
+    return null
+  }
+
+  const REST = <span data-testid="rest"> is op koers met sparen.</span>
+
+  it('de wachtvorm begint de kop met het onderwerp "Je budget"', () => {
+    render(
+      <DisplayModeProvider initialMode="full">
+        <BudgetHeaderSlotProvider>
+          <BudgetHeaderSlot sentenceSlot={REST} />
+        </BudgetHeaderSlotProvider>
+      </DisplayModeProvider>,
+    )
+    expect(screen.getByRole('heading', { level: 2 }).textContent).toBe(
+      'Je budget is op koers met sparen.',
+    )
+  })
+
+  it('de gepubliceerde aanhef houdt exact dezelfde kop', () => {
+    render(
+      <DisplayModeProvider initialMode="full">
+        <BudgetHeaderSlotProvider>
+          <BudgetHeaderSlot sentenceSlot={REST} />
+          <Publisher figures={{ ...HEADER_PROPS, simple: false }} />
+        </BudgetHeaderSlotProvider>
+      </DisplayModeProvider>,
+    )
+    expect(screen.getByText('Nog te besteden')).toBeTruthy()
+    expect(screen.getByRole('heading', { level: 2 }).textContent).toBe(
+      'Je budget is op koers met sparen.',
+    )
+  })
+
+  it('zonder slot (legacy /core/budgets) blijft de kale paginanaam staan', () => {
+    render(
+      <DisplayModeProvider initialMode="full">
+        <BudgetEditorialHeader {...HEADER_PROPS} simple={false} />
+      </DisplayModeProvider>,
+    )
+    expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('Budget')
+  })
+
+  it('de deck zegt in gewone taal waar de kop naar kijkt, zonder "oordeel" (B-071)', () => {
+    const { container } = render(
+      <DisplayModeProvider initialMode="full">
+        <BudgetHeaderSlotProvider>
+          <BudgetHeaderSlot sentenceSlot={REST} />
+          <Publisher figures={{ ...HEADER_PROPS, simple: false }} />
+        </BudgetHeaderSlotProvider>
+      </DisplayModeProvider>,
+    )
+    const tekst = container.textContent ?? ''
+    // Midden in de zin: de maand in kleine letters, zoals nl-NL hem schrijft.
+    expect(tekst).toContain('Je inkomen en uitgaven in juni 2026.')
+    expect(tekst).toContain('We kijken hoeveel je spaart en of je binnen je budgetten blijft.')
+    expect(tekst.toLowerCase()).not.toMatch(/\boordeel/)
+  })
+})
+
 describe('BudgetFiguresStrip — Eenvoudig vs Volledig', () => {
   it('simple: toont alleen Inkomen + Uitgaven (geen Sparen/Schulden)', () => {
     render(
