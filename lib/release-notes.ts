@@ -97,6 +97,24 @@ export const RELEASE_NOTE_NORM = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.92.2',
+    date: '2026-09-22',
+    title: 'Herstel achter de schermen',
+    sections: [
+      {
+        module: 'Platform',
+        color: 'zinc',
+        items: [
+          {
+            title: 'Nieuws wordt weer voorbereid voor de Krant',
+            description:
+              'Een stap die nieuwsberichten klaarzet voor de toekomstige Krant liep vast en werkt weer. Verder geen zichtbare verandering.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: '0.92.1',
     date: '2026-09-22',
     title: 'Je ziet welke versie je gebruikt',
