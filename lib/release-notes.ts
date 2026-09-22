@@ -97,6 +97,78 @@ export const RELEASE_NOTE_NORM = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.92.3',
+    date: '2026-09-22',
+    title: 'Elke pagina zegt in één zin hoe je ervoor staat',
+    sections: [
+      {
+        module: 'Bezittingen',
+        color: 'amber',
+        items: [
+          {
+            title: 'Spreiding zegt waar hij op rekent',
+            description:
+              'Bij de spreiding van je bezit staat nu dat je eigen woning niet meetelt. Het getal zelf is niet veranderd.',
+          },
+        ],
+      },
+      {
+        module: 'Schulden',
+        color: 'teal',
+        items: [
+          {
+            title: 'Lage schuldenlast in plaats van aflosschema',
+            description:
+              'De schuldentegel zei "Aflossing op schema", maar meet hoeveel schuld je hebt naast je bezit. Nu staat er wat hij meet.',
+          },
+        ],
+      },
+      {
+        module: 'Budget',
+        color: 'purple',
+        items: [
+          {
+            title: 'Budget op koers, vraagt aandacht of onder druk',
+            description:
+              'De budgettegel noemt geen oorzaak meer die niet voor iedereen klopt. Wat meeweegt, lees je in de regel eronder.',
+          },
+        ],
+      },
+      {
+        module: 'Je plan',
+        color: 'purple',
+        items: [
+          {
+            title: 'Je plan in het kompas',
+            description:
+              'Het kompas bovenin op je telefoon heeft een vijfde punt: hoe je plan ervoor staat, met een doorklik naar Toekomst.',
+          },
+        ],
+      },
+      {
+        module: 'Platform',
+        color: 'zinc',
+        items: [
+          {
+            title: 'Koppen die zeggen hoe je ervoor staat',
+            description:
+              'Bezittingen, Schulden, Budget, Belasting en Toekomst openen met één zin over hoe het gaat. Het overzicht noemt waar je score op rust.',
+          },
+          {
+            title: 'Paginanaam bovenin, in een kleur naar keuze',
+            description:
+              'Op je telefoon staat de naam van de pagina bovenin op een eigen balk. De kleur kies je bij Uiterlijk en geldt op al je apparaten.',
+          },
+          {
+            title: 'Geld levert tijd op',
+            description:
+              'In de app zeggen we het nu overal zo: je geld levert tijd op, en vrijheidstijd bouw je op.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: '0.92.2',
     date: '2026-09-22',
     title: 'Herstel achter de schermen',
