@@ -1,5 +1,5 @@
 {
-  "attestedAt": "2026-09-21T21:20:02.782Z",
+  "attestedAt": "2026-09-22T14:55:52.679Z",
   "note": "Attestatie-baseline voor de merkstem (ADR 0112). Per toon-/claimbron en per copy-oppervlak een sha256. Bijwerken betekent: de copy is opnieuw naast de bron gelegd. Zie .claude/skills/merkstem/SKILL.md en scripts/merkstem/scan.mjs.",
   "toneSources": [
     {
@@ -151,7 +151,7 @@
         },
         {
           "file": "app/signup/page.tsx",
-          "sha256": "ad4c5811ec39f898bc38c152bd3fb94d13f4704d1efca070dfe388241e7d2c3d",
+          "sha256": "635938df4ab58d8fb7a4454f650d69b6f13fa4e5d7ba1eee511058c7e65fd758",
           "copyLines": 15
         }
       ]
