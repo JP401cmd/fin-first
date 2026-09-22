@@ -90,3 +90,31 @@ describe('LeverCompassMobile — NAV-6 statuspunt-reductie', () => {
     expect(panel.className).toMatch(/max-w-\[calc\(100vw-2rem\)\]/)
   })
 })
+
+describe('LeverCompassMobile op de leisteen-TopBar (ADR 0174)', () => {
+  afterEach(cleanup)
+
+  // Rood-500 haalt op #3f4a5e maar 2,37:1. Alleen de rode stip krijgt een ring
+  // in de balkvoorgrond; een ring om amber zou die juist onder 3:1 trekken.
+  it("geeft in 'full' alléén de rode stip een ring in --topbar-fg", () => {
+    renderCompass('full', scoresWith({ assets: 'green', debts: 'amber', cashflow: 'red', tax: 'neutral' }))
+    const dots = triggerDots(screen.getByRole('button', { name: 'Kompas openen' }))
+    const metRing = dots.filter(d => d.className.includes('ring-[var(--topbar-fg)]'))
+    expect(metRing).toHaveLength(1)
+    expect(metRing[0].className).toContain('bg-red-500')
+  })
+
+  it("hovert in 'simple' in een neutrale rand, niet in het module-accent", () => {
+    renderCompass('simple', scoresWith({}))
+    const button = screen.getByRole('button', { name: /Kompas:/ })
+    expect(button.className).not.toContain('--module-active')
+    expect(button.className).toContain('hover:border-[var(--border-md)]')
+  })
+
+  it("het drukvlak in 'full' volgt de balk, niet het papier", () => {
+    renderCompass('full', scoresWith({}))
+    const button = screen.getByRole('button', { name: 'Kompas openen' })
+    expect(button.className).toContain('hover:bg-[var(--topbar-hover)]')
+    expect(button.className).not.toContain('hover:bg-[var(--subtle)]')
+  })
+})

@@ -427,8 +427,12 @@ export function LeverCompassMobile({ scores }: { scores: LeverScores }) {
           simple
             ? // `simple`-tak = 28×28, bewust compromis (M19 categorie a, besluit
               // eigenaar 26-08-2026) — niet aanraken zonder conventiebesluit.
-              'flex h-7 w-7 items-center justify-center rounded-full border border-[var(--border-ed)] bg-[var(--paper)] transition-colors hover:border-[var(--module-active-500)]'
-            : `flex items-center gap-[3px] rounded-full px-1.5 py-1 transition-colors hover:bg-[var(--subtle)] ${tapTargetClass('extend')}`
+              // Hover in neutrale rand, niet het module-accent: de pil staat op de
+              // TopBar, en die is chrome zonder module-identiteit (ADR 0174).
+              'flex h-7 w-7 items-center justify-center rounded-full border border-[var(--border-ed)] bg-[var(--paper)] transition-colors hover:border-[var(--border-md)]'
+            : // Staat op de gekleurde TopBar (ADR 0174): het drukvlak volgt de
+              // balk, niet het papier. Het paneel hieronder blijft wél op papier.
+              `flex items-center gap-[3px] rounded-full px-1.5 py-1 transition-colors hover:bg-[var(--topbar-hover)] ${tapTargetClass('extend')}`
         }
         aria-label={
           expanded
@@ -449,10 +453,17 @@ export function LeverCompassMobile({ scores }: { scores: LeverScores }) {
           LEVERS.map(({ key }) => {
             const entry = scores[key]
             const colors = STATUS_COLORS[entry.status]
+            // Op de leisteen-TopBar (ADR 0174) haalt rood-500 maar 2,37:1, onder
+            // de 3:1 voor een grafisch object, en juist rood is "actie". Een
+            // ring in de balkvoorgrond geeft de stip een eigen rand (rood tegen
+            // wit 3,8:1, tegen inkt 4,2:1 bij een lichte balk). Alléén rood:
+            // groen (3,5) en amber (4,2) halen het op de balk zelf, en een
+            // witte ring zou amber juist onder de grens trekken (2,2:1).
+            const ring = entry.status === 'red' ? ' ring-1 ring-[var(--topbar-fg)]' : ''
             return (
               <span
                 key={key}
-                className={`block w-[6px] h-[6px] rounded-full ${colors.dot}`}
+                className={`block w-[6px] h-[6px] rounded-full ${colors.dot}${ring}`}
                 aria-hidden
               />
             )

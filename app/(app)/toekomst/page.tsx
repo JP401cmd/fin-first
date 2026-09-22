@@ -240,10 +240,10 @@ export default async function ToekomstPage({
             zijn breedte over de vólle hoogte — op mobiel wikkelde de intro
             daardoor in vier smalle regels. Vol-breed dus, en kort (twee zinnen).
 
-            LET OP: /toekomst is een tab-root, en daar houdt de TopBar zich
-            bewust leeg. De paginanaam die `PageVerdictOpening` op mobiel aan de
-            shell overlaat, wordt daar dus gedragen door de actieve tab onderin
-            ("Toekomst") — niet door de bovenbalk. */}
+            De paginanaam die `PageVerdictOpening` op mobiel aan de shell
+            overlaat, staat in de TopBar: links naast de "← home"-knop, gezet
+            door de `<NavStackMeta title="Toekomst">` hierboven (ADR 0174;
+            tab-root-topbar-title.test.ts pint dat). */}
         <EditorialDeck className="mb-4">
           Je tijdas met doelen, gebeurtenissen en voorkeuren. Geld is opgeslagen tijd; kies wat je
           ermee doet.

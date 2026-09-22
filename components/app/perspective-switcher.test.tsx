@@ -78,4 +78,18 @@ describe('PerspectiveSwitcher (weergave-badge)', () => {
     expect(trigger.getAttribute('aria-label')).toContain('Partner')
     expect(trigger.textContent).not.toContain('Partner')
   })
+
+  it('compact zet geen eigen inkt-ring: op de leisteen-TopBar komt de ringkleur uit globals.css (ADR 0174 D5)', () => {
+    mockState = { perspective: 'partner', isHousehold: true, loading: false, partnerName: 'JP', availablePerspectives: AVAIL }
+    render(<PerspectiveSwitcher compact />)
+    const trigger = screen.getByTestId('perspective-switcher-trigger')
+    expect(trigger.className).not.toContain('outline-[var(--ink)]')
+    expect(trigger.className).toContain('focus-visible:outline-2')
+  })
+
+  it('niet-compact houdt de inkt-ring (staat op papier)', () => {
+    mockState = { perspective: 'partner', isHousehold: true, loading: false, partnerName: 'JP', availablePerspectives: AVAIL }
+    render(<PerspectiveSwitcher />)
+    expect(screen.getByTestId('perspective-switcher-trigger').className).toContain('focus-visible:outline-[var(--ink)]')
+  })
 })

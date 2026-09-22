@@ -58,6 +58,37 @@ describe('globals.css — tokens die alleen vanuit JS worden gelezen', () => {
     ).toEqual([])
   })
 
+  it('elk --topbar-*-token (ADR 0174) is in @theme inline gerefereerd', () => {
+    const gedefinieerd = [...CSS.matchAll(/^\s*(--topbar-[a-z-]+)\s*:/gm)].map(m => m[1])
+    expect(gedefinieerd.sort()).toEqual(['--topbar-bg', '--topbar-fg', '--topbar-fg-muted', '--topbar-hover'])
+
+    const theme = themeInlineBlok(CSS)
+    const ongemapt = gedefinieerd.filter(naam => !theme.includes(`var(${naam})`))
+    expect(ongemapt, 'voeg --color-<naam>: var(<naam>) toe aan @theme inline').toEqual([])
+  })
+
+  it('de focusring volgt de TopBar-voorgrond, en de menu’s in de header houden inkt (ADR 0174 D5)', () => {
+    // Beide regels moeten in `@layer base` staan. Ongelaagd zouden ze elke
+    // Tailwind-utility overstemmen. Zonder de eerste regel is de ring op de
+    // standaard-leisteen 1,96:1 (onzichtbaar), zonder de tweede wordt hij in het
+    // accountmenu wit op papier.
+    const lagen = [...CSS.matchAll(/@layer base\s*\{/g)].map(m => {
+      const open = CSS.indexOf('{', m.index!)
+      let diepte = 0
+      for (let i = open; i < CSS.length; i++) {
+        if (CSS[i] === '{') diepte++
+        else if (CSS[i] === '}' && --diepte === 0) return CSS.slice(open + 1, i)
+      }
+      return ''
+    })
+    const plat = (s: string) => s.replace(/\s+/g, ' ')
+    const base = plat(lagen.join('\n'))
+    expect(base).toContain("[data-topbar] :is(a, button):focus-visible { outline-color: var(--topbar-fg); }")
+    expect(base).toContain(
+      "[data-topbar] :is([role='menu'], [role='dialog']) :is(a, button):focus-visible { outline-color: var(--ink); }",
+    )
+  })
+
   it('elk --coverage-*-token dat een component gebruikt, bestaat ook echt', () => {
     const strook = zonderComments(
       readFileSync(join(process.cwd(), 'components/app/horizon/levensinkomen-strook.tsx'), 'utf8'),

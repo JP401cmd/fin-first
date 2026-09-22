@@ -46,6 +46,20 @@
      `lib/overlay-scrim.test.ts` bewaakt dat beide gelijk blijven. */
   --scrim: rgba(0, 0, 0, 0.5);
   --scrim-blur: 2px;
+
+  /* ── Mobiele TopBar (ADR 0174) ──
+     De balk is chrome, geen module-identiteit: een leisteenblauwe grond met
+     een voorgrond die op contrast wordt gekozen (wit of inkt). Deze vier
+     waarden zijn GEGENEREERD met topbarColorVars(DEFAULT_TOPBAR_COLOR) uit
+     lib/color-palette.ts. Stel ze nooit met de hand bij:
+     lib/color-palette.topbar.test.ts houdt beide gelijk. Vanaf F2 overschrijft
+     de (app)-layout ze per gebruiker.
+     Overschrijf op de header bewust NIET --ink/--subtle: het accountmenu en het
+     kompas-paneel hangen ín de header-DOM en moeten op papier blijven. */
+  --topbar-bg: #3f4a5e;
+  --topbar-fg: #ffffff;
+  --topbar-fg-muted: rgba(255, 255, 255, 0.75);
+  --topbar-hover: rgba(255, 255, 255, 0.12);
   --r: 0px;
   --r-lg: 0px;
   --r-sm: 0px;
@@ -788,6 +802,14 @@
   --color-coverage-rendement: var(--coverage-rendement);
   --color-coverage-interen:   var(--coverage-interen);
   --color-coverage-overschot: var(--coverage-overschot);
+
+  /* ── Mobiele TopBar (ADR 0174): bg-topbar-bg, text-topbar-fg, … ──
+     Zelfde reden als hierboven: de mapping houdt de :root-tokens levend.
+     Bewaakt door globals-tokens.test.ts. */
+  --color-topbar-bg:       var(--topbar-bg);
+  --color-topbar-fg:       var(--topbar-fg);
+  --color-topbar-fg-muted: var(--topbar-fg-muted);
+  --color-topbar-hover:    var(--topbar-hover);
 }
 
 /* Landing page animations */
@@ -1772,5 +1794,17 @@ body.sleepmodus-dragging * {
     outline: 2px solid var(--ink);
     outline-offset: 2px;
     border-radius: 2px;
+  }
+
+  /* Op de gekleurde TopBar (ADR 0174) valt de inkt-ring weg: 1,96:1 op de
+     standaard-leisteen. Daar krijgt de ring de voorgrondkleur van de balk.
+     Het accountmenu, het kompas-paneel en het weergavemenu hangen ín de
+     header-DOM, maar staan op papier; die houden de inkt-ring. Alleen de
+     kleur wisselt, dikte en offset blijven van de regel hierboven. */
+  [data-topbar] :is(a, button):focus-visible {
+    outline-color: var(--topbar-fg);
+  }
+  [data-topbar] :is([role='menu'], [role='dialog']) :is(a, button):focus-visible {
+    outline-color: var(--ink);
   }
 }

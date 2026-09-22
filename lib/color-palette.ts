@@ -546,6 +546,56 @@ export function generatePhaseColorVars(
   return vars
 }
 
+// ── TopBar-kleur (ADR 0174) ─────────────────────────────────────────────
+
+/**
+ * Standaardkleur van de mobiele TopBar: leisteenblauw uit de mockup van
+ * 22 sep 2026. Bewust GEEN vijfde accent: de balk is chrome, geen
+ * module-identiteit, en krijgt dus geen `--color-*-50..950`-palet.
+ *
+ * `:root` in `app/globals.css` draagt precies
+ * `topbarColorVars(DEFAULT_TOPBAR_COLOR)`. Wijzig je deze waarde, regenereer
+ * dan die vier regels; `color-palette.topbar.test.ts` wordt anders rood.
+ * Fase F2 maakt de kleur per gebruiker instelbaar (`profiles.topbar_color`).
+ */
+export const DEFAULT_TOPBAR_COLOR = '#3f4a5e'
+
+/** Voorgrond op een donkere balk. */
+const TOPBAR_FG_LIGHT = '#ffffff'
+/** Voorgrond op een lichte balk: gelijk aan `--ink`. */
+const TOPBAR_FG_DARK = '#1a1916'
+
+const HEX6 = /^#[0-9a-f]{6}$/i
+
+/**
+ * De vier `--topbar-*`-tokens voor één balkkleur.
+ *
+ * De voorgrond is wit of inkt, en wel de kleur met het meeste contrast op de
+ * balk. `--topbar-fg-muted` (iconen) en `--topbar-hover` (drukvlak) zijn
+ * alfa-varianten van die voorgrond, zodat ze met elke balkkleur meeschuiven
+ * zonder dat iemand ze apart hoeft te kiezen.
+ *
+ * Een ongeldige waarde (geen `#rrggbb`) valt terug op de standaard. Dat is
+ * meer dan netheid: vanaf F2 komt de invoer uit de profielrij en gaat hij
+ * rechtstreeks een `style`-attribuut in.
+ *
+ * Grens van de keuze wit/inkt: rond een balk-luminantie van ~0,2 halen beide
+ * maar ~4,2:1. Dat is een grijze middentoon, geen realistische balkkleur. De
+ * picker van F2 hoort daar te waarschuwen (zelfde lijn als de WCAG-hint bij de
+ * accenten).
+ */
+export function topbarColorVars(hex: string = DEFAULT_TOPBAR_COLOR): Record<string, string> {
+  const bg = HEX6.test(hex) ? hex.toLowerCase() : DEFAULT_TOPBAR_COLOR
+  const light = contrastRatio(bg, TOPBAR_FG_LIGHT) >= contrastRatio(bg, TOPBAR_FG_DARK)
+  const rgb = light ? '255, 255, 255' : '26, 25, 22'
+  return {
+    '--topbar-bg': bg,
+    '--topbar-fg': light ? TOPBAR_FG_LIGHT : TOPBAR_FG_DARK,
+    '--topbar-fg-muted': `rgba(${rgb}, 0.75)`,
+    '--topbar-hover': `rgba(${rgb}, ${light ? 0.12 : 0.08})`,
+  }
+}
+
 /**
  * Generates all CSS color variables: accenten (44) + budget (55) + fase (44) = 143 total.
  */

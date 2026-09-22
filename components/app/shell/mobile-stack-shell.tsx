@@ -189,9 +189,10 @@ function Tray({
     >
       {/* De ENIGE <h1> van de route (ADR 0110). Bewust hier en niet in TopBar:
           die is `lg:hidden` (= display:none ⇒ uit de a11y-tree op desktop),
-          rendert `null` bij `topBar.kind: 'hidden'`, en houdt zijn titel leeg
-          op tab-roots ('rich'). Een kop-drager die op één van de drie assen
-          wegvalt kan de "precies één h1"-invariant niet dragen.
+          rendert `null` bij `topBar.kind: 'hidden'`, en valt op tab-roots
+          ('rich') niet terug op de nav-config (daar komt de naam alleen uit
+          NavStackMeta). Een kop-drager die op één van de drie assen wegvalt
+          kan de "precies één h1"-invariant niet dragen.
           `sr-only` (clip, géén display:none) houdt 'm op BEIDE breakpoints in
           de a11y-tree; de zichtbare titel in de TopBar is hetzelfde label maar
           niet-semantisch. `aria-live="polite"` staat hier — zo kondigt een
@@ -315,9 +316,11 @@ export function MobileStackShell({
   const frameCollapse = forceVisible ? '' : ' lg:contents'
 
   // ── Paginanaam voor de enige <h1> (ADR 0110) ───────────────────
-  // Eigen resolutie, bewust NIET die van TopBar: die houdt tab-roots ('rich')
-  // opzettelijk leeg omdat de chrome daar geen titel wil tónen. De a11y-boom
-  // heeft juist dáár een naam nodig. Volgorde: expliciete NavStackMeta-titel →
+  // Eigen resolutie, bewust NIET die van TopBar: die valt op tab-roots ('rich')
+  // niet terug op de nav-config. Daar toont de balk de naam pas zodra de
+  // pagina's NavStackMeta hem zet (tab-root-topbar-title.test.ts pint dat).
+  // De a11y-boom heeft óók vóór dat moment een naam nodig. Volgorde:
+  // expliciete NavStackMeta-titel →
   // nav-config op het pad van de top-entry → nav-config op het live pad
   // (dekt een pagina die nog geen NavStackMeta rendert). Blijft alles leeg,
   // dan rendert er géén h1 — beter dan de lege <h1> van hiervoor.

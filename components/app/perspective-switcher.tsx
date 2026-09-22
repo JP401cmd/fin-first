@@ -70,8 +70,13 @@ export function PerspectiveSwitcher({
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className={`inline-flex items-center gap-1.5 rounded-full border transition-all hover:shadow-[var(--s0)] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--ink)] ${pillTint[perspective]} ${
-          compact ? 'h-8 w-8 justify-center' : 'px-2.5 py-1 text-xs font-medium'
+        // Compact staat de pil op de gekleurde mobiele TopBar (ADR 0174). De
+        // ring valt daar buiten de pil, op de balk, en een inkt-ring is op de
+        // standaard-leisteen onzichtbaar. Compact zet daarom zelf geen
+        // ringkleur: die komt uit globals.css (inkt, of `--topbar-fg` binnen
+        // `[data-topbar]`).
+        className={`inline-flex items-center gap-1.5 rounded-full border transition-all hover:shadow-[var(--s0)] focus-visible:outline-2 focus-visible:outline-offset-1 ${pillTint[perspective]} ${
+          compact ? 'h-8 w-8 justify-center' : 'px-2.5 py-1 text-xs font-medium focus-visible:outline-[var(--ink)]'
         }`}
         data-testid="perspective-switcher-trigger"
         aria-haspopup="menu"

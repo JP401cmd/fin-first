@@ -12,19 +12,24 @@
  * mee als onderdeel van de tray.
  *
  * Bewuste keuzes:
- *  - Subpagina-titel ('simple' kind) staat bewust in editorial serif
- *    (`var(--font-serif)`) + module-accentkleur (`var(--module-active-700)`),
- *    op verzoek van de gebruiker als consistentie-fix van de bovenbalk: de
- *    titel hoort visueel bij de actieve module en bij de editorial-toon van
- *    de rest van de app. Rustig gehouden (~16px, één regel, truncate) — geen
- *    EditorialHeadline-emphasis (te zwaar voor 48px-balk + breekt getByText).
+ *  - De balk draagt de paginanaam, links uitgelijnd naast de terugknop (ADR
+ *    0174). Zonder terugknop lijnt de naam op de pagina-gutter. De kop óp de
+ *    pagina hoeft de naam dan niet te herhalen en wordt vanaf F3 een oordeelzin.
+ *  - Kleur via de `--topbar-*`-tokens (`app/globals.css`, gegenereerd met
+ *    `topbarColorVars` uit `lib/color-palette.ts`): een leisteenblauwe grond
+ *    met een voorgrond die op contrast is gekozen. De balk is chrome, geen
+ *    module-identiteit: geen module-accent op de titel, geen onderlijn in
+ *    `--module-active-500`. De kleur staat per element en NIET als `text-*`
+ *    op de header: het accountmenu en het kompas-paneel hangen ín de header-
+ *    DOM en moeten op papier en in inkt blijven.
+ *  - Titel in editorial serif (de `font-serif`-class), 18px, één regel,
+ *    truncate. Geen EditorialHeadline-emphasis (te zwaar voor een 48px-balk,
+ *    en het breekt getByText).
  *  - Tab-roots ('rich' kind: Overzicht/Toekomst/Mijn) tonen hun tab-label als
  *    titel (via NavStackMeta op de pagina) NAAST het utility/icoon-cluster
  *    rechts. De `kind === 'simple'` fallback met resolveRouteTitle springt
  *    bewust niet voor 'rich'; de titel komt daar dus van de NavStackMeta-prop.
- *  - Module-aware via `--module-active-500` als 1px onderlijn op active-module
- *    routes. Op `/identity`, `/berichten`, etc. valt deze terug op
- *    `var(--border-ed)`.
+ *  - De browserchrome volgt de balkkleur via `ThemeColorSync`.
  *  - 44×44px touch-targets voor ←-knop en actions (a11y minimum).
  *  - `safe-area-inset-top` padding voor iOS-notch.
  *  - Optionele `title` + `showBackOverride` props voor de outgoing-tray:
@@ -43,7 +48,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { Activity, ArrowLeft, Bell, Newspaper } from 'lucide-react'
+import { Activity, Bell, ChevronLeft, Newspaper } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useNavStack, type TopBarKind } from './nav-stack-provider'
 import { resolveRouteTitle } from '@/lib/nav-config'
@@ -55,6 +60,8 @@ import { LeverCompassMobile } from '@/components/app/shell/lever-compass'
 import { useLeverScores } from '@/components/app/shell/shell-contexts'
 import { useHomeScreen } from '@/lib/hooks/use-home-screen'
 import { TAP_TARGET_EXTEND_BLOCK } from '@/components/editorial/tap-target'
+import { DEFAULT_TOPBAR_COLOR } from '@/lib/color-palette'
+import { ThemeColorSync } from './theme-color-sync'
 
 type TopBarProps = {
   /**
@@ -173,7 +180,7 @@ function TopBarUtilities({ email, initials, role }: { email: string; initials?: 
       <Link
         href="/nieuws"
         aria-label="Krant"
-        className={`flex h-9 w-9 items-center justify-center text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] ${TAP_TARGET_EXTEND_BLOCK}`}
+        className={`flex h-9 w-9 items-center justify-center text-[var(--topbar-fg-muted)] transition-colors hover:bg-[var(--topbar-hover)] hover:text-[var(--topbar-fg)] ${TAP_TARGET_EXTEND_BLOCK}`}
       >
         <Newspaper className="h-4 w-4" aria-hidden="true" />
       </Link>
@@ -185,11 +192,13 @@ function TopBarUtilities({ email, initials, role }: { email: string; initials?: 
           openModal()
         }}
         aria-label={unreadCount > 0 ? `Meldingen, ${unreadCount > 9 ? 'meer dan 9' : unreadCount} ongelezen` : 'Meldingen'}
-        className={`flex h-9 w-9 items-center justify-center text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] ${TAP_TARGET_EXTEND_BLOCK}`}
+        className={`flex h-9 w-9 items-center justify-center text-[var(--topbar-fg-muted)] transition-colors hover:bg-[var(--topbar-hover)] hover:text-[var(--topbar-fg)] ${TAP_TARGET_EXTEND_BLOCK}`}
       >
         <Bell className="h-4 w-4" aria-hidden="true" />
         {unreadCount > 0 && (
-          <span className="absolute right-0.5 top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
+          // Ring in de balkvoorgrond: rood-500 haalt op leisteen maar 2,37:1 (ADR
+          // 0174); met de ring tekent de badge zich af tegen elke balkkleur.
+          <span className="absolute right-0.5 top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white ring-1 ring-[var(--topbar-fg)]">
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
@@ -202,9 +211,10 @@ function TopBarUtilities({ email, initials, role }: { email: string; initials?: 
           aria-label="Account"
           aria-haspopup="menu"
           aria-expanded={menuOpen}
-          className={`flex h-9 w-9 items-center justify-center transition-colors hover:bg-[var(--subtle)] ${TAP_TARGET_EXTEND_BLOCK}`}
+          className={`flex h-9 w-9 items-center justify-center transition-colors hover:bg-[var(--topbar-hover)] ${TAP_TARGET_EXTEND_BLOCK}`}
         >
-          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--ink)] text-[10px] font-medium text-[var(--paper)]">
+          {/* Omgekeerd t.o.v. de balk: voorgrond als vlak, balkkleur als letter. */}
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--topbar-fg)] text-[10px] font-medium text-[var(--topbar-bg)]">
             {initials || email[0]?.toUpperCase() || '?'}
           </span>
         </button>
@@ -374,11 +384,6 @@ export function TopBar({
   const homeBackLabel =
     homeScreen === 'budget' ? 'Terug naar budgetteren' : 'Terug naar overzicht'
 
-  // Module-aware onderlijn: hoofdmodules krijgen `--module-active-500`-streep,
-  // andere tabs (identity, other) → defaultkleur.
-  const isModuleTab = activeTab === 'kern' || activeTab === 'wil' || activeTab === 'horizon'
-  const borderColorVar = isModuleTab ? 'var(--module-active-500)' : 'var(--border-ed)'
-
   // BELANGRIJK: NIET meer `sticky top-0`. TopBar zit binnen de tray-flex-
   // column van MobileStackShell — als hij sticky was zou hij over de
   // tray-grenzen heen plakken bij scroll. Visibility-gating via lg:hidden
@@ -394,74 +399,60 @@ export function TopBar({
   const renderedActions =
     actions ?? (kind === 'rich' && email ? <TopBarUtilities email={email} initials={initials} role={role} /> : null)
 
+  // De terugknop: pop op een subpagina, "← home" op de secundaire tab-roots.
+  // Zonder knop rendert er NIETS (geen placeholder): de naam schuift dan naar
+  // de gutter in plaats van een lege 44px-kolom voor zich uit te duwen.
+  const backClass =
+    'touch-target shrink-0 text-[var(--topbar-fg)] hover:bg-[var(--topbar-hover)] tap-highlight'
+  const backIcon = <ChevronLeft className="h-7 w-7" strokeWidth={1.5} aria-hidden="true" />
+  const backSlot = showBack ? (
+    <button type="button" onClick={pop} aria-label="Terug" className={backClass}>
+      {backIcon}
+    </button>
+  ) : showHomeBack ? (
+    <Link href={homeHref} aria-label={homeBackLabel} className={backClass}>
+      {backIcon}
+    </Link>
+  ) : null
+
   return (
     <header
-      className={`${visibilityClass} bg-[var(--paper)] shrink-0`}
-      style={{
-        // Safe-area padding voor iOS-notch / Dynamic Island.
-        paddingTop: 'env(safe-area-inset-top, 0px)',
-        // 1px onderlijn — module-aware. Inline-style omdat var-driven kleur
-        // in Tailwind v4 een arbitrary-value zou zijn die slechter leest.
-        borderBottom: `1px solid ${borderColorVar}`,
-      }}
+      data-topbar
+      className={`${visibilityClass} bg-[var(--topbar-bg)] shrink-0`}
+      // Safe-area padding voor iOS-notch / Dynamic Island. De balkkleur loopt
+      // zo dóór onder de statusbalk (`statusBarStyle: 'black-translucent'`).
+      style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
     >
-      {/* Inner-row vaste hoogte 48px volgens spec.
-          Lay-out: [back of placeholder] [title (truncate)] [actions]
-          Grid met 1fr in midden zodat titel altijd gecentreerd lijkt.
-          shrink-0 op flanken voorkomt dat een lange titel de knoppen knijpt. */}
-      <div className="grid grid-cols-[44px_1fr_auto] items-center gap-2 px-2 h-12">
-        {/* Links — back of lege placeholder van 44px om titel symmetrisch te houden. */}
-        {showBack ? (
-          <button
-            type="button"
-            onClick={pop}
-            aria-label="Terug"
-            className="touch-target text-[var(--ink-2)] hover:bg-[var(--subtle)] tap-highlight"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </button>
-        ) : showHomeBack ? (
-          <Link
-            href={homeHref}
-            aria-label={homeBackLabel}
-            className="touch-target text-[var(--ink-2)] hover:bg-[var(--subtle)] tap-highlight"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Link>
-        ) : (
-          <span aria-hidden className="block h-11 w-11" />
-        )}
+      <ThemeColorSync color={DEFAULT_TOPBAR_COLOR} />
 
-        {/* Midden — titel. Bewust een <p>, GÉÉN <h1> (ADR 0110): deze balk is
-            `lg:hidden` (= display:none, dus weg uit de a11y-tree op desktop),
-            rendert niet bij `kind: 'hidden'`, en blijft op tab-roots ('rich')
-            leeg — een kop die op drie assen kan wegvallen kan de enige h1 niet
-            zijn. De echte <h1> is de sr-only paginanaam in MobileStackShell;
-            die draagt nu ook de `aria-live`. Dit label is puur zichtbaar en
-            daarom `aria-hidden` — anders leest een schermlezer de naam twee
-            keer. Editorial serif + module-
-            accentkleur (op module-tabs) zodat de titel visueel bij de actieve
-            module + de editorial-toon hoort; truncate op één regel. Op niet-
-            module-routes valt de kleur terug op `var(--ink)`.
-            Bewust `--module-active-900` (niet -700): de horizon-accent is een
-            licht warm goud waarvan -700 op `var(--paper)` onder WCAG AA (4.5:1)
-            zakt bij 16px tekst; -900 blijft in de accent-familie maar haalt het
-            contrast. Expliciete fontWeight 400 voorkomt UA-bold op de serif-
-            fallback. (Kleur via inline-style, dus geen `text-*`-class hier.) */}
+      {/* Inner-row vaste hoogte 48px. Lay-out: [terug?] [naam (truncate)] [actions].
+          `pl-1` + de 44px-knop zet de chevron dicht bij de schermrand; zonder
+          knop geeft `pl-3` op de naam samen 16px = de pagina-gutter (`px-4`).
+          `shrink-0` op de flanken voorkomt dat een lange naam de knoppen knijpt. */}
+      <div className="flex h-12 items-center pl-1 pr-2">
+        {backSlot}
+
+        {/* De naam. Bewust een <p>, GÉÉN <h1> (ADR 0110): deze balk is
+            `lg:hidden` (= display:none, dus weg uit de a11y-tree op desktop) en
+            rendert niet bij `kind: 'hidden'`. Een kop die zo kan wegvallen kan
+            de enige h1 niet zijn. De echte <h1> is de sr-only paginanaam in
+            MobileStackShell, en die draagt ook de `aria-live`. Dit label is
+            puur zichtbaar en daarom `aria-hidden`; anders leest een schermlezer
+            de naam twee keer.
+            Lettertype via de `font-serif`-class (= `--font-source-serif`, dat
+            het typografie-thema van de gebruiker volgt). NIET via een inline
+            `var(--font-serif)`: `@theme inline` schrijft die variabele niet uit,
+            en dan viel de titel stil terug op Georgia. `font-normal` voorkomt
+            UA-bold. */}
         <p
           aria-hidden="true"
-          className="text-center text-base truncate min-w-0 leading-tight"
-          style={{
-            fontFamily: 'var(--font-serif, Georgia, serif)',
-            fontWeight: 400,
-            color: isModuleTab ? 'var(--module-active-900)' : 'var(--ink)',
-          }}
+          className={`min-w-0 flex-1 truncate text-left font-serif text-[18px] font-normal leading-tight text-[var(--topbar-fg)]${backSlot ? '' : ' pl-3'}`}
         >
           {title}
         </p>
 
         {/* Rechts — utility-cluster ('rich' kind) of pagina-specifieke actions. */}
-        <div className="flex items-center justify-end gap-1">{renderedActions}</div>
+        <div className="ml-2 flex shrink-0 items-center justify-end gap-1">{renderedActions}</div>
       </div>
     </header>
   )
