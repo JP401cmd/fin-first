@@ -5,7 +5,7 @@ import { formatCurrency } from '@/lib/format'
  * (y-as, 0–60%) uitgezet tegen het inkomen (x-as).
  *
  * Filosofie: marginale druk laat zien hoeveel van élke extra verdiende euro
- * naar de schatkist gaat — oftewel hoeveel "opgeslagen tijd" je per extra
+ * naar de schatkist gaat — oftewel hoeveel vrijheidstijd je per extra
  * euro daadwerkelijk overhoudt. Cliffs (drempels waar het tarief abrupt
  * verspringt, bv. wegvallende toeslagen of de schijfgrens) worden als
  * verticale markeringen getoond.

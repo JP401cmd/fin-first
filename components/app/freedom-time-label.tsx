@@ -143,7 +143,7 @@ export function eurToFreedomTime(amount: number, dailyExpenseRate: number): {
 /**
  * FreedomTimeLabel — Reusable component showing EUR amount + freedom time equivalent.
  *
- * Philosophy: "Geld is opgeslagen tijd" — every EUR represents stored life time.
+ * Philosophy: "Geld levert tijd op" — every amount stands for time in which expenses are covered.
  * This component translates EUR amounts into how many days/months/years of
  * financial freedom they represent, based on the user's actual daily expenses.
  *

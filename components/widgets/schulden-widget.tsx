@@ -268,7 +268,7 @@ export const SchuldenWidget = memo(function SchuldenWidget({ size, data, href }:
           )}
 
           <p className="text-[11px] text-[var(--ink-3)]">
-            Vrijheid die je terugkoopt
+            Elke aflossing levert tijd op
           </p>
         </div>
       ) : (

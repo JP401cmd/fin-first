@@ -337,7 +337,7 @@ export function OverzichtSecondary({
 
       {/* Filosofie-tagline als hero-footer — visueel afsluitend. */}
       <p className="mt-6 pb-4 text-center text-[11px] uppercase tracking-[0.18em] text-[var(--ink-3)] font-medium">
-        Geld is opgeslagen tijd
+        Geld levert tijd op
       </p>
     </>
   )

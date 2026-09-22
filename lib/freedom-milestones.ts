@@ -4,7 +4,7 @@
  * Calculates projected dates for reaching 25%, 50%, 75%, 100% freedom milestones.
  * Uses the same math as computeFireProjection (inflation-adjusted compound growth + monthly savings).
  *
- * "Geld is opgeslagen tijd" — each milestone represents a step closer to full freedom.
+ * "Geld levert tijd op" — each milestone represents a step closer to full freedom.
  */
 
 import { DEFAULT_RETURN, INFLATION, NL_SWR } from '@/lib/horizon-data'

@@ -46,7 +46,7 @@ export function LandingPreview() {
       </header>
 
       <EditorialDeck>
-        Het vermogen is opgeslagen tijd. Hieronder zie je de categorieën waarin
+        Geld levert tijd op. Hieronder zie je de categorieën waarin
         je tijd is geparkeerd — en wat ervan terugverdient.
       </EditorialDeck>
 

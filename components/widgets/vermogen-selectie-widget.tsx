@@ -115,7 +115,7 @@ export const VermogenSelectieWidget = memo(function VermogenSelectieWidget({
     const ft = calculateFreedomTime(selection.total, dailyExp)
     const str = formatFreedomTimeString(ft, 'short')
     if (!str) return null
-    return ft.isDeficit ? `${str} vrijheid terug te kopen` : `${str} vrijheid`
+    return ft.isDeficit ? `${str} achter` : `${str} vrijheid`
   }, [selection, data.dailyExpenseRate])
 
   // Zelfde richting-lek als in de netto-vermogen-tegel: bij maskering wordt de

@@ -134,7 +134,7 @@ export function buildDeficitLoanCopy(input: DeficitLoanCopyInput): DeficitLoanCo
     : housingSentence(input.housing, startAge, cleared)
 
   const piek = input.freedomText
-    ? `Op het diepste punt staat er ${input.peakText} open — ${input.freedomText} vrijheid die je later terugkoopt.`
+    ? `Op het diepste punt staat er ${input.peakText} open — een schuld ter waarde van ${input.freedomText} vrijheid, die je later aflost.`
     : `Op het diepste punt staat er ${input.peakText} open.`
 
   const lijn = `Op de vermogenslijn zie je dit niet: die toont je nettovermogen, waarin het tekort al is verrekend.`

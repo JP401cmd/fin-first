@@ -14,8 +14,8 @@ import { RANGE_STEP_ANY, nextRangeValueForKey, snapToStep } from './range-slider
  *
  * De gebruiker schuift het dividend dat dit jaar wordt uitgekeerd; de tool
  * splitst dat over de lage schijf (24,5%) en de hoge schijf (31%), toont de
- * resulterende Box 2-heffing, het netto restant en — in de geest van "geld is
- * opgeslagen tijd" — de vrijheidsdagen die de heffing kost.
+ * resulterende Box 2-heffing, het netto restant en — in de geest van "geld levert
+ * tijd op" — de vrijheidsdagen die de heffing kost.
  *
  * ÉÉN MOTOR (bevinding H26). Tot 26-08-2026 rekende dit component met een eigen
  * `splitDividend()`: een tweede staffel-implementatie náást `calculateBox2`, die

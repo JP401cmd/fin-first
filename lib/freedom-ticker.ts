@@ -1,7 +1,8 @@
 /**
  * Vrijheidstijd-teller voor INTAKE-flows (`/check`-wizard en `/onboarding`).
  *
- * Eén bron voor de "Al vrijgekocht · 1j 3m"-teller die tijdens het invullen
+ * Eén bron voor de "Al opgebouwd · 1j 3m"-teller (in de `/check`-wizard nog
+ * "Al vrijgekocht", fase 2 van ADR 0165) die tijdens het invullen
  * meeloopt. Vóór deze module bestond die teller alleen in `check-wizard.tsx`
  * (module-privaat) en had de ingelogde onboarding er géén — twintig schermen
  * lang geen enkel vrijheidsgetal, terwijl de publieke trechter ervóór het wél

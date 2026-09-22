@@ -249,8 +249,8 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
         {/* 0. Uitleg-intro — wat is deze fase & waarom zie je dit */}
         <PhaseIntro
           kicker="AFBOUWFASE"
-          title="Nu leef je van opgeslagen tijd"
-          body="Je hebt jarenlang vrijheid opgebouwd; nu leef je ervan. Elke euro die je onttrekt is een stukje teruggekochte levenstijd. De eerste jaren wegen het zwaarst: een tegenvaller vlak na je stop raakt je vermogen blijvend, want je verkoopt op een laag punt zonder herstelkans (volgorde-risico)."
+          title="Tijd die je vermogen je nu oplevert"
+          body="Je hebt jarenlang vrijheid opgebouwd; nu leef je ervan. Elke euro die je onttrekt staat voor tijd waarin je uitgaven gedekt zijn. De eerste jaren wegen het zwaarst: een tegenvaller vlak na je stop raakt je vermogen blijvend, want je verkoopt op een laag punt zonder herstelkans (volgorde-risico)."
           infoContent={getPageInfo('/toekomst/fase-onttrekking/intro')}
         />
 

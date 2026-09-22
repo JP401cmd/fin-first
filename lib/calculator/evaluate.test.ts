@@ -226,7 +226,7 @@ describe('resolveInitialInputs', () => {
  * binnen het bereik te vallen van het veld dat 'm erft. Vóór de fix erfde
  * "Maandelijks bedrag" (min: 50) letterlijk een negatief maandoverschot, wat
  * negatieve eindwaarden én NEGATIEVE VRIJHEIDSTIJD opleverde — regelrecht in
- * strijd met "geld is opgeslagen tijd" — plus een slider-desync (de HTML-range
+ * strijd met "geld levert tijd op" — plus een slider-desync (de HTML-range
  * klemt alleen de visuele thumb, niet de React-waarde).
  */
 describe('resolveInitialInputs — prefill klemt naar het veldbereik', () => {

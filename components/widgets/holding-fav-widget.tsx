@@ -143,7 +143,7 @@ export const HoldingFavWidget = memo(function HoldingFavWidget({
   const returnAmount = holding.totalValue - holding.totalCost
   const dailyChangeAmount = holding.totalValue * (holding.dailyChangePct / 100)
 
-  // Vrijheidstijd-equivalent van de positiewaarde ("Geld is opgeslagen tijd").
+  // Vrijheidstijd-equivalent van de positiewaarde ("Geld levert tijd op").
   // Consume-don't-recompute: dagtarief komt uit de bundel, niet lokaal berekend.
   const freedomStr =
     dailyExp && dailyExp > 0 && holding.totalValue > 0

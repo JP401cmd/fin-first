@@ -261,7 +261,7 @@ export function OnboardingKlaar({
                 {freedomLabel ? (
                   <>
                     <span className="mt-1.5 block font-mono text-[11px] tabular-nums text-[var(--module-active-700)]">
-                      Al vrijgekocht &middot; {freedomLabel}
+                      Al opgebouwd &middot; {freedomLabel}
                     </span>
                     {/* De grondslag-zin volgt sinds ADR 0133 de woning-keuze
                         van de gebruiker; de kopij komt uit
@@ -319,12 +319,12 @@ export function OnboardingKlaar({
 
       {/* ── De wisselkoers, onder de strip ────────────────────────────────
           Het dagtarief is de NOEMER van elke vrijheidstijd in de app; zonder
-          dat getal blijft "geld is opgeslagen tijd" een leus. Het stond tot
+          dat getal blijft "geld levert tijd op" een leus. Het stond tot
           UR3-05 alleen op het uitgaven-scherm, en dan nog uitsluitend als
           iemand beide bedragen had ingevuld — wie "Later invullen" koos,
           verliet de onboarding zonder één tijdgetal.
 
-          BEWUST LOS VAN DE VERMOGENSCEL: die toont "al vrijgekocht" en valt
+          BEWUST LOS VAN DE VERMOGENSCEL: die toont "al opgebouwd" en valt
           weg zonder bezittingen. Deze regel leunt alleen op inkomen en
           uitgaven, en is dus ook de eerste (en soms enige) vrijheidsvertaling
           die een lege startpositie te zien krijgt. Eén bron met de meelopende
@@ -547,7 +547,7 @@ function StartGroup({
 /**
  * Startpositie-paneel — toont de individuele bezittingen en schulden als
  * zachte markers, gegroepeerd (bezittingen eerst: "wat je meebrengt", dan
- * schulden: "vrijheid die je terugkoopt"). Complementair aan de recap-strip:
+ * schulden: "schulden die je aflost"). Complementair aan de recap-strip:
  * die toont het TOTALE netto vermogen, hier zie je de opsplitsing per post.
  *
  * Bewust GEEN vrijheidstijd-getal — alleen lichte kwalitatieve framing — in
@@ -624,8 +624,8 @@ function OnboardingStartpositie({
 
           {hasDebts && (
             <StartGroup
-              kicker="Vrijheid die je terugkoopt"
-              deck="Schulden die je stap voor stap aflost."
+              kicker="Schulden die je aflost"
+              deck="Elke aflossing levert tijd op."
               posts={debtPosts}
               tone="negative"
             />

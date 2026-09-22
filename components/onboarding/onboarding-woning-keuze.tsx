@@ -40,7 +40,7 @@ import {
  * die stap houdt alleen voor zijn TWEEDE vraag nog een eigen `<h2>`, want die
  * valt buiten de kop.
  *
- * "Geld is opgeslagen tijd": deze keuze bepaalt of de stenen waarin je woont
+ * "Geld levert tijd op": deze keuze bepaalt of de stenen waarin je woont
  * meetellen als vrijheid die je kunt uitgeven, of pas op het moment dat je ze
  * verzilvert.
  */

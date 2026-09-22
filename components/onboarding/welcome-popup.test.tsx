@@ -19,7 +19,7 @@ describe('WelcomePopup — kort welkomstbericht (B-052)', () => {
     render(<WelcomePopup onDismiss={vi.fn()} />)
     const dialog = screen.getByRole('dialog')
     expect(dialog.textContent).toContain('Welkom bij')
-    expect(dialog.textContent).toContain('Geld is opgeslagen tijd.')
+    expect(dialog.textContent).toContain('Geld levert tijd op.')
     expect(dialog.textContent).toContain('rekent dat om naar tijd: de datum waarop werken een keuze wordt')
     expect(dialog.textContent).toContain('We beginnen met een korte onboarding')
     expect(screen.getByRole('button', { name: /Start de onboarding/ })).toBeTruthy()

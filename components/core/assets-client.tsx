@@ -4587,7 +4587,7 @@ export function AssetForm({
               (components/core/sale-config-fields.tsx). */}
           {showSaleConfig && (
             <SaleConfigFields draft={saleDraft} onChange={setSaleDraft} activeDebts={activeDebts}>
-              {/* Vrijheidstijd-context bij de waarde — "geld is opgeslagen tijd". */}
+              {/* Vrijheidstijd-context bij de waarde — "geld levert tijd op". */}
               {dailyExpenses > 0 && currentValueNum > 0 && (
                 <p className="text-[11px] text-[var(--ink-3)]">
                   Deze waarde van <span className="font-medium text-[var(--ink-2)]">{fc(currentValueNum)}</span> staat voor{' '}

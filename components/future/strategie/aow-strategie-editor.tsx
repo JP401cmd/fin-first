@@ -50,7 +50,7 @@ export function AowStrategieEditor({
       open
       onClose={onClose}
       title="AOW-strategie"
-      intro="AOW is opgeslagen tijd die de staat teruggeeft — gegarandeerde vrijheid vanaf je pensioenleeftijd."
+      intro="AOW levert je tijd op — gegarandeerde vrijheid vanaf je pensioenleeftijd."
       readOnly={readOnly}
       footer={
         readOnly ? undefined : (

@@ -205,7 +205,8 @@ describe('BudgetTrendWidget — sparen-XL (waarde-labels per maand)', () => {
  * de widget toont het openstaand schuldSALDO (dalend = goed). Een dalend saldo
  * hoort groen (text-positive), een stijgend saldo rood. De reeks is een SALDO,
  * geen maandstroom → geen aflossings-budget-referentielijn en de vrijheidstijd is
- * "terug te kopen", niet "/maand".
+ * een achterstand ("≈ X achter", zoals `formatWithFreedom`), niet "/maand". Niet
+ * "die aflossen oplevert": aflossen uit vermogen levert niet de hele saldotijd op.
  */
 describe('BudgetTrendWidget — Schuldtrend (saldo, Optie B)', () => {
   const dalend: History = [
@@ -233,11 +234,13 @@ describe('BudgetTrendWidget — Schuldtrend (saldo, Optie B)', () => {
     expect(container.querySelector('.text-positive')).toBeNull()
   })
 
-  it('full-size framet de vrijheidstijd als "terug te kopen", niet "/maand"', () => {
+  it('full-size framet de vrijheidstijd als achterstand ("≈ X achter"), niet "/maand"', () => {
     const { container } = render(
       <BudgetTrendWidget budgetType="debt" size="full" data={makeData('debt', dalend)} />,
     )
-    expect(container.textContent).toContain('terug te kopen')
+    expect(container.textContent).toMatch(/≈ \d\S*\s+achter/)
+    expect(container.textContent).not.toContain('die aflossen oplevert')
+    expect(container.textContent).not.toContain('/maand')
     // Geen aflossings-budget-referentie voor een saldo, ook niet als er een limit staat.
     const { container: withLimit } = render(
       <BudgetTrendWidget budgetType="debt" size="full" data={makeData('debt', dalend, 400)} />,

@@ -24,7 +24,7 @@ export const LEVEL_NAMES: Record<number, string> = {
 // ── Wat het volgende niveau betekent (motivatie, GEEN feature-gate) ──────────
 // Gekeyd op het HUIDIGE niveau: de tekst beschrijft wat het bereiken van
 // niveau+1 op de vrijheidsreis betekent. Bewust geframed als betekenis/mijlpaal
-// ("Geld is opgeslagen tijd"), niet als "ontgrendelt functie X" — dat zou een
+// ("Geld levert tijd op"), niet als "ontgrendelt functie X" — dat zou een
 // feature-gate suggereren die sinds ADR 0001 niet meer bestaat.
 export const NEXT_LEVEL_MOTIVATION: Record<number, string> = {
   [-2]: 'Grip terugkrijgen op je uitgaven',

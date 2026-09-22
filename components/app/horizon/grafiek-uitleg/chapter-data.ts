@@ -90,7 +90,7 @@ export interface OpbouwData {
    */
   assetTypeGrowth?: { type: string; growth: number }[]
   /**
-   * Totaal afgeloste hoofdsom over de opbouwfase ("vrijheid die je terugkoopt").
+   * Totaal afgeloste hoofdsom over de opbouwfase ("schulden die je aflost"; elke aflossing levert tijd op).
    * Vereist `unifiedRows` én een schuld met aflossing; `undefined` als geen schuld/rows.
    */
   debtPrincipalPaidDuringAccumulation?: number

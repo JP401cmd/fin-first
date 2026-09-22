@@ -653,7 +653,7 @@ function BriefingImpactBadge({ impact }: { impact?: BriefingEntry['impact'] }) {
   const hasEur = eur != null && eur > 0
   const hasDays = days != null && days > 0
   if (!hasEur && !hasDays) return null
-  // "Geld is opgeslagen tijd": de vrijheidsdagen krijgen de visuele lead
+  // "Geld levert tijd op": de vrijheidsdagen krijgen de visuele lead
   // (geaccentueerde chip), het euro-bedrag is de secundaire context.
   return (
     <div className="mt-2 inline-flex items-center gap-2 text-[10px] text-[var(--ink-3)]">
@@ -755,14 +755,14 @@ function BriefingCard({
 }
 
 /**
- * Colofon onder de briefing — de krant-signatuur "Geld is opgeslagen tijd"
+ * Colofon onder de briefing — de krant-signatuur "Geld levert tijd op"
  * gecentreerd onder een hairline, zoals op de reference-plaat. Puur visueel.
  */
 function BriefingColophon() {
   return (
     <div className="mt-9 border-t border-[var(--border-ed)] pt-4 text-center">
       <span className="briefing-rubriek font-mono text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--ink-3)]">
-        Geld is opgeslagen tijd
+        Geld levert tijd op
       </span>
     </div>
   )

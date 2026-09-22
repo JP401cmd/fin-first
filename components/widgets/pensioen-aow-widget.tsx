@@ -82,7 +82,7 @@ export const PensioenAowWidget = memo(function PensioenAowWidget({ size, data, h
     : NL_SWR
   const aowFireReduction = aowYearly / swr
 
-  // LOW-4: vrijheidstijd-framing ("Geld is opgeslagen tijd"). Het AOW-vermogens-
+  // LOW-4: vrijheidstijd-framing ("Geld levert tijd op"). Het AOW-vermogens-
   // equivalent is gegarandeerde vrijheid die je niet zelf hoeft op te bouwen.
   // Consumeert het canonieke rolling dagtarief (data.dailyExpenseRate) — geen eigen som.
   const dailyExp = data.dailyExpenseRate ?? null

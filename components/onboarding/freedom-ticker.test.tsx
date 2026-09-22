@@ -56,7 +56,7 @@ describe('meelopende teller in de onboarding-kop', () => {
   it('toont exact de canonieke tellerwaarde', () => {
     expect(CANONIEK).not.toBeNull()
     render(<Shell label={CANONIEK!.label} />)
-    expect(screen.getByText('Al vrijgekocht')).toBeTruthy()
+    expect(screen.getByText('Al opgebouwd')).toBeTruthy()
     // Geen los "er staat een getal": de gerenderde string IS de engine-uitvoer.
     expect(screen.getByText(CANONIEK!.label)).toBeTruthy()
     expect(CANONIEK!.label).toBe('1j 3m')
@@ -64,7 +64,7 @@ describe('meelopende teller in de onboarding-kop', () => {
 
   it('rendert niets zolang er geen eerlijke waarde is', () => {
     render(<Shell label={null} />)
-    expect(screen.queryByText('Al vrijgekocht')).toBeNull()
+    expect(screen.queryByText('Al opgebouwd')).toBeNull()
   })
 })
 
@@ -93,7 +93,7 @@ describe('eindscherm — zelfde getal, met grondslag-label', () => {
     render(
       <OnboardingKlaar {...klaarProps} freedomLabel={CANONIEK!.label} />,
     )
-    expect(screen.getAllByText(new RegExp(`Al vrijgekocht`))[0]).toBeTruthy()
+    expect(screen.getAllByText(new RegExp(`Al opgebouwd`))[0]).toBeTruthy()
     // De grondslag-zin volgt sinds ADR 0133 de woning-keuze. Zonder keuze
     // (geen woning, of de vraag niet gesteld) geldt de terugval — dezelfde
     // lezing als vóór ADR 0133: de woning telt pas mee bij verkoop.

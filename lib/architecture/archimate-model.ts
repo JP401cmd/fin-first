@@ -195,7 +195,7 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
     // ── Motivatie ──
     {
       id: 'm-filo', x: 560, y: 36, w: 300, h: 58, kind: 'motiv',
-      title: 'Geld is opgeslagen tijd',
+      title: 'Geld levert tijd op',
       lead: 'De kerndriver van TriFinity. Elke euro boven €100 wordt ook getoond als vrijheidstijd — dagen, maanden, jaren financiële onafhankelijkheid.',
       items: ['Driver / principe', '€ → vrijheidstijd', 'time-framing'],
     },
@@ -257,7 +257,7 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
     {
       id: 'sp-vermogen', x: 320, y: row(2), w: 210, h: 66, kind: 'bizproc',
       title: 'Vermogen & schulden beheren',
-      lead: "Bezittingen, beleggingen en schulden beheren, waarderen en herbalanceren. Nettovermogen als 'jaren vrijheid'; schulden als vrijheid die je terugkoopt.",
+      lead: "Bezittingen, beleggingen en schulden beheren, waarderen en herbalanceren. Nettovermogen als 'jaren vrijheid'; schulden die je aflost — elke aflossing levert tijd op.",
       items: ['/overzicht/bezittingen', '/overzicht/schulden'],
     },
     {

@@ -68,7 +68,7 @@ function LoginForm() {
         Inloggen bij TriFinity
       </h1>
 
-      {/* Philosofie-haak: houdt de "geld is opgeslagen tijd"-stem ook bij
+      {/* Philosofie-haak: houdt de "geld levert tijd op"-stem ook bij
           terugkeer vast. Sobere één-regel, geen tijd-cue (inloggen is geen
           getting-started-moment). */}
       <p className="mb-6 text-center text-sm italic text-zinc-600">

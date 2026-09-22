@@ -422,18 +422,18 @@ export const GrafiekUitlegWalkthrough = memo(function GrafiekUitlegWalkthrough({
           </div>
         )}
 
-        {/* Schuld = vrijheid die je terugkoopt */}
+        {/* Schulden die je aflost — elke aflossing levert tijd op (ADR 0165) */}
         {showDebtPaid && (
           <p className="mt-4 rounded-[var(--r-sm)] border-l-[3px] border-l-horizon-500 bg-horizon-50/40 px-3 py-2 text-[12px] leading-relaxed text-[var(--ink-2)]">
-            Onderweg koop je{' '}
+            Onderweg los je{' '}
             <span className="font-mono font-semibold tabular-nums text-horizon-700">
               {formatCurrency(data.opbouw.debtPrincipalPaidDuringAccumulation!)}
             </span>{' '}
-            vrijheid terug door schuld af te lossen
+            schuld af
             {freedomNote(data.opbouw.debtPrincipalPaidDuringAccumulation!, dailyRate) && (
               <> — zo&apos;n {freedomNote(data.opbouw.debtPrincipalPaidDuringAccumulation!, dailyRate)}</>
             )}
-            . Elke afgeloste euro is rente die je niet meer kwijt bent.
+            . Elke aflossing levert tijd op: een afgeloste euro is rente die je niet meer kwijt bent.
           </p>
         )}
       </UitlegChapter>

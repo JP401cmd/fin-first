@@ -9,7 +9,7 @@ import type { PageInfoContent } from '@/lib/page-info-content'
  * PhaseIntro — herbruikbaar intro-/uitlegblok bovenaan elke fase-modal
  * (opbouw / overgang / onttrekking).
  *
- * Legt in de filosofie "Geld is opgeslagen tijd" uit wát de fase is en wáárom
+ * Legt in de filosofie "Geld levert tijd op" uit wát de fase is en wáárom
  * de gebruiker deze analyses ziet. De PageInfoButton ("Wat zie ik hier?") staat
  * rechtsboven; de body geeft 1-2 zinnen context in editorial-serif.
  *
@@ -24,7 +24,7 @@ export function PhaseIntro({
 }: {
   /** Korte mono-kicker, bijv. "OPBOUWFASE". */
   kicker: string
-  /** Editorial-kop, bijv. "Geld is opgeslagen tijd". */
+  /** Editorial-kop, bijv. "Geld levert tijd op". */
   title: string
   /** 1-2 zinnen uitleg (serif). */
   body: ReactNode

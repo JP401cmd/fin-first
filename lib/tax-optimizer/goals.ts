@@ -27,7 +27,7 @@ export const TAX_OPTIMIZER_GOALS: TaxOptimizerGoal[] = [
     id: 'jaarruimte-maximaal',
     label: 'Mijn jaarruimte maximaal benutten',
     description:
-      'Reken door wat een lijfrente-inleg tegen je marginale tarief bespaart — en hoeveel vrijheid je ermee terugkoopt.',
+      'Reken door wat een lijfrente-inleg tegen je marginale tarief bespaart — en hoeveel vrijheidstijd dat oplevert.',
     box: 'box1',
     available: true,
   },

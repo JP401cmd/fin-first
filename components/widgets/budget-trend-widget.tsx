@@ -42,7 +42,7 @@ interface TypeConfig {
   /** Is de reeks een SALDO/voorraad (schuld) i.p.v. een maandstroom (inkomen/
    *  uitgaven/sparen)? Schuld toont het openstaand saldo (Optie B): een maand-budget-
    *  referentielijn is dan betekenisloos en de vrijheidstijd is geen "/maand"-stroom
-   *  maar de vrijheid die je terugkoopt door de schuld af te lossen. */
+   *  maar de tijd die aflossen oplevert. */
   isStock: boolean
 }
 
@@ -435,14 +435,17 @@ export const BudgetTrendWidget = memo(function BudgetTrendWidget({ budgetType, s
   const dailyExp = data.dailyExpenseRate ?? dailyExpenseRate(data.monthlyExpenses)
   // Stromen (inkomen/uitgaven/sparen): vrijheidstijd van de gemiddelde MAANDstroom
   // → "≈ X/maand". Schuld is een saldo (voorraad): de vrijheidstijd van het huidige
-  // openstaande saldo = de vrijheid die je terugkoopt door het af te lossen.
+  // openstaande saldo, als achterstand ("≈ X achter", dezelfde vorm als
+  // `formatWithFreedom` voor een negatief bedrag). Níét "tijd die aflossen
+  // oplevert": aflossen uit vermogen verandert je netto vermogen niet, dus de
+  // hele saldotijd komt er niet bij (ADR 0165, eindreview B-051).
   const freedomBase = config.isStock ? current.value : avg(history)
   const freedomTime = dailyExp > 0 && freedomBase > 0
     ? calculateFreedomTime(freedomBase, dailyExp)
     : null
   const freedomStr = freedomTime ? formatFreedomTimeString(freedomTime, 'short') : null
-  // Label-suffix bij de "≈"-regel: maandstroom vs. terug te kopen vrijheid.
-  const freedomSuffix = config.isStock ? ' terug te kopen' : '/maand'
+  // Label-suffix bij de "≈"-regel: maandstroom vs. achterstand van het saldo.
+  const freedomSuffix = config.isStock ? ' achter' : '/maand'
 
   // ── Mini ─────────────────────────────────────────────────
   if (size === 'mini') {

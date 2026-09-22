@@ -46,9 +46,9 @@ describe('FontPicker — render', () => {
     expect(editorial?.getAttribute('aria-pressed')).toBe('true')
   })
 
-  it('elk thema heeft preview-tekst "Geld is opgeslagen tijd"', () => {
+  it('elk thema heeft preview-tekst "Geld levert tijd op"', () => {
     renderWithProvider()
-    expect(screen.getAllByText('Geld is opgeslagen tijd').length).toBe(3)
+    expect(screen.getAllByText('Geld levert tijd op').length).toBe(3)
   })
 })
 

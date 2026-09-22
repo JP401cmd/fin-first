@@ -95,7 +95,7 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
   // de andere grondslag lezen in de mock geen verschil laten zien.
   currentMonthIncome: 5200,
   currentMonthExpenses: 3100,
-  // Canoniek dagtarief (€/dag) — voedt de "Geld is opgeslagen tijd"-vertaling in widgets.
+  // Canoniek dagtarief (€/dag) — voedt de "Geld levert tijd op"-vertaling in widgets.
   dailyExpenseRate: 100,
   monthlyContributions: 1400,
   yearlyMustExpenses: 28800,

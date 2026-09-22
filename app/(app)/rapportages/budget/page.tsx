@@ -933,7 +933,7 @@ export default function BudgetReportPage() {
       {freedom && (
         <div className="mt-8 text-center">
           <p className="font-inter text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)] mb-3">
-            Geld is opgeslagen tijd
+            Geld levert tijd op
           </p>
           <p
             className={`inline-block font-playfair text-4xl font-bold pb-2 ${freedomGained ? 'text-[var(--module-active-700)]' : 'text-[var(--negative)]'}`}
@@ -959,7 +959,7 @@ export default function BudgetReportPage() {
           <span>t</span><span style={{ color: 'var(--module-active-700)' }}>f.</span>
         </p>
         <p className="mt-1 font-source-serif text-[13px] italic text-[var(--ink-3)]">
-          &ldquo;Geld is opgeslagen tijd&rdquo;
+          &ldquo;Geld levert tijd op&rdquo;
         </p>
       </div>
       <OrnamentColophon

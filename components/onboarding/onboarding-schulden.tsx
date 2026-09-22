@@ -62,8 +62,8 @@ import {
  * `ask`/`more`) heelt naar het raster: `healSchuldenPhases` in de orchestrator,
  * en hier als vangnet in `renderPhase`.
  *
- * "Geld is opgeslagen tijd": schulden zijn hier geframed als *vrijheid die je
- * terugkoopt* — geen nieuw €→tijd-cijfer verzonnen (onboarding kent geen
+ * "Geld levert tijd op": schulden zijn hier neutraal geframed als *schulden die
+ * je aflost* (ADR 0165) — geen nieuw €→tijd-cijfer verzonnen (onboarding kent geen
  * dagkosten-grondslag).
  */
 
@@ -385,7 +385,7 @@ export function OnboardingSchulden({
   const factsPanel = (
     <FactsPanel
       stat={hasAnyDebt ? `−${formatCurrency(totalDebt)}` : '€3.700'}
-      sub={hasAnyDebt ? 'vrijheid die je terugkoopt' : 'gemiddelde consumptieve schuld per huishouden'}
+      sub={hasAnyDebt ? 'schulden die je aflost' : 'gemiddelde consumptieve schuld per huishouden'}
       source={
         hasAnyDebt
           ? `${totalDebtCount} schuld${totalDebtCount === 1 ? '' : 'en'}`
@@ -442,7 +442,7 @@ export function OnboardingSchulden({
               Welke <em className="font-normal italic">schulden</em> heb je?
             </span>
           }
-          deck="Vink alles aan wat van toepassing is — denk ook aan een hypotheek of studielening. Daarna vul je per schuld het bedrag in; elke schuld is vrijheid die je stap voor stap terugkoopt. Geen schulden? Ga gewoon verder."
+          deck="Vink alles aan wat van toepassing is — denk ook aan een hypotheek of studielening. Daarna vul je per schuld het bedrag in; elke aflossing levert tijd op. Geen schulden? Ga gewoon verder."
           dataNote={dataNoteFor('schulden')}
           factsPanel={factsPanel}
           currentStep={currentStep}
@@ -491,7 +491,7 @@ export function OnboardingSchulden({
           kicker="Schuld"
           romanNum="iv."
           title={<span>Dit zijn je schulden</span>}
-          deck="Samen de vrijheid die je stap voor stap terugkoopt. Klopt het, of wil je nog iets toevoegen?"
+          deck="Samen de schulden die je stap voor stap aflost. Klopt het, of wil je nog iets toevoegen?"
           factsPanel={factsPanel}
           currentStep={currentStep}
           totalSteps={totalSteps}

@@ -77,7 +77,7 @@ export function WerkStrategieEditor({
       open
       onClose={onClose}
       title="Werk-strategie"
-      intro="Je loopbaan is opgeslagen tijd in wording. Schets je inkomenslijn — groei, een plafond, minder werken — en zie wat het met je vrijheidsdatum doet. Elke euro die je extra verdient, spaar je volledig."
+      intro="Je loopbaan levert tijd op. Schets je inkomenslijn — groei, een plafond, minder werken — en zie wat het met je vrijheidsdatum doet. Elke euro die je extra verdient, spaar je volledig."
       error={error}
       readOnly={readOnly}
       footer={

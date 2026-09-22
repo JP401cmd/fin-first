@@ -46,7 +46,8 @@ describe('ArchitectuurShell — view-switcher', () => {
   it('schakelt naar de praatplaat (HLD, gebruikersperspectief)', () => {
     renderShell()
     fireEvent.click(screen.getByRole('tab', { name: /Praatplaat/ }))
-    expect(screen.getByRole('heading', { name: /Geld is opgeslagen/i })).toBeInTheDocument()
+    // De belofte volgt de leus uit ADR 0165: "Geld levert tijd op".
+    expect(screen.getByRole('heading', { name: /Geld levert/i })).toBeInTheDocument()
     expect(screen.getByText(/Wat de app voor je doet/i)).toBeInTheDocument()
     expect(window.location.search).toContain('view=praatplaat')
   })

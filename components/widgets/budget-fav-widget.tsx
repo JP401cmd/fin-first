@@ -61,7 +61,7 @@ export const BudgetFavWidget = memo(function BudgetFavWidget({
   const dailyAvg = daysPassed > 0 ? budget.spent / daysPassed : 0
   const remainingPerDay = daysLeft > 0 ? remaining / daysLeft : 0
 
-  // ── Vrijheidstijd ("Geld is opgeslagen tijd") ──
+  // ── Vrijheidstijd ("Geld levert tijd op") ──
   // Consume-don't-recompute: dagtarief komt uit de bundel, niet lokaal berekend.
   // Restant = vrijheid die je deze maand nog over hebt; limiet = de vrijheid die het
   // hele budget vertegenwoordigt.

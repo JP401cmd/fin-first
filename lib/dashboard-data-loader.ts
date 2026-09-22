@@ -1878,8 +1878,8 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   }
 
   // Schuldtrend (widgetreview, Optie B): het openstaand schuldSALDO per maand uit de
-  // balance_snapshots — een dalend saldo is "goed" (schuld = vrijheid die je
-  // terugkoopt), wat via `goodWhenUp:false` op het debt-type vanzelf correct kleurt.
+  // balance_snapshots — een dalend saldo is "goed" (elke aflossing levert tijd
+  // op), wat via `goodWhenUp:false` op het debt-type vanzelf correct kleurt.
   // Fallback op de vroegere AFLOSSINGEN-som (debt-budget-transacties) als er nog geen
   // snapshot-historie is (nieuw account) of de RPC faalde, zodat de widget niet leegt.
   const debtSaldoHistory = buildDebtSaldoHistory(

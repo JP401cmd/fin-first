@@ -38,7 +38,7 @@ import type { PensionParseResult } from '@/app/api/pension/parse/route'
  * de eind-save (`applyPensionParseResult`), zodat het POST-contract en de
  * ownership-scoping (auth.uid()) ongewijzigd blijven.
  *
- * "Geld is opgeslagen tijd": pensioen is *vrijheid die later vanzelf binnenkomt*.
+ * "Geld levert tijd op": pensioen is *vrijheid die later vanzelf binnenkomt*.
  */
 
 export type PensionMode = 'estimate' | 'upload'

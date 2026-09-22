@@ -388,7 +388,7 @@ function FirstUseEmpty() {
     <div className="flex flex-col items-center gap-2 py-12 text-center">
       <h3 className="font-serif text-[18px] font-semibold text-[var(--ink)]">Nog geen transacties.</h3>
       <p className="max-w-xs font-serif text-[13px] italic text-[var(--ink-3)]">
-        Koppel je bank of importeer een bestand om je geldstroom als opgeslagen tijd te zien.
+        Koppel je bank of importeer een bestand om je geldstroom in vrijheidstijd te zien.
       </p>
       {/* De veiligheidszin reist mee naar het moment van twijfel, uit één bron
           (UR3-15). De knoppen staan in de banner erboven. */}

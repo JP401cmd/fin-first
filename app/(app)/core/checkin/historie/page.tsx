@@ -278,7 +278,7 @@ function CheckinSummary({
             className="text-[11px] italic text-[var(--ink-3)]"
             style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
           >
-            Netto vermogen over je check-ins — opgeslagen tijd die groeit.
+            Netto vermogen over je check-ins — de vrijheidstijd die je opbouwt.
           </p>
         </>
       )}

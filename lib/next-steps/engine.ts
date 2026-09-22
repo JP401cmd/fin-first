@@ -164,7 +164,7 @@ export function computeNextSteps(input: NextStepInput): NextStep[] {
       'add_debts', 'kern', 'fundament',
       'Schulden vastleggen',
       'Leg je schulden vast',
-      'Schulden zijn vrijheid die je terugkoopt — pas compleet als ze erin staan.',
+      'Elke aflossing levert tijd op — je beeld is pas compleet als je schulden erin staan.',
       '/overzicht/schulden',
     )
   }

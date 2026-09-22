@@ -281,7 +281,7 @@ describe('BudgetFiguresStrip — Eenvoudig vs Volledig', () => {
     expect(screen.queryByText('Schulden')).toBeNull()
     // De Sparen/Schulden-taglines (enkel in die cells) zijn afwezig.
     expect(screen.queryByText('vrijheid opbouwen')).toBeNull()
-    expect(screen.queryByText('vrijheid terugkopen')).toBeNull()
+    expect(screen.queryByText('tijd die aflossen oplevert')).toBeNull()
   })
 
   it('full: toont alle vier cellen Inkomen/Uitgaven/Sparen/Schulden', () => {
@@ -295,7 +295,7 @@ describe('BudgetFiguresStrip — Eenvoudig vs Volledig', () => {
     expect(screen.getByText('Sparen')).toBeTruthy()
     expect(screen.getByText('Schulden')).toBeTruthy()
     expect(screen.getByText('vrijheid opbouwen')).toBeTruthy()
-    expect(screen.getByText('vrijheid terugkopen')).toBeTruthy()
+    expect(screen.getByText('tijd die aflossen oplevert')).toBeTruthy()
   })
 })
 

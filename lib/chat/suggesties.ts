@@ -122,10 +122,10 @@ export const CHAT_SUGGESTIES: readonly ChatSuggestie[] = [
 
   /* ── A · Bezittingen & vermogen (1–12) ─────────────────────────────────── */
   {
-    id: 'vrijheid-vrijgekocht',
+    id: 'vrijheid-opgebouwd',
     categorie: 'bezittingen',
-    label: 'Hoeveel vrijheid heb ik al vrijgekocht?',
-    prompt: 'Hoeveel vrijheid heb ik al vrijgekocht?',
+    label: 'Hoeveel vrijheid heb ik al opgebouwd?',
+    prompt: 'Hoeveel vrijheid heb ik al opgebouwd?',
     routes: ['/overzicht', '/overzicht/bezittingen'],
     generiek: true,
     vereist: ['hasAssets'],

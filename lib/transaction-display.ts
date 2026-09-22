@@ -122,7 +122,7 @@ export function freedomDays(amount: number, dailyExpense: number): number {
  * teller als het euro-bedrag dat er in de kop naast staat. Vóór M20 rekende de
  * dagkop met alléén `expenseTotal`, waardoor een dag met €507,64 inkomsten en
  * €28,61 uitgaven "+ €479,03 · ≈ 0,3 vrijheidsdag" toonde: twee verschillende
- * grondslagen in één regel, precies op de plek die "geld is opgeslagen tijd" het
+ * grondslagen in één regel, precies op de plek die "geld levert tijd op" het
  * meest letterlijk uitlegt. Op zuivere uitgavendagen (`incomeTotal = 0`) is het
  * netto bedrag gelijk aan `-expenseTotal` en verandert er niets.
  *

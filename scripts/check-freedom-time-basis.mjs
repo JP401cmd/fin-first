@@ -162,7 +162,7 @@ const INLINE_CONVERSION_ALLOWED = new Map([
  * totaal dragen, als eerste argument van `calculateFreedomTime`/
  * `formatWithFreedom`. Bewust een lijst en géén prefix-heuristiek zoals
  * `total*` of `bruto*`:
- *   · `total*` zou `totalDebts` (schuld → "vrijheid die je terugkoopt"),
+ *   · `total*` zou `totalDebts` (schuld → "elke aflossing levert tijd op"),
  *     `totalRecurringAmount`, `totalAnnualFee`, `totalIncome`/`totalExpenses`
  *     en `totalImpact` meepakken — allemaal STROMEN of KOSTEN, waar de
  *     marginale vraag juist de goede is;
@@ -313,7 +313,7 @@ const ALLOWED_FILES = new Map([
   [
     'lib/freedom-ticker.ts',
     'DE gedeelde intake-grondslag (intakeDailyExpenseRate): de meelopende ' +
-      '"Al vrijgekocht"-teller van /check én /onboarding rekent op de bedragen die ' +
+      'teller van /check ("Al vrijgekocht", tot fase 2 van ADR 0165) én /onboarding ("Al opgebouwd") rekent op de bedragen die ' +
       'de gebruiker zojuist zelf typte — er is nog geen transactiehistorie voor een ' +
       'rolling tarief. Bewust ÉÉN module in plaats van de conversie per intake-scherm ' +
       '(bevinding H12): zo blijft "intake rekent op eigen invoer" één gedocumenteerde ' +

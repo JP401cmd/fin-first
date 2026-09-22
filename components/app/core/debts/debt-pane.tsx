@@ -43,7 +43,7 @@ interface DebtPaneProps {
   userAssets: Asset[]
   /** Alle (actieve) schulden — door edit-form gebruikt voor splits. */
   allDebts?: Debt[]
-  /** Daily-expense-schatting voor de "vrijheid die je terugkoopt"-regel. */
+  /** Daily-expense-schatting voor de "elke aflossing levert tijd op"-regel. */
   dailyExpenses?: number
   /**
    * Auth-uid van de kijker, voor de eigenaar-guard op Bewerken/Verwijderen.

@@ -67,10 +67,10 @@ describe('buildDeelTekst — stand Weinig deelt alleen vrijheidstijd', () => {
   it('valt zonder vrijheidstijd terug op een tekst zónder cijfers', () => {
     const leeg = maakKaart('anonymous', { freedomTime: { years: 0, months: 0 } })
     const inhoud = buildDeelTekst(leeg, 'https://app.trifinity.nl')
-    expect(inhoud.text).toMatch(/geld is opgeslagen tijd/i)
+    expect(inhoud.text).toMatch(/geld levert tijd op/i)
     expect(inhoud.text).not.toContain('%')
     // `freedomTimeLong` is bij een vers account de truthy string '0 dagen' —
-    // die mag hier nooit doorsijpelen ("Ik kocht al 0 dagen vrijheid").
+    // die mag hier nooit doorsijpelen ("Ik heb al 0 dagen vrijheid opgebouwd").
     expect(inhoud.text).not.toMatch(/\d/)
   })
 })

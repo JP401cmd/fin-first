@@ -396,7 +396,7 @@ describe('vrijheidstijd - zonder geloofwaardige uitgavenbasis geen claim', () =>
     expect(buildBriefingHeadline(runway)).toBeNull()
   })
 
-  it('een tekort levert evenmin een meetpunt (geen "gekochte vrijheid" bij schuld)', () => {
+  it('een tekort levert evenmin een meetpunt (geen opgebouwde vrijheid bij schuld)', () => {
     const runway = { ...deplete, kind: 'deficit', solverStatus: 'unreachable_within_horizon' } as const
     expect(summarizeRunway(runway)).toBeNull()
     expect(buildBriefingHeadline(runway)).toBeNull()

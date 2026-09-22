@@ -862,7 +862,7 @@ export function DebtsClient({ toolbarFilter, debtTypeFilter, initialData, showPa
         )}
 
         {/* Eenvoudig — compacte pill-lijst i.p.v. het kaart-grid. Zelfde
-            redactionele kop "Vrijheid die je terugkoopt" (header) blijft staan;
+            redactionele kop (header) blijft staan;
             hier alleen een korte italic deck + de pills. */}
         {simple && activeDebts.length > 0 && debtPillItems.length > 0 && (
           <>

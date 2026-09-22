@@ -31,7 +31,7 @@ const PILLAR_GROUP_LABELS: Record<PillarGroup, string> = {
 const PILLAR_GROUP_BLURBS: Record<PillarGroup, string> = {
   rondkomen: 'Wat je elke maand overhoudt — de motor van je vrijheid.',
   buffer: 'Je stootkussen — hoelang je het volhoudt zonder inkomen.',
-  schuld: 'Vrijheid die je terugkoopt — hoe zwaar je lasten wegen.',
+  schuld: 'Schulden die je aflost — hoe zwaar je lasten wegen.',
   vrijheid: 'Je weg naar volledige vrijheid — voortgang en spreiding.',
 }
 

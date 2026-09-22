@@ -530,13 +530,13 @@ const detectSchulden: Detector = (i) => {
     score: clamp(days / 3, 10, 60),
     variants: [
       (v) => ({
-        vraag: `${v.subjCap} ${v.poss} totale schuld is ${formatEUR(i.totalDebts)} — dat is ${freedomLabel(days)} aan vrijheid die ${v.subj} nog terugkopen. Welke schuld ${v.wil} ${v.subj} het eerste aanpakken?`,
+        vraag: `${v.subjCap} ${v.poss} totale schuld is ${formatEUR(i.totalDebts)} — dat staat gelijk aan ${freedomLabel(days)} vrijheid. Welke schuld ${v.wil} ${v.subj} het eerste aanpakken?`,
         context: `${i.debtCount} ${i.debtCount === 1 ? 'schuld' : 'schulden'}, totaal ${formatEUR(i.totalDebts)}.`,
         actie: `Bespreek ${v.samen} een extra aflossing op de duurste schuld.`,
         vrijheidstijd: freedomLabel(days),
       }),
       (v) => ({
-        vraag: `${formatEUR(i.totalDebts)} schuld = ${freedomLabel(days)} teruggekochte vrijheid. Welke aflossing geeft de meeste rust?`,
+        vraag: `${formatEUR(i.totalDebts)} schuld staat gelijk aan ${freedomLabel(days)} vrijheid. Welke aflossing geeft de meeste rust?`,
         context: `Totale schuldenlast over ${i.debtCount} ${i.debtCount === 1 ? 'schuld' : 'schulden'}.`,
         actie: `Kies ${v.samen} de eerstvolgende schuld om op te focussen.`,
         vrijheidstijd: freedomLabel(days),

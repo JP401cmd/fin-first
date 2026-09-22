@@ -923,7 +923,7 @@ function SpendLimitCard({
             )}
           </p>
         )}
-        {/* Geld is opgeslagen tijd: de ruimte of de overschrijding ook in
+        {/* Geld levert tijd op: de ruimte of de overschrijding ook in
             vrijheidstijd, op het dagtarief uit de loader. Bij `reached` houdt
             FreedomLine zich stil — "Die ruimte is ≈ 0 dagen vrijheid" zou
             dezelfde belofte herhalen (ADR 0136). Let op: het bedrag is dáár niet

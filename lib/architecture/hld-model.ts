@@ -62,9 +62,11 @@ export function buildHldModel(): HldModel {
   return {
     promise: {
       kicker: 'De belofte',
-      headline: 'Geld is opgeslagen',
-      emphasis: 'tijd',
-      deck: 'Elke euro die je hebt, is vrije tijd die je hebt teruggekocht. TriFinity vertaalt je geld naar tijd — en helpt je die tijd te vergroten. Hieronder: wat de app concreet voor je doet.',
+      // ADR 0165: de leus is "Geld levert tijd op"; "opgeslagen tijd" en
+      // "teruggekocht" zijn vervallen.
+      headline: 'Geld levert',
+      emphasis: 'tijd op',
+      deck: 'Elk bedrag staat voor tijd waarin je uitgaven gedekt zijn. TriFinity vertaalt je geld naar tijd — en helpt je die tijd te vergroten. Hieronder: wat de app concreet voor je doet.',
     },
 
     // De reis als korte verhaallijn rond de functionaliteiten.

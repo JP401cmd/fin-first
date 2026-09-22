@@ -1,7 +1,7 @@
 {
   "name": "TriFinity",
   "short_name": "TriFinity",
-  "description": "Geld is opgeslagen tijd — persoonlijke financiën in beweging",
+  "description": "Geld levert tijd op — persoonlijke financiën in beweging",
   "id": "/",
   "start_url": "/dashboard",
   "scope": "/",

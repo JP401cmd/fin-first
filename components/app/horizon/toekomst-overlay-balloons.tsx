@@ -7,7 +7,7 @@
  * In een eigen, lichte module zodat de regressietest het exacte aantal, de
  * kickers en de emphasis-mapping kan vastpinnen tegen drift — zonder de zware
  * `horizon-client` te hoeven laden. Puur informatieve leke-uitleg in
- * "Geld is opgeslagen tijd"-geest: géén bedragen, géén rekenlogica
+ * "Geld levert tijd op"-geest: géén bedragen, géén rekenlogica
  * (consume-only). De gewogen plaatsing + leader-lines/kaders/FIRE-cirkel zit in
  * `ToekomstOverlay`; de emphasis-koppeling laat de juiste grafiekfase oplichten.
  */

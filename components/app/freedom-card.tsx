@@ -70,8 +70,8 @@ function buildFreedomNarrative(data: FreedomCardData): { pre: string; accent: st
   const reached = data.fireCountdown?.label === 'Bereikt!'
 
   if (reached) return { pre: 'Ik bereikte ', accent: 'volledige vrijheid', post: '.' }
-  if (fY > 0) return { pre: 'Ik kocht al ', accent: `${fY} jaar`, post: ' vrijheid.' }
-  if (fM > 0) return { pre: 'Ik kocht al ', accent: `${fM} ${fM === 1 ? 'maand' : 'maanden'}`, post: ' vrijheid.' }
+  if (fY > 0) return { pre: 'Ik heb al ', accent: `${fY} jaar`, post: ' vrijheid opgebouwd.' }
+  if (fM > 0) return { pre: 'Ik heb al ', accent: `${fM} ${fM === 1 ? 'maand' : 'maanden'}`, post: ' vrijheid opgebouwd.' }
   // In de Weinig-stand draagt de kaart uitsluitend vrijheidstijd. Dan mag ook de
   // kop geen percentage lenen — anders lekt het cijfer alsnog via de zin binnen.
   if (pct != null && pct > 0 && data.privacyLevel !== 'anonymous') {

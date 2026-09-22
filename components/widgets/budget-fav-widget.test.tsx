@@ -42,7 +42,7 @@ function makeBudget(overrides: Partial<FavBudget> = {}): FavBudget {
   }
 }
 
-describe('BudgetFavWidget — vrijheidstijd (Geld is opgeslagen tijd)', () => {
+describe('BudgetFavWidget — vrijheidstijd (Geld levert tijd op)', () => {
   it('full: toont exact de canonieke vrijheidstijd van het restant', () => {
     const budget = makeBudget() // restant = 300
     const dailyExp = 100

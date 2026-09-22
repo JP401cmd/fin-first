@@ -833,7 +833,7 @@ export default function VermogenReportPage() {
             <span>t</span><span style={{ color: 'var(--module-active-700)' }}>f.</span>
           </p>
           <p className="mt-1 font-source-serif text-[13px] italic text-[var(--ink-3)]">
-            &ldquo;Geld is opgeslagen tijd&rdquo;
+            &ldquo;Geld levert tijd op&rdquo;
           </p>
         </div>
         <OrnamentColophon module="Vermogensoverzicht" text={generatedDate} />

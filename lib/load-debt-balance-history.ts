@@ -4,7 +4,7 @@
 // ───────────────────────────────────────────────────────────────────────────
 // De Schuldtrend-widget (`trend_schulden`) toonde vroeger de som van débt-budget-
 // TRANSACTIES per maand = maandelijkse AFLOSSINGEN. Dat botste met de widgetnaam en
-// het filosofie-frame "schulden = vrijheid die je terugkoopt" (dat een DÁLEND
+// het filosofie-frame "elke aflossing levert tijd op" (dat een DÁLEND
 // openstaand saldo als "goed" leest). Optie B (gekozen door de gebruiker): toon het
 // openstaand schuldSALDO over tijd. Een dalend saldo = goed → dankzij
 // `goodWhenUp: false` op het debt-type kleurt de trend dan vanzelf correct.

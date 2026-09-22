@@ -48,12 +48,12 @@ export const NettoVermogenWidget = memo(function NettoVermogenWidget({ size, dat
     : data.dailyExpenseRate ?? dailyExpenseRate(monthlyExpenses)
   // Geef het GETEKENDE netto vermogen door (niet Math.abs): calculateFreedomTime zet dan
   // de isDeficit-flag, zodat een negatief vermogen niet misleidend als "vrijheid" maar als
-  // "vrijheid terug te kopen" wordt geframed (filosofie: schuld = vrijheid die je terugkoopt).
+  // achterstand ("X achter", zelfde vorm als formatWithFreedom) wordt geframed (ADR 0165).
   const freedomTime = dailyExp > 0 ? calculateFreedomTime(netWorth, dailyExp) : null
   const freedomStr = freedomTime ? formatFreedomTimeString(freedomTime, 'short') : null
   const freedomLabel = freedomStr
     ? freedomTime!.isDeficit
-      ? `${freedomStr} vrijheid terug te kopen`
+      ? `${freedomStr} achter`
       : `${freedomStr} vrijheid`
     : null
 

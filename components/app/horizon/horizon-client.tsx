@@ -5811,7 +5811,7 @@ export default function HorizonPage({
   // De drie fase-bubbels (Opbouw / Financiële vrijheid / Afbouw) komen uit de
   // module-level constante TOEKOMST_OVERLAY_BALLOONS (zie onder), zodat de
   // regressietest ze kan vastpinnen. Geen eigen rekenlogica/bedragen — leke-
-  // uitleg in "Geld is opgeslagen tijd"-geest; de gewogen layout + emphasis-
+  // uitleg in "Geld levert tijd op"-geest; de gewogen layout + emphasis-
   // koppeling zit in ToekomstOverlay.
   const toekomstOverlayBalloons: OverlayBalloonDef[] = TOEKOMST_OVERLAY_BALLOONS
 

@@ -342,7 +342,7 @@ export const SpendLimitWidget = memo(function SpendLimitWidget({
   /** Precies op de grens: binnen, maar zonder ruimte (ADR 0136). */
   const isReached = status === 'reached'
 
-  // ── Vrijheidstijd ("Geld is opgeslagen tijd") ──
+  // ── Vrijheidstijd ("Geld levert tijd op") ──
   // Dagtarief komt uit de bundel; nooit lokaal /30 rekenen.
   // Bij `reached` verdwijnt de regel: "≈ 0 dagen vrijheid over" is geen
   // informatie, de statusregel zegt het al. De drempel is DEZELFDE halve cent

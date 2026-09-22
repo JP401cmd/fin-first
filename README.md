@@ -1,7 +1,7 @@
 # TriFinity
 
-TriFinity is een Nederlandstalige personal-finance-app rond het idee **"Geld is
-opgeslagen tijd"** — het vertaalt financiële cijfers (vermogen, budget, schulden,
+TriFinity is een Nederlandstalige personal-finance-app rond het idee **"Geld levert
+tijd op"** — het vertaalt financiële cijfers (vermogen, budget, schulden,
 belasting, FIRE) naar *vrijheidstijd*: dagen, maanden en jaren van financiële
 onafhankelijkheid.
 

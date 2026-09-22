@@ -145,7 +145,7 @@ export function missingWordFraction(expected: string, raw: string): number {
 const ECHO_TOLERANCE = 0.2
 
 /** De zin uit de lange echo-taak — lang genoeg om het decoderen te belasten. */
-const ECHO_SENTENCE = 'Een euro is opgeslagen tijd, en tijd is de enige echte munt.'
+const ECHO_SENTENCE = 'Geld levert tijd op, en tijd is de enige echte munt.'
 
 /**
  * De drie proefvragen. Alle drie ECHO-TAKEN: het goede antwoord staat letterlijk

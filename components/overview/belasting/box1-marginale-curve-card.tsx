@@ -16,7 +16,7 @@ import { Kicker } from '@/components/editorial'
  * inkomensbereik en toont het via <MarginaleDrukCurve>.
  *
  * Filosofie: de marginale druk laat zien hoeveel van élke extra verdiende
- * euro naar de schatkist gaat — dus hoeveel "opgeslagen tijd" je per extra
+ * euro naar de schatkist gaat — dus hoeveel vrijheidstijd je per extra
  * euro werkelijk overhoudt. De curve maakt de schijfgrenzen én de afbouw van
  * heffingskortingen zichtbaar als knikken/cliffs.
  *

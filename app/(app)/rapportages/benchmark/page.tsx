@@ -498,7 +498,7 @@ export default function BenchmarkPage() {
           tf<span style={{ color: VIZ.accent }}>.</span>
         </p>
         <p className="mt-1 font-source-serif text-[14px] italic text-[var(--ink-2)]">
-          &ldquo;Geld is opgeslagen tijd&rdquo;
+          &ldquo;Geld levert tijd op&rdquo;
         </p>
         <div className="mt-3.5 flex items-center justify-center gap-3.5 font-dm-mono text-[11px] uppercase tracking-[0.22em] text-[var(--ink-4)]">
           <span>TriFinity</span>

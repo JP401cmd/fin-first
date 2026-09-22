@@ -37,9 +37,10 @@ export function useOnboardingFreedomTicker(): string | null {
 }
 
 /**
- * Tellerregel in de sticky kop. Spiegelt de publieke `/check`-teller in woord
- * ("Al vrijgekocht") en vorm (mono, tabular-nums, module-accent) zodat de
- * ingelogde onboarding niet een tweede taal spreekt voor hetzelfde getal.
+ * Tellerregel in de sticky kop. Spiegelt de publieke `/check`-teller in vorm
+ * (mono, tabular-nums, module-accent) zodat de ingelogde onboarding niet een
+ * tweede taal spreekt voor hetzelfde getal. Het woord is hier "Al opgebouwd"
+ * (ADR 0165); de `/check`-teller zegt tot fase 2 nog "Al vrijgekocht".
  *
  * `aria-live="polite"` zodat een schermlezer de groei meldt zonder de invoer
  * te onderbreken.
@@ -52,7 +53,7 @@ export function OnboardingFreedomTickerRow({ label }: { label: string }) {
       aria-atomic="true"
     >
       <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-[var(--ink-3)]">
-        Al vrijgekocht
+        Al opgebouwd
       </span>
       <span className="font-mono text-xs font-medium tabular-nums text-[var(--module-active-700)]">
         {label}

@@ -339,7 +339,7 @@ export type GoalSection =
 //
 // Keuzecriterium is NETTO (zie `pickTopChoice`, lib/tax-optimizer/rank.ts):
 // kandidaten met `netEffect ≤ 0` vallen af, daarna wint de meeste NETTO
-// teruggekochte vrijheidsdagen (`netEffect` als tiebreak). Geen kandidaat → null
+// opgeleverde vrijheidsdagen (`netEffect` als tiebreak). Geen kandidaat → null
 // (neutrale variant). Voorheen werd op BRUTO besparing gekozen — daardoor kon
 // "€ 47 besparing" als grootste kans bovenaan staan terwijl de onderliggende
 // shift per saldo honderden euro's rendement kost.

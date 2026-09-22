@@ -87,7 +87,7 @@ export default async function BelastingBox1Page() {
   // "bovengrens" noemt. Eén bundelveld, drie consumenten op deze pagina.
   const pensionFactorAKnown: boolean = horizonData.pensioenFactorAKnown
 
-  // Vrijheidstijd-equivalent ("Geld is opgeslagen tijd"). CONSUMEER het
+  // Vrijheidstijd-equivalent ("Geld levert tijd op"). CONSUMEER het
   // canonieke 12-mnd rolling dagtarief uit de bundel — dezelfde bron als de
   // belasting-hub, de widgets en de rapporten. Was
   // `dailyExpenseRate(effectiveInput.monthlyExpenses)`: de EFFECTIVE grondslag

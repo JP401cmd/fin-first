@@ -39,7 +39,7 @@ function makeHolding(overrides: Partial<FavoriteHolding> = {}): FavoriteHolding 
   }
 }
 
-describe('HoldingFavWidget — vrijheidstijd (Geld is opgeslagen tijd)', () => {
+describe('HoldingFavWidget — vrijheidstijd (Geld levert tijd op)', () => {
   it('xl: toont exact de canonieke vrijheidstijd van de positiewaarde', () => {
     const holding = makeHolding()
     const dailyExp = 100

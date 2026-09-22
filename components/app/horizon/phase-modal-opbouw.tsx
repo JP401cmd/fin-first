@@ -265,11 +265,11 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
       <div className="h-[2px] bg-[var(--color-horizon-600)]" />
 
       <div className="p-5 space-y-4">
-        {/* 0. Phase intro — "wat zie ik hier" + filosofie "Geld is opgeslagen tijd" */}
+        {/* 0. Phase intro — "wat zie ik hier" + filosofie "Geld levert tijd op" */}
         <PhaseIntro
           kicker="OPBOUWFASE"
-          title="Geld is opgeslagen tijd"
-          body="In deze fase groeit je vermogen door wat je inlegt én door het rendement daarop — elke euro die je nu opzij zet, koop je later vrijheid mee. Hieronder zie je hoe inleg en rendement samen je vermogen richting volledige vrijheid stuwen."
+          title="Geld levert tijd op"
+          body="In deze fase groeit je vermogen door wat je inlegt én door het rendement daarop — elke euro die je nu opzij zet, levert je later tijd op. Hieronder zie je hoe inleg en rendement samen je vermogen richting volledige vrijheid stuwen."
           infoContent={getPageInfo('/toekomst/fase-opbouw/intro')}
         />
 

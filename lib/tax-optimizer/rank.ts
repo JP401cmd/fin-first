@@ -80,7 +80,7 @@ export const JAARRUIMTE_CAVEAT =
  * eronder renderen) — geen herberekening, geen tweede houder van een getal.
  *
  * KEUZECRITERIUM = NETTO. Kandidaten met `netEffect ≤ 0` vallen af; daarna wint
- * de meeste NETTO teruggekochte vrijheidsdagen (`netEffect` als tiebreak).
+ * de meeste NETTO opgeleverde vrijheidsdagen (`netEffect` als tiebreak).
  * Voorheen werd op BRUTO besparing gekozen — daardoor kon een shift van "€ 47
  * minder heffing" bovenaan komen terwijl diezelfde shift honderden euro's
  * verwacht rendement kost.

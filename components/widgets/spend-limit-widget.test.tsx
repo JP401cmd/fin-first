@@ -182,7 +182,7 @@ describe('SpendLimitWidget — status komt uit de motor, niet uit een eigen drem
   })
 })
 
-describe('SpendLimitWidget — vrijheidstijd (Geld is opgeslagen tijd)', () => {
+describe('SpendLimitWidget — vrijheidstijd (Geld levert tijd op)', () => {
   it('half: ruimte over ≈ exact de canonieke vrijheidstijd van de headroom', () => {
     const limit = makeLimit() // headroom = 80
     const dailyExp = 40

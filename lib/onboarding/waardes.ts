@@ -37,12 +37,12 @@ export const WAARDES: readonly Waarde[] = [
     kicker: 'Wat je hebt',
     belofte: 'Je vermogen in euro’s én in jaren.',
     toelichting:
-      'We tellen je bezittingen, schulden en pensioen bij elkaar op, en rekenen dat bedrag om naar de tijd die het je vrij koopt.',
+      'We tellen je bezittingen, schulden en pensioen bij elkaar op, en rekenen dat bedrag om naar de tijd die het je oplevert.',
     accent: 'kern',
   },
   {
     kicker: 'Wat er omgaat',
-    belofte: 'Elke maand zie je wat je vrijkoopt.',
+    belofte: 'Elke maand zie je wat je opbouwt.',
     toelichting:
       'Je ziet wat er binnenkomt, waar het heen gaat en wat je overhoudt — inclusief de abonnementen die stilletjes blijven lopen.',
     accent: 'horizon',

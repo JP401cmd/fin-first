@@ -4,7 +4,7 @@
 // bovenaan niet-groene pagina's onder /overzicht. Géén IO, géén berekening — puur
 // tekst per route.
 //
-// Filosofie ("Geld is opgeslagen tijd"): warm, concreet, gewone taal. GEEN
+// Filosofie ("Geld levert tijd op"): warm, concreet, gewone taal. GEEN
 // Wft-advies (nooit "beleg in X", geen productadvies) — we duiden de situatie en
 // wijzen naar de hefboom-pagina waar de gebruiker zélf handelt. De `remedy`-
 // teksten leunen waar passend op de bestaande `improvementTip`-formuleringen uit
@@ -90,8 +90,11 @@ export const PAGE_STATUS_COPY: Record<string, RouteCopy> = {
     title: 'Schulden',
     warn: {
       reason: 'Je schulden zijn een merkbaar deel van je vermogen ({figure}).',
+      // Beschrijvend handelingsperspectief (geen imperatief, Wft): wat aflossen
+      // doet, niet wat je moet doen. Was "Overweeg extra aflossingen … vrijheid
+      // die je terugkoopt" (koop-metafoor, ADR 0165).
       remedy:
-        'Overweeg extra aflossingen op je duurste lening — elke euro minder schuld is vrijheid die je terugkoopt.',
+        'Extra aflossen op de duurste lening scheelt rente — elke aflossing levert tijd op.',
     },
     bad: {
       reason: 'Je schulden wegen zwaar ten opzichte van je vermogen ({figure}).',
@@ -284,7 +287,7 @@ export const PAGE_STATUS_COPY: Record<string, RouteCopy> = {
 // Aparte copy-set (géén onderdeel van PAGE_STATUS_COPY, dat is warn/bad-only):
 // de informatieve duiding op /overzicht wanneer de gebruiker al financieel vrij
 // of met pensioen is. Twee varianten op basis van de gedeelde framing-vlag.
-// Filosofie behouden ("Geld is opgeslagen tijd"): het beeld toont nu onttrekking,
+// Filosofie behouden ("Geld levert tijd op"): het beeld toont nu onttrekking,
 // geen opbouw — geen Wft-advies.
 
 export interface FreedomBannerCopy {

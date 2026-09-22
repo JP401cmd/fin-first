@@ -77,7 +77,7 @@ import {
  * veldfouten en hints hangen via `aria-describedby` aan hun invoer; de tegelrijen
  * zijn een `role="group"` met `aria-labelledby` naar hun vraagkop.
  *
- * "Geld is opgeslagen tijd": deze twee keuzes bepalen hoe de app je toekomst
+ * "Geld levert tijd op": deze twee keuzes bepalen hoe de app je toekomst
  * doorrekent — vanaf wanneer werken een keuze wordt, en tot wanneer je geld
  * moet reiken.
  */

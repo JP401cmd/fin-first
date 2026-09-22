@@ -237,7 +237,7 @@ export const PhaseModalOvergang = memo(function PhaseModalOvergang({
           title="De brug naar je AOW"
           body={
             transitionScenario === 'gap'
-              ? 'Tussen het moment dat je stopt met werken en je AOW ingaat, leef je volledig van je opgebouwde vermogen — elke euro die je eerder opzij zette koop je hier vrijheid mee. Deze analyses laten zien of je vermogen die jaren overbrugt.'
+              ? 'Tussen het moment dat je stopt met werken en je AOW ingaat, leef je volledig van je opgebouwde vermogen — elke euro die je eerder opzij zette, levert je hier tijd op. Deze analyses laten zien of je vermogen die jaren overbrugt.'
               : 'Je AOW is al ingegaan, maar je volledige vrijheid (FIRE) komt nog. In deze brugperiode vult je vermogen aan wat je AOW niet dekt. Deze analyses laten zien of je vermogen dat tekort overbrugt.'
           }
           infoContent={getPageInfo('/toekomst/fase-overgang/intro')}

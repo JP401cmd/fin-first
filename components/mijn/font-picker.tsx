@@ -34,7 +34,7 @@ const FONT_THEMES_META: Record<FontTheme, FontThemeMeta> = {
   editorial: {
     label: 'Editorial',
     description: 'Playfair Display + Source Serif Pro (default).',
-    preview: 'Geld is opgeslagen tijd',
+    preview: 'Geld levert tijd op',
     previewStyle: {
       fontFamily: 'var(--font-playfair-default, var(--font-playfair, Georgia, serif))',
       fontStyle: 'italic',
@@ -43,7 +43,7 @@ const FONT_THEMES_META: Record<FontTheme, FontThemeMeta> = {
   andada: {
     label: 'Andada',
     description: 'Andada Pro — één serif voor headlines en body.',
-    preview: 'Geld is opgeslagen tijd',
+    preview: 'Geld levert tijd op',
     previewStyle: {
       fontFamily: 'var(--font-andada, Georgia, serif)',
       fontStyle: 'italic',
@@ -52,7 +52,7 @@ const FONT_THEMES_META: Record<FontTheme, FontThemeMeta> = {
   digital: {
     label: 'Digital',
     description: 'Inter — modern sans-serif voor scherpe leesbaarheid.',
-    preview: 'Geld is opgeslagen tijd',
+    preview: 'Geld levert tijd op',
     previewStyle: {
       fontFamily: 'var(--font-inter, -apple-system, BlinkMacSystemFont, sans-serif)',
       fontStyle: 'normal',

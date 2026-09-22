@@ -222,7 +222,7 @@ export const AGENT_CURATION: Record<string, AgentCuration> = {
   // ── product ──
   'business-owner': {
     groupId: 'product',
-    rol: 'Product owner — houdt de missie ("Geld is opgeslagen tijd"), de backlog en de Wft-compliance.',
+    rol: 'Product owner — houdt de missie ("Geld levert tijd op"), de backlog en de Wft-compliance.',
     inzet: 'Aan de start van een idee: is dit waardevol, past het, en hoe knip je het in features.',
   },
   'requirement-specialist': {

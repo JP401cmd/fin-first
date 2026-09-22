@@ -70,7 +70,7 @@ describe('WeekoverzichtWidget', () => {
   })
 
   // M2-filosofie: euro's worden ook als vrijheidsdagen getoond.
-  it('toont weekuitgaven ook als vrijheidsdagen (Geld is opgeslagen tijd)', () => {
+  it('toont weekuitgaven ook als vrijheidsdagen (Geld levert tijd op)', () => {
     const dailyExpenses = ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo'].map((label, i) => ({
       day: `2026-07-0${i + 1}`,
       label,

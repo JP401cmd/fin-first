@@ -120,13 +120,13 @@ export function buildDeelTekst(data: FreedomCardData, origin: string): ShareCont
     // Vrijheidstijd via dezelfde afgeleide als de kaart zelf — nooit een tweede
     // omrekening van euro's naar tijd. Expliciet op jaren/maanden toetsen:
     // `freedomTimeLong` is bij een vers account de truthy string '0 dagen', en
-    // "Ik kocht al 0 dagen vrijheid" is geen zin om te delen.
+    // "Ik heb al 0 dagen vrijheid opgebouwd" is geen zin om te delen.
     const fY = data.freedomTime?.years ?? 0
     const fM = data.freedomTime?.months ?? 0
     const vrijheidstijd = fY > 0 || fM > 0 ? deriveCardStats(data).freedomTimeLong : null
     const text = vrijheidstijd
-      ? `Ik kocht al ${vrijheidstijd} vrijheid — geld is opgeslagen tijd. Bereken de jouwe:`
-      : 'Geld is opgeslagen tijd. Bereken hoeveel vrijheid je al hebt:'
+      ? `Ik heb al ${vrijheidstijd} vrijheid opgebouwd — geld levert tijd op. Bereken de jouwe:`
+      : 'Geld levert tijd op. Bereken hoeveel vrijheid je al hebt:'
     return {
       title: 'Mijn vrijheid',
       text,

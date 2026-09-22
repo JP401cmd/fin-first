@@ -139,7 +139,7 @@ export const PortfolioMonthDetailsSheet = memo(function PortfolioMonthDetailsShe
     [onClose, onOpenHolding],
   )
 
-  // Vrijheidstijd van de maandwaarde — geld is opgeslagen tijd. Bij masking valt
+  // Vrijheidstijd van de maandwaarde — geld levert tijd op. Bij masking valt
   // de regel weg: hij zou de orde van grootte alsnog verklappen.
   const freedomText = useMemo(() => {
     if (dailyExpenses <= 0 || total <= 0) return null

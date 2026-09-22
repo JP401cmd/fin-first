@@ -69,7 +69,7 @@ export const WeekoverzichtWidget = memo(function WeekoverzichtWidget({ size, dat
   const daysWithData = dailyExpenses.filter(d => d.amount > 0).length
   const dailyAvg = daysWithData > 0 ? weekExpenses / daysWithData : 0
 
-  // Vrijheidstijd-vertaling (Geld is opgeslagen tijd): weekuitgaven → vrijheidsdagen
+  // Vrijheidstijd-vertaling (Geld levert tijd op): weekuitgaven → vrijheidsdagen
   // via het canonieke dagtarief uit de bundel (geen eigen herberekening). 0 = niet tonen.
   const dagtarief = data.dailyExpenseRate ?? 0
   const weekFreedomDays = dagtarief > 0 ? weekExpenses / dagtarief : 0

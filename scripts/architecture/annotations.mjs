@@ -12,7 +12,7 @@
  */
 
 export const annotations = {
-  philosophy: 'Geld is opgeslagen tijd — elke euro vertegenwoordigt een stukje levenstijd.',
+  philosophy: 'Geld levert tijd op — elk bedrag staat voor tijd waarin je uitgaven gedekt zijn.',
   tagline: 'Eén samenhangende filosofie over elk scherm, geen "financiële data + losse AI-coaching".',
 
   // Inleiding boven het paneel met de drie generieke mechanismen.

@@ -16,7 +16,7 @@
  * schermen, waar de volle bodies niet naast elkaar passen, vallen de markers
  * terug op een inklapbare popover die op hover (desktop) of tik (mobiel) opent.
  * De tip-teksten zijn puur informatief (uitleg van de grafiek in
- * "Geld is opgeslagen tijd"-geest), zonder navigerende CTA. Geen eigen
+ * "Geld levert tijd op"-geest), zonder navigerende CTA. Geen eigen
  * rekenlogica — `onEmphasisChange` laat de parent de relevante grafiekfase
  * accentueren via `SimChart.emphasis`.
  *

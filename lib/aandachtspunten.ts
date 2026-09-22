@@ -304,7 +304,7 @@ export const DEBT_INTEREST_THRESHOLD = 4
  * - Alleen `is_active`, `current_balance > 0` EN `interest_rate >= DEBT_INTEREST_THRESHOLD`.
  *   (Lage-rente hypotheek/studielening worden zo niet over-agressief opgevoerd.)
  * - savings = current_balance × (interest_rate / 100) — de jaarlijkse rentelast
- *   die je terugkoopt als je de schuld wegwerkt.
+ *   die je niet meer betaalt als je de schuld wegwerkt.
  * - freedomDays = savings / dailyExpenses (0 als dailyExpenses ≤ 0).
  * - id-namespace 'debt:' op debt.id.
  */

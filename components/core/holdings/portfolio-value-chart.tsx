@@ -823,7 +823,7 @@ function ValueHistoryChart({
       headerRight={toggle}
       busy={busy}
     >
-      {/* Vrijheidstijd van de eindwaarde — geld is opgeslagen tijd. Bij
+      {/* Vrijheidstijd van de eindwaarde — geld levert tijd op. Bij
           privacy-masking valt de regel weg: hij zou de orde van grootte van het
           gemaskeerde bedrag alsnog verklappen. */}
       {freedomText && !masked && (

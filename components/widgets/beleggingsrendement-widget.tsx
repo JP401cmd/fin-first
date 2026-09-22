@@ -64,7 +64,7 @@ export const BeleggingsrendementWidget = memo(function BeleggingsrendementWidget
   // net zomin als een inflatie- of SWR-percentage dat doet.
   const expectedReturnPct = (portfolioReturn > 0 ? portfolioReturn : (data.grossReturn || DEFAULT_RETURN)) * 100
 
-  // Vrijheidstijd-framing van de absolute winst/verlies ("Geld is opgeslagen tijd").
+  // Vrijheidstijd-framing van de absolute winst/verlies ("Geld levert tijd op").
   const dailyExp = data.dailyExpenseRate ?? dailyExpenseRate(data.monthlyExpenses)
   const gainFt = hasCostBasis && dailyExp > 0 && sinceInceptionAbsolute !== 0
     ? calculateFreedomTime(sinceInceptionAbsolute, dailyExp)

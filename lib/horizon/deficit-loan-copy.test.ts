@@ -206,7 +206,7 @@ describe('buildDeficitLoanCopy — piek en vermogenslijn', () => {
   it('koppelt de piek aan zijn vrijheidstijd-vertaling', () => {
     const copy = buildDeficitLoanCopy(BASE)
     expect(copy.piek).toContain('€ 42.000')
-    expect(copy.piek).toContain('1 jaar en 4 maanden vrijheid die je later terugkoopt')
+    expect(copy.piek).toContain('een schuld ter waarde van 1 jaar en 4 maanden vrijheid, die je later aflost')
   })
 
   it('laat de vrijheidstijd weg als die er niet is (masked / geen dagtarief)', () => {

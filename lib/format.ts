@@ -382,7 +382,7 @@ export const CREDIBLE_DAILY_EXPENSE_MIN =
 //
 // Praktisch: `calculateFreedomTime`/`formatWithFreedom` zijn bedoeld voor een
 // STROOM of een AFGEBAKEND, onbezwaard bedrag — een uitgave, een besparing, een
-// delta, een fee, een schuld die je terugkoopt, een liquide pot. Niet voor een
+// delta, een fee, een schuld die je aflost, een liquide pot. Niet voor een
 // vermogensTOTAAL. Bewaakt door regel 5 van scripts/check-freedom-time-basis.mjs
 // (npm run check:freedom-basis, pre-push) op een expliciete namenlijst; die gate
 // is een vangrail, geen dekkingsbewijs — een totaal via een neutraal genoemde
@@ -691,8 +691,8 @@ export function formatFreedomRateFootnote(
 /**
  * Convert a EUR amount to a formatted string with freedom-time equivalent.
  *
- * Core utility for the TriFinity philosophy: "Geld is opgeslagen tijd"
- * (Money is stored time). Every EUR amount represents freedom time.
+ * Core utility for the TriFinity philosophy: "Geld levert tijd op"
+ * (money yields time, ADR 0165). Every EUR amount represents freedom time.
  *
  * Edge cases handled:
  * - NaN/undefined/Infinity → returns "€ 0 (0 dagen)" or "0 dagen" (does not crash)

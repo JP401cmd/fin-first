@@ -442,7 +442,7 @@ export function clampToInputRange(value: number, input: CalculatorInput): number
  * negatief maandoverschot (uitgaven > inkomen) erfde "Maandelijks bedrag"
  * letterlijk −€3.485 terwijl het veld `min: 50` draagt. Gevolg: negatieve
  * eindwaarden, NEGATIEVE VRIJHEIDSTIJD ("−17 jr 11 mnd", regelrecht in strijd
- * met "geld is opgeslagen tijd") en een slider-desync — de HTML-range klemt
+ * met "geld levert tijd op") en een slider-desync — de HTML-range klemt
  * alleen de VISUELE thumb naar min/max, de React-waarde bleef de rauwe −3.485.
  *
  * De klem hoort hier, op het punt waar een brondatum een VELDWAARDE wordt:

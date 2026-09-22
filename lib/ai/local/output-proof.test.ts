@@ -19,7 +19,7 @@ const task = (id: string): ProofTask => {
 const GEZONDE_ANTWOORDEN: Record<string, string> = {
   'echo-woord': 'vrijheid',
   json: '[{"status":"ok"}]',
-  'echo-zin': 'Een euro is opgeslagen tijd, en tijd is de enige echte munt.',
+  'echo-zin': 'Geld levert tijd op, en tijd is de enige echte munt.',
 }
 
 function gezondeSessie() {
@@ -106,7 +106,7 @@ describe('evaluateProofTask', () => {
   it('de zin-echo verdraagt leestekens en hoofdletters, maar geen rommel', () => {
     const zin = GEZONDE_ANTWOORDEN['echo-zin']
     expect(evaluateProofTask(task('echo-zin'), zin.toLowerCase().replace(/[.,]/g, ''))).toBeNull()
-    expect(evaluateProofTask(task('echo-zin'), 'Een euro is')).toBe('de zin kwam er niet compleet uit')
+    expect(evaluateProofTask(task('echo-zin'), 'Geld levert tijd')).toBe('de zin kwam er niet compleet uit')
   })
 
   // De corruptie-toetsen gaan vóór de taak-toets: "er stond Japans in" is een

@@ -121,8 +121,7 @@ export function Box3Heffingsvrij({
   )
   const ruimteToelichting = (
     <p className="text-[var(--ink-3)]">
-      Tot dit bedrag betaal je geen Box 3-belasting — het is je belastingvrije
-      stuk opgeslagen tijd.
+      Tot dit bedrag betaal je geen Box 3-belasting over je vermogen.
     </p>
   )
 

@@ -1,5 +1,5 @@
 /**
- * Canonieke dagtarief-bron (€/dag) voor de "geld = opgeslagen tijd"-conversie.
+ * Canonieke dagtarief-bron (€/dag) voor de "geld levert tijd op"-conversie.
  *
  * ── Waarom deze module bestaat ──────────────────────────────────────────────
  * Vóór KRUIS-20 herimplementeerde élk oppervlak (balans/budget/vermogen-rapport,

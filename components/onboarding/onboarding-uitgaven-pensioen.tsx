@@ -30,7 +30,7 @@ import {
  * bij skip stuurt de orchestrator niets mee → de impliciete server-default
  * (80%) blijft werken.
  *
- * "Geld is opgeslagen tijd": dit getal is de vrijheid die je later per jaar
+ * "Geld levert tijd op": dit getal is de vrijheid die je later per jaar
  * inwisselt — in prijspeil van vandaag.
  */
 

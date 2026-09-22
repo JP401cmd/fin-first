@@ -114,10 +114,10 @@ export const KNOWLEDGE_STARTER_SET: KnowledgeStarterTemplate[] = [
   },
   {
     titel: 'Vrijheidstijd',
-    tags: ['vrijheid', 'vrijheidstijd', 'tijd', 'opgeslagen tijd', 'geld is tijd', 'levenstijd'],
+    tags: ['vrijheid', 'vrijheidstijd', 'tijd', 'geld levert tijd op', 'tijd die geld oplevert', 'levenstijd'],
     categorie: 'FIRE & vrijheid',
     tekst:
-      'Vrijheidstijd is de kern van deze app: geld is opgeslagen tijd. Elke euro die je hebt, staat voor een stukje levenstijd waarin je niet hoeft te werken om je uitgaven te dekken. Daarom vertaalt de app je vermogen en uitgaven naar tijd — dagen, maanden en jaren vrijheid — in plaats van alleen naar bedragen. Zo zie je niet hoeveel je hebt, maar hoeveel vrije tijd het je oplevert. De omrekening naar tijd doet de rekenmotor voor je.',
+      'Vrijheidstijd is de kern van deze app: geld levert tijd op. Elk bedrag dat je hebt, staat voor tijd waarin je uitgaven gedekt zijn zonder dat je daarvoor hoeft te werken. Daarom vertaalt de app je vermogen en uitgaven naar tijd — dagen, maanden en jaren vrijheid — in plaats van alleen naar bedragen. Zo zie je niet hoeveel je hebt, maar hoeveel vrije tijd het je oplevert. De omrekening naar tijd doet de rekenmotor voor je.',
   },
   {
     titel: 'Spaarquote',
@@ -517,7 +517,7 @@ export const KNOWLEDGE_STARTER_SET: KnowledgeStarterTemplate[] = [
     tags: ['soevereiniteit', 'Recovery', 'Stability', 'Momentum', 'Mastery', 'jouw pad', 'niveau'],
     categorie: 'TriFinity-begrippen',
     tekst:
-      "De soevereiniteitsfases (Recovery, Stability, Momentum, Mastery) beschrijven waar je ongeveer staat op je reis naar financiële vrijheid, gebaseerd op signalen als je vermogen, je buffer in maanden en je vrijheidspercentage. Dit is uitdrukkelijk een duidings- en motivatielaag, geen toegangspoort: geen enkele functie in de app wordt verborgen of vergrendeld op basis van je fase. Wat je in de app kunt zien en gebruiken, hangt af van de modules die je hebt aangezet en het abonnement-onderdeel dat je gebruikt — nooit van je soevereiniteitsniveau. De fase-teksten zijn bewust geformuleerd als betekenisvolle mijlpalen op de weg naar vrijheid ('geld is opgeslagen tijd'), niet als 'ontgrendel functie X'. Zo krijg je duiding en motivatie zonder dat je ooit het gevoel hebt dat de app iets voor je achterhoudt vanwege waar je in je reis staat.",
+      "De soevereiniteitsfases (Recovery, Stability, Momentum, Mastery) beschrijven waar je ongeveer staat op je reis naar financiële vrijheid, gebaseerd op signalen als je vermogen, je buffer in maanden en je vrijheidspercentage. Dit is uitdrukkelijk een duidings- en motivatielaag, geen toegangspoort: geen enkele functie in de app wordt verborgen of vergrendeld op basis van je fase. Wat je in de app kunt zien en gebruiken, hangt af van de modules die je hebt aangezet en het abonnement-onderdeel dat je gebruikt — nooit van je soevereiniteitsniveau. De fase-teksten zijn bewust geformuleerd als betekenisvolle mijlpalen op de weg naar vrijheid ('geld levert tijd op'), niet als 'ontgrendel functie X'. Zo krijg je duiding en motivatie zonder dat je ooit het gevoel hebt dat de app iets voor je achterhoudt vanwege waar je in je reis staat.",
   },
   {
     titel: "Wat-als-scenario's",
@@ -587,14 +587,14 @@ export const KNOWLEDGE_STARTER_SET: KnowledgeStarterTemplate[] = [
     tags: ['inflatie', 'koopkracht', 'waardevermindering', 'prijsstijging', 'koopkrachtverlies', 'geldwaarde'],
     categorie: 'Algemene financiële basis',
     tekst:
-      "Inflatie betekent dat geld geleidelijk minder waard wordt, omdat je met hetzelfde bedrag na verloop van tijd minder kunt kopen dan nu. Dit gebeurt doordat de prijzen van goederen en diensten in de economie over het geheel genomen doorgaans stijgen. Voor je spaargeld betekent dit dat een bedrag dat nu op je rekening staat, in de toekomst een kleinere hoeveelheid koopkracht vertegenwoordigt, tenzij het rendement dat je maakt de inflatie bijhoudt. Omdat geld in deze app wordt gezien als opgeslagen tijd, is inflatie in feite de kracht die maakt dat diezelfde euro's later voor minder van je levenstijd kunnen worden ingewisseld. De app houdt hier rekening mee wanneer het je vermogen vertaalt naar vrijheidstijd.",
+      "Inflatie betekent dat geld geleidelijk minder waard wordt, omdat je met hetzelfde bedrag na verloop van tijd minder kunt kopen dan nu. Dit gebeurt doordat de prijzen van goederen en diensten in de economie over het geheel genomen doorgaans stijgen. Voor je spaargeld betekent dit dat een bedrag dat nu op je rekening staat, in de toekomst een kleinere hoeveelheid koopkracht vertegenwoordigt, tenzij het rendement dat je maakt de inflatie bijhoudt. Omdat geld in deze app wordt gezien als iets dat tijd oplevert, is inflatie in feite de kracht die maakt dat diezelfde euro's later minder vrijheidstijd opleveren. De app houdt hier rekening mee wanneer het je vermogen vertaalt naar vrijheidstijd.",
   },
   {
     titel: 'Reëel versus nominaal rendement',
     tags: ['reëel rendement', 'nominaal rendement', 'rendement na inflatie', 'koopkrachtrendement', 'rente', 'beleggingsrendement'],
     categorie: 'Algemene financiële basis',
     tekst:
-      "Nominaal rendement is het rendement dat je op papier op je spaargeld of beleggingen behaalt, zonder rekening te houden met inflatie. Reëel rendement is dat rendement gecorrigeerd voor inflatie en laat zien hoeveel koopkracht je werkelijk hebt gewonnen of verloren. Als je nominale rendement lager is dan de inflatie, groeit je vermogen in euro's wel, maar krimpt het in koopkracht, waardoor je er uiteindelijk minder mee kunt kopen dan voorheen. Dit onderscheid is belangrijk, omdat een op het eerste gezicht positief rendement soms toch een verlies aan koopkracht verbergt. Vanuit de filosofie van opgeslagen tijd bepaalt vooral het reële rendement hoeveel vrijheidstijd je vermogen je werkelijk oplevert.",
+      "Nominaal rendement is het rendement dat je op papier op je spaargeld of beleggingen behaalt, zonder rekening te houden met inflatie. Reëel rendement is dat rendement gecorrigeerd voor inflatie en laat zien hoeveel koopkracht je werkelijk hebt gewonnen of verloren. Als je nominale rendement lager is dan de inflatie, groeit je vermogen in euro's wel, maar krimpt het in koopkracht, waardoor je er uiteindelijk minder mee kunt kopen dan voorheen. Dit onderscheid is belangrijk, omdat een op het eerste gezicht positief rendement soms toch een verlies aan koopkracht verbergt. Vanuit de gedachte dat geld tijd oplevert, bepaalt vooral het reële rendement hoeveel vrijheidstijd je vermogen je werkelijk oplevert.",
   },
   {
     titel: 'Netto versus bruto',
@@ -608,7 +608,7 @@ export const KNOWLEDGE_STARTER_SET: KnowledgeStarterTemplate[] = [
     tags: ['opportunity cost', 'alternatieve-aanwendingskosten', 'keuzekosten', 'wat je opgeeft', 'afweging', 'kosten van een keuze'],
     categorie: 'Algemene financiële basis',
     tekst:
-      "Opportunity cost, ofwel alternatieve-aanwendingskosten, is de waarde van de beste andere optie die je misloopt op het moment dat je voor iets kiest. Elke keer dat je geld of tijd aan het ene besteedt, kun je het niet tegelijk aan iets anders besteden, en die gemiste mogelijkheid is de opportunity cost van je keuze. Dit geldt niet alleen voor geld: ook tijd en aandacht kennen een opportunity cost, omdat een uur besteed aan de ene activiteit een uur is dat niet aan een andere activiteit kan worden besteed. Binnen de filosofie van geld als opgeslagen tijd maakt dit begrip zichtbaar dat elke financiële keuze impliciet ook een keuze is over hoeveel toekomstige vrijheidstijd je opgeeft of wint. Deze onzichtbare kosten spelen vaak mee in financiële keuzes, ook al staan ze nergens als apart bedrag op een rekening.",
+      "Opportunity cost, ofwel alternatieve-aanwendingskosten, is de waarde van de beste andere optie die je misloopt op het moment dat je voor iets kiest. Elke keer dat je geld of tijd aan het ene besteedt, kun je het niet tegelijk aan iets anders besteden, en die gemiste mogelijkheid is de opportunity cost van je keuze. Dit geldt niet alleen voor geld: ook tijd en aandacht kennen een opportunity cost, omdat een uur besteed aan de ene activiteit een uur is dat niet aan een andere activiteit kan worden besteed. Binnen de gedachte dat geld tijd oplevert, maakt dit begrip zichtbaar dat elke financiële keuze impliciet ook een keuze is over hoeveel toekomstige vrijheidstijd je opgeeft of wint. Deze onzichtbare kosten spelen vaak mee in financiële keuzes, ook al staan ze nergens als apart bedrag op een rekening.",
   },
   {
     titel: 'Liquiditeit',
@@ -623,10 +623,10 @@ export const KNOWLEDGE_STARTER_SET: KnowledgeStarterTemplate[] = [
   // TriFinity-begrippen (+10)
   {
     titel: 'Dagtarief',
-    tags: ['dagtarief', 'geld is opgeslagen tijd', 'euro naar tijd', 'dagelijkse uitgaven', 'vrijheidstijd per dag'],
+    tags: ['dagtarief', 'geld levert tijd op', 'euro naar tijd', 'dagelijkse uitgaven', 'vrijheidstijd per dag'],
     categorie: 'TriFinity-begrippen',
     tekst:
-      "Het dagtarief rekent een bedrag om naar de tijd die het kost of oplevert, in lijn met de gedachte dat geld opgeslagen tijd is. De app bepaalt dit tarief door je werkelijke uitgaven te middelen over een voortschrijdende periode van meerdere maanden, zodat een toevallig dure of goedkope maand het beeld niet vertekent. Voor de omrekening naar een dagbedrag gaat de app uit van een jaargemiddelde in plaats van een vereenvoudigde maandbenadering, zodat hetzelfde dagtarief overal in de app op dezelfde manier wordt berekend. Dit dagtarief is de bouwsteen achter de meeste tijd-vertalingen die je in de app tegenkomt, van een los bedrag tot je vrijheidstijd.",
+      "Het dagtarief rekent een bedrag om naar de tijd die het kost of oplevert, in lijn met de gedachte dat geld tijd oplevert. De app bepaalt dit tarief door je werkelijke uitgaven te middelen over een voortschrijdende periode van meerdere maanden, zodat een toevallig dure of goedkope maand het beeld niet vertekent. Voor de omrekening naar een dagbedrag gaat de app uit van een jaargemiddelde in plaats van een vereenvoudigde maandbenadering, zodat hetzelfde dagtarief overal in de app op dezelfde manier wordt berekend. Dit dagtarief is de bouwsteen achter de meeste tijd-vertalingen die je in de app tegenkomt, van een los bedrag tot je vrijheidstijd.",
   },
   {
     titel: 'Sleepmodus',

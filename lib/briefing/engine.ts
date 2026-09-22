@@ -58,7 +58,7 @@ function pillarToHefboom(pillarId: string): HefboomTag | undefined {
  *  duidelijke 1-op-1 categorieën taggen. */
 /** Impact-extractor — leest de freedom_days en EUR-effect uit een
  *  recommendation zodat de BriefingCard dezelfde dual-unit-badge toont
- *  als TipsLijst ("Geld is opgeslagen tijd"). Wanneer yearly ontbreekt
+ *  als TipsLijst ("Geld levert tijd op"). Wanneer yearly ontbreekt
  *  rekenen we maandelijks × 12 om. */
 function impactFromRecommendation(
   rec: BriefingEngineInput['recommendations'][number],
@@ -469,7 +469,7 @@ function buildAandachtspuntEntry(punten: Aandachtspunt[]): BriefingEntry | null 
 // voor veel gebruikers maar 2-3 entries. Deze financiële generators putten
 // uit de cijfers die /overzicht toch al laadt (vermogensverloop, budget,
 // inkomen, cash, FIRE-voortgang) zodat de briefing natuurlijk 5-6 *echte*
-// kaartjes haalt. Filosofie "Geld is opgeslagen tijd": elke euro-impact wordt
+// kaartjes haalt. Filosofie "Geld levert tijd op": elke euro-impact wordt
 // óók in vrijheidsdagen uitgedrukt. Geen holle vulling — elke generator vuurt
 // alleen boven een betekenisvolle drempel.
 
@@ -643,7 +643,7 @@ function buildFinanceEntries(finance: BriefingFinanceInput, now: Date): Briefing
 
   // 4. FIRE-voortgang — percentage naar volledige vrijheid (cross-hefboom).
   //    Met huidige + vrijheidsleeftijd wordt het een tijd-frame ("van je Xe
-  //    nu naar vrijheid rond je Ye") — past bij "Geld is opgeslagen tijd".
+  //    nu naar vrijheid rond je Ye") — past bij "Geld levert tijd op".
   if (finance.stopAnchorFixed) {
     // ADR 0129 — onder een vast anker is er geen "naar vrijheid rond je Xe": het
     // stopmoment is een instelling; de uitspraak is hoe ver het liquide vermogen reikt.

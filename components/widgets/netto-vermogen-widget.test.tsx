@@ -113,7 +113,7 @@ describe('NettoVermogenWidget — L-grafiek label-plaatsing (fix W4)', () => {
 })
 
 describe('NettoVermogenWidget — negatief vermogen (fix #4)', () => {
-  it('framet een tekort als "vrijheid terug te kopen", niet als positieve vrijheid', () => {
+  it('framet een tekort als achterstand ("X achter"), niet als positieve vrijheid', () => {
     const { container } = render(
       <NettoVermogenWidget
         size="full"
@@ -121,6 +121,9 @@ describe('NettoVermogenWidget — negatief vermogen (fix #4)', () => {
       />,
     )
     const text = container.textContent ?? ''
-    expect(text).toContain('vrijheid terug te kopen')
+    // Getal + eenheid direct vóór "achter" ("≈ 1m achter"). Geen \b erachter:
+    // in textContent plakt het volgende element er zonder spatie aan vast.
+    expect(text).toMatch(/≈ \d\S*\s+achter/)
+    expect(text).not.toMatch(/terug te kopen/)
   })
 })

@@ -15,8 +15,8 @@ const PLAYFAIR = 'var(--font-playfair, Georgia, serif)'
  * de boxen.
  *
  * Het jaartotaal (Box 1 + Box 3 [+ Box 2 indien bekend]) krijgt het
- * Playfair-hero-formaat met de vrijheidstijd-subregel eronder ("Geld is
- * opgeslagen tijd": elk €-bedrag > €100 krijgt zijn vrijheidstijd-equivalent).
+ * Playfair-hero-formaat met de vrijheidstijd-subregel eronder ("Geld levert
+ * tijd op": elk €-bedrag > €100 krijgt zijn vrijheidstijd-equivalent).
  * Daaronder effectief- en marginaal-tarief als mono-data.
  *
  * Bewust presentationeel/server-compatible: de hub-pagina rekent het overzicht

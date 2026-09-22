@@ -27,7 +27,7 @@
  * constatering van de gebruiker over zijn eigen plan, geen aanbeveling om te
  * verkopen. Geen enkele optie is als "beter" gemarkeerd.
  *
- * "Geld is opgeslagen tijd": deze keuze bepaalt of de stenen waarin je woont
+ * "Geld levert tijd op": deze keuze bepaalt of de stenen waarin je woont
  * meetellen als vrijheid die je kunt uitgeven, of pas op het moment dat je ze
  * verzilvert.
  *

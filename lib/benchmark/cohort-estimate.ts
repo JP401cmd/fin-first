@@ -3,8 +3,8 @@
  *
  * ── Waarom deze module bestaat ──────────────────────────────────────────────
  * Wie in de onboarding "Later invullen" koos, verliet de app zónder dagtarief —
- * en daarmee zonder één enkel vrijheidsgetal, nergens. De kernbelofte ("geld is
- * opgeslagen tijd") hing aan één overslaanbare stap. De uitweg is niet dwang
+ * en daarmee zonder één enkel vrijheidsgetal, nergens. De kernbelofte ("geld
+ * levert tijd op") hing aan één overslaanbare stap. De uitweg is niet dwang
  * maar een gok die zich als gok bekendmaakt: de app vult een plausibel bedrag
  * in en zegt erbij dat zíj het geraden heeft (ADR 0131 — `'estimate'` is een
  * placeholder, geen keuze; echte data verdringt 'm vanzelf).

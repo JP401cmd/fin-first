@@ -161,7 +161,7 @@ export function WelcomePopup({ onDismiss, colorVars }: WelcomePopupProps) {
           className="mt-3 font-serif text-[17px] italic leading-snug text-[var(--ink-2)]"
           style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
         >
-          Geld is opgeslagen tijd.
+          Geld levert tijd op.
         </p>
 
         {/* Twee regels over wat de app doet — in beloftes, niet in features

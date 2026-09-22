@@ -54,7 +54,7 @@ export function OnboardingSuccess({
 
       {/* Philosophical closing — font-serif italic */}
       <p className="mt-3 max-w-sm font-serif text-base italic leading-relaxed text-[var(--ink-2)] sm:text-lg">
-        &ldquo;Geld is opgeslagen tijd &mdash; en jouw reis naar vrijheid begint nu.&rdquo;
+        &ldquo;Geld levert tijd op &mdash; en jouw reis naar vrijheid begint nu.&rdquo;
       </p>
 
       {/* Editorial divider */}

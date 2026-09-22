@@ -551,7 +551,7 @@ function BudgetKpiCell({
       >
         {actionLabel}
       </p>
-      {/* Optionele tagline (vrijheid opbouwen / terugkopen) */}
+      {/* Optionele tagline (vrijheid opbouwen / tijd die aflossen oplevert) */}
       {tagline && (
         <p
           className="hidden sm:block mt-0.5 italic text-[10px]"
@@ -654,7 +654,7 @@ export function BudgetFiguresStrip({
           actual={totalDebtActual}
           target={totalDebtBudget}
           actionLabel="afgelost"
-          tagline="vrijheid terugkopen"
+          tagline="tijd die aflossen oplevert"
           taglineColor="var(--negative)"
           href={hasDebt ? '#schulden' : undefined}
         />
@@ -2527,7 +2527,7 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
         )}
         {deb.length > 0 && (
           <div id={withAnchors ? 'schulden' : undefined} className="mt-4 sm:mt-8 scroll-mt-20">
-            <h3 className="mb-4 label-editorial text-[var(--ink-2)]">Schulden <span className="ml-1 font-normal normal-case tracking-normal text-red-400/70">— vrijheid terugkopen</span></h3>
+            <h3 className="mb-4 label-editorial text-[var(--ink-2)]">Schulden <span className="ml-1 font-normal normal-case tracking-normal text-red-400/70">— tijd die aflossen oplevert</span></h3>
             <TreeComp groups={deb} spending={spending} budgetType="debt" onNavigate={openBudgetModal} beschikbaarMap={beschikbaarMap} />
           </div>
         )}
@@ -2867,7 +2867,7 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
             variant="first-use"
             icon={LayoutGrid}
             title="Nog geen budgetten"
-            description="Maak je eerste budget om je uitgaven per categorie te volgen — elke euro is opgeslagen tijd."
+            description="Maak je eerste budget om je uitgaven per categorie te volgen — geld levert tijd op."
             action={{
               label: 'Maak je eerste budget',
               onClick: () => {
@@ -2945,7 +2945,7 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
           )}
           {debtBudgets.length > 0 && (
             <div id="schulden" className="mt-4 sm:mt-8 scroll-mt-20">
-              <h3 className="mb-4 label-editorial text-[var(--ink-2)]">Schulden <span className="ml-1 font-normal normal-case tracking-normal text-red-400/70">— vrijheid terugkopen</span></h3>
+              <h3 className="mb-4 label-editorial text-[var(--ink-2)]">Schulden <span className="ml-1 font-normal normal-case tracking-normal text-red-400/70">— tijd die aflossen oplevert</span></h3>
               <TreeComp
                 groups={debtBudgets}
                 spending={spending}

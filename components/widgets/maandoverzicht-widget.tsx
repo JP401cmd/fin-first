@@ -62,7 +62,7 @@ export const MaandoverzichtWidget = memo(function MaandoverzichtWidget({ size, d
   const { monthSummary, netWorthHistory } = data
   const { netWorthDelta, freedomDaysWon, savingsRate, budgetScore, prevMonthComparison } = monthSummary
   const deltaPositive = netWorthDelta >= 0
-  // Canoniek dagtarief uit de bundel — voor de "Geld is opgeslagen tijd"-vertaling
+  // Canoniek dagtarief uit de bundel — voor de "Geld levert tijd op"-vertaling
   // van €-bedragen (geen eigen herberekening). 0 = geen vertaling tonen.
   const dagtarief = data.dailyExpenseRate ?? 0
 

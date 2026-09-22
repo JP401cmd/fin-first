@@ -355,7 +355,7 @@ export function JaarruimteCard({
                   style={{ color: BOX1_COLOR }}
                   aria-hidden="true"
                 />
-                ≈ <span className="font-medium text-[var(--ink)]">{freedom}</span> aan vrijheid teruggekocht
+                ≈ <span className="font-medium text-[var(--ink)]">{freedom}</span> aan vrijheid opgebouwd
               </div>
             )}
 

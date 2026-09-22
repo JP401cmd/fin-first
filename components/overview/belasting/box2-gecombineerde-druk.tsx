@@ -21,7 +21,7 @@ import { GepaardeStaven } from './gepaarde-staven'
  * geen data-fetching, geen hooks → kan in een server-context renderen, maar
  * wordt hier binnen de client-Box2Detail-kaart gemount.
  *
- * Filosofie: dit toont hoeveel "opgeslagen tijd" er per uitgekeerde euro winst
+ * Filosofie: dit toont hoeveel vrijheidstijd er per uitgekeerde euro winst
  * werkelijk wegvloeit voordat het privé besteedbaar is — een indicatie, geen
  * fiscaal advies.
  */

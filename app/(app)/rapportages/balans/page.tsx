@@ -551,7 +551,7 @@ export default function BalansPage() {
           <SectionLabel num="iv.">Vrijheidstijd</SectionLabel>
           <div className="text-center">
             <p className="font-inter text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)] mb-3">
-              Geld is opgeslagen tijd
+              Geld levert tijd op
             </p>
             <div className="inline-block border border-[var(--module-active-300)] bg-[var(--module-active-50)]/40 px-8 py-5">
               <p className="font-playfair text-4xl font-bold text-[var(--module-active-700)]" style={{ letterSpacing: '-0.03em' }}>
@@ -576,7 +576,7 @@ export default function BalansPage() {
           <span>t</span><span style={{ color: 'var(--module-active-700)' }}>f.</span>
         </p>
         <p className="mt-1 font-source-serif text-[13px] italic text-[var(--ink-3)]">
-          &ldquo;Geld is opgeslagen tijd&rdquo;
+          &ldquo;Geld levert tijd op&rdquo;
         </p>
       </div>
       <OrnamentColophon module="Balans" text={generatedDate} />

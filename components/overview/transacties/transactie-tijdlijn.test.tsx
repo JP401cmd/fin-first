@@ -180,7 +180,7 @@ describe('TransactieTijdlijn — rekening-filterpills', () => {
  * filtervenster door de vensterlengte deelde. Daardoor kantelde de wisselkoers
  * "€ → tijd" mee met elke periodekeuze en elk filter — € 2.500 las op de
  * transactielijst als 6000,0 vrijheidsdagen en op de check-in als 6083: twee
- * koersen binnen één app, op precies het scherm dat "geld is opgeslagen tijd" het
+ * koersen binnen één app, op precies het scherm dat "geld levert tijd op" het
  * vaakst uitspreekt. Vóór de fix rendeerde de eerste case hieronder
  * "≈ 30,0 vrijheidsdagen kwijt" i.p.v. "≈ 3,0".
  */

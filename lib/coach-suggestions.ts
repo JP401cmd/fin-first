@@ -486,7 +486,7 @@ export const PATH_SUGGESTIONS: PathRule[] = [
     check: (g) => g.hasDebts,
     suggestion: {
       message:
-        'Je schulden staan in beeld. Kies een aflosvolgorde, dan zie je hoeveel vrijheid je terugkoopt.',
+        'Je schulden staan in beeld. Kies een aflosvolgorde, dan zie je hoeveel tijd elke aflossing oplevert.',
       cta: 'Bekijk je aflosplan',
     },
   },
@@ -618,7 +618,7 @@ export const DEFAULT_SUGGESTIONS: DefaultRule[] = [
     condition:
       'Altijd van toepassing — wint alleen als geen enkele andere regel matcht én het account nog niet gevuld is.',
     suggestion: {
-      message: 'Welkom. Geld is opgeslagen tijd — ik help je zien hoeveel vrijheid het je geeft.',
+      message: 'Welkom. Geld levert tijd op — ik help je zien hoeveel vrijheid het je geeft.',
       cta: 'Aan de slag',
       ctaHref: '/overzicht',
     },

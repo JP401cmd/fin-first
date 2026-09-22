@@ -134,7 +134,7 @@ export default function SignupPage() {
             tijd") en geeft een eerlijke verwachting voordat de gebruiker begint.
             Sobere copy, geen uitroeptekens — in lijn met de coach-stem. */}
         <p className="mb-1 text-center text-sm italic text-zinc-600">
-          Geld is opgeslagen tijd &mdash; we vertalen je geld naar jaren vrijheid.
+          Geld levert tijd op &mdash; we vertalen je geld naar jaren vrijheid.
         </p>
         <p className="mb-4 text-center text-xs text-zinc-400">
           Account aanmaken duurt een minuut, je profiel klaar in ~5 minuten.

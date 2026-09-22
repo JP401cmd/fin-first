@@ -31,7 +31,7 @@ import {
  *  - 'free' / 'pensioen': de gebruiker IS al vrij / met pensioen. Geen "% op
  *    weg" meer (dat is niet meer relevant): de kop schakelt naar een
  *    onttrekkings-framing ("Je bent vrij" / "Je bent met pensioen"), trouw aan
- *    "Geld is opgeslagen tijd". De `framing` wordt afgeleid door de gedeelde,
+ *    "Geld levert tijd op". De `framing` wordt afgeleid door de gedeelde,
  *    consume-only vlag (`resolveFreedomFraming`) op de pagina en hier alleen
  *    weergegeven — geen herberekening in de component.
  *
@@ -238,14 +238,14 @@ export function VrijheidStrip({
 
   // Reeds vrij / met pensioen: "% op weg" is niet meer relevant. Toon de
   // onttrekkings-framing in plaats van de voortgangsbalk. Filosofie blijft:
-  // het opgebouwde vermogen is opgeslagen tijd die nu voor je werkt.
+  // het opgebouwde vermogen levert je nu tijd op.
   if (framing === 'free') {
     const isPensioen = freeAsPensioen
     const kicker = isPensioen ? 'Met pensioen' : 'Financieel vrij'
     const heading = isPensioen ? 'Je bent met pensioen.' : 'Je bent vrij.'
     const body = isPensioen
       ? 'Je hoeft niet meer te werken voor geld. Dit beeld toont je onttrekking tot het einde van je leven — niet meer je opbouw.'
-      : 'Je hoeft niet meer te werken voor geld. Je vermogen — opgeslagen tijd — werkt nu voor jou; dit beeld toont je onttrekking, niet meer je opbouw.'
+      : 'Je hoeft niet meer te werken voor geld. Je vermogen levert je nu tijd op; dit beeld toont je onttrekking, niet meer je opbouw.'
 
     return (
       <Link
