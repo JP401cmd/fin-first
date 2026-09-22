@@ -1172,3 +1172,12 @@
 ## 2026-09-22
 
 - Geen wijzigingen.
+
+## 2026-09-22
+
+- **API-routes** toegevoegd: /api/admin/krant-meting, /api/krant/testeditie
+- **Componenten (aantal)** toegevoegd: +2
+
+## 2026-09-22
+
+- Geen wijzigingen.

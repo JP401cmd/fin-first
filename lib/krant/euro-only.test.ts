@@ -25,6 +25,18 @@ import { readSourceLF } from '@/lib/test-utils/read-source'
 
 const KRANT_DIR = join(process.cwd(), 'lib', 'krant')
 
+/**
+ * Krant-oppervlakken buiten lib/krant die dezelfde regel dragen. De testsectie
+ * op /nieuws (kaart 1B fase 3) toont de bedragen van de matcher; hij mag ze
+ * net zo min naar dagen vertalen als de motor zelf. Het meting-paneel telt
+ * alleen edities, maar valt onder dezelfde regel zodra iemand er een bedrag
+ * bij zet.
+ */
+const EXTRA_BESTANDEN = [
+  join(process.cwd(), 'components', 'berichten', 'krant-testsectie.tsx'),
+  join(process.cwd(), 'components', 'app', 'beheer', 'krant-meting-panel.tsx'),
+]
+
 /** Symbolen van de €→tijd-vertaling en de vervallen uitgavenband. */
 const VERBODEN_IDENTIFIERS = [
   'formatWithFreedom',
@@ -89,10 +101,14 @@ function imports(bron: string): Array<{ module: string; symbolen: string[] }> {
 }
 
 describe('euro-only (B2, ADR 0172)', () => {
-  const bestanden = bronbestanden(KRANT_DIR)
+  const bestanden = [...bronbestanden(KRANT_DIR), ...EXTRA_BESTANDEN]
 
-  it('vindt de bronbestanden (recursief)', () => {
+  it('vindt de bronbestanden (recursief) én de Krant-oppervlakken erbuiten', () => {
     expect(bestanden.length).toBeGreaterThan(8)
+    for (const extra of EXTRA_BESTANDEN) {
+      expect(statSync(extra).isFile(), extra).toBe(true)
+      expect(bestanden).toContain(extra)
+    }
   })
 
   it('importregel: uit @/lib/format alleen formatCurrency; niets uit de vrijheidstijd-modules', () => {

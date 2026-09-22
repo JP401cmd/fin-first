@@ -3,6 +3,7 @@ import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { NieuwsOnlyClient } from '@/components/berichten/nieuws-only-client'
 import { createClient } from '@/lib/supabase/server'
 import { getCachedUser } from '@/lib/supabase/cached-user'
+import { magTesteditieZien } from '@/lib/krant/testeditie-toegang'
 
 export default async function NieuwsOnlyPage() {
   // De user_id gaat als prop mee omdat de browsercache van de krant erop wordt
@@ -17,6 +18,14 @@ export default async function NieuwsOnlyPage() {
   const user = await getCachedUser(supabase)
   if (!user) redirect('/login')
 
+  // Keuze 12 (kaart 1B): de schaduweditie is tot 1C onzichtbaar, behalve als
+  // testsectie voor SUPERADMIN (22 sep: versmald van testaccounts+superadmin
+  // — `is_demo_user` bleek geen betrouwbaar testaccount-predicaat, zie
+  // lib/krant/testeditie-toegang.ts). Server-side beslist, zodat een gewone
+  // lezer het component niet eens meekrijgt; /api/krant/testeditie toetst
+  // hetzelfde nog een keer.
+  const toonTestsectie = await magTesteditieZien(supabase, user.id)
+
   return (
     <>
       {/* /nieuws is een globale hoofd-bestemming (tab 'other') → 'rich' TopBar
@@ -24,7 +33,7 @@ export default async function NieuwsOnlyPage() {
           + account) zichtbaar blijft. Zonder expliciete topBar kiest de
           pathname-watcher 'simple' (geen cluster). */}
       <NavStackMeta title="Krant" topBar={{ kind: 'rich' }} />
-      <NieuwsOnlyClient userId={user.id} />
+      <NieuwsOnlyClient userId={user.id} toonTestsectie={toonTestsectie} />
     </>
   )
 }

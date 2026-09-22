@@ -11,6 +11,7 @@ import { getPageInfo } from '@/lib/page-info-content'
 import { NewspaperFooter } from './newspaper-footer'
 import { HeroNewsArticle, NewsArticle, NewsSkeletonLoader } from './news-components'
 import { ArchiveSection } from './archive-section'
+import { KrantTestsectie } from './krant-testsectie'
 import { useExecutionMode } from '@/lib/ai/local/use-execution-mode'
 import type { LocalNewsProgress } from '@/lib/ai/local/local-news-resolver'
 import { LOCAL_NEWS_MAX_ITEMS } from '@/lib/ai/local/local-news-select'
@@ -292,7 +293,7 @@ const GENERATION_TIMEOUT_MS = 3 * 60_000
  */
 const GENERATION_TIMEOUT_MESSAGE = `Het duurde langer dan ${GENERATION_TIMEOUT_MS / 60_000} minuten.`
 
-export function NieuwsOnlyClient({ userId }: { userId: string }) {
+export function NieuwsOnlyClient({ userId, toonTestsectie = false }: { userId: string; toonTestsectie?: boolean }) {
   // Weergavemodus — stuurt alleen de masthead-reductie (NWS-1) aan.
   const simple = useDisplayMode().mode === 'simple'
   // ── News state ──
@@ -868,6 +869,10 @@ export function NieuwsOnlyClient({ userId }: { userId: string }) {
           </div>
         </div>
       </section>
+
+      {/* Keuze 12 (kaart 1B): itemcontrole van de schaduweditie, alleen voor
+          testaccounts en superadmin — de server-page beslist dat. */}
+      {toonTestsectie && <KrantTestsectie />}
 
       <NewspaperFooter />
     </div>

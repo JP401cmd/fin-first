@@ -50,6 +50,16 @@ const VRIJ_LEESBAAR = new Set([
   // (`nieuwsprofiel`, `krant_edities`, `krant_editie_items`, ADR 0173) — die
   // blijven op de strenge regel; de herberekening na terugtrekken leest ze in
   // lib/krant via de service-role en geeft beheer alleen een aantal terug.
+  // Zelfde lijn voor de twee oppervlakken van kaart 1B fase 3, die deze scan
+  // dus NIET hoeven te verruimen (openstaande G6 blijft dicht):
+  //  - `GET /api/admin/krant-meting` + het meting-paneel lezen alléén
+  //    `job_runs` (hieronder, operationeel): de tellingen per profieltype zijn
+  //    in de cron-summary al k=5-onderdrukt;
+  //  - de testsectie op /nieuws leest wél editie-inhoud, maar uitsluitend de
+  //    EIGEN rij van de aanroeper via de sessie-client onder own-row-RLS
+  //    (lib/krant/testeditie.ts) — een superadmin ziet daar zijn eigen editie,
+  //    nooit die van een ander. Die belofte hangt niet aan deze scan maar aan
+  //    RLS + geen service-role; bewaakt door lib/krant/testeditie.gate.test.ts.
   'news_articles',
   'questionnaires',
   'questionnaire_questions',
@@ -162,7 +172,7 @@ function bronbestanden(dir: string): string[] {
 function beheerBronnen(): string[] {
   const set = new Set(SCAN_DIRS.flatMap(bronbestanden))
   for (const f of bronbestanden('app/api')) {
-    if (/\b(isSuperAdmin|superadminGate)\b/.test(readFileSync(f, 'utf8'))) set.add(f)
+    if (/\b(isSuperAdmin|superadminGate|SUPERADMIN_ROLE)\b/.test(readFileSync(f, 'utf8'))) set.add(f)
   }
   return [...set]
 }

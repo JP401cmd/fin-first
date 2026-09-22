@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-09-22T04:11:39.168Z",
+  "generatedAt": "2026-09-22T06:40:45.596Z",
   "generatedDate": "2026-09-22",
   "repo": {
     "name": "fin",
-    "version": "0.92.1"
+    "version": "0.92.2"
   },
   "annotations": {
     "philosophy": "Geld is opgeslagen tijd — elke euro vertegenwoordigt een stukje levenstijd.",
@@ -191,11 +191,11 @@
   "stats": {
     "routes": 136,
     "routesProduction": 90,
-    "api": 331,
+    "api": 333,
     "tables": 105,
     "migrations": 259,
     "integrations": 25,
-    "components": 1159,
+    "components": 1161,
     "providers": 19,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -2024,6 +2024,14 @@
       ]
     },
     {
+      "url": "/api/admin/krant-meting",
+      "file": "app/api/admin/krant-meting/route.ts",
+      "domain": "admin",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
       "url": "/api/admin/local-ai-gate",
       "file": "app/api/admin/local-ai-gate/route.ts",
       "domain": "admin",
@@ -3634,6 +3642,14 @@
       ]
     },
     {
+      "url": "/api/krant/testeditie",
+      "file": "app/api/krant/testeditie/route.ts",
+      "domain": "krant",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
       "url": "/api/life-events/strategie",
       "file": "app/api/life-events/strategie/route.ts",
       "domain": "life-events",
@@ -4641,7 +4657,7 @@
     {
       "domain": "admin",
       "label": "Beheer",
-      "count": 52,
+      "count": 53,
       "routes": [
         {
           "url": "/api/admin/ai-features",
@@ -4768,6 +4784,14 @@
           "domain": "admin",
           "methods": [
             "POST"
+          ]
+        },
+        {
+          "url": "/api/admin/krant-meting",
+          "file": "app/api/admin/krant-meting/route.ts",
+          "domain": "admin",
+          "methods": [
+            "GET"
           ]
         },
         {
@@ -6836,6 +6860,29 @@
       ]
     },
     {
+      "domain": "krant",
+      "label": "krant",
+      "count": 2,
+      "routes": [
+        {
+          "url": "/api/krant/cron",
+          "file": "app/api/krant/cron/route.ts",
+          "domain": "krant",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/krant/testeditie",
+          "file": "app/api/krant/testeditie/route.ts",
+          "domain": "krant",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "module-guide",
       "label": "module-guide",
       "count": 2,
@@ -7571,21 +7618,6 @@
           "url": "/api/investment/holdings/[id]/detail",
           "file": "app/api/investment/holdings/[id]/detail/route.ts",
           "domain": "investment",
-          "methods": [
-            "GET"
-          ]
-        }
-      ]
-    },
-    {
-      "domain": "krant",
-      "label": "krant",
-      "count": 1,
-      "routes": [
-        {
-          "url": "/api/krant/cron",
-          "file": "app/api/krant/cron/route.ts",
-          "domain": "krant",
           "methods": [
             "GET"
           ]
@@ -9254,11 +9286,11 @@
     }
   ],
   "components": {
-    "total": 1159,
+    "total": 1161,
     "groups": [
       {
         "group": "app",
-        "count": 474,
+        "count": 475,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -9500,6 +9532,7 @@
           "kassabon-shell",
           "koopkracht-erosie",
           "koopkracht-erosie-onttrekken",
+          "krant-meting-panel",
           "lab-harp",
           "lab-harp.test",
           "lab-knoppen",
@@ -10396,7 +10429,7 @@
       },
       {
         "group": "berichten",
-        "count": 13,
+        "count": 14,
         "items": [
           "archive-edition-card",
           "archive-section",
@@ -10404,6 +10437,7 @@
           "berichten-client.density.test",
           "berichten-client.loading-masthead.test",
           "berichten-client.unread-count.test",
+          "krant-testsectie",
           "masthead",
           "masthead.test",
           "news-components",
@@ -13892,6 +13926,25 @@
           ]
         }
       ],
+      "job_runs": [
+        {
+          "domain": "admin",
+          "label": "Beheer",
+          "write": false,
+          "routes": [
+            "/api/admin/krant-meting",
+            "/api/admin/news-ingest"
+          ]
+        },
+        {
+          "domain": "cron",
+          "label": "cron",
+          "write": false,
+          "routes": [
+            "/api/cron/alerts-sweep"
+          ]
+        }
+      ],
       "news_articles": [
         {
           "domain": "admin",
@@ -13921,24 +13974,6 @@
           "write": false,
           "routes": [
             "/api/admin/news-feedback"
-          ]
-        }
-      ],
-      "job_runs": [
-        {
-          "domain": "admin",
-          "label": "Beheer",
-          "write": false,
-          "routes": [
-            "/api/admin/news-ingest"
-          ]
-        },
-        {
-          "domain": "cron",
-          "label": "cron",
-          "write": false,
-          "routes": [
-            "/api/cron/alerts-sweep"
           ]
         }
       ],
@@ -18758,8 +18793,8 @@
       },
       {
         "file": "lib/release-notes.ts",
-        "loc": 3376,
-        "commits": 6
+        "loc": 3394,
+        "commits": 7
       },
       {
         "file": "lib/dashboard-data-loader.ts",
@@ -19962,7 +19997,7 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-09-21",
+    "previousDate": "2026-09-22",
     "hasChanges": false,
     "sections": []
   },
@@ -20424,8 +20459,8 @@
     },
     {
       "date": "2026-09-22",
-      "api": 331,
-      "components": 1159,
+      "api": 333,
+      "components": 1161,
       "tables": 105,
       "routesProduction": 90
     }
