@@ -145,6 +145,21 @@ describe('duidWachtendeArtikelen — de stap in de schaduw', () => {
     expect(bump.filters).toContainEqual(['lt', 'duiding_versie', 1])
   })
 
+  it('vraagt Anthropic om de json-tool, niet om strikte structured output (union-limiet van de API)', async () => {
+    // Given het duidingsschema (12 mechanismen × nullable drempel/params ≈ 41 union-parameters)
+    // When de stap het model aanroept
+    // Then kiest hij `structuredOutputMode: 'jsonTool'`: de strikte `output_format` van
+    // Anthropic weigert meer dan 16 union-parameters, en dat liet op 22-09-2026 élk
+    // artikel mislukken. De strengheid zit in onze eigen controles, niet in de API.
+    generateObjectMock.mockResolvedValue({ object: GELDIGE_UITVOER } as never)
+    const { client } = maakClient([artikel()])
+
+    await duidWachtendeArtikelen(client as never, MODEL, { maxPerRun: 1 })
+
+    const aanroep = generateObjectMock.mock.calls[0][0] as { providerOptions?: { anthropic?: { structuredOutputMode?: string } } }
+    expect(aanroep.providerOptions?.anthropic?.structuredOutputMode).toBe('jsonTool')
+  })
+
   it('een schema-overtreding uit generateObject is direct afgewezen (code schema), geen retry', async () => {
     generateObjectMock.mockRejectedValue(new SchemaFout('past niet in het schema'))
     const { client, queries } = maakClient([artikel()])

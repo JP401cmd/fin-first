@@ -260,6 +260,12 @@ async function duidEen(
       schema: duidingModelSchema,
       system: buildDuidingSystemPrompt(),
       prompt: buildDuidingPrompt(artikel, tekst),
+      // De json-tool, niet de strikte `output_format`: die weigert schema's met
+      // meer dan 16 union-parameters, en de gediscrimineerde mechanisme-union
+      // telt er ~41 — op 22-09-2026 mislukte daardoor élk artikel. Het schema
+      // blijft gesloten: generateObject valideert tegen zod en
+      // controleerDuiding doet het daarna opnieuw, strikt.
+      providerOptions: { anthropic: { structuredOutputMode: 'jsonTool' } },
     })
     uitvoer = object
   } catch (err) {
