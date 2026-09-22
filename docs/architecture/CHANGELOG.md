@@ -1150,3 +1150,25 @@
 ## 2026-09-21
 
 - Geen wijzigingen.
+
+## 2026-09-21
+
+- **API-routes** toegevoegd: /api/krant/cron
+- **Tabellen** toegevoegd: krant_editie_items, krant_edities, nieuwsprofiel
+
+## 2026-09-21
+
+- Geen wijzigingen.
+
+## 2026-09-21
+
+- **API-routes** toegevoegd: /api/admin/news-duiding/meting, /api/admin/news-duiding/opnieuw, /api/admin/news-duiding/terugtrekken
+- **Componenten (aantal)** toegevoegd: +2
+
+## 2026-09-21
+
+- Geen wijzigingen.
+
+## 2026-09-22
+
+- Geen wijzigingen.

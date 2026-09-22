@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-09-21T21:57:49.285Z",
-  "generatedDate": "2026-09-21",
+  "generatedAt": "2026-09-22T04:11:39.168Z",
+  "generatedDate": "2026-09-22",
   "repo": {
     "name": "fin",
-    "version": "0.92.0"
+    "version": "0.92.1"
   },
   "annotations": {
     "philosophy": "Geld is opgeslagen tijd — elke euro vertegenwoordigt een stukje levenstijd.",
@@ -191,11 +191,11 @@
   "stats": {
     "routes": 136,
     "routesProduction": 90,
-    "api": 327,
-    "tables": 102,
-    "migrations": 258,
+    "api": 331,
+    "tables": 105,
+    "migrations": 259,
     "integrations": 25,
-    "components": 1157,
+    "components": 1159,
     "providers": 19,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -2059,6 +2059,30 @@
       ]
     },
     {
+      "url": "/api/admin/news-duiding/meting",
+      "file": "app/api/admin/news-duiding/meting/route.ts",
+      "domain": "admin",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "url": "/api/admin/news-duiding/opnieuw",
+      "file": "app/api/admin/news-duiding/opnieuw/route.ts",
+      "domain": "admin",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "url": "/api/admin/news-duiding/terugtrekken",
+      "file": "app/api/admin/news-duiding/terugtrekken/route.ts",
+      "domain": "admin",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
       "url": "/api/admin/news-feedback",
       "file": "app/api/admin/news-feedback/route.ts",
       "domain": "admin",
@@ -3602,6 +3626,14 @@
       ]
     },
     {
+      "url": "/api/krant/cron",
+      "file": "app/api/krant/cron/route.ts",
+      "domain": "krant",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
       "url": "/api/life-events/strategie",
       "file": "app/api/life-events/strategie/route.ts",
       "domain": "life-events",
@@ -4609,7 +4641,7 @@
     {
       "domain": "admin",
       "label": "Beheer",
-      "count": 49,
+      "count": 52,
       "routes": [
         {
           "url": "/api/admin/ai-features",
@@ -4771,6 +4803,30 @@
           "methods": [
             "GET",
             "DELETE"
+          ]
+        },
+        {
+          "url": "/api/admin/news-duiding/meting",
+          "file": "app/api/admin/news-duiding/meting/route.ts",
+          "domain": "admin",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/admin/news-duiding/opnieuw",
+          "file": "app/api/admin/news-duiding/opnieuw/route.ts",
+          "domain": "admin",
+          "methods": [
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/admin/news-duiding/terugtrekken",
+          "file": "app/api/admin/news-duiding/terugtrekken/route.ts",
+          "domain": "admin",
+          "methods": [
+            "POST"
           ]
         },
         {
@@ -7522,6 +7578,21 @@
       ]
     },
     {
+      "domain": "krant",
+      "label": "krant",
+      "count": 1,
+      "routes": [
+        {
+          "url": "/api/krant/cron",
+          "file": "app/api/krant/cron/route.ts",
+          "domain": "krant",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "life-events",
       "label": "life-events",
       "count": 1,
@@ -8437,6 +8508,14 @@
         "migration": "supabase/migrations/20260610010000_create_job_runs.sql"
       },
       {
+        "name": "krant_editie_items",
+        "migration": "supabase/migrations/20260922120000_krant_nieuwsprofiel_en_schaduwedities.sql"
+      },
+      {
+        "name": "krant_edities",
+        "migration": "supabase/migrations/20260922120000_krant_nieuwsprofiel_en_schaduwedities.sql"
+      },
+      {
         "name": "lead_intakes",
         "migration": "supabase/migrations/20260617000000_lead_intakes.sql"
       },
@@ -8475,6 +8554,10 @@
       {
         "name": "nibud_reference_data",
         "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
+      },
+      {
+        "name": "nieuwsprofiel",
+        "migration": "supabase/migrations/20260922120000_krant_nieuwsprofiel_en_schaduwedities.sql"
       },
       {
         "name": "profiles",
@@ -8613,7 +8696,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 258
+    "migrationCount": 259
   },
   "tablesByDomain": [
     {
@@ -8712,6 +8795,14 @@
           "migration": "supabase/migrations/20260610010000_create_job_runs.sql"
         },
         {
+          "name": "krant_editie_items",
+          "migration": "supabase/migrations/20260922120000_krant_nieuwsprofiel_en_schaduwedities.sql"
+        },
+        {
+          "name": "krant_edities",
+          "migration": "supabase/migrations/20260922120000_krant_nieuwsprofiel_en_schaduwedities.sql"
+        },
+        {
           "name": "lead_intakes",
           "migration": "supabase/migrations/20260617000000_lead_intakes.sql"
         },
@@ -8726,6 +8817,10 @@
         {
           "name": "nibud_reference_data",
           "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
+        },
+        {
+          "name": "nieuwsprofiel",
+          "migration": "supabase/migrations/20260922120000_krant_nieuwsprofiel_en_schaduwedities.sql"
         },
         {
           "name": "recommendation_feedback",
@@ -9159,11 +9254,11 @@
     }
   ],
   "components": {
-    "total": 1157,
+    "total": 1159,
     "groups": [
       {
         "group": "app",
-        "count": 472,
+        "count": 474,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -9461,6 +9556,8 @@
           "nav-stack-meta",
           "nav-stack-provider",
           "net-worth-projection-chart",
+          "news-duiding-detail",
+          "news-duiding-meting-panel",
           "news-feedback-panel",
           "nibud-benchmark",
           "nibud-benchmark.test",
@@ -11557,6 +11654,12 @@
           "write": false
         }
       ],
+      "krant": [
+        {
+          "name": "profiles",
+          "write": false
+        }
+      ],
       "life-events": [
         {
           "name": "life_events",
@@ -12733,6 +12836,14 @@
           ]
         },
         {
+          "domain": "krant",
+          "label": "krant",
+          "write": false,
+          "routes": [
+            "/api/krant/cron"
+          ]
+        },
+        {
           "domain": "local-chat-overview",
           "label": "local-chat-overview",
           "write": false,
@@ -13787,7 +13898,10 @@
           "label": "Beheer",
           "write": true,
           "routes": [
-            "/api/admin/news-articles"
+            "/api/admin/news-articles",
+            "/api/admin/news-duiding/meting",
+            "/api/admin/news-duiding/opnieuw",
+            "/api/admin/news-duiding/terugtrekken"
           ]
         }
       ],
@@ -15690,6 +15804,16 @@
         "column": "holding_id"
       },
       {
+        "from": "krant_editie_items",
+        "to": "krant_edities",
+        "column": "editie_id"
+      },
+      {
+        "from": "krant_editie_items",
+        "to": "news_articles",
+        "column": "article_id"
+      },
+      {
         "from": "life_events",
         "to": "assets",
         "column": "linked_asset_id"
@@ -16347,6 +16471,21 @@
         "rls": true
       },
       "consent_events": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "nieuwsprofiel": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "krant_edities": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "krant_editie_items": {
         "user": true,
         "household": false,
         "rls": true
@@ -18536,6 +18675,20 @@
       ],
       "summary": "Op de duiding van ADR 0171 legt een pure, deterministische matcher (`lib/krant/matcher.ts`) per lezer een editie samen: doelgroepregels toetsen op een profiel van dertien velden in banden, de impact op de twee bandranden rekenen met de canonieke motoren (box 3, box 1 via een para",
       "file": "docs/adr/0172-de-krant-matcher-deterministische-editie-alleen-euros-sjablonen-met-attest.md"
+    },
+    {
+      "id": "0173-de-schaduweditie-van-de-krant-eigen-tabellen-profielafleiding-weekcron",
+      "title": "De schaduweditie van de Krant: eigen tabellen, profielafleiding uit eigen data, weekcron",
+      "status": "aanvaard",
+      "date": "2026-09-22",
+      "elements": [
+        "as-nieuws",
+        "do-krant",
+        "t-supabase",
+        "t-platform"
+      ],
+      "summary": "De matcher van ADR 0172 gaat draaien zonder dat een lezer iets ziet: een weekcron (maandag 06:00 UTC, `/api/krant/cron`) leidt per gebruiker met de module nieuws een nieuwsprofiel af uit zijn eigen data (B8; expliciete `.eq('user_id', …)` op elke tabel, banden in plaats van bedra",
+      "file": "docs/adr/0173-de-schaduweditie-van-de-krant-eigen-tabellen-profielafleiding-weekcron.md"
     }
   ],
   "churn": {
@@ -18547,7 +18700,7 @@
       },
       {
         "path": "lib/ai",
-        "commits": 58
+        "commits": 59
       },
       {
         "path": "app/(app)/toekomst",
@@ -18586,7 +18739,7 @@
       {
         "file": "components/app/horizon/horizon-client.tsx",
         "loc": 11039,
-        "commits": 99
+        "commits": 100
       },
       {
         "file": "components/app/budgets-client.tsx",
@@ -18605,13 +18758,13 @@
       },
       {
         "file": "lib/release-notes.ts",
-        "loc": 3352,
-        "commits": 5
+        "loc": 3376,
+        "commits": 6
       },
       {
         "file": "lib/dashboard-data-loader.ts",
         "loc": 3144,
-        "commits": 61
+        "commits": 62
       },
       {
         "file": "app/(app)/core/cash/import/page.tsx",
@@ -20264,9 +20417,16 @@
     },
     {
       "date": "2026-09-21",
-      "api": 327,
-      "components": 1157,
-      "tables": 102,
+      "api": 331,
+      "components": 1159,
+      "tables": 105,
+      "routesProduction": 90
+    },
+    {
+      "date": "2026-09-22",
+      "api": 331,
+      "components": 1159,
+      "tables": 105,
       "routesProduction": 90
     }
   ]

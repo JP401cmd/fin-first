@@ -4,8 +4,9 @@
  * Versie: semver `0.MINOR.PATCH`, gelijk aan `package.json` (de enige
  * versiebron, zie lib/app-version.ts). De major blijft 0 tot het go-besluit
  * voor de livegang — `lib/release-notes.test.ts` houdt dat hard. Alleen de
- * release-skill bumpt (stap "Versie & vrijgavenotitie"): fix → patch,
- * functionaliteit → minor, nooit major. Checkpoints en losse pushes bumpen niet.
+ * release-skill bumpt (stap "Versie & vrijgavenotitie"): elke release telt de
+ * patch door; minor maximaal 1× per maand; nooit major. Checkpoints en losse
+ * pushes bumpen niet. Gebruikers zien de patch met drie cijfers (0.92.001).
  *
  * Schrijfnorm vanaf 0.89.0 (RELEASE_NOTE_NORM, getoetst in de vitest): kort,
  * in gewone taal, gegroepeerd op wat de gebruiker kent — Bezittingen, Schulden,
@@ -95,6 +96,29 @@ export const RELEASE_NOTE_NORM = {
 } as const
 
 export const RELEASE_NOTES: ReleaseNote[] = [
+  {
+    version: '0.92.1',
+    date: '2026-09-22',
+    title: 'Je ziet welke versie je gebruikt',
+    sections: [
+      {
+        module: 'Platform',
+        color: 'zinc',
+        items: [
+          {
+            title: 'Versienummer onderaan Mijn',
+            description:
+              'Onderaan Mijn staat nu welke versie van TriFinity je gebruikt. Handig als je iets meldt.',
+          },
+          {
+            title: 'Voorbereiding op de nieuwe Krant',
+            description:
+              'Achter de schermen oefenen we een weekkrant die past bij jouw situatie. Je ziet er nog niets van.',
+          },
+        ],
+      },
+    ],
+  },
   {
     version: '0.92.0',
     date: '2026-09-21',
