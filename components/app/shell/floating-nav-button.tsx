@@ -250,17 +250,21 @@ export function FloatingNavButton() {
         {/* select-none + geen touch-callout: iOS Safari start bij ~500 ms vasthouden
             anders tekstselectie (vergrootglas/Kopieer-menu) en breekt de aanraking af
             met een touchcancel, waardoor de 1000 ms-long-press nooit afgaat. iOS stuurt
-            daarbij géén contextmenu-event, dus onContextMenu vangt het niet (bug 13 sep 2026). */}
-        <div className="flex items-stretch gap-px rounded-full bg-stone-900 p-1 shadow-[0_8px_24px_rgba(0,0,0,0.25),0_2px_8px_rgba(0,0,0,0.15)] select-none [-webkit-touch-callout:none]">
+            daarbij géén contextmenu-event, dus onContextMenu vangt het niet (bug 13 sep 2026).
+            Kleur: de capsule is chrome, net als de mobiele TopBar, en draagt dezelfde
+            `--topbar-*`-tokens (ADR 0174 D2/D3). Zo loopt hij mee met de instelbare
+            balkkleur, en de voorgrond (wit of inkt) haalt vanzelf het contrast dat
+            `topbarColorVars` al kiest. Geen module-accent, geen vaste stone-900. */}
+        <div className="flex items-stretch gap-px rounded-full bg-[var(--topbar-bg)] p-1 shadow-[0_8px_24px_rgba(0,0,0,0.25),0_2px_8px_rgba(0,0,0,0.15)] select-none [-webkit-touch-callout:none]">
           <button
             type="button"
             onClick={() => cmd.open()}
             aria-label="Zoeken"
-            className="flex items-center justify-center rounded-full px-5 py-2.5 text-white/90 hover:bg-white/10 active:bg-white/15 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--paper)]"
+            className="flex items-center justify-center rounded-full px-5 py-2.5 text-[var(--topbar-fg)] hover:bg-[var(--topbar-hover)] active:bg-[var(--topbar-hover)] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--topbar-fg)]"
           >
             <Search size={18} strokeWidth={2.25} />
           </button>
-          <div className="w-px self-stretch bg-white/15" aria-hidden="true" />
+          <div className="w-px self-stretch bg-[var(--topbar-hover)]" aria-hidden="true" />
           <button
             type="button"
             onClick={handleWaffleClick}
@@ -277,7 +281,7 @@ export function FloatingNavButton() {
             aria-label={menuOpen ? 'Menu sluiten' : 'Menu openen'}
             aria-expanded={menuOpen}
             data-pressing={pressing || undefined}
-            className="flex items-center justify-center rounded-full px-5 py-2.5 text-white/90 hover:bg-white/10 active:bg-white/15 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--paper)]"
+            className="flex items-center justify-center rounded-full px-5 py-2.5 text-[var(--topbar-fg)] hover:bg-[var(--topbar-hover)] active:bg-[var(--topbar-hover)] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--topbar-fg)]"
           >
             {/* Druk-registratie: verschijnt ná PRESS_VISUAL_DELAY_MS en groeit
                 dan over de resterende drempel mee (duration-[750ms] =
@@ -302,7 +306,7 @@ export function FloatingNavButton() {
               De scheidingslijn verbergt zichzelf (`has-[+div:empty]`) zolang
               Fin niets portalt (chat open / overlay), anders bleef er een kier
               met een kaal streepje over. */}
-          <div className="w-px self-stretch bg-white/15 has-[+div:empty]:hidden" aria-hidden="true" />
+          <div className="w-px self-stretch bg-[var(--topbar-hover)] has-[+div:empty]:hidden" aria-hidden="true" />
           <div ref={slotRef} className="flex items-center justify-center empty:hidden" />
         </div>
       </div>

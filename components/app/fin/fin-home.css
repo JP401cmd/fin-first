@@ -78,8 +78,10 @@
   box-shadow: none;
   transition: background-color 160ms ease;
 }
-.wh-slot .wh-bubble--slot:hover { transform: none; background: rgb(255 255 255 / 0.1); border-color: transparent; }
-.wh-slot .wh-bubble--slot:active { transform: none; background: rgb(255 255 255 / 0.15); }
+/* Drukvlak uit de balk-tokens (ADR 0174): de pill draagt `--topbar-bg`, dus een
+   vaste witte hover zou op een lichte, zelfgekozen balkkleur wegvallen. */
+.wh-slot .wh-bubble--slot:hover { transform: none; background: var(--topbar-hover); border-color: transparent; }
+.wh-slot .wh-bubble--slot:active { transform: none; background: var(--topbar-hover); }
 /* De avatar is GEEN kind van de knop (los, absoluut gepositioneerd overlay-
    element — zie .wh-avatar hieronder), dus de knop zelf krijgt een
    onzichtbare 18px-spacer (exact het icoonformaat van zoeken/menu) zodat
