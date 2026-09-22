@@ -1130,6 +1130,25 @@ describe('MiniNetWorthChart — tweedeling in verleden- en toekomst-kaart', () =
       expect(regel.className).toContain('text-red-700')
     })
 
+    it('zo vroeg mogelijk, haalbaar, maar het vastgelegde doel reikt niet: oranje tekst op de kaart (ADR 0175)', () => {
+      render(<MiniNetWorthChart {...baseProps} planStatus="warn" />)
+      expect(screen.getByTestId('nw-toekomst-status').className).toContain('bg-amber-500')
+      const regel = screen.getByTestId('nw-toekomst-doel-nog-niet')
+      expect(regel.textContent).toBe('haalbaar, je doel nog niet')
+      expect(regel.className).toContain('text-amber-700')
+      expect(screen.queryByTestId('nw-toekomst-onhaalbaar')).toBeNull()
+      // De zichtbare regel draagt het oordeel; het sr-only-statuswoord vervalt dan.
+      const ids = (screen.getByTestId('nw-kaart-toekomst').getAttribute('aria-labelledby') ?? '').split(' ')
+      const woorden = ids.map((id) => document.getElementById(id)?.textContent ?? '').join(' ')
+      expect(woorden).toContain('haalbaar, je doel nog niet')
+    })
+
+    it('vast stopmoment met oranje status: de dekkingsregel, niet de doelregel', () => {
+      render(<MiniNetWorthChart {...stopProps} planCoveragePct={95} planStatus="warn" />)
+      expect(screen.queryByTestId('nw-toekomst-doel-nog-niet')).toBeNull()
+      expect(screen.getByTestId('nw-toekomst-dekking')).toBeTruthy()
+    })
+
     it('zonder oordeel (neutral) geen punt en de dekking in inkt — ongewijzigd gedrag', () => {
       render(<MiniNetWorthChart {...stopProps} planCoveragePct={72} />)
       expect(screen.queryByTestId('nw-toekomst-status')).toBeNull()

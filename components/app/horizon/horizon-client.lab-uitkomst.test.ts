@@ -217,12 +217,28 @@ describe('de twee profielparameter-knoppen reizen mee in de doelstand (ADR 0170)
     expect(blok).toContain('nalatenschap: scenarioNalatenschap')
   })
 
+  it('vastleggen en loslaten verversen de server-kop en het menupunt (ADR 0175)', () => {
+    const src = bron()
+    for (const naam of ['const handleDoelVastleggen = useCallback', 'const handleDoelLoslaten = useCallback']) {
+      const start = src.indexOf(naam)
+      expect(start).toBeGreaterThan(-1)
+      // Tot de volgende declaratie op component-niveau: precies deze handler, niet de buurman.
+      const eind = src.indexOf('\n  const ', start + naam.length)
+      const blok = src.slice(start, eind)
+      expect(blok, naam).toContain('startRefresh(() => router.refresh())')
+      expect(blok, naam).toMatch(/\[[^\]]*\brouter\]/)
+    }
+  })
+
   it('"Herstel mijn doel" zet ze terug uit de stand, niet hard op null', () => {
     const src = bron()
     const start = src.indexOf('const handleDoelHerstellen = useCallback')
     const blok = src.slice(start, src.indexOf('}, [doelBlok', start))
-    expect(blok).toContain('setScenarioUitgaveNaPensioen(stand.uitgaveNaPensioen ?? null)')
-    expect(blok).toContain('setScenarioNalatenschap(stand.nalatenschap ?? null)')
+    // Via de gedeelde vertaling (ADR 0175); dat die de knoppen uit de stand leest en niet
+    // hard op null zet, pint `lib/horizon/doel-oordeel.test.ts` (doelStandNaarLab).
+    expect(blok).toContain('doelStandNaarLab(stand,')
+    expect(blok).toContain('setScenarioUitgaveNaPensioen(lab.uitgaveNaPensioen)')
+    expect(blok).toContain('setScenarioNalatenschap(lab.nalatenschap)')
   })
 
   it('de nalatenschap-override loopt via de scenario-overrides van de hook', () => {

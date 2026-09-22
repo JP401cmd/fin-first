@@ -188,8 +188,7 @@ export function computeLabGrenzen(ctx: LabGrenzenContext, deps?: { solve?: LabSo
   const gedektOp = (stand: LabGrenzenWaarden, S: number, eindOprek: number | null): boolean => {
     if (runs >= budget) throw new RunbudgetOp()
     runs += 1
-    const input = bouwInput(ctx, stand, eindOprek)
-    return !SHORTFALL.has(solve({ ...input, stopAnker: { soort: 'leeftijd', leeftijd: S } }).status)
+    return isGedekt(solve, bouwInput(ctx, stand, eindOprek), S)
   }
   const gedektBij = (stand: LabGrenzenWaarden): boolean => gedektOp(stand, stand.stop, null)
   const ruimBij = (stand: LabGrenzenWaarden): boolean => {
@@ -281,6 +280,34 @@ export function computeLabGrenzen(ctx: LabGrenzenContext, deps?: { solve?: LabSo
   return { grenzen, huidig, runs }
 }
 
+// ── Eén stand, buiten de batch ──────────────────────────────────────────────
+
+/**
+ * Wat `standGedekt` nodig heeft: de grenzen-context zonder knopbereik, runbudget en de
+ * marge-velden (die horen bij `ruim`, niet bij `gedekt`).
+ */
+export type LabStandContext = Pick<
+  LabGrenzenContext,
+  'profile' | 'assets' | 'debts' | 'lifeEvents' | 'aowRows' | 'baseline' | 'currentAge' | 'waarden'
+>
+
+/**
+ * Is de stand `ctx.waarden` gedekt? HETZELFDE predicaat als `huidig.gedekt` van
+ * `computeLabGrenzen`, en dus als het zone-woord van het doelscenario-blok. Eén run.
+ *
+ * Bestaansreden (ADR 0175): het plan-stoplicht weegt onder "zo vroeg mogelijk" het
+ * VASTGELEGDE doel mee, server-side. Het lab rekent dat oordeel in de worker; de server
+ * mag daar geen eigen toets naast zetten, anders kunnen kop en lab elkaar tegenspreken.
+ */
+export function standGedekt(ctx: LabStandContext, deps?: { solve?: LabSolve }): boolean {
+  return isGedekt(deps?.solve ?? solveFire, bouwInput(ctx, ctx.waarden, null), ctx.waarden.stop)
+}
+
+/** De kern van het predicaat — niet ontbrekend onder een stop-anker op leeftijd S. */
+function isGedekt(solve: LabSolve, input: KernelInput, S: number): boolean {
+  return !SHORTFALL.has(solve({ ...input, stopAnker: { soort: 'leeftijd', leeftijd: S } }).status)
+}
+
 // ── KernelInput per iteratie ────────────────────────────────────────────────
 
 /**
@@ -289,7 +316,7 @@ export function computeLabGrenzen(ctx: LabGrenzenContext, deps?: { solve?: LabSo
  * uitgeven op de DB-gebeurtenissen — exact `haalbare-uitgave.ts#inputMet` en
  * `use-horizon-fire-sim#resolveScenarioContext`, zonder tweede assemblageweg.
  */
-function bouwInput(ctx: LabGrenzenContext, stand: LabGrenzenWaarden, eindOprek: number | null): KernelInput {
+function bouwInput(ctx: LabStandContext, stand: LabGrenzenWaarden, eindOprek: number | null): KernelInput {
   let profile: ConvergentieRawProfileRow = ctx.profile
   if (stand.uitgaveNaPensioen != null && Number.isFinite(stand.uitgaveNaPensioen)) {
     profile = {

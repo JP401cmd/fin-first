@@ -24,6 +24,8 @@ import type { Asset, AssetType } from '@/lib/asset-data'
 import type { AssetCategorie } from '@/lib/horizon-kernel/types'
 import { ASSET_TYPE_TO_CATEGORIE, potRendement } from '@/lib/horizon-kernel/adapter/potten'
 import { isSliderWorkEvent } from '@/lib/horizon-kernel/adapter/guard'
+import { applyReturnDeltasToAssets } from '@/lib/horizon-kernel/adapter/whatif-varianten'
+import { resolveFireParams, type FireProfileInput } from '@/lib/fire-params'
 import type { WhatIfEvent } from '@/lib/types/horizon-whatif'
 import type { AssetGroupReturn } from '@/lib/types/horizon-whatif'
 // Stopleeftijd-clamps (integer, jaren) — ÉÉN bron met de schrijftoets van de routes
@@ -482,6 +484,29 @@ export function expandCategorieReturnDeltas(
     if (delta !== undefined && delta !== 0) out[assetType] = delta
   }
   return out
+}
+
+/**
+ * De bezittingen MET de per-categorie rendement-delta ("Rendement per categorie") erin —
+ * de ÉNE afleiding voor de scenariolijn (`resolveScenarioContext`), de grenzen-batch en het
+ * plan-stoplicht (ADR 0175). Basis voor een bezitting zónder eigen rendement is het
+ * profielrendement (PROCENT), dezelfde `resolveFireParams`-ketting als de adapter-terugval
+ * (TPR-02) — anders zou een delta op zo'n bezitting de kern-terugval omzeilen. Zonder delta
+ * blijft de lijst ongewijzigd (referentie behouden).
+ */
+export function assetsMetRendementDelta(
+  assets: readonly Asset[],
+  deltaByCategorie: Partial<Record<AssetCategorie, number>> | undefined,
+  profile: FireProfileInput,
+): Asset[] {
+  // Zonder delta dezelfde referentie terug; de lezers muteren de lijst niet.
+  if (deltaByCategorie == null || Object.keys(deltaByCategorie).length === 0) return assets as Asset[]
+  return applyReturnDeltasToAssets(
+    assets,
+    expandCategorieReturnDeltas(deltaByCategorie, assets),
+    0,
+    resolveFireParams(profile).grossReturn * 100,
+  )
 }
 
 // ── Gewogen baseline-rendement per bezeten categorie (Marktbias-UI) ──────────

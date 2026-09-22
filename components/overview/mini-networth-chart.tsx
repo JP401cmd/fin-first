@@ -538,6 +538,9 @@ function MiniNetWorthChartComponent({
   // Zo vroeg mogelijk zonder haalbaar stopmoment: dat is het rode oordeel, en het
   // hoort als tekst op de kaart — de kleur alleen draagt geen betekenis.
   const toonOnhaalbaar = !stopAnchorFixed && !fireReached && planStatus === 'bad'
+  // Zo vroeg mogelijk kent oranje maar één betekenis: het plan is haalbaar, het vastgelegde
+  // doel nog niet (ADR 0175). Ook dat oordeel staat als tekst op de kaart.
+  const toonDoelNogNiet = !stopAnchorFixed && !fireReached && planStatus === 'warn'
   const toonStatus = planStatus !== 'neutral'
   const oordeelKleur = toonStatus ? leverageStatusTextClass(planStatus) : 'text-[var(--ink-3)]'
 
@@ -554,9 +557,9 @@ function MiniNetWorthChartComponent({
   const futureLabelledBy = [
     ids.futureKop,
     toonBedragen ? ids.futureAmounts : null,
-    toonDekking || toonOnhaalbaar ? ids.futureCoverage : null,
+    toonDekking || toonOnhaalbaar || toonDoelNogNiet ? ids.futureCoverage : null,
     // Geen zichtbaar oordeel (bv. solved én haalbaar) → het sr-only-statuswoord.
-    toonStatus && !toonDekking && !toonOnhaalbaar ? ids.futureStatus : null,
+    toonStatus && !toonDekking && !toonOnhaalbaar && !toonDoelNogNiet ? ids.futureStatus : null,
     ids.futureAction,
   ]
     .filter(Boolean)
@@ -688,7 +691,16 @@ function MiniNetWorthChartComponent({
             niet haalbaar binnen je horizon
           </div>
         )}
-        {toonStatus && !toonDekking && !toonOnhaalbaar && (
+        {toonDoelNogNiet && (
+          <div
+            id={ids.futureCoverage}
+            data-testid="nw-toekomst-doel-nog-niet"
+            className={`mt-0.5 text-xs ${oordeelKleur}`}
+          >
+            haalbaar, je doel nog niet
+          </div>
+        )}
+        {toonStatus && !toonDekking && !toonOnhaalbaar && !toonDoelNogNiet && (
           <span id={ids.futureStatus} className="sr-only">
             , {LEVERAGE_STATUS_LABEL[planStatus]}
           </span>

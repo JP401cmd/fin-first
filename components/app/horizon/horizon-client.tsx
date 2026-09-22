@@ -222,6 +222,7 @@ import {
   type DoelParameter,
   type ToekomstScenarioDoel, KNOP_WEERGAVE_STANDAARD } from '@/lib/horizon/toekomst-scenario'
 import { doelGewogenRendement } from '@/lib/horizon/toekomst-doel'
+import { doelStandNaarLab } from '@/lib/horizon/doel-stand'
 import {
   DoelVastlegSheet,
   buildLiveStand,
@@ -4193,6 +4194,9 @@ export default function HorizonPage({
         })
         setShowScenarioLine(true)
         setDoelSheetOpen(false)
+        // ADR 0175 — het plan-stoplicht (kop, menupunt) weegt het vastgelegde doel mee en
+        // komt van de server; zonder refresh bleef de kop op het oude doel staan.
+        startRefresh(() => router.refresh())
         addToast({
           type: 'success',
           title: doelActief ? 'Doel bijgewerkt' : 'Doel vastgelegd',
@@ -4208,7 +4212,7 @@ export default function HorizonPage({
         setDoelSaving(false)
       }
     },
-    [buildLiveStandNow, whatIfBaseline, scenarioSliderEvents, doelRendementPct, doelFireLeeftijd, doelMargeJaren, doelActief, addToast, isFixedAnchorMode, labDekking],
+    [buildLiveStandNow, whatIfBaseline, scenarioSliderEvents, doelRendementPct, doelFireLeeftijd, doelMargeJaren, doelActief, addToast, isFixedAnchorMode, labDekking, router],
   )
 
   // Loslaten: verwijder de parameter-doelen + het doel-blok (server-route) en wis de client-state.
@@ -4230,13 +4234,16 @@ export default function HorizonPage({
       }
       setDoelBlok(null)
       setDoelLoslatenOpen(false)
+      // ADR 0175 — zonder doel valt het oranje "je doel nog niet" weg; kop en menupunt
+      // komen van de server.
+      startRefresh(() => router.refresh())
       addToast({ type: 'success', title: 'Doel losgelaten', message: 'Je verkent weer vrij.' })
     } catch {
       addToast({ type: 'error', title: 'Doel niet losgelaten', message: 'Probeer het zo nog eens.' })
     } finally {
       setDoelSaving(false)
     }
-  }, [addToast])
+  }, [addToast, router])
 
   // TPR-09 — de verkenning wordt het plan. Twee stopleeftijden stonden naast elkaar
   // (scenario-marker `toekomst_scenario_prefs.stopAge` vs. plan-anker `fire_stop_age`)
@@ -4293,40 +4300,24 @@ export default function HorizonPage({
     }
   }, [effectiveStopAge, userAowAge.fractional, addToast, loadData, router])
 
-  // "Herstel mijn doel": kopieer de vastgelegde `doel.stand` terug naar de live-states.
-  // Sliders reconstrueren zoals de pref-hydratie (buildSliderEvent per key); de rendement-delta's,
-  // de stopkeuze en de twee profielparameter-knoppen direct terugzetten.
+  // "Herstel mijn doel": kopieer de vastgelegde `doel.stand` terug naar de live-states, via
+  // `doelStandNaarLab` — dezelfde vertaling waarmee het plan-stoplicht het doel beoordeelt
+  // (ADR 0175), zodat kop en lab na herstel op dezelfde stand rekenen.
   const handleDoelHerstellen = useCallback(() => {
     const stand = doelBlok?.stand
     if (!stand) return
-    if (whatIfBaseline && currentAge !== null) {
-      // income is geen lab-parameter meer (spec §2) — een legacy doel.stand met
-      // sliders.income wordt hier genegeerd, net als bij de pref-hydratie.
-      const KEY_MAP: Record<string, SliderKey> = {
-        savings: 'savings',
-        extraInleg: 'extra_inleg',
-      }
-      const evs: WhatIfEvent[] = []
-      for (const [prefKey, sliderKey] of Object.entries(KEY_MAP)) {
-        const val = stand.sliders?.[prefKey as keyof NonNullable<typeof stand.sliders>]
-        if (val === undefined) continue
-        const ev = buildSliderEvent(sliderKey, val, whatIfBaseline, currentAge)
-        if (ev) evs.push(ev)
-      }
-      setScenarioSliderEvents(evs)
-    } else {
-      setScenarioSliderEvents([])
-    }
-    setScenarioReturnDeltas({ ...(stand.returnDeltaByCategorie ?? {}) })
+    const lab = doelStandNaarLab(stand, whatIfBaseline, currentAge)
+    setScenarioSliderEvents(lab.sliderEvents)
+    setScenarioReturnDeltas(lab.returnDeltaByCategorie)
     // Onder een vast stopmoment is de stopkeuze geen doelstand (ADR 0145 D4): de
     // verkende stop blijft staan waar hij staat.
     if (!isFixedAnchorMode) {
-      setScenarioStopAge(stand.stopAge ?? null)
+      setScenarioStopAge(lab.stopAge)
     }
     // ADR 0170 — de twee profielparameter-knoppen reizen wél mee in `doel.stand`. Afwezig
     // betekent daar "wat het plan rekent", dus `null`: dan staat de knop weer op de plan-waarde.
-    setScenarioUitgaveNaPensioen(stand.uitgaveNaPensioen ?? null)
-    setScenarioNalatenschap(stand.nalatenschap ?? null)
+    setScenarioUitgaveNaPensioen(lab.uitgaveNaPensioen)
+    setScenarioNalatenschap(lab.nalatenschap)
   }, [doelBlok, whatIfBaseline, currentAge, isFixedAnchorMode])
 
   // Compacte FIRE-delta voor de toggle-pill ("−30 mnd" = eerder vrij; beslishulp-conventie).

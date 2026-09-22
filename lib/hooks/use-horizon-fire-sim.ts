@@ -24,9 +24,7 @@ import {
   type ConvergentieRawProfileRow,
 } from '@/lib/horizon-kernel/convergentie-router'
 import { dedupeById, hasAowOntbreektNotice } from '@/lib/horizon-kernel/adapter'
-import { applyReturnDeltasToAssets } from '@/lib/horizon-kernel/adapter/whatif-varianten'
-import { resolveFireParams } from '@/lib/fire-params'
-import { expandCategorieReturnDeltas } from '@/lib/horizon/toekomst-scenario'
+import { assetsMetRendementDelta } from '@/lib/horizon/toekomst-scenario'
 import { runForcedStopPath, type ForcedStopPathInput, type ForcedStopPathResult } from '@/lib/horizon/scenario-presets'
 import {
   isKernelWorkerAvailable,
@@ -131,21 +129,9 @@ export function resolveScenarioContext(
   profile: ConvergentieRawProfileRow,
 ): { assets: Asset[]; lifeEvents: LifeEvent[]; profile: ConvergentieRawProfileRow } {
   const extraEvents = ov?.extraLifeEvents ?? []
-  const returnDeltas = ov?.returnDeltaByCategorie
-  const hasReturnDeltas = returnDeltas != null && Object.keys(returnDeltas).length > 0
-  const baseAssets = assets ?? []
-  // Basis voor een bezitting zónder eigen rendement = het profielrendement (PROCENT),
-  // dezelfde `resolveFireParams`-ketting als de adapter-terugval (TPR-02) — anders zou
-  // een delta op zo'n bezitting de kern-terugval omzeilen en de scenariolijn van de
-  // hoofdlijn afwijken. Zonder delta blijft de rij ongewijzigd (referentie behouden).
-  const scenarioAssets = hasReturnDeltas
-    ? applyReturnDeltasToAssets(
-        baseAssets,
-        expandCategorieReturnDeltas(returnDeltas, baseAssets),
-        0,
-        resolveFireParams(profile).grossReturn * 100,
-      )
-    : baseAssets
+  // De rendement-delta per categorie via de ÉNE afleiding (ook gelezen door het
+  // plan-stoplicht, ADR 0175); zonder delta blijft de lijst ongewijzigd.
+  const scenarioAssets = assetsMetRendementDelta(assets ?? [], ov?.returnDeltaByCategorie, profile)
   const baseLifeEvents = lifeEvents ?? []
   const scenarioLifeEvents = extraEvents.length > 0 ? [...baseLifeEvents, ...extraEvents] : baseLifeEvents
   // (c) uitgave na pensioen als profielparameter — zelfde mechanisme als

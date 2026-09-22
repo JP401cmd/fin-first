@@ -96,9 +96,12 @@ describe('haalbare uitgave — bron-grendel', () => {
     expect(start).toBeGreaterThan(-1)
     const body = source.slice(start, source.indexOf('}, [doelBlok', start))
     // Vóór ADR 0170 kende `doel.stand` dit veld niet en viel herstel hard op `null` terug;
-    // nu heeft "afwezig in de stand" één betekenis: wat het plan rekent.
-    expect(body).toContain('setScenarioUitgaveNaPensioen(stand.uitgaveNaPensioen ?? null)')
-    expect(body).toContain('setScenarioNalatenschap(stand.nalatenschap ?? null)')
+    // nu heeft "afwezig in de stand" één betekenis: wat het plan rekent. Sinds ADR 0175 loopt
+    // de vertaling via `doelStandNaarLab` (gedeeld met het plan-stoplicht); dat die de
+    // knoppen UIT de stand leest, pint `lib/horizon/doel-oordeel.test.ts`.
+    expect(body).toContain('doelStandNaarLab(stand,')
+    expect(body).toContain('setScenarioUitgaveNaPensioen(lab.uitgaveNaPensioen)')
+    expect(body).toContain('setScenarioNalatenschap(lab.nalatenschap)')
   })
 
   it('de drift-detectie ziet de knop via de stand, niet via een losse noodgreep', () => {

@@ -51,6 +51,56 @@ describe('resolvePlanStatus — zo vroeg mogelijk volgt de hoofdrun', () => {
 })
 
 /**
+ * ADR 0175 — onder solved weegt het VASTGELEGDE doel mee. Elke tak aan béíde kanten:
+ * het doel reikt wél / niet / is er niet, bij een haalbaar én een onhaalbaar plan, en een
+ * vast stopmoment dat het doel negeert.
+ */
+describe('resolvePlanStatus — zo vroeg mogelijk met een vastgelegd doel (ADR 0175)', () => {
+  const solved = (solvedReachable: boolean | null, doelGedekt: boolean | null | undefined): PlanStatusInput => ({
+    anchorFixed: false,
+    coveragePct: null,
+    solvedReachable,
+    doelGedekt,
+  })
+
+  it.each([
+    [true, false, 'warn'], // haalbaar, doel reikt niet → oranje
+    [true, true, 'good'], // haalbaar, doel reikt → groen
+    [true, null, 'good'], // haalbaar, geen doel met stopleeftijd → ongewijzigd
+    [true, undefined, 'good'],
+    [false, false, 'bad'], // onhaalbaar blijft rood, wat het doel ook zegt
+    [false, true, 'bad'],
+    [null, false, 'neutral'], // geen run → geen oordeel
+  ] as const)('haalbaar %s, doel gedekt %s → %s', (reachable, doelGedekt, verwacht) => {
+    expect(resolvePlanStatus(solved(reachable, doelGedekt))).toBe(verwacht)
+  })
+
+  it('vast stopmoment negeert het doel: de dekking beslist', () => {
+    for (const doelGedekt of [false, true, null]) {
+      expect(resolvePlanStatus({ anchorFixed: true, coveragePct: 120, solvedReachable: true, doelGedekt })).toBe('good')
+      expect(resolvePlanStatus({ anchorFixed: true, coveragePct: 5, solvedReachable: true, doelGedekt })).toBe('bad')
+    }
+  })
+
+  it('kort label en kop-zin zeggen hetzelfde, in dezelfde stand', () => {
+    expect(resolvePlanVerdict(solved(true, false))).toEqual({ label: 'Plan haalbaar, doel nog niet', status: 'warn' })
+    expect(resolvePlanVerdictSentence(solved(true, false))).toEqual({
+      sentence: { voor: 'Je toekomstplan is', oordeel: 'haalbaar, je doel nog niet' },
+      status: 'warn',
+    })
+    // Een reikend doel verandert niets aan de bestaande zin.
+    expect(resolvePlanVerdictSentence(solved(true, true))).toEqual({
+      sentence: { voor: 'Je toekomstplan is', oordeel: 'haalbaar' },
+      status: 'good',
+    })
+    expect(resolvePlanVerdictSentence(solved(false, false))).toEqual({
+      sentence: { voor: 'Je toekomstplan is', oordeel: 'nog niet haalbaar' },
+      status: 'bad',
+    })
+  })
+})
+
+/**
  * De paginatitel van /toekomst toont een BEREKEND kerngetal (de plan-dekking).
  * Deze suite pint die uitspraak op de canonieke bron: dezelfde drempels als de
  * dekkingsstrook (`coverageStatus`) en hetzelfde afgeronde percentage dat de
@@ -139,6 +189,9 @@ describe('resolvePlanVerdictSentence — de kop-zin van /toekomst', () => {
       { anchorFixed: false, coveragePct: 5, solvedReachable: true },
       { anchorFixed: false, coveragePct: 5, solvedReachable: false },
       { anchorFixed: false, coveragePct: null, solvedReachable: null },
+      { anchorFixed: false, coveragePct: null, solvedReachable: true, doelGedekt: false },
+      { anchorFixed: false, coveragePct: null, solvedReachable: true, doelGedekt: true },
+      { anchorFixed: false, coveragePct: null, solvedReachable: false, doelGedekt: false },
     ]
     for (const input of invoer) {
       const kort = resolvePlanVerdict(input)
@@ -178,6 +231,7 @@ describe('resolvePlanVerdictSentence — de kop-zin van /toekomst', () => {
       resolvePlanVerdictSentence(vast(96)).sentence,
       resolvePlanVerdictSentence({ anchorFixed: false, coveragePct: null, solvedReachable: true }).sentence,
       resolvePlanVerdictSentence({ anchorFixed: false, coveragePct: null, solvedReachable: false }).sentence,
+      resolvePlanVerdictSentence({ anchorFixed: false, coveragePct: null, solvedReachable: true, doelGedekt: false }).sentence,
     ]
     const alle = zinnen.map((z) => `${z?.voor} ${z?.oordeel}.`).join(' ')
     expect(alle.toLowerCase()).not.toMatch(/\boordeel/)

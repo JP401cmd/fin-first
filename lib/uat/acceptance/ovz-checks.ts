@@ -628,6 +628,7 @@ export const OVZ_ENGINE_CHECKS: OvzEngineCheck[] = [
         actual:
           `fixed5=${fixed(5)}; fixed95=${fixed(95)}; fixed100=${fixed(100)}; fixedGeenDekking=${fixed(null)}` +
           `; solvedHaalbaar=${solved(true)}; solvedOnhaalbaar=${solved(false)}` +
+          `; solvedDoelNogNiet=${resolvePlanStatus({ anchorFixed: false, coveragePct: null, solvedReachable: true, doelGedekt: false })}` +
           `; banner5=${banner(5, tekort)}; banner95=${banner(95, tekort)}` +
           `; bannerGedekt=${banner(100, { kind: 'gedekt', endAge: 90 })}`,
       }

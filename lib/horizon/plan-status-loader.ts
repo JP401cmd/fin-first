@@ -12,14 +12,21 @@
 // Grondslag (zie lib/horizon/plan-status.ts):
 //  - vast anker → `healthScoreInput.freedomPct` (de plan-dekking, ADR 0129 B3);
 //  - solved     → `sim.fireReachable` van de hoofdrun (NIET de runway: dat is onder
-//                 solved de stop-vandaag-run).
+//                 solved de stop-vandaag-run), plus — alleen in de eigen blik en bij een
+//                 haalbaar plan — of het VASTGELEGDE doel reikt (`vastgelegdDoelGedekt`,
+//                 ADR 0175): één extra kernel-run, alleen voor wie een doel met
+//                 stopleeftijd vastlegde.
 
+import { cache } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Perspective } from '@/lib/household-data'
 import type { LeverageStatus } from '@/lib/leverage-status'
 import { loadHorizonData } from '@/lib/horizon-data-loader'
 import { computeHorizonFireSim } from '@/lib/fire-target-shared'
 import { isFixedAnchor } from '@/lib/fire-strategy'
+import { ageAtDate } from '@/lib/horizon-data'
+import { buildBaselineOverrides } from '@/lib/whatif-overrides'
+import { vastgelegdDoelGedekt } from '@/lib/horizon/doel-oordeel'
 import {
   resolvePlanVerdict,
   resolvePlanVerdictSentence,
@@ -32,8 +39,11 @@ import {
  * De ÉNE invoer-verzameling voor het plan-stoplicht. `null` = geen horizon-data,
  * dus geen oordeel. Beide loaders hieronder lezen deze functie, zodat de zin op
  * /toekomst en het stoplicht elders per constructie hetzelfde zeggen.
+ *
+ * React-`cache()`'d: op /toekomst lezen de kop (pagina) en het menupunt (layout) allebei
+ * deze invoer; de doel-run (ADR 0175) draait zo één keer per request.
  */
-async function loadPlanStatusInput(
+const loadPlanStatusInput = cache(async function loadPlanStatusInputInner(
   supabase: SupabaseClient,
   perspective: Perspective,
 ): Promise<PlanStatusInput | null> {
@@ -49,12 +59,36 @@ async function loadPlanStatusInput(
   // (`computeFreedomPctForPlan`, gepind in horizon-data-loader.anker.test.ts). Die 0
   // mag hier geen rood worden — geen run = geen oordeel.
   const dekkingBekend = run != null && Boolean(horizonData.effectiveInput?.dateOfBirth)
+  const solvedReachable = run?.sim.fireReachable ?? null
+
+  // ADR 0175 — onder solved weegt het vastgelegde doel mee, maar alleen in de EIGEN blik:
+  // het doel is de stand van het eigen lab op /toekomst (dat altijd `personal` draait), en de
+  // huishoud-run rekent op andere potten plus een partnerblok dat het lab niet kent. Alleen
+  // bij een haalbaar plan: een onhaalbaar plan blijft rood, wat het doel ook zegt.
+  let doelGedekt: boolean | null = null
+  const doel = horizonData.toekomstScenarioPrefs?.doel
+  const dob = horizonData.effectiveInput?.dateOfBirth
+  if (!anchorFixed && perspective === 'personal' && solvedReachable === true && doel != null && run != null && dob) {
+    doelGedekt = vastgelegdDoelGedekt({
+      doel,
+      rawContext: run.rawContext,
+      // Dezelfde baseline als de lab-host (`horizon-client.tsx#whatIfBaseline`).
+      baseline: buildBaselineOverrides(
+        horizonData.effectiveInput,
+        horizonData.fireParams.grossReturn,
+        horizonData.healthScoreInput.effectiveSavingsRatePct,
+      ),
+      currentAge: ageAtDate(dob),
+    })
+  }
+
   return {
     anchorFixed,
     coveragePct: dekkingBekend ? (horizonData.healthScoreInput?.freedomPct ?? null) : null,
-    solvedReachable: run?.sim.fireReachable ?? null,
+    solvedReachable,
+    doelGedekt,
   }
-}
+})
 
 /**
  * Het plan-oordeel in woorden én kleur, in de korte vorm ("Plan dekt 96%"). De

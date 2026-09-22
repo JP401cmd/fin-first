@@ -11,6 +11,8 @@
 //  - Zo vroeg mogelijk (solved): de solver zoekt per definitie een gedekt
 //    stopmoment, dus groen — behalve als hij er binnen de horizon geen vindt.
 //    `freedomPct` is daar een kapitaalratio en telt bewust niet mee.
+//    Heeft de gebruiker een DOEL vastgelegd met een stopleeftijd en reikt dat doel
+//    niet, dan oranje: het plan is haalbaar, het doel nog niet (ADR 0175, 22 sep 2026).
 //
 // LET OP de bron van `solvedReachable`: dat is `sim.fireReachable` van de HOOFDRUN
 // (`computeHorizonFireSim`), niet het `solverStatus` van `computeHorizonRunway` —
@@ -28,6 +30,17 @@ export interface PlanStatusInput {
   coveragePct: number | null | undefined
   /** `sim.fireReachable` van de hoofdrun — alleen gelezen onder solved; `null` = geen run. */
   solvedReachable: boolean | null | undefined
+  /**
+   * Reikt het vastgelegde doel (`vastgelegdDoelGedekt`, ADR 0175)? Alleen gelezen onder
+   * solved én bij een haalbaar plan. Afwezig/`null` = geen doel met stopleeftijd, of niet te
+   * beoordelen — dan telt alleen de haalbaarheid, precies het gedrag van vóór ADR 0175.
+   */
+  doelGedekt?: boolean | null
+}
+
+/** Onder solved: het plan is haalbaar, maar het vastgelegde doel reikt niet (ADR 0175). */
+function doelReiktNiet(input: PlanStatusInput): boolean {
+  return input.solvedReachable === true && input.doelGedekt === false
 }
 
 const FROM_COVERAGE: Record<ReturnType<typeof coverageStatus>, LeverageStatus> = {
@@ -44,6 +57,7 @@ export function resolvePlanStatus(input: PlanStatusInput): LeverageStatus {
     return FROM_COVERAGE[coverageStatus(Math.round(pct))]
   }
   if (input.solvedReachable == null) return 'neutral'
+  if (doelReiktNiet(input)) return 'warn'
   return input.solvedReachable ? 'good' : 'bad'
 }
 
@@ -63,7 +77,8 @@ export interface PlanVerdict {
  *
  * Twee modi, exact de twee takken hierboven:
  *  - vast stopmoment → de DEKKING van het plan ("Plan dekt 96%");
- *  - zo vroeg mogelijk → geen dekking maar de haalbaarheid van de hoofdrun.
+ *  - zo vroeg mogelijk → geen dekking maar de haalbaarheid van de hoofdrun, en bij
+ *    een vastgelegd doel dat niet reikt "Plan haalbaar, doel nog niet" (ADR 0175).
  *
  * Beschrijvend, nooit aansporend (Wft-grens).
  */
@@ -75,6 +90,7 @@ export function resolvePlanVerdict(input: PlanStatusInput): PlanVerdict {
     return { label: `Plan dekt ${Math.round(pct)}%`, status }
   }
   if (input.solvedReachable == null) return { label: null, status }
+  if (doelReiktNiet(input)) return { label: 'Plan haalbaar, doel nog niet', status }
   return {
     label: input.solvedReachable ? 'Plan is haalbaar' : 'Plan nog niet haalbaar',
     status,
@@ -99,7 +115,8 @@ export const PLAN_ONDERWERP = 'Je toekomstplan'
  *
  *  - vast stopmoment → "Je toekomstplan is *voor 96% gedekt*.", in de kleur van
  *    de dekking (≥100 groen, 90–99 oranje, <90 rood);
- *  - zo vroeg mogelijk → "is *haalbaar*" of "is *nog niet haalbaar*".
+ *  - zo vroeg mogelijk → "is *haalbaar*" of "is *nog niet haalbaar*"; reikt een
+ *    vastgelegd doel niet, dan "is *haalbaar, je doel nog niet*" in oranje (ADR 0175).
  *
  * Beschrijvend, nooit aansporend (Wft-grens).
  */
@@ -112,6 +129,7 @@ export function resolvePlanVerdictSentence(input: PlanStatusInput): PlanVerdictS
     return { sentence: { voor, oordeel: `voor ${Math.round(pct)}% gedekt` }, status }
   }
   if (input.solvedReachable == null) return { sentence: null, status }
+  if (doelReiktNiet(input)) return { sentence: { voor, oordeel: 'haalbaar, je doel nog niet' }, status }
   return {
     sentence: { voor, oordeel: input.solvedReachable ? 'haalbaar' : 'nog niet haalbaar' },
     status,
