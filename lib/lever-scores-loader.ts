@@ -13,8 +13,15 @@
 // argument-identiteit).
 //
 // "Consume, don't recompute": niemand assembleert de lever-scores-input of roept
-// computeLeverScores/box1JaarruimteStatus/box3TaxStatus zelf opnieuw aan — men
-// importeert `loadLeverScores`.
+// computeLeverScores/box1JaarruimteStatus/box3TaxStatus/computeFiscaleRuimte
+// zelf opnieuw aan — men importeert `loadLeverScores`.
+//
+// ADR 0177: de Belasting-hefboom oordeelt hier sinds 22 sep 2026 op ONBENUTTE
+// FISCALE RUIMTE (`computeFiscaleRuimte`, lib/fiscale-ruimte.ts) in plaats van
+// op de euro-banden van `box3TaxStatus`. Die laatste blijft bestaan als Box
+// 3-kaartlabel (ADR 0177 D6). De vijf scalars achter de nieuwe grondslag komen
+// uit de canonieke motoren op rijen die deze loader al in handen heeft — zie
+// het blok "ONBENUTTE FISCALE RUIMTE" onderaan: GEEN enkele extra query.
 
 import { cache } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -28,10 +35,31 @@ import {
   box3TaxStatus,
   type Box3TaxableInput,
 } from '@/lib/box3-taxable-input'
+import {
+  calculateBox3,
+  optimizePartnerAllocation,
+  CURRENT_TAX_YEAR,
+  type Box3Input,
+} from '@/lib/box3-data'
+import { generateBox3Strategies, DEFAULT_GOAL_ID } from '@/lib/tax-optimizer'
+import { computeBox1Tax, grossFromNet } from '@/lib/box1-tax'
+import { buildEigenWoningBox1Input } from '@/lib/box1-income'
+import {
+  computeFiscaleRuimte,
+  type FiscaleRuimteInput,
+  type FiscaleRuimteResult,
+} from '@/lib/fiscale-ruimte'
+import { hasPartner as deriveHasPartner } from '@/lib/household-type'
+import type { Asset } from '@/lib/asset-data'
 import { buildBudgetSpendingMap, type SpendingSplitRow } from '@/lib/budget-spending'
 import { getCurrentMonthSplits } from '@/lib/budget-spending-fetch'
 import { buildBudgetTypeMap } from '@/lib/budget-utils'
-import { box1JaarruimteStatus, resolvePensionFactorA } from '@/lib/jaarruimte'
+import {
+  box1JaarruimteVerdict,
+  computeJaarruimte,
+  jaarruimteBesparing,
+  resolvePensionFactorA,
+} from '@/lib/jaarruimte'
 import {
   resolveAmountWithBasis,
   resolveEffectiveIncomeExpenses,
@@ -79,8 +107,18 @@ export interface LeverScoresResult {
    * dezelfde uitkomst geven.
    */
   taxInput: Box3TaxableInput
-  /** Box 3-status (good/warn/bad/neutral) afgeleid uit `taxInput`. */
+  /**
+   * Box 3-status (good/warn/bad/neutral) afgeleid uit `taxInput`.
+   *
+   * LET OP — dit is sinds ADR 0177 NIET meer de status van de Belasting-
+   * HEFBOOM. Hij blijft het Box 3-kaartlabel op de belasting-hub en de
+   * kop van /overzicht/belasting/box3 ("Ruim boven de vrijstelling" — een
+   * feitelijke constatering over de grondslag, ADR 0177 D6). Het oordeel van de
+   * hefboom staat in `fiscaleRuimte` / `scores.tax`.
+   */
   box3Status: LeverageStatus
+  /** ADR 0177: onbenutte fiscale ruimte — voedt de Belasting-hefboom én de melding. */
+  fiscaleRuimte: FiscaleRuimteResult
   /**
    * Box 1-status (onbenutte jaarruimte → belastingbesparingskans). Afgeleid uit
    * het effectieve maandinkomen + marginaal tarief, identiek aan de Belasting-
@@ -119,6 +157,17 @@ interface LeverScoresProfile {
   /** Jaarlijkse pensioenaangroei (factor A) — voedt de Box 1-statusdot. */
   pension_factor_a?: number | null
   pension_factor_a_source?: string | null
+  /**
+   * Handmatig opgegeven bruto-jaarinkomen (Box 1). Heeft VOORRANG op de
+   * schatting uit netto, exact zoals `resolveBox1GrossIncome` het doet
+   * (`manual ?? estimateGross`, lib/box1-income.ts).
+   *
+   * `getOwnProfile` doet `select('*')`, dus deze kolom ligt er al — hem hier
+   * opnemen kost geen query. Zonder deze regel rekende het hefboompad altijd op
+   * de schattingstak, terwijl /overzicht/belasting/box1 het opgegeven bruto
+   * gebruikte: twee bedragen voor één grootheid, één klik uit elkaar.
+   */
+  box1_gross_income?: number | null
 }
 
 type AssetRow = {
@@ -134,11 +183,40 @@ type AssetRow = {
   tax_benefit?: boolean | null
   box3_vrijgesteld?: boolean | null
   box3_vrijstelling_reden?: string | null
+  /**
+   * `calculateBox3` filtert zélf op `is_active` (lib/box3-data.ts). De query
+   * doet dat al (`getActiveAssets` → `.eq('is_active', true)`), maar het VELD
+   * moet in de rij staan, anders filtert de motor alles weg en komt de heffing
+   * stil op € 0 uit. `ASSET_CLIENT_COLUMNS` levert de kolom.
+   */
+  is_active?: boolean | null
+  /**
+   * De WOZ-waarde van een `eigen_huis`-rij — de eerste helft van de canonieke
+   * eigen-woning-invoer voor `computeBox1Tax` (`buildEigenWoningBox1Input`,
+   * bevinding C8). Zit in `ASSET_CLIENT_COLUMNS`.
+   */
+  woz_value?: number | string | null
 }
 type DebtRow = {
   current_balance: number | string
   original_amount?: number | string | null
   net_worth_inclusion_pct?: number | null
+  // ── Velden die de canonieke Box 3-schuldindeling leest ──
+  // `getActiveDebts` doet select('*'), dus ze liggen er al. Zonder deze vier
+  // zou de cast naar `Debt` oneerlijk zijn en `classifyDebt` op `undefined`
+  // draaien: een EIGENWONINGHYPOTHEEK zou dan ten onrechte als Box 3-schuld
+  // meetellen (en `calculateBox3` zou zonder `is_active` álle schulden
+  // wegfilteren).
+  is_active?: boolean | null
+  debt_type?: string | null
+  linked_asset_id?: string | null
+  is_tax_deductible?: boolean | null
+  /**
+   * De tweede helft van de eigen-woning-invoer: `buildEigenWoningBox1Input`
+   * leidt de jaarrente af uit saldo × rente% (`estimateMortgageRenteJaar`).
+   * `getActiveDebts` doet `select('*')`, dus de kolom ligt er al.
+   */
+  interest_rate?: number | string | null
 }
 type BudgetRow = {
   id: string
@@ -217,6 +295,267 @@ export function deriveBudgetHealthCounts(
   return { budgetsTotal, budgetsOver, budgetsOnTrack: budgetsTotal - budgetsOver }
 }
 
+// ── ONBENUTTE FISCALE RUIMTE — de grondslag van de Belasting-hefboom ─────────
+//
+// ADR 0177: de hefboom oordeelt niet meer op de HOOGTE van de heffing (de
+// euro-banden van `box3TaxStatus`, monotoon dalend in vermogen en zonder weg
+// terug) maar op hoeveel ruimte ONBENUT blijft, als aandeel van de eigen
+// heffing over Box 1 én Box 3.
+//
+// HARDE EIS — GEEN ENKELE EXTRA QUERY (ADR 0177 D5). `loadLeverScores` draait
+// in app/(app)/layout.tsx op ÉLKE route. `loadFiscaleKansen` (de tweede
+// invoerkant, voor de belasting-hub) trekt `loadHorizonRaw` en
+// `loadPerspectiveBox3` mee; die hier hangen zou elke pagina in de app de
+// horizon-loader laten betalen — precies de regressie die ADR 0083 heeft
+// opgeruimd. Alles hieronder is dus PURE rekenkracht op rijen die de loader al
+// in handen heeft.
+//
+// Eén rekenweg, twee invoerkanalen: de verdeling, de banden en de volgorde
+// wonen in `computeFiscaleRuimte` (lib/fiscale-ruimte.ts), niet hier. Deze
+// functie levert uitsluitend de vijf SCALARS aan.
+//
+// BEWUST EEN APARTE, GEËXPORTEERDE PURE FUNCTIE (en geen inline blok in de
+// loader): hij is daardoor zonder Supabase te testen, en de `try/catch`
+// hieronder heeft een scherpe grens.
+
+/** De inerte invoer: geen enkele fiscale bron → 'neutral', nooit groen. */
+const GEEN_FISCALE_BRON: FiscaleRuimteInput = {
+  partnerverdelingBesparing: null,
+  jaarruimteBesparing: null,
+  samenstellingNetEffect: null,
+  box1Tax: null,
+  box3Tax: null,
+}
+
+export interface DeriveFiscaleRuimteInput {
+  /** Actieve bezittingen (RLS-scope: eigen + huishoud-gedeeld). */
+  assetRows: AssetRow[]
+  /** Actieve schulden. */
+  debtRows: DebtRow[]
+  /** `profiles.household_type` — bepaalt de fiscale partner (dubbele voet/drempel). */
+  householdType: string | undefined
+  /** Uit `computeBox3TaxableInput`: heeft deze gebruiker box 3-belastbaar bezit? */
+  hasBox3Assets: boolean
+  /** Het EFFECTIEVE netto maandinkomen (`resolveEffectiveIncomeExpenses`). */
+  netMonthlyIncome: number
+  /** Jaarlijkse pensioenaangroei (factor A, €) uit `resolvePensionFactorA`. */
+  factorA: number
+  /** `resolvePensionFactorA(...).isKnown` — NULL ≠ 0, zie hieronder. */
+  factorAKnown: boolean
+  /**
+   * `profiles.box1_gross_income` — het handmatig opgegeven bruto-jaarinkomen,
+   * of `null`. Heeft voorrang op de schatting uit netto (`manual ??
+   * estimateGross`), dezelfde precedentie als `resolveBox1GrossIncome`.
+   */
+  manualGrossYearly: number | null
+  /** `resolveFireParams(profile).grossReturn` — de rendementsaanname van DEZE gebruiker. */
+  expectedReturn: number
+}
+
+/**
+ * HET BRUTO-JAARINKOMEN VAN HET HEFBOOMPAD — één afleiding, twee consumenten:
+ * de Box 1-statusdot (`box1Status`) en de jaarruimte-post van de hefboom.
+ *
+ * Spiegelt `resolveBox1GrossIncome` (lib/box1-income.ts) op de twee punten die
+ * ertoe doen: de handmatige override wint van de schatting (`manual ??
+ * estimateGross`), en de schatting loopt via `grossFromNet` — de echte inverse
+ * van de Box 1-motor inclusief heffingskortingen.
+ *
+ * Tot 22 sep 2026 gebruikte de statusdot hier een goedkopere lineaire vuistregel
+ * (`netto × 12 / (1 − marginaalTarief)`). Die OVERschat bruto structureel: bij
+ * € 1.500 netto/mnd gaf hij € 28.016 waar de canonieke inverse op € 18.475
+ * uitkomt — ruim 50% te hoog. Zolang die vuistregel alleen een stipje voedde was
+ * dat verdedigbaar; sinds ADR 0177 voedt dezelfde grootheid óók een EURO-BEDRAG
+ * in de melding, en dan geldt de single-source-regel onverkort. Eigenaarsbesluit
+ * 22 sep 2026: allebei op de canonieke bruto. Gemeten gevolg voor de dot: alleen
+ * onder ± € 1.800 netto/mnd verschuift hij (oranje → groen); daarboven is de
+ * verdict-tak grof genoeg om zelfs € 14.000 heffingsverschil op te vangen.
+ *
+ * ENIGE RESTERENDE INVOERVERSCHIL met `resolveBox1GrossIncome`: die leidt zijn
+ * netto af uit `loadCashflowSettingsData(...).effectiveAnnualIncome` (een
+ * 12-maands jaarcijfer), hier is het het effectieve MAANDinkomen × 12. Dezelfde
+ * ADR 0103-grondslagmachinerie, ander venster. Gelijktrekken vraagt die loader
+ * in het shell-pad en dus een extra query — bewust niet gedaan.
+ */
+export function resolveLeverGrossYearly(
+  netMonthlyIncome: number,
+  manualGrossYearly: number | null,
+): number {
+  const manual = Number(manualGrossYearly)
+  if (manualGrossYearly != null && Number.isFinite(manual) && manual > 0) return manual
+  const netYearly = Math.max(0, Math.round(netMonthlyIncome * 12))
+  return netYearly > 0 ? grossFromNet(netYearly, CURRENT_TAX_YEAR) : 0
+}
+
+/**
+ * `net_worth_inclusion_pct` als factor; ontbreekt/onzin → 100%.
+ *
+ * De `?? 100` staat er VÓÓR de `Number()` en dat is het hele punt:
+ * `Number(null)` is `0` en `Number.isFinite(0)` is `true`, dus een afwezig
+ * percentage zou anders als 0% doorgaan en de hele post laten verdampen.
+ * Exact dezelfde vorm als `computeBox3TaxableInput` gebruikt.
+ */
+function inclusionFactor(pct: number | null | undefined): number {
+  const n = Number(pct ?? 100)
+  return Number.isFinite(n) ? n / 100 : 1
+}
+
+/**
+ * De vijf scalars van ADR 0177 uit al-geladen rijen — puur, fail-soft.
+ *
+ * FAIL-SOFT IS HIER GEEN LUXE. `loadLeverScores` wordt ge-`await`-ed in
+ * app/(app)/layout.tsx, dus een throw uit dit blok legt ÉLKE ingelogde route
+ * plat — inclusief /mijn en uitloggen. Vóór ADR 0177 bleef zo'n fout
+ * paginalokaal. De `catch` valt daarom terug op "geen enkele bron bekend", wat
+ * de kern als `neutral` leest ("we weten het niet") en nooit als groen — exact
+ * wat ADR 0177 D3 eist van een gefaalde bron.
+ */
+export function deriveFiscaleRuimte(input: DeriveFiscaleRuimteInput): FiscaleRuimteResult {
+  try {
+    const hasPartner = deriveHasPartner(input.householdType)
+
+    // ── Box 3-zijde ──────────────────────────────────────────────────────────
+    // GEWOGEN met `net_worth_inclusion_pct`, in een MAPPED KOPIE (de rijen zelf
+    // blijven onaangeraakt — de netto-vermogen-aggregaten hierboven lezen ze
+    // ook). `calculateBox3` telt zelf rauw op, terwijl de assets-SELECT
+    // huishoud-gedeeld is: een gezamenlijke rekening van € 400.000 op 50% zou
+    // anders voor € 400.000 in de heffing van deze gebruiker landen, en dat
+    // bedrag komt via de grootste post letterlijk in zijn melding te staan.
+    // `computeBox3TaxableInput` weegt om precies dezelfde reden.
+    const box3CalcInput: Box3Input = {
+      assets: input.assetRows.map((a) => ({
+        ...a,
+        current_value: Number(a.current_value) * inclusionFactor(a.net_worth_inclusion_pct),
+      })) as unknown as Asset[],
+      debts: input.debtRows.map((d) => ({
+        ...d,
+        current_balance: Number(d.current_balance) * inclusionFactor(d.net_worth_inclusion_pct),
+      })) as unknown as Debt[],
+      hasPartner,
+      // De €→vrijheidstijd-vertaling speelt hier geen rol: we lezen alleen `tax`
+      // en `netEffect`. Een dagtarief zou een extra bron (en query) vragen.
+      dailyExpenses: 0,
+      year: CURRENT_TAX_YEAR,
+    }
+    const box3Full = calculateBox3(box3CalcInput)
+    // Alleen de SCALAR verlaat dit blok. `Box3Result` draagt
+    // `assetClassifications`/`debtClassifications` met de complete rijen —
+    // inclusief huishoud-gedeelde — en daar heeft niets buiten deze functie iets
+    // te zoeken (zelfde reden als de scalaire `optimalAllocation` hieronder).
+    const box3Tax = box3Full.tax
+
+    // Post 1 — fiscale partnerverdeling. ALLEEN de scalaire winst t.o.v. gelijk
+    // verdelen; nooit de per-partner-splitsing (ADR 0036).
+    const optimalAllocation = hasPartner
+      ? optimizePartnerAllocation(box3Full, box3CalcInput)
+      : null
+    const partnerverdelingBesparing = optimalAllocation?.savingsVsEqual ?? null
+
+    // Post 3 — samenstelling-shift, NETTO (besparing ná gemist rendement). Puur;
+    // geen DB. Het rendement is de profiel-instelling van deze gebruiker, niet
+    // DEFAULT_RETURN: het netto effect (en dus of deze post meetelt) kantelt erop.
+    const samenstellingNetEffect =
+      generateBox3Strategies({
+        goalId: DEFAULT_GOAL_ID,
+        year: CURRENT_TAX_YEAR,
+        dailyExpenses: 0,
+        hasPartner,
+        current: box3Full,
+        optimalAllocation: optimalAllocation
+          ? {
+              totalTax: optimalAllocation.totalTax,
+              savingsVsEqual: optimalAllocation.savingsVsEqual,
+            }
+          : undefined,
+        expectedReturn: input.expectedReturn,
+      }).strategies.find((s) => s.kind === 'samenstelling-shift')?.netEffect ?? null
+
+    // ── Box 1-zijde ──────────────────────────────────────────────────────────
+    // DE CANONIEKE BRUTO-INVERSIE, niet de sidebar-vuistregel. `grossFromNet`
+    // (lib/box1-tax.ts) is de echte inverse van de Box 1-motor inclusief
+    // heffingskortingen — dezelfde functie waarmee `resolveBox1GrossIncome` het
+    // bruto van /overzicht/belasting/box1 bepaalt, en met dezelfde afronding.
+    // `box1JaarruimteStatus` gebruikt bewust een goedkopere lineaire opslag
+    // (netto / (1 − marginaal)) die bruto structureel OVERschat; die heuristiek
+    // mag een grijs/oranje stipje voeden, maar niet een EURO-BEDRAG dat de
+    // gebruiker in zijn melding leest. Dat verschil is bestaand en
+    // gedocumenteerd — zie app/(app)/overzicht/belasting/page.tsx — en wordt
+    // hier NIET stilzwijgend rechtgetrokken door de VORM van de heuristiek over
+    // te nemen; beide kanten lezen sinds het eigenaarsbesluit van 22 sep 2026
+    // dezelfde canonieke bruto (zie `resolveLeverGrossYearly`).
+    const grossYearly = resolveLeverGrossYearly(
+      input.netMonthlyIncome,
+      input.manualGrossYearly,
+    )
+
+    // De tweede helft van de Box 1-invoer (bevinding C8): zonder eigen woning
+    // zou de noemer de renteaftrek missen en tot ~1,9× te hoog uitvallen, en
+    // dan meldt de banner een ander getal dan de Box 1-pagina één klik verder.
+    // `buildEigenWoningBox1Input` is de canonieke, pure mapping; hij verwacht de
+    // woning-rijen op WOZ AFLOPEND gesorteerd (de DB-variant doet dat in de
+    // query), dus dat doen we hier zelf.
+    //
+    // BEWUST ONGEWOGEN, anders dan de Box 3-zijde hierboven: de canonieke
+    // `resolveEigenWoningBox1Input` weegt `net_worth_inclusion_pct` óók niet, en
+    // afwijken zou deze noemer laten verschillen van /overzicht/belasting/box1 —
+    // precies het A=B dat C8 heeft hersteld. Dat gedeeld eigendom daar de volle
+    // WOZ meetelt is een bekend, apart belegd besluit.
+    const eigenWoning = buildEigenWoningBox1Input(
+      input.assetRows
+        .filter((a) => a.asset_type === 'eigen_huis' && a.id != null)
+        .map((a) => ({ id: String(a.id), woz_value: a.woz_value ?? null }))
+        .sort((x, y) => (Number(y.woz_value) || 0) - (Number(x.woz_value) || 0)),
+      input.debtRows
+        .filter((d) => d.debt_type === 'mortgage')
+        .map((d) => ({
+          linked_asset_id: d.linked_asset_id ?? null,
+          current_balance: d.current_balance,
+          interest_rate: d.interest_rate ?? null,
+        })),
+    )
+
+    // Post 2 — onbenutte jaarruimte.
+    //
+    // NULL ≠ 0 OP FACTOR A (bevinding H23, en de scherpste faalvorm van deze
+    // hefboom). `resolvePensionFactorA` geeft bij een lege kolom `factorA: 0`
+    // MÉT `isKnown: false`: "niet ingevuld", niet "bouwt geen pensioen op".
+    // Rekenen met die 0 levert de BOVENGRENS van de jaarruimte, en die is zo
+    // groot t.o.v. de eigen heffing dat de ratio bij élk inkomen in de rode band
+    // valt (gemeten: 35–45%). Dan is "nooit groen behalve minder vermogen
+    // bezitten" vervangen door "nooit groen behalve je UPO invullen" — dezelfde
+    // fout in een nieuw jasje. Onbekend → `null` → de post valt weg, en omdat
+    // box1Tax/box3Tax wél bekend zijn wordt dat groen als er verder niets
+    // openstaat, niet grijs.
+    const jaarruimte = computeJaarruimte(grossYearly, input.factorA, CURRENT_TAX_YEAR)
+    const jaarruimteBesparingEur =
+      input.factorAKnown && grossYearly > 0
+        ? jaarruimteBesparing(grossYearly, jaarruimte.jaarruimte, CURRENT_TAX_YEAR)
+        : null
+
+    // De NOEMER: de eigen heffing over Box 1 + Box 3. Beide kunnen `null` zijn —
+    // "we weten het niet" — en dat is iets anders dan 0 ("berekend, levert niets
+    // op"). Geen box 3-belastbare bezittingen → geen Box 3-uitspraak; geen
+    // bekend bruto inkomen → geen Box 1-uitspraak. Allebei null → hefboom grijs.
+    return computeFiscaleRuimte({
+      partnerverdelingBesparing,
+      jaarruimteBesparing: jaarruimteBesparingEur,
+      samenstellingNetEffect,
+      box1Tax:
+        grossYearly > 0
+          ? computeBox1Tax({
+              grossYearlyIncome: grossYearly,
+              year: CURRENT_TAX_YEAR,
+              wozValue: eigenWoning.wozValue,
+              hypotheekRente: eigenWoning.hypotheekRente,
+            }).tax
+          : null,
+      box3Tax: input.hasBox3Assets ? box3Tax : null,
+    })
+  } catch {
+    return computeFiscaleRuimte(GEEN_FISCALE_BRON)
+  }
+}
+
 /**
  * Laad de vier-hefbomen-scores + de Box 1/3-statussen voor de huidige gebruiker.
  *
@@ -286,19 +625,35 @@ export const loadLeverScores = cache(async function loadLeverScores(
 ): Promise<LeverScoresResult> {
   const user = await getCachedUser(supabase)
   if (!user) {
+    // Geen sessie → geen enkele fiscale bron. De kern leest dat als 'neutral'
+    // ("we weten het niet"), nooit als groen — zie ADR 0177 D3.
+    const fiscaleRuimte = computeFiscaleRuimte({
+      partnerverdelingBesparing: null,
+      jaarruimteBesparing: null,
+      samenstellingNetEffect: null,
+      box1Tax: null,
+      box3Tax: null,
+    })
     const empty = computeLeverScores({
       totalAssets: 0,
       totalDebts: 0,
       assetTypeCount: 0,
       savingsRate: null,
-      box3TaxableAboveThreshold: 0,
-      hasBox3Assets: false,
+      fiscaleRuimte,
     })
     const taxInput: Box3TaxableInput = {
       box3TaxableAboveThreshold: 0,
       hasBox3Assets: false,
     }
-    return { scores: empty, taxInput, box3Status: 'neutral', box1Status: 'neutral', netWorth: 0, budgetsOver: 0 }
+    return {
+      scores: empty,
+      taxInput,
+      box3Status: 'neutral',
+      fiscaleRuimte,
+      box1Status: 'neutral',
+      netWorth: 0,
+      budgetsOver: 0,
+    }
   }
 
   const now = new Date()
@@ -624,24 +979,6 @@ export const loadLeverScores = cache(async function loadLeverScores(
     budgetTypeById,
   )
 
-  const scores = computeLeverScores({
-    totalAssets,
-    totalDebts,
-    totalOriginalDebts,
-    debtCount: debtRows.length,
-    assetTypeCount: assetTypeSet.size,
-    savingsRate,
-    box3TaxableAboveThreshold: taxInput.box3TaxableAboveThreshold,
-    hasBox3Assets: taxInput.hasBox3Assets,
-    householdType,
-    budgetsTotal,
-    budgetsOnTrack,
-    budgetsOver,
-  })
-
-  // ── Box 3-status (canonieke helper, gedeeld met de lever) ──
-  const box3Status = box3TaxStatus(taxInput)
-
   // ── Box 1-status (onbenutte jaarruimte) ──
   // Huidige-maand transacties (alle) voor het Box 1-maandinkomen — dezelfde
   // gedeelde huidige-maand fetch (de vroegere query had geen budget_id-filter).
@@ -668,16 +1005,68 @@ export const loadLeverScores = cache(async function loadLeverScores(
       expenses: leverBudgetBasis.expenses.monthlyTotal,
     },
   )
-  const box1MarginaalTarief = resolveFireParams(profile).marginaalTarief
-  // Factor A meegeven: zonder werkgeverspensioen-aftrek meldde de dot een
-  // "onbenutte jaarruimte"-kans terwijl de Belasting-kaart (die factor A wél
-  // meeneemt) "ruimte benut" toonde. `getOwnProfile` doet select('*'), dus de
-  // kolom ligt er al — geen extra query.
-  const { status: box1Status } = box1JaarruimteStatus({
-    netMonthly: box1MonthlyIncome,
-    marginaalTarief: box1MarginaalTarief,
-    factorA: resolvePensionFactorA(profile).factorA,
+  // Eén afleiding, twee consumenten: het marginale tarief hieronder (Box 1) en
+  // het verwachte beleggingsrendement van DEZE gebruiker (het netto effect van
+  // de samenstelling-shift). Een tweede `resolveFireParams`-aanroep zou
+  // dezelfde grootheid een tweede bron geven.
+  const leverFireParams = resolveFireParams(profile)
+  // NULL ≠ 0 (bevinding H23): `resolvePensionFactorA` geeft bij een lege kolom
+  // bewust `{ factorA: 0, isKnown: false }` — "niet ingevuld", niet "bouwt geen
+  // pensioen op". `isKnown` gaat daarom MEE naar de jaarruimte-post hieronder.
+  const pensioenFactorA = resolvePensionFactorA(profile)
+  const manualGrossYearly =
+    profile.box1_gross_income == null ? null : Number(profile.box1_gross_income)
+
+  // ── Box 1-statusdot ──────────────────────────────────────────────────────
+  // ÉÉN bruto voor de dot én voor de jaarruimte-post van de hefboom
+  // (`resolveLeverGrossYearly`, eigenaarsbesluit 22 sep 2026). Tot dan draaide
+  // de dot op een lineaire vuistregel die bruto met ruim 50% kon OVERschatten,
+  // terwijl de post ernaast de canonieke inverse gebruikte — twee grondslagen
+  // voor één grootheid, met de post als zichtbaar euro-bedrag.
+  //
+  // Factor A telt hier mee zoals /overzicht/belasting/box1 hem meetelt: een
+  // ONBEKENDE factor A leest daar als 0 en levert dus "Onbenutte jaarruimte".
+  // Dat is bewust ANDERS dan de hefboom-post, die bij een onbekende factor A
+  // helemaal geen post opvoert (je kunt niet tellen wat je niet weet). De dot
+  // spiegelt de Box 1-pagina, de post spiegelt de rekenregel — allebei juist
+  // voor hun eigen vraag.
+  const leverGrossYearly = resolveLeverGrossYearly(box1MonthlyIncome, manualGrossYearly)
+  const { status: box1Status } = box1JaarruimteVerdict(
+    computeJaarruimte(leverGrossYearly, pensioenFactorA.factorA, CURRENT_TAX_YEAR),
+  )
+
+  // ── ONBENUTTE FISCALE RUIMTE — de grondslag van de Belasting-hefboom ─────────
+  // Alle vijf de scalars komen uit `deriveFiscaleRuimte` hierboven: puur, fail-
+  // soft en zonder één extra query (ADR 0177 D5).
+  const fiscaleRuimte = deriveFiscaleRuimte({
+    assetRows,
+    debtRows,
+    householdType,
+    hasBox3Assets: taxInput.hasBox3Assets,
+    netMonthlyIncome: box1MonthlyIncome,
+    factorA: pensioenFactorA.factorA,
+    factorAKnown: pensioenFactorA.isKnown,
+    manualGrossYearly,
+    expectedReturn: leverFireParams.grossReturn,
   })
 
-  return { scores, taxInput, box3Status, box1Status, netWorth, budgetsOver }
+  const scores = computeLeverScores({
+    totalAssets,
+    totalDebts,
+    totalOriginalDebts,
+    debtCount: debtRows.length,
+    assetTypeCount: assetTypeSet.size,
+    savingsRate,
+    fiscaleRuimte,
+    budgetsTotal,
+    budgetsOnTrack,
+    budgetsOver,
+  })
+
+  // ── Box 3-status (canonieke helper) ──
+  // NIET meer de hefboomstatus (ADR 0177 D6) — alleen nog het Box 3-kaartlabel
+  // op de belasting-hub en de kop van /overzicht/belasting/box3.
+  const box3Status = box3TaxStatus(taxInput)
+
+  return { scores, taxInput, box3Status, fiscaleRuimte, box1Status, netWorth, budgetsOver }
 })

@@ -19,8 +19,18 @@
 import { describe, it, expect } from 'vitest'
 import { computeLeverScores, leverToLeverageStatus, type LeverScores } from './lever-scores'
 import { scoreDebtRatio, hasDebtRatioData } from './financial-health'
+import { computeFiscaleRuimte, type FiscaleRuimteInput } from './fiscale-ruimte'
 import { hefboomVerdict } from './hefboom-status-copy'
 import type { Hefboom } from './hefboom-config'
+
+/** Geen enkele fiscale bron → de Belasting-hefboom doet geen uitspraak. */
+const GEEN_FISCALE_DATA: FiscaleRuimteInput = {
+  partnerverdelingBesparing: null,
+  jaarruimteBesparing: null,
+  samenstellingNetEffect: null,
+  box1Tax: null,
+  box3Tax: null,
+}
 
 /** Minimale, verder neutrale invoer; per test alleen de schuld-assen gezet. */
 function leverInput(over: {
@@ -36,8 +46,7 @@ function leverInput(over: {
     totalOriginalDebts: over.totalOriginalDebts,
     assetTypeCount: over.assetTypeCount ?? 0,
     savingsRate: over.savingsRate ?? null,
-    box3TaxableAboveThreshold: 0,
-    hasBox3Assets: false,
+    fiscaleRuimte: computeFiscaleRuimte(GEEN_FISCALE_DATA),
   }
 }
 
@@ -120,8 +129,15 @@ describe('Invariant: "— Start" in het detail ⟺ status neutral', () => {
       naam: 'gevuld account',
       scores: computeLeverScores({
         ...leverInput({ totalAssets: 500_000, totalDebts: 200_000, assetTypeCount: 4, savingsRate: 22 }),
-        box3TaxableAboveThreshold: 150_000,
-        hasBox3Assets: true,
+        // Wél fiscale data, mét een openstaande post → de Belasting-hefboom
+        // draagt een oordeel en dus géén "— Start"-sentinel.
+        fiscaleRuimte: computeFiscaleRuimte({
+          partnerverdelingBesparing: 400,
+          jaarruimteBesparing: 2_960,
+          samenstellingNetEffect: null,
+          box1Tax: 12_000,
+          box3Tax: 2_606,
+        }),
         budgetsTotal: 5,
         budgetsOver: 0,
         budgetsOnTrack: 5,

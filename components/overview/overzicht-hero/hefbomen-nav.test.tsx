@@ -164,20 +164,25 @@ describe('HefbomenNav', () => {
         leverScores={mockLeverScores({ tax: { score: 90, status: 'green', detail: '' } })}
       />,
     )
-    expect(screen.getByText('Belastingdruk beperkt')).toBeTruthy()
-    expect(screen.queryByText('Mogelijk betaal je meer dan nodig')).toBeNull()
+    expect(screen.getByText('Niets onbenut')).toBeTruthy()
+    expect(screen.queryByText('Ruimte onbenut')).toBeNull()
+    // 'Ruimte benut' hoort bij de Box 1-kaart (jaarruimte), niet bij de hefboom.
+    expect(screen.queryByText('Ruimte benut')).toBeNull()
     // Het oude jargon mag nergens meer opduiken op de tegel.
     expect(screen.queryByText('Verken je Box 3-positie')).toBeNull()
   })
 
-  it('belasting-tegel houdt de BEL-3-hedge bij een warn-status', () => {
+  // ADR 0177: het tegelwoord gaat over onbenutte fiscale ruimte, niet over de
+  // hoogte van de heffing. De BEL-3-hedge ("Mogelijk …") is daarmee vervallen —
+  // de posten worden geteld, niet vermoed.
+  it('belasting-tegel noemt bij een warn-status de onbenutte ruimte', () => {
     render(
       <HefbomenNav
         health={mockHealth()}
         leverScores={mockLeverScores({ tax: { score: 55, status: 'amber', detail: '' } })}
       />,
     )
-    expect(screen.getByText('Mogelijk betaal je meer dan nodig')).toBeTruthy()
+    expect(screen.getByText('Ruimte onbenut')).toBeTruthy()
   })
 
   it('restpunt B2 — belasting-tegel valt NIET meer terug op health.total als proxy (geen leverScores)', () => {
@@ -186,9 +191,9 @@ describe('HefbomenNav', () => {
     // status 'neutral' blijven i.p.v. een geleend oordeel van een algemene
     // gezondheidsproxy (components/overview/overzicht-hero/hefbomen-nav.tsx:232).
     render(<HefbomenNav health={mockHealth({ total: 85 })} />)
-    expect(screen.queryByText('Belastingdruk beperkt')).toBeNull()
-    expect(screen.queryByText('Mogelijk betaal je meer dan nodig')).toBeNull()
-    expect(screen.queryByText('Hoge belastingdruk')).toBeNull()
+    expect(screen.queryByText('Ruimte benut')).toBeNull()
+    expect(screen.queryByText('Ruimte onbenut')).toBeNull()
+    expect(screen.queryByText('Veel ruimte onbenut')).toBeNull()
   })
 
   it('rendert geen status-substext bij ontbrekende health (neutral)', () => {
@@ -579,7 +584,7 @@ describe('HefbomenNav — eenvoudige weergave (S1: oordeel primair)', () => {
     render(
       <HefbomenNav health={mockHealth()} totals={totals} leverScores={mockLeverScores()} simple />,
     )
-    expect(screen.getByText('Belastingdruk beperkt')).toBeTruthy()
+    expect(screen.getByText('Niets onbenut')).toBeTruthy()
     expect(screen.getByText('Schuldenlast vraagt aandacht')).toBeTruthy()
     expect(screen.getByText('Budget onder druk')).toBeTruthy()
   })
@@ -641,7 +646,7 @@ describe('HefbomenNav — eenvoudige weergave (S1: oordeel primair)', () => {
     expect(container.textContent).not.toContain('250.000')
     // Precies dít is waarom S1 bestaat: gemaskeerd + Eenvoudig hield vóór deze
     // kaart nul informatie over.
-    expect(screen.getByText('Belastingdruk beperkt')).toBeTruthy()
+    expect(screen.getByText('Niets onbenut')).toBeTruthy()
     window.localStorage.clear()
   })
 
@@ -662,7 +667,7 @@ describe('HefbomenNav — eenvoudige weergave (S1: oordeel primair)', () => {
         leverScores={mockLeverScores()}
       />,
     )
-    expect(screen.getByText('Belastingdruk beperkt')).toBeTruthy()
+    expect(screen.getByText('Niets onbenut')).toBeTruthy()
     expect(screen.getAllByText(/excl\. eigen woning/i).length).toBe(2)
   })
 })

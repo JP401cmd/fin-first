@@ -31,13 +31,38 @@ describe('HEFBOOM_VERDICT — elk oordeel volgt zijn eigen status', () => {
   })
 
   it('belasting: een groene status draagt géén waarschuwingszin', () => {
-    expect(hefboomVerdict('belasting', 'good')).toBe('Belastingdruk beperkt')
+    expect(hefboomVerdict('belasting', 'good')).toBe('Niets onbenut')
+    // Geen vermoeden-formulering (de oude BEL-3-hedge) en niet te verwarren met
+    // de twee niet-groene oordelen. Bewust GEEN regex op /onbenut/: het groene
+    // woord is een ONTKENNING ("Niets onbenut") en bevat die stam dus legitiem.
     expect(hefboomVerdict('belasting', 'good')).not.toMatch(/meer dan nodig/i)
+    expect(hefboomVerdict('belasting', 'good')).not.toBe(hefboomVerdict('belasting', 'warn'))
+    expect(hefboomVerdict('belasting', 'good')).not.toBe(hefboomVerdict('belasting', 'bad'))
   })
 
-  it('belasting: de geijkte BEL-3-hedge blijft op warn staan', () => {
-    // Wft: hedge behouden ("Mogelijk"), geen imperatief, geen bedragbelofte.
-    expect(hefboomVerdict('belasting', 'warn')).toBe('Mogelijk betaal je meer dan nodig')
+  it('belasting: het groene woord botst niet met het Box 1-jaarruimte-label', () => {
+    // Op /overzicht/belasting staan de hefboomtegel en de Box 1-kaart onder
+    // elkaar. `box1JaarruimteVerdict` gebruikt 'Ruimte benut' voor UITSLUITEND
+    // de jaarruimte; de hefboom weegt drie posten. Dezelfde twee woorden voor
+    // twee grootheden, tien centimeter uit elkaar, is drift (eigenaarsbesluit
+    // 22 sep 2026).
+    expect(hefboomVerdict('belasting', 'good')).not.toBe('Ruimte benut')
+  })
+
+  /**
+   * ADR 0177 — de hefboom oordeelt op ONBENUTTE FISCALE RUIMTE (aandeel van de
+   * eigen heffing over Box 1 + Box 3), niet op de hoogte van de Box 3-heffing.
+   * Daarmee vervalt de BEL-3-hedge "Mogelijk": die stond er omdat "je betaalt
+   * meer dan nodig" een vermoeden was dat de bron niet kon dragen. De posten
+   * worden nu geteld, dus het tegelwoord is een constatering. Het BEDRAG blijft
+   * uit de tegel — dat staat in de status-duiding-melding.
+   */
+  it('belasting: de tegel noemt onbenutte ruimte, niet de hoogte van de heffing', () => {
+    expect(hefboomVerdict('belasting', 'warn')).toBe('Ruimte onbenut')
+    expect(hefboomVerdict('belasting', 'bad')).toBe('Veel ruimte onbenut')
+    for (const s of OORDEEL_STATUSSEN) {
+      expect(HEFBOOM_VERDICT.belasting[s]).not.toMatch(/mogelijk|belastingdruk|heffing/i)
+    }
   })
 
   it('geen enkel oordeel bevat een imperatief of een bedragbelofte (Wft)', () => {

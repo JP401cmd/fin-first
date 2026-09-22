@@ -24,12 +24,18 @@ import type { LeverageStatus } from './leverage-status'
 const HEFBOMEN = Object.keys(HEFBOOM_CONFIG) as Hefboom[]
 const STATUSSEN: LeverageStatus[] = ['good', 'warn', 'bad', 'neutral']
 
-/** Het woord dat de pagina in de nav draagt, in kleine letters. */
-const PAGINAWOORD: Record<Hefboom, string> = {
+/**
+ * Het woord dat de pagina in de nav draagt, in kleine letters.
+ *
+ * Belasting staat er bewust NIET in: sinds ADR 0177 meet die hefboom de
+ * onbenutte fiscale ruimte over Box 1 + Box 3, en het onderwerp draagt die
+ * grondslag ("Je fiscale ruimte") in plaats van het paginawoord. Het paginawoord
+ * staat links ervan in de TopBar. Zie de aparte test hieronder.
+ */
+const PAGINAWOORD: Partial<Record<Hefboom, string>> = {
   bezittingen: 'bezittingen',
   schulden: 'schulden',
   cashflow: 'budget',
-  belasting: 'belasting',
 }
 
 const alleZinnen = HEFBOMEN.flatMap((h) =>
@@ -79,8 +85,19 @@ describe('HEFBOOM_OORDEELZIN — onderwerp en streamingcontract', () => {
     expect(rest === '' || rest.startsWith(' ')).toBe(true)
   })
 
-  it.each(HEFBOMEN)('het onderwerp van %s draagt het paginawoord', (h) => {
-    expect(HEFBOOM_ONDERWERP[h].toLowerCase()).toContain(PAGINAWOORD[h])
+  it.each(Object.keys(PAGINAWOORD) as Hefboom[])(
+    'het onderwerp van %s draagt het paginawoord',
+    (h) => {
+      expect(HEFBOOM_ONDERWERP[h].toLowerCase()).toContain(PAGINAWOORD[h]!)
+    },
+  )
+
+  it('belasting draagt de grondslag als onderwerp, niet het paginawoord (ADR 0177)', () => {
+    // De hefboom meet onbenutte fiscale ruimte over Box 1 én Box 3. "Je Box
+    // 3-belasting" zou te smal zijn (Box 1 telt mee) en "Je belasting" zou
+    // suggereren dat de zin over de hoogte van de heffing gaat — precies de
+    // grondslag die ADR 0177 heeft afgeschaft.
+    expect(HEFBOOM_ONDERWERP.belasting).toBe('Je fiscale ruimte')
   })
 
   it('het budget-onderwerp is de fallback van de stromende kop', () => {
@@ -93,9 +110,17 @@ describe('HEFBOOM_OORDEELZIN — onderwerp en streamingcontract', () => {
  * stonden in het concept en waren daar onwaar voor een deel van de gebruikers.
  */
 describe('HEFBOOM_OORDEELZIN — beweert niet meer dan de score meet', () => {
-  it('belasting noemt Box 3: de status is alleen box3TaxStatus, de hub toont ook Box 1', () => {
+  // Tot ADR 0177 stond hier de spiegelbeeldige eis: elke belastingzin moest met
+  // "Je Box 3-belasting" beginnen, omdat de status uitsluitend `box3TaxStatus`
+  // was. De grondslag is nu onbenutte fiscale ruimte over Box 1 + Box 3, dus die
+  // eis zou de zin juist onwaar maken.
+  it('belasting spreekt over fiscale ruimte, niet over de hoogte van de heffing', () => {
     for (const s of STATUSSEN) {
-      expect(HEFBOOM_OORDEELZIN.belasting[s].voor).toMatch(/^Je Box 3-belasting\b/)
+      expect(HEFBOOM_OORDEELZIN.belasting[s].voor).toMatch(/^Je fiscale ruimte\b/)
+    }
+    // Geen enkele zin beweert nog iets over de hóógte van de belasting.
+    for (const s of STATUSSEN) {
+      expect(volledig(HEFBOOM_OORDEELZIN.belasting[s])).not.toMatch(/belastingdruk|heffing|hoog\b/i)
     }
   })
 
@@ -121,9 +146,14 @@ describe('HEFBOOM_OORDEELZIN — eenvoud, Wft en ADR 0165', () => {
   it('bevat geen imperatief en geen bedrag- of percentagebelofte', () => {
     for (const { hefboom, status, zin } of alleZinnen) {
       const tekst = volledig(zin)
+      // "benut" staat hier niet los in: sinds ADR 0177 zegt de belastingzin
+      // "goed benut" — een voltooid deelwoord over de eigen situatie, geen
+      // gebiedende wijs. De imperatiefvorm ("benut je …", "benut de …") wordt
+      // hieronder apart uitgesloten.
       expect(tekst, `${hefboom}.${status}`).not.toMatch(
-        /\b(stort|verschuif|verkoop|koop|beleg|los af|verlaag|verhoog|zorg dat|optimaliseer|benut)\b/i,
+        /\b(stort|verschuif|verkoop|koop|beleg|los af|verlaag|verhoog|zorg dat|optimaliseer)\b/i,
       )
+      expect(tekst, `${hefboom}.${status}`).not.toMatch(/\bbenut (je|de|het|meer)\b/i)
       // Een boxnaam ("Box 3") is geen getal over je geld; alles daarbuiten wel.
       expect(tekst.replace(/\bBox \d\b/g, 'Box'), `${hefboom}.${status}`).not.toMatch(/€|\d/)
     }
@@ -137,11 +167,20 @@ describe('HEFBOOM_OORDEELZIN — eenvoud, Wft en ADR 0165', () => {
     }
   })
 
-  it('belasting houdt de hedge "mogelijk" op warn, en alléén daar', () => {
-    expect(HEFBOOM_OORDEELZIN.belasting.warn.oordeel).toMatch(/^mogelijk /)
-    for (const s of ['good', 'bad', 'neutral'] as const) {
-      expect(HEFBOOM_OORDEELZIN.belasting[s].oordeel).not.toMatch(/mogelijk/i)
+  // De hedge "Mogelijk" op belasting.warn is met ADR 0177 vervallen: hij stond er
+  // omdat "je betaalt meer dan nodig" een vermoeden was dat de bron niet kon
+  // dragen. De nieuwe bron telt openstaande posten (partnerverdeling,
+  // jaarruimte, samenstelling), dus "deels onbenut" is een constatering — en een
+  // hedge boven een geteld bedrag zou de melding eronder juist tegenspreken.
+  it('belasting hedget niet meer: de posten worden geteld, niet vermoed', () => {
+    for (const s of STATUSSEN) {
+      expect(HEFBOOM_OORDEELZIN.belasting[s].oordeel).not.toMatch(/mogelijk|waarschijnlijk/i)
     }
+  })
+
+  it('belasting onderscheidt de twee niet-groene banden in graad', () => {
+    expect(HEFBOOM_OORDEELZIN.belasting.warn.oordeel).toBe('deels onbenut')
+    expect(HEFBOOM_OORDEELZIN.belasting.bad.oordeel).toBe('grotendeels onbenut')
   })
 
   it('budget zegt bij neutral "te beoordelen", niet "in beeld": de pagina toont al cijfers', () => {
@@ -164,7 +203,9 @@ describe('HEFBOOM_OORDEELZIN — zegt hetzelfde als de tegel', () => {
     ['cashflow', 'good', 'op koers'],
     ['cashflow', 'warn', 'aandacht'],
     ['cashflow', 'bad', 'onder druk'],
-    ['belasting', 'warn', 'mogelijk'],
+    ['belasting', 'good', 'benut'],
+    ['belasting', 'warn', 'onbenut'],
+    ['belasting', 'bad', 'onbenut'],
   ] as const)('%s.%s deelt de kern "%s" met HEFBOOM_VERDICT', (h, s, kern) => {
     expect(HEFBOOM_OORDEELZIN[h][s].oordeel.toLowerCase()).toContain(kern)
     expect(HEFBOOM_VERDICT[h][s].toLowerCase()).toContain(kern)

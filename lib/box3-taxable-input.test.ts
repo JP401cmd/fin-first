@@ -2,9 +2,11 @@ import { describe, it, expect } from 'vitest'
 import {
   computeBox3TaxableInput,
   box3TaxStatus,
+  box3StatusVerdict,
   BOX3_VRIJSTELLING_SINGLE,
 } from './box3-taxable-input'
 import { computeLeverScores } from '@/lib/lever-scores'
+import { computeFiscaleRuimte, type FiscaleRuimteResult } from '@/lib/fiscale-ruimte'
 import type { LeverageStatus } from '@/lib/leverage-status'
 import { BOX3_PARAMS, CURRENT_TAX_YEAR } from '@/lib/box3-data'
 
@@ -371,11 +373,20 @@ describe('box3TaxStatus — bad branch', () => {
   })
 })
 
-// ── SSoT equivalence: box3TaxStatus == computeLeverScores.tax (mapped) ────────
+// ── De banden zijn GEEN hefboomstatus meer (ADR 0177) ─────────────────────────
 //
-// computeLeverScores returns LeverStatus (green/amber/red/neutral).
-// The mapping in lever-scores.ts: good→green, warn→amber, bad→red, neutral→neutral.
-// We verify that box3TaxStatus produces the same semantic result for each band.
+// Hier stond tot 22 sep 2026 een SSoT-equivalentiesuite: `box3TaxStatus` ==
+// `computeLeverScores().tax.status` (gemapt). Die gelijkheid geldt NIET meer.
+// De hefboom Belasting oordeelt sinds ADR 0177 op ONBENUTTE FISCALE RUIMTE
+// (`computeFiscaleRuimte`, lib/fiscale-ruimte.ts + lib/fiscale-ruimte.test.ts);
+// `box3TaxStatus` is nog uitsluitend het Box 3-GRONDSLAGSIGNAAL voor het
+// kaartlabel, de subpaginakop en de Box 3-dot (ADR 0177 D6).
+//
+// Wat hieronder overblijft is de toets dat die twee oordelen inderdaad
+// LOSGEKOPPELD zijn: dezelfde box 3-grondslag die `box3TaxStatus` rood kleurt,
+// mag de hefboom groen laten zolang er niets onbenut blijft. Dát is precies de
+// gedragswijziging die ADR 0177 beoogt — een alleenstaande met € 2M belegd en
+// niets te optimaliseren ging van rood naar groen.
 
 function leverStatusToLeverageStatus(
   s: 'green' | 'amber' | 'red' | 'neutral',
@@ -386,77 +397,82 @@ function leverStatusToLeverageStatus(
   return 'neutral'
 }
 
-/** Minimal valid computeLeverScores input. */
-function leverInput(override: {
-  box3TaxableAboveThreshold: number
-  hasBox3Assets: boolean
-  householdType?: string
-}) {
+/** Minimale, verder neutrale `computeLeverScores`-invoer. */
+function leverInput(fiscaleRuimte: FiscaleRuimteResult) {
   return {
     totalAssets: 500_000,
     totalDebts: 0,
     assetTypeCount: 3,
     savingsRate: 20,
-    box3TaxableAboveThreshold: override.box3TaxableAboveThreshold,
-    hasBox3Assets: override.hasBox3Assets,
-    householdType: override.householdType,
+    fiscaleRuimte,
   }
 }
 
-describe('SSoT equivalence — computeLeverScores.tax.status matches box3TaxStatus', () => {
-  it('neutral band: no box3 assets → both neutral', () => {
-    const inp = { box3TaxableAboveThreshold: 0, hasBox3Assets: false }
-    const leverageStatus = box3TaxStatus(inp)
-    const leverScores = computeLeverScores(leverInput(inp))
-    expect(leverStatusToLeverageStatus(leverScores.tax.status)).toBe(leverageStatus)
-    expect(leverageStatus).toBe('neutral')
+describe('ADR 0177 — box3TaxStatus draagt het hefboomoordeel niet meer', () => {
+  it('box 3 ruim boven de vrijstelling ("bad") terwijl de hefboom GROEN staat', () => {
+    // De oude regel: above = € 1,94M > € 500k → rood, zonder weg terug.
+    const grondslag = box3TaxStatus({
+      box3TaxableAboveThreshold: 1_940_000,
+      hasBox3Assets: true,
+      householdType: 'solo',
+    })
+    expect(grondslag).toBe('bad')
+    expect(box3StatusVerdict(grondslag)).toBe('Ruim boven de vrijstelling')
+
+    // De nieuwe regel: niets onbenut → groen, bij elk vermogensniveau.
+    const scores = computeLeverScores(
+      leverInput(
+        computeFiscaleRuimte({
+          partnerverdelingBesparing: null,
+          jaarruimteBesparing: 0,
+          samenstellingNetEffect: -11_400,
+          box1Tax: 30_000,
+          box3Tax: 41_918,
+        }),
+      ),
+    )
+    expect(leverStatusToLeverageStatus(scores.tax.status)).toBe('good')
+    expect(scores.tax.detail).toBe('Geen onbenutte ruimte')
   })
 
-  it('good band: above=0, has assets → both good/green', () => {
-    const inp = { box3TaxableAboveThreshold: 0, hasBox3Assets: true }
-    const leverageStatus = box3TaxStatus(inp)
-    const leverScores = computeLeverScores(leverInput(inp))
-    expect(leverStatusToLeverageStatus(leverScores.tax.status)).toBe(leverageStatus)
-    expect(leverageStatus).toBe('good')
+  it('box 3 binnen de vrijstelling ("good") terwijl de hefboom ROOD staat', () => {
+    // De omkering: bescheiden vermogen, maar er ligt echt geld (ratio ≈ 20%).
+    expect(
+      box3TaxStatus({ box3TaxableAboveThreshold: 0, hasBox3Assets: true, householdType: 'solo' }),
+    ).toBe('good')
+
+    const scores = computeLeverScores(
+      leverInput(
+        computeFiscaleRuimte({
+          partnerverdelingBesparing: null,
+          jaarruimteBesparing: 2_960,
+          samenstellingNetEffect: null,
+          box1Tax: 12_000,
+          box3Tax: 2_606,
+        }),
+      ),
+    )
+    expect(leverStatusToLeverageStatus(scores.tax.status)).toBe('bad')
+    // De grootste post bij naam, mét bedrag (ADR 0177 D4).
+    expect(scores.tax.detail).toContain('Onbenutte jaarruimte')
+    expect(scores.tax.detail).toContain('2.960')
   })
 
-  it('good band: above=50000 + partner → both good/green', () => {
-    const inp = { box3TaxableAboveThreshold: 50_000, hasBox3Assets: true, householdType: 'samen' }
-    const leverageStatus = box3TaxStatus(inp)
-    const leverScores = computeLeverScores(leverInput(inp))
-    expect(leverStatusToLeverageStatus(leverScores.tax.status)).toBe(leverageStatus)
-    expect(leverageStatus).toBe('good')
-  })
-
-  it('warn band: above=50000, solo → both warn/amber', () => {
-    const inp = { box3TaxableAboveThreshold: 50_000, hasBox3Assets: true, householdType: 'solo' }
-    const leverageStatus = box3TaxStatus(inp)
-    const leverScores = computeLeverScores(leverInput(inp))
-    expect(leverStatusToLeverageStatus(leverScores.tax.status)).toBe(leverageStatus)
-    expect(leverageStatus).toBe('warn')
-  })
-
-  it('warn band: above=300000 + partner → both warn/amber', () => {
-    const inp = { box3TaxableAboveThreshold: 300_000, hasBox3Assets: true, householdType: 'samen' }
-    const leverageStatus = box3TaxStatus(inp)
-    const leverScores = computeLeverScores(leverInput(inp))
-    expect(leverStatusToLeverageStatus(leverScores.tax.status)).toBe(leverageStatus)
-    expect(leverageStatus).toBe('warn')
-  })
-
-  it('bad band: above=200000, solo → both bad/red', () => {
-    const inp = { box3TaxableAboveThreshold: 200_000, hasBox3Assets: true, householdType: 'solo' }
-    const leverageStatus = box3TaxStatus(inp)
-    const leverScores = computeLeverScores(leverInput(inp))
-    expect(leverStatusToLeverageStatus(leverScores.tax.status)).toBe(leverageStatus)
-    expect(leverageStatus).toBe('bad')
-  })
-
-  it('bad band: above=600000 + partner → both bad/red', () => {
-    const inp = { box3TaxableAboveThreshold: 600_000, hasBox3Assets: true, householdType: 'samen' }
-    const leverageStatus = box3TaxStatus(inp)
-    const leverScores = computeLeverScores(leverInput(inp))
-    expect(leverStatusToLeverageStatus(leverScores.tax.status)).toBe(leverageStatus)
-    expect(leverageStatus).toBe('bad')
+  it('geen enkele fiscale bron → de hefboom is grijs, niet groen', () => {
+    const scores = computeLeverScores(
+      leverInput(
+        computeFiscaleRuimte({
+          partnerverdelingBesparing: null,
+          jaarruimteBesparing: null,
+          samenstellingNetEffect: null,
+          box1Tax: null,
+          box3Tax: null,
+        }),
+      ),
+    )
+    expect(scores.tax.status).toBe('neutral')
+    expect(scores.tax.score).toBeNull()
+    // De sentinel waar lib/page-status/resolve.ts op leunt.
+    expect(scores.tax.detail).toContain('— Start')
   })
 })

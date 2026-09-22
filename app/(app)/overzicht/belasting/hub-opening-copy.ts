@@ -17,7 +17,7 @@
  *
  * VERHUISD VAN DE KOP NAAR DE DECK (kop-herziening sep 2026). De hub-aanhef is
  * sinds die herziening een `PageVerdictOpening`: de titel is een oordeel (sinds
- * ADR 0174 D6 de zin "Je Box 3-belasting blijft *beperkt*.") en draagt dus geen
+ * ADR 0174 D6 een zin, sinds ADR 0177 "Je fiscale ruimte is *goed benut*.") en draagt dus geen
  * telwoord meer. De H22-belofte is daarmee niet vervallen maar verplaatst — hij
  * staat nu in de eerste zin van de deck en in de colophon, en
  * `hub-opening-copy.test.ts` pint 'm daar tegen hetzelfde canonieke
@@ -49,17 +49,24 @@ export type BelastingHubOpening = {
 }
 
 /**
- * Tweede zin van de deck — identiek in beide takken: de kop-zin ("Je belasting
- * blijft *beperkt*.") volgt de Box 3-stand, ongeacht of Box 2 meespeelt. Eén
- * constante zodat de twee takken niet los van elkaar kunnen wegdriften.
+ * Tweede zin van de deck — identiek in beide takken: hij legt uit wat de stand
+ * in de kop bepaalt. Eén constante zodat de twee takken niet los van elkaar
+ * kunnen wegdriften.
  *
- * Eenvoud-check B-071 (F3, ADR 0174 D6): het woord "oordeel" is eruit. De zin
- * zegt nu gewoon wat de stand bepaalt.
+ * HERSCHREVEN BIJ ADR 0177. Hier stond "Hoe meer Box 3-vermogen boven de
+ * vrijstelling, hoe meer je betaalt" — dat beschreef de oude grondslag, waarin
+ * de hefboom op de hóógte van de Box 3-heffing oordeelde. Die grondslag is
+ * vervallen: de kop-zin ("Je fiscale ruimte is *deels onbenut*.") volgt nu de
+ * onbenutte fiscale ruimte over Box 1 én Box 3. Een deck die nog naar het
+ * vermogen boven de vrijstelling wees, zou een andere vraag beantwoorden dan de
+ * kop erboven stelt.
  *
- * WFT — beschrijvend (hoe meer vermogen, hoe meer belasting), geen aansporing om
- * iets aan dat vermogen te doen.
+ * Eenvoud-check B-071 (F3, ADR 0174 D6): het woord "oordeel" blijft eruit.
+ *
+ * WFT — beschrijvend (wat de stand volgt), geen aansporing om die ruimte te
+ * gaan benutten.
  */
-const KOP_UITLEG = 'Hoe meer Box 3-vermogen boven de vrijstelling, hoe meer je betaalt.'
+const KOP_UITLEG = 'De stand volgt de fiscale ruimte die onbenut blijft.'
 
 export function buildBelastingHubOpening({
   hasAanmerkelijkBelang,

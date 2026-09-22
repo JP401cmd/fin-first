@@ -8,6 +8,7 @@ import { PATH_SUGGESTIONS } from './coach-suggestions'
 import { TAX_DEADLINES } from './tax-calendar'
 import { PAGE_STATUS_COPY, fillFigure } from './page-status/copy'
 import { computeLeverScores } from './lever-scores'
+import { computeFiscaleRuimte } from './fiscale-ruimte'
 import { PERSONAS } from './test-personas'
 import { aandachtspuntToActionPayload, type Aandachtspunt } from './aandachtspunten'
 
@@ -143,21 +144,34 @@ describe('H24 — passage 3: status-banner op de belasting-hub', () => {
   })
 
   it('benoemt de grondslag in plaats van een oordeel te vellen', () => {
-    expect(route.bad!.reason).toMatch(/heffingsvrije voet/i)
-    expect(route.warn!.reason).toMatch(/Box 3-heffing/i)
+    // Sinds ADR 0177 is de grondslag ONBENUTTE FISCALE RUIMTE, niet meer het
+    // vermogen boven de heffingsvrije voet. De eis blijft dezelfde: de zin
+    // benoemt wat er gemeten is, hij velt geen oordeel en spoort niet aan.
+    expect(route.bad!.reason).toMatch(/fiscale ruimte/i)
+    expect(route.bad!.reason).toMatch(/onbenut/i)
+    expect(route.warn!.reason).toMatch(/fiscale ruimte/i)
+    expect(route.warn!.reason).toMatch(/onbenut/i)
   })
 
   it('de {figure} die de banner invult draagt geen aanbeveling', () => {
     // Dit is de naad waar de bevinding ontstond: reason + {figure} vormden
     // samen het letterlijke citaat uit de PDF. Beide helften toetsen, én de
     // samengestelde zin.
+    // Sinds ADR 0177 is de detailregel de GROOTSTE onbenutte post met zijn
+    // bedrag (niet meer "€ X boven vrijstelling — bekijk tips"). De Wft-grens
+    // verschuift daarmee niet: ook deze zin mag constateren, niet aansporen.
     const scores = computeLeverScores({
       totalAssets: 800_000,
       totalDebts: 0,
       assetTypeCount: 3,
       savingsRate: 20,
-      box3TaxableAboveThreshold: 250_000,
-      householdType: 'samen', // partner + boven €100k = de tak uit de bevinding
+      fiscaleRuimte: computeFiscaleRuimte({
+        partnerverdelingBesparing: 1_240,
+        jaarruimteBesparing: 2_960,
+        samenstellingNetEffect: -11_400,
+        box1Tax: 18_000,
+        box3Tax: 6_400,
+      }),
     })
     toetsVrijVan(scores.tax.detail, 'computeLeverScores().tax.detail')
 

@@ -20,7 +20,15 @@ import type { LeverStatus } from '@/lib/lever-scores'
 import type { CashflowCard } from '@/lib/cashflow-cards'
 import type { LeverageStatus } from '@/lib/leverage-status'
 import type { PageStatusInfo, PageStatusMap } from '@/lib/page-status/types'
-import { PAGE_STATUS_COPY, fillFigure, type RouteCopy } from '@/lib/page-status/copy'
+import {
+  PAGE_STATUS_COPY,
+  fillFigure,
+  fiscaleRuimteFigure,
+  overigePostenZin,
+  type RouteCopy,
+  type StatusCopy,
+} from '@/lib/page-status/copy'
+import { formatCurrency } from '@/lib/format'
 
 /** LeverStatus (kompas-vocabulaire) → LeverageStatus (kaart-/banner-vocabulaire). */
 export function leverToLeverageStatus(s: LeverStatus): LeverageStatus {
@@ -45,22 +53,30 @@ const LEVER_NO_DATA_MARKER = '— Start'
 /**
  * Bouw één PageStatusInfo uit een route + status + live cijfer. Geeft `null`
  * terug voor good/neutral (die tonen geen banner) of als er geen copy bestaat.
+ *
+ * `opts.copy` overschrijft de warn/bad-tekst met een oorzaak-specifieke variant
+ * (ADR 0177 D4); `opts.suffix` plakt er één extra zin achter. Beide optioneel —
+ * zonder die opties is het gedrag identiek aan vóór ADR 0177.
  */
 function buildInfo(
   route: string,
   status: LeverageStatus,
   figure: string | null | undefined,
+  opts?: { copy?: StatusCopy; suffix?: string },
 ): PageStatusInfo | null {
   if (status !== 'warn' && status !== 'bad') return null
   const copy: RouteCopy | undefined = PAGE_STATUS_COPY[route]
   if (!copy) return null
-  const sc = status === 'warn' ? copy.warn : copy.bad
+  const sc = opts?.copy ?? (status === 'warn' ? copy.warn : copy.bad)
+  const reason = [fillFigure(sc.reason, figure), opts?.suffix?.trim()]
+    .filter((deel): deel is string => !!deel && deel.length > 0)
+    .join(' ')
   return {
     route,
     kind: 'leverage',
     status,
     title: copy.title,
-    reason: fillFigure(sc.reason, figure),
+    reason,
     remedy: sc.remedy,
     action: copy.action,
     will: copy.will,
@@ -128,17 +144,49 @@ export function resolvePageStatusMap(input: ResolvePageStatusInput): PageStatusM
         ? null
         : buildInfo(route, leverToLeverageStatus(lever.status), lever.detail)
 
+    // ── De belasting-hefboom NOEMT DE OORZAAK (ADR 0177 D4) ─────────────
+    // De hefboom oordeelt op onbenutte fiscale ruimte, en de statusbron levert
+    // de openstaande posten mee (aflopend op besparing). De melding leest de
+    // GROOTSTE post: die draagt per definitie het meeste van de ratio die de
+    // kleur bepaalt. Ontbreekt de bron, de post of de oorzaak-copy, dan valt de
+    // melding terug op de generieke warn/bad-tekst — nooit op een lege haakjes-
+    // zin, want `fillFigure` strookt de placeholder dan weg.
+    const ruimte = levers.fiscaleRuimte
+    const grootstePost = ruimte?.posten?.[0]
+    const oorzaakCopy = grootstePost
+      ? PAGE_STATUS_COPY['/overzicht/belasting']?.byCause?.[grootstePost.cause]
+      : undefined
+    const taxInfo =
+      grootstePost && oorzaakCopy && !scores.tax.detail.includes(LEVER_NO_DATA_MARKER)
+        ? buildInfo(
+            '/overzicht/belasting',
+            leverToLeverageStatus(scores.tax.status),
+            fiscaleRuimteFigure(grootstePost.besparing),
+            {
+              copy: oorzaakCopy,
+              suffix: overigePostenZin((ruimte?.posten.length ?? 1) - 1),
+            },
+          )
+        : leverInfo('/overzicht/belasting', scores.tax)
+
+    // Box 3-subpagina: het live cijfer is de Box 3-GRONDSLAG boven de
+    // heffingsvrije voet uit `taxInput` — dezelfde `computeBox3TaxableInput`-
+    // uitkomst die `box3Status` voedt. Tot ADR 0177 stond hier `scores.tax.detail`;
+    // dat detail beschreef de Box 3-blootstelling omdat de hefboom daarop
+    // oordeelde. Nu de hefboom over onbenutte ruimte gaat, zou dat detail een
+    // vreemd getal in een Box 3-vermogenszin zetten.
+    const box3Above = levers.taxInput?.box3TaxableAboveThreshold ?? 0
+    const box3Figure = box3Above > 0 ? formatCurrency(box3Above) : null
+
     entries.push(
       leverInfo('/overzicht/bezittingen', scores.assets),
       leverInfo('/overzicht/schulden', scores.debts),
       leverInfo('/overzicht/budget', scores.cashflow),
-      leverInfo('/overzicht/belasting', scores.tax),
+      taxInfo,
       // Belasting-subpagina's (Box 1/3 AL LeverageStatus). Box 1: geen
       // jaarruimte-cijfer-string → null (copy valt terug op de cijferloze vorm).
-      // Box 3: het Belasting-lever-detail beschrijft de Box 3-blootstelling
-      // ("€ Xk boven vrijstelling") → bruikbaar live cijfer.
       buildInfo('/overzicht/belasting/box1', box1Status, null),
-      buildInfo('/overzicht/belasting/box3', box3Status, scores.tax.detail),
+      buildInfo('/overzicht/belasting/box3', box3Status, box3Figure),
     )
   }
 

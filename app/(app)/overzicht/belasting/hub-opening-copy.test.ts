@@ -101,9 +101,11 @@ describe.each([
   })
 
   it('legt uit waar de kop-zin op slaat', () => {
-    // De kop-zin volgt de Box 3-stand; de tweede deck-zin legt uit wat die stand
-    // bepaalt, zodat de lezer niet denkt dat het over alle boxen gaat.
-    expect(opening.deck).toContain('Box 3-vermogen boven de vrijstelling')
+    // ADR 0177: de kop-zin volgt de ONBENUTTE FISCALE RUIMTE (Box 1 + Box 3), niet
+    // meer de hoogte van de Box 3-heffing. De tweede deck-zin legt uit wat die
+    // stand volgt, zodat de lezer het oordeel niet als "je betaalt veel" leest.
+    expect(opening.deck).toContain('fiscale ruimte die onbenut blijft')
+    expect(opening.deck).not.toContain('boven de vrijstelling')
   })
 
   it('gebruikt het woord "oordeel" niet (eenvoud-check B-071)', () => {

@@ -539,13 +539,20 @@ export function box1JaarruimteStatus(input: {
   marginaalTarief: number
   /** Jaarlijkse pensioenaangroei (factor A, €). Default 0 = geen werkgeverspensioen. */
   factorA?: number
+  /**
+   * Belastingjaar. Optioneel met de bestaande default (2026) zodat elke
+   * aanroeper die 'm weglaat byte-identiek blijft; aanroepers die elders al
+   * expliciet op `CURRENT_TAX_YEAR` rekenen geven 'm mee, zodat de dot en die
+   * berekening bij een jaarwissel niet stil uit elkaar lopen.
+   */
+  year?: JaarruimteJaar
 }): { status: LeverageStatus; grossYearly: number } {
-  const { netMonthly, marginaalTarief, factorA = 0 } = input
+  const { netMonthly, marginaalTarief, factorA = 0, year = 2026 } = input
   const grossYearly =
     netMonthly > 0 && marginaalTarief > 0 && marginaalTarief < 1
       ? (netMonthly * 12) / (1 - marginaalTarief)
       : 0
-  const jaarruimte = computeJaarruimte(grossYearly, factorA)
+  const jaarruimte = computeJaarruimte(grossYearly, factorA, year)
   return { status: box1JaarruimteVerdict(jaarruimte).status, grossYearly }
 }
 

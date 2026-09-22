@@ -6,8 +6,12 @@
  * (e.g. lever-compass.tsx, responsive-shell.tsx).
  */
 
-import { box3TaxStatus } from '@/lib/box3-taxable-input'
 import { hasDebtRatioData, scoreDebtRatio } from '@/lib/financial-health'
+import { formatCurrency } from '@/lib/format'
+import {
+  FISCALE_RUIMTE_POST_LABEL,
+  type FiscaleRuimteResult,
+} from '@/lib/fiscale-ruimte'
 import { LEVERAGE_STATUS_LABEL, type LeverageStatus } from '@/lib/leverage-status'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -78,7 +82,7 @@ export type LeverScores = {
   debts: LeverEntry
   /** Cashflow: de EFFECTIEVE spaarquote (ADR 0121) + budget-health. */
   cashflow: LeverEntry
-  /** Belasting: box3-exposure. */
+  /** Belasting: ONBENUTTE fiscale ruimte als aandeel van de eigen heffing (ADR 0177). */
   tax: LeverEntry
 }
 
@@ -151,12 +155,25 @@ export function computeLeverScores(input: {
    * rauw afgeleid stipje.
    */
   savingsRate: number | null
-  /** Totaal box3-belast vermogen boven vrijstelling. */
-  box3TaxableAboveThreshold: number
-  /** Of de gebruiker box3-belastbare assets heeft (cash, savings, investment, etc.). Geen → neutral. */
-  hasBox3Assets?: boolean
-  /** Huishoudtype: 'solo' | 'samen' | 'gezin'. Partner verdubbelt vrijstelling → optimalisatie-kans. */
-  householdType?: string
+  /**
+   * De ONBENUTTE fiscale ruimte (ADR 0177) — status, ratio, posten en score in
+   * één, uit de pure kern `computeFiscaleRuimte` (lib/fiscale-ruimte.ts).
+   *
+   * BEWUST EEN PARAMETER, GEEN AANROEP HIER: de scalars achter die kern
+   * (partnerverdeling, jaarruimte, samenstelling-netto, Box 1- en
+   * Box 3-heffing) komen uit de canonieke motoren op al-geladen rijen, en die
+   * assemblage woont in `loadLeverScores` (lib/lever-scores-loader.ts). Eén
+   * rekenweg, twee invoerkanalen (ADR 0177 D5) — het hefboompad hier en de
+   * belasting-hub via `loadFiscaleKansen`.
+   *
+   * Dit VERVANGT de oude euro-banden (`box3TaxStatus` op
+   * `box3TaxableAboveThreshold`, € 100k/€ 500k boven de vrijstelling). Die
+   * maten vermogen, niet gedrag: monotoon dalend, zonder plafond, en zonder
+   * handeling die ze groen kon maken behalve minder vermogen bezitten.
+   * `box3TaxStatus` bestaat nog, maar uitsluitend als Box 3-kaart-/subpagina-
+   * label (ADR 0177 D6) — niet meer als hefboomstatus.
+   */
+  fiscaleRuimte: FiscaleRuimteResult
   /** Aantal top-level budgets met limiet (expense/savings). */
   budgetsTotal?: number
   /** Aantal budgets die op schema liggen (spent ≤ limit). */
@@ -242,35 +259,14 @@ export function computeLeverScores(input: {
     cashflowScore = savingsComponent // null of een waarde
   }
 
-  // 4. Belasting: tax optimization status (#848)
+  // 4. Belasting: ONBENUTTE FISCALE RUIMTE (ADR 0177)
   //
-  // Neutral (grijs): geen box3-belastbare assets → niets te optimaliseren
-  // Green (gezond):  onder vrijstelling → optimaal, geen belasting verschuldigd
-  // Green (gezond):  boven vrijstelling maar beperkt + partner → geoptimaliseerd
-  // Amber (aandacht): boven vrijstelling, optimalisatie mogelijk
-  //   - Solo-huishouden met partner-potentieel
-  //   - Significante blootstelling (>100k boven drempel)
-  // Red (zorg): zeer hoge blootstelling (>500k boven drempel)
-  const hasBox3 = input.hasBox3Assets ?? (input.box3TaxableAboveThreshold > 0 || input.totalAssets > 0)
-  const hasPartner = input.householdType === 'samen' || input.householdType === 'gezin'
-  let taxScore: number | null
-
-  if (!hasBox3) {
-    // Geen box3-relevante assets → geen belasting-data
-    taxScore = null
-  } else if (input.box3TaxableAboveThreshold <= 0) {
-    // Onder vrijstelling → optimaal
-    taxScore = 90
-  } else if (input.box3TaxableAboveThreshold <= 100_000) {
-    // Lichte blootstelling — amber: er is belasting verschuldigd, tips mogelijk
-    taxScore = hasPartner ? 70 : 45
-  } else if (input.box3TaxableAboveThreshold <= 500_000) {
-    // Significante blootstelling — amber/red afhankelijk van partner-situatie
-    taxScore = hasPartner ? 40 : 25
-  } else {
-    // Zeer hoge blootstelling
-    taxScore = 20
-  }
+  // Score én status komen uit dezelfde pure kern, en de tax-lever routeert zijn
+  // status bewust NIET via `statusFromScore` (dat deed hij vóór ADR 0177 ook
+  // al niet) — anders kunnen band en ring uit elkaar lopen. `score` is
+  // `100 − min(100, ratio × 400)`: 0% → 100, 5% → 80 (bovenkant groen),
+  // 15% → 40 (bovenkant oranje). `null` = geen oordeel → neutral.
+  const taxScore: number | null = input.fiscaleRuimte.score
 
   // ── Detail text per lever ─────────────────────────────────────────────────
   const assetDetail = input.assetTypeCount <= 0
@@ -321,21 +317,24 @@ export function computeLeverScores(input: {
     cashflowDetail = 'Onvoldoende transactiedata — Start'
   }
 
+  // Belasting-detail: de GROOTSTE openstaande post met zijn bedrag (ADR 0177
+  // D4). Deze regel wordt via {figure} in de status-banner van
+  // /overzicht/belasting geïnterpoleerd, dus hij blijft CONSTATEREND — het
+  // label komt uit `FISCALE_RUIMTE_POST_LABEL` (één home, gedeeld met de
+  // oorzaak-specifieke melding), nooit uit een tweede woordenlijst hier.
+  //
+  // De "— Start"-sentinel hangt exact aan `neutral`, net als bij de drie andere
+  // hefbomen (invariant in lib/lever-scores.test.ts, waar lib/page-status/
+  // resolve.ts op leunt). "Geen onbenutte ruimte" is GEEN geen-data-regel: daar
+  // is wél gerekend, er valt alleen niets te halen.
   let taxDetail: string
-  if (!hasBox3) {
-    taxDetail = 'Geen belastbare bezittingen — Start'
-  } else if (input.box3TaxableAboveThreshold <= 0) {
-    taxDetail = 'Onder vrijstelling'
-  } else if (hasPartner && input.box3TaxableAboveThreshold <= 100_000) {
-    taxDetail = `${fmtShort(input.box3TaxableAboveThreshold)} boven vrijstelling`
+  if (input.fiscaleRuimte.status === 'neutral') {
+    taxDetail = 'Geen fiscale gegevens — Start'
+  } else if (input.fiscaleRuimte.posten.length > 0) {
+    const grootste = input.fiscaleRuimte.posten[0]
+    taxDetail = `${FISCALE_RUIMTE_POST_LABEL[grootste.cause]} · ${formatCurrency(grootste.besparing)} per jaar`
   } else {
-    // H24 (Wft): de staart was "— optimalisatie aanbevolen". Deze detailtekst
-    // wordt via {figure} in de status-banner van /overzicht/belasting
-    // geïnterpoleerd, dus die aanbeveling landde letterlijk in de banner.
-    // Beschrijvend gehouden; de verwijzing naar tips is navigatie, geen advies.
-    // De twee resterende takken (geen partner; partner boven €100k) leverden
-    // hetzelfde inzicht op en zijn daarom samengevoegd.
-    taxDetail = `${fmtShort(input.box3TaxableAboveThreshold)} boven vrijstelling — bekijk tips`
+    taxDetail = 'Geen onbenutte ruimte'
   }
 
   // Schulden payoff voortgang: 0–100 (null als schuldenvrij of geen data)
@@ -345,18 +344,17 @@ export function computeLeverScores(input: {
     origDebt > 0 ? Math.round(((origDebt - input.totalDebts) / origDebt) * 100) :
     null
 
-  // Tax-status komt uit de gedeelde canonieke helper (box3-taxable-input.ts) —
-  // dezelfde bron die de Belasting-kaart (Box 3) en de sidebar-Box-3-dot lezen,
-  // zodat alle drie altijd dezelfde status tonen. De score (taxScore) blijft voor
-  // de tooltip/ring; de status komt single-sourced uit box3TaxStatus, gemapt van
-  // het LeverageStatus-vocabulaire (good/warn/bad) naar LeverStatus
-  // (green/amber/red) dat het kompas rendert.
-  const taxLeverageStatus = box3TaxStatus({
-    box3TaxableAboveThreshold: input.box3TaxableAboveThreshold,
-    hasBox3Assets: hasBox3,
-    householdType: input.householdType,
-  })
-  const taxStatus: LeverStatus = leverageToLeverStatus(taxLeverageStatus)
+  // Tax-status komt sinds ADR 0177 uit de pure kern `computeFiscaleRuimte`,
+  // gemapt van het LeverageStatus-vocabulaire (good/warn/bad/neutral) naar
+  // LeverStatus (green/amber/red/neutral) dat het kompas rendert. Score, status
+  // en detailregel hebben daarmee ÉÉN bron: ze kunnen elkaar niet meer
+  // tegenspreken, en de status kan de kansenlijst niet meer tegenspreken (het
+  // rode alarm naast een lege kansenlijst verdwijnt per constructie).
+  //
+  // Wat hier stond: `box3TaxStatus` op het box 3-vermogen boven de
+  // heffingsvrije voet. Die helper blijft bestaan voor het Box 3-KAARTLABEL en
+  // de Box 3-subpagina (ADR 0177 D6), maar draagt het hefboomoordeel niet meer.
+  const taxStatus: LeverStatus = leverageToLeverStatus(input.fiscaleRuimte.status)
 
   return {
     assets: { score: assetScore, status: statusFromScore(assetScore), detail: assetDetail },

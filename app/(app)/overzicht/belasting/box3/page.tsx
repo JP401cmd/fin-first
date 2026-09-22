@@ -50,6 +50,11 @@ export default async function BelastingBox3Page() {
   // `computeBox3TaxableInput` hier, en de zin komt uit `box3StatusVerdict` die
   // de hub-kaart óók gebruikt.
   //
+  // ADR 0177 D6: deze zin is een feitelijke constatering over de Box 3-GRONDSLAG
+  // ("Ruim boven de vrijstelling") en blijft daarom staan — maar hij draagt niet
+  // langer het oordeel van de hefboom Belasting. Die oordeelt sinds ADR 0177 op
+  // onbenutte fiscale ruimte over Box 1 + Box 3 en spreekt zich uit op de hub.
+  //
   // Wat dit kost: niets. `loadLeverScores` is `cache()`-gewrapt en draait op
   // élke app-route al in `app/(app)/layout.tsx` voor de sidebar-statuspunten;
   // binnen dezelfde request pakt deze aanroep dat resultaat op.

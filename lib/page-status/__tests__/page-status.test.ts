@@ -11,6 +11,7 @@ import type { LeverScores, LeverEntry } from '@/lib/lever-scores'
 import type { CashflowCard } from '@/lib/cashflow-cards'
 import type { LeverStatus } from '@/lib/lever-scores'
 import type { LeverageStatus } from '@/lib/leverage-status'
+import type { FiscaleRuimtePost } from '@/lib/fiscale-ruimte'
 
 // ── Helpers voor fake data ────────────────────────────────────────────────────
 
@@ -18,7 +19,14 @@ function makeLeverEntry(status: LeverStatus, detail = ''): LeverEntry {
   return { score: 50, status, detail }
 }
 
-/** Bouw een LeverScoresResult met de vier hefbomen op de opgegeven statussen. */
+/**
+ * Bouw een LeverScoresResult met de vier hefbomen op de opgegeven statussen.
+ *
+ * `fiscaleRuimte` staat er sinds ADR 0177 op: de belasting-hefboom draagt zijn
+ * openstaande posten mee, zodat de melding de OORZAAK kan noemen. De default is
+ * de lege, groene uitkomst — de oorzaak-takken worden hieronder expliciet
+ * gevoed via `withFiscaleRuimte`.
+ */
 function makeLeverScores(
   assets: LeverStatus = 'green',
   debts: LeverStatus = 'green',
@@ -38,10 +46,23 @@ function makeLeverScores(
   return {
     scores,
     taxInput: { box3TaxableAboveThreshold: 0, hasBox3Assets: false },
+    fiscaleRuimte: { status: 'good', ratio: 0, posten: [], score: 100 },
     box3Status: 'neutral' as LeverageStatus,
     box1Status: 'neutral' as LeverageStatus,
     netWorth: 0,
     budgetsOver: 0,
+  }
+}
+
+/** Zet de openstaande fiscale-ruimte-posten op een bestaande fixture. */
+function withFiscaleRuimte(
+  levers: LeverScoresResult,
+  posten: FiscaleRuimtePost[],
+  status: LeverageStatus = 'warn',
+): LeverScoresResult {
+  return {
+    ...levers,
+    fiscaleRuimte: { status, ratio: 0.1, posten, score: 60 },
   }
 }
 
@@ -208,7 +229,9 @@ describe('resolvePageStatusMap — lever/box routes', () => {
 
   it('red tax lever → /overzicht/belasting with status bad', () => {
     const map = resolvePageStatusMap({
-      levers: makeLeverScores('green', 'green', 'green', 'red', '', '', '', '€ 600k boven vrijstelling'),
+      // Sinds ADR 0177 beschrijft het tax-detail de onbenutte ruimte, niet meer
+      // het vermogen boven de vrijstelling.
+      levers: makeLeverScores('green', 'green', 'green', 'red', '', '', '', 'Veel ruimte onbenut'),
     })
     expect(map['/overzicht/belasting']).toBeDefined()
     expect(map['/overzicht/belasting'].status).toBe('bad')
@@ -329,6 +352,79 @@ describe('resolvePageStatusMap — {figure} interpolation', () => {
     expect(info).toBeDefined()
     expect(info.reason).not.toContain('{figure}')
     expect(info.reason).not.toContain('()')
+  })
+})
+
+// ── ADR 0177 D4 — de belastingmelding noemt de OORZAAK ───────────────────────
+
+describe('resolvePageStatusMap — fiscale ruimte: de melding noemt de oorzaak', () => {
+  const amberTax = () => makeLeverScores('green', 'green', 'green', 'amber', '', '', '', 'Ruimte onbenut')
+
+  it('kiest de byCause-tekst van de GROOTSTE post en noemt het bedrag', () => {
+    const levers = withFiscaleRuimte(amberTax(), [
+      { cause: 'jaarruimte', besparing: 2960 },
+      { cause: 'partnerverdeling', besparing: 400 },
+    ])
+    const info = resolvePageStatusMap({ levers })['/overzicht/belasting']
+    expect(info).toBeDefined()
+    expect(info.status).toBe('warn')
+    expect(info.reason).toContain('onbenutte jaarruimte')
+    // Bedrag via formatCurrency (nl-NL): "€ 2.960" met een non-breaking space.
+    expect(info.reason).toMatch(/€\s?2\.960/)
+    expect(info.reason).toContain('per jaar')
+    // De tweede post wordt geteld, niet opgesomd.
+    expect(info.reason).toContain('nog een andere post')
+    expect(info.remedy).toContain('pensioenopbouw')
+  })
+
+  it('noemt bij één post geen staartzin over andere posten', () => {
+    const levers = withFiscaleRuimte(amberTax(), [
+      { cause: 'partnerverdeling', besparing: 1200 },
+    ])
+    const info = resolvePageStatusMap({ levers })['/overzicht/belasting']
+    expect(info.reason).toContain('fiscale partner')
+    expect(info.reason).not.toMatch(/andere post/)
+    expect(info.reason).not.toContain('{figure}')
+  })
+
+  it('valt terug op de generieke warn-tekst wanneer er geen post is', () => {
+    const info = resolvePageStatusMap({ levers: amberTax() })['/overzicht/belasting']
+    expect(info).toBeDefined()
+    expect(info.reason).toContain('fiscale ruimte onbenut')
+    expect(info.reason).not.toContain('{figure}')
+    expect(info.reason).not.toContain('()')
+  })
+
+  it('is rood met de oorzaak-tekst wanneer de hefboom rood staat', () => {
+    const levers = withFiscaleRuimte(
+      makeLeverScores('green', 'green', 'green', 'red', '', '', '', 'Veel ruimte onbenut'),
+      [{ cause: 'samenstelling', besparing: 815 }],
+      'bad',
+    )
+    const info = resolvePageStatusMap({ levers })['/overzicht/belasting']
+    expect(info.status).toBe('bad')
+    expect(info.reason).toContain('sparen en beleggen')
+    expect(info.remedy).toContain('ná gemist rendement')
+  })
+
+  it('spoort nergens aan (Wft: inzicht mag, advies niet)', () => {
+    for (const cause of ['partnerverdeling', 'jaarruimte', 'samenstelling'] as const) {
+      const levers = withFiscaleRuimte(amberTax(), [{ cause, besparing: 500 }])
+      const info = resolvePageStatusMap({ levers })['/overzicht/belasting']
+      const tekst = `${info.reason} ${info.remedy}`.toLowerCase()
+      for (const aansporing of ['benut je', 'verschuif', 'optimaliseer', 'zorg dat', 'verlaag je']) {
+        expect(tekst, `${cause}: ${aansporing}`).not.toContain(aansporing)
+      }
+    }
+  })
+
+  it('onderdrukt de melding ook met posten wanneer de hefboom geen data heeft', () => {
+    const levers = withFiscaleRuimte(
+      makeLeverScores('green', 'green', 'green', 'red', '', '', '', 'Geen belastbare bezittingen — Start'),
+      [{ cause: 'jaarruimte', besparing: 2960 }],
+      'bad',
+    )
+    expect(resolvePageStatusMap({ levers })['/overzicht/belasting']).toBeUndefined()
   })
 })
 

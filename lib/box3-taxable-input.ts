@@ -12,11 +12,22 @@
 //      en de type-set nooit meer divergeren tussen sidebar en kaart.
 //
 //   2. box3TaxStatus(input) → LeverageStatus
-//      De exacte tax-lever-statuslogica die ook `computeLeverScores` (lever-
-//      scores.ts) gebruikt. Levert good/warn/bad/neutral. De Belasting-kaart
-//      consumeerde voorheen een verwijderde gezondheids-pillar (tax_optimization,
-//      ADR 0010) → ALTIJD neutral. Nu deelt de kaart deze canonieke bron met de
-//      sidebar, dus kaart-status == sidebar-status, beide betekenisvol.
+//      Het BOX 3-GRONDSLAGSIGNAAL: hoe ver het box 3-vermogen boven de
+//      heffingsvrije voet uitkomt, in vaste euro-banden. Levert
+//      good/warn/bad/neutral voor het Box 3-kaartlabel op /overzicht/belasting
+//      (via `box3StatusVerdict`), de kop van /overzicht/belasting/box3 en de
+//      Box 3-dot in de sidebar — die drie delen deze ene bron en kunnen elkaar
+//      dus niet tegenspreken.
+//
+//      HIJ IS NIET (MEER) DE STATUS VAN DE HEFBOOM BELASTING. Tot 22 sep 2026
+//      las `computeLeverScores` hem als hefboomoordeel; ADR 0177 heeft die
+//      grondslag vervangen door ONBENUTTE FISCALE RUIMTE
+//      (`computeFiscaleRuimte`, lib/fiscale-ruimte.ts). Reden: deze banden zijn
+//      een vermogensmeter — monotoon dalend in vermogen, zonder plafond, en
+//      zonder handeling die ze groen kon maken behalve minder vermogen
+//      bezitten. Als constatering óver de grondslag ("Ruim boven de
+//      vrijstelling") blijft hij bruikbaar; als oordeel over de gebruiker niet
+//      (ADR 0177 D6).
 //
 // "Consume, don't recompute": niemand mag de BOX3_TYPES-set of de drempels
 // dupliceren — importeer deze helpers.
@@ -144,11 +155,15 @@ export function computeBox3TaxableInput(
 }
 
 /**
- * Box 3 tax-lever-status (good/warn/bad/neutral) — de canonieke statuslogica
- * die `computeLeverScores` intern hergebruikt (lever-scores.ts), zodat de
- * sidebar-dot en de Belasting-kaart gegarandeerd dezelfde uitkomst tonen.
+ * Box 3-GRONDSLAGSTATUS (good/warn/bad/neutral) — de canonieke bron voor het
+ * Box 3-kaartlabel, de Box 3-subpaginakop en de Box 3-dot in de sidebar, zodat
+ * die drie gegarandeerd dezelfde uitkomst tonen.
  *
- * Drempels (identiek aan de tax-lever vóór deze extractie):
+ * NIET de status van de hefboom Belasting — die komt sinds ADR 0177 uit
+ * `computeFiscaleRuimte` (lib/fiscale-ruimte.ts). Zie de module-kop voor
+ * waarom deze euro-banden geen hefboomoordeel meer dragen.
+ *
+ * Drempels (ongewijzigd sinds de extractie uit de tax-lever):
  *  - neutral: geen box3-belastbare assets → niets te beoordelen
  *  - good:    onder de vrijstelling → optimaal, geen heffing
  *  - good:    ≤ €100k boven vrijstelling mét partner → geoptimaliseerd

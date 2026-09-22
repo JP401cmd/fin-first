@@ -26,8 +26,11 @@
  *
  * ── Wft en ADR 0165 ──────────────────────────────────────────────────────
  * Elke zin is een CONSTATERING over de eigen situatie: geen imperatief, geen
- * bedrag- of besparingsbelofte en geen koop-/verkoopmetafoor. De belasting-
- * regel houdt de hedge "mogelijk", net als `HEFBOOM_VERDICT.belasting.warn`.
+ * bedrag- of besparingsbelofte en geen koop-/verkoopmetafoor. De belasting-regel
+ * droeg tot ADR 0177 de hedge "mogelijk"; die is vervallen omdat de bron de
+ * openstaande posten nu daadwerkelijk telt in plaats van ze te vermoeden (zie
+ * `HEFBOOM_VERDICT.belasting`). Het BEDRAG blijft buiten de kop — dat staat in
+ * de status-duiding-melding.
  *
  * Pure module (géén 'use client'), zodat server-pages en client-components
  * dezelfde zin lezen.
@@ -56,16 +59,23 @@ export interface Oordeelzin {
  * hefboom is dat "budget", want die hefboom heet in de app Budget
  * (/overzicht/budget, ADR 0135).
  *
- * Belasting zegt "Je Box 3-belasting" en niet "Je belasting": de status van die
- * hefboom is uitsluitend `box3TaxStatus` (lib/lever-scores.ts). De hub toont ook
- * Box 1, vaak het grootste bedrag. "Je belasting blijft *beperkt*." zou daar een
- * uitspraak over álle belasting zijn die de score niet meet (eindreview F3).
+ * Belasting is de ENIGE hefboom waarvan het onderwerp niet het paginawoord
+ * draagt, en dat is sinds ADR 0177 een bewuste keuze. Het onderwerp was "Je Box
+ * 3-belasting" omdat de status uitsluitend `box3TaxStatus` was — de hoogte van
+ * de Box 3-heffing — terwijl de hub ook Box 1 toont. Die grondslag is vervallen:
+ * de hefboom meet nu de ONBENUTTE FISCALE RUIMTE als aandeel van de eigen
+ * heffing over Box 1 én Box 3 (`computeFiscaleRuimte`). "Je Box 3-belasting"
+ * zou dus te smal zijn (Box 1 telt mee) en "Je belasting" te breed én onjuist
+ * (de zin gaat niet over de hoogte van de heffing, maar over wat je ernaast laat
+ * liggen). Het onderwerp is daarom de grondslag zelf: "Je fiscale ruimte". Het
+ * paginawoord staat er nog steeds bij — de TopBar draagt "Belasting" links van
+ * de kop.
  */
 export const HEFBOOM_ONDERWERP: Record<Hefboom, string> = {
   bezittingen: 'Je bezittingen',
   schulden: 'Je schulden',
   cashflow: 'Je budget',
-  belasting: 'Je Box 3-belasting',
+  belasting: 'Je fiscale ruimte',
 }
 
 /**
@@ -111,13 +121,20 @@ export const HEFBOOM_OORDEELZIN: Record<Hefboom, Record<LeverageStatus, Oordeelz
     bad: { voor: 'Je budget staat', oordeel: 'onder druk' },
     neutral: { voor: 'Je budget is', oordeel: 'nog niet te beoordelen' },
   },
-  // `good` dekt ook "beperkt boven de vrijstelling mét fiscaal partner"
-  // (box3TaxStatus), vandaar "beperkt" en niet "nul" — zie HEFBOOM_VERDICT.
+  // ADR 0177: de zin gaat over onbenutte fiscale ruimte, niet over de hoogte van
+  // de heffing. `good` zegt "goed benut" en niet "volledig benut" — de groene
+  // band loopt tot 5% van de eigen heffing, dus er mág een kleine post
+  // openstaan. `warn` en `bad` verschillen in graad ("deels" / "grotendeels"),
+  // precies zoals de banden dat doen; de MELDING eronder noemt de post en het
+  // bedrag (PAGE_STATUS_COPY['/overzicht/belasting'].byCause).
+  //
+  // Geen hedge "mogelijk" meer: de posten worden geteld, niet vermoed — zie de
+  // aantekening bij HEFBOOM_VERDICT.belasting.
   belasting: {
-    good: { voor: 'Je Box 3-belasting blijft', oordeel: 'beperkt' },
-    warn: { voor: 'Je Box 3-belasting is', oordeel: 'mogelijk hoger dan nodig' },
-    bad: { voor: 'Je Box 3-belasting is', oordeel: 'hoog' },
-    neutral: { voor: 'Je Box 3-belasting is', oordeel: 'nog niet in beeld' },
+    good: { voor: 'Je fiscale ruimte is', oordeel: 'goed benut' },
+    warn: { voor: 'Je fiscale ruimte is', oordeel: 'deels onbenut' },
+    bad: { voor: 'Je fiscale ruimte is', oordeel: 'grotendeels onbenut' },
+    neutral: { voor: 'Je fiscale ruimte is', oordeel: 'nog niet in beeld' },
   },
 }
 

@@ -216,9 +216,12 @@ export default async function OverzichtBelastingPage() {
     householdType,
   )
   const box3Status = box3TaxStatus(box3TaxableInput)
-  // Eén oordeelszin voor drie oppervlakken: de kaart hieronder, de titel van
-  // deze hub en de titel van /overzicht/belasting/box3 (zie
-  // `box3StatusVerdict`). De vorige, hier inline geschreven teksten waren
+  // Eén zin voor twee oppervlakken: de Box 3-kaart hieronder en de titel van
+  // /overzicht/belasting/box3 (zie `box3StatusVerdict`). NIET meer voor de titel
+  // van deze hub — die volgt sinds ADR 0177 de hefboom (onbenutte fiscale
+  // ruimte). "Ruim boven de vrijstelling" blijft hier staan als feitelijke
+  // constatering over de Box 3-GRONDSLAG (ADR 0177 D6); het draagt geen oordeel
+  // van de hefboom meer. De vorige, hier inline geschreven teksten waren
   // handelings-geframed — "Optimaliseer Box 3" is een gebiedende wijs en
   // daarmee een aansporing i.p.v. een constatering (Wft-grens).
   const box3StatusText = box3StatusVerdict(box3Status)
@@ -280,9 +283,11 @@ export default async function OverzichtBelastingPage() {
       {/* ── Editorial pagina-opening die het OORDEEL uitspreekt ──────────
           Kop-herziening sep 2026: kicker vervallen, titel = "Belasting |
           <oordeel>" (op mobiel alleen het oordeel — de TopBar draagt de naam).
-          Het oordeel is de Box 3-stand: de enige box waar deze hub een
-          stoplicht voor heeft, en dezelfde zin als op de Box 3-kaart hieronder
-          en op /overzicht/belasting/box3. Het oordeelswoord kleurt met de
+          Het oordeel is de BELASTING-HEFBOOM, en die meet sinds ADR 0177 de
+          onbenutte fiscale ruimte over Box 1 + Box 3 — niet de hoogte van de
+          Box 3-heffing. Het Box 3-oordeel (`box3StatusVerdict`) is dus bewust
+          iets ánders en staat op de Box 3-kaart hieronder en op
+          /overzicht/belasting/box3. Het oordeelswoord kleurt met de
           stoplichtkleur (semantiek), niet met een accent. */}
       <div className="relative mx-auto max-w-6xl px-4 pt-6 sm:px-6 sm:pt-8">
         <PageStatusDot className="absolute right-[52px] top-6 sm:right-[60px] sm:top-8" />
@@ -304,8 +309,9 @@ export default async function OverzichtBelastingPage() {
             /schulden en /budget. Het Box 3-oordeel blijft staan waar het thuis
             hoort: op de Box 3-kaart hieronder en op /overzicht/belasting/box3.
 
-            Sinds ADR 0174 D6 is de titel een zin ("Je Box 3-belasting blijft
-            *beperkt*."), uit dezelfde hefboomstatus. */}
+            Sinds ADR 0174 D6 is de titel een zin, sinds ADR 0177 over de
+            grondslag van de hefboom zelf ("Je fiscale ruimte is *goed
+            benut*."), uit dezelfde hefboomstatus. */}
         <PageVerdictOpening
           gutterClassName="pr-20 sm:pr-24"
           pageName={resolveRouteTitle('/overzicht/belasting') ?? 'Belasting'}

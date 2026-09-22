@@ -26,6 +26,8 @@
 
 import type { LeverageStatus } from '@/lib/leverage-status'
 import type { PageStatusAction, PageStatusWill } from '@/lib/page-status/types'
+import type { FiscaleRuimteCause } from '@/lib/fiscale-ruimte'
+import { formatCurrency } from '@/lib/format'
 import { ankerTitel, ankerZin, type AnkerReach, type AnkerStop } from '@/lib/horizon/anker-copy'
 
 /** Per status (warn/bad) een reason + remedy; {figure} = live cijfer. */
@@ -40,6 +42,31 @@ export interface RouteCopy {
   /** Copy voor de twee zichtbare statussen. good/neutral tonen geen banner. */
   warn: StatusCopy
   bad: StatusCopy
+  /**
+   * OORZAAK-SPECIFIEKE variant (ADR 0177 D4) — optioneel, en alléén gevuld voor
+   * een route waarvan de statusbron méér levert dan een niveau.
+   *
+   * `LeverageStatus` draagt alleen "oranje" of "rood"; een melding die niets
+   * anders kent kan niet zeggen waaróm. De belasting-hefboom levert sinds ADR
+   * 0177 de openstaande posten mee, aflopend op besparing, en `resolve.ts` kiest
+   * de variant van de GROOTSTE post. Ontbreekt de post of de variant, dan vallen
+   * we terug op `warn`/`bad` — routes zónder `byCause` gedragen zich dus exact
+   * zoals voorheen.
+   *
+   * Eén variant per oorzaak, niet per oorzaak × status: het NIVEAU zit al in de
+   * kleur van de melding en in het bedrag, de oorzaak-tekst verschilt daar niet
+   * door.
+   *
+   * VOLLEDIG, niet `Partial` — bewust. De hele reden van bestaan van dit veld is
+   * dat oranje en rood hun oorzaak noemen; een `Partial` liet een vierde
+   * `FiscaleRuimteCause` (bv. `tegenbewijs` uit ADR 0177 D7) gewoon compileren
+   * zónder copy, waarna `resolve.ts` stil terugvalt op de generieke warn-tekst
+   * met de detailregel als cijfer — "Er blijft fiscale ruimte onbenut
+   * (Samenstelling vermogen · € 815 per jaar)", grammaticaal scheef en door geen
+   * test gevangen. Het veld zelf blijft optioneel: een route die géén
+   * oorzaak-bron heeft, hoort hier niets te zetten. Maar wie 'm zet, zet 'm vol.
+   */
+  byCause?: Record<FiscaleRuimteCause, StatusCopy>
   action?: PageStatusAction
   will: PageStatusWill
 }
@@ -137,25 +164,52 @@ export const PAGE_STATUS_COPY: Record<string, RouteCopy> = {
     },
   },
 
+  // De hefboom Belasting oordeelt sinds ADR 0177 op ONBENUTTE FISCALE RUIMTE als
+  // aandeel van de eigen heffing over Box 1 + Box 3 — niet meer op de hoogte van
+  // de Box 3-heffing. De oude teksten ("Je vermogen ligt ruim boven de
+  // heffingsvrije voet") beschreven precies de grondslag die is afgeschaft: die
+  // was monotoon in vermogen, had geen plafond en kende geen handeling die hem
+  // groen maakte. `warn`/`bad` hieronder zijn nu de TERUGVAL; de melding die de
+  // gebruiker normaal leest komt uit `byCause`.
   '/overzicht/belasting': {
     title: 'Belasting',
-    // H24 (Wft): beschrijvend, niet oordelend. "Je betaalt waarschijnlijk meer
-    // belasting dan nodig" is een bewering die we niet hard kunnen maken —
-    // we kennen de heffing, niet wat "nodig" was. Zelfde register als de
-    // box3-pagina hieronder: benoem de grondslag, trek geen conclusie.
+    // H24 (Wft): beschrijvend, niet oordelend. We noemen wat er onbenut blijft en
+    // waar het te zien is; we sporen niet aan om het te benutten.
     warn: {
-      reason: 'Een deel van je vermogen valt in de Box 3-heffing ({figure}).',
+      reason: 'Er blijft fiscale ruimte onbenut ({figure}).',
       remedy:
-        'Bekijk je Box 1- en Box 3-overzicht om te zien hoe die heffing is opgebouwd.',
+        'In je Box 1- en Box 3-overzicht zie je hoe je heffing is opgebouwd.',
     },
     bad: {
-      reason: 'Je vermogen ligt ruim boven de heffingsvrije voet ({figure}).',
+      reason: 'Een fors deel van je fiscale ruimte blijft onbenut ({figure}).',
       remedy:
         'In je Box 1- en Box 3-overzicht zie je per box waar de heffing vandaan komt.',
     },
+    // De drie posten van ADR 0177 D2. Elke tekst is een CONSTATERING: hij benoemt
+    // wat de post is en waar de gebruiker hem terugziet — nooit "benut je
+    // jaarruimte" of een andere gebiedende wijs (Wft: inzicht mag, advies niet).
+    byCause: {
+      partnerverdeling: {
+        reason:
+          'Je laat fiscale ruimte liggen: de verdeling tussen jou en je fiscale partner ({figure}).',
+        remedy:
+          'De verdeling van je vermogen tussen jou en je fiscale partner bepaalt hoeveel Box 3-heffing er in totaal betaald wordt. In je Box 3-overzicht zie je de huidige verdeling.',
+      },
+      jaarruimte: {
+        reason: 'Je laat fiscale ruimte liggen: onbenutte jaarruimte ({figure}).',
+        remedy:
+          'Onbenutte jaarruimte is fiscale ruimte voor pensioenopbouw die dit jaar niet gebruikt wordt. Je Box 1-overzicht laat zien hoeveel het is.',
+      },
+      samenstelling: {
+        reason:
+          'Je laat fiscale ruimte liggen: de verhouding tussen sparen en beleggen ({figure}).',
+        remedy:
+          'Sparen en beleggen worden in Box 3 verschillend belast. De optimizer laat zien wat een verschuiving netto oplevert, ná gemist rendement.',
+      },
+    },
     will: {
-      onderwerp: 'Mijn belasting optimaliseren',
-      detail: 'Ik wil weten waar ik legaal belasting kan besparen.',
+      onderwerp: 'De fiscale ruimte die ik nog niet gebruik',
+      detail: 'Ik wil begrijpen welke fiscale ruimte ik onbenut laat en wat daarachter zit.',
     },
   },
 
@@ -359,6 +413,35 @@ export function anchoredBannerCopy(reach: AnkerReach, stop: AnkerStop): FreedomB
         : 'Ik wil weten waar de ruimte zit om mijn liquide vermogen verder te laten reiken.',
     },
   }
+}
+
+// ── Fiscale ruimte: het live cijfer en de staartzin (ADR 0177 D4) ───────────
+
+/**
+ * Het live cijfer in een `byCause`-reason: "ongeveer € 2.960 per jaar".
+ *
+ * "Ongeveer" is geen sierwoord maar de hedge die bij de bron hoort: de posten
+ * komen uit modelmatige motoren (partnerverdeling, jaarruimte, samenstelling) en
+ * zijn een indicatie, geen aanslag. Bedragen altijd via `formatCurrency`
+ * (nl-NL, hele euro's) — nooit met de hand opgemaakt.
+ */
+export function fiscaleRuimteFigure(besparing: number): string {
+  return `ongeveer ${formatCurrency(besparing)} per jaar`
+}
+
+/**
+ * Staartzin wanneer er naast de grootste post nog andere openstaan. Lege string
+ * bij 0 — de melding noemt dan alleen de grootste post.
+ *
+ * Bewust een eigen ZIN en niet een staart binnen de haakjes van het bedrag:
+ * "(ongeveer € 2.960 per jaar, en 1 andere)" leest alsof dat aantal bij het
+ * bedrag hoort.
+ */
+export function overigePostenZin(extra: number): string {
+  if (extra <= 0) return ''
+  return extra === 1
+    ? 'Daarnaast ligt er nog een andere post open.'
+    : `Daarnaast liggen er nog ${extra} andere posten open.`
 }
 
 /** Helper: copy voor een route + status (warn/bad). null als route onbekend. */

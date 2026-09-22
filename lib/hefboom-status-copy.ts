@@ -53,9 +53,11 @@ import type { LeverageStatus } from './leverage-status'
  *    meer dan nodig"). De motivering daarvoor — belasting heeft sinds ADR 0010
  *    geen eigen gezondheidspijler en de tegel zou terugvallen op een
  *    totaalscore-proxy — is achterhaald: de tegel leest zijn status sinds de
- *    lever-pariteitsfix uit `loadLeverScores` → `box3TaxStatus`, een échte,
- *    betekenisvolle Box 3-status. De proxy is nog uitsluitend fallback voor het
- *    geval `leverScores` ontbreekt.
+ *    lever-pariteitsfix uit `loadLeverScores`. De proxy is nog uitsluitend
+ *    fallback voor het geval `leverScores` ontbreekt. Sinds ADR 0177 is die
+ *    status niet langer `box3TaxStatus` (de hoogte van de Box 3-heffing) maar
+ *    `computeFiscaleRuimte` (onbenutte fiscale ruimte over Box 1 + Box 3) —
+ *    vandaar de nieuwe woorden hieronder.
  *
  *    Gevolg van die achterstallige koppeling was bug UR2-04: bij een GROENE
  *    belasting-hefboom (onder de vrijstelling) stond op één scherm de kaart
@@ -92,15 +94,32 @@ export const HEFBOOM_VERDICT: Record<
     warn: 'Budget vraagt aandacht',
     bad: 'Budget onder druk',
   },
-  // Elk van de drie is een CONSTATERING over de eigen Box 3-positie, geen
-  // imperatief en geen besparingsbelofte (Wft). `good` dekt twee gevallen —
-  // onder de heffingsvrije voet, én beperkt erboven mét fiscaal partner
-  // (box3TaxStatus) — vandaar "beperkt" en niet "geen": dat laatste zou voor het
-  // partner-geval onwaar zijn.
+  // Sinds ADR 0177 oordeelt deze hefboom op ONBENUTTE FISCALE RUIMTE als aandeel
+  // van de eigen heffing over Box 1 + Box 3 — niet meer op de hoogte van de Box
+  // 3-heffing. De oude woorden ("Belastingdruk beperkt" / "Hoge belastingdruk")
+  // beschreven die afgeschafte grondslag: ze noemden de heffing zelf, die geen
+  // tekortkoming van de gebruiker is maar de werking van het stelsel, en bij hoog
+  // vermogen nooit groen te krijgen was.
+  //
+  // De hedge "Mogelijk" op `warn` is daarmee ook vervallen. Die stond er omdat
+  // "je betaalt meer dan nodig" een bewering was die de bron niet kon dragen — we
+  // kenden de heffing, niet wat "nodig" was. De nieuwe bron telt daadwerkelijk
+  // openstaande posten op (partnerverdeling, jaarruimte, samenstelling), dus
+  // "Ruimte onbenut" is een constatering en geen vermoeden. Nog steeds geen
+  // imperatief en geen besparingsbelofte (Wft): het bedrag staat in de melding,
+  // niet in het tegelwoord.
+  // `good` was 'Ruimte benut' — woordelijk hetzelfde als het label van
+  // `box1JaarruimteVerdict` (lib/jaarruimte.ts), en op /overzicht/belasting
+  // staan die twee onder elkaar. Ze gaan over verschillende dingen: de Box
+  // 1-kaart bedoelt uitsluitend je jaarruimte, de hefboom weegt drie posten
+  // (partnerverdeling, jaarruimte, samenstelling). Twee grootheden die dezelfde
+  // twee woorden dragen, tien centimeter uit elkaar, is precies de drift die
+  // deze module hoort te voorkomen. 'Niets onbenut' dekt alle drie de posten en
+  // is niet te verwarren met het jaarruimte-oordeel.
   belasting: {
-    good: 'Belastingdruk beperkt',
-    warn: 'Mogelijk betaal je meer dan nodig',
-    bad: 'Hoge belastingdruk',
+    good: 'Niets onbenut',
+    warn: 'Ruimte onbenut',
+    bad: 'Veel ruimte onbenut',
   },
 }
 
