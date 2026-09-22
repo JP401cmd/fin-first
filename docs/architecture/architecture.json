@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-09-22T20:19:50.300Z",
+  "generatedAt": "2026-09-22T21:30:12.599Z",
   "generatedDate": "2026-09-22",
   "repo": {
     "name": "fin",
-    "version": "0.92.4"
+    "version": "0.92.5"
   },
   "annotations": {
     "philosophy": "Geld levert tijd op — elk bedrag staat voor tijd waarin je uitgaven gedekt zijn.",
@@ -18866,7 +18866,7 @@
       },
       {
         "file": "lib/release-notes.ts",
-        "loc": 3484,
+        "loc": 3523,
         "commits": 10
       },
       {
@@ -20071,23 +20071,8 @@
   "diff": {
     "baseline": false,
     "previousDate": "2026-09-22",
-    "hasChanges": true,
-    "sections": [
-      {
-        "label": "API-routes",
-        "added": [
-          "/api/admin/news-duiding/steekproef"
-        ],
-        "removed": []
-      },
-      {
-        "label": "Componenten (aantal)",
-        "added": [
-          "+1"
-        ],
-        "removed": []
-      }
-    ]
+    "hasChanges": false,
+    "sections": []
   },
   "statsHistory": [
     {

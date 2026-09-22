@@ -1202,3 +1202,7 @@
 
 - **API-routes** toegevoegd: /api/admin/news-duiding/steekproef
 - **Componenten (aantal)** toegevoegd: +1
+
+## 2026-09-22
+
+- Geen wijzigingen.

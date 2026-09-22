@@ -97,6 +97,45 @@ export const RELEASE_NOTE_NORM = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.92.5',
+    date: '2026-09-22',
+    title: 'Nieuws met de kop en de woorden van de bron',
+    sections: [
+      {
+        module: 'Fin',
+        color: 'blue',
+        items: [
+          {
+            title: 'De kop is die van de bron zelf',
+            description:
+              'Een nieuwsbericht draagt nu de eigen kop van de bron, en de link brengt je naar dat bericht in plaats van naar een pagina die er niet blijkt te zijn.',
+          },
+          {
+            title: 'Een samenvatting mag ook ontbreken',
+            description:
+              'Komt een samenvatting niet door de controle, dan zie je de kop van de bron met een link erbij. Liever geen tekst dan een tekst waar we niet voor kunnen staan.',
+          },
+          {
+            title: 'De datum komt uit het bericht',
+            description:
+              'De datum bij een bericht komt uit het bericht zelf. Staat die er niet in, dan zie je wanneer we het voor het eerst tegenkwamen.',
+          },
+        ],
+      },
+      {
+        module: 'Platform',
+        color: 'zinc',
+        items: [
+          {
+            title: 'De nieuwsverzameling begint één keer opnieuw',
+            description:
+              'Vlak na deze versie staan er tijdelijk minder berichten in het nieuws. De lijst vult zich in de dagen daarna weer aan.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: '0.92.4',
     date: '2026-09-22',
     title: 'Je plan zegt ook of je doel reikt',
