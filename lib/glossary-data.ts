@@ -281,6 +281,17 @@ export const GLOSSARY_ENTRIES: Record<string, GlossaryEntry> = {
   // vanaf het zichtbare woord niet te vinden was. "Noodbuffer" (budget-
   // subcategorie) blijft een apart, ongewijzigd data-label — dat is een
   // categorienaam, geen jargonwoord dat hier wordt uitgelegd.
+  // Wát de score weegt, achter de hub-zin "Je financiële gezondheid is …,
+  // gezien je …" (B-069). Die zin noemt alleen de onderdelen; de uitleg per
+  // onderdeel stond tot F4 als losse zin in de deck en woont nu hier (chip in de
+  // pagina-`i` van /overzicht). De gewichten zelf staan per pijler in de receipt
+  // achter de gezondheidskaart.
+  gezondheidsscore: {
+    name: 'Gezondheidsscore',
+    alternative: 'Hoe je er nu voor staat, van 0 tot 100',
+    explanation:
+      'Eén getal van 0 tot 100 voor hoe je er nu voor staat. Het weegt je uitgaven (hoeveel je spaart en of je binnen je budgetten blijft), je buffer, je schulden en je bezittingen (hoe ver je op weg bent naar volledige vrijheid en hoe gespreid). Een onderdeel waarvoor je nog geen gegevens hebt, of dat je niet gebruikt, telt niet mee; tik op de kaart voor de berekening per onderdeel.',
+  },
   noodfonds: {
     name: 'Noodfonds',
     alternative: 'Spaarpot voor onverwachte uitgaven',

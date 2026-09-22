@@ -152,12 +152,17 @@ export default async function OverzichtCashflowTransactiesPage({
             Het oordeelswoord komt uit `transactiesVerdict`, dezelfde bron als de
             `subText` van de Transacties-kaart op /overzicht/budget. De vorige
             deck ("gekochte of verkochte tijd") was een koop-/verkoopmetafoor en
-            daarmee in strijd met ADR 0165. */}
+            daarmee in strijd met ADR 0165.
+
+            De tweede zin zegt in gewone woorden waar het oordeel op rust,
+            zonder het woord "oordeel" (B-071, F4 van "Topbar & oordeelzin"):
+            20% overhouden ís de spaarquote-drempel van `transactiesCardStatus`.
+            De volledige drempels staan in de pagina-`i`. */}
         <PageVerdictOpening
           pageName={resolveRouteTitle('/overzicht/budget/transacties') ?? 'Transacties'}
           verdict={txVerdict.label}
           tone={txVerdict.status}
-          deck="Waar je geld heen gaat, per periode en tegenpartij. Het oordeel volgt je spaarquote deze maand: vanaf 20% op koers."
+          deck="Waar je geld heen gaat, per periode en tegenpartij. Houd je deze maand 20% of meer van je inkomen over, dan ben je op koers."
         />
         <KoppelRekeningBanner accountCount={accountCount} />
         {/* Versheidsmelding: alles hieronder rust op transacties, dus als die

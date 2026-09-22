@@ -66,7 +66,7 @@ export default async function BelastingBox2Page() {
         route="/overzicht/belasting/box2"
         verdict={box2Verdict}
         tone={box2Tone}
-        deck="Belasting over een aanmerkelijk belang van 5% of meer. Het oordeel volgt de heffing over dividend en DGA-leningen."
+        deck="Belasting over een aanmerkelijk belang van 5% of meer. Je ziet hier of er dit jaar heffing is over dividend en DGA-leningen."
       />
       {hasAanmerkelijkBelang ? <Box2Detail year={2026} /> : <Box2EmptyState />}
     </>

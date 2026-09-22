@@ -6,7 +6,12 @@ import { EditorialHeadline, EditorialDeck, Kicker } from '@/components/editorial
 import { leverageStatusTextClass } from '@/lib/leverage-status'
 import { SectionDivider } from '@/components/app/section-divider'
 import { BottomSheet } from '@/components/app/bottom-sheet'
-import { healthScoreTone, healthScoreVerdict, type HealthScore } from '@/lib/financial-health'
+import {
+  healthScoreBasisPhrase,
+  healthScoreTone,
+  healthScoreVerdict,
+  type HealthScore,
+} from '@/lib/financial-health'
 import {
   HefbomenNav,
   type HefbomenHousingSplit,
@@ -131,6 +136,10 @@ export function OverzichtHeroPrimary({
   // grondslag-onbekend-staat af, zodat de uitleg daar geen oordeel verzint maar
   // terugvalt op een neutrale beschrijving van de pagina.
   const healthVerdict = health ? healthScoreVerdict(health) : null
+  // "gezien je bezittingen, buffer, schulden en uitgaven" — alleen de groepen
+  // die in déze score meetellen (B-069). `null` bij nul pijlers: dan eindigt
+  // de zin na het bandwoord.
+  const healthBasis = health ? healthScoreBasisPhrase(health) : null
 
   return (
     <section className="relative mx-auto max-w-6xl px-4 sm:px-6 pt-6 pb-2 md:pt-8 md:pb-4">
@@ -162,15 +171,22 @@ export function OverzichtHeroPrimary({
         <EditorialDeck className="mt-3">
           {healthVerdict?.kind === 'score' && health ? (
             <>
-              {/* Het oordeelswoord draagt de stoplichtkleur, de rest niet —
-                  zelfde scheiding als `OordeelDeck` op /overzicht/budget/
-                  vaste-lasten. Het getal zelf staat in de gezondheidskaart
-                  hieronder; dat herhalen we hier niet. */}
+              {/* Eén lopende zin (B-069): het bandwoord plus WAAROP het rust,
+                  in woorden die de gebruiker herkent. Tot F4 stond hier "De
+                  score weegt rondkomen, buffer, schuld en vrijheid." — de
+                  interne groepsnamen, en "vrijheid" las als iets wat een score
+                  niet kan meten. De weging zelf staat in de receipt achter de
+                  gezondheidskaart en in de pagina-`i`.
+
+                  Het bandwoord draagt de stoplichtkleur, de rest niet — zelfde
+                  scheiding als `OordeelDeck` op /overzicht/budget/vaste-lasten.
+                  Het getal zelf staat in de gezondheidskaart hieronder; dat
+                  herhalen we hier niet. */}
               Je financiële gezondheid is{' '}
               <span className={leverageStatusTextClass(healthScoreTone(health))}>
                 {healthVerdict.label.toLowerCase()}
               </span>
-              . De score weegt rondkomen, buffer, schuld en vrijheid.
+              {healthBasis ? `, ${healthBasis}` : ''}.
             </>
           ) : (
             'Hoe je ervoor staat, in één blik: je vier hefbomen, je gezondheid en je plan.'

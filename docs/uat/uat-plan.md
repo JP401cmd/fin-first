@@ -2615,7 +2615,7 @@ Scope: `/overzicht/schulden`, `/overzicht/schulden/[type]`, `/core/debts`, `/cor
 #### WF-SCHULD-01 — Schuldenoverzicht bekijken: totalen, categorieën en kaarten
 - **Doel:** De gebruiker ziet in één oogopslag zijn totale schuldpositie: totaalbedrag, maandlasten, gewogen rente en alle schulden gegroepeerd per type.
 - **Trigger/startpunt:** Navigatie via sidebar/menu naar Overzicht → Schulden (`/overzicht/schulden`), of direct `/core/debts`.
-- **Eindresultaat:** Pagina toont de redactionele opening ("Elke schuld is vrijheid die je terugkoopt"), een figures-strip met vier kerncijfers (Totale schuld, Maandlasten, Rente (gewogen), Categorieën), en per schuldtype een groep met schuld-kaarten (naam, saldo, KPI-strip, sparkline-breuklijn).
+- **Eindresultaat:** Pagina toont de kop als oordeelzin ("Je schulden *wegen licht*." / "*vragen aandacht*" / "*wegen zwaar*", ADR 0174 D6) met de deck "Al je schulden, met hun maandlast en rente. Elke aflossing levert tijd op, en hoe lager je schuldgraad, hoe meer ruimte je hebt.", een figures-strip met vier kerncijfers (Totale schuld, Maandlasten, Rente (gewogen), Categorieën), en per schuldtype een groep met schuld-kaarten (naam, saldo, KPI-strip, sparkline-breuklijn).
 - **Stappen:**
   1. Open de pagina Schulden onder Overzicht.
   2. Bekijk de figures-strip bovenaan: totale schuld, maandlasten per maand, gewogen gemiddelde rente en het aantal categorieën.
@@ -9985,7 +9985,7 @@ Waar een berekening door een meerjarige simulatie loopt die niet met de hand te 
 - **Kriticiteit:** KERN · **Platform:** webapp · **Rooktest:** ja · **Duur:** ~3 min
 - **Preconditie:** persona `lisa` geladen via `/beheer/testdata`
 - **a. Happy path:**
-  1. Open `/overzicht/schulden` → *verwacht:* redactionele opening "Elke schuld is vrijheid die je terugkoopt" en een figures-strip met 4 kerncijfers.
+  1. Open `/overzicht/schulden` → *verwacht:* de kop als oordeelzin ("Je schulden *wegen licht*." of een andere stand) en een figures-strip met 4 kerncijfers.
   2. Lees de figures-strip → *verwacht:* Totale schuld **€368.270**, Maandlasten **€2.135**, Rente (gewogen) **2,9%**, Categorieën **11**.
   3. Scroll door de categorie-groepen → *verwacht:* 11 groepen (Hypotheek, Persoonlijke lening, Studielening, Autolening, Creditcard, Doorlopend krediet, Afbetalingsregeling, Belastingschuld, Familielening, DGA-schuld, Overig), elk met precies 1 kaart.
   4. Bekijk de Hypotheek-kaart → *verwacht:* KPI "LTV **91%**" (neutrale kleur, tussen 80–100%).

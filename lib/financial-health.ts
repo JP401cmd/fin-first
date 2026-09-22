@@ -1124,3 +1124,55 @@ export function healthScoreTone(health: HealthScore): LeverageStatus {
   if (health.total >= 40) return 'warn'
   return 'bad'
 }
+
+/**
+ * Het alledaagse woord per pijlergroep, voor de lopende zin onder de begroeting
+ * op /overzicht (B-069): "Je financiële gezondheid is sterk, gezien je
+ * bezittingen, buffer, schulden en uitgaven."
+ *
+ * De groepsnamen zelf (Rondkomen / Buffer / Schuld / Vrijheid) blijven in de
+ * receipt staan; deze zin noemt de BRON die de gebruiker herkent. Dat
+ * "vrijheid" hier "bezittingen" heet is geen versimpeling maar een correctie:
+ * beide indicatoren in die groep (FIRE-voortgang en spreiding) lezen het
+ * vermogen, en "de score weegt vrijheid" las voor de melder als iets wat een
+ * score niet kan meten. Rondkomen (spaarquote, budgetdiscipline) → uitgaven.
+ */
+const PILLAR_GROUP_WORD: Record<PillarGroup, string> = {
+  vrijheid: 'bezittingen',
+  buffer: 'buffer',
+  schuld: 'schulden',
+  rondkomen: 'uitgaven',
+}
+
+/** Vaste volgorde van de zin — die van de melding (B-069), niet die van de gewichten. */
+const PILLAR_WORD_ORDER: readonly PillarGroup[] = ['vrijheid', 'buffer', 'schuld', 'rondkomen']
+
+/**
+ * De woorden voor de pijlergroepen die in DEZE score meetellen, in zinsvolgorde.
+ * Leest `health.pillars` — dat is al de actieve set (module-gating én
+ * data-beschikbaarheid, zie `resolveActiveSet`), dus een groep die voor deze
+ * gebruiker wegvalt wordt ook niet genoemd. Een zin die "gezien je schulden"
+ * zegt terwijl de schuldpijler niet meeweegt, beweert iets wat de score niet
+ * meet — dezelfde deck-regel als op de hefboompagina's (ADR 0174 D6).
+ */
+export function healthScorePillarWords(health: HealthScore): string[] {
+  const groups = new Set<PillarGroup>()
+  for (const p of health.pillars) {
+    const group = p.pillarGroup ?? PILLAR_GROUP[p.id]
+    if (group) groups.add(group)
+  }
+  return PILLAR_WORD_ORDER.filter((g) => groups.has(g)).map((g) => PILLAR_GROUP_WORD[g])
+}
+
+/**
+ * Het staartstuk van de hub-zin: "gezien je bezittingen, buffer, schulden en
+ * uitgaven", of `null` als er geen pijler meetelt — dan eindigt de zin na het
+ * bandwoord in plaats van een lege opsomming te tonen.
+ */
+export function healthScoreBasisPhrase(health: HealthScore): string | null {
+  const words = healthScorePillarWords(health)
+  if (words.length === 0) return null
+  const list =
+    words.length === 1 ? words[0] : `${words.slice(0, -1).join(', ')} en ${words[words.length - 1]}`
+  return `gezien je ${list}`
+}

@@ -53,6 +53,14 @@ Twee regels die daaruit volgen:
   enige bewuste uitzondering, en alleen op mobiel. Desktop heeft geen TopBar
   (`lg:hidden`) en verandert niet.
 
+**Tweede drager: de zwevende nav-pill** (22 sep, na F3, `cc0b530fd`). De capsule onderaan
+op mobiel (zoeken, menu, Fin) is net zo goed chrome en leest dezelfde tokens: `--topbar-bg`
+als vlak, `--topbar-fg` voor de iconen en de focusring, `--topbar-hover` voor het drukvlak en
+de scheidingslijnen, ook in het Fin-segment (`fin-home.css`). Eén instelling heeft dus twee
+dragers; wie later verandert hoe de balkkleur wordt toegepast, raakt beide. De pill krijgt
+geen eigen token of instelling en telt niet als accent. Tot dan stond hij vast op
+stone-900 met witte iconen en liep hij niet mee met de gekozen balkkleur.
+
 **D3 — De kleur is per gebruiker instelbaar (F2).** Hij staat op `/mijn/uiterlijk` en
 wordt per account opgeslagen in `profiles.topbar_color`. Zelfde patroon als de accenten:
 de (app)-layout zet server-side `topbarColorVars(profiel.topbar_color)` op de
@@ -110,6 +118,17 @@ stoplichtkleur. Het oordeel wordt geconsumeerd uit de bestaande bron
 herberekend. De overige subpagina's houden "Naam | oordeel" (vervolg in F4). De hub
 `/overzicht` houdt zijn begroeting. Alleen de zin eronder wordt de lopende zin uit B-069.
 
+Uitgevoerd in F4 (22 sep):
+- **De hub-zin** luidt "Je financiële gezondheid is *{bandwoord}*, gezien je {pijlers}."
+  `healthScoreBasisPhrase` (`lib/financial-health.ts`) noemt alleen de pijlergroepen die in
+  déze score meetellen, in de volgorde van de melding: bezittingen, buffer, schulden,
+  uitgaven. "Vrijheid" heet daar "bezittingen", omdat beide indicatoren in die groep het
+  vermogen lezen. De weging, die tot F4 als losse zin in de deck stond, staat nu in de
+  receipt achter de gezondheidskaart en als term "Gezondheidsscore" in de pagina-`i`.
+- **Transacties, Box 1, Box 2 en Box 3** houden de kop "Naam | oordeel". Hun deck noemt het
+  woord "oordeel" niet meer, maar zegt in gewone taal waar de kop op rust.
+- De oordeelzin op de overige subpagina's is een vervolgkaart.
+
 ## Gevolgen
 
 - **F1:**
@@ -122,6 +141,11 @@ herberekend. De overige subpagina's houden "Naam | oordeel" (vervolg in F4). De 
   - Tests: `lib/color-palette.topbar.test.ts` (contrast, invoerpoort, `:root` = generator),
     `components/app/shell/top-bar.render.test.tsx` (volgorde, tokens, theme-color) en
     `app/globals-tokens.test.ts` (mapping in `@theme inline`).
+- **F4:** `components/overview/overzicht-hero.tsx` (hub-deck), `healthScorePillarWords` en
+  `healthScoreBasisPhrase` in `lib/financial-health.ts` (test:
+  `lib/financial-health.hub-zin.test.ts`), de glossary-term `gezondheidsscore`, de decks
+  van transacties en Box 1, 2 en 3, en de UAT-definities van ovz, bezit, schuld, cash en
+  belast.
 - **Documentatie:** de patroonkaart *Mobile TopBar* en de checklist in de ui-ux-skill. Die
   beschreven nog een gecentreerde Inter-titel van 14px.
 - **Geen architectuurplaat-wijziging:** dit is presentatie binnen `app-comp`, geen domein,

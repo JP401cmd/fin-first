@@ -62,7 +62,7 @@ export default async function BelastingBox3Page() {
         route="/overzicht/belasting/box3"
         verdict={box3StatusVerdict(box3Status)}
         tone={box3Status}
-        deck="Vermogensheffing over sparen en beleggen, forfaitair berekend. Het oordeel volgt je vermogen boven de vrijstelling."
+        deck="Belasting over je spaargeld en beleggingen, berekend op een verondersteld rendement. Hoe meer Box 3-vermogen boven de vrijstelling, hoe meer je betaalt."
       />
       <Box3Detail year={YEAR} initialData={box3} />
     </>

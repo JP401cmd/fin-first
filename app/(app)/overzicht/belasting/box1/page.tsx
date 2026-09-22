@@ -162,7 +162,7 @@ export default async function BelastingBox1Page() {
         route="/overzicht/belasting/box1"
         verdict={box1JaarruimteVerdictFromStatus(box1Status)}
         tone={box1Status}
-        deck="Belasting over loon, winst en je eigen woning. Het oordeel volgt je onbenutte jaarruimte voor extra pensioenopbouw."
+        deck="Belasting over loon, winst en je eigen woning. Je ziet hier ook of je jaarruimte voor extra pensioenopbouw nog onbenut is."
       />
 
       {box1Result != null && (

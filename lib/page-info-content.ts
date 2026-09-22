@@ -83,7 +83,7 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
         text: 'Bij je eerste bezoek loopt Fin in twee minuten met je langs de blokken op deze pagina en vertelt wat je cijfers betekenen. Je kunt hem hieronder opnieuw starten, of vanuit de gids in Fin.',
       },
     ],
-    terms: ['netto_vermogen', 'vrijheidstijd', 'spaarquote', 'bandbreedte', 'kassabon'],
+    terms: ['gezondheidsscore', 'netto_vermogen', 'vrijheidstijd', 'spaarquote', 'bandbreedte', 'kassabon'],
     related: [
       { href: '/overzicht/budget', label: 'Budget — wat er in- en uitgaat' },
       { href: '/toekomst', label: 'Toekomst — je pad naar vrijheid' },
@@ -356,7 +356,7 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
   },
   '/overzicht/budget/vaste-lasten': {
     insight:
-      'Je abonnementen en terugkerende kosten op één plek, uitgedrukt in hoeveel vrijheidstijd ze je kosten. Elke euro minder vaste last is vrijheid die je terugkoopt.',
+      'Je abonnementen en terugkerende kosten op één plek, uitgedrukt in hoeveel vrijheidstijd ze je kosten. Elke euro minder vaste last levert tijd op.',
     grip:
       'Onder de lijst staat je vaste-lastenquote — het aandeel van je inkomen, met Nibud-duiding — en je abonnementen-sluipverbruik ten opzichte van het gemiddelde. In Volledig zie je ook de samenstelling per categorie.',
     werking: [
