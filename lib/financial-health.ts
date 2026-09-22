@@ -982,16 +982,21 @@ export function computeHealthScoreFromInputs(
       'Vermogensspreiding',
       concentrationScore,
       'Hoe sterk leunt je vermogen op één type bezit? (excl. eigen woning)',
+      // Grondslag in de tekst zelf: de Bezittingen-tegel toont deze regels
+      // onder een kop-bedrag MÉT woning, zonder de omschrijving hierboven.
+      // Kaal "redelijk gespreid" las dan als oordeel over het hele bezit
+      // (melding 22 sep: 91% in de woning). Eigenaar koos labelen boven
+      // meetellen — ADR 0010 blijft staan.
       input.largestAssetTypeShare == null
         ? 'Bouw eerst vermogen op — spreiding wordt relevant vanaf ±€10.000.'
         : concentrationPct > 70
-        ? 'Je vermogen is sterk geconcentreerd — overweeg te spreiden over meer typen.'
+        ? 'Zonder eigen woning gerekend is je vermogen sterk geconcentreerd — overweeg te spreiden over meer typen.'
         : concentrationPct > 40
-        ? 'Redelijk gespreid — een extra vermogenstype verlaagt je risico verder.'
-        : 'Goed gespreid — monitor je allocatie periodiek.',
+        ? 'Zonder eigen woning gerekend is je vermogen redelijk gespreid — een extra vermogenstype verlaagt je risico verder.'
+        : 'Zonder eigen woning gerekend is je vermogen goed gespreid — monitor je allocatie periodiek.',
       input.largestAssetTypeShare == null
         ? 'Te weinig vermogen'
-        : `${Math.round(concentrationPct)}% in 1 type`,
+        : `${Math.round(concentrationPct)}% in 1 type, excl. eigen woning`,
     ),
   ]
 

@@ -582,6 +582,23 @@ describe('label-banden (80/60/40/20)', () => {
   })
 })
 
+// ── asset_concentration draagt zijn grondslag in de tekst ─────────────────
+//
+// Given: de spreidingspijler rekent excl. eigen woning (ADR 0010 / FR-3).
+// When: de drill-down van de Bezittingen-tegel rawValue + tip toont — onder een
+//   kop-bedrag dat de woning wél meetelt.
+// Then: beide teksten noemen die uitsluiting, anders leest "47% in 1 type —
+//   redelijk gespreid" als een oordeel over het héle bezit (melding 22 sep:
+//   91% in de woning, toch "redelijk gespreid").
+describe('asset_concentration: grondslag excl. eigen woning zichtbaar', () => {
+  it.each([0.3, 0.47, 0.85])('share %s → rawValue en tip noemen de eigen woning', (share) => {
+    const score = computeHealthScoreFromInputs({ ...baseInput, largestAssetTypeShare: share }, true)
+    const pillar = score.pillars.find((p) => p.id === 'asset_concentration')!
+    expect(pillar.rawValue).toMatch(/excl\. eigen woning/)
+    expect(pillar.improvementTip).toMatch(/eigen woning/)
+  })
+})
+
 // ── trend: dezelfde actieve set als current ───────────────────────────────
 
 describe('trend-berekening op dezelfde actieve set', () => {

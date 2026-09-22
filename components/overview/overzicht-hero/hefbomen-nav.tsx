@@ -407,7 +407,10 @@ function HefboomDetailCard({
     <div
       className={`mt-2 -mx-3 sm:-mx-4 px-3 sm:px-4 py-3 border-t border-[var(--border-ed)] ${leverageStatusBgClass(status)}`}
     >
-      <div className="flex items-baseline justify-between gap-2 mb-1.5">
+      {/* flex-wrap: op een mobiele tegel (~140px inhoud) vult de pijlernaam de
+          regel al; zonder wrap liep de rawValue ("47% in 1 type, excl. eigen
+          woning") de buurtegel in. Nu zakt hij naar een eigen regel. */}
+      <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5 mb-1.5">
         <span className="text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--ink-3)]">
           {pillar.name}
         </span>
