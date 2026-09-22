@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { MijnOverview } from '@/components/mijn/mijn-overview'
+import { APP_VERSION_DISPLAY } from '@/lib/app-version'
 
 export const metadata: Metadata = {
   title: 'Mijn — TriFinity',
@@ -30,7 +31,7 @@ export default function MijnPage() {
           Zonder expliciete topBar valt NavStackMeta terug op 'simple' en zou
           de cluster verdwijnen (zie nav-stack-meta.tsx DEFAULT_TOP_BAR). */}
       <NavStackMeta title="Mijn" topBar={{ kind: 'rich' }} bottomBar={{ kind: 'tabs' }} />
-      <MijnOverview />
+      <MijnOverview versie={APP_VERSION_DISPLAY} />
     </>
   )
 }

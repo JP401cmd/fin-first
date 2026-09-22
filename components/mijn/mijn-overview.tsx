@@ -174,7 +174,7 @@ function RouteCard({ href, label, description, Icon }: SubRoute) {
 
 const GRID_CLASSES = 'grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4'
 
-export function MijnOverview() {
+export function MijnOverview({ versie }: { versie?: string }) {
   const { mode } = useDisplayMode()
   const simple = mode === 'simple'
 
@@ -232,6 +232,12 @@ export function MijnOverview() {
             <RouteCard key={route.href} {...route} />
           ))}
         </div>
+      )}
+
+      {versie && (
+        <p className="mt-6 text-center text-xs font-mono tabular-nums text-[var(--ink-3)]">
+          TriFinity versie {versie}
+        </p>
       )}
     </section>
   )
