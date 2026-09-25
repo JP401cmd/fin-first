@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { forbidden } from '@/lib/api/respond'
 import { createClient } from '@/lib/supabase/server'
 import { isSuperAdmin } from '@/lib/admin'
-import { probeIntegrations } from '@/lib/integrations/health-probe'
+import { probeIntegrations, summarizeProbes } from '@/lib/integrations/health-probe'
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -24,9 +24,11 @@ export async function POST(request: Request) {
 
     const results = await probeIntegrations(ids)
 
-    const reachable = results.filter((r) => r.ok === true).length
-    const unreachable = results.filter((r) => r.ok === false).length
-    const notProbeable = results.filter((r) => r.ok === null).length
+    // Dezelfde telling als de dagelijkse cron-rij (`summarizeProbes`), zodat de
+    // beheerpagina en het meldkanaal niet uiteen kunnen lopen over de vraag wat
+    // een storing is. Een begrensde dienst (HTTP 429) is bereikbaar.
+    const { ok: reachable, failed: unreachable, rateLimited, notProbeable } =
+      summarizeProbes(results)
 
     return NextResponse.json({
       success: true,
@@ -35,6 +37,7 @@ export async function POST(request: Request) {
         total: results.length,
         reachable,
         unreachable,
+        rateLimited,
         notProbeable,
       },
     })

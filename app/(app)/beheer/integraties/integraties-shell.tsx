@@ -18,6 +18,7 @@ import {
   CheckCircle2,
   Clock,
   FileCheck,
+  Gauge,
   List,
   Loader2,
   Play,
@@ -58,7 +59,14 @@ interface ProbeResult {
     error?: string
     code?: string
   }>
-  summary: { total: number; reachable: number; unreachable: number; notProbeable: number }
+  summary: {
+    total: number
+    reachable: number
+    unreachable: number
+    /** Deelverzameling van `reachable`: dienst antwoordt, maar begrenst ons (429). */
+    rateLimited: number
+    notProbeable: number
+  }
 }
 
 interface DriftEvent {
@@ -466,6 +474,11 @@ function LivenessTab({
           <span>
             {probeResult.summary.reachable}/{probeableTotal} bereikbaar ·{' '}
             {probeResult.summary.notProbeable} niet probeerbaar
+            {/* "waarvan": begrensd is een deelverzameling van bereikbaar —
+                zonder dat woord telt een lezer de rijen dubbel. */}
+            {probeResult.summary.rateLimited > 0
+              ? ` · waarvan ${probeResult.summary.rateLimited} begrensd`
+              : ''}
           </span>
         </div>
       )}
@@ -492,6 +505,16 @@ function LivenessTab({
                   <td className="px-3 py-2">
                     {!r ? (
                       <span className="text-[var(--ink-4)]">—</span>
+                    ) : r.code === 'rate_limited' ? (
+                      // Bereikbaar, maar de dienst begrensde ons. Bewust géén
+                      // groen vinkje (dat zou een quotum-probleem verbergen) en
+                      // géén rood kruis (de dienst antwoordde juist). Ook geen
+                      // AlertCircle: dat icoon draagt in dit bestand al 'Deels'
+                      // en 'Fout', en een derde betekenis maakt het onleesbaar.
+                      <Gauge
+                        className="h-4 w-4 text-[var(--ink-3)]"
+                        aria-label="Bereikbaar, maar begrensd"
+                      />
                     ) : r.ok === true ? (
                       <CheckCircle2 className="h-4 w-4 text-positive" aria-label="Bereikbaar" />
                     ) : r.ok === false ? (
@@ -516,6 +539,10 @@ function LivenessTab({
                   <td className="px-3 py-2 text-xs">
                     {!r ? (
                       <span className="text-[var(--ink-4)]">—</span>
+                    ) : r.code === 'rate_limited' ? (
+                      <span className="text-[var(--ink-3)]">
+                        begrensd (HTTP {r.status ?? 429})
+                      </span>
                     ) : r.ok === false ? (
                       <span className="text-red-600">{r.error ?? `HTTP ${r.status ?? '?'}`}</span>
                     ) : r.ok === true ? (

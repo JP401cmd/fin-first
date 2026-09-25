@@ -51,6 +51,24 @@ uit op de publieke endpoints van de 6 probebare koppelingen (Bitvavo, Kraken, Co
 CoinGecko, Blockchair, TrueLayer-admin-test). Trading 212, FMP en NIBUD zijn niet publiek
 probebaar en krijgen de badge "creds vereist". De probe raakt nooit opgeslagen credentials.
 
+*Wat telt als storing (aanvulling 25 sep 2026).* Een HTTP 429 geldt als **bereikbaar,
+niet als storing**: `ProbeCode` `'rate_limited'` met `ok: true`. Een 429 is het antwoord
+van een lévende dienst — het enige HTTP-antwoord dat bereikbaarheid juist bewijst. De
+telling loopt voor álle consumenten via één bron, `summarizeProbes()`, zodat de
+beheerpagina en het dagelijkse meldkanaal niet uiteen kunnen lopen over die definitie;
+alleen `failed > 0` maakt de job-run rood. Aanleiding: de CoinGecko-probe stond van
+18 jun t/m 25 sep 2026 in 27 van 27 runs rood op een 429, terwijl de koersophaal via
+hetzelfde endpoint aantoonbaar slaagde (op 25 sep nog dertien seconden vóór de probe).
+Een meldkanaal dat maandenlang rood staat, leert de operator het te negeren — precies
+wat ADR 0178 wil voorkomen. `RATE_LIMIT_STATUSES` bevat daarom uitsluitend gemeten
+statussen: uitbreiden mag alleen met een waargenomen geval én een test, anders wast de
+classificatie een dode koppeling wit.
+
+*Beperking.* Zolang we keyless op CoinGecko's publieke tier draaien (geen
+`COINGECKO_API_KEY` in de omgeving) is die probe in de praktijk permanent begrensd en
+bevestigt hij dus weinig; de 5xx-, timeout- en netwerktakken blijven het echte alarm
+dragen. Een demo-key geeft de probe zijn zeggingskracht terug.
+
 **3. `contract_events` als platform-brede operator-telemetrie**
 Tabel `contract_events` (migratie `20260617190000_create_contract_events.sql`):
 

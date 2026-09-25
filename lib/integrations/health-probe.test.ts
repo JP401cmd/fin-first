@@ -18,7 +18,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 vi.mock('@/lib/truelayer/client', () => ({ getBaseUrls: vi.fn(), getProviders: vi.fn() }))
 vi.mock('@/lib/supabase/service', () => ({ getServiceClient: vi.fn() }))
 
-import { probeIntegrations } from './health-probe'
+import { probeIntegrations, summarizeProbes } from './health-probe'
 
 const fetchMock = vi.fn()
 const ORIG_KEY = process.env.COINGECKO_API_KEY
@@ -66,5 +66,51 @@ describe('health-probe — CoinGecko', () => {
     fetchMock.mockResolvedValue(new Response('', { status: 403 }))
     const [result] = await probeIntegrations(['coingecko'])
     expect(result).toMatchObject({ id: 'coingecko', ok: false, status: 403, code: 'http_error' })
+  })
+
+  /**
+   * Given een dienst die antwoordt met een rate-limit
+   * When de probe die 429 binnenkrijgt
+   * Then geldt de dienst als bereikbaar (`rate_limited`), niet als storing.
+   *
+   * Aanleiding (25 sep 2026): op 25 sep om 18:57:21 schreef de koersophaal vijf
+   * CoinGecko-koersen weg; dertien seconden later verklaarde de probe dezelfde
+   * dienst dood op een 429. Een 429 is het antwoord van een lévende dienst —
+   * het enige HTTP-antwoord dat bereikbaarheid juist bewijst. Als storing
+   * geteld hield het `integraties-health` ruim drie maanden rood.
+   */
+  it('telt een 429 als bereikbaar-maar-begrensd, niet als storing', async () => {
+    fetchMock.mockResolvedValue(new Response('', { status: 429 }))
+    const [result] = await probeIntegrations(['coingecko'])
+    expect(result).toMatchObject({ id: 'coingecko', ok: true, status: 429, code: 'rate_limited' })
+    expect(result.error).toBeUndefined()
+  })
+})
+
+describe('summarizeProbes', () => {
+  const base = { latencyMs: 12, status: 200, code: 'ok' as const }
+
+  it('houdt een begrensde probe buiten de storingstelling maar wel zichtbaar', () => {
+    const summary = summarizeProbes([
+      { id: 'kraken', ok: true, ...base },
+      { id: 'coingecko', ok: true, latencyMs: 40, status: 429, code: 'rate_limited' },
+      { id: 'mt940', ok: null, latencyMs: null, status: null, code: 'not_probeable' },
+    ])
+    expect(summary.failed).toBe(0)
+    expect(summary.rateLimited).toBe(1)
+    expect(summary.ok).toBe(2)
+    expect(summary.notProbeable).toBe(1)
+    // De begrenzing mag niet als latency wegvallen: `perId` moet 'm benoemen.
+    expect(summary.perId.coingecko).toBe('rate_limited')
+    expect(summary.failures).toEqual({})
+  })
+
+  it('telt een echte storing wél, met status en code', () => {
+    const summary = summarizeProbes([
+      { id: 'coingecko', ok: false, latencyMs: 30, status: 503, code: 'http_error', error: 'HTTP 503' },
+    ])
+    expect(summary.failed).toBe(1)
+    expect(summary.rateLimited).toBe(0)
+    expect(summary.failures.coingecko).toMatchObject({ code: 'http_error', status: 503 })
   })
 })

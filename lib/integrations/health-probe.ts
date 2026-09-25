@@ -24,7 +24,24 @@ export type ProbeCode =
   | 'not_probeable'
   | 'admin_test_ok'
   | 'admin_test_failed'
+  /**
+   * De dienst antwoordde met een rate-limit (429). Telt als BEREIKBAAR, niet
+   * als storing: een 429 is het antwoord van een lévende dienst — het enige
+   * HTTP-antwoord dat bereikbaarheid juist bewijst. Zie `RATE_LIMIT_STATUSES`.
+   */
+  | 'rate_limited'
   | 'unknown'
+
+/**
+ * HTTP-statussen die "de dienst leeft, maar begrenst ons nu" betekenen —
+ * geen storing. Bewust alléén 429 (Too Many Requests): dat is de enige status
+ * waarvoor we een gemeten geval hebben. Zet hier niets speculatief bij — een
+ * status die in werkelijkheid een permanente blokkade is (418 bij sommige
+ * anti-bot-proxy's) zou een dode koppeling elke dag als bereikbaar tellen, en
+ * dat is precies wat deze classificatie hoort te voorkomen. Uitbreiden mag,
+ * maar alleen met een waargenomen voorbeeld én een test.
+ */
+const RATE_LIMIT_STATUSES = new Set([429])
 
 export interface ProbeResult {
   id: string
@@ -77,6 +94,23 @@ async function probePublicUrl(id: string, url: string): Promise<ProbeResult> {
     })
     const latencyMs = Date.now() - start
     const ok = res.status >= 200 && res.status < 300
+
+    // Een rate-limit is géén storing. Gemeten 25 sep 2026: om 18:57:21 schreef
+    // de koersophaal vijf CoinGecko-koersen weg, en dertien seconden later
+    // verklaarde deze probe dezelfde dienst dood op een 429. Als storing geteld
+    // hield dat `integraties-health` ruim drie maanden dagelijks rood — precies
+    // de gewenning aan een rood meldkanaal die ADR 0178 wil voorkomen.
+    if (!ok && RATE_LIMIT_STATUSES.has(res.status)) {
+      return {
+        id,
+        ok: true,
+        latencyMs,
+        status: res.status,
+        code: 'rate_limited',
+        note: `Begrensd (HTTP ${res.status}) — dienst antwoordt, quotum bereikt`,
+      }
+    }
+
     return {
       id,
       ok,
@@ -134,6 +168,60 @@ async function probeTruelayer(id: string): Promise<ProbeResult> {
       code: 'admin_test_failed',
     }
   }
+}
+
+// ── Samenvatting ──────────────────────────────────────────────────────────────
+
+export interface ProbeSummary {
+  probed: number
+  /** Bereikbaar — inclusief de begrensde (`rate_limited`) probes. */
+  ok: number
+  /** Écht onbereikbaar. Dít getal bepaalt of de job-run rood wordt. */
+  failed: number
+  /** Deelverzameling van `ok`: bereikbaar, maar de dienst begrensde ons. */
+  rateLimited: number
+  /** Vereist credentials of heeft geen publiek endpoint. */
+  notProbeable: number
+  /** Per integratie: latency bij groen, anders de code. */
+  perId: Record<string, number | string>
+  /** Alleen de échte storingen, met status en fouttekst. */
+  failures: Record<string, { code: ProbeCode; status: number | null; error: string | null }>
+}
+
+/**
+ * Vat probe-resultaten samen voor de cron-job-rij én de beheerpagina. Eén bron,
+ * zodat "wat telt als storing" niet per consument kan gaan afwijken.
+ */
+export function summarizeProbes(results: ProbeResult[]): ProbeSummary {
+  const perId: ProbeSummary['perId'] = {}
+  const failures: ProbeSummary['failures'] = {}
+  let ok = 0
+  let failed = 0
+  let rateLimited = 0
+  let notProbeable = 0
+
+  for (const r of results) {
+    if (r.ok === true) {
+      ok++
+      if (r.code === 'rate_limited') {
+        rateLimited++
+        // Bewust de code en niet de latency: anders verdwijnt de begrenzing
+        // achter een onschuldig getal en is een quotum-probleem onzichtbaar.
+        perId[r.id] = 'rate_limited'
+      } else {
+        perId[r.id] = r.latencyMs ?? 'ok'
+      }
+    } else if (r.ok === false) {
+      failed++
+      perId[r.id] = r.code ?? 'error'
+      failures[r.id] = { code: r.code, status: r.status, error: r.error ?? null }
+    } else {
+      notProbeable++
+      perId[r.id] = r.code ?? 'not_probeable'
+    }
+  }
+
+  return { probed: results.length, ok, failed, rateLimited, notProbeable, perId, failures }
 }
 
 // ── Hoofdfunctie ──────────────────────────────────────────────────────────────

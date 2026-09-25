@@ -12,7 +12,7 @@ import {
 import { syncAllExchangeConnections } from '@/lib/integrations/exchange-cron'
 import { syncAllWalletAddresses } from '@/lib/integrations/wallet-cron'
 import { recordJobRun } from '@/lib/job-runs'
-import { probeIntegrations } from '@/lib/integrations/health-probe'
+import { probeIntegrations, summarizeProbes } from '@/lib/integrations/health-probe'
 import { unauthorized } from '@/lib/api/respond'
 
 /**
@@ -146,26 +146,17 @@ export async function GET(request: Request) {
     // de prijsverversing NOOIT rood maakt. Eigen try/catch; eigen job-run-rij.
     try {
       const probeStartedAt = new Date().toISOString()
-      const probeResults = await probeIntegrations()
-      const probed = probeResults.length
-      const ok = probeResults.filter((r) => r.ok === true).length
-      const failed = probeResults.filter((r) => r.ok === false).length
-      const perId = Object.fromEntries(
-        probeResults.map((r) => [r.id, r.ok === true ? r.latencyMs ?? 'ok' : (r.code ?? 'error')])
-      )
-      // `perId` toont alleen de code; zonder HTTP-status bleef "http_error" op
-      // CoinGecko maandenlang onverklaarbaar. Aparte sleutel zodat `perId` zijn
-      // vorm houdt.
-      const failures = Object.fromEntries(
-        probeResults
-          .filter((r) => r.ok === false)
-          .map((r) => [r.id, { code: r.code, status: r.status, error: r.error ?? null }])
+      // `summarizeProbes` is de gedeelde bron van "wat telt als storing" —
+      // dezelfde telling als de beheerpagina. Een begrensde dienst (HTTP 429)
+      // telt daarin als bereikbaar; alleen echte onbereikbaarheid maakt rood.
+      const { probed, ok, failed, rateLimited, perId, failures } = summarizeProbes(
+        await probeIntegrations()
       )
       await recordJobRun(supabase, {
         job: 'integraties-health',
         status: failed === 0 ? 'success' : 'error',
         startedAt: probeStartedAt,
-        summary: { probed, ok, failed, perId, failures },
+        summary: { probed, ok, failed, rateLimited, perId, failures },
         error: failed > 0 ? `${failed} van ${probed} probe(s) gefaald` : null,
       })
     } catch {
