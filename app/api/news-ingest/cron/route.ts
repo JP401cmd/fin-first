@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { errorResponse, serverError } from '@/lib/api/respond'
 import { getModel } from '@/lib/ai/config'
-import { runNewsIngest } from '@/lib/news-ingest'
+import { bepaalIngestUitkomst, runNewsIngest } from '@/lib/news-ingest'
 import { DUIDING_MAX_PER_RUN_CRON, DUIDING_TIJDBUDGET_MS_CRON } from '@/lib/krant/duiding'
 import { recordJobRun } from '@/lib/job-runs'
 
@@ -119,18 +119,29 @@ export async function GET(request: Request) {
       // Zonder model wordt alleen de wachtrij geteld — de ingest draait door
     }
 
-    const { summary } = await runNewsIngest(service, model, {
+    const { summary, health } = await runNewsIngest(service, model, {
       duidingModel,
       duidingMaxPerRun: DUIDING_MAX_PER_RUN_CRON,
       duidingTijdBudgetMs: DUIDING_TIJDBUDGET_MS_CRON,
     })
 
-    await recordJobRun(service, { job: 'news-ingest', status: 'success', startedAt, summary })
+    // De status volgt de UITKOMST, niet het uitblijven van een exception. Tot
+    // 25 sep 2026 stond hier onvoorwaardelijk 'success': de run waarin het
+    // AI-tegoed leeg was duidde 0 van 2 rijen en verloor de hele bronklasse
+    // `web_lijst` (33 -> 0), en meldde zich toch groen. De AI-stappen blijven
+    // niet-fataal — alleen het resultaatverlies wordt nu gemeld. 'partial'
+    // alarmeert bewust niet (zie recordJobRun); de reden gaat mee in de
+    // summary, zodat /beheer/jobs kan laten zien WELKE stap wat verloor.
+    const { status, verlies } = bepaalIngestUitkomst(summary, health)
+    const gemeld = { ...summary, verlies }
+
+    await recordJobRun(service, { job: 'news-ingest', status, startedAt, summary: gemeld })
 
     return NextResponse.json({
       success: true,
+      status,
       timestamp: new Date().toISOString(),
-      summary,
+      summary: gemeld,
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Onbekende fout'

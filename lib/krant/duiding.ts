@@ -43,6 +43,7 @@
 import { createHash } from 'node:crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { generateObject, NoObjectGeneratedError } from 'ai'
+import { classifyProviderError } from '@/lib/ai/provider-error'
 import { DOELGROEP_SLEUTELS, DOELGROEP_SLEUTEL_LIJST } from './profiel-velden'
 import { MECHANISMEN, MECHANISME_IDS } from './mechanismen'
 import { DREMPEL_SLEUTELS } from './drempels'
@@ -62,6 +63,61 @@ export const DUIDING_MAX_PER_RUN_CRON = 60
 export const DUIDING_MAX_PER_RUN_HANDMATIG = 15
 /** Na dit aantal modelfouten wordt een rij 'afgewezen' met code 'mislukt'. */
 export const DUIDING_MAX_POGINGEN = 3
+
+/**
+ * Lag deze mislukking aan de PROVIDER en niet aan dit artikel? Dan kost hij
+ * geen poging.
+ *
+ * AANLEIDING (24-25 sep 2026). Het Anthropic-tegoed liep leeg; de run van 25
+ * sep zette twee rijen op 'mislukt' met poging 1. Elke volgende run zou op
+ * datzelfde lege tegoed stuiten, en na drie runs stonden die artikelen
+ * PERMANENT op 'afgewezen' — weggegooid om een oorzaak die niets met het
+ * artikel te maken had, en niet terug te draaien zonder handmatige actie.
+ *
+ * De pogingenteller bestaat om een rij te stoppen die het model structureel
+ * niet aankan (een tekst die telkens een transportfout uitlokt). Een provider
+ * die het verzoek weigert (`refused`: tegoed op, sleutel ongeldig) of tijdelijk
+ * faalt (`transient`: rate limit, 5xx, netwerk, time-out) zegt niets over déze
+ * rij — die informatie is er simpelweg nog niet.
+ *
+ * `unknown` telt bewust WÉL als poging: een niet-herkende fout kan aan het
+ * artikel liggen, en de teller is precies het vangnet voor dat geval.
+ *
+ * DE COULANCE IS BEGRENSD IN TIJD, niet in aantal. `classifyProviderError`
+ * geeft `refused` voor élke niet-retrybare `APICallError` — dus ook voor een
+ * 400 die door de payload van DEZE rij komt (een contentfilter-weigering, een
+ * verzoekvorm die dit artikel uitlokt). Zo'n rij zou zonder grens eeuwig
+ * opnieuw geprobeerd worden, want haar teller loopt nooit op. Splitsen op
+ * statuscode helpt níet: de tegoedstoring van 24 sep 2026 wás zelf een 400
+ * ("Your credit balance is too low"), dus "400 telt als poging" zou precies
+ * het defect terugbouwen dat deze functie oplost.
+ *
+ * Daarom de tijdgrens: `PROVIDER_COULANCE_DAGEN` na `fetched_at` telt een
+ * providerfout wél weer als poging. Een echte storing duurt uren tot dagen —
+ * ruim binnen de grens, dus die rijen blijven gespaard. Een rij die na een
+ * maand nog steeds op providerfouten stuit, is geen storingsslachtoffer maar
+ * een probleemgeval; bovendien valt ze dan buiten het editievenster en heeft
+ * ze geen lezerswaarde meer. Zo loopt de wachtrij gegarandeerd leeg.
+ */
+export function isProviderStoring(err: unknown): boolean {
+  const soort = classifyProviderError(err)
+  return soort === 'refused' || soort === 'transient'
+}
+
+/**
+ * Hoe lang een providerstoring een rij spaart. Ruim boven de duur van een
+ * echte storing, en gelijk aan het venster waarbinnen een artikel de lezer nog
+ * kan bereiken — daarbuiten is sparen zinloos.
+ */
+export const PROVIDER_COULANCE_DAGEN = 30
+
+/** Valt deze rij nog binnen de coulance? Zonder `fetched_at` (legacy): ja, dan telt alleen de storing. */
+export function binnenProviderCoulance(fetchedAt: string | null, nu: Date): boolean {
+  if (!fetchedAt) return true
+  const gezien = new Date(fetchedAt).getTime()
+  if (!Number.isFinite(gezien)) return true
+  return nu.getTime() - gezien < PROVIDER_COULANCE_DAGEN * 24 * 60 * 60 * 1000
+}
 /**
  * Tijdbudget per run: de ingest zelf kost 70–90 s; met dit budget blijft de
  * cron (maxDuration 300) en de handmatige knop ruim binnen hun plafond.
@@ -118,10 +174,12 @@ export interface WachtendArtikel {
   published_at: string | null
   published_bron: PublishedBron | null
   duiding_pogingen: number
+  /** Wanneer de ingest deze rij zag. Begrenst de coulance bij providerstoringen (`isProviderStoring`). */
+  fetched_at: string | null
 }
 
 export const WACHTEND_ARTIKEL_KOLOMMEN =
-  'id, bron_soort, bron_kop, bron_fragment, source_name, category, published_at, published_bron, duiding_pogingen'
+  'id, bron_soort, bron_kop, bron_fragment, source_name, category, published_at, published_bron, duiding_pogingen, fetched_at'
 
 export const LEGE_DUIDING_SUMMARY: DuidingSummary = { geduid: 0, afgewezen: 0, mislukt: 0, overgeslagen: 0, wacht: 0 }
 
@@ -272,10 +330,14 @@ async function duidEen(
    * schrijffout werpt (de werker telt 'mislukt'); nul geraakte rijen betekent
    * dat een parallelle run deze rij al afhandelde — dan telt hij hier niet.
    */
-  const schrijf = async (velden: Record<string, unknown>): Promise<boolean> => {
+  const schrijf = async (
+    velden: Record<string, unknown>,
+    /** Alleen de providerstoring wijkt af: die laat de teller staan (`isProviderStoring`). */
+    opts: { pogingen?: number } = {},
+  ): Promise<boolean> => {
     const { data, error } = await supabase
       .from('news_articles')
-      .update({ ...velden, duiding_pogingen: pogingen, geduid_at: now })
+      .update({ ...velden, duiding_pogingen: opts.pogingen ?? pogingen, geduid_at: now })
       .eq('id', artikel.id)
       .in('duiding_status', [...WACHTENDE_STATUSSEN])
       .select('id')
@@ -332,6 +394,24 @@ async function duidEen(
       })
       return uitkomstVan(geschreven, 'afgewezen')
     }
+    // Een providerstoring (tegoed op, rate limit, 5xx, netwerk) is geen oordeel
+    // over dít artikel — hij kost dus geen poging en wijst nooit af. Zie
+    // `isProviderStoring`: zonder deze tak verbrandde de tegoedstoring van 24
+    // sep 2026 de wachtrij in drie runs permanent.
+    if (isProviderStoring(err) && binnenProviderCoulance(artikel.fetched_at, opties.now ?? new Date())) {
+      console.error(`[krant-duiding] providerstoring op ${artikel.id}:`, err instanceof Error ? err.message : err)
+      const geschreven = await schrijf(
+        {
+          duiding: null,
+          duiding_status: 'mislukt',
+          duiding_versie: DUIDING_VERSIE,
+          duiding_fout: 'provider',
+        },
+        { pogingen: artikel.duiding_pogingen },
+      )
+      return uitkomstVan(geschreven, 'mislukt')
+    }
+
     console.error(`[krant-duiding] modelfout op ${artikel.id}:`, err instanceof Error ? err.message : err)
     const definitief = pogingen >= DUIDING_MAX_POGINGEN
     const geschreven = await schrijf({

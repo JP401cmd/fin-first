@@ -1,21 +1,67 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // vi.mock wordt gehoist: de vervanger voor NoObjectGeneratedError moet ín de factory leven.
+// `APICallError`/`LoadAPIKeyError` staan er sinds 25 sep 2026 bij omdat de duiding
+// via `classifyProviderError` (lib/ai/provider-error.ts) onderscheidt of een
+// mislukking aan het ARTIKEL of aan de PROVIDER lag — en die classifier leest
+// deze twee klassen uit dezelfde 'ai'-module.
 vi.mock('ai', () => {
   class SchemaFout extends Error {
     static isInstance(err: unknown): err is SchemaFout {
       return err instanceof SchemaFout
     }
   }
-  return { generateObject: vi.fn(), NoObjectGeneratedError: SchemaFout }
+  class ApiFout extends Error {
+    isRetryable: boolean
+    statusCode: number
+    constructor(opts: { message: string; isRetryable: boolean; statusCode: number }) {
+      super(opts.message)
+      this.isRetryable = opts.isRetryable
+      this.statusCode = opts.statusCode
+    }
+    static isInstance(err: unknown): err is ApiFout {
+      return err instanceof ApiFout
+    }
+  }
+  class SleutelFout extends Error {
+    static isInstance(err: unknown): err is SleutelFout {
+      return err instanceof SleutelFout
+    }
+  }
+  return {
+    generateObject: vi.fn(),
+    NoObjectGeneratedError: SchemaFout,
+    APICallError: ApiFout,
+    LoadAPIKeyError: SleutelFout,
+  }
 })
 
-import { generateObject, NoObjectGeneratedError } from 'ai'
+import { generateObject, NoObjectGeneratedError, APICallError } from 'ai'
 const SchemaFout = NoObjectGeneratedError as unknown as new (message: string) => Error
+const ApiFout = APICallError as unknown as new (opts: {
+  message: string
+  isRetryable: boolean
+  statusCode: number
+}) => Error
+
+/** Het tegoed is op: HTTP 400, niet-retrybaar → `refused`. De fout van 24 sep 2026. */
+function tegoedOp(): Error {
+  return new ApiFout({
+    message: 'Your credit balance is too low to access the Anthropic API.',
+    isRetryable: false,
+    statusCode: 400,
+  })
+}
+
+/** Rate limit: HTTP 429, retrybaar → `transient`. */
+function rateLimit(): Error {
+  return new ApiFout({ message: 'rate limit exceeded', isRetryable: true, statusCode: 429 })
+}
 import {
   buildDuidingSystemPrompt,
   duidWachtendeArtikelen,
   DUIDING_MAX_POGINGEN,
+  PROVIDER_COULANCE_DAGEN,
 } from './duiding'
 import { GELDIGE_UITVOER } from './duiding.fixture'
 import { DUIDING_VERSIE, type DuidingV1 } from './duiding-schema'
@@ -194,7 +240,10 @@ describe('duidWachtendeArtikelen — de stap in de schaduw', () => {
   })
 
   it('modelfout → mislukt met poging +1; na de laatste poging afgewezen met code mislukt', async () => {
-    generateObjectMock.mockRejectedValue(new Error('rate limit'))
+    // Een KALE Error is `unknown` in classifyProviderError: niet herkenbaar als
+    // providerstoring, dus mogelijk iets aan dit artikel. Die blijft pogingen
+    // kosten — zie de provider-tests hieronder voor het andere geval.
+    generateObjectMock.mockRejectedValue(new Error('onbekende fout'))
     const eerste = maakClient([artikel({ duiding_pogingen: 0 })])
     const s1 = await duidWachtendeArtikelen(eerste.client as never, MODEL, { maxPerRun: 5 })
     expect(s1.mislukt).toBe(1)
@@ -204,6 +253,119 @@ describe('duidWachtendeArtikelen — de stap in de schaduw', () => {
     const s2 = await duidWachtendeArtikelen(laatste.client as never, MODEL, { maxPerRun: 5 })
     expect(s2.afgewezen).toBe(1)
     expect(updates(laatste.queries).at(-1)!.velden).toMatchObject({ duiding_status: 'afgewezen', duiding_pogingen: DUIDING_MAX_POGINGEN })
+  })
+
+  // ── Een providerstoring is geen oordeel over het artikel ────────────────────
+  //
+  // 24 sep 2026 ~18:00 liep het Anthropic-tegoed leeg. De run van 25 sep zette
+  // twee rijen op 'mislukt' met poging 1. Elke volgende run zou opnieuw op
+  // hetzelfde lege tegoed stuiten, en na drie runs stonden die artikelen
+  // PERMANENT op 'afgewezen' — weggegooid om een oorzaak die niets met het
+  // artikel te maken had, en onherstelbaar zonder handmatige tussenkomst.
+  //
+  // De pogingenteller bestaat om een rij te stoppen die het MODEL structureel
+  // niet aankan. Een provider die weigert (tegoed op) of tijdelijk faalt (rate
+  // limit, 5xx, netwerk) zegt niets over deze rij, en mag hem dus geen poging
+  // kosten. `classifyProviderError` maakt dat onderscheid al voor de rest van
+  // de app; de duiding leest het hier terug.
+
+  it('tegoed op (refused) → mislukt ZONDER poging te verbranden', async () => {
+    generateObjectMock.mockRejectedValue(tegoedOp())
+    const { client, queries } = maakClient([artikel({ duiding_pogingen: 0 })])
+
+    const summary = await duidWachtendeArtikelen(client as never, MODEL, { maxPerRun: 5 })
+
+    expect(summary.mislukt).toBe(1)
+    expect(updates(queries).at(-1)!.velden).toMatchObject({
+      duiding_status: 'mislukt',
+      duiding_fout: 'provider',
+      duiding_pogingen: 0,
+      duiding: null,
+    })
+  })
+
+  it('rate limit (transient) → mislukt ZONDER poging te verbranden', async () => {
+    generateObjectMock.mockRejectedValue(rateLimit())
+    const { client, queries } = maakClient([artikel({ duiding_pogingen: 1 })])
+
+    const summary = await duidWachtendeArtikelen(client as never, MODEL, { maxPerRun: 5 })
+
+    expect(summary.mislukt).toBe(1)
+    expect(updates(queries).at(-1)!.velden).toMatchObject({ duiding_pogingen: 1, duiding_fout: 'provider' })
+  })
+
+  it('een providerstoring op de LAATSTE poging wijst het artikel NIET af', async () => {
+    // Dit is de kern: zonder deze regel verdwijnt een artikel definitief zodra
+    // de storing toevallig samenvalt met poging 3.
+    generateObjectMock.mockRejectedValue(tegoedOp())
+    const { client, queries } = maakClient([artikel({ duiding_pogingen: DUIDING_MAX_POGINGEN - 1 })])
+
+    const summary = await duidWachtendeArtikelen(client as never, MODEL, { maxPerRun: 5 })
+
+    expect(summary).toMatchObject({ afgewezen: 0, mislukt: 1 })
+    expect(updates(queries).at(-1)!.velden).toMatchObject({
+      duiding_status: 'mislukt',
+      duiding_pogingen: DUIDING_MAX_POGINGEN - 1,
+    })
+  })
+
+  // De coulance is begrensd in TIJD, niet in aantal — anders zou een 400 die
+  // door de payload van één rij komt (contentfilter, verzoekvorm) die rij
+  // eeuwig laten herhalen. Splitsen op statuscode kan niet: de tegoedstoring
+  // van 24 sep was zelf een 400.
+
+  it('voorbij PROVIDER_COULANCE_DAGEN telt een providerstoring alsnog als poging', async () => {
+    generateObjectMock.mockRejectedValue(tegoedOp())
+    const nu = new Date('2026-09-25T06:00:00.000Z')
+    const teOud = new Date(nu.getTime() - (PROVIDER_COULANCE_DAGEN + 1) * 86_400_000).toISOString()
+    const { client, queries } = maakClient([artikel({ duiding_pogingen: 0, fetched_at: teOud })])
+
+    await duidWachtendeArtikelen(client as never, MODEL, { maxPerRun: 5, now: nu })
+
+    expect(updates(queries).at(-1)!.velden).toMatchObject({
+      duiding_status: 'mislukt',
+      duiding_fout: 'mislukt',
+      duiding_pogingen: 1,
+    })
+  })
+
+  it('precies op de grens is de coulance voorbij; één seconde ervoor geldt hij nog', async () => {
+    generateObjectMock.mockRejectedValue(tegoedOp())
+    const nu = new Date('2026-09-25T06:00:00.000Z')
+    const grensMs = PROVIDER_COULANCE_DAGEN * 86_400_000
+
+    const op = maakClient([artikel({ duiding_pogingen: 0, fetched_at: new Date(nu.getTime() - grensMs).toISOString() })])
+    await duidWachtendeArtikelen(op.client as never, MODEL, { maxPerRun: 5, now: nu })
+    expect(updates(op.queries).at(-1)!.velden).toMatchObject({ duiding_pogingen: 1, duiding_fout: 'mislukt' })
+
+    const net = maakClient([artikel({ duiding_pogingen: 0, fetched_at: new Date(nu.getTime() - grensMs + 1000).toISOString() })])
+    await duidWachtendeArtikelen(net.client as never, MODEL, { maxPerRun: 5, now: nu })
+    expect(updates(net.queries).at(-1)!.velden).toMatchObject({ duiding_pogingen: 0, duiding_fout: 'provider' })
+  })
+
+  it('zonder fetched_at (legacy-rij) geldt de coulance gewoon', async () => {
+    generateObjectMock.mockRejectedValue(tegoedOp())
+    const { client, queries } = maakClient([artikel({ duiding_pogingen: 0, fetched_at: null })])
+
+    await duidWachtendeArtikelen(client as never, MODEL, { maxPerRun: 5 })
+
+    expect(updates(queries).at(-1)!.velden).toMatchObject({ duiding_pogingen: 0, duiding_fout: 'provider' })
+  })
+
+  it('een rij die zijn pogingen al op is, blijft ook bij een providerstoring gewoon staan', async () => {
+    // Boven de grens selecteert de runner de rij niet meer (`lt pogingen`), maar
+    // komt hij er tóch langs, dan mag een providerstoring 'm niet alsnog naar
+    // 'afgewezen' duwen — de teller staat al waar hij hoort.
+    generateObjectMock.mockRejectedValue(tegoedOp())
+    const { client, queries } = maakClient([artikel({ duiding_pogingen: DUIDING_MAX_POGINGEN })])
+
+    const summary = await duidWachtendeArtikelen(client as never, MODEL, { maxPerRun: 5 })
+
+    expect(summary.afgewezen).toBe(0)
+    expect(updates(queries).at(-1)!.velden).toMatchObject({
+      duiding_status: 'mislukt',
+      duiding_pogingen: DUIDING_MAX_POGINGEN,
+    })
   })
 
   it('afgekeurd door de controles → afgewezen met de foutcode, zonder duiding', async () => {

@@ -137,6 +137,7 @@ describe('Krant 1F fase 2 — het eigen fragment bijt waar de hele pagina doorli
       published_at: f.rij.published_at,
       published_bron,
       duiding_pogingen: 0,
+      fetched_at: f.rij.published_at,
     })
     const zonder = buildDuidingPrompt(artikel('eerste_gezien'), f.bron.fragment)
     expect(zonder).toContain('Datum: onbekend')

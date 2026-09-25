@@ -311,6 +311,13 @@ export function NieuwsOnlyClient({ userId, toonTestsectie = false }: { userId: s
   const [generatedAt, setGeneratedAt] = useState<string | undefined>()
   const [sourceCount, setSourceCount] = useState<number | undefined>()
   /**
+   * Noodeditie: de verrijking viel om, dit zijn de bronkoppen met hun links
+   * (25 sep 2026). Bewust apart van `newsError` — er is niets mislukt voor de
+   * lezer, er is minder. De bijbehorende items gaan NIET in de browsercache:
+   * het eerstvolgende bezoek hoort gewoon weer een echte editie te proberen.
+   */
+  const [degraded, setDegraded] = useState(false)
+  /**
    * Wanneer we de lopende generatie opgeven. Een ref en geen state: de waarde
    * mag geen render uitlokken, en de poll-effect mag er niet op herstarten —
    * anders schuift het venster bij elke tussenstand weer op.
@@ -390,7 +397,10 @@ export function NieuwsOnlyClient({ userId, toonTestsectie = false }: { userId: s
 
       const items: NewsItem[] = data.items ?? data
       setNewsItems(items)
-      setLocalNewsCache(userId, items, data.generatedAt, data.sourceCount, data.editionNr, data.jaargang)
+      setDegraded(data.degraded === true)
+      if (data.degraded !== true) {
+        setLocalNewsCache(userId, items, data.generatedAt, data.sourceCount, data.editionNr, data.jaargang)
+      }
       setNewsFetched(true)
       if (data.editionNr) setEditionNr(data.editionNr)
       if (data.jaargang) setJaargang(data.jaargang)
@@ -447,7 +457,10 @@ export function NieuwsOnlyClient({ userId, toonTestsectie = false }: { userId: s
       const items: NewsItem[] = data.items ?? data
       generationDeadlineRef.current = null
       setNewsItems(items)
-      setLocalNewsCache(userId, items, data.generatedAt, data.sourceCount, data.editionNr, data.jaargang)
+      setDegraded(data.degraded === true)
+      if (data.degraded !== true) {
+        setLocalNewsCache(userId, items, data.generatedAt, data.sourceCount, data.editionNr, data.jaargang)
+      }
       setNewsFetched(true)
       setRefreshing(false)
       if (data.editionNr) setEditionNr(data.editionNr)
@@ -509,7 +522,10 @@ export function NieuwsOnlyClient({ userId, toonTestsectie = false }: { userId: s
         const items: NewsItem[] = data.items ?? data
         generationDeadlineRef.current = null
         setNewsItems(items)
-        setLocalNewsCache(userId, items, data.generatedAt, data.sourceCount, data.editionNr, data.jaargang)
+        setDegraded(data.degraded === true)
+        if (data.degraded !== true) {
+          setLocalNewsCache(userId, items, data.generatedAt, data.sourceCount, data.editionNr, data.jaargang)
+        }
         setNewsFetched(true)
         setGenerating(false)
         setRefreshing(false)
@@ -788,6 +804,24 @@ export function NieuwsOnlyClient({ userId, toonTestsectie = false }: { userId: s
                           Nieuwe editie wordt samengesteld&hellip;
                         </span>
                       </div>
+                    )}
+                    {/* Noodeditie (25 sep 2026): de duiding kon niet gemaakt
+                        worden, dus staan hier de bronkoppen met hun links. Eén
+                        regel uitleg — zonder die regel leest een kale
+                        koppenlijst als een kwaliteitsval in plaats van als een
+                        eerlijke terugval. */}
+                    {!isLocal && degraded && newsTab === 'current' && (
+                      // role="status" (niet "alert"): er is niets misgegaan voor
+                      // de lezer, er is minder. Hij verschijnt ná het pollen, dus
+                      // zonder live-regio mist een schermlezer precies de uitleg
+                      // die de kale koppenlijst verklaarbaar maakt.
+                      <p
+                        role="status"
+                        className="mb-4 border-l-2 border-[var(--border-md)] bg-[var(--subtle)]/60 px-4 py-2.5 font-source-serif text-sm leading-relaxed text-[var(--ink-2)]"
+                      >
+                        De editie kon nu niet worden samengesteld. Je ziet de koppen van de bronnen
+                        met een link erheen; wat het voor jou betekent, staat er deze keer niet bij.
+                      </p>
                     )}
                     <div className="news-reveal-item">
                       <HeroNewsArticle item={viewItems[0]} isRead={readArticleIds.has(viewItems[0].id)} onMarkRead={markArticleRead} />

@@ -12,7 +12,7 @@ import { checkTierGate } from '@/lib/require-tier'
 import { aiSubscriptionRequired, aiModelUnavailable } from '@/lib/ai/gate-responses'
 import { NEWS_SYSTEM_PROMPT } from '@/lib/news-system-prompt'
 import { filterGroundedItems, type SelectableArticle } from '@/lib/news-selection'
-import { newsItemSchema, type NewsItem } from '@/lib/news-item'
+import { bronkoppenEditie, newsItemSchema, type NewsItem } from '@/lib/news-item'
 import { demotedCategories, demotionWindowStartIso } from '@/lib/news-feedback-summary'
 import {
   archiveCurrentEdition,
@@ -80,6 +80,12 @@ interface GenerationState {
   startedAt: string
   sourceCount?: number
   sourceNewestAt?: string
+  /**
+   * De verrijking viel om en dit zijn de BRONKOPPEN (25 sep 2026) — kop + link,
+   * zonder samenvatting of impactregel. De lezer hoort te weten dat dit een
+   * noodeditie is, anders leest een kale koppenlijst als een kwaliteitsval.
+   */
+  degraded?: boolean
 }
 
 async function readGenerationState(
@@ -222,6 +228,9 @@ export async function GET(request: Request) {
         refreshesRemaining: refreshStatus.remaining,
         sourceCount: existingState.sourceCount,
         sourceNewestAt: existingState.sourceNewestAt,
+        // Alleen waar bij de noodeditie; de lezer ziet dan één regel uitleg
+        // boven de koppen in plaats van een onverklaarde kale lijst.
+        ...(existingState.degraded ? { degraded: true } : {}),
       })
     }
 
@@ -407,6 +416,34 @@ Toets de aangeleverde bronartikelen op relevantie en impact voor dit profiel en 
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err)
       console.error('[/api/news] Background generation failed:', errMsg)
+
+      // DEGRADEREN, NIET LEEGLATEN (25 sep 2026). De bronlaag hield stand: de
+      // artikelen staan er, alleen de verrijking viel om (24 sep liep het
+      // AI-tegoed leeg). Een lege Krant met "Nieuws kon niet worden
+      // gegenereerd" is dan niet eerlijker dan de bronkoppen met hun links —
+      // het is minder. Dit is het B26-patroon één laag hoger: geen
+      // samenvatting, geen impactregel, wél de kop en de bron.
+      //
+      // BEWUST NIET GECACHED (`setCachedNews`) en `recordAiUsage`/
+      // `markUsedArticles` blijven achterwege: dit is een noodeditie, geen
+      // editie. De state wordt na uitlevering gewist, dus het eerstvolgende
+      // bezoek probeert gewoon weer een echte generatie — en zodra het model
+      // terug is, krijgt de lezer meteen het echte werk.
+      const noodeditie = bronkoppenEditie(sourceArticles)
+      if (noodeditie.length > 0) {
+        await writeGenerationState(supabase, user.id, {
+          items: noodeditie,
+          complete: true,
+          degraded: true,
+          startedAt,
+          sourceCount: sourceArticles.length,
+          sourceNewestAt,
+        })
+        return
+      }
+
+      // Geen bronartikelen om op terug te vallen — dan is de fout het enige
+      // eerlijke antwoord.
       await writeGenerationState(supabase, user.id, {
         items: [],
         complete: false,

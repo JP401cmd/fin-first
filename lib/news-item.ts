@@ -58,6 +58,79 @@ export function clampNewsImpactScore(raw: number | null | undefined): number {
   return Math.min(5, Math.max(1, Math.round(raw)))
 }
 
+// ── De gedegradeerde editie: bronkoppen + links ──────────────────────────────
+
+/** Hoogstens zoveel bronkoppen in een gedegradeerde editie — gelijk aan de bovengrens van een gewone editie. */
+export const BRONKOPPEN_EDITIE_MAX = 8
+
+/** Wat `bronkoppenEditie` van een bronartikel nodig heeft — structureel, zodat deze module puur blijft. */
+export interface Bronartikel {
+  id: string
+  title: string
+  source_url: string
+  source_name: string
+  category: string | null
+  published_at: string | null
+}
+
+/** Het id-voorvoegsel van een bronkop-bericht; maakt in de leesstatus herkenbaar dat het een degradatie was. */
+export const BRONKOP_ITEM_PREFIX = 'news-bron-'
+
+function isNewsCategory(waarde: string | null): waarde is NewsCategory {
+  return waarde !== null && (NEWS_CATEGORIES as readonly string[]).includes(waarde)
+}
+
+/**
+ * Bouw een editie uit louter BRONKOPPEN: kop + link, zonder samenvatting en
+ * zonder impactregel. Volledig deterministisch — er komt geen model aan te pas.
+ *
+ * AANLEIDING (24-25 sep 2026). Het AI-tegoed liep leeg. `loadNewsSourceArticles`
+ * leverde gewoon zijn bronartikelen, maar de generatie viel om, en de lezer
+ * kreeg een lege Krant met "Nieuws kon niet worden gegenereerd" — terwijl er
+ * 96 bruikbare artikelen in de bak stonden. De bronlaag hield stand; alleen de
+ * verrijking ontbrak.
+ *
+ * DIT IS HET BESTAANDE B26-PATROON, één laag hoger. De duidingspoort kent al de
+ * uitkomst "geduid, maar zonder samenvatting": de lezer krijgt dan de bronkop
+ * met de link, en dat is een GELDIGE uitkomst, geen storing (ADR 0176, B26/B27).
+ * Hier geldt hetzelfde — met dit verschil dat de degradatie niet per artikel
+ * maar voor de hele editie geldt.
+ *
+ * WAT ER BEWUST NIET IN STAAT: geen `summary`, geen `personalImpact`. Beide
+ * zouden een bewering zijn die niemand heeft gedaan en die niet op de bron te
+ * gronden is. Leeg is hier het eerlijke antwoord; de lezerscomponenten laten
+ * een leeg blok weg. Om diezelfde reden `impactType: 'relevant'` en
+ * `impactScore: 1`: "direct" claimt berekende impact, en een hogere score
+ * claimt een weging die niemand heeft gemaakt.
+ *
+ * De rubriek komt uit de opgeslagen `category` van de ingest. Staat die er niet
+ * (of is het geen bekende rubriek), dan wordt het 'macro' — de minst
+ * beweerende bak, en de enige eerlijke keuze zolang het schema een rubriek eist.
+ */
+export function bronkoppenEditie(
+  artikelen: readonly Bronartikel[],
+  opties: { max?: number; vandaag?: string } = {},
+): NewsItem[] {
+  const max = Math.max(0, opties.max ?? BRONKOPPEN_EDITIE_MAX)
+  const vandaag = opties.vandaag ?? new Date().toISOString().slice(0, 10)
+  return artikelen
+    .filter((a) => a.title.trim().length > 0)
+    .slice(0, max)
+    .map((a) => ({
+      id: `${BRONKOP_ITEM_PREFIX}${a.id}`,
+      headline: a.title,
+      summary: '',
+      impactType: 'relevant' as const,
+      personalImpact: '',
+      impactScore: 1,
+      impactDirection: 'neutraal' as const,
+      category: isNewsCategory(a.category) ? a.category : 'macro',
+      date: a.published_at?.slice(0, 10) || vandaag,
+      sourceUrl: a.source_url,
+      sourceName: a.source_name,
+    }))
+}
+
 /**
  * Sorteer een editie zoals de gebruiker 'm hoort te zien: direct-impact eerst,
  * daarbinnen de hoogste impactScore bovenaan. Muteert de invoer niet.

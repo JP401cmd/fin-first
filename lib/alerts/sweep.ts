@@ -16,7 +16,9 @@ import type { PushMessage } from '@/lib/alerts/push'
  *    alarm per 20 uur via dezelfde `cron_alert_last_<job>`-sleutel als de
  *    bestaande mail, zodat mail en push samen niet twee keer alarm slaan
  *    (zie `THROTTLE_MS` — inclusief wat dat venster niet belooft).
- *  - **S2b uitgebleven taak** — geen geslaagde run binnen `maxAgeHours`. Dit
+ *  - **S2b uitgebleven taak** — geen geslaagde run binnen `maxAgeHours`, waarbij
+ *    een `'partial'`-run als geslaagd telt: dit signaal meet of de taak nog
+ *    draait, niet of hij alles opleverde (zie `loadLastSuccessByJob`). Dit
  *    sluit fase 2 van ADR 0060 en is het enige signaal dat "de cron draaide
  *    helemaal niet" van binnenuit ziet (mits de sweep zélf nog draait — dáárom
  *    hangt er extern een dead man's switch omheen).

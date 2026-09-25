@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-09-22T21:30:12.599Z",
-  "generatedDate": "2026-09-22",
+  "generatedAt": "2026-09-25T20:18:21.585Z",
+  "generatedDate": "2026-09-25",
   "repo": {
     "name": "fin",
     "version": "0.92.5"
@@ -193,7 +193,7 @@
     "routesProduction": 90,
     "api": 334,
     "tables": 105,
-    "migrations": 262,
+    "migrations": 263,
     "integrations": 25,
     "components": 1167,
     "providers": 19,
@@ -8744,7 +8744,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 262
+    "migrationCount": 263
   },
   "tablesByDomain": [
     {
@@ -18797,6 +18797,20 @@
       ],
       "summary": "De status van de hefboom Belasting was een vermogensmeter in absolute euro's: boven € 500.000 boven de heffingsvrije voet altijd rood, zonder bovengrens en zonder weg terug. Vanaf nu meet hij hoeveel fiscale ruimte onbenut blijft, uitgedrukt als aandeel van de eigen heffing over ",
       "file": "docs/adr/0177-de-belastinghefboom-oordeelt-op-onbenutte-ruimte.md"
+    },
+    {
+      "id": "0178-de-krant-zonder-model",
+      "title": "De Krant zonder model: verlies melden, deterministisch terugvallen, de lezer degraderen",
+      "status": "aanvaard",
+      "date": "2026-09-25",
+      "elements": [
+        "as-nieuws",
+        "sp-nieuws",
+        "do-krant",
+        "t-supabase"
+      ],
+      "summary": "Als het model wegvalt, blijven de AI-stappen van de Krant **niet-fataal** — dat blijft ongewijzigd — maar drie dingen komen erbij. (1) Een run die liep zonder alles op te leveren meldt zich als **`partial`**, niet als `success`. (2) Een lijstpagina valt **deterministisch terug** ",
+      "file": "docs/adr/0178-de-krant-zonder-model.md"
     }
   ],
   "churn": {
@@ -18867,7 +18881,7 @@
       {
         "file": "lib/release-notes.ts",
         "loc": 3523,
-        "commits": 10
+        "commits": 11
       },
       {
         "file": "lib/dashboard-data-loader.ts",
@@ -20532,6 +20546,13 @@
     },
     {
       "date": "2026-09-22",
+      "api": 334,
+      "components": 1167,
+      "tables": 105,
+      "routesProduction": 90
+    },
+    {
+      "date": "2026-09-25",
       "api": 334,
       "components": 1167,
       "tables": 105,

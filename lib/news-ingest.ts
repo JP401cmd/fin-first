@@ -47,6 +47,7 @@ import {
   loadNewsSources,
   fetchRssFeed,
   fetchWebPage,
+  isTerugvalOorzaak,
   type BronOorzaak,
   type BronSoort,
   type SourceArticle,
@@ -58,6 +59,7 @@ import {
   LEGE_DUIDING_SUMMARY,
   type DuidingSummary,
 } from '@/lib/krant/duiding'
+import type { JobStatus } from '@/lib/job-runs'
 
 /** Bewaartermijn van de artikelbak. Het editievenster (30 dagen) valt hier ruim binnen. */
 export const ARTICLE_RETENTION_DAYS = 120
@@ -65,6 +67,14 @@ export const ARTICLE_RETENTION_DAYS = 120
 export const MAX_SECTIES_PER_PAGINA = 12
 /** Links die het model per lijstpagina te zien krijgt (expliciete cap; de rest staat als `afgekapt`). */
 export const MAX_LINKS_AANBOD = 120
+/**
+ * Links die de TERUGVAL per lijstpagina neemt als het model niet kan kiezen.
+ * Bewust de helft van `MAX_LINKS_PER_LIJST` (de cap van het modelpad): de
+ * terugval kan geen relevantie beoordelen, dus elke extra link is een gok die
+ * de artikelbak vult. Vier houdt de bronklasse in leven zonder dat een storing
+ * van een week de bak volzet — zeven lijstbronnen × 4 = 28 rijen per dag.
+ */
+export const TERUGVAL_MAX_PER_LIJST = 4
 /** Grens op het bewaarde bronfragment (= de grondslag voor de duiding in fase 2). */
 export const BRON_FRAGMENT_MAX_TEKENS = 8_000
 /** Grens op de bronkop (= CHECK in de migratie); een kaarttekst kan langer zijn dan een kop. */
@@ -152,6 +162,92 @@ export interface SourceHealthEntry {
 export interface SourceHealth {
   checkedAt: string
   sources: SourceHealthEntry[]
+}
+
+// ── Uitkomst van een run: liep hij, en leverde hij alles? ─────────────
+
+export interface IngestUitkomst {
+  /** `partial` = de run liep, maar een stap verloor zijn resultaat. */
+  status: JobStatus
+  /** Per verloren stap één regel: welke stap, en wat hij verloor. */
+  verlies: string[]
+}
+
+/**
+ * Leid de job-status af UIT DE WEGGESCHREVEN UITKOMST van de run (`summary` +
+ * `health`) — geen eigen teller die tijdens de run wordt opgehoogd, zodat de
+ * status niet kan afwijken van wat er werkelijk gebeurd is.
+ *
+ * AANLEIDING (25 sep 2026): het Anthropic-tegoed liep leeg, de duiding duidde
+ * 0 van 2 rijen en de bronklasse `web_lijst` viel van 33 naar 0 kandidaten —
+ * en de run landde als `status: 'success'`, `error: null`. De AI-stappen zijn
+ * bewust niet-fataal; wat ontbrak was de MELDING van het resultaatverlies.
+ *
+ * TWEE TRIGGERS, bewust smal (een te brede poort wordt binnen een week
+ * genegeerd — eigenaarsbesluit):
+ *
+ *  1. **De duiding hield rijen in handen en duidde er niets van.** `pogingen` =
+ *     `geduid + afgewezen + mislukt`. `overgeslagen` (geen grondslag, of buiten
+ *     het tijdbudget) en `wacht` (batch-cap) zijn UITSTEL, geen verlies: die
+ *     rijen komen de volgende run terug en tellen dus niet mee.
+ *  2. **Een hele bronklasse viel weg.** Zijn er bronnen van een soort bevraagd
+ *     en leverden ze samen nul kandidaten, dan is die klasse weg. Eén falende
+ *     bron naast een werkende van dezelfde soort triggert niets (het totaal is
+ *     dan > 0); een soort zonder geconfigureerde bronnen ook niet (niets
+ *     bevraagd).
+ *
+ * BEWUST GEEN trigger: `skipped` (schrijffout per rij) en `uitgesteld` (buiten
+ * het tijdbudget). Die staan al geteld in de summary en zijn geen weggevallen
+ * stap — uitbreiden hoort een expliciet besluit te zijn, niet een sluipende
+ * verbreding hier.
+ *
+ * Privacy: de regels dragen alleen tellingen, bronsoorten en oorzaak-codes uit
+ * de configuratie — nooit artikeltekst of bron-URL's.
+ */
+export function bepaalIngestUitkomst(
+  summary: IngestSummary,
+  health: SourceHealth,
+): IngestUitkomst {
+  const verlies: string[] = []
+
+  const { geduid, afgewezen, mislukt } = summary.duiding
+  const pogingen = geduid + afgewezen + mislukt
+  if (pogingen > 0 && geduid === 0) {
+    verlies.push(
+      `duiding: 0 van ${pogingen} geduid (afgewezen ${afgewezen}, mislukt ${mislukt})`,
+    )
+  }
+
+  const soorten = [...new Set(health.sources.map((s) => s.soort))].sort()
+  for (const soort of soorten) {
+    const bronnen = health.sources.filter((s) => s.soort === soort)
+    const items = bronnen.reduce((totaal, s) => totaal + s.items, 0)
+    if (items === 0) {
+      const oorzaken = [...new Set(bronnen.map((s) => s.oorzaak))].sort().join(', ')
+      verlies.push(
+        `bronsoort ${soort}: 0 kandidaten uit ${bronnen.length} bevraagde bron(nen) (${oorzaken})`,
+      )
+      continue
+    }
+
+    // Trigger 3: de bron leverde WEL, maar zonder AI-oordeel (`terugvalLinks`).
+    // Dit moet apart, want de terugval maakt trigger 2 juist blind: hij vult
+    // `items` op, dus "de klasse viel weg" vuurt niet meer. Zonder deze regel
+    // meldt een run waarin ÉLKE AI-stap wegviel zich groen — het scenario is
+    // niet hypothetisch: valt `getModel` om (kill-switch, ontbrekende sleutel),
+    // dan is er geen duidingsmodel (pogingen 0, dus trigger 1 zwijgt) én geen
+    // keuzemodel (terugval, dus trigger 2 zwijgt). Gevonden in de eindreview
+    // van 25 sep 2026, ná de eerste versie van deze functie.
+    const terugval = bronnen.filter((b) => isTerugvalOorzaak(b.oorzaak))
+    if (terugval.length > 0) {
+      const codes = [...new Set(terugval.map((b) => b.oorzaak))].sort().join(', ')
+      verlies.push(
+        `bronsoort ${soort}: ${terugval.length} van ${bronnen.length} bron(nen) zonder AI-oordeel, eerste links genomen (${codes})`,
+      )
+    }
+  }
+
+  return { status: verlies.length > 0 ? 'partial' : 'success', verlies }
 }
 
 /** Een rij voor `news_articles`, plus de index van de bron in `health` (niet persistent). */
@@ -249,6 +345,77 @@ export function webPaginaKandidaten(
     }
   })
   return { kandidaten, afgekapt }
+}
+
+/**
+ * De deterministische terugval voor een lijstpagina: de eerste `max` links in
+ * PAGINAVOLGORDE, zonder model.
+ *
+ * WAAROM PAGINAVOLGORDE. `extractLinks` levert al een voorgefilterde lijst —
+ * alleen de hoofdinhoud (nav/header/footer/aside/form zijn eruit geknipt),
+ * alleen dezelfde site, alleen linkteksten van betekenis, ontdubbeld, in de
+ * volgorde waarin ze op de pagina staan. Een overzichtspagina zet zijn nieuwste
+ * items bovenaan, dus "de eerste N" is de beste server-bepaalde benadering van
+ * "de meest recente" die zonder model te maken is. Elk alternatief (op datum in
+ * het fragment, op woorden in de linktekst) is een heuristiek die stil de
+ * verkeerde kant op kan vallen; deze niet.
+ *
+ * WAT DIT BEWUST NIET DOET: relevantie beoordelen. Dat is precies wat het model
+ * deed, en de terugval doet het niet beter door te gokken. Er komen dus
+ * gegarandeerd links langs die het model zou hebben overgeslagen — dat is de
+ * prijs voor een bronklasse die blijft leven, en de reden dat `max` de helft is
+ * van de modelcap (zie `TERUGVAL_MAX_PER_LIJST`). De duidingspoort en de
+ * editie-selectie filteren daarna alsnog op inhoud.
+ *
+ * ADR 0176 blijft onverkort: de sleutel, de kop en het fragment komen uit de
+ * door de server gelezen link — hier komt geen modeltekst aan te pas.
+ */
+export function terugvalLinks<T extends { url: string }>(
+  links: readonly T[],
+  max: number,
+): T[] {
+  return links.filter((l) => !isDoorstuurVorm(l.url)).slice(0, Math.max(0, max))
+}
+
+/**
+ * Draagt deze same-site URL een andere absolute URL in zijn pad of query? Dat
+ * is de vorm van een open redirector (`https://bron.nl/uit?url=https://elders`).
+ *
+ * WAAROM DIT HIER STAAT EN NIET IN `extractLinks`. De hostgrens houdt ook
+ * zonder deze toets stand — `extractLinks` laat alleen http(s)-links op dezelfde
+ * host als de GECONFIGUREERDE bron door, en voor een `web_lijst` haalt de server
+ * de gekozen link nooit zelf op. Maar het model deed naast relevantie óók,
+ * impliciet, een zeef op wélke same-site link werd opgeslagen; die zeef is in de
+ * terugval weg. Een doorstuur-link zou dan gegarandeerd bovenaan de
+ * paginavolgorde staan en via `bronkoppenEditie` zónder enig model ertussen als
+ * klikbare bron bij de lezer komen (security-review 25 sep 2026).
+ *
+ * Bewust een VORM-toets, geen lijst van parameternamen: `?url=`, `?redirect=`,
+ * `?next=`, `/out/https://…` — de naam varieert, de vorm niet.
+ */
+export function isDoorstuurVorm(url: string): boolean {
+  let doel: URL
+  try {
+    doel = new URL(url)
+  } catch {
+    return true
+  }
+  const verdacht = /https?:\/\//i
+  // `decodeURIComponent` werpt op een misvormde escape (`%ZZ`). Dan toetsen we
+  // de rauwe vorm: een URL die niet eens te decoderen is, verdient geen
+  // voorkeursbehandeling.
+  const ontcijfer = (s: string): string => {
+    try {
+      return decodeURIComponent(s)
+    } catch {
+      return s
+    }
+  }
+  if (verdacht.test(ontcijfer(doel.pathname))) return true
+  for (const [, waarde] of doel.searchParams) {
+    if (verdacht.test(ontcijfer(waarde))) return true
+  }
+  return false
 }
 
 export function webLijstKandidaat(
@@ -397,22 +564,40 @@ export async function runNewsIngest(
       // redirects binnen dezelfde site); de "zelfde site"-grens is de
       // GECONFIGUREERDE bron-URL, zodat een redirect die grens niet verschuift.
       const { links, afgekapt } = extractLinks(u.html, u.finalUrl, MAX_LINKS_AANBOD, source.url)
-      if (!model) {
-        gezond({ label: source.label, url: source.url, soort: source.soort, items: 0, oorzaak: 'geen_model', ...(afgekapt ? { afgekapt } : {}) })
-        return
-      }
-      const keuze = await kiesArtikelLinks(links, source, model)
-      linksGeweigerd += keuze.geweigerd
+
+      // Kan het model kiezen? Zo niet, dan valt de klasse NIET weg: de server
+      // heeft de links al, en `terugvalLinks` kiest er deterministisch uit.
+      // Op 25 sep 2026 stonden alle zeven lijstbronnen op `model_fout` omdat
+      // het AI-tegoed leeg was — 33 kandidaten werden er 0, en de hele
+      // bronklasse verdween uit de Krant terwijl de pagina's gewoon opgehaald
+      // waren. Het model beoordeelt relevantie; het is geen voorwaarde om een
+      // link te KUNNEN zien.
+      const keuze = model ? await kiesArtikelLinks(links, source, model) : null
+      if (keuze) linksGeweigerd += keuze.geweigerd
+
       // De garantie dat er geen verzonnen URL binnenkomt, is de constructie:
       // het model geeft een index, de URL komt uit de door de server gelezen
-      // lijst (`kiesArtikelLinks` weigert elke index buiten die lijst).
-      const gekozen = keuze.indexen.map((idx) => links[idx])
-      const totaalAfgekapt = afgekapt + keuze.afgekapt
+      // lijst (`kiesArtikelLinks` weigert elke index buiten die lijst). De
+      // terugval versterkt die garantie alleen maar — daar komt geen modeltekst
+      // aan te pas (ADR 0176: sleutel, kop en fragment zijn server-bepaald).
+      const modelKoos = keuze?.ok === true
+      const gekozen = modelKoos
+        ? keuze.indexen.map((idx) => links[idx])
+        : terugvalLinks(links, TERUGVAL_MAX_PER_LIJST)
+      const totaalAfgekapt = afgekapt + (keuze?.afgekapt ?? 0)
       const bron = gezond({
         label: source.label, url: source.url, soort: source.soort, items: gekozen.length,
-        oorzaak: !keuze.ok ? 'model_fout' : gekozen.length > 0 ? 'ok' : 'leeg',
+        // Nul links op de pagina is 'leeg', ongeacht het model: er viel niets te
+        // kiezen én niets terug te vallen. Leverde de terugval wél iets, dan
+        // zegt de oorzaak dát het de terugval was én waaróm — anders leest
+        // /beheer/nieuws een gedegradeerde run als een gewone.
+        oorzaak: gekozen.length === 0
+          ? 'leeg'
+          : modelKoos
+            ? 'ok'
+            : model ? 'terugval_model_fout' : 'terugval_geen_model',
         ...(totaalAfgekapt ? { afgekapt: totaalAfgekapt } : {}),
-        ...(keuze.geweigerd ? { geweigerd: keuze.geweigerd } : {}),
+        ...(keuze?.geweigerd ? { geweigerd: keuze.geweigerd } : {}),
       })
       for (const link of gekozen) kandidaten.push({ rij: webLijstKandidaat(link, source, runMoment), bron })
     }),

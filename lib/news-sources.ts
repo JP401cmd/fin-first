@@ -99,6 +99,14 @@ export const BRON_OORZAKEN = [
   'netwerk',
   'geen_model',
   'model_fout',
+  // De twee terugval-codes (25 sep 2026): de bron leverde WEL links, maar het
+  // model kon ze niet beoordelen, dus nam de ingest de eerste paar in
+  // paginavolgorde (`terugvalLinks`). Een eigen code en niet 'ok', want deze
+  // items zijn niet op relevantie gekozen; en niet 'geen_model'/'model_fout',
+  // want er kwam wél iets binnen. Zonder dit onderscheid leest /beheer/nieuws
+  // een gedegradeerde run als een gewone.
+  'terugval_geen_model',
+  'terugval_model_fout',
 ] as const
 export type BronOorzaak = (typeof BRON_OORZAKEN)[number]
 
@@ -115,6 +123,21 @@ export const BRON_OORZAAK_LABEL: Record<BronOorzaak, string> = {
   netwerk: 'netwerkfout',
   geen_model: 'geen AI-model — links niet gekozen',
   model_fout: 'AI-keuze mislukt',
+  terugval_geen_model: 'geen AI-model — eerste links genomen',
+  terugval_model_fout: 'AI-keuze mislukt — eerste links genomen',
+}
+
+/**
+ * Oorzaken waarbij de bron WEL leverde, maar zonder AI-oordeel. Bewust een
+ * eigen verzameling en geen `startsWith('terugval_')`: een nieuwe terugval-code
+ * moet hier bewust bij, anders telt hij stil niet mee in `bepaalIngestUitkomst`.
+ * Dat is precies hoe de eerste versie vals-groen werd — de codes bestonden al,
+ * maar niemand las ze.
+ */
+export const TERUGVAL_OORZAKEN = ['terugval_geen_model', 'terugval_model_fout'] as const
+
+export function isTerugvalOorzaak(oorzaak: BronOorzaak): boolean {
+  return (TERUGVAL_OORZAKEN as readonly BronOorzaak[]).includes(oorzaak)
 }
 
 // ── Default sources ──────────────────────────────────────────────────

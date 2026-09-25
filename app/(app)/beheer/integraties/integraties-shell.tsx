@@ -30,6 +30,7 @@ import type {
   IntegrationKind,
 } from '@/lib/architecture/integrations-model'
 import { INTEGRATIONS } from '@/lib/architecture/integrations-model'
+import type { JobStatus } from '@/lib/job-runs'
 import { INTEGRATION_VERSIONS } from '@/lib/integrations/version-registry'
 import { FORMAT_CONTRACTS } from '@/lib/parsers/format-contracts'
 
@@ -38,7 +39,7 @@ type View = 'inventaris' | 'liveness' | 'contracten'
 interface JobRun {
   id: string
   job: string
-  status: 'success' | 'error'
+  status: JobStatus
   started_at: string
   finished_at: string
   duration_ms: number | null
@@ -125,16 +126,24 @@ function isView(v: string | null): v is View {
   return v === 'inventaris' || v === 'liveness' || v === 'contracten'
 }
 
-function StatusBadge({ status }: { status: 'success' | 'error' }) {
-  const isOk = status === 'success'
+/**
+ * `job_runs.status` kent sinds 25 sep 2026 drie waarden. 'partial' (de taak
+ * liep, maar een stap verloor zijn resultaat) mag hier niet als "Fout" landen:
+ * dat zou liegen over een run die gewoon draaide.
+ */
+function StatusBadge({ status }: { status: JobStatus }) {
+  const toon =
+    status === 'success'
+      ? { klasse: 'text-positive', icoon: <Check className="h-3 w-3" />, label: 'OK' }
+      : status === 'partial'
+        ? { klasse: 'text-warning', icoon: <AlertCircle className="h-3 w-3" />, label: 'Deels' }
+        : { klasse: 'text-negative', icoon: <AlertCircle className="h-3 w-3" />, label: 'Fout' }
   return (
     <span
-      className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] ${
-        isOk ? 'bg-[var(--subtle)] text-positive' : 'bg-[var(--subtle)] text-negative'
-      }`}
+      className={`inline-flex items-center gap-1 bg-[var(--subtle)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] ${toon.klasse}`}
     >
-      {isOk ? <Check className="h-3 w-3" /> : <AlertCircle className="h-3 w-3" />}
-      {isOk ? 'OK' : 'Fout'}
+      {toon.icoon}
+      {toon.label}
     </span>
   )
 }

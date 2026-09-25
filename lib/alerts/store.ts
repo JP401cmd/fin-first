@@ -119,6 +119,14 @@ export async function saveSweepState(
  * op de bestaande index) i.p.v. één brede scan: de maandsnapshot heeft een
  * venster van ruim een maand, en dat met een `limit`-venster benaderen is
  * precies hoe je een stille taak mist.
+ *
+ * `'partial'` TELT HIER MEE ALS GESLAAGD (sinds 25 sep 2026). S2b meet één
+ * ding: draaide de taak nog? Een `partial`-run is het bewijs dat hij draaide.
+ * Zou hij niet meetellen, dan gaat de stilte-teller lopen bij een taak die wél
+ * liep en meldt de sweep "draaide niet binnen het verwachte venster" — een
+ * onware tekst, en twee signalen die door elkaar lopen (stilte vs.
+ * resultaatverlies). Resultaatverlies heeft zijn eigen zichtbaarheid op
+ * /beheer/jobs; het hoort geen verbouwde stilte-teller te kapen.
  */
 export async function loadLastSuccessByJob(
   service: SupabaseClient,
@@ -129,7 +137,7 @@ export async function loadLastSuccessByJob(
         .from('job_runs')
         .select('created_at')
         .eq('job', job.key)
-        .eq('status', 'success')
+        .in('status', ['success', 'partial'])
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle()

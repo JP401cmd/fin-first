@@ -45,12 +45,19 @@ describe('lib/krant/duiding.ts — de grondslag leest alleen de eigen kolommen',
   }
 
   it('leest precies de toegestane kolommen uit news_articles', () => {
+    // Elke kolom hier is een bewuste toevoeging. `fetched_at` kwam erbij op
+    // 25-09-2026 (ADR 0178) en draagt GEEN inhoud: het is een tijdstempel die
+    // uitsluitend `binnenProviderCoulance` voedt — de grens waarna een
+    // providerstoring een rij weer een duidingspoging kost. Hij komt niet in
+    // de prompt en niet in de grondslag; `bepaalGrondslag` leest alleen
+    // `bron_kop` + `bron_fragment`, geborgd door de tests hieronder.
     expect(WACHTEND_ARTIKEL_KOLOMMEN.split(',').map((k) => k.trim()).sort()).toEqual([
       'bron_fragment',
       'bron_kop',
       'bron_soort',
       'category',
       'duiding_pogingen',
+      'fetched_at',
       'id',
       'published_at',
       'published_bron',
@@ -74,6 +81,7 @@ describe('bepaalGrondslag', () => {
     published_at: null,
     published_bron: 'feed',
     duiding_pogingen: 0,
+    fetched_at: null,
   }
 
   it('kop + fragment vormen samen de grondslag, soort = fragment', () => {

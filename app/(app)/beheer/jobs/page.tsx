@@ -2,6 +2,7 @@ import { Activity, Check, AlertCircle, Clock } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { isPushConfigured } from '@/lib/alerts/push'
 import { JOB_CATALOG, JOB_LIST } from '@/lib/job-catalog'
+import type { JobStatus } from '@/lib/job-runs'
 import {
   JOB_HEALTH_META,
   JOB_HEALTH_ORDER,
@@ -18,7 +19,8 @@ export const dynamic = 'force-dynamic'
 interface JobRun {
   id: string
   job: string
-  status: 'success' | 'error'
+  /** `partial` = de taak liep, maar een stap verloor zijn resultaat (sinds 25 sep 2026). */
+  status: JobStatus
   started_at: string
   finished_at: string
   duration_ms: number | null
@@ -64,13 +66,19 @@ async function lastRunFor(supabase: Db, job: string): Promise<ReadResult<JobRun 
   return { ok: true, value: (data as JobRun | null) ?? null }
 }
 
-/** Alleen het tijdstip van de laatste GESLAAGDE run — meer heeft het oordeel niet nodig. */
+/**
+ * Alleen het tijdstip van de laatste run die NIET hard faalde — meer heeft het
+ * actualiteitsoordeel niet nodig. `'partial'` telt hier mee, net als in
+ * `loadLastSuccessByJob` (lib/alerts/store.ts): die run liep, hij leverde
+ * alleen niet alles. Resultaatverlies is een ándere vraag en heeft op deze
+ * pagina zijn eigen band en badge.
+ */
 async function lastSuccessAtFor(supabase: Db, job: string): Promise<ReadResult<string | null>> {
   const { data, error } = await supabase
     .from('job_runs')
     .select('created_at')
     .eq('job', job)
-    .eq('status', 'success')
+    .in('status', ['success', 'partial'])
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
@@ -122,6 +130,18 @@ function primitiveEntries(summary: unknown): [string, string][] {
   return out
 }
 
+/**
+ * De verlies-regels uit een summary van een `partial`-run: welke stap verloor
+ * wat. `primitiveEntries` laat arrays bewust weg, dus deze lijst heeft zijn
+ * eigen weergave — anders zou de reden alleen in de dichtgeklapte JSON staan,
+ * en dan is 'partial' net zo onzichtbaar als het defect dat hij moet melden.
+ */
+function verliesRegels(summary: unknown): string[] {
+  if (!summary || typeof summary !== 'object') return []
+  const rauw = (summary as { verlies?: unknown }).verlies
+  return Array.isArray(rauw) ? rauw.filter((r): r is string => typeof r === 'string') : []
+}
+
 // Stoplichtsemantiek — bewust géén module-accenten: dit is status, geen identiteit.
 const TONE_CLASSES: Record<
   (typeof JOB_HEALTH_META)[JobHealth]['tone'],
@@ -137,12 +157,22 @@ const TONE_CLASSES: Record<
   },
 }
 
-function StatusBadge({ status }: { status: 'success' | 'error' }) {
+function StatusBadge({ status }: { status: JobStatus }) {
   if (status === 'success') {
     return (
       <span className="inline-flex items-center gap-1 bg-positive-bg px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-positive">
         <Check className="h-3 w-3" />
         OK
+      </span>
+    )
+  }
+  // 'partial' is geen fout: de taak liep, maar een stap verloor zijn resultaat.
+  // Warning-toon, want er is iets te doen — geen rood, want niets is gebroken.
+  if (status === 'partial') {
+    return (
+      <span className="inline-flex items-center gap-1 bg-warning-bg px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-warning">
+        <AlertCircle className="h-3 w-3" />
+        Deels
       </span>
     )
   }
@@ -194,9 +224,11 @@ export default async function BeheerJobsPage() {
         // als hij iets kan toevoegen — niet bij een geslaagde laatste run (zelfde
         // rij), niet zonder runs (gegarandeerd leeg) en niet bij een taak die we
         // toch niet bewaken (uitkomst wordt genegeerd).
-        let lastSuccessAt = last?.status === 'success' ? last.created_at : null
+        // 'partial' telt als "draaide" (zie lastSuccessAtFor): alleen een harde
+        // fout zet de actualiteitsklok door naar een eerdere run.
+        let lastSuccessAt = last && last.status !== 'error' ? last.created_at : null
         let readFailed = !lastRes.ok
-        if (last && last.status !== 'success' && job.maxAgeHours != null) {
+        if (last && last.status === 'error' && job.maxAgeHours != null) {
           const successRes = await lastSuccessAtFor(supabase, job.key)
           if (successRes.ok) lastSuccessAt = successRes.value
           else readFailed = true
@@ -219,6 +251,14 @@ export default async function BeheerJobsPage() {
   const recent = (recentRes.data ?? []) as JobRun[]
   const counts = summarizeJobHealth(jobRows.map((r) => r.health))
   const drift = detectScheduleDrift()
+  // Taken waarvan de LAATSTE run liep maar niet alles opleverde. Bewust een
+  // eigen band en niet verwerkt in het actualiteitsoordeel hierboven: "is deze
+  // taak bij?" en "leverde hij alles op?" zijn twee vragen, en een 'partial'
+  // die als Achterstallig zou tonen ("nog nooit geslaagd geëindigd") vertelt
+  // een onwaarheid over een taak die gewoon draaide.
+  const partialRows = jobRows
+    .filter((r) => r.last?.status === 'partial')
+    .map((r) => ({ job: r.job, verlies: verliesRegels(r.last?.summary) }))
   const hasDrift = drift.unknownCrons.length > 0 || drift.unscheduledJobs.length > 0
   const cronSecretSet = Boolean(process.env.CRON_SECRET)
   const ntfyTopicSet = Boolean(process.env.NTFY_TOPIC?.trim())
@@ -324,6 +364,37 @@ export default async function BeheerJobsPage() {
               </li>
             ))}
           </ul>
+        </section>
+      )}
+
+      {partialRows.length > 0 && (
+        <section className="mb-6 border-l-2 border-warning bg-warning-bg px-4 py-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-warning">
+            Deels geslaagd — een stap verloor zijn resultaat
+          </p>
+          <ul className="mt-1.5 space-y-1.5 text-xs text-[var(--ink-2)]">
+            {partialRows.map(({ job, verlies }) => (
+              <li key={job.key}>
+                <span className="font-medium">{job.label}</span> draaide, maar leverde niet alles op
+                {verlies.length > 0 ? ':' : '.'}
+                {verlies.length > 0 && (
+                  <ul className="mt-1 space-y-0.5 pl-4">
+                    {verlies.map((regel) => (
+                      <li key={regel} className="font-mono text-[11px] text-[var(--ink-3)]">
+                        {regel}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs leading-relaxed text-[var(--ink-3)]">
+            Deze taken zijn <em>niet</em> achterstallig — ze liepen op tijd. Een van hun stappen
+            leverde alleen niets op; bij de AI-stappen is een leeg tegoed of een
+            uitgeschakeld model de gebruikelijke oorzaak. Er gaat hiervoor bewust geen melding
+            uit: dat zou dagelijkse ruis worden.
+          </p>
         </section>
       )}
 

@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react'
 import { TrendingUp, TrendingDown, Lightbulb, MessageSquare, CheckCheck, Loader2, ExternalLink, CalendarClock, ListPlus, Check, EyeOff } from 'lucide-react'
 import { useChatContext } from '@/components/app/chat/chat-provider'
 import type { NewsItem } from '@/app/api/news/route'
+import { BRONKOP_ITEM_PREFIX } from '@/lib/news-item'
 import { safeHttpUrl } from '@/lib/safe-url'
 
 // ── Category config ──────────────────────────────────────────────────
@@ -99,6 +100,10 @@ export function ImpactBlock({ item }: { item: NewsItem }) {
 // ── Relevance block ─────────────────────────────────────────────────
 
 export function RelevanceBlock({ relevance }: { relevance: string }) {
+  // Zonder tekst geen blok. Een kader met de kop "Relevant voor jou" boven een
+  // lege alinea suggereert een oordeel dat niemand heeft gegeven — precies wat
+  // het degradatiepad (bronkop + link, B26) juist vermijdt.
+  if (!relevance.trim()) return null
   return (
     <div className="mt-3 rounded-[var(--r)] border-l-3 border-[var(--border-md)] bg-[var(--subtle)]/60 px-4 py-3">
       <div className="mb-1 flex items-center gap-1.5">
@@ -180,16 +185,32 @@ export function NewsArticleActions({ item, isRead, onMarkRead }: { item: NewsIte
     onMarkRead(item.id)
   }, [item.id, onMarkRead])
 
+  /**
+   * Een bronkop-bericht uit de noodeditie (ADR 0178): kop + link, verder niets.
+   * Twee acties slaan we daar over, allebei omdat ze een leeg bericht als vol
+   * behandelen:
+   *  - "Bespreek met Fin" zou een prompt met een lege samenvatting sturen, en
+   *    juist in de situatie die deze editie veroorzaakt is Fin zelf onbereikbaar.
+   *  - "Minder hierover" zou een ECHTE stem leggen op de rubriek, terwijl die
+   *    bij een ongecategoriseerd artikel de terugval 'macro' is. Die stem demoot
+   *    'macro' daarna acht weken in de echte edities — een gebruikersoordeel dat
+   *    de gebruiker nooit over 'macro' gaf.
+   * "Gelezen" blijft wél staan: dat gaat over dit bericht, niet over een rubriek.
+   */
+  const isBronkop = item.id.startsWith(BRONKOP_ITEM_PREFIX)
+
   return (
     <div className="mt-3 flex flex-wrap items-center gap-2">
-      <button
-        type="button"
-        onClick={handleDiscuss}
-        className="inline-flex min-h-[44px] items-center gap-1.5 rounded-[var(--r-sm)] border border-wil-200 bg-wil-50 px-3 py-2 font-inter text-[11px] font-medium text-wil-700 transition-colors hover:bg-wil-100 sm:min-h-0 sm:px-2 sm:py-1"
-      >
-        <MessageSquare className="h-3 w-3" />
-        Bespreek met Fin
-      </button>
+      {!isBronkop && (
+        <button
+          type="button"
+          onClick={handleDiscuss}
+          className="inline-flex min-h-[44px] items-center gap-1.5 rounded-[var(--r-sm)] border border-wil-200 bg-wil-50 px-3 py-2 font-inter text-[11px] font-medium text-wil-700 transition-colors hover:bg-wil-100 sm:min-h-0 sm:px-2 sm:py-1"
+        >
+          <MessageSquare className="h-3 w-3" />
+          Bespreek met Fin
+        </button>
+      )}
       {item.impactType === 'direct' && (
         <button
           type="button"
@@ -211,16 +232,18 @@ export function NewsArticleActions({ item, isRead, onMarkRead }: { item: NewsIte
           Gelezen
         </button>
       )}
-      <button
-        type="button"
-        onClick={handleLessLikeThis}
-        disabled={feedbackGiven}
-        title="Toon minder berichten zoals dit"
-        className="ml-auto inline-flex min-h-[44px] items-center gap-1.5 rounded-[var(--r-sm)] px-2 py-2 font-inter text-[11px] text-[var(--ink-4)] transition-colors hover:bg-[var(--subtle)] hover:text-[var(--ink-3)] disabled:opacity-70 sm:min-h-0 sm:py-1"
-      >
-        <EyeOff className="h-3 w-3" />
-        {feedbackGiven ? 'Genoteerd' : 'Minder hierover'}
-      </button>
+      {!isBronkop && (
+        <button
+          type="button"
+          onClick={handleLessLikeThis}
+          disabled={feedbackGiven}
+          title="Toon minder berichten zoals dit"
+          className="ml-auto inline-flex min-h-[44px] items-center gap-1.5 rounded-[var(--r-sm)] px-2 py-2 font-inter text-[11px] text-[var(--ink-4)] transition-colors hover:bg-[var(--subtle)] hover:text-[var(--ink-3)] disabled:opacity-70 sm:min-h-0 sm:py-1"
+        >
+          <EyeOff className="h-3 w-3" />
+          {feedbackGiven ? 'Genoteerd' : 'Minder hierover'}
+        </button>
+      )}
     </div>
   )
 }
@@ -254,9 +277,13 @@ export function HeroNewsArticle({ item, isRead, onMarkRead, readOnly }: {
         {item.headline}
       </h2>
 
-      <p className="mt-3 font-source-serif text-base leading-relaxed text-[var(--ink-2)] first-letter:float-left first-letter:mr-2 first-letter:font-playfair first-letter:text-[3.2rem] first-letter:font-bold first-letter:leading-[0.8] first-letter:text-[var(--ink)] sm:text-lg">
-        {item.summary}
-      </p>
+      {/* Geen samenvatting = geen alinea (B26-degradatie: kop + link). Een lege
+          alinea mét initiaal laat bovendien een zwevende marge achter. */}
+      {item.summary.trim() && (
+        <p className="mt-3 font-source-serif text-base leading-relaxed text-[var(--ink-2)] first-letter:float-left first-letter:mr-2 first-letter:font-playfair first-letter:text-[3.2rem] first-letter:font-bold first-letter:leading-[0.8] first-letter:text-[var(--ink)] sm:text-lg">
+          {item.summary}
+        </p>
+      )}
 
       <div className="mt-3 flex items-center gap-1 clear-left">
         <span className="font-inter text-[11px] text-[var(--ink-4)]">
@@ -315,9 +342,15 @@ export function NewsArticle({ item, isRead, onMarkRead, readOnly }: {
         {item.headline}
       </h3>
 
-      <p className="mt-1.5 flex-1 font-source-serif text-sm leading-relaxed text-[var(--ink-2)]">
-        {item.summary}
-      </p>
+      {/* Zie hierboven: zonder samenvatting geen alinea. `flex-1` verhuist naar
+          een spacer, zodat de kaartvoet onderaan blijft staan. */}
+      {item.summary.trim() ? (
+        <p className="mt-1.5 flex-1 font-source-serif text-sm leading-relaxed text-[var(--ink-2)]">
+          {item.summary}
+        </p>
+      ) : (
+        <div className="flex-1" />
+      )}
 
       <div className="mt-2 flex items-center gap-1">
         <span className="font-inter text-[11px] text-[var(--ink-4)]">

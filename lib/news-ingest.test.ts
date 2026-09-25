@@ -24,14 +24,21 @@ vi.mock('@/lib/krant/duiding', () => ({
 import { duidWachtendeArtikelen } from '@/lib/krant/duiding'
 import { loadNewsSources, fetchRssFeed, fetchWebPage } from '@/lib/news-sources'
 import { kiesArtikelLinks, categorizeArticles } from '@/lib/news-enrich'
+import type { DuidingSummary } from '@/lib/krant/duiding'
 import {
   runNewsIngest,
+  bepaalIngestUitkomst,
   ARTICLE_RETENTION_DAYS,
   inhoudHash,
   sectieArtikelUrl,
   ontdubbelBatch,
   rssKandidaat,
+  terugvalLinks,
+  isDoorstuurVorm,
+  TERUGVAL_MAX_PER_LIJST,
+  type IngestSummary,
   type SourceHealth,
+  type SourceHealthEntry,
 } from './news-ingest'
 
 // ── Nep-client: een in-memory news_articles met een unieke index op source_url ──
@@ -220,7 +227,9 @@ describe('runNewsIngest — eerlijke telling', () => {
     zetBronnen()
     const { client } = maakClient({ racePerUrl: new Set([FEED_ITEMS[0].link]) })
     const { summary, health } = await runNewsIngest(client as never, null, { now: NU })
-    expect(summary.inserted).toBe(2) // alleen de twee secties; de feed-rij verloor de race
+    // Twee secties + twee lijstlinks; die laatste komen zonder model via de
+    // terugval binnen. De feed-rij verloor de race en telt als "al bekend".
+    expect(summary.inserted).toBe(4)
     expect(summary.alBekend).toBe(1)
     const feed = health.sources.find((s) => s.soort === 'rss')!
     expect(feed.items).toBe(1)
@@ -276,7 +285,7 @@ describe('runNewsIngest — eerlijke telling', () => {
 })
 
 describe('runNewsIngest — brongezondheid met oorzaak', () => {
-  it('elke bron krijgt een oorzaak; zonder model kiest een lijstpagina niets (geen_model)', async () => {
+  it('elke bron krijgt een oorzaak; zonder model valt een lijstpagina terug op de eerste links', async () => {
     vi.mocked(loadNewsSources).mockResolvedValue({ rssFeeds: [FEED], webSources: [LIJST, PAGINA] })
     vi.mocked(fetchRssFeed).mockResolvedValue({ items: [], oorzaak: 'dns', afgekapt: 0 })
     vi.mocked(fetchWebPage).mockImplementation(async (s) =>
@@ -286,13 +295,148 @@ describe('runNewsIngest — brongezondheid met oorzaak', () => {
     const { health } = await runNewsIngest(client as never, null, { now: NU })
     const per = Object.fromEntries(health.sources.map((s) => [s.url, s]))
     expect(per[FEED.url]).toMatchObject({ soort: 'rss', type: 'rss', oorzaak: 'dns', items: 0 })
-    expect(per[LIJST.url]).toMatchObject({ soort: 'web_lijst', type: 'web', oorzaak: 'geen_model' })
+    // De twee links van de pagina komen binnen via de terugval; de oorzaak zegt
+    // dát het de terugval was, zodat /beheer/nieuws dit niet als 'ok' leest.
+    expect(per[LIJST.url]).toMatchObject({ soort: 'web_lijst', type: 'web', oorzaak: 'terugval_geen_model', items: 2 })
     expect(per[PAGINA.url]).toMatchObject({ soort: 'web_pagina', oorzaak: 'http_fout', httpStatus: 404 })
 
     // De gezondheid landt in app_settings en bevat geen artikeltekst.
     const opgeslagen = stappen.find((q) => q.table === 'app_settings')!.stappen.find((s) => s.m === 'upsert')!
     const waarde = JSON.parse((opgeslagen.args[0] as { value: string }).value) as SourceHealth
     expect(JSON.stringify(waarde)).not.toMatch(/Woninghuur|pensioenstelsel/)
+  })
+})
+
+// ── De terugval op een lijstpagina (25 sep 2026) ─────────────────────
+//
+// REPRO: op 24 sep ~18:00 liep het Anthropic-tegoed leeg. In de run van 25 sep
+// 07:23 weigerde `kiesArtikelLinks` op alle ZEVEN web_lijst-bronnen (AFM ×2,
+// CBS ×2, CPB ×2, ECB) — in de brongezondheid stond overal `oorzaak:
+// model_fout, items: 0`. De pagina's waren gewoon opgehaald; alleen het
+// oordeel ontbrak. Resultaat: `perSoort.web_lijst` viel van 33 naar 0 en de
+// hele bronklasse verdween.
+
+describe('runNewsIngest — web_lijst valt terug als het model niet kan kiezen', () => {
+  it('REPRO: modelfout op de lijstpagina → de links komen alsnog binnen, met terugval_model_fout', async () => {
+    zetBronnen()
+    const { client, rijen } = maakClient()
+    vi.mocked(kiesArtikelLinks).mockResolvedValueOnce({ indexen: [], geweigerd: 0, afgekapt: 0, ok: false })
+
+    const { summary, health } = await runNewsIngest(client as never, MODEL, { now: NU })
+
+    expect(summary.perSoort.web_lijst).toBe(2)
+    expect(health.sources.find((s) => s.url === LIJST.url)).toMatchObject({
+      oorzaak: 'terugval_model_fout',
+      items: 2,
+    })
+    // ADR 0176: kop en sleutel komen uit de door de server gelezen link.
+    const lijst = rijen.filter((r) => r.bron_soort === 'web_lijst')
+    expect(lijst.map((r) => r.bron_kop)).toEqual([
+      'Woninghuur stijgt gemiddeld met 4,4 procent',
+      'Inflatie stijgt naar 3,3 procent in augustus',
+    ])
+    expect(lijst.every((r) => String(r.source_url).startsWith('https://www.cbs.nl/'))).toBe(true)
+  })
+
+  it('een model dat wél koos maar niets passend vond, wordt gerespecteerd — geen terugval', async () => {
+    // Het onderscheid dat de hele terugval draagt: `ok: true` met een lege
+    // keuze is een OORDEEL ("geen van deze links is een artikel"). Dat
+    // overrulen zou de bak vullen met wat het model bewust wegliet.
+    zetBronnen()
+    const { client } = maakClient()
+    vi.mocked(kiesArtikelLinks).mockResolvedValueOnce({ indexen: [], geweigerd: 0, afgekapt: 0, ok: true })
+
+    const { summary, health } = await runNewsIngest(client as never, MODEL, { now: NU })
+
+    expect(summary.perSoort.web_lijst).toBe(0)
+    expect(health.sources.find((s) => s.url === LIJST.url)).toMatchObject({ oorzaak: 'leeg', items: 0 })
+  })
+
+  it('een pagina zonder bruikbare links blijft "leeg" — er valt niets terug te vallen', async () => {
+    vi.mocked(loadNewsSources).mockResolvedValue({ rssFeeds: [], webSources: [LIJST] })
+    vi.mocked(fetchWebPage).mockResolvedValue({ ok: true, html: '<main><p>Niets hier.</p></main>', finalUrl: LIJST.url })
+    const { client } = maakClient()
+
+    const { health } = await runNewsIngest(client as never, null, { now: NU })
+
+    expect(health.sources.find((s) => s.url === LIJST.url)).toMatchObject({ oorzaak: 'leeg', items: 0 })
+  })
+
+  it('de terugval neemt hoogstens TERUGVAL_MAX_PER_LIJST links, ook als de pagina er veel meer heeft', async () => {
+    const paginaMet = (n: number) =>
+      `<main><ul>${Array.from({ length: n }, (_, i) => `<li><a href="/nl-nl/nieuws/2026/${i}/bericht-over-koopkracht">Bericht ${i} over koopkracht en inflatie</a></li>`).join('')}</ul></main>`
+    vi.mocked(loadNewsSources).mockResolvedValue({ rssFeeds: [], webSources: [LIJST] })
+    vi.mocked(fetchWebPage).mockResolvedValue({ ok: true, html: paginaMet(50), finalUrl: LIJST.url })
+    const { client } = maakClient()
+
+    const { summary } = await runNewsIngest(client as never, null, { now: NU })
+
+    expect(summary.perSoort.web_lijst).toBe(TERUGVAL_MAX_PER_LIJST)
+  })
+})
+
+describe('terugvalLinks', () => {
+  const l = (pad: string) => ({ url: `https://www.cbs.nl${pad}` })
+  const links = [l('/a'), l('/b'), l('/c'), l('/d'), l('/e')]
+
+  it('neemt de eerste `max` in paginavolgorde', () => {
+    expect(terugvalLinks(links, 3)).toEqual([l('/a'), l('/b'), l('/c')])
+  })
+
+  it('minder links dan de cap: alles', () => {
+    expect(terugvalLinks([l('/a')], 4)).toEqual([l('/a')])
+  })
+
+  it('een lege lijst en een cap van 0 geven beide niets — geen uitzondering', () => {
+    expect(terugvalLinks([], 4)).toEqual([])
+    expect(terugvalLinks(links, 0)).toEqual([])
+  })
+
+  it('een negatieve cap valt naar 0, niet naar een slice-vanaf-achteren', () => {
+    // `slice(0, -1)` zou hier stilletjes alles-op-één-na teruggeven.
+    expect(terugvalLinks(links, -2)).toEqual([])
+  })
+
+  it('weert een doorstuur-link en schuift de volgende door — de cap blijft vol', () => {
+    // Zonder deze zeef zou een open redirector bovenaan de paginavolgorde
+    // gegarandeerd meegaan; het model hield zoiets impliciet tegen.
+    const uit = terugvalLinks([{ url: 'https://www.cbs.nl/uit?url=https://kwaadaardig.nl' }, ...links], 2)
+    expect(uit).toEqual([l('/a'), l('/b')])
+  })
+})
+
+describe('isDoorstuurVorm', () => {
+  it('een gewone artikel-URL is geen doorstuur', () => {
+    expect(isDoorstuurVorm('https://www.cbs.nl/nl-nl/nieuws/2026/37/inflatie')).toBe(false)
+  })
+
+  it('een absolute URL in de query is een doorstuur, ongeacht de parameternaam', () => {
+    for (const naam of ['url', 'redirect', 'next', 'r', 'doel']) {
+      expect(isDoorstuurVorm(`https://www.cbs.nl/uit?${naam}=https://kwaadaardig.nl`)).toBe(true)
+    }
+  })
+
+  it('een absolute URL in het pad is een doorstuur, ook ge-escaped', () => {
+    expect(isDoorstuurVorm('https://www.cbs.nl/out/https://kwaadaardig.nl')).toBe(true)
+    expect(isDoorstuurVorm('https://www.cbs.nl/out/https%3A%2F%2Fkwaadaardig.nl')).toBe(true)
+  })
+
+  it('een ge-escapete absolute URL in de query telt ook', () => {
+    expect(isDoorstuurVorm('https://www.cbs.nl/uit?url=https%3A%2F%2Fkwaadaardig.nl')).toBe(true)
+  })
+
+  it('een onparseerbare URL geldt als doorstuur — geen voorkeursbehandeling', () => {
+    expect(isDoorstuurVorm('niet-eens-een-url')).toBe(true)
+  })
+
+  it('een misvormde escape laat de toets niet omvallen', () => {
+    // decodeURIComponent werpt op %ZZ; de rauwe vorm wordt dan getoetst.
+    expect(isDoorstuurVorm('https://www.cbs.nl/nieuws%ZZ/inflatie')).toBe(false)
+    expect(isDoorstuurVorm('https://www.cbs.nl/uit%ZZ/https://kwaadaardig.nl')).toBe(true)
+  })
+
+  it('het woord http in een gewone padnaam is geen doorstuur', () => {
+    expect(isDoorstuurVorm('https://www.cbs.nl/nl-nl/dossier/https-uitleg')).toBe(false)
   })
 })
 
@@ -368,7 +512,10 @@ describe('runNewsIngest — categorisatie per brok, met tijdbudget (H1)', () => 
   it('faalt alleen de inhoudcontrole, dan blijft de sleutelcontrole gelden: al bekend wordt niet opnieuw gecategoriseerd', async () => {
     zetBronnen()
     const eerste = maakClient()
-    await runNewsIngest(eerste.client as never, null, { now: NU })
+    // De seed-run draait MÉT model (dat standaard niets kiest: `ok: true`, lege
+    // keuze), zodat de twee lijstlinks in de tweede run écht nieuw zijn. Met
+    // `null` zou de terugval ze hier al binnenhalen en meet de test niets meer.
+    await runNewsIngest(eerste.client as never, MODEL, { now: NU })
     const { client, rijen } = maakClient({ hashLeesFout: true })
     rijen.push(...eerste.rijen)
     vi.mocked(categorizeArticles).mockClear()
@@ -419,5 +566,155 @@ describe('runNewsIngest — de duidingsstap', () => {
     await runNewsIngest(client as never, null, { now: NU, duidingMaxPerRun: 1 })
     const [, , opties] = vi.mocked(duidWachtendeArtikelen).mock.calls[0]
     expect(opties).toEqual({ maxPerRun: 1, tijdBudgetMs: undefined })
+  })
+})
+
+// ── Uitkomst van een run: liep hij, en leverde hij alles? ─────────────
+//
+// Aanleiding 25 sep 2026: het AI-tegoed liep leeg, de duiding duidde 0 van 2
+// rijen en de bronklasse web_lijst viel van 33 naar 0 kandidaten — en de run
+// meldde zich als `status: 'success'`, `error: null`.
+
+describe('bepaalIngestUitkomst', () => {
+  const summary = (duiding: Partial<DuidingSummary> = {}): IngestSummary => ({
+    sourcesChecked: 3,
+    rssArticlesFound: 15,
+    webArticlesExtracted: 78,
+    perSoort: { rss: 15, web_lijst: 33, web_pagina: 45 },
+    duplicatesSkipped: 0,
+    alBekend: 0,
+    inserted: 3,
+    skipped: 0,
+    uitgesteld: 0,
+    linksGeweigerd: 0,
+    duiding: { geduid: 3, afgewezen: 0, mislukt: 0, overgeslagen: 0, wacht: 0, ...duiding },
+  })
+
+  const bron = (
+    soort: 'rss' | 'web_lijst' | 'web_pagina',
+    items: number,
+    oorzaak: SourceHealthEntry['oorzaak'] = items > 0 ? 'ok' : 'leeg',
+  ): SourceHealthEntry => ({
+    label: `${soort}-bron`,
+    url: `https://voorbeeld.nl/${soort}`,
+    soort,
+    type: soort === 'rss' ? 'rss' : 'web',
+    items,
+    nieuw: 0,
+    oorzaak,
+  })
+
+  const gezond = (sources: SourceHealthEntry[]): SourceHealth => ({
+    checkedAt: '2026-09-25T05:23:44.879Z',
+    sources,
+  })
+
+  const VOLLEDIG = gezond([bron('rss', 15), bron('web_lijst', 33), bron('web_pagina', 45)])
+
+  it('een volledige run is "success" zonder verlies', () => {
+    expect(bepaalIngestUitkomst(summary(), VOLLEDIG)).toEqual({ status: 'success', verlies: [] })
+  })
+
+  it('duiding met pogingen maar 0 geduid → partial', () => {
+    const uit = bepaalIngestUitkomst(summary({ geduid: 0, mislukt: 2, wacht: 2 }), VOLLEDIG)
+    expect(uit.status).toBe('partial')
+    expect(uit.verlies).toEqual(['duiding: 0 van 2 geduid (afgewezen 0, mislukt 2)'])
+  })
+
+  it('een lege duidingswachtrij is geen verlies: nul pogingen, nul duidingen', () => {
+    const uit = bepaalIngestUitkomst(summary({ geduid: 0 }), VOLLEDIG)
+    expect(uit).toEqual({ status: 'success', verlies: [] })
+  })
+
+  it('overgeslagen en wacht zijn uitstel, geen verlies — ze komen de volgende run terug', () => {
+    const uit = bepaalIngestUitkomst(summary({ geduid: 0, overgeslagen: 4, wacht: 9 }), VOLLEDIG)
+    expect(uit).toEqual({ status: 'success', verlies: [] })
+  })
+
+  // ── De terugval mag de melding niet blind maken (eindreview 25 sep 2026) ──
+  //
+  // De eerste versie van deze functie kende twee triggers, en de A2-terugval
+  // ontkrachtte ze allebei tegelijk: hij vult `items` op (trigger 2 zwijgt),
+  // en zonder duidingsmodel zijn er nul pogingen (trigger 1 zwijgt). Een run
+  // met NUL AI meldde zich daardoor als 'success' — precies het defect waarvoor
+  // deze hele functie bestaat.
+
+  it('REPRO eindreview: geen enkel model → terugval vult de bronnen, en de run is tóch partial', () => {
+    const uit = bepaalIngestUitkomst(
+      // Zonder duidingsmodel wordt de stap overgeslagen: nul pogingen, dus
+      // trigger 1 (duiding) kan hier per definitie niet vuren.
+      summary({ geduid: 0, afgewezen: 0, mislukt: 0, wacht: 12 }),
+      gezond([
+        bron('rss', 15),
+        bron('web_lijst', 4, 'terugval_geen_model'),
+        bron('web_lijst', 4, 'terugval_geen_model'),
+        bron('web_pagina', 45),
+      ]),
+    )
+    expect(uit.status).toBe('partial')
+    expect(uit.verlies).toEqual([
+      'bronsoort web_lijst: 2 van 2 bron(nen) zonder AI-oordeel, eerste links genomen (terugval_geen_model)',
+    ])
+  })
+
+  it('terugval na een modelfout meldt zich óók, naast een gezonde bron van dezelfde soort', () => {
+    const uit = bepaalIngestUitkomst(
+      summary(),
+      gezond([bron('web_lijst', 4, 'terugval_model_fout'), bron('web_lijst', 12), bron('rss', 15)]),
+    )
+    expect(uit.status).toBe('partial')
+    expect(uit.verlies).toEqual([
+      'bronsoort web_lijst: 1 van 2 bron(nen) zonder AI-oordeel, eerste links genomen (terugval_model_fout)',
+    ])
+  })
+
+  it('een weggevallen klasse meldt zich één keer, niet óók als terugval', () => {
+    // items === 0 wint: er viel niets terug te vallen, dus de weggevallen-regel
+    // is de juiste en enige.
+    const uit = bepaalIngestUitkomst(
+      summary(),
+      gezond([bron('rss', 15), bron('web_lijst', 0, 'model_fout'), bron('web_pagina', 45)]),
+    )
+    expect(uit.verlies).toHaveLength(1)
+    expect(uit.verlies[0]).toContain('0 kandidaten')
+  })
+
+  it('een weggevallen bronklasse → partial, met de oorzaak-code erbij', () => {
+    const uit = bepaalIngestUitkomst(
+      summary(),
+      gezond([bron('rss', 15), bron('web_lijst', 0, 'model_fout'), bron('web_pagina', 45)]),
+    )
+    expect(uit.status).toBe('partial')
+    expect(uit.verlies).toEqual([
+      'bronsoort web_lijst: 0 kandidaten uit 1 bevraagde bron(nen) (model_fout)',
+    ])
+  })
+
+  it('één falende bron naast een werkende van dezelfde soort triggert niets', () => {
+    const uit = bepaalIngestUitkomst(
+      summary(),
+      gezond([bron('web_lijst', 0, 'http_fout'), bron('web_lijst', 12), bron('rss', 15)]),
+    )
+    expect(uit).toEqual({ status: 'success', verlies: [] })
+  })
+
+  it('een soort zonder geconfigureerde bronnen triggert niets — niets bevraagd', () => {
+    const uit = bepaalIngestUitkomst(summary(), gezond([bron('rss', 15)]))
+    expect(uit).toEqual({ status: 'success', verlies: [] })
+  })
+
+  it('geen enkele bron geconfigureerd: geen verlies te melden', () => {
+    expect(bepaalIngestUitkomst(summary(), gezond([]))).toEqual({ status: 'success', verlies: [] })
+  })
+
+  it('de verlies-regels dragen alleen tellingen, soorten en oorzaak-codes', () => {
+    const uit = bepaalIngestUitkomst(
+      summary({ geduid: 0, mislukt: 2 }),
+      gezond([bron('web_lijst', 0, 'model_fout')]),
+    )
+    for (const regel of uit.verlies) {
+      expect(regel).not.toContain('https://')
+      expect(regel).not.toContain('voorbeeld.nl')
+    }
   })
 })

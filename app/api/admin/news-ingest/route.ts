@@ -3,7 +3,7 @@ import { forbidden, serverError } from '@/lib/api/respond'
 import { createClient } from '@/lib/supabase/server'
 import { isSuperAdmin } from '@/lib/admin'
 import { getModel } from '@/lib/ai/config'
-import { runNewsIngest } from '@/lib/news-ingest'
+import { bepaalIngestUitkomst, runNewsIngest } from '@/lib/news-ingest'
 import { DUIDING_MAX_PER_RUN_HANDMATIG, DUIDING_TIJDBUDGET_MS_HANDMATIG } from '@/lib/krant/duiding'
 
 // ── POST — Manual news ingestion (admin-triggered) ───────────────────
@@ -40,13 +40,18 @@ export async function POST() {
       // Zonder model wordt alleen de wachtrij geteld
     }
 
-    const { summary } = await runNewsIngest(supabase, model, {
+    const { summary, health } = await runNewsIngest(supabase, model, {
       duidingModel,
       duidingMaxPerRun: DUIDING_MAX_PER_RUN_HANDMATIG,
       duidingTijdBudgetMs: DUIDING_TIJDBUDGET_MS_HANDMATIG,
     })
 
-    return NextResponse.json({ success: true, summary })
+    // Dezelfde afleiding als de cron (bepaalIngestUitkomst): ook de handmatige
+    // knop hoort te zeggen dat een stap niets opleverde. Deze route schrijft
+    // geen job_runs-regel, dus de status gaat alleen mee in het antwoord.
+    const { status, verlies } = bepaalIngestUitkomst(summary, health)
+
+    return NextResponse.json({ success: true, status, summary: { ...summary, verlies } })
   } catch (err) {
     return serverError(err, 'admin-news-ingest:POST')
   }

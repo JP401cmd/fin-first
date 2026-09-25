@@ -41,7 +41,8 @@ interface DbArticle extends DuidingVelden {
 }
 
 interface JobRun {
-  status: 'success' | 'error'
+  /** `partial` = de run liep, maar een stap verloor zijn resultaat (25 sep 2026). */
+  status: 'success' | 'partial' | 'error'
   started_at: string
   finished_at: string | null
   duration_ms: number | null
@@ -58,6 +59,8 @@ interface JobRun {
     skipped?: number
     /** ADR 0171: uitkomst van de duidingsstap in deze run. */
     duiding?: { geduid?: number; afgewezen?: number; mislukt?: number; overgeslagen?: number; wacht?: number }
+    /** Welke stap zijn resultaat verloor bij een `partial`-run; tellingen en labels, geen tekst. */
+    verlies?: string[]
   } | null
   error: string | null
 }
@@ -398,9 +401,12 @@ export default function BeheerNieuwsPage() {
       if (!res.ok) throw new Error('Ophalen mislukt')
       const data = await res.json()
       const s = data.summary
+      // Een run die liep maar een stap verloor, zegt dat er ook bij: zonder die
+      // regel is "het is gelukt" niet te onderscheiden van "er is niets gebeurd".
+      const verlies: string[] = Array.isArray(s.verlies) ? s.verlies : []
       setStatus({
         type: 'success',
-        message: `${s.inserted} nieuw · ${s.alBekend ?? 0} al bekend · ${s.duplicatesSkipped ?? 0} dubbel${s.skipped ? ` · ${s.skipped} niet geschreven` : ''}${s.uitgesteld ? ` · ${s.uitgesteld} uitgesteld naar de volgende run` : ''} (${s.rssArticlesFound ?? 0} uit RSS, ${s.webArticlesExtracted ?? 0} uit web) uit ${s.sourcesChecked} bronnen`,
+        message: `${s.inserted} nieuw · ${s.alBekend ?? 0} al bekend · ${s.duplicatesSkipped ?? 0} dubbel${s.skipped ? ` · ${s.skipped} niet geschreven` : ''}${s.uitgesteld ? ` · ${s.uitgesteld} uitgesteld naar de volgende run` : ''} (${s.rssArticlesFound ?? 0} uit RSS, ${s.webArticlesExtracted ?? 0} uit web) uit ${s.sourcesChecked} bronnen${verlies.length > 0 ? ` — deels geslaagd, verloren: ${verlies.join(' · ')}` : ''}`,
       })
       loadArticles(dbSearch, { status: statusFilter, rekenend: alleenRekenend })
       loadIngestStatus()
@@ -532,18 +538,39 @@ export default function BeheerNieuwsPage() {
                 key={i}
                 className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-[var(--border-ed)] px-4 py-2.5 text-sm"
               >
+                {/* Drie uitkomsten, drie kleuren. 'partial' als "Mislukt" tonen zou
+                    liegen over een run die gewoon liep; hem als "Geslaagd" tonen was
+                    precies het defect van 25 sep. */}
                 <span
                   className={`inline-flex items-center gap-1.5 font-medium ${
-                    run.status === 'success' ? 'text-green-700' : 'text-red-700'
+                    run.status === 'success'
+                      ? 'text-green-700'
+                      : run.status === 'partial'
+                        ? 'text-warning'
+                        : 'text-red-700'
                   }`}
                 >
-                  <span className={`h-2 w-2 rounded-full ${run.status === 'success' ? LEVERAGE_STATUS_DOT.good : LEVERAGE_STATUS_DOT.bad}`} />
-                  {run.status === 'success' ? 'Geslaagd' : 'Mislukt'}
+                  <span
+                    className={`h-2 w-2 rounded-full ${
+                      run.status === 'success'
+                        ? LEVERAGE_STATUS_DOT.good
+                        : run.status === 'partial'
+                          ? LEVERAGE_STATUS_DOT.warn
+                          : LEVERAGE_STATUS_DOT.bad
+                    }`}
+                  />
+                  {run.status === 'success'
+                    ? 'Geslaagd'
+                    : run.status === 'partial'
+                      ? 'Deels geslaagd'
+                      : 'Mislukt'}
                 </span>
                 <span className="font-mono text-xs text-[var(--ink-4)]">
                   {new Date(run.started_at).toLocaleString('nl-NL')}
                 </span>
-                {run.status === 'success' && run.summary ? (
+                {/* De tellingen horen óók bij een partial-run zichtbaar te zijn —
+                    die run heeft juist iets te vertellen. */}
+                {run.status !== 'error' && run.summary ? (
                   <span className="text-[var(--ink-3)]">
                     {run.summary.inserted ?? 0} nieuw
                     {run.summary.alBekend !== undefined && <> · {run.summary.alBekend} al bekend</>}
@@ -561,6 +588,11 @@ export default function BeheerNieuwsPage() {
                 ) : run.error ? (
                   <span className="text-red-700">{run.error}</span>
                 ) : null}
+                {run.status === 'partial' && (run.summary?.verlies?.length ?? 0) > 0 && (
+                  <span className="basis-full text-xs text-warning">
+                    Verloren: {run.summary?.verlies?.join(' · ')}
+                  </span>
+                )}
               </div>
             ))}
           </div>
