@@ -151,6 +151,17 @@ langere bewaartermijn hen niet raakt.
   `lib/beheer/geen-inhoud.test.ts`. De per-lezer-tabellen van 1B blijven op de strenge regel.
 - **Duidingsbudget cron 180 s → 150 s** (release-review 0.92.0, L3): het budget stopt alleen
   het oppakken; de uitlopende calls hielden de cron op ~275–285 s van 300.
+- **Niet-numerieke beweringen — de beslissing staat in ADR 0176, besluit 16.** Bugkaart
+  *Krant 1A · Samenvattingen: getal gegrond op token* eiste die beslissing hier, in 0171.
+  Ze is genomen, maar landde één ADR verder omdat 1F fase 2 de hele grondslag verving:
+  **G6** toetst doelgroep en domeinkwalificaties tegen een gesloten lexicon
+  (`lib/krant/doelgroep-lexicon.ts`), waarvan een test volledige dekking afdwingt. Een
+  bewering zonder getal wordt dus niet meer ongetoetst doorgelaten — punt 3 hierboven
+  ("relevant, zonder getal") beschrijft alleen wat er met het *mechanisme* gebeurt, niet
+  met de tekst. Regressiebewijs: `lib/krant/__golden__/bron-7ce838c7.json` (de
+  woninghuur-bewering "geldt voor zowel de sociale als de vrije sector") valt onder beide
+  grondslagen op G6. Wat bewust open blijft, staat in 0176: een geïnjecteerde zin zónder
+  getal, URL, meta-patroon of lexiconwoord passeert de poort nog steeds.
 - **Nog open** (buiten fase 2): de Wft-woordenlijst in code, de redirect-hertoets en
   body-cap in `fetchWebContent`, `/nieuws` in `protectedPrefixes` van de proxy, een
   `revoke all … from anon` op `news_articles` (alleen RLS keert anon nu), de toelichting bij
