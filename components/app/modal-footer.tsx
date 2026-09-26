@@ -118,6 +118,12 @@ export type ModalFooterProps = {
    * zet), anders `default`.
    */
   tone?: ModalFooterTone
+  /**
+   * Optionele context-info vóór de knoppen (bv. de verschilregel van een editor, ADR 0179
+   * §7.7) — dezelfde plek als `footerInfo` in de pane-footer (`SlideInPane`): info eerst,
+   * dan primary, dan secondary. Weglaten = exact de render van vóór deze prop.
+   */
+  info?: ReactNode
 }
 
 export function ModalFooter({
@@ -126,6 +132,7 @@ export function ModalFooter({
   layout = 'inline',
   align = 'start',
   tone,
+  info,
 }: ModalFooterProps) {
   const stacked = layout === 'stacked'
   const inheritedTone = useContext(ModalFooterToneContext)
@@ -140,7 +147,7 @@ export function ModalFooter({
     ? 'flex items-center gap-2'
     : `flex items-center gap-3 ${align === 'end' ? 'justify-end' : 'justify-start'}`
 
-  return (
+  const knoppen = (
     <div className={rowClass}>
       <Button
         variant={effectiveTone === 'destructive' ? 'destructive' : 'primary'}
@@ -162,6 +169,13 @@ export function ModalFooter({
           {secondary.label}
         </Button>
       )}
+    </div>
+  )
+  if (info == null || info === false) return knoppen
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+      <div className="min-w-0 text-[var(--ink-2)]">{info}</div>
+      {knoppen}
     </div>
   )
 }

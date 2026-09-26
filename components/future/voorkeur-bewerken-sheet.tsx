@@ -67,6 +67,8 @@ export function VoorkeurBewerkenSheet({
         <ModalFooter
           primary={{ label: 'Opslaan', onClick: () => actions?.save(), loading: saving }}
           secondary={{ label: 'Annuleer', onClick: onClose }}
+          // ADR 0179 §7.7 — de verschilregel van de body (alleen met een snapshot en na een wijziging).
+          info={actions?.footerInfo}
         />
       }
     >

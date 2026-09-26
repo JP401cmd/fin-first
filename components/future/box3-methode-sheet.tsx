@@ -6,6 +6,7 @@ import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { ModalFooter } from '@/components/app/modal-footer'
 import type { RegelEditActionsState } from './regels/types'
 import type { Box3Method } from '@/lib/bucket-projection'
+import type { RegelSimSnapshot } from '@/lib/future/regel-sim'
 import { Box3MethodeBody } from './box3-methode-body'
 
 // De kopij woont bij de body (één body, twee hosts); hier her-geëxporteerd voor bestaande imports.
@@ -22,6 +23,7 @@ export { BOX3_METHOD_INTRO, BOX3_METHOD_UITLEG, HEFFINGVRIJ_INKOMEN_UITLEG } fro
 export function Box3MethodeSheet({
   current,
   currentHeffingvrijInkomen = null,
+  snapshot = null,
   open = true,
   onClose,
 }: {
@@ -29,6 +31,8 @@ export function Box3MethodeSheet({
   current: Box3Method
   /** Opgeslagen heffingvrij inkomen (euro p.p. per jaar); null = kernel-default. */
   currentHeffingvrijInkomen?: number | null
+  /** ADR 0179 fase 3 — client-veilige snapshot: met snapshot toont de footer de verschilregel. */
+  snapshot?: RegelSimSnapshot | null
   open?: boolean
   onClose: () => void
 }) {
@@ -64,12 +68,14 @@ export function Box3MethodeSheet({
             disabled: !(actions?.changed ?? false),
           }}
           secondary={{ label: 'Annuleer', onClick: onClose }}
+          info={actions?.footerInfo}
         />
       }
     >
       <Box3MethodeBody
         current={current}
         currentHeffingvrijInkomen={currentHeffingvrijInkomen}
+        snapshot={snapshot}
         onActionsChange={handleActionsChange}
         onClose={onClose}
         onSaved={handleSaved}
