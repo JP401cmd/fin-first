@@ -23,6 +23,8 @@ import {
   STARTERSVRIJSTELLING_MAX,
   NHG_KOSTENGRENS,
   NHG_BORGTOCHTPROVISIE_PCT,
+  KOSTEN_KOPER_ADVIES_BEMIDDELING,
+  KOSTEN_KOPER_AANKOOPMAKELAAR,
 } from '@/lib/constants'
 import { formatCurrency } from '@/lib/format'
 
@@ -627,8 +629,7 @@ export const LIFE_EVENT_STORIES: Record<string, LifeEventStory> = {
         key: 'koopprijs',
         type: 'number',
         label: 'Koopprijs',
-        microcopy:
-          'Hieruit rekenen we je kosten koper: overdrachtsbelasting, notaris, taxatie en bankgarantie. Advies- en makelaarskosten zitten er niet in; tel die zelf op bij Eenmalig.',
+        microcopy: `Hieruit rekenen we je kosten koper: overdrachtsbelasting, notaris, taxatie en bankgarantie. Daarbij tellen we ${formatCurrency(KOSTEN_KOPER_ADVIES_BEMIDDELING)} voor hypotheekadvies en bemiddeling. Dat is een gemiddeld tarief, geen offerte. Weet je wat jouw adviseur rekent, pas Eenmalig dan aan.`,
         min: 0,
         step: 10000,
         suffix: '€',
@@ -649,6 +650,13 @@ export const LIFE_EVENT_STORIES: Record<string, LifeEventStory> = {
         default: false,
       },
       {
+        key: 'aankoopmakelaar',
+        type: 'toggle',
+        label: 'Met een aankoopmakelaar',
+        microcopy: `Aan: we tellen ${formatCurrency(KOSTEN_KOPER_AANKOOPMAKELAAR)} op, een gemiddeld vast tarief. Uit: geen makelaarskosten, want veel kopers zoeken en bieden zelf. Wat een makelaar echt vraagt, verschilt per kantoor; zie dit bedrag als indicatie.`,
+        default: false,
+      },
+      {
         key: 'maandlastVerschil',
         type: 'number',
         label: 'Verschil maandlasten t.o.v. nu',
@@ -666,6 +674,7 @@ export const LIFE_EVENT_STORIES: Record<string, LifeEventStory> = {
         aankoopprijs: num(answers.koopprijs, 400000),
         isStarter: bool(answers.starter, false),
         hasNHG: bool(answers.nhg, false),
+        metAankoopmakelaar: bool(answers.aankoopmakelaar, false),
       }).totaal
       const verschil = num(answers.maandlastVerschil, 300)
       return {

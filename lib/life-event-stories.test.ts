@@ -234,6 +234,22 @@ describe('house_purchase story', () => {
     )
   })
 
+  it('aankoopmakelaar-vraag: aan telt de makelaar-indicatie op, default uit', () => {
+    const story = LIFE_EVENT_STORIES['house_purchase']!
+    expect(defaultStoryAnswers('house_purchase').aankoopmakelaar).toBe(false)
+    const basis = { startAge: 35, koopprijs: 400000, starter: false, nhg: false, maandlastVerschil: 0 }
+    const zonder = story.computeImpact({ ...basis, aankoopmakelaar: false }, 30)
+    const met = story.computeImpact({ ...basis, aankoopmakelaar: true }, 30)
+    expect(met.oneTimeAmount).toBe(
+      computeKostenKoper({ aankoopprijs: 400000, isStarter: false, hasNHG: false, metAankoopmakelaar: true }).totaal,
+    )
+    expect(met.oneTimeAmount! - zonder.oneTimeAmount!).toBe(
+      computeKostenKoper({ aankoopprijs: 400000, isStarter: false, hasNHG: false, metAankoopmakelaar: true }).aankoopmakelaar,
+    )
+    // Oude opgeslagen antwoorden zonder de vraag → geen makelaar
+    expect(story.computeImpact(basis, 30).oneTimeAmount).toBe(zonder.oneTimeAmount)
+  })
+
   it('negatief maandlast-verschil → continu inkomst (besparing)', () => {
     const impact = LIFE_EVENT_STORIES['house_purchase']!.computeImpact(
       { startAge: 35, koopprijs: 300000, starter: false, nhg: false, maandlastVerschil: -200 },

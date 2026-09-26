@@ -6,6 +6,8 @@ import {
   KOSTEN_KOPER_NOTARIS,
   KOSTEN_KOPER_TAXATIE,
   KOSTEN_KOPER_BANKGARANTIE_PCT,
+  KOSTEN_KOPER_ADVIES_BEMIDDELING,
+  KOSTEN_KOPER_AANKOOPMAKELAAR,
 } from './constants'
 
 export interface KostenKoperInput {
@@ -15,6 +17,8 @@ export interface KostenKoperInput {
   isStarter: boolean
   /** Financiering met Nationale Hypotheek Garantie (NHG). */
   hasNHG: boolean
+  /** Met een aankoopmakelaar (optioneel; veel kopers gebruiken er geen). Default: false. */
+  metAankoopmakelaar?: boolean
 }
 
 export interface KostenKoperBreakdown {
@@ -28,7 +32,15 @@ export interface KostenKoperBreakdown {
   bankgarantie: number
   /** NHG borgtochtprovisie (€). €0 zonder NHG of boven de NHG-kostengrens. */
   nhgKosten: number
-  /** Totaal kosten koper (€) — som van de posten hierboven. */
+  /** Subtotaal vaste posten (€): overdracht + notaris + taxatie + bankgarantie + nhgKosten. */
+  vastePosten: number
+  /** Indicatie hypotheekadvies + bemiddeling (€) — marktindicatie, altijd meegeteld. */
+  adviesBemiddeling: number
+  /** Indicatie aankoopmakelaar (€). €0 zonder aankoopmakelaar. */
+  aankoopmakelaar: number
+  /** Subtotaal indicatie overig (€): adviesBemiddeling + aankoopmakelaar. */
+  indicatieOverig: number
+  /** Totaal kosten koper (€) — vastePosten + indicatieOverig. */
   totaal: number
 }
 
@@ -40,9 +52,14 @@ export interface KostenKoperBreakdown {
  * berekening. Voorheen stond deze som 4× gedupliceerd in horizon-client.tsx met
  * hardcoded (en verouderde) grenzen — verkeerde grenzen = verkeerd bedrag.
  *
- * Fiscale grondslag (2026, zie lib/constants.ts — JAARLIJKS verifiëren):
- *  • Startersvrijstelling: geen overdrachtsbelasting tot €555.000, daarboven 2%.
- *  • NHG: borgtochtprovisie 0,4% van de aankoopprijs, alleen ≤ NHG-kostengrens €470.000.
+ * Opbouw: "vaste posten + indicatie overig" (eigenaarsbesluit 26 sep 2026).
+ *  • Vaste posten — fiscale grondslag (2026, zie lib/constants.ts — JAARLIJKS verifiëren):
+ *    - Startersvrijstelling: geen overdrachtsbelasting tot €555.000, daarboven 2%.
+ *    - NHG: borgtochtprovisie 0,4% van de aankoopprijs, alleen ≤ NHG-kostengrens €470.000.
+ *    - Notaris, taxatie en bankgarantie als vaste marktindicatie.
+ *  • Indicatie overig — marktindicaties, geen offerte:
+ *    - Hypotheekadvies + bemiddeling: altijd meegeteld (vast bedrag).
+ *    - Aankoopmakelaar: alleen als `metAankoopmakelaar` (vast tarief).
  *
  * Let op: dit geldt voor een HOOFDVERBLIJF. Een tweede woning/beleggingspand valt
  * niet onder de startersvrijstelling en kent 8% overdrachtsbelasting (2026) — dat
@@ -61,6 +78,21 @@ export function computeKostenKoper(input: KostenKoperInput): KostenKoperBreakdow
     input.hasNHG && prijs <= NHG_KOSTENGRENS
       ? Math.round(prijs * NHG_BORGTOCHTPROVISIE_PCT)
       : 0
-  const totaal = overdracht + notaris + taxatie + bankgarantie + nhgKosten
-  return { overdracht, notaris, taxatie, bankgarantie, nhgKosten, totaal }
+  const vastePosten = overdracht + notaris + taxatie + bankgarantie + nhgKosten
+  const adviesBemiddeling = KOSTEN_KOPER_ADVIES_BEMIDDELING
+  const aankoopmakelaar = input.metAankoopmakelaar === true ? KOSTEN_KOPER_AANKOOPMAKELAAR : 0
+  const indicatieOverig = adviesBemiddeling + aankoopmakelaar
+  const totaal = vastePosten + indicatieOverig
+  return {
+    overdracht,
+    notaris,
+    taxatie,
+    bankgarantie,
+    nhgKosten,
+    vastePosten,
+    adviesBemiddeling,
+    aankoopmakelaar,
+    indicatieOverig,
+    totaal,
+  }
 }

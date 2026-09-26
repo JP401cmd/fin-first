@@ -55,6 +55,8 @@ import {
   KOSTEN_KOPER_NOTARIS,
   KOSTEN_KOPER_TAXATIE,
   KOSTEN_KOPER_BANKGARANTIE_PCT,
+  KOSTEN_KOPER_ADVIES_BEMIDDELING,
+  KOSTEN_KOPER_AANKOOPMAKELAAR,
 } from './constants'
 import { TAX_DEADLINES } from './tax-calendar'
 
@@ -427,6 +429,8 @@ export const FISCALE_KERNGETALLEN: FiscaalKerngetal[] = [
           { label: 'Notariskosten (indicatie)', value: `${eur(KOSTEN_KOPER_NOTARIS)} — markt` },
           { label: 'Taxatiekosten (indicatie)', value: `${eur(KOSTEN_KOPER_TAXATIE)} — markt` },
           { label: 'Bankgarantie (fractie aankoopprijs)', value: `${pct(KOSTEN_KOPER_BANKGARANTIE_PCT)} — markt` },
+          { label: 'Hypotheekadvies + bemiddeling (indicatie)', value: `${eur(KOSTEN_KOPER_ADVIES_BEMIDDELING)} — Consumentenbond` },
+          { label: 'Aankoopmakelaar, vast tarief (indicatie, optioneel)', value: `${eur(KOSTEN_KOPER_AANKOOPMAKELAAR)} — markt` },
         ],
       },
     ],
@@ -436,7 +440,7 @@ export const FISCALE_KERNGETALLEN: FiscaalKerngetal[] = [
     sourceUrl: 'https://www.nhg.nl/',
     updateFrequency: 'jaarlijks',
     lastVerified: '2026-07-03',
-    note: 'Geldt voor een HOOFDVERBLIJF. Een tweede woning/beleggingspand valt buiten de startersvrijstelling en kent 8% overdrachtsbelasting (2026) — dat loopt via een eigen handmatig bedrag, niet via computeKostenKoper. De 7 constanten (OVB_TARIEF_EIGEN_WONING, STARTERSVRIJSTELLING_MAX, NHG_KOSTENGRENS, NHG_BORGTOCHTPROVISIE_PCT, KOSTEN_KOPER_NOTARIS, KOSTEN_KOPER_TAXATIE, KOSTEN_KOPER_BANKGARANTIE_PCT) staan gecentraliseerd in lib/constants.ts en worden hier live afgelezen; ook gecureerd als rekenmotor in lib/architecture/calculations.ts (id "kosten-koper"). Bron gemengd: OVB + startersvrijstelling = Belastingdienst, NHG-grens + borgtocht = nhg.nl, notaris/taxatie/bankgarantie = marktindicatie.',
+    note: 'Geldt voor een HOOFDVERBLIJF. Een tweede woning/beleggingspand valt buiten de startersvrijstelling en kent 8% overdrachtsbelasting (2026) — dat loopt via een eigen handmatig bedrag, niet via computeKostenKoper. De 9 constanten (OVB_TARIEF_EIGEN_WONING, STARTERSVRIJSTELLING_MAX, NHG_KOSTENGRENS, NHG_BORGTOCHTPROVISIE_PCT, KOSTEN_KOPER_NOTARIS, KOSTEN_KOPER_TAXATIE, KOSTEN_KOPER_BANKGARANTIE_PCT, KOSTEN_KOPER_ADVIES_BEMIDDELING, KOSTEN_KOPER_AANKOOPMAKELAAR) staan gecentraliseerd in lib/constants.ts en worden hier live afgelezen; ook gecureerd als rekenmotor in lib/architecture/calculations.ts (id "kosten-koper"). Bron gemengd: OVB + startersvrijstelling = Belastingdienst, NHG-grens + borgtocht = nhg.nl, notaris/taxatie/bankgarantie = marktindicatie; advies + bemiddeling = Consumentenbond-banktarieven (feb 2026), aankoopmakelaar = Trustoo/Weusthuis (jul–aug 2026), beide als indicatie overig (eigenaarsbesluit 26 sep 2026).',
   },
 
   // ── AOW ──

@@ -445,6 +445,32 @@ export const KOSTEN_KOPER_TAXATIE = 500
 /** Bankgarantie (waarborgsom-garantie), als fractie van de aankoopprijs — 0,1%. Bron: marktgemiddelde, 2026 — jaarlijks verifiëren. */
 export const KOSTEN_KOPER_BANKGARANTIE_PCT = 0.001
 
+// ── Kosten koper — indicatie overig (advies & makelaar) ─────────
+//
+// Geen fiscale grenzen maar MARKTINDICATIES: tarieven verschillen per adviseur
+// en makelaar. computeKostenKoper telt ze als aparte posten mee in het totaal
+// (eigenaarsbesluit 26 sep 2026: "vaste posten + indicatie overig"), zodat het
+// eenmalige bedrag de werkelijke kosten niet stelselmatig onderschat. Het blijft
+// een indicatie, geen offerte of advies — de UI-kopij zegt dat.
+
+/**
+ * Hypotheekadvies + bemiddeling (afsluitkosten), vaste indicatie — €2.750.
+ * Bron: Consumentenbond (peildatum 18 feb 2026), tarieven grote banken
+ * €2.100–€2.580 (starter) en €2.750–€3.180 (niet-starter), advies én bemiddeling;
+ * De Hypotheker "vanaf €2.995". €2.750 = het veelgenoemde banktarief (ABN AMRO,
+ * Rabobank) midden in die bandbreedte. Jaarlijks verifiëren.
+ */
+export const KOSTEN_KOPER_ADVIES_BEMIDDELING = 2750
+
+/**
+ * Aankoopmakelaar (optioneel), vaste indicatie — €3.500 incl. btw.
+ * Bron: Trustoo (26 jul 2026) vast tarief gemiddeld €2.500–€5.000; Weusthuis
+ * Makelaardij (aug 2026) €1.500–€4.500 incl. btw. €3.500 = midden van de
+ * overlap €2.500–€4.500. Vast tarief i.p.v. courtage-% omdat dat volgens beide
+ * bronnen de meest gekozen vorm is. Jaarlijks verifiëren.
+ */
+export const KOSTEN_KOPER_AANKOOPMAKELAAR = 3500
+
 // ── Historische Weerbaarheid — weergavedrempels (backtest-succeskans) ──
 //
 // Stoplicht-grenzen voor de backtest-succeskans (0–100), gedeeld door de
