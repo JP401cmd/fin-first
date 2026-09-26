@@ -18,6 +18,11 @@ import type { ActiveModal, ClusterSheet, EventPaneMode, ActiveFaseModal, Strateg
 import { useStabielObject } from './use-stabiel-object'
 import type { ToekomstPerspectief } from './use-toekomst-perspectief'
 
+/** Ritme waarop de `?whatif=open`-scroll kijkt of het lab er al staat. */
+const WHATIF_SCROLL_INTERVAL_MS = 120
+/** Plafond: na ~6 s zonder lab (bv. geen sim-uitkomst) geeft de scroll het op. */
+const WHATIF_SCROLL_MAX_POGINGEN = 50
+
 export function useToekomstOverlayState({ perspectief }: { perspectief: ToekomstPerspectief }) {
   const {
     isHouseholdView,
@@ -54,8 +59,11 @@ export function useToekomstOverlayState({ perspectief }: { perspectief: Toekomst
   const [clusterSheet, setClusterSheet] = useState<ClusterSheet>(null)
   // Mobile KPI's tonen nu volledig 2x2 — `horizonHeroExpanded` toggle is verwijderd.
 
-  // ── Inline what-if sliders state (feature #795) ──────────────
-  const [whatIfInlineOpen, setWhatIfInlineOpen] = useState(false)
+  // ── Scroll naar het doelscenario-lab (feature #795) ──────────────
+  // Een teller, geen boolean: elke `?whatif=open` is een nieuw scrollverzoek. De provider
+  // staat in de katern-layout en blijft staan bij een katernwissel; een boolean die nooit
+  // terugvalt scrolde daardoor maar één keer per sessie.
+  const [whatIfScrollVerzoek, setWhatIfScrollVerzoek] = useState(0)
   const verkenSectionRef = useRef<HTMLElement | null>(null)
 
   // Deep-link: open modal via ?modal= URL param (from dashboard widgets)
@@ -116,7 +124,7 @@ export function useToekomstOverlayState({ perspectief }: { perspectief: Toekomst
     // Feature #795+#800: ?whatif=open — opens inline what-if sliders (was: dream gate).
     const whatifParam = searchParams.get('whatif')
     if (whatifParam === 'open') {
-      setWhatIfInlineOpen(true)
+      setWhatIfScrollVerzoek((n) => n + 1)
       shouldReplace = true
     }
 
@@ -124,7 +132,7 @@ export function useToekomstOverlayState({ perspectief }: { perspectief: Toekomst
     // hardgecodeerd `router.replace('/horizon')`, en `/horizon` redirect op de
     // routing-laag naar `/toekomst` (next.config.ts). Elke deeplink maakte
     // zichzelf daarmee ongedaan: state gezet → router wisselt van route → boom
-    // remount → `whatIfInlineOpen` c.s. weer op de beginwaarde, gebruiker op een
+    // remount → de gezette state weer op de beginwaarde, gebruiker op een
     // kale /toekomst zonder paneel (UR2-11). Zie `lib/horizon/deeplink-cleanup.ts`.
     if (shouldReplace) {
       router.replace(buildDeeplinkCleanupUrl(pathname, searchParams), { scroll: false })
@@ -132,16 +140,21 @@ export function useToekomstOverlayState({ perspectief }: { perspectief: Toekomst
 
   }, [searchParams, router, pathname])
 
-  // Deeplink `?whatif=open` (en ScenarioChip-klik) → scroll naar het doelscenario.
-  // Sinds ADR 0170 staat dat blok altijd open, dus alleen nog scrollen.
+  // Deeplink `?whatif=open` → scroll naar het doelscenario. Sinds ADR 0170 staat dat blok
+  // altijd open, dus alleen nog scrollen. Het lab rendert pas als de sim-uitkomst er is;
+  // een eenmalige timeout vond de sectie daardoor vaak nog niet (vangnet §3.3). Daarom
+  // kijken we op een vast ritme tot de sectie er is, en geven we het na een plafond op.
   useEffect(() => {
-    if (!whatIfInlineOpen) return
-    const t = setTimeout(
-      () => verkenSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
-      120,
-    )
-    return () => clearTimeout(t)
-  }, [whatIfInlineOpen])
+    if (whatIfScrollVerzoek === 0) return
+    let pogingen = 0
+    const t = setInterval(() => {
+      const sectie = verkenSectionRef.current
+      pogingen += 1
+      if (sectie) sectie.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      if (sectie || pogingen >= WHATIF_SCROLL_MAX_POGINGEN) clearInterval(t)
+    }, WHATIF_SCROLL_INTERVAL_MS)
+    return () => clearInterval(t)
+  }, [whatIfScrollVerzoek])
 
   // ── Natuurlijke-mijlpaal info-sheet state ─────────────────────────────
   const [selectedNaturalMilestone, setSelectedNaturalMilestone] =
