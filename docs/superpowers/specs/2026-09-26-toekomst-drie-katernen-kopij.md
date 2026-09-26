@@ -67,9 +67,17 @@ Waarom: de band is p25–p75. Dat is de middelste **helft**, zoals de bestaande 
 |---|---|---|
 | "Je plan leent in 2049 kort om een tekort te dekken. Instelling bekijken →" | **Aanpassen** | "Je plan dekt tussen je 61e en 64e een tekort met een lening." · "Naar de instelling →". /toekomst spreekt in leeftijden en niet in jaartallen (`buildDeficitLoanCopy`). "kort" is een oordeel dat de melding niet hoeft te vellen. |
 | Plan niet haalbaar · "Verken je opties →" | Goedkeuren | De actie wijst naar de eigen verkenning in Doelen en niet naar een geldhandeling. |
-| "Je doelscenario loopt achter op je plan." · Bijwerken | Goedkeuren | Beschrijvend. |
+| "Je doelscenario loopt achter op je plan." · Bijwerken | **Aanpassen** (canoniek) | Consumeer `doelenPlanGewijzigdMelding(n)` en `DOELEN_MELDING_ACTIES` uit `lib/horizon/anker-copy.ts`: "Je plan is veranderd. 1 doel uit het lab past er niet meer bij." · Bijwerken · Loslaten. De bestaande `LabPlanMelding` zegt dit al; een tweede formulering voor dezelfde toestand is drift. |
 | "Je AOW-leeftijd ontbreekt nog. Toevoegen →" | **Aanpassen, feitelijk onjuist** | "Geen AOW op je tijdas" · "Naar je AOW-strategie →". Wat ontbreekt is de AOW-gebeurtenis en niet de leeftijd. De projectie rekent dan met € 0 AOW. Canoniek in `lib/horizon/aow-notice-minimize.ts`. |
 | Uitkomstregel Doelen "stoppen op 58 · gedekt" | **Aanpassen** | "Stopmoment 58 · gedekt". Hetzelfde patroon als de samenvatting, met de zonewoorden uit `LAB_COPY`. |
+
+## 7. Aanvulling: drie getallen onder de Marktcheck-band (spec §7.6)
+
+| Concept (spec) | Besluit | Tekst |
+|---|---|---|
+| "als het tegenzit 55 · verwacht 52 · als het meezit 49" | **Aanpassen** | "als het tegenzit 55 · in het midden 52 · als het meezit 49" |
+
+Waarom: "als het tegenzit" en "als het meezit" zijn scenario-namen die Nederlanders kennen van het pensioenoverzicht. Ze beschrijven een marktverloop, geen verwachting. "verwacht" doet dat wel, en botst met de uitleg van de laag ("Geen voorspelling"). Het middelste getal is de mediaan van de doorgerekende marktverlopen, dus "in het midden". De drie getallen komen uit dezelfde marktcheck-run; er komt geen motor bij.
 
 ## Wat dit vraagt van de bouw (fase 1–2)
 
