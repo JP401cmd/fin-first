@@ -2,7 +2,7 @@
 
 /**
  * Toggle-state voor de mobiele apps-strip boven de bottom-nav (Kern-module).
- * Default dicht; long-press op de Kern-tab in `BottomNavTabs` toggelt
+ * Default dicht; long-press op de Kern-tab in de (verwijderde) `BottomNavTabs` toggelde
  * (op `/core/**`) of forceert open (vanaf andere modules, met automatische
  * navigatie naar `/core`). State leeft per browser-tab via sessionStorage —
  * past bij andere session-scoped nav-state (NavStackProvider) maar zonder

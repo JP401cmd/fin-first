@@ -16,7 +16,7 @@ import { useLiveBottomBar } from './nav-stack-provider'
 // systeem-long-press (~500 ms) zodat de gesture nooit botst met een gewone
 // tik; de 8px-move-drempel matcht HORIZONTAL_DECISION_PX uit
 // lib/hooks/use-swipe-back.ts — daarboven is het een scroll/swipe en cancelen
-// we. Patroon gespiegeld op de (inmiddels dode) long-press in bottom-nav-tabs.tsx.
+// we. Patroon gespiegeld op de long-press van de verwijderde bottom-nav-tabs.tsx.
 //
 // Druk-registratie (huisje-icoon + groei) verschijnt pas ná
 // PRESS_VISUAL_DELAY_MS: een gewone korte tik (menu-toggle) mag nooit een

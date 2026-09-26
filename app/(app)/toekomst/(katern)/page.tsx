@@ -26,8 +26,10 @@ export default function ToekomstPlanPage() {
     <>
       {/* Tab-root → 'rich' TopBar (utility-cluster) + tab-titel in de mobiele
           bovenbalk, gelijk aan /overzicht en /mijn. Zonder expliciete topBar
-          valt NavStackMeta terug op 'simple' en verdwijnt de cluster. */}
-      <NavStackMeta title="Toekomst" topBar={{ kind: 'rich' }} bottomBar={{ kind: 'tabs' }} />
+          valt NavStackMeta terug op 'simple' en verdwijnt de cluster. Geen
+          `bottomBar`: de module-tabs zijn afgeschaft en `tabs` rendert niets
+          (ADR 0179 fase 6, spec §2.5); de default `hidden` doet hetzelfde. */}
+      <NavStackMeta title="Toekomst" topBar={{ kind: 'rich' }} />
 
       {/* `/toekomst#verken-je-aannames` (het lab stond hier tot stap 16) → katern Doelen. */}
       <OudeLabBladwijzer />

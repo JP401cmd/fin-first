@@ -7,8 +7,9 @@
  *
  * Slot-component dat de juiste BottomBar-content rendert op basis van een
  * `BottomBarConfig` (uit StackEntry.bottomBar). Vier kinds:
- *  - `tabs` (default): module-tabs (Kern/Wil/Horizon), gating via
- *    `useModuleAccess`. Gebruikt `<BottomNavTabs />` (content-only export).
+ *  - `tabs`: historische waarde; rendert niets. De module-tabs zijn afgeschaft (de
+ *    mobiele navigatie loopt via de FloatingNavButton) en `bottom-nav-tabs.tsx` is
+ *    verwijderd (ADR 0179 fase 6, spec §2.5).
  *  - `action-bar`: primary + optionele secondary CTA voor sub-flows.
  *  - `context-actions`: 2-3 actie-knoppen op detail-pagina's.
  *  - `hidden`: rendert niets — full-screen content.
@@ -49,7 +50,6 @@ import {
   SlidersHorizontal,
 } from 'lucide-react'
 import type { ComponentType, CSSProperties } from 'react'
-import { BottomNavTabs } from './bottom-nav-tabs'
 import type { BottomBarConfig, BottomBarAction, BottomBarAppTab } from './nav-stack-provider'
 import { useLiveBottomBar } from './nav-stack-provider'
 import { MobileAppStrip } from './mobile-app-strip'
@@ -123,7 +123,7 @@ function moduleAccentVars(accent: BottomBarAppTab['moduleAccent']): CSSPropertie
  * Eén tap-target in een `app-tabs` BottomBar. Drie gelijke kolommen, label
  * altijd zichtbaar (geen icon-only zoals MobileAppStrip).
  *
- * Visueel identiek aan `BottomNavTabs` (bottom-nav.tsx:204) — zelfde icon-
+ * Visueel gelijk aan de vroegere module-tabbalk (`BottomNavTabs`, verwijderd) — zelfde icon-
  * grootte (3.5×3.5), zelfde typografie (10px, medium, uppercase, tracking
  * 0.06em), zelfde accent-pattern (`border-t-3` boven + module-bg + module-
  * text wanneer active), zelfde hoogte. Active-state gebruikt de lokale

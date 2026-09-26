@@ -193,28 +193,10 @@ const tests: TestCase[] = [
     },
   },
 
-  // ── 5. Active nav-tab background tint ────────────────────────────────
-  {
-    id: 'ds-active-nav-bg-tint',
-    name: 'Actieve nav-tab heeft achtergrondtint (bg-*-50/40)',
-    category: CAT,
-    // app-header.tsx bestaat niet meer — de nav is verplaatst naar
-    // components/app/shell/bottom-nav-tabs.tsx (mobiele tabbar) +
-    // nav-menu-sheet.tsx (zie CLAUDE.md-vermelding in de opdracht die deze
-    // suite herstelde). bottom-nav-tabs.tsx draagt dezelfde bg-*-50/40 tint.
-    description: 'bottom-nav-tabs.tsx activeClasses bevat bg-[module]-50/40 achtergrondkleur op actieve tab',
-    priority: 'medium',
-    estimatedDurationMs: 10,
-    fn() {
-      const src = readSourceFile('components/app/shell/bottom-nav-tabs.tsx')
-      assert(src.length > 0, 'bottom-nav-tabs.tsx kon niet gelezen worden')
-
-      // Verify each module has a bg-*-50/40 class in activeClasses
-      assert(src.includes('bg-kern-50/40'), 'Actieve kern-tab mist bg-kern-50/40 achtergrond')
-      assert(src.includes('bg-wil-50/40'), 'Actieve wil-tab mist bg-wil-50/40 achtergrond')
-      assert(src.includes('bg-horizon-50/40'), 'Actieve horizon-tab mist bg-horizon-50/40 achtergrond')
-    },
-  },
+  // ── 5. (vervallen) Active nav-tab background tint ────────────────────
+  // Deze case las components/app/shell/bottom-nav-tabs.tsx. Die tabbalk werd al niet
+  // meer gerenderd (MobileBottomBar geeft voor `tabs` null) en is verwijderd in ADR 0179
+  // fase 6 (spec §2.5). De mobiele navigatie loopt via de FloatingNavButton.
 
   // ── 6. WidgetShell kicker prop ───────────────────────────────────────
   {
