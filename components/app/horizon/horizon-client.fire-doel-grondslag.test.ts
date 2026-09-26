@@ -61,7 +61,11 @@ describe('horizon-client — één beslisser voor de doelbedrag-grondslag', () =
     expect(source).toMatch(/const balkVrijheidDoel = fireDoel\.bedrag/)
     expect(source).toMatch(/const fireTargetInclHome = fireDoel\.inclHuis/)
     expect(source).toMatch(/const fireTargetExclHome = fireDoel\.exclHuis/)
-    expect(host).toMatch(/FIRE_DOEL_ONDERSCHRIFT\[fireDoel\.grondslag\]/)
+    // Sinds C3 punt 6 (26 sep) kiest `doelbedragOnderschrift` (plan-helpers) het woord;
+    // de host geeft dezelfde grondslag door, de helper leest FIRE_DOEL_ONDERSCHRIFT.
+    expect(host).toMatch(/grondslag: fireDoel\.grondslag/)
+    const helpers = readFileSync(join(process.cwd(), 'components', 'toekomst', 'plan', 'plan-helpers.tsx'), 'utf8')
+    expect(helpers).toMatch(/FIRE_DOEL_ONDERSCHRIFT\[input\.grondslag\]/)
   })
 
   it('schrijft het onderschrift nergens meer zelf uit', () => {
