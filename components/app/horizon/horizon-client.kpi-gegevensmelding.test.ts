@@ -46,17 +46,6 @@ describe('horizon-client — elke hero-KPI toetst zijn eigen brondata', () => {
     }
   })
 
-  it('rendert de melding op elke tegel in beide layouts', () => {
-    const treffers = source.match(/<HeroKpiNotice\b/g) ?? []
-    expect(
-      treffers,
-      'drie tegels × desktop/mobiel — een tegel die de melding overslaat verlaagt dit getal',
-    ).toHaveLength(3 * LAYOUTS)
-    // De mobiele strip draagt de compacte variant: 3 van de 6.
-    const compact = source.match(/<HeroKpiNotice[^/>]*\bcompact\b/g) ?? []
-    expect(compact).toHaveLength(3)
-  })
-
   it('kent precies één vorm — geen tegel schrijft de melding zelf uit', () => {
     // De KOP hoort uitsluitend ín HeroKpiNotice (of als gedeelde constante in de
     // kassabons) te staan; een tegel die 'm zelf uitschrijft is de kopie-de-markup
@@ -85,8 +74,4 @@ describe('horizon-client — de melding verdringt geen geldig antwoord', () => {
     expect(source).toMatch(/showFireAgeNotice =[\s\S]{0,400}heroFireAge\.status !== 'berekenen'/)
   })
 
-  it('houdt de duidingszin stil zodra de tegel een melding draagt', () => {
-    // Anders staat er "rond je 83e" pal onder "We missen gegevens".
-    expect(source).toMatch(/pending:[\s\S]{0,200}showFireAgeNotice/)
-  })
 })

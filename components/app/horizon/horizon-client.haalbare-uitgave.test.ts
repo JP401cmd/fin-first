@@ -33,29 +33,20 @@ const LAYOUTS = 2
 
 describe('haalbare uitgave — bron-grendel', () => {
   it('rendert de regel in beide KPI-layouts via één helper', () => {
-    expect(source.match(/data-testid="haalbaar-bij-uitgave"/g) ?? []).toHaveLength(LAYOUTS)
-    // Eén aanroep van de kopij-helper, hergebruikt in beide tegels.
+    // De twee tegels (data-testid) staan sinds fase 1 stap 5 in plan-kpi-strip.tsx
+    // (plan-kpi-strip.bron.test.ts). Eén aanroep van de kopij-helper, hergebruikt in beide tegels.
     expect((source.match(/haalbaarBijUitgaveRegel\(/g) ?? []).length).toBe(1)
   })
 
   it('kleurt met de semantische tokens en niets anders', () => {
-    const blokken = source.match(/data-testid="haalbaar-bij-uitgave"[\s\S]{0,400}/g) ?? []
-    expect(blokken).toHaveLength(LAYOUTS)
-    for (const b of blokken) {
-      expect(b).toMatch(/haalbareUitgaveToon/)
-      expect(b).not.toMatch(/text-(red|emerald|green|rose)-\d/)
-      expect(b).not.toMatch(/#[0-9a-fA-F]{6}/)
-    }
+    // De tegelblokken zelf staan sinds fase 1 stap 5 in plan-kpi-strip.tsx
+    // (plan-kpi-strip.bron.test.ts); hier blijft de toon-afleiding.
     // Letterlijke vorm — een losse `text-negative`/`text-positive`-substring-toets
     // (zoals eerder) matcht ook een OMGEKEERDE ternary (`'meer' ? negative : positive`).
     // Dit pint de exacte voorwaarde: 'minder' → negatief, al het andere → positief.
     expect(source).toMatch(
       /const haalbareUitgaveToon =\s*\n\s*haalbareUitgave\?\.richting === 'minder' \? 'text-negative' : 'text-positive'/,
     )
-  })
-
-  it('toont niets in huishoud-/partnerweergave', () => {
-    expect((source.match(/!hasPerspectiveHero && haalbareUitgaveRegel/g) ?? [])).toHaveLength(LAYOUTS)
   })
 
   it('zet de batch-uitkomst in state én ruimt hem op bij ELKE uitgang', () => {

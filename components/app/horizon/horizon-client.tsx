@@ -11,7 +11,7 @@ import { type SimResult } from '@/lib/fire-simulation'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/components/app/toast-provider'
 
-import { calculateFreedomTime, formatFreedomTimeString, formatCurrency, formatMaskedCurrency, formatMaskedApproxCurrency, formatWithFreedom, dailyExpenseRate } from '@/lib/format'
+import { calculateFreedomTime, formatFreedomTimeString, formatCurrency, formatMaskedCurrency, formatWithFreedom, dailyExpenseRate } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import {
   computeFireProjection, computeFireRange,
@@ -51,15 +51,14 @@ import { NaturalMilestoneSheet } from '@/components/app/horizon/natural-mileston
 import { ActionCard } from '@/components/app/action-card'
 import dynamic from 'next/dynamic'
 import {
-  Hourglass, TrendingUp, Percent,
+  TrendingUp,
   AlertTriangle, Calendar, BarChart3, FlaskConical, Landmark,
   Zap, Target, Sparkles,
-  TableProperties, GitBranch,
-  ChevronDown, ChevronUp, Compass,
+  GitBranch,
+  ChevronDown, ChevronUp,
   Home, Lightbulb,
   Play,
   Pause,
-  Receipt,
   Minus,
 } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
@@ -125,12 +124,10 @@ import { ScenarioKaarten } from '@/components/app/horizon/scenario-kaarten'
 import { computeDekkingsradar, type RadarAs } from '@/lib/horizon/dekkingsradar'
 import { type ScenarioPresetResult } from '@/lib/horizon/scenario-presets'
 import { withResolvedKernelBedragen } from '@/lib/horizon/kernel-profile-basis'
-import { buildVrijheidsleeftijdZin } from '@/lib/horizon/vrijheidsleeftijd-zin'
 import { selectDoelLijnBron } from '@/lib/horizon/doel-lijn-bron'
 import {
   resolveHeroFireAge,
   formatHeroFireAge,
-  heroFireAgeCaption,
   isHeroAnswerPending,
   isHeroAnswerInvalid,
   heroFireAgeYear,
@@ -181,7 +178,6 @@ import {
   type LabUitkomst,
 } from '@/lib/horizon/lab-uitkomst'
 import { GOAL_TYPE_LABELS } from '@/lib/goal-data'
-import { AnkerDrieslag } from '@/components/app/horizon/anker-drieslag'
 import {
   guardFireTarget,
   guardFreedomMoment,
@@ -354,7 +350,10 @@ import {
   COLOR_LIFE_INCOME, COLOR_LIFE_EXPENSE, COLOR_NAT_ASSET, COLOR_NAT_DEBT, COLOR_NAT_SIM,
   COLOR_NAT_DANGER, COLOR_PARTNER_EVENT, COLOR_GOAL, COLOR_GOAL_OVERDUE,
 } from '@/components/toekomst/canvas/marker-kleuren'
-import { ReceiptCue, HeroKpiNotice } from '@/components/toekomst/plan/plan-helpers'
+import { PlanHeroKop } from '@/components/toekomst/plan/plan-hero-kop'
+import { PlanKerngetalMobiel, PlanKpiStripDesktop, PlanKpiStripMobiel } from '@/components/toekomst/plan/plan-kpi-strip'
+import { PlanHeroDuiding } from '@/components/toekomst/plan/plan-hero-duiding'
+import { PlanGegevensmelding } from '@/components/toekomst/plan/plan-gegevensmelding'
 import { useInViewOnce } from '@/components/toekomst/plan/use-in-view-once'
 
 export default function HorizonPage({
@@ -4632,666 +4631,129 @@ export default function HorizonPage({
         <div className="h-1.5" style={{ background: 'var(--module-active-500)' }} />
 
         <div className="p-4 sm:p-6 md:p-8">
-          {/* Header rij: kicker + Details pill.
-              `relative z-[46]` (M9): de tips-scrim van ToekomstOverlay is een
-              klik-vanger die als portal-kind van [data-scroll-container] op
-              z-[45] over de VOLLE paginahoogte ligt — hij vervaagt bewust ook
-              deze kop. Zonder eigen stapelniveau viel de Details-pill dus
-              ónder die vanger: de eerste klik sloot de tips i.p.v. de
-              jaar-op-jaar-tabel te openen. 46 tilt de rij precies één stap
-              boven de scrim, en blijft ruim onder de grafiek+markers (z-[50])
-              en onder elke overlay (z-[70]). Werkt omdat de hero-kaart in
-              tips-modus `no-hover-lift` draagt en dus géén eigen
-              stacking-context via hover-transform opent. */}
-          <div className="relative z-[46] mb-3 sm:mb-6 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              {hasPerspectiveHero && (
-                <div>
-                  <p className="label-editorial text-horizon-600">
-                    {isPartnerView
-                      ? `${perspectiveHero!.householdName} — Horizon`
-                      : `${perspectiveHero!.householdName} — Gezamenlijke horizon`}
-                  </p>
-                  <p className="mt-0.5 text-[11px] text-[var(--ink-3)]">
-                    {isPartnerView
-                      ? `FIRE-projectie van ${perspectiveHero!.householdName}`
-                      : 'Gecombineerde financiën van het huishouden'}
-                  </p>
-                </div>
-              )}
-            </div>
-            {simResult && (
-              <button
-                type="button"
-                onClick={() => setSimModalOpen(true)}
-                // Pointerdown-guard, zelfde patroon als de ✕ en de markers in
-                // toekomst-overlay.tsx: houd de pointerdown weg bij alles wat
-                // hem zou kunnen kapen (pointer-capture/klik-vangers) zodat de
-                // knop zijn eigen `onClick` gegarandeerd krijgt.
-                onPointerDown={(e) => e.stopPropagation()}
-                className="flex items-center gap-1 rounded-[var(--r-sm)] border border-horizon-200 bg-horizon-50 px-2 py-0.5 font-sans text-[10px] text-horizon-600 transition-all hover:bg-horizon-100"
-              >
-                <TableProperties className="h-3 w-3" />
-                Details
-              </button>
-            )}
-          </div>
+          <PlanHeroKop
+            hasPerspectiveHero={hasPerspectiveHero}
+            isPartnerView={isPartnerView}
+            perspectiveHero={perspectiveHero}
+            simResult={simResult}
+            setSimModalOpen={setSimModalOpen}
+          />
 
-          {/* Mobile: Primary number */}
-          {/* Zelfde breekpunt als de 2x2-strip hieronder (B-025). */}
-          <div className="md:hidden mb-3">
-            <button type="button" onClick={() => setShowFireAgeReceipt(true)} className="text-left">
-              {showFreeHero ? (
-                <span className="font-serif text-[28px] font-bold tracking-tight text-[var(--ink)]">{freeHeroPhrase}.</span>
-              ) : (
-                <>
-                  <span
-                    className="font-display text-[36px] font-bold tracking-tight text-[var(--ink)]"
-                    aria-busy={!hasPerspectiveHero && heroFireAgePending}
-                  >
-                    {hasPerspectiveHero
-                      ? (perspectiveHero!.fireAge !== null ? Math.round(perspectiveHero!.fireAge) : '-')
-                      : heroFireAgeTextMobile}
-                  </span>
-                  <span className="ml-3 font-serif italic text-lg text-[var(--ink-3)]">
-                    {hasPerspectiveHero
-                      ? (isPensioenMode ? 'pensioenleeftijd' : 'vrijheidsleeftijd')
-                      : heroFireAgeCaption(heroFireAge, heroAgeLabel.toLowerCase())}
-                  </span>
-                  {/* M5 — hetzelfde bonnetje-spoor als op de figures-strip: dit
-                      grote getal is óók een knop naar zijn eigen aannames. */}
-                  <Receipt className="ml-2 inline h-3.5 w-3.5 shrink-0 align-middle text-[var(--ink-4)]" aria-hidden />
-                  <span className="sr-only">— tik voor de aannames achter dit getal</span>
-                </>
-              )}
-            </button>
-          </div>
+          <PlanKerngetalMobiel
+            setShowFireAgeReceipt={setShowFireAgeReceipt}
+            showFreeHero={showFreeHero}
+            freeHeroPhrase={freeHeroPhrase}
+            hasPerspectiveHero={hasPerspectiveHero}
+            heroFireAgePending={heroFireAgePending}
+            perspectiveHero={perspectiveHero}
+            heroFireAgeTextMobile={heroFireAgeTextMobile}
+            isPensioenMode={isPensioenMode}
+            heroFireAge={heroFireAge}
+            heroAgeLabel={heroAgeLabel}
+          />
 
-          {/* Desktop: 4-col figures-strip — editorial blueprint. Onder een vast anker
-              valt de Opnamerate-tegel weg (uitgaven ÷ huidig vermogen is daar
-              betekenisloos — bevinding 6) en wordt het een 3-koloms strip.
+          <PlanKpiStripDesktop
+            isFixedAnchorMode={isFixedAnchorMode}
+            hasPerspectiveHero={hasPerspectiveHero}
+            setShowFireAgeReceipt={setShowFireAgeReceipt}
+            heroFireAge={heroFireAge}
+            heroFireAgePending={heroFireAgePending}
+            isPartnerView={isPartnerView}
+            perspectiveHero={perspectiveHero}
+            showFireAgeNotice={showFireAgeNotice}
+            showFreeHero={showFreeHero}
+            freeHeroLabel={freeHeroLabel}
+            heroAgeLabel={heroAgeLabel}
+            fireAgeNoticeGuard={fireAgeNoticeGuard}
+            freeHeroPhrase={freeHeroPhrase}
+            heroFireAgeText={heroFireAgeText}
+            heroAgeCaptionBase={heroAgeCaptionBase}
+            setShowFireTargetReceipt={setShowFireTargetReceipt}
+            showFireTargetNotice={showFireTargetNotice}
+            fireTargetGuard={fireTargetGuard}
+            isNuStoppenMode={isNuStoppenMode}
+            dualDoelRegels={dualDoelRegels}
+            viewPerspectiveHeroFireTarget={viewPerspectiveHeroFireTarget}
+            viewVermogenOpAnker={viewVermogenOpAnker}
+            viewBalkVrijheidDoel={viewBalkVrijheidDoel}
+            fireTargetCaption={fireTargetCaption}
+            setShowSwrReceipt={setShowSwrReceipt}
+            isPensioenMode={isPensioenMode}
+            isKernelDepleteRate={isKernelDepleteRate}
+            viewMonthlyWithdrawalAtAow={viewMonthlyWithdrawalAtAow}
+            simResult={simResult}
+            fireSwr={fireSwr}
+            openRetirementExpensePane={openRetirementExpensePane}
+            retirementMethod={retirementMethod}
+            showRetirementExpenseNotice={showRetirementExpenseNotice}
+            retirementExpenseGuard={retirementExpenseGuard}
+            input={input}
+            haalbareUitgaveRegel={haalbareUitgaveRegel}
+            haalbareUitgaveToon={haalbareUitgaveToon}
+          />
 
-              Breekpunt is `md` (768px), niet `sm` (640px) — B-025. Op 640–767px
-              (Surface Duo staand: 696px) gaf vier kolommen ~150px per tegel voor
-              een kicker, een icoon en een 32px Playfair-getal: de cijfers liepen
-              in elkaar. Die band houdt daarom de 2×2-variant hieronder. */}
-          <div className={`hidden md:grid ${isFixedAnchorMode && !hasPerspectiveHero ? 'md:grid-cols-3' : 'md:grid-cols-4'} items-start border-t border-b border-[var(--ink)] mb-5`}>
-            {/* KPI 1: Vrijheidsleeftijd / Pensioenleeftijd — winner met highlight-marker */}
-            <button
-              type="button"
-              onClick={() => setShowFireAgeReceipt(true)}
-              className="p-4 border-r border-[var(--rule-soft)] last:border-r-0 text-left transition-colors hover:bg-[var(--subtle)]/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
-              data-testid="hero-stat-fire-age"
-              // Hardheid van het kernantwoord machineleesbaar (C1) — voedt de
-              // UAT-controle "3-5x herladen geeft hetzelfde antwoord".
-              data-fire-age-status={hasPerspectiveHero ? 'perspectief' : heroFireAge.status}
-              aria-busy={!hasPerspectiveHero && heroFireAgePending}
-              title={hasPerspectiveHero ? (isPartnerView ? `FIRE-leeftijd van ${perspectiveHero!.householdName}` : 'Gezamenlijke FIRE-leeftijd op basis van gecombineerd vermogen en gedeelde uitgaven') : isFixedAnchorMode ? 'Tot welke leeftijd je liquide vermogen reikt als je op je stopmoment stopt' : undefined}
-            >
-              <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1.5">
-                <Hourglass className="h-3 w-3 shrink-0" aria-hidden />
-                <span>{showFireAgeNotice ? 'Vrijheidsleeftijd' : showFreeHero ? freeHeroLabel : heroAgeLabel}</span>
-                <ReceiptCue />
-              </div>
-              {showFireAgeNotice ? (
-                /* UR2-05: geen onderbouwd kernantwoord — dezelfde melding als de
-                   Doelbedrag-tegel ernaast, niet een kaal getal of een streepje. */
-                <HeroKpiNotice guard={fireAgeNoticeGuard} />
-              ) : (
-                <>
-              <div
-                className={`${showFreeHero ? 'text-[18px] sm:text-[20px] leading-tight' : 'text-[28px] sm:text-[32px] leading-none'} font-black tracking-[-0.02em] tabular-nums`}
-                style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
-              >
-                <span
-                  className="inline px-1"
-                  style={{
-                    backgroundImage:
-                      'linear-gradient(transparent 60%, var(--module-active-200) 60%)',
-                  }}
-                >
-                  {showFreeHero
-                    ? freeHeroPhrase
-                    : hasPerspectiveHero
-                      ? (perspectiveHero!.fireAge !== null ? Math.round(perspectiveHero!.fireAge) : '–')
-                      : heroFireAgeText}
-                </span>
-              </div>
-              <div
-                className="italic text-[11px] text-[var(--ink-3)] mt-1.5"
-                style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
-              >
-                {showFreeHero
-                  ? ''
-                  : hasPerspectiveHero
-                    ? (isPartnerView ? `jaar (${perspectiveHero!.householdName})` : 'jaar (huishouden)')
-                    : heroFireAgeCaption(heroFireAge, heroAgeCaptionBase)}
-              </div>
-                </>
-              )}
-            </button>
+          <PlanHeroDuiding
+            hasPerspectiveHero={hasPerspectiveHero}
+            heroFireAge={heroFireAge}
+            currentAge={currentAge}
+            solvedRun={solvedRun}
+            simResult={simResult}
+            isFixedAnchorMode={isFixedAnchorMode}
+            perspectiveHero={perspectiveHero}
+            heroFreedomFraming={heroFreedomFraming}
+            planAnchor={planAnchor}
+            ankerReach={ankerReach}
+            ankerStop={ankerStop}
+            showFireAgeNotice={showFireAgeNotice}
+            effectiveFreedomPct={effectiveFreedomPct}
+            viewPerspectiveHeroFireTarget={viewPerspectiveHeroFireTarget}
+            masked={masked}
+            isPartnerView={isPartnerView}
+            viewBalkVrijheidDoel={viewBalkVrijheidDoel}
+          />
 
-            {/* KPI 2: Doelbedrag / Verwacht vermogen op AOW */}
-            <button
-              type="button"
-              onClick={() => setShowFireTargetReceipt(true)}
-              className="p-4 border-r border-[var(--rule-soft)] last:border-r-0 text-left transition-colors hover:bg-[var(--subtle)]/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
-              data-testid="hero-stat-fire-target"
-              title={hasPerspectiveHero ? (isPartnerView ? `FIRE-doelbedrag van ${perspectiveHero!.householdName}` : 'Gezamenlijk FIRE-doelbedrag op basis van gedeelde uitgaven') : isFixedAnchorMode ? 'Geprojecteerd liquide vermogen op je stopmoment' : undefined}
-            >
-              <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1.5">
-                <Target className="h-3 w-3 shrink-0" aria-hidden />
-                <span>{isFixedAnchorMode ? 'Vermogen op je stopmoment' : 'Doelbedrag'}</span>
-                <ReceiptCue />
-              </div>
-              {!hasPerspectiveHero && showFireTargetNotice ? (
-                /* M6: onmogelijk/niet-berekenbaar doelbedrag — melding i.p.v. getal. */
-                <HeroKpiNotice guard={fireTargetGuard} label={isNuStoppenMode ? 'Geen doelbedrag' : undefined} />
-              ) : !hasPerspectiveHero && dualDoelRegels ? (
-                <>
-                  {/* Het doel op de GRONDSLAG van dit plan — het grote getal; kwalificatie
-                      inline zodat de kaart even hoog blijft als de buur-KPI's */}
-                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                    <div
-                      className="text-[24px] sm:text-[28px] font-black leading-none tracking-[-0.02em]"
-                      style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
-                    >
-                      <MaskedAmount value={dualDoelRegels[0].bedrag} tone="horizon" monoWhenVisible={false} approx />
-                    </div>
-                    <span
-                      className="italic text-[11px] text-[var(--ink-3)]"
-                      style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
-                    >
-                      {dualDoelRegels[0].kwalificatie}
-                    </span>
-                  </div>
-                  {/* Het doel op de ándere grondslag — kleiner en lichter, bewust ZONDER
-                      module-accent. Een accent is een gebruikersinstelbaar identiteits-
-                      token en draagt daarom nooit een grondslag of hiërarchie (besluit
-                      19-09-2026). Tot 19-09 viel de tweede regel altijd samen met het
-                      liquide doel; sinds de leesvolgorde de grondslag volgt is dat bij
-                      Uitsluiten juist het doel MÉT huis, en markeerde de kleur dus niets
-                      meer. Hiërarchie loopt nu via grootte + inkt, de grondslag via de
-                      kwalificatie-woorden ernaast. */}
-                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 mt-1.5">
-                    <div
-                      className="text-[16px] sm:text-[18px] font-black leading-none tracking-[-0.02em] text-[var(--ink-2)]"
-                      style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
-                    >
-                      <MaskedAmount value={dualDoelRegels[1].bedrag} tone="horizon" monoWhenVisible={false} approx />
-                    </div>
-                    <span
-                      className="italic text-[11px] text-[var(--ink-3)]"
-                      style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
-                    >
-                      {dualDoelRegels[1].kwalificatie}
-                    </span>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div
-                    className="text-[24px] sm:text-[28px] font-black leading-none tracking-[-0.02em]"
-                    style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
-                  >
-                    {hasPerspectiveHero
-                      ? <MaskedAmount value={viewPerspectiveHeroFireTarget ?? perspectiveHero!.fireTarget} tone="horizon" monoWhenVisible={false} approx />
-                      : <MaskedAmount value={isFixedAnchorMode ? (viewVermogenOpAnker ?? 0) : viewBalkVrijheidDoel} tone="horizon" monoWhenVisible={false} approx />}
-                  </div>
-                  <div
-                    className="italic text-[11px] text-[var(--ink-3)] mt-1.5"
-                    style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
-                  >
-                    {fireTargetCaption}
-                  </div>
-                </>
-              )}
-            </button>
+          <PlanKpiStripMobiel
+            setShowFireAgeReceipt={setShowFireAgeReceipt}
+            showFireAgeNotice={showFireAgeNotice}
+            showFreeHero={showFreeHero}
+            freeHeroLabel={freeHeroLabel}
+            heroAgeLabelKort={heroAgeLabelKort}
+            fireAgeNoticeGuard={fireAgeNoticeGuard}
+            freeHeroPhrase={freeHeroPhrase}
+            hasPerspectiveHero={hasPerspectiveHero}
+            perspectiveHero={perspectiveHero}
+            heroFireAgeText={heroFireAgeText}
+            heroFireAge={heroFireAge}
+            setShowFireTargetReceipt={setShowFireTargetReceipt}
+            isFixedAnchorMode={isFixedAnchorMode}
+            showFireTargetNotice={showFireTargetNotice}
+            fireTargetGuard={fireTargetGuard}
+            isNuStoppenMode={isNuStoppenMode}
+            dualDoelRegels={dualDoelRegels}
+            viewPerspectiveHeroFireTarget={viewPerspectiveHeroFireTarget}
+            viewVermogenOpAnker={viewVermogenOpAnker}
+            viewBalkVrijheidDoel={viewBalkVrijheidDoel}
+            fireTargetCaption={fireTargetCaption}
+            setShowSwrReceipt={setShowSwrReceipt}
+            isPensioenMode={isPensioenMode}
+            isKernelDepleteRate={isKernelDepleteRate}
+            viewMonthlyWithdrawalAtAow={viewMonthlyWithdrawalAtAow}
+            simResult={simResult}
+            fireSwr={fireSwr}
+            openRetirementExpensePane={openRetirementExpensePane}
+            showRetirementExpenseNotice={showRetirementExpenseNotice}
+            retirementExpenseGuard={retirementExpenseGuard}
+            input={input}
+            haalbareUitgaveRegel={haalbareUitgaveRegel}
+            haalbareUitgaveToon={haalbareUitgaveToon}
+          />
 
-            {/* KPI 3: Opnamerate / Maandelijkse onttrekking — secundaire diepte,
-                verborgen in Eenvoudig-modus (hard-hide) én onder een vast anker
-                (ADR 0129 F3b, bevinding 6: uitgaven ÷ huidig vermogen zegt daar niets). */}
-            {!(isFixedAnchorMode && !hasPerspectiveHero) && (
-            <HideInSimple>
-            <button
-              type="button"
-              onClick={() => setShowSwrReceipt(true)}
-              className="p-4 border-r border-[var(--rule-soft)] last:border-r-0 text-left transition-colors hover:bg-[var(--subtle)]/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
-              data-testid="hero-stat-swr"
-            >
-              <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1.5">
-                <Percent className="h-3 w-3 shrink-0" aria-hidden />
-                <span>{isPensioenMode ? 'Mnd. onttrekking' : isKernelDepleteRate ? 'Onttrekking' : 'Opnamerate'}</span>
-                <ReceiptCue />
-              </div>
-              <div
-                className="text-[24px] sm:text-[28px] font-black leading-none tracking-[-0.02em] tabular-nums"
-                style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
-              >
-                {isPensioenMode && viewMonthlyWithdrawalAtAow != null
-                  ? <MaskedAmount value={Math.round(viewMonthlyWithdrawalAtAow)} tone="horizon" monoWhenVisible={false} />
-                  : isKernelDepleteRate
-                    ? 'Interen'
-                    : simResult?.implicitWithdrawalRate != null
-                      ? `${(simResult.implicitWithdrawalRate * 100).toFixed(2)}%`
-                      : `${(fireSwr * 100).toFixed(2)}%`}
-              </div>
-              <div
-                className="italic text-[11px] text-[var(--ink-3)] mt-1.5"
-                style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
-              >
-                {isPensioenMode ? 'per maand' : isKernelDepleteRate ? 'je teert op je vermogen — geen vaste opnamerate' : simResult?.implicitWithdrawalRate != null ? 'impliciet' : 'ingesteld'}
-              </div>
-            </button>
-            </HideInSimple>
-            )}
-
-            {/* KPI 4: Uitgave na pensioen — linkt naar verdiepingspagina */}
-            <button
-              type="button"
-              onClick={openRetirementExpensePane}
-              className="p-4 border-r border-[var(--rule-soft)] last:border-r-0 text-left transition-colors hover:bg-[var(--subtle)]/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
-              data-testid="hero-stat-retirement-expense"
-              title={
-                hasPerspectiveHero
-                  ? (isPartnerView
-                      ? `Uitgave na pensioen van ${perspectiveHero!.householdName}`
-                      : 'Gezamenlijke uitgave na pensioen — pas de methode aan in de huishoud-FIRE-sectie')
-                  : retirementMethod === 'custom_amount'
-                    ? 'Zelf samengesteld — aanpassen of herzien'
-                    : retirementMethod === 'current_income'
-                      ? 'Op basis van huidig inkomen — verfijnen'
-                      : 'Op basis van essentiële budgetten — verfijnen'
-              }
-            >
-              <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1.5">
-                <Compass className="h-3 w-3 shrink-0" aria-hidden />
-                <span>Na pensioen</span>
-              </div>
-              {showRetirementExpenseNotice ? (
-                /* UR2-05: de methode viel terug op de profielschatting en daarna
-                   op 0 — dat is geen bestedingspatroon, dus geen bedrag. */
-                <HeroKpiNotice guard={retirementExpenseGuard} />
-              ) : (
-                <>
-              <div
-                className="text-[24px] sm:text-[28px] font-black leading-none tracking-[-0.02em]"
-                style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
-              >
-                <MaskedAmount value={hasPerspectiveHero ? perspectiveHero!.retirementExpense : (input?.yearlyMustExpenses ?? 0)} tone="horizon" monoWhenVisible={false} />
-              </div>
-              <div
-                className="italic text-[11px] text-[var(--ink-3)] mt-1.5"
-                style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
-              >
-                per jaar
-              </div>
-              {!hasPerspectiveHero && haalbareUitgaveRegel && (
-                <p
-                  data-testid="haalbaar-bij-uitgave"
-                  className={`mt-1 font-sans text-[11px] leading-snug ${haalbareUitgaveToon}`}
-                >
-                  {haalbareUitgaveRegel}
-                </p>
-              )}
-                </>
-              )}
-            </button>
-          </div>
-
-          {/* ── Duiding onder het kerngetal (S15) ────────────────────────────
-              Wat de KPI's laten zien is een getal; wat de gebruiker wil weten
-              is wat dat getal betekent. Die zin bestond al in de tips-overlay en
-              op de welkomstkaart — allebei tijdelijk zichtbaar — maar niet op de
-              pagina zelf, en juist in Eenvoudig (waar de Opnamerate-KPI wegvalt)
-              stonden er drie kale cijfers zonder vertaling.
-
-              Deze plek in de DOM dekt beide layouts met één instantie: op
-              desktop valt hij onder de figures-strip hierboven, op mobiel onder
-              het grote primaire getal (de desktop-strip is daar `hidden` en de
-              2×2-strip volgt pas ná de balk).
-
-              Beide weergavemodi (eigenaarsbesluit D1): Volledig zou anders
-              mínder tekst tonen dan Eenvoudig, en dat keert het contract van
-              `HideInSimple` om. De duiding staat náást de expert-KPI, niet in
-              plaats daarvan.
-
-              Woorden én afronding komen uit `lib/horizon/vrijheidsleeftijd-zin.ts`
-              — dezelfde bron als de overlay en de welkomstkaart, en dezelfde
-              afrondingsregel als het kopgetal hierboven. Consume-only: geen
-              eigen leeftijdsafleiding, geen bedrag (dus buiten de deflator- en
-              maskeringsregels). */}
-          {/* ADR 0129 D7/B9 — de DRIESLAG onder een vast anker: VRIJ MOGELIJK VANAF
-              (tweede run) · JOUW STOPMOMENT (instelling) · REIKT TOT (bereik). Alleen
-              in de eigen weergave; consume-only uit `heroFireAge.anker`. */}
-          {!hasPerspectiveHero && heroFireAge.anker && (
-            <AnkerDrieslag
-              anker={heroFireAge.anker}
-              currentAge={currentAge}
-              solvedFireEndAge={solvedRun?.endAge ?? null}
-              planEndAge={simResult?.displayEndAge ?? null}
-              solvedPending={isFixedAnchorMode && solvedRun === null}
-            />
-          )}
-
-          {(() => {
-            const zin = buildVrijheidsleeftijdZin({
-              freedomAge: hasPerspectiveHero ? perspectiveHero!.fireAge : heroFireAge.age,
-              framing: heroFreedomFraming,
-              anchor: planAnchor,
-              // ADR 0129 — onder een VAST anker gaat deze zin over BEREIK, niet over
-              // een moment: `heroFireAge.age` is daar de bereik-leeftijd, en
-              // "werken wordt een keuze rond je 78e" zou daar een belofte van maken.
-              ankerReach: hasPerspectiveHero ? null : ankerReach,
-              ankerStop: hasPerspectiveHero ? null : ankerStop,
-              // Nog geen antwoord (kernel rekent) of een gegevensprobleem (M6 /
-              // UR2-05): dan draagt de KPI zelf al een melding. Een duidingszin
-              // eronder zou daar tegenin praten — `showFireAgeNotice` dekt óók
-              // het geval waarin het doelbedrag de melding veroorzaakt.
-              pending:
-                !hasPerspectiveHero &&
-                (heroFireAge.status === 'berekenen' || showFireAgeNotice),
-              subjectName: hasPerspectiveHero ? perspectiveHero!.householdName : null,
-            })
-            if (zin.kind === 'berekenen') return null
-            return (
-              <p
-                data-testid="hero-duiding"
-                className="mb-3 sm:mb-4 max-w-[60ch] text-[13px] italic leading-snug text-[var(--ink-2)]"
-                style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
-              >
-                {zin.lead}
-                {zin.ageLabel && (
-                  <span className="not-italic font-semibold text-[var(--module-active-700)]">
-                    {zin.ageLabel}
-                  </span>
-                )}
-                {zin.tail}
-              </p>
-            )
-          })()}
-
-          {/* Voortgangsbalk */}
-          <div className="mb-3 sm:mb-6">
-            <div className="h-[5px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-horizon-600 via-horizon-400 to-horizon-300 transition-all duration-1000"
-                style={{ width: `${hasPerspectiveHero ? Math.max(Math.min(perspectiveHero!.freedomPercentage, 100), 0) : effectiveFreedomPct}%` }}
-              />
-            </div>
-            {/* Balk-label = HETZELFDE bedrag als de Doelbedrag-KPI hierboven, in
-                de actieve euro-weergave. Eigenaar-besluit 27-08-2026 (addendum
-                ADR 0034, conventie ADR 0093): het label leest voor een gebruiker
-                als een doelbedrag, niet als de wiskundige noemer van de
-                balk-vulling — twee bedragen voor hetzelfde doel op één scherm
-                ("ca. €180.000" in de KPI naast €200.032 onder de balk) leest als
-                een fout, ook al was de eerdere nominale keuze intern
-                verdedigbaar. Daarmee vervalt de euro-view-uitzondering die hier
-                stond (D12/D13).
-                Wat NIET meebeweegt: de vulling blijft `effectiveFreedomPct` —
-                onder `solved` de kapitaalratio (computeFreedomProgressWithBasis),
-                onder een vast anker de DEKKING (ADR 0129 B3/D5), zodat de vulling
-                dezelfde grootheid meet als het tijd-label hieronder. Beide zijn een
-                ratio (klasse R, ADR 0093) en deflateren nooit. Gevolg dat de eigenaar accepteert:
-                in 'real' is de breuk onder de balk niet meer letterlijk
-                teller/label. Ook de grondslag-keuze (excl. woning bij
-                `isHomeExcludedFromFire`) is ongewijzigd — ADR 0034.
-                Deflatie loopt via de canonieke route en exact één keer:
-                `viewBalkVrijheidDoel`/`viewVermogenOpAnker` zijn binnen de
-                render-grens gedeeld door `factorAtAge` op het FIRE- resp.
-                ANKER-jaar (`SimResult.vastStopLeeftijd` — het bedrag staat op de
-                ankermaand, niet op de AOW-leeftijd).
-                Gepind in horizon-client.euro-view.test.ts. */}
-            <div className="mt-2 flex justify-between text-xs text-[var(--ink-4)]">
-              <span>0%</span>
-              <span className="font-mono">
-                {hasPerspectiveHero
-                  ? `${formatMaskedApproxCurrency(viewPerspectiveHeroFireTarget ?? perspectiveHero!.fireTarget, masked)} — ${isPartnerView ? `${perspectiveHero!.householdName}'s vrijheid` : 'gezamenlijke vrijheid'}`
-                  // ADR 0129 D5/D8 — onder ÉLK vast anker meet de balk DEKKING (tijd),
-                  // geen kapitaal: een doelbedrag noemen zou een noemer suggereren die
-                  // niet bestaat (D4). Het label noemt daarom het einde van het plan.
-                  : isFixedAnchorMode
-                    ? (simResult != null
-                        ? `tot je ${Math.round(simResult.displayEndAge)}e — einde van je plan`
-                        : 'einde van je plan')
-                    : `${formatMaskedApproxCurrency(viewBalkVrijheidDoel, masked)} — volledige vrijheid`}
-              </span>
-              <span>100%</span>
-            </div>
-          </div>
-
-          {/* Mobiel én smalle tablet (< 768px): 2x2 figures-strip — editorial
-              blueprint. Cellen stretchen (géén items-start): de rand tussen de
-              cellen moet doorlopen tot de volle rijhoogte, ook als één KPI (dual
-              doelbedrag) hoger uitvalt dan zijn buur.
-              `md:hidden` i.p.v. `sm:hidden` — zie de noot bij de strip hierboven. */}
-          <div className="grid grid-cols-2 md:hidden border-t border-b border-[var(--ink)] mb-5">
-            {/* KPI 1: Vrijheidsleeftijd / Pensioenleeftijd — winner */}
-            <button
-              type="button"
-              onClick={() => setShowFireAgeReceipt(true)}
-              className="p-3 border-r border-b border-[var(--rule-soft)] text-left transition-colors hover:bg-[var(--subtle)]/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
-            >
-              <div className="flex items-center gap-1.5 text-[9px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1">
-                <Hourglass className="h-3 w-3 shrink-0" aria-hidden />
-                <span>{showFireAgeNotice ? 'Vrijheidslft' : showFreeHero ? freeHeroLabel : heroAgeLabelKort}</span>
-                <ReceiptCue />
-              </div>
-              {showFireAgeNotice ? (
-                /* UR2-05 — zie de desktop-tegel. */
-                <HeroKpiNotice guard={fireAgeNoticeGuard} compact />
-              ) : (
-                <>
-              <div
-                className={`${showFreeHero ? 'text-[15px] leading-tight' : 'text-[22px] leading-none'} font-black tracking-[-0.02em] tabular-nums`}
-                style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
-              >
-                <span
-                  className="inline px-1"
-                  style={{
-                    backgroundImage:
-                      'linear-gradient(transparent 60%, var(--module-active-200) 60%)',
-                  }}
-                >
-                  {showFreeHero
-                    ? freeHeroPhrase
-                    : hasPerspectiveHero
-                      ? (perspectiveHero!.fireAge !== null ? Math.round(perspectiveHero!.fireAge) : '–')
-                      : heroFireAgeText}
-                </span>
-              </div>
-              <div
-                className="italic text-[10px] text-[var(--ink-3)] mt-1"
-                style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
-              >
-                {showFreeHero ? '' : hasPerspectiveHero ? 'jaar' : heroFireAgeCaption(heroFireAge, 'jaar')}
-              </div>
-                </>
-              )}
-            </button>
-
-            {/* KPI 2: Doelbedrag */}
-            <button
-              type="button"
-              onClick={() => setShowFireTargetReceipt(true)}
-              className="p-3 border-b border-[var(--rule-soft)] text-left transition-colors hover:bg-[var(--subtle)]/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
-            >
-              <div className="flex items-center gap-1.5 text-[9px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1">
-                <Target className="h-3 w-3 shrink-0" aria-hidden />
-                <span>{isFixedAnchorMode ? 'Vermogen bij stop' : 'Doelbedrag'}</span>
-                <ReceiptCue />
-              </div>
-              {!hasPerspectiveHero && showFireTargetNotice ? (
-                /* M6: onmogelijk/niet-berekenbaar doelbedrag — melding i.p.v. getal. */
-                <HeroKpiNotice guard={fireTargetGuard} compact label={isNuStoppenMode ? 'Geen doelbedrag' : undefined} />
-              ) : !hasPerspectiveHero && dualDoelRegels ? (
-                <>
-                  {/* Het doel op de GRONDSLAG van dit plan — het grote getal */}
-                  <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
-                    <div
-                      className="text-[18px] font-black leading-none tracking-[-0.02em]"
-                      style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
-                    >
-                      <MaskedAmount value={dualDoelRegels[0].bedrag} tone="horizon" monoWhenVisible={false} approx />
-                    </div>
-                    <span
-                      className="italic text-[10px] text-[var(--ink-3)]"
-                      style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
-                    >
-                      {dualDoelRegels[0].kwalificatie}
-                    </span>
-                  </div>
-                  {/* Het doel op de ándere grondslag — kleiner en lichter, bewust ZONDER
-                      module-accent. Een accent is een gebruikersinstelbaar identiteits-
-                      token en draagt daarom nooit een grondslag of hiërarchie (besluit
-                      19-09-2026). Tot 19-09 viel de tweede regel altijd samen met het
-                      liquide doel; sinds de leesvolgorde de grondslag volgt is dat bij
-                      Uitsluiten juist het doel MÉT huis, en markeerde de kleur dus niets
-                      meer. Hiërarchie loopt nu via grootte + inkt, de grondslag via de
-                      kwalificatie-woorden ernaast. */}
-                  <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 mt-1">
-                    <div
-                      className="text-[13px] font-black leading-none tracking-[-0.02em] text-[var(--ink-2)]"
-                      style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
-                    >
-                      <MaskedAmount value={dualDoelRegels[1].bedrag} tone="horizon" monoWhenVisible={false} approx />
-                    </div>
-                    <span
-                      className="italic text-[10px] text-[var(--ink-3)]"
-                      style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
-                    >
-                      {dualDoelRegels[1].kwalificatie}
-                    </span>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div
-                    className="text-[18px] font-black leading-none tracking-[-0.02em]"
-                    style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
-                  >
-                    {hasPerspectiveHero
-                      ? <MaskedAmount value={viewPerspectiveHeroFireTarget ?? perspectiveHero!.fireTarget} tone="horizon" monoWhenVisible={false} approx />
-                      : <MaskedAmount value={isFixedAnchorMode ? (viewVermogenOpAnker ?? 0) : viewBalkVrijheidDoel} tone="horizon" monoWhenVisible={false} approx />}
-                  </div>
-                  <div
-                    className="italic text-[10px] text-[var(--ink-3)] mt-1"
-                    style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
-                  >
-                    {fireTargetCaption}
-                  </div>
-                </>
-              )}
-            </button>
-
-            {/* KPI 3: Opnamerate — verborgen in Eenvoudig-modus (hard-hide) én onder een
-                vast anker (ADR 0129 F3b, bevinding 6). */}
-            {!(isFixedAnchorMode && !hasPerspectiveHero) && (
-            <HideInSimple>
-            <button
-              type="button"
-              onClick={() => setShowSwrReceipt(true)}
-              className="p-3 border-r border-[var(--rule-soft)] text-left transition-colors hover:bg-[var(--subtle)]/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
-            >
-              <div className="flex items-center gap-1.5 text-[9px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1">
-                <Percent className="h-3 w-3 shrink-0" aria-hidden />
-                <span>{isPensioenMode ? 'Mnd.' : isKernelDepleteRate ? 'Onttrekking' : 'Opnamerate'}</span>
-                <ReceiptCue />
-              </div>
-              <div
-                className="text-[18px] font-black leading-none tracking-[-0.02em]"
-                style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
-              >
-                {isPensioenMode && viewMonthlyWithdrawalAtAow != null
-                  ? <MaskedAmount value={Math.round(viewMonthlyWithdrawalAtAow)} tone="horizon" monoWhenVisible={false} />
-                  : isKernelDepleteRate
-                    ? 'Interen'
-                    : simResult?.implicitWithdrawalRate != null
-                      ? `${(simResult.implicitWithdrawalRate * 100).toFixed(2)}%`
-                      : `${(fireSwr * 100).toFixed(2)}%`}
-              </div>
-              <div
-                className="italic text-[10px] text-[var(--ink-3)] mt-1"
-                style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
-              >
-                {isPensioenMode ? 'per maand' : isKernelDepleteRate ? 'teert op vermogen' : simResult?.implicitWithdrawalRate != null ? 'impliciet' : 'ingesteld'}
-              </div>
-            </button>
-            </HideInSimple>
-            )}
-
-            {/* KPI 4: Uitgave na pensioen — linkt naar verdiepingspagina */}
-            <button
-              type="button"
-              onClick={openRetirementExpensePane}
-              className="p-3 text-left transition-colors hover:bg-[var(--subtle)]/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
-              data-testid="hero-stat-retirement-expense"
-            >
-              <div className="flex items-center gap-1.5 text-[9px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1">
-                <Compass className="h-3 w-3 shrink-0" aria-hidden />
-                <span>Na pensioen</span>
-              </div>
-              {showRetirementExpenseNotice ? (
-                /* UR2-05 — zie de desktop-tegel. */
-                <HeroKpiNotice guard={retirementExpenseGuard} compact />
-              ) : (
-                <>
-              <div
-                className="text-[18px] font-black leading-none tracking-[-0.02em]"
-                style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
-              >
-                <MaskedAmount value={hasPerspectiveHero ? perspectiveHero!.retirementExpense : (input?.yearlyMustExpenses ?? 0)} tone="horizon" monoWhenVisible={false} />
-              </div>
-              <div
-                className="italic text-[10px] text-[var(--ink-3)] mt-1"
-                style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
-              >
-                per jaar
-              </div>
-              {!hasPerspectiveHero && haalbareUitgaveRegel && (
-                <p
-                  data-testid="haalbaar-bij-uitgave"
-                  className={`mt-1 font-sans text-[10px] leading-snug ${haalbareUitgaveToon}`}
-                >
-                  {haalbareUitgaveRegel}
-                </p>
-              )}
-                </>
-              )}
-            </button>
-          </div>
-
-          {/* UR3-07 defect 1B — de gegevensmelding zei WAT er ontbrak, maar nergens hing
-              er een actie aan: de tegel bleef een doodlopende mededeling. Eén knop ONDER
-              de strip, niet één per tegel — de tegels zijn zelf al knoppen (naar hun
-              kassabon), en een link in een knop is geen geldige markup. Staat één keer in
-              de boom (na de mobiele strip) en geldt dus voor beide layouts.
-              Woorden: de duiding komt uit de guards ín de tegels; hier staat alleen de
-              actie, zodat de app-brede formulering in outcome-guard.ts niet kan driften. */}
-          {(showFireAgeNotice || showFireTargetNotice || showRetirementExpenseNotice) && (
-            <Link
-              href="/mijn/profiel"
-              data-testid="hero-missende-gegevens-cta"
-              className="group mb-5 flex items-center justify-between gap-3 rounded-[var(--r)] border border-dashed border-[var(--border-md)] bg-[var(--paper)] px-3 py-2.5 transition-colors hover:border-[var(--module-active-300)]"
-            >
-              <span className="font-sans text-[12px] text-[var(--ink-2)]">
-                Vul je geboortedatum, inkomen en bestedingen aan — dan rekenen we je vrijheidsmoment uit.
-              </span>
-              <span className="shrink-0 font-sans text-[12px] font-semibold text-[var(--module-active-700)] group-hover:underline">
-                Vul profiel aan →
-              </span>
-            </Link>
-          )}
-
-          {/* Profile error warning — shown when profile query failed but page loads with defaults */}
-          {simError && (
-            <div className="mb-4 flex items-start gap-2.5 rounded-[var(--r)] border border-dashed border-amber-300 bg-amber-50/60 px-3 py-2.5">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
-              <p className="font-sans text-[12px] text-amber-700">
-                Je profielgegevens konden niet worden geladen — de grafiek toont standaardwaarden. Probeer de pagina te verversen.
-              </p>
-            </div>
-          )}
+          <PlanGegevensmelding
+            showFireAgeNotice={showFireAgeNotice}
+            showFireTargetNotice={showFireTargetNotice}
+            showRetirementExpenseNotice={showRetirementExpenseNotice}
+            simError={simError}
+          />
 
           {/* Grafiekgedeelte. De !hasCompletedHorizonSetup-staat wordt
               paginabreed afgevangen door de guard-clause bovenaan de render.

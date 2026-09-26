@@ -85,7 +85,7 @@ describe('horizon-client — één beslisser voor het kernantwoord', () => {
     // niet getoond.
     expect(source).toContain('heroFireAgeText')
     expect(source).toContain('heroFireAgeReceiptText')
-    expect(source).toContain('heroFireAgeCaption(')
+    // `heroFireAgeCaption(` staat sinds fase 1 stap 5 in plan-kpi-strip.tsx (plan-kpi-strip.bron.test.ts).
   })
 })
 

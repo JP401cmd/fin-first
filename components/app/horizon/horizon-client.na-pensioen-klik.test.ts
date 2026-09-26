@@ -49,13 +49,6 @@ describe('"Na pensioen"-KPI — klik in huishoudweergave (WF-REKEN-23-bug4)', ()
     expect(deps).toContain('isHouseholdView')
   })
 
-  it('wordt door beide KPI-varianten geconsumeerd', () => {
-    const tiles = source.match(/data-testid="hero-stat-retirement-expense"/g) ?? []
-    expect(tiles, 'de tegel bestaat in desktop- en mobiele strip').toHaveLength(LAYOUTS)
-    const consumers = source.match(/onClick=\{openRetirementExpensePane\}/g) ?? []
-    expect(consumers, 'elke tegel hoort dezelfde handler te gebruiken').toHaveLength(LAYOUTS)
-  })
-
   it('kent de onbewaakte vertakking nergens meer', () => {
     // Precies de regel die de bevinding veroorzaakte: vertakken op alleen het
     // gekozen perspectief, zonder te toetsen of de pane gevuld is.

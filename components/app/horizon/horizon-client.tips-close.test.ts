@@ -66,31 +66,6 @@ describe('tips-overlay sluiten (M38)', () => {
  * afschermt — dezelfde twee dingen die de bevinding veroorzaakten.
  */
 describe('Details-knop boven de tips-scrim (M9)', () => {
-  /** De scrim in toekomst-overlay.tsx moet op z-[45] blijven staan; anders klopt 46 niet. */
-  it('staat precies één stap boven de tips-scrim', () => {
-    const overlaySource = readFileSync(
-      join(process.cwd(), 'components', 'app', 'horizon', 'toekomst-overlay.tsx'),
-      'utf8',
-    )
-    expect(overlaySource).toContain('z-[45]')
-
-    const lifted = source.indexOf('className="relative z-[46]')
-    expect(lifted, 'de Details-knoprij draagt geen `relative z-[46]`').toBeGreaterThan(-1)
-    // De Details-knop moet ín die opgetilde rij zitten, niet ergens anders.
-    const rowRegion = source.slice(lifted, lifted + 2500)
-    expect(rowRegion).toContain('setSimModalOpen(true)')
-    expect(rowRegion).toContain('TableProperties')
-  })
-
-  it('schermt de pointerdown van de Details-knop af', () => {
-    const lifted = source.indexOf('className="relative z-[46]')
-    const rowRegion = source.slice(lifted, lifted + 2500)
-    const buttonStart = rowRegion.indexOf('setSimModalOpen(true)')
-    expect(
-      rowRegion.slice(buttonStart, buttonStart + 600),
-    ).toContain('onPointerDown={(e) => e.stopPropagation()}')
-  })
-
   it('maakt de voetnoot onder de grafiek zelf een knop naar dezelfde tabel', () => {
     expect(source).toContain('Open de jaar-op-jaar-tabel')
     // Niet langer alleen een verwijzing naar een knop elders in de kaart.

@@ -39,6 +39,8 @@ import { join } from 'node:path'
  */
 const PROGNOSE_OPPERVLAKKEN = [
   ['components', 'app', 'horizon', 'horizon-client.tsx'],
+  // De KPI-strip (fase 1 stap 5, ADR 0179).
+  ['components', 'toekomst', 'plan', 'plan-kpi-strip.tsx'],
   ['components', 'app', 'household-fire-section.tsx'],
   ['components', 'widgets', 'fire-prognose-widget.tsx'],
   ['components', 'overview', 'mini-networth-chart.tsx'],

@@ -49,9 +49,6 @@ describe('preset-batch onder een vast anker wacht niet op scrollen', () => {
     expect(effect.slice(c)).toContain('setSolvedRun({ fireAge: null, endAge: null })')
   })
 
-  it('de hero-drieslag krijgt de rekenstand: vast anker én nog geen batch-antwoord', () => {
-    expect(src).toContain('solvedPending={isFixedAnchorMode && solvedRun === null}')
-  })
 })
 
 describe('preset-batch draait op de geïnjecteerde profielrij (ADR 0103 × ADR 0129 D7)', () => {

@@ -126,13 +126,6 @@ describe('horizon-client — alle consumenten lezen hetzelfde vrijheids-%', () =
     expect(source).toMatch(/const heroFreedomState = \{\s*\r?\n\s*freedomPct: effectiveFreedomPct,/)
   })
 
-  it('de vulling van de voortgangsbalk', () => {
-    // Een ratio (klasse R, ADR 0093) deflateert nooit — dus geen `view*`-variant hier.
-    expect(source).toMatch(
-      /width: `\$\{hasPerspectiveHero \? Math\.max\(Math\.min\(perspectiveHero!\.freedomPercentage, 100\), 0\) : effectiveFreedomPct\}%`/,
-    )
-  })
-
   it('de persoonlijke hero-projectie die de overlay/kassabon voedt', () => {
     expect(source).toMatch(/freedomPercentage: effectiveFreedomPct,/)
   })

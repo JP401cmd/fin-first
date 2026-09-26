@@ -159,40 +159,6 @@ describe('horizon-client.tsx — euro-weergave-render-grens (T4)', () => {
     expect(src).not.toMatch(/deflate\(vermogenOpAnker, aowFactor/)
   })
 
-  it('zet het balk-label in de actieve euro-weergave, gelijk aan de Doelbedrag-KPI', () => {
-    // Given een gebruiker met een nominaal FIRE-doel van € 200.032, When hij de
-    // euro-weergave op "huidige euro's" zet, Then toont het label rechts van de
-    // voortgangsbalk hetzelfde bedrag als de Doelbedrag-KPI erboven
-    // ("ca. € 180.000 — volledige vrijheid") en niet meer het nominale bedrag.
-    // Eigenaar-besluit 27-08-2026: twee bedragen voor hetzelfde doel op één
-    // scherm leest als een fout, ook al was de eerdere nominale keuze (label =
-    // noemer van de balk-fill) intern verdedigbaar.
-    const src = readFileSync(SOURCE_PATH, 'utf8')
-    // De VULLING blijft op `effectiveFreedomPct` — een ratio (klasse R)
-    // deflateert nooit; alleen de euro-weergave van het label wisselt mee.
-    expect(src).toMatch(/width: `\$\{hasPerspectiveHero \? [^`]*effectiveFreedomPct\}%`/)
-    // Het label leest de view*-waarden — dezelfde variabelen als de KPI, dus
-    // per constructie hetzelfde bedrag.
-    expect(src).toMatch(/formatMaskedApproxCurrency\(viewBalkVrijheidDoel, masked\)\} — volledige vrijheid/)
-    // ADR 0129 D5/D8 — onder een VAST anker meet de balk dekking (tijd), geen kapitaal:
-    // het label noemt het einde van het plan en draagt géén bedrag meer (dus ook geen
-    // nominale terugval). De vroegere "— vermogen op AOW"-variant is daarmee weg.
-    expect(src).toMatch(/isFixedAnchorMode\s*\?\s*\(simResult != null\s*\?\s*`tot je \$\{Math\.round\(simResult\.displayEndAge\)\}e — einde van je plan`/)
-    expect(src).not.toMatch(/— vermogen op AOW/)
-    // …en de nominale variant is wég. Een terugval hierop is onzichtbaar: het
-    // bedrag blijft plausibel, alleen te hoog.
-    expect(src).not.toMatch(/formatMaskedCurrency\(balkVrijheidDoel, masked\)/)
-    expect(src).not.toMatch(/formatMaskedCurrency\(vermogenOpAnker \?\? 0, masked\)/)
-    // De euro-view-uitzondering op deze plek is vervallen met het besluit; laat
-    // hem niet stil terugkeren (dat zou de oude conventie heropenen).
-    expect(src).not.toMatch(/euro-view: exempt — hoort bij de nominale freedomPct-noemer/)
-    // De KPI-tegel "benodigd" deflateerde al en blijft ongewijzigd — dit is de
-    // waarde waaraan het label is gelijkgetrokken.
-    // ADR 0129 F3b: de tegel toont onder ÉLK vast anker het geprojecteerde (gedeflateerde)
-    // vermogen op het stopmoment — de sleutel is het anker, niet de pensioen-label.
-    expect(src).toMatch(/isFixedAnchorMode \? \(viewVermogenOpAnker \?\? 0\) : viewBalkVrijheidDoel/)
-  })
-
   it('deflateert het balk-doelbedrag via de canonieke route — € 200.032 nominaal wordt ca. € 180.000', () => {
     // Given de kernelrijen van het eigenaarsprofiel (FIRE-moment zes jaar
     // vooruit, ~2% inflatie ⇒ deflator 1,126), When de euro-weergave op 'real'

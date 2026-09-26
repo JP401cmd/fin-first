@@ -80,12 +80,6 @@ describe('het kernantwoord loopt via resolveHeroFireAge', () => {
     expect(src).not.toContain('nuStoppenRunway: nuStoppenRunway,')
   })
 
-  it('de drieslag (D7) rendert uit heroFireAge.anker — consume-only', () => {
-    const src = bron()
-    expect(src).toContain('<AnkerDrieslag')
-    expect(src).toContain('anker={heroFireAge.anker}')
-    expect(src).toContain('solvedFireEndAge={solvedRun?.endAge ?? null}')
-  })
 })
 
 describe('planningMode blijft tweewaardig en volgt het anker (D6/B11)', () => {
@@ -194,12 +188,6 @@ describe('doelbedrag (D4) en opnamerate (bevinding 6)', () => {
 
   it('de vrijheidsleeftijd-tegel valt niet om op de anker-guard (eigen uitzondering op isFixedAnchorMode)', () => {
     expect(bron()).toMatch(/const showFireAgeNotice =[\s\S]{0,400}?!isFixedAnchorMode &&/)
-  })
-
-  it('KPI 2 heet onder een vast anker "Vermogen op je stopmoment" en KPI 3 (opnamerate) verdwijnt', () => {
-    const src = bron()
-    expect(src).toContain("isFixedAnchorMode ? 'Vermogen op je stopmoment' : 'Doelbedrag'")
-    expect(src.match(/!\(isFixedAnchorMode && !hasPerspectiveHero\) && \(/g)?.length).toBe(2)
   })
 
   it('de doelbedrag-bon heeft onder een vast anker geen "Benodigd"-totaalregel', () => {
