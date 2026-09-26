@@ -164,14 +164,19 @@ export async function OverzichtSecondaryLoader({
 
   // Wekelijkse briefing — verrijkte engine (finance-bronnen) + snapshot.
   // In huishoud-/partnerweergave compose't de briefing met de perspectief-
-  // inkomsten/-uitgaven.
+  // inkomsten/-uitgaven, en ZONDER het gezondheidsverloop: dat is persoonlijk,
+  // terwijl de score daar het perspectief-getal is — "sinds vorige maand" zou
+  // twee grootheden vergelijken.
   const briefingDashboardData = perspectiveOverride
     ? {
         ...dashboardData,
         monthlyIncome: perspectiveOverride.monthlyIncome,
         monthlyExpenses: perspectiveOverride.monthlyExpenses,
+        healthVerloop: undefined,
       }
-    : dashboardData
+    : perspective === 'personal'
+      ? dashboardData
+      : { ...dashboardData, healthVerloop: undefined }
   const composedBriefing = composeOverviewBriefing(
     briefingDashboardData,
     finData,

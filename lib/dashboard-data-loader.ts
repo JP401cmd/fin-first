@@ -182,6 +182,7 @@ import { transactionAnnualIncome } from '@/lib/budget-realized'
 import { buildHealthScoreInput, type HealthScoreTransaction } from '@/lib/health-score-input'
 import type { SpendingTxRow } from '@/lib/budget-spending'
 import { computeHealthScoreWithTrend, type HealthScore } from '@/lib/financial-health'
+import { deriveHealthVerloop } from '@/lib/health-verloop'
 
 /**
  * Filter out own-account transfers from income/expense calculations.
@@ -2998,6 +2999,8 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     recurringTransactions: vasteLastenSummary.count,
     lifeEvents: (eventsResult.data ?? []).length,
     netWorthHistory,
+    // Zelfde maandstanden als netWorthHistory — geen extra query.
+    healthVerloop: deriveHealthVerloop(snapshotRows),
     savingsHistory,
     expenseHistory,
     budgetTypeHistory,

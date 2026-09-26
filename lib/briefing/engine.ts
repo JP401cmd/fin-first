@@ -192,8 +192,16 @@ export interface BriefingEngineInput {
   recommendations: Recommendation[]
   /** Levensgebeurtenissen uit horizonData. */
   events: LifeEvent[]
-  /** Gezondheidsscore uit horizonData (inclusief pillars + trend). */
+  /** Gezondheidsscore uit horizonData (canoniek, trendloos: `trend` is 0). */
   health: HealthScore | null
+  /**
+   * Verandering van het gezondheidsgetal sinds vorige maand, in hele punten —
+   * `healthScoreSinceLastMonth` (lib/health-verloop.ts), dezelfde bron als
+   * "sinds vorige maand" op de gezondheidskaart. `null`/afwezig = geen
+   * vergelijking (geen stand, andere rekenmethode, onbekend oordeel of een
+   * huishoud-/partnerblik). Voedt de mijlpaal "score steeg met X punten".
+   */
+  healthSinceLastMonth?: number | null
   /** Doelen + bijbehorende voortgang. Indices moeten parallel zijn. */
   goalNames: string[]
   goalProgresses: GoalProgressInput[]
@@ -340,11 +348,11 @@ export function buildBriefingEntries(input: BriefingEngineInput): BriefingEntry[
         href: '/toekomst/doelen',
       })
     }
-  } else if (input.health && input.health.trend >= 5) {
+  } else if (input.healthSinceLastMonth != null && input.healthSinceLastMonth >= 5) {
     entries.push({
       id: 'milestone:score-trend',
       category: 'milestone',
-      text: `Je gezondheidsscore steeg met ${Math.round(input.health.trend)} punten deze maand.`,
+      text: `Je gezondheidsscore steeg met ${Math.round(input.healthSinceLastMonth)} punten deze maand.`,
       href: '/overzicht',
     })
   }

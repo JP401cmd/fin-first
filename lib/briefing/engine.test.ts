@@ -157,10 +157,13 @@ describe('buildBriefingEntries — milestone', () => {
     expect(milestone?.href).toBe('/toekomst/doelen')
   })
 
-  it('valt terug op score-trend >= 5 wanneer geen behaald doel', () => {
+  it('Given een stijging van 6 punten sinds vorige maand en geen behaald doel, When de briefing wordt gebouwd, Then de mijlpaal "steeg met 6 punten"', () => {
     const result = buildBriefingEntries(
       emptyInput({
-        health: makeHealth({ trend: 6 }),
+        // De canonieke score is trendloos (trend 0); de stijging komt uit
+        // healthScoreSinceLastMonth, dezelfde bron als de gezondheidskaart.
+        health: makeHealth({ trend: 0, previousMonth: null }),
+        healthSinceLastMonth: 6,
         goalProgresses: [{ current: 10, target: 100, pct: 10, onTrack: false, eta: null }],
         goalNames: ['onafgeleid'],
       }),
@@ -170,10 +173,21 @@ describe('buildBriefingEntries — milestone', () => {
     expect(milestone?.text).toContain('6 punten')
   })
 
-  it('geen milestone bij trend < 5 en geen behaald doel', () => {
+  it('Given een stijging kleiner dan 5 punten, When de briefing wordt gebouwd, Then geen mijlpaal', () => {
     const result = buildBriefingEntries(
       emptyInput({
-        health: makeHealth({ trend: 2 }),
+        health: makeHealth({ trend: 0 }),
+        healthSinceLastMonth: 2,
+      }),
+    )
+    expect(result.find((e) => e.category === 'milestone')).toBeUndefined()
+  })
+
+  it('Given geen vergelijking (null), When de briefing wordt gebouwd, Then geen mijlpaal — ook niet uit health.trend', () => {
+    const result = buildBriefingEntries(
+      emptyInput({
+        health: makeHealth({ trend: 9 }),
+        healthSinceLastMonth: null,
       }),
     )
     expect(result.find((e) => e.category === 'milestone')).toBeUndefined()
@@ -182,7 +196,8 @@ describe('buildBriefingEntries — milestone', () => {
   it('behaald doel wint van score-trend', () => {
     const result = buildBriefingEntries(
       emptyInput({
-        health: makeHealth({ trend: 10 }),
+        health: makeHealth({ trend: 0 }),
+        healthSinceLastMonth: 10,
         goalNames: ['Doel A'],
         goalProgresses: [{ current: 100, target: 100, pct: 100, onTrack: true, eta: null }],
       }),

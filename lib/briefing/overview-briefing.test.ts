@@ -433,3 +433,51 @@ describe('sanitizeAiHeadline', () => {
     expect(sanitizeAiHeadline('x'.repeat(200))).toBeNull()
   })
 })
+
+describe('buildOverviewBriefingInput — "sinds vorige maand" uit dezelfde helper als de kaart', () => {
+  const health = { total: 64, label: 'Sterk', pillars: [], previousMonth: null, trend: 0 }
+  const vorigeMaand = () => {
+    const d = new Date()
+    const vm = new Date(d.getFullYear(), d.getMonth() - 1, 15)
+    return `${vm.getFullYear()}-${String(vm.getMonth() + 1).padStart(2, '0')}-15`
+  }
+  const punt = (score: number, version = 2) => ({
+    snapshot_date: vorigeMaand(),
+    resilience_score: score,
+    score_version: version,
+    fire_age: null,
+    engine_bron: null,
+  })
+
+  it('Given een opgeslagen stand vorige maand met dezelfde versie, When de input wordt gebouwd, Then healthSinceLastMonth = live − vorige maand', () => {
+    const input = buildOverviewBriefingInput(
+      makeDashboard({ healthVerloop: [punt(58)] }),
+      makeWill(),
+      makeHorizon({ healthScore: health }),
+    )
+    expect(input.healthSinceLastMonth).toBe(6)
+  })
+
+  it('Given een andere score_version vorige maand, When de input wordt gebouwd, Then geen vergelijking', () => {
+    const input = buildOverviewBriefingInput(
+      makeDashboard({ healthVerloop: [punt(58, 1)] }),
+      makeWill(),
+      makeHorizon({ healthScore: health }),
+    )
+    expect(input.healthSinceLastMonth).toBeNull()
+  })
+
+  it('Given geen verloop in de bundel (bv. huishoudblik), When de input wordt gebouwd, Then geen vergelijking', () => {
+    const input = buildOverviewBriefingInput(makeDashboard(), makeWill(), makeHorizon({ healthScore: health }))
+    expect(input.healthSinceLastMonth).toBeNull()
+  })
+
+  it('Given een onbekend oordeel, When de input wordt gebouwd, Then geen vergelijking', () => {
+    const input = buildOverviewBriefingInput(
+      makeDashboard({ healthVerloop: [punt(58)] }),
+      makeWill(),
+      makeHorizon({ healthScore: { ...health, onbekend: { hint: 'x', actie: { label: 'y', href: '/z' }, pijlers: [] } } }),
+    )
+    expect(input.healthSinceLastMonth).toBeNull()
+  })
+})
