@@ -68,8 +68,10 @@ export const TOEK_FLOW: UatFlow = {
     { id: 'opeetrente', scenarioId: 'UAT-TOEK-55', label: 'WF-TOEK-55 · Bijgeschreven rente zichtbaar, geen-maandlast-toelichting', kind: 'action', stage: 2, lane: 'aflezen', subOf: 'opeetopname' },
 
     // ── 2 · navigeren & delen ─────────────────────────────────────────────
-    { id: 'navkaarten', scenarioId: 'UAT-TOEK-28', label: 'WF-TOEK-28 · Navigatiekaarten (drilldown)', kind: 'screen', stage: 2, lane: 'navigeren' },
-    { id: 'deeplinks', scenarioId: 'UAT-TOEK-30', label: 'WF-TOEK-30 · Deeplinks & legacy-routes', kind: 'screen', stage: 2, lane: 'navigeren', subOf: 'navkaarten' },
+    // ADR 0179 fase 1 — de vier navkaarten zijn vervangen door de katern-koppen
+    // Plan · Doelen · Instellingen onder het gedeelde canvas.
+    { id: 'katernkoppen', scenarioId: 'UAT-TOEK-28', label: 'WF-TOEK-28 · Katern-koppen (Plan · Doelen · Instellingen)', kind: 'screen', stage: 2, lane: 'navigeren' },
+    { id: 'deeplinks', scenarioId: 'UAT-TOEK-30', label: 'WF-TOEK-30 · Deeplinks & legacy-routes', kind: 'screen', stage: 2, lane: 'navigeren', subOf: 'katernkoppen' },
     { id: 'delen', scenarioId: 'UAT-TOEK-29', label: 'WF-TOEK-29 · Delen / afdrukken (PDF)', kind: 'action', stage: 2, lane: 'navigeren' },
 
     // ── 3 · simuleren (niet-persistent over de grafiek) ───────────────────
@@ -103,6 +105,9 @@ export const TOEK_FLOW: UatFlow = {
     { id: 'downsizebeslis', label: 'Meetellen / uitsluiten / verkopen?', kind: 'decision', stage: 4, lane: 'strategie', subOf: 'huisstrat' },
 
     // ── 4 · de toekomst configureren · voorkeuren ─────────────────────────
+    // ADR 0179 fase 1 — katern Instellingen (/toekomst/instellingen) bundelt de
+    // wizard-ingang, Voorkeuren en Gebeurtenissen op één route.
+    { id: 'instellingen', scenarioId: 'UAT-TOEK-59', label: 'WF-TOEK-59 · Katern Instellingen (wizard-ingang · Voorkeuren · Gebeurtenissen)', kind: 'screen', stage: 4, lane: 'voorkeuren' },
     { id: 'eindstrat', scenarioId: 'UAT-TOEK-24', label: 'WF-TOEK-24 · Plan (stop × eind-vorm) / onttrekkingsstrategie', kind: 'screen', stage: 4, lane: 'voorkeuren' },
     // ADR 0149 — hoofdinstelling naast de rest van de Eindstrategie-kaart; ook
     // als detailregel + vergelijking in de plan-review-stap "Je plan" (WF-TOEK-44).
@@ -178,8 +183,10 @@ export const TOEK_FLOW: UatFlow = {
     { from: 'tijdas', to: 'verdieping' },
 
     // hub → navigeren & delen
-    { from: 'tijdas', to: 'navkaarten' },
-    { from: 'navkaarten', to: 'deeplinks' },
+    { from: 'tijdas', to: 'katernkoppen' },
+    { from: 'katernkoppen', to: 'deeplinks' },
+    { from: 'katernkoppen', to: 'instellingen', kind: 'branch', label: 'Instellingen' },
+    { from: 'deeplinks', to: 'instellingen', label: 'oude /toekomst/voorkeuren|gebeurtenissen, ?tab=, ?modal=' },
     { from: 'tijdas', to: 'delen' },
 
     // hub → simuleren
@@ -194,16 +201,16 @@ export const TOEK_FLOW: UatFlow = {
     { from: 'aowbeslis', to: 'aowstop', kind: 'branch', label: 'ja: doorwerken tot AOW' },
     { from: 'sliders', to: 'x-reken', kind: 'cross', label: 'levensgebeurtenis-export → Rekenhulp (zelfde horizon-kernel)' },
 
-    // hub/navkaarten → gebeurtenissen
+    // hub/katern Instellingen → gebeurtenissen
     { from: 'tijdas', to: 'eventadd' },
     { from: 'eventadd', to: 'eventedit' },
     { from: 'eventadd', to: 'eventdrag' },
     { from: 'eventadd', to: 'risicoevents' },
-    { from: 'navkaarten', to: 'eventpagina', kind: 'branch', label: 'Gebeurtenissen' },
+    { from: 'instellingen', to: 'eventpagina', kind: 'branch', label: '#gebeurtenissen' },
     { from: 'eventpagina', to: 'tekortbeslis' },
     { from: 'tekortbeslis', to: 'x-reken', kind: 'cross', label: 'ja: tekort-lening (kernel)' },
 
-    // navkaarten → configureren (Voorkeuren / Doelen), strategie via markers/hub
+    // katern-koppen → configureren (Instellingen / Doelen), strategie via markers/hub
     { from: 'tijdas', to: 'strategiebeslis' },
     { from: 'strategiebeslis', to: 'aowstrat', kind: 'branch', label: 'AOW' },
     { from: 'strategiebeslis', to: 'pensioenstrat', kind: 'branch', label: 'pensioen' },
@@ -213,16 +220,16 @@ export const TOEK_FLOW: UatFlow = {
     // De woonstrategie bepaalt de grondslag van de PRIMAIRE vermogenslijn
     // (ADR 0114 D1) — de keuze wordt hier gemaakt, op de grafiek afgelezen.
     { from: 'huisstrat', to: 'grondslaglijn', kind: 'branch', label: 'grondslag hoofdlijn (I of J)' },
-    { from: 'navkaarten', to: 'eindstrat', kind: 'branch', label: 'Voorkeuren' },
+    { from: 'instellingen', to: 'eindstrat', kind: 'branch', label: '#voorkeuren' },
     { from: 'eindstrat', to: 'potregels' },
     { from: 'eindstrat', to: 'marktaannames' },
     { from: 'eindstrat', to: 'geentekortlening' },
     { from: 'geentekortlening', to: 'planreview', label: 'zelfde plan-contract, ook als wizard-detailregel' },
-    { from: 'navkaarten', to: 'planreview', kind: 'branch', label: 'Je plan (niet voltooid)' },
+    { from: 'instellingen', to: 'planreview', kind: 'branch', label: 'wizard-ingang' },
     { from: 'planreview', to: 'planreviewlaag2', kind: 'branch', label: 'Voor wie wil (inline, geen markering)' },
     { from: 'planreviewlaag2', to: 'fire' },
     { from: 'planreview', to: 'fire' },
-    { from: 'navkaarten', to: 'doelen', kind: 'branch', label: 'Doelen' },
+    { from: 'katernkoppen', to: 'doelen', kind: 'branch', label: 'Doelen' },
     { from: 'doelen', to: 'doelvoortgang' },
     { from: 'doelen', to: 'doelpace' },
     { from: 'doelen', to: 'doelkoppelen' },

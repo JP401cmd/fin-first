@@ -21,8 +21,9 @@
  * routing-/config-functies (`deriveTabFromPath`, `resolveRouteTitle`,
  * `next.config.ts#redirects`, `SIMPLE_HIDDEN_NAV_HREFS`, `buildActionItems`,
  * `STACK_DEPTH_LIMIT`, `euroViewLabel`) — allemaal de daadwerkelijke
- * productiefuncties, op één na: `resolveTabRedirect` leeft in een Server
- * Component met server-only imports en wordt daarom gemirrord (zie
+ * productiefuncties. De oude `/toekomst`-deeplinks (WF-NAV-15) zijn sinds
+ * ADR 0179 `has`-regels in `next.config.ts`; die regels worden rechtstreeks
+ * gelezen, alleen Next' keuze "eerste passende regel" is gemirrord (zie
  * nav-checks.ts). Één criterium (status-dots) is 'consistency' (A=B tussen
  * dot en landingskaart, geen eigen formule).
  *
@@ -178,7 +179,7 @@ const criteria: AcceptanceCriterion[] = [
     scenarioId: 'UAT-NAV-10',
     titel: 'Weergavemodus Eenvoudig ↔ Volledig en doorwerking op navigatie en pagina\'s',
     kriticiteit: 'BELANGRIJK',
-    given: '`SIMPLE_HIDDEN_NAV_HREFS` = [\'/toekomst/rekenhulp\'] (sinds 14 sep 2026, ADR 0144: /toekomst/whatif bestaat niet meer als eigen route — de pagina is vervallen en /toekomst/whatif is nu een kale redirect naar /toekomst?whatif=open, dus er is niets meer te verbergen). De modus is sinds fase 1 van de eenvoudige weergave op TWEE plekken te zetten: het keuzeblok bovenaan /mijn/uiterlijk (`DisplayModePicker`, APP-1) en de ⌘K-actie "action:toggle-display-mode" — beide schrijven via hetzelfde `PUT /api/display-mode`.',
+    given: '`SIMPLE_HIDDEN_NAV_HREFS` = [\'/toekomst/rekenhulp\'] (sinds 14 sep 2026, ADR 0144: /toekomst/whatif bestaat niet meer als eigen route — de pagina is vervallen en /toekomst/whatif is een kale redirect, sinds ADR 0179 rechtstreeks naar katern /toekomst/doelen, dus er is niets meer te verbergen). De Toekomst-subitems in de nav zijn sinds ADR 0179 Doelen · Instellingen · Rekenhulp (Gebeurtenissen en Voorkeuren gingen op in Instellingen); alleen Rekenhulp valt in Eenvoudig weg. De modus is sinds fase 1 van de eenvoudige weergave op TWEE plekken te zetten: het keuzeblok bovenaan /mijn/uiterlijk (`DisplayModePicker`, APP-1) en de ⌘K-actie "action:toggle-display-mode" — beide schrijven via hetzelfde `PUT /api/display-mode`.',
     when: 'De sidebar/nav-sheet/⌘K filteren hun menu-items op deze lijst in Eenvoudige weergave.',
     then: '/toekomst/rekenhulp zit in de verberg-lijst (wordt overal uit de menu-ingangen gefilterd); een niet-gelijste route (bv. /toekomst/doelen) blijft zichtbaar. Direct navigeren naar de URL blijft mogelijk (alleen de menu-ingang is gefilterd). De ⌘K-omschrijving luidt "Meer/minder detail op elke pagina" — niet meer "Diepte-secties standaard tonen of inklappen" (dat gedrag bestaat niet; APP-3). Sinds fase 4 reduceert Eenvoudig de navigatie zelf ook: de nav-sheet klapt alleen de sub-items van de ACTIEVE hoofdpagina uit (NAV-2 — de rest blijft één regel; de desktop-sidebar deed dit structureel al), en naast "Het Overzicht" in de sidebar verdwijnt de netto-vermogen-badge (NAV-5 — een cijfer zonder context dat op de pagina zelf al staat). In Volledig blijven beide ongewijzigd.',
     assertion: {
@@ -232,13 +233,13 @@ const criteria: AcceptanceCriterion[] = [
     scenarioId: 'UAT-NAV-15',
     titel: 'Oude ?tab=-deeplinks op /toekomst',
     kriticiteit: 'OVERIG',
-    given: 'Query-params `{tab: "gebeurtenissen", strategie: "aow"}`, `{strategie: "open"}` (geen tab), `{tab: "onzin"}`.',
-    when: '`resolveTabRedirect` bepaalt het redirect-doel.',
-    then: 'Met tab=gebeurtenissen + een geldige `?strategie=`-sleutel: redirect naar /toekomst/voorkeuren?strategie=aow (overige parameters behouden) — sinds 17 sep 2026 wonen de vier levensstrategieën op Voorkeuren, niet meer op Gebeurtenissen. Zonder tab-param of met een onbekende tab-waarde: geen redirect (null).',
+    given: 'Oude deeplinks op exact /toekomst (widgets, Fin-acties, briefing-mails, gedeelde links): `?tab=gebeurtenissen&strategie=aow`, `?tab=gebeurtenissen&strategie=aowx`, `?tab=gebeurtenissen`, `?tab=voorkeuren`, `?tab=doelen`, `?tab=rekenhulp`, `?whatif=open`, `?strategie=open`, `?modal=strategie`, `?modal=withdrawal`, `?tab=onzin` en een kale /toekomst.',
+    when: 'Next kiest in `next.config.ts#redirects` de eerste regel voor /toekomst waarvan elke `has`-queryvoorwaarde klopt (sinds ADR 0179 fase 1 op de routing-laag; de render-tijd-guard `resolveTabRedirect` in de oude toekomst-page is vervallen).',
+    then: 'Het doel volgt de drie katernen van ADR 0179. `?tab=gebeurtenissen` met een levensstrategie-sleutel (aow|pensioen|huis|werk) → /toekomst/instellingen (die strategieën wonen in het Voorkeuren-deel, dus geen hash); met een andere sleutel of zonder → /toekomst/instellingen#gebeurtenissen (de gerichte regel staat bewust vóór de algemene, en het `(?:…)`-anker laat "aowx" niet matchen). `?tab=voorkeuren` → /toekomst/instellingen, `?tab=doelen` en `?whatif=open` → /toekomst/doelen (het doelscenario-lab woont in katern Doelen), `?tab=rekenhulp` → /toekomst/rekenhulp. `?strategie=open` en `?modal=strategie` → /toekomst/instellingen?regel=eindstrategie, `?modal=withdrawal` → /toekomst/instellingen?regel=onttrekkingsstrategie (de Strategieën- en Withdrawal-modals op de tijdas bestaan niet meer). Een onbekende tab-waarde of een kale /toekomst: geen regel, katern Plan rendert. Next laat de meegegeven query ongewijzigd meereizen naar het doel (dus `tab=` blijft in de URL staan; geen doelpagina leest hem en er is geen lus, want elke regel matcht alleen exact /toekomst) — die samenvoeging is live te zien, de check toetst welke regel wint.',
     assertion: {
       kind: 'exact',
-      expected: 'metTab=/toekomst/voorkeuren?strategie=aow; zonderTab=null; onbekendeTab=null',
-      source: 'app/(app)/toekomst/page.tsx#resolveTabRedirect (gemirrord — de server-page importeert next/navigation + @/lib/supabase/server en is dus niet client-bundelbaar; spiegelt hoe redirect-guard.test.ts diezelfde afhankelijkheden wegmockt) — zie nav-checks.ts',
+      expected: 'tabGebeurtenissenStrategie=/toekomst/instellingen; tabGebeurtenissenOnbekendeStrategie=/toekomst/instellingen#gebeurtenissen; tabGebeurtenissen=/toekomst/instellingen#gebeurtenissen; tabVoorkeuren=/toekomst/instellingen; tabDoelen=/toekomst/doelen; tabRekenhulp=/toekomst/rekenhulp; whatifOpen=/toekomst/doelen; strategieOpen=/toekomst/instellingen?regel=eindstrategie; modalStrategie=/toekomst/instellingen?regel=eindstrategie; modalWithdrawal=/toekomst/instellingen?regel=onttrekkingsstrategie; onbekendeTab=null; zonderQuery=null',
+      source: 'next.config.ts#redirects (de `has`-regels voor /toekomst, rechtstreeks gelezen — geen herimplementatie); alleen Next\' keuze "eerste passende regel, `^${value}$`" is gemirrord in nav-checks.ts#eersteRedirectDoel',
     },
   },
   {
@@ -248,7 +249,7 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'OVERIG',
     given: 'De redirect-lijst in `next.config.ts`.',
     when: '`nextConfig.redirects()` wordt aangeroepen.',
-    then: '/core → /overzicht, /horizon → /toekomst, /identity → /mijn, /will → /overzicht, /core/budgets → /overzicht/budget, /core/cash → /overzicht/bezittingen/cash (de rekeningen zijn sinds ADR 0135 een bezitgroep, niet de budgetpagina), de vijf ADR 0135-redirects /overzicht/cashflow{,/budget,/transacties,/vaste-lasten,/forecast} → hun nieuwe plek (de hub zelf staat bewust als laatste: Next matcht exact, maar de volgorde is expliciet zodat herordenen opvalt), sinds 14 sep 2026 (ADR 0144) hebben /horizon/whatif ÉN /toekomst/whatif elk nog maar ÉÉN, ONVOORWAARDELIJKE redirect-regel naar /toekomst?whatif=open (de ?via=dreamgate-vertakking en de bijbehorende dream-gate-animatie zijn vervallen samen met de standalone Wat-Als-pagina, dus geen enkele aanroep rendert nog een eigen pagina) — de regel zelf geeft een meegegeven query gewoon door (Next voegt `?via=dreamgate` aan de bestemming toe, die zelf geen `?` draagt), dus die vertaalt naar `/toekomst?whatif=open&via=dreamgate`; een losse opschoonstap op de tijdas (`CONSUMED_DEEPLINK_PARAMS`, lib/horizon/deeplink-cleanup.ts) poetst `via` daarna uit de URL, /horizon/strategie → /toekomst?strategie=open, /horizon/uitgaven-na-pensioen en /toekomst/uitgaven-na-pensioen → /toekomst?uitgaven=open, /toekomst/strategie (twee takken: met/zonder ?focus=aow|pensioen|huis), /overzicht/acties → /overzicht/tips, en sinds UR3-26 /toekomst/samengestelde-interest → /toekomst/rekenhulp (én /horizon/samengestelde-interest rechtstreeks daarheen, geen keten) plus /core/checkin/historie → /mijn/checkins zitten allemaal in de lijst; een diepere legacy-subroute zonder regel (bv. /core/assets) heeft GEEN redirect-entry (blijft live backing-UI). /dashboard heeft sinds 1 sep 2026 (kiesbaar homescherm) bewust GEEN config-regel meer: de edge-middleware vertaalt hem naar het gekozen homescherm (profiles.home_screen); een statische regel zou die vertaling onbereikbaar maken.',
+    then: '/core → /overzicht, /horizon → /toekomst, /identity → /mijn, /will → /overzicht, /core/budgets → /overzicht/budget, /core/cash → /overzicht/bezittingen/cash (de rekeningen zijn sinds ADR 0135 een bezitgroep, niet de budgetpagina), de vijf ADR 0135-redirects /overzicht/cashflow{,/budget,/transacties,/vaste-lasten,/forecast} → hun nieuwe plek (de hub zelf staat bewust als laatste: Next matcht exact, maar de volgorde is expliciet zodat herordenen opvalt), /horizon/whatif ÉN /toekomst/whatif hebben elk één ONVOORWAARDELIJKE regel, sinds ADR 0179 (fase 1, 26 sep 2026) rechtstreeks naar katern Doelen /toekomst/doelen (daarvoor, sinds ADR 0144, naar /toekomst?whatif=open; een meegegeven `?via=dreamgate` reist mee en de opschoonstap `CONSUMED_DEEPLINK_PARAMS`, lib/horizon/deeplink-cleanup.ts, poetst hem weg), /horizon/strategie → /toekomst/instellingen?regel=eindstrategie, /horizon/uitgaven-na-pensioen en /toekomst/uitgaven-na-pensioen → /toekomst?uitgaven=open, /toekomst/strategie (twee takken: met ?focus=aow|pensioen|huis|werk → /toekomst/instellingen?strategie=:focus, zonder → …?strategie=aow), /identity/parameters → /toekomst/instellingen, de opgeheven subroutes /toekomst/voorkeuren → /toekomst/instellingen en /toekomst/gebeurtenissen → /toekomst/instellingen#gebeurtenissen, de negen `has`-regels op exact /toekomst voor de oude `?tab=`/`?whatif=open`/`?strategie=open`/`?modal=`-deeplinks (welke wint: WF-NAV-15), /overzicht/acties → /overzicht/tips, en sinds UR3-26 /toekomst/samengestelde-interest → /toekomst/rekenhulp (én /horizon/samengestelde-interest rechtstreeks daarheen, geen keten) plus /core/checkin/historie → /mijn/checkins zitten allemaal in de lijst; een diepere legacy-subroute zonder regel (bv. /core/assets) heeft GEEN redirect-entry (blijft live backing-UI). /dashboard heeft sinds 1 sep 2026 (kiesbaar homescherm) bewust GEEN config-regel meer: de edge-middleware vertaalt hem naar het gekozen homescherm (profiles.home_screen); een statische regel zou die vertaling onbereikbaar maken.',
     assertion: {
       kind: 'exact',
       // 24 = de eerdere 25 (16 + React #310-lichtingen, zie het redirect-blok
@@ -286,7 +287,11 @@ const criteria: AcceptanceCriterion[] = [
       // draagt; een destination met een eigen '?' zou de meegegeven parameters
       // stilzwijgend laten vallen. Dat is nu een assertie: de vijf
       // cashflow-regels bestaan én geen van hun bestemmingen draagt een query.
-      expected: 'aantalRedirects=32; coreNaarOverzicht=true; dashboardGeenConfigRedirect=true; coreAssetsGeenRedirect=true; cashflowRedirects=5; cashflowBestemmingZonderQuery=true',
+      // 30 -> 41 (26 sep 2026, ADR 0179 fase 1): +2 opgeheven subroutes
+      // (/toekomst/voorkeuren, /toekomst/gebeurtenissen), +5 `?tab=`-has-regels
+      // (vervangen de render-tijd-guard resolveTabRedirect), +1 `?whatif=open`,
+      // +1 `?modal=withdrawal`, +2 `?strategie=open`/`?modal=strategie`.
+      expected: 'aantalRedirects=41; coreNaarOverzicht=true; dashboardGeenConfigRedirect=true; coreAssetsGeenRedirect=true; cashflowRedirects=5; cashflowBestemmingZonderQuery=true',
       source: 'next.config.ts#redirects — échte productieconfiguratie, geen mirror; zie nav-checks.ts',
     },
   },

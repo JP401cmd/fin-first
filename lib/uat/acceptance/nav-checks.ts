@@ -8,15 +8,17 @@
  *     `assertEqual(actual, expected, label)` per check — deze draait in de
  *     browser, dus elke import hier moet client-bundelbaar zijn.
  *
- * De meeste checks roepen ÉCHTE productiefuncties/-constanten aan. TWEE
- * mirrors met bronregel-verwijzing (spiegelt de mirrors in eerdere zones):
- *  - `resolveTabRedirect` (app/(app)/toekomst/page.tsx) is een Server
- *    Component met server-only imports (`next/navigation`, `@/lib/supabase/server`,
- *    de volledige horizon-client-boom) — NIET veilig om in een client-
- *    bundelbare module te importeren (zie `redirect-guard.test.ts`, dat deze
- *    afhankelijkheden juist wegmockt om de page-import "licht" te houden —
- *    die truc bestaat niet in de browser-runtime van de regressiesuite).
- *    Hier daarom een 1-op-1-mirror van de pure logica.
+ * De meeste checks roepen ÉCHTE productiefuncties/-constanten aan. Drie
+ * kleine mirrors met bronverwijzing (spiegelt de mirrors in eerdere zones):
+ *  - Next' `has`-matching voor query-voorwaarden. Sinds ADR 0179 (fase 1,
+ *    26 sep 2026) staan de oude `/toekomst?tab=`/`?whatif=`/`?modal=`/
+ *    `?strategie=open`-deeplinks als `has`-regels in `next.config.ts`; de
+ *    render-tijd-guard `resolveTabRedirect` in de oude toekomst-page is weg.
+ *    De REGELS komen hier rechtstreeks uit `nextConfig.redirects()` — niets
+ *    wordt opnieuw geïmplementeerd; alleen de keuze "eerste regel voor dit pad
+ *    waarvan elke query-voorwaarde klopt" (Next: `^${value}$`, zonder `value`
+ *    volstaat aanwezigheid) is gemirrord, omdat Next' matcher geen publieke,
+ *    client-bundelbare functie is.
  *  - de FIFO-stack-trim (component-interne logica in nav-stack-provider.tsx,
  *    hier op de geëxporteerde `STACK_DEPTH_LIMIT`-constante toegepast)
  *  - de bel-badge-cap "9+" (components/app/shell/top-bar.tsx)
@@ -72,31 +74,34 @@ function capBadge(n: number): string {
   return n > 9 ? '9+' : n === 0 ? '' : String(n)
 }
 
-/** Mirror van `resolveTabRedirect` (app/(app)/toekomst/page.tsx r62-82) — zie
- *  de module-header voor waarom dit geen directe import kan zijn. Sinds
- *  17 sep 2026 wonen de vier levensstrategieën op Voorkeuren, niet meer op
- *  Gebeurtenissen: een `?tab=gebeurtenissen`-deeplink met een geldige
- *  `?strategie=`-sleutel wijkt daarom af naar 'voorkeuren' (spiegelt
- *  `isStrategieKey`, lib/horizon/strategie-route.ts). */
-const TAB_ROUTES_MIRROR = new Set(['doelen', 'gebeurtenissen', 'voorkeuren', 'rekenhulp'])
-const STRATEGIE_KEYS_MIRROR = new Set(['aow', 'pensioen', 'huis', 'werk'])
-function resolveTabRedirectMirror(sp: Record<string, string | string[] | undefined>): string | null {
-  const rawTab = sp.tab
-  const tab = Array.isArray(rawTab) ? rawTab[0] : rawTab
-  if (!tab || !TAB_ROUTES_MIRROR.has(tab)) return null
+type ConfigRedirect = Awaited<ReturnType<NonNullable<typeof nextConfig.redirects>>>[number]
 
-  const rest = new URLSearchParams()
-  for (const [key, value] of Object.entries(sp)) {
-    if (key === 'tab' || value === undefined) continue
-    if (Array.isArray(value)) {
-      for (const v of value) rest.append(key, v)
-    } else {
-      rest.append(key, value)
-    }
+/** Mirror van Next' redirect-keuze voor query-voorwaarden (zie module-header):
+ *  loopt de ÉCHTE regels uit next.config.ts in volgorde af en geeft de
+ *  `destination` van de eerste regel voor `pad` waarvan elke `has`-voorwaarde
+ *  klopt (en geen `missing`-voorwaarde). Next toetst een `value` als
+ *  `^${value}$`; zonder `value` volstaat aanwezigheid. De meegegeven query reist
+ *  in Next ongewijzigd mee naar het doel — die samenvoeging zit hier bewust
+ *  níét in: de check toetst welke regel wint, niet Next' query-merge.
+ *  `null` = geen regel, de pagina zelf rendert. */
+function eersteRedirectDoel(
+  redirects: ConfigRedirect[],
+  pad: string,
+  query: Record<string, string>,
+): string | null {
+  const klopt = (h: { type: string; key?: string; value?: string }): boolean => {
+    if (h.type !== 'query' || h.key == null) return false
+    const v = query[h.key]
+    if (v === undefined) return false
+    return h.value === undefined || new RegExp(`^${h.value}$`).test(v)
   }
-  const qs = rest.toString()
-  const doel = tab === 'gebeurtenissen' && STRATEGIE_KEYS_MIRROR.has(rest.get('strategie') ?? '') ? 'voorkeuren' : tab
-  return qs ? `/toekomst/${doel}?${qs}` : `/toekomst/${doel}`
+  for (const r of redirects) {
+    if (r.source !== pad) continue
+    if (!(r.has ?? []).every(klopt)) continue
+    if ((r.missing ?? []).some(klopt)) continue
+    return r.destination
+  }
+  return null
 }
 
 // ── Checks — één per 'exact'-workflow in NAV_ACCEPTANCE ────────────────────
@@ -232,15 +237,29 @@ export const NAV_ENGINE_CHECKS: NavEngineCheck[] = [
   {
     workflow: 'WF-NAV-15',
     scenarioId: 'UAT-NAV-15',
-    label: 'Oude ?tab=-deeplinks (resolveTabRedirect): bekende tab, geen tab, onbekende tab',
-    run: () => {
+    label: 'Oude /toekomst-deeplinks (has-regels in next.config.ts): ?tab=, ?whatif=open, ?modal=, ?strategie=open',
+    run: async () => {
       criterion('WF-NAV-15')
-      const metTab = resolveTabRedirectMirror({ tab: 'gebeurtenissen', strategie: 'aow' })
-      const zonderTab = resolveTabRedirectMirror({ strategie: 'open' })
-      const onbekendeTab = resolveTabRedirectMirror({ tab: 'onzin' })
+      const redirects = (await nextConfig.redirects?.()) ?? []
+      const doel = (query: Record<string, string>) => eersteRedirectDoel(redirects, '/toekomst', query)
+      const uitkomst = [
+        `tabGebeurtenissenStrategie=${doel({ tab: 'gebeurtenissen', strategie: 'aow' })}`,
+        `tabGebeurtenissenOnbekendeStrategie=${doel({ tab: 'gebeurtenissen', strategie: 'aowx' })}`,
+        `tabGebeurtenissen=${doel({ tab: 'gebeurtenissen' })}`,
+        `tabVoorkeuren=${doel({ tab: 'voorkeuren' })}`,
+        `tabDoelen=${doel({ tab: 'doelen' })}`,
+        `tabRekenhulp=${doel({ tab: 'rekenhulp' })}`,
+        `whatifOpen=${doel({ whatif: 'open' })}`,
+        `strategieOpen=${doel({ strategie: 'open' })}`,
+        `modalStrategie=${doel({ modal: 'strategie' })}`,
+        `modalWithdrawal=${doel({ modal: 'withdrawal' })}`,
+        `onbekendeTab=${doel({ tab: 'onzin' })}`,
+        `zonderQuery=${doel({})}`,
+      ].join('; ')
       return {
-        expected: 'metTab=/toekomst/voorkeuren?strategie=aow; zonderTab=null; onbekendeTab=null',
-        actual: `metTab=${metTab}; zonderTab=${zonderTab}; onbekendeTab=${onbekendeTab}`,
+        expected:
+          'tabGebeurtenissenStrategie=/toekomst/instellingen; tabGebeurtenissenOnbekendeStrategie=/toekomst/instellingen#gebeurtenissen; tabGebeurtenissen=/toekomst/instellingen#gebeurtenissen; tabVoorkeuren=/toekomst/instellingen; tabDoelen=/toekomst/doelen; tabRekenhulp=/toekomst/rekenhulp; whatifOpen=/toekomst/doelen; strategieOpen=/toekomst/instellingen?regel=eindstrategie; modalStrategie=/toekomst/instellingen?regel=eindstrategie; modalWithdrawal=/toekomst/instellingen?regel=onttrekkingsstrategie; onbekendeTab=null; zonderQuery=null',
+        actual: uitkomst,
       }
     },
   },
@@ -276,7 +295,16 @@ export const NAV_ENGINE_CHECKS: NavEngineCheck[] = [
         // De regel zelf geeft een meegegeven ?via=dreamgate gewoon door (geen
         // eigen '?' op de bestemming); een losse client-side opschoonstap
         // (lib/horizon/deeplink-cleanup.ts) haalt `via` daarna uit de URL.
-        expected: 'aantalRedirects=32; coreNaarOverzicht=true; dashboardGeenConfigRedirect=true; coreAssetsGeenRedirect=true; cashflowRedirects=5; cashflowBestemmingZonderQuery=true',
+        // 30 -> 41 (26 sep 2026, ADR 0179 fase 1 — /toekomst in drie katernen):
+        // +2 voor de opgeheven subroutes (/toekomst/voorkeuren -> /toekomst/
+        // instellingen, /toekomst/gebeurtenissen -> …#gebeurtenissen), +5 `has`-
+        // regels voor de oude `?tab=`-deeplinks (die de render-tijd-guard
+        // `resolveTabRedirect` vervangen), +1 `?whatif=open` -> /toekomst/doelen,
+        // +1 `?modal=withdrawal` en +2 `?strategie=open`/`?modal=strategie` ->
+        // /toekomst/instellingen?regel=…. De whatif-, strategie- en
+        // /identity/parameters-regels wijzen nu rechtstreeks naar het katern
+        // (geen extra regel). Welke regel wint, toetst WF-NAV-15.
+        expected: 'aantalRedirects=41; coreNaarOverzicht=true; dashboardGeenConfigRedirect=true; coreAssetsGeenRedirect=true; cashflowRedirects=5; cashflowBestemmingZonderQuery=true',
         actual: `aantalRedirects=${redirects.length}; coreNaarOverzicht=${coreNaarOverzicht}; dashboardGeenConfigRedirect=${dashboardGeenConfigRedirect}; coreAssetsGeenRedirect=${coreAssetsGeenRedirect}; cashflowRedirects=${cashflowRegels.length}; cashflowBestemmingZonderQuery=${cashflowBestemmingZonderQuery}`,
       }
     },

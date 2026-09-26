@@ -10,8 +10,9 @@
  *
  * NAV combineert échte routing-/configuratiefuncties (deriveTabFromPath,
  * resolveRouteTitle, filterPagesByModules, buildActionItems, SIMPLE_HIDDEN_NAV_HREFS,
- * next.config.ts-redirects) met twee kleine mirrors (resolveTabRedirect — de
- * server-page is niet client-bundelbaar — en de bel-badge-cap). Alle checks
+ * next.config.ts-redirects) met drie kleine mirrors (Next' keuze van de eerste
+ * passende `has`-regel over de échte next.config.ts-redirects, de FIFO-stack-trim
+ * en de bel-badge-cap). Alle checks
  * zijn pure functies — geen netwerk, geen auth-afhankelijkheid, vandaar
  * `requiredRole: 'any'`.
  */
