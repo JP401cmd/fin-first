@@ -70,6 +70,25 @@ export interface KaternMeldingActie {
   readonly href: string
 }
 
+/**
+ * "Bespreek met Fin" als vervolgactie (eigenaarsbesluit 26 sep): geen plek maar een
+ * gesprek. Het slot rendert `BesprekMetWillButton` — hetzelfde mechanisme als de vroegere
+ * `EindsituatieNotice` (chat `openWithMessage` met onderwerp, context en vraag). Data,
+ * geen callback: deze module blijft puur; de knop opent de chat zelf.
+ */
+export interface KaternMeldingFinActie {
+  readonly kind: 'fin'
+  /** Onderwerp van het gesprek (de titel van de melding). */
+  readonly onderwerp: string
+  /** Context die mee de chat in gaat — bewust zonder bedragen. */
+  readonly detail?: string
+  /** Vooraf ingevulde vraag; zonder valt de knop terug op zijn standaardvraag. */
+  readonly vraag?: string
+}
+
+/** De tweede vervolgactie: een andere plek, of een gesprek met Fin. */
+export type KaternMeldingTweedeActie = KaternMeldingActie | KaternMeldingFinActie
+
 export interface KaternMelding {
   /** Stabiele sleutel, uniek over alle katernen (React-key, tests). */
   readonly id: string
@@ -85,11 +104,12 @@ export interface KaternMelding {
   /** Eén vervolgactie naar één plek, of geen. */
   readonly actie: KaternMeldingActie | null
   /**
-   * Hoogstens één tweede vervolgactie, naar een ándere plek dan `actie` (spec §4.8:
-   * "Verken je opties →" naar Doelen; "Stopmoment →" naar Instellingen). Alleen naast
-   * een eerste actie; meer dan twee kan het model niet dragen.
+   * Hoogstens één tweede vervolgactie: een ándere plek dan `actie` (spec §4.8: "Verken
+   * je opties →" naar Doelen; "Stopmoment →" naar Instellingen), of een gesprek met Fin
+   * (tekort-lening, eindsituatie). Alleen naast een eerste actie; meer dan twee kan het
+   * model niet dragen.
    */
-  readonly tweedeActie?: KaternMeldingActie | null
+  readonly tweedeActie?: KaternMeldingTweedeActie | null
 }
 
 export interface KaternMeldingenVanKatern {
@@ -162,6 +182,12 @@ export interface KaternMeldingenInput {
   } | null
   /** Instellingen: de problemen die de outcome-guards op dit scherm meldden. */
   readonly ontbrekendeGegevens: readonly HorizonOutcomeIssue[]
+  /**
+   * Kan Fin hier antwoorden (AI-abonnement én een uitvoermodus voor 'gesprek', zoals de
+   * vroegere `EindsituatieNotice` toetste)? Dan krijgen tekort-lening en eindsituatie
+   * "Bespreek met Fin" als tweede actie. Afwezig = nee.
+   */
+  readonly finBeschikbaar?: boolean
 }
 
 // ── Kopij zonder eigen module ────────────────────────────────────────────────
@@ -326,30 +352,43 @@ function nuAlGenoegMelding(p: PlanSignaal): KaternMelding | null {
   }
 }
 
-function tekortLeningMelding(t: NonNullable<KaternMeldingenInput['tekortLening']>): KaternMelding {
+function tekortLeningMelding(
+  t: NonNullable<KaternMeldingenInput['tekortLening']>,
+  finBeschikbaar: boolean,
+): KaternMelding {
   const vanaf = Math.floor(t.notice.firstAge)
   const tot = t.notice.clearedAge != null && Number.isFinite(t.notice.clearedAge) ? Math.floor(t.notice.clearedAge) : null
   const c = t.copy
+  const titel = KATERN_MELDING_KOPIJ.tekortLeningTitel(vanaf, tot)
+  const zinnen = (delen: readonly (string | null | undefined)[]) => delen.filter((z): z is string => !!z).join(' ')
   return {
     id: 'plan-tekort-lening',
     katern: 'plan',
     ernst: 'warn',
-    titel: KATERN_MELDING_KOPIJ.tekortLeningTitel(vanaf, tot),
+    titel,
     kort: KATERN_MELDING_KOPIJ.tekortLeningKort,
-    uitleg: [c.waarom, c.woning, c.piek, c.instelling].filter((z): z is string => !!z).join(' '),
+    uitleg: zinnen([c.waarom, c.woning, c.piek, c.instelling]),
     actie: { label: KATERN_MELDING_KOPIJ.tekortLeningActie, href: instellingenRegelHref('eindstrategie') },
+    // Fin krijgt de uitleg zonder de piekzin: net als bij de eindsituatie gaat er geen
+    // bedrag mee de vraag in. Geen eigen vraag — de oude melding had er geen; de knop
+    // valt terug op zijn standaardvraag.
+    tweedeActie: finBeschikbaar ? { kind: 'fin', onderwerp: titel, detail: zinnen([c.waarom, c.woning, c.instelling]) } : null,
   }
 }
 
-function eindsituatieMelding(c: EindsituatieCopy): KaternMelding {
+function eindsituatieMelding(c: EindsituatieCopy, finBeschikbaar: boolean): KaternMelding {
+  // Zoals de vroegere `EindsituatieNotice`: Fin alleen als er niet één oorzaak aan te
+  // wijzen is (`onduidelijk`), met die zin erbij, en de vaste vraag + context uit de copy.
+  const fin = finBeschikbaar && c.onduidelijk != null
   return {
     id: 'plan-eindsituatie',
     katern: 'plan',
     ernst: 'neutral',
     titel: c.kop,
     kort: c.kop,
-    uitleg: c.samenvatting,
+    uitleg: fin ? `${c.samenvatting} ${c.onduidelijk}` : c.samenvatting,
     actie: { label: zonderPijl(EINDSITUATIE_INSTELLING_LABEL), href: EINDSITUATIE_INSTELLING_HREF },
+    tweedeActie: fin ? { kind: 'fin', onderwerp: c.kop, detail: c.finContext, vraag: c.finVraag } : null,
   }
 }
 
@@ -463,8 +502,9 @@ export function wijsMeldingenToe(input: KaternMeldingenInput): KaternMeldingen {
     push(planMelding(input.plan, input.masked))
     push(nuAlGenoegMelding(input.plan))
   }
-  if (input.tekortLening) push(tekortLeningMelding(input.tekortLening))
-  if (input.eindsituatie) push(eindsituatieMelding(input.eindsituatie))
+  const fin = input.finBeschikbaar === true
+  if (input.tekortLening) push(tekortLeningMelding(input.tekortLening, fin))
+  if (input.eindsituatie) push(eindsituatieMelding(input.eindsituatie, fin))
 
   // Doelen
   push(labPlanMelding(input.labDoelenBuitenPlan))

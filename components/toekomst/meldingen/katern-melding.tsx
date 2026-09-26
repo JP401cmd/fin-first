@@ -4,7 +4,11 @@ import { useId, useState } from 'react'
 import Link from 'next/link'
 import { ArrowRight, ChevronDown } from 'lucide-react'
 import type { LeverageStatus } from '@/lib/leverage-status'
-import type { KaternMelding as KaternMeldingData } from '@/lib/horizon/katern-meldingen'
+import type {
+  KaternMelding as KaternMeldingData,
+  KaternMeldingTweedeActie,
+} from '@/lib/horizon/katern-meldingen'
+import { BesprekMetWillButton } from '@/components/app/chat/bespreek-met-fin-button'
 import { katernMeldingGeminimaliseerdSr, katernMeldingNogLabel } from '@/lib/horizon/katern-copy'
 import type { BannerDisplay } from '@/lib/page-status/display'
 import {
@@ -80,11 +84,11 @@ const FOCUS_RING =
 /**
  * Eén melding als kaart: `PageStatusBannerBody` compact, het enige uiterlijk.
  *
- * Een tweede actie (spec §4.8, "Stopmoment →") staat vanaf `lg` in de actie-rij naast
- * de eerste (`extraActions`). Mobiel is de kaart één regel (titel · actie ·
- * minimaliseren); daar staat de tweede actie onder de uitleg, na een tik op de titel —
- * dezelfde plek als de uitleg zelf. Elke actie wijst naar één plek; beide varianten
- * dragen dezelfde href.
+ * Een tweede actie (spec §4.8, "Stopmoment →"; of "Bespreek met Fin") staat vanaf `lg`
+ * in de actie-rij naast de eerste (`extraActions`). Mobiel is de kaart één regel
+ * (titel · actie · minimaliseren); daar staat de tweede actie onder de uitleg, na een
+ * tik op de titel — dezelfde plek als de uitleg zelf. Beide varianten doen hetzelfde:
+ * dezelfde href, of dezelfde chat-opener.
  */
 function MeldingKaart({ melding, onMinimize }: { melding: KaternMeldingData; onMinimize?: () => void }) {
   const uitleg = melding.uitleg || null
@@ -102,32 +106,48 @@ function MeldingKaart({ melding, onMinimize }: { melding: KaternMeldingData; onM
           <>
             {uitleg}
             <span className="flex lg:hidden">
-              <Link
-                href={tweede.href}
-                className={`inline-flex min-h-[44px] items-center gap-1 font-sans text-[12px] font-semibold not-italic text-[var(--ink)] underline underline-offset-4 ${FOCUS_RING}`}
-              >
-                {tweede.label}
-                <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-              </Link>
+              <TweedeActie actie={tweede} variant="mobiel" />
             </span>
           </>
         )
       }
       action={melding.actie}
-      extraActions={
-        tweede != null ? (
-          <Link
-            href={tweede.href}
-            className={`inline-flex items-center gap-1.5 rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2.5 text-[12px] font-semibold text-[var(--ink)] transition-colors hover:bg-[var(--subtle)] ${FOCUS_RING}`}
-          >
-            {tweede.label}
-            <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-          </Link>
-        ) : undefined
-      }
+      extraActions={tweede != null ? <TweedeActie actie={tweede} variant="desktop" /> : undefined}
       onMinimize={onMinimize}
       rootProps={{ 'data-testid': `katern-melding-${melding.id}`, 'data-ernst': melding.ernst }}
     />
+  )
+}
+
+/**
+ * De tweede actie in de stijl van zijn plek: mobiel een onderstreepte regel zoals de
+ * eerste actie in de compacte rij, desktop een omlijnde knop naast de donkere eerste.
+ * Een Fin-actie is `BesprekMetWillButton` — hetzelfde mechanisme als de vroegere
+ * `EindsituatieNotice` en de statusbanner op /overzicht (chat `openWithMessage`).
+ */
+function TweedeActie({ actie, variant }: { actie: KaternMeldingTweedeActie; variant: 'mobiel' | 'desktop' }) {
+  if ('kind' in actie) {
+    return (
+      <BesprekMetWillButton
+        onderwerp={actie.onderwerp}
+        detail={actie.detail}
+        vraag={actie.vraag}
+        className={`min-h-[44px] not-italic ${variant === 'desktop' ? 'py-2.5' : ''}`}
+      />
+    )
+  }
+  return (
+    <Link
+      href={actie.href}
+      className={
+        variant === 'mobiel'
+          ? `inline-flex min-h-[44px] items-center gap-1 font-sans text-[12px] font-semibold not-italic text-[var(--ink)] underline underline-offset-4 ${FOCUS_RING}`
+          : `inline-flex items-center gap-1.5 rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2.5 text-[12px] font-semibold text-[var(--ink)] transition-colors hover:bg-[var(--subtle)] ${FOCUS_RING}`
+      }
+    >
+      {actie.label}
+      <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+    </Link>
   )
 }
 

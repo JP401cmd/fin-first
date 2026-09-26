@@ -12,6 +12,11 @@ vi.mock('next/link', () => ({
   ),
 }))
 
+const openWithMessage = vi.fn()
+vi.mock('@/components/app/chat/chat-provider', () => ({
+  useChatContextOptional: () => ({ openWithMessage }),
+}))
+
 const AOW: KaternMeldingData = {
   id: 'instellingen-aow',
   katern: 'instellingen',
@@ -164,6 +169,39 @@ describe('KaternMelding — slot', () => {
     // Elke actie wijst naar één plek: twee hrefs in totaal.
     const hrefs = new Set(screen.getAllByRole('link').map((a) => a.getAttribute('href')))
     expect([...hrefs].sort()).toEqual(['/toekomst/doelen', '/toekomst/instellingen?regel=eindstrategie'])
+  })
+
+  it('een Fin-actie als tweede: opent de chat met onderwerp, context en vraag; 44px (eigenaarsbesluit 26 sep)', () => {
+    const TEKORT: KaternMeldingData = {
+      id: 'plan-tekort-lening',
+      katern: 'plan',
+      ernst: 'warn',
+      titel: 'Je plan dekt vanaf je 61e een tekort met een lening.',
+      kort: 'tekort-lening',
+      uitleg: 'Waarom.',
+      actie: { label: 'Naar de instelling', href: '/toekomst/instellingen?regel=eindstrategie' },
+      tweedeActie: { kind: 'fin', onderwerp: 'Tekort', detail: 'Context zonder bedragen.', vraag: 'Hoe komt dat?' },
+    }
+    render(<KaternMelding meldingen={[TEKORT]} display="expanded" onMinimize={() => {}} />)
+    const alleenMobiel = (el: HTMLElement) => el.closest('.lg\\:hidden') != null
+    const desktop = screen.getAllByRole('button', { name: /met Fin/ }).filter((b) => !alleenMobiel(b))
+    expect(desktop).toHaveLength(1)
+    expect(desktop[0].className).toContain('min-h-[44px]')
+    fireEvent.click(desktop[0])
+    expect(openWithMessage).toHaveBeenCalledTimes(1)
+    const bericht = openWithMessage.mock.calls[0][0] as string
+    expect(bericht).toContain('"Tekort"')
+    expect(bericht).toContain('Context zonder bedragen.')
+    expect(bericht).toContain('Hoe komt dat?')
+    // Mobiel: onder de uitleg, na een tik op de titel.
+    const titelKnop = screen.getByRole('button', { name: /Je plan dekt vanaf je 61e/ })
+    fireEvent.click(titelKnop)
+    const uitleg = document.getElementById(titelKnop.getAttribute('aria-controls')!)!
+    expect(within(uitleg).getByRole('button', { name: /met Fin/ }).className).toContain('min-h-[44px]')
+    // Geen tweede href: de Fin-actie is geen link.
+    expect(new Set(screen.getAllByRole('link').map((a) => a.getAttribute('href')))).toEqual(
+      new Set(['/toekomst/instellingen?regel=eindstrategie']),
+    )
   })
 
   it('minimaliseren roept de host aan; canMinimize=false verbergt de knoppen', () => {

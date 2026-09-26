@@ -20,6 +20,9 @@
  */
 
 import { createContext, useContext, useMemo, type ReactNode } from 'react'
+import { useExecutionMode } from '@/lib/ai/local/use-execution-mode'
+import { useModuleAccess } from '@/lib/feature-access/context'
+import { hasSubscription } from '@/lib/feature-registry'
 import { formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { buildDeficitLoanCopy } from '@/lib/horizon/deficit-loan-copy'
@@ -187,6 +190,16 @@ export function ToekomstKaternMeldingenProvider({
     }
   }, [housingHeldNotice, isPensioenMode, masked, bedragen])
 
+  // "Bespreek met Fin" bij tekort-lening en eindsituatie (eigenaarsbesluit 26 sep): dezelfde
+  // poort als de vroegere `EindsituatieNotice` — AI-abonnement én een uitvoermodus voor
+  // 'gesprek' (cloud of lokaal). Alleen resolven als er een melding is die Fin kan
+  // dragen, zodat er niet per render een voorkeur wordt opgehaald.
+  const { subscriptions } = useModuleAccess()
+  const hasAi = hasSubscription(subscriptions, 'ai')
+  const wilFin = deficitLoanCopyBasis != null || eindsituatieDuiding != null
+  const exec = useExecutionMode('gesprek', wilFin && hasAi)
+  const finBeschikbaar = wilFin && hasAi && (exec.canUseCloud || exec.canUseLocal)
+
   // Ontbrekende gegevens: de guards die de KPI-tegels al toetsen (outcome-guard), niet
   // opnieuw afgeleid (`ontbrekendeGegevensIssues`). Alleen in de eigen weergave, net als
   // de tegels; dit slot is de énige ingang naar /mijn/profiel (spec §4.8/§4.9).
@@ -224,6 +237,7 @@ export function ToekomstKaternMeldingenProvider({
       aowOntbreekt: aowNoticeVisible,
       huisNooitVerkocht,
       ontbrekendeGegevens,
+      finBeschikbaar,
     }
     return wijsMeldingenToe(invoer)
   }, [
@@ -243,6 +257,7 @@ export function ToekomstKaternMeldingenProvider({
     aowNoticeVisible,
     huisNooitVerkocht,
     ontbrekendeGegevens,
+    finBeschikbaar,
   ])
 
   // Samenvattingen op de inactieve koppen (kopij-toets §4). Geen eigen getal: het

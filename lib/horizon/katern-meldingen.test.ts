@@ -137,7 +137,7 @@ describe('Plan — niet haalbaar onder solved', () => {
   it('tweede actie "Stopmoment" naar de stopmoment-instelling in Instellingen (spec §4.8, C1 punt 6)', () => {
     const [m] = wijsMeldingenToe(metInput({ plan: niet })).plan.meldingen
     expect(m.tweedeActie).toEqual({ label: 'Stopmoment', href: '/toekomst/instellingen?regel=eindstrategie' })
-    expect(m.tweedeActie?.href).toBe(instellingenRegelHref('eindstrategie'))
+    expect(m.tweedeActie).toEqual({ label: 'Stopmoment', href: instellingenRegelHref('eindstrategie') })
   })
 
   it('maandhint: 0 en null geven geen uitleg, > 0 de canonieke antwoordzin (ook masked)', () => {
@@ -259,6 +259,20 @@ describe('Plan — tekort-lening', () => {
     ).plan.meldingen
     expect(m.uitleg).toContain('Je huis telt in dit plan niet mee.')
   })
+
+  it('met AI beschikbaar: tweede actie Fin, met de uitleg zonder bedragen als context (eigenaarsbesluit 26 sep)', () => {
+    const tekortLening = { notice: { firstAge: 61.2, clearedAge: 64.8 }, copy: DEFICIT_COPY }
+    const [m] = wijsMeldingenToe(metInput({ tekortLening, finBeschikbaar: true })).plan.meldingen
+    expect(m.tweedeActie).toEqual({
+      kind: 'fin',
+      onderwerp: 'Je plan dekt tussen je 61e en 64e een tekort met een lening.',
+      detail: [DEFICIT_COPY.waarom, DEFICIT_COPY.instelling].join(' '),
+    })
+    // Geen bedrag in wat naar Fin gaat (zoals de eindsituatie-vraag): de piekzin blijft buiten.
+    expect(m.tweedeActie && 'kind' in m.tweedeActie ? m.tweedeActie.detail : '').not.toContain(DEFICIT_COPY.piek)
+    // Zonder AI geen Fin-actie.
+    expect(wijsMeldingenToe(metInput({ tekortLening })).plan.meldingen[0].tweedeActie ?? null).toBeNull()
+  })
 })
 
 describe('Plan — eindsituatie', () => {
@@ -266,6 +280,29 @@ describe('Plan — eindsituatie', () => {
     const [m] = wijsMeldingenToe(metInput({ eindsituatie: EIND_COPY })).plan.meldingen
     expect(m).toMatchObject({ ernst: 'neutral', titel: EIND_COPY.kop, uitleg: EIND_COPY.samenvatting })
     expect(m.actie).toEqual({ label: 'Bekijk of wijzig je plan', href: EINDSITUATIE_INSTELLING_HREF })
+  })
+
+  it('niet één oorzaak aan te wijzen + AI: Fin als tweede actie met de vaste vraag en context (EindsituatieNotice)', () => {
+    const onduidelijk: EindsituatieCopy = {
+      ...EIND_COPY,
+      onduidelijk: 'Er is uit de berekening niet één regel aan te wijzen die dit verklaart.',
+      finVraag: 'Hoe komt dat?',
+      finContext: 'Ik heb "Geen tekort-lening" aan.',
+    }
+    const [m] = wijsMeldingenToe(metInput({ eindsituatie: onduidelijk, finBeschikbaar: true })).plan.meldingen
+    expect(m.tweedeActie).toEqual({
+      kind: 'fin',
+      onderwerp: EIND_COPY.kop,
+      detail: 'Ik heb "Geen tekort-lening" aan.',
+      vraag: 'Hoe komt dat?',
+    })
+    // De zin die de knop inleidde staat weer in de uitleg.
+    expect(m.uitleg).toBe(`${EIND_COPY.samenvatting} ${onduidelijk.onduidelijk}`)
+    // Eén oorzaak aan te wijzen (onduidelijk null) of geen AI: geen Fin, uitleg ongewijzigd.
+    const eenduidig = wijsMeldingenToe(metInput({ eindsituatie: EIND_COPY, finBeschikbaar: true })).plan.meldingen[0]
+    expect(eenduidig.tweedeActie ?? null).toBeNull()
+    expect(eenduidig.uitleg).toBe(EIND_COPY.samenvatting)
+    expect(wijsMeldingenToe(metInput({ eindsituatie: onduidelijk })).plan.meldingen[0].tweedeActie ?? null).toBeNull()
   })
 })
 
@@ -420,14 +457,14 @@ describe('toewijzing — sortering en uniciteit', () => {
     ])
     for (const m of alleMeldingen(wijsMeldingenToe(ALLES))) {
       for (const actie of [m.actie, m.tweedeActie]) {
-        if (!actie) continue
+        if (!actie || 'kind' in actie) continue
         expect(toegestaan.has(actie.href), `${m.id} → ${actie.href}`).toBe(true)
         expect(actie.label.endsWith('→')).toBe(false)
       }
       // Twee acties = twee verschillende plekken; een tweede zonder eerste bestaat niet.
       if (m.tweedeActie) {
         expect(m.actie).not.toBeNull()
-        expect(m.tweedeActie.href).not.toBe(m.actie?.href)
+        if (!('kind' in m.tweedeActie)) expect(m.tweedeActie.href).not.toBe(m.actie?.href)
       }
     }
   })
