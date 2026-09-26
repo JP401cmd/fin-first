@@ -1129,3 +1129,42 @@ describe('DoelenView — vrijheidsgetal-doel onder een vast anker (ADR 0145)', (
     expect(container).toBeTruthy()
   })
 })
+
+describe('DoelenView — ingebed onder het lab in katern Doelen (ADR 0179 fase 4)', () => {
+  const goals = [
+    paramGoal({ id: 'pf', name: 'Vrij op 55 jaar', goal_type: 'fire_age', target_value: 55, current_value: 57 }),
+    paramGoal({ id: 'ps', name: 'Spaarquote naar 45%', goal_type: 'savings_rate', target_value: 45, current_value: 30 }),
+  ]
+  const progresses = [
+    { current: 57, target: 55, pct: 90, onTrack: true, measured: true, requiredMonthly: null, eta: null, paceSkipped: false },
+    { current: 30, target: 45, pct: 67, onTrack: false, measured: true, requiredMonthly: null, eta: null, paceSkipped: true },
+  ]
+
+  it('een uitkomstdoel toont alleen zijn doel: de live uitkomst staat in het lab erboven (§4.9)', () => {
+    render(<DoelenView ingebed goals={goals} goalProgresses={progresses} />)
+    const fire = screen.getByRole('link', { name: 'Bekijk Vrij op 55 jaar in het lab' })
+    expect(fire.querySelector('[data-testid="uitkomstdoel-alleen-doel"]')).toBeTruthy()
+    expect(fire.textContent).not.toContain('nu ')
+    expect(fire.textContent).not.toMatch(/bekijk live in het lab/)
+  })
+
+  it('een knop-doel (instelling) houdt zijn waarde en voortgang', () => {
+    render(<DoelenView ingebed goals={goals} goalProgresses={progresses} />)
+    const spaar = screen.getByRole('link', { name: 'Bekijk Spaarquote naar 45% in het lab' })
+    expect(spaar.querySelector('[data-testid="uitkomstdoel-alleen-doel"]')).toBeNull()
+    expect(spaar.querySelector('[role="progressbar"]')).toBeTruthy()
+  })
+
+  it('geen eigen paginakolom en geen herhaalde lab-intro', () => {
+    const { container } = render(<DoelenView ingebed goals={goals} goalProgresses={progresses} />)
+    expect(container.querySelector('section')!.className).not.toContain('max-w-6xl')
+    expect(screen.queryByText(/Doelen uit je scenario in het lab/)).toBeNull()
+  })
+
+  it('los (niet ingebed) verandert er niets', () => {
+    const { container } = render(<DoelenView goals={goals} goalProgresses={progresses} />)
+    expect(container.querySelector('section')!.className).toContain('max-w-6xl')
+    expect(screen.getByText(/Doelen uit je scenario in het lab/)).toBeTruthy()
+    expect(screen.queryByTestId('uitkomstdoel-alleen-doel')).toBeNull()
+  })
+})

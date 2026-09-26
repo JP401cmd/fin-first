@@ -192,7 +192,20 @@ function metaStopAnker(v: unknown): 'aow' | 'age' | 'now' | null {
  * de gegroepeerde weergave (Volledig) als de samengevoegde lijst (Eenvoudig)
  * exact dezelfde kaart rendert.
  */
-function ParameterGoalCard({ goal, progress, labPlan }: GoalDisplay & { labPlan: LabPlanContext | null }) {
+function ParameterGoalCard({
+  goal,
+  progress,
+  labPlan,
+  uitkomstInLab = false,
+}: GoalDisplay & {
+  labPlan: LabPlanContext | null
+  /**
+   * ADR 0179 fase 4 (spec §4.9): staat de lijst onder het lab in katern Doelen, dan draagt
+   * de uitkomstregel van het lab de live uitkomst. Een UITKOMSTdoel (vrijheidsleeftijd,
+   * plan gedekt, eindvermogen) toont dan alleen zijn doel, niet nog eens de uitkomst.
+   */
+  uitkomstInLab?: boolean
+}) {
   const isFire = goal.goal_type === 'fire_age'
   // ADR 0145 — "Plan gedekt": het uitkomstdoel onder een vast stopmoment.
   const isCoverage = goal.goal_type === 'plan_coverage'
@@ -253,6 +266,7 @@ function ParameterGoalCard({ goal, progress, labPlan }: GoalDisplay & { labPlan:
       ? statusFor(progress)
       : null
   const pct = Math.min(100, Math.max(0, Math.round(progress.pct)))
+  const alleenDoel = uitkomstInLab && (isFire || volgtPlan) && !goal.notApplicableReason
   return (
     <Link
       href="/toekomst/doelen#verken-je-aannames"
@@ -289,7 +303,21 @@ function ParameterGoalCard({ goal, progress, labPlan }: GoalDisplay & { labPlan:
         )}
       </header>
 
-      {goal.notApplicableReason ? (
+      {alleenDoel ? (
+        /* Fase 4: de uitkomst staat in het lab erboven; hier alleen wat je vastlegde. */
+        <>
+          <div className="flex items-baseline gap-1.5 mb-1" data-testid="uitkomstdoel-alleen-doel">
+            <span className="font-serif text-lg font-semibold text-[var(--ink)] tabular-nums">
+              {`Doel: ${formatGoalValue(progress.target, goal.goal_type)}`}
+            </span>
+          </div>
+          {coverageSubregel && (
+            <p data-testid="plan-coverage-subregel" className="text-[11px] italic text-[var(--ink-3)]">
+              {coverageSubregel}
+            </p>
+          )}
+        </>
+      ) : goal.notApplicableReason ? (
         /* ADR 0129 (bijlage "Doelen") / ADR 0145 — een parameter-doel zonder uitkomst
            onder het huidige anker (fire_age onder een vast stopmoment, plan_coverage
            onder solved). De notitie komt uit de goal-loader (consume-only). */
@@ -639,6 +667,7 @@ export function DoelenView({
   linkedGoalIds,
   autoCompletedGoals,
   labPlan = null,
+  ingebed = false,
 }: {
   goals: GoalWithBudget[]
   goalProgresses: GoalDisplay['progress'][]
@@ -689,6 +718,12 @@ export function DoelenView({
    * vastleggen. Zonder (null) valt de kaart terug op die metadata.
    */
   labPlan?: LabPlanContext | null
+  /**
+   * ADR 0179 fase 4: de lijst staat ingebed onder het lab in katern Doelen. Geen eigen
+   * paginakolom (de katern-layout padt al), geen herhaalde intro "doelen uit je scenario in
+   * het lab" (het lab staat er direct boven) en uitkomstdoelen zonder herhaalde uitkomst.
+   */
+  ingebed?: boolean
 }) {
   const router = useRouter()
   const linkedIds = new Set(linkedGoalIds ?? [])
@@ -791,7 +826,7 @@ export function DoelenView({
   // Bereikt-archief (de lege-actieve-lijst-tekst verwijst er dan naar).
   if (all.length === 0 && bereiktGoals.length === 0) {
     return (
-      <section className="mx-auto max-w-6xl px-4 sm:px-6 pb-8">
+      <section className={ingebed ? 'pb-8' : 'mx-auto max-w-6xl px-4 sm:px-6 pb-8'}>
         <article className="rounded-2xl border border-dashed border-[var(--border-md)] bg-[var(--paper)] p-6 sm:p-8 text-center">
           <span className="inline-flex w-10 h-10 rounded-xl bg-horizon-50 items-center justify-center mb-3">
             <Target className="w-5 h-5 text-horizon-700" aria-hidden="true" />
@@ -814,7 +849,7 @@ export function DoelenView({
   const manualCount = manualDisplay.length
 
   return (
-    <section className="mx-auto max-w-6xl px-4 sm:px-6 pb-8">
+    <section className={ingebed ? 'pb-8' : 'mx-auto max-w-6xl px-4 sm:px-6 pb-8'}>
       {/* ── Groep: Scenariodoelen (lab-parameter-doelen) — bovenaan, beide modi ── */}
       {parameterDisplay.length > 0 && (
         <div className="mb-8">
@@ -876,14 +911,22 @@ export function DoelenView({
           {/* De melding "je plan is veranderd" staat sinds ADR 0179 fase 2 (D6) in het
               meldingenslot bovenaan katern Doelen (`wijsMeldingenToe`, actie Bijwerken →
               het lab). Loslaten blijft hier, in het doelsituatie-menu. */}
-          <p className="mb-4 text-[11px] italic text-[var(--ink-3)]">
-            Doelen uit je scenario in het lab. Klik een kaart om ze live te
-            verkennen op de tijdas.
-          </p>
+          {!ingebed && (
+            <p className="mb-4 text-[11px] italic text-[var(--ink-3)]">
+              Doelen uit je scenario in het lab. Klik een kaart om ze live te
+              verkennen op de tijdas.
+            </p>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             {parameterDisplay.map((d) => (
-              <ParameterGoalCard key={d.goal.id} goal={d.goal} progress={d.progress} labPlan={labPlan} />
+              <ParameterGoalCard
+                key={d.goal.id}
+                goal={d.goal}
+                progress={d.progress}
+                labPlan={labPlan}
+                uitkomstInLab={ingebed}
+              />
             ))}
           </div>
         </div>

@@ -323,6 +323,9 @@ export const DOELEN_TOONT_DOELSCENARIO_LABEL = 'Je doelscenario'
  * Doelen, §5). De kop letterlijk uit de spec; de uitleg is de bestaande zin van de
  * vroegere Plan-sectie "Wat het betekent" (ongewijzigd verhuisd). Kop nog langs merkstem.
  */
+/** Katern Doelen, sectie II: de doelenlijst onder het lab (spec §4.3 wireframe Doelen). Nog langs merkstem. */
+export const DOELEN_LIJST_KOP = 'Je doelen'
+
 export const ANDERE_PADEN_KOP = 'Andere paden naast je doelscenario'
 export const ANDERE_PADEN_UITLEG =
   'Vijf paden — één basispad, verbeteringen en één waarschuwing; elk pad wordt afgezet tegen je basispad.'

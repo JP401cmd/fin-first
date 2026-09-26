@@ -3,6 +3,8 @@ import { loadEffectiveMonthlyFigures } from '@/lib/fin-data-loader'
 import { getToekomstClient, loadToekomstFinData } from '@/lib/toekomst/load-toekomst-data'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { DoelenView } from '@/components/future/doelen-view'
+import { SectionLabel } from '@/components/editorial'
+import { DOELEN_LIJST_KOP } from '@/lib/horizon/katern-copy'
 import { DoelenKaternLab, DoelenKaternLabSheets } from '@/components/toekomst/doelen/doelen-katern-lab'
 import { DoelenLabDetails } from '@/components/toekomst/doelen/doelen-lab-details'
 import { DoelenAnderePaden } from '@/components/toekomst/doelen/andere-paden'
@@ -26,6 +28,10 @@ export const metadata: Metadata = {
  * plan-oordeel, plan-review) draaien voor één veld. Alleen de maandcijfers zijn eigen.
  * Mutaties in DoelenView en het lab doen `router.refresh()`, waarmee ook de layout (en
  * dus het canvas) verse data krijgt (GW2).
+ *
+ * Fase 4 (ADR 0179 D7, spec §4.3): mobiel het lab direct onder de koppen, dan de details
+ * (marktaannames, indicatieregel), II · Je doelen, III · Andere paden, en de sheets één keer.
+ * Op desktop staat het lab in de rechterkolom van de canvas-rij (layout).
  */
 export default async function ToekomstDoelenPage() {
   const supabase = await getToekomstClient()
@@ -41,11 +47,12 @@ export default async function ToekomstDoelenPage() {
           staat het in de rechterkolom van de canvas-rij (layout, CanvasZijkolom). */}
       <DoelenKaternLab plek="onder-koppen" />
       <DoelenLabDetails />
-      {/* DoelenView draagt zijn eigen `max-w-6xl px-4 sm:px-6`-kolom; de katern-layout
-          padt al, dus de negatieve marge voorkomt dubbele inspringing. Fase 4 voegt lab
-          en lijst samen en ruimt dit op. */}
-      <div className="mt-6 -mx-4 sm:-mx-6">
+      {/* II · Je doelen (fase 4): de lijst onder het lab, ingebed in de katern-kolom. De
+          SectionLabel is visueel; de koppen (h2) staan in de lijst zelf. */}
+      <div className="mt-8 sm:mt-10" data-testid="doelen-lijst">
+        <SectionLabel num="II">{DOELEN_LIJST_KOP}</SectionLabel>
         <DoelenView
+          ingebed
           goals={finData.goals}
           goalProgresses={finData.goalProgresses}
           completedGoals={finData.completedGoals}
