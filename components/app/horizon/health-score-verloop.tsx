@@ -45,6 +45,7 @@ export function HealthScoreVerloop({ punten }: { punten: readonly HealthVerloopP
   const metLeeftijd = punten.filter((p) => p.fire_age !== null)
   const versieWissel = detectScoreVersionTransition(metScore)
   const motorWissel = detectEngineBronTransition(metLeeftijd)
+  const lopendeMaandLive = punten.some((p) => p.live)
 
   return (
     <section
@@ -56,8 +57,10 @@ export function HealthScoreVerloop({ punten }: { punten: readonly HealthVerloopP
         <h3 id={headingId} className="text-xs font-semibold text-[var(--ink-2)]">
           Verloop
         </h3>
-        <p className="mt-0.5 text-[11px] text-[var(--ink-3)]">
-          De laatste stand van elke maand, over de laatste twaalf maanden.
+        <p className="mt-0.5 text-[11px] text-[var(--ink-3)]" data-testid="health-verloop-ondertitel">
+          {lopendeMaandLive
+            ? 'De laatste stand van elke maand over de laatste twaalf maanden; voor deze maand je huidige stand.'
+            : 'De laatste stand van elke maand, over de laatste twaalf maanden.'}
         </p>
       </div>
 

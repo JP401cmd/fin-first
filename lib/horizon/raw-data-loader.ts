@@ -60,7 +60,7 @@ import {
 } from '@/lib/fire-strategy'
 import { resolveFireParams, type FireParams } from '@/lib/fire-params'
 import { resolveWithdrawalStrategy, type WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
-import { type HealthScoreInput } from '@/lib/financial-health'
+import { budgetingActiveFromProfile, type HealthScoreInput } from '@/lib/financial-health'
 import { computeEffectiveExpenses, computeFireTarget } from '@/lib/core-metrics'
 import {
   parseHousingStrategy,
@@ -861,8 +861,8 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
   }
 
   // ── Health Score (5 or 6 pillars) ──────────────────────────
-  // Detect budgetingActive from profile (defaults to true if column doesn't exist)
-  const budgetingActive = (profile as Record<string, unknown>).budgeting_active !== false
+  // Eén lezing van de budgetteer-vlag, gedeeld met de snapshot-writers (ADR 0008).
+  const budgetingActive = budgetingActiveFromProfile(profile as { budgeting_active?: boolean | null })
 
   // ── savingsRate6m (zelfde formule ÉN zelfde transfer-exclusieve grondslag als
   //    dashboard-data-loader) ────

@@ -16,7 +16,7 @@
  *    de horizon-kernel en wordt nooit uit snapshots afgeleid.
  */
 import { HEALTH_SCORE_VERSION } from '@/lib/financial-health'
-import { localMonthStartMonthsAgo } from '@/lib/month-range'
+import { localDateString, localMonthStartMonthsAgo } from '@/lib/month-range'
 
 /** Eén maandpunt in het verloop — geen bedragen, alleen wat de reeksen tonen. */
 export interface HealthVerloopPunt {
@@ -30,6 +30,8 @@ export interface HealthVerloopPunt {
   fire_age: number | null
   /** Motor die `fire_age` schreef ('kernel' | 'v2'; null telt als 'v2'). */
   engine_bron: string | null
+  /** Waar: het gezondheidsgetal van dit punt is de live stand (lopende maand). */
+  live?: true
 }
 
 /** Minimale rijvorm van een maandstand (subset van `NetWorthSnapshot12mRow`). */
@@ -56,6 +58,38 @@ export function deriveHealthVerloop(rows: readonly VerloopBronRij[]): HealthVerl
     fire_age: toNumberOrNull(r.fire_age),
     engine_bron: r.engine_bron ?? null,
   }))
+}
+
+/**
+ * Het verloop met de LOPENDE maand als live stand. De opgeslagen stand van deze
+ * maand is eerder in de maand geschreven en rekent de vrijheidspijler met een
+ * andere motor; de kaart toont het live getal. Door het punt van de lopende maand
+ * het live getal te geven, zeggen "sinds vorige maand" en de grafiek per
+ * constructie hetzelfde.
+ *
+ * Staat er een rij deze maand, dan krijgt die het live getal en de huidige
+ * rekenmethode; datum, vrijheidsleeftijd en motor blijven historie. Staat er geen
+ * rij, dan komt er een punt van vandaag bij zonder vrijheidsleeftijd. Alleen
+ * aanroepen wanneer het live getal een oordeel is (verdict 'score').
+ */
+export function withLiveCurrentMonth(
+  verloop: readonly HealthVerloopPunt[],
+  live: { liveTotal: number; now: Date; currentVersion?: number },
+): HealthVerloopPunt[] {
+  const { liveTotal, now, currentVersion = HEALTH_SCORE_VERSION } = live
+  const vandaag = localDateString(now)
+  const dezeMaand = vandaag.slice(0, 7)
+  const liveScore = Math.round(liveTotal)
+  const idx = verloop.findIndex((p) => p.snapshot_date.slice(0, 7) === dezeMaand)
+  if (idx === -1) {
+    return [
+      ...verloop,
+      { snapshot_date: vandaag, resilience_score: liveScore, score_version: currentVersion, fire_age: null, engine_bron: null, live: true },
+    ]
+  }
+  return verloop.map((p, i) =>
+    i === idx ? { ...p, resilience_score: liveScore, score_version: currentVersion, live: true } : p,
+  )
 }
 
 /**

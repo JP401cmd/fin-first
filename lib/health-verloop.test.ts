@@ -6,6 +6,7 @@ import {
   detectScoreVersionTransition,
   formatTransitionDate,
   healthScoreSinceLastMonth,
+  withLiveCurrentMonth,
   type HealthVerloopPunt,
 } from './health-verloop'
 
@@ -126,5 +127,51 @@ describe('formatTransitionDate', () => {
 
   it('laat een onleesbare datum ongemoeid', () => {
     expect(formatTransitionDate('onbekend')).toBe('onbekend')
+  })
+})
+
+describe('withLiveCurrentMonth — de lopende maand is de live stand', () => {
+  it('Given een opgeslagen stand deze maand die afwijkt van live, When het verloop wordt samengesteld, Then draagt de lopende maand het live getal en de huidige versie, en blijft de FIRE-historie staan', () => {
+    const verloop: HealthVerloopPunt[] = [
+      punt('2026-08-29', 56),
+      { snapshot_date: '2026-09-03', resilience_score: 69, score_version: 1, fire_age: 51.9, engine_bron: 'v2' },
+    ]
+    const uit = withLiveCurrentMonth(verloop, { liveTotal: 56.4, now: NOW })
+    expect(uit).toHaveLength(2)
+    expect(uit[1]).toEqual({
+      snapshot_date: '2026-09-03',
+      resilience_score: 56,
+      score_version: HEALTH_SCORE_VERSION,
+      fire_age: 51.9,
+      engine_bron: 'v2',
+      live: true,
+    })
+    // De invoer blijft onaangeroerd.
+    expect(verloop[1].resilience_score).toBe(69)
+  })
+
+  it('Given geen stand deze maand, When het verloop wordt samengesteld, Then komt er een punt van vandaag bij met de live stand en zonder vrijheidsleeftijd', () => {
+    const uit = withLiveCurrentMonth([punt('2026-08-29', 56)], { liveTotal: 61, now: NOW })
+    expect(uit.map((p) => p.snapshot_date)).toEqual(['2026-08-29', '2026-09-26'])
+    expect(uit[1]).toEqual({
+      snapshot_date: '2026-09-26',
+      resilience_score: 61,
+      score_version: HEALTH_SCORE_VERSION,
+      fire_age: null,
+      engine_bron: null,
+      live: true,
+    })
+  })
+
+  it('Given een lege reeks, When het verloop wordt samengesteld, Then één live punt', () => {
+    expect(withLiveCurrentMonth([], { liveTotal: 61, now: NOW })).toHaveLength(1)
+  })
+
+  it('Given het live verloop, When "sinds vorige maand" en de grafiek hetzelfde lezen, Then zeggen ze per constructie hetzelfde', () => {
+    const uit = withLiveCurrentMonth([punt('2026-08-29', 56), punt('2026-09-03', 69)], { liveTotal: 56, now: NOW })
+    const delta = healthScoreSinceLastMonth({ currentTotal: 56, verloop: uit, now: NOW })
+    const [aug, sep] = uit.slice(-2)
+    expect(delta).toBe(0)
+    expect((sep.resilience_score ?? 0) - (aug.resilience_score ?? 0)).toBe(delta)
   })
 })

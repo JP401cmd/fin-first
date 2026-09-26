@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { errorResponse } from '@/lib/api/respond'
 import { getServiceClient } from '@/lib/supabase/service'
 import { computeFireProjection, ageAtDate, type FinancialInput } from '@/lib/horizon-data'
-import { computeHealthScoreFromInputs, HEALTH_SCORE_VERSION } from '@/lib/financial-health'
+import { computeSnapshotHealthScore, HEALTH_SCORE_VERSION } from '@/lib/financial-health'
 import {
   buildHealthScoreInput,
   type HealthScoreAsset,
@@ -135,7 +135,7 @@ export async function GET(request: Request) {
     // Zie snapshots/route.ts: de bron-vlaggen + handmatige bedragen voeden de
     // EFFECTIEVE spaarquote en de noodbuffer-norm (3 × netto maandsalaris).
     // + het PLAN (ADR 0129 F3a): onder een vast stop-anker geen `fire_age`.
-    .select(`id, date_of_birth, expected_return, inflation_rate, household_type, net_monthly_income, estimated_monthly_expenses, income_source, expenses_source, feature_preferences, ${FIRE_PLAN_COLUMNS}`)
+    .select(`id, date_of_birth, expected_return, inflation_rate, household_type, net_monthly_income, estimated_monthly_expenses, income_source, expenses_source, feature_preferences, budgeting_active, ${FIRE_PLAN_COLUMNS}`)
     .eq('onboarding_completed', true)
 
   if (profilesError) {
@@ -477,7 +477,7 @@ export async function GET(request: Request) {
       // canonieke bestedingssom (inkomsten gaan eraf, transfers tellen niet mee).
       // Bestaande snapshot-rijen blijven staan: historie voor 30 aug 2026 op de
       // oude grondslag (ongefilterde som van |amount|), bewust geaccepteerd.
-      const healthScore = computeHealthScoreFromInputs(
+      const { health: healthScore, resilienceScore } = computeSnapshotHealthScore(
         buildHealthScoreInput(
           {
             effectiveSavingsRatePct,
@@ -507,6 +507,8 @@ export async function GET(request: Request) {
             debtMonthlyPayments,
           },
         ),
+        // Budgetteer-vlag uit het profiel, zoals de live score (ADR 0008).
+        profile,
       )
 
       // Upsert snapshot with all metrics
@@ -527,7 +529,7 @@ export async function GET(request: Request) {
         // Canonieke spaarquote (effectiveSavingsRatePct), NIET fireProjection.savingsRate:
         // deze kolom voedt de spaarquote-widget-ontwikkeling (savingsHistory).
         savings_rate: Math.round(effectiveSavingsRatePct * 10) / 10,
-        resilience_score: healthScore.total,
+        resilience_score: resilienceScore,
         // Methode-versie van de opgeslagen score (ADR 0010 / FR-7). DEFAULT 1 op
         // de kolom; v2-snapshots schrijven expliciet 2. De basic-fallback-upsert
         // hieronder laat 'm bewust weg (mag terugvallen op de kolom-default).

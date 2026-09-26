@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getCachedUser } from '@/lib/supabase/cached-user'
 import { loadHorizonData } from '@/lib/horizon-data-loader'
 import { getNetWorthSnapshots12m, getOwnProfile } from '@/lib/server-data/base'
-import { deriveHealthVerloop, healthScoreSinceLastMonth } from '@/lib/health-verloop'
+import { deriveHealthVerloop, healthScoreSinceLastMonth, withLiveCurrentMonth } from '@/lib/health-verloop'
 import { healthScoreVerdict } from '@/lib/financial-health'
 import { getTxAgg12m, aggLatestMonth, type TxMonthAggregateRow } from '@/lib/server-data/tx-aggregates'
 import { StaleDataGuard } from '@/components/app/stale-data-guard'
@@ -133,12 +133,20 @@ export default async function OverzichtPage() {
   // maandstanden zijn persoonlijk (eigen user_id), terwijl `health` in
   // Huishouden/Partner het perspectief-getal is; die twee vergelijken zou een
   // verandering tonen die er niet is. Het huidige getal komt uit de canonieke
-  // bron (`horizonData.healthScore`) — geen eigen som.
-  const healthVerloop =
+  // bron (`horizonData.healthScore`) — geen eigen som. De lopende maand in het
+  // verloop IS die live stand (`withLiveCurrentMonth`), zodat de grafiek en
+  // "sinds vorige maand" per constructie hetzelfde zeggen.
+  const nu = new Date()
+  const healthIsScore = health != null && healthScoreVerdict(health).kind === 'score'
+  const opgeslagenVerloop =
     perspective === 'personal' ? deriveHealthVerloop(snapshots12mRes.data ?? []) : null
+  const healthVerloop =
+    opgeslagenVerloop && health && healthIsScore
+      ? withLiveCurrentMonth(opgeslagenVerloop, { liveTotal: health.total, now: nu })
+      : opgeslagenVerloop
   const healthSindsVorigeMaand =
-    health && healthVerloop && healthScoreVerdict(health).kind === 'score'
-      ? healthScoreSinceLastMonth({ currentTotal: health.total, verloop: healthVerloop, now: new Date() })
+    health && healthVerloop && healthIsScore
+      ? healthScoreSinceLastMonth({ currentTotal: health.total, verloop: healthVerloop, now: nu })
       : null
 
   // Mini-tijdslijn-strip inputs: huidige leeftijd uit DOB + vrijheidsleeftijd.

@@ -386,3 +386,28 @@ describe('HealthScoreReceipt — sectie Verloop', () => {
     expect(note.textContent).toMatch(/Rekenwijze gewijzigd in aug 2026/)
   })
 })
+
+describe('HealthScoreReceipt — lopende maand = live stand', () => {
+  it('Given een verloop waarvan de lopende maand live is, When de kassabon opent, Then zegt de ondertitel dat en staat het live getal als laatste punt', async () => {
+    render(
+      <HealthScoreReceipt
+        health={makeHealthV2(56, 'Redelijk')}
+        verloop={[verloopPunt('2026-08-29', 56), { ...verloopPunt('2026-09-26', 56), live: true }]}
+      />,
+    )
+    const ondertitel = await screen.findByTestId('health-verloop-ondertitel')
+    expect(ondertitel.textContent).toBe(
+      'De laatste stand van elke maand over de laatste twaalf maanden; voor deze maand je huidige stand.',
+    )
+    const labels = Array.from(screen.getByTestId('resilience-trend-chart').querySelectorAll('text'))
+      .map((t) => t.textContent)
+    expect(labels.filter((t) => t === '56')).toHaveLength(2)
+  })
+
+  it('Given een verloop zonder live punt, When de kassabon opent, Then de gewone ondertitel', async () => {
+    render(<HealthScoreReceipt health={makeHealthV2()} verloop={[verloopPunt('2026-08-29', 56)]} />)
+    expect((await screen.findByTestId('health-verloop-ondertitel')).textContent).toBe(
+      'De laatste stand van elke maand, over de laatste twaalf maanden.',
+    )
+  })
+})

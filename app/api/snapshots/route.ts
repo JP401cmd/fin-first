@@ -2,7 +2,7 @@ import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { unauthorized, serverError } from '@/lib/api/respond'
 import { computeFireProjection, ageAtDate, type FinancialInput } from '@/lib/horizon-data'
-import { computeHealthScoreFromInputs, HEALTH_SCORE_VERSION } from '@/lib/financial-health'
+import { computeSnapshotHealthScore, HEALTH_SCORE_VERSION } from '@/lib/financial-health'
 import {
   buildHealthScoreInput,
   type HealthScoreAsset,
@@ -186,7 +186,7 @@ export async function POST() {
       // (3 × netto maandsalaris) — dezelfde grondslag als de live loader.
       // + het PLAN (ADR 0129 F3a): onder een vast stop-anker wordt `fire_age` niet
       // geschreven en reist het anker (+ de dekking) mee in `params`.
-      .select(`date_of_birth, expected_return, inflation_rate, household_type, net_monthly_income, estimated_monthly_expenses, income_source, expenses_source, feature_preferences, ${FIRE_PLAN_COLUMNS}`)
+      .select(`date_of_birth, expected_return, inflation_rate, household_type, net_monthly_income, estimated_monthly_expenses, income_source, expenses_source, feature_preferences, budgeting_active, ${FIRE_PLAN_COLUMNS}`)
       .eq('id', user.id)
       .single(),
     // Alle budgetten (alle types, parents + children) — must-expenses + health.
@@ -406,7 +406,7 @@ export async function POST() {
   // mee). Bestaande snapshot-rijen blijven staan: historie vóór 30 aug 2026 op
   // de oude grondslag (ongefilterde Σ|amount|), bewust geaccepteerd. De trendlijn
   // op /toekomst kan daardoor een eenmalige knik tonen op de naad.
-  const healthScore = computeHealthScoreFromInputs(
+  const { health: healthScore, resilienceScore } = computeSnapshotHealthScore(
     buildHealthScoreInput(
       {
         effectiveSavingsRatePct,
@@ -436,6 +436,8 @@ export async function POST() {
         debtMonthlyPayments,
       },
     ),
+    // Budgetteer-vlag uit het profiel, zoals de live score (ADR 0008).
+    profileResult.data,
   )
 
   const today = new Date().toISOString().split('T')[0]
@@ -461,7 +463,7 @@ export async function POST() {
     savings_rate: Math.round(effectiveSavingsRatePct * 10) / 10,
     // Note: resilience_score column is retained for historical data continuity.
     // It now stores the v2 4-pijler/7-indicator gezondheidsscore (ADR 0010).
-    resilience_score: healthScore.total,
+    resilience_score: resilienceScore,
     // Methode-versie van de opgeslagen score (ADR 0010 / FR-7). DEFAULT 1 op de
     // kolom; v2-snapshots schrijven expliciet 2 zodat de trendlijn de
     // methodewissel kan markeren bij een mix v1/v2.
@@ -534,7 +536,7 @@ export async function POST() {
       coverage_pct: coveragePct,
       sovereignty_level: sovereigntyLevel,
       savings_rate: Math.round(effectiveSavingsRatePct * 10) / 10,
-      resilience_score: healthScore.total,
+      resilience_score: resilienceScore,
       fire_target: fireTarget,
       yearly_must_expenses: yearlyMustExpenses,
       net_worth_verified: netWorth === totalAssets - totalDebts,
@@ -551,7 +553,7 @@ export async function POST() {
       stop_anchor: firePlan.anchor.kind,
       sovereignty_level: sovereigntyLevel,
       savings_rate: Math.round(effectiveSavingsRatePct * 10) / 10,
-      resilience_score: healthScore.total,
+      resilience_score: resilienceScore,
       health_pillars: healthScore.pillars.map(p => ({ id: p.id, name: p.name, score: p.score, weight: p.weight })),
     },
     ...(upsertError ? { warning: upsertError } : {}),

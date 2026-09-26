@@ -1119,6 +1119,37 @@ export function healthScoreVerdict(health: HealthScore): HealthScoreVerdict {
 }
 
 /**
+ * Staat budgetteren aan voor dit profiel? De ENE lezing van
+ * `profiles.budgeting_active` voor de gezondheidsscore: de live loader
+ * (lib/horizon/raw-data-loader.ts) en de drie snapshot-writers gebruiken hem,
+ * zodat de opgeslagen score en de live score dezelfde pijlerset wegen (ADR 0008).
+ * Ontbreekt de waarde (oude select, geen rij), dan staat budgetteren aan — de
+ * kolomdefault.
+ */
+export function budgetingActiveFromProfile(
+  profile: { budgeting_active?: boolean | null } | null | undefined,
+): boolean {
+  return profile?.budgeting_active !== false
+}
+
+/**
+ * De gezondheidsscore zoals een snapshot-writer hem wegschrijft: dezelfde
+ * canonieke berekening als live (`computeHealthScoreFromInputs`) met de
+ * budgetteer-vlag uit het profiel. `resilienceScore` is de waarde voor de kolom
+ * `net_worth_snapshots.resilience_score`.
+ *
+ * Gedeeld door POST /api/snapshots, GET /api/snapshots/auto en de cron, zodat
+ * geen van de drie een eigen variant van de regel draagt.
+ */
+export function computeSnapshotHealthScore(
+  input: HealthScoreInput,
+  profile: { budgeting_active?: boolean | null } | null | undefined,
+): { health: HealthScore; resilienceScore: number } {
+  const health = computeHealthScoreFromInputs(input, budgetingActiveFromProfile(profile))
+  return { health, resilienceScore: health.total }
+}
+
+/**
  * De gezondheidsscore afgebeeld op de stoplicht-schaal, voor oppervlakken die
  * een status-KLEUR nodig hebben in plaats van het bandwoord — sinds de
  * kop-herziening (sep 2026) de paginatitel van /overzicht.
