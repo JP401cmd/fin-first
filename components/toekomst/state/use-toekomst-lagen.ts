@@ -17,7 +17,6 @@
 import { useEffect, useState, useCallback, useRef, useMemo, useDeferredValue } from 'react'
 import { useRouter } from 'next/navigation'
 import { type HorizonPageData, HORIZON_EXIT_NOTICE_DISMISSED_SLUG } from '@/lib/horizon-data-loader'
-import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/components/app/toast-provider'
 import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import { ageAtDate, type LifeEvent } from '@/lib/horizon-data'
@@ -42,7 +41,7 @@ import { faseAtAge } from '@/lib/horizon/phase-bar-segments'
 import { buildBreakdown } from '@/lib/income-expense-breakdown'
 import { unifiedRowsToStackedRows, type StackedRow } from '@/lib/wealth-composition'
 import type { IeViewMode } from '@/components/toekomst/state/types'
-import type { CanvasModus, LaagId } from '@/lib/horizon/katern-copy'
+import { GEBEURTENIS_NIET_VERPLAATST, type CanvasModus, type LaagId } from '@/lib/horizon/katern-copy'
 import {
   COLOR_LIFE_INCOME,
   COLOR_LIFE_EXPENSE,
@@ -55,6 +54,7 @@ import {
   COLOR_GOAL_OVERDUE,
 } from '@/components/toekomst/canvas/marker-kleuren'
 import { useStabielObject } from './use-stabiel-object'
+import { verplaatsLevensgebeurtenis } from './levensgebeurtenis-verplaatsen'
 import type { ToekomstPerspectief } from './use-toekomst-perspectief'
 import type { ToekomstOverlayState } from './use-toekomst-overlay-state'
 import type { ToekomstScenarioState } from './use-toekomst-scenario'
@@ -706,14 +706,10 @@ export function useToekomstLagen({ initialData, goals, perspectief, overlays, sc
         ),
       )
 
-      const supabase = createClient()
-      const { error } = await supabase
-        .from('life_events')
-        .update({ target_age: clamped, target_date: null })
-        .eq('id', eventId)
-      if (error) {
-        console.error('[F-1 drag] life_events update faalde:', error)
-        // Rollback optimistic update naar oorspronkelijke waarden.
+      const uitkomst = await verplaatsLevensgebeurtenis(eventId, { target_age: clamped, target_date: null })
+      if (uitkomst !== 'verplaatst') {
+        // Rollback optimistic update naar oorspronkelijke waarden — bij een fout én bij
+        // nul geraakte rijen (niet jouw gebeurtenis), want dan is er niets opgeslagen.
         setEvents((prev) =>
           prev.map((e) =>
             e.id === eventId
@@ -721,13 +717,21 @@ export function useToekomstLagen({ initialData, goals, perspectief, overlays, sc
               : e,
           ),
         )
+        if (uitkomst === 'niet-geraakt') {
+          addToast({
+            type: 'info',
+            title: GEBEURTENIS_NIET_VERPLAATST.titel,
+            message: GEBEURTENIS_NIET_VERPLAATST.uitleg,
+            duration: 5000,
+          })
+        }
         return
       }
       // Props-als-bron (fase 1 stap 3): na de write de server-bundel verversen, zodat
       // `initialData.events` niet achterloopt op de optimistische lokale lijst.
       loadData()
     },
-    [currentAge, events, loadData, setEvents],
+    [currentAge, events, loadData, setEvents, addToast],
   )
   // Cijferbar-waarden bij de actieve leeftijd (hover/playback); consumeert de
   // unified-rij + format-helpers, herberekent niets.
@@ -966,19 +970,27 @@ export function useToekomstLagen({ initialData, goals, perspectief, overlays, sc
     // Optimistic local update for instant feedback
     setEvents(prev => prev.map(e => e.id === eventId ? { ...e, target_age: roundedAge } : e))
 
-    const supabase = createClient()
-    const { error } = await supabase.from('life_events').update({ target_age: roundedAge }).eq('id', eventId)
-    if (error) {
-      console.error('Failed to update life event age:', error)
-      // Revert optimistic update
+    const uitkomst = await verplaatsLevensgebeurtenis(eventId, { target_age: roundedAge })
+    if (uitkomst !== 'verplaatst') {
+      // Revert optimistic update — bij een fout én bij nul geraakte rijen (niet jouw
+      // gebeurtenis): er is niets opgeslagen, dus ook geen "verplaatst".
       setEvents(prev => prev.map(e => e.id === eventId ? { ...e, target_age: originalAge } : e))
+      if (uitkomst === 'niet-geraakt') {
+        addToast({
+          type: 'info',
+          title: GEBEURTENIS_NIET_VERPLAATST.titel,
+          message: GEBEURTENIS_NIET_VERPLAATST.uitleg,
+          duration: 5000,
+        })
+      }
       return
     }
 
-    // Show undo toast after successful drag
+    // Show undo toast after successful drag. De leeftijd is wat er is opgeslagen
+    // (afgerond), niet de fractionele sleeppositie.
     addToast({
       type: 'info',
-      title: `${ev.name} verplaatst naar ${newAge}j`,
+      title: `${ev.name} verplaatst naar ${roundedAge}j`,
       message: `Was ${originalAge}j`,
       duration: 5000,
       action: {
@@ -986,15 +998,10 @@ export function useToekomstLagen({ initialData, goals, perspectief, overlays, sc
         onClick: async () => {
           // Revert to original age optimistically
           setEvents(prev => prev.map(e => e.id === eventId ? { ...e, target_age: originalAge } : e))
-          const undoSupabase = createClient()
-          const { error: undoErr } = await undoSupabase
-            .from('life_events')
-            .update({ target_age: originalAge })
-            .eq('id', eventId)
-          if (undoErr) {
-            console.error('Failed to undo event drag:', undoErr)
+          const undoUitkomst = await verplaatsLevensgebeurtenis(eventId, { target_age: originalAge })
+          if (undoUitkomst !== 'verplaatst') {
             // Revert back to the new age if undo failed
-            setEvents(prev => prev.map(e => e.id === eventId ? { ...e, target_age: newAge } : e))
+            setEvents(prev => prev.map(e => e.id === eventId ? { ...e, target_age: roundedAge } : e))
             addToast({ type: 'error', title: 'Ongedaan maken mislukt', duration: 3000 })
             return
           }

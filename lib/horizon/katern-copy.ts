@@ -372,6 +372,17 @@ export function laagUitleg(id: LaagId, hoofdlijn: HoofdlijnGrondslag): string {
   return id === 'metHuis' ? HUIS_LAAG_UITLEG[hoofdlijn] : LAAG_UITLEG[id]
 }
 
+// ── Een gebeurtenis verslepen op de tijdas ───────────────────────────────────
+
+/**
+ * De sleep raakte geen rij: de gebeurtenis is niet van jou (bijvoorbeeld een gedeelde
+ * gebeurtenis van je partner) of bestaat niet meer. De sleep is teruggedraaid.
+ */
+export const GEBEURTENIS_NIET_VERPLAATST = {
+  titel: 'Niet verplaatst',
+  uitleg: 'Je kunt alleen gebeurtenissen verplaatsen die je zelf hebt toegevoegd. Deze staat weer op zijn oude plek.',
+} as const
+
 // ── Drie getallen onder de Marktcheck-band (kopij-toets §7, spec §7.6) ───────
 
 export type MarktcheckStand = 'tegenzit' | 'midden' | 'meezit'
