@@ -43,7 +43,7 @@ import { runKernelProjection } from '../engine'
 import { computeEs } from '../tables/es'
 import type { KernelInput, ScenarioBand } from '../types'
 import { clng, eindMaandVan, eindleeftijdVan, prognoseJ } from '../gap'
-import { isToereikend } from '../solver'
+import { isToereikend, ligtVoorbijEindleeftijd } from '../solver'
 import { potRisicoFactor } from './risico'
 
 /** De scenario's + hun rendement-shift P!B43 (SWITCH op P!B42). */
@@ -146,6 +146,19 @@ export function runScenarioBand(input: KernelInput): ScenarioBandResult {
     }
 
     const fireAge = start + hi / 12
+    // V26 — dezelfde grens als `solveFire` (één predicaat): een scenario-leeftijd op/
+    // voorbij de eindleeftijd is binnen het plan niet haalbaar (= #N/A). Vlag weggelaten
+    // (fixture-pad) ⇒ altijd false ⇒ parity-band cel-exact.
+    if (ligtVoorbijEindleeftijd(shifted, eindleeftijd, fireAge)) {
+      rows.push({
+        scenario,
+        reachable: false,
+        fireAge: null,
+        nettoVermogenBijFire: null,
+        vermogenOpEindleeftijd: null,
+      })
+      continue
+    }
     const finalProj = run(fireAge)
     rows.push({
       scenario,

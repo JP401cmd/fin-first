@@ -18,6 +18,10 @@
  *     laat lopen, niet via de bisectie). Het criterium is `isToereikend`: op het
  *     app-pad met `geenTekortLening` (ADR 0149) is dat gap ≥ 0 ∧ geen blijvende
  *     tekort-lening; zonder die vlag exact de gap.
+ *  4. App-pad (`KernelInput.vrijheidVoorEindleeftijd`, voorgesteld gap-besluit V26):
+ *     ligt de gevonden maand op/voorbij de eindleeftijd (`ligtVoorbijEindleeftijd`),
+ *     dan is er binnen het plan geen vrijheidsmoment → dezelfde parkeerstand en
+ *     `unreachable_within_horizon` als bij stap 2. Vlag weggelaten ⇒ oracle-exact.
  *
  * Statusblok (per kandidaat volledig herrekend, zoals Excel dat per
  * `Application.Calculate` doet):
@@ -148,6 +152,34 @@ export function isToereikend(
   if (computeGap(input, es, proj, fireAge) < 0) return false
   if (input.geenTekortLening !== true) return true
   return !heeftBlijvendeTekortLening(input, proj, eindleeftijdVan(es))
+}
+
+/**
+ * **Ligt een OPGELOSTE vrijheidsleeftijd op of voorbij de eindleeftijd van het plan?**
+ * (voorgesteld gap-besluit V26, `KernelInput.vrijheidVoorEindleeftijd`). De enige
+ * definitie — gelezen door het statusblok, de parkeer-stap van `solveFire` en de
+ * scenarioband (`wrappers/band.ts`), zodat geen oppervlak een eigen leeftijd-cap houdt.
+ *
+ * Waarom de eindleeftijd de grens is: B37 leest de modelwaarde óp de eindleeftijd, dus
+ * elke FIRE-maand ná die leeftijd laat B37 ongemoeid en is triviaal "toereikend" — de
+ * bisectie vond zo "de eerste maand na je plan" (deplete tot 90 → 90,08). Wie pas ná
+ * het einde van zijn plan kan stoppen, is binnen zijn plan niet vrij. Bij perpetual is
+ * de eindleeftijd de horizon (100): alleen de parkeerstand valt dan om.
+ *
+ * Alleen voor het gesolvede pad: onder een vast stopmoment (anker, oracle-pensioen,
+ * `evaluateFireAt`) is de vraag niet wánneer maar óf het geld reikt — de aanroeper
+ * sluit die uit. Vlag weggelaten ⇒ altijd `false` ⇒ Excel v5-oracle byte-identiek.
+ *
+ * Tolerantie: absoluut 1e-9 jaar — alleen float-ruis van `start + k/12`; de kleinste
+ * betekenisvolle stap is een maand (0,083), dus de grens "precies op de eindleeftijd"
+ * valt ondubbelzinnig aan de onhaalbare kant.
+ */
+export function ligtVoorbijEindleeftijd(
+  input: KernelInput,
+  eindleeftijd: number,
+  fireAge: number,
+): boolean {
+  return input.vrijheidVoorEindleeftijd === true && fireAge >= eindleeftijd - 1e-9
 }
 
 export interface SolveFireResult {
@@ -296,6 +328,12 @@ function computeStatusBlok(
     input.stopAnker === undefined &&
     !vastStop &&
     heeftBlijvendeTekortLening(input, proj, eindleeftijd)
+  // Voorgesteld gap-besluit V26 — een OPGELOSTE leeftijd op/voorbij de eindleeftijd is de
+  // verhulde parkeerstand, geen vrijheid binnen het plan. Zelfde scoping als de ADR
+  // 0149-tak (geen anker, geen vast stopmoment) en dezelfde plaats: vóór reached_now,
+  // want bij B36 = 0 is `J(0) ≥ 0` triviaal waar en zou die tak 'm maskeren.
+  const voorbijEindleeftijd =
+    input.stopAnker === undefined && !vastStop && ligtVoorbijEindleeftijd(input, eindleeftijd, fireAge)
   let status: SolverStatus
   if (code === 'pensioen' && tekortLening > 0) {
     status = 'pension_shortfall'
@@ -310,7 +348,7 @@ function computeStatusBlok(
     // `stopAnker`-blok. De app-adapter stuurt die selector sinds F2 niet meer
     // (het anker reist als blok); F4 verwijdert de selector én deze tak.
     status = 'stop_now_shortfall'
-  } else if (schijnbereik || blijvendeTekortLening) {
+  } else if (schijnbereik || blijvendeTekortLening || voorbijEindleeftijd) {
     status = 'unreachable_within_horizon'
   } else if (jMaand0 >= doelbedrag) {
     status = 'reached_now'
@@ -399,11 +437,13 @@ export function solveFire(input: KernelInput): SolveFireResult {
   // F5: alleen het criterium nodig → `isToereikend` i.p.v. het volle `computeStatusBlok`
   // (byte-identiek: beide leiden B38 uit computeDoelblok(input, es, proj, fireAge);
   // het ADR 0149-tekortdeel is zonder `geenTekortLening` inert).
-  let proj = run(leeftijd + hi / 12)
-  if (!isToereikend(input, es, proj, leeftijd + hi / 12)) {
+  const parkeerLeeftijd = leeftijd + hi / 12
+  const horizonProj = run(parkeerLeeftijd)
+  if (!isToereikend(input, es, horizonProj, parkeerLeeftijd)) {
     // Parkeerstand: geen gekozen stopmoment → `vastStopLeeftijd` null.
-    return afronden(leeftijd + hi / 12, proj, null)
+    return afronden(parkeerLeeftijd, horizonProj, null)
   }
+  let proj = horizonProj
 
   // ── Maand-bisectie op het criterium (VBA: `\` = integer-deling, floor) ──────
   while (hi - lo > 1) {
@@ -419,6 +459,13 @@ export function solveFire(input: KernelInput): SolveFireResult {
   }
 
   const fireAge = leeftijd + hi / 12
+  // V26 — de vroegste toereikende maand ligt op/voorbij de eindleeftijd: binnen het plan
+  // is er geen vrijheidsmoment. Zelfde uitkomst als een mislukte horizon-check: B16 op
+  // de parkeerstand met de horizon-projectie (die run bestaat al — geen extra engine-run);
+  // het statusblok geeft daar via dezelfde regel `unreachable_within_horizon`.
+  if (ligtVoorbijEindleeftijd(input, eindleeftijdVan(es), fireAge)) {
+    return afronden(parkeerLeeftijd, horizonProj, null)
+  }
   return afronden(fireAge, run(fireAge), null)
 }
 

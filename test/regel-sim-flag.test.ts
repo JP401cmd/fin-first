@@ -37,7 +37,24 @@ const rawContext: ConvergentieRawContext = {
     fire_end_age: 90,
     fire_legacy_amount: 0,
   },
-  assets: [],
+  // Een beleggingspot als instroom-doel: zonder pot verdampt het maandoverschot (V24,
+  // pot-bewuste instroom) en vond de bisectie alleen 90,08 — een leeftijd ná de
+  // eindleeftijd, sinds V26 terecht "niet haalbaar". Deze suite toetst de draad, dus
+  // een profiel met een échte vrijheidsleeftijd vóór 90.
+  assets: [
+    {
+      id: 'inv',
+      name: 'Beleggingen',
+      asset_type: 'investment',
+      current_value: 50_000,
+      woz_value: null,
+      expected_return: 7,
+      monthly_contribution: 0,
+      is_active: true,
+      net_worth_inclusion_pct: 100,
+      depreciation_rate: 0,
+    },
+  ] as unknown as ConvergentieRawContext['assets'],
   debts: [],
   lifeEvents: [],
   yearlyExpenses: YEARLY_EXPENSES,

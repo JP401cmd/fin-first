@@ -58,8 +58,13 @@ function makeInput(overrides: Partial<ConvergentieRawProfileRow> = {}) {
 
 describe('evaluateFireAt — pariteit met de solver-eind-run', () => {
   it('op de door solveFire gevonden fireAge levert het HETZELFDE statusblok', () => {
-    const input = makeInput()
+    // De pariteit geldt voor een ECHT gevonden moment (vóór de eindleeftijd). Het basis-
+    // profiel (perpetual) landde op de horizon-parkeerstand 100 (gap exact 0); daar wijken
+    // de solved-only takken bewust af van een geforceerde run: V26 (vrijheidVoorEindleeftijd)
+    // maakt de gesolvede parkeerstand onhaalbaar, een vast moment niet. Vandaar deplete.
+    const input = makeInput({ fire_end_strategy: 'deplete', fire_end_age: 90 })
     const solve = solveFire(input)
+    expect(solve.fireAge).toBeLessThan(solve.eindleeftijd)
     const forced = evaluateFireAt(input, solve.fireAge)
 
     // fireAge gelijk per constructie; het volledige statusblok moet samenvallen.

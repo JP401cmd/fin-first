@@ -97,9 +97,14 @@ function bouw(adapterInput: unknown): KernelInput {
   return buildKernelInputFromAppWithNotices(adapterInput as never).input
 }
 
-/** Zonder de vlag = exact het Excel v5-oracle-gedrag (fixture-/parity-pad). */
+/**
+ * Zonder de vangrails = exact het Excel v5-oracle-gedrag (fixture-/parity-pad). Sinds
+ * V26 vangt ook `vrijheidVoorEindleeftijd` deze perpetual-parkeerstand (fireAge 100 =
+ * eindleeftijd) — beide vlaggen gaan eraf, anders pint de defect-test niet meer het
+ * oracle-gedrag.
+ */
 function zonderVangrail(input: KernelInput): KernelInput {
-  return { ...input, reachedNowVereistBereikbaarDoel: undefined }
+  return { ...input, reachedNowVereistBereikbaarDoel: undefined, vrijheidVoorEindleeftijd: undefined }
 }
 
 function naarUnified(input: KernelInput, assets: Asset[]) {

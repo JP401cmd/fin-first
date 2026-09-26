@@ -326,15 +326,16 @@ describe('kernel-tak', () => {
     expect(outcome.result.fireDate).toBe('Bereikt!')
   })
 
-  it('deplete die structureel ontspaart: fireAge landt ná de eindleeftijd, niet op "Bereikt!"', () => {
+  it('deplete die structureel ontspaart: geen FIRE-maand vóór de eindleeftijd → "Niet haalbaar" (V26)', () => {
     // Uitgaven > inkomen met een minipot: geen enkele FIRE-maand vóór de eindleeftijd
     // draagt de afbouw — de bisectie landt dan nét ná de eindleeftijd (≈ endAge + 1
     // maand; de tekort-lening houdt Prognose!J op de vloer, dus gap ≥ 0). De doel=0-
     // quirk verhulde dit vóór de weergave-regel als "nu al bereikt" (fireAge = 40).
-    // NB — OPEN BESLUIT (geen gewenst-gedrag-pin): of "fireAge ≥ eindleeftijd" als
-    // "Niet haalbaar" getoond moet worden is een nog niet genomen weergave-besluit
-    // (zelfde procedure als de gap-besluiten); deze test pint alléén dat het geen
-    // "Bereikt!" meer is. Wordt dat besluit genomen, herijk dan deze verwachting.
+    // HERIJKT 26 sep 2026 (voorgesteld gap-besluit V26, het open weergave-besluit dat
+    // hier stond is genomen): wie pas ná het einde van zijn plan kan stoppen, is binnen
+    // zijn plan niet vrij. De kern geeft op het app-pad (KernelInput
+    // .vrijheidVoorEindleeftijd) `unreachable_within_horizon` — dezelfde uitkomst als
+    // de parkeerstand hieronder. Kernel-kant: vrijheid-voorbij-eindleeftijd.test.ts.
     const outcome = computeScalarFireProjection(
       makeParams({
         input: makeInput({
@@ -346,9 +347,9 @@ describe('kernel-tak', () => {
       }),
     )
     expect(outcome.engine).toBe('kernel')
-    expect(outcome.result.fireAge).not.toBeNull()
-    expect(outcome.result.fireAge!).toBeGreaterThanOrEqual(90) // ná de deplete-eindleeftijd
-    expect(outcome.result.fireDate).not.toBe('Bereikt!')
+    expect(outcome.kernelStatus).toBe('unreachable_within_horizon')
+    expect(outcome.result.fireAge).toBeNull()
+    expect(outcome.result.fireDate).toBe('Niet haalbaar')
   })
 
   it('deplete op de horizon-eindleeftijd met structureel tekort: verhulde parkeerstand → "Niet haalbaar"', () => {

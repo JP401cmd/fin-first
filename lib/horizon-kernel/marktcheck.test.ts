@@ -302,16 +302,19 @@ describe('Marktcheck — de marge zegt iets over dit plan (en het percentage dee
   })
 
   it('Given het ONhaalbaarste plan (FIRE voorbij de eindleeftijd), When de marge wordt gelezen, Then meldt hij een tekort i.p.v. het oude 100%-artefact', () => {
-    // €6.000/mnd op €4.000 inkomen → solver landt op FIRE 91 bij eindleeftijd 90.
-    // De oude kans meldde daar 1,00 (hoogste van de hele reeks) tot de guard 'm
-    // op null zette. De marge ankert op de AOW-leeftijd (67 < 90), dus er IS een
-    // onttrekkingsfase en het antwoord is een eerlijk, groot tekort.
+    // €6.000/mnd op €4.000 inkomen → de bisectie vindt pas een maand ná eindleeftijd 90.
+    // Sinds V26 (KernelInput.vrijheidVoorEindleeftijd) is dat bij de bron "niet haalbaar
+    // binnen je plan": geen vrijheidsleeftijd, niet de oude 91. De oude kans meldde hier
+    // 1,00 (hoogste van de hele reeks) tot de guard 'm op null zette. De marge ankert op
+    // de AOW-leeftijd (67 < 90), dus er IS een onttrekkingsfase en het antwoord is een
+    // eerlijk, groot tekort.
     const ctx = makeKernelContext({ monthlyExpenses: 6000, yearlyExpenses: 72_000 })
     const outcome = computeConvergentieProjection({ rawContext: ctx })
     expect(outcome.ok).toBe(true)
     if (!outcome.ok) return
     const sim = toSimResult(outcome.result)
-    expect(sim.fireAge!).toBeGreaterThanOrEqual(sim.displayEndAge)
+    expect(sim.fireReachable).toBe(false)
+    expect(sim.fireAge).toBeNull()
 
     const check = computeMarktcheck({ rawContext: ctx, maxRuns: 1 })
     expect(check.ok).toBe(true)

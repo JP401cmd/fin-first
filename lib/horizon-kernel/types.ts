@@ -876,6 +876,31 @@ export interface KernelInput {
   readonly reachedNowVereistBereikbaarDoel?: boolean
 
   /**
+   * **Buiten oracle-domein (voorgesteld gap-besluit V26).** Een OPGELOSTE
+   * vrijheidsleeftijd op of voorbij de eindleeftijd van het plan (P!B35) is geen
+   * vrijheid binnen het plan, maar de verhulde parkeerstand.
+   *
+   * Het mechanisme: B37 leest de modelwaarde óp de eindleeftijd. Een FIRE-maand ná
+   * die leeftijd verandert niets meer aan B37 (de onttrekkingsfase begint pas als
+   * het plan voorbij is), dus de bisectie van `BepaalFIRE` vindt dan "de eerste maand
+   * na de eindleeftijd" als toereikend — bij deplete met eindleeftijd 90 wordt dat
+   * 90,08 (gemeld 26 sep 2026, uitgaven boven het inkomen). Bij B36 = 0 geeft B93
+   * er bovendien `reached_now` bij. Bij perpetual (B35 = 100) is het dezelfde vorm:
+   * de horizon-parkeerstand 100 is triviaal toereikend (gap exact 0).
+   *
+   * Met de vlag AAN geldt op het GESOLVEDE pad (geen `stopAnker`, geen vast
+   * stopmoment): `fireAge ≥ eindleeftijd` ⇒ `unreachable_within_horizon` en de
+   * solver parkeert B16 op de horizon, net als bij een mislukte horizon-check
+   * (`solver.ts#ligtVoorbijEindleeftijd` — de enige definitie; ook de scenarioband
+   * leest hem). Vaste stopmomenten (anker, oracle-pensioen, `evaluateFireAt`) zijn
+   * uitgezonderd: die vragen niet wánneer, maar óf het geld reikt.
+   *
+   * Weggelaten/`false` → **byte-identiek aan het Excel v5-oracle**:
+   * `input-from-fixture` zet 'm níet. De app-adapter zet 'm op `true`.
+   */
+  readonly vrijheidVoorEindleeftijd?: boolean
+
+  /**
    * **Buiten oracle-domein (gap-besluit V22).** Rekent de rente/aflossing-split van
    * een annuïteit PER MAAND opnieuw uit i.p.v. de aflossingscomponent van vandaag te
    * bevriezen.

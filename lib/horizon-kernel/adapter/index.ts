@@ -235,6 +235,10 @@ export function buildKernelInputFromAppWithNotices(input: KernelAdapterInput): K
     // leverde "Vrijheidsleeftijd 100,0 jaar" als hard feit. Parity-/fixture-pad
     // zet deze vlag NIET (input-from-fixture) → Excel v5-oracle byte-identiek.
     reachedNowVereistBereikbaarDoel: true,
+    // Voorgesteld gap-besluit V26: een opgeloste vrijheidsleeftijd op/voorbij de
+    // eindleeftijd van het plan is "niet haalbaar binnen je plan", geen leeftijd (bv.
+    // 90,08 bij deplete tot 90). Fixture-pad zet deze vlag NIET → oracle byte-identiek.
+    vrijheidVoorEindleeftijd: true,
     // Gap-besluit V22: een annuïteit lost niet met een vast bedrag af — het
     // aflossingsdeel groeit terwijl de rente over het dalende saldo krimpt. Het
     // oracle bevriest de aflossing van vandaag, waardoor een hypotheek ~5× te

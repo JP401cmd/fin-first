@@ -33,8 +33,8 @@ const PROFILE: ConvergentieRawProfileRow = {
   date_of_birth: DOB,
   net_monthly_income: 4000,
   estimated_monthly_expenses: 2500,
-  expected_return: 7,
-  inflation_rate: 2,
+  expected_return: 0.07, // profiles-kolom = FRACTIE (0.07); 7 was 700% (V26-herijking)
+  inflation_rate: 0.02, // FRACTIE; 2 was 200% inflatie → perpetual landde op de parkeerstand 100
   box3_method: 'forfaitair',
   fire_end_strategy: 'perpetual',
   fire_end_age: 90,
