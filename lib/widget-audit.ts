@@ -81,7 +81,7 @@ export const WIDGET_CLASSIFICATION: Record<string, WidgetClassification> = {
   sim_vermogenspad:         'insight',       // → /horizon?modal=simulations
   box3_drag:                'insight',       // → /core/debts (tax strategy)
   backtesting_score:        'insight',       // → /horizon?modal=backtesting
-  surplus_gap:              'insight',       // → /horizon#vermogensstromen
+  surplus_gap:              'insight',       // → /toekomst (canvas, modus Geldstroom)
   inflatie_impact:          'insight',       // → /identity/instellingen (adjust assumption)
   swr_monitor:              'insight',       // → /identity/instellingen (adjust SWR params)
   meldingen:                'insight',       // → /berichten (view/dismiss)

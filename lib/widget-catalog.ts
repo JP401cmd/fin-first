@@ -531,7 +531,7 @@ export const WIDGET_HREFS: Record<string, string> = {
   box3_drag:                '/overzicht/belasting/box3',
   vrijheidsmijlpalen:       '/toekomst',
   backtesting_score:        '/toekomst?modal=backtesting',
-  surplus_gap:              '/toekomst#vermogensstromen',
+  surplus_gap:              '/toekomst',
   swr_monitor:              '/toekomst/instellingen',
   inflatie_impact:          '/toekomst/instellingen',
   // Kaart H7 — de rekenmodal "Zo is het rendement berekend" hing aan één knop op
