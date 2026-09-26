@@ -30,6 +30,7 @@ import {
   instellingenSamenvatting,
   katernAnkerregel,
   katernKpi1Label,
+  katernMeldingNogLabel,
   katernStatuspuntLabel,
   laagLabel,
   laagUitleg,
@@ -61,6 +62,8 @@ function alleKopij(): string[] {
     DOELEN_VOLGT_PLAN_REGEL,
     MARKTCHECK_MISLUKT_REGEL,
     PLAN_JAARTABEL_LINK,
+    katernMeldingNogLabel(1),
+    katernMeldingNogLabel(3),
     ...Object.values(GEBEURTENIS_NIET_VERPLAATST),
     katernAnkerregel({ kind: 'solved', solvedFireAge: 52.3, currentAge: 38 }),
     katernAnkerregel({ kind: 'solved', solvedFireAge: null, currentAge: 38 }),
@@ -87,6 +90,11 @@ describe('katern-copy — katernen', () => {
 
   it('de wizardnaam is de canonieke PLAN_REVIEW_NAAM', () => {
     expect(KATERN_WIZARD_NAAM).toBe(PLAN_REVIEW_NAAM)
+  })
+
+  it('"Nog N" onder de bovenste melding: enkelvoud en meervoud', () => {
+    expect(katernMeldingNogLabel(1)).toBe('Nog 1 melding')
+    expect(katernMeldingNogLabel(2)).toBe('Nog 2 meldingen')
   })
 
   it('statuspunt-label voor schermlezers', () => {

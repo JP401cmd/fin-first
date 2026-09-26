@@ -39,6 +39,45 @@ describe('KaternMelding — slot', () => {
     expect(screen.getByText('Aandacht')).toBeTruthy()
   })
 
+  it('de overige meldingen staan ingeklapt onder "Nog N" en blijven bereikbaar (fixronde C1 punt 1)', () => {
+    const GEGEVENS: KaternMeldingData = {
+      id: 'instellingen-gegevens',
+      katern: 'instellingen',
+      ernst: 'warn',
+      titel: 'Vul je profiel aan',
+      kort: 'Vul je profiel aan',
+      actie: { label: 'Naar je profiel', href: '/mijn/profiel' },
+    }
+    render(<KaternMelding meldingen={[AOW, GEGEVENS, HUIS]} display="expanded" onMinimize={() => {}} />)
+    const nog = screen.getByRole('button', { name: /Nog 2 meldingen/ })
+    expect(nog.getAttribute('aria-expanded')).toBe('false')
+    expect(nog.className).toContain('min-h-[44px]')
+    expect(screen.queryByTestId('katern-melding-instellingen-gegevens')).toBeNull()
+    expect(screen.queryByRole('link', { name: /Naar je profiel/ })).toBeNull()
+
+    fireEvent.click(nog)
+    expect(nog.getAttribute('aria-expanded')).toBe('true')
+    const lijst = document.getElementById(nog.getAttribute('aria-controls')!)!
+    expect(lijst).toBeTruthy()
+    // Dezelfde kaart (PageStatusBannerBody compact), zonder eigen Minimaliseren.
+    expect(screen.getByTestId('katern-melding-instellingen-gegevens')).toBeTruthy()
+    expect(screen.getByTestId('katern-melding-instellingen-huis')).toBeTruthy()
+    expect(screen.getAllByRole('link', { name: /Naar je profiel/ })[0].getAttribute('href')).toBe('/mijn/profiel')
+    expect(screen.getAllByRole('button', { name: 'Minimaliseren' })).toHaveLength(2) // alleen de bovenste
+    // Uitklappen kondigt de live-regio niet aan: de lijst is aria-live="off".
+    expect(lijst.closest('[aria-live="off"]')).toBeTruthy()
+
+    fireEvent.click(nog)
+    expect(screen.queryByTestId('katern-melding-instellingen-gegevens')).toBeNull()
+  })
+
+  it('één melding: geen "Nog"-knop; geminimaliseerd ook niet', () => {
+    const { rerender } = render(<KaternMelding meldingen={[AOW]} display="expanded" onMinimize={() => {}} />)
+    expect(screen.queryByRole('button', { name: /^Nog / })).toBeNull()
+    rerender(<KaternMelding meldingen={[AOW, HUIS]} display="minimized" onMinimize={() => {}} />)
+    expect(screen.queryByRole('button', { name: /^Nog / })).toBeNull()
+  })
+
   it('geminimaliseerd: niets zichtbaars, wel de sr-aankondiging in de altijd gemounte live-regio', () => {
     render(<KaternMelding meldingen={[AOW]} display="minimized" onMinimize={() => {}} />)
     const regio = screen.getByRole('status')

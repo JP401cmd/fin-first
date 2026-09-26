@@ -56,6 +56,15 @@ export function katernStatuspuntLabel(katern: KaternId, kort: string): string {
   return `${KATERN_LABEL[katern]}, melding: ${kort}`
 }
 
+/**
+ * De uitklapknop onder de bovenste melding als een katern er meer heeft (fixronde C1):
+ * "Nog 2 meldingen". De bovenste blijft de enige uitgeklapte (spec §4.8); de rest is
+ * zo bereikbaar zonder dat hij het slot vult.
+ */
+export function katernMeldingNogLabel(aantal: number): string {
+  return `Nog ${aantal} ${aantal === 1 ? 'melding' : 'meldingen'}`
+}
+
 // ── Ankerregel (kopij-toets §2) ──────────────────────────────────────────────
 
 /**
