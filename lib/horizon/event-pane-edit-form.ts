@@ -243,8 +243,10 @@ export function initFormState(
   const oneTimeAbs = Math.abs(oneTimeSigned)
   // monthly: pak de niet-nul waarde uit catalog
   const monthlyAmount = Math.abs(entry.defaultMonthlyCost) || Math.abs(entry.defaultMonthlyIncome)
-  const monthlyDirection: 'income' | 'expense' =
-    entry.defaultMonthlyIncome > 0 || entry.defaultMonthlyIncome < 0 ? 'income' : 'expense'
+  // Alleen een POSITIEF maandinkomen is een inkomst; een negatief (inkomensverlies:
+  // part_time, early_retirement, sabbatical) is een uitgave. Zelfde tekenregel als
+  // computeSuggestedEventValues (lib/horizon/event-prefill.ts).
+  const monthlyDirection: 'income' | 'expense' = entry.defaultMonthlyIncome > 0 ? 'income' : 'expense'
   const isContinuous = entry.defaultDuration === 0 && monthlyAmount > 0
   const isTemporary = entry.defaultDuration > 0 && monthlyAmount > 0
   const baseState: EditFormState = {

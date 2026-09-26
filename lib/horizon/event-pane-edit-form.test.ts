@@ -150,3 +150,23 @@ describe('event-pane-edit-form — tot wanneer loopt een blijvende verandering',
     expect(draft.metadata).not.toHaveProperty('tot_stopmoment')
   })
 })
+
+/**
+ * Given een catalogus-type zonder story met een NEGATIEVE defaultMonthlyIncome
+ * (inkomensverlies: part_time −1000, early_retirement −2500),
+ * When EventPane een nieuw formulier opent (initFormState zonder bestaand event),
+ * Then staat het maandbedrag als UITGAVE (expense) in het formulier, niet als inkomst.
+ * Zelfde tekenregel als computeSuggestedEventValues (event-prefill.ts): alleen een
+ * positieve defaultMonthlyIncome is een inkomst. Gevonden 26 sep: part_time gaf
+ * +€1.000/mnd en early_retirement +€2.500/mnd inkomsten, dus een te rooskleurig plan.
+ */
+describe('event-pane-edit-form — teken van het catalogus-maandbedrag', () => {
+  for (const type of ['part_time', 'early_retirement'] as const) {
+    it(`${type}: negatief maandinkomen wordt een uitgave`, () => {
+      const s = initFormState(type, null, 40)
+      const actief = s.tempEnabled ? { dir: s.tempDirection, amt: s.tempAmount } : { dir: s.contDirection, amt: s.contAmount }
+      expect(actief.amt).toBeGreaterThan(0)
+      expect(actief.dir).toBe('expense')
+    })
+  }
+})
