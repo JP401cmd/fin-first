@@ -105,6 +105,39 @@ describe('PlanKpiStrip — KPI 1 in hele jaren', () => {
   })
 })
 
+describe('PlanKpiStrip — KPI 1 bij onbereikbaar en bij rekenen (C3 punt 2)', () => {
+  const ONBEREIKBAAR = resolveHeroFireAge({ hasKernelResult: true, kernelFireAgeFractional: null })
+  const BEREKENEN = resolveHeroFireAge({ hasKernelResult: false, isRefining: true })
+
+  function kpi1(heroFireAge: typeof SOLVED, pending: boolean) {
+    const { container } = renderStrip('full', {
+      heroFireAge,
+      heroFireAgePending: pending,
+      heroFireAgeText: formatHeroFireAge(heroFireAge, { dash: '–', pendingText: '···' }),
+    })
+    return container.querySelector('[data-testid="hero-stat-fire-age"]') as HTMLElement
+  }
+
+  it('onbereikbaar: de canonieke woorden, geen streepje, geen "jaar", geen markeerblok', () => {
+    expect(ONBEREIKBAAR.status).toBe('onbekend')
+    const cel = kpi1(ONBEREIKBAAR, false)
+    expect(cel.textContent).toContain('Niet binnen je plan')
+    expect(cel.textContent).not.toContain('–')
+    expect(cel.textContent).not.toMatch(/\bjaar\b/)
+    // Het beige markeerblok (HighlightMark) onder een leeg getal oogde als een skeleton.
+    expect(cel.querySelector('[style*="linear-gradient"]')).toBeNull()
+    expect(cel.getAttribute('aria-busy')).toBeNull()
+  })
+
+  it('rekenen: "···" met "wordt berekend…" en aria-busy — oogt anders dan onbereikbaar', () => {
+    const cel = kpi1(BEREKENEN, true)
+    expect(cel.textContent).toContain('···')
+    expect(cel.textContent).toContain('wordt berekend…')
+    expect(cel.getAttribute('aria-busy')).toBe('true')
+    expect(cel.textContent).not.toContain('Niet binnen je plan')
+  })
+})
+
 describe('PlanKpiStrip — Eenvoudig en Volledig', () => {
   it('Volledig: vier cellen', () => {
     const { container } = renderStrip('full')

@@ -31,9 +31,18 @@ import type { SimResult } from '@/lib/fire-simulation'
 import type { FinancialInput } from '@/lib/horizon-data'
 import type { FireDoelPaarRegel } from '@/lib/horizon/fire-doel-weergave'
 import { type HeroFireAge, heroFireAgeCaption } from '@/lib/horizon/hero-fire-age'
+import { MARKTCHECK_NIET_BINNEN_PLAN } from '@/lib/horizon/katern-copy'
 import type { HorizonOutcomeGuard } from '@/lib/horizon/outcome-guard'
 import { heroKpiNoticeDelen, ReceiptCue } from './plan-helpers'
 import type { HouseholdHeroData } from '@/components/toekomst/state/types'
+
+/**
+ * KPI 1 bij een onbereikbaar plan: de canonieke korte vorm ("niet binnen je plan",
+ * kopij-toets §7), met hoofdletter omdat hij hier op de plaats van het getal staat.
+ * Zelfde betekenis als de ankerregel-zin in de kop; geen nieuwe tekst.
+ */
+const NIET_BINNEN_PLAN_KPI =
+  MARKTCHECK_NIET_BINNEN_PLAN.charAt(0).toUpperCase() + MARKTCHECK_NIET_BINNEN_PLAN.slice(1)
 
 export interface PlanKpiStripProps {
   isFixedAnchorMode: boolean
@@ -129,23 +138,35 @@ export function PlanKpiStrip({
   // UR2-05: geen onderbouwd kernantwoord ⇒ dezelfde melding als de Doelbedrag-cel,
   // niet een kaal getal of een streepje.
   const fireAgeNotice = showFireAgeNotice ? heroKpiNoticeDelen(fireAgeNoticeGuard) : null
+  // Onder `solved` betekent 'onbekend' dat de kernel klaar is zonder leeftijd: niet
+  // haalbaar binnen het plan. Dat is een antwoord, geen lege hand — dus geen streepje
+  // met "jaar" en geen markeerblok (dat oogde als een laad-skeleton), maar de canonieke
+  // korte vorm van de nul-tak van `ankerVrijZin`. 'berekenen' houdt "···" + aria-busy.
+  const onbereikbaar =
+    !fireAgeNotice && !showFreeHero && !hasPerspectiveHero && !isFixedAnchorMode && heroFireAge.status === 'onbekend'
+  // Zonder getal (streepje) nooit het markeerblok: een gemarkeerd leeg vak leest als laden.
+  const zonderGetal = hasPerspectiveHero
+    ? perspectiveHero!.fireAge === null
+    : heroFireAge.age == null && heroFireAge.status !== 'berekenen'
   const kpiLeeftijd: FigureProps = {
     kicker: <KickerMetBon label={showFireAgeNotice ? 'Vrijheidsleeftijd' : showFreeHero ? freeHeroLabel : heroAgeLabel} />,
     amount: fireAgeNotice
       ? fireAgeNotice.amount
       : showFreeHero
         ? <span className="text-[18px] sm:text-[20px] leading-tight">{freeHeroPhrase}</span>
-        : hasPerspectiveHero
-          ? (perspectiveHero!.fireAge !== null ? Math.round(perspectiveHero!.fireAge) : '–')
-          : heroFireAgeText,
+        : onbereikbaar
+          ? <span className="text-[18px] sm:text-[20px] leading-tight">{NIET_BINNEN_PLAN_KPI}</span>
+          : hasPerspectiveHero
+            ? (perspectiveHero!.fireAge !== null ? Math.round(perspectiveHero!.fireAge) : '–')
+            : heroFireAgeText,
     sub: fireAgeNotice
       ? fireAgeNotice.sub
-      : showFreeHero
+      : showFreeHero || onbereikbaar
         ? undefined
         : hasPerspectiveHero
           ? (isPartnerView ? `jaar (${perspectiveHero!.householdName})` : 'jaar (huishouden)')
           : heroFireAgeCaption(heroFireAge, heroAgeCaptionBase),
-    variant: fireAgeNotice ? 'neutral' : 'winner',
+    variant: fireAgeNotice || zonderGetal ? 'neutral' : 'winner',
     onClick: () => setShowFireAgeReceipt(true),
     busy: !hasPerspectiveHero && heroFireAgePending,
     title: hasPerspectiveHero
