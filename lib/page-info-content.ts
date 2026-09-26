@@ -58,7 +58,7 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
   // ── Overzicht (Kern) ───────────────────────────────────────────────
   '/overzicht': {
     insight:
-      'Hoe je ervoor staat in één blik: vier hefbomen — bezittingen, schulden, cashflow, belasting — naast je financiële gezondheidsscore en de voortgang op je doelen. Het verloop van je gezondheidsgetal en van je vrijheidsleeftijd staat in de kassabon van je gezondheidsgetal. De vermogensgrafiek loopt van je verleden tot je vrijheidsmoment (of, als je dat al haalde, tot je eindleeftijd), met een band eromheen die de bandbreedte toont: de marge waarbinnen je vermogen zich waarschijnlijk beweegt.',
+      'Hoe je ervoor staat in één blik: vier hefbomen — bezittingen, schulden, cashflow, belasting — naast je financiële gezondheidsscore en de voortgang op je doelen. Het verloop van je gezondheidsgetal en van je vrijheidsleeftijd staat in de kassabon van je gezondheidsgetal. In het verloop is deze maand je huidige stand; eerdere maanden staan zoals ze toen berekend werden, en een maand zonder bekend inkomen of uitgaven blijft leeg. De vermogensgrafiek loopt van je verleden tot je vrijheidsmoment (of, als je dat al haalde, tot je eindleeftijd), met een band eromheen die de bandbreedte toont: de marge waarbinnen je vermogen zich waarschijnlijk beweegt.',
     grip:
       'Klik op een hefboom voor verdieping — het stipje erop is een stoplicht: groen is op koers, oranje vraagt aandacht, rood vraagt actie. Lees de wekelijkse briefing van Fin voor duiding bij de cijfers.',
     werking: [
@@ -489,7 +489,7 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
   },
   '/overzicht/tips': {
     insight:
-      'Suggesties van Fin, gebaseerd op je chat of analyse van je cijfers: toptips bovenaan, openstaande acties eronder.',
+      'Suggesties van Fin, gebaseerd op je chat of analyse van je cijfers: toptips bovenaan, openstaande acties eronder. Ook je geplande acties staan hier.',
     grip: 'Beslis per tip met Doe nu, Later of Negeren — accepteer je er een, dan landt hij automatisch op je actielijst.',
   },
 
@@ -526,8 +526,8 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
 
   // NB: /toekomst/strategie en /toekomst/uitgaven-na-pensioen hadden hier een
   // entry, maar renderen sinds de React #310-opruiming (11 aug 2026) geen
-  // pagina meer — ze redirecten op de routing-laag (next.config.ts) naar de
-  // Gebeurtenissen-tab resp. de uitgaven-pane op /toekomst. De `i` van die
+  // pagina meer — ze redirecten op de routing-laag (next.config.ts) naar hun
+  // rij in Instellingen. De `i` van die
   // oppervlakken hoort bij hun eigen route, niet bij een dood adres.
 
   '/toekomst/inflatie-koopkracht': {
@@ -542,13 +542,13 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
   // bezittingen. Een info-tekst voor een dood adres hoort hier niet.
   '/toekomst/doelen': {
     insight:
-      'Elk doel hier is een stuk vrijheid dat je opbouwt — zie in één oogopslag hoeveel je al hebt, wat er nog te gaan is en of je op koers ligt, loopt achter of aandacht nodig hebt.',
+      'Hier verken je een doelscenario naast je plan. Op een groot scherm staan de vijf knoppen naast de grafiek, op je telefoon direct eronder: elke verschuiving zie je meteen als stippellijn, met je plan gedempt erachter. In Samenstelling en Geldstroom zie je je doelscenario. Onder het lab staan je doelen en andere paden naast je doelscenario.',
     grip:
-      'Voeg een doel toe als bedrag, of koppel het aan één of meer bezittingen en schulden zodat het netto meerekent met wat je opbouwt en aflost — of zet het op een kengetal dat de app al bijhoudt (spaarquote, netto vermogen, vrijheidsleeftijd, noodfonds, passief inkomen, belastingdruk, schuldenvrij-moment, eindkapitaal), dan werkt het vanzelf mee. Doelen van twee jaar of verder krijgen automatisch een seintje bij 25%, 50% en 75%; is een doel behaald, dan wordt dat gevierd en verhuist het naar het archief onderaan, met meteen een suggestie voor de volgende stap. Direct onder de grafiek staat je doelscenario; doelen die je daar vastlegt, pas je daar ook aan. Je eigen doelen staan in de lijst eronder. Ligt je stopmoment vast, dan volgt het doel "Plan gedekt" of je plan tot je eindleeftijd reikt. Verandert je plan zó dat een doel uit je doelscenario er niet meer bij past, dan meldt een regel bovenaan Doelen dat: bijwerken kan in het doelscenario, loslaten bij het doel in de lijst. Niets verdwijnt vanzelf.',
+      'Voeg een doel toe als bedrag, of koppel het aan één of meer bezittingen en schulden zodat het netto meerekent met wat je opbouwt en aflost — of zet het op een kengetal dat de app al bijhoudt (spaarquote, netto vermogen, vrijheidsleeftijd, noodfonds, passief inkomen, belastingdruk, schuldenvrij-moment, eindkapitaal), dan werkt het vanzelf mee. Doelen van twee jaar of verder krijgen automatisch een seintje bij 25%, 50% en 75%; is een doel behaald, dan wordt dat gevierd en verhuist het naar het archief onderaan, met meteen een suggestie voor de volgende stap. Elk doel is een stuk vrijheid dat je opbouwt. Doelen die je in je doelscenario vastlegt, pas je daar ook aan; je eigen doelen staan in de lijst onder het lab. Ligt je stopmoment vast, dan volgt het doel "Plan gedekt" of je plan tot je eindleeftijd reikt. Verandert je plan zó dat een doel uit je doelscenario er niet meer bij past, dan meldt een regel bovenaan Doelen dat: bijwerken kan in het doelscenario, loslaten bij het doel in de lijst. Niets verdwijnt vanzelf.',
     werking: [
       {
         title: 'Je doelscenario',
-        text: 'Onder de grafiek staat je doelscenario: vijf knoppen — meer verdienen, minder uitgeven, je uitgave na pensioen, je nalatenschap en je stopleeftijd — waaraan je draait zonder je plan te wijzigen; de gestippelde lijn in de grafiek laat het effect zien. Elke knop kleurt rood, oranje of groen: rood betekent dat je plan het niet haalt, oranje dat het net haalt, groen dat er ruim marge in zit. Zodra je één knop verschuift, bewegen de grenzen op de andere knoppen mee — ze hangen immers van elkaar af. Onderaan staat of je verkenning al als doel is opgeslagen.',
+        text: 'Bij de grafiek staat je doelscenario: vijf knoppen — meer verdienen, minder uitgeven, je uitgave na pensioen, je nalatenschap en je stopleeftijd — waaraan je draait zonder je plan te wijzigen; de gestippelde lijn in de grafiek laat het effect zien. Elke knop kleurt rood, oranje of groen: rood betekent dat je plan het niet haalt, oranje dat het net haalt, groen dat er ruim marge in zit. Zodra je één knop verschuift, bewegen de grenzen op de andere knoppen mee — ze hangen immers van elkaar af. Onderaan staat of je verkenning al als doel is opgeslagen.',
       },
       {
         title: 'Doel als bedrag',
@@ -574,8 +574,24 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
   // worden bij /toekomst beschreven.
   '/toekomst/instellingen': {
     insight:
-      'Achter elke projectie zitten aannames — verwacht rendement, inflatie, je uitgaven na pensioen, je eindleeftijd. Samen met je levensgebeurtenissen bepalen ze hoeveel jaar vrijheid je berekening laat zien. Die gebeurtenissen staan onder je plan, op de eerste pagina van Toekomst.',
-    grip: 'Hier stel je die aannames bij; een kleine bijstelling kan je uitkomst met jaren verschuiven. Ook je stopmoment en je AOW-, pensioen-, huis- en werkstrategie staan hier. Liever stap voor stap? "Je voorkeuren voor je plan instellen" bovenaan zet de belangrijkste keuzes met hun effect op een rij.',
+      'Hier staat elke keuze waar je plan op rust, als één regel met de waarde waarmee de app nu rekent.',
+    grip:
+      'Tik op het potloodje om één keuze aan te passen. Onderin zie je wat het met je vrijheidsmoment doet, nog vóór je opslaat. Liever stap voor stap? "Je voorkeuren voor je plan instellen" bovenaan zet de belangrijkste keuzes met hun effect op een rij.',
+    werking: [
+      {
+        title: 'Eén plek per keuze',
+        text: "Je stopmoment, je strategieën en je aannames pas je alleen hier aan. Meldingen en de tegel 'Na pensioen' op Plan brengen je naar de juiste regel.",
+      },
+      {
+        title: 'Het effect vóór je opslaat',
+        text: 'De regel onderin rekent je plan door met de nieuwe keuze, op dezelfde manier als de wizard. Pas na Opslaan verandert je grafiek.',
+      },
+      {
+        title: 'Eenvoudig en Volledig',
+        text: 'In Eenvoudig zijn de tekort-lening, de pot-regels en de marktaannames ingeklapt. Ze tellen wel gewoon mee.',
+      },
+    ],
+    related: [{ href: '/toekomst/inflatie-koopkracht', label: 'Wat doet inflatie met je plan?' }],
     // De plan-regel (ADR 0129) is hier twee vragen: wanneer stop je, en wat moet
     // er aan het eind gelden. De opties van die twee vragen zijn precies deze
     // begrippen — als radio-label kunnen ze geen popover dragen, dus staan ze

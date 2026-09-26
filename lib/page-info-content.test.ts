@@ -217,6 +217,38 @@ describe('PAGE_INFO — /toekomst in drie delen (ADR 0179, fixronde C1 punt 10)'
     expect(PAGE_INFO['/overzicht'].insight).toMatch(/verloop van je gezondheidsgetal en van je vrijheidsleeftijd staat in de kassabon van je gezondheidsgetal/)
   })
 
+  it('Instellingen beschrijft de rijen, het potloodje en de verschilregel (fase 3)', () => {
+    const c = PAGE_INFO['/toekomst/instellingen']
+    expect(c.insight).toMatch(/als één regel met de waarde waarmee de app nu rekent/)
+    expect(c.grip).toMatch(/potloodje/)
+    expect(c.grip).toMatch(/Je voorkeuren voor je plan instellen/)
+    expect((c.werking ?? []).map((w) => w.title)).toEqual([
+      'Eén plek per keuze',
+      'Het effect vóór je opslaat',
+      'Eenvoudig en Volledig',
+    ])
+  })
+
+  it('Doelen beschrijft het lab naast of onder de grafiek en de andere paden (fase 4)', () => {
+    expect(PAGE_INFO['/toekomst/doelen'].insight).toMatch(/andere paden naast je doelscenario/)
+    expect(alles('/toekomst/doelen')).not.toMatch(/Direct onder de grafiek staat je doelscenario/)
+  })
+
+  it('/overzicht noemt het verloop één keer, met de lopende maand en lege maanden (fase 5)', () => {
+    const insight = PAGE_INFO['/overzicht'].insight
+    expect(insight.match(/verloop/g)?.length).toBe(2)
+    expect(insight).toMatch(/deze maand je huidige stand/)
+    expect(insight).toMatch(/blijft leeg/)
+  })
+
+  it('/overzicht/tips noemt de geplande acties', () => {
+    expect(PAGE_INFO['/overzicht/tips'].insight).toMatch(/geplande acties/)
+  })
+
+  it('Plan wijst niet meer naar verdwenen delen', () => {
+    expect(alles('/toekomst')).not.toMatch(/radar|levensinkomen|Scenario's naast elkaar|Geplande acties|verloop/i)
+  })
+
   it('de grip van Plan noemt geen Voorkeuren-kaart meer', () => {
     expect(PAGE_INFO['/toekomst'].grip).not.toMatch(/Voorkeuren-kaart/)
   })
