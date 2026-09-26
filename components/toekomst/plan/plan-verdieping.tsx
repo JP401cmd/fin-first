@@ -23,6 +23,7 @@ import type { RadarAs } from '@/lib/horizon/dekkingsradar'
 import { formatAge } from '@/lib/horizon/fire-format'
 import type { ForcedStopPathResult, ScenarioPresetResult } from '@/lib/horizon/scenario-presets'
 import type { Action, ActionStatus } from '@/lib/recommendation-data'
+import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import { useInViewOnce } from './use-in-view-once'
 
 // Kopie van horizon-client r297–304 + r309–312 — V3: de dynamic() verhuist mee met zijn
@@ -112,9 +113,19 @@ export function PlanVerdieping({
   handleActionStatusChange,
   onDuidingInView,
 }: PlanVerdiepingProps) {
+  const { mode: displayMode } = useDisplayMode()
+  const heeftKaternIII =
+    coverageNodes.length > 0 ||
+    radarAssen !== null ||
+    scenarioPresets !== null ||
+    scenarioPresetsLoading
   // Kopie van horizon-client r1022–1028 (V1): ref en zichtbaarheidshook bij de sectie zelf.
+  // De sectie mount pas als `heeftKaternIII` waar is én de modus Volledig (HideInSimple):
+  // een late kernel of een wissel van Eenvoudig naar Volledig. Een ref-wissel triggert
+  // geen effect, dus de mount-conditie gaat mee als remountKey — anders haakt de observer
+  // nooit aan en draaien de presets onder solved nooit (review fase 1, W5).
   const duidingSectionRef = useRef<HTMLElement | null>(null)
-  const duidingInView = useInViewOnce(duidingSectionRef)
+  const duidingInView = useInViewOnce(duidingSectionRef, '600px', `${heeftKaternIII}:${displayMode}`)
   useEffect(() => {
     if (duidingInView) onDuidingInView()
   }, [duidingInView, onDuidingInView])
@@ -127,11 +138,6 @@ export function PlanVerdieping({
           gescheiden door hairlines. Label én kaart renderen zodra ten minste één
           segment rendert (per-segment-condities blijven ongewijzigd). */}
       {(() => {
-        const heeftKaternIII =
-          coverageNodes.length > 0 ||
-          radarAssen !== null ||
-          scenarioPresets !== null ||
-          scenarioPresetsLoading
         if (!heeftKaternIII) return null
         // Tot ADR 0170 klapte deze duiding mee met KATERN II ("doel dicht = alles
         // dicht"). Dat inklappen bestaat niet meer — het doelscenario staat altijd

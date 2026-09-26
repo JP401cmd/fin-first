@@ -14,7 +14,9 @@ const source = readSourceLF(join(process.cwd(), 'components', 'toekomst', 'plan'
 describe('plan-verdieping — zichtbaarheids-gate van katern III (V1)', () => {
   it('observeert de sectie in dit paneel, niet in een provider', () => {
     expect(source).toContain("import { useInViewOnce } from './use-in-view-once'")
-    expect(source).toContain('const duidingInView = useInViewOnce(duidingSectionRef)')
+    // Review fase 1 (W5): de sectie mount laat (heeftKaternIII, HideInSimple) — de
+    // mount-conditie gaat als remountKey mee, anders haakt de observer nooit aan.
+    expect(source).toContain("const duidingInView = useInViewOnce(duidingSectionRef, '600px', `${heeftKaternIII}:${displayMode}`)")
     expect(source).toContain('<section ref={duidingSectionRef}')
   })
 
