@@ -39,7 +39,7 @@ describe('NavMenuSheet — Eenvoudig-weergave verbergt Rekenhulp', () => {
     // Overige Toekomst-subroutes blijven zichtbaar — alleen de aangewezen
     // ingang wordt verborgen.
     expect(screen.getByText('Doelen')).toBeInTheDocument()
-    expect(screen.getByText('Gebeurtenissen')).toBeInTheDocument()
+    expect(screen.getByText('Instellingen')).toBeInTheDocument()
   })
 })
 

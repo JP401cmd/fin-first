@@ -1658,7 +1658,7 @@ export const CALCULATIONS: Calculation[] = [
       'lib/cashflow-settings.ts',
       'app/api/report/route.ts',
       'app/api/household/fire-projections/route.ts',
-      'app/(app)/toekomst/gebeurtenissen/page.tsx',
+      'app/(app)/toekomst/instellingen/page.tsx',
     ],
     functions: [
       'computeScalarFireProjection',

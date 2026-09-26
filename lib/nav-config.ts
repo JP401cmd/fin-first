@@ -125,9 +125,10 @@ export const navGroups: NavGroup[] = [
       // Toekomst-subnavigatie. "Tijdas" stond hier tot 15 sep 2026 als eerste
       // item, maar wees naar /toekomst zelf — dezelfde plek als de hoofdpagina
       // erboven. Eén ingang per plek: de hoofdpagina ís de tijdas.
+      // ADR 0179 — Gebeurtenissen en Voorkeuren gingen op in katern Instellingen
+      // (oude routes redirecten via next.config.ts).
       { label: 'Doelen', href: '/toekomst/doelen' },
-      { label: 'Gebeurtenissen', href: '/toekomst/gebeurtenissen' },
-      { label: 'Voorkeuren', href: '/toekomst/voorkeuren' },
+      { label: 'Instellingen', href: '/toekomst/instellingen' },
       { label: 'Rekenhulp', href: '/toekomst/rekenhulp' },
     ],
   },
@@ -352,8 +353,9 @@ export const globalNav: GlobalNavItem[] = [
  * Elke route hieronder is geverifieerd tegen `app/(app)/<route>/page.tsx`.
  * Dynamische routes (bv. /toekomst/bibliotheek/[id]) horen hier bewust NIET:
  * die hebben een runtime-afhankelijke titel en leveren die via <NavStackMeta>.
- * Redirect-only routes evenmin: /toekomst/strategie en
- * /toekomst/uitgaven-na-pensioen redirecten sinds de React #310-opruiming op
+ * Redirect-only routes evenmin: /toekomst/strategie,
+ * /toekomst/uitgaven-na-pensioen en (ADR 0179) /toekomst/voorkeuren en
+ * /toekomst/gebeurtenissen redirecten sinds de React #310-opruiming op
  * de routing-laag (next.config.ts) en renderen geen TopBar meer — een titel
  * hier zou naar een pagina wijzen die niet bestaat.
  */

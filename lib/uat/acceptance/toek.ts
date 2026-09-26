@@ -271,7 +271,7 @@ const criteria: AcceptanceCriterion[] = [
     assertion: {
       kind: 'exact',
       expected: 'tekortLeningRentePct=5.0',
-      source: 'EXCEL_TEKORT_LENING_RENTE (lib/horizon-kernel/adapter/defaults.ts = 0.05) — default omdat PERSONAS.willem geen deficit_loan_rate-override heeft. Titel: app/(app)/toekomst/gebeurtenissen/page.tsx (ToekomstSubpageShell verdict={null}); telling: components/future/gebeurtenissen-view.tsx (sectiekop, sorted.length).',
+      source: 'EXCEL_TEKORT_LENING_RENTE (lib/horizon-kernel/adapter/defaults.ts = 0.05) — default omdat PERSONAS.willem geen deficit_loan_rate-override heeft. Titel: app/(app)/toekomst/instellingen/page.tsx (ToekomstSubpageShell verdict={null}); telling: components/future/gebeurtenissen-view.tsx (sectiekop, sorted.length).',
     },
   },
   {
@@ -373,7 +373,7 @@ const criteria: AcceptanceCriterion[] = [
     assertion: {
       kind: 'exact',
       expected: 'floorPct=80; ceilingPct=120; cutStepPct=10; anker=aow; ankerLabel=Op mijn AOW-leeftijd; eindVorm=deplete; eindVormLabel=Niets, het mag op zijn; eindleeftijd=90; eindleeftijdVeld=zichtbaar; bedragVeld=verborgen; rijNalatenschap=200000; putNalatenschap=null',
-      source: 'PERSONAS.marijke.profile.guardrail_floor/ceiling/cut_step (×100) + lib/fire-strategy.ts#parseFirePlan → lib/horizon/plan-draft.ts#planDraftFromPlan + planDraftToFireSettingsBody + endFormShowsEndAge (kopij STOP_ANCHOR_OPTIONS/END_FORM_OPTIONS) op PERSONAS.marijke.profile — zie toek-checks.ts. TITEL (kop-herziening 19-09-2026, `ToekomstSubpageShell`): de vervallen kicker/H1 ("Onder welke aannames reken je?") is vervangen door een kerncijfer, GEEN oordeel — "Plan-review {bevestigd} van {totaal}" uit `derivePlanReviewProgress(planReviewState, buildPlanReviewFacts(...))` (app/(app)/toekomst/voorkeuren/page.tsx) — dezelfde afleiding als de Voorkeuren-kaart op /toekomst (WF-TOEK-44), geen tweede telling; zonder beschikbare review (kolom niet uitgerold / uitgelogd) is de titel de kale paginanaam "Voorkeuren". Neutrale inkt: voortgang is een stand, geen stoplicht.',
+      source: 'PERSONAS.marijke.profile.guardrail_floor/ceiling/cut_step (×100) + lib/fire-strategy.ts#parseFirePlan → lib/horizon/plan-draft.ts#planDraftFromPlan + planDraftToFireSettingsBody + endFormShowsEndAge (kopij STOP_ANCHOR_OPTIONS/END_FORM_OPTIONS) op PERSONAS.marijke.profile — zie toek-checks.ts. TITEL (kop-herziening 19-09-2026, `ToekomstSubpageShell`): de vervallen kicker/H1 ("Onder welke aannames reken je?") is vervangen door een kerncijfer, GEEN oordeel — "Plan-review {bevestigd} van {totaal}" uit `derivePlanReviewProgress(planReviewState, buildPlanReviewFacts(...))` (app/(app)/toekomst/instellingen/page.tsx) — dezelfde afleiding als de Voorkeuren-kaart op /toekomst (WF-TOEK-44), geen tweede telling; zonder beschikbare review (kolom niet uitgerold / uitgelogd) is de titel de kale paginanaam "Voorkeuren". Neutrale inkt: voortgang is een stand, geen stoplicht.',
     },
   },
   {

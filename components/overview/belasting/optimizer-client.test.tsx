@@ -397,7 +397,7 @@ describe('Box3OptimizerClient — inline editor voor de rendements-aanname', () 
     // Secundaire uitgang: beheer van álle aannames blijft vindbaar.
     expect(
       screen.getByRole('link', { name: /Beheer al je aannames/i }).getAttribute('href'),
-    ).toBe('/toekomst/voorkeuren')
+    ).toBe('/toekomst/instellingen')
   })
 
   it('slaat op via PUT /api/parameters met de fractie, sluit en refresht', async () => {

@@ -162,7 +162,7 @@ function overzicht(stap: PlanReviewStap): PlanReviewStapOverzicht {
     keuzeVerplicht: false,
     schrijf: [{ url: '/api/fire-settings', body: { fire_end_age: 90 } }],
     blokkade: null,
-    aanpassen: [{ href: '/toekomst/voorkeuren?regel=eindstrategie', label: 'Plan aanpassen' }],
+    aanpassen: [{ href: '/toekomst/instellingen?regel=eindstrategie', label: 'Plan aanpassen' }],
     beperking: null,
   }
 }
@@ -297,7 +297,7 @@ describe('PlanReviewPane', () => {
     const { onClose } = renderPane('uitgaven')
     await screen.findByText('De app rekent nu met uitgaven.')
     fireEvent.click(screen.getByRole('button', { name: /Plan aanpassen/ }))
-    await waitFor(() => expect(push).toHaveBeenCalledWith('/toekomst/voorkeuren?regel=eindstrategie'))
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/toekomst/instellingen?regel=eindstrategie'))
     expect(onClose).toHaveBeenCalled()
   })
 })

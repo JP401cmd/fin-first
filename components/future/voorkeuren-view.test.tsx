@@ -11,7 +11,7 @@ const nav = vi.hoisted(() => ({ search: new URLSearchParams(), replace: vi.fn() 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ refresh: vi.fn(), replace: nav.replace, push: vi.fn() }),
   useSearchParams: () => nav.search,
-  usePathname: () => '/toekomst/voorkeuren',
+  usePathname: () => '/toekomst/instellingen',
 }))
 vi.mock('@/lib/supabase/client', () => ({
   createClient: () => ({
@@ -445,7 +445,7 @@ describe('VoorkeurenView — levensstrategieën', () => {
     expect(screen.getByTestId('strategie-editors-open').textContent).toBe('pensioen')
     expect(screen.getByTestId('strategie-jaarruimte').textContent).toBe('true')
     fireEvent.click(screen.getByText('editor-sluiten'))
-    expect(nav.replace).toHaveBeenCalledWith('/toekomst/voorkeuren?x=1', { scroll: false })
+    expect(nav.replace).toHaveBeenCalledWith('/toekomst/instellingen?x=1', { scroll: false })
   })
 
   it.each(['aow', 'huis', 'werk'] as const)('?strategie=%s opent die editor zonder jaarruimte-uitvraag', (key) => {

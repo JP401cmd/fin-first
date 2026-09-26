@@ -426,7 +426,7 @@ export const DATA_GAP_SUGGESTIONS: DataGapRule[] = [
     suggestion: {
       message: 'Stel je verwacht rendement in, dan klopt je vrijheidsprojectie met jouw situatie.',
       cta: 'Rendement instellen',
-      ctaHref: '/toekomst/voorkeuren',
+      ctaHref: '/toekomst/instellingen',
     },
   },
   {
@@ -437,7 +437,7 @@ export const DATA_GAP_SUGGESTIONS: DataGapRule[] = [
     suggestion: {
       message: 'Plan je levensgebeurtenissen — ze bepalen mee wanneer je vrij bent.',
       cta: 'Gebeurtenis toevoegen',
-      ctaHref: '/toekomst/gebeurtenissen',
+      ctaHref: '/toekomst/instellingen#gebeurtenissen',
     },
   },
 ]

@@ -41,7 +41,7 @@ export interface EindsituatieCopy {
   disclaimer: string
 }
 
-export const EINDSITUATIE_INSTELLING_HREF = '/toekomst/voorkeuren?regel=eindstrategie'
+export const EINDSITUATIE_INSTELLING_HREF = '/toekomst/instellingen?regel=eindstrategie'
 export const EINDSITUATIE_INSTELLING_LABEL = 'Bekijk of wijzig je plan →'
 
 function heel(age: number | null): number | null {

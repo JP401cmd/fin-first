@@ -105,7 +105,7 @@ const tests: TestCase[] = [
     },
   },
   {
-    id: 'nav-redirect-parameters', name: 'Redirect /identity/parameters → /toekomst/voorkeuren', category: CAT,
+    id: 'nav-redirect-parameters', name: 'Redirect /identity/parameters → /toekomst/instellingen', category: CAT,
     description: 'Parameters pagina redirectt naar de Voorkeuren-tab (de FIRE-editors)',
     priority: 'high', estimatedDurationMs: 500,
     async fn() {
@@ -117,8 +117,8 @@ const tests: TestCase[] = [
       if (isRedirect(res.status)) {
         const location = res.headers.get('location') ?? ''
         assert(
-          location.includes('/toekomst/voorkeuren') || location.includes('/login'),
-          `Expected redirect to /toekomst/voorkeuren or /login, got ${location}`,
+          location.includes('/toekomst/instellingen') || location.includes('/login'),
+          `Expected redirect to /toekomst/instellingen or /login, got ${location}`,
         )
       }
     },

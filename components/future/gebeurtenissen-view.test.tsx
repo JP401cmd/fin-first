@@ -16,12 +16,12 @@ import type { SimResult } from '@/lib/fire-simulation'
 // jsdom) + de strategie-launcher die next/navigation + supabase client gebruiken.
 // Mock beide zodat de view zelf in isolatie test-baar blijft. (Kaarten zijn
 // altijd interactieve buttons — geen Kijken/Plannen-modus meer.)
-// Gedeelde push-mock: strategie-klikken navigeren naar /toekomst/voorkeuren?strategie=…
+// Gedeelde push-mock: strategie-klikken navigeren naar /toekomst/instellingen?strategie=…
 const { mockPush } = vi.hoisted(() => ({ mockPush: vi.fn() }))
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ refresh: vi.fn(), replace: vi.fn(), push: mockPush }),
   useSearchParams: () => new URLSearchParams(),
-  usePathname: () => '/toekomst/gebeurtenissen',
+  usePathname: () => '/toekomst/instellingen',
 }))
 vi.mock('@/lib/supabase/client', () => ({
   createClient: () => ({
@@ -267,7 +267,7 @@ describe('GebeurtenissenView — levensstrategieën zijn verhuisd naar Voorkeure
       events: [mockEvent({ event_type: 'aow', name: 'AOW', target_age: 67, target_date: null })],
     })
     fireEvent.click(screen.getByRole('button', { name: 'Open Beheerd via AOW-strategie' }))
-    expect(mockPush).toHaveBeenCalledWith('/toekomst/voorkeuren?strategie=aow')
+    expect(mockPush).toHaveBeenCalledWith('/toekomst/instellingen?strategie=aow')
   })
 })
 
@@ -405,7 +405,7 @@ describe('GebeurtenissenView — kernel-afgeleide strategiemomenten (feature #87
     expect(screen.getByText(/Restschuld hypotheek/)).toBeTruthy()
     // Klik → Huis-strategie op Voorkeuren.
     fireEvent.click(row)
-    expect(mockPush).toHaveBeenCalledWith('/toekomst/voorkeuren?strategie=huis')
+    expect(mockPush).toHaveBeenCalledWith('/toekomst/instellingen?strategie=huis')
   })
 
   it('telt de kernel-afgeleide verkooprij mee en toont de telling precies één keer', () => {
@@ -444,7 +444,7 @@ describe('GebeurtenissenView — kernel-afgeleide strategiemomenten (feature #87
     fireEvent.click(
       screen.getByRole('button', { name: 'Berekend: Opname opeethypotheek start' }),
     )
-    expect(mockPush).toHaveBeenCalledWith('/toekomst/voorkeuren?strategie=huis')
+    expect(mockPush).toHaveBeenCalledWith('/toekomst/instellingen?strategie=huis')
   })
 
   it('pensioenpot-einde rendert bij eindige duur en navigeert naar de Pensioen-strategie', () => {
@@ -461,7 +461,7 @@ describe('GebeurtenissenView — kernel-afgeleide strategiemomenten (feature #87
     // Levenslange pot → geen einde-rij.
     expect(screen.queryByText('Bedrijfspensioen stopt')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Berekend: Lijfrente stopt' }))
-    expect(mockPush).toHaveBeenCalledWith('/toekomst/voorkeuren?strategie=pensioen')
+    expect(mockPush).toHaveBeenCalledWith('/toekomst/instellingen?strategie=pensioen')
   })
 
   it('tekort-lening-rij opent de read-only uitleg-sheet met rente + voorkeuren-link', () => {
@@ -483,7 +483,7 @@ describe('GebeurtenissenView — kernel-afgeleide strategiemomenten (feature #87
     expect(screen.getByText(/5%\/jr/)).toBeTruthy()
     expect(screen.getByText('Ontstaat op leeftijd')).toBeTruthy()
     const link = screen.getByRole('link', { name: /Rente tekort-lening aanpassen/ })
-    expect(link.getAttribute('href')).toBe('/toekomst/voorkeuren?regel=eindstrategie')
+    expect(link.getAttribute('href')).toBe('/toekomst/instellingen?regel=eindstrategie')
   })
 
   // ── Besluit 4 juli 2026: tekort-lening telt alleen mee t/m endAge − 1 ──────

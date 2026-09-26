@@ -518,7 +518,7 @@ export const WIDGET_HREFS: Record<string, string> = {
   doelen:                   '/toekomst/doelen',
   fire_prognose:            '/toekomst',
   monte_carlo:              '/toekomst?modal=simulations',
-  levensgebeurtenissen:     '/toekomst/gebeurtenissen',
+  levensgebeurtenissen:     '/toekomst/instellingen#gebeurtenissen',
   spaarquote:               '/overzicht/budget/forecast',
   vrijheidsvoortgang:       '/toekomst',
   vaste_lasten:             '/overzicht/budget/vaste-lasten',
@@ -530,15 +530,15 @@ export const WIDGET_HREFS: Record<string, string> = {
   vrijheidsmijlpalen:       '/toekomst',
   backtesting_score:        '/toekomst?modal=backtesting',
   surplus_gap:              '/toekomst#vermogensstromen',
-  swr_monitor:              '/toekomst/voorkeuren',
-  inflatie_impact:          '/toekomst/voorkeuren',
+  swr_monitor:              '/toekomst/instellingen',
+  inflatie_impact:          '/toekomst/instellingen',
   // Kaart H7 — de rekenmodal "Zo is het rendement berekend" hing aan één knop op
   // één pagina. Deze widget gaat volledig ÓVER het rendement, dus zijn tegel-link
   // opent die uitleg rechtstreeks (OVERLAY_QUERY_KEYS.rendementUitleg). Zo komt
   // het getal en de uitleg erbij op één klik van elkaar, zonder de modal per
   // oppervlak na te bouwen.
   beleggingsrendement:      '/overzicht/bezittingen?rendementUitleg=open',
-  pensioen_aow:             '/toekomst/voorkeuren',
+  pensioen_aow:             '/toekomst/instellingen',
   meldingen:                '/berichten',
   volgende_stap:            '/overzicht/tips',
   maandoverzicht:           '/overzicht/budget/transacties',

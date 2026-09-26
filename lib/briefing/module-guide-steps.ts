@@ -52,7 +52,7 @@ export const DEFAULT_MODULE_GUIDE_STEPS: Record<ModuleId, ModuleGuideStep[]> = {
   ],
   toekomstplannen: [
     { key: 'horizon_fire', label: 'Bekijk je FIRE-prognose', href: '/toekomst' },
-    { key: 'horizon_params', label: 'Stel je parameters in', href: '/toekomst/voorkeuren' },
+    { key: 'horizon_params', label: 'Stel je parameters in', href: '/toekomst/instellingen' },
     { key: 'horizon_mijlpalen', label: 'Bekijk je mijlpalen', href: '/toekomst' },
     { key: 'horizon_scenario', label: 'Verken scenario\'s', href: '/toekomst' },
   ],

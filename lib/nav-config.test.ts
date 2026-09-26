@@ -12,9 +12,11 @@ import {
 
 describe('resolveRouteTitle', () => {
   it('resolveert toekomst-subroutes uit navGroups', () => {
-    expect(resolveRouteTitle('/toekomst/gebeurtenissen')).toBe('Gebeurtenissen')
+    expect(resolveRouteTitle('/toekomst/instellingen')).toBe('Instellingen')
     expect(resolveRouteTitle('/toekomst/doelen')).toBe('Doelen')
-    expect(resolveRouteTitle('/toekomst/voorkeuren')).toBe('Voorkeuren')
+    // ADR 0179 — de opgeheven subroutes zijn redirects, geen nav-items meer.
+    expect(resolveRouteTitle('/toekomst/gebeurtenissen')).toBeNull()
+    expect(resolveRouteTitle('/toekomst/voorkeuren')).toBeNull()
     expect(resolveRouteTitle('/toekomst/rekenhulp')).toBe('Rekenhulp')
   })
 

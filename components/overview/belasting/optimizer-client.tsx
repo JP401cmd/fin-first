@@ -38,7 +38,7 @@ const SOURCE_SERIF = 'var(--font-source-serif, Georgia, serif)'
  * sheet ("beheer al je aannames"), zodat de samenhang met Toekomst zichtbaar
  * blijft zonder een tweede editor.
  */
-const RENDEMENT_INSTELLING_HREF = '/toekomst/voorkeuren'
+const RENDEMENT_INSTELLING_HREF = '/toekomst/instellingen'
 
 /** Percentage in NL-notatie uit een fractie (0,07 → "7,0%"). */
 function fractionPct(fraction: number, digits = 1): string {
@@ -200,7 +200,7 @@ export function Box3OptimizerClient({
           helperText="Dezelfde aanname voedt je projectie op Toekomst: pas je 'm hier aan, dan verschuift daar ook je FIRE-datum en je vrijheidstijd. Ter referentie: wereldwijde aandelen deden historisch zo'n 6 tot 8% per jaar; een lagere aanname geeft een later vrijheidsmoment."
           secondaryLink={{
             href: RENDEMENT_INSTELLING_HREF,
-            label: 'Beheer al je aannames op Toekomst › Voorkeuren',
+            label: 'Beheer al je aannames op Toekomst › Instellingen',
           }}
           onClose={() => setRendementOpen(false)}
         />

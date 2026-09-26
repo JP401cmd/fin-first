@@ -83,7 +83,7 @@ describe('EindsituatieNotice — tonen', () => {
     expect(melding).toContain('je huis (')
     expect(melding).toContain('Indicatie, geen advies')
     const link = screen.getByRole('link', { name: 'Bekijk of wijzig je plan →' })
-    expect(link.getAttribute('href')).toBe('/toekomst/voorkeuren?regel=eindstrategie')
+    expect(link.getAttribute('href')).toBe('/toekomst/instellingen?regel=eindstrategie')
   })
 
   it('rendert niets zichtbaars zonder duiding, maar houdt de aria-live-regio gemount', () => {

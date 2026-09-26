@@ -277,7 +277,7 @@ function GeenPlan() {
         en je plan op Toekomst staan, kunnen de drie varianten hier worden doorgerekend.
       </p>
       <div className="mt-4">
-        <Button href="/toekomst/voorkeuren" variant="secondary">
+        <Button href="/toekomst/instellingen" variant="secondary">
           Naar je toekomstplan
         </Button>
       </div>

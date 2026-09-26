@@ -60,7 +60,7 @@ export interface EventPaneData {
   /**
    * Rauwe kernel-context (zelfde als de Tijdas-grafiek). Wanneer gezet, draaien de
    * EventPane-delta-previews via de horizon-kernel (`computeConvergentieProjection`);
-   * null → geen doorrekening (lege staat). Zie gebeurtenissen/page.tsx.
+   * null → geen doorrekening (lege staat). Zie toekomst/instellingen/page.tsx.
    */
   previewBaseline: PreviewBaseline | null
 }
@@ -103,7 +103,7 @@ const TIMELINE_CARD_CLASS =
   'flex-1 min-w-0 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 text-left'
 
 /**
- * GebeurtenissenView — content voor /toekomst/gebeurtenissen.
+ * GebeurtenissenView — sectie Gebeurtenissen in katern Instellingen (/toekomst/instellingen#gebeurtenissen, ADR 0179).
  *
  * Eén verticale tijdlijn met levensgebeurtenissen (kind, erfenis, ZZP-start,
  * deeltijd, verhuizing, schenking — bewerken via de EventPane) en de momenten
@@ -733,8 +733,12 @@ export function GebeurtenissenView({
               )}
             </dl>
           )}
+          {/* Zelfde route sinds ADR 0179: de Voorkeuren-sectie opent de regel via
+              ?regel=. Sluit deze sheet eerst — één sheet tegelijk (D4). */}
           <Link
-            href="/toekomst/voorkeuren?regel=eindstrategie"
+            href="/toekomst/instellingen?regel=eindstrategie"
+            scroll={false}
+            onClick={() => setDeficitSheetOpen(false)}
             className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--module-active-700)]"
           >
             Rente tekort-lening aanpassen bij je voorkeuren

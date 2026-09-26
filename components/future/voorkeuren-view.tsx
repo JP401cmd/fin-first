@@ -35,7 +35,7 @@ import { StrategieEditors, type StrategieEditorsData } from './strategie/strateg
 import { LevensstrategieenSection } from './levensstrategieen-section'
 
 /**
- * VoorkeurenView — content voor Voorkeuren-tab op /toekomst.
+ * VoorkeurenView — sectie Voorkeuren in katern Instellingen (/toekomst/instellingen#voorkeuren, ADR 0179).
  *
  * Sectie "Regels op de hele tijdas": vijf regels die elk een rijk bewerkscherm
  * (RegelBewerkenPane) openen met uitleg, instellingen en impact. Regel 1 & 2

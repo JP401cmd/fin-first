@@ -261,9 +261,20 @@ const nextConfig: NextConfig = {
         permanent: false,
       },
 
+      // ADR 0179 — Voorkeuren en Gebeurtenissen gingen op in katern Instellingen.
+      // Next geeft de inkomende query vanzelf door aan het doel, dus
+      // `?strategie=`, `?regel=` en `?nieuw=` blijven werken; bij Gebeurtenissen
+      // komt de hash erachter (`/toekomst/instellingen?nieuw=1#gebeurtenissen`).
+      { source: '/toekomst/voorkeuren', destination: '/toekomst/instellingen', permanent: false },
+      {
+        source: '/toekomst/gebeurtenissen',
+        destination: '/toekomst/instellingen#gebeurtenissen',
+        permanent: false,
+      },
+
       // /toekomst/strategie?focus=aow|pensioen|huis|werk opende de bijbehorende
-      // levensstrategie — sinds 17 sep 2026 op Voorkeuren (daarvoor de
-      // Gebeurtenissen-tab). Die vertakking gaat mee naar
+      // levensstrategie — sinds ADR 0179 in katern Instellingen (daarvoor
+      // Voorkeuren, en vóór 17 sep 2026 de Gebeurtenissen-tab). Die vertakking gaat mee naar
       // de routing-laag via een named capture group in `has` — met een
       // volgorde-eis: de gerichte variant MOET vóór de
       // catch-all staan, anders landt elke deeplink op `aow`. Een onbekende
@@ -272,12 +283,12 @@ const nextConfig: NextConfig = {
       {
         source: '/toekomst/strategie',
         has: [{ type: 'query', key: 'focus', value: '(?<focus>aow|pensioen|huis|werk)' }],
-        destination: '/toekomst/voorkeuren?strategie=:focus',
+        destination: '/toekomst/instellingen?strategie=:focus',
         permanent: false,
       },
       {
         source: '/toekomst/strategie',
-        destination: '/toekomst/voorkeuren?strategie=aow',
+        destination: '/toekomst/instellingen?strategie=aow',
         permanent: false,
       },
 
@@ -286,7 +297,7 @@ const nextConfig: NextConfig = {
       // /toekomst. Volgorde/verdeling/afname zijn nog placeholders zonder
       // engine-koppeling; tot die tijd landt iedere /identity/parameters-
       // link op de Voorkeuren-tab waar de 4 werkende editors zitten.
-      { source: '/identity/parameters', destination: '/toekomst/voorkeuren', permanent: false },
+      { source: '/identity/parameters', destination: '/toekomst/instellingen', permanent: false },
 
       // Instellingen-monolith retirement (beslissing 4 voltooid): alle zes
       // tabs leven op /mijn/* (geavanceerd, privacy, profiel, uiterlijk,

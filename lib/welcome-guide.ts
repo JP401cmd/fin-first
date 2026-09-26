@@ -173,7 +173,7 @@ export const DEFAULT_WELCOME_GUIDE: WelcomeGuideConfig = {
           id: 's2-gebeurtenissen',
           title: 'Heb je al levensgebeurtenissen ingevuld of bewerkt?',
           description: 'Zoals een verhuizing of de aanschaf van een auto in de toekomst.',
-          href: '/toekomst/gebeurtenissen',
+          href: '/toekomst/instellingen#gebeurtenissen',
           icon: 'CalendarClock',
           enabled: true,
         },

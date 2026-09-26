@@ -276,7 +276,7 @@ export const NAV_ENGINE_CHECKS: NavEngineCheck[] = [
         // De regel zelf geeft een meegegeven ?via=dreamgate gewoon door (geen
         // eigen '?' op de bestemming); een losse client-side opschoonstap
         // (lib/horizon/deeplink-cleanup.ts) haalt `via` daarna uit de URL.
-        expected: 'aantalRedirects=30; coreNaarOverzicht=true; dashboardGeenConfigRedirect=true; coreAssetsGeenRedirect=true; cashflowRedirects=5; cashflowBestemmingZonderQuery=true',
+        expected: 'aantalRedirects=32; coreNaarOverzicht=true; dashboardGeenConfigRedirect=true; coreAssetsGeenRedirect=true; cashflowRedirects=5; cashflowBestemmingZonderQuery=true',
         actual: `aantalRedirects=${redirects.length}; coreNaarOverzicht=${coreNaarOverzicht}; dashboardGeenConfigRedirect=${dashboardGeenConfigRedirect}; coreAssetsGeenRedirect=${coreAssetsGeenRedirect}; cashflowRedirects=${cashflowRegels.length}; cashflowBestemmingZonderQuery=${cashflowBestemmingZonderQuery}`,
       }
     },

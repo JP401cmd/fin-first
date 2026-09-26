@@ -75,10 +75,10 @@ describe('next.config redirects — legacy routes redirecten op de routing-laag 
     expect(gericht.has).toEqual([
       { type: 'query', key: 'focus', value: '(?<focus>aow|pensioen|huis|werk)' },
     ])
-    expect(gericht.destination).toBe('/toekomst/voorkeuren?strategie=:focus')
+    expect(gericht.destination).toBe('/toekomst/instellingen?strategie=:focus')
 
     expect(fallback.has).toBeUndefined()
-    expect(fallback.destination).toBe('/toekomst/voorkeuren?strategie=aow')
+    expect(fallback.destination).toBe('/toekomst/instellingen?strategie=aow')
   })
 
   it('/horizon/whatif en /toekomst/whatif landen kaal op het inline lab (ADR 0144)', async () => {
@@ -94,7 +94,32 @@ describe('next.config redirects — legacy routes redirecten op de routing-laag 
     }
   })
 
-  it('geen page.tsx meer op de zeven routes — anders is de runtime-redirect terug', () => {
+  it('/toekomst/voorkeuren en /toekomst/gebeurtenissen gaan op in Instellingen (ADR 0179)', async () => {
+    const voorkeuren = await rulesFor('/toekomst/voorkeuren')
+    expect(voorkeuren).toHaveLength(1)
+    expect(voorkeuren[0].destination).toBe('/toekomst/instellingen')
+    expect(voorkeuren[0].permanent).toBe(false)
+
+    const gebeurtenissen = await rulesFor('/toekomst/gebeurtenissen')
+    expect(gebeurtenissen).toHaveLength(1)
+    expect(gebeurtenissen[0].destination).toBe('/toekomst/instellingen#gebeurtenissen')
+    expect(gebeurtenissen[0].permanent).toBe(false)
+
+    // Geen `has`-filter: elke query (?strategie=, ?regel=, ?nieuw=) gaat mee.
+    expect(voorkeuren[0].has).toBeUndefined()
+    expect(gebeurtenissen[0].has).toBeUndefined()
+  })
+
+  it('geen redirect wijst nog naar de opgeheven routes (geen dubbele hop)', async () => {
+    const all = await nextConfig.redirects!()
+    for (const r of all) {
+      expect(r.destination, `${r.source} → ${r.destination}`).not.toMatch(
+        /^\/toekomst\/(voorkeuren|gebeurtenissen)(\?|#|$)/,
+      )
+    }
+  })
+
+  it('geen page.tsx meer op de negen routes — anders is de runtime-redirect terug', () => {
     // Een `page.tsx` hier zou opnieuw een React-boom bouwen die zichzelf
     // meteen wegredirect: precies de trigger die deze fix wegnam.
     for (const route of [
@@ -105,6 +130,8 @@ describe('next.config redirects — legacy routes redirecten op de routing-laag 
       'app/(app)/horizon/uitgaven-na-pensioen/page.tsx',
       'app/(app)/toekomst/strategie/page.tsx',
       'app/(app)/toekomst/uitgaven-na-pensioen/page.tsx',
+      'app/(app)/toekomst/voorkeuren/page.tsx',
+      'app/(app)/toekomst/gebeurtenissen/page.tsx',
     ]) {
       expect(existsSync(path.join(process.cwd(), route)), `${route} hoort niet te bestaan`).toBe(
         false,
@@ -113,11 +140,11 @@ describe('next.config redirects — legacy routes redirecten op de routing-laag 
   })
 
   it('de redirect-doelen zijn zelf geen redirect-only route (geen keten)', () => {
-    // /toekomst en /toekomst/gebeurtenissen renderen echte pagina's; zou een doel
+    // /toekomst en /toekomst/instellingen renderen echte pagina's; zou een doel
     // zelf een runtime-redirect zijn, dan was de trigger alleen verplaatst.
     for (const target of [
       'app/(app)/toekomst/page.tsx',
-      'app/(app)/toekomst/gebeurtenissen/page.tsx',
+      'app/(app)/toekomst/instellingen/page.tsx',
     ]) {
       expect(existsSync(path.join(process.cwd(), target))).toBe(true)
     }

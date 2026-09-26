@@ -108,7 +108,7 @@ describe('getFirstUndismissedSuggestion priority', () => {
     const fireGap: CoachDataGaps = { ...full(), hasFireParams: false }
     const lifeGap: CoachDataGaps = { ...full(), hasLifeEvents: false }
     expect(getFirstUndismissedSuggestion(fireGap, '/toekomst', none, [])?.key).toBe('path_horizon')
-    expect(getFirstUndismissedSuggestion(lifeGap, '/toekomst/voorkeuren', none, [])?.key).toBe('path_horizon')
+    expect(getFirstUndismissedSuggestion(lifeGap, '/toekomst/instellingen', none, [])?.key).toBe('path_horizon')
     // Buiten /toekomst vuren ze gewoon (geen overlay daar).
     expect(getFirstUndismissedSuggestion(fireGap, '/random', none, [])?.key).toBe('gap_fire_params')
   })
@@ -400,8 +400,8 @@ describe('gids-laag (ADR 0130)', () => {
     // Ook de subroutes (prefix-match, zoals de bestaande overlay-de-dup).
     expect(
       getFirstUndismissedSuggestion(
-        empty(), '/toekomst/gebeurtenissen', none, [], undefined, ALL_MODULES,
-        actief([stap({ id: 's2-gebeurtenissen', href: '/toekomst/gebeurtenissen', description: undefined })]),
+        empty(), '/toekomst/instellingen', none, [], undefined, ALL_MODULES,
+        actief([stap({ id: 's2-gebeurtenissen', href: '/toekomst/instellingen#gebeurtenissen', description: undefined })]),
       )?.key,
     ).toBe('path_horizon')
   })

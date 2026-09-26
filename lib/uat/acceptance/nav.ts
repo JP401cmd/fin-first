@@ -286,7 +286,7 @@ const criteria: AcceptanceCriterion[] = [
       // draagt; een destination met een eigen '?' zou de meegegeven parameters
       // stilzwijgend laten vallen. Dat is nu een assertie: de vijf
       // cashflow-regels bestaan én geen van hun bestemmingen draagt een query.
-      expected: 'aantalRedirects=30; coreNaarOverzicht=true; dashboardGeenConfigRedirect=true; coreAssetsGeenRedirect=true; cashflowRedirects=5; cashflowBestemmingZonderQuery=true',
+      expected: 'aantalRedirects=32; coreNaarOverzicht=true; dashboardGeenConfigRedirect=true; coreAssetsGeenRedirect=true; cashflowRedirects=5; cashflowBestemmingZonderQuery=true',
       source: 'next.config.ts#redirects — échte productieconfiguratie, geen mirror; zie nav-checks.ts',
     },
   },

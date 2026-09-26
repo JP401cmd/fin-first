@@ -380,7 +380,7 @@ function stapPlan(b: PlanReviewBronnen): PlanReviewStapOverzicht {
     keuzeVerplicht: false,
     schrijf: geldig.ok ? [{ url: '/api/fire-settings', body: planDraftToFireSettingsBody(draft) }] : [],
     blokkade: geldig.ok ? null : 'Je plan bevat een combinatie die de app niet kan opslaan. Pas het eerst aan.',
-    aanpassen: [{ href: '/toekomst/voorkeuren?regel=eindstrategie', label: 'Plan aanpassen' }],
+    aanpassen: [{ href: '/toekomst/instellingen?regel=eindstrategie', label: 'Plan aanpassen' }],
     beperking: null,
   }
 }
@@ -560,10 +560,10 @@ function stapInkomsten(b: PlanReviewBronnen): PlanReviewStapOverzicht {
     // Het eerste label is ook de knop van de inline bewerkstand (TPR-15).
     aanpassen: [
       {
-        href: '/toekomst/voorkeuren?strategie=aow',
+        href: '/toekomst/instellingen?strategie=aow',
         label: heeftAow ? 'AOW, pensioen en werk aanpassen' : 'AOW-gegevens toevoegen',
       },
-      { href: '/toekomst/voorkeuren?strategie=pensioen', label: 'Pensioen bekijken' },
+      { href: '/toekomst/instellingen?strategie=pensioen', label: 'Pensioen bekijken' },
     ],
     // De upload van je pensioenoverzicht en de jaarruimte blijven op het pensioenscherm.
     beperking:
@@ -740,7 +740,7 @@ function stapWoning(b: PlanReviewBronnen): PlanReviewStapOverzicht {
     // TPR-15 — de eerste regel is ook het label van de inline bewerkstand (stap 4 heeft een editor).
     aanpassen: [
       ...(heeftHuis
-        ? [{ href: '/toekomst/voorkeuren?strategie=huis', label: overig.length > 0 ? 'Woonstrategie en verkoop aanpassen' : 'Woonstrategie aanpassen' }]
+        ? [{ href: '/toekomst/instellingen?strategie=huis', label: overig.length > 0 ? 'Woonstrategie en verkoop aanpassen' : 'Woonstrategie aanpassen' }]
         : []),
       ...(overig.length > 0 ? [{ href: '/overzicht/bezittingen', label: 'Verkoopinstellingen aanpassen' }] : []),
     ],
@@ -818,9 +818,9 @@ function stapPotten(b: PlanReviewBronnen): PlanReviewStapOverzicht {
     ],
     blokkade: null,
     aanpassen: [
-      { href: '/toekomst/voorkeuren?regel=onttrekkingsstrategie', label: 'Onttrekkingsprofiel aanpassen' },
-      { href: '/toekomst/voorkeuren?regel=verdeling-toename', label: 'Verdeling van extra geld' },
-      { href: '/toekomst/voorkeuren?regel=onttrekkingsvolgorde', label: 'Volgorde van opnemen' },
+      { href: '/toekomst/instellingen?regel=onttrekkingsstrategie', label: 'Onttrekkingsprofiel aanpassen' },
+      { href: '/toekomst/instellingen?regel=verdeling-toename', label: 'Verdeling van extra geld' },
+      { href: '/toekomst/instellingen?regel=onttrekkingsvolgorde', label: 'Volgorde van opnemen' },
     ],
     beperking: null,
   }

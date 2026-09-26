@@ -787,7 +787,7 @@ export function StrategieModal({ open, onClose, onSaved, housingStrategy, initia
               <p className="mb-3 font-sans text-xs text-[var(--ink-3)]">
                 Twee vragen bepalen je plan: wanneer je stopt, en wat er aan het eind moet gelden.
                 Wijzigingen worden bewaard zodra ze kloppen. Dezelfde vragen staan bij{' '}
-                <Link href="/toekomst/voorkeuren?regel=eindstrategie" className="font-medium text-horizon-700 underline hover:text-[var(--ink)]">Voorkeuren</Link>.
+                <Link href="/toekomst/instellingen?regel=eindstrategie" className="font-medium text-horizon-700 underline hover:text-[var(--ink)]">Instellingen</Link>.
               </p>
 
               {/* ADR 0129 B13 — de twee vragen, gespiegeld uit Voorkeuren via hetzelfde
@@ -849,7 +849,7 @@ export function StrategieModal({ open, onClose, onSaved, housingStrategy, initia
             Deze vergelijking gebruikt de horizon-kernel. Hieronder vergelijk je de vier
             onttrekkings<strong>profielen</strong> — Vast, Afnemend, Oplopend en Guardrails.
             Dit vergelijk is informatief; je kiest en bewaart je profiel bij{' '}
-            <Link href="/toekomst?tab=voorkeuren" className="font-medium text-horizon-700 underline hover:text-[var(--ink)]">Voorkeuren</Link>.
+            <Link href="/toekomst?tab=voorkeuren" className="font-medium text-horizon-700 underline hover:text-[var(--ink)]">Instellingen</Link>.
           </p>
         </div>
 

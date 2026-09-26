@@ -682,7 +682,7 @@ describe('OptimizerLevenslang — laad- en foutstaten', () => {
     await waitFor(() => expect(screen.getByText(/rekent op je toekomstplan/i)).toBeTruthy())
     expect(mockSweep).not.toHaveBeenCalled()
     expect(screen.getByRole('link', { name: /Naar je toekomstplan/i }).getAttribute('href')).toBe(
-      '/toekomst/voorkeuren',
+      '/toekomst/instellingen',
     )
   })
 
