@@ -49,7 +49,7 @@ import { isKernelReachedNowDisplay } from '@/lib/horizon-kernel/bridge'
 import { type ConvergentieRawContext, type ConvergentieRawProfileRow } from '@/lib/horizon-kernel/convergentie-router'
 import { resolveFireParams, type FireParams } from '@/lib/fire-params'
 import { deriveMarginaalTarief } from '@/lib/box1-tax'
-import { type WithdrawalStrategyType, type WithdrawalStrategyConfig, WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
+import { type WithdrawalStrategyConfig, WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
 import type { Action, ActionStatus } from '@/lib/recommendation-data'
 import { computeRetirementExpenses, computeYearlyMustExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
 import { deriveRetirementExpenseBasis, extrapolateAnnualIncome } from '@/lib/retirement-expense-basis'
@@ -124,7 +124,7 @@ import { usePerspective } from '@/components/app/perspective-provider'
 import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
 import { PensionParseSummaryCard, PensionInstructionPanel, computeCumulativeImpacts, type SnapshotForTrend } from '@/components/app/horizon/horizon-helpers'
 import { MaskedAmount } from '@/components/app/masked-amount'
-import { PageInfoButton, GlossaryTerm, SectionLabel, Kicker } from '@/components/editorial'
+import { GlossaryTerm, SectionLabel, Kicker } from '@/components/editorial'
 import { formatAge } from '@/lib/horizon/fire-format'
 import {
   zoneVanHuidig,
@@ -248,7 +248,6 @@ import { resolveScenarioContext, type HorizonScenarioOverrides } from '@/lib/hoo
 import type { AssetCategorie } from '@/lib/horizon-kernel/types'
 import { runLabGrenzenAsync, runMarktcheckAsync, runScenarioPresetsAsync } from '@/lib/horizon-kernel/worker/run-in-worker'
 import { MASKED_AMOUNT_PLACEHOLDER } from '@/lib/format'
-import { getPageInfo } from '@/lib/page-info-content'
 
 const ScenariosModal = dynamic(() =>
   import('@/components/app/horizon/scenarios-modal').then(m => ({ default: m.ScenariosModal })),
@@ -363,7 +362,6 @@ import {
 } from '@/lib/chart-tips'
 import { ToekomstOverlay, type OverlayBalloonDef, type ToekomstOverlayGeometry } from '@/components/app/horizon/toekomst-overlay'
 import { TOEKOMST_OVERLAY_BALLOONS } from '@/components/app/horizon/toekomst-overlay-balloons'
-import { WidgetEmpty } from '@/components/widgets/widget-empty'
 import { resolveUnlinkedCashShare, unlinkedCashTotal } from '@/lib/unlinked-cash'
 
 type ActiveModal = null | 'scenarios' | 'simulations' | 'withdrawal' | 'backtesting' | 'strategie'
@@ -596,16 +594,14 @@ export function factorMapByPosition(
 
 export default function HorizonPage({
   initialData,
-  embedded = false,
   goals,
 }: {
   initialData: HorizonPageData
   /**
-   * K-02 — dubbele-hero-ontstapeling. Op /toekomst rendert de pagina al een
-   * eigen `PageOpening` ("Je tijdas") + PageInfoButton; dan degradeert de
-   * horizon-client-kop tot sectie-niveau (kicker + Tips-toggle, géén tweede
-   * H1-formaat, géén eigen PageInfoButton). Op de legacy-route /horizon staat
-   * geen paginakop, dus daar blijft `embedded={false}` de volle hero renderen.
+   * @deprecated Genegeerd. K-02 — de enige aanroeper (/toekomst) gaf altijd
+   * `embedded`; de standalone-tak (eigen PageInfoButton + h1) was dood en is
+   * weg (ADR 0179 fase 1 stap 1, ADR 0110). Het veld blijft alleen staan tot
+   * de page-verhuizing (stap 15) de prop bij de aanroeper schrapt.
    */
   embedded?: boolean
   /**
@@ -661,11 +657,6 @@ export default function HorizonPage({
     }>
   >([])
   const [fireParams, setFireParams] = useState<FireParams>(initialData.fireParams)
-  const [wsConfig, setWsConfig] = useState<{ strategy: WithdrawalStrategyType; floor: number; ceiling: number } | null>(
-    initialData?.withdrawalStrategy
-      ? { strategy: initialData.withdrawalStrategy.strategy, floor: initialData.withdrawalStrategy.guardrailFloor, ceiling: initialData.withdrawalStrategy.guardrailCeiling }
-      : null,
-  )
   const [withdrawalStrategyConfig, setWithdrawalStrategyConfig] = useState<WithdrawalStrategyConfig>(
     initialData?.withdrawalStrategy ?? WITHDRAWAL_DEFAULTS,
   )
@@ -713,9 +704,6 @@ export default function HorizonPage({
   const [impacts, setImpacts] = useState<LifeEventImpact[]>(initialData.impacts)
   const [actions, setActions] = useState<Action[]>(initialData.actions)
   const [debts, setDebts] = useState<Debt[]>(initialData.debts)
-  // Doorrekening-inline needs raw profile data + extrapolated income
-  const [profileRaw, setProfileRaw] = useState<Record<string, unknown> | null>(null)
-  const [estimatedYearlyIncome, setEstimatedYearlyIncome] = useState(0)
   const [fireStrategy, setFireStrategy] = useState<FireStrategyConfig | undefined>(initialData?.fireStrategy ?? undefined)
   /**
    * AOW-leeftijd. SYNCHROON geseed uit de server-voorgeladen wettelijke tabel
@@ -736,8 +724,7 @@ export default function HorizonPage({
    *  yearly_essential_expenses) — kern-invoerbron voor de convergentie-router. Server-
    *  side voorgeladen via `initialData.rawProfile` (bevat al `yearly_essential_expenses`),
    *  zodat de EERSTE render meteen de kernel-projectie heeft i.p.v. een null-flits; de
-   *  mount-fetch (loadKernelContext) + loadData verversen 'm daarna. Los van `profileRaw`
-   *  (doorrekening-inline). */
+   *  mount-fetch (loadKernelContext) + loadData verversen 'm daarna. */
   const [kernelRawProfile, setKernelRawProfile] = useState<ConvergentieRawProfileRow | null>(
     initialData.rawProfile ?? null,
   )
@@ -746,7 +733,6 @@ export default function HorizonPage({
    *  `kernelRawProfile`) al bij de EERSTE render compleet is en de mount-fetch kan
    *  worden overgeslagen — geen tweede solve. Leeg = legacy DB / tabel ontbreekt. */
   const [aowRows, setAowRows] = useState<AowLeeftijdRow[]>(() => initialData.aowRows ?? [])
-  const [loading] = useState(true)
   const [activeModal, setActiveModal] = useState<ActiveModal>(null)
   // Voorkeurs-tab bij het openen van de StrategieModal (bv. direct naar 'woning'
   // vanuit de "huis wordt nooit verkocht"-melding). Reset naar null bij sluiten.
@@ -1049,8 +1035,6 @@ export default function HorizonPage({
   // `projectiePending` → de Fin-laadlaag op de grafiek + gedempte hoofdlijn.
   const [dataRefreshing, setDataRefreshing] = useState(false)
   const [refreshPending, startRefresh] = useTransition()
-  // /toekomst krijgt nieuwe overzicht-tekst; /horizon-fallback voor legacy bezoeken
-  const pageInfoText = getPageInfo(pathname, '/horizon')
   useEffect(() => {
     const modal = searchParams.get('modal')
     const strategieParam = searchParams.get('strategie')
@@ -1673,10 +1657,7 @@ export default function HorizonPage({
       setAvgIncome6m(avgInc6)
       setAvgExpenses6m(avgExp6)
       setRetirementMethod((profileResult.data?.retirement_expense_method ?? 'essential_budgets') as RetirementExpenseMethod)
-      // Store raw profile + extrapolated income for doorrekening-inline
-      setProfileRaw((profileResult.data as Record<string, unknown>) ?? null)
-      setEstimatedYearlyIncome(extrapolatedIncome)
-      // Kernel-context ná elke loadData verversen (los van profileRaw hierboven).
+      // Kernel-context ná elke loadData verversen.
       // yearly_essential_expenses = de al-berekende essentiële jaaruitgaven (NIET de
       // retirement-expenses) zodat de kernel dezelfde grondslag gebruikt.
       setKernelRawProfile({
@@ -1692,11 +1673,6 @@ export default function HorizonPage({
         setAowRows(aowTabel)
       }
       if (wsData) {
-        setWsConfig({
-          strategy: (wsData.withdrawal_strategy as WithdrawalStrategyConfig['strategy'] | undefined) ?? 'static',
-          floor: (wsData.guardrail_floor as number | undefined) ?? 0.80,
-          ceiling: (wsData.guardrail_ceiling as number | undefined) ?? 1.20,
-        })
         setWithdrawalStrategyConfig({
           strategy: (wsData.withdrawal_strategy as WithdrawalStrategyConfig['strategy'] | undefined) ?? WITHDRAWAL_DEFAULTS.strategy,
           guardrailFloor: (wsData.guardrail_floor as number | undefined) ?? WITHDRAWAL_DEFAULTS.guardrailFloor,
@@ -2622,10 +2598,6 @@ export default function HorizonPage({
     },
     [currentAge, events],
   )
-  const baseFireStratOpts = fireStrategy ? { strategy: fireStrategy.strategy, endAge: fireStrategy.endAge } : undefined
-  const baseFire = effectiveInput ? computeFireProjection(effectiveInput, fireParams.grossReturn, fireSwr, undefined, baseFireStratOpts) : null
-  const totalDelayMonths = impacts.reduce((s, i) => s + i.fireDelayMonths, 0)
-  const adjustedFireAge = baseFire?.fireAge != null ? baseFire.fireAge + totalDelayMonths / 12 : null
 
   // Gebruik simulatie-FIRE-bedrag als authoritative vrijheidspercentage wanneer beschikbaar.
   // Task 4.2 (progressieve first paint): zolang de worker-run nog niet geland is, wint de
@@ -5827,10 +5799,8 @@ export default function HorizonPage({
             <Lightbulb className="h-3.5 w-3.5" aria-hidden />
             <span className="hidden sm:inline">Tips</span>
           </button>
-          {/* Embedded (op /toekomst): geen eigen PageInfoButton — de paginakop
-              (PageOpening "Je tijdas") levert 'm al. Alleen op de legacy-route
-              /horizon (standalone) rendert de i-knop hier. */}
-          {!embedded && <PageInfoButton content={pageInfoText} />}
+          {/* Geen eigen PageInfoButton: de paginakop (PageOpening "Je tijdas")
+              levert 'm al. */}
         </div>
         {/* Kicker met 28×1px Horizon-streep */}
         <div className="flex items-center gap-2.5 pr-20 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)] sm:pr-24">
@@ -5842,27 +5812,9 @@ export default function HorizonPage({
           Horizon · jouw vrijheidshorizon
           <PerspectiveContextLabel className="normal-case tracking-normal" />
         </div>
-        {/* Headline met italic-em "vrij" — alleen als volwaardige pagina-kop.
-            Embedded op /toekomst zou dit een tweede H1 náást "Je tijdas" geven
-            (dubbele hero, K-02); dan blijft de kop op kicker/sectie-niveau. */}
-        {!embedded && (
-          <h1
-            className="font-bold leading-tight tracking-[-0.02em] text-[28px] sm:text-[36px]"
-            style={{ fontFamily: 'var(--font-playfair, serif)' }}
-          >
-            {/* ADR 0129 B10 — de vraag draagt de modus: `solved` "Wanneer kun je
-                stoppen?" · vast anker "Kun je op {stop} stoppen?" · nu "Hoe ver reikt
-                je vermogen?". Het accentwoord is het laatste woord van de vraag. */}
-            {heroVraag.replace(/\s\S+\?$/, '')}{' '}
-            <em
-              className="font-normal italic"
-              style={{ color: 'var(--module-active-700)' }}
-            >
-              {heroVraag.match(/(\S+)\?$/)?.[1] ?? ''}
-            </em>
-            ?
-          </h1>
-        )}
+        {/* Geen eigen kop: onder "Je tijdas" (PageOpening) zou dat een tweede
+            paginakop geven (dubbele hero, K-02). De kop blijft op
+            kicker/sectie-niveau (ADR 0110: de shell draagt de enige h1). */}
       </header>
 
       {/* === KATERN I — Waar je staat === */}
@@ -6538,29 +6490,11 @@ export default function HorizonPage({
           )}
 
           {/* Grafiekgedeelte. De !hasCompletedHorizonSetup-staat wordt
-              paginabreed afgevangen door de guard-clause bovenaan de render,
-              dus hier hoeven we alleen de geladen/lege/gevulde staten te tonen. */}
-          {!simResult && !loading ? (
-            <div className="py-8" style={{ minHeight: 320 }}>
-              {simError ? (
-                <WidgetEmpty
-                  variant="first-use"
-                  icon={AlertTriangle}
-                  title="Projectie"
-                  description="Er is een fout opgetreden bij het berekenen van je FIRE-projectie. Controleer je gegevens of probeer opnieuw."
-                  action={{ label: 'Opnieuw berekenen', onClick: () => loadData() }}
-                />
-              ) : (
-                <WidgetEmpty
-                  variant="first-use"
-                  icon={TrendingUp}
-                  title="Projectie"
-                  description="Voeg vermogen toe in Het Overzicht zodat De Toekomst een projectie kan berekenen."
-                  action={{ label: 'Vermogen toevoegen', href: '/overzicht/bezittingen' }}
-                />
-              )}
-            </div>
-          ) : simResult ? (
+              paginabreed afgevangen door de guard-clause bovenaan de render.
+              Zonder simResult rendert dit blok niets (de vroegere
+              WidgetEmpty-lege-staat hing aan een constante `loading = true`
+              en was onbereikbaar — fase 1 stap 1). */}
+          {simResult ? (
             <>
               <div className="my-2 border-b border-dashed border-[var(--border-ed)]" />
 
