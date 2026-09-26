@@ -146,3 +146,31 @@ describe('runRegelProjection — cashflow (W-009)', () => {
     })
   })
 })
+
+describe('runRegelProjection — potRules (ADR 0179 fase 3)', () => {
+  const metRegels = {
+    rawContext: {
+      profile: { pot_rules: { surplus_group: 'spaargeld' }, inflation_rate: 0.02 },
+      assets: [],
+      debts: [],
+      lifeEvents: [],
+    },
+  } as unknown as RegelSimSnapshot
+
+  it('zonder potRules-override blijft de context byte-identiek', () => {
+    runRegelProjection(metRegels, {})
+    expect(ontvangen.contexts[0]).toBe(metRegels.rawContext)
+  })
+
+  it('vervangt alleen de kolom pot_rules', () => {
+    runRegelProjection(metRegels, { potRules: { surplus_group: 'beleggingen' } })
+    const ctx = ontvangen.contexts[0] as { profile: Record<string, unknown> }
+    expect(ctx.profile).toEqual({ pot_rules: { surplus_group: 'beleggingen' }, inflation_rate: 0.02 })
+    expect(metRegels.rawContext.profile).toEqual({ pot_rules: { surplus_group: 'spaargeld' }, inflation_rate: 0.02 })
+  })
+
+  it('de override-kolom reist mee in de client-snapshot', async () => {
+    const { PROFIEL_KERNEL_KOLOMMEN } = await import('./regel-sim-snapshot')
+    expect(PROFIEL_KERNEL_KOLOMMEN as readonly string[]).toContain('pot_rules')
+  })
+})

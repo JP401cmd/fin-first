@@ -16,7 +16,7 @@ import {
   type ConvergentieRawContext,
   type ConvergentieRawProfileRow,
 } from '@/lib/horizon-kernel/convergentie-router'
-import type { SimRow } from '@/lib/fire-simulation'
+import type { SimResult, SimRow } from '@/lib/fire-simulation'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
 import { ankerReachFromSim, type AnkerReach } from '@/lib/horizon/anker-copy'
 import { clipRowsToPlanEnd } from '@/lib/horizon/clip-rows-to-plan-end'
@@ -68,6 +68,13 @@ export interface RegelProjection {
    * einde van het plan reikt (effectmaat trede 3). Optioneel/additief in het TYPE.
    */
   eindeLiquide?: { leeftijd: number; nominaal: number; inflationFactor: number } | null
+  /**
+   * ADR 0179 fase 3 — het volledige `SimResult` van DEZELFDE run (`toSimResult`), voor
+   * weergaven die meer lezen dan rijen + vrijheidsleeftijd (de profielvergelijking in de
+   * onttrekkingsbody: stopanker, doelbedrag, vermogen op het stopmoment). Consume-only.
+   * Optioneel/additief in het TYPE; `runRegelProjection` zet 'm bij een geslaagde run.
+   */
+  sim?: SimResult
 }
 
 /** Verse lege projectie per aanroep — geen gedeelde (muteerbare) `rows`-array. */
@@ -175,6 +182,13 @@ export interface RegelSimOverride {
    * `resolveAmountWithBasis` op de cashflow-bundel. `undefined` = kolommen ongewijzigd.
    */
   cashflow?: { monthlyIncome: number; monthlyExpenses: number }
+  /**
+   * ADR 0179 fase 3 — kandidaat-pot-regels als rauwe `profiles.pot_rules`-JSONB (dezelfde
+   * vorm als `potRulesToRaw` en de PUT-body van `/api/pot-rules`). De kern leest de kolom
+   * zelf (`resolvePotRules` → `buildTsParams`); hier wordt alleen de kolom vervangen.
+   * `undefined` = kolom ongewijzigd; `null` = geen regels (kern-defaults).
+   */
+  potRules?: Record<string, unknown> | null
 }
 
 /**
@@ -205,6 +219,7 @@ export function runRegelProjection(
     eindeLiquide: eindRij
       ? { leeftijd: eindRij.age, nominaal: eindRij.nettoLiquide, inflationFactor: eindRij.inflationFactor }
       : null,
+    sim: res,
   }
 }
 
@@ -232,7 +247,8 @@ function applyDraftToRawContext(
     override?.lifeEvent === undefined &&
     override?.parameters === undefined &&
     override?.assetExpectedReturns === undefined &&
-    override?.cashflow === undefined
+    override?.cashflow === undefined &&
+    override?.potRules === undefined
   ) {
     return base
   }
@@ -275,6 +291,9 @@ function applyDraftToRawContext(
   }
   if (override.legacyIncludeIlliquid !== undefined) {
     profile.fire_legacy_include_illiquid = override.legacyIncludeIlliquid
+  }
+  if (override.potRules !== undefined) {
+    profile.pot_rules = override.potRules
   }
   if (override.geenTekortLening !== undefined) {
     profile.fire_no_deficit_loan = override.geenTekortLening
