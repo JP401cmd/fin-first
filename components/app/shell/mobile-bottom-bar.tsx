@@ -305,6 +305,7 @@ export function MobileBottomBar({ config }: MobileBottomBarProps) {
       <div
         className={`${wrapperClasses} flex items-center gap-2 px-3 pb-[var(--safe-area-bottom)]`}
         style={{ minHeight: 'var(--bottom-nav-height)' }}
+        data-testid="shell-action-bar"
       >
         {/* Secondary links (terug-context), primary rechts (forward-action) —
             volgens platform-conventie (iOS/Android). */}

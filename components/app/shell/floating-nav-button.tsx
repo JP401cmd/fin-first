@@ -9,6 +9,7 @@ import { isImmersiveRoute } from '@/lib/shell/immersive-routes'
 import { useFinSlot } from '@/lib/shell/fin-slot'
 import { useHomeScreen } from '@/lib/hooks/use-home-screen'
 import { NavMenuSheet } from './nav-menu-sheet'
+import { useLiveBottomBar } from './nav-stack-provider'
 
 // Long-press-configuratie voor de waffle-knop: 1000 ms vasthouden = direct
 // naar het gekozen homescherm (useHomeScreen). Bewust boven de
@@ -63,7 +64,12 @@ export function FloatingNavButton() {
   // …en op een immersieve taakflow (bv. de check-in-wizard), die zijn eigen
   // sticky primaire actie onderaan zet. Zie lib/shell/immersive-routes.ts.
   const pathname = usePathname()
-  const hidden = overlayOpen || isImmersiveRoute(pathname)
+  // …en zolang een pagina een live action-bar in de shell heeft staan (bv. de opslaan-balk
+  // van het doelscenario-lab op /toekomst/doelen, ADR 0179 D7): de pill staat vast 12px
+  // boven de onderrand en zou over die knoppen vallen. Verdwijnt de bar (niets meer op te
+  // slaan), dan komt de pill terug. Zelfde precedent als de immersieve routes.
+  const liveActionBar = useLiveBottomBar()?.config?.kind === 'action-bar'
+  const hidden = overlayOpen || liveActionBar || isImmersiveRoute(pathname)
   // Gekozen homescherm — het doel van de long-press op de waffle.
   const { homeHref } = useHomeScreen()
 
