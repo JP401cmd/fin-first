@@ -128,7 +128,7 @@ const DUBBELE_INGANG_GESCHRAPT = ['hero-missende-gegevens-cta', 'Vul profiel aan
  * (`PlanAfbouwOverzicht`, spec §5) — die montage staat nog uit (orchestrator) en komt dan
  * hier terug in de lijst.
  */
-const SUBPAGINA_VIEWS = ['DoelenView', 'InstellingenRijen', 'GebeurtenissenView'] as const
+const SUBPAGINA_VIEWS = ['DoelenView', 'InstellingenRijen', 'GebeurtenissenView', 'PlanAfbouwOverzicht'] as const
 
 /**
  * Render-plekken die NIET de /toekomst-grafiek zijn maar wel in de graaf zitten:
