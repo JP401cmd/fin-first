@@ -199,7 +199,7 @@ export default async function BibliotheekPage({
       />
       {/* Breadcrumb terug — geen tab-balk; bibliotheek is een aparte route. */}
       <Link
-        href="/toekomst?tab=rekenhulp"
+        href="/toekomst/rekenhulp"
         className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--ink-3)] hover:text-[var(--ink-2)] mb-4"
       >
         <ArrowLeft className="w-3.5 h-3.5" aria-hidden="true" />
@@ -317,7 +317,7 @@ function EmptyState({ showOnlyUsable }: { showOnlyUsable: boolean }) {
         Word de eerste die een rekenhulp deelt. Maak er een met Fin, en
         publiceer &apos;m zodat anderen op jouw inzicht kunnen voortbouwen.
       </p>
-      <Button href="/toekomst?tab=rekenhulp" variant="primary" className="gap-1.5">
+      <Button href="/toekomst/rekenhulp" variant="primary" className="gap-1.5">
         <Sparkles className="w-4 h-4" aria-hidden="true" />
         Maak je eerste rekenhulp
       </Button>

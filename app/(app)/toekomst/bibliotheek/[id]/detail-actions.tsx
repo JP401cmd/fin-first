@@ -18,7 +18,7 @@ import { DuplicateConfirmSheet } from '@/components/future/duplicate-confirm-she
  *
  * Drie acties:
  *  1. Dupliceer — opent de DuplicateConfirmSheet die zelf de POST regelt
- *     en bij success naar `/toekomst?tab=rekenhulp` navigeert.
+ *     en bij success naar `/toekomst/rekenhulp` navigeert.
  *  2. Like — toggle-knop met optimistische UI (Agent C).
  *  3. Melden — opent ReportSheet voor een korte vrije-tekst-melding.
  *

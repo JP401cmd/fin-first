@@ -849,7 +849,7 @@ export function StrategieModal({ open, onClose, onSaved, housingStrategy, initia
             Deze vergelijking gebruikt de horizon-kernel. Hieronder vergelijk je de vier
             onttrekkings<strong>profielen</strong> — Vast, Afnemend, Oplopend en Guardrails.
             Dit vergelijk is informatief; je kiest en bewaart je profiel bij{' '}
-            <Link href="/toekomst?tab=voorkeuren" className="font-medium text-horizon-700 underline hover:text-[var(--ink)]">Instellingen</Link>.
+            <Link href="/toekomst/instellingen" className="font-medium text-horizon-700 underline hover:text-[var(--ink)]">Instellingen</Link>.
           </p>
         </div>
 
@@ -1146,7 +1146,7 @@ export function StrategieModal({ open, onClose, onSaved, housingStrategy, initia
 
         {/* ── Secondary link to full settings (guardrail parameters etc.) ── */}
         <Link
-          href="/toekomst?tab=voorkeuren"
+          href="/toekomst/instellingen"
           className="flex items-center justify-between rounded-[var(--r)] border-2 border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3 transition-all hover:border-horizon-300 hover:shadow-sm"
         >
           <div className="flex items-center gap-2.5">

@@ -247,7 +247,7 @@ export const DEFAULT_WELCOME_GUIDE: WelcomeGuideConfig = {
           id: 's4-whatif',
           title: 'Speel met je aannames',
           description: 'Zie direct het effect van keuzes op je vrijheid.',
-          href: '/toekomst?whatif=open',
+          href: '/toekomst/doelen',
           icon: 'Compass',
           enabled: true,
         },

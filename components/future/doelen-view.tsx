@@ -396,8 +396,9 @@ function ParameterGoalCard({ goal, progress, labPlan }: GoalDisplay & { labPlan:
 
 /**
  * Eén regel wanneer de plankeuze lab-doelen n.v.t. maakte (spec lab-haalbaarheid §4.2).
- * Eén markup voor beide weergavemodi. "Bijwerken" opent het lab zelf via de canonieke
- * deeplink (`?whatif=open` klapt het lab uit en scrolt ernaartoe); "Loslaten" opent de
+ * Eén markup voor beide weergavemodi. "Bijwerken" springt naar het lab, dat sinds ADR 0179
+ * (fase 1 stap 16) boven deze lijst in katern Doelen staat (`#verken-je-aannames`,
+ * rechtstreeks, zonder de `?whatif=open`-redirect); "Loslaten" opent de
  * bestaande confirm — dezelfde flow als het overflow-menu van de doelsituatie.
  */
 function LabPlanMelding({ count, onLoslaten }: { count: number; onLoslaten: () => void }) {
@@ -410,7 +411,7 @@ function LabPlanMelding({ count, onLoslaten }: { count: number; onLoslaten: () =
       <span>{doelenPlanGewijzigdMelding(count)}</span>
       <span className="flex items-center gap-x-4">
         <Link
-          href="/toekomst?whatif=open"
+          href="/toekomst/doelen#verken-je-aannames"
           className="inline-flex min-h-[44px] items-center font-semibold text-horizon-700 underline underline-offset-2"
         >
           {DOELEN_MELDING_ACTIES.bijwerken}

@@ -223,7 +223,7 @@ export function PlanMeldingen({
                       {deficitLoanCopy.toonInstellingLink && (
                         <button
                           type="button"
-                          onClick={() => router.push('/toekomst/voorkeuren?regel=eindstrategie')}
+                          onClick={() => router.push('/toekomst/instellingen?regel=eindstrategie')}
                           className="mt-1.5 mr-4 inline-flex items-center gap-1 font-sans text-[12px] font-medium text-amber-900 underline underline-offset-2 transition-colors hover:text-[var(--ink)]"
                           style={{ minHeight: 44 }}
                         >

@@ -1066,7 +1066,7 @@ describe('DoelenView — melding wanneer lab-doelen niet meer bij het plan passe
     expect(melding).toHaveAttribute('role', 'status')
     expect(melding).toHaveTextContent('Je plan is veranderd. 1 doel uit het lab past er niet meer bij.')
     // Bijwerken opent het lab zelf (canonieke deeplink), niet alleen de landingsanker.
-    expect(screen.getByRole('link', { name: 'Bijwerken' })).toHaveAttribute('href', '/toekomst?whatif=open')
+    expect(screen.getByRole('link', { name: 'Bijwerken' })).toHaveAttribute('href', '/toekomst/doelen#verken-je-aannames')
     expect(screen.queryByText('Doelsituatie loslaten')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Loslaten' }))
     expect(screen.getByText('Doelsituatie loslaten')).toBeInTheDocument()
@@ -1105,7 +1105,7 @@ describe('DoelenView — melding wanneer lab-doelen niet meer bij het plan passe
     // Boven de lijst: de melding komt in documentvolgorde vóór de eerste doelkaart.
     const eersteKaart = screen.getByRole('link', { name: /Bekijk Vrij op 58 jaar in het lab/ })
     expect(meldingen[0].compareDocumentPosition(eersteKaart) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'Bijwerken' })).toHaveAttribute('href', '/toekomst?whatif=open')
+    expect(screen.getByRole('link', { name: 'Bijwerken' })).toHaveAttribute('href', '/toekomst/doelen#verken-je-aannames')
     expect(screen.queryByText('Doelsituatie loslaten')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Loslaten' }))
     expect(screen.getByText('Doelsituatie loslaten')).toBeInTheDocument()

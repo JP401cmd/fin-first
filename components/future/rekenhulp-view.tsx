@@ -32,7 +32,7 @@ import { useHasAiSubscription } from '@/lib/feature-access/context'
 import { describeAiError, isAiErrorCode } from '@/lib/ai/error-copy'
 
 /**
- * RekenhulpView — eigen plek (/toekomst?tab=rekenhulp) waar Fin helpt
+ * RekenhulpView — eigen plek (/toekomst/rekenhulp) waar Fin helpt
  * een custom calculator te bouwen. Drie modi:
  *   - 'list':    opgeslagen calculators + "Nieuwe met Fin"-knop
  *   - 'build':   prompt-veld → AI-generatie → preview (Opslaan/Verfijnen)
