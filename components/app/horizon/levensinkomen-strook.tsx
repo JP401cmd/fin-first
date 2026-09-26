@@ -190,7 +190,13 @@ export function LevensinkomenStrook({ nodes, activeAge, segments }: Levensinkome
         </p>
       </InlineInfoDisclosure>
 
-      <div className="flex gap-1" role="group" aria-label="Dekking per leeftijd">
+      {/* Zestien knopen passen niet op 360–390px. De rij scrollt daarom binnen de
+          kaart (eigen scroller), zodat de pagina zelf nooit horizontaal scrollt;
+          `min-w-max` houdt elke knoop leesbaar in plaats van ze samen te persen.
+          De padding geeft focusring, schaduw en de optil-translatie ruimte binnen
+          de scroller, die anders ook verticaal zou knippen. */}
+      <div className="-mx-1 -my-1 overflow-x-auto overscroll-x-contain px-1 py-1">
+      <div className="flex min-w-max gap-1" role="group" aria-label="Dekking per leeftijd">
         {nodes.map(n => {
           const active = n.age === activeNode
           const toontBon = bonNode?.age === n.age
@@ -211,7 +217,7 @@ export function LevensinkomenStrook({ nodes, activeAge, segments }: Levensinkome
               // Keuze-uit-een-reeks, geen aan/uit-schakelaar → aria-current, niet aria-pressed.
               aria-current={toontBon ? 'true' : undefined}
               aria-controls={bonId}
-              className={`flex-1 cursor-pointer px-1 py-1.5 text-center transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)] disabled:cursor-default ${
+              className={`min-h-[44px] min-w-[44px] flex-1 cursor-pointer px-1 py-1.5 text-center transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)] disabled:cursor-default ${
                 active ? 'bg-[var(--subtle)] -translate-y-0.5 shadow-sm' : ''
               } ${toontBon && !active ? 'bg-[var(--subtle)]' : ''}`}
             >
@@ -236,6 +242,7 @@ export function LevensinkomenStrook({ nodes, activeAge, segments }: Levensinkome
             </button>
           )
         })}
+      </div>
       </div>
 
       <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 text-[11.5px] text-[var(--ink-3)]">
