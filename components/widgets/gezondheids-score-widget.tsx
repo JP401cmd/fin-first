@@ -1,7 +1,6 @@
 'use client'
 
 import { memo, useState } from 'react'
-import Link from 'next/link'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import { Activity, TrendingUp, TrendingDown, Minus, ChevronRight, ExternalLink } from 'lucide-react'
@@ -13,6 +12,7 @@ import { KassabonShell } from '@/components/app/kassabon-shell'
 import { BesprekMetWillButton } from '@/components/app/chat/bespreek-met-fin-button'
 import { WidgetEmpty } from './widget-empty'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
+import { GEZONDHEID_KASSABON_HREF } from '@/lib/overview/gezondheid-deeplink'
 
 // Starter/low-data — waar een lege gebruiker naartoe kan om gegevens toe te
 // voegen (bezittingen zijn het startpunt van de meeste pijlers).
@@ -264,16 +264,16 @@ function TrendBadge({ trend }: { trend: number }) {
   )
 }
 
-// ── Simplified Kassabon for widget (summary + link to Horizon) ──
+// ── Simplified Kassabon for widget (summary + link naar de hub-kassabon) ──
 
 /**
  * Widget kassabon shows a summary of the health score with pillar overview bars
- * and links to the Horizon page for the full detail view.
+ * and links to the full health receipt on /overzicht (met het verloop).
  * Het getal komt uit de canonieke `data.healthScore` (loader → buildHealthScore-
  * Input + computeHealthScoreFromInputs), per definitie hetzelfde getal als
  * /toekomst (ADR 0008).
  */
-function HealthKassabonSummary({ health }: { health: HealthScore }) {
+function HealthKassabonSummary({ health, onNaarKassabon }: { health: HealthScore; onNaarKassabon: () => void }) {
   return (
     <div className="space-y-4">
       {/* Total score header */}
@@ -313,14 +313,18 @@ function HealthKassabonSummary({ health }: { health: HealthScore }) {
         ))}
       </div>
 
-      {/* CTA: link to Horizon for full detail view */}
-      <Link
-        href="/toekomst"
+      {/* CTA: de volledige kassabon op /overzicht, mét het verloop. Een gewone
+          <a> (geen next/link): alleen een fragmentnavigatie vuurt `hashchange`,
+          waarop de hub de kassabon opent — zie lib/overview/gezondheid-deeplink.ts.
+          Deze samenvatting sluit eerst, zodat er geen twee sheets op elkaar liggen. */}
+      <a
+        href={GEZONDHEID_KASSABON_HREF}
+        onClick={onNaarKassabon}
         className="flex items-center justify-center gap-2 rounded-[var(--r)] border border-horizon-200 bg-horizon-50/50 px-4 py-2.5 text-xs font-medium text-horizon-700 transition-colors hover:bg-horizon-100 hover:border-horizon-300"
       >
         <ExternalLink className="h-3.5 w-3.5" />
-        Bekijk volledige analyse op Toekomst
-      </Link>
+        Bekijk volledige analyse en verloop
+      </a>
     </div>
   )
 }
@@ -447,7 +451,7 @@ export const GezondheidScoreWidget = memo(function GezondheidScoreWidget({ size,
           </div>
         )}
         <BottomSheet open={showKassabon} onClose={() => setShowKassabon(false)} title="Financiële Gezondheid">
-          <div className="p-5"><HealthKassabonSummary health={health} /></div>
+          <div className="p-5"><HealthKassabonSummary health={health} onNaarKassabon={() => setShowKassabon(false)} /></div>
         </BottomSheet>
       </WidgetShell>
     )
@@ -477,7 +481,7 @@ export const GezondheidScoreWidget = memo(function GezondheidScoreWidget({ size,
           </div>
         </div>
         <BottomSheet open={showKassabon} onClose={() => setShowKassabon(false)} title="Financiële Gezondheid">
-          <div className="p-5"><HealthKassabonSummary health={health} /></div>
+          <div className="p-5"><HealthKassabonSummary health={health} onNaarKassabon={() => setShowKassabon(false)} /></div>
         </BottomSheet>
       </WidgetShell>
     )
@@ -551,16 +555,17 @@ export const GezondheidScoreWidget = memo(function GezondheidScoreWidget({ size,
         />
       </div>
 
-      {/* CTA: link to Horizon for full detail view */}
-      <Link
-        href="/toekomst"
+      {/* CTA: de volledige kassabon op /overzicht, mét het verloop (gewone <a>,
+          zie de CTA in HealthKassabonSummary). */}
+      <a
+        href={GEZONDHEID_KASSABON_HREF}
         className="mt-1.5 font-serif italic text-[11px] text-horizon-600 hover:text-horizon-800 flex items-center gap-1"
       >
-        Bekijk details op Toekomst <ChevronRight className="h-3 w-3" />
-      </Link>
+        Bekijk details en verloop <ChevronRight className="h-3 w-3" />
+      </a>
 
       <BottomSheet open={showKassabon} onClose={() => setShowKassabon(false)} title="Financiële Gezondheid">
-        <div className="p-5"><HealthKassabonSummary health={health} /></div>
+        <div className="p-5"><HealthKassabonSummary health={health} onNaarKassabon={() => setShowKassabon(false)} /></div>
       </BottomSheet>
     </WidgetShell>
   )

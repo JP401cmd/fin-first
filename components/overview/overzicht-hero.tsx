@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type ReactNode } from 'react'
+import { useCallback, useState, type ReactNode } from 'react'
 import dynamic from 'next/dynamic'
 import { EditorialHeadline, EditorialDeck, Kicker } from '@/components/editorial'
 import { leverageStatusTextClass } from '@/lib/leverage-status'
@@ -23,6 +23,8 @@ import type { LeverScores } from '@/components/app/shell/lever-scores'
 import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import type { HealthVerloopPunt } from '@/lib/health-verloop'
+import { useOpenOnHash } from '@/lib/hooks/use-open-on-hash'
+import { GEZONDHEID_ANKER_ID, GEZONDHEID_KASSABON_HASH } from '@/lib/overview/gezondheid-deeplink'
 
 // HealthScoreReceipt (zwaar, ~1011 r) blijft lazy — hij zit alleen in de
 // BottomSheet die pas ná een klik op de Health-card opent, dus buiten het
@@ -137,6 +139,10 @@ export function OverzichtHeroPrimary({
   // Health-card. De card + sheet leven nu in blok 1 zodat gezondheid direct
   // paint, i.p.v. mee te stromen met de widget-zware databundel.
   const [receiptOpen, setReceiptOpen] = useState(false)
+  // Deeplink `/overzicht#gezondheid` (o.a. vanuit de widget gezondheids_score)
+  // opent dezelfde kassabon, mét het verloop.
+  const openReceipt = useCallback(() => setReceiptOpen(true), [])
+  useOpenOnHash(GEZONDHEID_KASSABON_HASH, openReceipt)
 
   // `dateLabel` + `greeting` komen als props binnen (server-side berekend in
   // Europe/Amsterdam) — één bron van waarheid voor de tijd, zodat SSR en de
@@ -237,7 +243,7 @@ export function OverzichtHeroPrimary({
           toekomst-kaart onder Budget + Belasting; de naad Vandaag valt op de grens
           Schulden | Budget. Wijzig deze drie gaps alleen samen. */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-3 items-stretch">
-        <div data-tour="gezondheid" className="lg:col-span-1">
+        <div data-tour="gezondheid" id={GEZONDHEID_ANKER_ID} className="lg:col-span-1 scroll-mt-20">
           {health ? (
             <HealthScoreCard
               health={health}

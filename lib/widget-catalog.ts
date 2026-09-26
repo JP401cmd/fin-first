@@ -4,6 +4,7 @@
 import { WIDGET_TO_FEATURE } from '@/lib/feature-registry'
 import type { ModuleId } from '@/lib/module-registry'
 import { getWidgetRequiredModule } from '@/lib/module-registry'
+import { GEZONDHEID_KASSABON_HREF } from '@/lib/overview/gezondheid-deeplink'
 
 // 'xl' ("Double" in de UI) is een opt-in bouwblok voor stats-heavy widgets:
 // alleen widgets die 'xl' expliciet in hun `sizes` hebben, bieden de optie aan.
@@ -522,7 +523,8 @@ export const WIDGET_HREFS: Record<string, string> = {
   spaarquote:               '/overzicht/budget/forecast',
   vrijheidsvoortgang:       '/toekomst',
   vaste_lasten:             '/overzicht/budget/vaste-lasten',
-  gezondheids_score:        '/toekomst',
+  // De volledige kassabon (met verloop) woont op /overzicht — ADR 0179 fase 5.
+  gezondheids_score:        GEZONDHEID_KASSABON_HREF,
   belasting_box3:           '/overzicht/belasting/box3',
   vrijheidsscenarios:       '/toekomst?modal=scenarios',
   sim_vermogenspad:         '/toekomst?modal=simulations',

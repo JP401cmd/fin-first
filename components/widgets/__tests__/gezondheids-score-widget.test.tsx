@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { GezondheidScoreWidget } from '../gezondheids-score-widget'
 import type { DashboardData } from '../widget-renderer'
 import type { HealthPillar, HealthScore, HealthScoreInput } from '@/lib/financial-health'
@@ -261,5 +261,24 @@ describe('GezondheidScoreWidget — full: Bespreek met Fin i.p.v. verbeterpunten
     expect(message).toContain('Vrijheid (40/100')
     // De vrijheidstijd-gerichte kick-off-vraag gaat mee.
     expect(message).toContain('vrijheidstijd')
+  })
+  // ── Fase 5 (ADR 0179): de volledige kassabon + verloop woont op /overzicht ──
+  it('Given de full-widget, When je de details zoekt, Then linkt hij met een gewone <a> naar de hub-kassabon (niet naar /toekomst)', () => {
+    render(<GezondheidScoreWidget size="full" data={bundleWith(health)} />)
+    const link = screen.getByRole('link', { name: /Bekijk details en verloop/ })
+    expect(link.getAttribute('href')).toBe('/overzicht#gezondheid')
+    expect(screen.queryByRole('link', { name: /Toekomst/ })).toBeNull()
+  })
+
+  it('Given de geopende widget-samenvatting, When je naar de volledige analyse gaat, Then sluit de samenvatting en wijst de link naar de hub-kassabon', async () => {
+    render(<GezondheidScoreWidget size="full" data={bundleWith(health)} />)
+    fireEvent.click(screen.getByRole('button', { name: /opbouw van je financiële gezondheid/i }))
+    const cta = screen.getByRole('link', { name: /Bekijk volledige analyse en verloop/ })
+    expect(cta.getAttribute('href')).toBe('/overzicht#gezondheid')
+    fireEvent.click(cta)
+    // De sheet speelt nog een sluitanimatie af vóór hij unmount.
+    await waitFor(() =>
+      expect(screen.queryByRole('link', { name: /Bekijk volledige analyse en verloop/ })).toBeNull(),
+    )
   })
 })
