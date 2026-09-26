@@ -66,11 +66,12 @@
 // venster verbreden zonder consument.
 
 import { cache } from 'react'
-import type { SupabaseClient } from '@supabase/supabase-js'
+import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js'
 import { ASSET_CLIENT_COLUMNS } from '@/lib/asset-data'
 import { getCachedUser } from '@/lib/supabase/cached-user'
 import { localMonthBounds, localMonthStartMonthsAgo } from '@/lib/month-range'
 import { selectUnlinkedBankAccounts } from '@/lib/unlinked-cash'
+import { latestSnapshotPerMonth } from '@/lib/snapshots/month-dedupe'
 
 // ── 1. Assets ──────────────────────────────────────────────────────────────
 /**
@@ -330,34 +331,73 @@ export const getEarliestIncomeDate = cache(async (supabase: SupabaseClient) => {
 })
 
 // ── 8. Netto-vermogen-snapshots (12-maands venster) ────────────────────────
+/** Eén maandstand uit `net_worth_snapshots`, zoals `getNetWorthSnapshots12m` 'm levert. */
+export interface NetWorthSnapshot12mRow {
+  snapshot_date: string
+  net_worth: number
+  fire_age: number | null
+  savings_rate: number | null
+  /** Het gezondheidsgetal zoals het toen berekend werd (0–100). */
+  resilience_score: number | null
+  /** Rekenmethode van `resilience_score` (ADR 0010); scores uit verschillende versies zijn niet vergelijkbaar. */
+  score_version: number | null
+  /** Motor die `fire_age` schreef ('kernel' | 'v2'; null telt als 'v2'). */
+  engine_bron: string | null
+}
+
 /**
- * De maandelijkse netto-vermogen-snapshots binnen het rollende 12-maands-venster
- * `[localMonthStartMonthsAgo(now, 11), ∞)`, oplopend op datum, hooguit 12 rijen.
+ * Bovengrens op de rijen in het venster. De unique-constraint
+ * `(user_id, snapshot_date)` staat hooguit één rij per dag toe, en het venster
+ * beslaat hooguit 366 dagen — 400 kapt dus nooit iets af. Hij staat er alleen om
+ * de query begrensd te houden.
+ */
+const SNAPSHOT_WINDOW_ROW_CAP = 400
+
+/**
+ * De netto-vermogen-snapshots van de ingelogde gebruiker over de laatste 12
+ * kalendermaanden (`[localMonthStartMonthsAgo(now, 11), ∞)`): één stand per
+ * kalendermaand (de laatste `snapshot_date` in de maand wint, via
+ * `lib/snapshots/month-dedupe.ts`), oplopend op datum — dus hooguit twaalf
+ * rijen. De laatste rij is de recentste maand; de voorlaatste de maand daarvóór.
  *
- * Voedt op dit moment twee paden, en dat is precies waarom hij hier staat:
- *  · `lib/dashboard-data-loader.ts` — `netWorthHistory`, `savingsHistory`, de
- *    snapshot-`fire_age` en de net-worth-delta-fallback op de spaarquote;
- *  · `lib/cashflow-kpis.ts#loadForecastSectionData` — `savingsHistory` + diezelfde
- *    delta-fallback, zonder de rest van de dashboard-bundel (T2.5).
+ * Eén maand kan meerdere rijen hebben: auto-, cron- en POST-snapshots landen op
+ * de werkelijke kalenderdag. De fetcher haalt daarom álle rijen in het venster
+ * op en dedupliceert zelf. Een `order(asc).limit(12)` levert bij dubbele maanden
+ * de OUDSTE twaalf en laat juist de recente kant weg — een bron voor een
+ * "vorige" of "recentste" stand moet de recente rijen gegarandeerd teruggeven.
+ *
+ * SCOPING: expliciet `.eq('user_id', <eigen id>)`. De SELECT-policy op
+ * `net_worth_snapshots` is huishouden-gedeeld (`ownership = 'shared'` van het
+ * eigen huishouden is zichtbaar); deze reeks is persoonlijk en mag dus niet op
+ * RLS leunen — een afwijking van de kop van dit bestand, om dezelfde reden als
+ * `getEarliestIncomeDate`. Zonder sessie een lege reeks.
+ *
+ * Lezers: `lib/dashboard-data-loader.ts` (`netWorthHistory`, `savingsHistory`,
+ * de snapshot-`fire_age`, de net-worth-delta en de spaarquote-delta-tak),
+ * `lib/cashflow-kpis.ts#loadForecastSectionData` en de check-in-routes
+ * (`app/api/checkin/overview`, `app/api/checkin/gespreksstarters`).
  *
  * De ondergrens is tijdzone-veilig via `localMonthStartMonthsAgo` (het TZ-lint
- * verbiedt `toISOString()` op maandgrenzen) en levert exact dezelfde
- * `YYYY-MM-01`-datum als het `Date.UTC(jaar, maand − 11, 1).toISOString()` dat de
- * dashboard-loader hier had: beide bouwen de grens uit de LOKALE jaar/maand van
- * `now` en zetten de dag op 01.
- *
- * BEWUST `.limit(12)` behouden: de snapshot-cron schrijft één rij per maand, dus
- * 12 dekt het venster — maar de kolom is niet uniek per maand en de dashboard-
- * loader las er altijd hooguit 12. Weglaten zou de historie-reeksen stil kunnen
- * verlengen bij een account met dubbele snapshots in één maand.
+ * verbiedt `toISOString()` op maandgrenzen).
  */
-export const getNetWorthSnapshots12m = cache(async (supabase: SupabaseClient) =>
-  supabase
-    .from('net_worth_snapshots')
-    .select('snapshot_date, net_worth, fire_age, savings_rate')
-    .gte('snapshot_date', localMonthStartMonthsAgo(new Date(), 11))
-    .order('snapshot_date', { ascending: true })
-    .limit(12),
+export const getNetWorthSnapshots12m = cache(
+  async (
+    supabase: SupabaseClient,
+  ): Promise<{ data: NetWorthSnapshot12mRow[] | null; error: PostgrestError | null }> => {
+    const user = await getCachedUser(supabase)
+    if (!user) return { data: [], error: null }
+
+    const { data, error } = await supabase
+      .from('net_worth_snapshots')
+      .select('snapshot_date, net_worth, fire_age, savings_rate, resilience_score, score_version, engine_bron')
+      .eq('user_id', user.id)
+      .gte('snapshot_date', localMonthStartMonthsAgo(new Date(), 11))
+      .order('snapshot_date', { ascending: true })
+      .limit(SNAPSHOT_WINDOW_ROW_CAP)
+
+    if (error) return { data: null, error }
+    return { data: latestSnapshotPerMonth((data ?? []) as NetWorthSnapshot12mRow[]), error: null }
+  },
 )
 
 // ── 9. Effectieve budgetlimiet: carry + periode-overrides ──────────────────
