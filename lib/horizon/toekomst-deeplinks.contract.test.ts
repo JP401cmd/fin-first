@@ -212,7 +212,10 @@ describe('deeplink-contract /toekomst — elke link die de app uitstuurt valt bi
   it('vindt de bekende uitgaande links (de scan mag niet leeg draaien)', () => {
     const keys = new Set(emitted.map((e) => e.key))
     // Gemeten 26 sep 2026: whatif, uitgaven, modal, tab, strategie, planreview.
-    for (const k of ['whatif', 'uitgaven', 'modal', 'strategie']) expect(keys, k).toContain(k)
+    // ADR 0179 stap 18–19: `strategie=open` en `whatif=open` redirecten naar hun katern,
+    // en de app stuurt die links sindsdien rechtstreeks daarheen — ze vallen dus uit
+    // deze scan. Wat op Plan blijft (de panes en modals van de overlay-host), niet.
+    for (const k of ['uitgaven', 'modal']) expect(keys, k).toContain(k)
   })
 
   it('geen uitgaande link gebruikt een sleutel of waarde die /toekomst niet kent', () => {

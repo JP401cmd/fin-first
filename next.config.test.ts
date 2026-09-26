@@ -57,9 +57,10 @@ describe('next.config redirects — legacy routes redirecten op de routing-laag 
     expect(rules[0].permanent).toBe(false)
   })
 
-  it('/horizon/strategie en /horizon/uitgaven-na-pensioen landen op de /toekomst-panes', async () => {
+  it('/horizon/strategie landt in Instellingen, uitgaven-na-pensioen op de Plan-pane', async () => {
     for (const [source, destination] of [
-      ['/horizon/strategie', '/toekomst?strategie=open'],
+      // ADR 0179 stap 18: rechtstreeks naar het katern, geen hop via /toekomst?strategie=open.
+      ['/horizon/strategie', '/toekomst/instellingen?regel=eindstrategie'],
       ['/horizon/uitgaven-na-pensioen', '/toekomst?uitgaven=open'],
       ['/toekomst/uitgaven-na-pensioen', '/toekomst?uitgaven=open'],
     ]) {
@@ -241,6 +242,17 @@ describe('next.config redirects — oude /toekomst?tab= en ?modal=withdrawal (AD
     )
   })
 
+  it('?strategie=open en ?modal=strategie landen op de eindstrategie-regel in Instellingen (ADR 0179 stap 18)', async () => {
+    expect(await resolveLocation('/toekomst?strategie=open')).toBe(
+      '/toekomst/instellingen?strategie=open&regel=eindstrategie',
+    )
+    expect(await resolveLocation('/toekomst?modal=strategie')).toBe(
+      '/toekomst/instellingen?modal=strategie&regel=eindstrategie',
+    )
+    // `?strategie=<levensstrategie>` hoort bij Instellingen zelf, niet bij /toekomst.
+    expect(await resolveLocation('/toekomst?strategie=huis')).toBeNull()
+  })
+
   it('?whatif=open landt op het lab in katern Doelen; de query reist mee (ADR 0179 stap 16)', async () => {
     expect(await resolveLocation('/toekomst?whatif=open')).toBe('/toekomst/doelen?whatif=open')
     expect(await resolveLocation('/toekomst?whatif=open&via=dreamgate')).toBe(
@@ -255,10 +267,8 @@ describe('next.config redirects — oude /toekomst?tab= en ?modal=withdrawal (AD
       '/toekomst',
       '/toekomst?tab=bestaat-niet',
       '/toekomst?tab=',
-      '/toekomst?strategie=open',
       '/toekomst?uitgaven=open',
       '/toekomst?planreview=open',
-      '/toekomst?modal=strategie',
       '/toekomst?modal=life_events',
       '/toekomst?modal=scenarios',
     ]) {

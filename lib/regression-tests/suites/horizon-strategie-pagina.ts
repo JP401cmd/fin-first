@@ -101,20 +101,21 @@ const tests: TestCase[] = [
   },
   {
     id: 'strategie-page-accessible',
-    name: 'Strategie-deeplink landt op de strategie-pane',
+    name: 'Strategie-deeplink landt op de eindstrategie-regel in Instellingen',
     category: CAT,
-    description: '/horizon/strategie stuurt door naar /toekomst met de strategie-pane open',
+    description:
+      '/horizon/strategie stuurt rechtstreeks door naar /toekomst/instellingen?regel=eindstrategie (ADR 0179 stap 18)',
     priority: 'critical',
     estimatedDurationMs: 500,
     async fn() {
       const res = await authenticatedFetch('/horizon/strategie', { redirect: 'manual' })
       assertEqual(res.status, 307, 'routing-laag-redirect (307)')
-      // Next levert de Location relatief ('/toekomst?strategie=open'); een
-      // proxy mag hem absoluut maken, dus toetsen we op de betekenisdragende
+      // Next levert de Location relatief ('/toekomst/instellingen?regel=eindstrategie');
+      // een proxy mag hem absoluut maken, dus toetsen we op de betekenisdragende
       // delen in plaats van op de exacte string.
       const location = res.headers.get('location') ?? ''
-      assert(location.includes('/toekomst'), `doel onder /toekomst, kreeg "${location}"`)
-      assert(location.includes('strategie=open'), `pane-param aanwezig, kreeg "${location}"`)
+      assert(location.includes('/toekomst/instellingen'), `doel is katern Instellingen, kreeg "${location}"`)
+      assert(location.includes('regel=eindstrategie'), `regel-param aanwezig, kreeg "${location}"`)
     },
   },
 

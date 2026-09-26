@@ -259,7 +259,14 @@ const nextConfig: NextConfig = {
       // enkel #310-event stond op hun naam, maar ze droegen exact dezelfde
       // trigger als /core/cash en /horizon/whatif en zouden hem bij het eerste
       // bezoek opnieuw kunnen afvuren.
-      { source: '/horizon/strategie', destination: '/toekomst?strategie=open', permanent: false },
+      // De strategie-kiezer heeft zijn plek in katern Instellingen (ADR 0179 D4,
+      // fase 1 stap 18): rechtstreeks naar de eindstrategie-regel, het standaard-
+      // tabblad van de vroegere Strategieën-modal — geen hop via /toekomst.
+      {
+        source: '/horizon/strategie',
+        destination: '/toekomst/instellingen?regel=eindstrategie',
+        permanent: false,
+      },
       {
         source: '/horizon/uitgaven-na-pensioen',
         destination: '/toekomst?uitgaven=open',
@@ -345,6 +352,26 @@ const nextConfig: NextConfig = {
         source: '/toekomst',
         has: [{ type: 'query', key: 'modal', value: 'withdrawal' }],
         destination: '/toekomst/instellingen?regel=onttrekkingsstrategie',
+        permanent: false,
+      },
+
+      // `?strategie=open` en `?modal=strategie` openden de Strategieën-modal op de
+      // tijdas (standaard-tabblad: eindstrategie). Die keuzes wonen in katern
+      // Instellingen (ADR 0179 D4, fase 1 stap 18); het Voorkeuren-deel opent de
+      // regel via `?regel=eindstrategie` (REGEL_ORDER). De meereizende
+      // `strategie=open`/`modal=strategie` leest daar niemand: de levensstrategie-
+      // editor kent alleen aow|pensioen|huis|werk, en de overlay-host opent de
+      // modal niet meer op een deeplink.
+      {
+        source: '/toekomst',
+        has: [{ type: 'query', key: 'strategie', value: 'open' }],
+        destination: '/toekomst/instellingen?regel=eindstrategie',
+        permanent: false,
+      },
+      {
+        source: '/toekomst',
+        has: [{ type: 'query', key: 'modal', value: 'strategie' }],
+        destination: '/toekomst/instellingen?regel=eindstrategie',
         permanent: false,
       },
 

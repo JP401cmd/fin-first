@@ -64,7 +64,6 @@ export function useToekomstOverlayState({ perspectief }: { perspectief: Toekomst
   const pathname = usePathname()
   useEffect(() => {
     const modal = searchParams.get('modal')
-    const strategieParam = searchParams.get('strategie')
     let shouldReplace = false
 
     if (modal) {
@@ -72,7 +71,10 @@ export function useToekomstOverlayState({ perspectief }: { perspectief: Toekomst
       // `next.config.ts` stuurt `?modal=withdrawal` sinds 5f3cd79c1 door naar
       // `/toekomst/instellingen?regel=onttrekkingsstrategie`. Staat deze provider straks in de
       // katern-layout, dan zou hij de dode modal daar anders alsnog openen.
-      if (modal === 'scenarios' || modal === 'simulations' || modal === 'backtesting' || modal === 'strategie') {
+      // Evenmin 'strategie' (stap 18): `?modal=strategie` redirect naar
+      // `/toekomst/instellingen?regel=eindstrategie`, en de meereizende param mag de
+      // modal op Instellingen niet alsnog openen.
+      if (modal === 'scenarios' || modal === 'simulations' || modal === 'backtesting') {
         setActiveModal(modal)
       } else if (modal === 'life_events') {
         // Het legacy-gebeurtenisformulier is weg (ADR 0179 fase 1 stap 2): deze
@@ -84,11 +86,9 @@ export function useToekomstOverlayState({ perspectief }: { perspectief: Toekomst
       shouldReplace = true
     }
 
-    // Support ?strategie=open query param (redirect from /horizon/strategie)
-    if (strategieParam === 'open') {
-      setActiveModal('strategie')
-      shouldReplace = true
-    }
+    // `?strategie=open` opende hier de Strategieën-modal; sinds stap 18 stuurt
+    // `next.config.ts` hem door naar `/toekomst/instellingen?regel=eindstrategie`.
+    // Op Instellingen betekent `?strategie=` de levensstrategie-editor (VoorkeurenView).
 
     // Support ?uitgaven=open query param (redirect from /horizon/uitgaven-na-pensioen)
     const uitgavenParam = searchParams.get('uitgaven')
