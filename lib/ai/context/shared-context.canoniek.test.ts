@@ -119,12 +119,20 @@ describe('buildSharedContext — vrijheidsmoment komt uit de kernel (UR3-06 geva
   })
 
   it('zegt "bereikt" wanneer de kernel-vrijheidsleeftijd ~ de huidige leeftijd is', async () => {
-    // Precies het gemelde account: /toekomst toont "42 — je kunt nu al stoppen".
+    // Precies het gemelde account: /toekomst toont 42 als bereikt ("Volgens je huidige
+    // cijfers draagt je vermogen je uitgaven nu al." — kopij-toets 26 sep, §8).
     horizonFireSimMock.mockResolvedValue(makeRun(CURRENT_AGE + 1 / 12))
     const ctx = await buildSharedContext(makeSupabase())
 
     expect(ctx).toContain('Vrijheidsleeftijd: 42 — BEREIKT')
-    expect(ctx).toContain('nu al stoppen met werken')
+    expect(ctx).toContain('draagt het vermogen de uitgaven nu al')
+    // Beschrijvend, nooit aansporend (TOON in lib/horizon/anker-copy.ts + Wft in
+    // base.ts): het model herhaalde de oude contextzin letterlijk als "je kunt nu al
+    // stoppen met werken" (scripts/ai-regressie, 6 sep). Die zin mag er niet meer staan.
+    expect(ctx).not.toMatch(/stoppen met werken/i)
+    // (lookbehind: de geciteerde verbodsregel 'Zeg nooit … "kan stoppen"' telt niet mee)
+    expect(ctx).not.toMatch(/(?<!")\b(kan|kun|kunt) (je |de gebruiker )?(nu al )?stoppen\b/i)
+    expect(ctx).toContain('Zeg nooit dat de gebruiker "kan stoppen"')
     // En vooral: NIET de datum uit de eigen projectie van core-metrics.
     expect(ctx).not.toContain(naieveFireDate())
     expect(ctx).not.toContain('Verwachte FIRE-datum')

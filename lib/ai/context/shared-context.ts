@@ -102,8 +102,9 @@ function buildFireMomentLine(
   const countdown = deriveCountdown(fireAgeFractional, currentAge)
   if (isKernelReachedNowDisplay(fireAgeFractional, currentAge)) {
     return (
-      `Vrijheidsleeftijd: ${leeftijd} — BEREIKT. Volgens de huidige cijfers kan de gebruiker nu al stoppen met werken ` +
-      '(exact wat /toekomst toont). Noem géén toekomstige FIRE-datum en geen "nog X jaar te gaan".'
+      `Vrijheidsleeftijd: ${leeftijd} — BEREIKT. Volgens de huidige cijfers draagt het vermogen de uitgaven nu al ` +
+      '(exact wat /toekomst toont). Zeg nooit dat de gebruiker "kan stoppen" — beschrijf hoe ver het reikt. ' +
+      'Noem géén toekomstige FIRE-datum en geen "nog X jaar te gaan".'
     )
   }
   return (
