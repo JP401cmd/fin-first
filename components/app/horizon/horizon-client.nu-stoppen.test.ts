@@ -121,9 +121,9 @@ describe('de stopkeuze (vrijheidsas)', () => {
    */
   it('de as verwijst naar de strategie-modal én schrijft het plan alleen volledig (plan-draft)', () => {
     const src = bron()
-    // ADR 0170 — de verwijzing staat in het stop-slot onder de stop-knop.
-    expect(src).toContain("onClick={() => setActiveModal('strategie')}")
-    expect(src).toContain('Je plan-keuzes')
+    // ADR 0170 — de verwijzing staat in het stop-slot onder de stop-knop. Die knop
+    // (setActiveModal('strategie') + 'Je plan-keuzes') staat sinds fase 1 stap 9 in
+    // components/toekomst/doelen/doelen-lab.tsx (doelen-lab.test.ts).
     expect(src, 'de CTA schrijft via de plan-draft-helper, niet met een eigen body').toContain(
       'planDraftToFireSettingsBody(',
     )

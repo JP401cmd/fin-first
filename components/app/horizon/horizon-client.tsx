@@ -89,14 +89,13 @@ import {
 // ADR 0170 — het doelscenario is vijf knoppen met een driekleurige schaal. `Vrijheidsas`
 // (marge-band) en `Dekkingsbalk` (drie tegels) vervielen daarmee.
 import {
-  LabKnoppen,
   type LabKnopConfig,
   type LabKnopFormatters,
   type LabKnopWeergave,
   type LabUitkomstRegel,
 } from '@/components/app/horizon/lab-knoppen'
-import { LabIndicatieRegel, LabOpslaanBalk, type LabOpslaanToestand } from '@/components/app/horizon/lab-opslaan-balk'
-import { ScenarioChip, VERKEN_SECTION_ID } from '@/components/app/horizon/scenario-chip'
+import { type LabOpslaanToestand } from '@/components/app/horizon/lab-opslaan-balk'
+import { ScenarioChip } from '@/components/app/horizon/scenario-chip'
 import { Dekkingsradar } from '@/components/app/horizon/dekkingsradar'
 import { ScenarioKaarten } from '@/components/app/horizon/scenario-kaarten'
 import { computeDekkingsradar, type RadarAs } from '@/lib/horizon/dekkingsradar'
@@ -128,15 +127,12 @@ import {
   dekkingBadge,
   dekkingDeltaBadge,
   dekkingPreviewWaarde,
-  dekkingSheetToelichting,
   dekkingVastgelegdToast,
   eindvermogenOpTegel,
-  LAB_COPY,
   EINDVERMOGEN_DELTA_DREMPEL,
   eindvermogenDeltaBadge,
   eindvermogenOpgeslagenNoot,
   eindvermogenPreviewWaarde,
-  eindvermogenSheetToelichting,
   eindvermogenVastgelegdToast,
   formatStopAge,
   haalbaarBijUitgaveRegel,
@@ -168,14 +164,10 @@ import {
 import { doelGewogenRendement } from '@/lib/horizon/toekomst-doel'
 import { doelStandNaarLab } from '@/lib/horizon/doel-stand'
 import {
-  DoelVastlegSheet,
   buildLiveStand,
   buildScenarioPersistPayload,
   type DoelParameterPreview,
 } from '@/components/app/horizon/doel-vastleg-sheet'
-import { WhatIfMarketAssumptions } from '@/components/app/horizon/whatif-market-assumptions'
-import { DoelLoslatenConfirm } from '@/components/future/doel-loslaten-confirm'
-import { StopPlanConfirm } from '@/components/app/horizon/stop-plan-confirm'
 import { planDraftFromSettings, planDraftToFireSettingsBody, validatePlanDraft } from '@/lib/horizon/plan-draft'
 import {
   applySliderEvent,
@@ -303,6 +295,8 @@ import { PlanKerngetalMobiel, PlanKpiStripDesktop, PlanKpiStripMobiel } from '@/
 import { PlanHeroDuiding } from '@/components/toekomst/plan/plan-hero-duiding'
 import { PlanGegevensmelding } from '@/components/toekomst/plan/plan-gegevensmelding'
 import { PlanMeldingen } from '@/components/toekomst/plan/plan-meldingen'
+import { DoelenLab } from '@/components/toekomst/doelen/doelen-lab'
+import { DoelenLabSheets } from '@/components/toekomst/doelen/doelen-lab-sheets'
 import {
   PlanKassabonVrijheidsleeftijd,
   PlanKassabonDoelbedrag,
@@ -4882,98 +4876,40 @@ export default function HorizonPage({
                 setActiveFaseModal={setActiveFaseModal}
               />
 
-              {/* ── Doelscenario: vijf knoppen met een driekleurige schaal (ADR 0170) ──
-                  Staat IN de grafiekkaart, direct onder de fasering: de knoppen bewegen de
-                  gestippelde lijn hierboven, dus ze horen bij die grafiek en niet in een eigen
-                  katern eronder. Wat hier stond — twee genummerde panelen, de marge-band, de
-                  dekkingsbalk met drie tegels, per-knop antwoordregels, "Wat hoort daarbij?",
-                  een uitleg-disclosure en een concept-banner — is vervangen door één blok:
-                  uitkomstregel → vijf gekleurde knoppen → opslaan-balk. De grens staat op de
-                  knop; dat maakt de duidingslagen overbodig. */}
-              {verkenSectieZichtbaar && (
-                <section
-                  id={VERKEN_SECTION_ID}
-                  ref={verkenSectionRef}
-                  className="mt-6 scroll-mt-24 border-t border-[var(--border-ed)] pt-4"
-                >
-                  {/* Eerste-sleep-hint: éénmalig per apparaat een pijl naar de gestippelde
-                      lijn, zodat de eerste knopbeweging niet onopgemerkt blijft. */}
-                  {firstDragHintVisible && (
-                    <p className="mb-2 flex flex-wrap items-baseline gap-x-2 font-sans text-[11px] text-[var(--ink-3)]">
-                      <span>Kijk naar de gestippelde lijn in de grafiek ↑ — dat is jouw wat-als.</span>
-                      <button
-                        type="button"
-                        onClick={dismissFirstDragHint}
-                        className="font-semibold text-horizon-700 underline underline-offset-2 transition-colors hover:text-[var(--ink)]"
-                      >
-                        Begrepen
-                      </button>
-                    </p>
-                  )}
-
-                  <LabKnoppen
-                    vraag={heroVraag}
-                    knoppen={labKnoppen}
-                    nalatenschapNotitie={planEindVorm === 'perpetual' ? LAB_COPY.nalatenschapPerpetual : null}
-                    uitkomst={labUitkomstRegel}
-                    zone={labZone}
-                    pending={labGrenzenPending}
-                    weergave={knopWeergave}
-                    onWeergaveChange={setKnopWeergave}
-                    formatters={labFormatters}
-                    stopSlot={
-                      // TPR-09 + melding B-038 — de stop-knop is een VERKENNING. Hier staat de
-                      // enige plek waar die verkenning het plan kan worden (het volledige plan,
-                      // via `planDraftToFireSettingsBody`), náást de verwijzing naar de plek waar
-                      // álle plan-keuzes staan. Alleen zichtbaar als de knop van het plan afwijkt.
-                      <div className="flex flex-wrap items-center gap-x-4">
-                        {!planIsDezeStop && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setStopPlanError('')
-                              setStopPlanConfirmOpen(true)
-                            }}
-                            disabled={stopPlanSaving}
-                            className="inline-flex min-h-[44px] items-center font-sans text-[11px] font-semibold text-horizon-700 underline underline-offset-2 transition-colors hover:text-horizon-800 disabled:no-underline disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
-                          >
-                            {stopPlanSaving ? 'Opslaan…' : `Maak ${formatAge(effectiveStopAge)} mijn stopmoment`}
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => setActiveModal('strategie')}
-                          className="inline-flex min-h-[44px] items-center font-sans text-[11px] font-medium text-[var(--ink-2)] underline underline-offset-2 transition-colors hover:text-horizon-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
-                        >
-                          Je plan-keuzes &rarr;
-                        </button>
-                      </div>
-                    }
-                    marktbias={
-                      whatIfBaseline && categorieReturnGroups.length > 0 ? (
-                        <WhatIfMarketAssumptions
-                          value={scenarioReturnDeltas}
-                          onChange={setScenarioReturnDeltas}
-                          assetGroups={categorieReturnGroups}
-                        />
-                      ) : null
-                    }
-                  />
-
-                  <LabOpslaanBalk
-                    toestand={labOpslaanToestand}
-                    gezetOp={doelBlok?.gezetOp ?? null}
-                    busy={doelSaving}
-                    vastleggenMogelijk={doelVastleggenMogelijk}
-                    bijwerkenMogelijk={doelBijwerkenMogelijk}
-                    onVastleggen={() => setDoelSheetOpen(true)}
-                    onHerstel={handleDoelHerstellen}
-                    onLoslaten={() => setDoelLoslatenOpen(true)}
-                    onReset={handleScenarioReset}
-                  />
-                  <LabIndicatieRegel />
-                </section>
-              )}
+              <DoelenLab
+                verkenSectieZichtbaar={verkenSectieZichtbaar}
+                verkenSectionRef={verkenSectionRef}
+                firstDragHintVisible={firstDragHintVisible}
+                dismissFirstDragHint={dismissFirstDragHint}
+                heroVraag={heroVraag}
+                labKnoppen={labKnoppen}
+                planEindVorm={planEindVorm}
+                labUitkomstRegel={labUitkomstRegel}
+                labZone={labZone}
+                labGrenzenPending={labGrenzenPending}
+                knopWeergave={knopWeergave}
+                setKnopWeergave={setKnopWeergave}
+                labFormatters={labFormatters}
+                planIsDezeStop={planIsDezeStop}
+                setStopPlanError={setStopPlanError}
+                setStopPlanConfirmOpen={setStopPlanConfirmOpen}
+                stopPlanSaving={stopPlanSaving}
+                effectiveStopAge={effectiveStopAge}
+                setActiveModal={setActiveModal}
+                whatIfBaseline={whatIfBaseline}
+                categorieReturnGroups={categorieReturnGroups}
+                scenarioReturnDeltas={scenarioReturnDeltas}
+                setScenarioReturnDeltas={setScenarioReturnDeltas}
+                labOpslaanToestand={labOpslaanToestand}
+                doelBlok={doelBlok}
+                doelSaving={doelSaving}
+                doelVastleggenMogelijk={doelVastleggenMogelijk}
+                doelBijwerkenMogelijk={doelBijwerkenMogelijk}
+                setDoelSheetOpen={setDoelSheetOpen}
+                handleDoelHerstellen={handleDoelHerstellen}
+                setDoelLoslatenOpen={setDoelLoslatenOpen}
+                handleScenarioReset={handleScenarioReset}
+              />
 
               <CanvasLegenda
                 scenariosExpanded={scenariosExpanded}
@@ -5013,68 +4949,29 @@ export default function HorizonPage({
         />
       )}
 
-      {/* === KATERN II — Verken je aannames (wat-als slider-lab) ===
-          Perspectief-gate blijft intact: alleen solo (géén partner/household —
-          spiegelt de chart-overlay: usePartnerMainLine || useHouseholdMainLine
-          → géén wat-als-lijn). Weergave: in Volledig altijd; in Eenvoudig
-          alléén met een vastgelegd doel (doelActief) — een vástgelegd doel is
-          kernfunctionaliteit waar de Doelen-tab naartoe deep-linkt, pure
-          verkenning blijft volledig-weergave-diepte.
-
-          S6 (tier 1) — ÉN wanneer er expliciet naartoe gedeeplinkt is:
-          `?whatif=open` zet `whatIfInlineOpen` (de welkomstgids-stap "Speel met
-          je aannames" gebruikt dat pad). Zonder deze derde tak zette
-          die deeplink in Eenvoudig zónder vastgelegd doel state op een sectie
-          die niet gemonteerd is en no-opte de scroll stil: een dode
-          verwijzing op precies het beginnersoppervlak waar Eenvoudig voor is.
-          `whatIfInlineOpen` kan alleen wáár worden via die deeplink of via een
-          control binnen deze sectie zelf, dus de gate blijft dicht zolang er
-          niemand hierheen verwezen heeft. */}
-        {/* Vastleg-/bijwerk-sheet (BottomSheet, boven de nav-pill). */}
-        <DoelVastlegSheet
-          open={doelSheetOpen}
-          onClose={() => setDoelSheetOpen(false)}
-          previews={viewDoelPreviews}
-          bijwerken={doelActief}
-          saving={doelSaving}
-          onSubmit={handleDoelVastleggen}
-          // ADR 0129/0145 — onder een vast stopmoment schrijft het lab geen fire_age-doel
-          // (de sheet filtert de fire-rij als vangnet); de toelichting zegt wat het lab
-          // dáár wél vastlegt: of het plan reikt.
-          // D12 — bij een GEDEKT plan legt het lab het eindvermogen vast; de toelichting zegt dat.
-          fireAgeNietVanToepassing={
-            isFixedAnchorMode && planAnchor.kind !== 'solved'
-              ? (labPromotie.kind === 'eindvermogen' ? eindvermogenSheetToelichting : dekkingSheetToelichting)(
-                  ankerStop ?? (planAnchor.kind === 'age' ? { kind: 'age', stopAge: planAnchor.age } : { kind: 'now' }),
-                  simResult?.displayEndAge ?? initialData.firePlan?.endAge ?? null,
-                )
-              : null
-          }
-        />
-
-        {/* Gedeelde "Doel loslaten"-bevestiging — zelfde ShellOverlay-confirm
-            als /toekomst/doelen. Horizon meldt fouten via toast, dus error="". */}
-        <DoelLoslatenConfirm
-          open={doelLoslatenOpen}
-          busy={doelSaving}
-          error=""
-          onConfirm={handleDoelLoslaten}
-          onClose={() => setDoelLoslatenOpen(false)}
-        />
-
-        {/* TPR-09 — "Maak dit mijn plan": bevestiging vóór de verkenning het plan wordt.
-            Fouten (validatie/route) inline in de confirm, zodat de gebruiker ze ziet
-            naast de keuze die ze afwijzen. */}
-        <StopPlanConfirm
-          open={stopPlanConfirmOpen}
-          busy={stopPlanSaving}
-          error={stopPlanError}
-          stopAge={effectiveStopAge}
+        <DoelenLabSheets
+          doelSheetOpen={doelSheetOpen}
+          setDoelSheetOpen={setDoelSheetOpen}
+          viewDoelPreviews={viewDoelPreviews}
+          doelActief={doelActief}
+          doelSaving={doelSaving}
+          handleDoelVastleggen={handleDoelVastleggen}
+          isFixedAnchorMode={isFixedAnchorMode}
           planAnchor={planAnchor}
-          planEndAge={simResult?.displayEndAge ?? initialData.firePlan?.endAge ?? null}
-          aowAge={userAowAge.fractional}
-          onConfirm={handleStopPlanBevestigen}
-          onClose={() => setStopPlanConfirmOpen(false)}
+          labPromotie={labPromotie}
+          ankerStop={ankerStop}
+          simResult={simResult}
+          initialData={initialData}
+          doelLoslatenOpen={doelLoslatenOpen}
+          handleDoelLoslaten={handleDoelLoslaten}
+          setDoelLoslatenOpen={setDoelLoslatenOpen}
+          stopPlanConfirmOpen={stopPlanConfirmOpen}
+          stopPlanSaving={stopPlanSaving}
+          stopPlanError={stopPlanError}
+          effectiveStopAge={effectiveStopAge}
+          userAowAge={userAowAge}
+          handleStopPlanBevestigen={handleStopPlanBevestigen}
+          setStopPlanConfirmOpen={setStopPlanConfirmOpen}
         />
 
       {/* === KATERN III — Wat het betekent ===

@@ -53,13 +53,11 @@ describe('horizon-client consumeert ÉÉN lab-uitkomst (ADR 0145)', () => {
   it('de opslaan-balk hangt aan die gates, niet aan (hasScenario || hasStopKeuze)', () => {
     const src = bron()
     // ADR 0170 — de knoplabels wonen in LAB_COPY; de balk krijgt de toestand + de gates mee.
-    expect(src).toContain('<LabOpslaanBalk')
-    expect(src).toContain('toestand={labOpslaanToestand}')
+    // De JSX-aanroep (LabOpslaanBalk met de gates) staat sinds fase 1 stap 9 in
+    // components/toekomst/doelen/doelen-lab.tsx (doelen-lab.test.ts).
     // PIN HET GEBRUIK, niet de declaratie: deze grendel stond eerder op
     // `const doelVastleggenMogelijk =` en bleef groen toen de gate uit de UI verdween — de
     // balk bood toen "Maak dit mijn doel" aan waar de sheet niets kon vastleggen (D4/M10).
-    expect(src).toContain('vastleggenMogelijk={doelVastleggenMogelijk}')
-    expect(src).toContain('bijwerkenMogelijk={doelBijwerkenMogelijk}')
     const start = src.indexOf('const labOpslaanToestand')
     expect(start).toBeGreaterThan(-1)
     const blok = src.slice(start, src.indexOf('\n\n', start))
@@ -145,10 +143,6 @@ describe('de vijf knoppen consumeren ÉÉN grenzen-batch (ADR 0170)', () => {
     expect(src).toContain('zoneVanHuidig(labGrenzen?.huidig ?? null)')
   })
 
-  it('pending gaat naar de knoppen, zodat de oude grenzen gedempt blijven staan', () => {
-    expect(bron()).toContain('pending={labGrenzenPending}')
-  })
-
   it('de oude antwoorden-laag is helemaal weg (geen tweede waarheid naast de grenzen)', () => {
     // Alleen CODE-regels: een uitleg mag de oude naam noemen (de comment bij het
     // marge-criterium legt bijvoorbeeld uit dat `computeStopMarge` verviel).
@@ -196,7 +190,7 @@ describe('eindvermogen (ADR 0145 D12) blijft nominaal vastgelegd en gedeflateerd
       /eindvermogen:\s*gekozen\.eindvermogen && labDekking\?\.scenarioEindvermogen\?\.kind === 'bedrag'\s*\?\s*labDekking\.scenarioEindvermogen\.nominaal\s*:\s*undefined/,
     )
     expect(handler).not.toMatch(/eindvermogen:[^\n]*view/)
-    expect(src).toContain('previews={viewDoelPreviews}')
+    // `previews={viewDoelPreviews}` staat sinds fase 1 stap 9 in doelen-lab-sheets.tsx (doelen-lab.test.ts).
     expect(src).toContain("labPromotie.kind === 'eindvermogen'")
   })
 

@@ -78,8 +78,8 @@ describe('KATERN II blijft bereikbaar na "Doel loslaten" (B-031)', () => {
     // component leest de gate uitsluitend via `doelVastleggenMogelijk`.
     // ADR 0170 — het knoplabel woont in `LAB_COPY`; de host geeft de gate aan de balk mee.
     const src = bron()
-    expect(src).toContain('vastleggenMogelijk={doelVastleggenMogelijk}')
-    expect(src).toContain('bijwerkenMogelijk={doelBijwerkenMogelijk}')
+    // De JSX-aanroep (LabOpslaanBalk met de gates) staat sinds fase 1 stap 9 in
+    // components/toekomst/doelen/doelen-lab.tsx (doelen-lab.test.ts).
     const gateStart = src.indexOf('const labOpslaanToestand')
     expect(gateStart).toBeGreaterThan(-1)
     expect(src.slice(gateStart, gateStart + 600)).toContain('hasScenario || hasStopKeuze')
