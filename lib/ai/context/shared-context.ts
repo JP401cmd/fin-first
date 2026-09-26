@@ -328,12 +328,12 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
     // maar werd door deze bouwer niet gelezen.
     `Dagtarief (uitgaven per dag): ${formatCurrency(facts.dagtarief)} — DE €→vrijheidsdagen-koers, hetzelfde tarief als op /overzicht/budget ("één dag vrijheid kost je nu ..."). Deel bedragen door dit getal om ze in vrijheidsdagen uit te drukken; leid het NIET af uit maandinkomen/-uitgaven.`,
     // De marktaannames waar de hele projectie op draait — per gebruiker afgeleid in
-    // `lib/fire-params.ts`, exact de drie die /toekomst/voorkeuren naast elkaar toont
+    // `lib/fire-params.ts`, exact de drie die /toekomst/instellingen naast elkaar toont
     // (Inflatie · rendement · SWR). Ze bereikten het model eerder NIET, terwijl de
     // DNA-basisprompt het model wél vertelt dat ze in dit overzicht staan — het model
     // vulde dat gat met eigen kennis (7% / ~3%) i.p.v. de profielwaarden (UR3-06
     // geval 4, eigenaarskeuze optie A: de velden alsnog leveren).
-    `Aannames (uit je profiel, /toekomst/voorkeuren): bruto rendement ${formatPercentage(coreData.fireParams.grossReturn * 100)} | inflatie ${formatPercentage(coreData.fireParams.inflationRate * 100)} | veilig opnamepercentage (SWR) ${formatPercentage(coreData.fireParams.effectiveSwr * 100)}. Noem deze percentages letterlijk; gebruik NOOIT een standaardaanname (geen 7%, geen 4%-regel).`,
+    `Aannames (uit je profiel, /toekomst/instellingen): bruto rendement ${formatPercentage(coreData.fireParams.grossReturn * 100)} | inflatie ${formatPercentage(coreData.fireParams.inflationRate * 100)} | veilig opnamepercentage (SWR) ${formatPercentage(coreData.fireParams.effectiveSwr * 100)}. Noem deze percentages letterlijk; gebruik NOOIT een standaardaanname (geen 7%, geen 4%-regel).`,
     // DE AOW-leeftijd — cohort-correct uit de `aow_leeftijd`-tabel (`lookupAowAge`),
     // geschreven met de canonieke `formatAowAge`, dus letterlijk hetzelfde als op het
     // scherm. Stond hier tot UR3-24 NIET in: het model kreeg de leeftijd alleen mee

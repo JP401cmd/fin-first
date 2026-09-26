@@ -36,7 +36,7 @@ import { buildSharedContext } from './shared-context'
 
 const CURRENT_AGE = 42
 
-/** De profielaannames zoals /toekomst/voorkeuren ze toont — NIET de defaults. */
+/** De profielaannames zoals /toekomst/instellingen ze toont — NIET de defaults. */
 const FIRE_PARAMS = { effectiveSwr: 0.0288, grossReturn: 0.061, inflationRate: 0.02 }
 
 /**
@@ -224,6 +224,7 @@ describe('buildSharedContext — rendement, inflatie en SWR staan in de context 
 
   it('verwijst naar het scherm waar de gebruiker diezelfde aannames ziet', async () => {
     const ctx = await buildSharedContext(makeSupabase())
-    expect(ctx).toContain('/toekomst/voorkeuren')
+    expect(ctx).toContain('/toekomst/instellingen')
+    expect(ctx).not.toContain('/toekomst/voorkeuren')
   })
 })
