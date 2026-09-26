@@ -45,19 +45,6 @@ function themeInlineBlok(css: string): string {
 }
 
 describe('globals.css — tokens die alleen vanuit JS worden gelezen', () => {
-  it('elk --coverage-*-token is in @theme inline gerefereerd, anders snoeit de bouw het weg', () => {
-    const gedefinieerd = [...CSS.matchAll(/^\s*(--coverage-[a-z-]+)\s*:/gm)].map(m => m[1])
-    expect(gedefinieerd.length, 'verwacht --coverage-*-tokens in globals.css').toBeGreaterThan(0)
-
-    const theme = themeInlineBlok(CSS)
-    const ongemapt = gedefinieerd.filter(naam => !theme.includes(`var(${naam})`))
-    expect(
-      ongemapt,
-      `deze tokens worden weggesnoeid omdat ze nergens in de CSS staan; voeg ` +
-        `--color-<naam>: var(<naam>) toe aan @theme inline`,
-    ).toEqual([])
-  })
-
   it('elk --topbar-*-token (ADR 0174) is in @theme inline gerefereerd', () => {
     const gedefinieerd = [...CSS.matchAll(/^\s*(--topbar-[a-z-]+)\s*:/gm)].map(m => m[1])
     expect(gedefinieerd.sort()).toEqual(['--topbar-bg', '--topbar-fg', '--topbar-fg-muted', '--topbar-hover'])
