@@ -418,7 +418,7 @@ export function PlanPaneel() {
             data-testid="plan-jaar-op-jaar"
             className="inline-flex min-h-[44px] items-center font-sans text-[13px] text-[var(--ink-2)] underline decoration-[var(--border-ed)] underline-offset-4 transition-colors hover:text-[var(--module-active-700)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
           >
-            Open de jaar-op-jaar-tabel &rarr;
+            Jaar-op-jaar-tabel &rarr;
           </button>
         </p>
       )}
