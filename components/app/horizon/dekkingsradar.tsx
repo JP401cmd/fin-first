@@ -13,10 +13,13 @@
  * Kleur-conventie: de radarvulling is NEUTRAAL (ink-tint, lage opacity) — de
  * statussemantiek zit uitsluitend in de stippen (SVG) en badges (lijst), in
  * SEMANTISCHE stoplichtkleuren (emerald/amber/red), NIET het module-accent. Spiegelt
- * LevensinkomenStrook. Percentages zijn geen bedragen → geen masking.
+ * LevensinkomenStrook. Percentages zijn geen bedragen → geen masking; de bedragen in
+ * de detailregels wél (`maskCurrencyInText`).
  */
 
 import type { RadarAs, RadarAsKey } from '@/lib/horizon/dekkingsradar'
+import { maskCurrencyInText } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { InlineInfoDisclosure } from '@/components/editorial'
 
@@ -94,6 +97,10 @@ export function Dekkingsradar({ assen }: DekkingsradarProps) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 700 })
   const count = assen.length
   const zwakste = zwaksteAs(assen)
+  // De detailregels komen als tekst uit lib/horizon/dekkingsradar.ts en dragen soms
+  // bedragen (eindvermogen, brug-behoefte). Die volgen de privacystand, zoals elk
+  // bedrag; percentages blijven zichtbaar.
+  const { masked } = useMaskedAmounts()
 
   const dataPoints = assen
     .map((a, i) => {
@@ -228,7 +235,7 @@ export function Dekkingsradar({ assen }: DekkingsradarProps) {
                 </div>
                 {/* Niet bepaalbaar? De reden hoort in beeld, niet verstopt achter de i. */}
                 {a.status === null && (
-                  <p className="m-0 mt-1 text-[12px] leading-snug text-[var(--ink-4)]">{a.detail}</p>
+                  <p className="m-0 mt-1 text-[12px] leading-snug text-[var(--ink-4)]">{maskCurrencyInText(a.detail, masked)}</p>
                 )}
               </li>
             ))}
@@ -244,7 +251,7 @@ export function Dekkingsradar({ assen }: DekkingsradarProps) {
                   <b className="text-[var(--ink)]">
                     {zwakste.label} ({zwakste.pct}%)
                   </b>{' '}
-                  is de zwakste plek — {zwakste.detail}
+                  is de zwakste plek — {maskCurrencyInText(zwakste.detail, masked)}
                 </>
               ) : (
                 <>Alle bepaalbare assen zijn volledig gedekt (≥ 100%).</>

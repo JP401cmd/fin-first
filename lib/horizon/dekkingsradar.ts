@@ -29,6 +29,7 @@ import type { KernelHousingSale } from '@/lib/horizon-kernel/bridge'
 import { isFireEndForm, type FireEndForm, type FireEndStrategy } from '@/lib/fire-strategy'
 import { spendablePortfolio, coveragePctForRow } from '@/lib/horizon/coverage-strip'
 import { radarEindstrategieAnkerReden } from '@/lib/horizon/anker-copy'
+import { formatCurrency, formatDecimal } from '@/lib/format'
 
 // ── Presentatiedrempels (GEEN financiële aannames) ──────────────────────────
 // Spiegelt de dekkingsgraad-strook (coverage-strip.ts): volledig gedekt (≥100) /
@@ -190,7 +191,7 @@ function axisBrugTotAow(input: DekkingsradarInput): RadarAs {
     'brug-tot-aow',
     label,
     pct,
-    `Belegbaar bij je stop €${round(pot)} moet de brugjaren tot AOW (behoefte €${round(sumNeed)}) dekken.`,
+    `Belegbaar bij je stop ${formatCurrency(pot)} moet de brugjaren tot AOW (behoefte ${formatCurrency(sumNeed)}) dekken.`,
   )
 }
 
@@ -288,8 +289,8 @@ function axisEindstrategie(input: DekkingsradarInput): RadarAs {
     const pct = clamp(100 + jarenOver * EINDSTRATEGIE_DEPLETE_PUNTEN_PER_JAAR, 0, RADAR_PCT_MAX)
     const detail =
       eind >= 0
-        ? `${naam}: aan het eind blijft €${round(eind)} over (≈ ${jarenOver.toFixed(1)} jaar besteding).`
-        : `${naam}: aan het eind een tekort van €${round(-eind)} (≈ ${(-jarenOver).toFixed(1)} jaar besteding te kort).`
+        ? `${naam}: aan het eind blijft ${formatCurrency(eind)} over (≈ ${formatDecimal(jarenOver, 1)} jaar besteding).`
+        : `${naam}: aan het eind een tekort van ${formatCurrency(-eind)} (≈ ${formatDecimal(-jarenOver, 1)} jaar besteding te kort).`
     return as('eindstrategie', label, pct, detail)
   }
 
@@ -299,7 +300,7 @@ function axisEindstrategie(input: DekkingsradarInput): RadarAs {
       'eindstrategie',
       label,
       pct,
-      `Doel-eindvermogen €${round(input.targetEndPortfolio)}; verwacht €${round(eind)}.`,
+      `Doel-eindvermogen ${formatCurrency(input.targetEndPortfolio)}; verwacht ${formatCurrency(eind)}.`,
     )
   }
 
@@ -316,7 +317,7 @@ function axisEindstrategie(input: DekkingsradarInput): RadarAs {
     'eindstrategie',
     label,
     pct,
-    `Behoud-strategie: eindvermogen €${round(eind)} t.o.v. de FIRE-pot €${round(input.requiredFirePortfolio)}.`,
+    `Behoud-strategie: eindvermogen ${formatCurrency(eind)} t.o.v. de FIRE-pot ${formatCurrency(input.requiredFirePortfolio)}.`,
   )
 }
 

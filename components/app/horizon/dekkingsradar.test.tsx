@@ -1,7 +1,14 @@
 import { render, screen, fireEvent, within } from '@testing-library/react'
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { Dekkingsradar } from './dekkingsradar'
 import type { RadarAs } from '@/lib/horizon/dekkingsradar'
+import { formatCurrency, MASKED_AMOUNT_PLACEHOLDER } from '@/lib/format'
+
+// Privacy-stand per test te zetten (C3 punt 4): de detailregels dragen bedragen.
+const privacy = vi.hoisted(() => ({ masked: false }))
+vi.mock('@/lib/hooks/use-privacy', () => ({
+  useMaskedAmounts: () => ({ masked: privacy.masked }),
+}))
 
 /**
  * Unit-tests voor de Dekkingsradar.
@@ -91,5 +98,31 @@ describe('Dekkingsradar rendering', () => {
     expect(screen.getByText(/behaald ÷ benodigd × 100%/)).toBeInTheDocument()
     // Per-as definitie-regel aanwezig (brug noemt de brugjaren stop→AOW).
     expect(screen.getByText(/brugjaren \(stop→AOW\)/)).toBeInTheDocument()
+  })
+})
+
+describe('Dekkingsradar — bedragen in de detailregel volgen de privacystand (C3 punt 4)', () => {
+  afterEach(() => {
+    privacy.masked = false
+  })
+  const detail = `Doel-eindvermogen ${formatCurrency(2_996_907)}; verwacht ${formatCurrency(2_473_268)}.`
+  const metBedrag: RadarAs[] = [
+    { key: 'brug-tot-aow', label: 'Brug tot AOW', pct: 120, status: 'groen', detail: 'ruim.' },
+    { key: 'pensioeninkomen', label: 'Pensioeninkomen', pct: 110, status: 'groen', detail: 'ruim.' },
+    { key: 'wonen', label: 'Wonen', pct: 100, status: 'groen', detail: 'geborgd.' },
+    { key: 'eindstrategie', label: 'Eindstrategie', pct: 83, status: 'rood', detail },
+  ]
+
+  it('zichtbaar: het geformatteerde bedrag staat er', () => {
+    const { container } = render(<Dekkingsradar assen={metBedrag} />)
+    expect(container.textContent).toContain(formatCurrency(2_996_907))
+  })
+
+  it('gemaskeerd: geen bedrag in de detailregel of de zwakste-plek-regel', () => {
+    privacy.masked = true
+    const { container } = render(<Dekkingsradar assen={metBedrag} />)
+    expect(container.textContent).not.toContain('2.996.907')
+    expect(container.textContent).not.toContain('2.473.268')
+    expect(container.textContent).toContain(MASKED_AMOUNT_PLACEHOLDER)
   })
 })

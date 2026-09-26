@@ -4,6 +4,7 @@ import type {
   UnifiedProjectionRow,
   WithdrawalNeedBreakdown,
 } from '@/lib/unified-projection'
+import { formatCurrency } from '@/lib/format'
 import { computeDekkingsradar, type DekkingsradarInput, type RadarAsKey } from './dekkingsradar'
 
 function bucket(endValue: number): AssetBucketDetail {
@@ -298,5 +299,28 @@ describe('as: eindstrategie', () => {
         expect(ax(met, key)).toEqual(ax(zonder, key))
       }
     })
+  })
+})
+
+describe('bedragen in de detailregels: nl-NL via formatCurrency (C3 punt 4)', () => {
+  it('legacy: "€ 2.996.907" en "€ 2.473.268", niet "€2996907"', () => {
+    const a = ax(
+      computeDekkingsradar(
+        baseInput({ rows: [makeRow(90, { netWorth: 2_473_268 })], endStrategy: 'legacy', targetEndPortfolio: 2_996_907 }),
+      ),
+      'eindstrategie',
+    )
+    expect(a.detail).toBe(`Doel-eindvermogen ${formatCurrency(2_996_907)}; verwacht ${formatCurrency(2_473_268)}.`)
+    expect(a.detail).not.toMatch(/€\d/)
+  })
+
+  it('deplete: bedrag én jaren in nl-NL (komma, geen punt als decimaalteken)', () => {
+    const a = ax(
+      computeDekkingsradar(baseInput({ rows: [makeRow(90, { netWorth: 50_000 })], endStrategy: 'deplete', jaarBesteding: 40_000 })),
+      'eindstrategie',
+    )
+    expect(a.detail).toContain(formatCurrency(50_000))
+    expect(a.detail).toContain('≈ 1,3 jaar')
+    expect(a.detail).not.toMatch(/€\d|\d\.\d jaar/)
   })
 })
