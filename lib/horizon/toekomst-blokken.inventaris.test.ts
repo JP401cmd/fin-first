@@ -122,8 +122,13 @@ const CANVAS_GESCHRAPTE_TEKST = ['Stopmoment wijzigen', 'Zelf een stopmoment kie
  */
 const DUBBELE_INGANG_GESCHRAPT = ['hero-missende-gegevens-cta', 'Vul profiel aan'] as const
 
-/** De katern-inhoud van vandaag op de subroutes (stroom B stapelt ze in Instellingen). */
-const SUBPAGINA_VIEWS = ['DoelenView', 'VoorkeurenView', 'GebeurtenissenView', 'AfbouwOverzichtCard'] as const
+/**
+ * De katern-inhoud op de subroutes. Fase 3 (ADR 0179): de Voorkeuren-kaarten werden rijen
+ * (`InstellingenRijen`); `AfbouwOverzichtCard` verhuist naar de verdieping van Plan
+ * (`PlanAfbouwOverzicht`, spec §5) — die montage staat nog uit (orchestrator) en komt dan
+ * hier terug in de lijst.
+ */
+const SUBPAGINA_VIEWS = ['DoelenView', 'InstellingenRijen', 'GebeurtenissenView'] as const
 
 /**
  * Render-plekken die NIET de /toekomst-grafiek zijn maar wel in de graaf zitten:

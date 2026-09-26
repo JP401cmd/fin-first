@@ -15,7 +15,7 @@ import { buildStrategieEditorsData } from '@/lib/horizon/strategie-editors-data'
 export const metadata: Metadata = {
   title: 'Instellingen — TriFinity',
   description:
-    'Wat je toekomstplan voedt: eindstrategie, onttrekking, pot-regels, je AOW-, pensioen-, huis- en werkstrategie en markt-aannames.',
+    'Wat je toekomstplan voedt: je stopmoment, je onttrekking, je AOW-, pensioen-, werk- en woonstrategie en de marktaannames.',
 }
 
 /**
@@ -41,20 +41,15 @@ export default async function ToekomstInstellingenPage() {
     loadDashboardData(supabase),
   ])
 
-  // Levensstrategie-editors (AOW/Pensioen/Huis/Werk) voor de Voorkeuren-view.
+  // Levensstrategie-editors (AOW/Pensioen/Huis/Werk).
   const { strategieData } = buildStrategieEditorsData(horizonData)
-
-  // ── Voorkeuren ────────────────────────────────────────────────────────
-  const simRows = dashboardResult.dashboardData.simRows ?? null
-  const fireAge =
-    dashboardResult.dashboardData.fireAgeFractional != null
-      ? Math.round(dashboardResult.dashboardData.fireAgeFractional)
-      : null
+  const rawProfile = horizonData.rawProfile
   const potBalances = buildPotBalances(horizonData.assets, horizonData.unlinkedCash)
   // TPR-12 — heffingvrij inkomen (Box 3, werkelijk-tak); NULL = kernel-default.
-  const rawHeffingvrij = horizonData.rawProfile?.box3_heffingvrij_inkomen
+  const rawHeffingvrij = rawProfile?.box3_heffingvrij_inkomen
   const box3HeffingvrijInkomen =
     rawHeffingvrij == null || !Number.isFinite(Number(rawHeffingvrij)) ? null : Number(rawHeffingvrij)
+  const rawRente = rawProfile?.deficit_loan_rate
 
   return (
     <>
@@ -69,7 +64,7 @@ export default async function ToekomstInstellingenPage() {
       <div className="-mx-4 sm:-mx-6">
       <InstellingenKatern
         planReviewProgress={planReviewProgress}
-        voorkeuren={{
+        rijen={{
           fireParams: horizonData.fireParams,
           fireStrategy: horizonData.fireStrategy,
           firePlan: horizonData.firePlan,
@@ -77,16 +72,22 @@ export default async function ToekomstInstellingenPage() {
           // Zelfde rauwe rij + zelfde voorrangsregel als de kernel-adapter (B-042).
           withdrawalProfiel: resolveWithdrawalProfiel({
             withdrawal_strategy: horizonData.withdrawalStrategy.strategy,
-            withdrawal_profile_config: horizonData.rawProfile?.withdrawal_profile_config,
+            withdrawal_profile_config: rawProfile?.withdrawal_profile_config,
           }),
-          fireAge,
-          simRows,
           simSnapshot: dashboardResult.regelSimSnapshot,
           regelVoorkeuren: dashboardResult.regelVoorkeuren,
           potBalances,
           box3HeffingvrijInkomen,
           events: horizonData.events,
           strategieData,
+          housingStrategy: horizonData.housingStrategy,
+          retirementMethod: rawProfile?.retirement_expense_method ?? null,
+          // Dezelfde bron als KPI 4 "Na pensioen" op Plan (de state-provider leest
+          // `effectiveInput` als `input`): één getal, twee plekken.
+          uitgaveNaPensioen: horizonData.effectiveInput.yearlyMustExpenses,
+          // ADR 0149 — NULL = aan; alleen een bewuste `false` is uit.
+          geenTekortLening: rawProfile?.fire_no_deficit_loan !== false,
+          tekortLeningRente: rawRente == null || !Number.isFinite(Number(rawRente)) ? null : Number(rawRente),
         }}
       />
       </div>

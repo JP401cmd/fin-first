@@ -7,15 +7,15 @@ import { POT_RULES_DEFAULTS } from '@/lib/pot-rules'
 import type { StrategieEditorsData } from '@/components/future/strategie/strategie-editors'
 
 /**
- * InstellingenKatern (ADR 0179) — compositie van wizard-ingang en Voorkeuren. Bewaakt: de
- * Voorkeuren-sectie met haar anker, de wizard-kaart (naam uit PLAN_REVIEW_NAAM + voortgang
- * "N van M", opent de pane state-gedreven), en dat een deeplink-param (`?strategie=`) nog
- * steeds zijn editor opent.
+ * InstellingenKatern (ADR 0179) — compositie van wizard-ingang en de rijen (fase 3). Bewaakt:
+ * sectie I met het oude anker `#voorkeuren`, de wizard-kaart (naam uit PLAN_REVIEW_NAAM +
+ * voortgang "N van M", opent de pane state-gedreven), en dat een deeplink-param
+ * (`?strategie=`, alias van `?rij=`) nog steeds zijn editor opent.
  *
  * Addendum 26 sep: de levensgebeurtenissen staan niet meer hier maar onder het plan
  * (`/toekomst#gebeurtenissen`); de katern rendert ze niet en kent hun anker niet meer.
  *
- * VoorkeurenView rendert echt (met dezelfde stubs als voorkeuren-view.test.tsx). De
+ * De rijen renderen echt (editors gestubd, zie instellingen-rijen.test.tsx). De
  * GebeurtenissenView is gestubd als verklikker: rendert hij toch, dan valt dat op.
  */
 
@@ -46,6 +46,7 @@ vi.mock('@/components/future/gebeurtenissen-view', async () => {
     },
   }
 })
+vi.mock('./uitgaven-rij-pane', () => ({ UitgavenRijPane: () => null }))
 // De echte pane zou matchMedia/ShellOverlay nodig hebben; de kaart praat alleen met de context.
 vi.mock('@/components/future/plan-review/plan-review-pane', () => ({ PlanReviewPane: () => null }))
 
@@ -64,8 +65,16 @@ const strategieData: StrategieEditorsData = {
   housingPreview: null,
 }
 
-const voorkeuren = {
+const rijen = {
   events: [],
+  firePlan: null,
+  withdrawalProfiel: 'guardrails' as const,
+  box3HeffingvrijInkomen: null,
+  housingStrategy: null,
+  retirementMethod: null,
+  uitgaveNaPensioen: 0,
+  geenTekortLening: true,
+  tekortLeningRente: null,
   strategieData,
   fireParams: {
     grossReturn: 0.07,
@@ -95,7 +104,7 @@ function renderKatern(planReviewProgress: PlanReviewProgress | null, opener?: { 
     <DisplayModeProvider initialMode="full">
       <InstellingenKatern
         planReviewProgress={planReviewProgress}
-        voorkeuren={voorkeuren}
+        rijen={rijen}
       />
     </DisplayModeProvider>
   )
@@ -115,11 +124,11 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('InstellingenKatern — compositie', () => {
-  it('toont Voorkeuren met haar anker', () => {
+  it('toont sectie I (Je plan) onder het oude anker #voorkeuren', () => {
     const { container } = renderKatern(null)
     const voorkeurenAnker = container.querySelector('#voorkeuren')
     expect(voorkeurenAnker).toBeTruthy()
-    expect(voorkeurenAnker!.textContent).toContain('Regels op de hele tijdas')
+    expect(voorkeurenAnker!.textContent).toContain('Stopmoment')
   })
 
   it('rendert de levensgebeurtenissen niet meer: die staan onder het plan (addendum 26 sep)', () => {
@@ -166,7 +175,7 @@ describe('InstellingenKatern — wizard-ingang', () => {
 })
 
 describe('InstellingenKatern — deeplinks op de samengevoegde route', () => {
-  it('?strategie=aow opent de AOW-editor in de Voorkeuren-sectie', () => {
+  it('?strategie=aow (alias van ?rij=aow) opent de AOW-editor', () => {
     nav.search = new URLSearchParams('strategie=aow')
     renderKatern(null)
     expect(screen.getByTestId('strategie-editors-open').textContent).toBe('aow')
