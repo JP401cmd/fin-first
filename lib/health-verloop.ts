@@ -18,6 +18,16 @@
 import { HEALTH_SCORE_VERSION } from '@/lib/financial-health'
 import { localDateString, localMonthStartMonthsAgo } from '@/lib/month-range'
 
+/**
+ * Datum van de grondslagbreuk in de budgetdiscipline-pijler (eigenaarsbesluit
+ * 30 aug 2026, zonder backfill): vanaf deze dag telt de pijler de canonieke
+ * bestedingssom (inkomsten eraf, eigen-rekening-overboekingen niet mee); rijen
+ * van daarvóór telden de ongefilterde som. Zelfde rekenmethode (`score_version`),
+ * andere telling van één pijler — het verloop markeert hem, maar breekt de lijn
+ * niet. De snapshot-writers verwijzen in hun "GRONDSLAG-BREUK"-commentaar hierheen.
+ */
+export const BUDGETDISCIPLINE_GRONDSLAG_BREUK = '2026-08-30'
+
 /** Eén maandpunt in het verloop — geen bedragen, alleen wat de reeksen tonen. */
 export interface HealthVerloopPunt {
   /** `YYYY-MM-DD` van de maandstand (de laatste snapshot in die maand). */
@@ -109,6 +119,20 @@ export function detectScoreVersionTransition(
     vorige = p.score_version
   }
   return null
+}
+
+/**
+ * De grondslagbreuk van de budgetdiscipline, als het verloop eroverheen loopt:
+ * `BUDGETDISCIPLINE_GRONDSLAG_BREUK` wanneer er een punt mét score vóór die datum
+ * én een op of na die datum is, anders null.
+ */
+export function detectGrondslagBreuk(
+  punten: readonly { snapshot_date: string; resilience_score?: number | null }[],
+): string | null {
+  const metScore = punten.filter((p) => p.resilience_score !== null && p.resilience_score !== undefined)
+  const ervoor = metScore.some((p) => p.snapshot_date < BUDGETDISCIPLINE_GRONDSLAG_BREUK)
+  const erna = metScore.some((p) => p.snapshot_date >= BUDGETDISCIPLINE_GRONDSLAG_BREUK)
+  return ervoor && erna ? BUDGETDISCIPLINE_GRONDSLAG_BREUK : null
 }
 
 /**

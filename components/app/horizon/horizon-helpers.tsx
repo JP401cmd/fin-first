@@ -372,7 +372,17 @@ export function ExploreCard({
   )
 }
 
-export function ResilienceTrendChart({ snapshots }: { snapshots: readonly TrendPoint[] }) {
+/** Een extra verticale markering in het verloop (bv. een grondslagbreuk). */
+export type TrendMarker = { date: string; label: string; testId: string }
+
+export function ResilienceTrendChart({
+  snapshots,
+  markers = [],
+}: {
+  snapshots: readonly TrendPoint[]
+  /** Extra markeringen op de tijdas; de lijn loopt er gewoon doorheen. */
+  markers?: readonly TrendMarker[]
+}) {
   const withScore = snapshots.filter(s => s.resilience_score !== null && s.resilience_score !== undefined)
   if (withScore.length < 2) return null
 
@@ -450,6 +460,30 @@ export function ResilienceTrendChart({ snapshots }: { snapshots: readonly TrendP
 
       {/* Line — horizon module-identiteit (volgt instelbare accent) */}
       <path d={linePath} fill="none" stroke="var(--color-horizon-500, #c4a06b)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+
+      {/* Extra markeringen (bv. een grondslagbreuk) — zelfde vorm als de methode-wissel */}
+      {markers.map(m => (
+        <g key={m.testId} data-testid={m.testId} aria-hidden="true">
+          <line
+            x1={x(m.date)}
+            y1={PAD - 18}
+            x2={x(m.date)}
+            y2={H - PAD}
+            stroke="#a1a1aa"
+            strokeWidth={1}
+            strokeDasharray="3 3"
+          />
+          <text
+            x={x(m.date)}
+            y={PAD - 20}
+            textAnchor="middle"
+            className="fill-zinc-500"
+            style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.04em' }}
+          >
+            {m.label}
+          </text>
+        </g>
+      ))}
 
       {/* Methode-wissel-markering (alleen bij mix v1+v2) */}
       {showMethodMarker && (

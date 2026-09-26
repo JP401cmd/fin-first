@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { HEALTH_SCORE_VERSION } from '@/lib/financial-health'
 import {
+  BUDGETDISCIPLINE_GRONDSLAG_BREUK,
+  detectGrondslagBreuk,
   deriveHealthVerloop,
   detectEngineBronTransition,
   detectScoreVersionTransition,
@@ -173,5 +175,28 @@ describe('withLiveCurrentMonth — de lopende maand is de live stand', () => {
     const [aug, sep] = uit.slice(-2)
     expect(delta).toBe(0)
     expect((sep.resilience_score ?? 0) - (aug.resilience_score ?? 0)).toBe(delta)
+  })
+})
+
+describe('detectGrondslagBreuk — de telling van de budgetdiscipline veranderde op 30 aug 2026', () => {
+  it('Given de constante, Then is het de datum van het eigenaarsbesluit', () => {
+    expect(BUDGETDISCIPLINE_GRONDSLAG_BREUK).toBe('2026-08-30')
+  })
+
+  it('Given scores vóór én op/na de breuk, When gedetecteerd, Then de breukdatum', () => {
+    expect(detectGrondslagBreuk([punt('2026-07-31', 58), punt('2026-08-29', 60), punt('2026-09-26', 61)])).toBe('2026-08-30')
+    expect(detectGrondslagBreuk([punt('2026-08-29', 60), punt('2026-08-30', 61)])).toBe('2026-08-30')
+  })
+
+  it('Given alleen scores na de breuk, Then null', () => {
+    expect(detectGrondslagBreuk([punt('2026-08-31', 60), punt('2026-09-26', 61)])).toBeNull()
+  })
+
+  it('Given alleen scores vóór de breuk, Then null', () => {
+    expect(detectGrondslagBreuk([punt('2026-06-30', 60), punt('2026-07-31', 61)])).toBeNull()
+  })
+
+  it('Given punten zonder score aan één kant, Then telt die kant niet', () => {
+    expect(detectGrondslagBreuk([punt('2026-07-31', null), punt('2026-09-26', 61)])).toBeNull()
   })
 })

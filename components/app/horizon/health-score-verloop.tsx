@@ -4,12 +4,20 @@ import { useId, type ReactNode } from 'react'
 import { ResilienceTrendChart, FireAgeTrendChart } from '@/components/app/horizon/horizon-helpers'
 import {
   detectEngineBronTransition,
+  detectGrondslagBreuk,
   detectScoreVersionTransition,
   formatTransitionDate,
   type HealthVerloopPunt,
 } from '@/lib/health-verloop'
 
 const LEEFTIJD_FORMAAT = new Intl.NumberFormat('nl-NL', { maximumFractionDigits: 1 })
+const DAG_FORMAAT = new Intl.DateTimeFormat('nl-NL', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
+
+/** 'YYYY-MM-DD' → "30 augustus 2026", tijdzone-onafhankelijk. */
+function formatDag(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  return DAG_FORMAAT.format(new Date(Date.UTC(y, m - 1, d)))
+}
 
 function Reeks({ titel, testId, children }: { titel: string; testId: string; children: ReactNode }) {
   return (
@@ -46,6 +54,7 @@ export function HealthScoreVerloop({ punten }: { punten: readonly HealthVerloopP
   const versieWissel = detectScoreVersionTransition(metScore)
   const motorWissel = detectEngineBronTransition(metLeeftijd)
   const lopendeMaandLive = punten.some((p) => p.live)
+  const grondslagBreuk = detectGrondslagBreuk(metScore)
 
   return (
     <section
@@ -72,7 +81,14 @@ export function HealthScoreVerloop({ punten }: { punten: readonly HealthVerloopP
         <>
           <Reeks titel="Gezondheidsgetal" testId="health-verloop-gezondheid">
             {metScore.length >= 2 ? (
-              <ResilienceTrendChart snapshots={metScore} />
+              <ResilienceTrendChart
+                snapshots={metScore}
+                markers={
+                  grondslagBreuk
+                    ? [{ date: grondslagBreuk, label: 'budgettelling aangepast', testId: 'grondslag-breuk-marker' }]
+                    : []
+                }
+              />
             ) : metScore.length === 1 ? (
               <Voetregel testId="health-verloop-gezondheid-een-punt">
                 Eén maandstand tot nu toe: {metScore[0].resilience_score} van 100 in{' '}
@@ -81,6 +97,13 @@ export function HealthScoreVerloop({ punten }: { punten: readonly HealthVerloopP
             ) : (
               <Voetregel testId="health-verloop-gezondheid-leeg">
                 De maandstanden bevatten nog geen gezondheidsgetal.
+              </Voetregel>
+            )}
+            {grondslagBreuk && metScore.length >= 2 && (
+              <Voetregel testId="health-verloop-grondslagbreuk">
+                Op {formatDag(grondslagBreuk)} veranderde hoe het budgetdeel van het gezondheidsgetal je uitgaven
+                telt: inkomsten en overboekingen tussen je eigen rekeningen tellen sindsdien niet meer mee. Een knik
+                rond die datum kan daardoor komen.
               </Voetregel>
             )}
             {versieWissel && (

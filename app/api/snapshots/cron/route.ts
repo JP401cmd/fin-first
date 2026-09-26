@@ -477,6 +477,8 @@ export async function GET(request: Request) {
       // canonieke bestedingssom (inkomsten gaan eraf, transfers tellen niet mee).
       // Bestaande snapshot-rijen blijven staan: historie voor 30 aug 2026 op de
       // oude grondslag (ongefilterde som van |amount|), bewust geaccepteerd.
+      // Datum van de breuk: BUDGETDISCIPLINE_GRONDSLAG_BREUK (lib/health-verloop.ts);
+      // het verloop in de gezondheidskassabon markeert hem.
       const { health: healthScore, resilienceScore } = computeSnapshotHealthScore(
         buildHealthScoreInput(
           {

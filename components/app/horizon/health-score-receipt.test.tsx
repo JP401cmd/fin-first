@@ -431,3 +431,28 @@ describe('HealthScoreReceipt — maand zonder oordeel (ADR 0131)', () => {
     expect(lijnPad(chart).match(/M/g)).toHaveLength(2)
   })
 })
+
+describe('HealthScoreReceipt — grondslagbreuk budgetdiscipline (30 aug 2026)', () => {
+  it('Given een reeks over 30 aug 2026, When de kassabon opent, Then gemarkeerd in de grafiek en uitgelegd, zonder de lijn te breken', async () => {
+    render(
+      <HealthScoreReceipt
+        health={makeHealthV2()}
+        verloop={[verloopPunt('2026-07-31', 58), verloopPunt('2026-08-29', 60), verloopPunt('2026-09-26', 61)]}
+      />,
+    )
+    const chart = await screen.findByTestId('resilience-trend-chart')
+    expect(screen.getByTestId('grondslag-breuk-marker')).toBeTruthy()
+    expect(screen.getByTestId('health-verloop-grondslagbreuk').textContent).toMatch(/Op 30 augustus 2026 veranderde/)
+    // Zelfde rekenmethode: de lijn loopt door.
+    expect(lijnPad(chart).match(/M/g)).toHaveLength(1)
+  })
+
+  it('Given een reeks die helemaal na de breuk ligt, When de kassabon opent, Then geen markering', async () => {
+    render(
+      <HealthScoreReceipt health={makeHealthV2()} verloop={[verloopPunt('2026-09-01', 60), verloopPunt('2026-09-26', 61)]} />,
+    )
+    await screen.findByTestId('resilience-trend-chart')
+    expect(screen.queryByTestId('grondslag-breuk-marker')).toBeNull()
+    expect(screen.queryByTestId('health-verloop-grondslagbreuk')).toBeNull()
+  })
+})
