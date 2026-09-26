@@ -68,6 +68,35 @@ export type ChartStaticLayersProps = {
   hoofdlijnGedempt?: boolean
 }
 
+/**
+ * Botsing van het koopkracht-/erfenislabel met de doellabels rechtsboven (fase 4,
+ * meting 27 sep: op 390 px liepen "koopkracht €3,8M", "€940k nu" en het doelbedrag door
+ * elkaar). Beide staan rechts uitgelijnd; het doellabel is twee regels van 11px
+ * (woord op y, bedrag op y+13), het koopkrachtlabel één regel van 8px plus een "nu"-regel
+ * van 7px (op y+8).
+ *
+ * Botst het (verticaal binnen de doel-labelband én horizontaal in de rechter ~100px), dan
+ * schuift het koopkrachtlabel onder het laagste botsende doellabel. Op smal scherm vervalt
+ * daarbij het "nu"-sublabel: daar is geen ruimte voor drie regels. Pure functie, getest.
+ */
+export function ontwarKoopkrachtLabel(a: {
+  koopY: number
+  koopX: number
+  rechtsX: number
+  doelLabelYs: readonly number[]
+  isDesktop: boolean
+  onderGrens: number
+}): { koopY: number; toonNu: boolean } {
+  const horizontaal = a.koopX > a.rechtsX - 100
+  if (!horizontaal) return { koopY: a.koopY, toonNu: true }
+  const koopBoven = a.koopY - 8
+  const koopOnder = a.koopY + 8
+  const botsers = a.doelLabelYs.filter((y) => koopOnder >= y - 11 && koopBoven <= y + 13 + 3)
+  if (botsers.length === 0) return { koopY: a.koopY, toonNu: true }
+  const laagste = Math.max(...botsers)
+  return { koopY: Math.min(a.onderGrens, laagste + 13 + 11), toonNu: a.isDesktop }
+}
+
 /** Opaciteit van de hoofdpaden als referentielijn (Doelen). Zelfde ondergrens-logica als
  *  `DIMMED`: leesbaar gedempt, het verschil leunt niet alleen op contrast. */
 export const HOOFDLIJN_GEDEMPT = 0.45
@@ -232,6 +261,24 @@ export function ChartStaticLayersInner({
   // de onderdrukkingsconditie hieronder op de getoonde tekst kan vergelijken.
   const targetEndLabel = targetLine ? targetAmountLabel(targetLine.labelVal) : null
   const targetNowLabel = targetLine ? targetAmountLabel(targetLine.realTargetNow) : null
+  // Positie van het koopkracht-/erfenislabel, ontward van de doellabels (fase 4).
+  const koopLabel = targetLine
+    ? ontwarKoopkrachtLabel({
+        koopY: Math.max(labelSafeTopY + 8, PAD.top + yScale(targetLine.labelVal) - 12),
+        koopX: Math.max(PAD.left + 44, PAD.left + xScale(targetLine.labelAge) - 2),
+        rechtsX: PAD.left + innerW,
+        doelLabelYs: [
+          ...(!isPensioenMode && showExclTargetLine && fireTarget != null && fireTarget > 0
+            ? [targetLabelY(yScale(fireTarget), masked)]
+            : []),
+          ...(!isPensioenMode && showInclTargetLine && fireTargetInclHome != null && fireTargetInclHome > 0
+            ? [targetLabelY(yScale(fireTargetInclHome), masked)]
+            : []),
+        ],
+        isDesktop,
+        onderGrens: PAD.top + innerH - 4,
+      })
+    : null
 
   return (
     <>
@@ -359,7 +406,8 @@ export function ChartStaticLayersInner({
               strokeLinecap="round" strokeLinejoin="round"
             />
             <text
-              x={Math.max(PAD.left + 44, PAD.left + xScale(targetLine.labelAge) - 2)} y={Math.max(labelSafeTopY + 8, PAD.top + yScale(targetLine.labelVal) - 12)}
+              x={Math.max(PAD.left + 44, PAD.left + xScale(targetLine.labelAge) - 2)} y={koopLabel!.koopY}
+              data-testid="koopkracht-label"
               fontSize={8} fill="var(--kern-t, #58362d)" textAnchor="end"
               fontFamily="var(--font-inter, sans-serif)" fontWeight={600}
             >
@@ -388,9 +436,10 @@ export function ChartStaticLayersInner({
                 hierheen te lekken — en het is inhoudelijk juist: zónder inflatie
                 ís de eindwaarde het bedrag-van-nu, dus een tweede regel met
                 hetzelfde getal voegt ook daar niets toe. */}
-            {!masked && targetNowLabel !== targetEndLabel && (
+            {!masked && targetNowLabel !== targetEndLabel && koopLabel!.toonNu && (
               <text
-                x={Math.max(PAD.left + 44, PAD.left + xScale(targetLine.labelAge) - 2)} y={Math.max(labelSafeTopY + 16, PAD.top + yScale(targetLine.labelVal) - 4)}
+                x={Math.max(PAD.left + 44, PAD.left + xScale(targetLine.labelAge) - 2)} y={koopLabel!.koopY + 8}
+                data-testid="koopkracht-nu-label"
                 fontSize={7} fill="var(--kern-t, #58362d)" textAnchor="end"
                 fontFamily="var(--font-dm-mono, monospace)" opacity={0.85}
               >
