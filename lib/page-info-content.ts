@@ -58,7 +58,7 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
   // ── Overzicht (Kern) ───────────────────────────────────────────────
   '/overzicht': {
     insight:
-      'Hoe je ervoor staat in één blik: vier hefbomen — bezittingen, schulden, cashflow, belasting — naast je financiële gezondheidsscore en de voortgang op je doelen. De vermogensgrafiek loopt van je verleden tot je vrijheidsmoment (of, als je dat al haalde, tot je eindleeftijd), met een band eromheen die de bandbreedte toont: de marge waarbinnen je vermogen zich waarschijnlijk beweegt.',
+      'Hoe je ervoor staat in één blik: vier hefbomen — bezittingen, schulden, cashflow, belasting — naast je financiële gezondheidsscore en de voortgang op je doelen. Het verloop van je gezondheidsgetal en van je vrijheidsleeftijd staat in de kassabon van je gezondheidsgetal. De vermogensgrafiek loopt van je verleden tot je vrijheidsmoment (of, als je dat al haalde, tot je eindleeftijd), met een band eromheen die de bandbreedte toont: de marge waarbinnen je vermogen zich waarschijnlijk beweegt.',
     grip:
       'Klik op een hefboom voor verdieping — het stipje erop is een stoplicht: groen is op koers, oranje vraagt aandacht, rood vraagt actie. Lees de wekelijkse briefing van Fin voor duiding bij de cijfers.',
     werking: [
@@ -496,9 +496,9 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
   // ── Toekomst (Horizon) ───────────────────────────────────────────────
   '/toekomst': {
     insight:
-      'Deze tijdas laat zien waar je financieel heen gaat: de opbouwjaren (groen) en de afbouwjaren (oranje) tot je gekozen eindleeftijd, met de levensgebeurtenissen en instellingen die samen je route bepalen.',
+      'Deze tijdas laat zien waar je financieel heen gaat: de opbouwjaren (groen) en de afbouwjaren (oranje) tot je gekozen eindleeftijd, met de levensgebeurtenissen en instellingen die samen je route bepalen. Onder je plan staan je levensgebeurtenissen: een kind, een erfenis, een verhuizing of minder werken, en de momenten die je plan zelf berekent, zoals het stoppen van een pensioenpot.',
     grip:
-      'Je sleept een gebeurtenis naar een ander jaar en ziet meteen hoe je vrijheidsmoment verschuift. Onder de grafiek staan Plan, Doelen en Instellingen: in Doelen verken je met je doelscenario wat een andere keuze doet, in Instellingen staan de aannames en gebeurtenissen achter je plan. Bovenaan Instellingen loop je met "Je voorkeuren voor je plan instellen" stap voor stap na waar de app mee rekent.',
+      'Je sleept een gebeurtenis naar een ander jaar en ziet meteen hoe je vrijheidsmoment verschuift. Onder de grafiek staan Plan, Doelen en Instellingen: onder Plan voeg je een levensgebeurtenis toe en zie je meteen het effect op je pad naar vrijheid, in Doelen verken je met je doelscenario wat een andere keuze doet, en in Instellingen staan de aannames achter je plan. Bovenaan Instellingen loop je met "Je voorkeuren voor je plan instellen" stap voor stap na waar de app mee rekent.',
     werking: [
       {
         title: 'De tijdas lezen',
@@ -520,7 +520,7 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
     terms: ['fire', 'vrijheidstijd', 'swr', 'inflatie', 'omslagpunt', 'stopmoment', 'bandbreedte', 'tekort_lening'],
     related: [
       { href: '/toekomst/doelen', label: 'Je doelen beheren' },
-      { href: '/toekomst/instellingen', label: 'Aannames en gebeurtenissen achter je plan' },
+      { href: '/toekomst/instellingen', label: 'Aannames achter je plan' },
     ],
   },
 
@@ -569,12 +569,13 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
       { href: '/mijn/mijlpalen', label: 'Mijlpalen die je al passeerde' },
     ],
   },
-  // ADR 0179 — Voorkeuren en Gebeurtenissen gingen op in Instellingen; de twee
-  // teksten zijn hier samengevoegd (de oude sleutels vervielen met hun routes).
+  // ADR 0179 — Voorkeuren ging op in Instellingen (de oude sleutel verviel met zijn
+  // route). De gebeurtenissen staan sinds het addendum van 26 sep onder het plan en
+  // worden bij /toekomst beschreven.
   '/toekomst/instellingen': {
     insight:
-      'Achter elke projectie zitten aannames — verwacht rendement, inflatie, je uitgaven na pensioen, je eindleeftijd — en momenten in je leven: een kind, een erfenis, een verhuizing of minder werken. Samen bepalen ze hoeveel jaar vrijheid je berekening laat zien. Ook momenten die je plan zelf berekent, zoals het stoppen van een pensioenpot, staan hier.',
-    grip: 'Hier stel je die aannames bij; een kleine bijstelling kan je uitkomst met jaren verschuiven. Ook je stopmoment en je AOW-, pensioen-, huis- en werkstrategie staan hier, en onder Gebeurtenissen voeg je een moment toe en zie je meteen het effect op je pad naar vrijheid. Liever stap voor stap? "Je voorkeuren voor je plan instellen" bovenaan zet de belangrijkste keuzes met hun effect op een rij.',
+      'Achter elke projectie zitten aannames — verwacht rendement, inflatie, je uitgaven na pensioen, je eindleeftijd. Samen met je levensgebeurtenissen bepalen ze hoeveel jaar vrijheid je berekening laat zien. Die gebeurtenissen staan onder je plan, op de eerste pagina van Toekomst.',
+    grip: 'Hier stel je die aannames bij; een kleine bijstelling kan je uitkomst met jaren verschuiven. Ook je stopmoment en je AOW-, pensioen-, huis- en werkstrategie staan hier. Liever stap voor stap? "Je voorkeuren voor je plan instellen" bovenaan zet de belangrijkste keuzes met hun effect op een rij.',
     // De plan-regel (ADR 0129) is hier twee vragen: wanneer stop je, en wat moet
     // er aan het eind gelden. De opties van die twee vragen zijn precies deze
     // begrippen — als radio-label kunnen ze geen popover dragen, dus staan ze

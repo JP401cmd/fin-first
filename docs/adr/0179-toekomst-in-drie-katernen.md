@@ -78,6 +78,18 @@ De amendementen op 0170 B7/B11/B12 en B9 en op 0144 staan niet in de amendemente
 
 **Addendum (26 sep 2026): drie getallen onder de band.** Spec §7.6 vroeg een uitkomst die de marktcheck nog niet had: drie vrijheidsleeftijden. Die komen uit de kern en niet uit de UI, want een eigen som in de UI is verboden (consume, don't recompute). `MarktcheckOutcome.vrijheidsleeftijden` wordt berekend uit dezelfde runs als de band. De runs worden gerangschikt op hun gap op de live FIRE-leeftijd, en `solveFire` lost alleen de run op p25, p50 en p75 op. Dat kost +15% rekenwerk, en de uitkomst is gemeten gelijk aan het oplossen van elke run. De band, de marge en de oracle-velden blijven byte-gelijk, dus D9 geldt in deze zin: geen bestaande motor verandert van gedrag. De Monte Carlo-consolidatie blijft een aparte kaart (eigenaarsbesluit 10). Onder een vast stop-anker is het veld `null` en toont de component geen regel. Berekeningen: `marktcheck-vrijheidsleeftijden`.
 
+## Addendum 26 sep — Plan toont de gebeurtenissen; verloop naar /overzicht
+
+Eigenaarsbesluit van 26 september 2026 (laat), letterlijk: "Wil je onder het plan de inkomensstrook en de dekkingsradar verwijderen. Graag daar de levensgebeurtenissen zetten die nu onder instellingen staat."
+
+**(a) Plan toont de levensgebeurtenissen.** Onder de KPI-strip, de voortgangsbalk en de fasebalk van Plan staat de lijst met levensgebeurtenissen en kernelmomenten, met de toevoegknop: dezelfde `GebeurtenissenView` (via `GebeurtenissenMetHoofdrun`, besluit Q8) die tot dan in Instellingen stond, met het anker `#gebeurtenissen`, in Eenvoudig én Volledig. Er is geen tweede lijst en geen tweede toevoegmechanisme. De props bouwt de katern-layout server-side uit de bundel die hij al laadt (`bouwGebeurtenissenBron`) en geeft ze via de state-provider door; het Plan-paneel leest de route niet (D8). De levensinkomenstrook en de dekkingsradar zijn verwijderd, met hun componenten, `lib/horizon/dekkingsradar.ts` en de scenario-chip. Instellingen is voortaan de wizard-ingang plus Voorkeuren.
+
+Dit amendeert de katern-inhoud van D1 en D4, spec §4.4 en §6, en fase 3 (de gebeurtenissen-sectie in Instellingen vervalt). "Wat het betekent" houdt alleen de scenario's naast elkaar, met de zichtbaarheidsgate van ADR 0145 D7a; op mobiel staat het standaard ingeklapt (spec §4.3), en de gate is dan "in beeld én open". Waarom: de invoer van het plan hoort onder het plan, en Plan krijgt minder duidingslagen.
+
+Deeplinks: `/toekomst/gebeurtenissen` en `?tab=gebeurtenissen` landen op `/toekomst#gebeurtenissen` (met een levensstrategie-sleutel nog op Instellingen, waar die editors wonen); een oude bladwijzer `/toekomst/instellingen#gebeurtenissen` stuurt de Instellingen-page door. Er is één manier om via een link een gebeurtenis toe te voegen: `?event=new`, geopend door de provider op elk katern; `?nieuw=1` is daarvan een alias.
+
+**(b) Fase 5 naar voren.** Het verloop van gezondheid en vrijheidsleeftijd (`HorizonTrendGrid`) staat in de gezondheidskassabon op /overzicht, de geplande acties op `/overzicht/tips` (D9). Plan toont ze niet meer; het `/toekomst`-sheet "Financiële Gezondheid", waarvan het verloop-grid de enige opener was, is weg.
+
 ## Toets: raakt het vervallen van de duidingszin ADR 0129 B10?
 
 B10 regelt de naamgeving van de modi: vanuit de vraag die het scherm beantwoordt, geen systeemlabel. Drie feiten:

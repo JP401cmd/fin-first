@@ -207,6 +207,16 @@ describe('PAGE_INFO — /toekomst in drie delen (ADR 0179, fixronde C1 punt 10)'
     expect(kaart?.text).toMatch(/standaard uit/)
   })
 
+  it('de gebeurtenissen horen bij Plan, niet meer bij Instellingen (addendum 26 sep)', () => {
+    expect(alles('/toekomst')).toMatch(/levensgebeurtenis/)
+    expect(PAGE_INFO['/toekomst/instellingen'].grip).not.toMatch(/Gebeurtenissen/)
+    expect(PAGE_INFO['/toekomst'].grip).not.toMatch(/in Instellingen staan de aannames en gebeurtenissen/)
+  })
+
+  it('/overzicht zegt waar het verloop van gezondheid en vrijheidsleeftijd staat', () => {
+    expect(PAGE_INFO['/overzicht'].insight).toMatch(/verloop van je gezondheidsgetal en van je vrijheidsleeftijd staat in de kassabon van je gezondheidsgetal/)
+  })
+
   it('de grip van Plan noemt geen Voorkeuren-kaart meer', () => {
     expect(PAGE_INFO['/toekomst'].grip).not.toMatch(/Voorkeuren-kaart/)
   })
