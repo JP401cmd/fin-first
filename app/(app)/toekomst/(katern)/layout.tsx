@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { Suspense, type ReactNode } from 'react'
 import { PageVerdictOpening } from '@/components/editorial'
 import { resolveRouteTitle } from '@/lib/nav-config'
 import { getPageInfo, hasPageInfo, type PageInfoContent } from '@/lib/page-info-content'
@@ -9,6 +9,7 @@ import { ToekomstCanvas } from '@/components/toekomst/canvas/toekomst-canvas'
 import { ToekomstOverlayHost } from '@/components/toekomst/overlays/toekomst-overlay-host'
 import { ToekomstRekenGrens } from '@/components/toekomst/layout/toekomst-reken-grens'
 import { ToekomstAnkerregel } from '@/components/toekomst/layout/toekomst-ankerregel'
+import { OudeTabParam } from '@/components/toekomst/layout/oude-tab-param'
 import {
   ToekomstKaternKoppen,
   ToekomstKaternInfo,
@@ -81,6 +82,11 @@ export default async function ToekomstKaternLayout({ children }: { children: Rea
           op elk katern dezelfde zijn (kaart V16). */}
       <ToekomstStateProvider initialData={horizonData} goals={finData.goals}>
         <ToekomstKaternMeldingenProvider bron={meldingenBron}>
+          {/* Een meegereisde `?tab=` van een oude deeplink (next.config-redirect) weg,
+              zonder scroll en zonder lus. Suspense: `useSearchParams` in de layout. */}
+          <Suspense fallback={null}>
+            <OudeTabParam />
+          </Suspense>
           <section className="mx-auto max-w-6xl px-4 sm:px-6 pt-4 sm:pt-6 print:hidden">
             <div className="mb-3 flex items-start justify-between gap-3">
               {/* Aanhef als ZIN (ADR 0174 D6): onder een vast stopmoment de dekking van je

@@ -68,6 +68,11 @@ describe('katern-layout — het canvas blijft gemonteerd bij een katernwissel (G
     expect(layout.indexOf('<ToekomstKaternMeldingSlot')).toBeLessThan(layout.indexOf('{children}'))
   })
 
+  it('de layout-laag ruimt een meegereisde ?tab= op, binnen Suspense (fixronde C1)', () => {
+    const layout = codeOnly(readRel(LAYOUT))
+    expect(layout).toMatch(/<Suspense fallback=\{null\}>\s*<OudeTabParam \/>\s*<\/Suspense>/)
+  })
+
   it.each(KATERN_PAGES)('%s rendert geen tweede provider, canvas of overlay-host', (page) => {
     for (const mod of reachableModules([page])) {
       if (DEFINITIES.has(mod)) continue
