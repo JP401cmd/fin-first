@@ -166,6 +166,13 @@ zevende punt in `horizon-kernel-bekende-afwijkingen`, klasse ADR 0033.
 | B13 | Plek van de plan-regel | Voorkeuren is de bron; de strategie-modal op `/toekomst` spiegelt dezelfde twee vragen. |
 | B14 | Zeven losse defecten | Allemaal in de fasen, geen aparte release. |
 
+> **Geamendeerd door ADR 0179 (26 sep 2026):** B13 — de strategie-modal op /toekomst
+> verdwijnt. Katern Instellingen (`/toekomst/instellingen`, de opvolger van Voorkeuren) is de
+> enige plek waar de plan-regel wordt bewerkt, met de wizard als tweede host van dezelfde body
+> (ADR 0142 D6). Dat versterkt B13; de bijlage-notitie van 8 sep die de modal het enige
+> schrijfpad noemt, geldt voortaan voor Instellingen. B10 is getoetst tegen het vervallen van de
+> duidingszin op /toekomst en blijft ongewijzigd (zie ADR 0179).
+
 ## Fasering (bewijs per fase)
 
 - **F0** — Fundament op papier: dit besluit + merkstem-ronde op de vaste

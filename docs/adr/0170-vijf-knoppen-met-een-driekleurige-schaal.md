@@ -75,6 +75,11 @@ vervallen; `Vrijheidsas`, `Dekkingsbalk` en `computeStopMarge` gaan mee.
 `PhaseBar`, met daaronder één opslaan-balk. Katern II als eigen inklapbare sectie vervalt;
 alleen toelichting die iets toevoegt blijft staan.
 
+> **Geamendeerd door ADR 0179 (26 sep 2026):** de knoppen staan in katern Doelen
+> (`/toekomst/doelen`): op desktop naast de grafiek in de canvas-rij, op mobiel direct onder de
+> katern-koppen, zodat grafiek en knoppen samen in beeld staan. De fasebalk gaat naar katern
+> Plan. De opslaan-balk blijft onder de knoppen; op mobiel is hij de action-bar van de shell.
+
 **B7 — Twee vormen, de wijzer als standaard** (eigenaarskeuze 20 sep 2026). Dezelfde vijf
 knoppen staan als **wijzer** (een halfronde meter, de vorm van de geldstroom-kaart op
 /overzicht/budget/transacties) of als **balk**. De wijzers zijn smal en staan op een breed
@@ -83,6 +88,11 @@ schaal af te lezen en blijven één kolom op de telefoon, twee vanaf tablet. De 
 schakelaar in de kop en wordt server-side bewaard naast `showScenarioLine` — cross-device,
 en bewust GÉÉN onderdeel van `ToekomstScenarioStand`: van vorm wisselen verandert je plan niet,
 dus de opslaan-balk mag daar niets van zeggen.
+
+> **Geamendeerd door ADR 0179 (26 sep 2026):** de standaardvorm hangt aan het breekpunt: harp
+> op desktop, rad op mobiel, en de keuze wordt per breekpunt onthouden (`knopWeergave` met twee
+> sleutels). Alle vijf vormen blijven kiesbaar. Dit vervangt "de wijzer als standaard" hier, de
+> wijzer als standaard overal in B11 (3) en "geen standaard" in B12.
 
 De wijzer is niet zélf het besturingselement: er ligt een onzichtbare `<input type="range">`
 overheen die de bediening en de toegankelijkheid draagt. Een zelfgebouwde sleep-interactie op
@@ -125,6 +135,11 @@ over gaan. Alleen op de OVERGANG van "geen verkenning" naar "wel een verkenning"
 elke knopbeweging — zet de gebruiker de lijn daarna bewust uit, dan blijft dat zo tot hij
 terug naar basis gaat. Een ref houdt de vorige stand vast, zodat het laden van een bewaarde
 verkenning een opgeslagen "uit" niet alsnog overschrijft.
+
+> **Geamendeerd door ADR 0179 (26 sep 2026):** in katern Doelen zijn de wat-als-lijn en het
+> verschilvlak een vaste laag; in katern Plan zijn ze een keuze in het lagenmenu. Het vanzelf
+> aanzetten op de overgang en het onthouden van "uit" vervallen daarmee. De drie vlakregels
+> hieronder blijven onverkort.
 
 Tussen de basislijn en de wat-als-lijn komt een **gearceerd verschilvlak**: groen waar de
 wat-als hóger ligt (meer vermogen), rood waar hij láger ligt. Twee lijnen dicht bij elkaar
@@ -177,6 +192,9 @@ migratie). Welk onderwerp het rad toont is ephemeral — kijken is geen plan-keu
 terug op het eerste beschikbare onderwerp zodra het gekozen onderwerp verdwijnt. De plan-acties
 staan in rad-vorm onder het blok, net als bij de wijzers: de stop-knop is niet altijd in beeld.
 
+> **Geamendeerd door ADR 0179 (26 sep 2026):** keuze (3) geldt niet meer; het rad is de
+> standaard op mobiel (zie het addendum bij B7).
+
 **B12 — Twee vormen die de koppeling tékenen: de harp (mobiel) en de vijfhoek (laptop)**
 (eigenaarswens 20 sep 2026: "verras me in vorm, niet in functie"). Dezelfde vijf standen,
 dezelfde grenzen, dezelfde `onChange` en dezelfde toegankelijkheid als de andere vormen; alleen
@@ -218,6 +236,9 @@ verkenning, bewust niet in deze ronde: bij een sleep verschuift de grens ónder 
 knop-in-je-hand mee (target escape) — de grens van de actieve knop bevriezen tijdens de sleep
 en alleen de vier andere animeren zou de "ripple" leesbaarder maken. Dat raakt alle vormen en
 de grenzen-batch, en is een eigen besluit.
+
+> **Geamendeerd door ADR 0179 (26 sep 2026):** de harp is de standaard op desktop, in de
+> rechterkolom naast de grafiek (zie het addendum bij B7); de vijfhoek blijft een keuze.
 
 In harp en vijfhoek geldt, net als op het rad, dat een onderwerp dat er niet is gewoon niet op
 de figuur staat: de nalatenschap-notitie ("je plan houdt je vermogen in stand") hoort bij de

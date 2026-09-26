@@ -47,6 +47,11 @@ volledige plan-kopieën, nooit een aparte pagina met een eigen persona.
 2. **Het inline lab op /toekomst is de enige wat-als.** Geen functionaliteit verdwijnt die
    het lab niet al had; wat vervalt zijn de dubbels (presets, een tweede sliderset, een
    tweede persona) en de functionaliteit die zelfverklaard "nog in ontwikkeling" was.
+
+   > **Geamendeerd door ADR 0179 (26 sep 2026):** het principe blijft (één wat-als). Het lab
+   > woont op `/toekomst/doelen` (katern Doelen); `/toekomst/whatif`, `?via=dreamgate` en
+   > `/horizon/whatif` redirecten daar rechtstreeks heen, zonder hop via `/toekomst?whatif=open`.
+
 3. **Levensgebeurtenissen blijven** — die horen bij het plan zelf, niet bij de losse
    pagina, en worden door dit besluit niet geraakt.
 4. **`context: 'whatif'` blijft** als de interne naam van de gebeurtenis-pane-chat-persona

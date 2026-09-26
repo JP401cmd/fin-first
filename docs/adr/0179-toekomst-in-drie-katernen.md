@@ -1,0 +1,127 @@
+---
+id: 0179-toekomst-in-drie-katernen
+title: '/toekomst in drie katernen: één canvas, drie routes (Plan, Doelen, Instellingen) en elke instelling op één plek'
+status: aanvaard
+date: 2026-09-26
+elements: [fn-toekomstplannen, as-planning, app-comp]
+---
+
+# 0179 — /toekomst in drie katernen
+
+/toekomst wordt één layout met kop, gedeeld grafiekcanvas en drie katern-koppen, met drie routes eronder: Plan (`/toekomst`), Doelen (`/toekomst/doelen`) en Instellingen (`/toekomst/instellingen`). Het canvas blijft gemonteerd; elk katern heeft één taak, elke instelling één plek.
+
+Eigenaarsbesluiten van 26 september 2026 (spec `docs/superpowers/specs/2026-09-26-toekomst-drie-katernen-design.md`, §11). De spec draagt het onderzoek, de wireframes en de inventaris per functie; dit besluit legt de architectuur vast.
+
+## Context
+
+De pagina doet drie dingen tegelijk in één kaart: het resultaat van het plan tonen, een doelscenario verkennen en de instellingen voeden waar het plan op rust. Boven de grafiek staan zo'n 28 interactieve elementen (statuspunten, vier navkaarten met chevrons, tips, details, vier KPI's, tot zeven meldingen met eigen links, tot tien pills), er staan twee koppen boven elkaar, en het lab staat ín de resultaatkaart, tussen de fasebalk en de legenda's van de pills. De eigenaar ervaart de pagina als te druk.
+
+De oorzaak is structureel:
+
+- **God-component.** `components/app/horizon/horizon-client.tsx` telt 11.029 regels (`wc -l`, 26 sep 2026; het aandachtspunt `horizon-god-component` noemt nog 8.800). Alle drie de delen, alle modals en een legacy-gebeurtenisformulier zitten in één bestand; zeventien bron-scan-tests lezen het letterlijk. `loadData()` leest bij elke modal-sluiting ±10 tabellen client-side en houdt het bestand op de grandfather-allowlist van `check:client-reads` (ADR 0058).
+- **Drie ingangen naar dezelfde instelling.** Stopmoment, onttrekking en woonstrategie zijn te bewerken via de Strategieën-modal, via /toekomst/voorkeuren en via de wizard. `WithdrawalModal` en het legacy-formulier zijn onbereikbaar maar bestaan nog.
+- **Eén grootheid in drie rollen.** De uitgave na pensioen is KPI (resultaat), lab-knop (verkennen) en wizardstap (instellen).
+
+## Besluit
+
+**D1 — Eén layout, drie routes (model C).** Een route-groep `app/(app)/toekomst/(katern)/` met één server-layout houdt de kop, de state-provider, het canvas en de katern-koppen. Drie routes leveren het paneel eronder: **Plan** `/toekomst` (standaard), **Doelen** `/toekomst/doelen` en **Instellingen** `/toekomst/instellingen`. De labels Plan · Doelen · Instellingen zijn een eigenaarsbesluit. Het canvas blijft gemonteerd bij het wisselen van katern (geen herlaad, geen sprong); elk katern heeft een eigen URL, TopBar-titel en terugknop. `/toekomst/gebeurtenissen` en `/toekomst/voorkeuren` gaan samen op in Instellingen en redirecten met hash en query. Rekenhulp, bibliotheek en inflatie-koopkracht zijn gereedschap: ze vallen buiten de route-groep en laden de planbundel niet.
+
+**D2 — De kop is oordeel plus anker.** De kop bestaat uit de oordeelzin (`resolvePlanVerdictSentence`, ADR 0174 D6 en 0175), één ankerregel en de i. De vrijheidsleeftijd staat twee keer per scherm: als tekst in de ankerregel en als eerste KPI in Plan, die de kassabon draagt. De duidingszin onder het kerngetal vervalt (zie de toets van ADR 0129 B10 hieronder). De paginakop draagt geen statuspunten meer.
+
+**D3 — Eén canvas, drie modi, één lagenmenu.** Het canvas heeft drie modi: het vermogenspad, de samenstelling en de geldstroom (in- en uitgaven, nu nog een uitklap, wordt een volwaardige modus). De modus-switch is een segmented control. De tien pills en de laaguitleg gaan op in één lagenmenu (popover op desktop, `ShellOverlay kind="sheet"` op mobiel). Modus en lagen horen bij het canvas, niet bij een katern: een keuze van de gebruiker blijft staan bij het wisselen, en per katern verschillen alleen de standaardstand en de vaste lagen. In Doelen zijn dat de doelscenario-lijn met verschilvlak en de doelmarkers; in Instellingen is het canvas compact op desktop en toont mobiel alleen de kop. Boven de grafiek staan hoogstens vijf interactieve elementen.
+
+De doelscenario-lijn is de bestaande scenario-run (`selectDoelLijnBron`, ADR 0085 en 0170 B9); er komt geen run en geen motor bij. Tonen samenstelling en geldstroom in Doelen het doelscenario, dan alleen uit rijen van diezelfde run (een adaptervraag voor fase 1). Tot dan tonen die twee modi in Doelen het plan, met een regel die dat zegt. Een eigen samenstelling buiten de kernel komt er niet.
+
+**D4 — Eén taak per katern, één plek per instelling.** Plan toont en duidt: KPI-strip van vier cellen, ankerdrieslag alleen onder een vast anker, voortgangsbalk, fasebalk, verdieping lazy. Doelen verkent en legt vast: het lab, de doelenlijst en de andere paden. Instellingen voedt het plan: de wizard-ingang, rijen met ✎ die de bestaande bodies openen, gebeurtenissen, levensstrategieën en marktaannames. Een instelling wordt alleen in Instellingen bewerkt; KPI's en meldingen linken naar de rij. De Strategieën-modal, `WithdrawalModal` en het legacy-gebeurtenisformulier verdwijnen. Elke editor toont een verschilregel uit `runRegelProjection` met `RegelSimOverride`, dezelfde override-run als de wizard, en nooit een eigen som. Er is één sheet tegelijk open.
+
+**D5 — De aannamesregel staat alleen in Plan**, onder het canvas, met één link naar Instellingen. In Doelen staat op die plek de uitkomstregel van het doelscenario, in Instellingen niets.
+
+**D6 — Meldingen wonen in hun katern.** Een melding staat bovenaan het katern waar ze over gaat, en haar vervolgactie wijst naar precies één rij of één blok. Het statuspunt (stoplichtkleur van de ernst) staat op de katern-kop van dat katern, niet in de paginakop en niet in de TopBar; badges zijn er niet. Per katern is hoogstens één melding uitgeklapt. Minimaliseren gebruikt de bestaande `status_banner_minimized`-pref per route; omdat elk katern een route is, vraagt dat geen schemawijziging. De katern-koppen zijn een nieuwe editorial primitive op het `CategoryTabs`-patroon, bewust geen segmented control (dat is de modus-switch; twee gelijke controls verwarren). Inactieve koppen dragen een samenvattingsregel; op mobiel tonen ze alleen label en punt en kleven ze zodra de grafiek uit beeld is. De toewijzing per melding staat in spec §4.8.
+
+**D7 — In Doelen staan grafiek en knoppen samen in beeld (harde eis).** Op desktop wordt de canvas-rij twee kolommen, met de grafiek links en de harp rechts; kop plus canvas-rij blijven binnen 480 px, zodat ze op 1280×720 samen passen. Op mobiel is de grafiek `clamp(170px, 30vh, 230px)` hoog, staat het rad direct onder de klevende katern-koppen en is de opslaan-balk de action-bar van de shell; grafiek, rad en action-bar passen binnen 640 px onder de TopBar op 360×800 en 390×844. Alle vijf lab-weergaven blijven kiesbaar. De standaard is harp op desktop en rad op mobiel, en de keuze wordt per breekpunt onthouden: `knopWeergave` krijgt twee sleutels in de bestaande own-row JSONB-pref. Of dat zonder migratie kan, wordt in fase 4 nagegaan.
+
+**D8 — Terugvaloptie C′ zonder herbouw.** Wijst een gebruikerstest uit dat mensen katernen missen, dan komen dezelfde drie katern-componenten gestapeld op één route (desktop open, mobiel ingeklapt met klevende koppen). Om dat goedkoop te houden geldt vanaf fase 1: een katern-component haalt zijn data uit de provider of uit props en leest nooit de route (`usePathname`, `params`). Routing zit alleen in de layout en de katern-koppen.
+
+**D9 — Het verloop hoort bij /overzicht.** Het gezondheids- en FIRE-verloop (`HorizonTrendGrid`) verhuist naar de gezondheidskassabon op /overzicht, één laag onder de kaart en niet op het hoofdscherm; geplande acties gaan naar `/overzicht/tips`. Eerst wordt de leesquery op `net_worth_snapshots` gerepareerd (datumvenster, één punt per maand). De Monte Carlo-consolidatie is een aparte kaart: deze herindeling verplaatst ingangen en raakt geen motor.
+
+De letterlijke kopij van kop, ankerregel, aannamesregel, samenvattingsregels, lagenmenu en verschilregel ligt niet in dit besluit; die gaat in een aparte ronde langs `merkstem` en `compliance-check` (constaterend, geen imperatief, ADR 0165).
+
+## Wat blijft staan
+
+- Het oordeel komt uit `resolvePlanStatus` en `resolvePlanVerdictSentence` en wordt nooit herberekend (ADR 0174, 0175). De kop is `PageVerdictOpening` (h2); de shell draagt de enige h1 (ADR 0110).
+- Er is één wat-als: het doelscenario-lab. `resolveLabUitkomst` en `standGedekt` zijn de enige uitkomst- en haalbaarheidsbron (ADR 0144, 0145, 0160, 0170, 0175).
+- Eén body, twee hosts voor elke instelling; het veld-register per schrijfroute beweegt in dezelfde PR mee (ADR 0142 D6–D8).
+- Instellingen (voorheen Voorkeuren) is de bron van de plankeuzes; verkennen wijzigt het plan nooit (ADR 0129 B13). Plan-mutaties lopen via `/api/fire-settings` met bevestiging.
+- Euro-weergave: precies één render-grens, in de state-provider, die `InEuroView<T>`-feeds uitdeelt; de bron-test verhuist mee (ADR 0090, 0093).
+- Vrijheidsgetal en -leeftijd komen uit `computeHorizonFireSim`, met worker en fallback; zichtbaarheidsgates verhuizen mee met hun blok (ADR 0054, 0107, 0145 D7a).
+- Datapad: `loadData()` wordt `router.refresh()` plus loader vóór de decompositie; nieuwe client-bestanden lezen niet zelf (ADR 0058).
+- Eenvoudig en Volledig via `HideInSimple` en `DepthSection`, nooit per sectie en nooit als ternary (ADR 0026). Het doelscenario blijft in Eenvoudig, alleen solo (ADR 0170 B10).
+- Overlays via `ShellOverlay` (ADR 0039); RESIDUE- en ALLOWLIST-lijsten krimpen alleen.
+- De Huishoud-FIRE-sectie blijft gemount in Plan: ze schrijft `households.combined_fire_summary` (ADR 0168).
+- Taal: geld levert tijd op, geen koop-/verkoopmetafoor (ADR 0165).
+- Deeplinks blijven werken (`?tab=`, `?modal=…`, `?strategie=`, `?uitgaven=open`, `?event=`, `?whatif=open`, `?planreview=open`, widget-hrefs). Oude redirects wijzen rechtstreeks naar het katern, zonder dubbele hop.
+
+## Amendementen
+
+| ADR | Punt | Wordt |
+|---|---|---|
+| 0170 | B6: knoppen in de grafiekkaart, onder de `PhaseBar` | De knoppen staan in katern Doelen: op desktop naast de grafiek in de canvas-rij, op mobiel direct onder de katern-koppen. De fasebalk gaat naar Plan. De opslaan-balk blijft onder de knoppen; op mobiel is hij de action-bar. |
+| 0170 | B7, B11 (3), B12: de wijzer als standaard, geen standaard op smal | Standaard per breekpunt: harp op desktop, rad op mobiel. Alle vijf vormen blijven kiesbaar (D7). |
+| 0170 | B9: de lijn verschijnt vanzelf bij de eerste verkenning en "uit" wordt onthouden | In Doelen zijn lijn en verschilvlak een vaste laag, in Plan een keuze in het lagenmenu. De drie vlakregels van B9 blijven. |
+| 0142 | D5: ingang is de Voorkeuren-kaart op /toekomst, plus de knop op /voorkeuren en ⌘K | Ingang is de wizard-kaart bovenaan Instellingen, met de stapvoortgang in de kaart zelf, plus ⌘K. Kaart en knop vervallen. Een onvoltooide review is geen melding en geeft geen statuspunt. |
+| 0129 | B13: de strategie-modal spiegelt Voorkeuren | De modal verdwijnt; Instellingen is de enige bewerkplek. Dit versterkt B13. |
+| 0144 | Punt 2: het lab op /toekomst, redirects naar `/toekomst?whatif=open` | Het principe (één wat-als) blijft. Het lab woont op `/toekomst/doelen`, en de redirects gaan daar rechtstreeks heen. |
+| 0162 | Doelen wonen op `/toekomst/doelen` | Ongewijzigd; de route wordt katern Doelen. |
+| spec 1 jun 2026 | Tijdas-landing met vier navkaarten | Vervangen door dit besluit. |
+
+De amendementen op 0170 B7/B11/B12 en B9 en op 0144 staan niet in de amendementenlijst van de spec (§8). Ze volgen uit de eigenaarsbesluiten 4 en 9 en uit de verhuizing van het lab naar een eigen route, en staan hier zodat geen ADR iets anders zegt dan de app.
+
+## Toets: raakt het vervallen van de duidingszin ADR 0129 B10?
+
+B10 regelt de naamgeving van de modi: vanuit de vraag die het scherm beantwoordt, geen systeemlabel. Drie feiten:
+
+1. **De drager van B10 is `ankerVraag`** (`lib/horizon/anker-copy.ts`), niet de duidingszin. De duidingszin komt uit `buildVrijheidsleeftijdZin` en vertaalt het kerngetal naar een moment; onder een vast anker is het de bereikzin uit de bijlage van ADR 0129 (`ankerZin`).
+2. **De vraag als paginakop rendert op de live pagina al niet meer.** Die tak staat alleen in de weergave `embedded=false`, die /toekomst niet gebruikt; sinds ADR 0174 D6 is de kop een oordeelzin. `ankerVraag` leeft wél voort als kop van het lab (`LabKnoppen`, prop `vraag`) en verhuist daarmee mee naar Doelen.
+3. **Na de herindeling blijft de modus zichtbaar zonder systeemlabel.** De oordeelzin onderscheidt haalbaarheid onder `solved` van dekking onder een vast anker (`resolvePlanVerdictSentence`). De ankerregel noemt onder `solved` de vrijheidsleeftijd en onder een vast anker het stopmoment. De ankerdrieslag staat alleen onder een vast anker. Wat de duidingszin onder een vast anker zei, blijft op het scherm: het bereik in de tegel "reikt tot", de opgeloste leeftijd in tegel 1 (ADR 0129 B9), het tekort in de melding van Plan. De bereikzin zelf blijft in gebruik in de statusbanner onder een vast stopmoment (`anchoredBannerCopy`, `lib/page-status/copy.ts`).
+
+**Uitkomst:** het vervallen van de duidingszin raakt B10 niet. B10 blijft ongewijzigd en krijgt geen amendement. Er gelden twee voorwaarden: de kop van het lab in Doelen blijft `ankerVraag`, en de ankerregel onderscheidt de modi zonder systeemlabel. De definitieve zinnen lopen via `merkstem`, zoals B10 al voorschrijft.
+
+## Gevolgen
+
+- **Wat het oplevert.** Overzicht eerst: boven de grafiek zakt het aantal interactieve elementen van zo'n 28 naar hoogstens vijf. Elke instelling heeft één ingang; twee modals en het legacy-formulier (samen ±4.000 regels) verdwijnen. De code volgt de indeling (`components/toekomst/{state,canvas,plan,doelen,instellingen}`) in plaats van één bestand, en de zware katernen laden alleen op hun eigen route.
+- **Risico: gemiste katernen.** Content achter routes wordt gemist. Dat vangen drie dingen op: het canvas op alle routes, koppen met samenvatting, en de aannamesregel met link. Helpt dat niet, dan geldt C′ (D8).
+- **Risico: de state-provider wordt de nieuwe god-component.** Hij erft de state van ±5.000 regels. Regel: de provider draagt state, afgeleide feeds en de euro-render-grens, geen JSX-blokken. Groeit hij, dan splitst hij per concern (sim, scenario, lagen, perspectief). Het aandachtspunt `horizon-god-component` gaat daarom pas dicht als geen opvolgbestand de rol overneemt; anders verhuist het naar de provider.
+- **Risico: de kosten van `router.refresh()`** op een layout die de horizon-loaders draagt. Die worden gemeten tegen de TTFB-baseline in `docs/superpowers/plans/2026-09-26-ttfb-oorzaak-en-plan.md`.
+- **Risico: dubbele deflatie** als een katern-component zelf deflateert. Er is één grens, in de provider. Katernen krijgen `view*`-feeds, of een eigen grens met bron-test.
+- **Regressiebewijs.** De zeventien bron-scan-tests verhuizen elk naar het bestand waar hun invariant woont: één invariant, één bestand.
+- **Prijs.** Route-groep, provider en decompositie zijn meer verbouwing dan tabs (A) of een `?katern=`-schakelaar (B). Dat is de prijs van een gemonteerd canvas plus een URL per katern.
+- **Topologie.** Geen nieuw domein, geen nieuwe applicatiedienst, geen nieuw data-object, geen rekenmotor: dit is presentatie binnen `app-comp` op `fn-toekomstplannen` en `as-planning`. Er is geen migratie voorzien; `knopWeergave` en `status_banner_minimized` worden in hun fase nagegaan.
+
+## Platen en views per fase
+
+Een plaat beweegt mee in de fase die hem onwaar maakt, niet in een nazorgfase. Fase 6 regenereert alleen de gescande feiten.
+
+| Fase | View | Wat meebeweegt |
+|---|---|---|
+| 0 | ADR's | Dit besluit en de addenda in 0170, 0142 en 0129; de spec van 1 jun gemarkeerd als vervangen. Geen topologiewijziging. |
+| 1 | Berekeningen | `lib/architecture/calculations.ts`: vijf `files[]`-verwijzingen naar `horizon-client.tsx` en één naar `app/(app)/toekomst/gebeurtenissen/page.tsx` wijzen naar het opvolgbestand; anders wordt `calculations.test.ts` rood op bestandsexistentie en op functions-in-files. Routenamen `/toekomst/voorkeuren` en "navkaart" worden `/toekomst/instellingen` en katern-kop. |
+| 1 | Plaat | `lib/architecture/archimate-model.ts`: `sp-plannen.items` (de drie katernen plus Rekenhulp) en de lead van `as-planning` (het lab op `/toekomst/doelen`). De routenaam in het aandachtspunt over de profielsnapshot. |
+| 1 | Aandachtspunten | `horizon-god-component`: dicht zodra `horizon-client.tsx` weg is, of herformuleerd naar de state-provider als die de rol overneemt (zie Gevolgen). |
+| 1 | Praatplaat | `lib/architecture/hld-model.ts`: de Voorkeuren-kaart op Toekomst en "bij Voorkeuren" worden katern Instellingen. |
+| 2 | Praatplaat | De geldstroom als modus, de lagen en de drie getallen onder de waaier, als capability-tekst. |
+| 3 | Praatplaat, Berekeningen | Eén ingang per instelling en de verschilregel; de editors als nieuwe lezers van `runRegelProjection`. |
+| 5 | Stromen, Praatplaat | `lib/architecture/archimate-flows.ts`: de stroom `snapshot-trend` eindigt in de gezondheidskassabon op /overzicht; het verloop verlaat de Toekomst-capabilities. |
+| 6 | Feiten | `npm run arch:diagram` (ADR-scan, churn, datatoegang) en de org-site; niets handmatig. |
+
+`archimate-flows.ts` kent geen stroom "Toekomst", en er komt er geen: de driedeling is presentatie, geen nieuwe waardeketen. De stroom `transactie-naar-vrijheid` eindigt op `fn-toekomstplannen` en blijft kloppen.
+
+## Verworpen alternatieven
+
+- **A. Drie tabs boven de grafiek, of drie losse pagina's.** Tabs zijn voor wisselende weergaven van dezelfde inhoud, niet voor drie taken. In Instellingen verlies je de grafiek als feedback, in Doelen moet ze gedupliceerd worden.
+- **B. Eén route met een `?katern=`-schakelaar.** Dan heeft geen katern een eigen URL, terwijl de eigenaar in juni bewust voor echte routes koos, en blijft het god-component één bundel.
+- **De katernen als segmented control.** Verworpen: dat is de modus-switch boven de grafiek, en twee gelijke controls verwarren.
+- **De vrijheidsleeftijd alleen in de kop, met een KPI-strip van drie cellen.** Verworpen door de eigenaar: de kassabon hoort onder het getal, dus de leeftijd staat in de kop én als eerste KPI.
+
+## Verwant
+
+ADR 0170 (B6, B7/B11/B12, B9 — geamendeerd), ADR 0142 (D5 — geamendeerd), ADR 0129 (B13 — geamendeerd; B10 getoetst, ongewijzigd), ADR 0144 (punt 2 — locatie geamendeerd), ADR 0162 (ongewijzigd), ADR 0174 en 0175 (oordeelzin), ADR 0110 (h1), ADR 0058 (datapad), ADR 0090 en 0093 (euro-weergave), ADR 0145 D7a, ADR 0168, ADR 0026, ADR 0039. Vervangen: `docs/superpowers/specs/2026-06-01-toekomst-tijdas-landing-navkaarten-design.md`.

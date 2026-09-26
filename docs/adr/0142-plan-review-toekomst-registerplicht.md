@@ -70,6 +70,13 @@ keuze doet; nooit "aanbevolen" of "past bij jou" (Wft). De woonstrategieën staa
 vaste volgorde zonder rangorde, met eigen neutrale kopij (niet
 `HOUSING_STRATEGY_DESCRIPTIONS`, die oordeelt).
 
+> **Geamendeerd door ADR 0179 (26 sep 2026):** de ingang is de wizard-kaart bovenaan katern
+> Instellingen (`/toekomst/instellingen`), met de stapvoortgang in de kaart zelf, plus ⌘K; na
+> voltooiing blijft de kaart de ingang om opnieuw door te lopen. De Voorkeuren-kaart op /toekomst
+> en de knop op /toekomst/voorkeuren vervallen. Een onvoltooide review is geen melding en geeft
+> geen statuspunt op de katern-kop. `PLAN_REVIEW_NAAM` blijft de enige naambron; D1–D4 en D6–D8
+> blijven onverkort.
+
 ## Gevolgen
 
 - Migratie `20260913160000_add_profiles_plan_review_state.sql` (puur additief). Tot die

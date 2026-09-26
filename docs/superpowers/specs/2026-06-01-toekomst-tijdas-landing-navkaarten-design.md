@@ -1,7 +1,12 @@
 # /toekomst — Tijdas als landing + 4 navigatiekaarten
 
+> **Vervangen door [ADR 0179](../../adr/0179-toekomst-in-drie-katernen.md) (26 sep 2026).**
+> De tijdas-landing met vier navigatiekaarten maakt plaats voor één gedeeld canvas met drie
+> katernen (Plan · Doelen · Instellingen); de navkaarten verdwijnen, en Gebeurtenissen en
+> Voorkeuren gaan samen op in `/toekomst/instellingen`. Dit document blijft staan als historie.
+
 **Datum:** 2026-06-01
-**Status:** Goedgekeurd (ontwerp), klaar voor implementatieplan
+**Status:** Vervangen door ADR 0179 (26 sep 2026); was: goedgekeurd (ontwerp)
 **Module:** De Toekomst (Horizon, paars)
 
 ## Probleem & doel
