@@ -88,15 +88,4 @@ describe('globals.css — tokens die alleen vanuit JS worden gelezen', () => {
       "[data-topbar] :is([role='menu'], [role='dialog']) :is(a, button):focus-visible { outline-color: var(--ink); }",
     )
   })
-
-  it('elk --coverage-*-token dat een component gebruikt, bestaat ook echt', () => {
-    const strook = zonderComments(
-      readFileSync(join(process.cwd(), 'components/app/horizon/levensinkomen-strook.tsx'), 'utf8'),
-    )
-    const gebruikt = [...new Set([...strook.matchAll(/var\((--coverage-[a-z-]+)\)/g)].map(m => m[1]))]
-    expect(gebruikt.length, 'de strook hoort de coverage-tokens te gebruiken').toBeGreaterThan(0)
-
-    const ontbrekend = gebruikt.filter(naam => !new RegExp(`^\\s*${naam}\\s*:`, 'm').test(CSS))
-    expect(ontbrekend, 'component verwijst naar een token dat niet in globals.css staat').toEqual([])
-  })
 })

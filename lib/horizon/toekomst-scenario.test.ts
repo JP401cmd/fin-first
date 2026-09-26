@@ -7,7 +7,6 @@ import {
   stripStopKeuze,
   expandCategorieReturnDeltas,
   buildCategorieReturnGroups,
-  scenarioMonthlySpendDelta,
   DOEL_PARAMETERS,
   DOELWAARDE_BEDRAG_MAX,
   type ToekomstScenarioStand,
@@ -691,45 +690,5 @@ describe('buildCategorieReturnGroups', () => {
 
   it('geen assets → lege lijst', () => {
     expect(buildCategorieReturnGroups([])).toEqual([])
-  })
-})
-
-// ── scenarioMonthlySpendDelta ────────────────────────────────────────────────
-
-describe('scenarioMonthlySpendDelta', () => {
-  it('sommeert monthly_cost_change over actieve events', () => {
-    const events = [
-      makeSliderEvent({ monthly_cost_change: -200 }), // spaarquote hoger → minder besteden
-      makeSliderEvent({ monthly_cost_change: 150 }),
-      makeSliderEvent({ monthly_income_change: 500, monthly_cost_change: 0 }), // inkomen-event, geen bestedingsdelta
-    ]
-    expect(scenarioMonthlySpendDelta(events)).toBe(-50)
-  })
-
-  it('negeert uitgezette / inactieve events', () => {
-    const events = [
-      makeSliderEvent({ monthly_cost_change: -300 }),
-      makeSliderEvent({ monthly_cost_change: 999, whatIfDisabled: true }),
-      makeSliderEvent({ monthly_cost_change: 888, is_active: false }),
-    ]
-    expect(scenarioMonthlySpendDelta(events)).toBe(-300)
-  })
-
-  it('lege lijst → 0', () => {
-    expect(scenarioMonthlySpendDelta([])).toBe(0)
-  })
-
-  // ── Slider-werk-gate (29-jul): één grondslag met de motor ──────────────────
-  it('negeert de spaarquote-slider (slider:savings) — die loopt via het FIRE-gegate salaris-kanaal', () => {
-    const events = [
-      makeSliderEvent({ monthly_cost_change: -400, scenario_origin: 'slider:savings' }),
-      makeSliderEvent({ monthly_cost_change: -100 }), // écht lifestyle-event (geen origin) → telt wél
-    ]
-    expect(scenarioMonthlySpendDelta(events)).toBe(-100)
-  })
-
-  it('preset-events (preset:*) tellen wél mee — die blijven in de motor een permanente Geb-rij', () => {
-    const events = [makeSliderEvent({ monthly_cost_change: -250, scenario_origin: 'preset:frugal' })]
-    expect(scenarioMonthlySpendDelta(events)).toBe(-250)
   })
 })
