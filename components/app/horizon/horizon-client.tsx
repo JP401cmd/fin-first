@@ -6,6 +6,7 @@ import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import type { HorizonPageData } from '@/lib/horizon-data-loader'
 import { HORIZON_EXIT_NOTICE_DISMISSED_SLUG } from '@/lib/horizon-data-loader'
 import { useHorizonFireSim } from '@/lib/hooks/use-horizon-fire-sim'
+import { useHorizonBron } from '@/lib/hooks/use-horizon-bron'
 import { type SimRow, type SimResult } from '@/lib/fire-simulation'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/components/app/toast-provider'
@@ -28,21 +29,11 @@ import {
 import { computeHealthScoreFromInputs, type HealthScore, type HealthScoreInput } from '@/lib/financial-health'
 import { computeEffectiveExpenses, computeFireTarget, computeFreedomProgressWithBasis, inclHomeTargetFromScalar } from '@/lib/core-metrics'
 import { computeEmergencyFundMonths } from '@/lib/health-score-input'
-import { NL_AOW_MONTHLY, NL_AOW_MONTHLY_SAMENWONEND, SAVINGS_RATE_WINDOW_MONTHS } from '@/lib/constants'
-import { savingsRateWindow } from '@/lib/savings-source'
-import { isTransferType } from '@/lib/transactions/transfer-marking'
-import { lookupAowAge, formatAowAgeKort, type AowLeeftijdRow, type AowAge } from '@/lib/aow-leeftijd'
-import { shouldSkipKernelContextFetch, keepRefIfEqual } from '@/lib/horizon/kernel-context-sync'
+import { NL_AOW_MONTHLY, NL_AOW_MONTHLY_SAMENWONEND } from '@/lib/constants'
+import { formatAowAgeKort } from '@/lib/aow-leeftijd'
 import { isKernelReachedNowDisplay } from '@/lib/horizon-kernel/bridge'
-import { type ConvergentieRawContext, type ConvergentieRawProfileRow } from '@/lib/horizon-kernel/convergentie-router'
-import { resolveFireParams, type FireParams } from '@/lib/fire-params'
-import { type WithdrawalStrategyConfig, WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
-import type { Action, ActionStatus } from '@/lib/recommendation-data'
-import { computeRetirementExpenses, computeYearlyMustExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
-import { deriveRetirementExpenseBasis, extrapolateAnnualIncome } from '@/lib/retirement-expense-basis'
-import type { CashflowSettingsData } from '@/lib/cashflow-settings-data'
-import { resolveEffectiveIncomeExpenses, type IncomeExpenseSources } from '@/lib/effective-financials'
-import type { Debt } from '@/lib/debt-data'
+import { type ConvergentieRawContext } from '@/lib/horizon-kernel/convergentie-router'
+import type { ActionStatus } from '@/lib/recommendation-data'
 import { deriveNaturalMilestones, naturalMilestoneToLifeEvent, type NaturalMilestone } from '@/lib/natural-milestones'
 import {
   chartEventOverlayToClusterRow,
@@ -73,7 +64,6 @@ import {
 } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import {
-  isHousingStrategyEvent,
   getFireEligibleNetWorth,
   isHomeExcludedFromFire,
 } from '@/lib/housing-strategy'
@@ -109,7 +99,6 @@ import {
 import { HouseholdRetirementPane } from '@/components/app/horizon/household-retirement-pane'
 import { usePerspective } from '@/components/app/perspective-provider'
 import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
-import { type SnapshotForTrend } from '@/components/app/horizon/horizon-helpers'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { GlossaryTerm, SectionLabel, Kicker } from '@/components/editorial'
 import { formatAge } from '@/lib/horizon/fire-format'
@@ -332,7 +321,7 @@ import {
 } from '@/lib/euro-display'
 import { useEuroView } from '@/lib/hooks/use-euro-view'
 import { PillRow } from '@/components/app/pill-row'
-import { FIRE_PLAN_COLUMNS, parseFireStrategy, DEFAULT_FIRE_STRATEGY, type FireStrategyConfig, type StopAnchor, STRATEGY_LABELS, resolveFreedomFraming, fireAgeForDisplay, isAtOrPastAow, isFixedAnchor, stopAnchorFromKernel, resolveFirePlanWithOverride } from '@/lib/fire-strategy'
+import { DEFAULT_FIRE_STRATEGY, type StopAnchor, STRATEGY_LABELS, resolveFreedomFraming, fireAgeForDisplay, isAtOrPastAow, isFixedAnchor, stopAnchorFromKernel, resolveFirePlanWithOverride } from '@/lib/fire-strategy'
 import { buildHorizonInput } from '@/lib/horizon/build-input'
 import { buildDeeplinkCleanupUrl } from '@/lib/horizon/deeplink-cleanup'
 import type { PreviewBaseline } from '@/lib/strategy-preview'
@@ -348,7 +337,6 @@ import {
 } from '@/lib/chart-tips'
 import { ToekomstOverlay, type OverlayBalloonDef, type ToekomstOverlayGeometry } from '@/components/app/horizon/toekomst-overlay'
 import { TOEKOMST_OVERLAY_BALLOONS } from '@/components/app/horizon/toekomst-overlay-balloons'
-import { resolveUnlinkedCashShare, unlinkedCashTotal } from '@/lib/unlinked-cash'
 
 type ActiveModal = null | 'scenarios' | 'simulations' | 'withdrawal' | 'backtesting' | 'strategie'
 
@@ -642,10 +630,27 @@ export default function HorizonPage({
       icon?: string
     }>
   >([])
-  const [fireParams, setFireParams] = useState<FireParams>(initialData.fireParams)
-  const [withdrawalStrategyConfig, setWithdrawalStrategyConfig] = useState<WithdrawalStrategyConfig>(
-    initialData?.withdrawalStrategy ?? WITHDRAWAL_DEFAULTS,
-  )
+  // Props-als-bron (ADR 0179 fase 1 stap 3): de projectie-invoer volgt `initialData`.
+  // Een mutatie ververst de server-bundel met `router.refresh()` (zie `loadData`);
+  // de hook neemt de nieuwe props referentie-stabiel over. `events` blijft lokale
+  // state voor de optimistische drag en resynct op elke nieuwe server-lijst.
+  const {
+    input,
+    fireParams,
+    withdrawalStrategyConfig,
+    fireStrategy,
+    kernelRawProfile,
+    aowRows,
+    userAowAge,
+    debts,
+    actions,
+    resilienceSnapshots,
+    avgIncome6m,
+    avgExpenses6m,
+    retirementMethod,
+    events,
+    setEvents,
+  } = useHorizonBron(initialData)
   const fireSwr = fireParams.effectiveSwr
   /**
    * Canoniek dagtarief (€/dag) voor ÉLKE €→vrijheidstijd-vertaling op deze
@@ -665,7 +670,6 @@ export default function HorizonPage({
    * tijdregel (ze guarden allemaal al op `> 0`).
    */
   const canonicalDailyRate = initialData.dailyExpenseRate
-  const [input, setInput] = useState<FinancialInput | null>(initialData.effectiveInput)
   // Strategy-aware fallback: thread fireStrategy into computeFireProjection/computeFireRange
   // so fire.fireTarget matches the user's chosen end strategy (deplete/legacy/perpetual)
   const initStrategyOpts = initialData?.fireStrategy
@@ -681,43 +685,8 @@ export default function HorizonPage({
   const [healthScoreInput, setHealthScoreInput] = useState<HealthScoreInput>(initialData.healthScoreInput)
   const [budgetingActive] = useState(initialData.budgetingActive)
 
-  const [avgIncome6m, setAvgIncome6m] = useState<number | null>(initialData.avgIncome6m)
-  const [avgExpenses6m, setAvgExpenses6m] = useState<number | null>(initialData.avgExpenses6m)
-  const [resilienceSnapshots, setResilienceSnapshots] = useState<SnapshotForTrend[]>(initialData.resilienceSnapshots)
   const [healthChartOpen, setHealthChartOpen] = useState(false)
   const [fireAgeChartOpen, setFireAgeChartOpen] = useState(false)
-  const [events, setEvents] = useState<LifeEvent[]>(initialData.events)
-  const [actions, setActions] = useState<Action[]>(initialData.actions)
-  const [debts, setDebts] = useState<Debt[]>(initialData.debts)
-  const [fireStrategy, setFireStrategy] = useState<FireStrategyConfig | undefined>(initialData?.fireStrategy ?? undefined)
-  /**
-   * AOW-leeftijd. SYNCHROON geseed uit de server-voorgeladen wettelijke tabel
-   * (`initialData.aowRows`) i.p.v. de hardcoded 67-terugval; de mount-fetch
-   * (regel ±1358) ververst 'm daarna alleen nog bij een legacy-DB zonder tabel.
-   *
-   * WAAROM (bevinding C1): in pensioen-modus TOONT de hero deze leeftijd als
-   * kernantwoord. Startte hij op de terugval, dan las de gebruiker eerst "67
-   * jaar" en daarna zijn echte AOW-leeftijd — de "exact 67" uit de bevinding.
-   * `lookupAowAge` geeft zelf de 67-terugval als de tabel leeg is, dus dit is
-   * gedragsidentiek waar er niets te seeden valt.
-   */
-  const [userAowAge, setUserAowAge] = useState<AowAge>(() =>
-    lookupAowAge(initialData.aowRows ?? [], initialData.effectiveInput?.dateOfBirth ?? null),
-  )
-  // ── Kernel-context (horizon-kernel = de enige motor) ──
-  /** Rauwe profiel-rij (incl. kernel-instellingen-kolommen + geïnjecteerde
-   *  yearly_essential_expenses) — kern-invoerbron voor de convergentie-router. Server-
-   *  side voorgeladen via `initialData.rawProfile` (bevat al `yearly_essential_expenses`),
-   *  zodat de EERSTE render meteen de kernel-projectie heeft i.p.v. een null-flits; de
-   *  mount-fetch (loadKernelContext) + loadData verversen 'm daarna. */
-  const [kernelRawProfile, setKernelRawProfile] = useState<ConvergentieRawProfileRow | null>(
-    initialData.rawProfile ?? null,
-  )
-  /** Rauwe AOW-tabel — voor de kern-tijdas (lookupAowAge) in de adapter. Server-
-   *  side voorgeladen via `initialData.aowRows` zodat de kernel-context (samen met
-   *  `kernelRawProfile`) al bij de EERSTE render compleet is en de mount-fetch kan
-   *  worden overgeslagen — geen tweede solve. Leeg = legacy DB / tabel ontbreekt. */
-  const [aowRows, setAowRows] = useState<AowLeeftijdRow[]>(() => initialData.aowRows ?? [])
   const [activeModal, setActiveModal] = useState<ActiveModal>(null)
   // Voorkeurs-tab bij het openen van de StrategieModal (bv. direct naar 'woning'
   // vanuit de "huis wordt nooit verkocht"-melding). Reset naar null bij sluiten.
@@ -901,7 +870,6 @@ export default function HorizonPage({
   }, [secondaryLinePrefKey])
 
   // Kassabon modal state
-  const [retirementMethod, setRetirementMethod] = useState<RetirementExpenseMethod>('essential_budgets')
   const [uitgavenPaneOpen, setUitgavenPaneOpen] = useState(false)
   // Huishoud-aanpasflow (uitgave na pensioen) — geopend vanaf de "Na pensioen"-KPI
   // in huishoudweergave. candidates/method komen uit de combined-projectie.
@@ -1014,11 +982,9 @@ export default function HorizonPage({
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
-  // B-057 — de twee vensters die de kernel-hook zelf niet ziet: (1) `loadData()`
-  // haalt de grondslag opnieuw op (try/finally in de functie), (2) `router.refresh()`
-  // rendert de server-context opnieuw. Samen met `mainPending` uit de hook vormen ze
-  // `projectiePending` → de Fin-laadlaag op de grafiek + gedempte hoofdlijn.
-  const [dataRefreshing, setDataRefreshing] = useState(false)
+  // B-057 — het venster dat de kernel-hook zelf niet ziet: `router.refresh()` (ook via
+  // `loadData`) rendert de server-context opnieuw. Samen met `mainPending` uit de hook
+  // vormt het `projectiePending` → de Fin-laadlaag op de grafiek + gedempte hoofdlijn.
   const [refreshPending, startRefresh] = useTransition()
   useEffect(() => {
     const modal = searchParams.get('modal')
@@ -1223,11 +1189,11 @@ export default function HorizonPage({
       : null,
   )
 
-  // B-057 — één signaal voor "de getoonde projectie is verouderd": grondslag-herlaad,
-  // server-refresh of hersolve van de hoofdlijn. Voedt de Fin-laadlaag op de grafiek
+  // B-057 — één signaal voor "de getoonde projectie is verouderd": server-refresh
+  // (grondslag-herlaad) of hersolve van de hoofdlijn. Voedt de Fin-laadlaag op de grafiek
   // én de demping van de hoofdpaden. Bewust NIET gekoppeld aan `kernelIsRefining`
   // (first paint — de hero draagt die staat al).
-  const projectiePending = dataRefreshing || refreshPending || mainPending === true
+  const projectiePending = refreshPending || mainPending === true
 
   // Events voor weergave: echte events + client-side geregenereerde
   // housing-strategy-events uit de hook. De hook resolved het
@@ -1307,343 +1273,15 @@ export default function HorizonPage({
   // Uitgesteld om dezelfde reden als de context: één job per gebaar.
   const deferredMarktcheckStopAge = useDeferredValue(scenarioStopAge)
 
-  // ── Kernel-context laden op mount ─────────────────────────────────────────
-  // De kernel-context (`kernelRawProfile` + `aowRows`) is server-side voorgeladen
-  // via `initialData` (rawProfile + aowRows). Zijn beide compleet, dan is de eerste
-  // render al volledig en slaan we deze mount-fetch VOLLEDIG over — anders levert
-  // de tweede `setKernelRawProfile`/`setAowRows` (verse referenties) een
-  // gegarandeerde TWEEDE volledige kernel-solve op (beide zijn deps van de
-  // kernel-input-memo in use-horizon-fire-sim).
-  //
-  // Fallback-pad (profiel-query faalde server-side → rawProfile null, óf lege
-  // AOW-tabel op legacy DB): we halen de context alsnog client-side op, maar
-  // schrijven de state via een structurele-gelijkheidsguard (`keepRefIfEqual`) —
-  // identieke data behoudt de vorige referentie → geen re-solve.
-  useEffect(() => {
-    if (shouldSkipKernelContextFetch(initialData)) return
-    let cancelled = false
-    async function loadKernelContext() {
-      try {
-        const supabase = createClient()
-        const { data: profileData } = await supabase
-          .from('profiles')
-          // `income_source`/`expenses_source` erbij (ADR 0103): de kernel-context
-          // droeg wél `net_monthly_income`/`estimated_monthly_expenses` maar niet
-          // de bijbehorende bronsignalen, terwijl de `loadData`-select ze al
-          // meenam. Zonder die twee kan de rekenlaag hier niet zien welke
-          // grondslag geldt en leest ze een profielbedrag alsof het de waarheid is.
-          .select(`date_of_birth, retirement_expense_method, retirement_expense_custom_amount, ${FIRE_PLAN_COLUMNS}, fire_legacy_include_illiquid, fire_no_deficit_loan, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, income_source, expenses_source, box3_method, box3_heffingvrij_inkomen, feature_preferences, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, withdrawal_profile_config, deficit_loan_rate, housing_strategy_config, pot_rules`)
-          .single()
-        if (cancelled || !profileData) return
-        // Jaarlijkse essentiële uitgaven — zelfde grondslag (echte essentiële
-        // budgetten, NIET de retirement-expenses) als v2/loadData, zodat de
-        // 'essential_budgets'-pensioenuitgave-methode in de kernel klopt.
-        const [essentialBudgetsResult, childBudgetsResult, aowResult] = await Promise.all([
-          supabase.from('budgets').select('id, name, default_limit, interval, budget_type, is_essential').eq('is_essential', true).in('budget_type', ['expense']).is('parent_id', null),
-          supabase.from('budgets').select('id, name, parent_id, default_limit, is_essential, interval, budget_type').not('parent_id', 'is', null).not('budget_type', 'in', '("archive","income","savings")'),
-          supabase.from('aow_leeftijd').select('id, birth_date_from, birth_date_through, aow_years, aow_months, is_definitive, source').order('birth_date_from', { ascending: true }),
-        ])
-        if (cancelled) return
-        const { yearlyMustExpenses } = computeYearlyMustExpenses(
-          essentialBudgetsResult.data ?? [],
-          childBudgetsResult.data ?? [],
-        )
-        // Gelijkheidsguard: is de verse context deep-equal aan de al-geseedde
-        // state, dan behoudt keepRefIfEqual de vorige referentie → de kernel-memo
-        // herrekent niet (geen re-solve). Anders is het een echte wijziging.
-        const nextProfile: ConvergentieRawProfileRow = {
-          ...(profileData as ConvergentieRawProfileRow),
-          yearly_essential_expenses: yearlyMustExpenses,
-        }
-        setKernelRawProfile(prev => keepRefIfEqual(prev, nextProfile))
-        if (aowResult.data && aowResult.data.length > 0) {
-          const nextRows = aowResult.data as AowLeeftijdRow[]
-          setAowRows(prev => keepRefIfEqual(prev, nextRows))
-        }
-      } catch {
-        // Non-critical — zonder kern-context rekent de hook byte-identiek v2.
-      }
-    }
-    loadKernelContext()
-    return () => { cancelled = true }
-  }, [initialData])
-
-  // Client-side data reload (used after event CRUD operations)
-  const loadData = useCallback(async () => {
-    // B-057 — "grondslag wordt herladen" voor de Fin-laadlaag op de grafiek; de
-    // finally-tak wist 'm ook bij een fout, anders blijft Fin eeuwig denken.
-    setDataRefreshing(true)
-    try {
-      const supabase = createClient()
-      const now = new Date()
-      const monthStart = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1)).toISOString().split('T')[0]
-      const monthEnd = new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 1)).toISOString().split('T')[0]
-      const oneYearFromNow = new Date(Date.UTC(now.getFullYear() + 1, now.getMonth(), now.getDate())).toISOString().split('T')[0]
-      const today = now.toISOString().split('T')[0]
-      // Twaalf AFGESLOTEN maanden (ADR 0138): van 12 maanden terug tot de 1e van
-      // de lopende maand — hetzelfde venster als het realisatievenster op de
-      // server, zodat deze terugval niet met de lopende maand meeschuift.
-      const twelveMonthsAgo = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 12, 1)).toISOString().split('T')[0]
-      // 6-maands venster uit de CANONIEKE bron (lib/savings-source.ts): zes
-      // VOLTOOIDE kalendermaanden, de lopende maand EXCLUSIEF — dezelfde grenzen
-      // als de SSR-loader (lib/horizon/raw-data-loader.ts) waar
-      // `initialData.avgIncome6m`/`avgExpenses6m` vandaan komen. Stond hier als
-      // `getMonth() - 5` t/m `monthEnd` (lopende maand INCLUSIEF, het pre-C6-
-      // patroon), waardoor de gezondheidsscore-ankers na een client-herlading
-      // (event-CRUD) konden verspringen t.o.v. de eerste render.
-      const window6m = savingsRateWindow(now)
-
-      // B-057/B2 — ÉÉN commit: alle bronnen (ook fire-settings, de AOW-tabel en de
-      // onttrekkingsstrategie, die hier eerst drie losse `await`s ná de eerste
-      // setStates waren) komen in dezelfde `Promise.all`, en álle setStates staan
-      // onderaan in één synchrone continuation. React batcht die tot één render,
-      // dus één hoofdrun i.p.v. ~5 (elke tussen-commit raakte een kernel-dep).
-      const [txResult, assetsResult, debtsResult, profileResult, essentialBudgetsResult, eventsResult, actionsResult, childBudgetsResult, fullDebtsResult, snapshotsResult, income12Result, earliestIncomeResult, tx6mResult, bankAccountsResult, cashflowSettings, fireSettingsData, aowRes, withdrawalData] = await Promise.all([
-        supabase.from('transactions').select('amount').gte('date', monthStart).lt('date', monthEnd),
-        supabase.from('assets').select('current_value, monthly_contribution, net_worth_inclusion_pct').eq('is_active', true),
-        supabase.from('debts').select('current_balance, net_worth_inclusion_pct').eq('is_active', true),
-        supabase.from('profiles').select(`date_of_birth, retirement_expense_method, retirement_expense_custom_amount, ${FIRE_PLAN_COLUMNS}, fire_legacy_include_illiquid, fire_no_deficit_loan, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, income_source, expenses_source, box3_method, box3_heffingvrij_inkomen, feature_preferences, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, withdrawal_profile_config, deficit_loan_rate, housing_strategy_config, pot_rules`).single(),
-        supabase.from('budgets').select('id, name, default_limit, interval, budget_type, is_essential').eq('is_essential', true).in('budget_type', ['expense']).is('parent_id', null),
-        supabase.from('life_events').select('*').eq('is_active', true).order('sort_order', { ascending: true }),
-        supabase
-          .from('actions')
-          .select('*, recommendation:recommendations(title, recommendation_type)')
-          .eq('status', 'open')
-          .not('scheduled_week', 'is', null)
-          .gte('scheduled_week', today)
-          .lte('scheduled_week', oneYearFromNow)
-          .order('scheduled_week', { ascending: true }),
-        supabase.from('budgets').select('id, name, parent_id, default_limit, is_essential, interval, budget_type').not('parent_id', 'is', null).not('budget_type', 'in', '("archive","income","savings")'),
-        supabase.from('debts').select('*').eq('is_active', true).limit(200),
-        supabase
-          .from('net_worth_snapshots')
-          .select('snapshot_date, resilience_score, net_worth, freedom_percentage, fire_age, score_version')
-          .order('snapshot_date', { ascending: true })
-          .limit(60),
-        // `transaction_type` erbij: de terugval-som filtert transfers, zoals de bundel
-        // (ADR 0169 — één inkomensgrondslag, ook op het pad zonder cashflow-settings).
-        supabase.from('transactions').select('amount, date, transaction_type').gt('amount', 0).gte('date', twelveMonthsAgo).lt('date', monthStart),
-        // Vroegste inkomstendatum ALL-TIME (geen 12-maands-venster) — deler-anker
-        // voor de extrapolatie. Spiegelt de canonieke getEarliestIncomeDate
-        // (SSR-loader / API-route); een gecapt venster gaf een te recente datum →
-        // afwijkend jaarbedrag (WF-TOEK-02-bug2).
-        supabase.from('transactions').select('date').gt('amount', 0).order('date', { ascending: true }).limit(1),
-        // 6-month transactions for stable resilience calculation — canoniek
-        // venster; `transaction_type` erbij voor de transfer-filter (zoals SSR).
-        supabase.from('transactions').select('amount, transaction_type').gte('date', window6m.fromDate).lt('date', window6m.toDate),
-        // `ownership` erbij: de SELECT-policy is huishoud-verbreed, dus een
-        // gedeelde rekening komt hier ook binnen en telt op het eigen aandeel.
-        supabase.from('bank_accounts').select('id, name, balance, ownership').eq('is_active', true).is('linked_asset_id', null),
-        // GEDEELDE GRONDSLAG (ADR 0103) — het jaarinkomen dat `current_income`
-        // als pensioenuitgave (en dus als FIRE-doel) gebruikt, komt uit dezelfde
-        // bundel als de inkomenskaart op /overzicht/budget. Zonder dit rekende
-        // deze refresh nog puur op de transactie-extrapolatie.
-        fetch('/api/overzicht/cashflow-settings')
-          .then((r) => (r.ok ? (r.json() as Promise<CashflowSettingsData>) : null))
-          .catch(() => null),
-        // FIRE-strategie via de API (pensioen-terugval); null ⇒ profiel-parse.
-        fetch('/api/fire-settings')
-          .then((r) => (r.ok ? (r.json() as Promise<Record<string, unknown>>) : null))
-          .catch(() => null),
-        // AOW-tabel voor de kern-tijdas (FASE 5, stap 2b); fout ⇒ terugval 67.
-        supabase
-          .from('aow_leeftijd')
-          .select('id, birth_date_from, birth_date_through, aow_years, aow_months, is_definitive, source')
-          .order('birth_date_from', { ascending: true })
-          .then((r) => r, () => ({ data: null })),
-        // Onttrekkingsstrategie (ververst de server-side initial data); null ⇒ defaults.
-        fetch('/api/withdrawal-strategy')
-          .then((r) => (r.ok ? (r.json() as Promise<Record<string, unknown>>) : null))
-          .catch(() => null),
-      ])
-
-      // Check for profile query errors
-      if (profileResult.error) {
-        console.warn(
-          `[horizon-client] Profile query failed: code=${profileResult.error.code}, message=${profileResult.error.message}`,
-          profileResult.error,
-        )
-      }
-
-      let monthlyIncome = 0
-      let monthlyExpenses = 0
-      for (const tx of txResult.data ?? []) {
-        const amt = Number(tx.amount)
-        if (amt > 0) monthlyIncome += amt
-        else monthlyExpenses += Math.abs(amt)
-      }
-
-      // Canonieke income/expenses-resolutie (lib/effective-financials.ts): een
-      // expliciete handmatige bron (income_source/expenses_source === 'manual')
-      // wint ALTIJD van de mogelijk-onvolledige lopende-maand-transactiesom.
-      // Consumeert de ene bron i.p.v. een eigen inline fallback — voorheen zakte
-      // de wat-als-baseline naar een partiële maandsom (WF-TOEK-10-bug1,
-      // ADR 0058 "consume, don't recompute"). Spiegelt de SSR-loader
-      // (lib/horizon-data-loader.ts).
-      const profileMonthlyExpenses = Number(profileResult.data?.estimated_monthly_expenses ?? 0)
-      const { income: effectiveMonthlyIncome, expenses: effectiveMonthlyExpenses } =
-        resolveEffectiveIncomeExpenses(
-          (profileResult.data ?? {}) as IncomeExpenseSources,
-          monthlyIncome,
-          monthlyExpenses,
-          // Budgetgrondslag erbij (ADR 0103) zodra de gedeelde bundel binnen is.
-          cashflowSettings
-            ? {
-                income: cashflowSettings.budgetIncome.monthlyTotal,
-                expenses: cashflowSettings.budgetExpenses.monthlyTotal,
-              }
-            : undefined,
-        )
-
-      // 6-month average income/expenses for stable resilience calculation —
-      // TRANSFER-EXCLUSIEF, zoals de SSR-loader (realOnly:true): eigen-rekening-
-      // overboekingen tellen nergens mee in de health-grondslag.
-      let totalIncome6m = 0
-      let totalExpenses6m = 0
-      for (const tx of tx6mResult.data ?? []) {
-        if (isTransferType(tx.transaction_type)) continue
-        const amt = Number(tx.amount)
-        if (amt > 0) totalIncome6m += amt
-        else totalExpenses6m += Math.abs(amt)
-      }
-      const avgInc6 = totalIncome6m > 0 ? totalIncome6m / SAVINGS_RATE_WINDOW_MONTHS : effectiveMonthlyIncome
-      const avgExp6 = totalExpenses6m > 0 ? totalExpenses6m / SAVINGS_RATE_WINDOW_MONTHS : effectiveMonthlyExpenses
-      // (setAvgIncome6m/setAvgExpenses6m staan onderaan, in het ene commit-blok — B2.)
-
-      const totalAssetsOnly = (assetsResult.data ?? []).reduce((s, a) =>
-        s + Number(a.current_value) * ((a.net_worth_inclusion_pct ?? 100) / 100), 0)
-      // DE canonieke, huishoud-gewogen optelling (lib/unlinked-cash.ts) — geen
-      // eigen reduce, anders drift deze client-herlading met de server-bundel.
-      const unlinkedCash = unlinkedCashTotal(
-        bankAccountsResult.data,
-        await resolveUnlinkedCashShare(supabase, bankAccountsResult.data),
-      )
-      const totalAssets = totalAssetsOnly + unlinkedCash
-      const totalDebts = (debtsResult.data ?? []).reduce((s, d) =>
-        s + Number(d.current_balance) * ((d.net_worth_inclusion_pct ?? 100) / 100), 0)
-      const monthlyContributions = (assetsResult.data ?? []).reduce((s, a) => s + Number(a.monthly_contribution), 0)
-
-      // Transfer-EXCLUSIEF (ADR 0169): dezelfde grondslag als `cashflowSettings.
-      // effectiveAnnualIncome` en de SSR-loader — de terugval mag niet stil van
-      // semantiek wisselen zodra de bundel er even niet is.
-      const last12Income =
-        income12Result.data?.reduce(
-          (s, t) => (isTransferType(t.transaction_type) ? s : s + Number(t.amount)),
-          0,
-        ) ?? 0
-      const earliestIncomeDate = earliestIncomeResult.data?.[0]?.date
-
-      const allChildren = childBudgetsResult.data ?? []
-      const { yearlyMustExpenses } = computeYearlyMustExpenses(
-        essentialBudgetsResult.data ?? [],
-        allChildren,
-      )
-
-      // Jaarinkomen + pensioenuitgave-methode.
-      //
-      // Het jaarinkomen komt op de GEDEELDE grondslag (ADR 0103): budgetten,
-      // transacties, eigen bedrag of profielschatting — hetzelfde getal dat de
-      // inkomenskaart op /overzicht/budget toont. Dat is hier de zwaarste
-      // consequentie van het besluit: bij `retirement_expense_method =
-      // 'current_income'` ÍS dit jaarinkomen de pensioenuitgave, en dus het
-      // FIRE-doel.
-      //
-      // Terugval wanneer de bundel niet beschikbaar is: de gedeelde
-      // client-extrapolatie (lib/retirement-expense-basis.ts) op de rauwe som
-      // over twaalf afgesloten maanden, met de all-time vroegste inkomstendatum
-      // als deler-anker — dezelfde schaalformule als de server (ADR 0138), nooit
-      // een eigen, vierde afleiding.
-      const fallbackBasis = deriveRetirementExpenseBasis({
-        method: profileResult.data?.retirement_expense_method as RetirementExpenseMethod,
-        yearlyMustExpenses,
-        transactionAnnualIncome: extrapolateAnnualIncome(last12Income, earliestIncomeDate, now),
-        customAmount: profileResult.data?.retirement_expense_custom_amount,
-        estimatedYearlyExpenses: profileMonthlyExpenses * 12,
-      })
-      const extrapolatedIncome = cashflowSettings
-        ? cashflowSettings.effectiveAnnualIncome
-        : fallbackBasis.extrapolatedIncome
-      const yearlyRetirementExpenses = cashflowSettings
-        ? computeRetirementExpenses(
-            profileResult.data?.retirement_expense_method as RetirementExpenseMethod,
-            yearlyMustExpenses,
-            extrapolatedIncome,
-            profileResult.data?.retirement_expense_custom_amount,
-            profileMonthlyExpenses * 12,
-          )
-        : fallbackBasis.yearlyRetirementExpenses
-
-      const dob = profileResult.data?.date_of_birth ?? null
-
-      // FIRE strategy from profile — use API for pensioen fallback (al opgehaald in
-      // de Promise.all hierboven; null ⇒ profiel-parse, identiek aan de oude terugval).
-      const fsStrategy = fireSettingsData?.fire_end_strategy
-      const nextFireStrategy =
-        typeof fsStrategy === 'string' && ['perpetual', 'legacy', 'deplete', 'pensioen'].includes(fsStrategy)
-          ? { strategy: fsStrategy as FireStrategyConfig['strategy'], endAge: (fireSettingsData?.fire_end_age as number | null | undefined) ?? 90, legacyAmount: Number(fireSettingsData?.fire_legacy_amount ?? 0) }
-          : parseFireStrategy(profileResult.data ?? {})
-
-      // AOW-leeftijd op basis van geboortedatum (tabel al opgehaald; leeg ⇒ terugval 67).
-      const aowTabel = (aowRes?.data ?? null) as AowLeeftijdRow[] | null
-      const heeftAowTabel = aowTabel != null && aowTabel.length > 0
-
-      // Onttrekkingsstrategie (al opgehaald; null ⇒ bestaande defaults blijven staan).
-      const wsData = withdrawalData
-
-      const horizonInput: FinancialInput = {
-        totalAssets, totalDebts, monthlyIncome: effectiveMonthlyIncome, monthlyExpenses: effectiveMonthlyExpenses,
-        monthlyContributions, yearlyMustExpenses: yearlyRetirementExpenses, dateOfBirth: dob,
-      }
-
-      // Snapshots voeden uitsluitend de historische trendlijn; het huidige
-      // gezondheidsgetal komt van de live score (SSoT, Defect A).
-      const allSnapshots = (snapshotsResult.data ?? []) as SnapshotForTrend[]
-
-      const loadedEvents = (eventsResult.data ?? []) as LifeEvent[]
-      // Virtuele housing-strategy events leven in initialData (server-side
-      // gegenereerd) en hebben geen DB-row. Plak ze achter de echte events
-      // zodat ze blijven verschijnen na een loadData() refresh.
-      const housingFromInitial = initialData.events.filter(isHousingStrategyEvent)
-      const merged: LifeEvent[] = [...loadedEvents, ...housingFromInitial]
-
-      // ── ÉÉN commit-blok (B-057/B2): geen `await` meer tussen deze setStates ──
-      setAvgIncome6m(avgInc6)
-      setAvgExpenses6m(avgExp6)
-      setRetirementMethod((profileResult.data?.retirement_expense_method ?? 'essential_budgets') as RetirementExpenseMethod)
-      // Kernel-context ná elke loadData verversen.
-      // yearly_essential_expenses = de al-berekende essentiële jaaruitgaven (NIET de
-      // retirement-expenses) zodat de kernel dezelfde grondslag gebruikt.
-      setKernelRawProfile({
-        ...(profileResult.data as ConvergentieRawProfileRow),
-        yearly_essential_expenses: yearlyMustExpenses,
-      })
-      setFireStrategy(nextFireStrategy)
-      // Berekeningsparameters uit profiel
-      setFireParams(resolveFireParams(profileResult.data ?? {}))
-      if (heeftAowTabel) {
-        setUserAowAge(lookupAowAge(aowTabel, dob))
-        // FASE 5, stap 2b — rauwe AOW-tabel voor de kern-tijdas (adapter).
-        setAowRows(aowTabel)
-      }
-      if (wsData) {
-        setWithdrawalStrategyConfig({
-          strategy: (wsData.withdrawal_strategy as WithdrawalStrategyConfig['strategy'] | undefined) ?? WITHDRAWAL_DEFAULTS.strategy,
-          guardrailFloor: (wsData.guardrail_floor as number | undefined) ?? WITHDRAWAL_DEFAULTS.guardrailFloor,
-          guardrailCeiling: (wsData.guardrail_ceiling as number | undefined) ?? WITHDRAWAL_DEFAULTS.guardrailCeiling,
-          guardrailCutStep: (wsData.guardrail_cut_step as number | undefined) ?? WITHDRAWAL_DEFAULTS.guardrailCutStep,
-        })
-      }
-      setResilienceSnapshots(allSnapshots)
-      setInput(horizonInput)
-      setEvents(merged)
-      setActions((actionsResult.data ?? []) as Action[])
-      setDebts((fullDebtsResult.data ?? []) as Debt[])
-    } catch (err) {
-      console.error('Error reloading horizon data:', err)
-    } finally {
-      setDataRefreshing(false)
-    }
-  }, [initialData.events])
+  // Grondslag verversen na een mutatie (ADR 0179 fase 1 stap 3). De server-bundel is
+  // de enige bron: `router.refresh()` levert een nieuwe `initialData`, en
+  // `useHorizonBron` neemt die referentie-stabiel over. Vervangt de oude client-
+  // herlading (15 Supabase-reads + 3 fetches die de SSR-loader spiegelden) en de
+  // mount-fetch `loadKernelContext`. De naam blijft, zodat de aanroepers (modals,
+  // panes, EventPane, tijdlijn-drag, acties) ongewijzigd zijn.
+  const loadData = useCallback(() => {
+    startRefresh(() => router.refresh())
+  }, [router])
 
   // Laad huishouden-/partner-FIRE-data bij perspectief-wissel.
   //
@@ -2460,7 +2098,7 @@ export default function HorizonPage({
         ),
       )
     },
-    [currentAge],
+    [currentAge, setEvents],
   )
 
   const handleChartEventDragEnd = useCallback(
@@ -2508,9 +2146,13 @@ export default function HorizonPage({
               : e,
           ),
         )
+        return
       }
+      // Props-als-bron (fase 1 stap 3): na de write de server-bundel verversen, zodat
+      // `initialData.events` niet achterloopt op de optimistische lokale lijst.
+      loadData()
     },
-    [currentAge, events],
+    [currentAge, events, loadData, setEvents],
   )
 
   // Gebruik simulatie-FIRE-bedrag als authoritative vrijheidspercentage wanneer beschikbaar.
@@ -4136,7 +3778,7 @@ export default function HorizonPage({
   // Ná succes: de scenario-marker wissen (de verkenning ís nu het plan, de slider
   // landt op het plan-stopmoment), koppelmodus uit (anders schuift de marker meteen
   // weer weg van het zojuist gekozen plan), en de pagina verversen zoals na de
-  // strategie-modal (`loadData` + `router.refresh`).
+  // strategie-modal (`loadData` = `router.refresh`).
   const handleStopPlanBevestigen = useCallback(async () => {
     setStopPlanSaving(true)
     setStopPlanError('')
@@ -4173,13 +3815,12 @@ export default function HorizonPage({
         message: `Je plan rekent nu met stoppen op ${formatStopAge(effectiveStopAge)}.`,
       })
       loadData()
-      startRefresh(() => router.refresh())
     } catch {
       setStopPlanError('Opslaan mislukt. Probeer het zo nog eens.')
     } finally {
       setStopPlanSaving(false)
     }
-  }, [effectiveStopAge, userAowAge.fractional, addToast, loadData, router])
+  }, [effectiveStopAge, userAowAge.fractional, addToast, loadData])
 
   // "Herstel mijn doel": kopieer de vastgelegde `doel.stand` terug naar de live-states, via
   // `doelStandNaarLab` — dezelfde vertaling waarmee het plan-stoplicht het doel beoordeelt
@@ -4344,14 +3985,14 @@ export default function HorizonPage({
             return
           }
           // Reload data to recalculate projections with restored position
-          await loadData()
+          loadData()
           addToast({ type: 'success', title: `${ev.name} terug op ${originalAge}j`, duration: 3000 })
         },
       },
     })
 
     // Full reload to recalculate projections with new event position
-    await loadData()
+    loadData()
   }
 
   // ── EURO-WEERGAVE: DE RENDER-GRENS ─────────────────────────────────────────
@@ -8007,10 +7648,10 @@ export default function HorizonPage({
       )}
       <StrategieModal
         open={activeModal === 'strategie'}
-        onClose={() => { setActiveModal(null); setStrategieInitialTab(null); loadData(); startRefresh(() => router.refresh()) }}
+        onClose={() => { setActiveModal(null); setStrategieInitialTab(null); loadData() }}
         // B-057/B1 — na een geslaagde autosave van het plan herlaadt de grafiek
-        // meteen (pane blijft open); `router.refresh()` volgt pas bij sluiten (B5
-        // — of die nog nodig is — staat op een aparte kaart).
+        // meteen (pane blijft open). Sinds fase 1 stap 3 is `loadData` zelf de
+        // `router.refresh()`; sluiten ververst nog één keer.
         onSaved={() => { void loadData() }}
         housingStrategy={initialData.housingStrategy}
         initialTab={strategieInitialTab}

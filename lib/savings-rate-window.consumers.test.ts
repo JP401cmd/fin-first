@@ -45,7 +45,9 @@ const PRODUCERS = [
   'lib/goal-current-value.ts',
   'app/api/checkin/overview/route.ts',
   'app/api/checkin/gespreksstarters/route.ts',
-  'components/app/horizon/horizon-client.tsx',
+  // horizon-client.tsx is geen producent meer: zijn client-herlading (`loadData`) is
+  // vervangen door router.refresh() + props-als-bron (ADR 0179 fase 1 stap 3). Het
+  // venster komt nu alleen nog uit lib/horizon/raw-data-loader.ts (hierboven).
 ] as const
 
 const CANONICAL_WINDOW = /\b(savingsRateWindow|deriveSavingsRate6mWindow)\s*\(/

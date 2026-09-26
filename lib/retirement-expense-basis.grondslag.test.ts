@@ -9,9 +9,10 @@ import { transactionAnnualIncome } from './budget-realized'
  *
  * Given een gebruiker met `retirement_expense_method = 'current_income'`, `income_source
  * ≠ 'manual'`, geen bruikbare budgetgrondslag én inkomsten-TRANSFERS in de historie,
- * When de SSR-loader (/toekomst), de client-herlading (`horizon-client#loadData` via de
- * cashflow-settings-bundel uit `loadCoreData`), de pensioenuitgave-sheet-route en de
- * huishoud-sectie het transactie-jaarinkomen afleiden,
+ * When de SSR-loader (/toekomst), de cashflow-settings-bundel uit `loadCoreData`, de
+ * pensioenuitgave-sheet-route en de huishoud-sectie het transactie-jaarinkomen afleiden
+ * (de client-herlading `horizon-client#loadData` bestaat sinds ADR 0179 fase 1 stap 3
+ * niet meer: /toekomst ververst via router.refresh() de SSR-loader),
  * Then rekenen ze alle vier op DEZELFDE, transfer-EXCLUSIEVE som — de app-brede
  * grondslag van de inkomenskaart, spaarquote en gezondheidsscore. De per-module
  * splitsing ("horizon telt transfers bewust mee") is opgeheven: een gedocumenteerde
@@ -28,7 +29,8 @@ const CALL_SITES = [
   'app/api/uitgaven-na-pensioen/context/route.ts',
   'lib/household-projection.ts',
   'lib/core-data-loader.ts',
-  'components/app/horizon/horizon-client.tsx',
+  // horizon-client.tsx (de client-herlading `loadData`) is geen call-site meer sinds
+  // ADR 0179 fase 1 stap 3: /toekomst ververst via router.refresh() de SSR-loader.
 ] as const
 
 describe('transactionAnnualIncome — één grondslag, transfer-exclusief', () => {

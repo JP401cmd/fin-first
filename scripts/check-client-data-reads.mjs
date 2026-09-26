@@ -123,7 +123,8 @@ const ALLOWLIST = new Set([
   // 'app/(app)/core/cash/connect/success/page.tsx' — VERVALLEN (fase 5): leest nu
   // via GET /api/bank-connect/linked-accounts. Entries verwijderen mag; toevoegen niet.
   // — Fase b, slice 4: horizon / toekomst —
-  'components/app/horizon/horizon-client.tsx',
+  // 'components/app/horizon/horizon-client.tsx' — VERVALLEN (ADR 0179 fase 1 stap 3):
+  // loadData/loadKernelContext zijn vervangen door router.refresh() + props-als-bron.
   'components/app/horizon/strategie-modal.tsx',
   'components/future/doel-toevoegen-sheet.tsx',
   'components/future/doel-bewerken-sheet.tsx',
