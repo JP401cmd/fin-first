@@ -2,12 +2,13 @@
 //
 // Server-lading van de /toekomst-landing, getild uit `app/(app)/toekomst/page.tsx`
 // (fase 1 "/toekomst in drie katernen", ADR 0179, stroom R — voorbereiding op
-// stap 15). Straks roept de `(katern)`-layout deze functie aan, zodat Plan, Doelen
-// en Instellingen dezelfde lading delen; tot dan roept de page hem aan en rendert
-// hij identiek.
+// stap 15). De `(katern)`-layout roept deze functie aan, en de katern-pages Doelen en
+// Instellingen lezen er hun bundel uit, zodat Plan, Doelen en Instellingen dezelfde
+// lading delen.
 //
-// PURE MOVE: dezelfde zeven lezingen, in dezelfde `Promise.all`, met dezelfde
-// fail-closed-takken en dezelfde afleidingen als voorheen in de page. Het enige
+// Ontstaan als PURE MOVE: dezelfde lezingen, in dezelfde `Promise.all`, met dezelfde
+// fail-closed-takken en dezelfde afleidingen als voorheen in de page (sinds stap 21
+// zonder de rekenhulp-telling van de vervallen navkaart). Het enige
 // dat erbij komt is de `cache()`-wrapper om de hele lading: een layout én een page
 // die hem in hetzelfde request aanroepen, delen dan één lading. Dat is nodig
 // omdat de React-`cache()` van de onderliggende loaders (`loadHorizonData`,
@@ -44,10 +45,8 @@ import { loadEigenStrategieEvents } from '@/lib/plan-review/eigen-strategie-even
 export interface ToekomstData {
   /** De tijdas-bundel (kernel-run, perspectief 'personal'). */
   horizonData: HorizonPageData
-  /** Doelen + voortgang (Doelen-navkaart en de doelmarkers op de tijdas). */
+  /** Doelen + voortgang (katern Doelen en de doelmarkers op de tijdas). */
   finData: FinPageData
-  /** Aantal eigen rekenhulpen (count-query, geen rijen). */
-  calculatorCount: number
   /** Plan-review-voortgang; `null` = geen gebruiker of kolom nog niet uitgerold. */
   planReviewProgress: PlanReviewProgress | null
   /** Server-seed "geminimaliseerd" van de tekort-lening-melding (piek of null). */
@@ -70,15 +69,11 @@ export const loadToekomstData = cache(async function loadToekomstData(): Promise
     data: { user },
   } = await supabase.auth.getUser()
 
-  const [horizonData, finData, calcCountRes, minimizedMap, planReviewState, eigenStrategieEvents, planVerdict] = await Promise.all([
+  // Het aantal rekenhulpen (count-query op `custom_calculators`) is weg met de
+  // Rekenhulp-navkaart (ADR 0179 fase 1 stap 15/21): geen lezer meer.
+  const [horizonData, finData, minimizedMap, planReviewState, eigenStrategieEvents, planVerdict] = await Promise.all([
     loadHorizonData(supabase),
     loadFinData(supabase),
-    user
-      ? supabase
-          .from('custom_calculators')
-          .select('*', { count: 'exact', head: true })
-          .eq('user_id', user.id)
-      : Promise.resolve({ count: 0 }),
     // Server-seed van de "geminimaliseerd"-voorkeur voor de tekort-lening-melding
     // (own-row jsonb-pref, cross-device). Lichte single-row select, parallel aan
     // de zware loaders — zo flikkert de melding/het statuspunt niet na hydration.
@@ -124,7 +119,6 @@ export const loadToekomstData = cache(async function loadToekomstData(): Promise
   return {
     horizonData,
     finData,
-    calculatorCount: calcCountRes.count ?? 0,
     planReviewProgress,
     deficitMinimizedPeak: asDeficitMinimizedPeak(minimizedMap[DEFICIT_NOTICE_MINIMIZE_KEY]),
     // TPR-04 — zelfde server-seed voor de "AOW ontbreekt"-melding (vlag 1 of null).

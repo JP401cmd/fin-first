@@ -15,7 +15,8 @@
 // (r1054–1114) blijft in de parent. Besluit Q9 (directe BottomSheet → ShellOverlay):
 // geen van deze blokken gebruikt een directe BottomSheet — de sheets/modals/panes dragen
 // hun eigen overlay-laag — dus hier is geen afwijking van de bron.
-// De dode WithdrawalModal (`activeModal === 'withdrawal'`) staat er ongewijzigd in.
+// De dode WithdrawalModal is weg (stap 21): niets zette `activeModal` nog op 'withdrawal'
+// (de deeplink redirect sinds stap 13 naar Instellingen, ADR 0179 D4).
 import dynamic from 'next/dynamic'
 import type { Dispatch, SetStateAction } from 'react'
 import type { useRouter } from 'next/navigation'
@@ -55,10 +56,6 @@ const ScenariosModal = dynamic(() =>
 )
 const SimulationsModal = dynamic(() =>
   import('@/components/app/horizon/simulations-modal').then(m => ({ default: m.SimulationsModal })),
-  { ssr: false }
-)
-const WithdrawalModal = dynamic(() =>
-  import('@/components/app/horizon/withdrawal-modal').then(m => ({ default: m.WithdrawalModal })),
   { ssr: false }
 )
 const BacktestingModal = dynamic(() =>
@@ -373,7 +370,6 @@ export function ToekomstOverlays({
                 : undefined
             }
           />
-          <WithdrawalModal input={effectiveInput} open={activeModal === 'withdrawal'} onClose={() => setActiveModal(null)} />
           <BacktestingModal
             input={isHouseholdView && householdInput ? householdInput : effectiveInput}
             swr={fireSwr}

@@ -5,8 +5,8 @@
  *
  * Draagt de state, de afgeleide feeds en de euro-render-grens van de
  * pagina, zodat canvas en katern-panelen straks kinderen van één server-layout kunnen
- * zijn en hun data hier halen in plaats van uit de route (D8). Tot de route-groep
- * (stap 15) is `horizon-client.tsx` de enige host.
+ * zijn en hun data hier halen in plaats van uit de route (D8). Sinds stap 15 is de
+ * `(katern)`-layout van /toekomst de enige host.
  *
  * REGELS (ADR 0179 "Gevolgen" — de provider mag niet de nieuwe god-component worden):
  *  - geen JSX-blokken: dit bestand rendert alleen de contexts en `children`;

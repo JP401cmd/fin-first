@@ -109,7 +109,7 @@ describe('overlay-host — overlay-standaard (ADR 0039, besluit Q9)', () => {
 
   it('elke dynamic() staat hier precies één keer, zonder SSR', () => {
     const namen = [
-      'ScenariosModal', 'SimulationsModal', 'WithdrawalModal', 'BacktestingModal', 'StrategieModal',
+      'ScenariosModal', 'SimulationsModal', 'BacktestingModal', 'StrategieModal',
       'UitgavenPane', 'EventPane', 'PhaseModalOpbouw', 'PhaseModalOvergang', 'PhaseModalOnttrekking',
       'SimChartModal', 'HorizonYearDetailsSheet',
     ]
