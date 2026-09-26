@@ -959,13 +959,15 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
     label: 'Huis kopen',
     icon: 'Home',
     group: 'wonen',
-    impactRange: '€15K–€40K kosten koper',
+    // Bandbreedte en tip volgen computeKostenKoper (lib/kosten-koper.ts) voor koopsommen
+    // €250k–€600k; gepind in life-events-catalog.kosten-koper.test.ts.
+    impactRange: '€5K–€21K kosten koper',
     defaultCost: 25000,
     defaultMonthlyCost: 300,
     defaultMonthlyIncome: 0,
     defaultDuration: 0,
     description: 'Eerste woning of overstap',
-    tip: 'Kosten koper ca. 5–6% van aankoopprijs (notaris, taxatie, overdrachtsbelasting). Gemiddelde koopsom NL 2025: ca. €430.000. Maximale hypotheek: 100% van marktwaarde.',
+    tip: 'Kosten koper: overdrachtsbelasting (2%; starters tot €555.000 vrijgesteld), notaris, taxatie, bankgarantie en eventueel NHG, plus ca. €2.750 voor hypotheekadvies en bemiddeling en ca. €3.500 als je een aankoopmakelaar neemt. Bij een koopsom van €250.000–€600.000 is dat samen ca. €5K–€21K. Gemiddelde koopsom NL 2025: ca. €430.000. Maximale hypotheek: 100% van marktwaarde.',
     fields: [
       { key: 'aankoopprijs', label: 'Aankoopprijs', fieldType: 'number', default: 350000, tip: 'Gemiddelde koopsom NL 2025: ca. €430.000. In Randstad hoger, buiten Randstad lager.' },
       { key: 'hypotheekRente', label: 'Hypotheekrente', fieldType: 'percentage', default: 4.0, tip: 'Indicatie 2026: 10-jarig vast ca. 3,8–4,2%. NHG-rente ca. 0,2% lager. Check hypotheker.nl voor actuele tarieven.', suffix: '%' },
