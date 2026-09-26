@@ -38,7 +38,7 @@ describe('rijwaarden van katern Instellingen', () => {
   it('Stopmoment noemt de keuze, nooit een leeftijdsgetal onder een opgelost anker (§4.9)', () => {
     expect(t('stopmoment')).toBe('zo vroeg als het kan')
     expect(t('stopmoment')).not.toMatch(/\d/)
-    expect(t('stopmoment', { firePlan: { ...BASIS.firePlan!, anchor: { kind: 'aow' } } })).toBe('op mijn AOW-leeftijd')
+    expect(t('stopmoment', { firePlan: { ...BASIS.firePlan!, anchor: { kind: 'aow' } } })).toBe('op je AOW-leeftijd')
     expect(t('stopmoment', { firePlan: { ...BASIS.firePlan!, anchor: { kind: 'now' } } })).toBe('nu')
     expect(t('stopmoment', { firePlan: { ...BASIS.firePlan!, anchor: { kind: 'age', age: 58.5 } } })).toBe('op 58,5')
   })

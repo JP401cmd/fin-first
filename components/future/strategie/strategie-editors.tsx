@@ -169,7 +169,7 @@ function HuisStrategieEditor({
             onSave={() => actions?.save()}
             saving={actions?.saving}
             saveDisabled={actions ? !actions.canSave || !actions.changed : true}
-            saveLabel="Huis-strategie opslaan"
+            saveLabel="Woonstrategie opslaan"
             info={actions?.footerInfo}
           />
         )

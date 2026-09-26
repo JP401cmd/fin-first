@@ -118,7 +118,7 @@ const rij = (r: string) => document.querySelector(`button[data-rij="${r}"]`) as 
 describe('StrategieModal → rijen: elke functie is bereikbaar (plan §3)', () => {
   it('kop-badges Stop · Eind · Onttrekking · Eigen woning → de rijwaarden', () => {
     renderRijen()
-    expect(rij('stopmoment').textContent).toContain('op mijn AOW-leeftijd')
+    expect(rij('stopmoment').textContent).toContain('op je AOW-leeftijd')
     expect(rij('eindleeftijd').textContent).toContain('tot je 90e')
     expect(rij('onttrekking').textContent).toContain('guardrails')
     expect(rij('huis').textContent).toContain('uitsluiten van FIRE-pot')

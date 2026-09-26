@@ -130,7 +130,9 @@ function stopmoment(plan: FirePlan | null): string {
   const a = plan.anchor
   if (a.kind === 'age') return `op ${formatPlanAge(a.age)}`
   const opt = STOP_ANCHOR_OPTIONS.find((o) => o.kind === a.kind)
-  return opt ? klein(opt.name) : 'zo vroeg als het kan'
+  // De optienaam is een keuze in ik-vorm ("Op mijn AOW-leeftijd"); de samenvattingsrij
+  // spreekt in je-vorm, net als "tot je 90e" en "je vermogen mag niet slinken" (kopij §12).
+  return opt ? klein(opt.name).replace(/\bmijn\b/g, 'je') : 'zo vroeg als het kan'
 }
 
 function eind(plan: FirePlan | null, fs: FireStrategyConfig): RijDeel[] {
