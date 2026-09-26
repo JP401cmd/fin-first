@@ -101,20 +101,17 @@ describe('next.config redirects — legacy routes redirecten op de routing-laag 
     }
   })
 
-  it('/toekomst/voorkeuren en /toekomst/gebeurtenissen gaan op in Instellingen (ADR 0179)', async () => {
+  it('/toekomst/voorkeuren gaat op in Instellingen, /toekomst/gebeurtenissen landt onder het plan (ADR 0179, addendum 26 sep)', async () => {
     const voorkeuren = await rulesFor('/toekomst/voorkeuren')
     expect(voorkeuren).toHaveLength(1)
     expect(voorkeuren[0].destination).toBe('/toekomst/instellingen')
     expect(voorkeuren[0].permanent).toBe(false)
+    // Geen `has`-filter: elke query (?strategie=, ?regel=) gaat mee.
+    expect(voorkeuren[0].has).toBeUndefined()
 
     const gebeurtenissen = await rulesFor('/toekomst/gebeurtenissen')
-    expect(gebeurtenissen).toHaveLength(1)
-    expect(gebeurtenissen[0].destination).toBe('/toekomst/instellingen#gebeurtenissen')
-    expect(gebeurtenissen[0].permanent).toBe(false)
-
-    // Geen `has`-filter: elke query (?strategie=, ?regel=, ?nieuw=) gaat mee.
-    expect(voorkeuren[0].has).toBeUndefined()
-    expect(gebeurtenissen[0].has).toBeUndefined()
+    expect(gebeurtenissen).toHaveLength(2)
+    for (const r of gebeurtenissen) expect(r.permanent).toBe(false)
   })
 
   it('geen redirect wijst nog naar de opgeheven routes (geen dubbele hop)', async () => {
@@ -194,6 +191,24 @@ async function resolveLocation(url: string): Promise<string | null> {
   return null
 }
 
+describe('next.config redirects — /toekomst/gebeurtenissen (ADR 0179, addendum 26 sep)', () => {
+  it('kaal en met ?nieuw= → Plan, bij de gebeurtenissen; de query reist mee', async () => {
+    expect(await resolveLocation('/toekomst/gebeurtenissen')).toBe('/toekomst#gebeurtenissen')
+    expect(await resolveLocation('/toekomst/gebeurtenissen?nieuw=1')).toBe('/toekomst?nieuw=1#gebeurtenissen')
+  })
+
+  it('met een levensstrategie → Instellingen (die editors wonen bij Voorkeuren)', async () => {
+    for (const key of ['aow', 'pensioen', 'huis', 'werk']) {
+      expect(await resolveLocation(`/toekomst/gebeurtenissen?strategie=${key}`)).toBe(
+        `/toekomst/instellingen?strategie=${key}`,
+      )
+    }
+    expect(await resolveLocation('/toekomst/gebeurtenissen?strategie=aowx')).toBe(
+      '/toekomst?strategie=aowx#gebeurtenissen',
+    )
+  })
+})
+
 describe('next.config redirects — oude /toekomst?tab= en ?modal=withdrawal (ADR 0179 Q2)', () => {
   it('tab=voorkeuren → Instellingen', async () => {
     expect(await resolveLocation('/toekomst?tab=voorkeuren')).toBe(
@@ -201,13 +216,9 @@ describe('next.config redirects — oude /toekomst?tab= en ?modal=withdrawal (AD
     )
   })
 
-  it('tab=gebeurtenissen → Instellingen, bij de gebeurtenissen', async () => {
-    expect(await resolveLocation('/toekomst?tab=gebeurtenissen')).toBe(
-      '/toekomst/instellingen?tab=gebeurtenissen#gebeurtenissen',
-    )
-    expect(await resolveLocation('/toekomst?tab=gebeurtenissen&nieuw=1')).toBe(
-      '/toekomst/instellingen?tab=gebeurtenissen&nieuw=1#gebeurtenissen',
-    )
+  it('tab=gebeurtenissen blijft op Plan: geen redirect (dat zou een lus zijn); OudeTabParam zet het anker', async () => {
+    expect(await resolveLocation('/toekomst?tab=gebeurtenissen')).toBeNull()
+    expect(await resolveLocation('/toekomst?tab=gebeurtenissen&nieuw=1')).toBeNull()
   })
 
   it('tab=gebeurtenissen mét levensstrategie → Instellingen zonder hash (strategieën wonen bij Voorkeuren)', async () => {
@@ -216,13 +227,15 @@ describe('next.config redirects — oude /toekomst?tab= en ?modal=withdrawal (AD
         `/toekomst/instellingen?tab=gebeurtenissen&strategie=${key}`,
       )
     }
-    // Geen levensstrategie-sleutel (bv. de tijdas-param `open`, of een prefix-truc):
-    // de algemene gebeurtenissen-regel vangt hem.
-    for (const waarde of ['open', 'aowx', 'xwerk']) {
-      expect(await resolveLocation(`/toekomst?tab=gebeurtenissen&strategie=${waarde}`)).toBe(
-        `/toekomst/instellingen?tab=gebeurtenissen&strategie=${waarde}#gebeurtenissen`,
-      )
+    // Geen levensstrategie-sleutel (een prefix-truc): geen regel, dus Plan — waar
+    // OudeTabParam het anker #gebeurtenissen zet (addendum 26 sep).
+    for (const waarde of ['aowx', 'xwerk']) {
+      expect(await resolveLocation(`/toekomst?tab=gebeurtenissen&strategie=${waarde}`)).toBeNull()
     }
+    // `strategie=open` is de tijdas-param: die heeft zijn eigen regel naar de eindstrategie.
+    expect(await resolveLocation('/toekomst?tab=gebeurtenissen&strategie=open')).toBe(
+      '/toekomst/instellingen?tab=gebeurtenissen&strategie=open&regel=eindstrategie',
+    )
   })
 
   it('tab=doelen → Doelen, overige params mee', async () => {

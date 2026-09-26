@@ -437,7 +437,7 @@ export const DATA_GAP_SUGGESTIONS: DataGapRule[] = [
     suggestion: {
       message: 'Plan je levensgebeurtenissen — ze bepalen mee wanneer je vrij bent.',
       cta: 'Gebeurtenis toevoegen',
-      ctaHref: '/toekomst/instellingen#gebeurtenissen',
+      ctaHref: '/toekomst#gebeurtenissen',
     },
   },
 ]

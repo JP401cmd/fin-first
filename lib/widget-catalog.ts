@@ -518,7 +518,7 @@ export const WIDGET_HREFS: Record<string, string> = {
   doelen:                   '/toekomst/doelen',
   fire_prognose:            '/toekomst',
   monte_carlo:              '/toekomst?modal=simulations',
-  levensgebeurtenissen:     '/toekomst/instellingen#gebeurtenissen',
+  levensgebeurtenissen:     '/toekomst#gebeurtenissen',
   spaarquote:               '/overzicht/budget/forecast',
   vrijheidsvoortgang:       '/toekomst',
   vaste_lasten:             '/overzicht/budget/vaste-lasten',

@@ -278,14 +278,22 @@ const nextConfig: NextConfig = {
         permanent: false,
       },
 
-      // ADR 0179 — Voorkeuren en Gebeurtenissen gingen op in katern Instellingen.
-      // Next geeft de inkomende query vanzelf door aan het doel, dus
-      // `?strategie=`, `?regel=` en `?nieuw=` blijven werken; bij Gebeurtenissen
-      // komt de hash erachter (`/toekomst/instellingen?nieuw=1#gebeurtenissen`).
+      // ADR 0179 — Voorkeuren ging op in katern Instellingen; de Gebeurtenissen staan sinds
+      // het addendum van 26 sep onder het plan, op `/toekomst#gebeurtenissen`. Next geeft
+      // de inkomende query vanzelf door aan het doel, dus `?strategie=` en `?regel=` blijven
+      // werken, en `?nieuw=1` (alias van `?event=new`) opent op Plan de catalogus.
+      // Volgorde-eis: een levensstrategie-sleutel hoort bij Voorkeuren (Instellingen), dus
+      // die gerichte variant staat vóór de algemene.
       { source: '/toekomst/voorkeuren', destination: '/toekomst/instellingen', permanent: false },
       {
         source: '/toekomst/gebeurtenissen',
-        destination: '/toekomst/instellingen#gebeurtenissen',
+        has: [{ type: 'query', key: 'strategie', value: '(?:aow|pensioen|huis|werk)' }],
+        destination: '/toekomst/instellingen',
+        permanent: false,
+      },
+      {
+        source: '/toekomst/gebeurtenissen',
+        destination: '/toekomst#gebeurtenissen',
         permanent: false,
       },
 
@@ -303,10 +311,11 @@ const nextConfig: NextConfig = {
       // er is geen lus. Overige params (`?focus=`, `?nieuw=`) werken daardoor
       // vanzelf door.
       //
-      // Volgorde-eis: de gerichte Gebeurtenissen-variant (met een
-      // levensstrategie-sleutel) MOET vóór de algemene staan. Die strategieën
-      // wonen in het Voorkeuren-deel van Instellingen, dus daar hoort geen
-      // `#gebeurtenissen`-hash achter (vroeger: naar /toekomst/voorkeuren).
+      // `?tab=gebeurtenissen` zonder levensstrategie heeft GEEN regel meer (addendum 26
+      // sep): de gebeurtenissen staan op `/toekomst` zelf, en een regel `/toekomst` →
+      // `/toekomst` zou met de meereizende query een lus zijn. `OudeTabParam` in de
+      // katern-layout haalt `tab` weg en zet het anker `#gebeurtenissen`. Mét een
+      // levensstrategie-sleutel hoort de link bij Voorkeuren, in Instellingen:
       {
         source: '/toekomst',
         has: [
@@ -316,12 +325,6 @@ const nextConfig: NextConfig = {
           { type: 'query', key: 'strategie', value: '(?:aow|pensioen|huis|werk)' },
         ],
         destination: '/toekomst/instellingen',
-        permanent: false,
-      },
-      {
-        source: '/toekomst',
-        has: [{ type: 'query', key: 'tab', value: 'gebeurtenissen' }],
-        destination: '/toekomst/instellingen#gebeurtenissen',
         permanent: false,
       },
       {

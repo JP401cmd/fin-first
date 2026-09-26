@@ -41,10 +41,39 @@ describe('OudeTabParam', () => {
 
   it('houdt de overige params en de hash', () => {
     pathname = '/toekomst/instellingen'
-    search = 'tab=gebeurtenissen&nieuw=1'
-    window.history.replaceState(null, '', '/toekomst/instellingen?tab=gebeurtenissen&nieuw=1#gebeurtenissen')
+    search = 'tab=voorkeuren&focus=x'
+    window.history.replaceState(null, '', '/toekomst/instellingen?tab=voorkeuren&focus=x#voorkeuren')
     render(<OudeTabParam />)
-    expect(replace).toHaveBeenCalledWith('/toekomst/instellingen?nieuw=1#gebeurtenissen', { scroll: false })
+    expect(replace).toHaveBeenCalledWith('/toekomst/instellingen?focus=x#voorkeuren', { scroll: false })
+  })
+
+  it('tab=gebeurtenissen op Plan: tab weg, het anker #gebeurtenissen erbij, en naar de lijst scrollen (addendum 26 sep)', () => {
+    pathname = '/toekomst'
+    search = 'tab=gebeurtenissen&focus=x'
+    const scroll = vi.fn()
+    Element.prototype.scrollIntoView = scroll
+    const raf = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
+      cb(0)
+      return 1
+    })
+    const doel = document.createElement('section')
+    doel.id = 'gebeurtenissen'
+    document.body.appendChild(doel)
+    render(<OudeTabParam />)
+    expect(replace).toHaveBeenCalledWith('/toekomst?focus=x#gebeurtenissen', { scroll: false })
+    expect(scroll.mock.contexts[0]).toBe(doel)
+    doel.remove()
+    raf.mockRestore()
+  })
+
+  it('tab=gebeurtenissen met ?nieuw=1 wacht tot de provider de catalogus opende', () => {
+    pathname = '/toekomst'
+    search = 'tab=gebeurtenissen&nieuw=1'
+    const { rerender } = render(<OudeTabParam />)
+    expect(replace).not.toHaveBeenCalled()
+    search = 'tab=gebeurtenissen'
+    rerender(<OudeTabParam />)
+    expect(replace).toHaveBeenCalledWith('/toekomst#gebeurtenissen', { scroll: false })
   })
 
   it('geen lus: zonder tab gebeurt er niets, ook niet na de opruiming', () => {

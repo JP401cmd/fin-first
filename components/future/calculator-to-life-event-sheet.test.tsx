@@ -60,7 +60,7 @@ describe('CalculatorToLifeEventSheet — sluiten door eigen navigatie', () => {
     expect(getOverlayHistoryDepth()).toBe(1)
 
     fireEvent.click(screen.getByText('Naar tijdas'))
-    await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/toekomst/instellingen#gebeurtenissen'))
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/toekomst#gebeurtenissen'))
     expect(onClose).toHaveBeenCalledTimes(1)
 
     // De ouder haalt de sheet weg zodra onClose komt; dáár hangt de cleanup aan.

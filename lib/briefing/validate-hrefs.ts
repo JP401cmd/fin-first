@@ -59,9 +59,10 @@ const ROUTE_ALIASES: Record<string, string> = {
   '/identity/profiel': '/mijn/profiel',
   '/identity/instellingen': '/mijn',
   '/dashboard': '/overzicht',
-  // ADR 0179 — opgegaan in katern Instellingen (next.config redirect vangt ze ook).
+  // ADR 0179 — Voorkeuren opgegaan in Instellingen; Gebeurtenissen staan sinds het
+  // addendum van 26 sep onder het plan (next.config redirect vangt ze ook).
   '/toekomst/voorkeuren': '/toekomst/instellingen',
-  '/toekomst/gebeurtenissen': '/toekomst/instellingen',
+  '/toekomst/gebeurtenissen': '/toekomst',
   // Hallucinaties
   '/core/goals': '/toekomst/doelen',
   '/core/goal': '/toekomst/doelen',

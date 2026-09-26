@@ -109,7 +109,7 @@ export function CalculatorToLifeEventSheet({
     // dit is een knop in de sticky footer). Zie lib/overlay-history.ts.
     noteOverlayNavigation()
     onClose()
-    router.push('/toekomst/instellingen#gebeurtenissen')
+    router.push('/toekomst#gebeurtenissen')
     router.refresh()
   }
 

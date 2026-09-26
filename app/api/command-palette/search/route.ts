@@ -184,7 +184,7 @@ export async function POST(req: NextRequest) {
       // Canonieke gebeurtenissen-surface (de oude /horizon/doorrekening-test-route is
       // verwijderd in C5-pre). De pagina leest geen ?event= deep-link, maar de query
       // is onschadelijk en bewaart de event-id voor evt. toekomstige auto-open.
-      href: `/toekomst/instellingen?event=${l.id}#gebeurtenissen`,
+      href: `/toekomst?event=${l.id}#gebeurtenissen`,
     })
   }
 

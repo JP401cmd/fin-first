@@ -70,7 +70,7 @@ export const KERNEL_INPUT_REVIEW_REGISTER: Record<
   onttrekkingsprofiel: { dekking: 'potten', toelichting: 'withdrawal_profile_config (profiel + fasecurve + flex) en guardrails.' },
   onzekerheid: { dekking: 'kern-intern', toelichting: 'Marktvolatiliteit uit fire_assumptions (beheer) — band/Monte Carlo, niet per gebruiker; buiten de review.' },
   ts: { dekking: 'potten', toelichting: 'pot_rules: onttrekkingsvolgorde, verdeling bij toename, afname-volgorde, categorie-prio’s.' },
-  gebeurtenissen: { dekking: 'brondata', toelichting: 'Handmatige life-events op /toekomst/gebeurtenissen.' },
+  gebeurtenissen: { dekking: 'brondata', toelichting: 'Handmatige life-events onder het plan op /toekomst (#gebeurtenissen).' },
   autoGebeurtenissen: { dekking: 'inkomsten', toelichting: 'AOW-event (leefsituatie, jaren buiten NL) en pensioenpotten — inline instelbaar in stap 3 (TPR-15).' },
   partner: { dekking: 'brondata', toelichting: 'Huishoudtype/partnerkoppeling (/mijn/profiel). In het gecombineerde perspectief rekent de hoofdgrafiek als huishouden via de partner-parameterlaag (TPR-07); de review en de wizard rekenen op het eigen perspectief (snapshot zonder partnerblok).' },
   werkStrategie: { dekking: 'inkomsten', toelichting: 'Optionele werk-strategie (life_event werk) — inline instelbaar in stap 3 (TPR-15).' },

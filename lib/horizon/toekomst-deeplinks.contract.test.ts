@@ -52,6 +52,9 @@ const CONTRACT: Record<string, Contract> = {
   uitgaven: { values: ['open'], effect: 'pane "uitgaven na pensioen" open' },
   event: { values: '*', effect: "'new' → gebeurtenis-catalogus; <id> → gebeurtenis bekijken" },
   edit: { values: ['true'], effect: 'met event=<id>: gebeurtenis in bewerkmodus' },
+  // Addendum 26 sep (ADR 0179): alias van event=new. Tot dan las de gebeurtenissenlijst in
+  // Instellingen hem zelf; nu opent de provider op elk katern dezelfde catalogus.
+  nieuw: { values: ['1', 'true'], effect: 'alias van event=new → gebeurtenis-catalogus' },
   modal: {
     values: ['scenarios', 'simulations', 'withdrawal', 'backtesting', 'strategie', 'life_events'],
     effect:
@@ -63,7 +66,9 @@ const CONTRACT: Record<string, Contract> = {
     values: ['doelen', 'gebeurtenissen', 'voorkeuren', 'rekenhulp'],
     effect:
       'next.config-redirect (has-regel, ADR 0179 Q2) naar het katern: doelen/rekenhulp → ' +
-      'hun route, voorkeuren/gebeurtenissen → /toekomst/instellingen (overige query mee)',
+      'hun route, voorkeuren → /toekomst/instellingen (overige query mee); gebeurtenissen ' +
+      'blijft op Plan (addendum 26 sep): OudeTabParam zet #gebeurtenissen, mét levensstrategie ' +
+      '→ /toekomst/instellingen',
   },
 }
 

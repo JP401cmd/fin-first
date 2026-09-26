@@ -401,7 +401,7 @@ describe('gids-laag (ADR 0130)', () => {
     expect(
       getFirstUndismissedSuggestion(
         empty(), '/toekomst/instellingen', none, [], undefined, ALL_MODULES,
-        actief([stap({ id: 's2-gebeurtenissen', href: '/toekomst/instellingen#gebeurtenissen', description: undefined })]),
+        actief([stap({ id: 's2-gebeurtenissen', href: '/toekomst#gebeurtenissen', description: undefined })]),
       )?.key,
     ).toBe('path_horizon')
   })

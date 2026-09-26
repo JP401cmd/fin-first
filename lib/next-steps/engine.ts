@@ -276,7 +276,7 @@ export function computeNextSteps(input: NextStepInput): NextStep[] {
       'Gebeurtenissen plannen',
       'Zet je plannen op de tijdlijn',
       'Verhuizing, studie of sabbatical veranderen je vrijheidsdatum — reken ze mee.',
-      '/toekomst/instellingen#gebeurtenissen',
+      '/toekomst#gebeurtenissen',
     )
   }
   if (input.fireCountdownYears != null && input.fireCountdownYears > 0) {

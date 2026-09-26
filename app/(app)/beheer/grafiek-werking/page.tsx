@@ -441,7 +441,7 @@ export default function GrafiekWerkingPage() {
       </Sec>
 
       {/* 3 — Gebeurtenissen */}
-      <Sec id="gebeurtenissen" kicker="3 · /toekomst/gebeurtenissen" title="Levensgebeurtenissen">
+      <Sec id="gebeurtenissen" kicker="3 · /toekomst#gebeurtenissen" title="Levensgebeurtenissen">
         <p>
           Een life-event (tabel <F>life_events</F>) wordt door de kernel-adapter via een <C>guard</C> gepartitioneerd:{' '}
           <strong>beheerde</strong> events (AOW, pensioen, werk, huis + kinderen/erfenis) voeden de auto-gebeurtenis-/strategie-blokken;{' '}

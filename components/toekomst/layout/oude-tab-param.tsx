@@ -3,6 +3,8 @@
 import { useEffect } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { CONSUMED_DEEPLINK_PARAMS } from '@/lib/horizon/deeplink-cleanup'
+import { GEBEURTENISSEN_ANKER } from './oude-lab-bladwijzer'
+import { KATERN_HREF } from './katern-routes'
 
 /**
  * Params die een ándere opruimer zelf uit de URL haalt: de tijdas-deeplinks
@@ -22,6 +24,12 @@ const ANDERE_OPRUIMERS: readonly string[] = [...CONSUMED_DEEPLINK_PARAMS, 'planr
  * huidige pad, zonder navigatie-scroll, en laat de overige params en de hash staan. Geen
  * lus: na de replace staat er geen `tab` meer, en geen redirect-regel matcht een
  * katern-pad. Rendert niets.
+ *
+ * `?tab=gebeurtenissen` (addendum 26 sep op ADR 0179): de levensgebeurtenissen staan onder
+ * het plan, op `/toekomst` zelf. Een redirect van `/toekomst` naar `/toekomst` zou een lus
+ * zijn (de query reist mee), dus hier: `tab` weg, het anker `#gebeurtenissen` erbij, en na
+ * één frame naar de lijst scrollen. Met een levensstrategie erbij
+ * (`&strategie=aow|pensioen|huis|werk`) stuurt `next.config.ts` hem nog naar Instellingen.
  */
 export function OudeTabParam() {
   const router = useRouter()
@@ -33,9 +41,16 @@ export function OudeTabParam() {
     const params = new URLSearchParams(query)
     if (!params.has('tab')) return
     if (ANDERE_OPRUIMERS.some((p) => params.has(p))) return
+    const naarGebeurtenissen = pathname === KATERN_HREF.plan && params.get('tab') === 'gebeurtenissen'
     params.delete('tab')
     const rest = params.toString()
-    router.replace(`${pathname}${rest ? `?${rest}` : ''}${window.location.hash}`, { scroll: false })
+    const hash = naarGebeurtenissen ? `#${GEBEURTENISSEN_ANKER}` : window.location.hash
+    router.replace(`${pathname}${rest ? `?${rest}` : ''}${hash}`, { scroll: false })
+    if (!naarGebeurtenissen) return
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById(GEBEURTENISSEN_ANKER)?.scrollIntoView({ block: 'start' })
+    })
+    return () => window.cancelAnimationFrame(frame)
   }, [query, pathname, router])
 
   return null
