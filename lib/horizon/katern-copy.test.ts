@@ -44,6 +44,7 @@ import {
 import type { MarktcheckVrijheidsleeftijden } from '@/lib/horizon-kernel/marktcheck'
 import { ANKER_KPI_LABEL, ankerTitel, ankerVrijZin, labZoneWoord } from './anker-copy'
 import { PLAN_REVIEW_NAAM } from '@/lib/plan-review/types'
+import { END_FORM_OPTIONS } from './plan-draft'
 
 /** ADR 0165: nooit de koop-/verkoopmetafoor. */
 const KOOP_METAFOOR = /vrijgekocht|terugkop|terug te kopen|vrijkop|gekocht|verkocht|koop je|kopen/i
@@ -212,6 +213,29 @@ describe('katern-copy — aannamesregel', () => {
       expect(t).not.toMatch(/stopmoment/)
       expect(aannamesSegmenten({ ...basis, stop }).map((s) => s.key)).not.toContain('stop')
     }
+  })
+
+  it('eind-vorm met eindleeftijd (opeten, nalatenschap): "plan tot je 90e"', () => {
+    for (const eindvorm of ['deplete', 'legacy'] as const) {
+      expect(aannamesRegelTekst({ ...basis, eindvorm }, 'eenvoudig')).toBe(
+        'Op basis van: stopmoment zo vroeg mogelijk · plan tot je 90e · 3 gebeurtenissen',
+      )
+    }
+  })
+
+  it('niet laten slinken: geen leeftijd, de je-vorm van de canonieke optie', () => {
+    const t = aannamesRegelTekst({ ...basis, eindvorm: 'perpetual' }, 'eenvoudig')
+    expect(t).toBe('Op basis van: stopmoment zo vroeg mogelijk · je vermogen mag niet slinken · 3 gebeurtenissen')
+    expect(t).not.toMatch(/tot je \d+e/)
+    const optie = END_FORM_OPTIONS.find((o) => o.form === 'perpetual')!.name
+    expect(optie).toBe('Mijn vermogen mag niet slinken')
+    expect(aannamesSegmenten({ ...basis, eindvorm: 'perpetual' }).find((s) => s.key === 'eind')?.tekst).toBe(
+      optie.replace(/^Mijn /, 'je '),
+    )
+  })
+
+  it('eind-vorm onbekend (null): het bestaande gedrag, met leeftijd', () => {
+    expect(aannamesRegelTekst({ ...basis, eindvorm: null }, 'eenvoudig')).toBe(aannamesRegelTekst(basis, 'eenvoudig'))
   })
 
   it('solved: "stopmoment zo vroeg mogelijk" blijft staan (de kop noemt dan een leeftijd, geen instelling)', () => {

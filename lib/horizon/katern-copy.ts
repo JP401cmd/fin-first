@@ -26,6 +26,8 @@ import {
 import { heroFireAgeYear } from './hero-fire-age'
 import type { LabZone } from './lab-grenzen-types'
 import { PLAN_REVIEW_NAAM } from '@/lib/plan-review/types'
+import type { FireEndForm } from '@/lib/fire-strategy'
+import { endFormShowsEndAge } from './plan-draft'
 
 const SCHEIDING = ' · '
 
@@ -189,11 +191,24 @@ export function instellingenSamenvatting(
 export const AANNAMES_PREFIX = 'Op basis van:'
 export const AANNAMES_LINK_LABEL = 'Naar instellingen'
 
+/**
+ * Het eind-segment onder "niet laten slinken": de je-vorm van de canonieke optie "Mijn
+ * vermogen mag niet slinken" (`END_FORM_OPTIONS`, plan-draft). Die eind-vorm heeft per
+ * definitie geen eindleeftijd (C1, kopijwens C2 beslist door de hoofdthread).
+ */
+export const AANNAMES_EIND_NIET_SLINKEN = 'je vermogen mag niet slinken'
+
 export interface AannamesInput {
   /** `null` = solved ("stopmoment zo vroeg mogelijk"), anders het vaste anker. */
   readonly stop: AnkerStop | null
-  /** Eindleeftijd van het plan. */
+  /** Ingestelde eindleeftijd van het plan (`fireStrategy.endAge`). */
   readonly eindleeftijd: number
+  /**
+   * De eind-vorm van het plan (`firePlan.endForm`). Onder "niet laten slinken" heeft het
+   * plan geen eindleeftijd en noemt het eind-segment er dus ook geen. `null`/afwezig =
+   * onbekend: dan het gedrag van vóór dit veld (met leeftijd).
+   */
+  readonly eindvorm?: FireEndForm | null
   /** Inflatie in procenten (2 = "2,0%"), niet als fractie. */
   readonly inflatiePct: number
   /** Rendementsaanname in procenten per jaar (5 = "5,0%"), niet als fractie. */
@@ -229,9 +244,14 @@ export function aannamesSegmenten(input: AannamesInput): AannamesSegment[] {
   const n = Math.max(0, Math.floor(input.gebeurtenissen))
   const stop: AannamesSegment[] =
     input.stop == null ? [{ key: 'stop', tekst: 'stopmoment zo vroeg mogelijk', alleenVolledig: false }] : []
+  // Opeten en nalatenschap rekenen tot een eindleeftijd; "niet laten slinken" niet.
+  const eind =
+    input.eindvorm != null && !endFormShowsEndAge(input.eindvorm)
+      ? AANNAMES_EIND_NIET_SLINKEN
+      : `plan tot je ${heroFireAgeYear(input.eindleeftijd)}e`
   return [
     ...stop,
-    { key: 'eind', tekst: `plan tot je ${heroFireAgeYear(input.eindleeftijd)}e`, alleenVolledig: false },
+    { key: 'eind', tekst: eind, alleenVolledig: false },
     { key: 'inflatie', tekst: `${PCT_EEN_DECIMAAL.format(input.inflatiePct)}% inflatie`, alleenVolledig: true },
     {
       key: 'rendement',
