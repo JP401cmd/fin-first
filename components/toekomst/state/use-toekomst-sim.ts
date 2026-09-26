@@ -50,7 +50,7 @@ import { dekkingVanRun } from '@/lib/horizon/lab-uitkomst'
 import { guardFireTarget } from '@/lib/horizon/outcome-guard'
 import { runScenarioPresetsAsync } from '@/lib/horizon-kernel/worker/run-in-worker'
 import { clipRowsToPlanEnd } from '@/lib/horizon/clip-rows-to-plan-end'
-import { DEFAULT_FIRE_STRATEGY, type StopAnchor, isFixedAnchor, stopAnchorFromKernel } from '@/lib/fire-strategy'
+import { DEFAULT_FIRE_STRATEGY, type FireEndForm, type StopAnchor, isFixedAnchor, stopAnchorFromKernel } from '@/lib/fire-strategy'
 import { buildHorizonInput } from '@/lib/horizon/build-input'
 import type { PreviewBaseline } from '@/lib/strategy-preview'
 import { useStabielObject } from './use-stabiel-object'
@@ -405,6 +405,10 @@ export function useToekomstSim({ initialData, perspectief, scenarioState }: { in
     ? stopAnchorFromKernel(simResult.stopAnker)
     : (initialData.firePlan?.anchor ?? { kind: 'solved' })
   const isFixedAnchorMode = isFixedAnchor({ anchor: planAnchor })
+  // De EIND-VORM van het plan zoals ingesteld (ADR 0129), uit dezelfde bron als de
+  // Instellingen-rij. Niet de kernel-echo `simResult.strategy`: die vouwt het anker
+  // erin terug naar de legacy-naam ('pensioen'/'nu-stoppen').
+  const planEindvorm: FireEndForm | null = initialData.firePlan?.endForm ?? null
   useEffect(() => {
     // Onder een VAST anker draagt de batch de tweede run ("vrij mogelijk vanaf", ADR 0129
     // D7) die de hero-tegel bovenaan voedt — die mag niet wachten tot de gebruiker naar de
@@ -1039,6 +1043,7 @@ export function useToekomstSim({ initialData, perspectief, scenarioState }: { in
     effectiveInput,
     currentAge,
     planAnchor,
+    planEindvorm,
     isFixedAnchorMode,
     eventStopAge,
     effectiveFireTarget,

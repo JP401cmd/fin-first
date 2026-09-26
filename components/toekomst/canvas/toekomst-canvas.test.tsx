@@ -59,7 +59,10 @@ let displayMode: 'simple' | 'full' = 'full'
 const lagenKeuze = (aan: readonly LaagId[]) =>
   Object.fromEntries(LAAG_VOLGORDE.map((id) => [id, aan.includes(id)])) as Record<LaagId, boolean>
 
-const simResult = { fireAge: 52, fireAgeFractional: 52.3, displayEndAge: 90, vastStopLeeftijd: null, strategy: 'deplete' }
+// Eeuwigdurend: de kernel rekent tot zijn horizonplafond (displayEndAge 100), terwijl
+// Instellingen de ingestelde eindleeftijd noemt ("Tot 90 jaar").
+const simResult = { fireAge: 52, fireAgeFractional: 52.3, displayEndAge: 100, vastStopLeeftijd: null, strategy: 'perpetual' }
+const fireStrategy = { strategy: 'perpetual', endAge: 90, legacyAmount: 0 }
 const fireParams = { grossReturn: 0.05, inflationRate: 0.02 }
 const events = [{ id: 'a' }, { id: 'b' }, { id: 'c' }]
 
@@ -87,6 +90,8 @@ vi.mock('@/components/toekomst/state/toekomst-state-provider', () => ({
   useToekomstScenarioContext: () => ({ hasDoelLijn: true, labZone: 'zone-plan', nalatenschapMarker: { zone: null } }),
   useToekomstSimContext: () => ({
     fireParams,
+    fireStrategy,
+    planEindvorm: 'perpetual',
     userAowAge: { fractional: 67.25 },
     events,
     canonicalDailyRate: 100,
@@ -223,6 +228,13 @@ describe('ToekomstCanvas — Plan', () => {
       ),
     )
     expect(within(regel).getByRole('link').getAttribute('href')).toBe('/toekomst/instellingen')
+  })
+
+  it('noemt de ingestelde eindleeftijd zoals Instellingen, niet het horizonplafond van de kernel', () => {
+    renderIn(null)
+    const regel = screen.getByTestId('aannamesregel')
+    expect(regel.textContent).toContain('plan tot je 90e')
+    expect(regel.textContent).not.toContain('100e')
   })
 
   it('tekent de fasebalk en laat de doelscenario-lijn weg zolang die laag uit staat', () => {

@@ -100,6 +100,8 @@ export function ToekomstCanvas() {
     projectiePending,
     currentAge,
     planAnchor,
+    planEindvorm,
+    fireStrategy,
     isFixedAnchorMode,
     eventStopAge,
     effectiveNetWorth,
@@ -218,6 +220,23 @@ export function ToekomstCanvas() {
     rendementScenarios,
     metHuis: tweedeLijnZichtbaar,
   })
+
+  // Waar de grafiek op rust (D5). De eindleeftijd is de ingestelde, zoals de
+  // Instellingen-rij hem noemt ("Tot 90 jaar"), niet `displayEndAge`: dat is het
+  // horizonplafond van de kernel (100 bij eeuwigdurend). `eindvorm` gaat al mee voor de
+  // kopij van het eind-segment (katern-copy, C1); Aannamesregel leest hem nog niet.
+  const aannames = simResult
+    ? {
+        stop: isFixedAnchorMode ? ankerStop : null,
+        eindleeftijd: fireStrategy?.endAge ?? simResult.displayEndAge,
+        eindvorm: planEindvorm,
+        // Weergave in procenten; de fracties komen uit dezelfde fireParams waarop de
+        // projectie rekent.
+        inflatiePct: fireParams.inflationRate * 100,
+        rendementPct: fireParams.grossReturn * 100,
+        gebeurtenissen: events.length,
+      }
+    : null
 
   // ── Ballon-definities — puur informatieve uitleg bij de grafiek ──
   const toekomstOverlayBalloons: OverlayBalloonDef[] = TOEKOMST_OVERLAY_BALLOONS
@@ -423,20 +442,8 @@ export function ToekomstCanvas() {
 
             {/* Waar de grafiek op rust, alleen in Plan (D5). Vervangt de voetnoot en
                 de hint "Stopmoment wijzigen" (spec §7.3). */}
-            {stand.toonAannamesregel && (
-              <Aannamesregel
-                className="mt-3"
-                instellingenHref={KATERN_HREF.instellingen}
-                aannames={{
-                  stop: isFixedAnchorMode ? ankerStop : null,
-                  eindleeftijd: simResult.displayEndAge,
-                  // Weergave in procenten; de fracties komen uit dezelfde fireParams
-                  // waarop de projectie rekent.
-                  inflatiePct: fireParams.inflationRate * 100,
-                  rendementPct: fireParams.grossReturn * 100,
-                  gebeurtenissen: events.length,
-                }}
-              />
+            {stand.toonAannamesregel && aannames && (
+              <Aannamesregel className="mt-3" instellingenHref={KATERN_HREF.instellingen} aannames={aannames} />
             )}
           </>
         ) : null}
