@@ -37,7 +37,7 @@ Eigenaarsbesluiten 26 sep: checkpoint-commit per stap **op master, per pad, nooi
 ## Checklist
 
 - [x] 1 P dood weg (A1)
-- [ ] 2 S legacy Event Form weg, `?modal=life_events` → EventPane catalog (A1)
+- [x] 2 S legacy Event Form weg, `?modal=life_events` → EventPane catalog (A1)
 - [ ] 3 S `loadData` → `router.refresh()` + props-als-bron (A1)
 - [ ] X1/X2/X3 kopieën klaar met inplug-map
 - [ ] 4 P helpers/typen (integrator)

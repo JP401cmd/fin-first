@@ -52,7 +52,7 @@ const CONTRACT: Record<string, Contract> = {
   edit: { values: ['true'], effect: 'met event=<id>: gebeurtenis in bewerkmodus' },
   modal: {
     values: ['scenarios', 'simulations', 'withdrawal', 'backtesting', 'strategie', 'life_events'],
-    effect: 'bijbehorende modal; life_events → het (legacy) gebeurtenisformulier',
+    effect: 'bijbehorende modal; life_events → gebeurtenis-catalogus (als event=new; fase 1 stap 2)',
   },
   planreview: { values: ['open'], effect: 'plan-review-wizard open' },
   tab: {
