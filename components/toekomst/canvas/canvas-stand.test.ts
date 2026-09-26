@@ -8,7 +8,13 @@
  */
 import { describe, it, expect } from 'vitest'
 import { LAAG_VOLGORDE, LAGEN_EENVOUDIG, type LaagId } from '@/lib/horizon/katern-copy'
-import { canvasStand, type CanvasBeschikbaarheid, type CanvasKeuze, type CanvasWeergave } from './canvas-stand'
+import {
+  COMPACTE_PLOTHOOGTE,
+  canvasStand,
+  type CanvasBeschikbaarheid,
+  type CanvasKeuze,
+  type CanvasWeergave,
+} from './canvas-stand'
 
 const alleLagen = (aan: readonly LaagId[] = []): Record<LaagId, boolean> =>
   Object.fromEntries(LAAG_VOLGORDE.map((id) => [id, aan.includes(id)])) as Record<LaagId, boolean>
@@ -116,6 +122,14 @@ describe('canvasStand — Instellingen', () => {
     expect(stand.toonLegenda).toBe(false)
     expect(stand.toonAannamesregel).toBe(false)
     expect(stand.alleenDesktop).toBe(true)
+  })
+
+  it('geeft de grafiek een compacte plothoogte; Plan en Doelen houden de standaard (spec §4.5)', () => {
+    expect(stand.plotHoogte).toBe(COMPACTE_PLOTHOOGTE)
+    expect(COMPACTE_PLOTHOOGTE).toBeLessThan(220)
+    for (const katern of ['plan', 'doelen'] as const) {
+      expect(canvasStand(katern, standaard, alles, VOLLEDIG).plotHoogte).toBeNull()
+    }
   })
 
   it('tekent alleen de hoofdlijn en heeft geen cijferbalk; Plan en Doelen wel', () => {

@@ -123,3 +123,15 @@ describe('CanvasGrafiek — Geldstroom heeft een laadstand', () => {
     expect(screen.queryByTestId('geldstroom-laden')).toBeNull()
   })
 })
+
+describe('CanvasGrafiek — compacte plothoogte (spec §4.5)', () => {
+  it('geeft de hoogte van het katern door aan de vermogensgrafiek', () => {
+    renderModus('vermogen', { plotHoogte: 180 })
+    expect(h.simChart?.plotHoogte).toBe(180)
+  })
+
+  it('zonder katern-hoogte krijgt de grafiek geen prop (standaardhoogte, Plan en Doelen)', () => {
+    renderModus('vermogen', { plotHoogte: null })
+    expect(h.simChart?.plotHoogte).toBeUndefined()
+  })
+})

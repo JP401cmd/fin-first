@@ -721,3 +721,47 @@ describe('buildSimChartGeometry — nalatenschap-bol', () => {
     expect(g.nalatenschapDot!.zone).toBeNull()
   })
 })
+
+/**
+ * Compacte plot (spec §4.5, FX-D): katern Instellingen toont op desktop een compact
+ * canvas. `plotHoogte` vervangt alleen de basishoogte (260 desktop, 220 mobiel); de
+ * icoon-band van de gebeurtenis-markers komt er BOVENOP (PAD.top groeit mee), zodat de
+ * markers het kleine plot niet opslokken: `innerH` hangt niet af van de stapel.
+ */
+describe('buildSimChartGeometry — plotHoogte (compacte plot)', () => {
+  const events: ChartEventOverlay[] = [
+    { id: 'e1', label: 'Erfenis', age: 55, side: 'above', color: '#8a6e42', icon: 'Gift', kind: 'life_event', sourceId: 'src1' },
+    { id: 'e2', label: 'Pensioen', age: 55, side: 'above', color: '#58362d', icon: 'Calendar', kind: 'life_event', sourceId: 'src2' },
+    { id: 'e3', label: 'Verhuizing', age: 55, side: 'above', color: '#0d9488', icon: 'Home', kind: 'life_event', sourceId: 'src3' },
+  ]
+  const desktop = { ...baseInput, containerW: 1000 }
+  /** De geometrie zonder de schaalfuncties, zodat `toEqual` hem als data vergelijkt. */
+  const data = (g: ReturnType<typeof buildSimChartGeometry>) =>
+    Object.fromEntries(Object.entries(g).filter(([, v]) => typeof v !== 'function'))
+
+  it('zonder prop blijft de geometrie ongewijzigd (desktop 260, mobiel 220)', () => {
+    expect(buildSimChartGeometry(desktop).H).toBe(260)
+    expect(buildSimChartGeometry(baseInput).H).toBe(220)
+    expect(data(buildSimChartGeometry({ ...desktop, plotHoogte: undefined }))).toEqual(
+      data(buildSimChartGeometry(desktop)),
+    )
+    expect(data(buildSimChartGeometry({ ...baseInput, eventOverlay: events, plotHoogte: undefined }))).toEqual(
+      data(buildSimChartGeometry({ ...baseInput, eventOverlay: events })),
+    )
+  })
+
+  it('met prop is de basishoogte de gevraagde hoogte, op elke breedte', () => {
+    const g = buildSimChartGeometry({ ...desktop, plotHoogte: 180 })
+    expect(g.H).toBe(180)
+    expect(g.innerH).toBe(180 - g.PAD.top - g.PAD.bottom)
+    expect(buildSimChartGeometry({ ...baseInput, plotHoogte: 180 }).H).toBe(180)
+  })
+
+  it('gestapelde markers vergroten de band erboven, niet ten koste van het plot', () => {
+    const zonder = buildSimChartGeometry({ ...desktop, plotHoogte: 180 })
+    const met = buildSimChartGeometry({ ...desktop, plotHoogte: 180, eventOverlay: events })
+    expect(met.innerH).toBe(zonder.innerH)
+    expect(met.H - zonder.H).toBe(met.PAD.top - zonder.PAD.top)
+    expect(met.H).toBeGreaterThan(180)
+  })
+})

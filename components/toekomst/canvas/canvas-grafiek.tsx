@@ -174,6 +174,8 @@ export interface CanvasGrafiekProps {
   toonFasebalk: boolean
   /** Het katern draagt de cijferbalk (`LifelineReadout`, desktop, Volledig). */
   toonReadout: boolean
+  /** Compacte basishoogte van de vermogensgrafiek (`CanvasStand.plotHoogte`); `null` ⇒ standaard. */
+  plotHoogte: number | null
 }
 
 export function CanvasGrafiek({
@@ -252,6 +254,7 @@ export function CanvasGrafiek({
   setActiveFaseModal,
   toonFasebalk,
   toonReadout,
+  plotHoogte,
 }: CanvasGrafiekProps) {
   const isLg = useIsLgUp()
   return (
@@ -326,6 +329,7 @@ export function CanvasGrafiek({
                             // desktop en waar het katern hem draagt; overal anders toont de
                             // grafiek ze zelf.
                             hideValueTooltip={displayMode === 'full' && isLg && toonReadout}
+                            plotHoogte={plotHoogte ?? undefined}
                             rows={useHouseholdMainLine ? viewHouseholdMainLineRows! : usePartnerMainLine ? viewPartnerLineRows! : (viewDisplaySimRows)}
                             fireAge={useHouseholdMainLine ? householdMainLine!.fireAge : usePartnerMainLine ? partnerLine!.fireAge : (simResult.fireAge)}
                             fireAgeFractional={useHouseholdMainLine ? householdMainLine!.fireAgeFractional : usePartnerMainLine ? partnerLine!.fireAgeFractional : (simResult.fireAgeFractional)}

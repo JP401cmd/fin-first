@@ -150,6 +150,16 @@ export type SimChartGeometryInput = {
   nalatenschapMarker?: { zone: 'rood' | 'oranje' | 'groen' | null }
   /** Gemeten containerbreedte (px, uit de ResizeObserver in de component). */
   containerW: number
+  /**
+   * Basishoogte van de grafiek in px, inclusief de vaste marges (`CHART_PAD`), zonder de
+   * icoon-band van de markers. Afwezig ⇒ 260 op desktop, 220 op mobiel (byte-identiek voor
+   * bestaande callers). Katern Instellingen geeft een compacte hoogte mee (spec §4.5).
+   *
+   * De icoon-band (`topPaddingFor`) komt er bovenop en groeit `PAD.top` mee, dus
+   * gestapelde markers verkleinen het plot nooit: `innerH` hangt niet van de stapel af.
+   * Daarom geen extra begrenzing van de band bij een kleine plot.
+   */
+  plotHoogte?: number
 }
 
 export type ScenarioPathGeometry = {
@@ -387,6 +397,7 @@ export function buildSimChartGeometry(input: SimChartGeometryInput): SimChartGeo
     secondaryLineVisible = true,
     nalatenschapMarker,
     containerW,
+    plotHoogte,
   } = input
 
   const W = containerW
@@ -416,7 +427,7 @@ export function buildSimChartGeometry(input: SimChartGeometryInput): SimChartGeo
     bottom: CHART_PAD.bottom + extraBottom,
     left: CHART_PAD.left,
   }
-  const H = (isDesktop ? 260 : 220) + extraTop + extraBottom
+  const H = (plotHoogte ?? (isDesktop ? 260 : 220)) + extraTop + extraBottom
   const innerW = W - PAD.left - PAD.right
   const innerH = H - PAD.top - PAD.bottom
 

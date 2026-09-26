@@ -805,3 +805,19 @@ describe('SimChart — propcontract (AC-C6, naad N2)', () => {
     expect(metView).toBeTruthy()
   })
 })
+
+describe('SimChart — compacte plothoogte (spec §4.5, FX-D)', () => {
+  const viewBoxHoogte = (container: HTMLElement) =>
+    Number(container.querySelector('svg[viewBox]')!.getAttribute('viewBox')!.split(' ')[3])
+
+  it('zonder `plotHoogte` blijft de grafiek op de standaardhoogte', () => {
+    const { container } = render(<SimChart {...richProps()} />)
+    expect(viewBoxHoogte(container)).toBe(220) // containerW 600 ⇒ mobiel
+    expect(vi.mocked(geometryModule.buildSimChartGeometry).mock.calls[0][0].plotHoogte).toBeUndefined()
+  })
+
+  it('met `plotHoogte` tekent de grafiek op die hoogte', () => {
+    const { container } = render(<SimChart {...richProps()} plotHoogte={180} />)
+    expect(viewBoxHoogte(container)).toBe(180)
+  })
+})

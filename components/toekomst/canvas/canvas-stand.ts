@@ -67,7 +67,15 @@ export interface CanvasStand {
   readonly alleenHoofdlijn: boolean
   /** De cijferbalk (`LifelineReadout`) boven de grafiek: niet in Instellingen (§4.7). */
   readonly toonReadout: boolean
+  /**
+   * Basishoogte van de vermogensgrafiek in px (`SimChart.plotHoogte`); `null` ⇒ de
+   * standaardhoogte van de grafiek. Instellingen: compact (spec §4.5).
+   */
+  readonly plotHoogte: number | null
 }
+
+/** De compacte plothoogte van katern Instellingen op desktop (spec §4.5: "compact"). */
+export const COMPACTE_PLOTHOOGTE = 180
 
 const GEEN_LAGEN: Record<LaagId, boolean> = Object.fromEntries(
   LAAG_VOLGORDE.map((id) => [id, false]),
@@ -125,6 +133,7 @@ export function canvasStand(
       alleenDesktop: true,
       alleenHoofdlijn: true,
       toonReadout: false,
+      plotHoogte: COMPACTE_PLOTHOOGTE,
     }
   }
 
@@ -151,6 +160,7 @@ export function canvasStand(
     alleenDesktop: false,
     alleenHoofdlijn: false,
     toonReadout: true,
+    plotHoogte: null,
   }
 }
 

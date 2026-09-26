@@ -307,6 +307,7 @@ export const SimChart = memo(function SimChart({
   hoverAge,
   onHoverAge,
   hideValueTooltip = false,
+  plotHoogte,
 }: {
   rows: SimRow[]
   fireAge: number | null
@@ -432,6 +433,9 @@ export const SimChart = memo(function SimChart({
   onHoverAge?: (age: number | null) => void
   /** Onderdruk de zwevende waarde-tooltip; de crosshair-lijn/stip blijven staan. */
   hideValueTooltip?: boolean
+  /** Compacte basishoogte in px (zie `SimChartGeometryInput.plotHoogte`); afwezig ⇒
+   *  260 desktop / 220 mobiel, byte-identiek voor bestaande callers. */
+  plotHoogte?: number
 }) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 1200, forModal })
   // Bedragmaskering (ADR 0091) komt uit de hook, NIET uit een prop: de hook
@@ -492,6 +496,7 @@ export const SimChart = memo(function SimChart({
         secondaryLineVisible,
         nalatenschapMarker,
         containerW,
+        plotHoogte,
       }),
     [
       rows,
@@ -519,6 +524,7 @@ export const SimChart = memo(function SimChart({
       secondaryLineVisible,
       nalatenschapMarker,
       containerW,
+      plotHoogte,
     ],
   )
 
