@@ -168,6 +168,18 @@ export function buildDraftEvent(
  *   partner) vult die de blokken met het berekende voorstel i.p.v. de kale
  *   catalogus-defaults. Een bestaand event wordt nooit overschreven.
  */
+/**
+ * Het maandblok van een OPGESLAGEN rij als één positief bedrag plus richting.
+ * Paden als AI-extractie en onboarding schrijven een inkomensverlies als negatief
+ * `monthly_income_change`, en een besparing kan een negatief `monthly_cost_change`
+ * zijn. Minder inkomen is een uitgave, minder kosten een inkomst. Het bedrag is altijd
+ * positief: `buildDraftEvent` eist > 0 en gooit het blok anders bij opslaan stil weg.
+ */
+function maandblokUitRij(cost: number, income: number): { amount: number; direction: 'income' | 'expense' } {
+  if (cost !== 0) return { amount: Math.abs(cost), direction: cost > 0 ? 'expense' : 'income' }
+  return { amount: Math.abs(income), direction: income > 0 ? 'income' : 'expense' }
+}
+
 export function initFormState(
   type: string,
   existing: LifeEvent | null,
@@ -191,6 +203,7 @@ export function initFormState(
       baseAnswers && ageKey && existing.target_age != null && baseAnswers[ageKey] !== existing.target_age
         ? { ...baseAnswers, [ageKey]: existing.target_age }
         : baseAnswers
+    const maandblok = maandblokUitRij(existing.monthly_cost_change, existing.monthly_income_change)
     return {
       name: existing.name,
       event_type: existing.event_type,
@@ -198,22 +211,14 @@ export function initFormState(
       oneTimeAmount: Math.abs(existing.one_time_cost),
       oneTimeDirection: existing.one_time_cost >= 0 ? 'expense' : 'income',
       tempEnabled: existing.duration_months > 0,
-      tempAmount:
-        existing.duration_months > 0
-          ? existing.monthly_cost_change || existing.monthly_income_change
-          : 0,
-      tempDirection: existing.monthly_income_change > 0 ? 'income' : 'expense',
+      tempAmount: existing.duration_months > 0 ? maandblok.amount : 0,
+      tempDirection: maandblok.direction,
       tempDurationYears:
         existing.duration_months > 0 ? Math.max(1, Math.round(existing.duration_months / 12)) : 5,
       tempIndexed: existing.is_indexed,
-      contEnabled:
-        existing.duration_months === 0 &&
-        (existing.monthly_cost_change > 0 || existing.monthly_income_change > 0),
-      contAmount:
-        existing.duration_months === 0
-          ? existing.monthly_cost_change || existing.monthly_income_change
-          : 0,
-      contDirection: existing.monthly_income_change > 0 ? 'income' : 'expense',
+      contEnabled: existing.duration_months === 0 && maandblok.amount > 0,
+      contAmount: existing.duration_months === 0 ? maandblok.amount : 0,
+      contDirection: maandblok.direction,
       contIndexed: existing.is_indexed,
       contUntilStop: isTotStopmoment(existing),
       storyAnswers: savedStoryAnswers,

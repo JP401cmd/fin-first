@@ -170,3 +170,55 @@ describe('event-pane-edit-form — teken van het catalogus-maandbedrag', () => {
     })
   }
 })
+
+/**
+ * Given een OPGESLAGEN gebeurtenis met een maandblok dat negatief is weggeschreven
+ * (AI-extractie en onboarding schrijven een inkomensverlies als negatief
+ * monthly_income_change; een besparing kan een negatief monthly_cost_change zijn),
+ * When EventPane haar opent om te bewerken (initFormState met `existing`),
+ * Then staat het maandblok aan, met een POSITIEF bedrag en de juiste richting:
+ * minder inkomen = uitgave, minder kosten = inkomst. Anders gooit buildDraftEvent
+ * (bedrag > 0) het blok bij opslaan stil weg. Gevonden 26 sep bij de backfill-afbakening.
+ */
+describe('event-pane-edit-form — bestaand negatief maandblok blijft behouden', () => {
+  const rij = (m: { cost: number; income: number; duration: number }) => ({
+    id: 'x', name: 'Minder werken', event_type: 'custom', target_age: 45, target_date: null,
+    one_time_cost: 0, monthly_cost_change: m.cost, monthly_income_change: m.income, duration_months: m.duration,
+    icon: 'Clock', is_active: true, sort_order: 0, is_indexed: true, metadata: {},
+  })
+
+  it('doorlopend inkomensverlies (income −1500) → uitgave 1500, blok aan', () => {
+    const s = initFormState('custom', rij({ cost: 0, income: -1500, duration: 0 }), 40)
+    expect(s.contEnabled).toBe(true)
+    expect(s.contAmount).toBe(1500)
+    expect(s.contDirection).toBe('expense')
+  })
+
+  it('tijdelijk inkomensverlies (income −1500, 24 mnd) → uitgave 1500', () => {
+    const s = initFormState('custom', rij({ cost: 0, income: -1500, duration: 24 }), 40)
+    expect(s.tempEnabled).toBe(true)
+    expect(s.tempAmount).toBe(1500)
+    expect(s.tempDirection).toBe('expense')
+  })
+
+  it('doorlopende besparing (cost −500) → inkomst 500', () => {
+    const s = initFormState('custom', rij({ cost: -500, income: 0, duration: 0 }), 40)
+    expect(s.contEnabled).toBe(true)
+    expect(s.contAmount).toBe(500)
+    expect(s.contDirection).toBe('income')
+  })
+
+  it('ongewijzigd: kosten +500 → uitgave 500; inkomen +800 → inkomst 800', () => {
+    const k = initFormState('custom', rij({ cost: 500, income: 0, duration: 0 }), 40)
+    expect([k.contEnabled, k.contAmount, k.contDirection]).toEqual([true, 500, 'expense'])
+    const i = initFormState('custom', rij({ cost: 0, income: 800, duration: 12 }), 40)
+    expect([i.tempEnabled, i.tempAmount, i.tempDirection]).toEqual([true, 800, 'income'])
+  })
+
+  it('opslaan na openen verliest het blok niet (round-trip via buildDraftEvent)', () => {
+    const s = initFormState('custom', rij({ cost: 0, income: -1500, duration: 0 }), 40)
+    const draft = buildDraftEvent(s, undefined)
+    expect(draft.monthly_cost_change).toBe(1500)
+    expect(draft.monthly_income_change).toBe(0)
+  })
+})
