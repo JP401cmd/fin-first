@@ -17,6 +17,19 @@ import {
   kinderbijslagPerMaand,
   NIBUD_CHILDREN_MONTHLY_COST,
 } from '@/lib/horizon-data'
+import { computeKostenKoper } from '@/lib/kosten-koper'
+import {
+  OVB_TARIEF_EIGEN_WONING,
+  STARTERSVRIJSTELLING_MAX,
+  NHG_KOSTENGRENS,
+  NHG_BORGTOCHTPROVISIE_PCT,
+} from '@/lib/constants'
+import { formatCurrency } from '@/lib/format'
+
+/** Fractie → Nederlandse procentnotatie voor microcopy (0.004 → "0,4%"). */
+function formatPct(fractie: number): string {
+  return `${(fractie * 100).toLocaleString('nl-NL', { maximumFractionDigits: 2 })}%`
+}
 
 // ─── Question schema ──────────────────────────────────────────────
 
@@ -614,24 +627,26 @@ export const LIFE_EVENT_STORIES: Record<string, LifeEventStory> = {
         key: 'koopprijs',
         type: 'number',
         label: 'Koopprijs',
-        microcopy: 'Bepaalt indirect de overdracht en notaris.',
+        microcopy:
+          'Hieruit rekenen we je kosten koper: overdrachtsbelasting, notaris, taxatie en bankgarantie. Advies- en makelaarskosten zitten er niet in; tel die zelf op bij Eenmalig.',
         min: 0,
         step: 10000,
         suffix: '€',
         default: 400000,
       },
       {
-        key: 'kostenKoperPct',
-        type: 'segmented',
-        label: 'Kosten koper',
-        microcopy: 'Standaard ~6% (overdracht, notaris, advies).',
-        options: [
-          { value: 0, label: 'Geen' },
-          { value: 4, label: '4%' },
-          { value: 6, label: '6%' },
-          { value: 10, label: '10%' },
-        ],
-        default: 6,
+        key: 'starter',
+        type: 'toggle',
+        label: 'Je eerste eigen woning, en je bent jonger dan 35',
+        microcopy: `Aan: geen overdrachtsbelasting tot een koopprijs van ${formatCurrency(STARTERSVRIJSTELLING_MAX)} (startersvrijstelling). Uit: ${formatPct(OVB_TARIEF_EIGEN_WONING)} van de koopprijs. Zo reken je met wat voor jou geldt.`,
+        default: false,
+      },
+      {
+        key: 'nhg',
+        type: 'toggle',
+        label: 'Met Nationale Hypotheek Garantie (NHG)',
+        microcopy: `Aan: eenmalig ${formatPct(NHG_BORGTOCHTPROVISIE_PCT)} borgtochtprovisie, alleen tot een koopprijs van ${formatCurrency(NHG_KOSTENGRENS)}. Uit: geen NHG-kosten. Het rentevoordeel van NHG zit in je maandlasten, niet hier.`,
+        default: false,
       },
       {
         key: 'maandlastVerschil',
@@ -644,9 +659,14 @@ export const LIFE_EVENT_STORIES: Record<string, LifeEventStory> = {
       },
     ],
     computeImpact(answers) {
-      const koopprijs = num(answers.koopprijs, 400000)
-      const kkPct = num(answers.kostenKoperPct, 6) / 100
-      const kostenKoper = Math.round(koopprijs * kkPct)
+      // Kosten koper uit de canonieke bron (lib/kosten-koper.ts) — geen eigen
+      // percentage. Oude opgeslagen antwoorden met `kostenKoperPct` worden bij een
+      // story-wijziging genegeerd; het opgeslagen bedrag blijft staan tot dan.
+      const kostenKoper = computeKostenKoper({
+        aankoopprijs: num(answers.koopprijs, 400000),
+        isStarter: bool(answers.starter, false),
+        hasNHG: bool(answers.nhg, false),
+      }).totaal
       const verschil = num(answers.maandlastVerschil, 300)
       return {
         oneTimeAmount: kostenKoper,

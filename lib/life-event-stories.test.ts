@@ -5,6 +5,7 @@ import {
   defaultStoryAnswers,
   NIBUD_CHILDREN_MONTHLY_COST,
 } from './life-event-stories'
+import { computeKostenKoper } from './kosten-koper'
 
 describe('LIFE_EVENT_STORIES — basis', () => {
   it('heeft minstens 5 stories voor populaire types', () => {
@@ -183,21 +184,59 @@ describe('pension story — bruto naar netto', () => {
 })
 
 describe('house_purchase story', () => {
-  it('koopprijs €400k met 6% kosten koper = €24k eenmalig', () => {
-    const impact = LIFE_EVENT_STORIES['house_purchase']!.computeImpact(
-      { startAge: 35, koopprijs: 400000, kostenKoperPct: 6, maandlastVerschil: 300 },
-      30,
+  // Kosten koper is gepind tegen de canonieke motor (lib/kosten-koper.ts), niet
+  // tegen een eigen percentage: weergave-drift blijft zo zichtbaar.
+  it('eenmalig = computeKostenKoper(koopprijs, starter, nhg).totaal', () => {
+    const cases = [
+      { koopprijs: 400000, starter: false, nhg: false },
+      { koopprijs: 400000, starter: true, nhg: false },
+      { koopprijs: 400000, starter: false, nhg: true },
+      { koopprijs: 600000, starter: true, nhg: true },
+    ]
+    for (const c of cases) {
+      const impact = LIFE_EVENT_STORIES['house_purchase']!.computeImpact(
+        { startAge: 35, ...c, maandlastVerschil: 300 },
+        30,
+      )
+      const verwacht = computeKostenKoper({ aankoopprijs: c.koopprijs, isStarter: c.starter, hasNHG: c.nhg }).totaal
+      expect(impact.oneTimeAmount, JSON.stringify(c)).toBe(verwacht)
+      expect(impact.oneTimeDirection).toBe('expense')
+    }
+  })
+
+  it('niet-starter betaalt overdrachtsbelasting, starter onder de grens niet', () => {
+    const story = LIFE_EVENT_STORIES['house_purchase']!
+    const zonder = story.computeImpact({ startAge: 35, koopprijs: 400000, starter: false, nhg: false, maandlastVerschil: 0 }, 30)
+    const met = story.computeImpact({ startAge: 35, koopprijs: 400000, starter: true, nhg: false, maandlastVerschil: 0 }, 30)
+    expect(zonder.oneTimeAmount! - met.oneTimeAmount!).toBe(
+      computeKostenKoper({ aankoopprijs: 400000, isStarter: false, hasNHG: false }).overdracht,
     )
-    expect(impact.oneTimeAmount).toBe(24000)
-    expect(impact.oneTimeDirection).toBe('expense')
+    expect(computeKostenKoper({ aankoopprijs: 400000, isStarter: true, hasNHG: false }).overdracht).toBe(0)
+  })
+
+  it('default-antwoorden rekenen via de motor (geen starter, geen NHG)', () => {
+    const impact = LIFE_EVENT_STORIES['house_purchase']!.computeImpact(defaultStoryAnswers('house_purchase'), 30)
+    expect(impact.oneTimeAmount).toBe(
+      computeKostenKoper({ aankoopprijs: 400000, isStarter: false, hasNHG: false }).totaal,
+    )
     expect(impact.contEnabled).toBe(true)
     expect(impact.contAmount).toBe(300)
     expect(impact.contDirection).toBe('expense')
   })
 
+  it('oude opgeslagen antwoorden met kostenKoperPct vallen terug op de motor', () => {
+    const impact = LIFE_EVENT_STORIES['house_purchase']!.computeImpact(
+      { startAge: 35, koopprijs: 400000, kostenKoperPct: 6, maandlastVerschil: 300 },
+      30,
+    )
+    expect(impact.oneTimeAmount).toBe(
+      computeKostenKoper({ aankoopprijs: 400000, isStarter: false, hasNHG: false }).totaal,
+    )
+  })
+
   it('negatief maandlast-verschil → continu inkomst (besparing)', () => {
     const impact = LIFE_EVENT_STORIES['house_purchase']!.computeImpact(
-      { startAge: 35, koopprijs: 300000, kostenKoperPct: 4, maandlastVerschil: -200 },
+      { startAge: 35, koopprijs: 300000, starter: false, nhg: false, maandlastVerschil: -200 },
       30,
     )
     expect(impact.contDirection).toBe('income')

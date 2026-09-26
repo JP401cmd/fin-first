@@ -11,6 +11,7 @@ import {
   type LifeEvent,
 } from '@/lib/horizon-data'
 import { LIFE_EVENT_STORIES, hasStory, defaultStoryAnswers, type StoryAnswerValue } from '@/lib/life-event-stories'
+import { risicoEventVoorstel, type VoorstelProfiel } from '@/lib/horizon/event-pane-voorstel'
 
 /** Form-state voor de drie-blokken-edit-flow. */
 export interface EditFormState {
@@ -159,11 +160,19 @@ export function buildDraftEvent(
   }
 }
 
-/** Initialiseer form-state uit catalog-defaults of een bestaand event. */
+/**
+ * Initialiseer form-state uit catalog-defaults of een bestaand event.
+ *
+ * @param profiel optioneel: de profielgrondslag (netto inkomen + maandlasten).
+ *   Alleen bij een NIEUW event van een voorstel-type (werkloosheid, overlijden
+ *   partner) vult die de blokken met het berekende voorstel i.p.v. de kale
+ *   catalogus-defaults. Een bestaand event wordt nooit overschreven.
+ */
 export function initFormState(
   type: string,
   existing: LifeEvent | null,
   currentAge: number,
+  profiel?: VoorstelProfiel,
 ): EditFormState {
   if (existing) {
     const rawStoryAnswers =
@@ -272,5 +281,8 @@ export function initFormState(
     }
     return applyStory(baseState, type, answers, currentAge)
   }
+  // Risico-gebeurtenis: berekend voorstel (lib/horizon/event-pane-voorstel.ts).
+  const voorstel = profiel ? risicoEventVoorstel(type, profiel, currentAge) : null
+  if (voorstel) return { ...baseState, ...voorstel.velden }
   return baseState
 }

@@ -35,6 +35,7 @@ import { EVENT_ICONS } from './log-timeline'
 
 // EditFormState + form-helpers wonen nu in lib/horizon/event-pane-edit-form.ts (UI→lib).
 import { buildDraftEvent, initFormState, applyStory, setSharedAge, type EditFormState } from '@/lib/horizon/event-pane-edit-form'
+import { risicoEventVoorstel, wijktAfVanVoorstel, type EventVoorstel } from '@/lib/horizon/event-pane-voorstel'
 export { buildDraftEvent, initFormState, applyStory }
 export type { EditFormState }
 
@@ -157,6 +158,14 @@ export function EventPaneEdit({
   const catalogEntry = LIFE_EVENT_CATALOG[state.event_type]
   const eventIcon = catalogEntry?.icon ?? 'Calendar'
 
+  // Berekend voorstel voor werkloosheid / overlijden partner (null voor andere
+  // types). Nieuwe events starten er al mee (initFormState); hier alleen de
+  // uitleg + "opnieuw invullen" — ook bij bewerken.
+  const voorstel = useMemo(
+    () => risicoEventVoorstel(state.event_type, baselineInput, currentAge),
+    [state.event_type, baselineInput, currentAge],
+  )
+
   // Sanity-check: minimum 1 dimensie heeft een waarde
   const hasAnyImpact =
     state.oneTimeAmount > 0 ||
@@ -277,8 +286,17 @@ export function EventPaneEdit({
         <EditorialDeck className="mt-3">
           {hasStory(state.event_type)
             ? 'Automatisch ingevuld op basis van je antwoorden hierboven. Pas alleen aan als jouw situatie anders is.'
-            : 'Kies wat past: een eenmalig bedrag, een tijdelijke periode, of een blijvende verandering.'}
+            : voorstel
+              ? 'Voorgesteld op basis van je profiel en de regels van dit jaar. Pas alleen aan als jouw situatie anders is.'
+              : 'Kies wat past: een eenmalig bedrag, een tijdelijke periode, of een blijvende verandering.'}
         </EditorialDeck>
+        {voorstel && (
+          <VoorstelUitleg
+            voorstel={voorstel}
+            afwijkend={wijktAfVanVoorstel(state, voorstel.velden)}
+            onOvernemen={() => setState({ ...state, ...voorstel.velden })}
+          />
+        )}
       </div>
 
       {/* Block 1: Eenmalig */}
@@ -608,6 +626,87 @@ export function EventPaneEdit({
 // ─── Sub-componenten ──────────────────────────────────────────────
 
 // ─── Story-sectie ─────────────────────────────────────────────────
+
+/**
+ * Uitleg bij het berekende voorstel (werkloosheid / overlijden partner): wat er
+ * is ingevuld (keuze), wat het doet (effect) en waarop het rust (waarom),
+ * inclusief de aannames die niet uit je profiel komen. Bedragen komen letterlijk
+ * uit het voorstel — de rekenregels staan in lib/horizon/risico-event-regels.ts.
+ */
+function VoorstelUitleg({
+  voorstel,
+  afwijkend,
+  onOvernemen,
+}: {
+  voorstel: EventVoorstel
+  afwijkend: boolean
+  onOvernemen: () => void
+}) {
+  const g = voorstel.grondslag
+  return (
+    <div
+      className="mt-4 border-l-2 border-[var(--module-active-700)] bg-[var(--module-active-50)] px-4 py-3 text-sm text-[var(--ink-2)] space-y-2"
+      data-testid="event-voorstel-uitleg"
+    >
+      <div className="text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--ink-3)]">
+        Zo komt dit voorstel tot stand
+      </div>
+      {g.kind === 'werkloosheid' ? (
+        <>
+          <p>
+            <strong className="font-semibold text-[var(--ink)]">Eenmalig</strong>: je transitievergoeding van{' '}
+            <MaskedAmount value={g.transitievergoeding} /> als inkomst.
+          </p>
+          <p>
+            {g.inkomensgatPerMaand > 0 ? (
+              <>
+                <strong className="font-semibold text-[var(--ink)]">Tijdelijk</strong>: je inkomensgat van{' '}
+                <MaskedAmount value={Math.round(g.inkomensgatPerMaand)} /> per maand, {g.totaleDuurMaanden}{' '}
+                maanden lang, als uitgave. Minder inkomen weegt in je plan even zwaar als meer uitgeven.
+              </>
+            ) : (
+              <>Je WW-uitkering dekt je netto inkomen, dus er is geen inkomensgat.</>
+            )}
+          </p>
+          <p className="text-xs text-[var(--ink-3)]">
+            Gerekend met {g.nettoUitProfiel ? 'je netto inkomen uit je profiel' : 'een aangenomen netto inkomen'} van{' '}
+            <MaskedAmount value={g.huidigNetto} /> per maand, een aangenomen bruto maandsalaris van{' '}
+            <MaskedAmount value={g.huidigBruto} /> en {g.dienstjaren} dienstjaren, met de WW-regels van
+            dit jaar. Verdien je anders of werk je korter of langer bij je werkgever? Pas de bedragen hieronder aan.
+          </p>
+        </>
+      ) : (
+        <>
+          <p>
+            <strong className="font-semibold text-[var(--ink)]">Blijvend</strong>: het netto inkomen van je partner
+            valt weg (<MaskedAmount value={g.partnerInkomen} /> per maand). Daartegenover staan een
+            Anw-uitkering van ongeveer <MaskedAmount value={Math.round(g.anwNetto)} /> netto en{' '}
+            {g.kostendalingPct}% lagere gedeelde kosten (<MaskedAmount value={g.kostendaling} /> per maand).
+            Samen is dat <MaskedAmount value={Math.abs(Math.round(g.nettoMaandImpact))} /> per maand{' '}
+            {g.nettoMaandImpact < 0 ? 'minder' : 'meer'}, ook nadat je stopt met werken.
+          </p>
+          <p className="text-xs text-[var(--ink-3)]">
+            Het inkomen van je partner is een aanname: het staat niet in je profiel. We gaan ook uit van recht op een
+            Anw-uitkering, zoals met een thuiswonend kind jonger dan 18.
+            {!g.maandlastenUitProfiel && ' Je maandlasten zijn nog onbekend, dus de kostendaling staat op nul.'}{' '}
+            Een nabestaandenpensioen rekenen we niet mee: het bedrag staat op het pensioenoverzicht van je partner
+            (mijnpensioenoverzicht.nl). Verlaag het bedrag bij Blijvend met dat pensioen, en zet een uitkering van een
+            overlijdensrisicoverzekering bij Eenmalig als inkomst.
+          </p>
+        </>
+      )}
+      {afwijkend && (
+        <button
+          type="button"
+          onClick={onOvernemen}
+          className="min-h-[44px] -my-2 text-sm font-semibold text-[var(--module-active-700)] underline underline-offset-4 hover:text-[var(--ink)]"
+        >
+          Voorstel opnieuw invullen
+        </button>
+      )}
+    </div>
+  )
+}
 
 function StorySection({
   type,

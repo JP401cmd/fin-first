@@ -121,7 +121,9 @@ export function EventPane({
 
   // Initialiseer form-state wanneer mode wisselt naar edit
   function handleSelectType(type: string) {
-    setFormState(initFormState(type, null, currentAge(baselineInput)))
+    // baselineInput als profielgrondslag: werkloosheid en overlijden partner
+    // starten met het berekende voorstel (lib/horizon/event-pane-voorstel.ts).
+    setFormState(initFormState(type, null, currentAge(baselineInput), baselineInput))
     setMode('edit')
   }
 
