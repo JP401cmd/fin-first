@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter, useSearchParams, usePathname } from 'next/navigation'
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { SlidersHorizontal, ArrowRight, TrendingUp, Wallet, Pencil } from 'lucide-react'
 import type { FireParams } from '@/lib/fire-params'
@@ -33,6 +33,7 @@ import type { ManagedStrategy } from '@/lib/strategy-events'
 import { isStrategieKey } from '@/lib/horizon/strategie-route'
 import { StrategieEditors, type StrategieEditorsData } from './strategie/strategie-editors'
 import { LevensstrategieenSection } from './levensstrategieen-section'
+import { useEenmaligeDeeplink } from '@/components/toekomst/instellingen/use-eenmalige-deeplink'
 
 /**
  * VoorkeurenView — sectie Voorkeuren in katern Instellingen (/toekomst/instellingen#voorkeuren, ADR 0179).
@@ -183,8 +184,6 @@ export function VoorkeurenView({
   potBalances: Record<WealthGroup, number>
 }) {
   const router = useRouter()
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
   // Weergavemodus: single source of truth — zelfde bron als HideInSimple.
   const { mode } = useDisplayMode()
   const simple = mode === 'simple'
@@ -206,49 +205,42 @@ export function VoorkeurenView({
   // Welke levensstrategie-editor open is (null = dicht).
   const [openStrategy, setOpenStrategy] = useState<ManagedStrategy | null>(null)
 
-  // Deep-link: ?strategie=aow|pensioen|huis|werk opent de bijbehorende editor.
+  // Kwam de open editor via de deeplink binnen? De param zelf is dan al uit de URL
+  // (useEenmaligeDeeplink), dus die herkomst moet als state blijven staan.
+  const [strategieViaDeeplink, setStrategieViaDeeplink] = useState<ManagedStrategy | null>(null)
+
+  // Deep-link: ?strategie=aow|pensioen|huis|werk opent de bijbehorende editor; de param
+  // verdwijnt direct uit de URL (C3 punt 7 — hij bleef na sluiten soms staan).
   // (Disjunct van ?strategie=open op /toekomst — dat is de horizon-strategiekiezer.)
-  useEffect(() => {
-    const s = searchParams.get('strategie')
-    if (isStrategieKey(s)) setOpenStrategy(s)
-  }, [searchParams])
+  useEenmaligeDeeplink('strategie', (s) => {
+    if (!isStrategieKey(s)) return
+    setOpenStrategy(s)
+    setStrategieViaDeeplink(s)
+  })
 
   // S6 — de Pensioen-strategie is de bestemming van twee zichtbare verwijzingen
   // op /overzicht/belasting/box1 ("vul je factor A in bij je pensioen-strategie").
   // Komt de gebruiker daar vandaan (?strategie=pensioen), dan staat de
   // factor-A-uitvraag in de editor meteen open — geen tweede klik op
   // "Bereken je fiscale ruimte" om de opdracht te kunnen uitvoeren.
-  const jaarruimteDeeplink =
-    openStrategy === 'pensioen' && searchParams.get('strategie') === 'pensioen'
+  const jaarruimteDeeplink = openStrategy === 'pensioen' && strategieViaDeeplink === 'pensioen'
 
-  // Sluit de strategie-editor én ruim de ?strategie-param op.
+  // Sluit de strategie-editor; de ?strategie-param is al bij het openen opgeruimd.
   function closeStrategy() {
     setOpenStrategy(null)
-    if (searchParams.get('strategie')) {
-      const p = new URLSearchParams(searchParams)
-      p.delete('strategie')
-      router.replace(`${pathname}${p.toString() ? `?${p}` : ''}`, { scroll: false })
-    }
+    setStrategieViaDeeplink(null)
   }
 
   // Deep-link: ?regel=eindstrategie|onttrekkingsstrategie|… opent het
   // bijbehorende regel-bewerkscherm (spiegelt het ?strategie=-patroon
-  // hierboven). Valideert tegen de geldige RegelId-set.
-  useEffect(() => {
-    const r = searchParams.get('regel')
-    if (r && (REGEL_ORDER as string[]).includes(r)) {
-      setEditingRegel(r as RegelId)
-    }
-  }, [searchParams])
+  // hierboven). Valideert tegen de geldige RegelId-set; de param verdwijnt bij openen.
+  useEenmaligeDeeplink('regel', (r) => {
+    if ((REGEL_ORDER as string[]).includes(r)) setEditingRegel(r as RegelId)
+  })
 
-  // Sluit het regel-bewerkscherm én ruim de ?regel-param op (spiegelt closeStrategy).
+  // Sluit het regel-bewerkscherm (spiegelt closeStrategy).
   function closeRegel() {
     setEditingRegel(null)
-    if (searchParams.get('regel')) {
-      const p = new URLSearchParams(searchParams)
-      p.delete('regel')
-      router.replace(`${pathname}${p.toString() ? `?${p}` : ''}`, { scroll: false })
-    }
   }
 
   // ADR 0129 — de plan-kaart toont de EIND-VORM als naam en het STOP-ANKER als

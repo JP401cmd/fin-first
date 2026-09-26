@@ -5,7 +5,9 @@
  * daaronder de bestaande Voorkeuren- en Gebeurtenissen-view, gestapeld als secties met
  * ankers (`#voorkeuren`, `#gebeurtenissen`). De views houden hun eigen deeplinks
  * (`?strategie=`, `?regel=` in Voorkeuren; `?nieuw=` in Gebeurtenissen) — die sleutels
- * zijn disjunct, dus beide kunnen op dezelfde route luisteren.
+ * zijn disjunct, dus beide kunnen op dezelfde route luisteren. Elke view ruimt zijn param
+ * meteen na het openen op (`useEenmaligeDeeplink`); `AnkerScroll` zet de pagina na
+ * hydratie op het anker uit de hash.
  *
  * D8: dit component leest de route niet. Data komt via props; de plan-review-opener via
  * de provider die de host (route of katern-layout) eromheen zet.
@@ -19,6 +21,7 @@ import type { GebeurtenissenView } from '@/components/future/gebeurtenissen-view
 import { GebeurtenissenMetHoofdrun } from './gebeurtenissen-met-hoofdrun'
 import type { PlanReviewProgress } from '@/lib/plan-review/types'
 import { WizardIngang } from './wizard-ingang'
+import { AnkerScroll } from './anker-scroll'
 
 export const INSTELLINGEN_ANKERS = {
   voorkeuren: 'voorkeuren',
@@ -37,6 +40,8 @@ export function InstellingenKatern({
 }) {
   return (
     <div className="pt-4">
+      {/* Deeplinks met #voorkeuren/#gebeurtenissen landen pas na hydratie op hun plek. */}
+      <AnkerScroll ankers={Object.values(INSTELLINGEN_ANKERS)} />
       {planReviewProgress && (
         <div className="mx-auto max-w-6xl px-4 sm:px-6 pb-8">
           <WizardIngang progress={planReviewProgress} />

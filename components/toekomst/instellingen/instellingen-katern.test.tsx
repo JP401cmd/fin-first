@@ -190,3 +190,50 @@ describe('InstellingenKatern — deeplinks op de samengevoegde route', () => {
     expect(screen.getByTestId('gebeurtenissen-nieuw').textContent).toBe('1')
   })
 })
+
+describe('InstellingenKatern — deeplink ruimt zich op en het anker klopt (C3 punt 7)', () => {
+  afterEach(() => {
+    window.history.replaceState(null, '', '/')
+    vi.restoreAllMocks()
+  })
+
+  it('?strategie=aow: de editor opent en de param verdwijnt meteen, met behoud van de hash', () => {
+    window.history.replaceState(null, '', '/toekomst/instellingen?strategie=aow#voorkeuren')
+    nav.search = new URLSearchParams('strategie=aow')
+    renderKatern(null)
+    expect(screen.getByTestId('strategie-editors-open').textContent).toBe('aow')
+    expect(nav.replace).toHaveBeenCalledWith('/toekomst/instellingen#voorkeuren', { scroll: false })
+  })
+
+  it('een ongeldige ?strategie= opent niets maar blijft ook niet hangen', () => {
+    nav.search = new URLSearchParams('strategie=onzin&x=1')
+    renderKatern(null)
+    expect(screen.getByTestId('strategie-editors-open').textContent).toBe('none')
+    expect(nav.replace).toHaveBeenCalledWith('/toekomst/instellingen?x=1', { scroll: false })
+  })
+
+  it('#gebeurtenissen: na hydratie scrollt de pagina naar het anker', () => {
+    window.history.replaceState(null, '', '/toekomst/instellingen?nieuw=1#gebeurtenissen')
+    const scroll = vi.fn()
+    Element.prototype.scrollIntoView = scroll
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
+      cb(0)
+      return 1
+    })
+    const { container } = renderKatern(null)
+    expect(scroll).toHaveBeenCalledTimes(1)
+    expect(scroll.mock.contexts[0]).toBe(container.querySelector('#gebeurtenissen'))
+  })
+
+  it('een vreemde hash laat de scrollpositie met rust', () => {
+    window.history.replaceState(null, '', '/toekomst/instellingen#iets-anders')
+    const scroll = vi.fn()
+    Element.prototype.scrollIntoView = scroll
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
+      cb(0)
+      return 1
+    })
+    renderKatern(null)
+    expect(scroll).not.toHaveBeenCalled()
+  })
+})

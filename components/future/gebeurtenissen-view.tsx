@@ -3,7 +3,8 @@
 import { useState, useEffect, useMemo } from 'react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
-import { useRouter, useSearchParams, usePathname } from 'next/navigation'
+import { useRouter } from 'next/navigation'
+import { useEenmaligeDeeplink } from '@/components/toekomst/instellingen/use-eenmalige-deeplink'
 import {
   Wallet,
   Compass,
@@ -225,8 +226,6 @@ export function GebeurtenissenView({
   // Feature #876 — read-only uitleg-sheet voor de tekort-lening-rij.
   const [deficitSheetOpen, setDeficitSheetOpen] = useState(false)
   const router = useRouter()
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
 
   // ── Feature #876: kernel-run (zelfde run-site als de Tijdas-grafiek) ─────
   // De hook draait pas ná hydration (params null → isLoading, skeleton-rij);
@@ -372,21 +371,16 @@ export function GebeurtenissenView({
   }
 
   // Deep-link: ?nieuw=1|true opent de EventPane direct in catalog-mode
-  // (vanuit een overlay-CTA op de Tijdas-grafiek).
+  // (vanuit een overlay-CTA op de Tijdas-grafiek). De param verdwijnt meteen uit de
+  // URL (C3 punt 7), route-onafhankelijk via de huidige pathname.
   // Na openCatalog gedeclareerd zodat de functie in scope is bij mount.
-  useEffect(() => {
-    const n = searchParams.get('nieuw')
+  useEenmaligeDeeplink('nieuw', (n) => {
     if (n === '1' || n === 'true') openCatalog()
-  }, [searchParams])
+  })
 
-  // Sluit de EventPane én ruim een eventuele ?nieuw-param op.
+  // Sluit de EventPane; de ?nieuw-param is al bij het openen opgeruimd.
   function closeEventPane() {
     setEventPaneOpen(false)
-    if (searchParams.get('nieuw')) {
-      const p = new URLSearchParams(searchParams)
-      p.delete('nieuw')
-      router.replace(`${pathname}${p.toString() ? `?${p}` : ''}`, { scroll: false })
-    }
   }
   // Tijdlijn-bron: op de kernel-tak vervangt de hook het stale server-virtuele
   // verkoop-event door het kernel-afgeleide verkoopmoment (zelfde run als de
