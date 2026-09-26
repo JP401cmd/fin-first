@@ -217,7 +217,7 @@ describe('event-pane-edit-form — bestaand negatief maandblok blijft behouden',
 
   it('opslaan na openen verliest het blok niet (round-trip via buildDraftEvent)', () => {
     const s = initFormState('custom', rij({ cost: 0, income: -1500, duration: 0 }), 40)
-    const draft = buildDraftEvent(s, undefined)
+    const draft = buildDraftEvent(s, null)
     expect(draft.monthly_cost_change).toBe(1500)
     expect(draft.monthly_income_change).toBe(0)
   })

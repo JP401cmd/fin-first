@@ -26,6 +26,8 @@ import {
 const h = vi.hoisted(() => ({
   segment: null as string | null,
   grafiek: { current: null as Record<string, unknown> | null },
+  // De eind-vorm van het plan. Standaard een vorm mét eindleeftijd; de perpetual-test zet hem om.
+  eindvorm: 'deplete' as 'deplete' | 'legacy' | 'perpetual',
 }))
 
 vi.mock('next/navigation', () => ({
@@ -91,7 +93,7 @@ vi.mock('@/components/toekomst/state/toekomst-state-provider', () => ({
   useToekomstSimContext: () => ({
     fireParams,
     fireStrategy,
-    planEindvorm: 'perpetual',
+    planEindvorm: h.eindvorm,
     userAowAge: { fractional: 67.25 },
     events,
     canonicalDailyRate: 100,
@@ -168,8 +170,9 @@ vi.mock('@/components/toekomst/state/toekomst-state-provider', () => ({
 
 import { ToekomstCanvas } from './toekomst-canvas'
 
-function renderIn(segment: string | null) {
+function renderIn(segment: string | null, eindvorm: 'deplete' | 'legacy' | 'perpetual' = 'deplete') {
   h.segment = segment
+  h.eindvorm = eindvorm
   h.grafiek.current = null
   return render(
     <DisplayModeProvider initialMode="full">
@@ -235,6 +238,13 @@ describe('ToekomstCanvas — Plan', () => {
     const regel = screen.getByTestId('aannamesregel')
     expect(regel.textContent).toContain('plan tot je 90e')
     expect(regel.textContent).not.toContain('100e')
+  })
+
+  it('noemt bij een eeuwigdurend plan geen eindleeftijd ("Mijn vermogen mag niet slinken" heeft er geen)', () => {
+    renderIn(null, 'perpetual')
+    const regel = screen.getByTestId('aannamesregel')
+    expect(regel.textContent).toContain('je vermogen mag niet slinken')
+    expect(regel.textContent).not.toMatch(/tot je \d+e/)
   })
 
   it('tekent de fasebalk en laat de doelscenario-lijn weg zolang die laag uit staat', () => {
