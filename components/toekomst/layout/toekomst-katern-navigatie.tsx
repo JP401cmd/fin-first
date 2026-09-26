@@ -12,6 +12,7 @@
  * katern de "Wat zie ik hier?"-inhoud van zijn eigen route toont.
  */
 
+import { useEffect, useRef } from 'react'
 import { KaternKoppen, type KaternKopItem } from '@/components/editorial/katern-koppen'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import type { PageInfoContent } from '@/lib/page-info-content'
@@ -30,6 +31,32 @@ import { useActiefKatern } from './actief-katern'
 export function ToekomstKaternKoppen({ className = '' }: { className?: string }) {
   const actief = useActiefKatern()
   const meldingen = useToekomstKaternMeldingen()
+  const ankerRef = useRef<HTMLDivElement>(null)
+  const vorigKatern = useRef(actief)
+
+  // Katernwissel zonder sprong (fixronde C1). De koppen navigeren met `scroll={false}`;
+  // hier één regel voor waar de pagina daarna staat: staan de koppen op hun eigen plek
+  // in beeld, dan blijft alles staan. Kleven ze (mobiel, ver naar beneden gescrold) of
+  // zijn ze boven uit beeld, dan komen ze bovenaan het zichtbare deel, met het nieuwe
+  // katern er direct onder — niet halverwege een katern dat je nog niet gezien hebt.
+  // Niet bij de eerste render, en niet bij een hash (`#verken-je-aannames`): die
+  // scrolt zelf naar zijn anker.
+  useEffect(() => {
+    if (vorigKatern.current === actief) return
+    vorigKatern.current = actief
+    if (window.location.hash) return
+    const anker = ankerRef.current
+    if (!anker) return
+    const nav = anker.nextElementSibling
+    if (!(nav instanceof HTMLElement)) return
+    // Natuurlijke bovenkant van de nav = het anker plus de eigen marge van de nav (de
+    // layout geeft `mt-6`); kleeft hij, dan staat hij lager dan die plek.
+    const natuurlijk = anker.getBoundingClientRect().top + (parseFloat(getComputedStyle(nav).marginTop) || 0)
+    const kleeft = nav.getBoundingClientRect().top > natuurlijk + 1
+    if (!kleeft && natuurlijk >= 0) return
+    anker.scrollIntoView({ block: 'start' })
+  }, [actief])
+
   const items: KaternKopItem[] = KATERN_VOLGORDE.map((key) => {
     const staat = meldingen?.perKatern[key] ?? null
     return {
@@ -41,7 +68,14 @@ export function ToekomstKaternKoppen({ className = '' }: { className?: string })
       onSelect: staat && staat.display === 'minimized' ? staat.restore : undefined,
     }
   })
-  return <KaternKoppen items={items} actiefKey={actief} label={KATERN_NAV_LABEL} className={className} />
+  return (
+    <>
+      {/* De natuurlijke plek van de koppen: de nav zelf kleeft (sticky) en mag niet in
+          een wrapper, want sticky werkt alleen binnen zijn ouder. */}
+      <div ref={ankerRef} aria-hidden="true" data-testid="katern-koppen-anker" />
+      <KaternKoppen items={items} actiefKey={actief} label={KATERN_NAV_LABEL} className={className} />
+    </>
+  )
 }
 
 /**

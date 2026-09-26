@@ -93,6 +93,11 @@ export function KaternKoppen({ items, actiefKey, label, className = '' }: Katern
             <li key={item.key} className="min-w-0">
               <Link
                 href={item.href}
+                // Katernen van één pagina: de layout (kop, canvas) blijft staan, dus Next
+                // scrolt niet naar het nieuwe segment. Zonder dit eerst `scrollTop = 0`,
+                // daarna `scrollIntoView` op het katern: twee sprongen per klik. Waar de
+                // pagina dan wel moet schuiven, beslist de host (fixronde C1).
+                scroll={false}
                 aria-current={actief ? 'page' : undefined}
                 // Met een melding een expliciete naam; de samenvatting blijft dan als
                 // beschrijving bereikbaar. Zonder melding is de inhoud de naam.
