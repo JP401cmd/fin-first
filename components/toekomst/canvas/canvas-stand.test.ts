@@ -117,6 +117,16 @@ describe('canvasStand — Instellingen', () => {
     expect(stand.toonAannamesregel).toBe(false)
     expect(stand.alleenDesktop).toBe(true)
   })
+
+  it('tekent alleen de hoofdlijn en heeft geen cijferbalk; Plan en Doelen wel', () => {
+    expect(stand.alleenHoofdlijn).toBe(true)
+    expect(stand.toonReadout).toBe(false)
+    for (const katern of ['plan', 'doelen'] as const) {
+      const s = canvasStand(katern, standaard, alles, VOLLEDIG)
+      expect(s.alleenHoofdlijn).toBe(false)
+      expect(s.toonReadout).toBe(true)
+    }
+  })
 })
 
 describe('canvasStand — de keuze blijft staan bij een katernwissel', () => {

@@ -57,6 +57,8 @@ import {
 
 /** Naam van de doelscenario-lijn in de scenario-overlays (`use-toekomst-scenario.ts`). */
 const DOELSCENARIO_OVERLAY = 'wat-als'
+/** Geen meegroeiende doellijn (Instellingen); stabiel, zodat de grafiek niet hertekent. */
+const GEEN_FACTOREN: { age: number; factor: number }[] = []
 
 export function ToekomstCanvas() {
   const {
@@ -200,6 +202,9 @@ export function ToekomstCanvas() {
   )
   const zichtbareMonteCarlo = marktcheck ? viewMonteCarloOverlay : undefined
   const tweedeLijnZichtbaar = secondaryLineVisible && metHuis
+  // Instellingen: alleen de hoofdlijn met de gebeurtenis-markers (spec §4.5). De
+  // doellijnen en de doelscenario-attributen (verschilvlak, nalatenschap-bol) vallen weg.
+  const { alleenHoofdlijn } = stand
 
   // Geldstroom in Eenvoudig: alleen Lijnen (spec §4.7). De modus-switch verbergt
   // Bronnen al via HideInSimple; hier bewaakt de host de waarde, zodat een keuze uit
@@ -306,7 +311,7 @@ export function ToekomstCanvas() {
             WidgetEmpty-lege-staat was onbereikbaar — fase 1 stap 1). */}
         {simResult ? (
           <>
-            {!stand.alleenDesktop && (
+            {stand.toonReadout && (
               <CanvasUitleg modus={stand.modus} viewReadoutData={viewReadoutData} lifelineAge={lifelineAge} />
             )}
 
@@ -341,19 +346,19 @@ export function ToekomstCanvas() {
               viewPartnerLineRows={viewPartnerLineRows}
               viewDisplaySimRows={viewDisplaySimRows}
               simCashflows={simCashflows}
-              viewFireTarget={viewFireTarget}
-              showDualFireTarget={showDualFireTarget}
+              viewFireTarget={alleenHoofdlijn ? undefined : viewFireTarget}
+              showDualFireTarget={alleenHoofdlijn ? false : showDualFireTarget}
               viewFireTargetInclHome={viewFireTargetInclHome}
-              viewTargetEndPortfolio={viewTargetEndPortfolio}
-              viewTargetInflationFactors={viewTargetInflationFactors}
+              viewTargetEndPortfolio={alleenHoofdlijn ? undefined : viewTargetEndPortfolio}
+              viewTargetInflationFactors={alleenHoofdlijn ? GEEN_FACTOREN : viewTargetInflationFactors}
               dualBasisAvailable={dualBasisAvailable}
               viewLiquidWealthPoints={viewLiquidWealthPoints}
               effectiveChartPrimaryBasis={effectiveChartPrimaryBasis}
               secondaryLineVisible={tweedeLijnZichtbaar}
               partnerName={partnerName}
               viewCombinedScenarioOverlays={zichtbareScenarioOverlays}
-              labZone={labZone}
-              nalatenschapMarker={nalatenschapMarker}
+              labZone={alleenHoofdlijn ? null : labZone}
+              nalatenschapMarker={alleenHoofdlijn ? undefined : nalatenschapMarker}
               scenarioPending={scenarioPending}
               stopPadPending={stopPadPending}
               viewMonteCarloOverlay={zichtbareMonteCarlo}

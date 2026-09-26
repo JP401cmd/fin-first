@@ -59,6 +59,14 @@ export interface CanvasStand {
   readonly toonLegenda: boolean
   /** Instellingen: compact canvas op desktop, geen canvas op mobiel. */
   readonly alleenDesktop: boolean
+  /**
+   * Instellingen: alleen de hoofdlijn met de gebeurtenis-markers (spec §4.5), dus geen
+   * doellijnen (doelbedrag, meegroeiend doel, de doelscenario-stippellijn met zijn
+   * verschilvlak en nalatenschap-bol).
+   */
+  readonly alleenHoofdlijn: boolean
+  /** De cijferbalk (`LifelineReadout`) boven de grafiek: niet in Instellingen (§4.7). */
+  readonly toonReadout: boolean
 }
 
 const GEEN_LAGEN: Record<LaagId, boolean> = Object.fromEntries(
@@ -115,6 +123,8 @@ export function canvasStand(
       toonPlanVolgtRegel: false,
       toonLegenda: false,
       alleenDesktop: true,
+      alleenHoofdlijn: true,
+      toonReadout: false,
     }
   }
 
@@ -139,6 +149,8 @@ export function canvasStand(
     toonPlanVolgtRegel: katern === 'doelen' && keuze.modus !== 'vermogen',
     toonLegenda: true,
     alleenDesktop: false,
+    alleenHoofdlijn: false,
+    toonReadout: true,
   }
 }
 

@@ -39,6 +39,9 @@ vi.mock('@/lib/hooks/use-media-query', () => ({
 }))
 
 vi.mock('@/components/app/perspective-context-label', () => ({ PerspectiveContextLabel: () => null }))
+vi.mock('@/components/app/horizon/lifeline-readout', () => ({
+  LifelineReadout: () => <div data-testid="lifeline-readout" />,
+}))
 
 vi.mock('./canvas-grafiek', () => ({
   CanvasGrafiek: (props: Record<string, unknown>) => {
@@ -81,7 +84,7 @@ vi.mock('@/components/toekomst/state/toekomst-state-provider', () => ({
     setClusterSheet: vi.fn(),
     setSelectedYearAge: vi.fn(),
   }),
-  useToekomstScenarioContext: () => ({ hasDoelLijn: true, labZone: null, nalatenschapMarker: undefined }),
+  useToekomstScenarioContext: () => ({ hasDoelLijn: true, labZone: 'zone-plan', nalatenschapMarker: { zone: null } }),
   useToekomstSimContext: () => ({
     fireParams,
     userAowAge: { fractional: 67.25 },
@@ -153,7 +156,7 @@ vi.mock('@/components/toekomst/state/toekomst-state-provider', () => ({
     viewFireTargetInclHome: null,
     viewTargetEndPortfolio: undefined,
     viewTargetInflationFactors: [],
-    viewReadoutData: null,
+    viewReadoutData: { age: 45 },
     viewIeBreakdownResult: null,
   }),
 }))
@@ -304,6 +307,25 @@ describe('ToekomstCanvas — Instellingen', () => {
     expect(grafiek().chartEventOverlay).toEqual([
       { id: 'bouw', lagen: { gebeurtenissen: true, mijlpalen: false, doelen: false } },
     ])
+  })
+
+  it('tekent alleen de hoofdlijn: geen doellijnen, geen verschilvlak of nalatenschap-bol, geen cijferbalk', () => {
+    renderIn('instellingen')
+    expect(grafiek().viewFireTarget).toBeUndefined()
+    expect(grafiek().showDualFireTarget).toBe(false)
+    expect(grafiek().viewTargetEndPortfolio).toBeUndefined()
+    expect(grafiek().viewTargetInflationFactors).toEqual([])
+    expect(grafiek().labZone).toBeNull()
+    expect(grafiek().nalatenschapMarker).toBeUndefined()
+    expect(screen.queryByTestId('lifeline-readout')).toBeNull()
+  })
+
+  it('Plan houdt de doellijn en de cijferbalk', () => {
+    renderIn(null)
+    expect(grafiek().viewFireTarget).toBe(1)
+    expect(grafiek().labZone).toBe('zone-plan')
+    expect(grafiek().nalatenschapMarker).toEqual({ zone: null })
+    expect(screen.getByTestId('lifeline-readout')).toBeTruthy()
   })
 
   it('ontbreekt op mobiel (alleen desktop)', () => {
