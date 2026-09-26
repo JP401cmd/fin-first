@@ -11,7 +11,11 @@
  */
 import { describe, it, expect } from 'vitest'
 import { readSourceLF } from '@/lib/test-utils/read-source'
-import { RAW_PROFILE_KOLOMMEN, kiesRawProfileKolommen } from './raw-profile-kolommen'
+import {
+  RAW_PROFILE_FEATURE_PREFERENCES_SLEUTELS,
+  RAW_PROFILE_KOLOMMEN,
+  kiesRawProfileKolommen,
+} from './raw-profile-kolommen'
 
 const VOLLE_RIJ: Record<string, unknown> = {
   id: 'u1',
@@ -96,5 +100,61 @@ describe('RAW_PROFILE_KOLOMMEN dekt elke lezer', () => {
     const src = readSourceLF('lib/horizon/raw-data-loader.ts')
     expect(src).toContain('kiesRawProfileKolommen(profile)')
     expect(src).not.toMatch(/\.\.\.\(profile as ConvergentieRawProfileRow\)/)
+  })
+})
+
+/**
+ * Security 🟢-1 (C3 punt 9): `feature_preferences` is een vrije JSONB-zak. Hij draagt
+ * o.a. `retirement_aspirations.customDreams[].label` (vrije tekst), `wealth_widget_selection`
+ * en `deferred_onboarding_fields` — niets daarvan leest een rawProfile-lezer. Alleen de
+ * sub-sleutels die de kernel-keten leest mogen mee.
+ */
+describe('feature_preferences: alleen de gelezen sub-sleutels', () => {
+  const VOLLE_PREFS = {
+    fire_strategy_override: 'pensioen',
+    retirement_aspirations: { customDreams: [{ label: 'Zeilboot voor Anna', amount: 20_000 }] },
+    wealth_widget_selection: { assetIds: ['a1'], debtIds: [] },
+    deferred_onboarding_fields: ['assets'],
+  }
+
+  it('neemt fire_strategy_override over en laat vrije tekst en andere voorkeuren weg', () => {
+    const uit = kiesRawProfileKolommen({ feature_preferences: VOLLE_PREFS })
+    expect(uit.feature_preferences).toEqual({ fire_strategy_override: 'pensioen' })
+    expect(JSON.stringify(uit)).not.toContain('Zeilboot')
+  })
+
+  it('null blijft null, een zak zonder gelezen sleutels wordt leeg, de bron wordt niet gemuteerd', () => {
+    expect(kiesRawProfileKolommen({ feature_preferences: null }).feature_preferences).toBeNull()
+    expect(kiesRawProfileKolommen({ feature_preferences: { wealth_widget_selection: {} } }).feature_preferences).toEqual({})
+    const bron = { feature_preferences: { ...VOLLE_PREFS } }
+    kiesRawProfileKolommen(bron)
+    expect(bron.feature_preferences).toEqual(VOLLE_PREFS)
+  })
+
+  it('élke sub-sleutel die een rawProfile-lezer uit feature_preferences leest, staat in de lijst', () => {
+    const lijst = new Set<string>(RAW_PROFILE_FEATURE_PREFERENCES_SLEUTELS)
+    // De lezers van de kernel-keten (server én client: use-horizon-fire-sim → adapter →
+    // resolveFireStrategyWithOverride; lab/scenario → patchNalatenschap) plus de
+    // /toekomst-state. Een lezing is `fp.<sleutel>`, `feature_preferences.<sleutel>`,
+    // `feature_preferences?.<sleutel>` of `hasOwnProperty.call(fp, '<sleutel>')`.
+    const bronnen = [
+      'lib/fire-strategy.ts',
+      'lib/horizon/kernel-profile-basis.ts',
+      'lib/horizon-kernel/adapter/params.ts',
+      'lib/horizon-kernel/convergentie-router.ts',
+      'lib/hooks/use-horizon-fire-sim.ts',
+      'lib/plan-review/overzicht.ts',
+      'components/toekomst/state/use-toekomst-sim.ts',
+      'components/toekomst/state/use-toekomst-scenario.ts',
+      'components/toekomst/state/use-toekomst-lagen.ts',
+    ]
+    const gelezen = new Set<string>()
+    for (const pad of bronnen) {
+      const src = readSourceLF(pad)
+      for (const m of src.matchAll(/\b(?:fp|feature_preferences)\??\.([a-z][a-z0-9_]*)/g)) gelezen.add(m[1])
+      for (const m of src.matchAll(/hasOwnProperty\.call\((?:fp|[a-zA-Z_.]*feature_preferences), '([a-z0-9_]+)'\)/g)) gelezen.add(m[1])
+    }
+    expect([...gelezen]).toContain('fire_strategy_override')
+    expect([...gelezen].filter((s) => !lijst.has(s))).toEqual([])
   })
 })

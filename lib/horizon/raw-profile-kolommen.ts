@@ -63,6 +63,32 @@ export const RAW_PROFILE_KOLOMMEN = [
 type RawProfileKolom = (typeof RAW_PROFILE_KOLOMMEN)[number]
 
 /**
+ * De sub-sleutels van `feature_preferences` die een rawProfile-lezer gebruikt.
+ *
+ * `feature_preferences` is een vrije JSONB-zak voor voorkeuren van allerlei schermen:
+ * `retirement_aspirations` (met vrije tekst in `customDreams[].label`),
+ * `wealth_widget_selection`, `deferred_onboarding_fields`, gids-voortgang. Geen van die
+ * sleutels hoort in de RSC-payload of in een API-antwoord van /toekomst (security-review
+ * 🟢-1, C3 punt 9). De kernel-keten leest er precies één: het pensioen-parkeerpad
+ * `fire_strategy_override` (`resolveFireStrategyWithOverride` in lib/fire-strategy.ts,
+ * `patchNalatenschap` in kernel-profile-basis.ts). `raw-profile-kolommen.test.ts` scant
+ * de lezers en wordt rood bij een nieuwe sub-sleutel die hier ontbreekt — want een
+ * ontbrekende sleutel breekt stil (de lezer ziet dan gewoon "niet gezet").
+ */
+export const RAW_PROFILE_FEATURE_PREFERENCES_SLEUTELS = ['fire_strategy_override'] as const
+
+/** `feature_preferences` met alleen de gelezen sub-sleutels; `null`/geen object blijft zoals het was. */
+function kiesFeaturePreferences(waarde: unknown): unknown {
+  if (waarde == null || typeof waarde !== 'object' || Array.isArray(waarde)) return waarde
+  const bron = waarde as Record<string, unknown>
+  const uit: Record<string, unknown> = {}
+  for (const sleutel of RAW_PROFILE_FEATURE_PREFERENCES_SLEUTELS) {
+    if (sleutel in bron) uit[sleutel] = bron[sleutel]
+  }
+  return uit
+}
+
+/**
  * Compile-time: elk veld van het contract staat in de lijst. `yearly_essential_expenses` is
  * geen kolom; de loader injecteert de al-berekende waarde.
  */
@@ -73,11 +99,13 @@ void LIJST_IS_VOLLEDIG
 /**
  * Neem alleen de kolommen uit `RAW_PROFILE_KOLOMMEN` over. Een kolom die de rij niet
  * had, blijft afwezig (niet `undefined`), zodat "niet opgehaald" en "leeg" niet vermengen.
+ * Van `feature_preferences` gaan alleen de gelezen sub-sleutels mee.
  */
 export function kiesRawProfileKolommen(rij: Record<string, unknown>): HorizonRawProfileRow {
   const uit: Record<string, unknown> = {}
   for (const kolom of RAW_PROFILE_KOLOMMEN) {
-    if (kolom in rij) uit[kolom] = rij[kolom]
+    if (!(kolom in rij)) continue
+    uit[kolom] = kolom === 'feature_preferences' ? kiesFeaturePreferences(rij[kolom]) : rij[kolom]
   }
   return uit as HorizonRawProfileRow
 }
