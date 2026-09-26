@@ -46,6 +46,7 @@ import {
 } from '@/lib/horizon/plan-draft'
 import type { StopAnchorKind } from '@/lib/fire-strategy'
 import { formatAowAge } from '@/lib/aow-leeftijd'
+import { EINDSTRATEGIE_ANKER } from '@/lib/toekomst/instellingen-rij'
 
 export interface StopPlanVragenProps {
   value: PlanDraft
@@ -119,7 +120,7 @@ export function StopPlanVragen({
   return (
     <div className="space-y-6">
       {/* ── Vraag 1: het stop-anker ─────────────────────────────────────── */}
-      <section aria-labelledby="stop-plan-vraag-1">
+      <section id={EINDSTRATEGIE_ANKER.stopmoment} aria-labelledby="stop-plan-vraag-1" className="scroll-mt-4">
         <span id="stop-plan-vraag-1" className="sr-only">{STOP_ANCHOR_QUESTION}</span>
         <Kop compact={compact}>{STOP_ANCHOR_QUESTION}</Kop>
         <div className="space-y-2" role="group" aria-labelledby="stop-plan-vraag-1">
@@ -161,7 +162,7 @@ export function StopPlanVragen({
       </section>
 
       {/* ── Vraag 2: tot welke leeftijd, en wat blijft er over ─────────── */}
-      <section aria-labelledby="stop-plan-vraag-2">
+      <section id={EINDSTRATEGIE_ANKER.eindleeftijd} aria-labelledby="stop-plan-vraag-2" className="scroll-mt-4">
         <span id="stop-plan-vraag-2" className="sr-only">{END_FORM_QUESTION}</span>
         <Kop compact={compact}>{END_FORM_QUESTION}</Kop>
 

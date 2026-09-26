@@ -29,6 +29,7 @@ export function RegelBewerkenPane({
   withdrawalStrategy,
   potRules,
   potBalances,
+  anker,
 }: {
   open: boolean
   /** Welke regel wordt bewerkt; null tijdens de sluit-animatie. */
@@ -42,6 +43,12 @@ export function RegelBewerkenPane({
   withdrawalStrategy: WithdrawalStrategyConfig
   potRules: PotRulesConfig
   potBalances: Record<WealthGroup, number>
+  /**
+   * ADR 0179 fase 3 — element-id in de body waar de pane naartoe scrolt na openen (bv. vraag 2
+   * of de tekort-lening-schakelaar van de eindstrategie-body): de rijen "Tot welke leeftijd"
+   * en "Geen tekort-lening" openen dezelfde body als Stopmoment, op hun eigen plek.
+   */
+  anker?: string | null
 }) {
   const [actions, setActions] = useState<RegelEditActionsState | null>(null)
   // Behoud de laatste niet-null regelId tijdens de sluit-animatie zodat de
@@ -59,6 +66,21 @@ export function RegelBewerkenPane({
   useEffect(() => {
     setActions(null)
   }, [shownId])
+
+  // Na openen naar het anker scrollen (twee frames: de pane schuift eerst in beeld).
+  useEffect(() => {
+    if (!open || !anker) return
+    let f2 = 0
+    const f1 = window.requestAnimationFrame(() => {
+      f2 = window.requestAnimationFrame(() => {
+        document.getElementById(anker)?.scrollIntoView({ block: 'start' })
+      })
+    })
+    return () => {
+      window.cancelAnimationFrame(f1)
+      window.cancelAnimationFrame(f2)
+    }
+  }, [open, anker, shownId])
 
   // Stabiele identity — anders herevalueert de publish-effect in de body elke render.
   const handleActionsChange = useCallback((next: RegelEditActionsState) => {
