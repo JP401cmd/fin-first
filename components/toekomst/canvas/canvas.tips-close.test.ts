@@ -17,7 +17,6 @@ const lees = (naam: string) => readSourceLF(join(DIR, naam))
 
 const CANVAS_BLADEREN = [
   'canvas-tips-toggle.tsx',
-  'canvas-lege-staat.tsx',
   'canvas-pills.tsx',
   'canvas-uitleg.tsx',
   'canvas-grafiek.tsx',

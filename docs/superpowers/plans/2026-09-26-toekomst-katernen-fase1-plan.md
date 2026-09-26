@@ -43,7 +43,7 @@ Eigenaarsbesluiten 26 sep: checkpoint-commit per stap **op master, per pad, nooi
 - [x] 4 P helpers/typen (integrator, A2)
 - [x] 5 P Plan-bladeren inpluggen
 - [x] 6 S-klein kassabons via ShellOverlay inpluggen
-- [ ] 7 P canvas-bladeren inpluggen
+- [x] 7 P canvas-bladeren inpluggen
 - [ ] 8 P Plan-meldingen inpluggen
 - [ ] 9 P Doelen-lab inpluggen
 - [ ] 10 P Plan-verdieping inpluggen (`useInViewOnce` mee)

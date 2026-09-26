@@ -127,16 +127,6 @@ describe('horizon-client.tsx — euro-weergave-render-grens (T4)', () => {
     ).toEqual([])
   })
 
-  it('gebruikt de naamconventie: de chart-feeds gaan als view*-waarden naar SimChart', () => {
-    const src = readFileSync(SOURCE_PATH, 'utf8')
-    // De vier feeds waar een terugval op de nominale variabele onzichtbaar zou
-    // zijn (het bedrag oogt plausibel), dus expliciet gepind.
-    expect(src).toMatch(/rows=\{useHouseholdMainLine \? viewHouseholdMainLineRows/)
-    expect(src).toMatch(/fireTarget=\{viewFireTarget\}/)
-    expect(src).toMatch(/targetEndPortfolio=\{viewTargetEndPortfolio\}/)
-    expect(src).toMatch(/targetInflationFactors=\{[^}]*viewTargetInflationFactors\}/)
-  })
-
   it('toont de hero-puntbedragen als view*-waarden (FR-B5)', () => {
     const src = readFileSync(SOURCE_PATH, 'utf8')
     // Het FIRE-doel, "vermogen op AOW" en de maandonttrekking horen bij een
@@ -259,23 +249,6 @@ describe('horizon-client.tsx — euro-weergave-render-grens (T4)', () => {
     expect(out[3][1]).not.toBeCloseTo(133_100, 0)
   })
 
-  it('laat het dagtarief (€ → vrijheidstijd) ongemoeid', () => {
-    const src = readFileSync(SOURCE_PATH, 'utf8')
-    // D15: het dagtarief is per definitie een grootheid van vandaag. Deflateert
-    // het mee, dan wordt de deflatie twee keer toegepast op de vrijheidstijd.
-    //
-    // De koers zélf verhuisde bij UR3-08 (eigenaarsbesluit C) van een eigen som
-    // over de projectie-uitgave — `(effectiveInput?.yearlyMustExpenses ?? 0) / 365`
-    // — naar `canonicalDailyRate` (= HorizonPageData.dailyExpenseRate, 12-mnd
-    // rolling consumptie), zodat de grafiek-tooltip dezelfde vrijheidstijd toont
-    // als de rest van deze pagina. Dat verandert niets aan D15: ook de canonieke
-    // koers is een grootheid van vandaag en gaat ONGEDEFLATEERD de grafiek in.
-    expect(src).toMatch(/dailyExpenseRate=\{canonicalDailyRate\}/)
-    // De vangrail zelf: nergens een gedeflateerde variant van de koers.
-    expect(src).not.toMatch(/dailyExpenseRate=\{deflate\(/)
-    expect(src).not.toMatch(/dailyExpenseRate=\{view[A-Za-z]*DailyRate/)
-  })
-
   it('deflateert de vermogensopbouw-staven (WealthCompositionChart) als view*-feed', () => {
     // Given een gebruiker die de hoofdgrafiek op de staafmodus (vermogensopbouw)
     // zet, When hij de euro-weergave op 'huidige euro's' zet, Then horen de
@@ -284,8 +257,8 @@ describe('horizon-client.tsx — euro-weergave-render-grens (T4)', () => {
     // Deze feed werd in wave 2 gemist: hij bevat geen deflate-aanroep en geen
     // inflationFactor-verwijzing, dus regels 2 en 3 konden hem niet vangen —
     // een AFWEZIGE deflatie is voor die grendels onzichtbaar. Vandaar deze pin.
-    const src = readFileSync(SOURCE_PATH, 'utf8')
-    expect(src).toMatch(/stackedRows=\{viewWealthCompositionRows\}/)
+    // De callsite `stackedRows={viewWealthCompositionRows}` staat sinds fase 1 stap 7
+    // in canvas-grafiek.tsx (canvas-grafiek.euro-view.test.ts); de feed zelf blijft hier.
     // De veldenlijst is expliciet (nooit "alles wat een getal is") en `age`
     // mag er niet in staan (klasse R).
     const fieldsMatch = readFileSync(FEEDS_PATH, 'utf8').match(/const STACKED_ROW_MONEY_FIELDS = \[([^\]]+)\]/)

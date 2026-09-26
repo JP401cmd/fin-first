@@ -20,12 +20,6 @@ import {
   type LifeEvent,
 } from '@/lib/horizon-data'
 import { MARKTCHECK_DEBOUNCE_MS, type MarktcheckOutcome } from '@/lib/horizon-kernel/marktcheck'
-import {
-  margeAnkerKort,
-  margeKort,
-  margeLegenda,
-  margeZin,
-} from '@/lib/horizon/marktcheck-copy'
 import { computeHealthScoreFromInputs, type HealthScore, type HealthScoreInput } from '@/lib/financial-health'
 import { computeEffectiveExpenses, computeFireTarget, computeFreedomProgressWithBasis, inclHomeTargetFromScalar } from '@/lib/core-metrics'
 import { computeEmergencyFundMonths } from '@/lib/health-score-input'
@@ -51,14 +45,9 @@ import { NaturalMilestoneSheet } from '@/components/app/horizon/natural-mileston
 import { ActionCard } from '@/components/app/action-card'
 import dynamic from 'next/dynamic'
 import {
-  TrendingUp,
-  AlertTriangle, Calendar, BarChart3, FlaskConical, Landmark,
-  Zap, Target, Sparkles,
-  GitBranch,
-  ChevronDown, ChevronUp,
-  Home, Lightbulb,
-  Play,
-  Pause,
+  AlertTriangle, Landmark,
+  Zap, Sparkles,
+  Home,
   Minus,
 } from 'lucide-react'
 import {
@@ -83,7 +72,6 @@ import { EindsituatieNotice } from '@/components/app/horizon/eindsituatie-notice
 import { detectEindsituatie } from '@/lib/horizon/eindsituatie-duiding'
 import { HideInSimple } from '@/components/app/hide-in-simple'
 import { HorizonTrendGrid } from '@/components/app/horizon/horizon-trend-grid'
-import { LifelineReadout } from '@/components/app/horizon/lifeline-readout'
 import { LevensinkomenStrook } from '@/components/app/horizon/levensinkomen-strook'
 import { buildCoverageStrip } from '@/lib/horizon/coverage-strip'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
@@ -139,7 +127,6 @@ import {
   ankerKpiCaption,
   ankerReachFromSim,
   ankerStopFromSim,
-  ankerTitel,
   ankerVraag,
   ankerZin,
   ankerZinKort,
@@ -273,20 +260,10 @@ const HouseholdFireSection = dynamic(() =>
   import('@/components/app/household-fire-section').then(m => ({ default: m.HouseholdFireSection })),
   { ssr: false }
 )
-const IncomeExpenseChart = dynamic(() =>
-  import('@/components/app/horizon/income-expense-chart').then(m => ({ default: m.IncomeExpenseChart })),
-  { ssr: false }
-)
-import { SimChart, buildScenarioVariants, SCENARIO_VARIANTS, type ScenarioOverlay, type MonteCarloOverlay, type HouseholdPartnerOverlay } from '@/components/app/horizon/sim-chart'
-import { ZoomableChartContainer } from '@/components/app/horizon/zoomable-chart-container'
-import { ProjectieLaadlaag } from '@/components/app/horizon/projectie-laadlaag'
-import { EventsTimeline } from '@/components/app/horizon/events-timeline'
+import { buildScenarioVariants, type ScenarioOverlay, type MonteCarloOverlay, type HouseholdPartnerOverlay } from '@/components/app/horizon/sim-chart'
 import { EventClusterSheet } from '@/components/app/horizon/event-cluster-sheet'
-import { PhaseBar } from '@/components/app/horizon/phase-bar'
 import { faseAtAge } from '@/lib/horizon/phase-bar-segments'
-import { CHART_PAD } from '@/lib/chart-constants'
 import { buildBreakdown } from '@/lib/income-expense-breakdown'
-import { WealthCompositionChart } from '@/components/app/horizon/wealth-composition-chart'
 import { unifiedRowsToStackedRows, type StackedRow } from '@/lib/wealth-composition'
 import { clipRowsToPlanEnd } from '@/lib/horizon/clip-rows-to-plan-end'
 import { simRowsToChartPoints } from '@/lib/horizon/sim-chart-geometry'
@@ -300,22 +277,14 @@ import {
   factorAtAge,
 } from '@/lib/euro-display'
 import { useEuroView } from '@/lib/hooks/use-euro-view'
-import { PillRow } from '@/components/app/pill-row'
-import { DEFAULT_FIRE_STRATEGY, type StopAnchor, STRATEGY_LABELS, resolveFreedomFraming, fireAgeForDisplay, isAtOrPastAow, isFixedAnchor, stopAnchorFromKernel, resolveFirePlanWithOverride } from '@/lib/fire-strategy'
+import { DEFAULT_FIRE_STRATEGY, type StopAnchor, resolveFreedomFraming, fireAgeForDisplay, isAtOrPastAow, isFixedAnchor, stopAnchorFromKernel, resolveFirePlanWithOverride } from '@/lib/fire-strategy'
 import { buildHorizonInput } from '@/lib/horizon/build-input'
 import { buildDeeplinkCleanupUrl } from '@/lib/horizon/deeplink-cleanup'
 import type { PreviewBaseline } from '@/lib/strategy-preview'
 import { buildBaselineOverrides } from '@/lib/whatif-overrides'
 import type { WhatIfOverrides } from '@/lib/types/horizon-whatif'
 import type { WhatIfEvent } from '@/lib/types/horizon-whatif'
-import { ChartOverlayExplainer } from '@/components/app/horizon/chart-overlay-explainer'
-import { ChartTips } from '@/components/editorial/chart-tips'
-import {
-  getFireProjectionTips,
-  getWealthCompositionTips,
-  getIncomeExpenseTips,
-} from '@/lib/chart-tips'
-import { ToekomstOverlay, type OverlayBalloonDef, type ToekomstOverlayGeometry } from '@/components/app/horizon/toekomst-overlay'
+import { type OverlayBalloonDef } from '@/components/app/horizon/toekomst-overlay'
 import { TOEKOMST_OVERLAY_BALLOONS } from '@/components/app/horizon/toekomst-overlay-balloons'
 import type {
   ActiveModal,
@@ -347,6 +316,11 @@ import {
   PlanKassabonGezondheid,
 } from '@/components/toekomst/plan/plan-kassabons'
 import { useInViewOnce } from '@/components/toekomst/plan/use-in-view-once'
+import { CanvasTipsToggle } from '@/components/toekomst/canvas/canvas-tips-toggle'
+import { CanvasPills } from '@/components/toekomst/canvas/canvas-pills'
+import { CanvasUitleg } from '@/components/toekomst/canvas/canvas-uitleg'
+import { CanvasGrafiek } from '@/components/toekomst/canvas/canvas-grafiek'
+import { CanvasLegenda } from '@/components/toekomst/canvas/canvas-legenda'
 
 export default function HorizonPage({
   initialData,
@@ -4578,22 +4552,11 @@ export default function HorizonPage({
       {/* === Editorial header — blueprint Type 1 (Module-landing) === */}
       <header className="relative mb-6 space-y-2">
         <div className="absolute right-4 top-0 flex items-center gap-1.5 sm:right-6">
-          {/* STEP 3b: overlay-toggle naast de "i" — wijst-tips aan/uit. */}
-          <button
-            type="button"
-            onClick={() => { if (overlayVisible) handleOverlayExit(); else persistOverlayVisible(true) }}
-            aria-pressed={overlayVisible}
-            aria-label={overlayVisible ? 'Aanscherp-tips verbergen' : 'Aanscherp-tips tonen'}
-            title={overlayVisible ? 'Tips verbergen' : 'Tips tonen'}
-            className={`inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-medium transition-colors ${
-              overlayVisible
-                ? 'border-[var(--module-active-300)] bg-[var(--module-active-50)] text-[var(--module-active-700)]'
-                : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:text-[var(--ink-2)]'
-            }`}
-          >
-            <Lightbulb className="h-3.5 w-3.5" aria-hidden />
-            <span className="hidden sm:inline">Tips</span>
-          </button>
+          <CanvasTipsToggle
+            overlayVisible={overlayVisible}
+            handleOverlayExit={handleOverlayExit}
+            persistOverlayVisible={persistOverlayVisible}
+          />
           {/* Geen eigen PageInfoButton: de paginakop (PageOpening "Je tijdas")
               levert 'm al. */}
         </div>
@@ -5023,733 +4986,141 @@ export default function HorizonPage({
                 )
               })()}
 
-              {/* ── Overlay toggles boven de grafiek ──
-                  `PillRow` houdt deze rij op ÉÉN regel: passen de labels niet,
-                  dan vallen ze allemaal weg en blijven de iconen over. Twee rijen
-                  pillen aten verticale ruimte die de grafiek zelf nodig heeft.
-                  Labels dragen daarom `data-pill-label`.
+              <CanvasPills
+                chartMode={chartMode}
+                scenariosExpanded={scenariosExpanded}
+                setScenariosExpanded={setScenariosExpanded}
+                scenarioData={scenarioData}
+                mcExpanded={mcExpanded}
+                setMcExpanded={setMcExpanded}
+                mcMarge={mcMarge}
+                mcFailed={mcFailed}
+                mcPending={mcPending}
+                hasDoelLijn={hasDoelLijn}
+                showScenarioLine={showScenarioLine}
+                setShowScenarioLine={setShowScenarioLine}
+                doelLijnLabel={doelLijnLabel}
+                hasScenario={hasScenario}
+                scenarioFireDeltaLabel={scenarioFireDeltaLabel}
+                scenarioPending={scenarioPending}
+                stopPadPending={stopPadPending}
+                dualBasisAvailable={dualBasisAvailable}
+                effectiveChartPrimaryBasis={effectiveChartPrimaryBasis}
+                showLiquidLine={showLiquidLine}
+                persistLiquidLine={persistLiquidLine}
+                showLifeEvents={showLifeEvents}
+                persistLifeEvents={persistLifeEvents}
+                events={events}
+                goalChartMarkers={goalChartMarkers}
+                showGoals={showGoals}
+                persistGoals={persistGoals}
+                showNaturalMilestones={showNaturalMilestones}
+                persistNaturalMilestones={persistNaturalMilestones}
+                naturalMilestones={naturalMilestones}
+                isPlaying={isPlaying}
+                setIsPlaying={setIsPlaying}
+                setChartMode={setChartMode}
+                simResult={simResult}
+                userAowAge={userAowAge}
+                currentAge={currentAge}
+                monteCarloOverlay={monteCarloOverlay}
+                planningMode={planningMode}
+                isFixedAnchorMode={isFixedAnchorMode}
+              />
 
-                  De euro-weergave-badge stond hier; die is verhuisd naar de
-                  weergave-sectie bovenaan de sidebar (`EuroViewBadge`).
-                  De schakelaar zelf woont in het zoekscherm (⌘K) — één plek voor
-                  de status, één voor de knop, in plaats van een badge per
-                  grafiek. */}
-              <PillRow className="mb-2" ariaLabel="Grafiek-opties">
-                {/* De AOW-stop-toggle stond hier (ADR 0129 B11): die is een
-                    snelkoppeling op de stop-slider van de vrijheidsas geworden. */}
-                {/* Scenario- en Monte-Carlo-toggles zijn line-chart-overlays —
-                    niet zinvol op de vermogensopbouw-stack. Verbergen in
-                    barchart-mode i.p.v. uitgrijzen: minder visuele ruis,
-                    en de gebruiker kan altijd terug-toggelen naar 'Pad'. */}
-                {chartMode === 'vermogenspad' && (
-                  <>
-                  <HideInSimple>
-                    <button
-                      type="button"
-                      onClick={() => setScenariosExpanded(prev => !prev)}
-                      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
-                        scenariosExpanded
-                          ? 'border-horizon-300 bg-horizon-50 text-horizon-700'
-                          : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-200 hover:text-[var(--ink-2)]'
-                      }`}
-                      aria-label="Scenario-lijnen tonen"
-                      title="Scenario's"
-                    >
-                      <GitBranch className="h-3 w-3" />
-                      <span data-pill-label className="hidden sm:inline">Scenario&apos;s</span>
-                      {scenarioData && scenariosExpanded && (
-                        <span data-pill-badge className="flex items-center gap-0.5">
-                          {scenarioData.map(s => (
-                            <span key={s.name} className="inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: s.color }} />
-                          ))}
-                        </span>
-                      )}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setMcExpanded(prev => !prev)}
-                      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
-                        mcExpanded
-                          ? 'border-horizon-300 bg-horizon-50 text-horizon-700'
-                          : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-200 hover:text-[var(--ink-2)]'
-                      }`}
-                      aria-label={mcMarge
-                        ? `Marktcheck — ${margeZin(mcMarge)}`
-                        : 'Marktcheck tonen — hoeveel je rendement mag tegenvallen'}
-                      title={mcFailed
-                        ? 'Marktcheck kon niet worden doorgerekend'
-                        : mcMarge
-                          ? margeZin(mcMarge)
-                          : 'Marktcheck: je plan doorgerekend onder wisselende markten'}
-                      aria-busy={mcExpanded && mcPending}
-                      /* Het label mag NIET wegvallen zolang de datawaarde staat
-                         (H21/F2): op smal scherm bleef anders een kaal getal over,
-                         dat naast een "succeskans" als kans gelezen werd. Dat liep
-                         via `className="inline"` op het label (0,1,0) en verloor
-                         altijd van de compact-regel (0,3,0) — B-025. Nu draagt de
-                         PIL het keep-signaal, en garandeert de CSS dat label en
-                         badge samen reizen. Zonder badge geen keep: dan doet de pil
-                         gewoon mee met de compacte stand. */
-                      data-pill-keep={mcExpanded && (mcPending || mcFailed || Boolean(mcMarge)) ? '' : undefined}
-                    >
-                      <FlaskConical className="h-3 w-3" />
-                      <span data-pill-label className="hidden sm:inline">
-                        Marktcheck
-                      </span>
-                      {mcExpanded && mcPending && (
-                        <span data-pill-badge className="font-mono text-[10px] tabular-nums opacity-60">…</span>
-                      )}
-                      {mcExpanded && !mcPending && mcFailed && (
-                        <span data-pill-badge className="font-mono text-[10px] tabular-nums opacity-60">—</span>
-                      )}
-                      {/* De datawaarde blijft ook in de compacte pillenbalk staan (daar
-                          valt alleen het label weg) — vandaar de korte vorm. */}
-                      {mcExpanded && !mcPending && mcMarge && (
-                        <span data-pill-badge className="font-mono text-[10px] tabular-nums opacity-75">
-                          {margeKort(mcMarge)}
-                        </span>
-                      )}
-                    </button>
-                  </HideInSimple>
-                  {/* ── Doel-/wat-als-lijn toggle (alleen wanneer er écht een
-                      gestippelde lijn te tonen is — zelfde bron-waarheid als de
-                      overlay, ADR 0085). Bewust BUITEN HideInSimple: de doellijn
-                      zelf rendert in béíde weergavemodi, dus ook in Eenvoudig
-                      hoort de gebruiker 'm aan/uit te kunnen zetten. */}
-                  {hasDoelLijn && (
-                    <>
-                    <button
-                      type="button"
-                      onClick={() => setShowScenarioLine(prev => !prev)}
-                      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
-                        showScenarioLine
-                          ? 'border-horizon-300 bg-horizon-50 text-horizon-700'
-                          : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-200 hover:text-[var(--ink-2)]'
-                      }`}
-                      aria-pressed={showScenarioLine}
-                      aria-label={`${doelLijnLabel}-lijn tonen`}
-                      title={`${doelLijnLabel}-lijn`}
-                      /* De delta is hier het punt van de pil → label en badge
-                         blijven samen staan zolang die delta er is (B-025). */
-                      data-pill-keep={hasScenario && scenarioFireDeltaLabel ? '' : undefined}
-                    >
-                      {/* Ink-dash-swatch (zelfde SVG als legenda/ScenarioChip) draagt de
-                          wat-als-identiteit; de pill volgt verder de horizon-chroom van de rij. */}
-                      <svg width="20" height="8" viewBox="0 0 20 8" aria-hidden className="shrink-0">
-                        <line x1="0" y1="4" x2="20" y2="4" stroke="var(--ink-2)" strokeWidth="2" strokeDasharray="6 4" />
-                      </svg>
-                      <span data-pill-label className="hidden sm:inline">{doelLijnLabel}</span>
-                      {/* Delta t.o.v. de basislijn is alleen betekenisvol bij een echt
-                          wat-als; een stop-only-lijn zou hier "gelijk" tonen. */}
-                      {hasScenario && scenarioFireDeltaLabel && (
-                        <span data-pill-badge className="ml-0.5 font-mono text-[10px] tabular-nums opacity-75">
-                          {scenarioFireDeltaLabel}
-                        </span>
-                      )}
-                    </button>
-                    <span aria-live="polite" className="font-mono text-[10px] text-[var(--ink-3)]">
-                      {showScenarioLine && (scenarioPending || stopPadPending) ? 'bijwerken…' : ''}
-                    </span>
-                    </>
-                  )}
-                  {/* ── Tweede-grondslag-toggle ──
-                      Alleen zichtbaar zodra er écht een tweede lijn te tonen is
-                      (`dualBasisAvailable`) — bij "Meerekenen" valt J exact samen
-                      met I, dus daar verdwijnt de pill in plaats van een lijn aan te
-                      bieden die al zichtbaar is. In Eenvoudig verdwijnt de pill
-                      helemaal: het onderscheid mét/zonder huis is secundaire
-                      diepte. De lijn zelf blijft door de opgeslagen voorkeur
-                      gestuurd en rendert in béíde weergavemodi.
+              <CanvasUitleg
+                scenariosExpanded={scenariosExpanded}
+                scenarioData={scenarioData}
+                mcExpanded={mcExpanded}
+                mcData={mcData}
+                mcMarge={mcMarge}
+                mcFailed={mcFailed}
+                liquidWealthPoints={liquidWealthPoints}
+                chartMode={chartMode}
+                secondaryLineVisible={secondaryLineVisible}
+                effectiveChartPrimaryBasis={effectiveChartPrimaryBasis}
+                viewReadoutData={viewReadoutData}
+                lifelineAge={lifelineAge}
+              />
 
-                      LABEL VOLGT DE ROL (ADR 0114): de pill benoemt de lijn die
-                      hij schakelt, niet een vaste grondslag. Bij "Uitsluiten" is
-                      de J-lijn de hóófdlijn en schakelt deze pill dus de
-                      totaallijn ("Met je huis"); in de andere modi andersom.
-                      Een pill die "Zonder je huis" heet terwijl die lijn er
-                      altijd staat, zou een aan/uit-knop voor niets zijn. */}
-                  {dualBasisAvailable && (() => {
-                    const secondaryLabel =
-                      effectiveChartPrimaryBasis === 'liquid' ? 'Met je huis' : 'Zonder je huis'
-                    return (
-                    <HideInSimple>
-                    <button
-                      type="button"
-                      onClick={() => persistLiquidLine(!showLiquidLine)}
-                      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
-                        showLiquidLine
-                          ? 'border-horizon-300 bg-horizon-50 text-horizon-700'
-                          : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-200 hover:text-[var(--ink-2)]'
-                      }`}
-                      aria-pressed={showLiquidLine}
-                      aria-label={`Lijn ${secondaryLabel.toLowerCase()} tonen`}
-                      title={secondaryLabel}
-                    >
-                      {/* Zelfde swatch als de legenda en de tooltip-regel: fijne
-                          horizon-streep. Kleur uit de module-token, niet uit een
-                          losse hex (`secondaryStroke` in lib/horizon/sim-chart-geometry.ts). */}
-                      <svg width="20" height="8" viewBox="0 0 20 8" aria-hidden className="shrink-0">
-                        <line x1="0" y1="4" x2="20" y2="4" stroke="var(--color-horizon-600)" strokeWidth="1.8" strokeDasharray="2 3" strokeLinecap="round" />
-                      </svg>
-                      <span data-pill-label className="hidden sm:inline">{secondaryLabel}</span>
-                    </button>
-                    </HideInSimple>
-                    )
-                  })()}
-                  </>
-                )}
-
-                {/* ── Levensgebeurtenissen toggle ── */}
-                <button
-                  type="button"
-                  onClick={() => persistLifeEvents(!showLifeEvents)}
-                  className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
-                    showLifeEvents
-                      ? 'border-horizon-300 bg-horizon-50 text-horizon-700'
-                      : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-200 hover:text-[var(--ink-2)]'
-                  }`}
-                  aria-pressed={showLifeEvents}
-                  aria-label="Levensgebeurtenissen op de tijdlijn tonen"
-                  title="Toon je eigen levensgebeurtenissen op de tijdlijn"
-                >
-                  <Calendar className="h-3 w-3" />
-                  <span data-pill-label className="hidden sm:inline">Levensgebeurtenissen</span>
-                  {showLifeEvents && events.length > 0 && (
-                    <span data-pill-badge className="ml-0.5 font-mono text-[10px] tabular-nums opacity-75">
-                      {events.length}
-                    </span>
-                  )}
-                </button>
-
-                {/* ── Doelen toggle (M36) ──
-                    Alleen zichtbaar zodra er écht doel-markers te tonen zijn:
-                    zonder doelen met streefdatum voegt een lege pill niets toe. */}
-                {goalChartMarkers.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => persistGoals(!showGoals)}
-                    className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
-                      showGoals
-                        ? 'border-horizon-300 bg-horizon-50 text-horizon-700'
-                        : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-200 hover:text-[var(--ink-2)]'
-                    }`}
-                    aria-pressed={showGoals}
-                    aria-label="Doelen met een streefdatum op de tijdlijn tonen"
-                    title="Toon je doelen op de tijdlijn, op hun streefdatum"
-                  >
-                    <Target className="h-3 w-3" />
-                    <span data-pill-label className="hidden sm:inline">Doelen</span>
-                    {showGoals && (
-                      <span data-pill-badge className="ml-0.5 font-mono text-[10px] tabular-nums opacity-75">
-                        {goalChartMarkers.length}
-                      </span>
-                    )}
-                  </button>
-                )}
-
-                {/* ── Natuurlijke mijlpalen toggle ── */}
-                <button
-                  type="button"
-                  onClick={() => persistNaturalMilestones(!showNaturalMilestones)}
-                  className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
-                    showNaturalMilestones
-                      ? 'border-horizon-300 bg-horizon-50 text-horizon-700'
-                      : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-200 hover:text-[var(--ink-2)]'
-                  }`}
-                  aria-pressed={showNaturalMilestones}
-                  aria-label="Natuurlijke mijlpalen tonen"
-                  title="Toon automatisch afgeleide mijlpalen (hypotheek afgelost, eerste miljoen, vermogen op, …)"
-                >
-                  <Sparkles className="h-3 w-3" />
-                  <span data-pill-label className="hidden sm:inline">Natuurlijke mijlpalen</span>
-                  {showNaturalMilestones && naturalMilestones.length > 0 && (
-                    <span data-pill-badge className="ml-0.5 font-mono text-[10px] tabular-nums opacity-75">
-                      {naturalMilestones.length}
-                    </span>
-                  )}
-                </button>
-
-                {/* ── Chart mode toggle (compact pill, right-aligned) ──
-                    Op mobiel: alleen icon. Op desktop: icon + label.
-                    TrendingUp = pad/line; BarChart3 = opbouw/stack. */}
-                <div className="ml-auto flex items-center gap-1">
-                  {/* "Speel af" — animeert de levenslijn 40→einde; alleen in de
-                      volledige weergave en op de pad-grafiek (uitgebreide diepte). */}
-                  {chartMode === 'vermogenspad' && (
-                    <HideInSimple>
-                      <button
-                        type="button"
-                        onClick={() => setIsPlaying(p => !p)}
-                        className="inline-flex items-center gap-1.5 rounded-full border border-horizon-300 bg-horizon-50 px-2.5 py-1 text-[11px] font-medium text-horizon-700 transition-colors hover:bg-horizon-100"
-                        aria-pressed={isPlaying}
-                        aria-label={isPlaying ? 'Pauzeer afspelen' : 'Speel de levenslijn af'}
-                        title={isPlaying ? 'Pauze' : 'Speel af'}
-                      >
-                        {isPlaying ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
-                        <span data-pill-label className="hidden sm:inline">{isPlaying ? 'Pauze' : 'Speel af'}</span>
-                      </button>
-                    </HideInSimple>
-                  )}
-                  {(['vermogenspad', 'vermogensopbouw'] as const).map((mode) => {
-                    const btn = (
-                      <button
-                        key={mode}
-                        type="button"
-                        onClick={() => setChartMode(mode)}
-                        className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors select-none ${
-                          chartMode === mode
-                            ? 'border-horizon-300 bg-horizon-50 text-horizon-700'
-                            : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-200 hover:text-[var(--ink-2)]'
-                        }`}
-                        aria-pressed={chartMode === mode}
-                        aria-label={mode === 'vermogenspad' ? 'Pad-modus' : 'Opbouw-modus'}
-                        title={mode === 'vermogenspad' ? 'Pad' : 'Opbouw'}
-                      >
-                        {mode === 'vermogenspad'
-                          ? <TrendingUp className="h-3.5 w-3.5" />
-                          : <BarChart3 className="h-3.5 w-3.5" />}
-                        <span data-pill-label className="hidden sm:inline">
-                          {mode === 'vermogenspad' ? 'Pad' : 'Opbouw'}
-                        </span>
-                      </button>
-                    )
-                    // Beide varianten blijven in béíde weergavemodi staan: de
-                    // opbouw-staafgrafiek is een andere blik op dezelfde cijfers,
-                    // geen extra diepte — en juist in Eenvoudig de begrijpelijkste.
-                    return btn
-                  })}
-                </div>
-
-                {/* ── Inline ChartTips: kleine "i" met editorial popover ── */}
-                <ChartTips
-                  storageKey="horizon_main_chart"
-                  tips={
-                    chartMode === 'vermogenspad'
-                      ? getFireProjectionTips({
-                          fireAge: simResult.fireAge,
-                          aowAge: userAowAge.fractional,
-                          currentAge: currentAge ?? 30,
-                          hasMonteCarlo: !!monteCarloOverlay,
-                          hasBaseline: false,
-                          planningMode,
-                          // ADR 0129 — onder een vast anker noemt de spotlight het
-                          // stopmoment, niet "op 47 bereik je vrijheid" (bevinding 6).
-                          stopAnchorFixed: isFixedAnchorMode,
-                          stopAge: simResult.vastStopLeeftijd ?? null,
-                        })
-                      : getWealthCompositionTips({
-                          fireAge: simResult.fireAge,
-                          aowAge: userAowAge.fractional,
-                          currentAge: currentAge ?? 30,
-                        })
-                  }
-                  align="right"
-                />
-              </PillRow>
-
-              {/* ── Editorial quote-explainers per actieve overlay/optie ── */}
-              <ChartOverlayExplainer active={scenariosExpanded && !!scenarioData}>
-                De <em>scenario-lijnen</em> tonen je vermogenspad onder een
-                voorzichtiger en optimistischer <GlossaryTerm term="rendement">rendement</GlossaryTerm> (±2 procentpunt).
-                Zo zie je hoe gevoelig je pad is voor onzekere markten.
-              </ChartOverlayExplainer>
-
-              <ChartOverlayExplainer active={mcExpanded && !!mcData}>
-                De <GlossaryTerm term="Monte_Carlo"><em>marktcheck</em></GlossaryTerm> rekent je hele plan
-                {mcData ? ` ${mcData.runs} ` : ' '}keer opnieuw door met een ander marktverloop —
-                opbouw, stoppen én onttrekking. De band toont waar je <GlossaryTerm term="netto_vermogen">netto vermogen</GlossaryTerm> dan
-                uitkomt: de middelste helft van de marktverlopen (p25–p75), met de mediaan
-                als lijn.
-                {mcMarge && (
-                  <> Het getal ernaast is je <em>speling</em>: {margeZin(mcMarge)}{' '}
-                  {mcMarge.anker === 'aow'
-                    ? 'Je hebt nog geen eigen stopleeftijd gekozen, dus rekenen we met je AOW-leeftijd — schuif de stopleeftijd en het getal beweegt mee.'
-                    : 'Schuif je stopleeftijd en je ziet direct wat een jaar langer of korter doorwerken aan speling oplevert.'}</>
-                )}
-                {!mcMarge && (
-                  <> Een speling-getal tonen we hier niet: op de gekozen stopleeftijd is er
-                  binnen dit plan geen onttrekkingsfase om te toetsen.</>
-                )}
-                {liquidWealthPoints != null && (
-                  <> Let op de <em>grondslag</em>: de band telt je huis mee, de speling kijkt
-                  alleen naar het geld waar je bij kunt — dezelfde grondslag als de lijn
-                  &ldquo;zonder je huis&rdquo;. Daardoor kan de band ruim boven nul eindigen
-                  terwijl de speling krap is: die overwaarde zit in je huis, niet in je
-                  portefeuille.</>
-                )}
-              </ChartOverlayExplainer>
-
-              <ChartOverlayExplainer active={mcExpanded && mcFailed}>
-                De <em>marktcheck</em> kon niet worden doorgerekend — er is nu geen band en geen
-                percentage. Je plan-lijn zelf klopt gewoon; alleen de doorrekening met wisselende
-                markten ontbreekt. Zet de pil uit en weer aan om het opnieuw te proberen.
-              </ChartOverlayExplainer>
-
-              {/* Waarom de twee lijnen uit elkaar lopen — feitelijk, geen advies.
-                  Het verhaal is hetzelfde, ongeacht welke van de twee de dikke
-                  lijn is; alleen de aanwijzing verschilt. */}
-              <ChartOverlayExplainer
-                active={chartMode === 'vermogenspad' && secondaryLineVisible}
-              >
-                De lijn <em>zonder je huis</em> toont het deel van je vermogen waar
-                je direct bij kunt. Je huis zit daar niet in — daardoor kan de lijn
-                met je huis doorgroeien terwijl die andere lijn daalt.
-                {effectiveChartPrimaryBasis === 'liquid' && (
-                  <> Omdat je je huis buiten je vrijheidsdoel houdt, is de lijn
-                  <em> zonder je huis</em> hier de dikke lijn — dezelfde grondslag
-                  als de balk eronder.</>
-                )}
-              </ChartOverlayExplainer>
-
-              <ChartOverlayExplainer active={chartMode === 'vermogensopbouw'}>
-                In <em>opbouw</em>-modus zie je de samenstelling van je vermogen —
-                hoeveel komt uit eigen bijdragen, hoeveel uit <GlossaryTerm term="rendement">rendement</GlossaryTerm>, en hoe
-                schulden je <GlossaryTerm term="netto_vermogen">netto vermogen</GlossaryTerm> drukken. Geeft inzicht in waar je
-                groei vandaan komt.
-              </ChartOverlayExplainer>
-
-              {/* Cijferbar boven de grafiek — beweegt mee met hover/playback en
-                  vervangt de zwevende tooltip. Alleen volledige weergave + pad-modus. */}
-              <HideInSimple>
-                {chartMode === 'vermogenspad' && viewReadoutData && (
-                  <div className="mb-2">
-                    <LifelineReadout
-                      age={viewReadoutData.age}
-                      year={viewReadoutData.year}
-                      phaseLabel={viewReadoutData.phaseLabel}
-                      phaseColor={viewReadoutData.phaseColor}
-                      netWorth={viewReadoutData.netWorth}
-                      freedomTime={viewReadoutData.freedomTime}
-                      monthlyLabel={viewReadoutData.monthlyLabel}
-                      monthlyAmount={viewReadoutData.monthlyAmount}
-                      netWorthMoment={viewReadoutData.netWorthMoment}
-                      isResting={lifelineAge === null}
-                    />
-                  </div>
-                )}
-              </HideInSimple>
-
-              <div className="-mx-4 sm:-mx-6 md:-mx-8 overflow-hidden">
-                <ZoomableChartContainer currentAge={currentAge ?? 30} endAge={chartEndAge!}>
-                  {(visibleMin, visibleMax, controls) => (
-                    <>
-                      {/* B-057 — Fin's wachtstand op de grafiek zolang de projectie
-                          verouderd is (herlaad / refresh / hersolve). Eerst in de
-                          fragment zodat de zoom-knoppen (zelfde z-10) erboven blijven. */}
-                      <ProjectieLaadlaag pending={projectiePending} />
-                      {/* STEP 3b/4: tips-laag wikkelt de grafiek — markers in een rij
-                          boven + onder; de grafiek vervaagt zolang de tips aan staan. */}
-                      <ToekomstOverlay
-                        visible={overlayVisible && chartMode === 'vermogenspad'}
-                        autoScrollIntoView={overlayPrefRestored}
-                        onEmphasisChange={setOverlayEmphasis}
-                        balloons={toekomstOverlayBalloons}
-                        geometry={((): ToekomstOverlayGeometry => {
-                          // FIRE-fractie binnen het zichtbare leeftijdsbereik —
-                          // dezelfde bron + precedentie als de SimChart hieronder
-                          // (single-source, niet herberekend). De plot-insets
-                          // matchen CHART_PAD zodat de leader-lines/kaders precies
-                          // over het tekengebied vallen.
-                          const fireFrac = useHouseholdMainLine
-                            ? householdMainLine!.fireAgeFractional
-                            : usePartnerMainLine
-                              ? partnerLine!.fireAgeFractional
-                              : simResult.fireAgeFractional
-                          const lo = visibleMin
-                          const span = visibleMax - lo
-                          const fraction =
-                            fireFrac != null && span > 0
-                              ? Math.min(Math.max((fireFrac - lo) / span, 0), 1)
-                              : null
-                          return {
-                            padLeft: CHART_PAD.left,
-                            padRight: CHART_PAD.right,
-                            padTop: CHART_PAD.top,
-                            padBottom: CHART_PAD.bottom,
-                            fireFraction: fraction,
-                          }
-                        })()}
-                        summary={{
-                          // Netto vermogen: canonieke afleiding uit de effectieve input
-                          // (totalAssets − totalDebts), niet lokaal herberekend.
-                          netWorth: effectiveNetWorth,
-                          // Vrijheidsleeftijd: EXACT dezelfde bron + precedentie als de
-                          // hero-KPI "vrijheidsleeftijd" (single-source, niet herberekend).
-                          freedomAge: hasPerspectiveHero ? perspectiveHero!.fireAge : heroFireAge.age,
-                          masked,
-                          anchor: planAnchor,
-                          ankerReach: hasPerspectiveHero ? null : ankerReach,
-                          ankerStop: hasPerspectiveHero ? null : ankerStop,
-                        }}
-                        onClose={handleOverlayExit}
-                      >
-                      <div className="relative">
-                        {/* Vermogenspad (SimChart) */}
-                        <div
-                          className="transition-opacity duration-300 ease-in-out"
-                          style={{
-                            opacity: chartMode === 'vermogenspad' ? 1 : 0,
-                            pointerEvents: chartMode === 'vermogenspad' ? 'auto' : 'none',
-                            position: chartMode === 'vermogenspad' ? 'relative' : 'absolute',
-                            top: 0,
-                            left: 0,
-                            width: '100%',
-                          }}
-                          aria-hidden={chartMode !== 'vermogenspad'}
-                        >
-                          <SimChart
-                            emphasis={overlayEmphasis}
-                            disableCrosshair={overlayVisible && chartMode === 'vermogenspad'}
-                            hoverAge={lifelineAge}
-                            onHoverAge={setLifelineAge}
-                            hideValueTooltip={displayMode === 'full'}
-                            rows={useHouseholdMainLine ? viewHouseholdMainLineRows! : usePartnerMainLine ? viewPartnerLineRows! : (viewDisplaySimRows)}
-                            fireAge={useHouseholdMainLine ? householdMainLine!.fireAge : usePartnerMainLine ? partnerLine!.fireAge : (simResult.fireAge)}
-                            fireAgeFractional={useHouseholdMainLine ? householdMainLine!.fireAgeFractional : usePartnerMainLine ? partnerLine!.fireAgeFractional : (simResult.fireAgeFractional)}
-                            currentAge={useHouseholdMainLine ? (householdMainLine!.currentAge ?? currentAge ?? 30) : usePartnerMainLine ? (partnerLine!.currentAge ?? currentAge ?? 30) : (currentAge ?? 30)}
-                            endAge={chartEndAge!}
-                            // euro-view: exempt — `cashflows` levert géén zichtbaar bedrag in
-                            // SimChart (de prop wordt daar gedestructureerd maar nergens in de
-                            // teken-body gebruikt; de tooltip-bedragen komen alle uit `rows`).
-                            // Nominaal doorgeven is dus het juiste én het gedrag-neutrale pad.
-                            cashflows={simCashflows}
-                            fireTarget={viewFireTarget}
-                            // Tweede doellijn (incl. woning) alleen op de basis-projectie,
-                            // net als targetInflationFactors — niet op partner-/huishoud-/
-                            // AOW-stop-lijnen. Bij de dubbele-woning-grondslag (downsize/
-                            // opeethypotheek/uitsluiten); anders undefined → één doellijn.
-                            fireTargetInclHome={(usePartnerMainLine || useHouseholdMainLine) ? undefined : (showDualFireTarget ? viewFireTargetInclHome! : undefined)}
-                            strategy={simResult.strategy}
-                            targetEndPortfolio={viewTargetEndPortfolio}
-                            // Meegroeiende doellijn alleen op de basis-projectie (niet op
-                            // partner-/huishoud-/AOW-stop-lijnen — die hebben eigen rijen).
-                            targetInflationFactors={(usePartnerMainLine || useHouseholdMainLine) ? undefined : viewTargetInflationFactors}
-                            // Besteedbaar-reeks alleen op de basis-projectie: partner-/
-                            // huishoud-/AOW-stop-lijnen tekenen andere rijen, waar deze
-                            // punten niet bij horen (`dualBasisAvailable`).
-                            //
-                            // Deze reeks is de PRIMAIRE lijn zodra `primaryBasis`
-                            // 'liquid' is — dan moet 'ie er altijd zijn en schakelt de
-                            // pill de tweede (totaal)lijn. Staat de primaire lijn op
-                            // 'total', dan is dít de tweede lijn en schakelt dezelfde
-                            // pill hem uit. Eén schakelaar, twee richtingen:
-                            // `secondaryLineVisible`. Valt de tweede lijn weg, dan valt
-                            // ook de bijbehorende drempel mee weg (`showExclTargetLine`
-                            // resp. `showInclTargetLine` in chart-static-layers.tsx).
-                            liquidPoints={dualBasisAvailable ? viewLiquidWealthPoints : undefined}
-                            primaryBasis={effectiveChartPrimaryBasis}
-                            secondaryLineVisible={secondaryLineVisible}
-                            mainLineLabel={useHouseholdMainLine ? 'Gezamenlijk' : usePartnerMainLine ? (partnerName ?? 'Partner') : undefined}
-                            // Partner- én huishoud-projectie krijgen dezelfde teal als de
-                            // partner-event-markers, zodat de lijn + de partner-gebeurtenissen
-                            // visueel bij elkaar horen. FIRE-annotaties blijven goud (COLOR_OPBOUW).
-                            mainLineColor={(usePartnerMainLine || useHouseholdMainLine) ? COLOR_PARTNER_EVENT : undefined}
-                            scenarioOverlays={(usePartnerMainLine || useHouseholdMainLine) ? undefined : viewCombinedScenarioOverlays}
-                            // Het verschilvlak onder de basislijn kleurt neutraal zolang het
-                            // plan gedekt is, en alleen rood als het plan niet reikt.
-                            planZone={labZone}
-                            // Bol op het eind van de wat-als-lijn in de stoplichtkleur van de
-                            // nalatenschap-knop. Op een partner-/huishoudlijn rekent het lab
-                            // niet, dus daar staat ook geen wat-als-lijn om 'm op te zetten.
-                            nalatenschapMarker={(usePartnerMainLine || useHouseholdMainLine) ? undefined : nalatenschapMarker}
-                            scenarioPending={scenarioPending || stopPadPending}
-                            mainPending={projectiePending}
-                            monteCarloOverlay={(usePartnerMainLine || useHouseholdMainLine) ? undefined : viewMonteCarloOverlay}
-                            // euro-view: exempt — het dagtarief (€→vrijheidstijd) is per
-                            // definitie een grootheid van VANDAAG en deflateert nooit (D15).
-                            // Deflateert het bedrag wél, dan volgt de vrijheidstijd
-                            // automatisch mee; ook de noemer aanpakken zou de deflatie
-                            // twee keer toepassen.
-                            //
-                            // Consume, don't recompute: hier stond
-                            // `(effectiveInput?.yearlyMustExpenses ?? 0) / 365` — de
-                            // PROJECTIE-uitgave als weergave-koers. De grafiek-tooltip gaf
-                            // daardoor een andere vrijheidstijd dan élk ander tijdgetal op
-                            // deze pagina, die al op `canonicalDailyRate` staan
-                            // (eigenaarsbesluit C bij UR3-08, vervolg KRUIS-20).
-                            dailyExpenseRate={canonicalDailyRate}
-                            householdOverlays={viewHouseholdOverlays ?? undefined}
-                            visibleMinAge={visibleMin}
-                            visibleMaxAge={visibleMax}
-                            aowAgeFractional={userAowAge.fractional}
-                            planningMode={planningMode}
-                            stopAnchorFixed={isFixedAnchorMode}
-                            showDepletionWarning={false}
-                            eventOverlay={chartEventOverlay}
-                            onEventClick={handleChartEventClick}
-                            onEventDragEnd={handleChartEventDragEnd}
-                            onEventDragMove={handleChartEventDragMove}
-                            onClusterOpen={handleChartClusterOpen}
-                          />
-                        </div>
-
-                        {/* Vermogensopbouw (WealthCompositionChart) */}
-                        <div
-                          className="transition-opacity duration-300 ease-in-out"
-                          style={{
-                            opacity: chartMode === 'vermogensopbouw' ? 1 : 0,
-                            pointerEvents: chartMode === 'vermogensopbouw' ? 'auto' : 'none',
-                            position: chartMode === 'vermogensopbouw' ? 'relative' : 'absolute',
-                            top: 0,
-                            left: 0,
-                            width: '100%',
-                          }}
-                          aria-hidden={chartMode !== 'vermogensopbouw'}
-                        >
-                          <WealthCompositionChart
-                            stackedRows={viewWealthCompositionRows}
-                            currentAge={currentAge ?? 30}
-                            endAge={chartEndAge!}
-                            visibleMinAge={visibleMin}
-                            visibleMaxAge={visibleMax}
-                            fireAge={simResult.fireAge}
-                            fireAgeFractional={simResult.fireAgeFractional}
-                            planningMode={planningMode}
-                            aowAgeFractional={userAowAge.fractional}
-                            housingSaleAge={kernelHousingSale?.age ?? null}
-                            // Het huis blijft in de staaf staan (het is echt bezit), maar
-                            // gedempt zodra het buiten het doel valt — dezelfde
-                            // strategie-beslissing als de doelbedrag-grondslag hierboven.
-                            homeExcludedFromFire={homeExcludedFromProgress}
-                            eventOverlay={chartEventOverlay}
-                            onEventClick={handleChartEventClick}
-                            onClusterOpen={handleChartClusterOpen}
-                            onYearClick={(age) => setSelectedYearAge(age)}
-                          />
-                        </div>
-                      </div>
-                      </ToekomstOverlay>
-                      {/* ── Inkomen & Uitgaven toggle + collapsible chart ── */}
-                      <div className="flex w-full items-center border-t border-[var(--border-ed)]">
-                        <button
-                          type="button"
-                          onClick={() => setIncomeExpenseExpanded(prev => !prev)}
-                          onPointerDown={(e) => e.stopPropagation()}
-                          className="flex flex-1 items-center justify-center gap-2 py-2.5 text-[12px] font-medium text-[var(--ink-3)] hover:text-[var(--ink-2)] transition-colors cursor-pointer select-none"
-                          style={{ minHeight: 44 }}
-                          aria-expanded={incomeExpenseExpanded}
-                          aria-controls="income-expense-panel"
-                          aria-label={incomeExpenseExpanded ? 'Inkomen & Uitgaven grafiek verbergen' : 'Inkomen & Uitgaven grafiek tonen'}
-                        >
-                          <span>Inkomen &amp; Uitgaven</span>
-                          {incomeExpenseExpanded
-                            ? <ChevronUp size={14} />
-                            : <ChevronDown size={14} />
-                          }
-                        </button>
-                        {incomeExpenseExpanded && (
-                          <div className="flex items-center gap-2 pr-3" onPointerDown={(e) => e.stopPropagation()}>
-                            <div className="flex items-center gap-1">
-                              {(['lines', 'breakdown'] as const).map((mode) => (
-                                <button
-                                  key={mode}
-                                  type="button"
-                                  onClick={() => setIeViewMode(mode)}
-                                  className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors select-none cursor-pointer ${
-                                    ieViewMode === mode
-                                      ? 'border-horizon-300 bg-horizon-50 text-horizon-700'
-                                      : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-200 hover:text-[var(--ink-2)]'
-                                  }`}
-                                  aria-pressed={ieViewMode === mode}
-                                >
-                                  {mode === 'lines' ? 'Lijnen' : 'Bronnen'}
-                                </button>
-                              ))}
-                            </div>
-                            <ChartTips
-                              storageKey="income_expense_chart"
-                              tips={getIncomeExpenseTips({
-                                fireAge: simResult.fireAge,
-                                aowAge: userAowAge.fractional,
-                                viewMode: ieViewMode,
-                              })}
-                              align="right"
-                            />
-                          </div>
-                        )}
-                      </div>
-                      <div
-                        id="income-expense-panel"
-                        className="overflow-hidden transition-all duration-300 ease-in-out"
-                        style={{
-                          maxHeight: incomeExpenseExpanded ? (ieViewMode === 'breakdown' ? 420 : 280) : 0,
-                          opacity: incomeExpenseExpanded ? 1 : 0,
-                        }}
-                      >
-                        <IncomeExpenseChart
-                          rows={viewDisplaySimRows}
-                          currentAge={currentAge ?? 30}
-                          endAge={chartEndAge!}
-                          visibleMinAge={visibleMin}
-                          visibleMaxAge={visibleMax}
-                          fireAge={simResult.fireAge}
-                          planningMode={planningMode}
-                          aowAgeFractional={userAowAge.fractional}
-                          viewMode={ieViewMode}
-                          breakdownResult={viewIeBreakdownResult}
-                        />
-                      </div>
-
-                      {/* Events timeline aligned to same age axis.
-                          Alleen op line-chart (vermogenspad): de bar-chart
-                          (vermogensopbouw) toont events al inline boven/onder
-                          de bars via ChartEventMarkers — een aparte timeline
-                          eronder zou dubbele informatie zijn. */}
-                      {chartMode === 'vermogenspad' && eventsForTimeline.length > 0 && (
-                        <EventsTimeline
-                          events={eventsForTimeline}
-                          currentAge={currentAge ?? 30}
-                          endAge={chartEndAge!}
-                          visibleMinAge={visibleMin}
-                          visibleMaxAge={visibleMax}
-                          onClusterOpen={(clusterEvents, centerAge) => setClusterSheet({ events: clusterEvents, centerAge })}
-                          onViewEvent={id => {
-                            // Natuurlijke mijlpalen hebben geen edit-pane; deeplink
-                            // naar bron-asset/debt indien beschikbaar.
-                            if (id.startsWith('nat-')) {
-                              const m = naturalMilestones.find(x => x.id === id)
-                              if (m?.category === 'debt') router.push('/core/debts')
-                              else if (m?.category === 'asset') router.push('/core/assets')
-                              return
-                            }
-                            setEventPaneEditingId(id)
-                            setEventPaneMode('view')
-                            setEventPaneOpen(true)
-                          }}
-                          onEditEvent={id => {
-                            if (id.startsWith('nat-')) return // natuurlijke mijlpalen niet bewerkbaar
-                            setEventPaneEditingId(id)
-                            setEventPaneMode('edit')
-                            setEventPaneOpen(true)
-                          }}
-                          onEventDragEnd={handleEventDragEnd}
-                          stopAge={eventStopAge}
-                        />
-                      )}
-
-                      {/* ── Fase-balk (Opbouw / Overgang / Onttrekking) ──
-                          Secundaire diepte → verborgen in Eenvoudig-modus. */}
-                      {simResult && currentAge != null && (
-                        <HideInSimple>
-                        <div className="mt-2" style={{ marginLeft: CHART_PAD.left, marginRight: CHART_PAD.right }}>
-                          <PhaseBar
-                            currentAge={currentAge}
-                            fireAge={simResult.fireAge}
-                            fireAgeFractional={simResult.fireAgeFractional}
-                            aowAge={userAowAge.fractional}
-                            endAge={chartEndAge!}
-                            fireReachable={simResult.fireReachable}
-                            isPensioenMode={isPensioenMode}
-                            onSegmentClick={(fase) => setActiveFaseModal(fase)}
-                            visibleMinAge={visibleMin}
-                            visibleMaxAge={visibleMax}
-                          />
-                        </div>
-                        </HideInSimple>
-                      )}
-                    </>
-                  )}
-                </ZoomableChartContainer>
-              </div>
+              <CanvasGrafiek
+                currentAge={currentAge}
+                chartEndAge={chartEndAge}
+                projectiePending={projectiePending}
+                overlayVisible={overlayVisible}
+                chartMode={chartMode}
+                overlayPrefRestored={overlayPrefRestored}
+                setOverlayEmphasis={setOverlayEmphasis}
+                toekomstOverlayBalloons={toekomstOverlayBalloons}
+                useHouseholdMainLine={useHouseholdMainLine}
+                householdMainLine={householdMainLine}
+                usePartnerMainLine={usePartnerMainLine}
+                partnerLine={partnerLine}
+                simResult={simResult}
+                effectiveNetWorth={effectiveNetWorth}
+                hasPerspectiveHero={hasPerspectiveHero}
+                perspectiveHero={perspectiveHero}
+                heroFireAge={heroFireAge}
+                masked={masked}
+                planAnchor={planAnchor}
+                ankerReach={ankerReach}
+                ankerStop={ankerStop}
+                handleOverlayExit={handleOverlayExit}
+                overlayEmphasis={overlayEmphasis}
+                lifelineAge={lifelineAge}
+                setLifelineAge={setLifelineAge}
+                displayMode={displayMode}
+                viewHouseholdMainLineRows={viewHouseholdMainLineRows}
+                viewPartnerLineRows={viewPartnerLineRows}
+                viewDisplaySimRows={viewDisplaySimRows}
+                simCashflows={simCashflows}
+                viewFireTarget={viewFireTarget}
+                showDualFireTarget={showDualFireTarget}
+                viewFireTargetInclHome={viewFireTargetInclHome}
+                viewTargetEndPortfolio={viewTargetEndPortfolio}
+                viewTargetInflationFactors={viewTargetInflationFactors}
+                dualBasisAvailable={dualBasisAvailable}
+                viewLiquidWealthPoints={viewLiquidWealthPoints}
+                effectiveChartPrimaryBasis={effectiveChartPrimaryBasis}
+                secondaryLineVisible={secondaryLineVisible}
+                partnerName={partnerName}
+                viewCombinedScenarioOverlays={viewCombinedScenarioOverlays}
+                labZone={labZone}
+                nalatenschapMarker={nalatenschapMarker}
+                scenarioPending={scenarioPending}
+                stopPadPending={stopPadPending}
+                viewMonteCarloOverlay={viewMonteCarloOverlay}
+                canonicalDailyRate={canonicalDailyRate}
+                viewHouseholdOverlays={viewHouseholdOverlays}
+                userAowAge={userAowAge}
+                planningMode={planningMode}
+                isFixedAnchorMode={isFixedAnchorMode}
+                chartEventOverlay={chartEventOverlay}
+                handleChartEventClick={handleChartEventClick}
+                handleChartEventDragEnd={handleChartEventDragEnd}
+                handleChartEventDragMove={handleChartEventDragMove}
+                handleChartClusterOpen={handleChartClusterOpen}
+                viewWealthCompositionRows={viewWealthCompositionRows}
+                kernelHousingSale={kernelHousingSale}
+                homeExcludedFromProgress={homeExcludedFromProgress}
+                setSelectedYearAge={setSelectedYearAge}
+                incomeExpenseExpanded={incomeExpenseExpanded}
+                setIncomeExpenseExpanded={setIncomeExpenseExpanded}
+                ieViewMode={ieViewMode}
+                setIeViewMode={setIeViewMode}
+                viewIeBreakdownResult={viewIeBreakdownResult}
+                eventsForTimeline={eventsForTimeline}
+                setClusterSheet={setClusterSheet}
+                naturalMilestones={naturalMilestones}
+                router={router}
+                setEventPaneEditingId={setEventPaneEditingId}
+                setEventPaneMode={setEventPaneMode}
+                setEventPaneOpen={setEventPaneOpen}
+                handleEventDragEnd={handleEventDragEnd}
+                eventStopAge={eventStopAge}
+                isPensioenMode={isPensioenMode}
+                setActiveFaseModal={setActiveFaseModal}
+              />
 
               {/* ── Doelscenario: vijf knoppen met een driekleurige schaal (ADR 0170) ──
                   Staat IN de grafiekkaart, direct onder de fasering: de knoppen bewegen de
@@ -5844,96 +5215,20 @@ export default function HorizonPage({
                 </section>
               )}
 
-              {/* ── Legenda + detail-links onder de grafiek ── */}
-              <div className="mt-2 space-y-2">
-                {/* Scenario legenda */}
-                {scenariosExpanded && scenarioData && (
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                    {scenarioData.map((s, i) => (
-                      <span key={s.name} className="inline-flex items-center gap-1.5 text-[11px] text-[var(--ink-2)]">
-                        <span className="inline-block h-0.5 w-3.5 rounded-full" style={{ backgroundColor: s.color, opacity: 0.7 }} />
-                        {s.label}
-                        <span className="font-mono tabular-nums text-[var(--ink-4)]">
-                          {((fireParams.grossReturn + SCENARIO_VARIANTS[i].delta) * 100).toFixed(1)}%
-                        </span>
-                      </span>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={() => setActiveModal('scenarios')}
-                      className="font-serif text-[11px] italic text-horizon-600 transition-colors hover:text-horizon-700"
-                    >
-                      Verdiepen &rarr;
-                    </button>
-                  </div>
-                )}
-
-                {/* Marktcheck-legenda */}
-                {mcExpanded && mcData && (
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                    {/* Alleen p25–p75 staat in de legenda: dat is sinds 2026-08-09
-                        ook exact wat er getekend wordt (en wat de Y-as bepaalt). */}
-                    <span className="inline-flex items-center gap-1.5 text-[11px] text-[var(--ink-2)]">
-                      <span className="inline-block h-2.5 w-3.5 bg-[var(--hor-t,#8a6e42)] opacity-[0.18]" />
-                      p25–p75
-                    </span>
-                    {mcMarge && (
-                      <span
-                        className="text-[11px] text-[var(--ink-2)]"
-                        title={liquidWealthPoints != null
-                          ? `${margeZin(mcMarge)} Gemeten op je besteedbaar vermogen (zonder je huis) — de band toont je netto vermogen mét huis.`
-                          : margeZin(mcMarge)}
-                      >
-                        {margeLegenda(mcMarge)}{' '}
-                        <span className="text-[var(--ink-4)]">
-                          {margeAnkerKort(mcMarge)}
-                          {liquidWealthPoints != null && ', zonder huis'}
-                        </span>
-                      </span>
-                    )}
-                    <span className="text-[11px] text-[var(--ink-2)]">
-                      <span className="font-mono tabular-nums text-[var(--ink-3)]">{mcData.runs}</span> marktverlopen
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setActiveModal('simulations')}
-                      className="font-serif text-[11px] italic text-horizon-600 transition-colors hover:text-horizon-700"
-                    >
-                      Verdiepen &rarr;
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* Voetnoot. "Details" is hier nu zélf de knop (M9): de echte
-                  Details-pill staat helemaal bovenin dezelfde kaart, dus wie
-                  naar deze regel gescrold heeft ziet 'm niet staan — dat is de
-                  "de knop viel buiten het zichtbare deel"-waarneming uit de
-                  bevinding. Zelfde handler, geen tweede pad. */}
-              <p className="mt-3 font-sans text-[10px] text-[var(--ink-4)]">
-                {STRATEGY_LABELS[simResult.strategy].name} &middot; Weergave t/m leeftijd {simResult.displayEndAge - 1} (eindleeftijd {simResult.displayEndAge}) &middot;{' '}
-                <button
-                  type="button"
-                  onClick={() => setSimModalOpen(true)}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  className="underline underline-offset-2 transition-colors hover:text-horizon-600"
-                >
-                  Open de jaar-op-jaar-tabel
-                </button>
-              </p>
-
-              {/* Context-hint: modus indicator + link to StrategieModal */}
-              <button
-                type="button"
-                onClick={() => setActiveModal('strategie')}
-                className="mt-1 block font-sans text-[10px] text-[var(--ink-4)] transition-colors hover:text-horizon-600"
-                style={{ minHeight: 44, display: 'flex', alignItems: 'center' }}
-              >
-                {/* ADR 0129 B10 — geen modus-label maar het plan in gewone taal. */}
-                {isFixedAnchorMode && ankerStop != null
-                  ? <>{ankerTitel(ankerStop)} &middot; <span className="ml-0.5 underline underline-offset-2">Stopmoment wijzigen &rarr;</span></>
-                  : <>De app rekent je stopmoment uit &middot; <span className="ml-0.5 underline underline-offset-2">Zelf een stopmoment kiezen &rarr;</span></>}
-              </button>
+              <CanvasLegenda
+                scenariosExpanded={scenariosExpanded}
+                scenarioData={scenarioData}
+                fireParams={fireParams}
+                setActiveModal={setActiveModal}
+                mcExpanded={mcExpanded}
+                mcData={mcData}
+                mcMarge={mcMarge}
+                liquidWealthPoints={liquidWealthPoints}
+                simResult={simResult}
+                setSimModalOpen={setSimModalOpen}
+                isFixedAnchorMode={isFixedAnchorMode}
+                ankerStop={ankerStop}
+              />
 
               {/* De wat-als-slider-lab is verplaatst naar de eigen sectie
                   "Verken je aannames" (katern II) onder de grafiek — zie hieronder. */}

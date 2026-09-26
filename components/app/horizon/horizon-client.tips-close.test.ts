@@ -53,22 +53,3 @@ describe('tips-overlay sluiten (M38)', () => {
     expect(source).toContain('dismissExitNoticeForever')
   })
 })
-
-/**
- * Bron-grendel op de bereikbaarheid van de Details-knop tijdens tips-modus (M9).
- *
- * De tips-scrim (`toekomst-overlay.tsx`) is een klik-vanger op `z-[45]` die als
- * portal-kind van `[data-scroll-container]` over de VOLLE paginahoogte ligt.
- * De Details-pill staat in dezelfde hero-kaart maar buiten de grafiek-wrapper
- * (`z-[50]`), dus zonder eigen stapelniveau ving de scrim de klik af: de eerste
- * klik sloot de tips i.p.v. de jaar-op-jaar-tabel te openen. Deze test pint dat
- * de knoprij één stap bóven de scrim staat en dat de knop zijn pointerdown
- * afschermt — dezelfde twee dingen die de bevinding veroorzaakten.
- */
-describe('Details-knop boven de tips-scrim (M9)', () => {
-  it('maakt de voetnoot onder de grafiek zelf een knop naar dezelfde tabel', () => {
-    expect(source).toContain('Open de jaar-op-jaar-tabel')
-    // Niet langer alleen een verwijzing naar een knop elders in de kaart.
-    expect(source).not.toContain('Klik Details voor jaar-op-jaar tabel')
-  })
-})

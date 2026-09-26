@@ -93,9 +93,6 @@ describe('planningMode blijft tweewaardig en volgt het anker (D6/B11)', () => {
     expect(code).not.toContain('evaluateFireAt(')
   })
 
-  it('de grafiek krijgt het anker expliciet mee voor de STOP-marker', () => {
-    expect(bron()).toContain('stopAnchorFixed={isFixedAnchorMode}')
-  })
 })
 
 describe('de stopkeuze (vrijheidsas)', () => {
