@@ -40,9 +40,10 @@ describe('Aannamesregel', () => {
     expect(regelTekst()).not.toContain('rendement')
   })
 
-  it('vast anker: stopmoment 60', () => {
+  it('vast anker: geen stopmoment-segment, de kop zegt het al (eigenaarsbesluit 26 sep)', () => {
     renderRegel('full', { ...INPUT, stop: { kind: 'age', stopAge: 60 } })
-    expect(regelTekst()).toContain('stopmoment 60')
+    expect(regelTekst()).not.toContain('stopmoment')
+    expect(regelTekst()).toContain('plan tot je 90e')
   })
 
   it('één link, "Naar instellingen", naar de meegegeven href', () => {
