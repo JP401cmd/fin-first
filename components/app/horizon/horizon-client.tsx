@@ -40,11 +40,9 @@ import {
   type GoalMarkerInput,
 } from '@/lib/horizon/goal-chart-markers'
 import { NaturalMilestoneSheet } from '@/components/app/horizon/natural-milestone-sheet'
-import { ActionCard } from '@/components/app/action-card'
 import dynamic from 'next/dynamic'
 import {
   Landmark,
-  Zap,
 } from 'lucide-react'
 import {
   getFireEligibleNetWorth,
@@ -65,8 +63,6 @@ import { useAowNotice } from '@/components/app/horizon/aow-notice-provider'
 import { useEindsituatieNotice } from '@/components/app/horizon/eindsituatie-notice-provider'
 import { detectEindsituatie } from '@/lib/horizon/eindsituatie-duiding'
 import { HideInSimple } from '@/components/app/hide-in-simple'
-import { HorizonTrendGrid } from '@/components/app/horizon/horizon-trend-grid'
-import { LevensinkomenStrook } from '@/components/app/horizon/levensinkomen-strook'
 import { buildCoverageStrip } from '@/lib/horizon/coverage-strip'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import {
@@ -76,7 +72,7 @@ import {
 import { HouseholdRetirementPane } from '@/components/app/horizon/household-retirement-pane'
 import { usePerspective } from '@/components/app/perspective-provider'
 import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
-import { SectionLabel, Kicker } from '@/components/editorial'
+import { SectionLabel } from '@/components/editorial'
 import { formatAge } from '@/lib/horizon/fire-format'
 import {
   zoneVanHuidig,
@@ -95,9 +91,6 @@ import {
   type LabUitkomstRegel,
 } from '@/components/app/horizon/lab-knoppen'
 import { type LabOpslaanToestand } from '@/components/app/horizon/lab-opslaan-balk'
-import { ScenarioChip } from '@/components/app/horizon/scenario-chip'
-import { Dekkingsradar } from '@/components/app/horizon/dekkingsradar'
-import { ScenarioKaarten } from '@/components/app/horizon/scenario-kaarten'
 import { computeDekkingsradar, type RadarAs } from '@/lib/horizon/dekkingsradar'
 import { type ScenarioPresetResult } from '@/lib/horizon/scenario-presets'
 import { withResolvedKernelBedragen } from '@/lib/horizon/kernel-profile-basis'
@@ -136,7 +129,6 @@ import {
   eindvermogenVastgelegdToast,
   formatStopAge,
   haalbaarBijUitgaveRegel,
-  radarSubtitel,
   type AnkerReach,
   type AnkerStop,
 } from '@/lib/horizon/anker-copy'
@@ -241,10 +233,6 @@ const HorizonYearDetailsSheet = dynamic(() =>
   import('@/components/app/horizon/horizon-year-details-sheet').then(m => ({ default: m.HorizonYearDetailsSheet })),
   { ssr: false }
 )
-const HouseholdFireSection = dynamic(() =>
-  import('@/components/app/household-fire-section').then(m => ({ default: m.HouseholdFireSection })),
-  { ssr: false }
-)
 import { buildScenarioVariants, type ScenarioOverlay, type MonteCarloOverlay, type HouseholdPartnerOverlay } from '@/components/app/horizon/sim-chart'
 import { EventClusterSheet } from '@/components/app/horizon/event-cluster-sheet'
 import { faseAtAge } from '@/lib/horizon/phase-bar-segments'
@@ -295,6 +283,7 @@ import { PlanKerngetalMobiel, PlanKpiStripDesktop, PlanKpiStripMobiel } from '@/
 import { PlanHeroDuiding } from '@/components/toekomst/plan/plan-hero-duiding'
 import { PlanGegevensmelding } from '@/components/toekomst/plan/plan-gegevensmelding'
 import { PlanMeldingen } from '@/components/toekomst/plan/plan-meldingen'
+import { PlanVerdieping } from '@/components/toekomst/plan/plan-verdieping'
 import { DoelenLab } from '@/components/toekomst/doelen/doelen-lab'
 import { DoelenLabSheets } from '@/components/toekomst/doelen/doelen-lab-sheets'
 import {
@@ -303,7 +292,6 @@ import {
   PlanKassabonOpnamerate,
   PlanKassabonGezondheid,
 } from '@/components/toekomst/plan/plan-kassabons'
-import { useInViewOnce } from '@/components/toekomst/plan/use-in-view-once'
 import { CanvasTipsToggle } from '@/components/toekomst/canvas/canvas-tips-toggle'
 import { CanvasPills } from '@/components/toekomst/canvas/canvas-pills'
 import { CanvasUitleg } from '@/components/toekomst/canvas/canvas-uitleg'
@@ -692,8 +680,10 @@ export default function HorizonPage({
   // eager in idle. De sectie klapte tot ADR 0170 mee met het in-/uitklappen van KATERN II;
   // dat inklappen bestaat niet meer (het doelscenario staat altijd open in de grafiekkaart),
   // dus is er ook geen remountKey meer nodig.
-  const duidingSectionRef = useRef<HTMLElement | null>(null)
-  const duidingInView = useInViewOnce(duidingSectionRef)
+  // ADR 0179 fase 1 (kaart V1): `useInViewOnce` draait in PlanVerdieping, naast de sectie
+  // die hij observeert; hier staat alleen de grendel. Eenmaal waar, nooit terug.
+  const [duidingInView, setDuidingInView] = useState(false)
+  const markeerDuidingInView = useCallback(() => setDuidingInView(true), [])
 
   // ── Toekomst-overlay (ballonnen) ─────────────────────────────────
   // De grafiek wordt sinds juni 2026 altijd getoond (de oude setup-pane is
@@ -4974,163 +4964,37 @@ export default function HorizonPage({
           setStopPlanConfirmOpen={setStopPlanConfirmOpen}
         />
 
-      {/* === KATERN III — Wat het betekent ===
-          Eén katern-kaart: SectionLabel + één card-editorial met de drie delen
-          (Levensinkomenstrook / Dekkingsradar / Scenario's) als interne segmenten,
-          gescheiden door hairlines. Label én kaart renderen zodra ten minste één
-          segment rendert (per-segment-condities blijven ongewijzigd). */}
-      {(() => {
-        const heeftKaternIII =
-          coverageNodes.length > 0 ||
-          radarAssen !== null ||
-          scenarioPresets !== null ||
-          scenarioPresetsLoading
-        if (!heeftKaternIII) return null
-        // Tot ADR 0170 klapte deze duiding mee met KATERN II ("doel dicht = alles
-        // dicht"). Dat inklappen bestaat niet meer — het doelscenario staat altijd
-        // open in de grafiekkaart — dus is die koppeling vervallen; ze hield de
-        // duiding anders permanent verborgen.
-        return (
-          <>
-            <HideInSimple>
-              <SectionLabel className="mt-8 sm:mt-10" num="III">Wat het betekent</SectionLabel>
-            </HideInSimple>
-            <HideInSimple>
-              <section ref={duidingSectionRef} className="mt-6 sm:mt-8">
-                <div className="card-editorial no-hover-lift divide-y divide-[var(--border-ed)]">
-                  {/* === 4b. Levensinkomenstrook (dekkingsgraad per leeftijd) === */}
-                  {coverageNodes.length > 0 && (
-                    <div className="p-4 sm:p-5">
-                      <div className="mb-1">
-                        <Kicker className="mb-1">Levensinkomenstrook</Kicker>
-                        <div className="flex items-center gap-2">
-                          <h2 className="font-display text-[14px] font-semibold leading-snug text-[var(--ink)]">Dekt je inkomen straks je uitgaven?</h2>
-                          {(hasScenario || hasStopKeuze) && !(usePartnerMainLine || useHouseholdMainLine) && <ScenarioChip doelActief={doelActief} hasScenario={hasScenario} />}
-                        </div>
-                      </div>
-                      <p className="mb-3 font-sans text-[12px] text-[var(--ink-3)]">
-                        Dekkingsgraad per leeftijd — rekent met je gekozen stopleeftijd zodra je die zet.
-                      </p>
-                      {(() => {
-                        const first = coverageNodes[0].age
-                        const last = coverageNodes[coverageNodes.length - 1].age
-                        const span = Math.max(1, last - first)
-                        // Fasegrens = het gekozen stopmoment zodra een expliciete stop gezet is —
-                        // de GELANDE stop-run-leeftijd (duidingStopAge), zodat de opbouw/brug-grens
-                        // én de dekkingsdip in de strook bij dezelfde rijen horen; anders het
-                        // verwacht-FIRE-moment.
-                        const fire = Math.round(
-                          stopPad != null && duidingStopAge != null
-                            ? duidingStopAge
-                            : (simResult?.fireAgeFractional ?? simResult?.fireAge ?? first),
-                        )
-                        const aow = Math.round(userAowAge?.fractional ?? fire)
-                        const pct = (a: number) => Math.max(0, Math.min(100, ((a - first) / span) * 100))
-                        // Onttrekking begint pas op max(stop, AOW): wie vóórbij de AOW
-                        // doorwerkt heeft geen brug én nog geen onttrekking — anders
-                        // tellen de segmentbreedtes op tot >100% en spreekt de balk de
-                        // (nog groene) opbouw-stippen 67–74 tegen.
-                        const segments = [
-                          { label: 'Opbouw', color: 'var(--hor-t, #8a6e42)', widthPct: pct(fire) },
-                          { label: 'Brug FIRE → AOW', color: 'var(--color-horizon-500)', widthPct: Math.max(0, pct(aow) - pct(fire)) },
-                          { label: 'Onttrekking', color: 'var(--kern-t, #58362d)', widthPct: Math.max(0, 100 - pct(Math.max(fire, aow))) },
-                        ]
-                        // 0%-brede fasen niet meegeven: anders toont de legenda een
-                        // "Brug FIRE → AOW"-swatch bij een band die niet bestaat (stop ≥ AOW).
-                        return <LevensinkomenStrook nodes={coverageNodes} activeAge={lifelineAge} segments={segments.filter((s) => s.widthPct > 0)} />
-                      })()}
-                    </div>
-                  )}
-
-                  {/* === 4c. Dekkingsradar (vier dekkingsratio's) === */}
-                  {radarAssen !== null && (
-                    <div className="p-4 sm:p-5">
-                      <div className="mb-1">
-                        <Kicker className="mb-1">Dekkingsradar</Kicker>
-                        <div className="flex items-center gap-2">
-                          <h2 className="font-display text-[14px] font-semibold leading-snug text-[var(--ink)]">Hoe stevig staat je plan?</h2>
-                          {(hasScenario || hasStopKeuze) && !(usePartnerMainLine || useHouseholdMainLine) && <ScenarioChip doelActief={doelActief} hasScenario={hasScenario} />}
-                        </div>
-                      </div>
-                      {/* De grondslag hoort in beeld: op wélk scenario (en welke stopleeftijd) rekenen
-                          deze assen? Zelfde gelande bron als de assen zelf (duidingStopAge). */}
-                      <p className="mb-3 font-sans text-[12px] text-[var(--ink-3)]">
-                        {/* ADR 0145 — onder een vast stopmoment rekent de radar op het plan
-                            (of op een verkend stopmoment); onder `solved` blijft de tekst van vandaag. */}
-                        {(isFixedAnchorMode
-                          ? radarSubtitel({ stop: ankerStop, verkendStopAge: stopPad != null ? duidingStopAge : null })
-                          : null) ??
-                          (stopPad != null && duidingStopAge != null
-                          ? `Vier dekkingsratio’s — gerekend op je doelscenario: stoppen op ${formatAge(duidingStopAge)} jr.`
-                          : scenarioVerwachtFireAge != null
-                            ? `Vier dekkingsratio’s — gerekend op je verwachte pad (vrij rond ${formatAge(scenarioVerwachtFireAge)} jr).`
-                            : 'Vier dekkingsratio’s — op elk front.')}
-                      </p>
-                      <Dekkingsradar assen={radarAssen} />
-                    </div>
-                  )}
-
-                  {/* === 4d. Scenario's naast elkaar (5 preset-kaarten, tegen je basispad) === */}
-                  {(scenarioPresets !== null || scenarioPresetsLoading) && (
-                    <div className="p-4 sm:p-5">
-                      <div className="mb-1">
-                        <Kicker className="mb-1">Scenario&apos;s naast elkaar</Kicker>
-                        <h2 className="font-display text-[14px] font-semibold leading-snug text-[var(--ink)]">Wat als het anders loopt?</h2>
-                      </div>
-                      <p className="mb-3 font-sans text-[12px] text-[var(--ink-3)]">
-                        Vijf paden — één basispad, verbeteringen en één waarschuwing; elk pad wordt afgezet tegen je basispad.
-                      </p>
-                      <ScenarioKaarten kaarten={viewScenarioPresets ?? []} isLoading={scenarioPresetsLoading} />
-                    </div>
-                  )}
-                </div>
-              </section>
-            </HideInSimple>
-          </>
-        )
-      })()}
-
-      {/* === 5. Household FIRE Projections === */}
-      <HideInSimple>
-        <HouseholdFireSection personalProjection={personalHeroProjection} />
-      </HideInSimple>
-
-
-
-      {/* === 5b. Verloop-grid: Gezondheid + FIRE-leeftijd (Deep Dive) === */}
-      <HideInSimple>
-        <HorizonTrendGrid
-          resilienceSnapshots={resilienceSnapshots}
-          healthScoreTotal={healthScore.total}
-          healthChartOpen={healthChartOpen}
-          onToggleHealth={() => setHealthChartOpen(v => !v)}
-          fireAgeChartOpen={fireAgeChartOpen}
-          onToggleFireAge={() => setFireAgeChartOpen(v => !v)}
-          onOpenResilienceReceipt={() => setShowResilienceReceipt(true)}
-        />
-      </HideInSimple>
-
-
-      {/* === 9. Acties (Primary Content) === */}
-      {actions.length > 0 && (
-        <HideInSimple>
-          <section className="mt-4 sm:mt-8">
-            <h2 className="mb-3 label-editorial text-[var(--ink-2)]">
-              <Zap className="mr-1.5 inline h-3.5 w-3.5 text-horizon-600" />
-              Geplande acties (komend jaar)
-            </h2>
-            <div className="space-y-2">
-              {actions.map((action) => (
-                <ActionCard
-                  key={action.id}
-                  action={action}
-                  onStatusChange={handleActionStatusChange}
-                />
-              ))}
-            </div>
-          </section>
-        </HideInSimple>
-      )}
+      <PlanVerdieping
+        coverageNodes={coverageNodes}
+        radarAssen={radarAssen}
+        scenarioPresets={scenarioPresets}
+        scenarioPresetsLoading={scenarioPresetsLoading}
+        hasScenario={hasScenario}
+        hasStopKeuze={hasStopKeuze}
+        usePartnerMainLine={usePartnerMainLine}
+        useHouseholdMainLine={useHouseholdMainLine}
+        doelActief={doelActief}
+        stopPad={stopPad}
+        duidingStopAge={duidingStopAge}
+        simResult={simResult}
+        userAowAge={userAowAge}
+        lifelineAge={lifelineAge}
+        isFixedAnchorMode={isFixedAnchorMode}
+        ankerStop={ankerStop}
+        scenarioVerwachtFireAge={scenarioVerwachtFireAge}
+        viewScenarioPresets={viewScenarioPresets}
+        personalHeroProjection={personalHeroProjection}
+        resilienceSnapshots={resilienceSnapshots}
+        healthScore={healthScore}
+        healthChartOpen={healthChartOpen}
+        setHealthChartOpen={setHealthChartOpen}
+        fireAgeChartOpen={fireAgeChartOpen}
+        setFireAgeChartOpen={setFireAgeChartOpen}
+        setShowResilienceReceipt={setShowResilienceReceipt}
+        actions={actions}
+        handleActionStatusChange={handleActionStatusChange}
+        onDuidingInView={markeerDuidingInView}
+      />
 
       {/* === Phase Modals === */}
       {simResult && currentAge != null && simResult.fireAge != null && (

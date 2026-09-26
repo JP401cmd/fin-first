@@ -46,7 +46,7 @@ Eigenaarsbesluiten 26 sep: checkpoint-commit per stap **op master, per pad, nooi
 - [x] 7 P canvas-bladeren inpluggen
 - [x] 8 P Plan-meldingen inpluggen
 - [x] 9 P Doelen-lab inpluggen
-- [ ] 10 P Plan-verdieping inpluggen (`useInViewOnce` mee)
+- [x] 10 P Plan-verdieping inpluggen (`useInViewOnce` mee)
 - [ ] 11 S-klein overlay-host + deeplink-effect E2
 - [ ] 12 S provider (a) euro-grens
 - [ ] 13 S provider (b) sim/kernel + perspectief + meldingen-hooks

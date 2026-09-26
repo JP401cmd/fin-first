@@ -35,6 +35,16 @@ describe('preset-batch onder een vast anker wacht niet op scrollen', () => {
     expect(src).not.toContain("if (displayMode !== 'full' || !duidingInView) {")
   })
 
+  it('duidingInView is een grendel: PlanVerdieping meldt "in beeld", de ouder zet hem nooit terug (kaart V1)', () => {
+    // Sinds fase 1 stap 10 (ADR 0179) draait useInViewOnce in PlanVerdieping, naast de
+    // sectie. Zou de ouder de vlag ooit terugzetten, dan vallen scenarioPresets en
+    // haalbareUitgave weg zodra het Plan-paneel ontkoppelt (GW3a).
+    expect(src).toContain('const [duidingInView, setDuidingInView] = useState(false)')
+    expect(src).toContain('const markeerDuidingInView = useCallback(() => setDuidingInView(true), [])')
+    expect(src.match(/setDuidingInView\(/g) ?? []).toHaveLength(1)
+    expect(src).toContain('onDuidingInView={markeerDuidingInView}')
+  })
+
   it('isFixedAnchorMode staat in de dependency-array en is vóór het effect gedeclareerd (geen TDZ)', () => {
     const deps = presetEffect().slice(presetEffect().lastIndexOf('}, ['))
     expect(deps).toContain('isFixedAnchorMode')
