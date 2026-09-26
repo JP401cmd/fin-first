@@ -963,21 +963,6 @@ export function eindvermogenOpgeslagenNoot(nominaal: number): string {
 }
 
 /**
- * Onder welk verschil (in weergave-euro's) de eindvermogen-delta-badge niets zegt (eindreview
- * M5): een paar euro verschil is ruis in een projectie over tientallen jaren, net zoals de
- * dekkings-delta onder één procentpunt "gelijk" heet.
- */
-export const EINDVERMOGEN_DELTA_DREMPEL = 500
-
-/**
- * De delta-badge naast de dekkings-badge: "+€ 12.000 eindvermogen" / "−€ 3.000 eindvermogen".
- * Spiegelt `dekkingDeltaBadge`; het minteken is het typografische − (U+2212), zoals overal.
- */
-export function eindvermogenDeltaBadge(delta: number): string {
-  return `${delta >= 0 ? '+' : '−'}${formatCurrency(Math.abs(delta))} eindvermogen`
-}
-
-/**
  * Toelichting bovenaan het vastleg-venster bij een GEDEKT plan onder een vast stopmoment —
  * de spiegel van `dekkingSheetToelichting` (die gaat over een plan dat nog niet reikt).
  */

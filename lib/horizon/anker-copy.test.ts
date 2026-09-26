@@ -51,9 +51,7 @@ import {
   eindvermogenOpTegel,
   eindvermogenOpgeslagenNoot,
   eindvermogenGoalNotApplicableReason,
-  EINDVERMOGEN_DELTA_DREMPEL,
   eindvermogenPreviewWaarde,
-  eindvermogenDeltaBadge,
   eindvermogenSheetToelichting,
   eindvermogenGoalName,
   eindvermogenVastgelegdToast,
@@ -600,20 +598,11 @@ describe('eindvermogen-kopij (ADR 0145 D12, eigenaarsbesluit 15 sep 2026)', () =
     expect(euro(eindvermogenOpgeslagenNoot(480_000))).toBe("(opgeslagen als € 480.000 in toekomstige euro's)")
   })
 
-  it('M5 · de delta-drempel is € 500', () => {
-    expect(EINDVERMOGEN_DELTA_DREMPEL).toBe(500)
-  })
-
   it('preview-waarde: nu € X → € Y op je 90e; gemaskeerd verdwijnen beide bedragen', () => {
     expect(euro(eindvermogenPreviewWaarde(120_000, 210_000, 90))).toBe('nu € 120.000 → € 210.000 op je 90e')
     expect(eindvermogenPreviewWaarde(120_000, 210_000, 90, true)).toBe(
       `nu ${MASKED_AMOUNT_PLACEHOLDER} → ${MASKED_AMOUNT_PLACEHOLDER} op je 90e`,
     )
-  })
-
-  it('delta-badge draagt teken + bedrag + het woord eindvermogen', () => {
-    expect(euro(eindvermogenDeltaBadge(12_000))).toBe('+€ 12.000 eindvermogen')
-    expect(euro(eindvermogenDeltaBadge(-3_000))).toBe('−€ 3.000 eindvermogen')
   })
 
   it('sheet-toelichting: stopmoment vast + gedekt → het lab legt het eindvermogen vast (geen woord AOW)', () => {

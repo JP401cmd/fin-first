@@ -730,7 +730,6 @@ export function useToekomstSim({ initialData, perspectief, scenarioState }: { in
   })
   const heroFireAgePending = isHeroAnswerPending(heroFireAge)
   const heroFireAgeText = formatHeroFireAge(heroFireAge, { aowText: aowAgeFormatted, dash: '–', pendingText: '···' })
-  const heroFireAgeTextMobile = formatHeroFireAge(heroFireAge, { aowText: aowAgeFormatted, dash: '-', pendingText: '···' })
   /** Kassabon-vorm: mét eenheid, en "Niet bereikbaar" i.p.v. een streepje. */
   const heroFireAgeReceiptText =
     heroFireAge.bron === 'aow-tabel'
@@ -1068,7 +1067,6 @@ export function useToekomstSim({ initialData, perspectief, scenarioState }: { in
     heroFireAge,
     heroFireAgePending,
     heroFireAgeText,
-    heroFireAgeTextMobile,
     heroFireAgeReceiptText,
     vermogenOpAnker,
     monthlyWithdrawalAtAow,
