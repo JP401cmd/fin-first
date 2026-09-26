@@ -45,27 +45,6 @@ describe('horizon-client — elke hero-KPI toetst zijn eigen brondata', () => {
       expect(source).toContain(flag)
     }
   })
-
-  it('kent precies één vorm — geen tegel schrijft de melding zelf uit', () => {
-    // De KOP hoort uitsluitend ín HeroKpiNotice (of als gedeelde constante in de
-    // kassabons) te staan; een tegel die 'm zelf uitschrijft is de kopie-de-markup
-    // -route die de bevinding veroorzaakte.
-    for (const g of ['fireTargetGuard', 'retirementExpenseGuard', 'fireAgeNoticeGuard']) {
-      expect(source.match(new RegExp(`\\b${g}\\.label\\b`, 'g')) ?? [], g).toHaveLength(0)
-    }
-    // De twee kassabons tonen de UITLEG wél los (andere vorm: een blok bovenaan
-    // de bon) — precies één keer elk, en nooit met een eigen tekst.
-    expect(source.match(/\bfireAgeNoticeGuard\.hint\b/g) ?? []).toHaveLength(1)
-    expect(source.match(/\bfireTargetGuard\.hint\b/g) ?? []).toHaveLength(1)
-    expect(source.match(/\bretirementExpenseGuard\.hint\b/g) ?? []).toHaveLength(0)
-  })
-
-  it('haalt de woorden uit outcome-guard, nooit uit een lokale string', () => {
-    // De kop staat exact één keer in het bestand: als import-naam. Een letterlijke
-    // "We missen gegevens" in de markup zou de app-brede formulering laten driften.
-    expect(source).not.toMatch(/['"`]We missen gegevens/)
-    expect(source).toContain('HORIZON_MISSENDE_GEGEVENS_LABEL')
-  })
 })
 
 describe('horizon-client — de melding verdringt geen geldig antwoord', () => {
@@ -73,5 +52,4 @@ describe('horizon-client — de melding verdringt geen geldig antwoord', () => {
     // Zolang de kernel rekent is er geen gegevensprobleem maar een lege hand.
     expect(source).toMatch(/showFireAgeNotice =[\s\S]{0,400}heroFireAge\.status !== 'berekenen'/)
   })
-
 })

@@ -38,8 +38,8 @@ import { join } from 'node:path'
  * kozen voor hetzelfde getal.
  */
 const PROGNOSE_OPPERVLAKKEN = [
-  ['components', 'app', 'horizon', 'horizon-client.tsx'],
-  // De KPI-strip (fase 1 stap 5, ADR 0179).
+  // De kassabons (fase 1 stap 6) en de KPI-strip (stap 5) kwamen uit horizon-client.tsx (ADR 0179).
+  ['components', 'toekomst', 'plan', 'plan-kassabons.tsx'],
   ['components', 'toekomst', 'plan', 'plan-kpi-strip.tsx'],
   ['components', 'app', 'household-fire-section.tsx'],
   ['components', 'widgets', 'fire-prognose-widget.tsx'],
@@ -152,7 +152,7 @@ describe('prognose-kopgetallen — één vorm voor de vrijheidsleeftijd', () => 
 describe('horizon-client — de kassabon draagt de aannames', () => {
   it('noemt zowel rendement als inflatie', () => {
     const src = readFileSync(
-      join(process.cwd(), 'components', 'app', 'horizon', 'horizon-client.tsx'),
+      join(process.cwd(), 'components', 'toekomst', 'plan', 'plan-kassabons.tsx'),
       'utf8',
     )
     // Rendement stond er al; inflatie ontbrak — precies het gat uit de

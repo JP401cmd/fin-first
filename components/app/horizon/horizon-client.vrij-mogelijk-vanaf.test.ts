@@ -48,7 +48,6 @@ describe('preset-batch onder een vast anker wacht niet op scrollen', () => {
     expect(c).toBeGreaterThan(-1)
     expect(effect.slice(c)).toContain('setSolvedRun({ fireAge: null, endAge: null })')
   })
-
 })
 
 describe('preset-batch draait op de geïnjecteerde profielrij (ADR 0103 × ADR 0129 D7)', () => {

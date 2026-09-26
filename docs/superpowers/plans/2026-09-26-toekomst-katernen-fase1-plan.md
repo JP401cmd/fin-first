@@ -42,7 +42,7 @@ Eigenaarsbesluiten 26 sep: checkpoint-commit per stap **op master, per pad, nooi
 - [x] X1/X2/X3 kopieën klaar met inplug-map
 - [x] 4 P helpers/typen (integrator, A2)
 - [x] 5 P Plan-bladeren inpluggen
-- [ ] 6 S-klein kassabons via ShellOverlay inpluggen
+- [x] 6 S-klein kassabons via ShellOverlay inpluggen
 - [ ] 7 P canvas-bladeren inpluggen
 - [ ] 8 P Plan-meldingen inpluggen
 - [ ] 9 P Doelen-lab inpluggen

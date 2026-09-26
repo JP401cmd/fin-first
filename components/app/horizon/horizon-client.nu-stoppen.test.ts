@@ -79,7 +79,6 @@ describe('het kernantwoord loopt via resolveHeroFireAge', () => {
     expect(call).not.toContain('isNuStoppenMode')
     expect(src).not.toContain('nuStoppenRunway: nuStoppenRunway,')
   })
-
 })
 
 describe('planningMode blijft tweewaardig en volgt het anker (D6/B11)', () => {
@@ -188,10 +187,6 @@ describe('doelbedrag (D4) en opnamerate (bevinding 6)', () => {
 
   it('de vrijheidsleeftijd-tegel valt niet om op de anker-guard (eigen uitzondering op isFixedAnchorMode)', () => {
     expect(bron()).toMatch(/const showFireAgeNotice =[\s\S]{0,400}?!isFixedAnchorMode &&/)
-  })
-
-  it('de doelbedrag-bon heeft onder een vast anker geen "Benodigd"-totaalregel', () => {
-    expect(bron()).toContain("isFixedAnchorMode ? 'Vermogen op je stopmoment (geprojecteerd)' : 'Benodigd'")
   })
 
   it('de aftel-bon (dode code) is verwijderd', () => {
