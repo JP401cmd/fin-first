@@ -79,6 +79,8 @@ Waarom: de band is p25–p75. Dat is de middelste **helft**, zoals de bestaande 
 
 Waarom: "als het tegenzit" en "als het meezit" zijn scenario-namen die Nederlanders kennen van het pensioenoverzicht. Ze beschrijven een marktverloop, geen verwachting. "verwacht" doet dat wel, en botst met de uitleg van de laag ("Geen voorspelling"). Het middelste getal is de mediaan van de doorgerekende marktverlopen, dus "in het midden". De drie getallen komen uit dezelfde marktcheck-run; er komt geen motor bij.
 
+**Aanvulling bij onbereikbaar (26 sep).** Is één stand onbereikbaar binnen de horizon (de kern geeft `null`), dan blijft de regel staan en krijgt die stand de woorden "niet binnen je plan", bijvoorbeeld "als het tegenzit niet binnen je plan · in het midden 58 · als het meezit 52". Een regel die verdwijnt zodra het tegenzit, verzwijgt juist de uitkomst die het meest zegt. Het is dezelfde betekenis als de nul-tak van `ankerVrijZin`, maar kort genoeg voor één regel. Zijn alle drie onbereikbaar, of staat er een vast stop-anker, dan is er geen regel. Beschrijvend, geen oordeel: compliance goedgekeurd.
+
 ## Wat dit vraagt van de bouw (fase 1–2)
 
 - Ankerregel: consumeer `ankerVrijZin` en `ankerTitel` uit `lib/horizon/anker-copy.ts` en schrijf geen nieuwe zinnen. KPI 1 via `formatHeroFireAge`.

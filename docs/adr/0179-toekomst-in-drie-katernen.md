@@ -76,6 +76,8 @@ De letterlijke kopij van kop, ankerregel, aannamesregel, samenvattingsregels, la
 
 De amendementen op 0170 B7/B11/B12 en B9 en op 0144 staan niet in de amendementenlijst van de spec (§8). Ze volgen uit de eigenaarsbesluiten 4 en 9 en uit de verhuizing van het lab naar een eigen route, en staan hier zodat geen ADR iets anders zegt dan de app.
 
+**Addendum (26 sep 2026): drie getallen onder de band.** Spec §7.6 vroeg een uitkomst die de marktcheck nog niet had: drie vrijheidsleeftijden. Die komen uit de kern en niet uit de UI, want een eigen som in de UI is verboden (consume, don't recompute). `MarktcheckOutcome.vrijheidsleeftijden` wordt berekend uit dezelfde runs als de band. De runs worden gerangschikt op hun gap op de live FIRE-leeftijd, en `solveFire` lost alleen de run op p25, p50 en p75 op. Dat kost +15% rekenwerk, en de uitkomst is gemeten gelijk aan het oplossen van elke run. De band, de marge en de oracle-velden blijven byte-gelijk, dus D9 geldt in deze zin: geen bestaande motor verandert van gedrag. De Monte Carlo-consolidatie blijft een aparte kaart (eigenaarsbesluit 10). Onder een vast stop-anker is het veld `null` en toont de component geen regel. Berekeningen: `marktcheck-vrijheidsleeftijden`.
+
 ## Toets: raakt het vervallen van de duidingszin ADR 0129 B10?
 
 B10 regelt de naamgeving van de modi: vanuit de vraag die het scherm beantwoordt, geen systeemlabel. Drie feiten:
