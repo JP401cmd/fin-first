@@ -11,8 +11,9 @@
  *  2. dat de vrijheidstijd via de canonieke helper op de bundel-dagbasis loopt
  *    (`formatWithFreedom(..., canonicalDailyRate, ...)`), geen eigen dag/jaar-som;
  *  3. dat de detector (`deficit-loan-display.ts`) ONgewijzigd geconsumeerd wordt;
- *  4. dat de melding de meldingen-conventie volgt: gated op de gedeelde
- *    `useDeficitNotice`-toestand, met een altijd-gemounte aria-live-regio.
+ *  4. dat de melding de meldingen-conventie volgt: sinds ADR 0179 fase 2 via het
+ *    meldingenslot per katern (minimaliseren onder de katern-route), niet meer via
+ *    een eigen provider.
  * (Precedent: `horizon-client.wat-hoort-daarbij.test.ts` leest de bron óók letterlijk.)
  *
  * De TOON-grendel op de copy zelf staat in `lib/horizon/deficit-loan-copy.test.ts`:
@@ -90,10 +91,14 @@ describe('horizon-client — tekort-lening-melding consumeert één bron', () =>
 })
 
 describe('horizon-client — tekort-lening-melding volgt de meldingen-conventie', () => {
-  it('gebruikt de gedeelde minimaliseer-toestand (geen tweede, lokale state)', () => {
+  it('minimaliseren gaat per katern, niet per melding (ADR 0179 D6, fase 2)', () => {
+    // De losse DeficitNoticeProvider is weg: de melding woont in katern Plan en wordt
+    // geminimaliseerd onder de katern-route (`useKaternMeldingMinimize` in de
+    // meldingen-host). De meldingen-hook levert alleen het signaal en de copy.
     const src = source()
-    expect(src).toContain("import { useDeficitNotice } from '@/components/app/horizon/deficit-notice-provider'")
-    expect(src).toContain('} = useDeficitNotice(deficitNoticeVisible ? deficitLoanNotice!.peak : null)')
+    expect(src).not.toContain('useDeficitNotice')
+    expect(src).not.toContain('deficit-notice-provider')
+    expect(src).toContain('const deficitNoticeVisible = deficitLoanNotice != null && !usePartnerMainLine')
   })
 
   it('behoudt de partner-view-gating van de melding', () => {

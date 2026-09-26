@@ -34,9 +34,12 @@ describe('/toekomst/instellingen — één telling, in de view', () => {
 
 describe('/toekomst/instellingen — samengevoegde server-opbouw', () => {
   it('leest de horizon-bundel en de strategie-editordata precies één keer', () => {
-    // De bundel komt uit dezelfde `loadToekomstData`-lading als de katern-layout
-    // (React-`cache()`), niet uit een tweede loader-aanroep.
-    expect(PAGE_SRC.match(/loadToekomstData\(/g)).toHaveLength(1)
+    // De bundel komt uit de per request gecachte deel-lading die de katern-layout ook
+    // leest (React-`cache()`), niet uit een tweede loader-aanroep — en niet uit de volle
+    // `loadToekomstData()`: bij client-navigatie rendert de layout niet opnieuw, dan zou
+    // de page ook Fin-data en plan-oordeel laden (review fase 1, TTFB).
+    expect(PAGE_SRC.match(/loadToekomstHorizonData\(/g)).toHaveLength(1)
+    expect(PAGE_SRC).not.toMatch(/loadToekomstData\(/)
     expect(PAGE_SRC).not.toMatch(/loadHorizon(Raw|Data)\(/)
     expect(PAGE_SRC.match(/buildStrategieEditorsData\(/g)).toHaveLength(1)
   })

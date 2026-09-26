@@ -40,6 +40,12 @@ export interface KaternKopItem {
   /** Samenvattingsregel; alleen zichtbaar op een inactieve kop, vanaf `lg`. */
   samenvatting?: string | null
   status?: KaternKopStatus | null
+  /**
+   * Bij een klik op de kop, náást de navigatie. De host gebruikt dit om een
+   * geminimaliseerde melding van dat katern weer uit te klappen (spec §4.8: klik op
+   * de kop opent het katern met de melding uitgeklapt).
+   */
+  onSelect?: () => void
 }
 
 export interface KaternKoppenProps {
@@ -71,6 +77,7 @@ export function KaternKoppen({ items, actiefKey, label, className = '' }: Katern
               <Link
                 href={item.href}
                 aria-current={actief ? 'page' : undefined}
+                onClick={item.onSelect}
                 className={`block min-h-[44px] border-t-2 pb-2 pt-2.5 pr-2 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)] ${
                   actief
                     ? 'border-[var(--ink)] text-[var(--ink)]'

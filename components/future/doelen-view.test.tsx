@@ -1060,55 +1060,36 @@ describe('DoelenView — melding wanneer lab-doelen niet meer bij het plan passe
   const spaarquoteDoel = () => paramGoal({ id: 'sq', name: 'Spaarquote naar 45%', goal_type: 'savings_rate' })
   const spaarquoteProgress = { current: 38, target: 45, pct: 84, onTrack: true, measured: true, requiredMonthly: null, eta: null, paceSkipped: false }
 
-  it('toont één regel met de telling en de acties Bijwerken · Loslaten; Loslaten opent de bestaande confirm', () => {
+  it('toont de melding zelf niet meer: die staat in het meldingenslot van katern Doelen (ADR 0179 D6)', () => {
     render(<DoelenView goals={[fireAgeNvt(), spaarquoteDoel()]} goalProgresses={[fireAgeProgress, spaarquoteProgress]} />)
-    const melding = screen.getByTestId('doelen-plan-melding')
-    expect(melding).toHaveAttribute('role', 'status')
-    expect(melding).toHaveTextContent('Je plan is veranderd. 1 doel uit het lab past er niet meer bij.')
-    // Bijwerken opent het lab zelf (canonieke deeplink), niet alleen de landingsanker.
-    expect(screen.getByRole('link', { name: 'Bijwerken' })).toHaveAttribute('href', '/toekomst/doelen#verken-je-aannames')
-    expect(screen.queryByText('Doelsituatie loslaten')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Loslaten' }))
-    expect(screen.getByText('Doelsituatie loslaten')).toBeInTheDocument()
+    expect(screen.queryByTestId('doelen-plan-melding')).toBeNull()
+    expect(screen.queryByText(/Je plan is veranderd/)).toBeNull()
+  })
+
+  it('Loslaten blijft bereikbaar via het doelsituatie-menu en opent de bestaande confirm', () => {
+    render(<DoelenView goals={[fireAgeNvt(), spaarquoteDoel()]} goalProgresses={[fireAgeProgress, spaarquoteProgress]} />)
+    expect(screen.queryByText('Je laat je vastgelegde doelsituatie los', { exact: false })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Doelsituatie-opties' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Doelsituatie loslaten' }))
     // De confirm noemt de huidige lab-doelen: "Plan gedekt" wél, het vervallen salaris niet.
     const uitleg = screen.getByText(/Je laat je vastgelegde doelsituatie los/)
     expect(uitleg).toHaveTextContent('Plan gedekt')
     expect(uitleg.textContent ?? '').not.toMatch(/salaris/i)
   })
 
-  it('geen melding zonder n.v.t.-lab-doelen; het vrijheidsgetal-doel met reden telt niet', () => {
-    const vg = mockGoal({
-      id: 'vg',
-      name: 'Volledige vrijheid (FIRE)',
-      target_value: 1650000,
-      current_value: 960000,
-      metadata: { standaardDoel: 'vrijheidsgetal' },
-      notApplicableReason: 'n.v.t.',
-    } as Partial<GoalWithBudget>)
-    const vgProgress = { current: 960000, target: 1650000, pct: 0, onTrack: true, measured: false, requiredMonthly: null, eta: null, paceSkipped: true, notApplicableReason: 'n.v.t.' }
-    render(<DoelenView goals={[spaarquoteDoel(), vg]} goalProgresses={[spaarquoteProgress, vgProgress]} />)
-    expect(screen.queryByTestId('doelen-plan-melding')).toBeNull()
-    expect(screen.queryByText(/Je plan is veranderd/)).toBeNull()
-  })
-
-  it('in Eenvoudig staat dezelfde melding boven de lijst; Loslaten opent daar ook de confirm', () => {
-    render(
+  it('in Eenvoudig staat het menu er alleen als lab-doelen niet meer bij het plan passen', () => {
+    const { unmount } = render(
       <DoelenView goals={[fireAgeNvt(), spaarquoteDoel()]} goalProgresses={[fireAgeProgress, spaarquoteProgress]} />,
       'simple',
     )
-    // Eenvoudig: óók de scenariodoelen-groep, met de melding erin.
     expect(screen.getByText('Scenariodoelen')).toBeTruthy()
-    const meldingen = screen.getAllByTestId('doelen-plan-melding')
-    expect(meldingen).toHaveLength(1)
-    expect(meldingen[0]).toHaveAttribute('role', 'status')
-    expect(meldingen[0]).toHaveTextContent('Je plan is veranderd. 1 doel uit het lab past er niet meer bij.')
-    // Boven de lijst: de melding komt in documentvolgorde vóór de eerste doelkaart.
-    const eersteKaart = screen.getByRole('link', { name: /Bekijk Vrij op 58 jaar in het lab/ })
-    expect(meldingen[0].compareDocumentPosition(eersteKaart) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'Bijwerken' })).toHaveAttribute('href', '/toekomst/doelen#verken-je-aannames')
-    expect(screen.queryByText('Doelsituatie loslaten')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Loslaten' }))
-    expect(screen.getByText('Doelsituatie loslaten')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Doelsituatie-opties' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Doelsituatie loslaten' }))
+    expect(screen.getByText(/Je laat je vastgelegde doelsituatie los/)).toBeInTheDocument()
+    unmount()
+
+    render(<DoelenView goals={[spaarquoteDoel()]} goalProgresses={[spaarquoteProgress]} />, 'simple')
+    expect(screen.queryByRole('button', { name: 'Doelsituatie-opties' })).toBeNull()
   })
 
   it('doelen-view importeert niets uit lib/horizon/toekomst-doel (bundelgrens: die trekt de kernel-adapter mee)', async () => {

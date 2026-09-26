@@ -1,6 +1,4 @@
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
 import type { Asset } from '@/lib/asset-data'
 import {
   buildCompleetHorizonFixture,
@@ -13,6 +11,7 @@ import {
 import { buildKernelInputFromApp, deriveEigenHuisIds } from './adapter'
 import { solveFire, type SolverStatus } from './solver'
 import { buildKernelSlotMeta, kernelToUnifiedResult } from './bridge'
+import { wijsMeldingenToe } from '@/lib/horizon/katern-meldingen'
 
 /**
  * ADR 0129 F2 — de status-compat van de bridge tijdens de tussentoestand.
@@ -30,8 +29,8 @@ import { buildKernelSlotMeta, kernelToUnifiedResult } from './bridge'
  * paste die gedachte niet toe op `pension_shortfall`.
  *
  * DE INVARIANT, anker-onafhankelijk geformuleerd: elke status die de bridge voor
- * een via de app bereikbaar anker kan uitzenden, heeft een blok in horizon-client.
- * De bron-grendel onderaan bewaakt dat mechanisch, zodat een volgende hernoeming
+ * een via de app bereikbaar anker kan uitzenden, krijgt een melding in katern Plan.
+ * De grendel onderaan bewaakt dat mechanisch, zodat een volgende hernoeming
  * hier omvalt in plaats van in productie.
  *
  * F4 generaliseert de UI naar `anchor_shortfall` en haalt deze mapping weer weg.
@@ -126,20 +125,35 @@ describe('bridge — het aow-anker spreekt tijdens F2 de taal die de UI verstaat
   })
 })
 
-describe('bron-grendel — elke TEKORT-status die de bridge voor een live anker uitzendt heeft een UI-blok', () => {
-  // Alleen tekort-statussen hebben een eigen blok nodig: `reached_now`/`reached_at`
+describe('grendel — elke TEKORT-status die de bridge voor een live anker uitzendt heeft een melding', () => {
+  // Alleen tekort-statussen hebben een eigen melding nodig: `reached_now`/`reached_at`
   // worden door de hero-leeftijd gedragen en hoeven niet apart gemeld te worden.
   // Een tekort daarentegen is precies de melding die een gebruiker níét mag missen.
-  // De statusblokken woonden in horizon-client.tsx; sinds ADR 0179 fase 1 stap 8
-  // rendert components/toekomst/plan/plan-meldingen.tsx ze.
-  const src = readFileSync(
-    resolve(process.cwd(), 'components/toekomst/plan/plan-meldingen.tsx'),
-    'utf8',
-  )
-  const uiStatussen = new Set(
-    [...src.matchAll(/kernelStatus\s*===\s*'([a-z_]+)'/g)].map((m) => m[1]),
-  )
+  // De statusblokken woonden in horizon-client.tsx en daarna in plan-meldingen.tsx; sinds
+  // ADR 0179 fase 2 (D6) is de plan-melding van katern Plan de enige plek, toegewezen door
+  // `wijsMeldingenToe` (lib/horizon/katern-meldingen.ts). Deze grendel toetst dus GEDRAG:
+  // levert de toewijzing voor deze status onder een vast anker een melding op?
   const isTekort = (s: SolverStatus) => s.endsWith('_shortfall')
+  const toonMelding = (kernelStatus: SolverStatus) =>
+    wijsMeldingenToe({
+      masked: false,
+      plan: {
+        status: { anchorFixed: true, coveragePct: 80, solvedReachable: null },
+        kernelStatus,
+        fireAgeFractional: null,
+        currentAge: 45,
+        ankerReach: { kind: 'reikt-tot', age: 78, endAge: 90 },
+        ankerStop: { kind: 'age', stopAge: 60 },
+        kernelMaandHint: null,
+      },
+      tekortLening: null,
+      eindsituatie: null,
+      labDoelenBuitenPlan: 0,
+      doelen: [],
+      aowOntbreekt: false,
+      huisNooitVerkocht: null,
+      ontbrekendeGegevens: [],
+    }).plan.meldingen.some((m) => m.id === 'plan-tekort')
 
   // F3b — het `age`-anker: sinds het generieke `anchor_shortfall`-blok in horizon-client
   // (ADR 0129 D3) is dit een gewone rij in de matrix; de UI schrijft het anker nu ook
@@ -149,15 +163,15 @@ describe('bron-grendel — elke TEKORT-status die de bridge voor een live anker 
     ['aow via legacy-kolom', { fire_end_strategy: 'pensioen' } as const],
     ['nu', { fire_stop_anchor: 'now' } as const],
     ['age (F3b)', { fire_stop_anchor: 'age', fire_stop_age: 65 } as const],
-  ])('%s: het scenario trekt een tekort én dat tekort heeft een blok in horizon-client', (_naam, rij) => {
+  ])('%s: het scenario trekt een tekort én dat tekort krijgt een melding in katern Plan', (_naam, rij) => {
     const { bridge } = bridgedStatus(rij)
     // Eerst bewijzen dat het scenario überhaupt een tekort is — anders toetst de
     // grendel niets (de fout waarmee deze test zelf begon).
     expect(isTekort(bridge), `scenario levert '${bridge}', geen tekort — fixture te rijk`).toBe(true)
     expect(
-      uiStatussen.has(bridge),
-      `bridge zendt '${bridge}' uit maar horizon-client.tsx matcht er nergens op — ` +
-        `een gebruiker met een tekort ziet dan niets. UI kent: ${[...uiStatussen].join(', ')}`,
+      toonMelding(bridge),
+      `bridge zendt '${bridge}' uit maar wijsMeldingenToe maakt er geen plan-melding van — ` +
+        'een gebruiker met een tekort ziet dan niets.',
     ).toBe(true)
   })
 })

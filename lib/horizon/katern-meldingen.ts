@@ -1,7 +1,9 @@
 // lib/horizon/katern-meldingen.ts
 //
-// Meldingen per katern op /toekomst (ADR 0179 D6, spec §4.8). Fase 2-bouwsteen, nog
-// niet ingeplugd.
+// Meldingen per katern op /toekomst (ADR 0179 D6, spec §4.8). Sinds fase 2 (W2)
+// ingeplugd via `components/toekomst/meldingen/toekomst-katern-meldingen.tsx`: die
+// provider vult de invoer uit de state-provider en de server-lading, en voedt zowel het
+// slot bovenaan het actieve katern als de punten op de katern-koppen.
 //
 // Eén functie, `wijsMeldingenToe`, neemt de signalen die de pagina nu al heeft (de
 // hoofdrun, de adapter-notices, de detectoren, de doelvoortgang) en legt elke melding in
@@ -158,9 +160,9 @@ export interface KaternMeldingenInput {
 // ── Kopij zonder eigen module ────────────────────────────────────────────────
 
 /**
- * Regels die nog in geen kopijmodule stonden. Herkomst per regel; de host
- * (`components/toekomst/plan/plan-meldingen.tsx`) consumeert bij het inpluggen deze
- * bron in plaats van zijn eigen letterlijke tekst, zodat er één formulering blijft.
+ * Regels die nog in geen kopijmodule stonden. Herkomst per regel ("plan-meldingen.tsx"
+ * = het vroegere blok boven de grafiek, in fase 2 opgegaan in het meldingenslot); dit
+ * is nu de enige bron, zodat er één formulering blijft.
  * Nieuwe formuleringen (gemarkeerd NIEUW) gaan in fase 2 langs `merkstem`.
  */
 export const KATERN_MELDING_KOPIJ = {
@@ -215,6 +217,12 @@ export function instellingenRegelHref(regel: RegelId): string {
 }
 
 export const PROFIEL_HREF = '/mijn/profiel'
+
+/**
+ * Het doelscenario-lab bovenaan katern Doelen (`VERKEN_SECTION_ID`). Letterlijk, omdat
+ * die constante in een client-component woont; `katern-meldingen.test.ts` pint de gelijkheid.
+ */
+export const DOELEN_LAB_HREF = '/toekomst/doelen#verken-je-aannames'
 
 /** Pijl weg: het slot tekent zelf een pijl-icoon achter elk actielabel. */
 function zonderPijl(label: string): string {
@@ -330,7 +338,9 @@ function labPlanMelding(n: number): KaternMelding | null {
     ernst: 'neutral',
     titel,
     kort: titel,
-    actie: { label: DOELEN_MELDING_ACTIES.bijwerken, href: KATERN_ROUTE.doelen },
+    // Het lab zelf, zoals de vroegere `LabPlanMelding` in doelen-view (één plek).
+    // "Loslaten" staat in het doelsituatie-menu van de doelenlijst.
+    actie: { label: DOELEN_MELDING_ACTIES.bijwerken, href: DOELEN_LAB_HREF },
   }
 }
 
@@ -493,4 +503,13 @@ export function katernMinimizedLevelUitMap(
 ): MinimizedLevel | null {
   const key = KATERN_ROUTE[katern]
   return Object.prototype.hasOwnProperty.call(map, key) ? alsKaternMinimizedLevel(map[key]) : null
+}
+
+/** De seed van alle drie de katernen in één keer — wat `loadToekomstData` meegeeft. */
+export type KaternMinimizedSeed = Readonly<Record<KaternId, MinimizedLevel | null>>
+
+export function katernMinimizedSeed(map: Readonly<Record<string, unknown>>): KaternMinimizedSeed {
+  const uit = {} as Record<KaternId, MinimizedLevel | null>
+  for (const k of KATERN_VOLGORDE) uit[k] = katernMinimizedLevelUitMap(map, k)
+  return uit
 }

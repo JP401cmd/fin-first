@@ -9,6 +9,8 @@ import {
   katernKopStatus,
   katernMinimizeLevel,
   katernMinimizedLevelUitMap,
+  katernMinimizedSeed,
+  DOELEN_LAB_HREF,
   resolveKaternMeldingDisplay,
   wijsMeldingenToe,
   type DoelSignaal,
@@ -24,6 +26,7 @@ import { KATERN_VOLGORDE, katernStatuspuntLabel } from './katern-copy'
 import { HORIZON_MISSENDE_GEGEVENS_HINTS, HORIZON_MISSENDE_GEGEVENS_LABEL } from './outcome-guard'
 import { resolvePlanVerdict } from './plan-status'
 import { strategieHref } from './strategie-route'
+import { VERKEN_SECTION_ID } from '@/components/app/horizon/scenario-chip'
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -268,7 +271,9 @@ describe('Doelen — lab-doelen buiten het plan', () => {
       const [m] = wijsMeldingenToe(metInput({ labDoelenBuitenPlan: n })).doelen.meldingen
       expect(m.titel).toBe(doelenPlanGewijzigdMelding(n))
       expect(m.ernst).toBe('neutral')
-      expect(m.actie).toEqual({ label: DOELEN_MELDING_ACTIES.bijwerken, href: '/toekomst/doelen' })
+      // Naar het lab zelf (het anker van `VERKEN_SECTION_ID`), zoals de vroegere LabPlanMelding.
+      expect(m.actie).toEqual({ label: DOELEN_MELDING_ACTIES.bijwerken, href: `/toekomst/doelen#${VERKEN_SECTION_ID}` })
+      expect(DOELEN_LAB_HREF).toBe(`${KATERN_ROUTE.doelen}#${VERKEN_SECTION_ID}`)
     }
   })
 
@@ -402,6 +407,8 @@ describe('toewijzing — sortering en uniciteit', () => {
       '/toekomst/instellingen?strategie=huis',
       '/toekomst/instellingen?regel=eindstrategie',
       '/toekomst/doelen',
+      // Het lab bovenaan katern Doelen (de vroegere LabPlanMelding wees er ook heen).
+      '/toekomst/doelen#verken-je-aannames',
       '/mijn/profiel',
     ])
     for (const m of alleMeldingen(wijsMeldingenToe(ALLES))) {
@@ -483,6 +490,15 @@ describe('minimaliseren per katern-route', () => {
     expect(katernMinimizedLevelUitMap({ '/toekomst': 1 }, 'plan')).toBeNull()
     expect(katernMinimizedLevelUitMap({ '/toekomst/doelen': 'info' }, 'plan')).toBeNull()
     expect(katernMinimizedLevelUitMap({}, 'doelen')).toBeNull()
+    // De seed voor loadToekomstData: alle drie tegelijk, oude pref-sleutels tellen niet.
+    expect(
+      katernMinimizedSeed({
+        '/toekomst': 'bad',
+        '/toekomst/instellingen': 'info',
+        '/toekomst/aow-ontbreekt': 1,
+        '/toekomst/tekort-lening': 12345,
+      }),
+    ).toEqual({ plan: 'bad', doelen: null, instellingen: 'info' })
     const vervuild = Object.create({ '/toekomst/instellingen': 'bad' }) as Record<string, unknown>
     expect(katernMinimizedLevelUitMap(vervuild, 'instellingen')).toBeNull()
     expect(alsKaternMinimizedLevel('good')).toBeNull()

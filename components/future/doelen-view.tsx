@@ -15,8 +15,6 @@ import {
 import { getGoalSuggestions } from '@/lib/goal-suggestions'
 import {
   planCoverageKaartSubregel,
-  doelenPlanGewijzigdMelding,
-  DOELEN_MELDING_ACTIES,
   planCoverageGoalName,
   eindvermogenGoalName,
 } from '@/lib/horizon/anker-copy'
@@ -391,40 +389,6 @@ function ParameterGoalCard({ goal, progress, labPlan }: GoalDisplay & { labPlan:
         </>
       )}
     </Link>
-  )
-}
-
-/**
- * Eén regel wanneer de plankeuze lab-doelen n.v.t. maakte (spec lab-haalbaarheid §4.2).
- * Eén markup voor beide weergavemodi. "Bijwerken" springt naar het lab, dat sinds ADR 0179
- * (fase 1 stap 16) boven deze lijst in katern Doelen staat (`#verken-je-aannames`,
- * rechtstreeks, zonder de `?whatif=open`-redirect); "Loslaten" opent de
- * bestaande confirm — dezelfde flow als het overflow-menu van de doelsituatie.
- */
-function LabPlanMelding({ count, onLoslaten }: { count: number; onLoslaten: () => void }) {
-  return (
-    <div
-      role="status"
-      data-testid="doelen-plan-melding"
-      className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 border border-[var(--ink-2)] border-l-4 border-l-warning bg-[var(--paper)] px-3 py-2 font-sans text-[12px] text-[var(--ink-2)]"
-    >
-      <span>{doelenPlanGewijzigdMelding(count)}</span>
-      <span className="flex items-center gap-x-4">
-        <Link
-          href="/toekomst/doelen#verken-je-aannames"
-          className="inline-flex min-h-[44px] items-center font-semibold text-horizon-700 underline underline-offset-2"
-        >
-          {DOELEN_MELDING_ACTIES.bijwerken}
-        </Link>
-        <button
-          type="button"
-          onClick={onLoslaten}
-          className="inline-flex min-h-[44px] items-center font-semibold text-negative underline underline-offset-2"
-        >
-          {DOELEN_MELDING_ACTIES.loslaten}
-        </button>
-      </span>
-    </div>
   )
 }
 
@@ -863,7 +827,10 @@ export function DoelenView({
                 Scenariodoelen
               </h2>
             </div>
-            {!simple && (
+            {/* Het menu staat in Volledig altijd, en in Eenvoudig zodra lab-doelen niet
+                meer bij het plan passen: dan is Loslaten de tweede actie bij de melding in
+                het meldingenslot (die draagt er maar één, Bijwerken). */}
+            {(!simple || labDoelenBuitenPlan.length > 0) && (
             <div className="relative">
               <button
                 type="button"
@@ -906,11 +873,9 @@ export function DoelenView({
             </div>
             )}
           </header>
-          {/* Spec §4.2 (ruling 15 sep): de melding geldt in beide modi en staat boven
-              de scenariodoelen waar hij over gaat. */}
-          {labDoelenBuitenPlan.length > 0 && (
-            <LabPlanMelding count={labDoelenBuitenPlan.length} onLoslaten={() => setConfirmOpen(true)} />
-          )}
+          {/* De melding "je plan is veranderd" staat sinds ADR 0179 fase 2 (D6) in het
+              meldingenslot bovenaan katern Doelen (`wijsMeldingenToe`, actie Bijwerken →
+              het lab). Loslaten blijft hier, in het doelsituatie-menu. */}
           <p className="mb-4 text-[11px] italic text-[var(--ink-3)]">
             Doelen uit je scenario in het lab. Klik een kaart om ze live te
             verkennen op de tijdas.

@@ -25,13 +25,22 @@ const LAYOUT = `${GROEP}/layout.tsx`
 const KATERN_PAGES = [`${GROEP}/page.tsx`, `${GROEP}/doelen/page.tsx`, `${GROEP}/instellingen/page.tsx`] as const
 
 /** De gedeelde onderdelen die precies één keer, in de layout, horen te staan. */
-const LAYOUT_BLOKKEN = ['<ToekomstStateProvider', '<ToekomstCanvas', '<ToekomstKaternKoppen', '<ToekomstOverlayHost']
+const LAYOUT_BLOKKEN = [
+  '<ToekomstStateProvider',
+  '<ToekomstCanvas',
+  '<ToekomstKaternKoppen',
+  // Fase 2 (D6): de meldingen-host en het slot bovenaan het actieve katern.
+  '<ToekomstKaternMeldingenProvider',
+  '<ToekomstKaternMeldingSlot',
+  '<ToekomstOverlayHost',
+]
 /** De bestanden die deze blokken definiëren (de provider noemt zichzelf in een foutmelding). */
 const DEFINITIES = new Set([
   'components/toekomst/state/toekomst-state-provider.tsx',
   'components/toekomst/canvas/toekomst-canvas.tsx',
   'components/toekomst/layout/toekomst-katern-navigatie.tsx',
   'components/toekomst/overlays/toekomst-overlay-host.tsx',
+  'components/toekomst/meldingen/toekomst-katern-meldingen.tsx',
 ])
 
 describe('katern-layout — het canvas blijft gemonteerd bij een katernwissel (GW1)', () => {
@@ -54,6 +63,9 @@ describe('katern-layout — het canvas blijft gemonteerd bij een katernwissel (G
     }
     // …en het katern als kind, ná het canvas: alleen `{children}` wisselt.
     expect(layout.indexOf('{children}')).toBeGreaterThan(layout.indexOf('<ToekomstCanvas'))
+    // Het meldingenslot staat bovenaan het katern: ná de koppen, vóór het katern.
+    expect(layout.indexOf('<ToekomstKaternMeldingSlot')).toBeGreaterThan(layout.indexOf('<ToekomstKaternKoppen'))
+    expect(layout.indexOf('<ToekomstKaternMeldingSlot')).toBeLessThan(layout.indexOf('{children}'))
   })
 
   it.each(KATERN_PAGES)('%s rendert geen tweede provider, canvas of overlay-host', (page) => {
@@ -64,5 +76,18 @@ describe('katern-layout — het canvas blijft gemonteerd bij een katernwissel (G
         expect(src, `${mod} (bereikbaar vanuit ${page}) rendert ${blok}`).not.toContain(blok)
       }
     }
+  })
+})
+
+describe('katern-pages laden alleen hun eigen deel (review fase 1, TTFB bij een katernwissel)', () => {
+  // Bij client-navigatie rendert de layout niet opnieuw, dus `cache()` ontdubbelt dan
+  // niets: een page die `loadToekomstData()` aanroept, draait de volle lading
+  // (horizon-kernel, plan-oordeel, plan-review) voor één veld.
+  it.each([`${GROEP}/doelen/page.tsx`, `${GROEP}/instellingen/page.tsx`])('%s roept loadToekomstData() niet aan', (page) => {
+    expect(codeOnly(readRel(page))).not.toMatch(/loadToekomstData\(/)
+  })
+
+  it('Doelen leest alleen de Fin-deel-lading', () => {
+    expect(codeOnly(readRel(`${GROEP}/doelen/page.tsx`))).toContain('loadToekomstFinData()')
   })
 })

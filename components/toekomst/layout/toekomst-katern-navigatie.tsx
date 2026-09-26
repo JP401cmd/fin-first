@@ -3,45 +3,44 @@
 /**
  * De route-kennis van de katern-layout (ADR 0179 D8, fase 1 stap 15).
  *
- * Alleen de `(katern)`-layout en de katern-koppen weten welk katern actief is. Dat
- * gebeurt hier, via `useSelectedLayoutSegment` (het segment onder de layout: `null`
- * op Plan, `'doelen'`, `'instellingen'`). Katern-componenten zelf lezen de route nooit;
- * zo blijft de terugvaloptie C′ (drie katernen gestapeld op één route) een
+ * Alleen de `(katern)`-layout en de katern-koppen weten welk katern actief is
+ * (`useActiefKatern`, het segment onder de layout). Katern-componenten zelf lezen de
+ * route nooit; zo blijft de terugvaloptie C′ (drie katernen gestapeld op één route) een
  * herschikking zonder herbouw.
  *
  * Twee consumenten: de katern-koppen onder het canvas en de i in de paginakop, die per
  * katern de "Wat zie ik hier?"-inhoud van zijn eigen route toont.
  */
 
-import { useSelectedLayoutSegment } from 'next/navigation'
 import { KaternKoppen, type KaternKopItem } from '@/components/editorial/katern-koppen'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import type { PageInfoContent } from '@/lib/page-info-content'
 import { KATERN_LABEL, KATERN_NAV_LABEL, KATERN_VOLGORDE, type KaternId } from '@/lib/horizon/katern-copy'
+import { useToekomstKaternMeldingen } from '@/components/toekomst/meldingen/toekomst-katern-meldingen'
 import { KATERN_HREF } from './katern-routes'
-
-const KATERN_VAN_SEGMENT: Readonly<Record<string, KaternId>> = {
-  doelen: 'doelen',
-  instellingen: 'instellingen',
-}
-
-/** Het actieve katern volgens het segment onder de `(katern)`-layout. */
-function useActiefKatern(): KaternId {
-  const segment = useSelectedLayoutSegment()
-  return (segment != null ? KATERN_VAN_SEGMENT[segment] : undefined) ?? 'plan'
-}
+import { useActiefKatern } from './actief-katern'
 
 /**
- * De katern-koppen onder het canvas. Fase 1: alleen labels; samenvattingen en
- * statuspunten volgen in fase 2 (besluit Q6).
+ * De katern-koppen onder het canvas (fase 2, spec §4.2 regel 4 en §4.8): de inactieve
+ * koppen dragen hun samenvatting (vanaf `lg`), een katern met een melding draagt het
+ * statuspunt in stoplichtkleur met tekstlabel en aantal. Een klik op de kop van een
+ * katern met een geminimaliseerde melding klapt die weer uit (dezelfde `restore` als de
+ * Minimaliseren-knop terugdraait; server-side onthouden).
  */
 export function ToekomstKaternKoppen({ className = '' }: { className?: string }) {
   const actief = useActiefKatern()
-  const items: KaternKopItem[] = KATERN_VOLGORDE.map((key) => ({
-    key,
-    label: KATERN_LABEL[key],
-    href: KATERN_HREF[key],
-  }))
+  const meldingen = useToekomstKaternMeldingen()
+  const items: KaternKopItem[] = KATERN_VOLGORDE.map((key) => {
+    const staat = meldingen?.perKatern[key] ?? null
+    return {
+      key,
+      label: KATERN_LABEL[key],
+      href: KATERN_HREF[key],
+      samenvatting: staat?.samenvatting ?? null,
+      status: staat?.status ?? null,
+      onSelect: staat && staat.display === 'minimized' ? staat.restore : undefined,
+    }
+  })
   return <KaternKoppen items={items} actiefKey={actief} label={KATERN_NAV_LABEL} className={className} />
 }
 

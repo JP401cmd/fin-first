@@ -24,18 +24,10 @@ import { cache } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { loadHorizonData, type HorizonPageData } from '@/lib/horizon-data-loader'
 import { loadFinData, type FinPageData } from '@/lib/fin-data-loader'
-import { loadPlanVerdictSentence } from '@/lib/horizon/plan-status-loader'
-import type { PlanVerdictSentence } from '@/lib/horizon/plan-status'
+import { loadPlanStatusInput, loadPlanVerdictSentence } from '@/lib/horizon/plan-status-loader'
+import type { PlanStatusInput, PlanVerdictSentence } from '@/lib/horizon/plan-status'
 import { readMinimizedMap } from '@/lib/page-status/minimized-prefs'
-import {
-  DEFICIT_NOTICE_MINIMIZE_KEY,
-  asDeficitMinimizedPeak,
-} from '@/lib/horizon/deficit-loan-minimize'
-import { AOW_NOTICE_MINIMIZE_KEY, asAowMinimizedFlag } from '@/lib/horizon/aow-notice-minimize'
-import {
-  EINDSITUATIE_NOTICE_MINIMIZE_KEY,
-  asEindsituatieMinimizedFlag,
-} from '@/lib/horizon/eindsituatie-notice-minimize'
+import { katernMinimizedSeed, type KaternMinimizedSeed } from '@/lib/horizon/katern-meldingen'
 import { readPlanReviewState } from '@/lib/plan-review/read-state'
 import { buildPlanReviewFacts, derivePlanReviewProgress } from '@/lib/plan-review/progress'
 import type { PlanReviewProgress } from '@/lib/plan-review/types'
@@ -49,49 +41,109 @@ export interface ToekomstData {
   finData: FinPageData
   /** Plan-review-voortgang; `null` = geen gebruiker of kolom nog niet uitgerold. */
   planReviewProgress: PlanReviewProgress | null
-  /** Server-seed "geminimaliseerd" van de tekort-lening-melding (piek of null). */
-  deficitMinimizedPeak: number | null
-  /** Server-seed "geminimaliseerd" van de "AOW ontbreekt"-melding (vlag of null). */
-  aowMinimizedFlag: number | null
-  /** Server-seed "geminimaliseerd" van de eindsituatie-uitleg (vlag of null). */
-  eindsituatieMinimizedFlag: number | null
+  /**
+   * Server-seed "geminimaliseerd" van de melding per katern (ADR 0179 D6): het
+   * stoplichtniveau onder de katern-route in `status_banner_minimized`, of null. De
+   * oude losse sleutels (tekort-lening, AOW, eindsituatie) worden niet meer gelezen;
+   * hun JSONB-waarden mogen blijven staan.
+   */
+  katernMinimized: KaternMinimizedSeed
   /** Het plan-oordeel als kop-zin (ADR 0174 D6). */
   planVerdict: PlanVerdictSentence
+  /**
+   * De invoer van dat oordeel (`loadPlanStatusInput`, mét de geboortedatum-poort):
+   * de plan-melding in katern Plan leest hem, zodat melding en kop hetzelfde zeggen.
+   * `null` = geen horizon-data, dus geen oordeel.
+   */
+  planStatusInput: PlanStatusInput | null
 }
 
 /**
- * Laad de /toekomst-data voor de ingelogde gebruiker. React-`cache()`'d per
- * request (zie de kop van dit bestand).
+ * Eén Supabase-client per request. De `cache()` van de onderliggende loaders keyt op het
+ * client-OBJECT; met deze gedeelde client ontdubbelen de deel-ladingen hieronder ook
+ * wanneer een katern-page er maar één van nodig heeft.
  */
-export const loadToekomstData = cache(async function loadToekomstData(): Promise<ToekomstData> {
-  const supabase = await createClient()
+export const getToekomstClient = cache(createClient)
+
+const getToekomstUser = cache(async function getToekomstUser() {
+  const supabase = await getToekomstClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
+  return user
+})
+
+/**
+ * Deel-ladingen, elk per request gecachet. Waarom los: bij client-navigatie tussen de
+ * katernen rendert de layout NIET opnieuw — alleen de page. Een page die
+ * `loadToekomstData()` aanroept voor één veld draait dan de hele lading (horizon-kernel,
+ * plan-oordeel, plan-review). Doelen leest daarom alleen `loadToekomstFinData`,
+ * Instellingen alleen horizon + review. Binnen één request (eerste load) delen layout en
+ * page dezelfde uitkomst.
+ */
+export const loadToekomstHorizonData = cache(async function loadToekomstHorizonData(): Promise<HorizonPageData> {
+  return loadHorizonData(await getToekomstClient())
+})
+
+export const loadToekomstFinData = cache(async function loadToekomstFinData(): Promise<FinPageData> {
+  return loadFinData(await getToekomstClient())
+})
+
+/** Plan-review-voortgang; `null` = geen gebruiker of kolom nog niet uitgerold. */
+export const loadToekomstPlanReviewProgress = cache(
+  async function loadToekomstPlanReviewProgress(): Promise<PlanReviewProgress | null> {
+    const supabase = await getToekomstClient()
+    const user = await getToekomstUser()
+    if (!user) return null
+    const [horizonData, planReviewState, eigenStrategieEvents] = await Promise.all([
+      loadToekomstHorizonData(),
+      // TPR-01 — de plan-review-markering (own-row jsonb-pref). `null` = kolom nog niet
+      // uitgerold → geen review-ingang.
+      readPlanReviewState(supabase, user.id),
+      // TPR-15 — de EIGEN AOW/werk/pensioen-rijen: de life_events-policy is huishoud-gedeeld,
+      // en een gedeeld partner-AOW-event mag de AOW-stap niet dichtzetten. Faalt de lezing,
+      // dan fail-closed: geen rijen (de AOW-stap toont dan open), nooit de gedeelde bundelrijen.
+      loadEigenStrategieEvents(supabase, user.id).catch((err: unknown) => {
+        console.error('[toekomst:plan-review:eigen-events]', err)
+        return []
+      }),
+    ])
+    if (!planReviewState) return null
+    // TPR-01 — voortgang AFGELEID uit markering + profielstaat (A9/A10). Alleen de eigen
+    // bezittingen en gebeurtenissen: de policies zijn huishoud-gedeeld en de review gaat
+    // over de eigen keuzes.
+    return derivePlanReviewProgress(
+      planReviewState,
+      buildPlanReviewFacts({
+        events: eigenStrategieEvents,
+        assets: horizonData.assets,
+        housingStrategyRaw: horizonData.rawProfile?.housing_strategy_config,
+        ownerId: user.id,
+      }),
+    )
+  },
+)
+
+/**
+ * Laad de /toekomst-data voor de ingelogde gebruiker (de katern-layout). React-`cache()`'d
+ * per request (zie de kop van dit bestand).
+ */
+export const loadToekomstData = cache(async function loadToekomstData(): Promise<ToekomstData> {
+  const supabase = await getToekomstClient()
+  const user = await getToekomstUser()
 
   // Het aantal rekenhulpen (count-query op `custom_calculators`) is weg met de
   // Rekenhulp-navkaart (ADR 0179 fase 1 stap 15/21): geen lezer meer.
-  const [horizonData, finData, minimizedMap, planReviewState, eigenStrategieEvents, planVerdict] = await Promise.all([
-    loadHorizonData(supabase),
-    loadFinData(supabase),
-    // Server-seed van de "geminimaliseerd"-voorkeur voor de tekort-lening-melding
-    // (own-row jsonb-pref, cross-device). Lichte single-row select, parallel aan
-    // de zware loaders — zo flikkert de melding/het statuspunt niet na hydration.
+  const [horizonData, finData, minimizedMap, planReviewProgress, planVerdict, planStatusInput] = await Promise.all([
+    loadToekomstHorizonData(),
+    loadToekomstFinData(),
+    // Server-seed van de "geminimaliseerd"-voorkeur per katern (own-row jsonb-pref,
+    // cross-device). Lichte single-row select, parallel aan de zware loaders — zo
+    // flikkeren slot en statuspunt niet na hydration.
     user
       ? readMinimizedMap(supabase, user.id)
       : Promise.resolve({} as Record<string, unknown>),
-    // TPR-01 — de plan-review-markering (own-row jsonb-pref). `null` = kolom nog niet
-    // uitgerold → geen review-ingang.
-    user ? readPlanReviewState(supabase, user.id) : Promise.resolve(null),
-    // TPR-15 — de EIGEN AOW/werk/pensioen-rijen: de life_events-policy is huishoud-gedeeld,
-    // en een gedeeld partner-AOW-event mag de AOW-stap niet dichtzetten. Faalt de lezing,
-    // dan fail-closed: geen rijen (de AOW-stap toont dan open), nooit de gedeelde bundelrijen.
-    user
-      ? loadEigenStrategieEvents(supabase, user.id).catch((err: unknown) => {
-          console.error('[toekomst:plan-review:eigen-events]', err)
-          return []
-        })
-      : Promise.resolve([]),
+    loadToekomstPlanReviewProgress(),
     // OORDEEL IN DE PAGINATITEL — de dekking van je plan, als zin (ADR 0174 D6).
     // Consume-only: dezelfde invoer als `loadPlanVerdict`, die de plankaart op
     // /overzicht en het menupunt "De toekomst" als stoplicht lezen, dus per
@@ -99,34 +151,16 @@ export const loadToekomstData = cache(async function loadToekomstData(): Promise
     // `computeHorizonFireSim` zijn React-`cache()`'d en draaien op deze route toch
     // al (zelfde 'personal'-perspectief als hierboven).
     loadPlanVerdictSentence(supabase, 'personal'),
+    // De invoer van datzelfde oordeel, voor de plan-melding (cache()'d: geen tweede run).
+    loadPlanStatusInput(supabase, 'personal'),
   ])
-  // TPR-01 — voortgang AFGELEID uit markering + profielstaat (A9/A10). Alleen de eigen
-  // bezittingen en gebeurtenissen: de policies zijn huishoud-gedeeld en de review gaat over
-  // de eigen keuzes.
-  const planReviewProgress =
-    user && planReviewState
-      ? derivePlanReviewProgress(
-          planReviewState,
-          buildPlanReviewFacts({
-            events: eigenStrategieEvents,
-            assets: horizonData.assets,
-            housingStrategyRaw: horizonData.rawProfile?.housing_strategy_config,
-            ownerId: user.id,
-          }),
-        )
-      : null
 
   return {
     horizonData,
     finData,
     planReviewProgress,
-    deficitMinimizedPeak: asDeficitMinimizedPeak(minimizedMap[DEFICIT_NOTICE_MINIMIZE_KEY]),
-    // TPR-04 — zelfde server-seed voor de "AOW ontbreekt"-melding (vlag 1 of null).
-    aowMinimizedFlag: asAowMinimizedFlag(minimizedMap[AOW_NOTICE_MINIMIZE_KEY]),
-    // Plan 17 sep (D) — zelfde server-seed voor de eindsituatie-uitleg (vlag 1 of null).
-    eindsituatieMinimizedFlag: asEindsituatieMinimizedFlag(
-      minimizedMap[EINDSITUATIE_NOTICE_MINIMIZE_KEY],
-    ),
+    katernMinimized: katernMinimizedSeed(minimizedMap),
     planVerdict,
+    planStatusInput,
   }
 })

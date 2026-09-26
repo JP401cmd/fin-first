@@ -42,8 +42,12 @@ import {
  *
  * React-`cache()`'d: op /toekomst lezen de kop (pagina) en het menupunt (layout) allebei
  * deze invoer; de doel-run (ADR 0175) draait zo één keer per request.
+ *
+ * Geëxporteerd voor de meldingen per katern op /toekomst (ADR 0179 D6): de
+ * plan-melding leest DEZE invoer (met de geboortedatum-poort), zodat melding en
+ * oordeelzin in de kop nooit iets anders zeggen.
  */
-const loadPlanStatusInput = cache(async function loadPlanStatusInputInner(
+export const loadPlanStatusInput = cache(async function loadPlanStatusInputInner(
   supabase: SupabaseClient,
   perspective: Perspective,
 ): Promise<PlanStatusInput | null> {

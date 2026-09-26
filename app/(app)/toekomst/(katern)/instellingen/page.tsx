@@ -1,7 +1,10 @@
 import type { Metadata } from 'next'
-import { createClient } from '@/lib/supabase/server'
 import { loadDashboardData } from '@/lib/dashboard-data-loader'
-import { loadToekomstData } from '@/lib/toekomst/load-toekomst-data'
+import {
+  getToekomstClient,
+  loadToekomstHorizonData,
+  loadToekomstPlanReviewProgress,
+} from '@/lib/toekomst/load-toekomst-data'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { InstellingenKatern } from '@/components/toekomst/instellingen/instellingen-katern'
 import type { KernelSimData } from '@/components/future/gebeurtenissen-view'
@@ -26,15 +29,17 @@ export const metadata: Metadata = {
  * Staat in de `(katern)`-groep: de kop, de `PlanReviewProvider`, het canvas en de
  * katern-koppen komen uit de layout — hier dus geen eigen kop en geen tweede provider.
  *
- * De horizon-bundel en de review-voortgang komen uit dezelfde `loadToekomstData`-lading
- * als de layout (React-`cache()`, één lading per request; `HorizonPageData` is een
- * superset van de rauwe bundel die de views lezen). Eén `buildStrategieEditorsData` voedt
+ * De horizon-bundel en de review-voortgang komen uit de per request gecachte deel-ladingen
+ * die de layout ook leest (`HorizonPageData` is een superset van de rauwe bundel die de
+ * views lezen). Bewust niet `loadToekomstData()`: bij client-navigatie rendert de layout
+ * niet opnieuw, en dan zou deze page ook Fin-data, plan-oordeel en minimaliseer-pref laden. Eén `buildStrategieEditorsData` voedt
  * beide views.
  */
 export default async function ToekomstInstellingenPage() {
-  const supabase = await createClient()
-  const [{ horizonData, planReviewProgress }, dashboardResult] = await Promise.all([
-    loadToekomstData(),
+  const supabase = await getToekomstClient()
+  const [horizonData, planReviewProgress, dashboardResult] = await Promise.all([
+    loadToekomstHorizonData(),
+    loadToekomstPlanReviewProgress(),
     loadDashboardData(supabase),
   ])
 

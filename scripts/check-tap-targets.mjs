@@ -70,7 +70,6 @@ const ALLOWLIST_ENTRIES = [
   'components/app/core/assets/asset-pane.tsx',
   'components/app/core/debts/debt-pane.tsx',
   'components/app/goal-form.tsx',
-  'components/app/horizon/deficit-notice-provider.tsx',
   'components/app/horizon/event-chat-pane.tsx',
   'components/app/horizon/event-pane-edit.tsx',
   'components/app/horizon/horizon-year-details-sheet.tsx',

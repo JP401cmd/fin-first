@@ -7,7 +7,7 @@
  *  1. de provider rendert geen JSX-blokken, alleen de contexts en `children`;
  *  2. elk concern is een eigen hook in een eigen bestand, in de dataflow-volgorde;
  *  3. elke context-waarde is gememoïseerd per concern (`useStabielObject`);
- *  4. de drie meldingen-registraties draaien in de provider, niet in een katern (GW3b);
+ *  4. de minimaliseer-toestand per katern hangt aan de layout, niet aan een katern (GW3b);
  *  5. `useInViewOnce` hangt aan het Plan-blad, niet aan de provider (GW3a, kaart V1);
  *  6. de deeplink-afhandeling opent de dode WithdrawalModal niet meer.
  */
@@ -74,13 +74,20 @@ describe('toekomst-state-provider — geen nieuwe god-component', () => {
 })
 
 describe('meldingen en grendels blijven gemount bij een katernwissel', () => {
-  it('de drie registratie-hooks draaien in de meldingen-hook, niet in de host (GW3b)', () => {
-    const meldingen = leesToekomst('meldingen')
-    const host = (['plan', 'canvas', 'overlayHost'] as const).map((d) => leesToekomst(d)).join('\n')
-    for (const hook of ['useDeficitNotice(', 'useAowNotice(', 'useEindsituatieNotice(']) {
-      expect(meldingen, `${hook} hoort in de provider`).toContain(hook)
-      expect(host, `${hook} hoort niet in de host`).not.toContain(hook)
+  it('de minimaliseer-toestand per katern hangt aan de layout, niet aan een katern (GW3b, fase 2)', () => {
+    // Sinds ADR 0179 fase 2 (D6) vervangen drie `useKaternMeldingMinimize`-aanroepen in
+    // de meldingen-host de drie losse notice-providers. Die host staat in de layout, dus
+    // slot en punten op de katern-koppen blijven bij een katernwissel.
+    const host = readSourceLF(
+      join(process.cwd(), 'components', 'toekomst', 'meldingen', 'toekomst-katern-meldingen.tsx'),
+    )
+    expect(host.match(/useKaternMeldingMinimize\(\{/g) ?? []).toHaveLength(3)
+    const elders = (['plan', 'canvas', 'overlayHost', 'meldingen'] as const).map((d) => leesToekomst(d)).join('\n')
+    for (const hook of ['useDeficitNotice(', 'useAowNotice(', 'useEindsituatieNotice(', 'useKaternMeldingMinimize(']) {
+      expect(elders, `${hook} hoort niet in een katern of de state-laag`).not.toContain(hook)
     }
+    const layout = readSourceLF(join(process.cwd(), 'app', '(app)', 'toekomst', '(katern)', 'layout.tsx'))
+    expect(layout).toContain('<ToekomstKaternMeldingenProvider')
   })
 
   it('useInViewOnce hangt aan het Plan-blad, niet aan de state-laag (GW3a)', () => {

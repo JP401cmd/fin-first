@@ -2,13 +2,16 @@
 
 // Verplaatst uit components/app/horizon/horizon-client.tsx (ADR 0179 fase 1, stap 13).
 //
-// Meldingen: tekort-lening, AOW ontbreekt en eindsituatie. De drie registratie-hooks
-// staan hier zodat ze gemount blijven zolang de provider leeft (kaart GW3b): de
-// statuspunten verdwijnen niet bij een katernwissel.
+// Meldingen: de SIGNALEN achter tekort-lening, AOW ontbreekt, eindsituatie en "huis
+// nooit verkocht" — detectie, zichtbaarheid (view-gating) en de copy uit dezelfde run.
+// Sinds fase 2 (ADR 0179 D6, stroom W2) hoort de minimaliseer-toestand hier NIET meer:
+// die woont per katern-route in `components/toekomst/meldingen/toekomst-katern-meldingen.tsx`
+// (`useKaternMeldingMinimize`), dat deze signalen via `wijsMeldingenToe` aan een katern
+// toewijst. De drie losse notice-providers (Deficit/Aow/Eindsituatie) en hun punten in de
+// paginakop zijn weg.
 //
-// Pure move: de statements staan in dezelfde onderlinge volgorde als in horizon-client,
-// met dezelfde dependency-arrays. De provider (`toekomst-state-provider.tsx`) roept deze
-// hook aan en deelt het resultaat per concern via een eigen context.
+// De provider (`toekomst-state-provider.tsx`) roept deze hook aan en deelt het resultaat
+// per concern via een eigen context.
 
 import { useMemo } from 'react'
 import type { HorizonPageData } from '@/lib/horizon-data-loader'
@@ -17,9 +20,6 @@ import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { detectDeficitLoanFromRows } from '@/lib/horizon/deficit-loan-display'
 import { detectReverseMortgageStartAge } from '@/lib/horizon/reverse-mortgage-start'
 import { buildDeficitLoanCopy } from '@/lib/horizon/deficit-loan-copy'
-import { useDeficitNotice } from '@/components/app/horizon/deficit-notice-provider'
-import { useAowNotice } from '@/components/app/horizon/aow-notice-provider'
-import { useEindsituatieNotice } from '@/components/app/horizon/eindsituatie-notice-provider'
 import { detectEindsituatie } from '@/lib/horizon/eindsituatie-duiding'
 import { resolveFirePlanWithOverride } from '@/lib/fire-strategy'
 import { useStabielObject } from './use-stabiel-object'
@@ -120,29 +120,17 @@ export function useToekomstMeldingen({ initialData, perspectief, sim }: { initia
     }
   }, [initialData.housingStrategy, kernelHousingSale, unifiedRows, fireStrategy, simResult])
 
-  // ── Tekort-lening-melding: zichtbaarheid + minimaliseer-toestand ─────────
+  // ── Tekort-lening-melding: zichtbaarheid ─────────────────────────────────
   // View-gating spiegelt de tijdlijn-marker: in partner-weergave mét partner-pad
   // plot de grafiek de pártnerlijn — dan hoort het eigen tekort-verhaal er niet.
-  // De piek wordt aan de `DeficitNoticeProvider` gemeld (paginakop op /toekomst),
-  // die bepaalt of de melding uitgeklapt is of ingeklapt tot het statuspunt naast
-  // de pagina-'i'. Buiten die provider (legacy /horizon) blijft 'ie uitgeklapt.
+  // Minimaliseren gaat per katern (Plan), niet meer per melding.
   const deficitNoticeVisible = deficitLoanNotice != null && !usePartnerMainLine
-  const {
-    display: deficitDisplay,
-    canMinimize: canMinimizeDeficit,
-    minimize: minimizeDeficitNotice,
-  } = useDeficitNotice(deficitNoticeVisible ? deficitLoanNotice!.peak : null)
 
   // ── "AOW ontbreekt"-melding (TPR-04) ───────────────────────────────────────
   // De adapter-notice (code `aow_ontbreekt`) komt via de run mee (`aowOntbreekt`);
   // zelfde view-gating als de tekort-melding: in partner-weergave mét partner-pad
-  // hoort het eigen AOW-verhaal er niet. Zusje van de tekort-provider in de /toekomst-kop.
+  // hoort het eigen AOW-verhaal er niet. Woont in katern Instellingen.
   const aowNoticeVisible = Boolean(aowOntbreekt) && !usePartnerMainLine
-  const {
-    display: aowDisplay,
-    canMinimize: canMinimizeAow,
-    minimize: minimizeAowNotice,
-  } = useAowNotice(aowNoticeVisible)
 
   // ── Eindsituatie-duiding: "waarom blijft er aan het eind zoveel over?" ─────
   // Pure detector op DEZELFDE kernelrijen als de grafiek (`unifiedRows`); plan uit de
@@ -169,11 +157,6 @@ export function useToekomstMeldingen({ initialData, perspectief, sim }: { initia
       jaarUitgavenNu: input?.yearlyMustExpenses ?? 0,
     })
   }, [eindsituatiePlan, unifiedRows, currentAge, isPensioenMode, usePartnerMainLine, simResult?.displayEndAge, simResult?.stopAnker, simResult?.fireAgeFractional, kernelRawProfile?.fire_legacy_include_illiquid, kernelRawProfile?.fire_no_deficit_loan, input?.yearlyMustExpenses])
-  const {
-    display: eindsituatieDisplay,
-    canMinimize: canMinimizeEindsituatie,
-    minimize: minimizeEindsituatieNotice,
-  } = useEindsituatieNotice(eindsituatieDuiding != null)
 
   // Situatie-specifieke uitleg bij de melding. Alle getallen komen uit DEZELFDE
   // run (detector + `displayEndAge` + AOW-leeftijd + woonstrategie); de copy
@@ -212,17 +195,9 @@ export function useToekomstMeldingen({ initialData, perspectief, sim }: { initia
     deficitLoanNotice,
     reverseMortgageStartAge,
     housingHeldNotice,
-    deficitDisplay,
-    canMinimizeDeficit,
-    minimizeDeficitNotice,
-    aowDisplay,
-    canMinimizeAow,
-    minimizeAowNotice,
+    aowNoticeVisible,
     eindsituatiePlan,
     eindsituatieDuiding,
-    eindsituatieDisplay,
-    canMinimizeEindsituatie,
-    minimizeEindsituatieNotice,
     deficitLoanCopy,
   })
 }

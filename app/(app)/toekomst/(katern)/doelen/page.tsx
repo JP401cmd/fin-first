@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
-import { createClient } from '@/lib/supabase/server'
 import { loadEffectiveMonthlyFigures } from '@/lib/fin-data-loader'
-import { loadToekomstData } from '@/lib/toekomst/load-toekomst-data'
+import { getToekomstClient, loadToekomstFinData } from '@/lib/toekomst/load-toekomst-data'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { DoelenView } from '@/components/future/doelen-view'
 import { DoelenKaternLab } from '@/components/toekomst/doelen/doelen-katern-lab'
@@ -19,15 +18,17 @@ export const metadata: Metadata = {
  * blijven gemonteerd bij een wissel met Plan of Instellingen (GW1). Deze page levert
  * het doelscenario-lab (van Plan hierheen verhuisd, GW5) en daaronder de doelenlijst.
  *
- * De Fin-data komt uit dezelfde `loadToekomstData`-lading als de layout (React-`cache()`,
- * één lading per request); alleen de maandcijfers voor DoelenView zijn eigen.
+ * De Fin-data komt uit de per request gecachte deel-lading `loadToekomstFinData`, die de
+ * layout ook leest. Bewust NIET `loadToekomstData()`: bij client-navigatie tussen de
+ * katernen rendert de layout niet opnieuw, dus die zou hier de volle lading (horizon-kernel,
+ * plan-oordeel, plan-review) draaien voor één veld. Alleen de maandcijfers zijn eigen.
  * Mutaties in DoelenView en het lab doen `router.refresh()`, waarmee ook de layout (en
  * dus het canvas) verse data krijgt (GW2).
  */
 export default async function ToekomstDoelenPage() {
-  const supabase = await createClient()
-  const [{ finData }, monthlyFigures] = await Promise.all([
-    loadToekomstData(),
+  const supabase = await getToekomstClient()
+  const [finData, monthlyFigures] = await Promise.all([
+    loadToekomstFinData(),
     loadEffectiveMonthlyFigures(supabase),
   ])
 
