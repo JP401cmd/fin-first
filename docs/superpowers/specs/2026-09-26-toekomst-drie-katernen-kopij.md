@@ -128,7 +128,26 @@ Getoetst op merkstem (constaterend, geen koop-/verkoopmetafoor, geen vakjargon) 
 | Catalogustip "Huis kopen": "Kosten koper: overdrachtsbelasting (2%; starters tot €555.000 vrijgesteld), notaris, taxatie, bankgarantie en eventueel NHG, plus ca. €2.750 voor hypotheekadvies en bemiddeling en ca. €3.500 als je een aankoopmakelaar neemt. Bij een koopsom van €250.000–€600.000 is dat samen ca. €5K–€21K. …" · bandbreedte "€5K–€21K kosten koper" | Goedkeuren | Feitelijke, generieke indicaties met bron en jaartal in `lib/constants.ts`. Ze gaan over kosten, niet over een product: geen advies (compliance-check, "feitelijke vergelijkingen zonder aanbeveling"). De makelaar is optioneel, geen aanrader. De bandbreedte is gepind tegen `computeKostenKoper`. |
 | Kassabonregels "Hypotheekadvies + bemiddeling (indicatie)" en "Aankoopmakelaar, vast tarief (indicatie, optioneel)" | Goedkeuren | Het woord "indicatie" maakt de aard van het getal zichtbaar; de bron staat erbij. |
 
-**Nog te toetsen:** de teksten van de laatste verbouwing: Plan met de gebeurtenissen, het verloop in de gezondheidskassabon, de instellingenrijen en het samengevoegde Doelen. Die krijgen een eigen aanvulling zodra ze gebouwd zijn.
+**Nog te toetsen:** de teksten van de instellingenrijen (fase 3) en het samengevoegde Doelen (fase 4). Plan met de gebeurtenissen en het verloop staan in §11.
+
+## 11. Aanvulling: Plan met de gebeurtenissen en het verloop op /overzicht (27 sep)
+
+Getoetst op merkstem en compliance. De teksten komen uit twee eigenaarsbesluiten van 26 sep. Het eerste zet de levensgebeurtenissen onder het plan in plaats van de strook en de radar (stroom NP). Het tweede zet het verloop in de gezondheidskassabon (stroom P5, fase 5).
+
+| Tekst | Besluit | Waarom |
+|---|---|---|
+| Sectielabel op Plan: "Wat er in je leven gebeurt" | Goedkeuren | Zegt wat de lijst is, in gewone taal. Geen vakwoord. |
+| Mobiele toggle: "Wat het betekent" | Goedkeuren | Bestaand sectielabel. Op mobiel is het een uitklapknop. |
+| i-tekst `/toekomst`: "Onder je plan staan je levensgebeurtenissen: een kind, een erfenis, een verhuizing of minder werken, en de momenten die je plan zelf berekent, zoals het stoppen van een pensioenpot." · "…onder Plan voeg je een levensgebeurtenis toe en zie je meteen het effect op je pad naar vrijheid, in Doelen verken je met je doelscenario wat een andere keuze doet, en in Instellingen staan de aannames achter je plan." | Goedkeuren | Beschrijft het scherm. De drie delen heten zoals op de koppen; "katern" komt er niet in voor. |
+| i-tekst `/toekomst/instellingen`: "Achter elke projectie zitten aannames — verwacht rendement, inflatie, je uitgaven na pensioen, je eindleeftijd. Samen met je levensgebeurtenissen bepalen ze hoeveel jaar vrijheid je berekening laat zien. …" | Goedkeuren | "Verwacht rendement" staat er als instelbare aanname, niet als voorspelling. Dat is de toegestane vorm uit de grijze zone van de compliance-check. |
+| i-tekst `/overzicht`: "Het verloop van je gezondheidsgetal en van je vrijheidsleeftijd staat in de kassabon van je gezondheidsgetal." | Goedkeuren | Wijst de plek aan, zonder oordeel. |
+| Kaart: "+N punten sinds vorige maand" · "−N punten sinds vorige maand" · "+1 punt sinds vorige maand" · "gelijk aan vorige maand" | Goedkeuren | Een telling. Verschijnt alleen als de rekenmethode gelijk is (`score_version`); anders staat er niets, zodat er geen schijnbeweging ontstaat. |
+| Kassabon, sectie "Verloop": "De laatste stand van elke maand, over de laatste twaalf maanden." · reeksen "Gezondheidsgetal" en "Vrijheidsleeftijd" | Goedkeuren | Zegt precies wat de lijn is: één stand per maand. |
+| Lege staat: "Er zijn nog geen maandstanden; het verloop groeit mee met elke maand." · één punt: "Eén maandstand tot nu toe: … van 100 in …" | Goedkeuren | Eerlijk over wat er (nog) niet is. |
+| Versiewissel: "De rekenmethode van het gezondheidsgetal veranderde in …. Standen van daarvóór zijn niet met latere te vergelijken." · motorwissel: "Rekenwijze gewijzigd in … — een knik in de lijn kan daardoor komen." | Goedkeuren | Legt een knik uit in plaats van hem te verbergen. De lezer trekt geen conclusie uit een methodewissel. |
+| Uitlegregel bij de FIRE-reeks: "Dit is de vrijheidsleeftijd zoals hij toen berekend werd, met de cijfers en aannames van dat moment. Je huidige vrijheidsleeftijd kan daarvan afwijken." | Goedkeuren | Historie, geen live getal en geen belofte. Dezelfde grens als het aandachtspunt over snapshot-`fire_age` (andere motor dan de live kernel). |
+| Widgetlinks: "Bekijk volledige analyse en verloop" · "Bekijk details en verloop" | Goedkeuren | Linklabel, net als de bestaande "Bekijk details". Het label is een knopnaam, geen oordeelzin. |
+| Praatplaat (HLD): "Terugzien hoe je gezondheid en je vrijheidsleeftijd bewegen" · "De lijst met je levensgebeurtenissen staat direct onder je plan, …" | Goedkeuren | Interne praatplaat in "ik wil"-taal. |
 
 ## Wat dit vraagt van de bouw (fase 1–2)
 
