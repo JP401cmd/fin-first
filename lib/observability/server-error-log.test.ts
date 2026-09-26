@@ -51,6 +51,19 @@ describe('maskErrorMessage', () => {
     expect(maskErrorMessage('upstream gaf {"naam":"Jan de Vr')).not.toContain('Jan')
   })
 
+  it('een aangehaalde waarde met een regeleinde gaat óók weg', () => {
+    expect(maskErrorMessage('Onbekend budget "Jan\nde Vries"')).toBe('Onbekend budget "…"')
+  })
+
+  it('blijft lineair op enorme invoer en kapt een half woord op de knip af', () => {
+    const t0 = performance.now()
+    const uit = maskErrorMessage('a'.repeat(1_000_000))
+    expect(performance.now() - t0).toBeLessThan(50)
+    expect(uit.length).toBeLessThanOrEqual(301)
+    const met = maskErrorMessage(`${'x '.repeat(598)}jan.devries@example.nl rest`)
+    expect(met).not.toMatch(/jan|devries/)
+  })
+
   it('laat korte getallen (statuscodes) staan en kapt af op 300 tekens', () => {
     expect(maskErrorMessage('upstream gaf 429')).toBe('upstream gaf 429')
     expect(maskErrorMessage('x'.repeat(500))).toHaveLength(301)

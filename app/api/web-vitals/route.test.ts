@@ -120,6 +120,7 @@ describe('POST /api/web-vitals', () => {
     ['route', { route: '/x\u0000' }],
     ['navigationType', { navigationType: '\u0000' }],
     ['effectiveType', { effectiveType: '4g\u0001' }],
+    ['route (losse surrogaat)', { route: '/x\ud800' }],
   ])('AC5e — controleteken in %s → 400, geen insert (anders 22P05 → serverError → error_logs)', async (_veld, extra) => {
     const res = await POST(req(validBody(extra)))
     expect(res.status).toBe(400)

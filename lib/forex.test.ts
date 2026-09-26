@@ -36,6 +36,21 @@ describe('forex — cache', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
+  it('een fallback die later binnenkomt overschrijft een net gecachete live koers niet', async () => {
+    let lateTimeout: (e: Error) => void = () => {}
+    const fetchMock = vi
+      .fn()
+      .mockImplementationOnce(() => new Promise((_, reject) => { lateTimeout = reject }))
+      .mockResolvedValueOnce(yahoo(0.9))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const traag = fetchForexRate('USD') // A: hangt
+    expect(await fetchForexRate('USD')).toMatchObject({ source: 'yahoo_finance', rate: 0.9 }) // B: live
+    lateTimeout(new Error('timeout'))
+    expect((await traag)?.source).toBe('fallback')
+    expect(await fetchForexRate('USD')).toMatchObject({ source: 'cache', rate: 0.9 })
+  })
+
   it('een batch wacht niet tussen de verzoeken', async () => {
     vi.useFakeTimers()
     vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => yahoo(1.1)))

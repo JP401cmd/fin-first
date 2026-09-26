@@ -134,7 +134,10 @@ function getFallbackRate(from: string): ForexRate | null {
     timestamp: new Date().toISOString(),
     source: 'fallback',
   }
-  forexCache.set(from, { rate: fallback, expiresAt: Date.now() + FALLBACK_CACHE_TTL_MS })
+  // Een parallel verzoek kan intussen een live koers hebben gecachet; die wint.
+  const bestaand = forexCache.get(from)
+  const liveGeldig = bestaand && bestaand.rate.source !== 'fallback' && Date.now() < bestaand.expiresAt
+  if (!liveGeldig) forexCache.set(from, { rate: fallback, expiresAt: Date.now() + FALLBACK_CACHE_TTL_MS })
   return fallback
 }
 

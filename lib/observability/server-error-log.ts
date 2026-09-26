@@ -28,6 +28,8 @@ import { shouldPersistErrorLog } from '@/lib/observability/runtime-environment'
  */
 
 const MAX_MESSAGE = 300
+/** Invoergrens vóór het maskeren; houdt de regexen lineair begrensd. */
+const MAX_INPUT = 4 * MAX_MESSAGE
 
 /** Woorden waarna een aangehaalde naam een schema-identifier is, geen waarde. */
 const IDENTIFIER_PREFIX =
@@ -67,17 +69,28 @@ function rawMessageOf(err: unknown): string {
  * elke andere aangehaalde tekst.
  */
 export function maskErrorMessage(message: string): string {
+  // Eerst begrenzen, dán maskeren: de regexen hieronder zijn op lange invoer
+  // superlineair (gemeten 15 s op 200 kB), en een Postgres-melding kan de hele
+  // waarde uit een request-body bevatten. Na een knip valt het laatste,
+  // mogelijk halve woord weg — een half e-mailadres matcht geen regex meer.
   let out = message
-    .replace(/[\w.+-]+(@|%40)[\w-]+(\.[\w-]+)+/gi, '[email]')
+  if (out.length > MAX_INPUT) {
+    const knip = out.slice(0, MAX_INPUT)
+    const spatie = knip.search(/\s\S*$/)
+    out = `${spatie > 0 ? knip.slice(0, spatie) : ''} …`
+  }
+  out = out
+    .replace(/[\w.+-]{1,64}(@|%40)[\w-]{1,63}(\.[\w-]{1,63}){1,8}/gi, '[email]')
     .replace(/\b[A-Z]{2}\d{2}(\s?[A-Z0-9]{4}){2,7}(\s?[A-Z0-9]{1,4})?\b/g, '[iban]')
     .replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, '[id]')
-    .replace(/=\([^)]*\)/g, '=(…)')
+    .replace(/=\([^)]{0,500}\)/g, '=(…)')
 
   // Aangehaalde tekst: ", ', `, “…” en ‘…’. Een waarde blijft alleen staan als
   // hij na een schema-woord staat ÉN de vorm van een identifier heeft — anders
   // lekt `Onbekend type "Salaris Jan de Vries"` gewoon door.
   const src = out
-  out = src.replace(/(["'`])((?:(?!\1).)*)\1|“([^”]*)”|‘([^’]*)’/g, (match, quote: string | undefined, plain: string | undefined, dubbel: string | undefined, enkel: string | undefined, offset: number) => {
+  // `[\s\S]`, niet `.`: een waarde met een regeleinde ("Jan\nde Vries") moet óók weg.
+  out = src.replace(/(["'`])((?:(?!\1)[\s\S])*)\1|“([^”]*)”|‘([^’]*)’/g, (match, quote: string | undefined, plain: string | undefined, dubbel: string | undefined, enkel: string | undefined, offset: number) => {
     const inner = plain ?? dubbel ?? enkel ?? ''
     if (IDENTIFIER_PREFIX.test(src.slice(0, offset)) && /^[a-z_][a-z0-9_.]*$/.test(inner)) return match
     if (quote) return `${quote}…${quote}`
@@ -92,7 +105,7 @@ export function maskErrorMessage(message: string): string {
     if (onaf) out = `${out.slice(0, out.lastIndexOf(open) + 1)}…`
   }
 
-  out = out.replace(/\d[\d.,]{2,}\d/g, '[n]')
+  out = out.replace(/\d[\d.,]{2,40}\d/g, '[n]')
   return out.length > MAX_MESSAGE ? `${out.slice(0, MAX_MESSAGE)}…` : out
 }
 
@@ -105,7 +118,7 @@ export function stackFramesOnly(stack: string | undefined): string | undefined {
   if (!stack) return undefined
   const frames = stack
     .split('\n')
-    .filter((line) => /^\s+at\s/.test(line) && /(:\d+:\d+\)?|\(native\)|<anonymous>\)?)\s*$/.test(line))
+    .filter((line) => line.length <= 500 && /^\s+at\s/.test(line) && /(:\d+:\d+\)?|\(native\)|<anonymous>\)?)\s*$/.test(line))
   return frames.length ? frames.join('\n') : undefined
 }
 

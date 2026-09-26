@@ -61,6 +61,11 @@ describe('safeContextTag', () => {
     expect(safeContextTag('window.onerror')).toBe('window.onerror')
     expect(safeContextTag('unhandledrejection')).toBe('unhandledrejection')
     expect(safeContextTag('serverError:beta-addon:POST:consent-event')).toBe('servererror:beta-addon:post:consent-event')
+    expect(safeContextTag('serverError:life-events:strategie:PUT:upsert')).toBe('servererror:life-events:strategie:put:upsert')
+    expect(safeContextTag('serverError:pension/parse:consent')).toBe('servererror:pension/parse:consent')
+    expect(safeContextTag('serverError:admin-uat-compare:GET basisronde|doelronde')).toBe(
+      'servererror:admin-uat-compare:get basisronde|doelronde',
+    )
     expect(safeContextTag('serverError:jan@x.nl')).toBe('onbekend')
   })
 

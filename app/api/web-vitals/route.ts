@@ -51,6 +51,16 @@ export const runtime = 'nodejs'
 const MAX_BODY_BYTES = 4096
 
 const GEEN_CONTROLETEKENS = /^[^\u0000-\u001f\u007f]*$/
+// Een losse surrogaat (bv. "\ud800") is geen geldige UTF-16 en kan in Postgres
+// óók een 500 geven — zelfde gevolg als een NUL.
+const LOSSE_SURROGAAT = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/
+const schoneTekst = (max: number, min = 0) =>
+  z
+    .string()
+    .min(min)
+    .max(max)
+    .regex(GEEN_CONTROLETEKENS)
+    .refine((s) => !LOSSE_SURROGAAT.test(s), 'Ongeldige tekens')
 
 // Enums/grenzen komen uit de gedeelde config zodat zender en ontvanger nooit
 // uiteenlopen (client-toegestaan == server-geaccepteerd).
@@ -63,11 +73,11 @@ const metricSchema = z.object({
   // Geen controletekens: een NUL laat Postgres-text falen (22P05), en die 500
   // zou via serverError() een anonieme, herhaalbare schrijfroute naar
   // error_logs openen. Nu is het een 400.
-  route: z.string().min(1).max(512).regex(GEEN_CONTROLETEKENS),
-  navigationType: z.string().max(40).regex(GEEN_CONTROLETEKENS).nullish(),
+  route: schoneTekst(512, 1),
+  navigationType: schoneTekst(40).nullish(),
   device: z.enum(WEB_VITAL_DEVICES).nullish(),
   viewportBucket: z.enum(VIEWPORT_BUCKETS).nullish(),
-  effectiveType: z.string().max(16).regex(GEEN_CONTROLETEKENS).nullish(),
+  effectiveType: schoneTekst(16).nullish(),
 })
 
 export async function POST(request: Request) {
