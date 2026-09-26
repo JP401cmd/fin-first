@@ -1,16 +1,22 @@
 /**
- * Bron-grendel op de euro-weergave-render-grens in `horizon-client.tsx` (T4).
+ * Bron-grendel op de euro-weergave-render-grens van /toekomst (T4).
  *
- * WAAROM EEN BRON-TEST EN GEEN RENDER-TEST: dit bestand is >8000 regels met
- * tientallen chart-feeds. Een render-test kan bewijzen dát een bepaald bedrag
- * klopt, maar niet dat er nérgens anders in het bestand nog een tweede
- * omzetting bijkomt. Precies die tweede omzetting is de fout die we moeten
- * uitsluiten: een dubbel gedeeld bedrag ziet er op het scherm plausibel uit.
- * Dus lezen we de bron en eisen we dat álle omzetting binnen één blok ligt.
- * (Precedent: `lib/fire-target-shared.test.ts` leest de bron óók letterlijk.)
+ * Verhuisd uit `components/app/horizon/horizon-client.euro-view.test.ts` (ADR 0179
+ * fase 1 stap 12): de grens woont sindsdien als één blok in
+ * `use-euro-view-feeds.ts`, en "één invariant, één bestand" zegt dat de grendel
+ * meeverhuist. Wat hij bewaakt is ongewijzigd; alleen het bereik is breder: hij
+ * scant de host (`horizon-client.tsx`) én elk bronbestand in `components/toekomst/state/`,
+ * zodat een tweede grens in een nieuw state-bestand even rood wordt als een in de host.
+ *
+ * WAAROM EEN BRON-TEST EN GEEN (ALLEEN) RENDER-TEST: een render-test kan bewijzen dát
+ * een bepaald bedrag klopt, maar niet dat er nérgens anders nog een tweede omzetting
+ * bijkomt. Precies die tweede omzetting is de fout die we moeten uitsluiten: een dubbel
+ * gedeeld bedrag ziet er op het scherm plausibel uit. Dus lezen we de bron en eisen we
+ * dat álle omzetting binnen één blok ligt. (De render-kant staat in
+ * `use-euro-view-feeds.test.tsx`: dezelfde hook in 'nominal' en 'real'.)
  *
  * DRIE REGELS, en regel 3 is de belangrijkste:
- *  1. er is precies één start- en één eindbaken, in die volgorde;
+ *  1. er is precies één start- en één eindbaken, in die volgorde, in één bestand;
  *  2. elke `deflate(`/`deflateRowsByAge(`/`deflatePoints(`/
  *     `deflateSeriesByOffset(`-aanroep ligt tussen de bakens;
  *  3. elk voorkomen van `inflationFactor` ligt tussen de bakens óf draagt een
@@ -24,9 +30,9 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { readdirSync } from 'node:fs'
+import { join, relative } from 'node:path'
 import { simRowsToChartPoints } from '@/lib/horizon/sim-chart-geometry'
-import { join } from 'node:path'
 import { deflate, deflatePoints, factorAtAge } from '@/lib/euro-display'
 import {
   APPROX_PREFIX,
@@ -35,10 +41,24 @@ import {
   roundToSignificant,
   MASKED_AMOUNT_PLACEHOLDER,
 } from '@/lib/format'
+import { readSourceLF } from '@/lib/test-utils/read-source'
 
-const SOURCE_PATH = join(process.cwd(), 'components', 'app', 'horizon', 'horizon-client.tsx')
+const ROOT = process.cwd()
+/** De host die de feeds consumeert (tot de route-groep van stap 15). */
+const HOST_PATH = join(ROOT, 'components', 'app', 'horizon', 'horizon-client.tsx')
+const STATE_DIR = join(ROOT, 'components', 'toekomst', 'state')
+/** Het bestand waar de grens woont. */
+const GRENS_PATH = join(STATE_DIR, 'use-euro-view-feeds.ts')
 /** De veldclassificatie van de grens woont sinds fase 1 stap 4 (ADR 0179) hier. */
-const FEEDS_PATH = join(process.cwd(), 'components', 'toekomst', 'state', 'euro-view-feeds.ts')
+const FEEDS_PATH = join(STATE_DIR, 'euro-view-feeds.ts')
+
+/** De host plus elk bronbestand (geen test) in `components/toekomst/state/`. */
+function scanPaden(): string[] {
+  const state = readdirSync(STATE_DIR)
+    .filter((naam) => /\.(ts|tsx)$/.test(naam) && !/\.test\.(ts|tsx)$/.test(naam))
+    .map((naam) => join(STATE_DIR, naam))
+  return [HOST_PATH, ...state]
+}
 
 const START_BAKEN = 'EURO-WEERGAVE: DE RENDER-GRENS'
 const EIND_BAKEN = 'EINDE EURO-WEERGAVE'
@@ -49,22 +69,35 @@ const DEFLATE_CALL = /\b(deflate|deflateRowsByAge|deflatePoints|deflateSeriesByO
 /** Markering die een bewuste uitzondering buiten het blok legitimeert (D12/D13). */
 const EXEMPT_MARK = '// euro-view: exempt'
 
-function readSourceLines(): string[] {
-  return readFileSync(SOURCE_PATH, 'utf8').split(/\r?\n/)
+interface Bron {
+  pad: string
+  lines: string[]
 }
 
-/** Regelindexen (0-based) van start- en eindbaken. */
-function findBakens(lines: string[]): { start: number; eind: number } {
-  const starts: number[] = []
-  const einden: number[] = []
-  lines.forEach((line, index) => {
-    if (line.includes(START_BAKEN)) starts.push(index)
-    if (line.includes(EIND_BAKEN)) einden.push(index)
-  })
+function leesBronnen(): Bron[] {
+  return scanPaden().map((pad) => ({ pad, lines: readSourceLF(pad).split('\n') }))
+}
+
+/** Het bestand met de bakens en hun regelindexen (0-based); `null` buiten dat bestand. */
+function findBakens(bronnen: Bron[]): { pad: string; start: number; eind: number } {
+  const starts: { pad: string; index: number }[] = []
+  const einden: { pad: string; index: number }[] = []
+  for (const { pad, lines } of bronnen) {
+    lines.forEach((line, index) => {
+      if (line.includes(START_BAKEN)) starts.push({ pad, index })
+      if (line.includes(EIND_BAKEN)) einden.push({ pad, index })
+    })
+  }
   expect(starts, 'exact één startbaken verwacht').toHaveLength(1)
   expect(einden, 'exact één eindbaken verwacht').toHaveLength(1)
-  expect(starts[0], 'het startbaken moet vóór het eindbaken staan').toBeLessThan(einden[0])
-  return { start: starts[0], eind: einden[0] }
+  expect(einden[0].pad, 'start- en eindbaken horen in hetzelfde bestand').toBe(starts[0].pad)
+  expect(starts[0].index, 'het startbaken moet vóór het eindbaken staan').toBeLessThan(einden[0].index)
+  return { pad: starts[0].pad, start: starts[0].index, eind: einden[0].index }
+}
+
+/** Ligt regel `index` van `pad` binnen het blok? */
+function binnenBlok(bakens: { pad: string; start: number; eind: number }, pad: string, index: number): boolean {
+  return pad === bakens.pad && index > bakens.start && index < bakens.eind
 }
 
 /**
@@ -79,28 +112,33 @@ function isExempt(lines: string[], index: number): boolean {
   )
 }
 
-describe('horizon-client.tsx — euro-weergave-render-grens (T4)', () => {
-  it('heeft precies één gemarkeerd render-grensblok', () => {
-    const lines = readSourceLines()
-    const { start, eind } = findBakens(lines)
+const label = (pad: string, index: number, line: string) =>
+  `${relative(ROOT, pad)}:${index + 1}: ${line.trim()}`
+
+describe('/toekomst — euro-weergave-render-grens (T4)', () => {
+  it('heeft precies één gemarkeerd render-grensblok, in use-euro-view-feeds.ts', () => {
+    const bakens = findBakens(leesBronnen())
+    expect(bakens.pad).toBe(GRENS_PATH)
     // Het blok moet ook daadwerkelijk iets omvatten; een leeg blok zou de
     // grendel formeel groen houden zonder iets te bewaken.
-    expect(eind - start).toBeGreaterThan(1)
+    expect(bakens.eind - bakens.start).toBeGreaterThan(1)
   })
 
   it('zet elke deflatie-aanroep binnen de bakens', () => {
-    const lines = readSourceLines()
-    const { start, eind } = findBakens(lines)
+    const bronnen = leesBronnen()
+    const bakens = findBakens(bronnen)
 
     const buiten: string[] = []
-    lines.forEach((line, index) => {
-      if (index > start && index < eind) return
-      // De import-regels noemen de functienamen zonder ze aan te roepen.
-      if (/^\s*(import|export)\b/.test(line)) return
-      if (!DEFLATE_CALL.test(line)) return
-      if (isExempt(lines, index)) return
-      buiten.push(`r${index + 1}: ${line.trim()}`)
-    })
+    for (const { pad, lines } of bronnen) {
+      lines.forEach((line, index) => {
+        if (binnenBlok(bakens, pad, index)) return
+        // De import-regels noemen de functienamen zonder ze aan te roepen.
+        if (/^\s*(import|export)\b/.test(line)) return
+        if (!DEFLATE_CALL.test(line)) return
+        if (isExempt(lines, index)) return
+        buiten.push(label(pad, index, line))
+      })
+    }
 
     expect(
       buiten,
@@ -109,16 +147,18 @@ describe('horizon-client.tsx — euro-weergave-render-grens (T4)', () => {
   })
 
   it('zet elke inflationFactor-verwijzing binnen de bakens of markeert hem exempt', () => {
-    const lines = readSourceLines()
-    const { start, eind } = findBakens(lines)
+    const bronnen = leesBronnen()
+    const bakens = findBakens(bronnen)
 
     const ongemarkeerd: string[] = []
-    lines.forEach((line, index) => {
-      if (index > start && index < eind) return
-      if (!line.includes('inflationFactor')) return
-      if (isExempt(lines, index)) return
-      ongemarkeerd.push(`r${index + 1}: ${line.trim()}`)
-    })
+    for (const { pad, lines } of bronnen) {
+      lines.forEach((line, index) => {
+        if (binnenBlok(bakens, pad, index)) return
+        if (!line.includes('inflationFactor')) return
+        if (isExempt(lines, index)) return
+        ongemarkeerd.push(label(pad, index, line))
+      })
+    }
 
     expect(
       ongemarkeerd,
@@ -128,13 +168,14 @@ describe('horizon-client.tsx — euro-weergave-render-grens (T4)', () => {
   })
 
   it('toont de hero-puntbedragen als view*-waarden (FR-B5)', () => {
-    const src = readFileSync(SOURCE_PATH, 'utf8')
+    const host = readSourceLF(HOST_PATH)
+    const src = readSourceLF(GRENS_PATH)
     // Het FIRE-doel, "vermogen op AOW" en de maandonttrekking horen bij een
     // SPECIFIEKE leeftijd. Een terugval op de nominale variabele is hier
     // onzichtbaar: het bedrag blijft plausibel, alleen te hoog.
-    expect(src).not.toMatch(/MaskedAmount value=\{fireTargetInclHome!\}/)
-    expect(src).not.toMatch(/MaskedAmount value=\{fireTargetExclHome!\}/)
-    expect(src).not.toMatch(/isPensioenMode \? \(vermogenOpAnker \?\? 0\) : balkVrijheidDoel/)
+    expect(host).not.toMatch(/MaskedAmount value=\{fireTargetInclHome!\}/)
+    expect(host).not.toMatch(/MaskedAmount value=\{fireTargetExclHome!\}/)
+    expect(host).not.toMatch(/isPensioenMode \? \(vermogenOpAnker \?\? 0\) : balkVrijheidDoel/)
     expect(src).toMatch(/const viewFireTargetInclHome = /)
     expect(src).toMatch(/const viewVermogenOpAnker = /)
     expect(src).toMatch(/const viewMonthlyWithdrawalAtAow =/)
@@ -144,7 +185,7 @@ describe('horizon-client.tsx — euro-weergave-render-grens (T4)', () => {
     // ankermaand, dus op `SimResult.vastStopLeeftijd`; met `aowFactor` werd een
     // `age`-anker van 46 bij een AOW van 68,5 ruim twintig jaar te ver
     // teruggerekend — onzichtbaar, want het bedrag bleef plausibel (alleen te laag).
-    expect(src).toMatch(/const ankerFactor = useMemo\(\s*\r?\n?\s*\(\) => factorAtAge\(displayUnifiedRows, simResult\?\.vastStopLeeftijd \?\? null\)/)
+    expect(src).toMatch(/const ankerFactor = useMemo\(\s*\n?\s*\(\) => factorAtAge\(displayUnifiedRows, simResult\?\.vastStopLeeftijd \?\? null\)/)
     expect(src).toMatch(/deflate\(vermogenOpAnker, ankerFactor, euroView\)/)
     expect(src).not.toMatch(/deflate\(vermogenOpAnker, aowFactor/)
   })
@@ -180,7 +221,7 @@ describe('horizon-client.tsx — euro-weergave-render-grens (T4)', () => {
   })
 
   it('leidt élke FIRE-moment-factor af uit één genormaliseerde leeftijd (KRUIS-27)', () => {
-    const src = readFileSync(SOURCE_PATH, 'utf8')
+    const src = readSourceLF(GRENS_PATH)
     // `factorAtAge` kiest de dichtstbijzijnde rij en laat een leeftijd exact op
     // .5 naar BENEDEN vallen, terwijl /overzicht zijn lookup voedt met de
     // afgeronde weergave-leeftijd uit `fireAgeForDisplay` (naar BOVEN). Zonder
@@ -189,11 +230,15 @@ describe('horizon-client.tsx — euro-weergave-render-grens (T4)', () => {
     expect(src).toMatch(/fireAgeForDisplay\(simResult\?\.fireAgeFractional \?\? simResult\?\.fireAge \?\? null\)/)
     // Geen enkele FIRE-factor-lookup mag nog rechtstreeks op de fractionele
     // leeftijd sleutelen — dat was precies de divergentie.
-    expect(src).not.toMatch(/factorAtAge\(displayUnifiedRows, simResult\??\.fireAgeFractional/)
+    for (const pad of scanPaden()) {
+      expect(readSourceLF(pad), relative(ROOT, pad)).not.toMatch(
+        /factorAtAge\(displayUnifiedRows, simResult\??\.fireAgeFractional/,
+      )
+    }
   })
 
   it('houdt de twee onzichtbare sleutelkeuzes expliciet op de callsite (K2/K4)', () => {
-    const src = readFileSync(SOURCE_PATH, 'utf8')
+    const src = readSourceLF(GRENS_PATH)
     // K2 — de besteedbaar-lijn plot de waarde van rij `age` op `age + 1`; zonder
     // deze sleutel deflateert de lijn stil één jaar te ver.
     expect(src).toMatch(/deflatePoints\(liquidWealthPoints, factorByAge, euroView, x => x - 1\)/)
@@ -258,10 +303,13 @@ describe('horizon-client.tsx — euro-weergave-render-grens (T4)', () => {
     // inflationFactor-verwijzing, dus regels 2 en 3 konden hem niet vangen —
     // een AFWEZIGE deflatie is voor die grendels onzichtbaar. Vandaar deze pin.
     // De callsite `stackedRows={viewWealthCompositionRows}` staat sinds fase 1 stap 7
-    // in canvas-grafiek.tsx (canvas-grafiek.euro-view.test.ts); de feed zelf blijft hier.
+    // in canvas-grafiek.tsx (canvas-grafiek.euro-view.test.ts); de feed zelf in de grens.
     // De veldenlijst is expliciet (nooit "alles wat een getal is") en `age`
     // mag er niet in staan (klasse R).
-    const fieldsMatch = readFileSync(FEEDS_PATH, 'utf8').match(/const STACKED_ROW_MONEY_FIELDS = \[([^\]]+)\]/)
+    expect(readSourceLF(GRENS_PATH)).toMatch(
+      /deflateRowsByAge\(wealthCompositionRows, factorByAge, STACKED_ROW_MONEY_FIELDS, euroView\)/,
+    )
+    const fieldsMatch = readSourceLF(FEEDS_PATH).match(/const STACKED_ROW_MONEY_FIELDS = \[([^\]]+)\]/)
     expect(fieldsMatch, 'STACKED_ROW_MONEY_FIELDS moet bestaan').not.toBeNull()
     for (const field of ['spaargeld', 'beleggingen', 'pensioen', 'vastgoed', 'overig', 'schulden']) {
       expect(fieldsMatch![1]).toContain(`'${field}'`)
@@ -275,19 +323,24 @@ describe('horizon-client.tsx — euro-weergave-render-grens (T4)', () => {
     // euro-veld op SimRow zou dus ongedeflateerd de rendergrens kruisen zonder
     // compile-fout. De dekkingsgard (`Exclude<keyof SimRow, …>` → `never`) draait
     // dat om; deze pin zorgt dat hij niet stil weggehaald wordt.
-    const src = readFileSync(FEEDS_PATH, 'utf8')
+    const src = readSourceLF(FEEDS_PATH)
     expect(src).toMatch(/const SIM_ROW_NON_MONEY_FIELDS = \[/)
     expect(src).toMatch(/type OngeclassificeerdSimRowVeld = Exclude</)
     expect(src).toMatch(/AlleSimRowVeldenGeclassificeerd<OngeclassificeerdSimRowVeld>/)
   })
 
   it('passeert de rekenrijen nominaal naar de fase-modals (kruis-regime, N3)', () => {
-    const src = readFileSync(SOURCE_PATH, 'utf8')
     // De modals lezen `useEuroView()` zelf en deflateren per klasse; zouden ze
     // hier al-gedeflateerde rijen krijgen, dan deflateert de kassabon dubbel.
-    expect(src).not.toMatch(/rows=\{viewUnifiedRows/)
-    expect(src).not.toMatch(/allRows=\{view/)
-    // …en er gaat geen `view`-prop naar een fase-modal.
-    expect(src).not.toMatch(/^\s*view=\{euroView\}/m)
+    // De modal-callsites zelf staan in `components/toekomst/overlays/` (die test pint
+    // de ontvangende kant); hier de gevende kant: de host en de state-laag.
+    for (const pad of scanPaden()) {
+      const src = readSourceLF(pad)
+      expect(src, relative(ROOT, pad)).not.toMatch(/rows=\{viewUnifiedRows/)
+      expect(src, relative(ROOT, pad)).not.toMatch(/allRows=\{view/)
+      // …en er gaat geen `view`-prop naar een fase-modal.
+      expect(src, relative(ROOT, pad)).not.toMatch(/^\s*view=\{euroView\}/m)
+    }
+    expect(readSourceLF(HOST_PATH)).toMatch(/unifiedRows=\{unifiedRows\}/)
   })
 })

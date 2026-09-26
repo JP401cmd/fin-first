@@ -85,7 +85,8 @@ describe('de nalatenschap-bol hangt aan de wat-als-lijn (eigenaarsbesluit 20 sep
   })
 
   it('de host levert de zone uit dezelfde grenzen als de knop zelf', () => {
-    const src = lees('components', 'app', 'horizon', 'horizon-client.tsx')
+    // Sinds ADR 0179 fase 1 stap 12 staat de marker in de euro-render-grens (state-laag).
+    const src = lees('components', 'toekomst', 'state', 'use-euro-view-feeds.ts')
     const start = src.indexOf('const nalatenschapMarker')
     expect(start).toBeGreaterThan(-1)
     const blok = src.slice(start, start + 400)

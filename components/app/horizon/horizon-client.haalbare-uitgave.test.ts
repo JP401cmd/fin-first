@@ -27,6 +27,11 @@ const source = readFileSync(
   join(process.cwd(), 'components', 'app', 'horizon', 'horizon-client.tsx'),
   'utf8',
 )
+/** De knoppen (`labKnoppen`) staan sinds ADR 0179 fase 1 stap 12 in de state-laag. */
+const knoppenSource = readFileSync(
+  join(process.cwd(), 'components', 'toekomst', 'state', 'use-euro-view-feeds.ts'),
+  'utf8',
+)
 
 /** Desktop-strip + mobiele strip. */
 const LAYOUTS = 2
@@ -74,9 +79,9 @@ describe('haalbare uitgave — bron-grendel', () => {
     // De antwoordregel met "Reken hiermee" verviel: de knop draagt zijn grens nu zelf
     // (`computeLabGrenzen`). Wat blijft is dát deze knop bestaat, met zijn basis uit
     // `haalbareUitgave` — één grondslag met de tegelregel erboven.
-    const start = source.indexOf('const labKnoppen = useMemo')
+    const start = knoppenSource.indexOf('const labKnoppen = useMemo')
     expect(start).toBeGreaterThan(-1)
-    const blok = source.slice(start, source.indexOf('const labFormatters', start))
+    const blok = knoppenSource.slice(start, knoppenSource.indexOf('const labFormatters', start))
     expect(blok).toContain('out.uitgaveNaPensioen = {')
     expect(blok).toContain('basis: uitgaveNaPensioenBasis')
     expect(blok).toContain("grenzen: grens('uitgaveNaPensioen')")
@@ -135,8 +140,9 @@ describe('haalbare uitgave — bron-grendel', () => {
     // Zonder deze tolerantie blijft `hasScenario` waar en blijft de opslaan-balk "gewijzigd"
     // melden nadat de gebruiker precies terugsleepte naar de dichtstbijzijnde bereikbare stand
     // (de test hierboven bewijst dat die stand vrijwel nooit exact de basis is).
-    expect(source).toContain('Math.abs(v - uitgaveNaPensioenBasis) < UITGAVE_NA_PENSIOEN_STAP / 2 ? null : v')
+    expect(knoppenSource).toContain('Math.abs(v - uitgaveNaPensioenBasis) < UITGAVE_NA_PENSIOEN_STAP / 2 ? null : v')
     // De oude, te-strenge vorm (exacte gelijkheid) mag nergens meer voorkomen.
+    expect(knoppenSource).not.toMatch(/v === (haalbareUitgave\.huidigPerJaar|uitgaveNaPensioenBasis) \? null : v/)
     expect(source).not.toMatch(/v === (haalbareUitgave\.huidigPerJaar|uitgaveNaPensioenBasis) \? null : v/)
   })
 

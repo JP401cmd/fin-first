@@ -48,7 +48,7 @@ Eigenaarsbesluiten 26 sep: checkpoint-commit per stap **op master, per pad, nooi
 - [x] 9 P Doelen-lab inpluggen
 - [x] 10 P Plan-verdieping inpluggen (`useInViewOnce` mee)
 - [x] 11 S-klein overlay-host (E2 blijft tot de provider-stap in de ouder)
-- [ ] 12 S provider (a) euro-grens
+- [x] 12 S provider (a) euro-grens → `components/toekomst/state/use-euro-view-feeds.ts` (A3)
 - [ ] 13 S provider (b) sim/kernel + perspectief + meldingen-hooks
 - [ ] 14 S provider (c) scenario/lab + lagen
 - [ ] 15 S route-groep met Plan (layout, KaternKoppen uit stroom C, navkaarten + dubbele kop weg)

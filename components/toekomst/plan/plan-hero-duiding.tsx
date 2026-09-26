@@ -155,7 +155,7 @@ export function PlanHeroDuiding({
                 render-grens gedeeld door `factorAtAge` op het FIRE- resp.
                 ANKER-jaar (`SimResult.vastStopLeeftijd` — het bedrag staat op de
                 ankermaand, niet op de AOW-leeftijd).
-                Gepind in horizon-client.euro-view.test.ts. */}
+                Gepind in use-euro-view-feeds.euro-view.test.ts. */}
             <div className="mt-2 flex justify-between text-xs text-[var(--ink-4)]">
               <span>0%</span>
               <span className="font-mono">

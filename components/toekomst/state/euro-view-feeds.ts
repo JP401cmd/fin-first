@@ -4,7 +4,7 @@
 // `SimRow`/`StackedRow` euro's zijn en dus meedeflateren, plus de compile-gard die
 // élk `SimRow`-veld laat classificeren, en de sleutel-helper `factorMapByPosition`
 // voor feeds met een eigen leeftijd-as (K4). De grens zelf (de `deflate*`-aanroepen)
-// staat nog in horizon-client; stap 12 brengt hem als geheel naar `state/`.
+// staat sinds stap 12 als geheel in `use-euro-view-feeds.ts`.
 // Hier wordt niets gedeeld en niets uitgerekend.
 
 import type { SimRow } from '@/lib/fire-simulation'
@@ -71,7 +71,7 @@ type _SimRowDekking = AlleSimRowVeldenGeclassificeerd<OngeclassificeerdSimRowVel
 /**
  * De euro-velden van `StackedRow` (vermogensopbouw-staven) — jaarstanden per
  * vermogensgroep, klasse S op de eigen leeftijd-as. `age` is klasse R en blijft
- * er bewust buiten. Bewaakt door horizon-client.euro-view.test.ts.
+ * er bewust buiten. Bewaakt door use-euro-view-feeds.euro-view.test.ts.
  */
 export const STACKED_ROW_MONEY_FIELDS = [
   'spaargeld',

@@ -22,6 +22,13 @@ function bron(): string {
   return readFileSync(SOURCE_PATH, 'utf8')
 }
 
+/** De euro-render-grens (ADR 0179 fase 1 stap 12): de weergave-feeds van het lab wonen hier. */
+const GRENS_PATH = join(process.cwd(), 'components', 'toekomst', 'state', 'use-euro-view-feeds.ts')
+
+function grensBron(): string {
+  return readFileSync(GRENS_PATH, 'utf8')
+}
+
 /** Niet-comment-regels — een uitleg mág elke naam noemen. */
 function codeRegels(): string[] {
   return bron()
@@ -133,9 +140,10 @@ describe('de vijf knoppen consumeren ÉÉN grenzen-batch (ADR 0170)', () => {
 
   it('de knoppen lezen de grenzen uit die batch en berekenen er zelf niets bij', () => {
     const src = bron()
-    const start = src.indexOf('const labKnoppen = useMemo')
+    const knoppenSrc = grensBron()
+    const start = knoppenSrc.indexOf('const labKnoppen = useMemo')
     expect(start).toBeGreaterThan(-1)
-    const blok = src.slice(start, src.indexOf('const labFormatters', start))
+    const blok = knoppenSrc.slice(start, knoppenSrc.indexOf('const labFormatters', start))
     expect(blok).toContain("const grens = (k: HefboomKey) => labGrenzen?.grenzen?.[k] ?? null")
     // Geen bisectie, geen solve, geen benadering in de host.
     expect(blok).not.toMatch(/solveFire|bisect|Math\.pow/)
@@ -168,7 +176,8 @@ describe('de vijf knoppen consumeren ÉÉN grenzen-batch (ADR 0170)', () => {
 describe('eindvermogen (ADR 0145 D12) blijft nominaal vastgelegd en gedeflateerd getoond', () => {
   it('weergave gedeflateerd IN het euro-weergave-blok, doelbedrag NOMINAAL uit labDekking', () => {
     const src = bron()
-    const euroBlok = src.slice(src.indexOf('EURO-WEERGAVE: DE RENDER-GRENS'), src.indexOf('EINDE EURO-WEERGAVE'))
+    const grens = grensBron()
+    const euroBlok = grens.slice(grens.indexOf('EURO-WEERGAVE: DE RENDER-GRENS'), grens.indexOf('EINDE EURO-WEERGAVE'))
     // Eén factor op de eindleeftijd, via de canonieke helpers — nooit een eigen machtsverheffing.
     expect(euroBlok).toContain('factorAtAge(displayUnifiedRows, labDekking?.eind ?? chartEndAge)')
     expect(euroBlok).toMatch(

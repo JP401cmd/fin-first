@@ -35,6 +35,9 @@ import type { SimResult } from '@/lib/fire-simulation'
 
 const SOURCE_PATH = join(process.cwd(), 'components', 'app', 'horizon', 'horizon-client.tsx')
 const source = readFileSync(SOURCE_PATH, 'utf8')
+/** De euro-render-grens (ADR 0179 fase 1 stap 12): de ankerfactor woont hier. */
+const GRENS_PATH = join(process.cwd(), 'components', 'toekomst', 'state', 'use-euro-view-feeds.ts')
+const grensSource = readFileSync(GRENS_PATH, 'utf8')
 
 /**
  * De ANKER van een bron-grendel is zijn zwakke plek. De eerste versie van deze suite
@@ -186,6 +189,7 @@ describe('horizon-client — de vermogenstegel onder een vast anker noemt haar g
    * terug — onzichtbaar, want het resultaat blijft een plausibel bedrag.
    */
   it('deflateert met de factor van de ANKERLEEFTIJD, niet die van de AOW', () => {
+    const source = grensSource
     expect(source).toMatch(
       /const ankerFactor = useMemo\(\s*\r?\n?\s*\(\) => factorAtAge\(displayUnifiedRows, simResult\?\.vastStopLeeftijd \?\? null\)/,
     )
