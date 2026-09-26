@@ -20,7 +20,7 @@ const ITEMS: KaternKopItem[] = [
     label: 'Instellingen',
     href: '/toekomst/instellingen',
     samenvatting: 'nog 2 voorkeuren open · AOW ontbreekt',
-    status: { ernst: 'warn', label: 'Instellingen, melding: AOW ontbreekt' },
+    status: { ernst: 'warn', label: 'melding: AOW ontbreekt' },
   },
 ]
 
@@ -54,7 +54,9 @@ describe('KaternKoppen', () => {
     expect(punt.className).toContain(LEVERAGE_STATUS_DOT.warn)
     expect(punt.getAttribute('aria-hidden')).toBe('true')
     const link = screen.getByTestId('katern-kop-instellingen')
-    expect(within(link).getByText('Instellingen, melding: AOW ontbreekt').className).toContain('sr-only')
+    // Eén toegankelijke naam: de kopnaam één keer, dan de melding (C1 punt 5 — was
+    // "Instellingen Instellingen, melding: …").
+    expect(link).toHaveAccessibleName('Instellingen, melding: AOW ontbreekt')
     expect(within(link).queryByText('1')).toBeNull()
     // Kleur is nooit module-accent.
     expect(punt.className).not.toMatch(/horizon-|kern-|wil-|module-active/)
@@ -63,14 +65,25 @@ describe('KaternKoppen', () => {
   it('bij meer dan één melding staat het aantal bij het punt', () => {
     const items: KaternKopItem[] = [
       ITEMS[0],
-      { ...ITEMS[1], status: { ernst: 'bad', label: 'Doelen, melding: doel loopt achter', aantal: 3 } },
+      { ...ITEMS[1], status: { ernst: 'bad', label: 'melding: doel loopt achter', aantal: 3 } },
       ITEMS[2],
     ]
     renderKoppen('plan', items)
     const link = screen.getByTestId('katern-kop-doelen')
     expect(within(link).getByText('3')).toBeTruthy()
-    expect(within(link).getByText('Doelen, melding: doel loopt achter (3 meldingen)')).toBeTruthy()
+    expect(link).toHaveAccessibleName('Doelen, melding: doel loopt achter (3 meldingen)')
     expect(screen.getByTestId('katern-kop-punt-doelen').className).toContain(LEVERAGE_STATUS_DOT.bad)
+  })
+
+  it('de samenvatting blijft voor schermlezers bereikbaar als beschrijving naast de meldingsnaam', () => {
+    renderKoppen('plan')
+    const link = screen.getByTestId('katern-kop-instellingen')
+    expect(link).toHaveAccessibleDescription('nog 2 voorkeuren open · AOW ontbreekt')
+    // Zonder melding blijft de naam de inhoud: label plus samenvatting (jsdom telt geen
+    // witruimte tussen flex-items; een browser wel).
+    const doelen = screen.getByTestId('katern-kop-doelen')
+    expect(doelen.hasAttribute('aria-label')).toBe(false)
+    expect(doelen).toHaveAccessibleName(/^Doelen\s*stopmoment 58 · ruim gedekt$/)
   })
 
   it('mobiel sticky bovenaan, desktop statisch; elke kop ≥ 44px', () => {

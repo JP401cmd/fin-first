@@ -21,13 +21,17 @@
  * Presentational: geen route-lezing, geen data. De host bepaalt `actiefKey`.
  */
 
+import { useId } from 'react'
 import Link from 'next/link'
 import { LEVERAGE_STATUS_DOT, type LeverageStatus } from '@/lib/leverage-status'
 
 export interface KaternKopStatus {
   /** Ernst van de (hoogste) melding — kleurt het punt. */
   ernst: LeverageStatus
-  /** Tekst voor schermlezers, bv. "Instellingen, melding: AOW ontbreekt". */
+  /**
+   * Tekst voor schermlezers ZONDER de kopnaam, bv. "melding: AOW ontbreekt". De kop
+   * zet zijn eigen label ervoor: de link heet "Instellingen, melding: AOW ontbreekt".
+   */
   label: string
   /** Aantal meldingen in dit katern; bij > 1 staat het getal bij het punt. */
   aantal?: number
@@ -56,7 +60,18 @@ export interface KaternKoppenProps {
   className?: string
 }
 
+/**
+ * De toegankelijke naam van een kop met een melding: de kopnaam één keer, dan de
+ * melding — "Plan, melding: tekort-lening (2 meldingen)". Expliciet als `aria-label`,
+ * zodat de naam niet afhangt van hoe een browser witruimte tussen flex-items telt.
+ */
+function kopNaamMetStatus(label: string, status: KaternKopStatus): string {
+  const aantal = status.aantal ?? 0
+  return `${label}, ${status.label}${aantal > 1 ? ` (${aantal} meldingen)` : ''}`
+}
+
 export function KaternKoppen({ items, actiefKey, label, className = '' }: KaternKoppenProps) {
+  const idBasis = useId()
   return (
     <nav
       aria-label={label}
@@ -72,11 +87,17 @@ export function KaternKoppen({ items, actiefKey, label, className = '' }: Katern
           const status = item.status ?? null
           const aantal = status?.aantal ?? 0
           const toonSamenvatting = !actief && !!item.samenvatting
+          const naam = status ? kopNaamMetStatus(item.label, status) : null
+          const samenvattingId = `${idBasis}-${item.key}-samenvatting`
           return (
             <li key={item.key} className="min-w-0">
               <Link
                 href={item.href}
                 aria-current={actief ? 'page' : undefined}
+                // Met een melding een expliciete naam; de samenvatting blijft dan als
+                // beschrijving bereikbaar. Zonder melding is de inhoud de naam.
+                aria-label={naam ?? undefined}
+                aria-describedby={naam && toonSamenvatting ? samenvattingId : undefined}
                 onClick={item.onSelect}
                 className={`block min-h-[44px] border-t-2 pb-2 pt-2.5 pr-2 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)] ${
                   actief
@@ -88,7 +109,7 @@ export function KaternKoppen({ items, actiefKey, label, className = '' }: Katern
                 <span className="flex items-center gap-1.5 font-mono text-[11px] font-medium uppercase tracking-[0.12em]">
                   <span className="truncate">{item.label}</span>
                   {status && (
-                    <span className="inline-flex shrink-0 items-center gap-1" title={status.label}>
+                    <span className="inline-flex shrink-0 items-center gap-1" title={naam ?? undefined}>
                       <span
                         aria-hidden="true"
                         className={`inline-block h-2 w-2 rounded-full ${LEVERAGE_STATUS_DOT[status.ernst]}`}
@@ -99,14 +120,14 @@ export function KaternKoppen({ items, actiefKey, label, className = '' }: Katern
                           {aantal}
                         </span>
                       )}
-                      <span className="sr-only">
-                        {aantal > 1 ? `${status.label} (${aantal} meldingen)` : status.label}
-                      </span>
                     </span>
                   )}
                 </span>
                 {toonSamenvatting && (
-                  <span className="mt-0.5 hidden truncate font-serif text-[12px] normal-case text-[var(--ink-3)] lg:block">
+                  <span
+                    id={samenvattingId}
+                    className="mt-0.5 hidden truncate font-serif text-[12px] normal-case text-[var(--ink-3)] lg:block"
+                  >
                     {item.samenvatting}
                   </span>
                 )}

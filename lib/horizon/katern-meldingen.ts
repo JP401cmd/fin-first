@@ -460,7 +460,7 @@ export function katernKopStatus(meldingen: KaternMeldingen, katern: KaternId): K
   const k = meldingen[katern]
   const top = k.meldingen[0]
   if (!top || k.hoogsteErnst == null) return null
-  return { ernst: k.hoogsteErnst, label: katernStatuspuntLabel(katern, top.kort), aantal: k.aantal }
+  return { ernst: k.hoogsteErnst, label: katernStatuspuntLabel(top.kort), aantal: k.aantal }
 }
 
 // ── Minimaliseren per katern-route ───────────────────────────────────────────

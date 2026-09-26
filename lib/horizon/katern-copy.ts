@@ -49,11 +49,13 @@ export const KATERN_NAV_LABEL = 'Onderdelen van je toekomstplan'
 export const KATERN_WIZARD_NAAM = PLAN_REVIEW_NAAM
 
 /**
- * Het label van het statuspunt voor schermlezers (kopij-toets §4, WCAG 1.4.1):
- * "Instellingen, melding: AOW ontbreekt". Kleur alleen is geen informatie.
+ * Het label van het statuspunt voor schermlezers (kopij-toets §4, WCAG 1.4.1). Kleur
+ * alleen is geen informatie. Zonder de kopnaam: het punt staat ín de kop-link, en
+ * `KaternKoppen` zet de naam ervoor — samen "Instellingen, melding: AOW ontbreekt".
+ * Met de kopnaam erin las de link "Plan Plan, melding: …" (fixronde C1).
  */
-export function katernStatuspuntLabel(katern: KaternId, kort: string): string {
-  return `${KATERN_LABEL[katern]}, melding: ${kort}`
+export function katernStatuspuntLabel(kort: string): string {
+  return `melding: ${kort}`
 }
 
 /**

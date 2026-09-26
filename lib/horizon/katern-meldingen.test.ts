@@ -435,10 +435,10 @@ describe('katernKopStatus', () => {
     const uit = wijsMeldingenToe(ALLES)
     expect(katernKopStatus(uit, 'instellingen')).toEqual({
       ernst: 'warn',
-      label: katernStatuspuntLabel('instellingen', 'AOW ontbreekt'),
+      label: katernStatuspuntLabel('AOW ontbreekt'),
       aantal: 3,
     })
-    expect(katernKopStatus(uit, 'instellingen')?.label).toBe('Instellingen, melding: AOW ontbreekt')
+    expect(katernKopStatus(uit, 'instellingen')?.label).toBe('melding: AOW ontbreekt')
   })
 
   it('één melding → aantal 1; geen melding → null', () => {

@@ -168,7 +168,7 @@ describe('katern-koppen — samenvatting en statuspunt', () => {
     renderKoppen(waarde().w)
     const instellingen = screen.getByTestId('katern-kop-instellingen')
     expect(within(instellingen).getByTestId('katern-kop-punt-instellingen').className).toContain(LEVERAGE_STATUS_DOT.warn)
-    expect(instellingen).toHaveTextContent('Instellingen, melding: AOW ontbreekt')
+    expect(instellingen).toHaveAccessibleName('Instellingen, melding: AOW ontbreekt')
     // Plan (tekort-lening) en Doelen (lab) hebben er ook één; zonder melding geen punt.
     expect(screen.getByTestId('katern-kop-punt-plan')).toBeTruthy()
   })

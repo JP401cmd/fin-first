@@ -106,8 +106,8 @@ describe('katern-copy — katernen', () => {
     for (const k of KATERN_VOLGORDE) expect(katernMeldingGeminimaliseerdSr(k)).not.toMatch(/katern/i)
   })
 
-  it('statuspunt-label voor schermlezers', () => {
-    expect(katernStatuspuntLabel('instellingen', 'AOW ontbreekt')).toBe('Instellingen, melding: AOW ontbreekt')
+  it('statuspunt-label voor schermlezers: zonder kopnaam, die draagt de kop-link zelf (C1 punt 5)', () => {
+    expect(katernStatuspuntLabel('AOW ontbreekt')).toBe('melding: AOW ontbreekt')
   })
 })
 
