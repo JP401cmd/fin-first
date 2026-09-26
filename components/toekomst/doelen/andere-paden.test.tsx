@@ -70,6 +70,29 @@ describe('AnderePaden — de preset-gate is "in beeld"', () => {
     expect(screen.queryByTestId('scenario-kaarten')).toBeNull()
   })
 
+  it('mislukte of lege batch: geen kop en geen intro, maar de observer-sectie blijft', () => {
+    for (const leeg of [
+      { scenarioPresets: null, viewScenarioPresets: null },
+      { scenarioPresets: [], viewScenarioPresets: [] },
+    ]) {
+      const { onDuidingInView } = renderPaden(leeg)
+      const sectie = screen.getByTestId('doelen-andere-paden')
+      expect(sectie.getAttribute('data-leeg')).toBe('true')
+      expect(screen.queryByRole('heading', { name: ANDERE_PADEN_KOP })).toBeNull()
+      expect(sectie.textContent).toBe('')
+      inBeeld()
+      expect(onDuidingInView).toHaveBeenCalled()
+      cleanup()
+    }
+  })
+
+  it('met kaarten: kop, intro en kaarten', () => {
+    const kaart = {} as unknown as NonNullable<AnderePadenProps['scenarioPresets']>[number]
+    renderPaden({ scenarioPresets: [kaart], viewScenarioPresets: [kaart] })
+    expect(screen.getByTestId('scenario-kaarten').textContent).toBe('klaar')
+    expect(screen.getByTestId('doelen-andere-paden').getAttribute('data-leeg')).toBeNull()
+  })
+
   it('zonder hoofdrun geen sectie', () => {
     renderPaden({ hasRun: false })
     expect(screen.queryByTestId('doelen-andere-paden')).toBeNull()
@@ -81,7 +104,7 @@ describe('AnderePaden — de preset-gate is "in beeld"', () => {
   })
 
   it('draagt de kop als h2 (de shell draagt de h1, ADR 0110)', () => {
-    renderPaden()
+    renderPaden({ scenarioPresetsLoading: true })
     expect(screen.getByRole('heading', { level: 2, name: ANDERE_PADEN_KOP })).toBeTruthy()
   })
 })

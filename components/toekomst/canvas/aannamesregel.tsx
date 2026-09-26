@@ -10,6 +10,11 @@
  * Kopij en segmenten komen uit `aannamesSegmenten` (katern-copy); inflatie en
  * rendement staan in `HideInSimple` (ADR 0026), samen met hun scheidingsteken.
  * Presentational: de getallen komen van de host (plan-invoer), hier wordt niets berekend.
+ *
+ * Het segment "N gebeurtenissen" is bewust een telling zónder link: sinds 70e7496c3 staan de
+ * gebeurtenissen op Plan zelf (onder de fasebalk, anker `#gebeurtenissen`), niet in
+ * Instellingen. De ene link "Naar instellingen" gaat over de aannames (stopmoment,
+ * eindleeftijd, inflatie, rendement) die dáár staan.
  */
 
 import Link from 'next/link'

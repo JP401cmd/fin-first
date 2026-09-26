@@ -53,4 +53,14 @@ describe('Aannamesregel', () => {
     expect(link.className).toContain('min-h-[44px]')
     expect(screen.getAllByRole('link')).toHaveLength(1)
   })
+
+  it('het gebeurtenissen-segment is een telling zonder link: de gebeurtenissen staan op Plan zelf (70e7496c3)', () => {
+    renderRegel('full')
+    const segment = document.querySelector('[data-segment="gebeurtenissen"]') as HTMLElement
+    expect(segment).toBeTruthy()
+    expect(segment.closest('a')).toBeNull()
+    expect(segment.querySelector('a')).toBeNull()
+    // De enige link blijft "Naar instellingen" (de aannames staan daar), niet naar de gebeurtenissen.
+    expect(screen.getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual(['/toekomst/instellingen'])
+  })
 })

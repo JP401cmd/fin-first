@@ -54,17 +54,30 @@ export function AnderePaden({
   }, [inBeeld, onDuidingInView])
 
   if (!hasRun) return null
+  // Zonder kaarten (batch nog niet gestart, mislukt of leeg) geen kop en geen intro: een
+  // lege sectie zegt niets. De sectie zélf blijft gemount, want zij is het doel van de
+  // observer — anders start de batch onder `solved` nooit (NP-bevinding na S8).
+  const heeftInhoud =
+    scenarioPresetsLoading || (scenarioPresets !== null && (viewScenarioPresets ?? []).length > 0)
   return (
     <HideInSimple>
-      <section ref={sectieRef} className="mt-8 sm:mt-10" data-testid="doelen-andere-paden">
-        {/* Visueel de sectiekicker; voor de koppenboom een h2 (ADR 0110: de shell draagt de h1). */}
-        <h2 className="sr-only">{ANDERE_PADEN_KOP}</h2>
-        <div aria-hidden="true">
-          <SectionLabel num="III">{ANDERE_PADEN_KOP}</SectionLabel>
-        </div>
-        <p className="mb-3 font-sans text-[12px] text-[var(--ink-3)]">{ANDERE_PADEN_UITLEG}</p>
-        {(scenarioPresets !== null || scenarioPresetsLoading) && (
-          <ScenarioKaarten kaarten={viewScenarioPresets ?? []} isLoading={scenarioPresetsLoading} />
+      <section
+        ref={sectieRef}
+        className={heeftInhoud ? 'mt-8 sm:mt-10' : ''}
+        data-testid="doelen-andere-paden"
+        data-leeg={heeftInhoud ? undefined : true}
+        aria-hidden={heeftInhoud ? undefined : true}
+      >
+        {heeftInhoud && (
+          <>
+            {/* Visueel de sectiekicker; voor de koppenboom een h2 (ADR 0110: de shell draagt de h1). */}
+            <h2 className="sr-only">{ANDERE_PADEN_KOP}</h2>
+            <div aria-hidden="true">
+              <SectionLabel num="III">{ANDERE_PADEN_KOP}</SectionLabel>
+            </div>
+            <p className="mb-3 font-sans text-[12px] text-[var(--ink-3)]">{ANDERE_PADEN_UITLEG}</p>
+            <ScenarioKaarten kaarten={viewScenarioPresets ?? []} isLoading={scenarioPresetsLoading} />
+          </>
         )}
       </section>
     </HideInSimple>

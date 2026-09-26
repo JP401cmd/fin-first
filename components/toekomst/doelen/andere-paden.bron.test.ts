@@ -16,7 +16,7 @@ describe('andere-paden — zichtbaarheids-gate van de scenario-kaarten (V1, ADR 
     // Review fase 1 (W5): de sectie mount laat (hasRun, HideInSimple) — de
     // mount-conditie gaat als remountKey mee, anders haakt de observer nooit aan.
     expect(source).toContain("const inBeeld = useInViewOnce(sectieRef, '600px', `${hasRun}:${displayMode}`)")
-    expect(source).toContain('<section ref={sectieRef}')
+    expect(source).toMatch(/<section\s+ref=\{sectieRef\}/)
   })
 
   it('meldt "in beeld" aan de ouder (die de grendel zet)', () => {
@@ -26,7 +26,9 @@ describe('andere-paden — zichtbaarheids-gate van de scenario-kaarten (V1, ADR 
 
   it('de sectie mount op de hoofdrun, niet op de kaarten (anders start de batch onder solved nooit)', () => {
     expect(source).toContain('if (!hasRun) return null')
-    expect(source).toMatch(/<HideInSimple>\s*<section ref=\{sectieRef\}/)
+    expect(source).toMatch(/<HideInSimple>\s*<section\s+ref=\{sectieRef\}/)
+    // Leeg (mislukt, leeg of nog niet gestart) verbergt alleen de inhoud, niet de sectie.
+    expect(source).toMatch(/\{heeftInhoud && \(/)
   })
 
   it('draait de preset-batch niet zelf (die gate blijft in de sim-hook)', () => {

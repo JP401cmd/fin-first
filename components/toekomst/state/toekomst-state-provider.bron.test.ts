@@ -8,7 +8,8 @@
  *  2. elk concern is een eigen hook in een eigen bestand, in de dataflow-volgorde;
  *  3. elke context-waarde is gememoïseerd per concern (`useStabielObject`);
  *  4. de minimaliseer-toestand per katern hangt aan de layout, niet aan een katern (GW3b);
- *  5. `useInViewOnce` hangt aan het Plan-blad, niet aan de provider (GW3a, kaart V1);
+ *  5. `useInViewOnce` hangt aan het paneel met de scenario-kaarten (sinds fase 4 in Doelen),
+ *     niet aan de provider (GW3a, kaart V1);
  *  6. de deeplink-afhandeling opent de dode WithdrawalModal niet meer.
  */
 import { describe, it, expect } from 'vitest'
@@ -90,11 +91,11 @@ describe('meldingen en grendels blijven gemount bij een katernwissel', () => {
     expect(layout).toContain('<ToekomstKaternMeldingenProvider')
   })
 
-  it('useInViewOnce hangt aan het Plan-blad, niet aan de state-laag (GW3a)', () => {
+  it('useInViewOnce hangt aan het paneel met de scenario-kaarten, niet aan de state-laag (GW3a)', () => {
     for (const { naam, src } of stateBronnen()) {
       expect(src, `${naam} mag useInViewOnce niet aanroepen`).not.toMatch(/useInViewOnce\s*\(/)
     }
-    expect(readSourceLF(join(process.cwd(), 'components', 'toekomst', 'plan', 'plan-verdieping.tsx'))).toMatch(
+    expect(readSourceLF(join(process.cwd(), 'components', 'toekomst', 'doelen', 'andere-paden.tsx'))).toMatch(
       /useInViewOnce\s*\(/,
     )
   })
