@@ -185,6 +185,13 @@ export function EventPane({
     setMode('catalog')
   }
 
+  // De ←-knop "Terug" in de pane-kop wijst naar `onClose` tenzij we een `onBack`
+  // meegeven. Bij een NIEUW event dat uit de catalogus kwam (formulier of Fin-chat)
+  // hoort Terug één stap terug te gaan, naar de keuze — niet de hele pane te sluiten
+  // (C3 punt 8). In de catalogus zelf en bij een bestaand event blijft Terug sluiten.
+  const terugNaarCatalogus =
+    initialMode === 'catalog' && !editingEvent && (mode === 'edit' || mode === 'chat')
+
   async function handleSave(draftEvent: LifeEvent) {
     setSaving(true)
     setSaveError(null)
@@ -309,6 +316,7 @@ export function EventPane({
       <ShellOverlay
         open={open}
         onClose={onClose}
+        onBack={terugNaarCatalogus ? handleBackToCatalog : undefined}
         kind="pane" mobileBackCloses
         title={title}
         primaryAction={primaryAction}
