@@ -10,7 +10,7 @@ import type { HealthScore, HealthPillar, PillarGroup } from '@/lib/financial-hea
  * voor de useInViewAnimation hook.
  *
  * Dekt:
- * - Basis: total-score, label, trend, time-anchor
+ * - Basis: total-score, label, "sinds vorige maand", time-anchor
  * - v2: 4 mini-bars renderen bij pillars mét pillarGroup
  * - Mini-bars ontbreken bij pillars zónder pillarGroup
  * - Samengestelde score meest prominent (>= 2 subscores → mini-bars tonen)
@@ -101,47 +101,32 @@ describe('HealthScoreCard', () => {
     expect(screen.getByText('Redelijk')).toBeTruthy()
   })
 
-  it('toont trend-label bij trend > 0', () => {
-    const onOpen = vi.fn()
-    render(
-      <HealthScoreCard
-        health={makeHealth({ trend: 7, previousMonth: 65 })}
-        onOpenReceipt={onOpen}
-      />,
-    )
-    expect(screen.getByText(/\+7 punten/)).toBeTruthy()
+  it('Given een delta van +7 sinds vorige maand, When de kaart rendert, Then "+7 punten sinds vorige maand"', () => {
+    render(<HealthScoreCard health={makeHealth()} onOpenReceipt={vi.fn()} sindsVorigeMaand={7} />)
+    expect(screen.getByTestId('health-score-sinds-vorige-maand').textContent).toBe('+7 punten sinds vorige maand')
   })
 
-  it('toont trend-label bij trend < 0', () => {
-    const onOpen = vi.fn()
-    render(
-      <HealthScoreCard
-        health={makeHealth({ trend: -5, previousMonth: 77 })}
-        onOpenReceipt={onOpen}
-      />,
-    )
-    expect(screen.getByText(/-5 punten/)).toBeTruthy()
+  it('Given een delta van -5, When de kaart rendert, Then "-5 punten sinds vorige maand"', () => {
+    render(<HealthScoreCard health={makeHealth()} onOpenReceipt={vi.fn()} sindsVorigeMaand={-5} />)
+    expect(screen.getByText('-5 punten sinds vorige maand')).toBeTruthy()
   })
 
-  it('toont "gelijk aan vorige maand" bij trend = 0', () => {
-    const onOpen = vi.fn()
-    render(
-      <HealthScoreCard
-        health={makeHealth({ trend: 0, previousMonth: 72 })}
-        onOpenReceipt={onOpen}
-      />,
-    )
+  it('Given een delta van 1, When de kaart rendert, Then enkelvoud "punt"', () => {
+    render(<HealthScoreCard health={makeHealth()} onOpenReceipt={vi.fn()} sindsVorigeMaand={1} />)
+    expect(screen.getByText('+1 punt sinds vorige maand')).toBeTruthy()
+  })
+
+  it('Given een delta van 0, When de kaart rendert, Then "gelijk aan vorige maand"', () => {
+    render(<HealthScoreCard health={makeHealth()} onOpenReceipt={vi.fn()} sindsVorigeMaand={0} />)
     expect(screen.getByText('gelijk aan vorige maand')).toBeTruthy()
   })
 
-  it('verbergt trend-label bij previousMonth null', () => {
-    const onOpen = vi.fn()
-    render(
-      <HealthScoreCard
-        health={makeHealth({ previousMonth: null, trend: 0 })}
-        onOpenReceipt={onOpen}
-      />,
+  it('Given geen vergelijking (null of afwezig), When de kaart rendert, Then geen regel — ook niet uit health.previousMonth', () => {
+    const { rerender } = render(
+      <HealthScoreCard health={makeHealth({ previousMonth: 65, trend: 7 })} onOpenReceipt={vi.fn()} sindsVorigeMaand={null} />,
     )
+    expect(screen.queryByTestId('health-score-sinds-vorige-maand')).toBeNull()
+    rerender(<HealthScoreCard health={makeHealth({ previousMonth: 65, trend: 7 })} onOpenReceipt={vi.fn()} />)
     expect(screen.queryByText(/punten/)).toBeNull()
     expect(screen.queryByText(/gelijk aan/)).toBeNull()
   })

@@ -12,6 +12,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import type { HealthScore, HealthPillar, PillarGroup } from '@/lib/financial-health'
 import { HealthScoreReceipt } from './health-score-receipt'
+import type { HealthVerloopPunt } from '@/lib/health-verloop'
 
 // useChatContext heeft een provider nodig — stub 'm; chat-gedrag is hier niet relevant.
 vi.mock('@/components/app/chat/chat-provider', () => ({
@@ -256,5 +257,132 @@ describe('HealthScoreReceipt — belasting-kans-sectie (ADR 0010, Wft)', () => {
     const section = screen.getByRole('region', { name: /Belasting.*educatief inzicht/i })
     expect(section.textContent).not.toMatch(/bespaar.*€\d/)
     expect(section.textContent).not.toMatch(/te veel.*€\d/)
+  })
+})
+
+// ── Sectie "Verloop" (fase 5 — verloop naar /overzicht) ─────────────────────
+
+function verloopPunt(
+  snapshot_date: string,
+  resilience_score: number | null,
+  opts: { score_version?: number | null; fire_age?: number | null; engine_bron?: string | null } = {},
+): HealthVerloopPunt {
+  return {
+    snapshot_date,
+    resilience_score,
+    score_version: opts.score_version === undefined ? 2 : opts.score_version,
+    fire_age: opts.fire_age ?? null,
+    engine_bron: opts.engine_bron ?? null,
+  }
+}
+
+/** Het lijnpad (geen vlak) van een verloopgrafiek. */
+function lijnPad(chart: HTMLElement): string {
+  const path = chart.querySelector('path[fill="none"]')
+  return path?.getAttribute('d') ?? ''
+}
+
+describe('HealthScoreReceipt — sectie Verloop', () => {
+  it('Given geen verloop-prop (bv. /toekomst), When de kassabon rendert, Then geen sectie Verloop', () => {
+    render(<HealthScoreReceipt health={makeHealthV2()} />)
+    expect(screen.queryByTestId('health-verloop')).toBeNull()
+    expect(screen.queryByRole('heading', { name: 'Verloop' })).toBeNull()
+  })
+
+  it('Given een lege reeks, When de kassabon opent, Then de lege staat zonder grafiek', async () => {
+    render(<HealthScoreReceipt health={makeHealthV2()} verloop={[]} />)
+    expect(await screen.findByRole('heading', { name: 'Verloop' })).toBeTruthy()
+    expect(screen.getByTestId('health-verloop-leeg')).toBeTruthy()
+    expect(screen.queryByTestId('resilience-trend-chart')).toBeNull()
+    expect(screen.queryByTestId('fire-age-trend-chart')).toBeNull()
+  })
+
+  it('Given één maandstand, When de kassabon opent, Then die stand als tekst en geen grafiek', async () => {
+    render(
+      <HealthScoreReceipt
+        health={makeHealthV2()}
+        verloop={[verloopPunt('2026-09-26', 64, { fire_age: 51.9 })]}
+      />,
+    )
+    const gezondheid = await screen.findByTestId('health-verloop-gezondheid-een-punt')
+    expect(gezondheid.textContent).toMatch(/64 van 100 in sep 2026/)
+    expect(screen.getByTestId('health-verloop-vrijheidsleeftijd-een-punt').textContent).toMatch(/51,9 jaar in sep 2026/)
+    expect(screen.queryByTestId('resilience-trend-chart')).toBeNull()
+    expect(screen.queryByTestId('fire-age-trend-chart')).toBeNull()
+  })
+
+  it('Given twee reeksen per maand, When de kassabon opent, Then gezondheidsgetal én vrijheidsleeftijd met de constaterende uitlegregel', async () => {
+    render(
+      <HealthScoreReceipt
+        health={makeHealthV2()}
+        verloop={[
+          verloopPunt('2026-07-31', 58, { fire_age: 53 }),
+          verloopPunt('2026-08-29', 61, { fire_age: 52.4 }),
+          verloopPunt('2026-09-26', 64, { fire_age: 51.9 }),
+        ]}
+      />,
+    )
+    expect(await screen.findByTestId('resilience-trend-chart')).toBeTruthy()
+    expect(screen.getByTestId('fire-age-trend-chart')).toBeTruthy()
+    const uitleg = screen.getByTestId('health-verloop-fire-uitleg').textContent ?? ''
+    expect(uitleg).toMatch(/zoals hij toen berekend werd/)
+    // Merkstem (ADR 0165): geen koop-/verkoopmetafoor.
+    expect(uitleg).not.toMatch(/koop|kocht|verkoop/i)
+    expect(screen.queryByTestId('health-verloop-versiewissel')).toBeNull()
+    expect(screen.queryByTestId('method-change-marker')).toBeNull()
+  })
+
+  it('Given een score_version-overgang, When de kassabon opent, Then gemarkeerd in de grafiek en de lijn breekt daar', async () => {
+    render(
+      <HealthScoreReceipt
+        health={makeHealthV2()}
+        verloop={[
+          verloopPunt('2026-05-31', 70, { score_version: 1 }),
+          verloopPunt('2026-06-30', 72, { score_version: 1 }),
+          verloopPunt('2026-07-31', 58, { score_version: 2 }),
+          verloopPunt('2026-08-29', 61, { score_version: 2 }),
+        ]}
+      />,
+    )
+    const chart = await screen.findByTestId('resilience-trend-chart')
+    expect(screen.getByTestId('method-change-marker')).toBeTruthy()
+    expect(screen.getByTestId('health-verloop-versiewissel').textContent).toMatch(/veranderde in jul 2026/)
+    // Twee lijnstukken: v1 en v2 worden niet met elkaar verbonden.
+    expect(lijnPad(chart).match(/M/g)).toHaveLength(2)
+  })
+
+  it('Given een ontbrekende maand, When de kassabon opent, Then plot op datum: het gat blijft zichtbaar en de lijn breekt', async () => {
+    render(
+      <HealthScoreReceipt
+        health={makeHealthV2()}
+        verloop={[
+          verloopPunt('2026-01-31', 50),
+          verloopPunt('2026-02-28', 52),
+          // maart ontbreekt
+          verloopPunt('2026-04-30', 55),
+          verloopPunt('2026-05-31', 57),
+        ]}
+      />,
+    )
+    const chart = await screen.findByTestId('resilience-trend-chart')
+    const xs = Array.from(chart.querySelectorAll('circle')).map((c) => Number(c.getAttribute('cx')))
+    const stapFebApr = xs[2] - xs[1]
+    const stapJanFeb = xs[1] - xs[0]
+    expect(stapFebApr).toBeGreaterThan(stapJanFeb * 1.8)
+    expect(lijnPad(chart).match(/M/g)).toHaveLength(2)
+  })
+
+  it('Given een engine_bron-wisseling in de FIRE-reeks, When de kassabon opent, Then de "rekenwijze gewijzigd"-regel', async () => {
+    render(
+      <HealthScoreReceipt
+        health={makeHealthV2()}
+        verloop={[
+          verloopPunt('2026-07-31', 58, { fire_age: 53, engine_bron: 'v2' }),
+          verloopPunt('2026-08-29', 61, { fire_age: 51, engine_bron: 'kernel' }),
+        ]}
+      />,
+    )
+    const note = await screen.findByTestId('engine-bron-transition-note')
+    expect(note.textContent).toMatch(/Rekenwijze gewijzigd in aug 2026/)
   })
 })

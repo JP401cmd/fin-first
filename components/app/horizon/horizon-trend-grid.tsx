@@ -54,7 +54,7 @@ export function detectEngineBronTransition(
  * zou UTC-middernacht opleveren en via lokale getters bij negatieve UTC-offsets
  * een dag (en op een maandgrens dus een maand) kunnen verschuiven.
  */
-function formatTransitionDate(dateStr: string): string {
+export function formatTransitionDate(dateStr: string): string {
   const months = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec']
   const [year, month] = dateStr.split('-')
   const monthIdx = Number(month) - 1

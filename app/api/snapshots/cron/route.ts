@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { errorResponse } from '@/lib/api/respond'
 import { getServiceClient } from '@/lib/supabase/service'
 import { computeFireProjection, ageAtDate, type FinancialInput } from '@/lib/horizon-data'
-import { computeHealthScoreFromInputs } from '@/lib/financial-health'
+import { computeHealthScoreFromInputs, HEALTH_SCORE_VERSION } from '@/lib/financial-health'
 import {
   buildHealthScoreInput,
   type HealthScoreAsset,
@@ -531,7 +531,7 @@ export async function GET(request: Request) {
         // Methode-versie van de opgeslagen score (ADR 0010 / FR-7). DEFAULT 1 op
         // de kolom; v2-snapshots schrijven expliciet 2. De basic-fallback-upsert
         // hieronder laat 'm bewust weg (mag terugvallen op de kolom-default).
-        score_version: 2,
+        score_version: HEALTH_SCORE_VERSION,
         // Provenance-parameterset ([Arch F6] #27) — zie POST /api/snapshots. De
         // basic-fallback-upsert hieronder laat 'm bewust weg (kolom nullable).
         params: buildSnapshotParams(fireParams, { stopAnchor: firePlan.anchor.kind }),

@@ -2,6 +2,7 @@
 
 import { useMemo, useId, useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import { Lightbulb, ArrowRight, MessageSquare, ListPlus, Check, Loader2, Receipt } from 'lucide-react'
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import { KassabonShell } from '@/components/app/kassabon-shell'
@@ -10,6 +11,20 @@ import { useChatContext } from '@/components/app/chat/chat-provider'
 import { healthScoreVerdict, type HealthScore, type HealthPillar, type PillarGroup, type HealthScoreOnbekend } from '@/lib/financial-health'
 import { GRONDSLAG_ONBEKEND_LABEL } from '@/lib/grondslag-guard'
 import { Button } from '@/components/editorial'
+import type { HealthVerloopPunt } from '@/lib/health-verloop'
+
+// De verloopgrafieken laden pas als de kassabon open is en er een verloop is
+// meegegeven: ze hangen niet in het chunk van de kassabon zelf. De placeholder
+// houdt ruwweg de hoogte vast, zodat de sheet niet verspringt.
+const HealthScoreVerloop = dynamic(
+  () => import('./health-score-verloop').then((m) => ({ default: m.HealthScoreVerloop })),
+  {
+    ssr: false,
+    loading: () => (
+      <div aria-hidden="true" className="h-40 rounded-[var(--r-sm)] border border-[var(--border-ed)]" />
+    ),
+  },
+)
 
 // ── Pillar-group presentatie-metadata ────────────────────────
 // Vaste volgorde + leesbaar label voor de vier gedragspijlers (ADR 0010).
@@ -522,6 +537,12 @@ function PillarBar({
 
 interface HealthScoreReceiptProps {
   health: HealthScore
+  /**
+   * Maandstanden voor de sectie "Verloop" (laatste 12 kalendermaanden, één per
+   * maand). Optioneel: zonder deze prop verschijnt de sectie niet; een lege
+   * reeks toont de lege staat.
+   */
+  verloop?: readonly HealthVerloopPunt[] | null
   /** Optional: footer content (e.g. backtesting link) */
   footer?: React.ReactNode
 }
@@ -530,6 +551,7 @@ interface HealthScoreReceiptProps {
 
 export function HealthScoreReceipt({
   health,
+  verloop,
   footer,
 }: HealthScoreReceiptProps) {
   // Always use the live computed total from the weighted average of pillars.
@@ -628,6 +650,9 @@ export function HealthScoreReceipt({
           </p>
         </div>
       </KassabonShell>
+
+      {/* Verloop per maand (gezondheidsgetal + vrijheidsleeftijd) — lazy */}
+      {verloop && <HealthScoreVerloop punten={verloop} />}
 
       {/* Radar chart overview — at-a-glance pillar comparison */}
       <div

@@ -146,13 +146,28 @@ function getTimeAnchor(
   return null
 }
 
+/** "sinds vorige maand"-regel bij een al bepaalde delta (hele punten). */
+function sindsVorigeMaandLabel(delta: number): string {
+  if (delta === 0) return 'gelijk aan vorige maand'
+  const eenheid = Math.abs(delta) === 1 ? 'punt' : 'punten'
+  return `${delta > 0 ? '+' : ''}${delta} ${eenheid} sinds vorige maand`
+}
+
 export function HealthScoreCard({
   health,
   onOpenReceipt,
+  sindsVorigeMaand = null,
   simple = false,
 }: {
   health: HealthScore
   onOpenReceipt: () => void
+  /**
+   * Verandering van het gezondheidsgetal t.o.v. de opgeslagen stand van vorige
+   * maand, in hele punten — bepaald door `healthScoreSinceLastMonth`
+   * (lib/health-verloop.ts). `null` = geen vergelijking (geen stand, of een
+   * andere rekenmethode): dan geen regel.
+   */
+  sindsVorigeMaand?: number | null
   /**
    * Eenvoudige weergave (display_mode === 'simple'): toon alleen het getal +
    * de cirkel (enkelvoudige ring op de totaalscore), GEEN per-categorie
@@ -194,14 +209,6 @@ export function HealthScoreCard({
   const ringAriaLabel = useSegmentedRing
     ? subscores.map((s) => `${s.label} ${s.subtotal}`).join(', ') + ' van 100'
     : `Gezondheidsscore ${Math.round(health.total)} van 100`
-
-  const trend = health.trend
-  const trendLabel =
-    trend > 0
-      ? `+${trend.toFixed(0)} punten t.o.v. vorige maand`
-      : trend < 0
-      ? `${trend.toFixed(0)} punten t.o.v. vorige maand`
-      : 'gelijk aan vorige maand'
 
   // Onbekend is geen nul (ADR 0131): zonder inkomen/uitgaven geen cijfer en
   // geen oordeel — één zin en één knop. Géén <button>-wrapper hier: een link
@@ -331,8 +338,10 @@ export function HealthScoreCard({
       <div className={`mt-3 text-sm sm:text-base font-semibold ${style.text}`}>
         {style.label}
       </div>
-      {health.previousMonth !== null && (
-        <div className="text-[11px] text-[var(--ink-3)] mt-1">{trendLabel}</div>
+      {sindsVorigeMaand !== null && (
+        <div className="text-[11px] text-[var(--ink-3)] mt-1" data-testid="health-score-sinds-vorige-maand">
+          {sindsVorigeMaandLabel(sindsVorigeMaand)}
+        </div>
       )}
       {timeAnchor && (
         <div className="text-[11px] text-[var(--ink-3)] mt-0.5 italic">

@@ -22,6 +22,7 @@ import { HealthScoreEmptyState } from './overzicht-hero/empty-states'
 import type { LeverScores } from '@/components/app/shell/lever-scores'
 import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
+import type { HealthVerloopPunt } from '@/lib/health-verloop'
 
 // HealthScoreReceipt (zwaar, ~1011 r) blijft lazy — hij zit alleen in de
 // BottomSheet die pas ná een klik op de Health-card opent, dus buiten het
@@ -63,6 +64,13 @@ type OverzichtHeroPrimaryProps = {
   banners?: ReactNode
   /** Health Score — voedt de status-fallback op de hefboomtegels. Uit horizonData. */
   health: HealthScore | null
+  /**
+   * Maandstanden voor de sectie "Verloop" in de gezondheidskassabon (laatste 12
+   * kalendermaanden). `null` buiten het eigen perspectief: dan geen sectie.
+   */
+  healthVerloop?: readonly HealthVerloopPunt[] | null
+  /** "Sinds vorige maand" op de gezondheidskaart; `null` = geen vergelijking. */
+  healthSindsVorigeMaand?: number | null
   /**
    * Vier-hefbomen-kompas-scores uit `loadLeverScores` (gedeelde SSoT). Voedt de
    * status-dots op de hefboomkaarten, identiek aan de sidebar-dots en de
@@ -111,6 +119,8 @@ export function OverzichtHeroPrimary({
   dateLabel,
   banners,
   health,
+  healthVerloop = null,
+  healthSindsVorigeMaand = null,
   leverScores,
   totals,
   housingSplit = null,
@@ -231,6 +241,7 @@ export function OverzichtHeroPrimary({
           {health ? (
             <HealthScoreCard
               health={health}
+              sindsVorigeMaand={healthSindsVorigeMaand}
               onOpenReceipt={() => setReceiptOpen(true)}
               simple={simple}
             />
@@ -252,7 +263,7 @@ export function OverzichtHeroPrimary({
           title="Financiële gezondheid"
           size="lg"
         >
-          <HealthScoreReceipt health={health} />
+          <HealthScoreReceipt health={health} verloop={healthVerloop} />
         </BottomSheet>
       )}
     </section>

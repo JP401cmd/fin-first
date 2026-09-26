@@ -374,7 +374,9 @@ const SNAPSHOT_WINDOW_ROW_CAP = 400
  *
  * Lezers: `lib/dashboard-data-loader.ts` (`netWorthHistory`, `savingsHistory`,
  * de snapshot-`fire_age`, de net-worth-delta en de spaarquote-delta-tak),
- * `lib/cashflow-kpis.ts#loadForecastSectionData` en de check-in-routes
+ * `lib/cashflow-kpis.ts#loadForecastSectionData`, `app/(app)/overzicht/page.tsx`
+ * (via `lib/health-verloop.ts`: het verloop in de gezondheidskassabon en "sinds
+ * vorige maand" op de gezondheidskaart) en de check-in-routes
  * (`app/api/checkin/overview`, `app/api/checkin/gespreksstarters`).
  *
  * De ondergrens is tijdzone-veilig via `localMonthStartMonthsAgo` (het TZ-lint

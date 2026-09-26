@@ -2,7 +2,7 @@ import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { unauthorized, serverError } from '@/lib/api/respond'
 import { computeFireProjection, ageAtDate, type FinancialInput } from '@/lib/horizon-data'
-import { computeHealthScoreFromInputs } from '@/lib/financial-health'
+import { computeHealthScoreFromInputs, HEALTH_SCORE_VERSION } from '@/lib/financial-health'
 import {
   buildHealthScoreInput,
   type HealthScoreAsset,
@@ -465,7 +465,7 @@ export async function POST() {
     // Methode-versie van de opgeslagen score (ADR 0010 / FR-7). DEFAULT 1 op de
     // kolom; v2-snapshots schrijven expliciet 2 zodat de trendlijn de
     // methodewissel kan markeren bij een mix v1/v2.
-    score_version: 2,
+    score_version: HEALTH_SCORE_VERSION,
     // Provenance-parameterset ([Arch F6] #27): de aannames (SWR/rendement/
     // inflatie/Box 3-drag/belastingjaar/grondslag) die deze afgeleiden
     // produceerden. Engine-onafhankelijk — de basic-fallback-upsert hieronder

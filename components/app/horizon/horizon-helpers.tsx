@@ -10,6 +10,7 @@ import {
 } from '@/lib/horizon-data'
 import { Info, ChevronDown, ExternalLink, Download, Loader2, FileText } from 'lucide-react'
 import { MaskedAmount } from '@/components/app/masked-amount'
+import { detectScoreVersionTransition } from '@/lib/health-verloop'
 
 // ── Shared types ─────────────────────────────────────────────
 
@@ -32,6 +33,88 @@ export type SnapshotForTrend = {
    * leveren 'm niet.
    */
   engine_bron?: string | null
+}
+
+/**
+ * Eén punt in een verloopgrafiek: de velden die de grafieken lezen, zonder
+ * bedragen. `SnapshotForTrend` en `HealthVerloopPunt` (lib/health-verloop.ts)
+ * passen er allebei op.
+ */
+export type TrendPoint = Pick<
+  SnapshotForTrend,
+  'snapshot_date' | 'resilience_score' | 'fire_age' | 'score_version' | 'engine_bron'
+>
+
+// ── Tijdas-helpers voor de verloopgrafieken ──────────────────
+// De grafieken plotten op DATUM, niet op volgnummer: een maand zonder stand
+// blijft zo als gat zichtbaar in plaats van weggeschoven te worden.
+
+/** 'YYYY-MM-DD' → UTC-ms; parseert zelf, dus tijdzone-onafhankelijk. */
+function trendDateMs(dateStr: string): number {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  return Date.UTC(y, (m || 1) - 1, d || 1)
+}
+
+/** 'YYYY-MM-…' → doorlopend maandnummer (jaar × 12 + maand). */
+function trendMonthIndex(dateStr: string): number {
+  const [y, m] = dateStr.split('-').map(Number)
+  return y * 12 + ((m || 1) - 1)
+}
+
+/** x-schaal op de tijdas; één datum (of allemaal gelijk) staat in het midden. */
+function trendTimeScale(dates: readonly string[], x0: number, x1: number): (dateStr: string) => number {
+  const ms = dates.map(trendDateMs)
+  const min = Math.min(...ms)
+  const max = Math.max(...ms)
+  if (!(max > min)) return () => (x0 + x1) / 2
+  return (dateStr) => x0 + ((trendDateMs(dateStr) - min) / (max - min)) * (x1 - x0)
+}
+
+/**
+ * Knip een reeks in lijnstukken: een nieuw stuk begint waar een kalendermaand
+ * ontbreekt, of waar `breakBetween` twee buurpunten onvergelijkbaar noemt.
+ */
+export function splitTrendSegments<T extends { snapshot_date: string }>(
+  points: readonly T[],
+  breakBetween?: (prev: T, next: T) => boolean,
+): T[][] {
+  const segments: T[][] = []
+  for (const p of points) {
+    const current = segments[segments.length - 1]
+    const prev = current?.[current.length - 1]
+    const gap = prev ? trendMonthIndex(p.snapshot_date) - trendMonthIndex(prev.snapshot_date) > 1 : true
+    if (!current || !prev || gap || breakBetween?.(prev, p)) segments.push([p])
+    else current.push(p)
+  }
+  return segments
+}
+
+/** Lijn- en vlakpad per lijnstuk; losse punten krijgen alleen hun stip. */
+function trendPaths<T extends { snapshot_date: string }>(
+  segments: readonly T[][],
+  xAt: (dateStr: string) => number,
+  yOf: (p: T) => number,
+  baseY: number,
+): { linePath: string; areaPath: string } {
+  const line = (seg: readonly T[]) =>
+    seg.map((p, i) => `${i === 0 ? 'M' : 'L'}${xAt(p.snapshot_date).toFixed(1)},${yOf(p).toFixed(1)}`).join(' ')
+  const drawn = segments.filter((seg) => seg.length >= 2)
+  const linePath = drawn.map(line).join(' ')
+  const areaPath = drawn
+    .map(
+      (seg) =>
+        `${line(seg)} L${xAt(seg[seg.length - 1].snapshot_date).toFixed(1)},${baseY.toFixed(1)} L${xAt(seg[0].snapshot_date).toFixed(1)},${baseY.toFixed(1)} Z`,
+    )
+    .join(' ')
+  return { linePath, areaPath }
+}
+
+/** Korte maandnotatie voor de x-as ("sep '26"), tijdzone-onafhankelijk. */
+function formatTrendAxisDate(dateStr: string): string {
+  const months = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec']
+  const [year, month] = dateStr.split('-')
+  const idx = Number(month) - 1
+  return idx >= 0 && idx < 12 ? `${months[idx]} '${year.slice(2)}` : dateStr
 }
 
 export type PensionParseSummaryResult = {
@@ -400,7 +483,7 @@ export function FireAgeContextMessage({ snapshots }: { snapshots: SnapshotForTre
   )
 }
 
-export function ResilienceTrendChart({ snapshots }: { snapshots: SnapshotForTrend[] }) {
+export function ResilienceTrendChart({ snapshots }: { snapshots: readonly TrendPoint[] }) {
   const withScore = snapshots.filter(s => s.resilience_score !== null && s.resilience_score !== undefined)
   if (withScore.length < 2) return null
 
@@ -411,19 +494,21 @@ export function ResilienceTrendChart({ snapshots }: { snapshots: SnapshotForTren
   const maxVal = 100
   const minVal = 0
 
-  function x(i: number) { return PAD + (i / (withScore.length - 1)) * (W - PAD * 2) }
+  // Tijdas: x uit de datum, zodat een ontbrekende maand als gat zichtbaar blijft.
+  const x = trendTimeScale(withScore.map(s => s.snapshot_date), PAD, W - PAD)
   function y(val: number) { return H - PAD - ((val - minVal) / (maxVal - minVal)) * (H - PAD * 2) }
 
-  const linePath = withScore.map((s, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(s.resilience_score as number).toFixed(1)}`).join(' ')
-  const areaPath = linePath + ` L${x(withScore.length - 1).toFixed(1)},${(H - PAD).toFixed(1)} L${PAD},${(H - PAD).toFixed(1)} Z`
-
-  // Methode-wissel-markering: alleen tonen wanneer de reeks zowel v1- als v2-
-  // punten bevat (ADR 0010). We markeren het eerste v2-punt subtiel met een
-  // gestreepte verticale scheiding + klein label "methode aangepast".
-  const firstV2Index = withScore.findIndex(s => s.score_version === 2)
-  const hasV1 = withScore.some(s => s.score_version != null && s.score_version < 2)
-  const showMethodMarker = firstV2Index > 0 && hasV1
-  const markerX = showMethodMarker ? x(firstV2Index) : 0
+  // Methode-wissel (ADR 0010): scores uit verschillende `score_version`s zijn
+  // niet vergelijkbaar. De lijn breekt daar, en het eerste punt in de nieuwe
+  // versie krijgt een gestreepte verticale scheiding + klein label.
+  const methodChangeDate = detectScoreVersionTransition(withScore)
+  const segments = splitTrendSegments(
+    withScore,
+    (prev, next) => prev.score_version != null && next.score_version != null && prev.score_version !== next.score_version,
+  )
+  const { linePath, areaPath } = trendPaths(segments, x, s => y(s.resilience_score as number), H - PAD)
+  const showMethodMarker = methodChangeDate !== null
+  const markerX = methodChangeDate !== null ? x(methodChangeDate) : 0
 
   // Color zones: Kritiek (0-20), Kwetsbaar (20-40), Redelijk (40-60), Sterk (60-80), Uitstekend (80-100)
   const zones = [
@@ -434,12 +519,7 @@ export function ResilienceTrendChart({ snapshots }: { snapshots: SnapshotForTren
     { min: 80, max: 100, color: '#a5f3fc', label: 'Uitstekend' },
   ]
 
-  // Format date label
-  const formatDate = (dateStr: string) => {
-    const d = new Date(dateStr)
-    const months = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec']
-    return `${months[d.getMonth()]} '${String(d.getFullYear()).slice(2)}`
-  }
+  const formatDate = formatTrendAxisDate
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: 220 }} data-testid="resilience-trend-chart">
@@ -511,7 +591,7 @@ export function ResilienceTrendChart({ snapshots }: { snapshots: SnapshotForTren
       {withScore.map((s, i) => (
         <circle
           key={i}
-          cx={x(i)}
+          cx={x(s.snapshot_date)}
           cy={y(s.resilience_score as number)}
           r="4"
           fill="var(--color-horizon-500, #c4a06b)"
@@ -526,7 +606,7 @@ export function ResilienceTrendChart({ snapshots }: { snapshots: SnapshotForTren
         const showEvery = withScore.length <= 6 ? 1 : Math.ceil(withScore.length / 6)
         if (i % showEvery !== 0 && i !== withScore.length - 1) return null
         return (
-          <text key={i} x={x(i)} y={H - 8} textAnchor="middle" className="fill-zinc-400" style={{ fontSize: 9 }}>
+          <text key={i} x={x(s.snapshot_date)} y={H - 8} textAnchor="middle" className="fill-zinc-400" style={{ fontSize: 9 }}>
             {formatDate(s.snapshot_date)}
           </text>
         )
@@ -540,7 +620,7 @@ export function ResilienceTrendChart({ snapshots }: { snapshots: SnapshotForTren
         return (
           <text
             key={`val-${i}`}
-            x={x(i)}
+            x={x(s.snapshot_date)}
             y={y(score) - 10}
             textAnchor="middle"
             className="fill-horizon-700"
@@ -556,7 +636,7 @@ export function ResilienceTrendChart({ snapshots }: { snapshots: SnapshotForTren
 
 // ── FIRE Age Trend Chart ────────────────────────
 
-export function FireAgeTrendChart({ snapshots }: { snapshots: SnapshotForTrend[] }) {
+export function FireAgeTrendChart({ snapshots }: { snapshots: readonly TrendPoint[] }) {
   const withAge = snapshots.filter(s => s.fire_age !== null && s.fire_age !== undefined)
   if (withAge.length < 2) {
     return (
@@ -575,7 +655,8 @@ export function FireAgeTrendChart({ snapshots }: { snapshots: SnapshotForTrend[]
   const maxAge = Math.ceil(Math.max(...ages) + 2)
   const range = maxAge - minAge || 1
 
-  function x(i: number) { return PAD + (i / (withAge.length - 1)) * (W - PAD * 2) }
+  // Tijdas: x uit de datum, zodat een ontbrekende maand als gat zichtbaar blijft.
+  const x = trendTimeScale(withAge.map(s => s.snapshot_date), PAD, W - PAD)
   function y(val: number) { return PAD + ((val - minAge) / range) * (H - PAD * 2) }
 
   // For FIRE age: higher y = older age (top = old = bad, bottom = young = good)
@@ -585,8 +666,12 @@ export function FireAgeTrendChart({ snapshots }: { snapshots: SnapshotForTrend[]
   // Standard: y-axis top = high value. For FIRE age, high = bad, so let's keep it natural
   // The chart shows the fire age value on y-axis, naturally high values at top
 
-  const linePath = withAge.map((s, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(s.fire_age as number).toFixed(1)}`).join(' ')
-  const areaPath = linePath + ` L${x(withAge.length - 1).toFixed(1)},${(H - PAD).toFixed(1)} L${PAD},${(H - PAD).toFixed(1)} Z`
+  const { linePath, areaPath } = trendPaths(
+    splitTrendSegments(withAge),
+    x,
+    s => y(s.fire_age as number),
+    H - PAD,
+  )
 
   // Determine trend: is FIRE age decreasing (good) or increasing (bad)?
   const firstAge = ages[0]
@@ -600,12 +685,7 @@ export function FireAgeTrendChart({ snapshots }: { snapshots: SnapshotForTrend[]
   const tickStep = range / (tickCount - 1)
   const ticks = Array.from({ length: tickCount }, (_, i) => Math.round(minAge + i * tickStep))
 
-  // Format date label
-  const formatDate = (dateStr: string) => {
-    const d = new Date(dateStr)
-    const months = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec']
-    return `${months[d.getMonth()]} '${String(d.getFullYear()).slice(2)}`
-  }
+  const formatDate = formatTrendAxisDate
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: 240 }} data-testid="fire-age-trend-chart">
@@ -647,7 +727,7 @@ export function FireAgeTrendChart({ snapshots }: { snapshots: SnapshotForTrend[]
       {withAge.map((s, i) => (
         <circle
           key={i}
-          cx={x(i)}
+          cx={x(s.snapshot_date)}
           cy={y(s.fire_age as number)}
           r="4"
           fill={lineColor}
@@ -661,7 +741,7 @@ export function FireAgeTrendChart({ snapshots }: { snapshots: SnapshotForTrend[]
         const showEvery = withAge.length <= 6 ? 1 : Math.ceil(withAge.length / 6)
         if (i % showEvery !== 0 && i !== withAge.length - 1) return null
         return (
-          <text key={i} x={x(i)} y={H - 8} textAnchor="middle" className="fill-zinc-400" style={{ fontSize: 9 }}>
+          <text key={i} x={x(s.snapshot_date)} y={H - 8} textAnchor="middle" className="fill-zinc-400" style={{ fontSize: 9 }}>
             {formatDate(s.snapshot_date)}
           </text>
         )
@@ -675,7 +755,7 @@ export function FireAgeTrendChart({ snapshots }: { snapshots: SnapshotForTrend[]
         return (
           <text
             key={`val-${i}`}
-            x={x(i)}
+            x={x(s.snapshot_date)}
             y={y(age) - 10}
             textAnchor="middle"
             className={improving ? 'fill-positive' : 'fill-negative'}

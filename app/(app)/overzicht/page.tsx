@@ -4,7 +4,9 @@ import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { createClient } from '@/lib/supabase/server'
 import { getCachedUser } from '@/lib/supabase/cached-user'
 import { loadHorizonData } from '@/lib/horizon-data-loader'
-import { getOwnProfile } from '@/lib/server-data/base'
+import { getNetWorthSnapshots12m, getOwnProfile } from '@/lib/server-data/base'
+import { deriveHealthVerloop, healthScoreSinceLastMonth } from '@/lib/health-verloop'
+import { healthScoreVerdict } from '@/lib/financial-health'
 import { getTxAgg12m, aggLatestMonth, type TxMonthAggregateRow } from '@/lib/server-data/tx-aggregates'
 import { StaleDataGuard } from '@/components/app/stale-data-guard'
 import { StaleNoticeBanner } from '@/components/app/stale-transactions-notice'
@@ -83,6 +85,7 @@ export default async function OverzichtPage() {
     checkinBannerBase,
     txAgg12Res,
     minimizedMap,
+    snapshots12mRes,
   ] = await Promise.all([
     loadLeverScores(supabase, perspective),
     loadHorizonData(supabase, perspective),
@@ -101,6 +104,11 @@ export default async function OverzichtPage() {
     userId
       ? readMinimizedMap(supabase, userId)
       : Promise.resolve({} as Record<string, unknown>),
+    // Maandstanden (laatste 12 kalendermaanden, één per maand, eigen user_id)
+    // voor het verloop in de gezondheidskassabon en "sinds vorige maand" op de
+    // kaart. `cache()`-gewrapt en in blok 2 óók gelezen door `loadDashboardData`:
+    // dit haalt die query naar voren, er komt er geen bij.
+    getNetWorthSnapshots12m(supabase),
   ])
 
   const userName = (ownProfileRes.data as { full_name?: string | null } | null)?.full_name ?? null
@@ -120,6 +128,18 @@ export default async function OverzichtPage() {
 
   const health = horizonData?.healthScore ?? null
   const freedomPct = horizonData?.healthScoreInput?.freedomPct ?? null
+
+  // Verloop + "sinds vorige maand" — ALLEEN IN HET EIGEN PERSPECTIEF. De
+  // maandstanden zijn persoonlijk (eigen user_id), terwijl `health` in
+  // Huishouden/Partner het perspectief-getal is; die twee vergelijken zou een
+  // verandering tonen die er niet is. Het huidige getal komt uit de canonieke
+  // bron (`horizonData.healthScore`) — geen eigen som.
+  const healthVerloop =
+    perspective === 'personal' ? deriveHealthVerloop(snapshots12mRes.data ?? []) : null
+  const healthSindsVorigeMaand =
+    health && healthVerloop && healthScoreVerdict(health).kind === 'score'
+      ? healthScoreSinceLastMonth({ currentTotal: health.total, verloop: healthVerloop, now: new Date() })
+      : null
 
   // Mini-tijdslijn-strip inputs: huidige leeftijd uit DOB + vrijheidsleeftijd.
   const dob = horizonData?.effectiveInput?.dateOfBirth ?? null
@@ -315,6 +335,8 @@ export default async function OverzichtPage() {
             </>
           }
           health={health}
+          healthVerloop={healthVerloop}
+          healthSindsVorigeMaand={healthSindsVorigeMaand}
           leverScores={leverScoresResult.scores}
           totals={totals}
           housingSplit={housingSplit}

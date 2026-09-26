@@ -141,6 +141,15 @@ export interface HealthScoreInput {
   } | null
 }
 
+/**
+ * Versie van de rekenmethode van de gezondheidsscore (ADR 0010): 1 = de oude
+ * 7-pijler-methode, 2 = de vier gedragspijlers. Snapshot-writers schrijven hem
+ * als `net_worth_snapshots.score_version`; scores uit verschillende versies zijn
+ * niet vergelijkbaar (een ander rekenmodel is geen vooruitgang of achteruitgang).
+ * Verandert de methode, dan gaat dit getal omhoog.
+ */
+export const HEALTH_SCORE_VERSION = 2
+
 // ── Types ────────────────────────────────────────────────────
 
 /** De vier gedragspijler-groepen waarin de 7 indicatoren vallen (ADR 0010). */
