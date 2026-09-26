@@ -71,7 +71,7 @@ describe('overlay-host — "Na pensioen"-panes (WF-REKEN-23-bug4)', () => {
   })
 
   it('de persoonlijke uitgaven-pane bestaat hier niet meer: dat is de rij in Instellingen (ADR 0179 fase 3)', () => {
-    expect(src).not.toMatch(/<UitgavenPane/)
+    expect(src).not.toMatch(/<UitgavenPane\b/)
   })
 })
 
