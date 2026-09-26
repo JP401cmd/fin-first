@@ -37,21 +37,9 @@ import type { PageStatusInfo } from '@/lib/page-status/types'
 import type { MinimizedLevel } from '@/lib/page-status/display'
 import { readMinimizedMap } from '@/lib/page-status/minimized-prefs'
 import {
-  DEFICIT_NOTICE_MINIMIZE_KEY,
-  asDeficitMinimizedPeak,
-} from '@/lib/horizon/deficit-loan-minimize'
-import {
   STALE_TX_NOTICE_MINIMIZE_KEY,
   asStaleMinimizedMonths,
 } from '@/lib/transaction-staleness-minimize'
-import {
-  AOW_NOTICE_MINIMIZE_KEY,
-  asAowMinimizedFlag,
-} from '@/lib/horizon/aow-notice-minimize'
-import {
-  EINDSITUATIE_NOTICE_MINIMIZE_KEY,
-  asEindsituatieMinimizedFlag,
-} from '@/lib/horizon/eindsituatie-notice-minimize'
 
 /** Welke databron(nen) een in-scope route nodig heeft. */
 export type Family = 'lever' | 'cashflow' | 'box2' | 'freedom'
@@ -108,9 +96,8 @@ export function normalizePageStatusRoute(raw: string | null): string | null {
  * GET blijft er `{ info: null }` voor geven — maar de PUT moet ze wel kunnen
  * opslaan, zodat er één schrijfpad voor minimaliseren blijft bestaan.
  *
- * Beide huidige sleutels dragen een GETAL i.p.v. een stoplicht-niveau: de piek
- * van de tekort-lening resp. het aantal maanden achterstand van de
- * "Gegevens verouderd"-melding. De PUT kiest per sleutel de bijbehorende
+ * De huidige sleutel draagt een GETAL i.p.v. een stoplicht-niveau: het aantal
+ * maanden achterstand van de "Gegevens verouderd"-melding. De PUT kiest per sleutel de bijbehorende
  * narrowing-helper; zie `app/api/overzicht/page-status/route.ts`.
  */
 /**
@@ -125,21 +112,17 @@ export function normalizePageStatusRoute(raw: string | null): string | null {
  * zichtbaar, en `__tests__/minimize-key-allowlist.test.ts` pint de pariteit vast.
  */
 export const NUMERIC_MINIMIZE_NARROWERS: ReadonlyMap<string, (value: unknown) => number | null> =
-  new Map([
-    [DEFICIT_NOTICE_MINIMIZE_KEY, asDeficitMinimizedPeak],
-    [STALE_TX_NOTICE_MINIMIZE_KEY, asStaleMinimizedMonths],
-    // TPR-04: de "AOW ontbreekt"-melding op /toekomst — vlag 1, geen escalatie-dimensie.
-    [AOW_NOTICE_MINIMIZE_KEY, asAowMinimizedFlag],
-    // Plan 17 sep (D): de eindsituatie-uitleg op /toekomst — vlag 1, informatief.
-    [EINDSITUATIE_NOTICE_MINIMIZE_KEY, asEindsituatieMinimizedFlag],
-  ])
+  new Map([[STALE_TX_NOTICE_MINIMIZE_KEY, asStaleMinimizedMonths]])
 
-export const EXTRA_MINIMIZE_KEYS: readonly string[] = [
-  DEFICIT_NOTICE_MINIMIZE_KEY,
-  STALE_TX_NOTICE_MINIMIZE_KEY,
-  AOW_NOTICE_MINIMIZE_KEY,
-  EINDSITUATIE_NOTICE_MINIMIZE_KEY,
-]
+/**
+ * De oude /toekomst-meldingsleutels (`/toekomst/tekort-lening`, `/toekomst/aow-ontbreekt`,
+ * `/toekomst/eindsituatie`) stonden hier tot 26 sep. Sinds ADR 0179 D6 minimaliseert het
+ * meldingenslot per katern onder de katern-route (`STOPLICHT_MINIMIZE_KEYS`) en schrijft
+ * niets die sleutels nog; een schrijfbare sleutel zonder schrijver is alleen oppervlak
+ * (security-review 🟢-2, C3 punt 10). De `lib/horizon/*-minimize.ts`-modules blijven
+ * (UAT leest de constanten); oude JSONB-waarden mogen in de pref blijven staan.
+ */
+export const EXTRA_MINIMIZE_KEYS: readonly string[] = [STALE_TX_NOTICE_MINIMIZE_KEY]
 
 /**
  * Pref-only sleutels die een STOPLICHT-niveau dragen ('warn' | 'bad' | 'info'),

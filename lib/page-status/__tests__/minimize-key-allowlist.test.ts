@@ -69,10 +69,17 @@ describe('normalizeMinimizeKey — schrijf-allowlist', () => {
     expect(normalizeMinimizeKey('/overzicht/budget')).toBe('/overzicht/budget')
   })
 
-  it('laat de extra pref-only sleutel door', () => {
-    expect(EXTRA_MINIMIZE_KEYS).toContain(DEFICIT_NOTICE_MINIMIZE_KEY)
-    expect(normalizeMinimizeKey(DEFICIT_NOTICE_MINIMIZE_KEY)).toBe(DEFICIT_NOTICE_MINIMIZE_KEY)
-    expect(normalizeMinimizeKey(`${DEFICIT_NOTICE_MINIMIZE_KEY}/`)).toBe(DEFICIT_NOTICE_MINIMIZE_KEY)
+  it('de drie oude /toekomst-meldingsleutels zijn niet meer schrijfbaar (ADR 0179 D6, security 🟢-2)', () => {
+    // Fase 2 verving de losse notices door het meldingenslot per katern; die minimaliseert
+    // onder de katern-route (STOPLICHT_MINIMIZE_KEYS). Niets schrijft de oude sleutels nog,
+    // dus de allowlist hoort ze ook niet meer door te laten. De *-minimize.ts-modules
+    // blijven bestaan (UAT leest de constanten); bestaande JSONB-waarden mogen blijven staan.
+    for (const oud of [DEFICIT_NOTICE_MINIMIZE_KEY, AOW_NOTICE_MINIMIZE_KEY, EINDSITUATIE_NOTICE_MINIMIZE_KEY]) {
+      expect(EXTRA_MINIMIZE_KEYS, oud).not.toContain(oud)
+      expect(NUMERIC_MINIMIZE_NARROWERS.has(oud), oud).toBe(false)
+      expect(normalizeMinimizeKey(oud), oud).toBeNull()
+      expect(normalizeMinimizeKey(`${oud}/`), oud).toBeNull()
+    }
   })
 
   it('laat de "gegevens verouderd"-sleutel door (B-015)', () => {
@@ -83,19 +90,6 @@ describe('normalizeMinimizeKey — schrijf-allowlist', () => {
     expect(normalizeMinimizeKey(`${STALE_TX_NOTICE_MINIMIZE_KEY}/`)).toBe(
       STALE_TX_NOTICE_MINIMIZE_KEY,
     )
-  })
-
-  it('laat de "AOW ontbreekt"-sleutel door (TPR-04) — en de GET-scope groeit niet mee', () => {
-    expect(EXTRA_MINIMIZE_KEYS).toContain(AOW_NOTICE_MINIMIZE_KEY)
-    expect(normalizeMinimizeKey(AOW_NOTICE_MINIMIZE_KEY)).toBe(AOW_NOTICE_MINIMIZE_KEY)
-    expect(normalizeMinimizeKey(`${AOW_NOTICE_MINIMIZE_KEY}/`)).toBe(AOW_NOTICE_MINIMIZE_KEY)
-    expect(normalizePageStatusRoute(AOW_NOTICE_MINIMIZE_KEY)).toBeNull()
-  })
-
-  it('laat de eindsituatie-sleutel door (plan 17 sep, D) — en de GET-scope groeit niet mee', () => {
-    expect(EXTRA_MINIMIZE_KEYS).toContain(EINDSITUATIE_NOTICE_MINIMIZE_KEY)
-    expect(normalizeMinimizeKey(EINDSITUATIE_NOTICE_MINIMIZE_KEY)).toBe(EINDSITUATIE_NOTICE_MINIMIZE_KEY)
-    expect(normalizePageStatusRoute(EINDSITUATIE_NOTICE_MINIMIZE_KEY)).toBeNull()
   })
 
   it('weigert prototype-sleutels → 400', () => {
@@ -178,7 +172,7 @@ describe('STOPLICHT_MINIMIZE_KEYS — de drie katern-routes van /toekomst (ADR 0
   })
 
   it('numerieke sleutels blijven hun eigen narrower houden', () => {
-    expect(narrowMinimizeValue(DEFICIT_NOTICE_MINIMIZE_KEY, 'warn')).toBeNull()
+    expect(narrowMinimizeValue(STALE_TX_NOTICE_MINIMIZE_KEY, 'warn')).toBeNull()
     expect(narrowMinimizeValue('/overzicht/budget', 'warn')).toBe('warn')
     expect(narrowMinimizeValue('/overzicht/budget', 5)).toBeNull()
   })
