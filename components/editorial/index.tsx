@@ -47,6 +47,9 @@ export type { TapTargetProps, TapTargetHit } from './tap-target'
 // Re-export SubtotalLine (gedeeld "excl. eigen woning"-subtotaal; raakt privacy-context)
 export { SubtotalLine } from './subtotal-line'
 export type { SubtotalLineProps } from './subtotal-line'
+// Re-export KaternKoppen (navigatie tussen katernen van één pagina; ADR 0179 D6)
+export { KaternKoppen } from './katern-koppen'
+export type { KaternKoppenProps, KaternKopItem, KaternKopStatus } from './katern-koppen'
 
 const PLAYFAIR = 'var(--font-playfair, Georgia, serif)'
 const SOURCE_SERIF = 'var(--font-source-serif, Georgia, serif)'

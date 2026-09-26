@@ -1,0 +1,55 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen } from '@testing-library/react'
+import { DisplayModeProvider, type DisplayMode } from '@/lib/hooks/use-display-mode'
+import { aannamesRegelTekst, type AannamesInput } from '@/lib/horizon/katern-copy'
+import { Aannamesregel } from './aannamesregel'
+
+beforeEach(() => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }))
+})
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
+
+const INPUT: AannamesInput = { stop: null, eindleeftijd: 90, inflatiePct: 2, rendementPct: 5, gebeurtenissen: 3 }
+
+function renderRegel(mode: DisplayMode, input: AannamesInput = INPUT) {
+  return render(
+    <DisplayModeProvider initialMode={mode}>
+      <Aannamesregel aannames={input} instellingenHref="/toekomst/instellingen" />
+    </DisplayModeProvider>,
+  )
+}
+
+/** De zichtbare regel zonder de link, met genormaliseerde witruimte. */
+function regelTekst(): string {
+  const p = screen.getByTestId('aannamesregel')
+  return (p.firstElementChild?.textContent ?? '').replace(/\s+/g, ' ').trim()
+}
+
+describe('Aannamesregel', () => {
+  it('Volledig: de hele regel uit katern-copy', () => {
+    renderRegel('full')
+    expect(regelTekst()).toBe(aannamesRegelTekst(INPUT, 'volledig'))
+  })
+
+  it('Eenvoudig: zonder inflatie en rendement', () => {
+    renderRegel('simple')
+    expect(regelTekst()).toBe(aannamesRegelTekst(INPUT, 'eenvoudig'))
+    expect(regelTekst()).not.toContain('inflatie')
+    expect(regelTekst()).not.toContain('rendement')
+  })
+
+  it('vast anker: stopmoment 60', () => {
+    renderRegel('full', { ...INPUT, stop: { kind: 'age', stopAge: 60 } })
+    expect(regelTekst()).toContain('stopmoment 60')
+  })
+
+  it('één link, "Naar instellingen", naar de meegegeven href', () => {
+    renderRegel('simple')
+    const link = screen.getByRole('link', { name: /Naar instellingen/ })
+    expect(link.getAttribute('href')).toBe('/toekomst/instellingen')
+    expect(link.className).toContain('min-h-[44px]')
+    expect(screen.getAllByRole('link')).toHaveLength(1)
+  })
+})
