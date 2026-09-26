@@ -8,7 +8,7 @@
  * referentie-zijde wordt hier opgebouwd (gemeten CBS-cijfers + gemodelleerde peer).
  */
 
-import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { calculateFreedomTime, formatDecimal, formatFreedomTimeString } from '@/lib/format'
 import { CAPTION_AMOUNT_TOKEN } from '@/lib/benchmark-report-data'
 import { isUnknownBasis, savingsRateBasisPhrase, type ResolvedBasis } from '@/lib/budget-basis'
 import type {
@@ -196,7 +196,7 @@ function buildFireAgeMetric(userValue: number | null, ref: number | null, anchor
     const d = userValue - ref // negatief = eerder vrij = beter
     const yrs = Math.abs(d)
     const label = yrs < 0.5 ? 'rond dezelfde leeftijd' :
-      `${yrs.toFixed(yrs < 10 ? 1 : 0)} jaar ${d < 0 ? 'eerder' : 'later'}`
+      `${formatDecimal(yrs, yrs < 10 ? 1 : 0)} jaar ${d < 0 ? 'eerder' : 'later'}`
     caption = yrs < 0.5
       ? 'Je wordt rond dezelfde leeftijd vrij als de doelgroep.'
       : `Je wordt ${label} vrij dan een typische peer.`

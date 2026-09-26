@@ -213,20 +213,20 @@ describe('GebeurtenissenView — event-impact-badge (plan F-5)', () => {
 
   it('toont impact-badge per event wanneer annualSavings > 0', () => {
     renderView({ events: [flatEvent({ one_time_cost: 12000 })], annualSavings: 12000 })
-    // 12000 / 12000 = 1.0 jaar kost → "→ 1.0 jaar later vrij"
+    // 12000 / 12000 = 1,0 jaar kost → "→ 1,0 jaar later vrij" (nl-NL-komma)
     expect(
       screen.getByText(
         computeEventImpact({ ...flatEvent({ one_time_cost: 12000 }) }, 12000).displayLabel,
       ),
     ).toBeTruthy()
-    expect(screen.getByText(/1\.0 jaar later vrij/)).toBeTruthy()
+    expect(screen.getByText(/1,0 jaar later vrij/)).toBeTruthy()
   })
 
   it('tekst de badge als richting, niet als saldo (bug C2)', () => {
     // Een event dat geld oplevert mag geen "−" vóór "vrijheid" krijgen:
     // het schuift de vrijheidsdatum naar voren.
     renderView({ events: [flatEvent({ one_time_cost: -50000 })], annualSavings: 12000 })
-    expect(screen.getByText(/4\.2 jaar eerder vrij/)).toBeTruthy()
+    expect(screen.getByText(/4,2 jaar eerder vrij/)).toBeTruthy()
     expect(screen.queryByText(/jaar vrijheid|mnd vrijheid/i)).toBeNull()
   })
 

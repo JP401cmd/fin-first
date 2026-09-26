@@ -27,14 +27,14 @@ describe('computeEventImpact — basis', () => {
 })
 
 describe('computeEventImpact — kosten (positieve impact)', () => {
-  it('eenmalige €12.000 op €12k/jaar = 1.0 jaar later vrij', () => {
+  it('eenmalige €12.000 op €12k/jaar = 1,0 jaar later vrij (nl-NL-komma)', () => {
     const result = computeEventImpact(
       { ...baseEvent, one_time_cost: 12000 },
       12000,
     )
     expect(result.yearsImpact).toBeCloseTo(1.0)
     expect(result.tone).toBe('cost')
-    expect(result.displayLabel).toBe('→ 1.0 jaar later vrij')
+    expect(result.displayLabel).toBe('→ 1,0 jaar later vrij')
   })
 
   it('€6.000 eenmalig op €12k/jaar = 6 mnd later vrij', () => {
@@ -58,14 +58,14 @@ describe('computeEventImpact — kosten (positieve impact)', () => {
 })
 
 describe('computeEventImpact — opbrengsten (negatieve impact)', () => {
-  it('erfenis €50.000 op €12k/jaar = 4.2 jaar eerder vrij', () => {
+  it('erfenis €50.000 op €12k/jaar = 4,2 jaar eerder vrij (nl-NL-komma)', () => {
     const result = computeEventImpact(
       { ...baseEvent, one_time_cost: -50000 },
       12000,
     )
     expect(result.yearsImpact).toBeCloseTo(-4.2, 1)
     expect(result.tone).toBe('gain')
-    expect(result.displayLabel).toBe('→ 4.2 jaar eerder vrij')
+    expect(result.displayLabel).toBe('→ 4,2 jaar eerder vrij')
   })
 
   it('positieve monthly_income_change verlaagt netCost', () => {

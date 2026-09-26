@@ -24,6 +24,7 @@
  * proxy zodat permanente delta's niet "oneindig" worden. Dit is een
  * heuristic — de horizon-engine berekent het exact.
  */
+import { formatDecimal } from '@/lib/format'
 
 const PERMANENT_PROXY_MONTHS = 60
 
@@ -82,7 +83,8 @@ export function computeEventImpact(
     const monthsLabel = Math.round(absYears * 12)
     displayLabel = `→ ${monthsLabel} mnd ${direction}`
   } else {
-    displayLabel = `→ ${absYears.toFixed(1)} jaar ${direction}`
+    // nl-NL: komma als decimaalteken ("2,2 jaar"), niet toFixed's punt.
+    displayLabel = `→ ${formatDecimal(absYears, 1)} jaar ${direction}`
   }
   return {
     netCostEUR,
