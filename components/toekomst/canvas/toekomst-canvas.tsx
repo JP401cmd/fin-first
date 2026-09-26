@@ -2,37 +2,50 @@
 // euro-view: ontvangt view*-feeds van de render-grens, deflateert niet zelf
 
 /**
- * Het canvas van /toekomst (ADR 0179 D1/D3, fase 1 stap 15): de grafiekkaart die de
+ * Het canvas van /toekomst (ADR 0179 D1/D3/D5): de grafiekkaart die de
  * `(katern)`-layout boven de katern-koppen rendert en die bij een katernwissel
  * gemonteerd blijft (GW1).
  *
- * Verplaatst uit de compositie van `components/app/horizon/horizon-client.tsx`
- * (@ ec883d283, `HorizonCompositie`): de kaart `horizon-hero` met de canvas-bladeren
- * (pills, uitleg, grafiek, legenda). Nieuw is alleen de kopregel: de vervallen
- * kicker-kop gaf het perspectief-label en de Tips-toggle af aan de Details-rij
- * (kaart V11, GW6).
+ * Fase 2 (stroom W1):
+ * - Boven de grafiek hoogstens vijf interactieve elementen (spec §4.2 regel 7): de
+ *   modus-switch Vermogen · Samenstelling · Geldstroom, Lagen, de canvas-i ("Zo werkt
+ *   je grafiek", met de tips-schakelaar erin), Details en de zoom op de grafiek. De
+ *   tien pills en de `ChartOverlayExplainer`-blokken zijn vervallen.
+ * - Per katern (spec §4.5) via `useActiefKatern()` + `canvasStand`: de keuze van de
+ *   gebruiker (modus, lagen) blijft staan; een katern voegt alleen vaste lagen toe of
+ *   beperkt wat er kan. Alle filtering gebeurt op feeds die al over de euro-grens zijn.
+ * - Onder het canvas: de Marktcheck-getallen (uit dezelfde marktcheck-run), de
+ *   legenda (alleen bij twee of meer reeksen), en in Plan de aannamesregel met de link
+ *   naar Instellingen (D5); in Doelen buiten Vermogen de regel dat Samenstelling en
+ *   Geldstroom het plan volgen.
  *
- * Fase 1 = hetzelfde canvas op elk katern (besluit Q4); de katern-afhankelijke stand
- * (vaste lagen, compact) volgt in fase 2 via een katern-context uit de layout. Dit
- * component leest de route dus niet (D8).
- *
- * Lokale UI-state die alleen het canvas leest: de uitklap van Inkomen & Uitgaven en de
- * nadruk van een gehoverde tips-ballon.
+ * Katern-componenten lezen de route niet (D8); het canvas krijgt het katern uit de
+ * layout-laag (`components/toekomst/layout/actief-katern.tsx`).
  */
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
 import type { OverlayBalloonDef } from '@/components/app/horizon/toekomst-overlay'
 import { TOEKOMST_OVERLAY_BALLOONS } from '@/components/app/horizon/toekomst-overlay-balloons'
-import type { OverlayEmphasis } from '@/components/toekomst/state/types'
-import { PlanHeroKop } from '@/components/toekomst/plan/plan-hero-kop'
+import { ChartTips } from '@/components/editorial/chart-tips'
+import { getFireProjectionTips, getIncomeExpenseTips, getWealthCompositionTips } from '@/lib/chart-tips'
+import type { GeldstroomSub } from '@/lib/horizon/katern-copy'
+import type { IeViewMode, OverlayEmphasis } from '@/components/toekomst/state/types'
+import { useActiefKatern } from '@/components/toekomst/layout/actief-katern'
+import { KATERN_HREF } from '@/components/toekomst/layout/katern-routes'
+import { CanvasKop } from '@/components/toekomst/canvas/canvas-kop'
 import { CanvasTipsToggle } from '@/components/toekomst/canvas/canvas-tips-toggle'
-import { CanvasPills } from '@/components/toekomst/canvas/canvas-pills'
+import { ModusSwitch } from '@/components/toekomst/canvas/modus-switch'
+import { LagenMenu } from '@/components/toekomst/canvas/lagen-menu'
 import { CanvasUitleg } from '@/components/toekomst/canvas/canvas-uitleg'
 import { CanvasGrafiek } from '@/components/toekomst/canvas/canvas-grafiek'
 import { CanvasLegenda } from '@/components/toekomst/canvas/canvas-legenda'
+import { MarktcheckGetallen } from '@/components/toekomst/canvas/marktcheck-getallen'
+import { Aannamesregel } from '@/components/toekomst/canvas/aannamesregel'
+import { aantalReeksen, canvasStand } from '@/components/toekomst/canvas/canvas-stand'
+import { CANVAS_UITLEG_TITEL, DOELEN_VOLGT_PLAN_REGEL } from '@/components/toekomst/canvas/canvas-kopij-voorlopig'
 import {
   useToekomstPerspectiefContext,
   useToekomstOverlayContext,
@@ -41,6 +54,9 @@ import {
   useToekomstLagenContext,
   useToekomstEuroContext,
 } from '@/components/toekomst/state/toekomst-state-provider'
+
+/** Naam van de doelscenario-lijn in de scenario-overlays (`use-toekomst-scenario.ts`). */
+const DOELSCENARIO_OVERLAY = 'wat-als'
 
 export function ToekomstCanvas() {
   const {
@@ -64,13 +80,8 @@ export function ToekomstCanvas() {
     setSelectedYearAge,
   } = useToekomstOverlayContext()
   const {
-    showScenarioLine,
-    setShowScenarioLine,
-    hasScenario,
-    doelLijnLabel,
     hasDoelLijn,
     labZone,
-    scenarioFireDeltaLabel,
     nalatenschapMarker,
   } = useToekomstScenarioContext()
   const {
@@ -101,38 +112,26 @@ export function ToekomstCanvas() {
     liquidWealthPoints,
   } = useToekomstSimContext()
   const {
-    scenariosExpanded,
-    setScenariosExpanded,
     scenarioData,
-    mcExpanded,
-    setMcExpanded,
     mcData,
     mcPending,
     mcFailed,
     ieViewMode,
     setIeViewMode,
-    chartMode,
-    setChartMode,
+    canvasModus,
+    setCanvasModus,
+    canvasLagenKeuze,
+    toggleLaag,
+    bouwChartEventOverlay,
+    bouwEventsForTimeline,
     lifelineAge,
     setLifelineAge,
-    isPlaying,
-    setIsPlaying,
-    showNaturalMilestones,
-    showLifeEvents,
-    showGoals,
-    showLiquidLine,
     overlayPrefRestored,
     persistOverlayVisible,
     handleOverlayExit,
-    persistNaturalMilestones,
-    persistLifeEvents,
-    persistGoals,
-    persistLiquidLine,
     overlayVisible,
     naturalMilestones,
-    eventsForTimeline,
     goalChartMarkers,
-    chartEventOverlay,
     handleChartEventClick,
     handleChartClusterOpen,
     handleChartEventDragMove,
@@ -141,7 +140,6 @@ export function ToekomstCanvas() {
     effectiveChartPrimaryBasis,
     secondaryLineVisible,
     mcMarge,
-    monteCarloOverlay,
     handleEventDragEnd,
   } = useToekomstLagenContext()
   const {
@@ -162,37 +160,146 @@ export function ToekomstCanvas() {
   } = useToekomstEuroContext()
   const { masked } = useMaskedAmounts()
   const router = useRouter()
+  const katern = useActiefKatern()
 
-  const [incomeExpenseExpanded, setIncomeExpenseExpanded] = useState(false)
   // overlayEmphasis: welke grafiekfase een gehoverde/gefocuste ballon accentueert.
   const [overlayEmphasis, setOverlayEmphasis] = useState<OverlayEmphasis>(null)
 
+  // ── De stand van het canvas in dit katern (spec §4.5) ──
+  const heeftDoelen = goalChartMarkers.length > 0
+  const stand = useMemo(
+    () =>
+      canvasStand(
+        katern,
+        { modus: canvasModus, lagen: canvasLagenKeuze },
+        { doelen: heeftDoelen, doelscenario: hasDoelLijn, metHuis: dualBasisAvailable },
+      ),
+    [katern, canvasModus, canvasLagenKeuze, heeftDoelen, hasDoelLijn, dualBasisAvailable],
+  )
+  const { gebeurtenissen, mijlpalen, doelen, doelscenario, marktcheck, rendementScenarios, metHuis } = stand.lagen
+
+  // Markers en tijdlijn volgen de lagen van dít katern (vaste lagen erbij), zonder de
+  // keuze van de gebruiker te overschrijven.
+  const chartEventOverlay = useMemo(
+    () => bouwChartEventOverlay({ gebeurtenissen, mijlpalen, doelen }),
+    [bouwChartEventOverlay, gebeurtenissen, mijlpalen, doelen],
+  )
+  const eventsForTimeline = useMemo(
+    () => bouwEventsForTimeline({ gebeurtenissen, mijlpalen }),
+    [bouwEventsForTimeline, gebeurtenissen, mijlpalen],
+  )
+  // Lijnen: de doelscenario-lijn en de rendementsvarianten volgen hun laag. Filtert
+  // een feed die al over de euro-grens is (`view*`); geen tweede omzetting.
+  const zichtbareScenarioOverlays = useMemo(
+    () =>
+      viewCombinedScenarioOverlays.filter((o) =>
+        o.name === DOELSCENARIO_OVERLAY ? doelscenario : rendementScenarios,
+      ),
+    [viewCombinedScenarioOverlays, doelscenario, rendementScenarios],
+  )
+  const zichtbareMonteCarlo = marktcheck ? viewMonteCarloOverlay : undefined
+  const tweedeLijnZichtbaar = secondaryLineVisible && metHuis
+
+  // Geldstroom in Eenvoudig: alleen Lijnen (spec §4.7). De modus-switch verbergt
+  // Bronnen al via HideInSimple; hier bewaakt de host de waarde, zodat een keuze uit
+  // Volledig niet als Bronnen doorwerkt. De keuze zelf blijft staan.
+  const eenvoudig = displayMode === 'simple'
+  const ieWeergave: IeViewMode = eenvoudig ? 'lines' : ieViewMode
+  const geldstroomSub: GeldstroomSub = ieWeergave === 'breakdown' ? 'bronnen' : 'lijnen'
+
+  const reeksen = aantalReeksen({
+    doelscenario,
+    marktcheck,
+    rendementScenarios,
+    metHuis: tweedeLijnZichtbaar,
+  })
+
   // ── Ballon-definities — puur informatieve uitleg bij de grafiek ──
-  // De drie fase-bubbels (Opbouw / Financiële vrijheid / Afbouw) komen uit de
-  // module-level constante TOEKOMST_OVERLAY_BALLOONS, zodat de regressietest ze kan
-  // vastpinnen. Geen eigen rekenlogica/bedragen; de gewogen layout +
-  // emphasis-koppeling zit in ToekomstOverlay.
   const toekomstOverlayBalloons: OverlayBalloonDef[] = TOEKOMST_OVERLAY_BALLOONS
 
+  // "Zo werkt je grafiek" per modus; de tips-ballonnen bestaan alleen in Vermogen.
+  const uitlegTips = simResult
+    ? stand.modus === 'vermogen'
+      ? getFireProjectionTips({
+          fireAge: simResult.fireAge,
+          aowAge: userAowAge.fractional,
+          currentAge: currentAge ?? 30,
+          hasMonteCarlo: !!zichtbareMonteCarlo,
+          hasBaseline: false,
+          planningMode,
+          // ADR 0129 — onder een vast anker noemt de spotlight het stopmoment.
+          stopAnchorFixed: isFixedAnchorMode,
+          stopAge: simResult.vastStopLeeftijd ?? null,
+        })
+      : stand.modus === 'samenstelling'
+        ? getWealthCompositionTips({
+            fireAge: simResult.fireAge,
+            aowAge: userAowAge.fractional,
+            currentAge: currentAge ?? 30,
+          })
+        : getIncomeExpenseTips({
+            fireAge: simResult.fireAge,
+            aowAge: userAowAge.fractional,
+            viewMode: ieWeergave,
+          })
+    : []
+
   return (
-    <section data-testid="horizon-hero" className={`card-editorial overflow-hidden ${overlayVisible && chartMode === 'vermogenspad' ? 'no-hover-lift' : ''}`}>
+    <section
+      data-testid="horizon-hero"
+      data-katern={katern}
+      className={`card-editorial overflow-hidden ${stand.alleenDesktop ? 'hidden lg:block' : ''} ${overlayVisible && stand.modus === 'vermogen' ? 'no-hover-lift' : ''}`}
+    >
       {/* Module-active accent (Horizon-500 op /toekomst/**) */}
       <div className="h-1.5" style={{ background: 'var(--module-active-500)' }} />
 
       <div className="p-4 sm:p-6 md:p-8">
-        <PlanHeroKop
+        <CanvasKop
           hasPerspectiveHero={hasPerspectiveHero}
           isPartnerView={isPartnerView}
           perspectiveHero={perspectiveHero}
           simResult={simResult}
           setSimModalOpen={setSimModalOpen}
           kicker={<PerspectiveContextLabel />}
+          modus={
+            simResult && stand.toonModusSwitch ? (
+              <ModusSwitch
+                value={stand.modus}
+                onChange={setCanvasModus}
+                sub={geldstroomSub}
+                onSubChange={(s) => setIeViewMode(s === 'bronnen' ? 'breakdown' : 'lines')}
+                modi={stand.modi}
+              />
+            ) : null
+          }
           acties={
-            <CanvasTipsToggle
-              overlayVisible={overlayVisible}
-              handleOverlayExit={handleOverlayExit}
-              persistOverlayVisible={persistOverlayVisible}
-            />
+            simResult ? (
+              <>
+                {stand.toonLagenKnop && (
+                  <LagenMenu
+                    lagen={stand.lagen}
+                    vast={stand.vast}
+                    beschikbaar={stand.beschikbaar}
+                    onToggle={toggleLaag}
+                  />
+                )}
+                <ChartTips
+                  storageKey="horizon_main_chart"
+                  title={CANVAS_UITLEG_TITEL}
+                  tips={uitlegTips}
+                  align="right"
+                  footer={
+                    stand.modus === 'vermogen' ? (
+                      <CanvasTipsToggle
+                        overlayVisible={overlayVisible}
+                        handleOverlayExit={handleOverlayExit}
+                        persistOverlayVisible={persistOverlayVisible}
+                      />
+                    ) : undefined
+                  }
+                />
+              </>
+            ) : null
           }
         />
 
@@ -200,69 +307,16 @@ export function ToekomstCanvas() {
             WidgetEmpty-lege-staat was onbereikbaar — fase 1 stap 1). */}
         {simResult ? (
           <>
-            <CanvasPills
-              chartMode={chartMode}
-              scenariosExpanded={scenariosExpanded}
-              setScenariosExpanded={setScenariosExpanded}
-              scenarioData={scenarioData}
-              mcExpanded={mcExpanded}
-              setMcExpanded={setMcExpanded}
-              mcMarge={mcMarge}
-              mcFailed={mcFailed}
-              mcPending={mcPending}
-              hasDoelLijn={hasDoelLijn}
-              showScenarioLine={showScenarioLine}
-              setShowScenarioLine={setShowScenarioLine}
-              doelLijnLabel={doelLijnLabel}
-              hasScenario={hasScenario}
-              scenarioFireDeltaLabel={scenarioFireDeltaLabel}
-              scenarioPending={scenarioPending}
-              stopPadPending={stopPadPending}
-              dualBasisAvailable={dualBasisAvailable}
-              effectiveChartPrimaryBasis={effectiveChartPrimaryBasis}
-              showLiquidLine={showLiquidLine}
-              persistLiquidLine={persistLiquidLine}
-              showLifeEvents={showLifeEvents}
-              persistLifeEvents={persistLifeEvents}
-              events={events}
-              goalChartMarkers={goalChartMarkers}
-              showGoals={showGoals}
-              persistGoals={persistGoals}
-              showNaturalMilestones={showNaturalMilestones}
-              persistNaturalMilestones={persistNaturalMilestones}
-              naturalMilestones={naturalMilestones}
-              isPlaying={isPlaying}
-              setIsPlaying={setIsPlaying}
-              setChartMode={setChartMode}
-              simResult={simResult}
-              userAowAge={userAowAge}
-              currentAge={currentAge}
-              monteCarloOverlay={monteCarloOverlay}
-              planningMode={planningMode}
-              isFixedAnchorMode={isFixedAnchorMode}
-            />
-
-            <CanvasUitleg
-              scenariosExpanded={scenariosExpanded}
-              scenarioData={scenarioData}
-              mcExpanded={mcExpanded}
-              mcData={mcData}
-              mcMarge={mcMarge}
-              mcFailed={mcFailed}
-              liquidWealthPoints={liquidWealthPoints}
-              chartMode={chartMode}
-              secondaryLineVisible={secondaryLineVisible}
-              effectiveChartPrimaryBasis={effectiveChartPrimaryBasis}
-              viewReadoutData={viewReadoutData}
-              lifelineAge={lifelineAge}
-            />
+            {!stand.alleenDesktop && (
+              <CanvasUitleg modus={stand.modus} viewReadoutData={viewReadoutData} lifelineAge={lifelineAge} />
+            )}
 
             <CanvasGrafiek
               currentAge={currentAge}
               chartEndAge={chartEndAge}
               projectiePending={projectiePending}
               overlayVisible={overlayVisible}
-              chartMode={chartMode}
+              modus={stand.modus}
               overlayPrefRestored={overlayPrefRestored}
               setOverlayEmphasis={setOverlayEmphasis}
               toekomstOverlayBalloons={toekomstOverlayBalloons}
@@ -296,14 +350,14 @@ export function ToekomstCanvas() {
               dualBasisAvailable={dualBasisAvailable}
               viewLiquidWealthPoints={viewLiquidWealthPoints}
               effectiveChartPrimaryBasis={effectiveChartPrimaryBasis}
-              secondaryLineVisible={secondaryLineVisible}
+              secondaryLineVisible={tweedeLijnZichtbaar}
               partnerName={partnerName}
-              viewCombinedScenarioOverlays={viewCombinedScenarioOverlays}
+              viewCombinedScenarioOverlays={zichtbareScenarioOverlays}
               labZone={labZone}
               nalatenschapMarker={nalatenschapMarker}
               scenarioPending={scenarioPending}
               stopPadPending={stopPadPending}
-              viewMonteCarloOverlay={viewMonteCarloOverlay}
+              viewMonteCarloOverlay={zichtbareMonteCarlo}
               canonicalDailyRate={canonicalDailyRate}
               viewHouseholdOverlays={viewHouseholdOverlays}
               userAowAge={userAowAge}
@@ -318,10 +372,7 @@ export function ToekomstCanvas() {
               kernelHousingSale={kernelHousingSale}
               homeExcludedFromProgress={homeExcludedFromProgress}
               setSelectedYearAge={setSelectedYearAge}
-              incomeExpenseExpanded={incomeExpenseExpanded}
-              setIncomeExpenseExpanded={setIncomeExpenseExpanded}
-              ieViewMode={ieViewMode}
-              setIeViewMode={setIeViewMode}
+              ieViewMode={ieWeergave}
               viewIeBreakdownResult={viewIeBreakdownResult}
               eventsForTimeline={eventsForTimeline}
               setClusterSheet={setClusterSheet}
@@ -334,22 +385,54 @@ export function ToekomstCanvas() {
               eventStopAge={eventStopAge}
               isPensioenMode={isPensioenMode}
               setActiveFaseModal={setActiveFaseModal}
+              toonFasebalk={stand.toonFasebalk}
             />
 
-            <CanvasLegenda
-              scenariosExpanded={scenariosExpanded}
-              scenarioData={scenarioData}
-              fireParams={fireParams}
-              setActiveModal={setActiveModal}
-              mcExpanded={mcExpanded}
-              mcData={mcData}
-              mcMarge={mcMarge}
-              liquidWealthPoints={liquidWealthPoints}
-              simResult={simResult}
-              setSimModalOpen={setSimModalOpen}
-              isFixedAnchorMode={isFixedAnchorMode}
-              ankerStop={ankerStop}
-            />
+            {/* Drie vrijheidsleeftijden onder de Marktcheck-band (spec §7.6), uit
+                dezelfde marktcheck-run; onder een vast anker levert de kern `null`. */}
+            {stand.modus === 'vermogen' && marktcheck && mcData && (
+              <MarktcheckGetallen leeftijden={mcData.vrijheidsleeftijden} className="mt-2" />
+            )}
+
+            {stand.toonLegenda && stand.modus === 'vermogen' && (
+              <CanvasLegenda
+                aantalReeksen={reeksen}
+                rendementScenarios={rendementScenarios}
+                scenarioData={scenarioData}
+                fireParams={fireParams}
+                setActiveModal={setActiveModal}
+                marktcheck={marktcheck}
+                mcData={mcData}
+                mcMarge={mcMarge}
+                mcPending={mcPending}
+                mcFailed={mcFailed}
+                liquidWealthPoints={liquidWealthPoints}
+              />
+            )}
+
+            {stand.toonPlanVolgtRegel && (
+              <p className="mt-3 font-serif text-[12px] italic text-[var(--ink-3)]" data-testid="doelen-volgt-plan">
+                {DOELEN_VOLGT_PLAN_REGEL}
+              </p>
+            )}
+
+            {/* Waar de grafiek op rust, alleen in Plan (D5). Vervangt de voetnoot en
+                de hint "Stopmoment wijzigen" (spec §7.3). */}
+            {stand.toonAannamesregel && (
+              <Aannamesregel
+                className="mt-3"
+                instellingenHref={KATERN_HREF.instellingen}
+                aannames={{
+                  stop: isFixedAnchorMode ? ankerStop : null,
+                  eindleeftijd: simResult.displayEndAge,
+                  // Weergave in procenten; de fracties komen uit dezelfde fireParams
+                  // waarop de projectie rekent.
+                  inflatiePct: fireParams.inflationRate * 100,
+                  rendementPct: fireParams.grossReturn * 100,
+                  gebeurtenissen: events.length,
+                }}
+              />
+            )}
           </>
         ) : null}
       </div>

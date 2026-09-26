@@ -2,143 +2,131 @@
 'use client'
 
 /**
- * Onder de grafiek (blok N): legenda Scenario's/Marktcheck, de voetnoot met de
- * knop naar de jaar-op-jaar-tabel (M9) en de strategie-hint. Toont percentages
- * en aantallen, geen bedragen; rekent niets.
+ * Onder de grafiek (blok N): de legenda-regels van de extra reeksen die het canvas
+ * zelf aanzet — Rendement hoger en lager, en de Marktcheck. De hoofdlijn, de
+ * doelscenario-lijn en de lijn met je huis legendeert `SimChart` zelf.
+ *
+ * Fase 2 (ADR 0179, spec §4.9):
+ * - Een legenda staat er alleen bij twee of meer reeksen (`toonLegendaBij`); markers
+ *   zijn geen reeks en krijgen geen legenda-item (ze hebben labels en tooltips).
+ * - Het jargon "p25–p75" verhuisde naar de uitleg in het Lagen-menu; de band heet hier
+ *   gewoon Marktcheck.
+ * - De voetnoot (strategie · eindleeftijd · knop naar de jaartabel) en de
+ *   stopmoment-hint eronder vervallen: de aannamesregel onder het canvas en de
+ *   Details-knop in de canvaskop nemen ze over (spec §7.3).
+ *
+ * Toont percentages en aantallen, geen bedragen; rekent niets.
  */
 
 import type { Dispatch, SetStateAction } from 'react'
 import { margeAnkerKort, margeLegenda, margeZin } from '@/lib/horizon/marktcheck-copy'
 import type { MarktcheckOutcome } from '@/lib/horizon-kernel/marktcheck'
 import type { RendementMarge } from '@/lib/horizon-kernel/rendement-marge'
-import type { SimResult } from '@/lib/fire-simulation'
 import type { FireParams } from '@/lib/fire-params'
+import { LAAG_LABEL } from '@/lib/horizon/katern-copy'
 import { SCENARIO_VARIANTS, type ScenarioOverlay } from '@/components/app/horizon/sim-chart'
-import { STRATEGY_LABELS } from '@/lib/fire-strategy'
-import { ankerTitel, type AnkerStop } from '@/lib/horizon/anker-copy'
 import type { ActiveModal } from '@/components/toekomst/state/types'
+import { toonLegendaBij } from './canvas-stand'
+import { MARKTCHECK_MISLUKT_REGEL } from './canvas-kopij-voorlopig'
 
 export interface CanvasLegendaProps {
-  scenariosExpanded: boolean
+  /** Aantal reeksen op de grafiek (`aantalReeksen`); onder de twee geen legenda. */
+  aantalReeksen: number
+  /** Laag "Rendement hoger en lager" staat effectief aan. */
+  rendementScenarios: boolean
   scenarioData: ScenarioOverlay[] | null
   fireParams: FireParams
   setActiveModal: Dispatch<SetStateAction<ActiveModal>>
-  mcExpanded: boolean
+  /** Laag Marktcheck staat effectief aan. */
+  marktcheck: boolean
   mcData: Extract<MarktcheckOutcome, { ok: true }> | null
   mcMarge: RendementMarge | null
+  mcPending: boolean
+  mcFailed: boolean
   liquidWealthPoints: [number, number][] | undefined
-  simResult: SimResult
-  setSimModalOpen: Dispatch<SetStateAction<boolean>>
-  isFixedAnchorMode: boolean
-  ankerStop: AnkerStop | null
 }
 
 export function CanvasLegenda({
-  scenariosExpanded,
+  aantalReeksen,
+  rendementScenarios,
   scenarioData,
   fireParams,
   setActiveModal,
-  mcExpanded,
+  marktcheck,
   mcData,
   mcMarge,
+  mcPending,
+  mcFailed,
   liquidWealthPoints,
-  simResult,
-  setSimModalOpen,
-  isFixedAnchorMode,
-  ankerStop,
 }: CanvasLegendaProps) {
+  if (!toonLegendaBij(aantalReeksen)) return null
+  const toonRendement = rendementScenarios && scenarioData != null
+  const toonMarktcheck = marktcheck && (mcData != null || mcPending || mcFailed)
+  if (!toonRendement && !toonMarktcheck) return null
+
   return (
-    <>
-              {/* ── Legenda + detail-links onder de grafiek ── */}
-              <div className="mt-2 space-y-2">
-                {/* Scenario legenda */}
-                {scenariosExpanded && scenarioData && (
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                    {scenarioData.map((s, i) => (
-                      <span key={s.name} className="inline-flex items-center gap-1.5 text-[11px] text-[var(--ink-2)]">
-                        <span className="inline-block h-0.5 w-3.5 rounded-full" style={{ backgroundColor: s.color, opacity: 0.7 }} />
-                        {s.label}
-                        <span className="font-mono tabular-nums text-[var(--ink-4)]">
-                          {((fireParams.grossReturn + SCENARIO_VARIANTS[i].delta) * 100).toFixed(1)}%
-                        </span>
-                      </span>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={() => setActiveModal('scenarios')}
-                      className="font-serif text-[11px] italic text-horizon-600 transition-colors hover:text-horizon-700"
-                    >
-                      Verdiepen &rarr;
-                    </button>
-                  </div>
-                )}
+    <div className="mt-2 space-y-2" data-testid="canvas-legenda">
+      {toonRendement && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          {scenarioData.map((s, i) => (
+            <span key={s.name} className="inline-flex items-center gap-1.5 text-[11px] text-[var(--ink-2)]">
+              <span className="inline-block h-0.5 w-3.5 rounded-full" style={{ backgroundColor: s.color, opacity: 0.7 }} />
+              {s.label}
+              <span className="font-mono tabular-nums text-[var(--ink-4)]">
+                {((fireParams.grossReturn + SCENARIO_VARIANTS[i].delta) * 100).toFixed(1)}%
+              </span>
+            </span>
+          ))}
+          <button
+            type="button"
+            onClick={() => setActiveModal('scenarios')}
+            className="inline-flex min-h-[44px] items-center font-serif text-[11px] italic text-horizon-600 transition-colors hover:text-horizon-700 lg:min-h-0"
+          >
+            Verdiepen &rarr;
+          </button>
+        </div>
+      )}
 
-                {/* Marktcheck-legenda */}
-                {mcExpanded && mcData && (
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                    {/* Alleen p25–p75 staat in de legenda: dat is sinds 2026-08-09
-                        ook exact wat er getekend wordt (en wat de Y-as bepaalt). */}
-                    <span className="inline-flex items-center gap-1.5 text-[11px] text-[var(--ink-2)]">
-                      <span className="inline-block h-2.5 w-3.5 bg-[var(--hor-t,#8a6e42)] opacity-[0.18]" />
-                      p25–p75
-                    </span>
-                    {mcMarge && (
-                      <span
-                        className="text-[11px] text-[var(--ink-2)]"
-                        title={liquidWealthPoints != null
-                          ? `${margeZin(mcMarge)} Gemeten op je besteedbaar vermogen (zonder je huis) — de band toont je netto vermogen mét huis.`
-                          : margeZin(mcMarge)}
-                      >
-                        {margeLegenda(mcMarge)}{' '}
-                        <span className="text-[var(--ink-4)]">
-                          {margeAnkerKort(mcMarge)}
-                          {liquidWealthPoints != null && ', zonder huis'}
-                        </span>
-                      </span>
-                    )}
-                    <span className="text-[11px] text-[var(--ink-2)]">
-                      <span className="font-mono tabular-nums text-[var(--ink-3)]">{mcData.runs}</span> marktverlopen
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setActiveModal('simulations')}
-                      className="font-serif text-[11px] italic text-horizon-600 transition-colors hover:text-horizon-700"
-                    >
-                      Verdiepen &rarr;
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* Voetnoot. "Details" is hier nu zélf de knop (M9): de echte
-                  Details-pill staat helemaal bovenin dezelfde kaart, dus wie
-                  naar deze regel gescrold heeft ziet 'm niet staan — dat is de
-                  "de knop viel buiten het zichtbare deel"-waarneming uit de
-                  bevinding. Zelfde handler, geen tweede pad. */}
-              <p className="mt-3 font-sans text-[10px] text-[var(--ink-4)]">
-                {STRATEGY_LABELS[simResult.strategy].name} &middot; Weergave t/m leeftijd {simResult.displayEndAge - 1} (eindleeftijd {simResult.displayEndAge}) &middot;{' '}
-                <button
-                  type="button"
-                  onClick={() => setSimModalOpen(true)}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  className="underline underline-offset-2 transition-colors hover:text-horizon-600"
-                >
-                  Open de jaar-op-jaar-tabel
-                </button>
-              </p>
-
-              {/* Context-hint: modus indicator + link to StrategieModal */}
+      {toonMarktcheck && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1" aria-live="polite" aria-busy={mcPending}>
+          <span className="inline-flex items-center gap-1.5 text-[11px] text-[var(--ink-2)]">
+            <span className="inline-block h-2.5 w-3.5 bg-[var(--hor-t,#8a6e42)] opacity-[0.18]" aria-hidden="true" />
+            {LAAG_LABEL.marktcheck}
+            {mcPending && <span className="font-mono text-[10px] text-[var(--ink-4)]">…</span>}
+          </span>
+          {!mcPending && mcFailed && (
+            <span className="font-serif text-[11px] text-[var(--ink-3)]">{MARKTCHECK_MISLUKT_REGEL}</span>
+          )}
+          {!mcPending && mcData && mcMarge && (
+            <span
+              className="text-[11px] text-[var(--ink-2)]"
+              title={liquidWealthPoints != null
+                ? `${margeZin(mcMarge)} Gemeten op je besteedbaar vermogen (zonder je huis) — de band toont je netto vermogen mét huis.`
+                : margeZin(mcMarge)}
+            >
+              {margeLegenda(mcMarge)}{' '}
+              <span className="text-[var(--ink-4)]">
+                {margeAnkerKort(mcMarge)}
+                {liquidWealthPoints != null && ', zonder huis'}
+              </span>
+            </span>
+          )}
+          {!mcPending && mcData && (
+            <>
+              <span className="text-[11px] text-[var(--ink-2)]">
+                <span className="font-mono tabular-nums text-[var(--ink-3)]">{mcData.runs}</span> marktverlopen
+              </span>
               <button
                 type="button"
-                onClick={() => setActiveModal('strategie')}
-                className="mt-1 block font-sans text-[10px] text-[var(--ink-4)] transition-colors hover:text-horizon-600"
-                style={{ minHeight: 44, display: 'flex', alignItems: 'center' }}
+                onClick={() => setActiveModal('simulations')}
+                className="inline-flex min-h-[44px] items-center font-serif text-[11px] italic text-horizon-600 transition-colors hover:text-horizon-700 lg:min-h-0"
               >
-                {/* ADR 0129 B10 — geen modus-label maar het plan in gewone taal. */}
-                {isFixedAnchorMode && ankerStop != null
-                  ? <>{ankerTitel(ankerStop)} &middot; <span className="ml-0.5 underline underline-offset-2">Stopmoment wijzigen &rarr;</span></>
-                  : <>De app rekent je stopmoment uit &middot; <span className="ml-0.5 underline underline-offset-2">Zelf een stopmoment kiezen &rarr;</span></>}
+                Verdiepen &rarr;
               </button>
-    </>
+            </>
+          )}
+        </div>
+      )}
+    </div>
   )
 }

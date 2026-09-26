@@ -3,9 +3,11 @@
 
 /**
  * De grafiek zelf (blok L): ZoomableChartContainer met in de render-prop
- * ProjectieLaadlaag, ToekomstOverlay, SimChart, WealthCompositionChart, de
- * Inkomen & Uitgaven-uitklap, EventsTimeline en PhaseBar. PhaseBar blijft in
- * fase 1 hier: hij leest de zoom-render-prop (besluit Q4, kaart V4).
+ * ProjectieLaadlaag, ToekomstOverlay, de drie modi van het canvas (ADR 0179 D3:
+ * Vermogen = SimChart, Samenstelling = WealthCompositionChart, Geldstroom =
+ * IncomeExpenseChart — tot fase 2 een uitklap onder de grafiek), EventsTimeline en
+ * PhaseBar. PhaseBar leest de zoom-render-prop (besluit Q4, kaart V4) en staat
+ * alleen in katern Plan (`toonFasebalk`, spec §4.5).
  *
  * Alle bedragfeeds zijn `view*` van de render-grens in de host; de enige
  * nominale feed is `simCashflows` (exempt, zie de callsite). Het dagtarief is
@@ -16,7 +18,6 @@
 import type { Dispatch, SetStateAction } from 'react'
 import type { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
-import { ChevronDown, ChevronUp } from 'lucide-react'
 import type { SimRow, SimResult, SimCashflow } from '@/lib/fire-simulation'
 import type { LifeEvent } from '@/lib/horizon-data'
 import type { InEuroView } from '@/lib/euro-display'
@@ -44,17 +45,15 @@ import { EventsTimeline } from '@/components/app/horizon/events-timeline'
 import { PhaseBar } from '@/components/app/horizon/phase-bar'
 import { CHART_PAD } from '@/lib/chart-constants'
 import { WealthCompositionChart } from '@/components/app/horizon/wealth-composition-chart'
-import { ChartTips } from '@/components/editorial/chart-tips'
-import { getIncomeExpenseTips } from '@/lib/chart-tips'
 import {
   ToekomstOverlay,
   type OverlayBalloonDef,
   type ToekomstOverlayGeometry,
 } from '@/components/app/horizon/toekomst-overlay'
 import { COLOR_PARTNER_EVENT } from './marker-kleuren'
+import type { CanvasModus } from '@/lib/horizon/katern-copy'
 import type {
   ActiveFaseModal,
-  ChartMode,
   ClusterSheet,
   EventPaneMode,
   HouseholdHeroData,
@@ -75,7 +74,8 @@ export interface CanvasGrafiekProps {
   chartEndAge: number | null
   projectiePending: boolean
   overlayVisible: boolean
-  chartMode: ChartMode
+  /** De modus die het canvas tekent (de katern-stand, niet per se de keuze). */
+  modus: CanvasModus
   overlayPrefRestored: boolean
   setOverlayEmphasis: Dispatch<SetStateAction<OverlayEmphasis>>
   toekomstOverlayBalloons: OverlayBalloonDef[]
@@ -131,10 +131,8 @@ export interface CanvasGrafiekProps {
   kernelHousingSale: KernelHousingSale | null
   homeExcludedFromProgress: boolean
   setSelectedYearAge: Dispatch<SetStateAction<number | null>>
-  incomeExpenseExpanded: boolean
-  setIncomeExpenseExpanded: Dispatch<SetStateAction<boolean>>
+  /** Sub-weergave van Geldstroom; in Eenvoudig altijd `lines` (host bewaakt dat). */
   ieViewMode: IeViewMode
-  setIeViewMode: Dispatch<SetStateAction<IeViewMode>>
   viewIeBreakdownResult: BreakdownResult | null
   eventsForTimeline: LifeEvent[]
   setClusterSheet: Dispatch<SetStateAction<ClusterSheet>>
@@ -147,6 +145,8 @@ export interface CanvasGrafiekProps {
   eventStopAge: number | null
   isPensioenMode: boolean
   setActiveFaseModal: Dispatch<SetStateAction<ActiveFaseModal>>
+  /** De fasebalk staat alleen in katern Plan (spec §4.5). */
+  toonFasebalk: boolean
 }
 
 export function CanvasGrafiek({
@@ -154,7 +154,7 @@ export function CanvasGrafiek({
   chartEndAge,
   projectiePending,
   overlayVisible,
-  chartMode,
+  modus,
   overlayPrefRestored,
   setOverlayEmphasis,
   toekomstOverlayBalloons,
@@ -210,10 +210,7 @@ export function CanvasGrafiek({
   kernelHousingSale,
   homeExcludedFromProgress,
   setSelectedYearAge,
-  incomeExpenseExpanded,
-  setIncomeExpenseExpanded,
   ieViewMode,
-  setIeViewMode,
   viewIeBreakdownResult,
   eventsForTimeline,
   setClusterSheet,
@@ -226,6 +223,7 @@ export function CanvasGrafiek({
   eventStopAge,
   isPensioenMode,
   setActiveFaseModal,
+  toonFasebalk,
 }: CanvasGrafiekProps) {
   return (
               <div className="-mx-4 sm:-mx-6 md:-mx-8 overflow-hidden">
@@ -239,7 +237,7 @@ export function CanvasGrafiek({
                       {/* STEP 3b/4: tips-laag wikkelt de grafiek — markers in een rij
                           boven + onder; de grafiek vervaagt zolang de tips aan staan. */}
                       <ToekomstOverlay
-                        visible={overlayVisible && chartMode === 'vermogenspad'}
+                        visible={overlayVisible && modus === 'vermogen'}
                         autoScrollIntoView={overlayPrefRestored}
                         onEmphasisChange={setOverlayEmphasis}
                         balloons={toekomstOverlayBalloons}
@@ -287,18 +285,18 @@ export function CanvasGrafiek({
                         <div
                           className="transition-opacity duration-300 ease-in-out"
                           style={{
-                            opacity: chartMode === 'vermogenspad' ? 1 : 0,
-                            pointerEvents: chartMode === 'vermogenspad' ? 'auto' : 'none',
-                            position: chartMode === 'vermogenspad' ? 'relative' : 'absolute',
+                            opacity: modus === 'vermogen' ? 1 : 0,
+                            pointerEvents: modus === 'vermogen' ? 'auto' : 'none',
+                            position: modus === 'vermogen' ? 'relative' : 'absolute',
                             top: 0,
                             left: 0,
                             width: '100%',
                           }}
-                          aria-hidden={chartMode !== 'vermogenspad'}
+                          aria-hidden={modus !== 'vermogen'}
                         >
                           <SimChart
                             emphasis={overlayEmphasis}
-                            disableCrosshair={overlayVisible && chartMode === 'vermogenspad'}
+                            disableCrosshair={overlayVisible && modus === 'vermogen'}
                             hoverAge={lifelineAge}
                             onHoverAge={setLifelineAge}
                             hideValueTooltip={displayMode === 'full'}
@@ -386,14 +384,14 @@ export function CanvasGrafiek({
                         <div
                           className="transition-opacity duration-300 ease-in-out"
                           style={{
-                            opacity: chartMode === 'vermogensopbouw' ? 1 : 0,
-                            pointerEvents: chartMode === 'vermogensopbouw' ? 'auto' : 'none',
-                            position: chartMode === 'vermogensopbouw' ? 'relative' : 'absolute',
+                            opacity: modus === 'samenstelling' ? 1 : 0,
+                            pointerEvents: modus === 'samenstelling' ? 'auto' : 'none',
+                            position: modus === 'samenstelling' ? 'relative' : 'absolute',
                             top: 0,
                             left: 0,
                             width: '100%',
                           }}
-                          aria-hidden={chartMode !== 'vermogensopbouw'}
+                          aria-hidden={modus !== 'samenstelling'}
                         >
                           <WealthCompositionChart
                             stackedRows={viewWealthCompositionRows}
@@ -416,85 +414,46 @@ export function CanvasGrafiek({
                             onYearClick={(age) => setSelectedYearAge(age)}
                           />
                         </div>
+
+                        {/* Geldstroom (IncomeExpenseChart) — sinds fase 2 een volwaardige
+                            modus i.p.v. een uitklap onder de grafiek (spec §7.2). De
+                            sub-weergave Lijnen/Bronnen staat in de canvaskop. */}
+                        <div
+                          className="transition-opacity duration-300 ease-in-out"
+                          style={{
+                            opacity: modus === 'geldstroom' ? 1 : 0,
+                            pointerEvents: modus === 'geldstroom' ? 'auto' : 'none',
+                            position: modus === 'geldstroom' ? 'relative' : 'absolute',
+                            top: 0,
+                            left: 0,
+                            width: '100%',
+                          }}
+                          aria-hidden={modus !== 'geldstroom'}
+                          data-testid="canvas-geldstroom"
+                        >
+                          {modus === 'geldstroom' && (
+                            <IncomeExpenseChart
+                              rows={viewDisplaySimRows}
+                              currentAge={currentAge ?? 30}
+                              endAge={chartEndAge!}
+                              visibleMinAge={visibleMin}
+                              visibleMaxAge={visibleMax}
+                              fireAge={simResult.fireAge}
+                              planningMode={planningMode}
+                              aowAgeFractional={userAowAge.fractional}
+                              viewMode={ieViewMode}
+                              breakdownResult={viewIeBreakdownResult}
+                            />
+                          )}
+                        </div>
                       </div>
                       </ToekomstOverlay>
-                      {/* ── Inkomen & Uitgaven toggle + collapsible chart ── */}
-                      <div className="flex w-full items-center border-t border-[var(--border-ed)]">
-                        <button
-                          type="button"
-                          onClick={() => setIncomeExpenseExpanded(prev => !prev)}
-                          onPointerDown={(e) => e.stopPropagation()}
-                          className="flex flex-1 items-center justify-center gap-2 py-2.5 text-[12px] font-medium text-[var(--ink-3)] hover:text-[var(--ink-2)] transition-colors cursor-pointer select-none"
-                          style={{ minHeight: 44 }}
-                          aria-expanded={incomeExpenseExpanded}
-                          aria-controls="income-expense-panel"
-                          aria-label={incomeExpenseExpanded ? 'Inkomen & Uitgaven grafiek verbergen' : 'Inkomen & Uitgaven grafiek tonen'}
-                        >
-                          <span>Inkomen &amp; Uitgaven</span>
-                          {incomeExpenseExpanded
-                            ? <ChevronUp size={14} />
-                            : <ChevronDown size={14} />
-                          }
-                        </button>
-                        {incomeExpenseExpanded && (
-                          <div className="flex items-center gap-2 pr-3" onPointerDown={(e) => e.stopPropagation()}>
-                            <div className="flex items-center gap-1">
-                              {(['lines', 'breakdown'] as const).map((mode) => (
-                                <button
-                                  key={mode}
-                                  type="button"
-                                  onClick={() => setIeViewMode(mode)}
-                                  className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors select-none cursor-pointer ${
-                                    ieViewMode === mode
-                                      ? 'border-horizon-300 bg-horizon-50 text-horizon-700'
-                                      : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-200 hover:text-[var(--ink-2)]'
-                                  }`}
-                                  aria-pressed={ieViewMode === mode}
-                                >
-                                  {mode === 'lines' ? 'Lijnen' : 'Bronnen'}
-                                </button>
-                              ))}
-                            </div>
-                            <ChartTips
-                              storageKey="income_expense_chart"
-                              tips={getIncomeExpenseTips({
-                                fireAge: simResult.fireAge,
-                                aowAge: userAowAge.fractional,
-                                viewMode: ieViewMode,
-                              })}
-                              align="right"
-                            />
-                          </div>
-                        )}
-                      </div>
-                      <div
-                        id="income-expense-panel"
-                        className="overflow-hidden transition-all duration-300 ease-in-out"
-                        style={{
-                          maxHeight: incomeExpenseExpanded ? (ieViewMode === 'breakdown' ? 420 : 280) : 0,
-                          opacity: incomeExpenseExpanded ? 1 : 0,
-                        }}
-                      >
-                        <IncomeExpenseChart
-                          rows={viewDisplaySimRows}
-                          currentAge={currentAge ?? 30}
-                          endAge={chartEndAge!}
-                          visibleMinAge={visibleMin}
-                          visibleMaxAge={visibleMax}
-                          fireAge={simResult.fireAge}
-                          planningMode={planningMode}
-                          aowAgeFractional={userAowAge.fractional}
-                          viewMode={ieViewMode}
-                          breakdownResult={viewIeBreakdownResult}
-                        />
-                      </div>
 
                       {/* Events timeline aligned to same age axis.
-                          Alleen op line-chart (vermogenspad): de bar-chart
-                          (vermogensopbouw) toont events al inline boven/onder
-                          de bars via ChartEventMarkers — een aparte timeline
-                          eronder zou dubbele informatie zijn. */}
-                      {chartMode === 'vermogenspad' && eventsForTimeline.length > 0 && (
+                          Alleen in Vermogen: Samenstelling toont events al inline
+                          boven/onder de staven via ChartEventMarkers — een aparte
+                          timeline eronder zou dubbele informatie zijn. */}
+                      {modus === 'vermogen' && eventsForTimeline.length > 0 && (
                         <EventsTimeline
                           events={eventsForTimeline}
                           currentAge={currentAge ?? 30}
@@ -527,8 +486,9 @@ export function CanvasGrafiek({
                       )}
 
                       {/* ── Fase-balk (Opbouw / Overgang / Onttrekking) ──
-                          Secundaire diepte → verborgen in Eenvoudig-modus. */}
-                      {simResult && currentAge != null && (
+                          Secundaire diepte → verborgen in Eenvoudig-modus; alleen in
+                          katern Plan (spec §4.5). */}
+                      {toonFasebalk && simResult && currentAge != null && (
                         <HideInSimple>
                         <div className="mt-2" style={{ marginLeft: CHART_PAD.left, marginRight: CHART_PAD.right }}>
                           <PhaseBar

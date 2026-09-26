@@ -23,8 +23,10 @@ const DIR = join(process.cwd(), 'components', 'toekomst', 'canvas')
 const lees = (naam: string) => readSourceLF(join(DIR, naam))
 
 const CANVAS_BLADEREN = [
+  'toekomst-canvas.tsx',
+  'canvas-kop.tsx',
+  'canvas-stand.ts',
   'canvas-tips-toggle.tsx',
-  'canvas-pills.tsx',
   'canvas-uitleg.tsx',
   'canvas-grafiek.tsx',
   'canvas-legenda.tsx',

@@ -48,10 +48,11 @@ export interface PartnerLine {
   currentAge: number | null
 }
 
-/** State-generiek `chartMode` (horizon-client r794). */
-export type ChartMode = 'vermogenspad' | 'vermogensopbouw'
-
-/** State-generiek `ieViewMode` (horizon-client r793). */
+/**
+ * Sub-weergave van de canvas-modus Geldstroom (horizon-client r793): `lines` = Lijnen,
+ * `breakdown` = Bronnen. De modus zelf is `CanvasModus` uit `lib/horizon/katern-copy`
+ * (ADR 0179 fase 2; de oude `ChartMode` Pad/Opbouw ging erin op).
+ */
 export type IeViewMode = 'lines' | 'breakdown'
 
 /** State-generiek `activeFaseModal` (horizon-client r755). */

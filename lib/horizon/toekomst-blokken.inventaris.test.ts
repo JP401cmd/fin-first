@@ -29,6 +29,13 @@
  * `AnkerDrieslag` blijft in VOLGORDE staan: hij deelt geen bestand met de grafiek, dus de
  * paartoets legt hem niets op; de Plan-volgorde staat in de aparte toets onderaan.
  *
+ * Fase 2 (W1, bewust): het canvas verliest de tien pills (`CanvasPills` + `PillRow`), de
+ * vijf `ChartOverlayExplainer`-blokken en de voetnoot met de strategie-hint onder de
+ * grafiek; zie CANVAS_GESCHRAPT en CANVAS_GESCHRAPTE_TEKST. Hun opvolgers (modus-switch,
+ * Lagen-menu, aannamesregel, marktcheck-getallen) staan in CANVAS_NIEUW en zijn verplicht.
+ * `IncomeExpenseChart` is van uitklap modus Geldstroom geworden en houdt zijn plek in
+ * VOLGORDE (na Samenstelling, vóór de tijdlijn).
+ *
  * Verwachte, bewuste wijzigingen: fase 4 verhuist `ScenarioKaarten` naar Doelen
  * (volgorde-paar met Dekkingsradar vervalt dan vanzelf); fase 5 haalt
  * `HorizonTrendGrid` naar /overzicht — haal hem dán uit INVENTARIS, niet eerder.
@@ -86,6 +93,19 @@ const VERDWENEN = [
   'LabPlanMelding',
 ] as const
 
+/** Fase 2 (W1) — BEWUST nieuw: de canvasbediening die de pills en explainers vervangt. */
+const CANVAS_NIEUW = ['ModusSwitch', 'LagenMenu', 'Aannamesregel', 'MarktcheckGetallen'] as const
+
+/** Fase 2 (W1) — BEWUST geschrapt: de pillenrij en de laaguitleg boven de grafiek. */
+const CANVAS_GESCHRAPT = ['CanvasPills', 'PillRow', 'ChartOverlayExplainer'] as const
+
+/**
+ * Fase 2 (W1) — de strategie-hint onder de grafiek had geen eigen component; dit zijn
+ * zijn teksten. (De voetnoot-knop "Open de jaar-op-jaar-tabel" bestaat bewust nog wél:
+ * als link-rij in het Plan-paneel, spec §4.9.)
+ */
+const CANVAS_GESCHRAPTE_TEKST = ['Stopmoment wijzigen', 'Zelf een stopmoment kiezen'] as const
+
 /** De katern-inhoud van vandaag op de subroutes (stroom B stapelt ze in Instellingen). */
 const SUBPAGINA_VIEWS = ['DoelenView', 'VoorkeurenView', 'GebeurtenissenView', 'AfbouwOverzichtCard'] as const
 
@@ -116,7 +136,7 @@ describe('/toekomst-blokken — inventaris (geen blok valt weg bij de decomposit
     expect(modules.length).toBeGreaterThan(50)
   })
 
-  for (const naam of [...VOLGORDE, ...OVERLAYS, ...SUBPAGINA_VIEWS, ...KATERN_LAAG]) {
+  for (const naam of [...VOLGORDE, ...OVERLAYS, ...SUBPAGINA_VIEWS, ...KATERN_LAAG, ...CANVAS_NIEUW]) {
     it(`<${naam}> wordt gerenderd door een module van de /toekomst-routes`, () => {
       expect(renderPlekken(naam), `${naam} staat nergens meer op /toekomst`).not.toEqual([])
     })
@@ -125,6 +145,18 @@ describe('/toekomst-blokken — inventaris (geen blok valt weg bij de decomposit
   for (const naam of VERDWENEN) {
     it(`<${naam}> staat bewust niet meer op /toekomst (fase 2, meldingen per katern)`, () => {
       expect(renderPlekken(naam)).toEqual([])
+    })
+  }
+
+  for (const naam of CANVAS_GESCHRAPT) {
+    it(`<${naam}> staat bewust niet meer op /toekomst (fase 2, canvas)`, () => {
+      expect(renderPlekken(naam)).toEqual([])
+    })
+  }
+
+  for (const tekst of CANVAS_GESCHRAPTE_TEKST) {
+    it(`de voetnoottekst "${tekst}" staat bewust niet meer op /toekomst (fase 2, canvas)`, () => {
+      expect(bronnen.filter((b) => b.code.includes(tekst)).map((b) => b.rel)).toEqual([])
     })
   }
 })

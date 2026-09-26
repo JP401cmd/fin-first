@@ -535,9 +535,11 @@ export function useToekomstScenario({ initialData, scenarioState, sim }: { initi
   const hasDoelLijn = doelLijnBron != null
 
   // Gestippelde ink-lijn + FIRE-stip via `variant: 'scenario'` (chart-static-layers);
-  // kleur wordt genegeerd (inkt vast). Alleen wanneer de toggle aan staat.
+  // kleur wordt genegeerd (inkt vast). Sinds ADR 0179 fase 2 ongeacht de toggle: in
+  // katern Doelen is de lijn een vaste laag, in Plan een keuze. Het canvas beslist of
+  // hij getekend wordt (`canvas-stand.ts`, laag `doelscenario`), op naam `'wat-als'`.
   const scenarioLineOverlay = useMemo<ScenarioOverlay | null>(() => {
-    if (!showScenarioLine || doelLijnBron == null) return null
+    if (doelLijnBron == null) return null
     return {
       name: 'wat-als',
       // "Jouw doel" · "Jouw wat-als" · "Jouw stopkeuze" (zelfde drieslag als de pill).
@@ -551,7 +553,7 @@ export function useToekomstScenario({ initialData, scenarioState, sim }: { initi
       // Stop-bron ⇒ legenda toont "(stop 63)" i.p.v. de gesolvede "(57j)".
       ageLabel: doelLijnBron.bron === 'stop' ? 'stop' : 'fire',
     }
-  }, [showScenarioLine, doelLijnBron, displayEndAge, doelLijnLabel])
+  }, [doelLijnBron, displayEndAge, doelLijnLabel])
 
   // Gewogen baseline-rendement per bezeten categorie (Marktbias-UI). Gememoized zodat
   // de inline-call in de JSX niet elke render een verse array-identiteit oplevert.

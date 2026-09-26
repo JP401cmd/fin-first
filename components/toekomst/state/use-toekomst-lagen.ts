@@ -2,15 +2,17 @@
 
 // Verplaatst uit components/app/horizon/horizon-client.tsx (ADR 0179 fase 1, stap 14).
 //
-// Lagen en chart-modus van het canvas (ADR 0179 D3: de keuze blijft staan bij een
-// katernwissel): de pills en hun localStorage-voorkeur (E1), de tips-overlay, `chartMode`,
+// Lagen en modus van het canvas (ADR 0179 D3: de keuze blijft staan bij een
+// katernwissel): de lagenkeuze en haar localStorage-voorkeur (E1), de tips-overlay, `canvasModus`,
 // `lifelineAge` + afspelen (E14), de marktcheck-band (E10) en scenario-varianten (E9), de
 // markers op de tijdas en hun klik-/sleep-handlers, en de nominale chart-feeds die de
-// euro-grens daarna omzet. Alleen canvas-UI zonder feed (`incomeExpenseExpanded`,
-// `overlayEmphasis`) blijft lokaal in de compositie.
+// euro-grens daarna omzet. Alleen canvas-UI zonder feed (`overlayEmphasis`) blijft lokaal
+// in de compositie.
 //
-// Pure move: de statements staan in dezelfde onderlinge volgorde als in horizon-client, met
-// dezelfde dependency-arrays.
+// Fase 2 (W1): de tien pills zijn één lagenkeuze (`canvasLagenKeuze` + `toggleLaag`) op
+// dezelfde voorkeur-opslag; de katern-stand (vaste lagen) legt het canvas er zelf overheen
+// (`canvas-stand.ts`), dus die schrijft nooit in de keuze. De markers en de tijdlijn zijn
+// daarom ook als bouwfunctie beschikbaar (`bouwChartEventOverlay`, `bouwEventsForTimeline`).
 
 import { useEffect, useState, useCallback, useRef, useMemo, useDeferredValue } from 'react'
 import { useRouter } from 'next/navigation'
@@ -39,7 +41,8 @@ import { buildScenarioVariants, type ScenarioOverlay, type MonteCarloOverlay } f
 import { faseAtAge } from '@/lib/horizon/phase-bar-segments'
 import { buildBreakdown } from '@/lib/income-expense-breakdown'
 import { unifiedRowsToStackedRows, type StackedRow } from '@/lib/wealth-composition'
-import type { ChartMode, IeViewMode } from '@/components/toekomst/state/types'
+import type { IeViewMode } from '@/components/toekomst/state/types'
+import type { CanvasModus, LaagId } from '@/lib/horizon/katern-copy'
 import {
   COLOR_LIFE_INCOME,
   COLOR_LIFE_EXPENSE,
@@ -107,6 +110,8 @@ export function useToekomstLagen({ initialData, goals, perspectief, overlays, sc
   } = meldingen
   const {
     scenarioLineOverlay,
+    showScenarioLine,
+    setShowScenarioLine,
   } = lab
   const { addToast } = useToast()
   const router = useRouter()
@@ -128,8 +133,12 @@ export function useToekomstLagen({ initialData, goals, perspectief, overlays, sc
   const [mcFailed, setMcFailed] = useState(false)
   /** Monotone generatie: alleen het antwoord van de NIEUWSTE aanvraag telt. */
   const marktcheckGenRef = useRef(0)
+  // Sub-weergave van de modus Geldstroom (Lijnen / Bronnen).
   const [ieViewMode, setIeViewMode] = useState<IeViewMode>('lines')
-  const [chartMode, setChartMode] = useState<ChartMode>('vermogenspad')
+  // Vermogen · Samenstelling · Geldstroom (ADR 0179 D3). Hoort bij het canvas: de keuze
+  // blijft staan bij een katernwissel; Instellingen tekent altijd Vermogen zonder deze
+  // keuze te overschrijven (`canvas-stand.ts`).
+  const [canvasModus, setCanvasModus] = useState<CanvasModus>('vermogen')
 
   // Levenslijn cijferbar + "speel af" (alleen volledige weergave): de actieve leeftijd
   // wordt gedeeld door de SimChart-hover én de playback-animatie.
@@ -145,9 +154,11 @@ export function useToekomstLagen({ initialData, goals, perspectief, overlays, sc
   // Levensgebeurtenissen toggle — handmatig aangemaakte life events tonen/verbergen.
   // Default true. Persistent zoals natuurlijke mijlpalen.
   const [showLifeEvents, setShowLifeEvents] = useState(true)
-  // Doelen toggle (M36) — financiële doelen met streefdatum op de as. Default
-  // true; zelfde per-apparaat localStorage-voorkeur als de twee buur-pills.
-  const [showGoals, setShowGoals] = useState(true)
+  // Doelen-laag (M36) — financiële doelen met streefdatum op de as. Zelfde
+  // per-apparaat localStorage-voorkeur als de twee buurlagen. Standaard UIT (ADR 0179,
+  // spec §4.5): in Plan staan standaard alleen Gebeurtenissen en Mijlpalen aan; in
+  // Doelen is deze laag vast aan, los van deze keuze.
+  const [showGoals, setShowGoals] = useState(false)
   // ── Grondslag van de PRIMAIRE vermogenslijn (ADR 0114 D1) ────────────────
   // Server-props, dus stabiel over de hydratie heen — daarom hier bovenaan: de
   // voorkeur-sleutel van de tweede-lijn-pill hangt eraan.
@@ -187,8 +198,8 @@ export function useToekomstLagen({ initialData, goals, perspectief, overlays, sc
       // hangt aan de ROL van de pill (zie `secondaryLinePrefKey`).
       const storedLiquid = localStorage.getItem(secondaryLinePrefKey)
       if (storedLiquid !== null) setShowLiquidLine(storedLiquid === 'true')
-      // Overlay-zichtbaarheid: default AAN de eerste keer (geen key), daarna
-      // de opgeslagen voorkeur. Onafhankelijk van de welkomsttekst-state.
+      // Overlay-zichtbaarheid: default UIT (ADR 0179 fase 2 — de tips zitten achter
+      // de canvas-i), daarna de opgeslagen voorkeur.
       const storedOverlay = localStorage.getItem('horizon_overlay_visible')
       if (storedOverlay !== null) setOverlayVisible(storedOverlay === 'true')
     } catch {
@@ -241,7 +252,7 @@ export function useToekomstLagen({ initialData, goals, perspectief, overlays, sc
     addToast({
       type: 'info',
       title: 'Tips verborgen',
-      message: 'Je zet ze terug aan met de Tips-knop boven de grafiek.',
+      message: 'Je zet ze terug aan via de i boven de grafiek.',
       duration: 8000,
       action: { label: 'Niet meer melden', onClick: dismissExitNoticeForever },
     })
@@ -269,9 +280,9 @@ export function useToekomstLagen({ initialData, goals, perspectief, overlays, sc
   // naar de inline-editors. De eenmalige welkomstkaart is per ADR 0130
   // verdwenen: het welkom woont nu in de rondleiding op /overzicht.
   //
-  // overlayVisible: zichtbaarheid van de ballonnen-laag. Default AAN de eerste
-  // keer (geen localStorage-key), daarna gepersisteerd.
-  const [overlayVisible, setOverlayVisible] = useState(true)
+  // overlayVisible: zichtbaarheid van de ballonnen-laag. Default UIT (ADR 0179 fase 2:
+  // de tips staan achter de canvas-i en niet standaard aan), daarna gepersisteerd.
+  const [overlayVisible, setOverlayVisible] = useState(false)
 
   // ── Marktcheck-context ────────────────────────────────────────────────────
   // De rauwe kernel-context voor de Monte-Carlo-band: de preview-baseline (die de
@@ -391,15 +402,23 @@ export function useToekomstLagen({ initialData, goals, perspectief, overlays, sc
   // Alleen deze weergave-lijst wordt afgerond. `displayEvents` (EventPane,
   // chart-markers, simulatie-invoer) houdt de exacte kernel-waarde — afronden
   // dáár zou een rekenwaarde verschuiven, en dat is geen weergavekwestie.
-  const eventsForTimeline = useMemo(() => {
-    const base = showLifeEvents ? displayEvents : []
-    const alle = showNaturalMilestones ? [...base, ...naturalMilestonesAsEvents] : base
+  //
+  // Als bouwfunctie, zodat het canvas de katern-stand (vaste lagen) kan toepassen
+  // zonder de keuze van de gebruiker te overschrijven; `eventsForTimeline` is de
+  // bouw met die keuze.
+  const bouwEventsForTimeline = useCallback((lagen: { gebeurtenissen: boolean; mijlpalen: boolean }) => {
+    const base = lagen.gebeurtenissen ? displayEvents : []
+    const alle = lagen.mijlpalen && showNaturalMilestones ? [...base, ...naturalMilestonesAsEvents] : base
     return alle.map(e =>
       e.target_age != null && !Number.isInteger(e.target_age)
         ? { ...e, target_age: Math.round(e.target_age) }
         : e,
     )
-  }, [showLifeEvents, showNaturalMilestones, displayEvents, naturalMilestonesAsEvents])
+  }, [showNaturalMilestones, displayEvents, naturalMilestonesAsEvents])
+  const eventsForTimeline = useMemo(
+    () => bouwEventsForTimeline({ gebeurtenissen: showLifeEvents, mijlpalen: showNaturalMilestones }),
+    [bouwEventsForTimeline, showLifeEvents, showNaturalMilestones],
+  )
 
 
   // Doelen met een kalender-streefdatum → markers op de leeftijd-as. De
@@ -418,7 +437,13 @@ export function useToekomstLagen({ initialData, goals, perspectief, overlays, sc
     [goals, effectiveInput?.dateOfBirth, currentAge],
   )
 
-  const chartEventOverlay = useMemo<ChartEventOverlay[]>(() => {
+  // Bouwfunctie met expliciete lagen (zelfde reden als `bouwEventsForTimeline`).
+  // Mijlpalen kunnen alleen aan als de keuze ze berekent (`showNaturalMilestones`):
+  // geen katern zet ze vast aan.
+  const bouwChartEventOverlay = useCallback((lagen: { gebeurtenissen: boolean; mijlpalen: boolean; doelen: boolean }): ChartEventOverlay[] => {
+    const showLifeEvents = lagen.gebeurtenissen
+    const showNaturalMilestones = lagen.mijlpalen
+    const showGoals = lagen.doelen
     const out: ChartEventOverlay[] = []
     // Partner-view met een precies partner-pad: de hoofdlijn IS de partner z'n
     // lijn, dus de EIGEN events + natuurlijke mijlpalen (op de eigen as) horen
@@ -554,7 +579,11 @@ export function useToekomstLagen({ initialData, goals, perspectief, overlays, sc
       })
     }
     return out
-  }, [showLifeEvents, showNaturalMilestones, showGoals, goalChartMarkers, displayEvents, naturalMilestones, isHouseholdView, isPartnerView, partnerLine, partnerLifeEvents, deficitLoanNotice, reverseMortgageStartAge, eventStopAge, householdMainLine?.partnerAowAge, simResult?.partnerAowAge])
+  }, [goalChartMarkers, displayEvents, naturalMilestones, isHouseholdView, isPartnerView, partnerLine, partnerLifeEvents, deficitLoanNotice, reverseMortgageStartAge, eventStopAge, householdMainLine?.partnerAowAge, simResult?.partnerAowAge])
+  const chartEventOverlay = useMemo<ChartEventOverlay[]>(
+    () => bouwChartEventOverlay({ gebeurtenissen: showLifeEvents, mijlpalen: showNaturalMilestones, doelen: showGoals }),
+    [bouwChartEventOverlay, showLifeEvents, showNaturalMilestones, showGoals],
+  )
 
   // Klik-handler voor markers op de chart. Life-events openen de EventPane
   // (bestaande slide-in/stack-push flow), natuurlijke mijlpalen openen onze
@@ -846,7 +875,7 @@ export function useToekomstLagen({ initialData, goals, perspectief, overlays, sc
     : undefined
 
   const wealthCompositionRows: StackedRow[] = useMemo(() => {
-    if (chartMode !== 'vermogensopbouw') return []
+    if (canvasModus !== 'samenstelling') return []
     if (!displayUnifiedRows.length) return []
     const baseRows = unifiedRowsToStackedRows(
       displayUnifiedRows,
@@ -875,7 +904,7 @@ export function useToekomstLagen({ initialData, goals, perspectief, overlays, sc
       // `houseInLedger`, maar dezelfde grondslag als de kernel zodra het pad leeft.
       terugvalRendement: initialData.fireParams.grossReturn,
     })
-  }, [chartMode, displayUnifiedRows, initialData, displayEvents, debts, eigenHuisMortgageIds])
+  }, [canvasModus, displayUnifiedRows, initialData, displayEvents, debts, eigenHuisMortgageIds])
 
   // Lazy compute income/expense breakdown only when user toggles to 'breakdown' mode.
   // Consume de geclipte weergaverijen zodat de bronnen-breakdown niet tot het
@@ -893,6 +922,35 @@ export function useToekomstLagen({ initialData, goals, perspectief, overlays, sc
     ...(scenarioLineOverlay ? [scenarioLineOverlay] : []),
     ...(scenarioOverlays ?? []),
   ], [scenarioLineOverlay, scenarioOverlays])
+
+  // ── De lagenkeuze van het Lagen-menu (ADR 0179 D3) ─────────────────────────
+  // Eén record over de bestaande vlaggen en hun bestaande opslag (localStorage per
+  // apparaat; de doelscenario-lijn cross-device via de scenario-prefs) — geen nieuw
+  // schema. Dit is de keuze van de gebruiker; vaste lagen van een katern legt het
+  // canvas erbovenop en komen hier nooit in terecht.
+  const canvasLagenKeuze = useMemo<Record<LaagId, boolean>>(() => ({
+    gebeurtenissen: showLifeEvents,
+    mijlpalen: showNaturalMilestones,
+    doelen: showGoals,
+    doelscenario: showScenarioLine,
+    marktcheck: mcExpanded,
+    rendementScenarios: scenariosExpanded,
+    metHuis: showLiquidLine,
+    speelAf: isPlaying,
+  }), [showLifeEvents, showNaturalMilestones, showGoals, showScenarioLine, mcExpanded, scenariosExpanded, showLiquidLine, isPlaying])
+
+  const toggleLaag = useCallback((id: LaagId) => {
+    switch (id) {
+      case 'gebeurtenissen': persistLifeEvents(!showLifeEvents); return
+      case 'mijlpalen': persistNaturalMilestones(!showNaturalMilestones); return
+      case 'doelen': persistGoals(!showGoals); return
+      case 'doelscenario': setShowScenarioLine(prev => !prev); return
+      case 'marktcheck': setMcExpanded(prev => !prev); return
+      case 'rendementScenarios': setScenariosExpanded(prev => !prev); return
+      case 'metHuis': persistLiquidLine(!showLiquidLine); return
+      case 'speelAf': setIsPlaying(prev => !prev); return
+    }
+  }, [persistLifeEvents, showLifeEvents, persistNaturalMilestones, showNaturalMilestones, persistGoals, showGoals, setShowScenarioLine, persistLiquidLine, showLiquidLine])
 
   /** Drag-and-drop: update event target_age when dragged to a new position on the timeline. */
   async function handleEventDragEnd(eventId: string, newAge: number) {
@@ -962,8 +1020,12 @@ export function useToekomstLagen({ initialData, goals, perspectief, overlays, sc
     mcFailed,
     ieViewMode,
     setIeViewMode,
-    chartMode,
-    setChartMode,
+    canvasModus,
+    setCanvasModus,
+    canvasLagenKeuze,
+    toggleLaag,
+    bouwChartEventOverlay,
+    bouwEventsForTimeline,
     lifelineAge,
     setLifelineAge,
     isPlaying,

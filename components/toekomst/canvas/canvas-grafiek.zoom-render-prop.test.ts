@@ -2,9 +2,9 @@
  * Structuur-grendels op de canvas-bladeren die bij de extractie het makkelijkst
  * stil verschuiven (kaart V4, V7, besluit Q4):
  *
- *  1. PhaseBar, EventsTimeline en de Inkomen & Uitgaven-grafiek staan ín de
- *     render-prop van ZoomableChartContainer en lezen zijn zoomvenster
- *     (visibleMin/visibleMax). Fase 1 laat PhaseBar hier (Q4).
+ *  1. PhaseBar, EventsTimeline en de Geldstroom-grafiek (IncomeExpenseChart, sinds
+ *     fase 2 een modus) staan ín de render-prop van ZoomableChartContainer en lezen
+ *     zijn zoomvenster (visibleMin/visibleMax). PhaseBar blijft hier (Q4), alleen in Plan.
  *  2. De render-volgorde binnen de grafiek is die van vandaag (spiegelt VOLGORDE
  *     in `lib/horizon/toekomst-blokken.inventaris.test.ts`).
  *  3. De HideInSimple-grenzen reizen mee (ADR 0026: nooit als ternary).
@@ -68,21 +68,17 @@ describe('canvas-bladeren — HideInSimple-grenzen reizen mee (V7)', () => {
     expect(src.lastIndexOf('<HideInSimple>', i)).toBeGreaterThan(src.lastIndexOf('</HideInSimple>', i))
   })
 
-  it("Scenario's, Marktcheck, tweede lijn en Speel af staan binnen HideInSimple; de doellijn-pil niet", () => {
-    const src = lees('canvas-pills.tsx')
-    const binnen = (anker: string) => {
-      const i = src.indexOf(anker)
-      expect(i, anker).toBeGreaterThan(-1)
-      return src.lastIndexOf('<HideInSimple>', i) > src.lastIndexOf('</HideInSimple>', i)
-    }
-    expect(binnen('aria-label="Scenario-lijnen tonen"')).toBe(true)
-    expect(binnen('<FlaskConical')).toBe(true)
-    expect(binnen('onClick={() => persistLiquidLine(!showLiquidLine)}')).toBe(true)
-    expect(binnen("aria-label={isPlaying ? 'Pauzeer afspelen' : 'Speel de levenslijn af'}")).toBe(true)
-    expect(binnen('onClick={() => setShowScenarioLine(prev => !prev)}')).toBe(false)
+  it('de lagen buiten Eenvoudig staan in HideInSimple van het Lagen-menu (de pills zijn vervallen)', () => {
+    const src = lees('lagen-menu.tsx')
+    expect(src).toContain('LAGEN_EENVOUDIG.includes(id) ? rij : <HideInSimple key={id}>{rij}</HideInSimple>')
   })
 
-  it.each(['canvas-pills.tsx', 'canvas-uitleg.tsx', 'canvas-grafiek.tsx', 'canvas-legenda.tsx'])(
+  it('de sub-weergave Bronnen van Geldstroom staat in HideInSimple', () => {
+    const src = lees('modus-switch.tsx')
+    expect(src).toContain("s === 'bronnen' ? <HideInSimple key={s}>{knop}</HideInSimple> : knop")
+  })
+
+  it.each(['canvas-uitleg.tsx', 'canvas-grafiek.tsx', 'canvas-legenda.tsx', 'modus-switch.tsx', 'lagen-menu.tsx'])(
     '%s kiest nooit via een ternary op de weergavemodus',
     (naam) => {
       expect(lees(naam)).not.toMatch(/displayMode === 'simple' \?/)

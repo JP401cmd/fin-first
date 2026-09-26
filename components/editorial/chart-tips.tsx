@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, type ReactNode } from 'react'
 import { Info, X } from 'lucide-react'
 
 interface ChartTipsProps {
@@ -16,6 +16,11 @@ interface ChartTipsProps {
    * - `'left'`: popover groeit naar rechts — voor knoppen aan de linker chart-rand
    */
   align?: 'left' | 'right'
+  /**
+   * Optionele extra regel onderaan de popover, onder de tips — bv. de schakelaar van de
+   * tips-ballonnen op de toekomstgrafiek (ADR 0179 fase 2: die zit achter de canvas-i).
+   */
+  footer?: ReactNode
 }
 
 /**
@@ -36,6 +41,7 @@ export function ChartTips({
   tips,
   title = 'Hoe lees je deze grafiek?',
   align = 'right',
+  footer,
 }: ChartTipsProps) {
   const [isOpen, setIsOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -149,6 +155,9 @@ export function ChartTips({
               </li>
             ))}
           </ol>
+          {footer != null && (
+            <div className="border-t border-[var(--rule-soft)] px-3 py-2">{footer}</div>
+          )}
         </div>
       )}
     </div>
