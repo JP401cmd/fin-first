@@ -48,7 +48,7 @@ describe('Plan-bladeren — map-brede grendels', () => {
     // Fase 1: uit horizon-client @ c1b4849eb. Fase 3: het afbouwoverzicht kwam uit de
     // opgeheven Voorkeuren-view (resultaat hoort in Plan, spec §5).
     expect(eerste).toMatch(
-      /^\/\/ Verplaatst uit (components\/app\/horizon\/horizon-client\.tsx r\d+–\d+.* @ c1b4849eb \(fase 1|components\/future\/voorkeuren-view\.tsx r\d+–\d+ @ [0-9a-f]{9} \(fase 3), ADR 0179\)\.$/,
+      /^\/\/ Verplaatst uit (components\/app\/horizon\/horizon-client\.tsx r\d+–\d+.* @ c1b4849eb \(fase 1|components\/future\/voorkeuren-view\.tsx r\d+–\d+ @ [0-9a-f]{9} \(fase 3|components\/toekomst\/instellingen\/[\w-]+\.tsx @ [0-9a-f]{9} \(fase 6), ADR 0179\)\.$/,
     )
   })
 

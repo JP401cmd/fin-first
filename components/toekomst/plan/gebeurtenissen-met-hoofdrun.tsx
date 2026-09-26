@@ -1,8 +1,10 @@
+// Verplaatst uit components/toekomst/instellingen/gebeurtenissen-met-hoofdrun.tsx @ 2dc244d57 (fase 6, ADR 0179).
 'use client'
 
 /**
- * GebeurtenissenView in katern Instellingen, gevoed met de hoofdrun van de
- * /toekomst-provider (ADR 0179 fase 1 stap 17, besluit Q8).
+ * GebeurtenissenView onder het plan (katern Plan, ADR 0179 addendum 26 sep), gevoed met
+ * de hoofdrun van de /toekomst-provider (fase 1 stap 17, besluit Q8). Stond tot fase 6 in
+ * `components/toekomst/instellingen/`, toen de lijst nog in Instellingen woonde.
  *
  * Gemeten: met een eigen `useHorizonFireSim` in de view liepen er op Instellingen twee
  * instanties op kernel-rijstrook `main`, die elkaars wachtende run verdrongen (vier

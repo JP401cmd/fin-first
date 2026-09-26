@@ -18,7 +18,7 @@
 
 import type { PlanReviewProgress } from '@/lib/plan-review/types'
 import { WizardIngang } from './wizard-ingang'
-import { AnkerScroll } from './anker-scroll'
+import { AnkerScroll } from '@/components/toekomst/layout/anker-scroll'
 import { InstellingenRijen, INSTELLINGEN_PLAN_ANKER, type InstellingenRijenProps } from './instellingen-rijen'
 
 export const INSTELLINGEN_ANKERS = {

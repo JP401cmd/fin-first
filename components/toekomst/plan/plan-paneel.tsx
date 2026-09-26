@@ -20,8 +20,8 @@
  */
 
 import { useState } from 'react'
-import { GebeurtenissenMetHoofdrun } from '@/components/toekomst/instellingen/gebeurtenissen-met-hoofdrun'
-import { AnkerScroll } from '@/components/toekomst/instellingen/anker-scroll'
+import { GebeurtenissenMetHoofdrun } from './gebeurtenissen-met-hoofdrun'
+import { AnkerScroll } from '@/components/toekomst/layout/anker-scroll'
 import { GEBEURTENISSEN_ANKER } from '@/components/toekomst/layout/oude-lab-bladwijzer'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { HideInSimple } from '@/components/app/hide-in-simple'
