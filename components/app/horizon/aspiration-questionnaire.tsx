@@ -52,9 +52,10 @@ export const LIFESTYLE_COPY: Record<LifestyleId, { label: string; line: string }
  */
 /**
  * Kopniveau van de vragenlijst (ADR 0110). Default h3 — de uitgaven-pane en de huishoud-pane.
- * De plan-review-wizard hangt de vragenlijst onder zijn stap-h4 en zet h5 (TPR-15).
+ * De plan-review-wizard hangt de vragenlijst onder zijn stap-h4 en zet h5 (TPR-15); de rij
+ * "Uitgave na pensioen" in katern Instellingen hangt hem onder de pane-titel (h3) en zet h4.
  */
-type VragenlijstKop = 'h3' | 'h5'
+type VragenlijstKop = 'h3' | 'h4' | 'h5'
 const KopContext = createContext<VragenlijstKop>('h3')
 
 export function AspirationQuestionnaire({

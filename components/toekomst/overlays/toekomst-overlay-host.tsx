@@ -33,8 +33,6 @@ export function ToekomstOverlayHost() {
     setSimModalOpen,
     activeFaseModal,
     setActiveFaseModal,
-    uitgavenPaneOpen,
-    setUitgavenPaneOpen,
     householdRetireOpen,
     setHouseholdRetireOpen,
     eventPaneOpen,
@@ -123,8 +121,6 @@ export function ToekomstOverlayHost() {
       router={router}
       strategieInitialTab={strategieInitialTab}
       aowRows={aowRows}
-      uitgavenPaneOpen={uitgavenPaneOpen}
-      setUitgavenPaneOpen={setUitgavenPaneOpen}
       householdRetireInfo={householdRetireInfo}
       householdRetireOpen={householdRetireOpen}
       setHouseholdRetireOpen={setHouseholdRetireOpen}

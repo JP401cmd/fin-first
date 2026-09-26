@@ -66,10 +66,6 @@ const StrategieModal = dynamic(() =>
   import('@/components/app/horizon/strategie-modal').then(m => ({ default: m.StrategieModal })),
   { ssr: false }
 )
-const UitgavenPane = dynamic(() =>
-  import('@/components/app/horizon/uitgaven-pane').then(m => ({ default: m.UitgavenPane })),
-  { ssr: false }
-)
 const EventPane = dynamic(() =>
   import('@/components/app/horizon/event-pane').then(m => ({ default: m.EventPane })),
   { ssr: false }
@@ -128,7 +124,7 @@ export interface ToekomstOverlaysProps {
   onttrekkingData: OnttrekkingData
   erfgenamen: Erfgenamen
   partnerAowBedrag: number | undefined
-  // AA — deep-dive modals, StrategieModal, UitgavenPane
+  // AA — deep-dive modals, StrategieModal
   activeModal: ActiveModal
   setActiveModal: Dispatch<SetStateAction<ActiveModal>>
   effectiveFireTarget: number
@@ -140,8 +136,6 @@ export interface ToekomstOverlaysProps {
   router: ReturnType<typeof useRouter>
   strategieInitialTab: StrategieInitialTab
   aowRows: AowLeeftijdRow[]
-  uitgavenPaneOpen: boolean
-  setUitgavenPaneOpen: Dispatch<SetStateAction<boolean>>
   // AB — HouseholdRetirementPane, EventPane
   householdRetireInfo: HouseholdRetireInfo
   householdRetireOpen: boolean
@@ -207,8 +201,6 @@ export function ToekomstOverlays({
   router,
   strategieInitialTab,
   aowRows,
-  uitgavenPaneOpen,
-  setUitgavenPaneOpen,
   householdRetireInfo,
   householdRetireOpen,
   setHouseholdRetireOpen,
@@ -395,7 +387,6 @@ export function ToekomstOverlays({
         kernelLifeEvents={displayEvents}
         kernelAowRows={aowRows}
       />
-      <UitgavenPane open={uitgavenPaneOpen} onClose={() => { setUitgavenPaneOpen(false); loadData() }} />
 
       {/* Huishoud-aanpasflow — geopend vanaf de "Na pensioen"-KPI in huishoudweergave.
           onSaved bumpt de perspectief-versie zodat hero + grafiek + huishoud-FIRE-sectie

@@ -1,8 +1,8 @@
 /**
  * URL-opschoning na een geconsumeerde tijdas-deeplink.
  *
- * `/toekomst` opent panelen/overlays via query-params (`?whatif=open`,
- * `?strategie=open`, `?uitgaven=open`, `?modal=…`, `?event=…`). Het
+ * `/toekomst` opent panelen/overlays via query-params (`?modal=…`, `?event=…`, …;
+ * `?strategie=open`, `?uitgaven=open` en `?whatif=open` redirecten sinds ADR 0179 naar hun katern). Het
  * mount-effect in `components/app/horizon/horizon-client.tsx` leest die params,
  * zet de bijbehorende state en poetst ze daarna uit de URL zodat een refresh of
  * een gedeelde link niet nóg een keer hetzelfde paneel opent.
@@ -43,7 +43,6 @@
 export const CONSUMED_DEEPLINK_PARAMS = [
   'modal',
   'strategie',
-  'uitgaven',
   'event',
   'edit',
   'whatif',

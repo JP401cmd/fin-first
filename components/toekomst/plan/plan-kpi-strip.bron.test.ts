@@ -81,7 +81,9 @@ describe('plan-kpi-strip — haalbare uitgave (JSX-deel)', () => {
 describe('plan-kpi-strip — "Na pensioen"-tegels (na-pensioen-klik)', () => {
   it('beide tegels bestaan en gebruiken dezelfde handler', () => {
     expect(source.match(/'data-testid': 'hero-stat-retirement-expense'/g) ?? []).toHaveLength(LAYOUTS)
-    expect(source.match(/onClick: openRetirementExpensePane,/g) ?? []).toHaveLength(LAYOUTS)
+    // ADR 0179 fase 3: persoonlijk een link naar de rij, in de huishoudweergave de handler.
+    expect(source.match(/\{ onClick: openRetirementExpensePane \} : \{ href: UITGAVE_RIJ_HREF \}/g) ?? []).toHaveLength(LAYOUTS)
+    expect(source).toContain("instellingenRijHref('uitgave-na-pensioen')")
   })
 })
 

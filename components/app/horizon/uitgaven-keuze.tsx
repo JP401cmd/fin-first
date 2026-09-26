@@ -293,8 +293,8 @@ export function UitgavenMethodeKeuze({
   budgetingActive: boolean
   saving: boolean
   onPick: (m: RetirementExpenseMethod) => void
-  /** Kopniveau van "Hoe bepaal je het?" — de wizard hangt hem onder zijn h4 (ADR 0110). */
-  kop?: 'h2' | 'h5'
+  /** Kopniveau van "Hoe bepaal je het?" — de wizard hangt hem onder zijn h4, de Instellingen-pane onder zijn h3 (ADR 0110). */
+  kop?: 'h2' | 'h4' | 'h5'
 }) {
   return (
     <section className="mt-10">
@@ -369,7 +369,7 @@ export function UitgavenEigenBedrag({
   kop = 'h3',
 }: {
   /** Kopniveau van de vragenlijst — de wizard zet h5 onder zijn stap-h4 (ADR 0110). */
-  kop?: 'h3' | 'h5'
+  kop?: 'h3' | 'h4' | 'h5'
   answers: AspirationAnswers
   setAnswers: Dispatch<SetStateAction<AspirationAnswers>>
   showInlineSaveBlock: boolean

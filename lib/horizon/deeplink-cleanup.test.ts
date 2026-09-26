@@ -69,7 +69,6 @@ describe('buildDeeplinkCleanupUrl — blijft op de huidige route', () => {
     expect([...CONSUMED_DEEPLINK_PARAMS]).toEqual([
       'modal',
       'strategie',
-      'uitgaven',
       'event',
       'edit',
       'whatif',

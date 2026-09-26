@@ -18,7 +18,8 @@
  *
  * Wat we vastpinnen:
  *  1. er is precies één handler, en die toetst `householdRetireInfo` vóór hij
- *     naar de huishoud-tak vertakt, met het eigen uitgavenpaneel als terugval;
+ *     naar de huishoud-tak vertakt, met de rij "Uitgave na pensioen" in Instellingen als
+ *     terugval (ADR 0179 fase 3; tot dan het eigen uitgavenpaneel);
  *  2. beide KPI-varianten (desktop-strip + mobiele strip) consumeren die ene
  *     handler — geen tegel schrijft de vertakking zelf uit;
  *  3. de oude, onbewaakte vertakking komt nergens meer voor.
@@ -44,10 +45,12 @@ describe('"Na pensioen"-KPI — klik in huishoudweergave (WF-REKEN-23-bug4)', ()
     const [, body, deps] = match!
     // De guard: perspectief ÉN gevulde huishoud-info, anders het eigen paneel.
     expect(body).toMatch(/if \(isHouseholdView && householdRetireInfo\) setHouseholdRetireOpen\(true\)/)
-    expect(body).toMatch(/else setUitgavenPaneOpen\(true\)/)
+    // Sinds ADR 0179 fase 3 is de terugval de rij in Instellingen, niet meer een pane op Plan.
+    expect(body).toMatch(/else router\.push\(UITGAVE_RIJ_HREF\)/)
     // De handler moet meebewegen met de asynchroon geladen huishoud-info.
     expect(deps).toContain('householdRetireInfo')
     expect(deps).toContain('isHouseholdView')
+    expect(source).toContain("instellingenRijHref('uitgave-na-pensioen')")
   })
 
   it('kent de onbewaakte vertakking nergens meer', () => {

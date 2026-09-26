@@ -2,8 +2,11 @@ import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
 import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react'
 
 /**
- * Characterization-test voor het uitgaven-na-stoppen-scherm (TPR-15, vóór de wizard het
- * hergebruikt). Pint het BESTAANDE gedrag:
+ * Characterization-test voor de uitgaven-keuze-hook (TPR-15). Sinds ADR 0179 fase 3 is het
+ * losse uitgaven-scherm (`uitgaven-client.tsx`, de pane op Plan) weg; de enige hosts zijn de
+ * wizard en de Instellingen-rij (beide `opslaanBijKiezen: false`, zie uitgaven-editor.test en
+ * uitgaven-rij-pane.test). Deze test houdt het standaardgedrag van de hook zelf vast met een
+ * minimale host hieronder:
  *  - een methode-klik (niet "zelf samenstellen") schrijft direct via PUT /api/fire-settings,
  *    met de huidige eind-vorm erbij en een leeg eigen bedrag, en meldt `onSaveComplete`;
  *  - in een pane publiceert de flow zijn save-state; "zelf samenstellen" schrijft pas bij
@@ -17,8 +20,44 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }))
 
-import UitgavenNaPensioenClient from '@/app/(app)/horizon/uitgaven-na-pensioen/uitgaven-client'
-import type { UitgavenPaneActionsState } from './uitgaven-keuze'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+import {
+  UitgavenEigenBedrag,
+  UitgavenMethodeKeuze,
+  useUitgavenKeuze,
+  type UitgavenKeuzeProps,
+  type UitgavenPaneActionsState,
+} from './uitgaven-keuze'
+
+/** Minimale host: de hook plus de twee weergaven, zoals de oude pane ze renderde. */
+function UitgavenNaPensioenClient(props: UitgavenKeuzeProps & { inPane?: boolean }) {
+  const { masked } = useMaskedAmounts()
+  const k = useUitgavenKeuze(props)
+  return (
+    <div>
+      <UitgavenMethodeKeuze
+        method={k.method}
+        previewByMethod={k.previewByMethod}
+        budgetingActive={props.budgetingActive}
+        saving={k.saving}
+        onPick={k.pickMethod}
+      />
+      {k.method === 'custom_amount' && (
+        <UitgavenEigenBedrag
+          answers={k.answers}
+          setAnswers={k.setAnswers}
+          showInlineSaveBlock={k.showInlineSaveBlock}
+          savedFlash={k.savedFlash}
+          finalAmount={k.finalAmount}
+          saving={k.saving}
+          masked={masked}
+          onSaveCustom={k.saveCustom}
+          error={k.error}
+        />
+      )}
+    </div>
+  )
+}
 
 afterEach(cleanup)
 

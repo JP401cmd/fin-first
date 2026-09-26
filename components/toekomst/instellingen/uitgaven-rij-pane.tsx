@@ -45,7 +45,7 @@ export function UitgavenRijPane({
       secondaryAction={{ label: 'Annuleren', onClick: onClose }}
       footerInfo={actions?.footerInfo}
     >
-      {open && <UitgavenBody snapshot={snapshot} onActionsChange={handleActionsChange} onSaved={handleSaved} metKop />}
+      {open && <UitgavenBody snapshot={snapshot} onActionsChange={handleActionsChange} onSaved={handleSaved} metKop kop="h4" />}
     </ShellOverlay>
   )
 }

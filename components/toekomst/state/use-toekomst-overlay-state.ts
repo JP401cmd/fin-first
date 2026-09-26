@@ -14,6 +14,9 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import type { NaturalMilestone } from '@/lib/natural-milestones'
 import { buildDeeplinkCleanupUrl } from '@/lib/horizon/deeplink-cleanup'
+import { instellingenRijHref } from '@/lib/toekomst/instellingen-rij'
+
+const UITGAVE_RIJ_HREF = instellingenRijHref('uitgave-na-pensioen')
 import type { ActiveModal, ClusterSheet, EventPaneMode, ActiveFaseModal, StrategieInitialTab } from '@/components/toekomst/state/types'
 import { useStabielObject } from './use-stabiel-object'
 import type { ToekomstPerspectief } from './use-toekomst-perspectief'
@@ -28,6 +31,7 @@ export function useToekomstOverlayState({ perspectief }: { perspectief: Toekomst
     isHouseholdView,
     householdRetireInfo,
   } = perspectief
+  const router = useRouter()
   const [activeModal, setActiveModal] = useState<ActiveModal>(null)
   // Voorkeurs-tab bij het openen van de StrategieModal (bv. direct naar 'woning'
   // vanuit de "huis wordt nooit verkocht"-melding). Reset naar null bij sluiten.
@@ -35,8 +39,6 @@ export function useToekomstOverlayState({ perspectief }: { perspectief: Toekomst
   const [simModalOpen, setSimModalOpen] = useState(false)
   const [activeFaseModal, setActiveFaseModal] = useState<ActiveFaseModal>(null)
 
-  // Kassabon modal state
-  const [uitgavenPaneOpen, setUitgavenPaneOpen] = useState(false)
   // Huishoud-aanpasflow (uitgave na pensioen) — geopend vanaf de "Na pensioen"-KPI
   // in huishoudweergave. candidates/method komen uit de combined-projectie.
   const [householdRetireOpen, setHouseholdRetireOpen] = useState(false)
@@ -47,12 +49,13 @@ export function useToekomstOverlayState({ perspectief }: { perspectief: Toekomst
   // 'Huishouden' al eerder aan (app/api/perspective/route.ts: profielveld
   // 'samen'/'gezin' óf >= 1 lid), dus `isHouseholdView` alleen is geen bewijs
   // dat de pane kán renderen: bij die kloof opende de klik voorheen niets
-  // (WF-REKEN-23-bug4). Zonder huishoud-info valt de klik terug op het eigen
-  // uitgavenpaneel, dat altijd gerenderd wordt.
+  // (WF-REKEN-23-bug4). Zonder huishoud-info valt de klik terug op de eigen
+  // instelling: de rij "Uitgave na pensioen" in katern Instellingen (ADR 0179 fase 3;
+  // de uitgaven-pane op Plan is opgeheven, één ingang per instelling).
   const openRetirementExpensePane = useCallback(() => {
     if (isHouseholdView && householdRetireInfo) setHouseholdRetireOpen(true)
-    else setUitgavenPaneOpen(true)
-  }, [isHouseholdView, householdRetireInfo])
+    else router.push(UITGAVE_RIJ_HREF)
+  }, [isHouseholdView, householdRetireInfo, router])
   const [eventPaneOpen, setEventPaneOpen] = useState(false)
   const [eventPaneEditingId, setEventPaneEditingId] = useState<string | null>(null)
   const [eventPaneMode, setEventPaneMode] = useState<EventPaneMode>('catalog')
@@ -68,7 +71,6 @@ export function useToekomstOverlayState({ perspectief }: { perspectief: Toekomst
 
   // Deep-link: open modal via ?modal= URL param (from dashboard widgets)
   const searchParams = useSearchParams()
-  const router = useRouter()
   const pathname = usePathname()
   useEffect(() => {
     const modal = searchParams.get('modal')
@@ -98,12 +100,8 @@ export function useToekomstOverlayState({ perspectief }: { perspectief: Toekomst
     // `next.config.ts` hem door naar `/toekomst/instellingen?regel=eindstrategie`.
     // Op Instellingen betekent `?strategie=` de levensstrategie-editor (VoorkeurenView).
 
-    // Support ?uitgaven=open query param (redirect from /horizon/uitgaven-na-pensioen)
-    const uitgavenParam = searchParams.get('uitgaven')
-    if (uitgavenParam === 'open') {
-      setUitgavenPaneOpen(true)
-      shouldReplace = true
-    }
+    // `?uitgaven=open` opende hier de uitgaven-pane; sinds ADR 0179 fase 3 stuurt
+    // `next.config.ts` hem door naar de rij Uitgave na pensioen in Instellingen.
 
     // Support ?event=new | ?event=<id> | ?event=<id>&edit=true
     // `?nieuw=1|true` is de alias van `?event=new` (ADR 0179, addendum 26 sep): tot dan
@@ -180,8 +178,6 @@ export function useToekomstOverlayState({ perspectief }: { perspectief: Toekomst
     setSimModalOpen,
     activeFaseModal,
     setActiveFaseModal,
-    uitgavenPaneOpen,
-    setUitgavenPaneOpen,
     householdRetireOpen,
     setHouseholdRetireOpen,
     openRetirementExpensePane,

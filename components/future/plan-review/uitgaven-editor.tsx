@@ -46,11 +46,14 @@ export function UitgavenBody({
   onActionsChange,
   onSaved,
   metKop = false,
+  kop = 'h5',
 }: {
   snapshot: RegelSimSnapshot | null
   onActionsChange: PlanReviewEditorProps['onActionsChange']
   onSaved: () => void
   metKop?: boolean
+  /** Kopniveau binnen de host (ADR 0110): h5 onder de stap-h4 van de wizard, h4 onder de pane-titel. */
+  kop?: 'h4' | 'h5'
 }) {
   const { ctx, loading, error, retry } = useUitgavenContext(true)
 
@@ -76,7 +79,7 @@ export function UitgavenBody({
     )
   }
   return (
-    <UitgavenEditorInhoud ctx={ctx} snapshot={snapshot} onActionsChange={onActionsChange} onSaved={onSaved} metKop={metKop} />
+    <UitgavenEditorInhoud ctx={ctx} snapshot={snapshot} onActionsChange={onActionsChange} onSaved={onSaved} metKop={metKop} kop={kop} />
   )
 }
 
@@ -86,7 +89,9 @@ function UitgavenEditorInhoud({
   onActionsChange,
   onSaved,
   metKop,
+  kop,
 }: {
+  kop: 'h4' | 'h5'
   ctx: UitgavenContext
   snapshot: RegelSimSnapshot | null
   onActionsChange: PlanReviewEditorProps['onActionsChange']
@@ -174,7 +179,7 @@ function UitgavenEditorInhoud({
         </div>
       )}
       <UitgavenMethodeKeuze
-        kop="h5"
+        kop={kop}
         method={keuze.method}
         previewByMethod={keuze.previewByMethod}
         budgetingActive={ctx.budgetingActive}
@@ -184,7 +189,7 @@ function UitgavenEditorInhoud({
 
       {keuze.method === 'custom_amount' ? (
         <UitgavenEigenBedrag
-          kop="h5"
+          kop={kop}
           answers={keuze.answers}
           setAnswers={keuze.setAnswers}
           showInlineSaveBlock={false}

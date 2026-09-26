@@ -23,6 +23,7 @@
  * uit de provider of als `view*`-feed van de euro-grens.
  */
 
+import { instellingenRijHref } from '@/lib/toekomst/instellingen-rij'
 import type { Dispatch, SetStateAction } from 'react'
 import { FiguresStrip, type FigureProps } from '@/components/editorial'
 import { MaskedAmount } from '@/components/app/masked-amount'
@@ -45,6 +46,9 @@ import type { HouseholdHeroData } from '@/components/toekomst/state/types'
 const NIET_BINNEN_PLAN_KPI =
   MARKTCHECK_NIET_BINNEN_PLAN.charAt(0).toUpperCase() + MARKTCHECK_NIET_BINNEN_PLAN.slice(1)
 
+
+/** KPI 4 → de rij Uitgave na pensioen in katern Instellingen (ADR 0179 fase 3). */
+const UITGAVE_RIJ_HREF = instellingenRijHref('uitgave-na-pensioen')
 export interface PlanKpiStripProps {
   isFixedAnchorMode: boolean
   hasPerspectiveHero: boolean
@@ -242,7 +246,7 @@ export function PlanKpiStrip({
     data: { 'data-testid': 'hero-stat-swr' },
   }
 
-  // ── KPI 4: Na pensioen — opent de pane ───────────────────────────────────
+  // ── KPI 4: Na pensioen — linkt naar de rij (persoonlijk) of opent de huishoud-pane ───────────────────────────────────
   // UR2-05: de methode viel terug op de profielschatting en daarna op 0 — dat is geen
   // bestedingspatroon, dus geen bedrag.
   const retirementNotice = showRetirementExpenseNotice ? heroKpiNoticeDelen(retirementExpenseGuard) : null
@@ -261,7 +265,10 @@ export function PlanKpiStrip({
           {haalbareUitgaveRegel}
         </span>
       ) : undefined,
-    onClick: openRetirementExpensePane,
+    // ADR 0179 fase 3: de persoonlijke uitgave na pensioen is een instelling — de tegel linkt
+    // naar zijn rij in Instellingen (één ingang). In de huishoudweergave blijft de klik de
+    // gezamenlijke aanpasflow openen (geen persoonlijke instelling).
+    ...(hasPerspectiveHero ? { onClick: openRetirementExpensePane } : { href: UITGAVE_RIJ_HREF }),
     title: hasPerspectiveHero
       ? (isPartnerView
           ? `Uitgave na pensioen van ${perspectiveHero!.householdName}`

@@ -161,8 +161,9 @@ describe('deeplink-contract /toekomst — de opschoning loopt in de pas', () => 
     // `tab` gaat op de routing-laag weg (next.config, vóór render) en `planreview` poetst zichzelf
     // (plan-review-provider, native replaceState) — die twee staan bewust niet in
     // CONSUMED_DEEPLINK_PARAMS. De rest moet er wél in, anders heropent een
-    // refresh hetzelfde paneel.
-    const clientKeys = Object.keys(CONTRACT).filter((k) => k !== 'tab' && k !== PLAN_REVIEW_PARAM)
+    // refresh hetzelfde paneel. `uitgaven` (ADR 0179 fase 3) gaat óók op de routing-laag weg:
+    // de pane op Plan bestaat niet meer, de redirect landt op de rij in Instellingen.
+    const clientKeys = Object.keys(CONTRACT).filter((k) => k !== 'tab' && k !== PLAN_REVIEW_PARAM && k !== 'uitgaven')
     for (const key of clientKeys) {
       expect(CONSUMED_DEEPLINK_PARAMS as readonly string[], key).toContain(key)
     }

@@ -13,7 +13,7 @@ import { unauthorized, serverError } from '@/lib/api/respond'
 
 /**
  * Context-loader voor de uitgaven-na-pensioen pane.
- * Geeft alle data terug die UitgavenNaPensioenClient nodig heeft als props.
+ * Geeft alle data terug die de uitgaven-body (`UitgavenBody`: wizard + Instellingen-rij) als context leest.
  */
 export async function GET() {
   try {

@@ -70,8 +70,8 @@ describe('overlay-host — "Na pensioen"-panes (WF-REKEN-23-bug4)', () => {
     expect(src).toMatch(/\{householdRetireInfo && \(\s*<HouseholdRetirementPane/)
   })
 
-  it('het terugval-paneel rendert onvoorwaardelijk', () => {
-    expect(src).toMatch(/<UitgavenPane open=\{uitgavenPaneOpen\}/)
+  it('de persoonlijke uitgaven-pane bestaat hier niet meer: dat is de rij in Instellingen (ADR 0179 fase 3)', () => {
+    expect(src).not.toMatch(/<UitgavenPane/)
   })
 })
 
@@ -110,7 +110,7 @@ describe('overlay-host — overlay-standaard (ADR 0039, besluit Q9)', () => {
   it('elke dynamic() staat hier precies één keer, zonder SSR', () => {
     const namen = [
       'ScenariosModal', 'SimulationsModal', 'BacktestingModal', 'StrategieModal',
-      'UitgavenPane', 'EventPane', 'PhaseModalOpbouw', 'PhaseModalOvergang', 'PhaseModalOnttrekking',
+      'EventPane', 'PhaseModalOpbouw', 'PhaseModalOvergang', 'PhaseModalOnttrekking',
       'SimChartModal', 'HorizonYearDetailsSheet',
     ]
     for (const naam of namen) {
