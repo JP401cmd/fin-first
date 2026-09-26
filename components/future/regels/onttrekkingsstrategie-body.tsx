@@ -14,6 +14,7 @@ import {
   FireDeltaFooter,
   fireFooterSleutel,
 } from './shared'
+import { OnttrekkingProfielVergelijk } from './onttrekking-profielvergelijk'
 import type { RegelBodyProps } from './types'
 
 const EMPTY_PROJ: RegelProjection = { rows: [], fireAgeFractional: null }
@@ -613,6 +614,13 @@ export function OnttrekkingsstrategieBody({
         <SubsectionLabel>Impact op je vrijheidspad</SubsectionLabel>
         <LiveSimImpact baseline={baseline} draft={draftProj} />
       </div>
+
+      {/* ADR 0179 fase 3 — de vier profielen naast elkaar (uit de opgeheven Strategieën-modal). */}
+      <OnttrekkingProfielVergelijk
+        snapshot={simSnapshot}
+        actiefProfiel={savedProfiel}
+        withdrawalStrategy={withdrawalStrategy}
+      />
     </div>
   )
 }
