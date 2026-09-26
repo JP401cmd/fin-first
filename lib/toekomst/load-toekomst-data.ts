@@ -9,12 +9,11 @@
 // Ontstaan als PURE MOVE: dezelfde lezingen, in dezelfde `Promise.all`, met dezelfde
 // fail-closed-takken en dezelfde afleidingen als voorheen in de page (sinds stap 21
 // zonder de rekenhulp-telling van de vervallen navkaart). Het enige
-// dat erbij komt is de `cache()`-wrapper om de hele lading: een layout én een page
-// die hem in hetzelfde request aanroepen, delen dan één lading. Dat is nodig
-// omdat de React-`cache()` van de onderliggende loaders (`loadHorizonData`,
-// `readMinimizedMap`, `readPlanReviewState`) op het Supabase-client-OBJECT keyt —
-// twee aanroepers met elk een eigen `createClient()` zouden anders alles dubbel
-// ophalen.
+// dat erbij komt is de `cache()`-wrapper om de deel-ladingen: een layout én een page
+// die ze in hetzelfde request aanroepen, delen dan één lading. De onderliggende
+// loaders (`loadHorizonData`, `readMinimizedMap`, `readPlanReviewState`) keyen hun
+// React-`cache()` op het Supabase-client-OBJECT; dat object is per request al één en
+// hetzelfde, want `createClient` (lib/supabase/server.ts) is zelf request-gecachet.
 //
 // Geen `import 'server-only'`: de repo gebruikt dat patroon nergens; de
 // `@/lib/supabase/server`-import (next/headers) maakt de module al onbruikbaar in
@@ -59,11 +58,12 @@ export interface ToekomstData {
 }
 
 /**
- * Eén Supabase-client per request. De `cache()` van de onderliggende loaders keyt op het
- * client-OBJECT; met deze gedeelde client ontdubbelen de deel-ladingen hieronder ook
- * wanneer een katern-page er maar één van nodig heeft.
+ * De Supabase-client van dit request — `createClient` zelf, die al per request gecachet
+ * is (lib/supabase/server.ts). Geen tweede `cache()` eromheen: die voegde niets toe. De
+ * naam blijft, zodat de katern-pages zichtbaar dezelfde client pakken als de deel-ladingen
+ * hieronder (de `cache()` van de loaders keyt op dat object).
  */
-export const getToekomstClient = cache(createClient)
+export const getToekomstClient = createClient
 
 const getToekomstUser = cache(async function getToekomstUser() {
   const supabase = await getToekomstClient()
