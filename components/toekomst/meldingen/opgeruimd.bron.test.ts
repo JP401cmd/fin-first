@@ -4,10 +4,11 @@
  * grafiek (`plan-meldingen.tsx`) gingen op in het meldingenslot per katern. Deze grendel
  * bewaakt dat ze weg blijven en dat niets er nog naar verwijst (geen dode imports).
  *
- * De oude pref-sleutels (`/toekomst/tekort-lening|aow-ontbreekt|eindsituatie`) blijven
- * bewust in de schrijf-allowlist van `lib/page-status/compute.ts` en hun
- * `lib/horizon/*-minimize.ts`-modules bestaan nog (de UAT-checks lezen ze); de
- * JSONB-waarden mogen blijven staan. Alleen de React-kant is weg.
+ * De oude pref-sleutels (`/toekomst/tekort-lening|aow-ontbreekt|eindsituatie`) zijn sinds
+ * C3 (`6c1b74e69`) niet meer schrijfbaar: ze staan niet meer in de schrijf-allowlist van
+ * `lib/page-status/compute.ts` (bewaakt door `minimize-key-allowlist.test.ts`). Hun
+ * `lib/horizon/*-minimize.ts`-modules bestaan nog (de UAT-checks lezen ze) en de
+ * bestaande JSONB-waarden mogen blijven staan.
  */
 import { describe, expect, it } from 'vitest'
 import { existsSync } from 'node:fs'

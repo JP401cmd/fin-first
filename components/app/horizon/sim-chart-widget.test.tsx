@@ -8,7 +8,7 @@
  * Marijke-profiel (5%) toonden beide 7%. Deze test pint de weergegeven waarde
  * tegen de prop, zodat display-drift zichtbaar wordt.
  *
- * Heavy children (ShellOverlay/SimChart/ZoomableChartContainer/walkthrough)
+ * Heavy children (ShellOverlay/SimChart/ZoomableChartContainer)
  * worden gestubt — de test focust op de Kassabon-onderbouwingsregel.
  */
 import { describe, it, expect, vi } from 'vitest'
@@ -30,9 +30,6 @@ vi.mock('@/components/app/horizon/zoomable-chart-container', () => ({
   }: {
     children: (min: number, max: number) => React.ReactNode
   }) => <>{children(30, 90)}</>,
-}))
-vi.mock('@/components/app/horizon/grafiek-uitleg/grafiek-uitleg-walkthrough', () => ({
-  GrafiekUitlegWalkthrough: () => <div data-testid="walkthrough" />,
 }))
 
 // ── Fixtures ────────────────────────────────────────────────────────────────
@@ -154,9 +151,11 @@ describe('SimChartModal — de link "Jaar-op-jaar-tabel" opent de tabel (C3 punt
     )
   }
 
-  it('geen tweede ingang voor "Zo werkt jouw grafiek": die hoort alleen achter de canvas-i', () => {
+  it('geen tweede ingang voor "Zo werkt je grafiek": die hoort alleen achter de canvas-i', () => {
+    // De oude walkthrough ("Zo werkt jouw grafiek") is sinds FX-D verwijderd; de modal
+    // mag de uitleg ook niet onder een andere vorm terugbrengen.
     renderModal()
-    expect(screen.queryByTestId('walkthrough')).toBeNull()
+    expect(screen.queryByText(/zo werkt j(e|ouw) grafiek/i)).toBeNull()
   })
 
   it('de tabel staat bovenaan en is direct uitgeklapt, zonder de motorkap te openen', () => {

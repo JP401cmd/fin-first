@@ -37,9 +37,6 @@ vi.mock('@/components/app/horizon/zoomable-chart-container', () => ({
     children: (min: number, max: number) => React.ReactNode
   }) => <>{children(30, 90)}</>,
 }))
-vi.mock('@/components/app/horizon/grafiek-uitleg/grafiek-uitleg-walkthrough', () => ({
-  GrafiekUitlegWalkthrough: () => <div data-testid="walkthrough" />,
-}))
 
 const START_PORTFOLIO = 100_000
 const YEARLY_EXPENSES = 30_000
