@@ -183,10 +183,10 @@ function copyFor(kind: NaturalMilestoneKind): MilestoneCopy {
 /** Bepaalt naar welke route de "Bekijk bron"-knop linkt. `null` betekent geen bron-actie. */
 function sourceRouteFor(m: NaturalMilestone): { href: string; label: string } | null {
   if (m.category === 'debt') {
-    return { href: '/core/debts', label: 'Bekijk schuld' }
+    return { href: '/overzicht/schulden', label: 'Bekijk schuld' }
   }
   if (m.category === 'asset') {
-    return { href: '/core/assets', label: 'Bekijk bezitting' }
+    return { href: '/overzicht/bezittingen', label: 'Bekijk bezitting' }
   }
   // sim-momenten hebben geen bron-rij — alleen sluit-knop
   return null

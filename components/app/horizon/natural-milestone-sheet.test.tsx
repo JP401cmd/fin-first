@@ -55,7 +55,8 @@ describe('NaturalMilestoneSheet — sluiten door eigen navigatie', () => {
     expect(getOverlayHistoryDepth()).toBe(1)
 
     fireEvent.click(screen.getByText('Bekijk schuld'))
-    expect(mockPush).toHaveBeenCalledWith('/core/debts')
+    // De canonieke route, niet de legacy-backing-route /core/debts (spec 2026-09-26 §2.5).
+    expect(mockPush).toHaveBeenCalledWith('/overzicht/schulden')
     expect(onClose).toHaveBeenCalledTimes(1)
 
     // De ouder reageert op onClose en zet `open` uit; dáár hangt de cleanup aan.

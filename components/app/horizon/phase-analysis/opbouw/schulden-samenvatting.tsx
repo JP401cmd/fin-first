@@ -539,7 +539,7 @@ export const SchuldenSamenvatting = memo(function SchuldenSamenvatting({
 
         {/* ── Link to full analysis ──────────────────────────── */}
         <Link
-          href="/core/debts"
+          href="/overzicht/schulden"
           className="inline-flex min-h-[44px] items-center text-xs font-semibold text-[var(--color-horizon-600)] transition-colors hover:text-[var(--color-horizon-700)]"
         >
           Bekijk volledige schuldenanalyse →
