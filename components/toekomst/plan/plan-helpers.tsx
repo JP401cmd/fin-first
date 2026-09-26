@@ -1,6 +1,7 @@
 // Verplaatst uit components/app/horizon/horizon-client.tsx r387–455 @ c1b4849eb (fase 1, ADR 0179).
 'use client'
 
+import type { ReactNode } from 'react'
 import { Receipt } from 'lucide-react'
 import type { HorizonOutcomeGuard } from '@/lib/horizon/outcome-guard'
 
@@ -26,27 +27,20 @@ export function ReceiptCue() {
 }
 
 /**
- * De "we missen gegevens"-melding ín een hero-KPI-tegel — ÉÉN vorm voor alle
- * tegels van de figures-strip (bevinding UR2-05).
+ * De "we missen gegevens"-melding ín een KPI-cel — ÉÉN vorm voor alle cellen van de
+ * figures-strip (bevinding UR2-05).
  *
- * De melding bestond al, maar alleen op de Doelbedrag-tegel en tweemaal met de
- * hand uitgeschreven (desktop + mobiel). Daardoor kon een buur-KPI met dezelfde
- * ontbrekende brondata rustig een exact getal blijven tonen: er was geen vorm om
- * te hergebruiken, alleen markup om te kopiëren. Dit component ís die vorm —
- * kop (`guard.label`) in de cijferregel, uitleg (`guard.hint`) op de plek van
- * het bijschrift, zodat de tegel even hoog blijft als zijn buren en de rij niet
- * verspringt.
+ * De melding bestond eerst alleen op de Doelbedrag-tegel, tweemaal met de hand
+ * uitgeschreven. Daardoor kon een buur-KPI met dezelfde ontbrekende brondata rustig
+ * een exact getal blijven tonen. Deze helper ís die vorm, nu als de twee delen van
+ * een `FiguresStrip`-cel (fase 2, ADR 0179): de kop (`guard.label`) op de plek van
+ * het getal, iets kleiner gezet, en de uitleg (`guard.hint`) op de plek van het
+ * onderschrift — zodat de cel even hoog blijft als zijn buren.
  *
- * `compact` = de mobiele 2×2-strip (kleinere typografie, krappere marges).
  * Tekst komt uitsluitend uit `lib/horizon/outcome-guard.ts` — nooit hier.
  */
-export function HeroKpiNotice({
-  guard,
-  compact = false,
-  label,
-}: {
-  guard: HorizonOutcomeGuard
-  compact?: boolean
+export function heroKpiNoticeDelen(
+  guard: HorizonOutcomeGuard,
   /**
    * ADR 0127 — kop-override. De guard geeft app-breed één kop (zie
    * HORIZON_MISSENDE_GEGEVENS_LABEL), en die klopt voor elk gegevensprobleem.
@@ -54,22 +48,14 @@ export function HeroKpiNotice({
    * maar een EIGENSCHAP van de strategie: er ís geen doelbedrag. De hint van
    * de guard blijft leidend.
    */
-  label?: string
-}) {
-  return (
-    <>
-      <div
-        className={`${compact ? 'text-[13px]' : 'text-[16px] sm:text-[18px]'} font-black leading-tight tracking-[-0.01em]`}
-        style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
-      >
+  label?: string,
+): { amount: ReactNode; sub: string | undefined } {
+  return {
+    amount: (
+      <span className="block text-[15px] sm:text-[18px] leading-tight tracking-[-0.01em]">
         {label ?? guard.label}
-      </div>
-      <div
-        className={`italic text-[var(--ink-3)] ${compact ? 'text-[10px] mt-1' : 'text-[11px] mt-1.5'}`}
-        style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
-      >
-        {guard.hint}
-      </div>
-    </>
-  )
+      </span>
+    ),
+    sub: guard.hint ?? undefined,
+  }
 }

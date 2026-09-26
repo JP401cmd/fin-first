@@ -121,7 +121,10 @@ describe('prognose-kopgetallen — één vorm voor het FIRE-doelbedrag', () => {
     const sites = alleRegels().filter(
       (r) => r.tekst.includes('<MaskedAmount') && DOELBEDRAG.test(r.tekst) && !r.inKassabon,
     )
-    expect(sites.length).toBeGreaterThanOrEqual(8)
+    // Fase 2 (ADR 0179): de KPI-strip op /toekomst is één FiguresStrip i.p.v. een desktop-
+    // én een mobiele strip — daar vier sites minder (8 → 4). Samen met de overige
+    // oppervlakken komt de ondergrens daarmee bewust op 7.
+    expect(sites.length).toBeGreaterThanOrEqual(7)
   })
 })
 
@@ -145,7 +148,8 @@ describe('prognose-kopgetallen — één vorm voor de vrijheidsleeftijd', () => 
       'utf8',
     )
     expect(src).toContain('heroFireAgeText')
-    expect(src).toContain('heroFireAgeTextMobile')
+    // Fase 2 (ADR 0179): het grote mobiele kerngetal vervalt; KPI 1 is de enige weergave.
+    expect(src).not.toContain('heroFireAgeTextMobile')
   })
 })
 

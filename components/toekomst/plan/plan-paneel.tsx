@@ -16,7 +16,6 @@
  */
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { HideInSimple } from '@/components/app/hide-in-simple'
 import { SectionLabel } from '@/components/editorial'
@@ -24,17 +23,15 @@ import { isHeroAnswerInvalid } from '@/lib/horizon/hero-fire-age'
 import { fireDoelPaarInLeesvolgorde, FIRE_DOEL_ONDERSCHRIFT } from '@/lib/horizon/fire-doel-weergave'
 import {
   ANKER_KPI_LABEL,
-  ANKER_KPI_LABEL_KORT,
   ANKER_VERMOGEN_TEGEL_ONDERSCHRIFT,
   ankerKpiCaption,
   haalbaarBijUitgaveRegel,
 } from '@/lib/horizon/anker-copy'
 import { guardFreedomMoment, guardRetirementExpense } from '@/lib/horizon/outcome-guard'
 import { resolveFreedomFraming, isAtOrPastAow, stopAnchorFromKernel } from '@/lib/fire-strategy'
-import { PlanKerngetalMobiel, PlanKpiStripDesktop, PlanKpiStripMobiel } from '@/components/toekomst/plan/plan-kpi-strip'
-import { PlanHeroDuiding } from '@/components/toekomst/plan/plan-hero-duiding'
+import { PlanKpiStrip } from '@/components/toekomst/plan/plan-kpi-strip'
+import { PlanAnkerEnVoortgang } from '@/components/toekomst/plan/plan-hero-duiding'
 import { PlanGegevensmelding } from '@/components/toekomst/plan/plan-gegevensmelding'
-import { PlanMeldingen } from '@/components/toekomst/plan/plan-meldingen'
 import { PlanVerdieping } from '@/components/toekomst/plan/plan-verdieping'
 import {
   PlanKassabonVrijheidsleeftijd,
@@ -48,7 +45,6 @@ import {
   useToekomstOverlayContext,
   useToekomstScenarioContext,
   useToekomstSimContext,
-  useToekomstMeldingenContext,
   useToekomstLagenContext,
   useToekomstEuroContext,
 } from '@/components/toekomst/state/toekomst-state-provider'
@@ -65,8 +61,8 @@ export function PlanPaneel() {
   } = useToekomstPerspectiefContext()
   const {
     setActiveModal,
-    setStrategieInitialTab,
     openRetirementExpensePane,
+    setSimModalOpen,
   } = useToekomstOverlayContext()
   const {
     hasScenario,
@@ -81,13 +77,11 @@ export function PlanPaneel() {
     input,
     fireParams,
     fireStrategy,
-    kernelRawProfile,
     userAowAge,
     actions,
     resilienceSnapshots,
     retirementMethod,
     fireSwr,
-    canonicalDailyRate,
     fire,
     range,
     healthScore,
@@ -99,13 +93,10 @@ export function PlanPaneel() {
     simResult,
     simCashflows,
     simError,
-    kernelStatus,
-    kernelMaandHint,
     aowOntbreekt,
     stopPad,
     effectiveInput,
     currentAge,
-    planAnchor,
     isFixedAnchorMode,
     effectiveFireTarget,
     effectiveFreedomPct,
@@ -122,28 +113,11 @@ export function PlanPaneel() {
     heroFireAge,
     heroFireAgePending,
     heroFireAgeText,
-    heroFireAgeTextMobile,
     heroFireAgeReceiptText,
     isKernelDepleteRate,
     personalHeroProjection,
     handleActionStatusChange,
   } = useToekomstSimContext()
-  const {
-    deficitLoanNotice,
-    housingHeldNotice,
-    deficitDisplay,
-    canMinimizeDeficit,
-    minimizeDeficitNotice,
-    aowDisplay,
-    canMinimizeAow,
-    minimizeAowNotice,
-    eindsituatiePlan,
-    eindsituatieDuiding,
-    eindsituatieDisplay,
-    canMinimizeEindsituatie,
-    minimizeEindsituatieNotice,
-    deficitLoanCopy,
-  } = useToekomstMeldingenContext()
   const { lifelineAge } = useToekomstLagenContext()
   const {
     viewFireTargetInclHome,
@@ -157,7 +131,6 @@ export function PlanPaneel() {
     viewPartnerHeroFireTarget,
   } = useToekomstEuroContext()
   const { masked } = useMaskedAmounts()
-  const router = useRouter()
 
   const [healthChartOpen, setHealthChartOpen] = useState(false)
   const [fireAgeChartOpen, setFireAgeChartOpen] = useState(false)
@@ -252,13 +225,11 @@ export function PlanPaneel() {
   const freeHeroLabel = heroFreeAsPensioen ? 'Pensioen' : 'Vrijheid'
 
   // ── KPI-koppen van de leeftijds-tegel (ADR 0127) ───────────────────────
-  // Één plek voor de drie varianten, zodat desktop- en mobiele tegel (en hun
-  // kassabon) niet uiteen kunnen lopen.
+  // Één plek voor de varianten, zodat de tegel en zijn kassabon niet uiteen kunnen lopen.
   // ADR 0129 — onder ÉLK vast anker (aow/now/age) is het kopgetal de leeftijd tot waar
   // het liquide vermogen reikt; de drieslag eronder draagt stopmoment en "vrij mogelijk
   // vanaf". Geen "Pensioenleeftijd" meer als kop: de AOW is een stopmoment, geen antwoord.
   const heroAgeLabel = isFixedAnchorMode ? ANKER_KPI_LABEL : 'Vrijheidsleeftijd'
-  const heroAgeLabelKort = isFixedAnchorMode ? ANKER_KPI_LABEL_KORT : 'Vrijheidslft'
   const heroAgeCaptionBase = isFixedAnchorMode
     ? (ankerReach != null ? ankerKpiCaption(ankerReach) : 'jaar')
     : 'jaar'
@@ -269,7 +240,7 @@ export function PlanPaneel() {
   // van 83 en een "Na pensioen" met een exact jaarbedrag — drie tegels, één
   // ontbrekende grondslag, drie verschillende beloftes. Elke tegel toetst nu zijn
   // EIGEN bron met dezelfde guard-familie; de vorm van de melding is één
-  // component (`HeroKpiNotice`).
+  // helper (`heroKpiNoticeDelen`).
   //
   // Vrijheidsleeftijd volgt bewust het DOELBEDRAG en niet een eigen toets: het
   // moment en het doel zijn twee helften van hetzelfde kernantwoord (zie
@@ -336,20 +307,11 @@ export function PlanPaneel() {
 
       <section className="card-editorial overflow-hidden">
         <div className="p-4 sm:p-6 md:p-8">
-          <PlanKerngetalMobiel
-            setShowFireAgeReceipt={setShowFireAgeReceipt}
-            showFreeHero={showFreeHero}
-            freeHeroPhrase={freeHeroPhrase}
-            hasPerspectiveHero={hasPerspectiveHero}
-            heroFireAgePending={heroFireAgePending}
-            perspectiveHero={perspectiveHero}
-            heroFireAgeTextMobile={heroFireAgeTextMobile}
-            isPensioenMode={isPensioenMode}
-            heroFireAge={heroFireAge}
-            heroAgeLabel={heroAgeLabel}
-          />
-
-          <PlanKpiStripDesktop
+          {/* Fase 2 (ADR 0179 D2/D4, spec §4.3/§4.9): één KPI-strip voor alle breedtes.
+              De vrijheidsleeftijd staat twee keer per scherm: in de ankerregel van de
+              kop en hier als KPI 1 (met de kassabon). Het grote mobiele kerngetal, de
+              aparte mobiele strip en de duidingszin zijn vervallen. */}
+          <PlanKpiStrip
             isFixedAnchorMode={isFixedAnchorMode}
             hasPerspectiveHero={hasPerspectiveHero}
             setShowFireAgeReceipt={setShowFireAgeReceipt}
@@ -389,7 +351,7 @@ export function PlanPaneel() {
             haalbareUitgaveToon={haalbareUitgaveToon}
           />
 
-          <PlanHeroDuiding
+          <PlanAnkerEnVoortgang
             hasPerspectiveHero={hasPerspectiveHero}
             heroFireAge={heroFireAge}
             currentAge={currentAge}
@@ -397,52 +359,8 @@ export function PlanPaneel() {
             simResult={simResult}
             isFixedAnchorMode={isFixedAnchorMode}
             perspectiveHero={perspectiveHero}
-            heroFreedomFraming={heroFreedomFraming}
-            planAnchor={planAnchor}
-            ankerReach={ankerReach}
-            ankerStop={ankerStop}
-            showFireAgeNotice={showFireAgeNotice}
             effectiveFreedomPct={effectiveFreedomPct}
-            viewPerspectiveHeroFireTarget={viewPerspectiveHeroFireTarget}
-            masked={masked}
-            isPartnerView={isPartnerView}
-            viewBalkVrijheidDoel={viewBalkVrijheidDoel}
-          />
-
-          <PlanKpiStripMobiel
-            setShowFireAgeReceipt={setShowFireAgeReceipt}
-            showFireAgeNotice={showFireAgeNotice}
-            showFreeHero={showFreeHero}
-            freeHeroLabel={freeHeroLabel}
-            heroAgeLabelKort={heroAgeLabelKort}
-            fireAgeNoticeGuard={fireAgeNoticeGuard}
-            freeHeroPhrase={freeHeroPhrase}
-            hasPerspectiveHero={hasPerspectiveHero}
-            perspectiveHero={perspectiveHero}
-            heroFireAgeText={heroFireAgeText}
-            heroFireAge={heroFireAge}
-            setShowFireTargetReceipt={setShowFireTargetReceipt}
-            isFixedAnchorMode={isFixedAnchorMode}
             showFireTargetNotice={showFireTargetNotice}
-            fireTargetGuard={fireTargetGuard}
-            isNuStoppenMode={isNuStoppenMode}
-            dualDoelRegels={dualDoelRegels}
-            viewPerspectiveHeroFireTarget={viewPerspectiveHeroFireTarget}
-            viewVermogenOpAnker={viewVermogenOpAnker}
-            viewBalkVrijheidDoel={viewBalkVrijheidDoel}
-            fireTargetCaption={fireTargetCaption}
-            setShowSwrReceipt={setShowSwrReceipt}
-            isPensioenMode={isPensioenMode}
-            isKernelDepleteRate={isKernelDepleteRate}
-            viewMonthlyWithdrawalAtAow={viewMonthlyWithdrawalAtAow}
-            simResult={simResult}
-            fireSwr={fireSwr}
-            openRetirementExpensePane={openRetirementExpensePane}
-            showRetirementExpenseNotice={showRetirementExpenseNotice}
-            retirementExpenseGuard={retirementExpenseGuard}
-            input={input}
-            haalbareUitgaveRegel={haalbareUitgaveRegel}
-            haalbareUitgaveToon={haalbareUitgaveToon}
           />
 
           <PlanGegevensmelding
@@ -452,44 +370,9 @@ export function PlanPaneel() {
             simError={simError}
           />
 
-          {simResult ? (
-            <>
-              <div className="my-2 border-b border-dashed border-[var(--border-ed)]" />
-
-              <PlanMeldingen
-                simResult={simResult}
-                isFixedAnchorMode={isFixedAnchorMode}
-                fireStrategy={fireStrategy}
-                masked={masked}
-                kernelStatus={kernelStatus}
-                kernelMaandHint={kernelMaandHint}
-                ankerReach={ankerReach}
-                ankerStop={ankerStop}
-                currentAge={currentAge}
-                deficitLoanCopy={deficitLoanCopy}
-                deficitDisplay={deficitDisplay}
-                deficitLoanNotice={deficitLoanNotice}
-                canMinimizeDeficit={canMinimizeDeficit}
-                minimizeDeficitNotice={minimizeDeficitNotice}
-                router={router}
-                setStrategieInitialTab={setStrategieInitialTab}
-                setActiveModal={setActiveModal}
-                aowDisplay={aowDisplay}
-                canMinimizeAow={canMinimizeAow}
-                minimizeAowNotice={minimizeAowNotice}
-                eindsituatiePlan={eindsituatiePlan}
-                eindsituatieDuiding={eindsituatieDuiding}
-                eindsituatieDisplay={eindsituatieDisplay}
-                canMinimizeEindsituatie={canMinimizeEindsituatie}
-                minimizeEindsituatieNotice={minimizeEindsituatieNotice}
-                canonicalDailyRate={canonicalDailyRate}
-                initialData={initialData}
-                kernelRawProfile={kernelRawProfile}
-                housingHeldNotice={housingHeldNotice}
-                isPensioenMode={isPensioenMode}
-              />
-            </>
-          ) : null}
+          {/* De meldingen (niet haalbaar, tekort, nu al gedekt, tekort-lening, eindsituatie)
+              staan sinds fase 2 in het meldingenslot bovenaan het katern (ADR 0179 D6);
+              AOW en "huis nooit verkocht" wonen in katern Instellingen. */}
         </div>
       </section>
 
@@ -524,6 +407,21 @@ export function PlanPaneel() {
         handleActionStatusChange={handleActionStatusChange}
         onDuidingInView={markeerDuidingInView}
       />
+
+      {/* Links-rij van Plan (spec §4.3/§4.9): alleen de jaar-op-jaar-tabel. "Zo werkt je
+          grafiek" heeft één ingang, de i op het canvas. In beide weergavemodi (§4.7). */}
+      {simResult && (
+        <p className="mt-6 sm:mt-8">
+          <button
+            type="button"
+            onClick={() => setSimModalOpen(true)}
+            data-testid="plan-jaar-op-jaar"
+            className="inline-flex min-h-[44px] items-center font-sans text-[13px] text-[var(--ink-2)] underline decoration-[var(--border-ed)] underline-offset-4 transition-colors hover:text-[var(--module-active-700)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+          >
+            Open de jaar-op-jaar-tabel &rarr;
+          </button>
+        </p>
+      )}
 
       <PlanKassabonVrijheidsleeftijd
         showFireAgeReceipt={showFireAgeReceipt}

@@ -22,6 +22,13 @@
  * Inkomen & Uitgaven, fasebalk) → doelscenario "Wanneer kun je stoppen?" →
  * III "Wat het betekent" (levensinkomenstrook, dekkingsradar) → verloop).
  *
+ * Fase 2 (W3, bewust): in katern Plan staat de ankerdrieslag niet meer boven de KPI's
+ * maar eronder — volgorde KPI-strip (`PlanKpiStrip`, één `FiguresStrip`) → ankerdrieslag
+ * en voortgangsbalk (`PlanAnkerEnVoortgang`) → verdieping → jaar-op-jaar-link (spec §4.3).
+ * De duidingszin en het grote mobiele kerngetal zijn vervallen (geen blok in deze lijst).
+ * `AnkerDrieslag` blijft in VOLGORDE staan: hij deelt geen bestand met de grafiek, dus de
+ * paartoets legt hem niets op; de Plan-volgorde staat in de aparte toets onderaan.
+ *
  * Verwachte, bewuste wijzigingen: fase 4 verhuist `ScenarioKaarten` naar Doelen
  * (volgorde-paar met Dekkingsradar vervalt dan vanzelf); fase 5 haalt
  * `HorizonTrendGrid` naar /overzicht — haal hem dán uit INVENTARIS, niet eerder.
@@ -56,6 +63,29 @@ const VOLGORDE = [
 /** Blokken zonder vaste plek in de leesvolgorde (sheets/panes), wel verplicht aanwezig. */
 const OVERLAYS = ['DoelVastlegSheet', 'HorizonYearDetailsSheet', 'EventPane', 'PlanReviewProvider'] as const
 
+/**
+ * Fase 2 (ADR 0179 D2/D6, stroom W2) — BEWUSTE aanpassing: de kop (oordeelzin +
+ * ankerregel), de katern-koppen en het meldingenslot per katern zijn nieuwe, verplichte
+ * blokken van de katern-layout.
+ */
+const KATERN_LAAG = ['PageVerdictOpening', 'ToekomstAnkerregel', 'KaternKoppen', 'KaternMelding'] as const
+
+/**
+ * Fase 2 — BEWUST verdwenen: de meldingen boven de grafiek (`PlanMeldingen`, met daarin
+ * de eindsituatie-uitleg), de drie statuspunten in de paginakop en de lab-melding in de
+ * doelenlijst. Ze gingen op in het meldingenslot per katern (`KaternMelding`) en het
+ * punt op de katern-kop. Komt er één terug, dan staan er weer twee meldingen voor
+ * dezelfde toestand op het scherm.
+ */
+const VERDWENEN = [
+  'PlanMeldingen',
+  'EindsituatieNotice',
+  'DeficitNoticeDot',
+  'AowNoticeDot',
+  'EindsituatieNoticeDot',
+  'LabPlanMelding',
+] as const
+
 /** De katern-inhoud van vandaag op de subroutes (stroom B stapelt ze in Instellingen). */
 const SUBPAGINA_VIEWS = ['DoelenView', 'VoorkeurenView', 'GebeurtenissenView', 'AfbouwOverzichtCard'] as const
 
@@ -86,9 +116,15 @@ describe('/toekomst-blokken — inventaris (geen blok valt weg bij de decomposit
     expect(modules.length).toBeGreaterThan(50)
   })
 
-  for (const naam of [...VOLGORDE, ...OVERLAYS, ...SUBPAGINA_VIEWS]) {
+  for (const naam of [...VOLGORDE, ...OVERLAYS, ...SUBPAGINA_VIEWS, ...KATERN_LAAG]) {
     it(`<${naam}> wordt gerenderd door een module van de /toekomst-routes`, () => {
       expect(renderPlekken(naam), `${naam} staat nergens meer op /toekomst`).not.toEqual([])
+    })
+  }
+
+  for (const naam of VERDWENEN) {
+    it(`<${naam}> staat bewust niet meer op /toekomst (fase 2, meldingen per katern)`, () => {
+      expect(renderPlekken(naam)).toEqual([])
     })
   }
 })
@@ -117,5 +153,22 @@ describe('/toekomst-blokken — volgorde (blokken die samen blijven, verspringen
       ({ code }) => VOLGORDE.filter((naam) => renderRe(naam).test(code)).length >= 2,
     )
     expect(metMeerdere.length).toBeGreaterThan(0)
+  })
+})
+
+describe('/toekomst-blokken — katern Plan (fase 2, spec §4.3)', () => {
+  const PLAN_VOLGORDE = ['PlanKpiStrip', 'PlanAnkerEnVoortgang', 'PlanVerdieping'] as const
+  const plan = codeOnly(readRel('components/toekomst/plan/plan-paneel.tsx'))
+
+  it('KPI-strip → ankerdrieslag en voortgangsbalk → verdieping → jaar-op-jaar-tabel', () => {
+    const posities = PLAN_VOLGORDE.map((naam) => plan.search(renderRe(naam)))
+    expect(posities.every((p) => p >= 0), PLAN_VOLGORDE.join(', ')).toBe(true)
+    expect([...posities].sort((x, y) => x - y)).toEqual(posities)
+    expect(plan.indexOf('data-testid="plan-jaar-op-jaar"')).toBeGreaterThan(posities[posities.length - 1])
+  })
+
+  it('de drieslag staat onder de KPI-strip, in het voortgangsblok', () => {
+    const blok = codeOnly(readRel('components/toekomst/plan/plan-hero-duiding.tsx'))
+    expect(renderRe('AnkerDrieslag').test(blok)).toBe(true)
   })
 })

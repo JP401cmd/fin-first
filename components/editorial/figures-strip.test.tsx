@@ -113,3 +113,28 @@ describe('FiguresStrip — stripnorm Eenvoudig vs Volledig (APP-7)', () => {
     expect(cellCount(optedOut)).toBe(4)
   })
 })
+
+describe('FiguresStrip — klikbare cel en breekpunt (ADR 0179 fase 2)', () => {
+  it('onClick maakt de héle cel een knop, met data-haken', () => {
+    let geklikt = 0
+    const { container } = render(
+      <DisplayModeProvider initialMode="full">
+        <FiguresStrip
+          figures={[{ kicker: 'Leeftijd', amount: '52', onClick: () => { geklikt++ }, data: { 'data-testid': 'cel-1' } }]}
+        />
+      </DisplayModeProvider>,
+    )
+    const cel = container.querySelector('[data-testid="cel-1"]') as HTMLButtonElement
+    expect(cel.tagName).toBe('BUTTON')
+    expect(cel.getAttribute('type')).toBe('button')
+    cel.click()
+    expect(geklikt).toBe(1)
+  })
+
+  it('colsFrom="md" zet de kolommen pas vanaf md', () => {
+    const { container } = renderStrip('full', { colsFrom: 'md' })
+    const cls = container.querySelector('[data-figures-strip]')?.className ?? ''
+    expect(cls).toContain('md:grid-cols-4')
+    expect(cls).not.toContain('sm:grid-cols-4')
+  })
+})

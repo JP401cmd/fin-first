@@ -220,18 +220,30 @@ export function HLNeg({ children }: { children: ReactNode }) {
 // ─────────────────────────────────────────────────────────────────
 
 export interface FigureProps {
-  kicker: string
+  /** Meestal een kale string; een node mag voor een kicker met een affordance-icoon
+   *  (bv. het kassabon-bonnetje op /toekomst, bevinding M5). */
+  kicker: string | ReactNode
   /** Either a pre-formatted string ("€ 12.345") or a node (e.g. <MaskedAmount>) — the latter lets privacy-aware widgets swap in masked bullets without losing the cell's typography. */
   amount: string | ReactNode
-  sub?: string
+  /** Meestal een string; een node mag voor een tweede bedrag of een gekleurde regel. */
+  sub?: string | ReactNode
   /** Optionele TWEEDE subregel onder `sub`, zelfde typografie. Voor cellen waar
    *  de herkomst van het getal en de eenheid/periode allebei mee moeten — bv.
    *  de grondslag-vermelding (ADR 0103: elk getal benoemt waar het vandaan komt)
    *  naast "per maand". Weglaten = exact het gedrag van vóór deze prop. */
-  sub2?: string
+  sub2?: string | ReactNode
   variant?: 'neutral' | 'positive' | 'negative' | 'winner'
   /** Maakt de cell een klikbare deeplink. Wordt gerenderd als Next.js `<Link>`. */
   href?: string
+  /** Maakt de héle cel een `<button>` (bv. een kassabon of pane openen). De cel is dan
+   *  het raakgebied, niet een klein woord erin. Genegeerd zodra `href` gezet is. */
+  onClick?: () => void
+  /** `title` op de klikbare cel. */
+  title?: string
+  /** `data-*`-attributen op de cel (test-/UAT-haken zoals `data-testid`). */
+  data?: Record<`data-${string}`, string | undefined>
+  /** `aria-busy` op de cel, zolang het getal nog berekend wordt. */
+  busy?: boolean
 }
 
 /** Max. aantal cellen dat een figures-strip in de weergavemodus "Eenvoudig"
@@ -262,10 +274,14 @@ export function FiguresStrip({
   figures,
   simpleFigures,
   alwaysFull = false,
+  colsFrom = 'sm',
   className = '',
 }: {
   cols?: 2 | 3 | 4
   figures: FigureProps[]
+  /** Vanaf welk breekpunt de strip `cols` kolommen krijgt (daaronder 2×2). Default `sm`;
+   *  `md` voor strips met brede cellen, waar 640–767px te krap is (B-025). */
+  colsFrom?: 'sm' | 'md'
   /** Welke cellen in "Eenvoudig" blijven staan (max 2). Default: de eerste twee uit `figures`. */
   simpleFigures?: FigureProps[]
   /** Reductie uitschakelen — altijd alle `figures` tonen, ongeacht de modus. */
@@ -285,16 +301,16 @@ export function FiguresStrip({
     : figures
   const effectiveCols = reduce ? 2 : cols
 
-  const colsClass =
-    effectiveCols === 2
-      ? 'sm:grid-cols-2'
-      : effectiveCols === 3
-      ? 'sm:grid-cols-3'
-      : 'sm:grid-cols-4'
+  // Letterlijke classes (Tailwind scant de bron), per breekpunt.
+  const COLS_CLASS = {
+    sm: { 2: 'sm:grid-cols-2', 3: 'sm:grid-cols-3', 4: 'sm:grid-cols-4' },
+    md: { 2: 'md:grid-cols-2', 3: 'md:grid-cols-3', 4: 'md:grid-cols-4' },
+  } as const
+  const colsClass = COLS_CLASS[colsFrom][effectiveCols]
   // 3-cols heeft geen even aantal op mobile; pas border-bottom-row-rule aan.
   const mobileRowBorderRule =
-    effectiveCols === 3
-      ? '[&:nth-child(-n+2)]:border-b sm:[&:nth-child(-n+2)]:border-b-0'
+    colsFrom === 'md'
+      ? '[&:nth-child(-n+2)]:border-b md:[&:nth-child(-n+2)]:border-b-0'
       : '[&:nth-child(-n+2)]:border-b sm:[&:nth-child(-n+2)]:border-b-0'
   return (
     <div
@@ -372,6 +388,9 @@ function FiguresStripCell({
     </>
   )
 
+  const clickClass =
+    'transition-colors hover:bg-[var(--subtle)]/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]'
+
   if (figure.href) {
     // Lazy-load Link only when needed — geen overhead op niet-klikbare cellen.
     // Next.js Link is cheap; we importeren via require om client-component-status
@@ -380,14 +399,34 @@ function FiguresStripCell({
     return (
       <a
         href={figure.href}
-        className={`${cellClass} transition-colors hover:bg-[var(--subtle)]/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]`}
+        className={`${cellClass} ${clickClass}`}
+        {...figure.data}
       >
         {inner}
       </a>
     )
   }
 
-  return <div className={cellClass}>{inner}</div>
+  if (figure.onClick) {
+    return (
+      <button
+        type="button"
+        onClick={figure.onClick}
+        title={figure.title}
+        aria-busy={figure.busy || undefined}
+        className={`${cellClass} ${clickClass} text-left`}
+        {...figure.data}
+      >
+        {inner}
+      </button>
+    )
+  }
+
+  return (
+    <div className={cellClass} aria-busy={figure.busy || undefined} {...figure.data}>
+      {inner}
+    </div>
+  )
 }
 
 /** Pull-quote met grote module-quote-mark + italic Playfair body.

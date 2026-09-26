@@ -30,12 +30,12 @@ function code(src: string): string {
 describe('Plan-bladeren — map-brede grendels', () => {
   it('vindt de bladeren (de grendel mag niet leeg draaien)', () => {
     for (const f of [
+      // Fase 2: plan-hero-kop.tsx verhuisde naar het canvas (W1), plan-meldingen.tsx ging
+      // op in het meldingenslot (W2).
       'plan-helpers.tsx',
-      'plan-hero-kop.tsx',
       'plan-kpi-strip.tsx',
       'plan-hero-duiding.tsx',
       'plan-gegevensmelding.tsx',
-      'plan-meldingen.tsx',
       'plan-verdieping.tsx',
       'plan-kassabons.tsx',
     ]) {

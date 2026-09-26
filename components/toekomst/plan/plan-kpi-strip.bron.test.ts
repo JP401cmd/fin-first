@@ -12,6 +12,11 @@
  *
  * De afleidingen zelf (guards, `haalbareUitgaveRegel`, `fireDoel`) blijven in de ouder;
  * die helften blijven op de ouder gepind.
+ *
+ * Fase 2 (ADR 0179 D2/D4, spec §4.9): de drie weergaven (groot mobiel getal, desktop-strip,
+ * mobiele 2×2-strip) zijn één `FiguresStrip`. Elke invariant geldt daarom nu voor ÉÉN
+ * layout; de tellingen gingen bewust van 2 naar 1. De vorm van de gegevensmelding is de
+ * helper `heroKpiNoticeDelen` (kop op de plek van het getal, uitleg als onderschrift).
  */
 import { describe, it, expect } from 'vitest'
 import { join } from 'node:path'
@@ -20,8 +25,8 @@ import { readSourceLF } from '@/lib/test-utils/read-source'
 const SOURCE_PATH = join(process.cwd(), 'components', 'toekomst', 'plan', 'plan-kpi-strip.tsx')
 const source = readSourceLF(SOURCE_PATH)
 
-/** Desktop-strip + mobiele 2×2-strip, dus elke tegel telt twee keer. */
-const LAYOUTS = 2
+/** Eén `FiguresStrip` voor alle breedtes (fase 2): elke tegel staat één keer in de bron. */
+const LAYOUTS = 1
 
 function codeRegels(): string[] {
   return source.split('\n').filter((l) => {
@@ -32,12 +37,14 @@ function codeRegels(): string[] {
 
 describe('plan-kpi-strip — elke tegel toetst zijn eigen brondata (kpi-gegevensmelding)', () => {
   it('haalt de ene meldingsvorm uit plan-helpers', () => {
-    expect(source).toContain("import { HeroKpiNotice, ReceiptCue } from './plan-helpers'")
+    expect(source).toContain("import { heroKpiNoticeDelen, ReceiptCue } from './plan-helpers'")
   })
 
-  it('rendert de melding op elke tegel in beide layouts, de mobiele compact', () => {
-    expect(source.match(/<HeroKpiNotice\b/g) ?? []).toHaveLength(3 * LAYOUTS)
-    expect(source.match(/<HeroKpiNotice[^/>]*\bcompact\b/g) ?? []).toHaveLength(3)
+  it('rendert de melding op de leeftijd-, doel- en na-pensioen-tegel', () => {
+    expect(source.match(/\bheroKpiNoticeDelen\(/g) ?? []).toHaveLength(3 * LAYOUTS)
+    for (const g of ['fireAgeNoticeGuard', 'fireTargetGuard', 'retirementExpenseGuard']) {
+      expect(source, g).toMatch(new RegExp(`heroKpiNoticeDelen\\(${g}\\b`))
+    }
   })
 
   it('schrijft de kop nergens zelf uit', () => {
@@ -73,8 +80,8 @@ describe('plan-kpi-strip — haalbare uitgave (JSX-deel)', () => {
 
 describe('plan-kpi-strip — "Na pensioen"-tegels (na-pensioen-klik)', () => {
   it('beide tegels bestaan en gebruiken dezelfde handler', () => {
-    expect(source.match(/data-testid="hero-stat-retirement-expense"/g) ?? []).toHaveLength(LAYOUTS)
-    expect(source.match(/onClick=\{openRetirementExpensePane\}/g) ?? []).toHaveLength(LAYOUTS)
+    expect(source.match(/'data-testid': 'hero-stat-retirement-expense'/g) ?? []).toHaveLength(LAYOUTS)
+    expect(source.match(/onClick: openRetirementExpensePane,/g) ?? []).toHaveLength(LAYOUTS)
   })
 })
 
@@ -83,7 +90,7 @@ describe('plan-kpi-strip — doelbedrag-grondslag (fire-doel-grondslag, JSX-deel
     for (const literal of ['benodigd — met je huis', 'benodigd — zonder je huis']) {
       expect(codeRegels().filter((l) => l.includes(literal))).toEqual([])
     }
-    expect(source.match(/\{fireTargetCaption\}/g) ?? []).toHaveLength(LAYOUTS)
+    expect(source.match(/: fireTargetCaption,/g) ?? []).toHaveLength(LAYOUTS)
   })
 
   it('leest de dubbele doeltegel via de leesvolgorde, niet rechtstreeks', () => {
@@ -109,8 +116,8 @@ describe('plan-kpi-strip — prognose-precisie (deel)', () => {
 
   it('rendert elk doelbedrag met approx', () => {
     const sites = source.split('\n').filter((l) => l.includes('<MaskedAmount') && DOELBEDRAG.test(l))
-    // desktop + mobiel × (dubbel 2 + enkel 2) = 8; de grendel mag niet leeg draaien
-    expect(sites.length).toBeGreaterThanOrEqual(8)
+    // één layout × (dubbel 2 + perspectief 1 + enkel 1) = 4; de grendel mag niet leeg draaien
+    expect(sites.length).toBeGreaterThanOrEqual(4)
     expect(sites.filter((l) => !l.includes('approx'))).toEqual([])
   })
 
@@ -118,7 +125,8 @@ describe('plan-kpi-strip — prognose-precisie (deel)', () => {
     const LEEFTIJD_MET_DECIMALEN = /\b\w*[fF]ire[aA]ge\w*[?!]?\.toFixed\(|\bheroFireAge\.age[?!]?\.toFixed\(/
     expect(source.split('\n').filter((l) => LEEFTIJD_MET_DECIMALEN.test(l))).toEqual([])
     expect(source).toContain('heroFireAgeText')
-    expect(source).toContain('heroFireAgeTextMobile')
+    // Het grote mobiele kerngetal is in fase 2 vervallen: geen tweede weergave van KPI 1.
+    expect(source).not.toContain('heroFireAgeTextMobile')
     expect(source).toContain('heroFireAgeCaption(')
   })
 })
@@ -126,7 +134,8 @@ describe('plan-kpi-strip — prognose-precisie (deel)', () => {
 describe('plan-kpi-strip — vast anker (nu-stoppen, KPI-labels) en euro-weergave', () => {
   it('KPI 2 heet onder een vast anker "Vermogen op je stopmoment"; KPI 3 valt weg', () => {
     expect(source).toContain("isFixedAnchorMode ? 'Vermogen op je stopmoment' : 'Doelbedrag'")
-    expect(source.match(/!\(isFixedAnchorMode && !hasPerspectiveHero\) && \(/g)?.length).toBe(2)
+    expect(source).toContain('const zonderOpname = isFixedAnchorMode && !hasPerspectiveHero')
+    expect(source).toMatch(/zonderOpname\s*\?\s*\[kpiLeeftijd, kpiDoel, kpiNaPensioen\]/)
   })
 
   it('toont de hero-puntbedragen als view*-waarden (FR-B5)', () => {
@@ -134,5 +143,18 @@ describe('plan-kpi-strip — vast anker (nu-stoppen, KPI-labels) en euro-weergav
     expect(source).not.toMatch(/MaskedAmount value=\{fireTargetExclHome!\}/)
     expect(source).toMatch(/isFixedAnchorMode \? \(viewVermogenOpAnker \?\? 0\) : viewBalkVrijheidDoel/)
     expect(source).toContain('viewMonthlyWithdrawalAtAow')
+  })
+})
+
+describe('plan-kpi-strip — één strip, Eenvoudig twee cellen (fase 2, spec §4.7/§4.9)', () => {
+  it('is één FiguresStrip, geen eigen grid en geen tweede (mobiele) weergave', () => {
+    expect(source.match(/<FiguresStrip\b/g) ?? []).toHaveLength(1)
+    expect(source).not.toMatch(/md:hidden|hidden md:grid/)
+    expect(source).not.toContain('PlanKerngetalMobiel')
+  })
+
+  it('kiest in Eenvoudig Vrijheidsleeftijd en Na pensioen via simpleFigures (geen modus-ternary)', () => {
+    expect(source).toContain('simpleFigures={[kpiLeeftijd, kpiNaPensioen]}')
+    expect(source).not.toMatch(/useDisplayMode|displayMode\s*===/)
   })
 })
