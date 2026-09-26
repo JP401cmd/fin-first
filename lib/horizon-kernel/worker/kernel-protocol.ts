@@ -95,7 +95,10 @@ export type KernelWorkerRequest =
    * Marktcheck (Monte Carlo op de horizon-kernel): n VOLLEDIGE projecties op
    * dezelfde `rawContext` als de hoofdprojectie. Bewust een eigen `kind` naast
    * `'mc'` — die laatste is de losstaande legacy-motor die de fase-modals nog
-   * gebruiken; deze levert de percentielband die de Toekomst-grafiek tekent.
+   * gebruiken; deze levert de percentielband die de Toekomst-grafiek tekent, de
+   * rendement-marge en de drie vrijheidsleeftijden onder de band
+   * (`MarktcheckOutcome.vrijheidsleeftijden`, spec toekomst-drie-katernen §7.6) —
+   * allemaal plain getallen/`null`, dus structured-clone-veilig.
    */
   | {
       readonly id: number

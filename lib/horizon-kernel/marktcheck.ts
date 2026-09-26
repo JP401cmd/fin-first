@@ -27,10 +27,16 @@
  */
 
 import { runMonteCarlo, type MonteCarloBand } from './wrappers/mc'
+import {
+  computeMarktcheckVrijheidsleeftijden,
+  type MarktcheckVrijheidsleeftijden,
+} from './wrappers/mc-vrijheid'
 import { computeEs } from './tables/es'
 import { eindleeftijdVan } from './gap'
 import { computeRendementMarge, type RendementMarge } from './rendement-marge'
 import type { KernelInput } from './types'
+
+export type { MarktcheckVrijheidsleeftijden } from './wrappers/mc-vrijheid'
 
 /**
  * Bovengrens voor het aantal Monte-Carlo-runs van een marktcheck-overlay. Elke run
@@ -145,6 +151,16 @@ export type MarktcheckOutcome =
       readonly marge: RendementMarge | null
       /** Aantal doorgerekende marktverlopen. */
       readonly runs: number
+      /**
+       * Drie vrijheidsleeftijden uit DEZELFDE runs als `band` (spec §7.6): het
+       * marktverloop op rang p25 / p50 / p75 van de uitkomst, elk opgelost met
+       * `solveFire` — hetzelfde begrip als het live kerngetal. Per stand `null` bij
+       * onbereikbaar binnen de horizon; het hele veld `null` onder een vast
+       * stopmoment (anker of pensioen-kortsluiting), want dan is de leeftijd van elke
+       * run de ankerleeftijd. Garantie: tegenzit ≥ midden ≥ meezit waar gedefinieerd.
+       * Zie `wrappers/mc-vrijheid.ts`.
+       */
+      readonly vrijheidsleeftijden: MarktcheckVrijheidsleeftijden | null
     }
   | { readonly ok: false; readonly reason: string }
 
@@ -169,7 +185,7 @@ export function runMarktcheckOnKernelInput(
   try {
     const plafond = Math.min(params.maxRuns ?? MARKTCHECK_MAX_RUNS, MARKTCHECK_MAX_RUNS)
     const runs = Math.min(input.onzekerheid.mc.aantalRuns, plafond)
-    const mc = runMonteCarlo({
+    const mcInput: KernelInput = {
       ...input,
       onzekerheid: {
         ...input.onzekerheid,
@@ -181,7 +197,8 @@ export function runMarktcheckOnKernelInput(
           sigma: marktcheckSigma(input),
         },
       },
-    })
+    }
+    const mc = runMonteCarlo(mcInput)
     // De marge draait NIET mee in de 200 verstoorde runs: het is een eigen,
     // goedkope binaire zoektocht (14 projecties) naar de rendement-verschuiving
     // waarbij de gap door nul gaat, op een VASTE stopleeftijd. Zie
@@ -197,6 +214,8 @@ export function runMarktcheckOnKernelInput(
       bandLiquide: mc.bandLiquide,
       marge: computeRendementMarge(input, params.stopAge),
       runs: mc.runs,
+      // Dezelfde `mcInput` als de band: run i is hier exact run i van de band.
+      vrijheidsleeftijden: computeMarktcheckVrijheidsleeftijden(mcInput, mc),
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : 'onbekende kernel-fout'
