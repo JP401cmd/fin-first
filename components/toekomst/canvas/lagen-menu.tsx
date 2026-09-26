@@ -24,13 +24,14 @@ import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { HideInSimple } from '@/components/app/hide-in-simple'
 import { useIsLgUp } from '@/lib/hooks/use-media-query'
 import {
-  LAAG_LABEL,
-  LAAG_UITLEG,
   LAAG_VAST_LABEL,
   LAAG_VOLGORDE,
   LAGEN_EENVOUDIG,
   LAGEN_KNOP_LABEL,
   LAGEN_KOP,
+  laagLabel,
+  laagUitleg,
+  type HoofdlijnGrondslag,
   type LaagId,
 } from '@/lib/horizon/katern-copy'
 
@@ -42,10 +43,15 @@ export interface LagenMenuProps {
   /** Lagen die in deze modus/dit katern bestaan; de rest verschijnt niet in het menu. */
   beschikbaar: readonly LaagId[]
   onToggle: (id: LaagId) => void
+  /**
+   * Grondslag van de hoofdlijn (`effectiveChartPrimaryBasis`). De huislaag schakelt de
+   * andere grondslag in en heet daarom "Met je huis" of "Zonder je huis".
+   */
+  hoofdlijn: HoofdlijnGrondslag
   className?: string
 }
 
-export function LagenMenu({ lagen, vast, beschikbaar, onToggle, className = '' }: LagenMenuProps) {
+export function LagenMenu({ lagen, vast, beschikbaar, onToggle, hoofdlijn, className = '' }: LagenMenuProps) {
   const [open, setOpen] = useState(false)
   const isLg = useIsLgUp()
   const wrapRef = useRef<HTMLDivElement>(null)
@@ -75,7 +81,14 @@ export function LagenMenu({ lagen, vast, beschikbaar, onToggle, className = '' }
   if (beschikbaar.length === 0) return null
 
   const lijst = (
-    <LagenLijst lagen={lagen} vast={vast} beschikbaar={beschikbaar} onToggle={onToggle} kopId={kopId} />
+    <LagenLijst
+      lagen={lagen}
+      vast={vast}
+      beschikbaar={beschikbaar}
+      onToggle={onToggle}
+      hoofdlijn={hoofdlijn}
+      kopId={kopId}
+    />
   )
 
   return (
@@ -126,13 +139,24 @@ function LagenLijst({
   vast,
   beschikbaar,
   onToggle,
+  hoofdlijn,
   kopId,
 }: Omit<LagenMenuProps, 'className'> & { kopId: string }) {
   const zichtbaar = LAAG_VOLGORDE.filter((id) => beschikbaar.includes(id))
   return (
     <ul role="group" aria-labelledby={kopId} className="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
       {zichtbaar.map((id) => {
-        const rij = <LaagRij key={id} id={id} aan={lagen[id]} vast={vast.includes(id)} onToggle={onToggle} />
+        const rij = (
+          <LaagRij
+            key={id}
+            id={id}
+            label={laagLabel(id, hoofdlijn)}
+            uitleg={laagUitleg(id, hoofdlijn)}
+            aan={lagen[id]}
+            vast={vast.includes(id)}
+            onToggle={onToggle}
+          />
+        )
         return LAGEN_EENVOUDIG.includes(id) ? rij : <HideInSimple key={id}>{rij}</HideInSimple>
       })}
     </ul>
@@ -141,11 +165,15 @@ function LagenLijst({
 
 function LaagRij({
   id,
+  label,
+  uitleg,
   aan,
   vast,
   onToggle,
 }: {
   id: LaagId
+  label: string
+  uitleg: string
   aan: boolean
   vast: boolean
   onToggle: (id: LaagId) => void
@@ -166,7 +194,7 @@ function LaagRij({
         />
         <span className="min-w-0">
           <span className="block text-[13px] font-medium text-[var(--ink)]">
-            {LAAG_LABEL[id]}
+            {label}
             {vast && (
               <span className="ml-1.5 font-mono text-[9px] uppercase tracking-[0.14em] text-[var(--ink-3)]">
                 {LAAG_VAST_LABEL}
@@ -174,7 +202,7 @@ function LaagRij({
             )}
           </span>
           <span id={uitlegId} className="block font-serif text-[12px] leading-snug text-[var(--ink-3)]">
-            {LAAG_UITLEG[id]}
+            {uitleg}
           </span>
         </span>
       </label>

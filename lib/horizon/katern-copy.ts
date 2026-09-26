@@ -306,18 +306,20 @@ export const LAGEN_KOP = 'Lagen op de grafiek'
 /** Achtervoegsel bij een laag die het katern vast aanzet. */
 export const LAAG_VAST_LABEL = 'vast'
 
-export const LAAG_LABEL: Record<LaagId, string> = {
+/** Lagen met één vaste naam; de huislaag (`metHuis`) hangt af van de hoofdlijn. */
+type VasteLaagId = Exclude<LaagId, 'metHuis'>
+
+export const LAAG_LABEL: Record<VasteLaagId, string> = {
   gebeurtenissen: 'Gebeurtenissen',
   mijlpalen: 'Mijlpalen',
   doelen: 'Doelen',
   doelscenario: 'Je doelscenario',
   marktcheck: 'Marktcheck',
   rendementScenarios: 'Rendement hoger en lager',
-  metHuis: 'Met je huis',
   speelAf: 'Speel af',
 }
 
-export const LAAG_UITLEG: Record<LaagId, string> = {
+export const LAAG_UITLEG: Record<VasteLaagId, string> = {
   gebeurtenissen: 'Wat je zelf op je tijdas zette, zoals een kind of een verhuizing.',
   mijlpalen: 'Momenten die uit je plan volgen, zoals je AOW of een lege pensioenpot.',
   doelen: 'Je vastgelegde doelen als punt op de lijn.',
@@ -325,8 +327,43 @@ export const LAAG_UITLEG: Record<LaagId, string> = {
   marktcheck:
     'Je plan vaak opnieuw doorgerekend met een ander marktverloop. De band is de middelste helft van de uitkomsten, de lijn erin het midden. Geen voorspelling: het laat zien hoe gevoelig je plan is voor de markt.',
   rendementScenarios: 'Je vermogenspad bij een rendement van 2 procentpunt lager en 2 procentpunt hoger.',
-  metHuis: 'Een tweede lijn met je huis erbij. De hoofdlijn is het deel waar je direct bij kunt.',
   speelAf: 'Loopt je plan jaar voor jaar door.',
+}
+
+/**
+ * Grondslag van de hoofdlijn (`effectiveChartPrimaryBasis`, ADR 0114): `liquid` = de
+ * hoofdlijn is zonder je huis (je houdt je huis buiten je vrijheidsdoel), `total` = de
+ * hoofdlijn telt je huis mee.
+ */
+export type HoofdlijnGrondslag = 'total' | 'liquid'
+
+/**
+ * De huislaag schakelt de lijn met de ándere grondslag dan de hoofdlijn. Zelfde woorden
+ * als de lijnnamen in `sim-chart.tsx` ("Met je huis" / "Zonder je huis").
+ */
+export const HUIS_LAAG_LABEL: Record<HoofdlijnGrondslag, string> = {
+  liquid: 'Met je huis',
+  total: 'Zonder je huis',
+}
+
+/**
+ * `liquid`: de kopij-toets (§5). `total`: de uitleg die de vervallen
+ * `ChartOverlayExplainer` bij de tweede lijn gaf, letterlijk overgenomen.
+ */
+export const HUIS_LAAG_UITLEG: Record<HoofdlijnGrondslag, string> = {
+  liquid: 'Een tweede lijn met je huis erbij. De hoofdlijn is het deel waar je direct bij kunt.',
+  total:
+    'De lijn zonder je huis toont het deel van je vermogen waar je direct bij kunt. Je huis zit daar niet in — daardoor kan de lijn met je huis doorgroeien terwijl die andere lijn daalt.',
+}
+
+/** Het label van een laag in het Lagen-menu; de huislaag volgt de hoofdlijn. */
+export function laagLabel(id: LaagId, hoofdlijn: HoofdlijnGrondslag): string {
+  return id === 'metHuis' ? HUIS_LAAG_LABEL[hoofdlijn] : LAAG_LABEL[id]
+}
+
+/** De uitleg van een laag in het Lagen-menu; de huislaag volgt de hoofdlijn. */
+export function laagUitleg(id: LaagId, hoofdlijn: HoofdlijnGrondslag): string {
+  return id === 'metHuis' ? HUIS_LAAG_UITLEG[hoofdlijn] : LAAG_UITLEG[id]
 }
 
 // ── Drie getallen onder de Marktcheck-band (kopij-toets §7, spec §7.6) ───────

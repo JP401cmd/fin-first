@@ -1,13 +1,14 @@
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import {
   AANNAMES_LINK_LABEL,
   CANVAS_MODUS_LABEL,
+  CANVAS_MODUS_VOLGORDE,
   CANVAS_UITLEG_TITEL,
   DOELEN_VOLGT_PLAN_REGEL,
-  MARKTCHECK_MISLUKT_REGEL,
-  CANVAS_MODUS_VOLGORDE,
+  HUIS_LAAG_LABEL,
+  HUIS_LAAG_UITLEG,
   INSTELLINGEN_SAMENVATTING_TOONT_WIZARDSTAND,
   KATERN_LABEL,
   KATERN_VOLGORDE,
@@ -17,6 +18,7 @@ import {
   LAAG_VOLGORDE,
   LAGEN_EENVOUDIG,
   LAGEN_KOP,
+  MARKTCHECK_MISLUKT_REGEL,
   MARKTCHECK_NIET_BINNEN_PLAN,
   MARKTCHECK_STAND_LABEL,
   aannamesRegelTekst,
@@ -27,6 +29,8 @@ import {
   katernAnkerregel,
   katernKpi1Label,
   katernStatuspuntLabel,
+  laagLabel,
+  laagUitleg,
   marktcheckGetallenRegel,
   marktcheckStandWaarde,
   planSamenvatting,
@@ -45,6 +49,8 @@ function alleKopij(): string[] {
     ...Object.values(KATERN_LABEL),
     ...Object.values(LAAG_LABEL),
     ...Object.values(LAAG_UITLEG),
+    ...Object.values(HUIS_LAAG_LABEL),
+    ...Object.values(HUIS_LAAG_UITLEG),
     ...Object.values(MARKTCHECK_STAND_LABEL),
     ...Object.values(CANVAS_MODUS_LABEL),
     LAGEN_KOP,
@@ -195,16 +201,37 @@ describe('katern-copy — aannamesregel', () => {
 })
 
 describe('katern-copy — lagen', () => {
-  it('elke LaagId heeft label én uitleg', () => {
-    for (const id of LAAG_VOLGORDE) {
-      expect(LAAG_LABEL[id].length).toBeGreaterThan(0)
-      expect(LAAG_UITLEG[id].length).toBeGreaterThan(0)
+  it('elke LaagId heeft label én uitleg, onder beide hoofdlijnen', () => {
+    for (const hoofdlijn of ['total', 'liquid'] as const) {
+      for (const id of LAAG_VOLGORDE) {
+        expect(laagLabel(id, hoofdlijn).length).toBeGreaterThan(0)
+        expect(laagUitleg(id, hoofdlijn).length).toBeGreaterThan(0)
+      }
     }
-    expect(new Set(LAAG_VOLGORDE).size).toBe(Object.keys(LAAG_LABEL).length)
+    // De vaste records plus de huislaag dekken precies de volgorde.
+    expect(new Set(LAAG_VOLGORDE).size).toBe(Object.keys(LAAG_LABEL).length + 1)
+  })
+
+  it('huislaag volgt de hoofdlijn: zonder je huis ⇒ "Met je huis", anders "Zonder je huis"', () => {
+    expect(laagLabel('metHuis', 'liquid')).toBe('Met je huis')
+    expect(laagUitleg('metHuis', 'liquid')).toBe(
+      'Een tweede lijn met je huis erbij. De hoofdlijn is het deel waar je direct bij kunt.',
+    )
+    expect(laagLabel('metHuis', 'total')).toBe('Zonder je huis')
+    expect(laagUitleg('metHuis', 'total')).toBe(
+      'De lijn zonder je huis toont het deel van je vermogen waar je direct bij kunt. Je huis zit daar niet in — daardoor kan de lijn met je huis doorgroeien terwijl die andere lijn daalt.',
+    )
+    // Andere lagen hangen niet af van de hoofdlijn.
+    expect(laagLabel('marktcheck', 'total')).toBe(laagLabel('marktcheck', 'liquid'))
+  })
+
+  it('de huislabels zijn de lijnnamen uit sim-chart (geen nieuwe formulering)', () => {
+    const src = readFileSync(join(process.cwd(), 'components/app/horizon/sim-chart.tsx'), 'utf8')
+    for (const label of Object.values(HUIS_LAAG_LABEL)) expect(src).toContain(`'${label}'`)
   })
 
   it('Eenvoudig toont Gebeurtenissen, Mijlpalen, Doelen en Je doelscenario', () => {
-    expect(LAGEN_EENVOUDIG.map((id: LaagId) => LAAG_LABEL[id])).toEqual([
+    expect(LAGEN_EENVOUDIG.map((id: LaagId) => laagLabel(id, 'liquid'))).toEqual([
       'Gebeurtenissen',
       'Mijlpalen',
       'Doelen',
@@ -219,7 +246,12 @@ describe('katern-copy — lagen', () => {
   })
 
   it('geen onverklaarde vakterm "±2pp" of "Natuurlijke mijlpalen"', () => {
-    const alles = [...Object.values(LAAG_LABEL), ...Object.values(LAAG_UITLEG)].join(' ')
+    const alles = [
+      ...Object.values(LAAG_LABEL),
+      ...Object.values(LAAG_UITLEG),
+      ...Object.values(HUIS_LAAG_LABEL),
+      ...Object.values(HUIS_LAAG_UITLEG),
+    ].join(' ')
     expect(alles).not.toMatch(/±|pp\b|Natuurlijke/)
   })
 })

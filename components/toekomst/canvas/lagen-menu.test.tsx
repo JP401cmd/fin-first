@@ -2,7 +2,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { DisplayModeProvider, type DisplayMode } from '@/lib/hooks/use-display-mode'
-import { LAAG_LABEL, LAAG_UITLEG, LAAG_VOLGORDE, type LaagId } from '@/lib/horizon/katern-copy'
+import {
+  LAAG_VOLGORDE,
+  laagLabel,
+  laagUitleg,
+  type HoofdlijnGrondslag,
+  type LaagId,
+} from '@/lib/horizon/katern-copy'
 import { LagenMenu } from './lagen-menu'
 
 vi.mock('@/lib/hooks/use-media-query', () => ({
@@ -35,7 +41,12 @@ afterEach(() => {
 
 function renderMenu(
   mode: DisplayMode,
-  props: Partial<{ lagen: Record<LaagId, boolean>; vast: LaagId[]; beschikbaar: LaagId[] }> = {},
+  props: Partial<{
+    lagen: Record<LaagId, boolean>
+    vast: LaagId[]
+    beschikbaar: LaagId[]
+    hoofdlijn: HoofdlijnGrondslag
+  }> = {},
 ) {
   const onToggle = vi.fn()
   render(
@@ -45,6 +56,7 @@ function renderMenu(
         vast={props.vast ?? []}
         beschikbaar={props.beschikbaar ?? [...LAAG_VOLGORDE]}
         onToggle={onToggle}
+        hoofdlijn={props.hoofdlijn ?? 'liquid'}
       />
     </DisplayModeProvider>,
   )
@@ -61,10 +73,30 @@ describe('LagenMenu', () => {
     const pop = screen.getByTestId('lagen-popover')
     expect(within(pop).getByText('Lagen op de grafiek')).toBeTruthy()
     for (const id of LAAG_VOLGORDE) {
-      expect(within(pop).getByText(LAAG_LABEL[id])).toBeTruthy()
-      expect(within(pop).getByText(LAAG_UITLEG[id])).toBeTruthy()
+      expect(within(pop).getByText(laagLabel(id, 'liquid'))).toBeTruthy()
+      expect(within(pop).getByText(laagUitleg(id, 'liquid'))).toBeTruthy()
     }
     expect(screen.queryByTestId('shell-overlay')).toBeNull()
+  })
+
+  it('huislaag: hoofdlijn zonder je huis ⇒ de laag heet "Met je huis"', () => {
+    renderMenu('full', { hoofdlijn: 'liquid' })
+    fireEvent.click(screen.getByRole('button', { name: /Lagen/ }))
+    const rij = screen.getByTestId('laag-metHuis')
+    expect(within(rij).getByRole('checkbox', { name: /^Met je huis/ })).toBeTruthy()
+    expect(rij.textContent).toContain('De hoofdlijn is het deel waar je direct bij kunt.')
+    expect(rij.textContent).not.toContain('Zonder je huis')
+  })
+
+  it('huislaag: hoofdlijn met je huis ⇒ de laag heet "Zonder je huis"', () => {
+    renderMenu('full', { hoofdlijn: 'total' })
+    fireEvent.click(screen.getByRole('button', { name: /Lagen/ }))
+    const rij = screen.getByTestId('laag-metHuis')
+    expect(within(rij).getByRole('checkbox', { name: /^Zonder je huis/ })).toBeTruthy()
+    expect(rij.textContent).toContain(
+      'De lijn zonder je huis toont het deel van je vermogen waar je direct bij kunt.',
+    )
+    expect(rij.textContent).not.toContain('Met je huis')
   })
 
   it('checkbox weerspiegelt de stand en roept onToggle', () => {

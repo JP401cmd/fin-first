@@ -278,6 +278,7 @@ export function ToekomstCanvas() {
                     vast={stand.vast}
                     beschikbaar={stand.beschikbaar}
                     onToggle={toggleLaag}
+                    hoofdlijn={effectiveChartPrimaryBasis}
                   />
                 )}
                 <ChartTips
