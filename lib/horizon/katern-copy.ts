@@ -43,7 +43,7 @@ export const KATERN_LABEL: Record<KaternId, string> = {
 }
 
 /** Toegankelijke naam van de `<nav>` met de katern-koppen. */
-export const KATERN_NAV_LABEL = 'Katernen van je toekomstplan'
+export const KATERN_NAV_LABEL = 'Onderdelen van je toekomstplan'
 
 /** De naam van de wizard-ingang bovenaan Instellingen — dezelfde bron als pane-titel en ⌘K. */
 export const KATERN_WIZARD_NAAM = PLAN_REVIEW_NAAM
