@@ -270,7 +270,7 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
       id: 'sp-plannen', x: 320, y: row(4), w: 210, h: 66, kind: 'bizproc',
       title: 'Plannen & simuleren (FIRE)',
       lead: 'FIRE-doel bepalen, scenario’s en what-if doorrekenen, levensgebeurtenissen en opnamestrategie op de tijdas.',
-      items: ['/toekomst', 'doelen · gebeurtenissen · voorkeuren · rekenhulp'],
+      items: ['/toekomst: plan · doelen · instellingen', 'rekenhulp'],
     },
     {
       id: 'sp-inzicht', x: 320, y: row(5), w: 210, h: 66, kind: 'bizproc',
@@ -325,7 +325,7 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
     {
       id: 'as-planning', x: 560, y: row(4), w: 220, h: 66, kind: 'appsvc',
       title: 'Planningsdienst (FIRE)',
-      lead: 'FIRE-doelrekening, unified projection en opnamestrategie; wat-als-verkenning via het inline lab op /toekomst (ADR 0144).',
+      lead: 'FIRE-doelrekening, unified projection en opnamestrategie; wat-als-verkenning via het inline lab (ADR 0144), dat op /toekomst/doelen woont; de instellingen staan op /toekomst/instellingen, en de drie katernen (plan · doelen · instellingen, ADR 0179) delen één grafiek.',
       items: ['/api/fire-settings', 'lib/fire-simulation'],
     },
     {
