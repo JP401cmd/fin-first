@@ -377,7 +377,6 @@ export function GebeurtenissenView({
   useEffect(() => {
     const n = searchParams.get('nieuw')
     if (n === '1' || n === 'true') openCatalog()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams])
 
   // Sluit de EventPane én ruim een eventuele ?nieuw-param op.

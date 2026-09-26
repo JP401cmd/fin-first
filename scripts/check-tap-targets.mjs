@@ -103,7 +103,6 @@ const ALLOWLIST_ENTRIES = [
   'components/overview/checkin-banner.tsx',
   'components/overview/hero-widget-rail.tsx',
   'components/overview/leverage-card.tsx',
-  'components/overview/print-overzicht-button.tsx',
   'components/overview/transacties/bulk/bulk-resultaten.tsx',
   'components/overview/transacties/bulk/bulk-uitkomst.tsx',
   'components/overview/transacties/spend-limits-section.tsx',
