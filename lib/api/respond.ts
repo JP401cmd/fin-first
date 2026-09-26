@@ -1,4 +1,5 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
+import { captureServerError } from '@/lib/observability/server-error-log'
 
 /**
  * Gedeelde API-error-envelope + respond-helpers (ADR 0044).
@@ -112,5 +113,21 @@ export function serverError(
 ): NextResponse {
   const stack = err instanceof Error ? err.stack : undefined
   console.error(`[${tag}] ${describeError(err)}`, stack ?? '')
+  scheduleServerErrorLog(err, tag, status)
   return errorResponse(clientMessage, status, 'server_error')
+}
+
+/**
+ * Fire-and-forget naar `error_logs` (/beheer/errors), gemaskeerd — zie
+ * lib/observability/server-error-log.ts voor wat er wel en niet mee gaat.
+ * `after()` laat het platform de schrijfactie ná de response afmaken; buiten
+ * een request-scope (tests, scripts) gooit `after` en valt dit terug op een
+ * losse promise. De response wacht nooit en faalt nooit op de log.
+ */
+function scheduleServerErrorLog(err: unknown, tag: string, status: number): void {
+  try {
+    after(() => captureServerError(err, tag, status))
+  } catch {
+    void captureServerError(err, tag, status)
+  }
 }

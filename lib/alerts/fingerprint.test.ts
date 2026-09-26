@@ -60,6 +60,8 @@ describe('safeContextTag', () => {
     expect(safeContextTag('global-error')).toBe('global-error')
     expect(safeContextTag('window.onerror')).toBe('window.onerror')
     expect(safeContextTag('unhandledrejection')).toBe('unhandledrejection')
+    expect(safeContextTag('serverError:beta-addon:POST:consent-event')).toBe('servererror:beta-addon:post:consent-event')
+    expect(safeContextTag('serverError:jan@x.nl')).toBe('onbekend')
   })
 
   /**

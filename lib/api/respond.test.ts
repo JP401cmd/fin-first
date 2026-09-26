@@ -11,6 +11,9 @@ import {
 } from './respond'
 import { parseBody } from './parse-body'
 
+const captureMock = vi.hoisted(() => vi.fn(async () => {}))
+vi.mock('@/lib/observability/server-error-log', () => ({ captureServerError: captureMock }))
+
 async function readBody(res: Response): Promise<{ status: number; body: Record<string, unknown> }> {
   return { status: res.status, body: await res.json() }
 }
@@ -76,6 +79,16 @@ describe('respond helpers', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     const { status } = await readBody(serverError(new Error('upstream'), 'x', 'Kon niet ophalen', 502))
     expect(status).toBe(502)
+  })
+
+  it('serverError plant de error_logs-capture in met tag en status, en wacht er niet op', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    captureMock.mockClear()
+    captureMock.mockImplementation(() => new Promise(() => {})) // hangt eeuwig
+    const err = new Error('kapot')
+    const res = serverError(err, 'x:GET', 'Kon niet ophalen', 503)
+    expect(res.status).toBe(503)
+    expect(captureMock).toHaveBeenCalledWith(err, 'x:GET', 503)
   })
 })
 

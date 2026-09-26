@@ -116,6 +116,16 @@ describe('POST /api/web-vitals', () => {
     expect(payload).toMatchObject({ user_id: null })
   })
 
+  it.each([
+    ['route', { route: '/x\u0000' }],
+    ['navigationType', { navigationType: '\u0000' }],
+    ['effectiveType', { effectiveType: '4g\u0001' }],
+  ])('AC5e — controleteken in %s → 400, geen insert (anders 22P05 → serverError → error_logs)', async (_veld, extra) => {
+    const res = await POST(req(validBody(extra)))
+    expect(res.status).toBe(400)
+    expect(mockInsert).not.toHaveBeenCalled()
+  })
+
   it('AC5a — onbekende metric → 400, geen insert', async () => {
     const res = await POST(req(validBody({ metric: 'XYZ' })))
     expect(res.status).toBe(400)

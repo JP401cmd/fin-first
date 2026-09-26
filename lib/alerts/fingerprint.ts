@@ -70,6 +70,8 @@ const ONREQUEST_TAG = /^onrequesterror:[a-z-]{1,20}$/
 /** `ai:<feature>` uit lib/ai/ai-failure-middleware.ts (feature-strings zijn
  *  lowercase snake_case, zie AiTokenFeature; plus 'config' en 'onbekend'). */
 const AI_FAILURE_TAG = /^ai:[a-z_]{1,32}$/
+/** `serverError:<domein>:<METHOD>[:<stap>]` uit lib/observability/server-error-log.ts. */
+const SERVER_ERROR_TAG = /^servererror:[a-z0-9_-]{1,40}(:[a-z0-9_-]{1,30}){0,2}$/
 
 /**
  * Maakt een `context`-waarde veilig om in een melding te tonen.
@@ -90,5 +92,6 @@ export function safeContextTag(context: string | null | undefined): string {
   if (EIGEN_TAGS.has(raw)) return raw
   if (ONREQUEST_TAG.test(raw)) return raw
   if (AI_FAILURE_TAG.test(raw)) return raw
+  if (SERVER_ERROR_TAG.test(raw)) return raw
   return 'onbekend'
 }

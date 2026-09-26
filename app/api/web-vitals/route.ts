@@ -50,6 +50,8 @@ export const runtime = 'nodejs'
 // Ruime bovengrens voor één beacon-meting; houdt malafide payloads klein.
 const MAX_BODY_BYTES = 4096
 
+const GEEN_CONTROLETEKENS = /^[^\u0000-\u001f\u007f]*$/
+
 // Enums/grenzen komen uit de gedeelde config zodat zender en ontvanger nooit
 // uiteenlopen (client-toegestaan == server-geaccepteerd).
 const metricSchema = z.object({
@@ -58,11 +60,14 @@ const metricSchema = z.object({
   // (in Zod 4 deprecated) .finite() deed, zonder de deprecation-waarschuwing.
   value: z.number().min(0).max(MAX_METRIC_VALUE),
   rating: z.enum(WEB_VITAL_RATINGS).nullish(),
-  route: z.string().min(1).max(512),
-  navigationType: z.string().max(40).nullish(),
+  // Geen controletekens: een NUL laat Postgres-text falen (22P05), en die 500
+  // zou via serverError() een anonieme, herhaalbare schrijfroute naar
+  // error_logs openen. Nu is het een 400.
+  route: z.string().min(1).max(512).regex(GEEN_CONTROLETEKENS),
+  navigationType: z.string().max(40).regex(GEEN_CONTROLETEKENS).nullish(),
   device: z.enum(WEB_VITAL_DEVICES).nullish(),
   viewportBucket: z.enum(VIEWPORT_BUCKETS).nullish(),
-  effectiveType: z.string().max(16).nullish(),
+  effectiveType: z.string().max(16).regex(GEEN_CONTROLETEKENS).nullish(),
 })
 
 export async function POST(request: Request) {
