@@ -26,11 +26,32 @@ import {
 } from '@/components/app/horizon/uitgaven-keuze'
 import { FireDeltaFooter, LiveSimImpact, fireFooterSleutel } from '@/components/future/regels/shared'
 import { SubsectionLabel } from '@/components/editorial'
+import { MaskedAmount } from '@/components/app/masked-amount'
 import type { PlanReviewEditorProps } from './editors'
 
 const LEGE_PROJECTIE: RegelProjection = { rows: [], fireAgeFractional: null }
 
 export function UitgavenEditor({ context, onActionsChange, onSaved }: PlanReviewEditorProps) {
+  return <UitgavenBody snapshot={context.snapshot} onActionsChange={onActionsChange} onSaved={onSaved} />
+}
+
+/**
+ * De body zelf (één body, twee hosts — ADR 0142/0179): de wizardstap "Leven na stoppen" en
+ * de rij "Uitgave na pensioen" in katern Instellingen (`UitgavenRijPane`). Laadt de
+ * uitgaven-context zelf; `metKop` toont het huidige jaarbedrag met de prijspeil-noot
+ * (wat de oude uitgaven-pane bovenaan had).
+ */
+export function UitgavenBody({
+  snapshot,
+  onActionsChange,
+  onSaved,
+  metKop = false,
+}: {
+  snapshot: RegelSimSnapshot | null
+  onActionsChange: PlanReviewEditorProps['onActionsChange']
+  onSaved: () => void
+  metKop?: boolean
+}) {
   const { ctx, loading, error, retry } = useUitgavenContext(true)
 
   if (error) {
@@ -54,7 +75,9 @@ export function UitgavenEditor({ context, onActionsChange, onSaved }: PlanReview
       </p>
     )
   }
-  return <UitgavenEditorInhoud ctx={ctx} snapshot={context.snapshot} onActionsChange={onActionsChange} onSaved={onSaved} />
+  return (
+    <UitgavenEditorInhoud ctx={ctx} snapshot={snapshot} onActionsChange={onActionsChange} onSaved={onSaved} metKop={metKop} />
+  )
 }
 
 function UitgavenEditorInhoud({
@@ -62,11 +85,13 @@ function UitgavenEditorInhoud({
   snapshot,
   onActionsChange,
   onSaved,
+  metKop,
 }: {
   ctx: UitgavenContext
   snapshot: RegelSimSnapshot | null
   onActionsChange: PlanReviewEditorProps['onActionsChange']
   onSaved: () => void
+  metKop: boolean
 }) {
   const { masked } = useMaskedAmounts()
   const keuze = useUitgavenKeuze({
@@ -128,6 +153,26 @@ function UitgavenEditorInhoud({
 
   return (
     <div className="pb-2">
+      {metKop && (
+        <div className="mb-5 border-b border-t border-[var(--ink)] py-4" data-testid="uitgaven-kop">
+          <p className="mb-1 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--ink-3)]">
+            {keuze.method === 'custom_amount' ? 'Voorlopig' : 'Huidig'}
+          </p>
+          <p className="font-serif text-3xl font-black leading-none tracking-[-0.02em] text-[var(--ink)]">
+            <MaskedAmount value={keuze.heroAmount} tone="horizon" monoWhenVisible={false} />
+            <span className="ml-2 text-base font-normal text-[var(--ink-3)]">/ jaar</span>
+          </p>
+          {keuze.dailyPrice > 0 && (
+            <p className="mt-1 text-sm italic text-[var(--ink-3)]">
+              ≈ {formatMaskedCurrency(Math.round(keuze.dailyPrice), masked)}/dag ·{' '}
+              {formatMaskedCurrency(Math.round(keuze.heroAmount / 12), masked)}/maand
+            </p>
+          )}
+          <p className="mt-3 text-xs leading-snug text-[var(--ink-2)]">
+            Alle bedragen hier zijn in prijspeil van vandaag. Inflatie rekent je projectie apart mee.
+          </p>
+        </div>
+      )}
       <UitgavenMethodeKeuze
         kop="h5"
         method={keuze.method}
