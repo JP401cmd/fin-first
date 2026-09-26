@@ -52,11 +52,18 @@
  *                                lib/scenario-events + lib/horizon/anker-copy.
  *   - `lib/goals/lab-doelen-buiten-plan.ts` — pure filter (WF-TOEK-50, spec
  *                                lab-haalbaarheid §4); geen imports.
- *   - `lib/horizon/eindsituatie-duiding.ts` + `eindsituatie-copy.ts` +
- *                                `eindsituatie-notice-minimize.ts` (WF-TOEK-56,
+ *   - `lib/horizon/eindsituatie-duiding.ts` + `eindsituatie-copy.ts` (WF-TOEK-56,
  *                                plan 17 sep 2026 onderdeel D); geen
  *                                Supabase-/Next-imports, alleen een
  *                                `UnifiedProjectionRow`-type-import.
+ *   - `lib/horizon/katern-meldingen.ts` + `katern-copy.ts` (WF-TOEK-01/50/52/56,
+ *                                ADR 0179 fase 2: de meldingen per katern en de
+ *                                aannamesregel). Pure modules; beide worden ook
+ *                                door client-componenten op /toekomst geïmporteerd.
+ *                                `eindsituatie-notice-minimize.ts` is sinds fase 2
+ *                                niet meer het minimaliseerpad (de losse
+ *                                EindsituatieNotice is weg) en wordt hier niet meer
+ *                                gespiegeld.
  *   - `lib/horizon/haalbare-uitgave.ts` (alleen het `HAALBARE_UITGAVE_DREMPEL`-
  *                                type/de constante) + `lib/scenario-events.ts`
  *                                (WF-TOEK-57, ADR 0160); de bisectie zelf
@@ -108,7 +115,15 @@ import { UITGAVE_NA_PENSIOEN_STAP } from '@/lib/scenario-events'
 import { buildDeficitLoanCopy } from '@/lib/horizon/deficit-loan-copy'
 import { detectEindsituatie } from '@/lib/horizon/eindsituatie-duiding'
 import { buildEindsituatieCopy } from '@/lib/horizon/eindsituatie-copy'
-import { resolveEindsituatieNoticeDisplay, asEindsituatieMinimizedFlag } from '@/lib/horizon/eindsituatie-notice-minimize'
+import { aannamesSegmenten } from '@/lib/horizon/katern-copy'
+import {
+  KATERN_ROUTE,
+  alsKaternMinimizedLevel,
+  katernMinimizeLevel,
+  resolveKaternMeldingDisplay,
+  wijsMeldingenToe,
+  type KaternMeldingenInput,
+} from '@/lib/horizon/katern-meldingen'
 import type { UnifiedProjectionRow } from '@/lib/unified-projection'
 import { TOEK_ACCEPTANCE } from './toek'
 import type { AcceptanceCriterion } from './types'
@@ -228,6 +243,29 @@ function balkGrondslag(context: HousingContext, config: HousingStrategyConfig): 
   return requiredPortfolio === SENTINEL_J ? 'J' : 'I'
 }
 
+// ── Meldingen per katern (ADR 0179 fase 2) ─────────────────────────────────
+// Lege invoer van `wijsMeldingenToe`: elke check zet alleen het signaal dat hij toetst,
+// zodat de toewijzing (katern, ernst, actie) van precies die ene melding zichtbaar is.
+const GEEN_MELDINGEN: KaternMeldingenInput = {
+  masked: false,
+  plan: null,
+  tekortLening: null,
+  eindsituatie: null,
+  labDoelenBuitenPlan: 0,
+  doelen: [],
+  aowOntbreekt: false,
+  huisNooitVerkocht: null,
+  ontbrekendeGegevens: [],
+}
+
+/** De enige melding die `wijsMeldingenToe` voor deze invoer oplevert, met haar katern. */
+function enigeMelding(input: Partial<KaternMeldingenInput>) {
+  const perKatern = wijsMeldingenToe({ ...GEEN_MELDINGEN, ...input })
+  const alle = (['plan', 'doelen', 'instellingen'] as const).flatMap((k) => perKatern[k].meldingen)
+  if (alle.length !== 1) throw new Error(`Verwacht precies één melding, kreeg ${alle.length}`)
+  return alle[0]
+}
+
 // ── WF-TOEK-56 helper (eindsituatie-duiding, plan 17 sep 2026 onderdeel D) ──
 
 /**
@@ -275,15 +313,28 @@ export const TOEK_ENGINE_CHECKS: ToekEngineCheck[] = [
   {
     workflow: 'WF-TOEK-01',
     scenarioId: 'UAT-TOEK-01',
-    label: 'Strategie-labels + eindleeftijd-echo + weergave-eindleeftijd (Willem deplete)',
+    label: 'Strategie-labels + eindleeftijd-echo + weergave-eindleeftijd + aannamesregel (stop/eind) (Willem deplete)',
     run: () => {
       criterion('WF-TOEK-01')
       const cfg = parseFireStrategy(willem.profile)
       const eindleeftijd = cfg.endAge // 95 (deplete → fire_end_age)
       const weergaveTot = eindleeftijd - 1 // 94 (displayEndAge − 1)
+      // Aannamesregel (ADR 0179 fase 2, vervangt de voetnoot): het canvas geeft `stop: null`
+      // onder solved (toekomst-canvas.tsx), anders het vaste anker. Willem heeft geen
+      // fire_stop_anchor → solved. Alleen de stop- en eind-segmenten zijn hier te herleiden;
+      // inflatie/rendement/gebeurtenissen hangen aan de run en blijven buiten deze check.
+      const plan = parseFirePlan(willem.profile)
+      const segmenten = aannamesSegmenten({
+        stop: null,
+        eindleeftijd: plan.endAge,
+        inflatiePct: 0,
+        rendementPct: 0,
+        gebeurtenissen: 0,
+      })
+      const seg = (key: string) => segmenten.find((s) => s.key === key)?.tekst
       return {
-        expected: 'strategieLabelDeplete=Vermogen opeten; eindleeftijd=95; weergaveTot=94; strategieLabelPensioen=Pensioenleeftijd',
-        actual: `strategieLabelDeplete=${STRATEGY_LABELS.deplete.name}; eindleeftijd=${eindleeftijd}; weergaveTot=${weergaveTot}; strategieLabelPensioen=${STRATEGY_LABELS.pensioen.name}`,
+        expected: 'strategieLabelDeplete=Vermogen opeten; eindleeftijd=95; weergaveTot=94; strategieLabelPensioen=Pensioenleeftijd; anker=solved; aannamesStop=stopmoment zo vroeg mogelijk; aannamesEind=plan tot je 95e',
+        actual: `strategieLabelDeplete=${STRATEGY_LABELS.deplete.name}; eindleeftijd=${eindleeftijd}; weergaveTot=${weergaveTot}; strategieLabelPensioen=${STRATEGY_LABELS.pensioen.name}; anker=${plan.anchor.kind}; aannamesStop=${seg('stop')}; aannamesEind=${seg('eind')}`,
       }
     },
   },
@@ -724,9 +775,11 @@ export const TOEK_ENGINE_CHECKS: ToekEngineCheck[] = [
         { id: 'vrijheidsgetal', metadata: {}, notApplicableReason: 'Je stopmoment ligt vast op 62, dus er is geen doelvermogen om naartoe te sparen.' },
       ]
       const buiten = selectLabDoelenBuitenPlan(goals)
+      // ADR 0179 fase 2: de melding staat in het meldingenslot van katern Doelen.
+      const m = enigeMelding({ labDoelenBuitenPlan: buiten.length })
       return {
-        expected: 'buitenPlan=fire; melding=Je plan is veranderd. 1 doel uit het lab past er niet meer bij.',
-        actual: `buitenPlan=${buiten.map((g) => g.id).join(',')}; melding=${doelenPlanGewijzigdMelding(buiten.length)}`,
+        expected: 'buitenPlan=fire; melding=Je plan is veranderd. 1 doel uit het lab past er niet meer bij.; katern=doelen; ernst=neutral; actie=Bijwerken→/toekomst/doelen#verken-je-aannames',
+        actual: `buitenPlan=${buiten.map((g) => g.id).join(',')}; melding=${doelenPlanGewijzigdMelding(buiten.length)}; katern=${m.katern}; ernst=${m.ernst}; actie=${m.actie?.label}→${m.actie?.href}`,
       }
     },
   },
@@ -750,10 +803,15 @@ export const TOEK_ENGINE_CHECKS: ToekEngineCheck[] = [
       const uit = buildDeficitLoanCopy({ ...base, geenTekortLeningAan: false })
       const aan = buildDeficitLoanCopy({ ...base, geenTekortLeningAan: true, vastStopmoment: true })
       const aanZonderAnker = buildDeficitLoanCopy({ ...base, geenTekortLeningAan: true, vastStopmoment: false })
+      // ADR 0179 fase 2: de melding staat in het meldingenslot van katern Plan, met één
+      // actie naar de instelling. Zonder bewezen aflossing (clearedAge null) de "vanaf"-vorm,
+      // mét aflossing de "tussen … en …"-vorm.
+      const zonderAflossing = enigeMelding({ tekortLening: { notice: { firstAge: 60, clearedAge: null }, copy: uit } })
+      const metAflossing = enigeMelding({ tekortLening: { notice: { firstAge: 60, clearedAge: 62.5 }, copy: uit } })
       return {
         expected:
-          'instellingUit=Je plan staat een tekort-lening nu toe. Met de instelling "Geen tekort-lening in mijn plan" rekent de app met het vroegste stopmoment waarop je zonder lening rondkomt.; instellingAan=Je hebt ingesteld dat een tekort-lening niet in je plan hoort, maar met je gekozen stopmoment is hij toch nodig.; instellingAanZonderVastStopmoment=Je hebt ingesteld dat een tekort-lening niet in je plan hoort; deze berekening laat er toch een zien.; toonInstellingLink=true',
-        actual: `instellingUit=${uit.instelling}; instellingAan=${aan.instelling}; instellingAanZonderVastStopmoment=${aanZonderAnker.instelling}; toonInstellingLink=${uit.toonInstellingLink && aan.toonInstellingLink}`,
+          'instellingUit=Je plan staat een tekort-lening nu toe. Met de instelling "Geen tekort-lening in mijn plan" rekent de app met het vroegste stopmoment waarop je zonder lening rondkomt.; instellingAan=Je hebt ingesteld dat een tekort-lening niet in je plan hoort, maar met je gekozen stopmoment is hij toch nodig.; instellingAanZonderVastStopmoment=Je hebt ingesteld dat een tekort-lening niet in je plan hoort; deze berekening laat er toch een zien.; katern=plan; ernst=warn; titelZonderAflossing=Je plan dekt vanaf je 60e een tekort met een lening.; titelMetAflossing=Je plan dekt tussen je 60e en 62e een tekort met een lening.; uitlegBevatInstelling=true; actie=Naar de instelling→/toekomst/instellingen?regel=eindstrategie',
+        actual: `instellingUit=${uit.instelling}; instellingAan=${aan.instelling}; instellingAanZonderVastStopmoment=${aanZonderAnker.instelling}; katern=${zonderAflossing.katern}; ernst=${zonderAflossing.ernst}; titelZonderAflossing=${zonderAflossing.titel}; titelMetAflossing=${metAflossing.titel}; uitlegBevatInstelling=${(zonderAflossing.uitleg ?? '').includes(uit.instelling)}; actie=${zonderAflossing.actie?.label}→${zonderAflossing.actie?.href}`,
       }
     },
   },
@@ -788,17 +846,22 @@ export const TOEK_ENGINE_CHECKS: ToekEngineCheck[] = [
       const bedragTekst = (b: { bedrag: number }) => `€ ${Math.round(b.bedrag).toLocaleString('nl-NL')}`
       const copy = buildEindsituatieCopy({ duiding, endForm: 'deplete', bedragTekst })
 
-      const displayNone = resolveEindsituatieNoticeDisplay(false, null)
-      const displayExpanded = resolveEindsituatieNoticeDisplay(true, null)
-      const displayMinimized = resolveEindsituatieNoticeDisplay(true, 1)
-      const flagOnbekendeWaarde = asEindsituatieMinimizedFlag(2)
-      const flagGeldig = asEindsituatieMinimizedFlag(1)
+      // ADR 0179 fase 2: de melding staat in het meldingenslot van katern Plan (de losse
+      // EindsituatieNotice met zijn eigen vlag is weg). Minimaliseren gaat per katern-route
+      // op `status_banner_minimized` (route → niveau): informatief slaat op als `info`,
+      // dat nooit escaleert.
+      const m = enigeMelding({ eindsituatie: copy })
+      const level = katernMinimizeLevel(m.ernst)
+      const displayNone = resolveKaternMeldingDisplay(null, null)
+      const displayExpanded = resolveKaternMeldingDisplay(m.ernst, null)
+      const displayMinimized = resolveKaternMeldingDisplay(m.ernst, level)
+      const levelOnbekend = alsKaternMinimizedLevel(1)
 
       return {
         expected:
-          'oorzaken=geen-tekort-lening,later-inkomen; eenduidig=true; overschot=300000@90; dieptepunt=15000@68; kopBevatVermogenOpeten=true; oorzaak0BevatJe68e=true; oorzaak0BevatDieptepunt=true; oorzaak1BevatJe80e=true; onduidelijk=null; displayNone=none; displayExpanded=expanded; displayMinimized=minimized; flagOnbekendeWaarde=null; flagGeldig=1',
+          'oorzaken=geen-tekort-lening,later-inkomen; eenduidig=true; overschot=300000@90; dieptepunt=15000@68; kopBevatVermogenOpeten=true; oorzaak0BevatJe68e=true; oorzaak0BevatDieptepunt=true; oorzaak1BevatJe80e=true; onduidelijk=null; katern=plan; ernst=neutral; titelIsKop=true; actie=Bekijk of wijzig je plan→/toekomst/instellingen?regel=eindstrategie; prefSleutel=/toekomst; minimizeLevel=info; displayNone=none; displayExpanded=expanded; displayMinimized=minimized; levelOnbekend=null',
         actual:
-          `oorzaken=${duiding.oorzaken.map((o) => o.id).join(',')}; eenduidig=${duiding.eenduidig}; overschot=${duiding.overschot.bedrag}@${duiding.overschot.age}; dieptepunt=${duiding.dieptepunt?.bedrag}@${duiding.dieptepunt?.age}; kopBevatVermogenOpeten=${copy.kop.includes('vermogen opeten')}; oorzaak0BevatJe68e=${copy.oorzaken[0]?.includes('je 68e')}; oorzaak0BevatDieptepunt=${copy.oorzaken[0]?.includes('€ 15.000')}; oorzaak1BevatJe80e=${copy.oorzaken[1]?.includes('je 80e')}; onduidelijk=${copy.onduidelijk}; displayNone=${displayNone}; displayExpanded=${displayExpanded}; displayMinimized=${displayMinimized}; flagOnbekendeWaarde=${flagOnbekendeWaarde}; flagGeldig=${flagGeldig}`,
+          `oorzaken=${duiding.oorzaken.map((o) => o.id).join(',')}; eenduidig=${duiding.eenduidig}; overschot=${duiding.overschot.bedrag}@${duiding.overschot.age}; dieptepunt=${duiding.dieptepunt?.bedrag}@${duiding.dieptepunt?.age}; kopBevatVermogenOpeten=${copy.kop.includes('vermogen opeten')}; oorzaak0BevatJe68e=${copy.oorzaken[0]?.includes('je 68e')}; oorzaak0BevatDieptepunt=${copy.oorzaken[0]?.includes('€ 15.000')}; oorzaak1BevatJe80e=${copy.oorzaken[1]?.includes('je 80e')}; onduidelijk=${copy.onduidelijk}; katern=${m.katern}; ernst=${m.ernst}; titelIsKop=${m.titel === copy.kop}; actie=${m.actie?.label}→${m.actie?.href}; prefSleutel=${KATERN_ROUTE[m.katern]}; minimizeLevel=${level}; displayNone=${displayNone}; displayExpanded=${displayExpanded}; displayMinimized=${displayMinimized}; levelOnbekend=${levelOnbekend}`,
       }
     },
   },

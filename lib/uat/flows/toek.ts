@@ -31,38 +31,42 @@ export const TOEK_FLOW: UatFlow = {
     // ── 0 · instap ────────────────────────────────────────────────────────
     { id: 'nav', label: 'Navigatie naar Toekomst (/toekomst)', kind: 'entry', stage: 0 },
     { id: 'eerste', label: 'Eerste keer?', kind: 'decision', stage: 0 },
-    { id: 'welkom', scenarioId: 'UAT-TOEK-07', label: 'WF-TOEK-07 · Tips-modus', kind: 'screen', stage: 0, lane: 'instap' },
+    { id: 'welkom', scenarioId: 'UAT-TOEK-07', label: 'WF-TOEK-07 · Tips-modus (standaard uit, achter de canvas-i)', kind: 'screen', stage: 0, lane: 'instap' },
 
     // ── 0 · grondslag (kernel-inputs uit andere domeinen) ─────────────────
     { id: 'x-bezit', label: 'Liquide / FIRE-eligible portefeuille (grondslag)', kind: 'cross', stage: 0, lane: 'grondslag', crossZone: 'BEZIT' },
     { id: 'x-belast', label: 'Box 3-forfait (nettorendement)', kind: 'cross', stage: 0, lane: 'grondslag', crossZone: 'BELAST' },
 
     // ── 1 · tijdas-hub ────────────────────────────────────────────────────
-    { id: 'tijdas', scenarioId: 'UAT-TOEK-01', label: 'WF-TOEK-01 · Tijdas-landing & FIRE-kerncijfers', kind: 'screen', stage: 1 },
+    { id: 'tijdas', scenarioId: 'UAT-TOEK-01', label: 'WF-TOEK-01 · Landing: oordeelzin + ankerregel, KPI-strip, aannamesregel', kind: 'screen', stage: 1 },
 
     // ── 2 · de grafiek aflezen ────────────────────────────────────────────
     { id: 'kpi', scenarioId: 'UAT-TOEK-02', label: 'WF-TOEK-02 · KPI-kassabon controleren', kind: 'screen', stage: 2, lane: 'aflezen' },
-    { id: 'status', scenarioId: 'UAT-TOEK-03', label: 'WF-TOEK-03 · Statusmeldingen boven de grafiek', kind: 'screen', stage: 2, lane: 'aflezen' },
-    // ADR 0148/0149 — werkelijk aflosmoment, woonstrategie-zin en instelling-ingang.
-    { id: 'tekortmelding', scenarioId: 'UAT-TOEK-52', label: 'WF-TOEK-52 · Tekort-lening-melding (aflosmoment, woonstrategie, instelling)', kind: 'screen', stage: 2, lane: 'aflezen', subOf: 'status' },
+    // ADR 0179 fase 2 — één meldingenslot bovenaan het actieve katern; het punt staat op de katern-kop.
+    { id: 'status', scenarioId: 'UAT-TOEK-03', label: 'WF-TOEK-03 · Meldingen bovenaan katern Plan', kind: 'screen', stage: 2, lane: 'aflezen' },
+    // ADR 0148/0149 — werkelijk aflosmoment, woonstrategie-zin; sinds ADR 0179 één actie naar de instelling.
+    { id: 'tekortmelding', scenarioId: 'UAT-TOEK-52', label: 'WF-TOEK-52 · Tekort-lening-melding in Plan (aflosmoment, woonstrategie, instelling)', kind: 'screen', stage: 2, lane: 'aflezen', subOf: 'status' },
     // Plan 17 sep 2026 onderdeel D — "waarom blijft er aan het eind zoveel over?".
-    { id: 'eindsituatie', scenarioId: 'UAT-TOEK-56', label: 'WF-TOEK-56 · Melding "waarom blijft er aan het eind zoveel over?"', kind: 'screen', stage: 2, lane: 'aflezen', subOf: 'status' },
-    { id: 'grafiek', scenarioId: 'UAT-TOEK-04', label: 'WF-TOEK-04 · Grafiek verkennen (Pad/Opbouw, zoom)', kind: 'screen', stage: 2, lane: 'aflezen' },
+    { id: 'eindsituatie', scenarioId: 'UAT-TOEK-56', label: 'WF-TOEK-56 · Melding "waarom blijft er aan het eind zoveel over?" in Plan', kind: 'screen', stage: 2, lane: 'aflezen', subOf: 'status' },
+    { id: 'grafiek', scenarioId: 'UAT-TOEK-04', label: 'WF-TOEK-04 · Grafiek verkennen (Vermogen/Samenstelling/Geldstroom, Lagen, zoom)', kind: 'screen', stage: 2, lane: 'aflezen' },
     { id: 'jaardetail', scenarioId: 'UAT-TOEK-05', label: 'WF-TOEK-05 · Jaar-detail-kassabon', kind: 'screen', stage: 2, lane: 'aflezen', subOf: 'grafiek' },
-    { id: 'details', scenarioId: 'UAT-TOEK-06', label: 'WF-TOEK-06 · "Details" · jaar-op-jaar tabel', kind: 'screen', stage: 2, lane: 'aflezen', subOf: 'grafiek' },
+    // ADR 0179 fase 2 — de Details-knop boven de grafiek is weg; de tabel opent via de link in Plan.
+    { id: 'details', scenarioId: 'UAT-TOEK-06', label: 'WF-TOEK-06 · "Jaar-op-jaar-tabel →" in Plan', kind: 'screen', stage: 2, lane: 'aflezen', subOf: 'grafiek' },
     { id: 'fasebalk', scenarioId: 'UAT-TOEK-12', label: 'WF-TOEK-12 · Fase-balk (drie levensfasen)', kind: 'screen', stage: 2, lane: 'aflezen' },
     { id: 'markers', scenarioId: 'UAT-TOEK-16', label: 'WF-TOEK-16 · Markers & natuurlijke mijlpalen', kind: 'screen', stage: 2, lane: 'aflezen' },
     { id: 'verdieping', scenarioId: 'UAT-TOEK-32', label: 'WF-TOEK-32 · Verdieping: trends & geplande acties', kind: 'screen', stage: 2, lane: 'aflezen' },
     { id: 'euroweergave', scenarioId: 'UAT-TOEK-33', label: "WF-TOEK-33 · Huidige euro's: grafiek/hero/fasetabel", kind: 'action', stage: 2, lane: 'aflezen', subOf: 'grafiek' },
     { id: 'maskering', scenarioId: 'UAT-TOEK-34', label: 'WF-TOEK-34 · Bedragmaskering op de grafiek', kind: 'action', stage: 2, lane: 'aflezen', subOf: 'grafiek' },
     { id: 'grondslaglijn', scenarioId: 'UAT-TOEK-36', label: 'WF-TOEK-36 · Grondslag hoofdlijn per woonstrategie', kind: 'screen', stage: 2, lane: 'aflezen', subOf: 'grafiek' },
-    { id: 'grondslagdoorwerking', scenarioId: 'UAT-TOEK-37', label: 'WF-TOEK-37 · Stip, band, drempels, pill & kassabon bewegen mee', kind: 'screen', stage: 2, lane: 'aflezen', subOf: 'grondslaglijn' },
-    // ADR 0148 — schuld-segmenten per soort in de Opbouw-weergave; sinds de
+    { id: 'grondslagdoorwerking', scenarioId: 'UAT-TOEK-37', label: 'WF-TOEK-37 · Stip, band, drempels, tweede lijn & kassabon bewegen mee', kind: 'screen', stage: 2, lane: 'aflezen', subOf: 'grondslaglijn' },
+    // ADR 0148 — schuld-segmenten per soort in de Opbouw-weergave (sinds ADR 0179
+    // fase 2 de modus Samenstelling); sinds de
     // bugfix van 18-09-2026 markeert diezelfde weergave ook het uitgesloten
     // eigen huis én zijn hypotheek (subscenario b).
     { id: 'opbouwkleuren', scenarioId: 'UAT-TOEK-53', label: 'WF-TOEK-53 · Schuldkleuren per soort + gemarkeerd eigen huis', kind: 'screen', stage: 2, lane: 'aflezen', subOf: 'grafiek' },
-    // ADR 0150 — opname naar behoefte krijgt een eigen post (Inkomen & Uitgaven,
-    // jaar-kassabon, opbouw-hover, tijdlijn-marker).
+    // ADR 0150 — opname naar behoefte krijgt een eigen post (Inkomen & Uitgaven —
+    // sinds ADR 0179 fase 2 de modus Geldstroom —, jaar-kassabon, opbouw-hover,
+    // tijdlijn-marker).
     { id: 'opeetopname', scenarioId: 'UAT-TOEK-54', label: 'WF-TOEK-54 · Opname uit je huis zichtbaar als eigen post', kind: 'screen', stage: 2, lane: 'aflezen', subOf: 'grafiek' },
     // ADR 0151 — bijgeschreven rente krijgt een eigen "+"-regel op de jaarkaart.
     { id: 'opeetrente', scenarioId: 'UAT-TOEK-55', label: 'WF-TOEK-55 · Bijgeschreven rente zichtbaar, geen-maandlast-toelichting', kind: 'action', stage: 2, lane: 'aflezen', subOf: 'opeetopname' },
@@ -70,12 +74,13 @@ export const TOEK_FLOW: UatFlow = {
     // ── 2 · navigeren & delen ─────────────────────────────────────────────
     // ADR 0179 fase 1 — de vier navkaarten zijn vervangen door de katern-koppen
     // Plan · Doelen · Instellingen onder het gedeelde canvas.
-    { id: 'katernkoppen', scenarioId: 'UAT-TOEK-28', label: 'WF-TOEK-28 · Katern-koppen (Plan · Doelen · Instellingen)', kind: 'screen', stage: 2, lane: 'navigeren' },
+    // Fase 2 — inactieve koppen dragen een samenvatting (≥ lg) en het statuspunt van hun melding.
+    { id: 'katernkoppen', scenarioId: 'UAT-TOEK-28', label: 'WF-TOEK-28 · Katern-koppen (Plan · Doelen · Instellingen) met samenvatting en statuspunt', kind: 'screen', stage: 2, lane: 'navigeren' },
     { id: 'deeplinks', scenarioId: 'UAT-TOEK-30', label: 'WF-TOEK-30 · Deeplinks & legacy-routes', kind: 'screen', stage: 2, lane: 'navigeren', subOf: 'katernkoppen' },
     { id: 'delen', scenarioId: 'UAT-TOEK-29', label: 'WF-TOEK-29 · Delen / afdrukken (PDF)', kind: 'action', stage: 2, lane: 'navigeren' },
 
     // ── 3 · simuleren (niet-persistent over de grafiek) ───────────────────
-    { id: 'scenarios', scenarioId: 'UAT-TOEK-08', label: "WF-TOEK-08 · Scenario's & Monte Carlo", kind: 'action', stage: 3, lane: 'simuleren' },
+    { id: 'scenarios', scenarioId: 'UAT-TOEK-08', label: 'WF-TOEK-08 · Lagen "Rendement hoger en lager" & Marktcheck (drie getallen)', kind: 'action', stage: 3, lane: 'simuleren' },
     // WF-TOEK-09 (opgeslagen wat-als als spooklijn) is VERVALLEN op 14 sep
     // 2026 (ADR 0144) — de bewaarde wat-als-scenario's en de spooklijn-
     // overlay-picker zijn met de standalone Wat-Als-pagina verwijderd.
@@ -84,8 +89,9 @@ export const TOEK_FLOW: UatFlow = {
     { id: 'aowstop', scenarioId: 'UAT-TOEK-11', label: 'WF-TOEK-11 · AOW-stop-simulatie (doorwerken)', kind: 'action', stage: 3, lane: 'simuleren', subOf: 'aowbeslis' },
     // TPR-09 — de verkende stopleeftijd van de stop-knop tot plan maken (schrijft het volledige plan).
     { id: 'maakplan', scenarioId: 'UAT-TOEK-46', label: 'WF-TOEK-46 · Verkenning tot plan maken ("Maak dit mijn plan")', kind: 'action', stage: 3, lane: 'simuleren', subOf: 'sliders' },
-    // TPR-04 — geen actief AOW-event: de €0 AOW benoemd, minimaliseerbaar naar een statuspunt.
-    { id: 'aowmelding', scenarioId: 'UAT-TOEK-45', label: 'WF-TOEK-45 · Melding "Geen AOW op je tijdas" (minimaliseren/heropenen)', kind: 'screen', stage: 2, lane: 'aflezen' },
+    // TPR-04 — geen actief AOW-event: de €0 AOW benoemd; sinds ADR 0179 fase 2 in katern
+    // Instellingen, minimaliseerbaar naar het punt op de Instellingen-kop.
+    { id: 'aowmelding', scenarioId: 'UAT-TOEK-45', label: 'WF-TOEK-45 · Melding "Geen AOW op je tijdas" in Instellingen (minimaliseren/heropenen)', kind: 'screen', stage: 2, lane: 'aflezen' },
 
     // ── 3 · gebeurtenissen op de tijdas ───────────────────────────────────
     { id: 'eventadd', scenarioId: 'UAT-TOEK-13', label: 'WF-TOEK-13 · Levensgebeurtenis toevoegen', kind: 'action', stage: 3, lane: 'gebeurtenissen' },
@@ -136,9 +142,10 @@ export const TOEK_FLOW: UatFlow = {
     // worden — vandaar de cross-lane edge vanuit `sliders` hieronder.
     { id: 'labuitkomst', scenarioId: 'UAT-TOEK-49', label: 'WF-TOEK-49 · Lab volgt het anker: dekking als uitkomst onder een vast stopmoment', kind: 'action', stage: 4, lane: 'doelen', subOf: 'doelen' },
     { id: 'labknoppen', scenarioId: 'UAT-TOEK-58', label: 'WF-TOEK-58 · Vijf knoppen met een driekleurige schaal; de grens staat op de knop', kind: 'action', stage: 4, lane: 'doelen', subOf: 'doelen' },
-    { id: 'doelenmelding', scenarioId: 'UAT-TOEK-50', label: 'WF-TOEK-50 · Doelen volgen het plan: melding bij lab-doelen buiten het plan', kind: 'screen', stage: 4, lane: 'doelen', subOf: 'doelen' },
+    { id: 'doelenmelding', scenarioId: 'UAT-TOEK-50', label: 'WF-TOEK-50 · Doelen volgen het plan: melding in het slot van katern Doelen', kind: 'screen', stage: 4, lane: 'doelen', subOf: 'doelen' },
 
-    { id: 'pillenrij', scenarioId: 'UAT-TOEK-41', label: 'WF-TOEK-41 · Pillenrij-invariant (label + badge samen) & het md-breekpunt van de cijferstrip', kind: 'screen', stage: 2, lane: 'aflezen', subOf: 'grafiek' },
+    // Knoop-id `pillenrij` blijft (edges); de pillenrij zelf is sinds ADR 0179 fase 2 weg.
+    { id: 'pillenrij', scenarioId: 'UAT-TOEK-41', label: 'WF-TOEK-41 · Geen kaal getal zonder naam (Lagen-menu, drie getallen) & het md-breekpunt van de KPI-strip', kind: 'screen', stage: 2, lane: 'aflezen', subOf: 'grafiek' },
     { id: 'strategiekaarten', scenarioId: 'UAT-TOEK-42', label: 'WF-TOEK-42 · Vier levensstrategieën in beide weergavemodi', kind: 'screen', stage: 4, lane: 'strategie', subOf: 'strategiebeslis' },
     // Loslaten is een doel-actie, niet een aparte pagina: hij hangt onder de
     // doelen-rail en moet terugleiden naar het opnieuw vastleggen (B-031).

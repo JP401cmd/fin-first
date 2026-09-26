@@ -447,7 +447,7 @@ const criteria: AcceptanceCriterion[] = [
     then: 'Het getoonde bedrag is op de twee oppervlakken identiek tot op afronding — dezelfde `deflate(fireTarget, factorAtAge(unifiedRows, fireAge), \'real\')`-aanroep op dezelfde kernelrijen, nooit een tweede/eigen herberekening per widget (NFR-X1/X2). Dit is de kern-eis van AC-F4/T13: zonder deze rij kunnen twee oppervlakken elk voor zich "groen" zijn en toch onderling verschillen.',
     assertion: {
       kind: 'consistency',
-      source: 'components/toekomst/state/use-euro-view-feeds.ts → components/toekomst/canvas/canvas-grafiek.tsx (TOEK-hero, brok B; tot ADR 0179 horizon-client.tsx) + components/widgets/vrijheidsvoortgang-widget.tsx (OVZ-widget, brok F, r51/55 — expliciet UAT-KRUIS-27 in commentaar) — beide consumeren lib/euro-display.ts#deflate, geen eigen berekening; kruisZones = TOEK/OVZ (catalog.ts)',
+      source: 'components/toekomst/state/use-euro-view-feeds.ts → components/toekomst/canvas/canvas-grafiek.tsx (doellijn in de grafiek) en components/toekomst/plan/plan-kpi-strip.tsx (KPI "Doelbedrag" in katern Plan, sinds ADR 0179 fase 2 één strip voor alle breedtes) (TOEK-hero, brok B; tot ADR 0179 horizon-client.tsx) + components/widgets/vrijheidsvoortgang-widget.tsx (OVZ-widget, brok F, r51/55 — expliciet UAT-KRUIS-27 in commentaar) — beide consumeren lib/euro-display.ts#deflate, geen eigen berekening; kruisZones = TOEK/OVZ (catalog.ts)',
     },
   },
 ]
