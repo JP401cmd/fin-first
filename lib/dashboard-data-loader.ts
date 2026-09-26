@@ -2038,7 +2038,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       message: `Je bent op ${Math.round(freedomPct)}% van je FIRE-doel — bijna volledige vrijheid!`,
       severity: 'info',
       createdAt: new Date().toISOString(),
-      actionHref: '/horizon',
+      actionHref: '/toekomst',
     })
   } else if (freedomPct >= 100) {
     notifications.push({
@@ -2047,7 +2047,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       message: 'Gefeliciteerd! Je hebt je FIRE-doel bereikt!',
       severity: 'info',
       createdAt: new Date().toISOString(),
-      actionHref: '/horizon',
+      actionHref: '/toekomst',
     })
   }
   // Positive: monthly growth

@@ -85,7 +85,7 @@ export function OffTrackDoelenLijst({
           </h2>
         </div>
         <Link
-          href="/toekomst?tab=doelen"
+          href="/toekomst/doelen"
           className="inline-flex items-center gap-1 text-[11px] font-semibold text-violet-700 hover:underline"
         >
           Alle doelen
@@ -123,7 +123,7 @@ export function OffTrackDoelenLijst({
                 </span>
               </header>
               <Link
-                href="/toekomst?tab=doelen"
+                href="/toekomst/doelen"
                 className="inline-flex items-center gap-1 text-[11px] font-semibold text-violet-700 hover:underline"
               >
                 Bewerk voortgang

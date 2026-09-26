@@ -323,7 +323,7 @@ export async function GET() {
         description: 'Je huidige spaarquote is onvoldoende om financiële vrijheid te bereiken. Verken scenario\'s om je plan te verbeteren.',
         category: 'horizon',
         priority: 5,
-        href: '/horizon',
+        href: '/toekomst',
         icon: 'compass',
         completed: !fireUnreachable || completedByDb.has('fire_unreachable'),
         dismissed: dismissedKeys.has('fire_unreachable'),

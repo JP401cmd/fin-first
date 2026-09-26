@@ -122,7 +122,7 @@ describe('OffTrackDoelenLijst', () => {
     expect(screen.getByText('Achter op planning')).toBeTruthy()
   })
 
-  it('linkt naar /toekomst?tab=doelen', () => {
+  it('linkt rechtstreeks naar katern Doelen (/toekomst/doelen)', () => {
     const { container } = render(
       <OffTrackDoelenLijst
         goals={[mockGoal()]}
@@ -134,7 +134,7 @@ describe('OffTrackDoelenLijst', () => {
     const hrefs = Array.from(container.querySelectorAll('a')).map((a) =>
       a.getAttribute('href'),
     )
-    expect(hrefs.every((h) => h === '/toekomst?tab=doelen')).toBe(true)
+    expect(hrefs.every((h) => h === '/toekomst/doelen')).toBe(true)
   })
 
   it('toont aantal off-track-doelen in header', () => {

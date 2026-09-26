@@ -84,7 +84,7 @@ const CATEGORIES: DataCategory[] = [
     what: 'Naam, doelbedrag, streefdatum en voortgang.',
     where: 'Supabase (EU-regio, encrypted at rest)',
     why: 'Voortgang-bars, Wealthfolio-status-flags, briefing-mijlpalen.',
-    action: { label: 'Doelen openen', href: '/toekomst?tab=doelen' },
+    action: { label: 'Doelen openen', href: '/toekomst/doelen' },
   },
   {
     Icon: MessageSquare,

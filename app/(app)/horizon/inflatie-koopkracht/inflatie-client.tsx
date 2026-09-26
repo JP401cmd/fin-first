@@ -20,7 +20,9 @@ export function InflatieKoopkrachtClient({
   const pageInfoText =
     getPageInfo(pathname, '/toekomst/inflatie-koopkracht')
   // Back-link wijst naar canonieke route /toekomst (was /horizon)
-  const backHref = pathname?.startsWith('/toekomst') ? '/toekomst' : '/horizon'
+  // Beide paden (ook het legacy /horizon-pad) keren rechtstreeks terug naar
+  // /toekomst: `/horizon` zou alleen een extra redirect-hop kosten.
+  const backHref = '/toekomst'
   const backLabel = pathname?.startsWith('/toekomst') ? 'De Toekomst' : 'Toekomst'
   // Paginanaam altijd uit de canonieke titel-resolver — dezelfde bron als de
   // shell-`h1` en de mobiele TopBar. Deze component draait op twee paden (de
