@@ -10,7 +10,13 @@
 
 import type { GoalProgress } from '@/lib/goal-data'
 import { selectLabDoelenBuitenPlan } from '@/lib/goals/lab-doelen-buiten-plan'
+import { isHeroAnswerInvalid, type HeroFireAge } from '@/lib/horizon/hero-fire-age'
 import type { DoelSignaal } from '@/lib/horizon/katern-meldingen'
+import {
+  guardRetirementExpense,
+  type HorizonOutcomeGuard,
+  type HorizonOutcomeIssue,
+} from '@/lib/horizon/outcome-guard'
 import type { PlanStatusInput } from '@/lib/horizon/plan-status'
 import type { PlanReviewProgress } from '@/lib/plan-review/types'
 
@@ -68,4 +74,36 @@ export function voorkeurenOpen(progress: PlanReviewProgress | null): number {
 export function planOordeelBekend(input: PlanStatusInput | null): input is PlanStatusInput {
   if (input == null) return false
   return input.anchorFixed ? input.coveragePct != null : input.solvedReachable != null
+}
+
+export interface OntbrekendeGegevensInput {
+  /** Partner-/huishoudperspectief: die cijfers hebben hun eigen keten, geen melding. */
+  readonly perspectief: boolean
+  /** Vast stop-anker: geen gesolvede leeftijd en een doelbedrag dat bewust ontbreekt. */
+  readonly vastAnker: boolean
+  /** De doelbedrag-guard uit de sim-hook (`fireTargetGuard`). */
+  readonly doelbedrag: HorizonOutcomeGuard
+  /** Het kernantwoord van de vrijheidsleeftijd-tegel (`heroFireAge`). */
+  readonly vrijheidsleeftijd: HeroFireAge
+  /** De jaaruitgave ná pensioen (`input.yearlyMustExpenses`). */
+  readonly jaaruitgaveNaPensioen: number | null
+}
+
+/**
+ * De ontbrekende gegevens voor het meldingenslot van Instellingen: dezelfde guards die de
+ * drie KPI-tegels van Plan toetsen (outcome-guard), niet opnieuw afgeleid. Dit slot is de
+ * énige ingang naar /mijn/profiel voor ontbrekende gegevens (spec §4.8/§4.9), dus het dekt
+ * alle drie de tegels:
+ *  - Doelbedrag: de guard, behalve onder een vast anker (ADR 0129 D4).
+ *  - Vrijheidsleeftijd: een kernantwoord buiten de horizon, ook niet onder een vast anker.
+ *  - Na pensioen: de uitgave-guard.
+ */
+export function ontbrekendeGegevensIssues(input: OntbrekendeGegevensInput): HorizonOutcomeIssue[] {
+  if (input.perspectief) return []
+  const issues: HorizonOutcomeIssue[] = []
+  if (!input.vastAnker && !input.doelbedrag.ok && input.doelbedrag.issue) issues.push(input.doelbedrag.issue)
+  if (!input.vastAnker && isHeroAnswerInvalid(input.vrijheidsleeftijd)) issues.push('buiten-horizon')
+  const uitgave = guardRetirementExpense(input.jaaruitgaveNaPensioen)
+  if (!uitgave.ok && uitgave.issue) issues.push(uitgave.issue)
+  return issues
 }

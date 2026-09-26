@@ -106,6 +106,14 @@ const CANVAS_GESCHRAPT = ['CanvasPills', 'PillRow', 'ChartOverlayExplainer'] as 
  */
 const CANVAS_GESCHRAPTE_TEKST = ['Stopmoment wijzigen', 'Zelf een stopmoment kiezen'] as const
 
+/**
+ * Fase 2 (fixronde B, spec §4.8/§4.9) — BEWUST geschrapt: de "Vul profiel aan"-actie
+ * onder de KPI-rij van Plan. Ontbrekende gegevens hebben één ingang naar /mijn/profiel:
+ * het meldingenslot van Instellingen (`instellingen-gegevens`). De KPI-waarde "We missen
+ * gegevens" blijft, want dat is de weergave van de waarde zelf.
+ */
+const DUBBELE_INGANG_GESCHRAPT = ['hero-missende-gegevens-cta', 'Vul profiel aan'] as const
+
 /** De katern-inhoud van vandaag op de subroutes (stroom B stapelt ze in Instellingen). */
 const SUBPAGINA_VIEWS = ['DoelenView', 'VoorkeurenView', 'GebeurtenissenView', 'AfbouwOverzichtCard'] as const
 
@@ -159,6 +167,18 @@ describe('/toekomst-blokken — inventaris (geen blok valt weg bij de decomposit
       expect(bronnen.filter((b) => b.code.includes(tekst)).map((b) => b.rel)).toEqual([])
     })
   }
+
+  for (const tekst of DUBBELE_INGANG_GESCHRAPT) {
+    it(`"${tekst}" staat bewust niet meer op /toekomst (één ingang naar ontbrekende gegevens)`, () => {
+      expect(bronnen.filter((b) => b.code.includes(tekst)).map((b) => b.rel)).toEqual([])
+    })
+  }
+
+  it('ontbrekende gegevens wonen in het meldingenslot van Instellingen, met de actie naar je profiel', () => {
+    const toewijzing = codeOnly(readRel('lib/horizon/katern-meldingen.ts'))
+    expect(toewijzing).toContain("id: 'instellingen-gegevens'")
+    expect(toewijzing).toContain('href: PROFIEL_HREF')
+  })
 })
 
 describe('/toekomst-blokken — volgorde (blokken die samen blijven, verspringen niet)', () => {

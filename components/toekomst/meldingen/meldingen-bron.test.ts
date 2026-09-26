@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import type { GoalProgress } from '@/lib/goal-data'
-import { bouwDoelenBron, planOordeelBekend, voorkeurenOpen } from './meldingen-bron'
+import type { HeroFireAge } from '@/lib/horizon/hero-fire-age'
+import { guardFireTarget } from '@/lib/horizon/outcome-guard'
+import {
+  bouwDoelenBron,
+  ontbrekendeGegevensIssues,
+  planOordeelBekend,
+  voorkeurenOpen,
+  type OntbrekendeGegevensInput,
+} from './meldingen-bron'
 
 function progress(pct: number, onTrack: boolean): GoalProgress {
   return { current: 0, target: 100, pct, onTrack, measured: true, requiredMonthly: null, eta: null, paceSkipped: false } as GoalProgress
@@ -45,5 +53,42 @@ describe('planOordeelBekend — dezelfde poort als loadPlanStatusInput', () => {
     expect(planOordeelBekend({ anchorFixed: true, coveragePct: null, solvedReachable: null })).toBe(false)
     expect(planOordeelBekend({ anchorFixed: false, coveragePct: null, solvedReachable: false })).toBe(true)
     expect(planOordeelBekend({ anchorFixed: false, coveragePct: null, solvedReachable: null })).toBe(false)
+  })
+})
+
+describe('ontbrekendeGegevensIssues — de énige ingang naar je profiel dekt alle drie de tegels', () => {
+  const geldig: HeroFireAge = { status: 'definitief', age: 55, bron: 'kernel' } as HeroFireAge
+  const ongeldig: HeroFireAge = { status: 'ongeldig', age: 140, bron: 'kernel' } as HeroFireAge
+  const basis: OntbrekendeGegevensInput = {
+    perspectief: false,
+    vastAnker: false,
+    doelbedrag: guardFireTarget(640_000),
+    vrijheidsleeftijd: geldig,
+    jaaruitgaveNaPensioen: 30_000,
+  }
+
+  it('alles bekend: niets te melden', () => {
+    expect(ontbrekendeGegevensIssues(basis)).toEqual([])
+  })
+
+  it('een vrijheidsleeftijd buiten de horizon meldt zich hier (vroeger alleen via de Plan-link)', () => {
+    expect(ontbrekendeGegevensIssues({ ...basis, vrijheidsleeftijd: ongeldig })).toEqual(['buiten-horizon'])
+  })
+
+  it('doelbedrag en uitgave ná pensioen via hun eigen guards', () => {
+    expect(ontbrekendeGegevensIssues({ ...basis, doelbedrag: guardFireTarget(null) })).toHaveLength(1)
+    expect(ontbrekendeGegevensIssues({ ...basis, jaaruitgaveNaPensioen: null })).toHaveLength(1)
+  })
+
+  it('vast anker: geen doelbedrag- of leeftijdsmelding, de uitgave-guard blijft', () => {
+    const vast = { ...basis, vastAnker: true, doelbedrag: guardFireTarget(null), vrijheidsleeftijd: ongeldig }
+    expect(ontbrekendeGegevensIssues(vast)).toEqual([])
+    expect(ontbrekendeGegevensIssues({ ...vast, jaaruitgaveNaPensioen: null })).toHaveLength(1)
+  })
+
+  it('partner-/huishoudperspectief: geen melding', () => {
+    expect(
+      ontbrekendeGegevensIssues({ ...basis, perspectief: true, vrijheidsleeftijd: ongeldig, jaaruitgaveNaPensioen: null }),
+    ).toEqual([])
   })
 })

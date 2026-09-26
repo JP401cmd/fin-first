@@ -364,12 +364,7 @@ export function PlanPaneel() {
             showFireTargetNotice={showFireTargetNotice}
           />
 
-          <PlanGegevensmelding
-            showFireAgeNotice={showFireAgeNotice}
-            showFireTargetNotice={showFireTargetNotice}
-            showRetirementExpenseNotice={showRetirementExpenseNotice}
-            simError={simError}
-          />
+          <PlanGegevensmelding simError={simError} />
 
           {/* De meldingen (niet haalbaar, tekort, nu al gedekt, tekort-lening, eindsituatie)
               staan sinds fase 2 in het meldingenslot bovenaan het katern (ADR 0179 D6);

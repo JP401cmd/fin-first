@@ -41,7 +41,7 @@ import {
   type KaternMeldingenInput,
   type KaternMinimizedSeed,
 } from '@/lib/horizon/katern-meldingen'
-import { guardRetirementExpense, type HorizonOutcomeIssue } from '@/lib/horizon/outcome-guard'
+import type { HorizonOutcomeIssue } from '@/lib/horizon/outcome-guard'
 import type { PlanStatusInput } from '@/lib/horizon/plan-status'
 import type { KaternKopStatus } from '@/components/editorial/katern-koppen'
 import type { BannerDisplay } from '@/lib/page-status/display'
@@ -53,7 +53,7 @@ import {
 } from '@/components/toekomst/state/toekomst-state-provider'
 import { useActiefKatern } from '@/components/toekomst/layout/actief-katern'
 import { KaternMelding } from './katern-melding'
-import { planOordeelBekend } from './meldingen-bron'
+import { ontbrekendeGegevensIssues, planOordeelBekend } from './meldingen-bron'
 import { useKaternMeldingMinimize, type KaternMeldingMinimize } from './use-katern-melding-minimize'
 
 /** Wat de server-layout meegeeft (serialiseerbaar). */
@@ -115,6 +115,7 @@ export function ToekomstKaternMeldingenProvider({
     effectiveFreedomPct,
     fireTargetGuard,
     showFireTargetNotice,
+    heroFireAge,
     input,
   } = sim
   const {
@@ -157,15 +158,19 @@ export function ToekomstKaternMeldingenProvider({
   }, [housingHeldNotice, isPensioenMode, masked, canonicalDailyRate])
 
   // Ontbrekende gegevens: de guards die de KPI-tegels al toetsen (outcome-guard), niet
-  // opnieuw afgeleid. Alleen in de eigen weergave, net als de tegels.
-  const ontbrekendeGegevens = useMemo<HorizonOutcomeIssue[]>(() => {
-    if (hasPerspectiveHero) return []
-    const issues: HorizonOutcomeIssue[] = []
-    if (showFireTargetNotice && fireTargetGuard.issue) issues.push(fireTargetGuard.issue)
-    const uitgave = guardRetirementExpense(input?.yearlyMustExpenses ?? null)
-    if (!uitgave.ok && uitgave.issue) issues.push(uitgave.issue)
-    return issues
-  }, [hasPerspectiveHero, showFireTargetNotice, fireTargetGuard, input?.yearlyMustExpenses])
+  // opnieuw afgeleid (`ontbrekendeGegevensIssues`). Alleen in de eigen weergave, net als
+  // de tegels; dit slot is de énige ingang naar /mijn/profiel (spec §4.8/§4.9).
+  const ontbrekendeGegevens = useMemo<HorizonOutcomeIssue[]>(
+    () =>
+      ontbrekendeGegevensIssues({
+        perspectief: hasPerspectiveHero,
+        vastAnker: isFixedAnchorMode,
+        doelbedrag: fireTargetGuard,
+        vrijheidsleeftijd: heroFireAge,
+        jaaruitgaveNaPensioen: input?.yearlyMustExpenses ?? null,
+      }),
+    [hasPerspectiveHero, isFixedAnchorMode, fireTargetGuard, heroFireAge, input?.yearlyMustExpenses],
+  )
 
   const meldingen = useMemo(() => {
     const invoer: KaternMeldingenInput = {
