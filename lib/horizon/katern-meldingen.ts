@@ -164,12 +164,14 @@ export interface KaternMeldingenInput {
  * Nieuwe formuleringen (gemarkeerd NIEUW) gaan in fase 2 langs `merkstem`.
  */
 export const KATERN_MELDING_KOPIJ = {
-  /** Letterlijk uit plan-meldingen.tsx (reached_now, solved). */
-  nuAlGenoegSolved: 'Volgens je huidige cijfers kun je nu al stoppen met werken.',
+  /** Kopij-toets §8 (26 sep): de oude zin "kun je nu al stoppen met werken" botste met de
+   *  toonregel uit anker-copy.ts (de app zegt niet dát je kunt stoppen, alleen hoe ver je
+   *  vermogen reikt). Zelfde begrip als de nul-tak van ankerVrijZin ("het zelf draagt"). */
+  nuAlGenoegSolved: 'Volgens je huidige cijfers draagt je vermogen je uitgaven nu al.',
   /** Letterlijk uit plan-meldingen.tsx (reached_now, vast anker zonder bereik). */
   nuAlGenoegVast: 'Als je op je stopmoment stopt, reikt je liquide vermogen tot het einde van je plan.',
   /** NIEUW: kort label voor het statuspunt bij "nu al genoeg". */
-  nuAlGenoegKort: 'nu al genoeg',
+  nuAlGenoegKort: 'nu al gedekt',
   /** Kopij-toets §6 (aangepast): de leenperiode in leeftijden. */
   tekortLeningTitel: (vanaf: number, tot: number | null): string =>
     tot != null
@@ -187,7 +189,7 @@ export const KATERN_MELDING_KOPIJ = {
   huisUitleg: (bedragTekst: string, sharePct: number, endAge: number): string =>
     `Je hebt ingesteld: verkopen zodra je geld opraakt — maar je inkomen blijft je uitgaven dekken, dus dat moment komt niet. Daardoor blijft je huis staan en groeit het mee in je vermogen: ${bedragTekst}, oftewel ${sharePct}% van je vermogen op leeftijd ${endAge}.`,
   /** NIEUW: spiegelt "Naar je AOW-strategie" (kopij-toets §6). */
-  huisActie: 'Naar je huis-strategie',
+  huisActie: 'Naar je woonstrategie',
   /** NIEUW: kort label voor het statuspunt bij een doel dat achterloopt. */
   doelAchterKort: 'doel achter op planning',
   /** Het label uit doelen-view.tsx (`goalStatus`), als titel met de doelnaam. */

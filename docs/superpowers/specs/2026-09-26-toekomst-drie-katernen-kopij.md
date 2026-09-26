@@ -81,6 +81,20 @@ Waarom: "als het tegenzit" en "als het meezit" zijn scenario-namen die Nederland
 
 **Aanvulling bij onbereikbaar (26 sep).** Is één stand onbereikbaar binnen de horizon (de kern geeft `null`), dan blijft de regel staan en krijgt die stand de woorden "niet binnen je plan", bijvoorbeeld "als het tegenzit niet binnen je plan · in het midden 58 · als het meezit 52". Een regel die verdwijnt zodra het tegenzit, verzwijgt juist de uitkomst die het meest zegt. Het is dezelfde betekenis als de nul-tak van `ankerVrijZin`, maar kort genoeg voor één regel. Zijn alle drie onbereikbaar, of staat er een vast stop-anker, dan is er geen regel. Beschrijvend, geen oordeel: compliance goedgekeurd.
 
+## 8. Aanvulling: kopij uit de bouwstenen (26 sep)
+
+Getoetst op de tekst die stroom C (`lib/horizon/katern-copy.ts`) en stroom M (`lib/horizon/katern-meldingen.ts`, `KATERN_MELDING_KOPIJ`) zelf moesten kiezen.
+
+| Tekst | Besluit | Waarom |
+|---|---|---|
+| "Volgens je huidige cijfers kun je nu al stoppen met werken." (nu al genoeg, solved; letterlijk uit de huidige /toekomst) | **Aanpassen**: "Volgens je huidige cijfers draagt je vermogen je uitgaven nu al." | Botst met de toonregel in `anker-copy.ts`: de app zegt niet dát je kunt stoppen, alleen hoe ver je vermogen reikt. Zelfde begrip als de nul-tak van `ankerVrijZin`. Geldt vanaf het moment dat het meldingenslot de oude meldingen vervangt (fase 2). De AI-context (`lib/ai/context/shared-context.ts:105`) gebruikt dezelfde oude formulering; die loopt via `ai-gedrag`, niet hier. |
+| Kort label "nu al genoeg" | **Aanpassen**: "nu al gedekt" | Sluit aan bij de dekkingswoorden (`LAB_COPY`). |
+| "Naar je huis-strategie" | **Aanpassen**: "Naar je woonstrategie" | De app noemt het overal woonstrategie. |
+| "Je plan dekt vanaf je 61e een tekort met een lening." (leenperiode zonder einde) | Goedkeuren | Beschrijvend, zelfde vorm als de variant met einde. |
+| "doel achter op planning", "Naar je doelen", "Naar je profiel", "tekort-lening" | Goedkeuren | Bestaande labels of een bestemming, geen aansporing. |
+| "stopmoment nu", "geen gebeurtenissen", "1 gebeurtenis", "1 voorkeur" | Goedkeuren | Instellingsnamen, geen oordeel. |
+| Zonewoord groen = "ruim gedekt" (`labZoneWoord`) | Goedkeuren | De samenvatting consumeert de bron; het voorbeeld "stopmoment 58 · gedekt" in §4 was illustratief. |
+
 ## Wat dit vraagt van de bouw (fase 1–2)
 
 - Ankerregel: consumeer `ankerVrijZin` en `ankerTitel` uit `lib/horizon/anker-copy.ts` en schrijf geen nieuwe zinnen. KPI 1 via `formatHeroFireAge`.
