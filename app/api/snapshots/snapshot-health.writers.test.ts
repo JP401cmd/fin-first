@@ -129,6 +129,43 @@ describe('GET /api/snapshots/auto — budgetteer-vlag zoals de live score', () =
   })
 })
 
+// ── Onbekend is geen nul (ADR 0131) ─────────────────────────────────────────
+// Zonder inkomen en uitgaven onthoudt de score haar oordeel: `total` is dan een
+// som over de resterende pijlers. Die partiële score hoort niet in de historie —
+// de rij draagt verder niets waaraan je zo'n maand later herkent.
+const ONBEKEND_PROFIEL = {
+  date_of_birth: DOB,
+  expected_return: 0.06,
+  inflation_rate: 0.02,
+  household_type: 'single',
+  fire_end_strategy: 'deplete',
+  fire_end_age: 90,
+  budgeting_active: true,
+}
+
+describe('snapshot-writers — geen partiële score bij een onbekend oordeel', () => {
+  it('Given onbekend inkomen en uitgaven, When POST /api/snapshots schrijft, Then is resilience_score null (rij én antwoord)', async () => {
+    arm(ONBEKEND_PROFIEL)
+    const body = await (await POST()).json()
+    expect(upserts[0]).toHaveProperty('resilience_score', null)
+    expect(body.calculation.resilience_score).toBeNull()
+    expect(body.snapshot.resilience_score).toBeNull()
+  })
+
+  it('Given onbekend inkomen en uitgaven, When de auto-snapshot schrijft, Then is resilience_score null', async () => {
+    arm(ONBEKEND_PROFIEL)
+    const body = await (await AUTO_GET(new Request('http://localhost/api/snapshots/auto?source=manual'))).json()
+    expect(upserts[0]).toHaveProperty('resilience_score', null)
+    expect(body.snapshot.resilience_score).toBeNull()
+  })
+
+  it('Given een bekend inkomen (controle), When POST schrijft, Then een getal', async () => {
+    arm({ ...PROFILE, budgeting_active: true })
+    await POST()
+    expect(typeof upserts[0]?.resilience_score).toBe('number')
+  })
+})
+
 describe('snapshot-writers — één regel voor de opgeslagen score (bron-grendel)', () => {
   const WRITERS = ['app/api/snapshots/route.ts', 'app/api/snapshots/auto/route.ts', 'app/api/snapshots/cron/route.ts']
 

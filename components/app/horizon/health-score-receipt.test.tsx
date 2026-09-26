@@ -411,3 +411,23 @@ describe('HealthScoreReceipt — lopende maand = live stand', () => {
     )
   })
 })
+
+describe('HealthScoreReceipt — maand zonder oordeel (ADR 0131)', () => {
+  it('Given een maand met resilience_score null, When de kassabon opent, Then is die maand een gat: geen stip en de lijn breekt', async () => {
+    render(
+      <HealthScoreReceipt
+        health={makeHealthV2()}
+        verloop={[
+          verloopPunt('2026-05-31', 50),
+          verloopPunt('2026-06-30', 52),
+          verloopPunt('2026-07-31', null),
+          verloopPunt('2026-08-29', 55),
+          verloopPunt('2026-09-26', 57),
+        ]}
+      />,
+    )
+    const chart = await screen.findByTestId('resilience-trend-chart')
+    expect(chart.querySelectorAll('circle')).toHaveLength(4)
+    expect(lijnPad(chart).match(/M/g)).toHaveLength(2)
+  })
+})

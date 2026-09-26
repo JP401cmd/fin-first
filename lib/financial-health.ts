@@ -1138,15 +1138,22 @@ export function budgetingActiveFromProfile(
  * budgetteer-vlag uit het profiel. `resilienceScore` is de waarde voor de kolom
  * `net_worth_snapshots.resilience_score`.
  *
+ * Onbekend is geen nul (ADR 0131): heeft de score haar oordeel onthouden
+ * (inkomen of uitgaven onbekend), dan is `total` een som over de resterende
+ * pijlers. Die partiële score gaat niet de historie in: `resilienceScore` is dan
+ * `null`, een gat in het verloop. De rij draagt verder niets waaraan je zo'n
+ * maand later herkent — daarom beslist de writer het hier, bij het schrijven.
+ *
  * Gedeeld door POST /api/snapshots, GET /api/snapshots/auto en de cron, zodat
  * geen van de drie een eigen variant van de regel draagt.
  */
 export function computeSnapshotHealthScore(
   input: HealthScoreInput,
   profile: { budgeting_active?: boolean | null } | null | undefined,
-): { health: HealthScore; resilienceScore: number } {
+): { health: HealthScore; resilienceScore: number | null } {
   const health = computeHealthScoreFromInputs(input, budgetingActiveFromProfile(profile))
-  return { health, resilienceScore: health.total }
+  const resilienceScore = healthScoreVerdict(health).kind === 'score' ? health.total : null
+  return { health, resilienceScore }
 }
 
 /**

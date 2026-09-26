@@ -71,12 +71,12 @@ export const ARCHI_CONCERNS: ArchiConcern[] = [
   },
   {
     id: 'snapshot-resilience-score-bij-onbekend-inkomen',
-    title: 'De snapshot-routes schrijven bij een onthouden oordeel nog een partiële score weg',
+    title: 'Oude snapshot-rijen dragen nog een partiële score uit maanden zonder oordeel',
     detail:
-      'Sinds ADR 0131 onthoudt de gezondheidsscore haar oordeel zodra inkomen/uitgaven een \'unknown\'-grondslag hebben: de inkomen-/uitgavenpijlers vallen inactief en `HealthScore.onbekend` is gezet, en élk gebruikerszichtbaar oppervlak toont dan geen cijfer (presenter `healthScoreVerdict`). `total` blijft echter de gewogen som over de RESTERENDE pijlers, en de drie snapshot-routes (app/api/snapshots, /auto, /cron) schrijven dat getal ongewijzigd weg als `net_worth_snapshots.resilience_score`. Gevolg: de trendlijn op /toekomst kan voor een maand zonder oordeel tóch een score tonen (bv. alleen schuldratio + spreiding), en zodra de gebruiker zijn inkomen invult, een sprong die geen gedragsverandering is. Bewust open gelaten: of zo\'n maand `null` hoort te dragen (gat in de lijn) of de partiële score (met markering) is een productkeuze. Verwijder dit punt zodra de snapshot-routes `onbekend` respecteren én de trend-lezers (dashboard-loader `previousMonth`, /toekomst-historie) daarop zijn aangepast.',
+      'Sinds ADR 0131 onthoudt de gezondheidsscore haar oordeel zodra inkomen/uitgaven een \'unknown\'-grondslag hebben; `total` is dan een som over de resterende pijlers. Sinds 27 sep 2026 schrijven de drie snapshot-routes (app/api/snapshots, /auto, /cron) in dat geval `resilience_score = null` via de gedeelde `computeSnapshotHealthScore` (lib/financial-health.ts), en het verloop in de gezondheidskassabon op /overzicht leest null als een gat. Wat blijft: rijen van vóór die datum dragen nog de partiële score, en de rij bevat niets waaraan je zo\'n maand achteraf herkent (geen grondslag in `params`). Een correctie kan alleen met een backfill die de score per maand opnieuw bepaalt uit historische invoer die niet bewaard is — dus niet. Het risico dooft vanzelf uit: het verloop toont twaalf maanden, dus vanaf september 2027 valt het laatste oude punt (sep 2026) buiten beeld. Verwijder dit punt dan.',
     severity: 'debt',
     elementIds: ['as-planning', 'as-vermogen', 'as-budget'],
-    reviewedAt: '2026-09-05',
+    reviewedAt: '2026-09-27',
   },
   {
     id: 'besteding-per-budget-meerdere-implementaties',
