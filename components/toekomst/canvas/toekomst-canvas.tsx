@@ -164,7 +164,8 @@ export function ToekomstCanvas() {
   // overlayEmphasis: welke grafiekfase een gehoverde/gefocuste ballon accentueert.
   const [overlayEmphasis, setOverlayEmphasis] = useState<OverlayEmphasis>(null)
 
-  // ── De stand van het canvas in dit katern (spec §4.5) ──
+  // ── De stand van het canvas in dit katern (spec §4.5) en deze weergave (§4.7) ──
+  const eenvoudig = displayMode === 'simple'
   const heeftDoelen = goalChartMarkers.length > 0
   const stand = useMemo(
     () =>
@@ -172,8 +173,9 @@ export function ToekomstCanvas() {
         katern,
         { modus: canvasModus, lagen: canvasLagenKeuze },
         { doelen: heeftDoelen, doelscenario: hasDoelLijn, metHuis: dualBasisAvailable },
+        { eenvoudig },
       ),
-    [katern, canvasModus, canvasLagenKeuze, heeftDoelen, hasDoelLijn, dualBasisAvailable],
+    [katern, canvasModus, canvasLagenKeuze, heeftDoelen, hasDoelLijn, dualBasisAvailable, eenvoudig],
   )
   const { gebeurtenissen, mijlpalen, doelen, doelscenario, marktcheck, rendementScenarios, metHuis } = stand.lagen
 
@@ -202,7 +204,6 @@ export function ToekomstCanvas() {
   // Geldstroom in Eenvoudig: alleen Lijnen (spec §4.7). De modus-switch verbergt
   // Bronnen al via HideInSimple; hier bewaakt de host de waarde, zodat een keuze uit
   // Volledig niet als Bronnen doorwerkt. De keuze zelf blijft staan.
-  const eenvoudig = displayMode === 'simple'
   const ieWeergave: IeViewMode = eenvoudig ? 'lines' : ieViewMode
   const geldstroomSub: GeldstroomSub = ieWeergave === 'breakdown' ? 'bronnen' : 'lijnen'
 

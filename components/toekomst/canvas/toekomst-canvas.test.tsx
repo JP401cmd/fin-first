@@ -51,6 +51,7 @@ const setCanvasModus = vi.fn()
 const toggleLaag = vi.fn()
 let canvasModus: CanvasModus = 'vermogen'
 let keuze: Record<LaagId, boolean>
+let displayMode: 'simple' | 'full' = 'full'
 
 const lagenKeuze = (aan: readonly LaagId[]) =>
   Object.fromEntries(LAAG_VOLGORDE.map((id) => [id, aan.includes(id)])) as Record<LaagId, boolean>
@@ -87,7 +88,7 @@ vi.mock('@/components/toekomst/state/toekomst-state-provider', () => ({
     events,
     canonicalDailyRate: 100,
     heroFireAge: { age: 52.3 },
-    displayMode: 'full',
+    displayMode,
     simResult,
     simCashflows: [],
     kernelHousingSale: null,
@@ -147,7 +148,7 @@ vi.mock('@/components/toekomst/state/toekomst-state-provider', () => ({
     viewLiquidWealthPoints: undefined,
     viewCombinedScenarioOverlays: [{ name: 'wat-als' }, { name: 'pessimistic' }],
     viewHouseholdOverlays: null,
-    viewMonteCarloOverlay: undefined,
+    viewMonteCarloOverlay: { naam: 'marktcheck-band' },
     viewFireTarget: 1,
     viewFireTargetInclHome: null,
     viewTargetEndPortfolio: undefined,
@@ -175,6 +176,7 @@ const overlayNamen = () => (grafiek().viewCombinedScenarioOverlays as { name: st
 beforeEach(() => {
   canvasModus = 'vermogen'
   keuze = lagenKeuze(['gebeurtenissen', 'mijlpalen'])
+  displayMode = 'full'
   setCanvasModus.mockClear()
   toggleLaag.mockClear()
 })
@@ -265,6 +267,26 @@ describe('ToekomstCanvas — Doelen', () => {
     renderIn('doelen')
     expect(screen.getByTestId('doelen-volgt-plan').textContent).toBe(DOELEN_VOLGT_PLAN_REGEL)
     expect(grafiek().modus).toBe('samenstelling')
+  })
+})
+
+describe('ToekomstCanvas — Eenvoudig tekent alleen de lagen van zijn menu (spec §4.7)', () => {
+  // Een keuze uit Volledig: Rendement hoger en lager en de doelscenario-lijn aan.
+  const volledigeKeuze = () => lagenKeuze(['gebeurtenissen', 'doelscenario', 'rendementScenarios', 'marktcheck'])
+
+  it('Volledig: de rendementsvarianten staan op de grafiek', () => {
+    keuze = volledigeKeuze()
+    renderIn(null)
+    expect(overlayNamen()).toEqual(['wat-als', 'pessimistic'])
+    expect(grafiek().viewMonteCarloOverlay).toEqual({ naam: 'marktcheck-band' })
+  })
+
+  it('Eenvoudig: dezelfde keuze tekent de rendementsvarianten niet, de doelscenario-lijn wel', () => {
+    keuze = volledigeKeuze()
+    displayMode = 'simple'
+    renderIn(null)
+    expect(overlayNamen()).toEqual(['wat-als'])
+    expect(grafiek().viewMonteCarloOverlay).toBeUndefined()
   })
 })
 

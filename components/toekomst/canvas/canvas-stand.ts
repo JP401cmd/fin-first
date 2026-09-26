@@ -13,6 +13,7 @@
 import {
   CANVAS_MODUS_VOLGORDE,
   LAAG_VOLGORDE,
+  LAGEN_EENVOUDIG,
   type CanvasModus,
   type KaternId,
   type LaagId,
@@ -73,13 +74,29 @@ function beschikbareLagen(b: CanvasBeschikbaarheid): LaagId[] {
   })
 }
 
-/** De stand van het canvas voor `katern`, gegeven de keuze van de gebruiker. */
+/**
+ * De weergave van de gebruiker (spec §4.7). Verplicht, zodat de host de Eenvoudig-stand
+ * niet kan vergeten door te geven.
+ */
+export interface CanvasWeergave {
+  /** Eenvoudig tekent alleen `LAGEN_EENVOUDIG`; de rest van de keuze blijft staan. */
+  readonly eenvoudig: boolean
+}
+
+/** De stand van het canvas voor `katern`, gegeven de keuze en de weergave van de gebruiker. */
 export function canvasStand(
   katern: KaternId,
   keuze: CanvasKeuze,
   beschikbaarheid: CanvasBeschikbaarheid,
+  weergave: CanvasWeergave,
 ): CanvasStand {
-  const bestaat = beschikbareLagen(beschikbaarheid)
+  // Eenvoudig kent alleen de lagen van zijn menu (spec §4.7). Een laag die in Volledig
+  // aan staat (Marktcheck, Rendement hoger en lager, Met je huis, Speel af) zou anders
+  // getekend blijven terwijl het menu hem verbergt, en dus niet meer uit te zetten zijn.
+  // Alleen de tekening wordt gemaskeerd: de keuze zelf blijft staan voor Volledig.
+  const bestaat = beschikbareLagen(beschikbaarheid).filter(
+    (id) => !weergave.eenvoudig || LAGEN_EENVOUDIG.includes(id),
+  )
 
   if (katern === 'instellingen') {
     // Alleen de hoofdlijn met de gebeurtenissen waar je hier aan werkt (vast);
