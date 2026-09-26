@@ -23,11 +23,10 @@ import { margeAnkerKort, margeLegenda, margeZin } from '@/lib/horizon/marktcheck
 import type { MarktcheckOutcome } from '@/lib/horizon-kernel/marktcheck'
 import type { RendementMarge } from '@/lib/horizon-kernel/rendement-marge'
 import type { FireParams } from '@/lib/fire-params'
-import { LAAG_LABEL } from '@/lib/horizon/katern-copy'
+import { LAAG_LABEL, MARKTCHECK_MISLUKT_REGEL } from '@/lib/horizon/katern-copy'
 import { SCENARIO_VARIANTS, type ScenarioOverlay } from '@/components/app/horizon/sim-chart'
 import type { ActiveModal } from '@/components/toekomst/state/types'
 import { toonLegendaBij } from './canvas-stand'
-import { MARKTCHECK_MISLUKT_REGEL } from './canvas-kopij-voorlopig'
 
 export interface CanvasLegendaProps {
   /** Aantal reeksen op de grafiek (`aantalReeksen`); onder de twee geen legenda. */

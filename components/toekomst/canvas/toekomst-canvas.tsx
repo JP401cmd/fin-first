@@ -32,7 +32,7 @@ import type { OverlayBalloonDef } from '@/components/app/horizon/toekomst-overla
 import { TOEKOMST_OVERLAY_BALLOONS } from '@/components/app/horizon/toekomst-overlay-balloons'
 import { ChartTips } from '@/components/editorial/chart-tips'
 import { getFireProjectionTips, getIncomeExpenseTips, getWealthCompositionTips } from '@/lib/chart-tips'
-import type { GeldstroomSub } from '@/lib/horizon/katern-copy'
+import { CANVAS_UITLEG_TITEL, DOELEN_VOLGT_PLAN_REGEL, type GeldstroomSub } from '@/lib/horizon/katern-copy'
 import type { IeViewMode, OverlayEmphasis } from '@/components/toekomst/state/types'
 import { useActiefKatern } from '@/components/toekomst/layout/actief-katern'
 import { KATERN_HREF } from '@/components/toekomst/layout/katern-routes'
@@ -46,7 +46,6 @@ import { CanvasLegenda } from '@/components/toekomst/canvas/canvas-legenda'
 import { MarktcheckGetallen } from '@/components/toekomst/canvas/marktcheck-getallen'
 import { Aannamesregel } from '@/components/toekomst/canvas/aannamesregel'
 import { aantalReeksen, canvasStand } from '@/components/toekomst/canvas/canvas-stand'
-import { CANVAS_UITLEG_TITEL, DOELEN_VOLGT_PLAN_REGEL } from '@/components/toekomst/canvas/canvas-kopij-voorlopig'
 import {
   useToekomstPerspectiefContext,
   useToekomstOverlayContext,

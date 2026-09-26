@@ -254,6 +254,26 @@ export const GELDSTROOM_SUB_LABEL: Record<GeldstroomSub, string> = {
 export const CANVAS_MODUS_GROEP_LABEL = 'Weergave van de grafiek'
 export const GELDSTROOM_SUB_GROEP_LABEL = 'Geldstroom tonen als'
 
+/** Titel van de canvas-i — "Zo werkt je grafiek" heeft één ingang (spec §4.9). */
+export const CANVAS_UITLEG_TITEL = 'Zo werkt je grafiek'
+
+/**
+ * Doelen, in Samenstelling en Geldstroom: die modi tonen het plan tot de adapter het
+ * doelscenario levert (spec §4.5, "het enige controlepunt"). Letterlijk uit de
+ * ontwerpspec; deze drie canvasteksten staan nog niet in de kopij-toets en gaan langs
+ * merkstem.
+ */
+export const DOELEN_VOLGT_PLAN_REGEL =
+  'Samenstelling en Geldstroom volgen je plan; je doelscenario zie je in Vermogen'
+
+/**
+ * De marktcheck-laag staat aan maar de doorrekening mislukte. Vervangt de vervallen
+ * `ChartOverlayExplainer`-tekst ("Zet de pil uit en weer aan …"): de pil bestaat niet
+ * meer, de laag wel.
+ */
+export const MARKTCHECK_MISLUKT_REGEL =
+  'De marktcheck kon niet worden doorgerekend. Je planlijn klopt gewoon; zet de laag uit en weer aan om het opnieuw te proberen.'
+
 // ── Lagen-menu (kopij-toets §5) ──────────────────────────────────────────────
 
 export type LaagId =

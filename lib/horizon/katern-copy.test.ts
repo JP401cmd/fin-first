@@ -1,7 +1,12 @@
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import {
   AANNAMES_LINK_LABEL,
   CANVAS_MODUS_LABEL,
+  CANVAS_UITLEG_TITEL,
+  DOELEN_VOLGT_PLAN_REGEL,
+  MARKTCHECK_MISLUKT_REGEL,
   CANVAS_MODUS_VOLGORDE,
   INSTELLINGEN_SAMENVATTING_TOONT_WIZARDSTAND,
   KATERN_LABEL,
@@ -44,6 +49,9 @@ function alleKopij(): string[] {
     ...Object.values(CANVAS_MODUS_LABEL),
     LAGEN_KOP,
     AANNAMES_LINK_LABEL,
+    CANVAS_UITLEG_TITEL,
+    DOELEN_VOLGT_PLAN_REGEL,
+    MARKTCHECK_MISLUKT_REGEL,
     katernAnkerregel({ kind: 'solved', solvedFireAge: 52.3, currentAge: 38 }),
     katernAnkerregel({ kind: 'solved', solvedFireAge: null, currentAge: 38 }),
     katernAnkerregel({ kind: 'vast', stop: { kind: 'age', stopAge: 60 } }),
@@ -277,6 +285,19 @@ describe('katern-copy — compliance-invarianten over alle kopij', () => {
       expect(t).not.toMatch(/verwacht/i)
       expect(t).not.toMatch(/driekwart/i)
     }
+  })
+
+  it('de canvas-kopij woont hier; het voorlopige canvasbestand is weg', () => {
+    expect(CANVAS_UITLEG_TITEL).toBe('Zo werkt je grafiek')
+    expect(DOELEN_VOLGT_PLAN_REGEL).toBe(
+      'Samenstelling en Geldstroom volgen je plan; je doelscenario zie je in Vermogen',
+    )
+    expect(MARKTCHECK_MISLUKT_REGEL).toBe(
+      'De marktcheck kon niet worden doorgerekend. Je planlijn klopt gewoon; zet de laag uit en weer aan om het opnieuw te proberen.',
+    )
+    expect(
+      existsSync(join(process.cwd(), 'components/toekomst/canvas/canvas-kopij-voorlopig.ts')),
+    ).toBe(false)
   })
 
   it('canvas-modi in vaste volgorde', () => {

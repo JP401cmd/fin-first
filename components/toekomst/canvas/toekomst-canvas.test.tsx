@@ -15,8 +15,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { DisplayModeProvider } from '@/lib/hooks/use-display-mode'
-import { LAAG_VOLGORDE, aannamesRegelTekst, type CanvasModus, type LaagId } from '@/lib/horizon/katern-copy'
-import { DOELEN_VOLGT_PLAN_REGEL } from './canvas-kopij-voorlopig'
+import {
+  DOELEN_VOLGT_PLAN_REGEL,
+  LAAG_VOLGORDE,
+  aannamesRegelTekst,
+  type CanvasModus,
+  type LaagId,
+} from '@/lib/horizon/katern-copy'
 
 const h = vi.hoisted(() => ({
   segment: null as string | null,
