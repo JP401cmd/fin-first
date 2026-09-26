@@ -222,6 +222,12 @@ describe('SimChart — wat-als-variant rendert dashed ink-lijn + stip + legenda'
     expect(getByText('(55j)')).toBeTruthy() // Math.round(54.5) = 55
   })
 
+  it('hoofdlijnLabel vervangt "Jouw pad" (op /toekomst: "Je plan")', () => {
+    const { getByText, queryByText } = render(<SimChart {...watalsProps()} hoofdlijnLabel="Je plan" />)
+    expect(getByText('Je plan')).toBeTruthy()
+    expect(queryByText('Jouw pad')).toBeNull()
+  })
+
   it('zonder variant blijft de ink-wat-als-lijn afwezig (byte-identiek pad)', () => {
     const { container } = render(<SimChart {...richProps()} />)
     const inkPath = Array.from(container.querySelectorAll('path')).find(

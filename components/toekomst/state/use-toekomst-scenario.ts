@@ -32,6 +32,7 @@ import {
 import type { LabOpslaanToestand } from '@/components/app/horizon/lab-opslaan-balk'
 import { withResolvedKernelBedragen } from '@/lib/horizon/kernel-profile-basis'
 import { selectDoelLijnBron } from '@/lib/horizon/doel-lijn-bron'
+import { CANVAS_LEGENDA_DOELSCENARIO } from '@/lib/horizon/katern-copy'
 import type { UnifiedProjectionRow } from '@/lib/unified-projection'
 import type { SimRow } from '@/lib/fire-simulation'
 import type { KernelHousingSale } from '@/lib/horizon-kernel/bridge'
@@ -317,7 +318,6 @@ export function useToekomstScenario({ initialData, scenarioState, sim }: { initi
     hasScenario,
     hasStopKeuze,
     doelActief,
-    doelLijnLabel,
     scenarioOverrides,
   } = scenarioState
   const {
@@ -463,8 +463,9 @@ export function useToekomstScenario({ initialData, scenarioState, sim }: { initi
     if (doelLijnBron == null) return null
     return {
       name: 'wat-als',
-      // "Jouw doel" · "Jouw wat-als" · "Jouw stopkeuze" (zelfde drieslag als de pill).
-      label: `Jouw ${doelLijnLabel.toLowerCase()}`,
+      // Fase 4: de lijn heet in de legenda "Je doelscenario" (het wat-als heet sinds
+      // ADR 0144/0145 zo), ongeacht of er een doel ligt of alleen een stopkeuze.
+      label: CANVAS_LEGENDA_DOELSCENARIO,
       color: 'var(--ink-2)',
       // Clip op dezelfde `displayEndAge` als de hoofdlijn (zie displaySimRows) — anders
       // loopt de gestippelde lijn een jaar verder door dan de basislijn.
@@ -474,7 +475,7 @@ export function useToekomstScenario({ initialData, scenarioState, sim }: { initi
       // Stop-bron ⇒ legenda toont "(stop 63)" i.p.v. de gesolvede "(57j)".
       ageLabel: doelLijnBron.bron === 'stop' ? 'stop' : 'fire',
     }
-  }, [doelLijnBron, displayEndAge, doelLijnLabel])
+  }, [doelLijnBron, displayEndAge])
 
   // ── Grootboek van het doelscenario (ADR 0179 D3, fase 4) ──────────────────────
   // Samenstelling en Geldstroom tonen in katern Doelen het doelscenario, uit de rijen van

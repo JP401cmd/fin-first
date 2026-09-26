@@ -319,6 +319,14 @@ export const DOELEN_VOLGT_PLAN_REGEL =
 export const DOELEN_TOONT_DOELSCENARIO_LABEL = 'Je doelscenario'
 
 /**
+ * De legenda van de vermogensgrafiek op /toekomst (fase 4): "Je plan" en "Je doelscenario"
+ * (wireframe §4.3: "─ plan ┄ doelscenario"). Vervangt "Jouw pad" / "Jouw wat-als": het
+ * wat-als heet sinds ADR 0144/0145 het doelscenario. Nog langs merkstem.
+ */
+export const CANVAS_LEGENDA_PLAN = 'Je plan'
+export const CANVAS_LEGENDA_DOELSCENARIO = DOELEN_TOONT_DOELSCENARIO_LABEL
+
+/**
  * Katern Doelen, sectie III: de scenario-kaarten (ADR 0179 fase 4; spec §4.3 wireframe
  * Doelen, §5). De kop letterlijk uit de spec; de uitleg is de bestaande zin van de
  * vroegere Plan-sectie "Wat het betekent" (ongewijzigd verhuisd). Kop nog langs merkstem.

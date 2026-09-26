@@ -52,7 +52,7 @@ import {
   type ToekomstOverlayGeometry,
 } from '@/components/app/horizon/toekomst-overlay'
 import { COLOR_PARTNER_EVENT } from './marker-kleuren'
-import type { CanvasModus } from '@/lib/horizon/katern-copy'
+import { CANVAS_LEGENDA_PLAN, type CanvasModus } from '@/lib/horizon/katern-copy'
 import type {
   ActiveFaseModal,
   ClusterSheet,
@@ -366,6 +366,7 @@ export function CanvasGrafiek({
                             hideValueTooltip={displayMode === 'full' && isLg && toonReadout}
                             plotHoogte={plotHoogte ?? undefined}
                             hoofdlijnGedempt={hoofdlijnGedempt}
+                            hoofdlijnLabel={CANVAS_LEGENDA_PLAN}
                             rows={useHouseholdMainLine ? viewHouseholdMainLineRows! : usePartnerMainLine ? viewPartnerLineRows! : (viewDisplaySimRows)}
                             fireAge={useHouseholdMainLine ? householdMainLine!.fireAge : usePartnerMainLine ? partnerLine!.fireAge : (simResult.fireAge)}
                             fireAgeFractional={useHouseholdMainLine ? householdMainLine!.fireAgeFractional : usePartnerMainLine ? partnerLine!.fireAgeFractional : (simResult.fireAgeFractional)}

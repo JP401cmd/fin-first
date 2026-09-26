@@ -309,6 +309,7 @@ export const SimChart = memo(function SimChart({
   hideValueTooltip = false,
   plotHoogte,
   hoofdlijnGedempt = false,
+  hoofdlijnLabel = 'Jouw pad',
 }: {
   rows: SimRow[]
   fireAge: number | null
@@ -439,6 +440,8 @@ export const SimChart = memo(function SimChart({
   plotHoogte?: number
   /** ADR 0179 fase 4: de hoofdlijn als gedempte referentie (katern Doelen). Afwezig = normaal. */
   hoofdlijnGedempt?: boolean
+  /** Naam van de hoofdlijn in de legenda. Default "Jouw pad" (bestaande callers); /toekomst zegt "Je plan". */
+  hoofdlijnLabel?: string
 }) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 1200, forModal })
   // Bedragmaskering (ADR 0091) komt uit de hook, NIET uit een prop: de hook
@@ -897,7 +900,7 @@ export const SimChart = memo(function SimChart({
               <line x1="0" y1="4" x2="20" y2="4" stroke={mainStrokeAcc} strokeWidth={2.5} strokeLinecap="round" />
             </svg>
             <span className="text-[10px] font-medium text-[var(--ink-3)]">
-              Jouw pad
+              {hoofdlijnLabel}
               {/* Kwalificatie zodra de grondslag van deze lijn niet vanzelf
                   spreekt: er staat een tweede grondslag naast, óf de lijn is de
                   J-lijn (die zónder benoeming als "het totaal" leest). Zelfde
