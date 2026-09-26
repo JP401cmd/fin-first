@@ -44,7 +44,7 @@ Eigenaarsbesluiten 26 sep: checkpoint-commit per stap **op master, per pad, nooi
 - [x] 5 P Plan-bladeren inpluggen
 - [x] 6 S-klein kassabons via ShellOverlay inpluggen
 - [x] 7 P canvas-bladeren inpluggen
-- [ ] 8 P Plan-meldingen inpluggen
+- [x] 8 P Plan-meldingen inpluggen
 - [ ] 9 P Doelen-lab inpluggen
 - [ ] 10 P Plan-verdieping inpluggen (`useInViewOnce` mee)
 - [ ] 11 S-klein overlay-host + deeplink-effect E2

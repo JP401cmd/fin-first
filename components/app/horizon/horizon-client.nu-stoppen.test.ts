@@ -143,39 +143,6 @@ describe('de stopkeuze (vrijheidsas)', () => {
   })
 })
 
-describe('statusblokken', () => {
-  it('ÉÉN tekort-blok voor anchor_shortfall, met pension_shortfall en stop_now_shortfall als aliassen', () => {
-    const src = bron()
-    expect(src).toContain("kernelStatus === 'anchor_shortfall'")
-    expect(src).toContain("kernelStatus === 'pension_shortfall'")
-    expect(src).toContain("kernelStatus === 'stop_now_shortfall'")
-    // Alle drie in dezelfde conditie: geen apart pensioen-blok meer.
-    const start = src.indexOf("kernelStatus === 'anchor_shortfall'")
-    const regel = src.slice(start, src.indexOf('\n', start))
-    expect(regel).toContain("'pension_shortfall'")
-    expect(regel).toContain("'stop_now_shortfall'")
-  })
-
-  it('dat blok noemt de AOW niet — het tekort kan er ook ná vallen (ADR 0127 D2 / 0129 D3)', () => {
-    const src = bron()
-    const start = src.indexOf("kernelStatus === 'anchor_shortfall'")
-    expect(start).toBeGreaterThan(-1)
-    const blok = src.slice(start, start + 900)
-    const jsx = blok.slice(0, blok.indexOf('</div>'))
-    expect(jsx).not.toMatch(/AOW/)
-    expect(jsx).toContain('ankerZin(ankerReach, ankerStop')
-  })
-
-  it("`reached_now` zegt onder een vast anker niet 'je kunt nu al stoppen' (tautologie) maar de bereik-zin", () => {
-    const src = bron()
-    const start = src.indexOf("kernelStatus === 'reached_now'")
-    expect(start).toBeGreaterThan(-1)
-    const blok = src.slice(start, start + 1400)
-    expect(blok).toContain('isFixedAnchorMode')
-    expect(blok).toContain('ankerZin(')
-  })
-})
-
 describe('doelbedrag (D4) en opnamerate (bevinding 6)', () => {
   it('de doelbedrag-guard krijgt de ANKER-vlag mee; de smalle ADR 0127-vlag is weg', () => {
     expect(bron()).toContain('isAnchorPortfolio: simResult?.requiredFireIsAnchorPortfolio === true')

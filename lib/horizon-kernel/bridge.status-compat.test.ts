@@ -130,8 +130,10 @@ describe('bron-grendel — elke TEKORT-status die de bridge voor een live anker 
   // Alleen tekort-statussen hebben een eigen blok nodig: `reached_now`/`reached_at`
   // worden door de hero-leeftijd gedragen en hoeven niet apart gemeld te worden.
   // Een tekort daarentegen is precies de melding die een gebruiker níét mag missen.
+  // De statusblokken woonden in horizon-client.tsx; sinds ADR 0179 fase 1 stap 8
+  // rendert components/toekomst/plan/plan-meldingen.tsx ze.
   const src = readFileSync(
-    resolve(process.cwd(), 'components/app/horizon/horizon-client.tsx'),
+    resolve(process.cwd(), 'components/toekomst/plan/plan-meldingen.tsx'),
     'utf8',
   )
   const uiStatussen = new Set(

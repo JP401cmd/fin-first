@@ -94,27 +94,6 @@ describe('horizon-client — tekort-lening-melding volgt de meldingen-conventie'
     expect(src).toContain('} = useDeficitNotice(deficitNoticeVisible ? deficitLoanNotice!.peak : null)')
   })
 
-  it('gated de zichtbare melding op display === \'expanded\'', () => {
-    expect(source()).toContain("deficitLoanNotice && deficitDisplay === 'expanded'")
-  })
-
-  it('houdt de aria-live-regio altijd gemount en kondigt minimaliseren sr-only aan', () => {
-    const src = source()
-    const start = src.indexOf('<section role="status" aria-live="polite">')
-    expect(start, 'de aria-live-regio moet bestaan').toBeGreaterThan(-1)
-    const regio = src.slice(start, src.indexOf('</section>', start))
-    expect(regio).toContain("deficitDisplay === 'minimized'")
-    expect(regio).toContain('className="sr-only"')
-    expect(regio).toContain('stip naast de informatie-knop')
-  })
-
-  it('toont de minimaliseer-knop alleen waar de keuze onthouden wordt', () => {
-    const src = source()
-    expect(src).toContain('{canMinimizeDeficit && (')
-    expect(src).toContain('onClick={minimizeDeficitNotice}')
-    expect(src).toContain('aria-label="Minimaliseren"')
-  })
-
   it('behoudt de partner-view-gating van de melding', () => {
     expect(source()).toContain('const deficitNoticeVisible = deficitLoanNotice != null && !usePartnerMainLine')
   })
