@@ -188,3 +188,33 @@ describe('PAGE_INFO — UR3-13 F2: de gekoppelde begrippen blijven gekoppeld', (
     }
   })
 })
+
+describe('PAGE_INFO — /toekomst in drie delen (ADR 0179, fixronde C1 punt 10)', () => {
+  const alles = (key: string) => {
+    const c = PAGE_INFO[key]
+    return [c.insight, c.grip, ...(c.werking ?? []).flatMap((w) => [w.title, w.text])].join(' ')
+  }
+
+  it('Plan beschrijft het doelscenario niet meer: dat woont in Doelen', () => {
+    expect(alles('/toekomst')).not.toMatch(/vijf knoppen/)
+    expect(alles('/toekomst/doelen')).toMatch(/doelscenario/)
+    expect(alles('/toekomst/doelen')).toMatch(/vijf knoppen/)
+    expect(alles('/toekomst/doelen')).not.toMatch(/Toekomst-lab/)
+  })
+
+  it('"Doelen op de as" zegt dat de laag in Plan standaard uit staat', () => {
+    const kaart = PAGE_INFO['/toekomst'].werking?.find((w) => w.title === 'Doelen op de as')
+    expect(kaart?.text).toMatch(/standaard uit/)
+  })
+
+  it('de grip van Plan noemt geen Voorkeuren-kaart meer', () => {
+    expect(PAGE_INFO['/toekomst'].grip).not.toMatch(/Voorkeuren-kaart/)
+  })
+
+  it('geen vakwoord "katern" in de drie teksten, en het verweesde /horizon-blok is weg', () => {
+    for (const key of ['/toekomst', '/toekomst/doelen', '/toekomst/instellingen']) {
+      expect(alles(key), key).not.toMatch(/katern/i)
+    }
+    expect(PAGE_INFO['/horizon']).toBeUndefined()
+  })
+})

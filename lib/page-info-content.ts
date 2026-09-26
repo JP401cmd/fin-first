@@ -496,9 +496,9 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
   // ── Toekomst (Horizon) ───────────────────────────────────────────────
   '/toekomst': {
     insight:
-      'Deze tijdas laat zien waar je financieel heen gaat: de opbouwjaren (groen) en de afbouwjaren (oranje) tot je gekozen eindleeftijd, met doelen, levensgebeurtenissen en voorkeuren die samen je route bepalen.',
+      'Deze tijdas laat zien waar je financieel heen gaat: de opbouwjaren (groen) en de afbouwjaren (oranje) tot je gekozen eindleeftijd, met de levensgebeurtenissen en instellingen die samen je route bepalen.',
     grip:
-      'Sleep een gebeurtenis naar een ander jaar en zie meteen hoe je vrijheidsmoment verschuift; van hieruit open je doelen, gebeurtenissen en voorkeuren om de projectie bij te stellen. Heet de Voorkeuren-kaart "Je voorkeuren voor je plan instellen", dan loop je daar stap voor stap na waar de app mee rekent en wat een andere keuze doet.',
+      'Je sleept een gebeurtenis naar een ander jaar en ziet meteen hoe je vrijheidsmoment verschuift. Onder de grafiek staan Plan, Doelen en Instellingen: in Doelen verken je met je doelscenario wat een andere keuze doet, in Instellingen staan de aannames en gebeurtenissen achter je plan. Bovenaan Instellingen loop je met "Je voorkeuren voor je plan instellen" stap voor stap na waar de app mee rekent.',
     werking: [
       {
         title: 'De tijdas lezen',
@@ -510,11 +510,11 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
       },
       {
         title: 'Doelen op de as',
-        text: 'Elk doel verschijnt op het jaar waarin het valt, zodat zichtbaar wordt of doelen elkaar in de weg zitten of juist versterken.',
+        text: 'Elk doel verschijnt op het jaar waarin het valt, zodat zichtbaar wordt of doelen elkaar in de weg zitten of juist versterken. In Plan staat deze laag standaard uit; je zet hem aan via Lagen boven de grafiek. In Doelen staat hij altijd aan.',
       },
       {
         title: 'Aannames erachter',
-        text: 'Rendement, inflatie, je uitgaven na pensioen en je eindleeftijd bepalen samen de uitkomst. Je stelt ze zelf in bij Instellingen — een kleine bijstelling kan jaren schelen. Onder de grafiek staat je doelscenario: vijf knoppen — meer verdienen, minder uitgeven, je uitgave na pensioen, je nalatenschap en je stopleeftijd — waaraan je draait zonder je plan te wijzigen. Elke knop kleurt rood, oranje of groen: rood betekent dat je plan het niet haalt, oranje dat het net haalt, groen dat er ruim marge in zit. De regel onder een knop zegt vanaf welke stand die grens ligt, en zodra je één knop verschuift, bewegen de grenzen op de andere knoppen mee — ze hangen immers van elkaar af. Onderaan staat of je verkenning al als doel is opgeslagen. Laat je de app het vroegste stopmoment zoeken en reikt je opgeslagen doel met stopleeftijd niet, dan zegt de zin bovenaan de pagina in oranje "haalbaar, je doel nog niet": je plan lukt, alleen nog niet met je doelwensen erbij. Je AOW telt alleen mee als er een actieve AOW-gebeurtenis op je tijdas staat; ontbreekt die, dan rekent de projectie met €0 AOW en zegt een melding bovenaan Instellingen dat. Standaard rekent je plan zonder blijvende tekort-lening: je vrijheidsleeftijd is het vroegste moment waarop je zonder zo’n lening rondkomt. Kies je een vast stopmoment en is je vermogen onderweg op, dan overbrugt de projectie het gat met een tekort-lening en meldt dat bovenaan Plan; bij Instellingen stel je in of je plan zo’n lening mag gebruiken. Blijft er aan het eind van je plan veel meer over dan je gekozen eind-vorm doet verwachten, dan legt een melding bovenaan Plan uit welke regels dat in deze berekening veroorzaken. Heeft Plan, Doelen of Instellingen een melding, dan staat er een gekleurd punt bij die naam onder de grafiek; minimaliseer je de melding, dan blijft alleen dat punt, en een klik op de naam haalt haar terug.',
+        text: 'Rendement, inflatie, je uitgaven na pensioen en je eindleeftijd bepalen samen de uitkomst. Je stelt ze zelf in bij Instellingen — een kleine bijstelling kan jaren schelen. Laat je de app het vroegste stopmoment zoeken en reikt je opgeslagen doel met stopleeftijd niet, dan zegt de zin bovenaan de pagina in oranje "haalbaar, je doel nog niet": je plan lukt, alleen nog niet met je doelwensen erbij. Je AOW telt alleen mee als er een actieve AOW-gebeurtenis op je tijdas staat; ontbreekt die, dan rekent de projectie met €0 AOW en zegt een melding bovenaan Instellingen dat. Standaard rekent je plan zonder blijvende tekort-lening: je vrijheidsleeftijd is het vroegste moment waarop je zonder zo’n lening rondkomt. Kies je een vast stopmoment en is je vermogen onderweg op, dan overbrugt de projectie het gat met een tekort-lening en meldt dat bovenaan Plan; bij Instellingen stel je in of je plan zo’n lening mag gebruiken. Blijft er aan het eind van je plan veel meer over dan je gekozen eind-vorm doet verwachten, dan legt een melding bovenaan Plan uit welke regels dat in deze berekening veroorzaken. Heeft Plan, Doelen of Instellingen een melding, dan staat er een gekleurd punt bij die naam onder de grafiek; minimaliseer je de melding, dan blijft alleen dat punt, en een klik op de naam haalt haar terug. Zijn er meer meldingen, dan staat de belangrijkste uitgeklapt en de rest eronder achter "Nog 1 melding" of "Nog 2 meldingen".',
       },
     ],
     terms: ['fire', 'vrijheidstijd', 'swr', 'inflatie', 'omslagpunt', 'stopmoment', 'bandbreedte', 'tekort_lening'],
@@ -544,15 +544,15 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
     insight:
       'Elk doel hier is een stuk vrijheid dat je opbouwt — zie in één oogopslag hoeveel je al hebt, wat er nog te gaan is en of je op koers ligt, loopt achter of aandacht nodig hebt.',
     grip:
-      'Voeg een doel toe als bedrag, of koppel het aan één of meer bezittingen en schulden zodat het netto meerekent met wat je opbouwt en aflost — of zet het op een kengetal dat de app al bijhoudt (spaarquote, netto vermogen, vrijheidsleeftijd, noodfonds, passief inkomen, belastingdruk, schuldenvrij-moment, eindkapitaal), dan werkt het vanzelf mee. Doelen van twee jaar of verder krijgen automatisch een seintje bij 25%, 50% en 75%; is een doel behaald, dan wordt dat gevierd en verhuist het naar het archief onderaan, met meteen een suggestie voor de volgende stap. Je eigen doelen staan bovenaan; doelen uit je doelsituatie pas je aan in het Toekomst-lab. Ligt je stopmoment vast, dan volgt het doel "Plan gedekt" daar of je plan tot je eindleeftijd reikt. Verandert je plan zó dat een doel uit het lab er niet meer bij past, dan zie je dat bovenaan in één regel — bijwerken of loslaten, niets verdwijnt vanzelf.',
+      'Voeg een doel toe als bedrag, of koppel het aan één of meer bezittingen en schulden zodat het netto meerekent met wat je opbouwt en aflost — of zet het op een kengetal dat de app al bijhoudt (spaarquote, netto vermogen, vrijheidsleeftijd, noodfonds, passief inkomen, belastingdruk, schuldenvrij-moment, eindkapitaal), dan werkt het vanzelf mee. Doelen van twee jaar of verder krijgen automatisch een seintje bij 25%, 50% en 75%; is een doel behaald, dan wordt dat gevierd en verhuist het naar het archief onderaan, met meteen een suggestie voor de volgende stap. Direct onder de grafiek staat je doelscenario; doelen die je daar vastlegt, pas je daar ook aan. Je eigen doelen staan in de lijst eronder. Ligt je stopmoment vast, dan volgt het doel "Plan gedekt" of je plan tot je eindleeftijd reikt. Verandert je plan zó dat een doel uit je doelscenario er niet meer bij past, dan meldt een regel bovenaan Doelen dat: bijwerken kan in het doelscenario, loslaten bij het doel in de lijst. Niets verdwijnt vanzelf.',
     werking: [
       {
-        title: 'Doel als bedrag',
-        text: 'Leg een streefbedrag en een datum vast. De voortgang loopt daarna mee met wat je opbouwt, zonder dat je hem bijhoudt.',
+        title: 'Je doelscenario',
+        text: 'Onder de grafiek staat je doelscenario: vijf knoppen — meer verdienen, minder uitgeven, je uitgave na pensioen, je nalatenschap en je stopleeftijd — waaraan je draait zonder je plan te wijzigen; de gestippelde lijn in de grafiek laat het effect zien. Elke knop kleurt rood, oranje of groen: rood betekent dat je plan het niet haalt, oranje dat het net haalt, groen dat er ruim marge in zit. Zodra je één knop verschuift, bewegen de grenzen op de andere knoppen mee — ze hangen immers van elkaar af. Onderaan staat of je verkenning al als doel is opgeslagen.',
       },
       {
-        title: 'Doel gekoppeld aan bezittingen',
-        text: 'Koppel bezittingen en schulden aan een doel, dan telt de voortgang nétto mee: wat je opbouwt minus wat er nog openstaat.',
+        title: 'Doel als bedrag',
+        text: 'Een doel is een streefbedrag met een datum; de voortgang loopt mee met wat je opbouwt, zonder dat je hem bijhoudt. Koppel je bezittingen en schulden aan het doel, dan telt de voortgang nétto mee: wat je opbouwt minus wat er nog openstaat.',
       },
       {
         title: 'Doel op een kengetal',
@@ -569,12 +569,12 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
       { href: '/mijn/mijlpalen', label: 'Mijlpalen die je al passeerde' },
     ],
   },
-  // ADR 0179 — Voorkeuren en Gebeurtenissen gingen op in katern Instellingen; de twee
+  // ADR 0179 — Voorkeuren en Gebeurtenissen gingen op in Instellingen; de twee
   // teksten zijn hier samengevoegd (de oude sleutels vervielen met hun routes).
   '/toekomst/instellingen': {
     insight:
       'Achter elke projectie zitten aannames — verwacht rendement, inflatie, je uitgaven na pensioen, je eindleeftijd — en momenten in je leven: een kind, een erfenis, een verhuizing of minder werken. Samen bepalen ze hoeveel jaar vrijheid je berekening laat zien. Ook momenten die je plan zelf berekent, zoals het stoppen van een pensioenpot, staan hier.',
-    grip: 'Draai hier aan die knoppen; een kleine bijstelling kan je uitkomst met jaren verschuiven. Ook je AOW-, pensioen-, huis- en werkstrategie stel je hier in, en onder Gebeurtenissen voeg je een moment toe en zie je meteen het effect op je pad naar vrijheid. Liever stap voor stap? "Je voorkeuren voor je plan instellen" bovenaan zet de belangrijkste keuzes met hun effect op een rij.',
+    grip: 'Hier stel je die aannames bij; een kleine bijstelling kan je uitkomst met jaren verschuiven. Ook je stopmoment en je AOW-, pensioen-, huis- en werkstrategie staan hier, en onder Gebeurtenissen voeg je een moment toe en zie je meteen het effect op je pad naar vrijheid. Liever stap voor stap? "Je voorkeuren voor je plan instellen" bovenaan zet de belangrijkste keuzes met hun effect op een rij.',
     // De plan-regel (ADR 0129) is hier twee vragen: wanneer stop je, en wat moet
     // er aan het eind gelden. De opties van die twee vragen zijn precies deze
     // begrippen — als radio-label kunnen ze geen popover dragen, dus staan ze
@@ -625,12 +625,9 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
     ],
   },
 
-  // ── Horizon-fallbacks (embedded /horizon-varianten) ─────────────────
-  '/horizon': {
-    insight:
-      'Deze projectie laat zien wanneer je financieel vrij bent en hoe scenario’s en levensgebeurtenissen dat pad beïnvloeden.',
-    grip: 'Voeg gebeurtenissen toe of pas parameters aan om je plan te verkennen.',
-  },
+  // '/horizon' stond hier als fallback voor de embedded /horizon-varianten. Die route
+  // redirect op de routing-laag naar /toekomst en niets vraagt de sleutel nog op
+  // (fixronde C1, page-info:check meldde hem als wees).
 
   // ── Toekomst — fase-analyse-modals (widget-brede uitleg, geen route) ─
   '/toekomst/fase-opbouw/intro': {
