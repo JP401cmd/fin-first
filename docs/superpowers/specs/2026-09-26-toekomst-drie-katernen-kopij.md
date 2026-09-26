@@ -95,6 +95,20 @@ Getoetst op de tekst die stroom C (`lib/horizon/katern-copy.ts`) en stroom M (`l
 | "stopmoment nu", "geen gebeurtenissen", "1 gebeurtenis", "1 voorkeur" | Goedkeuren | Instellingsnamen, geen oordeel. |
 | Zonewoord groen = "ruim gedekt" (`labZoneWoord`) | Goedkeuren | De samenvatting consumeert de bron; het voorbeeld "stopmoment 58 · gedekt" in §4 was illustratief. |
 
+## 9. Aanvulling: kopij uit de fixrondes (26 sep, avond)
+
+Getoetst op merkstem en compliance. Alle teksten staan in `lib/horizon/katern-copy.ts`.
+
+| Tekst | Besluit | Waarom |
+|---|---|---|
+| "Zo werkt je grafiek" (titel van de canvas-i) | Goedkeuren | Bestaande titel, één ingang (§4.9). |
+| "Samenstelling en Geldstroom volgen je plan; je doelscenario zie je in Vermogen" | Goedkeuren | Letterlijk uit spec §4.5; beschrijvend. |
+| "De marktcheck kon niet worden doorgerekend. Je planlijn klopt gewoon; zet de laag uit en weer aan om het opnieuw te proberen." | Goedkeuren | Volgt de bestaande foutuitleg van de marktcheck. De aansporing gaat over een knop, niet over een geldhandeling. |
+| Huislaag: "Met je huis" · "Een tweede lijn met je huis erbij. De hoofdlijn is het deel waar je direct bij kunt." / "Zonder je huis" · "De lijn zonder je huis toont het deel van je vermogen waar je direct bij kunt. …" | Goedkeuren | De labels komen letterlijk uit `sim-chart.tsx` en de uitleg uit de bestaande grafiekuitleg. Label en uitleg volgen de hoofdlijn, zodat de laag zegt wat hij toont. |
+| "Jaar-op-jaar-tabel →" | Goedkeuren | Letterlijk uit het wireframe (§4.3); de enige ingang naar de tabel. |
+| "Niet verplaatst" · "Je kunt alleen gebeurtenissen verplaatsen die je zelf hebt toegevoegd. Deze staat weer op zijn oude plek." | Goedkeuren | Eerlijk en beschrijvend. Onthult niets over de partner: het zegt alleen dat de gebeurtenis niet van jou is. |
+| Nav-naam voor schermlezers "Onderdelen van je toekomstplan"; i-tekst "Heeft Plan, Doelen of Instellingen een melding, …" | Aangepast (commit `4ee6a58ee`) | "katern" is intern vakjargon (DNA-toon: vakterm vermijden). |
+
 ## Wat dit vraagt van de bouw (fase 1–2)
 
 - Ankerregel: consumeer `ankerVrijZin` en `ankerTitel` uit `lib/horizon/anker-copy.ts` en schrijf geen nieuwe zinnen. KPI 1 via `formatHeroFireAge`.
