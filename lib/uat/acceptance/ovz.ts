@@ -1,5 +1,6 @@
 /**
- * Acceptatiecriteria — domein Overzicht-hub (WF-OVZ-01..27 / UAT-OVZ-01..16,19..27).
+ * Acceptatiecriteria — domein Overzicht-hub (WF-OVZ-01..29 / UAT-OVZ-01..16,19..29;
+ * WF-OVZ-29 is op 26 sep 2026 verhuisd uit WF-TOEK-32).
  *
  * WF-OVZ-27 (netto-vermogen-kaart in twee delen — verleden-venster vs.
  * /toekomst-link, naad op Schulden|Budget, kop per planmodus) is NIEUW,
@@ -387,6 +388,24 @@ given: 'Een vers geonboarde gebruiker met `module_guide_state[\'rondleiding:pend
       kind: 'exact',
       expected: 'fixed5=bad; fixed95=warn; fixed100=good; fixedGeenDekking=neutral; solvedHaalbaar=good; solvedOnhaalbaar=bad; solvedDoelNogNiet=warn; banner5=bad; banner95=warn; bannerGedekt=neutral',
       source: 'lib/horizon/plan-status.ts#resolvePlanStatus + lib/page-status/freedom.ts#resolveFreedomBanner (echte functies, niet gemirrord) — UI-toets in components/overview/mini-networth-chart.test.tsx ("plan-stoplicht") en components/app/shell/plan-status-menu.test.tsx (menu); server-bron lib/horizon/plan-status-loader.ts',
+    },
+  },
+  {
+    workflow: 'WF-OVZ-29',
+    scenarioId: 'UAT-OVZ-29',
+    titel: 'Verloop van gezondheidsgetal en vrijheidsleeftijd in de gezondheidskassabon, "sinds vorige maand" op de kaart',
+    kriticiteit: 'BELANGRIJK',
+    persona: 'willem',
+    given:
+      'VERHUISD uit WF-TOEK-32 ("Verdieping onder de grafiek: trends en geplande acties") — eigenaarsbesluit 26 sep 2026, fase 5 van "/toekomst in drie katernen". DOELSTAND, BOUW LOOPT: de exacte kopij volgt zodra de bouwers klaar zijn; tot dan beschrijft dit criterium het gedrag, niet de letterlijke teksten. Katern Plan op /toekomst toont het verloop-grid (gezondheid en FIRE-leeftijd) en "Geplande acties (komend jaar)" niet meer, en het /toekomst-sheet "Financiële Gezondheid" vervalt. Persona Willem met minstens 13 maanden `net_worth_snapshots` (gezondheidsgetal `resilience_score`, `fire_age`, `score_version`), waarin één `score_version`-overgang valt, en een paar geplande acties.',
+    when:
+      '(a) De gebruiker opent op /overzicht de gezondheidskaart (`HealthScoreCard`) en leest de regel "sinds vorige maand"; (b) hij opent de gezondheidskassabon (`HealthScoreReceipt`) en leest de sectie "Verloop"; (c) hij klikt de widget gezondheids_score op zijn homescherm aan; (d) hij zoekt de geplande acties en wijzigt de status van één actie.',
+    then:
+      '(a) De kaart toont "sinds vorige maand" (de verandering van het gezondheidsgetal t.o.v. de vorige maand) ALLEEN als beide maanden dezelfde `score_version` hebben; over een versie-overgang heen staat er geen vergelijking (een ander rekenmodel is geen vooruitgang of achteruitgang). (b) De kassabon heeft een sectie "Verloop" met twee reeksen per maand — het gezondheidsgetal en de vrijheidsleeftijd — geplot op datum, één punt per maand, over de laatste 12 maanden. Een `score_version`-overgang is in het verloop gemarkeerd, zodat een sprong door een nieuw rekenmodel niet als echte verandering leest. Bij de FIRE-reeks staat een uitlegregel (wat de historische vrijheidsleeftijd meet; de historie is niet met de huidige kernel herschreven, zie het aandachtspunt over `net_worth_snapshots.fire_age`). De kassabon consumeert het gezondheidsgetal uit dezelfde bron als elders in de app — geen eigen som (consume, don\'t recompute). (c) De widget gezondheids_score opent de kassabon of linkt naar /overzicht — geen eigen verloop in de widget. (d) De geplande acties staan op /overzicht/tips (niet meer op /toekomst); een statuswijziging is direct zichtbaar en geldt ook in De Wil (gedeeld domein).',
+    assertion: {
+      kind: 'ui-only',
+      source:
+        'DOELSTAND (bouw loopt, nog te verifiëren): components/app/horizon/health-score-receipt.tsx (`HealthScoreReceipt`, sectie "Verloop") geopend vanuit components/overview/overzicht-hero/health-score-card.tsx (`HealthScoreCard`, "sinds vorige maand" bij gelijke `score_version`) + de historie uit lib/horizon/raw-data-loader.ts (`snapshot_date, resilience_score, fire_age, score_version`) + widget gezondheids_score (components/widgets/widget-renderer.tsx) + /overzicht/tips (geplande acties). Het vervallen /toekomst-grid staat nog in components/app/horizon/horizon-trend-grid.tsx tot de bouw landt. Weergave- en navigatiegedrag; de getallen zelf zijn consume-only uit de bestaande bundel.',
     },
   },
 ]

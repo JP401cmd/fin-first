@@ -168,6 +168,8 @@ export const UAT_SCENARIOS: UatScenario[] = [
   { id: 'UAT-OVZ-26', wf: 'WF-OVZ-26', zone: 'OVZ', band: 'dagelijks', naam: 'Interactieve rondleiding op /overzicht (autostart, overslaan, herstart)', kriticiteit: 'BELANGRIJK', rooktest: false, platforms: ['webapp', 'mobiel'], subscenarios: ['a', 'b', 'c'], volgorde: 26, duurMin: 8 },
   { id: 'UAT-OVZ-27', wf: 'WF-OVZ-27', zone: 'OVZ', band: 'dagelijks', naam: 'Netto-vermogen-kaart in twee delen: verleden-venster vs. /toekomst-link, naad op Schulden|Budget, kop per planmodus', kriticiteit: 'BELANGRIJK', rooktest: false, platforms: ['webapp', 'mobiel'], subscenarios: ['a', 'c'], volgorde: 27, duurMin: 5 },
   { id: 'UAT-OVZ-28', wf: 'WF-OVZ-28', zone: 'OVZ', band: 'dagelijks', naam: 'Plan-stoplicht: statuspunt en oordeel op de plankaart, banner in dezelfde kleur', kriticiteit: 'BELANGRIJK', rooktest: false, platforms: ['webapp', 'mobiel'], subscenarios: ['a', 'c'], volgorde: 28, duurMin: 4 },
+  // Verhuisd uit UAT-TOEK-32 (eigenaarsbesluit 26 sep 2026, fase 5): doelstand, bouw loopt.
+  { id: 'UAT-OVZ-29', wf: 'WF-OVZ-29', zone: 'OVZ', band: 'dagelijks', naam: 'Verloop van gezondheidsgetal en vrijheidsleeftijd in de gezondheidskassabon, "sinds vorige maand" op de kaart', kriticiteit: 'BELANGRIJK', rooktest: false, platforms: ['webapp', 'mobiel'], subscenarios: ['a', 'b', 'c'], volgorde: 29, duurMin: 4 },
   { id: 'UAT-BEZIT-01', wf: 'WF-BEZIT-01', zone: 'BEZIT', band: 'fundament', naam: 'Bezittingenoverzicht bekijken: totalen en categorieën', kriticiteit: 'KERN', rooktest: true, platforms: ['webapp', 'mobiel'], subscenarios: ['a', 'b', 'c', 'd'], volgorde: 1, duurMin: 4 },
   { id: 'UAT-BEZIT-02', wf: 'WF-BEZIT-02', zone: 'BEZIT', band: 'fundament', naam: 'Bezittingen filteren op categorie', kriticiteit: 'OVERIG', rooktest: false, platforms: ['webapp'], subscenarios: ['a'], volgorde: 2, duurMin: 2 },
   { id: 'UAT-BEZIT-03', wf: 'WF-BEZIT-03', zone: 'BEZIT', band: 'fundament', naam: 'Verdeling & projectie raadplegen', kriticiteit: 'BELANGRIJK', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'c'], volgorde: 3, duurMin: 5 },
@@ -367,7 +369,10 @@ export const UAT_SCENARIOS: UatScenario[] = [
   // 26 sep 2026): de knop "Delen / Afdrukken" (`PrintTijdasButton`) is op 6 sep 2026
   // verwijderd (commit 40704f5a7). Het nummer blijft vrij; niet hergebruiken.
   { id: 'UAT-TOEK-30', wf: null, zone: 'TOEK', band: 'vooruitkijken', naam: 'Deeplinks en legacy-routes volgen (LEIDEND, dekt WF-TOEK-30)', kriticiteit: 'BELANGRIJK', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'b', 'c'], volgorde: 30, duurMin: 6 },
-  { id: 'UAT-TOEK-32', wf: 'WF-TOEK-32', zone: 'TOEK', band: 'vooruitkijken', naam: 'Verdieping onder de grafiek: trends en geplande acties', kriticiteit: 'OVERIG', rooktest: false, platforms: ['webapp'], subscenarios: ['a'], volgorde: 32, duurMin: 3 },
+  // UAT-TOEK-32 ("Verdieping onder de grafiek: trends en geplande acties") is VERHUISD
+  // naar UAT-OVZ-29 (eigenaarsbesluit 26 sep 2026, fase 5 van "/toekomst in drie
+  // katernen"): het verloop staat in de gezondheidskassabon op /overzicht, de geplande
+  // acties op /overzicht/tips. Het TOEK-nummer blijft vrij; niet hergebruiken.
   { id: 'UAT-TOEK-33', wf: 'WF-TOEK-33', zone: 'TOEK', band: 'vooruitkijken', naam: '/toekomst in huidige euro\'s: grafiek, hero-cijfers, fasetabel — exact één keer gedeeld', kriticiteit: 'KERN', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'c'], volgorde: 33, duurMin: 6 },
   { id: 'UAT-TOEK-34', wf: 'WF-TOEK-34', zone: 'TOEK', band: 'vooruitkijken', naam: 'Bedragmaskering op de vrijheidsgrafiek (geometrie blijft, bedragen weg)', kriticiteit: 'BELANGRIJK', rooktest: false, platforms: ['webapp'], subscenarios: ['a'], volgorde: 34, duurMin: 4 },
   { id: 'UAT-TOEK-35', wf: 'WF-TOEK-35', zone: 'TOEK', band: 'vooruitkijken', naam: 'Doelenpagina: pace-toets ("op koers") en het vrijheidsgetal-doel dat live meesynct', kriticiteit: 'KERN', rooktest: false, platforms: ['webapp'], subscenarios: ['a', 'b'], volgorde: 35, duurMin: 5 },

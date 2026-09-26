@@ -1,6 +1,7 @@
 /**
- * Acceptatiecriteria — domein Toekomst (WF-TOEK-01..26,28,30,32..59 /
- * UAT-TOEK-01..26,28,30,32..59; WF-TOEK-29 is op 26 sep 2026 geschrapt, zie
+ * Acceptatiecriteria — domein Toekomst (WF-TOEK-01..26,28,30,33..59 /
+ * UAT-TOEK-01..26,28,30,33..59; WF-TOEK-29 is op 26 sep 2026 geschrapt en
+ * WF-TOEK-32 is dezelfde dag verhuisd naar WF-OVZ-29, zie
  * TOEK_EXPECTED_WORKFLOW_NUMBERS). WF-TOEK-27 (uitgave-na-pensioen) en
  * WF-TOEK-31 (tijdas in huishoud-/partnerperspectief) zijn bewust GEEN eigen
  * criterium: ze zijn in de catalogus verwijsregels naar UAT-REKEN-23/24 resp.
@@ -57,7 +58,7 @@ const criteria: AcceptanceCriterion[] = [
     persona: 'willem',
     given: 'Persona Willem geladen (deplete-strategie, fire_end_age 95, geen vast stopmoment → anker "zo vroeg als het kan"). Sinds ADR 0179 fase 2 (26 sep 2026) is de kop oordeelzin + ankerregel + i (geen statuspunten meer, geen kicker), staat de KPI-strip in katern Plan onder het canvas en vervangt de aannamesregel onder de grafiek de oude voetnoot ("Vermogen opeten · Weergave t/m leeftijd 94 …") en de hint "Stopmoment wijzigen".',
     when: 'De gebruiker opent /toekomst, leest de oordeelzin en de ankerregel eronder, de aannamesregel onder de grafiek, en daarna in Plan de KPI-strip (Vrijheidsleeftijd/Doelbedrag/Opnamerate/Na pensioen) en de voortgangsbalk — in Volledig én Eenvoudig. Daarna zet hij een vast stopmoment (bv. 60) en leest kop, KPI 1 en balk opnieuw; tot slot bekijkt hij de pagina zonder geboortedatum.',
-    then: 'KOP: de oordeelzin ("Je toekomstplan is …") met daaronder één ankerregel. Onder "zo vroeg als het kan" is dat de vrijheidsleeftijd als tekst, "Vrij mogelijk vanaf je Ne." (onbereikbaar binnen het plan: "De app vindt binnen dit plan nog geen leeftijd waarop je vermogen het zelf draagt."); onder een vast anker is het de instelling, "Je rekent met stoppen op 60." (nu-anker: "Je rekent alsof je nu stopt."), nooit het dekkingspercentage (dat zegt de oordeelzin). Zonder geboortedatum staat er onder solved GEEN ankerregel (dezelfde poort als de oordeelzin); onder een vast anker staat de regel er wel. In de huishouden- en partnerweergave (perspectief) zwijgt de ankerregel altijd — de kop las anders je eigen run terwijl KPI 1 het perspectief-cijfer toont (zelfde poort als `ontbrekendeGegevensIssues`). Zolang de kernel rekent houdt de regel zijn ruimte vast (geen layoutsprong). Rechts in de kop alleen de i. AANNAMESREGEL (alleen in Plan): "Op basis van: stopmoment zo vroeg mogelijk · plan tot je 95e · 2,0% inflatie · N% rendement per jaar · N gebeurtenissen" met de link "Naar instellingen"; Eenvoudig laat inflatie en rendement weg. Het stop-segment staat er alleen onder "zo vroeg als het kan"; onder een vast anker valt het weg (de ankerregel in de kop zegt het al: "Je rekent met stoppen op 60."). Het eind-segment noemt de INGESTELDE eindleeftijd (`fireStrategy.endAge`, dezelfde als de Instellingen-rij "Tot 90 jaar"), nooit het horizonplafond van de kernel (`displayEndAge`, 100 bij eeuwigdurend); onder de eind-vorm "Mijn vermogen mag niet slinken" noemt het geen leeftijd maar "je vermogen mag niet slinken". KPI-STRIP (Plan): één strip voor alle breedtes. KPI 1 is de vrijheidsleeftijd in HELE jaren met onderschrift "jaar" (hetzelfde jaartal als de ankerregel, gedeelde afronding heroFireAgeYear); de exacte waarde staat in de kassabon achter KPI 1 (WF-TOEK-02). Vindt de kernel binnen het plan geen leeftijd, dan staat er "Niet binnen je plan" (zonder eenheid en zonder markeerblok); alleen zolang er gerekend wordt staat er "···" (aria-busy). Onder een vast anker is KPI 1 de tegel "Reikt tot" (`ANKER_KPI_LABEL`) en valt KPI 3 (opnamerate) weg; de ankerdrieslag eronder draagt dan alleen nog "Vrij mogelijk vanaf" en "Jouw stopmoment" — "Reikt tot" staat één keer in Plan, in KPI 1. Het onderschrift van KPI 2 (Doelbedrag) noemt "met je huis" alleen als er een eigen woning is (`housingContext.hasEigenHuis`); zonder woning en in een perspectief-weergave is het kaal "benodigd". Eenvoudig toont twee cellen: Vrijheidsleeftijd (of Reikt tot) en Na pensioen. De duidingszin ("Dit betekent: werken wordt voor jou een keuze rond je Ne.") bestaat niet meer. VOORTGANGSBALK: onder solved met het getal "N% van je doelbedrag"; onder een vast anker alleen de vulling, zonder getal (het percentage staat al in de oordeelzin). PLAN-PANEEL (DOELSTAND, eigenaarsbesluit 26 sep 2026, bouw loopt): de levensinkomenstrook en de dekkingsradar verdwijnen; onder de KPI-strip, de voortgangsbalk en de fasebalk staat de lijst levensgebeurtenissen (WF-TOEK-17). Tot die bouw landt staan strook en radar er nog (in "Wat het betekent"); ze zijn geen toetspunt meer. EXACT-provable deel: de strategie-labels (STRATEGY_LABELS blijft de korte vakterm voor rapport en jaar-op-jaar-tabel), de eindleeftijd-echo, de −1-weergaveregel van de grafiek (clipRowsToPlanEnd) en de stop- en eind-segmenten van de aannamesregel. De vrijheidsleeftijd/het doelbedrag ZELF komen uit de kernel → toetsvorm oracle (/beheer/horizon-kernel).',
+    then: 'KOP: de oordeelzin ("Je toekomstplan is …") met daaronder één ankerregel. Onder "zo vroeg als het kan" is dat de vrijheidsleeftijd als tekst, "Vrij mogelijk vanaf je Ne." (onbereikbaar binnen het plan: "De app vindt binnen dit plan nog geen leeftijd waarop je vermogen het zelf draagt."); onder een vast anker is het de instelling, "Je rekent met stoppen op 60." (nu-anker: "Je rekent alsof je nu stopt."), nooit het dekkingspercentage (dat zegt de oordeelzin). Zonder geboortedatum staat er onder solved GEEN ankerregel (dezelfde poort als de oordeelzin); onder een vast anker staat de regel er wel. In de huishouden- en partnerweergave (perspectief) zwijgt de ankerregel altijd — de kop las anders je eigen run terwijl KPI 1 het perspectief-cijfer toont (zelfde poort als `ontbrekendeGegevensIssues`). Zolang de kernel rekent houdt de regel zijn ruimte vast (geen layoutsprong). Rechts in de kop alleen de i. AANNAMESREGEL (alleen in Plan): "Op basis van: stopmoment zo vroeg mogelijk · plan tot je 95e · 2,0% inflatie · N% rendement per jaar · N gebeurtenissen" met de link "Naar instellingen"; Eenvoudig laat inflatie en rendement weg. Het stop-segment staat er alleen onder "zo vroeg als het kan"; onder een vast anker valt het weg (de ankerregel in de kop zegt het al: "Je rekent met stoppen op 60."). Het eind-segment noemt de INGESTELDE eindleeftijd (`fireStrategy.endAge`, dezelfde als de Instellingen-rij "Tot 90 jaar"), nooit het horizonplafond van de kernel (`displayEndAge`, 100 bij eeuwigdurend); onder de eind-vorm "Mijn vermogen mag niet slinken" noemt het geen leeftijd maar "je vermogen mag niet slinken". KPI-STRIP (Plan): één strip voor alle breedtes. KPI 1 is de vrijheidsleeftijd in HELE jaren met onderschrift "jaar" (hetzelfde jaartal als de ankerregel, gedeelde afronding heroFireAgeYear); de exacte waarde staat in de kassabon achter KPI 1 (WF-TOEK-02). Vindt de kernel binnen het plan geen leeftijd, dan staat er "Niet binnen je plan" (zonder eenheid en zonder markeerblok); alleen zolang er gerekend wordt staat er "···" (aria-busy). Onder een vast anker is KPI 1 de tegel "Reikt tot" (`ANKER_KPI_LABEL`) en valt KPI 3 (opnamerate) weg; de ankerdrieslag eronder draagt dan alleen nog "Vrij mogelijk vanaf" en "Jouw stopmoment" — "Reikt tot" staat één keer in Plan, in KPI 1. Het onderschrift van KPI 2 (Doelbedrag) noemt "met je huis" alleen als er een eigen woning is (`housingContext.hasEigenHuis`); zonder woning en in een perspectief-weergave is het kaal "benodigd". Eenvoudig toont twee cellen: Vrijheidsleeftijd (of Reikt tot) en Na pensioen. De duidingszin ("Dit betekent: werken wordt voor jou een keuze rond je Ne.") bestaat niet meer. VOORTGANGSBALK: onder solved met het getal "N% van je doelbedrag"; onder een vast anker alleen de vulling, zonder getal (het percentage staat al in de oordeelzin). PLAN-PANEEL (DOELSTAND, eigenaarsbesluit 26 sep 2026, bouw loopt): de levensinkomenstrook en de dekkingsradar verdwijnen (strook, radar en verloop zijn geen toetspunt meer); onder de KPI-strip, de voortgangsbalk en de fasebalk staat de lijst levensgebeurtenissen (WF-TOEK-17). Ook het verloop-grid (gezondheid en FIRE-leeftijd), "Geplande acties (komend jaar)" en het sheet "Financiële Gezondheid" verdwijnen uit Plan (fase 5): het verloop staat in de gezondheidskassabon op /overzicht, de geplande acties op /overzicht/tips (WF-OVZ-29). Tot die bouw landt staan strook en radar er nog (in "Wat het betekent"); ze zijn geen toetspunt meer. EXACT-provable deel: de strategie-labels (STRATEGY_LABELS blijft de korte vakterm voor rapport en jaar-op-jaar-tabel), de eindleeftijd-echo, de −1-weergaveregel van de grafiek (clipRowsToPlanEnd) en de stop- en eind-segmenten van de aannamesregel. De vrijheidsleeftijd/het doelbedrag ZELF komen uit de kernel → toetsvorm oracle (/beheer/horizon-kernel).',
     assertion: {
       kind: 'exact',
       expected: 'strategieLabelDeplete=Vermogen opeten; eindleeftijd=95; weergaveTot=94; strategieLabelPensioen=Pensioenleeftijd; anker=solved; aannamesStop=stopmoment zo vroeg mogelijk; aannamesEind=plan tot je 95e; aannamesStopVastAnker=geen; aannamesEindNietSlinken=je vermogen mag niet slinken',
@@ -432,20 +433,6 @@ const criteria: AcceptanceCriterion[] = [
     assertion: {
       kind: 'ui-only',
       source: 'next.config.ts#redirects (routing-laag, exact getoetst via WF-NAV-15/16) + components/toekomst/state/use-toekomst-overlay-state.ts (consumptie van `?uitgaven=`/`?event=`/`?whatif=`/`?modal=scenarios|simulations|backtesting|life_events` + `buildDeeplinkCleanupUrl`) + components/toekomst/instellingen/instellingen-katern.tsx (ankers `#voorkeuren`/`#gebeurtenissen`) + components/future/voorkeuren-view.tsx (`?strategie=`/`?regel=`) + components/future/plan-review/plan-review-provider.tsx (`?planreview=open`) + components/toekomst/layout/oude-tab-param.tsx (`OudeTabParam`, `tab=` weg na de redirect) + components/toekomst/instellingen/use-eenmalige-deeplink.ts (`?nieuw=`/`?strategie=`/`?regel=` eenmalig) + components/toekomst/instellingen/anker-scroll.tsx (`AnkerScroll`) + components/toekomst/layout/oude-lab-bladwijzer.tsx (/toekomst#verken-je-aannames → Doelen) — bewaakt in lib/horizon/toekomst-deeplinks.contract.test.ts, next.config.test.ts en components/toekomst/state/use-toekomst-overlay-state.whatif-scroll.test.tsx (herhaalde en late `whatif=open`-scroll).',
-    },
-  },
-  {
-    workflow: 'WF-TOEK-32',
-    scenarioId: 'UAT-TOEK-32',
-    titel: 'Verdieping onder de grafiek: trends en geplande acties',
-    kriticiteit: 'OVERIG',
-    persona: 'willem',
-    given: 'Persona Willem geladen.',
-    when: 'De gebruiker klapt "Gezondheid" open, opent de kassabon "Financiële Gezondheid" en wijzigt de status van een geplande actie.',
-    then: 'De kassabon toont de uitsplitsing van het gezondheidsgetal consume-only, uit dezelfde bron als elders in de app (consistentie, geen eigen som). Een status-wijziging op een ActionCard is direct zichtbaar en ook in De Wil (gedeeld domein). In "Eenvoudig"-modus zijn beide blokken verborgen.',
-    assertion: {
-      kind: 'consistency',
-      source: 'consistentie-eis: kassabon "Financiële Gezondheid" === gezondheidsgetal elders (consume-only, één bron); actiestatus gedeeld met De Wil.',
     },
   },
   {
@@ -941,7 +928,7 @@ export const TOEK_ACCEPTANCE: AcceptanceSet = {
 
 /**
  * De TOEK-scenario-nummers die een acceptatiecriterium HOREN te hebben — de
- * catalogus dekt 01..08, 10..26, 28, 30, 32..59 (27 en 31 zijn
+ * catalogus dekt 01..08, 10..26, 28, 30, 33..59 (27 en 31 zijn
  * verwijsregels naar REKEN/NAV en horen NIET in deze set). WF-TOEK-09
  * (opgeslagen wat-als-scenario's als spooklijn) is VERVALLEN op 14 sep 2026
  * (ADR 0144 "De Wat-Als-pagina gaat op in de tijdas") — de bewaarde
@@ -987,10 +974,15 @@ export const TOEK_ACCEPTANCE: AcceptanceSet = {
  * 26 sep 2026): de knop "Delen / Afdrukken" (`PrintTijdasButton`) is op 6 sep 2026
  * verwijderd (commit 40704f5a7). Catalogus, flow en criteria dragen hem niet meer;
  * het nummer blijft vrij.
+ * WF-TOEK-32 ("Verdieping onder de grafiek: trends en geplande acties") is
+ * VERHUISD naar WF-OVZ-29 (eigenaarsbesluit 26 sep 2026, fase 5): Plan toont het
+ * verloop-grid en "Geplande acties (komend jaar)" niet meer en het /toekomst-sheet
+ * "Financiële Gezondheid" vervalt; het verloop staat in de gezondheidskassabon op
+ * /overzicht, de geplande acties op /overzicht/tips. Het nummer blijft vrij.
  */
 export const TOEK_EXPECTED_WORKFLOW_NUMBERS: number[] = [
   ...Array.from({ length: 8 }, (_, i) => i + 1), // 1..8
   ...Array.from({ length: 17 }, (_, i) => i + 10), // 10..26
-  28, 30, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57,
+  28, 30, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57,
   58, 59,
 ]

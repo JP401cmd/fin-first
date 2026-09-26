@@ -47,7 +47,7 @@ describe('TOEK_FLOW — curatie-integriteit', () => {
     }
   })
 
-  it('dekt de verwachte statusdragende WF-TOEK-scenario\'s (01..08,10..26,28,30,32,33,34)', () => {
+  it('dekt de verwachte statusdragende WF-TOEK-scenario\'s (01..08,10..26,28,30,33,34)', () => {
     const covered = new Set(
       TOEK_FLOW.nodes.map((n) => n.scenarioId).filter((id): id is string => Boolean(id)),
     )
@@ -56,13 +56,16 @@ describe('TOEK_FLOW — curatie-integriteit', () => {
     // (opgeslagen wat-als als spooklijn) is VERVALLEN op 14 sep 2026
     // (ADR 0144) samen met de standalone Wat-Als-pagina. 29 (tijdas delen of
     // afdrukken) is GESCHRAPT op 26 sep 2026: de afdrukknop bestaat sinds 6 sep
-    // 2026 niet meer (commit 40704f5a7).
+    // 2026 niet meer (commit 40704f5a7). 32 (verdieping: trends & geplande acties)
+    // is dezelfde dag VERHUISD naar UAT-OVZ-29 (fase 5); TOEK houdt er een
+    // cross-knoop naar OVZ voor.
     const expected = [
       ...Array.from({ length: 8 }, (_, i) => i + 1), // 1..8
       ...Array.from({ length: 17 }, (_, i) => i + 10), // 10..26
-      28, 30, 32, 33, 34,
+      28, 30, 33, 34,
     ].map((n) => `UAT-TOEK-${String(n).padStart(2, '0')}`)
     expect(covered.has('UAT-TOEK-29'), 'UAT-TOEK-29 is geschrapt').toBe(false)
+    expect(covered.has('UAT-TOEK-32'), 'UAT-TOEK-32 is verhuisd naar UAT-OVZ-29').toBe(false)
     for (const id of expected) {
       expect(covered.has(id), `${id} moet als flow-knoop voorkomen`).toBe(true)
     }

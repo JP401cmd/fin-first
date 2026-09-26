@@ -1,7 +1,7 @@
 // Gecureerde Toekomst-procesflow (verdiepingslaag laag 2 voor de UAT-plaat).
 //
 // Bron: docs/uat/uat-plan.md Deel 1 — "Toekomst & tijdas (WF-TOEK)"
-// (WF-TOEK-01..26,28,30,32; 29 geschrapt op 26 sep 2026) en de acceptatie in lib/uat/acceptance/toek.ts.
+// (WF-TOEK-01..26,28,30,33..59; 29 geschrapt en 32 verhuisd naar OVZ-29 op 26 sep 2026) en de acceptatie in lib/uat/acceptance/toek.ts.
 // De knopen met `scenarioId` verwijzen naar de UAT-scenario-ID's uit
 // lib/uat/catalog.ts (UAT-TOEK-NN) en erven daarmee de rondestatus. Het label
 // toont bewust het WF-nummer, spiegelt lib/uat/flows/bezit.ts.
@@ -54,7 +54,10 @@ export const TOEK_FLOW: UatFlow = {
     { id: 'details', scenarioId: 'UAT-TOEK-06', label: 'WF-TOEK-06 · "Jaar-op-jaar-tabel →" in Plan', kind: 'screen', stage: 2, lane: 'aflezen', subOf: 'grafiek' },
     { id: 'fasebalk', scenarioId: 'UAT-TOEK-12', label: 'WF-TOEK-12 · Fase-balk (drie levensfasen)', kind: 'screen', stage: 2, lane: 'aflezen' },
     { id: 'markers', scenarioId: 'UAT-TOEK-16', label: 'WF-TOEK-16 · Markers & natuurlijke mijlpalen', kind: 'screen', stage: 2, lane: 'aflezen' },
-    { id: 'verdieping', scenarioId: 'UAT-TOEK-32', label: 'WF-TOEK-32 · Verdieping: trends & geplande acties', kind: 'screen', stage: 2, lane: 'aflezen' },
+    // WF-TOEK-32 (verdieping: trends & geplande acties) is VERHUISD naar WF-OVZ-29
+    // (eigenaarsbesluit 26 sep 2026, fase 5): het verloop staat in de
+    // gezondheidskassabon op /overzicht. Cross-knoop i.p.v. een eigen scenario.
+    { id: 'verdieping', label: 'Verloop & geplande acties → /overzicht (WF-OVZ-29)', kind: 'cross', stage: 2, lane: 'aflezen', crossZone: 'OVZ' },
     { id: 'euroweergave', scenarioId: 'UAT-TOEK-33', label: "WF-TOEK-33 · Huidige euro's: grafiek/hero/fasetabel", kind: 'action', stage: 2, lane: 'aflezen', subOf: 'grafiek' },
     { id: 'maskering', scenarioId: 'UAT-TOEK-34', label: 'WF-TOEK-34 · Bedragmaskering op de grafiek', kind: 'action', stage: 2, lane: 'aflezen', subOf: 'grafiek' },
     { id: 'grondslaglijn', scenarioId: 'UAT-TOEK-36', label: 'WF-TOEK-36 · Grondslag hoofdlijn per woonstrategie', kind: 'screen', stage: 2, lane: 'aflezen', subOf: 'grafiek' },
