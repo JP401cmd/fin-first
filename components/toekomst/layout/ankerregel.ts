@@ -9,6 +9,11 @@
 // geboortedatum is "vrij mogelijk vanaf je 52e" niet te onderbouwen en is de kop neutraal.
 // Onder een vast anker is de regel een instelling ("Je rekent met stoppen op 60."), die
 // staat ook zonder geboortedatum.
+//
+// Perspectief: in de huishouden- of partnerweergave toont KPI 1 het cijfer van dat
+// perspectief, en `heroFireAge`/`ankerStop` zijn je eigen run. Dan geen regel — dezelfde
+// poort als `ontbrekendeGegevensIssues` (fixronde C1): de kop mag nooit een ander getal
+// zeggen dan de KPI eronder.
 
 import { katernAnkerregel } from '@/lib/horizon/katern-copy'
 import type { AnkerStop } from '@/lib/horizon/anker-copy'
@@ -32,6 +37,8 @@ export interface AnkerregelInput {
   readonly currentAge: number | null
   /** Is de geboortedatum bekend (`effectiveInput.dateOfBirth`)? */
   readonly heeftGeboortedatum: boolean
+  /** `perspectief.hasPerspectiveHero` — huishouden- of partnerweergave actief? */
+  readonly perspectief: boolean
 }
 
 const WACHT: AnkerregelStand = { kind: 'wacht' }
@@ -39,6 +46,7 @@ const GEEN: AnkerregelStand = { kind: 'geen' }
 
 export function toekomstAnkerregel(input: AnkerregelInput): AnkerregelStand {
   const { heroFireAge } = input
+  if (input.perspectief) return GEEN
   if (input.isFixedAnchorMode) {
     if (input.ankerStop != null) {
       return { kind: 'tekst', tekst: katernAnkerregel({ kind: 'vast', stop: input.ankerStop }) }

@@ -13,6 +13,7 @@
 import { EditorialDeck } from '@/components/editorial'
 import {
   useToekomstBron,
+  useToekomstPerspectiefContext,
   useToekomstSimContext,
 } from '@/components/toekomst/state/toekomst-state-provider'
 import { toekomstAnkerregel } from './ankerregel'
@@ -20,12 +21,14 @@ import { toekomstAnkerregel } from './ankerregel'
 export function ToekomstAnkerregel({ className = '' }: { className?: string }) {
   const { initialData } = useToekomstBron()
   const { isFixedAnchorMode, ankerStop, heroFireAge, currentAge } = useToekomstSimContext()
+  const { hasPerspectiveHero } = useToekomstPerspectiefContext()
   const stand = toekomstAnkerregel({
     isFixedAnchorMode,
     ankerStop,
     heroFireAge,
     currentAge,
     heeftGeboortedatum: Boolean(initialData.effectiveInput?.dateOfBirth),
+    perspectief: hasPerspectiveHero,
   })
 
   if (stand.kind === 'geen') return null

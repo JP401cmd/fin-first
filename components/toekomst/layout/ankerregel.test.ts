@@ -15,6 +15,7 @@ const BASIS: AnkerregelInput = {
   heroFireAge: { status: 'definitief', age: 52.3 },
   currentAge: 41,
   heeftGeboortedatum: true,
+  perspectief: false,
 }
 
 describe('toekomstAnkerregel — solved ("zo vroeg mogelijk")', () => {
@@ -87,5 +88,23 @@ describe('toekomstAnkerregel — vast anker', () => {
       toekomstAnkerregel({ ...VAST, ankerStop: null, heroFireAge: { status: 'berekenen', age: null } }),
     ).toEqual({ kind: 'wacht' })
     expect(toekomstAnkerregel({ ...VAST, ankerStop: null })).toEqual({ kind: 'geen' })
+  })
+})
+
+describe('toekomstAnkerregel — perspectief (C1 punt 3)', () => {
+  it('in de huishouden- of partnerweergave geen regel: KPI 1 toont daar het perspectief-cijfer', () => {
+    expect(toekomstAnkerregel({ ...BASIS, perspectief: true })).toEqual({ kind: 'geen' })
+    expect(
+      toekomstAnkerregel({
+        ...BASIS,
+        perspectief: true,
+        isFixedAnchorMode: true,
+        ankerStop: { kind: 'age', stopAge: 60 },
+      }),
+    ).toEqual({ kind: 'geen' })
+    // Ook niet "wachten": er komt in dit perspectief geen eigen regel.
+    expect(
+      toekomstAnkerregel({ ...BASIS, perspectief: true, heroFireAge: { status: 'berekenen', age: null } }),
+    ).toEqual({ kind: 'geen' })
   })
 })
