@@ -25,7 +25,7 @@ import {
 export function DoelenKaternLab() {
   const { initialData } = useToekomstBron()
   const { verkenSectieZichtbaar } = useToekomstPerspectiefContext()
-  const { setActiveModal, verkenSectionRef } = useToekomstOverlayContext()
+  const { verkenSectionRef } = useToekomstOverlayContext()
   const {
     scenarioReturnDeltas,
     setScenarioReturnDeltas,
@@ -90,7 +90,6 @@ export function DoelenKaternLab() {
           setStopPlanConfirmOpen={setStopPlanConfirmOpen}
           stopPlanSaving={stopPlanSaving}
           effectiveStopAge={effectiveStopAge}
-          setActiveModal={setActiveModal}
           whatIfBaseline={whatIfBaseline}
           categorieReturnGroups={categorieReturnGroups}
           scenarioReturnDeltas={scenarioReturnDeltas}

@@ -10,6 +10,8 @@
 // de JSX-body is byte-gelijk aan de bron (controle: `diff` op r7562–7653). `vraag={heroVraag}`
 // blijft staan — ADR 0179 toetste B10 op precies die voorwaarde.
 import type { Dispatch, RefObject, SetStateAction } from 'react'
+import Link from 'next/link'
+import { KATERN_HREF } from '@/components/toekomst/layout/katern-routes'
 import {
   LabKnoppen,
   type LabKnopConfig,
@@ -26,7 +28,6 @@ import type { zoneVanHuidig, HefboomKey } from '@/lib/horizon/lab-grenzen-types'
 import type { buildCategorieReturnGroups, ToekomstScenarioDoel } from '@/lib/horizon/toekomst-scenario'
 import type { WhatIfOverrides } from '@/lib/types/horizon-whatif'
 import type { FireEndForm } from '@/lib/fire-strategy'
-import type { ActiveModal } from '@/components/toekomst/state/types'
 
 export interface DoelenLabProps {
   verkenSectieZichtbaar: boolean
@@ -47,7 +48,6 @@ export interface DoelenLabProps {
   setStopPlanConfirmOpen: Dispatch<SetStateAction<boolean>>
   stopPlanSaving: boolean
   effectiveStopAge: number
-  setActiveModal: Dispatch<SetStateAction<ActiveModal>>
   whatIfBaseline: WhatIfOverrides | null
   categorieReturnGroups: ReturnType<typeof buildCategorieReturnGroups>
   scenarioReturnDeltas: Record<string, number>
@@ -82,7 +82,6 @@ export function DoelenLab({
   setStopPlanConfirmOpen,
   stopPlanSaving,
   effectiveStopAge,
-  setActiveModal,
   whatIfBaseline,
   categorieReturnGroups,
   scenarioReturnDeltas,
@@ -157,13 +156,14 @@ export function DoelenLab({
                             {stopPlanSaving ? 'Opslaan…' : `Maak ${formatAge(effectiveStopAge)} mijn stopmoment`}
                           </button>
                         )}
-                        <button
-                          type="button"
-                          onClick={() => setActiveModal('strategie')}
+                        {/* ADR 0179 D4: één ingang per instelling — de plan-keuzes wonen in
+                            katern Instellingen (de strategie-modal verdwijnt in fase 3). */}
+                        <Link
+                          href={KATERN_HREF.instellingen}
                           className="inline-flex min-h-[44px] items-center font-sans text-[11px] font-medium text-[var(--ink-2)] underline underline-offset-2 transition-colors hover:text-horizon-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
                         >
                           Je plan-keuzes &rarr;
-                        </button>
+                        </Link>
                       </div>
                     }
                     marktbias={

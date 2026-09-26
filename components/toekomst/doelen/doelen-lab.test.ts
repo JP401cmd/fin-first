@@ -92,9 +92,10 @@ describe('doelen-lab — stopkeuze (nu-stoppen, TPR-09)', () => {
     expect(src).toContain('setStopPlanConfirmOpen(true)')
   })
 
-  it('de verwijzing naar álle plan-keuzes opent de strategie-modal', () => {
+  it('de verwijzing naar álle plan-keuzes is een link naar katern Instellingen (ADR 0179 D4)', () => {
     const src = readSourceLF(LAB)
-    expect(src).toContain("onClick={() => setActiveModal('strategie')}")
+    expect(src).toContain('href={KATERN_HREF.instellingen}')
+    expect(src).not.toContain("setActiveModal('strategie')")
     expect(src).toContain('Je plan-keuzes')
   })
 
