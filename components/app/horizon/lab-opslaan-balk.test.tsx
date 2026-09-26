@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import { LabOpslaanBalk, LabIndicatieRegel } from './lab-opslaan-balk'
+import { LabOpslaanBalk, LabIndicatieRegel, labActieBar } from './lab-opslaan-balk'
 
 /**
  * De opslaan-balk (ADR 0170) vervangt de "Je draait aan je doel"-banner én de losse
@@ -93,5 +93,31 @@ describe('LabIndicatieRegel', () => {
     expect(tekst).toContain('Indicatie, geen advies')
     // Geen aansporing en geen belofte over stoppen (toon-invarianten van anker-copy).
     expect(tekst).not.toMatch(/je moet|je kunt stoppen/i)
+  })
+})
+
+describe('labActieBar + acties="shell" (mobiel, ADR 0179 D7)', () => {
+  it('alleen bij iets om op te slaan: nieuw → Vastleggen + Reset, gewijzigd → Bijwerken + Herstel', () => {
+    expect(labActieBar('nieuw')).toEqual({ primary: 'vastleggen', secondary: 'reset' })
+    expect(labActieBar('gewijzigd')).toEqual({ primary: 'bijwerken', secondary: 'herstel' })
+    for (const t of ['rust', 'opgeslagen', 'nu-anker'] as const) expect(labActieBar(t)).toBeNull()
+    expect(labActieBar('nieuw', { vastleggenMogelijk: false })).toBeNull()
+    expect(labActieBar('gewijzigd', { bijwerkenMogelijk: false })).toBeNull()
+  })
+
+  it('nieuw in de shell-stand: geen knoppen in de balk (ze staan in de action-bar)', () => {
+    const { tekst, knoppen } = renderBalk({ toestand: 'nieuw', acties: 'shell' })
+    expect(tekst).toContain('Nog niet opgeslagen.')
+    expect(knoppen).toEqual([])
+  })
+
+  it('gewijzigd in de shell-stand: alleen Loslaten blijft in de balk', () => {
+    const { knoppen } = renderBalk({ toestand: 'gewijzigd', acties: 'shell' })
+    expect(knoppen).toEqual(['Doel loslaten'])
+  })
+
+  it('zonder bar (bijwerken wacht) blijven de knoppen in de balk', () => {
+    const { knoppen } = renderBalk({ toestand: 'gewijzigd', acties: 'shell', bijwerkenMogelijk: false })
+    expect(knoppen).toContain('Herstel mijn doel')
   })
 })

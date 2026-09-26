@@ -106,6 +106,12 @@ export interface LabKnoppenProps {
   weergave?: LabKnopWeergave
   /** Afwezig ⇒ geen schakelaar (de host bewaart de keuze niet). */
   onWeergaveChange?: (v: LabKnopWeergave) => void
+  /**
+   * Vorm van de schakelaar: vijf knoppen (standaard) of één native keuzelijst (ADR 0179 D7:
+   * in katern Doelen staat het lab in een smalle kolom of onder de koppen, en telt elke
+   * regel voor de één-scherm-eis).
+   */
+  weergaveKiezer?: 'knoppen' | 'menu'
 }
 
 /** De vormen waarin de knoppen kunnen staan — één lijst met de voorkeur (`KNOP_WEERGAVEN`). */
@@ -152,6 +158,7 @@ export function LabKnoppen({
   level = 'h2',
   weergave = 'wijzer',
   onWeergaveChange,
+  weergaveKiezer = 'knoppen',
   knoppen,
   nalatenschapNotitie = null,
   uitkomst,
@@ -249,7 +256,24 @@ export function LabKnoppen({
           </Kop>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          {onWeergaveChange && (
+          {onWeergaveChange && weergaveKiezer === 'menu' && (
+            <label className="inline-flex items-center">
+              <span className="sr-only">{LAB_COPY.weergaveLabel}</span>
+              <select
+                data-testid="lab-weergave-menu"
+                value={weergave}
+                onChange={(e) => onWeergaveChange(e.target.value as LabKnopWeergave)}
+                className="min-h-[30px] border border-[var(--border-md)] bg-[var(--paper)] px-1.5 font-sans text-[11px] text-[var(--ink-2)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+              >
+                {WEERGAVE_VOLGORDE.map((v) => (
+                  <option key={v} value={v}>
+                    {WEERGAVE_LABEL[v]}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {onWeergaveChange && weergaveKiezer === 'knoppen' && (
             <div
               role="group"
               aria-label={LAB_COPY.weergaveLabel}

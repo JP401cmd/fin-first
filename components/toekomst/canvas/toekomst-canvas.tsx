@@ -24,7 +24,7 @@
  * layout-laag (`components/toekomst/layout/actief-katern.tsx`).
  */
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { useIsLgUp } from '@/lib/hooks/use-media-query'
@@ -67,7 +67,16 @@ const DOELSCENARIO_OVERLAY = 'wat-als'
 /** Geen meegroeiende doellijn (Instellingen); stabiel, zodat de grafiek niet hertekent. */
 const GEEN_FACTOREN: { age: number; factor: number }[] = []
 
-export function ToekomstCanvas() {
+/**
+ * De canvas-rij van katern Doelen op desktop (ADR 0179 D7, spec §4.2 regel 9): grafiek
+ * links, het lab (standaard harp) rechts, zodat een knop en zijn effect samen in beeld staan.
+ * Onder `lg` blijft het één kolom en staat het lab onder de katern-koppen.
+ */
+export const DOELEN_CANVAS_RIJ = 'lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(320px,360px)]'
+/** De rechterkolom: alleen vanaf `lg`, met een haarlijn als scheiding. */
+export const DOELEN_CANVAS_ZIJKOLOM = 'hidden min-w-0 border-l border-[var(--border-ed)] p-5 lg:block'
+
+export function ToekomstCanvas({ zijkolom = null }: { zijkolom?: ReactNode } = {}) {
   const {
     partnerName,
     isPartnerView,
@@ -215,6 +224,8 @@ export function ToekomstCanvas() {
     [stand.grafiekBron, doelGrootboek, viewDoelWealthCompositionRows, viewDoelDisplaySimRows, viewDoelIeBreakdownResult],
   )
   const { gebeurtenissen, mijlpalen, doelen, doelscenario, marktcheck, rendementScenarios, metHuis } = stand.lagen
+  // De rechterkolom bestaat alleen in Doelen, met een run en met iets om te tonen.
+  const metZijkolom = katern === 'doelen' && simResult != null && zijkolom != null
 
   // Markers en tijdlijn volgen de lagen van dít katern (vaste lagen erbij), zonder de
   // keuze van de gebruiker te overschrijven.
@@ -310,7 +321,8 @@ export function ToekomstCanvas() {
       {/* Module-active accent (Horizon-500 op /toekomst/**) */}
       <div className="h-1.5" style={{ background: 'var(--module-active-500)' }} />
 
-      <div className="p-4 sm:p-6 md:p-8">
+      <div className={metZijkolom ? DOELEN_CANVAS_RIJ : undefined} data-testid={metZijkolom ? 'doelen-canvas-rij' : undefined}>
+      <div className={`min-w-0 p-4 sm:p-6 md:p-8 ${metZijkolom ? 'lg:py-5' : ''}`}>
         <CanvasKop
           hasPerspectiveHero={hasPerspectiveHero}
           isPartnerView={isPartnerView}
@@ -496,6 +508,12 @@ export function ToekomstCanvas() {
             )}
           </>
         ) : null}
+      </div>
+      {metZijkolom && (
+        <aside className={DOELEN_CANVAS_ZIJKOLOM} data-testid="doelen-canvas-zijkolom">
+          {zijkolom}
+        </aside>
+      )}
       </div>
     </section>
   )

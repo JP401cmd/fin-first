@@ -6,6 +6,7 @@ import type { KaternId } from '@/lib/horizon/katern-copy'
 import { PlanReviewProvider } from '@/components/future/plan-review/plan-review-provider'
 import { ToekomstStateProvider } from '@/components/toekomst/state/toekomst-state-provider'
 import { ToekomstCanvas } from '@/components/toekomst/canvas/toekomst-canvas'
+import { CanvasZijkolom } from '@/components/toekomst/layout/canvas-zijkolom'
 import { ToekomstOverlayHost } from '@/components/toekomst/overlays/toekomst-overlay-host'
 import { ToekomstRekenGrens } from '@/components/toekomst/layout/toekomst-reken-grens'
 import { ToekomstAnkerregel } from '@/components/toekomst/layout/toekomst-ankerregel'
@@ -120,7 +121,8 @@ export default async function ToekomstKaternLayout({ children }: { children: Rea
 
           <ToekomstRekenGrens>
             <div className="mx-auto max-w-6xl py-5 sm:py-8 px-4 sm:px-6">
-              <ToekomstCanvas />
+              {/* In Doelen staat het lab op desktop naast de grafiek (ADR 0179 D7). */}
+              <ToekomstCanvas zijkolom={<CanvasZijkolom />} />
               <ToekomstKaternKoppen className="mt-6" />
               {/* Meldingen per katern (spec §4.8): bovenaan het actieve katern. */}
               <ToekomstKaternMeldingSlot className="[&>div]:mt-3" />

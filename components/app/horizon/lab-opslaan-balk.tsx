@@ -40,6 +40,42 @@ export interface LabOpslaanBalkProps {
   onHerstel: () => void
   onLoslaten: () => void
   onReset: () => void
+  /**
+   * Waar de opslaan-actie staat (ADR 0179 D7). `inline` (standaard): alle knoppen in de balk.
+   * `shell`: de primaire actie (Vastleggen of Bijwerken) en zijn tweede knop staan in de
+   * action-bar van de mobiele shell (`labActieBar`); de balk toont dan alleen de statusregel
+   * en wat níét in die bar staat (Loslaten). Staat er niets op te slaan, dan is er geen bar
+   * en blijven de knoppen gewoon in de balk.
+   */
+  acties?: 'inline' | 'shell'
+}
+
+/** De knoppen van de opslaan-actie in de shell-action-bar (mobiel). */
+export interface LabActieBar {
+  primary: 'vastleggen' | 'bijwerken'
+  secondary: 'reset' | 'herstel'
+}
+
+/**
+ * Welke opslaan-actie hoort in de action-bar van de shell (ADR 0179 D7; spec §4.9: één knop
+ * per staat, "Vastleggen" of "Bijwerken"). Alleen als er écht iets op te slaan is; anders
+ * `null` — dan is er geen bar en komt de zwevende nav-pill terug.
+ */
+export function labActieBar(
+  toestand: LabOpslaanToestand,
+  { vastleggenMogelijk = true, bijwerkenMogelijk = true }: { vastleggenMogelijk?: boolean; bijwerkenMogelijk?: boolean } = {},
+): LabActieBar | null {
+  if (toestand === 'nieuw' && vastleggenMogelijk) return { primary: 'vastleggen', secondary: 'reset' }
+  if (toestand === 'gewijzigd' && bijwerkenMogelijk) return { primary: 'bijwerken', secondary: 'herstel' }
+  return null
+}
+
+/** De labels van de bar-knoppen: dezelfde teksten als in de balk. */
+export const LAB_ACTIE_LABEL: Record<LabActieBar['primary'] | LabActieBar['secondary'], string> = {
+  vastleggen: LAB_COPY.opslaanActieVastleggen,
+  bijwerken: LAB_COPY.opslaanActieBijwerken,
+  reset: LAB_COPY.opslaanActieReset,
+  herstel: LAB_COPY.opslaanActieHerstel,
 }
 
 const KNOP_BASIS =
@@ -66,8 +102,11 @@ export function LabOpslaanBalk({
   onHerstel,
   onLoslaten,
   onReset,
+  acties = 'inline',
 }: LabOpslaanBalkProps) {
   const datum = formatGezetOp(gezetOp)
+  // In de shell-stand staan primair en secundair in de action-bar; hier alleen de rest.
+  const inBar = acties === 'shell' ? labActieBar(toestand, { vastleggenMogelijk, bijwerkenMogelijk }) : null
   const tekst =
     toestand === 'rust'
       ? LAB_COPY.opslaanRust
@@ -104,7 +143,7 @@ export function LabOpslaanBalk({
         {tekst}
       </p>
       <div className="flex flex-wrap items-center gap-2">
-        {toestand === 'nieuw' && (
+        {toestand === 'nieuw' && !inBar && (
           <>
             {vastleggenMogelijk && (
               <button type="button" onClick={onVastleggen} disabled={busy} className={KNOP_PRIMAIR}>
@@ -118,14 +157,16 @@ export function LabOpslaanBalk({
         )}
         {toestand === 'gewijzigd' && (
           <>
-            {bijwerkenMogelijk && (
+            {!inBar && bijwerkenMogelijk && (
               <button type="button" onClick={onVastleggen} disabled={busy} className={KNOP_PRIMAIR}>
                 {LAB_COPY.opslaanActieBijwerken}
               </button>
             )}
-            <button type="button" onClick={onHerstel} disabled={busy} className={KNOP_SECUNDAIR}>
-              {LAB_COPY.opslaanActieHerstel}
-            </button>
+            {!inBar && (
+              <button type="button" onClick={onHerstel} disabled={busy} className={KNOP_SECUNDAIR}>
+                {LAB_COPY.opslaanActieHerstel}
+              </button>
+            )}
             <button type="button" onClick={onLoslaten} disabled={busy} className={KNOP_STIL}>
               {LAB_COPY.opslaanActieLoslaten}
             </button>

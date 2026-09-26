@@ -3,7 +3,8 @@ import { loadEffectiveMonthlyFigures } from '@/lib/fin-data-loader'
 import { getToekomstClient, loadToekomstFinData } from '@/lib/toekomst/load-toekomst-data'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { DoelenView } from '@/components/future/doelen-view'
-import { DoelenKaternLab } from '@/components/toekomst/doelen/doelen-katern-lab'
+import { DoelenKaternLab, DoelenKaternLabSheets } from '@/components/toekomst/doelen/doelen-katern-lab'
+import { DoelenLabDetails } from '@/components/toekomst/doelen/doelen-lab-details'
 import { DoelenAnderePaden } from '@/components/toekomst/doelen/andere-paden'
 
 export const metadata: Metadata = {
@@ -36,7 +37,10 @@ export default async function ToekomstDoelenPage() {
   return (
     <>
       <NavStackMeta title="Doelen" />
-      <DoelenKaternLab />
+      {/* Mobiel: het lab direct onder de klevende katern-koppen (ADR 0179 D7); op desktop
+          staat het in de rechterkolom van de canvas-rij (layout, CanvasZijkolom). */}
+      <DoelenKaternLab plek="onder-koppen" />
+      <DoelenLabDetails />
       {/* DoelenView draagt zijn eigen `max-w-6xl px-4 sm:px-6`-kolom; de katern-layout
           padt al, dus de negatieve marge voorkomt dubbele inspringing. Fase 4 voegt lab
           en lijst samen en ruimt dit op. */}
@@ -56,6 +60,8 @@ export default async function ToekomstDoelenPage() {
       </div>
       {/* III · Andere paden naast je doelscenario (fase 4): de scenario-kaarten, lazy. */}
       <DoelenAnderePaden />
+      {/* De sheets van het lab: één keer, los van de twee plekken. */}
+      <DoelenKaternLabSheets />
     </>
   )
 }

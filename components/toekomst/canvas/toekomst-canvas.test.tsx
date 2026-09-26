@@ -319,6 +319,38 @@ describe('ToekomstCanvas — Doelen', () => {
   })
 })
 
+describe('ToekomstCanvas — de canvas-rij in Doelen: grafiek links, lab rechts (ADR 0179 D7)', () => {
+  function renderMetKolom(segment: string | null) {
+    h.segment = segment
+    return render(
+      <DisplayModeProvider initialMode="full">
+        <ToekomstCanvas zijkolom={<div data-testid="lab-kolom-stub" />} />
+      </DisplayModeProvider>,
+    )
+  }
+
+  it('Doelen: twee kolommen vanaf lg, het lab in de rechterkolom (alleen vanaf lg zichtbaar)', () => {
+    renderMetKolom('doelen')
+    const rij = screen.getByTestId('doelen-canvas-rij')
+    expect(rij.className).toContain('lg:grid')
+    expect(rij.className).toContain('lg:grid-cols-[minmax(0,1fr)_minmax(320px,360px)]')
+    const kolom = screen.getByTestId('doelen-canvas-zijkolom')
+    expect(kolom.className).toContain('hidden')
+    expect(kolom.className).toContain('lg:block')
+    expect(within(kolom).getByTestId('lab-kolom-stub')).toBeTruthy()
+    // De grafiek staat in de linkerkolom, niet in de zijkolom.
+    expect(within(kolom).queryByTestId('grafiek-stub')).toBeNull()
+    expect(within(rij).getByTestId('grafiek-stub')).toBeTruthy()
+  })
+
+  it('Plan: geen rij, geen zijkolom (zelfde DOM als zonder slot)', () => {
+    renderMetKolom(null)
+    expect(screen.queryByTestId('doelen-canvas-rij')).toBeNull()
+    expect(screen.queryByTestId('doelen-canvas-zijkolom')).toBeNull()
+    expect(screen.queryByTestId('lab-kolom-stub')).toBeNull()
+  })
+})
+
 describe('ToekomstCanvas — Samenstelling en Geldstroom in Doelen tonen het doelscenario (fase 4)', () => {
   const grootboek = { fireAge: 55, fireAgeFractional: 55.4, kernelHousingSale: { age: 70 } }
 

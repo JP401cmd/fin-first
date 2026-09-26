@@ -288,3 +288,17 @@ describe('LabKnoppen — de vijfhoek-vorm (ADR 0170 B12)', () => {
     expect(screen.getByTestId('plan-actie')).toBeTruthy()
   })
 })
+
+describe('LabKnoppen — de vorm als keuzelijst (katern Doelen, ADR 0179 D7)', () => {
+  it('weergaveKiezer="menu": één keuzelijst met de vijf vormen in plaats van vijf knoppen', () => {
+    const onWeergaveChange = vi.fn()
+    renderBlok({ weergave: 'harp', onWeergaveChange, weergaveKiezer: 'menu' })
+    expect(screen.queryByTestId('lab-weergave')).toBeNull()
+    const menu = screen.getByTestId('lab-weergave-menu') as HTMLSelectElement
+    expect(menu.value).toBe('harp')
+    expect(Array.from(menu.options).map((o) => o.value)).toEqual(['balk', 'wijzer', 'rad', 'harp', 'vijfhoek'])
+    fireEvent.change(menu, { target: { value: 'rad' } })
+    expect(onWeergaveChange).toHaveBeenCalledWith('rad')
+    expect(screen.getByLabelText('Vorm van de knoppen')).toBe(menu)
+  })
+})
