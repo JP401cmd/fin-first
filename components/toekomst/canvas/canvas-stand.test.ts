@@ -196,3 +196,43 @@ describe('canvasStand — Eenvoudig tekent alleen de lagen van zijn menu (spec �
     expect(s.lagen.doelscenario).toBe(true)
   })
 })
+
+describe('canvasStand — bron van Samenstelling en Geldstroom (ADR 0179 fase 4)', () => {
+  const keuze = (modus: 'vermogen' | 'samenstelling' | 'geldstroom') => ({
+    modus,
+    lagen: Object.fromEntries(LAAG_VOLGORDE.map((id) => [id, false])) as Record<LaagId, boolean>,
+  })
+  const b = (doelscenario: boolean, doelscenarioRijen?: boolean) => ({
+    doelen: false,
+    doelscenario,
+    metHuis: false,
+    ...(doelscenarioRijen === undefined ? {} : { doelscenarioRijen }),
+  })
+  const W = { eenvoudig: false }
+
+  it('Doelen + doellijn + doelrijen: het doelscenario, zonder regel', () => {
+    for (const modus of ['samenstelling', 'geldstroom'] as const) {
+      const s = canvasStand('doelen', keuze(modus), b(true, true), W)
+      expect(s.grafiekBron).toBe('doelscenario')
+      expect(s.toonPlanVolgtRegel).toBe(false)
+    }
+  })
+
+  it('Doelen + doellijn zonder doelrijen: het plan met de regel', () => {
+    const s = canvasStand('doelen', keuze('samenstelling'), b(true, false), W)
+    expect(s.grafiekBron).toBe('plan-met-regel')
+    expect(s.toonPlanVolgtRegel).toBe(true)
+  })
+
+  it('Doelen zonder doellijn: het plan, geen regel (plan en doelscenario zijn gelijk)', () => {
+    const s = canvasStand('doelen', keuze('geldstroom'), b(false, true), W)
+    expect(s.grafiekBron).toBe('plan')
+    expect(s.toonPlanVolgtRegel).toBe(false)
+  })
+
+  it('Vermogen, Plan en Instellingen: altijd het plan', () => {
+    expect(canvasStand('doelen', keuze('vermogen'), b(true, true), W).grafiekBron).toBe('plan')
+    expect(canvasStand('plan', keuze('samenstelling'), b(true, true), W).grafiekBron).toBe('plan')
+    expect(canvasStand('instellingen', keuze('samenstelling'), b(true, true), W).grafiekBron).toBe('plan')
+  })
+})

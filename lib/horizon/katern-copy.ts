@@ -305,13 +305,18 @@ export const GELDSTROOM_SUB_GROEP_LABEL = 'Geldstroom tonen als'
 export const CANVAS_UITLEG_TITEL = 'Zo werkt je grafiek'
 
 /**
- * Doelen, in Samenstelling en Geldstroom: die modi tonen het plan tot de adapter het
- * doelscenario levert (spec §4.5, "het enige controlepunt"). Letterlijk uit de
- * ontwerpspec; deze drie canvasteksten staan nog niet in de kopij-toets en gaan langs
- * merkstem.
+ * Doelen, in Samenstelling en Geldstroom, als er wél een doellijn is maar geen doelrijen
+ * (partner- of huishoudperspectief): die modi tonen dan het plan (spec §4.5, "het enige
+ * controlepunt"; kopij-toets §9 goedgekeurd).
  */
 export const DOELEN_VOLGT_PLAN_REGEL =
   'Samenstelling en Geldstroom volgen je plan; je doelscenario zie je in Vermogen'
+
+/**
+ * Doelen, in Samenstelling en Geldstroom, als de balken het doelscenario tonen (ADR 0179
+ * fase 4; spec §4.5: label "je doelscenario"). Nog langs merkstem (kopij-toets §11).
+ */
+export const DOELEN_TOONT_DOELSCENARIO_LABEL = 'Je doelscenario'
 
 /**
  * De marktcheck-laag staat aan maar de doorrekening mislukte. Vervangt de vervallen

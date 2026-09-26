@@ -53,7 +53,7 @@ import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { useStabielObject } from './use-stabiel-object'
 import type { ToekomstPerspectief } from './use-toekomst-perspectief'
 import type { ToekomstSim } from './use-toekomst-sim'
-import type { ToekomstScenario } from './use-toekomst-scenario'
+import type { ToekomstScenario, DoelGrootboek } from './use-toekomst-scenario'
 import type { ToekomstLagen } from './use-toekomst-lagen'
 
 export interface EuroViewFeedsInput {
@@ -84,6 +84,14 @@ export interface EuroViewFeedsInput {
   readoutData: ReadoutData | null
   canonicalDailyRate: number
   ieBreakdownResult: ReturnType<typeof buildBreakdown> | null
+  /**
+   * Het doelscenario voor Samenstelling en Geldstroom in katern Doelen (ADR 0179 fase 4):
+   * rijen van de doelrun (nominaal) — `null` zonder doelgrootboek. Gedeflateerd met de
+   * factor van de DOELrijen zelf, niet die van het plan.
+   */
+  doelGrootboek: DoelGrootboek | null
+  doelWealthCompositionRows: StackedRow[] | null
+  doelIeBreakdownResult: ReturnType<typeof buildBreakdown> | null
   scenarioPresets: ScenarioPresetResult[] | null
   householdHero: HouseholdHeroData | null
   partnerHero: HouseholdHeroData | null
@@ -118,6 +126,9 @@ export function useEuroViewFeeds(nominaal: EuroViewFeedsInput) {
     readoutData,
     canonicalDailyRate,
     ieBreakdownResult,
+    doelGrootboek,
+    doelWealthCompositionRows,
+    doelIeBreakdownResult,
     scenarioPresets,
     householdHero,
     partnerHero,
@@ -518,16 +529,19 @@ export function useEuroViewFeeds(nominaal: EuroViewFeedsInput) {
   // handgerolde deling, zodat de onbruikbare-factor-regel (0/NaN/∞ ⇒ ongemoeid)
   // óók hier geldt. Zonder dit zou wisselen tussen 'totalen' en 'bronnen' twee
   // verschillende grondslagen in dezelfde grafiek tonen.
-  const viewIeBreakdownResult = useMemo(() => {
-    if (ieBreakdownResult == null || euroView === 'nominal') return ieBreakdownResult
+  const deflateBreakdown = (
+    result: ReturnType<typeof buildBreakdown> | null,
+    factoren: Map<number, number>,
+  ): ReturnType<typeof buildBreakdown> | null => {
+    if (result == null || euroView === 'nominal') return result
     const deflateRecord = (record: Record<string, number>, factor: number) =>
       Object.fromEntries(
         Object.entries(record).map(([key, value]) => [key, deflate(value, factor, euroView)]),
       )
     return {
-      ...ieBreakdownResult,
-      rows: ieBreakdownResult.rows.map(row => {
-        const factor = factorByAge.get(row.age) ?? 1
+      ...result,
+      rows: result.rows.map(row => {
+        const factor = factoren.get(row.age) ?? 1
         return {
           ...row,
           incomeBySource: deflateRecord(row.incomeBySource, factor),
@@ -538,7 +552,39 @@ export function useEuroViewFeeds(nominaal: EuroViewFeedsInput) {
         }
       }),
     }
-  }, [ieBreakdownResult, factorByAge, euroView])
+  }
+  const viewIeBreakdownResult = useMemo(
+    () => deflateBreakdown(ieBreakdownResult, factorByAge),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- deflateBreakdown leest alleen euroView
+    [ieBreakdownResult, factorByAge, euroView],
+  )
+
+  // ── Het doelscenario in Samenstelling en Geldstroom (ADR 0179 fase 4) ────
+  // Zelfde klassen als de planfeeds hierboven, maar met de factor van de DOELrijen:
+  // elke rij deflateert met zijn eigen run (elk bedrag exact één keer).
+  const factorByAgeDoel = useMemo(
+    () => (doelGrootboek ? buildFactorByAge(doelGrootboek.unifiedRows) : null),
+    [doelGrootboek],
+  )
+  const viewDoelDisplaySimRows = useMemo(
+    () =>
+      doelGrootboek && factorByAgeDoel
+        ? deflateRowsByAge(doelGrootboek.simRows, factorByAgeDoel, SIM_ROW_MONEY_FIELDS, euroView)
+        : null,
+    [doelGrootboek, factorByAgeDoel, euroView],
+  )
+  const viewDoelWealthCompositionRows = useMemo(
+    () =>
+      doelWealthCompositionRows && factorByAgeDoel
+        ? deflateRowsByAge(doelWealthCompositionRows, factorByAgeDoel, STACKED_ROW_MONEY_FIELDS, euroView)
+        : null,
+    [doelWealthCompositionRows, factorByAgeDoel, euroView],
+  )
+  const viewDoelIeBreakdownResult = useMemo(
+    () => (factorByAgeDoel ? deflateBreakdown(doelIeBreakdownResult, factorByAgeDoel) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- deflateBreakdown leest alleen euroView
+    [doelIeBreakdownResult, factorByAgeDoel, euroView],
+  )
 
   // ── Scenario-kaarten ──────────────────────────────────────────────────────
   // `laagsteBuffer` is klasse S: één bedrag op één leeftijd (de kaart toont die
@@ -625,6 +671,9 @@ export function useEuroViewFeeds(nominaal: EuroViewFeedsInput) {
     viewDoelPreviews,
     viewReadoutData,
     viewIeBreakdownResult,
+    viewDoelDisplaySimRows,
+    viewDoelWealthCompositionRows,
+    viewDoelIeBreakdownResult,
     viewScenarioPresets,
     viewHouseholdHeroFireTarget,
     viewPartnerHeroFireTarget,
@@ -756,6 +805,9 @@ export function useToekomstEuro({
     readoutData: lagen.readoutData,
     canonicalDailyRate: sim.canonicalDailyRate,
     ieBreakdownResult: lagen.ieBreakdownResult,
+    doelGrootboek: scenario.doelGrootboek,
+    doelWealthCompositionRows: lagen.doelWealthCompositionRows,
+    doelIeBreakdownResult: lagen.doelIeBreakdownResult,
     scenarioPresets: sim.scenarioPresets,
     householdHero: perspectief.householdHero,
     partnerHero: perspectief.partnerHero,

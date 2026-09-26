@@ -15,6 +15,7 @@
 // daarom ook als bouwfunctie beschikbaar (`bouwChartEventOverlay`, `bouwEventsForTimeline`).
 
 import { useEffect, useState, useCallback, useRef, useMemo, useDeferredValue } from 'react'
+import type { UnifiedProjectionRow } from '@/lib/unified-projection'
 import { useRouter } from 'next/navigation'
 import { type HorizonPageData, HORIZON_EXIT_NOTICE_DISMISSED_SLUG } from '@/lib/horizon-data-loader'
 import { useToast } from '@/components/app/toast-provider'
@@ -112,6 +113,7 @@ export function useToekomstLagen({ initialData, goals, perspectief, overlays, sc
     scenarioLineOverlay,
     showScenarioLine,
     setShowScenarioLine,
+    doelGrootboek,
   } = lab
   const { addToast } = useToast()
   const router = useRouter()
@@ -794,11 +796,12 @@ export function useToekomstLagen({ initialData, goals, perspectief, overlays, sc
       }
     : undefined
 
-  const wealthCompositionRows: StackedRow[] = useMemo(() => {
-    if (canvasModus !== 'samenstelling') return []
-    if (!displayUnifiedRows.length) return []
+  // Eén bouwer voor de staven van Samenstelling — het plan én (ADR 0179 fase 4) het
+  // doelscenario gaan door exact dezelfde helpers, alleen de rijen verschillen.
+  const bouwSamenstelling = useCallback((rows: UnifiedProjectionRow[]): StackedRow[] => {
+    if (!rows.length) return []
     const baseRows = unifiedRowsToStackedRows(
-      displayUnifiedRows,
+      rows,
       new Map(debts.map((d) => [d.id, d.debt_type])),
       eigenHuisMortgageIds,
     )
@@ -824,7 +827,18 @@ export function useToekomstLagen({ initialData, goals, perspectief, overlays, sc
       // `houseInLedger`, maar dezelfde grondslag als de kernel zodra het pad leeft.
       terugvalRendement: initialData.fireParams.grossReturn,
     })
-  }, [canvasModus, displayUnifiedRows, initialData, displayEvents, debts, eigenHuisMortgageIds])
+  }, [initialData, displayEvents, debts, eigenHuisMortgageIds])
+
+  const wealthCompositionRows: StackedRow[] = useMemo(
+    () => (canvasModus === 'samenstelling' ? bouwSamenstelling(displayUnifiedRows) : []),
+    [canvasModus, bouwSamenstelling, displayUnifiedRows],
+  )
+  // Het doelscenario: alleen als er een doelgrootboek is én de modus erom vraagt.
+  const doelWealthCompositionRows: StackedRow[] | null = useMemo(
+    () =>
+      doelGrootboek && canvasModus === 'samenstelling' ? bouwSamenstelling(doelGrootboek.unifiedRows) : null,
+    [doelGrootboek, canvasModus, bouwSamenstelling],
+  )
 
   // Lazy compute income/expense breakdown only when user toggles to 'breakdown' mode.
   // Consume de geclipte weergaverijen zodat de bronnen-breakdown niet tot het
@@ -833,6 +847,12 @@ export function useToekomstLagen({ initialData, goals, perspectief, overlays, sc
     if (ieViewMode !== 'breakdown' || !displayUnifiedRows.length || !displaySimRows.length) return null
     return buildBreakdown(displayUnifiedRows, displaySimRows, debts)
   }, [ieViewMode, displayUnifiedRows, displaySimRows, debts])
+  // Idem voor het doelscenario (ADR 0179 fase 4): zelfde helper, rijen van de doelrun.
+  const doelIeBreakdownResult = useMemo(() => {
+    if (ieViewMode !== 'breakdown' || doelGrootboek == null) return null
+    if (!doelGrootboek.unifiedRows.length || !doelGrootboek.simRows.length) return null
+    return buildBreakdown(doelGrootboek.unifiedRows, doelGrootboek.simRows, debts)
+  }, [ieViewMode, doelGrootboek, debts])
 
   // Gememoized samenstelling voor de SimChart-prop: een inline spread op de
   // callsite gaf per render een verse array-identiteit, waardoor de memo() van
@@ -921,6 +941,8 @@ export function useToekomstLagen({ initialData, goals, perspectief, overlays, sc
     monteCarloOverlay,
     wealthCompositionRows,
     ieBreakdownResult,
+    doelWealthCompositionRows,
+    doelIeBreakdownResult,
     combinedScenarioOverlays,
     handleEventDragEnd,
   })

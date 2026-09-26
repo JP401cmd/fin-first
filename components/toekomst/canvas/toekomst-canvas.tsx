@@ -32,7 +32,12 @@ import type { OverlayBalloonDef } from '@/components/app/horizon/toekomst-overla
 import { TOEKOMST_OVERLAY_BALLOONS } from '@/components/app/horizon/toekomst-overlay-balloons'
 import { ChartTips } from '@/components/editorial/chart-tips'
 import { getFireProjectionTips, getIncomeExpenseTips, getWealthCompositionTips } from '@/lib/chart-tips'
-import { CANVAS_UITLEG_TITEL, DOELEN_VOLGT_PLAN_REGEL, type GeldstroomSub } from '@/lib/horizon/katern-copy'
+import {
+  CANVAS_UITLEG_TITEL,
+  DOELEN_TOONT_DOELSCENARIO_LABEL,
+  DOELEN_VOLGT_PLAN_REGEL,
+  type GeldstroomSub,
+} from '@/lib/horizon/katern-copy'
 import type { IeViewMode, OverlayEmphasis } from '@/components/toekomst/state/types'
 import { useActiefKatern } from '@/components/toekomst/layout/actief-katern'
 import { KATERN_HREF } from '@/components/toekomst/layout/katern-routes'
@@ -41,7 +46,7 @@ import { CanvasTipsToggle } from '@/components/toekomst/canvas/canvas-tips-toggl
 import { ModusSwitch } from '@/components/toekomst/canvas/modus-switch'
 import { LagenMenu } from '@/components/toekomst/canvas/lagen-menu'
 import { CanvasUitleg } from '@/components/toekomst/canvas/canvas-uitleg'
-import { CanvasGrafiek } from '@/components/toekomst/canvas/canvas-grafiek'
+import { CanvasGrafiek, type CanvasDoelscenarioFeed } from '@/components/toekomst/canvas/canvas-grafiek'
 import { CanvasLegenda } from '@/components/toekomst/canvas/canvas-legenda'
 import { MarktcheckGetallen } from '@/components/toekomst/canvas/marktcheck-getallen'
 import { Aannamesregel } from '@/components/toekomst/canvas/aannamesregel'
@@ -70,6 +75,7 @@ export function ToekomstCanvas() {
     useHouseholdMainLine,
     perspectiveHero,
     hasPerspectiveHero,
+    verkenSectieZichtbaar,
   } = useToekomstPerspectiefContext()
   const {
     setActiveModal,
@@ -84,6 +90,7 @@ export function ToekomstCanvas() {
     hasDoelLijn,
     labZone,
     nalatenschapMarker,
+    doelGrootboek,
   } = useToekomstScenarioContext()
   const {
     fireParams,
@@ -160,6 +167,9 @@ export function ToekomstCanvas() {
     viewTargetInflationFactors,
     viewReadoutData,
     viewIeBreakdownResult,
+    viewDoelDisplaySimRows,
+    viewDoelWealthCompositionRows,
+    viewDoelIeBreakdownResult,
   } = useToekomstEuroContext()
   const { masked } = useMaskedAmounts()
   const router = useRouter()
@@ -171,15 +181,33 @@ export function ToekomstCanvas() {
   // ── De stand van het canvas in dit katern (spec §4.5) en deze weergave (§4.7) ──
   const eenvoudig = displayMode === 'simple'
   const heeftDoelen = goalChartMarkers.length > 0
+  // Doelrijen voor Samenstelling en Geldstroom: alleen solo (het lab is solo, ADR 0170 B10).
+  const doelscenarioRijen = doelGrootboek != null && verkenSectieZichtbaar
   const stand = useMemo(
     () =>
       canvasStand(
         katern,
         { modus: canvasModus, lagen: canvasLagenKeuze },
-        { doelen: heeftDoelen, doelscenario: hasDoelLijn, metHuis: dualBasisAvailable },
+        { doelen: heeftDoelen, doelscenario: hasDoelLijn, metHuis: dualBasisAvailable, doelscenarioRijen },
         { eenvoudig },
       ),
-    [katern, canvasModus, canvasLagenKeuze, heeftDoelen, hasDoelLijn, dualBasisAvailable, eenvoudig],
+    [katern, canvasModus, canvasLagenKeuze, heeftDoelen, hasDoelLijn, dualBasisAvailable, doelscenarioRijen, eenvoudig],
+  )
+  // ADR 0179 fase 4: in Doelen tonen Samenstelling en Geldstroom het doelscenario, uit
+  // feeds die al over de euro-grens zijn en uit dezelfde run als de stippellijn.
+  const doelscenarioFeed = useMemo<CanvasDoelscenarioFeed | null>(
+    () =>
+      stand.grafiekBron === 'doelscenario' && doelGrootboek
+        ? {
+            viewWealthCompositionRows: viewDoelWealthCompositionRows ?? [],
+            viewSimRows: viewDoelDisplaySimRows ?? [],
+            viewIeBreakdownResult: viewDoelIeBreakdownResult,
+            fireAge: doelGrootboek.fireAge,
+            fireAgeFractional: doelGrootboek.fireAgeFractional,
+            housingSaleAge: doelGrootboek.kernelHousingSale?.age ?? null,
+          }
+        : null,
+    [stand.grafiekBron, doelGrootboek, viewDoelWealthCompositionRows, viewDoelDisplaySimRows, viewDoelIeBreakdownResult],
   )
   const { gebeurtenissen, mijlpalen, doelen, doelscenario, marktcheck, rendementScenarios, metHuis } = stand.lagen
 
@@ -411,6 +439,7 @@ export function ToekomstCanvas() {
               toonFasebalk={stand.toonFasebalk}
               toonReadout={stand.toonReadout}
               plotHoogte={stand.plotHoogte}
+              doelscenario={doelscenarioFeed}
             />
 
             {/* Drie vrijheidsleeftijden onder de Marktcheck-band (spec §7.6), uit
@@ -433,6 +462,18 @@ export function ToekomstCanvas() {
                 mcFailed={mcFailed}
                 liquidWealthPoints={liquidWealthPoints}
               />
+            )}
+
+            {stand.grafiekBron === 'doelscenario' && (
+              <p
+                className="mt-3 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--ink-3)]"
+                data-testid="doelen-toont-doelscenario"
+              >
+                <svg width="20" height="8" viewBox="0 0 20 8" aria-hidden="true" className="shrink-0">
+                  <line x1="0" y1="4" x2="20" y2="4" stroke="var(--ink-2)" strokeWidth="2" strokeDasharray="6 4" />
+                </svg>
+                {DOELEN_TOONT_DOELSCENARIO_LABEL}
+              </p>
             )}
 
             {stand.toonPlanVolgtRegel && (

@@ -89,6 +89,9 @@ function input(): EuroViewFeedsInput {
     readoutData: null,
     canonicalDailyRate: 100,
     ieBreakdownResult: null,
+    doelGrootboek: null,
+    doelWealthCompositionRows: null,
+    doelIeBreakdownResult: null,
     scenarioPresets: null,
     householdHero: null,
     partnerHero: null,
@@ -101,6 +104,54 @@ function render(view: EuroView, feeds: EuroViewFeedsInput) {
   )
   return renderHook(() => useEuroViewFeeds(feeds), { wrapper }).result.current
 }
+
+describe('useEuroViewFeeds — het doelscenario (ADR 0179 fase 4)', () => {
+  // Een doelrun met een ANDERE inflatie dan het plan: bewijst dat de doelfeeds met de
+  // factor van de doelrijen zelf deflateren (één keer), niet met die van het plan.
+  const PI_DOEL = 0.03
+  const DOEL_UNIFIED = [40, 41, 42, 43, 44].map(
+    (age) => ({ age, inflationFactor: (1 + PI_DOEL) ** (age - 40) }) as unknown as UnifiedProjectionRow,
+  )
+  function metDoel(): EuroViewFeedsInput {
+    return {
+      ...input(),
+      doelGrootboek: {
+        unifiedRows: DOEL_UNIFIED,
+        simRows: SIM_ROWS,
+        kernelHousingSale: null,
+        fireAge: 42,
+        fireAgeFractional: 42.5,
+      },
+      doelWealthCompositionRows: [40, 41, 42, 43, 44].map(
+        (age) => ({ age, spaargeld: 50_000 }) as unknown as EuroViewFeedsInput['wealthCompositionRows'][number],
+      ),
+    }
+  }
+
+  it('zonder doelgrootboek: geen doelfeeds', () => {
+    const out = render('real', input())
+    expect(out.viewDoelDisplaySimRows).toBeNull()
+    expect(out.viewDoelWealthCompositionRows).toBeNull()
+    expect(out.viewDoelIeBreakdownResult).toBeNull()
+  })
+
+  it("'real': doelrijen delen door de factor van hun eigen run, exact één keer", () => {
+    const out = render('real', metDoel())
+    out.viewDoelDisplaySimRows!.forEach((rij, k) => {
+      expect(rij.endPortfolio).toBeCloseTo(110_000 / (1 + PI_DOEL) ** k, 6)
+    })
+    out.viewDoelWealthCompositionRows!.forEach((rij, k) => {
+      expect(rij.spaargeld).toBeCloseTo(50_000 / (1 + PI_DOEL) ** k, 6)
+    })
+  })
+
+  it("'nominal': dezelfde referenties", () => {
+    const feeds = metDoel()
+    const out = render('nominal', feeds)
+    expect(out.viewDoelDisplaySimRows).toBe(feeds.doelGrootboek!.simRows)
+    expect(out.viewDoelWealthCompositionRows).toBe(feeds.doelWealthCompositionRows)
+  })
+})
 
 describe('useEuroViewFeeds — de verhuisde render-grens', () => {
   it("'nominal' geeft de nominale feeds ongewijzigd door, met dezelfde referentie", () => {

@@ -27,7 +27,23 @@ export interface CanvasBeschikbaarheid {
   readonly doelscenario: boolean
   /** Er is een tweede grondslag-lijn (`dualBasisAvailable`). */
   readonly metHuis: boolean
+  /**
+   * De doelscenario-run levert ook grootboekrijen (`doelGrootboek`) én het perspectief is
+   * solo (het lab is solo, ADR 0170 B10). Dan tonen Samenstelling en Geldstroom in Doelen
+   * het doelscenario (ADR 0179 fase 4). Afwezig = nee.
+   */
+  readonly doelscenarioRijen?: boolean
 }
+
+/**
+ * Welke rijen Samenstelling en Geldstroom tekenen (spec §4.5, "Het enige controlepunt"):
+ * - `plan`: het plan (overal buiten Doelen, in Vermogen, en in Doelen zonder doellijn —
+ *   dan zijn plan en doelscenario gelijk);
+ * - `doelscenario`: de rijen van de doelrun, met het label "Je doelscenario";
+ * - `plan-met-regel`: er is wél een doellijn maar geen doelrijen (partner- of
+ *   huishoudperspectief) ⇒ het plan, met de regel dat die modi het plan volgen.
+ */
+export type CanvasGrafiekBron = 'plan' | 'doelscenario' | 'plan-met-regel'
 
 export interface CanvasKeuze {
   readonly modus: CanvasModus
@@ -53,8 +69,10 @@ export interface CanvasStand {
   readonly toonFasebalk: boolean
   /** De aannamesregel staat alleen in Plan (D5). */
   readonly toonAannamesregel: boolean
-  /** Doelen, buiten Vermogen: "Samenstelling en Geldstroom volgen je plan; …" (§4.5). */
+  /** Doelen, buiten Vermogen, zonder doelrijen: "Samenstelling en Geldstroom volgen je plan; …" (§4.5). */
   readonly toonPlanVolgtRegel: boolean
+  /** Welke rijen Samenstelling en Geldstroom tekenen (zie `CanvasGrafiekBron`). */
+  readonly grafiekBron: CanvasGrafiekBron
   /** Legenda onder het canvas (Instellingen: geen). */
   readonly toonLegenda: boolean
   /** Instellingen: compact canvas op desktop, geen canvas op mobiel. */
@@ -129,6 +147,7 @@ export function canvasStand(
       toonFasebalk: false,
       toonAannamesregel: false,
       toonPlanVolgtRegel: false,
+      grafiekBron: 'plan',
       toonLegenda: false,
       alleenDesktop: true,
       alleenHoofdlijn: true,
@@ -145,6 +164,13 @@ export function canvasStand(
   // Lagen gelden alleen in Vermogen (spec §7.2); in de andere modi geen menu.
   const beschikbaar = keuze.modus === 'vermogen' ? bestaat : []
 
+  const grafiekBron: CanvasGrafiekBron =
+    katern !== 'doelen' || keuze.modus === 'vermogen' || !beschikbaarheid.doelscenario
+      ? 'plan'
+      : beschikbaarheid.doelscenarioRijen
+        ? 'doelscenario'
+        : 'plan-met-regel'
+
   return {
     modi: CANVAS_MODUS_VOLGORDE,
     modus: keuze.modus,
@@ -155,7 +181,8 @@ export function canvasStand(
     lagen,
     toonFasebalk: katern === 'plan',
     toonAannamesregel: katern === 'plan',
-    toonPlanVolgtRegel: katern === 'doelen' && keuze.modus !== 'vermogen',
+    toonPlanVolgtRegel: grafiekBron === 'plan-met-regel',
+    grafiekBron,
     toonLegenda: true,
     alleenDesktop: false,
     alleenHoofdlijn: false,

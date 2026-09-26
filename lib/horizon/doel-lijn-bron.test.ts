@@ -145,3 +145,42 @@ describe('selectDoelLijnBron', () => {
     })
   })
 })
+
+describe('selectDoelLijnBron — grootboek uit dezelfde run (ADR 0179 fase 4)', () => {
+  const stopGrootboek = [{ age: 63 }] as unknown as NonNullable<DoelLijnPad['unifiedRows']>
+  const scenarioGrootboek = [{ age: 57 }] as unknown as NonNullable<DoelLijnPad['unifiedRows']>
+  const verkoop = { age: 70 } as unknown as NonNullable<DoelLijnPad['kernelHousingSale']>
+
+  it('stop-bron: rijen, stip, FIRE-leeftijd, grootboek en woningverkoop komen alle uit het stop-pad', () => {
+    const uit = selectDoelLijnBron(
+      params({
+        stopPad: { result: { rows: stopRows, fireAgeFractional: 63, fireAge: 63 }, unifiedRows: stopGrootboek, kernelHousingSale: verkoop },
+        scenario: { result: { rows: scenarioRows, fireAgeFractional: 57.4, fireAge: 57 }, unifiedRows: scenarioGrootboek, kernelHousingSale: null },
+      }),
+    )
+    expect(uit!.bron).toBe('stop')
+    expect(uit!.rows).toBe(stopRows)
+    expect(uit!.unifiedRows).toBe(stopGrootboek)
+    expect(uit!.kernelHousingSale).toBe(verkoop)
+    expect(uit!.fireAge).toBe(63)
+  })
+
+  it('scenario-bron: alles uit de scenario-run', () => {
+    const uit = selectDoelLijnBron(
+      params({
+        stopKeuzeActief: false,
+        scenario: { result: { rows: scenarioRows, fireAgeFractional: 57.4, fireAge: 57 }, unifiedRows: scenarioGrootboek, kernelHousingSale: null },
+      }),
+    )
+    expect(uit!.bron).toBe('scenario')
+    expect(uit!.unifiedRows).toBe(scenarioGrootboek)
+    expect(uit!.fireAge).toBe(57)
+  })
+
+  it('een run zonder grootboek levert null (dan volgen Samenstelling en Geldstroom het plan)', () => {
+    const uit = selectDoelLijnBron(params())
+    expect(uit!.unifiedRows).toBeNull()
+    expect(uit!.kernelHousingSale).toBeNull()
+    expect(uit!.fireAge).toBeNull()
+  })
+})

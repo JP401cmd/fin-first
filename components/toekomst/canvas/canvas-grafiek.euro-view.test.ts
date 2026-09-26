@@ -68,14 +68,18 @@ describe('canvas-grafiek — view*-feeds naar de grafieken', () => {
     expect(src).toContain('householdOverlays={viewHouseholdOverlays ?? undefined}')
   })
 
+  // ADR 0179 fase 4: in Doelen kan de feed ook het doelscenario zijn — dat is dan
+  // `doelscenario.view*` (al over de grens, uit dezelfde doelrun), nooit een nominale rij.
   it('de vermogensopbouw-staven zijn een view*-feed (euro-view test 12)', () => {
-    expect(src).toMatch(/stackedRows=\{viewWealthCompositionRows\}/)
+    expect(src).toMatch(/stackedRows=\{samenstelling \? samenstelling\.rows : viewWealthCompositionRows\}/)
+    expect(src).toContain('rows: doelscenario.viewWealthCompositionRows,')
   })
 
   it('de Inkomen & Uitgaven-grafiek krijgt view*-rijen en -bronnen', () => {
     const ie = src.slice(src.indexOf('<IncomeExpenseChart'))
-    expect(ie).toMatch(/rows=\{viewDisplaySimRows\}/)
-    expect(ie).toMatch(/breakdownResult=\{viewIeBreakdownResult\}/)
+    expect(ie).toMatch(/rows=\{geldstroom \? geldstroom\.rows : viewDisplaySimRows\}/)
+    expect(ie).toMatch(/breakdownResult=\{geldstroom \? geldstroom\.breakdown : viewIeBreakdownResult\}/)
+    expect(src).toContain('{ rows: doelscenario.viewSimRows, fireAge: doelscenario.fireAge, breakdown: doelscenario.viewIeBreakdownResult }')
   })
 
   it('laat het dagtarief ongemoeid (D15, euro-view test 11)', () => {

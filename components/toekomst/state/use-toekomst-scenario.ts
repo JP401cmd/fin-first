@@ -32,6 +32,9 @@ import {
 import type { LabOpslaanToestand } from '@/components/app/horizon/lab-opslaan-balk'
 import { withResolvedKernelBedragen } from '@/lib/horizon/kernel-profile-basis'
 import { selectDoelLijnBron } from '@/lib/horizon/doel-lijn-bron'
+import type { UnifiedProjectionRow } from '@/lib/unified-projection'
+import type { SimRow } from '@/lib/fire-simulation'
+import type { KernelHousingSale } from '@/lib/horizon-kernel/bridge'
 import {
   dekkingDeltaBadge,
   dekkingPreviewWaarde,
@@ -277,6 +280,15 @@ export function useToekomstScenarioState({ initialData }: { initialData: Horizon
 
 export type ToekomstScenarioState = ReturnType<typeof useToekomstScenarioState>
 
+/** De rijen van de doelscenario-run voor Samenstelling en Geldstroom (nominaal, geclipt). */
+export interface DoelGrootboek {
+  unifiedRows: UnifiedProjectionRow[]
+  simRows: SimRow[]
+  kernelHousingSale: KernelHousingSale | null
+  fireAge: number | null
+  fireAgeFractional: number | null
+}
+
 export function useToekomstScenario({ initialData, scenarioState, sim }: { initialData: HorizonPageData; scenarioState: ToekomstScenarioState; sim: ToekomstSim }) {
   const {
     scenarioUitgaveNaPensioen,
@@ -463,6 +475,22 @@ export function useToekomstScenario({ initialData, scenarioState, sim }: { initi
       ageLabel: doelLijnBron.bron === 'stop' ? 'stop' : 'fire',
     }
   }, [doelLijnBron, displayEndAge, doelLijnLabel])
+
+  // ── Grootboek van het doelscenario (ADR 0179 D3, fase 4) ──────────────────────
+  // Samenstelling en Geldstroom tonen in katern Doelen het doelscenario, uit de rijen van
+  // DEZELFDE run die de stippellijn tekent (`doelLijnBron`) — geen extra run, geen eigen
+  // som. Geclipt op dezelfde `displayEndAge` als het plan. `null` = geen doellijn, of een
+  // run zonder grootboek (dan volgen die modi het plan met een regel).
+  const doelGrootboek = useMemo<DoelGrootboek | null>(() => {
+    if (doelLijnBron == null || doelLijnBron.unifiedRows == null) return null
+    return {
+      unifiedRows: clipRowsToPlanEnd(doelLijnBron.unifiedRows, displayEndAge),
+      simRows: clipRowsToPlanEnd(doelLijnBron.rows, displayEndAge),
+      kernelHousingSale: doelLijnBron.kernelHousingSale,
+      fireAge: doelLijnBron.fireAge,
+      fireAgeFractional: doelLijnBron.fireAgeFractional,
+    }
+  }, [doelLijnBron, displayEndAge])
 
   // Gewogen baseline-rendement per bezeten categorie (Marktbias-UI). Gememoized zodat
   // de inline-call in de JSX niet elke render een verse array-identiteit oplevert.
@@ -1358,6 +1386,7 @@ export function useToekomstScenario({ initialData, scenarioState, sim }: { initi
     labDekking,
     hasDoelLijn,
     scenarioLineOverlay,
+    doelGrootboek,
     categorieReturnGroups,
     effectiveStopAge,
     planEindVorm,

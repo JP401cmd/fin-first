@@ -36,6 +36,8 @@
  * niet per tick ververst (review M1).
  */
 import type { SimRow } from '@/lib/fire-simulation'
+import type { UnifiedProjectionRow } from '@/lib/unified-projection'
+import type { KernelHousingSale } from '@/lib/horizon-kernel/bridge'
 
 /** Drempel (jaren) waaronder een stopkeuze te dicht op de verwachting ligt. */
 export const DOEL_LIJN_STOP_DREMPEL_JAAR = 0.5
@@ -48,7 +50,16 @@ export interface DoelLijnPad {
   result: {
     rows: SimRow[]
     fireAgeFractional: number | null
+    /** Hele FIRE-leeftijd van dezelfde run (SimResult); optioneel voor minimale fixtures. */
+    fireAge?: number | null
   }
+  /**
+   * De grootboekrijen van DEZELFDE run (ADR 0179 D3, fase 4): voeden Samenstelling en
+   * Geldstroom in katern Doelen. Afwezig ⇒ die twee modi volgen het plan met een regel.
+   */
+  unifiedRows?: UnifiedProjectionRow[]
+  /** Verkoopmoment eigen woning in dezelfde run (of `null`). */
+  kernelHousingSale?: KernelHousingSale | null
 }
 
 export interface SelectDoelLijnBronParams {
@@ -73,6 +84,24 @@ export interface DoelLijnSelectie {
   fireAgeFractional: number | null
   /** Welke run de lijn voedt — stuurt de legenda-vorm ("(stop 63)" vs. "(57j)"). */
   bron: 'stop' | 'scenario'
+  /** Hele FIRE-leeftijd uit dezelfde run (`null` als de run hem niet draagt). */
+  fireAge: number | null
+  /** Grootboekrijen uit dezelfde run; `null` als de run ze niet draagt. */
+  unifiedRows: UnifiedProjectionRow[] | null
+  /** Verkoopmoment eigen woning uit dezelfde run. */
+  kernelHousingSale: KernelHousingSale | null
+}
+
+/** Alles uit één en dezelfde run — nooit rijen van de ene en grootboek van de andere. */
+function uitRun(pad: DoelLijnPad, bron: 'stop' | 'scenario'): DoelLijnSelectie {
+  return {
+    rows: pad.result.rows,
+    fireAgeFractional: pad.result.fireAgeFractional,
+    bron,
+    fireAge: pad.result.fireAge ?? null,
+    unifiedRows: pad.unifiedRows ?? null,
+    kernelHousingSale: pad.kernelHousingSale ?? null,
+  }
 }
 
 /**
@@ -94,21 +123,9 @@ export function selectDoelLijnBron(params: SelectDoelLijnBronParams): DoelLijnSe
       stopRunAge == null ||
       Math.abs(stopRunAge - verwachtFireAge) >= DOEL_LIJN_STOP_DREMPEL_JAAR)
 
-  if (stopBronWint) {
-    return {
-      rows: stopPad.result.rows,
-      fireAgeFractional: stopPad.result.fireAgeFractional,
-      bron: 'stop',
-    }
-  }
+  if (stopBronWint) return uitRun(stopPad, 'stop')
 
-  if (scenario != null) {
-    return {
-      rows: scenario.result.rows,
-      fireAgeFractional: scenario.result.fireAgeFractional,
-      bron: 'scenario',
-    }
-  }
+  if (scenario != null) return uitRun(scenario, 'scenario')
 
   return null
 }

@@ -176,6 +176,22 @@ export interface CanvasGrafiekProps {
   toonReadout: boolean
   /** Compacte basishoogte van de vermogensgrafiek (`CanvasStand.plotHoogte`); `null` ⇒ standaard. */
   plotHoogte: number | null
+  /**
+   * ADR 0179 fase 4 — Samenstelling en Geldstroom tekenen in katern Doelen het doelscenario
+   * (`CanvasStand.grafiekBron === 'doelscenario'`). Alle rijen komen al over de euro-grens
+   * (`viewDoel*`) en uit één run; Vermogen blijft op het plan. `null`/afwezig ⇒ het plan.
+   */
+  doelscenario?: CanvasDoelscenarioFeed | null
+}
+
+/** De doelscenario-feed voor Samenstelling en Geldstroom (alles uit dezelfde doelrun). */
+export interface CanvasDoelscenarioFeed {
+  viewWealthCompositionRows: InEuroView<StackedRow>[]
+  viewSimRows: InEuroView<SimRow>[]
+  viewIeBreakdownResult: BreakdownResult | null
+  fireAge: number | null
+  fireAgeFractional: number | null
+  housingSaleAge: number | null
 }
 
 export function CanvasGrafiek({
@@ -255,8 +271,21 @@ export function CanvasGrafiek({
   toonFasebalk,
   toonReadout,
   plotHoogte,
+  doelscenario = null,
 }: CanvasGrafiekProps) {
   const isLg = useIsLgUp()
+  // Samenstelling en Geldstroom: het doelscenario als de stand dat vraagt, anders het plan.
+  const samenstelling = doelscenario
+    ? {
+        rows: doelscenario.viewWealthCompositionRows,
+        fireAge: doelscenario.fireAge,
+        fireAgeFractional: doelscenario.fireAgeFractional,
+        housingSaleAge: doelscenario.housingSaleAge,
+      }
+    : null
+  const geldstroom = doelscenario
+    ? { rows: doelscenario.viewSimRows, fireAge: doelscenario.fireAge, breakdown: doelscenario.viewIeBreakdownResult }
+    : null
   return (
               <div className="-mx-4 sm:-mx-6 md:-mx-8 overflow-hidden">
                 <ZoomableChartContainer currentAge={currentAge ?? 30} endAge={chartEndAge!}>
@@ -417,16 +446,16 @@ export function CanvasGrafiek({
                           aria-hidden={modus !== 'samenstelling'}
                         >
                           <WealthCompositionChart
-                            stackedRows={viewWealthCompositionRows}
+                            stackedRows={samenstelling ? samenstelling.rows : viewWealthCompositionRows}
                             currentAge={currentAge ?? 30}
                             endAge={chartEndAge!}
                             visibleMinAge={visibleMin}
                             visibleMaxAge={visibleMax}
-                            fireAge={simResult.fireAge}
-                            fireAgeFractional={simResult.fireAgeFractional}
+                            fireAge={samenstelling ? samenstelling.fireAge : simResult.fireAge}
+                            fireAgeFractional={samenstelling ? samenstelling.fireAgeFractional : simResult.fireAgeFractional}
                             planningMode={planningMode}
                             aowAgeFractional={userAowAge.fractional}
-                            housingSaleAge={kernelHousingSale?.age ?? null}
+                            housingSaleAge={samenstelling ? samenstelling.housingSaleAge : (kernelHousingSale?.age ?? null)}
                             // Het huis blijft in de staaf staan (het is echt bezit), maar
                             // gedempt zodra het buiten het doel valt — dezelfde
                             // strategie-beslissing als de doelbedrag-grondslag hierboven.
@@ -450,16 +479,16 @@ export function CanvasGrafiek({
                         >
                           {modus === 'geldstroom' && (
                             <IncomeExpenseChart
-                              rows={viewDisplaySimRows}
+                              rows={geldstroom ? geldstroom.rows : viewDisplaySimRows}
                               currentAge={currentAge ?? 30}
                               endAge={chartEndAge!}
                               visibleMinAge={visibleMin}
                               visibleMaxAge={visibleMax}
-                              fireAge={simResult.fireAge}
+                              fireAge={geldstroom ? geldstroom.fireAge : simResult.fireAge}
                               planningMode={planningMode}
                               aowAgeFractional={userAowAge.fractional}
                               viewMode={ieViewMode}
-                              breakdownResult={viewIeBreakdownResult}
+                              breakdownResult={geldstroom ? geldstroom.breakdown : viewIeBreakdownResult}
                             />
                           )}
                         </div>

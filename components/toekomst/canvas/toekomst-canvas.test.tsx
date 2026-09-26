@@ -57,6 +57,12 @@ const toggleLaag = vi.fn()
 let canvasModus: CanvasModus = 'vermogen'
 let keuze: Record<LaagId, boolean>
 let displayMode: 'simple' | 'full' = 'full'
+// ADR 0179 fase 4 — het doelgrootboek en het perspectief (solo = lab zichtbaar).
+let doelGrootboek: Record<string, unknown> | null = null
+let verkenSectieZichtbaar = true
+const DOEL_STAVEN = [{ age: 41, spaargeld: 1 }]
+const DOEL_RIJEN = [{ age: 41, endPortfolio: 2 }]
+const DOEL_BRONNEN = { rows: [] }
 
 const lagenKeuze = (aan: readonly LaagId[]) =>
   Object.fromEntries(LAAG_VOLGORDE.map((id) => [id, aan.includes(id)])) as Record<LaagId, boolean>
@@ -78,6 +84,7 @@ vi.mock('@/components/toekomst/state/toekomst-state-provider', () => ({
     useHouseholdMainLine: false,
     perspectiveHero: null,
     hasPerspectiveHero: false,
+    verkenSectieZichtbaar,
   }),
   useToekomstOverlayContext: () => ({
     setActiveModal: vi.fn(),
@@ -89,7 +96,7 @@ vi.mock('@/components/toekomst/state/toekomst-state-provider', () => ({
     setClusterSheet: vi.fn(),
     setSelectedYearAge: vi.fn(),
   }),
-  useToekomstScenarioContext: () => ({ hasDoelLijn: true, labZone: 'zone-plan', nalatenschapMarker: { zone: null } }),
+  useToekomstScenarioContext: () => ({ hasDoelLijn: true, labZone: 'zone-plan', nalatenschapMarker: { zone: null }, doelGrootboek }),
   useToekomstSimContext: () => ({
     fireParams,
     fireStrategy,
@@ -165,6 +172,9 @@ vi.mock('@/components/toekomst/state/toekomst-state-provider', () => ({
     viewTargetInflationFactors: [],
     viewReadoutData: { age: 45 },
     viewIeBreakdownResult: null,
+    viewDoelDisplaySimRows: doelGrootboek ? DOEL_RIJEN : null,
+    viewDoelWealthCompositionRows: doelGrootboek ? DOEL_STAVEN : null,
+    viewDoelIeBreakdownResult: doelGrootboek ? DOEL_BRONNEN : null,
   }),
 }))
 
@@ -190,6 +200,8 @@ beforeEach(() => {
   displayMode = 'full'
   setCanvasModus.mockClear()
   toggleLaag.mockClear()
+  doelGrootboek = null
+  verkenSectieZichtbaar = true
 })
 
 describe('ToekomstCanvas — modus-switch ingeplugd', () => {
@@ -292,6 +304,52 @@ describe('ToekomstCanvas — Doelen', () => {
     renderIn('doelen')
     expect(screen.getByTestId('doelen-volgt-plan').textContent).toBe(DOELEN_VOLGT_PLAN_REGEL)
     expect(grafiek().modus).toBe('samenstelling')
+  })
+})
+
+describe('ToekomstCanvas — Samenstelling en Geldstroom in Doelen tonen het doelscenario (fase 4)', () => {
+  const grootboek = { fireAge: 55, fireAgeFractional: 55.4, kernelHousingSale: { age: 70 } }
+
+  it('Samenstelling: de doelfeeds uit dezelfde run, met label en zonder terugvalregel', () => {
+    canvasModus = 'samenstelling'
+    doelGrootboek = grootboek
+    renderIn('doelen')
+    const feed = grafiek().doelscenario as Record<string, unknown>
+    expect(feed.viewWealthCompositionRows).toBe(DOEL_STAVEN)
+    expect(feed.viewSimRows).toBe(DOEL_RIJEN)
+    expect(feed.viewIeBreakdownResult).toBe(DOEL_BRONNEN)
+    expect(feed.fireAge).toBe(55)
+    expect(feed.fireAgeFractional).toBe(55.4)
+    expect(feed.housingSaleAge).toBe(70)
+    expect(screen.getByTestId('doelen-toont-doelscenario').textContent).toContain('Je doelscenario')
+    expect(screen.queryByTestId('doelen-volgt-plan')).toBeNull()
+  })
+
+  it('Geldstroom: idem', () => {
+    canvasModus = 'geldstroom'
+    doelGrootboek = grootboek
+    renderIn('doelen')
+    expect((grafiek().doelscenario as Record<string, unknown>).viewSimRows).toBe(DOEL_RIJEN)
+  })
+
+  it('partner- of huishoudperspectief: het plan, met de terugvalregel', () => {
+    canvasModus = 'samenstelling'
+    doelGrootboek = grootboek
+    verkenSectieZichtbaar = false
+    renderIn('doelen')
+    expect(grafiek().doelscenario).toBeNull()
+    expect(screen.getByTestId('doelen-volgt-plan').textContent).toBe(DOELEN_VOLGT_PLAN_REGEL)
+  })
+
+  it('in Plan en in Vermogen: altijd het plan', () => {
+    canvasModus = 'samenstelling'
+    doelGrootboek = grootboek
+    renderIn(null)
+    expect(grafiek().doelscenario).toBeNull()
+    expect(screen.queryByTestId('doelen-toont-doelscenario')).toBeNull()
+    canvasModus = 'vermogen'
+    renderIn('doelen')
+    expect(grafiek().doelscenario).toBeNull()
   })
 })
 
