@@ -1,10 +1,11 @@
-'use client'
+import Link from 'next/link'
 
 /**
  * ScenarioChip — kleine pill met een gestippelde ink-swatch, die de duidingsblokken
  * (levensinkomenstrook, dekkingsradar) markeert zodra ze de scenario-
- * cijfers tonen i.p.v. de basis. Klik scrollt naar de sectie "Verken je aannames" (het
- * slider-lab). Puur presentational; de swatch spiegelt de wat-als-lijn in de grafiek
+ * cijfers tonen i.p.v. de basis. Klik gaat naar het doelscenario-lab in katern Doelen
+ * (ADR 0179 fase 1 stap 16, GW3c: het lab staat niet meer op Plan, dus scrollen naar
+ * het anker op dezelfde pagina deed niets meer). Puur presentational; de swatch spiegelt de wat-als-lijn in de grafiek
  * (ink-2, dash "6 4"). De tekst volgt dezelfde drieslag als de doellijn-pill
  * (`doelLijnLabel` in horizon-client): vastgelegd doel → "Jouw doel", live wat-als →
  * "Jouw wat-als", alléén een gekozen stopleeftijd → "Jouw stopkeuze".
@@ -22,7 +23,6 @@ export function ScenarioChip({
   className = '',
   doelActief = false,
   hasScenario = true,
-  onBeforeScroll,
 }: {
   className?: string
   doelActief?: boolean
@@ -31,23 +31,12 @@ export function ScenarioChip({
    *  Geef 'm bij elke callsite expliciet mee: op de default vertrouwen laat een
    *  stop-only-situatie stilzwijgend "Jouw wat-als" liegen. */
   hasScenario?: boolean
-  /** Vlak vóór de scroll aangeroepen — horizon-client klapt hiermee de (standaard
-   *  ingeklapte) doelsectie open zodat de klik niet op een dichte regel landt. */
-  onBeforeScroll?: () => void
 }) {
   const label = doelActief ? 'Jouw doel' : hasScenario ? 'Jouw wat-als' : 'Jouw stopkeuze'
-  const scrollToSection = () => {
-    if (typeof document === 'undefined') return
-    onBeforeScroll?.()
-    document
-      .getElementById(VERKEN_SECTION_ID)
-      ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }
 
   return (
-    <button
-      type="button"
-      onClick={scrollToSection}
+    <Link
+      href={`/toekomst/doelen#${VERKEN_SECTION_ID}`}
       aria-label={
         doelActief
           ? 'Toont je vastgelegde doel — ga naar Jouw doelsituatie'
@@ -69,6 +58,6 @@ export function ScenarioChip({
         />
       </svg>
       {label}
-    </button>
+    </Link>
   )
 }

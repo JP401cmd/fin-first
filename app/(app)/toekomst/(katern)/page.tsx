@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { OrnamentColophon } from '@/components/editorial'
 import { PlanPaneel } from '@/components/toekomst/plan/plan-paneel'
+import { OudeLabBladwijzer } from '@/components/toekomst/layout/oude-lab-bladwijzer'
 
 export const metadata: Metadata = {
   title: 'Toekomst — TriFinity',
@@ -28,6 +29,8 @@ export default function ToekomstPlanPage() {
           valt NavStackMeta terug op 'simple' en verdwijnt de cluster. */}
       <NavStackMeta title="Toekomst" topBar={{ kind: 'rich' }} bottomBar={{ kind: 'tabs' }} />
 
+      {/* `/toekomst#verken-je-aannames` (het lab stond hier tot stap 16) → katern Doelen. */}
+      <OudeLabBladwijzer />
       <PlanPaneel />
 
       {/* Krant-stijl colophon als voet van katern Plan. `print:hidden` blijft staan:

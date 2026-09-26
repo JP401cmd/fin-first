@@ -86,7 +86,7 @@ describe('next.config redirects — legacy routes redirecten op de routing-laag 
     expect(fallback.destination).toBe('/toekomst/instellingen?strategie=aow')
   })
 
-  it('/horizon/whatif en /toekomst/whatif landen kaal op het inline lab (ADR 0144)', async () => {
+  it('/horizon/whatif en /toekomst/whatif landen kaal op het lab in katern Doelen (ADR 0144, 0179)', async () => {
     // Eén regel per route, zonder `has`/`missing`: ook een oude ?via=dreamgate
     // valt er gewoon onder — er is geen losse Wat-Als-pagina meer.
     for (const source of ['/horizon/whatif', '/toekomst/whatif']) {
@@ -94,7 +94,8 @@ describe('next.config redirects — legacy routes redirecten op de routing-laag 
       expect(rules, `${source} mist een routing-laag-redirect`).toHaveLength(1)
       expect(rules[0].has).toBeUndefined()
       expect(rules[0].missing).toBeUndefined()
-      expect(rules[0].destination).toBe('/toekomst?whatif=open')
+      // Rechtstreeks naar het katern, geen hop via /toekomst (ADR 0179 stap 16).
+      expect(rules[0].destination).toBe('/toekomst/doelen')
       expect(rules[0].permanent).toBe(false)
     }
   })
@@ -240,13 +241,21 @@ describe('next.config redirects — oude /toekomst?tab= en ?modal=withdrawal (AD
     )
   })
 
+  it('?whatif=open landt op het lab in katern Doelen; de query reist mee (ADR 0179 stap 16)', async () => {
+    expect(await resolveLocation('/toekomst?whatif=open')).toBe('/toekomst/doelen?whatif=open')
+    expect(await resolveLocation('/toekomst?whatif=open&via=dreamgate')).toBe(
+      '/toekomst/doelen?whatif=open&via=dreamgate',
+    )
+    // Alleen de waarde `open`: een onbekende waarde blijft op Plan.
+    expect(await resolveLocation('/toekomst?whatif=dicht')).toBeNull()
+  })
+
   it('niet redirecten: geen tab, onbekende tab, de tijdas-params en de overige modals', async () => {
     for (const url of [
       '/toekomst',
       '/toekomst?tab=bestaat-niet',
       '/toekomst?tab=',
       '/toekomst?strategie=open',
-      '/toekomst?whatif=open',
       '/toekomst?uitgaven=open',
       '/toekomst?planreview=open',
       '/toekomst?modal=strategie',

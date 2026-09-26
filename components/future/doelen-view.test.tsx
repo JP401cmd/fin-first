@@ -539,7 +539,7 @@ describe('DoelenView — doelsituatie-groep', () => {
       />,
     )
     const link = screen.getByRole('link', { name: /Bekijk .* in het lab/ })
-    expect(link.getAttribute('href')).toBe('/toekomst#verken-je-aannames')
+    expect(link.getAttribute('href')).toBe('/toekomst/doelen#verken-je-aannames')
   })
 
   it('overflow-menu → "Doelsituatie loslaten" → confirm → PUT loslaten', async () => {
@@ -631,7 +631,7 @@ describe('DoelenView — weergavemodus (scenario/vrij)', () => {
     expect(
       screen.getByRole('link', { name: 'Bekijk Vrijheidsleeftijd in het lab' })
         .getAttribute('href'),
-    ).toBe('/toekomst#verken-je-aannames')
+    ).toBe('/toekomst/doelen#verken-je-aannames')
     expect(screen.getByRole('button', { name: 'Bewerk doel Noodfonds' })).toBeTruthy()
   })
 

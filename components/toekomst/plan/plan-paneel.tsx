@@ -10,8 +10,7 @@
  * Verplaatst uit de compositie van `horizon-client.tsx` (@ ec883d283, `HorizonCompositie`):
  * de KPI-strip met duiding, voortgang en gegevensmelding, de Plan-meldingen, de
  * verdieping en de kassabons, plus de Plan-lokale afleidingen die alleen deze blokken
- * lezen. Het lab staat in deze stap nog hier (onder de meldingen); stap 16 verhuist
- * het naar katern Doelen.
+ * lezen. Het lab woont sinds stap 16 in katern Doelen (`DoelenKaternLab`).
  *
  * Leest zijn data uit de provider, nooit uit de route (D8).
  */
@@ -43,8 +42,6 @@ import {
   PlanKassabonOpnamerate,
   PlanKassabonGezondheid,
 } from '@/components/toekomst/plan/plan-kassabons'
-import { DoelenLab } from '@/components/toekomst/doelen/doelen-lab'
-import { DoelenLabSheets } from '@/components/toekomst/doelen/doelen-lab-sheets'
 import {
   useToekomstBron,
   useToekomstPerspectiefContext,
@@ -63,7 +60,6 @@ export function PlanPaneel() {
     isPartnerView,
     usePartnerMainLine,
     useHouseholdMainLine,
-    verkenSectieZichtbaar,
     perspectiveHero,
     hasPerspectiveHero,
   } = useToekomstPerspectiefContext()
@@ -71,51 +67,15 @@ export function PlanPaneel() {
     setActiveModal,
     setStrategieInitialTab,
     openRetirementExpensePane,
-    verkenSectionRef,
   } = useToekomstOverlayContext()
   const {
-    scenarioReturnDeltas,
-    setScenarioReturnDeltas,
-    knopWeergave,
-    setKnopWeergave,
-    doelBlok,
-    doelSheetOpen,
-    setDoelSheetOpen,
-    doelSaving,
-    doelLoslatenOpen,
-    setDoelLoslatenOpen,
-    stopPlanConfirmOpen,
-    setStopPlanConfirmOpen,
-    stopPlanSaving,
-    stopPlanError,
-    setStopPlanError,
-    firstDragHintVisible,
-    dismissFirstDragHint,
     hasScenario,
     hasStopKeuze,
     doelActief,
-    whatIfBaseline,
     scenarioVerwachtFireAge,
     coverageNodes,
     duidingStopAge,
-    labPromotie,
-    doelVastleggenMogelijk,
-    doelBijwerkenMogelijk,
     radarAssen,
-    categorieReturnGroups,
-    effectiveStopAge,
-    planEindVorm,
-    labGrenzenPending,
-    labZone,
-    planIsDezeStop,
-    handleScenarioReset,
-    labOpslaanToestand,
-    handleDoelVastleggen,
-    handleDoelLoslaten,
-    handleStopPlanBevestigen,
-    handleDoelHerstellen,
-    labKnoppen,
-    labFormatters,
   } = useToekomstScenarioContext()
   const {
     input,
@@ -153,7 +113,6 @@ export function PlanPaneel() {
     isNuStoppenMode,
     ankerReach,
     ankerStop,
-    heroVraag,
     fireDoel,
     showDualFireTarget,
     showLiquidWealthLine,
@@ -193,8 +152,6 @@ export function PlanPaneel() {
     viewEffectiveFireTarget,
     viewVermogenOpAnker,
     viewMonthlyWithdrawalAtAow,
-    labUitkomstRegel,
-    viewDoelPreviews,
     viewScenarioPresets,
     viewHouseholdHeroFireTarget,
     viewPartnerHeroFireTarget,
@@ -531,70 +488,10 @@ export function PlanPaneel() {
                 housingHeldNotice={housingHeldNotice}
                 isPensioenMode={isPensioenMode}
               />
-
-              <DoelenLab
-                verkenSectieZichtbaar={verkenSectieZichtbaar}
-                verkenSectionRef={verkenSectionRef}
-                firstDragHintVisible={firstDragHintVisible}
-                dismissFirstDragHint={dismissFirstDragHint}
-                heroVraag={heroVraag}
-                labKnoppen={labKnoppen}
-                planEindVorm={planEindVorm}
-                labUitkomstRegel={labUitkomstRegel}
-                labZone={labZone}
-                labGrenzenPending={labGrenzenPending}
-                knopWeergave={knopWeergave}
-                setKnopWeergave={setKnopWeergave}
-                labFormatters={labFormatters}
-                planIsDezeStop={planIsDezeStop}
-                setStopPlanError={setStopPlanError}
-                setStopPlanConfirmOpen={setStopPlanConfirmOpen}
-                stopPlanSaving={stopPlanSaving}
-                effectiveStopAge={effectiveStopAge}
-                setActiveModal={setActiveModal}
-                whatIfBaseline={whatIfBaseline}
-                categorieReturnGroups={categorieReturnGroups}
-                scenarioReturnDeltas={scenarioReturnDeltas}
-                setScenarioReturnDeltas={setScenarioReturnDeltas}
-                labOpslaanToestand={labOpslaanToestand}
-                doelBlok={doelBlok}
-                doelSaving={doelSaving}
-                doelVastleggenMogelijk={doelVastleggenMogelijk}
-                doelBijwerkenMogelijk={doelBijwerkenMogelijk}
-                setDoelSheetOpen={setDoelSheetOpen}
-                handleDoelHerstellen={handleDoelHerstellen}
-                setDoelLoslatenOpen={setDoelLoslatenOpen}
-                handleScenarioReset={handleScenarioReset}
-              />
             </>
           ) : null}
         </div>
       </section>
-
-        <DoelenLabSheets
-          doelSheetOpen={doelSheetOpen}
-          setDoelSheetOpen={setDoelSheetOpen}
-          viewDoelPreviews={viewDoelPreviews}
-          doelActief={doelActief}
-          doelSaving={doelSaving}
-          handleDoelVastleggen={handleDoelVastleggen}
-          isFixedAnchorMode={isFixedAnchorMode}
-          planAnchor={planAnchor}
-          labPromotie={labPromotie}
-          ankerStop={ankerStop}
-          simResult={simResult}
-          initialData={initialData}
-          doelLoslatenOpen={doelLoslatenOpen}
-          handleDoelLoslaten={handleDoelLoslaten}
-          setDoelLoslatenOpen={setDoelLoslatenOpen}
-          stopPlanConfirmOpen={stopPlanConfirmOpen}
-          stopPlanSaving={stopPlanSaving}
-          stopPlanError={stopPlanError}
-          effectiveStopAge={effectiveStopAge}
-          userAowAge={userAowAge}
-          handleStopPlanBevestigen={handleStopPlanBevestigen}
-          setStopPlanConfirmOpen={setStopPlanConfirmOpen}
-        />
 
       <PlanVerdieping
         coverageNodes={coverageNodes}

@@ -257,7 +257,7 @@ function ParameterGoalCard({ goal, progress, labPlan }: GoalDisplay & { labPlan:
   const pct = Math.min(100, Math.max(0, Math.round(progress.pct)))
   return (
     <Link
-      href="/toekomst#verken-je-aannames"
+      href="/toekomst/doelen#verken-je-aannames"
       aria-label={`Bekijk ${cardName} in het lab${behaald ? ' — behaald' : ''}`}
       data-behaald={behaald || undefined}
       className={`relative block rounded-2xl border p-4 sm:p-5 hover:shadow-sm transition-all ${

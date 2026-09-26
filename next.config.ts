@@ -236,13 +236,23 @@ const nextConfig: NextConfig = {
       // te gooien, en het scheelt bovendien een RSC-round-trip.
       { source: '/core/cash', destination: '/overzicht/bezittingen/cash', permanent: false },
 
-      // De losse Wat-Als-pagina is vervallen (ADR 0144): het inline lab op de
-      // tijdas is de enige wat-als-ervaring. Beide oude routes — ook met een
-      // oude `?via=dreamgate` — landen op de tijdas met het lab open. Op de
-      // routing-laag, om dezelfde React #310-reden als /core/cash hierboven
-      // (UR2-11: /toekomst/whatif deed zijn redirect eerst op render-tijd).
-      { source: '/horizon/whatif', destination: '/toekomst?whatif=open', permanent: false },
-      { source: '/toekomst/whatif', destination: '/toekomst?whatif=open', permanent: false },
+      // De losse Wat-Als-pagina is vervallen (ADR 0144): het doelscenario-lab is
+      // de enige wat-als-ervaring. Het woont sinds ADR 0179 (fase 1 stap 16) in
+      // katern Doelen, dus beide oude routes — ook met een oude `?via=dreamgate` —
+      // landen daar rechtstreeks, zonder hop via /toekomst. Op de routing-laag, om
+      // dezelfde React #310-reden als /core/cash hierboven (UR2-11: /toekomst/whatif
+      // deed zijn redirect eerst op render-tijd).
+      { source: '/horizon/whatif', destination: '/toekomst/doelen', permanent: false },
+      { source: '/toekomst/whatif', destination: '/toekomst/doelen', permanent: false },
+      // `/toekomst?whatif=open` (widgets, Fin-acties, briefing) → katern Doelen. De
+      // query reist mee; de overlay-state op Doelen leest `whatif=open`, scrolt naar
+      // het lab en ruimt de URL op (CONSUMED_DEEPLINK_PARAMS).
+      {
+        source: '/toekomst',
+        has: [{ type: 'query', key: 'whatif', value: 'open' }],
+        destination: '/toekomst/doelen',
+        permanent: false,
+      },
 
       // Tweede lichting (11 aug 2026) — dezelfde behandeling voor de vier
       // resterende redirect-only server-componenten. Ze waren latent: geen
