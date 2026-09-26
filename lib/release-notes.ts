@@ -97,6 +97,29 @@ export const RELEASE_NOTE_NORM = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.92.6',
+    date: '2026-09-26',
+    title: 'Rustiger bewaking achter de schermen',
+    sections: [
+      {
+        module: 'Platform',
+        color: 'zinc',
+        items: [
+          {
+            title: 'Een drukke dienst is geen storing meer',
+            description:
+              'Vraagt een externe dienst ons even rustiger aan te doen, dan telt dat niet langer als storing. Zo gaat het alarm alleen af als er echt iets stuk is.',
+          },
+          {
+            title: 'Inzicht in wat de achtergrondtaken kosten',
+            description:
+              'Beheer ziet nu per achtergrondtaak hoeveel AI er gebruikt is en wat dat ongeveer kost. Voor jou geen zichtbare verandering.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: '0.92.5',
     date: '2026-09-22',
     title: 'Nieuws met de kop en de woorden van de bron',
