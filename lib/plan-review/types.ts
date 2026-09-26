@@ -38,8 +38,13 @@ export const PLAN_REVIEW_STAP_PARAM = 'stap'
  * De deeplink naar de review, vanaf elke route (⌘K, "Alle keuzes doorlopen").
  * Bewust in deze server-veilige module: een constante uit een `'use client'`-bestand
  * is in een server-component een client-referentie, geen string.
+ *
+ * Doel = katern Instellingen (ADR 0179): de review hoort bij de voorkeuren, en
+ * `/toekomst/instellingen` montert zelf een `PlanReviewProvider` die `?planreview=`
+ * (en `&stap=`) leest. Op /toekomst onderschept de navkaart de klik op deze href en
+ * opent de pane ter plekke; de gewone link landt op Instellingen.
  */
-export const PLAN_REVIEW_HREF = `/toekomst?${PLAN_REVIEW_PARAM}=open`
+export const PLAN_REVIEW_HREF = `/toekomst/instellingen?${PLAN_REVIEW_PARAM}=open`
 
 /**
  * De naam van de review zoals de gebruiker hem overal ziet — pane-titel, ⌘K, de
