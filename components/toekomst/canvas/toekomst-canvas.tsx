@@ -322,7 +322,7 @@ export function ToekomstCanvas({ zijkolom = null }: { zijkolom?: ReactNode } = {
       <div className="h-1.5" style={{ background: 'var(--module-active-500)' }} />
 
       <div className={metZijkolom ? DOELEN_CANVAS_RIJ : undefined} data-testid={metZijkolom ? 'doelen-canvas-rij' : undefined}>
-      <div className={`min-w-0 p-4 sm:p-6 md:p-8 ${metZijkolom ? 'lg:py-5' : ''}`}>
+      <div className={`min-w-0 p-4 sm:p-6 md:p-8 ${katern === 'doelen' ? 'max-lg:py-3' : ''} ${metZijkolom ? 'lg:py-5' : ''}`}>
         <CanvasKop
           hasPerspectiveHero={hasPerspectiveHero}
           isPartnerView={isPartnerView}

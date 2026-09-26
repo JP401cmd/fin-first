@@ -6,7 +6,7 @@
  * Het anker `#verken-je-aannames` hoort bij de plek die op dit breekpunt zichtbaar is.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, cleanup } from '@testing-library/react'
+import { render, screen, cleanup, fireEvent } from '@testing-library/react'
 import type { LabOpslaanToestand } from '@/components/app/horizon/lab-opslaan-balk'
 
 const h = vi.hoisted(() => ({
@@ -27,7 +27,8 @@ vi.mock('@/components/app/shell/use-live-action-bar', () => ({
     h.bar.push(config)
   },
 }))
-vi.mock('@/components/app/horizon/lab-knoppen', () => ({
+vi.mock('@/components/app/horizon/lab-knoppen', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/components/app/horizon/lab-knoppen')>()),
   LabKnoppen: (props: Record<string, unknown>) => {
     h.lab.push(props)
     return <div data-testid="lab-knoppen-stub" data-weergave={String(props.weergave)} />
@@ -96,8 +97,19 @@ describe('DoelenKaternLab — twee plekken', () => {
     expect(screen.getByTestId('lab-knoppen-stub').getAttribute('data-weergave')).toBe('rad')
     const wrapper = document.querySelector('[data-lab-plek="onder-koppen"]') as HTMLElement
     expect(wrapper.className).toContain('lg:hidden')
-    ;(h.lab[0].onWeergaveChange as (v: string) => void)('balk')
+    // Compact (één-scherm-eis): geen kicker, en de vormkeuze staat in de actierij.
+    expect(h.lab[0].kicker).toBe(false)
+    expect(h.lab[0].onWeergaveChange).toBeUndefined()
+    cleanup()
+    render(<>{h.lab[0].stopSlot as React.ReactNode}</>)
+    fireEvent.change(screen.getByTestId('lab-weergave-menu'), { target: { value: 'balk' } })
     expect(h.setKnopWeergave).toHaveBeenCalledWith('mobiel', 'balk')
+  })
+
+  it('kolom: kicker en keuzelijst naast de vraag', () => {
+    render(<DoelenKaternLab plek="kolom" />)
+    expect(h.lab[0].kicker).toBe(true)
+    expect(typeof h.lab[0].onWeergaveChange).toBe('function')
   })
 
   it('het anker hoort bij de zichtbare plek', () => {

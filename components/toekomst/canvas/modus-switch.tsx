@@ -80,10 +80,30 @@ export function ModusSwitch({
 
   return (
     <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 ${className}`}>
+      {/* Mobiel (< lg): één compacte keuzelijst, zodat de canvas-kop op één regel past
+          ("Vermogen ▾ · Lagen ▾", wireframe spec §4.4; ADR 0179 D7). Vanaf lg de
+          segmented control. Beide staan in de DOM; CSS kiest (geen hydratiesprong). */}
+      {modi.length > 1 && (
+        <label className="inline-flex lg:hidden">
+          <span className="sr-only">{CANVAS_MODUS_GROEP_LABEL}</span>
+          <select
+            data-testid="modus-menu"
+            value={value}
+            onChange={(e) => onChange(e.target.value as CanvasModus)}
+            className="min-h-[44px] border border-[var(--border-ed)] bg-[var(--paper)] px-2 text-[12px] font-medium text-horizon-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+          >
+            {modi.map((modus) => (
+              <option key={modus} value={modus}>
+                {CANVAS_MODUS_LABEL[modus]}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <div
         role="radiogroup"
         aria-label={CANVAS_MODUS_GROEP_LABEL}
-        className="inline-flex items-stretch divide-x divide-[var(--border-ed)] border border-[var(--border-ed)] bg-[var(--paper)]"
+        className={`${modi.length > 1 ? 'hidden lg:inline-flex' : 'inline-flex'} items-stretch divide-x divide-[var(--border-ed)] border border-[var(--border-ed)] bg-[var(--paper)]`}
         data-testid="modus-switch"
       >
         {modi.map((modus, index) => {

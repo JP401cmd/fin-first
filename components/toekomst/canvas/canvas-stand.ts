@@ -114,8 +114,12 @@ export const COMPACTE_PLOTHOOGTE = 180
  */
 export const DOELEN_PLOTHOOGTE_DESKTOP = 220
 
-/** Mobiele plothoogte van Doelen: `clamp(170px, 30vh, 230px)` (spec §4.2 regel 9). */
-export const DOELEN_PLOTHOOGTE_MOBIEL = { min: 170, vh: 0.3, max: 230, zonderViewport: 200 } as const
+/**
+ * Mobiele plothoogte van Doelen: `clamp(170px, 24vh, 200px)`. De spec noemde
+ * `clamp(170px, 30vh, 230px)` (§4.2 regel 9), maar begroot zelf 200 op 390×844 en 170 op
+ * 360×800 (§4.4); de meting van 27 sep liet zien dat 230 het rad onder de vouw duwt.
+ */
+export const DOELEN_PLOTHOOGTE_MOBIEL = { min: 170, vh: 0.24, max: 200, zonderViewport: 200 } as const
 
 /**
  * De plothoogte van Doelen op mobiel bij een viewporthoogte (px). Zonder hoogte (server,

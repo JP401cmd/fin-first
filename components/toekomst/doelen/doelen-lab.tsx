@@ -15,6 +15,7 @@ import Link from 'next/link'
 import { KATERN_HREF } from '@/components/toekomst/layout/katern-routes'
 import {
   LabKnoppen,
+  LabWeergaveMenu,
   type LabKnopConfig,
   type LabKnopFormatters,
   type LabKnopWeergave,
@@ -76,7 +77,7 @@ export interface DoelenLabProps {
 /** De sectieklassen per plek: de kolom heeft zijn eigen rand; onder de koppen compact. */
 export const DOELEN_LAB_PLEK_KLASSE: Record<DoelenLabPlek, string> = {
   kolom: 'scroll-mt-24',
-  'onder-koppen': 'mt-3 scroll-mt-24 border-t border-[var(--border-ed)] pt-3',
+  'onder-koppen': 'mt-2 scroll-mt-24 border-t border-[var(--border-ed)] pt-2',
 }
 
 export function DoelenLab({
@@ -148,7 +149,7 @@ export function DoelenLab({
                       lijn, zodat de eerste knopbeweging niet onopgemerkt blijft. */}
                   {firstDragHintVisible && (
                     <p className="mb-2 flex flex-wrap items-baseline gap-x-2 font-sans text-[11px] text-[var(--ink-3)]">
-                      <span>Kijk naar de gestippelde lijn in de grafiek ↑ — dat is jouw wat-als.</span>
+                      <span>Kijk naar de gestippelde lijn in de grafiek ↑ — dat is je doelscenario.</span>
                       <button
                         type="button"
                         onClick={dismissFirstDragHint}
@@ -167,8 +168,12 @@ export function DoelenLab({
                     zone={labZone}
                     pending={labGrenzenPending}
                     weergave={knopWeergave}
-                    onWeergaveChange={setKnopWeergave}
+                    // Kolom: de keuzelijst naast de vraag. Onder de koppen (mobiel) staat hij
+                    // in de actierij onder de knoppen, en valt de kicker weg: de vraag past
+                    // dan met de zone op één regel (één-scherm-eis, ADR 0179 D7).
+                    onWeergaveChange={plek === 'kolom' ? setKnopWeergave : undefined}
                     weergaveKiezer="menu"
+                    kicker={plek === 'kolom'}
                     // De schaal-legenda staat onder het lab (DoelenLabDetails): één regel
                     // minder in de kolom en onder de koppen (één-scherm-eis).
                     schaalLegenda={false}
@@ -179,6 +184,9 @@ export function DoelenLab({
                       // via `planDraftToFireSettingsBody`), náást de verwijzing naar de plek waar
                       // álle plan-keuzes staan. Alleen zichtbaar als de knop van het plan afwijkt.
                       <div className="flex flex-wrap items-center gap-x-4">
+                        {plek === 'onder-koppen' && (
+                          <LabWeergaveMenu weergave={knopWeergave} onChange={setKnopWeergave} />
+                        )}
                         {!planIsDezeStop && (
                           <button
                             type="button"

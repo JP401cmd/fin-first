@@ -7,6 +7,7 @@ import { PlanReviewProvider } from '@/components/future/plan-review/plan-review-
 import { ToekomstStateProvider } from '@/components/toekomst/state/toekomst-state-provider'
 import { ToekomstCanvas } from '@/components/toekomst/canvas/toekomst-canvas'
 import { CanvasZijkolom } from '@/components/toekomst/layout/canvas-zijkolom'
+import { ToekomstKaternStand, DOELEN_MOBIEL_COMPACT } from '@/components/toekomst/layout/toekomst-katern-stand'
 import { ToekomstOverlayHost } from '@/components/toekomst/overlays/toekomst-overlay-host'
 import { ToekomstRekenGrens } from '@/components/toekomst/layout/toekomst-reken-grens'
 import { ToekomstAnkerregel } from '@/components/toekomst/layout/toekomst-ankerregel'
@@ -94,14 +95,16 @@ export default async function ToekomstKaternLayout({ children }: { children: Rea
           <Suspense fallback={null}>
             <OudeTabParam />
           </Suspense>
-          <section className="mx-auto max-w-6xl px-4 sm:px-6 pt-4 sm:pt-6 print:hidden">
+          {/* Doelen op mobiel: compactere kop en canvas (één-scherm-eis, ADR 0179 D7). */}
+          <ToekomstKaternStand>
+          <section className={`mx-auto max-w-6xl px-4 sm:px-6 pt-4 sm:pt-6 print:hidden ${DOELEN_MOBIEL_COMPACT.kopSectie}`}>
             <div className="mb-3 flex items-start justify-between gap-3">
               {/* Aanhef als ZIN (ADR 0174 D6): onder een vast stopmoment de dekking van je
                   plan ("Je toekomstplan is *voor 96% gedekt*."), onder "zo vroeg mogelijk"
                   de haalbaarheid. Zonder oordeel blijft de kale paginanaam staan. Een h2:
                   de shell draagt de enige h1 (ADR 0110). */}
               <PageVerdictOpening
-                className="min-w-0 flex-1"
+                className={`min-w-0 flex-1 ${DOELEN_MOBIEL_COMPACT.oordeel}`}
                 pageName={resolveRouteTitle('/toekomst') ?? 'Toekomst'}
                 sentence={planVerdict.sentence}
                 tone={planVerdict.status}
@@ -116,20 +119,21 @@ export default async function ToekomstKaternLayout({ children }: { children: Rea
             {/* De ankerregel (spec §4.2 regel 1) vol-breed onder de kop-rij: in de
                 `deck`-prop van de aanhef zou de i-kolom zijn breedte over de vólle hoogte
                 reserveren. Eén regel, elk getal één keer. */}
-            <ToekomstAnkerregel className="mb-4" />
+            <ToekomstAnkerregel className={`mb-4 ${DOELEN_MOBIEL_COMPACT.ankerregel}`} />
           </section>
 
           <ToekomstRekenGrens>
-            <div className="mx-auto max-w-6xl py-5 sm:py-8 px-4 sm:px-6">
+            <div className={`mx-auto max-w-6xl py-5 sm:py-8 px-4 sm:px-6 ${DOELEN_MOBIEL_COMPACT.canvasKolom}`}>
               {/* In Doelen staat het lab op desktop naast de grafiek (ADR 0179 D7). */}
               <ToekomstCanvas zijkolom={<CanvasZijkolom />} />
-              <ToekomstKaternKoppen className="mt-6" />
+              <ToekomstKaternKoppen className={`mt-6 ${DOELEN_MOBIEL_COMPACT.koppen}`} />
               {/* Meldingen per katern (spec §4.8): bovenaan het actieve katern. */}
               <ToekomstKaternMeldingSlot className="[&>div]:mt-3" />
               {children}
             </div>
             <ToekomstOverlayHost />
           </ToekomstRekenGrens>
+          </ToekomstKaternStand>
         </ToekomstKaternMeldingenProvider>
       </ToekomstStateProvider>
     </PlanReviewProvider>

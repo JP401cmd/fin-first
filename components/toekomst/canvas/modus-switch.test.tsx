@@ -68,3 +68,22 @@ describe('ModusSwitch', () => {
     for (const r of screen.getAllByRole('radio')) expect(r.className).toContain('min-h-[44px]')
   })
 })
+
+describe('ModusSwitch — mobiel één keuzelijst (spec §4.4, ADR 0179 D7)', () => {
+  it('onder lg een keuzelijst van 44px, vanaf lg de segmented control', () => {
+    const { onChange } = renderSwitch('full')
+    const menu = screen.getByTestId('modus-menu') as HTMLSelectElement
+    expect(menu.closest('label')!.className).toContain('lg:hidden')
+    expect(menu.className).toContain('min-h-[44px]')
+    expect(screen.getByTestId('modus-switch').className).toContain('hidden lg:inline-flex')
+    expect(Array.from(menu.options).map((o) => o.textContent)).toEqual(['Vermogen', 'Samenstelling', 'Geldstroom'])
+    fireEvent.change(menu, { target: { value: 'samenstelling' } })
+    expect(onChange).toHaveBeenCalledWith('samenstelling')
+    expect(screen.getByLabelText('Weergave van de grafiek', { selector: 'select' })).toBe(menu)
+  })
+
+  it('één modus: geen keuzelijst', () => {
+    renderSwitch('full', { modi: ['vermogen'] })
+    expect(screen.queryByTestId('modus-menu')).toBeNull()
+  })
+})

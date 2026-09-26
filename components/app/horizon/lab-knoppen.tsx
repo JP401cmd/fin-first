@@ -117,6 +117,41 @@ export interface LabKnoppenProps {
    * Katern Doelen zet hem uit en toont `LabSchaalLegenda` onder het lab (één-scherm-eis).
    */
   schaalLegenda?: boolean
+  /**
+   * Toont de kicker "Doelscenario" boven de vraag. Standaard ja. Onder de katern-koppen op
+   * mobiel zegt de kop "Doelen" het al (één-scherm-eis, ADR 0179 D7). De vraag zelf (B10)
+   * blijft altijd.
+   */
+  kicker?: boolean
+}
+
+/** De vorm van de knoppen als native keuzelijst (één regel). Ook los te plaatsen. */
+export function LabWeergaveMenu({
+  weergave,
+  onChange,
+  className = '',
+}: {
+  weergave: LabKnopWeergave
+  onChange: (v: LabKnopWeergave) => void
+  className?: string
+}) {
+  return (
+    <label className={`inline-flex items-center ${className}`}>
+      <span className="sr-only">{LAB_COPY.weergaveLabel}</span>
+      <select
+        data-testid="lab-weergave-menu"
+        value={weergave}
+        onChange={(e) => onChange(e.target.value as LabKnopWeergave)}
+        className="min-h-[44px] border border-[var(--border-md)] bg-[var(--paper)] px-1.5 font-sans text-[11px] text-[var(--ink-2)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)] lg:min-h-[30px]"
+      >
+        {WEERGAVE_VOLGORDE.map((v) => (
+          <option key={v} value={v}>
+            {WEERGAVE_LABEL[v]}
+          </option>
+        ))}
+      </select>
+    </label>
+  )
 }
 
 /** De legenda van de schaal — één regel, want de kleuren zijn op elke knop hetzelfde. */
@@ -176,6 +211,7 @@ export function LabKnoppen({
   onWeergaveChange,
   weergaveKiezer = 'knoppen',
   schaalLegenda = true,
+  kicker = true,
   knoppen,
   nalatenschapNotitie = null,
   uitkomst,
@@ -263,7 +299,7 @@ export function LabKnoppen({
     <div>
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <div className="min-w-0">
-          <Kicker>{LAB_COPY.kicker}</Kicker>
+          {kicker && <Kicker>{LAB_COPY.kicker}</Kicker>}
           <Kop
             level={level}
             className="mt-0.5 font-display text-[17px] font-semibold leading-tight text-[var(--ink)]"
@@ -274,21 +310,7 @@ export function LabKnoppen({
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {onWeergaveChange && weergaveKiezer === 'menu' && (
-            <label className="inline-flex items-center">
-              <span className="sr-only">{LAB_COPY.weergaveLabel}</span>
-              <select
-                data-testid="lab-weergave-menu"
-                value={weergave}
-                onChange={(e) => onWeergaveChange(e.target.value as LabKnopWeergave)}
-                className="min-h-[30px] border border-[var(--border-md)] bg-[var(--paper)] px-1.5 font-sans text-[11px] text-[var(--ink-2)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
-              >
-                {WEERGAVE_VOLGORDE.map((v) => (
-                  <option key={v} value={v}>
-                    {WEERGAVE_LABEL[v]}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <LabWeergaveMenu weergave={weergave} onChange={onWeergaveChange} />
           )}
           {onWeergaveChange && weergaveKiezer === 'knoppen' && (
             <div

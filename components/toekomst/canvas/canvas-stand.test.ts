@@ -240,14 +240,15 @@ describe('canvasStand — Doelen: grafiek en knoppen op één scherm (ADR 0179 D
   const k = { modus: 'vermogen' as const, lagen: Object.fromEntries(LAAG_VOLGORDE.map((id) => [id, false])) as Record<LaagId, boolean> }
   const b = { doelen: true, doelscenario: true, metHuis: false }
 
-  it('mobiel: clamp(170px, 30vh, 230px); zonder viewport 200', () => {
-    expect([500, 600, 700, 800, 900].map((vh) => doelenPlotHoogteMobiel(vh))).toEqual([170, 180, 210, 230, 230])
+  it('mobiel: clamp(170px, 24vh, 200px); zonder viewport 200', () => {
+    expect([500, 600, 700, 800, 900].map((vh) => doelenPlotHoogteMobiel(vh))).toEqual([170, 170, 170, 192, 200])
     expect(doelenPlotHoogteMobiel(null)).toBe(200)
     expect(doelenPlotHoogteMobiel(undefined)).toBe(200)
     expect(doelenPlotHoogteMobiel(0)).toBe(200)
-    // 360×800 en 390×844 (onder de TopBar staat ±752 resp. ±796 px): altijd 230.
-    expect(canvasStand('doelen', k, b, { eenvoudig: false, viewportHoogte: 800 }).plotHoogte).toBe(230)
-    expect(canvasStand('doelen', k, b, { eenvoudig: false, viewportHoogte: 667 }).plotHoogte).toBe(200)
+    // 360×800 → 192, 390×844 → 200 (plafond), iPhone SE 667 → 170 (vloer).
+    expect(canvasStand('doelen', k, b, { eenvoudig: false, viewportHoogte: 800 }).plotHoogte).toBe(192)
+    expect(canvasStand('doelen', k, b, { eenvoudig: false, viewportHoogte: 844 }).plotHoogte).toBe(200)
+    expect(canvasStand('doelen', k, b, { eenvoudig: false, viewportHoogte: 667 }).plotHoogte).toBe(170)
   })
 
   it('desktop: de vaste Doelen-hoogte, lager dan de standaard 260', () => {
