@@ -59,9 +59,13 @@ export function CanvasKop({
           die als portal-kind van [data-scroll-container] op z-[45] over de volle
           paginahoogte ligt. Zonder eigen stapelniveau viel deze rij eronder: de eerste
           klik sloot de tips in plaats van Lagen of de i te openen. 46
-          tilt de rij precies één stap boven de scrim, ruim onder de grafiek+markers
-          (z-[50]) en elke overlay (z-[70]). */}
-      <div className="relative z-[46] mb-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 sm:mb-4">
+          tilt de rij precies één stap boven de scrim, onder de grafiek+markers (z-[50])
+          en elke overlay (z-[70]).
+          Zolang een popover van de rij open staat (Lagen, de canvas-i: hun knop draagt
+          `aria-expanded`), gaat de rij naar z-[51]: anders viel het menu met de tips aan
+          onder de grafiek-wrapper. Alleen dan, zodat de rij in rust niet boven de lagen op
+          z-50 (NavMenuSheet, Fin-companion) uitkomt. Geen modal, dus geen z-[70]. */}
+      <div className="relative z-[46] mb-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 has-aria-expanded:z-[51] sm:mb-4">
         <div className="min-w-0">{modus}</div>
         <div className="flex items-center gap-1.5">{acties}</div>
       </div>

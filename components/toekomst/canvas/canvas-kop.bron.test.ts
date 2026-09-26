@@ -21,6 +21,11 @@ describe('canvas-kop — bedieningsrij boven de tips-scrim (M9)', () => {
     expect(source, 'de bedieningsrij draagt geen `relative z-[46]`').toContain('className="relative z-[46]')
   })
 
+  it('ligt met een open popover (Lagen, de canvas-i) boven de grafiek-wrapper, onder de overlays', () => {
+    expect(overlaySource).toContain("'relative z-[50] scroll-mt-2'")
+    expect(source).toContain('has-aria-expanded:z-[51]')
+  })
+
   it('opent de jaar-op-jaar-tabel niet: die ingang woont in Plan', () => {
     expect(source).not.toContain('setSimModalOpen')
     expect(source).not.toContain('TableProperties')
