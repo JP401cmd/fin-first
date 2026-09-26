@@ -734,15 +734,15 @@ export function GebeurtenissenView({
               )}
             </dl>
           )}
-          {/* Zelfde route sinds ADR 0179: de Voorkeuren-sectie opent de regel via
-              ?regel=. Sluit deze sheet eerst — één sheet tegelijk (D4). */}
+          {/* ADR 0179 fase 3: de rij Geen tekort-lening in katern Instellingen (de rente staat
+              direct onder die schakelaar). Sluit deze sheet eerst — één sheet tegelijk (D4). */}
           <Link
-            href="/toekomst/instellingen?regel=eindstrategie"
+            href="/toekomst/instellingen?rij=geen-tekort-lening"
             scroll={false}
             onClick={() => setDeficitSheetOpen(false)}
             className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--module-active-700)]"
           >
-            Rente tekort-lening aanpassen bij je voorkeuren
+            Rente tekort-lening aanpassen in je instellingen
             <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
           </Link>
         </div>

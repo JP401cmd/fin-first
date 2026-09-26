@@ -72,7 +72,7 @@ export const AOW_ONTBREEKT_COPY = {
   waarom:
     'Voor de meeste huishoudens is de AOW de grootste vaste post na het stoppen — zonder AOW is het beeld voorzichtiger dan de werkelijkheid.',
   actieLabel: 'Naar je AOW-strategie',
-  actieHref: '/toekomst/instellingen?strategie=aow',
+  actieHref: '/toekomst/instellingen?rij=aow',
   /** Kassabon-regel (label · waarde). */
   kassabonLabel: 'AOW-inkomen',
   kassabonWaarde: '€ 0 — geen AOW-gebeurtenis',

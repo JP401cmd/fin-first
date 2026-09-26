@@ -1,7 +1,8 @@
 /**
  * Waar de vier levensstrategieën (AOW, Pensioen, Huis, Werk) wonen: in katern Instellingen
- * op /toekomst/instellingen, geopend via `?strategie=<key>` (ADR 0179: Voorkeuren en
- * Gebeurtenissen gingen daarin op). Eén home voor het pad en de sleutelvalidatie.
+ * op /toekomst/instellingen, sinds fase 3 (ADR 0179) als rij `?rij=<key>` — de rij-sleutel
+ * is gelijk aan de strategie-sleutel (`STRATEGIE_NAAR_RIJ` in lib/toekomst/instellingen-rij.ts).
+ * De oude vorm `?strategie=<key>` blijft een alias. Eén home voor het pad en de sleutelvalidatie.
  *
  * De oude deeplinks /toekomst/voorkeuren?strategie=… en /toekomst/gebeurtenissen?strategie=…
  * vangt `next.config.ts` op (redirect met query); een eigen server-redirect is niet meer nodig.
@@ -18,7 +19,7 @@ export function isStrategieKey(value: unknown): value is ManagedStrategy {
   return typeof value === 'string' && (STRATEGIE_KEYS as readonly string[]).includes(value)
 }
 
-/** Deeplink die de editor van één levensstrategie opent. */
+/** Deeplink die de editor van één levensstrategie opent (de rij in Instellingen). */
 export function strategieHref(key: ManagedStrategy): string {
-  return `${STRATEGIE_PAGINA}?strategie=${key}`
+  return `${STRATEGIE_PAGINA}?rij=${key}`
 }

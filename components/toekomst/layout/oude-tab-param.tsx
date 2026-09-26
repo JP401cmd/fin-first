@@ -5,14 +5,15 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { CONSUMED_DEEPLINK_PARAMS } from '@/lib/horizon/deeplink-cleanup'
 import { GEBEURTENISSEN_ANKER } from './oude-lab-bladwijzer'
 import { KATERN_HREF } from './katern-routes'
+import { RIJ_DEEPLINK_PARAMS } from '@/lib/toekomst/instellingen-rij'
 
 /**
  * Params die een ándere opruimer zelf uit de URL haalt: de tijdas-deeplinks
  * (`buildDeeplinkCleanupUrl`), de plan-review (`?planreview=open`) en de regel-editor in
- * Instellingen (`?regel=` bij sluiten). Staat er zo één, dan wacht deze opruimer: twee
+ * Instellingen (`?rij=` en de aliassen `?regel=`/`?strategie=`, bij openen). Staat er zo één, dan wacht deze opruimer: twee
  * `router.replace`s op dezelfde momentopname zouden elkaars werk terugdraaien.
  */
-const ANDERE_OPRUIMERS: readonly string[] = [...CONSUMED_DEEPLINK_PARAMS, 'planreview', 'regel']
+const ANDERE_OPRUIMERS: readonly string[] = [...CONSUMED_DEEPLINK_PARAMS, 'planreview', ...RIJ_DEEPLINK_PARAMS]
 
 /**
  * Ruimt `?tab=` op na de redirect van een oude `/toekomst?tab=…`-deeplink (ADR 0179

@@ -82,7 +82,7 @@ export function FireRetirementExpensePanel({ value, onChange, showDeepLink = tru
       </p>
       {showDeepLink && (
         <p className="mt-2 font-sans text-[11px]">
-          <Link href="/toekomst?uitgaven=open" className="text-[var(--ink-2)] underline decoration-dotted underline-offset-4 hover:text-[var(--ink)]">
+          <Link href="/toekomst/instellingen?rij=uitgave-na-pensioen" className="text-[var(--ink-2)] underline decoration-dotted underline-offset-4 hover:text-[var(--ink)]">
             &rarr; Stel je uitgaven gedetailleerd samen in Toekomst
           </Link>
         </p>

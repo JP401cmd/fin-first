@@ -20,7 +20,7 @@
 //    `deficit-loan-copy`, `eindsituatie-copy`, `outcome-guard`, `plan-status`). Wat daar
 //    nog niet staat, staat in `KATERN_MELDING_KOPIJ` hieronder, met per regel de herkomst.
 //  - Elke vervolgactie wijst naar precies één plek: een rij in Instellingen
-//    (`?strategie=`/`?regel=`), het katern Doelen of /mijn/profiel. Een melding heeft
+//    (`?rij=`, fase 3), het katern Doelen of /mijn/profiel. Een melding heeft
 //    hoogstens twee acties (`actie` + `tweedeActie`), elk naar een eigen plek.
 //  - Zichtbaarheid (partnerweergave, pensioenmodus, view-gating) regelt de host: een
 //    signaal dat daar niet getoond mag worden, komt hier als `null`/`false` binnen.
@@ -55,12 +55,12 @@ import {
 } from './outcome-guard'
 import { resolvePlanStatus, resolvePlanVerdict, type PlanStatusInput } from './plan-status'
 import { STRATEGIE_PAGINA, strategieHref } from './strategie-route'
+import { instellingenRijHref } from '@/lib/toekomst/instellingen-rij'
 import { isKernelReachedNowDisplay } from '@/lib/horizon-kernel/bridge'
 import type { SolverStatus } from '@/lib/horizon-kernel/solver'
 import type { KaternKopStatus } from '@/components/editorial/katern-koppen'
 import type { GoalProgress } from '@/lib/goal-data'
 import type { LeverageStatus } from '@/lib/leverage-status'
-import type { RegelId } from '@/lib/future/regel-registry'
 import { minimizeLevelFor, resolveBannerDisplay, type BannerDisplay, type MinimizedLevel } from '@/lib/page-status/display'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -231,7 +231,7 @@ export const KATERN_MELDING_KOPIJ = {
   doelAchterKort: 'doel achter op planning',
   /** Het label uit doelen-view.tsx (`goalStatus`), als titel met de doelnaam. */
   doelAchterTitel: (naam: string): string => `${naam}: achter op planning`,
-  /** NIEUW: actie naar het doel in de lijst (de `?rij=`-sleutel komt in fase 3). */
+  /** NIEUW: actie naar het doel in de lijst (katern Doelen). */
   doelAchterActie: 'Naar je doelen',
   /** NIEUW: actie naar /mijn/profiel. */
   gegevensActie: 'Naar je profiel',
@@ -246,10 +246,11 @@ export const KATERN_ROUTE: Readonly<Record<KaternId, string>> = {
   instellingen: STRATEGIE_PAGINA,
 }
 
-/** Een regel-bewerkscherm in Instellingen (`VoorkeurenView` leest `?regel=`). */
-export function instellingenRegelHref(regel: RegelId): string {
-  return `${STRATEGIE_PAGINA}?regel=${regel}`
-}
+/**
+ * Een rij in katern Instellingen (fase 3: `?rij=`, ADR 0179). Elke vervolgactie wijst naar
+ * precies één rij; de oude `?regel=`-vorm blijft alleen als alias voor bestaande links.
+ */
+export const instellingenRij = instellingenRijHref
 
 export const PROFIEL_HREF = '/mijn/profiel'
 
@@ -275,7 +276,7 @@ const PLAN_VERKEN_ACTIE: KaternMeldingActie = {
 }
 const PLAN_STOPMOMENT_ACTIE: KaternMeldingActie = {
   label: KATERN_MELDING_KOPIJ.planStopmomentActie,
-  href: instellingenRegelHref('eindstrategie'),
+  href: instellingenRij('stopmoment'),
 }
 
 // ── Ernst ────────────────────────────────────────────────────────────────────
@@ -368,7 +369,7 @@ function tekortLeningMelding(
     titel,
     kort: KATERN_MELDING_KOPIJ.tekortLeningKort,
     uitleg: zinnen([c.waarom, c.woning, c.piek, c.instelling]),
-    actie: { label: KATERN_MELDING_KOPIJ.tekortLeningActie, href: instellingenRegelHref('eindstrategie') },
+    actie: { label: KATERN_MELDING_KOPIJ.tekortLeningActie, href: instellingenRij('geen-tekort-lening') },
     // Fin krijgt de uitleg zonder de piekzin: net als bij de eindsituatie gaat er geen
     // bedrag mee de vraag in. Geen eigen vraag — de oude melding had er geen; de knop
     // valt terug op zijn standaardvraag.

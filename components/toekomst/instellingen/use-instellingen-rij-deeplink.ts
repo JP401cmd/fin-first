@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { PLAN_REVIEW_PARAM } from '@/lib/plan-review/types'
-import { RIJ_DEEPLINK_PARAMS, resolveRijDeeplink, type RijSleutel } from '@/lib/toekomst/instellingen-rij'
+import { RIJ_DEEPLINK_PARAMS, RIJ_OPRUIM_PARAMS, resolveRijDeeplink, type RijSleutel } from '@/lib/toekomst/instellingen-rij'
 
 /**
  * De rij-deeplink van katern Instellingen (ADR 0179 fase 3): `?rij=<sleutel>`, met de oude
@@ -37,7 +37,7 @@ export function useInstellingenRijDeeplink(onRij: (rij: RijSleutel, via: 'rij' |
     const doel = resolveRijDeeplink(searchParams)
     if (doel) onRijRef.current(doel.rij, doel.via)
     const rest = new URLSearchParams(searchParams)
-    for (const k of RIJ_DEEPLINK_PARAMS) rest.delete(k)
+    for (const k of RIJ_OPRUIM_PARAMS) rest.delete(k)
     const query = rest.toString()
     const hash = typeof window !== 'undefined' ? window.location.hash : ''
     routerRef.current.replace(`${pathname}${query ? `?${query}` : ''}${hash}`, { scroll: false })

@@ -444,7 +444,7 @@ export function ProjectieBlock({
           {projectie.tekortLening.copy.toonInstellingLink && (
             <p className="mt-1">
               <Link
-                href="/toekomst/instellingen?regel=eindstrategie"
+                href="/toekomst/instellingen?rij=stopmoment"
                 className="font-medium text-amber-900 underline underline-offset-2 transition-colors hover:text-[var(--ink)]"
               >
                 Bekijk of wijzig of een tekort-lening mag &rarr;

@@ -109,7 +109,7 @@ describe('meldingenslot — per katern de juiste melding', () => {
     expect(kaart).toHaveTextContent(KATERN_MELDING_KOPIJ.tekortLeningTitel(61, 64))
     expect(within(kaart).getAllByRole('link', { name: /Naar de instelling/ })[0]).toHaveAttribute(
       'href',
-      '/toekomst/instellingen?regel=eindstrategie',
+      '/toekomst/instellingen?rij=geen-tekort-lening',
     )
   })
 

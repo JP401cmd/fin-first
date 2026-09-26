@@ -259,29 +259,29 @@ const nextConfig: NextConfig = {
       // enkel #310-event stond op hun naam, maar ze droegen exact dezelfde
       // trigger als /core/cash en /horizon/whatif en zouden hem bij het eerste
       // bezoek opnieuw kunnen afvuren.
-      // De strategie-kiezer heeft zijn plek in katern Instellingen (ADR 0179 D4,
-      // fase 1 stap 18): rechtstreeks naar de eindstrategie-regel, het standaard-
-      // tabblad van de vroegere Strategieën-modal — geen hop via /toekomst.
+      // De strategie-kiezer heeft zijn plek in katern Instellingen (ADR 0179 D4):
+      // rechtstreeks naar de rij Stopmoment (fase 3: `?rij=`), het standaard-tabblad
+      // van de opgeheven Strategieën-modal — geen hop via /toekomst.
       {
         source: '/horizon/strategie',
-        destination: '/toekomst/instellingen?regel=eindstrategie',
+        destination: '/toekomst/instellingen?rij=stopmoment',
         permanent: false,
       },
       {
         source: '/horizon/uitgaven-na-pensioen',
-        destination: '/toekomst?uitgaven=open',
+        destination: '/toekomst/instellingen?rij=uitgave-na-pensioen',
         permanent: false,
       },
       {
         source: '/toekomst/uitgaven-na-pensioen',
-        destination: '/toekomst?uitgaven=open',
+        destination: '/toekomst/instellingen?rij=uitgave-na-pensioen',
         permanent: false,
       },
 
       // ADR 0179 — Voorkeuren ging op in katern Instellingen; de Gebeurtenissen staan sinds
       // het addendum van 26 sep onder het plan, op `/toekomst#gebeurtenissen`. Next geeft
-      // de inkomende query vanzelf door aan het doel, dus `?strategie=` en `?regel=` blijven
-      // werken, en `?nieuw=1` (alias van `?event=new`) opent op Plan de catalogus.
+      // de inkomende query vanzelf door aan het doel, dus `?strategie=` en `?regel=` (sinds
+      // fase 3 aliassen van `?rij=`) blijven werken, en `?nieuw=1` (alias van `?event=new`) opent op Plan de catalogus.
       // Volgorde-eis: een levensstrategie-sleutel hoort bij Voorkeuren (Instellingen), dus
       // die gerichte variant staat vóór de algemene.
       { source: '/toekomst/voorkeuren', destination: '/toekomst/instellingen', permanent: false },
@@ -347,34 +347,41 @@ const nextConfig: NextConfig = {
       },
 
       // `?modal=withdrawal` opende de WithdrawalModal, die niet meer bestaat
-      // (ADR 0179). De onttrekkingskeuze woont als regel in Instellingen; het
-      // Voorkeuren-deel opent hem via `?regel=onttrekkingsstrategie`
-      // (REGEL_ORDER in lib/future/regel-registry.ts). `modal=withdrawal` reist
-      // mee (zie hierboven) en wordt op Instellingen door niets gelezen.
+      // (ADR 0179). De onttrekkingskeuze is de rij Onttrekking in Instellingen
+      // (`?rij=onttrekking`, lib/toekomst/instellingen-rij.ts). `modal=withdrawal`
+      // reist mee (zie hierboven); de overlay-host ruimt hem op zonder iets te openen.
       {
         source: '/toekomst',
         has: [{ type: 'query', key: 'modal', value: 'withdrawal' }],
-        destination: '/toekomst/instellingen?regel=onttrekkingsstrategie',
+        destination: '/toekomst/instellingen?rij=onttrekking',
+        permanent: false,
+      },
+
+      // `?uitgaven=open` opende de uitgaven-pane op de tijdas; sinds ADR 0179 fase 3
+      // is dat de rij Uitgave na pensioen in Instellingen. De meereizende
+      // `uitgaven=open` ruimt de rij-deeplink mee op.
+      {
+        source: '/toekomst',
+        has: [{ type: 'query', key: 'uitgaven', value: 'open' }],
+        destination: '/toekomst/instellingen?rij=uitgave-na-pensioen',
         permanent: false,
       },
 
       // `?strategie=open` en `?modal=strategie` openden de Strategieën-modal op de
-      // tijdas (standaard-tabblad: eindstrategie). Die keuzes wonen in katern
-      // Instellingen (ADR 0179 D4, fase 1 stap 18); het Voorkeuren-deel opent de
-      // regel via `?regel=eindstrategie` (REGEL_ORDER). De meereizende
-      // `strategie=open`/`modal=strategie` leest daar niemand: de levensstrategie-
-      // editor kent alleen aow|pensioen|huis|werk, en de overlay-host opent de
-      // modal niet meer op een deeplink.
+      // tijdas (standaard-tabblad: eindstrategie). Die modal is opgeheven (ADR 0179
+      // fase 3); elke keuze is een rij in Instellingen, deze landen op Stopmoment.
+      // De meereizende `strategie=open` is geen rij-sleutel en wordt door de
+      // rij-deeplink opgeruimd; `modal=strategie` ruimt de overlay-host op.
       {
         source: '/toekomst',
         has: [{ type: 'query', key: 'strategie', value: 'open' }],
-        destination: '/toekomst/instellingen?regel=eindstrategie',
+        destination: '/toekomst/instellingen?rij=stopmoment',
         permanent: false,
       },
       {
         source: '/toekomst',
         has: [{ type: 'query', key: 'modal', value: 'strategie' }],
-        destination: '/toekomst/instellingen?regel=eindstrategie',
+        destination: '/toekomst/instellingen?rij=stopmoment',
         permanent: false,
       },
 
@@ -389,12 +396,12 @@ const nextConfig: NextConfig = {
       {
         source: '/toekomst/strategie',
         has: [{ type: 'query', key: 'focus', value: '(?<focus>aow|pensioen|huis|werk)' }],
-        destination: '/toekomst/instellingen?strategie=:focus',
+        destination: '/toekomst/instellingen?rij=:focus',
         permanent: false,
       },
       {
         source: '/toekomst/strategie',
-        destination: '/toekomst/instellingen?strategie=aow',
+        destination: '/toekomst/instellingen?rij=aow',
         permanent: false,
       },
 

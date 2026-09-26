@@ -181,7 +181,7 @@ export const DEFAULT_WELCOME_GUIDE: WelcomeGuideConfig = {
           id: 's2-uitgaven',
           title: 'Bewerk je uitgave na pensioen',
           description: 'Stel zelf in of laat je budgetten spreken.',
-          href: '/toekomst?uitgaven=open',
+          href: '/toekomst/instellingen?rij=uitgave-na-pensioen',
           icon: 'Receipt',
           enabled: true,
         },

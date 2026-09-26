@@ -48,8 +48,8 @@ type Contract = {
  */
 const CONTRACT: Record<string, Contract> = {
   whatif: { values: ['open'], effect: 'doelscenario (lab) in beeld scrollen' },
-  strategie: { values: ['open'], effect: 'strategie-venster open' },
-  uitgaven: { values: ['open'], effect: 'pane "uitgaven na pensioen" open' },
+  strategie: { values: ['open'], effect: 'next.config-redirect naar de rij Stopmoment in Instellingen (ADR 0179 fase 3)' },
+  uitgaven: { values: ['open'], effect: 'next.config-redirect naar de rij Uitgave na pensioen in Instellingen (ADR 0179 fase 3)' },
   event: { values: '*', effect: "'new' → gebeurtenis-catalogus; <id> → gebeurtenis bekijken" },
   edit: { values: ['true'], effect: 'met event=<id>: gebeurtenis in bewerkmodus' },
   // Addendum 26 sep (ADR 0179): alias van event=new. Tot dan las de gebeurtenissenlijst in
@@ -59,7 +59,8 @@ const CONTRACT: Record<string, Contract> = {
     values: ['scenarios', 'simulations', 'withdrawal', 'backtesting', 'strategie', 'life_events'],
     effect:
       'bijbehorende modal; life_events → gebeurtenis-catalogus (als event=new; fase 1 stap 2); ' +
-      'withdrawal → next.config-redirect naar /toekomst/instellingen?regel=onttrekkingsstrategie',
+      'withdrawal → next.config-redirect naar /toekomst/instellingen?rij=onttrekking; ' +
+      'strategie → next.config-redirect naar /toekomst/instellingen?rij=stopmoment',
   },
   planreview: { values: ['open'], effect: 'plan-review-wizard open' },
   tab: {
@@ -217,8 +218,11 @@ describe('deeplink-contract /toekomst — elke link die de app uitstuurt valt bi
     // Gemeten 26 sep 2026: whatif, uitgaven, modal, tab, strategie, planreview.
     // ADR 0179 stap 18–19: `strategie=open` en `whatif=open` redirecten naar hun katern,
     // en de app stuurt die links sindsdien rechtstreeks daarheen — ze vallen dus uit
-    // deze scan. Wat op Plan blijft (de panes en modals van de overlay-host), niet.
-    for (const k of ['uitgaven', 'modal']) expect(keys, k).toContain(k)
+    // deze scan. Fase 3 (ADR 0179): `uitgaven=open` idem — de uitgave na pensioen is een
+    // rij in Instellingen en de app linkt daar rechtstreeks heen (`?rij=`). Wat op Plan
+    // blijft (de modals van de overlay-host), niet.
+    for (const k of ['modal']) expect(keys, k).toContain(k)
+    expect(keys.has('uitgaven'), 'de app linkt niet meer naar /toekomst?uitgaven=open').toBe(false)
   })
 
   it('geen uitgaande link gebruikt een sleutel of waarde die /toekomst niet kent', () => {

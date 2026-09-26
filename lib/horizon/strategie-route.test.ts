@@ -3,7 +3,7 @@ import { isStrategieKey, strategieHref } from './strategie-route'
 
 describe('strategie-route — levensstrategieën wonen in katern Instellingen', () => {
   it('strategieHref wijst naar /toekomst/instellingen', () => {
-    expect(strategieHref('pensioen')).toBe('/toekomst/instellingen?strategie=pensioen')
+    expect(strategieHref('pensioen')).toBe('/toekomst/instellingen?rij=pensioen')
   })
 
   it('isStrategieKey kent precies de vier strategieën', () => {

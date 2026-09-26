@@ -5,7 +5,7 @@ import {
   PROFIEL_HREF,
   alsKaternMinimizedLevel,
   ernstRang,
-  instellingenRegelHref,
+  instellingenRij,
   katernKopStatus,
   katernMinimizeLevel,
   katernMinimizedLevelUitMap,
@@ -136,8 +136,8 @@ describe('Plan — niet haalbaar onder solved', () => {
 
   it('tweede actie "Stopmoment" naar de stopmoment-instelling in Instellingen (spec §4.8, C1 punt 6)', () => {
     const [m] = wijsMeldingenToe(metInput({ plan: niet })).plan.meldingen
-    expect(m.tweedeActie).toEqual({ label: 'Stopmoment', href: '/toekomst/instellingen?regel=eindstrategie' })
-    expect(m.tweedeActie).toEqual({ label: 'Stopmoment', href: instellingenRegelHref('eindstrategie') })
+    expect(m.tweedeActie).toEqual({ label: 'Stopmoment', href: '/toekomst/instellingen?rij=stopmoment' })
+    expect(m.tweedeActie).toEqual({ label: 'Stopmoment', href: instellingenRij('stopmoment') })
   })
 
   it('maandhint: 0 en null geven geen uitleg, > 0 de canonieke antwoordzin (ook masked)', () => {
@@ -179,7 +179,7 @@ describe('Plan — tekort onder een vast anker', () => {
     expect(m.titel).toBe('Plan dekt 87%')
     expect(m.uitleg).toBe(ankerZin({ kind: 'reikt-tot', age: 84.5, endAge: 90 }, { kind: 'age', stopAge: 60 }))
     expect(m.actie?.href).toBe(KATERN_ROUTE.doelen)
-    expect(m.tweedeActie).toEqual({ label: 'Stopmoment', href: instellingenRegelHref('eindstrategie') })
+    expect(m.tweedeActie).toEqual({ label: 'Stopmoment', href: instellingenRij('stopmoment') })
   })
 
   it('alle drie shortfall-statussen tellen; reached_at en ontbrekend bereik niet', () => {
@@ -239,7 +239,7 @@ describe('Plan — tekort-lening', () => {
     ).plan.meldingen
     expect(m.ernst).toBe('warn')
     expect(m.titel).toBe('Je plan dekt tussen je 61e en 64e een tekort met een lening.')
-    expect(m.actie).toEqual({ label: 'Naar de instelling', href: '/toekomst/instellingen?regel=eindstrategie' })
+    expect(m.actie).toEqual({ label: 'Naar de instelling', href: '/toekomst/instellingen?rij=geen-tekort-lening' })
     expect(m.uitleg).toContain(DEFICIT_COPY.waarom)
     expect(m.uitleg).toContain(DEFICIT_COPY.piek)
     expect(m.uitleg).toContain(DEFICIT_COPY.instelling)
@@ -364,7 +364,7 @@ describe('Instellingen', () => {
   it('AOW ontbreekt: kop en actie uit AOW_ONTBREEKT_COPY, kort "AOW ontbreekt"', () => {
     const [m] = wijsMeldingenToe(metInput({ aowOntbreekt: true })).instellingen.meldingen
     expect(m).toMatchObject({ ernst: 'warn', titel: AOW_ONTBREEKT_COPY.kop, kort: 'AOW ontbreekt' })
-    expect(m.actie).toEqual({ label: AOW_ONTBREEKT_COPY.actieLabel, href: '/toekomst/instellingen?strategie=aow' })
+    expect(m.actie).toEqual({ label: AOW_ONTBREEKT_COPY.actieLabel, href: '/toekomst/instellingen?rij=aow' })
     expect(m.uitleg).toBe(`${AOW_ONTBREEKT_COPY.keuze} ${AOW_ONTBREEKT_COPY.effect}`)
     expect(wijsMeldingenToe(metInput({ aowOntbreekt: false })).instellingen.aantal).toBe(0)
   })
@@ -447,9 +447,12 @@ describe('toewijzing — sortering en uniciteit', () => {
 
   it('elke vervolgactie wijst naar precies één toegestane plek', () => {
     const toegestaan = new Set([
-      '/toekomst/instellingen?strategie=aow',
-      '/toekomst/instellingen?strategie=huis',
-      '/toekomst/instellingen?regel=eindstrategie',
+      // Fase 3 (ADR 0179): elke instelling-actie wijst naar precies één rij (`?rij=`).
+      '/toekomst/instellingen?rij=aow',
+      '/toekomst/instellingen?rij=huis',
+      '/toekomst/instellingen?rij=stopmoment',
+      '/toekomst/instellingen?rij=eindleeftijd',
+      '/toekomst/instellingen?rij=geen-tekort-lening',
       '/toekomst/doelen',
       // Het lab bovenaan katern Doelen (de vroegere LabPlanMelding wees er ook heen).
       '/toekomst/doelen#verken-je-aannames',
@@ -479,8 +482,8 @@ describe('toewijzing — sortering en uniciteit', () => {
     expect(Object.keys(LEEG).some((k) => /wizard|review|voorkeur/i.test(k))).toBe(false)
   })
 
-  it('instellingenRegelHref bouwt op de Instellingen-route', () => {
-    expect(instellingenRegelHref('onttrekkingsstrategie')).toBe('/toekomst/instellingen?regel=onttrekkingsstrategie')
+  it('instellingenRij bouwt de ?rij=-deeplink op de Instellingen-route', () => {
+    expect(instellingenRij('onttrekking')).toBe('/toekomst/instellingen?rij=onttrekking')
   })
 })
 

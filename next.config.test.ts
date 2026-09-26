@@ -57,12 +57,12 @@ describe('next.config redirects — legacy routes redirecten op de routing-laag 
     expect(rules[0].permanent).toBe(false)
   })
 
-  it('/horizon/strategie landt in Instellingen, uitgaven-na-pensioen op de Plan-pane', async () => {
+  it('/horizon/strategie en uitgaven-na-pensioen landen op hun rij in Instellingen (ADR 0179 fase 3)', async () => {
     for (const [source, destination] of [
-      // ADR 0179 stap 18: rechtstreeks naar het katern, geen hop via /toekomst?strategie=open.
-      ['/horizon/strategie', '/toekomst/instellingen?regel=eindstrategie'],
-      ['/horizon/uitgaven-na-pensioen', '/toekomst?uitgaven=open'],
-      ['/toekomst/uitgaven-na-pensioen', '/toekomst?uitgaven=open'],
+      // Rechtstreeks naar de rij, geen hop via /toekomst?strategie=open of ?uitgaven=open.
+      ['/horizon/strategie', '/toekomst/instellingen?rij=stopmoment'],
+      ['/horizon/uitgaven-na-pensioen', '/toekomst/instellingen?rij=uitgave-na-pensioen'],
+      ['/toekomst/uitgaven-na-pensioen', '/toekomst/instellingen?rij=uitgave-na-pensioen'],
     ]) {
       const rules = await rulesFor(source)
       expect(rules, `${source} mist een routing-laag-redirect`).toHaveLength(1)
@@ -81,10 +81,10 @@ describe('next.config redirects — legacy routes redirecten op de routing-laag 
     expect(gericht.has).toEqual([
       { type: 'query', key: 'focus', value: '(?<focus>aow|pensioen|huis|werk)' },
     ])
-    expect(gericht.destination).toBe('/toekomst/instellingen?strategie=:focus')
+    expect(gericht.destination).toBe('/toekomst/instellingen?rij=:focus')
 
     expect(fallback.has).toBeUndefined()
-    expect(fallback.destination).toBe('/toekomst/instellingen?strategie=aow')
+    expect(fallback.destination).toBe('/toekomst/instellingen?rij=aow')
   })
 
   it('/horizon/whatif en /toekomst/whatif landen kaal op het lab in katern Doelen (ADR 0144, 0179)', async () => {
@@ -232,9 +232,9 @@ describe('next.config redirects — oude /toekomst?tab= en ?modal=withdrawal (AD
     for (const waarde of ['aowx', 'xwerk']) {
       expect(await resolveLocation(`/toekomst?tab=gebeurtenissen&strategie=${waarde}`)).toBeNull()
     }
-    // `strategie=open` is de tijdas-param: die heeft zijn eigen regel naar de eindstrategie.
+    // `strategie=open` is de tijdas-param: die heeft zijn eigen regel naar de rij Stopmoment.
     expect(await resolveLocation('/toekomst?tab=gebeurtenissen&strategie=open')).toBe(
-      '/toekomst/instellingen?tab=gebeurtenissen&strategie=open&regel=eindstrategie',
+      '/toekomst/instellingen?tab=gebeurtenissen&strategie=open&rij=stopmoment',
     )
   })
 
@@ -249,18 +249,25 @@ describe('next.config redirects — oude /toekomst?tab= en ?modal=withdrawal (AD
     expect(await resolveLocation('/toekomst?tab=rekenhulp')).toBe('/toekomst/rekenhulp?tab=rekenhulp')
   })
 
-  it('modal=withdrawal → Instellingen, onttrekkingsregel open', async () => {
+  it('modal=withdrawal → Instellingen, rij Onttrekking open', async () => {
     expect(await resolveLocation('/toekomst?modal=withdrawal')).toBe(
-      '/toekomst/instellingen?modal=withdrawal&regel=onttrekkingsstrategie',
+      '/toekomst/instellingen?modal=withdrawal&rij=onttrekking',
     )
   })
 
-  it('?strategie=open en ?modal=strategie landen op de eindstrategie-regel in Instellingen (ADR 0179 stap 18)', async () => {
+  it('uitgaven=open → Instellingen, rij Uitgave na pensioen (ADR 0179 fase 3: de pane op Plan is weg)', async () => {
+    expect(await resolveLocation('/toekomst?uitgaven=open')).toBe(
+      '/toekomst/instellingen?uitgaven=open&rij=uitgave-na-pensioen',
+    )
+    expect(await resolveLocation('/toekomst?uitgaven=dicht')).toBeNull()
+  })
+
+  it('?strategie=open en ?modal=strategie landen op de rij Stopmoment in Instellingen (ADR 0179 fase 3)', async () => {
     expect(await resolveLocation('/toekomst?strategie=open')).toBe(
-      '/toekomst/instellingen?strategie=open&regel=eindstrategie',
+      '/toekomst/instellingen?strategie=open&rij=stopmoment',
     )
     expect(await resolveLocation('/toekomst?modal=strategie')).toBe(
-      '/toekomst/instellingen?modal=strategie&regel=eindstrategie',
+      '/toekomst/instellingen?modal=strategie&rij=stopmoment',
     )
     // `?strategie=<levensstrategie>` hoort bij Instellingen zelf, niet bij /toekomst.
     expect(await resolveLocation('/toekomst?strategie=huis')).toBeNull()
@@ -280,7 +287,6 @@ describe('next.config redirects — oude /toekomst?tab= en ?modal=withdrawal (AD
       '/toekomst',
       '/toekomst?tab=bestaat-niet',
       '/toekomst?tab=',
-      '/toekomst?uitgaven=open',
       '/toekomst?planreview=open',
       '/toekomst?modal=life_events',
       '/toekomst?modal=scenarios',

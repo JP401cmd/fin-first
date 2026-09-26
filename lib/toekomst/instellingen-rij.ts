@@ -100,6 +100,14 @@ export const STRATEGIE_NAAR_RIJ: Record<ManagedStrategy, RijSleutel> = {
 /** De query-sleutels die de rij-deeplink leest en opruimt. */
 export const RIJ_DEEPLINK_PARAMS = ['rij', 'regel', 'strategie'] as const
 
+/**
+ * Wat de rij-deeplink bij het openen óók opruimt: de param die een redirect uit
+ * `next.config.ts` laat meereizen (`/toekomst?uitgaven=open` →
+ * `/toekomst/instellingen?rij=uitgave-na-pensioen&uitgaven=open`); op Instellingen leest
+ * niets hem.
+ */
+export const RIJ_OPRUIM_PARAMS = [...RIJ_DEEPLINK_PARAMS, 'uitgaven'] as const
+
 export function isRijSleutel(value: unknown): value is RijSleutel {
   return typeof value === 'string' && Object.prototype.hasOwnProperty.call(RIJ_META, value)
 }

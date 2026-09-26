@@ -225,7 +225,7 @@ describe('ProjectieBlock — planeinde, euro-weergave en tekort-meldingen (B-043
     expect(copy.instelling).toMatch(/gekozen stopmoment/)
     expect(tekst).toContain(copy.instelling)
     expect(tekst).toContain(copy.knoppen)
-    const link = blok.querySelector('a[href="/toekomst/instellingen?regel=eindstrategie"]')
+    const link = blok.querySelector('a[href="/toekomst/instellingen?rij=stopmoment"]')
     expect(link).not.toBeNull()
     expect(link?.textContent).toMatch(/tekort-lening mag/)
   })
