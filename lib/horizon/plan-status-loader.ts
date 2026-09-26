@@ -59,7 +59,11 @@ const loadPlanStatusInput = cache(async function loadPlanStatusInputInner(
   // (`computeFreedomPctForPlan`, gepind in horizon-data-loader.anker.test.ts). Die 0
   // mag hier geen rood worden — geen run = geen oordeel.
   const dekkingBekend = run != null && Boolean(horizonData.effectiveInput?.dateOfBirth)
-  const solvedReachable = run?.sim.fireReachable ?? null
+  // Zonder geboortedatum geen oordeel, óók onder solved: de kernel levert dan wel een
+  // run, maar "haalbaar" op een onbekende leeftijd is niet te onderbouwen, en /toekomst
+  // toont op die plek "We missen gegevens" (outcome-guard). Dezelfde poort als
+  // `dekkingBekend` onder een vast anker ⇒ neutral en geen oordeelzin.
+  const solvedReachable = dekkingBekend ? (run?.sim.fireReachable ?? null) : null
 
   // ADR 0175 — onder solved weegt het vastgelegde doel mee, maar alleen in de EIGEN blik:
   // het doel is de stand van het eigen lab op /toekomst (dat altijd `personal` draait), en de

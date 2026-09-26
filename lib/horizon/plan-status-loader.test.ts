@@ -61,6 +61,22 @@ describe('loadPlanStatus', () => {
     await expect(loadPlanStatus(SB, 'personal')).resolves.toBe('neutral')
   })
 
+  /**
+   * Given solved (zo vroeg mogelijk) en een profiel ZONDER geboortedatum,
+   * When de kernel toch een run levert die fireReachable meldt,
+   * Then is er geen oordeel: status neutral en geen oordeelzin. Zonder leeftijd is
+   * "haalbaar" niet te onderbouwen, en /toekomst toont op dezelfde plek "We missen
+   * gegevens" (outcome-guard). Zelfde regel als het vaste anker hierboven
+   * (`dekkingBekend`). Gevonden in de visuele baseline van 26 sep: kop "haalbaar"
+   * naast de KPI "We missen gegevens".
+   */
+  it('solved zonder geboortedatum ⇒ neutral, geen oordeelzin', async () => {
+    loadHorizonDataMock.mockResolvedValue(horizon({ kind: 'solved' }, 5, null))
+    computeHorizonFireSimMock.mockResolvedValue(run(true))
+    await expect(loadPlanStatus(SB, 'personal')).resolves.toBe('neutral')
+    await expect(loadPlanVerdictSentence(SB, 'personal')).resolves.toEqual({ sentence: null, status: 'neutral' })
+  })
+
   it('solved: fireReachable van de hoofdrun beslist', async () => {
     loadHorizonDataMock.mockResolvedValue(horizon({ kind: 'solved' }, 5))
     computeHorizonFireSimMock.mockResolvedValue(run(true))
@@ -115,10 +131,10 @@ describe('loadPlanStatus', () => {
       expect(vastgelegdDoelGedektMock).not.toHaveBeenCalled()
     })
 
-    it('zonder geboortedatum geen doel-run', async () => {
+    it('zonder geboortedatum geen doel-run (en geen oordeel: neutral)', async () => {
       loadHorizonDataMock.mockResolvedValue(horizon({ kind: 'solved' }, 5, null, DOEL))
       computeHorizonFireSimMock.mockResolvedValue(run(true))
-      await expect(loadPlanStatus(SB, 'personal')).resolves.toBe('good')
+      await expect(loadPlanStatus(SB, 'personal')).resolves.toBe('neutral')
       expect(vastgelegdDoelGedektMock).not.toHaveBeenCalled()
     })
 
