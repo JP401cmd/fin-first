@@ -152,7 +152,7 @@ describe('next.config redirects — legacy routes redirecten op de routing-laag 
     // route-groep `(katern)/`, die geen URL-segment toevoegt.
     for (const target of [
       'app/(app)/toekomst/(katern)/page.tsx',
-      'app/(app)/toekomst/instellingen/page.tsx',
+      'app/(app)/toekomst/(katern)/instellingen/page.tsx',
     ]) {
       expect(existsSync(path.join(process.cwd(), target))).toBe(true)
     }

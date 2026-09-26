@@ -1,14 +1,8 @@
 import type { Metadata } from 'next'
-import { readPlanReviewState } from '@/lib/plan-review/read-state'
-import { buildPlanReviewFacts, derivePlanReviewProgress } from '@/lib/plan-review/progress'
-import { loadEigenStrategieEvents } from '@/lib/plan-review/eigen-strategie-events'
-import { getCachedUser } from '@/lib/supabase/cached-user'
 import { createClient } from '@/lib/supabase/server'
-import { loadHorizonRaw } from '@/lib/horizon-data-loader'
 import { loadDashboardData } from '@/lib/dashboard-data-loader'
+import { loadToekomstData } from '@/lib/toekomst/load-toekomst-data'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
-import { ToekomstSubpageShell } from '@/components/future/toekomst-subpage-shell'
-import { PlanReviewProvider } from '@/components/future/plan-review/plan-review-provider'
 import { InstellingenKatern } from '@/components/toekomst/instellingen/instellingen-katern'
 import type { KernelSimData } from '@/components/future/gebeurtenissen-view'
 import { resolveWithdrawalProfiel } from '@/lib/withdrawal-strategy'
@@ -25,48 +19,24 @@ export const metadata: Metadata = {
 }
 
 /**
- * /toekomst/instellingen — katern 3 (ADR 0179 D1/D4).
+ * /toekomst/instellingen — katern Instellingen (ADR 0179 D1/D4, fase 1 stap 17).
  *
  * Voegt de oude subroutes /toekomst/voorkeuren en /toekomst/gebeurtenissen samen; die
  * redirecten via `next.config.ts` hierheen (query mee, gebeurtenissen met `#gebeurtenissen`).
- * Fase 1: tijdelijk een losse route met de bestaande `ToekomstSubpageShell`; stroom A
- * verplaatst hem later in de route-groep `(katern)/`.
+ * Staat in de `(katern)`-groep: de kop, de `PlanReviewProvider`, het canvas en de
+ * katern-koppen komen uit de layout — hier dus geen eigen kop en geen tweede provider.
  *
- * De server-opbouw is de vereniging van beide oude pagina's, zonder dubbele lezing:
- * één `loadHorizonRaw`, één `buildStrategieEditorsData` (voedt beide views).
+ * De horizon-bundel en de review-voortgang komen uit dezelfde `loadToekomstData`-lading
+ * als de layout (React-`cache()`, één lading per request; `HorizonPageData` is een
+ * superset van de rauwe bundel die de views lezen). Eén `buildStrategieEditorsData` voedt
+ * beide views.
  */
 export default async function ToekomstInstellingenPage() {
   const supabase = await createClient()
-  const user = await getCachedUser(supabase)
-  const [horizonData, dashboardResult, planReviewState, eigenStrategieEvents] = await Promise.all([
-    loadHorizonRaw(supabase),
+  const [{ horizonData, planReviewProgress }, dashboardResult] = await Promise.all([
+    loadToekomstData(),
     loadDashboardData(supabase),
-    // TPR-01 — alleen om te weten of de review iets kan bewaren (kolom uitgerold).
-    user ? readPlanReviewState(supabase, user.id) : Promise.resolve(null),
-    // TPR-15 — de EIGEN AOW/werk/pensioen-rijen voor de review-voortgang. De
-    // life_events-policy is huishoud-gedeeld; een gedeeld partner-event mag de
-    // AOW-stap niet dichtzetten. Faalt de lezing: fail-closed (geen rijen).
-    user
-      ? loadEigenStrategieEvents(supabase, user.id).catch((err: unknown) => {
-          console.error('[toekomst:instellingen:plan-review:eigen-events]', err)
-          return []
-        })
-      : Promise.resolve([]),
   ])
-
-  // Review-voortgang: AFGELEID met dezelfde helpers als /toekomst — geen tweede telling.
-  const planReviewProgress =
-    user && planReviewState
-      ? derivePlanReviewProgress(
-          planReviewState,
-          buildPlanReviewFacts({
-            events: eigenStrategieEvents,
-            assets: horizonData.assets,
-            housingStrategyRaw: horizonData.rawProfile?.housing_strategy_config,
-            ownerId: user.id,
-          }),
-        )
-      : null
 
   // Levensstrategie-editors (AOW/Pensioen/Huis/Werk) — één opbouw voor beide views.
   const { strategieData, aowAgeFractional } = buildStrategieEditorsData(horizonData)
@@ -129,18 +99,14 @@ export default async function ToekomstInstellingenPage() {
       : null
 
   return (
-    <PlanReviewProvider initialProgress={planReviewProgress}>
+    <>
+      {/* Geen eigen kop: de layout draagt de plan-kop. De review-voortgang staat op de
+          wizard-ingang en het aantal gebeurtenissen in de sectiekop van de view (die
+          telt ook het kernel-verkoopmoment mee, dat alleen client-side bestaat). */}
       <NavStackMeta title="Instellingen" />
-      {/* Titel = de kale paginanaam, bewust zonder kerncijfer: de review-voortgang
-          staat op de wizard-ingang eronder en het aantal gebeurtenissen in de
-          sectiekop van de view (die telt ook het kernel-verkoopmoment mee, dat
-          alleen client-side bestaat). Eén getal, één plek. */}
-      <ToekomstSubpageShell
-        route="/toekomst/instellingen"
-        fallbackName="Instellingen"
-        verdict={null}
-        deck="Alles wat je plan voedt: je keuzes, je levensstrategieën en de gebeurtenissen op je tijdas."
-      />
+      {/* De views dragen hun eigen `max-w-6xl px-4 sm:px-6`-kolom; de katern-layout padt
+          al, dus de negatieve marge voorkomt dubbele inspringing (zoals bij Doelen). */}
+      <div className="-mx-4 sm:-mx-6">
       <InstellingenKatern
         planReviewProgress={planReviewProgress}
         voorkeuren={{
@@ -171,6 +137,7 @@ export default async function ToekomstInstellingenPage() {
           kernelSim,
         }}
       />
-    </PlanReviewProvider>
+      </div>
+    </>
   )
 }

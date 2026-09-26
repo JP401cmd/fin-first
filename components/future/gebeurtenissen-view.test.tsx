@@ -45,11 +45,17 @@ const LOADING_SIM: HorizonFireSimResult = {
   kernelPensionPots: null,
 }
 let mockSimResult: HorizonFireSimResult = LOADING_SIM
+/** De params waarmee de eigen kernel-hook van de view is aangeroepen (besluit Q8). */
+const hookAanroepen: unknown[] = []
 vi.mock('@/lib/hooks/use-horizon-fire-sim', () => ({
-  useHorizonFireSim: (params: unknown) => (params ? mockSimResult : LOADING_SIM),
+  useHorizonFireSim: (params: unknown) => {
+    hookAanroepen.push(params)
+    return params ? mockSimResult : LOADING_SIM
+  },
 }))
 beforeEach(() => {
   mockSimResult = LOADING_SIM
+  hookAanroepen.length = 0
   mockPush.mockClear()
 })
 
@@ -378,6 +384,38 @@ const staleServerSale = mockEvent({
 function renderKernelView(events: LifeEvent[]) {
   return renderView({ events, strategieData: kernelStrategieData, kernelSim: mockKernelSim })
 }
+
+describe('GebeurtenissenView — leest de hoofdrun van de provider in katern Instellingen (ADR 0179 Q8)', () => {
+  it('met `hoofdrun` draait de eigen kernel-hook niet en toont de view de provider-run', () => {
+    // Given: de provider-run kent het kernel-verkoopmoment; de eigen hook zou (via
+    // `mockSimResult`) niets opleveren.
+    const hoofdrun = loadedSim({
+      effectiveLifeEvents: [kernelSaleEvent(71.25, 250_000)],
+      kernelHousingSale: { month: 195, age: 71.25, proceeds: 250_000 },
+    })
+    render(
+      <DisplayModeProvider initialMode="full">
+        <GebeurtenissenView
+          events={[staleServerSale]}
+          strategieData={kernelStrategieData}
+          eventPaneData={mockEventPaneData}
+          kernelSim={mockKernelSim}
+          hoofdrun={hoofdrun}
+        />
+      </DisplayModeProvider>,
+    )
+    // Then: de eigen hook kreeg in élke render `null` (geen tweede run op rijstrook
+    // `main`) en de tijdlijn toont het moment uit de provider-run.
+    expect(hookAanroepen.length).toBeGreaterThan(0)
+    expect(hookAanroepen.every((p) => p === null)).toBe(true)
+    expect(screen.getByText('Leeftijd 71')).toBeTruthy()
+  })
+
+  it('zonder `hoofdrun` draait de view zijn eigen run (los gebruik)', () => {
+    renderKernelView([staleServerSale])
+    expect(hookAanroepen.some((p) => p !== null)).toBe(true)
+  })
+})
 
 describe('GebeurtenissenView — kernel-afgeleide strategiemomenten (feature #876)', () => {
   it('anti-drift: tab toont de verkoopleeftijd uit dezelfde kernel-run, niet het stale server-event', () => {

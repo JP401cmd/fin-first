@@ -71,6 +71,12 @@ export const useToekomstSimContext = () => useVerplicht(SimContext, 'useToekomst
 export const useToekomstMeldingenContext = () => useVerplicht(MeldingenContext, 'useToekomstMeldingenContext')
 export const useToekomstLagenContext = () => useVerplicht(LagenContext, 'useToekomstLagenContext')
 export const useToekomstEuroContext = () => useVerplicht(EuroContext, 'useToekomstEuroContext')
+/**
+ * De sim-context, of `null` buiten de provider. Alleen voor een view die óók los
+ * gebruikt wordt (GebeurtenissenView via katern Instellingen, besluit Q8): binnen de
+ * katern-layout leest hij de hoofdrun van de provider, daarbuiten draait hij zelf.
+ */
+export const useToekomstSimContextOptioneel = () => useContext(SimContext)
 
 export function ToekomstStateProvider({
   initialData,

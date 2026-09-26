@@ -15,7 +15,8 @@
 
 import type { ComponentProps } from 'react'
 import { VoorkeurenView } from '@/components/future/voorkeuren-view'
-import { GebeurtenissenView } from '@/components/future/gebeurtenissen-view'
+import type { GebeurtenissenView } from '@/components/future/gebeurtenissen-view'
+import { GebeurtenissenMetHoofdrun } from './gebeurtenissen-met-hoofdrun'
 import type { PlanReviewProgress } from '@/lib/plan-review/types'
 import { WizardIngang } from './wizard-ingang'
 
@@ -45,7 +46,7 @@ export function InstellingenKatern({
         <VoorkeurenView {...voorkeuren} />
       </div>
       <div id={INSTELLINGEN_ANKERS.gebeurtenissen} className="scroll-mt-20">
-        <GebeurtenissenView {...gebeurtenissen} />
+        <GebeurtenissenMetHoofdrun {...gebeurtenissen} />
       </div>
     </div>
   )

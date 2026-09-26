@@ -22,7 +22,7 @@ import { codeOnly, readRel, reachableModules, routeEntryFiles } from '@/lib/test
 
 const GROEP = 'app/(app)/toekomst/(katern)'
 const LAYOUT = `${GROEP}/layout.tsx`
-const KATERN_PAGES = [`${GROEP}/page.tsx`, `${GROEP}/doelen/page.tsx`] as const
+const KATERN_PAGES = [`${GROEP}/page.tsx`, `${GROEP}/doelen/page.tsx`, `${GROEP}/instellingen/page.tsx`] as const
 
 /** De gedeelde onderdelen die precies één keer, in de layout, horen te staan. */
 const LAYOUT_BLOKKEN = ['<ToekomstStateProvider', '<ToekomstCanvas', '<ToekomstKaternKoppen', '<ToekomstOverlayHost']
@@ -35,14 +35,14 @@ const DEFINITIES = new Set([
 ])
 
 describe('katern-layout — het canvas blijft gemonteerd bij een katernwissel (GW1)', () => {
-  it('Plan en Doelen zijn pages onder dezelfde (katern)-layout', () => {
+  it('Plan, Doelen en Instellingen zijn pages onder dezelfde (katern)-layout', () => {
     expect(existsSync(path.join(process.cwd(), LAYOUT))).toBe(true)
     const entries = routeEntryFiles(GROEP)
     for (const page of KATERN_PAGES) {
       expect(entries, `${page} hoort in de (katern)-groep`).toContain(page)
     }
     // De oude losse routes mogen niet terugkomen: die zouden de layout omzeilen.
-    for (const oud of ['app/(app)/toekomst/page.tsx', 'app/(app)/toekomst/doelen/page.tsx']) {
+    for (const oud of ['app/(app)/toekomst/page.tsx', 'app/(app)/toekomst/doelen/page.tsx', 'app/(app)/toekomst/instellingen/page.tsx']) {
       expect(existsSync(path.join(process.cwd(), oud)), `${oud} omzeilt de katern-layout`).toBe(false)
     }
   })

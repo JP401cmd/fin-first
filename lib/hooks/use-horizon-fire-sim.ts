@@ -435,6 +435,18 @@ function mapMainOutcome(
   }
 }
 
+/**
+ * Het deel van de hoofdrun dat een tweede lezer van dezelfde run nodig heeft
+ * (ADR 0179 fase 1 stap 17, besluit Q8): katern Instellingen leest de hoofdrun van de
+ * /toekomst-provider in plaats van een eigen `useHorizonFireSim` te draaien. Twee
+ * instanties op rijstrook `main` verdringen elkaars wachtende run, en een verdrongen
+ * instantie houdt dan `result: null` tot haar invoer verandert.
+ */
+export type HorizonHoofdrun = Pick<
+  HorizonFireSimResult,
+  'result' | 'unifiedRows' | 'kernelPensionPots' | 'effectiveLifeEvents' | 'isLoading'
+>
+
 export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFireSimResult {
   const { horizonInput, lifeEvents, fireStrategy, withdrawalStrategy, grossReturn: grossReturnParam, inflation: inflationParam, profileError, aowAgeFractional: aowAgeFractionalParam, assets, debts, box3Method, hasPartner, bankAccountCash, baseAnnualSavingsFromCashflow, housingStrategy, kernelRawProfile, aowRows } = params ?? {}
   // Scenario-overrides apart gedestructureerd — mag GEEN dep van de hoofd-memo worden

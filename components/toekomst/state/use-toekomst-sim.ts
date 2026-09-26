@@ -13,7 +13,7 @@
 import { useEffect, useState, useCallback, useMemo, useSyncExternalStore, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import type { HorizonPageData } from '@/lib/horizon-data-loader'
-import { useHorizonFireSim } from '@/lib/hooks/use-horizon-fire-sim'
+import { useHorizonFireSim, type HorizonHoofdrun } from '@/lib/hooks/use-horizon-fire-sim'
 import { useHorizonBron } from '@/lib/hooks/use-horizon-bron'
 import {
   computeFireProjection,
@@ -169,7 +169,7 @@ export function useToekomstSim({ initialData, perspectief, scenarioState }: { in
   // Fase 2b (#495): gemigreerd naar runUnifiedProjection() met per-asset-type rendement
   // Task 4.2: de kernel-runs draaien in een web worker (met synchrone jsdom/SSR-fallback);
   // `firstPaint*` levert de server-scalars zolang de worker-run nog niet geland is.
-  const { result: simResult, cashflows: simCashflows, error: simError, unifiedRows, effectiveLifeEvents, kernelStatus, kernelMaandHint, kernelHousingSale, aowOntbreekt, scenario, stopPad, scenarioPending, stopPadPending, mainPending, isRefining: kernelIsRefining, firstPaintFireAge, firstPaintFreedomPct, firstPaintRequiredPortfolio, firstPaintRequiredNetWorth } = useHorizonFireSim(
+  const { result: simResult, cashflows: simCashflows, error: simError, unifiedRows, effectiveLifeEvents, kernelPensionPots, isLoading: kernelIsLoading, kernelStatus, kernelMaandHint, kernelHousingSale, aowOntbreekt, scenario, stopPad, scenarioPending, stopPadPending, mainPending, isRefining: kernelIsRefining, firstPaintFireAge, firstPaintFreedomPct, firstPaintRequiredPortfolio, firstPaintRequiredNetWorth } = useHorizonFireSim(
     input
       ? {
           horizonInput: input,
@@ -220,6 +220,15 @@ export function useToekomstSim({ initialData, perspectief, scenarioState }: { in
   const displayEvents = useMemo<LifeEvent[]>(
     () => (effectiveLifeEvents.length > 0 ? effectiveLifeEvents : events),
     [effectiveLifeEvents, events],
+  )
+
+  // Besluit Q8 (ADR 0179 stap 17): de hoofdrun voor een tweede lezer (katern
+  // Instellingen, GebeurtenissenView). Eén run per pagina: een eigen hook-instantie
+  // daar verdrong deze run op rijstrook `main` (gemeten: vier verdrongen verzoeken bij
+  // een directe lading van /toekomst/instellingen, nul op /toekomst).
+  const hoofdrun = useMemo<HorizonHoofdrun>(
+    () => ({ result: simResult, unifiedRows, kernelPensionPots, effectiveLifeEvents, isLoading: kernelIsLoading }),
+    [simResult, unifiedRows, kernelPensionPots, effectiveLifeEvents, kernelIsLoading],
   )
 
   // ── EventPane preview-baseline (kernel-only) ─────────────────────────────
@@ -987,6 +996,7 @@ export function useToekomstSim({ initialData, perspectief, scenarioState }: { in
   }
 
   return useStabielObject({
+    hoofdrun,
     input,
     fireParams,
     withdrawalStrategyConfig,

@@ -30,7 +30,7 @@ import type { AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import type { Box3Method } from '@/lib/bucket-projection'
 import type { HousingStrategyConfig } from '@/lib/housing-strategy'
 import { computeEventImpact } from '@/lib/event-impact'
-import { useHorizonFireSim } from '@/lib/hooks/use-horizon-fire-sim'
+import { useHorizonFireSim, type HorizonHoofdrun } from '@/lib/hooks/use-horizon-fire-sim'
 import {
   deriveOpeetLifespanFromRows,
   derivePensionPotEndFromRows,
@@ -188,6 +188,7 @@ export function GebeurtenissenView({
   strategieData,
   eventPaneData,
   kernelSim = null,
+  hoofdrun = null,
 }: {
   events: LifeEvent[]
   /** Huidige leeftijd uit DOB — nodig om scenario-defaults op te baseren
@@ -206,6 +207,13 @@ export function GebeurtenissenView({
   eventPaneData: EventPaneData
   /** Feature #876 — extra hook-inputs voor de kernel-run; null = geen kernel-rijen. */
   kernelSim?: KernelSimData | null
+  /**
+   * De hoofdrun van de /toekomst-provider (ADR 0179 stap 17, besluit Q8). Gezet in
+   * katern Instellingen: dan draait deze view géén eigen `useHorizonFireSim`, want twee
+   * instanties op rijstrook `main` verdringen elkaars run. `null` = eigen run (los
+   * gebruik, tests).
+   */
+  hoofdrun?: HorizonHoofdrun | null
 }) {
   // EventPane (toevoegen/bewerken) = scenario-tool → alleen in 'plannen'-modus
   // zichtbaar (plan A-5). Niveau-A "Kijken"-gebruikers zien dan een
@@ -228,8 +236,8 @@ export function GebeurtenissenView({
   useEffect(() => setHydrated(true), [])
   const rawContext = strategieData.baseline?.rawContext ?? null
   const kernelSimActive = Boolean(kernelSim && rawContext)
-  const sim = useHorizonFireSim(
-    hydrated && kernelSim && rawContext
+  const eigenSim = useHorizonFireSim(
+    !hoofdrun && hydrated && kernelSim && rawContext
       ? {
           horizonInput: eventPaneData.baselineInput,
           lifeEvents: events,
@@ -250,6 +258,11 @@ export function GebeurtenissenView({
         }
       : null,
   )
+  // Mét provider-hoofdrun (Instellingen) leest de view díe run; de eigen hook krijgt dan
+  // `null` en rekent niets (hooks blijven onvoorwaardelijk, V2). Pas ná hydration: de
+  // provider-run bestaat op de server al (synchrone SSR-tak), de client-render start
+  // zonder — tot dan dus dezelfde laad-vorm als de eigen hook (geen hydration-mismatch).
+  const sim: HorizonHoofdrun = hoofdrun && hydrated ? hoofdrun : eigenSim
 
   // Bedragen in € mét vrijheidstijd — zelfde dagtarief-grondslag als de
   // strategie-editors (consume, don't recompute). Zonder dagtarief: alleen €.
