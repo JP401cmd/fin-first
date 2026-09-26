@@ -1,12 +1,13 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { BottomSheet } from '@/components/app/bottom-sheet'
+import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 
 /**
  * StrategieModalShell — gedeelde chrome voor de drie levensstrategie-editors
- * (AOW, Pensioen, Huis). Bouwt op BottomSheet (portal, drag-dismiss, focus-trap,
- * Escape, sticky footer) en standaardiseert kicker + serif-titel + intro +
+ * (AOW, Pensioen, Huis). Bouwt op `ShellOverlay kind="sheet"` (ADR 0039; sinds ADR 0179
+ * fase 3 — daarvoor een directe BottomSheet), dus portal, drag-dismiss, focus-trap, Escape
+ * en sticky footer) en standaardiseert kicker + serif-titel + intro +
  * amber error-banner + read-only-modus.
  *
  * De `footer`-slot is volledig injecteerbaar (geen vaste onSave), omdat de
@@ -38,14 +39,7 @@ export function StrategieModalShell({
   size?: 'md' | 'lg' | 'xl'
 }) {
   return (
-    <BottomSheet
-      open={open}
-      onClose={onClose}
-      title={title}
-      size={size}
-      initialMobileHeight="78vh"
-      footerSlot={footer}
-    >
+    <ShellOverlay kind="sheet" open={open} onClose={onClose} title={title} size={size} footer={footer}>
       <div className="px-5 py-4 sm:px-6">
         <div className="mb-4">
           <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
@@ -78,7 +72,7 @@ export function StrategieModalShell({
 
         {children}
       </div>
-    </BottomSheet>
+    </ShellOverlay>
   )
 }
 
@@ -91,6 +85,7 @@ export function StrategieFooter({
   saveLabel = 'Opslaan',
   cancelLabel = 'Annuleer',
   leading,
+  info,
 }: {
   onCancel: () => void
   onSave?: () => void
@@ -99,10 +94,15 @@ export function StrategieFooter({
   saveLabel?: string
   cancelLabel?: string
   leading?: ReactNode
+  /** ADR 0179 §7.7 — de verschilregel van de body (`RegelEditActionsState.footerInfo`). */
+  info?: ReactNode
 }) {
   return (
-    <div className="flex items-center justify-between gap-2 px-5 py-3 sm:px-6">
-      <div className="min-w-0">{leading}</div>
+    <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-3 sm:px-6">
+      <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1">
+        {leading}
+        {info && <span className="text-[var(--ink-2)]">{info}</span>}
+      </div>
       <div className="ml-auto flex items-center gap-2">
         <button
           type="button"

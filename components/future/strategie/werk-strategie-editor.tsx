@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Trash2 } from 'lucide-react'
 import type { LifeEvent } from '@/lib/horizon-data'
 import type { PreviewBaseline } from '@/lib/strategy-preview'
+import type { RegelSimSnapshot } from '@/lib/future/regel-sim'
 import type { RegelEditActionsState } from '@/components/future/regels/types'
 import { StrategieModalShell, StrategieFooter } from './strategie-modal-shell'
 import { WerkStrategieBody } from './werk-strategie-body'
@@ -16,6 +17,12 @@ interface Props {
   /** Alle huidige events (voor de live vrijheidsleeftijd-preview). */
   allEvents: LifeEvent[]
   baseline: PreviewBaseline | null
+  /**
+   * ADR 0179 fase 3 (§7.7) — client-veilige snapshot. Gezet = het effect komt uit de kern-run
+   * met een `lifeEvent`-override (zoals de wizard) en staat als verschilregel in de footer;
+   * zonder snapshot de oude `preview`-regel in het formulier.
+   */
+  snapshot?: RegelSimSnapshot | null
   /** Dagelijkse must-uitgaven, voor vrijheid-tijd framing. */
   dailyExpenses: number
   /** Huidige leeftijd uit DOB (null = onbekend → editor defaultet naar 40 + waarschuwing). */
@@ -36,6 +43,7 @@ export function WerkStrategieEditor({
   event,
   allEvents,
   baseline,
+  snapshot = null,
   dailyExpenses,
   currentAge,
   currentNetMonthly,
@@ -50,7 +58,10 @@ export function WerkStrategieEditor({
   // Opslaan en verwijderen sluiten elkaar uit, zoals toen ze één `saving`-vlag deelden.
   const busy = deleting || (actions?.saving ?? false)
 
-  const impact = useMemo<StrategieImpactBron>(() => ({ kind: 'preview', baseline, allEvents }), [baseline, allEvents])
+  const impact = useMemo<StrategieImpactBron>(
+    () => (snapshot ? { kind: 'kern', snapshot } : { kind: 'preview', baseline, allEvents }),
+    [snapshot, baseline, allEvents],
+  )
 
   const handleSaved = useCallback(() => {
     onClose()
@@ -91,6 +102,7 @@ export function WerkStrategieEditor({
             saving={busy}
             saveDisabled={actions ? !actions.canSave : false}
             saveLabel="Werk-strategie opslaan"
+            info={actions?.footerInfo}
             leading={
               event ? (
                 <button

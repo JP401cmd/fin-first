@@ -126,7 +126,6 @@ const ALLOWLIST_ENTRIES = [
   'components/future/gebeurtenissen-view.tsx',
   'components/future/report-sheet.tsx',
   'components/future/strategie/pensioen-projectie-chart.tsx',
-  'components/future/strategie/strategie-modal-shell.tsx',
   'components/mijn/account/abonnement-section.tsx',
   'components/mijn/ai-privacy-settings.tsx',
   'components/onboarding/welcome-popup.tsx',

@@ -17,6 +17,7 @@ import { normalizePensionType, type LifeEvent } from '@/lib/horizon-data'
 import { formatCurrency, formatWithFreedom } from '@/lib/format'
 import { computeJaarruimte, estimateFactorAFromSalary } from '@/lib/jaarruimte'
 import type { PreviewBaseline } from '@/lib/strategy-preview'
+import type { RegelSimSnapshot } from '@/lib/future/regel-sim'
 import { newPot, potFromEvent, type PotDraft } from '@/lib/pension/pot-draft'
 import type { RegelEditActionsState } from '@/components/future/regels/types'
 import { PensionPdfUpload } from '@/components/app/horizon/pension-pdf-upload'
@@ -37,6 +38,12 @@ interface Props {
   pensionEvents: LifeEvent[]
   allEvents: LifeEvent[]
   baseline: PreviewBaseline | null
+  /**
+   * ADR 0179 fase 3 (§7.7) — client-veilige snapshot. Gezet = het effect komt uit de kern-run
+   * met een `lifeEvent`-override (zoals de wizard) en staat als verschilregel in de footer;
+   * zonder snapshot de oude `preview`-regel in het formulier.
+   */
+  snapshot?: RegelSimSnapshot | null
   dailyExpenses: number
   /** Wettelijke AOW-leeftijd voor validatie-waarschuwingen. */
   aowAge: number
@@ -68,6 +75,7 @@ export function PensioenStrategieEditor({
   pensionEvents,
   allEvents,
   baseline,
+  snapshot = null,
   dailyExpenses,
   aowAge,
   grossYearlyIncome,
@@ -299,7 +307,10 @@ export function PensioenStrategieEditor({
   }, [router])
 
   // Vóór de view-splitsing: de hook-volgorde blijft gelijk tussen lijst en pot.
-  const impact = useMemo<StrategieImpactBron>(() => ({ kind: 'preview', baseline, allEvents }), [baseline, allEvents])
+  const impact = useMemo<StrategieImpactBron>(
+    () => (snapshot ? { kind: 'kern', snapshot } : { kind: 'preview', baseline, allEvents }),
+    [snapshot, baseline, allEvents],
+  )
 
   async function deletePot() {
     if (!draft?.id) {
@@ -912,6 +923,7 @@ export function PensioenStrategieEditor({
           saving={potBusy}
           saveDisabled={potActions ? !potActions.canSave : false}
           saveLabel="Pot bewaren"
+            info={potActions?.footerInfo}
           leading={
             draft.id && !readOnly ? (
               <button

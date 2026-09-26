@@ -1,5 +1,6 @@
 'use client'
 
+import { useCallback, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { HousingStrategySection } from '@/components/future/strategie/housing-strategy-section'
 import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
@@ -7,7 +8,9 @@ import type { ManagedStrategy } from '@/lib/strategy-events'
 import type { LifeEvent } from '@/lib/horizon-data'
 import type { PreviewBaseline } from '@/lib/strategy-preview'
 import type { HousingPreviewData } from '@/lib/housing-trigger'
-import { StrategieModalShell } from './strategie-modal-shell'
+import type { RegelSimSnapshot } from '@/lib/future/regel-sim'
+import type { RegelEditActionsState } from '@/components/future/regels/types'
+import { StrategieModalShell, StrategieFooter } from './strategie-modal-shell'
 import { AowStrategieEditor } from './aow-strategie-editor'
 import { PensioenStrategieEditor } from './pensioen-strategie-editor'
 import { WerkStrategieEditor } from './werk-strategie-editor'
@@ -44,6 +47,7 @@ export function StrategieEditors({
   data,
   readOnly,
   autoOpenJaarruimte,
+  snapshot = null,
 }: {
   open: ManagedStrategy | null
   onClose: () => void
@@ -53,13 +57,19 @@ export function StrategieEditors({
   /** S6 — geopend via `?strategie=pensioen` vanaf de factor-A-verwijzing op
    *  Box 1: dan staat de jaarruimte-/factor-A-uitvraag meteen open. */
   autoOpenJaarruimte?: boolean
+  /**
+   * ADR 0179 fase 3 (§7.7) — client-veilige snapshot. Gezet = elke editor toont de
+   * verschilregel uit de kern-run in zijn footer (AOW/Werk/Pensioen via een
+   * `lifeEvent`-override, Huis via `housingStrategyConfig`) — dezelfde runs als de wizard.
+   */
+  snapshot?: RegelSimSnapshot | null
 }) {
-  const router = useRouter()
 
   if (open === 'aow') {
     const aowEvent = events.find((e) => e.event_type === 'aow') ?? null
     return (
       <AowStrategieEditor
+        snapshot={snapshot}
         event={aowEvent}
         allEvents={events}
         baseline={data.baseline}
@@ -84,6 +94,7 @@ export function StrategieEditors({
     const samenwonend = aowLeefsituatie !== 'alleenstaand'
     return (
       <PensioenStrategieEditor
+        snapshot={snapshot}
         pensionEvents={pensionEvents}
         allEvents={events}
         baseline={data.baseline}
@@ -105,6 +116,7 @@ export function StrategieEditors({
     const werkEvent = events.find((e) => e.event_type === 'werk') ?? null
     return (
       <WerkStrategieEditor
+        snapshot={snapshot}
         event={werkEvent}
         allEvents={events}
         baseline={data.baseline}
@@ -119,24 +131,60 @@ export function StrategieEditors({
   }
 
   if (open === 'huis') {
-    return (
-      <StrategieModalShell
-        open
-        onClose={onClose}
-        title="Huis-strategie"
-        intro="Bepaal hoe je eigen woning meedoet in de FIRE-berekening. Een huis is geen liquide vermogen — je kunt er pas uit putten door te verkopen of een opeethypotheek af te sluiten."
-      >
-        <HousingStrategySection
-          showHeader={false}
-          preview={data.housingPreview}
-          onSaved={() => {
-            onClose()
-            router.refresh()
-          }}
-        />
-      </StrategieModalShell>
-    )
+    return <HuisStrategieEditor onClose={onClose} preview={data.housingPreview} snapshot={snapshot} readOnly={readOnly} />
   }
 
   return null
+}
+
+/**
+ * Host van de Huis-strategie: `HousingStrategySection` in host-modus, zodat Opslaan en de
+ * verschilregel in de sheet-footer staan (net als bij AOW, Werk en Pensioen).
+ */
+function HuisStrategieEditor({
+  onClose,
+  preview,
+  snapshot,
+  readOnly,
+}: {
+  onClose: () => void
+  preview: HousingPreviewData | null
+  snapshot: RegelSimSnapshot | null
+  readOnly?: boolean
+}) {
+  const router = useRouter()
+  const [actions, setActions] = useState<RegelEditActionsState | null>(null)
+  const handleActionsChange = useCallback((next: RegelEditActionsState) => setActions(next), [])
+  return (
+    <StrategieModalShell
+      open
+      onClose={onClose}
+      title="Huis-strategie"
+      intro="Bepaal hoe je eigen woning meedoet in de FIRE-berekening. Een huis is geen liquide vermogen — je kunt er pas uit putten door te verkopen of een opeethypotheek af te sluiten."
+      readOnly={readOnly}
+      footer={
+        readOnly ? undefined : (
+          <StrategieFooter
+            onCancel={onClose}
+            onSave={() => actions?.save()}
+            saving={actions?.saving}
+            saveDisabled={actions ? !actions.canSave || !actions.changed : true}
+            saveLabel="Huis-strategie opslaan"
+            info={actions?.footerInfo}
+          />
+        )
+      }
+    >
+      <HousingStrategySection
+        showHeader={false}
+        preview={preview}
+        simSnapshot={snapshot}
+        onActionsChange={handleActionsChange}
+        onSaved={() => {
+          onClose()
+          router.refresh()
+        }}
+      />
+    </StrategieModalShell>
+  )
 }

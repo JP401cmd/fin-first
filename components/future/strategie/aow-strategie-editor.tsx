@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import type { LifeEvent } from '@/lib/horizon-data'
 import type { AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import type { PreviewBaseline } from '@/lib/strategy-preview'
+import type { RegelSimSnapshot } from '@/lib/future/regel-sim'
 import type { RegelEditActionsState } from '@/components/future/regels/types'
 import { StrategieModalShell, StrategieFooter } from './strategie-modal-shell'
 import { AowStrategieBody } from './aow-strategie-body'
@@ -16,6 +17,12 @@ interface Props {
   /** Alle huidige events (voor de live vrijheidsleeftijd-preview). */
   allEvents: LifeEvent[]
   baseline: PreviewBaseline | null
+  /**
+   * ADR 0179 fase 3 (§7.7) — client-veilige snapshot. Gezet = het effect komt uit de kern-run
+   * met een `lifeEvent`-override (zoals de wizard) en staat als verschilregel in de footer;
+   * zonder snapshot de oude `preview`-regel in het formulier.
+   */
+  snapshot?: RegelSimSnapshot | null
   /** Dagelijkse must-uitgaven, voor vrijheid-tijd framing. */
   dailyExpenses: number
   aowRows: AowLeeftijdRow[]
@@ -29,6 +36,7 @@ export function AowStrategieEditor({
   event,
   allEvents,
   baseline,
+  snapshot = null,
   dailyExpenses,
   aowRows,
   dateOfBirth,
@@ -38,7 +46,10 @@ export function AowStrategieEditor({
   const router = useRouter()
   const [actions, setActions] = useState<RegelEditActionsState | null>(null)
 
-  const impact = useMemo<StrategieImpactBron>(() => ({ kind: 'preview', baseline, allEvents }), [baseline, allEvents])
+  const impact = useMemo<StrategieImpactBron>(
+    () => (snapshot ? { kind: 'kern', snapshot } : { kind: 'preview', baseline, allEvents }),
+    [snapshot, baseline, allEvents],
+  )
 
   const handleSaved = useCallback(() => {
     onClose()
@@ -60,6 +71,7 @@ export function AowStrategieEditor({
             saving={actions?.saving}
             saveDisabled={actions ? !actions.canSave : false}
             saveLabel="AOW opslaan"
+            info={actions?.footerInfo}
           />
         )
       }
