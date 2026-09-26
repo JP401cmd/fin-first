@@ -5,7 +5,7 @@
  * Converts foreign currency amounts to EUR for portfolio calculations.
  *
  * Includes:
- * - In-memory cache with 1-hour TTL
+ * - In-memory cache with 1-hour TTL (5 minutes for a fallback rate)
  * - Graceful fallback (returns null if unavailable)
  * - Common currency pair support (USD, GBP, CHF, JPY, etc.)
  */
@@ -26,6 +26,7 @@ export interface ForexRate {
 // ── Cache ───────────────────────────────────────────────────
 const forexCache = new Map<string, { rate: ForexRate; expiresAt: number }>()
 const FOREX_CACHE_TTL_MS = 60 * 60 * 1000 // 1 hour
+const FALLBACK_CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
 
 // ── Fallback rates (approximate, updated periodically) ──────
 // Used when Yahoo Finance is unavailable
@@ -66,10 +67,11 @@ export async function fetchForexRate(fromCurrency: string): Promise<ForexRate | 
     return { from: 'EUR', to: 'EUR', rate: 1, timestamp: new Date().toISOString(), source: 'cache' }
   }
 
-  // Check cache
+  // Check cache. Een gecachte fallback blijft 'fallback' heten: aanroepers
+  // (bv. /beheer/jobs) melden op basis van `source` dat het een benadering is.
   const cached = forexCache.get(from)
   if (cached && Date.now() < cached.expiresAt) {
-    return { ...cached.rate, source: 'cache' }
+    return cached.rate.source === 'fallback' ? cached.rate : { ...cached.rate, source: 'cache' }
   }
 
   try {
@@ -116,18 +118,24 @@ export async function fetchForexRate(fromCurrency: string): Promise<ForexRate | 
 
 /**
  * Get a fallback rate when Yahoo Finance is unavailable.
+ *
+ * Kort gecachet (FALLBACK_CACHE_TTL_MS): hangt Yahoo, dan kost elke load
+ * anders opnieuw de volle 8 s timeout. Kort genoeg om snel terug te gaan naar
+ * een live koers zodra Yahoo weer antwoordt.
  */
 function getFallbackRate(from: string): ForexRate | null {
   const rate = FALLBACK_RATES[from]
   if (!rate) return null
 
-  return {
+  const fallback: ForexRate = {
     from,
     to: 'EUR',
     rate,
     timestamp: new Date().toISOString(),
     source: 'fallback',
   }
+  forexCache.set(from, { rate: fallback, expiresAt: Date.now() + FALLBACK_CACHE_TTL_MS })
+  return fallback
 }
 
 /**
@@ -170,11 +178,6 @@ export async function fetchBatchForexRates(currencies: string[]): Promise<Map<st
   for (const currency of unique) {
     const rate = await fetchForexRate(currency)
     results.set(currency, rate)
-
-    // Small delay between requests
-    if (rate?.source === 'yahoo_finance') {
-      await new Promise(resolve => setTimeout(resolve, 200))
-    }
   }
 
   return results
