@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, expectTypeOf, it } from 'vitest'
 import {
   AANNAMES_LINK_LABEL,
   CANVAS_MODUS_LABEL,
@@ -12,6 +12,7 @@ import {
   LAAG_VOLGORDE,
   LAGEN_EENVOUDIG,
   LAGEN_KOP,
+  MARKTCHECK_NIET_BINNEN_PLAN,
   MARKTCHECK_STAND_LABEL,
   aannamesRegelTekst,
   aannamesSegmenten,
@@ -22,9 +23,12 @@ import {
   katernKpi1Label,
   katernStatuspuntLabel,
   marktcheckGetallenRegel,
+  marktcheckStandWaarde,
   planSamenvatting,
   type LaagId,
+  type MarktcheckLeeftijden,
 } from './katern-copy'
+import type { MarktcheckVrijheidsleeftijden } from '@/lib/horizon-kernel/marktcheck'
 import { ANKER_KPI_LABEL, ankerTitel, ankerVrijZin, labZoneWoord } from './anker-copy'
 import { PLAN_REVIEW_NAAM } from '@/lib/plan-review/types'
 
@@ -54,6 +58,7 @@ function alleKopij(): string[] {
       'volledig',
     ),
     marktcheckGetallenRegel({ tegenzit: 55, midden: 52, meezit: 49 }) ?? '',
+    marktcheckGetallenRegel({ tegenzit: null, midden: 58, meezit: 52 }) ?? '',
   ]
 }
 
@@ -218,8 +223,47 @@ describe('katern-copy — marktcheck-getallen', () => {
     expect(regel).not.toMatch(/verwacht/i)
   })
 
-  it('één ontbrekende leeftijd ⇒ geen regel', () => {
-    expect(marktcheckGetallenRegel({ tegenzit: 55, midden: null, meezit: 49 })).toBeNull()
+  it('onbereikbaar tegenzit: de regel blijft, met "niet binnen je plan" (kopij-toets §7)', () => {
+    expect(marktcheckGetallenRegel({ tegenzit: null, midden: 58, meezit: 52 })).toBe(
+      'als het tegenzit niet binnen je plan · in het midden 58 · als het meezit 52',
+    )
+  })
+
+  it('onbereikbaar midden of meezit: op die plek "niet binnen je plan"', () => {
+    expect(marktcheckGetallenRegel({ tegenzit: 55, midden: null, meezit: 49 })).toBe(
+      'als het tegenzit 55 · in het midden niet binnen je plan · als het meezit 49',
+    )
+    expect(marktcheckGetallenRegel({ tegenzit: 55, midden: 52, meezit: null })).toBe(
+      'als het tegenzit 55 · in het midden 52 · als het meezit niet binnen je plan',
+    )
+  })
+
+  it('twee van de drie onbereikbaar: nog steeds een regel', () => {
+    expect(marktcheckGetallenRegel({ tegenzit: null, midden: null, meezit: 49.6 })).toBe(
+      'als het tegenzit niet binnen je plan · in het midden niet binnen je plan · als het meezit 50',
+    )
+  })
+
+  it('alle drie onbereikbaar ⇒ geen regel', () => {
+    expect(marktcheckGetallenRegel({ tegenzit: null, midden: null, meezit: null })).toBeNull()
+  })
+
+  it('een niet-eindig getal is een datafout, geen "onbereikbaar" ⇒ geen regel', () => {
+    expect(marktcheckGetallenRegel({ tegenzit: Number.NaN, midden: 52, meezit: 49 })).toBeNull()
+    expect(marktcheckGetallenRegel({ tegenzit: 55, midden: 52, meezit: Infinity })).toBeNull()
+    expect(marktcheckGetallenRegel({ tegenzit: null, midden: Number.NaN, meezit: null })).toBeNull()
+  })
+
+  it('marktcheckStandWaarde: hele jaren of de woorden', () => {
+    expect(marktcheckStandWaarde(52.3)).toBe('52')
+    expect(marktcheckStandWaarde(null)).toBe(MARKTCHECK_NIET_BINNEN_PLAN)
+    expect(MARKTCHECK_NIET_BINNEN_PLAN).toBe('niet binnen je plan')
+  })
+
+  it('MarktcheckLeeftijden is structureel gelijk aan de kernel-uitkomst (beide richtingen)', () => {
+    expectTypeOf<MarktcheckVrijheidsleeftijden>().toExtend<MarktcheckLeeftijden>()
+    expectTypeOf<MarktcheckLeeftijden>().toExtend<MarktcheckVrijheidsleeftijden>()
+    expectTypeOf<keyof MarktcheckLeeftijden>().toEqualTypeOf<keyof MarktcheckVrijheidsleeftijden>()
   })
 })
 

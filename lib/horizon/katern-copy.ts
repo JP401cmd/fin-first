@@ -321,20 +321,47 @@ export const MARKTCHECK_STAND_LABEL: Record<MarktcheckStand, string> = {
   meezit: 'als het meezit',
 }
 
-/** Drie vrijheidsleeftijden uit één marktcheck-run; `null` = niet beschikbaar. */
+/**
+ * Drie vrijheidsleeftijden uit één marktcheck-run; per stand `null` = dat marktverloop
+ * haalt de vrijheid niet binnen de horizon. Structureel gelijk aan
+ * `MarktcheckVrijheidsleeftijden` (`lib/horizon-kernel/marktcheck.ts`); de test pint dat
+ * in beide richtingen vast.
+ */
 export type MarktcheckLeeftijden = Record<MarktcheckStand, number | null>
 
 /**
+ * De woorden voor een stand die de vrijheid niet binnen de horizon haalt (kopij-toets
+ * §7, aanvulling 26 sep). Zelfde betekenis als de nul-tak van `ankerVrijZin`, kort
+ * genoeg voor één regel. Beschrijvend, geen oordeel.
+ */
+export const MARKTCHECK_NIET_BINNEN_PLAN = 'niet binnen je plan'
+
+/**
+ * De waarde van één stand: de leeftijd in hele jaren (`heroFireAgeYear`), of
+ * `MARKTCHECK_NIET_BINNEN_PLAN` bij `null`.
+ */
+export function marktcheckStandWaarde(age: number | null): string {
+  return age == null ? MARKTCHECK_NIET_BINNEN_PLAN : String(heroFireAgeYear(age))
+}
+
+/**
  * "als het tegenzit 55 · in het midden 52 · als het meezit 49" in hele jaren
- * (`heroFireAgeYear`). `null` zodra één van de drie ontbreekt: een halve regel zou
- * suggereren dat de markt maar één kant op kan.
+ * (`heroFireAgeYear`). Een onbereikbare stand (`null`) blijft in de regel staan als
+ * "niet binnen je plan": een regel die verdwijnt zodra het tegenzit, verzwijgt juist
+ * de uitkomst die het meest zegt (kopij-toets §7, 26 sep).
+ *
+ * `null` (geen regel) wanneer:
+ *  - alle drie de standen onbereikbaar zijn — dan zegt de regel niets wat de rest van
+ *    het scherm niet al zegt;
+ *  - een waarde een niet-eindig getal is: dat is een datafout, geen "onbereikbaar",
+ *    en mag niet als "niet binnen je plan" op het scherm komen.
+ * Het vaste stop-anker (hele invoer `null`) vangt de component af.
  */
 export function marktcheckGetallenRegel(leeftijden: MarktcheckLeeftijden): string | null {
-  const delen: string[] = []
-  for (const stand of MARKTCHECK_STAND_VOLGORDE) {
-    const age = leeftijden[stand]
-    if (age == null || !Number.isFinite(age)) return null
-    delen.push(`${MARKTCHECK_STAND_LABEL[stand]} ${heroFireAgeYear(age)}`)
-  }
-  return delen.join(SCHEIDING)
+  const standen = MARKTCHECK_STAND_VOLGORDE.map((stand) => leeftijden[stand])
+  if (standen.some((age) => age != null && !Number.isFinite(age))) return null
+  if (standen.every((age) => age == null)) return null
+  return MARKTCHECK_STAND_VOLGORDE.map(
+    (stand) => `${MARKTCHECK_STAND_LABEL[stand]} ${marktcheckStandWaarde(leeftijden[stand])}`,
+  ).join(SCHEIDING)
 }
