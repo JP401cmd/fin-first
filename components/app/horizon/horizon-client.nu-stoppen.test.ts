@@ -18,10 +18,11 @@ import { leesToekomst, leesToekomstAlles } from '@/lib/test-utils/toekomst-bronn
 
 /**
  * Sinds ADR 0179 fase 1 stap 13 woont het anker in de sim-hook van de state-provider
- * (`use-toekomst-sim.ts`); de lab-afleidingen staan nog in de host (tot stap 14).
+ * (`use-toekomst-sim.ts`); de lab-afleidingen sinds stap 14 in de scenario-hook, de
+ * Plan-tegels in de host.
  * "Mag nergens"-toetsen lezen alle /toekomst-bronnen samen.
  */
-function bron(deel: 'sim' | 'host' = 'sim'): string {
+function bron(deel: 'sim' | 'scenario' | 'host' = 'sim'): string {
   return leesToekomst(deel)
 }
 
@@ -101,7 +102,7 @@ describe('de stopkeuze (vrijheidsas)', () => {
   it('de stop-knop is alleen onder het nu-anker verborgen; onder aow/age is hij verkenning', () => {
     // ADR 0170 — de zichtbaarheid van een knop is dát hij in `labKnopBereik` staat; de host
     // laat de stop-knop weg onder het nu-anker (het plan rekent daar met vandaag).
-    const src = bron('host')
+    const src = bron('scenario')
     const start = src.indexOf('const labKnopBereik = useMemo')
     expect(start).toBeGreaterThan(-1)
     const blok = src.slice(start, src.indexOf('}, [', start))
@@ -122,7 +123,7 @@ describe('de stopkeuze (vrijheidsas)', () => {
    * `fire_stop_anchor: 'age'`-body meer in dit bestand.
    */
   it('de as verwijst naar de strategie-modal én schrijft het plan alleen volledig (plan-draft)', () => {
-    const src = bron('host')
+    const src = bron('scenario')
     // ADR 0170 — de verwijzing staat in het stop-slot onder de stop-knop. Die knop
     // (setActiveModal('strategie') + 'Je plan-keuzes') staat sinds fase 1 stap 9 in
     // components/toekomst/doelen/doelen-lab.tsx (doelen-lab.test.ts).
@@ -142,7 +143,7 @@ describe('de stopkeuze (vrijheidsas)', () => {
   })
 
   it('de default van de slider is onder een vast anker het stopmoment van het plan', () => {
-    expect(bron('host')).toContain('isFixedAnchorMode && planStopAgeDefault != null')
+    expect(bron('scenario')).toContain('isFixedAnchorMode && planStopAgeDefault != null')
   })
 })
 

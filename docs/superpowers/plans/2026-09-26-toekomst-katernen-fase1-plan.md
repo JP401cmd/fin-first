@@ -50,7 +50,7 @@ Eigenaarsbesluiten 26 sep: checkpoint-commit per stap **op master, per pad, nooi
 - [x] 11 S-klein overlay-host (E2 blijft tot de provider-stap in de ouder)
 - [x] 12 S provider (a) euro-grens → `components/toekomst/state/use-euro-view-feeds.ts` (A3)
 - [x] 13 S provider (b) sim/kernel + perspectief + meldingen-hooks → `state/toekomst-state-provider.tsx` + `use-toekomst-{perspectief,overlay-state,scenario,sim,meldingen}.ts` (A3; afwijkingen: `withdrawal` uit E2, hydratie-grendel kerngetal)
-- [ ] 14 S provider (c) scenario/lab + lagen
+- [x] 14 S provider (c) scenario/lab + lagen → `use-toekomst-scenario.ts` (+ `useToekomstScenario`), `use-toekomst-lagen.ts`, euro-grens via `useToekomstEuro` in de provider (A3)
 - [ ] 15 S route-groep met Plan (layout, KaternKoppen uit stroom C, navkaarten + dubbele kop weg)
 - [ ] 16 S Doelen in de groep (lab mee; mount-teller-test)
 - [ ] 17 S Instellingen de groep in (route van stroom B verhuist; Q8 meten)

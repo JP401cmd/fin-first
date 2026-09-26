@@ -61,7 +61,6 @@ const LAB_UITKOMST = {
 } as unknown as LabUitkomst
 
 function input(): EuroViewFeedsInput {
-  const noop = () => {}
   return {
     displayUnifiedRows: UNIFIED,
     displaySimRows: SIM_ROWS,
@@ -86,20 +85,6 @@ function input(): EuroViewFeedsInput {
     labDekking: null,
     labUitkomst: LAB_UITKOMST,
     masked: false,
-    labGrenzen: null,
-    whatIfBaseline: null,
-    labKnopBereik: {},
-    scenarioSliderEvents: [],
-    handleScenarioSliderValue: noop,
-    scenarioUitgaveNaPensioen: null,
-    uitgaveNaPensioenBasis: 0,
-    setScenarioUitgaveNaPensioen: noop,
-    scenarioNalatenschap: null,
-    nalatenschapBasis: 0,
-    setScenarioNalatenschap: noop,
-    effectiveStopAge: 60,
-    stopKnopBasis: 60,
-    handleStopAgeChange: noop,
     labPromotie: LAB_UITKOMST.promotie,
     doelPreviews: [],
     readoutData: null,

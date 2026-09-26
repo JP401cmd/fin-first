@@ -17,7 +17,8 @@ import { leesToekomst, leesToekomstAlles } from '@/lib/test-utils/toekomst-bronn
  * bisecteren of een grens benadert, staan er twee waarheden op één as.
  */
 
-const SOURCE_PATH = join(process.cwd(), 'components', 'app', 'horizon', 'horizon-client.tsx')
+/** De lab-afleidingen wonen sinds ADR 0179 fase 1 stap 14 in de scenario-hook van de provider. */
+const SOURCE_PATH = join(process.cwd(), 'components', 'toekomst', 'state', 'use-toekomst-scenario.ts')
 
 function bron(): string {
   return readFileSync(SOURCE_PATH, 'utf8')
@@ -30,9 +31,9 @@ function grensBron(): string {
   return readFileSync(GRENS_PATH, 'utf8')
 }
 
-/** Niet-comment-regels — een uitleg mág elke naam noemen. */
+/** Niet-comment-regels van álle /toekomst-bronnen — een uitleg mág elke naam noemen. */
 function codeRegels(): string[] {
-  return bron()
+  return leesToekomstAlles()
     .split(/\r?\n/)
     .filter((l) => {
       const t = l.trim()
@@ -141,7 +142,8 @@ describe('de vijf knoppen consumeren ÉÉN grenzen-batch (ADR 0170)', () => {
 
   it('de knoppen lezen de grenzen uit die batch en berekenen er zelf niets bij', () => {
     const src = bron()
-    const knoppenSrc = grensBron()
+    // De knoppen verhuisden in stap 14 uit de euro-grens naar de scenario-hook.
+    const knoppenSrc = bron()
     const start = knoppenSrc.indexOf('const labKnoppen = useMemo')
     expect(start).toBeGreaterThan(-1)
     const blok = knoppenSrc.slice(start, knoppenSrc.indexOf('const labFormatters', start))

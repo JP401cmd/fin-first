@@ -8,13 +8,12 @@
 // en geeft de `view*`-feeds terug. Er is precies één grens: buiten dit bestand roept geen
 // /toekomst-bestand `deflate*` aan (bewaakt door `use-euro-view-feeds.euro-view.test.ts`).
 
-import { useCallback, useMemo, type Dispatch, type SetStateAction } from 'react'
+import { useCallback, useMemo } from 'react'
 import type { SimResult, SimRow } from '@/lib/fire-simulation'
 import type { UnifiedProjectionRow } from '@/lib/unified-projection'
 import type { StackedRow } from '@/lib/wealth-composition'
 import type { AowAge } from '@/lib/aow-leeftijd'
 import type { FinancialInput } from '@/lib/horizon-data'
-import type { WhatIfEvent, WhatIfOverrides } from '@/lib/types/horizon-whatif'
 import type { buildBreakdown } from '@/lib/income-expense-breakdown'
 import type { ScenarioPresetResult } from '@/lib/horizon/scenario-presets'
 import type { ScenarioOverlay, MonteCarloOverlay, HouseholdPartnerOverlay } from '@/components/app/horizon/sim-chart'
@@ -31,18 +30,7 @@ import {
 import { useEuroView } from '@/lib/hooks/use-euro-view'
 import { fireAgeForDisplay } from '@/lib/fire-strategy'
 import { formatAge } from '@/lib/horizon/fire-format'
-import {
-  zoneVanWaarde,
-  HEFBOOM_RICHTING,
-  type HefboomBereik,
-  type HefboomKey,
-  type LabGrenzenResultaat,
-} from '@/lib/horizon/lab-grenzen-types'
-import {
-  type LabKnopConfig,
-  type LabKnopFormatters,
-  type LabUitkomstRegel,
-} from '@/components/app/horizon/lab-knoppen'
+import type { LabUitkomstRegel } from '@/components/app/horizon/lab-knoppen'
 import {
   ankerKort,
   dekkingBadge,
@@ -53,9 +41,14 @@ import {
 } from '@/lib/horizon/anker-copy'
 import type { LabEindvermogen, LabPromotie, LabUitkomst, LabUitkomstDekking } from '@/lib/horizon/lab-uitkomst'
 import type { DoelParameterPreview } from '@/components/app/horizon/doel-vastleg-sheet'
-import { readSliderValueFromEvents, savingsEuroForPp, UITGAVE_NA_PENSIOEN_STAP } from '@/lib/scenario-events'
 import { SIM_ROW_MONEY_FIELDS, STACKED_ROW_MONEY_FIELDS, factorMapByPosition } from '@/components/toekomst/state/euro-view-feeds'
 import type { HouseholdHeroData, HouseholdMainLine, PartnerLine, ReadoutData } from '@/components/toekomst/state/types'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+import { useStabielObject } from './use-stabiel-object'
+import type { ToekomstPerspectief } from './use-toekomst-perspectief'
+import type { ToekomstSim } from './use-toekomst-sim'
+import type { ToekomstScenario } from './use-toekomst-scenario'
+import type { ToekomstLagen } from './use-toekomst-lagen'
 
 export interface EuroViewFeedsInput {
   displayUnifiedRows: UnifiedProjectionRow[]
@@ -81,20 +74,6 @@ export interface EuroViewFeedsInput {
   labDekking: LabUitkomstDekking | null
   labUitkomst: LabUitkomst
   masked: boolean
-  labGrenzen: LabGrenzenResultaat | null
-  whatIfBaseline: WhatIfOverrides | null
-  labKnopBereik: Partial<Record<HefboomKey, HefboomBereik>>
-  scenarioSliderEvents: WhatIfEvent[]
-  handleScenarioSliderValue: (key: 'extra_inleg' | 'savings', value: number) => void
-  scenarioUitgaveNaPensioen: number | null
-  uitgaveNaPensioenBasis: number
-  setScenarioUitgaveNaPensioen: Dispatch<SetStateAction<number | null>>
-  scenarioNalatenschap: number | null
-  nalatenschapBasis: number
-  setScenarioNalatenschap: Dispatch<SetStateAction<number | null>>
-  effectiveStopAge: number
-  stopKnopBasis: number
-  handleStopAgeChange: (v: number) => void
   labPromotie: LabPromotie
   doelPreviews: DoelParameterPreview[]
   readoutData: ReadoutData | null
@@ -131,20 +110,6 @@ export function useEuroViewFeeds(nominaal: EuroViewFeedsInput) {
     labDekking,
     labUitkomst,
     masked,
-    labGrenzen,
-    whatIfBaseline,
-    labKnopBereik,
-    scenarioSliderEvents,
-    handleScenarioSliderValue,
-    scenarioUitgaveNaPensioen,
-    uitgaveNaPensioenBasis,
-    setScenarioUitgaveNaPensioen,
-    scenarioNalatenschap,
-    nalatenschapBasis,
-    setScenarioNalatenschap,
-    effectiveStopAge,
-    stopKnopBasis,
-    handleStopAgeChange,
     labPromotie,
     doelPreviews,
     readoutData,
@@ -496,153 +461,6 @@ export function useEuroViewFeeds(nominaal: EuroViewFeedsInput) {
     scenarioEindvermogenUitkomst,
   ])
 
-  /**
-   * De vijf knoppen als props: huidige waarde, basiswaarde ("nu"), bereik, de twee grenzen en
-   * de detailregel. Een knop die niet in `labKnopBereik` staat, staat hier ook niet — dan is
-   * hij verborgen (stopleeftijd onder het nu-anker, nalatenschap zonder nalatenschap-eindvorm).
-   * De twee euro-knoppen draaien onder de motorkap op hun bestaande grootheid: `verdienen` is
-   * het extra-inleg-event, `uitgeven` de spaarquote in procentpunten (ADR 0170 B4).
-   */
-  const labKnoppen = useMemo<Partial<Record<HefboomKey, LabKnopConfig>>>(() => {
-    const out: Partial<Record<HefboomKey, LabKnopConfig>> = {}
-    const grens = (k: HefboomKey) => labGrenzen?.grenzen?.[k] ?? null
-    if (whatIfBaseline && labKnopBereik.verdienen) {
-      out.verdienen = {
-        value: readSliderValueFromEvents('extra_inleg', scenarioSliderEvents, whatIfBaseline),
-        basis: 0,
-        bereik: labKnopBereik.verdienen,
-        grenzen: grens('verdienen'),
-        onChange: (v) => handleScenarioSliderValue('extra_inleg', v),
-      }
-    }
-    if (whatIfBaseline && labKnopBereik.uitgeven) {
-      const pp = readSliderValueFromEvents('savings', scenarioSliderEvents, whatIfBaseline)
-      out.uitgeven = {
-        value: pp,
-        basis: whatIfBaseline.savingsRate,
-        bereik: labKnopBereik.uitgeven,
-        grenzen: grens('uitgeven'),
-        // De spaarquote hoort erbij als duiding: de knop TOONT euro's, maar het doel dat het
-        // lab schrijft is een spaarquote-doel (`savings_rate`) — dan moet dat getal in beeld.
-        detail: `spaarquote ${Math.round(whatIfBaseline.savingsRate)}% → ${Math.round(pp)}%`,
-        onChange: (v) => handleScenarioSliderValue('savings', v),
-      }
-    }
-    if (labKnopBereik.uitgaveNaPensioen) {
-      const waarde = scenarioUitgaveNaPensioen ?? uitgaveNaPensioenBasis
-      out.uitgaveNaPensioen = {
-        value: waarde,
-        basis: uitgaveNaPensioenBasis,
-        bereik: labKnopBereik.uitgaveNaPensioen,
-        grenzen: grens('uitgaveNaPensioen'),
-        detail: masked ? null : `≈ ${formatCurrency(Math.round(waarde / 12))}/mnd`,
-        // Binnen een halve stap van de plan-waarde terug naar `null`: de knop staat dan weer
-        // op "wat het plan rekent" en zet geen override (spiegel ADR 0160 F1).
-        onChange: (v) =>
-          setScenarioUitgaveNaPensioen(
-            Math.abs(v - uitgaveNaPensioenBasis) < UITGAVE_NA_PENSIOEN_STAP / 2 ? null : v,
-          ),
-      }
-    }
-    if (labKnopBereik.nalatenschap) {
-      const stap = labKnopBereik.nalatenschap.stap
-      out.nalatenschap = {
-        value: scenarioNalatenschap ?? nalatenschapBasis,
-        basis: nalatenschapBasis,
-        bereik: labKnopBereik.nalatenschap,
-        grenzen: grens('nalatenschap'),
-        onChange: (v) => setScenarioNalatenschap(Math.abs(v - nalatenschapBasis) < stap / 2 ? null : v),
-      }
-    }
-    if (labKnopBereik.stop) {
-      out.stop = {
-        value: effectiveStopAge,
-        // Zelfde bron als het midden van de schaal — zie `stopKnopBasis`.
-        basis: stopKnopBasis,
-        bereik: labKnopBereik.stop,
-        grenzen: grens('stop'),
-        onChange: handleStopAgeChange,
-      }
-    }
-    return out
-  }, [
-    whatIfBaseline,
-    labKnopBereik,
-    labGrenzen,
-    scenarioSliderEvents,
-    handleScenarioSliderValue,
-    scenarioUitgaveNaPensioen,
-    uitgaveNaPensioenBasis,
-    scenarioNalatenschap,
-    nalatenschapBasis,
-    effectiveStopAge,
-    stopKnopBasis,
-    handleStopAgeChange,
-    masked,
-  ])
-
-  /**
-   * De nalatenschap-marker voor de grafiek: de bol op het eind van de wat-als-lijn
-   * (eigenaarsbesluit 20 sep 2026). Alleen wanneer de knop BESTAAT — onder eind-vorm
-   * `perpetual` staat hij niet in `labKnoppen` en dan hoort er ook geen bol te zijn.
-   *
-   * Consume, don't recompute: het oordeel wordt hier geveld (dezelfde `zoneVanWaarde` op
-   * dezelfde kernel-grenzen als de knop zelf) en reist als kale zone naar de grafiek; de
-   * geometrie bepaalt alleen nog de positie. Zo kunnen de bol en de knop niet uit elkaar lopen.
-   */
-  const nalatenschapMarker = useMemo(() => {
-    const knop = labKnoppen.nalatenschap
-    if (!knop) return undefined
-    return { zone: zoneVanWaarde(knop.value, knop.grenzen, HEFBOOM_RICHTING.nalatenschap) }
-  }, [labKnoppen])
-
-  /**
-   * Per knop de drie formatters (waarde, delta, grens). De privacy-weergave maskeert hier —
-   * één plek, zodat er geen tweede maskeer-pad in de knop-component ontstaat.
-   * `uitgeven` rekent van procentpunten naar euro's per maand via `savingsEuroForPp`
-   * (één som, ADR 0170 B4): de knop toont wat je minder uitgeeft, niet het percentage.
-   */
-  const labFormatters = useMemo<Record<HefboomKey, LabKnopFormatters>>(() => {
-    const geld = (v: number) => (masked ? MASKED_AMOUNT_PLACEHOLDER : formatCurrency(Math.round(v)))
-    const perMaand = (v: number) => `${geld(v)}/mnd`
-    const ppNaarEuro = (pp: number) =>
-      whatIfBaseline ? savingsEuroForPp(whatIfBaseline, pp) : 0
-    return {
-      // Geen `delta` op deze twee: hun WAARDE is al relatief aan "nu" (verdienen staat op 0 op
-      // de basis, uitgeven toont het verschil in euro's), dus een badge zou hetzelfde getal
-      // een tweede keer laten zien.
-      verdienen: {
-        value: (v) => (v === 0 ? `${geld(0)}/mnd` : `${v > 0 ? '+' : '−'}${geld(Math.abs(v))}/mnd`),
-        grens: (v) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${geld(Math.abs(v))}`,
-      },
-      uitgeven: {
-        value: (pp) => {
-          const euro = ppNaarEuro(pp)
-          return euro === 0 ? `${geld(0)}/mnd` : `${euro > 0 ? '−' : '+'}${geld(Math.abs(euro))}/mnd`
-        },
-        grens: (pp) => {
-          const euro = ppNaarEuro(pp)
-          return `${euro > 0 ? '−' : '+'}${geld(Math.abs(euro))}`
-        },
-      },
-      uitgaveNaPensioen: {
-        value: (v) => `${geld(v)}/jr`,
-        delta: (d) => `${d > 0 ? '+' : '−'}${geld(Math.abs(d))}`,
-        grens: (v) => geld(v),
-      },
-      nalatenschap: {
-        value: (v) => geld(v),
-        delta: (d) => `${d > 0 ? '+' : '−'}${geld(Math.abs(d))}`,
-        grens: (v) => geld(v),
-      },
-      stop: {
-        value: (v) => `${formatAge(v)} jr`,
-        delta: (d) => `${d > 0 ? '+' : '−'}${formatAge(Math.abs(d))} jr`,
-        grens: (v) => formatAge(v),
-      },
-    }
-  }, [masked, whatIfBaseline])
-
   // De delta-badge naast `lab-dekking-badge`: alleen als basis ÉN wat-als allebei een bedrag
   // hebben (I1 — bij een (dreigend) tekort draagt de dekkings-badge de beweging al), weg bij
   // maskeren, en weg onder de drempel (M5: een paar euro verschil is ruis).
@@ -814,9 +632,6 @@ export function useEuroViewFeeds(nominaal: EuroViewFeedsInput) {
     viewVermogenOpAnker,
     viewMonthlyWithdrawalAtAow,
     labUitkomstRegel,
-    labKnoppen,
-    nalatenschapMarker,
-    labFormatters,
     viewDoelPreviews,
     viewReadoutData,
     viewIeBreakdownResult,
@@ -825,3 +640,60 @@ export function useEuroViewFeeds(nominaal: EuroViewFeedsInput) {
     viewPartnerHeroFireTarget,
   }
 }
+
+/**
+ * De provider-kant van de grens (ADR 0179 fase 1 stap 14): zet de concern-waarden van de
+ * state-provider om in de nominale invoer van `useEuroViewFeeds` en deelt het resultaat
+ * gememoïseerd, zodat de euro-context alleen verandert als een feed verandert. Hier wordt
+ * niets gedeeld of omgerekend — alleen doorgegeven.
+ */
+export function useToekomstEuro({
+  perspectief,
+  sim,
+  scenario,
+  lagen,
+}: {
+  perspectief: ToekomstPerspectief
+  sim: ToekomstSim
+  scenario: ToekomstScenario
+  lagen: ToekomstLagen
+}) {
+  const { masked } = useMaskedAmounts()
+  const feeds = useEuroViewFeeds({
+    displayUnifiedRows: sim.displayUnifiedRows,
+    displaySimRows: sim.displaySimRows,
+    displayEffectiveSimRows: sim.displayEffectiveSimRows,
+    wealthCompositionRows: lagen.wealthCompositionRows,
+    partnerLine: perspectief.partnerLine,
+    householdMainLine: perspectief.householdMainLine,
+    liquidWealthPoints: sim.liquidWealthPoints,
+    combinedScenarioOverlays: lagen.combinedScenarioOverlays,
+    householdOverlays: perspectief.householdOverlays,
+    monteCarloOverlay: lagen.monteCarloOverlay,
+    simResult: sim.simResult,
+    fireTargetInclHome: sim.fireTargetInclHome,
+    chartEndAge: sim.chartEndAge,
+    targetInflationFactors: sim.targetInflationFactors,
+    userAowAge: sim.userAowAge,
+    fireTargetExclHome: sim.fireTargetExclHome,
+    balkVrijheidDoel: sim.balkVrijheidDoel,
+    effectiveFireTarget: sim.effectiveFireTarget,
+    vermogenOpAnker: sim.vermogenOpAnker,
+    monthlyWithdrawalAtAow: sim.monthlyWithdrawalAtAow,
+    labDekking: scenario.labDekking,
+    labUitkomst: scenario.labUitkomst,
+    masked,
+    labPromotie: scenario.labPromotie,
+    doelPreviews: scenario.doelPreviews,
+    readoutData: lagen.readoutData,
+    canonicalDailyRate: sim.canonicalDailyRate,
+    effectiveInput: sim.effectiveInput,
+    ieBreakdownResult: lagen.ieBreakdownResult,
+    scenarioPresets: sim.scenarioPresets,
+    householdHero: perspectief.householdHero,
+    partnerHero: perspectief.partnerHero,
+  })
+  return useStabielObject(feeds)
+}
+
+export type ToekomstEuro = ReturnType<typeof useToekomstEuro>

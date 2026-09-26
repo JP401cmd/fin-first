@@ -18,9 +18,11 @@ export const TOEKOMST_BRONNEN = {
   provider: 'components/toekomst/state/toekomst-state-provider.tsx',
   perspectief: 'components/toekomst/state/use-toekomst-perspectief.ts',
   overlays: 'components/toekomst/state/use-toekomst-overlay-state.ts',
+  /** Scenario-state (stap 13) én de lab-afleidingen (stap 14). */
   scenario: 'components/toekomst/state/use-toekomst-scenario.ts',
   sim: 'components/toekomst/state/use-toekomst-sim.ts',
   meldingen: 'components/toekomst/state/use-toekomst-meldingen.ts',
+  lagen: 'components/toekomst/state/use-toekomst-lagen.ts',
   /** De euro-render-grens (stap 12). */
   euro: 'components/toekomst/state/use-euro-view-feeds.ts',
 } as const

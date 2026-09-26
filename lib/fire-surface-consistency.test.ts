@@ -233,7 +233,8 @@ describe('H21 — bron-grendels tegen terugkeer van de motor-mix', () => {
   })
 
   it('de kassabon leest de BEGINstand van het blok (één peilmoment)', () => {
-    const src = read('components', 'app', 'horizon', 'horizon-client.tsx')
+    // Sinds ADR 0179 fase 1 stap 14 in de lagen-hook van de /toekomst-state-provider.
+    const src = read('components', 'toekomst', 'state', 'use-toekomst-lagen.ts')
     expect(src).toMatch(/readoutNetWorth\s*=\s*row\.startNetWorth/)
     expect(src).toMatch(/netWorth:\s*readoutNetWorth/)
   })

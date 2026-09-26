@@ -3,7 +3,7 @@
 /**
  * De state-provider van /toekomst (ADR 0179 D1/D8, fase 1 stap 13).
  *
- * Draagt de state, de afgeleide feeds en (vanaf stap 14) de euro-render-grens van de
+ * Draagt de state, de afgeleide feeds en de euro-render-grens van de
  * pagina, zodat canvas en katern-panelen straks kinderen van één server-layout kunnen
  * zijn en hun data hier halen in plaats van uit de route (D8). Tot de route-groep
  * (stap 15) is `horizon-client.tsx` de enige host.
@@ -18,9 +18,14 @@
  *    op elke knopbeweging in het lab of elke kernel-run.
  *
  * VOLGORDE van de concern-hooks (dataflow, geen smaak):
- *   perspectief → overlays → scenario-state → sim → meldingen.
+ *   perspectief → overlays → scenario-state → sim → meldingen → scenario → lagen → euro.
  * De sim heeft de scenario-state nodig (de wat-als-run van de kernel), de meldingen
- * lezen de sim, en de overlay-opener "Na pensioen" leest het perspectief.
+ * lezen de sim, de overlay-opener "Na pensioen" leest het perspectief, de lab-afleidingen
+ * (scenario) lezen de sim, de lagen tekenen de doel-lijn van het scenario, en de euro-grens
+ * zet als laatste de nominale feeds van alle concerns om (precies één grens, ADR 0090/0093).
+ *
+ * Het scenario-concern bestaat uit twee hooks (state vóór de sim, afleidingen erna); de
+ * provider voegt ze samen tot één context-waarde.
  */
 
 import { createContext, useContext, type Context, type ReactNode } from 'react'
@@ -29,9 +34,11 @@ import type { GoalMarkerInput } from '@/lib/horizon/goal-chart-markers'
 import { useStabielObject } from './use-stabiel-object'
 import { useToekomstPerspectief, type ToekomstPerspectief } from './use-toekomst-perspectief'
 import { useToekomstOverlayState, type ToekomstOverlayState } from './use-toekomst-overlay-state'
-import { useToekomstScenarioState, type ToekomstScenarioState } from './use-toekomst-scenario'
+import { useToekomstScenarioState, useToekomstScenario, type ToekomstScenario } from './use-toekomst-scenario'
 import { useToekomstSim, type ToekomstSim } from './use-toekomst-sim'
 import { useToekomstMeldingen, type ToekomstMeldingen } from './use-toekomst-meldingen'
+import { useToekomstLagen, type ToekomstLagen } from './use-toekomst-lagen'
+import { useToekomstEuro, type ToekomstEuro } from './use-euro-view-feeds'
 
 /** De server-bundel zoals de pagina hem kreeg (props-als-bron, ADR 0179 stap 3). */
 export interface ToekomstBron {
@@ -43,9 +50,12 @@ export interface ToekomstBron {
 const BronContext = createContext<ToekomstBron | null>(null)
 const PerspectiefContext = createContext<ToekomstPerspectief | null>(null)
 const OverlayContext = createContext<ToekomstOverlayState | null>(null)
-const ScenarioContext = createContext<ToekomstScenarioState | null>(null)
+const ScenarioContext = createContext<ToekomstScenario | null>(null)
 const SimContext = createContext<ToekomstSim | null>(null)
 const MeldingenContext = createContext<ToekomstMeldingen | null>(null)
+const LagenContext = createContext<ToekomstLagen | null>(null)
+/** De `view*`-feeds van de euro-render-grens: het enige wat katernen aan euro-bedragen lezen. */
+const EuroContext = createContext<ToekomstEuro | null>(null)
 
 function useVerplicht<T>(context: Context<T | null>, naam: string): T {
   const waarde = useContext(context)
@@ -59,6 +69,8 @@ export const useToekomstOverlayContext = () => useVerplicht(OverlayContext, 'use
 export const useToekomstScenarioContext = () => useVerplicht(ScenarioContext, 'useToekomstScenarioContext')
 export const useToekomstSimContext = () => useVerplicht(SimContext, 'useToekomstSimContext')
 export const useToekomstMeldingenContext = () => useVerplicht(MeldingenContext, 'useToekomstMeldingenContext')
+export const useToekomstLagenContext = () => useVerplicht(LagenContext, 'useToekomstLagenContext')
+export const useToekomstEuroContext = () => useVerplicht(EuroContext, 'useToekomstEuroContext')
 
 export function ToekomstStateProvider({
   initialData,
@@ -75,14 +87,22 @@ export function ToekomstStateProvider({
   const scenarioState = useToekomstScenarioState({ initialData })
   const sim = useToekomstSim({ initialData, perspectief, scenarioState })
   const meldingen = useToekomstMeldingen({ initialData, perspectief, sim })
+  const scenarioAfgeleid = useToekomstScenario({ initialData, scenarioState, sim })
+  const scenario = useStabielObject({ ...scenarioState, ...scenarioAfgeleid })
+  const lagen = useToekomstLagen({ initialData, goals, perspectief, overlays, scenarioState, sim, meldingen, lab: scenario })
+  const euro = useToekomstEuro({ perspectief, sim, scenario, lagen })
 
   return (
     <BronContext.Provider value={bron}>
       <PerspectiefContext.Provider value={perspectief}>
         <OverlayContext.Provider value={overlays}>
-          <ScenarioContext.Provider value={scenarioState}>
+          <ScenarioContext.Provider value={scenario}>
             <SimContext.Provider value={sim}>
-              <MeldingenContext.Provider value={meldingen}>{children}</MeldingenContext.Provider>
+              <MeldingenContext.Provider value={meldingen}>
+                <LagenContext.Provider value={lagen}>
+                  <EuroContext.Provider value={euro}>{children}</EuroContext.Provider>
+                </LagenContext.Provider>
+              </MeldingenContext.Provider>
             </SimContext.Provider>
           </ScenarioContext.Provider>
         </OverlayContext.Provider>

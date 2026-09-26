@@ -24,9 +24,10 @@ import { leesToekomst, leesToekomstAlles } from '@/lib/test-utils/toekomst-bronn
 
 /**
  * Sinds ADR 0179 fase 1 stap 13: de zichtbaarheid van het lab is een perspectief-afleiding
- * (`use-toekomst-perspectief.ts`); de opslaan-balk-toestand staat nog in de host (stap 14).
+ * (`use-toekomst-perspectief.ts`); de opslaan-balk-toestand is sinds stap 14 een lab-afleiding
+ * (`use-toekomst-scenario.ts`).
  */
-function bron(deel: 'perspectief' | 'host' = 'host'): string {
+function bron(deel: 'perspectief' | 'scenario' = 'scenario'): string {
   return leesToekomst(deel)
 }
 

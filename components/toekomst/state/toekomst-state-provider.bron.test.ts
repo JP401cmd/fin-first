@@ -46,12 +46,19 @@ describe('toekomst-state-provider — geen nieuwe god-component', () => {
       'useToekomstScenarioState(',
       'useToekomstSim(',
       'useToekomstMeldingen(',
+      'useToekomstScenario(',
+      'useToekomstLagen(',
+      // De euro-grens als laatste: hij zet de nominale feeds van alle concerns om.
+      'useToekomstEuro(',
     ].map((aanroep) => {
       const i = provider.indexOf(`= ${aanroep}`)
       expect(i, `${aanroep} ontbreekt in de provider`).toBeGreaterThan(-1)
       return i
     })
     expect([...volgorde].sort((a, b) => a - b)).toEqual(volgorde)
+    // De host rekent de grens niet zelf aan: hij leest alleen de euro-context.
+    expect(leesToekomst('host')).not.toMatch(/useEuroViewFeeds\s*\(|useToekomstEuro\s*\(/)
+    expect(leesToekomst('host')).toContain('useToekomstEuroContext()')
   })
 
   it('elke concern-hook geeft een per concern gememoïseerde waarde terug', () => {

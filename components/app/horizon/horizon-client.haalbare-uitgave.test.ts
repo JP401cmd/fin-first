@@ -34,9 +34,9 @@ const simSource = leesToekomst('sim')
 const scenarioSource = leesToekomst('scenario')
 /** De lab-zichtbaarheid is een perspectief-afleiding (stap 13). */
 const perspectiefSource = leesToekomst('perspectief')
-/** De knoppen (`labKnoppen`) staan sinds ADR 0179 fase 1 stap 12 in de state-laag. */
+/** De knoppen, hun basis en de doel-handlers staan sinds ADR 0179 fase 1 stap 14 in de scenario-hook. */
 const knoppenSource = readFileSync(
-  join(process.cwd(), 'components', 'toekomst', 'state', 'use-euro-view-feeds.ts'),
+  join(process.cwd(), 'components', 'toekomst', 'state', 'use-toekomst-scenario.ts'),
   'utf8',
 )
 
@@ -95,9 +95,9 @@ describe('haalbare uitgave — bron-grendel', () => {
   })
 
   it('"Herstel mijn doel" zet de knop terug UIT de stand (ADR 0170: hij reist nu mee)', () => {
-    const start = source.indexOf('const handleDoelHerstellen = useCallback')
+    const start = knoppenSource.indexOf('const handleDoelHerstellen = useCallback')
     expect(start).toBeGreaterThan(-1)
-    const body = source.slice(start, source.indexOf('}, [doelBlok', start))
+    const body = knoppenSource.slice(start, knoppenSource.indexOf('}, [doelBlok', start))
     // Vóór ADR 0170 kende `doel.stand` dit veld niet en viel herstel hard op `null` terug;
     // nu heeft "afwezig in de stand" één betekenis: wat het plan rekent. Sinds ADR 0175 loopt
     // de vertaling via `doelStandNaarLab` (gedeeld met het plan-stoplicht); dat die de
@@ -108,16 +108,16 @@ describe('haalbare uitgave — bron-grendel', () => {
   })
 
   it('de drift-detectie ziet de knop via de stand, niet via een losse noodgreep', () => {
-    const start = source.indexOf('const conceptGewijzigd = useMemo')
+    const start = knoppenSource.indexOf('const conceptGewijzigd = useMemo')
     expect(start).toBeGreaterThan(-1)
-    const body = source.slice(start, source.indexOf('}, [doelActief', start))
+    const body = knoppenSource.slice(start, knoppenSource.indexOf('}, [doelActief', start))
     // ADR 0170 — `buildLiveStand` draagt de knop nu zelf, dus de noodgreep ("elke actieve
     // override IS drift") is weg: een doel dát mét de knop is vastgelegd blijft nu terecht
     // "ongewijzigd" staan.
     expect(body).not.toContain('scenarioUitgaveNaPensioen != null ||')
     expect(body).toContain('isDoelConceptGewijzigd(buildLiveStandNow()')
-    const standStart = source.indexOf('const buildLiveStandNow = useCallback')
-    expect(source.slice(standStart, source.indexOf('const conceptGewijzigd', standStart))).toContain(
+    const standStart = knoppenSource.indexOf('const buildLiveStandNow = useCallback')
+    expect(knoppenSource.slice(standStart, knoppenSource.indexOf('const conceptGewijzigd', standStart))).toContain(
       'uitgaveNaPensioen: scenarioUitgaveNaPensioen',
     )
   })
@@ -168,7 +168,7 @@ describe('haalbare uitgave — bron-grendel', () => {
   it('F2a — de zichtbaarheid van de knop hangt aan zijn grondslag, de sectie aan het perspectief', () => {
     // ADR 0170 — een knop bestaat zodra hij een bereik heeft; de perspectief-gate zit op de
     // sectie als geheel (`verkenSectieZichtbaar`, solo-weergave), niet meer per knop-prop.
-    expect(source).toContain('if (uitgaveNaPensioenBasis > 0) {')
+    expect(knoppenSource).toContain('if (uitgaveNaPensioenBasis > 0) {')
     expect(perspectiefSource).toContain('const verkenSectieZichtbaar')
   })
 
@@ -177,7 +177,7 @@ describe('haalbare uitgave — bron-grendel', () => {
     // stopmoment om tegen te solven) — maar de spec eist dat de knop dan als
     // VERKENNING bruikbaar blijft. De grondslag valt daarom terug op
     // `input?.yearlyMustExpenses`, dat ongeacht het anker bestaat.
-    expect(source).toMatch(
+    expect(knoppenSource).toMatch(
       /const uitgaveNaPensioenBasis = haalbareUitgave\?\.huidigPerJaar \?\? input\?\.yearlyMustExpenses \?\? 0/,
     )
     // De oude vorm (het bestaan van de knop rechtstreeks gate'n op `haalbareUitgave`)
