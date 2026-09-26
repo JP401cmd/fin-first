@@ -132,7 +132,7 @@ describe('ArchitectuurClient — aandachtspunten-lens', () => {
   it('toont aandachtspunten en navigeert naar het element', () => {
     renderClient()
     fireEvent.click(screen.getByRole('tab', { name: 'Aandachtspunten' }))
-    fireEvent.click(screen.getByRole('button', { name: /horizon-client\.tsx is een god-component/i }))
+    fireEvent.click(screen.getByRole('button', { name: /De \/toekomst-state zit in een paar te grote hooks/i }))
     expect(screen.getByRole('heading', { level: 3, name: /Toekomstplannen/ })).toBeInTheDocument()
   })
 
