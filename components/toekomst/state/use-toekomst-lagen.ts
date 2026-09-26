@@ -41,7 +41,7 @@ import { faseAtAge } from '@/lib/horizon/phase-bar-segments'
 import { buildBreakdown } from '@/lib/income-expense-breakdown'
 import { unifiedRowsToStackedRows, type StackedRow } from '@/lib/wealth-composition'
 import type { IeViewMode } from '@/components/toekomst/state/types'
-import { GEBEURTENIS_NIET_VERPLAATST, type CanvasModus, type LaagId } from '@/lib/horizon/katern-copy'
+import type { CanvasModus, LaagId } from '@/lib/horizon/katern-copy'
 import {
   COLOR_LIFE_INCOME,
   COLOR_LIFE_EXPENSE,
@@ -54,7 +54,7 @@ import {
   COLOR_GOAL_OVERDUE,
 } from '@/components/toekomst/canvas/marker-kleuren'
 import { useStabielObject } from './use-stabiel-object'
-import { verplaatsLevensgebeurtenis } from './levensgebeurtenis-verplaatsen'
+import { useGebeurtenisSleep } from './levensgebeurtenis-verplaatsen'
 import type { ToekomstPerspectief } from './use-toekomst-perspectief'
 import type { ToekomstOverlayState } from './use-toekomst-overlay-state'
 import type { ToekomstScenarioState } from './use-toekomst-scenario'
@@ -639,100 +639,16 @@ export function useToekomstLagen({ initialData, goals, perspectief, overlays, sc
   )
 
   /**
-   * F-1 directe manipulatie: drag-and-drop op chart-events. Wanneer de
-   * gebruiker een marker horizontaal sleept en loslaat, persisteren we
-   * de nieuwe target_age direct in supabase en triggeren een re-load
-   * van de events-state. Alleen life_events zijn dragbaar; natural
-   * milestones zijn auto-afgeleid en niet bewerkbaar.
+   * F-1/F-5 directe manipulatie: een levensgebeurtenis slepen op de grafiek (de
+   * vermogenslijn beweegt live mee) of op de tijdlijn. Alleen life_events zijn
+   * sleepbaar; natuurlijke mijlpalen zijn afgeleid en niet bewerkbaar. Vergelijken en
+   * terugdraaien gebeurt tegen de plek van vóór de sleep (`useGebeurtenisSleep`).
    */
-  /**
-   * F-5 live curve-update: tijdens een drag krijgen we per kwartaal-
-   * crossing een nieuwe target_age aangeleverd. We werken events lokaal
-   * bij zonder supabase-call zodat de SimChart-NW-curve live mee
-   * beweegt. Bij release commit handleChartEventDragEnd de definitieve
-   * waarde naar de DB.
-   */
-  const handleChartEventDragMove = useCallback(
-    (
-      id: string,
-      sourceId: string | undefined,
-      newAge: number,
-      kind: ChartEventKind,
-    ) => {
-      if (kind !== 'life_event') return
-      const eventId = sourceId ?? id
-      if (!eventId) return
-      // Persist als geheel jaar (DB-schema beperking) maar respecteer
-      // wel het clamp-bereik van de drag.
-      const rounded = Math.max(currentAge ?? 18, Math.min(120, Math.round(newAge)))
-      setEvents((prev) =>
-        prev.map((e) =>
-          e.id === eventId && e.target_age !== rounded
-            ? { ...e, target_age: rounded, target_date: null }
-            : e,
-        ),
-      )
-    },
-    [currentAge, setEvents],
-  )
-
-  const handleChartEventDragEnd = useCallback(
-    async (
-      id: string,
-      sourceId: string | undefined,
-      newAge: number,
-      kind: ChartEventKind,
-    ) => {
-      if (kind !== 'life_event') return
-      // Voor life_events is sourceId === id (zie chartEventOverlay-build).
-      // Val terug op id wanneer sourceId om welke reden ook ontbreekt.
-      const eventId = sourceId ?? id
-      if (!eventId) return
-      const clamped = Math.max(currentAge ?? 18, Math.min(120, newAge))
-      const target = events.find((e) => e.id === eventId)
-      if (target && target.target_age === clamped) return
-
-      // Optimistic update vóór de async supabase-call. Voorkomt dat de
-      // marker terugschiet naar zijn oude positie tussen pointer-release
-      // en server-response. Oude waarden bewaren voor rollback.
-      const oldTargetAge = target?.target_age ?? null
-      const oldTargetDate =
-        (target as { target_date?: string | null } | undefined)?.target_date ?? null
-      setEvents((prev) =>
-        prev.map((e) =>
-          e.id === eventId
-            ? { ...e, target_age: clamped, target_date: null }
-            : e,
-        ),
-      )
-
-      const uitkomst = await verplaatsLevensgebeurtenis(eventId, { target_age: clamped, target_date: null })
-      if (uitkomst !== 'verplaatst') {
-        // Rollback optimistic update naar oorspronkelijke waarden — bij een fout én bij
-        // nul geraakte rijen (niet jouw gebeurtenis), want dan is er niets opgeslagen.
-        setEvents((prev) =>
-          prev.map((e) =>
-            e.id === eventId
-              ? { ...e, target_age: oldTargetAge, target_date: oldTargetDate }
-              : e,
-          ),
-        )
-        if (uitkomst === 'niet-geraakt') {
-          addToast({
-            type: 'info',
-            title: GEBEURTENIS_NIET_VERPLAATST.titel,
-            message: GEBEURTENIS_NIET_VERPLAATST.uitleg,
-            duration: 5000,
-          })
-        }
-        return
-      }
-      // Props-als-bron (fase 1 stap 3): na de write de server-bundel verversen, zodat
-      // `initialData.events` niet achterloopt op de optimistische lokale lijst.
-      loadData()
-    },
-    [currentAge, events, loadData, setEvents, addToast],
-  )
+  const {
+    grafiekMove: handleChartEventDragMove,
+    grafiekEnd: handleChartEventDragEnd,
+    tijdlijnEnd: handleEventDragEnd,
+  } = useGebeurtenisSleep({ events, setEvents, currentAge, loadData, addToast })
   // Cijferbar-waarden bij de actieve leeftijd (hover/playback); consumeert de
   // unified-rij + format-helpers, herberekent niets.
   const readoutData = useMemo(() => {
@@ -955,66 +871,6 @@ export function useToekomstLagen({ initialData, goals, perspectief, overlays, sc
       case 'speelAf': setIsPlaying(prev => !prev); return
     }
   }, [persistLifeEvents, showLifeEvents, persistNaturalMilestones, showNaturalMilestones, persistGoals, showGoals, setShowScenarioLine, persistLiquidLine, showLiquidLine])
-
-  /** Drag-and-drop: update event target_age when dragged to a new position on the timeline. */
-  async function handleEventDragEnd(eventId: string, newAge: number) {
-    const ev = events.find(e => e.id === eventId)
-    // target_age is een integer-kolom; drag-posities kunnen fractioneel zijn
-    // (bv. 59.5) → afronden, anders weigert Postgres de update ("invalid input
-    // syntax for type integer").
-    const roundedAge = Math.round(newAge)
-    if (!ev || ev.target_age === roundedAge) return
-
-    const originalAge = ev.target_age
-
-    // Optimistic local update for instant feedback
-    setEvents(prev => prev.map(e => e.id === eventId ? { ...e, target_age: roundedAge } : e))
-
-    const uitkomst = await verplaatsLevensgebeurtenis(eventId, { target_age: roundedAge })
-    if (uitkomst !== 'verplaatst') {
-      // Revert optimistic update — bij een fout én bij nul geraakte rijen (niet jouw
-      // gebeurtenis): er is niets opgeslagen, dus ook geen "verplaatst".
-      setEvents(prev => prev.map(e => e.id === eventId ? { ...e, target_age: originalAge } : e))
-      if (uitkomst === 'niet-geraakt') {
-        addToast({
-          type: 'info',
-          title: GEBEURTENIS_NIET_VERPLAATST.titel,
-          message: GEBEURTENIS_NIET_VERPLAATST.uitleg,
-          duration: 5000,
-        })
-      }
-      return
-    }
-
-    // Show undo toast after successful drag. De leeftijd is wat er is opgeslagen
-    // (afgerond), niet de fractionele sleeppositie.
-    addToast({
-      type: 'info',
-      title: `${ev.name} verplaatst naar ${roundedAge}j`,
-      message: `Was ${originalAge}j`,
-      duration: 5000,
-      action: {
-        label: 'Ongedaan maken',
-        onClick: async () => {
-          // Revert to original age optimistically
-          setEvents(prev => prev.map(e => e.id === eventId ? { ...e, target_age: originalAge } : e))
-          const undoUitkomst = await verplaatsLevensgebeurtenis(eventId, { target_age: originalAge })
-          if (undoUitkomst !== 'verplaatst') {
-            // Revert back to the new age if undo failed
-            setEvents(prev => prev.map(e => e.id === eventId ? { ...e, target_age: roundedAge } : e))
-            addToast({ type: 'error', title: 'Ongedaan maken mislukt', duration: 3000 })
-            return
-          }
-          // Reload data to recalculate projections with restored position
-          loadData()
-          addToast({ type: 'success', title: `${ev.name} terug op ${originalAge}j`, duration: 3000 })
-        },
-      },
-    })
-
-    // Full reload to recalculate projections with new event position
-    loadData()
-  }
 
   return useStabielObject({
     scenariosExpanded,
