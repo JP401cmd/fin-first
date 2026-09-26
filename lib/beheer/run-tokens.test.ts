@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { wijsTokensToe, type RunVenster } from './run-tokens'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { loadRunTokens, wijsTokensToe, type RunVenster } from './run-tokens'
 
 const SONNET = 'claude-sonnet-4-5-20250929'
 
@@ -173,5 +174,79 @@ describe('wijsTokensToe — overlappende runs', () => {
     const open: RunVenster = { id: 'open', started_at: RUN.started_at, finished_at: null }
     const uit = wijsTokensToe([RUN, open], [])
     expect(uit.get('run-a')!.overlaptMetAndereRun).toBe(false)
+  })
+})
+
+/**
+ * Nep-querybuilder: legt elke aanroep vast en geeft per `range()` de volgende
+ * pagina terug. Zo bewijst de test de QUERYVORM — welke kolommen, welk filter —
+ * en niet alleen wat de toewijzing met de rijen doet.
+ */
+function nepService(paginas: Array<{ data: unknown[] | null; error: unknown }>) {
+  const calls: Array<{ methode: string; args: unknown[] }> = []
+  let pagina = 0
+  const builder: Record<string, (...args: unknown[]) => unknown> = {}
+  for (const methode of ['select', 'is', 'gte', 'lte', 'order']) {
+    builder[methode] = (...args: unknown[]) => {
+      calls.push({ methode, args })
+      return builder
+    }
+  }
+  builder.range = (...args: unknown[]) => {
+    calls.push({ methode: 'range', args })
+    return Promise.resolve(paginas[pagina++] ?? { data: [], error: null })
+  }
+  const service = {
+    from: (tabel: string) => {
+      calls.push({ methode: 'from', args: [tabel] })
+      return builder
+    },
+  } as unknown as SupabaseClient
+  return { service, calls }
+}
+
+describe('loadRunTokens — de queryvorm', () => {
+  it('leest alleen user_id IS NULL, en alleen gebruiksmeta (geen user_id, geen feature)', async () => {
+    const { service, calls } = nepService([{ data: [rij('2026-09-26T05:24:00.000Z')], error: null }])
+    const uit = await loadRunTokens(service, [RUN])
+
+    expect(calls.find((c) => c.methode === 'from')?.args).toEqual(['ai_token_usage'])
+    expect(calls.find((c) => c.methode === 'is')?.args).toEqual(['user_id', null])
+
+    const kolommen = String(calls.find((c) => c.methode === 'select')?.args[0])
+      .split(',')
+      .map((k) => k.trim())
+    expect(kolommen).toEqual(['provider', 'model', 'input_tokens', 'output_tokens', 'created_at'])
+    expect(kolommen).not.toContain('user_id')
+    expect(kolommen).not.toContain('feature')
+
+    expect(calls.find((c) => c.methode === 'gte')?.args).toEqual(['created_at', RUN.started_at])
+    expect(calls.find((c) => c.methode === 'lte')?.args).toEqual(['created_at', RUN.finished_at])
+    expect(uit.leesfout).toBe(false)
+    expect(uit.tokens.get('run-a')).toBeDefined()
+  })
+
+  it('pagineert door zolang een pagina vol is (max_rows kapt anders stil af)', async () => {
+    const vol = Array.from({ length: 1000 }, () => rij('2026-09-26T05:24:00.000Z'))
+    const { service, calls } = nepService([
+      { data: vol, error: null },
+      { data: [rij('2026-09-26T05:24:01.000Z')], error: null },
+    ])
+    await loadRunTokens(service, [RUN])
+    expect(calls.filter((c) => c.methode === 'range').map((c) => c.args)).toEqual([
+      [0, 999],
+      [1000, 1999],
+    ])
+  })
+
+  it('een leesfout is een melding, geen lege uitkomst', async () => {
+    const { service } = nepService([{ data: null, error: { message: 'kapot' } }])
+    expect(await loadRunTokens(service, [RUN])).toEqual({ tokens: new Map(), leesfout: true })
+  })
+
+  it('zonder afgeronde run wordt er niets gelezen', async () => {
+    const { service, calls } = nepService([])
+    await loadRunTokens(service, [{ id: 'open', started_at: RUN.started_at, finished_at: null }])
+    expect(calls).toHaveLength(0)
   })
 })
