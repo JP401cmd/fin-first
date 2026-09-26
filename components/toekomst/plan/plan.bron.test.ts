@@ -70,6 +70,14 @@ describe('Plan-bladeren — map-brede grendels', () => {
     expect(src).not.toMatch(/\bfire[?!]?\.fireTarget\b/)
   })
 
+  it('de jaartabel-link consumeert PLAN_JAARTABEL_LINK uit katern-copy, geen eigen tekst', () => {
+    const src = code(readSourceLF(join(DIR, 'plan-paneel.tsx')))
+    expect(src).toContain('{PLAN_JAARTABEL_LINK}')
+    for (const f of bestanden) {
+      expect(code(readSourceLF(join(DIR, f)))).not.toMatch(/Jaar-op-jaar-tabel/i)
+    }
+  })
+
   it.each(bestanden)('%s gebruikt geen directe BottomSheet en geen <h1>', (f) => {
     const src = readSourceLF(join(DIR, f))
     expect(src).not.toMatch(/from '@\/components\/app\/bottom-sheet'/)

@@ -33,6 +33,7 @@ import { PlanKpiStrip } from '@/components/toekomst/plan/plan-kpi-strip'
 import { PlanAnkerEnVoortgang } from '@/components/toekomst/plan/plan-hero-duiding'
 import { PlanGegevensmelding } from '@/components/toekomst/plan/plan-gegevensmelding'
 import { PlanVerdieping } from '@/components/toekomst/plan/plan-verdieping'
+import { PLAN_JAARTABEL_LINK } from '@/lib/horizon/katern-copy'
 import {
   PlanKassabonVrijheidsleeftijd,
   PlanKassabonDoelbedrag,
@@ -418,7 +419,7 @@ export function PlanPaneel() {
             data-testid="plan-jaar-op-jaar"
             className="inline-flex min-h-[44px] items-center font-sans text-[13px] text-[var(--ink-2)] underline decoration-[var(--border-ed)] underline-offset-4 transition-colors hover:text-[var(--module-active-700)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
           >
-            Jaar-op-jaar-tabel &rarr;
+            {PLAN_JAARTABEL_LINK}
           </button>
         </p>
       )}

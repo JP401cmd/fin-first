@@ -233,6 +233,12 @@ export function aannamesRegelTekst(input: AannamesInput, modus: 'eenvoudig' | 'v
   return `${AANNAMES_PREFIX} ${delen.join(SCHEIDING)}`
 }
 
+/**
+ * De link-rij van Plan (spec §4.3/§4.9): de énige ingang naar de jaar-op-jaar-tabel.
+ * "Zo werkt je grafiek" heeft zijn eigen ingang, de canvas-i.
+ */
+export const PLAN_JAARTABEL_LINK = 'Jaar-op-jaar-tabel →'
+
 // ── Canvas-modi (spec §4.2 regel 2, ADR 0179 D3) ─────────────────────────────
 
 export type CanvasModus = 'vermogen' | 'samenstelling' | 'geldstroom'

@@ -21,6 +21,7 @@ import {
   MARKTCHECK_MISLUKT_REGEL,
   MARKTCHECK_NIET_BINNEN_PLAN,
   MARKTCHECK_STAND_LABEL,
+  PLAN_JAARTABEL_LINK,
   aannamesRegelTekst,
   aannamesSegmenten,
   doelenSamenvatting,
@@ -58,6 +59,7 @@ function alleKopij(): string[] {
     CANVAS_UITLEG_TITEL,
     DOELEN_VOLGT_PLAN_REGEL,
     MARKTCHECK_MISLUKT_REGEL,
+    PLAN_JAARTABEL_LINK,
     katernAnkerregel({ kind: 'solved', solvedFireAge: 52.3, currentAge: 38 }),
     katernAnkerregel({ kind: 'solved', solvedFireAge: null, currentAge: 38 }),
     katernAnkerregel({ kind: 'vast', stop: { kind: 'age', stopAge: 60 } }),
@@ -330,6 +332,10 @@ describe('katern-copy — compliance-invarianten over alle kopij', () => {
     expect(
       existsSync(join(process.cwd(), 'components/toekomst/canvas/canvas-kopij-voorlopig.ts')),
     ).toBe(false)
+  })
+
+  it('de jaartabel-link in Plan noemt zijn bestemming', () => {
+    expect(PLAN_JAARTABEL_LINK).toBe('Jaar-op-jaar-tabel →')
   })
 
   it('canvas-modi in vaste volgorde', () => {
