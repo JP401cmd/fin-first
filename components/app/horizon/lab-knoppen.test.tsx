@@ -302,3 +302,14 @@ describe('LabKnoppen — de vorm als keuzelijst (katern Doelen, ADR 0179 D7)', (
     expect(screen.getByLabelText('Vorm van de knoppen')).toBe(menu)
   })
 })
+
+describe('LabKnoppen — schaal-legenda uit te zetten (katern Doelen)', () => {
+  it('standaard aan, met schaalLegenda={false} weg', () => {
+    renderBlok()
+    expect(screen.getByTestId('lab-schaal-legenda')).toBeTruthy()
+  })
+  it('uit', () => {
+    renderBlok({ schaalLegenda: false })
+    expect(screen.queryByTestId('lab-schaal-legenda')).toBeNull()
+  })
+})

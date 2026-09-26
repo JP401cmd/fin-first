@@ -112,6 +112,22 @@ export interface LabKnoppenProps {
    * regel voor de één-scherm-eis).
    */
   weergaveKiezer?: 'knoppen' | 'menu'
+  /**
+   * Toont de schaal-legenda (rood · oranje · groen) onder de uitkomstregel. Standaard ja.
+   * Katern Doelen zet hem uit en toont `LabSchaalLegenda` onder het lab (één-scherm-eis).
+   */
+  schaalLegenda?: boolean
+}
+
+/** De legenda van de schaal — één regel, want de kleuren zijn op elke knop hetzelfde. */
+export function LabSchaalLegenda({ className = 'mt-2' }: { className?: string }) {
+  return (
+    <p className={`${className} font-sans text-[11px] leading-snug text-[var(--ink-3)]`} data-testid="lab-schaal-legenda">
+      <span className="font-semibold text-score-bad">rood</span> {LAB_COPY.schaalRood} ·{' '}
+      <span className="font-semibold text-score-warn">oranje</span> {LAB_COPY.schaalOranje} ·{' '}
+      <span className="font-semibold text-score-good">groen</span> {LAB_COPY.schaalGroen}
+    </p>
+  )
 }
 
 /** De vormen waarin de knoppen kunnen staan — één lijst met de voorkeur (`KNOP_WEERGAVEN`). */
@@ -159,6 +175,7 @@ export function LabKnoppen({
   weergave = 'wijzer',
   onWeergaveChange,
   weergaveKiezer = 'knoppen',
+  schaalLegenda = true,
   knoppen,
   nalatenschapNotitie = null,
   uitkomst,
@@ -336,12 +353,7 @@ export function LabKnoppen({
         </div>
       )}
 
-      {/* De legenda van de schaal — één regel, want de kleuren zijn op elke knop hetzelfde. */}
-      <p className="mt-2 font-sans text-[11px] leading-snug text-[var(--ink-3)]">
-        <span className="font-semibold text-score-bad">rood</span> {LAB_COPY.schaalRood} ·{' '}
-        <span className="font-semibold text-score-warn">oranje</span> {LAB_COPY.schaalOranje} ·{' '}
-        <span className="font-semibold text-score-good">groen</span> {LAB_COPY.schaalGroen}
-      </p>
+      {schaalLegenda && <LabSchaalLegenda />}
 
       {/* RAD (B11): één rij — links het draairad dat het onderwerp kiest, rechts de balk van
           dát onderwerp. De balk verbergt zijn eigen label: het rad ís het label. De

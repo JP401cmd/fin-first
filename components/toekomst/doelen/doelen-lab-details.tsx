@@ -2,9 +2,10 @@
 // euro-view: dit bestand deflateert niets; de rendement-delta's zijn percentages.
 
 /**
- * Onder het lab in katern Doelen (ADR 0179 fase 4; spec §4.7): het ingeklapte blok
- * "Rendement per categorie" (de marktaannames van dit scenario, alleen Volledig) en de
- * complianceregel van het doelscenario — één keer per scherm, niet per plek van het lab.
+ * Onder het lab in katern Doelen (ADR 0179 fase 4; spec §4.7): de schaal-legenda
+ * (rood · oranje · groen), het ingeklapte blok "Rendement per categorie" (de marktaannames
+ * van dit scenario, alleen Volledig) en de complianceregel van het doelscenario — één keer
+ * per scherm, niet per plek van het lab.
  *
  * Vroeger zaten beide in het lab zelf. Het lab staat sinds fase 4 op desktop in een smalle
  * kolom naast de grafiek en op mobiel direct onder de koppen, waar elke regel meetelt voor
@@ -15,6 +16,7 @@ import { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { HideInSimple } from '@/components/app/hide-in-simple'
 import { LabIndicatieRegel } from '@/components/app/horizon/lab-opslaan-balk'
+import { LabSchaalLegenda } from '@/components/app/horizon/lab-knoppen'
 import { WhatIfMarketAssumptions } from '@/components/app/horizon/whatif-market-assumptions'
 import { LAB_COPY } from '@/lib/horizon/anker-copy'
 import {
@@ -34,6 +36,7 @@ export function DoelenLabDetails() {
   const toonMarktbias = whatIfBaseline != null && categorieReturnGroups.length > 0
   return (
     <div className="mt-3" data-testid="doelen-lab-details">
+      <LabSchaalLegenda className="mb-1" />
       {toonMarktbias && (
         <HideInSimple>
           <div className="border-t border-dashed border-[var(--border-ed)] pt-1">

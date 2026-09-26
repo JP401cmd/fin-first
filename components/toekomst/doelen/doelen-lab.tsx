@@ -169,6 +169,9 @@ export function DoelenLab({
                     weergave={knopWeergave}
                     onWeergaveChange={setKnopWeergave}
                     weergaveKiezer="menu"
+                    // De schaal-legenda staat onder het lab (DoelenLabDetails): één regel
+                    // minder in de kolom en onder de koppen (één-scherm-eis).
+                    schaalLegenda={false}
                     formatters={labFormatters}
                     stopSlot={
                       // TPR-09 + melding B-038 — de stop-knop is een VERKENNING. Hier staat de
