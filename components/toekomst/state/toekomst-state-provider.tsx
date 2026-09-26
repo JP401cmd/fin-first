@@ -84,6 +84,12 @@ export const useToekomstEuroContext = () => useVerplicht(EuroContext, 'useToekom
  * katern-layout leest hij de hoofdrun van de provider, daarbuiten draait hij zelf.
  */
 export const useToekomstSimContextOptioneel = () => useContext(SimContext)
+/**
+ * De overlay-context, of `null` buiten de provider. Voor dezelfde view: binnen de
+ * katern-layout opent de gebeurtenissenlijst de ene EventPane van de overlay-host
+ * (`openEventPane`, spec §4.2 regel 8) in plaats van een eigen pane te mounten.
+ */
+export const useToekomstOverlayContextOptioneel = () => useContext(OverlayContext)
 
 export function ToekomstStateProvider({
   initialData,

@@ -56,6 +56,22 @@ export function useToekomstOverlayState({ perspectief }: { perspectief: Toekomst
   const [eventPaneOpen, setEventPaneOpen] = useState(false)
   const [eventPaneEditingId, setEventPaneEditingId] = useState<string | null>(null)
   const [eventPaneMode, setEventPaneMode] = useState<EventPaneMode>('catalog')
+  /**
+   * Eén opener voor de ene EventPane van /toekomst (spec §4.2 regel 8, "één sheet
+   * tegelijk"). De deeplinks `?event=new` / `?event=<id>` (en de alias `?nieuw=1`) lopen
+   * hierlangs, en de gebeurtenissenlijst onder het plan ook — die mount geen eigen pane
+   * meer. `'new'` = de catalogus; een id opent die gebeurtenis in `mode` (standaard view).
+   */
+  const openEventPane = useCallback((doel: 'new' | string, mode: 'view' | 'edit' = 'view') => {
+    if (doel === 'new') {
+      setEventPaneEditingId(null)
+      setEventPaneMode('catalog')
+    } else {
+      setEventPaneEditingId(doel)
+      setEventPaneMode(mode)
+    }
+    setEventPaneOpen(true)
+  }, [])
   const [clusterSheet, setClusterSheet] = useState<ClusterSheet>(null)
   // Mobile KPI's tonen nu volledig 2x2 — `horizonHeroExpanded` toggle is verwijderd.
 
@@ -83,9 +99,7 @@ export function useToekomstOverlayState({ perspectief }: { perspectief: Toekomst
       } else if (modal === 'life_events') {
         // Het legacy-gebeurtenisformulier is weg (ADR 0179 fase 1 stap 2): deze
         // oude deeplink opent voortaan de EventPane-catalogus, net als `?event=new`.
-        setEventPaneEditingId(null)
-        setEventPaneMode('catalog')
-        setEventPaneOpen(true)
+        openEventPane('new')
       }
       shouldReplace = true
     }
@@ -106,15 +120,7 @@ export function useToekomstOverlayState({ perspectief }: { perspectief: Toekomst
     const eventEditParam = searchParams.get('edit')
     if (nieuwParam != null) shouldReplace = true
     if (eventParam) {
-      if (eventParam === 'new') {
-        setEventPaneEditingId(null)
-        setEventPaneMode('catalog')
-        setEventPaneOpen(true)
-      } else {
-        setEventPaneEditingId(eventParam)
-        setEventPaneMode(eventEditParam === 'true' ? 'edit' : 'view')
-        setEventPaneOpen(true)
-      }
+      openEventPane(eventParam, eventEditParam === 'true' ? 'edit' : 'view')
       shouldReplace = true
     }
 
@@ -135,7 +141,7 @@ export function useToekomstOverlayState({ perspectief }: { perspectief: Toekomst
       router.replace(buildDeeplinkCleanupUrl(pathname, searchParams, window.location.hash), { scroll: false })
     }
 
-  }, [searchParams, router, pathname])
+  }, [searchParams, router, pathname, openEventPane])
 
   // Deeplink `?whatif=open` → scroll naar het doelscenario. Sinds ADR 0170 staat dat blok
   // altijd open, dus alleen nog scrollen. Het lab rendert pas als de sim-uitkomst er is;
@@ -175,6 +181,7 @@ export function useToekomstOverlayState({ perspectief }: { perspectief: Toekomst
     openRetirementExpensePane,
     eventPaneOpen,
     setEventPaneOpen,
+    openEventPane,
     eventPaneEditingId,
     setEventPaneEditingId,
     eventPaneMode,

@@ -40,6 +40,7 @@ import { isStrategyManagedEvent, STRATEGY_BADGE_LABEL } from '@/lib/strategy-eve
 import { strategieHref } from '@/lib/horizon/strategie-route'
 import type { StrategieEditorsData } from './strategie/strategie-editors'
 import { BottomSheet } from '@/components/app/bottom-sheet'
+import { useToekomstOverlayContextOptioneel } from '@/components/toekomst/state/toekomst-state-provider'
 
 // EventPane = herstelde toevoeg/bewerk-flow uit /horizon (catalogus + Praat met
 // Fin + 3-blokken-editor). Dynamisch geladen zodat de pagina-bundle licht blijft.
@@ -219,6 +220,11 @@ export function GebeurtenissenView({
   // zichtbaar (plan A-5). Niveau-A "Kijken"-gebruikers zien dan een
   // rustige lijst van bestaande events zonder edit-knoppen.
   // EventPane-state: catalog (nieuw) of view (bestaand vrij event bekijken/bewerken).
+  // Binnen de /toekomst-provider opent de lijst de ENE EventPane van de overlay-host
+  // (`openEventPane`, dezelfde opener als `?event=new` / `?event=<id>`; spec §4.2 regel 8,
+  // "één sheet tegelijk") en mount hij er zelf geen. Buiten de provider (los gebruik,
+  // tests) houdt hij zijn eigen pane.
+  const overlay = useToekomstOverlayContextOptioneel()
   const [eventPaneOpen, setEventPaneOpen] = useState(false)
   const [eventPaneEditingId, setEventPaneEditingId] = useState<string | null>(null)
   const [eventPaneMode, setEventPaneMode] = useState<'catalog' | 'view'>('catalog')
@@ -356,6 +362,10 @@ export function GebeurtenissenView({
     if (managed) {
       router.push(strategieHref(managed))
     } else {
+      if (overlay) {
+        overlay.openEventPane(event.id, 'view')
+        return
+      }
       setEventPaneEditingId(event.id)
       setEventPaneMode('view')
       setEventPaneOpen(true)
@@ -364,6 +374,10 @@ export function GebeurtenissenView({
 
   // Opent de EventPane in catalog-mode (nieuw event toevoegen).
   function openCatalog() {
+    if (overlay) {
+      overlay.openEventPane('new')
+      return
+    }
     setEventPaneEditingId(null)
     setEventPaneMode('catalog')
     setEventPaneOpen(true)
@@ -675,6 +689,9 @@ export function GebeurtenissenView({
         )}
       </div>
 
+      {/* Alleen buiten de /toekomst-provider: daarbinnen staat de ene EventPane in de
+          overlay-host (spec §4.2 regel 8). */}
+      {!overlay && (
       <EventPane
         open={eventPaneOpen}
         onClose={closeEventPane}
@@ -691,6 +708,7 @@ export function GebeurtenissenView({
         previewBaseline={eventPaneData.previewBaseline}
         onChanged={() => router.refresh()}
       />
+      )}
 
       {/* Feature #876 — read-only uitleg-sheet voor de tekort-lening-rij.
           Gedeelde BottomSheet (z-[70]-conventie automatisch). */}
