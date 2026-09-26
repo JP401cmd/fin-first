@@ -121,8 +121,11 @@ export function useToekomstSim({ initialData, perspectief, scenarioState }: { in
     computeFireRange(initialData.effectiveInput, initialData.fireParams.effectiveSwr, undefined, initialData.fireParams.grossReturn, initStrategyOpts)
   )
   const [healthScore, setHealthScore] = useState<HealthScore | null>(() => initialData.healthScore)
+  // `healthScoreInput` is de AFGELEIDE invoer (de bundel plus de herrekende velden
+  // hieronder); de grondslag zelf leest het effect rechtstreeks uit `initialData`
+  // (props-als-bron), zodat een `router.refresh()` de pijlers ververst.
   const [healthScoreInput, setHealthScoreInput] = useState<HealthScoreInput>(initialData.healthScoreInput)
-  const [budgetingActive] = useState(initialData.budgetingActive)
+  const budgetingActive = initialData.budgetingActive
 
   // ADR 0129 D7 — de tweede kernel-run onder een vast anker ("vrij mogelijk vanaf"),
   // uitgepakt uit dezelfde worker-batch als de scenariokaarten. `null` = nog niet
@@ -305,7 +308,7 @@ export function useToekomstSim({ initialData, perspectief, scenarioState }: { in
     // salaris als de liquide pot wijzigen niet onder de what-if-sliders (die
     // raken totalAssets/totalDebts, niet je betaal-/spaarsaldo), dus hier valt
     // niets te herrekenen — consume, don't recompute.
-    const emergencyMonths = healthScoreInput.emergencyFundMonths
+    const emergencyMonths = initialData.healthScoreInput.emergencyFundMonths
     // Vrijheidsvoortgang: zelfde TELLER-grondslag als de loader en de hero —
     // FIRE-eligible netto vermogen (huis gefilterd via de housing-strategie)
     // via computeFreedomProgress (NIET de oude computeFreedomPercentage op het
@@ -362,7 +365,7 @@ export function useToekomstSim({ initialData, perspectief, scenarioState }: { in
           requiredPortfolioExclHome: hsRequiredPortfolioExcl,
         })
     const newInput: HealthScoreInput = {
-      ...healthScoreInput,
+      ...initialData.healthScoreInput,
       totalAssets: effectiveInput.totalAssets,
       totalDebts: effectiveInput.totalDebts,
       emergencyFundMonths: emergencyMonths,
@@ -377,8 +380,10 @@ export function useToekomstSim({ initialData, perspectief, scenarioState }: { in
   // twee-definities-op-één-scherm die we hier repareren. `isFixedAnchorMode` zelf kan
   // niet in de array (het is een latere `const`; TDZ tijdens de render) en hoeft dat ook
   // niet: hij is een pure functie van `simResult` en de stabiele `initialData`-prop.
+  // `initialData.healthScoreInput` + `budgetingActive` staan er wél in: een
+  // `router.refresh()` levert daar een nieuwe grondslag (props-als-bron).
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [input, fireSwr, fireParams, avgIncome6m, avgExpenses6m, fireStrategy, simResult, firstPaintFreedomPct])
+  }, [input, fireSwr, fireParams, avgIncome6m, avgExpenses6m, fireStrategy, simResult, firstPaintFreedomPct, initialData.healthScoreInput, budgetingActive])
 
   const currentAge = effectiveInput?.dateOfBirth ? ageAtDate(effectiveInput.dateOfBirth) : null
 
