@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { leesToekomst, leesToekomstAlles } from '@/lib/test-utils/toekomst-bronnen'
 
 /**
  * BRON-GRENDEL op de doelscenario-wiring in horizon-client.tsx (ADR 0145 + ADR 0170).
@@ -245,7 +246,8 @@ describe('de twee profielparameter-knoppen reizen mee in de doelstand (ADR 0170)
   })
 
   it('de nalatenschap-override loopt via de scenario-overrides van de hook', () => {
-    const src = bron()
+    // Sinds ADR 0179 fase 1 stap 13 in de scenario-state van de provider.
+    const src = leesToekomst('scenario')
     const start = src.indexOf('const scenarioOverrides = useMemo')
     const blok = src.slice(start, src.indexOf('}, [', start))
     expect(blok).toContain('nalatenschap: scenarioNalatenschap')

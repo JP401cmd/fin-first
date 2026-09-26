@@ -13,9 +13,16 @@
 import { describe, it, expect } from 'vitest'
 import { join } from 'node:path'
 import { readSourceLF } from '@/lib/test-utils/read-source'
+import { leesToekomstAlles } from '@/lib/test-utils/toekomst-bronnen'
 
-const SOURCE_PATH = join(process.cwd(), 'components', 'app', 'horizon', 'horizon-client.tsx')
+/**
+ * Sinds ADR 0179 fase 1 stap 13 leest de sim-hook van de state-provider de bundel
+ * (`use-toekomst-sim.ts`). De "geen bevroren useState"-toets geldt voor álle
+ * /toekomst-bronnen: de host en elke state-hook.
+ */
+const SOURCE_PATH = join(process.cwd(), 'components', 'toekomst', 'state', 'use-toekomst-sim.ts')
 const source = readSourceLF(SOURCE_PATH)
+const alles = leesToekomstAlles()
 
 /** De velden die de hook levert en die `useHorizonFireSim` (mede) voeden. */
 const BRON_VELDEN = [
@@ -40,7 +47,7 @@ describe('horizon-client — props-als-bron (ADR 0179 fase 1 stap 3)', () => {
 
   it('seedt geen invoer meer met een bevroren useState(initialData.x)', () => {
     for (const veld of ['effectiveInput', 'fireParams', 'withdrawalStrategy', 'fireStrategy', 'rawProfile', 'aowRows', 'debts', 'actions', 'events', 'avgIncome6m', 'avgExpenses6m', 'resilienceSnapshots']) {
-      expect(source, `useState(initialData.${veld}) is terug`).not.toMatch(
+      expect(alles, `useState(initialData.${veld}) is terug`).not.toMatch(
         new RegExp(`useState(<[^>]*>)?\\(\\s*(\\(\\)\\s*=>\\s*)?initialData\\??\\.${veld}\\b`),
       )
     }
@@ -48,7 +55,7 @@ describe('horizon-client — props-als-bron (ADR 0179 fase 1 stap 3)', () => {
 
   it('loadData ververst de server-bundel en leest zelf niets meer', () => {
     expect(source).toMatch(/const loadData = useCallback\(\(\) => \{\n\s*startRefresh\(\(\) => router\.refresh\(\)\)\n\s*\}, \[router\]\)/)
-    expect(source).not.toMatch(/function loadKernelContext\b/)
-    expect(source).not.toMatch(/\.select\(/)
+    expect(alles).not.toMatch(/function loadKernelContext\b/)
+    expect(alles).not.toMatch(/\.select\(/)
   })
 })

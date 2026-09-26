@@ -24,6 +24,12 @@ import { join } from 'node:path'
 
 const SOURCE_PATH = join(process.cwd(), 'components', 'app', 'horizon', 'horizon-client.tsx')
 const source = readFileSync(SOURCE_PATH, 'utf8')
+/**
+ * De doelbedrag-guard is een sim-afleiding (ADR 0179 fase 1 stap 13, `use-toekomst-sim.ts`):
+ * de sim-hook toetst het getoonde doelbedrag; de host de twee Plan-tegels.
+ */
+const SIM_PATH = join(process.cwd(), 'components', 'toekomst', 'state', 'use-toekomst-sim.ts')
+const simSource = readFileSync(SIM_PATH, 'utf8')
 
 /** Desktop-strip + mobiele 2×2-strip, dus elke tegel telt twee keer. */
 const LAYOUTS = 2
@@ -31,14 +37,16 @@ const LAYOUTS = 2
 describe('horizon-client — elke hero-KPI toetst zijn eigen brondata', () => {
   it('consumeert de gedeelde guards uit outcome-guard.ts', () => {
     expect(source).toContain("from '@/lib/horizon/outcome-guard'")
-    for (const guard of ['guardFireTarget(', 'guardFreedomMoment(', 'guardRetirementExpense(']) {
+    expect(simSource).toContain("from '@/lib/horizon/outcome-guard'")
+    expect(simSource, 'guardFireTarget( hoort de bron van zijn tegel te toetsen').toContain('guardFireTarget(')
+    for (const guard of ['guardFreedomMoment(', 'guardRetirementExpense(']) {
       expect(source, `${guard} hoort de bron van zijn tegel te toetsen`).toContain(guard)
     }
   })
 
   it('heeft voor alle drie de tegels een melding-conditie', () => {
+    expect(simSource).toContain('const showFireTargetNotice =')
     for (const flag of [
-      'const showFireTargetNotice =',
       'const showFireAgeNotice =',
       'const showRetirementExpenseNotice =',
     ]) {

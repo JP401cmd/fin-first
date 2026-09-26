@@ -26,8 +26,12 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { TOEKOMST_BRONNEN, leesToekomst, leesToekomstAlles } from '@/lib/test-utils/toekomst-bronnen'
 
-const SOURCE_PATH = join(process.cwd(), 'components', 'app', 'horizon', 'horizon-client.tsx')
+/** Het kernantwoord woont sinds ADR 0179 fase 1 stap 13 in de sim-hook van de provider. */
+const SOURCE_PATH = join(process.cwd(), TOEKOMST_BRONNEN.sim)
+/** De host toont de teksten. */
+const HOST = () => leesToekomst('host')
 
 /** De legacy-scalarmotor als tweede antwoord op de FIRE-leeftijd. */
 const LEGACY_FIRE_AGE = /\bfire[?!]?\.fireAge\b/
@@ -36,8 +40,9 @@ const LEGACY_FIRE_TARGET = /\bfire[?!]?\.fireTarget\b/
 
 const EXEMPT_MARK = '// tweede-motor: exempt'
 
+/** Alle /toekomst-bronnen: een tweede motor mag in géén state-hook of de host opduiken. */
 function readSourceLines(): string[] {
-  return readFileSync(SOURCE_PATH, 'utf8').split(/\r?\n/)
+  return leesToekomstAlles().split(/\r?\n/)
 }
 
 /** Commentaarregels tellen niet mee — een uitleg mág de oude naam noemen. */
@@ -74,12 +79,12 @@ describe('horizon-client — één beslisser voor het kernantwoord', () => {
   it('consumeert de gedeelde resolver, precies één keer', () => {
     const source = readFileSync(SOURCE_PATH, 'utf8')
     expect(source).toContain("from '@/lib/horizon/hero-fire-age'")
-    const calls = source.match(/resolveHeroFireAge\s*\(/g) ?? []
+    const calls = leesToekomstAlles().match(/resolveHeroFireAge\s*\(/g) ?? []
     expect(calls, 'precies één plek mag het kernantwoord bepalen').toHaveLength(1)
   })
 
   it('gebruikt de hero-tekst uit de resolver op de KPI-oppervlakken', () => {
-    const source = readFileSync(SOURCE_PATH, 'utf8')
+    const source = HOST()
     // Desktop-KPI + mobiele KPI's + beide kassabons consumeren de afgeleide
     // teksten; staat er geen enkele, dan is de resolver wel aangeroepen maar
     // niet getoond.

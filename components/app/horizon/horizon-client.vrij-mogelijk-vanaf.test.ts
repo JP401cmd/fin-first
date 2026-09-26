@@ -13,8 +13,11 @@ import { join } from 'node:path'
  *  2. de tegel kent een rekenstand (`solvedPending`) en een gefaalde batch beëindigt die;
  *  3. de batch rekent op dezelfde profielrij als elke andere kernel-run: mét de ADR 0103-injectie.
  */
-const SOURCE_PATH = join(process.cwd(), 'components', 'app', 'horizon', 'horizon-client.tsx')
+/** De preset-batch (E12) en de grendel wonen sinds ADR 0179 fase 1 stap 13 in de sim-hook. */
+const SOURCE_PATH = join(process.cwd(), 'components', 'toekomst', 'state', 'use-toekomst-sim.ts')
 const src = readFileSync(SOURCE_PATH, 'utf8')
+/** De host geeft de grendel-setter aan het Plan-blad. */
+const host = readFileSync(join(process.cwd(), 'components', 'app', 'horizon', 'horizon-client.tsx'), 'utf8')
 
 function presetEffect(): string {
   const gate = src.indexOf('const presetBatchNodig')
@@ -42,7 +45,8 @@ describe('preset-batch onder een vast anker wacht niet op scrollen', () => {
     expect(src).toContain('const [duidingInView, setDuidingInView] = useState(false)')
     expect(src).toContain('const markeerDuidingInView = useCallback(() => setDuidingInView(true), [])')
     expect(src.match(/setDuidingInView\(/g) ?? []).toHaveLength(1)
-    expect(src).toContain('onDuidingInView={markeerDuidingInView}')
+    expect(host.match(/setDuidingInView\(/g) ?? []).toHaveLength(0)
+    expect(host).toContain('onDuidingInView={markeerDuidingInView}')
   })
 
   it('isFixedAnchorMode staat in de dependency-array en is vóór het effect gedeclareerd (geen TDZ)', () => {

@@ -33,8 +33,14 @@ import type { SimResult } from '@/lib/fire-simulation'
  * consumeert en er geen tweede definitie naast laat ontstaan.
  */
 
-const SOURCE_PATH = join(process.cwd(), 'components', 'app', 'horizon', 'horizon-client.tsx')
+/**
+ * Het vrijheids-% en de gezondheidsscore (E7) wonen sinds ADR 0179 fase 1 stap 13 in de
+ * sim-hook van de state-provider; de hero-gate en het tegel-onderschrift in de host.
+ */
+const SOURCE_PATH = join(process.cwd(), 'components', 'toekomst', 'state', 'use-toekomst-sim.ts')
 const source = readFileSync(SOURCE_PATH, 'utf8')
+const HOST_PATH = join(process.cwd(), 'components', 'app', 'horizon', 'horizon-client.tsx')
+const host = readFileSync(HOST_PATH, 'utf8')
 /** De euro-render-grens (ADR 0179 fase 1 stap 12): de ankerfactor woont hier. */
 const GRENS_PATH = join(process.cwd(), 'components', 'toekomst', 'state', 'use-euro-view-feeds.ts')
 const grensSource = readFileSync(GRENS_PATH, 'utf8')
@@ -126,7 +132,7 @@ describe('horizon-client — het ANKER kiest de definitie van het vrijheids-%', 
  */
 describe('horizon-client — alle consumenten lezen hetzelfde vrijheids-%', () => {
   it('de vrij-gate van de hero (`heroFreedomState`)', () => {
-    expect(source).toMatch(/const heroFreedomState = \{\s*\r?\n\s*freedomPct: effectiveFreedomPct,/)
+    expect(host).toMatch(/const heroFreedomState = \{\s*\r?\n\s*freedomPct: effectiveFreedomPct,/)
   })
 
   it('de persoonlijke hero-projectie die de overlay/kassabon voedt', () => {
@@ -143,10 +149,10 @@ describe('horizon-client — alle consumenten lezen hetzelfde vrijheids-%', () =
  */
 describe('horizon-client — de vermogenstegel onder een vast anker noemt haar grondslag', () => {
   it('consumeert het onderschrift uit anker-copy, schrijft het niet zelf uit', () => {
-    expect(source).toMatch(/import \{[^}]*ANKER_VERMOGEN_TEGEL_ONDERSCHRIFT[^}]*\} from '@\/lib\/horizon\/anker-copy'/)
-    expect(source).toMatch(/const fireTargetCaption = isFixedAnchorMode\s*\r?\n\s*\? ANKER_VERMOGEN_TEGEL_ONDERSCHRIFT/)
+    expect(host).toMatch(/import \{[^}]*ANKER_VERMOGEN_TEGEL_ONDERSCHRIFT[^}]*\} from '@\/lib\/horizon\/anker-copy'/)
+    expect(host).toMatch(/const fireTargetCaption = isFixedAnchorMode\s*\r?\n\s*\? ANKER_VERMOGEN_TEGEL_ONDERSCHRIFT/)
     // De losse zin mag alleen nog in de constante leven (commentaar uitgezonderd).
-    const losseRegels = source
+    const losseRegels = [source, host].join('\n')
       .split(/\r?\n/)
       .filter((l) => {
         const t = l.trim()

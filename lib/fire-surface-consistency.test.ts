@@ -224,7 +224,8 @@ describe('H21 — bron-grendels tegen terugkeer van de motor-mix', () => {
   })
 
   it('/toekomst leidt de first-paint-leeftijd niet meer uit snapshots af', () => {
-    const src = read('components', 'app', 'horizon', 'horizon-client.tsx')
+    // Sinds ADR 0179 fase 1 stap 13 in de sim-hook van de /toekomst-state-provider.
+    const src = read('components', 'toekomst', 'state', 'use-toekomst-sim.ts')
     // `net_worth_snapshots.fire_age` wordt door de RAUWE scalar-lus geschreven —
     // een andere motor dan de kernel-worker die daarna landt. Dat gaf de sprong.
     expect(src).not.toMatch(/resilienceSnapshots[\s\S]{0,200}?\.fire_age/)

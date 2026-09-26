@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { leesToekomst, leesToekomstAlles } from '@/lib/test-utils/toekomst-bronnen'
 
 /**
  * BRON-GRENDEL op de TERUGWEG na "Doel loslaten" (melding B-031).
@@ -23,15 +22,17 @@ import { join } from 'node:path'
  *        vastleggen zonder van weergave te wisselen.
  */
 
-const SOURCE_PATH = join(process.cwd(), 'components', 'app', 'horizon', 'horizon-client.tsx')
-
-function bron(): string {
-  return readFileSync(SOURCE_PATH, 'utf8')
+/**
+ * Sinds ADR 0179 fase 1 stap 13: de zichtbaarheid van het lab is een perspectief-afleiding
+ * (`use-toekomst-perspectief.ts`); de opslaan-balk-toestand staat nog in de host (stap 14).
+ */
+function bron(deel: 'perspectief' | 'host' = 'host'): string {
+  return leesToekomst(deel)
 }
 
-/** Niet-comment-regels — een uitleg mág elke naam noemen. */
+/** Niet-comment-regels van álle /toekomst-bronnen — een uitleg mág elke naam noemen. */
 function codeRegels(): string[] {
-  return bron()
+  return leesToekomstAlles()
     .split(/\r?\n/)
     .filter((l) => {
       const t = l.trim()
@@ -41,7 +42,7 @@ function codeRegels(): string[] {
 
 describe('KATERN II blijft bereikbaar na "Doel loslaten" (B-031)', () => {
   it('de zichtbaarheid van de doelsectie staat op ÉÉN plek, als benoemde afleiding', () => {
-    expect(bron()).toContain('const verkenSectieZichtbaar =')
+    expect(bron('perspectief')).toContain('const verkenSectieZichtbaar =')
   })
 
   it('de conditie staat nergens meer los ingetypt — twee kopieën lopen uiteen', () => {
@@ -58,7 +59,7 @@ describe('KATERN II blijft bereikbaar na "Doel loslaten" (B-031)', () => {
     // omweg is vervallen: het doelscenario staat nu áltijd in de grafiekkaart, ook
     // in Eenvoudig. Dat maakt de terugweg structureel in plaats van geplakt — maar
     // alleen zolang de afleiding niet opnieuw aan het doel of de modus gaat hangen.
-    const src = bron()
+    const src = bron('perspectief')
     const afleiding = src.slice(
       src.indexOf('const verkenSectieZichtbaar ='),
       src.indexOf('const verkenSectieZichtbaar =') + 200,
@@ -69,7 +70,7 @@ describe('KATERN II blijft bereikbaar na "Doel loslaten" (B-031)', () => {
     expect(afleiding).toContain('usePartnerMainLine')
 
     // De vlag is weg, en daarmee ook de setters die 'm onderhielden.
-    expect(src).not.toContain('doelLosgelatenDezeSessie')
+    expect(leesToekomstAlles()).not.toContain('doelLosgelatenDezeSessie')
   })
 
   it('"Maak dit mijn doel" verschijnt óók bij een kale stopkeuze, niet alleen bij sliders', async () => {

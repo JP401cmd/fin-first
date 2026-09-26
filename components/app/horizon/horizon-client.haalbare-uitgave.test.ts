@@ -22,11 +22,18 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { uitgaveNaPensioenRange, UITGAVE_NA_PENSIOEN_STAP } from '@/lib/scenario-events'
+import { leesToekomst } from '@/lib/test-utils/toekomst-bronnen'
 
 const source = readFileSync(
   join(process.cwd(), 'components', 'app', 'horizon', 'horizon-client.tsx'),
   'utf8',
 )
+/** De preset-batch (`haalbareUitgave`) woont sinds stap 13 in de sim-hook van de provider. */
+const simSource = leesToekomst('sim')
+/** De scenario-state (knopwaarden, `hasScenario`, overrides) sinds stap 13 in de provider. */
+const scenarioSource = leesToekomst('scenario')
+/** De lab-zichtbaarheid is een perspectief-afleiding (stap 13). */
+const perspectiefSource = leesToekomst('perspectief')
 /** De knoppen (`labKnoppen`) staan sinds ADR 0179 fase 1 stap 12 in de state-laag. */
 const knoppenSource = readFileSync(
   join(process.cwd(), 'components', 'toekomst', 'state', 'use-euro-view-feeds.ts'),
@@ -55,21 +62,21 @@ describe('haalbare uitgave — bron-grendel', () => {
   })
 
   it('zet de batch-uitkomst in state én ruimt hem op bij ELKE uitgang', () => {
-    expect(source).toMatch(/setHaalbareUitgave\(batch\.haalbareUitgave \?\? null\)/)
+    expect(simSource).toMatch(/setHaalbareUitgave\(batch\.haalbareUitgave \?\? null\)/)
     // Drie opruimplekken: `.catch`, `yearlyExp <= 0` en `!presetBatchNodig` (task-7-brief
     // stap 3). Een losse `toMatch` bewijst alleen "≥1 voorkomen" en mist het als er twee
     // van de drie sneuvelen — vandaar de exacte telling.
-    expect(source.match(/setHaalbareUitgave\(null\)/g) ?? []).toHaveLength(3)
+    expect(simSource.match(/setHaalbareUitgave\(null\)/g) ?? []).toHaveLength(3)
   })
 
   it('geeft de override door aan de scenario-run', () => {
-    expect(source).toMatch(/uitgaveNaPensioenPerJaar: scenarioUitgaveNaPensioen/)
+    expect(scenarioSource).toMatch(/uitgaveNaPensioenPerJaar: scenarioUitgaveNaPensioen/)
   })
 
   it('hasScenario telt de vierde knop mee — anders bereikt de override de hook nooit', () => {
     // Anker op de hasScenario-declaratie zelf (niet een losse count elders in het
     // bestand): dit is de exacte regel die de override live schakelt.
-    const match = source.match(
+    const match = scenarioSource.match(
       /const hasScenario =\s*\n\s*scenarioSliderEvents\.length > 0 \|\|\s*\n\s*Object\.keys\(scenarioReturnDeltas\)\.length > 0 \|\|\s*\n\s*scenarioUitgaveNaPensioen != null/,
     )
     expect(match, 'hasScenario mist de scenarioUitgaveNaPensioen-disjunct').not.toBeNull()
@@ -162,7 +169,7 @@ describe('haalbare uitgave — bron-grendel', () => {
     // ADR 0170 — een knop bestaat zodra hij een bereik heeft; de perspectief-gate zit op de
     // sectie als geheel (`verkenSectieZichtbaar`, solo-weergave), niet meer per knop-prop.
     expect(source).toContain('if (uitgaveNaPensioenBasis > 0) {')
-    expect(source).toContain('const verkenSectieZichtbaar')
+    expect(perspectiefSource).toContain('const verkenSectieZichtbaar')
   })
 
   it('F3 — de knop bestaat onafhankelijk van een opgelost antwoord (verkenning blijft mogelijk zonder vast stopmoment)', () => {

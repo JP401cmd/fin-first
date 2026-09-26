@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { leesToekomst, leesToekomstAlles } from '@/lib/test-utils/toekomst-bronnen'
 
 /**
  * BRON-GRENDEL op de STOP-ANKER-takken in horizon-client.tsx (ADR 0127 → ADR 0129 F3b).
@@ -17,15 +16,18 @@ import { join } from 'node:path'
  * — nooit meer een string-vergelijking op de strategienaam.
  */
 
-const SOURCE_PATH = join(process.cwd(), 'components', 'app', 'horizon', 'horizon-client.tsx')
-
-function bron(): string {
-  return readFileSync(SOURCE_PATH, 'utf8')
+/**
+ * Sinds ADR 0179 fase 1 stap 13 woont het anker in de sim-hook van de state-provider
+ * (`use-toekomst-sim.ts`); de lab-afleidingen staan nog in de host (tot stap 14).
+ * "Mag nergens"-toetsen lezen alle /toekomst-bronnen samen.
+ */
+function bron(deel: 'sim' | 'host' = 'sim'): string {
+  return leesToekomst(deel)
 }
 
-/** Niet-comment-regels — een uitleg mág elke naam noemen. */
+/** Niet-comment-regels van álle /toekomst-bronnen — een uitleg mág elke naam noemen. */
 function codeRegels(): string[] {
-  return bron()
+  return leesToekomstAlles()
     .split(/\r?\n/)
     .filter((l) => {
       const t = l.trim()
@@ -61,8 +63,8 @@ describe('één sleutel: het plan-anker uit de kernel-echo (ADR 0129, ontwerppri
     const src = bron()
     expect(src).toContain('const heroVraag = ankerVraag(isFixedAnchorMode ? ankerStop : null)')
     // Geen systeemlabel meer als kop of context-hint.
-    expect(src).not.toContain('Pensioen-modus actief')
-    expect(src).not.toContain('Nu-stoppen-modus actief')
+    expect(leesToekomstAlles()).not.toContain('Pensioen-modus actief')
+    expect(leesToekomstAlles()).not.toContain('Nu-stoppen-modus actief')
   })
 })
 
@@ -77,7 +79,7 @@ describe('het kernantwoord loopt via resolveHeroFireAge', () => {
     expect(call).toContain('solvedFireAgeFractional: solvedRun?.fireAge ?? null,')
     expect(call).not.toContain('isPensioenMode')
     expect(call).not.toContain('isNuStoppenMode')
-    expect(src).not.toContain('nuStoppenRunway: nuStoppenRunway,')
+    expect(leesToekomstAlles()).not.toContain('nuStoppenRunway: nuStoppenRunway,')
   })
 })
 
@@ -85,7 +87,7 @@ describe('planningMode blijft tweewaardig en volgt het anker (D6/B11)', () => {
   it("'aow' → pensioen-weergave; de AOW-stop-toggle met eigen kernel-run is weg", () => {
     const src = bron()
     expect(src).toContain("const planningMode: 'fire' | 'pensioen' = isPensioenMode ? 'pensioen' : 'fire'")
-    expect(src).not.toContain("'fire' | 'pensioen' | 'nu-stoppen'")
+    expect(leesToekomstAlles()).not.toContain("'fire' | 'pensioen' | 'nu-stoppen'")
     const code = codeRegels().join('\n')
     expect(code).not.toContain('aowStopSimResult')
     expect(code).not.toContain('isAowStopActive')
@@ -99,7 +101,7 @@ describe('de stopkeuze (vrijheidsas)', () => {
   it('de stop-knop is alleen onder het nu-anker verborgen; onder aow/age is hij verkenning', () => {
     // ADR 0170 — de zichtbaarheid van een knop is dát hij in `labKnopBereik` staat; de host
     // laat de stop-knop weg onder het nu-anker (het plan rekent daar met vandaag).
-    const src = bron()
+    const src = bron('host')
     const start = src.indexOf('const labKnopBereik = useMemo')
     expect(start).toBeGreaterThan(-1)
     const blok = src.slice(start, src.indexOf('}, [', start))
@@ -120,7 +122,7 @@ describe('de stopkeuze (vrijheidsas)', () => {
    * `fire_stop_anchor: 'age'`-body meer in dit bestand.
    */
   it('de as verwijst naar de strategie-modal én schrijft het plan alleen volledig (plan-draft)', () => {
-    const src = bron()
+    const src = bron('host')
     // ADR 0170 — de verwijzing staat in het stop-slot onder de stop-knop. Die knop
     // (setActiveModal('strategie') + 'Je plan-keuzes') staat sinds fase 1 stap 9 in
     // components/toekomst/doelen/doelen-lab.tsx (doelen-lab.test.ts).
@@ -132,6 +134,7 @@ describe('de stopkeuze (vrijheidsas)', () => {
       src,
       'geen hand-gebouwde half-plan-body (het B-038-defect) in dit bestand',
     ).not.toMatch(/fire_stop_anchor:\s*'age'/)
+    expect(leesToekomstAlles()).not.toMatch(/fire_stop_anchor:\s*'age'/)
     expect(
       src,
       'de AOW-snelknop is met B-038 vervallen en komt niet terug',
@@ -139,18 +142,18 @@ describe('de stopkeuze (vrijheidsas)', () => {
   })
 
   it('de default van de slider is onder een vast anker het stopmoment van het plan', () => {
-    expect(bron()).toContain('isFixedAnchorMode && planStopAgeDefault != null')
+    expect(bron('host')).toContain('isFixedAnchorMode && planStopAgeDefault != null')
   })
 })
 
 describe('doelbedrag (D4) en opnamerate (bevinding 6)', () => {
   it('de doelbedrag-guard krijgt de ANKER-vlag mee; de smalle ADR 0127-vlag is weg', () => {
     expect(bron()).toContain('isAnchorPortfolio: simResult?.requiredFireIsAnchorPortfolio === true')
-    expect(bron()).not.toContain('requiredFireIsStartPortfolio')
+    expect(leesToekomstAlles()).not.toContain('requiredFireIsStartPortfolio')
   })
 
   it('de vrijheidsleeftijd-tegel valt niet om op de anker-guard (eigen uitzondering op isFixedAnchorMode)', () => {
-    expect(bron()).toMatch(/const showFireAgeNotice =[\s\S]{0,400}?!isFixedAnchorMode &&/)
+    expect(bron('host')).toMatch(/const showFireAgeNotice =[\s\S]{0,400}?!isFixedAnchorMode &&/)
   })
 
   it('de aftel-bon (dode code) is verwijderd', () => {

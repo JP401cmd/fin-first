@@ -17,9 +17,13 @@
 import { describe, it, expect } from 'vitest'
 import { join } from 'node:path'
 import { readSourceLF } from '@/lib/test-utils/read-source'
+import { leesToekomstAlles } from '@/lib/test-utils/toekomst-bronnen'
 
-const SOURCE_PATH = join(process.cwd(), 'components', 'app', 'horizon', 'horizon-client.tsx')
+/** Het deeplink-effect (E2) woont sinds ADR 0179 fase 1 stap 13 in de overlay-state-hook. */
+const SOURCE_PATH = join(process.cwd(), 'components', 'toekomst', 'state', 'use-toekomst-overlay-state.ts')
 const source = readSourceLF(SOURCE_PATH)
+/** Het legacy-formulier mag in géén /toekomst-bron terugkomen. */
+const alles = leesToekomstAlles()
 
 /** De body van een `if/else if`-tak, tot de eerstvolgende sluitende accolade op dezelfde inspringing. */
 function branchBody(opener: RegExp): string {
@@ -50,9 +54,9 @@ describe('deeplink ?modal=life_events → EventPane-catalogus (ADR 0179 fase 1 s
   })
 
   it('het legacy-gebeurtenisformulier en zijn schrijfpad bestaan niet meer', () => {
-    expect(source).not.toMatch(/\bsetShowForm\b/)
-    expect(source).not.toMatch(/\bsaveEvent\b/)
-    expect(source).not.toMatch(/\brefreshEvents\b/)
-    expect(source).not.toMatch(/=== Event Form Modal ===/)
+    expect(alles).not.toMatch(/\bsetShowForm\b/)
+    expect(alles).not.toMatch(/\bsaveEvent\b/)
+    expect(alles).not.toMatch(/\brefreshEvents\b/)
+    expect(alles).not.toMatch(/=== Event Form Modal ===/)
   })
 })

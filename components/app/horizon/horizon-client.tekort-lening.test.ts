@@ -21,13 +21,15 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { leesToekomst, leesToekomstAlles } from '@/lib/test-utils/toekomst-bronnen'
 
-const SOURCE_PATH = join(process.cwd(), 'components', 'app', 'horizon', 'horizon-client.tsx')
-
+/**
+ * Detector, copy-memo en registratie-hook wonen sinds ADR 0179 fase 1 stap 13 in de
+ * meldingen-hook van de state-provider (`use-toekomst-meldingen.ts`), zodat de
+ * registratie gemount blijft bij een katernwissel (kaart GW3b).
+ */
 function source(): string {
-  return readFileSync(SOURCE_PATH, 'utf8')
+  return leesToekomst('meldingen')
 }
 
 /** Het memo dat de copy bouwt, van declaratie tot sluitende dependency-array. */
@@ -76,7 +78,7 @@ describe('horizon-client — tekort-lening-melding consumeert één bron', () =>
   it('schrijft de uitleg niet ook nog eens inline uit', () => {
     // De zinnen wonen in de copy-module; staan ze óók in de component, dan
     // bestaan er twee lezingen van hetzelfde verhaal naast elkaar.
-    const src = source()
+    const src = leesToekomstAlles()
     for (const zin of [
       'De leenperiode loopt van leeftijd',
       'Op het diepste punt staat er',

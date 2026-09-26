@@ -28,7 +28,8 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-const SOURCE_PATH = join(process.cwd(), 'components', 'app', 'horizon', 'horizon-client.tsx')
+/** De opener woont sinds ADR 0179 fase 1 stap 13 in de overlay-state-hook van de provider. */
+const SOURCE_PATH = join(process.cwd(), 'components', 'toekomst', 'state', 'use-toekomst-overlay-state.ts')
 const source = readFileSync(SOURCE_PATH, 'utf8')
 
 /** Desktop-strip + mobiele strip. */
@@ -39,7 +40,7 @@ describe('"Na pensioen"-KPI — klik in huishoudweergave (WF-REKEN-23-bug4)', ()
     const match = source.match(
       /const openRetirementExpensePane = useCallback\(\(\) => \{([\s\S]*?)\n {2}\}, \[([^\]]*)\]\)/,
     )
-    expect(match, 'openRetirementExpensePane niet gevonden in horizon-client.tsx').not.toBeNull()
+    expect(match, 'openRetirementExpensePane niet gevonden in use-toekomst-overlay-state.ts').not.toBeNull()
     const [, body, deps] = match!
     // De guard: perspectief ÉN gevulde huishoud-info, anders het eigen paneel.
     expect(body).toMatch(/if \(isHouseholdView && householdRetireInfo\) setHouseholdRetireOpen\(true\)/)

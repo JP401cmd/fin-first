@@ -85,7 +85,13 @@ describe('buildDeeplinkCleanupUrl — blijft op de huidige route', () => {
 })
 
 describe('bron-grendel — de deeplink-opschoning wisselt niet van route', () => {
+  // Het mount-effect (E2) woont sinds ADR 0179 fase 1 stap 13 in de overlay-state-hook
+  // van de /toekomst-state-provider.
   const SOURCE = readFileSync(
+    join(process.cwd(), 'components', 'toekomst', 'state', 'use-toekomst-overlay-state.ts'),
+    'utf8',
+  )
+  const HOST = readFileSync(
     join(process.cwd(), 'components', 'app', 'horizon', 'horizon-client.tsx'),
     'utf8',
   )
@@ -102,7 +108,7 @@ describe('bron-grendel — de deeplink-opschoning wisselt niet van route', () =>
     // de router-URL op een pad dat niets rendert — de React #310-desync.
     // Cross-page-navigatie naar échte routes (/toekomst/doelen, /core/debts)
     // blijft gewoon toegestaan; alleen /horizon** is verboden.
-    const offenders = SOURCE.split(/\r?\n/)
+    const offenders = [SOURCE, HOST].join('\n').split(/\r?\n/)
       .filter((line) => !/^\s*(\*|\/\/|\/\*)/.test(line))
       .filter((line) => /(router\.(replace|push)|triggerDream)\(\s*['"`]\/horizon/.test(line))
     expect(offenders).toEqual([])

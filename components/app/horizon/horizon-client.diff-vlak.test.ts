@@ -122,7 +122,8 @@ describe('de nalatenschap-bol hangt aan de wat-als-lijn (eigenaarsbesluit 20 sep
 
 describe('de wat-als-lijn verschijnt zodra je aan een knop draait', () => {
   it('één effect op de overgang naar een actieve verkenning, met een ref als geheugen', () => {
-    const src = lees('components', 'app', 'horizon', 'horizon-client.tsx')
+    // Sinds ADR 0179 fase 1 stap 13 in de scenario-state van de provider.
+    const src = lees('components', 'toekomst', 'state', 'use-toekomst-scenario.ts')
     const start = src.indexOf('const hadScenarioRef')
     expect(start).toBeGreaterThan(-1)
     const blok = src.slice(start, start + 400)

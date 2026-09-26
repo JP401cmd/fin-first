@@ -23,16 +23,19 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { leesToekomst, leesToekomstAlles } from '@/lib/test-utils/toekomst-bronnen'
 
-const SOURCE_PATH = join(process.cwd(), 'components', 'app', 'horizon', 'horizon-client.tsx')
 const HOOK_PATH = join(process.cwd(), 'lib', 'hooks', 'use-horizon-fire-sim.ts')
 const LOADER_PATH = join(process.cwd(), 'lib', 'horizon-data-loader.ts')
 
-const source = readFileSync(SOURCE_PATH, 'utf8')
+/** De beslisser woont sinds ADR 0179 fase 1 stap 13 in de sim-hook van de state-provider. */
+const source = leesToekomst('sim')
+/** De tegel-kopij (onderschrift, leesvolgorde) staat in de host. */
+const host = leesToekomst('host')
 
-/** Commentaarregels tellen niet mee — een uitleg mág de oude keten citeren. */
+/** Commentaarregels van álle /toekomst-bronnen — een uitleg mág de oude keten citeren. */
 function codeRegels(): string[] {
-  return source.split(/\r?\n/).filter((l) => {
+  return leesToekomstAlles().split(/\r?\n/).filter((l) => {
     const t = l.trim()
     return !(t.startsWith('//') || t.startsWith('*') || t.startsWith('/*'))
   })
@@ -41,7 +44,7 @@ function codeRegels(): string[] {
 describe('horizon-client — één beslisser voor de doelbedrag-grondslag', () => {
   it('consumeert de gedeelde resolver, precies één keer', () => {
     expect(source).toContain("from '@/lib/horizon/fire-doel-weergave'")
-    const calls = source.match(/resolveFireDoelWeergave\s*\(/g) ?? []
+    const calls = leesToekomstAlles().match(/resolveFireDoelWeergave\s*\(/g) ?? []
     expect(calls, 'precies één plek mag de grondslag van het doelbedrag kiezen').toHaveLength(1)
   })
 
@@ -58,7 +61,7 @@ describe('horizon-client — één beslisser voor de doelbedrag-grondslag', () =
     expect(source).toMatch(/const balkVrijheidDoel = fireDoel\.bedrag/)
     expect(source).toMatch(/const fireTargetInclHome = fireDoel\.inclHuis/)
     expect(source).toMatch(/const fireTargetExclHome = fireDoel\.exclHuis/)
-    expect(source).toMatch(/FIRE_DOEL_ONDERSCHRIFT\[fireDoel\.grondslag\]/)
+    expect(host).toMatch(/FIRE_DOEL_ONDERSCHRIFT\[fireDoel\.grondslag\]/)
   })
 
   it('schrijft het onderschrift nergens meer zelf uit', () => {
@@ -106,7 +109,7 @@ describe('horizon-client — één beslisser voor de doelbedrag-grondslag', () =
     // als hoofdantwoord bóven een balk die € 530.000 noemde. Het grootste getal is
     // een bewering over wát het antwoord is — die moet dus uit dezelfde ene
     // grondslagkeuze komen als het bedrag, het onderschrift en de balk.
-    expect(source).toMatch(/fireDoelPaarInLeesvolgorde\(fireDoel\.grondslag/)
+    expect(host).toMatch(/fireDoelPaarInLeesvolgorde\(fireDoel\.grondslag/)
     // Geen enkel bedrag in de tegel meer rechtstreeks uit een grondslag-vaste bron.
     for (const regel of codeRegels()) {
       expect(

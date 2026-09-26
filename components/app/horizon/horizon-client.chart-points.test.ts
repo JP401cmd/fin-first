@@ -24,13 +24,14 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { leesToekomstAlles } from '@/lib/test-utils/toekomst-bronnen'
 
-const SRC = readFileSync(
-  join(process.cwd(), 'components/app/horizon/horizon-client.tsx'),
-  'utf-8',
-)
+/**
+ * Sinds ADR 0179 fase 1 stap 13 staan de overlay-reeksen verspreid over de host en de
+ * state-hooks (perspectief: huishoudlijn; euro-grens: de gedeflateerde reeksen). De
+ * conventie geldt voor élke /toekomst-bron, dus lezen we ze samen.
+ */
+const SRC = leesToekomstAlles()
 
 describe('horizon-client — chart-punten volgen de tijdstip-conventie', () => {
   it('bouwt geen overlay-punten meer met de rauwe [age, endPortfolio]-vorm', () => {
