@@ -306,9 +306,11 @@ describe('ToekomstCanvas — Doelen', () => {
     expect(grafiek().toonReadout).toBe(false)
     // useIsLgUp is hier gemockt op true ⇒ de desktophoogte.
     expect(grafiek().plotHoogte).toBe(220)
+    expect(grafiek().hoofdlijnGedempt).toBe(true)
     renderIn(null)
     expect(grafiek().toonTijdlijn).toBe(true)
     expect(grafiek().plotHoogte).toBeNull()
+    expect(grafiek().hoofdlijnGedempt).toBe(false)
   })
 
   it('zegt in Samenstelling dat die modus het plan volgt', () => {

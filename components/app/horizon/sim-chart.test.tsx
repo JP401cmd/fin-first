@@ -258,6 +258,31 @@ function besteedbaarPath(container: HTMLElement) {
   )
 }
 
+describe('SimChart — hoofdlijn als gedempte referentie (katern Doelen, ADR 0179 fase 4)', () => {
+  // De hoofdpaden (opbouw, afbouw, brug, onttrekking, of de grijze lijn zonder FIRE) dragen
+  // `data-hoofdpad`; spooklijnen, huishoudlijnen en de wat-als-lijn niet.
+  const hoofdpaden = (c: HTMLElement) => Array.from(c.querySelectorAll('path[data-hoofdpad="true"]'))
+
+  it('hoofdlijnGedempt: elk hoofdpad op 0,45; de wat-als-lijn blijft vol', () => {
+    const { container } = render(<SimChart {...watalsProps()} hoofdlijnGedempt />)
+    const paden = hoofdpaden(container)
+    expect(paden.length).toBeGreaterThan(0)
+    for (const p of paden) expect(Number(p.getAttribute('opacity'))).toBeCloseTo(0.45, 5)
+    const inkPath = Array.from(container.querySelectorAll('path')).find(
+      (p) => p.getAttribute('stroke') === 'var(--ink-2)' && p.getAttribute('stroke-dasharray') === '6 4',
+    )
+    expect(inkPath!.getAttribute('opacity')).not.toBe('0.45')
+  })
+
+  it('zonder de vlag: de hoofdpaden op volle opaciteit (bestaande callers ongewijzigd)', () => {
+    const { container } = render(<SimChart {...watalsProps()} />)
+    for (const p of hoofdpaden(container)) {
+      const o = p.getAttribute('opacity')
+      expect(o === null || Number(o) === 1).toBe(true)
+    }
+  })
+})
+
 describe('SimChart — besteedbaar-lijn naast de totale vermogenslijn', () => {
   it('tekent een dunne gestreepte horizon-lijn zodra liquidPoints gezet is', () => {
     const { container } = render(<SimChart {...besteedbaarProps()} />)

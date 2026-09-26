@@ -61,7 +61,16 @@ export type ChartStaticLayersProps = {
   /** M16 — doorgegeven aan ChartEventMarkers: opent de lijst achter een
    *  "+N"-clusterbadge. Zie `ChartEventMarkers.onClusterOpen`. */
   onClusterOpen?: (events: ChartEventOverlay[], centerAge: number) => void
+  /**
+   * ADR 0179 fase 4 (spec §4.5): in katern Doelen is de hoofdlijn (het plan) de referentie
+   * en het doelscenario het verhaal — de hoofdpaden staan dan gedempt. Afwezig = normaal.
+   */
+  hoofdlijnGedempt?: boolean
 }
+
+/** Opaciteit van de hoofdpaden als referentielijn (Doelen). Zelfde ondergrens-logica als
+ *  `DIMMED`: leesbaar gedempt, het verschil leunt niet alleen op contrast. */
+export const HOOFDLIJN_GEDEMPT = 0.45
 
 /** Dim-contrast voor niet-benadrukte segmenten (uitleg-walkthrough). Bewust
  *  0.30 (niet lager): de gedimde segmenten blijven leesbaar zodat het verschil
@@ -109,6 +118,7 @@ export function ChartStaticLayersInner({
   onEventDragEnd,
   onEventDragMove,
   onClusterOpen,
+  hoofdlijnGedempt = false,
 }: ChartStaticLayersProps) {
   // B-057 — dezelfde puls als de wat-als-lijn, op de hoofdpaden zolang een hersolve
   // onderweg is. Pas ná de intreek-animatie (anders vecht de puls met de reveal).
@@ -183,8 +193,9 @@ export function ChartStaticLayersInner({
 
   // Emphasis-afgeleide render-waarden (uitleg-walkthrough). Geen geometrie —
   // daarom hier, niet in de gememoiseerde geometry.
-  const accOpacity = emphasis === null || emphasis === 'accumulation' || emphasis === 'fire' ? 1 : DIMMED
-  const decOpacity = emphasis === null || emphasis === 'withdrawal' ? 1 : DIMMED
+  const demp = hoofdlijnGedempt ? HOOFDLIJN_GEDEMPT : 1
+  const accOpacity = (emphasis === null || emphasis === 'accumulation' || emphasis === 'fire' ? 1 : DIMMED) * demp
+  const decOpacity = (emphasis === null || emphasis === 'withdrawal' ? 1 : DIMMED) * demp
 
   // Elke drempel hoort bij precies één GETEKENDE lijn — en sinds de primaire
   // lijn per woonstrategie van grondslag kan wisselen (ADR 0114) volgt die regel
@@ -733,6 +744,7 @@ export function ChartStaticLayersInner({
         <path
           d={accPath}
           className={mainPendingClass}
+          data-hoofdpad="true"
           fill="none"
           stroke={mainStrokeAcc}
           strokeWidth={emphasis === 'accumulation' ? 3.25 : 2.5}
@@ -751,6 +763,7 @@ export function ChartStaticLayersInner({
         <path
           d={decPath}
           className={mainPendingClass}
+          data-hoofdpad="true"
           fill="none"
           stroke={mainStrokeDec}
           strokeWidth={emphasis === 'withdrawal' ? 3.25 : 2.5}
@@ -771,6 +784,7 @@ export function ChartStaticLayersInner({
         <path
           d={bridgePath}
           className={mainPendingClass}
+          data-hoofdpad="true"
           fill="none"
           stroke={bridgeStroke}
           strokeWidth={2.5}
@@ -789,6 +803,7 @@ export function ChartStaticLayersInner({
         <path
           d={withdrawalPath}
           className={mainPendingClass}
+          data-hoofdpad="true"
           fill="none"
           stroke={mainStrokeDec}
           strokeWidth={emphasis === 'withdrawal' ? 3.25 : 2.5}
@@ -807,6 +822,7 @@ export function ChartStaticLayersInner({
         <path
           d={allPath}
           className={mainPendingClass}
+          data-hoofdpad="true"
           fill="none"
           stroke="var(--ink-3)"
           strokeWidth={2.5}
@@ -815,6 +831,7 @@ export function ChartStaticLayersInner({
           pathLength={1}
           strokeDasharray="1"
           strokeDashoffset={hasEntered ? 0 : 1}
+          opacity={hoofdlijnGedempt ? HOOFDLIJN_GEDEMPT : undefined}
           style={{ transition: hasEntered ? 'stroke-dashoffset 1.2s cubic-bezier(.22,1,.36,1)' : 'none' }}
         />
       )}

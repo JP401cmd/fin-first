@@ -308,6 +308,7 @@ export const SimChart = memo(function SimChart({
   onHoverAge,
   hideValueTooltip = false,
   plotHoogte,
+  hoofdlijnGedempt = false,
 }: {
   rows: SimRow[]
   fireAge: number | null
@@ -436,6 +437,8 @@ export const SimChart = memo(function SimChart({
   /** Compacte basishoogte in px (zie `SimChartGeometryInput.plotHoogte`); afwezig ⇒
    *  260 desktop / 220 mobiel, byte-identiek voor bestaande callers. */
   plotHoogte?: number
+  /** ADR 0179 fase 4: de hoofdlijn als gedempte referentie (katern Doelen). Afwezig = normaal. */
+  hoofdlijnGedempt?: boolean
 }) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 1200, forModal })
   // Bedragmaskering (ADR 0091) komt uit de hook, NIET uit een prop: de hook
@@ -612,6 +615,7 @@ export const SimChart = memo(function SimChart({
           onEventDragEnd={onEventDragEnd}
           onEventDragMove={onEventDragMove}
           onClusterOpen={onClusterOpen}
+          hoofdlijnGedempt={hoofdlijnGedempt}
         />
 
         {/* Crosshair-laag (hover-rect + verticale lijn + stip) — de enige laag

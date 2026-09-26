@@ -94,6 +94,11 @@ export interface CanvasStand {
   /** De legenda past op mobiel op hoogstens één regel (Doelen, §4.2 regel 9). */
   readonly legendaEenRegel: boolean
   /**
+   * De hoofdlijn als gedempte referentie (spec §4.5: "ja, als referentie in gedempte
+   * inkt"): in Doelen, zodra er een doelscenario-lijn is om tegen af te zetten.
+   */
+  readonly hoofdlijnGedempt: boolean
+  /**
    * Basishoogte van de vermogensgrafiek in px (`SimChart.plotHoogte`); `null` ⇒ de
    * standaardhoogte van de grafiek. Instellingen: compact (spec §4.5).
    */
@@ -185,6 +190,7 @@ export function canvasStand(
       toonReadout: false,
       toonTijdlijn: true,
       legendaEenRegel: false,
+      hoofdlijnGedempt: false,
       plotHoogte: COMPACTE_PLOTHOOGTE,
     }
   }
@@ -222,6 +228,7 @@ export function canvasStand(
     toonReadout: katern !== 'doelen',
     toonTijdlijn: katern !== 'doelen',
     legendaEenRegel: katern === 'doelen',
+    hoofdlijnGedempt: katern === 'doelen' && lagen.doelscenario,
     plotHoogte:
       katern === 'doelen'
         ? weergave.breed

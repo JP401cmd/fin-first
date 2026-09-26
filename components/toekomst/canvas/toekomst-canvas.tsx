@@ -456,6 +456,7 @@ export function ToekomstCanvas({ zijkolom = null }: { zijkolom?: ReactNode } = {
               toonFasebalk={stand.toonFasebalk}
               toonReadout={stand.toonReadout}
               toonTijdlijn={stand.toonTijdlijn}
+              hoofdlijnGedempt={stand.hoofdlijnGedempt}
               plotHoogte={stand.plotHoogte}
               doelscenario={doelscenarioFeed}
             />

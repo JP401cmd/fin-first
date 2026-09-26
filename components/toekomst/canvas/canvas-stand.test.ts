@@ -274,3 +274,17 @@ describe('canvasStand — Doelen: grafiek en knoppen op één scherm (ADR 0179 D
     expect(canvasStand('doelen', metKeuze, b2, { eenvoudig: false }).lagen.marktcheck).toBe(true)
   })
 })
+
+describe('canvasStand — gedempte hoofdlijn (spec §4.5, fase 4 S5b)', () => {
+  const k = { modus: 'vermogen' as const, lagen: Object.fromEntries(LAAG_VOLGORDE.map((id) => [id, false])) as Record<LaagId, boolean> }
+  it('Doelen met een doellijn: de hoofdlijn als referentie gedempt; zonder doellijn niet', () => {
+    expect(canvasStand('doelen', k, { doelen: false, doelscenario: true, metHuis: false }, { eenvoudig: false }).hoofdlijnGedempt).toBe(true)
+    expect(canvasStand('doelen', k, { doelen: false, doelscenario: false, metHuis: false }, { eenvoudig: false }).hoofdlijnGedempt).toBe(false)
+  })
+  it('Plan en Instellingen: nooit', () => {
+    const metKeuze = { ...k, lagen: { ...k.lagen, doelscenario: true } }
+    const b = { doelen: false, doelscenario: true, metHuis: false }
+    expect(canvasStand('plan', metKeuze, b, { eenvoudig: false }).hoofdlijnGedempt).toBe(false)
+    expect(canvasStand('instellingen', metKeuze, b, { eenvoudig: false }).hoofdlijnGedempt).toBe(false)
+  })
+})

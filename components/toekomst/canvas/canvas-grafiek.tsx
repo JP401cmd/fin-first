@@ -176,6 +176,8 @@ export interface CanvasGrafiekProps {
   toonReadout: boolean
   /** De gebeurtenissentijdlijn onder de grafiek (niet in Doelen, `CanvasStand.toonTijdlijn`). Afwezig = ja. */
   toonTijdlijn?: boolean
+  /** De hoofdlijn als gedempte referentie (Doelen met doellijn, `CanvasStand.hoofdlijnGedempt`). */
+  hoofdlijnGedempt?: boolean
   /** Compacte basishoogte van de vermogensgrafiek (`CanvasStand.plotHoogte`); `null` ⇒ standaard. */
   plotHoogte: number | null
   /**
@@ -273,6 +275,7 @@ export function CanvasGrafiek({
   toonFasebalk,
   toonReadout,
   toonTijdlijn = true,
+  hoofdlijnGedempt = false,
   plotHoogte,
   doelscenario = null,
 }: CanvasGrafiekProps) {
@@ -362,6 +365,7 @@ export function CanvasGrafiek({
                             // grafiek ze zelf.
                             hideValueTooltip={displayMode === 'full' && isLg && toonReadout}
                             plotHoogte={plotHoogte ?? undefined}
+                            hoofdlijnGedempt={hoofdlijnGedempt}
                             rows={useHouseholdMainLine ? viewHouseholdMainLineRows! : usePartnerMainLine ? viewPartnerLineRows! : (viewDisplaySimRows)}
                             fireAge={useHouseholdMainLine ? householdMainLine!.fireAge : usePartnerMainLine ? partnerLine!.fireAge : (simResult.fireAge)}
                             fireAgeFractional={useHouseholdMainLine ? householdMainLine!.fireAgeFractional : usePartnerMainLine ? partnerLine!.fireAgeFractional : (simResult.fireAgeFractional)}
