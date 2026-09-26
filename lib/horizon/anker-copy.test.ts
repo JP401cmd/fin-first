@@ -25,8 +25,6 @@ import {
   dekkingBadge,
   dekkingDeltaBadge,
   dekkingAsNotitie,
-  radarSubtitel,
-  radarEindstrategieAnkerReden,
   antwoordDoorwerken,
   antwoordMeerSalaris,
   HEFBOOM_COPY,
@@ -360,21 +358,6 @@ describe('dekking-zinnen — de vastgestelde kopij', () => {
     expect(dekkingAsNotitie({ kind: 'onbekend' }, null, 90)).toBeNull()
   })
 
-  it('9 · radar-subtitel: plan · verkend · nu · solved (null = UI houdt haar tekst)', () => {
-    expect(radarSubtitel({ stop: AGE, verkendStopAge: null })).toBe("Vier dekkingsratio's — gerekend op je plan: stoppen op 58,5.")
-    expect(radarSubtitel({ stop: AOW, verkendStopAge: 62 })).toBe(
-      "Vier dekkingsratio's — gerekend op een verkend stopmoment: stoppen op 62 jr; je plan rekent met 67.",
-    )
-    expect(radarSubtitel({ stop: { kind: 'now' }, verkendStopAge: null })).toBe("Vier dekkingsratio's — je rekent alsof je nu stopt.")
-    expect(radarSubtitel({ stop: null, verkendStopAge: 60 })).toBeNull()
-  })
-
-  it('10 · radar-as 4 reden', () => {
-    expect(radarEindstrategieAnkerReden()).toBe(
-      'Onder een vast stopmoment is er geen doelvermogen om het eindvermogen tegen af te zetten — de dekking hiernaast zegt of je plan reikt.',
-    )
-  })
-
   it('de vijf knoppen: vaste namen en de euro-regel onder de spaarquote (ADR 0170)', () => {
     // De vijf van ADR 0170, plus twee namen die buiten het lab nog leven (KPI-duiding en
     // oudere teksten). "Minder werken" en "Later of eerder stoppen" vervielen als knop.
@@ -487,13 +470,10 @@ describe('dekking-zinnen — toon-invarianten over alle ankers', () => {
         ANTWOORD_BOVEN_BEREIK,
         ANTWOORD_KNOP,
         ANTWOORD_KNOP_MAX,
-        radarSubtitel({ stop, verkendStopAge: null }) ?? '',
-        radarSubtitel({ stop, verkendStopAge: 62 }) ?? '',
         ...TEKORT_REACHES.map((r) => dekkingAsNotitie(r, 40, 90) ?? ''),
         dekkingVerkenZin({ basisPct: 40, scenarioPct: 60, reikt: 84 }),
         dekkingBadge(40),
         dekkingDeltaBadge(20),
-        radarEindstrategieAnkerReden(),
         dekkingVastgelegdToast(90),
         planCoverageGoalNotApplicableReason(),
       ]

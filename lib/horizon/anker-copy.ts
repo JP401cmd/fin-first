@@ -816,30 +816,8 @@ export function dekkingAsNotitie(reach: AnkerReach, pct: number | null, endAge: 
   }
 }
 
-/**
- * Zin 9 — de radar-subtitel. `null` onder `solved` (de UI houdt dan haar bestaande
- * tekst); onder een vast anker "gerekend op je plan" resp. "op een verkend stopmoment"
- * wanneer de stop-slider (stop-pad) de rijen levert. Onder `now` is er geen slider.
- */
-export function radarSubtitel(input: { stop: AnkerStop | null; verkendStopAge: number | null }): string | null {
-  const { stop, verkendStopAge } = input
-  if (stop == null) return null
-  if (stop.kind === 'now') return "Vier dekkingsratio's — je rekent alsof je nu stopt."
-  const plan = formatStopAge(stop.stopAge)
-  if (verkendStopAge != null && Number.isFinite(verkendStopAge)) {
-    return `Vier dekkingsratio's — gerekend op een verkend stopmoment: stoppen op ${formatStopAge(verkendStopAge)} jr; je plan rekent met ${plan}.`
-  }
-  return `Vier dekkingsratio's — gerekend op je plan: stoppen op ${plan}.`
-}
-
-/**
- * Zin 10 — de reden waarom radar-as 4 (eindstrategie, behoud-tak) onder een vast
- * stopmoment `null` is: `requiredFirePortfolio` is daar de stand op het anker, geen doel
- * (ADR 0087-principe, ADR 0145 D5).
- */
-export function radarEindstrategieAnkerReden(): string {
-  return 'Onder een vast stopmoment is er geen doelvermogen om het eindvermogen tegen af te zetten — de dekking hiernaast zegt of je plan reikt.'
-}
+// Zin 9 en 10 (radar-subtitel en de reden bij radar-as 4) vervielen met de dekkingsradar
+// (eigenaarsbesluit 26 sep 2026, ADR 0179-addendum).
 
 // ── Zin 11 — antwoorden naast de knoppen (spec lab-haalbaarheid §3/§5; spec antwoorden-naast-sliders, 15 sep 2026) ──
 // Beschrijvend ("dekt je plan" / "hoort bij een gedekt plan"), nooit een instructie; geen "AOW" in een tekortzin.
