@@ -22,7 +22,7 @@ import { NextRequest } from 'next/server'
 const mockGetUser = vi.fn()
 const mockSingle = vi.fn()
 const mockUpdateEq = vi.fn()
-const mockUpdate = vi.fn((_: unknown) => ({ eq: mockUpdateEq }))
+const mockUpdate = vi.fn<(row: unknown) => { eq: typeof mockUpdateEq }>(() => ({ eq: mockUpdateEq }))
 const mockSelect = vi.fn(() => ({ eq: () => ({ single: mockSingle }) }))
 const mockFrom = vi.fn(() => ({ select: mockSelect, update: mockUpdate }))
 
