@@ -250,3 +250,21 @@ describe('PlanAnkerEnVoortgang — de voortgangsbalk', () => {
     expect(container.textContent).not.toMatch(/werken wordt een keuze/i)
   })
 })
+
+describe('PlanKpiStrip — KPI 4 linkt naar de rij in Instellingen (ADR 0179 fase 3)', () => {
+  it('persoonlijk: de cel is een link naar ?rij=uitgave-na-pensioen, geen pane', () => {
+    const openRetirementExpensePane = vi.fn()
+    const { container } = renderStrip('full', { openRetirementExpensePane })
+    const cel = container.querySelector('[data-testid="hero-stat-retirement-expense"]') as HTMLElement
+    expect(cel.tagName).toBe('A')
+    expect(cel.getAttribute('href')).toBe('/toekomst/instellingen?rij=uitgave-na-pensioen')
+    cel.click()
+    expect(openRetirementExpensePane).not.toHaveBeenCalled()
+  })
+
+  it('het bedrag op de tegel is dezelfde bron als de rij (effectiveInput.yearlyMustExpenses)', () => {
+    const { container } = renderStrip('full')
+    const cel = container.querySelector('[data-testid="hero-stat-retirement-expense"]') as HTMLElement
+    expect(cel.textContent).toMatch(/37\.800/)
+  })
+})

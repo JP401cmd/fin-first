@@ -91,12 +91,9 @@ describe('overlay-host — deeplinks blijven in de parent (E2)', () => {
   })
 })
 
-describe('overlay-host — StrategieModal ververst na sluiten', () => {
-  it('sluiten herlaadt en ververst de server-render', () => {
-    // Sinds fase 1 stap 3 (A1) is `loadData` zelf `startRefresh(() => router.refresh())`.
-    expect(src).toContain(
-      'onClose={() => { setActiveModal(null); setStrategieInitialTab(null); loadData() }}',
-    )
+describe('overlay-host — de Strategieën-modal is opgeheven (ADR 0179 fase 3)', () => {
+  it('mount geen StrategieModal meer: elke keuze is een rij in Instellingen', () => {
+    expect(src).not.toMatch(/StrategieModal|strategie-modal/)
   })
 })
 
@@ -109,7 +106,7 @@ describe('overlay-host — overlay-standaard (ADR 0039, besluit Q9)', () => {
 
   it('elke dynamic() staat hier precies één keer, zonder SSR', () => {
     const namen = [
-      'ScenariosModal', 'SimulationsModal', 'BacktestingModal', 'StrategieModal',
+      'ScenariosModal', 'SimulationsModal', 'BacktestingModal',
       'EventPane', 'PhaseModalOpbouw', 'PhaseModalOvergang', 'PhaseModalOnttrekking',
       'SimChartModal', 'HorizonYearDetailsSheet',
     ]

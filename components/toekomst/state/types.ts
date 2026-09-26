@@ -12,7 +12,7 @@ import type { LifeEvent } from '@/lib/horizon-data'
 import type { HouseholdRetirementMethod } from '@/lib/household-projection'
 
 /** Welke analyse-modal open staat (horizon-client r369). */
-export type ActiveModal = null | 'scenarios' | 'simulations' | 'backtesting' | 'strategie'
+export type ActiveModal = null | 'scenarios' | 'simulations' | 'backtesting'
 
 /** Household FIRE data shape (from /api/household/fire-projections) — horizon-client r371–386. */
 export interface HouseholdHeroData {
@@ -57,9 +57,6 @@ export type IeViewMode = 'lines' | 'breakdown'
 
 /** State-generiek `activeFaseModal` (horizon-client r755). */
 export type ActiveFaseModal = 'opbouw' | 'overgang' | 'onttrekking' | null
-
-/** State-generiek `strategieInitialTab` (horizon-client r753). */
-export type StrategieInitialTab = 'eind' | 'onttrekking' | 'woning' | null
 
 /** State-generiek `householdRetireInfo` (horizon-client r938–941). */
 export type HouseholdRetireInfo = {

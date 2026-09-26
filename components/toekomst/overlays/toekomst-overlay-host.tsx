@@ -27,8 +27,6 @@ export function ToekomstOverlayHost() {
   const {
     activeModal,
     setActiveModal,
-    strategieInitialTab,
-    setStrategieInitialTab,
     simModalOpen,
     setSimModalOpen,
     activeFaseModal,
@@ -54,7 +52,6 @@ export function ToekomstOverlayHost() {
     withdrawalStrategyConfig,
     fireStrategy,
     kernelRawProfile,
-    aowRows,
     userAowAge,
     debts,
     events,
@@ -116,11 +113,8 @@ export function ToekomstOverlayHost() {
       isHouseholdView={isHouseholdView}
       householdInput={householdInput}
       fireSwr={fireSwr}
-      setStrategieInitialTab={setStrategieInitialTab}
       loadData={loadData}
       router={router}
-      strategieInitialTab={strategieInitialTab}
-      aowRows={aowRows}
       householdRetireInfo={householdRetireInfo}
       householdRetireOpen={householdRetireOpen}
       setHouseholdRetireOpen={setHouseholdRetireOpen}

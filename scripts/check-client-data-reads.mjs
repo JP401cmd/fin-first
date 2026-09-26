@@ -125,7 +125,8 @@ const ALLOWLIST = new Set([
   // — Fase b, slice 4: horizon / toekomst —
   // 'components/app/horizon/horizon-client.tsx' — VERVALLEN (ADR 0179 fase 1 stap 3):
   // loadData/loadKernelContext zijn vervangen door router.refresh() + props-als-bron.
-  'components/app/horizon/strategie-modal.tsx',
+  // 'components/app/horizon/strategie-modal.tsx' — VERVALLEN (ADR 0179 fase 3): de modal is
+  // opgeheven; elke keuze is een rij in katern Instellingen.
   'components/future/doel-toevoegen-sheet.tsx',
   'components/future/doel-bewerken-sheet.tsx',
   // — Fase b, slice 5: debts + belasting —

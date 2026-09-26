@@ -31,7 +31,7 @@ import type { Debt } from '@/lib/debt-data'
 import type { HealthScoreInput } from '@/lib/financial-health'
 import type { ConvergentieRawProfileRow } from '@/lib/horizon-kernel/convergentie-router'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
-import type { AowAge, AowLeeftijdRow } from '@/lib/aow-leeftijd'
+import type { AowAge } from '@/lib/aow-leeftijd'
 import type { WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
 import type { PreviewBaseline } from '@/lib/strategy-preview'
 import type { NaturalMilestone } from '@/lib/natural-milestones'
@@ -47,7 +47,6 @@ import type {
   HouseholdRetireInfo,
   OnttrekkingData,
   OvergangData,
-  StrategieInitialTab,
 } from '@/components/toekomst/state/types'
 
 const ScenariosModal = dynamic(() =>
@@ -60,10 +59,6 @@ const SimulationsModal = dynamic(() =>
 )
 const BacktestingModal = dynamic(() =>
   import('@/components/app/horizon/backtesting-modal').then(m => ({ default: m.BacktestingModal })),
-  { ssr: false }
-)
-const StrategieModal = dynamic(() =>
-  import('@/components/app/horizon/strategie-modal').then(m => ({ default: m.StrategieModal })),
   { ssr: false }
 )
 const EventPane = dynamic(() =>
@@ -124,18 +119,15 @@ export interface ToekomstOverlaysProps {
   onttrekkingData: OnttrekkingData
   erfgenamen: Erfgenamen
   partnerAowBedrag: number | undefined
-  // AA — deep-dive modals, StrategieModal
+  // AA — deep-dive modals
   activeModal: ActiveModal
   setActiveModal: Dispatch<SetStateAction<ActiveModal>>
   effectiveFireTarget: number
   isHouseholdView: boolean
   householdInput: FinancialInput | null
   fireSwr: number
-  setStrategieInitialTab: Dispatch<SetStateAction<StrategieInitialTab>>
   loadData: () => void
   router: ReturnType<typeof useRouter>
-  strategieInitialTab: StrategieInitialTab
-  aowRows: AowLeeftijdRow[]
   // AB — HouseholdRetirementPane, EventPane
   householdRetireInfo: HouseholdRetireInfo
   householdRetireOpen: boolean
@@ -196,11 +188,8 @@ export function ToekomstOverlays({
   isHouseholdView,
   householdInput,
   fireSwr,
-  setStrategieInitialTab,
   loadData,
   router,
-  strategieInitialTab,
-  aowRows,
   householdRetireInfo,
   householdRetireOpen,
   setHouseholdRetireOpen,
@@ -371,22 +360,6 @@ export function ToekomstOverlays({
           />
         </>
       )}
-      <StrategieModal
-        open={activeModal === 'strategie'}
-        onClose={() => { setActiveModal(null); setStrategieInitialTab(null); loadData() }}
-        // B-057/B1 — na een geslaagde autosave van het plan herlaadt de grafiek
-        // meteen (pane blijft open). Sinds fase 1 stap 3 is `loadData` zelf de
-        // `router.refresh()`; sluiten ververst nog één keer.
-        onSaved={() => { void loadData() }}
-        housingStrategy={initialData.housingStrategy}
-        initialTab={strategieInitialTab}
-        // Kernel-context: de onttrekking-tab vergelijkt de vier PROFIELEN via de kernel.
-        kernelRawProfile={kernelRawProfile}
-        kernelAssets={initialData.assets}
-        kernelDebts={debts}
-        kernelLifeEvents={displayEvents}
-        kernelAowRows={aowRows}
-      />
 
       {/* Huishoud-aanpasflow — geopend vanaf de "Na pensioen"-KPI in huishoudweergave.
           onSaved bumpt de perspectief-versie zodat hero + grafiek + huishoud-FIRE-sectie

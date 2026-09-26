@@ -17,7 +17,7 @@ import { buildDeeplinkCleanupUrl } from '@/lib/horizon/deeplink-cleanup'
 import { instellingenRijHref } from '@/lib/toekomst/instellingen-rij'
 
 const UITGAVE_RIJ_HREF = instellingenRijHref('uitgave-na-pensioen')
-import type { ActiveModal, ClusterSheet, EventPaneMode, ActiveFaseModal, StrategieInitialTab } from '@/components/toekomst/state/types'
+import type { ActiveModal, ClusterSheet, EventPaneMode, ActiveFaseModal } from '@/components/toekomst/state/types'
 import { useStabielObject } from './use-stabiel-object'
 import type { ToekomstPerspectief } from './use-toekomst-perspectief'
 
@@ -33,9 +33,6 @@ export function useToekomstOverlayState({ perspectief }: { perspectief: Toekomst
   } = perspectief
   const router = useRouter()
   const [activeModal, setActiveModal] = useState<ActiveModal>(null)
-  // Voorkeurs-tab bij het openen van de StrategieModal (bv. direct naar 'woning'
-  // vanuit de "huis wordt nooit verkocht"-melding). Reset naar null bij sluiten.
-  const [strategieInitialTab, setStrategieInitialTab] = useState<StrategieInitialTab>(null)
   const [simModalOpen, setSimModalOpen] = useState(false)
   const [activeFaseModal, setActiveFaseModal] = useState<ActiveFaseModal>(null)
 
@@ -77,13 +74,10 @@ export function useToekomstOverlayState({ perspectief }: { perspectief: Toekomst
     let shouldReplace = false
 
     if (modal) {
-      // Geen 'withdrawal' meer (ADR 0179 fase 1 stap 13): de WithdrawalModal is dood en
-      // `next.config.ts` stuurt `?modal=withdrawal` sinds 5f3cd79c1 door naar
-      // `/toekomst/instellingen?regel=onttrekkingsstrategie`. Staat deze provider straks in de
-      // katern-layout, dan zou hij de dode modal daar anders alsnog openen.
-      // Evenmin 'strategie' (stap 18): `?modal=strategie` redirect naar
-      // `/toekomst/instellingen?regel=eindstrategie`, en de meereizende param mag de
-      // modal op Instellingen niet alsnog openen.
+      // Geen 'withdrawal' en geen 'strategie' meer: die modals zijn opgeheven (ADR 0179
+      // fase 1 stap 13 resp. fase 3) en `next.config.ts` stuurt beide door naar hun rij in
+      // Instellingen (`?rij=onttrekking`, `?rij=stopmoment`). De meereizende param wordt
+      // hier alleen opgeruimd.
       if (modal === 'scenarios' || modal === 'simulations' || modal === 'backtesting') {
         setActiveModal(modal)
       } else if (modal === 'life_events') {
@@ -96,9 +90,9 @@ export function useToekomstOverlayState({ perspectief }: { perspectief: Toekomst
       shouldReplace = true
     }
 
-    // `?strategie=open` opende hier de Strategieën-modal; sinds stap 18 stuurt
-    // `next.config.ts` hem door naar `/toekomst/instellingen?regel=eindstrategie`.
-    // Op Instellingen betekent `?strategie=` de levensstrategie-editor (VoorkeurenView).
+    // `?strategie=open` opende hier de Strategieën-modal (opgeheven, ADR 0179 fase 3);
+    // `next.config.ts` stuurt hem door naar `/toekomst/instellingen?rij=stopmoment`.
+    // Op Instellingen is `?strategie=<aow|pensioen|huis|werk>` een alias van `?rij=`.
 
     // `?uitgaven=open` opende hier de uitgaven-pane; sinds ADR 0179 fase 3 stuurt
     // `next.config.ts` hem door naar de rij Uitgave na pensioen in Instellingen.
@@ -172,8 +166,6 @@ export function useToekomstOverlayState({ perspectief }: { perspectief: Toekomst
   return useStabielObject({
     activeModal,
     setActiveModal,
-    strategieInitialTab,
-    setStrategieInitialTab,
     simModalOpen,
     setSimModalOpen,
     activeFaseModal,

@@ -736,7 +736,7 @@ export function useToekomstScenario({ initialData, scenarioState, sim }: { initi
   // identifier, en een herdenkingsregel zou dat vals rood maken.)
   // Melding B-038 haalt die knop weg: hij schreef één van de vijf
   // plan-keuzes en verborg daarmee de andere vier. De vrijheidsas verwijst nu
-  // naar `setActiveModal('strategie')`, en die modal schrijft hetzelfde
+  // naar de plan-keuzes (sinds ADR 0179 fase 3 de rijen in Instellingen, voorheen de strategie-modal), en die schrijven hetzelfde
   // volledige plan via `planDraftToFireSettingsBody` — één schrijfpad in plaats
   // van twee, en het pad dat álle keuzes toont.
 
