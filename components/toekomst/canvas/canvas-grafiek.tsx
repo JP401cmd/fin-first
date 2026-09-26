@@ -15,7 +15,7 @@
  */
 // euro-view: ontvangt view*-feeds van de render-grens, deflateert niet zelf
 
-import type { Dispatch, SetStateAction } from 'react'
+import type { CSSProperties, Dispatch, SetStateAction } from 'react'
 import type { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import type { SimRow, SimResult, SimCashflow } from '@/lib/fire-simulation'
@@ -63,11 +63,35 @@ import type {
   PartnerLine,
 } from '@/components/toekomst/state/types'
 
+/**
+ * Laadstand van Geldstroom zolang de grafiek-chunk laadt: Fins wachtstand in de volle
+ * hoogte van het canvas (de laag beslaat dezelfde gridcel als Vermogen), in plaats van
+ * een lege vlek die daarna verspringt.
+ */
+export function GeldstroomLaden() {
+  return (
+    <div className="relative min-h-[120px] flex-1" data-testid="geldstroom-laden">
+      <ProjectieLaadlaag pending />
+    </div>
+  )
+}
+
 // Verplaatst uit horizon-client r313–316: de énige consument is dit blok (kaart V3).
 const IncomeExpenseChart = dynamic(() =>
   import('@/components/app/horizon/income-expense-chart').then(m => ({ default: m.IncomeExpenseChart })),
-  { ssr: false }
+  { ssr: false, loading: () => <GeldstroomLaden /> }
 )
+
+/**
+ * De drie modi liggen in één gridcel op elkaar (ADR 0179 D3). De cel is zo hoog als de
+ * hoogste laag, en Vermogen blijft altijd gemonteerd: een modus-wissel verandert de
+ * hoogte van het canvas dus niet, ook niet naar de lagere Geldstroom-grafiek.
+ */
+const MODUS_CEL = 'col-start-1 row-start-1 min-w-0 transition-opacity duration-300 ease-in-out'
+
+function modusLaag(actief: boolean): CSSProperties {
+  return { opacity: actief ? 1 : 0, pointerEvents: actief ? 'auto' : 'none' }
+}
 
 export interface CanvasGrafiekProps {
   currentAge: number | null
@@ -280,19 +304,13 @@ export function CanvasGrafiek({
                         }}
                         onClose={handleOverlayExit}
                       >
-                      <div className="relative">
+                      <div className="relative grid" data-testid="canvas-modi">
                         {/* Vermogenspad (SimChart) */}
                         <div
-                          className="transition-opacity duration-300 ease-in-out"
-                          style={{
-                            opacity: modus === 'vermogen' ? 1 : 0,
-                            pointerEvents: modus === 'vermogen' ? 'auto' : 'none',
-                            position: modus === 'vermogen' ? 'relative' : 'absolute',
-                            top: 0,
-                            left: 0,
-                            width: '100%',
-                          }}
+                          className={MODUS_CEL}
+                          style={modusLaag(modus === 'vermogen')}
                           aria-hidden={modus !== 'vermogen'}
+                          data-testid="canvas-vermogen"
                         >
                           <SimChart
                             emphasis={overlayEmphasis}
@@ -382,15 +400,8 @@ export function CanvasGrafiek({
 
                         {/* Vermogensopbouw (WealthCompositionChart) */}
                         <div
-                          className="transition-opacity duration-300 ease-in-out"
-                          style={{
-                            opacity: modus === 'samenstelling' ? 1 : 0,
-                            pointerEvents: modus === 'samenstelling' ? 'auto' : 'none',
-                            position: modus === 'samenstelling' ? 'relative' : 'absolute',
-                            top: 0,
-                            left: 0,
-                            width: '100%',
-                          }}
+                          className={MODUS_CEL}
+                          style={modusLaag(modus === 'samenstelling')}
                           aria-hidden={modus !== 'samenstelling'}
                         >
                           <WealthCompositionChart
@@ -417,17 +428,11 @@ export function CanvasGrafiek({
 
                         {/* Geldstroom (IncomeExpenseChart) — sinds fase 2 een volwaardige
                             modus i.p.v. een uitklap onder de grafiek (spec §7.2). De
-                            sub-weergave Lijnen/Bronnen staat in de canvaskop. */}
+                            sub-weergave Lijnen/Bronnen staat in de canvaskop. De grafiek is
+                            lager dan Vermogen en staat verticaal in het midden van de cel. */}
                         <div
-                          className="transition-opacity duration-300 ease-in-out"
-                          style={{
-                            opacity: modus === 'geldstroom' ? 1 : 0,
-                            pointerEvents: modus === 'geldstroom' ? 'auto' : 'none',
-                            position: modus === 'geldstroom' ? 'relative' : 'absolute',
-                            top: 0,
-                            left: 0,
-                            width: '100%',
-                          }}
+                          className={`${MODUS_CEL} flex flex-col justify-center`}
+                          style={modusLaag(modus === 'geldstroom')}
                           aria-hidden={modus !== 'geldstroom'}
                           data-testid="canvas-geldstroom"
                         >

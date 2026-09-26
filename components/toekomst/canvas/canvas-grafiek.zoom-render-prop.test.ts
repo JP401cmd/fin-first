@@ -51,7 +51,7 @@ describe('canvas-grafiek — zoom-render-prop (V4/Q4)', () => {
 
   it('de IncomeExpenseChart-dynamic verhuisde mee met zijn enige consument (V3)', () => {
     expect(src).toContain("import('@/components/app/horizon/income-expense-chart')")
-    expect(src).toContain('{ ssr: false }')
+    expect(src).toContain('{ ssr: false, loading: () => <GeldstroomLaden /> }')
   })
 })
 
