@@ -63,8 +63,6 @@ export interface HorizonBron {
   aowRows: AowLeeftijdRow[]
   userAowAge: AowAge
   debts: HorizonPageData['debts']
-  actions: HorizonPageData['actions']
-  resilienceSnapshots: HorizonPageData['resilienceSnapshots']
   avgIncome6m: number | null
   avgExpenses6m: number | null
   retirementMethod: RetirementExpenseMethod
@@ -84,8 +82,6 @@ export function useHorizonBron(initialData: HorizonPageData): HorizonBron {
   const kernelRawProfile = useStructurallyStable(initialData.rawProfile ?? null)
   const aowRows = useStructurallyStable(initialData.aowRows ?? GEEN_AOW_RIJEN)
   const debts = useStructurallyStable(initialData.debts)
-  const actions = useStructurallyStable(initialData.actions)
-  const resilienceSnapshots = useStructurallyStable(initialData.resilienceSnapshots)
 
   /**
    * AOW-leeftijd uit de server-voorgeladen wettelijke tabel, niet de 67-terugval
@@ -112,8 +108,6 @@ export function useHorizonBron(initialData: HorizonPageData): HorizonBron {
     aowRows,
     userAowAge,
     debts,
-    actions,
-    resilienceSnapshots,
     avgIncome6m: initialData.avgIncome6m,
     avgExpenses6m: initialData.avgExpenses6m,
     retirementMethod: initialData.retirementExpenseMethod ?? 'essential_budgets',

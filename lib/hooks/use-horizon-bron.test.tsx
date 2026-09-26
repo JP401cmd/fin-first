@@ -50,8 +50,6 @@ function bundel(over: {
     rawProfile: { fire_stop_age: over.stopAge ?? 55, expected_return: over.grossReturn ?? 0.06 },
     aowRows: 'aowRows' in over ? over.aowRows : AOW_RIJEN,
     debts: [{ id: 'd1', current_balance: 1000 }],
-    actions: [],
-    resilienceSnapshots: [],
     avgIncome6m: 4000,
     avgExpenses6m: 2500,
     retirementExpenseMethod: over.retirementExpenseMethod ?? null,

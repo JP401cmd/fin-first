@@ -96,8 +96,6 @@ function bundel(over: { healthScoreInput: HealthScoreInput; budgetingActive: boo
     rawProfile: { fire_stop_age: 55, expected_return: 0.06 },
     aowRows: [],
     debts: [],
-    actions: [],
-    resilienceSnapshots: [],
     avgIncome6m: 4000,
     avgExpenses6m: 2500,
     retirementExpenseMethod: null,

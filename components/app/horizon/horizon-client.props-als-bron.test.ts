@@ -46,7 +46,7 @@ describe('horizon-client — props-als-bron (ADR 0179 fase 1 stap 3)', () => {
   })
 
   it('seedt geen invoer meer met een bevroren useState(initialData.x)', () => {
-    for (const veld of ['effectiveInput', 'fireParams', 'withdrawalStrategy', 'fireStrategy', 'rawProfile', 'aowRows', 'debts', 'actions', 'events', 'avgIncome6m', 'avgExpenses6m', 'resilienceSnapshots']) {
+    for (const veld of ['effectiveInput', 'fireParams', 'withdrawalStrategy', 'fireStrategy', 'rawProfile', 'aowRows', 'debts', 'events', 'avgIncome6m', 'avgExpenses6m']) {
       expect(alles, `useState(initialData.${veld}) is terug`).not.toMatch(
         new RegExp(`useState(<[^>]*>)?\\(\\s*(\\(\\)\\s*=>\\s*)?initialData\\??\\.${veld}\\b`),
       )

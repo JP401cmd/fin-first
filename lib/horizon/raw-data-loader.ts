@@ -45,7 +45,6 @@ import {
   type LifeEvent,
   type LifeEventImpact,
 } from '@/lib/horizon-data'
-import type { Action } from '@/lib/recommendation-data'
 import { buildBudgetTypeMap, computeYearlyMustExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
 import { deriveRetirementExpenseBasis } from '@/lib/retirement-expense-basis'
 import { transactionAnnualIncome } from '@/lib/budget-realized'
@@ -132,22 +131,6 @@ import {
   type EmergencyFundDisplay,
 } from '@/lib/emergency-fund'
 
-// Snapshot type for resilience trend data
-export type SnapshotForTrend = {
-  snapshot_date: string
-  resilience_score: number | null
-  net_worth: number
-  freedom_percentage: number | null
-  fire_age: number | null
-  score_version: number | null
-  /**
-   * Rekenmotor die de FIRE-velden (fire_age / fire_portfolio) van deze snapshot
-   * schreef — 'kernel' of 'v2' (FASE 5 stap 2b, V15). NULL = historisch / vlag-uit.
-   * Voedt de "rekenwijze gewijzigd"-annotatie in de FIRE-trend-weergave.
-   */
-  engine_bron: string | null
-}
-
 export interface HorizonRawData {
   effectiveInput: FinancialInput
   /**
@@ -192,7 +175,6 @@ export interface HorizonRawData {
   dailyExpenseRateDetail: RecentDailyExpenseRate
   events: LifeEvent[]
   impacts: LifeEventImpact[]
-  actions: Action[]
   debts: Debt[]
   fireStrategy: FireStrategyConfig
   /**
@@ -203,8 +185,6 @@ export interface HorizonRawData {
   firePlan: FirePlan
   withdrawalStrategy: WithdrawalStrategyConfig
   fireParams: FireParams
-  resilienceSnapshots: SnapshotForTrend[]
-  snapshotResilience: number | null
   avgIncome6m: number
   avgExpenses6m: number
   /**
@@ -353,10 +333,6 @@ export interface HorizonRawData {
   unlinkedCash: number
   /** Number of children from profile (for erfgenamen calculation) */
   numberOfChildren: number
-  /** Of de gebruiker de Horizon-prognose setup-pane heeft doorlopen + opgeslagen.
-   *  Legacy-marker — de grafiek wordt sinds juni 2026 altijd getoond; deze flag
-   *  bepaalt dat niet langer. Behouden voor achterwaartse compatibiliteit. */
-  hasCompletedHorizonSetup: boolean
   /** Of de gebruiker "Niet meer melden" koos op de bevestigings-toast van de
    *  tips-overlay. True → toon die toast niet meer. De overlay zelf sluit
    *  sinds M38 altijd direct; deze marker raakt alleen de melding. */
@@ -514,8 +490,6 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
   perspective: Perspective,
 ): Promise<HorizonRawData> {
   const now = new Date()
-  const oneYearFromNow = new Date(Date.UTC(now.getFullYear() + 1, now.getMonth(), now.getDate())).toISOString().split('T')[0]
-  const today = now.toISOString().split('T')[0]
   // 6-maands venster voor de 6m-slice uit de gedeelde 12-maands tx-fetch — grenzen
   // uit `savingsRateWindow` (lib/savings-source.ts), gedeeld met dashboard-, core-
   // en lever-scores-loader: zes VOLTOOIDE kalendermaanden, de lopende maand
@@ -528,11 +502,8 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
     profileResult,
     allBudgetsResult,
     eventsResult,
-    actionsResult,
     fullDebtsResult,
-    snapshotsResult,
     bankAccountsResult,
-    horizonSetupVisitResult,
     exitNoticeDismissedResult,
     aowRowsResult,
     txAgg12Result,
@@ -550,29 +521,8 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
     getOwnProfile(supabase),
     getBudgets(supabase),
     supabase.from('life_events').select('id, name, event_type, target_age, target_date, one_time_cost, monthly_cost_change, monthly_income_change, duration_months, icon, is_active, sort_order, is_indexed, linked_asset_id, metadata').eq('is_active', true).order('sort_order', { ascending: true }),
-    supabase
-      .from('actions')
-      .select('*, recommendation:recommendations(title, recommendation_type)')
-      .eq('status', 'open')
-      .not('scheduled_week', 'is', null)
-      .gte('scheduled_week', today)
-      .lte('scheduled_week', oneYearFromNow)
-      .order('scheduled_week', { ascending: true }),
     getActiveDebts(supabase),
-    supabase
-      .from('net_worth_snapshots')
-      .select('snapshot_date, resilience_score, net_worth, freedom_percentage, fire_age, score_version, engine_bron')
-      .order('snapshot_date', { ascending: true })
-      .limit(60),
     getUnlinkedBankAccounts(supabase),
-    // Legacy setup-marker (de setup-pane is verwijderd — zie STEP 2). Nog
-    // gelezen voor achterwaartse compatibiliteit; bepaalt geen weergave meer.
-    // .maybeSingle() + null-fallback downstream — table kan ontbreken op legacy DBs.
-    supabase
-      .from('user_feature_visits')
-      .select('feature_slug')
-      .eq('feature_slug', HORIZON_SETUP_COMPLETED_SLUG)
-      .maybeSingle(),
     // Exit-melding-dismiss-marker ("Niet meer weergeven"). Zelfde patroon.
     supabase
       .from('user_feature_visits')
@@ -910,13 +860,6 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
     dateOfBirth: dob,
   }
 
-  // Process snapshot data for resilience score
-  const allSnapshots = (snapshotsResult.data ?? []) as SnapshotForTrend[]
-  const snapshotsWithResilience = allSnapshots.filter(s => s.resilience_score !== null && s.resilience_score !== undefined)
-  const snapshotResilience = snapshotsWithResilience.length > 0
-    ? snapshotsWithResilience[snapshotsWithResilience.length - 1].resilience_score
-    : null
-
   // ── Health Score (5 or 6 pillars) ──────────────────────────
   // Detect budgetingActive from profile (defaults to true if column doesn't exist)
   const budgetingActive = (profile as Record<string, unknown>).budgeting_active !== false
@@ -1172,9 +1115,8 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
     return rest
   })()
 
-  // Events, actions, debts, assets
+  // Events, debts, assets
   const realEvents = (eventsResult.data ?? []) as LifeEvent[]
-  const actions = (actionsResult.data ?? []) as Action[]
   const debts = (fullDebtsResult.data ?? []) as Debt[]
   const assets = (fullAssetsResult.data ?? []) as Asset[]
 
@@ -1322,13 +1264,6 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
   const potRules = resolvePotRules(profile as { pot_rules?: unknown })
   const numberOfChildren = Number((profile as Record<string, unknown>).number_of_children ?? 0)
 
-  // ── Horizon setup-pane state ──────────────────────────────────────
-  // hasCompletedHorizonSetup: true zodra de gebruiker de Horizon-prognose-
-  // setup-pane heeft doorlopen + opgeslagen. Bepaalt of de hoofd-grafiek
-  // wordt vervangen door de intro-card.
-  const hasCompletedHorizonSetup = !horizonSetupVisitResult.error
-    && horizonSetupVisitResult.data?.feature_slug === HORIZON_SETUP_COMPLETED_SLUG
-
   // exitNoticeDismissed: true zodra de "Niet meer weergeven"-marker bestaat. Bij
   // een ontbrekende tabel (error) → behandel als "nog niet weggeklikt" zodat de
   // exit-melding minstens kan verschijnen (graceful degrade).
@@ -1406,14 +1341,11 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
     dailyExpenseRateDetail: canonicalDailyExpenses,
     events: loadedEvents,
     impacts,
-    actions,
     debts,
     fireStrategy,
     firePlan,
     withdrawalStrategy,
     fireParams,
-    resilienceSnapshots: allSnapshots,
-    snapshotResilience,
     avgIncome6m,
     avgExpenses6m,
     healthScoreInputBase,
@@ -1436,7 +1368,6 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
     profileError: profielFoutVoorClient(profileResult.error),
     unlinkedCash,
     numberOfChildren,
-    hasCompletedHorizonSetup,
     exitNoticeDismissed,
     monthlyContributionFromAssets,
     monthlySurplusFromBudget,

@@ -34,7 +34,6 @@ import {
 } from '@/lib/core-metrics'
 import { NL_AOW_MONTHLY, NL_AOW_MONTHLY_SAMENWONEND } from '@/lib/constants'
 import { formatAowAgeKort } from '@/lib/aow-leeftijd'
-import type { ActionStatus } from '@/lib/recommendation-data'
 import { getFireEligibleNetWorth, isHomeExcludedFromFire } from '@/lib/housing-strategy'
 import { shouldShowLiquidWealthLine, buildLiquidWealthPoints } from '@/lib/horizon/liquid-wealth-line'
 import { nettoLiquideAtAge } from '@/lib/horizon/vrijheidsdagen'
@@ -82,8 +81,6 @@ export function useToekomstSim({ initialData, perspectief, scenarioState }: { in
     aowRows,
     userAowAge,
     debts,
-    actions,
-    resilienceSnapshots,
     avgIncome6m,
     avgExpenses6m,
     retirementMethod,
@@ -984,17 +981,6 @@ export function useToekomstSim({ initialData, perspectief, scenarioState }: { in
     [initialData.housingContext.eigenHuisMortgages],
   )
 
-  async function handleActionStatusChange(id: string, status: ActionStatus, data?: Record<string, unknown>) {
-    const res = await fetch(`/api/ai/actions/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status, ...data }),
-    })
-    if (res.ok) {
-      loadData()
-    }
-  }
-
   return useStabielObject({
     hoofdrun,
     input,
@@ -1005,8 +991,6 @@ export function useToekomstSim({ initialData, perspectief, scenarioState }: { in
     aowRows,
     userAowAge,
     debts,
-    actions,
-    resilienceSnapshots,
     retirementMethod,
     events,
     setEvents,
@@ -1084,7 +1068,6 @@ export function useToekomstSim({ initialData, perspectief, scenarioState }: { in
     effectiveCountdown,
     personalHeroProjection,
     eigenHuisMortgageIds,
-    handleActionStatusChange,
   })
 }
 

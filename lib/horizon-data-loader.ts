@@ -56,7 +56,7 @@ export {
   HORIZON_EXIT_NOTICE_DISMISSED_SLUG,
   HORIZON_TIPS_FIRST_CLOSE_NAVIGATED_SLUG,
 } from '@/lib/horizon/raw-data-loader'
-export type { SnapshotForTrend, HorizonRawData } from '@/lib/horizon/raw-data-loader'
+export type { HorizonRawData } from '@/lib/horizon/raw-data-loader'
 
 /**
  * De volledige Horizon-bundel: rauwe data + de kernel-afgeleide cijfers.
