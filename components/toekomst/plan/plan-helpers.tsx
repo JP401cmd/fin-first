@@ -4,6 +4,33 @@
 import type { ReactNode } from 'react'
 import { Receipt } from 'lucide-react'
 import type { HorizonOutcomeGuard } from '@/lib/horizon/outcome-guard'
+import { ANKER_VERMOGEN_TEGEL_ONDERSCHRIFT } from '@/lib/horizon/anker-copy'
+import { FIRE_DOEL_ONDERSCHRIFT, type FireDoelGrondslag } from '@/lib/horizon/fire-doel-weergave'
+
+/** Onderschrift van het doelbedrag zonder grondslag-kwalificatie (huishoud-/partnerweergave, geen woning). */
+const DOELBEDRAG_ONDERSCHRIFT_KAAL = 'benodigd'
+
+/**
+ * Onderschrift van KPI 2 (Doelbedrag / Vermogen op je stopmoment).
+ *
+ * - vast anker: de liquide grondslag van `vermogenOpAnker` (`anker-copy`);
+ * - huishoud-/partnerweergave: kaal "benodigd" (het bedrag komt uit een andere bron);
+ * - zonder eigen woning: óók kaal "benodigd". De standaard-grondslag is `incl-huis`, ook
+ *   als er geen huis bestaat — dan beloofde de tegel "met je huis" bij een account
+ *   zonder woning (C3 punt 6). Het huis noemen heeft alleen zin als er een huis is;
+ * - anders: de kwalificatie van de grondslag die het getoonde bedrag koos.
+ */
+export function doelbedragOnderschrift(input: {
+  isFixedAnchorMode: boolean
+  hasPerspectiveHero: boolean
+  /** `HorizonPageData.housingContext.hasEigenHuis` — consumeren, niet afleiden. */
+  heeftEigenHuis: boolean
+  grondslag: FireDoelGrondslag
+}): string {
+  if (input.isFixedAnchorMode) return ANKER_VERMOGEN_TEGEL_ONDERSCHRIFT
+  if (input.hasPerspectiveHero || !input.heeftEigenHuis) return DOELBEDRAG_ONDERSCHRIFT_KAAL
+  return FIRE_DOEL_ONDERSCHRIFT[input.grondslag]
+}
 
 /**
  * Tap-affordance op een KPI-tegel die een kassabon opent (bevinding M5).

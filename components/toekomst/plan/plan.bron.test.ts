@@ -84,3 +84,11 @@ describe('Plan-bladeren — map-brede grendels', () => {
     expect(src).not.toMatch(/<h1[\s>]/)
   })
 })
+
+describe('plan-paneel — Doelbedrag-onderschrift volgt het bestaan van een woning (C3 punt 6)', () => {
+  it('consumeert housingContext.hasEigenHuis via doelbedragOnderschrift', () => {
+    const paneel = readSourceLF(join(process.cwd(), 'components', 'toekomst', 'plan', 'plan-paneel.tsx'))
+    expect(paneel).toMatch(/doelbedragOnderschrift\(\{[\s\S]*?heeftEigenHuis: initialData\.housingContext\.hasEigenHuis/)
+    expect(paneel).not.toContain('FIRE_DOEL_ONDERSCHRIFT[')
+  })
+})

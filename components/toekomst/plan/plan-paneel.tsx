@@ -20,10 +20,9 @@ import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { HideInSimple } from '@/components/app/hide-in-simple'
 import { SectionLabel } from '@/components/editorial'
 import { isHeroAnswerInvalid } from '@/lib/horizon/hero-fire-age'
-import { fireDoelPaarInLeesvolgorde, FIRE_DOEL_ONDERSCHRIFT } from '@/lib/horizon/fire-doel-weergave'
+import { fireDoelPaarInLeesvolgorde } from '@/lib/horizon/fire-doel-weergave'
 import {
   ANKER_KPI_LABEL,
-  ANKER_VERMOGEN_TEGEL_ONDERSCHRIFT,
   ankerKpiCaption,
   haalbaarBijUitgaveRegel,
 } from '@/lib/horizon/anker-copy'
@@ -33,6 +32,7 @@ import { PlanKpiStrip } from '@/components/toekomst/plan/plan-kpi-strip'
 import { PlanAnkerEnVoortgang } from '@/components/toekomst/plan/plan-hero-duiding'
 import { PlanGegevensmelding } from '@/components/toekomst/plan/plan-gegevensmelding'
 import { PlanVerdieping } from '@/components/toekomst/plan/plan-verdieping'
+import { doelbedragOnderschrift } from '@/components/toekomst/plan/plan-helpers'
 import { PLAN_JAARTABEL_LINK } from '@/lib/horizon/katern-copy'
 import {
   PlanKassabonVrijheidsleeftijd,
@@ -173,11 +173,14 @@ export function PlanPaneel() {
   // ontbrak en liet het getal als een (te laag) doelbedrag lezen. De woorden staan
   // náást die grondslag in `anker-copy.ts`, net zoals FIRE_DOEL_ONDERSCHRIFT dat
   // doet voor de solved-tak; de tegel schrijft ze niet zelf uit.
-  const fireTargetCaption = isFixedAnchorMode
-    ? ANKER_VERMOGEN_TEGEL_ONDERSCHRIFT
-    : hasPerspectiveHero
-      ? 'benodigd'
-      : FIRE_DOEL_ONDERSCHRIFT[fireDoel.grondslag]
+  // Zonder eigen woning geen huis-kwalificatie (C3 punt 6): de keuze staat in
+  // `doelbedragOnderschrift` (plan-helpers), het huis-veld komt uit de bundel.
+  const fireTargetCaption = doelbedragOnderschrift({
+    isFixedAnchorMode,
+    hasPerspectiveHero,
+    heeftEigenHuis: initialData.housingContext.hasEigenHuis,
+    grondslag: fireDoel.grondslag,
+  })
 
   // ── Leesvolgorde van het DUBBELE doelbedrag ────────────────────────────────
   // Het grote getal is een bewering over wat het antwoord IS. De tak hieronder

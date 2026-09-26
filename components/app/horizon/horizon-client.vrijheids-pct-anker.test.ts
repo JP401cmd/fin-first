@@ -149,8 +149,13 @@ describe('horizon-client — alle consumenten lezen hetzelfde vrijheids-%', () =
  */
 describe('horizon-client — de vermogenstegel onder een vast anker noemt haar grondslag', () => {
   it('consumeert het onderschrift uit anker-copy, schrijft het niet zelf uit', () => {
-    expect(host).toMatch(/import \{[^}]*ANKER_VERMOGEN_TEGEL_ONDERSCHRIFT[^}]*\} from '@\/lib\/horizon\/anker-copy'/)
-    expect(host).toMatch(/const fireTargetCaption = isFixedAnchorMode\s*\r?\n\s*\? ANKER_VERMOGEN_TEGEL_ONDERSCHRIFT/)
+    // Sinds C3 punt 6 (26 sep) kiest `doelbedragOnderschrift` in plan-helpers het
+    // onderschrift (ook: geen huis-kwalificatie zonder woning); de host geeft de
+    // anker-modus door, de helper zet onder een vast anker de anker-copy-constante.
+    const helpers = readFileSync(join(process.cwd(), 'components', 'toekomst', 'plan', 'plan-helpers.tsx'), 'utf8')
+    expect(helpers).toMatch(/import \{[^}]*ANKER_VERMOGEN_TEGEL_ONDERSCHRIFT[^}]*\} from '@\/lib\/horizon\/anker-copy'/)
+    expect(helpers).toMatch(/if \(input\.isFixedAnchorMode\) return ANKER_VERMOGEN_TEGEL_ONDERSCHRIFT/)
+    expect(host).toMatch(/const fireTargetCaption = doelbedragOnderschrift\(\{\s*\r?\n\s*isFixedAnchorMode,/)
     // De losse zin mag alleen nog in de constante leven (commentaar uitgezonderd).
     const losseRegels = [source, host].join('\n')
       .split(/\r?\n/)
