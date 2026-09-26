@@ -93,8 +93,9 @@ describe('overlay-host — deeplinks blijven in de parent (E2)', () => {
 
 describe('overlay-host — StrategieModal ververst na sluiten', () => {
   it('sluiten herlaadt en ververst de server-render', () => {
+    // Sinds fase 1 stap 3 (A1) is `loadData` zelf `startRefresh(() => router.refresh())`.
     expect(src).toContain(
-      'onClose={() => { setActiveModal(null); setStrategieInitialTab(null); loadData(); startRefresh(() => router.refresh()) }}',
+      'onClose={() => { setActiveModal(null); setStrategieInitialTab(null); loadData() }}',
     )
   })
 })

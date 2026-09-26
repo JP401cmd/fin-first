@@ -54,12 +54,8 @@ describe('"Na pensioen"-KPI — klik in huishoudweergave (WF-REKEN-23-bug4)', ()
     // gekozen perspectief, zonder te toetsen of de pane gevuld is.
     expect(source).not.toMatch(/if \(isHouseholdView\) setHouseholdRetireOpen\(true\)/)
     // De huishoud-pane blijft voorwaardelijk op de info — dát is de reden dat
-    // de handler 'm moet toetsen.
-    expect(source).toMatch(/\{householdRetireInfo && \(\s*<HouseholdRetirementPane/)
-  })
-
-  it('rendert het terugval-paneel onvoorwaardelijk', () => {
-    // UitgavenPane hangt niet aan huishoud-data; daarom is hij een veilige terugval.
-    expect(source).toMatch(/<UitgavenPane open=\{uitgavenPaneOpen\}/)
+    // de handler 'm moet toetsen. Die pane (en de UitgavenPane-terugval) staat sinds
+    // fase 1 stap 11 in components/toekomst/overlays/toekomst-overlays.tsx
+    // (toekomst-overlays.test.ts).
   })
 })

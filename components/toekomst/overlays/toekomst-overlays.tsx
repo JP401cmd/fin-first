@@ -17,7 +17,6 @@
 // hun eigen overlay-laag — dus hier is geen afwijking van de bron.
 // De dode WithdrawalModal (`activeModal === 'withdrawal'`) staat er ongewijzigd in.
 import dynamic from 'next/dynamic'
-import type { TransitionStartFunction } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
 import type { useRouter } from 'next/navigation'
 import { NaturalMilestoneSheet } from '@/components/app/horizon/natural-milestone-sheet'
@@ -132,7 +131,6 @@ export interface ToekomstOverlaysProps {
   onttrekkingData: OnttrekkingData
   erfgenamen: Erfgenamen
   partnerAowBedrag: number | undefined
-  nabestaandenPensioenBedrag: number | undefined
   // AA — deep-dive modals, StrategieModal, UitgavenPane
   activeModal: ActiveModal
   setActiveModal: Dispatch<SetStateAction<ActiveModal>>
@@ -141,8 +139,7 @@ export interface ToekomstOverlaysProps {
   householdInput: FinancialInput | null
   fireSwr: number
   setStrategieInitialTab: Dispatch<SetStateAction<StrategieInitialTab>>
-  loadData: () => Promise<void>
-  startRefresh: TransitionStartFunction
+  loadData: () => void
   router: ReturnType<typeof useRouter>
   strategieInitialTab: StrategieInitialTab
   aowRows: AowLeeftijdRow[]
@@ -202,7 +199,6 @@ export function ToekomstOverlays({
   onttrekkingData,
   erfgenamen,
   partnerAowBedrag,
-  nabestaandenPensioenBedrag,
   activeModal,
   setActiveModal,
   effectiveFireTarget,
@@ -211,7 +207,6 @@ export function ToekomstOverlays({
   fireSwr,
   setStrategieInitialTab,
   loadData,
-  startRefresh,
   router,
   strategieInitialTab,
   aowRows,
@@ -352,7 +347,6 @@ export function ToekomstOverlays({
           hasPartner={initialData.hasPartner}
           erfgenamen={erfgenamen}
           partnerAowBedrag={partnerAowBedrag}
-          nabestaandenPensioen={nabestaandenPensioenBedrag}
           currentAge={currentAge ?? undefined}
         />
       )}
@@ -391,10 +385,10 @@ export function ToekomstOverlays({
       )}
       <StrategieModal
         open={activeModal === 'strategie'}
-        onClose={() => { setActiveModal(null); setStrategieInitialTab(null); loadData(); startRefresh(() => router.refresh()) }}
+        onClose={() => { setActiveModal(null); setStrategieInitialTab(null); loadData() }}
         // B-057/B1 — na een geslaagde autosave van het plan herlaadt de grafiek
-        // meteen (pane blijft open); `router.refresh()` volgt pas bij sluiten (B5
-        // — of die nog nodig is — staat op een aparte kaart).
+        // meteen (pane blijft open). Sinds fase 1 stap 3 is `loadData` zelf de
+        // `router.refresh()`; sluiten ververst nog één keer.
         onSaved={() => { void loadData() }}
         housingStrategy={initialData.housingStrategy}
         initialTab={strategieInitialTab}
