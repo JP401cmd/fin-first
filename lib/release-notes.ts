@@ -97,6 +97,35 @@ export const RELEASE_NOTE_NORM = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.92.7',
+    date: '2026-09-26',
+    title: 'Sneller bij een haperende koersdienst, scherper zicht op fouten',
+    sections: [
+      {
+        module: 'Bezittingen',
+        color: 'amber',
+        items: [
+          {
+            title: 'Niet meer wachten op een haperende koersdienst',
+            description:
+              'Hapert de wisselkoersdienst, dan wacht je pagina niet steeds opnieuw: we gebruiken even een benaderde koers en daarna weer de echte.',
+          },
+        ],
+      },
+      {
+        module: 'Platform',
+        color: 'zinc',
+        items: [
+          {
+            title: 'Fouten achter de schermen komen eerder boven',
+            description:
+              'Loopt er op de server iets mis, dan zien we dat nu direct, zonder jouw gegevens mee te nemen. Voor jou geen zichtbare verandering.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: '0.92.6',
     date: '2026-09-26',
     title: 'Rustiger bewaking achter de schermen',
