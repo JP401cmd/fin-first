@@ -347,7 +347,7 @@ export interface HorizonRawData {
   marktVolatiliteit: number
   /** Pot-regels (profiles.pot_rules) — verdeling/onttrekkingsvolgorde voor v2. */
   potRules: PotRulesConfig
-  /** Error message from profile query, null if successful */
+  /** Generieke melding bij een mislukte profielquery (`PROFIEL_FOUT_CLIENT`), null bij succes. Nooit de rauwe DB-fout. */
   profileError: string | null
   /** Total balance of disconnected bank accounts (not linked to assets) */
   unlinkedCash: number
@@ -475,6 +475,20 @@ export const HORIZON_TIPS_FIRST_CLOSE_NAVIGATED_SLUG = 'horizon_tips_first_close
  * uit een eigen literal — een tweede default voor hetzelfde veld liet /toekomst bij een
  * queryfout een andere eind-vorm rekenen dan elk ander pad.
  */
+/**
+ * Wat de client van een mislukte profielquery te zien krijgt (C3 punt 11, security 🟢-4).
+ * `profileError` reist als prop naar de browser; de rauwe PostgREST-`code`/`message`
+ * (schema-, kolom- en policydetails) hoort daar niet in. De echte fout logt
+ * `loadHorizonRaw` server-side met de tag `[horizon-data-loader]`, in de geest van
+ * `serverError` (lib/api/respond.ts). De client leest alleen óf er een fout was:
+ * `PlanGegevensmelding` toont zijn eigen tekst.
+ */
+export const PROFIEL_FOUT_CLIENT = 'Profiel kon niet worden geladen'
+
+export function profielFoutVoorClient(error: unknown): string | null {
+  return error ? PROFIEL_FOUT_CLIENT : null
+}
+
 export const PROFILE_DEFAULTS = {
   date_of_birth: null as string | null,
   retirement_expense_method: null as string | null,
@@ -1419,9 +1433,7 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
     aowRows,
     marktVolatiliteit: fireAssumptions.volatility,
     potRules,
-    profileError: profileResult.error
-      ? `Profile query failed: ${profileResult.error.code} — ${profileResult.error.message}`
-      : null,
+    profileError: profielFoutVoorClient(profileResult.error),
     unlinkedCash,
     numberOfChildren,
     hasCompletedHorizonSetup,
