@@ -134,7 +134,7 @@ const HORIZON_PAGES: StaticPage[] = [
   { label: 'Doelen',                    sublabel: 'Financiële doelen en voortgang',     href: '/toekomst/doelen',                       icon: Goal,        module: 'horizon', requiredModule: 'toekomstplannen' },
   // ADR 0179 — Voorkeuren en Gebeurtenissen gingen op in katern Instellingen; de
   // sublabel draagt de oude namen zodat zoeken op "voorkeuren"/"gebeurtenissen" blijft vinden.
-  { label: 'Instellingen',              sublabel: 'Voorkeuren, gebeurtenissen, rendement en inflatie', href: '/toekomst/instellingen', icon: Settings,    module: 'horizon', requiredModule: 'toekomstplannen' },
+  { label: 'Instellingen',              sublabel: 'Stopmoment, onttrekking, strategieën, inflatie en rendement', href: '/toekomst/instellingen', icon: Settings,    module: 'horizon', requiredModule: 'toekomstplannen' },
   // TPR-01 — de plan-review heropenen (deeplink; sinds ADR 0179 op katern Instellingen).
   // Literal i.p.v. PLAN_REVIEW_HREF: de route-dekkingstest leest dit bestand letterlijk.
   // Moet gelijk blijven aan PLAN_REVIEW_HREF (lib/plan-review/plan-review-href.test.ts).
