@@ -183,8 +183,6 @@ const EMITTER_FILES = [
   .filter((f) => /\.(ts|tsx|mjs)$/.test(f))
   .filter((f) => !/\.test\.tsx?$/.test(f))
   .filter((f) => !/^lib\/(uat|regression-tests|test-utils)\//.test(f))
-  // de fase-0-mockup (ADR 0179) is een superadmin-sandbox, geen echte ingang
-  .filter((f) => !/^(components\/beheer\/toekomst-katernen-mockup|app\/\(app\)\/beheer\/toekomst-katernen)\//.test(f))
 
 type Emitted = { file: string; key: string; value: string }
 
