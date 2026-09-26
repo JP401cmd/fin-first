@@ -4,7 +4,8 @@ Launch-audit NO-GO 3/4 (`docs/launch-audit-2026-07.md`, rij C/AC3). Notion-kaart
 "Launch-audit · e2e-smoke op vers account (NO-GO 3/4)",
 page-ID `3abf9e8d568a819e8b2df70a39008fa8`.
 
-**Status: nog niet uitgevoerd.** Dit document is het geautomatiseerde/statische
+**Status: nog niet uitgevoerd. Route gekozen op 26 sep 2026: de eigenaar loopt
+de afvinklijst zelf (vervolg 3, zie hieronder).** Dit document is het geautomatiseerde/statische
 deel van de kaart — een concreet, stapsgewijs uitvoeringsplan met verwachte
 uitkomst per stap. Een echte live-run tegen productie (registratie, een
 inlogsessie in een browser, productie-authdata muteren) vereist middelen die
@@ -55,25 +56,57 @@ uitgevoerd door deze run:
 3. **De eigenaar voert de live-run zelf uit**, begeleid door de stappen
    hieronder, met een mailadres dat hij kan lezen.
 
-## Stap-voor-stap (met verwachte uitkomst)
+## Gekozen route (26 sep 2026): de eigenaar loopt zelf
 
-Voer uit tegen de productie-URL (`https://fin-first.vercel.app`, of de actieve
-Vercel-preview). Vereist: een superadmin-account voor de allowlist-stap, en
-een mailadres dat de uitvoerder kan lezen.
+Eigenaarskeuze 26 sep 2026: **vervolg 3**. De eigenaar voert de live-run zelf
+uit met onderstaande afvinklijst. Claude verwerkt de uitkomsten daarna in dit
+bestand (sectie "Uitkomst live-run") en in rij C van
+`docs/launch-audit-2026-07.md`. Er wordt geen nieuwe admin-route gebouwd.
 
-| # | Stap | Verwachte uitkomst |
-|---|---|---|
-| 1 | Log in als superadmin, ga naar `/beheer/allowlist`, voeg het verse mailadres toe. | Adres verschijnt in de lijst; bevestiging "`<adres>` staat nu op de lijst." |
-| 2 | Ga (uitgelogd, of in een incognito-sessie) naar `/signup` en registreer met dat adres + een sterk, eenmalig wachtwoord. | Scherm "Controleer je e-mail" — geen foutmelding van de allowlist-hook (die zou wijzen op een gemiste stap 1). |
-| 3 | Open de mailbox, klik de bevestigingslink. | Redirect naar `/auth/callback` → daarna naar `/onboarding`; sessie actief (geen herhaalde login gevraagd). |
-| 4 | Loop de onboarding-stappen (11, `app/(onboarding)/onboarding/page.tsx`) door tot minstens de helft. | Elke stap accepteert invoer en gaat door naar de volgende zonder foutmelding. |
-| 5 | **Regressie-check**: ververs de pagina (F5) midden in de flow. | De ingevoerde antwoorden blijven staan (server-side concept via `/api/onboarding/draft`) en er verschijnt de herstel-melding (`DRAFT_RESTORED_NOTICE`) — geen leeg formulier, geen verloren voortgang. **Statisch al gedekt**: `draft-restore-race.test.tsx` (WF-START-23) pint exact dit gedrag en staat groen (16/16 tests, 3 bestanden, geverifieerd 3 sep 2026 — zie Verificatie hieronder). De live stap is een bevestiging, geen eerste bewijs. |
-| 6 | Rond onboarding af. | Redirect naar het homescherm (`/overzicht` tenzij anders gekozen); geen placeholder-nulrecords op het profiel (statisch gedekt door `no-placeholder-assets.test.ts`, ook groen). |
-| 7 | Voeg één bezitting toe via quick-add. | Bezitting verschijnt in `/core/assets` met het juiste bedrag; geen console-error. |
-| 8 | Importeer een kleine bank-CSV (3–5 transacties) via `/core/cash/import`. | Transacties verschijnen op `/core/cash`; totalen kloppen met de CSV; geen dubbele import bij een herhaalde upload van hetzelfde bestand (dedup-key, zie `import-specialist`-agentbrief). |
-| 9 | Bezoek `/overzicht`, `/toekomst`, `/berichten`, `/mijn`. | Elke pagina rendert echte cijfers (geen NaN/"€ 0,00" op alles), geen error-envelope, geen onafgevangen console-error. `/berichten` en `/nieuws` mogen leeg zijn (crons liggen stil sinds 29 juli — lege staat is dan geen faal, zie eerdere analyse). |
-| 10 | Log uit, navigeer naar een beveiligde route (`/toekomst`). | Redirect naar `/login?redirectTo=/toekomst` (zelfde assertie als de bestaande `smoke.spec.ts`). |
-| 11 | Rond af: verslag (dit bestand aanvullen met datum/resultaat/screenshots), audit-rij C/AC3 → ✅, en het testaccount **verwijderen** (self-service `/api/account/delete`) of **promoveren** tot een nieuw `REGRESSION_TEST_EMAIL`-account met een privé wachtwoord (nooit in de repo). | Audit-blocker weg; geen extra publiek testaccount bijgekomen. |
+**Let op de mailketen (stap 3).** Zolang er geen eigen SMTP/Resend is
+ingericht, verstuurt Supabase de bevestigingsmail via de ingebouwde mailer.
+Die heeft een laag uurlimiet en bezorgt standaard alleen aan adressen van
+leden van het Supabase-team. Kies dus een adres dat je kunt lezen én dat
+teamlid is. Het adres van je eigen TriFinity-account kan niet, want dat
+bestaat al. Komt er binnen 10 minuten geen mail, noteer dat dan als
+**bevinding** (de mailketen is precies wat SMTP moet oplossen). Ga daarna
+verder door het account in het Supabase-dashboard handmatig te bevestigen
+(Authentication → Users → het adres → "Confirm email"). Dat is een
+productie-actie die je zelf doet. Noteer ook dat je hem deed, want dan is
+stap 3 **niet** bewezen.
+
+## Afvinklijst (met verwachte uitkomst)
+
+Voer uit tegen de productie-URL `https://fin-first.vercel.app` in een
+incognitovenster, en houd de browserconsole open (F12 → Console). Noteer per
+stap ✅ of ❌. Maak bij een ❌ een schermafbeelding en noteer de console-melding.
+Een ❌ is geen reden om te stoppen: noteer hem en ga door waar dat kan.
+
+| ☐ | # | Stap | Verwachte uitkomst | Uitkomst |
+|---|---|---|---|---|
+| ☐ | 1 | Log (in een gewoon venster) in als superadmin, ga naar `/beheer/allowlist` en voeg het verse adres toe. | Het adres verschijnt in de lijst met de bevestiging "`<adres>` staat nu op de lijst." | |
+| ☐ | 2 | Ga in het incognitovenster naar `/signup` en registreer met dat adres en een sterk, eenmalig wachtwoord. | Je ziet het scherm "Controleer je e-mail", zonder foutmelding van de allowlist (die zou op een gemiste stap 1 wijzen). | |
+| ☐ | 3 | Open de mailbox en klik de bevestigingslink. Komt er geen mail, zie "Let op de mailketen" hierboven. | Via `/auth/callback` kom je op `/onboarding`, met een actieve sessie (niet opnieuw inloggen). | |
+| ☐ | 4 | Doorloop de onboarding tot minstens groep 4 van 8 (naam → geboortedatum → inkomen → uitgaven → bezittingen → schulden). | Elke stap accepteert invoer en gaat zonder foutmelding door. | |
+| ☐ | 5 | **Regressie-check:** ververs de pagina (F5) midden in de flow. | Je antwoorden staan er nog en je ziet de herstelmelding. Geen leeg formulier. Statisch al gedekt door `draft-restore-race.test.tsx` (WF-START-23), dus dit is een live bevestiging. | |
+| ☐ | 6 | Rond de invulvragen af (pensioen → eindstrategie). De app slaat op, daarna volgen **budget inrichten** en **bank koppelen** (ADR 0156). Sla de bankkoppeling over. | De opslag slaagt. Budget en bank tonen zonder foutmelding, en overslaan werkt. | |
+| ☐ | 7 | Op de samenvatting ("klaar"): klik "Begin met TriFinity". | Je landt op het homescherm (`/overzicht`, tenzij anders gekozen), zonder €0-placeholderrecords (statisch gedekt door `no-placeholder-assets.test.ts`). | |
+| ☐ | 8 | Voeg één bezitting toe via quick-add. | De bezitting staat met het juiste bedrag in Bezittingen, zonder console-error. | |
+| ☐ | 9 | Importeer een kleine bank-CSV (3–5 transacties) via `/core/cash/import`. Upload daarna **hetzelfde** bestand nog een keer. | De transacties verschijnen, de totalen kloppen met de CSV, en de tweede upload voegt niets dubbel toe. | |
+| ☐ | 10 | Open een AI-functie (bv. Fin). Zonder AI-abonnement hoort de keuze "straks een abonnement, nu een keuze" te openen (ADR 0157). Kies "nee". | Je ziet de keuze met twee gelijkwaardige knoppen. Na "nee" blijft de app werken, zonder Fin. | |
+| ☐ | 11 | Bezoek `/overzicht`, `/toekomst`, `/berichten`, `/nieuws` en `/mijn`. | Elke pagina rendert echte cijfers (geen NaN, niet overal "€ 0,00"), zonder foutmelding of console-error. `/berichten` en `/nieuws` mogen voor een vers account nog leeg zijn: de crons draaien weer sinds 15 sep, maar een briefing komt pas na de eerstvolgende run. | |
+| ☐ | 12 | Onderaan `/mijn`: noteer het versienummer. | Het versienummer is `0.92.006` of hoger. | |
+| ☐ | 13 | Log uit en ga naar `/toekomst`. | Je wordt doorgestuurd naar `/login?redirectTo=/toekomst`. | |
+| ☐ | 14 | Log weer in en verwijder het account via `/mijn` (account verwijderen). Haal het adres daarna van `/beheer/allowlist`. | Het account is weg, inloggen lukt niet meer en er is geen extra testaccount bijgekomen. | |
+| ☐ | 15 | Kijk als superadmin op `/beheer/errors` of er tijdens je run nieuwe foutsoorten bij zijn gekomen. | Geen nieuwe foutsoorten, of alleen soorten die je al bij een ❌ hebt genoteerd. | |
+
+Klaar? Geef de ingevulde tabel (of alleen de ❌'s met toelichting) terug in
+de sessie. Claude verwerkt ze in "Uitkomst live-run" hieronder en in rij C van
+de launch-audit.
+
+## Uitkomst live-run
+
+_Nog niet uitgevoerd._
 
 ## Verificatie uitgevoerd in deze run (3 sep 2026)
 
@@ -88,7 +121,7 @@ productiedata gemuteerd:
 
 ## Openstaand
 
-- Live-uitvoering (stappen 1–11) — wacht op eigenaarskeuze tussen de drie
-  vervolgen hierboven.
+- Live-uitvoering (afvinklijst 1–15): de eigenaar loopt hem zelf (keuze 26 sep
+  2026, vervolg 3).
 - `docs/launch-audit-2026-07.md` rij C/AC3 blijft ⏳ tot een live run
   daadwerkelijk groen is.
