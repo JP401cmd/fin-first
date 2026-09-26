@@ -3,7 +3,7 @@
 
 /**
  * De cijferbalk boven de grafiek (blok K): de `LifelineReadout`, die meebeweegt met
- * hover en afspelen. Alleen Volledig (desktop-diepte, spec §4.7) en alleen in Vermogen.
+ * hover en afspelen. Alleen Volledig, alleen desktop (spec §4.7) en alleen in Vermogen.
  *
  * Fase 2 (ADR 0179 D3): de vijf `ChartOverlayExplainer`-blokken die hier stonden zijn
  * vervallen. De uitleg per laag staat in het Lagen-menu (`LAAG_UITLEG`), "Zo werkt je
@@ -27,8 +27,10 @@ export interface CanvasUitlegProps {
 export function CanvasUitleg({ modus, viewReadoutData, lifelineAge }: CanvasUitlegProps) {
   return (
     <HideInSimple>
+      {/* Alleen desktop (spec §4.7): op mobiel kostte de balk ±290px boven de grafiek.
+          Daar toont de grafiek zelf de waarden bij een tik (`hideValueTooltip`). */}
       {modus === 'vermogen' && viewReadoutData && (
-        <div className="mb-2">
+        <div className="mb-2 hidden lg:block" data-testid="canvas-readout">
           <LifelineReadout
             age={viewReadoutData.age}
             year={viewReadoutData.year}

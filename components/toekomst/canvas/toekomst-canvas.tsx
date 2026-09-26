@@ -390,6 +390,7 @@ export function ToekomstCanvas() {
               isPensioenMode={isPensioenMode}
               setActiveFaseModal={setActiveFaseModal}
               toonFasebalk={stand.toonFasebalk}
+              toonReadout={stand.toonReadout}
             />
 
             {/* Drie vrijheidsleeftijden onder de Marktcheck-band (spec §7.6), uit

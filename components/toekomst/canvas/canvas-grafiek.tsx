@@ -33,6 +33,7 @@ import type { AowAge } from '@/lib/aow-leeftijd'
 import type { ChartEventKind, ChartEventOverlay } from '@/lib/chart-event-overlay'
 import type { NaturalMilestone } from '@/lib/natural-milestones'
 import { HideInSimple } from '@/components/app/hide-in-simple'
+import { useIsLgUp } from '@/lib/hooks/use-media-query'
 import {
   SimChart,
   type ScenarioOverlay,
@@ -171,6 +172,8 @@ export interface CanvasGrafiekProps {
   setActiveFaseModal: Dispatch<SetStateAction<ActiveFaseModal>>
   /** De fasebalk staat alleen in katern Plan (spec §4.5). */
   toonFasebalk: boolean
+  /** Het katern draagt de cijferbalk (`LifelineReadout`, desktop, Volledig). */
+  toonReadout: boolean
 }
 
 export function CanvasGrafiek({
@@ -248,7 +251,9 @@ export function CanvasGrafiek({
   isPensioenMode,
   setActiveFaseModal,
   toonFasebalk,
+  toonReadout,
 }: CanvasGrafiekProps) {
+  const isLg = useIsLgUp()
   return (
               <div className="-mx-4 sm:-mx-6 md:-mx-8 overflow-hidden">
                 <ZoomableChartContainer currentAge={currentAge ?? 30} endAge={chartEndAge!}>
@@ -317,7 +322,10 @@ export function CanvasGrafiek({
                             disableCrosshair={overlayVisible && modus === 'vermogen'}
                             hoverAge={lifelineAge}
                             onHoverAge={setLifelineAge}
-                            hideValueTooltip={displayMode === 'full'}
+                            // De cijferbalk toont de waarden al, maar alleen in Volledig, op
+                            // desktop en waar het katern hem draagt; overal anders toont de
+                            // grafiek ze zelf.
+                            hideValueTooltip={displayMode === 'full' && isLg && toonReadout}
                             rows={useHouseholdMainLine ? viewHouseholdMainLineRows! : usePartnerMainLine ? viewPartnerLineRows! : (viewDisplaySimRows)}
                             fireAge={useHouseholdMainLine ? householdMainLine!.fireAge : usePartnerMainLine ? partnerLine!.fireAge : (simResult.fireAge)}
                             fireAgeFractional={useHouseholdMainLine ? householdMainLine!.fireAgeFractional : usePartnerMainLine ? partnerLine!.fireAgeFractional : (simResult.fireAgeFractional)}

@@ -22,7 +22,14 @@ vi.mock('next/dynamic', () => ({
       return <>{opties.loading()}</>
     },
 }))
-vi.mock('@/components/app/horizon/sim-chart', () => ({ SimChart: () => <div data-testid="sim-chart" /> }))
+const h = vi.hoisted(() => ({ isLg: true, simChart: null as Record<string, unknown> | null }))
+vi.mock('@/lib/hooks/use-media-query', () => ({ useIsLgUp: () => h.isLg, useMediaQuery: () => h.isLg }))
+vi.mock('@/components/app/horizon/sim-chart', () => ({
+  SimChart: (props: Record<string, unknown>) => {
+    h.simChart = props
+    return <div data-testid="sim-chart" />
+  },
+}))
 vi.mock('@/components/app/horizon/wealth-composition-chart', () => ({
   WealthCompositionChart: () => <div data-testid="samenstelling-chart" />,
 }))
@@ -39,9 +46,12 @@ vi.mock('@/components/app/horizon/phase-bar', () => ({ PhaseBar: () => null }))
 
 import { CanvasGrafiek, type CanvasGrafiekProps } from './canvas-grafiek'
 
-function renderModus(modus: CanvasModus) {
+function renderModus(modus: CanvasModus, extra: Partial<CanvasGrafiekProps> = {}) {
   const props = {
     modus,
+    displayMode: 'full',
+    toonReadout: true,
+    ...extra,
     currentAge: 40,
     chartEndAge: 90,
     simResult: { fireAge: 52, fireAgeFractional: 52.3, strategy: 'deplete' },
@@ -76,6 +86,27 @@ describe('CanvasGrafiek — de modi delen één cel', () => {
       expect(screen.getByTestId('canvas-vermogen').contains(screen.getByTestId('sim-chart'))).toBe(true)
     },
   )
+})
+
+describe('CanvasGrafiek — de waarde-tooltip wijkt alleen voor een zichtbare cijferbalk', () => {
+  const verborgen = (isLg: boolean, extra: Partial<CanvasGrafiekProps> = {}) => {
+    h.isLg = isLg
+    renderModus('vermogen', extra)
+    return h.simChart?.hideValueTooltip
+  }
+
+  it('desktop, Volledig, katern met cijferbalk: de balk toont de waarden', () => {
+    expect(verborgen(true)).toBe(true)
+  })
+
+  it('mobiel: geen cijferbalk (spec §4.7), dus de grafiek toont de waarden zelf', () => {
+    expect(verborgen(false)).toBe(false)
+  })
+
+  it('katern zonder cijferbalk (Instellingen) en Eenvoudig: de grafiek toont ze', () => {
+    expect(verborgen(true, { toonReadout: false })).toBe(false)
+    expect(verborgen(true, { displayMode: 'simple' })).toBe(false)
+  })
 })
 
 describe('CanvasGrafiek — Geldstroom heeft een laadstand', () => {
