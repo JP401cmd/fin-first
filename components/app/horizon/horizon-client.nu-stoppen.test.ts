@@ -22,7 +22,7 @@ import { leesToekomst, leesToekomstAlles } from '@/lib/test-utils/toekomst-bronn
  * Plan-tegels in de host.
  * "Mag nergens"-toetsen lezen alle /toekomst-bronnen samen.
  */
-function bron(deel: 'sim' | 'scenario' | 'host' = 'sim'): string {
+function bron(deel: 'sim' | 'scenario' | 'plan' = 'sim'): string {
   return leesToekomst(deel)
 }
 
@@ -154,7 +154,7 @@ describe('doelbedrag (D4) en opnamerate (bevinding 6)', () => {
   })
 
   it('de vrijheidsleeftijd-tegel valt niet om op de anker-guard (eigen uitzondering op isFixedAnchorMode)', () => {
-    expect(bron('host')).toMatch(/const showFireAgeNotice =[\s\S]{0,400}?!isFixedAnchorMode &&/)
+    expect(bron('plan')).toMatch(/const showFireAgeNotice =[\s\S]{0,400}?!isFixedAnchorMode &&/)
   })
 
   it('de aftel-bon (dode code) is verwijderd', () => {

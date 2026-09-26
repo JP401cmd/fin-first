@@ -31,7 +31,7 @@ const LOADER_PATH = join(process.cwd(), 'lib', 'horizon-data-loader.ts')
 /** De beslisser woont sinds ADR 0179 fase 1 stap 13 in de sim-hook van de state-provider. */
 const source = leesToekomst('sim')
 /** De tegel-kopij (onderschrift, leesvolgorde) staat in de host. */
-const host = leesToekomst('host')
+const host = leesToekomst('plan')
 
 /** Commentaarregels van álle /toekomst-bronnen — een uitleg mág de oude keten citeren. */
 function codeRegels(): string[] {

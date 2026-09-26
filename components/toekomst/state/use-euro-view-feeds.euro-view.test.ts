@@ -44,8 +44,16 @@ import {
 import { readSourceLF } from '@/lib/test-utils/read-source'
 
 const ROOT = process.cwd()
-/** De host die de feeds consumeert (tot de route-groep van stap 15). */
-const HOST_PATH = join(ROOT, 'components', 'app', 'horizon', 'horizon-client.tsx')
+/**
+ * De compositie die de feeds consumeert. Sinds de route-groep (stap 15) verdeeld over
+ * het Plan-paneel, het canvas en de overlay-host van de `(katern)`-layout.
+ */
+const HOST_PATHS = [
+  join(ROOT, 'components', 'toekomst', 'plan', 'plan-paneel.tsx'),
+  join(ROOT, 'components', 'toekomst', 'canvas', 'toekomst-canvas.tsx'),
+  join(ROOT, 'components', 'toekomst', 'overlays', 'toekomst-overlay-host.tsx'),
+]
+const OVERLAY_HOST_PATH = HOST_PATHS[2]
 const STATE_DIR = join(ROOT, 'components', 'toekomst', 'state')
 /** Het bestand waar de grens woont. */
 const GRENS_PATH = join(STATE_DIR, 'use-euro-view-feeds.ts')
@@ -57,7 +65,7 @@ function scanPaden(): string[] {
   const state = readdirSync(STATE_DIR)
     .filter((naam) => /\.(ts|tsx)$/.test(naam) && !/\.test\.(ts|tsx)$/.test(naam))
     .map((naam) => join(STATE_DIR, naam))
-  return [HOST_PATH, ...state]
+  return [...HOST_PATHS, ...state]
 }
 
 const START_BAKEN = 'EURO-WEERGAVE: DE RENDER-GRENS'
@@ -168,7 +176,7 @@ describe('/toekomst — euro-weergave-render-grens (T4)', () => {
   })
 
   it('toont de hero-puntbedragen als view*-waarden (FR-B5)', () => {
-    const host = readSourceLF(HOST_PATH)
+    const host = HOST_PATHS.map((p) => readSourceLF(p)).join('\n')
     const src = readSourceLF(GRENS_PATH)
     // Het FIRE-doel, "vermogen op AOW" en de maandonttrekking horen bij een
     // SPECIFIEKE leeftijd. Een terugval op de nominale variabele is hier
@@ -341,6 +349,6 @@ describe('/toekomst — euro-weergave-render-grens (T4)', () => {
       // …en er gaat geen `view`-prop naar een fase-modal.
       expect(src, relative(ROOT, pad)).not.toMatch(/^\s*view=\{euroView\}/m)
     }
-    expect(readSourceLF(HOST_PATH)).toMatch(/unifiedRows=\{unifiedRows\}/)
+    expect(readSourceLF(OVERLAY_HOST_PATH)).toMatch(/unifiedRows=\{unifiedRows\}/)
   })
 })

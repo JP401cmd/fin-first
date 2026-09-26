@@ -22,7 +22,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-const SOURCE_PATH = join(process.cwd(), 'components', 'app', 'horizon', 'horizon-client.tsx')
+const SOURCE_PATH = join(process.cwd(), 'components', 'toekomst', 'plan', 'plan-paneel.tsx')
 const source = readFileSync(SOURCE_PATH, 'utf8')
 /**
  * De doelbedrag-guard is een sim-afleiding (ADR 0179 fase 1 stap 13, `use-toekomst-sim.ts`):

@@ -31,7 +31,7 @@ import { TOEKOMST_BRONNEN, leesToekomst, leesToekomstAlles } from '@/lib/test-ut
 /** Het kernantwoord woont sinds ADR 0179 fase 1 stap 13 in de sim-hook van de provider. */
 const SOURCE_PATH = join(process.cwd(), TOEKOMST_BRONNEN.sim)
 /** De host toont de teksten. */
-const HOST = () => leesToekomst('host')
+const HOST = () => leesToekomst('plan')
 
 /** De legacy-scalarmotor als tweede antwoord op de FIRE-leeftijd. */
 const LEGACY_FIRE_AGE = /\bfire[?!]?\.fireAge\b/

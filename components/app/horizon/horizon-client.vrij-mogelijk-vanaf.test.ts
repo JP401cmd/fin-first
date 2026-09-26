@@ -17,7 +17,7 @@ import { join } from 'node:path'
 const SOURCE_PATH = join(process.cwd(), 'components', 'toekomst', 'state', 'use-toekomst-sim.ts')
 const src = readFileSync(SOURCE_PATH, 'utf8')
 /** De host geeft de grendel-setter aan het Plan-blad. */
-const host = readFileSync(join(process.cwd(), 'components', 'app', 'horizon', 'horizon-client.tsx'), 'utf8')
+const host = readFileSync(join(process.cwd(), 'components', 'toekomst', 'plan', 'plan-paneel.tsx'), 'utf8')
 
 function presetEffect(): string {
   const gate = src.indexOf('const presetBatchNodig')

@@ -243,6 +243,12 @@ export function useToekomstPerspectief() {
   // weergave koos.
   const verkenSectieZichtbaar = !(usePartnerMainLine || useHouseholdMainLine)
 
+  // Unified perspective hero: household or partner override.
+  // Verhuisd uit de compositie (ADR 0179 fase 1 stap 15): canvas én Plan-paneel lezen
+  // dezelfde keuze, dus één afleiding hier in plaats van een kopie per katern.
+  const perspectiveHero = isHouseholdView ? householdHero : isPartnerView ? partnerHero : null
+  const hasPerspectiveHero = perspectiveHero != null
+
   return useStabielObject({
     partnerName,
     refreshData,
@@ -259,6 +265,8 @@ export function useToekomstPerspectief() {
     usePartnerMainLine,
     useHouseholdMainLine,
     verkenSectieZichtbaar,
+    perspectiveHero,
+    hasPerspectiveHero,
   })
 }
 

@@ -295,6 +295,24 @@ export function routePatternToRegex(route) {
   return new RegExp('^' + body + '$')
 }
 
+/**
+ * Draagt een layout BOVEN de page (tot, niet met, `app/(app)/layout.tsx`) de knop?
+ * Een layout rendert rond elke page eronder, dus zijn knop staat ook op die pages.
+ * Aanleiding: de katern-layout van /toekomst (ADR 0179 fase 1 stap 15) draagt de i in
+ * de gedeelde paginakop en kiest per katern de tekst; de pages zelf dragen geen knop.
+ * De app-shell-layout zelf telt bewust niet mee: die zou elke route "gedekt" maken.
+ */
+export function ancestorLayoutHasInfoButton(pageFile) {
+  const appRoot = join(ROOT, APP_DIR)
+  let dir = dirname(pageFile)
+  while (dir.startsWith(appRoot) && dir !== appRoot) {
+    const layout = join(dir, 'layout.tsx')
+    if (existsSync(layout) && routeHasInfoButton(layout)) return true
+    dir = dirname(dir)
+  }
+  return false
+}
+
 export function scanRoutes() {
   const files = walkPages(join(ROOT, APP_DIR))
   const routes = []
@@ -302,7 +320,8 @@ export function scanRoutes() {
     const route = routePathOf(file)
     // /beheer is intern gereedschap, geen inhoudspagina voor de gebruiker.
     if (route.startsWith('/beheer')) continue
-    routes.push({ route, file: relative(ROOT, file).split(sep).join('/'), covered: routeHasInfoButton(file) })
+    const covered = routeHasInfoButton(file) || ancestorLayoutHasInfoButton(file)
+    routes.push({ route, file: relative(ROOT, file).split(sep).join('/'), covered })
   }
   routes.sort((a, b) => a.route.localeCompare(b.route))
   return routes

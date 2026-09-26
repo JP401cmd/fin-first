@@ -147,8 +147,10 @@ describe('next.config redirects — legacy routes redirecten op de routing-laag 
   it('de redirect-doelen zijn zelf geen redirect-only route (geen keten)', () => {
     // /toekomst en /toekomst/instellingen renderen echte pagina's; zou een doel
     // zelf een runtime-redirect zijn, dan was de trigger alleen verplaatst.
+    // Sinds de katern-layout (ADR 0179 fase 1 stap 15) staan de katernen in de
+    // route-groep `(katern)/`, die geen URL-segment toevoegt.
     for (const target of [
-      'app/(app)/toekomst/page.tsx',
+      'app/(app)/toekomst/(katern)/page.tsx',
       'app/(app)/toekomst/instellingen/page.tsx',
     ]) {
       expect(existsSync(path.join(process.cwd(), target))).toBe(true)

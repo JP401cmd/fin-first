@@ -56,9 +56,12 @@ describe('toekomst-state-provider — geen nieuwe god-component', () => {
       return i
     })
     expect([...volgorde].sort((a, b) => a - b)).toEqual(volgorde)
-    // De host rekent de grens niet zelf aan: hij leest alleen de euro-context.
-    expect(leesToekomst('host')).not.toMatch(/useEuroViewFeeds\s*\(|useToekomstEuro\s*\(/)
-    expect(leesToekomst('host')).toContain('useToekomstEuroContext()')
+    // De compositie (Plan-paneel en canvas, stap 15) rekent de grens niet zelf aan: ze
+    // leest alleen de euro-context.
+    for (const deel of ['plan', 'canvas'] as const) {
+      expect(leesToekomst(deel)).not.toMatch(/useEuroViewFeeds\s*\(|useToekomstEuro\s*\(/)
+      expect(leesToekomst(deel)).toContain('useToekomstEuroContext()')
+    }
   })
 
   it('elke concern-hook geeft een per concern gememoïseerde waarde terug', () => {
@@ -73,7 +76,7 @@ describe('toekomst-state-provider — geen nieuwe god-component', () => {
 describe('meldingen en grendels blijven gemount bij een katernwissel', () => {
   it('de drie registratie-hooks draaien in de meldingen-hook, niet in de host (GW3b)', () => {
     const meldingen = leesToekomst('meldingen')
-    const host = leesToekomst('host')
+    const host = (['plan', 'canvas', 'overlayHost'] as const).map((d) => leesToekomst(d)).join('\n')
     for (const hook of ['useDeficitNotice(', 'useAowNotice(', 'useEindsituatieNotice(']) {
       expect(meldingen, `${hook} hoort in de provider`).toContain(hook)
       expect(host, `${hook} hoort niet in de host`).not.toContain(hook)

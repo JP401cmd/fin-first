@@ -25,7 +25,7 @@ import { uitgaveNaPensioenRange, UITGAVE_NA_PENSIOEN_STAP } from '@/lib/scenario
 import { leesToekomst } from '@/lib/test-utils/toekomst-bronnen'
 
 const source = readFileSync(
-  join(process.cwd(), 'components', 'app', 'horizon', 'horizon-client.tsx'),
+  join(process.cwd(), 'components', 'toekomst', 'plan', 'plan-paneel.tsx'),
   'utf8',
 )
 /** De preset-batch (`haalbareUitgave`) woont sinds stap 13 in de sim-hook van de provider. */

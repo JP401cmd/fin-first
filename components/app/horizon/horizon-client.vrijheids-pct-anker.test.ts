@@ -39,7 +39,7 @@ import type { SimResult } from '@/lib/fire-simulation'
  */
 const SOURCE_PATH = join(process.cwd(), 'components', 'toekomst', 'state', 'use-toekomst-sim.ts')
 const source = readFileSync(SOURCE_PATH, 'utf8')
-const HOST_PATH = join(process.cwd(), 'components', 'app', 'horizon', 'horizon-client.tsx')
+const HOST_PATH = join(process.cwd(), 'components', 'toekomst', 'plan', 'plan-paneel.tsx')
 const host = readFileSync(HOST_PATH, 'utf8')
 /** De euro-render-grens (ADR 0179 fase 1 stap 12): de ankerfactor woont hier. */
 const GRENS_PATH = join(process.cwd(), 'components', 'toekomst', 'state', 'use-euro-view-feeds.ts')

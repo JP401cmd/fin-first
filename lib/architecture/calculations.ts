@@ -159,7 +159,7 @@ export const CALCULATIONS: Calculation[] = [
     inputs: ['GRONDSLAG van inkomen én uitgaven (ADR 0103, calc "Grondslag van inkomen & uitgaven") — budget / transactie / handmatig; de spaarquote volgt die keuze en is géén aparte instelbare bron', 'transactions (inkomen, uitgaven) — EXCLUSIEF de boekingen van rekeningen waarop budgetteren uit staat (ADR 0139, filter in tx_month_aggregate): van zo\'n rekening telt alleen het saldo, en dus tellen noch haar uitgaven noch haar inkomsten mee in de quote', 'budgets (budget_type=income/expense; savings en debt vallen er DRAGEND buiten)', 'net_worth_snapshots.savings_rate (historie)'],
     outputs: ['EFFECTIEVE spaarquote % (grondslag-geresolveerd — bundelveld `effectiveSavingsRatePct`; dít is waarop de gezondheidsscore, de FIRE-prognose én de cashflow-kaart draaien)', 'RAUWE 6-maands transactiequote % (bundelveld `savingsRate6m` — de meetwaarde die de transactie-kassabon verklaart; gelijk aan de effectieve quote zolang beide grondslagen \'transaction\' zijn)', 'sparen €/maand op die grondslag (bundelveld `effectiveMonthlySavings` = baseAnnualSavings / 12)', 'sparen €/jaar (`baseAnnualSavings`, voedt de FIRE-prognose)', 'de twee grondslagen zelf (`savingsRateIncomeBasis`/`savingsRateExpensesBasis`) zodat elke kaart kan benoemen waar het getal op rust', 'household/partner-spaarquote % + €/maand'],
     formula: 'BEIDE grondslagen transactie: spaarquote = (inkomen − (uitgaven − spaarbudget) + aflossing) / inkomen; ELKE andere grondslag-combinatie (budget/handmatig aan één of beide kanten): spaarquote = (effectief inkomen − effectieve uitgaven) / effectief inkomen, ZONDER spaarbudget-/aflossingscorrectie; sparen €/maand = inkomen × spaarquote%',
-    files: ['lib/savings-source.ts', 'lib/constants.ts', 'lib/budget-basis.ts', 'lib/budget-realized.ts', 'lib/history-basis.ts', 'lib/effective-financials.ts', 'lib/retirement-expense-basis.ts', 'lib/month-range.ts', 'lib/server-data/tx-aggregates.ts', 'lib/cashflow-kpis.ts', 'lib/core-metrics.ts', 'lib/dashboard-data-loader.ts', 'lib/horizon-data-loader.ts', 'lib/horizon/raw-data-loader.ts', 'lib/core-data-loader.ts', 'lib/lever-scores-loader.ts', 'lib/goal-current-value.ts', 'app/api/checkin/overview/route.ts', 'app/api/checkin/gespreksstarters/route.ts', 'lib/checkin/gespreksstarters.ts', 'components/app/horizon/horizon-client.tsx', 'lib/savings-rate-window.consumers.test.ts', 'components/widgets/spaarquote-widget.tsx', 'components/fin/cashflow-section.tsx', 'components/overview/cashflow-instellingen-blok.tsx', 'components/overview/cashflow-grondslag-body.tsx'],
+    files: ['lib/savings-source.ts', 'lib/constants.ts', 'lib/budget-basis.ts', 'lib/budget-realized.ts', 'lib/history-basis.ts', 'lib/effective-financials.ts', 'lib/retirement-expense-basis.ts', 'lib/month-range.ts', 'lib/server-data/tx-aggregates.ts', 'lib/cashflow-kpis.ts', 'lib/core-metrics.ts', 'lib/dashboard-data-loader.ts', 'lib/horizon-data-loader.ts', 'lib/horizon/raw-data-loader.ts', 'lib/core-data-loader.ts', 'lib/lever-scores-loader.ts', 'lib/goal-current-value.ts', 'app/api/checkin/overview/route.ts', 'app/api/checkin/gespreksstarters/route.ts', 'lib/checkin/gespreksstarters.ts', 'components/toekomst/plan/plan-paneel.tsx', 'lib/savings-rate-window.consumers.test.ts', 'components/widgets/spaarquote-widget.tsx', 'components/fin/cashflow-section.tsx', 'components/overview/cashflow-instellingen-blok.tsx', 'components/overview/cashflow-grondslag-body.tsx'],
     functions: ['resolveSavingsSource', 'savingsRateFromAggregates', 'computeSavingsRate6m', 'resolveSavingsRate6m', 'computeSavingsRateFromNetWorthDelta', 'savingsRateWindow', 'savingsRateDataMonths', 'deriveSavingsRate6mWindow', 'deriveDataMonths6', 'deriveSavingsHistory', 'monthlySavingsFromRate', 'computeDebtAflossingMonthly', 'loadForecastSectionData', 'transactionAnnualIncome', 'annualizeHistorySum', 'extrapolateAnnualIncome', 'savingsRateBasisLabel', 'savingsRateBasisPhrase', 'savingsRateFollowsTransactions'],
     constants: [
       { label: 'FIRE-referentiespaarquote (UI-benchmark)', value: 'FIRE_SAVINGS_RATE_BENCHMARK_PCT = 50% (lib/constants.ts) — oriëntatiepunt, geen afgeleide waarde' },
@@ -1307,7 +1307,7 @@ export const CALCULATIONS: Calculation[] = [
     ],
     outputs: ['vrijheidsvoortgang % (0–100)'],
     formula: 'basis = homeExcludedFromFire ? {teller: fireEligibleNetWorth, noemer: requiredFirePortfolio} : {teller: netWorth, noemer: requiredFireNetWorth}; pct = min(100, max(0, teller / noemer × 100)); 100% ⇔ FIRE-doel bereikt (op de FIRE-maand geldt netWorth == requiredFireNetWorth én liquide == requiredFirePortfolio, dus beide grondslagen raken 100% op hetzelfde moment)',
-    files: ['lib/core-metrics.ts', 'lib/fire-strategy.ts', 'lib/housing-strategy.ts', 'lib/dashboard-data-loader.ts', 'lib/horizon-data-loader.ts', 'lib/horizon/raw-data-loader.ts', 'lib/horizon/fire-doel-weergave.ts', 'lib/horizon/lab-uitkomst.ts', 'lib/horizon/anker-copy.ts', 'lib/report-data.ts', 'lib/core-data-loader.ts', 'lib/fire-target-shared.ts', 'lib/ai/context/shared-context.ts', 'lib/ai/context/fin-financial-facts.ts', 'lib/ai/local/local-chat-context.ts', 'app/api/share/freedom-card/route.ts', 'app/api/report/route.ts', 'lib/overview/canonical-health.ts', 'lib/page-status/compute.ts', 'components/app/horizon/horizon-client.tsx'],
+    files: ['lib/core-metrics.ts', 'lib/fire-strategy.ts', 'lib/housing-strategy.ts', 'lib/dashboard-data-loader.ts', 'lib/horizon-data-loader.ts', 'lib/horizon/raw-data-loader.ts', 'lib/horizon/fire-doel-weergave.ts', 'lib/horizon/lab-uitkomst.ts', 'lib/horizon/anker-copy.ts', 'lib/report-data.ts', 'lib/core-data-loader.ts', 'lib/fire-target-shared.ts', 'lib/ai/context/shared-context.ts', 'lib/ai/context/fin-financial-facts.ts', 'lib/ai/local/local-chat-context.ts', 'app/api/share/freedom-card/route.ts', 'app/api/report/route.ts', 'lib/overview/canonical-health.ts', 'lib/page-status/compute.ts', 'components/toekomst/plan/plan-paneel.tsx'],
     functions: ['computeFreedomPctForPlan', 'dekkingVanRun', 'rapportAnkerVoortgang', 'computeFreedomProgressWithBasis', 'selectFreedomProgressBasis', 'resolveFireDoelWeergave', 'inclHomeTargetFromScalar', 'computeFreedomProgress', 'computeRunwayCoveragePct', 'isFinanciallyFree', 'hasFreedomBasis', 'isAnchorReached', 'resolveFreedomAnchor', 'resolveFreedomFraming', 'isFixedAnchor', 'resolveFirePlanWithOverride', 'stopAnchorFromKernel', 'isHomeExcludedFromFire', 'getFireEligibleNetWorth', 'computeHorizonFireSim', 'computeHorizonFireTarget', 'loadHorizonRaw', 'loadHorizonData'],
     constants: [
       { label: 'Voorpoort: de conclusie heeft een feitenbasis nodig (B-058, 19 sep 2026)', value: "lib/fire-strategy.ts — FREEDOM_BASIS_MIN_MONTHLY_EXPENSES = 100 (€/maand) + hasFreedomBasis(). Vlak na de onboarding kan de gate TRIVIAAL waar worden: met een nog niet ingevulde uitgavenkant is het FIRE-doel ≈ 0 en haalt élke portefeuille de 100 % — een testgebruiker kreeg binnen seconden 'je hoeft niet meer te werken' te zien. FreedomStateInput draagt daarom optioneel `basis: { monthlyExpenses }`; is die er én ligt hij onder de grens, dan is isFinanciallyFree onwaar ongeacht freedomPct, leeftijd of anker (framing valt terug op 'building' resp. 'anchored'). De grens is bewust CONSERVATIEF: €100/maand is een leegte-detector, geen zuinigheidsoordeel. Aanroepers geven de EFFECTIEVE maanduitgaven die de kernel zelf at (horizonData.effectiveInput.monthlyExpenses) — consume, don't recompute. Dragen 'm: app/(app)/overzicht/page.tsx, components/overview/overzicht-secondary-loader.tsx, lib/page-status/compute.ts. Dragen 'm nog NIET (oud gedrag, bewust): lib/ai/context/shared-context.ts en components/app/horizon/horizon-client.tsx. Gepind in lib/fire-strategy.basis.test.ts." },
@@ -1349,7 +1349,7 @@ export const CALCULATIONS: Calculation[] = [
       'components/widgets/vrijheidsmijlpalen-widget.tsx',
       'components/widgets/sim-vermogenspad-widget.tsx',
       'components/widgets/fire-prognose-widget.tsx',
-      'components/app/horizon/horizon-client.tsx',
+      'components/toekomst/canvas/toekomst-canvas.tsx',
       'components/app/horizon/scenario-kaarten.tsx',
       'lib/uat/acceptance/ovz-checks.ts',
     ],
@@ -1485,7 +1485,7 @@ export const CALCULATIONS: Calculation[] = [
     ],
     formula:
       "Bisectie op retirement_expense_custom_amount (methode geforceerd naar 'custom_amount') tot solveFire(...).status geen shortfall meer is ('anchor_shortfall'/'stop_now_shortfall'/'pension_shortfall' — dezelfde drie statussen als computeStatusBlok#vastAnkerTekort, NIET herhaald maar gelezen). Ondergrens 0; bovengrens = 3× de huidige uitgave (BOVENGRENS_FACTOR) — dekt die ook nog, dan wordt daarop GEKLEMD (richting 'meer', geen verdere zoektocht: praktische klem, geen belofte). Precisie € 50/jaar (PRECISIE) — bewust fijner dan de sliderstap € 600/jaar (UITGAVE_NA_PENSIOEN_STAP, lib/scenario-events.ts, = € 50/mnd, gelijk aan 'Meer salaris'), zodat het antwoord niet op de sliderstap afrondt. Drempel € 250/jaar (HAALBARE_UITGAVE_DREMPEL): |perJaar − huidigPerJaar| daaronder ⇒ richting 'gelijk' ⇒ geen regel — gespiegeld aan de € 500-regel van de eindvermogen-badge (ADR 0145 M5), niet apart gemeten. Monotonie-vangrail: dekt gevonden+SLIDER_STAP tegen de verwachting in óók, dan is de bisectie niet-monotoon geweest (discontinuïteit — woningverkoop, potregel) en levert de functie null i.p.v. een misleidend getal. Randen: geen vast stop-anker (anker 'solved') ⇒ null (de hoofdrun ís het antwoord); huidige uitgave ≤ 0 ⇒ null (geen grondslag); dekt zelfs € 0 uitgeven niet ⇒ null (het tekort zit vóór het stopmoment, niet de knop die dit oplost); kern-fout ⇒ try/catch → null. Kosten: ~14 geankerde runs × ~25 ms (ADR 0129 D7: 174 ms/6 anker-kaarten) ≈ 350 ms extra in ScenarioPresetBatch, in dezelfde worker-oversteek als solvedFireAge/solvedFireEndAge.",
-    files: ['lib/horizon/haalbare-uitgave.ts', 'lib/horizon/scenario-presets.ts', 'lib/horizon/anker-copy.ts', 'lib/hooks/use-horizon-fire-sim.ts', 'lib/scenario-events.ts', 'components/app/horizon/horizon-client.tsx'],
+    files: ['lib/horizon/haalbare-uitgave.ts', 'lib/horizon/scenario-presets.ts', 'lib/horizon/anker-copy.ts', 'lib/hooks/use-horizon-fire-sim.ts', 'lib/scenario-events.ts', 'components/toekomst/plan/plan-paneel.tsx'],
     functions: ['solveHaalbareUitgave', 'solveFire', 'buildKernelInputFromApp', 'buildConvergentieAdapterProfile', 'haalbaarBijUitgaveRegel'],
     constants: [
       { label: 'HAALBARE_UITGAVE_DREMPEL', value: '€ 250/jaar — onder dit verschil geen richting/regel (gespiegeld aan ADR 0145 M5, niet apart gemeten)' },
@@ -1751,7 +1751,7 @@ export const CALCULATIONS: Calculation[] = [
       'lib/horizon/risico-event-regels.ts',
       'lib/horizon/life-events-catalog.ts',
       'lib/horizon/event-pane-voorstel.ts',
-      'components/app/horizon/horizon-client.tsx',
+      'components/toekomst/plan/plan-paneel.tsx',
     ],
     functions: [
       'risicoEventVoorstel',
@@ -1796,7 +1796,7 @@ export const CALCULATIONS: Calculation[] = [
       'lib/persoonlijk-plan-assembly.ts',
       'lib/totaalplan-data.ts',
       'lib/holdings-data-loader.ts',
-      'components/app/horizon/horizon-client.tsx',
+      'components/toekomst/canvas/toekomst-canvas.tsx',
       'app/api/uitgaven-na-pensioen/context/route.ts',
       'app/api/report/route.ts',
       'app/api/snapshots/route.ts',
@@ -2164,7 +2164,7 @@ export const CALCULATIONS: Calculation[] = [
       'lib/horizon-kernel/worker/kernel-protocol.ts',
       'lib/horizon-kernel/worker/run-in-worker.ts',
       'lib/horizon/marktcheck-copy.ts',
-      'components/app/horizon/horizon-client.tsx',
+      'components/toekomst/canvas/toekomst-canvas.tsx',
       'lib/constants.ts',
     ],
     functions: ['computeRendementMarge', 'resolveMargeAnker', 'potRisicoFactor', 'isToereikend', 'computeGap', 'runKernelProjection', 'margeKort', 'margeLegenda', 'margeZin', 'margeAnkerZin', 'margeAnkerKort'],

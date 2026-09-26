@@ -141,7 +141,7 @@ describe('prognose-kopgetallen — één vorm voor de vrijheidsleeftijd', () => 
 
   it('consumeert op /toekomst de seam die op hele jaren afrondt', () => {
     const src = readFileSync(
-      join(process.cwd(), 'components', 'app', 'horizon', 'horizon-client.tsx'),
+      join(process.cwd(), 'components', 'toekomst', 'plan', 'plan-paneel.tsx'),
       'utf8',
     )
     expect(src).toContain('heroFireAgeText')

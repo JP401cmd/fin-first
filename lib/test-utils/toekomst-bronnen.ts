@@ -4,7 +4,7 @@ import { readSourceLF } from './read-source'
 /**
  * De bronbestanden van /toekomst die de bron-scan-tests lezen (ADR 0179 fase 1).
  *
- * WAAROM: `horizon-client.tsx` was één bestand van 11.000 regels; zeventien bron-tests
+ * WAAROM: `horizon-client.tsx` (weg sinds stap 15) was één bestand van 11.000 regels; zeventien bron-tests
  * lazen het letterlijk. Sinds de state-provider (stap 12–14) woont elke invariant in het
  * bestand van zijn concern — "één invariant, één bestand". Een test kiest hier dus het
  * concern waar zijn invariant woont, en een negatieve toets ("dit mag nergens") leest
@@ -12,8 +12,14 @@ import { readSourceLF } from './read-source'
  * wegvalt doordat de test het verkeerde bestand leest.
  */
 export const TOEKOMST_BRONNEN = {
-  /** De host: de compositie van de pagina (JSX + Plan-lokale afleidingen). */
-  host: 'components/app/horizon/horizon-client.tsx',
+  /**
+   * De compositie is sinds de routeswitch (stap 15) verdeeld over de `(katern)`-layout:
+   * het Plan-paneel (JSX + Plan-lokale afleidingen), het canvas en de overlay-host.
+   * `horizon-client.tsx` bestaat niet meer.
+   */
+  plan: 'components/toekomst/plan/plan-paneel.tsx',
+  canvas: 'components/toekomst/canvas/toekomst-canvas.tsx',
+  overlayHost: 'components/toekomst/overlays/toekomst-overlay-host.tsx',
   /** De provider: contexts en de volgorde van de concern-hooks. */
   provider: 'components/toekomst/state/toekomst-state-provider.tsx',
   perspectief: 'components/toekomst/state/use-toekomst-perspectief.ts',
@@ -39,7 +45,7 @@ export function leesToekomst(deel: ToekomstBron): string {
   return readSourceLF(toekomstPad(deel))
 }
 
-/** Alle /toekomst-state- en host-bronnen aan elkaar — voor "mag nergens"-toetsen. */
+/** Alle /toekomst-state- en compositie-bronnen aan elkaar — voor "mag nergens"-toetsen. */
 export function leesToekomstAlles(): string {
   return (Object.keys(TOEKOMST_BRONNEN) as ToekomstBron[]).map(leesToekomst).join('\n')
 }

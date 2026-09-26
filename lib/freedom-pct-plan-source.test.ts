@@ -44,7 +44,9 @@ describe('voortgangsmeter — requiredFireIsStartPortfolio leeft alleen nog in d
     'lib/fire-target-shared.ts',
     'lib/horizon/outcome-guard.ts',
     'lib/goals/vrijheidsgetal-source.ts',
-    'components/app/horizon/horizon-client.tsx',
+    // ADR 0179 fase 1 stap 15: horizon-client.tsx is verdeeld over layout, canvas en Plan-paneel.
+    'components/toekomst/plan/plan-paneel.tsx',
+    'components/toekomst/canvas/toekomst-canvas.tsx',
     // ADR 0179 fase 1 stap 13: het vrijheids-% van /toekomst woont in de sim-hook.
     'components/toekomst/state/use-toekomst-sim.ts',
     ...LOADERS,

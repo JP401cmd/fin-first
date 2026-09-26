@@ -91,10 +91,10 @@ describe('bron-grendel — de deeplink-opschoning wisselt niet van route', () =>
     join(process.cwd(), 'components', 'toekomst', 'state', 'use-toekomst-overlay-state.ts'),
     'utf8',
   )
-  const HOST = readFileSync(
-    join(process.cwd(), 'components', 'app', 'horizon', 'horizon-client.tsx'),
-    'utf8',
-  )
+  // De compositie (ADR 0179 fase 1 stap 15): Plan-paneel, canvas en overlay-host.
+  const HOST = ['plan/plan-paneel.tsx', 'canvas/toekomst-canvas.tsx', 'overlays/toekomst-overlay-host.tsx']
+    .map((f) => readFileSync(join(process.cwd(), 'components', 'toekomst', ...f.split('/')), 'utf8'))
+    .join('\n')
 
   it('schoont op via de gedeelde helper', () => {
     expect(SOURCE).toContain("from '@/lib/horizon/deeplink-cleanup'")

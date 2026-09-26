@@ -1,7 +1,7 @@
 // Verplaatst uit components/app/horizon/horizon-client.tsx r5879–5922 @ c1b4849eb (fase 1, ADR 0179).
 'use client'
 
-import type { Dispatch, SetStateAction } from 'react'
+import type { Dispatch, ReactNode, SetStateAction } from 'react'
 import { TableProperties } from 'lucide-react'
 import type { SimResult } from '@/lib/fire-simulation'
 import type { HouseholdHeroData } from '@/components/toekomst/state/types'
@@ -17,6 +17,13 @@ export interface PlanHeroKopProps {
   perspectiveHero: HouseholdHeroData | null // horizon-client r5632
   simResult: SimResult | null // horizon-client r1253
   setSimModalOpen: Dispatch<SetStateAction<boolean>> // horizon-client r754
+  /**
+   * Stap 15 (ADR 0179, kaart V11): de kopregel is de canvas-kop geworden. Wat uit de
+   * vervallen kicker-kop meeverhuist, komt hier binnen — links het perspectief-label,
+   * rechts de Tips-toggle vóór de Details-pill.
+   */
+  kicker?: ReactNode
+  acties?: ReactNode
 }
 
 export function PlanHeroKop({
@@ -25,6 +32,8 @@ export function PlanHeroKop({
   perspectiveHero,
   simResult,
   setSimModalOpen,
+  kicker,
+  acties,
 }: PlanHeroKopProps) {
   return (
     <>
@@ -41,6 +50,7 @@ export function PlanHeroKop({
               stacking-context via hover-transform opent. */}
           <div className="relative z-[46] mb-3 sm:mb-6 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
+              {kicker}
               {hasPerspectiveHero && (
                 <div>
                   <p className="label-editorial text-horizon-600">
@@ -56,6 +66,8 @@ export function PlanHeroKop({
                 </div>
               )}
             </div>
+            <div className="flex items-center gap-1.5">
+            {acties}
             {simResult && (
               <button
                 type="button"
@@ -71,6 +83,7 @@ export function PlanHeroKop({
                 Details
               </button>
             )}
+            </div>
           </div>
     </>
   )

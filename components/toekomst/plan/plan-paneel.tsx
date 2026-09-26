@@ -1,12 +1,25 @@
-﻿'use client'
+// Verplaatst uit components/app/horizon/horizon-client.tsx r5632–5792, r5867–7990 @ c1b4849eb (fase 1, ADR 0179).
+// euro-view: ontvangt view*-feeds van de render-grens, deflateert niet zelf
+'use client'
+
+/**
+ * Het Plan-paneel van /toekomst (ADR 0179 D4, fase 1 stap 15): katern Plan, het kind
+ * van de `(katern)`-layout op `/toekomst`. Het canvas en de katern-koppen staan erboven
+ * in de layout; dit paneel toont en duidt het resultaat.
+ *
+ * Verplaatst uit de compositie van `horizon-client.tsx` (@ ec883d283, `HorizonCompositie`):
+ * de KPI-strip met duiding, voortgang en gegevensmelding, de Plan-meldingen, de
+ * verdieping en de kassabons, plus de Plan-lokale afleidingen die alleen deze blokken
+ * lezen. Het lab staat in deze stap nog hier (onder de meldingen); stap 16 verhuist
+ * het naar katern Doelen.
+ *
+ * Leest zijn data uit de provider, nooit uit de route (D8).
+ */
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import type { HorizonPageData } from '@/lib/horizon-data-loader'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
-import type { GoalMarkerInput } from '@/lib/horizon/goal-chart-markers'
 import { HideInSimple } from '@/components/app/hide-in-simple'
-import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
 import { SectionLabel } from '@/components/editorial'
 import { isHeroAnswerInvalid } from '@/lib/horizon/hero-fire-age'
 import { fireDoelPaarInLeesvolgorde, FIRE_DOEL_ONDERSCHRIFT } from '@/lib/horizon/fire-doel-weergave'
@@ -19,117 +32,50 @@ import {
 } from '@/lib/horizon/anker-copy'
 import { guardFreedomMoment, guardRetirementExpense } from '@/lib/horizon/outcome-guard'
 import { resolveFreedomFraming, isAtOrPastAow, stopAnchorFromKernel } from '@/lib/fire-strategy'
-import type { OverlayBalloonDef } from '@/components/app/horizon/toekomst-overlay'
-import { TOEKOMST_OVERLAY_BALLOONS } from '@/components/app/horizon/toekomst-overlay-balloons'
-import type { OverlayEmphasis } from '@/components/toekomst/state/types'
-import { PlanHeroKop } from '@/components/toekomst/plan/plan-hero-kop'
 import { PlanKerngetalMobiel, PlanKpiStripDesktop, PlanKpiStripMobiel } from '@/components/toekomst/plan/plan-kpi-strip'
 import { PlanHeroDuiding } from '@/components/toekomst/plan/plan-hero-duiding'
 import { PlanGegevensmelding } from '@/components/toekomst/plan/plan-gegevensmelding'
 import { PlanMeldingen } from '@/components/toekomst/plan/plan-meldingen'
 import { PlanVerdieping } from '@/components/toekomst/plan/plan-verdieping'
-import { DoelenLab } from '@/components/toekomst/doelen/doelen-lab'
-import { DoelenLabSheets } from '@/components/toekomst/doelen/doelen-lab-sheets'
-import { ToekomstOverlays } from '@/components/toekomst/overlays/toekomst-overlays'
 import {
   PlanKassabonVrijheidsleeftijd,
   PlanKassabonDoelbedrag,
   PlanKassabonOpnamerate,
   PlanKassabonGezondheid,
 } from '@/components/toekomst/plan/plan-kassabons'
-import { CanvasTipsToggle } from '@/components/toekomst/canvas/canvas-tips-toggle'
-import { CanvasPills } from '@/components/toekomst/canvas/canvas-pills'
-import { CanvasUitleg } from '@/components/toekomst/canvas/canvas-uitleg'
-import { CanvasGrafiek } from '@/components/toekomst/canvas/canvas-grafiek'
-import { CanvasLegenda } from '@/components/toekomst/canvas/canvas-legenda'
-import { ToekomstStateProvider, useToekomstBron, useToekomstPerspectiefContext, useToekomstOverlayContext, useToekomstScenarioContext, useToekomstSimContext, useToekomstMeldingenContext, useToekomstLagenContext, useToekomstEuroContext } from '@/components/toekomst/state/toekomst-state-provider'
+import { DoelenLab } from '@/components/toekomst/doelen/doelen-lab'
+import { DoelenLabSheets } from '@/components/toekomst/doelen/doelen-lab-sheets'
+import {
+  useToekomstBron,
+  useToekomstPerspectiefContext,
+  useToekomstOverlayContext,
+  useToekomstScenarioContext,
+  useToekomstSimContext,
+  useToekomstMeldingenContext,
+  useToekomstLagenContext,
+  useToekomstEuroContext,
+} from '@/components/toekomst/state/toekomst-state-provider'
 
-export default function HorizonPage({
-  initialData,
-  goals,
-}: {
-  initialData: HorizonPageData
-  /**
-   * @deprecated Genegeerd. K-02 — de enige aanroeper (/toekomst) gaf altijd
-   * `embedded`; de standalone-tak (eigen PageInfoButton + h1) was dood en is
-   * weg (ADR 0179 fase 1 stap 1, ADR 0110). Het veld blijft alleen staan tot
-   * de page-verhuizing (stap 15) de prop bij de aanroeper schrapt.
-   */
-  embedded?: boolean
-  /**
-   * M36 — financiële doelen met een streefdatum als markers op de tijdas.
-   * Bewust een PROP en geen extra query in de horizon-bundel: `/toekomst` laadt
-   * deze doelen toch al (`loadFinData`) voor de Doelen-navkaart, dus de grafiek
-   * leest exact DEZELFDE slice als de dashboard-widget — geen tweede bron, geen
-   * extra egress. Ontbreekt de prop (legacy `/horizon`-route), dan gedraagt de
-   * grafiek zich als voorheen.
-   */
-  goals?: readonly GoalMarkerInput[]
-}) {
-  return (
-    <ToekomstStateProvider initialData={initialData} goals={goals}>
-      <HorizonCompositie />
-    </ToekomstStateProvider>
-  )
-}
-
-/**
- * De compositie van /toekomst (ADR 0179 fase 1 stap 13–14): leest de gedeelde state per
- * concern uit `ToekomstStateProvider` (euro-bedragen alleen als `view*`-feeds uit de
- * euro-context) en rendert de blokken. Lokaal blijft alleen UI-state die één blok leest:
- * de kassabons en verloopgrafieken van Plan, de IE-uitklap en de ballon-nadruk van het
- * canvas. Stap 15 verdeelt deze compositie over layout, canvas en katern-panelen.
- */
-function HorizonCompositie() {
+export function PlanPaneel() {
   const { initialData } = useToekomstBron()
   const {
-    partnerName,
-    refreshData,
     isHouseholdView,
     isPartnerView,
-    householdHero,
-    partnerHero,
-    householdInput,
-    householdMainLine,
-    partnerLine,
-    householdRetireInfo,
     usePartnerMainLine,
     useHouseholdMainLine,
     verkenSectieZichtbaar,
+    perspectiveHero,
+    hasPerspectiveHero,
   } = useToekomstPerspectiefContext()
   const {
-    activeModal,
     setActiveModal,
-    strategieInitialTab,
     setStrategieInitialTab,
-    simModalOpen,
-    setSimModalOpen,
-    activeFaseModal,
-    setActiveFaseModal,
-    uitgavenPaneOpen,
-    setUitgavenPaneOpen,
-    householdRetireOpen,
-    setHouseholdRetireOpen,
     openRetirementExpensePane,
-    eventPaneOpen,
-    setEventPaneOpen,
-    eventPaneEditingId,
-    setEventPaneEditingId,
-    eventPaneMode,
-    setEventPaneMode,
-    clusterSheet,
-    setClusterSheet,
     verkenSectionRef,
-    selectedNaturalMilestone,
-    setSelectedNaturalMilestone,
-    selectedYearAge,
-    setSelectedYearAge,
   } = useToekomstOverlayContext()
   const {
     scenarioReturnDeltas,
     setScenarioReturnDeltas,
-    showScenarioLine,
-    setShowScenarioLine,
     knopWeergave,
     setKnopWeergave,
     doelBlok,
@@ -148,7 +94,6 @@ function HorizonCompositie() {
     hasScenario,
     hasStopKeuze,
     doelActief,
-    doelLijnLabel,
     whatIfBaseline,
     scenarioVerwachtFireAge,
     coverageNodes,
@@ -157,7 +102,6 @@ function HorizonCompositie() {
     doelVastleggenMogelijk,
     doelBijwerkenMogelijk,
     radarAssen,
-    hasDoelLijn,
     categorieReturnGroups,
     effectiveStopAge,
     planEindVorm,
@@ -170,59 +114,40 @@ function HorizonCompositie() {
     handleDoelLoslaten,
     handleStopPlanBevestigen,
     handleDoelHerstellen,
-    scenarioFireDeltaLabel,
     labKnoppen,
-    nalatenschapMarker,
     labFormatters,
   } = useToekomstScenarioContext()
   const {
     input,
     fireParams,
-    withdrawalStrategyConfig,
     fireStrategy,
     kernelRawProfile,
-    aowRows,
     userAowAge,
-    debts,
     actions,
     resilienceSnapshots,
     retirementMethod,
-    events,
     fireSwr,
     canonicalDailyRate,
     fire,
     range,
     healthScore,
-    healthScoreInput,
     solvedRun,
     haalbareUitgave,
     scenarioPresets,
     scenarioPresetsLoading,
-    displayMode,
     markeerDuidingInView,
     simResult,
     simCashflows,
     simError,
-    unifiedRows,
     kernelStatus,
     kernelMaandHint,
-    kernelHousingSale,
     aowOntbreekt,
     stopPad,
-    scenarioPending,
-    stopPadPending,
-    projectiePending,
-    displayEvents,
-    eventPanePreviewBaseline,
-    loadData,
     effectiveInput,
     currentAge,
     planAnchor,
     isFixedAnchorMode,
-    eventStopAge,
     effectiveFireTarget,
-    effectiveNetWorth,
-    homeExcludedFromProgress,
     effectiveFreedomPct,
     isPensioenMode,
     isNuStoppenMode,
@@ -234,25 +159,14 @@ function HorizonCompositie() {
     showLiquidWealthLine,
     fireTargetGuard,
     showFireTargetNotice,
-    planningMode,
     aowAgeFormatted,
     heroFireAge,
     heroFireAgePending,
     heroFireAgeText,
     heroFireAgeTextMobile,
     heroFireAgeReceiptText,
-    overgangData,
-    onttrekkingData,
-    displayUnifiedRows,
-    chartEndAge,
-    liquidWealthPoints,
-    displaySimRows,
-    erfgenamen,
-    partnerAowBedrag,
     isKernelDepleteRate,
-    effectiveCountdown,
     personalHeroProjection,
-    eigenHuisMortgageIds,
     handleActionStatusChange,
   } = useToekomstSimContext()
   const {
@@ -271,63 +185,9 @@ function HorizonCompositie() {
     minimizeEindsituatieNotice,
     deficitLoanCopy,
   } = useToekomstMeldingenContext()
+  const { lifelineAge } = useToekomstLagenContext()
   const {
-    scenariosExpanded,
-    setScenariosExpanded,
-    scenarioData,
-    mcExpanded,
-    setMcExpanded,
-    mcData,
-    mcPending,
-    mcFailed,
-    ieViewMode,
-    setIeViewMode,
-    chartMode,
-    setChartMode,
-    lifelineAge,
-    setLifelineAge,
-    isPlaying,
-    setIsPlaying,
-    showNaturalMilestones,
-    showLifeEvents,
-    showGoals,
-    showLiquidLine,
-    overlayPrefRestored,
-    persistOverlayVisible,
-    handleOverlayExit,
-    persistNaturalMilestones,
-    persistLifeEvents,
-    persistGoals,
-    persistLiquidLine,
-    overlayVisible,
-    naturalMilestones,
-    eventsForTimeline,
-    goalChartMarkers,
-    chartEventOverlay,
-    handleChartEventClick,
-    handleChartClusterOpen,
-    handleChartEventDragMove,
-    handleChartEventDragEnd,
-    dualBasisAvailable,
-    effectiveChartPrimaryBasis,
-    secondaryLineVisible,
-    mcMarge,
-    monteCarloOverlay,
-    handleEventDragEnd,
-  } = useToekomstLagenContext()
-  const {
-    viewDisplaySimRows,
-    viewWealthCompositionRows,
-    viewPartnerLineRows,
-    viewHouseholdMainLineRows,
-    viewLiquidWealthPoints,
-    viewCombinedScenarioOverlays,
-    viewHouseholdOverlays,
-    viewMonteCarloOverlay,
-    viewFireTarget,
     viewFireTargetInclHome,
-    viewTargetEndPortfolio,
-    viewTargetInflationFactors,
     viewFireTargetExclHome,
     viewBalkVrijheidDoel,
     viewEffectiveFireTarget,
@@ -335,8 +195,6 @@ function HorizonCompositie() {
     viewMonthlyWithdrawalAtAow,
     labUitkomstRegel,
     viewDoelPreviews,
-    viewReadoutData,
-    viewIeBreakdownResult,
     viewScenarioPresets,
     viewHouseholdHeroFireTarget,
     viewPartnerHeroFireTarget,
@@ -346,33 +204,15 @@ function HorizonCompositie() {
 
   const [healthChartOpen, setHealthChartOpen] = useState(false)
   const [fireAgeChartOpen, setFireAgeChartOpen] = useState(false)
-  const [incomeExpenseExpanded, setIncomeExpenseExpanded] = useState(false)
   const [showFireAgeReceipt, setShowFireAgeReceipt] = useState(false)
   const [showFireTargetReceipt, setShowFireTargetReceipt] = useState(false)
   const [showResilienceReceipt, setShowResilienceReceipt] = useState(false)
   const [showSwrReceipt, setShowSwrReceipt] = useState(false)
-  // overlayEmphasis: welke grafiekfase een gehoverde/gefocuste ballon accentueert.
-  const [overlayEmphasis, setOverlayEmphasis] = useState<OverlayEmphasis>(null)
 
-  // De foutstaat-guard staat bewust ONDER alle hooks (de render-grens woont sinds stap
-  // 12–14 in de provider): alle hooks van
-  // dit component moeten in elke render in dezelfde volgorde draaien, dus geen
-  // enkele `useMemo` mag achter een early return liggen. De memo's hierboven zijn
-  // stuk voor stuk null-safe en hebben geen neveneffecten, dus dit verandert
-  // niets aan wat de gebruiker ziet.
-  if (!fire || !range || !healthScore) {
-    return (
-      <div className="mx-auto max-w-6xl py-5 sm:py-12 px-4 sm:px-6">
-        <div className="rounded-[var(--r-lg)] border border-red-200 bg-red-50 p-6 text-center">
-          <p className="text-sm font-medium text-red-700">Er ging iets mis bij het berekenen van je projecties.</p>
-        </div>
-      </div>
-    )
-  }
+  // De foutstaat (`!fire || !range || !healthScore`) rendert `ToekomstRekenGrens` in de
+  // layout voor het hele katern; hier alleen de type-vernauwing, ná alle hooks (V2).
+  if (!fire || !range || !healthScore) return null
 
-  // Unified perspective hero: household or partner override
-  const perspectiveHero = isHouseholdView ? householdHero : isPartnerView ? partnerHero : null
-  const hasPerspectiveHero = perspectiveHero != null
   // Het bijbehorende doelbedrag in de gekozen euro-weergave (omzetting in het
   // render-grensblok hierboven; hier alleen de perspectief-keuze).
   const viewPerspectiveHeroFireTarget = isHouseholdView
@@ -530,71 +370,15 @@ function HorizonCompositie() {
    */
   // (`uitgaveNaPensioenBasis` staat bij de knop-afleidingen hierboven — één declaratie.)
 
-  const hasNoDob = !effectiveInput?.dateOfBirth
-  const fireNotReachable = effectiveCountdown.fireDate === 'Niet haalbaar'
-  const hasDebt = (effectiveInput?.totalDebts ?? 0) > 0
-
-  // ── STEP 2: geen paginabrede setup-gate meer ─────────────────────────
-  // De grafiek wordt nu altijd getoond. De projectie handelt simResult===null
-  // / fireAge===null netjes af (lege/foutmelding in de grafiek-sectie). Alle
-  // voorkeuren zijn bereikbaar via de inline-editors (uitgaven-pane,
-  // strategie-modal, event-pane) — geapunteerd door de ToekomstOverlay.
-
-  // ── STEP 4: ballon-definities — puur informatieve uitleg bij de grafiek ──
-  // De drie fase-bubbels (Opbouw / Financiële vrijheid / Afbouw) komen uit de
-  // module-level constante TOEKOMST_OVERLAY_BALLOONS (zie onder), zodat de
-  // regressietest ze kan vastpinnen. Geen eigen rekenlogica/bedragen — leke-
-  // uitleg in "Geld levert tijd op"-geest; de gewogen layout + emphasis-
-  // koppeling zit in ToekomstOverlay.
-  const toekomstOverlayBalloons: OverlayBalloonDef[] = TOEKOMST_OVERLAY_BALLOONS
-
   return (
-    <div className="mx-auto max-w-6xl py-5 sm:py-8 px-4 sm:px-6">
-      {/* === Editorial header — blueprint Type 1 (Module-landing) === */}
-      <header className="relative mb-6 space-y-2">
-        <div className="absolute right-4 top-0 flex items-center gap-1.5 sm:right-6">
-          <CanvasTipsToggle
-            overlayVisible={overlayVisible}
-            handleOverlayExit={handleOverlayExit}
-            persistOverlayVisible={persistOverlayVisible}
-          />
-          {/* Geen eigen PageInfoButton: de paginakop (PageOpening "Je tijdas")
-              levert 'm al. */}
-        </div>
-        {/* Kicker met 28×1px Horizon-streep */}
-        <div className="flex items-center gap-2.5 pr-20 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)] sm:pr-24">
-          <span
-            aria-hidden
-            className="inline-block h-px w-7 shrink-0"
-            style={{ background: 'var(--module-active-500)' }}
-          />
-          Horizon · jouw vrijheidshorizon
-          <PerspectiveContextLabel className="normal-case tracking-normal" />
-        </div>
-        {/* Geen eigen kop: onder "Je tijdas" (PageOpening) zou dat een tweede
-            paginakop geven (dubbele hero, K-02). De kop blijft op
-            kicker/sectie-niveau (ADR 0110: de shell draagt de enige h1). */}
-      </header>
-
+    <div className="mt-6">
       {/* === KATERN I — Waar je staat === */}
       <HideInSimple>
         <SectionLabel num="I">Waar je staat</SectionLabel>
       </HideInSimple>
 
-      {/* === 1. Hero + Simulatie (één gecombineerd blok) === */}
-      <section data-testid="horizon-hero" className={`card-editorial overflow-hidden ${overlayVisible && chartMode === 'vermogenspad' ? 'no-hover-lift' : ''}`}>
-        {/* Module-active accent (Horizon-500 op /horizon/**) */}
-        <div className="h-1.5" style={{ background: 'var(--module-active-500)' }} />
-
+      <section className="card-editorial overflow-hidden">
         <div className="p-4 sm:p-6 md:p-8">
-          <PlanHeroKop
-            hasPerspectiveHero={hasPerspectiveHero}
-            isPartnerView={isPartnerView}
-            perspectiveHero={perspectiveHero}
-            simResult={simResult}
-            setSimModalOpen={setSimModalOpen}
-          />
-
           <PlanKerngetalMobiel
             setShowFireAgeReceipt={setShowFireAgeReceipt}
             showFreeHero={showFreeHero}
@@ -711,11 +495,6 @@ function HorizonCompositie() {
             simError={simError}
           />
 
-          {/* Grafiekgedeelte. De !hasCompletedHorizonSetup-staat wordt
-              paginabreed afgevangen door de guard-clause bovenaan de render.
-              Zonder simResult rendert dit blok niets (de vroegere
-              WidgetEmpty-lege-staat hing aan een constante `loading = true`
-              en was onbereikbaar — fase 1 stap 1). */}
           {simResult ? (
             <>
               <div className="my-2 border-b border-dashed border-[var(--border-ed)]" />
@@ -753,142 +532,6 @@ function HorizonCompositie() {
                 isPensioenMode={isPensioenMode}
               />
 
-              <CanvasPills
-                chartMode={chartMode}
-                scenariosExpanded={scenariosExpanded}
-                setScenariosExpanded={setScenariosExpanded}
-                scenarioData={scenarioData}
-                mcExpanded={mcExpanded}
-                setMcExpanded={setMcExpanded}
-                mcMarge={mcMarge}
-                mcFailed={mcFailed}
-                mcPending={mcPending}
-                hasDoelLijn={hasDoelLijn}
-                showScenarioLine={showScenarioLine}
-                setShowScenarioLine={setShowScenarioLine}
-                doelLijnLabel={doelLijnLabel}
-                hasScenario={hasScenario}
-                scenarioFireDeltaLabel={scenarioFireDeltaLabel}
-                scenarioPending={scenarioPending}
-                stopPadPending={stopPadPending}
-                dualBasisAvailable={dualBasisAvailable}
-                effectiveChartPrimaryBasis={effectiveChartPrimaryBasis}
-                showLiquidLine={showLiquidLine}
-                persistLiquidLine={persistLiquidLine}
-                showLifeEvents={showLifeEvents}
-                persistLifeEvents={persistLifeEvents}
-                events={events}
-                goalChartMarkers={goalChartMarkers}
-                showGoals={showGoals}
-                persistGoals={persistGoals}
-                showNaturalMilestones={showNaturalMilestones}
-                persistNaturalMilestones={persistNaturalMilestones}
-                naturalMilestones={naturalMilestones}
-                isPlaying={isPlaying}
-                setIsPlaying={setIsPlaying}
-                setChartMode={setChartMode}
-                simResult={simResult}
-                userAowAge={userAowAge}
-                currentAge={currentAge}
-                monteCarloOverlay={monteCarloOverlay}
-                planningMode={planningMode}
-                isFixedAnchorMode={isFixedAnchorMode}
-              />
-
-              <CanvasUitleg
-                scenariosExpanded={scenariosExpanded}
-                scenarioData={scenarioData}
-                mcExpanded={mcExpanded}
-                mcData={mcData}
-                mcMarge={mcMarge}
-                mcFailed={mcFailed}
-                liquidWealthPoints={liquidWealthPoints}
-                chartMode={chartMode}
-                secondaryLineVisible={secondaryLineVisible}
-                effectiveChartPrimaryBasis={effectiveChartPrimaryBasis}
-                viewReadoutData={viewReadoutData}
-                lifelineAge={lifelineAge}
-              />
-
-              <CanvasGrafiek
-                currentAge={currentAge}
-                chartEndAge={chartEndAge}
-                projectiePending={projectiePending}
-                overlayVisible={overlayVisible}
-                chartMode={chartMode}
-                overlayPrefRestored={overlayPrefRestored}
-                setOverlayEmphasis={setOverlayEmphasis}
-                toekomstOverlayBalloons={toekomstOverlayBalloons}
-                useHouseholdMainLine={useHouseholdMainLine}
-                householdMainLine={householdMainLine}
-                usePartnerMainLine={usePartnerMainLine}
-                partnerLine={partnerLine}
-                simResult={simResult}
-                effectiveNetWorth={effectiveNetWorth}
-                hasPerspectiveHero={hasPerspectiveHero}
-                perspectiveHero={perspectiveHero}
-                heroFireAge={heroFireAge}
-                masked={masked}
-                planAnchor={planAnchor}
-                ankerReach={ankerReach}
-                ankerStop={ankerStop}
-                handleOverlayExit={handleOverlayExit}
-                overlayEmphasis={overlayEmphasis}
-                lifelineAge={lifelineAge}
-                setLifelineAge={setLifelineAge}
-                displayMode={displayMode}
-                viewHouseholdMainLineRows={viewHouseholdMainLineRows}
-                viewPartnerLineRows={viewPartnerLineRows}
-                viewDisplaySimRows={viewDisplaySimRows}
-                simCashflows={simCashflows}
-                viewFireTarget={viewFireTarget}
-                showDualFireTarget={showDualFireTarget}
-                viewFireTargetInclHome={viewFireTargetInclHome}
-                viewTargetEndPortfolio={viewTargetEndPortfolio}
-                viewTargetInflationFactors={viewTargetInflationFactors}
-                dualBasisAvailable={dualBasisAvailable}
-                viewLiquidWealthPoints={viewLiquidWealthPoints}
-                effectiveChartPrimaryBasis={effectiveChartPrimaryBasis}
-                secondaryLineVisible={secondaryLineVisible}
-                partnerName={partnerName}
-                viewCombinedScenarioOverlays={viewCombinedScenarioOverlays}
-                labZone={labZone}
-                nalatenschapMarker={nalatenschapMarker}
-                scenarioPending={scenarioPending}
-                stopPadPending={stopPadPending}
-                viewMonteCarloOverlay={viewMonteCarloOverlay}
-                canonicalDailyRate={canonicalDailyRate}
-                viewHouseholdOverlays={viewHouseholdOverlays}
-                userAowAge={userAowAge}
-                planningMode={planningMode}
-                isFixedAnchorMode={isFixedAnchorMode}
-                chartEventOverlay={chartEventOverlay}
-                handleChartEventClick={handleChartEventClick}
-                handleChartEventDragEnd={handleChartEventDragEnd}
-                handleChartEventDragMove={handleChartEventDragMove}
-                handleChartClusterOpen={handleChartClusterOpen}
-                viewWealthCompositionRows={viewWealthCompositionRows}
-                kernelHousingSale={kernelHousingSale}
-                homeExcludedFromProgress={homeExcludedFromProgress}
-                setSelectedYearAge={setSelectedYearAge}
-                incomeExpenseExpanded={incomeExpenseExpanded}
-                setIncomeExpenseExpanded={setIncomeExpenseExpanded}
-                ieViewMode={ieViewMode}
-                setIeViewMode={setIeViewMode}
-                viewIeBreakdownResult={viewIeBreakdownResult}
-                eventsForTimeline={eventsForTimeline}
-                setClusterSheet={setClusterSheet}
-                naturalMilestones={naturalMilestones}
-                router={router}
-                setEventPaneEditingId={setEventPaneEditingId}
-                setEventPaneMode={setEventPaneMode}
-                setEventPaneOpen={setEventPaneOpen}
-                handleEventDragEnd={handleEventDragEnd}
-                eventStopAge={eventStopAge}
-                isPensioenMode={isPensioenMode}
-                setActiveFaseModal={setActiveFaseModal}
-              />
-
               <DoelenLab
                 verkenSectieZichtbaar={verkenSectieZichtbaar}
                 verkenSectionRef={verkenSectionRef}
@@ -923,24 +566,6 @@ function HorizonCompositie() {
                 setDoelLoslatenOpen={setDoelLoslatenOpen}
                 handleScenarioReset={handleScenarioReset}
               />
-
-              <CanvasLegenda
-                scenariosExpanded={scenariosExpanded}
-                scenarioData={scenarioData}
-                fireParams={fireParams}
-                setActiveModal={setActiveModal}
-                mcExpanded={mcExpanded}
-                mcData={mcData}
-                mcMarge={mcMarge}
-                liquidWealthPoints={liquidWealthPoints}
-                simResult={simResult}
-                setSimModalOpen={setSimModalOpen}
-                isFixedAnchorMode={isFixedAnchorMode}
-                ankerStop={ankerStop}
-              />
-
-              {/* De wat-als-slider-lab is verplaatst naar de eigen sectie
-                  "Verken je aannames" (katern II) onder de grafiek — zie hieronder. */}
             </>
           ) : null}
         </div>
@@ -1065,72 +690,6 @@ function HorizonCompositie() {
         healthScore={healthScore}
         setActiveModal={setActiveModal}
       />
-
-      <ToekomstOverlays
-        simResult={simResult}
-        simModalOpen={simModalOpen}
-        setSimModalOpen={setSimModalOpen}
-        simCashflows={simCashflows}
-        currentAge={currentAge}
-        effectiveInput={effectiveInput}
-        fireParams={fireParams}
-        canonicalDailyRate={canonicalDailyRate}
-        unifiedRows={unifiedRows}
-        activeFaseModal={activeFaseModal}
-        setActiveFaseModal={setActiveFaseModal}
-        fire={fire}
-        initialData={initialData}
-        debts={debts}
-        displayEvents={displayEvents}
-        healthScoreInput={healthScoreInput}
-        kernelRawProfile={kernelRawProfile}
-        overgangData={overgangData}
-        fireStrategy={fireStrategy}
-        onttrekkingData={onttrekkingData}
-        erfgenamen={erfgenamen}
-        partnerAowBedrag={partnerAowBedrag}
-        activeModal={activeModal}
-        setActiveModal={setActiveModal}
-        effectiveFireTarget={effectiveFireTarget}
-        isHouseholdView={isHouseholdView}
-        householdInput={householdInput}
-        fireSwr={fireSwr}
-        setStrategieInitialTab={setStrategieInitialTab}
-        loadData={loadData}
-        router={router}
-        strategieInitialTab={strategieInitialTab}
-        aowRows={aowRows}
-        uitgavenPaneOpen={uitgavenPaneOpen}
-        setUitgavenPaneOpen={setUitgavenPaneOpen}
-        householdRetireInfo={householdRetireInfo}
-        householdRetireOpen={householdRetireOpen}
-        setHouseholdRetireOpen={setHouseholdRetireOpen}
-        refreshData={refreshData}
-        input={input}
-        withdrawalStrategyConfig={withdrawalStrategyConfig}
-        eventPaneOpen={eventPaneOpen}
-        setEventPaneOpen={setEventPaneOpen}
-        eventPaneEditingId={eventPaneEditingId}
-        eventPaneMode={eventPaneMode}
-        eventPanePreviewBaseline={eventPanePreviewBaseline}
-        selectedNaturalMilestone={selectedNaturalMilestone}
-        setSelectedNaturalMilestone={setSelectedNaturalMilestone}
-        clusterSheet={clusterSheet}
-        setClusterSheet={setClusterSheet}
-        eventStopAge={eventStopAge}
-        naturalMilestones={naturalMilestones}
-        setEventPaneEditingId={setEventPaneEditingId}
-        setEventPaneMode={setEventPaneMode}
-        selectedYearAge={selectedYearAge}
-        setSelectedYearAge={setSelectedYearAge}
-        displayUnifiedRows={displayUnifiedRows}
-        displaySimRows={displaySimRows}
-        events={events}
-        userAowAge={userAowAge}
-        effectiveChartPrimaryBasis={effectiveChartPrimaryBasis}
-        eigenHuisMortgageIds={eigenHuisMortgageIds}
-      />
     </div>
   )
 }
-

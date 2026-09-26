@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { mainNav } from '@/lib/nav-config'
 
@@ -16,10 +16,26 @@ import { mainNav } from '@/lib/nav-config'
  * zodat zowel de titel als de utility-cluster zichtbaar blijven. Single-sourced
  * op `mainNav` zodat een nieuwe/hernoemde tab-root vanzelf wordt meegenomen.
  */
+/**
+ * De `page.tsx` die een route zelf bedient: direct in de map of in een route-groep
+ * `(naam)/` daaronder (groepen voegen geen URL-segment toe). /toekomst staat sinds de
+ * katern-layout (ADR 0179 fase 1 stap 15) in `toekomst/(katern)/page.tsx`.
+ */
+function routePagePath(segment: string): string {
+  const dir = join(process.cwd(), 'app', '(app)', segment)
+  const direct = join(dir, 'page.tsx')
+  if (existsSync(direct)) return direct
+  const groep = readdirSync(dir)
+    .filter((naam) => /^\(.+\)$/.test(naam))
+    .map((naam) => join(dir, naam, 'page.tsx'))
+    .find((pad) => existsSync(pad))
+  return groep ?? direct
+}
+
 describe('tab-root TopBar-titel (mobiele bovenbalk)', () => {
   for (const { label, href } of mainNav) {
     const segment = href.replace(/^\//, '')
-    const pagePath = join(process.cwd(), 'app', '(app)', segment, 'page.tsx')
+    const pagePath = routePagePath(segment)
 
     it(`${href} rendert NavStackMeta met titel "${label}" en kind 'rich'`, () => {
       const src = readFileSync(pagePath, 'utf-8')
