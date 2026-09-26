@@ -51,13 +51,13 @@ Eigenaarsbesluiten 26 sep: checkpoint-commit per stap **op master, per pad, nooi
 - [x] 12 S provider (a) euro-grens → `components/toekomst/state/use-euro-view-feeds.ts` (A3)
 - [x] 13 S provider (b) sim/kernel + perspectief + meldingen-hooks → `state/toekomst-state-provider.tsx` + `use-toekomst-{perspectief,overlay-state,scenario,sim,meldingen}.ts` (A3; afwijkingen: `withdrawal` uit E2, hydratie-grendel kerngetal)
 - [x] 14 S provider (c) scenario/lab + lagen → `use-toekomst-scenario.ts` (+ `useToekomstScenario`), `use-toekomst-lagen.ts`, euro-grens via `useToekomstEuro` in de provider (A3)
-- [ ] 15 S route-groep met Plan (layout, KaternKoppen uit stroom C, navkaarten + dubbele kop weg)
-- [ ] 16 S Doelen in de groep (lab mee; mount-teller-test)
-- [ ] 17 S Instellingen de groep in (route van stroom B verhuist; Q8 meten)
-- [ ] 18 S `has`-regels (`?tab=`, `?whatif=open`, `?modal=withdrawal|life_events`) + bestaande /toekomst-regels rechtstreeks naar het katern
-- [ ] 19 P resterende hrefs in horizon/toekomst-bestanden, `PLAN_REVIEW_HREF`, briefing `validate-hrefs`
+- [x] 15 S route-groep met Plan (layout, KaternKoppen uit stroom C, navkaarten + dubbele kop weg) — `1e4915769` (A4; horizon-client.tsx leeg en verwijderd, page-info-gate telt een i in een bovenliggende layout mee)
+- [x] 16 S Doelen in de groep (lab mee; mount-teller-test) — `4a0274cea` (A4)
+- [x] 17 S Instellingen de groep in (route van stroom B verhuist; Q8 meten) — `be5ba303a` (A4; Q8: verdringing gemeten, view leest de provider-hoofdrun)
+- [x] 18 S `has`-regels (`?tab=`, `?whatif=open`, `?modal=withdrawal|life_events`) + bestaande /toekomst-regels rechtstreeks naar het katern — `8fae73d5c` (A4; `?whatif=open` in `4a0274cea`; `?modal=life_events` bewust géén redirect: lus)
+- [x] 19 P resterende hrefs in horizon/toekomst-bestanden, `PLAN_REVIEW_HREF`, briefing `validate-hrefs` — `fa49fa4ca` (A4; `PLAN_REVIEW_HREF` blijft `/toekomst?planreview=open`: de provider staat in de layout)
 - [ ] 20 P platen (calculations/archimate/concerns/hld) + UAT (docs-keepers)
-- [ ] 21 P opruimen (horizon-client-rest, nav-cards, `horizon/layout|loading`, stale allowlist-entries)
+- [x] 21 P opruimen (horizon-client-rest, nav-cards, `horizon/layout|loading`, stale allowlist-entries) — `b949d5aa2` (A4)
 - [ ] security-specialist (schone context) · gebundelde review · visuele vergelijking met de baseline
 
 ## Git-regels voor elke stroom
