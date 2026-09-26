@@ -31,6 +31,7 @@
 import { createContext, useContext, type Context, type ReactNode } from 'react'
 import type { HorizonPageData } from '@/lib/horizon-data-loader'
 import type { GoalMarkerInput } from '@/lib/horizon/goal-chart-markers'
+import type { GebeurtenissenBron } from '@/lib/toekomst/gebeurtenissen-bron'
 import { useStabielObject } from './use-stabiel-object'
 import { useToekomstPerspectief, type ToekomstPerspectief } from './use-toekomst-perspectief'
 import { useToekomstOverlayState, type ToekomstOverlayState } from './use-toekomst-overlay-state'
@@ -45,6 +46,12 @@ export interface ToekomstBron {
   initialData: HorizonPageData
   /** M36 — doelen met een streefdatum, als markers op de tijdas. */
   goals: readonly GoalMarkerInput[] | undefined
+  /**
+   * De levensgebeurtenissen van katern Plan (ADR 0179, addendum 26 sep): server-side
+   * gebouwd in de layout (`bouwGebeurtenissenBron`), zodat Plan de route niet leest (D8).
+   * `null` = de host levert ze niet (tests, los gebruik).
+   */
+  gebeurtenissen: GebeurtenissenBron | null
 }
 
 const BronContext = createContext<ToekomstBron | null>(null)
@@ -73,7 +80,7 @@ export const useToekomstLagenContext = () => useVerplicht(LagenContext, 'useToek
 export const useToekomstEuroContext = () => useVerplicht(EuroContext, 'useToekomstEuroContext')
 /**
  * De sim-context, of `null` buiten de provider. Alleen voor een view die óók los
- * gebruikt wordt (GebeurtenissenView via katern Instellingen, besluit Q8): binnen de
+ * gebruikt wordt (GebeurtenissenView via katern Plan, besluit Q8): binnen de
  * katern-layout leest hij de hoofdrun van de provider, daarbuiten draait hij zelf.
  */
 export const useToekomstSimContextOptioneel = () => useContext(SimContext)
@@ -81,13 +88,15 @@ export const useToekomstSimContextOptioneel = () => useContext(SimContext)
 export function ToekomstStateProvider({
   initialData,
   goals,
+  gebeurtenissen = null,
   children,
 }: {
   initialData: HorizonPageData
   goals?: readonly GoalMarkerInput[]
+  gebeurtenissen?: GebeurtenissenBron | null
   children: ReactNode
 }) {
-  const bron = useStabielObject<ToekomstBron>({ initialData, goals })
+  const bron = useStabielObject<ToekomstBron>({ initialData, goals, gebeurtenissen })
   const perspectief = useToekomstPerspectief()
   const overlays = useToekomstOverlayState({ perspectief })
   const scenarioState = useToekomstScenarioState({ initialData })

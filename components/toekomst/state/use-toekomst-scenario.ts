@@ -6,8 +6,9 @@
 //  - `useToekomstScenarioState` (stap 13): de state van de knoppen, het doelblok en de sheets.
 //    Die voedt de scenario-run van de kernel en moet dus vóór `useToekomstSim` bestaan.
 //  - `useToekomstScenario` (stap 14): alles wat de sim-uitkomst nodig heeft — de lab-uitkomst,
-//    de grenzen-batch (E15), de knoppen, de doel-lijn, de duiding-rijen (radar,
-//    levensinkomen), de doel-handlers, de hydratie (E11) en de autosave (E16).
+//    de grenzen-batch (E15), de knoppen, de doel-lijn, de doel-handlers, de hydratie (E11)
+//    en de autosave (E16). (De duiding-rijen voor strook en radar vervielen met het
+//    addendum van 26 sep op ADR 0179.)
 // De provider voegt beide samen tot één context-waarde.
 //
 // Pure move: de statements staan in dezelfde onderlinge volgorde als in horizon-client, met
@@ -20,7 +21,6 @@ import type { HorizonPageData } from '@/lib/horizon-data-loader'
 import { useToast } from '@/components/app/toast-provider'
 import { formatMaskedCurrency, formatCurrency, MASKED_AMOUNT_PLACEHOLDER } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
-import { buildCoverageStrip } from '@/lib/horizon/coverage-strip'
 import {
   zoneVanHuidig,
   type HefboomBereik,
@@ -30,7 +30,6 @@ import {
   HEFBOOM_RICHTING,
 } from '@/lib/horizon/lab-grenzen-types'
 import type { LabOpslaanToestand } from '@/components/app/horizon/lab-opslaan-balk'
-import { computeDekkingsradar, type RadarAs } from '@/lib/horizon/dekkingsradar'
 import { withResolvedKernelBedragen } from '@/lib/horizon/kernel-profile-basis'
 import { selectDoelLijnBron } from '@/lib/horizon/doel-lijn-bron'
 import {
@@ -43,7 +42,6 @@ import {
 import { resolveLabUitkomst, type LabUitkomst } from '@/lib/horizon/lab-uitkomst'
 import { GOAL_TYPE_LABELS } from '@/lib/goal-data'
 import {
-  scenarioMonthlySpendDelta,
   buildCategorieReturnGroups,
   isDoelConceptGewijzigd,
   stripStopKeuze,
@@ -72,7 +70,6 @@ import { runLabGrenzenAsync } from '@/lib/horizon-kernel/worker/run-in-worker'
 import type { ScenarioOverlay } from '@/components/app/horizon/sim-chart'
 import { clipRowsToPlanEnd } from '@/lib/horizon/clip-rows-to-plan-end'
 import { simRowsToChartPoints } from '@/lib/horizon/sim-chart-geometry'
-import { DEFAULT_FIRE_STRATEGY } from '@/lib/fire-strategy'
 import { buildBaselineOverrides } from '@/lib/whatif-overrides'
 import type { WhatIfOverrides, WhatIfEvent } from '@/lib/types/horizon-whatif'
 import { formatAge } from '@/lib/horizon/fire-format'
@@ -305,7 +302,6 @@ export function useToekomstScenario({ initialData, scenarioState, sim }: { initi
   const {
     input,
     fireParams,
-    fireStrategy,
     kernelRawProfile,
     aowRows,
     userAowAge,
@@ -315,7 +311,6 @@ export function useToekomstScenario({ initialData, scenarioState, sim }: { initi
     startRefresh,
     simResult,
     kernelMaandHint,
-    kernelHousingSale,
     scenario,
     stopPad,
     loadData,
@@ -325,7 +320,6 @@ export function useToekomstScenario({ initialData, scenarioState, sim }: { initi
     isFixedAnchorMode,
     isPensioenMode,
     displayEndAge,
-    displayUnifiedRows,
   } = sim
   const { masked } = useMaskedAmounts()
   const { addToast } = useToast()
@@ -376,46 +370,6 @@ export function useToekomstScenario({ initialData, scenarioState, sim }: { initi
     : (simResult?.fireAgeFractional ?? null)
   const scenarioVerwachtFireAge = scenarioVerwachtSettled ?? simResult?.fireAgeFractional ?? null
 
-  // ── Doorwerking wat-als in de duidingsblokken (plan §F) ─────────────────────
-  // De scenario-rijen worden identiek geclipt als de basisrijen; bij een actief
-  // scenario voeden ze de strook + de dekkingsradar i.p.v. de basisrijen (chip +
-  // reset maken dat zichtbaar). Cijferbar, PhaseBar en hero-KPI's blijven basis.
-  const scenarioDisplayRows = useMemo(
-    () => (scenario != null ? clipRowsToPlanEnd(scenario.unifiedRows, displayEndAge) : null),
-    [scenario, displayEndAge],
-  )
-  const activeUnifiedRows =
-    hasScenario && scenario != null ? (scenarioDisplayRows ?? displayUnifiedRows) : displayUnifiedRows
-
-  // ── Duiding-rijen (ronde 3): het gekozen-stop-pad wint zodra een expliciete stopleeftijd
-  // gezet is, zodat de dekkingsblokken (strook + radar) de éChte dekking van dat gekozen
-  // stopmoment tonen (bv. <100% in de rode zone) i.p.v. altijd het volledig-gedekte basispad.
-  // Geen stop gezet ⇒ de gewone actieve rijen (basis of scenario). Zelfde clip als de basis.
-  const duidingUnifiedRows = useMemo(
-    () => (stopPad != null ? clipRowsToPlanEnd(stopPad.unifiedRows, displayEndAge) : activeUnifiedRows),
-    [stopPad, displayEndAge, activeUnifiedRows],
-  )
-
-  // ── Uitgebreide-view blokken (levensinkomenstrook + dekkingsradar + cijferbar) ──
-  // Alles consumeert de bestaande unified-rijen / config — geen herberekening.
-  const coverageNodes = useMemo(
-    () => buildCoverageStrip(duidingUnifiedRows ?? []),
-    [duidingUnifiedRows],
-  )
-  // Bij een actief scenario schuift de bestedingsgrondslag mee met de scenario-events die
-  // de motor óók als permanente uitgavenwijziging telt (`monthly_cost_change` op een vrije
-  // Geb-rij). De spaarquote-slider valt daar per 29-jul BUITEN: die is inkomensgebonden en
-  // loopt via het FIRE-gegate salaris-kanaal, dus hij verlaagt het FIRE-doelbedrag niet en
-  // mag hier de onttrekkings-bestedingsgrondslag evenmin verlagen (`scenarioMonthlySpendDelta`
-  // past dezelfde `isSliderWorkEvent`-gate toe). Basis zonder scenario.
-  const activeMonthlySpend =
-    (effectiveInput?.monthlyExpenses ?? 0) + (hasScenario ? scenarioMonthlySpendDelta(scenarioSliderEvents) : 0)
-  // Gelande stopleeftijd van de stop-run — de duiding (radar-assen, subtitle, fasebalk)
-  // leest deze i.p.v. de rauwe slider-state: tijdens het slepen loopt scenarioStopAge vóór
-  // op de deferred stopPad-run, en de duiding hoort bij de rijen die er al stáán (zelfde
-  // les als doel-lijn-bron.ts: alles uit hetzelfde result-object). Fallback op de
-  // slider-stand voor het theoretische geval dat de geforceerde run geen leeftijd meldt.
-  const duidingStopAge = stopPad != null ? (stopPad.result.fireAgeFractional ?? scenarioStopAge) : null
   // ── Lab-uitkomst — ÉÉN uitkomst-switch per anker (ADR 0145) ─────────────────────────
   // Onder `solved` bewegen de knoppen de vrijheidsleeftijd (passthrough van vandaag);
   // onder een vast stopmoment de DEKKING. De switch bepaalt óók de promotie-gate
@@ -454,60 +408,6 @@ export function useToekomstScenario({ initialData, scenarioState, sim }: { initi
   // De dekking-uitkomst als losse afleiding (null onder `solved`) — alle dekking-
   // oppervlakken hieronder lezen deze ene waarde.
   const labDekking = labUitkomst.kind === 'dekking' ? labUitkomst : null
-  // ── Dekkingsradar-assen — pure consume-laag over de duiding-rijen ──────
-  // Alle grootheden komen elders vandaan: de duiding-rijen (stop-pad wint), de actieve-pad
-  // FIRE/benodigd-vermogen/doel-eindvermogen en de canonieke bestedingsgrondslag
-  // (activeMonthlySpend×12). null = nog geen leeftijd/rijen → blok blijft verborgen.
-  // Bij een expliciete stop meet de radar vanaf jouw stopleeftijd: stopPad wint dan óók
-  // voor de FIRE-leeftijd (= duidingStopAge, de gelande stop-run-leeftijd), het benodigd-/
-  // doel-eindvermogen (uit stopPad.result) én het woning-verkoopmoment — de sale-bron volgt altijd de rijen-bron
-  // (stop-pad → scenario → hoofd-run), anders duidt de wonen-as een noodverkoop uit het
-  // verkeerde scenario.
-  const radarAssen = useMemo<RadarAs[] | null>(() => {
-    if (currentAge == null) return null
-    const rows = duidingUnifiedRows ?? []
-    if (rows.length === 0) return null
-    const strat = fireStrategy ?? DEFAULT_FIRE_STRATEGY
-    const requiredFire = stopPad != null
-      ? stopPad.result.requiredFirePortfolio
-      : hasScenario && scenario != null
-        ? scenario.result.requiredFirePortfolio
-        : (simResult?.requiredFirePortfolio ?? 0)
-    const targetEnd = stopPad != null
-      ? stopPad.result.targetEndPortfolio
-      : hasScenario && scenario != null
-        ? scenario.result.targetEndPortfolio
-        : (simResult?.targetEndPortfolio ?? null)
-    const radarHousingSale = stopPad != null
-      ? stopPad.kernelHousingSale
-      : hasScenario && scenario != null
-        ? scenario.kernelHousingSale
-        : kernelHousingSale
-    return computeDekkingsradar({
-      rows,
-      currentAge,
-      fireAgeFractional: stopPad != null ? duidingStopAge : scenarioVerwachtFireAge,
-      aowAgeFractional: userAowAge.fractional,
-      requiredFirePortfolio: requiredFire,
-      targetEndPortfolio: targetEnd,
-      endStrategy: strat.strategy,
-      housingStrategy: initialData.housingStrategy,
-      hasEigenHuis: initialData.housingContext.hasEigenHuis,
-      kernelHousingSale: radarHousingSale,
-      jaarBesteding: activeMonthlySpend * 12,
-      // ADR 0145 D5 — de bridge-vlag van de run die de RIJEN levert (zelfde volgorde:
-      // stop-pad → scenario → hoofd-run). `true` ⇒ requiredFirePortfolio is de stand op
-      // het anker, geen doel; as 4 (behoud-tak) wordt dan n.v.t.
-      anchorPortfolio:
-        (stopPad != null
-          ? stopPad.result
-          : hasScenario && scenario != null
-            ? scenario.result
-            : simResult
-        )?.requiredFireIsAnchorPortfolio === true,
-    })
-  }, [duidingUnifiedRows, currentAge, scenarioVerwachtFireAge, stopPad, duidingStopAge, userAowAge.fractional, hasScenario, scenario, simResult, fireStrategy, initialData.housingStrategy, initialData.housingContext.hasEigenHuis, kernelHousingSale, activeMonthlySpend])
-
   // ── Doel-/wat-als-lijn (2e projectielijn, plan §E + ADR 0085) ───────────────
   // De BRON kiest `selectDoelLijnBron`: het geforceerde stop-pad wanneer er een
   // (betekenisvolle) stopleeftijd staat — opbouw tot je stopleeftijd, daarna
@@ -1441,14 +1341,11 @@ export function useToekomstScenario({ initialData, scenarioState, sim }: { initi
   return useStabielObject({
     whatIfBaseline,
     scenarioVerwachtFireAge,
-    coverageNodes,
-    duidingStopAge,
     labUitkomst,
     labPromotie,
     doelVastleggenMogelijk,
     doelBijwerkenMogelijk,
     labDekking,
-    radarAssen,
     hasDoelLijn,
     scenarioLineOverlay,
     categorieReturnGroups,

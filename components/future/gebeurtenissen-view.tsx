@@ -4,7 +4,6 @@ import { useState, useEffect, useMemo } from 'react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useEenmaligeDeeplink } from '@/components/toekomst/instellingen/use-eenmalige-deeplink'
 import {
   Wallet,
   Compass,
@@ -104,7 +103,7 @@ const TIMELINE_CARD_CLASS =
   'flex-1 min-w-0 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 text-left'
 
 /**
- * GebeurtenissenView — sectie Gebeurtenissen in katern Instellingen (/toekomst/instellingen#gebeurtenissen, ADR 0179).
+ * GebeurtenissenView — de levensgebeurtenissen onder het plan (/toekomst#gebeurtenissen, ADR 0179 addendum 26 sep).
  *
  * Eén verticale tijdlijn met levensgebeurtenissen (kind, erfenis, ZZP-start,
  * deeltijd, verhuizing, schenking — bewerken via de EventPane) en de momenten
@@ -210,7 +209,7 @@ export function GebeurtenissenView({
   kernelSim?: KernelSimData | null
   /**
    * De hoofdrun van de /toekomst-provider (ADR 0179 stap 17, besluit Q8). Gezet in
-   * katern Instellingen: dan draait deze view géén eigen `useHorizonFireSim`, want twee
+   * katern Plan: dan draait deze view géén eigen `useHorizonFireSim`, want twee
    * instanties op rijstrook `main` verdringen elkaars run. `null` = eigen run (los
    * gebruik, tests).
    */
@@ -257,7 +256,7 @@ export function GebeurtenissenView({
         }
       : null,
   )
-  // Mét provider-hoofdrun (Instellingen) leest de view díe run; de eigen hook krijgt dan
+  // Mét provider-hoofdrun (Plan) leest de view díe run; de eigen hook krijgt dan
   // `null` en rekent niets (hooks blijven onvoorwaardelijk, V2). Pas ná hydration: de
   // provider-run bestaat op de server al (synchrone SSR-tak), de client-render start
   // zonder — tot dan dus dezelfde laad-vorm als de eigen hook (geen hydration-mismatch).
@@ -370,15 +369,11 @@ export function GebeurtenissenView({
     setEventPaneOpen(true)
   }
 
-  // Deep-link: ?nieuw=1|true opent de EventPane direct in catalog-mode
-  // (vanuit een overlay-CTA op de Tijdas-grafiek). De param verdwijnt meteen uit de
-  // URL (C3 punt 7), route-onafhankelijk via de huidige pathname.
-  // Na openCatalog gedeclareerd zodat de functie in scope is bij mount.
-  useEenmaligeDeeplink('nieuw', (n) => {
-    if (n === '1' || n === 'true') openCatalog()
-  })
+  // Deeplink `?nieuw=1` leest deze view niet meer (ADR 0179, addendum 26 sep): het is een
+  // alias van `?event=new`, en die opent de provider van /toekomst op elk katern — één
+  // manier om via een link een gebeurtenis toe te voegen, niet twee catalogi tegelijk.
 
-  // Sluit de EventPane; de ?nieuw-param is al bij het openen opgeruimd.
+  // Sluit de EventPane.
   function closeEventPane() {
     setEventPaneOpen(false)
   }

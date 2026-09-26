@@ -35,6 +35,10 @@
  * lab in de URL staan (ADR 0144). Veilig om hier weg te poetsen: op /toekomst
  * leest niets `via` — de enige lezers zijn de bezittingen-/schulden-panes
  * (`?asset=…&via=revalue`), op andere routes.
+ *
+ * `nieuw` (ADR 0179, addendum 26 sep) is de alias van `event=new`: tot het addendum las
+ * de gebeurtenissenlijst in Instellingen hem zelf; sinds de lijst onder het plan staat is
+ * er één manier om via een link een gebeurtenis toe te voegen, en die opent de provider.
  */
 export const CONSUMED_DEEPLINK_PARAMS = [
   'modal',
@@ -44,6 +48,7 @@ export const CONSUMED_DEEPLINK_PARAMS = [
   'edit',
   'whatif',
   'via',
+  'nieuw',
 ] as const
 
 /**
@@ -53,15 +58,18 @@ export const CONSUMED_DEEPLINK_PARAMS = [
  * @param pathname het huidige pad (`usePathname()`); `null`/leeg valt terug op
  *   `/toekomst` — de canonieke tijdas-route, nooit de legacy `/horizon`.
  * @param search   de huidige query (`useSearchParams()` of een querystring).
- * @returns pad + resterende query, of het kale pad als er niets overblijft.
+ * @param hash     de huidige hash (`window.location.hash`), mét `#`; blijft staan zodat
+ *   een anker (`/toekomst?event=new#gebeurtenissen`) klopt na de opschoning.
+ * @returns pad + resterende query (+ hash), of het kale pad als er niets overblijft.
  */
 export function buildDeeplinkCleanupUrl(
   pathname: string | null | undefined,
   search: URLSearchParams | string,
+  hash = '',
 ): string {
   const rest = new URLSearchParams(typeof search === 'string' ? search : search.toString())
   for (const key of CONSUMED_DEEPLINK_PARAMS) rest.delete(key)
   const qs = rest.toString()
   const base = pathname || '/toekomst'
-  return qs ? `${base}?${qs}` : base
+  return `${qs ? `${base}?${qs}` : base}${hash}`
 }

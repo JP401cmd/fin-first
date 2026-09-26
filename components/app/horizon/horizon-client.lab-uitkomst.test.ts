@@ -84,19 +84,13 @@ describe('horizon-client consumeert ÉÉN lab-uitkomst (ADR 0145)', () => {
     expect(bron()).toContain('isFixedAnchorMode ? stripStopKeuze(stand) : stand')
   })
 
-  it('de radar krijgt de bridge-vlag van de run die de rijen levert', () => {
-    const src = bron()
-    const start = src.indexOf('anchorPortfolio:')
-    expect(start).toBeGreaterThan(-1)
-    expect(src.slice(start, start + 300)).toContain('requiredFireIsAnchorPortfolio === true')
-  })
 
   it('geen eigen dekking-som: geen eindMaand, geen computeRunwayCoveragePct, geen "/ 12" in het lab-blok', () => {
     const code = codeRegels()
     // De maand→eind-omzetting woont in lib/horizon/lab-uitkomst.ts (via eindMaandVan).
     expect(code.filter((l) => /eindMaand/.test(l))).toEqual([])
     const src = bron()
-    const blok = src.slice(src.indexOf('const labUitkomst: LabUitkomst'), src.indexOf('const radarAssen'))
+    const blok = src.slice(src.indexOf('const labUitkomst: LabUitkomst'), src.indexOf('const labDekking'))
     expect(blok.length).toBeGreaterThan(0)
     expect(blok).not.toMatch(/\/\s*12\b/)
     const dekkingRegels = code.filter((l) => /labDekking|labUitkomst|labGrenzen|dekking/i.test(l))

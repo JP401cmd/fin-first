@@ -1,5 +1,5 @@
 /**
- * Bron-grendels op de kassabons W–Z na de verhuizing naar `plan-kassabons.tsx`
+ * Bron-grendels op de kassabons W–Y (Z, gezondheid, verviel met het addendum van 26 sep) na de verhuizing naar `plan-kassabons.tsx`
  * (fase 1, ADR 0179, kaart §5.1 en besluit Q9):
  * - Q9 / ADR 0039: de bonnen lopen via `<ShellOverlay kind="sheet">`, niet via een
  *   directe `BottomSheet` (`check:overlays`)
@@ -23,8 +23,8 @@ describe('plan-kassabons — één overlay-systeem (Q9, ADR 0039)', () => {
       .filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l))
       .join('\n')
     expect(code).not.toContain('<BottomSheet')
-    expect(source.match(/<ShellOverlay kind="sheet" /g) ?? []).toHaveLength(4)
-    expect(source.match(/<\/ShellOverlay>/g) ?? []).toHaveLength(4)
+    expect(source.match(/<ShellOverlay kind="sheet" /g) ?? []).toHaveLength(3)
+    expect(source.match(/<\/ShellOverlay>/g) ?? []).toHaveLength(3)
   })
 })
 
@@ -62,8 +62,8 @@ describe('plan-kassabons — vast anker en kernantwoord', () => {
     expect(source).toContain('{heroFireAgeReceiptText}')
   })
 
-  it('de gezondheid-bon laadt HealthScoreReceipt lazy (V3: dynamic verhuist mee)', () => {
-    expect(source).toMatch(/const HealthScoreReceipt = dynamic\(/)
+  it('de gezondheid-bon is weg (addendum 26 sep): het verloop staat in de gezondheidskassabon op /overzicht', () => {
+    expect(source).not.toMatch(/HealthScoreReceipt|PlanKassabonGezondheid/)
   })
 })
 

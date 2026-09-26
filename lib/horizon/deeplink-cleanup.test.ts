@@ -74,7 +74,15 @@ describe('buildDeeplinkCleanupUrl — blijft op de huidige route', () => {
       'edit',
       'whatif',
       'via',
+      'nieuw',
     ])
+  })
+
+  it('houdt de hash: het anker klopt na de opschoning (ADR 0179, addendum 26 sep)', () => {
+    expect(buildDeeplinkCleanupUrl('/toekomst', 'event=new', '#gebeurtenissen')).toBe('/toekomst#gebeurtenissen')
+    expect(buildDeeplinkCleanupUrl('/toekomst', 'nieuw=1&view=jaren', '#gebeurtenissen')).toBe(
+      '/toekomst?view=jaren#gebeurtenissen',
+    )
   })
 
   it('poetst het restant ?via=dreamgate van een oude bladwijzer mee weg (ADR 0144)', () => {
@@ -98,7 +106,7 @@ describe('bron-grendel — de deeplink-opschoning wisselt niet van route', () =>
 
   it('schoont op via de gedeelde helper', () => {
     expect(SOURCE).toContain("from '@/lib/horizon/deeplink-cleanup'")
-    expect(SOURCE).toContain('router.replace(buildDeeplinkCleanupUrl(pathname, searchParams)')
+    expect(SOURCE).toContain('router.replace(buildDeeplinkCleanupUrl(pathname, searchParams, window.location.hash)')
   })
 
   it('navigeert nergens meer naar een legacy /horizon-route', () => {

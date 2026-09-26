@@ -1,16 +1,14 @@
-// Verplaatst uit components/app/horizon/horizon-client.tsx r10316–10472, r10474–10582, r10584–10833, r10835–10864 @ c1b4849eb (fase 1, ADR 0179).
+// Verplaatst uit components/app/horizon/horizon-client.tsx r10316–10472, r10474–10582, r10584–10833 @ c1b4849eb (fase 1, ADR 0179).
 // euro-view: ontvangt view*-feeds van de render-grens, deflateert niet zelf
 'use client'
 
 import type { Dispatch, SetStateAction } from 'react'
-import dynamic from 'next/dynamic'
 import { FreedomTimeBadge } from '@/components/app/freedom-time-label'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { GlossaryTerm } from '@/components/editorial'
 import type { AowAge } from '@/lib/aow-leeftijd'
-import type { HealthScore } from '@/lib/financial-health'
 import type { FireParams } from '@/lib/fire-params'
 import type { SimCashflow, SimResult } from '@/lib/fire-simulation'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
@@ -21,18 +19,6 @@ import { type AnkerReach, type AnkerStop, ankerTitel, ankerZin, formatStopAge } 
 import { AOW_ONTBREEKT_COPY } from '@/lib/horizon/aow-notice-minimize'
 import { type HeroFireAge, heroFireAgeYear } from '@/lib/horizon/hero-fire-age'
 import { HORIZON_MISSENDE_GEGEVENS_LABEL, type HorizonOutcomeGuard } from '@/lib/horizon/outcome-guard'
-import type { ActiveModal } from '@/components/toekomst/state/types'
-
-// Kopie van horizon-client r317–324 — V3: de dynamic() verhuist mee met zijn enige
-// consument (kassabon Z); de integrator schrapt de declaratie in horizon-client.
-// HealthScoreReceipt (1011 r) uit het first-load-chunk van /toekomst (perf Task
-// 3.2) — hij zit alleen in een BottomSheet die pas opent na een klik op de
-// gezondheidsscore-kaart. `loading: null` (default) omdat een skeleton hier
-// zou flitsen — zelfde afweging als de andere dynamics hierboven.
-const HealthScoreReceipt = dynamic(() =>
-  import('@/components/app/horizon/health-score-receipt').then(m => ({ default: m.HealthScoreReceipt })),
-  { ssr: false }
-)
 
 /** Kassabon W — vrijheidsleeftijd. Afwijking (Q9): `<ShellOverlay kind="sheet">` i.p.v. `<BottomSheet>`. */
 export interface PlanKassabonVrijheidsleeftijdProps {
@@ -674,56 +660,6 @@ export function PlanKassabonOpnamerate({
                 : 'Ingesteld via Toekomst → Voorkeuren'}
             </p>
           </KassabonShell>
-        </div>
-      </ShellOverlay>
-    </>
-  )
-}
-
-/** Kassabon Z — financiële gezondheid (HealthScoreReceipt). Afwijking (Q9): `<ShellOverlay kind="sheet">` i.p.v. `<BottomSheet>`. */
-export interface PlanKassabonGezondheidProps {
-  showResilienceReceipt: boolean // horizon-client r961
-  setShowResilienceReceipt: Dispatch<SetStateAction<boolean>> // horizon-client r961
-  healthScore: HealthScore // horizon-client r703
-  setActiveModal: Dispatch<SetStateAction<ActiveModal>> // horizon-client r750
-}
-
-export function PlanKassabonGezondheid({
-  showResilienceReceipt,
-  setShowResilienceReceipt,
-  healthScore,
-  setActiveModal,
-}: PlanKassabonGezondheidProps) {
-  return (
-    <>
-      <ShellOverlay kind="sheet" open={showResilienceReceipt} onClose={() => setShowResilienceReceipt(false)} title="Financiële Gezondheid">
-        <div className="p-5">
-          {healthScore && (
-            <HealthScoreReceipt
-              health={healthScore}
-              footer={
-                <>
-                  {/* Backtesting samenvatting */}
-                  <div className="rounded-[var(--r-sm)] border border-[var(--border-ed)] p-3">
-                    <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">HISTORISCHE VEERKRACHTCHECK</p>
-                    <p className="mt-1 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">
-                      Backtesting over 55 jaar marktgeschiedenis (1970–heden) toont hoe je plan standhoudt onder historische crises.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => { setShowResilienceReceipt(false); setActiveModal('backtesting') }}
-                      className="mt-2 font-serif text-sm italic text-horizon-600 transition-colors hover:text-horizon-800"
-                    >
-                      Bekijk volledige backtesting →
-                    </button>
-                  </div>
-                  <p className="mt-3 text-center font-sans text-[10px] text-[var(--ink-4)]">
-                    Live berekend uit huidige financiële gegevens
-                  </p>
-                </>
-              }
-            />
-          )}
         </div>
       </ShellOverlay>
     </>

@@ -106,8 +106,13 @@ export function useToekomstOverlayState({ perspectief }: { perspectief: Toekomst
     }
 
     // Support ?event=new | ?event=<id> | ?event=<id>&edit=true
-    const eventParam = searchParams.get('event')
+    // `?nieuw=1|true` is de alias van `?event=new` (ADR 0179, addendum 26 sep): tot dan
+    // opende de gebeurtenissenlijst in Instellingen zelf een catalogus op `?nieuw=`. Eén
+    // manier om via een link een gebeurtenis toe te voegen: deze, op elk katern.
+    const nieuwParam = searchParams.get('nieuw')
+    const eventParam = nieuwParam === '1' || nieuwParam === 'true' ? 'new' : searchParams.get('event')
     const eventEditParam = searchParams.get('edit')
+    if (nieuwParam != null) shouldReplace = true
     if (eventParam) {
       if (eventParam === 'new') {
         setEventPaneEditingId(null)
@@ -135,7 +140,7 @@ export function useToekomstOverlayState({ perspectief }: { perspectief: Toekomst
     // remount → de gezette state weer op de beginwaarde, gebruiker op een
     // kale /toekomst zonder paneel (UR2-11). Zie `lib/horizon/deeplink-cleanup.ts`.
     if (shouldReplace) {
-      router.replace(buildDeeplinkCleanupUrl(pathname, searchParams), { scroll: false })
+      router.replace(buildDeeplinkCleanupUrl(pathname, searchParams, window.location.hash), { scroll: false })
     }
 
   }, [searchParams, router, pathname])

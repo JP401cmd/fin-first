@@ -92,3 +92,32 @@ describe('plan-paneel — Doelbedrag-onderschrift volgt het bestaan van een woni
     expect(paneel).not.toContain('FIRE_DOEL_ONDERSCHRIFT[')
   })
 })
+
+describe('plan-paneel — de levensgebeurtenissen onder het plan (ADR 0179, addendum 26 sep)', () => {
+  const paneel = code(readSourceLF(join(DIR, 'plan-paneel.tsx')))
+
+  it('rendert de bestaande GebeurtenissenMetHoofdrun met het anker #gebeurtenissen', () => {
+    expect(paneel).toContain('id={GEBEURTENISSEN_ANKER}')
+    expect(paneel).toContain('<GebeurtenissenMetHoofdrun {...gebeurtenissen} />')
+    expect(paneel).toContain('<AnkerScroll ankers={[GEBEURTENISSEN_ANKER]} />')
+    // De props komen uit de provider (de layout bouwt ze), niet uit de route (D8).
+    expect(paneel).toContain('const { initialData, gebeurtenissen } = useToekomstBron()')
+    expect(paneel).not.toMatch(/useSearchParams|usePathname/)
+  })
+
+  it('staat onder de KPI-strip, de voortgang en de gegevensmelding, en boven "Wat het betekent"', () => {
+    const posities = ['<PlanKpiStrip', '<PlanAnkerEnVoortgang', '<PlanGegevensmelding', '<GebeurtenissenMetHoofdrun', '<PlanVerdieping'].map(
+      (t) => paneel.indexOf(t),
+    )
+    expect(posities.every((p) => p >= 0)).toBe(true)
+    expect([...posities].sort((a, b) => a - b)).toEqual(posities)
+  })
+
+  it('verbergt de lijst niet in Eenvoudig (alleen het sectielabel is Volledig-only)', () => {
+    expect(paneel).not.toMatch(/<HideInSimple>\s*<div className="-mx-4 sm:-mx-6">\s*<GebeurtenissenMetHoofdrun/)
+  })
+
+  it('het gezondheid-sheet is weg: het verloop-grid was zijn enige opener', () => {
+    expect(paneel).not.toMatch(/PlanKassabonGezondheid|showResilienceReceipt|resilienceSnapshots|handleActionStatusChange/)
+  })
+})

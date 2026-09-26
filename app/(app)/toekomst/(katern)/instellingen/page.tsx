@@ -7,33 +7,31 @@ import {
 } from '@/lib/toekomst/load-toekomst-data'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { InstellingenKatern } from '@/components/toekomst/instellingen/instellingen-katern'
-import type { KernelSimData } from '@/components/future/gebeurtenissen-view'
+import { OudeGebeurtenissenBladwijzer } from '@/components/toekomst/layout/oude-lab-bladwijzer'
 import { resolveWithdrawalProfiel } from '@/lib/withdrawal-strategy'
 import { buildPotBalances } from '@/lib/future/pot-balances'
 import { buildStrategieEditorsData } from '@/lib/horizon/strategie-editors-data'
-import { computeScalarFireProjection } from '@/lib/horizon-kernel/scalar-router'
-import { buildConvergentieAdapterProfile } from '@/lib/horizon-kernel/convergentie-router'
-import { resolveDeficitLoanRate } from '@/lib/horizon-kernel/adapter/params'
 
 export const metadata: Metadata = {
   title: 'Instellingen — TriFinity',
   description:
-    'Wat je toekomstplan voedt: eindstrategie, onttrekking, pot-regels, je AOW-, pensioen-, huis- en werkstrategie, markt-aannames en de levensgebeurtenissen op je tijdas.',
+    'Wat je toekomstplan voedt: eindstrategie, onttrekking, pot-regels, je AOW-, pensioen-, huis- en werkstrategie en markt-aannames.',
 }
 
 /**
  * /toekomst/instellingen — katern Instellingen (ADR 0179 D1/D4, fase 1 stap 17).
  *
- * Voegt de oude subroutes /toekomst/voorkeuren en /toekomst/gebeurtenissen samen; die
- * redirecten via `next.config.ts` hierheen (query mee, gebeurtenissen met `#gebeurtenissen`).
+ * Vervangt de oude subroute /toekomst/voorkeuren (redirect via `next.config.ts`, query
+ * mee). De levensgebeurtenissen stonden hier tot het addendum van 26 sep (ADR 0179); ze
+ * staan nu onder het plan op /toekomst#gebeurtenissen, waar ook /toekomst/gebeurtenissen
+ * heen redirect.
  * Staat in de `(katern)`-groep: de kop, de `PlanReviewProvider`, het canvas en de
  * katern-koppen komen uit de layout — hier dus geen eigen kop en geen tweede provider.
  *
  * De horizon-bundel en de review-voortgang komen uit de per request gecachte deel-ladingen
  * die de layout ook leest (`HorizonPageData` is een superset van de rauwe bundel die de
  * views lezen). Bewust niet `loadToekomstData()`: bij client-navigatie rendert de layout
- * niet opnieuw, en dan zou deze page ook Fin-data, plan-oordeel en minimaliseer-pref laden. Eén `buildStrategieEditorsData` voedt
- * beide views.
+ * niet opnieuw, en dan zou deze page ook Fin-data, plan-oordeel en minimaliseer-pref laden.
  */
 export default async function ToekomstInstellingenPage() {
   const supabase = await getToekomstClient()
@@ -43,9 +41,8 @@ export default async function ToekomstInstellingenPage() {
     loadDashboardData(supabase),
   ])
 
-  // Levensstrategie-editors (AOW/Pensioen/Huis/Werk) — één opbouw voor beide views.
-  const { strategieData, aowAgeFractional } = buildStrategieEditorsData(horizonData)
-  const strategieBaseline = strategieData.baseline
+  // Levensstrategie-editors (AOW/Pensioen/Huis/Werk) voor de Voorkeuren-view.
+  const { strategieData } = buildStrategieEditorsData(horizonData)
 
   // ── Voorkeuren ────────────────────────────────────────────────────────
   const simRows = dashboardResult.dashboardData.simRows ?? null
@@ -59,56 +56,14 @@ export default async function ToekomstInstellingenPage() {
   const box3HeffingvrijInkomen =
     rawHeffingvrij == null || !Number.isFinite(Number(rawHeffingvrij)) ? null : Number(rawHeffingvrij)
 
-  // ── Gebeurtenissen ────────────────────────────────────────────────────
-  const ei = horizonData.effectiveInput
-  // Baseline FIRE-projectie voor de EventPane impact-preview — zelfde strategy-aware
-  // aanroep als de tijdas, zodat de "vs. baseline"-delta klopt met de eindstrategie.
-  const baselineFire = computeScalarFireProjection({
-    input: ei,
-    annualReturn: horizonData.fireParams.grossReturn,
-    swrOverride: horizonData.fireParams.effectiveSwr,
-    inflationOverride: undefined,
-    strategyOptions: {
-      strategy: horizonData.fireStrategy.strategy,
-      endAge: horizonData.fireStrategy.endAge,
-      legacyAmount: horizonData.fireStrategy.legacyAmount,
-    },
-  }).result
-
-  // `previewBaseline` = dezelfde rauwe kernel-context als de tijdas en de strategie-editors.
-  const eventPaneData = {
-    baselineInput: ei,
-    baselineFire,
-    fireParams: horizonData.fireParams,
-    fireStrategy: horizonData.fireStrategy,
-    withdrawalStrategy: horizonData.withdrawalStrategy,
-    endAge: horizonData.fireStrategy.endAge ?? 90,
-    householdMode: horizonData.hasPartner ?? false,
-    previewBaseline: strategieBaseline,
-  }
-
-  // Feature #876 — hook-inputs voor de kernel-afgeleide strategiemomenten.
-  // `deficitLoanRate` is de canonieke tekort-lening-rente (V7-resolver).
-  const kernelSim: KernelSimData | null =
-    strategieBaseline && horizonData.rawProfile
-      ? {
-          aowAgeFractional,
-          box3Method: horizonData.box3Method,
-          bankAccountCash: horizonData.unlinkedCash,
-          baseAnnualSavingsFromCashflow: horizonData.baseAnnualSavingsFromCashflow,
-          housingStrategy: horizonData.housingStrategy,
-          deficitLoanRate: resolveDeficitLoanRate(
-            buildConvergentieAdapterProfile(horizonData.rawProfile),
-          ),
-        }
-      : null
-
   return (
     <>
       {/* Geen eigen kop: de layout draagt de plan-kop. De review-voortgang staat op de
-          wizard-ingang en het aantal gebeurtenissen in de sectiekop van de view (die
-          telt ook het kernel-verkoopmoment mee, dat alleen client-side bestaat). */}
+          wizard-ingang. */}
       <NavStackMeta title="Instellingen" />
+      {/* `/toekomst/instellingen#gebeurtenissen` (de lijst stond hier tot het addendum van
+          26 sep) → de gebeurtenissen onder het plan. */}
+      <OudeGebeurtenissenBladwijzer />
       {/* De views dragen hun eigen `max-w-6xl px-4 sm:px-6`-kolom; de katern-layout padt
           al, dus de negatieve marge voorkomt dubbele inspringing (zoals bij Doelen). */}
       <div className="-mx-4 sm:-mx-6">
@@ -132,14 +87,6 @@ export default async function ToekomstInstellingenPage() {
           box3HeffingvrijInkomen,
           events: horizonData.events,
           strategieData,
-        }}
-        gebeurtenissen={{
-          events: horizonData.events,
-          currentAge: strategieData.currentAge,
-          annualSavings: Math.max(0, (horizonData.avgIncome6m - horizonData.avgExpenses6m) * 12),
-          strategieData,
-          eventPaneData,
-          kernelSim,
         }}
       />
       </div>

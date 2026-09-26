@@ -14,19 +14,32 @@ const source = readSourceLF(join(process.cwd(), 'components', 'toekomst', 'plan'
 describe('plan-verdieping — zichtbaarheids-gate van katern III (V1)', () => {
   it('observeert de sectie in dit paneel, niet in een provider', () => {
     expect(source).toContain("import { useInViewOnce } from './use-in-view-once'")
-    // Review fase 1 (W5): de sectie mount laat (heeftKaternIII, HideInSimple) — de
+    // Review fase 1 (W5): de sectie mount laat (hasRun, HideInSimple) — de
     // mount-conditie gaat als remountKey mee, anders haakt de observer nooit aan.
-    expect(source).toContain("const duidingInView = useInViewOnce(duidingSectionRef, '600px', `${heeftKaternIII}:${displayMode}`)")
+    expect(source).toContain("const duidingInView = useInViewOnce(duidingSectionRef, '600px', `${hasRun}:${displayMode}`)")
     expect(source).toContain('<section ref={duidingSectionRef}')
   })
 
-  it('meldt "in beeld" aan de ouder zodra het zo is', () => {
-    expect(source).toMatch(/useEffect\(\(\) => \{\s*if \(duidingInView\) onDuidingInView\(\)\s*\}, \[duidingInView, onDuidingInView\]\)/)
+  it('meldt "in beeld" aan de ouder pas als de sectie ook open is (mobiel ingeklapt, addendum 26 sep)', () => {
+    expect(source).toMatch(/useEffect\(\(\) => \{\s*if \(duidingInView && open\) onDuidingInView\(\)\s*\}, \[duidingInView, open, onDuidingInView\]\)/)
+  })
+
+  it('de sectie mount op de hoofdrun, niet op de kaarten (anders start de batch onder solved nooit)', () => {
+    expect(source).toMatch(/\{hasRun && \(\s*<HideInSimple>\s*<section ref=\{duidingSectionRef\}/)
   })
 
   it('draait de preset-batch niet zelf (die gate blijft in de ouder)', () => {
     expect(source).not.toContain('presetBatchNodig')
     expect(source).not.toContain('runScenarioPresetsAsync')
+  })
+})
+
+describe("plan-verdieping — alleen de scenario's blijven (ADR 0179, addendum 26 sep)", () => {
+  it('rendert geen levensinkomenstrook, radar, verloop-grid of geplande acties meer', () => {
+    for (const weg of ['<LevensinkomenStrook', '<Dekkingsradar', '<HorizonTrendGrid', '<ActionCard', '<ScenarioChip', 'Geplande acties']) {
+      expect(source, weg).not.toContain(weg)
+    }
+    expect(source).toContain('<ScenarioKaarten')
   })
 })
 

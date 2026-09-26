@@ -12,10 +12,17 @@
  * verdieping en de kassabons, plus de Plan-lokale afleidingen die alleen deze blokken
  * lezen. Het lab woont sinds stap 16 in katern Doelen (`DoelenKaternLab`).
  *
+ * Addendum 26 sep (ADR 0179): onder de KPI-strip, de voortgangsbalk en de fasebalk staan
+ * de levensgebeurtenissen (verhuisd uit Instellingen); de levensinkomenstrook, de
+ * dekkingsradar, het verloop-grid en de geplande acties zijn van Plan af.
+ *
  * Leest zijn data uit de provider, nooit uit de route (D8).
  */
 
 import { useState } from 'react'
+import { GebeurtenissenMetHoofdrun } from '@/components/toekomst/instellingen/gebeurtenissen-met-hoofdrun'
+import { AnkerScroll } from '@/components/toekomst/instellingen/anker-scroll'
+import { GEBEURTENISSEN_ANKER } from '@/components/toekomst/layout/oude-lab-bladwijzer'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { HideInSimple } from '@/components/app/hide-in-simple'
 import { SectionLabel } from '@/components/editorial'
@@ -38,49 +45,32 @@ import {
   PlanKassabonVrijheidsleeftijd,
   PlanKassabonDoelbedrag,
   PlanKassabonOpnamerate,
-  PlanKassabonGezondheid,
 } from '@/components/toekomst/plan/plan-kassabons'
 import {
   useToekomstBron,
   useToekomstPerspectiefContext,
   useToekomstOverlayContext,
-  useToekomstScenarioContext,
   useToekomstSimContext,
-  useToekomstLagenContext,
   useToekomstEuroContext,
 } from '@/components/toekomst/state/toekomst-state-provider'
 
 export function PlanPaneel() {
-  const { initialData } = useToekomstBron()
+  const { initialData, gebeurtenissen } = useToekomstBron()
   const {
     isHouseholdView,
     isPartnerView,
-    usePartnerMainLine,
-    useHouseholdMainLine,
     perspectiveHero,
     hasPerspectiveHero,
   } = useToekomstPerspectiefContext()
   const {
-    setActiveModal,
     openRetirementExpensePane,
     setSimModalOpen,
   } = useToekomstOverlayContext()
-  const {
-    hasScenario,
-    hasStopKeuze,
-    doelActief,
-    scenarioVerwachtFireAge,
-    coverageNodes,
-    duidingStopAge,
-    radarAssen,
-  } = useToekomstScenarioContext()
   const {
     input,
     fireParams,
     fireStrategy,
     userAowAge,
-    actions,
-    resilienceSnapshots,
     retirementMethod,
     fireSwr,
     fire,
@@ -95,7 +85,6 @@ export function PlanPaneel() {
     simCashflows,
     simError,
     aowOntbreekt,
-    stopPad,
     effectiveInput,
     currentAge,
     isFixedAnchorMode,
@@ -117,9 +106,7 @@ export function PlanPaneel() {
     heroFireAgeReceiptText,
     isKernelDepleteRate,
     personalHeroProjection,
-    handleActionStatusChange,
   } = useToekomstSimContext()
-  const { lifelineAge } = useToekomstLagenContext()
   const {
     viewFireTargetInclHome,
     viewFireTargetExclHome,
@@ -133,11 +120,8 @@ export function PlanPaneel() {
   } = useToekomstEuroContext()
   const { masked } = useMaskedAmounts()
 
-  const [healthChartOpen, setHealthChartOpen] = useState(false)
-  const [fireAgeChartOpen, setFireAgeChartOpen] = useState(false)
   const [showFireAgeReceipt, setShowFireAgeReceipt] = useState(false)
   const [showFireTargetReceipt, setShowFireTargetReceipt] = useState(false)
-  const [showResilienceReceipt, setShowResilienceReceipt] = useState(false)
   const [showSwrReceipt, setShowSwrReceipt] = useState(false)
 
   // De foutstaat (`!fire || !range || !healthScore`) rendert `ToekomstRekenGrens` in de
@@ -375,35 +359,35 @@ export function PlanPaneel() {
         </div>
       </section>
 
+      {/* === KATERN II — Wat er in je leven gebeurt ===
+          De levensgebeurtenissen onder het plan (ADR 0179, addendum 26 sep): dezelfde
+          lijst met kernelmomenten en dezelfde toevoegknop als tot dan in Instellingen, in
+          Eenvoudig én Volledig. De props bouwt de layout server-side; de hoofdrun komt uit
+          de provider (besluit Q8). `#gebeurtenissen` is het anker van elke deeplink. */}
+      {gebeurtenissen && (
+        <section
+          id={GEBEURTENISSEN_ANKER}
+          className="mt-8 scroll-mt-20 sm:mt-10"
+          data-testid="plan-gebeurtenissen"
+        >
+          <AnkerScroll ankers={[GEBEURTENISSEN_ANKER]} />
+          <HideInSimple>
+            <SectionLabel num="II">Wat er in je leven gebeurt</SectionLabel>
+          </HideInSimple>
+          {/* De view draagt zijn eigen `max-w-6xl px-4 sm:px-6`-kolom; de katern-layout
+              padt al, dus de negatieve marge voorkomt dubbele inspringing. */}
+          <div className="-mx-4 sm:-mx-6">
+            <GebeurtenissenMetHoofdrun {...gebeurtenissen} />
+          </div>
+        </section>
+      )}
+
       <PlanVerdieping
-        coverageNodes={coverageNodes}
-        radarAssen={radarAssen}
+        hasRun={simResult != null}
         scenarioPresets={scenarioPresets}
         scenarioPresetsLoading={scenarioPresetsLoading}
-        hasScenario={hasScenario}
-        hasStopKeuze={hasStopKeuze}
-        usePartnerMainLine={usePartnerMainLine}
-        useHouseholdMainLine={useHouseholdMainLine}
-        doelActief={doelActief}
-        stopPad={stopPad}
-        duidingStopAge={duidingStopAge}
-        simResult={simResult}
-        userAowAge={userAowAge}
-        lifelineAge={lifelineAge}
-        isFixedAnchorMode={isFixedAnchorMode}
-        ankerStop={ankerStop}
-        scenarioVerwachtFireAge={scenarioVerwachtFireAge}
         viewScenarioPresets={viewScenarioPresets}
         personalHeroProjection={personalHeroProjection}
-        resilienceSnapshots={resilienceSnapshots}
-        healthScore={healthScore}
-        healthChartOpen={healthChartOpen}
-        setHealthChartOpen={setHealthChartOpen}
-        fireAgeChartOpen={fireAgeChartOpen}
-        setFireAgeChartOpen={setFireAgeChartOpen}
-        setShowResilienceReceipt={setShowResilienceReceipt}
-        actions={actions}
-        handleActionStatusChange={handleActionStatusChange}
         onDuidingInView={markeerDuidingInView}
       />
 
@@ -476,13 +460,6 @@ export function PlanPaneel() {
         simCashflows={simCashflows}
         userAowAge={userAowAge}
         effectiveFireTarget={effectiveFireTarget}
-      />
-
-      <PlanKassabonGezondheid
-        showResilienceReceipt={showResilienceReceipt}
-        setShowResilienceReceipt={setShowResilienceReceipt}
-        healthScore={healthScore}
-        setActiveModal={setActiveModal}
       />
     </div>
   )

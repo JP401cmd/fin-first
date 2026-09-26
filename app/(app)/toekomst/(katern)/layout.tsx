@@ -21,6 +21,7 @@ import {
 } from '@/components/toekomst/meldingen/toekomst-katern-meldingen'
 import { bouwDoelenBron, voorkeurenOpen } from '@/components/toekomst/meldingen/meldingen-bron'
 import { loadToekomstData } from '@/lib/toekomst/load-toekomst-data'
+import { bouwGebeurtenissenBron } from '@/lib/toekomst/gebeurtenissen-bron'
 
 /** Alleen de katernen met een "Wat zie ik hier?"-tekst gaan mee naar de client. */
 function metInhoud(
@@ -73,6 +74,11 @@ export default async function ToekomstKaternLayout({ children }: { children: Rea
     voorkeurenOpen: voorkeurenOpen(planReviewProgress),
   }
 
+  // De levensgebeurtenissen staan onder het plan (ADR 0179, addendum 26 sep). De layout
+  // bouwt hun props uit de bundel die hij al heeft: een katernwissel naar Plan rendert de
+  // layout niet opnieuw, dus zo kost die wissel geen tweede server-lading.
+  const gebeurtenissen = bouwGebeurtenissenBron(horizonData)
+
   return (
     // TPR-01 — plan-review: montert de review-pane (ShellOverlay pane) naast het canvas,
     // zodat de grafiek zichtbaar blijft. Consumeert ook de deeplink `?planreview=open`.
@@ -80,7 +86,7 @@ export default async function ToekomstKaternLayout({ children }: { children: Rea
       {/* `goals` = dezelfde slice die de dashboard-widget consumeert (M36): doelen met een
           streefdatum krijgen een marker op de tijdas. Staat in de layout, zodat de markers
           op elk katern dezelfde zijn (kaart V16). */}
-      <ToekomstStateProvider initialData={horizonData} goals={finData.goals}>
+      <ToekomstStateProvider initialData={horizonData} goals={finData.goals} gebeurtenissen={gebeurtenissen}>
         <ToekomstKaternMeldingenProvider bron={meldingenBron}>
           {/* Een meegereisde `?tab=` van een oude deeplink (next.config-redirect) weg,
               zonder scroll en zonder lus. Suspense: `useSearchParams` in de layout. */}

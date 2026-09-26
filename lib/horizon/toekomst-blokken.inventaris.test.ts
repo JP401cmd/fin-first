@@ -36,9 +36,9 @@
  * `IncomeExpenseChart` is van uitklap modus Geldstroom geworden en houdt zijn plek in
  * VOLGORDE (na Samenstelling, vóór de tijdlijn).
  *
- * Verwachte, bewuste wijzigingen: fase 4 verhuist `ScenarioKaarten` naar Doelen
- * (volgorde-paar met Dekkingsradar vervalt dan vanzelf); fase 5 haalt
- * `HorizonTrendGrid` naar /overzicht — haal hem dán uit INVENTARIS, niet eerder.
+ * Verwachte, bewuste wijzigingen: fase 4 verhuist `ScenarioKaarten` naar Doelen. Het
+ * addendum van 26 sep haalde fase 5 naar voren (`HorizonTrendGrid` naar /overzicht) en
+ * schrapte levensinkomenstrook en dekkingsradar: zie PLAN_GESCHRAPT.
  */
 import { describe, it, expect } from 'vitest'
 import {
@@ -60,12 +60,20 @@ const VOLGORDE = [
   'LabKnoppen',
   'WhatIfMarketAssumptions',
   'LabOpslaanBalk',
-  'LevensinkomenStrook',
-  'Dekkingsradar',
   'ScenarioKaarten',
   'HouseholdFireSection',
-  'HorizonTrendGrid',
 ] as const
+
+/**
+ * Addendum 26 sep (ADR 0179, eigenaarsbesluit) — BEWUST van Plan af: de
+ * levensinkomenstrook en de dekkingsradar (verwijderd), het verloop-grid (fase 5 naar
+ * voren: het verloop staat in de gezondheidskassabon op /overzicht) en de scenario-chip
+ * die alleen die twee duidingsblokken droeg.
+ */
+const PLAN_GESCHRAPT = ['LevensinkomenStrook', 'Dekkingsradar', 'HorizonTrendGrid', 'ScenarioChip', 'ActionCard'] as const
+
+/** Addendum 26 sep — de geplande acties staan op /overzicht/tips, niet meer op Plan. */
+const PLAN_GESCHRAPTE_TEKST = ['Geplande acties (komend jaar)'] as const
 
 /** Blokken zonder vaste plek in de leesvolgorde (sheets/panes), wel verplicht aanwezig. */
 const OVERLAYS = ['DoelVastlegSheet', 'HorizonYearDetailsSheet', 'EventPane', 'PlanReviewProvider'] as const
@@ -156,6 +164,18 @@ describe('/toekomst-blokken — inventaris (geen blok valt weg bij de decomposit
     })
   }
 
+  for (const naam of PLAN_GESCHRAPT) {
+    it(`<${naam}> staat bewust niet meer op /toekomst (addendum 26 sep)`, () => {
+      expect(renderPlekken(naam)).toEqual([])
+    })
+  }
+
+  for (const tekst of PLAN_GESCHRAPTE_TEKST) {
+    it(`"${tekst}" staat bewust niet meer op /toekomst (addendum 26 sep)`, () => {
+      expect(bronnen.filter((b) => b.code.includes(tekst)).map((b) => b.rel)).toEqual([])
+    })
+  }
+
   for (const naam of CANVAS_GESCHRAPT) {
     it(`<${naam}> staat bewust niet meer op /toekomst (fase 2, canvas)`, () => {
       expect(renderPlekken(naam)).toEqual([])
@@ -209,10 +229,11 @@ describe('/toekomst-blokken — volgorde (blokken die samen blijven, verspringen
 })
 
 describe('/toekomst-blokken — katern Plan (fase 2, spec §4.3)', () => {
-  const PLAN_VOLGORDE = ['PlanKpiStrip', 'PlanAnkerEnVoortgang', 'PlanVerdieping'] as const
+  // Addendum 26 sep: de levensgebeurtenissen staan tussen de voortgang en de verdieping.
+  const PLAN_VOLGORDE = ['PlanKpiStrip', 'PlanAnkerEnVoortgang', 'GebeurtenissenMetHoofdrun', 'PlanVerdieping'] as const
   const plan = codeOnly(readRel('components/toekomst/plan/plan-paneel.tsx'))
 
-  it('KPI-strip → ankerdrieslag en voortgangsbalk → verdieping → jaar-op-jaar-tabel', () => {
+  it('KPI-strip → ankerdrieslag en voortgangsbalk → gebeurtenissen → verdieping → jaar-op-jaar-tabel', () => {
     const posities = PLAN_VOLGORDE.map((naam) => plan.search(renderRe(naam)))
     expect(posities.every((p) => p >= 0), PLAN_VOLGORDE.join(', ')).toBe(true)
     expect([...posities].sort((x, y) => x - y)).toEqual(posities)
