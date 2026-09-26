@@ -138,6 +138,24 @@ describe('PlanKpiStrip — KPI 1 bij onbereikbaar en bij rekenen (C3 punt 2)', (
   })
 })
 
+describe('PlanKpiStrip — KPI 3 in nl-NL (C3 punt 5)', () => {
+  it('ingesteld: "3,40%" met komma, niet "3.40%"', () => {
+    const { container } = renderStrip('full', { fireSwr: 0.034, simResult: null })
+    const cel = container.querySelector('[data-testid="hero-stat-swr"]') as HTMLElement
+    expect(cel.textContent).toContain('3,40%')
+    expect(cel.textContent).not.toContain('3.40%')
+    expect(cel.textContent).toContain('ingesteld')
+  })
+
+  it('impliciet: het simulatiepercentage, met onderschrift "impliciet"', () => {
+    const simResult = { implicitWithdrawalRate: 0.0456 } as ComponentProps<typeof PlanKpiStrip>['simResult']
+    const { container } = renderStrip('full', { fireSwr: 0.0284, simResult })
+    const cel = container.querySelector('[data-testid="hero-stat-swr"]') as HTMLElement
+    expect(cel.textContent).toContain('4,56%')
+    expect(cel.textContent).toContain('impliciet')
+  })
+})
+
 describe('PlanKpiStrip — Eenvoudig en Volledig', () => {
   it('Volledig: vier cellen', () => {
     const { container } = renderStrip('full')

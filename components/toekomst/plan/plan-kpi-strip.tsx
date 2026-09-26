@@ -26,6 +26,7 @@
 import type { Dispatch, SetStateAction } from 'react'
 import { FiguresStrip, type FigureProps } from '@/components/editorial'
 import { MaskedAmount } from '@/components/app/masked-amount'
+import { formatDecimal } from '@/lib/format'
 import type { RetirementExpenseMethod } from '@/lib/budget-utils'
 import type { SimResult } from '@/lib/fire-simulation'
 import type { FinancialInput } from '@/lib/horizon-data'
@@ -230,8 +231,8 @@ export function PlanKpiStrip({
         : isKernelDepleteRate
           ? 'Interen'
           : simResult?.implicitWithdrawalRate != null
-            ? `${(simResult.implicitWithdrawalRate * 100).toFixed(2)}%`
-            : `${(fireSwr * 100).toFixed(2)}%`,
+            ? `${formatDecimal(simResult.implicitWithdrawalRate * 100, 2)}%`
+            : `${formatDecimal(fireSwr * 100, 2)}%`,
     sub: isPensioenMode
       ? 'per maand'
       : isKernelDepleteRate

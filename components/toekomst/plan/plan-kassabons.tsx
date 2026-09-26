@@ -14,7 +14,7 @@ import type { HealthScore } from '@/lib/financial-health'
 import type { FireParams } from '@/lib/fire-params'
 import type { SimCashflow, SimResult } from '@/lib/fire-simulation'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
-import { formatMaskedCurrency } from '@/lib/format'
+import { formatDecimal, formatMaskedCurrency } from '@/lib/format'
 import type { FinancialInput, FireProjection, FireRange } from '@/lib/horizon-data'
 import type { HorizonPageData } from '@/lib/horizon-data-loader'
 import { type AnkerReach, type AnkerStop, ankerTitel, ankerZin, formatStopAge } from '@/lib/horizon/anker-copy'
@@ -145,7 +145,7 @@ export function PlanKassabonVrijheidsleeftijd({
               </div>
               <div className="flex justify-between py-0.5">
                 <span className="font-sans text-sm text-[var(--ink-2)]">Verwacht rendement</span>
-                <span className="tabular-nums text-[var(--ink)]">{(fireParams.grossReturn * 100).toFixed(1)}%</span>
+                <span className="tabular-nums text-[var(--ink)]">{formatDecimal(fireParams.grossReturn * 100, 1)}%</span>
               </div>
               {/* M5 — de tweede aanname onder élk prognosegetal. De bevinding
                   wees erop dat rendement wél in de kassabon stond en inflatie
@@ -155,7 +155,7 @@ export function PlanKassabonVrijheidsleeftijd({
                   niet een eigen aanname. */}
               <div className="flex justify-between py-0.5">
                 <span className="font-sans text-sm text-[var(--ink-2)]">Verwachte inflatie</span>
-                <span className="tabular-nums text-[var(--ink)]">{(fireParams.inflationRate * 100).toFixed(1)}%</span>
+                <span className="tabular-nums text-[var(--ink)]">{formatDecimal(fireParams.inflationRate * 100, 1)}%</span>
               </div>
               <div className="flex justify-between py-0.5">
                 <span className="font-sans text-sm text-[var(--ink-2)]">Pensioenuitgaven/jr</span>
@@ -208,8 +208,8 @@ export function PlanKassabonVrijheidsleeftijd({
               )}
               {!isPensioenMode && (
                 <div className="flex justify-between py-0.5">
-                  <span className="font-sans text-sm text-[var(--ink-2)]"><GlossaryTerm term="swr">Opnamerate</GlossaryTerm></span>
-                  <span className="tabular-nums text-[var(--ink)]">{(fireSwr * 100).toFixed(2)}%</span>
+                  <span className="font-sans text-sm text-[var(--ink-2)]"><GlossaryTerm term="swr">Opnamerate (ingesteld)</GlossaryTerm></span>
+                  <span className="tabular-nums text-[var(--ink)]">{formatDecimal(fireSwr * 100, 2)}%</span>
                 </div>
               )}
             </div>
@@ -308,7 +308,7 @@ export function PlanKassabonDoelbedrag({
               <p className="mt-0.5 font-sans text-[10px] text-[var(--ink-3)]">
                 {isFixedAnchorMode
                   ? 'Geprojecteerd — een uitkomst, geen doel'
-                  : simResult?.requiredFirePortfolio != null ? 'Simulatie-engine berekening (incl. AOW & kasstromen)' : `Klassieke FIRE-berekening (${(fireSwr * 100).toFixed(2)}% SWR)`}
+                  : simResult?.requiredFirePortfolio != null ? 'Simulatie-engine berekening (incl. AOW & kasstromen)' : `Klassieke FIRE-berekening (${formatDecimal(fireSwr * 100, 2)}% SWR)`}
               </p>
             </div>
 
@@ -335,8 +335,8 @@ export function PlanKassabonDoelbedrag({
                   is daar betekenisloos (bevinding 6). */}
               {!isFixedAnchorMode && (
                 <div className="flex justify-between py-0.5">
-                  <span className="font-sans text-sm text-[var(--ink-2)]">Opnamerate (SWR)</span>
-                  <span className="tabular-nums text-[var(--ink)]">{(fireSwr * 100).toFixed(2)}%</span>
+                  <span className="font-sans text-sm text-[var(--ink-2)]">Opnamerate (ingesteld)</span>
+                  <span className="tabular-nums text-[var(--ink)]">{formatDecimal(fireSwr * 100, 2)}%</span>
                 </div>
               )}
               {/* M5 — de twee aannames waaruit die SWR volgt (rendement − Box 3-
@@ -345,11 +345,11 @@ export function PlanKassabonDoelbedrag({
                   `fireParams`, dus dezelfde waarden als de kernel gebruikt. */}
               <div className="flex justify-between py-0.5">
                 <span className="font-sans text-sm text-[var(--ink-2)]">Verwacht rendement</span>
-                <span className="tabular-nums text-[var(--ink)]">{(fireParams.grossReturn * 100).toFixed(1)}%</span>
+                <span className="tabular-nums text-[var(--ink)]">{formatDecimal(fireParams.grossReturn * 100, 1)}%</span>
               </div>
               <div className="flex justify-between py-0.5">
                 <span className="font-sans text-sm text-[var(--ink-2)]">Verwachte inflatie</span>
-                <span className="tabular-nums text-[var(--ink)]">{(fireParams.inflationRate * 100).toFixed(1)}%</span>
+                <span className="tabular-nums text-[var(--ink)]">{formatDecimal(fireParams.inflationRate * 100, 1)}%</span>
               </div>
               {isPensioenMode && viewMonthlyWithdrawalAtAow != null && (
                 <div className="flex justify-between py-0.5">
@@ -388,7 +388,7 @@ export function PlanKassabonDoelbedrag({
                       ? `Doelbedrag = PV-annuïteit: uitgaven × (1 − (1+r)⁻ⁿ) / r — vermogen ≈ €0 op leeftijd ${fireStrategy.endAge}`
                       : fireStrategy?.strategy === 'legacy'
                         ? `Doelbedrag = Jaaruitgaven ÷ SWR + erfenisbuffer (${formatMaskedCurrency(fireStrategy.legacyAmount, masked)})`
-                        : `Doelbedrag = Jaaruitgaven ÷ SWR = ${formatMaskedCurrency(effectiveInput?.yearlyMustExpenses ?? 0, masked)} ÷ ${(fireSwr * 100).toFixed(2)}%`}
+                        : `Doelbedrag = Jaaruitgaven ÷ SWR = ${formatMaskedCurrency(effectiveInput?.yearlyMustExpenses ?? 0, masked)} ÷ ${formatDecimal(fireSwr * 100, 2)}%`}
               </p>
             </div>
 
@@ -452,14 +452,14 @@ export function PlanKassabonOpnamerate({
               </div>
               <div className="flex justify-between py-0.5">
                 <span className="font-sans text-sm text-[var(--ink-2)]">Ingestelde SWR</span>
-                <span className="tabular-nums text-[var(--ink)]">{(fireSwr * 100).toFixed(2)}%</span>
+                <span className="tabular-nums text-[var(--ink)]">{formatDecimal(fireSwr * 100, 2)}%</span>
               </div>
               <div className="flex justify-between py-0.5">
                 <span className="font-sans text-sm text-[var(--ink-2)]">Klassiek doelvermogen</span>
                 <span className="tabular-nums text-[var(--ink)]">{<MaskedAmount value={Math.round((effectiveInput?.yearlyMustExpenses ?? 0) / fireSwr)} tone="horizon" />}</span>
               </div>
               <p className="mt-1 font-sans text-[10px] italic text-[var(--ink-4)]">
-                Uitgaven ÷ SWR = {<MaskedAmount value={effectiveInput?.yearlyMustExpenses ?? 0} tone="horizon" />} ÷ {(fireSwr * 100).toFixed(2)}% = {<MaskedAmount value={Math.round((effectiveInput?.yearlyMustExpenses ?? 0) / fireSwr)} tone="horizon" />}
+                Uitgaven ÷ SWR = {<MaskedAmount value={effectiveInput?.yearlyMustExpenses ?? 0} tone="horizon" />} ÷ {formatDecimal(fireSwr * 100, 2)}% = {<MaskedAmount value={Math.round((effectiveInput?.yearlyMustExpenses ?? 0) / fireSwr)} tone="horizon" />}
               </p>
             </div>
 
@@ -540,7 +540,7 @@ export function PlanKassabonOpnamerate({
                   {/* Totaalregel: impliciet opnamepercentage */}
                   <div className="mt-2 flex justify-between border-t-2 border-[var(--ink)] pt-2 font-bold">
                     <span className="text-[var(--ink)]">Impliciet opnamepercentage</span>
-                    <span className="tabular-nums text-[var(--ink)]">{implicitPct.toFixed(2)}%</span>
+                    <span className="tabular-nums text-[var(--ink)]">{formatDecimal(implicitPct, 2)}%</span>
                   </div>
 
                   {/* Verschil-indicator */}
@@ -551,7 +551,7 @@ export function PlanKassabonOpnamerate({
                         : 'border-kern-300 bg-kern-50/50 text-kern-700'
                     }`}>
                       <div className="flex items-center justify-between">
-                        <span>{diff < 0 ? '↓' : '↑'} {Math.abs(diff).toFixed(2)}pp {diff < 0 ? 'lager' : 'hoger'} dan ingesteld ({ingesteldPct.toFixed(2)}%)</span>
+                        <span>{diff < 0 ? '↓' : '↑'} {formatDecimal(Math.abs(diff), 2)}pp {diff < 0 ? 'lager' : 'hoger'} dan ingesteld ({formatDecimal(ingesteldPct, 2)}%)</span>
                         {diff < 0 && <span className="text-[10px] font-medium">= veiliger</span>}
                       </div>
                       {portfolioDiff > 0 && (
@@ -580,7 +580,7 @@ export function PlanKassabonOpnamerate({
                           )}
                           {firstPensionRow.startPortfolio > 0 && (
                             <p className="mt-0.5 font-sans text-[10px] text-[var(--ink-4)]">
-                              effectief {((Math.abs(firstPensionRow.withdrawal) / firstPensionRow.startPortfolio) * 100).toFixed(2)}% van vermogen
+                              effectief {formatDecimal((Math.abs(firstPensionRow.withdrawal) / firstPensionRow.startPortfolio) * 100, 2)}% van vermogen
                             </p>
                           )}
                         </div>
@@ -599,7 +599,7 @@ export function PlanKassabonOpnamerate({
                             )}
                             {rowAtAow.startPortfolio > 0 && (
                               <p className="mt-0.5 font-sans text-[10px] text-horizon-500">
-                                effectief {((Math.abs(rowAtAow.withdrawal) / rowAtAow.startPortfolio) * 100).toFixed(2)}% van vermogen
+                                effectief {formatDecimal((Math.abs(rowAtAow.withdrawal) / rowAtAow.startPortfolio) * 100, 2)}% van vermogen
                               </p>
                             )}
                           </div>
@@ -614,7 +614,7 @@ export function PlanKassabonOpnamerate({
                       <strong className="font-semibold text-[var(--ink-3)]">Waarom verschilt dit?</strong>
                     </p>
                     <p className="mt-1">
-                      De <strong className="font-semibold">ingestelde SWR</strong> ({ingesteldPct.toFixed(2)}%) gaat uit van een eenvoudige formule: je dekt 100% van je uitgaven uit je vermogen. Doelvermogen = uitgaven ÷ SWR.
+                      De <strong className="font-semibold">ingestelde SWR</strong> ({formatDecimal(ingesteldPct, 2)}%) gaat uit van een eenvoudige formule: je dekt 100% van je uitgaven uit je vermogen. Doelvermogen = uitgaven ÷ SWR.
                     </p>
                     <p className="mt-1">
                       De <strong className="font-semibold">simulatie</strong> modelleert je hele levenspad jaar voor jaar.
@@ -632,7 +632,7 @@ export function PlanKassabonOpnamerate({
                       <strong className="font-semibold text-[var(--ink-3)]">Formule:</strong>
                     </p>
                     <p className="mt-1">
-                      Klassiek: SWR = Jaaruitgaven ÷ Doelvermogen = {<MaskedAmount value={yearlyExp} tone="horizon" />} ÷ {<MaskedAmount value={Math.round(yearlyExp / fireSwr)} tone="horizon" />} = {ingesteldPct.toFixed(2)}%
+                      Klassiek: SWR = Jaaruitgaven ÷ Doelvermogen = {<MaskedAmount value={yearlyExp} tone="horizon" />} ÷ {<MaskedAmount value={Math.round(yearlyExp / fireSwr)} tone="horizon" />} = {formatDecimal(ingesteldPct, 2)}%
                     </p>
                     <p className="mt-0.5">
                       {/* euro-view: exempt — deze regel toont een DELING die op het
@@ -641,7 +641,7 @@ export function PlanKassabonOpnamerate({
                           Deflateer je alleen de noemer, dan klopt de zichtbare som niet
                           meer. De grondslag van de teller en de noemer verschilt hier
                           bewust; dat is de definitie van de opnamerate. */}
-                      Impliciet: Jaaruitgaven ÷ Simulatie-vermogen = {<MaskedAmount value={yearlyExp} tone="horizon" />} ÷ {<MaskedAmount value={Math.round(simResult.requiredFirePortfolio)} tone="horizon" />} = {implicitPct.toFixed(2)}%
+                      Impliciet: Jaaruitgaven ÷ Simulatie-vermogen = {<MaskedAmount value={yearlyExp} tone="horizon" />} ÷ {<MaskedAmount value={Math.round(simResult.requiredFirePortfolio)} tone="horizon" />} = {formatDecimal(implicitPct, 2)}%
                     </p>
                   </div>
                 </>
@@ -653,7 +653,7 @@ export function PlanKassabonOpnamerate({
               <>
                 <div className="mt-2 flex justify-between border-t-2 border-[var(--ink)] pt-2 font-bold">
                   <span className="text-[var(--ink)]">Opnamepercentage</span>
-                  <span className="tabular-nums text-[var(--ink)]">{(fireSwr * 100).toFixed(2)}%</span>
+                  <span className="tabular-nums text-[var(--ink)]">{formatDecimal(fireSwr * 100, 2)}%</span>
                 </div>
 
                 <div className="mt-3 border-t border-dashed border-[var(--border-ed)] pt-2 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">

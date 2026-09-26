@@ -66,3 +66,19 @@ describe('plan-kassabons — vast anker en kernantwoord', () => {
     expect(source).toMatch(/const HealthScoreReceipt = dynamic\(/)
   })
 })
+
+describe('plan-kassabons — opnamerate: twee grootheden, twee namen, nl-NL (C3 punt 5)', () => {
+  it('geen toFixed voor percentages: formatDecimal geeft de komma ("3,40%", niet "3.40%")', () => {
+    expect(source).not.toMatch(/\.toFixed\(/)
+    expect(source).toMatch(/import \{[^}]*\bformatDecimal\b[^}]*\} from '@\/lib\/format'/)
+  })
+
+  it('de ingestelde SWR (fireSwr) heet nooit kaal "Opnamerate": die naam draagt de KPI voor het impliciete percentage', () => {
+    // KPI 3 toont `implicitWithdrawalRate` (uitgave bij FIRE ÷ benodigd vermogen) met
+    // onderschrift "impliciet"; de bonnen van KPI 1 en 2 toonden `fireSwr` (rendement −
+    // Box 3 − inflatie) onder dezelfde naam. Twee grootheden, dus twee namen.
+    expect(source).not.toMatch(/>Opnamerate<\/GlossaryTerm>/)
+    expect(source).not.toContain('>Opnamerate (SWR)<')
+    expect(source.match(/Opnamerate \(ingesteld\)/g) ?? []).toHaveLength(2)
+  })
+})
