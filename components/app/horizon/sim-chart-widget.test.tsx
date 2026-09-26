@@ -136,3 +136,40 @@ describe('SimChartWidget — geeft grossReturn door aan de interne modal', () =>
     expect(screen.queryByText('7% per jaar')).toBeNull()
   })
 })
+
+describe('SimChartModal — de link "Jaar-op-jaar-tabel" opent de tabel (C3 punt 3, spec §4.9)', () => {
+  function renderModal() {
+    return render(
+      <SimChartModal
+        open
+        onClose={vi.fn()}
+        simResult={makeSimResult()}
+        cashflows={[]}
+        currentAge={40}
+        retirementExpenseMethod={null}
+        yearlyExpenses={30_000}
+        grossReturn={0.06}
+        canonicalDailyRate={105}
+      />,
+    )
+  }
+
+  it('geen tweede ingang voor "Zo werkt jouw grafiek": die hoort alleen achter de canvas-i', () => {
+    renderModal()
+    expect(screen.queryByTestId('walkthrough')).toBeNull()
+  })
+
+  it('de tabel staat bovenaan en is direct uitgeklapt, zonder de motorkap te openen', () => {
+    const { container } = renderModal()
+    const toggle = screen.getByRole('button', { name: /jaar-op-jaar verloop/i })
+    expect(toggle.getAttribute('aria-expanded')).toBe('true')
+    const tabel = container.querySelector('table')
+    expect(tabel).not.toBeNull()
+    // Bovenaan: de tabel komt vóór de grafiek en vóór de motorkap.
+    const grafiek = screen.getByTestId('sim-chart')
+    const motorkap = screen.getByRole('button', { name: /onder de motorkap/i })
+    expect(toggle.compareDocumentPosition(grafiek) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(toggle.compareDocumentPosition(motorkap) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(motorkap.getAttribute('aria-expanded')).toBe('false')
+  })
+})

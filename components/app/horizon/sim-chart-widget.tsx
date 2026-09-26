@@ -14,7 +14,6 @@ import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { SimChart } from '@/components/app/horizon/sim-chart'
 import { ZoomableChartContainer } from '@/components/app/horizon/zoomable-chart-container'
-import { GrafiekUitlegWalkthrough } from '@/components/app/horizon/grafiek-uitleg/grafiek-uitleg-walkthrough'
 import { formatCurrency, formatWithFreedom } from '@/lib/format'
 import { useEuroView } from '@/lib/hooks/use-euro-view'
 import { formatFireAge } from '@/lib/horizon-data'
@@ -153,8 +152,10 @@ export const SimChartModal = memo(function SimChartModal({
     kernelDepletionMonth: simResult?.kernelDepletionMonth,
     endAge: simResult?.displayEndAge,
   })
-  const [tableExpanded, setTableExpanded] = useState(false)
-  // "Onder de motorkap" — technische onderbouwing, default ingeklapt (verhaal voorop).
+  // De enige ingang naar deze sheet is de link "Jaar-op-jaar-tabel" in Plan: de tabel
+  // opent dus uitgeklapt (spec §4.9). Inklappen kan nog, voor wie alleen de grafiek wil.
+  const [tableExpanded, setTableExpanded] = useState(true)
+  // "Onder de motorkap" — technische onderbouwing, default ingeklapt.
   const [motorkapExpanded, setMotorkapExpanded] = useState(false)
   // euro-view: dit oppervlak is de ONDERBOUWING van de simulatie zoals de kernel
   // hem rekent — nominaal-throughout (ADR 0032). Elk bedrag hieronder hoort bij
@@ -186,14 +187,151 @@ export const SimChartModal = memo(function SimChartModal({
     <ShellOverlay open={open} onClose={onClose} kind="sheet" size="full" title="Simulatie Prognose">
       <div className="p-4 sm:p-6 space-y-6">
 
-        {/* 1. Verhaal voorop — "Zo werkt jouw grafiek" (4 hoofdstukken) */}
-        <GrafiekUitlegWalkthrough
-          simResult={simResult}
-          cashflows={cashflows}
-          currentAge={currentAge}
-          canonicalDailyRate={canonicalDailyRate}
-          unifiedRows={unifiedRows}
-        />
+        {/* 1. Jaar-op-jaar verloop — de reden dat deze sheet opent (link "Jaar-op-jaar-tabel"
+            in Plan). Direct uitgeklapt en bovenaan. "Zo werkt je grafiek" staat hier bewust
+            niet meer: die uitleg heeft één ingang, de canvas-i (spec §4.9). */}
+        <div>
+          <button
+            type="button"
+            onClick={() => setTableExpanded(v => !v)}
+            className="flex w-full items-center justify-between gap-2 text-left"
+            aria-expanded={tableExpanded}
+          >
+            <p className="label-editorial text-[var(--ink-3)]">
+              JAAR-OP-JAAR VERLOOP
+              <span className="ml-2 font-mono text-[10px] normal-case text-[var(--ink-4)]">
+                ({rows.length} jaar)
+              </span>
+            </p>
+            {tableExpanded
+              ? <ChevronUp className="h-4 w-4 text-[var(--ink-4)]" />
+              : <ChevronDown className="h-4 w-4 text-[var(--ink-4)]" />
+            }
+          </button>
+
+          {tableExpanded && (
+            <div className="mt-3 overflow-x-auto rounded-[var(--r)] border border-[var(--border-ed)]">
+              <table className="w-full min-w-[780px] text-[11px] font-mono">
+                <thead>
+                  <tr className="border-b border-[var(--border-ed)] bg-[var(--subtle)]">
+                    <th className="px-3 py-2 text-left font-sans text-[10px] font-bold uppercase tracking-[0.06em] text-[var(--ink-3)]">Leeftijd</th>
+                    <th className="px-3 py-2 text-left font-sans text-[10px] font-bold uppercase tracking-[0.06em] text-[var(--ink-3)]">Fase</th>
+                    <th className="px-3 py-2 text-right font-sans text-[10px] font-bold uppercase tracking-[0.06em] text-[var(--ink-3)]">Begin</th>
+                    <th className="px-3 py-2 text-right font-sans text-[10px] font-bold uppercase tracking-[0.06em] text-[var(--ink-3)]">Rendement</th>
+                    <th className="px-3 py-2 text-right font-sans text-[10px] font-bold uppercase tracking-[0.06em] text-[var(--ink-3)]">Inleg/Opname</th>
+                    <th className="px-3 py-2 text-right font-sans text-[10px] font-bold uppercase tracking-[0.06em] text-[var(--ink-3)]">Levensgebeur&shy;tenissen</th>
+                    <th className="px-3 py-2 text-right font-sans text-[10px] font-bold uppercase tracking-[0.06em] text-[var(--ink-3)]">Cumulatief LE</th>
+                    <th className="px-3 py-2 text-right font-sans text-[10px] font-bold uppercase tracking-[0.06em] text-[var(--ink-3)]">Eind</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(() => {
+                    let cumLifeEvent = 0
+                    return rows.map((row, i) => {
+                      cumLifeEvent += row.cashflowNet + row.oneTimeNet
+                      const isFireRow = fireAge !== null && row.age === fireAge && row.phase === 'retirement'
+                      const isAccumulation = row.phase === 'accumulation'
+                      return (
+                        <tr
+                          key={i}
+                          className={`border-b border-[var(--border-ed)] ${
+                            isFireRow
+                              ? 'bg-horizon-50/80 font-bold'
+                              : isAccumulation
+                              ? 'bg-[var(--paper)]'
+                              : 'bg-kern-50/30'
+                          }`}
+                        >
+                          <td className="px-3 py-1.5 text-[var(--ink)]">
+                            {row.age}
+                            {isFireRow && (
+                              <span className="ml-1.5 font-sans text-[9px] font-bold uppercase tracking-wide text-horizon-600">
+                                FIRE
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-3 py-1.5">
+                            <span className={`font-sans text-[10px] font-medium ${isAccumulation ? 'text-horizon-700' : strategy === 'perpetual' ? 'text-horizon-700' : 'text-kern-700'}`}>
+                              {isAccumulation ? 'Opbouw' : strategy === 'perpetual' ? 'Behoud' : 'Afbouw'}
+                            </span>
+                          </td>
+                          <td className="px-3 py-1.5 tabular-nums text-right text-[var(--ink-2)]">
+                            {fmt(row.startPortfolio)}
+                          </td>
+                          <td className="px-3 py-1.5 tabular-nums text-right text-horizon-700">
+                            +{fmt(row.growth)}
+                          </td>
+                          <td className="px-3 py-1.5 tabular-nums text-right">
+                            {isAccumulation ? (
+                              <span className="text-horizon-700">+{fmt(row.savings)}</span>
+                            ) : (
+                              <span className="text-kern-700">−{fmt(row.withdrawal)}</span>
+                            )}
+                          </td>
+                          <td className={`px-3 py-1.5 tabular-nums text-right ${
+                            (row.cashflowNet + row.oneTimeNet) > 0 ? 'text-horizon-700'
+                            : (row.cashflowNet + row.oneTimeNet) < 0 ? 'text-kern-700'
+                            : 'text-[var(--ink-4)]'
+                          }`}>
+                            {(row.cashflowNet + row.oneTimeNet) !== 0
+                              ? <>{(row.cashflowNet + row.oneTimeNet) > 0 ? '+' : ''}{fmt(row.cashflowNet + row.oneTimeNet)}</>
+                              : <span className="text-[var(--ink-4)]">—</span>
+                            }
+                          </td>
+                          <td className={`px-3 py-1.5 tabular-nums text-right font-medium ${
+                            cumLifeEvent > 0 ? 'text-horizon-800'
+                            : cumLifeEvent < 0 ? 'text-kern-800'
+                            : 'text-[var(--ink-4)]'
+                          }`}>
+                            {cumLifeEvent !== 0
+                              ? <>{cumLifeEvent > 0 ? '+' : ''}{fmt(cumLifeEvent)}</>
+                              : <span className="text-[var(--ink-4)]">—</span>
+                            }
+                          </td>
+                          <td className="px-3 py-1.5 tabular-nums text-right font-semibold text-[var(--ink)]">
+                            {fmt(row.endPortfolio)}
+                          </td>
+                        </tr>
+                      )
+                    })
+                  })()}
+                </tbody>
+              </table>
+
+              {/* Tabel legenda */}
+              <div className="border-t border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2 font-sans text-[10px] text-[var(--ink-4)]">
+                <strong className="text-[var(--ink-3)]">Levensgebeurtenissen</strong> = netto jaarlijks bedrag van actieve kasstromen (AOW, pensioen, etc.) in dat jaar.{' '}
+                <strong className="text-[var(--ink-3)]">Cumulatief LE</strong> = oplopend totaal van alle levensgebeurtenis-kasstromen t/m dat jaar.
+                Bedragen zijn nominaal (inclusief 2% inflatie per jaar).
+                {fireAgeFractional !== null && (
+                  <span className="ml-1">
+                    FIRE-moment op leeftijd <strong className="text-horizon-600">{fireAgeFractional.toFixed(1)}</strong> via fractionele interpolatie.
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Samenvattingsregel als tabel ingeklapt */}
+          {!tableExpanded && (
+            <div className="mt-2 grid grid-cols-3 gap-3">
+              <div className="rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--subtle)]/60 p-2.5 text-center">
+                <p className="font-sans text-[10px] text-[var(--ink-4)]">Opbouwjaren</p>
+                <p className="font-mono text-base font-semibold text-horizon-700">{accumulationRows.length}</p>
+              </div>
+              <div className="rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--subtle)]/60 p-2.5 text-center">
+                <p className="font-sans text-[10px] text-[var(--ink-4)]">{strategy === 'perpetual' ? 'Behoudjaren' : 'Afbouwjaren'}</p>
+                <p className={`font-mono text-base font-semibold ${strategy === 'perpetual' ? 'text-horizon-700' : 'text-kern-700'}`}>{retirementRows.length}</p>
+              </div>
+              <div className="rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--subtle)]/60 p-2.5 text-center">
+                <p className="font-sans text-[10px] text-[var(--ink-4)]">Totaal AOW</p>
+                <p className="font-mono text-base font-semibold text-[var(--ink)]">
+                  {retirementRows.filter(r => r.age >= 67).length} jaar
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* 2. Grafiek — blijft zichtbaar (de eigen vermogenslijn + legenda) */}
         <div>
@@ -254,7 +392,7 @@ export const SimChartModal = memo(function SimChartModal({
               <Wrench className="h-4 w-4 text-[var(--ink-4)]" />
               <span className="label-editorial text-[var(--ink-3)]">ONDER DE MOTORKAP</span>
               <span className="font-sans text-[11px] normal-case text-[var(--ink-4)]">
-                onderbouwing &amp; jaar-op-jaar
+                onderbouwing
               </span>
             </span>
             {motorkapExpanded
@@ -459,150 +597,6 @@ export const SimChartModal = memo(function SimChartModal({
             Simulatie-engine &middot; {methodLabel(retirementExpenseMethod)} &middot; {new Date().toLocaleDateString('nl-NL')}
           </p>
         </KassabonShell>
-
-        {/* Jaar-op-jaar tabel */}
-        <div>
-          <button
-            type="button"
-            onClick={() => setTableExpanded(v => !v)}
-            className="flex w-full items-center justify-between gap-2 text-left"
-            aria-expanded={tableExpanded}
-          >
-            <p className="label-editorial text-[var(--ink-3)]">
-              JAAR-OP-JAAR VERLOOP
-              <span className="ml-2 font-mono text-[10px] normal-case text-[var(--ink-4)]">
-                ({rows.length} jaar)
-              </span>
-            </p>
-            {tableExpanded
-              ? <ChevronUp className="h-4 w-4 text-[var(--ink-4)]" />
-              : <ChevronDown className="h-4 w-4 text-[var(--ink-4)]" />
-            }
-          </button>
-
-          {tableExpanded && (
-            <div className="mt-3 overflow-x-auto rounded-[var(--r)] border border-[var(--border-ed)]">
-              <table className="w-full min-w-[780px] text-[11px] font-mono">
-                <thead>
-                  <tr className="border-b border-[var(--border-ed)] bg-[var(--subtle)]">
-                    <th className="px-3 py-2 text-left font-sans text-[10px] font-bold uppercase tracking-[0.06em] text-[var(--ink-3)]">Leeftijd</th>
-                    <th className="px-3 py-2 text-left font-sans text-[10px] font-bold uppercase tracking-[0.06em] text-[var(--ink-3)]">Fase</th>
-                    <th className="px-3 py-2 text-right font-sans text-[10px] font-bold uppercase tracking-[0.06em] text-[var(--ink-3)]">Begin</th>
-                    <th className="px-3 py-2 text-right font-sans text-[10px] font-bold uppercase tracking-[0.06em] text-[var(--ink-3)]">Rendement</th>
-                    <th className="px-3 py-2 text-right font-sans text-[10px] font-bold uppercase tracking-[0.06em] text-[var(--ink-3)]">Inleg/Opname</th>
-                    <th className="px-3 py-2 text-right font-sans text-[10px] font-bold uppercase tracking-[0.06em] text-[var(--ink-3)]">Levensgebeur&shy;tenissen</th>
-                    <th className="px-3 py-2 text-right font-sans text-[10px] font-bold uppercase tracking-[0.06em] text-[var(--ink-3)]">Cumulatief LE</th>
-                    <th className="px-3 py-2 text-right font-sans text-[10px] font-bold uppercase tracking-[0.06em] text-[var(--ink-3)]">Eind</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(() => {
-                    let cumLifeEvent = 0
-                    return rows.map((row, i) => {
-                      cumLifeEvent += row.cashflowNet + row.oneTimeNet
-                      const isFireRow = fireAge !== null && row.age === fireAge && row.phase === 'retirement'
-                      const isAccumulation = row.phase === 'accumulation'
-                      return (
-                        <tr
-                          key={i}
-                          className={`border-b border-[var(--border-ed)] ${
-                            isFireRow
-                              ? 'bg-horizon-50/80 font-bold'
-                              : isAccumulation
-                              ? 'bg-[var(--paper)]'
-                              : 'bg-kern-50/30'
-                          }`}
-                        >
-                          <td className="px-3 py-1.5 text-[var(--ink)]">
-                            {row.age}
-                            {isFireRow && (
-                              <span className="ml-1.5 font-sans text-[9px] font-bold uppercase tracking-wide text-horizon-600">
-                                FIRE
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-3 py-1.5">
-                            <span className={`font-sans text-[10px] font-medium ${isAccumulation ? 'text-horizon-700' : strategy === 'perpetual' ? 'text-horizon-700' : 'text-kern-700'}`}>
-                              {isAccumulation ? 'Opbouw' : strategy === 'perpetual' ? 'Behoud' : 'Afbouw'}
-                            </span>
-                          </td>
-                          <td className="px-3 py-1.5 tabular-nums text-right text-[var(--ink-2)]">
-                            {fmt(row.startPortfolio)}
-                          </td>
-                          <td className="px-3 py-1.5 tabular-nums text-right text-horizon-700">
-                            +{fmt(row.growth)}
-                          </td>
-                          <td className="px-3 py-1.5 tabular-nums text-right">
-                            {isAccumulation ? (
-                              <span className="text-horizon-700">+{fmt(row.savings)}</span>
-                            ) : (
-                              <span className="text-kern-700">−{fmt(row.withdrawal)}</span>
-                            )}
-                          </td>
-                          <td className={`px-3 py-1.5 tabular-nums text-right ${
-                            (row.cashflowNet + row.oneTimeNet) > 0 ? 'text-horizon-700'
-                            : (row.cashflowNet + row.oneTimeNet) < 0 ? 'text-kern-700'
-                            : 'text-[var(--ink-4)]'
-                          }`}>
-                            {(row.cashflowNet + row.oneTimeNet) !== 0
-                              ? <>{(row.cashflowNet + row.oneTimeNet) > 0 ? '+' : ''}{fmt(row.cashflowNet + row.oneTimeNet)}</>
-                              : <span className="text-[var(--ink-4)]">—</span>
-                            }
-                          </td>
-                          <td className={`px-3 py-1.5 tabular-nums text-right font-medium ${
-                            cumLifeEvent > 0 ? 'text-horizon-800'
-                            : cumLifeEvent < 0 ? 'text-kern-800'
-                            : 'text-[var(--ink-4)]'
-                          }`}>
-                            {cumLifeEvent !== 0
-                              ? <>{cumLifeEvent > 0 ? '+' : ''}{fmt(cumLifeEvent)}</>
-                              : <span className="text-[var(--ink-4)]">—</span>
-                            }
-                          </td>
-                          <td className="px-3 py-1.5 tabular-nums text-right font-semibold text-[var(--ink)]">
-                            {fmt(row.endPortfolio)}
-                          </td>
-                        </tr>
-                      )
-                    })
-                  })()}
-                </tbody>
-              </table>
-
-              {/* Tabel legenda */}
-              <div className="border-t border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2 font-sans text-[10px] text-[var(--ink-4)]">
-                <strong className="text-[var(--ink-3)]">Levensgebeurtenissen</strong> = netto jaarlijks bedrag van actieve kasstromen (AOW, pensioen, etc.) in dat jaar.{' '}
-                <strong className="text-[var(--ink-3)]">Cumulatief LE</strong> = oplopend totaal van alle levensgebeurtenis-kasstromen t/m dat jaar.
-                Bedragen zijn nominaal (inclusief 2% inflatie per jaar).
-                {fireAgeFractional !== null && (
-                  <span className="ml-1">
-                    FIRE-moment op leeftijd <strong className="text-horizon-600">{fireAgeFractional.toFixed(1)}</strong> via fractionele interpolatie.
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Samenvattingsregel als tabel ingeklapt */}
-          {!tableExpanded && (
-            <div className="mt-2 grid grid-cols-3 gap-3">
-              <div className="rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--subtle)]/60 p-2.5 text-center">
-                <p className="font-sans text-[10px] text-[var(--ink-4)]">Opbouwjaren</p>
-                <p className="font-mono text-base font-semibold text-horizon-700">{accumulationRows.length}</p>
-              </div>
-              <div className="rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--subtle)]/60 p-2.5 text-center">
-                <p className="font-sans text-[10px] text-[var(--ink-4)]">{strategy === 'perpetual' ? 'Behoudjaren' : 'Afbouwjaren'}</p>
-                <p className={`font-mono text-base font-semibold ${strategy === 'perpetual' ? 'text-horizon-700' : 'text-kern-700'}`}>{retirementRows.length}</p>
-              </div>
-              <div className="rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--subtle)]/60 p-2.5 text-center">
-                <p className="font-sans text-[10px] text-[var(--ink-4)]">Totaal AOW</p>
-                <p className="font-mono text-base font-semibold text-[var(--ink)]">
-                  {retirementRows.filter(r => r.age >= 67).length} jaar
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
 
           </div>
           )}
