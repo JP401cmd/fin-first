@@ -16,8 +16,11 @@ import { join } from 'node:path'
 /** De preset-batch (E12) en de grendel wonen sinds ADR 0179 fase 1 stap 13 in de sim-hook. */
 const SOURCE_PATH = join(process.cwd(), 'components', 'toekomst', 'state', 'use-toekomst-sim.ts')
 const src = readFileSync(SOURCE_PATH, 'utf8')
-/** De host geeft de grendel-setter aan het Plan-blad. */
-const host = readFileSync(join(process.cwd(), 'components', 'toekomst', 'plan', 'plan-paneel.tsx'), 'utf8')
+/**
+ * De host geeft de grendel-setter aan het paneel met de scenario-kaarten. Sinds ADR 0179
+ * fase 4 staat dat in katern Doelen ("Andere paden naast je doelscenario").
+ */
+const host = readFileSync(join(process.cwd(), 'components', 'toekomst', 'doelen', 'andere-paden.tsx'), 'utf8')
 
 function presetEffect(): string {
   const gate = src.indexOf('const presetBatchNodig')
@@ -38,7 +41,7 @@ describe('preset-batch onder een vast anker wacht niet op scrollen', () => {
     expect(src).not.toContain("if (displayMode !== 'full' || !duidingInView) {")
   })
 
-  it('duidingInView is een grendel: PlanVerdieping meldt "in beeld", de ouder zet hem nooit terug (kaart V1)', () => {
+  it('duidingInView is een grendel: AnderePaden meldt "in beeld", de ouder zet hem nooit terug (kaart V1)', () => {
     // Sinds fase 1 stap 10 (ADR 0179) draait useInViewOnce in PlanVerdieping, naast de
     // sectie. Zou de ouder de vlag ooit terugzetten, dan vallen scenarioPresets en
     // haalbareUitgave weg zodra het Plan-paneel ontkoppelt (GW3a).

@@ -4,6 +4,7 @@ import { getToekomstClient, loadToekomstFinData } from '@/lib/toekomst/load-toek
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { DoelenView } from '@/components/future/doelen-view'
 import { DoelenKaternLab } from '@/components/toekomst/doelen/doelen-katern-lab'
+import { DoelenAnderePaden } from '@/components/toekomst/doelen/andere-paden'
 
 export const metadata: Metadata = {
   title: 'Doelen — TriFinity',
@@ -53,6 +54,8 @@ export default async function ToekomstDoelenPage() {
           labPlan={finData.labPlan}
         />
       </div>
+      {/* III · Andere paden naast je doelscenario (fase 4): de scenario-kaarten, lazy. */}
+      <DoelenAnderePaden />
     </>
   )
 }

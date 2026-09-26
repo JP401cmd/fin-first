@@ -78,9 +78,6 @@ export function PlanPaneel() {
     healthScore,
     solvedRun,
     haalbareUitgave,
-    scenarioPresets,
-    scenarioPresetsLoading,
-    markeerDuidingInView,
     simResult,
     simCashflows,
     simError,
@@ -114,7 +111,6 @@ export function PlanPaneel() {
     viewEffectiveFireTarget,
     viewVermogenOpAnker,
     viewMonthlyWithdrawalAtAow,
-    viewScenarioPresets,
     viewHouseholdHeroFireTarget,
     viewPartnerHeroFireTarget,
   } = useToekomstEuroContext()
@@ -382,14 +378,7 @@ export function PlanPaneel() {
         </section>
       )}
 
-      <PlanVerdieping
-        hasRun={simResult != null}
-        scenarioPresets={scenarioPresets}
-        scenarioPresetsLoading={scenarioPresetsLoading}
-        viewScenarioPresets={viewScenarioPresets}
-        personalHeroProjection={personalHeroProjection}
-        onDuidingInView={markeerDuidingInView}
-      />
+      <PlanVerdieping personalHeroProjection={personalHeroProjection} />
 
       {/* Links-rij van Plan (spec §4.3/§4.9): alleen de jaar-op-jaar-tabel. "Zo werkt je
           grafiek" heeft één ingang, de i op het canvas. In beide weergavemodi (§4.7). */}
