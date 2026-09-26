@@ -6,10 +6,9 @@ import {
   computePageStatusInfo,
   normalizePageStatusRoute,
   normalizeMinimizeKey,
-  asMinimizedLevel,
+  narrowMinimizeValue,
   readMinimizedLevel,
   ROUTE_FAMILY,
-  NUMERIC_MINIMIZE_NARROWERS,
 } from '@/lib/page-status/compute'
 import {
   statusCacheKey,
@@ -108,7 +107,8 @@ export async function GET(request: NextRequest) {
  * Schrijft read-modify-write op de jsonb-map in de EIGEN profielrij
  * (`.eq('id', user.id)`, RLS-scoped, anon-client). Nooit een service-role-client.
  * Valideert `route` via `normalizeMinimizeKey`: de GET-allowlist plus de extra
- * pref-only sleutels — de GET-scope groeit daar bewust NIET mee.
+ * pref-only sleutels (numeriek, en de drie katern-routes van /toekomst met een
+ * stoplicht-niveau) — de GET-scope groeit daar bewust NIET mee.
  */
 export async function PUT(request: NextRequest) {
   try {
@@ -140,6 +140,8 @@ export async function PUT(request: NextRequest) {
 
     // Het "niveau" is sleutel-afhankelijk:
     //  - /overzicht-routes    → stoplicht-niveau 'warn' | 'bad' | 'info'.
+    //  - katern-routes /toekomst, /toekomst/doelen, /toekomst/instellingen
+    //    (ADR 0179 D6)        → idem stoplicht-niveau; GEEN GET-status.
     //  - tekort-lening        → de PIEK (afgerond, nominaal) waarop geminimaliseerd
     //    werd; escalatie = een materieel hogere piek (zie deficit-loan-minimize).
     //  - gegevens-verouderd   → het aantal MAANDEN achterstand waarop
@@ -148,8 +150,7 @@ export async function PUT(request: NextRequest) {
     // Alle mogen null zijn (voorkeur wissen → melding weer tonen).
     let level: MinimizedLevel | number | null = null
     if (body.level !== null) {
-      const narrowNumeric = NUMERIC_MINIMIZE_NARROWERS.get(route)
-      level = narrowNumeric ? narrowNumeric(body.level) : asMinimizedLevel(body.level)
+      level = narrowMinimizeValue(route, body.level)
       if (level === null) {
         return NextResponse.json({ error: 'Ongeldig niveau' }, { status: 400 })
       }

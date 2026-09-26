@@ -25,9 +25,9 @@ import type { BannerDisplay, MinimizedLevel } from '@/lib/page-status/display'
  * - Optimistisch met terugrol bij een fout, en de terugrol alleen zolang het katern
  *   nog hetzelfde is (spiegel van `PageStatusProvider`).
  *
- * LET OP (fase 2): de schrijf-allowlist (`normalizeMinimizeKey` in
- * `lib/page-status/compute.ts`) kent de drie katern-routes nog niet. Tot die erbij
- * staan antwoordt de PUT 400 en rolt de hook terug.
+ * De schrijf-allowlist kent de drie katern-routes als `STOPLICHT_MINIMIZE_KEYS`
+ * (`lib/page-status/compute.ts`): de PUT neemt ze aan met 'warn' | 'bad' | 'info',
+ * zonder dat de GET-scope meegroeit.
  */
 export interface KaternMeldingMinimize {
   display: BannerDisplay | 'none'

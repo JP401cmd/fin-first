@@ -19,7 +19,11 @@ import {
   normalizeMinimizeKey,
   EXTRA_MINIMIZE_KEYS,
   NUMERIC_MINIMIZE_NARROWERS,
+  STOPLICHT_MINIMIZE_KEYS,
+  ROUTE_FAMILY,
+  narrowMinimizeValue,
 } from '@/lib/page-status/compute'
+import { KATERN_ROUTE } from '@/lib/horizon/katern-meldingen'
 import { DEFICIT_NOTICE_MINIMIZE_KEY } from '@/lib/horizon/deficit-loan-minimize'
 import { STALE_TX_NOTICE_MINIMIZE_KEY } from '@/lib/transaction-staleness-minimize'
 import { AOW_NOTICE_MINIMIZE_KEY } from '@/lib/horizon/aow-notice-minimize'
@@ -121,8 +125,61 @@ describe('normalizeMinimizeKey — schrijf-allowlist', () => {
   })
 
   it('weigert onbekende sleutels', () => {
-    expect(normalizeMinimizeKey('/toekomst')).toBeNull()
     expect(normalizeMinimizeKey('/toekomst/verzonnen')).toBeNull()
+    expect(normalizeMinimizeKey('/toekomst/doelen/x')).toBeNull()
+    expect(normalizeMinimizeKey('/toekomst/instellingen?regel=aow')).toBeNull()
+    expect(normalizeMinimizeKey('/toekomst//')).toBeNull()
+    expect(normalizeMinimizeKey('/TOEKOMST')).toBeNull()
+    expect(normalizeMinimizeKey('toekomst')).toBeNull()
     expect(normalizeMinimizeKey(null)).toBeNull()
+  })
+})
+
+describe('STOPLICHT_MINIMIZE_KEYS — de drie katern-routes van /toekomst (ADR 0179 D6)', () => {
+  it('is precies de set katern-routes uit KATERN_ROUTE', () => {
+    expect([...STOPLICHT_MINIMIZE_KEYS].sort()).toEqual(
+      ['/toekomst', '/toekomst/doelen', '/toekomst/instellingen'],
+    )
+    expect([...STOPLICHT_MINIMIZE_KEYS].sort()).toEqual(
+      [...Object.values(KATERN_ROUTE)].sort(),
+    )
+  })
+
+  it('laat elke katern-route door in de schrijf-allowlist (met en zonder trailing slash)', () => {
+    for (const sleutel of STOPLICHT_MINIMIZE_KEYS) {
+      expect(normalizeMinimizeKey(sleutel)).toBe(sleutel)
+      expect(normalizeMinimizeKey(`${sleutel}/`)).toBe(sleutel)
+    }
+  })
+
+  it('de GET-scope groeit niet mee: geen ROUTE_FAMILY-entry, geen status', () => {
+    for (const sleutel of STOPLICHT_MINIMIZE_KEYS) {
+      expect(normalizePageStatusRoute(sleutel), sleutel).toBeNull()
+      expect(Object.prototype.hasOwnProperty.call(ROUTE_FAMILY, sleutel)).toBe(false)
+    }
+  })
+
+  it('staat los van de numerieke sleutels (geen narrower, niet in EXTRA_MINIMIZE_KEYS)', () => {
+    for (const sleutel of STOPLICHT_MINIMIZE_KEYS) {
+      expect(EXTRA_MINIMIZE_KEYS).not.toContain(sleutel)
+      expect(NUMERIC_MINIMIZE_NARROWERS.has(sleutel)).toBe(false)
+    }
+  })
+
+  it('smalt naar een stoplicht-niveau en weigert al het andere', () => {
+    for (const sleutel of STOPLICHT_MINIMIZE_KEYS) {
+      expect(narrowMinimizeValue(sleutel, 'warn')).toBe('warn')
+      expect(narrowMinimizeValue(sleutel, 'bad')).toBe('bad')
+      expect(narrowMinimizeValue(sleutel, 'info')).toBe('info')
+      for (const ongeldig of ['good', 'neutral', 'WARN', '', 1, 0, true, {}, [], undefined]) {
+        expect(narrowMinimizeValue(sleutel, ongeldig), String(ongeldig)).toBeNull()
+      }
+    }
+  })
+
+  it('numerieke sleutels blijven hun eigen narrower houden', () => {
+    expect(narrowMinimizeValue(DEFICIT_NOTICE_MINIMIZE_KEY, 'warn')).toBeNull()
+    expect(narrowMinimizeValue('/overzicht/budget', 'warn')).toBe('warn')
+    expect(narrowMinimizeValue('/overzicht/budget', 5)).toBeNull()
   })
 })

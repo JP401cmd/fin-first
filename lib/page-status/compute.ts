@@ -142,17 +142,56 @@ export const EXTRA_MINIMIZE_KEYS: readonly string[] = [
 ]
 
 /**
+ * Pref-only sleutels die een STOPLICHT-niveau dragen ('warn' | 'bad' | 'info'),
+ * net als de /overzicht-routes, maar GEEN /overzicht-status hebben: de drie
+ * katernen van /toekomst (ADR 0179 D6). Hun meldingen komen uit data die de
+ * pagina zelf al heeft; minimaliseren gebruikt de bestaande
+ * `status_banner_minimized`-pref met de katern-route als sleutel
+ * (`KATERN_ROUTE` in `lib/horizon/katern-meldingen.ts`, pariteit getest).
+ *
+ * Bewust een aparte, expliciete lijst — en NIET in:
+ *  - `ROUTE_FAMILY`: dan zou de GET er een statusberekening voor gaan doen en
+ *    groeit de lees-scope stil mee;
+ *  - `EXTRA_MINIMIZE_KEYS`: die lijst is per definitie de set met een NUMERIEKE
+ *    narrower (pariteitstest), en deze sleutels dragen geen getal.
+ * Letterlijke strings i.p.v. een import van `KATERN_ROUTE`: compute.ts is de
+ * schrijf-allowlist van een API-route en hoort niet mee te groeien met een
+ * UI-constante; de test pint dat beide gelijk blijven.
+ */
+export const STOPLICHT_MINIMIZE_KEYS: readonly string[] = [
+  '/toekomst',
+  '/toekomst/doelen',
+  '/toekomst/instellingen',
+]
+
+/**
  * Allowlist voor het SCHRIJFPAD (PUT): de /overzicht-routes uit ROUTE_FAMILY
- * plus de extra pref-only sleutels hierboven. Bewust een aparte functie naast
- * `normalizePageStatusRoute` (die de LEES-scope van de status bewaakt), zodat de
- * GET niet stilzwijgend meegroeit met sleutels die geen status hebben.
+ * plus de pref-only sleutels hierboven (numeriek én stoplicht). Bewust een
+ * aparte functie naast `normalizePageStatusRoute` (die de LEES-scope van de
+ * status bewaakt), zodat de GET niet stilzwijgend meegroeit met sleutels die
+ * geen status hebben.
  */
 export function normalizeMinimizeKey(raw: string | null): string | null {
   if (!raw) return null
   const trimmed = raw.length > 1 && raw.endsWith('/') ? raw.slice(0, -1) : raw
   // Zie normalizePageStatusRoute: prototype-sleutels mogen de allowlist niet passeren.
   if (Object.prototype.hasOwnProperty.call(ROUTE_FAMILY, trimmed)) return trimmed
+  if (STOPLICHT_MINIMIZE_KEYS.includes(trimmed)) return trimmed
   return EXTRA_MINIMIZE_KEYS.includes(trimmed) ? trimmed : null
+}
+
+/**
+ * Smalt het "niveau" uit de PUT-body voor een AL GENORMALISEERDE sleutel:
+ * de numerieke narrower van die sleutel als hij er één heeft, anders het
+ * stoplicht-niveau (`asMinimizedLevel`) — voor de /overzicht-routes én de
+ * `STOPLICHT_MINIMIZE_KEYS`. Eén plek, zodat de route geen eigen keuze maakt.
+ */
+export function narrowMinimizeValue(
+  key: string,
+  value: unknown,
+): MinimizedLevel | number | null {
+  const narrowNumeric = NUMERIC_MINIMIZE_NARROWERS.get(key)
+  return narrowNumeric ? narrowNumeric(value) : asMinimizedLevel(value)
 }
 
 /** Smalt een onbekende jsonb-waarde tot een geldig minimized-niveau (of null). */
