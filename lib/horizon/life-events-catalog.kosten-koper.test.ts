@@ -83,3 +83,26 @@ describe('catalogus Huis kopen — kosten koper volgt de motor', () => {
     expect(impactRange).not.toBe('€15K–€40K kosten koper')
   })
 })
+
+describe('catalogus Huis kopen — het startbedrag volgt de motor', () => {
+  /** De standaardwaarde van een catalogusveld van Huis kopen. */
+  const veld = (key: string) => entry.fields?.find((f) => f.key === key)?.default
+
+  it('given de velddefaults van Huis kopen, when een nieuwe gebeurtenis start, then is defaultCost wat computeKostenKoper daarmee rekent', () => {
+    // Het startbedrag van een nieuwe gebeurtenis (EventPane, prefill, lokale extractie)
+    // is defaultCost. Het verhaal rekent met dezelfde velddefaults via de motor; een los
+    // bedrag ernaast spreekt de motor tegen zodra die verandert.
+    const verwachtTotaal = computeKostenKoper({
+      aankoopprijs: Number(veld('aankoopprijs')),
+      isStarter: veld('eersteWoning') === true,
+      hasNHG: veld('nhg') === true,
+    }).totaal
+    expect(entry.defaultCost).toBe(verwachtTotaal)
+  })
+
+  it('valt binnen de bandbreedte die de catalogus noemt', () => {
+    const [laag, hoog] = bandInK(impactRange)
+    expect(entry.defaultCost).toBeGreaterThanOrEqual(laag - 500)
+    expect(entry.defaultCost).toBeLessThanOrEqual(hoog + 500)
+  })
+})
