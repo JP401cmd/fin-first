@@ -209,6 +209,15 @@ export const ANKER_KPI_LABEL_KORT = 'Reikt tot'
 export const ANKER_VERMOGEN_TEGEL_ONDERSCHRIFT = 'zonder je huis, na schulden'
 
 /**
+ * Dezelfde tegel zonder eigen woning (FX-D). "zonder je huis" suggereert dan een woning
+ * die er niet is; wat overblijft is de vraag die het onderschrift beantwoordt: zijn de
+ * schulden er al af? De keuze valt in `doelbedragOnderschrift` op
+ * `housingContext.hasEigenHuis`, dezelfde bron als het Doelbedrag onder een gesolved
+ * anker (C3).
+ */
+export const ANKER_VERMOGEN_TEGEL_ONDERSCHRIFT_ZONDER_WONING = 'na schulden'
+
+/**
  * Wat er in een RAPPORTAGE in de plaats komt van "FIRE-voortgang X %" zodra het
  * stopmoment vastligt (ADR 0129 B3/D4).
  *

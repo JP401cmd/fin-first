@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import { FIRE_DOEL_ONDERSCHRIFT } from '@/lib/horizon/fire-doel-weergave'
-import { ANKER_VERMOGEN_TEGEL_ONDERSCHRIFT } from '@/lib/horizon/anker-copy'
+import {
+  ANKER_VERMOGEN_TEGEL_ONDERSCHRIFT,
+  ANKER_VERMOGEN_TEGEL_ONDERSCHRIFT_ZONDER_WONING,
+} from '@/lib/horizon/anker-copy'
 import { doelbedragOnderschrift } from './plan-helpers'
 
 /**
@@ -29,5 +32,25 @@ describe('doelbedragOnderschrift', () => {
       ANKER_VERMOGEN_TEGEL_ONDERSCHRIFT,
     )
     expect(doelbedragOnderschrift({ ...basis, hasPerspectiveHero: true, grondslag: 'incl-huis' })).toBe('benodigd')
+  })
+
+  /**
+   * Vast anker zonder eigen woning (FX-D punt 6): de tegel zei "zonder je huis, na
+   * schulden" ook als er geen huis is. Dan noemt hij alleen "na schulden"; met een huis
+   * blijft de volle grondslag staan. Zelfde bron als het Doelbedrag: `hasEigenHuis`.
+   */
+  it('vast anker zonder eigen woning: "na schulden", geen huis', () => {
+    for (const grondslag of ['incl-huis', 'excl-huis'] as const) {
+      const tekst = doelbedragOnderschrift({ ...basis, isFixedAnchorMode: true, heeftEigenHuis: false, grondslag })
+      expect(tekst).toBe(ANKER_VERMOGEN_TEGEL_ONDERSCHRIFT_ZONDER_WONING)
+      expect(tekst).toBe('na schulden')
+      expect(tekst).not.toMatch(/huis/)
+    }
+  })
+
+  it('vast anker met eigen woning: de volle grondslag', () => {
+    expect(doelbedragOnderschrift({ ...basis, isFixedAnchorMode: true, grondslag: 'excl-huis' })).toBe(
+      'zonder je huis, na schulden',
+    )
   })
 })

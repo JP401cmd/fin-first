@@ -154,7 +154,10 @@ describe('horizon-client — de vermogenstegel onder een vast anker noemt haar g
     // anker-modus door, de helper zet onder een vast anker de anker-copy-constante.
     const helpers = readFileSync(join(process.cwd(), 'components', 'toekomst', 'plan', 'plan-helpers.tsx'), 'utf8')
     expect(helpers).toMatch(/import \{[^}]*ANKER_VERMOGEN_TEGEL_ONDERSCHRIFT[^}]*\} from '@\/lib\/horizon\/anker-copy'/)
-    expect(helpers).toMatch(/if \(input\.isFixedAnchorMode\) return ANKER_VERMOGEN_TEGEL_ONDERSCHRIFT/)
+    // FX-D: zonder eigen woning de variant zonder "zonder je huis" (gedrag in plan-helpers.test.ts).
+    expect(helpers).toMatch(
+      /if \(input\.isFixedAnchorMode\) \{\s*return input\.heeftEigenHuis \? ANKER_VERMOGEN_TEGEL_ONDERSCHRIFT : ANKER_VERMOGEN_TEGEL_ONDERSCHRIFT_ZONDER_WONING/,
+    )
     expect(host).toMatch(/const fireTargetCaption = doelbedragOnderschrift\(\{\s*\r?\n\s*isFixedAnchorMode,/)
     // De losse zin mag alleen nog in de constante leven (commentaar uitgezonderd).
     const losseRegels = [source, host].join('\n')

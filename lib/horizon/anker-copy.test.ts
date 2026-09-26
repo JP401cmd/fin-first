@@ -56,6 +56,7 @@ import {
   eindvermogenGoalName,
   eindvermogenVastgelegdToast,
   ANKER_VERMOGEN_TEGEL_ONDERSCHRIFT,
+  ANKER_VERMOGEN_TEGEL_ONDERSCHRIFT_ZONDER_WONING,
   rapportAnkerVoortgang,
   type AnkerReach,
   type AnkerStop,
@@ -174,6 +175,13 @@ describe('woorden — stopmoment en titel', () => {
     expect(ANKER_VERMOGEN_TEGEL_ONDERSCHRIFT).not.toMatch(/stopmoment/i)
     // Geen doel-woord: onder een vast anker bestaat er geen doelbedrag (ADR 0129 D4).
     expect(ANKER_VERMOGEN_TEGEL_ONDERSCHRIFT).not.toMatch(/benodigd|doel/i)
+  })
+
+  it('zonder eigen woning noemt het onderschrift alleen de schulden (FX-D)', () => {
+    // "zonder je huis" bij een account zonder huis suggereert een woning die er niet is.
+    expect(ANKER_VERMOGEN_TEGEL_ONDERSCHRIFT_ZONDER_WONING).toBe('na schulden')
+    expect(ANKER_VERMOGEN_TEGEL_ONDERSCHRIFT).toContain(ANKER_VERMOGEN_TEGEL_ONDERSCHRIFT_ZONDER_WONING)
+    expect(ANKER_VERMOGEN_TEGEL_ONDERSCHRIFT_ZONDER_WONING).not.toMatch(/huis|liquide|stopmoment|benodigd|doel/i)
   })
 })
 
