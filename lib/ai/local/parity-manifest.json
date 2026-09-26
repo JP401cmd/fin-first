@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-19T14:18:38.915Z",
+  "generatedAt": "2026-09-26T12:01:25.409Z",
   "dnaSubBudget": 2000,
   "dnaEstimatedTokens": 999,
   "sources": [
@@ -41,7 +41,7 @@
       "sources": [
         {
           "file": "lib/briefing/redactie.ts",
-          "sha256": "4744a61c2de26316746e5f4c15743c1f1b5692873dd380c7f40bb89c5979fb47"
+          "sha256": "765fd025e649a792b114c2f2f8cb8599200b808beca3e5d83b045ebbc8bc9028"
         },
         {
           "file": "lib/ai/dna/base.ts",
@@ -109,7 +109,7 @@
       "sources": [
         {
           "file": "lib/ai/build-calculator.ts",
-          "sha256": "29811a34ae23c220558aefa5a5e55ed7dd810334ca3752266f89cafb09ca69f6"
+          "sha256": "309f151398b5c4507ff560a5f9622fb55052dbc9691c99861f1dac452e424153"
         }
       ]
     },
