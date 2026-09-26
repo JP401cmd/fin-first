@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
+import { stringify } from 'node:querystring'
+import {
+  matchHas,
+  prepareDestination,
+} from 'next/dist/shared/lib/router/utils/prepare-destination'
 import nextConfig from './next.config'
 
 /**
@@ -148,6 +153,137 @@ describe('next.config redirects — legacy routes redirecten op de routing-laag 
     ]) {
       expect(existsSync(path.join(process.cwd(), target))).toBe(true)
     }
+  })
+})
+
+/**
+ * Oude `/toekomst?tab=`- en `?modal=withdrawal`-deeplinks (ADR 0179, besluit Q2).
+ *
+ * Verhuisd uit `app/(app)/toekomst/redirect-guard.test.ts`: de guard
+ * (`resolveTabRedirect`) is vervangen door `has`-regels. Deze cases lopen door
+ * Next's EIGEN matcher (`matchHas`) en bestemmingsbouwer (`prepareDestination`),
+ * in dezelfde volgorde als de router (eerste treffer wint) — zo toetsen ze de
+ * echte Location, inclusief volgorde-eisen en het doorgeven van de query.
+ */
+async function resolveLocation(url: string): Promise<string | null> {
+  const [pathAndQuery, hashIn] = url.split('#')
+  if (hashIn !== undefined) throw new Error('een hash bereikt de server niet')
+  const [pathname, qs = ''] = pathAndQuery.split('?')
+  const query: Record<string, string | string[]> = {}
+  for (const [k, v] of new URLSearchParams(qs)) {
+    const prev = query[k]
+    query[k] = prev === undefined ? v : Array.isArray(prev) ? [...prev, v] : [prev, v]
+  }
+  for (const rule of await nextConfig.redirects!()) {
+    if (rule.source !== pathname) continue
+    const params = matchHas({ headers: {} } as never, query, rule.has, rule.missing)
+    if (!params) continue
+    const { parsedDestination } = prepareDestination({
+      appendParamsToQuery: false,
+      destination: rule.destination,
+      params,
+      query,
+    })
+    const search = stringify(parsedDestination.query as Record<string, string | string[]>)
+    return `${parsedDestination.pathname}${search ? `?${search}` : ''}${parsedDestination.hash ?? ''}`
+  }
+  return null
+}
+
+describe('next.config redirects — oude /toekomst?tab= en ?modal=withdrawal (ADR 0179 Q2)', () => {
+  it('tab=voorkeuren → Instellingen', async () => {
+    expect(await resolveLocation('/toekomst?tab=voorkeuren')).toBe(
+      '/toekomst/instellingen?tab=voorkeuren',
+    )
+  })
+
+  it('tab=gebeurtenissen → Instellingen, bij de gebeurtenissen', async () => {
+    expect(await resolveLocation('/toekomst?tab=gebeurtenissen')).toBe(
+      '/toekomst/instellingen?tab=gebeurtenissen#gebeurtenissen',
+    )
+    expect(await resolveLocation('/toekomst?tab=gebeurtenissen&nieuw=1')).toBe(
+      '/toekomst/instellingen?tab=gebeurtenissen&nieuw=1#gebeurtenissen',
+    )
+  })
+
+  it('tab=gebeurtenissen mét levensstrategie → Instellingen zonder hash (strategieën wonen bij Voorkeuren)', async () => {
+    for (const key of ['aow', 'pensioen', 'huis', 'werk']) {
+      expect(await resolveLocation(`/toekomst?tab=gebeurtenissen&strategie=${key}`)).toBe(
+        `/toekomst/instellingen?tab=gebeurtenissen&strategie=${key}`,
+      )
+    }
+    // Geen levensstrategie-sleutel (bv. de tijdas-param `open`, of een prefix-truc):
+    // de algemene gebeurtenissen-regel vangt hem.
+    for (const waarde of ['open', 'aowx', 'xwerk']) {
+      expect(await resolveLocation(`/toekomst?tab=gebeurtenissen&strategie=${waarde}`)).toBe(
+        `/toekomst/instellingen?tab=gebeurtenissen&strategie=${waarde}#gebeurtenissen`,
+      )
+    }
+  })
+
+  it('tab=doelen → Doelen, overige params mee', async () => {
+    expect(await resolveLocation('/toekomst?tab=doelen')).toBe('/toekomst/doelen?tab=doelen')
+    expect(await resolveLocation('/toekomst?tab=doelen&focus=g1&mode=edit')).toBe(
+      '/toekomst/doelen?tab=doelen&focus=g1&mode=edit',
+    )
+  })
+
+  it('tab=rekenhulp → Rekenhulp', async () => {
+    expect(await resolveLocation('/toekomst?tab=rekenhulp')).toBe('/toekomst/rekenhulp?tab=rekenhulp')
+  })
+
+  it('modal=withdrawal → Instellingen, onttrekkingsregel open', async () => {
+    expect(await resolveLocation('/toekomst?modal=withdrawal')).toBe(
+      '/toekomst/instellingen?modal=withdrawal&regel=onttrekkingsstrategie',
+    )
+  })
+
+  it('niet redirecten: geen tab, onbekende tab, de tijdas-params en de overige modals', async () => {
+    for (const url of [
+      '/toekomst',
+      '/toekomst?tab=bestaat-niet',
+      '/toekomst?tab=',
+      '/toekomst?strategie=open',
+      '/toekomst?whatif=open',
+      '/toekomst?uitgaven=open',
+      '/toekomst?planreview=open',
+      '/toekomst?modal=strategie',
+      '/toekomst?modal=life_events',
+      '/toekomst?modal=scenarios',
+    ]) {
+      expect(await resolveLocation(url), url).toBeNull()
+    }
+  })
+
+  it('geen lus: het doel van elke /toekomst-queryregel matcht zelf geen regel', async () => {
+    // Next geeft de query (incl. `tab`/`modal`) door aan het doel. Dat mag alleen
+    // omdat geen enkele regel op een doelpad matcht — anders was dit een lus.
+    const doelen = (await nextConfig.redirects!())
+      .filter((r) => r.source === '/toekomst' && r.has)
+      .map((r) => r.destination.split(/[?#]/)[0])
+    expect(doelen.length).toBeGreaterThanOrEqual(6)
+    for (const doel of new Set(doelen)) {
+      expect(doel).not.toBe('/toekomst')
+      expect(await resolveLocation(`${doel}?tab=voorkeuren&modal=withdrawal`), doel).toBeNull()
+      // Het doel is een echte pagina — ook nadat hij in de `(katern)`-groep verhuist.
+      const rest = doel.replace(/^\/toekomst/, '')
+      const kandidaten = [
+        path.join(process.cwd(), 'app/(app)', doel, 'page.tsx'),
+        path.join(process.cwd(), 'app/(app)/toekomst/(katern)', rest, 'page.tsx'),
+      ]
+      expect(kandidaten.some((p) => existsSync(p)), doel).toBe(true)
+    }
+  })
+
+  it('de oude render-guard is weg (redirect-only-trigger, React #310)', () => {
+    // /toekomst rendert een echte pagina; zijn render mag niet zelf redirecten.
+    // Stap 15 verhuist de page naar de `(katern)`-groep; de toets volgt hem.
+    const pagina = ['app/(app)/toekomst/page.tsx', 'app/(app)/toekomst/(katern)/page.tsx']
+      .map((p) => path.join(process.cwd(), p))
+      .find((p) => existsSync(p))
+    expect(pagina, 'de /toekomst-page is niet gevonden').toBeDefined()
+    const code = readFileSync(pagina!, 'utf8')
+    expect(code).not.toMatch(/resolveTabRedirect|from 'next\/navigation'/)
   })
 })
 

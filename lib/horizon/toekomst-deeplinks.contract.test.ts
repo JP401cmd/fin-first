@@ -6,7 +6,8 @@
  *  - `deeplink-cleanup.test.ts` toetst alleen de URL-OPSCHONING; zijn
  *    "dekt precies de params die het mount-effect leest" vergelijkt een
  *    hardgecodeerde lijst met zichzelf, niet met wat de route écht leest.
- *  - `redirect-guard.test.ts` dekt alleen `?tab=`.
+ *  - `redirect-guard.test.ts` dekte alleen `?tab=` (sinds stroom R verhuisd naar
+ *    `next.config.test.ts`, per waarde door Next's eigen matcher).
  *  - Niets toetste dat elke `/toekomst?…`-link die de app zelf uitstuurt
  *    (widgets, ⌘K, Fin, redirects) door de route wordt opgepakt.
  *
@@ -41,7 +42,8 @@ type Contract = {
 /**
  * Het deeplink-contract van de ROOT-route /toekomst zoals het op 26 sep 2026
  * werkt (horizon-client mount-effect r. ±1054, `plan-review-provider.tsx`,
- * `resolveTabRedirect` in `toekomst/page.tsx`). Een sleutel of waarde erbij of
+ * `resolveTabRedirect` in `toekomst/page.tsx` — sinds stroom R de `has`-regels in
+ * `next.config.ts`). Een sleutel of waarde erbij of
  * eraf is een bewuste contractwijziging — pas deze tabel dan in dezelfde PR aan.
  */
 const CONTRACT: Record<string, Contract> = {
@@ -52,12 +54,16 @@ const CONTRACT: Record<string, Contract> = {
   edit: { values: ['true'], effect: 'met event=<id>: gebeurtenis in bewerkmodus' },
   modal: {
     values: ['scenarios', 'simulations', 'withdrawal', 'backtesting', 'strategie', 'life_events'],
-    effect: 'bijbehorende modal; life_events → gebeurtenis-catalogus (als event=new; fase 1 stap 2)',
+    effect:
+      'bijbehorende modal; life_events → gebeurtenis-catalogus (als event=new; fase 1 stap 2); ' +
+      'withdrawal → next.config-redirect naar /toekomst/instellingen?regel=onttrekkingsstrategie',
   },
   planreview: { values: ['open'], effect: 'plan-review-wizard open' },
   tab: {
     values: ['doelen', 'gebeurtenissen', 'voorkeuren', 'rekenhulp'],
-    effect: 'server-redirect naar de subpagina (overige query mee)',
+    effect:
+      'next.config-redirect (has-regel, ADR 0179 Q2) naar het katern: doelen/rekenhulp → ' +
+      'hun route, voorkeuren/gebeurtenissen → /toekomst/instellingen (overige query mee)',
   },
 }
 
@@ -73,7 +79,9 @@ const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 function readerPattern(key: string): RegExp {
   const lit = `\\.get\\(\\s*(['"\`])${escapeRe(key)}\\1\\s*\\)`
   if (key === PLAN_REVIEW_PARAM) return new RegExp(`${lit}|\\.get\\(\\s*PLAN_REVIEW_PARAM\\s*\\)`)
-  // `?tab=` wordt server-side gelezen uit het searchParams-object (`sp.tab`).
+  // `?tab=` werd tot ADR 0179 (stroom R) server-side gelezen uit het searchParams-object
+  // (`sp.tab`); sinds besluit Q2 vangt `next.config.ts` hem af. Het patroon blijft staan
+  // zodat een teruggekeerde render-guard óók als lezer telt.
   if (key === 'tab') return new RegExp(`${lit}|\\b(sp|searchParams|params)\\.tab\\b|\\[\\s*['"]tab['"]\\s*\\]`)
   return new RegExp(lit)
 }
@@ -144,7 +152,7 @@ describe('deeplink-contract /toekomst — de route zelf', () => {
 
 describe('deeplink-contract /toekomst — de opschoning loopt in de pas', () => {
   it('elke client-deeplink die een paneel opent wordt na consumptie weggepoetst', () => {
-    // `tab` is server-side (redirect vóór render) en `planreview` poetst zichzelf
+    // `tab` gaat op de routing-laag weg (next.config, vóór render) en `planreview` poetst zichzelf
     // (plan-review-provider, native replaceState) — die twee staan bewust niet in
     // CONSUMED_DEEPLINK_PARAMS. De rest moet er wél in, anders heropent een
     // refresh hetzelfde paneel.

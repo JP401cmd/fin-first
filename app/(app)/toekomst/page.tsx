@@ -1,5 +1,4 @@
 import type { Metadata } from 'next'
-import { redirect } from 'next/navigation'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import HorizonPage from '@/components/app/horizon/horizon-client'
 import { ToekomstNavCards } from '@/components/future/toekomst-nav-cards'
@@ -18,53 +17,11 @@ import {
   EindsituatieNoticeDot,
 } from '@/components/app/horizon/eindsituatie-notice-provider'
 import { PlanReviewProvider } from '@/components/future/plan-review/plan-review-provider'
-import { isStrategieKey } from '@/lib/horizon/strategie-route'
 import { loadToekomstData } from '@/lib/toekomst/load-toekomst-data'
 
 export const metadata: Metadata = {
   title: 'Toekomst — TriFinity',
   description: 'Tijdas, doelen, gebeurtenissen en toekomst-voorkeuren — keuzes maken voor later.',
-}
-
-/** Tabs die nu eigen subpagina's hebben — `?tab=<x>` redirect naar `/toekomst/<x>`. */
-const TAB_ROUTES = new Set(['doelen', 'gebeurtenissen', 'voorkeuren', 'rekenhulp'])
-
-/**
- * Pure redirect-guard: bepaal of een oude `?tab=`-deeplink naar een
- * subpagina geredirect moet worden. Geëxporteerd zodat de logica los van de
- * server-render getest kan worden.
- *
- * Regels:
- *  - `tab` ontbreekt of is geen bekende subpagina → `null` (blijf op /toekomst;
- *    bv. `?strategie=open`, `?whatif=open` zijn tijdas-modal/pane-params).
- *  - `tab` is een bekende subpagina → `/toekomst/<tab>`, met alle overige
- *    query-params behouden (bv. `?tab=doelen&focus=g1` → `/toekomst/doelen?focus=g1`).
- *  - Uitzondering: `tab=gebeurtenissen` mét een levensstrategie-sleutel
- *    (`strategie=aow|pensioen|huis|werk`) → `/toekomst/voorkeuren?strategie=…`;
- *    de strategieën wonen sinds 17 sep 2026 op Voorkeuren (één hop, geen keten).
- *
- * @returns de redirect-doel-URL, of `null` wanneer niet geredirect moet worden.
- */
-export function resolveTabRedirect(
-  sp: Record<string, string | string[] | undefined>,
-): string | null {
-  const rawTab = sp.tab
-  const tab = Array.isArray(rawTab) ? rawTab[0] : rawTab
-  if (!tab || !TAB_ROUTES.has(tab)) return null
-
-  const rest = new URLSearchParams()
-  for (const [key, value] of Object.entries(sp)) {
-    if (key === 'tab' || value === undefined) continue
-    if (Array.isArray(value)) {
-      for (const v of value) rest.append(key, v)
-    } else {
-      rest.append(key, value)
-    }
-  }
-  const qs = rest.toString()
-  const doel =
-    tab === 'gebeurtenissen' && isStrategieKey(rest.get('strategie')) ? 'voorkeuren' : tab
-  return qs ? `/toekomst/${doel}?${qs}` : `/toekomst/${doel}`
 }
 
 /**
@@ -82,22 +39,13 @@ export function resolveTabRedirect(
  * (`loadHorizonData` + `loadFinData`) plus één count-query op
  * `custom_calculators`.
  *
- * Backwards-compat: oude `?tab=<doelen|gebeurtenissen|voorkeuren|rekenhulp>`
- * deeplinks worden naar de bijbehorende subpagina geredirect met behoud van
- * alle overige query-params. Tijdas-modal/pane-params (`?strategie=open`,
- * `?whatif=open`, `?uitgaven=open`) hebben geen `tab` en blijven op `/toekomst`.
+ * Backwards-compat: oude `?tab=<doelen|gebeurtenissen|voorkeuren|rekenhulp>`-
+ * en `?modal=withdrawal`-deeplinks redirecten op de routing-laag
+ * (`has`-regels in `next.config.ts`, ADR 0179 besluit Q2) — deze page ziet ze
+ * nooit. Tijdas-modal/pane-params (`?strategie=open`, `?whatif=open`,
+ * `?uitgaven=open`) blijven op `/toekomst`.
  */
-export default async function ToekomstPage({
-  searchParams,
-}: {
-  searchParams: Promise<Record<string, string | string[] | undefined>>
-}) {
-  const sp = await searchParams
-
-  // ── Redirect-guard: bewaar deeplinks naar de oude tab-views ──────────────
-  const redirectTarget = resolveTabRedirect(sp)
-  if (redirectTarget) redirect(redirectTarget)
-
+export default async function ToekomstPage() {
   // ── Lichte landing-data: KPI's voor de kaarten + tijdas-data ─────────────
   // De lading zelf woont in `lib/toekomst/load-toekomst-data.ts` (fase 1 stroom R),
   // zodat de katern-layout van stap 15 dezelfde functie kan aanroepen.

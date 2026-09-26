@@ -272,6 +272,72 @@ const nextConfig: NextConfig = {
         permanent: false,
       },
 
+      // ── Oude `/toekomst?tab=`-deeplinks (ADR 0179, besluit Q2) ──────────
+      // Vroeger ving een redirect-guard in `toekomst/page.tsx` deze links op
+      // render-tijd af (`resolveTabRedirect`) — dezelfde React #310-trigger als
+      // hierboven, en straks onmogelijk: de katern-layout krijgt geen
+      // searchParams. Op de routing-laag gaan ze rechtstreeks naar het katern,
+      // zonder tussenhop via de opgeheven /toekomst/voorkeuren|gebeurtenissen.
+      //
+      // Bekende grens van Next: de inkomende query reist ONGEWIJZIGD mee naar
+      // het doel (prepare-destination.js: `{ ...query, ...destQuery }`), dus
+      // `tab=` staat daarna nog in de URL. Onschadelijk — geen doelpagina leest
+      // `tab`, en geen regel matcht op een ander pad dan exact `/toekomst`, dus
+      // er is geen lus. Overige params (`?focus=`, `?nieuw=`) werken daardoor
+      // vanzelf door.
+      //
+      // Volgorde-eis: de gerichte Gebeurtenissen-variant (met een
+      // levensstrategie-sleutel) MOET vóór de algemene staan. Die strategieën
+      // wonen in het Voorkeuren-deel van Instellingen, dus daar hoort geen
+      // `#gebeurtenissen`-hash achter (vroeger: naar /toekomst/voorkeuren).
+      {
+        source: '/toekomst',
+        has: [
+          { type: 'query', key: 'tab', value: 'gebeurtenissen' },
+          // Groep verplicht: Next bouwt `^${value}$`, en zonder `(?:…)` zou het
+          // anker maar aan de eerste en laatste alternatief hangen.
+          { type: 'query', key: 'strategie', value: '(?:aow|pensioen|huis|werk)' },
+        ],
+        destination: '/toekomst/instellingen',
+        permanent: false,
+      },
+      {
+        source: '/toekomst',
+        has: [{ type: 'query', key: 'tab', value: 'gebeurtenissen' }],
+        destination: '/toekomst/instellingen#gebeurtenissen',
+        permanent: false,
+      },
+      {
+        source: '/toekomst',
+        has: [{ type: 'query', key: 'tab', value: 'voorkeuren' }],
+        destination: '/toekomst/instellingen',
+        permanent: false,
+      },
+      {
+        source: '/toekomst',
+        has: [{ type: 'query', key: 'tab', value: 'doelen' }],
+        destination: '/toekomst/doelen',
+        permanent: false,
+      },
+      {
+        source: '/toekomst',
+        has: [{ type: 'query', key: 'tab', value: 'rekenhulp' }],
+        destination: '/toekomst/rekenhulp',
+        permanent: false,
+      },
+
+      // `?modal=withdrawal` opende de WithdrawalModal, die niet meer bestaat
+      // (ADR 0179). De onttrekkingskeuze woont als regel in Instellingen; het
+      // Voorkeuren-deel opent hem via `?regel=onttrekkingsstrategie`
+      // (REGEL_ORDER in lib/future/regel-registry.ts). `modal=withdrawal` reist
+      // mee (zie hierboven) en wordt op Instellingen door niets gelezen.
+      {
+        source: '/toekomst',
+        has: [{ type: 'query', key: 'modal', value: 'withdrawal' }],
+        destination: '/toekomst/instellingen?regel=onttrekkingsstrategie',
+        permanent: false,
+      },
+
       // /toekomst/strategie?focus=aow|pensioen|huis|werk opende de bijbehorende
       // levensstrategie — sinds ADR 0179 in katern Instellingen (daarvoor
       // Voorkeuren, en vóór 17 sep 2026 de Gebeurtenissen-tab). Die vertakking gaat mee naar
