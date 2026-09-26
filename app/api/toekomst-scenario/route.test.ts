@@ -92,6 +92,16 @@ describe('PUT /api/toekomst-scenario', () => {
     expect(eq).toHaveBeenCalledWith('id', USER.id) // RLS-scoped op eigen rij
   })
 
+  it('200 met de knopvorm per breekpunt; een onbekende vorm valt weg (ADR 0179 D7)', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: USER } })
+    const { update } = mockUpdateChain()
+    const res = await PUT(
+      putRequest(JSON.stringify({ v: 2, knopWeergaveDesktop: 'harp', knopWeergaveMobiel: 'onzin' })),
+    )
+    expect(res.status).toBe(200)
+    expect(update).toHaveBeenCalledWith({ toekomst_scenario_prefs: { v: 2, knopWeergaveDesktop: 'harp' } })
+  })
+
   it('500 bij DB-fout (client kan terugrollen)', async () => {
     mockGetUser.mockResolvedValue({ data: { user: USER } })
     mockUpdateChain({ code: 'XX000', message: 'boom' })

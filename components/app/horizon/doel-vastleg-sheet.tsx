@@ -84,8 +84,11 @@ export function buildLiveStand(args: {
 export function buildScenarioPersistPayload(args: {
   stand: ToekomstScenarioStand
   showScenarioLine: boolean
-  /** Weergave-keuze van de knoppen (ADR 0170); afwezig = de standaard (balken). */
-  knopWeergave?: import('@/lib/horizon/toekomst-scenario').KnopWeergave
+  /**
+   * Weergave-keuze van de knoppen per breekpunt (ADR 0179 D7); afwezig = de standaard van dat
+   * breekpunt. Het legacy-veld `knopWeergave` wordt nooit meer geschreven.
+   */
+  knopWeergave?: Partial<Record<import('@/lib/horizon/toekomst-scenario').KnopBreekpunt, import('@/lib/horizon/toekomst-scenario').KnopWeergave>>
   doel: ToekomstScenarioDoel | null
 }): ToekomstScenarioPrefs {
   const { stand, showScenarioLine, knopWeergave, doel } = args
@@ -99,7 +102,8 @@ export function buildScenarioPersistPayload(args: {
     ...(stand.uitgaveNaPensioen !== undefined ? { uitgaveNaPensioen: stand.uitgaveNaPensioen } : {}),
     ...(stand.nalatenschap !== undefined ? { nalatenschap: stand.nalatenschap } : {}),
     showScenarioLine,
-    ...(knopWeergave ? { knopWeergave } : {}),
+    ...(knopWeergave?.desktop ? { knopWeergaveDesktop: knopWeergave.desktop } : {}),
+    ...(knopWeergave?.mobiel ? { knopWeergaveMobiel: knopWeergave.mobiel } : {}),
     ...(doel ? { doel } : {}),
   }
 }

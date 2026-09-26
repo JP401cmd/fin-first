@@ -11,6 +11,7 @@
  * dezelfde provider.
  */
 
+import { useIsLgUp } from '@/lib/hooks/use-media-query'
 import { DoelenLab } from '@/components/toekomst/doelen/doelen-lab'
 import { DoelenLabSheets } from '@/components/toekomst/doelen/doelen-lab-sheets'
 import {
@@ -23,6 +24,8 @@ import {
 } from '@/components/toekomst/state/toekomst-state-provider'
 
 export function DoelenKaternLab() {
+  // De knopvorm wordt per breekpunt onthouden (ADR 0179 D7); grens = Tailwind `lg`.
+  const breekpunt = useIsLgUp() ? 'desktop' : 'mobiel'
   const { initialData } = useToekomstBron()
   const { verkenSectieZichtbaar } = useToekomstPerspectiefContext()
   const { verkenSectionRef } = useToekomstOverlayContext()
@@ -82,8 +85,8 @@ export function DoelenKaternLab() {
           labUitkomstRegel={labUitkomstRegel}
           labZone={labZone}
           labGrenzenPending={labGrenzenPending}
-          knopWeergave={knopWeergave}
-          setKnopWeergave={setKnopWeergave}
+          knopWeergave={knopWeergave[breekpunt]}
+          setKnopWeergave={(vorm) => setKnopWeergave(breekpunt, vorm)}
           labFormatters={labFormatters}
           planIsDezeStop={planIsDezeStop}
           setStopPlanError={setStopPlanError}

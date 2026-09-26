@@ -180,10 +180,18 @@ export interface ToekomstScenarioPrefs {
   /** Toont de gestippelde 2e (wat-als)lijn in de grafiek. */
   showScenarioLine?: boolean
   /**
-   * De vorm van de doelscenario-knoppen — één van `KNOP_WEERGAVEN` (wijzer = standaard, balk,
-   * rad, harp, vijfhoek; ADR 0170 B7/B11/B12). Pure WEERGAVE, net als `showScenarioLine` — bewust GÉÉN onderdeel van
+   * De vorm van de doelscenario-knoppen per breekpunt (ADR 0179 D7): één van `KNOP_WEERGAVEN`.
+   * Pure WEERGAVE, net als `showScenarioLine` — bewust GÉÉN onderdeel van
    * `ToekomstScenarioStand`: wie van vorm wisselt verandert zijn plan niet, en de opslaan-balk
-   * mag daar dus niet "gewijzigd" van zeggen.
+   * mag daar dus niet "gewijzigd" van zeggen. Afwezig = de standaard van dat breekpunt
+   * (`KNOP_WEERGAVE_STANDAARD`: harp op desktop, rad op mobiel).
+   */
+  knopWeergaveDesktop?: KnopWeergave
+  knopWeergaveMobiel?: KnopWeergave
+  /**
+   * Legacy (ADR 0170, één vorm voor elk breekpunt): tolerant gelezen, nooit meer geschreven.
+   * Alleen een bewuste keuze (≠ de oude standaard 'wijzer') telt nog als desktopkeuze — zie
+   * `knopWeergaveVoor`.
    */
   knopWeergave?: KnopWeergave
   /** Vastgelegd doelscenario (ronde 4). Ontbreekt zolang de gebruiker niets promoveerde. */
@@ -196,12 +204,37 @@ export interface ToekomstScenarioPrefs {
  */
 export const KNOP_WEERGAVEN = ['balk', 'wijzer', 'rad', 'harp', 'vijfhoek'] as const
 export type KnopWeergave = (typeof KNOP_WEERGAVEN)[number]
+/** De twee breekpunten waarop de knopvorm apart onthouden wordt (ADR 0179 D7; grens = `lg`). */
+export type KnopBreekpunt = 'desktop' | 'mobiel'
+
 /**
- * De standaardvorm (B7). Eén constante voor de beginstand én de persist-poort in
- * horizon-client: die twee stonden op 'wijzer' resp. 'balk', waardoor de poort "geen
- * default-blob schrijven" voor iedereen altijd open stond.
+ * De standaardvorm per breekpunt (ADR 0179 D7, amendement op 0170 B7/B11/B12): harp naast de
+ * grafiek op desktop, rad onder de katern-koppen op mobiel. Eén constante voor de beginstand
+ * én de persist-poort ("geen default-blob schrijven").
  */
-export const KNOP_WEERGAVE_STANDAARD: KnopWeergave = 'wijzer'
+export const KNOP_WEERGAVE_STANDAARD: Readonly<Record<KnopBreekpunt, KnopWeergave>> = {
+  desktop: 'harp',
+  mobiel: 'rad',
+}
+
+/** De vorige standaard (ADR 0170 B7) — werd in élke PUT meegeschreven, dus geen keuze. */
+const LEGACY_STANDAARD: KnopWeergave = 'wijzer'
+
+/**
+ * De knopvorm voor een breekpunt uit de bewaarde voorkeur. Volgorde: de eigen sleutel van dat
+ * breekpunt → op desktop een bewuste legacy-keuze (`knopWeergave` ≠ 'wijzer') → de standaard.
+ */
+export function knopWeergaveVoor(
+  prefs: Pick<ToekomstScenarioPrefs, 'knopWeergaveDesktop' | 'knopWeergaveMobiel' | 'knopWeergave'> | null | undefined,
+  breekpunt: KnopBreekpunt,
+): KnopWeergave {
+  const eigen = breekpunt === 'desktop' ? prefs?.knopWeergaveDesktop : prefs?.knopWeergaveMobiel
+  if (eigen) return eigen
+  if (breekpunt === 'desktop' && prefs?.knopWeergave && prefs.knopWeergave !== LEGACY_STANDAARD) {
+    return prefs.knopWeergave
+  }
+  return KNOP_WEERGAVE_STANDAARD[breekpunt]
+}
 
 // ── Parser ───────────────────────────────────────────────────────────────────
 
@@ -330,8 +363,8 @@ export function parseToekomstScenarioPrefs(raw: unknown): ToekomstScenarioPrefs 
 
   // ── Weergavevlaggen (geen onderdeel van de goal-stand) ──
   if (typeof raw.showScenarioLine === 'boolean') out.showScenarioLine = raw.showScenarioLine
-  if ((KNOP_WEERGAVEN as readonly unknown[]).includes(raw.knopWeergave)) {
-    out.knopWeergave = raw.knopWeergave as KnopWeergave
+  for (const key of ['knopWeergaveDesktop', 'knopWeergaveMobiel', 'knopWeergave'] as const) {
+    if ((KNOP_WEERGAVEN as readonly unknown[]).includes(raw[key])) out[key] = raw[key] as KnopWeergave
   }
 
   // ── Doel-blok (alleen bij v2-input; v1 draagt per definitie geen doel) ──

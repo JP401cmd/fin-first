@@ -167,6 +167,26 @@ describe('buildScenarioPersistPayload (doel in ELKE PUT — VERPLICHT)', () => {
     expect(payload.doel).toBeUndefined()
     expect('doel' in payload).toBe(false)
   })
+
+  it('knopvorm per breekpunt: twee sleutels, het legacy-veld wordt nooit geschreven (ADR 0179 D7)', () => {
+    const stand = buildLiveStand({
+      baseline: BASELINE,
+      sliderEvents: [],
+      returnDeltas: {},
+      stopAge: null,
+      uitgaveNaPensioen: null,
+      nalatenschap: null,
+    })
+    const payload = buildScenarioPersistPayload({
+      stand,
+      showScenarioLine: true,
+      knopWeergave: { desktop: 'harp', mobiel: 'balk' },
+      doel: null,
+    })
+    expect(payload.knopWeergaveDesktop).toBe('harp')
+    expect(payload.knopWeergaveMobiel).toBe('balk')
+    expect('knopWeergave' in payload).toBe(false)
+  })
 })
 
 describe('conceptGewijzigd-flow (buildLiveStand + isDoelConceptGewijzigd)', () => {

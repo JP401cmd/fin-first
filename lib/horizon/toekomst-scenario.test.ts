@@ -9,6 +9,8 @@ import {
   buildCategorieReturnGroups,
   DOEL_PARAMETERS,
   DOELWAARDE_BEDRAG_MAX,
+  KNOP_WEERGAVE_STANDAARD,
+  knopWeergaveVoor,
   type ToekomstScenarioStand,
 } from './toekomst-scenario'
 
@@ -213,6 +215,32 @@ describe('parseToekomstScenarioPrefs', () => {
     expect(parseToekomstScenarioPrefs({ v: 2, knopWeergave: 'vijfhoek' })?.knopWeergave).toBe('vijfhoek')
     expect(parseToekomstScenarioPrefs({ v: 2, knopWeergave: 'knop' })?.knopWeergave).toBeUndefined()
     expect(parseToekomstScenarioPrefs({ v: 2 })?.knopWeergave).toBeUndefined()
+  })
+
+  it('knopWeergave per breekpunt (ADR 0179 D7): twee sleutels, dezelfde whitelist', () => {
+    const p = parseToekomstScenarioPrefs({ v: 2, knopWeergaveDesktop: 'vijfhoek', knopWeergaveMobiel: 'balk' })
+    expect(p?.knopWeergaveDesktop).toBe('vijfhoek')
+    expect(p?.knopWeergaveMobiel).toBe('balk')
+    const vuil = parseToekomstScenarioPrefs({ v: 2, knopWeergaveDesktop: 'knop', knopWeergaveMobiel: 7 })
+    expect(vuil?.knopWeergaveDesktop).toBeUndefined()
+    expect(vuil?.knopWeergaveMobiel).toBeUndefined()
+  })
+
+  it('standaard: harp op desktop, rad op mobiel', () => {
+    expect(KNOP_WEERGAVE_STANDAARD).toEqual({ desktop: 'harp', mobiel: 'rad' })
+    expect(knopWeergaveVoor(null, 'desktop')).toBe('harp')
+    expect(knopWeergaveVoor(null, 'mobiel')).toBe('rad')
+    expect(knopWeergaveVoor({}, 'desktop')).toBe('harp')
+  })
+
+  it('eigen sleutel wint; legacy telt alleen als bewuste desktopkeuze (≠ oude standaard wijzer)', () => {
+    expect(knopWeergaveVoor({ knopWeergaveMobiel: 'wijzer' }, 'mobiel')).toBe('wijzer')
+    expect(knopWeergaveVoor({ knopWeergaveDesktop: 'balk', knopWeergave: 'vijfhoek' }, 'desktop')).toBe('balk')
+    // Legacy 'wijzer' werd in elke PUT meegeschreven: geen keuze → de nieuwe standaard.
+    expect(knopWeergaveVoor({ knopWeergave: 'wijzer' }, 'desktop')).toBe('harp')
+    // Een bewuste legacy-vorm blijft op desktop staan, mobiel start op het rad.
+    expect(knopWeergaveVoor({ knopWeergave: 'vijfhoek' }, 'desktop')).toBe('vijfhoek')
+    expect(knopWeergaveVoor({ knopWeergave: 'vijfhoek' }, 'mobiel')).toBe('rad')
   })
 
   it('parseert showScenarioLine alleen als boolean', () => {

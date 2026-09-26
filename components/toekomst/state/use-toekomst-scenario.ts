@@ -47,6 +47,8 @@ import {
   stripStopKeuze,
   type DoelParameter,
   KNOP_WEERGAVE_STANDAARD,
+  knopWeergaveVoor,
+  type KnopBreekpunt,
   type ToekomstScenarioDoel,
 } from '@/lib/horizon/toekomst-scenario'
 import { doelGewogenRendement } from '@/lib/horizon/toekomst-doel'
@@ -104,12 +106,19 @@ export function useToekomstScenarioState({ initialData }: { initialData: Horizon
     () => initialData.toekomstScenarioPrefs?.showScenarioLine ?? true,
   )
   /**
-   * De vorm van de doelscenario-knoppen (ADR 0170): balken of wijzers. Server-side bewaard
-   * naast de andere weergavevlag (`showScenarioLine`), dus cross-device — het is een keuze
-   * over hoe je je plan wilt lezen, niet een "even niet tonen" per apparaat.
+   * De vorm van de doelscenario-knoppen per breekpunt (ADR 0179 D7): standaard harp op
+   * desktop, rad op mobiel. Server-side bewaard naast de andere weergavevlag
+   * (`showScenarioLine`), dus cross-device — het is een keuze over hoe je je plan wilt lezen,
+   * niet een "even niet tonen" per apparaat. Elk breekpunt schrijft alleen zijn eigen sleutel.
    */
-  const [knopWeergave, setKnopWeergave] = useState<LabKnopWeergave>(
-    () => initialData.toekomstScenarioPrefs?.knopWeergave ?? KNOP_WEERGAVE_STANDAARD,
+  const [knopWeergave, setKnopWeergaveRecord] = useState<Record<KnopBreekpunt, LabKnopWeergave>>(() => ({
+    desktop: knopWeergaveVoor(initialData.toekomstScenarioPrefs, 'desktop'),
+    mobiel: knopWeergaveVoor(initialData.toekomstScenarioPrefs, 'mobiel'),
+  }))
+  const setKnopWeergave = useCallback(
+    (breekpunt: KnopBreekpunt, vorm: LabKnopWeergave) =>
+      setKnopWeergaveRecord((prev) => (prev[breekpunt] === vorm ? prev : { ...prev, [breekpunt]: vorm })),
+    [],
   )
   const scenarioHydratedRef = useRef(false)
   // ADR 0170 — de koppelmodus (`stopKoppel`/`stopMarge`, `lockedMargeRef`) verviel met de
@@ -1148,7 +1157,8 @@ export function useToekomstScenario({ initialData, scenarioState, sim }: { initi
       hasScenario ||
       scenarioStopAge !== null ||
       !showScenarioLine ||
-      knopWeergave !== KNOP_WEERGAVE_STANDAARD ||
+      knopWeergave.desktop !== KNOP_WEERGAVE_STANDAARD.desktop ||
+      knopWeergave.mobiel !== KNOP_WEERGAVE_STANDAARD.mobiel ||
       doelBlok != null
     if (!deviatesFromDefaults && initialData.toekomstScenarioPrefs == null) return
     const handle = setTimeout(() => {

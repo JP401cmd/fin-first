@@ -41,7 +41,7 @@ export interface DoelenLabProps {
   labZone: ReturnType<typeof zoneVanHuidig>
   labGrenzenPending: boolean
   knopWeergave: LabKnopWeergave
-  setKnopWeergave: Dispatch<SetStateAction<LabKnopWeergave>>
+  setKnopWeergave: (v: LabKnopWeergave) => void
   labFormatters: Record<HefboomKey, LabKnopFormatters>
   planIsDezeStop: boolean
   setStopPlanError: Dispatch<SetStateAction<string>>
