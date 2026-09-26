@@ -112,6 +112,17 @@ describe('ActionBoard — volgorde van open acties (WF-OVZ-20-bug1)', () => {
   })
 })
 
+describe('ActionBoard — geplande acties wonen op /overzicht/tips (ADR 0179 fase 5)', () => {
+  it('Given een open actie met een scheduled_week binnen een jaar, When het bord rendert, Then staat hij bij de open acties', () => {
+    renderBoard([
+      baseAction({ id: 'g1', title: 'Geplande actie', status: 'open', scheduled_week: '2027-03-01' }),
+      baseAction({ id: 'z1', title: 'Losse actie', status: 'open', scheduled_week: null }),
+    ])
+    expect(screen.getByText('Geplande actie')).toBeTruthy()
+    expect(screen.getByText('Losse actie')).toBeTruthy()
+  })
+})
+
 describe('ActionBoard — faalpaden tonen een foutmelding (E-01)', () => {
   it('toont een foutmelding als het bijwerken van de status faalt (!res.ok)', async () => {
     fetchMock.mockResolvedValue({ ok: false, status: 500, text: () => Promise.resolve('boom') })

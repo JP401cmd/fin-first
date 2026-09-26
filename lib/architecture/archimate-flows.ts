@@ -59,11 +59,12 @@ export const ARCHI_FLOWS: ArchiFlow[] = [
   {
     id: 'snapshot-trend',
     title: 'Snapshot → trend',
-    lead: 'Hoe historische foto’s van je vermogen trends, backtests en dashboard-widgets voeden.',
+    lead: 'Hoe historische foto’s van je vermogen trends, backtests, dashboard-widgets en het verloop van je gezondheid voeden.',
     steps: [
-      { elementId: 'do-meta', label: 'Nachtelijke snapshot', artifact: 'net_worth_snapshots', detail: 'Automatische vermogens-foto per dag.' },
+      { elementId: 'do-meta', label: 'Nachtelijke snapshot', artifact: 'net_worth_snapshots', detail: 'Automatische vermogens-foto op de werkelijke kalenderdag — een maand kan dus meerdere rijen hebben.' },
       { elementId: 'as-rapport', label: 'Trends & backtest', artifact: 'runBacktest', detail: 'Slaagkans + named paths uit horizon-data.' },
-      { elementId: 'fn-inzicht_acties', label: 'Widgets & trends', detail: 'Trend-inkomen/uitgaven/sparen op het dashboard.' },
+      { elementId: 'fn-inzicht_acties', label: 'Widgets & trends', artifact: 'getNetWorthSnapshots12m', detail: 'Laatste 12 kalendermaanden, één stand per maand (laatste snapshot_date wint, lib/snapshots/month-dedupe.ts), eigen user_id. Trend-inkomen/uitgaven/sparen op het dashboard.' },
+      { elementId: 'sp-inzicht', label: 'Verloop in de gezondheidskassabon', artifact: 'HealthScoreReceipt · lib/health-verloop.ts', detail: 'Op /overzicht: gezondheidsgetal en vrijheidsleeftijd per maand (op datum, score_version-wissel gemarkeerd) en "sinds vorige maand" op de gezondheidskaart, alleen binnen dezelfde score_version.' },
     ],
   },
 ]
