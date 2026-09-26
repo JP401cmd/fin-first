@@ -21,7 +21,7 @@ import { type AnkerReach, type AnkerStop, ankerTitel, ankerZin, formatStopAge } 
 import { AOW_ONTBREEKT_COPY } from '@/lib/horizon/aow-notice-minimize'
 import { type HeroFireAge, heroFireAgeYear } from '@/lib/horizon/hero-fire-age'
 import { HORIZON_MISSENDE_GEGEVENS_LABEL, type HorizonOutcomeGuard } from '@/lib/horizon/outcome-guard'
-import type { ActiveModal } from './types'
+import type { ActiveModal } from '@/components/toekomst/state/types'
 
 // Kopie van horizon-client r317–324 — V3: de dynamic() verhuist mee met zijn enige
 // consument (kassabon Z); de integrator schrapt de declaratie in horizon-client.

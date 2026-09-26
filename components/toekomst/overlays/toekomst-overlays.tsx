@@ -41,14 +41,14 @@ import type { eventStopAgeFromSim } from '@/lib/horizon/event-duration-copy'
 import type {
   ActiveFaseModal,
   ActiveModal,
-  ClusterSheetState,
+  ClusterSheet,
   Erfgenamen,
   EventPaneMode,
   HouseholdRetireInfo,
   OnttrekkingData,
   OvergangData,
   StrategieInitialTab,
-} from './types'
+} from '@/components/toekomst/state/types'
 
 const ScenariosModal = dynamic(() =>
   import('@/components/app/horizon/scenarios-modal').then(m => ({ default: m.ScenariosModal })),
@@ -163,8 +163,8 @@ export interface ToekomstOverlaysProps {
   // AC — NaturalMilestoneSheet, EventClusterSheet, HorizonYearDetailsSheet
   selectedNaturalMilestone: NaturalMilestone | null
   setSelectedNaturalMilestone: Dispatch<SetStateAction<NaturalMilestone | null>>
-  clusterSheet: ClusterSheetState
-  setClusterSheet: Dispatch<SetStateAction<ClusterSheetState>>
+  clusterSheet: ClusterSheet
+  setClusterSheet: Dispatch<SetStateAction<ClusterSheet>>
   eventStopAge: ReturnType<typeof eventStopAgeFromSim>
   naturalMilestones: NaturalMilestone[]
   setEventPaneEditingId: Dispatch<SetStateAction<string | null>>

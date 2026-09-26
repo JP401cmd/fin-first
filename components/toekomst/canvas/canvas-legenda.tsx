@@ -16,7 +16,7 @@ import type { FireParams } from '@/lib/fire-params'
 import { SCENARIO_VARIANTS, type ScenarioOverlay } from '@/components/app/horizon/sim-chart'
 import { STRATEGY_LABELS } from '@/lib/fire-strategy'
 import { ankerTitel, type AnkerStop } from '@/lib/horizon/anker-copy'
-import type { ActiveModal } from './types'
+import type { ActiveModal } from '@/components/toekomst/state/types'
 
 export interface CanvasLegendaProps {
   scenariosExpanded: boolean

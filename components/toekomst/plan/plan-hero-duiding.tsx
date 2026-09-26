@@ -9,7 +9,7 @@ import { formatMaskedApproxCurrency } from '@/lib/format'
 import type { AnkerReach, AnkerStop } from '@/lib/horizon/anker-copy'
 import type { HeroFireAge } from '@/lib/horizon/hero-fire-age'
 import { buildVrijheidsleeftijdZin } from '@/lib/horizon/vrijheidsleeftijd-zin'
-import type { HouseholdHeroData } from './types'
+import type { HouseholdHeroData } from '@/components/toekomst/state/types'
 
 /** Blok E + F — ankerdrieslag, duidingszin en voortgangsbalk (aaneengesloten in de bron). */
 export interface PlanHeroDuidingProps {

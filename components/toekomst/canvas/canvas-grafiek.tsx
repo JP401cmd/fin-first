@@ -62,7 +62,7 @@ import type {
   IeViewMode,
   OverlayEmphasis,
   PartnerLine,
-} from './types'
+} from '@/components/toekomst/state/types'
 
 // Verplaatst uit horizon-client r313–316: de énige consument is dit blok (kaart V3).
 const IncomeExpenseChart = dynamic(() =>

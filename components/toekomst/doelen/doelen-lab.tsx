@@ -26,7 +26,7 @@ import type { zoneVanHuidig, HefboomKey } from '@/lib/horizon/lab-grenzen-types'
 import type { buildCategorieReturnGroups, ToekomstScenarioDoel } from '@/lib/horizon/toekomst-scenario'
 import type { WhatIfOverrides } from '@/lib/types/horizon-whatif'
 import type { FireEndForm } from '@/lib/fire-strategy'
-import type { ActiveModal } from '@/components/toekomst/overlays/types'
+import type { ActiveModal } from '@/components/toekomst/state/types'
 
 export interface DoelenLabProps {
   verkenSectieZichtbaar: boolean

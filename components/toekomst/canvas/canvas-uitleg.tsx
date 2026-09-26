@@ -17,7 +17,7 @@ import { HideInSimple } from '@/components/app/hide-in-simple'
 import { LifelineReadout } from '@/components/app/horizon/lifeline-readout'
 import { GlossaryTerm } from '@/components/editorial'
 import { ChartOverlayExplainer } from '@/components/app/horizon/chart-overlay-explainer'
-import type { ChartMode, ReadoutData } from './types'
+import type { ChartMode, ReadoutData } from '@/components/toekomst/state/types'
 
 export interface CanvasUitlegProps {
   scenariosExpanded: boolean

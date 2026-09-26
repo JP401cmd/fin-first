@@ -37,6 +37,8 @@ import {
 } from '@/lib/format'
 
 const SOURCE_PATH = join(process.cwd(), 'components', 'app', 'horizon', 'horizon-client.tsx')
+/** De veldclassificatie van de grens woont sinds fase 1 stap 4 (ADR 0179) hier. */
+const FEEDS_PATH = join(process.cwd(), 'components', 'toekomst', 'state', 'euro-view-feeds.ts')
 
 const START_BAKEN = 'EURO-WEERGAVE: DE RENDER-GRENS'
 const EIND_BAKEN = 'EINDE EURO-WEERGAVE'
@@ -320,7 +322,7 @@ describe('horizon-client.tsx — euro-weergave-render-grens (T4)', () => {
     expect(src).toMatch(/stackedRows=\{viewWealthCompositionRows\}/)
     // De veldenlijst is expliciet (nooit "alles wat een getal is") en `age`
     // mag er niet in staan (klasse R).
-    const fieldsMatch = src.match(/const STACKED_ROW_MONEY_FIELDS = \[([^\]]+)\]/)
+    const fieldsMatch = readFileSync(FEEDS_PATH, 'utf8').match(/const STACKED_ROW_MONEY_FIELDS = \[([^\]]+)\]/)
     expect(fieldsMatch, 'STACKED_ROW_MONEY_FIELDS moet bestaan').not.toBeNull()
     for (const field of ['spaargeld', 'beleggingen', 'pensioen', 'vastgoed', 'overig', 'schulden']) {
       expect(fieldsMatch![1]).toContain(`'${field}'`)
@@ -334,7 +336,7 @@ describe('horizon-client.tsx — euro-weergave-render-grens (T4)', () => {
     // euro-veld op SimRow zou dus ongedeflateerd de rendergrens kruisen zonder
     // compile-fout. De dekkingsgard (`Exclude<keyof SimRow, …>` → `never`) draait
     // dat om; deze pin zorgt dat hij niet stil weggehaald wordt.
-    const src = readFileSync(SOURCE_PATH, 'utf8')
+    const src = readFileSync(FEEDS_PATH, 'utf8')
     expect(src).toMatch(/const SIM_ROW_NON_MONEY_FIELDS = \[/)
     expect(src).toMatch(/type OngeclassificeerdSimRowVeld = Exclude</)
     expect(src).toMatch(/AlleSimRowVeldenGeclassificeerd<OngeclassificeerdSimRowVeld>/)

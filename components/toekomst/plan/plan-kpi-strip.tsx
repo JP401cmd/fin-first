@@ -13,7 +13,7 @@ import type { FireDoelPaarRegel } from '@/lib/horizon/fire-doel-weergave'
 import { type HeroFireAge, heroFireAgeCaption } from '@/lib/horizon/hero-fire-age'
 import type { HorizonOutcomeGuard } from '@/lib/horizon/outcome-guard'
 import { HeroKpiNotice, ReceiptCue } from './plan-helpers'
-import type { HouseholdHeroData } from './types'
+import type { HouseholdHeroData } from '@/components/toekomst/state/types'
 
 /** Blok C — het mobiele kerngetal (< md), een knop naar de kassabon vrijheidsleeftijd. */
 export interface PlanKerngetalMobielProps {

@@ -22,7 +22,7 @@ import { HideInSimple } from '@/components/app/hide-in-simple'
 import { PillRow } from '@/components/app/pill-row'
 import { ChartTips } from '@/components/editorial/chart-tips'
 import { getFireProjectionTips, getWealthCompositionTips } from '@/lib/chart-tips'
-import type { ChartMode } from './types'
+import type { ChartMode } from '@/components/toekomst/state/types'
 
 export interface CanvasPillsProps {
   chartMode: ChartMode

@@ -4,7 +4,7 @@
 import type { Dispatch, SetStateAction } from 'react'
 import { TableProperties } from 'lucide-react'
 import type { SimResult } from '@/lib/fire-simulation'
-import type { HouseholdHeroData } from './types'
+import type { HouseholdHeroData } from '@/components/toekomst/state/types'
 
 /**
  * Blok B — de kopregel van de hero-kaart: perspectief-kicker + Details-pill (`relative z-[46]`,

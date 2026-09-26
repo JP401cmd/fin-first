@@ -21,7 +21,7 @@ import type { DeficitLoanCopy } from '@/lib/horizon/deficit-loan-copy'
 import type { DeficitLoanNotice } from '@/lib/horizon/deficit-loan-display'
 import type { EindsituatieDuiding } from '@/lib/horizon/eindsituatie-duiding'
 import type { BannerDisplay } from '@/lib/page-status/display'
-import type { ActiveModal } from './types'
+import type { ActiveModal } from '@/components/toekomst/state/types'
 
 /**
  * Blok I (meldingen) — niet-haalbaar, anker-tekort, reached_now, tekort-lening, AOW,

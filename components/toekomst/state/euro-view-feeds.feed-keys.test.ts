@@ -11,7 +11,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import { buildFactorByOffset, deflatePoints, deflateRowsByAge, buildFactorByAge } from '@/lib/euro-display'
-import { factorMapByPosition } from './horizon-client'
+import { factorMapByPosition } from './euro-view-feeds'
 
 /** Eigen kernelrijen: 40 t/m 44 jaar, 2% inflatie, jaar 0 = factor 1. */
 const EIGEN_RIJEN = [0, 1, 2, 3, 4].map(k => ({

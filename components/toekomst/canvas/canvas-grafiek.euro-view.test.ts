@@ -30,7 +30,6 @@ const CANVAS_BLADEREN = [
   'canvas-grafiek.tsx',
   'canvas-legenda.tsx',
   'marker-kleuren.ts',
-  'types.ts',
 ]
 
 const EURO_KOPREGEL = '// euro-view: ontvangt view*-feeds van de render-grens, deflateert niet zelf'

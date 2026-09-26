@@ -1,13 +1,13 @@
 ﻿'use client'
 
-import { useEffect, useState, useCallback, useRef, useMemo, useDeferredValue, useTransition, type RefObject } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo, useDeferredValue, useTransition } from 'react'
 import Link from 'next/link'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import type { HorizonPageData } from '@/lib/horizon-data-loader'
 import { HORIZON_EXIT_NOTICE_DISMISSED_SLUG } from '@/lib/horizon-data-loader'
 import { useHorizonFireSim } from '@/lib/hooks/use-horizon-fire-sim'
 import { useHorizonBron } from '@/lib/hooks/use-horizon-bron'
-import { type SimRow, type SimResult } from '@/lib/fire-simulation'
+import { type SimResult } from '@/lib/fire-simulation'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/components/app/toast-provider'
 
@@ -94,7 +94,6 @@ import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import {
   buildHouseholdProjectionInput,
   type HouseholdProjectionResult,
-  type HouseholdRetirementMethod,
 } from '@/lib/household-projection'
 import { HouseholdRetirementPane } from '@/components/app/horizon/household-retirement-pane'
 import { usePerspective } from '@/components/app/perspective-provider'
@@ -188,7 +187,6 @@ import {
   guardFreedomMoment,
   guardRetirementExpense,
   HORIZON_MISSENDE_GEGEVENS_LABEL,
-  type HorizonOutcomeGuard,
 } from '@/lib/horizon/outcome-guard'
 import {
   scenarioMonthlySpendDelta,
@@ -337,234 +335,27 @@ import {
 } from '@/lib/chart-tips'
 import { ToekomstOverlay, type OverlayBalloonDef, type ToekomstOverlayGeometry } from '@/components/app/horizon/toekomst-overlay'
 import { TOEKOMST_OVERLAY_BALLOONS } from '@/components/app/horizon/toekomst-overlay-balloons'
-
-type ActiveModal = null | 'scenarios' | 'simulations' | 'withdrawal' | 'backtesting' | 'strategie'
-
-// Household FIRE data shape (from /api/household/fire-projections)
-interface HouseholdHeroData {
-  householdName: string
-  fireAge: number | null
-  fireTarget: number
-  freedomPercentage: number
-  countdownDays: number
-  fireDate: string
-  freedomYears: number
-  freedomMonths: number
-  savingsRate: number
-  /** Jaarlijkse uitgave ná pensioen voor dit perspectief (huishouden = gecombineerd,
-   *  methode-afhankelijk; partner = diens eigen bedrag). Voedt de "Na pensioen"-KPI. */
-  retirementExpense: number
-}
-
-/**
- * Tap-affordance op een KPI-tegel die een kassabon opent (bevinding M5).
- *
- * De hero-KPI's waren al `<button>`-elementen met een kassabon eronder, maar dat
- * was uitsluitend af te lezen aan een hover-tint — op touch dus nergens. Een
- * prognose-kopgetal zonder zichtbaar spoor naar zijn aannames leest als een
- * vaststaand feit; dít bonnetje is dat spoor. Klein en in `--ink-4`, zodat het
- * de cijferregel niet beconcurreert, mét sr-only tekst zodat een schermlezer de
- * belofte óók hoort.
- *
- * Hoort in de kicker-rij van de tegel (`ml-auto` duwt hem naar rechts).
- */
-function ReceiptCue() {
-  return (
-    <>
-      <Receipt className="ml-auto h-3 w-3 shrink-0 text-[var(--ink-4)]" aria-hidden />
-      <span className="sr-only">— tik voor de aannames achter dit getal</span>
-    </>
-  )
-}
-
-/**
- * De "we missen gegevens"-melding ín een hero-KPI-tegel — ÉÉN vorm voor alle
- * tegels van de figures-strip (bevinding UR2-05).
- *
- * De melding bestond al, maar alleen op de Doelbedrag-tegel en tweemaal met de
- * hand uitgeschreven (desktop + mobiel). Daardoor kon een buur-KPI met dezelfde
- * ontbrekende brondata rustig een exact getal blijven tonen: er was geen vorm om
- * te hergebruiken, alleen markup om te kopiëren. Dit component ís die vorm —
- * kop (`guard.label`) in de cijferregel, uitleg (`guard.hint`) op de plek van
- * het bijschrift, zodat de tegel even hoog blijft als zijn buren en de rij niet
- * verspringt.
- *
- * `compact` = de mobiele 2×2-strip (kleinere typografie, krappere marges).
- * Tekst komt uitsluitend uit `lib/horizon/outcome-guard.ts` — nooit hier.
- */
-function HeroKpiNotice({
-  guard,
-  compact = false,
-  label,
-}: {
-  guard: HorizonOutcomeGuard
-  compact?: boolean
-  /**
-   * ADR 0127 — kop-override. De guard geeft app-breed één kop (zie
-   * HORIZON_MISSENDE_GEGEVENS_LABEL), en die klopt voor elk gegevensprobleem.
-   * Onder 'Nu stoppen' is `geen-doelvermogen` echter geen ontbrekend gegeven
-   * maar een EIGENSCHAP van de strategie: er ís geen doelbedrag. De hint van
-   * de guard blijft leidend.
-   */
-  label?: string
-}) {
-  return (
-    <>
-      <div
-        className={`${compact ? 'text-[13px]' : 'text-[16px] sm:text-[18px]'} font-black leading-tight tracking-[-0.01em]`}
-        style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
-      >
-        {label ?? guard.label}
-      </div>
-      <div
-        className={`italic text-[var(--ink-3)] ${compact ? 'text-[10px] mt-1' : 'text-[11px] mt-1.5'}`}
-        style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
-      >
-        {guard.hint}
-      </div>
-    </>
-  )
-}
-
-/**
- * Zichtbaarheids-gate (Task 4.2): `true` zodra het gegeven element (bijna) in beeld komt.
- * Gebruikt om de zware duiding-secties (scenario-presets) pas te laten
- * rekenen wanneer de gebruiker er (dreigt te) scrollen — niet meer eager in idle. Blijft
- * `true` na de eerste keer (unobserve): een eenmaal-berekende sectie hoeft niet te herrekenen
- * op scroll-terug. SSR-veilig: `IntersectionObserver` ontbreekt server-side → `true`
- * (degradeert naar het oude altijd-berekenen-gedrag, geen regressie).
- * `remountKey`: mount het geobserveerde element pas later (conditioneel gerenderd),
- * geef dan de mount-conditie mee — een wissel re-runt het effect zodat de observer
- * alsnog aanhaakt (een ref-wissel triggert zelf géén effect).
- */
-function useInViewOnce(ref: RefObject<HTMLElement | null>, rootMargin = '600px', remountKey: unknown = null): boolean {
-  const [inView, setInView] = useState(false)
-  useEffect(() => {
-    if (inView) return
-    const el = ref.current
-    if (!el) return
-    if (typeof IntersectionObserver === 'undefined') { setInView(true); return }
-    const obs = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((e) => e.isIntersecting)) {
-          setInView(true)
-          obs.disconnect()
-        }
-      },
-      { rootMargin },
-    )
-    obs.observe(el)
-    return () => obs.disconnect()
-  }, [ref, rootMargin, inView, remountKey])
-  return inView
-}
-
-/**
- * De euro-velden van `SimRow` — expliciet, nooit "alles wat een getal is".
- * `age` en `phase` zijn geen euro's en mogen dus nooit meegedeeld worden
- * (klasse R resp. metadata, zie ADR 0090 / het deflatieklasse-besluit D1).
- */
-const SIM_ROW_MONEY_FIELDS = [
-  'startPortfolio',
-  'growth',
-  'savings',
-  'withdrawal',
-  'cashflowNet',
-  'oneTimeNet',
-  'endPortfolio',
-  'grossIncome',
-  'grossExpenses',
-  'flowIn',
-  'flowOut',
-] as const satisfies readonly (keyof SimRow)[]
-
-/**
- * De overige velden van `SimRow`, met per veld de reden dat ze NIET meedeflateren.
- * Deze lijst bestaat alleen om de gard hieronder te laten werken.
- *
- *  - `age`   — klasse R (een leeftijd, geen euro; ADR 0090).
- *  - `phase` — metadata (opbouw/opname).
- *  - `incomeBreakdown` / `expenseBreakdown` — dragen WÉL bedragen, maar zijn geen
- *    getalvelden: `deflateRowsByAge` deflateert alleen `typeof === 'number'` en
- *    laat de items dus ongemoeid passeren. Vandaag inert (`toSimRow` vult ze niet,
- *    de inkomsten/uitgaven-strook loopt via een eigen pad); `lib/unified-projection.test.ts`
- *    grendelt dat vast, zodat het moment waarop de kernel ze wél gaat vullen als
- *    falende test opvalt in plaats van als ongedeflateerd bedrag op het scherm.
- */
-const SIM_ROW_NON_MONEY_FIELDS = [
-  'age',
-  'phase',
-  'incomeBreakdown',
-  'expenseBreakdown',
-] as const satisfies readonly (keyof SimRow)[]
-
-/**
- * De gard die de ANDERE kant op werkt.
- *
- * `satisfies readonly (keyof SimRow)[]` controleert alleen dat de genoemde
- * sleutels BESTAAN — niet dat alle geldvelden genoemd zijn. Een nieuw euro-veld
- * op `SimRow` zou dus stil ongedeflateerd de rendergrens kruisen binnen een
- * `InEuroView<SimRow>`, zónder compile-fout. Daarom eisen we hier dat beide
- * lijsten SAMEN élk veld van `SimRow` dekken: een nieuw veld valt in geen van
- * beide en laat `never` klappen, wat de auteur dwingt te kiezen tussen "dit is
- * een euro" (meedeflateren) en "dit is het niet" (met reden hierboven).
- */
-type OngeclassificeerdSimRowVeld = Exclude<
-  keyof SimRow,
-  (typeof SIM_ROW_MONEY_FIELDS)[number] | (typeof SIM_ROW_NON_MONEY_FIELDS)[number]
->
-type AlleSimRowVeldenGeclassificeerd<T extends never> = T
-// eslint-disable-next-line @typescript-eslint/no-unused-vars -- puur een compile-gard; het type dráágt de controle
-type _SimRowDekking = AlleSimRowVeldenGeclassificeerd<OngeclassificeerdSimRowVeld>
-
-/**
- * De euro-velden van `StackedRow` (vermogensopbouw-staven) — jaarstanden per
- * vermogensgroep, klasse S op de eigen leeftijd-as. `age` is klasse R en blijft
- * er bewust buiten. Bewaakt door horizon-client.euro-view.test.ts.
- */
-const STACKED_ROW_MONEY_FIELDS = [
-  'spaargeld',
-  'beleggingen',
-  'pensioen',
-  'vastgoed',
-  'overig',
-  'vastgoedEigenHuis',
-  'schulden',
-  'schuldHypotheek',
-  'schuldEigenHuisHypotheek',
-  'schuldOverig',
-  'schuldOpeethypotheek',
-  'schuldTekortLening',
-  'opeetOpname',
-] as const satisfies readonly (keyof StackedRow)[]
-
-/**
- * Deflator-map voor een feed die zijn EIGEN leeftijd-as draagt (partner- en
- * huishoudlijn). Positie `k` in zo'n reeks is jaar `k` vanaf vandaag, maar
- * `rows[k].age` is de leeftijd van de PARTNER. Een `factorByAge`-lookup op die
- * leeftijd pakt daarom de verkeerde jaarfactor zodra de partner niet even oud
- * is — en het resultaat oogt plausibel, dus je ziet het niet.
- *
- * Deze helper hangt daarom de jaarfactor van jaar `k` (uit de EIGEN kernelrijen)
- * aan de leeftijd die dezelfde positie in de vreemde reeks draagt, zodat
- * `deflateRowsByAge` er alsnog op sleutelt. Er wordt hier niets gedeeld en niets
- * uitgerekend — alleen omgesleuteld.
- *
- * Geëxporteerd omdat dit de enige plek is waar een verkeerde sleutelkeuze
- * ONZICHTBAAR fout gaat: het bedrag blijft plausibel. Zo'n fout moet in een test
- * vast te pinnen zijn, niet alleen in een review op te merken.
- */
-export function factorMapByPosition(
-  rows: readonly { age: number }[],
-  factorByOffset: readonly number[],
-): Map<number, number> {
-  const map = new Map<number, number>()
-  rows.forEach((row, index) => {
-    const factor = factorByOffset[index]
-    if (factor !== undefined) map.set(row.age, factor)
-  })
-  return map
-}
+import type {
+  ActiveModal,
+  ChartMode,
+  ClusterSheet,
+  EventPaneMode,
+  HouseholdHeroData,
+  HouseholdMainLine,
+  HouseholdRetireInfo,
+  IeViewMode,
+  ActiveFaseModal,
+  OverlayEmphasis,
+  PartnerLine,
+  StrategieInitialTab,
+} from '@/components/toekomst/state/types'
+import { SIM_ROW_MONEY_FIELDS, STACKED_ROW_MONEY_FIELDS, factorMapByPosition } from '@/components/toekomst/state/euro-view-feeds'
+import {
+  COLOR_LIFE_INCOME, COLOR_LIFE_EXPENSE, COLOR_NAT_ASSET, COLOR_NAT_DEBT, COLOR_NAT_SIM,
+  COLOR_NAT_DANGER, COLOR_PARTNER_EVENT, COLOR_GOAL, COLOR_GOAL_OVERDUE,
+} from '@/components/toekomst/canvas/marker-kleuren'
+import { ReceiptCue, HeroKpiNotice } from '@/components/toekomst/plan/plan-helpers'
+import { useInViewOnce } from '@/components/toekomst/plan/use-in-view-once'
 
 export default function HorizonPage({
   initialData,
@@ -599,23 +390,11 @@ export default function HorizonPage({
   const [householdOverlays, setHouseholdOverlays] = useState<HouseholdPartnerOverlay[] | null>(null)
   // Gezamenlijke lijn als HOOFDLIJN in huishoudweergave (matcht de hero-FIRE),
   // zodat de prominente lijn + marker het huishouden tonen i.p.v. de eigen lijn.
-  const [householdMainLine, setHouseholdMainLine] = useState<{
-    rows: SimRow[]
-    fireAge: number | null
-    fireAgeFractional: number | null
-    currentAge: number | null
-    /** Partner-AOW op de kijker-as uit de gecombineerde kernel-run (ADR 0168). */
-    partnerAowAge: number | null
-  } | null>(null)
+  const [householdMainLine, setHouseholdMainLine] = useState<HouseholdMainLine | null>(null)
   // Partner-projectie-pad (voor het wisselen van de hoofdlijn in partner-view).
   // `rows` is leeg wanneer de partner alleen 'totals' deelt of z'n toekomst
   // verbergt — dan tonen we geen partner-lijn (graceful degrade).
-  const [partnerLine, setPartnerLine] = useState<{
-    rows: SimRow[]
-    fireAge: number | null
-    fireAgeFractional: number | null
-    currentAge: number | null
-  } | null>(null)
+  const [partnerLine, setPartnerLine] = useState<PartnerLine | null>(null)
   // Levensgebeurtenissen van de PARTNER (read-only markers op de grafiek in
   // huishouden- + partner-view). Alleen naam + leeftijd + icoon — nooit
   // bewerkbaar (geen sourceId), nooit de partner's natuurlijke mijlpalen.
@@ -690,9 +469,9 @@ export default function HorizonPage({
   const [activeModal, setActiveModal] = useState<ActiveModal>(null)
   // Voorkeurs-tab bij het openen van de StrategieModal (bv. direct naar 'woning'
   // vanuit de "huis wordt nooit verkocht"-melding). Reset naar null bij sluiten.
-  const [strategieInitialTab, setStrategieInitialTab] = useState<'eind' | 'onttrekking' | 'woning' | null>(null)
+  const [strategieInitialTab, setStrategieInitialTab] = useState<StrategieInitialTab>(null)
   const [simModalOpen, setSimModalOpen] = useState(false)
-  const [activeFaseModal, setActiveFaseModal] = useState<'opbouw' | 'overgang' | 'onttrekking' | null>(null)
+  const [activeFaseModal, setActiveFaseModal] = useState<ActiveFaseModal>(null)
 
   // ADR 0129 D7 — de tweede kernel-run onder een vast anker ("vrij mogelijk vanaf"),
   // uitgepakt uit dezelfde worker-batch als de scenariokaarten. `null` = nog niet
@@ -730,8 +509,8 @@ export default function HorizonPage({
   const [scenarioPresets, setScenarioPresets] = useState<ScenarioPresetResult[] | null>(null)
   const [scenarioPresetsLoading, setScenarioPresetsLoading] = useState(false)
   const [incomeExpenseExpanded, setIncomeExpenseExpanded] = useState(false)
-  const [ieViewMode, setIeViewMode] = useState<'lines' | 'breakdown'>('lines')
-  const [chartMode, setChartMode] = useState<'vermogenspad' | 'vermogensopbouw'>('vermogenspad')
+  const [ieViewMode, setIeViewMode] = useState<IeViewMode>('lines')
+  const [chartMode, setChartMode] = useState<ChartMode>('vermogenspad')
 
   // Weergavemodus (eenvoudig/volledig) — de zwevende chart-tooltip verdwijnt in de
   // volledige weergave omdat de meebewegende cijferbar (LifelineReadout) die vervangt.
@@ -874,10 +653,7 @@ export default function HorizonPage({
   // Huishoud-aanpasflow (uitgave na pensioen) — geopend vanaf de "Na pensioen"-KPI
   // in huishoudweergave. candidates/method komen uit de combined-projectie.
   const [householdRetireOpen, setHouseholdRetireOpen] = useState(false)
-  const [householdRetireInfo, setHouseholdRetireInfo] = useState<{
-    candidates: { autoShared: number; sumPartners: number; custom: number | null }
-    method: HouseholdRetirementMethod
-  } | null>(null)
+  const [householdRetireInfo, setHouseholdRetireInfo] = useState<HouseholdRetireInfo>(null)
   // Klik op de "Na pensioen"-KPI (desktop + mobiel delen deze ene handler).
   // De huishoud-variant bestaat alleen als `householdRetireInfo` gevuld is — dat
   // gebeurt uitsluitend wanneer buildHouseholdProjectionInput() hasHousehold=true
@@ -893,8 +669,8 @@ export default function HorizonPage({
   }, [isHouseholdView, householdRetireInfo])
   const [eventPaneOpen, setEventPaneOpen] = useState(false)
   const [eventPaneEditingId, setEventPaneEditingId] = useState<string | null>(null)
-  const [eventPaneMode, setEventPaneMode] = useState<'catalog' | 'view' | 'edit'>('catalog')
-  const [clusterSheet, setClusterSheet] = useState<{ events: LifeEvent[]; centerAge: number } | null>(null)
+  const [eventPaneMode, setEventPaneMode] = useState<EventPaneMode>('catalog')
+  const [clusterSheet, setClusterSheet] = useState<ClusterSheet>(null)
   const [showFireAgeReceipt, setShowFireAgeReceipt] = useState(false)
   const [showFireTargetReceipt, setShowFireTargetReceipt] = useState(false)
   const [showResilienceReceipt, setShowResilienceReceipt] = useState(false)
@@ -976,7 +752,7 @@ export default function HorizonPage({
   // keer (geen localStorage-key), daarna gepersisteerd.
   const [overlayVisible, setOverlayVisible] = useState(true)
   // overlayEmphasis: welke grafiekfase een gehoverde/gefocuste ballon accentueert.
-  const [overlayEmphasis, setOverlayEmphasis] = useState<'accumulation' | 'withdrawal' | 'fire' | null>(null)
+  const [overlayEmphasis, setOverlayEmphasis] = useState<OverlayEmphasis>(null)
 
   // Deep-link: open modal via ?modal= URL param (from dashboard widgets)
   const searchParams = useSearchParams()
@@ -1818,27 +1594,6 @@ export default function HorizonPage({
     [initialData.housingStrategy, unifiedRows],
   )
 
-  // ── Chart event-overlay (markers boven/onder de bar) ───────────────────
-  // Bouw één lijst met ChartEventOverlay-items uit gebruiker-events +
-  // natuurlijke mijlpalen. De chart bepaalt zelf side+positie via xScale;
-  // wij leveren alleen de raw lijst met side-hint en kleur.
-  const COLOR_LIFE_INCOME = 'var(--color-horizon-500, #c4a06b)'
-  const COLOR_LIFE_EXPENSE = 'var(--color-kern-500, #6b4339)'
-  const COLOR_NAT_ASSET = 'var(--color-horizon-500, #c4a06b)'
-  const COLOR_NAT_DEBT = 'var(--color-kern-500, #6b4339)'
-  const COLOR_NAT_SIM = 'var(--ink-2, #4a453d)'
-  const COLOR_NAT_DANGER = 'var(--negative, #b91c1c)'
-  // Distinctieve partner-kleur voor read-only partner-event-markers (teal) —
-  // verschilt van eigen events (goud/bruin) en natuurlijke mijlpalen.
-  const COLOR_PARTNER_EVENT = '#0d9488'
-  // Doel-markers (M36) dragen het Wil-accent: `doelen` hoort in de module
-  // `inzicht_acties` → navModule 'wil' (lib/module-registry.ts). Dat token is
-  // door de gebruiker instelbaar, dus geen losse hex — de fallback benadert
-  // alleen de standaard-wil uit globals.css voor het geval de var ontbreekt.
-  // Een verstreken streefdatum is SEMANTIEK (stoplicht-rood) en volgt de
-  // accentkeuze bewust niet.
-  const COLOR_GOAL = 'var(--color-wil-600, #3a2f52)'
-  const COLOR_GOAL_OVERDUE = 'var(--negative, #b91c1c)'
 
   // Doelen met een kalender-streefdatum → markers op de leeftijd-as. De
   // omzetting (en alle uitsluitingen) leeft in lib/horizon/goal-chart-markers.ts;
