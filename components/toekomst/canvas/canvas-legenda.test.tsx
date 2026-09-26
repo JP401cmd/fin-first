@@ -90,3 +90,20 @@ describe('CanvasLegenda', () => {
     expect(screen.queryByText(/Zelf een stopmoment kiezen/)).toBeNull()
   })
 })
+
+describe('legenda op één regel (Doelen, ADR 0179 D7)', () => {
+  it('eenRegel: mobiel alleen de eerste rij, zonder terugloop; vanaf lg de volle legenda', () => {
+    renderLegenda({ rendementScenarios: true, scenarioData, marktcheck: true, mcData, eenRegel: true })
+    const legenda = screen.getByTestId('canvas-legenda')
+    expect(legenda.getAttribute('data-een-regel')).toBe('true')
+    expect(legenda.className).toContain('max-lg:[&>div:nth-child(n+2)]:hidden')
+    expect(legenda.className).toContain('max-lg:[&>div]:flex-nowrap')
+  })
+
+  it('standaard (Plan): geen éénregel-klassen', () => {
+    renderLegenda({ rendementScenarios: true, scenarioData })
+    const legenda = screen.getByTestId('canvas-legenda')
+    expect(legenda.getAttribute('data-een-regel')).toBeNull()
+    expect(legenda.className).not.toContain('nth-child')
+  })
+})

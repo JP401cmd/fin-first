@@ -299,6 +299,18 @@ describe('ToekomstCanvas — Doelen', () => {
     expect((within(doelscenario).getByRole('checkbox') as HTMLInputElement).disabled).toBe(true)
   })
 
+  it('één scherm (ADR 0179 D7): geen cijferbalk en geen tijdlijn, lagere grafiek; Plan houdt ze', () => {
+    renderIn('doelen')
+    expect(screen.queryByTestId('canvas-readout')).toBeNull()
+    expect(grafiek().toonTijdlijn).toBe(false)
+    expect(grafiek().toonReadout).toBe(false)
+    // useIsLgUp is hier gemockt op true ⇒ de desktophoogte.
+    expect(grafiek().plotHoogte).toBe(220)
+    renderIn(null)
+    expect(grafiek().toonTijdlijn).toBe(true)
+    expect(grafiek().plotHoogte).toBeNull()
+  })
+
   it('zegt in Samenstelling dat die modus het plan volgt', () => {
     canvasModus = 'samenstelling'
     renderIn('doelen')

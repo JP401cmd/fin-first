@@ -27,6 +27,8 @@
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+import { useIsLgUp } from '@/lib/hooks/use-media-query'
+import { useViewportHoogte } from '@/lib/hooks/use-viewport-hoogte'
 import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
 import type { OverlayBalloonDef } from '@/components/app/horizon/toekomst-overlay'
 import { TOEKOMST_OVERLAY_BALLOONS } from '@/components/app/horizon/toekomst-overlay-balloons'
@@ -174,6 +176,9 @@ export function ToekomstCanvas() {
   const { masked } = useMaskedAmounts()
   const router = useRouter()
   const katern = useActiefKatern()
+  // De hoogte van de Doelen-grafiek hangt aan het breekpunt en (mobiel) aan de viewport.
+  const breed = useIsLgUp()
+  const viewportHoogte = useViewportHoogte()
 
   // overlayEmphasis: welke grafiekfase een gehoverde/gefocuste ballon accentueert.
   const [overlayEmphasis, setOverlayEmphasis] = useState<OverlayEmphasis>(null)
@@ -189,9 +194,9 @@ export function ToekomstCanvas() {
         katern,
         { modus: canvasModus, lagen: canvasLagenKeuze },
         { doelen: heeftDoelen, doelscenario: hasDoelLijn, metHuis: dualBasisAvailable, doelscenarioRijen },
-        { eenvoudig },
+        { eenvoudig, breed, viewportHoogte },
       ),
-    [katern, canvasModus, canvasLagenKeuze, heeftDoelen, hasDoelLijn, dualBasisAvailable, doelscenarioRijen, eenvoudig],
+    [katern, canvasModus, canvasLagenKeuze, heeftDoelen, hasDoelLijn, dualBasisAvailable, doelscenarioRijen, eenvoudig, breed, viewportHoogte],
   )
   // ADR 0179 fase 4: in Doelen tonen Samenstelling en Geldstroom het doelscenario, uit
   // feeds die al over de euro-grens zijn en uit dezelfde run als de stippellijn.
@@ -438,6 +443,7 @@ export function ToekomstCanvas() {
               setActiveFaseModal={setActiveFaseModal}
               toonFasebalk={stand.toonFasebalk}
               toonReadout={stand.toonReadout}
+              toonTijdlijn={stand.toonTijdlijn}
               plotHoogte={stand.plotHoogte}
               doelscenario={doelscenarioFeed}
             />
@@ -461,6 +467,7 @@ export function ToekomstCanvas() {
                 mcPending={mcPending}
                 mcFailed={mcFailed}
                 liquidWealthPoints={liquidWealthPoints}
+                eenRegel={stand.legendaEenRegel}
               />
             )}
 

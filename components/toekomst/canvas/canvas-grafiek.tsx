@@ -174,6 +174,8 @@ export interface CanvasGrafiekProps {
   toonFasebalk: boolean
   /** Het katern draagt de cijferbalk (`LifelineReadout`, desktop, Volledig). */
   toonReadout: boolean
+  /** De gebeurtenissentijdlijn onder de grafiek (niet in Doelen, `CanvasStand.toonTijdlijn`). Afwezig = ja. */
+  toonTijdlijn?: boolean
   /** Compacte basishoogte van de vermogensgrafiek (`CanvasStand.plotHoogte`); `null` ⇒ standaard. */
   plotHoogte: number | null
   /**
@@ -270,6 +272,7 @@ export function CanvasGrafiek({
   setActiveFaseModal,
   toonFasebalk,
   toonReadout,
+  toonTijdlijn = true,
   plotHoogte,
   doelscenario = null,
 }: CanvasGrafiekProps) {
@@ -499,7 +502,7 @@ export function CanvasGrafiek({
                           Alleen in Vermogen: Samenstelling toont events al inline
                           boven/onder de staven via ChartEventMarkers — een aparte
                           timeline eronder zou dubbele informatie zijn. */}
-                      {modus === 'vermogen' && eventsForTimeline.length > 0 && (
+                      {toonTijdlijn && modus === 'vermogen' && eventsForTimeline.length > 0 && (
                         <EventsTimeline
                           events={eventsForTimeline}
                           currentAge={currentAge ?? 30}

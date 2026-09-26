@@ -43,6 +43,11 @@ export interface CanvasLegendaProps {
   mcPending: boolean
   mcFailed: boolean
   liquidWealthPoints: [number, number][] | undefined
+  /**
+   * Op mobiel hoogstens één regel (katern Doelen, ADR 0179 D7): alleen de eerste rij,
+   * zonder terugloop. Vanaf `lg` de volle legenda.
+   */
+  eenRegel?: boolean
 }
 
 export function CanvasLegenda({
@@ -57,6 +62,7 @@ export function CanvasLegenda({
   mcPending,
   mcFailed,
   liquidWealthPoints,
+  eenRegel = false,
 }: CanvasLegendaProps) {
   if (!toonLegendaBij(aantalReeksen)) return null
   const toonRendement = rendementScenarios && scenarioData != null
@@ -64,7 +70,15 @@ export function CanvasLegenda({
   if (!toonRendement && !toonMarktcheck) return null
 
   return (
-    <div className="mt-2 space-y-2" data-testid="canvas-legenda">
+    <div
+      className={`mt-2 space-y-2 ${
+        eenRegel
+          ? 'max-lg:[&>div:nth-child(n+2)]:hidden max-lg:[&>div]:flex-nowrap max-lg:[&>div]:overflow-hidden max-lg:[&>div]:whitespace-nowrap'
+          : ''
+      }`}
+      data-testid="canvas-legenda"
+      data-een-regel={eenRegel || undefined}
+    >
       {toonRendement && (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
           {scenarioData.map((s, i) => (

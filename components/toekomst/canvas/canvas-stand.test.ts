@@ -10,6 +10,8 @@ import { describe, it, expect } from 'vitest'
 import { LAAG_VOLGORDE, LAGEN_EENVOUDIG, type LaagId } from '@/lib/horizon/katern-copy'
 import {
   COMPACTE_PLOTHOOGTE,
+  DOELEN_PLOTHOOGTE_DESKTOP,
+  doelenPlotHoogteMobiel,
   canvasStand,
   type CanvasBeschikbaarheid,
   type CanvasKeuze,
@@ -124,21 +126,18 @@ describe('canvasStand — Instellingen', () => {
     expect(stand.alleenDesktop).toBe(true)
   })
 
-  it('geeft de grafiek een compacte plothoogte; Plan en Doelen houden de standaard (spec §4.5)', () => {
+  it('geeft de grafiek een compacte plothoogte; Plan houdt de standaard (spec §4.5)', () => {
     expect(stand.plotHoogte).toBe(COMPACTE_PLOTHOOGTE)
     expect(COMPACTE_PLOTHOOGTE).toBeLessThan(220)
-    for (const katern of ['plan', 'doelen'] as const) {
-      expect(canvasStand(katern, standaard, alles, VOLLEDIG).plotHoogte).toBeNull()
-    }
+    expect(canvasStand('plan', standaard, alles, VOLLEDIG).plotHoogte).toBeNull()
   })
 
-  it('tekent alleen de hoofdlijn en heeft geen cijferbalk; Plan en Doelen wel', () => {
+  it('tekent alleen de hoofdlijn en heeft geen cijferbalk; Plan wel, Doelen wel de doellijnen', () => {
     expect(stand.alleenHoofdlijn).toBe(true)
     expect(stand.toonReadout).toBe(false)
+    expect(canvasStand('plan', standaard, alles, VOLLEDIG).toonReadout).toBe(true)
     for (const katern of ['plan', 'doelen'] as const) {
-      const s = canvasStand(katern, standaard, alles, VOLLEDIG)
-      expect(s.alleenHoofdlijn).toBe(false)
-      expect(s.toonReadout).toBe(true)
+      expect(canvasStand(katern, standaard, alles, VOLLEDIG).alleenHoofdlijn).toBe(false)
     }
   })
 })
@@ -234,5 +233,44 @@ describe('canvasStand — bron van Samenstelling en Geldstroom (ADR 0179 fase 4)
     expect(canvasStand('doelen', keuze('vermogen'), b(true, true), W).grafiekBron).toBe('plan')
     expect(canvasStand('plan', keuze('samenstelling'), b(true, true), W).grafiekBron).toBe('plan')
     expect(canvasStand('instellingen', keuze('samenstelling'), b(true, true), W).grafiekBron).toBe('plan')
+  })
+})
+
+describe('canvasStand — Doelen: grafiek en knoppen op één scherm (ADR 0179 D7, spec §4.2 regel 9)', () => {
+  const k = { modus: 'vermogen' as const, lagen: Object.fromEntries(LAAG_VOLGORDE.map((id) => [id, false])) as Record<LaagId, boolean> }
+  const b = { doelen: true, doelscenario: true, metHuis: false }
+
+  it('mobiel: clamp(170px, 30vh, 230px); zonder viewport 200', () => {
+    expect([500, 600, 700, 800, 900].map((vh) => doelenPlotHoogteMobiel(vh))).toEqual([170, 180, 210, 230, 230])
+    expect(doelenPlotHoogteMobiel(null)).toBe(200)
+    expect(doelenPlotHoogteMobiel(undefined)).toBe(200)
+    expect(doelenPlotHoogteMobiel(0)).toBe(200)
+    // 360×800 en 390×844 (onder de TopBar staat ±752 resp. ±796 px): altijd 230.
+    expect(canvasStand('doelen', k, b, { eenvoudig: false, viewportHoogte: 800 }).plotHoogte).toBe(230)
+    expect(canvasStand('doelen', k, b, { eenvoudig: false, viewportHoogte: 667 }).plotHoogte).toBe(200)
+  })
+
+  it('desktop: de vaste Doelen-hoogte, lager dan de standaard 260', () => {
+    const s = canvasStand('doelen', k, b, { eenvoudig: false, breed: true, viewportHoogte: 720 })
+    expect(s.plotHoogte).toBe(DOELEN_PLOTHOOGTE_DESKTOP)
+    expect(DOELEN_PLOTHOOGTE_DESKTOP).toBeLessThan(260)
+  })
+
+  it('geen cijferbalk, geen tijdlijn, legenda op één regel; Plan houdt ze', () => {
+    const d = canvasStand('doelen', k, b, { eenvoudig: false })
+    expect(d.toonReadout).toBe(false)
+    expect(d.toonTijdlijn).toBe(false)
+    expect(d.legendaEenRegel).toBe(true)
+    expect(d.toonAannamesregel).toBe(false)
+    const p = canvasStand('plan', k, b, { eenvoudig: false })
+    expect(p.toonTijdlijn).toBe(true)
+    expect(p.legendaEenRegel).toBe(false)
+  })
+
+  it('marktcheck staat in Doelen uit zolang de gebruiker hem niet koos; een eigen keuze blijft staan', () => {
+    const b2 = { doelen: true, doelscenario: true, metHuis: false }
+    expect(canvasStand('doelen', k, b2, { eenvoudig: false }).lagen.marktcheck).toBe(false)
+    const metKeuze = { ...k, lagen: { ...k.lagen, marktcheck: true } }
+    expect(canvasStand('doelen', metKeuze, b2, { eenvoudig: false }).lagen.marktcheck).toBe(true)
   })
 })
