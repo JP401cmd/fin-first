@@ -297,7 +297,7 @@ export function resolveFinActionIntent(
  * zelfde id → één "Toegevoegd"-status.
  */
 export function finActionIntentHash(intent: ResolvedFinActionIntent): string {
-  const basis = `${intent.title} ${intent.description ?? ''} ${intent.freedom_days_impact}`
+  const basis = `${intent.title}\u0000${intent.description ?? ''}\u0000${intent.freedom_days_impact}`
   // djb2 — klein, deterministisch, botsingsarm genoeg voor UI-dedupe.
   let h = 5381
   for (let i = 0; i < basis.length; i++) {

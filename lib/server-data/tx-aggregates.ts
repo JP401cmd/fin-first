@@ -439,7 +439,7 @@ export function buildMonthAggregatesFromRows(
     const month = r.date.slice(0, 7)
     const bid = r.budget_id ?? null
     const type = r.transaction_type ?? null
-    const key = `${month} ${bid ?? ''} ${type ?? ''}`
+    const key = `${month}\u0000${bid ?? ''}\u0000${type ?? ''}`
     let g = groups.get(key)
     if (!g) {
       g = { month, budget_id: bid, transaction_type: type, sum_positief: 0, sum_negatief: 0, count: 0 }
