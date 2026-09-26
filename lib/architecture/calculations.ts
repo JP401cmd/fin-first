@@ -1709,12 +1709,12 @@ export const CALCULATIONS: Calculation[] = [
     domain: 'Toekomst (FIRE)',
     summary:
       'Berekent de eenmalige kosten koper bij het life-event “Huis kopen” (hoofdverblijf): overdrachtsbelasting (met startersvrijstelling), notaris, taxatie, bankgarantie en NHG-borgtochtprovisie. Het totaal stroomt als eenmalige uitgave in de FIRE-projectie (life_events → SimCashflow → horizon-kernel) — verkeerde grenzen = verkeerd bedrag. Enige bron van waarheid; voorheen 4× gedupliceerd in horizon-client.tsx met verouderde 2024-grenzen.',
-    inputs: ['aankoopprijs', 'starter (metadata.eersteWoning)', 'NHG (metadata.nhg)'],
+    inputs: ['aankoopprijs (story-vraag koopprijs)', 'starter (story-vraag starter)', 'NHG (story-vraag nhg)'],
     outputs: ['overdracht', 'notaris', 'taxatie', 'bankgarantie', 'nhgKosten', 'totaal (kosten koper €)'],
     formula:
       'overdracht = (starter ∧ prijs ≤ €555.000) ? 0 : round(prijs × 2%); nhgKosten = (NHG ∧ prijs ≤ €470.000) ? round(prijs × 0,4%) : 0; totaal = overdracht + €1.200 (notaris) + €500 (taxatie) + round(prijs × 0,1%) (bankgarantie) + nhgKosten',
-    files: ['lib/kosten-koper.ts', 'lib/constants.ts', 'lib/horizon/event-prefill.ts'],
-    functions: ['computeKostenKoper'],
+    files: ['lib/kosten-koper.ts', 'lib/constants.ts', 'lib/life-event-stories.ts', 'components/app/horizon/event-pane-edit.tsx', 'lib/horizon/event-prefill.ts'],
+    functions: ['computeKostenKoper', 'computeSuggestedEventValues'],
     constants: [
       { label: 'OVB_TARIEF_EIGEN_WONING', value: '2% overdrachtsbelasting eigen woning (hoofdverblijf, niet-starter). Bron: Belastingdienst, 2026' },
       { label: 'STARTERSVRIJSTELLING_MAX', value: '€555.000 — startersvrijstelling-grens (was €510.000). Bron: Belastingdienst, 2026' },
@@ -1722,7 +1722,7 @@ export const CALCULATIONS: Calculation[] = [
       { label: 'NHG_BORGTOCHTPROVISIE_PCT', value: '0,4% borgtochtprovisie (was 0,6%). Bron: nhg.nl, 2026' },
     ],
     elementIds: ['as-planning', 'as-belasting', 'fn-toekomstplannen'],
-    note: 'Fiscale grenzen zijn jaargebonden — alle constanten staan in lib/constants.ts met bron + jaartal (jaarlijks verifiëren). De vier UI-call-sites zaten in het legacy-gebeurtenisformulier van horizon-client.tsx, dat alleen nog via de oude deeplink ?modal=life_events bereikbaar was; dat formulier is verwijderd (ADR 0179 fase 1 stap 2, 26 sep 2026). De enige aanroeper is nu computeSuggestedEventValues (lib/horizon/event-prefill.ts), en die heeft zelf geen productie-aanroeper: de EventPane rekent kosten koper (nog) niet uit. Open vervolg: de EventPane deze motor laten consumeren, of hem bewust opruimen. Een tweede woning/beleggingspand (holiday_home_purchase) valt hier NIET onder — 8% OVB (2026), geen startersvrijstelling, en het bedrag is daar handmatig.',
+    note: 'Fiscale grenzen zijn jaargebonden — alle constanten staan in lib/constants.ts met bron + jaartal (jaarlijks verifiëren). De vier UI-call-sites zaten in het legacy-gebeurtenisformulier van horizon-client.tsx, dat alleen nog via de oude deeplink ?modal=life_events bereikbaar was; dat formulier is verwijderd (ADR 0179 fase 1 stap 2, 26 sep 2026). Sinds 26 sep 2026 consumeert de EventPane de motor weer: de story “Huis kopen” (LIFE_EVENT_STORIES.house_purchase in lib/life-event-stories.ts, gerenderd door EventPaneEdit) rekent het Eenmalig-blok uit computeKostenKoper(koopprijs, starter, nhg) en vervangt daarmee het oude vaste percentage (0/4/6/10%). Advies- en makelaarskosten zitten niet in de motor; de microcopy zegt dat. computeSuggestedEventValues (lib/horizon/event-prefill.ts) roept de motor ook aan en voedt via lib/horizon/event-pane-voorstel.ts de voorstellen voor werkloosheid en overlijden partner. Een tweede woning/beleggingspand (holiday_home_purchase) valt hier NIET onder — 8% OVB (2026), geen startersvrijstelling, en het bedrag is daar handmatig.',
   },
   {
     id: 'risico-levensgebeurtenissen',
@@ -1749,9 +1749,11 @@ export const CALCULATIONS: Calculation[] = [
       'lib/sociale-zekerheid.ts',
       'lib/horizon/risico-event-regels.ts',
       'lib/horizon/life-events-catalog.ts',
+      'lib/horizon/event-pane-voorstel.ts',
       'components/app/horizon/horizon-client.tsx',
     ],
     functions: [
+      'risicoEventVoorstel',
       'berekenWerkloosheidImpact',
       'berekenOverlijdenPartnerImpact',
       'berekenWwUitkering',
