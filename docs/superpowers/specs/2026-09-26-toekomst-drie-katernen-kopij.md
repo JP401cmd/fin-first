@@ -109,6 +109,27 @@ Getoetst op merkstem en compliance. Alle teksten staan in `lib/horizon/katern-co
 | "Niet verplaatst" · "Je kunt alleen gebeurtenissen verplaatsen die je zelf hebt toegevoegd. Deze staat weer op zijn oude plek." | Goedkeuren | Eerlijk en beschrijvend. Onthult niets over de partner: het zegt alleen dat de gebeurtenis niet van jou is. |
 | Nav-naam voor schermlezers "Onderdelen van je toekomstplan"; i-tekst "Heeft Plan, Doelen of Instellingen een melding, …" | Aangepast (commit `4ee6a58ee`) | "katern" is intern vakjargon (DNA-toon: vakterm vermijden). |
 
+## 10. Aanvulling: kopij uit de laatste fixrondes (26–27 sep, nacht)
+
+Getoetst op merkstem (constaterend, geen koop-/verkoopmetafoor, geen vakjargon) en compliance (inzicht, geen advies). De teksten komen uit stroom C1 (meldingen, kop, i-teksten), C3 (Plan), KK (kosten koper) en FX-D.
+
+| Tekst | Besluit | Waarom |
+|---|---|---|
+| Tweede actie "Stopmoment" (bij "niet haalbaar" en een tekort onder een vast anker) | Goedkeuren | Een bestemming, geen aansporing. Hij wijst naar de ene plek waar het stopmoment wordt ingesteld (§4.2 regel 5). |
+| Tweede actie "Bespreek met Fin" (bij tekort-lening en eindsituatie; eigenaarsbesluit 26 sep) | Goedkeuren | Knoplabel, net als "Aanpassen →" en "Bijwerken →": de regel "constaterend, geen imperatief" geldt voor oordeel- en statuszinnen, niet voor de naam van een knop. Het label bestond al in de app. Hij verschijnt alleen met AI-toegang en in de gespreksmodus (UAT TOEK-52/56). |
+| "Nog 1 melding" / "Nog N meldingen" | Goedkeuren | Telling, geen oordeel. |
+| Schermlezer na minimaliseren: "Melding geminimaliseerd. Het punt bij Plan onder de grafiek haalt de melding terug." (ook Doelen en Instellingen) | Goedkeuren | Beschrijft wat er gebeurde en waar de melding terugkomt, zonder het woord "katern". |
+| Kop-link met melding: "Plan, melding: …" | Goedkeuren | Toegankelijke naam; eerder stond er twee keer "Plan". |
+| KPI 1 bij een onbereikbaar plan: "Niet binnen je plan" | Goedkeuren | Dezelfde formule als de drie getallen onder de Marktcheck-band (§7). Zegt wat de som laat zien, zonder oordeel over de persoon. |
+| "Opnamerate (ingesteld)" in de kassabon naast KPI 3 "Wat je plan onttrekt" (eigenaarsbesluit 26 sep) | Goedkeuren | Twee grootheden krijgen twee namen: wat je instelt, en wat je plan werkelijk onttrekt. Percentages in nl-NL (komma). |
+| Doelbedrag-onderschrift onder een vast anker zonder eigen woning: "na schulden" (met woning blijft "zonder je huis") | Goedkeuren | Het onderschrift noemt je huis alleen als je er een hebt; anders zegt het wat er van het bedrag af gaat. |
+| Aannamesregel onder "Mijn vermogen mag niet slinken": "je vermogen mag niet slinken", zonder eindleeftijd; onder een vast anker zonder stopmoment-segment | Goedkeuren | Een eeuwigdurend plan heeft geen eindleeftijd, en het stopmoment staat onder een vast anker al in de kop. Elk getal één keer per scherm (§4.2 regel 10). |
+| i-teksten van Plan, Doelen en Instellingen (commit `d0f175e04`), o.a. "Je sleept een gebeurtenis naar een ander jaar en ziet meteen hoe je vrijheidsmoment verschuift." en "een kleine bijstelling kan jaren schelen" | Goedkeuren | Beschrijven de werking van het scherm. "Kan jaren schelen" is een mogelijkheid, geen belofte. |
+| Catalogustip "Huis kopen": "Kosten koper: overdrachtsbelasting (2%; starters tot €555.000 vrijgesteld), notaris, taxatie, bankgarantie en eventueel NHG, plus ca. €2.750 voor hypotheekadvies en bemiddeling en ca. €3.500 als je een aankoopmakelaar neemt. Bij een koopsom van €250.000–€600.000 is dat samen ca. €5K–€21K. …" · bandbreedte "€5K–€21K kosten koper" | Goedkeuren | Feitelijke, generieke indicaties met bron en jaartal in `lib/constants.ts`. Ze gaan over kosten, niet over een product: geen advies (compliance-check, "feitelijke vergelijkingen zonder aanbeveling"). De makelaar is optioneel, geen aanrader. De bandbreedte is gepind tegen `computeKostenKoper`. |
+| Kassabonregels "Hypotheekadvies + bemiddeling (indicatie)" en "Aankoopmakelaar, vast tarief (indicatie, optioneel)" | Goedkeuren | Het woord "indicatie" maakt de aard van het getal zichtbaar; de bron staat erbij. |
+
+**Nog te toetsen:** de teksten van de laatste verbouwing: Plan met de gebeurtenissen, het verloop in de gezondheidskassabon, de instellingenrijen en het samengevoegde Doelen. Die krijgen een eigen aanvulling zodra ze gebouwd zijn.
+
 ## Wat dit vraagt van de bouw (fase 1–2)
 
 - Ankerregel: consumeer `ankerVrijZin` en `ankerTitel` uit `lib/horizon/anker-copy.ts` en schrijf geen nieuwe zinnen. KPI 1 via `formatHeroFireAge`.
