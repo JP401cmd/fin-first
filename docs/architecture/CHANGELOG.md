@@ -1216,3 +1216,7 @@
 - **Schermen** toegevoegd: /toekomst/instellingen
 - **Schermen** verwijderd: /toekomst/gebeurtenissen, /toekomst/voorkeuren
 - **Componenten (aantal)** toegevoegd: +40
+
+## 2026-09-26
+
+- **Componenten (aantal)** toegevoegd: +19
