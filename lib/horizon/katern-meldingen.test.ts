@@ -134,6 +134,12 @@ describe('Plan — niet haalbaar onder solved', () => {
     expect(m.actie).toEqual({ label: 'Verken je opties', href: '/toekomst/doelen' })
   })
 
+  it('tweede actie "Stopmoment" naar de stopmoment-instelling in Instellingen (spec §4.8, C1 punt 6)', () => {
+    const [m] = wijsMeldingenToe(metInput({ plan: niet })).plan.meldingen
+    expect(m.tweedeActie).toEqual({ label: 'Stopmoment', href: '/toekomst/instellingen?regel=eindstrategie' })
+    expect(m.tweedeActie?.href).toBe(instellingenRegelHref('eindstrategie'))
+  })
+
   it('maandhint: 0 en null geven geen uitleg, > 0 de canonieke antwoordzin (ook masked)', () => {
     expect(wijsMeldingenToe(metInput({ plan: { ...niet, kernelMaandHint: 0 } })).plan.meldingen[0].uitleg).toBeUndefined()
     expect(wijsMeldingenToe(metInput({ plan: { ...niet, kernelMaandHint: null } })).plan.meldingen[0].uitleg).toBeUndefined()
@@ -173,6 +179,7 @@ describe('Plan — tekort onder een vast anker', () => {
     expect(m.titel).toBe('Plan dekt 87%')
     expect(m.uitleg).toBe(ankerZin({ kind: 'reikt-tot', age: 84.5, endAge: 90 }, { kind: 'age', stopAge: 60 }))
     expect(m.actie?.href).toBe(KATERN_ROUTE.doelen)
+    expect(m.tweedeActie).toEqual({ label: 'Stopmoment', href: instellingenRegelHref('eindstrategie') })
   })
 
   it('alle drie shortfall-statussen tellen; reached_at en ontbrekend bereik niet', () => {
@@ -412,11 +419,23 @@ describe('toewijzing — sortering en uniciteit', () => {
       '/mijn/profiel',
     ])
     for (const m of alleMeldingen(wijsMeldingenToe(ALLES))) {
-      if (m.actie) {
-        expect(toegestaan.has(m.actie.href), `${m.id} → ${m.actie.href}`).toBe(true)
-        expect(m.actie.label.endsWith('→')).toBe(false)
+      for (const actie of [m.actie, m.tweedeActie]) {
+        if (!actie) continue
+        expect(toegestaan.has(actie.href), `${m.id} → ${actie.href}`).toBe(true)
+        expect(actie.label.endsWith('→')).toBe(false)
+      }
+      // Twee acties = twee verschillende plekken; een tweede zonder eerste bestaat niet.
+      if (m.tweedeActie) {
+        expect(m.actie).not.toBeNull()
+        expect(m.tweedeActie.href).not.toBe(m.actie?.href)
       }
     }
+  })
+
+  it('alleen de plan-melding (niet haalbaar / tekort) draagt een tweede actie', () => {
+    const metTweede = alleMeldingen(wijsMeldingenToe(ALLES)).filter((m) => m.tweedeActie)
+    expect(metTweede).toHaveLength(1)
+    expect(metTweede.map((m) => m.id).every((id) => id === 'plan-tekort' || id === 'plan-niet-haalbaar')).toBe(true)
   })
 
   it('de wizard-voortgang is geen melding: het inputcontract kent haar niet', () => {

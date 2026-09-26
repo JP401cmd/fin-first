@@ -1,7 +1,8 @@
 'use client'
 
 import { useId, useState } from 'react'
-import { ChevronDown } from 'lucide-react'
+import Link from 'next/link'
+import { ArrowRight, ChevronDown } from 'lucide-react'
 import type { LeverageStatus } from '@/lib/leverage-status'
 import type { KaternMelding as KaternMeldingData } from '@/lib/horizon/katern-meldingen'
 import { katernMeldingGeminimaliseerdSr, katernMeldingNogLabel } from '@/lib/horizon/katern-copy'
@@ -73,16 +74,57 @@ export function KaternMelding({
   )
 }
 
-/** Eén melding als kaart: `PageStatusBannerBody` compact, het enige uiterlijk. */
+const FOCUS_RING =
+  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]'
+
+/**
+ * Eén melding als kaart: `PageStatusBannerBody` compact, het enige uiterlijk.
+ *
+ * Een tweede actie (spec §4.8, "Stopmoment →") staat vanaf `lg` in de actie-rij naast
+ * de eerste (`extraActions`). Mobiel is de kaart één regel (titel · actie ·
+ * minimaliseren); daar staat de tweede actie onder de uitleg, na een tik op de titel —
+ * dezelfde plek als de uitleg zelf. Elke actie wijst naar één plek; beide varianten
+ * dragen dezelfde href.
+ */
 function MeldingKaart({ melding, onMinimize }: { melding: KaternMeldingData; onMinimize?: () => void }) {
+  const uitleg = melding.uitleg || null
+  const tweede = melding.actie != null ? (melding.tweedeActie ?? null) : null
   return (
     <PageStatusBannerBody
       variant="compact"
       tone={statusBannerTone(melding.ernst, melding.ernst === 'neutral')}
       kicker={kicker(melding.ernst)}
       title={melding.titel}
-      explanation={melding.uitleg || null}
+      explanation={
+        tweede == null ? (
+          uitleg
+        ) : (
+          <>
+            {uitleg}
+            <span className="flex lg:hidden">
+              <Link
+                href={tweede.href}
+                className={`inline-flex min-h-[44px] items-center gap-1 font-sans text-[12px] font-semibold not-italic text-[var(--ink)] underline underline-offset-4 ${FOCUS_RING}`}
+              >
+                {tweede.label}
+                <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+              </Link>
+            </span>
+          </>
+        )
+      }
       action={melding.actie}
+      extraActions={
+        tweede != null ? (
+          <Link
+            href={tweede.href}
+            className={`inline-flex items-center gap-1.5 rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2.5 text-[12px] font-semibold text-[var(--ink)] transition-colors hover:bg-[var(--subtle)] ${FOCUS_RING}`}
+          >
+            {tweede.label}
+            <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+          </Link>
+        ) : undefined
+      }
       onMinimize={onMinimize}
       rootProps={{ 'data-testid': `katern-melding-${melding.id}`, 'data-ernst': melding.ernst }}
     />

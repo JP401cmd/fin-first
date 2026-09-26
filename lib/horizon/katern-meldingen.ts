@@ -20,7 +20,8 @@
 //    `deficit-loan-copy`, `eindsituatie-copy`, `outcome-guard`, `plan-status`). Wat daar
 //    nog niet staat, staat in `KATERN_MELDING_KOPIJ` hieronder, met per regel de herkomst.
 //  - Elke vervolgactie wijst naar precies één plek: een rij in Instellingen
-//    (`?strategie=`/`?regel=`), het katern Doelen of /mijn/profiel.
+//    (`?strategie=`/`?regel=`), het katern Doelen of /mijn/profiel. Een melding heeft
+//    hoogstens twee acties (`actie` + `tweedeActie`), elk naar een eigen plek.
 //  - Zichtbaarheid (partnerweergave, pensioenmodus, view-gating) regelt de host: een
 //    signaal dat daar niet getoond mag worden, komt hier als `null`/`false` binnen.
 //  - De wizard-voortgang is geen melding (ADR 0142 D5, geamendeerd door ADR 0179): die
@@ -83,6 +84,12 @@ export interface KaternMelding {
   readonly uitleg?: string
   /** Eén vervolgactie naar één plek, of geen. */
   readonly actie: KaternMeldingActie | null
+  /**
+   * Hoogstens één tweede vervolgactie, naar een ándere plek dan `actie` (spec §4.8:
+   * "Verken je opties →" naar Doelen; "Stopmoment →" naar Instellingen). Alleen naast
+   * een eerste actie; meer dan twee kan het model niet dragen.
+   */
+  readonly tweedeActie?: KaternMeldingActie | null
 }
 
 export interface KaternMeldingenVanKatern {
@@ -185,6 +192,8 @@ export const KATERN_MELDING_KOPIJ = {
   tekortLeningActie: 'Naar de instelling',
   /** Kopij-toets §6 (goedgekeurd). */
   planVerkenActie: 'Verken je opties',
+  /** NIEUW (C1): letterlijk uit spec §4.8 ("Stopmoment →"); langs `merkstem`. */
+  planStopmomentActie: 'Stopmoment',
   /** Letterlijk uit plan-meldingen.tsx (huis nooit verkocht, kop). */
   huisTitel: 'Je huis wordt in deze projectie nooit verkocht',
   /** Letterlijk uit plan-meldingen.tsx, zonder de nalatenschapszin. */
@@ -229,6 +238,20 @@ function zonderPijl(label: string): string {
   return label.replace(/\s*→\s*$/, '')
 }
 
+/**
+ * De twee vervolgacties bij "niet haalbaar" en "tekort onder een vast anker" (spec §4.8):
+ * verkennen in Doelen, of het stopmoment zelf in Instellingen. Het stopmoment wordt
+ * gekozen in de regel Eindstrategie (de kaart draagt "Stopmoment: …" als ondertitel).
+ */
+const PLAN_VERKEN_ACTIE: KaternMeldingActie = {
+  label: KATERN_MELDING_KOPIJ.planVerkenActie,
+  href: KATERN_ROUTE.doelen,
+}
+const PLAN_STOPMOMENT_ACTIE: KaternMeldingActie = {
+  label: KATERN_MELDING_KOPIJ.planStopmomentActie,
+  href: instellingenRegelHref('eindstrategie'),
+}
+
 // ── Ernst ────────────────────────────────────────────────────────────────────
 
 /** bad > warn > good > neutral. Informatief (neutral) staat altijd onderaan. */
@@ -264,7 +287,8 @@ function planMelding(p: PlanSignaal, masked: boolean): KaternMelding | null {
       titel,
       kort: titel,
       uitleg: verdict.label != null ? zin : undefined,
-      actie: { label: KATERN_MELDING_KOPIJ.planVerkenActie, href: KATERN_ROUTE.doelen },
+      actie: PLAN_VERKEN_ACTIE,
+      tweedeActie: PLAN_STOPMOMENT_ACTIE,
     }
   }
 
@@ -277,7 +301,8 @@ function planMelding(p: PlanSignaal, masked: boolean): KaternMelding | null {
     titel: verdict.label,
     kort: verdict.label,
     uitleg: hint != null && Number.isFinite(hint) && hint > 0 ? antwoordMinderUitgeven(hint, masked) : undefined,
-    actie: { label: KATERN_MELDING_KOPIJ.planVerkenActie, href: KATERN_ROUTE.doelen },
+    actie: PLAN_VERKEN_ACTIE,
+    tweedeActie: PLAN_STOPMOMENT_ACTIE,
   }
 }
 

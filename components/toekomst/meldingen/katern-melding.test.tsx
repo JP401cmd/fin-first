@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, act, renderHook } from '@testing-library/react'
+import { render, screen, fireEvent, act, renderHook, within } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { KaternMelding } from './katern-melding'
 import { useKaternMeldingMinimize } from './use-katern-melding-minimize'
@@ -132,6 +132,38 @@ describe('KaternMelding — slot', () => {
     render(<KaternMelding meldingen={[AOW]} display="expanded" onMinimize={() => {}} />)
     const hrefs = new Set(screen.getAllByRole('link').map((a) => a.getAttribute('href')))
     expect([...hrefs]).toEqual(['/toekomst/instellingen?strategie=aow'])
+  })
+
+  it('een tweede actie: desktop in de actie-rij, mobiel onder de uitleg na een tik (C1 punt 6)', () => {
+    const NIET_HAALBAAR: KaternMeldingData = {
+      id: 'plan-niet-haalbaar',
+      katern: 'plan',
+      ernst: 'bad',
+      titel: 'Plan nog niet haalbaar',
+      kort: 'Plan nog niet haalbaar',
+      actie: { label: 'Verken je opties', href: '/toekomst/doelen' },
+      tweedeActie: { label: 'Stopmoment', href: '/toekomst/instellingen?regel=eindstrategie' },
+    }
+    render(<KaternMelding meldingen={[NIET_HAALBAAR]} display="expanded" onMinimize={() => {}} />)
+    // jsdom past geen CSS toe: we tellen per breedte via de `lg:hidden`-voorouder.
+    const alleenMobiel = (a: HTMLElement) => a.closest('.lg\\:hidden') != null
+    const stopmoment = () => screen.getAllByRole('link', { name: /Stopmoment/ })
+    // Desktop (lg-blok): precies één "Stopmoment" in de actie-rij, naast de eerste actie.
+    const desktop = stopmoment().filter((a) => !alleenMobiel(a))
+    expect(desktop).toHaveLength(1)
+    expect(desktop[0].getAttribute('href')).toBe('/toekomst/instellingen?regel=eindstrategie')
+    // Mobiel: zonder uitleg wordt de titel een knop; na een tik staat de tweede actie eronder.
+    const titelKnop = screen.getByRole('button', { name: /Plan nog niet haalbaar/ })
+    expect(titelKnop.getAttribute('aria-expanded')).toBe('false')
+    fireEvent.click(titelKnop)
+    const uitleg = document.getElementById(titelKnop.getAttribute('aria-controls')!)!
+    const mobiel = within(uitleg).getByRole('link', { name: /Stopmoment/ })
+    expect(mobiel.getAttribute('href')).toBe('/toekomst/instellingen?regel=eindstrategie')
+    expect(mobiel.className).toContain('min-h-[44px]')
+    expect(stopmoment().every((a) => a.getAttribute('href') === '/toekomst/instellingen?regel=eindstrategie')).toBe(true)
+    // Elke actie wijst naar één plek: twee hrefs in totaal.
+    const hrefs = new Set(screen.getAllByRole('link').map((a) => a.getAttribute('href')))
+    expect([...hrefs].sort()).toEqual(['/toekomst/doelen', '/toekomst/instellingen?regel=eindstrategie'])
   })
 
   it('minimaliseren roept de host aan; canMinimize=false verbergt de knoppen', () => {
