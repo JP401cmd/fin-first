@@ -100,3 +100,35 @@ export function healthScoreSinceLastMonth(input: {
   if (stand.score_version !== currentVersion) return null
   return Math.round(currentTotal) - Math.round(stand.resilience_score)
 }
+
+/**
+ * De eerste "rekenwijze gewijzigd"-overgang in een chronologisch geordende reeks
+ * (V15, FASE 5 stap 2b): het eerste punt waarop de motor die de FIRE-velden schreef
+ * (`engine_bron`) verschilt van het vorige punt. NULL (historisch / vlag-uit) telt als
+ * 'v2'. Geeft de `snapshot_date` van dát punt, of null als de hele reeks met één
+ * rekenwijze is doorgerekend (dan is er geen knik-uitleg nodig).
+ */
+export function detectEngineBronTransition(
+  snapshots: readonly Pick<HealthVerloopPunt, 'snapshot_date' | 'engine_bron'>[],
+): string | null {
+  const norm = (bron: string | null | undefined): string => bron ?? 'v2'
+  for (let i = 1; i < snapshots.length; i++) {
+    if (norm(snapshots[i].engine_bron) !== norm(snapshots[i - 1].engine_bron)) {
+      return snapshots[i].snapshot_date
+    }
+  }
+  return null
+}
+
+/**
+ * Compacte NL-maand+jaar-notatie voor een overgang-annotatie (bv. "jul 2026").
+ * Parseert de `YYYY-MM-DD`-string zélf (TZ-onafhankelijk): `new Date(dateStr)` zou
+ * UTC-middernacht opleveren en via lokale getters bij negatieve UTC-offsets een dag
+ * (en op een maandgrens dus een maand) kunnen verschuiven.
+ */
+export function formatTransitionDate(dateStr: string): string {
+  const months = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec']
+  const [year, month] = dateStr.split('-')
+  const monthIdx = Number(month) - 1
+  return monthIdx >= 0 && monthIdx < 12 ? `${months[monthIdx]} ${year}` : dateStr
+}

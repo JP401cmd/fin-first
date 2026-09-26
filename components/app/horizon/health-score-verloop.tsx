@@ -4,9 +4,10 @@ import { useId, type ReactNode } from 'react'
 import { ResilienceTrendChart, FireAgeTrendChart } from '@/components/app/horizon/horizon-helpers'
 import {
   detectEngineBronTransition,
+  detectScoreVersionTransition,
   formatTransitionDate,
-} from '@/components/app/horizon/horizon-trend-grid'
-import { detectScoreVersionTransition, type HealthVerloopPunt } from '@/lib/health-verloop'
+  type HealthVerloopPunt,
+} from '@/lib/health-verloop'
 
 const LEEFTIJD_FORMAAT = new Intl.NumberFormat('nl-NL', { maximumFractionDigits: 1 })
 

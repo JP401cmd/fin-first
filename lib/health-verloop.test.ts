@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest'
 import { HEALTH_SCORE_VERSION } from '@/lib/financial-health'
 import {
   deriveHealthVerloop,
+  detectEngineBronTransition,
   detectScoreVersionTransition,
+  formatTransitionDate,
   healthScoreSinceLastMonth,
   type HealthVerloopPunt,
 } from './health-verloop'
@@ -90,5 +92,39 @@ describe('detectScoreVersionTransition', () => {
 
   it('Given een reeks zonder versies (oudere select), Then null', () => {
     expect(detectScoreVersionTransition([punt('2026-05-31', 50, null), punt('2026-06-30', 58, null)])).toBeNull()
+  })
+})
+
+describe('detectEngineBronTransition (V15)', () => {
+  const snap = (snapshot_date: string, engine_bron: string | null) => ({ snapshot_date, engine_bron })
+
+  it('geen overgang (één rekenwijze) → null', () => {
+    expect(detectEngineBronTransition([snap('2026-05-01', 'v2'), snap('2026-06-01', 'v2')])).toBeNull()
+    expect(detectEngineBronTransition([snap('2026-05-01', 'kernel'), snap('2026-06-01', 'kernel')])).toBeNull()
+  })
+
+  it('null → kernel = overgang → de datum van het kernel-punt (null telt als v2)', () => {
+    expect(detectEngineBronTransition([snap('2026-05-01', null), snap('2026-06-01', 'kernel')])).toBe('2026-06-01')
+  })
+
+  it('kernel → v2 = ook een overgang → de datum van het v2-punt', () => {
+    expect(detectEngineBronTransition([snap('2026-05-01', 'kernel'), snap('2026-06-01', 'v2')])).toBe('2026-06-01')
+  })
+
+  it('alles-null (allemaal v2) → null', () => {
+    expect(
+      detectEngineBronTransition([snap('2026-05-01', null), snap('2026-06-01', null), snap('2026-07-01', null)]),
+    ).toBeNull()
+  })
+})
+
+describe('formatTransitionDate', () => {
+  it('maakt van een YYYY-MM-DD een korte NL-maand met jaar, zonder tijdzone', () => {
+    expect(formatTransitionDate('2026-07-01')).toBe('jul 2026')
+    expect(formatTransitionDate('2026-01-31')).toBe('jan 2026')
+  })
+
+  it('laat een onleesbare datum ongemoeid', () => {
+    expect(formatTransitionDate('onbekend')).toBe('onbekend')
   })
 })
