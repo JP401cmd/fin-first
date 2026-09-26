@@ -20,7 +20,7 @@ import type { EuroView } from '@/lib/euro-display'
 import type { SimResult, SimRow } from '@/lib/fire-simulation'
 import type { UnifiedProjectionRow } from '@/lib/unified-projection'
 import type { LabUitkomst } from '@/lib/horizon/lab-uitkomst'
-import { useEuroViewFeeds, type EuroViewFeedsInput } from './use-euro-view-feeds'
+import { useEuroViewFeeds, useMeldingBedragenInView, type EuroViewFeedsInput } from './use-euro-view-feeds'
 
 const PI = 0.02
 /** Kernelrijen 40..44 met factor (1+π)^(age − 40); jaar 0 draagt exact 1,0. */
@@ -171,5 +171,85 @@ describe('useEuroViewFeeds — de verhuisde render-grens', () => {
     expect(bij100).toBeTruthy()
     expect(bij200).toBeTruthy()
     expect(bij200).not.toBe(bij100)
+  })
+})
+
+/**
+ * De meldingen op /toekomst (fixronde C1 punt 2): de huiswaarde op de eindleeftijd en de
+ * piek van de tekort-lening zijn NOMINALE kernelbedragen op een toekomstige leeftijd. Ze
+ * kruisen de grens hier, exact één keer, met de kernelfactor van díé leeftijd; de
+ * vrijheidstijd komt uit `freedomDaysAtAge` en is real-verankerd (beweegt niet mee met
+ * de weergave). Vroeger: `formatWithFreedom(nominaal, dagtarief)` — geen deflatie in de
+ * weergave, en een nominaal bedrag door een dagtarief van vandaag gedeeld.
+ */
+describe('useMeldingBedragenInView — huiswaarde en tekort-piek (C1 punt 2)', () => {
+  const RATE = 100
+  const HUIS = { bedrag: 500_000 * (1 + PI) ** 4, age: 44 }
+  const PIEK = { bedrag: 20_000 * (1 + PI) ** 2, age: 42 }
+
+  function run(view: EuroView) {
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <EuroViewProvider initialView={view}>{children}</EuroViewProvider>
+    )
+    return renderHook(
+      () =>
+        useMeldingBedragenInView({
+          rows: UNIFIED,
+          huis: HUIS,
+          tekortPiek: PIEK,
+          canonicalDailyRate: RATE,
+          dailyRateSource: 'transactions',
+        }),
+      { wrapper },
+    ).result.current
+  }
+
+  it("'nominal': de bedragen blijven nominaal", () => {
+    const out = run('nominal')
+    expect(out.viewHuisWaarde).toBe(HUIS.bedrag)
+    expect(out.viewTekortPiek).toBe(PIEK.bedrag)
+  })
+
+  it("'real': elk bedrag precies één keer gedeeld door de factor van zijn eigen leeftijd", () => {
+    const out = run('real')
+    expect(out.viewHuisWaarde).toBeCloseTo(500_000, 6)
+    expect(out.viewTekortPiek).toBeCloseTo(20_000, 6)
+  })
+
+  it("de vrijheidstijd is real-verankerd: gelijk in beide weergaven, uit euro's van vandaag", () => {
+    const nominaal = run('nominal')
+    const reeel = run('real')
+    expect(nominaal.huisVrijheidsdagen).toBe(5_000) // 500.000 / 100
+    expect(reeel.huisVrijheidsdagen).toBe(5_000)
+    expect(nominaal.tekortPiekVrijheidsdagen).toBe(200) // 20.000 / 100
+    expect(reeel.tekortPiekVrijheidsdagen).toBe(200)
+    // Het oude pad (nominaal / dagtarief) gaf hier te veel dagen.
+    expect(Math.round(HUIS.bedrag / RATE)).toBeGreaterThan(5_000)
+  })
+
+  it('zonder bedrag of zonder geloofwaardig dagtarief: null, geen nul', () => {
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <EuroViewProvider initialView="real">{children}</EuroViewProvider>
+    )
+    const out = renderHook(
+      () =>
+        useMeldingBedragenInView({
+          rows: UNIFIED,
+          huis: null,
+          tekortPiek: PIEK,
+          canonicalDailyRate: RATE,
+          dailyRateSource: 'none',
+        }),
+      { wrapper },
+    ).result.current
+    expect(out.viewHuisWaarde).toBeNull()
+    expect(out.huisVrijheidsdagen).toBeNull()
+    expect(out.viewTekortPiek).toBeCloseTo(20_000, 6)
+    expect(out.tekortPiekVrijheidsdagen).toBeNull()
+  })
+
+  it('de eindsituatie-bedragen (bedrag + eigen factor) kruisen dezelfde grens', () => {
+    expect(run('nominal').viewNominaalOpLeeftijd({ bedrag: 1_020, inflationFactor: 1.02 })).toBe(1_020)
+    expect(run('real').viewNominaalOpLeeftijd({ bedrag: 1_020, inflationFactor: 1.02 })).toBeCloseTo(1_000, 6)
   })
 })

@@ -16,7 +16,15 @@ import type { AowAge } from '@/lib/aow-leeftijd'
 import type { buildBreakdown } from '@/lib/income-expense-breakdown'
 import type { ScenarioPresetResult } from '@/lib/horizon/scenario-presets'
 import type { ScenarioOverlay, MonteCarloOverlay, HouseholdPartnerOverlay } from '@/components/app/horizon/sim-chart'
-import { calculateFreedomTime, formatFreedomTimeString, formatCurrency, MASKED_AMOUNT_PLACEHOLDER } from '@/lib/format'
+import {
+  calculateFreedomTime,
+  formatFreedomTimeString,
+  formatCurrency,
+  MASKED_AMOUNT_PLACEHOLDER,
+  type FreedomRateSource,
+} from '@/lib/format'
+import { freedomDaysAtAge } from '@/lib/horizon/vrijheidsdagen'
+import type { NominaalOpLeeftijd } from '@/lib/horizon/eindsituatie-duiding'
 import {
   buildFactorByAge,
   buildFactorByOffset,
@@ -592,7 +600,8 @@ export function useEuroViewFeeds(nominaal: EuroViewFeedsInput) {
     [partnerHero, displayUnifiedRows, euroView],
   )
 
-  // ── EINDE EURO-WEERGAVE ────────────────────────────────────────────────────
+  // Het blok loopt door tot na `useMeldingBedragenInView` hieronder: de puntbedragen
+  // van de meldingen kruisen dezelfde grens (fixronde C1).
 
   return {
     viewDisplaySimRows,
@@ -621,6 +630,85 @@ export function useEuroViewFeeds(nominaal: EuroViewFeedsInput) {
     viewPartnerHeroFireTarget,
   }
 }
+
+/** Een nominaal puntbedrag op een toekomstige leeftijd (klasse S), zoals een melding het meldt. */
+export interface MeldingPuntBedrag {
+  readonly bedrag: number
+  /** De rij-leeftijd waar het bedrag staat; `factorAtAge` zoekt daar de kernelfactor. */
+  readonly age: number
+}
+
+export interface MeldingBedragenInput {
+  /**
+   * De kernelrijen waarop de meldingen detecteren (`sim.unifiedRows`, NIET de op de
+   * planeinde geknipte `displayUnifiedRows`): de huiswaarde staat op de laatste rij van
+   * de hele horizon, en daar moet de factor vandaan komen.
+   */
+  readonly rows: readonly UnifiedProjectionRow[]
+  /** "Huis nooit verkocht": de huiswaarde op de eindleeftijd (nominaal). */
+  readonly huis: MeldingPuntBedrag | null
+  /** Tekort-lening: het diepste punt (nominaal) op zijn leeftijd. */
+  readonly tekortPiek: MeldingPuntBedrag | null
+  /** `HorizonPageData.dailyExpenseRate` — geconsumeerd, nooit hier gerekend. */
+  readonly canonicalDailyRate: number
+  /** `dailyExpenseRateDetail.source` — `'none'` ⇒ geen vrijheidstijd (ADR 0131). */
+  readonly dailyRateSource: FreedomRateSource | undefined
+}
+
+/**
+ * De meldingen-kant van de grens (fixronde C1, punt 2). De meldingen per katern tonen
+ * drie soorten toekomstige puntbedragen: de huiswaarde op de eindleeftijd, de piek van de
+ * tekort-lening en de eindsituatie-bedragen. Alle drie gaan hier exact één keer door
+ * `deflate` met de kernelfactor van hun eigen leeftijd; de vrijheidstijd komt uit
+ * `freedomDaysAtAge` (teller één keer gedeflateerd, noemer nooit, real-verankerd — hij
+ * beweegt niet mee met de weergave). De meldingen-host formatteert alleen nog.
+ *
+ * Een eigen hook i.p.v. extra velden op `useEuroViewFeeds`: de meldingen lezen de
+ * signalen uit `useToekomstMeldingen`, dat niet in de euro-feeds van de state-provider
+ * meeloopt. Zo blijft het één grens (dit blok), zonder de provider-compositie te raken.
+ */
+export function useMeldingBedragenInView({
+  rows,
+  huis,
+  tekortPiek,
+  canonicalDailyRate,
+  dailyRateSource,
+}: MeldingBedragenInput) {
+  const { view: euroView } = useEuroView()
+  const huisBedrag = huis?.bedrag ?? null
+  const huisAge = huis?.age ?? null
+  const piekBedrag = tekortPiek?.bedrag ?? null
+  const piekAge = tekortPiek?.age ?? null
+
+  return useMemo(() => {
+    const opLeeftijd = (bedrag: number | null, age: number | null) =>
+      bedrag == null || age == null
+        ? { view: null, dagen: null }
+        : {
+            view: deflate(bedrag, factorAtAge(rows, age), euroView),
+            dagen: freedomDaysAtAge({
+              rows,
+              age,
+              nominalAmount: bedrag,
+              canonicalDailyRate,
+              source: dailyRateSource,
+            }),
+          }
+    const h = opLeeftijd(huisBedrag, huisAge)
+    const p = opLeeftijd(piekBedrag, piekAge)
+    return {
+      viewHuisWaarde: h.view,
+      huisVrijheidsdagen: h.dagen,
+      viewTekortPiek: p.view,
+      tekortPiekVrijheidsdagen: p.dagen,
+      /** Eindsituatie: de detector levert bedrag + factor van zijn rij (`NominaalOpLeeftijd`). */
+      viewNominaalOpLeeftijd: (b: Pick<NominaalOpLeeftijd, 'bedrag' | 'inflationFactor'>): number =>
+        deflate(b.bedrag, b.inflationFactor, euroView),
+    }
+  }, [rows, huisBedrag, huisAge, piekBedrag, piekAge, canonicalDailyRate, dailyRateSource, euroView])
+}
+
+// ── EINDE EURO-WEERGAVE ────────────────────────────────────────────────────
 
 /**
  * De provider-kant van de grens (ADR 0179 fase 1 stap 14): zet de concern-waarden van de

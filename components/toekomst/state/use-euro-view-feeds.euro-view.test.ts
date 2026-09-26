@@ -60,12 +60,22 @@ const GRENS_PATH = join(STATE_DIR, 'use-euro-view-feeds.ts')
 /** De veldclassificatie van de grens woont sinds fase 1 stap 4 (ADR 0179) hier. */
 const FEEDS_PATH = join(STATE_DIR, 'euro-view-feeds.ts')
 
-/** De host plus elk bronbestand (geen test) in `components/toekomst/state/`. */
-function scanPaden(): string[] {
-  const state = readdirSync(STATE_DIR)
+/**
+ * De meldingen per katern tonen toekomstige puntbedragen (huiswaarde, tekort-piek,
+ * eindsituatie). Sinds fixronde C1 kruisen die de grens in `useMeldingBedragenInView`;
+ * daarom valt de meldingen-map onder dezelfde scan — een `deflate(` daar is een tweede grens.
+ */
+const MELDINGEN_DIR = join(ROOT, 'components', 'toekomst', 'meldingen')
+
+function bronnenIn(dir: string): string[] {
+  return readdirSync(dir)
     .filter((naam) => /\.(ts|tsx)$/.test(naam) && !/\.test\.(ts|tsx)$/.test(naam))
-    .map((naam) => join(STATE_DIR, naam))
-  return [...HOST_PATHS, ...state]
+    .map((naam) => join(dir, naam))
+}
+
+/** De host plus elk bronbestand (geen test) in `components/toekomst/state/` en `…/meldingen/`. */
+function scanPaden(): string[] {
+  return [...HOST_PATHS, ...bronnenIn(STATE_DIR), ...bronnenIn(MELDINGEN_DIR)]
 }
 
 const START_BAKEN = 'EURO-WEERGAVE: DE RENDER-GRENS'

@@ -8,6 +8,7 @@
 // doelvoortgang komt uit `loadFinData` (`computeGoalProgress`), de lab-doelen-telling uit
 // `selectLabDoelenBuitenPlan` — dezelfde selectie als de doelenlijst, niets herberekend.
 
+import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import type { GoalProgress } from '@/lib/goal-data'
 import { selectLabDoelenBuitenPlan } from '@/lib/goals/lab-doelen-buiten-plan'
 import { isHeroAnswerInvalid, type HeroFireAge } from '@/lib/horizon/hero-fire-age'
@@ -106,4 +107,15 @@ export function ontbrekendeGegevensIssues(input: OntbrekendeGegevensInput): Hori
   const uitgave = guardRetirementExpense(input.jaaruitgaveNaPensioen)
   if (!uitgave.ok && uitgave.issue) issues.push(uitgave.issue)
   return issues
+}
+
+/**
+ * Vrijheidsdagen (uit `freedomDaysAtAge`, aan de euro-render-grens) als tekst voor een
+ * melding: "1 jaar en 2 maanden" — dezelfde vorm als voorheen via `formatWithFreedom`
+ * (lang, zonder losse dagen). Alleen een eenhedenomzetting (dagen → jaar/maanden, deler
+ * 1); het bedrag en het dagtarief zijn al verrekend. `null` bij masked of zonder dagen.
+ */
+export function vrijheidTekst(dagen: number | null, masked: boolean): string | null {
+  if (masked || dagen == null || !(dagen > 0)) return null
+  return formatFreedomTimeString(calculateFreedomTime(dagen, 1), 'long', false)
 }

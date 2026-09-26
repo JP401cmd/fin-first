@@ -7,8 +7,10 @@ import {
   ontbrekendeGegevensIssues,
   planOordeelBekend,
   voorkeurenOpen,
+  vrijheidTekst,
   type OntbrekendeGegevensInput,
 } from './meldingen-bron'
+import { formatWithFreedom } from '@/lib/format'
 
 function progress(pct: number, onTrack: boolean): GoalProgress {
   return { current: 0, target: 100, pct, onTrack, measured: true, requiredMonthly: null, eta: null, paceSkipped: false } as GoalProgress
@@ -90,5 +92,22 @@ describe('ontbrekendeGegevensIssues — de énige ingang naar je profiel dekt al
     expect(
       ontbrekendeGegevensIssues({ ...basis, perspectief: true, vrijheidsleeftijd: ongeldig, jaaruitgaveNaPensioen: null }),
     ).toEqual([])
+  })
+})
+
+describe('vrijheidTekst — dagen van de grens als meldingstekst (C1 punt 2)', () => {
+  it('dezelfde vorm als de vroegere formatWithFreedom-regel (lang, zonder losse dagen)', () => {
+    expect(vrijheidTekst(200, false)).toBe(
+      formatWithFreedom(20_000, 100, { includeCurrency: false, format: 'long', includeDays: false }),
+    )
+    expect(vrijheidTekst(5_000, false)).toBe(
+      formatWithFreedom(500_000, 100, { includeCurrency: false, format: 'long', includeDays: false }),
+    )
+  })
+
+  it('masked, null of nul: geen tekst', () => {
+    expect(vrijheidTekst(200, true)).toBeNull()
+    expect(vrijheidTekst(null, false)).toBeNull()
+    expect(vrijheidTekst(0, false)).toBeNull()
   })
 })

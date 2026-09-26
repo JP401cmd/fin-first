@@ -15,11 +15,9 @@
 
 import { useMemo } from 'react'
 import type { HorizonPageData } from '@/lib/horizon-data-loader'
-import { formatMaskedCurrency, formatWithFreedom } from '@/lib/format'
-import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { detectDeficitLoanFromRows } from '@/lib/horizon/deficit-loan-display'
 import { detectReverseMortgageStartAge } from '@/lib/horizon/reverse-mortgage-start'
-import { buildDeficitLoanCopy } from '@/lib/horizon/deficit-loan-copy'
+import type { DeficitLoanCopyInput } from '@/lib/horizon/deficit-loan-copy'
 import { detectEindsituatie } from '@/lib/horizon/eindsituatie-duiding'
 import { resolveFirePlanWithOverride } from '@/lib/fire-strategy'
 import { useStabielObject } from './use-stabiel-object'
@@ -35,7 +33,6 @@ export function useToekomstMeldingen({ initialData, perspectief, sim }: { initia
     fireStrategy,
     kernelRawProfile,
     userAowAge,
-    canonicalDailyRate,
     simResult,
     unifiedRows,
     kernelHousingSale,
@@ -45,7 +42,6 @@ export function useToekomstMeldingen({ initialData, perspectief, sim }: { initia
     isPensioenMode,
     displayEndAge,
   } = sim
-  const { masked } = useMaskedAmounts()
 
   // ── V7 tekort-lening-zichtbaarheid ──────────────────────────────────────
   // De grafiek plot netWorth (tekort al gesaldeerd) en vloert op 0 — een
@@ -136,7 +132,8 @@ export function useToekomstMeldingen({ initialData, perspectief, sim }: { initia
   // Pure detector op DEZELFDE kernelrijen als de grafiek (`unifiedRows`); plan uit de
   // rauwe profielrij via dezelfde resolver als de kernel-adapter (incl. schaduwpad),
   // jaaruitgaven = de grondslag van deze run (`buildHorizonInput`: yearlyMustExpenses).
-  // Bedragen blijven NOMINAAL; `EindsituatieNotice` deflateert exact één keer.
+  // Bedragen blijven NOMINAAL; de euro-render-grens (`useMeldingBedragenInView`)
+  // deflateert exact één keer.
   // View-gating als de tekort-melding; niet in pensioen-modus (vast stopmoment).
   const eindsituatiePlan = useMemo(
     () => (kernelRawProfile ? resolveFirePlanWithOverride(kernelRawProfile) : null),
@@ -160,16 +157,17 @@ export function useToekomstMeldingen({ initialData, perspectief, sim }: { initia
 
   // Situatie-specifieke uitleg bij de melding. Alle getallen komen uit DEZELFDE
   // run (detector + `displayEndAge` + AOW-leeftijd + woonstrategie); de copy
-  // zelf woont in een pure sibling-module met eigen toon-grendel. Bedragen gaan
-  // er RÉÉDS geformatteerd in via de canonieke helpers (`formatMaskedCurrency` /
-  // `formatWithFreedom` op de bundel-dagbasis) — geen tweede som, geen eigen
-  // dag/jaar-conversie.
-  const deficitLoanCopy = useMemo(() => {
+  // zelf woont in een pure sibling-module met eigen toon-grendel.
+  //
+  // Hier alleen de NOMINALE basis (fixronde C1): de piek is een kernelbedrag op een
+  // toekomstige leeftijd, dus bedrag én vrijheidstijd horen aan de euro-render-grens
+  // (`useMeldingBedragenInView`). De meldingen-host vult `peakText`/`freedomText` daarna
+  // en roept `buildDeficitLoanCopy`. Vroeger stond hier `formatWithFreedom(piek,
+  // dagtarief)`: geen deflatie in de weergave, en een nominaal bedrag door een dagtarief
+  // van vandaag gedeeld.
+  const deficitLoanCopyBasis = useMemo<Omit<DeficitLoanCopyInput, 'peakText' | 'freedomText'> | null>(() => {
     if (!deficitLoanNotice || !deficitNoticeVisible) return null
-    const freedomText = canonicalDailyRate > 0 && !masked
-      ? formatWithFreedom(deficitLoanNotice.peak, canonicalDailyRate, { includeCurrency: false, format: 'long', includeDays: false })
-      : null
-    return buildDeficitLoanCopy({
+    return {
       firstAge: deficitLoanNotice.firstAge,
       clearedAge: deficitLoanNotice.clearedAge,
       terugkeerAge: deficitLoanNotice.terugkeerAge,
@@ -186,19 +184,30 @@ export function useToekomstMeldingen({ initialData, perspectief, sim }: { initia
       homeExcludedFromFire: homeExcludedFromProgress,
       geenTekortLeningAan: kernelRawProfile?.fire_no_deficit_loan !== false,
       vastStopmoment: simResult?.stopAnker != null,
-      peakText: formatMaskedCurrency(deficitLoanNotice.peak, masked),
-      freedomText,
-    })
-  }, [deficitLoanNotice, deficitNoticeVisible, canonicalDailyRate, masked, userAowAge.fractional, displayEndAge, isPensioenMode, initialData.housingContext.hasEigenHuis, initialData.housingStrategy, kernelHousingSale, reverseMortgageStartAge, kernelRawProfile?.fire_no_deficit_loan, simResult?.stopAnker, homeExcludedFromProgress])
+    }
+  }, [deficitLoanNotice, deficitNoticeVisible, userAowAge.fractional, displayEndAge, isPensioenMode, initialData.housingContext.hasEigenHuis, initialData.housingStrategy, kernelHousingSale, reverseMortgageStartAge, kernelRawProfile?.fire_no_deficit_loan, simResult?.stopAnker, homeExcludedFromProgress])
+
+  // De leeftijd van het diepste punt, zodat de grens de kernelfactor van díé rij kan
+  // nemen. De detector levert alleen het (afgeronde) bedrag; de rij met het hoogste
+  // eindsaldo is de eerste waarvan het afgeronde saldo daaraan gelijk is. Een lookup,
+  // geen tweede som.
+  const deficitLoanPiekLeeftijd = useMemo(() => {
+    if (!deficitLoanNotice || !unifiedRows) return null
+    const rij = unifiedRows.find(
+      (r) => Math.round(r.debtBalances['tekort-lening']?.endBalance ?? 0) === deficitLoanNotice.peak,
+    )
+    return rij?.age ?? null
+  }, [deficitLoanNotice, unifiedRows])
 
   return useStabielObject({
     deficitLoanNotice,
+    deficitLoanPiekLeeftijd,
     reverseMortgageStartAge,
     housingHeldNotice,
     aowNoticeVisible,
     eindsituatiePlan,
     eindsituatieDuiding,
-    deficitLoanCopy,
+    deficitLoanCopyBasis,
   })
 }
 

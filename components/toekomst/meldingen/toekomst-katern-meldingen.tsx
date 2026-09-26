@@ -20,12 +20,12 @@
  */
 
 import { createContext, useContext, useMemo, type ReactNode } from 'react'
-import { deflate } from '@/lib/euro-display'
-import { formatMaskedCurrency, formatWithFreedom } from '@/lib/format'
-import { useEuroView } from '@/lib/hooks/use-euro-view'
+import { formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+import { buildDeficitLoanCopy } from '@/lib/horizon/deficit-loan-copy'
 import { buildEindsituatieCopy } from '@/lib/horizon/eindsituatie-copy'
 import type { NominaalOpLeeftijd } from '@/lib/horizon/eindsituatie-duiding'
+import type { UnifiedProjectionRow } from '@/lib/unified-projection'
 import {
   KATERN_VOLGORDE,
   doelenSamenvatting,
@@ -46,14 +46,16 @@ import type { PlanStatusInput } from '@/lib/horizon/plan-status'
 import type { KaternKopStatus } from '@/components/editorial/katern-koppen'
 import type { BannerDisplay } from '@/lib/page-status/display'
 import {
+  useToekomstBron,
   useToekomstMeldingenContext,
   useToekomstPerspectiefContext,
   useToekomstScenarioContext,
   useToekomstSimContext,
 } from '@/components/toekomst/state/toekomst-state-provider'
+import { useMeldingBedragenInView } from '@/components/toekomst/state/use-euro-view-feeds'
 import { useActiefKatern } from '@/components/toekomst/layout/actief-katern'
 import { KaternMelding } from './katern-melding'
-import { ontbrekendeGegevensIssues, planOordeelBekend } from './meldingen-bron'
+import { ontbrekendeGegevensIssues, planOordeelBekend, vrijheidTekst } from './meldingen-bron'
 import { useKaternMeldingMinimize, type KaternMeldingMinimize } from './use-katern-melding-minimize'
 
 /** Wat de server-layout meegeeft (serialiseerbaar). */
@@ -88,6 +90,9 @@ export function useToekomstKaternMeldingen(): ToekomstKaternMeldingenWaarde | nu
   return useContext(ToekomstKaternMeldingenContext)
 }
 
+/** Stabiele lege rijenlijst: een nieuwe `[]` per render zou de bedragen-memo breken. */
+const GEEN_RIJEN: UnifiedProjectionRow[] = []
+
 export function ToekomstKaternMeldingenProvider({
   bron,
   children,
@@ -96,11 +101,11 @@ export function ToekomstKaternMeldingenProvider({
   children: ReactNode
 }) {
   const sim = useToekomstSimContext()
+  const { initialData } = useToekomstBron()
   const { hasPerspectiveHero } = useToekomstPerspectiefContext()
   const signalen = useToekomstMeldingenContext()
   const { doelActief, effectiveStopAge, labZone } = useToekomstScenarioContext()
   const { masked } = useMaskedAmounts()
-  const { view: euroView } = useEuroView()
 
   const {
     simResult,
@@ -117,10 +122,12 @@ export function ToekomstKaternMeldingenProvider({
     showFireTargetNotice,
     heroFireAge,
     input,
+    unifiedRows,
   } = sim
   const {
     deficitLoanNotice,
-    deficitLoanCopy,
+    deficitLoanPiekLeeftijd,
+    deficitLoanCopyBasis,
     eindsituatiePlan,
     eindsituatieDuiding,
     housingHeldNotice,
@@ -128,34 +135,57 @@ export function ToekomstKaternMeldingenProvider({
   } = signalen
   const { planStatusInput, doelen, labDoelenBuitenPlan, voorkeurenOpen } = bron
 
-  // Eindsituatie: zelfde copy en zelfde euro-weergave als de vroegere EindsituatieNotice —
-  // nominaal in, exact één keer gedeflateerd (ADR 0090/0093), masked-aware.
+  // De toekomstige puntbedragen van de meldingen kruisen de euro-render-grens (ADR
+  // 0090/0093) in `useMeldingBedragenInView`: exact één keer gedeflateerd met de
+  // kernelfactor van hun leeftijd, vrijheidstijd via `freedomDaysAtAge`. Hier alleen nog
+  // formatteren (masked-aware). Fixronde C1: huiswaarde en tekort-piek gingen eerder
+  // nominaal door `formatWithFreedom(bedrag, dagtarief)`.
+  const bedragen = useMeldingBedragenInView({
+    rows: unifiedRows ?? GEEN_RIJEN,
+    huis:
+      housingHeldNotice && !isPensioenMode
+        ? { bedrag: housingHeldNotice.houseValue, age: housingHeldNotice.endAge }
+        : null,
+    // De piekleeftijd komt uit dezelfde rijen als de detector en mist dus niet; de
+    // terugval op de eerste leeftijd houdt het type eerlijk zonder een factor 1 te gokken.
+    tekortPiek: deficitLoanNotice
+      ? { bedrag: deficitLoanNotice.peak, age: deficitLoanPiekLeeftijd ?? deficitLoanNotice.firstAge }
+      : null,
+    canonicalDailyRate,
+    dailyRateSource: initialData.dailyExpenseRateDetail?.source,
+  })
+
+  // Eindsituatie: zelfde copy als de vroegere EindsituatieNotice — nominaal in, de grens
+  // deflateert, masked-aware.
   const eindsituatie = useMemo(() => {
     if (!eindsituatieDuiding || !eindsituatiePlan) return null
-    const bedragTekst = (b: NominaalOpLeeftijd) =>
-      formatMaskedCurrency(deflate(b.bedrag, b.inflationFactor, euroView), masked)
+    const bedragTekst = (b: NominaalOpLeeftijd) => formatMaskedCurrency(bedragen.viewNominaalOpLeeftijd(b), masked)
     return buildEindsituatieCopy({ duiding: eindsituatieDuiding, endForm: eindsituatiePlan.endForm, bedragTekst })
-  }, [eindsituatieDuiding, eindsituatiePlan, euroView, masked])
+  }, [eindsituatieDuiding, eindsituatiePlan, bedragen, masked])
 
-  // "Huis nooit verkocht": dezelfde bedragtekst als het vroegere blok boven de grafiek
-  // (huiswaarde op de eindleeftijd, masked-aware, vrijheidstijd op de bundel-dagbasis).
+  // Tekort-lening: de nominale basis uit de state-hook plus de piek in de actieve
+  // weergave, met vrijheidstijd in euro's van vandaag.
+  const deficitLoanCopy = useMemo(() => {
+    if (!deficitLoanCopyBasis || bedragen.viewTekortPiek == null) return null
+    return buildDeficitLoanCopy({
+      ...deficitLoanCopyBasis,
+      peakText: formatMaskedCurrency(bedragen.viewTekortPiek, masked),
+      freedomText: vrijheidTekst(bedragen.tekortPiekVrijheidsdagen, masked),
+    })
+  }, [deficitLoanCopyBasis, bedragen, masked])
+
+  // "Huis nooit verkocht": de huiswaarde op de eindleeftijd in de actieve weergave, met
+  // de vrijheidstijd die hij in euro's van vandaag vertegenwoordigt.
   const huisNooitVerkocht = useMemo(() => {
-    if (!housingHeldNotice || isPensioenMode) return null
-    const bedrag = formatMaskedCurrency(housingHeldNotice.houseValue, masked)
-    const vrijheid =
-      canonicalDailyRate > 0 && !masked
-        ? formatWithFreedom(housingHeldNotice.houseValue, canonicalDailyRate, {
-            includeCurrency: false,
-            format: 'long',
-            includeDays: false,
-          })
-        : null
+    if (!housingHeldNotice || isPensioenMode || bedragen.viewHuisWaarde == null) return null
+    const bedrag = formatMaskedCurrency(bedragen.viewHuisWaarde, masked)
+    const vrijheid = vrijheidTekst(bedragen.huisVrijheidsdagen, masked)
     return {
       bedragTekst: vrijheid ? `${bedrag} (${vrijheid} vrijheid)` : bedrag,
       sharePct: housingHeldNotice.sharePct,
       endAge: housingHeldNotice.endAge,
     }
-  }, [housingHeldNotice, isPensioenMode, masked, canonicalDailyRate])
+  }, [housingHeldNotice, isPensioenMode, masked, bedragen])
 
   // Ontbrekende gegevens: de guards die de KPI-tegels al toetsen (outcome-guard), niet
   // opnieuw afgeleid (`ontbrekendeGegevensIssues`). Alleen in de eigen weergave, net als
