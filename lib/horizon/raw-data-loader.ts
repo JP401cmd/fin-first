@@ -82,7 +82,7 @@ import { hasPartner } from '@/lib/household-type'
 import { calculateBox3, CURRENT_TAX_YEAR } from '@/lib/box3-data'
 import { dailyExpenseRate } from '@/lib/format'
 import { resolvePensionFactorA } from '@/lib/jaarruimte'
-import type { ConvergentieRawProfileRow } from '@/lib/horizon-kernel/convergentie-router'
+import { kiesRawProfileKolommen, type HorizonRawProfileRow } from './raw-profile-kolommen'
 import { resolvePotRules, type PotRulesConfig } from '@/lib/pot-rules'
 import { parseToekomstScenarioPrefs, type ToekomstScenarioPrefs } from '@/lib/horizon/toekomst-scenario'
 import { loadPerspectiveDataServer } from '@/lib/household/perspective-loader-server'
@@ -319,9 +319,10 @@ export interface HorizonRawData {
   /**
    * Rauwe profiel-rij voor de kernel-router (`computeConvergentieProjection`) —
    * de al-gemergede hoofdprofiel-rij + de al-berekende essentiële-jaaruitgaven.
-   * Null wanneer de profiel-query faalde.
+   * Null wanneer de profiel-query faalde. Alleen de kolommen uit `RAW_PROFILE_KOLOMMEN`
+   * (`./raw-profile-kolommen`): deze rij gaat als prop naar de browser.
    */
-  rawProfile: ConvergentieRawProfileRow | null
+  rawProfile: HorizonRawProfileRow | null
   /**
    * Volledige `aow_leeftijd`-tabel (publieke referentietabel), server-side
    * meegeleverd zodat de kernel-context (rawProfile + aowRows) al bij de EERSTE
@@ -1357,9 +1358,12 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
   // draagt geen budgetsom en geen transactiereeks. Zonder deze injectie rekende de
   // projectie voor een `budget`- of `transaction`-gebruiker met €0 basissalaris,
   // want `profiles.net_monthly_income` bestaat alleen voor de `manual`-grondslag.
-  const rawProfile: ConvergentieRawProfileRow = withResolvedKernelBedragen(
+  //
+  // Alleen de kolommen die de lezers gebruiken (`kiesRawProfileKolommen`): de volle
+  // `select('*')`-rij droeg o.a. `role` en `weekly_briefing_email` mee naar de browser.
+  const rawProfile: HorizonRawProfileRow = withResolvedKernelBedragen(
     {
-      ...(profile as ConvergentieRawProfileRow),
+      ...kiesRawProfileKolommen(profile),
       yearly_essential_expenses: yearlyMustExpenses,
     },
     effectiveInput,
