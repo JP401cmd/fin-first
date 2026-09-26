@@ -215,21 +215,22 @@ const PCT_EEN_DECIMAAL = new Intl.NumberFormat('nl-NL', {
   maximumFractionDigits: 1,
 })
 
-function stopSegment(stop: AnkerStop | null): string {
-  if (stop == null) return 'stopmoment zo vroeg mogelijk'
-  if (stop.kind === 'now') return 'stopmoment nu'
-  return `stopmoment ${formatStopAge(stop.stopAge)}`
-}
-
 /**
- * De segmenten van de aannamesregel, in leesvolgorde. Volledig: stopmoment · plan
- * tot je 90e · 2,0% inflatie · 5,0% rendement per jaar · 3 gebeurtenissen. Eenvoudig
- * laat inflatie en rendement weg (`alleenVolledig`).
+ * De segmenten van de aannamesregel, in leesvolgorde. Volledig: stopmoment zo vroeg
+ * mogelijk · plan tot je 90e · 2,0% inflatie · 5,0% rendement per jaar · 3
+ * gebeurtenissen. Eenvoudig laat inflatie en rendement weg (`alleenVolledig`).
+ *
+ * Onder een VAST stopmoment valt het stopmoment-segment weg (eigenaarsbesluit 26 sep):
+ * de ankerregel in de kop zegt het al ("Je rekent met stoppen op 60."), en elk getal
+ * staat één keer per scherm (spec §4.2 regel 10). Onder solved noemt de kop een
+ * leeftijd, geen instelling, dus daar blijft "stopmoment zo vroeg mogelijk" staan.
  */
 export function aannamesSegmenten(input: AannamesInput): AannamesSegment[] {
   const n = Math.max(0, Math.floor(input.gebeurtenissen))
+  const stop: AannamesSegment[] =
+    input.stop == null ? [{ key: 'stop', tekst: 'stopmoment zo vroeg mogelijk', alleenVolledig: false }] : []
   return [
-    { key: 'stop', tekst: stopSegment(input.stop), alleenVolledig: false },
+    ...stop,
     { key: 'eind', tekst: `plan tot je ${heroFireAgeYear(input.eindleeftijd)}e`, alleenVolledig: false },
     { key: 'inflatie', tekst: `${PCT_EEN_DECIMAAL.format(input.inflatiePct)}% inflatie`, alleenVolledig: true },
     {

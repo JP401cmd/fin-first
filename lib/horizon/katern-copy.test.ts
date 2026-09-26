@@ -205,10 +205,17 @@ describe('katern-copy — aannamesregel', () => {
     ])
   })
 
-  it('vast anker: "stopmoment 60"; nooit "zo vroeg mogelijk stoppen"', () => {
-    const t = aannamesRegelTekst({ ...basis, stop: { kind: 'age', stopAge: 60 } }, 'volledig')
-    expect(t).toContain('stopmoment 60')
-    expect(t).not.toMatch(/zo vroeg mogelijk stoppen/)
+  it('vast anker: geen stopmoment-segment — de kop zegt het al ("Je rekent met stoppen op 60.", eigenaarsbesluit 26 sep)', () => {
+    for (const stop of [{ kind: 'age', stopAge: 60 }, { kind: 'now' }] as const) {
+      const t = aannamesRegelTekst({ ...basis, stop }, 'volledig')
+      expect(t).toBe('Op basis van: plan tot je 90e · 2,0% inflatie · 5,0% rendement per jaar · 3 gebeurtenissen')
+      expect(t).not.toMatch(/stopmoment/)
+      expect(aannamesSegmenten({ ...basis, stop }).map((s) => s.key)).not.toContain('stop')
+    }
+  })
+
+  it('solved: "stopmoment zo vroeg mogelijk" blijft staan (de kop noemt dan een leeftijd, geen instelling)', () => {
+    expect(aannamesSegmenten(basis)[0]).toEqual({ key: 'stop', tekst: 'stopmoment zo vroeg mogelijk', alleenVolledig: false })
   })
 
   it('enkelvoud en nul gebeurtenissen', () => {
