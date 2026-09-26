@@ -7,10 +7,11 @@
  * gemonteerd blijft (GW1).
  *
  * Fase 2 (stroom W1):
- * - Boven de grafiek hoogstens vijf interactieve elementen (spec §4.2 regel 7): de
- *   modus-switch Vermogen · Samenstelling · Geldstroom, Lagen, de canvas-i ("Zo werkt
- *   je grafiek", met de tips-schakelaar erin), Details en de zoom op de grafiek. De
- *   tien pills en de `ChartOverlayExplainer`-blokken zijn vervallen.
+ * - Boven de grafiek alleen (wireframe §4.3 regel 7): de modus-switch Vermogen ·
+ *   Samenstelling · Geldstroom, Lagen, de canvas-i ("Zo werkt je grafiek", met de
+ *   tips-schakelaar erin) en de zoom op de grafiek. De jaar-op-jaar-tabel opent vanuit
+ *   de link in Plan (spec §4.2 regel 10: één ingang). De tien pills en de
+ *   `ChartOverlayExplainer`-blokken zijn vervallen.
  * - Per katern (spec §4.5) via `useActiefKatern()` + `canvasStand`: de keuze van de
  *   gebruiker (modus, lagen) blijft staan; een katern voegt alleen vaste lagen toe of
  *   beperkt wat er kan. Alle filtering gebeurt op feeds die al over de euro-grens zijn.
@@ -71,7 +72,6 @@ export function ToekomstCanvas() {
   } = useToekomstPerspectiefContext()
   const {
     setActiveModal,
-    setSimModalOpen,
     setActiveFaseModal,
     setEventPaneOpen,
     setEventPaneEditingId,
@@ -258,8 +258,6 @@ export function ToekomstCanvas() {
           hasPerspectiveHero={hasPerspectiveHero}
           isPartnerView={isPartnerView}
           perspectiveHero={perspectiveHero}
-          simResult={simResult}
-          setSimModalOpen={setSimModalOpen}
           kicker={<PerspectiveContextLabel />}
           modus={
             simResult && stand.toonModusSwitch ? (

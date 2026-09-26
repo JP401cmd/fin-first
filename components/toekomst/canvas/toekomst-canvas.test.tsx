@@ -4,7 +4,8 @@
  * Rendert het echte canvas met een gestubde provider en een gestubde grafiek (de
  * grafiek zelf is elders getest) en pint:
  *  - de modus-switch is ingeplugd (drie modi, keuze gaat naar `setCanvasModus`);
- *  - boven de grafiek hoogstens vijf interactieve elementen (vier in de kop + zoom);
+ *  - boven de grafiek vier interactieve elementen (drie in de kop + zoom); de
+ *    jaar-op-jaar-tabel opent vanuit Plan, niet vanuit de kop;
  *  - lagen per katern: de doelscenario-lijn is in Doelen vast, in Plan een keuze;
  *    de fasebalk alleen in Plan; Instellingen compact en niet op mobiel;
  *  - de aannamesregel alleen in Plan, met dezelfde tekst als `aannamesRegelTekst`
@@ -190,12 +191,14 @@ describe('ToekomstCanvas — modus-switch ingeplugd', () => {
     expect(screen.queryByRole('button', { name: /Pad-modus|Opbouw-modus/ })).toBeNull()
   })
 
-  it('houdt boven de grafiek vier bedieningselementen (plus de zoom op de grafiek: vijf)', () => {
+  it('houdt boven de grafiek drie bedieningselementen: modus-switch, Lagen en de i (plus de zoom: vier)', () => {
     const { container } = renderIn(null)
     const rij = container.querySelector('.z-\\[46\\]') as HTMLElement
     const groepen = rij.querySelectorAll('[role="radiogroup"]').length
     const losseKnoppen = Array.from(rij.querySelectorAll('button')).filter((b) => !b.closest('[role="radiogroup"]'))
-    expect(groepen + losseKnoppen.length).toBe(4)
+    expect(groepen + losseKnoppen.length).toBe(3)
+    // De jaar-op-jaar-tabel heeft één ingang, de link in Plan (spec §4.2 regel 10).
+    expect(within(rij).queryByRole('button', { name: /Details/ })).toBeNull()
   })
 })
 

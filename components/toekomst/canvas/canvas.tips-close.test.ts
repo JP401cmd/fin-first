@@ -5,7 +5,7 @@
  * woont in `use-toekomst-lagen.ts`. Hier: dat élke canvas-ingang naar die ene handler
  * loopt, dat er geen tussen-modal terugsluipt, en (fase 2, ADR 0179) dat de tips achter
  * de canvas-i zitten en niet standaard aan staan. De voetnoot met de knop naar de
- * jaar-op-jaar-tabel (M9) is in fase 2 vervallen; Details in de canvaskop is de ingang.
+ * jaar-op-jaar-tabel (M9) is in fase 2 vervallen; de link in Plan is de enige ingang.
  */
 import { describe, it, expect } from 'vitest'
 import { join } from 'node:path'

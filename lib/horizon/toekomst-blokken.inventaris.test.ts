@@ -199,6 +199,15 @@ describe('/toekomst-blokken — katern Plan (fase 2, spec §4.3)', () => {
     expect(plan.indexOf('data-testid="plan-jaar-op-jaar"')).toBeGreaterThan(posities[posities.length - 1])
   })
 
+  it('de jaar-op-jaar-tabel heeft één ingang: de link in Plan (spec §4.2 regel 10)', () => {
+    // Twee knoppen naar dezelfde tabel (Details in de canvaskop én de link in Plan) is
+    // precies wat §4.2 regel 10 verbiedt; de wireframe (§4.3 regel 7) houdt de link.
+    const openers = bronnen
+      .filter(({ code }) => code.includes('setSimModalOpen(true)'))
+      .map(({ rel }) => rel.replace(/\\/g, '/'))
+    expect(openers).toEqual(['components/toekomst/plan/plan-paneel.tsx'])
+  })
+
   it('de drieslag staat onder de KPI-strip, in het voortgangsblok', () => {
     const blok = codeOnly(readRel('components/toekomst/plan/plan-hero-duiding.tsx'))
     expect(renderRe('AnkerDrieslag').test(blok)).toBe(true)

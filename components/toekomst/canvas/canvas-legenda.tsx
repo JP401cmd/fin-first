@@ -13,7 +13,7 @@
  *   gewoon Marktcheck.
  * - De voetnoot (strategie · eindleeftijd · knop naar de jaartabel) en de
  *   stopmoment-hint eronder vervallen: de aannamesregel onder het canvas en de
- *   Details-knop in de canvaskop nemen ze over (spec §7.3).
+ *   jaar-op-jaar-link in Plan nemen ze over (spec §7.3).
  *
  * Toont percentages en aantallen, geen bedragen; rekent niets.
  */
