@@ -19,12 +19,22 @@ vi.mock('@/lib/housing-preview', () => ({
   },
 }))
 
+const kernRuns = vi.hoisted(() => ({ overrides: [] as unknown[] }))
+vi.mock('@/lib/future/regel-sim', async (orig) => ({
+  ...(await orig<typeof import('@/lib/future/regel-sim')>()),
+  runRegelProjection: (_s: unknown, o?: unknown) => {
+    kernRuns.overrides.push(o)
+    return { rows: [], fireAgeFractional: o ? 60 : 58, reach: { kind: 'onbekend' } }
+  },
+}))
+
 import { HousingStrategySection } from './housing-strategy-section'
 
 const fetchMock = vi.fn()
 
 beforeEach(() => {
   previewAanroepen.n = 0
+  kernRuns.overrides = []
   fetchMock.mockReset()
   fetchMock.mockImplementation(async (_url: string, init?: RequestInit) => {
     if (init?.method === 'PUT') return { ok: true, json: async () => ({}) }
@@ -89,5 +99,25 @@ describe('HousingStrategySection', () => {
     render(<HousingStrategySection kernelRawContext={{ profile: {} } as never} onActionsChange={() => {}} />)
     expect(await screen.findByText(/Live preview/)).toBeInTheDocument()
     expect(previewAanroepen.n).toBeGreaterThan(0)
+  })
+
+  it('met host en snapshot: verschilregel uit de kern-run met housingStrategyConfig, pas na een wijziging', async () => {
+    let actions: RegelEditActionsState | null = null
+    render(
+      <HousingStrategySection
+        simSnapshot={{ rawContext: { profile: {} } } as never}
+        onActionsChange={(s) => (actions = s)}
+      />,
+    )
+    await waitFor(() => expect(actions?.canSave).toBe(true))
+    expect(actions!.footerInfo).toBeUndefined()
+    expect(kernRuns.overrides).toHaveLength(0)
+
+    fireEvent.click(screen.getByRole('button', { name: /Uitsluiten/ }))
+    await waitFor(() => expect(actions!.footerInfo).toBeDefined())
+    expect(kernRuns.overrides).toContain(undefined)
+    expect(kernRuns.overrides).toContainEqual({ housingStrategyConfig: { mode: 'exclude_from_fire' } })
+    const { container } = render(<>{actions!.footerInfo}</>)
+    expect(container.textContent).toContain('24 mnd later')
   })
 })

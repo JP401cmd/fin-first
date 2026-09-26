@@ -23,6 +23,8 @@ import { formatCurrency } from '@/lib/format'
 import { LabeledNumber, TriggerButton } from '@/components/future/strategie/fields'
 import type { RegelEditActionsState } from '@/components/future/regels/types'
 import type { ConvergentieRawContext } from '@/lib/horizon-kernel/convergentie-router'
+import { runRegelProjection, type RegelSimSnapshot } from '@/lib/future/regel-sim'
+import { FireDeltaFooter, fireFooterSleutel } from '@/components/future/regels/shared'
 
 interface HousingStrategyContext {
   has_eigen_huis: boolean
@@ -94,6 +96,7 @@ export function HousingStrategySection({
   showHeader = true,
   preview = null,
   kernelRawContext = null,
+  simSnapshot = null,
   onSaved,
   onActionsChange,
 }: {
@@ -105,6 +108,13 @@ export function HousingStrategySection({
    * snapshot van de plan-review). Genegeerd wanneer `preview` gezet is.
    */
   kernelRawContext?: ConvergentieRawContext | null
+  /**
+   * ADR 0179 fase 3 (§7.7) — de client-veilige snapshot. Gezet (in host-modus) = de sectie
+   * publiceert de verschilregel in `footerInfo`: dezelfde kern-run als de Tijdas tegen
+   * dezelfde run met `housingStrategyConfig` = het concept (zoals de wizardstap die de vier
+   * strategieën vergelijkt). Pas na een wijziging.
+   */
+  simSnapshot?: RegelSimSnapshot | null
   onSaved?: () => void
   /**
    * TPR-15 — host-contract van de plan-review (`RegelEditActionsState`). Gezet = de host
@@ -224,14 +234,34 @@ export function HousingStrategySection({
     saveRef.current = save
   })
   const isDirty = savedConfig != null && JSON.stringify(config) !== JSON.stringify(savedConfig)
+  // Verschilregel: alleen in host-modus, met snapshot, na een wijziging (uitgesteld bij typen).
+  const deferredDirty = useDeferredValue(isDirty)
+  const verschilBasis = useMemo(
+    () => (hostMode && simSnapshot && deferredDirty ? runRegelProjection(simSnapshot) : null),
+    [hostMode, simSnapshot, deferredDirty],
+  )
+  const verschilConcept = useMemo(
+    () =>
+      verschilBasis && simSnapshot
+        ? runRegelProjection(simSnapshot, {
+            housingStrategyConfig: deferredConfig as unknown as Record<string, unknown>,
+          })
+        : null,
+    [verschilBasis, simSnapshot, deferredConfig],
+  )
+  const toonVerschil = isDirty && verschilBasis != null && verschilConcept != null
+  const verschilSleutel = toonVerschil ? fireFooterSleutel(verschilBasis!, verschilConcept!) : null
   useEffect(() => {
     onActionsChange?.({
       canSave: !saving && !loading,
       saving,
       save: () => void saveRef.current(),
       changed: isDirty,
+      footerInfo: toonVerschil ? <FireDeltaFooter baseline={verschilBasis!} draft={verschilConcept!} /> : undefined,
     })
-  }, [onActionsChange, saving, loading, isDirty])
+    // footerInfo volgt verschilSleutel; zo publiceert niet elke render opnieuw.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onActionsChange, saving, loading, isDirty, verschilSleutel])
 
   return (
     <div id="housing-strategy" className="mb-6">

@@ -128,6 +128,7 @@ export function WoningEditor({ context, onActionsChange, onSaved }: PlanReviewEd
           key={HUIS}
           showHeader={false}
           kernelRawContext={context.snapshot?.rawContext ?? null}
+          simSnapshot={context.snapshot}
           onActionsChange={huisActions}
           onSaved={huisOpgeslagen}
         />
