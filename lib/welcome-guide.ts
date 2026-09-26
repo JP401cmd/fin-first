@@ -600,7 +600,10 @@ export interface GuideVisitRoute {
 
 export const GUIDE_VISIT_ROUTES: readonly GuideVisitRoute[] = [
   { slug: 'guide_toekomst_grafiek', pathname: '/toekomst', match: 'exact' },
-  { slug: 'guide_whatif', pathname: '/toekomst', match: 'exact', query: ['whatif', 'open'] },
+  // Het lab woont in katern Doelen (ADR 0179): elk bezoek aan /toekomst/doelen telt.
+  // Niet op `/toekomst` + `?whatif=open`: die deeplink stuurt next.config door naar
+  // /toekomst/doelen, dus op /toekomst kwam hij nooit meer aan.
+  { slug: 'guide_whatif', pathname: '/toekomst/doelen', match: 'prefix' },
   { slug: 'guide_vaste_lasten', pathname: '/overzicht/budget/vaste-lasten', match: 'prefix' },
   { slug: 'guide_tips', pathname: '/overzicht/tips', match: 'prefix' },
   { slug: 'guide_nieuws', pathname: '/nieuws', match: 'prefix' },
@@ -611,8 +614,8 @@ export const GUIDE_VISIT_ROUTES: readonly GuideVisitRoute[] = [
 ]
 
 /**
- * Welke bezoek-slugs horen bij deze route? Meerdere tegelijk kan: /toekomst met
- * `?whatif=open` is zowel "grafiek bekeken" als "what-if geopend".
+ * Welke bezoek-slugs horen bij deze route? Meerdere tegelijk kan wanneer routes
+ * elkaar overlappen; `query` beperkt een route tot een deeplink die een paneel opent.
  */
 export function guideVisitSlugsForRoute(
   pathname: string,

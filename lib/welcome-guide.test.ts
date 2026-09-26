@@ -428,12 +428,22 @@ describe('isGuideComplete', () => {
 describe('guideVisitSlugsForRoute', () => {
   it('/toekomst telt alleen exact, niet elke subroute', () => {
     expect(guideVisitSlugsForRoute('/toekomst')).toEqual(['guide_toekomst_grafiek'])
-    expect(guideVisitSlugsForRoute('/toekomst/doelen')).toEqual([])
+    expect(guideVisitSlugsForRoute('/toekomst/instellingen')).toEqual([])
+    expect(guideVisitSlugsForRoute('/toekomst/doelen')).not.toContain('guide_toekomst_grafiek')
   })
 
-  it('deeplink met query levert beide slugs', () => {
-    const slugs = guideVisitSlugsForRoute('/toekomst', (k) => (k === 'whatif' ? 'open' : null))
-    expect(slugs).toEqual(['guide_toekomst_grafiek', 'guide_whatif'])
+  it('het lab woont in katern Doelen: elk bezoek aan /toekomst/doelen telt als "aannames bekeken"', () => {
+    // `/toekomst?whatif=open` stuurt next.config door naar /toekomst/doelen (query reist
+    // mee, daarna ruimt Doelen de URL op). Een matcher op /toekomst + whatif=open vuurt
+    // dus nooit meer; de stap moet het bezoek aan Doelen zelf herkennen.
+    expect(guideVisitSlugsForRoute('/toekomst/doelen')).toEqual(['guide_whatif'])
+    expect(
+      guideVisitSlugsForRoute('/toekomst/doelen', (k) => (k === 'whatif' ? 'open' : null)),
+    ).toEqual(['guide_whatif'])
+    // De stap zelf linkt naar Doelen: klikken moet de stap kunnen afvinken.
+    const stap = DEFAULT_WELCOME_GUIDE.screens.flatMap((s) => s.steps).find((st) => st.id === 's4-whatif')
+    expect(stap?.href).toBe('/toekomst/doelen')
+    expect(guideVisitSlugsForRoute(stap?.href ?? '')).toContain(GUIDE_VISIT_SLUG_BY_STEP_ID['s4-whatif'])
   })
 
   it('prefix-routes tellen ook diepere paden', () => {
