@@ -1,7 +1,7 @@
 // Gecureerde Toekomst-procesflow (verdiepingslaag laag 2 voor de UAT-plaat).
 //
 // Bron: docs/uat/uat-plan.md Deel 1 — "Toekomst & tijdas (WF-TOEK)"
-// (WF-TOEK-01..26,28,29,30,32) en de acceptatie in lib/uat/acceptance/toek.ts.
+// (WF-TOEK-01..26,28,30,32; 29 geschrapt op 26 sep 2026) en de acceptatie in lib/uat/acceptance/toek.ts.
 // De knopen met `scenarioId` verwijzen naar de UAT-scenario-ID's uit
 // lib/uat/catalog.ts (UAT-TOEK-NN) en erven daarmee de rondestatus. Het label
 // toont bewust het WF-nummer, spiegelt lib/uat/flows/bezit.ts.
@@ -71,13 +71,14 @@ export const TOEK_FLOW: UatFlow = {
     // ADR 0151 — bijgeschreven rente krijgt een eigen "+"-regel op de jaarkaart.
     { id: 'opeetrente', scenarioId: 'UAT-TOEK-55', label: 'WF-TOEK-55 · Bijgeschreven rente zichtbaar, geen-maandlast-toelichting', kind: 'action', stage: 2, lane: 'aflezen', subOf: 'opeetopname' },
 
-    // ── 2 · navigeren & delen ─────────────────────────────────────────────
+    // ── 2 · navigeren ─────────────────────────────────────────────────────
     // ADR 0179 fase 1 — de vier navkaarten zijn vervangen door de katern-koppen
     // Plan · Doelen · Instellingen onder het gedeelde canvas.
     // Fase 2 — inactieve koppen dragen een samenvatting (≥ lg) en het statuspunt van hun melding.
     { id: 'katernkoppen', scenarioId: 'UAT-TOEK-28', label: 'WF-TOEK-28 · Katern-koppen (Plan · Doelen · Instellingen) met samenvatting en statuspunt', kind: 'screen', stage: 2, lane: 'navigeren' },
     { id: 'deeplinks', scenarioId: 'UAT-TOEK-30', label: 'WF-TOEK-30 · Deeplinks & legacy-routes', kind: 'screen', stage: 2, lane: 'navigeren', subOf: 'katernkoppen' },
-    { id: 'delen', scenarioId: 'UAT-TOEK-29', label: 'WF-TOEK-29 · Delen / afdrukken (PDF)', kind: 'action', stage: 2, lane: 'navigeren' },
+    // WF-TOEK-29 (Delen / afdrukken) is GESCHRAPT (eigenaarsbesluit 26 sep 2026): de
+    // afdrukknop bestaat sinds 6 sep 2026 niet meer (commit 40704f5a7).
 
     // ── 3 · simuleren (niet-persistent over de grafiek) ───────────────────
     { id: 'scenarios', scenarioId: 'UAT-TOEK-08', label: 'WF-TOEK-08 · Lagen "Rendement hoger en lager" & Marktcheck (drie getallen)', kind: 'action', stage: 3, lane: 'simuleren' },
@@ -98,7 +99,9 @@ export const TOEK_FLOW: UatFlow = {
     { id: 'eventedit', scenarioId: 'UAT-TOEK-14', label: 'WF-TOEK-14 · Bekijken / bewerken / verwijderen', kind: 'screen', stage: 3, lane: 'gebeurtenissen', subOf: 'eventadd' },
     { id: 'eventtotwanneer', scenarioId: 'UAT-TOEK-47', label: 'WF-TOEK-47 · Blijvend: doorlopend of tot je stopt met werken', kind: 'action', stage: 3, lane: 'gebeurtenissen', subOf: 'eventadd' },
     { id: 'eventdrag', scenarioId: 'UAT-TOEK-15', label: 'WF-TOEK-15 · Slepen op de tijdas & undo', kind: 'action', stage: 3, lane: 'gebeurtenissen', subOf: 'eventadd' },
-    { id: 'eventpagina', scenarioId: 'UAT-TOEK-17', label: 'WF-TOEK-17 · Gebeurtenissen-pagina (kernel-momenten)', kind: 'screen', stage: 3, lane: 'gebeurtenissen' },
+    // Eigenaarsbesluit 26 sep 2026 (doelstand, bouw loopt): de lijst levensgebeurtenissen
+    // verhuist van katern Instellingen naar katern Plan (#gebeurtenissen, onder de KPI-strip).
+    { id: 'eventpagina', scenarioId: 'UAT-TOEK-17', label: 'WF-TOEK-17 · Levensgebeurtenissen in Plan (kernel-momenten, Toevoegen)', kind: 'screen', stage: 3, lane: 'gebeurtenissen' },
     { id: 'tekortbeslis', label: 'Tekort in de projectie?', kind: 'decision', stage: 3, lane: 'gebeurtenissen', subOf: 'eventpagina' },
     { id: 'risicoevents', scenarioId: 'UAT-TOEK-38', label: 'WF-TOEK-38 · Risico-events: werkloosheid & overlijden partner (WW/Anw)', kind: 'action', stage: 3, lane: 'gebeurtenissen', subOf: 'eventadd' },
 
@@ -112,8 +115,9 @@ export const TOEK_FLOW: UatFlow = {
 
     // ── 4 · de toekomst configureren · voorkeuren ─────────────────────────
     // ADR 0179 fase 1 — katern Instellingen (/toekomst/instellingen) bundelt de
-    // wizard-ingang, Voorkeuren en Gebeurtenissen op één route.
-    { id: 'instellingen', scenarioId: 'UAT-TOEK-59', label: 'WF-TOEK-59 · Katern Instellingen (wizard-ingang · Voorkeuren · Gebeurtenissen)', kind: 'screen', stage: 4, lane: 'voorkeuren' },
+    // wizard-ingang en Voorkeuren (plan-regels + levensstrategieën) op één route; de
+    // Gebeurtenissen-sectie verhuist naar Plan (eigenaarsbesluit 26 sep 2026, doelstand).
+    { id: 'instellingen', scenarioId: 'UAT-TOEK-59', label: 'WF-TOEK-59 · Katern Instellingen (wizard-ingang · Voorkeuren · levensstrategieën)', kind: 'screen', stage: 4, lane: 'voorkeuren' },
     { id: 'eindstrat', scenarioId: 'UAT-TOEK-24', label: 'WF-TOEK-24 · Plan (stop × eind-vorm) / onttrekkingsstrategie', kind: 'screen', stage: 4, lane: 'voorkeuren' },
     // ADR 0149 — hoofdinstelling naast de rest van de Eindstrategie-kaart; ook
     // als detailregel + vergelijking in de plan-review-stap "Je plan" (WF-TOEK-44).
@@ -189,12 +193,12 @@ export const TOEK_FLOW: UatFlow = {
     { from: 'tijdas', to: 'markers' },
     { from: 'tijdas', to: 'verdieping' },
 
-    // hub → navigeren & delen
+    // hub → navigeren
     { from: 'tijdas', to: 'katernkoppen' },
     { from: 'katernkoppen', to: 'deeplinks' },
     { from: 'katernkoppen', to: 'instellingen', kind: 'branch', label: 'Instellingen' },
-    { from: 'deeplinks', to: 'instellingen', label: 'oude /toekomst/voorkeuren|gebeurtenissen, ?tab=, ?modal=' },
-    { from: 'tijdas', to: 'delen' },
+    { from: 'deeplinks', to: 'instellingen', label: 'oude /toekomst/voorkeuren, ?tab=voorkeuren, ?modal=' },
+    { from: 'deeplinks', to: 'eventpagina', label: 'oude /toekomst/gebeurtenissen, ?tab=gebeurtenissen → Plan #gebeurtenissen (doelstand)' },
 
     // hub → simuleren
     { from: 'tijdas', to: 'scenarios' },
@@ -208,12 +212,13 @@ export const TOEK_FLOW: UatFlow = {
     { from: 'aowbeslis', to: 'aowstop', kind: 'branch', label: 'ja: doorwerken tot AOW' },
     { from: 'sliders', to: 'x-reken', kind: 'cross', label: 'levensgebeurtenis-export → Rekenhulp (zelfde horizon-kernel)' },
 
-    // hub/katern Instellingen → gebeurtenissen
+    // hub/katern Plan → gebeurtenissen (doelstand 26 sep 2026; tot de bouw landt nog in Instellingen)
     { from: 'tijdas', to: 'eventadd' },
     { from: 'eventadd', to: 'eventedit' },
     { from: 'eventadd', to: 'eventdrag' },
     { from: 'eventadd', to: 'risicoevents' },
-    { from: 'instellingen', to: 'eventpagina', kind: 'branch', label: '#gebeurtenissen' },
+    { from: 'tijdas', to: 'eventpagina', kind: 'branch', label: 'Plan #gebeurtenissen' },
+    { from: 'eventpagina', to: 'eventadd', label: 'Toevoegen → catalogus' },
     { from: 'eventpagina', to: 'tekortbeslis' },
     { from: 'tekortbeslis', to: 'x-reken', kind: 'cross', label: 'ja: tekort-lening (kernel)' },
 

@@ -323,18 +323,21 @@ export const TOEK_ENGINE_CHECKS: ToekEngineCheck[] = [
       // onder solved (toekomst-canvas.tsx), anders het vaste anker. Willem heeft geen
       // fire_stop_anchor → solved. Alleen de stop- en eind-segmenten zijn hier te herleiden;
       // inflatie/rendement/gebeurtenissen hangen aan de run en blijven buiten deze check.
+      // Het canvas geeft de INGESTELDE eindleeftijd en de eind-vorm van het plan door
+      // (fixronde C1/C2, 26 sep 2026), niet het horizonplafond `displayEndAge`.
       const plan = parseFirePlan(willem.profile)
-      const segmenten = aannamesSegmenten({
-        stop: null,
-        eindleeftijd: plan.endAge,
-        inflatiePct: 0,
-        rendementPct: 0,
-        gebeurtenissen: 0,
-      })
+      const basis = { eindleeftijd: plan.endAge, eindvorm: plan.endForm, inflatiePct: 0, rendementPct: 0, gebeurtenissen: 0 }
+      const segmenten = aannamesSegmenten({ ...basis, stop: null })
       const seg = (key: string) => segmenten.find((s) => s.key === key)?.tekst
+      // Onder een vast anker valt het stop-segment weg (de kop noemt het stopmoment al);
+      // onder "niet laten slinken" noemt het eind-segment geen leeftijd.
+      const vastAnker = aannamesSegmenten({ ...basis, stop: { kind: 'age', stopAge: 60 } })
+      const nietSlinken = aannamesSegmenten({ ...basis, stop: null, eindvorm: 'perpetual' })
+      const stopVast = vastAnker.find((s) => s.key === 'stop')?.tekst ?? 'geen'
+      const eindNietSlinken = nietSlinken.find((s) => s.key === 'eind')?.tekst
       return {
-        expected: 'strategieLabelDeplete=Vermogen opeten; eindleeftijd=95; weergaveTot=94; strategieLabelPensioen=Pensioenleeftijd; anker=solved; aannamesStop=stopmoment zo vroeg mogelijk; aannamesEind=plan tot je 95e',
-        actual: `strategieLabelDeplete=${STRATEGY_LABELS.deplete.name}; eindleeftijd=${eindleeftijd}; weergaveTot=${weergaveTot}; strategieLabelPensioen=${STRATEGY_LABELS.pensioen.name}; anker=${plan.anchor.kind}; aannamesStop=${seg('stop')}; aannamesEind=${seg('eind')}`,
+        expected: 'strategieLabelDeplete=Vermogen opeten; eindleeftijd=95; weergaveTot=94; strategieLabelPensioen=Pensioenleeftijd; anker=solved; aannamesStop=stopmoment zo vroeg mogelijk; aannamesEind=plan tot je 95e; aannamesStopVastAnker=geen; aannamesEindNietSlinken=je vermogen mag niet slinken',
+        actual: `strategieLabelDeplete=${STRATEGY_LABELS.deplete.name}; eindleeftijd=${eindleeftijd}; weergaveTot=${weergaveTot}; strategieLabelPensioen=${STRATEGY_LABELS.pensioen.name}; anker=${plan.anchor.kind}; aannamesStop=${seg('stop')}; aannamesEind=${seg('eind')}; aannamesStopVastAnker=${stopVast}; aannamesEindNietSlinken=${eindNietSlinken}`,
       }
     },
   },
@@ -808,10 +811,15 @@ export const TOEK_ENGINE_CHECKS: ToekEngineCheck[] = [
       // mét aflossing de "tussen … en …"-vorm.
       const zonderAflossing = enigeMelding({ tekortLening: { notice: { firstAge: 60, clearedAge: null }, copy: uit } })
       const metAflossing = enigeMelding({ tekortLening: { notice: { firstAge: 60, clearedAge: 62.5 }, copy: uit } })
+      // Eigenaarsbesluit 26 sep 2026: "Bespreek met Fin" als tweede actie, alleen achter de
+      // Fin-poort (`finBeschikbaar`); de context gaat zonder de piekzin (geen bedragen).
+      const metFin = enigeMelding({ tekortLening: { notice: { firstAge: 60, clearedAge: null }, copy: uit }, finBeschikbaar: true })
+      const fin = metFin.tweedeActie != null && 'kind' in metFin.tweedeActie ? metFin.tweedeActie : null
+      const piek = uit.piek ?? ''
       return {
         expected:
-          'instellingUit=Je plan staat een tekort-lening nu toe. Met de instelling "Geen tekort-lening in mijn plan" rekent de app met het vroegste stopmoment waarop je zonder lening rondkomt.; instellingAan=Je hebt ingesteld dat een tekort-lening niet in je plan hoort, maar met je gekozen stopmoment is hij toch nodig.; instellingAanZonderVastStopmoment=Je hebt ingesteld dat een tekort-lening niet in je plan hoort; deze berekening laat er toch een zien.; katern=plan; ernst=warn; titelZonderAflossing=Je plan dekt vanaf je 60e een tekort met een lening.; titelMetAflossing=Je plan dekt tussen je 60e en 62e een tekort met een lening.; uitlegBevatInstelling=true; actie=Naar de instelling→/toekomst/instellingen?regel=eindstrategie',
-        actual: `instellingUit=${uit.instelling}; instellingAan=${aan.instelling}; instellingAanZonderVastStopmoment=${aanZonderAnker.instelling}; katern=${zonderAflossing.katern}; ernst=${zonderAflossing.ernst}; titelZonderAflossing=${zonderAflossing.titel}; titelMetAflossing=${metAflossing.titel}; uitlegBevatInstelling=${(zonderAflossing.uitleg ?? '').includes(uit.instelling)}; actie=${zonderAflossing.actie?.label}→${zonderAflossing.actie?.href}`,
+          'instellingUit=Je plan staat een tekort-lening nu toe. Met de instelling "Geen tekort-lening in mijn plan" rekent de app met het vroegste stopmoment waarop je zonder lening rondkomt.; instellingAan=Je hebt ingesteld dat een tekort-lening niet in je plan hoort, maar met je gekozen stopmoment is hij toch nodig.; instellingAanZonderVastStopmoment=Je hebt ingesteld dat een tekort-lening niet in je plan hoort; deze berekening laat er toch een zien.; katern=plan; ernst=warn; titelZonderAflossing=Je plan dekt vanaf je 60e een tekort met een lening.; titelMetAflossing=Je plan dekt tussen je 60e en 62e een tekort met een lening.; uitlegBevatInstelling=true; actie=Naar de instelling→/toekomst/instellingen?regel=eindstrategie; tweedeActieZonderFin=geen; tweedeActieMetFin=fin; finOnderwerpIsTitel=true; finDetailZonderPiek=true',
+        actual: `instellingUit=${uit.instelling}; instellingAan=${aan.instelling}; instellingAanZonderVastStopmoment=${aanZonderAnker.instelling}; katern=${zonderAflossing.katern}; ernst=${zonderAflossing.ernst}; titelZonderAflossing=${zonderAflossing.titel}; titelMetAflossing=${metAflossing.titel}; uitlegBevatInstelling=${(zonderAflossing.uitleg ?? '').includes(uit.instelling)}; actie=${zonderAflossing.actie?.label}→${zonderAflossing.actie?.href}; tweedeActieZonderFin=${zonderAflossing.tweedeActie == null ? 'geen' : 'wel'}; tweedeActieMetFin=${fin?.kind ?? 'geen'}; finOnderwerpIsTitel=${fin?.onderwerp === metFin.titel}; finDetailZonderPiek=${piek.length > 0 && !(fin?.detail ?? '').includes(piek)}`,
       }
     },
   },
@@ -856,12 +864,16 @@ export const TOEK_ENGINE_CHECKS: ToekEngineCheck[] = [
       const displayExpanded = resolveKaternMeldingDisplay(m.ernst, null)
       const displayMinimized = resolveKaternMeldingDisplay(m.ernst, level)
       const levelOnbekend = alsKaternMinimizedLevel(1)
+      // Fin-knop (eigenaarsbesluit 26 sep 2026) alleen bij `onduidelijk` ≠ null: deze fixture
+      // is eenduidig, dus ook mét Fin-poort geen tweede actie.
+      const metFinPoort = enigeMelding({ eindsituatie: copy, finBeschikbaar: true })
+      const finBijEenduidig = metFinPoort.tweedeActie == null ? 'geen' : 'wel'
 
       return {
         expected:
-          'oorzaken=geen-tekort-lening,later-inkomen; eenduidig=true; overschot=300000@90; dieptepunt=15000@68; kopBevatVermogenOpeten=true; oorzaak0BevatJe68e=true; oorzaak0BevatDieptepunt=true; oorzaak1BevatJe80e=true; onduidelijk=null; katern=plan; ernst=neutral; titelIsKop=true; actie=Bekijk of wijzig je plan→/toekomst/instellingen?regel=eindstrategie; prefSleutel=/toekomst; minimizeLevel=info; displayNone=none; displayExpanded=expanded; displayMinimized=minimized; levelOnbekend=null',
+          'oorzaken=geen-tekort-lening,later-inkomen; eenduidig=true; overschot=300000@90; dieptepunt=15000@68; kopBevatVermogenOpeten=true; oorzaak0BevatJe68e=true; oorzaak0BevatDieptepunt=true; oorzaak1BevatJe80e=true; onduidelijk=null; katern=plan; ernst=neutral; titelIsKop=true; actie=Bekijk of wijzig je plan→/toekomst/instellingen?regel=eindstrategie; prefSleutel=/toekomst; minimizeLevel=info; displayNone=none; displayExpanded=expanded; displayMinimized=minimized; levelOnbekend=null; finBijEenduidig=geen',
         actual:
-          `oorzaken=${duiding.oorzaken.map((o) => o.id).join(',')}; eenduidig=${duiding.eenduidig}; overschot=${duiding.overschot.bedrag}@${duiding.overschot.age}; dieptepunt=${duiding.dieptepunt?.bedrag}@${duiding.dieptepunt?.age}; kopBevatVermogenOpeten=${copy.kop.includes('vermogen opeten')}; oorzaak0BevatJe68e=${copy.oorzaken[0]?.includes('je 68e')}; oorzaak0BevatDieptepunt=${copy.oorzaken[0]?.includes('€ 15.000')}; oorzaak1BevatJe80e=${copy.oorzaken[1]?.includes('je 80e')}; onduidelijk=${copy.onduidelijk}; katern=${m.katern}; ernst=${m.ernst}; titelIsKop=${m.titel === copy.kop}; actie=${m.actie?.label}→${m.actie?.href}; prefSleutel=${KATERN_ROUTE[m.katern]}; minimizeLevel=${level}; displayNone=${displayNone}; displayExpanded=${displayExpanded}; displayMinimized=${displayMinimized}; levelOnbekend=${levelOnbekend}`,
+          `oorzaken=${duiding.oorzaken.map((o) => o.id).join(',')}; eenduidig=${duiding.eenduidig}; overschot=${duiding.overschot.bedrag}@${duiding.overschot.age}; dieptepunt=${duiding.dieptepunt?.bedrag}@${duiding.dieptepunt?.age}; kopBevatVermogenOpeten=${copy.kop.includes('vermogen opeten')}; oorzaak0BevatJe68e=${copy.oorzaken[0]?.includes('je 68e')}; oorzaak0BevatDieptepunt=${copy.oorzaken[0]?.includes('€ 15.000')}; oorzaak1BevatJe80e=${copy.oorzaken[1]?.includes('je 80e')}; onduidelijk=${copy.onduidelijk}; katern=${m.katern}; ernst=${m.ernst}; titelIsKop=${m.titel === copy.kop}; actie=${m.actie?.label}→${m.actie?.href}; prefSleutel=${KATERN_ROUTE[m.katern]}; minimizeLevel=${level}; displayNone=${displayNone}; displayExpanded=${displayExpanded}; displayMinimized=${displayMinimized}; levelOnbekend=${levelOnbekend}; finBijEenduidig=${finBijEenduidig}`,
       }
     },
   },
