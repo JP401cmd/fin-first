@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-09-25T20:18:21.585Z",
-  "generatedDate": "2026-09-25",
+  "generatedAt": "2026-09-26T18:44:18.184Z",
+  "generatedDate": "2026-09-26",
   "repo": {
     "name": "fin",
-    "version": "0.92.5"
+    "version": "0.92.7"
   },
   "annotations": {
     "philosophy": "Geld levert tijd op — elk bedrag staat voor tijd waarin je uitgaven gedekt zijn.",
@@ -189,13 +189,13 @@
     }
   },
   "stats": {
-    "routes": 136,
-    "routesProduction": 90,
+    "routes": 135,
+    "routesProduction": 89,
     "api": 334,
     "tables": 105,
-    "migrations": 263,
+    "migrations": 264,
     "integrations": 25,
-    "components": 1167,
+    "components": 1207,
     "providers": 19,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -956,7 +956,7 @@
     },
     {
       "url": "/toekomst",
-      "file": "app/(app)/toekomst/page.tsx",
+      "file": "app/(app)/toekomst/(katern)/page.tsx",
       "group": "horizon",
       "isTest": false
     },
@@ -974,13 +974,7 @@
     },
     {
       "url": "/toekomst/doelen",
-      "file": "app/(app)/toekomst/doelen/page.tsx",
-      "group": "horizon",
-      "isTest": false
-    },
-    {
-      "url": "/toekomst/gebeurtenissen",
-      "file": "app/(app)/toekomst/gebeurtenissen/page.tsx",
+      "file": "app/(app)/toekomst/(katern)/doelen/page.tsx",
       "group": "horizon",
       "isTest": false
     },
@@ -991,14 +985,14 @@
       "isTest": false
     },
     {
-      "url": "/toekomst/rekenhulp",
-      "file": "app/(app)/toekomst/rekenhulp/page.tsx",
+      "url": "/toekomst/instellingen",
+      "file": "app/(app)/toekomst/(katern)/instellingen/page.tsx",
       "group": "horizon",
       "isTest": false
     },
     {
-      "url": "/toekomst/voorkeuren",
-      "file": "app/(app)/toekomst/voorkeuren/page.tsx",
+      "url": "/toekomst/rekenhulp",
+      "file": "app/(app)/toekomst/rekenhulp/page.tsx",
       "group": "horizon",
       "isTest": false
     },
@@ -1701,7 +1695,7 @@
       },
       {
         "url": "/toekomst",
-        "file": "app/(app)/toekomst/page.tsx",
+        "file": "app/(app)/toekomst/(katern)/page.tsx",
         "group": "horizon",
         "isTest": false
       },
@@ -1719,13 +1713,7 @@
       },
       {
         "url": "/toekomst/doelen",
-        "file": "app/(app)/toekomst/doelen/page.tsx",
-        "group": "horizon",
-        "isTest": false
-      },
-      {
-        "url": "/toekomst/gebeurtenissen",
-        "file": "app/(app)/toekomst/gebeurtenissen/page.tsx",
+        "file": "app/(app)/toekomst/(katern)/doelen/page.tsx",
         "group": "horizon",
         "isTest": false
       },
@@ -1736,14 +1724,14 @@
         "isTest": false
       },
       {
-        "url": "/toekomst/rekenhulp",
-        "file": "app/(app)/toekomst/rekenhulp/page.tsx",
+        "url": "/toekomst/instellingen",
+        "file": "app/(app)/toekomst/(katern)/instellingen/page.tsx",
         "group": "horizon",
         "isTest": false
       },
       {
-        "url": "/toekomst/voorkeuren",
-        "file": "app/(app)/toekomst/voorkeuren/page.tsx",
+        "url": "/toekomst/rekenhulp",
+        "file": "app/(app)/toekomst/rekenhulp/page.tsx",
         "group": "horizon",
         "isTest": false
       }
@@ -8744,7 +8732,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 263
+    "migrationCount": 264
   },
   "tablesByDomain": [
     {
@@ -9302,11 +9290,11 @@
     }
   ],
   "components": {
-    "total": 1167,
+    "total": 1207,
     "groups": [
       {
         "group": "app",
-        "count": 478,
+        "count": 470,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -9341,8 +9329,6 @@
           "analysis-section",
           "anker-drieslag",
           "anker-drieslag.test",
-          "aow-notice-provider",
-          "aow-notice-provider.test",
           "app-link-gate",
           "app-link-gate.test",
           "app-setup-gate",
@@ -9408,7 +9394,6 @@
           "category-rules-sheet",
           "chart-event-markers",
           "chart-event-markers.test",
-          "chart-overlay-explainer",
           "chart-static-layers",
           "chat-layout-wrapper",
           "chat-panel",
@@ -9446,8 +9431,6 @@
           "deel-kaart-sheet",
           "deel-kaart-sheet.test",
           "deeltijdwerk-impact",
-          "deficit-notice-provider",
-          "deficit-notice-provider.test",
           "dekkingsradar",
           "dekkingsradar.test",
           "density-toggle",
@@ -9459,9 +9442,6 @@
           "doel-vastleg-sheet",
           "doel-vastleg-sheet.test",
           "eerder-stoppen",
-          "eindsituatie-notice",
-          "eindsituatie-notice-provider",
-          "eindsituatie-notice.test",
           "empty-state",
           "end-of-life",
           "envelope-transfer-sheet",
@@ -9476,6 +9456,7 @@
           "event-pane-catalog",
           "event-pane-edit",
           "event-pane-edit.age.test",
+          "event-pane-edit.voorstel.test",
           "event-pane-view",
           "events-timeline",
           "export-dropdown",
@@ -9528,7 +9509,6 @@
           "holdings-heatmap",
           "holdings-heatmap.test",
           "horizon-cashflow-sankey",
-          "horizon-client",
           "horizon-helpers",
           "horizon-trend-grid",
           "horizon-trend-grid.test",
@@ -9623,6 +9603,9 @@
           "ownership-toggle",
           "page-skeleton",
           "page-status-banner",
+          "page-status-banner-body",
+          "page-status-banner-body.test",
+          "page-status-banner.dom.test",
           "page-status-dot",
           "page-status-provider",
           "pending-transfer-banner",
@@ -9647,8 +9630,6 @@
           "phase-modal-opbouw",
           "phase-modal-overgang",
           "phase-modal-vrijheidsdagen.test",
-          "pill-row",
-          "pill-row.test",
           "plan-status-menu.test",
           "plan-status-provider",
           "plan-status-signal",
@@ -9784,7 +9765,6 @@
           "web-vitals-trend",
           "welcome-guide-provider",
           "whatif-market-assumptions",
-          "withdrawal-modal",
           "zoomable-chart-container"
         ]
       },
@@ -10099,96 +10079,6 @@
         ]
       },
       {
-        "group": "future",
-        "count": 84,
-        "items": [
-          "afbouw-overzicht-card",
-          "afbouw-overzicht-card.test",
-          "aow-strategie-body",
-          "aow-strategie-editor",
-          "box3-methode-body",
-          "box3-methode-sheet",
-          "box3-methode-sheet.test",
-          "calculator-runner",
-          "calculator-to-life-event-sheet",
-          "calculator-to-life-event-sheet.test",
-          "categorie-prio-editor",
-          "categorie-prio-editor.test",
-          "disclaimer-strip",
-          "doel-bewerken-sheet",
-          "doel-bewerken-sheet.test",
-          "doel-loslaten-confirm",
-          "doel-toevoegen-sheet",
-          "doel-toevoegen-sheet.test",
-          "doelen-view",
-          "doelen-view.test",
-          "duplicate-confirm-sheet",
-          "editors",
-          "eindstrategie-body",
-          "eindstrategie-body.geen-tekort-lening.test",
-          "eindstrategie-body.nalatenschap.test",
-          "fields",
-          "gebeurtenissen-view",
-          "gebeurtenissen-view.test",
-          "grondslag-editor",
-          "grondslag-editor.test",
-          "housing-strategy-section",
-          "housing-strategy-section.test",
-          "inkomsten-editor",
-          "inkomsten-editor.test",
-          "laag2-editors",
-          "laag2-editors.test",
-          "levensstrategieen-section",
-          "library-card",
-          "library-filter",
-          "like-button",
-          "onttrekking-afname-body",
-          "onttrekkingsstrategie-body",
-          "onttrekkingsstrategie-body.test",
-          "onttrekkingsvolgorde-body",
-          "onttrekkingsvolgorde-body.test",
-          "order-preset-picker",
-          "order-preset-picker.test",
-          "owner-stats-badge",
-          "pensioen-pot-body",
-          "pensioen-projectie-chart",
-          "pensioen-strategie-editor",
-          "pensioen-strategie-editor.test",
-          "plan-review-pane",
-          "plan-review-pane.test",
-          "plan-review-provider",
-          "pot-flow-diagram",
-          "potten-editor",
-          "potten-editor.test",
-          "publish-curation-sheet",
-          "rate-limit-badge",
-          "regel-bewerken-pane",
-          "rekenhulp-view",
-          "report-sheet",
-          "requirements-checklist",
-          "requirements-chips",
-          "shared",
-          "strategie-editors",
-          "strategie-impact",
-          "strategie-modal-shell",
-          "toekomst-nav-cards",
-          "toekomst-nav-cards.test",
-          "toekomst-subpage-shell",
-          "uitgaven-editor",
-          "uitgaven-editor.test",
-          "verdeling-toename-body",
-          "voorkeur-bewerken-body",
-          "voorkeur-bewerken-sheet",
-          "voorkeur-bewerken-sheet.test",
-          "voorkeuren-view",
-          "voorkeuren-view.test",
-          "werk-strategie-body",
-          "werk-strategie-editor",
-          "woning-editor",
-          "woning-editor.test"
-        ]
-      },
-      {
         "group": "core",
         "count": 83,
         "items": [
@@ -10278,6 +10168,94 @@
         ]
       },
       {
+        "group": "future",
+        "count": 82,
+        "items": [
+          "afbouw-overzicht-card",
+          "afbouw-overzicht-card.test",
+          "aow-strategie-body",
+          "aow-strategie-editor",
+          "box3-methode-body",
+          "box3-methode-sheet",
+          "box3-methode-sheet.test",
+          "calculator-runner",
+          "calculator-to-life-event-sheet",
+          "calculator-to-life-event-sheet.test",
+          "categorie-prio-editor",
+          "categorie-prio-editor.test",
+          "disclaimer-strip",
+          "doel-bewerken-sheet",
+          "doel-bewerken-sheet.test",
+          "doel-loslaten-confirm",
+          "doel-toevoegen-sheet",
+          "doel-toevoegen-sheet.test",
+          "doelen-view",
+          "doelen-view.test",
+          "duplicate-confirm-sheet",
+          "editors",
+          "eindstrategie-body",
+          "eindstrategie-body.geen-tekort-lening.test",
+          "eindstrategie-body.nalatenschap.test",
+          "fields",
+          "gebeurtenissen-view",
+          "gebeurtenissen-view.test",
+          "grondslag-editor",
+          "grondslag-editor.test",
+          "housing-strategy-section",
+          "housing-strategy-section.test",
+          "inkomsten-editor",
+          "inkomsten-editor.test",
+          "laag2-editors",
+          "laag2-editors.test",
+          "levensstrategieen-section",
+          "library-card",
+          "library-filter",
+          "like-button",
+          "onttrekking-afname-body",
+          "onttrekkingsstrategie-body",
+          "onttrekkingsstrategie-body.test",
+          "onttrekkingsvolgorde-body",
+          "onttrekkingsvolgorde-body.test",
+          "order-preset-picker",
+          "order-preset-picker.test",
+          "owner-stats-badge",
+          "pensioen-pot-body",
+          "pensioen-projectie-chart",
+          "pensioen-strategie-editor",
+          "pensioen-strategie-editor.test",
+          "plan-review-pane",
+          "plan-review-pane.test",
+          "plan-review-provider",
+          "pot-flow-diagram",
+          "potten-editor",
+          "potten-editor.test",
+          "publish-curation-sheet",
+          "rate-limit-badge",
+          "regel-bewerken-pane",
+          "rekenhulp-view",
+          "report-sheet",
+          "requirements-checklist",
+          "requirements-chips",
+          "shared",
+          "strategie-editors",
+          "strategie-impact",
+          "strategie-modal-shell",
+          "toekomst-subpage-shell",
+          "uitgaven-editor",
+          "uitgaven-editor.test",
+          "verdeling-toename-body",
+          "voorkeur-bewerken-body",
+          "voorkeur-bewerken-sheet",
+          "voorkeur-bewerken-sheet.test",
+          "voorkeuren-view",
+          "voorkeuren-view.test",
+          "werk-strategie-body",
+          "werk-strategie-editor",
+          "woning-editor",
+          "woning-editor.test"
+        ]
+      },
+      {
         "group": "mijn",
         "count": 52,
         "items": [
@@ -10333,6 +10311,60 @@
           "spend-limit-alias-picker",
           "topbar-color-picker",
           "topbar-color-picker.test"
+        ]
+      },
+      {
+        "group": "toekomst",
+        "count": 48,
+        "items": [
+          "aannamesregel",
+          "aannamesregel.test",
+          "actief-katern",
+          "canvas-grafiek",
+          "canvas-kop",
+          "canvas-legenda",
+          "canvas-legenda.test",
+          "canvas-tips-toggle",
+          "canvas-tips-toggle.test",
+          "canvas-uitleg",
+          "doelen-katern-lab",
+          "doelen-lab",
+          "doelen-lab-sheets",
+          "gebeurtenissen-met-hoofdrun",
+          "instellingen-katern",
+          "instellingen-katern.test",
+          "katern-melding",
+          "katern-melding.test",
+          "lagen-menu",
+          "lagen-menu.test",
+          "marktcheck-getallen",
+          "marktcheck-getallen.test",
+          "modus-switch",
+          "modus-switch.test",
+          "oude-lab-bladwijzer",
+          "plan-gegevensmelding",
+          "plan-helpers",
+          "plan-hero-duiding",
+          "plan-kassabons",
+          "plan-kpi-strip",
+          "plan-kpi-strip.test",
+          "plan-paneel",
+          "plan-verdieping",
+          "toekomst-ankerregel",
+          "toekomst-canvas",
+          "toekomst-canvas.test",
+          "toekomst-katern-meldingen",
+          "toekomst-katern-meldingen.test",
+          "toekomst-katern-navigatie",
+          "toekomst-overlay-host",
+          "toekomst-overlays",
+          "toekomst-reken-grens",
+          "toekomst-state-provider",
+          "use-euro-view-feeds.test",
+          "use-in-view-once.test",
+          "use-toekomst-overlay-state.whatif-scroll.test",
+          "use-toekomst-sim.props-als-bron.test",
+          "wizard-ingang"
         ]
       },
       {
@@ -10424,7 +10456,7 @@
       },
       {
         "group": "editorial",
-        "count": 21,
+        "count": 23,
         "items": [
           "aanname-hint",
           "button",
@@ -10436,6 +10468,8 @@
           "index",
           "info-icon-tooltip",
           "inline-info-disclosure",
+          "katern-koppen",
+          "katern-koppen.test",
           "page-blueprints",
           "page-info-button",
           "page-info-button.test",
@@ -18811,6 +18845,19 @@
       ],
       "summary": "Als het model wegvalt, blijven de AI-stappen van de Krant **niet-fataal** — dat blijft ongewijzigd — maar drie dingen komen erbij. (1) Een run die liep zonder alles op te leveren meldt zich als **`partial`**, niet als `success`. (2) Een lijstpagina valt **deterministisch terug** ",
       "file": "docs/adr/0178-de-krant-zonder-model.md"
+    },
+    {
+      "id": "0179-toekomst-in-drie-katernen",
+      "title": "/toekomst in drie katernen: één canvas, drie routes (Plan, Doelen, Instellingen) en elke instelling op één plek",
+      "status": "aanvaard",
+      "date": "2026-09-26",
+      "elements": [
+        "fn-toekomstplannen",
+        "as-planning",
+        "app-comp"
+      ],
+      "summary": "/toekomst wordt één layout met kop, gedeeld grafiekcanvas en drie katern-koppen, met drie routes eronder: Plan (`/toekomst`), Doelen (`/toekomst/doelen`) en Instellingen (`/toekomst/instellingen`). Het canvas blijft gemonteerd; elk katern heeft één taak, elke instelling één plek.",
+      "file": "docs/adr/0179-toekomst-in-drie-katernen.md"
     }
   ],
   "churn": {
@@ -18818,19 +18865,19 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 79
+        "commits": 80
       },
       {
         "path": "lib/ai",
-        "commits": 60
+        "commits": 65
       },
       {
         "path": "app/(app)/toekomst",
-        "commits": 36
+        "commits": 44
       },
       {
         "path": "app/api/ai",
-        "commits": 20
+        "commits": 21
       },
       {
         "path": "app/api/assets",
@@ -18849,20 +18896,15 @@
         "commits": 6
       },
       {
-        "path": "lib/horizon-data.ts",
-        "commits": 5
+        "path": "components/horizon",
+        "commits": 6
       },
       {
-        "path": "components/horizon",
+        "path": "lib/horizon-data.ts",
         "commits": 5
       }
     ],
     "hotFiles": [
-      {
-        "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 11030,
-        "commits": 102
-      },
       {
         "file": "components/app/budgets-client.tsx",
         "loc": 5717,
@@ -18880,13 +18922,13 @@
       },
       {
         "file": "lib/release-notes.ts",
-        "loc": 3523,
-        "commits": 11
+        "loc": 3575,
+        "commits": 13
       },
       {
         "file": "lib/dashboard-data-loader.ts",
         "loc": 3144,
-        "commits": 63
+        "commits": 64
       },
       {
         "file": "app/(app)/core/cash/import/page.tsx",
@@ -18897,6 +18939,11 @@
         "file": "components/app/chat/chat-panel.tsx",
         "loc": 2439,
         "commits": 24
+      },
+      {
+        "file": "app/(app)/core/checkin/page.tsx",
+        "loc": 2419,
+        "commits": 13
       }
     ]
   },
@@ -20084,9 +20131,27 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-09-22",
-    "hasChanges": false,
-    "sections": []
+    "previousDate": "2026-09-25",
+    "hasChanges": true,
+    "sections": [
+      {
+        "label": "Schermen",
+        "added": [
+          "/toekomst/instellingen"
+        ],
+        "removed": [
+          "/toekomst/gebeurtenissen",
+          "/toekomst/voorkeuren"
+        ]
+      },
+      {
+        "label": "Componenten (aantal)",
+        "added": [
+          "+40"
+        ],
+        "removed": []
+      }
+    ]
   },
   "statsHistory": [
     {
@@ -20557,6 +20622,13 @@
       "components": 1167,
       "tables": 105,
       "routesProduction": 90
+    },
+    {
+      "date": "2026-09-26",
+      "api": 334,
+      "components": 1207,
+      "tables": 105,
+      "routesProduction": 89
     }
   ]
 }

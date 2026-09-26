@@ -1210,3 +1210,9 @@
 ## 2026-09-25
 
 - Geen wijzigingen.
+
+## 2026-09-26
+
+- **Schermen** toegevoegd: /toekomst/instellingen
+- **Schermen** verwijderd: /toekomst/gebeurtenissen, /toekomst/voorkeuren
+- **Componenten (aantal)** toegevoegd: +40
