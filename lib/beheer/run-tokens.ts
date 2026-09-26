@@ -14,7 +14,8 @@
 //  1. Een handmatige aanroep door een ingelogde beheerder (de ingest-knop op
 //     /beheer/nieuws) logt MET `user_id`, valt dus buiten elk venster en komt
 //     hier niet terug. Bewust: anders zou de tokens van een beheerder aan een
-//     cron worden toegeschreven.
+//     cron worden toegeschreven. Die route geeft de userId van de beheerder
+//     zelf mee aan `getModel`.
 //  2. Twee gelijktijdige crons zouden elkaars tokens claimen. Vandaag lopen ze
 //     na elkaar (`integraties-health` start ~37 ms ná `holdings-prices`), maar
 //     het venster is de aanname — niet een garantie. `overlaptMetAndereRun`
@@ -22,18 +23,27 @@
 //  3. Een run zonder `finished_at` (afgebroken) krijgt geen venster en dus geen
 //     tokens; dat toont als "—", niet als nul.
 //  4. De token-logging is fire-and-forget (`void logAiTokens(...)` in
-//     lib/ai/token-usage.ts) en doet éérst een `auth.getUser()` over het netwerk
-//     vóór de insert. De `created_at` van de laatste aanroep van een run kan
-//     daardoor ná `finished_at` landen en net buiten het venster vallen. Gemeten
-//     26 sep 2026 over tien dagen productie: 298 van 299 systeemrijen vielen
-//     binnen precies één venster, één erbuiten. Geen levend defect, wel de reden
-//     dat dit een aanname blijft en geen boekhouding.
-//  5. `user_id = null` is niet strikt "systeem". Diezelfde `auth.getUser()`
-//     achteraf kan bij een gebruikersaanroep mislukken, en dan logt die óók met
-//     `user_id = null`. Gemeten 26 sep 2026 over 30 dagen: 5 van 325 null-rijen
-//     kwamen van een gebruiker (`abonnementen_analyse`, `rekenhulp_bouwen`).
-//     Valt zo'n aanroep in een cron-venster, dan telt hij daar mee. Dat is een
-//     toerekeningsfout, geen privacylek: we lezen geen `user_id` of `feature`.
+//     lib/ai/token-usage.ts). De `created_at` van de laatste aanroep van een run
+//     kan daardoor ná `finished_at` landen en net buiten het venster vallen.
+//     De cron deed vroeger nog een (sessieloze, dus lokale) `auth.getUser()`
+//     vóór de insert; die gaf direct null en droeg nauwelijks bij. De
+//     insert-latentie zelf is de oorzaak, en die blijft. Gemeten
+//     26 sep 2026 (vóór die wijziging) over tien dagen productie: 298 van 299
+//     systeemrijen vielen binnen precies één venster, één erbuiten. Geen levend
+//     defect, wel de reden dat dit een aanname blijft en geen boekhouding.
+//  5. `user_id = null` is niet strikt "systeem". Tot 26 sep 2026 bepaalde de
+//     logging de gebruiker achteraf met `auth.getUser()`, bij `finish` van de
+//     stream — mogelijk ná de request-context. Mislukte dat, dan logde een
+//     gebruikersaanroep óók met `user_id = null`. Gemeten 26 sep 2026 over 30
+//     dagen: 5 van 325 null-rijen kwamen van een gebruiker
+//     (`abonnementen_analyse`, `rekenhulp_bouwen`). Sindsdien geven de
+//     gebruikersroutes hun userId zelf mee (`getModel(…, { userId })`), zodat
+//     nieuwe gebruikersaanroepen niet meer als null landen. De kanttekening
+//     blijft staan om twee redenen: historische rijen van vóór die wijziging
+//     kunnen nog zo'n gebruikersaanroep bevatten, en een aanroeper die nog geen
+//     `userId` meegeeft valt terug op de oude bepaling. Valt zo'n aanroep in
+//     een cron-venster, dan telt hij daar mee. Dat is een toerekeningsfout,
+//     geen privacylek: we lezen geen `user_id` of `feature`.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { estimateCostUsd } from '@/lib/ai/token-prices'

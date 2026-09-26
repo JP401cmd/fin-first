@@ -26,6 +26,7 @@ vi.mock('@/lib/ai/config', () => ({ getModel: vi.fn(async () => ({ id: 'model' }
 vi.mock('@supabase/supabase-js', () => ({ createClient: () => ({ from: () => ({}) }) }))
 
 import { GET } from './route'
+import { getModel } from '@/lib/ai/config'
 
 const SUMMARY_BASIS: IngestSummary = {
   sourcesChecked: 3,
@@ -120,5 +121,20 @@ describe('news-ingest cron — status volgt de uitkomst', () => {
     const res = await GET(req())
     expect(res.status).toBe(500)
     expect(mockRecordJobRun.mock.calls.at(-1)?.[1]).toMatchObject({ status: 'error' })
+  })
+})
+
+describe('news-ingest cron — token-logging als systeemcall', () => {
+  it('vraagt beide modellen aan met expliciet userId: null (geen getUser achteraf)', async () => {
+    mockRunNewsIngest.mockResolvedValue({
+      summary: SUMMARY_BASIS,
+      health: health({ rss: 15, web_lijst: 33, web_pagina: 45 }),
+    })
+
+    await GET(req())
+
+    const calls = vi.mocked(getModel).mock.calls
+    expect(calls.map((c) => c[1])).toEqual(['nieuws_ingest', 'nieuws_duiding'])
+    for (const c of calls) expect(c[2]).toEqual({ userId: null })
   })
 })

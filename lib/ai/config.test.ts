@@ -13,13 +13,16 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
  * vitest), enkel de twee config-foutpaden hierboven.
  */
 
-const { mockLogAiFailure, mockAiFailureMiddleware, mockFrom } = vi.hoisted(() => ({
+const { mockLogAiFailure, mockAiFailureMiddleware, mockFrom, mockTokenLoggingMiddleware } = vi.hoisted(() => ({
   // Expliciet getypeerd: zonder parameters infereert vitest `.mock.calls` als
   // `[]` (0-tuple), en de destructure naar de echte 3-argumenten-vorm
   // hieronder wordt dan een TS2352/TS2493-fout.
   mockLogAiFailure: vi.fn(async (_tag: string, _err: unknown, _opts?: { supabase?: unknown }) => {}),
   mockAiFailureMiddleware: vi.fn(() => ({})),
   mockFrom: vi.fn(),
+  mockTokenLoggingMiddleware: vi.fn((_opts: { feature: string; userId?: string | null }) => ({
+    specificationVersion: 'v3' as const,
+  })),
 }))
 
 vi.mock('@/lib/ai/ai-failure-middleware', () => ({
@@ -27,6 +30,7 @@ vi.mock('@/lib/ai/ai-failure-middleware', () => ({
   aiFailureMiddleware: mockAiFailureMiddleware,
 }))
 vi.mock('@/lib/supabase/service', () => ({ getServiceClient: () => ({ from: mockFrom }) }))
+vi.mock('@/lib/ai/token-usage', () => ({ tokenLoggingMiddleware: mockTokenLoggingMiddleware }))
 
 import { getModel, AIConfigError } from './config'
 import { AI_ERROR_CODE } from './error-copy'
@@ -45,6 +49,7 @@ beforeEach(() => {
   mockLogAiFailure.mockClear()
   mockAiFailureMiddleware.mockClear()
   mockFrom.mockReset()
+  mockTokenLoggingMiddleware.mockClear()
   vi.stubEnv('ANTHROPIC_API_KEY', '')
   vi.stubEnv('OPENAI_API_KEY', '')
   vi.stubEnv('MISTRAL_API_KEY', '')
@@ -108,5 +113,40 @@ describe('getModel — platform-kill-switch', () => {
     expect(caught).toBeInstanceOf(AIConfigError)
     expect((caught as InstanceType<typeof AIConfigError>).reason).toBe(AI_ERROR_CODE.disabledPlatform)
     expect(mockLogAiFailure).not.toHaveBeenCalled()
+  })
+})
+
+describe('getModel — userId voor token-logging', () => {
+  function metSleutel() {
+    vi.stubEnv('ANTHROPIC_API_KEY', 'sk-test')
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'app_settings') return appSettingsChain([])
+      throw new Error(`onverwachte tabel: ${table}`)
+    })
+  }
+
+  it('geeft een meegegeven userId door aan de token-logging', async () => {
+    metSleutel()
+    await getModel(fakeSupabase, 'chat', { userId: 'user-123' })
+    expect(mockTokenLoggingMiddleware).toHaveBeenCalledTimes(1)
+    expect(mockTokenLoggingMiddleware.mock.calls[0][0]).toMatchObject({ feature: 'chat', userId: 'user-123' })
+  })
+
+  it('geeft expliciet null door (systeemcall)', async () => {
+    metSleutel()
+    await getModel(fakeSupabase, 'nieuws_ingest', { userId: null })
+    expect(mockTokenLoggingMiddleware.mock.calls[0][0].userId).toBeNull()
+  })
+
+  it('zonder opts blijft userId undefined — de oude getUser-fallback', async () => {
+    metSleutel()
+    await getModel(fakeSupabase, 'chat')
+    expect(mockTokenLoggingMiddleware.mock.calls[0][0].userId).toBeUndefined()
+  })
+
+  it('zonder feature geen token-logging, ook niet met userId', async () => {
+    metSleutel()
+    await getModel(fakeSupabase, undefined, { userId: 'user-123' })
+    expect(mockTokenLoggingMiddleware).not.toHaveBeenCalled()
   })
 })

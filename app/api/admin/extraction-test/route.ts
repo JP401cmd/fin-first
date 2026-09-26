@@ -47,7 +47,7 @@ export async function POST(req: Request) {
     householdType: householdType ?? undefined,
     monthlyIncome: monthlyIncome ?? undefined,
     monthlyExpenses: monthlyExpenses ?? undefined,
-  })
+  }, { userId: user.id })
 
   return NextResponse.json(result)
 }

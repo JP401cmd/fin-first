@@ -11,7 +11,7 @@
 
 import { generateObject } from 'ai'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { getModel } from '@/lib/ai/config'
+import { getModel, type GetModelOptions } from '@/lib/ai/config'
 import { sanitizeForAI } from '@/lib/ai/sanitize'
 import { DEFAULT_EXTRACTION_PROMPT } from '@/lib/ai/extraction-system-prompt'
 import { leesBeheerInstelling } from '@/lib/app-settings/beheer-instelling'
@@ -56,6 +56,8 @@ export async function extractFinancialData(
     monthlyIncome?: number
     monthlyExpenses?: number
   } = {},
+  /** Voor token-logging: de userId van de aanroeper (zie `GetModelOptions`). */
+  modelOpts: GetModelOptions = {},
 ): Promise<ExtractionResult> {
   // Skip extraction for empty or too-short input
   if (!text || text.trim().length < 10) {
@@ -65,7 +67,7 @@ export async function extractFinancialData(
 
   try {
     // Resolve the AI model from project settings
-    const model = await getModel(supabase, 'document_extractie')
+    const model = await getModel(supabase, 'document_extractie', modelOpts)
 
     // Beheerder-override van het prompt: beheer-content, dus server-side via de
     // service-role (ADR 0163) — de sessie-client mag die sleutel niet lezen.

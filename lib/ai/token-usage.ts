@@ -7,10 +7,18 @@
 // credit-metering (lib/ai-credits.ts): credits zijn afgesproken kosten per
 // actie, tokens zijn het echte verbruik.
 //
-// De userId wordt lazy bepaald uit de meegegeven sessie (auth.getUser) op
-// het moment van loggen — systeemcalls (crons met de service-client) loggen
-// met user_id null. Schrijven gaat via de service-role: de tabel heeft
-// bewust geen insert-policy voor sessies.
+// Wie de aanroep deed, geeft de AANROEPER mee (`userId`), niet een
+// `auth.getUser()` achteraf: de middleware logt bij `finish` van de stream, en
+// dat kan ná de request-context vallen (sessie-cookie/refresh niet meer
+// beschikbaar). Faalde getUser daar, dan landde een gebruikersaanroep als
+// `user_id = null` — en /beheer/jobs telt null als systeem (lib/beheer/
+// run-tokens.ts). Contract van `userId`:
+//   - string    → die gebruiker, géén getUser
+//   - null      → expliciete systeemcall (cron/service-client), géén getUser
+//   - undefined → oude fallback: lazy `auth.getUser()` op de meegegeven sessie,
+//                 zodat een nog niet omgezette aanroeper niet breekt
+// Schrijven gaat via de service-role: de tabel heeft bewust geen
+// insert-policy voor sessies.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { wrapLanguageModel, type LanguageModelMiddleware } from 'ai'
@@ -66,22 +74,40 @@ export interface TokenUsageLike {
   outputTokens?: { total?: number | undefined } | null
 }
 
-export async function logAiTokens(opts: {
-  /** Sessie van de aanroeper — alleen gebruikt om de user te bepalen. */
+/**
+ * Wie de aanroep deed. `string` = gebruiker, `null` = expliciet systeem,
+ * `undefined` = onbekend → fallback op `auth.getUser()` bij het loggen.
+ */
+export type TokenLogUserId = string | null | undefined
+
+/** Het gedeelde logging-deel van de opties (middleware + wrap + getModel). */
+export interface TokenLoggingOptions {
+  /** Sessie van de aanroeper — alleen gebruikt voor de getUser-fallback. */
   supabase: SupabaseClient
   feature: string
   provider: string
   modelId: string
-  usage: TokenUsageLike | null | undefined
-}): Promise<void> {
+  /** Zie `TokenLogUserId`. Weglaten = oude getUser-fallback. */
+  userId?: TokenLogUserId
+}
+
+async function resolveUserId(supabase: SupabaseClient, userId: TokenLogUserId): Promise<string | null> {
+  if (userId !== undefined) return userId
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  return user?.id ?? null
+}
+
+export async function logAiTokens(
+  opts: TokenLoggingOptions & { usage: TokenUsageLike | null | undefined },
+): Promise<void> {
   try {
     const input = Math.round(opts.usage?.inputTokens?.total ?? 0)
     const output = Math.round(opts.usage?.outputTokens?.total ?? 0)
-    const {
-      data: { user },
-    } = await opts.supabase.auth.getUser()
+    const userId = await resolveUserId(opts.supabase, opts.userId)
     await getServiceClient().from('ai_token_usage').insert({
-      user_id: user?.id ?? null,
+      user_id: userId,
       feature: opts.feature,
       provider: opts.provider,
       model: opts.modelId,
@@ -102,12 +128,7 @@ export async function logAiTokens(opts: {
  * gelegd; gebruik `wrapModelWithTokenLogging` voor losse modellen die niet
  * via getModel lopen.
  */
-export function tokenLoggingMiddleware(opts: {
-  supabase: SupabaseClient
-  feature: string
-  provider: string
-  modelId: string
-}): LanguageModelMiddleware {
+export function tokenLoggingMiddleware(opts: TokenLoggingOptions): LanguageModelMiddleware {
   const log = (usage: unknown) => {
     void logAiTokens({ ...opts, usage: (usage ?? null) as TokenUsageLike | null })
   }
@@ -139,7 +160,7 @@ export type WrappableModel = Parameters<typeof wrapLanguageModel>[0]['model']
 /** Wrap een los (niet via getModel verkregen) model met token-logging. */
 export function wrapModelWithTokenLogging<M extends WrappableModel>(
   model: M,
-  opts: { supabase: SupabaseClient; feature: string; provider: string; modelId: string },
+  opts: TokenLoggingOptions,
 ) {
   return wrapLanguageModel({ model, middleware: tokenLoggingMiddleware(opts) })
 }

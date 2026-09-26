@@ -162,7 +162,7 @@ export async function POST() {
     // Ask Claude which of these patterns are subscriptions
     let model
     try {
-      model = await getModel(supabase, 'abonnementen_detectie')
+      model = await getModel(supabase, 'abonnementen_detectie', { userId: user.id })
     } catch (err) {
       return aiModelUnavailable(err, 'subscriptions-detect-ai')
     }

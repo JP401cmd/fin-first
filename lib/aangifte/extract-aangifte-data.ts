@@ -42,7 +42,7 @@
 
 import { generateObject } from 'ai'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { getModel } from '@/lib/ai/config'
+import { getModel, type GetModelOptions } from '@/lib/ai/config'
 import { leesBeheerInstelling } from '@/lib/app-settings/beheer-instelling'
 import {
   extractionSchema,
@@ -111,6 +111,8 @@ export async function extractAangifteData(
   supabase: SupabaseClient,
   text: string,
   fallbackTaxYear: number = new Date().getFullYear(),
+  /** Voor token-logging: de userId van de aanroeper (zie `GetModelOptions`). */
+  modelOpts: GetModelOptions = {},
 ): Promise<AangifteExtractionResult> {
   // Short-circuit on too-short input. We don't log the length — see
   // the privacy section above for why.
@@ -122,7 +124,7 @@ export async function extractAangifteData(
     // 1) Resolve the configured AI model. This may throw `AIConfigError`
     // if no provider is set up — we let it bubble into our catch so the
     // UI gets the same empty-result fallback regardless of cause.
-    const model = await getModel(supabase, 'aangifte_extractie')
+    const model = await getModel(supabase, 'aangifte_extractie', modelOpts)
 
     // 2) Optional admin override of the system prompt, stored in
     // `app_settings` under the stable key from `system-prompt.ts`. Beheer-

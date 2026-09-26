@@ -838,7 +838,7 @@ export async function POST(req: Request) {
           householdType: identity.household_type,
           monthlyIncome: identity.net_monthly_income,
           monthlyExpenses: identity.estimated_monthly_expenses,
-        })
+        }, { userId: user.id })
 
         // Verbruik registreren in dezelfde maandbucket die `mayRunServerExtraction`
         // hierboven leest — anders is deze AI-call ongemeten en telt hij niet mee

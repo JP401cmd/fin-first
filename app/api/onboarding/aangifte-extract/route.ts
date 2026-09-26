@@ -163,7 +163,7 @@ export async function POST(req: Request) {
   const fallbackYear = parsed.data.fallback_tax_year ?? new Date().getFullYear()
 
   try {
-    const result = await extractAangifteData(supabase, clean, fallbackYear)
+    const result = await extractAangifteData(supabase, clean, fallbackYear, { userId: user.id })
 
     // Belt-and-braces: re-validate the result against the public Zod
     // schema. `generateObject` already validates once, but the

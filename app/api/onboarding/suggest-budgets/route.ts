@@ -53,7 +53,7 @@ export async function POST(req: Request) {
 
   let model
   try {
-    model = await getModel(supabase, 'budget_suggesties')
+    model = await getModel(supabase, 'budget_suggesties', { userId: user.id })
   } catch (err) {
     return aiModelUnavailable(err, 'onboarding-suggest-budgets')
   }

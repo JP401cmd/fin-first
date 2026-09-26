@@ -107,7 +107,7 @@ export async function POST(req: Request) {
 
   let model
   try {
-    model = await getModel(supabase, 'chat')
+    model = await getModel(supabase, 'chat', { userId: user.id })
   } catch (err) {
     // De echte reden (provider, beheerpad, env-variabele) gaat naar het
     // SERVERLOG — nooit naar de client. De gebruiker krijgt de neutrale tekst

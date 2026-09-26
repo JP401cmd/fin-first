@@ -18,7 +18,7 @@
 import { generateObject } from 'ai'
 import { z } from 'zod'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { getModel } from '@/lib/ai/config'
+import { getModel, type GetModelOptions } from '@/lib/ai/config'
 
 export interface ScreenPublishInput {
   name: string
@@ -100,6 +100,8 @@ Antwoord met:
 export async function screenPublishMetadata(
   supabase: SupabaseClient,
   input: ScreenPublishInput,
+  /** Voor token-logging: de userId van de aanroeper (zie `GetModelOptions`). */
+  modelOpts: GetModelOptions = {},
 ): Promise<ScreenPublishResult> {
   const name = (input.name ?? '').trim()
   if (!name) {
@@ -119,7 +121,7 @@ export async function screenPublishMetadata(
   const userPrompt = blocks.join('\n\n')
 
   try {
-    const model = await getModel(supabase, 'scherm_publicatie')
+    const model = await getModel(supabase, 'scherm_publicatie', modelOpts)
     const { object } = await generateObject({
       model,
       schema: ScreenResultSchema,

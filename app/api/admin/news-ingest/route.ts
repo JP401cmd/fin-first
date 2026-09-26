@@ -21,13 +21,19 @@ export async function POST() {
   if (!(await isSuperAdmin(supabase))) {
     return forbidden()
   }
+  // De beheerder is de actor: zijn tokens horen bij hem, niet bij een cron-venster
+  // op /beheer/jobs. Eén keer hier bepalen in plaats van per aanroep achteraf.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  const modelOpts = { userId: user?.id }
 
   try {
     // AI-model voor verrijking — zonder model draait de ingest door zonder extractie
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let model: any = null
     try {
-      model = await getModel(supabase, 'nieuws_ingest')
+      model = await getModel(supabase, 'nieuws_ingest', modelOpts)
     } catch {
       // AI model not configured — proceed without enrichment
     }
@@ -35,7 +41,7 @@ export async function POST() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let duidingModel: any = null
     try {
-      duidingModel = await getModel(supabase, 'nieuws_duiding')
+      duidingModel = await getModel(supabase, 'nieuws_duiding', modelOpts)
     } catch {
       // Zonder model wordt alleen de wachtrij geteld
     }

@@ -158,7 +158,7 @@ export async function POST(req: Request) {
     // de herschrijving. Faalt dit (AI uit, fout, guard) → deterministisch.
     const directives = await loadBriefingDirectives()
     const directivesBlock = buildDirectivesBlock(directives, now, buildEngineMetrics(input))
-    const { headline, texts } = await redactBriefing(supabase, entries, { directivesBlock })
+    const { headline, texts } = await redactBriefing(supabase, entries, { directivesBlock, userId: user.id })
 
     // CREDITREGISTRATIE — alleen hier, op het CLOUDpad. 'briefing' is al sinds
     // de invoering een AiFeatureKey met kosten 2 (lib/ai-credits.ts) maar werd

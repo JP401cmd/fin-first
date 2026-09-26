@@ -103,7 +103,7 @@ export async function GET(request: Request) {
     let model: any = null
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      model = await getModel(service as any, 'nieuws_ingest')
+      model = await getModel(service as any, 'nieuws_ingest', { userId: null })
     } catch {
       // AI model not configured — proceed without enrichment
     }
@@ -114,7 +114,7 @@ export async function GET(request: Request) {
     let duidingModel: any = null
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      duidingModel = await getModel(service as any, 'nieuws_duiding')
+      duidingModel = await getModel(service as any, 'nieuws_duiding', { userId: null })
     } catch {
       // Zonder model wordt alleen de wachtrij geteld — de ingest draait door
     }

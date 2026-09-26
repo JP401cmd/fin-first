@@ -11,7 +11,7 @@
 import { generateObject, NoObjectGeneratedError, APICallError } from 'ai'
 import { z } from 'zod'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { AIConfigError, getModel } from '@/lib/ai/config'
+import { AIConfigError, getModel, type GetModelOptions } from '@/lib/ai/config'
 import { sanitizeForAI } from '@/lib/ai/sanitize'
 import {
   CalculatorDefinitionSchema,
@@ -253,12 +253,14 @@ export async function buildCalculator(
   supabase: SupabaseClient,
   rawPrompt: string,
   refineFrom?: CalculatorDefinition,
+  /** Voor token-logging: de userId van de aanroeper (zie `GetModelOptions`). */
+  modelOpts: GetModelOptions = {},
 ): Promise<BuildCalculatorResult> {
   const userPrompt = rawPrompt.trim()
   if (!userPrompt) return { ok: false, error: 'Lege vraag.' }
 
   try {
-    const model = await getModel(supabase, 'rekenhulp_bouwen')
+    const model = await getModel(supabase, 'rekenhulp_bouwen', modelOpts)
     const refineBlock = refineFrom
       ? `\n\nBestaande definitie om aan te passen (pas alleen aan wat de gebruiker vraagt):\n${JSON.stringify(refineFrom)}`
       : ''

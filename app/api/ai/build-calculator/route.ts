@@ -119,6 +119,6 @@ export async function POST(req: Request) {
     )
   }
 
-  const result = await buildCalculator(supabase, prompt, refineFrom)
+  const result = await buildCalculator(supabase, prompt, refineFrom, { userId: user.id })
   return Response.json(result, { status: result.ok ? 200 : 422 })
 }

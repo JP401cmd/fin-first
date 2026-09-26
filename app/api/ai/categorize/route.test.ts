@@ -146,7 +146,7 @@ describe('POST /api/ai/categorize — privé-modus-gate', () => {
     const json = await res.json()
     expect(json.results[0]).toMatchObject({ import_hash: 'h1', budget_slug: 'boodschappen', budget_id: 'b1' })
     expect(mockCheckTierGate).toHaveBeenCalled()
-    expect(mockGetModel).toHaveBeenCalledWith(supabase, 'categorisatie')
+    expect(mockGetModel).toHaveBeenCalledWith(supabase, 'categorisatie', { userId: 'user-1' })
     expect(mockRecordAiUsage).toHaveBeenCalled()
   })
 

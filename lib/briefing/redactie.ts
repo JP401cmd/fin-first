@@ -20,7 +20,7 @@
 import { generateObject } from 'ai'
 import { z } from 'zod'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { getModel } from '@/lib/ai/config'
+import { getModel, type GetModelOptions } from '@/lib/ai/config'
 import { sanitizeForAI } from '@/lib/ai/sanitize'
 import { maskPIIInObject } from '@/lib/ai/pii-output-filter'
 import { leesBeheerInstellingen } from '@/lib/app-settings/beheer-instelling'
@@ -210,11 +210,12 @@ function buildRedactiePrompt(entries: BriefingEntry[]): string {
 export async function redactBriefing(
   supabase: SupabaseClient,
   entries: BriefingEntry[],
-  opts: { directivesBlock?: string } = {},
+  /** `userId`: voor token-logging, de userId van de aanroeper (zie `GetModelOptions`). */
+  opts: { directivesBlock?: string; userId?: GetModelOptions['userId'] } = {},
 ): Promise<RedactieResult> {
   if (entries.length === 0) return { headline: null, texts: new Map() }
   try {
-    const model = await getModel(supabase, 'briefing')
+    const model = await getModel(supabase, 'briefing', { userId: opts.userId })
     const system = opts.directivesBlock
       ? `${REDACTIE_SYSTEM}\n\n${opts.directivesBlock}`
       : REDACTIE_SYSTEM

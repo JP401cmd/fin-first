@@ -314,7 +314,7 @@ export async function GET(request: Request) {
 
   let model
   try {
-    model = await getModel(supabase, 'nieuws')
+    model = await getModel(supabase, 'nieuws', { userId: user.id })
   } catch (err) {
     return aiModelUnavailable(err, 'news')
   }

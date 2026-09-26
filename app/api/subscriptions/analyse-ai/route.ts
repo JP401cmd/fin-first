@@ -280,7 +280,7 @@ export async function POST(req: Request) {
     // Prepare AI model
     let model
     try {
-      model = await getModel(supabase, 'abonnementen_analyse')
+      model = await getModel(supabase, 'abonnementen_analyse', { userId: user.id })
     } catch (err) {
       return aiModelUnavailable(err, 'subscriptions-analyse-ai')
     }

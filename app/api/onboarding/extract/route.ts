@@ -75,7 +75,7 @@ export async function POST(req: Request) {
       householdType: parsed.data.householdType,
       monthlyIncome: parsed.data.monthlyIncome,
       monthlyExpenses: parsed.data.monthlyExpenses,
-    })
+    }, { userId: user.id })
 
     // Registreren ná een geslaagde call, in dezelfde bucket die de gate leest.
     // Bij een fout tellen we niets: de gebruiker kreeg geen resultaat.

@@ -130,7 +130,7 @@ export async function POST(req: Request) {
 
   let model
   try {
-    model = await getModel(supabase, 'categorisatie')
+    model = await getModel(supabase, 'categorisatie', { userId: user.id })
   } catch (err) {
     return aiModelUnavailable(err, 'ai-categorize')
   }

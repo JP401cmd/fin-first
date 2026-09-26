@@ -67,7 +67,7 @@ async function main() {
   const sourceArticles = selectSourceArticles(data || [], { limit: 40 })
   console.log(`Bronartikelen geselecteerd: ${sourceArticles.length} (van ${data?.length ?? 0} kandidaten)\n`)
 
-  const model = await getModel(service, 'nieuws')
+  const model = await getModel(service, 'nieuws', { userId: null })
 
   // Representatief profiel (synthetisch — geen echte gebruikersdata in een debug-script)
   const financialContext = `Netto vermogen: €1.050.000 (waarvan €600.000 beleggingen, €250.000 spaargeld, €200.000 overwaarde woning).

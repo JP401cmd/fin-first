@@ -106,7 +106,7 @@ export async function POST() {
 
   let model
   try {
-    model = await getModel(supabase, 'aanbevelingen')
+    model = await getModel(supabase, 'aanbevelingen', { userId: user.id })
   } catch (err) {
     return aiModelUnavailable(err, 'ai-recommendations')
   }

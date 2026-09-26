@@ -665,8 +665,10 @@ export default async function BeheerJobsPage() {
               die run vielen. <span className="font-mono">ai_token_usage</span> kent geen
               run-verwijzing, dus de toewijzing gaat op tijd: alleen aanroepen zonder gebruiker
               (<span className="font-mono">user_id</span> leeg). Dat zijn vrijwel altijd
-              systeem-aanroepen; een enkele gebruikersaanroep waarvan de gebruiker niet gelogd
-              kon worden, kan meetellen. Een handmatige aanroep door een ingelogde beheerder valt
+              systeem-aanroepen: gebruikersaanroepen geven hun gebruiker inmiddels zelf mee. In
+              rijen van vóór die wijziging, of bij een aanroep die dat nog niet doet, kan een enkele
+              gebruikersaanroep waarvan de gebruiker niet gelogd kon worden nog meetellen. Een
+              handmatige aanroep door een ingelogde beheerder valt
               er bewust buiten en staat hier dus niet bij. Een{' '}
               <span className="text-warning">*</span> betekent dat twee runs elkaars venster
               overlappen — dan kan een aanroep dubbel geteld zijn.

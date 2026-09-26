@@ -202,7 +202,7 @@ export async function POST(req: Request) {
     name: source.name ?? sourceDef.name,
     description: source.description ?? sourceDef.description ?? null,
     assumptions: sourceDef.assumptions ?? [],
-  })
+  }, { userId: user.id })
 
   // Registreren zodra de screening geDRAAID heeft — óók wanneer ze afkeurt.
   // Een afgekeurde publicatie heeft het model net zo goed gekost, en zonder deze

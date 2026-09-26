@@ -4,7 +4,7 @@ import { createOpenAI } from '@ai-sdk/openai'
 import { wrapLanguageModel, type LanguageModelMiddleware } from 'ai'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getServiceClient } from '@/lib/supabase/service'
-import { tokenLoggingMiddleware, type WrappableModel } from '@/lib/ai/token-usage'
+import { tokenLoggingMiddleware, type TokenLogUserId, type WrappableModel } from '@/lib/ai/token-usage'
 import { aiFailureMiddleware, logAiFailure } from '@/lib/ai/ai-failure-middleware'
 import { parsePlatformStatus } from '@/lib/platform-status'
 import { decryptField } from '@/lib/crypto/field-encryption'
@@ -56,7 +56,17 @@ export class AIConfigError extends Error {
 // Geef `feature` mee (bv. 'chat', 'briefing') om werkelijk tokenverbruik
 // per call vast te leggen in ai_token_usage — zie lib/ai/token-usage.ts en
 // /beheer/ai-verbruik. Zonder feature wordt er niets gelogd.
-export async function getModel(supabase: SupabaseClient, feature?: string) {
+//
+// Geef ook `opts.userId` mee: de userId die de route bij zijn auth-check al
+// kent (user.id / claims.sub), of expliciet `null` voor een systeemcall (cron,
+// service-client). Dan hoeft de token-logging bij `finish` — mogelijk ná de
+// request-context — geen `auth.getUser()` meer te doen. Weglaten (undefined)
+// = de oude fallback op getUser; zie `TokenLogUserId` in token-usage.ts.
+export interface GetModelOptions {
+  userId?: TokenLogUserId
+}
+
+export async function getModel(supabase: SupabaseClient, feature?: string, opts: GetModelOptions = {}) {
   const { data, error } = await getServiceClient()
     .from('app_settings')
     .select('key, value')
@@ -139,7 +149,7 @@ export async function getModel(supabase: SupabaseClient, feature?: string) {
   // tot callsites die wél een feature meegeven.
   const middleware: LanguageModelMiddleware[] = [aiFailureMiddleware({ supabase, feature: feature ?? 'onbekend' })]
   if (feature) {
-    middleware.push(tokenLoggingMiddleware({ supabase, feature, provider, modelId }))
+    middleware.push(tokenLoggingMiddleware({ supabase, feature, provider, modelId, userId: opts.userId }))
   }
   return wrapLanguageModel({ model: base, middleware })
 }
