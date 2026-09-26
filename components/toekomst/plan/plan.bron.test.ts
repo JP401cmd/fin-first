@@ -7,7 +7,7 @@
  * - Kernantwoord (hero-fire-age): geen `fire.fireAge` / `fire.fireTarget`.
  * - Overlays (ADR 0039): geen directe BottomSheet-import.
  * - Koppen (ADR 0110): nooit een `<h1>`.
- * - Herkomst: elk bestand noemt het bronbereik in horizon-client @ c1b4849eb.
+ * - Herkomst: elk bestand noemt zijn bronbereik (horizon-client @ c1b4849eb; fase 3 de Voorkeuren-view).
  */
 import { describe, it, expect } from 'vitest'
 import { readdirSync } from 'node:fs'
@@ -45,7 +45,11 @@ describe('Plan-bladeren — map-brede grendels', () => {
 
   it.each(bestanden)('%s begint met de herkomstregel', (f) => {
     const eerste = readSourceLF(join(DIR, f)).split('\n')[0]
-    expect(eerste).toMatch(/^\/\/ Verplaatst uit components\/app\/horizon\/horizon-client\.tsx r\d+–\d+.* @ c1b4849eb \(fase 1, ADR 0179\)\.$/)
+    // Fase 1: uit horizon-client @ c1b4849eb. Fase 3: het afbouwoverzicht kwam uit de
+    // opgeheven Voorkeuren-view (resultaat hoort in Plan, spec §5).
+    expect(eerste).toMatch(
+      /^\/\/ Verplaatst uit (components\/app\/horizon\/horizon-client\.tsx r\d+–\d+.* @ c1b4849eb \(fase 1|components\/future\/voorkeuren-view\.tsx r\d+–\d+ @ [0-9a-f]{9} \(fase 3), ADR 0179\)\.$/,
+    )
   })
 
   it.each(bestanden)('%s deflateert niet zelf', (f) => {

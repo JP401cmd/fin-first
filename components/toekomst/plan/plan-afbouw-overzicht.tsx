@@ -1,3 +1,5 @@
+// Verplaatst uit components/future/voorkeuren-view.tsx r486–502 @ 3daf6ae1b (fase 3, ADR 0179).
+// euro-view: ontvangt view*-feeds van de render-grens, deflateert niet zelf
 'use client'
 
 /**
