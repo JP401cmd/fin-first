@@ -1,8 +1,14 @@
 import { Activity, Check, AlertCircle, Clock } from 'lucide-react'
+import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { getServiceClient } from '@/lib/supabase/service'
+import { isSuperAdmin } from '@/lib/admin'
 import { isPushConfigured } from '@/lib/alerts/push'
 import { JOB_CATALOG, JOB_LIST } from '@/lib/job-catalog'
 import type { JobStatus } from '@/lib/job-runs'
+import { PRIJZEN_BRON, PRIJZEN_PEILDATUM } from '@/lib/ai/token-prices'
+import { loadRunTokens, type RunTokens } from '@/lib/beheer/run-tokens'
+import { fetchBatchForexRates } from '@/lib/forex'
 import {
   JOB_HEALTH_META,
   JOB_HEALTH_ORDER,
@@ -114,6 +120,36 @@ function fmtWindow(hours: number): string {
   return hours < 48 ? `${hours} uur` : `${Math.round(hours / 24)} dagen`
 }
 
+const tokenFmt = new Intl.NumberFormat('nl-NL', { notation: 'compact', maximumFractionDigits: 1 })
+
+/** Tokens compact: 184.200 wordt "184,2K". Een streepje bij niets. */
+function fmtTokens(value: number): string {
+  return value === 0 ? '—' : tokenFmt.format(value)
+}
+
+const euroFmt = new Intl.NumberFormat('nl-NL', {
+  style: 'currency',
+  currency: 'EUR',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+})
+
+/**
+ * Kosten in euro's, omgerekend van het USD-tarief.
+ *
+ * Drie uitkomsten, elk met een eigen weergave: `null` = het tarief van minstens
+ * één model is onbekend (nooit als € 0,00 tonen — dat zou "gratis" beweren),
+ * `0` bij een run zonder AI-aanroepen, en anders het bedrag. Onder € 0,01 wordt
+ * het "< € 0,01" in plaats van € 0,00, zodat een kleine run niet als kosteloos
+ * leest.
+ */
+function fmtKosten(costUsd: number | null, usdNaarEur: number): string {
+  if (costUsd === null) return 'onbekend'
+  if (costUsd === 0) return '—'
+  const eur = costUsd * usdNaarEur
+  return eur < 0.005 ? '< € 0,01' : euroFmt.format(eur)
+}
+
 /**
  * Top-level primitieve velden uit een summary, voor de compacte KPI-grid.
  * BOOLEANS HOREN ERBIJ: de sweep meldt `backlog`, `persisted` en `bootstrapped`
@@ -210,6 +246,14 @@ function EnvChip({ ok, label, detail }: { ok: boolean; label: string; detail: st
 
 export default async function BeheerJobsPage() {
   const supabase = await createClient()
+  // De beheer-layout weert niet-admins al, maar deze pagina raakt de
+  // service-role (die RLS omzeilt) en zet die check daarom zelf ook — zoals
+  // /beheer/gebruik, /beheer/kpi en /beheer/webprestaties. Layout en pagina
+  // renderen in dezelfde RSC-doorloop; de redirect bepaalt wel de response,
+  // maar niet dat de body niet al aan een query begonnen is.
+  if (!(await isSuperAdmin(supabase))) {
+    redirect('/overzicht')
+  }
   const now = new Date()
 
   const [recentRes, jobRows] = await Promise.all([
@@ -249,6 +293,32 @@ export default async function BeheerJobsPage() {
 
   const recentFailed = Boolean(recentRes.error)
   const recent = (recentRes.data ?? []) as JobRun[]
+
+  // Tokenverbruik per run. Eén query over alle vensters (recente runs + de
+  // laatste run per taak), daarna in geheugen toegewezen — zie
+  // lib/beheer/run-tokens.ts voor waarom dit op tijdvenster gaat en waar die
+  // aanname niet houdt. Service-role: beheer leest cross-user nooit via RLS
+  // (ADR 0006); de query zelf beperkt zich tot `user_id is null` (systeemcalls).
+  const alleRuns = [...recent, ...jobRows.map((r) => r.last).filter((r): r is JobRun => r !== null)]
+  const unieke = [...new Map(alleRuns.map((r) => [r.id, r])).values()]
+  const [runTokens, forexRates] = await Promise.all([
+    loadRunTokens(getServiceClient(), unieke),
+    // De tarieven staan in USD (Anthropic factureert in USD); de euro's op dit
+    // scherm zijn een omrekening.
+    fetchBatchForexRates(['USD']).catch(() => null),
+  ])
+  const usdRate = forexRates?.get('USD') ?? null
+  const usdNaarEur = usdRate?.rate ?? 1
+  // `fetchForexRate` geeft voor USD NOOIT null: bij een dode Yahoo-endpoint valt
+  // hij intern terug op zijn eigen benaderde koers. Een "kon ik niet ophalen"-
+  // check op null is dus dode code — het echte signaal is `source`. Zonder dit
+  // zou een benaderde 0,92 als gemeten koers op vier decimalen op het scherm
+  // staan, precies de stille onwaarheid die de rest van dit scherm vermijdt.
+  const koersIsBenadering = usdRate === null || usdRate.source === 'fallback'
+  const tokensVoor = (run: JobRun | null): RunTokens | null =>
+    run ? runTokens.tokens.get(run.id) ?? null : null
+  const ergensTokens = [...runTokens.tokens.values()].some((t) => t.calls > 0)
+
   const counts = summarizeJobHealth(jobRows.map((r) => r.health))
   const drift = detectScheduleDrift()
   // Taken waarvan de LAATSTE run liep maar niet alles opleverde. Bewust een
@@ -457,6 +527,19 @@ export default async function BeheerJobsPage() {
                       <p className="mt-0.5 font-mono text-xs tabular-nums text-[var(--ink-4)]">
                         {fmtDuration(last.duration_ms)}
                       </p>
+                      {(() => {
+                        const tok = tokensVoor(last)
+                        if (!tok || tok.calls === 0) return null
+                        return (
+                          <p className="mt-0.5 font-mono text-xs tabular-nums text-[var(--ink-4)]">
+                            <span title="Inputtokens (heen)">↑ {fmtTokens(tok.input)}</span>{' '}
+                            <span title="Outputtokens (terug)">↓ {fmtTokens(tok.output)}</span>{' '}
+                            <span className="text-[var(--ink-3)]">
+                              · {fmtKosten(tok.costUsd, usdNaarEur)}
+                            </span>
+                          </p>
+                        )
+                      })()}
                     </>
                   ) : (
                     <span className="text-xs italic text-[var(--ink-4)]">Nog niet uitgevoerd</span>
@@ -518,12 +601,18 @@ export default async function BeheerJobsPage() {
                 <th className="py-2 pr-4 text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ink-4)]">Datum</th>
                 <th className="py-2 pr-4 text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ink-4)]">Taak</th>
                 <th className="py-2 pr-4 text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ink-4)]">Status</th>
-                <th className="py-2 text-right text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ink-4)]">Duur</th>
+                <th className="py-2 pr-4 text-right text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ink-4)]">Duur</th>
+                {/* "Tokens in/uit", niet "↑/↓": een pijl in een tabelkop leest
+                    als sorteerrichting, en een screenreader zegt "upwards arrow". */}
+                <th className="py-2 pr-4 text-right text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ink-4)]">Tokens in</th>
+                <th className="py-2 pr-4 text-right text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ink-4)]">Tokens uit</th>
+                <th className="py-2 text-right text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ink-4)]">Kosten</th>
               </tr>
             </thead>
             <tbody>
               {recent.map((run) => {
                 const meta = JOB_CATALOG[run.job as keyof typeof JOB_CATALOG]
+                const tok = tokensVoor(run)
                 return (
                   <tr key={run.id} className="border-b border-dotted border-[var(--border-ed)] hover:bg-[var(--subtle)]">
                     <td className="py-2 pr-4 font-mono text-xs tabular-nums text-[var(--ink-3)]">
@@ -533,14 +622,84 @@ export default async function BeheerJobsPage() {
                     <td className="py-2 pr-4">
                       <StatusBadge status={run.status} />
                     </td>
-                    <td className="py-2 text-right font-mono text-xs tabular-nums text-[var(--ink-3)]">
+                    <td className="py-2 pr-4 text-right font-mono text-xs tabular-nums text-[var(--ink-3)]">
                       {fmtDuration(run.duration_ms)}
+                    </td>
+                    <td className="py-2 pr-4 text-right font-mono text-xs tabular-nums text-[var(--ink-3)]">
+                      {tok ? fmtTokens(tok.input) : '—'}
+                    </td>
+                    <td className="py-2 pr-4 text-right font-mono text-xs tabular-nums text-[var(--ink-3)]">
+                      {tok ? fmtTokens(tok.output) : '—'}
+                    </td>
+                    <td className="py-2 text-right font-mono text-xs tabular-nums text-[var(--ink-2)]">
+                      {/* Bij "onbekend" wél zeggen wélk model geen tarief heeft —
+                          anders is de melding niet actiegericht. */}
+                      <span
+                        title={
+                          tok && tok.onbekendeModellen.length > 0
+                            ? `Geen tarief bekend voor: ${tok.onbekendeModellen.join(', ')}`
+                            : undefined
+                        }
+                      >
+                        {tok ? fmtKosten(tok.costUsd, usdNaarEur) : '—'}
+                      </span>
+                      {tok?.overlaptMetAndereRun && tok.calls > 0 && (
+                        <span
+                          className="ml-1 text-warning"
+                          title="Het tijdvenster van deze run overlapt een andere run — deze aanroepen kunnen dubbel geteld zijn."
+                        >
+                          *
+                        </span>
+                      )}
                     </td>
                   </tr>
                 )
               })}
             </tbody>
           </table>
+
+          <div className="mt-3 space-y-1.5 text-xs leading-relaxed text-[var(--ink-4)]">
+            <p>
+              <strong className="font-medium text-[var(--ink-3)]">Tokens ↑↓</strong> is wat er heen
+              (prompt) en terug (antwoord) ging bij de AI-aanroepen die binnen het tijdvenster van
+              die run vielen. <span className="font-mono">ai_token_usage</span> kent geen
+              run-verwijzing, dus de toewijzing gaat op tijd: alleen aanroepen zonder gebruiker
+              (<span className="font-mono">user_id</span> leeg). Dat zijn vrijwel altijd
+              systeem-aanroepen; een enkele gebruikersaanroep waarvan de gebruiker niet gelogd
+              kon worden, kan meetellen. Een handmatige aanroep door een ingelogde beheerder valt
+              er bewust buiten en staat hier dus niet bij. Een{' '}
+              <span className="text-warning">*</span> betekent dat twee runs elkaars venster
+              overlappen — dan kan een aanroep dubbel geteld zijn.
+            </p>
+            <p>
+              <strong className="font-medium text-[var(--ink-3)]">Kosten is een schatting</strong>,
+              geen factuur: tokens × het modeltarief, peildatum {PRIJZEN_PEILDATUM} (
+              <span className="font-mono">{PRIJZEN_BRON}</span>). Anthropic factureert in{' '}
+              <strong>USD</strong>; hier omgerekend tegen{' '}
+              <span className="font-mono tabular-nums">
+                1 USD = {usdNaarEur.toFixed(4)} EUR
+              </span>
+              {koersIsBenadering && ' (benaderde koers — live koers niet op te halen)'}. Batch-
+              korting, volumekorting en prompt-caching zijn niet verwerkt; zodra caching ergens
+              aan gaat, overschat dit de kosten.{' '}
+              <span className="font-mono">onbekend</span> betekent dat een model geen tarief in de
+              tabel heeft — dat is nooit als € 0,00 weergegeven.
+            </p>
+            {/* De leesfout-melding staat vóór de "geen aanroepen"-regel en sluit
+                die uit: anders zou een mislukte query als een rustige dag lezen. */}
+            {runTokens.leesfout ? (
+              <p className="border-l-2 border-warning bg-warning-bg px-3 py-2 text-[var(--ink-2)]">
+                Het tokenverbruik kon niet worden gelezen — de kolommen Tokens en Kosten zeggen
+                hierboven dus niets. Dat zegt niets over de taken zelf.
+              </p>
+            ) : (
+              !ergensTokens && (
+                <p className="italic">
+                  Geen van deze runs deed AI-aanroepen — of het AI-tegoed was leeg.
+                </p>
+              )
+            )}
+          </div>
         </section>
       )}
     </div>
