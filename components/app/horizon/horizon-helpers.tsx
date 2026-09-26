@@ -566,7 +566,9 @@ export function FireAgeTrendChart({ snapshots }: { snapshots: readonly TrendPoin
   const firstAge = ages[0]
   const lastAge = ages[ages.length - 1]
   const improving = lastAge < firstAge
-  const lineColor = improving ? '#059669' : '#dc2626' // green if improving, red if worsening
+  // Semantiek, geen identiteit: dezelfde vaste positief/negatief-tokens als het label eronder
+  // (fill-positive / fill-negative), niet instelbaar (CLAUDE.md, kleurconventie).
+  const lineColor = improving ? 'var(--positive)' : 'var(--negative)'
   const gradientId = 'fireAgeGrad'
 
   // Y-axis ticks: evenly spaced ages
