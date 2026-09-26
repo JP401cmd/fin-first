@@ -4,13 +4,15 @@
  */
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, cleanup } from '@testing-library/react'
+import fs from 'node:fs'
 import { join } from 'node:path'
 import { readSourceLF } from '@/lib/test-utils/read-source'
 
 const h = vi.hoisted(() => ({ segment: null as string | null }))
 vi.mock('next/navigation', () => ({ useSelectedLayoutSegment: () => h.segment }))
 
-import { DOELEN_MOBIEL_COMPACT, ToekomstKaternStand } from './toekomst-katern-stand'
+import { ToekomstKaternStand } from './toekomst-katern-stand'
+import { DOELEN_MOBIEL_COMPACT } from './doelen-mobiel-compact'
 
 afterEach(cleanup)
 
@@ -34,6 +36,20 @@ describe('ToekomstKaternStand', () => {
     }
     expect(DOELEN_MOBIEL_COMPACT.oordeel).toContain('[&_h2]:text-[20px]')
     expect(DOELEN_MOBIEL_COMPACT.ankerregel).toContain('truncate')
+  })
+
+  it('de compacte klassen komen uit een module zonder use client: een servercomponent krijgt daaruit anders geen waarden', () => {
+    // Given de server-layout die DOELEN_MOBIEL_COMPACT in className-strings zet,
+    // When hij die constante importeert,
+    // Then komt ze uit een gewone module. Uit een 'use client'-module krijgt een
+    // servercomponent alleen client-referenties: de klasse wordt letterlijk "undefined".
+    const layout = readSourceLF(join(process.cwd(), 'app', '(app)', 'toekomst', '(katern)', 'layout.tsx'))
+    const m = layout.match(/import\s*\{[^}]*\bDOELEN_MOBIEL_COMPACT\b[^}]*\}\s*from\s*'([^']+)'/)
+    expect(m, 'layout importeert DOELEN_MOBIEL_COMPACT').not.toBeNull()
+    const pad = m![1].replace('@/', '')
+    const bron = ['.ts', '.tsx'].map((ext) => join(process.cwd(), pad + ext)).find((p) => fs.existsSync(p))
+    expect(bron, pad).toBeTruthy()
+    expect(readSourceLF(bron!)).not.toMatch(/^\s*['"]use client['"]/m)
   })
 
   it('de layout gebruikt de groep en de compacte klassen', () => {
