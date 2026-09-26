@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { initFormState, applyStory, setSharedAge, storyAgeKey, buildDraftEvent } from './event-pane-edit-form'
+import {
+  initFormState,
+  applyStory,
+  setSharedAge,
+  storyAgeKey,
+  buildDraftEvent,
+  formStateUitVoorstel,
+} from './event-pane-edit-form'
 import { LIFE_EVENT_STORIES, defaultStoryAnswers } from '@/lib/life-event-stories'
 import { isTotStopmoment } from '@/lib/horizon-data'
 
@@ -220,5 +227,65 @@ describe('event-pane-edit-form — bestaand negatief maandblok blijft behouden',
     const draft = buildDraftEvent(s, null)
     expect(draft.monthly_cost_change).toBe(1500)
     expect(draft.monthly_income_change).toBe(0)
+  })
+})
+
+/**
+ * Given een geaccepteerd Fin-voorstel (`suggest_life_event`) waarvan het schema zegt
+ * "monthly_income_change: negatief = minder inkomen",
+ * When EventPane het voorstel in een vers formulier zet (`formStateUitVoorstel`),
+ * Then volgt het maandblok dezelfde tekenregel als een opgeslagen rij: minder inkomen is
+ * een UITGAVE, meer inkomen een inkomst, minder kosten een inkomst. Gevonden 26 sep
+ * (FX-D): elk voorstel met monthly_income_change ≠ 0 werd als inkomst opgeslagen, voor
+ * elk type, dus een inkomensverlies maakte het plan rooskleuriger.
+ */
+describe('event-pane-edit-form — teken van een Fin-voorstel', () => {
+  const voorstel = (m: { cost?: number; income?: number; duration?: number }) => ({
+    name: 'Minder werken',
+    target_age: 50,
+    one_time_cost: 0,
+    monthly_cost_change: m.cost ?? 0,
+    monthly_income_change: m.income ?? 0,
+    duration_months: m.duration ?? 0,
+  })
+  const vers = () => initFormState('custom', null, 40)
+
+  it('doorlopend inkomensverlies (income −800) → uitgave 800, en zo opgeslagen', () => {
+    const s = formStateUitVoorstel(vers(), voorstel({ income: -800 }))
+    expect(s.contEnabled).toBe(true)
+    expect(s.contAmount).toBe(800)
+    expect(s.contDirection).toBe('expense')
+    const draft = buildDraftEvent(s, null)
+    expect(draft.monthly_cost_change).toBe(800)
+    expect(draft.monthly_income_change).toBe(0)
+  })
+
+  it('tijdelijk inkomensverlies (income −1200, 18 mnd) → uitgave 1200', () => {
+    const s = formStateUitVoorstel(vers(), voorstel({ income: -1200, duration: 18 }))
+    expect(s.tempEnabled).toBe(true)
+    expect(s.tempAmount).toBe(1200)
+    expect(s.tempDirection).toBe('expense')
+    expect(s.tempDurationYears).toBe(2)
+    expect(s.contEnabled).toBe(false)
+  })
+
+  it('meer inkomen (income +500) blijft een inkomst', () => {
+    const s = formStateUitVoorstel(vers(), voorstel({ income: 500 }))
+    expect(s.contAmount).toBe(500)
+    expect(s.contDirection).toBe('income')
+  })
+
+  it('extra kosten (cost +300) blijven een uitgave; een besparing (cost −300) is een inkomst', () => {
+    expect(formStateUitVoorstel(vers(), voorstel({ cost: 300 })).contDirection).toBe('expense')
+    expect(formStateUitVoorstel(vers(), voorstel({ cost: -300 })).contDirection).toBe('income')
+  })
+
+  it('neemt naam, leeftijd en eenmalig bedrag over', () => {
+    const s = formStateUitVoorstel(vers(), { ...voorstel({}), one_time_cost: 4000 })
+    expect(s.name).toBe('Minder werken')
+    expect(s.shared_age).toBe(50)
+    expect(s.oneTimeAmount).toBe(4000)
+    expect(s.oneTimeDirection).toBe('expense')
+    expect(s.contEnabled).toBe(false)
   })
 })

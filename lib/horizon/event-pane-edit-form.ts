@@ -180,6 +180,48 @@ function maandblokUitRij(cost: number, income: number): { amount: number; direct
   return { amount: Math.abs(income), direction: income > 0 ? 'income' : 'expense' }
 }
 
+/**
+ * De bedragvelden van een Fin-voorstel (`suggest_life_event`, `SuggestedLifeEventPayload`),
+ * structureel getypt zodat lib niet naar components hoeft te reiken.
+ */
+export interface LevensgebeurtenisVoorstel {
+  name: string
+  target_age: number | null
+  one_time_cost: number
+  monthly_cost_change: number
+  /** Negatief = minder inkomen (tool-schema). */
+  monthly_income_change: number
+  duration_months: number
+}
+
+/**
+ * Vul een vers formulier (`initFormState` zonder bestaand event) met een geaccepteerd
+ * Fin-voorstel. Het maandblok volgt dezelfde tekenregel als een opgeslagen rij
+ * (`maandblokUitRij`): het tool-schema kent dezelfde vorm, dus een inkomensverlies
+ * (negatief `monthly_income_change`) is een uitgave, geen inkomst.
+ */
+export function formStateUitVoorstel(initial: EditFormState, voorstel: LevensgebeurtenisVoorstel): EditFormState {
+  const tijdelijk = voorstel.duration_months > 0
+  const maandblok = maandblokUitRij(voorstel.monthly_cost_change, voorstel.monthly_income_change)
+  return {
+    // setSharedAge spiegelt Fin's leeftijd óók naar de story-vraag, anders wint het
+    // oude story-antwoord bij de eerstvolgende story-wijziging.
+    ...setSharedAge(initial, voorstel.target_age ?? initial.shared_age),
+    name: voorstel.name,
+    oneTimeAmount: Math.abs(voorstel.one_time_cost),
+    oneTimeDirection: voorstel.one_time_cost >= 0 ? 'expense' : 'income',
+    tempEnabled: tijdelijk,
+    tempAmount: tijdelijk ? maandblok.amount : 0,
+    tempDirection: maandblok.direction,
+    tempDurationYears: tijdelijk ? Math.max(1, Math.round(voorstel.duration_months / 12)) : 5,
+    tempIndexed: true,
+    contEnabled: !tijdelijk && maandblok.amount > 0,
+    contAmount: tijdelijk ? 0 : maandblok.amount,
+    contDirection: maandblok.direction,
+    contIndexed: true,
+  }
+}
+
 export function initFormState(
   type: string,
   existing: LifeEvent | null,

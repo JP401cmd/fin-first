@@ -22,7 +22,7 @@ import {
   type EditFormState,
   type EventEditActionsState,
 } from './event-pane-edit'
-import { setSharedAge } from '@/lib/horizon/event-pane-edit-form'
+import { formStateUitVoorstel } from '@/lib/horizon/event-pane-edit-form'
 import { EventPaneView } from './event-pane-view'
 
 export type EventPaneMode = 'catalog' | 'chat' | 'view' | 'edit'
@@ -140,37 +140,9 @@ export function EventPane({
    */
   function handleAcceptSuggestion(payload: SuggestedLifeEventPayload) {
     const baseAge = currentAge(baselineInput)
-    const initial = initFormState(payload.event_type, null, baseAge)
-    // Override de catalog-defaults met de tool-output
-    // setSharedAge spiegelt Fin's leeftijd óók naar de story-vraag, anders
-    // wint het oude story-antwoord bij de eerstvolgende story-wijziging.
-    const next: EditFormState = {
-      ...setSharedAge(initial, payload.target_age ?? initial.shared_age),
-      name: payload.name,
-      oneTimeAmount: Math.abs(payload.one_time_cost),
-      oneTimeDirection: payload.one_time_cost >= 0 ? 'expense' : 'income',
-      tempEnabled: payload.duration_months > 0,
-      tempAmount:
-        payload.duration_months > 0
-          ? Math.abs(payload.monthly_cost_change) || Math.abs(payload.monthly_income_change)
-          : 0,
-      tempDirection:
-        payload.monthly_income_change !== 0 && payload.duration_months > 0 ? 'income' : 'expense',
-      tempDurationYears:
-        payload.duration_months > 0 ? Math.max(1, Math.round(payload.duration_months / 12)) : 5,
-      tempIndexed: true,
-      contEnabled:
-        payload.duration_months === 0 &&
-        (payload.monthly_cost_change !== 0 || payload.monthly_income_change !== 0),
-      contAmount:
-        payload.duration_months === 0
-          ? Math.abs(payload.monthly_cost_change) || Math.abs(payload.monthly_income_change)
-          : 0,
-      contDirection:
-        payload.monthly_income_change !== 0 && payload.duration_months === 0 ? 'income' : 'expense',
-      contIndexed: true,
-    }
-    setFormState(next)
+    // Override de catalog-defaults met de tool-output, met dezelfde tekenregel als een
+    // opgeslagen rij: negatief monthly_income_change = minder inkomen = uitgave.
+    setFormState(formStateUitVoorstel(initFormState(payload.event_type, null, baseAge), payload))
     setMode('edit')
   }
 
