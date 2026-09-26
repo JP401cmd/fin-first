@@ -4,7 +4,7 @@ import { useId, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import type { LeverageStatus } from '@/lib/leverage-status'
 import type { KaternMelding as KaternMeldingData } from '@/lib/horizon/katern-meldingen'
-import { katernMeldingNogLabel } from '@/lib/horizon/katern-copy'
+import { katernMeldingGeminimaliseerdSr, katernMeldingNogLabel } from '@/lib/horizon/katern-copy'
 import type { BannerDisplay } from '@/lib/page-status/display'
 import {
   PageStatusBannerBody,
@@ -41,9 +41,6 @@ export interface KaternMeldingProps {
   className?: string
 }
 
-const GEMINIMALISEERD_SR =
-  'Melding geminimaliseerd. Activeer het statuspunt op de katern-kop om de melding opnieuw te tonen.'
-
 /** Kicker zoals `PageStatusBanner`: alleen bij alarm; informatief draagt de titel het. */
 function kicker(ernst: LeverageStatus): string | null {
   if (ernst === 'bad') return 'Actie nodig'
@@ -63,7 +60,9 @@ export function KaternMelding({
 
   return (
     <section role="status" aria-live="polite" className={className} data-testid="katern-melding">
-      {melding != null && display === 'minimized' && <span className="sr-only">{GEMINIMALISEERD_SR}</span>}
+      {melding != null && display === 'minimized' && (
+        <span className="sr-only">{katernMeldingGeminimaliseerdSr(melding.katern)}</span>
+      )}
       {zichtbaar && (
         <MeldingKaart melding={melding} onMinimize={canMinimize ? onMinimize : undefined} />
       )}

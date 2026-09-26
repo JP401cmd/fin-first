@@ -30,6 +30,7 @@ import {
   instellingenSamenvatting,
   katernAnkerregel,
   katernKpi1Label,
+  katernMeldingGeminimaliseerdSr,
   katernMeldingNogLabel,
   katernStatuspuntLabel,
   laagLabel,
@@ -64,6 +65,7 @@ function alleKopij(): string[] {
     PLAN_JAARTABEL_LINK,
     katernMeldingNogLabel(1),
     katernMeldingNogLabel(3),
+    ...KATERN_VOLGORDE.map(katernMeldingGeminimaliseerdSr),
     ...Object.values(GEBEURTENIS_NIET_VERPLAATST),
     katernAnkerregel({ kind: 'solved', solvedFireAge: 52.3, currentAge: 38 }),
     katernAnkerregel({ kind: 'solved', solvedFireAge: null, currentAge: 38 }),
@@ -95,6 +97,13 @@ describe('katern-copy — katernen', () => {
   it('"Nog N" onder de bovenste melding: enkelvoud en meervoud', () => {
     expect(katernMeldingNogLabel(1)).toBe('Nog 1 melding')
     expect(katernMeldingNogLabel(2)).toBe('Nog 2 meldingen')
+  })
+
+  it('sr-tekst na minimaliseren: beschrijvend, per onderdeel, zonder "katern"', () => {
+    expect(katernMeldingGeminimaliseerdSr('plan')).toBe(
+      'Melding geminimaliseerd. Het punt bij Plan onder de grafiek haalt de melding terug.',
+    )
+    for (const k of KATERN_VOLGORDE) expect(katernMeldingGeminimaliseerdSr(k)).not.toMatch(/katern/i)
   })
 
   it('statuspunt-label voor schermlezers', () => {

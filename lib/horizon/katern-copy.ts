@@ -65,6 +65,15 @@ export function katernMeldingNogLabel(aantal: number): string {
   return `Nog ${aantal} ${aantal === 1 ? 'melding' : 'meldingen'}`
 }
 
+/**
+ * Wat de statusregio zegt na "Minimaliseren" (fixronde C1). Beschrijvend en zonder het
+ * vakwoord "katern": de gebruiker ziet een punt bij de kop "Plan"/"Doelen"/"Instellingen"
+ * onder de grafiek, en een klik daarop (de kop is een link) klapt de melding weer uit.
+ */
+export function katernMeldingGeminimaliseerdSr(katern: KaternId): string {
+  return `Melding geminimaliseerd. Het punt bij ${KATERN_LABEL[katern]} onder de grafiek haalt de melding terug.`
+}
+
 // ── Ankerregel (kopij-toets §2) ──────────────────────────────────────────────
 
 /**
