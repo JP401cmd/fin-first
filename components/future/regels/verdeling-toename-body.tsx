@@ -7,6 +7,7 @@ import { SubsectionLabel } from '@/components/editorial'
 import { RegelIntro, RegelOptionCard, PrioUitlegBlok } from './shared'
 import { PotFlowDiagram, usePotRulesSave } from './pot-flow-diagram'
 import { CategoriePrioEditor, useCategoriePrioState } from './categorie-prio-editor'
+import { usePotRegelVerschil } from './pot-regel-verschil'
 import type { RegelBodyProps } from './types'
 
 const EMPTY_BALANCES: Record<WealthGroup, number> = {
@@ -26,6 +27,7 @@ export const SURPLUS_OPTIONS: { value: SurplusGroup; title: string; description:
 
 /** Regel 4 — Verdeling bij toename (overschot / meevaller). Illustratief. */
 export function VerdelingToenameBody({
+  simSnapshot,
   potRules,
   potBalances,
   onActionsChange,
@@ -41,19 +43,23 @@ export function VerdelingToenameBody({
   const changed = target !== rules.surplusGroup || prio.changed
   const canSave = !saving && changed
 
+  // Het concept zoals Opslaan het wegschrijft; de verschilregel rekent met precies dit.
+  const concept = { ...rules, surplusGroup: target, categoriePrios: prio.mergeCategoriePrios() }
+  const { footerInfo, footerKey } = usePotRegelVerschil(simSnapshot, concept, changed)
+
   const saveRef = useRef(() => {})
+  const conceptRef = useRef(concept)
   useEffect(() => {
-    saveRef.current = () =>
-      save({
-        ...rules,
-        surplusGroup: target,
-        categoriePrios: prio.mergeCategoriePrios(),
-      })
-  }, [save, rules, target, prio])
+    conceptRef.current = concept
+    saveRef.current = () => save(conceptRef.current)
+  })
   useEffect(() => {
     // TPR-15 — `changed` voor de plan-review (zonder wijziging "Bevestigen").
-    onActionsChange({ canSave, saving, save: () => saveRef.current(), changed })
-  }, [onActionsChange, canSave, saving, changed])
+    // ADR 0179 fase 3 — de verschilregel uit de kern (`potRules`-override) in de footer.
+    onActionsChange({ canSave, saving, save: () => saveRef.current(), changed, footerInfo })
+    // footerInfo volgt footerKey; zo publiceert niet elke render opnieuw.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onActionsChange, canSave, saving, changed, footerKey])
 
   return (
     <div className="pb-6">

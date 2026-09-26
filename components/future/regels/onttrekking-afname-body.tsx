@@ -8,6 +8,7 @@ import { RegelIntro, PrioUitlegBlok } from './shared'
 import { PotFlowDiagram, usePotRulesSave } from './pot-flow-diagram'
 import { OrderPresetPicker } from './order-preset-picker'
 import { CategoriePrioEditor, useCategoriePrioState } from './categorie-prio-editor'
+import { usePotRegelVerschil } from './pot-regel-verschil'
 import type { RegelBodyProps } from './types'
 
 const EMPTY_BALANCES: Record<WealthGroup, number> = {
@@ -36,19 +37,23 @@ export function OnttrekkingAfnameBody({
     order.join('|') !== rules.deficitOrderGroups.join('|') || prio.changed
   const canSave = !saving && changed
 
+  // Het concept zoals Opslaan het wegschrijft; de verschilregel rekent met precies dit.
+  const concept = { ...rules, deficitOrderGroups: order, categoriePrios: prio.mergeCategoriePrios() }
+  const { footerInfo, footerKey } = usePotRegelVerschil(simSnapshot, concept, changed)
+
   const saveRef = useRef(() => {})
+  const conceptRef = useRef(concept)
   useEffect(() => {
-    saveRef.current = () =>
-      save({
-        ...rules,
-        deficitOrderGroups: order,
-        categoriePrios: prio.mergeCategoriePrios(),
-      })
-  }, [save, rules, order, prio])
+    conceptRef.current = concept
+    saveRef.current = () => save(conceptRef.current)
+  })
   useEffect(() => {
     // TPR-15 — `changed` voor de plan-review (zonder wijziging "Bevestigen").
-    onActionsChange({ canSave, saving, save: () => saveRef.current(), changed })
-  }, [onActionsChange, canSave, saving, changed])
+    // ADR 0179 fase 3 — de verschilregel uit de kern (`potRules`-override) in de footer.
+    onActionsChange({ canSave, saving, save: () => saveRef.current(), changed, footerInfo })
+    // footerInfo volgt footerKey; zo publiceert niet elke render opnieuw.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onActionsChange, canSave, saving, changed, footerKey])
 
   return (
     <div className="pb-6">
