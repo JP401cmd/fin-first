@@ -128,7 +128,7 @@ Getoetst op merkstem (constaterend, geen koop-/verkoopmetafoor, geen vakjargon) 
 | Catalogustip "Huis kopen": "Kosten koper: overdrachtsbelasting (2%; starters tot €555.000 vrijgesteld), notaris, taxatie, bankgarantie en eventueel NHG, plus ca. €2.750 voor hypotheekadvies en bemiddeling en ca. €3.500 als je een aankoopmakelaar neemt. Bij een koopsom van €250.000–€600.000 is dat samen ca. €5K–€21K. …" · bandbreedte "€5K–€21K kosten koper" | Goedkeuren | Feitelijke, generieke indicaties met bron en jaartal in `lib/constants.ts`. Ze gaan over kosten, niet over een product: geen advies (compliance-check, "feitelijke vergelijkingen zonder aanbeveling"). De makelaar is optioneel, geen aanrader. De bandbreedte is gepind tegen `computeKostenKoper`. |
 | Kassabonregels "Hypotheekadvies + bemiddeling (indicatie)" en "Aankoopmakelaar, vast tarief (indicatie, optioneel)" | Goedkeuren | Het woord "indicatie" maakt de aard van het getal zichtbaar; de bron staat erbij. |
 
-**Nog te toetsen:** de teksten van de instellingenrijen (fase 3) en het samengevoegde Doelen (fase 4). Plan met de gebeurtenissen en het verloop staan in §11.
+Plan met de gebeurtenissen en het verloop staan in §11; de instellingenrijen, Doelen op één scherm en het verloop (ronde 2) in §12.
 
 ## 11. Aanvulling: Plan met de gebeurtenissen en het verloop op /overzicht (27 sep)
 
@@ -148,6 +148,27 @@ Getoetst op merkstem en compliance. De teksten komen uit twee eigenaarsbesluiten
 | Uitlegregel bij de FIRE-reeks: "Dit is de vrijheidsleeftijd zoals hij toen berekend werd, met de cijfers en aannames van dat moment. Je huidige vrijheidsleeftijd kan daarvan afwijken." | Goedkeuren | Historie, geen live getal en geen belofte. Dezelfde grens als het aandachtspunt over snapshot-`fire_age` (andere motor dan de live kernel). |
 | Widgetlinks: "Bekijk volledige analyse en verloop" · "Bekijk details en verloop" | Goedkeuren | Linklabel, net als de bestaande "Bekijk details". Het label is een knopnaam, geen oordeelzin. |
 | Praatplaat (HLD): "Terugzien hoe je gezondheid en je vrijheidsleeftijd bewegen" · "De lijst met je levensgebeurtenissen staat direct onder je plan, …" | Goedkeuren | Interne praatplaat in "ik wil"-taal. |
+
+## 12. Aanvulling: Instellingen op rijen, Doelen op één scherm, verloop ronde 2 (27 sep)
+
+Getoetst op merkstem (constaterend, je/jij, geen koop-/verkoopmetafoor, geen "katern") en compliance (inzicht, geen advies). De teksten komen uit stroom F3 (fase 3), F4 (fase 4) en P5 (fase 5, tweede ronde).
+
+| Tekst | Besluit | Waarom |
+|---|---|---|
+| Sectiekoppen met deck: "Je plan" — "Wanneer je stopt, tot wanneer je geld moet reiken en hoe je het opneemt." · "Levensstrategieën" — "Wat er later binnenkomt of vrijkomt: je AOW, je pensioen, je werk en je huis." · "Marktaannames" — "De aannames over prijzen, rendement en belasting waar je hele plan mee rekent." | Goedkeuren | Zeggen wat eronder staat. "Aannames" maakt het karakter van de getallen zichtbaar. |
+| Rijlabels (Stopmoment · Tot welke leeftijd, en wat blijft over · Onttrekking · Uitgave na pensioen · Geen tekort-lening · Onttrekkingsvolgorde · Verdeling bij toename · Onttrekking bij afname · AOW · Pensioen · Werk · Eigen woning · Inflatie · Rendement · Box 3), "Meer over je plan", "Opnamerate (afgeleid)" met "volgt uit rendement, inflatie en Box 3" | Goedkeuren | Instellingsnamen, geen oordeel. "(afgeleid)" onderscheidt de leesrij van een instelling. |
+| Rijwaarde stopmoment "op mijn AOW-leeftijd" | **Aangepast**: "op je AOW-leeftijd" (commit `49704e767`) | De optienaam is een keuze in ik-vorm; de samenvattingsrij spreekt in je-vorm, net als "tot je 90e" en "je vermogen mag niet slinken". De editor houdt de optienaam. |
+| Overige rijwaarden ("zo vroeg als het kan", "tot je 90e · niets over", "je vermogen mag niet slinken", "vast bedrag", "guardrails · vloer 80% · plafond 120%", "je essentiële budgetten · € … per jaar", "aan", "uit · rente 5,0%", "spaargeld → beleggingen → …", "schulden aflossen", "niet op je tijdas", "1 pensioenpot", "2,0% per jaar", "forfaitair", "werkelijk rendement") | Goedkeuren | Een samenvatting van wat de gebruiker zelf instelde. "Schulden aflossen" is de naam van zijn eigen regel, geen aansporing. |
+| Marktnoot: "Het rendement per bezitting stel je in bij je bezittingen en gaat vóór; het rendement hier geldt voor bezittingen zonder eigen rendement." | Goedkeuren | Legt de voorrang uit, zonder rendementsbelofte. |
+| Profielvergelijking: "Vergelijk de vier profielen" · "Je plan vier keer doorgerekend, één keer per profiel. De rest van je plan blijft gelijk. Kiezen en bewaren doe je hierboven." · "Een doorrekening van je eigen cijfers, geen advies. Wat er werkelijk gebeurt, kan afwijken." · "Je onttrekking beweegt tussen € … en € … per maand." | Goedkeuren | Een wat-als op eigen data is inzicht. Er is geen "beste" of "aanbevolen" (gecontroleerd in de bron). De keuze blijft bij de gebruiker en de disclaimer staat erbij. De vergelijking eindigt dus niet in "kies dit" (compliance-check, grijze zone onttrekking: als concept, niet als instructie). |
+| "Vul je geboortedatum, je vermogen en je uitgaven in bij Overzicht, dan kan de app de profielen doorrekenen." | Goedkeuren | Een aanwijzing over ontbrekende invoer, geen financiële handeling. |
+| Uitgaven-pane: "Alle bedragen hier zijn in prijspeil van vandaag. Inflatie rekent je projectie apart mee." | Goedkeuren | Maakt de euro-grondslag expliciet (ADR 0090). |
+| Footerknop "Huis-strategie opslaan" | **Aangepast**: "Woonstrategie opslaan" (commit `49704e767`) | De app noemt het overal woonstrategie (§8). |
+| Link in de tekort-lening-uitleg: "Rente tekort-lening aanpassen in je instellingen" · ⌘K-sublabel "Stopmoment, onttrekking, strategieën, inflatie en rendement" | Goedkeuren | Een linklabel naar een bestemming en een zoekhulp. |
+| Doelen: "Je doelscenario" (label bij Samenstelling en Geldstroom en in de legenda) · "Je plan" (legenda) · "Andere paden naast je doelscenario" · "Je doelen" · sr-label "Vorm van de knoppen" · "Weergave van de grafiek" | Goedkeuren | "Doelscenario" vervangt het verouderde "wat-als" (ADR 0144/0145); de legenda volgt het wireframe (§4.3). |
+| Sleep-hint: "Kijk naar de gestippelde lijn in de grafiek ↑ — dat is je doelscenario." | Goedkeuren | Een bedieningsaanwijzing bij een gebaar, geen oordeel of geldhandeling. |
+| Verloop, ronde 2: ondertitel "De laatste stand van elke maand over de laatste twaalf maanden; voor deze maand je huidige stand." · markering "budgettelling aangepast" · uitleg "Op 30 augustus 2026 veranderde hoe het budgetdeel van het gezondheidsgetal je uitgaven telt: inkomsten en overboekingen tussen je eigen rekeningen tellen sindsdien niet meer mee. Een knik rond die datum kan daardoor komen." | Goedkeuren | Legt een methodewissel uit in plaats van hem te verbergen. De lezer trekt dan geen conclusie uit een knik die geen gedrag is. |
+| Briefing: "Je gezondheidsscore steeg met X punten deze maand." (bestond al, verschijnt nu echt) | Goedkeuren | Een telling, alleen bij een stijging van minstens 5 punten binnen dezelfde rekenmethode. |
 
 ## Wat dit vraagt van de bouw (fase 1–2)
 
