@@ -64,7 +64,6 @@ function input(): EuroViewFeedsInput {
   return {
     displayUnifiedRows: UNIFIED,
     displaySimRows: SIM_ROWS,
-    displayEffectiveSimRows: SIM_ROWS,
     wealthCompositionRows: [],
     partnerLine: null,
     householdMainLine: null,
@@ -89,7 +88,6 @@ function input(): EuroViewFeedsInput {
     doelPreviews: [],
     readoutData: null,
     canonicalDailyRate: 100,
-    effectiveInput: null,
     ieBreakdownResult: null,
     scenarioPresets: null,
     householdHero: null,
@@ -142,5 +140,36 @@ describe('useEuroViewFeeds — de verhuisde render-grens', () => {
     })
     // De meegroeiende doellijn wordt in 'real' een vlakke unit-factorlijst (N2b).
     expect(out.viewTargetInflationFactors.every((f) => f.factor === 1)).toBe(true)
+  })
+
+  it("'real': de vrijheidstijd in de cijferbar volgt een ververst dagtarief, ook als de rest gelijk blijft", () => {
+    // Na router.refresh() kan alleen het 12-mnd dagtarief veranderen (nieuwe transacties),
+    // terwijl de projectie-invoer structureel gelijk blijft (useStructurallyStable) en
+    // de readout dus dezelfde referentie houdt. Dan mag de tijdregel niet blijven hangen.
+    const readoutData = {
+      age: 42,
+      year: 2028,
+      phaseLabel: 'Opbouw',
+      phaseColor: 'x',
+      netWorth: 365_000,
+      netWorthMoment: 'begin 2028',
+      freedomTime: 'nominaal',
+      monthlyLabel: 'Inleg / maand',
+      monthlyAmount: 1_000,
+    } as EuroViewFeedsInput['readoutData']
+    const basis = { ...input(), readoutData }
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <EuroViewProvider initialView="real">{children}</EuroViewProvider>
+    )
+    const hook = renderHook((feeds: EuroViewFeedsInput) => useEuroViewFeeds(feeds), {
+      wrapper,
+      initialProps: basis,
+    })
+    const bij100 = hook.result.current.viewReadoutData?.freedomTime
+    hook.rerender({ ...basis, canonicalDailyRate: 200 })
+    const bij200 = hook.result.current.viewReadoutData?.freedomTime
+    expect(bij100).toBeTruthy()
+    expect(bij200).toBeTruthy()
+    expect(bij200).not.toBe(bij100)
   })
 })

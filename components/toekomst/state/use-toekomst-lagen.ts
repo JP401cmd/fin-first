@@ -798,7 +798,7 @@ export function useToekomstLagen({ initialData, goals, perspectief, overlays, sc
         ? Math.max(0, row.savings) / 12
         : (row.withdrawalNeed?.totaalNeed ?? (effectiveInput?.monthlyExpenses ?? 0) * 12) / 12,
     }
-  }, [displayUnifiedRows, lifelineAge, currentAge, effectiveInput, simResult, userAowAge.fractional, displayEndAge, isPensioenMode])
+  }, [displayUnifiedRows, lifelineAge, currentAge, canonicalDailyRate, effectiveInput, simResult, userAowAge.fractional, displayEndAge, isPensioenMode])
 
   // "Speel af": animeer de actieve leeftijd van de eerste naar de laatste rij.
   useEffect(() => {

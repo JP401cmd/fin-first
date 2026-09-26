@@ -13,7 +13,6 @@ import type { SimResult, SimRow } from '@/lib/fire-simulation'
 import type { UnifiedProjectionRow } from '@/lib/unified-projection'
 import type { StackedRow } from '@/lib/wealth-composition'
 import type { AowAge } from '@/lib/aow-leeftijd'
-import type { FinancialInput } from '@/lib/horizon-data'
 import type { buildBreakdown } from '@/lib/income-expense-breakdown'
 import type { ScenarioPresetResult } from '@/lib/horizon/scenario-presets'
 import type { ScenarioOverlay, MonteCarloOverlay, HouseholdPartnerOverlay } from '@/components/app/horizon/sim-chart'
@@ -35,7 +34,6 @@ import {
   ankerKort,
   dekkingBadge,
   eindvermogenOpTegel,
-  EINDVERMOGEN_DELTA_DREMPEL,
   eindvermogenOpgeslagenNoot,
   eindvermogenPreviewWaarde,
 } from '@/lib/horizon/anker-copy'
@@ -53,7 +51,6 @@ import type { ToekomstLagen } from './use-toekomst-lagen'
 export interface EuroViewFeedsInput {
   displayUnifiedRows: UnifiedProjectionRow[]
   displaySimRows: SimRow[]
-  displayEffectiveSimRows: SimRow[]
   wealthCompositionRows: StackedRow[]
   partnerLine: PartnerLine | null
   householdMainLine: HouseholdMainLine | null
@@ -78,7 +75,6 @@ export interface EuroViewFeedsInput {
   doelPreviews: DoelParameterPreview[]
   readoutData: ReadoutData | null
   canonicalDailyRate: number
-  effectiveInput: FinancialInput | null
   ieBreakdownResult: ReturnType<typeof buildBreakdown> | null
   scenarioPresets: ScenarioPresetResult[] | null
   householdHero: HouseholdHeroData | null
@@ -89,7 +85,6 @@ export function useEuroViewFeeds(nominaal: EuroViewFeedsInput) {
   const {
     displayUnifiedRows,
     displaySimRows,
-    displayEffectiveSimRows,
     wealthCompositionRows,
     partnerLine,
     householdMainLine,
@@ -114,7 +109,6 @@ export function useEuroViewFeeds(nominaal: EuroViewFeedsInput) {
     doelPreviews,
     readoutData,
     canonicalDailyRate,
-    effectiveInput,
     ieBreakdownResult,
     scenarioPresets,
     householdHero,
@@ -159,10 +153,6 @@ export function useEuroViewFeeds(nominaal: EuroViewFeedsInput) {
   const viewDisplaySimRows = useMemo(
     () => deflateRowsByAge(displaySimRows, factorByAge, SIM_ROW_MONEY_FIELDS, euroView),
     [displaySimRows, factorByAge, euroView],
-  )
-  const viewDisplayEffectiveSimRows = useMemo(
-    () => deflateRowsByAge(displayEffectiveSimRows, factorByAge, SIM_ROW_MONEY_FIELDS, euroView),
-    [displayEffectiveSimRows, factorByAge, euroView],
   )
   // Vermogensopbouw-staven (WealthCompositionChart): jaarstanden per groep op de
   // eigen leeftijd-as ⇒ leeftijd-sleutel. Deze feed draagt zelf geen deflate/
@@ -461,15 +451,6 @@ export function useEuroViewFeeds(nominaal: EuroViewFeedsInput) {
     scenarioEindvermogenUitkomst,
   ])
 
-  // De delta-badge naast `lab-dekking-badge`: alleen als basis ÉN wat-als allebei een bedrag
-  // hebben (I1 — bij een (dreigend) tekort draagt de dekkings-badge de beweging al), weg bij
-  // maskeren, en weg onder de drempel (M5: een paar euro verschil is ruis).
-  const viewLabEindvermogenVerschil =
-    !masked && viewBasisEindvermogen != null && viewScenarioEindvermogen != null
-      ? Math.round(viewScenarioEindvermogen - viewBasisEindvermogen)
-      : 0
-  const viewLabEindvermogenDelta =
-    Math.abs(viewLabEindvermogenVerschil) >= EINDVERMOGEN_DELTA_DREMPEL ? viewLabEindvermogenVerschil : 0
   // De vaste preview-rij "Eindvermogen" in het vastleg-venster (promotie `eindvermogen`):
   // toont de bedragen in de actieve weergave — de doelwaarde die de sheet schrijft blijft
   // nominaal (`handleDoelVastleggen`). Eindreview I4: staat de weergave op huidige euro's en
@@ -521,7 +502,7 @@ export function useEuroViewFeeds(nominaal: EuroViewFeedsInput) {
         'short',
       ),
     }
-  }, [readoutData, displayUnifiedRows, euroView, effectiveInput])
+  }, [readoutData, displayUnifiedRows, euroView, canonicalDailyRate])
 
   // ── Inkomsten & uitgaven-strook (bronnen-breakdown) ───────────────────────
   // Elke waarde is een jaarstroom in één projectiejaar (klasse F) ⇒ de factor van
@@ -662,7 +643,6 @@ export function useToekomstEuro({
   const feeds = useEuroViewFeeds({
     displayUnifiedRows: sim.displayUnifiedRows,
     displaySimRows: sim.displaySimRows,
-    displayEffectiveSimRows: sim.displayEffectiveSimRows,
     wealthCompositionRows: lagen.wealthCompositionRows,
     partnerLine: perspectief.partnerLine,
     householdMainLine: perspectief.householdMainLine,
@@ -687,7 +667,6 @@ export function useToekomstEuro({
     doelPreviews: scenario.doelPreviews,
     readoutData: lagen.readoutData,
     canonicalDailyRate: sim.canonicalDailyRate,
-    effectiveInput: sim.effectiveInput,
     ieBreakdownResult: lagen.ieBreakdownResult,
     scenarioPresets: sim.scenarioPresets,
     householdHero: perspectief.householdHero,

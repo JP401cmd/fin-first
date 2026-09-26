@@ -837,7 +837,7 @@ export function useToekomstSim({ initialData, perspectief, scenarioState }: { in
   // chart-componenten (incl. de sibling-owned sim-chart) onaangeraakt blijven.
   // Grens = kernel-`displayEndAge` (perpetual/pensioen = horizon-cap 100, deplete/
   // legacy = fire_end_age). Idempotent → veilig als een consument elders ook clipt.
-  // `displaySimRows` (SimRow[]) volgt verderop, ná `effectiveSimRows`.
+  // `displaySimRows` (SimRow[]) volgt verderop.
   const displayEndAge = simResult?.displayEndAge ?? null
   const displayUnifiedRows = useMemo(
     () => clipRowsToPlanEnd(unifiedRows, displayEndAge),
@@ -883,21 +883,13 @@ export function useToekomstSim({ initialData, perspectief, scenarioState }: { in
     [showLiquidWealthLine, displayUnifiedRows],
   )
 
-  // De AOW-stop-wat-als (eigen `evaluateFireAt`-run met deplete-override) is weg —
-  // ADR 0129 B11: de snelkoppeling zet alleen de stop-slider; de hoofdrun is de bron.
-  const effectiveSimRows = simResult?.rows ?? []
-
   // Weergave-clip voor de SimRow-oppervlakken (Pad-grafiek + Inkomen&Uitgaven-
   // strip): t/m eindleeftijd − 1, spiegelbeeld van `displayUnifiedRows`. De
-  // AOW-stop-wat-als heeft een eigen eindleeftijd → clip die op de eigen grens.
+  // AOW-stop-wat-als (eigen run, eigen rijen) is weg — ADR 0129 B11: de snelkoppeling
+  // zet alleen de stop-slider; de hoofdrun is de bron.
   const displaySimRows = useMemo(
     () => clipRowsToPlanEnd(simResult?.rows ?? null, displayEndAge),
     [simResult?.rows, displayEndAge],
-  )
-  const displayEffectiveSimRows = useMemo(
-    () =>
-      clipRowsToPlanEnd(effectiveSimRows, displayEndAge),
-    [effectiveSimRows, displayEndAge],
   )
 
   // ── Erfgenamen (heirs) derivation for End-of-Life analysis ───────────────
@@ -1083,7 +1075,6 @@ export function useToekomstSim({ initialData, perspectief, scenarioState }: { in
     targetInflationFactors,
     liquidWealthPoints,
     displaySimRows,
-    displayEffectiveSimRows,
     erfgenamen,
     partnerAowBedrag,
     isKernelDepleteRate,
