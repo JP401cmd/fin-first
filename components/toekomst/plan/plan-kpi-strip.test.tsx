@@ -216,6 +216,34 @@ describe('PlanAnkerEnVoortgang — de voortgangsbalk', () => {
     expect(container.querySelector('[data-testid="plan-voortgang-label"]')).toBeNull()
   })
 
+  it('solved: geen drieslag', () => {
+    const { container } = render(<PlanAnkerEnVoortgang {...basis} />)
+    expect(container.querySelector('[data-testid="anker-drieslag"]')).toBeNull()
+  })
+
+  it('vast anker: "Reikt tot" staat één keer in Plan — in KPI 1, niet nog eens in de drieslag (eigenaarsbesluit 26 sep)', () => {
+    const vast = resolveHeroFireAge({
+      hasKernelResult: true,
+      stopAnker: { soort: 'leeftijd', leeftijd: 58.5 },
+      vastStopLeeftijd: 58.5,
+      ankerReach: { kind: 'reikt-tot', age: 83.4, endAge: 90 },
+      solvedFireAgeFractional: 55.2,
+    } as Parameters<typeof resolveHeroFireAge>[0])
+    expect(vast.anker).toBeTruthy()
+    const { container } = render(
+      <DisplayModeProvider initialMode="full">
+        <PlanKpiStrip {...stripProps({ isFixedAnchorMode: true, heroAgeLabel: ANKER_KPI_LABEL, heroFireAge: vast })} />
+        <PlanAnkerEnVoortgang {...basis} heroFireAge={vast} isFixedAnchorMode />
+      </DisplayModeProvider>,
+    )
+    const drieslag = container.querySelector('[data-testid="anker-drieslag"]') as HTMLElement
+    expect(drieslag).toBeTruthy()
+    expect(drieslag.querySelector('[data-testid="anker-tegel-vrij"]')).toBeTruthy()
+    expect(drieslag.querySelector('[data-testid="anker-tegel-stop"]')).toBeTruthy()
+    expect(drieslag.textContent).not.toContain(ANKER_KPI_LABEL)
+    expect(container.textContent?.split(ANKER_KPI_LABEL).length).toBe(2)
+  })
+
   it('de duidingszin is vervallen', () => {
     const { container } = render(<PlanAnkerEnVoortgang {...basis} />)
     expect(container.querySelector('[data-testid="hero-duiding"]')).toBeNull()

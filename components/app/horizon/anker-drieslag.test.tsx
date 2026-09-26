@@ -23,7 +23,7 @@ function anker(over: Partial<HeroAnkerView>): HeroAnkerView {
 }
 
 describe('AnkerDrieslag — age-anker', () => {
-  it('gedekt: VRIJ MOGELIJK VANAF 55 · JOUW STOPMOMENT 58,5 · REIKT TOT voorbij je 90e, met de bijlage-zin', () => {
+  it('gedekt: VRIJ MOGELIJK VANAF 55 · JOUW STOPMOMENT 58,5, met de bijlage-zin; geen Reikt-tot-tegel', () => {
     const a = anker({})
     render(<AnkerDrieslag anker={a} currentAge={45} planEndAge={90} />)
     expect(screen.getByTestId('anker-tegel-vrij')).toHaveTextContent('Vrij mogelijk vanaf')
@@ -31,7 +31,8 @@ describe('AnkerDrieslag — age-anker', () => {
     expect(screen.getByTestId('anker-tegel-vrij')).toHaveTextContent('als je de app had laten rekenen')
     expect(screen.getByTestId('anker-tegel-stop')).toHaveTextContent('58,5')
     expect(screen.getByTestId('anker-tegel-stop')).toHaveTextContent('jouw instelling')
-    expect(screen.getByTestId('anker-tegel-reikt')).toHaveTextContent('voorbij je 90e')
+    // Eigenaarsbesluit 26 sep: "Reikt tot" staat in KPI 1, niet nog eens in de drieslag.
+    expect(screen.queryByTestId('anker-tegel-reikt')).toBeNull()
     expect(screen.getByTestId('anker-vrij-zin')).toHaveTextContent(
       ankerVrijZin({ solvedFireAge: 55.2, currentAge: 45, stop: { kind: 'age', stopAge: 58.5 }, gedekt: true }),
     )
@@ -40,11 +41,11 @@ describe('AnkerDrieslag — age-anker', () => {
     )
   })
 
-  it('tekort: REIKT TOT 83 met "plan loopt tot 90"; geen "je kunt stoppen"', () => {
+  it('tekort: geen Reikt-tot-tegel (KPI 1 draagt hem); geen "je kunt stoppen"', () => {
     const a = anker({ reach: { kind: 'reikt-tot', age: 83.4, endAge: 90 }, reachesAge: 83.4, gedekt: false, solvedFireAge: null })
     const { container } = render(<AnkerDrieslag anker={a} currentAge={45} planEndAge={90} />)
-    expect(screen.getByTestId('anker-tegel-reikt')).toHaveTextContent('83')
-    expect(screen.getByTestId('anker-tegel-reikt')).toHaveTextContent('plan loopt tot 90')
+    expect(screen.queryByTestId('anker-tegel-reikt')).toBeNull()
+    expect(container.textContent).not.toContain('Reikt tot')
     expect(screen.getByTestId('anker-tegel-vrij')).toHaveTextContent('—')
     expect(screen.getByTestId('anker-vrij-zin')).toHaveTextContent(
       'De app vindt binnen dit plan nog geen leeftijd waarop je vermogen het zelf draagt.',
@@ -92,13 +93,13 @@ describe('AnkerDrieslag — aow-anker', () => {
 })
 
 describe('AnkerDrieslag — nu-anker', () => {
-  it('tegel 2 valt weg; tegel 1 in de verleden tijd als vrij al vóór de huidige leeftijd lag', () => {
+  it('tegel 2 en de reikt-tegel vallen weg; tegel 1 in de verleden tijd als vrij al vóór de huidige leeftijd lag', () => {
     const a = anker({ soort: 'nu', stopAge: 47, solvedFireAge: 42.6, reach: { kind: 'reikt-tot', age: 78, endAge: 90 }, reachesAge: 78, gedekt: false })
     render(<AnkerDrieslag anker={a} currentAge={47} planEndAge={90} />)
     expect(screen.queryByTestId('anker-tegel-stop')).toBeNull()
     expect(screen.getByTestId('anker-tegel-vrij')).toHaveTextContent('Vrij was mogelijk vanaf')
     expect(screen.getByTestId('anker-tegel-vrij')).toHaveTextContent('43')
     expect(screen.getByTestId('anker-vrij-zin')).toHaveTextContent('Vrij was mogelijk vanaf je 43e.')
-    expect(screen.getByTestId('anker-tegel-reikt')).toHaveTextContent('78')
+    expect(screen.queryByTestId('anker-tegel-reikt')).toBeNull()
   })
 })

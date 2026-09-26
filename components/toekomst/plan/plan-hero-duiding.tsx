@@ -63,7 +63,8 @@ export function PlanAnkerEnVoortgang({
   return (
     <>
       {/* ADR 0129 D7/B9 — de DRIESLAG onder een vast anker: VRIJ MOGELIJK VANAF
-          (tweede run) · JOUW STOPMOMENT (instelling) · REIKT TOT (bereik). Alleen
+          (tweede run) · JOUW STOPMOMENT (instelling). Het bereik ("Reikt tot") staat
+          alleen in KPI 1 (eigenaarsbesluit 26 sep: één keer per scherm). Alleen
           in de eigen weergave; consume-only uit `heroFireAge.anker`. */}
       {!hasPerspectiveHero && heroFireAge.anker && (
         <AnkerDrieslag

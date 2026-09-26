@@ -1,17 +1,21 @@
 'use client'
 
 /**
- * AnkerDrieslag — de drie tegels onder een VAST stop-anker (ADR 0129 D7/B9, F3b):
+ * AnkerDrieslag — de tegels onder een VAST stop-anker (ADR 0129 D7/B9, F3b):
  *
- *   VRIJ MOGELIJK VANAF {vrij} · JOUW STOPMOMENT {stop} · REIKT TOT {reikt}
+ *   VRIJ MOGELIJK VANAF {vrij} · JOUW STOPMOMENT {stop}
+ *
+ * Tot 26 sep stond hier een derde tegel "Reikt tot". Die staat nu alleen in KPI 1 van
+ * Plan (`ANKER_KPI_LABEL`, eigenaarsbesluit 26 sep: elk getal één keer per scherm,
+ * spec §4.9); de naam "drieslag" is gebleven omdat hij in tests, UAT en ADR 0129 leeft.
  *
  * Consume-only: alle getallen komen uit `HeroFireAge.anker` (`lib/horizon/hero-fire-age.ts`)
  * — de tweede kernel-run (`solvedFireAge`), het stopmoment van de run
- * (`vastStopLeeftijd`, nooit `fireAge`) en het bereik uit dezelfde run. Woorden uit
+ * (`vastStopLeeftijd`, nooit `fireAge`). Woorden uit
  * `anker-copy`. Onder `now` valt tegel 2 weg (het stopmoment is vandaag) en staat
  * tegel 1 in de verleden tijd als het opgeloste moment al voorbij is.
  *
- * Hairline-cijferblok in de editorial taal: geen kaart-doos, wel drie Figure-cellen
+ * Hairline-cijferblok in de editorial taal: geen kaart-doos, wel Figure-cellen
  * onder een dunne regel — dezelfde vorm als de vrijheidsas-cijferrij.
  */
 
@@ -97,27 +101,6 @@ export function AnkerDrieslag({ anker, currentAge, solvedFireEndAge = null, plan
   const stopValue = anker.stopAge != null ? formatStopAge(anker.stopAge) : '—'
   const stopCaption = anker.soort === 'aow' ? 'je AOW-leeftijd' : 'jouw instelling'
 
-  // Tegel 3 — REIKT TOT
-  const reach = anker.reach
-  const reiktValue =
-    reach.kind === 'gedekt'
-      ? reach.endAge != null
-        ? `voorbij je ${heroFireAgeYear(reach.endAge)}e`
-        : 'einde van je plan'
-      : reach.kind === 'reikt-tot'
-        ? String(heroFireAgeYear(reach.age))
-        : reach.kind === 'nu-op'
-          ? 'vandaag'
-          : '—'
-  const reiktCaption =
-    reach.kind === 'gedekt'
-      ? 'het einde van je plan'
-      : reach.kind === 'reikt-tot' && reach.endAge != null
-        ? `plan loopt tot ${heroFireAgeYear(reach.endAge)}`
-        : reach.kind === 'nu-op'
-          ? 'vanaf vandaag niet gedekt'
-          : 'nog niet te bepalen'
-
   // Tijdens het rekenen geen bijlage-zin: die zou "nog geen leeftijd" beweren.
   const vrijZin =
     stop != null && !vrijBerekenen
@@ -126,15 +109,9 @@ export function AnkerDrieslag({ anker, currentAge, solvedFireEndAge = null, plan
 
   return (
     <div data-testid="anker-drieslag" className="mb-4 border-t border-[var(--border-ed)] pt-3">
-      <div className={`grid gap-3 ${isNow ? 'grid-cols-2' : 'grid-cols-3'}`}>
+      <div className={`grid gap-3 ${isNow ? 'grid-cols-1' : 'grid-cols-2'}`}>
         <Tegel label={vrijLabel} value={vrijValue} caption={vrijCaption} testId="anker-tegel-vrij" />
         {!isNow && <Tegel label="Jouw stopmoment" value={stopValue} caption={stopCaption} testId="anker-tegel-stop" />}
-        <Tegel
-          label="Reikt tot"
-          value={reiktValue}
-          caption={reiktCaption}
-          testId="anker-tegel-reikt"
-        />
       </div>
       {vrijZin && (
         <p
