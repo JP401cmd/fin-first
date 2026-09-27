@@ -32,6 +32,7 @@ import {
   VIEWPORT_BUCKETS,
   MAX_METRIC_VALUE,
 } from '@/lib/web-vitals/config'
+import { SERVER_TIMING_METRICS } from '@/lib/web-vitals/server-timing'
 
 // Node-runtime: we lezen de service-role-key en verifiëren de JWT server-side.
 export const runtime = 'nodejs'
@@ -64,8 +65,10 @@ const schoneTekst = (max: number, min = 0) =>
 
 // Enums/grenzen komen uit de gedeelde config zodat zender en ontvanger nooit
 // uiteenlopen (client-toegestaan == server-geaccepteerd).
+// De SRV_*-metrics zijn de server-opsplitsing van de (app)-layout (Snelheid 0,
+// lib/web-vitals/server-timing.ts) — zelfde tabel, zelfde dimensies.
 const metricSchema = z.object({
-  metric: z.enum(WEB_VITAL_METRICS),
+  metric: z.enum([...WEB_VITAL_METRICS, ...SERVER_TIMING_METRICS]),
   // .min(0) weigert NaN, .max() weigert Infinity — samen dekken ze wat het
   // (in Zod 4 deprecated) .finite() deed, zonder de deprecation-waarschuwing.
   value: z.number().min(0).max(MAX_METRIC_VALUE),
@@ -78,7 +81,11 @@ const metricSchema = z.object({
   device: z.enum(WEB_VITAL_DEVICES).nullish(),
   viewportBucket: z.enum(VIEWPORT_BUCKETS).nullish(),
   effectiveType: schoneTekst(16).nullish(),
+}).refine((m) => m.metric !== 'SRV_COLD' || m.value === 0 || m.value === 1, {
+  message: 'SRV_COLD is 0 of 1',
 })
+
+const SERVER_TIMING_SET = new Set<string>(SERVER_TIMING_METRICS)
 
 export async function POST(request: Request) {
   try {
@@ -126,7 +133,10 @@ export async function POST(request: Request) {
     const { error } = await getServiceClient()
       .from('web_vitals')
       .insert({
-        user_id: userId,
+        // Server-opsplitsing (SRV_*) altijd zonder user_id: de analyse (Snelheid
+        // C) heeft alleen route/device/navigatietype nodig, en /privacy belooft
+        // geanonimiseerde performance-signalen.
+        user_id: SERVER_TIMING_SET.has(m.metric) ? null : userId,
         metric: m.metric,
         value: m.value,
         rating: m.rating ?? null,

@@ -135,6 +135,36 @@ describe('POST /api/web-vitals', () => {
   })
 
   it.each([
+    ['SRV_AUTH_MS', 412],
+    ['SRV_TOTAL_MS', 1830],
+    ['SRV_COLD', 1],
+  ])('Snelheid 0 — server-metric %s wordt geaccepteerd, zonder rating en zonder user_id', async (metric, value) => {
+    mockGetClaims.mockResolvedValue({ data: { claims: { sub: 'user-123' } } })
+    const res = await POST(req({ metric, value, route: '/overzicht', navigationType: 'navigate' }))
+    expect(res.status).toBe(204)
+    const [, payload] = mockInsert.mock.calls[0]
+    expect(payload).toMatchObject({
+      metric,
+      value,
+      rating: null,
+      navigation_type: 'navigate',
+      user_id: null,
+    })
+  })
+
+  it('Snelheid 0 — SRV_COLD buiten 0/1 → 400 (scheeftrekken van de cold-start-verhouding)', async () => {
+    const res = await POST(req({ metric: 'SRV_COLD', value: 412, route: '/overzicht' }))
+    expect(res.status).toBe(400)
+    expect(mockInsert).not.toHaveBeenCalled()
+  })
+
+  it('Snelheid 0 — een onbekende SRV_-naam blijft geweigerd (whitelist, geen prefix)', async () => {
+    const res = await POST(req(validBody({ metric: 'SRV_WHATEVER', rating: undefined })))
+    expect(res.status).toBe(400)
+    expect(mockInsert).not.toHaveBeenCalled()
+  })
+
+  it.each([
     ['boven MAX_METRIC_VALUE', 3_600_001],
     ['negatief', -1],
     ['NaN', NaN],

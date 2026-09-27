@@ -70,6 +70,8 @@ import { WelcomeGuideProvider } from '@/components/app/chat/gids/welcome-guide-p
 import { loadWelcomeGuideSeed } from '@/lib/welcome-guide-loader'
 import { WELCOME_GUIDE_MODULE_KEY, openGuideSteps, summarizeGuide } from '@/lib/welcome-guide'
 import { AccountStorageGuard } from '@/components/app/account-storage-guard'
+import { ServerTimingReporter } from '@/components/app/web-vitals-reporter'
+import { startLayoutTimer } from '@/lib/web-vitals/layout-timer'
 import {
   generateAllColorVars,
   topbarColorVars,
@@ -128,6 +130,10 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode
 }) {
+  // Server-opsplitsing (Snelheid 0): lokale markers rond de vijf laadstappen,
+  // na de render naar web_vitals gebeacond door <ServerTimingReporter>.
+  const timer = startLayoutTimer()
+
   const supabase = await createClient()
   // getCachedUser (React cache()) i.p.v. supabase.auth.getUser(): deelt de
   // JWT-validate-round-trip met loadLeverScores() verderop (dat óók
@@ -139,6 +145,7 @@ export default async function AppLayout({
     // This is a fallback for edge cases (e.g., session expiry between proxy and layout).
     redirect('/login')
   }
+  timer.mark('auth')
 
   const threeMonthsAgo = new Date()
   threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
@@ -275,6 +282,7 @@ export default async function AppLayout({
       .eq('user_id', user.id)
       .eq('is_active', true),
   ])
+  timer.mark('batch')
 
   const platformStatus = parsePlatformStatus(platformStatusRes.data?.value as string | undefined)
 
@@ -418,6 +426,7 @@ export default async function AppLayout({
   // Perspectief stuurt uitsluitend `netWorth` (lever-status blijft persoonlijk).
   // `cache()` dedupliceert binnen het request (zelfde perspective-arg als de
   // page-status-route → één query-set).
+  timer.mark('leverStart')
   const sidebarPerspective = await getServerPerspective()
   const {
     scores: sidebarLeverScores,
@@ -426,6 +435,7 @@ export default async function AppLayout({
     netWorth: sidebarNetWorth,
     budgetsOver,
   } = await loadLeverScores(supabase, sidebarPerspective)
+  timer.mark('lever')
 
   const sidebarSignals: SidebarSignals = {
     tipsActions: sidebarActionCount > 0 || sidebarOpenRecCount > 0,
@@ -511,9 +521,11 @@ export default async function AppLayout({
     ] as { status?: string } | undefined
   )?.status
   const welcomeGuideDismissed = welcomeGuideStatus === 'dismissed'
+  timer.mark('guideStart')
   const welcomeGuideSeed = welcomeGuideDismissed
     ? null
     : await loadWelcomeGuideSeed(supabase, user.id)
+  timer.mark('guide')
 
   // ── Gids-laag voor Fins meldingen (ADR 0130, fase 2) ───────────────────
   // Fin noemt op de bijpassende route de eerstvolgende open gidsstap. De ROUTE
@@ -574,6 +586,7 @@ export default async function AppLayout({
   const colorVars = generateAllColorVars({ modules: moduleColors, budget: budgetColors, phase: phaseColors })
   const fontVars = generateFontVars(profile?.typography_theme ?? 'editorial')
   const allVars = { ...colorVars, ...topbarColorVars(topbarColor ?? DEFAULT_TOPBAR_COLOR), ...fontVars }
+  const serverTimings = timer.finish()
 
   return (
     <MobilePreviewProvider>
@@ -598,6 +611,7 @@ export default async function AppLayout({
         <ToastProvider>
           <SessionMonitor />
           <ErrorReporter />
+          <ServerTimingReporter timings={serverTimings} />
           <AutoSnapshotTrigger />
           <DailyPriceSyncTrigger />
           {/* `initialPerspective` = de server-gelezen tf_perspective-cookie
