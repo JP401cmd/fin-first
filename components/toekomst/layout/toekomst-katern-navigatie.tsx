@@ -8,8 +8,8 @@
  * route nooit; zo blijft de terugvaloptie C′ (drie katernen gestapeld op één route) een
  * herschikking zonder herbouw.
  *
- * Twee consumenten: de katern-koppen onder het canvas en de i in de paginakop, die per
- * katern de "Wat zie ik hier?"-inhoud van zijn eigen route toont.
+ * Twee consumenten: de katern-koppen (op desktop boven het canvas, mobiel eronder) en de i
+ * in de paginakop, die per katern de "Wat zie ik hier?"-inhoud van zijn eigen route toont.
  */
 
 import { useEffect, useRef, type ReactNode } from 'react'
@@ -24,11 +24,15 @@ import { KATERN_ACCENT } from './katern-accent'
 import { useActiefKatern } from './actief-katern'
 
 /**
- * De katern-koppen onder het canvas (fase 2, spec §4.2 regel 4 en §4.8): de inactieve
- * koppen dragen hun samenvatting (vanaf `lg`), een katern met een melding draagt het
- * statuspunt in stoplichtkleur met tekstlabel en aantal. Een klik op de kop van een
- * katern met een geminimaliseerde melding klapt die weer uit (dezelfde `restore` als de
+ * De katern-koppen (fase 2, spec §4.2 regel 4 en §4.8): de inactieve koppen dragen hun
+ * samenvatting (vanaf `lg`), een katern met een melding draagt het statuspunt in
+ * stoplichtkleur met tekstlabel en aantal. Een klik op de kop van een katern met een
+ * geminimaliseerde melding klapt die weer uit (dezelfde `restore` als de
  * Minimaliseren-knop terugdraait; server-side onthouden).
+ *
+ * De layout zet twee exemplaren (eigenaarswens 27 sep): op desktop boven het canvas, als
+ * tabbladen op de grafiekkaart, en mobiel eronder, klevend. Per breedte is er één
+ * zichtbaar; het andere staat op `display: none` en laat de scrollregel hieronder met rust.
  */
 export function ToekomstKaternKoppen({ className = '' }: { className?: string }) {
   const actief = useActiefKatern()
@@ -51,8 +55,11 @@ export function ToekomstKaternKoppen({ className = '' }: { className?: string })
     if (!anker) return
     const nav = anker.nextElementSibling
     if (!(nav instanceof HTMLElement)) return
-    // Natuurlijke bovenkant van de nav = het anker plus de eigen marge van de nav (de
-    // layout geeft `mt-6`); kleeft hij, dan staat hij lager dan die plek.
+    // Het exemplaar van de andere breedte (`hidden lg:block` / `lg:hidden`) doet niets:
+    // alleen de koppen die je ziet bepalen waar de pagina staat.
+    if (getComputedStyle(nav).display === 'none') return
+    // Natuurlijke bovenkant van de nav = het anker plus de eigen marge van de nav (mobiel
+    // geeft de layout `mt-6`); kleeft hij, dan staat hij lager dan die plek.
     const natuurlijk = anker.getBoundingClientRect().top + (parseFloat(getComputedStyle(nav).marginTop) || 0)
     const kleeft = nav.getBoundingClientRect().top > natuurlijk + 1
     if (!kleeft && natuurlijk >= 0) return

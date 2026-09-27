@@ -397,6 +397,16 @@ describe('ToekomstCanvas — de canvas-rij in Doelen: grafiek links, lab rechts 
     }
   })
 
+  it('de kaart (27 sep): tilt niet, deelt op desktop de basislijn van de tabbladen, accentbalk alleen mobiel', () => {
+    renderMetKolom('doelen')
+    const kaart = screen.getByTestId('horizon-hero')
+    expect(kaart.className).toContain('no-hover-lift')
+    expect(kaart.className).toContain('lg:-mt-px')
+    const balk = kaart.firstElementChild as HTMLElement
+    expect(balk.className).toContain('h-1.5')
+    expect(balk.className).toContain('lg:hidden')
+  })
+
   it('Instellingen: geen rij, geen kolom, geen actierij', () => {
     renderMetKolom('instellingen')
     expect(screen.queryByTestId('doelen-canvas-rij')).toBeNull()

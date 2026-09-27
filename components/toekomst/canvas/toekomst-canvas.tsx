@@ -3,8 +3,8 @@
 
 /**
  * Het canvas van /toekomst (ADR 0179 D1/D3/D5): de grafiekkaart die de
- * `(katern)`-layout boven de katern-koppen rendert en die bij een katernwissel
- * gemonteerd blijft (GW1).
+ * `(katern)`-layout rendert — op desktop onder de katern-tabbladen, mobiel boven de
+ * koppen — en die bij een katernwissel gemonteerd blijft (GW1).
  *
  * Fase 2 (stroom W1):
  * - Boven de grafiek alleen (wireframe §4.3 regel 7): de modus-switch Vermogen ·
@@ -350,14 +350,20 @@ export function ToekomstCanvas({
           })
     : []
 
+  // De kaart tilt niet op hover (`no-hover-lift`): ze is zelf niet klikbaar, en op desktop
+  // liggen de katern-tabbladen erop en sluit het katern eronder aan (eigenaarswens 27 sep)
+  // — een lift van 1px zou beide losscheuren. Dat dekt ook de tips-modus, waar een
+  // transform de boven de scrim getilde grafiek zou vangen (globals.css). Op desktop is de
+  // basislijn van de tabbladen de bovenrand van de kaart (`lg:-mt-px`: één lijn, geen twee).
   return (
     <section
       data-testid="horizon-hero"
       data-katern={katern}
-      className={`card-editorial overflow-hidden ${stand.alleenDesktop ? 'hidden lg:block' : ''} ${overlayVisible && stand.modus === 'vermogen' ? 'no-hover-lift' : ''}`}
+      className={`card-editorial no-hover-lift overflow-hidden lg:-mt-px ${stand.alleenDesktop ? 'hidden lg:block' : ''}`}
     >
-      {/* Module-active accent (Horizon-500 op /toekomst/**) */}
-      <div className="h-1.5" style={{ background: 'var(--module-active-500)' }} />
+      {/* Module-active accent (Horizon-500 op /toekomst/**), alleen mobiel: op desktop
+          draagt de actieve tab erboven het accent en loopt die naadloos over in de kaart. */}
+      <div className="h-1.5 lg:hidden" style={{ background: 'var(--module-active-500)' }} />
 
       <div
         className={metZijkolom ? DOELEN_CANVAS_RIJ : undefined}

@@ -100,10 +100,12 @@ describe('katern-copy — katernen', () => {
     expect(katernMeldingNogLabel(2)).toBe('Nog 2 meldingen')
   })
 
-  it('sr-tekst na minimaliseren: beschrijvend, per onderdeel, zonder "katern"', () => {
+  it('sr-tekst na minimaliseren: beschrijvend, per onderdeel, zonder "katern" en zonder plek', () => {
     expect(katernMeldingGeminimaliseerdSr('plan')).toBe(
-      'Melding geminimaliseerd. Het punt bij Plan onder de grafiek haalt de melding terug.',
+      'Melding geminimaliseerd. Het punt op het tabblad Plan haalt de melding terug.',
     )
+    // De tabbladen staan op desktop boven en mobiel onder de grafiek (27 sep): geen plek noemen.
+    for (const k of KATERN_VOLGORDE) expect(katernMeldingGeminimaliseerdSr(k)).not.toMatch(/onder|boven|grafiek/i)
     for (const k of KATERN_VOLGORDE) expect(katernMeldingGeminimaliseerdSr(k)).not.toMatch(/katern/i)
   })
 

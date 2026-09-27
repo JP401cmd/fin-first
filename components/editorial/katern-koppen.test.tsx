@@ -162,6 +162,9 @@ describe('KaternKoppen — accent per kop', () => {
     expect(doelen.className).toContain('bg-[var(--paper)]')
     expect(doelen.className).toContain('text-[var(--ink)]')
     expect(doelen.parentElement?.className).toContain('-mb-px')
+    // Elke tab vult de rij: vanaf lg maken de samenvattingen van de inactieve tabs de rij
+    // hoger, en de actieve (zonder samenvatting) moet dan nog steeds de basislijn raken.
+    for (const link of screen.getAllByRole('link')) expect(link.className).toContain('h-full')
     // Geen enkele tab heeft een accent als achtergrond.
     for (const link of screen.getAllByRole('link')) expect(link.className).not.toMatch(/bg-\[var\(--color-/)
   })

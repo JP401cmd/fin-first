@@ -71,11 +71,12 @@ export function katernMeldingNogLabel(aantal: number): string {
 
 /**
  * Wat de statusregio zegt na "Minimaliseren" (fixronde C1). Beschrijvend en zonder het
- * vakwoord "katern": de gebruiker ziet een punt bij de kop "Plan"/"Doelen"/"Instellingen"
- * onder de grafiek, en een klik daarop (de kop is een link) klapt de melding weer uit.
+ * vakwoord "katern": de gebruiker ziet een punt op het tabblad "Plan"/"Doelen"/
+ * "Instellingen", en een klik daarop (het tabblad is een link) klapt de melding weer uit.
+ * Zonder plek: op desktop staan de tabbladen boven de grafiek, mobiel eronder (27 sep).
  */
 export function katernMeldingGeminimaliseerdSr(katern: KaternId): string {
-  return `Melding geminimaliseerd. Het punt bij ${KATERN_LABEL[katern]} onder de grafiek haalt de melding terug.`
+  return `Melding geminimaliseerd. Het punt op het tabblad ${KATERN_LABEL[katern]} haalt de melding terug.`
 }
 
 // ── Ankerregel (kopij-toets §2) ──────────────────────────────────────────────

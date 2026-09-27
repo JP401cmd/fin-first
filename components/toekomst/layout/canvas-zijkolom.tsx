@@ -11,8 +11,7 @@
  *   bepaalt zo de hoogte van de rij. Buiten Doelen leeg.
  *
  * Staat in de layout-laag, omdat alleen die de route kent (D8): het canvas zit in de
- * `(katern)`-layout boven de katern-koppen, dus de page (ónder de koppen) kan hem niet
- * leveren. Een parallelle route (`@zij`) zou bij client-navigatie zijn vorige inhoud
+ * `(katern)`-layout boven het katern, dus de page (daaronder) kan hem niet leveren. Een parallelle route (`@zij`) zou bij client-navigatie zijn vorige inhoud
  * vasthouden, een portal verschijnt pas na mount; een slot vanuit de layout rendert
  * server-side op zijn plek. De actierij is daarom een tweede slot van hetzelfde soort, en
  * geen deel van de kolom: de kolom moet alleen het lab bevatten om als maat te dienen.
@@ -25,8 +24,8 @@ import { useActiefKatern } from './actief-katern'
 import { ToekomstKaternAccentScope } from './toekomst-katern-navigatie'
 
 // Beide slots dragen het accent van de actieve tab (eigenaarswens 27 sep): hun inhoud hoort
-// bij het katern, ook al staat die in de canvas boven de tabs. De scope is `display:
-// contents`, dus de maat van de kolom verandert niet.
+// bij het katern, ook al staat die in de canvas. De scope is `display: contents`, dus de
+// maat van de kolom verandert niet.
 
 export function CanvasZijkolom() {
   const katern = useActiefKatern()

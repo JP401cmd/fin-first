@@ -83,6 +83,15 @@ describe('ToekomstKaternKoppen — wisselen zonder sprong', () => {
     expect(scrollIntoView).toHaveBeenCalledWith({ block: 'start' })
   })
 
+  it('het exemplaar van de andere breedte (display: none) laat de pagina staan', () => {
+    const { rerender } = render(<ToekomstKaternKoppen />)
+    posities(-900, 0)
+    screen.getByTestId('katern-koppen').style.display = 'none'
+    segment = 'doelen'
+    rerender(<ToekomstKaternKoppen />)
+    expect(scrollIntoView).not.toHaveBeenCalled()
+  })
+
   it('boven uit beeld (desktop, statisch): ook naar boven, één keer', () => {
     const { rerender } = render(<ToekomstKaternKoppen />)
     posities(-50, -50)

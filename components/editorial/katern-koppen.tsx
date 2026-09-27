@@ -4,8 +4,8 @@
  * Uiterlijk: het kicker-met-streep-patroon van `CategoryTabs` (`pattern="tabs"`),
  * maar als `<nav>` met `Link`s, omdat elke kop een eigen route is en geen paneel
  * wisselt. Bewust GEEN segmented control: dat is de modus-switch boven de grafiek,
- * en twee gelijke controls verwarren. De streep staat bovenaan de kop (de koppen
- * liggen onder het canvas en "openen" het katern eronder).
+ * en twee gelijke controls verwarren. De streep staat bovenaan de kop: de kop "opent"
+ * wat eronder ligt.
  *
  * - De actieve kop draagt `aria-current="page"` en géén samenvatting (zijn inhoud
  *   staat eronder); inactieve koppen dragen hun samenvatting, alleen vanaf `lg`.
@@ -23,10 +23,10 @@
  * Tabbladen met accent (optioneel, `KaternKopItem.accent`, eigenaarswens 27 sep): de
  * koppen worden tabs op een map — een tabstrook op een basislijn, elke tab een eigen
  * omkaderd vlak met een streep in zijn eigen accent bovenaan. De actieve tab ligt vóór:
- * papierkleur van de pagina (`--bg`), sterkere streep, en hij sluit zonder lijn aan op
- * het katern eronder. De inactieve tabs liggen zichtbaar achter: een ingetogen,
- * donkerder papiertoon (gemengd uit `--border-ed` en `--bg`) en `ink-2`. Het accent is
- * hier nooit een vlak — de subpagina krijgt haar accent via `KaternAccentScope`.
+ * wit (`--paper`), sterkere streep, en hij sluit zonder lijn aan op het vlak eronder (op
+ * /toekomst mobiel de katern-module, op desktop de grafiekkaart). De inactieve tabs liggen
+ * achter, op de pagina (`--bg`), in `ink-2`. Alle tabs zijn even hoog. Het accent is hier
+ * nooit een vlak — de subpagina krijgt haar accent via `KaternAccentScope`.
  * Nog steeds geen segmented control (D6 blijft staan): tabs openen een eigen route met
  * een eigen katern eronder; de modus-switch wisselt een weergave van dezelfde grafiek.
  * Het statuspunt blijft stoplicht en onderscheidt zich van het accent door vorm (punt
@@ -89,7 +89,9 @@ const TAB_ACHTER = 'bg-transparent text-[var(--ink-2)] hover:bg-[var(--paper)] h
 /**
  * De witte module onder de tabbladen: dezelfde kaart als het canvas (papier, hairline,
  * schaduw `--s0`), zonder bovenrand — de basislijn van de tabstrook is die rand, en de
- * actieve tab schuift er 1px overheen. Utilities in plaats van `.card-editorial`: die
+ * actieve tab schuift er 1px overheen. Op /toekomst-desktop liggen de tabbladen op de
+ * grafiekkaart en sluit de module direct onder die kaart aan; daar scheidt de onderrand
+ * van de kaart. Utilities in plaats van `.card-editorial`: die
  * klasse staat buiten de CSS-lagen en laat zich niet per zijde overschrijven, en zijn
  * hover-lift hoort niet op een vlak met overlays erin. Onder `sm` loopt de module tot de
  * schermrand, zodat de inhoud even breed blijft (één-scherm-eis in Doelen).
@@ -164,8 +166,11 @@ export function KaternKoppen({ items, actiefKey, label, className = '' }: Katern
             ? // Tabblad. Zelfde hoogte als de kicker-variant (min-h 44, pt-2.5, pb-2): de
               // één-scherm-eis van Doelen op mobiel meet het rad ónder de koppen. De streep
               // van 3px valt binnen de 44px (border-box). Zijkanten in de hairline-kleur,
-              // géén onderrand: de basislijn is de rand van de `ul`.
-              `block min-h-[44px] border-x border-t-[3px] border-x-[color:var(--border-ed)] px-1.5 pb-2 pt-2.5 sm:px-3 ${FOCUS} ${
+              // géén onderrand: de basislijn is de rand van de `ul`. `h-full`: elke tab vult
+              // de rij. Vanaf `lg` dragen de inactieve tabs een samenvatting en is de rij
+              // hoger dan 44px; zonder dit bleef de actieve tab (zonder samenvatting) boven
+              // de basislijn hangen en sloot hij niet aan op het vlak eronder.
+              `block h-full min-h-[44px] border-x border-t-[3px] border-x-[color:var(--border-ed)] px-1.5 pb-2 pt-2.5 sm:px-3 ${FOCUS} ${
                 actief
                   ? `bg-[var(--paper)] text-[var(--ink)] ${ACCENT_STREEP[accent].voor}`
                   : `${TAB_ACHTER} ${ACCENT_STREEP[accent].achter}`

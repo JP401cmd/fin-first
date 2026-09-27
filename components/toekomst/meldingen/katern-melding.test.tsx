@@ -94,7 +94,7 @@ describe('KaternMelding — slot', () => {
   it('de sr-tekst bij minimaliseren beschrijft het punt bij de kop van dít onderdeel, zonder vakwoord (C1 punt 4)', () => {
     render(<KaternMelding meldingen={[AOW]} display="minimized" onMinimize={() => {}} />)
     expect(screen.getByRole('status').textContent).toBe(
-      'Melding geminimaliseerd. Het punt bij Instellingen onder de grafiek haalt de melding terug.',
+      'Melding geminimaliseerd. Het punt op het tabblad Instellingen haalt de melding terug.',
     )
     expect(screen.getByRole('status').textContent).not.toMatch(/katern|activeer/i)
   })
