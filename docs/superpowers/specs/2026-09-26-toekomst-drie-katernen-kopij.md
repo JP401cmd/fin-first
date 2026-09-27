@@ -170,6 +170,17 @@ Getoetst op merkstem (constaterend, je/jij, geen koop-/verkoopmetafoor, geen "ka
 | Verloop, ronde 2: ondertitel "De laatste stand van elke maand over de laatste twaalf maanden; voor deze maand je huidige stand." · markering "budgettelling aangepast" · uitleg "Op 30 augustus 2026 veranderde hoe het budgetdeel van het gezondheidsgetal je uitgaven telt: inkomsten en overboekingen tussen je eigen rekeningen tellen sindsdien niet meer mee. Een knik rond die datum kan daardoor komen." | Goedkeuren | Legt een methodewissel uit in plaats van hem te verbergen. De lezer trekt dan geen conclusie uit een knik die geen gedrag is. |
 | Briefing: "Je gezondheidsscore steeg met X punten deze maand." (bestond al, verschijnt nu echt) | Goedkeuren | Een telling, alleen bij een stijging van minstens 5 punten binnen dezelfde rekenmethode. |
 
+## 13. Aanvulling: teksten uit de eindreview-fixes (27 sep)
+
+Getoetst op merkstem en compliance. Ze komen uit de fix van eindreview-🔴 R1: "sinds vorige maand" rekent de vorige maand nu met dezelfde functie als het live getal, en het live getal staat los van de opgeslagen lijn. De rest komt uit 🟡 Y1: de profielvergelijking volgt de euro-weergave.
+
+| Tekst | Besluit | Waarom |
+|---|---|---|
+| Verloop, ondertitel met live stand: "De lijn toont de laatste stand van elke afgesloten maand zoals die toen berekend werd, over de laatste twaalf maanden. De losse stip ‘nu’ is je huidige stand; die wordt anders berekend en staat daarom niet op de lijn." · label "nu" | Goedkeuren | Zegt eerlijk dat de opgeslagen standen en het live getal niet op dezelfde manier berekend zijn. De lezer ziet daardoor geen stijging die er niet is. Geen oordeel, geen belofte. |
+| Alleen een live stand: "Nog geen afgesloten maandstand. Nu: {score} van 100." | Goedkeuren | Telling en stand, zonder aansporing. |
+| Onder een vast stopmoment: géén regel "sinds vorige maand" en geen briefingmijlpaal | Goedkeuren (weglaten is de tekst) | Een vergelijking die niet sluitend is, hoort er niet te staan (compliance: geen schijnprecisie). Het aandachtspunt `fire-historie-uit-een-andere-motor-dan-het-live-getal` beschrijft de weg terug. |
+| Profielvergelijking: "Bedragen in huidige euro's." / "Bedragen in toekomstige euro's." | Goedkeuren | Maakt de euro-grondslag van de getoonde bedragen zichtbaar (ADR 0090), in de woorden van `euroViewLabel`. |
+
 ## Wat dit vraagt van de bouw (fase 1–2)
 
 - Ankerregel: consumeer `ankerVrijZin` en `ankerTitel` uit `lib/horizon/anker-copy.ts` en schrijf geen nieuwe zinnen. KPI 1 via `formatHeroFireAge`.
