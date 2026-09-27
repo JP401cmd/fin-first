@@ -51,7 +51,7 @@ export default async function OverzichtCashflowVasteLastenPage() {
 
   return (
     <>
-      <NavStackMeta title="Vaste lasten" bottomBar={{ kind: 'tabs' }} />
+      <NavStackMeta title="Vaste lasten" />
       <div className="relative mx-auto max-w-6xl px-4 pt-4 sm:px-6">
         <PageStatusDot className="absolute right-[52px] top-4 sm:right-[60px]" />
         <PageInfoButton

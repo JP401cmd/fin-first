@@ -135,7 +135,7 @@ export default async function DebtCategoryServerPage({
 
   return (
     <>
-      <NavStackMeta title={DEBT_TYPE_LABELS[type] ?? 'Schulden'} bottomBar={{ kind: 'tabs' }} />
+      <NavStackMeta title={DEBT_TYPE_LABELS[type] ?? 'Schulden'} />
       <DebtCategoryPage
         type={type}
         initialDebts={debts}

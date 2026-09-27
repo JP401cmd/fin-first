@@ -71,7 +71,7 @@ export default async function OverzichtBudgetPage() {
 
   return (
     <>
-      <NavStackMeta title="Budget" bottomBar={{ kind: 'tabs' }} />
+      <NavStackMeta title="Budget" />
 
       <BudgetHeaderSlotProvider>
         {/* De pagina-aanhef — één opening, bovenaan. De header-controls zweven

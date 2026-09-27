@@ -22,7 +22,7 @@ export const metadata: Metadata = {
 export default function MijnPrivacyPage() {
   return (
     <>
-      <NavStackMeta title="Privacy" bottomBar={{ kind: 'tabs' }} />
+      <NavStackMeta title="Privacy" />
       <div className="relative mx-auto max-w-3xl px-4 pt-4 sm:px-6">
         <PageInfoButton
           content={getPageInfo('/mijn/privacy')}

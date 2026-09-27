@@ -125,7 +125,7 @@ export default async function OverzichtCashflowTransactiesPage({
 
   return (
     <>
-      <NavStackMeta title="Transacties" bottomBar={{ kind: 'tabs' }} />
+      <NavStackMeta title="Transacties" />
       {/* UR3-22 — de versheidsmelding kwam op deze pagina wél binnen maar zonder
           terughaalpunt: wie haar op /overzicht inklapte kon haar hier niet meer
           openen (de voorkeur is gedeeld, de knop stond er niet). De guard omspant

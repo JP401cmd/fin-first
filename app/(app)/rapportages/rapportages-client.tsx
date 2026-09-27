@@ -247,7 +247,7 @@ export function RapportagesClient({ data }: { data: RapportagesData }) {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 md:px-8">
-      <NavStackMeta title="Rapportages" bottomBar={{ kind: 'tabs' }} />
+      <NavStackMeta title="Rapportages" />
       {/* Editorial header — Type 1 Module-landing */}
       <header className="relative mb-6 space-y-3">
         <PageInfoButton

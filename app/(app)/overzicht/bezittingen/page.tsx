@@ -78,7 +78,7 @@ export default async function OverzichtBezittingenPage() {
 
   return (
     <>
-      <NavStackMeta title="Bezittingen" bottomBar={{ kind: 'tabs' }} />
+      <NavStackMeta title="Bezittingen" />
       <div className="relative mx-auto max-w-6xl px-4 pt-4 sm:px-6">
         <PageStatusDot className="absolute right-[52px] top-4 sm:right-[60px]" />
         <PageInfoButton

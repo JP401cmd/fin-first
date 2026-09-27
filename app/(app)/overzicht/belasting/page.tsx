@@ -278,7 +278,7 @@ export default async function OverzichtBelastingPage() {
 
   return (
     <>
-      <NavStackMeta title="Belasting" bottomBar={{ kind: 'tabs' }} />
+      <NavStackMeta title="Belasting" />
 
       {/* ── Editorial pagina-opening die het OORDEEL uitspreekt ──────────
           Kop-herziening sep 2026: kicker vervallen, titel = "Belasting |

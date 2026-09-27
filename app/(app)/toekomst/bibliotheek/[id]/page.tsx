@@ -166,7 +166,7 @@ export default async function BibliotheekDetailPage({
     <section className="mx-auto max-w-3xl px-4 sm:px-6 pb-12 pt-4">
       {/* Runtime-afhankelijke titel — dynamische route, niet via de statische
           resolver te dekken. Hergebruikt de calculatornaam uit de header. */}
-      <NavStackMeta title={calculator.name} bottomBar={{ kind: 'tabs' }} />
+      <NavStackMeta title={calculator.name} />
 
       {/* Breadcrumb */}
       <Link

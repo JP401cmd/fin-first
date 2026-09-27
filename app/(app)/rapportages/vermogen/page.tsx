@@ -609,7 +609,7 @@ export default function VermogenReportPage() {
       className="report-pdf-root mx-auto max-w-[900px] px-4 py-6 md:px-8"
       data-report-module="kern"
     >
-      <NavStackMeta title="Vermogensoverzicht" bottomBar={{ kind: 'tabs' }} />
+      <NavStackMeta title="Vermogensoverzicht" />
 
       {/* ── Toolbar — print-knop ── */}
       <div data-print-hide className="mb-6 flex items-center justify-end gap-3">

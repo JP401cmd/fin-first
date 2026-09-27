@@ -370,7 +370,7 @@ export default function MijnNotificatiesPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-5 sm:px-6 sm:py-8">
-      <NavStackMeta title="Notificaties" bottomBar={{ kind: 'tabs' }} />
+      <NavStackMeta title="Notificaties" />
 
       <PageOpening
         className="mb-6 pr-12 sm:pr-14"

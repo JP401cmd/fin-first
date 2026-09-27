@@ -689,7 +689,7 @@ export function DebtsClient({ toolbarFilter, debtTypeFilter, initialData, showPa
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
-      <NavStackMeta title="Schulden" bottomBar={{ kind: 'tabs' }} />
+      <NavStackMeta title="Schulden" />
 
       {/* ═══ Editorial pagina-opening (standaard-aanhef) ════════════
           Aanhef die het oordeel uitspreekt (kop-herziening sep 2026), sinds

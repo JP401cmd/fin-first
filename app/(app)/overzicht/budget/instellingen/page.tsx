@@ -55,7 +55,7 @@ export const metadata: Metadata = {
 export default async function BudgetInstellingenPage() {
   return (
     <>
-      <NavStackMeta title="Instellingen" bottomBar={{ kind: 'tabs' }} />
+      <NavStackMeta title="Instellingen" />
 
       {/* Eigen `relative` rij voor de header-control, zoals /forecast en
           /transacties het doen — zo hoeft de aanhef eronder geen gutter te

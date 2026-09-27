@@ -12,7 +12,7 @@ export default async function AssetsServerPage() {
     const assetsData = await loadAssetsData(supabase, perspective)
     return (
       <>
-        <NavStackMeta title="Bezittingen" bottomBar={{ kind: 'tabs' }} />
+        <NavStackMeta title="Bezittingen" />
         <AssetsPage initialData={assetsData} />
       </>
     )
@@ -20,7 +20,7 @@ export default async function AssetsServerPage() {
     // Fallback to client-side loading if server-side fails
     return (
       <>
-        <NavStackMeta title="Bezittingen" bottomBar={{ kind: 'tabs' }} />
+        <NavStackMeta title="Bezittingen" />
         <AssetsPage />
       </>
     )

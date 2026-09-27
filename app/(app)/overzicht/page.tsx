@@ -280,7 +280,7 @@ export default async function OverzichtPage() {
   return (
     <>
       {/* Tab-root → 'rich' TopBar + tab-titel in de mobiele bovenbalk. */}
-      <NavStackMeta title="Overzicht" topBar={{ kind: 'rich' }} bottomBar={{ kind: 'tabs' }} />
+      <NavStackMeta title="Overzicht" topBar={{ kind: 'rich' }} />
       {/* De welkomstgids stond hier tot ADR 0130 als banner (plus een
           geminimaliseerd punt in de utility-cluster van blok 2). Hij woont nu
           in Fin — vierde icoon in de chat-kop — en de provider hangt in

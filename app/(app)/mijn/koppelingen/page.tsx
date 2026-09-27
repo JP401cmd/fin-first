@@ -23,7 +23,7 @@ export default async function KoppelingenPage() {
 
   return (
     <>
-      <NavStackMeta title="Koppelingen" bottomBar={{ kind: 'tabs' }} />
+      <NavStackMeta title="Koppelingen" />
       <KoppelingenClient
         initialData={data}
         brokerConnections={brokerConnections}

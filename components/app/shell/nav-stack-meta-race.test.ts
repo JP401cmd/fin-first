@@ -41,7 +41,11 @@ function entry(pathname: string, title = ''): StackEntry {
   return { pathname, title, scrollY: 0, topBar: { kind: 'simple' }, bottomBar: { kind: 'hidden' } }
 }
 
-/** Precies wat de detailpagina stuurt: `<NavStackMeta title={calculator.name} bottomBar={{ kind: 'tabs' }} />`. */
+/**
+ * Neutrale meta-fixture voor de detailpagina. De bottomBar-waarde is willekeurig
+ * (een pagina geeft 'm sinds ADR 0179 fase 6 niet meer mee); hij staat er alleen
+ * om te bewijzen dat de provider de meta ongewijzigd doorzet.
+ */
 const DETAIL_META: NavStackMetaDetail = {
   pathname: DETAIL,
   title: 'Aflossen vs. beleggen',

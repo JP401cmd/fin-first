@@ -122,7 +122,7 @@ export default async function MijnMijlpalenPage() {
 
   return (
     <>
-      <NavStackMeta title="Mijlpalen" bottomBar={{ kind: 'tabs' }} />
+      <NavStackMeta title="Mijlpalen" />
       <MijlpalenTijdlijn years={years} laadFout={laadFout} />
     </>
   )

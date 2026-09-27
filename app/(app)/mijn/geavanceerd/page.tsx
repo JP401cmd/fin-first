@@ -18,7 +18,7 @@ export const metadata: Metadata = {
 export default function MijnGeavanceerdPage() {
   return (
     <>
-      <NavStackMeta title="Geavanceerd" bottomBar={{ kind: 'tabs' }} />
+      <NavStackMeta title="Geavanceerd" />
       <GeavanceerdSettings />
     </>
   )

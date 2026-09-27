@@ -27,7 +27,7 @@ export default async function HoldingsServerPage() {
 
   return (
     <Suspense fallback={<HoldingsLoading />}>
-      <NavStackMeta title="Holdings" bottomBar={{ kind: 'tabs' }} />
+      <NavStackMeta title="Holdings" />
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <HoldingsPage initialData={holdingsData ?? undefined} />
       </div>

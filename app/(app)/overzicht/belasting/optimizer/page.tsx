@@ -64,7 +64,7 @@ export default async function BelastingOptimizerPage() {
 
   return (
     <>
-      <NavStackMeta title="Fiscale kansen" bottomBar={{ kind: 'tabs' }} />
+      <NavStackMeta title="Fiscale kansen" />
 
       <div className="relative mx-auto max-w-6xl px-4 pt-6 pb-3 sm:px-6 sm:pt-8">
         <PageInfoButton

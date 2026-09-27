@@ -30,7 +30,7 @@ export default function MijnPage() {
           (kompas + privacy + nieuws + meldingen + account) zichtbaar blijft.
           Zonder expliciete topBar valt NavStackMeta terug op 'simple' en zou
           de cluster verdwijnen (zie nav-stack-meta.tsx DEFAULT_TOP_BAR). */}
-      <NavStackMeta title="Mijn" topBar={{ kind: 'rich' }} bottomBar={{ kind: 'tabs' }} />
+      <NavStackMeta title="Mijn" topBar={{ kind: 'rich' }} />
       <MijnOverview versie={APP_VERSION_DISPLAY} />
     </>
   )

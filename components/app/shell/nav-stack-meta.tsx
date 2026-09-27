@@ -66,10 +66,11 @@ export type NavStackMetaDetail = {
 
 /**
  * Default bottom-bar als een pagina niets meegeeft = `'hidden'` (lege bar).
- * Tab-roots krijgen `'tabs'` via de pathname-watcher in `nav-stack-provider.tsx`
- * — die default geldt voor de auto-push bij root-bezoek. Pagina's die ondanks
- * sub-page-status alsnog module-tabs willen zien geven `bottomBar={{ kind: 'tabs' }}`
- * expliciet mee. Form-flows kiezen `'action-bar'`, detail-pagina's `'context-actions'`.
+ * `'tabs'` is historisch: sinds ADR 0179 fase 6 zijn de module-tabs afgeschaft
+ * en rendert `MobileBottomBar` `'tabs'` net als `'hidden'` als niets. Geef
+ * `bottomBar={{ kind: 'tabs' }}` dus niet mee — het heeft geen effect (bewaakt
+ * door `nav-stack-meta.tabs-opgeruimd.test.ts`). Form-flows kiezen
+ * `'action-bar'`, detail-pagina's `'context-actions'`.
  */
 const DEFAULT_BOTTOM_BAR: BottomBarConfig = { kind: 'hidden' }
 
@@ -89,9 +90,10 @@ type NavStackMetaProps = {
   /** Titel die in de TopBar verschijnt voor deze pagina. */
   title: string
   /**
-   * BottomBar-config voor deze pagina. Default = module-tabs als niet
+   * BottomBar-config voor deze pagina. Default = `'hidden'` als niet
    * meegegeven. Pagina's die hun bottom-bar willen overschrijven (bv. een
    * form-flow die `'action-bar'` toont) geven hier expliciet een config door.
+   * `'tabs'` is historisch en rendert niets — niet meegeven.
    */
   bottomBar?: BottomBarConfig
   /**
@@ -111,7 +113,7 @@ type NavStackMetaProps = {
  *
  * Implementatie-detail: we depend de useEffect op een serialized config-key
  * ipv het hele bottomBar-object zodat we niet bij elke render dispatchen
- * wanneer een pagina inline `bottomBar={{ kind: 'tabs' }}` doorgeeft (nieuwe
+ * wanneer een pagina inline een config als `bottomBar={{ kind: 'action-bar', … }}` doorgeeft (nieuwe
  * object-ref per render, gelijke inhoud). De serializer schrijft alleen
  * primitives + nested objects; functions (onClick) worden weggelaten — dat is
  * acceptabel want twee actions met dezelfde label/href/icon zijn semantisch

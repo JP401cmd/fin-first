@@ -61,7 +61,7 @@ export default async function BelastingBox2Page() {
 
   return (
     <>
-      <NavStackMeta title="Box 2" bottomBar={{ kind: 'tabs' }} />
+      <NavStackMeta title="Box 2" />
       <BelastingBoxPageHeader
         route="/overzicht/belasting/box2"
         verdict={box2Verdict}

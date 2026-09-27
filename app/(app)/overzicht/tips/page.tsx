@@ -28,7 +28,7 @@ export default async function OverzichtTipsPage() {
 
   return (
     <>
-      <NavStackMeta title="Tips & acties" bottomBar={{ kind: 'tabs' }} />
+      <NavStackMeta title="Tips & acties" />
       <TipsActiesPage
         recommendations={finData.recommendations}
         actions={finData.actions}

@@ -674,7 +674,7 @@ export default function BudgetReportPage() {
 
   return (
     <div className="mx-auto max-w-[900px] px-4 py-6 md:px-8">
-      <NavStackMeta title="Budget-rapportage" bottomBar={{ kind: 'tabs' }} />
+      <NavStackMeta title="Budget-rapportage" />
       {/* ── Toolbar ──
            Back-knop is verwijderd in Fase 3 van de new-navigation-shell migratie:
            shell levert deze nu via TopBar (mobile) of pane-header (desktop).

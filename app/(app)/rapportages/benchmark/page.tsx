@@ -180,7 +180,7 @@ export default function BenchmarkPage() {
 
   return (
     <div className="mx-auto max-w-[1000px] px-4 pb-20 pt-6 md:px-8">
-      <NavStackMeta title="Benchmark" bottomBar={{ kind: 'tabs' }} />
+      <NavStackMeta title="Benchmark" />
 
       {/* ── Toolbar — page-eigen print-actie ── */}
       <div data-print-hide className="mb-4 flex items-center justify-end gap-3">

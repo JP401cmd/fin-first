@@ -52,7 +52,7 @@ export default async function LokaleChatPage() {
 
   return (
     <>
-      <NavStackMeta title="Lokale chat" bottomBar={{ kind: 'tabs' }} />
+      <NavStackMeta title="Lokale chat" />
       <div className="mx-auto max-w-3xl px-4 pt-4 sm:px-6">
         {!aiEnabled ? (
           <AiDisabledNotice />

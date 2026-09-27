@@ -102,7 +102,7 @@ export default function TotaalplanPage() {
       className="report-pdf-root mx-auto max-w-[900px] px-4 py-6 md:px-8"
       data-report-module="horizon"
     >
-      <NavStackMeta title="Totaalplan" bottomBar={{ kind: 'tabs' }} />
+      <NavStackMeta title="Totaalplan" />
 
       {/* ── Toolbar ── */}
       <div data-print-hide className="mb-6 flex items-center justify-end gap-3">

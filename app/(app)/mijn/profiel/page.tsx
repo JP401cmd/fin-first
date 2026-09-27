@@ -157,7 +157,7 @@ export default function ProfielPage() {
 
   return (
     <div className="relative mx-auto max-w-4xl px-4 py-5 sm:px-6 sm:py-8">
-      <NavStackMeta title="Profiel" bottomBar={{ kind: 'tabs' }} />
+      <NavStackMeta title="Profiel" />
       <PageInfoButton
         content={getPageInfo('/mijn/profiel')}
         className="absolute right-4 top-4 sm:right-6 sm:top-6"

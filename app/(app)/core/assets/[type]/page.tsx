@@ -366,7 +366,7 @@ export default async function AssetCategoryServerPage({
 
   return (
     <>
-      <NavStackMeta title={ASSET_TYPE_LABELS[type] ?? 'Bezittingen'} bottomBar={{ kind: 'tabs' }} />
+      <NavStackMeta title={ASSET_TYPE_LABELS[type] ?? 'Bezittingen'} />
       <AssetCategoryPage
         type={type}
         currentUserId={user.id}

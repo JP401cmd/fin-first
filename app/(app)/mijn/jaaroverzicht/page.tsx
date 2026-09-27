@@ -23,7 +23,7 @@ export const metadata: Metadata = {
 export default function MijnJaaroverzichtPage() {
   return (
     <>
-      <NavStackMeta title="Jaaroverzicht" bottomBar={{ kind: 'tabs' }} />
+      <NavStackMeta title="Jaaroverzicht" />
       <JaaroverzichtClient />
     </>
   )

@@ -49,7 +49,7 @@ export default async function MijnAccountPage({
 
   return (
     <>
-      <NavStackMeta title="Account" bottomBar={{ kind: 'tabs' }} />
+      <NavStackMeta title="Account" />
       <div className="relative mx-auto max-w-3xl px-4 pt-4 pb-6 sm:px-6">
         <PageInfoButton
           content={getPageInfo('/mijn/account')}

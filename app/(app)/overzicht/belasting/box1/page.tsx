@@ -156,7 +156,7 @@ export default async function BelastingBox1Page() {
 
   return (
     <>
-      <NavStackMeta title="Box 1" bottomBar={{ kind: 'tabs' }} />
+      <NavStackMeta title="Box 1" />
       <JaarruimteDeeplinkScroll />
       <BelastingBoxPageHeader
         route="/overzicht/belasting/box1"

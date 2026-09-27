@@ -31,7 +31,7 @@ export const metadata: Metadata = {
 export default function MijnUiterlijkPage() {
   return (
     <>
-      <NavStackMeta title="Weergave en uiterlijk" bottomBar={{ kind: 'tabs' }} />
+      <NavStackMeta title="Weergave en uiterlijk" />
       <section className="mx-auto max-w-2xl px-4 sm:px-6 py-6">
         <PageOpening
           className="mb-6"
