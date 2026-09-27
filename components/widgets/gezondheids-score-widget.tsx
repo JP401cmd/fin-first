@@ -1,6 +1,8 @@
 'use client'
 
-import { memo, useState } from 'react'
+import { memo, useState, type ReactNode } from 'react'
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import { Activity, TrendingUp, TrendingDown, Minus, ChevronRight, ExternalLink } from 'lucide-react'
@@ -264,6 +266,41 @@ function TrendBadge({ trend }: { trend: number }) {
   )
 }
 
+// ── Link naar de hub-kassabon ────────────────────────────────
+
+/**
+ * Link naar de volledige gezondheidskassabon op /overzicht (met het verloop).
+ *
+ * Op /overzicht zelf een gewone `<a>`: alleen een fragmentnavigatie op dezelfde
+ * pagina vuurt `hashchange`, waarop de hub de kassabon opent (`useOpenOnHash`).
+ * Elders (kiesbaar homescherm) `next/link`: een client-navigatie in plaats van
+ * een volledige herlaad; de hub leest het anker bij het mounten. Zie
+ * lib/overview/gezondheid-deeplink.ts.
+ */
+function GezondheidKassabonLink({
+  className,
+  onClick,
+  children,
+}: {
+  className: string
+  onClick?: () => void
+  children: ReactNode
+}) {
+  const pathname = usePathname()
+  if (pathname === '/overzicht') {
+    return (
+      <a href={GEZONDHEID_KASSABON_HREF} onClick={onClick} className={className}>
+        {children}
+      </a>
+    )
+  }
+  return (
+    <Link href={GEZONDHEID_KASSABON_HREF} onClick={onClick} className={className}>
+      {children}
+    </Link>
+  )
+}
+
 // ── Simplified Kassabon for widget (summary + link naar de hub-kassabon) ──
 
 /**
@@ -313,18 +350,16 @@ function HealthKassabonSummary({ health, onNaarKassabon }: { health: HealthScore
         ))}
       </div>
 
-      {/* CTA: de volledige kassabon op /overzicht, mét het verloop. Een gewone
-          <a> (geen next/link): alleen een fragmentnavigatie vuurt `hashchange`,
-          waarop de hub de kassabon opent — zie lib/overview/gezondheid-deeplink.ts.
-          Deze samenvatting sluit eerst, zodat er geen twee sheets op elkaar liggen. */}
-      <a
-        href={GEZONDHEID_KASSABON_HREF}
+      {/* CTA: de volledige kassabon op /overzicht, mét het verloop. Kern-accent:
+          de bestemming is /overzicht (kleurconventie). Deze samenvatting sluit
+          eerst, zodat er geen twee sheets op elkaar liggen. */}
+      <GezondheidKassabonLink
         onClick={onNaarKassabon}
-        className="flex items-center justify-center gap-2 rounded-[var(--r)] border border-horizon-200 bg-horizon-50/50 px-4 py-2.5 text-xs font-medium text-horizon-700 transition-colors hover:bg-horizon-100 hover:border-horizon-300"
+        className="flex items-center justify-center gap-2 rounded-[var(--r)] border border-kern-200 bg-kern-50/50 px-4 py-2.5 text-xs font-medium text-kern-700 transition-colors hover:bg-kern-100 hover:border-kern-300"
       >
         <ExternalLink className="h-3.5 w-3.5" />
         Bekijk volledige analyse en verloop
-      </a>
+      </GezondheidKassabonLink>
     </div>
   )
 }
@@ -555,14 +590,11 @@ export const GezondheidScoreWidget = memo(function GezondheidScoreWidget({ size,
         />
       </div>
 
-      {/* CTA: de volledige kassabon op /overzicht, mét het verloop (gewone <a>,
-          zie de CTA in HealthKassabonSummary). */}
-      <a
-        href={GEZONDHEID_KASSABON_HREF}
-        className="mt-1.5 font-serif italic text-[11px] text-horizon-600 hover:text-horizon-800 flex items-center gap-1"
-      >
+      {/* CTA: de volledige kassabon op /overzicht, mét het verloop (kern-accent,
+          zie GezondheidKassabonLink). */}
+      <GezondheidKassabonLink className="mt-1.5 font-serif italic text-[11px] text-kern-600 hover:text-kern-800 flex items-center gap-1">
         Bekijk details en verloop <ChevronRight className="h-3 w-3" />
-      </a>
+      </GezondheidKassabonLink>
 
       <BottomSheet open={showKassabon} onClose={() => setShowKassabon(false)} title="Financiële Gezondheid">
         <div className="p-5"><HealthKassabonSummary health={health} onNaarKassabon={() => setShowKassabon(false)} /></div>

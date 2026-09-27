@@ -13,6 +13,22 @@ vi.mock('@/components/app/chat/chat-provider', () => ({
   useChatContextOptional: () => ({ openWithMessage: openWithMessageMock }),
 }))
 
+// Pad van de huidige pagina: op /overzicht een gewone <a> (hashchange opent de
+// kassabon), elders next/link (geen volledige herlaad). next/link wordt een
+// herkenbaar anker, zodat de test het verschil ziet zonder app-router.
+const pathnameRef = vi.hoisted(() => ({ current: '/overzicht' as string | null }))
+vi.mock('next/navigation', async (orig) => ({
+  ...(await orig<typeof import('next/navigation')>()),
+  usePathname: () => pathnameRef.current,
+}))
+vi.mock('next/link', () => ({
+  default: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => (
+    <a data-next-link="" href={href} {...rest}>
+      {children}
+    </a>
+  ),
+}))
+
 /**
  * Regressietests voor de GezondheidScoreWidget (Notion-widgetreview).
  *
@@ -263,11 +279,30 @@ describe('GezondheidScoreWidget — full: Bespreek met Fin i.p.v. verbeterpunten
     expect(message).toContain('vrijheidstijd')
   })
   // ── Fase 5 (ADR 0179): de volledige kassabon + verloop woont op /overzicht ──
-  it('Given de full-widget, When je de details zoekt, Then linkt hij met een gewone <a> naar de hub-kassabon (niet naar /toekomst)', () => {
+  it('Given de full-widget op /overzicht, When je de details zoekt, Then linkt hij met een gewone <a> naar de hub-kassabon (niet naar /toekomst)', () => {
+    pathnameRef.current = '/overzicht'
     render(<GezondheidScoreWidget size="full" data={bundleWith(health)} />)
     const link = screen.getByRole('link', { name: /Bekijk details en verloop/ })
     expect(link.getAttribute('href')).toBe('/overzicht#gezondheid')
+    expect(link.hasAttribute('data-next-link')).toBe(false)
     expect(screen.queryByRole('link', { name: /Toekomst/ })).toBeNull()
+  })
+
+  it('Given de full-widget buiten /overzicht (kiesbaar homescherm), When je de details zoekt, Then een client-navigatie via next/link — geen volledige herlaad', () => {
+    pathnameRef.current = '/mijn'
+    render(<GezondheidScoreWidget size="full" data={bundleWith(health)} />)
+    const link = screen.getByRole('link', { name: /Bekijk details en verloop/ })
+    expect(link.getAttribute('href')).toBe('/overzicht#gezondheid')
+    expect(link.hasAttribute('data-next-link')).toBe(true)
+    pathnameRef.current = '/overzicht'
+  })
+
+  it('Given de CTA\'s, When ze renderen, Then dragen ze het kern-accent van /overzicht, geen horizon-accent', () => {
+    pathnameRef.current = '/overzicht'
+    render(<GezondheidScoreWidget size="full" data={bundleWith(health)} />)
+    const link = screen.getByRole('link', { name: /Bekijk details en verloop/ })
+    expect(link.className).toMatch(/\bkern-/)
+    expect(link.className).not.toMatch(/\bhorizon-/)
   })
 
   it('Given de geopende widget-samenvatting, When je naar de volledige analyse gaat, Then sluit de samenvatting en wijst de link naar de hub-kassabon', async () => {
