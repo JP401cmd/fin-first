@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { getCachedUser } from '@/lib/supabase/cached-user'
+import { getCachedUser, getVerifiedUser } from '@/lib/supabase/cached-user'
 import {
   computePageStatusInfo,
   normalizePageStatusRoute,
@@ -113,7 +113,7 @@ export async function GET(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const supabase = await createClient()
-    const user = await getCachedUser(supabase)
+    const user = await getVerifiedUser(supabase)
     if (!user) {
       return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
     }

@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-09-27T10:47:01.159Z",
+  "generatedAt": "2026-09-27T18:00:13.582Z",
   "generatedDate": "2026-09-27",
   "repo": {
     "name": "fin",
-    "version": "0.92.9"
+    "version": "0.92.12"
   },
   "annotations": {
     "philosophy": "Geld levert tijd op — elk bedrag staat voor tijd waarin je uitgaven gedekt zijn.",
@@ -189,13 +189,13 @@
     }
   },
   "stats": {
-    "routes": 135,
-    "routesProduction": 89,
-    "api": 334,
+    "routes": 136,
+    "routesProduction": 90,
+    "api": 335,
     "tables": 105,
-    "migrations": 266,
+    "migrations": 267,
     "integrations": 25,
-    "components": 1237,
+    "components": 1243,
     "providers": 19,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -766,6 +766,12 @@
       "url": "/nieuws",
       "file": "app/(app)/nieuws/page.tsx",
       "group": "persoonlijk",
+      "isTest": false
+    },
+    {
+      "url": "/offline",
+      "file": "app/offline/page.tsx",
+      "group": "overig",
       "isTest": false
     },
     {
@@ -1480,6 +1486,12 @@
       {
         "url": "/holdings/[id]",
         "file": "app/holdings/[id]/page.tsx",
+        "group": "overig",
+        "isTest": false
+      },
+      {
+        "url": "/offline",
+        "file": "app/offline/page.tsx",
         "group": "overig",
         "isTest": false
       },
@@ -2552,6 +2564,14 @@
       "domain": "auth",
       "methods": [
         "GET"
+      ]
+    },
+    {
+      "url": "/api/auto-sync",
+      "file": "app/api/auto-sync/route.ts",
+      "domain": "auto-sync",
+      "methods": [
+        "PUT"
       ]
     },
     {
@@ -7137,6 +7157,21 @@
       ]
     },
     {
+      "domain": "auto-sync",
+      "label": "auto-sync",
+      "count": 1,
+      "routes": [
+        {
+          "url": "/api/auto-sync",
+          "file": "app/api/auto-sync/route.ts",
+          "domain": "auto-sync",
+          "methods": [
+            "PUT"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "bank-accounts",
       "label": "bank-accounts",
       "count": 1,
@@ -8732,7 +8767,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 266
+    "migrationCount": 267
   },
   "tablesByDomain": [
     {
@@ -9290,11 +9325,11 @@
     }
   ],
   "components": {
-    "total": 1237,
+    "total": 1243,
     "groups": [
       {
         "group": "app",
-        "count": 461,
+        "count": 463,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -9420,6 +9455,7 @@
           "debt-detail-modal",
           "debt-form",
           "debt-form.berekend-toggle.test",
+          "debt-form.min-betaling-sync.test",
           "debt-form.negatieve-invoer.test",
           "debt-pane",
           "debt-trajectory-chart",
@@ -9715,6 +9751,7 @@
           "sync-status-badge.test",
           "target-account-choice",
           "target-account-choice.test",
+          "template-preview-list",
           "theme-color-sync",
           "toast-provider",
           "toekomst-overlay",
@@ -10340,7 +10377,7 @@
       },
       {
         "group": "mijn",
-        "count": 52,
+        "count": 53,
         "items": [
           "abonnement-section",
           "abonnement-section.test",
@@ -10353,6 +10390,7 @@
           "ai-execution-groups.eenvoudig.test",
           "ai-privacy-settings",
           "ai-privacy-settings.test",
+          "automatisch-bijwerken-schakelaar",
           "bedragen-verbergen-blok",
           "bedragen-verbergen-blok.test",
           "budget-tint-picker",
@@ -10553,6 +10591,23 @@
         ]
       },
       {
+        "group": "sync",
+        "count": 11,
+        "items": [
+          "automatisch-bijwerken",
+          "automatisch-bijwerken-loader",
+          "automatisch-bijwerken.test",
+          "eerste-sync-na-onboarding",
+          "eerste-sync-na-onboarding.test",
+          "global-sync-button",
+          "global-sync-button.test",
+          "global-sync-provider",
+          "global-sync-provider.test",
+          "sync-progress-strip",
+          "sync-report-modal"
+        ]
+      },
+      {
         "group": "connections",
         "count": 10,
         "items": [
@@ -10566,20 +10621,6 @@
           "isin-resolver-status",
           "market-data-sources-card",
           "sync-status-badge"
-        ]
-      },
-      {
-        "group": "sync",
-        "count": 8,
-        "items": [
-          "eerste-sync-na-onboarding",
-          "eerste-sync-na-onboarding.test",
-          "global-sync-button",
-          "global-sync-button.test",
-          "global-sync-provider",
-          "global-sync-provider.test",
-          "sync-progress-strip",
-          "sync-report-modal"
         ]
       },
       {
@@ -11144,6 +11185,12 @@
         {
           "name": "household_members",
           "write": false
+        }
+      ],
+      "auto-sync": [
+        {
+          "name": "profiles",
+          "write": true
         }
       ],
       "bank-accounts": [
@@ -12588,6 +12635,14 @@
           "write": true,
           "routes": [
             "/api/appearance"
+          ]
+        },
+        {
+          "domain": "auto-sync",
+          "label": "auto-sync",
+          "write": true,
+          "routes": [
+            "/api/auto-sync"
           ]
         },
         {
@@ -18902,6 +18957,32 @@
       ],
       "summary": "`net_worth_snapshots` en `valuations` lezen voortaan alleen de eigen rij; de huishoud-tak verdwijnt uit hun SELECT-policy. Een waardering hoort bij een bezitting of schuld van de schrijver zelf. Meegenomen budgetruimte (`budget_rollovers`) schrijft alleen de aanmaker van het budg",
       "file": "docs/adr/0180-snapshots-waarderingen-en-rollovers-zijn-eigen-rijen.md"
+    },
+    {
+      "id": "0181-een-mislukte-rekenhulp-generatie-kost-geen-weekslot",
+      "title": "Een mislukte rekenhulp-generatie kost geen weekslot — lezen vooraf, reserveren ná succes",
+      "status": "aanvaard",
+      "date": "2026-09-27",
+      "elements": [
+        "t-supabase",
+        "t-aigateway"
+      ],
+      "summary": "Addendum op ADR 0076 voor de weeklimiet van de AI-rekenhulp (10 generaties + 5 verfijningen per ISO-week). De reservering blijft atomair in de datalaag (`reserve_ai_calculator_slot`), maar verhuist in de route van vóór naar ná de LLM-aanroep. Vooraf leest de route alleen de stand",
+      "file": "docs/adr/0181-een-mislukte-rekenhulp-generatie-kost-geen-weekslot.md"
+    },
+    {
+      "id": "0182-koppelingen-bijwerken-bij-openen",
+      "title": "Bank- en brokerkoppelingen werken zichzelf bij bij het openen van Overzicht",
+      "status": "aanvaard",
+      "date": "2026-09-27",
+      "elements": [
+        "t-bankconnect",
+        "ext-brokers",
+        "as-budget",
+        "as-vermogen"
+      ],
+      "summary": "Opent iemand /overzicht, dan werkt de app op de achtergrond elke bank- of brokerkoppeling bij die langer dan twaalf uur niet gesynchroniseerd is. Dat gaat via de bestaande sync-routes, in de sessie van de gebruiker. Een globale schakelaar \"Automatisch bijwerken\" op /mijn/koppelin",
+      "file": "docs/adr/0182-koppelingen-bijwerken-bij-openen.md"
     }
   ],
   "churn": {
@@ -18917,7 +18998,7 @@
       },
       {
         "path": "app/(app)/toekomst",
-        "commits": 57
+        "commits": 58
       },
       {
         "path": "app/api/ai",
@@ -18960,14 +19041,14 @@
         "commits": 40
       },
       {
+        "file": "lib/release-notes.ts",
+        "loc": 3817,
+        "commits": 17
+      },
+      {
         "file": "components/app/cash-account-view.tsx",
         "loc": 3777,
         "commits": 22
-      },
-      {
-        "file": "lib/release-notes.ts",
-        "loc": 3693,
-        "commits": 14
       },
       {
         "file": "lib/dashboard-data-loader.ts",
@@ -19963,6 +20044,13 @@
       "parserFormat": null
     },
     {
+      "file": "lib/integrations/broker-error-messages.ts",
+      "exists": true,
+      "baseUrl": null,
+      "hasAdapter": false,
+      "parserFormat": null
+    },
+    {
       "file": "lib/integrations/coinbase-client.ts",
       "exists": true,
       "baseUrl": "https://api.coinbase.com",
@@ -20658,10 +20746,10 @@
     },
     {
       "date": "2026-09-27",
-      "api": 334,
-      "components": 1237,
+      "api": 335,
+      "components": 1243,
       "tables": 105,
-      "routesProduction": 89
+      "routesProduction": 90
     }
   ]
 }

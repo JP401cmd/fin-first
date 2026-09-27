@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
-import { getCachedUser } from '@/lib/supabase/cached-user'
+import { getCachedUser, getVerifiedUser } from '@/lib/supabase/cached-user'
 import { badRequest, serverError, unauthorized } from '@/lib/api/respond'
 import { parseBody } from '@/lib/api/parse-body'
 import {
@@ -103,7 +103,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
-    const user = await getCachedUser(supabase)
+    const user = await getVerifiedUser(supabase)
     if (!user) return unauthorized()
 
     const parsed = await parseBody(CreateSchema, request)

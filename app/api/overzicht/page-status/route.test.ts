@@ -20,6 +20,7 @@ import { NextRequest } from 'next/server'
  */
 
 const mockGetUser = vi.fn()
+const mockGetClaims = vi.fn()
 const mockSingle = vi.fn()
 const mockUpdateEq = vi.fn()
 const mockUpdate = vi.fn<(row: unknown) => { eq: typeof mockUpdateEq }>(() => ({ eq: mockUpdateEq }))
@@ -28,7 +29,7 @@ const mockFrom = vi.fn(() => ({ select: mockSelect, update: mockUpdate }))
 
 vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(async () => ({
-    auth: { getUser: mockGetUser },
+    auth: { getUser: mockGetUser, getClaims: mockGetClaims },
     from: mockFrom,
   })),
 }))
@@ -53,6 +54,8 @@ const BESTAANDE_MAP = { '/overzicht/budget': 'warn', '/toekomst/tekort-lening': 
 beforeEach(() => {
   vi.clearAllMocks()
   mockGetUser.mockResolvedValue({ data: { user: USER } })
+  // GET leest via getCachedUser (claims, ADR 0052); PUT via getVerifiedUser (getUser).
+  mockGetClaims.mockResolvedValue({ data: { claims: { sub: USER.id } }, error: null })
   mockSingle.mockResolvedValue({
     data: { status_banner_minimized: { ...BESTAANDE_MAP } },
     error: null,

@@ -106,7 +106,10 @@ function makeSupabase() {
     // Er IS een gebruiker (de kansen-loader heeft er één nodig voor de
     // Box 1-bron); alle tabellen blijven leeg, dus de budget-/schuld-/asset-
     // producenten leveren nog steeds niets.
-    auth: { getUser: () => Promise.resolve({ data: { user: { id: 'u1' } }, error: null }) },
+    auth: {
+      getUser: () => Promise.resolve({ data: { user: { id: 'u1' } }, error: null }),
+      getClaims: () => Promise.resolve({ data: { claims: { sub: 'u1' } }, error: null }),
+    },
     from: () => emptyQuery,
   } as never
 }
@@ -149,6 +152,7 @@ function makeSupabaseWithActions(
   return {
     auth: {
       getUser: () => Promise.resolve({ data: { user: { id: 'u1' } }, error: null }),
+      getClaims: () => Promise.resolve({ data: { claims: { sub: 'u1' } }, error: null }),
     },
     from: (table: string) => (table === 'actions' ? actionsQuery : emptyQuery),
   } as never

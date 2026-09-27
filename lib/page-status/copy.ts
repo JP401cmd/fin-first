@@ -27,6 +27,7 @@
 import type { LeverageStatus } from '@/lib/leverage-status'
 import type { PageStatusAction, PageStatusWill } from '@/lib/page-status/types'
 import type { FiscaleRuimteCause } from '@/lib/fiscale-ruimte'
+import type { CashflowCause, CashflowOorzaak } from '@/lib/lever-scores'
 import { formatCurrency } from '@/lib/format'
 import { ankerTitel, ankerZin, type AnkerReach, type AnkerStop } from '@/lib/horizon/anker-copy'
 
@@ -67,6 +68,13 @@ export interface RouteCopy {
    * oorzaak-bron heeft, hoort hier niets te zetten. Maar wie 'm zet, zet 'm vol.
    */
   byCause?: Record<FiscaleRuimteCause, StatusCopy>
+  /**
+   * Hetzelfde patroon voor de Budget-hefboom (B-068): de cashflow-score mengt
+   * spaarquote en budgetten, en `scores.cashflow.oorzaak` zegt welke van de
+   * twee (of beide) de kleur bepaalt. Een eigen veld naast `byCause`, omdat de
+   * oorzaak-sleutels een ander domein zijn. Ook hier volledig, niet `Partial`.
+   */
+  byCashflowCause?: Record<CashflowCause, StatusCopy>
   action?: PageStatusAction
   will: PageStatusWill
 }
@@ -148,15 +156,42 @@ export const PAGE_STATUS_COPY: Record<string, RouteCopy> = {
     // specifieke entry onder dezelfde route ("Meerdere budgetten zijn over de
     // limiet"); die kon niet blijven bestaan, maar zijn onderwerp is hier
     // opgenomen zodat de melding past bij de pagina waar je staat.
+    //
+    // B-068: de teksten noemden "deze maand" en één oorzaak, terwijl de score
+    // over twee vensters en twee oorzaken gaat — de spaarquote over zes
+    // AFGESLOTEN maanden of de gekozen grondslag (ADR 0121), de budgetten over de
+    // lopende maand. Een maand met ruim overschot kreeg zo "Je geeft deze maand
+    // meer uit dan er binnenkomt". De melding leest nu `byCashflowCause`; `warn`/
+    // `bad` zijn de TERUGVAL zonder oorzaak en noemen daarom geen van beide.
+    // Beschrijvend (merkstem, Wft): wat er te zien is en waar, geen opdracht.
     warn: {
-      reason: 'Je houdt deze maand weinig over ({figure}), en een paar budgetten dreigen uit te lopen.',
+      reason: 'Je budget vraagt aandacht ({figure}).',
       remedy:
-        'Bekijk welke categorieën uitlopen en stel ze bij — kleine besparingen tellen snel op tot meer ruimte.',
+        'Op deze pagina zie je per categorie welke budgetten uitlopen, en onderaan op welke grondslag je spaarquote berekend is.',
     },
     bad: {
-      reason: 'Je geeft deze maand meer uit dan er binnenkomt ({figure}).',
+      reason: 'Je budget staat onder druk ({figure}).',
       remedy:
-        'Begin bij je grootste posten: bekijk de kassabon per categorie en stel de overschreden budgetten bij.',
+        'Op deze pagina zie je per categorie welke budgetten uitlopen, en onderaan op welke grondslag je spaarquote berekend is.',
+    },
+    // {figure} komt uit `cashflowOorzaakFigure` en draagt het venster al mee.
+    byCashflowCause: {
+      sparen: {
+        reason: 'Je spaarquote blijft achter ({figure}).',
+        remedy:
+          'De spaarquote volgt uit je inkomen en je uitgaven. Onderaan deze pagina zie je op welke grondslag hij berekend is.',
+      },
+      budgetten: {
+        reason: 'Een deel van je budgetten zit boven de limiet ({figure}).',
+        remedy:
+          'In de kassabon per categorie zie je welke budgetten uitlopen en hoeveel.',
+      },
+      beide: {
+        reason:
+          'Je spaarquote blijft achter en een deel van je budgetten zit boven de limiet ({figure}).',
+        remedy:
+          'In de kassabon per categorie zie je welke budgetten uitlopen; onderaan deze pagina staat op welke grondslag je spaarquote berekend is.',
+      },
     },
     will: {
       onderwerp: 'Mijn budgetten op koers krijgen',
@@ -442,6 +477,32 @@ export function overigePostenZin(extra: number): string {
   return extra === 1
     ? 'Daarnaast ligt er nog een andere post open.'
     : `Daarnaast liggen er nog ${extra} andere posten open.`
+}
+
+// ── Budget-hefboom: het live cijfer per oorzaak (B-068) ─────────────────────
+
+/** Venster van de budgettelling: `deriveBudgetHealthCounts` telt de lopende maand. */
+const BUDGET_TELLING_VENSTER = 'in de lopende maand'
+
+/**
+ * Het live cijfer in een `byCashflowCause`-reason. Elk getal staat naast zijn
+ * EIGEN venster — de spaarquote met het venster of de grondslag die de loader
+ * meegaf (ADR 0121), de budgettelling met de lopende maand — zodat de melding
+ * nooit een 6-maandsmeting als "deze maand" presenteert (ADR 0073). Puur
+ * opmaak: alle getallen komen uit `scores.cashflow.oorzaak`.
+ */
+export function cashflowOorzaakFigure(oorzaak: CashflowOorzaak): string {
+  const venster = oorzaak.savingsRateWindow?.trim()
+  const quote =
+    oorzaak.savingsRatePct === null
+      ? null
+      : venster
+        ? `${oorzaak.savingsRatePct}% ${venster}`
+        : `${oorzaak.savingsRatePct}%`
+  const budgetten = `${oorzaak.budgetsOver} van ${oorzaak.budgetsTotal} budgetten ${BUDGET_TELLING_VENSTER}`
+  if (oorzaak.cause === 'sparen') return quote ?? ''
+  if (oorzaak.cause === 'budgetten') return budgetten
+  return quote ? `spaarquote ${quote} · ${budgetten}` : budgetten
 }
 
 /** Helper: copy voor een route + status (warn/bad). null als route onbekend. */

@@ -31,7 +31,7 @@ describe('WelcomePopup — kort welkomstbericht (B-052)', () => {
     const text = screen.getByRole('dialog').textContent ?? ''
     for (const waarde of WAARDES) {
       expect(text).not.toContain(waarde.kicker)
-      expect(text).not.toContain(waarde.belofte)
+      expect(text).not.toContain(waarde.zin)
     }
     expect(text).not.toContain('dagblad')
   })

@@ -580,6 +580,12 @@ export function NieuwsOnlyClient({ userId, toonTestsectie = false }: { userId: s
         void fetchNews()
       }
 
+  // Snelheid E (CLS): Ververs-knop en tabbalk renderen altijd (ruimte
+  // gereserveerd) en worden pas zichtbaar/bruikbaar als deze vlaggen waar zijn.
+  const refreshReady = modeResolved && viewFetched && !viewLoading && !viewBusy
+  const tabsReady =
+    (modeResolved && viewFetched && !viewLoading) || execution.status === 'blocked' || showNewsUpsell
+
   return (
     <div className="relative mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
       <PageInfoButton
@@ -593,6 +599,9 @@ export function NieuwsOnlyClient({ userId, toonTestsectie = false }: { userId: s
         // UR3-30 / K2a: de bestemming zegt haar eigen naam. "Krant" staat in
         // het menu, in ⌘K en in de zijbalk; tot nu toe nergens op de pagina.
         rubriek="De Krant"
+        // Snelheid E (CLS): de colofon komt pas na de client-fetch binnen;
+        // reserveer zijn hoogte vanaf de eerste render.
+        reserveColophon
         editionNr={viewEditionNr}
         jaargang={viewJaargang}
         hideEdition={simple}
@@ -628,12 +637,18 @@ export function NieuwsOnlyClient({ userId, toonTestsectie = false }: { userId: s
                 )}
               </span>
               <div className="h-px flex-1 bg-[var(--border-ed)]" />
-              {modeResolved && viewFetched && !viewLoading && !viewBusy && (
-                <button
+              {/* Snelheid E (CLS): de knop staat altijd in de DOM, zodat de rij
+                  vanaf de eerste render zijn hoogte heeft (min-h 44px op mobiel).
+                  Zolang hij niet bruikbaar is, is hij `invisible` (ruimte blijft,
+                  niet zichtbaar, niet focusbaar, buiten de a11y-boom) én disabled. */}
+              <button
                   type="button"
+                  data-testid="nieuws-ververs"
                   onClick={handleRefresh}
-                  disabled={viewBusy || (!isLocal && refreshesRemaining === 0)}
-                  className="flex min-h-[44px] items-center gap-1.5 rounded-[var(--r)] px-2 py-1 font-inter text-[11px] font-medium text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] disabled:opacity-50 sm:min-h-0"
+                  aria-hidden={refreshReady ? undefined : true}
+                  tabIndex={refreshReady ? undefined : -1}
+                  disabled={!refreshReady || viewBusy || (!isLocal && refreshesRemaining === 0)}
+                  className={`${refreshReady ? '' : 'invisible '}flex min-h-[44px] items-center gap-1.5 rounded-[var(--r)] px-2 py-1 font-inter text-[11px] font-medium text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] disabled:opacity-50 sm:min-h-0`}
                   title={
                     isLocal
                       ? 'Stel een nieuwe editie samen op dit toestel (duurt een paar minuten)'
@@ -647,17 +662,25 @@ export function NieuwsOnlyClient({ userId, toonTestsectie = false }: { userId: s
                     Ververs{!isLocal && refreshesRemaining !== undefined ? ` (${refreshesRemaining} over)` : ''}
                   </span>
                 </button>
-              )}
             </div>
 
             {/* ── Tab bar: Huidige editie / Archief ──
                 Ook zichtbaar bij 'blocked': het archief is bewaarde leesstof en
                 heeft geen generatie nodig, dus een toestel dat lokaal niet kan
-                samenstellen hoort niet in een doodlopende straat te staan. */}
-            {((modeResolved && viewFetched && !viewLoading) || execution.status === 'blocked' || showNewsUpsell) && (
-              <div className="mb-4 flex gap-1 rounded-[var(--r)] bg-[var(--subtle)] p-1" role="tablist">
+                samenstellen hoort niet in een doodlopende straat te staan.
+                Snelheid E (CLS): de balk staat altijd in de DOM; zolang hij nog
+                niet bruikbaar is, is hij `invisible` + aria-hidden en zijn de
+                tabs disabled, zodat zijn hoogte vanaf de eerste render
+                gereserveerd is en er niets meer inschuift. */}
+              <div
+                data-testid="nieuws-tabbalk"
+                className={`${tabsReady ? '' : 'invisible '}mb-4 flex gap-1 rounded-[var(--r)] bg-[var(--subtle)] p-1`}
+                role="tablist"
+                aria-hidden={tabsReady ? undefined : true}
+              >
                 <button
                   role="tab"
+                  disabled={!tabsReady}
                   aria-selected={newsTab === 'current'}
                   onClick={() => setNewsTab('current')}
                   className={`flex-1 rounded-[var(--r-sm)] px-2 py-1.5 text-[11px] font-semibold transition-colors ${
@@ -670,6 +693,7 @@ export function NieuwsOnlyClient({ userId, toonTestsectie = false }: { userId: s
                 </button>
                 <button
                   role="tab"
+                  disabled={!tabsReady}
                   aria-selected={newsTab === 'archive'}
                   onClick={() => setNewsTab('archive')}
                   className={`flex-1 rounded-[var(--r-sm)] px-2 py-1.5 text-[11px] font-semibold transition-colors ${
@@ -681,7 +705,6 @@ export function NieuwsOnlyClient({ userId, toonTestsectie = false }: { userId: s
                   Archief
                 </button>
               </div>
-            )}
 
             {newsTab === 'current' ? (
               <>

@@ -920,6 +920,28 @@ export interface StrategyMonth {
  * - highest_balance: target highest balance first (rip the band-aid off)
  * - custom: respect user-defined order (`debts.sort_order` ascending)
  * - current: just use each debt's own monthly_payment
+ *
+ * ── Het budget is wat je nú betaalt (B-067, sep 2026) ─────────────────────
+ *
+ * Het maandbudget van de simulatie is Σ `monthly_payment` (terugval
+ * `minimum_payment`, de H2-spiegel van `computeRenteAflossingsSplit`) plus
+ * `extraMonthly` — voor álle strategieën. Vroeger was het voor de
+ * targeting-strategieën Σ `minimum_payment`, terwijl het detailvenster, de
+ * horizon-kernel en de spaarquote met `monthly_payment` rekenen. Wie na het
+ * aanmaken alleen het Maandbedrag aanpaste, liet het oude minimum staan en de
+ * totaalpagina "bleef heel snel aflossen" (annuïteit € 130.000 à 12%: detail
+ * 327 maanden, totaal veel korter). Eigenaarsbesluit 27 sep 2026: het huidige
+ * maandbedrag is het budget, het minimum is de ondergrens per schuld.
+ *
+ * Die ondergrens is `min(minimum_payment, maandbedrag)`: een verouderd minimum
+ * bóven het maandbedrag kan het budget niet opblazen. Een minimum van 0 is
+ * "onbekend" (het formulier laat het veld leeg), niet "nul" — de schuld houdt
+ * dan haar eigen maandbedrag en alleen `extraMonthly` verschuift.
+ *
+ * Aflossingsvrije schulden staan buiten het budget: ze betalen hun rente, en
+ * wat iemand dáárboven betaalt is een modelvraag die de horizon-adapter
+ * (`potten.ts`) conservatief op 0 aflossing zet — het mag hier dus ook niet
+ * als "extra" op een andere schuld belanden.
  */
 export function simulatePayoff(
   debts: Debt[],
@@ -935,24 +957,32 @@ export function simulatePayoff(
   // tie-breaker when `sort_order` is missing or duplicated.
   const active = debts
     .filter((d) => Number(d.current_balance) > 0 && d.is_active)
-    .map((d, originalIndex) => ({
-      id: d.id,
-      name: d.name,
-      balance: Number(d.current_balance),
-      rate: Number(d.interest_rate) / 100 / 12,
-      minPayment: Number(d.minimum_payment),
-      monthlyPayment: Number(d.monthly_payment),
-      isInterestOnly: interestOnlyIds.has(d.id),
-      sortOrder: Number.isFinite(Number(d.sort_order)) ? Number(d.sort_order) : 0,
-      originalIndex,
-    }))
+    .map((d, originalIndex) => {
+      const minPayment = Number(d.minimum_payment) || 0
+      const monthlyPayment = Number(d.monthly_payment) || 0
+      // Het opgeslagen maandbedrag is de bron; het minimum de terugval (H2).
+      const basePayment = monthlyPayment > 0 ? monthlyPayment : minPayment
+      return {
+        id: d.id,
+        name: d.name,
+        balance: Number(d.current_balance),
+        rate: Number(d.interest_rate) / 100 / 12,
+        basePayment,
+        // Ondergrens per schuld: nooit boven het eigen maandbedrag; 0 = onbekend.
+        floorPayment: minPayment > 0 ? Math.min(minPayment, basePayment) : basePayment,
+        isInterestOnly: interestOnlyIds.has(d.id),
+        sortOrder: Number.isFinite(Number(d.sort_order)) ? Number(d.sort_order) : 0,
+        originalIndex,
+      }
+    })
 
   if (active.length === 0) return []
 
-  const totalMinPayments = active.reduce((s, d) => s + d.minPayment, 0)
-  const totalBudget = strategy === 'current'
-    ? active.reduce((s, d) => s + d.monthlyPayment, 0) + extraMonthly
-    : totalMinPayments + extraMonthly
+  // Budget = wat er nú maandelijks naar de aflossende schulden gaat + extra.
+  // Een afgeloste schuld blijft haar maandbedrag inbrengen (sneeuwbaleffect).
+  const totalBudget = active
+    .filter((d) => !d.isInterestOnly)
+    .reduce((s, d) => s + d.basePayment, 0) + extraMonthly
 
   const results: StrategyMonth[] = []
   const now = new Date()
@@ -1006,7 +1036,8 @@ export function simulatePayoff(
 
       const interest = d.balance * d.rate
 
-      // Interest-only debts: pay only interest, no principal reduction
+      // Interest-only debts: pay only interest, no principal reduction —
+      // buiten het budget om (zie de kop van deze functie).
       if (d.isInterestOnly) {
         monthDebts.push({
           id: d.id,
@@ -1016,13 +1047,15 @@ export function simulatePayoff(
           principal: 0,
           balance: d.balance,
         })
-        budgetLeft -= interest
         continue
       }
 
+      // 'current': elke schuld betaalt haar eigen maandbedrag, geen targeting.
+      // Overige strategieën: eerst de ondergrens, het overschot gaat hieronder
+      // naar de focusschuld.
       const minPay = strategy === 'current'
-        ? Math.min(d.monthlyPayment, d.balance + interest)
-        : Math.min(d.minPayment, d.balance + interest)
+        ? Math.min(d.basePayment, d.balance + interest)
+        : Math.min(d.floorPayment, d.balance + interest)
 
       monthDebts.push({
         id: d.id,

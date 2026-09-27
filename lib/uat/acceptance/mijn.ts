@@ -269,7 +269,7 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'KERN',
     given: 'Ingelogd, /mijn/koppelingen (crypto-exchanges, wallets, Trading 212).',
     when: 'De gebruiker bekijkt de status per bron, test de verbinding en start een handmatige sync per bron.',
-    then: 'Per bron: statusweergave, een verbindingstest en een saldi-verversing; een gesynchroniseerde holding verschijnt in de holdings-lijst en telt identiek mee als een handmatige (waarde/eenheden gelijk op koppelingskaart en holdings-rij — doorwerking getoetst in het BEZIT-domein).',
+    then: 'Per bron: statusweergave, een verbindingstest en een saldi-verversing; een gesynchroniseerde holding verschijnt in de holdings-lijst en telt identiek mee als een handmatige (waarde/eenheden gelijk op koppelingskaart en holdings-rij — doorwerking getoetst in het BEZIT-domein). Bovenaan de pagina staat sinds ADR 0182 de schakelaar "Automatisch bijwerken" — getoetst in WF-MIJN-34; het vanzelf bijwerken zelf in WF-OVZ-30.',
     assertion: {
       kind: 'ui-only',
       source: 'app/(app)/mijn/koppelingen/page.tsx (broker/exchange-connections + per-bron sync) — LIVE-koppeling, geen deterministische persona-berekening',
@@ -320,11 +320,11 @@ const criteria: AcceptanceCriterion[] = [
     titel: 'Weergave en uiterlijk aanpassen: weergavekeuze, palet, typografie en geavanceerde kleuren',
     kriticiteit: 'BELANGRIJK',
     given: 'Ingelogd, /mijn/uiterlijk. Bovenaan de pagina staat sinds fase 1 van de eenvoudige weergave het weergave-keuzeblok ("Eenvoudig — de kern" / "Volledig — alle detail", APP-1); daaronder palet, typografie en de "Geavanceerd"-disclosure.',
-    when: 'De gebruiker kiest een weergave, een palet, een typografie-thema, module-accentkleuren (kern/wil/horizon), de balkkleur van de mobiele TopBar (ADR 0174 D3), budget-tints en categoriekaart-tinten, en reset (randgeval) één accentkaart en de balkkleur.',
-    then: 'Wijzigingen zijn direct zichtbaar zonder page-reload en blijven na herladen bewaard (palet = per apparaat/localStorage; weergavemodus+accentkleur+balkkleur+font = account-gebonden/DB, dus ook op een tweede apparaat); de balkkleur kleurt de mobiele TopBar én de browserchrome (theme-color) direct mee, toont in de picker een voorbeeld van de balk (ook op desktop, waar de TopBar verborgen is) en waarschuwt zonder te blokkeren bij een middentoon (naam < 4,5:1) of een lichte balk (groene/oranje kompaspunten < 3:1, bv. de preset Papier); een balkkleur kiezen stuurt alleen `topbar_color` naar `PUT /api/appearance` en laat de accenten en budget-tints ongemoeid; reset zet leisteen `#3f4a5e` terug (opgeslagen als null); de weergavekeuze schrijft via hetzelfde `PUT /api/display-mode` als de ⌘K-actie en de aangeklikte kaart krijgt direct `aria-pressed="true"`; een accentkaart-reset zet alleen die kleur terug; geen licht/donker-toggle (alle vier paletten — cream, licht, fd-bruin, "Redactioneel wit" — zijn lichtgetint; het vierde palet heette tot UR3-30 zelf "Krant" en is hernoemd omdat dat botste met de nieuwsrubriek /nieuws, de sleutel `krant` bleef bewust ongemoeid).',
+    when: 'De gebruiker kiest een weergave, een palet, een typografie-thema, module-accentkleuren (kern/wil/horizon), de balkkleur van de mobiele TopBar (ADR 0174 D3), budget-tints en categoriekaart-tinten, en reset (randgeval) één accentkaart en de balkkleur; daarnaast kiest hij een homescherm ("Overzicht — alles bij elkaar" of "Budgetteren — direct je budgetten").',
+    then: 'Wijzigingen zijn direct zichtbaar zonder page-reload en blijven na herladen bewaard (palet = per apparaat/localStorage; weergavemodus+accentkleur+balkkleur+font = account-gebonden/DB, dus ook op een tweede apparaat); de balkkleur kleurt de mobiele TopBar én de browserchrome (theme-color) direct mee, toont in de picker een voorbeeld van de balk (ook op desktop, waar de TopBar verborgen is) en waarschuwt zonder te blokkeren bij een middentoon (naam < 4,5:1) of een lichte balk (groene/oranje kompaspunten < 3:1, bv. de preset Papier); een balkkleur kiezen stuurt alleen `topbar_color` naar `PUT /api/appearance` en laat de accenten en budget-tints ongemoeid; reset zet leisteen `#3f4a5e` terug (opgeslagen als null); de weergavekeuze schrijft via hetzelfde `PUT /api/display-mode` als de ⌘K-actie en de aangeklikte kaart krijgt direct `aria-pressed="true"`; een accentkaart-reset zet alleen die kleur terug; geen licht/donker-toggle (alle vier paletten — cream, licht, fd-bruin, "Redactioneel wit" — zijn lichtgetint; het vierde palet heette tot UR3-30 zelf "Krant" en is hernoemd omdat dat botste met de nieuwsrubriek /nieuws, de sleutel `krant` bleef bewust ongemoeid). Het homescherm-blok schrijft via `PUT /api/home-screen` (zod-enum `HOME_SCREEN_VALUES`: overzicht | budget), de gekozen kaart krijgt `aria-pressed="true"`, en daarna landt /dashboard (en de post-onboarding-landing, WF-START-26) op /overzicht resp. /overzicht/budget — de middleware-vertaling zelf is WF-NAV-16.',
     assertion: {
       kind: 'ui-only',
-      source: 'components/mijn/{display-mode-picker,palette-picker,font-picker,module-accent-picker,topbar-color-picker,budget-tint-picker,category-tint-picker}.tsx + PUT /api/appearance + PUT /api/display-mode, geen cijfermatige uitkomst',
+      source: 'components/mijn/{display-mode-picker,palette-picker,font-picker,module-accent-picker,topbar-color-picker,budget-tint-picker,category-tint-picker}.tsx + PUT /api/appearance + PUT /api/display-mode + components/mijn/home-screen-picker.tsx → app/api/home-screen/route.ts (lib/home-screen.ts#HOME_SCREEN_VALUES/HOME_SCREEN_HREFS), geen cijfermatige uitkomst',
     },
   },
   {
@@ -456,6 +456,19 @@ const criteria: AcceptanceCriterion[] = [
     assertion: {
       kind: 'ui-only',
       source: 'components/mijn/geavanceerd-settings.tsx (downloadlink) + app/api/account/export/route.ts (EXPORT_SESSION_TABLES + EXPORT_OWN_READ_EXTRA_TABLES + EXPORT_SERVICE_TABLES) + lib/account-export-shape.ts (kolom-redactie/ontsleuteling) — LIVE-account-export, geen deterministisch scenario-cijfer',
+    },
+  },
+  {
+    workflow: 'WF-MIJN-34',
+    scenarioId: 'UAT-MIJN-34',
+    titel: 'Schakelaar "Automatisch bijwerken" voor bank- en brokerkoppelingen (ADR 0182)',
+    kriticiteit: 'BELANGRIJK',
+    given: 'Ingelogd, /mijn/koppelingen. Bovenaan staat het blok "Automatisch bijwerken" met een schakelaar (`role="switch"`), gevoed door `profiles.auto_sync_enabled` via `getOwnProfile` en fail-closed gelezen (`readAutoSyncEnabled`: alleen een expliciete `true` is aan). Na het toepassen van de migratie staat hij voor iedereen standaard aan.',
+    when: 'De gebruiker zet de schakelaar uit en weer aan, herlaadt de pagina en opent de pagina op een tweede apparaat; randgeval: het opslaan faalt (netwerk/serverfout).',
+    then: 'De uitleg onder de kop volgt de stand: aan = "Aan: opent je Overzicht en is een bank- of brokerkoppeling langer dan twaalf uur niet bijgewerkt, dan halen we die op de achtergrond op."; uit = "Uit: je bank- en brokergegevens komen alleen binnen als je zelf op synchroniseren drukt." `aria-checked` volgt direct; de keuze gaat via `PUT /api/auto-sync` (`{ enabled: boolean }`, zod, own-row update op de eigen profielrij, error-envelope) en staat na herladen en op een ander apparaat hetzelfde (account-gebonden, geen localStorage). Faalt het opslaan, dan springt de schakelaar terug en verschijnt de melding "Niet opgeslagen — Je keuze voor automatisch bijwerken is niet bewaard. Probeer het opnieuw." Eén keuze voor alle bank- en brokerkoppelingen samen (per koppeling kiezen bestaat bewust niet). Het effect op /overzicht is WF-OVZ-30.',
+    assertion: {
+      kind: 'ui-only',
+      source: 'components/mijn/automatisch-bijwerken-schakelaar.tsx + app/(app)/mijn/koppelingen/koppelingen-client.tsx + app/(app)/mijn/koppelingen/page.tsx (getOwnProfile → lib/sync/auto-sync.ts#readAutoSyncEnabled) + app/api/auto-sync/route.ts (PUT, zod, own-row) — schrijfpad getoetst in app/api/auto-sync/route.test.ts, geen cijfermatige uitkomst',
     },
   },
 ]

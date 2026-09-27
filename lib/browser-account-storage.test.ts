@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { purgeAccountScopedStorage, purgeOnIdentityChange } from './browser-account-storage'
+import { SW_EXPIRATION_DB_NAME, USER_CONTENT_CACHE_NAMES } from './pwa/sw-caches'
 
 /**
  * Een wisseling van account op één toestel mag geen gegevens van de vorige
@@ -90,6 +91,43 @@ describe('purgeAccountScopedStorage', () => {
     expect(localStorage.getItem('horizon_overlay_visible')).toBe('true')
     expect(localStorage.getItem('collapsible_assets-insight')).toBe('closed')
     expect(localStorage.getItem('trifinity-chat-pinned')).toBe('true')
+  })
+
+  it('wist de service-worker-caches met gerenderde pagina’s, en alleen die', async () => {
+    // Een oude worker cachte elke navigatie in `pages-cache` — met vermogens- en
+    // transactiecijfers. Die mogen een uitlog niet overleven; de content-gehashte
+    // statische caches mogen blijven (daar staat niets van een account in).
+    const deleted: string[] = []
+    const fakeCaches = {
+      delete: vi.fn(async (name: string) => {
+        deleted.push(name)
+        return true
+      }),
+    }
+    const fakeIndexedDB = { deleteDatabase: vi.fn() }
+    vi.stubGlobal('caches', fakeCaches)
+    vi.stubGlobal('indexedDB', fakeIndexedDB)
+    try {
+      purgeAccountScopedStorage()
+      await vi.waitFor(() => expect(deleted).toHaveLength(USER_CONTENT_CACHE_NAMES.length))
+      expect(deleted).toContain('pages-cache')
+      expect(deleted).toContain('cross-origin')
+      expect([...deleted].sort()).toEqual([...USER_CONTENT_CACHE_NAMES].sort())
+      expect(deleted).not.toContain('static-assets')
+      // Serwist's URL-logboek van gecachete verzoeken gaat mee.
+      expect(fakeIndexedDB.deleteDatabase).toHaveBeenCalledWith(SW_EXPIRATION_DB_NAME)
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('strandt niet zonder Cache Storage (oude browser, onveilige context)', () => {
+    vi.stubGlobal('caches', undefined)
+    try {
+      expect(() => purgeAccountScopedStorage()).not.toThrow()
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 })
 

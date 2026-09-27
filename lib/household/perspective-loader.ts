@@ -112,7 +112,7 @@ const SOLO_CONTEXT = (userId: string): PerspectiveContext => ({
  */
 export async function loadPerspectiveContext(
   supabase: SupabaseClient,
-  preloadedUser?: User | null,
+  preloadedUser?: Pick<User, 'id'> | null,
 ): Promise<PerspectiveContext> {
   const user =
     preloadedUser !== undefined ? preloadedUser : (await supabase.auth.getUser()).data.user

@@ -50,6 +50,18 @@ import {
   deriveGuideStates,
   type GuideAccountFacts,
 } from '@/lib/welcome-guide'
+import {
+  AUTO_SYNC_MAX_DAILY_REQUESTS,
+  AUTO_SYNC_STALE_MS,
+  claimAutoSync,
+  readAutoSyncEnabled,
+  selectStaleBanks,
+  selectStaleBrokers,
+  type BrokerAutoSyncCandidate,
+  type ClaimStorage,
+} from '@/lib/sync/auto-sync'
+import type { BankSyncTarget } from '@/lib/sync/global-sync'
+import { PERMANENT_BROKER_ERRORS } from '@/lib/integrations/broker-error-messages'
 import { OVZ_ACCEPTANCE } from './ovz'
 import type { AcceptanceCriterion } from './types'
 
@@ -631,6 +643,67 @@ export const OVZ_ENGINE_CHECKS: OvzEngineCheck[] = [
           `; solvedDoelNogNiet=${resolvePlanStatus({ anchorFixed: false, coveragePct: null, solvedReachable: true, doelGedekt: false })}` +
           `; banner5=${banner(5, tekort)}; banner95=${banner(95, tekort)}` +
           `; bannerGedekt=${banner(100, { kind: 'gedekt', endAge: 90 })}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-OVZ-30',
+    scenarioId: 'UAT-OVZ-30',
+    label:
+      'Automatisch bijwerken (echte functies): welke bank-/brokerkoppelingen meegaan, fail-closed schakelaar, apparaatclaim per uur',
+    run: () => {
+      const c = criterion('WF-OVZ-30')
+      const H = 60 * 60 * 1000
+      const now = Date.parse('2026-09-27T12:00:00Z')
+      const ago = (ms: number) => new Date(now - ms).toISOString()
+      const bank = (label: string, extra: Partial<BankSyncTarget>): BankSyncTarget => ({
+        connectionAccountId: `ca-${label}`,
+        label,
+        bankAccountId: `ba-${label}`,
+        lastSyncedAt: ago(20 * H),
+        dailyRequests: 0,
+        ...extra,
+      })
+      const banks: BankSyncTarget[] = [
+        bank('A', { lastSyncedAt: ago(13 * H) }),
+        bank('B', { lastSyncedAt: ago(11 * H) }),
+        bank('C', { lastSyncedAt: null }),
+        bank('D', { linkBroken: true }),
+        bank('E', { dailyRequests: 2 }),
+        bank('F', { lastAttemptedAt: ago(0.5 * H) }),
+      ]
+      const broker = (label: string, lastSyncedAt: string | null, lastSyncError: string | null): BrokerAutoSyncCandidate => ({
+        id: `br-${label}`,
+        label,
+        lastSyncedAt,
+        lastSyncError,
+      })
+      const brokers: BrokerAutoSyncCandidate[] = [
+        broker('P', ago(13 * H), null),
+        broker('Q', ago(13 * H), PERMANENT_BROKER_ERRORS[0]),
+        broker('R', ago(13 * H), 'Tijdelijke fout bij de broker'),
+        broker('S', null, null),
+      ]
+      const store = new Map<string, string>()
+      const storage: ClaimStorage = {
+        getItem: (k) => store.get(k) ?? null,
+        setItem: (k, v) => void store.set(k, v),
+        removeItem: (k) => void store.delete(k),
+      }
+      const claim1 = claimAutoSync(storage, 'u1', now)
+      const claim30m = claimAutoSync(storage, 'u1', now + 0.5 * H)
+      const claim61m = claimAutoSync(storage, 'u1', now + 61 * 60 * 1000)
+      return {
+        expected: c.assertion.expected ?? '',
+        actual:
+          `banks=${selectStaleBanks(banks, now).map((b) => b.label).join(',')}` +
+          `; brokers=${selectStaleBrokers(brokers, now).map((b) => b.label).join(',')}` +
+          `; staleUren=${AUTO_SYNC_STALE_MS / H}; maxDagverzoeken=${AUTO_SYNC_MAX_DAILY_REQUESTS}` +
+          `; enabledTrue=${readAutoSyncEnabled({ auto_sync_enabled: true })}` +
+          `; enabledNull=${readAutoSyncEnabled(null)}` +
+          `; enabledOntbreekt=${readAutoSyncEnabled({})}` +
+          `; enabledString=${readAutoSyncEnabled({ auto_sync_enabled: 'true' })}` +
+          `; claim1=${claim1}; claim30m=${claim30m}; claim61m=${claim61m}`,
       }
     },
   },

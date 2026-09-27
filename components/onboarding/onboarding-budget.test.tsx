@@ -3,6 +3,9 @@ import { render, screen, fireEvent, within, waitFor } from '@testing-library/rea
 import { OnboardingBudget } from './onboarding-budget'
 import { BUDGET_SLUGS } from '@/lib/budget-data'
 import type { BudgetPlanDiff } from '@/lib/budget-plan-diff'
+import { BUDGET_TEMPLATES } from '@/lib/budget-templates/onboarding-presets'
+import { buildTemplateDraft, groupForRender } from '@/lib/budget-templates/template-draft'
+import { formatCurrency } from '@/lib/format'
 
 afterEach(() => {
   vi.restoreAllMocks()
@@ -26,23 +29,32 @@ function mockFetchOk() {
 }
 
 describe('OnboardingBudget', () => {
-  // W-012: de kop van fase 1 noemt de canonieke term ("budgetten"), niet de
-  // omschrijving "je geld verdelen". De <em> splitst de zin over drie tekstnodes,
-  // dus een getByText zou 'm niet vinden — de accessible name van de heading
-  // plakt ze wél aan elkaar.
-  it('fase 1 draagt "Stel je budgetten in" als kop', () => {
+  // B-063 (eigenaarsbesluit 27 sep 2026, vervangt W-012): de kop van fase 1 is
+  // "Kies je budgetplan". De <em> splitst de zin over tekstnodes, dus een
+  // getByText zou 'm niet vinden — de accessible name van de heading plakt ze
+  // wél aan elkaar.
+  it('fase 1 draagt "Kies je budgetplan" als kop en legt uit wat een budgetplan is', () => {
     renderStep()
     expect(
-      screen.getByRole('heading', { level: 1, name: 'Stel je budgetten in' }),
+      screen.getByRole('heading', { level: 1, name: 'Kies je budgetplan' }),
     ).toBeInTheDocument()
+    expect(screen.getByText(/Een budgetplan verdeelt je netto-inkomen per maand over potjes/)).toBeTruthy()
+  })
+
+  it('elke tegel draagt een "Past bij jou als …"-regel', () => {
+    renderStep()
+    for (const tpl of BUDGET_TEMPLATES) {
+      expect(screen.getByText(`Past bij jou als ${tpl.pastBij}.`)).toBeTruthy()
+    }
+    expect(screen.getByText('Past bij jou als je al weet welke potjes je wilt.')).toBeTruthy()
   })
 
   it('Nibud is voorgeselecteerd en er zijn vier startpunten', () => {
     renderStep()
     const group = screen.getByRole('group', { name: 'Kies een startpunt' })
-    const tiles = within(group).getAllByRole('button')
+    const tiles = within(group).getAllByRole('button').filter((b) => b.hasAttribute('aria-pressed'))
     expect(tiles).toHaveLength(4)
-    expect(within(group).getByRole('button', { name: /Nibud-standaard/ }).getAttribute('aria-pressed')).toBe('true')
+    expect(within(group).getByRole('button', { name: /^Nibud-standaard/ }).getAttribute('aria-pressed')).toBe('true')
     expect(within(group).getByRole('button', { name: /Leeg beginnen/ }).getAttribute('aria-pressed')).toBe('false')
   })
 
@@ -68,13 +80,26 @@ describe('OnboardingBudget', () => {
     expect(screen.getAllByRole('button', { name: 'Ik doe dit later' })).toHaveLength(1)
   })
 
-  it('het netto inkomen staat voorgevuld en is aan te passen; de template rekent met het aangepaste bedrag', () => {
-    renderStep(3000)
+  // B-062: een bekend inkomen wordt niet opnieuw gevraagd — alleen-lezen, één bron.
+  it('met een bekend inkomen is er geen inkomensveld, wel een alleen-lezen regel met het bedrag', () => {
+    renderStep(3525)
+    expect(screen.queryByLabelText('Netto maandinkomen')).toBeNull()
+    const line = screen.getByTestId('ob-budget-income-readonly')
+    expect(line.textContent).toContain(formatCurrency(3525))
+    expect(line.textContent).toMatch(/Mijn → Profiel/)
+    fireEvent.click(footerButton('Verder'))
+    // De Salaris-post draagt exact het netto inkomen uit de onboarding.
+    expect(screen.getByDisplayValue('3525')).toBeTruthy()
+  })
+
+  it('bij een onbekend inkomen staat het veld er wél; de template rekent met het getypte bedrag', () => {
+    renderStep(0)
     const input = screen.getByLabelText('Netto maandinkomen') as HTMLInputElement
-    expect(input.value).toBe('3000')
+    expect(input.value).toBe('')
+    expect(screen.queryByTestId('ob-budget-income-readonly')).toBeNull()
 
     fireEvent.change(input, { target: { value: '4.000' } })
-    expect(screen.getAllByText(/Aangepast in deze stap/).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/Ingevuld in deze stap/).length).toBeGreaterThan(0)
     fireEvent.click(footerButton('Verder'))
 
     // Nibud: Salaris = het volledige netto inkomen, de rest in percentages ervan.
@@ -158,6 +183,42 @@ describe('OnboardingBudget', () => {
     expect(footerButton('Budget opslaan').disabled).toBe(true)
     fireEvent.click(footerButton('Budget opslaan'))
     expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  // B-064: i-knop naast elke templatetegel met het plan en de bedragen.
+  it('de i-knop opent per template een sheet met de canonieke bedragen uit buildTemplateDraft', async () => {
+    renderStep(3000)
+    fireEvent.click(screen.getByRole('button', { name: 'Wat zit er in Minimalistisch?' }))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText('Wat zit er in Minimalistisch?')).toBeTruthy()
+
+    const grouped = groupForRender(buildTemplateDraft('minimalistisch', 3000))
+    const expense = grouped.find((g) => g.type === 'expense')!
+    expect(expense.parents.length).toBeGreaterThan(0)
+    for (const parent of expense.parents) {
+      const kids = expense.childrenBy[parent.id] ?? []
+      const amount = kids.length > 0 ? kids.reduce((s, k) => s + (k.amount ?? 0), 0) : (parent.amount ?? parent.defaultLimit ?? 0)
+      const row = within(dialog).getByText(parent.name).closest('[data-testid="template-preview-parent"]') as HTMLElement
+      expect(row.textContent).toContain(formatCurrency(amount))
+    }
+  })
+
+  it('"Kies dit plan" zet het startpunt zonder naar fase 2 te gaan', async () => {
+    renderStep()
+    fireEvent.click(screen.getByRole('button', { name: 'Wat zit er in Uitgebreid?' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Kies dit plan' }))
+    const group = screen.getByRole('group', { name: 'Kies een startpunt' })
+    expect(within(group).getByRole('button', { name: /^Uitgebreid/ }).getAttribute('aria-pressed')).toBe('true')
+    expect(within(group).getByRole('button', { name: /^Nibud-standaard/ }).getAttribute('aria-pressed')).toBe('false')
+    expect(screen.queryByTestId('nog-te-verdelen')).toBeNull()
+  })
+
+  it('klikken op de tegel zelf kiest het startpunt en opent geen preview', () => {
+    renderStep()
+    const group = screen.getByRole('group', { name: 'Kies een startpunt' })
+    fireEvent.click(within(group).getByRole('button', { name: /^Minimalistisch/ }))
+    expect(within(group).getByRole('button', { name: /^Minimalistisch/ }).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.queryByRole('dialog')).toBeNull()
   })
 
   it('"Ander startpunt" gaat na bevestiging terug naar de keuze', async () => {

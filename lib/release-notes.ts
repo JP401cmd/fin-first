@@ -97,6 +97,89 @@ export const RELEASE_NOTE_NORM = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.92.12',
+    date: '2026-09-27',
+    title: 'Koppelingen werken zichzelf bij',
+    sections: [
+      {
+        module: 'Bezittingen',
+        color: 'amber',
+        items: [
+          {
+            title: 'Je koppelingen werken zichzelf bij',
+            description:
+              'Is je bank of broker langer dan twaalf uur niet bijgewerkt, dan haalt het overzicht de nieuwe stand vanzelf op. Liever niet? Zet het uit bij je koppelingen.',
+          },
+        ],
+      },
+      {
+        module: 'Schulden',
+        color: 'teal',
+        items: [
+          {
+            title: 'De minimale betaling schuift mee',
+            description:
+              'Pas je het maandbedrag van een schuld aan, dan schuift de minimale betaling mee. Het schuldenoverzicht rekent met wat je nu betaalt.',
+          },
+        ],
+      },
+      {
+        module: 'Budget',
+        color: 'purple',
+        items: [
+          {
+            title: 'De budgetmelding noemt de oorzaak',
+            description:
+              'Staat je budget op oranje of rood, dan zie je welk deel het is en over welke periode.',
+          },
+          {
+            title: 'Makkelijker je budgetplan kiezen',
+            description:
+              'Bij het instellen zie je per plan wanneer het bij je past, en met de i-knop welke bedragen erin zitten.',
+          },
+        ],
+      },
+      {
+        module: 'Je plan',
+        color: 'purple',
+        items: [
+          {
+            title: 'Tabbladen ook op je telefoon bovenaan',
+            description:
+              'Plan, Doelen en Instellingen staan op je telefoon nu boven de grafiek, net als op de computer.',
+          },
+          {
+            title: 'Een rustiger start',
+            description:
+              'Heb je (nog) geen pensioen, dan zeg je dat gewoon. Een inkomen dat je al invulde, vragen we niet opnieuw.',
+          },
+        ],
+      },
+      {
+        module: 'Fin',
+        color: 'blue',
+        items: [
+          {
+            title: 'Een mislukte rekenhulp telt niet mee',
+            description:
+              'Lukt het maken van een rekenhulp niet, dan kost dat je geen poging van deze week.',
+          },
+        ],
+      },
+      {
+        module: 'Platform',
+        color: 'zinc',
+        items: [
+          {
+            title: 'Zonder verbinding een nette melding',
+            description:
+              'Heb je geen internet, dan zie je een duidelijke melding in plaats van een foutpagina.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: '0.92.11',
     date: '2026-09-27',
     title: 'Voorbereiding: nieuws ook zonder cijfers',

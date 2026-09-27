@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { getCachedUser } from '@/lib/supabase/cached-user'
+import { getCachedUser, getVerifiedUser } from '@/lib/supabase/cached-user'
 import { checkTierGate } from '@/lib/require-tier'
 import { aiSubscriptionRequired } from '@/lib/ai/gate-responses'
 
@@ -49,7 +49,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
-    const user = await getCachedUser(supabase)
+    const user = await getVerifiedUser(supabase)
     if (!user) {
       return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
     }

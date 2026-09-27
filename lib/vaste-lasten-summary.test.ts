@@ -57,7 +57,10 @@ function makeSupabase(recurrings: RecurringRow[]): SupabaseClient {
     return b
   }
   return {
-    auth: { getUser: async () => ({ data: { user: { id: 'u1' } }, error: null }) },
+    auth: {
+      getUser: async () => ({ data: { user: { id: 'u1' } }, error: null }),
+      getClaims: async () => ({ data: { claims: { sub: 'u1' } }, error: null }),
+    },
     from: (table: string) => builder(tables[table] ?? []),
   } as unknown as SupabaseClient
 }

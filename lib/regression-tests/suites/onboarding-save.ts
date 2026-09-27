@@ -587,8 +587,7 @@ const tests: TestCase[] = [
 
       for (const waarde of WAARDES) {
         assert(waarde.kicker.length > 0, `Kicker gevuld: ${waarde.kicker}`)
-        assert(waarde.belofte.length > 0, `Belofte gevuld bij ${waarde.kicker}`)
-        assert(waarde.toelichting.length > 0, `Toelichting gevuld bij ${waarde.kicker}`)
+        assert(waarde.zin.length > 0, `Zin gevuld bij ${waarde.kicker}`)
       }
 
       // De CTA navigeert HARD naar /dashboard; de middleware vertaalt dat naar

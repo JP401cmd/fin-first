@@ -23,7 +23,7 @@
  * De einddatum is de terugval voor rijen zónder maandbedrag.
  */
 import { describe, it, expect } from 'vitest'
-import { computeRenteAflossingsSplit, debtProjection, deriveRemainingMonths, type Debt } from './debt-data'
+import { computeRenteAflossingsSplit, debtProjection, deriveRemainingMonths, payoffSummary, simulatePayoff, type Debt } from './debt-data'
 import { debtRemainingMonths } from './debt-remaining-term'
 
 const base = {
@@ -172,5 +172,87 @@ describe('remainingMonths van de split is altijd een bruikbaar getal', () => {
     const split = computeRenteAflossingsSplit(d)!
     expect(split.rentePercentage).toBeLessThanOrEqual(100)
     expect(split.rentePercentage).toBeGreaterThanOrEqual(0)
+  })
+})
+
+// ── B-067: de totaalpagina rekent met hetzelfde maandbedrag ────────────────
+//
+// /overzicht/schulden draait `simulatePayoff` voor sneeuwbal/lawine/hoogste
+// saldo/eigen volgorde. Die simulatie nam als maandbudget Σ `minimum_payment`,
+// terwijl het detailvenster, de kernel en de spaarquote met `monthly_payment`
+// rekenen. Wie na het aanmaken alleen het Maandbedrag aanpast, laat het oude
+// minimum staan — en de totaalpagina "blijft heel snel aflossen" (B-067,
+// gemeld 19 sep 2026: annuïteit € 130.000 à 12%, maandbedrag € 1.352,
+// oud minimum € 3.000; detail 327 maanden, totaal veel korter).
+//
+// Norm (eigenaarsbesluit 27 sep 2026): het huidige maandbedrag is het
+// budget, het minimum is de ondergrens per schuld — en die ondergrens kan
+// nooit boven het eigen maandbedrag uitkomen (een verouderd minimum mag het
+// budget niet opblazen). Een minimum van 0 betekent "onbekend", niet "nul".
+describe('B-067: de strategievergelijking rekent met het maandbedrag', () => {
+  const annu = (over: Partial<Debt>): Debt => mk({
+    debt_type: 'mortgage', repayment_type: 'annuiteit', interest_rate: 12,
+    current_balance: 130000, minimum_payment: 3000, monthly_payment: 1352,
+    end_date: null, ...over,
+  })
+
+  it('één annuïteit: totaalpagina (lawine) en detailvenster geven dezelfde looptijd', () => {
+    const d = annu({})
+    const detail = debtProjection(d).monthsToPayoff
+    const totaal = payoffSummary(simulatePayoff([d], 'avalanche', 0)).totalMonths
+    // Gemeld als 327; de exacte maand schuift met de dag van de maand. Het anker
+    // is de orde van grootte ('heel lang'), de pariteit met de totaalpagina is de kern.
+    expect(detail).toBeGreaterThanOrEqual(320)
+    expect(detail).toBeLessThanOrEqual(340)
+    expect(Math.abs(totaal - detail)).toBeLessThanOrEqual(1)
+  })
+
+  it('een verouderd minimum boven het maandbedrag blaast het budget niet op', () => {
+    const maand1 = simulatePayoff([annu({})], 'snowball', 0)[0]!
+    expect(maand1.totalPayment).toBeCloseTo(1352, 0)
+  })
+
+  it('het overschot boven de minima gaat naar de focusschuld', () => {
+    const laag = mk({ id: 'laag', name: 'laag', repayment_type: 'annuiteit', interest_rate: 3,
+      current_balance: 10000, minimum_payment: 100, monthly_payment: 300, end_date: null })
+    const hoog = mk({ id: 'hoog', name: 'hoog', repayment_type: 'annuiteit', interest_rate: 9,
+      current_balance: 10000, minimum_payment: 100, monthly_payment: 100, end_date: null })
+    const maand1 = simulatePayoff([laag, hoog], 'avalanche', 0)[0]!
+    const pLaag = maand1.debts.find((x) => x.id === 'laag')!.payment
+    const pHoog = maand1.debts.find((x) => x.id === 'hoog')!.payment
+    expect(pLaag).toBeCloseTo(100, 0)   // ondergrens
+    expect(pHoog).toBeCloseTo(300, 0)   // 100 eigen + 200 overschot van 'laag'
+    expect(maand1.totalPayment).toBeCloseTo(400, 0)
+  })
+
+  it('minimum 0 is "onbekend": elke schuld houdt haar eigen maandbedrag, alleen extra verschuift', () => {
+    const a = mk({ id: 'a', name: 'a', repayment_type: 'annuiteit', interest_rate: 3,
+      current_balance: 10000, minimum_payment: 0, monthly_payment: 300, end_date: null })
+    const b = mk({ id: 'b', name: 'b', repayment_type: 'annuiteit', interest_rate: 9,
+      current_balance: 10000, minimum_payment: 0, monthly_payment: 100, end_date: null })
+    const zonder = simulatePayoff([a, b], 'avalanche', 0)[0]!
+    expect(zonder.debts.find((x) => x.id === 'a')!.payment).toBeCloseTo(300, 0)
+    expect(zonder.debts.find((x) => x.id === 'b')!.payment).toBeCloseTo(100, 0)
+    const met = simulatePayoff([a, b], 'avalanche', 50)[0]!
+    expect(met.debts.find((x) => x.id === 'b')!.payment).toBeCloseTo(150, 0)
+  })
+
+  it('een aflossingsvrije schuld betaalt haar rente buiten het budget om', () => {
+    // € 900 p/m op een aflossingsvrije hypotheek van € 200.000 à 3,6% (rente
+    // € 600): het verschil is een modelvraag (potten.ts zet aflossing op 0) en
+    // mag niet als "extra" op de lening belanden.
+    const hyp = mk({ id: 'hyp', name: 'hyp', debt_type: 'mortgage', repayment_type: 'aflossingsvrij',
+      interest_rate: 3.6, current_balance: 200000, minimum_payment: 900, monthly_payment: 900, end_date: null })
+    const lening = mk({ id: 'lening', name: 'lening', repayment_type: 'annuiteit', interest_rate: 6,
+      current_balance: 5000, minimum_payment: 100, monthly_payment: 100, end_date: null })
+    const maand1 = simulatePayoff([hyp, lening], 'avalanche', 0)[0]!
+    expect(maand1.debts.find((x) => x.id === 'hyp')!.payment).toBeCloseTo(600, 0)
+    expect(maand1.debts.find((x) => x.id === 'lening')!.payment).toBeCloseTo(100, 0)
+  })
+
+  it("'current' valt zonder maandbedrag terug op het minimum (H2-spiegel)", () => {
+    const d = mk({ repayment_type: 'annuiteit', interest_rate: 5, current_balance: 5000,
+      minimum_payment: 100, monthly_payment: 0, end_date: null })
+    expect(simulatePayoff([d], 'current', 0)[0]!.totalPayment).toBeCloseTo(100, 0)
   })
 })

@@ -22,6 +22,7 @@ import type { LeverageStatus } from '@/lib/leverage-status'
 import type { PageStatusInfo, PageStatusMap } from '@/lib/page-status/types'
 import {
   PAGE_STATUS_COPY,
+  cashflowOorzaakFigure,
   fillFigure,
   fiscaleRuimteFigure,
   overigePostenZin,
@@ -169,6 +170,25 @@ export function resolvePageStatusMap(input: ResolvePageStatusInput): PageStatusM
           )
         : leverInfo('/overzicht/belasting', scores.tax)
 
+    // ── De Budget-hefboom NOEMT DE OORZAAK (B-068) ────────────────────────
+    // Zelfde patroon als hierboven: de score mengt spaarquote en budgetten, en
+    // `scores.cashflow.oorzaak` (uit `computeLeverScores`, dezelfde componenten
+    // als de kleur) zegt welke van de twee. Het cijfer draagt per getal zijn
+    // eigen venster. Zonder oorzaak of copy: terugval op warn/bad.
+    const cashflowOorzaak = scores.cashflow.oorzaak
+    const cashflowCopy = cashflowOorzaak
+      ? PAGE_STATUS_COPY['/overzicht/budget']?.byCashflowCause?.[cashflowOorzaak.cause]
+      : undefined
+    const budgetInfo =
+      cashflowOorzaak && cashflowCopy && !scores.cashflow.detail.includes(LEVER_NO_DATA_MARKER)
+        ? buildInfo(
+            '/overzicht/budget',
+            leverToLeverageStatus(scores.cashflow.status),
+            cashflowOorzaakFigure(cashflowOorzaak),
+            { copy: cashflowCopy },
+          )
+        : leverInfo('/overzicht/budget', scores.cashflow)
+
     // Box 3-subpagina: het live cijfer is de Box 3-GRONDSLAG boven de
     // heffingsvrije voet uit `taxInput` — dezelfde `computeBox3TaxableInput`-
     // uitkomst die `box3Status` voedt. Tot ADR 0177 stond hier `scores.tax.detail`;
@@ -181,7 +201,7 @@ export function resolvePageStatusMap(input: ResolvePageStatusInput): PageStatusM
     entries.push(
       leverInfo('/overzicht/bezittingen', scores.assets),
       leverInfo('/overzicht/schulden', scores.debts),
-      leverInfo('/overzicht/budget', scores.cashflow),
+      budgetInfo,
       taxInfo,
       // Belasting-subpagina's (Box 1/3 AL LeverageStatus). Box 1: geen
       // jaarruimte-cijfer-string → null (copy valt terug op de cijferloze vorm).

@@ -20,10 +20,9 @@ import { unauthorized, serverError } from '@/lib/api/respond'
  * loader-bundel past" — dus via een API-route, niet via de browser-client.
  * Read-route, dus auth via `getAuthClaims` (ADR 0052): dat verifieert de JWT
  * lokaal tegen de JWKS en houdt de 401-tak dus roundtrip-vrij. Op het
- * doorlaat-pad doet `loadCashflowSettingsData` intern alsnog een
- * `getCachedUser()` → `auth.getUser()`, dus daar is de winst nul — de reden om
- * `getAuthClaims` te gebruiken is uniformiteit met de andere read-routes, niet
- * een besparing die deze route niet maakt. Geen body → geen zod. Foutvorm via
+ * doorlaat-pad doet `loadCashflowSettingsData` intern een `getCachedUser()`;
+ * sinds Snelheid B2 is dat óók een lokale claims-check, dus de hele read-route
+ * is roundtrip-vrij. Geen body → geen zod. Foutvorm via
  * lib/api/respond.ts (ADR 0044).
  *
  * `!claims?.sub` (en niet `!claims`) is bewust strenger dan de zusterroute: een

@@ -13,6 +13,13 @@
 
 set -e
 
+# Runtime-poort (ADR 0100): een Node onder engines.node stopt hier hard, met
+# één regel uitleg — geen rode canary tussen duizenden groene tests die als
+# "bekend rood" wordt weggeschreven. Eerst, want de checks hieronder draaien
+# op dezelfde runtime.
+echo "→ Running Node-runtime check (ADR 0100)…"
+node scripts/check-node-runtime.mjs
+
 echo "→ Running tsc --noEmit on production code…"
 
 # Capture output, filter test-file errors, fail als er productie-errors zijn

@@ -410,12 +410,12 @@ const criteria: AcceptanceCriterion[] = [
     scenarioId: 'UAT-NAV-25',
     titel: 'App installeren / offline-gedrag (PWA)',
     kriticiteit: 'OVERIG',
-    given: 'Productie-omgeving, PWA-capabele browser, Serwist service worker (`/api/**` NetworkOnly, navigaties NetworkFirst 3s, statics CacheFirst).',
-    when: 'De gebruiker installeert de app en gaat offline.',
-    then: 'Eerder bezochte pagina\'s tonen na ~3s hun gecachete HTML; API-verkeer wordt NOOIT gecachet (voorkomt verouderde saldi) — een offline API-actie faalt bewust.',
+    given: 'Productie-omgeving, PWA-capabele browser, Serwist service worker (`/api/**`, navigaties, RSC-verzoeken en cross-origin NetworkOnly; statics CacheFirst; `/offline` precached).',
+    when: 'De gebruiker installeert de app, gaat offline en navigeert; daarna logt hij uit.',
+    then: 'Offline verschijnt de statische offline-pagina ("Even geen verbinding") — nooit een eerder bezochte pagina met oude cijfers, ook niet bij een trage server. Na uitloggen staan `pages-cache`, `pages-rsc*`, `pages`, `others` en `cross-origin` niet meer in Cache Storage (besluit eigenaar 27 sep 2026: geen offline "laatste stand").',
     assertion: {
       kind: 'ui-only',
-      source: 'app/sw.ts (Serwist-configuratie) — service-worker-gedrag, niet pure-testbaar in vitest',
+      source: 'app/sw.ts + lib/pwa/sw-caches.ts (bron-toets in lib/pwa/sw-caches.test.ts; het echte offline-gedrag is alleen in een browser met geïnstalleerde worker te zien)',
     },
   },
   {
@@ -443,6 +443,19 @@ const criteria: AcceptanceCriterion[] = [
       kind: 'exact',
       expected: "labelNominal=Switch naar huidige euro's; labelReal=Switch naar toekomstige euro's; euroViewLabelNominal=Toekomstige euro's; euroViewLabelReal=Huidige euro's",
       source: 'lib/command-palette/actions.ts#buildActionItems + lib/euro-display.ts#euroViewLabel + app/api/euro-view/route.ts — échte productiefuncties (route alleen genoemd voor het cross-device-schrijfpad, niet geïmporteerd — server-only) — zie nav-checks.ts',
+    },
+  },
+  {
+    workflow: 'WF-NAV-28',
+    scenarioId: 'UAT-NAV-28',
+    titel: 'De offline-pagina: eerlijk "geen verbinding" in plaats van oude cijfers',
+    kriticiteit: 'OVERIG',
+    given: 'Productie-omgeving met de geïnstalleerde service worker (WF-NAV-25); `/offline` is precached (`OFFLINE_URL` in lib/pwa/sw-caches.ts) en navigaties zijn NetworkOnly. Het toestel is offline (of de server is onbereikbaar).',
+    when: 'De gebruiker opent een willekeurige app-route (bv. /overzicht/budget), klikt "Opnieuw proberen" terwijl hij nog offline is, gaat weer online en klikt opnieuw; apart: klikt "Overzicht".',
+    then: 'Onder de URL die hij probeerde te openen staat een statische pagina zonder enig cijfer of accountgegeven (dezelfde voor elke route en elk account op het toestel): kicker "Offline", kop "Even geen verbinding." (met "geen" cursief) als eigen `<h1>` — de pagina staat buiten de app-shell (ADR 0110) — de zin "Je cijfers halen we altijd vers op, zodat je nooit naar een oude stand kijkt. Zodra je weer online bent, ga je verder waar je was.", één primaire knop "Opnieuw proberen" en de link "of ga naar Overzicht". Tabtitel "Geen verbinding — TriFinity", niet geïndexeerd. "Opnieuw proberen" is een kale link naar de huidige URL: offline komt dezelfde pagina terug, online laadt precies de route die hij probeerde — zonder JavaScript. Nooit een eerder bezochte pagina met oude cijfers (besluit eigenaar 27-09-2026: geen offline "laatste stand").',
+    assertion: {
+      kind: 'ui-only',
+      source: 'app/offline/page.tsx (force-static, geen data) + app/sw.ts (fallbacks → /offline) + lib/pwa/sw-caches.ts#OFFLINE_URL (bron-toets lib/pwa/sw-caches.test.ts) — alleen in een browser met geïnstalleerde worker echt te zien',
     },
   },
 ]

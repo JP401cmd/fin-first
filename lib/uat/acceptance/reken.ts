@@ -77,7 +77,7 @@ const criteria: AcceptanceCriterion[] = [
     persona: 'daan',
     given: 'Persona Daan Bakker, actief AI-abonnement (tier-gate \'ai\' — gate-mechaniek zelf → UAT-KRUIS-25), weeklimiet 10 generaties / 5 verfijningen per ISO-week (reset maandag 00:00 Europe/Amsterdam, `lib/calculator/rate-limit.ts`).',
     when: 'De gebruiker beschrijft een vraagstuk, genereert, verfijnt en slaat de rekenhulp op.',
-    then: 'Live preview verschijnt, verbruik-badge daalt; opslaan zet de rekenhulp onder "Werkbladen" met `created_by_ai=true`. AI-inhoud zelf is niet-deterministisch — alleen het proces (genereren/verfijnen/opslaan/consistent heropenen) is toetsbaar. Weeklimiet bereikt → 429 bij de 11e poging (mislukte poging telt ook mee); >500 tekens → 400; geen AI-abonnement → 403 in het amber foutblok.',
+    then: 'Live preview verschijnt, verbruik-badge daalt; opslaan zet de rekenhulp onder "Werkbladen" met `created_by_ai=true`. AI-inhoud zelf is niet-deterministisch — alleen het proces (genereren/verfijnen/opslaan/consistent heropenen) is toetsbaar. Weeklimiet bereikt → 429 bij de 11e geslaagde generatie (een mislukte generatie telt niet mee en kost geen slot — ADR 0181); >500 tekens → 400; geen AI-abonnement → 403 in het amber foutblok.',
     assertion: {
       kind: 'ui-only',
       source: 'app/api/ai/build-calculator/route.ts + components/future/rekenhulp-view.tsx (build-modus) — AI-genereerde inhoud is niet statisch toetsbaar, proces wel',

@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { getCachedUser } from '@/lib/supabase/cached-user'
+import { getCachedUser, getVerifiedUser } from '@/lib/supabase/cached-user'
 import { parseBody } from '@/lib/api/parse-body'
 import { badRequest, serverError, unauthorized } from '@/lib/api/respond'
 import { PLAN_REVIEW_STAPPEN, isPlanReviewStap, parsePlanReviewState, type PlanReviewState } from '@/lib/plan-review/types'
@@ -122,7 +122,7 @@ export async function GET(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const supabase = await createClient()
-    const user = await getCachedUser(supabase)
+    const user = await getVerifiedUser(supabase)
     if (!user) return unauthorized()
 
     const parsed = await parseBody(BodySchema, request)

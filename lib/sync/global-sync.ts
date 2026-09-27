@@ -16,7 +16,7 @@
 
 import { fetchWithRetry } from './fetch-with-retry'
 
-export type SyncJobKind = 'exchange' | 'wallet' | 'prices' | 'bank'
+export type SyncJobKind = 'exchange' | 'wallet' | 'prices' | 'bank' | 'broker'
 
 export interface SyncJob {
   id: string                  // unique job identifier (connection id, or 'prices')
@@ -94,7 +94,14 @@ async function runOne(job: SyncJob, signal?: AbortSignal): Promise<SyncJobResult
       // atomair een tik op de 10/dag-rem (`reserve_bank_sync_slot`), óók als het
       // daarna stukloopt. Twee stille herhalingen zouden één klik dus drie tikken
       // laten kosten — en de gebruiker daarna van zijn handmatige sync afhouden.
-      { signal, timeoutMs: 90_000, retries: job.kind === 'bank' ? 0 : 2 },
+      // Brokers evenmin: Trading 212 remt per API-key per paar seconden, dus een
+      // stille herhaling na een 502 loopt vrijwel zeker tegen die rem aan — en de
+      // knop op /mijn/koppelingen probeert ook maar één keer (ADR 0182).
+      {
+        signal,
+        timeoutMs: 90_000,
+        retries: job.kind === 'bank' || job.kind === 'broker' ? 0 : 2,
+      },
     )
 
     let body: SyncBody = {}
@@ -421,6 +428,24 @@ const CHAIN_LABEL: Record<WalletAddressRow['chain'], string> = {
 }
 
 /**
+ * Eén brokerkoppeling (Trading 212, …) als sync-doel.
+ *
+ * Alleen het automatische bijwerken bij openen (ADR 0182) geeft ze mee: de
+ * globale knop kende brokers nooit, en dat blijft zo tot daar een besluit over
+ * is. Geen rem-velden zoals bij de bank — een broker-API kent geen PSD2-dagrem;
+ * de 12-uursgrens en de apparaatclaim in `lib/sync/auto-sync.ts` zijn de rem.
+ */
+export interface BrokerSyncTarget {
+  /** `broker_connections.id` — de sleutel van `POST /api/integrations/brokers/[id]/sync`. */
+  id: string
+  /** Zoals de gebruiker de koppeling herkent ("Trading 212 · ISA"). */
+  label: string
+}
+
+/** Waar de gebruiker een brokerkoppeling zélf kan synchroniseren of herstellen. */
+export const BROKER_MANUAL_HREF = '/mijn/koppelingen'
+
+/**
  * Bouw de joblijst voor één sync-ronde.
  *
  * Geeft sinds de bankstap een OBJECT terug in plaats van een kale array: de
@@ -434,6 +459,8 @@ export function buildSyncJobs(params: {
   wallets: WalletAddressRow[]
   /** Actieve bankkoppelingen. Leeg laten = geen bankstap (regressie-veilig). */
   banks?: BankSyncTarget[]
+  /** Brokerkoppelingen. Leeg laten = geen brokerstap (de globale knop geeft ze niet mee). */
+  brokers?: BrokerSyncTarget[]
   includePrices?: boolean
   /** Injecteerbare klok voor de uur-rem; standaard `Date.now()`. */
   nowMs?: number
@@ -442,6 +469,7 @@ export function buildSyncJobs(params: {
     exchanges,
     wallets,
     banks = [],
+    brokers = [],
     includePrices = true,
     nowMs = Date.now(),
   } = params
@@ -469,6 +497,16 @@ export function buildSyncJobs(params: {
   // voortgangsstrip haar tekst op baseert ("… · prijzen verversen").
   const { jobs: bankJobs, skipped: skippedBanks } = planBankSyncs(banks, nowMs)
   jobs.push(...bankJobs)
+
+  for (const b of brokers) {
+    jobs.push({
+      id: b.id,
+      kind: 'broker',
+      label: b.label,
+      url: `/api/integrations/brokers/${b.id}/sync`,
+      manualHref: BROKER_MANUAL_HREF,
+    })
+  }
 
   if (includePrices) {
     jobs.push({

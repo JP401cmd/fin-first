@@ -20,6 +20,7 @@ import {
   type SyncJobResult,
   type GlobalSyncResult,
   type BankSyncTarget,
+  type BrokerSyncTarget,
   type SkippedBankSync,
 } from '@/lib/sync/global-sync'
 import { useToast } from '@/components/app/toast-provider'
@@ -175,8 +176,19 @@ interface GlobalSyncContextValue {
      * sync-ronde van vóór deze uitbreiding.
      */
     banks?: BankSyncTarget[]
+    /**
+     * Brokerkoppelingen. Alleen het automatische bijwerken bij openen (ADR 0182)
+     * geeft ze mee; weglaten = geen brokerstap, zoals altijd.
+     */
+    brokers?: BrokerSyncTarget[]
     /** When true, only runs the prices refresh (used when no connections exist). */
     pricesOnly?: boolean
+    /**
+     * Prijzen verversen als afsluiter (standaard `true`). Het automatische
+     * bijwerken zet dit uit: het gaat om bank- en brokerdata, en een prijsronde
+     * schrijft een vermogenspunt met bron "manual" dat de gebruiker niet vroeg.
+     */
+    includePrices?: boolean
   }) => Promise<GlobalSyncResult | null>
   /** Mark partial-failure as acknowledged (clears the red dot on the header button). */
   acknowledgePartial: () => void
@@ -307,7 +319,9 @@ export function GlobalSyncProvider({ children }: { children: ReactNode }) {
       exchanges: ExchangeConnectionRow[]
       wallets: WalletAddressRow[]
       banks?: BankSyncTarget[]
+      brokers?: BrokerSyncTarget[]
       pricesOnly?: boolean
+      includePrices?: boolean
     }): Promise<GlobalSyncResult | null> => {
       if (inFlightRef.current) return null
       inFlightRef.current = true
@@ -318,7 +332,8 @@ export function GlobalSyncProvider({ children }: { children: ReactNode }) {
             exchanges: params.exchanges,
             wallets: params.wallets,
             banks: params.banks ?? [],
-            includePrices: true,
+            brokers: params.brokers ?? [],
+            includePrices: params.includePrices ?? true,
           })
 
       // De poging-stempel wordt gezet vóór het verzoek, niet erna: een sync die
@@ -359,12 +374,16 @@ export function GlobalSyncProvider({ children }: { children: ReactNode }) {
         }
       }
 
+      // "Alleen prijzen" is een eigen tekst; zonder prijsstap (automatisch
+      // bijwerken) is één job gewoon één bron.
+      const onlyPrices = jobs.length === 1 && jobs[0].kind === 'prices'
       addToast({
         type: 'info',
         title: 'Synchroniseren…',
-        message:
-          jobs.length === 1
-            ? 'Prijzen worden bijgewerkt.'
+        message: onlyPrices
+          ? 'Prijzen worden bijgewerkt.'
+          : jobs.length === 1
+            ? `${jobs[0].label} wordt bijgewerkt.`
             : `${jobs.length} bronnen worden bijgewerkt.`,
         duration: 2500,
       })
@@ -441,6 +460,36 @@ export function GlobalSyncProvider({ children }: { children: ReactNode }) {
           })
         }
 
+        // Brokers: een fout krijgt een eigen melding met de weg naar de
+        // koppeling — het sync-rapport kent (nog) geen brokerrijen, dus
+        // "open het rapport" zou daar niets tonen. Een geslaagde broker telt mee
+        // in de eindmelding en ververst het scherm (verse posities).
+        let brokerSynced = false
+        for (const result of aggregate.results) {
+          if (result.job.kind !== 'broker') continue
+          if (result.outcome === 'error') {
+            addToast({
+              type: 'error',
+              title: `${result.job.label} niet gelukt`,
+              message: result.error ?? 'Synchroniseren is niet gelukt — probeer het later opnieuw.',
+              duration: 9000,
+              // Eigen label: dit is geen rekening maar de koppelingen-pagina, waar
+              // de fout staat en opnieuw koppelen kan.
+              action: result.job.manualHref
+                ? { label: 'Naar koppelingen', onClick: () => router.push(result.job.manualHref!) }
+                : undefined,
+            })
+            continue
+          }
+          brokerSynced = true
+        }
+        // Waren álle fouten van brokers, dan heeft elke fout al een eigen melding
+        // met de uitweg; "open het sync-rapport" zou naar een rapport zonder
+        // brokerrijen verwijzen.
+        const alleenBrokerFouten =
+          aggregate.errorCount > 0 &&
+          aggregate.results.every((r) => r.outcome !== 'error' || r.job.kind === 'broker')
+
         let bankSynced = false
         for (const result of aggregate.results) {
           if (result.job.kind !== 'bank') continue
@@ -470,7 +519,7 @@ export function GlobalSyncProvider({ children }: { children: ReactNode }) {
         // Verse banktransacties zitten in server-componenten (cashflow, budgetten);
         // zonder deze verversing ziet de gebruiker "bijgewerkt" staan naast een
         // scherm dat nog het oude beeld toont.
-        if (bankSynced) router.refresh()
+        if (bankSynced || brokerSynced) router.refresh()
 
         // End-toast — vertel de gebruiker wat er is gebeurd.
         if (aggregate.errorCount === 0 && aggregate.partialCount === 0) {
@@ -479,20 +528,21 @@ export function GlobalSyncProvider({ children }: { children: ReactNode }) {
           addToast({
             type: 'success',
             title: 'Bijgewerkt',
-            message:
-              jobs.length === 1
+            message: onlyPrices
                 ? 'Prijzen ververst.'
                 : `${aggregate.successCount} van ${jobs.length} bronnen · ${updatedItems} items${
                     totalValue > 0 ? ` · ${formatCurrency(totalValue)}` : ''
                   }.`,
           })
         } else if (aggregate.errorCount > 0) {
-          addToast({
-            type: 'error',
-            title: `${aggregate.errorCount} fout${aggregate.errorCount === 1 ? '' : 'en'}`,
-            message: 'Open het sync-rapport voor details.',
-            duration: 6000,
-          })
+          if (!alleenBrokerFouten) {
+            addToast({
+              type: 'error',
+              title: `${aggregate.errorCount} fout${aggregate.errorCount === 1 ? '' : 'en'}`,
+              message: 'Open het sync-rapport voor details.',
+              duration: 6000,
+            })
+          }
         } else {
           addToast({
             type: 'warning',

@@ -154,7 +154,7 @@ export function StopPlanVragen({
                 }
                 className={`w-28 ${INPUT_CLASS}`}
               />
-              <span className="text-sm text-[var(--ink-3)]">jaar · halve jaren toegestaan</span>
+              <span className="text-sm text-[var(--ink-3)]">jaar</span>
             </span>
             <Fout text={errors.stopAge} />
           </label>

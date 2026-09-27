@@ -15,7 +15,9 @@ import {
   buildTemplateDraft,
   computeTeVerdelen,
   ensureEigenRekening,
+  groupForRender,
 } from '@/lib/budget-templates/template-draft'
+import { TemplatePreviewList } from '@/components/app/budget-plan/template-preview-list'
 import { computeBudgetPlanDiff, firstOfCurrentMonth } from '@/lib/budget-plan-diff'
 import { formatCurrency } from '@/lib/format'
 import { parseBedragInput } from './onboarding-inkomen'
@@ -60,15 +62,31 @@ export function OnboardingBudget({
   currentStep = 9,
   totalSteps = 9,
 }: OnboardingBudgetProps): JSX.Element {
-  // Aanpasbaar, net als het inkomensveld in de template-kiezer van de app: de
-  // template verdeelt dit bedrag in percentages. Het profielinkomen blijft
-  // ongemoeid — het bedrag landt als Salaris-post in het budget zelf.
-  const [incomeText, setIncomeText] = useState(netIncome > 0 ? String(Math.round(netIncome)) : '')
+  // B-062: het inkomen is eerder in de onboarding al gevraagd. Is het bekend,
+  // dan verdeelt het plan precies dát bedrag — geen tweede invoerveld hier, want
+  // een afwijkend getal landde als Salaris-post terwijl het profielinkomen
+  // ongemoeid bleef (twee inkomensgetallen, stille driftbron). Alleen bij een
+  // onbekend inkomen (inkomenstap overgeslagen of uitgesteld) vraagt de stap
+  // het alsnog; leeg = het voorbeeldbedrag (ADR 0131: zichtbaar gemarkeerd).
+  const incomeKnown = netIncome > 0
+  const [incomeText, setIncomeText] = useState('')
   const typedIncome = parseBedragInput(incomeText)
-  const income = isFinite(typedIncome) && typedIncome > 0 ? Math.round(typedIncome) : FALLBACK_INCOME
-  const incomeChanged = netIncome > 0 && income !== Math.round(netIncome)
+  const income = incomeKnown
+    ? Math.round(netIncome)
+    : isFinite(typedIncome) && typedIncome > 0
+      ? Math.round(typedIncome)
+      : FALLBACK_INCOME
   const [phase, setPhase] = useState<'start' | 'edit'>('start')
   const [startpunt, setStartpunt] = useState<Startpunt>('nibud')
+  // B-064: welk plan staat open in de i-preview (null = dicht).
+  const [previewId, setPreviewId] = useState<BudgetTemplateId | null>(null)
+  const previewTemplate = previewId ? BUDGET_TEMPLATES.find((t) => t.id === previewId) ?? null : null
+  // Canoniek: dezelfde draft-bouwer als "Verder" (startEditing), met hetzelfde
+  // inkomen — de preview toont dus exact wat je in fase 2 krijgt.
+  const previewGrouped = useMemo(
+    () => (previewId ? groupForRender(buildTemplateDraft(previewId, income)) : null),
+    [previewId, income],
+  )
   const draftState = useBudgetDraft()
   const { draft } = draftState
 
@@ -125,19 +143,18 @@ export function OnboardingBudget({
   const primaryCls =
     'w-full min-h-11 bg-[var(--ink)] px-6 py-3 text-sm font-medium text-[var(--paper)] transition-colors hover:bg-[var(--ink-2)] disabled:cursor-not-allowed disabled:opacity-40'
 
-  // W-011/W-012: fase 1 heet "Stel je budgetten in" — de canonieke term van de
-  // app ("budget" is het nav-label, de route en de app-brede CTA) in plaats van
-  // de omschrijving "je geld verdelen", die in Fins eigen kennis bovendien
-  // diérsificatie betekent en voor een beginner dus dubbelzinnig is.
-  // Eigenaarskeuze 19 sep 2026: letterlijk deze zin, niet de vraagvorm.
+  // B-063: fase 1 heet "Kies je budgetplan" — eigenaarsbesluit 27 sep 2026,
+  // dat bewust de keuze van 19 sep ("Stel je budgetten in", W-011/W-012)
+  // vervangt. "Budgetplan" is de term die de app zelf voor het resultaat van
+  // deze stap gebruikt (plan-editor, `/api/budgets/plan`); de deck legt in één
+  // zin uit wat dat is.
   const title: ReactNode =
     phase === 'start' ? (
       <>
-        Stel je{' '}
+        Kies je{' '}
         <em className="font-normal italic" style={{ color: 'var(--module-active-700)' }}>
-          budgetten
-        </em>{' '}
-        in
+          budgetplan
+        </em>
       </>
     ) : (
       <>
@@ -150,7 +167,9 @@ export function OnboardingBudget({
 
   const deck =
     phase === 'start'
-      ? 'Een budget laat zien waar je vrijheidsdagen naartoe gaan. Kies een opzet als startpunt of begin leeg. De bedragen zijn daarna per categorie aan te passen.'
+      // B-063: één uitlegzin wat een budgetplan is, plus waarom Nibud-standaard
+      // klaarstaat — beschrijvend, geen advies (Wft).
+      ? 'Een budgetplan verdeelt je netto-inkomen per maand over potjes, zoals wonen, boodschappen en sparen — zo zie je waar je vrijheidsdagen naartoe gaan. Kies een startpunt of begin leeg; Nibud-standaard staat klaar als gangbare, herkenbare indeling. Met de i zie je vooraf wat er in een plan zit, en elk bedrag pas je daarna zelf aan.'
       // W-013: fase 2 vertelde niet waar de bedragen vandaan kwamen. Nu wél — met
       // twee woorden die er bewust in staan. "VASTE VERDELING", want de
       // percentages zijn een generieke sleutel van de app, niet iets dat op
@@ -166,7 +185,7 @@ export function OnboardingBudget({
       // inkomenszin staat in een voorwaardelijke vorm — "Koos je een opzet, dan
       // …" — en blijft daarmee op beide paden waar. Het bedrag zelf herhalen we
       // niet: dat staat in beide fasen al in het feitenpaneel hiernaast, inclusief
-      // de herkomst ("Jouw invoer bij Inkomen" / "Aangepast in deze stap").
+      // de herkomst ("Jouw invoer bij Inkomen" / "Ingevuld in deze stap").
       : 'Koos je een opzet, dan zijn de bedragen al ingevuld als vaste verdeling van je netto-inkomen — een startpunt, geen maat voor jou. Hernoem, voeg toe of haal weg wat niet bij je past en zet er je eigen bedragen op; Eigen rekening blijft staan, daar landen overboekingen tussen je eigen rekeningen. Bijstellen kan later altijd onder Overzicht → Budget.'
 
   return (
@@ -179,7 +198,13 @@ export function OnboardingBudget({
           <FactsPanel
             stat={formatCurrency(income)}
             sub="netto per maand om te verdelen"
-            source={incomeText.trim() === '' ? 'Voorbeeldbedrag — vul je inkomen in' : incomeChanged ? 'Aangepast in deze stap' : 'Jouw invoer bij Inkomen'}
+            source={
+              incomeKnown
+                ? 'Jouw invoer bij Inkomen'
+                : incomeText.trim() === ''
+                  ? 'Voorbeeldbedrag — vul je inkomen in'
+                  : 'Ingevuld in deze stap'
+            }
           />
         }
         currentStep={currentStep}
@@ -213,7 +238,15 @@ export function OnboardingBudget({
             </div>
           )}
 
-          {phase === 'start' && (
+          {phase === 'start' && incomeKnown && (
+            <p className="text-sm leading-relaxed text-[var(--ink-2)]" data-testid="ob-budget-income-readonly">
+              Het plan verdeelt je netto maandinkomen van{' '}
+              <span className="font-mono tabular-nums text-[var(--ink)]">{formatCurrency(income)}</span>, zoals je
+              het invulde bij Inkomen. Klopt dat niet meer? Na de onboarding pas je het aan onder Mijn → Profiel.
+            </p>
+          )}
+
+          {phase === 'start' && !incomeKnown && (
             <div>
               <label htmlFor="ob-budget-income" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
                 Netto maandinkomen
@@ -235,8 +268,8 @@ export function OnboardingBudget({
                 />
               </div>
               <p id="ob-budget-income-hint" className="mt-1 text-xs text-[var(--ink-3)]">
-                De opzet verdeelt dit bedrag in vaste percentages. Wijkt je inkomen af van wat je eerder invulde,
-                pas het hier aan — dan kloppen de bedragen per categorie meteen.
+                Je inkomen is nog niet bekend. Het plan verdeelt dit bedrag in vaste percentages; laat je het
+                leeg, dan rekent het met een voorbeeldbedrag van {formatCurrency(FALLBACK_INCOME)}.
               </p>
             </div>
           )}
@@ -251,8 +284,11 @@ export function OnboardingBudget({
                     icon={<Icon className="h-4 w-4" strokeWidth={2} />}
                     label={tpl.name}
                     sublabel={`${tpl.subtitle}. ${tpl.description}`}
+                    hint={`Past bij jou als ${tpl.pastBij}.`}
                     active={startpunt === tpl.id}
                     onClick={() => setStartpunt(tpl.id)}
+                    onInfo={() => setPreviewId(tpl.id)}
+                    infoLabel={`Wat zit er in ${tpl.name}?`}
                   />
                 )
               })}
@@ -260,6 +296,7 @@ export function OnboardingBudget({
                 icon={<FilePlus2 className="h-4 w-4" strokeWidth={2} />}
                 label="Leeg beginnen"
                 sublabel="Alleen Eigen rekening staat klaar. Je voegt zelf de categorieën toe die bij je passen."
+                hint="Past bij jou als je al weet welke potjes je wilt."
                 active={startpunt === 'leeg'}
                 onClick={() => setStartpunt('leeg')}
               />
@@ -302,6 +339,42 @@ export function OnboardingBudget({
           </div>
         </div>
       </OnboardingShell>
+
+      {/* B-064: wat zit er in dit plan — vóór je kiest. De bedragen komen uit
+          dezelfde draft-bouwer als "Verder"; "Kies dit plan" zet alleen het
+          startpunt (je blijft in fase 1, zodat je nog kunt vergelijken). */}
+      <ShellOverlay
+        open={previewTemplate !== null}
+        onClose={() => setPreviewId(null)}
+        kind="sheet"
+        title={previewTemplate ? `Wat zit er in ${previewTemplate.name}?` : ''}
+        footer={
+          <ModalFooter
+            align="end"
+            primary={{
+              label: 'Kies dit plan',
+              onClick: () => {
+                if (previewId) setStartpunt(previewId)
+                setPreviewId(null)
+              },
+            }}
+            secondary={{ label: 'Sluiten', onClick: () => setPreviewId(null) }}
+          />
+        }
+      >
+        {previewTemplate && previewGrouped && (
+          <div className="space-y-4 p-6">
+            <p className="text-sm leading-relaxed text-[var(--ink-2)]">
+              {previewTemplate.description} Zo verdeelt dit plan {formatCurrency(income)} netto per maand, als vaste
+              verdeling — een startpunt, geen maat voor jou. Een hoofdbudget is de optelling van de potjes eronder.
+            </p>
+            <TemplatePreviewList grouped={previewGrouped} />
+            <p className="text-xs leading-relaxed text-[var(--ink-3)]">
+              Daarnaast staat in elk plan Eigen rekening klaar: daar landen overboekingen tussen je eigen rekeningen.
+            </p>
+          </div>
+        )}
+      </ShellOverlay>
 
       <ShellOverlay
         open={skipOpen}

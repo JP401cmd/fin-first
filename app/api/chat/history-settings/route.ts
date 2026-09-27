@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
-import { getCachedUser } from '@/lib/supabase/cached-user'
+import { getCachedUser, getVerifiedUser } from '@/lib/supabase/cached-user'
 import { serverError, unauthorized } from '@/lib/api/respond'
 import { parseBody } from '@/lib/api/parse-body'
 import type { ChatHistoryMode } from '@/lib/chat/history/types'
@@ -125,7 +125,7 @@ export async function GET() {
 export async function PUT(request: NextRequest) {
   try {
     const supabase = await createClient()
-    const user = await getCachedUser(supabase)
+    const user = await getVerifiedUser(supabase)
     if (!user) return unauthorized()
 
     const parsed = await parseBody(SettingsSchema, request)

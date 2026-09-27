@@ -1560,13 +1560,14 @@ Dit deelgebied heeft geen eigen pagina's: het beschrijft de app-brede bediening 
 #### WF-NAV-25 — App installeren / offline-gedrag (PWA)
 - **Doel:** Als gebruiker wil ik de app kunnen installeren en bij een haperende verbinding een bruikbare (gecachete) pagina zien in plaats van een browserfout.
 - **Trigger/startpunt:** Productie-omgeving in een PWA-capabele browser; installatieprompt of offline gaan na eerder bezoek.
-- **Eindresultaat:** App geïnstalleerd met eigen icoon; eerder bezochte pagina's tonen offline hun gecachete versie; API-verkeer wordt nooit gecachet.
+- **Eindresultaat:** App geïnstalleerd met eigen icoon; offline verschijnt de statische offline-pagina, nooit een gecachete versie met oude cijfers; pagina's, RSC-verzoeken, API- en Supabase-verkeer worden nooit gecachet.
 - **Stappen:**
   1. Bezoek de productie-app; de service worker registreert zich automatisch (alleen in productie).
   2. Installeer via de browserprompt (manifest.json is gekoppeld).
-  3. Ga offline en open een eerder bezochte pagina: na ~3 s netwerk-timeout verschijnt de gecachete HTML.
+  3. Ga offline en open een eerder bezochte pagina: de offline-pagina ("Even geen verbinding") verschijnt; "Opnieuw proberen" laadt dezelfde URL opnieuw.
+  3b. Log uit en open devtools → Application → Cache Storage: `pages-cache`, `pages-rsc*`, `pages`, `others` en `cross-origin` zijn weg.
   4. Probeer offline een actie die een API-call doet: die faalt bewust (geen gecachete API-antwoorden — voorkomt verouderde saldi).
-- **Schermen/componenten:** `app/sw.ts` (Serwist: /api/** NetworkOnly, navigaties NetworkFirst 3s, statics CacheFirst), registratie in `components/app/head-scripts.tsx`, `public/manifest.json`, `serwist.config.mjs`.
+- **Schermen/componenten:** `app/sw.ts` (Serwist: /api/**, navigaties, RSC en cross-origin NetworkOnly, statics CacheFirst, `/offline` precached), `app/offline/page.tsx`, `lib/pwa/sw-caches.ts` (cachelijst, gewist bij uitloggen), registratie in `components/app/head-scripts.tsx`, `public/manifest.json`, `serwist.config.mjs`.
 - **Kriticiteit:** OVERIG
 - **Rekenend:** nee
 - **Varianten & randgevallen:**

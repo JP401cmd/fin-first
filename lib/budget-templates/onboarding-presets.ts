@@ -43,6 +43,11 @@ export interface BudgetTemplate {
   name: string
   subtitle: string
   description: string
+  /**
+   * Keuzehulp (B-063): het vervolg op "Past bij jou als …". Beschrijvend —
+   * vóór wie de indeling handig is, geen advies welke je moet kiezen (Wft).
+   */
+  pastBij: string
   icon: ComponentType<LucideProps>
   categories: TemplateCategory[]
 }
@@ -134,6 +139,7 @@ export const BUDGET_TEMPLATES: BudgetTemplate[] = [
     name: 'Minimalistisch',
     subtitle: '5 potjes',
     description: 'Vijf potjes, klaar. Je boekt direct op de hoofdbudgetten — overzicht zonder details.',
+    pastBij: 'je voor het eerst een budget maakt en weinig wilt bijhouden',
     icon: Minus,
     categories: MINIMALISTISCH_CATEGORIES,
   },
@@ -142,6 +148,7 @@ export const BUDGET_TEMPLATES: BudgetTemplate[] = [
     name: 'Nibud-standaard',
     subtitle: '6 hoofdbudgetten · 22 potjes',
     description: 'Het Nibud-huishoudboekje: herkenbare potjes voor elk Nederlands huishouden.',
+    pastBij: 'je een gangbare indeling wilt die je herkent',
     icon: List,
     categories: NIBUD_CATEGORIES,
   },
@@ -150,6 +157,7 @@ export const BUDGET_TEMPLATES: BudgetTemplate[] = [
     name: 'Uitgebreid',
     subtitle: '6 hoofdbudgetten · 26 potjes',
     description: 'Maximaal inzicht: elk potje apart, inclusief reserveringen voor onregelmatige kosten.',
+    pastBij: 'je elke euro wilt volgen, ook jaarlijkse en onregelmatige kosten',
     icon: ListTree,
     categories: UITGEBREID_CATEGORIES,
   },

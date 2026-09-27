@@ -646,6 +646,13 @@ describe('onboarding buildPensionParseResult', () => {
     expect(weird!.regelingen[0].ingangLeeftijd).toBe(67)
   })
 
+  // B-060: "nee" schrijft niets — geen pension-life_event, zeker geen € 0-event.
+  it('returns null for mode none', () => {
+    expect(
+      buildPensionParseResult({ mode: 'none', grossMonthly: '1500', startAge: '67', parseResult: null }),
+    ).toBeNull()
+  })
+
   it('returns null for an empty/zero estimate', () => {
     expect(
       buildPensionParseResult({ mode: 'estimate', grossMonthly: '', startAge: '', parseResult: null }),

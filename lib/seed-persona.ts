@@ -561,6 +561,30 @@ export async function deleteAllUserData(
     for (const table of serviceTables) {
       summary[table] = await serviceWipeTable(opts.service, table, userId)
     }
+
+    // B-066 — invariant "mijlpalenlog gewist ⇔ seed-markering null" (ADR 0123
+    // §5), bewust HIER en niet bij één aanroeper. Staat `milestones_seeded_at`
+    // nog gezet terwijl de log leeg is, dan neemt de eerstvolgende run het
+    // detect-pad in plaats van het stille seed-pad en viert hij de zwaarste
+    // "verse" drempel — na een wis is `totalDebts === 0` triviaal, dus
+    // "Schuldenvrij" op een account dat nooit schuld aflostte. De reset-route
+    // deed dit al zelf (B-058); de persona-seeds (onboarding/seed, activate,
+    // admin/seed) niet. Op deze plek krijgt elk toekomstig wispad het mee.
+    //
+    // Service-client omdat de log in deze zelfde batch met die client gewist
+    // is (en admin/seed op een ándere gebruiker werkt dan de sessie). Het raakt
+    // uitsluitend deze ene kolom op de eigen profielrij van `userId`.
+    // Niet bij `fullErase`: dan verdwijnt het profiel zelf met de auth-user.
+    // Hard falen: een stil mislukte reset laat precies deze bug terugkomen.
+    if (!opts.fullErase && serviceTables.includes('achieved_milestones')) {
+      const { error: seedFlagErr } = await opts.service
+        .from('profiles')
+        .update({ milestones_seeded_at: null })
+        .eq('id', userId)
+      if (seedFlagErr) {
+        throw new Error(`[seed] Terugzetten van profiles.milestones_seeded_at mislukt: ${seedFlagErr.message}`)
+      }
+    }
   }
 
   return summary

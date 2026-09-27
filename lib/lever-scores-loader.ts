@@ -64,9 +64,9 @@ import {
   resolveAmountWithBasis,
   resolveEffectiveIncomeExpenses,
 } from '@/lib/effective-financials'
-import { transactionAnnualIncome } from '@/lib/budget-realized'
+import { getRealizedBudgetAmounts, transactionAnnualIncome } from '@/lib/budget-realized'
 import { loadBudgetBasis } from '@/lib/household/budget-share'
-import type { BudgetBasisRow } from '@/lib/budget-basis'
+import { savingsRateBasisPhrase, type BudgetBasisRow } from '@/lib/budget-basis'
 import { resolveFireParams } from '@/lib/fire-params'
 import { SAVINGS_RATE_WINDOW_MONTHS } from '@/lib/constants'
 import {
@@ -388,19 +388,6 @@ export function resolveLeverGrossYearly(
 }
 
 /**
- * `net_worth_inclusion_pct` als factor; ontbreekt/onzin → 100%.
- *
- * De `?? 100` staat er VÓÓR de `Number()` en dat is het hele punt:
- * `Number(null)` is `0` en `Number.isFinite(0)` is `true`, dus een afwezig
- * percentage zou anders als 0% doorgaan en de hele post laten verdampen.
- * Exact dezelfde vorm als `computeBox3TaxableInput` gebruikt.
- */
-function inclusionFactor(pct: number | null | undefined): number {
-  const n = Number(pct ?? 100)
-  return Number.isFinite(n) ? n / 100 : 1
-}
-
-/**
  * De vijf scalars van ADR 0177 uit al-geladen rijen — puur, fail-soft.
  *
  * FAIL-SOFT IS HIER GEEN LUXE. `loadLeverScores` wordt ge-`await`-ed in
@@ -415,22 +402,16 @@ export function deriveFiscaleRuimte(input: DeriveFiscaleRuimteInput): FiscaleRui
     const hasPartner = deriveHasPartner(input.householdType)
 
     // ── Box 3-zijde ──────────────────────────────────────────────────────────
-    // GEWOGEN met `net_worth_inclusion_pct`, in een MAPPED KOPIE (de rijen zelf
-    // blijven onaangeraakt — de netto-vermogen-aggregaten hierboven lezen ze
-    // ook). `calculateBox3` telt zelf rauw op, terwijl de assets-SELECT
-    // huishoud-gedeeld is: een gezamenlijke rekening van € 400.000 op 50% zou
-    // anders voor € 400.000 in de heffing van deze gebruiker landen, en dat
-    // bedrag komt via de grootste post letterlijk in zijn melding te staan.
-    // `computeBox3TaxableInput` weegt om precies dezelfde reden.
+    // De weging met `net_worth_inclusion_pct` zit sinds 4f (sep 2026) ín
+    // `calculateBox3` zelf — één home, gedeeld met het netto vermogen en de
+    // statusband (`computeBox3TaxableInput`). Tot dan woog dit blok in een eigen
+    // gemapte kopie omdat de motor rauw optelde terwijl de assets-SELECT
+    // huishoud-gedeeld is (een gezamenlijke rekening van € 400.000 op 50% landde
+    // anders voor de volle € 400.000 in de melding). Die kopie is weg: nu zou ze
+    // dubbel wegen. De rijen gaan ongewijzigd door; de motor muteert ze niet.
     const box3CalcInput: Box3Input = {
-      assets: input.assetRows.map((a) => ({
-        ...a,
-        current_value: Number(a.current_value) * inclusionFactor(a.net_worth_inclusion_pct),
-      })) as unknown as Asset[],
-      debts: input.debtRows.map((d) => ({
-        ...d,
-        current_balance: Number(d.current_balance) * inclusionFactor(d.net_worth_inclusion_pct),
-      })) as unknown as Debt[],
+      assets: input.assetRows as unknown as Asset[],
+      debts: input.debtRows as unknown as Debt[],
       hasPartner,
       // De €→vrijheidstijd-vertaling speelt hier geen rol: we lezen alleen `tax`
       // en `netEffect`. Een dagtarief zou een extra bron (en query) vragen.
@@ -716,6 +697,13 @@ export const loadLeverScores = cache(async function loadLeverScores(
     // gedeelde helper als dashboard-data-loader.ts/horizon-data-loader.ts;
     // cache() dedupliceert met die calls binnen hetzelfde request.
     getEarliestIncomeDate(supabase),
+    // Realisatievenster (ADR 0138) — hier alleen GESTART, niet gelezen (Snelheid
+    // B1). `loadBudgetBasis` verderop vraagt precies deze `cache()`-gewrapte
+    // fetch opnieuw op en krijgt dan dezelfde, inmiddels opgeloste promise terug;
+    // zonder deze regel waren zijn drie RPC's een eigen sequentiële ronde ná deze
+    // golf. Bewust geen eigen binding: `loadBudgetBasis` blijft de enige lezer, zodat
+    // de weging op het huishoud-aandeel niet naast die functie opnieuw ontstaat.
+    getRealizedBudgetAmounts(supabase),
   ])
 
   const profile = (profileRes.data ?? {}) as LeverScoresProfile
@@ -856,7 +844,8 @@ export const loadLeverScores = cache(async function loadLeverScores(
   // ── Budgetgrondslag (ADR 0103) — gedeelde samenstelling ──
   // Voedt zowel de EFFECTIEVE spaarquote hieronder als het Box 1-maandinkomen
   // verderop. `getBudgets`/`getOwnProfile` staan al in de golf hierboven en
-  // `loadBudgetBasis` is intern `cache()`-gedeeld, dus dit is geen extra last;
+  // `loadBudgetBasis` is intern `cache()`-gedeeld (en zijn realisatie-fetch liep
+  // al mee in de golf hierboven), dus dit is geen extra last en geen extra ronde;
   // hij staat hier bewust vóór `computeLeverScores` omdat de cashflow-hefboom
   // hem nu nodig heeft.
   const leverBudgetBasis = await loadBudgetBasis(
@@ -950,6 +939,17 @@ export const loadLeverScores = cache(async function loadLeverScores(
     : leverAnnualIncome.basis === 'unknown'
       ? null
       : effectiveSavingsRatePct
+  // Het venster bij die quote, als zinsdeel voor de oorzaak-melding op
+  // /overzicht/budget (B-068, ADR 0121: een spaarquote verschijnt mét venster).
+  // Op de transactie/transactie-grondslag is dat de 6-maands meting over
+  // afgesloten maanden; anders de grondslag zelf, in de woorden die het
+  // grondslagblok en de forecast-kaart ook gebruiken.
+  const savingsRateWindowLabel: string | null =
+    savingsRate === null
+      ? null
+      : bothTransaction
+        ? `over de laatste ${SAVINGS_RATE_WINDOW_MONTHS} afgesloten maanden`
+        : savingsRateBasisPhrase(leverAnnualIncome.basis, leverSavingsExpenses.basis)
 
   // ── Box 3-belast-vermogen-signaal (gedeelde helper) ──
   const householdType = (profile.household_type as string | undefined) ?? undefined
@@ -1061,6 +1061,7 @@ export const loadLeverScores = cache(async function loadLeverScores(
     budgetsTotal,
     budgetsOnTrack,
     budgetsOver,
+    savingsRateWindow: savingsRateWindowLabel,
   })
 
   // ── Box 3-status (canonieke helper) ──

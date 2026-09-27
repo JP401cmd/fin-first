@@ -75,13 +75,39 @@ export type LeverEntry = {
   progress?: number | null
 }
 
+/**
+ * Welke component de Budget-hefboom onder groen trekt (B-068). De cashflow-
+ * score is een 50/50-menging van spaarquote en budgetdiscipline; een melding
+ * die alleen het niveau kent, kan niet zeggen welke van de twee het is.
+ */
+export type CashflowCause = 'sparen' | 'budgetten' | 'beide'
+
+/**
+ * De oorzaak mét de getallen waarop hij rust — dezelfde invoer die de score
+ * voedde, zodat de status-melding niets hoeft na te rekenen. Elk getal draagt
+ * zijn eigen venster: de spaarquote dat van `savingsRateWindow`, de
+ * budgettelling per definitie de lopende maand (`deriveBudgetHealthCounts`).
+ */
+export interface CashflowOorzaak {
+  cause: CashflowCause
+  /** De (effectieve) spaarquote die de score voedde, of null zonder meting. */
+  savingsRatePct: number | null
+  budgetsOver: number
+  budgetsTotal: number
+  /** Vensterlabel als zinsdeel ("over de laatste 6 afgesloten maanden"); null = onbekend. */
+  savingsRateWindow: string | null
+}
+
 export type LeverScores = {
   /** Bezittingen: diversificatie + omvang. */
   assets: LeverEntry
   /** Schulden: schuld-vermogen-ratio. */
   debts: LeverEntry
-  /** Cashflow: de EFFECTIEVE spaarquote (ADR 0121) + budget-health. */
-  cashflow: LeverEntry
+  /**
+   * Cashflow: de EFFECTIEVE spaarquote (ADR 0121) + budget-health. `oorzaak`
+   * staat er alleen bij een oranje of rode status (B-068).
+   */
+  cashflow: LeverEntry & { oorzaak?: CashflowOorzaak }
   /** Belasting: ONBENUTTE fiscale ruimte als aandeel van de eigen heffing (ADR 0177). */
   tax: LeverEntry
 }
@@ -180,6 +206,13 @@ export function computeLeverScores(input: {
   budgetsOnTrack?: number
   /** Aantal budgets die over limiet zijn (spent > limit). */
   budgetsOver?: number
+  /**
+   * Het venster/de grondslag van `savingsRate` als zinsdeel, voor de oorzaak-
+   * melding (B-068, ADR 0121: een spaarquote verschijnt alleen mét venster).
+   * Wordt niet gerekend, alleen doorgegeven. Ontbreekt 'ie, dan noemt de
+   * melding het percentage zonder venster.
+   */
+  savingsRateWindow?: string | null
 }): LeverScores {
   // 1. Bezittingen: diversificatie
   // Bij géén assets → null (neutral/grijs) — er is niets om te beoordelen.
@@ -258,6 +291,33 @@ export function computeLeverScores(input: {
   } else {
     cashflowScore = savingsComponent // null of een waarde
   }
+
+  // Oorzaak (B-068): welke component zelf onder groen zit. Dezelfde band als de
+  // hefboomstatus (`statusFromScore`), dus geen eigen drempel. Bij een oranje of
+  // rode totaalscore zit per constructie minstens één component onder groen —
+  // het gemiddelde van twee groene componenten is groen.
+  const savingsWeak = savingsComponent !== null && statusFromScore(savingsComponent) !== 'green'
+  const budgetWeak = budgetComponent !== null && statusFromScore(budgetComponent) !== 'green'
+  const cashflowStatusNotGreen =
+    cashflowScore !== null && statusFromScore(cashflowScore) !== 'green'
+  const cashflowCause: CashflowCause | null = !cashflowStatusNotGreen
+    ? null
+    : savingsWeak && budgetWeak
+      ? 'beide'
+      : savingsWeak
+        ? 'sparen'
+        : budgetWeak
+          ? 'budgetten'
+          : null
+  const cashflowOorzaak: CashflowOorzaak | null = cashflowCause
+    ? {
+        cause: cashflowCause,
+        savingsRatePct: input.savingsRate === null ? null : Math.round(input.savingsRate),
+        budgetsOver: bOver,
+        budgetsTotal: bTotal,
+        savingsRateWindow: input.savingsRateWindow ?? null,
+      }
+    : null
 
   // 4. Belasting: ONBENUTTE FISCALE RUIMTE (ADR 0177)
   //
@@ -359,7 +419,12 @@ export function computeLeverScores(input: {
   return {
     assets: { score: assetScore, status: statusFromScore(assetScore), detail: assetDetail },
     debts: { score: debtScore, status: statusFromScore(debtScore), detail: debtDetail, progress: debtProgress },
-    cashflow: { score: cashflowScore, status: statusFromScore(cashflowScore), detail: cashflowDetail },
+    cashflow: {
+      score: cashflowScore,
+      status: statusFromScore(cashflowScore),
+      detail: cashflowDetail,
+      ...(cashflowOorzaak ? { oorzaak: cashflowOorzaak } : {}),
+    },
     tax: { score: taxScore, status: taxStatus, detail: taxDetail },
   }
 }

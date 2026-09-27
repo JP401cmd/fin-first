@@ -272,7 +272,7 @@ function ExtraPaymentSlider({
             Extra aflossen
           </p>
           <p className="mt-0.5 text-[11px] leading-snug text-[var(--ink-3)]">
-            Bovenop de minimum-betaling. Verdeling volgt je gekozen strategie.
+            Bovenop wat je nu al betaalt. Verdeling volgt je gekozen strategie.
           </p>
         </div>
         <p className="text-kern-700">

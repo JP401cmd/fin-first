@@ -91,6 +91,29 @@ export function findNegativeDebtValueError(values: {
   return null
 }
 
+/**
+ * "Min. betaling" beweegt mee met het Maandbedrag zolang de twee gelijk staan.
+ *
+ * Onboarding en quick-add zetten `minimum_payment` gelijk aan `monthly_payment`
+ * (`lib/quick-add/build-drafts.ts`). Wie daarna alleen het Maandbedrag aanpaste
+ * liet het oude minimum staan, en de strategievergelijking op
+ * /overzicht/schulden rekende met dat oude, hogere bedrag door (B-067: "de
+ * totaalpagina blijft heel snel aflossen"). De rekenmotor (`simulatePayoff`)
+ * capt het minimum inmiddels op het maandbedrag; dit voorkomt dat de rij
+ * überhaupt zo'n verouderd minimum krijgt.
+ *
+ * Bewust meeschuiven en niet verbergen: het veld heeft betekenis voor
+ * doorlopend krediet of een creditcard, waar het contractuele minimum lager
+ * ligt dan wat je betaalt en het verschil in de sneeuwbal naar de focusschuld
+ * mag. Een leeg veld blijft leeg (= "onbekend", de motor valt dan terug op het
+ * maandbedrag); een bewust ánder minimum blijft staan.
+ */
+export function syncedMinimumPayment(prevMonthly: string, prevMinimum: string, nextMonthly: string): string {
+  if (prevMinimum.trim() === '') return prevMinimum
+  if (Number(prevMinimum) === Number(prevMonthly)) return nextMonthly
+  return prevMinimum
+}
+
 export function DebtForm({
   debt,
   userAssets,
@@ -396,6 +419,10 @@ export function DebtForm({
       ? calculatedBalance
       : (Number(currentBalance) || 0)
 
+    const monthlyPaymentToWrite = useCalculatedPayment && calculatedPayment != null
+      ? calculatedPayment
+      : (Number(monthlyPayment) || 0)
+
     const row = {
       user_id: user.id,
       name,
@@ -403,8 +430,15 @@ export function DebtForm({
       original_amount: Number(originalAmount) || 0,
       current_balance: balanceToWrite,
       interest_rate: Number(interestRate) || 0,
-      minimum_payment: Number(minimumPayment) || 0,
-      monthly_payment: useCalculatedPayment && calculatedPayment != null ? calculatedPayment : (Number(monthlyPayment) || 0),
+      // Ook het "Berekend"-pad schrijft een nieuw maandbedrag zonder dat het
+      // Maandbedrag-veld wordt aangeraakt; stond het minimum gelijk aan het
+      // opgeslagen maandbedrag, dan schuift het hier alsnog mee (B-067).
+      minimum_payment: Number(syncedMinimumPayment(
+        String(debt?.monthly_payment ?? ''),
+        minimumPayment,
+        String(monthlyPaymentToWrite),
+      )) || 0,
+      monthly_payment: monthlyPaymentToWrite,
       start_date: startDate,
       end_date: endDate || null,
       creditor: creditor || null,
@@ -736,8 +770,12 @@ export function DebtForm({
                 type="number"
                 value={minimumPayment}
                 onChange={(e) => setMinimumPayment(e.target.value)}
+                data-testid="debt-minimum-payment"
                 className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
               />
+              <p className="mt-1 text-[10px] leading-tight text-[var(--ink-4)]">
+                Ondergrens in de strategievergelijking; volgt het maandbedrag zolang ze gelijk zijn.
+              </p>
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Maandbedrag</label>
@@ -769,8 +807,12 @@ export function DebtForm({
                 <input
                   type="number"
                   value={monthlyPayment}
-                  onChange={(e) => setMonthlyPayment(e.target.value)}
+                  onChange={(e) => {
+                    setMinimumPayment(syncedMinimumPayment(monthlyPayment, minimumPayment, e.target.value))
+                    setMonthlyPayment(e.target.value)
+                  }}
                   placeholder="0"
+                  data-testid="debt-monthly-payment"
                   className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
                 />
               )}
@@ -984,7 +1026,10 @@ export function DebtForm({
                       <input
                         type="number"
                         value={monthlyPayment}
-                        onChange={(e) => setMonthlyPayment(e.target.value)}
+                        onChange={(e) => {
+                          setMinimumPayment(syncedMinimumPayment(monthlyPayment, minimumPayment, e.target.value))
+                          setMonthlyPayment(e.target.value)
+                        }}
                         className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm"
                       />
                     </div>

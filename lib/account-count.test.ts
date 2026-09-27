@@ -116,7 +116,10 @@ function makeClient(tables: Record<string, Record<string, unknown>[]> = { bank_a
   }
 
   const supabase = {
-    auth: { getUser: async () => ({ data: { user: { id: 'me' } }, error: null }) },
+    auth: {
+      getUser: async () => ({ data: { user: { id: 'me' } }, error: null }),
+      getClaims: async () => ({ data: { claims: { sub: 'me' } }, error: null }),
+    },
     from: (table: string) => builder(table),
     rpc: () => Promise.resolve({ data: [], error: null }),
   } as unknown as SupabaseClient

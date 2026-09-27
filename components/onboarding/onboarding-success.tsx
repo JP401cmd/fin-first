@@ -20,11 +20,15 @@
  * brug naar de rondleiding op /overzicht, die dezelfde indeling mét eigen
  * cijfers laat zien (ADR 0130).
  *
- * **Bewust STATISCH.** Geen eigen cijfer in "Wat je hebt": op het
- * bank-herlaadpad (`recapAvailableRef === false`, de bankstap gaat dan direct
- * naar `success`) zijn de sessie-antwoorden weg — precies het pad waar de
- * klaar-recap óók al oversloeg. Bovendien stond het getal net op `klaar` en
- * opent de rondleiding ermee.
+ * **Eigen cijfers (B-065, eigenaarsbesluit 27 sep 2026).** Het scherm zet
+ * verwachtingen: wat de app nu voor je doet, met je eigen startpunt erbij. De
+ * twee tijdgetallen komen uit dezelfde canonieke helpers als het klaar-scherm
+ * en de meelopende teller (`computeFreedomTicker` / `computeMonthlyFreedomBuildup`
+ * in `lib/freedom-ticker.ts`), berekend door de orchestrator — hier wordt niets
+ * opgeteld of gedeeld. De /overzicht-bundel (`DashboardData`) bestaat op dit
+ * moment nog niet: dit scherm leeft in de (onboarding)-groep, vóór de eerste
+ * app-load. Op het bank-herlaadpad zijn de sessie-antwoorden weg; beide props
+ * zijn dan `null` en het blok valt terug op één beschrijvende zin.
  *
  * **Geen `colorVars`-prop**, anders dan bij de popup: dit scherm portalt niet
  * maar staat in de page-wrapper met `stepTintStyle`, dus `var(--color-kern-500)`
@@ -34,12 +38,26 @@
 import { FinDots } from '@/components/app/fin-dots'
 import { Button } from '@/components/editorial'
 import { WAARDES } from '@/lib/onboarding/waardes'
+import type { MonthlyFreedomBuildup } from '@/lib/freedom-ticker'
+
+export interface OnboardingSuccessProps {
+  onDashboard: () => void
+  /**
+   * Korte vrijheidstijd van wat je nu hebt ("1j 3m 16d") uit
+   * `computeFreedomTicker`. `null` = niets eerlijks te tonen (geen vermogen,
+   * geen inkomen/uitgaven, een tekort, of de sessie-antwoorden zijn weg).
+   */
+  freedomLabel?: string | null
+  /** Vrijheid die er per maand bijkomt (`computeMonthlyFreedomBuildup`); `null` bij tekort of onbekend. */
+  monthlyBuildup?: MonthlyFreedomBuildup | null
+}
 
 export function OnboardingSuccess({
   onDashboard,
-}: {
-  onDashboard: () => void
-}) {
+  freedomLabel = null,
+  monthlyBuildup = null,
+}: OnboardingSuccessProps) {
+  const heeftCijfers = Boolean(freedomLabel) || monthlyBuildup !== null
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col items-center py-8 text-center sm:py-12">
       {/* Fin's avatar — celebration emphasis with subtle pulse */}
@@ -67,9 +85,42 @@ export function OnboardingSuccess({
         Vandaag op orde, <em className="italic text-kern-600">morgen in beeld</em>
       </h2>
       <p className="mx-auto mt-3 max-w-md font-serif text-sm leading-relaxed text-[var(--ink-2)] sm:text-base">
-        Je hebt net verteld wat je hebt, wat er omgaat en waar je naartoe wilt. Vier dingen
-        houdt TriFinity vanaf nu voor je bij.
+        Dit houdt TriFinity vanaf nu voor je bij. Vul je later iets aan of verandert er iets, dan
+        rekent de app meteen mee.
       </p>
+
+      {/* B-065: je eigen startpunt — uitsluitend canonieke uitkomsten, geen
+          eigen som. Zonder cijfers één beschrijvende terugvalzin. */}
+      <div
+        className="mx-auto mt-6 w-full max-w-md border-y border-[var(--border-ed)] px-4 py-4 text-left"
+        data-testid="success-startpunt"
+      >
+        <p className="font-mono text-[10px] uppercase tracking-[0.20em] text-[var(--ink-3)]">Jouw startpunt</p>
+        {heeftCijfers ? (
+          <ul className="mt-2 space-y-1.5 text-sm leading-relaxed text-[var(--ink-2)]">
+            {freedomLabel && (
+              <li>
+                Wat je nu hebt, staat voor{' '}
+                <span className="font-mono font-semibold tabular-nums text-[var(--ink)]">{freedomLabel}</span>{' '}
+                vrijheid.
+              </li>
+            )}
+            {monthlyBuildup && (
+              <li>
+                Wat je nu per maand overhoudt, levert elke maand{' '}
+                <span className="font-mono font-semibold tabular-nums text-[var(--ink)]">
+                  {monthlyBuildup.daysPerMonth} {monthlyBuildup.daysPerMonth === 1 ? 'dag' : 'dagen'}
+                </span>{' '}
+                vrijheid op.
+              </li>
+            )}
+          </ul>
+        ) : (
+          <p className="mt-2 text-sm leading-relaxed text-[var(--ink-2)]">
+            Je eigen cijfers staan op je overzicht, ook in tijd: hoe lang je uitgaven gedekt zijn.
+          </p>
+        )}
+      </div>
 
       {/* De vier waardes — elk met de kicker-streep in zijn eigen accent
           (editorial patroon-kaart *Kicker-streep*), identiek aan hoe ze in de
@@ -91,12 +142,7 @@ export function OnboardingSuccess({
               >
                 {waarde.kicker}
               </p>
-              <p className="mt-1 font-serif text-[15px] font-semibold leading-snug text-[var(--ink)]">
-                {waarde.belofte}
-              </p>
-              <p className="mt-1 text-[13px] leading-snug text-[var(--ink-3)]">
-                {waarde.toelichting}
-              </p>
+              <p className="mt-1 font-serif text-[15px] leading-snug text-[var(--ink)]">{waarde.zin}</p>
             </div>
           </li>
         ))}
@@ -105,7 +151,8 @@ export function OnboardingSuccess({
       {/* Fin's closing — font-serif italic */}
       <div className="mx-auto mt-10 max-w-md border-y border-[var(--border-ed)] px-4 py-4">
         <p className="font-serif text-sm italic leading-relaxed text-[var(--ink-2)]">
-          Veel ontdekkingen! Elke bewuste keuze brengt je dichter bij vrijheid.
+          Alles wat je net invulde, staat nu op zijn plek. Wat je vandaag niet uitgeeft, levert tijd
+          op — en dat zie je voortaan terug.
         </p>
       </div>
 
@@ -125,7 +172,7 @@ export function OnboardingSuccess({
             worden, en zou de concept-staat laten staan. Een pad in tekst is
             hier veiliger dan een klikbare route. */}
       <p className="mx-auto mt-4 max-w-md font-sans text-xs leading-relaxed text-[var(--ink-3)]">
-        Rustig beginnen of meteen alle detail? Je weergave kies je later bij{' '}
+        Liever rustig beginnen of meteen alle details? Dat kies je bij{' '}
         <span className="font-semibold text-[var(--ink-2)]">Mijn &rarr; Weergave en uiterlijk</span>.
       </p>
 

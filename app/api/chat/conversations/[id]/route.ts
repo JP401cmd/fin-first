@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
-import { getCachedUser } from '@/lib/supabase/cached-user'
+import { getCachedUser, getVerifiedUser } from '@/lib/supabase/cached-user'
 import { badRequest, notFound, serverError, unauthorized } from '@/lib/api/respond'
 import { parseBody } from '@/lib/api/parse-body'
 import {
@@ -87,7 +87,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (!CONVERSATION_ID_RE.test(id)) return badRequest('Ongeldig gespreks-id')
 
     const supabase = await createClient()
-    const user = await getCachedUser(supabase)
+    const user = await getVerifiedUser(supabase)
     if (!user) return unauthorized()
 
     const parsed = await parseBody(RenameSchema, request)
@@ -123,7 +123,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     if (!CONVERSATION_ID_RE.test(id)) return badRequest('Ongeldig gespreks-id')
 
     const supabase = await createClient()
-    const user = await getCachedUser(supabase)
+    const user = await getVerifiedUser(supabase)
     if (!user) return unauthorized()
 
     // De berichten gaan mee via `chat_messages.conversation_id ON DELETE

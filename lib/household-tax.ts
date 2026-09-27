@@ -202,11 +202,12 @@ function ownItems(items: PerspectiveItem[]): PerspectiveItem[] {
 }
 
 /**
- * Bouw één `calculateBox3`-input uit een set PerspectiveItems. De pure engine
- * leest `current_value`/`current_balance` op vol bedrag (Box 3-vermogen wordt
- * fiscaal NIET fractioneel toegekend — het hoort bij de juridische eigenaar of
- * wordt tussen fiscaal partners verdeeld). Wij selecteren dus de juiste items
- * en voeden hun VOLLEDIGE waarde; de share-fractie speelt hier geen rol.
+ * Bouw één `calculateBox3`-input uit een set PerspectiveItems. Wij selecteren
+ * de juiste items en voeden ze ongewogen; de share-fractie speelt hier geen rol.
+ * Sinds 4f (27 sep 2026) weegt `calculateBox3` zelf elke post met
+ * `net_worth_inclusion_pct` — ook in het gecombineerde huishoudresultaat. Een
+ * gedeelde post die een partner op 50% zette, telt daar dus voor 50% mee
+ * (eigenaarsbesluit: de pct is een hard gegeven; zie calculations.ts, 4f).
  */
 function box3Input(
   assets: PerspectiveItem[],

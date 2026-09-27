@@ -3,6 +3,8 @@ import { loadConnectionsData } from '@/lib/connections-data'
 import { loadBrokerConnectionsForUser } from '@/lib/broker-connections-data'
 import { loadAangifteImports } from '@/lib/aangifte/imports-loader'
 import { isTrueLayerEnabled } from '@/lib/truelayer/feature-flag'
+import { getOwnProfile } from '@/lib/server-data/base'
+import { readAutoSyncEnabled } from '@/lib/sync/auto-sync'
 import { KoppelingenClient } from './koppelingen-client'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 
@@ -14,11 +16,14 @@ export default async function KoppelingenPage() {
   // app_settings (globale, niet-secret tak — leesbaar met de anon-RLS-client,
   // géén service-role) zodat de bank-sectie nooit iets belooft wat de vlag
   // tegenspreekt.
-  const [data, brokerConnections, aangifteImports, bankConnectEnabled] = await Promise.all([
+  // `getOwnProfile` (eigen rij, cache()-gedeeld) draagt de schakelaar
+  // "Automatisch bijwerken" (ADR 0182); fail-closed gelezen.
+  const [data, brokerConnections, aangifteImports, bankConnectEnabled, ownProfileRes] = await Promise.all([
     loadConnectionsData(supabase),
     loadBrokerConnectionsForUser(supabase),
     loadAangifteImports(supabase),
     isTrueLayerEnabled(supabase),
+    getOwnProfile(supabase),
   ])
 
   return (
@@ -29,6 +34,7 @@ export default async function KoppelingenPage() {
         brokerConnections={brokerConnections}
         aangifteImports={aangifteImports}
         bankConnectEnabled={bankConnectEnabled}
+        autoSyncEnabled={readAutoSyncEnabled(ownProfileRes.data)}
       />
     </>
   )

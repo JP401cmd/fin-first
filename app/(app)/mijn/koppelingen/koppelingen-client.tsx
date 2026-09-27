@@ -18,6 +18,7 @@ import type { BrokerConnectionRow, BrokerId } from '@/lib/broker-connections-dat
 import type { AangifteImportSummary } from '@/lib/aangifte/imports-loader'
 import { formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+import { AutomatischBijwerkenSchakelaar } from '@/components/mijn/automatisch-bijwerken-schakelaar'
 
 // Picker-source shape consumed by AddExchangeModal / AddWalletModal (R2 uses
 // these from the asset-edit page). Re-exported here to keep the existing import
@@ -50,6 +51,11 @@ interface KoppelingenClientProps {
    * gebruiker toch niet mag starten.
    */
   bankConnectEnabled: boolean
+  /**
+   * "Automatisch bijwerken" (`profiles.auto_sync_enabled`, ADR 0182) — fail-closed
+   * gelezen door de page: alleen een expliciete `true` is aan.
+   */
+  autoSyncEnabled: boolean
 }
 
 const EXCHANGE_LABEL: Record<ExchangeId, string> = {
@@ -97,7 +103,7 @@ function linkedAssetHref(linkedAssetType: string): string {
   return `/core/assets/${linkedAssetType}`
 }
 
-export function KoppelingenClient({ initialData, brokerConnections, aangifteImports, bankConnectEnabled }: KoppelingenClientProps) {
+export function KoppelingenClient({ initialData, brokerConnections, aangifteImports, bankConnectEnabled, autoSyncEnabled }: KoppelingenClientProps) {
   const router = useRouter()
   // Vaste kicker: dit component leeft onder /mijn/koppelingen, dus de vroegere
   // pathname-terugval op 'Identiteit' kon alleen nog een niet-bestaand pad tonen.
@@ -372,6 +378,9 @@ export function KoppelingenClient({ initialData, brokerConnections, aangifteImpo
           overzicht en kun je de verbinding testen.
         </p>
       </div>
+
+      {/* ── Automatisch bijwerken (ADR 0182) — één keuze voor alle bank- en brokerkoppelingen ── */}
+      <AutomatischBijwerkenSchakelaar initialEnabled={autoSyncEnabled} />
 
       {/* ── Crypto ─────────────────────────────────────────────────── */}
       <ConnectionSection

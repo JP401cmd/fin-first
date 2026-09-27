@@ -34,6 +34,8 @@
 // één van is.
 
 import { CHAT_DEVICE_DB_NAAM } from '@/lib/chat/history/device-db-naam'
+import { SW_EXPIRATION_DB_NAME, deleteUserContentCaches } from '@/lib/pwa/sw-caches'
+import { AUTO_SYNC_CLAIM_KEY_PREFIX } from '@/lib/sync/auto-sync'
 
 /**
  * Prefix van de krantcache. Hier canoniek, want deze module moet 'm kunnen
@@ -67,6 +69,7 @@ const ACCOUNT_DATA_PREFIXES = [
   'budget-edit-draft-',
   'budget-new-draft',
   'tf-celebrated:', // gevierde financiële mijlpalen
+  AUTO_SYNC_CLAIM_KEY_PREFIX, // tijdstempel automatisch bijwerken, sleutel draagt de user-id (ADR 0182)
 ] as const
 
 /**
@@ -109,6 +112,25 @@ export function purgeAccountScopedStorage(): void {
     }
   } catch {
     // Privémodus of beleid blokkeert IndexedDB — er staat dan sowieso niets.
+  }
+
+  // De service-worker-caches met gerenderde pagina's, RSC-payloads en Supabase-
+  // antwoorden. Sinds sep 2026 schrijft de worker ze niet meer (NetworkOnly), maar
+  // een oude worker op dit toestel kan er nog vermogens- en transactiecijfers in
+  // hebben gezet. Niet wachten (deleteUserContentCaches lost zelf faal-zacht op),
+  // en de toegang tot `caches` zelf in een try: deze purge staat vóór signOut, dus
+  // een fout hier mag het uitloggen nooit tegenhouden. Serwist's URL-logboek in
+  // IndexedDB gaat mee; bij een open verbinding van de worker blokkeert dat hooguit
+  // tot die sluit, net als bij de chat-database hierboven.
+  try {
+    void deleteUserContentCaches(
+      typeof caches === 'undefined' || caches === null ? undefined : caches,
+    )
+    if (typeof indexedDB !== 'undefined' && indexedDB !== null) {
+      indexedDB.deleteDatabase(SW_EXPIRATION_DB_NAME)
+    }
+  } catch {
+    // Cache Storage of IndexedDB geweigerd — uitloggen gaat gewoon door.
   }
 }
 

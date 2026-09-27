@@ -20,14 +20,19 @@
  * Copy-grens: elke regel beschrijft wat de app TOONT, nooit wat de gebruiker
  * zou moeten doen of wat iets gaat opleveren — inzicht mag, advies niet
  * (Wft-grens, zie de compliance-check-skill).
+ *
+ * B-065 (eigenaarsbesluit 27 sep 2026): elke waarde is ingekort tot één korte
+ * zin. De vroegere twee regels (belofte + toelichting) zijn samengevoegd in
+ * `zin`; het successcherm zet er nu eigen cijfers naast, dus de uitleg hoeft
+ * niet meer alles te dragen.
  */
 
 export type WaardeAccent = 'kern' | 'wil' | 'horizon' | 'fin'
 
 export interface Waarde {
   kicker: string
-  belofte: string
-  toelichting: string
+  /** Eén korte, beschrijvende zin: wat de app hierover laat zien. */
+  zin: string
   /** Accent-sleutel: `var(--color-<accent>-500)` voor de streep, `-700` voor de kicker. */
   accent: WaardeAccent
 }
@@ -35,30 +40,22 @@ export interface Waarde {
 export const WAARDES: readonly Waarde[] = [
   {
     kicker: 'Wat je hebt',
-    belofte: 'Je vermogen in euro’s én in jaren.',
-    toelichting:
-      'We tellen je bezittingen, schulden en pensioen bij elkaar op, en rekenen dat bedrag om naar de tijd die het je oplevert.',
+    zin: 'Je vermogen in euro’s én in de tijd die het je oplevert.',
     accent: 'kern',
   },
   {
     kicker: 'Wat er omgaat',
-    belofte: 'Elke maand zie je wat je opbouwt.',
-    toelichting:
-      'Je ziet wat er binnenkomt, waar het heen gaat en wat je overhoudt — inclusief de abonnementen die stilletjes blijven lopen.',
+    zin: 'Wat er elke maand binnenkomt, weggaat en overblijft.',
     accent: 'horizon',
   },
   {
     kicker: 'Waar het op uitloopt',
-    belofte: 'De datum waarop werken een keuze wordt.',
-    toelichting:
-      'We rekenen je plan door op je eigen cijfers en schuiven die datum mee zodra er iets verandert.',
+    zin: 'Wanneer werken een keuze wordt, doorgerekend op je eigen cijfers.',
     accent: 'wil',
   },
   {
     kicker: 'Waar je op kunt sturen',
-    belofte: 'Zie wat één keuze met die datum doet.',
-    toelichting:
-      'Fin rekent mee, wijst aan welke knop het zwaarst weegt en laat zien wat er gebeurt als je eraan draait.',
+    zin: 'Fin laat zien wat één keuze met dat moment doet.',
     accent: 'fin',
   },
 ]

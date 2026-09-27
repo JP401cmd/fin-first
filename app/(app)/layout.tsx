@@ -125,6 +125,22 @@ function generateFontVars(theme: string): Record<string, string> {
   return {}
 }
 
+/**
+ * Heeft de gebruiker de welkomstgids afgesloten? Eén definitie voor twee
+ * lezers in de layout: de vroeg gestarte seed-load en de `dismissed`-prop van
+ * `WelcomeGuideProvider` — die mogen nooit uiteenlopen.
+ */
+function isWelcomeGuideDismissed(
+  profile: { module_guide_state?: unknown } | null | undefined,
+): boolean {
+  const status = (
+    (profile?.module_guide_state as Record<string, unknown> | null | undefined)?.[
+      WELCOME_GUIDE_MODULE_KEY
+    ] as { status?: string } | undefined
+  )?.status
+  return status === 'dismissed'
+}
+
 export default async function AppLayout({
   children,
 }: {
@@ -135,9 +151,12 @@ export default async function AppLayout({
   const timer = startLayoutTimer()
 
   const supabase = await createClient()
-  // getCachedUser (React cache()) i.p.v. supabase.auth.getUser(): deelt de
-  // JWT-validate-round-trip met loadLeverScores() verderop (dat óók
-  // getCachedUser(supabase) aanroept) — één auth-call per request i.p.v. twee.
+  // getCachedUser verifieert het JWT via getClaims() — lokaal tegen de JWKS,
+  // géén /auth/v1/user-ronde (Snelheid B2, ADR 0052). De proxy deed die check al;
+  // React cache() deelt de uitkomst met loadLeverScores() en de paginaloaders.
+  // Een ingetrokken sessie blijft tot de JWT-expiry geldig (geaccepteerd venster,
+  // ADR 0052). De blocked_at-check verderop is daar los van (die trok nooit een
+  // sessie in).
   const user = await getCachedUser(supabase)
 
   if (!user) {
@@ -146,6 +165,52 @@ export default async function AppLayout({
     redirect('/login')
   }
   timer.mark('auth')
+  const userId = user.id
+
+  // ── Onafhankelijke laadstappen vóór de hoofdbatch starten (Snelheid B1) ──
+  // De leverscores en de gids-seed wachtten tot hier op de hoofdbatch, terwijl ze
+  // die niet nodig hebben: de lever-loader heeft alleen de client en de
+  // perspectief-cookie nodig (profiel/assets/debts deelt hij via `cache()` met de
+  // batch hieronder), de gids-seed alleen `userId` en één profielvlag. Ze starten
+  // nu hier en worden pas verderop, op hun oude plek, ge-await — daar blijft ook
+  // de foutvolgorde gelijk: een falende batch gooit eerst, en een redirect
+  // (geblokkeerd / niet-onboard) valt vóór die awaits, precies als voorheen. Het
+  // enige verschil is dat die twee in dat geval speculatief hebben gelopen; hun
+  // uitkomst wordt dan weggegooid. De `.catch(() => {})` voorkomt daarbij alleen
+  // een unhandled rejection — de latere `await` gooit de oorspronkelijke fout nog
+  // steeds.
+  //
+  // Timer-markers: `leverStart`/`guideStart` → `lever`/`guide` meten nu de EIGEN
+  // duur van die stap (gemarkeerd bij het oplossen van de promise), en die loopt
+  // over de hoofdbatch heen. De vier stapduren tellen dus niet meer op tot
+  // `totalMs`; de winst staat in `totalMs`.
+  //
+  // `loadLeverScores(supabase, sidebarPerspective)` houdt exact de argumenten van
+  // de pagina-aanroepen (zelfde client, zelfde perspectief) — anders verdwijnt de
+  // `cache()`-dedup met de status-duiding en /overzicht.
+  const sidebarPerspective = await getServerPerspective()
+  timer.mark('leverStart')
+  const leverScoresPromise = loadLeverScores(supabase, sidebarPerspective).then((result) => {
+    timer.mark('lever')
+    return result
+  })
+  leverScoresPromise.catch(() => {})
+  // De gids-seed hangt aan één profielvlag. `getOwnProfile` is `cache()`-gewrapt:
+  // dit is dezelfde profiel-query als die in de hoofdbatch, geen tweede. Zo start
+  // de seed zodra het profiel binnen is, naast de rest van de batch, en blijft een
+  // afgesloten gids gratis (geen queries), net als voorheen.
+  const welcomeGuideSeedPromise = getOwnProfile(supabase)
+    .then((profileRes) => {
+      timer.mark('guideStart')
+      return isWelcomeGuideDismissed(profileRes.data)
+        ? null
+        : loadWelcomeGuideSeed(supabase, userId)
+    })
+    .then((seed) => {
+      timer.mark('guide')
+      return seed
+    })
+  welcomeGuideSeedPromise.catch(() => {})
 
   const threeMonthsAgo = new Date()
   threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
@@ -425,17 +490,15 @@ export default async function AppLayout({
   // — de shell consumeert het i.p.v. die queries te dupliceren (#847-kompas).
   // Perspectief stuurt uitsluitend `netWorth` (lever-status blijft persoonlijk).
   // `cache()` dedupliceert binnen het request (zelfde perspective-arg als de
-  // page-status-route → één query-set).
-  timer.mark('leverStart')
-  const sidebarPerspective = await getServerPerspective()
+  // page-status-route → één query-set). Gestart vóór de hoofdbatch (Snelheid B1,
+  // zie boven); hier alleen nog opgehaald.
   const {
     scores: sidebarLeverScores,
     box1Status: sidebarBox1Status,
     box3Status: sidebarBox3Status,
     netWorth: sidebarNetWorth,
     budgetsOver,
-  } = await loadLeverScores(supabase, sidebarPerspective)
-  timer.mark('lever')
+  } = await leverScoresPromise
 
   const sidebarSignals: SidebarSignals = {
     tipsActions: sidebarActionCount > 0 || sidebarOpenRecCount > 0,
@@ -514,18 +577,10 @@ export default async function AppLayout({
   // als FinHome eronder vallen. Is de gids AFGESLOTEN, dan laden we niets: de
   // lege staat ("Gids opnieuw tonen") heeft geen config nodig, en de status
   // staat gratis in de al geladen profielrij. Dat scheelt twee queries per
-  // harde shell-render voor iedereen die klaar is met de gids.
-  const welcomeGuideStatus = (
-    (profile?.module_guide_state as Record<string, unknown> | null)?.[
-      WELCOME_GUIDE_MODULE_KEY
-    ] as { status?: string } | undefined
-  )?.status
-  const welcomeGuideDismissed = welcomeGuideStatus === 'dismissed'
-  timer.mark('guideStart')
-  const welcomeGuideSeed = welcomeGuideDismissed
-    ? null
-    : await loadWelcomeGuideSeed(supabase, user.id)
-  timer.mark('guide')
+  // harde shell-render voor iedereen die klaar is met de gids. De load zelf is
+  // vóór de hoofdbatch gestart (Snelheid B1) met dezelfde vlag-helper als hier.
+  const welcomeGuideDismissed = isWelcomeGuideDismissed(profile)
+  const welcomeGuideSeed = await welcomeGuideSeedPromise
 
   // ── Gids-laag voor Fins meldingen (ADR 0130, fase 2) ───────────────────
   // Fin noemt op de bijpassende route de eerstvolgende open gidsstap. De ROUTE

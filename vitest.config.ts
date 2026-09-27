@@ -1,6 +1,7 @@
 import { defineConfig, configDefaults } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import path from 'path'
+import { assertNodeRuntime } from './scripts/check-node-runtime.mjs'
 
 // Fail-fast-guard tegen een gediagnosticeerde omgevingsbug (Git Bash): op
 // win32 geeft de Bash-tool een lowercase-drive cwd (`c:\...`) ongewijzigd
@@ -28,6 +29,14 @@ if (process.platform === 'win32' && /^[a-z]:/.test(process.cwd())) {
       'Windows-cwd via de MSYS-mounttabel) of gebruik de PowerShell-tool.'
   )
 }
+
+// Runtime-poort (ADR 0100): op een Node onder `engines.node` stopt vitest hier
+// hard, vóór er één suite draait — in plaats van één rode canary
+// (test/node-webstreams-race.test.ts) tussen duizenden groene, die als "bekend
+// rood" wordt weggeschreven. Staat bewust in de config en niet (alleen) in een
+// npm-`pre*`-script: een kale `npx vitest` slaat die scripts over. Op Vercel
+// (env VERCEL) alleen een waarschuwing. Zie scripts/check-node-runtime.mjs.
+assertNodeRuntime({ rootDir: __dirname })
 
 export default defineConfig({
   plugins: [react()],

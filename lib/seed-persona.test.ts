@@ -28,6 +28,7 @@ type MockResult = { count: number | null; error: { message: string; code?: strin
 
 function makeSupabaseMock(failTables: string[] = [], ontbrekendeTabellen: string[] = []) {
   const deletedTables: string[] = []
+  const updates: { table: string; payload: Record<string, unknown>; eq: [string, unknown] }[] = []
   const client = {
     from(table: string) {
       const result: MockResult = failTables.includes(table)
@@ -39,17 +40,28 @@ function makeSupabaseMock(failTables: string[] = [], ontbrekendeTabellen: string
         deletedTables.push(table)
         return Promise.resolve(result)
       }
+      let pendingUpdate: Record<string, unknown> | null = null
       const builder = {
+        update: (payload: Record<string, unknown>) => {
+          pendingUpdate = payload
+          return builder
+        },
         delete: () => builder,
         select: () => builder,
-        eq: terminal,
+        eq: (col: string, val: unknown) => {
+          if (pendingUpdate) {
+            updates.push({ table, payload: pendingUpdate, eq: [col, val] })
+            return Promise.resolve({ error: failTables.includes(table) ? result.error : null })
+          }
+          return terminal()
+        },
         in: terminal,
         like: terminal,
       }
       return builder
     },
   }
-  return { client: client as unknown as SupabaseClient, deletedTables }
+  return { client: client as unknown as SupabaseClient, deletedTables, updates }
 }
 
 describe('deleteAllUserData — fail-fast bij delete-fouten', () => {
@@ -160,9 +172,9 @@ describe('deleteAllUserData — storage-buckets volgen de wis (ADR 0152)', () =>
         }
       },
     }
-    const { client: tables, deletedTables } = makeSupabaseMock()
+    const { client: tables, deletedTables, updates } = makeSupabaseMock()
     const service = { storage, from: (tables as unknown as { from: (t: string) => unknown }).from }
-    return { service: service as unknown as SupabaseClient, listed, removed, deletedTables }
+    return { service: service as unknown as SupabaseClient, listed, removed, deletedTables, updates }
   }
 
   it('wist de prefix `<user-id>/` in elke user-scoped bucket en telt in de summary', async () => {
@@ -188,6 +200,63 @@ describe('deleteAllUserData — storage-buckets volgen de wis (ADR 0152)', () =>
     )
     // Niets van de tabellen is geraakt: het account is intact en de gebruiker kan opnieuw.
     expect(deletedTables).toEqual([])
+  })
+})
+
+/**
+ * B-066 — de invariant "mijlpalenlog gewist ⇔ seed-markering null" (ADR 0123 §5)
+ * hoort op de plek waar de log gewist wordt, niet bij één aanroeper. Tot 27 sep
+ * zette alleen de onboarding-reset `profiles.milestones_seeded_at` terug (B-058);
+ * de persona-seedpaden (/api/onboarding/seed, /api/activate, /api/admin/seed)
+ * wisten `achieved_milestones` via deze functie maar lieten de markering staan.
+ * De eerste /overzicht-load vierde daarna de zwaarste "verse" drempel — op een
+ * schuldvrije persona "Schuldenvrij", terwijl er nooit schuld was afgelost.
+ */
+describe('deleteAllUserData — mijlpalen-seedmarkering volgt de log (B-066)', () => {
+  const UID = '22222222-2222-4222-8222-222222222222'
+
+  /** Service-mock: tabellen uit makeSupabaseMock plus lege storage-buckets. */
+  function makeService(failTables: string[] = []) {
+    const mock = makeSupabaseMock(failTables)
+    const storage = {
+      from: () => ({
+        list: async () => ({ data: [], error: null }),
+        remove: async () => ({ data: [], error: null }),
+      }),
+    }
+    const tables = mock.client as unknown as { from: (t: string) => unknown }
+    const service = { storage, from: tables.from } as unknown as SupabaseClient
+    return { ...mock, client: service }
+  }
+
+  it('zet profiles.milestones_seeded_at terug naar null zodra achieved_milestones gewist is (service-pad)', async () => {
+    const { client } = makeSupabaseMock()
+    const { client: service, deletedTables, updates } = makeService()
+    await deleteAllUserData(client, UID, undefined, { service })
+    expect(deletedTables).toContain('achieved_milestones')
+    const reset = updates.find((u) => u.table === 'profiles' && 'milestones_seeded_at' in u.payload)
+    expect(reset?.payload).toEqual({ milestones_seeded_at: null })
+    // Alléén de eigen rij van dezelfde gebruiker.
+    expect(reset?.eq).toEqual(['id', UID])
+  })
+
+  it('zonder service-client blijft de log staan, dus ook de markering (geen tweede viering op oude rijen)', async () => {
+    const { client, updates } = makeSupabaseMock()
+    await deleteAllUserData(client, UID)
+    expect(updates.some((u) => 'milestones_seeded_at' in u.payload)).toBe(false)
+  })
+
+  it('bij een volledige accountverwijdering (fullErase) is er geen profiel meer om te markeren', async () => {
+    const { client } = makeSupabaseMock()
+    const { client: service, updates } = makeService()
+    await deleteAllUserData(client, UID, undefined, { service, fullErase: true })
+    expect(updates.some((u) => u.table === 'profiles')).toBe(false)
+  })
+
+  it('faalt HARD als de markering niet terug te zetten is (anders viert de volgende load alsnog)', async () => {
+    const { client } = makeSupabaseMock()
+    const { client: service } = makeService(['profiles'])
+    await expect(deleteAllUserData(client, UID, undefined, { service })).rejects.toThrow(/milestones_seeded_at/)
   })
 })
 

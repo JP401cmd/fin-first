@@ -122,6 +122,18 @@ describe('OnboardingEindstrategie — de twee vragen in gewone taal', () => {
     expect(stateNow()).toMatchObject({ fire_stop_anchor: 'solved', fire_stop_age: null })
   })
 
+  // B-061: "(halve jaren)" las als eenheid. Label = "Stopleeftijd", eenheid "jaar";
+  // halve jaren blijven wél geldig (step 0,5).
+  it('het stopleeftijd-veld heet "Stopleeftijd" met eenheid "jaar" en noemt geen halve jaren', () => {
+    const { container } = render(<Harness currentAge={40} />)
+    fireEvent.click(tile(/Op een leeftijd die ik kies/))
+    expect(screen.getByLabelText('Stopleeftijd')).toBe(stopVeld())
+    expect(stopVeld()).toHaveAttribute('step', '0.5')
+    const veld = stopVeld().closest('.border-l-2') as HTMLElement
+    expect(veld.textContent).toMatch(/jaar/)
+    expect(container.textContent).not.toMatch(/halve jaren/)
+  })
+
   it('zonder geboortedatum valt de standaard-stopleeftijd op de helper terug (60)', () => {
     render(<Harness currentAge={null} />)
     fireEvent.click(tile(/Op een leeftijd die ik kies/))

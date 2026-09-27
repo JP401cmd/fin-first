@@ -377,7 +377,11 @@ export function makeSupabase(db: FakeDb): FakeSupabase {
   }
 
   const client = {
-    auth: { getUser: async () => ({ data: { user: { id: FAKE_USER_ID } }, error: null }) },
+    auth: {
+      getUser: async () => ({ data: { user: { id: FAKE_USER_ID } }, error: null }),
+      // Leespad (getCachedUser, Snelheid B2): dezelfde identiteit als JWT-claims.
+      getClaims: async () => ({ data: { claims: { sub: FAKE_USER_ID } }, error: null }),
+    },
     from: (table: string) => {
       tableQueries++
       perTable.set(table, (perTable.get(table) ?? 0) + 1)

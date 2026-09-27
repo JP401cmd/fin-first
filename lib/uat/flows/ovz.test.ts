@@ -47,7 +47,7 @@ describe('OVZ_FLOW — curatie-integriteit', () => {
     }
   })
 
-  it('dekt alle 25 WF-OVZ-scenario\'s (01..14, 19..29 — WF-OVZ-15/16/17/18 bestaan niet (meer) in de catalogus)', () => {
+  it('dekt alle 26 WF-OVZ-scenario\'s (01..14, 19..30 — WF-OVZ-15/16/17/18 bestaan niet (meer) in de catalogus)', () => {
     const covered = new Set(
       OVZ_FLOW.nodes.map((n) => n.scenarioId).filter((id): id is string => Boolean(id)),
     )
@@ -58,15 +58,16 @@ describe('OVZ_FLOW — curatie-integriteit', () => {
     // WF-OVZ-27 (netto-vermogen-kaart in twee delen) is nieuw sinds de
     // tweedeling van de vermogenskaart op /overzicht (sep 2026). WF-OVZ-28
     // (plan-stoplicht op de plankaart) is nieuw sinds 15 sep 2026. WF-OVZ-29
-    // (verloop in de gezondheidskassabon) is op 26 sep 2026 verhuisd uit WF-TOEK-32.
+    // (verloop in de gezondheidskassabon) is op 26 sep 2026 verhuisd uit WF-TOEK-32. WF-OVZ-30
+    // (automatisch bijwerken bij openen, ADR 0182) is nieuw sinds 27 sep 2026.
     const expected = [
       ...Array.from({ length: 14 }, (_, i) => i + 1),
-      19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
+      19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
     ].map((n) => `UAT-OVZ-${String(n).padStart(2, '0')}`)
     for (const id of expected) {
       expect(covered.has(id), `${id} moet als flow-knoop voorkomen`).toBe(true)
     }
-    expect(covered.size).toBe(25)
+    expect(covered.size).toBe(26)
   })
 
   it('de domeinoverschrijdende cross-knopen dekken WILL/TOEK/MIJN/NAV/BEZIT', () => {

@@ -35,6 +35,8 @@ import { loadCheckinBannerSeed, isCheckinBannerEligible } from '@/lib/overview/b
 import { loadRondleidingSeed } from '@/lib/rondleiding/seed'
 import { RondleidingProvider } from '@/components/overview/rondleiding/rondleiding-provider'
 import { leverToLeverageStatus } from '@/components/app/shell/lever-scores'
+import { AutomatischBijwerkenLoader } from '@/components/sync/automatisch-bijwerken-loader'
+import { readAutoSyncEnabled } from '@/lib/sync/auto-sync'
 import type { LeverageStatus } from '@/lib/leverage-status'
 import type { Hefboom } from '@/lib/hefboom-config'
 
@@ -118,6 +120,9 @@ export default async function OverzichtPage() {
   ])
 
   const userName = (ownProfileRes.data as { full_name?: string | null } | null)?.full_name ?? null
+  // W-018 / ADR 0182 — "Automatisch bijwerken". Uit dezelfde profielrij (gratis),
+  // fail-closed: alleen een expliciete `true` start iets vanzelf.
+  const autoSyncEnabled = readAutoSyncEnabled(ownProfileRes.data)
   // UR3-10 — de check-in-banner nodigt uit tot een terugblik; op een account dat
   // deze maand is aangemaakt is er nog niets om op terug te blikken en stond hij
   // op dag één naast de rondleiding, de coachmark en Fins tip. De gate hangt aan
@@ -281,6 +286,14 @@ export default async function OverzichtPage() {
     <>
       {/* Tab-root → 'rich' TopBar + tab-titel in de mobiele bovenbalk. */}
       <NavStackMeta title="Overzicht" topBar={{ kind: 'rich' }} />
+      {/* ADR 0182 — bank- en brokerkoppelingen die >12 uur stilstaan op de
+          achtergrond bijwerken. Rendert niets; eigen Suspense zodat de
+          broker-read nooit op het kritieke pad van blok 1 komt. */}
+      {userId && (
+        <Suspense fallback={null}>
+          <AutomatischBijwerkenLoader enabled={autoSyncEnabled} userId={userId} />
+        </Suspense>
+      )}
       {/* De welkomstgids stond hier tot ADR 0130 als banner (plus een
           geminimaliseerd punt in de utility-cluster van blok 2). Hij woont nu
           in Fin — vierde icoon in de chat-kop — en de provider hangt in

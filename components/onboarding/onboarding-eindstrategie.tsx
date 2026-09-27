@@ -51,7 +51,9 @@ import {
  *   1. Wanneer wil je stoppen met werken?  → het STOP-ANKER
  *      · Zo vroeg mogelijk          (`solved`)
  *      · Op mijn AOW-leeftijd          (`aow`)
- *      · Op een leeftijd die ik kies   (`age` + leeftijdveld, halve jaren)
+ *      · Op een leeftijd die ik kies   (`age` + leeftijdveld; halve jaren mogen
+ *        (step 0,5), maar de vraag noemt ze niet — B-061: "(halve jaren)" las als
+ *        eenheid. Alleen een ongeldige waarde toont "In stappen van een half jaar.")
  *      Het anker `now` wordt hier bewust NIET aangeboden — een nieuwe gebruiker
  *      zonder plan hoort daar niet mee te beginnen; het blijft in Voorkeuren.
  *
@@ -243,7 +245,8 @@ export function OnboardingEindstrategie({
           {value.fire_stop_anchor === 'age' && (
             <Veld
               id={IDS.stopAge}
-              label="Stopleeftijd (halve jaren)"
+              label="Stopleeftijd"
+              suffix="jaar"
               error={stopAgeError}
               hint="Jij kiest het moment; de app laat zien hoe het dan loopt."
             >
@@ -396,6 +399,7 @@ function Veld({
   error,
   hint,
   prefix,
+  suffix,
   children,
 }: {
   id: string
@@ -403,6 +407,8 @@ function Veld({
   error?: string
   hint: string
   prefix?: string
+  /** Eenheid achter het veld (bv. "jaar"), zoals het in-app zusterveld. */
+  suffix?: string
   children: ReactNode
 }) {
   return (
@@ -410,13 +416,20 @@ function Veld({
       <label htmlFor={id} className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
         {label}
       </label>
-      <div className="relative">
-        {prefix && (
-          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-mono text-sm text-[var(--ink-4)]">
-            {prefix}
+      <div className={suffix ? 'flex items-center gap-2' : undefined}>
+        <div className="relative min-w-0 flex-1">
+          {prefix && (
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-mono text-sm text-[var(--ink-4)]">
+              {prefix}
+            </span>
+          )}
+          {children}
+        </div>
+        {suffix && (
+          <span className="shrink-0 text-sm text-[var(--ink-3)]" aria-hidden>
+            {suffix}
           </span>
         )}
-        {children}
       </div>
       {error && (
         <p id={`${id}-error`} className="mt-1 text-xs text-amber-700">

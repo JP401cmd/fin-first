@@ -61,6 +61,10 @@ function clientFilesOnDisk(): string[] {
     'open-bank-auth.ts', 'connection-outcome.ts',
     // infra/probe/registry — geen extern API-client
     'health-probe.ts', 'version-registry.ts',
+    // ADR 0182: `broker-error-messages.ts` bevat alleen de vaste foutteksten van
+    // `classifyBrokerError`, apart zodat clientcode (auto-sync) ze kan lezen zonder
+    // de Trading 212-client mee te bundelen. Geen externe client.
+    'broker-error-messages.ts',
     // parser-support
     'format-contracts.ts', 'categorize.ts', 'counterparty-normalize.ts',
     'cross-source-dedup.ts',

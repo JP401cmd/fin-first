@@ -7,7 +7,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { WealthCompositionChart } from './wealth-composition-chart'
 import type { StackedRow } from '@/lib/wealth-composition'
-import { BUITEN_DOEL_ZIN } from '@/lib/wealth-composition'
+import { BUITEN_DOEL_ZIN, DEBT_LAYER_COLOR } from '@/lib/wealth-composition'
 
 // ── Mocks ──────────────────────────────────────────────────────
 
@@ -388,9 +388,9 @@ describe('WealthCompositionChart — debt layer', () => {
     const svg = container.querySelector('svg')
     expect(svg).toBeTruthy()
 
-    // Should render debt bars (red rects)
+    // Should render debt bars in the status-red token (geen Tailwind-hex)
     const rects = Array.from(svg!.querySelectorAll('rect'))
-    const redRects = rects.filter(r => r.getAttribute('fill') === '#ef4444')
+    const redRects = rects.filter(r => r.getAttribute('fill') === DEBT_LAYER_COLOR)
     expect(redRects.length).toBeGreaterThan(0)
   })
 

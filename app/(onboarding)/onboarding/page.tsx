@@ -1991,6 +1991,11 @@ export default function OnboardingPage() {
 
           {state.step === 'success' && (
             <OnboardingSuccess
+              // B-065: dezelfde canonieke tijdgetallen als het klaar-scherm. Op
+              // het bank-herlaadpad is de sessie-state leeg en zijn beide null;
+              // het successcherm valt dan terug op een beschrijvende zin.
+              freedomLabel={freedomTicker?.label ?? null}
+              monthlyBuildup={monthlyFreedomBuildup}
               onDashboard={() => {
                 // Vangnet: het concept is bij een geslaagde save al gewist.
                 // Faalde die wis (netwerk), dan is dit de tweede kans — de

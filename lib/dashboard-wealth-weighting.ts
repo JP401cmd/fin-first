@@ -24,9 +24,15 @@ export type WeightableAssetRow = {
 /**
  * `net_worth_inclusion_pct` als 0..1-factor. Ontbreekt de waarde → 100% (1).
  * Dit is de enige plek die de default-100%-conventie kent.
+ *
+ * De `?? 100` staat VÓÓR de `Number()`: `Number(null)` is `0`, dus een afwezig
+ * percentage zou anders als 0% doorgaan en de post laten verdampen. Een
+ * niet-numerieke waarde (NaN uit een string-kolom) telt eveneens als 100% —
+ * nooit een stille nul. Sinds 4f (sep 2026) ook de weging van `calculateBox3`.
  */
 export function inclusionFactor(row: { net_worth_inclusion_pct?: number | null }): number {
-  return (row.net_worth_inclusion_pct ?? 100) / 100
+  const n = Number(row.net_worth_inclusion_pct ?? 100)
+  return Number.isFinite(n) ? n / 100 : 1
 }
 
 /** Inclusion-gewogen huidige waarde van één bezitting. */

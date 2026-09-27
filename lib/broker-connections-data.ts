@@ -9,6 +9,17 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 export type BrokerId = 'trading212'
 
+/** Hoe de gebruiker de broker kent. `Record` zodat een nieuwe broker pas compileert mét naam. */
+export const BROKER_LABEL: Record<BrokerId, string> = {
+  trading212: 'Trading 212',
+}
+
+/** "Trading 212" of "Trading 212 · ISA" — zelfde vorm als de koppelingen-pagina. */
+export function brokerConnectionLabel(row: Pick<BrokerConnectionRow, 'broker' | 'label'>): string {
+  const base = BROKER_LABEL[row.broker] ?? 'Broker'
+  return row.label?.trim() ? `${base} · ${row.label.trim()}` : base
+}
+
 export interface BrokerConnectionRow {
   id: string
   broker: BrokerId

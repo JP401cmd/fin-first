@@ -385,3 +385,64 @@ describe('calculateBox3 — persona-golden op de Lisa-set (M23)', () => {
     expect(result.grondslagSparen).toBeCloseTo(1_373, 2)
   })
 })
+
+// ── 4f: weging met net_worth_inclusion_pct ──────────────────────────────────
+//
+// De statusband (`computeBox3TaxableInput`) en het netto vermogen wegen elke
+// post met `net_worth_inclusion_pct`; `calculateBox3` telde rauw op. Op de
+// Belasting-hub stonden de €-KPI en het stoplicht daardoor op een
+// verschillende grondslag bij gedeeld of deels-eigen bezit (nazorg R2+R3, 4f;
+// eigenaarsbesluit 27 sep 2026: wegen in de motor).
+describe('calculateBox3 — weging met net_worth_inclusion_pct (4f)', () => {
+  const debt = (over: Partial<Debt>): Debt => ({
+    id: 'd1', name: 'lening', debt_type: 'personal_loan' as DebtType, is_active: true,
+    current_balance: 0, linked_asset_id: null, is_tax_deductible: null, ...over,
+  } as Debt)
+
+  it('€ 400.000 op 50% geeft exact dezelfde heffing als € 200.000 op 100%', () => {
+    const gedeeld = calculateBox3(makeInput({
+      assets: [makeAsset({ asset_type: 'savings', current_value: 400_000, net_worth_inclusion_pct: 50 })],
+    }))
+    const eigen = calculateBox3(makeInput({
+      assets: [makeAsset({ asset_type: 'savings', current_value: 200_000 })],
+    }))
+    expect(gedeeld.totaalSpaargeld).toBe(200_000)
+    expect(gedeeld.tax).toBe(eigen.tax)
+    expect(gedeeld.tax).toBeGreaterThan(0)
+  })
+
+  it('een ontbrekend, null of onzinnig percentage telt als 100% — nooit een stille nul', () => {
+    const zonder = calculateBox3(makeInput({ assets: [makeAsset({ asset_type: 'savings', current_value: 200_000 })] }))
+    const metNull = calculateBox3(makeInput({
+      assets: [makeAsset({ asset_type: 'savings', current_value: 200_000, net_worth_inclusion_pct: null as unknown as number })],
+    }))
+    const metNaN = calculateBox3(makeInput({
+      assets: [makeAsset({ asset_type: 'savings', current_value: 200_000, net_worth_inclusion_pct: Number.NaN })],
+    }))
+    expect(metNull.tax).toBe(zonder.tax)
+    expect(metNaN.tax).toBe(zonder.tax)
+    expect(zonder.totaalSpaargeld).toBe(200_000)
+  })
+
+  it('schulden wegen op dezelfde kolom', () => {
+    const r = calculateBox3(makeInput({
+      assets: [makeAsset({ asset_type: 'savings', current_value: 200_000 })],
+      debts: [debt({ current_balance: 20_000, net_worth_inclusion_pct: 25 })],
+    }))
+    expect(r.totaalBox3Schulden).toBe(5_000)
+    expect(r.debtClassifications[0]!.balance).toBe(5_000)
+  })
+
+  it('de classificatie per post draagt het gewogen bedrag, zodat de lijst op de totalen sluit', () => {
+    const r = calculateBox3(makeInput({
+      assets: [
+        makeAsset({ asset_type: 'savings', current_value: 100_000, net_worth_inclusion_pct: 80 }),
+        makeAsset({ asset_type: 'investment', current_value: 50_000, net_worth_inclusion_pct: 0 }),
+      ],
+    }))
+    expect(r.assetClassifications.map((ac) => ac.value)).toEqual([80_000, 0])
+    expect(r.totaalSpaargeld + r.totaalBeleggingen).toBe(80_000)
+    // De rijen zelf blijven onaangeraakt — andere aggregaten lezen ze ook.
+    expect(Number(r.assetClassifications[0]!.asset.current_value)).toBe(100_000)
+  })
+})

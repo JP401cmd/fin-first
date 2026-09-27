@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { getCachedUser } from '@/lib/supabase/cached-user'
+import { getVerifiedUser } from '@/lib/supabase/cached-user'
 import { badRequest, notFound, serverError, unauthorized } from '@/lib/api/respond'
 import { parseBody } from '@/lib/api/parse-body'
 import { isUuid } from '@/lib/unlinked-cash'
@@ -65,7 +65,7 @@ async function bestaandeRij(
 export async function PUT(req: NextRequest) {
   try {
     const supabase = await createClient()
-    const user = await getCachedUser(supabase)
+    const user = await getVerifiedUser(supabase)
     if (!user) return unauthorized()
 
     const parsed = await parseBody(StrategieBodySchema, req)
@@ -121,7 +121,7 @@ export async function PUT(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   try {
     const supabase = await createClient()
-    const user = await getCachedUser(supabase)
+    const user = await getVerifiedUser(supabase)
     if (!user) return unauthorized()
 
     const id = req.nextUrl.searchParams.get('id')

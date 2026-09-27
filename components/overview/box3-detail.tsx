@@ -560,7 +560,7 @@ export function Box3Detail({
               <ClassRow
                 key={`a-${i}`}
                 name={ac.asset.name}
-                amount={Number(ac.asset.current_value)}
+                amount={ac.value}
                 categoryLabel={
                   ac.category === 'spaargeld'
                     ? 'Spaargeld'
@@ -590,7 +590,7 @@ export function Box3Detail({
                   <ClassRow
                     key={`d-${i}`}
                     name={dc.debt.name}
-                    amount={Number(dc.debt.current_balance)}
+                    amount={dc.balance}
                     categoryLabel={dc.inBox3 ? 'Box 3' : 'Uitgesloten'}
                     dotClass={dc.inBox3 ? 'bg-[var(--negative)]' : 'bg-[var(--ink-4)]'}
                     muted={!dc.inBox3}

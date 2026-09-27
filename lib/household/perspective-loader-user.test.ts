@@ -57,6 +57,11 @@ function makeSupabase(tables: Tables = {}, user: User | null = USER) {
         counts.getUser += 1
         return { data: { user }, error: null }
       },
+      // Server-pad (getCachedUser, Snelheid B2): dezelfde identiteit als claims.
+      getClaims: async () => ({
+        data: user ? { claims: { sub: user.id } } : null,
+        error: null,
+      }),
     },
     from: (table: string) => builder(rows(table as keyof Tables)),
     rpc: (fn: string) => Promise.resolve({ data: rows(fn as keyof Tables), error: null }),

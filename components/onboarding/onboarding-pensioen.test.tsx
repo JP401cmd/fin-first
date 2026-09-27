@@ -96,12 +96,36 @@ function Host({
 }
 
 describe('OnboardingPensioen', () => {
-  it('stelt de pensioen-vraag met drie uitwegen', () => {
+  it('stelt de pensioen-vraag met vier uitwegen', () => {
     const { container } = render(<Host />)
     expect(container.textContent).toContain('Heb je al')
     expect(screen.getByText('Schat het zelf')).toBeTruthy()
     expect(screen.getByText('Upload je overzicht')).toBeTruthy()
+    expect(screen.getByText('Nee, (nog) geen pensioen')).toBeTruthy()
     expect(footerText(/Kan altijd later nog/)).toBeTruthy()
+  })
+
+  // B-060: "nee" is een eigen antwoord, geen overslaan.
+  it('"Nee, (nog) geen pensioen" zet mode none, geeft Verder vrij en legt keuze · effect · waarom uit', () => {
+    const onNext = vi.fn()
+    const onSkip = vi.fn()
+    const onData = vi.fn()
+    render(<Host onNext={onNext} onSkip={onSkip} onData={onData} aowAge={67} />)
+    expect(footerButton('Verder').disabled).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: /Nee, \(nog\) geen pensioen/ }))
+    expect(onData).toHaveBeenLastCalledWith(expect.objectContaining({ mode: 'none', parseResult: null }))
+    const uitleg = screen.getByTestId('pensioen-none-uitleg')
+    expect(uitleg.textContent).toMatch(/alleen met AOW/)
+    expect(uitleg.textContent).toMatch(/67 jaar/)
+    expect(footerButton('Verder').disabled).toBe(false)
+    fireEvent.click(footerButton('Verder'))
+    expect(onNext).toHaveBeenCalledOnce()
+    expect(onSkip).not.toHaveBeenCalled()
+  })
+
+  it('de deck noemt "of zeg nee"', () => {
+    render(<Host />)
+    expect(screen.getAllByText(/of zeg nee/).length).toBeGreaterThan(0)
   })
 
   it('"Kan altijd later nog" roept onSkip aan', () => {

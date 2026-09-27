@@ -42,3 +42,25 @@ auth-roundtrip per API-call app-breed.
   module-globaal gecachet) en symmetrisch met het oude gedrag qua plaatsing.
 - Wie de signing-modus ooit terugzet naar symmetrisch, maakt de hele
   migratie een stille no-op — bij zo'n wijziging deze ADR herzien.
+
+## Aanvulling (27 sep 2026, Snelheid B2) — het RSC-leespad
+
+`getCachedUser` (`lib/supabase/cached-user.ts`) valt voortaan onder de lees-regel van
+dit besluit: hij verifieert via `getClaims()` en levert een smal `CachedUser`
+(`id`, `email`, `app_metadata`, `user_metadata` — alleen wat het JWT draagt).
+Daarmee verdwijnt de `/auth/v1/user`-ronde uit de app-shell-layout, de pagina's
+en alle server-loaders; de proxy verifieerde datzelfde token al lokaal.
+
+- **Mutaties** die de gebruiker via deze module resolven, gebruiken `getVerifiedUser`
+  (`auth.getUser()`). `lib/supabase/cached-user.test.ts` scant `app/api/**/route.ts`
+  en faalt op elke exported POST/PUT/PATCH/DELETE die `getCachedUser` aanroept.
+  Hij dekt níét: `getAuthClaims`/`auth.getClaims` direct in een mutatie-handler
+  (daar staan nog bestaande gevallen, o.a. `beta/addon` POST met een service-role-RPC),
+  helpers buiten het exported blok en `'use server'`-bestanden.
+- **Revocatievenster** blijft zoals hierboven: een ingetrokken sessie of verwijderd
+  account kan tot de JWT-expiry de app-shell renderen, met uitsluitend de eigen
+  (bij verwijdering: lege) data via RLS. Blokkeren trok nooit een sessie in en
+  verandert hierdoor niet: de layout toetst `profiles.blocked_at` alleen bij een
+  harde render, en die vlag is (bekend, los van B2) nog door de eigen rij te wijzigen.
+- **Precondities** ongewijzigd: asymmetrische signing (JWKS 27 sep: één ES256-sleutel)
+  en de module-globale JWKS-cache van auth-js (TTL 10 min).

@@ -7,9 +7,11 @@
  * queries. Ze lopen nu alle drie via `getCachedUser`, die React `cache()` op de
  * client-instantie keyt en dus binnen één request één keer uitvoert.
  *
- * Deze test telt de echte `auth.getUser()`-aanroepen op één mock-client terwijl
- * de drie loaders samen draaien: verwacht is precies 1. Vóór deze wijziging
- * waren dat er 3.
+ * Deze test telt de echte auth-aanroepen op één mock-client terwijl de drie
+ * loaders samen draaien: verwacht is precies één `auth.getClaims()` en nul
+ * `auth.getUser()`. Vóór T1.2 waren dat drie getUser-rondes; sinds Snelheid B2
+ * (ADR 0052) verifieert `getCachedUser` lokaal via getClaims, dus het leespad
+ * doet geen `/auth/v1/user`-ronde meer.
  *
  * React `cache()` is buiten een RSC-render (dus óók in vitest) een PASSTHROUGH.
  * Om het productiegedrag te toetsen vervangen we `cache` — net als in
@@ -96,12 +98,12 @@ const RECURRING_ROWS = [
 ]
 
 /**
- * Chainbare mock-client die élke `auth.getUser()` telt. Alleen
+ * Chainbare mock-client die élke `auth.getUser()` én `auth.getClaims()` telt. Alleen
  * `recurring_transactions` levert rijen; de overige tabellen zijn leeg, zodat de
  * loaders hun deterministische pad volgen en de test puur over auth-roundtrips gaat.
  */
 function makeCountingSupabase() {
-  const counts = { getUser: 0 }
+  const counts = { getUser: 0, getClaims: 0 }
   const tables: Record<string, unknown[]> = { recurring_transactions: RECURRING_ROWS }
   const builder = (rows: unknown[]) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -133,6 +135,10 @@ function makeCountingSupabase() {
         counts.getUser += 1
         return { data: { user: { id: 'u1' } }, error: null }
       },
+      getClaims: async () => {
+        counts.getClaims += 1
+        return { data: { claims: { sub: 'u1' } }, error: null }
+      },
     },
     from: (table: string) => builder(tables[table] ?? []),
     rpc: () => Promise.resolve({ data: [], error: null }),
@@ -146,7 +152,7 @@ describe('auth-dedupe op het cashflow-datapad', () => {
   // raken en niet meer het loaderpad meten dat hij beschrijft.
   beforeEach(() => __resetVasteLastenCache())
 
-  it('de drie loaders delen samen ÉÉN auth.getUser()-roundtrip', async () => {
+  it('de drie loaders delen samen ÉÉN claims-check en doen géén getUser-roundtrip', async () => {
     const { supabase, counts } = makeCountingSupabase()
 
     const [vasteLasten, settings, context] = await Promise.all([
@@ -155,7 +161,8 @@ describe('auth-dedupe op het cashflow-datapad', () => {
       getCachedPerspectiveContext(supabase),
     ])
 
-    expect(counts.getUser).toBe(1)
+    expect(counts.getClaims).toBe(1)
+    expect(counts.getUser).toBe(0)
     // Alle drie kwamen voorbij de auth-gate met dezelfde gebruiker: geen van de
     // loaders viel stil terug op zijn "niet ingelogd"-pad (EMPTY / null / throw).
     expect(vasteLasten.count).toBe(1)
@@ -175,7 +182,8 @@ describe('auth-dedupe op het cashflow-datapad', () => {
       getCachedPerspectiveContext(supabase),
     ])
 
-    expect(counts.getUser).toBe(1)
+    expect(counts.getClaims).toBe(1)
+    expect(counts.getUser).toBe(0)
   })
 
   it('een andere client-instantie is een aparte cache-key (geen cross-request-lek)', async () => {
@@ -185,7 +193,7 @@ describe('auth-dedupe op het cashflow-datapad', () => {
     await getCachedPerspectiveContext(first.supabase)
     await getCachedPerspectiveContext(second.supabase)
 
-    expect(first.counts.getUser).toBe(1)
-    expect(second.counts.getUser).toBe(1)
+    expect(first.counts.getClaims).toBe(1)
+    expect(second.counts.getClaims).toBe(1)
   })
 })

@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Calculator, Pencil, Upload } from 'lucide-react'
+import { Ban, Calculator, Pencil, Upload } from 'lucide-react'
 import { OnboardingShell } from './onboarding-shell'
 import { FactsPanel } from './facts-panel'
 import { PensionPdfUpload } from '@/components/app/horizon/pension-pdf-upload'
@@ -21,9 +21,9 @@ import { formatCurrency } from '@/lib/format'
 import type { PensionParseResult } from '@/app/api/pension/parse/route'
 
 /**
- * Stap — Pensioen (optioneel). Boldin-stijl: één vraag, drie uitwegen.
+ * Stap — Pensioen (optioneel). Boldin-stijl: één vraag, vier uitwegen.
  *
- * "Heb je al pensioen opgebouwd?" met drie uitkomsten:
+ * "Heb je al pensioen opgebouwd?" met vier uitkomsten:
  *   (i)   Schatting — vrij bruto-maandbedrag (+ optioneel ingangsleeftijd), met
  *         een inschat-hulp die bij bekende leeftijd + inkomen als "Schat het
  *         voor me" vóórvult (B-055, zelfde patroon als de inkomenstap, ADR 0131:
@@ -31,7 +31,15 @@ import type { PensionParseResult } from '@/app/api/pension/parse/route'
  *   (ii)  Upload je mijnpensioen.nl-overzicht (XML/JSON volledig client-side,
  *         zonder AI) — HERGEBRUIKT `PensionPdfUpload` met `context="onboarding"`:
  *         het PDF-pad (AI) is hier niet bruikbaar (V-002).
- *   (iii) Overslaan ("kan altijd later nog") — als deferred field getrackt.
+ *   (iii) Nee, (nog) geen pensioen (B-060) — `mode: 'none'`. Geeft "Verder"
+ *         vrij en schrijft niets: net als overslaan komt er geen
+ *         `pension`-life_event (en zeker geen € 0-event); AOW wordt server-side
+ *         altijd geseed. Het verschil met overslaan is de betekenis, niet het
+ *         getal. Het antwoord wordt bewust níét vastgelegd zolang niets het
+ *         leest (eigenaarsbesluit 27 sep 2026).
+ *   (iv)  Overslaan ("kan altijd later nog") — wist de keuze en gaat door.
+ *         Wordt NIET getrackt: `onSkip` voegt niets toe aan `deferredFields`
+ *         (dat enum kent alleen income/assets/spaardoel).
  *
  * Het scherm rapporteert alleen z'n keuze terug aan de orchestrator
  * (`PensionDraft`); de daadwerkelijke `life_events`-write gebeurt centraal bij
@@ -41,7 +49,7 @@ import type { PensionParseResult } from '@/app/api/pension/parse/route'
  * "Geld levert tijd op": pensioen is *vrijheid die later vanzelf binnenkomt*.
  */
 
-export type PensionMode = 'estimate' | 'upload'
+export type PensionMode = 'estimate' | 'upload' | 'none'
 
 export interface PensionDraft {
   /** Gekozen pad — null tot de gebruiker iets selecteert. */
@@ -147,7 +155,7 @@ export function OnboardingPensioen({
   const hasEstimate =
     data.mode === 'estimate' && parseBedragInput(data.grossMonthly) > 0
   const hasUpload = data.mode === 'upload' && data.parseResult !== null
-  const canContinue = hasEstimate || hasUpload
+  const canContinue = hasEstimate || hasUpload || data.mode === 'none'
 
   const headline = (
     <>
@@ -164,7 +172,7 @@ export function OnboardingPensioen({
       kicker="Pensioen"
       romanNum="v."
       title={headline}
-      deck="Pensioen is vrijheid die later vanzelf binnenkomt. Geef een schatting, upload je overzicht, of sla over — je vult het altijd later aan."
+      deck="Pensioen is vrijheid die later vanzelf binnenkomt. Geef een schatting, upload je overzicht, of zeg nee — je vult het altijd later aan."
       factsPanel={
         <FactsPanel
           stat="€1.300"
@@ -213,7 +221,28 @@ export function OnboardingPensioen({
             active={data.mode === 'upload'}
             onClick={() => selectMode('upload')}
           />
+          <div className="sm:col-span-2">
+            <ModeTile
+              icon={<Ban className="h-4 w-4" strokeWidth={2} />}
+              label="Nee, (nog) geen pensioen"
+              sublabel="Alleen AOW — die rekenen we al mee"
+              active={data.mode === 'none'}
+              onClick={() => selectMode('none')}
+            />
+          </div>
         </div>
+
+        {/* Nee-pad (B-060): keuze · effect · waarom. Er wordt niets opgeslagen. */}
+        {data.mode === 'none' && (
+          <p
+            className="border-l-2 border-[var(--module-active-500)] pl-4 text-sm leading-relaxed text-[var(--ink-2)]"
+            data-testid="pensioen-none-uitleg"
+          >
+            Je hebt geen aanvullend pensioen opgebouwd. Je plan rekent daarom vanaf je AOW-leeftijd ({aowLabel})
+            alleen met AOW, zodat je vrijheidsleeftijd niet leunt op geld dat er niet komt. Bouw je later wél
+            pensioen op, dan vul je het altijd nog aan.
+          </p>
+        )}
 
         {/* Schatting-pad. */}
         {data.mode === 'estimate' && (

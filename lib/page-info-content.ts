@@ -715,7 +715,7 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
   '/mijn/koppelingen': {
     insight:
       'Hoe minder je handmatig hoeft in te voeren, hoe actueler en betrouwbaarder je cijfers — automatische koppelingen schelen telkens een import.',
-    grip: 'Koppel of ontkoppel per dienst: PSD2-bank, UPO-pensioenoverzicht en crypto-brokerage.',
+    grip: 'Koppel of ontkoppel per dienst: PSD2-bank, UPO-pensioenoverzicht en crypto-brokerage. Ontkoppelen kan op elk moment; een koppeling is nooit verplicht, alles werkt ook met handmatige invoer.',
     werking: [
       {
         title: 'Bankkoppeling',
@@ -730,8 +730,8 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
         text: 'Koppel een beleggingsrekening of wallet zodat posities en koersen meelopen zonder dat je ze handmatig bijwerkt.',
       },
       {
-        title: 'Altijd terug te draaien',
-        text: 'Ontkoppelen kan hier op elk moment, per dienst. Een koppeling is nooit verplicht: alles in de app werkt ook met handmatige invoer.',
+        title: 'Automatisch bijwerken',
+        text: 'Staat de schakelaar aan, dan werkt de app bij het openen van je Overzicht elke bank- of brokerkoppeling bij die langer dan twaalf uur stilstaat. Alleen terwijl jij de app open hebt, met dezelfde verbinding als de knop; crypto-exchanges en wallets lopen daarnaast elke avond vanzelf mee.',
       },
     ],
     terms: ['psd2', 'upo'],

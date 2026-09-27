@@ -539,7 +539,8 @@ export function sanitizeStoredDraft(raw: unknown): OnboardingDraft | null {
 
   const rawPen = obj(p.pension)
   const pension: PensionDraftPersisted = {
-    mode: rawPen.mode === 'estimate' || rawPen.mode === 'upload' ? rawPen.mode : null,
+    mode:
+      rawPen.mode === 'estimate' || rawPen.mode === 'upload' || rawPen.mode === 'none' ? rawPen.mode : null,
     grossMonthly: str(rawPen.grossMonthly),
     startAge: str(rawPen.startAge),
     isEstimate: rawPen.isEstimate === true,

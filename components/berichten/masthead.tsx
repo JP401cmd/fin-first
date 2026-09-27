@@ -38,6 +38,15 @@ interface MastheadProps {
    * zichzelf anders noemde. Alleen de krant-oppervlakken vullen dit dus.
    */
   rubriek?: string
+  /**
+   * Reserveer de ruimte van de colofonregel ook als die (nog) leeg is
+   * (Snelheid E, CLS). Op /nieuws komt de editie pas na een client-fetch
+   * binnen; zonder reservering schoof de regel er daarna tussen en duwde hij
+   * de hele pagina omlaag. De regel krijgt een vaste regelhoogte met ruimte
+   * voor twee regels op xs (de volledige colofon breekt daar) en één vanaf sm.
+   * Optioneel omdat /berichten en het archief hun colofon direct kennen.
+   */
+  reserveColophon?: boolean
 }
 
 // Kapitaliseer de eerste letter — nl-NL geeft "maandag", krantdatelines zijn "Maandag …"
@@ -60,7 +69,7 @@ function formatUpdated(iso: string): string | null {
   return `Bijgewerkt ${when}`
 }
 
-export function Masthead({ editionNr, jaargang, dateline, metaLeft, articleCount, updatedAt, sourceNote, hideEdition = false, rubriek }: MastheadProps) {
+export function Masthead({ editionNr, jaargang, dateline, metaLeft, articleCount, updatedAt, sourceNote, hideEdition = false, rubriek, reserveColophon = false }: MastheadProps) {
   const now = new Date()
   const rawDateline = dateline ?? now.toLocaleDateString('nl-NL', {
     weekday: 'long',
@@ -133,8 +142,14 @@ export function Masthead({ editionNr, jaargang, dateline, metaLeft, articleCount
       >
         {displayDateline}
       </p>
-      {colophonParts.length > 0 && (
-        <p className="mt-1 text-center font-mono text-[10px] uppercase tracking-[0.14em] tabular-nums text-[var(--ink-4)]">
+      {(colophonParts.length > 0 || reserveColophon) && (
+        <p
+          data-testid="masthead-colophon"
+          aria-hidden={colophonParts.length === 0 ? true : undefined}
+          className={`mt-1 text-center font-mono text-[10px] uppercase tracking-[0.14em] tabular-nums text-[var(--ink-4)] ${
+            reserveColophon ? 'min-h-[28px] leading-[14px] sm:min-h-[14px]' : ''
+          }`}
+        >
           {colophonParts.join(' · ')}
         </p>
       )}

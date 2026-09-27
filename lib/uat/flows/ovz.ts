@@ -77,6 +77,7 @@ export const OVZ_FLOW: UatFlow = {
     { id: 'statusmelding', scenarioId: 'UAT-OVZ-12', label: 'WF-OVZ-12 · Status-/vrijheidsmelding minimaliseren', kind: 'action', stage: 4, lane: 'status' },
     { id: 'checkin', scenarioId: 'UAT-OVZ-13', label: 'WF-OVZ-13 · Maand-check-in starten', kind: 'action', stage: 4, lane: 'status' },
     { id: 'welkomstgids', scenarioId: 'UAT-OVZ-14', label: 'WF-OVZ-14 · Welkomstgids doorlopen in Fin', kind: 'action', stage: 4, lane: 'status' },
+    { id: 'autobijwerken', scenarioId: 'UAT-OVZ-30', label: 'WF-OVZ-30 · Koppelingen werken zichzelf bij bij openen (>12 u stil, ADR 0182)', kind: 'action', stage: 4, lane: 'status' },
     { id: 'rondleiding', scenarioId: 'UAT-OVZ-26', label: 'WF-OVZ-26 · Interactieve rondleiding (spotlight op /overzicht)', kind: 'action', stage: 4, lane: 'status', subOf: 'welkomstgids' },
 
     // ── 6 · tips & acties ─────────────────────────────────────────────────
@@ -127,6 +128,8 @@ export const OVZ_FLOW: UatFlow = {
     { from: 'checkin', to: 'x-mijn', kind: 'cross' },
     { from: 'hefboom', to: 'welkomstgids' },
     { from: 'welkomstgids', to: 'rondleiding' },
+    { from: 'nav', to: 'autobijwerken', label: 'na eerste paint (~4 s)' },
+    { from: 'autobijwerken', to: 'x-mijn', kind: 'cross', label: 'schakelaar (WF-MIJN-34)' },
 
     // inzichten (WF-OVZ-15 vervallen, B-047, 12-09-2026 — de knoop
     // 'samengesteldrente' en de kaart die zij toetste bestaan niet meer; de

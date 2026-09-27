@@ -112,6 +112,19 @@ describe('serializeDraft — het concept draagt alle antwoorden (UR2-01)', () =>
  * legacy-label in `fire_end_strategy`. Herstel mag de keuze niet verliezen én mag
  * nooit een concept opleveren dat zichzelf tegenspreekt.
  */
+describe('sanitizeStoredDraft — pensioen "nee" (B-060)', () => {
+  it('een concept met pension.mode "none" overleeft de round-trip', () => {
+    const restored = sanitizeStoredDraft({ lastStep: 'pensioen', pension: { mode: 'none' } })
+    expect(restored).not.toBeNull()
+    expect(restored!.pension.mode).toBe('none')
+  })
+
+  it('een onbekende modus valt terug op null', () => {
+    const restored = sanitizeStoredDraft({ lastStep: 'pensioen', pension: { mode: 'misschien' } })
+    expect(restored!.pension.mode).toBeNull()
+  })
+})
+
 describe('sanitizeStoredDraft — het plan: stop-anker × eind-vorm (ADR 0129)', () => {
   it('een concept zonder ankervelden (vóór de stap "Jouw plan") herstelt als solved', () => {
     const restored = sanitizeStoredDraft({

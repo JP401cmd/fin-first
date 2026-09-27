@@ -39,8 +39,10 @@
  *   ongeluk — op andermans teller uitkomen.
  *
  * Scheiding van zorgen: deze module weet niets van auth of HTTP, alleen van
- * de twee RPC's. De API-route doet `await checkAndIncrement(...)` vóór
- * `buildCalculator(...)`.
+ * de twee RPC's. De API-route leest vooraf de stand met `getUsage(...)` (geen
+ * tik), roept dan `buildCalculator(...)` aan en reserveert pas ná een geslaagde
+ * generatie met `checkAndIncrement(...)` — een mislukte generatie kost geen
+ * slot (ADR 0181).
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'

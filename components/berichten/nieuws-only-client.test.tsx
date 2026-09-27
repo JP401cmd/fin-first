@@ -542,3 +542,50 @@ describe('NieuwsOnlyClient — zonder AI-abonnement (V-002)', () => {
     expect(screen.queryByText(/vereist een AI abonnement/)).toBeNull()
   })
 })
+
+/**
+ * Snelheid E (CLS op mobiel) — vóór de editie binnen is, staan colofon,
+ * Ververs-knop (min-h 44px) en tabbalk al in de DOM: onzichtbaar en niet
+ * bedienbaar, maar mét hun hoogte. Anders schuiven ze na de fetch in en
+ * duwen ze de pagina omlaag (gemeten CLS 0,42 op /nieuws).
+ */
+describe('NieuwsOnlyClient — gereserveerde ruimte vóór de fetch (Snelheid E)', () => {
+  it('reserveert colofon, Ververs-knop en tabbalk in de laadtoestand', async () => {
+    mocks.useExecutionMode.mockReturnValue(executionState({ status: 'resolving' }))
+
+    render(<NieuwsOnlyClient userId="user-b" />)
+    await waitFor(() => expect(screen.getByTestId('skeleton')).toBeInTheDocument())
+
+    const colophon = screen.getByTestId('masthead-colophon')
+    expect(colophon.className).toContain('min-h-[28px]')
+
+    const ververs = screen.getByTestId('nieuws-ververs')
+    expect(ververs.className).toContain('invisible')
+    expect(ververs.className).toContain('min-h-[44px]')
+    expect(ververs).toBeDisabled()
+    expect(ververs).toHaveAttribute('aria-hidden', 'true')
+
+    const tabbalk = screen.getByTestId('nieuws-tabbalk')
+    expect(tabbalk.className).toContain('invisible')
+    expect(tabbalk).toHaveAttribute('aria-hidden', 'true')
+    for (const tab of tabbalk.querySelectorAll('button')) expect(tab).toBeDisabled()
+    // Buiten de a11y-boom: niet vindbaar als tablist.
+    expect(screen.queryByRole('tablist')).toBeNull()
+  })
+
+  it('maakt knop en tabbalk zichtbaar en bruikbaar zodra de editie er is', async () => {
+    mocks.useExecutionMode.mockReturnValue(
+      executionState({ status: 'cloud', intended: 'cloud', canUseCloud: true }),
+    )
+
+    render(<NieuwsOnlyClient userId="user-b" />)
+    expect(await screen.findByText('Cloudbericht')).toBeInTheDocument()
+
+    const ververs = screen.getByTestId('nieuws-ververs')
+    expect(ververs.className).not.toContain('invisible')
+    expect(ververs).not.toHaveAttribute('aria-hidden')
+    const tabbalk = screen.getByRole('tablist')
+    expect(tabbalk.className).not.toContain('invisible')
+    expect(screen.getByRole('tab', { name: 'Archief' })).toBeEnabled()
+  })
+})

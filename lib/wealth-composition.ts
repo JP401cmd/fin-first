@@ -76,8 +76,18 @@ export const WEALTH_GROUP_COLORS: Record<WealthGroup, string> = {
   overig: ASSET_TYPE_COLORS.other,           // kern-200
 }
 
-/** Colour for the debt (negative) layer */
-export const DEBT_LAYER_COLOR = '#ef4444' // red-500
+/**
+ * Kleur van de schuldlaag zonder opsplitsing én van de tekort-lening-laag.
+ *
+ * Bewust het felle status-rood (`--score-bad`, oklch 0.57/0.22/27) en geen
+ * accent- of schuldladder-tint: de tekort-lening is een SIGNAAL, geen bezit
+ * of contractuele schuld. Hij verschilt van de hypotheek-/overig-lagen op
+ * chroma (0,22 tegenover 0,09/0,07), precies de as waarop de kleurconventie
+ * identiteit en status uit elkaar houdt. Was `#ef4444` (Tailwind red-500,
+ * niet-token) tot nazorg R2+R3/E, sep 2026. Het token staat op :root en de
+ * grafiek is inline-SVG, dus `var()` rendert direct.
+ */
+export const DEBT_LAYER_COLOR = 'var(--score-bad)'
 
 export const DEBT_LAYER_LABEL = 'Schulden'
 

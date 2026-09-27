@@ -110,8 +110,8 @@ describe('Box3Detail', () => {
     mockFetch({
       personal: mockResult({
         assetClassifications: [
-          { asset: { name: 'Spaarrekening', current_value: 30000 }, category: 'spaargeld', exclusionReason: null, note: null },
-          { asset: { name: 'Eigen huis', current_value: 400000 }, category: null, exclusionReason: 'Box 1', note: null },
+          { asset: { name: 'Spaarrekening', current_value: 30000 }, value: 30000, category: 'spaargeld', exclusionReason: null, note: null },
+          { asset: { name: 'Eigen huis', current_value: 400000 }, value: 400000, category: null, exclusionReason: 'Box 1', note: null },
         ] as never,
       }),
     })

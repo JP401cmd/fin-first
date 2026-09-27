@@ -19,18 +19,20 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { OnboardingSuccess } from './onboarding-success'
 import { WAARDES } from '@/lib/onboarding/waardes'
+import { computeFreedomTicker, computeMonthlyFreedomBuildup } from '@/lib/freedom-ticker'
 
 function renderScherm() {
   return render(<OnboardingSuccess onDashboard={vi.fn()} />)
 }
 
 describe('OnboardingSuccess — de vier waardes landen hier', () => {
-  it('toont kicker, belofte en toelichting van elke waarde', () => {
+  it('toont kicker en de ene korte zin van elke waarde (B-065)', () => {
     renderScherm()
     for (const waarde of WAARDES) {
       expect(screen.getByText(waarde.kicker)).toBeTruthy()
-      expect(screen.getByText(waarde.belofte)).toBeTruthy()
-      expect(screen.getByText(waarde.toelichting)).toBeTruthy()
+      expect(screen.getByText(waarde.zin)).toBeTruthy()
+      // Eén korte zin: geen tweede zin achter de eerste punt.
+      expect(waarde.zin.trim().split(/[.!?](\s|$)/).filter((d) => d.trim().length > 0)).toHaveLength(1)
     }
   })
 
@@ -53,6 +55,37 @@ describe('OnboardingSuccess — de vier waardes landen hier', () => {
     expect(container.textContent).not.toMatch(/twee modules/i)
     expect(container.textContent).not.toMatch(/Het Overzicht · Vandaag/)
     expect(container.textContent).not.toMatch(/rekenhulpen/i)
+  })
+})
+
+describe('OnboardingSuccess — eigen startpunt (B-065)', () => {
+  it('toont de canonieke vrijheidstijd en opbouw, exact zoals de helpers ze leveren', () => {
+    const ticker = computeFreedomTicker({
+      monthlyIncome: 3500,
+      monthlyExpenses: 2500,
+      assets: [{ value: 40000, isHome: false }],
+      debts: 0,
+      basis: 'fire_pot_excl_home',
+    })
+    const buildup = computeMonthlyFreedomBuildup(3500, 2500)
+    expect(ticker).not.toBeNull()
+    expect(buildup).not.toBeNull()
+    render(<OnboardingSuccess onDashboard={vi.fn()} freedomLabel={ticker!.label} monthlyBuildup={buildup} />)
+    const blok = screen.getByTestId('success-startpunt')
+    expect(blok.textContent).toContain(ticker!.label)
+    expect(blok.textContent).toContain(`${buildup!.daysPerMonth} dag`)
+  })
+
+  it('valt zonder cijfers terug op één beschrijvende zin, zonder getal', () => {
+    renderScherm()
+    const blok = screen.getByTestId('success-startpunt')
+    expect(blok.textContent).toMatch(/Je eigen cijfers staan op je overzicht/)
+    expect(blok.textContent).not.toMatch(/\d/)
+  })
+
+  it('gebruikt geen koop-metafoor (ADR 0165)', () => {
+    const { container } = renderScherm()
+    expect(container.textContent).not.toMatch(/vrijkoop|vrij koop|terugkoop|gekocht|verkocht/i)
   })
 })
 

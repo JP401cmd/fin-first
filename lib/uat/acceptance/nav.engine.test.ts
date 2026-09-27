@@ -38,7 +38,7 @@ describe('UAT Nav — acceptatiecriteria dekking', () => {
     const workflows = NAV_ACCEPTANCE.criteria.map((c) => c.workflow).sort()
     expect(workflows).toEqual(catalogNavWorkflows)
     expect(new Set(workflows).size).toBe(catalogNavWorkflows.length)
-    expect(workflows.length).toBe(26)
+    expect(workflows.length).toBe(27)
   })
 
   it('elk criterium heeft een geldige assertion.kind', () => {
@@ -73,11 +73,12 @@ describe('UAT Nav — acceptatiecriteria dekking', () => {
       'WF-NAV-02', 'WF-NAV-04', 'WF-NAV-06', 'WF-NAV-08', 'WF-NAV-11',
       'WF-NAV-12', 'WF-NAV-17', 'WF-NAV-19', 'WF-NAV-20', 'WF-NAV-21',
       'WF-NAV-22', 'WF-NAV-23', 'WF-NAV-24', 'WF-NAV-25', 'WF-NAV-26',
+      'WF-NAV-28',
     ]
     for (const wf of uiOnly) {
       expect(criterion(wf).assertion.kind, `${wf} moet ui-only zijn`).toBe('ui-only')
     }
-    expect(uiOnly.length).toBe(15)
+    expect(uiOnly.length).toBe(16)
   })
 })
 

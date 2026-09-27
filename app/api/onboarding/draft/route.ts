@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { getCachedUser } from '@/lib/supabase/cached-user'
+import { getCachedUser, getVerifiedUser } from '@/lib/supabase/cached-user'
 import { unauthorized, serverError, badRequest } from '@/lib/api/respond'
 import { parseBody } from '@/lib/api/parse-body'
 import { OnboardingDraftBodySchema } from '@/app/(onboarding)/onboarding/draft-persistence'
@@ -76,7 +76,7 @@ export async function GET() {
 export async function PUT(request: Request) {
   try {
     const supabase = await createClient()
-    const user = await getCachedUser(supabase)
+    const user = await getVerifiedUser(supabase)
     if (!user) return unauthorized()
 
     // Eerste grens, vóór `req.json()`: weiger een absurde body zonder 'm te
@@ -120,7 +120,7 @@ export async function PUT(request: Request) {
 export async function DELETE() {
   try {
     const supabase = await createClient()
-    const user = await getCachedUser(supabase)
+    const user = await getVerifiedUser(supabase)
     if (!user) return unauthorized()
 
     const { error } = await supabase

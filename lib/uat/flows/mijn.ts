@@ -65,6 +65,7 @@ export const MIJN_FLOW: UatFlow = {
 
     // ── 2 · data & koppelingen ────────────────────────────────────────────
     { id: 'koppelingen', scenarioId: 'UAT-MIJN-18', label: 'WF-MIJN-18 · Koppelingen inzien, testen en handmatig syncen', kind: 'screen', stage: 2, lane: 'data' },
+    { id: 'automatisch-bijwerken', scenarioId: 'UAT-MIJN-34', label: 'WF-MIJN-34 · Schakelaar "Automatisch bijwerken" (ADR 0182)', kind: 'action', stage: 2, lane: 'data', subOf: 'koppelingen' },
     { id: 'belastingimport', scenarioId: 'UAT-MIJN-19', label: 'WF-MIJN-19 · Belastingaangifte importeren / import verwijderen', kind: 'action', stage: 2, lane: 'data' },
     { id: 'csv-export', scenarioId: 'UAT-MIJN-24', label: 'WF-MIJN-24 · Data exporteren als CSV', kind: 'action', stage: 2, lane: 'data' },
     { id: 'json-export', scenarioId: 'UAT-MIJN-33', label: 'WF-MIJN-33 · Al mijn gegevens downloaden (JSON, AVG)', kind: 'action', stage: 2, lane: 'data' },
@@ -118,6 +119,7 @@ export const MIJN_FLOW: UatFlow = {
 
     // hub → data
     { from: 'hub', to: 'koppelingen' },
+    { from: 'koppelingen', to: 'automatisch-bijwerken' },
     { from: 'hub', to: 'belastingimport' },
     { from: 'hub', to: 'csv-export' },
     { from: 'hub', to: 'json-export' },

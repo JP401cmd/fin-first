@@ -57,6 +57,7 @@ vi.mock('@/lib/supabase/server', () => ({
 }))
 vi.mock('@/lib/supabase/cached-user', () => ({
   getCachedUser: () => Promise.resolve(db.user),
+  getVerifiedUser: () => Promise.resolve(db.user),
 }))
 
 // GET — de canonieke run ontbreekt hier bewust (geen geboortedatum-scenario): de stap

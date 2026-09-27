@@ -1236,3 +1236,14 @@
 ## 2026-09-27
 
 - Geen wijzigingen.
+
+## 2026-09-27
+
+- **Schermen** toegevoegd: /offline
+- **API-routes** toegevoegd: /api/auto-sync
+- **Integratie-clients** toegevoegd: lib/integrations/broker-error-messages.ts
+- **Componenten (aantal)** toegevoegd: +6
+
+## 2026-09-27
+
+- Geen wijzigingen.

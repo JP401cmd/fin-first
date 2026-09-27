@@ -726,3 +726,85 @@ describe('route-family smoke — in-scope routes', () => {
     expect(PAGE_STATUS_COPY['/dashboard']).toBeUndefined()
   })
 })
+
+// ── B-068: de Budget-melding noemt oorzaak én venster ────────────────────────
+//
+// Melding: "Je geeft deze maand meer uit dan er binnenkomt (4/5 op schema ·
+// Spaarquote -126%)" boven een september met € 4.402 in en € 1.657 uit. De
+// kleur mengt spaarquote (zes AFGESLOTEN maanden of de grondslag, ADR 0121) en
+// budgetten (lopende maand); de tekst noemde één oorzaak en het verkeerde
+// venster. Nu kiest `resolve.ts` de variant bij `scores.cashflow.oorzaak`.
+describe('resolvePageStatusMap — /overzicht/budget per oorzaak (B-068)', () => {
+  function budgetLevers(
+    status: LeverStatus,
+    oorzaak: NonNullable<LeverScores['cashflow']['oorzaak']>,
+  ): LeverScoresResult {
+    const levers = makeLeverScores('green', 'green', status, 'green', '', '', '4/5 op schema · Spaarquote -126%')
+    return {
+      ...levers,
+      scores: { ...levers.scores, cashflow: { ...levers.scores.cashflow, oorzaak } },
+    }
+  }
+
+  it('beide: noemt spaarquote mét venster én de budgetten, nooit "deze maand"', () => {
+    const map = resolvePageStatusMap({
+      levers: budgetLevers('red', {
+        cause: 'beide',
+        savingsRatePct: -126,
+        budgetsOver: 1,
+        budgetsTotal: 5,
+        savingsRateWindow: 'over de laatste 6 afgesloten maanden',
+      }),
+    })
+    const info = map['/overzicht/budget']
+    expect(info.status).toBe('bad')
+    expect(info.reason).not.toMatch(/deze maand/i)
+    expect(info.reason).not.toMatch(/meer uit dan er binnenkomt/i)
+    expect(info.reason).toContain('-126%')
+    expect(info.reason).toContain('over de laatste 6 afgesloten maanden')
+    expect(info.reason).toContain('1 van 5 budgetten')
+    expect(info.remedy).not.toMatch(/deze maand/i)
+  })
+
+  it('budgetten: noemt de budgetten, geen spaarquote en geen tekort', () => {
+    const map = resolvePageStatusMap({
+      levers: budgetLevers('amber', {
+        cause: 'budgetten',
+        savingsRatePct: 20,
+        budgetsOver: 3,
+        budgetsTotal: 5,
+        savingsRateWindow: 'over de laatste 6 afgesloten maanden',
+      }),
+    })
+    const info = map['/overzicht/budget']
+    expect(info.reason).toContain('3 van 5 budgetten')
+    expect(info.reason).not.toMatch(/spaarquote/i)
+    expect(info.reason).not.toMatch(/binnenkomt|binnenkwam|tekort/i)
+    expect(info.reason).not.toMatch(/deze maand/i)
+  })
+
+  it('sparen: noemt de spaarquote met de grondslag, geen budgetten', () => {
+    const map = resolvePageStatusMap({
+      levers: budgetLevers('amber', {
+        cause: 'sparen',
+        savingsRatePct: 4,
+        budgetsOver: 0,
+        budgetsTotal: 4,
+        savingsRateWindow: 'volgens je budgetten',
+      }),
+    })
+    const info = map['/overzicht/budget']
+    expect(info.reason).toBe('Je spaarquote blijft achter (4% volgens je budgetten).')
+    expect(info.reason).not.toMatch(/deze maand/i)
+  })
+
+  it('zonder oorzaak valt de melding terug op een tekst zonder "deze maand"', () => {
+    for (const status of ['amber', 'red'] as const) {
+      const map = resolvePageStatusMap({
+        levers: makeLeverScores('green', 'green', status, 'green', '', '', '4/5 op schema · Spaarquote -126%'),
+      })
+      expect(map['/overzicht/budget'].reason).not.toMatch(/deze maand/i)
+      expect(map['/overzicht/budget'].reason).not.toMatch(/meer uit dan er binnenkomt/i)
+    }
+  })
+})

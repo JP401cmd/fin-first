@@ -22,6 +22,7 @@ vi.mock('@/lib/supabase/server', () => ({
 }))
 vi.mock('@/lib/supabase/cached-user', () => ({
   getCachedUser: (...args: unknown[]) => mockGetCachedUser(...args),
+  getVerifiedUser: (...args: unknown[]) => mockGetCachedUser(...args),
 }))
 
 import { GET, PATCH, DELETE } from './route'

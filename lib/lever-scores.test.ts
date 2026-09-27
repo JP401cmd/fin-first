@@ -172,3 +172,72 @@ describe('Alle vier de hefbomen: neutral betekent géén domeinoordeel', () => {
     }
   })
 })
+
+// ── B-068: de Budget-hefboom draagt zijn OORZAAK mee ─────────────────────────
+//
+// De cashflow-score is een 50/50-menging van een spaar- en een budgetcomponent.
+// De status-melding op /overzicht/budget noemde één oorzaak ("je geeft meer uit
+// dan er binnenkomt") terwijl de kleur ook door budgetten alleen rood kan
+// worden. De hefboom levert daarom mee WELKE component de score omlaag trekt —
+// afgeleid uit dezelfde componenten, niet opnieuw berekend door de melding.
+describe('Budget-hefboom: oorzaak volgt de zwakke component (B-068)', () => {
+  const basis = { totalAssets: 10_000, totalDebts: 0 }
+
+  it('spaarquote negatief, 1 van 5 budgetten over → beide', () => {
+    const { cashflow } = computeLeverScores({
+      ...leverInput({ ...basis, savingsRate: -126 }),
+      budgetsTotal: 5,
+      budgetsOver: 1,
+      budgetsOnTrack: 4,
+      savingsRateWindow: 'over de laatste 6 afgesloten maanden',
+    })
+    expect(cashflow.status).toBe('red')
+    expect(cashflow.oorzaak).toEqual({
+      cause: 'beide',
+      savingsRatePct: -126,
+      budgetsOver: 1,
+      budgetsTotal: 5,
+      savingsRateWindow: 'over de laatste 6 afgesloten maanden',
+    })
+  })
+
+  it('spaarquote gezond, 3 budgetten over → budgetten', () => {
+    const { cashflow } = computeLeverScores({
+      ...leverInput({ ...basis, savingsRate: 20 }),
+      budgetsTotal: 5,
+      budgetsOver: 3,
+      budgetsOnTrack: 2,
+    })
+    expect(cashflow.status).toBe('amber')
+    expect(cashflow.oorzaak?.cause).toBe('budgetten')
+  })
+
+  it('spaarquote laag, alle budgetten binnen de limiet → sparen', () => {
+    const { cashflow } = computeLeverScores({
+      ...leverInput({ ...basis, savingsRate: -40 }),
+      budgetsTotal: 4,
+      budgetsOver: 0,
+      budgetsOnTrack: 4,
+    })
+    expect(cashflow.status).toBe('amber')
+    expect(cashflow.oorzaak?.cause).toBe('sparen')
+  })
+
+  it('alleen een spaarquote (geen budgetten), laag → sparen', () => {
+    const { cashflow } = computeLeverScores(leverInput({ ...basis, savingsRate: 2 }))
+    expect(cashflow.oorzaak?.cause).toBe('sparen')
+  })
+
+  it('groen of neutraal → geen oorzaak', () => {
+    const groen = computeLeverScores({
+      ...leverInput({ ...basis, savingsRate: 30 }),
+      budgetsTotal: 3,
+      budgetsOver: 0,
+    })
+    expect(groen.cashflow.status).toBe('green')
+    expect(groen.cashflow.oorzaak).toBeUndefined()
+    const leeg = computeLeverScores(leverInput(basis))
+    expect(leeg.cashflow.status).toBe('neutral')
+    expect(leeg.cashflow.oorzaak).toBeUndefined()
+  })
+})

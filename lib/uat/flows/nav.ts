@@ -76,6 +76,7 @@ export const NAV_FLOW: UatFlow = {
     { id: 'platformbanner', scenarioId: 'UAT-NAV-23', label: 'WF-NAV-23 · Platform-banner', kind: 'action', stage: 7, lane: 'randvoorwaarden' },
     { id: 'bottomtabs', scenarioId: 'UAT-NAV-24', label: 'WF-NAV-24 · Mobiele bottom-tabs (dode code)', kind: 'action', stage: 7, lane: 'randvoorwaarden' },
     { id: 'pwa', scenarioId: 'UAT-NAV-25', label: 'WF-NAV-25 · PWA-installatie & offline', kind: 'action', stage: 7, lane: 'randvoorwaarden' },
+    { id: 'offlinepagina', scenarioId: 'UAT-NAV-28', label: 'WF-NAV-28 · Offline-pagina ("Even geen verbinding")', kind: 'screen', stage: 7, lane: 'randvoorwaarden', subOf: 'pwa' },
     { id: 'foutpaginas', scenarioId: 'UAT-NAV-26', label: 'WF-NAV-26 · Foutpagina\'s (404 + error-boundary)', kind: 'screen', stage: 7, lane: 'randvoorwaarden' },
 
     // ── 8 · uitkomst ──────────────────────────────────────────────────────

@@ -22,7 +22,12 @@ export function startLayoutTimer() {
     mark(name: Mark) {
       marks[name] = performance.now()
     },
-    /** De vijf stappen uit de diagnose; wat ertussen zit telt alleen mee in het totaal. */
+    /**
+     * De stappen uit de diagnose; wat ertussen zit telt alleen mee in het totaal.
+     * Sinds Snelheid B1 lopen lever en guide PARALLEL aan de batch: hun waarde is
+     * de eigen duur van die stap (start → oplossen), niet meer een sequentieel
+     * blok. De stappen tellen dus niet op tot `totalMs`; de winst staat in het totaal.
+     */
     finish(): LayoutServerTimings {
       const at = (m: Mark) => marks[m] ?? t0
       return {

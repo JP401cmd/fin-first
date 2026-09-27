@@ -17,6 +17,7 @@
 // module without reaching into the crypto namespace.
 export type { ValidationResult } from './exchange-adapter'
 import type { ValidationResult } from './exchange-adapter'
+import { BROKER_ERROR_INVALID_CREDENTIALS, BROKER_ERROR_PERMISSION_DENIED } from './broker-error-messages'
 
 export type BrokerId = 'trading212'
 
@@ -80,10 +81,10 @@ export function classifyBrokerError(raw: unknown): { code: ValidationResult['cod
   const text = raw instanceof Error ? raw.message : typeof raw === 'string' ? raw : 'Onbekende fout'
   const lower = text.toLowerCase()
   if (lower.includes('401') || lower.includes('invalid api key') || lower.includes('apikey') || lower.includes('unauthorized') || lower.includes('invalid token') || lower.includes('jwt')) {
-    return { code: 'invalid_credentials', message: 'Key ongeldig — opnieuw koppelen' }
+    return { code: 'invalid_credentials', message: BROKER_ERROR_INVALID_CREDENTIALS }
   }
   if (lower.includes('403') || lower.includes('permission') || lower.includes('forbidden') || lower.includes('scope') || lower.includes('insufficient permissions')) {
-    return { code: 'permission_denied', message: 'API-key mist leesrechten' }
+    return { code: 'permission_denied', message: BROKER_ERROR_PERMISSION_DENIED }
   }
   if (lower.includes('429') || lower.includes('rate limit') || lower.includes('too many requests')) {
     return { code: 'rate_limited', message: 'Broker limiteert tijdelijk — probeer later' }

@@ -55,3 +55,36 @@ describe('Masthead — koppenconventie (ADR 0110)', () => {
     expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('TriFinity')
   })
 })
+
+/**
+ * Snelheid E (CLS op mobiel) — op /nieuws komt de colofon pas na een
+ * client-fetch binnen. Met `reserveColophon` staat de regel al in de eerste
+ * render, met een vaste hoogte (2 regels op xs, 1 vanaf sm), zodat hij de
+ * pagina daarna niet meer omlaag duwt.
+ */
+describe('Masthead — gereserveerde colofon (Snelheid E, CLS)', () => {
+  afterEach(cleanup)
+
+  it('rendert zonder reservering en zonder gegevens geen colofonregel (ongewijzigd)', () => {
+    render(<Masthead editionNr={12} />)
+    expect(screen.queryByTestId('masthead-colophon')).toBeNull()
+  })
+
+  it('reserveert de colofon-hoogte al vóór er gegevens zijn', () => {
+    render(<Masthead editionNr={12} reserveColophon />)
+    const colophon = screen.getByTestId('masthead-colophon')
+    expect(colophon).toHaveTextContent('')
+    expect(colophon).toHaveAttribute('aria-hidden', 'true')
+    expect(colophon.className).toContain('min-h-[28px]')
+    expect(colophon.className).toContain('sm:min-h-[14px]')
+    expect(colophon.className).toContain('leading-[14px]')
+  })
+
+  it('houdt dezelfde hoogte als de gegevens binnenkomen', () => {
+    render(<Masthead editionNr={12} reserveColophon articleCount={5} sourceNote="Gebaseerd op 38 bronartikelen" />)
+    const colophon = screen.getByTestId('masthead-colophon')
+    expect(colophon).toHaveTextContent(/5 artikelen/)
+    expect(colophon).not.toHaveAttribute('aria-hidden')
+    expect(colophon.className).toContain('min-h-[28px]')
+  })
+})

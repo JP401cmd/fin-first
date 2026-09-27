@@ -113,6 +113,12 @@ function makeSupabase(fixture: {
         Promise.resolve({
           data: { user: fixture.userId === null ? null : { id: fixture.userId ?? USER } },
         }),
+      // Leespad (getCachedUser, Snelheid B2): zelfde identiteit als JWT-claims.
+      getClaims: () =>
+        Promise.resolve({
+          data: fixture.userId === null ? null : { claims: { sub: fixture.userId ?? USER } },
+          error: null,
+        }),
     },
     from: (table: string) => builder(table),
   } as unknown as SupabaseClient

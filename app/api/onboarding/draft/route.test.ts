@@ -19,7 +19,10 @@ const { mockCreateClient, mockGetCachedUser } = vi.hoisted(() => ({
 }))
 
 vi.mock('@/lib/supabase/server', () => ({ createClient: mockCreateClient }))
-vi.mock('@/lib/supabase/cached-user', () => ({ getCachedUser: mockGetCachedUser }))
+vi.mock('@/lib/supabase/cached-user', () => ({
+  getCachedUser: mockGetCachedUser,
+  getVerifiedUser: mockGetCachedUser,
+}))
 
 import { GET, PUT, DELETE } from './route'
 import { serializeDraft, type DraftStateSource } from '@/app/(onboarding)/onboarding/draft-persistence'

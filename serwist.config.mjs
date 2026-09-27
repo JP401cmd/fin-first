@@ -10,15 +10,26 @@
 // Wiring: `npm run build` calls `next build && serwist build serwist.config.mjs`.
 // The CLI reads this file, calls the helper from `@serwist/next/config`, and
 // writes `public/sw.js`. In dev (`npm run dev`) and tests no SW is produced.
+import { randomUUID } from "node:crypto";
 import { serwist } from "@serwist/next/config";
+
+// Revision of the precached offline page. The page is static, but its CSS/JS
+// chunk references change per deploy, so it is re-fetched once per build.
+// Vercel exposes the commit; locally a random id is fine.
+const offlineRevision = process.env.VERCEL_GIT_COMMIT_SHA || randomUUID();
 
 export default serwist({
   swSrc: "app/sw.ts",
   swDest: "public/sw.js",
   // Don't precache prerendered HTML pages — TriFinity has 600+ test routes
-  // that we don't want eagerly downloaded on first install. Runtime
-  // NetworkFirst/CacheFirst handlers in `app/sw.ts` cover those instead.
+  // that we don't want eagerly downloaded on first install. Pages are never
+  // cached at all (NetworkOnly in `app/sw.ts`); the one exception is below.
   precachePrerendered: false,
+  // The static offline page (`app/offline/page.tsx`) that `app/sw.ts` shows
+  // when a navigation fails. It must be precached — Serwist's fallback plugin
+  // only answers from the precache. Keep this URL in sync with OFFLINE_URL in
+  // `lib/pwa/sw-caches.ts` (guarded by `lib/pwa/sw-caches.test.ts`).
+  additionalPrecacheEntries: [{ url: "/offline", revision: offlineRevision }],
   // Override the default glob: only the static brand assets that the app
   // shell genuinely depends on. Keeps the precache manifest small (a few KB
   // instead of 15+ MB), which means a faster first-install + lower data use

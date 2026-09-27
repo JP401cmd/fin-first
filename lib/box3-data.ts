@@ -6,6 +6,7 @@
 
 import type { Asset, AssetType } from './asset-data'
 import type { Debt } from './debt-data'
+import { inclusionFactor } from './dashboard-wealth-weighting'
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -26,6 +27,13 @@ export interface Box3Params {
 
 export interface AssetClassification {
   asset: Asset
+  /**
+   * De waarde waarmee deze post in de grondslag telt: `current_value` gewogen
+   * met `net_worth_inclusion_pct` (4f). Consumenten die per post een bedrag
+   * tonen lezen dít veld, niet `asset.current_value` — anders sluit de lijst
+   * niet op de totalen.
+   */
+  value: number
   category: Box3Category
   exclusionReason: string | null
   note: string | null
@@ -33,6 +41,8 @@ export interface AssetClassification {
 
 export interface DebtClassification {
   debt: Debt
+  /** `current_balance` gewogen met `net_worth_inclusion_pct` — zie `AssetClassification.value`. */
+  balance: number
   inBox3: boolean
   exclusionReason: string | null
 }
@@ -403,6 +413,26 @@ export function classifyDebt(
 
 // ── Core Calculation ─────────────────────────────────────────
 
+/**
+ * De Box 3-heffing over een set bezittingen en schulden.
+ *
+ * ── Weging met `net_worth_inclusion_pct` (nazorg R2+R3, 4f — sep 2026) ────
+ *
+ * Elke post telt gewogen mee: `current_value` × `net_worth_inclusion_pct`/100
+ * (schulden idem op `current_balance`; ontbreekt het percentage → 100%). Dat is
+ * dezelfde regel als het netto vermogen (`lib/dashboard-wealth-weighting.ts`)
+ * en de Box 3-statusband (`computeBox3TaxableInput`). Tot dan telde deze motor
+ * rauw op, terwijl de statusband wél woog: op de Belasting-hub stonden de
+ * €-KPI en het stoplicht daardoor op een verschillende grondslag zodra iemand
+ * gedeeld of deels-eigen bezit had — en de assets-SELECT is huishoud-gedeeld,
+ * dus een gezamenlijke rekening van € 400.000 op 50% landde voor de volle
+ * € 400.000 in de heffing. `lever-scores-loader` omzeilde dat met een eigen
+ * gewogen kopie vóór de aanroep; die dubbeling is opgeruimd — de weging heeft
+ * één home, hier. Eigenaarsbesluit 27 sep 2026.
+ *
+ * `assetClassifications[].value` / `debtClassifications[].balance` dragen het
+ * gewogen bedrag per post, zodat een lijst per post op de totalen sluit.
+ */
 export function calculateBox3(input: Box3Input): Box3Result {
   const params = BOX3_PARAMS[input.year]
   const activeAssets = input.assets.filter(a => a.is_active)
@@ -417,34 +447,35 @@ export function calculateBox3(input: Box3Input): Box3Result {
 
   const assetClassifications: AssetClassification[] = activeAssets.map(asset => {
     const { category, exclusionReason, note } = classifyAsset(asset)
-    return { asset, category, exclusionReason, note }
+    // Gewogen met net_worth_inclusion_pct — zie de kop van deze functie (4f).
+    const value = Number(asset.current_value) * inclusionFactor(asset)
+    return { asset, value, category, exclusionReason, note }
   })
 
   // Step 2: Classify debts
   const debtClassifications: DebtClassification[] = activeDebts.map(debt => {
     const { inBox3, exclusionReason } = classifyDebt(debt, eigenHuisAssetIds)
-    return { debt, inBox3, exclusionReason }
+    const balance = Number(debt.current_balance) * inclusionFactor(debt)
+    return { debt, balance, inBox3, exclusionReason }
   })
 
-  // Step 3: Sum totals per category
+  // Step 3: Sum totals per category (gewogen bedragen uit stap 1/2)
   let totaalSpaargeld = 0
   let totaalBeleggingen = 0
   let totaalUitgesloten = 0
 
   for (const ac of assetClassifications) {
-    const value = Number(ac.asset.current_value)
-    if (ac.category === 'spaargeld') totaalSpaargeld += value
-    else if (ac.category === 'beleggingen') totaalBeleggingen += value
-    else totaalUitgesloten += value
+    if (ac.category === 'spaargeld') totaalSpaargeld += ac.value
+    else if (ac.category === 'beleggingen') totaalBeleggingen += ac.value
+    else totaalUitgesloten += ac.value
   }
 
   let totaalBox3Schulden = 0
   let totaalUitgeslotenSchulden = 0
 
   for (const dc of debtClassifications) {
-    const balance = Number(dc.debt.current_balance)
-    if (dc.inBox3) totaalBox3Schulden += balance
-    else totaalUitgeslotenSchulden += balance
+    if (dc.inBox3) totaalBox3Schulden += dc.balance
+    else totaalUitgeslotenSchulden += dc.balance
   }
 
   // Step 4-15: de forfait-keten — ÉÉN implementatie, gedeeld met de
