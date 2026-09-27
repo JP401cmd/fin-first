@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-09-27T09:40:21.175Z",
+  "generatedAt": "2026-09-27T10:47:01.159Z",
   "generatedDate": "2026-09-27",
   "repo": {
     "name": "fin",
-    "version": "0.92.8"
+    "version": "0.92.9"
   },
   "annotations": {
     "philosophy": "Geld levert tijd op — elk bedrag staat voor tijd waarin je uitgaven gedekt zijn.",
@@ -18909,7 +18909,7 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 85
+        "commits": 86
       },
       {
         "path": "lib/ai",
@@ -18917,7 +18917,7 @@
       },
       {
         "path": "app/(app)/toekomst",
-        "commits": 55
+        "commits": 57
       },
       {
         "path": "app/api/ai",
@@ -18952,7 +18952,7 @@
       {
         "file": "components/app/budgets-client.tsx",
         "loc": 5717,
-        "commits": 35
+        "commits": 36
       },
       {
         "file": "components/core/assets-client.tsx",
@@ -18966,7 +18966,7 @@
       },
       {
         "file": "lib/release-notes.ts",
-        "loc": 3634,
+        "loc": 3693,
         "commits": 14
       },
       {
@@ -20176,16 +20176,8 @@
   "diff": {
     "baseline": false,
     "previousDate": "2026-09-27",
-    "hasChanges": true,
-    "sections": [
-      {
-        "label": "Componenten (aantal)",
-        "added": [
-          "+11"
-        ],
-        "removed": []
-      }
-    ]
+    "hasChanges": false,
+    "sections": []
   },
   "statsHistory": [
     {

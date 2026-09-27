@@ -97,6 +97,65 @@ export const RELEASE_NOTE_NORM = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.92.9',
+    date: '2026-09-27',
+    title: 'Toekomst als tabbladen, en Instellingen als checklist',
+    sections: [
+      {
+        module: 'Je plan',
+        color: 'purple',
+        items: [
+          {
+            title: 'Plan, Doelen en Instellingen als tabbladen',
+            description:
+              'Op de computer staan ze bovenaan, vast aan de grafiek, elk met een eigen kleur. Op je telefoon staan ze onder de grafiek.',
+          },
+          {
+            title: 'Instellingen als checklist van je plan',
+            description:
+              'Per onderdeel zie je wat standaard is, wat je zelf instelde en wat nog ontbreekt. Reikt je plan niet, dan staat bovenaan waarom.',
+          },
+          {
+            title: 'Ook bij een plan dat nog niet reikt zie je het effect',
+            description:
+              'Pas je een instelling aan, dan zie je of je plan haalbaar wordt, of hoe het tekort per maand verandert.',
+          },
+          {
+            title: 'Doelen: geen dubbele knoppen meer',
+            description:
+              'Op je telefoon staat wat je kunt opslaan samen in de vaste balk onderaan. Op de computer staan de acties onder grafiek en harp.',
+          },
+          {
+            title: 'Levensgebeurtenissen bij de grafiek',
+            description:
+              'In Plan staan je gebeurtenissen en levensstrategieën bij de grafiek; op de computer ernaast, zodat de grafiek op zijn plek blijft.',
+          },
+          {
+            title: 'Samenstelling is de eerste weergave',
+            description:
+              'De grafiek opent op de samenstelling van je vermogen, in alle drie de delen. Vermogen en Geldstroom zijn één tik verder.',
+          },
+          {
+            title: 'Afbouw van je vermogen in vrijheidstijd',
+            description:
+              'Het afbouwoverzicht laat naast de bedragen zien hoeveel vrijheidstijd het liquide deel nog voor je dekt.',
+          },
+        ],
+      },
+      {
+        module: 'Platform',
+        color: 'zinc',
+        items: [
+          {
+            title: 'Metingen en onderhoud achter de schermen',
+            description:
+              'We meten nu preciezer hoe snel pagina’s laden, en er is onderhoud gedaan aan hoe je gegevens zijn opgeslagen. Voor jou geen zichtbare verandering.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: '0.92.8',
     date: '2026-09-27',
     title: 'Toekomst in drie delen, en je gezondheid door de tijd',
