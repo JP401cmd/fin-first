@@ -358,15 +358,6 @@ export const ARCHI_CONCERNS: ArchiConcern[] = [
     reviewedAt: '2026-08-29',
   },
   {
-    id: 'fk-waarde-zonder-datalaag-guard',
-    title: 'valuations.entity_id-guard + eigen-rij-SELECT: klaar in migratie 20260927120000, nog niet toegepast',
-    detail:
-      'RLS scopet de RIJ, niet de WAARDE van een FK-kolom daarop (ADR 0075). valuations.entity_id is polymorf (entity_type kiest assets of debts), heeft dus geen FK, en had tot nu toe geen guard; de INSERT-with_check toetste alléén user_id, waardoor ook ownership en household_id vrij zetbaar waren. Een huishoudpartner kon zo een waardering op een gedeelde bezitting van de ander schrijven, en zeven lezers die alleen op entity_id filteren (o.a. lib/assets-data-loader.ts) toonden die in de historie van de eigenaar. OPGELOST IN MIGRATIE 20260927120000_snapshots_waarderingen_rollovers_eigen_rij.sql (eigenaarsbesluit 27-09-2026): (1) de SELECT op valuations is strikt eigen rij, dus een entity_id-lezer ziet nooit meer andermans rijen — dat vervangt het eerder voorgenomen eigenaar-scopen van de loader; (2) trg_guard_valuation_entity_owner weigert een waardering waarvan de eigenaar van de bezitting/schuld niet NEW.user_id is (strikt eigenaar, spiegel van guard_goal_link_owner — consistent met de eigen-rij-UPDATE op assets/debts); (3) CHECK valuations_alleen_persoonlijk maakt ownership/household_id vaste waarden. De twee batch-schrijvers (check-in, /core/assets/revalue) slaan partnerrijen voortaan over. Bewuste keuze, geen risico: de partner ziet de waarderingshistorie van een gedeelde bezitting (nog) niet. WAAROM DIT PUNT NOG STAAT: de migratie is op 27-09-2026 geschreven maar niet toegepast; tot de release blijft het oude lek live (0 huishoudens, dus onbereikbaar tot iemand een uitnodiging accepteert). Verwijder dit punt zodra de migratie in schema_migrations staat én blok A–E van supabase/terugweg/verificatie_snapshots_waarderingen_rollovers_eigen_rij.sql groen is.',
-    severity: 'risk',
-    elementIds: ['t-bankconnect', 'as-vermogen', 't-supabase'],
-    reviewedAt: '2026-09-27',
-  },
-  {
     id: 'bank-sync-gefaalde-batch-niet-retried',
     title: 'Een gesneuvelde insert-batch bij een banksync wordt niet opnieuw geprobeerd',
     detail:
