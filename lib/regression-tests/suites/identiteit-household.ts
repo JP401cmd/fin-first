@@ -534,15 +534,23 @@ const tests: TestCase[] = [
     id: 'household-leave-data-tables',
     name: 'Household leave reverteert items naar personal',
     category: CAT,
-    description: 'Leave flow reverteert ownership van 9 datatabelreeksen',
+    description: 'Leave flow reverteert ownership van de 8 deelbare datatabellen',
     priority: 'high',
     estimatedDurationMs: 100,
     fn() {
-      // Leave route reverts these tables: assets, debts, budgets, transactions, bank_accounts,
-      // net_worth_snapshots, valuations, recurring_transactions, goals
+      // household_leave() zet deze deelbare tabellen terug naar personal (gemeten
+      // tegen pg_proc, 27-09-2026). De functie noemt daarnaast nog
+      // net_worth_snapshots en valuations, maar die zijn sinds migratie
+      // 20260927120000 strikt persoonlijk (CHECK ownership='personal' AND
+      // household_id IS NULL) — die twee regels matchen nooit meer een rij.
       const dataTables = ['assets', 'debts', 'budgets', 'transactions', 'bank_accounts',
-        'net_worth_snapshots', 'valuations', 'recurring_transactions', 'goals']
-      assertEqual(dataTables.length, 9, '9 datatabel reeksen')
+        'recurring_transactions', 'goals', 'life_events']
+      assertEqual(dataTables.length, 8, '8 deelbare datatabellen')
+      const altijdPersoonlijk = ['net_worth_snapshots', 'valuations']
+      assert(
+        altijdPersoonlijk.every((t) => !dataTables.includes(t)),
+        'snapshots en waarderingen zijn niet deelbaar',
+      )
       // Profile reset: household_id=null, household_type='solo', selected_perspective='personal'
       const profileReset = { household_id: null, household_type: 'solo', selected_perspective: 'personal' }
       assertEqual(profileReset.household_type, 'solo', 'Reset naar solo')
@@ -793,12 +801,20 @@ const tests: TestCase[] = [
     id: 'household-read-fundament-doc',
     name: 'Read/write-fundament: shared-RLS + write-trigger gedocumenteerd',
     category: CAT,
-    description: 'Shared-SELECT RLS staat op de 8 financiële tabellen + goals + life_events; de stamp_household_id-trigger stempelt household_id server-side. Live geverifieerd via simulated-JWT leaktest (build-plan §1a).',
+    description: 'Shared-SELECT RLS staat op 6 financiële tabellen + goals + life_events; de stamp_household_id-trigger stempelt household_id server-side. net_worth_snapshots en valuations zijn sinds migratie 20260927120000 strikt eigen rij (eigenaarsbesluit 27-09-2026). Live geverifieerd via simulated-JWT leaktest (build-plan §1a; verificatiescript supabase/terugweg/verificatie_snapshots_waarderingen_rollovers_eigen_rij.sql).',
     priority: 'medium',
     estimatedDurationMs: 50,
     fn() {
-      const sharedRlsTables = ['assets', 'debts', 'budgets', 'transactions', 'bank_accounts', 'valuations', 'net_worth_snapshots', 'recurring_transactions', 'goals', 'life_events']
-      assertEqual(sharedRlsTables.length, 10, '10 tabellen met huishoud-bewuste shared-SELECT RLS')
+      const sharedRlsTables = ['assets', 'debts', 'budgets', 'transactions', 'bank_accounts', 'recurring_transactions', 'goals', 'life_events']
+      assertEqual(sharedRlsTables.length, 8, '8 tabellen met huishoud-bewuste shared-SELECT RLS')
+      // Bewust NIET gedeeld: een gezamenlijk vermogensverloop is een optelsom van
+      // twee persoonlijke reeksen, geen gedeelde snapshotrij; waarderingen zijn
+      // persoonlijk en guarded op entity_id (trg_guard_valuation_entity_owner).
+      const eigenRijTables = ['net_worth_snapshots', 'valuations']
+      assert(
+        eigenRijTables.every((t) => !sharedRlsTables.includes(t)),
+        'snapshots en waarderingen hebben geen shared-SELECT-tak',
+      )
     },
   },
 

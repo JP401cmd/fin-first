@@ -1187,11 +1187,18 @@ function StepBezittingen({
       const changes: { asset: Asset; newValue: number }[] = []
       for (const asset of assets) {
         if (holdingsMap[asset.id]) continue
+        // Alleen eigen bezittingen: de lijst is huishoud-verbreed, maar een
+        // waardering mag alleen op je eigen bezitting (guard op valuations,
+        // migratie 20260927120000). Eén gedeelde partnerrij zou anders de hele
+        // batch-upsert laten falen — en de ouder-update liep er al op 0 rijen.
+        if (asset.user_id !== user.id) continue
         const current = Number(asset.current_value)
         const newVal = Number(newValues[asset.id])
         if (isNaN(newVal) || Math.abs(newVal - current) < 0.01) continue
         changes.push({ asset, newValue: newVal })
       }
+
+      if (changes.length === 0) return
 
       // Upsert valuations
       const valuationRows = changes.map(({ asset, newValue }) => ({
@@ -1406,11 +1413,15 @@ function StepSchulden({
       const date = new Date().toISOString().split('T')[0]
       const changes: { debt: Debt; newValue: number }[] = []
       for (const debt of debts) {
+        // Alleen eigen schulden — zelfde reden als bij de bezittingen hierboven.
+        if (debt.user_id !== user.id) continue
         const current = Number(debt.current_balance)
         const newVal = Number(newValues[debt.id])
         if (isNaN(newVal) || Math.abs(newVal - current) < 0.01) continue
         changes.push({ debt, newValue: newVal })
       }
+
+      if (changes.length === 0) return
 
       // Upsert valuations
       const valuationRows = changes.map(({ debt, newValue }) => ({

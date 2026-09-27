@@ -206,6 +206,11 @@ export default function RevaluePage() {
       const changes: { asset: Asset; newValue: number }[] = []
       for (const asset of assets) {
         if (isLocked(asset)) continue
+        // Alleen eigen bezittingen: de lijst is huishoud-verbreed, maar een
+        // waardering mag alleen op je eigen bezitting (guard op valuations,
+        // migratie 20260927120000). Eén gedeelde partnerrij zou anders de hele
+        // batch-upsert laten falen — en de ouder-update liep er al op 0 rijen.
+        if (asset.user_id !== user.id) continue
         const current = Number(asset.current_value)
         const newVal = Number(newValues[asset.id])
         if (isNaN(newVal) || Math.abs(newVal - current) < 0.01) continue
