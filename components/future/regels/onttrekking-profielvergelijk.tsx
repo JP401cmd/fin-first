@@ -14,13 +14,30 @@
  * dezelfde override-run als de verschilregel. Alle uitkomsten (stopanker, vrijheidsleeftijd,
  * doelbedrag, vermogen op het stopmoment, bereik) komen uit het `SimResult` van die run.
  *
- * Bekende schuld, ongewijzigd meeverhuisd: de guardrail-corridor (onttrekking × vloer en
- * plafond) en de bestedingsruimte (min en max van de jaarlijkse onttrekking ÷ 12) zijn
- * weergave-afleidingen op de kernrijen. De profielkleuren zijn categorie-herkenning, geen
- * module-identiteit (zelfde palet als de modal).
+ * Euro-weergave (ADR 0090/0093, review Y1): de runs zijn kernel-override-runs, dus elke
+ * run draagt zijn eigen canonieke deflator (`RegelProjection.factorRijen`, jaar 0 = 1.0).
+ * In "huidige euro's" gaat elk bedrag hier precies één keer door `lib/euro-display.ts`:
+ * de rijen via `deflateRowsByAge` (factor van de eigen leeftijd), puntbedragen via
+ * `deflate(…, factorAtAge(…))` op het stopmoment van díe run. Pas daarna de weergave-
+ * afleidingen (bestedingsruimte ÷ 12, guardrail-corridor × vloer/plafond).
+ *
+ * Kleuren (review): categorie-herkenning uit het gevalideerde categorische reekspalet
+ * (`--beheer-reeks-*` onder `.beheer-viz`, app/globals.css: > 20° van de statushues,
+ * CVD-getoetst, met donkere tegenhangers) — geen losse hexen, geen stoplicht-achtig groen
+ * of amber. Vast blijft neutrale inkt.
  */
 
 import { useMemo, useState } from 'react'
+import { useEuroView } from '@/lib/hooks/use-euro-view'
+import {
+  buildFactorByAge,
+  deflate,
+  deflateRowsByAge,
+  euroViewLabel,
+  factorAtAge,
+  type EuroView,
+} from '@/lib/euro-display'
+import { SIM_ROW_MONEY_FIELDS } from '@/components/toekomst/state/euro-view-feeds'
 import { ChevronDown, Info } from 'lucide-react'
 import { runRegelProjection, type RegelProjection, type RegelSimSnapshot } from '@/lib/future/regel-sim'
 import type { SimRow } from '@/lib/fire-simulation'
@@ -48,13 +65,23 @@ export const PROFIEL_VERGELIJK_KOPIJ = {
   samenvattingKop: 'Samenvatting',
   actief: 'Je keuze',
   disclaimer: 'Een doorrekening van je eigen cijfers, geen advies. Wat er werkelijk gebeurt, kan afwijken.',
+  /** Welke euro's de bedragen hieronder zijn — volgt de euro-weergave van de app. */
+  euroRegel: (view: EuroView) => `Bedragen in ${euroViewLabel(view).toLowerCase()}.`,
 } as const
+
+/** Reeksnummer (1..6) in het categorische palet `--beheer-reeks-*`; `null` = neutrale inkt. */
+export const PROFIEL_REEKS: Record<WithdrawalProfiel, number | null> = {
+  vast: null,
+  afnemend: 3, // petrol
+  oplopend: 2, // roestbruin
+  guardrails: 1, // blauw
+}
 
 export const PROFIEL_INFO: Record<WithdrawalProfiel, { label: string; stroke: string }> = {
   vast: { label: 'Vast', stroke: 'var(--ink-3)' },
-  afnemend: { label: 'Afnemend', stroke: '#22c55e' },
-  oplopend: { label: 'Oplopend', stroke: '#f59e0b' },
-  guardrails: { label: 'Guardrails', stroke: '#3b82f6' },
+  afnemend: { label: 'Afnemend', stroke: `var(--beheer-reeks-${PROFIEL_REEKS.afnemend})` },
+  oplopend: { label: 'Oplopend', stroke: `var(--beheer-reeks-${PROFIEL_REEKS.oplopend})` },
+  guardrails: { label: 'Guardrails', stroke: `var(--beheer-reeks-${PROFIEL_REEKS.guardrails})` },
 }
 
 const ALLE: WithdrawalProfiel[] = ['vast', 'afnemend', 'oplopend', 'guardrails']
@@ -118,6 +145,7 @@ function VergelijkInhoud({
   withdrawalStrategy?: WithdrawalStrategyConfig
 }) {
   const runs = useMemo(() => runProfielVergelijk(snapshot), [snapshot])
+  const { view } = useEuroView()
   const [gekozen, setGekozen] = useState<WithdrawalProfiel>(actiefProfiel)
 
   if (!runs) return <Melding tekst={PROFIEL_VERGELIJK_KOPIJ.geenBasis} />
@@ -127,9 +155,22 @@ function VergelijkInhoud({
   >
   if (ALLE.every((p) => sims[p] == null)) return <Melding tekst={PROFIEL_VERGELIJK_KOPIJ.mislukt} />
 
-  const pensioenRijen = Object.fromEntries(
-    ALLE.map((p) => [p, (sims[p]?.rows ?? []).filter((r) => r.phase === 'retirement')]),
+  // Euro-weergave: elke run met zijn eigen factor, elk bedrag één keer (ADR 0090/0093).
+  const factorRijen = Object.fromEntries(
+    runs.map((r) => [r.profiel, r.projectie.factorRijen ?? []]),
+  ) as Record<WithdrawalProfiel, NonNullable<RegelProjection['factorRijen']>>
+  const viewRijen = Object.fromEntries(
+    ALLE.map((p) => [
+      p,
+      deflateRowsByAge(sims[p]?.rows ?? [], buildFactorByAge(factorRijen[p]), SIM_ROW_MONEY_FIELDS, view),
+    ]),
   ) as Record<WithdrawalProfiel, SimRow[]>
+  const pensioenRijen = Object.fromEntries(
+    ALLE.map((p) => [p, viewRijen[p].filter((r) => r.phase === 'retirement')]),
+  ) as Record<WithdrawalProfiel, SimRow[]>
+  /** Een puntbedrag uit de run van profiel `p`, gedeflateerd op zijn eigen leeftijd. */
+  const opLeeftijd = (p: WithdrawalProfiel, bedrag: number, leeftijd: number | null | undefined) =>
+    deflate(bedrag, factorAtAge(factorRijen[p], leeftijd), view)
   const startLeeftijd = sims.vast?.rows[0]?.age ?? runs.find((r) => r.projectie.rows[0])?.projectie.rows[0]?.age ?? null
   const bereik = (p: WithdrawalProfiel): AnkerReach =>
     ankerReachFromSim({
@@ -160,8 +201,10 @@ function VergelijkInhoud({
     .filter((m) => grenzen && m.leeftijd >= grenzen.min && m.leeftijd <= grenzen.max)
 
   return (
-    <div className="mt-3 space-y-5" data-testid="profielvergelijk">
-      <p className="text-xs leading-snug text-[var(--ink-3)]">{PROFIEL_VERGELIJK_KOPIJ.intro}</p>
+    <div className="beheer-viz mt-3 space-y-5" data-testid="profielvergelijk">
+      <p className="text-xs leading-snug text-[var(--ink-3)]">
+        {PROFIEL_VERGELIJK_KOPIJ.intro} {PROFIEL_VERGELIJK_KOPIJ.euroRegel(view)}
+      </p>
 
       <div role="group" aria-label="Profiel in de grafiek" className="grid grid-cols-2 gap-2">
         {ALLE.map((p) => {
@@ -242,18 +285,31 @@ function VergelijkInhoud({
                   label={ANKER_KPI_LABEL}
                   waarde={ankerReachYear(bereik(gekozen)) != null ? `${ankerReachYear(bereik(gekozen))} jaar` : 'nog niet te bepalen'}
                 />
-                <Regel label="Vermogen op je stopmoment" waarde={<MaskedAmount value={sim.firePortfolioAtFire} tone="horizon" />} />
+                <Regel
+                  label="Vermogen op je stopmoment"
+                  waarde={<MaskedAmount value={opLeeftijd(gekozen, sim.firePortfolioAtFire, sim.vastStopLeeftijd)} tone="horizon" />}
+                />
               </>
             ) : (
               <>
                 <Regel label="Vrijheidsleeftijd" waarde={sim.fireReachable && sim.fireAge != null ? `${sim.fireAge} jaar` : 'niet binnen je plan'} />
-                <Regel label="Doelbedrag" waarde={<MaskedAmount value={sim.requiredFirePortfolio} tone="horizon" />} />
+                <Regel
+                  label="Doelbedrag"
+                  waarde={<MaskedAmount value={opLeeftijd(gekozen, sim.requiredFirePortfolio, sim.fireAgeFractional)} tone="horizon" />}
+                />
                 <Regel label="Onttrekkingspercentage" waarde={`${(sim.implicitWithdrawalRate * 100).toFixed(1).replace('.', ',')}%`} />
               </>
             )}
             <Regel
               label="Vermogen aan het eind"
-              waarde={sim.rows.length > 0 ? <MaskedAmount value={sim.rows[sim.rows.length - 1].endPortfolio} tone="horizon" /> : '—'}
+              testId="vermogen-eind"
+              waarde={
+                viewRijen[gekozen].length > 0 ? (
+                  <MaskedAmount value={viewRijen[gekozen][viewRijen[gekozen].length - 1].endPortfolio} tone="horizon" />
+                ) : (
+                  '—'
+                )
+              }
             />
           </dl>
         </div>
@@ -273,9 +329,9 @@ function Melding({ tekst }: { tekst: string }) {
   )
 }
 
-function Regel({ label, waarde }: { label: string; waarde: React.ReactNode }) {
+function Regel({ label, waarde, testId }: { label: string; waarde: React.ReactNode; testId?: string }) {
   return (
-    <div>
+    <div data-testid={testId}>
       <dt className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--ink-3)]">{label}</dt>
       <dd className="font-mono text-sm tabular-nums text-[var(--ink)]">{waarde}</dd>
     </div>

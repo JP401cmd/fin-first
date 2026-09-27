@@ -17,6 +17,7 @@ import {
   type ConvergentieRawProfileRow,
 } from '@/lib/horizon-kernel/convergentie-router'
 import type { SimResult, SimRow } from '@/lib/fire-simulation'
+import type { FactorRow } from '@/lib/euro-display'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
 import { ankerReachFromSim, type AnkerReach } from '@/lib/horizon/anker-copy'
 import { clipRowsToPlanEnd } from '@/lib/horizon/clip-rows-to-plan-end'
@@ -75,6 +76,13 @@ export interface RegelProjection {
    * Optioneel/additief in het TYPE; `runRegelProjection` zet 'm bij een geslaagde run.
    */
   sim?: SimResult
+  /**
+   * ADR 0179 fase 3 (review Y1) — de canonieke weergave-deflator van DEZELFDE run:
+   * `{ age, inflationFactor }` per kernelrij (jaar 0 = 1.0, ADR 0090/0093). Een consument
+   * die bedragen uit `sim` in "huidige euro's" toont, deflateert daarmee via
+   * `lib/euro-display.ts` — nooit met een eigen `Math.pow`. Optioneel/additief in het TYPE.
+   */
+  factorRijen?: FactorRow[]
 }
 
 /** Verse lege projectie per aanroep — geen gedeelde (muteerbare) `rows`-array. */
@@ -220,6 +228,7 @@ export function runRegelProjection(
       ? { leeftijd: eindRij.age, nominaal: eindRij.nettoLiquide, inflationFactor: eindRij.inflationFactor }
       : null,
     sim: res,
+    factorRijen: outcome.result.rows.map((r) => ({ age: r.age, inflationFactor: r.inflationFactor })),
   }
 }
 

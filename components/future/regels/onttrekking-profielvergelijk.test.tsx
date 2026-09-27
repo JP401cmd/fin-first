@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { render, screen, fireEvent, within } from '@testing-library/react'
+import { render, screen, fireEvent, within, cleanup } from '@testing-library/react'
+import { EuroViewProvider } from '@/lib/hooks/use-euro-view'
 import type { Asset } from '@/lib/asset-data'
 import type { LifeEvent } from '@/lib/horizon-data'
 import { toSimResult } from '@/lib/unified-projection'
@@ -10,7 +11,17 @@ import {
 } from '@/lib/horizon-kernel/convergentie-router'
 import type { RegelSimSnapshot } from '@/lib/future/regel-sim'
 import { WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
-import { OnttrekkingProfielVergelijk, runProfielVergelijk, PROFIEL_VERGELIJK_KOPIJ } from './onttrekking-profielvergelijk'
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
+import { accentClashesWithStatus } from '@/lib/color-palette'
+import { BEHEER_REEKS_DONKER, BEHEER_REEKS_LICHT } from '@/components/app/beheer/gebruik/palet'
+import {
+  OnttrekkingProfielVergelijk,
+  runProfielVergelijk,
+  PROFIEL_VERGELIJK_KOPIJ,
+  PROFIEL_INFO,
+  PROFIEL_REEKS,
+} from './onttrekking-profielvergelijk'
 
 /**
  * ADR 0179 fase 3 — de profielvergelijking die uit de Strategieën-modal verhuisde. Pint
@@ -127,5 +138,59 @@ describe('OnttrekkingProfielVergelijk', () => {
     render(<OnttrekkingProfielVergelijk snapshot={null} actiefProfiel="vast" />)
     fireEvent.click(screen.getByRole('button', { name: PROFIEL_VERGELIJK_KOPIJ.knop }))
     expect(screen.getByText(PROFIEL_VERGELIJK_KOPIJ.geenBasis)).toBeTruthy()
+  })
+})
+
+describe('OnttrekkingProfielVergelijk — euro-weergave (ADR 0090/0093, review Y1)', () => {
+  it('draagt de factorrijen van dezelfde run mee (geen eigen machtsverheffing)', () => {
+    const runs = runProfielVergelijk(SNAPSHOT)!
+    for (const { projectie } of runs) {
+      expect(projectie.factorRijen?.length).toBeGreaterThan(0)
+      expect(projectie.factorRijen![0].inflationFactor).toBeCloseTo(1, 6)
+    }
+  })
+
+  it('in "huidige euro\'s" deelt elk bedrag precies één keer door de factor van zijn eigen leeftijd', () => {
+    const runs = runProfielVergelijk(SNAPSHOT)!
+    const vast = runs.find((r) => r.profiel === 'vast')!.projectie
+    const eindRij = vast.sim!.rows[vast.sim!.rows.length - 1]
+    const factor = vast.factorRijen!.find((f) => f.age === eindRij.age)!.inflationFactor
+    expect(factor).toBeGreaterThan(1.2)
+    const bedrag = (euro: 'real' | 'nominal') => {
+      cleanup()
+      render(
+        <EuroViewProvider initialView={euro}>
+          <OnttrekkingProfielVergelijk snapshot={SNAPSHOT} actiefProfiel="vast" withdrawalStrategy={WITHDRAWAL_DEFAULTS} />
+        </EuroViewProvider>,
+      )
+      fireEvent.click(screen.getByRole('button', { name: PROFIEL_VERGELIJK_KOPIJ.knop }))
+      const regel = within(screen.getByTestId('profiel-samenvatting')).getByTestId('vermogen-eind')
+      return Number((regel.textContent ?? '').replace(/[^\d]/g, ''))
+    }
+    const nominaal = bedrag('nominal')
+    const reeel = bedrag('real')
+    // Alleen de cijfers (het teken zit in de opmaak): de grootte telt.
+    expect(nominaal).toBe(Math.abs(Math.round(eindRij.endPortfolio)))
+    expect(reeel).toBe(Math.abs(Math.round(eindRij.endPortfolio / factor)))
+    expect(reeel).toBeLessThan(nominaal)
+    expect(screen.getByTestId('profielvergelijk').textContent).toContain(PROFIEL_VERGELIJK_KOPIJ.euroRegel('real'))
+  })
+})
+
+describe('OnttrekkingProfielVergelijk — profielkleuren (review: geen status-achtige losse hexen)', () => {
+  it('gebruikt het categorische reekspalet; licht én donker botsen niet met de statuskleuren', () => {
+    const src = readFileSync(path.join(process.cwd(), 'components/future/regels/onttrekking-profielvergelijk.tsx'), 'utf8')
+    expect(src).not.toMatch(/#[0-9a-fA-F]{3,8}\b/)
+    for (const [profiel, reeks] of Object.entries(PROFIEL_REEKS)) {
+      if (reeks == null) {
+        expect(PROFIEL_INFO[profiel as keyof typeof PROFIEL_INFO].stroke).toBe('var(--ink-3)')
+        continue
+      }
+      expect(PROFIEL_INFO[profiel as keyof typeof PROFIEL_INFO].stroke).toBe(`var(--beheer-reeks-${reeks})`)
+      for (const hex of [BEHEER_REEKS_LICHT[reeks - 1], BEHEER_REEKS_DONKER[reeks - 1]]) {
+        expect(accentClashesWithStatus(hex), `${profiel} ${hex}`).toBe('ok')
+      }
+    }
+    expect(new Set(Object.values(PROFIEL_REEKS).filter((r) => r != null)).size).toBe(3)
   })
 })
