@@ -94,6 +94,20 @@ function modusLaag(actief: boolean): CSSProperties {
   return { opacity: actief ? 1 : 0, pointerEvents: actief ? 'auto' : 'none' }
 }
 
+/**
+ * De props van één modus-laag. Een inactieve laag is onzichtbaar (opacity 0) maar blijft
+ * gemount (Vermogen altijd); daarom haalt `aria-hidden` hem uit de a11y-boom en `inert`
+ * zijn focusbare elementen uit de tabvolgorde (eindreview fase 4). De actieve laag draagt
+ * geen van beide.
+ */
+export function modusLaagProps(actief: boolean): {
+  style: CSSProperties
+  'aria-hidden'?: true
+  inert?: true
+} {
+  return actief ? { style: modusLaag(true) } : { style: modusLaag(false), 'aria-hidden': true, inert: true }
+}
+
 export interface CanvasGrafiekProps {
   currentAge: number | null
   chartEndAge: number | null
@@ -351,8 +365,7 @@ export function CanvasGrafiek({
                         {/* Vermogenspad (SimChart) */}
                         <div
                           className={MODUS_CEL}
-                          style={modusLaag(modus === 'vermogen')}
-                          aria-hidden={modus !== 'vermogen'}
+                          {...modusLaagProps(modus === 'vermogen')}
                           data-testid="canvas-vermogen"
                         >
                           <SimChart
@@ -450,8 +463,8 @@ export function CanvasGrafiek({
                         {/* Vermogensopbouw (WealthCompositionChart) */}
                         <div
                           className={MODUS_CEL}
-                          style={modusLaag(modus === 'samenstelling')}
-                          aria-hidden={modus !== 'samenstelling'}
+                          {...modusLaagProps(modus === 'samenstelling')}
+                          data-testid="canvas-samenstelling"
                         >
                           <WealthCompositionChart
                             stackedRows={samenstelling ? samenstelling.rows : viewWealthCompositionRows}
@@ -481,8 +494,7 @@ export function CanvasGrafiek({
                             lager dan Vermogen en staat verticaal in het midden van de cel. */}
                         <div
                           className={`${MODUS_CEL} flex flex-col justify-center`}
-                          style={modusLaag(modus === 'geldstroom')}
-                          aria-hidden={modus !== 'geldstroom'}
+                          {...modusLaagProps(modus === 'geldstroom')}
                           data-testid="canvas-geldstroom"
                         >
                           {modus === 'geldstroom' && (

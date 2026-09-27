@@ -31,7 +31,13 @@ vi.mock('@/components/app/horizon/sim-chart', () => ({
   },
 }))
 vi.mock('@/components/app/horizon/wealth-composition-chart', () => ({
-  WealthCompositionChart: () => <div data-testid="samenstelling-chart" />,
+  // Met een focusbaar element, zodat de test kan bewijzen dat een inactieve laag niet
+  // met tab bereikbaar is.
+  WealthCompositionChart: () => (
+    <div data-testid="samenstelling-chart">
+      <button type="button">jaar 50</button>
+    </div>
+  ),
 }))
 vi.mock('@/components/app/horizon/zoomable-chart-container', () => ({
   ZoomableChartContainer: ({ children }: { children: (min: number, max: number, c: object) => ReactNode }) => (
@@ -133,5 +139,42 @@ describe('CanvasGrafiek — compacte plothoogte (spec §4.5)', () => {
   it('zonder katern-hoogte krijgt de grafiek geen prop (standaardhoogte, Plan en Doelen)', () => {
     renderModus('vermogen', { plotHoogte: null })
     expect(h.simChart?.plotHoogte).toBeUndefined()
+  })
+})
+
+describe('CanvasGrafiek — inactieve modi staan buiten de a11y-boom en de tabvolgorde', () => {
+  const lagenVan = () => ({
+    vermogen: screen.getByTestId('canvas-vermogen'),
+    samenstelling: screen.getByTestId('canvas-samenstelling'),
+    geldstroom: screen.getByTestId('canvas-geldstroom'),
+  })
+
+  it.each<CanvasModus>(['vermogen', 'samenstelling', 'geldstroom'])(
+    'in %s: alleen de actieve laag is bereikbaar; de andere zijn aria-hidden én inert',
+    (modus) => {
+      renderModus(modus)
+      for (const [naam, laag] of Object.entries(lagenVan())) {
+        if (naam === modus) {
+          expect(laag.hasAttribute('aria-hidden')).toBe(false)
+          expect(laag.hasAttribute('inert')).toBe(false)
+        } else {
+          expect(laag.getAttribute('aria-hidden')).toBe('true')
+          expect(laag.hasAttribute('inert')).toBe(true)
+        }
+      }
+    },
+  )
+
+  it('een knop in de verborgen Samenstelling-laag is niet focusbaar in Vermogen', () => {
+    renderModus('vermogen')
+    const knop = screen.getByText('jaar 50')
+    // inert op een voorouder: niet in de tabvolgorde en niet in de a11y-boom.
+    expect(knop.closest('[inert]')).toBe(screen.getByTestId('canvas-samenstelling'))
+    expect(screen.queryByRole('button', { name: 'jaar 50' })).toBeNull()
+  })
+
+  it('in Samenstelling is diezelfde knop wél bereikbaar', () => {
+    renderModus('samenstelling')
+    expect(screen.getByRole('button', { name: 'jaar 50' }).closest('[inert]')).toBeNull()
   })
 })
