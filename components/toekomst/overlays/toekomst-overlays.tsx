@@ -37,6 +37,7 @@ import type { PreviewBaseline } from '@/lib/strategy-preview'
 import type { NaturalMilestone } from '@/lib/natural-milestones'
 import type { UnifiedProjectionRow } from '@/lib/unified-projection'
 import type { SimRow } from '@/lib/fire-simulation'
+import { eventPaneBron } from '@/components/toekomst/state/event-pane-bron'
 import type { eventStopAgeFromSim } from '@/lib/horizon/event-duration-copy'
 import type {
   ActiveFaseModal,
@@ -218,6 +219,7 @@ export function ToekomstOverlays({
   effectiveChartPrimaryBasis,
   eigenHuisMortgageIds,
 }: ToekomstOverlaysProps) {
+  const eventPaneHost = eventPaneBron({ input, fireParams, fireStrategy, withdrawalStrategyConfig })
   return (
     <>
       {/* Detail modal (enige interactiepunt voor simulatie) */}
@@ -373,19 +375,21 @@ export function ToekomstOverlays({
           onSaved={refreshData}
         />
       )}
-      {input && fireParams && fireStrategy && withdrawalStrategyConfig && (
+      {/* Eén voorwaarde met de gebeurtenissenlijst (event-pane-bron.ts): rendert deze pane
+          niet, dan houdt de lijst zijn eigen pane — nooit twee, nooit een dode knop. */}
+      {eventPaneHost && (
         <EventPane
           open={eventPaneOpen}
           onClose={() => setEventPaneOpen(false)}
           editingId={eventPaneEditingId}
           initialMode={eventPaneMode}
           events={displayEvents}
-          baselineInput={input}
+          baselineInput={eventPaneHost.input}
           baselineFire={fire}
-          fireParams={fireParams}
-          fireStrategy={fireStrategy}
-          withdrawalStrategy={withdrawalStrategyConfig}
-          endAge={fireStrategy.endAge ?? 90}
+          fireParams={eventPaneHost.fireParams}
+          fireStrategy={eventPaneHost.fireStrategy}
+          withdrawalStrategy={eventPaneHost.withdrawalStrategyConfig}
+          endAge={eventPaneHost.fireStrategy.endAge ?? 90}
           householdMode={initialData.hasPartner ?? false}
           previewBaseline={eventPanePreviewBaseline}
           onChanged={() => loadData()}

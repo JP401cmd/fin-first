@@ -40,7 +40,11 @@ import { isStrategyManagedEvent, STRATEGY_BADGE_LABEL } from '@/lib/strategy-eve
 import { strategieHref } from '@/lib/horizon/strategie-route'
 import type { StrategieEditorsData } from './strategie/strategie-editors'
 import { BottomSheet } from '@/components/app/bottom-sheet'
-import { useToekomstOverlayContextOptioneel } from '@/components/toekomst/state/toekomst-state-provider'
+import {
+  useToekomstOverlayContextOptioneel,
+  useToekomstSimContextOptioneel,
+} from '@/components/toekomst/state/toekomst-state-provider'
+import { eventPaneBeschikbaar } from '@/components/toekomst/state/event-pane-bron'
 
 // EventPane = herstelde toevoeg/bewerk-flow uit /horizon (catalogus + Praat met
 // Fin + 3-blokken-editor). Dynamisch geladen zodat de pagina-bundle licht blijft.
@@ -223,8 +227,12 @@ export function GebeurtenissenView({
   // Binnen de /toekomst-provider opent de lijst de ENE EventPane van de overlay-host
   // (`openEventPane`, dezelfde opener als `?event=new` / `?event=<id>`; spec §4.2 regel 8,
   // "één sheet tegelijk") en mount hij er zelf geen. Buiten de provider (los gebruik,
-  // tests) houdt hij zijn eigen pane.
-  const overlay = useToekomstOverlayContextOptioneel()
+  // tests) houdt hij zijn eigen pane — en ook binnen de provider zolang de host-pane niet
+  // kan renderen (bv. zonder fireStrategy): dan zou "Toevoegen" anders een dode knop zijn.
+  // Eén voorwaarde met de host (`eventPaneBeschikbaar`), dus nooit twee panes tegelijk.
+  const overlayContext = useToekomstOverlayContextOptioneel()
+  const hostSim = useToekomstSimContextOptioneel()
+  const overlay = overlayContext && eventPaneBeschikbaar(hostSim) ? overlayContext : null
   const [eventPaneOpen, setEventPaneOpen] = useState(false)
   const [eventPaneEditingId, setEventPaneEditingId] = useState<string | null>(null)
   const [eventPaneMode, setEventPaneMode] = useState<'catalog' | 'view'>('catalog')

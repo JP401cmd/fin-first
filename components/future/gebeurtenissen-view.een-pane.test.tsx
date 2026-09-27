@@ -34,8 +34,20 @@ vi.mock('@/lib/supabase/client', () => ({
 // EventPane is een verklikker, zodat zichtbaar is of de view er zelf één mount.
 const openEventPane = vi.fn()
 let metProvider = true
+/** Kan de pane van de overlay-host renderen? (fire, input, fireParams, fireStrategy, onttrekking) */
+let hostPaneKan = true
 vi.mock('@/components/toekomst/state/toekomst-state-provider', () => ({
   useToekomstOverlayContextOptioneel: () => (metProvider ? { openEventPane } : null),
+  useToekomstSimContextOptioneel: () =>
+    metProvider
+      ? {
+          fire: hostPaneKan ? {} : null,
+          input: {},
+          fireParams: {},
+          fireStrategy: hostPaneKan ? {} : undefined,
+          withdrawalStrategyConfig: {},
+        }
+      : null,
 }))
 vi.mock('next/dynamic', () => ({
   default: () => (props: { open?: boolean }) => (
@@ -70,6 +82,7 @@ vi.mock('@/lib/hooks/use-horizon-fire-sim', () => ({
 beforeEach(() => {
   openEventPane.mockClear()
   metProvider = true
+  hostPaneKan = true
   mockSimResult = LOADING_SIM
   hookAanroepen.length = 0
   mockPush.mockClear()
@@ -183,5 +196,21 @@ describe('GebeurtenissenView — één EventPane op /toekomst (spec §4.2 regel 
     fireEvent.click(screen.getByText('Levensgebeurtenis toevoegen'))
     expect(screen.getByTestId('eigen-event-pane').getAttribute('data-open')).toBe('true')
     expect(openEventPane).not.toHaveBeenCalled()
+  })
+
+  it('kan de host-pane niet renderen (bv. geen fireStrategy), dan valt de lijst terug op zijn eigen pane — geen dode knop', () => {
+    hostPaneKan = false
+    renderView({ events: [mockEvent({ id: 'e7', name: 'Verhuizing' })] })
+    const eigen = screen.getByTestId('eigen-event-pane')
+    expect(eigen.getAttribute('data-open')).toBe('false')
+    fireEvent.click(screen.getByText('Levensgebeurtenis toevoegen'))
+    expect(screen.getByTestId('eigen-event-pane').getAttribute('data-open')).toBe('true')
+    expect(openEventPane).not.toHaveBeenCalled()
+  })
+
+  it('nooit twee panes: met een renderbare host-pane mount de lijst er geen', () => {
+    hostPaneKan = true
+    renderView({ events: [mockEvent()] })
+    expect(screen.queryAllByTestId('eigen-event-pane')).toHaveLength(0)
   })
 })
