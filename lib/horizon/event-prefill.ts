@@ -17,7 +17,7 @@ import {
   type FinancialInput,
 } from '@/lib/horizon-data'
 import { NL_AOW_MONTHLY, NL_AOW_MONTHLY_SAMENWONEND } from '@/lib/constants'
-import { computeKostenKoper } from '@/lib/kosten-koper'
+import { computeKostenKoper, HUIS_KOPEN_STANDAARD_INVOER } from '@/lib/kosten-koper'
 import type { AowAge } from '@/lib/aow-leeftijd'
 import type { Debt } from '@/lib/debt-data'
 
@@ -132,9 +132,9 @@ export function computeSuggestedEventValues(
   // House purchase: kosten koper (canonieke bron — lib/kosten-koper.ts)
   if (type === 'house_purchase') {
     amount = computeKostenKoper({
-      aankoopprijs: Number(metadata.aankoopprijs ?? 350000),
-      isStarter: Boolean(metadata.eersteWoning ?? true),
-      hasNHG: Boolean(metadata.nhg ?? false),
+      aankoopprijs: Number(metadata.aankoopprijs ?? HUIS_KOPEN_STANDAARD_INVOER.aankoopprijs),
+      isStarter: Boolean(metadata.eersteWoning ?? HUIS_KOPEN_STANDAARD_INVOER.isStarter),
+      hasNHG: Boolean(metadata.nhg ?? HUIS_KOPEN_STANDAARD_INVOER.hasNHG),
     }).totaal
     durationType = 'one_time'
     direction = 'expense'

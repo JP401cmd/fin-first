@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { computeSuggestedEventValues, type EventPrefillContext } from './event-prefill'
 import { NL_AOW_MONTHLY, NL_AOW_MONTHLY_SAMENWONEND } from '@/lib/constants'
-import { computeKostenKoper } from '@/lib/kosten-koper'
+import { computeKostenKoper, HUIS_KOPEN_STANDAARD_INVOER } from '@/lib/kosten-koper'
 import type { FinancialInput } from '@/lib/horizon-data'
 import type { AowAge } from '@/lib/aow-leeftijd'
 import type { Debt } from '@/lib/debt-data'
@@ -85,7 +85,7 @@ describe('computeSuggestedEventValues', () => {
 
   it('house_purchase: kosten koper uit canonieke bron', () => {
     const r = computeSuggestedEventValues('house_purchase', makeCtx())
-    const expected = computeKostenKoper({ aankoopprijs: 350000, isStarter: true, hasNHG: false }).totaal
+    const expected = computeKostenKoper(HUIS_KOPEN_STANDAARD_INVOER).totaal
     expect(r.amount).toBe(expected)
     expect(r.direction).toBe('expense')
     expect(r.durationType).toBe('one_time')

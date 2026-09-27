@@ -65,6 +65,20 @@ export interface KostenKoperBreakdown {
  * niet onder de startersvrijstelling en kent 8% overdrachtsbelasting (2026) — dat
  * loopt via een eigen (handmatig) bedrag, niet via deze helper.
  */
+/**
+ * De standaardantwoorden voor een nieuwe gebeurtenis "Huis kopen": koopsom, starter en
+ * NHG, zonder aankoopmakelaar (die is optioneel). Eén bron voor de catalogus
+ * (velddefaults én startbedrag), de prefill en het Huis-kopen-verhaal in de EventPane,
+ * zodat die elkaar niet tegenspreken (eindreview 27 sep: het waren er drie). Een
+ * voorbeeldinvoer, geen fiscale constante: wat de motor eruit rekent, komt uit
+ * lib/constants.ts.
+ */
+export const HUIS_KOPEN_STANDAARD_INVOER = {
+  aankoopprijs: 400_000,
+  isStarter: false,
+  hasNHG: false,
+} as const satisfies KostenKoperInput
+
 export function computeKostenKoper(input: KostenKoperInput): KostenKoperBreakdown {
   const prijs = Number.isFinite(input.aankoopprijs) ? Math.max(0, input.aankoopprijs) : 0
   const overdracht =

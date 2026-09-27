@@ -17,7 +17,7 @@ import {
   kinderbijslagPerMaand,
   NIBUD_CHILDREN_MONTHLY_COST,
 } from '@/lib/horizon-data'
-import { computeKostenKoper } from '@/lib/kosten-koper'
+import { computeKostenKoper, HUIS_KOPEN_STANDAARD_INVOER } from '@/lib/kosten-koper'
 import {
   OVB_TARIEF_EIGEN_WONING,
   STARTERSVRIJSTELLING_MAX,
@@ -633,21 +633,21 @@ export const LIFE_EVENT_STORIES: Record<string, LifeEventStory> = {
         min: 0,
         step: 10000,
         suffix: '€',
-        default: 400000,
+        default: HUIS_KOPEN_STANDAARD_INVOER.aankoopprijs,
       },
       {
         key: 'starter',
         type: 'toggle',
         label: 'Je eerste eigen woning, en je bent jonger dan 35',
         microcopy: `Aan: geen overdrachtsbelasting tot een koopprijs van ${formatCurrency(STARTERSVRIJSTELLING_MAX)} (startersvrijstelling). Uit: ${formatPct(OVB_TARIEF_EIGEN_WONING)} van de koopprijs. Zo reken je met wat voor jou geldt.`,
-        default: false,
+        default: HUIS_KOPEN_STANDAARD_INVOER.isStarter,
       },
       {
         key: 'nhg',
         type: 'toggle',
         label: 'Met Nationale Hypotheek Garantie (NHG)',
         microcopy: `Aan: eenmalig ${formatPct(NHG_BORGTOCHTPROVISIE_PCT)} borgtochtprovisie, alleen tot een koopprijs van ${formatCurrency(NHG_KOSTENGRENS)}. Uit: geen NHG-kosten. Het rentevoordeel van NHG zit in je maandlasten, niet hier.`,
-        default: false,
+        default: HUIS_KOPEN_STANDAARD_INVOER.hasNHG,
       },
       {
         key: 'aankoopmakelaar',

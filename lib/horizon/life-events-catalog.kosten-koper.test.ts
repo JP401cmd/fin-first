@@ -106,3 +106,19 @@ describe('catalogus Huis kopen — het startbedrag volgt de motor', () => {
     expect(entry.defaultCost).toBeLessThanOrEqual(hoog + 500)
   })
 })
+
+describe('Huis kopen — één set standaardantwoorden (eindreview 27 sep)', () => {
+  it('catalogusvelden, het verhaal en het startbedrag gebruiken HUIS_KOPEN_STANDAARD_INVOER', async () => {
+    const { HUIS_KOPEN_STANDAARD_INVOER } = await import('@/lib/kosten-koper')
+    const { defaultStoryAnswers } = await import('@/lib/life-event-stories')
+    const veldDefault = (key: string) => entry.fields?.find((f) => f.key === key)?.default
+    expect(veldDefault('aankoopprijs')).toBe(HUIS_KOPEN_STANDAARD_INVOER.aankoopprijs)
+    expect(veldDefault('eersteWoning')).toBe(HUIS_KOPEN_STANDAARD_INVOER.isStarter)
+    expect(veldDefault('nhg')).toBe(HUIS_KOPEN_STANDAARD_INVOER.hasNHG)
+    const verhaal = defaultStoryAnswers('house_purchase')
+    expect(verhaal.koopprijs).toBe(HUIS_KOPEN_STANDAARD_INVOER.aankoopprijs)
+    expect(verhaal.starter).toBe(HUIS_KOPEN_STANDAARD_INVOER.isStarter)
+    expect(verhaal.nhg).toBe(HUIS_KOPEN_STANDAARD_INVOER.hasNHG)
+    expect(entry.defaultCost).toBe(computeKostenKoper(HUIS_KOPEN_STANDAARD_INVOER).totaal)
+  })
+})

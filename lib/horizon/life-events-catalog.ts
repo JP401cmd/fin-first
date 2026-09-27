@@ -5,7 +5,7 @@
  */
 import { NL_AOW_MONTHLY, NL_AOW_MONTHLY_SAMENWONEND } from '../constants'
 import type { CamelCaseKeys } from '../db-mapper'
-import { computeKostenKoper } from '../kosten-koper'
+import { computeKostenKoper, HUIS_KOPEN_STANDAARD_INVOER } from '../kosten-koper'
 import { formatErfenisTipTekst, formatErfenisRelatieOpties, formatErfenisRelatieTip } from './schenk-erf-belasting'
 import {
   anwNabestaandenBruto,
@@ -766,14 +766,6 @@ export function kinderbijslagPerMaand(aantalKinderen: number): number {
   return Math.round((gemiddeldPerKwartaal / 3) * aantalKinderen)
 }
 
-/**
- * De standaardantwoorden van het Huis-kopen-verhaal (koopsom, starter, NHG). Het
- * startbedrag van een nieuwe gebeurtenis (`defaultCost`) is wat de kosten-koper-motor
- * met precies deze antwoorden rekent, zonder aankoopmakelaar (die is optioneel). Zo
- * spreken catalogus en verhaal elkaar niet tegen als de motor verandert.
- */
-const HUIS_KOPEN_STANDAARD = { aankoopprijs: 350_000, eersteWoning: true, nhg: false } as const
-
 export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
   sabbatical: {
     label: 'Sabbatical',
@@ -971,25 +963,23 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
     // Bandbreedte en tip volgen computeKostenKoper (lib/kosten-koper.ts) voor koopsommen
     // €250k–€600k; gepind in life-events-catalog.kosten-koper.test.ts.
     impactRange: '€5K–€21K kosten koper',
-    defaultCost: computeKostenKoper({
-      aankoopprijs: HUIS_KOPEN_STANDAARD.aankoopprijs,
-      isStarter: HUIS_KOPEN_STANDAARD.eersteWoning,
-      hasNHG: HUIS_KOPEN_STANDAARD.nhg,
-    }).totaal,
+    // Wat de motor rekent met de standaardantwoorden (HUIS_KOPEN_STANDAARD_INVOER), dezelfde
+    // als in de velden hieronder, de prefill en het verhaal.
+    defaultCost: computeKostenKoper(HUIS_KOPEN_STANDAARD_INVOER).totaal,
     defaultMonthlyCost: 300,
     defaultMonthlyIncome: 0,
     defaultDuration: 0,
     description: 'Eerste woning of overstap',
     tip: 'Kosten koper: overdrachtsbelasting (2%; starters tot €555.000 vrijgesteld), notaris, taxatie, bankgarantie en eventueel NHG, plus ca. €2.750 voor hypotheekadvies en bemiddeling en ca. €3.500 als je een aankoopmakelaar neemt. Bij een koopsom van €250.000–€600.000 is dat samen ca. €5K–€21K. Gemiddelde koopsom NL 2025: ca. €430.000. Maximale hypotheek: 100% van marktwaarde.',
     fields: [
-      { key: 'aankoopprijs', label: 'Aankoopprijs', fieldType: 'number', default: HUIS_KOPEN_STANDAARD.aankoopprijs, tip: 'Gemiddelde koopsom NL 2025: ca. €430.000. In Randstad hoger, buiten Randstad lager.' },
+      { key: 'aankoopprijs', label: 'Aankoopprijs', fieldType: 'number', default: HUIS_KOPEN_STANDAARD_INVOER.aankoopprijs, tip: 'Gemiddelde koopsom NL 2025: ca. €430.000. In Randstad hoger, buiten Randstad lager.' },
       { key: 'hypotheekRente', label: 'Hypotheekrente', fieldType: 'percentage', default: 4.0, tip: 'Indicatie 2026: 10-jarig vast ca. 3,8–4,2%. NHG-rente ca. 0,2% lager. Check hypotheker.nl voor actuele tarieven.', suffix: '%' },
       // Bron: Belastingdienst, 2026 — jaarlijks verifiëren. Startersvrijstelling-grens €555.000 (zie STARTERSVRIJSTELLING_MAX in lib/constants.ts).
-      { key: 'eersteWoning', label: 'Eerste woning (starter)', fieldType: 'toggle', default: HUIS_KOPEN_STANDAARD.eersteWoning, tip: 'Starters (18–35 jaar) zijn vrijgesteld van 2% overdrachtsbelasting tot €555.000 (Belastingdienst, 2026).' },
+      { key: 'eersteWoning', label: 'Eerste woning (starter)', fieldType: 'toggle', default: HUIS_KOPEN_STANDAARD_INVOER.isStarter, tip: 'Starters (18–35 jaar) zijn vrijgesteld van 2% overdrachtsbelasting tot €555.000 (Belastingdienst, 2026).' },
       { key: 'hypotheekLasten', label: 'Verwachte hypotheeklasten/mnd', fieldType: 'number', default: 1200, tip: 'Geschatte bruto hypotheeklasten per maand. Indicatie: €350K hypotheek à 4% = ca. €1.200/mnd annuïteit. Check hypotheker.nl voor je persoonlijke berekening.', suffix: '/mnd' },
       { key: 'huidigeHuur', label: 'Huidige huur/mnd', fieldType: 'number', default: 1000, tip: 'Gemiddelde vrije sector huur NL: ca. €1.100–€1.400/mnd. Dit bedrag bespaar je — verschil met hypotheek + onderhoud is de netto maandlast.', suffix: '/mnd' },
       // Bron: nhg.nl, 2026 — jaarlijks verifiëren. Kostengrens €470.000, borgtochtprovisie 0,4% (zie NHG_KOSTENGRENS/NHG_BORGTOCHTPROVISIE_PCT in lib/constants.ts).
-      { key: 'nhg', label: 'Nationale Hypotheek Garantie (NHG)', fieldType: 'toggle', default: HUIS_KOPEN_STANDAARD.nhg, tip: 'NHG-grens 2026: €470.000. Eenmalige kosten: 0,4% van hypotheeksom (borgtochtprovisie). Levert ca. 0,2% rentekorting op.' },
+      { key: 'nhg', label: 'Nationale Hypotheek Garantie (NHG)', fieldType: 'toggle', default: HUIS_KOPEN_STANDAARD_INVOER.hasNHG, tip: 'NHG-grens 2026: €470.000. Eenmalige kosten: 0,4% van hypotheeksom (borgtochtprovisie). Levert ca. 0,2% rentekorting op.' },
     ],
   },
   house_sale: {
