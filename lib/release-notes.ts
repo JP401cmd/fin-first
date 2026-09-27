@@ -97,6 +97,24 @@ export const RELEASE_NOTE_NORM = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.92.11',
+    date: '2026-09-27',
+    title: 'Voorbereiding: nieuws ook zonder cijfers',
+    sections: [
+      {
+        module: 'Platform',
+        color: 'zinc',
+        items: [
+          {
+            title: 'De nieuwe Krant leert ook nieuws zonder bedragen duiden',
+            description:
+              'Achter de schermen herkennen we nu waar een bericht over gaat, ook als er geen bedrag in staat. Voor jou nog geen zichtbare verandering.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: '0.92.10',
     date: '2026-09-27',
     title: 'Nieuws uit betere bronnen',
