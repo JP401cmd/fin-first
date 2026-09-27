@@ -387,28 +387,57 @@ describe('HealthScoreReceipt — sectie Verloop', () => {
   })
 })
 
-describe('HealthScoreReceipt — lopende maand = live stand', () => {
-  it('Given een verloop waarvan de lopende maand live is, When de kassabon opent, Then zegt de ondertitel dat en staat het live getal als laatste punt', async () => {
+describe('HealthScoreReceipt — "nu" staat los van de opgeslagen lijn (eindreview R1)', () => {
+  it('Given een live stand, When de kassabon opent, Then een losse "nu"-stip die niet op de lijn ligt, en een eerlijke ondertitel', async () => {
     render(
       <HealthScoreReceipt
         health={makeHealthV2(56, 'Redelijk')}
-        verloop={[verloopPunt('2026-08-29', 56), { ...verloopPunt('2026-09-26', 56), live: true }]}
+        verloop={[verloopPunt('2026-07-31', 60), verloopPunt('2026-08-29', 62)]}
+        verloopNu={{ snapshot_date: '2026-09-26', score: 56 }}
       />,
     )
     const ondertitel = await screen.findByTestId('health-verloop-ondertitel')
     expect(ondertitel.textContent).toBe(
-      'De laatste stand van elke maand over de laatste twaalf maanden; voor deze maand je huidige stand.',
+      'De lijn toont de laatste stand van elke afgesloten maand zoals die toen berekend werd, over de laatste twaalf maanden. De losse stip ‘nu’ is je huidige stand; die wordt anders berekend en staat daarom niet op de lijn.',
     )
-    const labels = Array.from(screen.getByTestId('resilience-trend-chart').querySelectorAll('text'))
-      .map((t) => t.textContent)
-    expect(labels.filter((t) => t === '56')).toHaveLength(2)
+    const chart = screen.getByTestId('resilience-trend-chart')
+    const nu = screen.getByTestId('health-verloop-nu')
+    expect(nu.textContent).toContain('nu')
+    expect(nu.textContent).toContain('56')
+    // De lijn verbindt alleen de twee opgeslagen maanden: het laatste lijnpunt
+    // ligt links van de "nu"-stip.
+    const nuX = Number(nu.querySelector('circle')?.getAttribute('cx'))
+    const lijnXs = (lijnPad(chart).match(/[ML](-?[\d.]+),/g) ?? []).map((m) => Number(m.slice(1, -1)))
+    expect(lijnXs).toHaveLength(2)
+    expect(Math.max(...lijnXs)).toBeLessThan(nuX)
   })
 
-  it('Given een verloop zonder live punt, When de kassabon opent, Then de gewone ondertitel', async () => {
-    render(<HealthScoreReceipt health={makeHealthV2()} verloop={[verloopPunt('2026-08-29', 56)]} />)
+  it('Given één afgesloten maand en een live stand, When de kassabon opent, Then de grafiek met één stip en de losse "nu"-stip, zonder lijn', async () => {
+    render(
+      <HealthScoreReceipt
+        health={makeHealthV2()}
+        verloop={[verloopPunt('2026-08-29', 62)]}
+        verloopNu={{ snapshot_date: '2026-09-26', score: 64 }}
+      />,
+    )
+    const chart = await screen.findByTestId('resilience-trend-chart')
+    expect(screen.getByTestId('health-verloop-nu')).toBeTruthy()
+    expect(lijnPad(chart)).toBe('')
+  })
+
+  it('Given alleen een live stand, When de kassabon opent, Then een regel met de huidige stand', async () => {
+    render(<HealthScoreReceipt health={makeHealthV2()} verloop={[]} verloopNu={{ snapshot_date: '2026-09-26', score: 64 }} />)
+    expect((await screen.findByTestId('health-verloop-gezondheid-alleen-nu')).textContent).toBe(
+      'Nog geen afgesloten maandstand. Nu: 64 van 100.',
+    )
+  })
+
+  it('Given geen live stand, When de kassabon opent, Then de gewone ondertitel en geen "nu"-stip', async () => {
+    render(<HealthScoreReceipt health={makeHealthV2()} verloop={[verloopPunt('2026-07-31', 60), verloopPunt('2026-08-29', 56)]} />)
     expect((await screen.findByTestId('health-verloop-ondertitel')).textContent).toBe(
       'De laatste stand van elke maand, over de laatste twaalf maanden.',
     )
+    expect(screen.queryByTestId('health-verloop-nu')).toBeNull()
   })
 })
 

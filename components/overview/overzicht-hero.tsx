@@ -22,7 +22,7 @@ import { HealthScoreEmptyState } from './overzicht-hero/empty-states'
 import type { LeverScores } from '@/components/app/shell/lever-scores'
 import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
-import type { HealthVerloopPunt } from '@/lib/health-verloop'
+import type { HealthVerloopNu, HealthVerloopPunt } from '@/lib/health-verloop'
 import { useOpenOnHash } from '@/lib/hooks/use-open-on-hash'
 import { GEZONDHEID_ANKER_ID, GEZONDHEID_KASSABON_HASH } from '@/lib/overview/gezondheid-deeplink'
 
@@ -71,6 +71,8 @@ type OverzichtHeroPrimaryProps = {
    * kalendermaanden). `null` buiten het eigen perspectief: dan geen sectie.
    */
   healthVerloop?: readonly HealthVerloopPunt[] | null
+  /** Het live gezondheidsgetal als losse "nu"-markering in het verloop. */
+  healthVerloopNu?: HealthVerloopNu | null
   /** "Sinds vorige maand" op de gezondheidskaart; `null` = geen vergelijking. */
   healthSindsVorigeMaand?: number | null
   /**
@@ -122,6 +124,7 @@ export function OverzichtHeroPrimary({
   banners,
   health,
   healthVerloop = null,
+  healthVerloopNu = null,
   healthSindsVorigeMaand = null,
   leverScores,
   totals,
@@ -269,7 +272,7 @@ export function OverzichtHeroPrimary({
           title="Financiële gezondheid"
           size="lg"
         >
-          <HealthScoreReceipt health={health} verloop={healthVerloop} />
+          <HealthScoreReceipt health={health} verloop={healthVerloop} verloopNu={healthVerloopNu} />
         </BottomSheet>
       )}
     </section>

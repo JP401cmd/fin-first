@@ -375,16 +375,22 @@ export function ExploreCard({
 /** Een extra verticale markering in het verloop (bv. een grondslagbreuk). */
 export type TrendMarker = { date: string; label: string; testId: string }
 
+/** Een losse stip naast de lijn (bv. de live stand "nu"), niet verbonden. */
+export type TrendLoosPunt = { date: string; value: number; label: string }
+
 export function ResilienceTrendChart({
   snapshots,
   markers = [],
+  nu = null,
 }: {
   snapshots: readonly TrendPoint[]
   /** Extra markeringen op de tijdas; de lijn loopt er gewoon doorheen. */
   markers?: readonly TrendMarker[]
+  /** Losse stip naast de lijn — een andere berekening, dus niet verbonden. */
+  nu?: TrendLoosPunt | null
 }) {
   const withScore = snapshots.filter(s => s.resilience_score !== null && s.resilience_score !== undefined)
-  if (withScore.length < 2) return null
+  if (withScore.length + (nu ? 1 : 0) < 2) return null
 
   const W = 600
   const H = 200
@@ -394,7 +400,11 @@ export function ResilienceTrendChart({
   const minVal = 0
 
   // Tijdas: x uit de datum, zodat een ontbrekende maand als gat zichtbaar blijft.
-  const x = trendTimeScale(withScore.map(s => s.snapshot_date), PAD, W - PAD)
+  const x = trendTimeScale(
+    [...withScore.map(s => s.snapshot_date), ...(nu ? [nu.date] : [])],
+    PAD,
+    W - PAD,
+  )
   function y(val: number) { return H - PAD - ((val - minVal) / (maxVal - minVal)) * (H - PAD * 2) }
 
   // Methode-wissel (ADR 0010): scores uit verschillende `score_version`s zijn
@@ -460,6 +470,38 @@ export function ResilienceTrendChart({
 
       {/* Line — horizon module-identiteit (volgt instelbare accent) */}
       <path d={linePath} fill="none" stroke="var(--color-horizon-500, #c4a06b)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+
+      {/* Losse stip "nu": open cirkel, niet op de lijn (andere berekening) */}
+      {nu && (
+        <g data-testid="health-verloop-nu">
+          <circle
+            cx={x(nu.date)}
+            cy={y(nu.value)}
+            r="4.5"
+            fill="var(--paper, #fff)"
+            stroke="var(--color-horizon-500, #c4a06b)"
+            strokeWidth="2"
+          />
+          <text
+            x={x(nu.date)}
+            y={y(nu.value) - 10}
+            textAnchor="middle"
+            className="fill-horizon-700"
+            style={{ fontSize: 10, fontWeight: 600 }}
+          >
+            {nu.value}
+          </text>
+          <text
+            x={x(nu.date)}
+            y={H - 8}
+            textAnchor="middle"
+            className="fill-zinc-500"
+            style={{ fontSize: 9, fontWeight: 600 }}
+          >
+            {nu.label}
+          </text>
+        </g>
+      )}
 
       {/* Extra markeringen (bv. een grondslagbreuk) — zelfde vorm als de methode-wissel */}
       {markers.map(m => (

@@ -1070,20 +1070,28 @@ export function computeHealthScoreWithTrend(
     prevSavingsRate: number | null
     /** Canonieke benodigde portfolio (noemer freedomPct); valt terug op fireTarget. */
     requiredPortfolio: number | null
+    /**
+     * Vorige-maand freedomPct, al bepaald met DEZELFDE functie als het huidige
+     * getal (`computeFreedomPctForPlan` op de verschoven grondslag). Gezet ⇒ wint
+     * van de `prevNetWorth / requiredPortfolio`-proxy en is `requiredPortfolio`
+     * niet nodig. Zo vergelijkt de trend ook bij de excl.-woning-grondslag appels
+     * met appels.
+     */
+    prevFreedomPct?: number | null
   },
   activeModules?: ModuleId[],
 ): HealthScore {
   const current = computeHealthScoreFromInputs(input, budgetingActive, activeModules)
 
-  if (history.prevNetWorth == null || history.requiredPortfolio == null || history.requiredPortfolio <= 0) {
-    return current
-  }
+  if (history.prevNetWorth == null) return current
+  const hasProxyNoemer = history.requiredPortfolio != null && history.requiredPortfolio > 0
+  if (history.prevFreedomPct == null && !hasProxyNoemer) return current
 
-  // Vorige-maand freedomPct op DEZELFDE noemer als de canonieke voortgang.
-  const prevFreedomPct = Math.max(
-    0,
-    Math.min((history.prevNetWorth / history.requiredPortfolio) * 100, 100),
-  )
+  // Vorige-maand freedomPct: de meegegeven canonieke waarde, anders op DEZELFDE
+  // noemer als de canonieke voortgang.
+  const prevFreedomPct =
+    history.prevFreedomPct ??
+    Math.max(0, Math.min((history.prevNetWorth / (history.requiredPortfolio as number)) * 100, 100))
   const prevInput: HealthScoreInput = {
     ...input,
     freedomPct: prevFreedomPct,

@@ -11,6 +11,9 @@ import {
   buildBriefingHeadline,
   sanitizeAiHeadline,
 } from './overview-briefing'
+import { buildBriefingEntries } from './engine'
+import { computeHealthScoreFromInputs, type HealthScoreInput } from '@/lib/financial-health'
+import { computeFreedomPctForPlan } from '@/lib/core-metrics'
 
 /**
  * Tests voor de pure transform die de page-loaders omzet in de engine-input
@@ -434,50 +437,77 @@ describe('sanitizeAiHeadline', () => {
   })
 })
 
-describe('buildOverviewBriefingInput — "sinds vorige maand" uit dezelfde helper als de kaart', () => {
-  const health = { total: 64, label: 'Sterk', pillars: [], previousMonth: null, trend: 0 }
-  const vorigeMaand = () => {
-    const d = new Date()
-    const vm = new Date(d.getFullYear(), d.getMonth() - 1, 15)
-    return `${vm.getFullYear()}-${String(vm.getMonth() + 1).padStart(2, '0')}-15`
+describe('buildOverviewBriefingInput — "sinds vorige maand" uit dezelfde helper als de kaart (eindreview R1)', () => {
+  // Live grondslag en invoer zoals lib/horizon-data-loader ze levert.
+  const basis = {
+    homeExcludedFromFire: false,
+    netWorthInclHome: 250_000,
+    fireEligibleNetWorth: 180_000,
+    requiredNetWorthInclHome: 1_000_000,
+    requiredPortfolioExclHome: 900_000,
   }
-  const punt = (score: number, version = 2) => ({
-    snapshot_date: vorigeMaand(),
-    resilience_score: score,
-    score_version: version,
-    fire_age: null,
-    engine_bron: null,
+  function horizon(over: Partial<HealthScoreInput> = {}) {
+    const healthScoreInput = {
+      effectiveSavingsRatePct: 22,
+      totalAssets: 300_000,
+      totalDebts: 50_000,
+      emergencyFundMonths: 5,
+      emergencyTargetMonths: 3,
+      freedomPct: computeFreedomPctForPlan({ anchorFixed: false, coverage: null, basis }),
+      currentAge: 42,
+      fireAgeFractional: 58.4,
+      fireStopAnchor: 'solved',
+      netMonthlyIncome: 4000,
+      debtMonthlyPayments: 400,
+      largestAssetTypeShare: 0.4,
+      budgetCategories: [{ limit: 500, spent: 400 }],
+      incomeBasis: 'profile',
+      expensesBasis: 'profile',
+      ...over,
+    } as HealthScoreInput
+    return makeHorizon({
+      healthScore: computeHealthScoreFromInputs(healthScoreInput, true),
+      healthScoreInput,
+      budgetingActive: true,
+      freedomBasis: {
+        homeExcludedFromFire: basis.homeExcludedFromFire,
+        netWorthInclHome: basis.netWorthInclHome,
+        fireEligibleNetWorth: basis.fireEligibleNetWorth,
+        scalarRequiredPortfolioExclHome: null,
+      },
+      requiredNetWorthInclHome: basis.requiredNetWorthInclHome,
+      requiredPortfolioExclHome: basis.requiredPortfolioExclHome,
+    })
+  }
+  const ongewijzigd = { netWorth: 250_000, savingsRatePct: 22 }
+
+  it('Given solved en ongewijzigde invoer, When de briefing wordt gebouwd, Then 0 en geen mijlpaal', () => {
+    const input = buildOverviewBriefingInput(makeDashboard({ healthVorigeMaand: ongewijzigd }), makeWill(), horizon())
+    expect(input.healthSinceLastMonth).toBe(0)
+    expect(buildBriefingEntries(input).find((e) => e.id === 'milestone:score-trend')).toBeUndefined()
   })
 
-  it('Given een opgeslagen stand vorige maand met dezelfde versie, When de input wordt gebouwd, Then healthSinceLastMonth = live − vorige maand', () => {
+  it('Given een vast anker met ±100% dekking en ongewijzigde invoer, When de briefing wordt gebouwd, Then geen vergelijking en geen mijlpaal', () => {
     const input = buildOverviewBriefingInput(
-      makeDashboard({ healthVerloop: [punt(58)] }),
+      makeDashboard({ healthVorigeMaand: ongewijzigd }),
       makeWill(),
-      makeHorizon({ healthScore: health }),
-    )
-    expect(input.healthSinceLastMonth).toBe(6)
-  })
-
-  it('Given een andere score_version vorige maand, When de input wordt gebouwd, Then geen vergelijking', () => {
-    const input = buildOverviewBriefingInput(
-      makeDashboard({ healthVerloop: [punt(58, 1)] }),
-      makeWill(),
-      makeHorizon({ healthScore: health }),
+      horizon({ freedomPct: 100, fireStopAnchor: 'aow' }),
     )
     expect(input.healthSinceLastMonth).toBeNull()
+    expect(buildBriefingEntries(input).find((e) => e.id === 'milestone:score-trend')).toBeUndefined()
   })
 
-  it('Given geen verloop in de bundel (bv. huishoudblik), When de input wordt gebouwd, Then geen vergelijking', () => {
-    const input = buildOverviewBriefingInput(makeDashboard(), makeWill(), makeHorizon({ healthScore: health }))
-    expect(input.healthSinceLastMonth).toBeNull()
-  })
-
-  it('Given een onbekend oordeel, When de input wordt gebouwd, Then geen vergelijking', () => {
+  it('Given solved en een duidelijk lager vermogen vorige maand, When de briefing wordt gebouwd, Then een positieve verandering uit dezelfde functie', () => {
     const input = buildOverviewBriefingInput(
-      makeDashboard({ healthVerloop: [punt(58)] }),
+      makeDashboard({ healthVorigeMaand: { netWorth: 50_000, savingsRatePct: 5 } }),
       makeWill(),
-      makeHorizon({ healthScore: { ...health, onbekend: { hint: 'x', actie: { label: 'y', href: '/z' }, pijlers: [] } } }),
+      horizon(),
     )
+    expect(input.healthSinceLastMonth as number).toBeGreaterThan(0)
+  })
+
+  it('Given geen vorige-maandstand in de bundel (bv. huishoudblik), When de briefing wordt gebouwd, Then geen vergelijking', () => {
+    const input = buildOverviewBriefingInput(makeDashboard(), makeWill(), horizon())
     expect(input.healthSinceLastMonth).toBeNull()
   })
 })

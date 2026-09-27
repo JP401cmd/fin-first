@@ -11,7 +11,7 @@ import { useChatContext } from '@/components/app/chat/chat-provider'
 import { healthScoreVerdict, type HealthScore, type HealthPillar, type PillarGroup, type HealthScoreOnbekend } from '@/lib/financial-health'
 import { GRONDSLAG_ONBEKEND_LABEL } from '@/lib/grondslag-guard'
 import { Button } from '@/components/editorial'
-import type { HealthVerloopPunt } from '@/lib/health-verloop'
+import type { HealthVerloopNu, HealthVerloopPunt } from '@/lib/health-verloop'
 
 // De verloopgrafieken laden pas als de kassabon open is en er een verloop is
 // meegegeven: ze hangen niet in het chunk van de kassabon zelf. De placeholder
@@ -543,6 +543,8 @@ interface HealthScoreReceiptProps {
    * reeks toont de lege staat.
    */
   verloop?: readonly HealthVerloopPunt[] | null
+  /** Het live gezondheidsgetal als losse "nu"-markering (niet op de lijn). */
+  verloopNu?: HealthVerloopNu | null
   /** Optional: footer content (e.g. backtesting link) */
   footer?: React.ReactNode
 }
@@ -552,6 +554,7 @@ interface HealthScoreReceiptProps {
 export function HealthScoreReceipt({
   health,
   verloop,
+  verloopNu = null,
   footer,
 }: HealthScoreReceiptProps) {
   // Always use the live computed total from the weighted average of pillars.
@@ -652,7 +655,7 @@ export function HealthScoreReceipt({
       </KassabonShell>
 
       {/* Verloop per maand (gezondheidsgetal + vrijheidsleeftijd) — lazy */}
-      {verloop && <HealthScoreVerloop punten={verloop} />}
+      {verloop && <HealthScoreVerloop punten={verloop} nu={verloopNu} />}
 
       {/* Radar chart overview — at-a-glance pillar comparison */}
       <div

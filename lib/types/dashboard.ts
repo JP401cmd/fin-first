@@ -11,7 +11,6 @@ import type { FreedomMilestoneResult } from '@/lib/freedom-milestones'
 import type { FeeAnalysis } from '@/lib/fee-analysis'
 import type { FireEndStrategy, StopAnchor } from '@/lib/fire-strategy'
 import type { HealthScore } from '@/lib/financial-health'
-import type { HealthVerloopPunt } from '@/lib/health-verloop'
 import type { NewsPreview } from '@/lib/news-preview'
 import type { SpendLimitWidgetData } from '@/lib/spend-limits/widget-data'
 
@@ -350,14 +349,14 @@ export interface DashboardData {
   // Historical net worth (up to 12 monthly snapshots, ascending)
   netWorthHistory: { month: string; value: number }[]
   /**
-   * Gezondheidsgetal + vrijheidsleeftijd per maand zoals ze toen berekend
-   * werden (laatste 12 kalendermaanden, één stand per maand, eigen user_id) —
-   * `deriveHealthVerloop` over dezelfde maandstanden als `netWorthHistory`.
-   * Altijd persoonlijk: een consument in huishoud-/partnerblik laat hem weg.
-   * Voedt "sinds vorige maand" in de briefing (`healthScoreSinceLastMonth`).
-   * Optioneel voor mock-/lege bundels.
+   * De opgeslagen maandstand van de vorige kalendermaand (netto vermogen +
+   * spaarquote — data, geen score), `vorigeMaandStand` over dezelfde rijen als
+   * `netWorthHistory`. Voedt "sinds vorige maand" in de briefing
+   * (`healthScoreSinceLastMonth`). Altijd persoonlijk: een consument in
+   * huishoud-/partnerblik laat hem weg. `null` = geen stand; optioneel voor
+   * mock-/lege bundels.
    */
-  healthVerloop?: HealthVerloopPunt[]
+  healthVorigeMaand?: { netWorth: number; savingsRatePct: number | null } | null
   // Historical savings rate % per month (up to 12 monthly snapshots, ascending)
   savingsHistory: { month: string; value: number }[]
   // Historical monthly expenses (up to 12 monthly snapshots, ascending)

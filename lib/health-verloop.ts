@@ -2,20 +2,27 @@
  * Verloop van het gezondheidsgetal en de vrijheidsleeftijd, per maand.
  *
  * Bron: de maandstanden uit `lib/server-data/base.ts#getNetWorthSnapshots12m`
- * (laatste 12 kalendermaanden, één stand per maand, eigen `user_id`). Deze module
- * rekent niets opnieuw uit: hij kiest velden uit die rijen en vergelijkt het
- * huidige gezondheidsgetal (uit de canonieke bron) met de opgeslagen stand van de
- * vorige maand.
+ * (laatste 12 kalendermaanden, één stand per maand, eigen `user_id`). Het verloop
+ * toont de opgeslagen scores zoals ze toen berekend werden; "sinds vorige maand"
+ * rekent de vorige maand opnieuw met de canonieke functie op de opgeslagen
+ * vorige-maand-DATA (netto vermogen, spaarquote) — nooit een opgeslagen score naast
+ * het live getal, want de writers rekenen de vrijheidspijler anders.
  *
- * Twee vergelijkbaarheidsregels:
+ * Twee vergelijkbaarheidsregels in het verloop:
  *  · `score_version` — een score uit een andere rekenmethode is niet vergelijkbaar
- *    (ADR 0010). "Sinds vorige maand" vergelijkt alleen binnen dezelfde versie, en
- *    het verloop markeert een wisseling.
+ *    (ADR 0010); het verloop markeert een wisseling en breekt de lijn.
  *  · `fire_age` — de vrijheidsleeftijd zoals hij tóen berekend werd, door de motor
  *    in `engine_bron`. Historie, geen live getal: de live vrijheidsleeftijd komt uit
  *    de horizon-kernel en wordt nooit uit snapshots afgeleid.
  */
-import { HEALTH_SCORE_VERSION } from '@/lib/financial-health'
+import {
+  computeHealthScoreWithTrend,
+  healthScoreVerdict,
+  type HealthScore,
+  type HealthScoreInput,
+} from '@/lib/financial-health'
+import { computeFreedomPctForPlan, type FreedomProgressBasisInput } from '@/lib/core-metrics'
+import { legacyAnchorOf } from '@/lib/fire-strategy'
 import { localDateString, localMonthStartMonthsAgo } from '@/lib/month-range'
 
 /**
@@ -40,8 +47,6 @@ export interface HealthVerloopPunt {
   fire_age: number | null
   /** Motor die `fire_age` schreef ('kernel' | 'v2'; null telt als 'v2'). */
   engine_bron: string | null
-  /** Waar: het gezondheidsgetal van dit punt is de live stand (lopende maand). */
-  live?: true
 }
 
 /** Minimale rijvorm van een maandstand (subset van `NetWorthSnapshot12mRow`). */
@@ -70,36 +75,36 @@ export function deriveHealthVerloop(rows: readonly VerloopBronRij[]): HealthVerl
   }))
 }
 
+/** De losse "nu"-markering: het live gezondheidsgetal van vandaag. */
+export interface HealthVerloopNu {
+  /** `YYYY-MM-DD` van vandaag (lokaal). */
+  snapshot_date: string
+  /** Het live gezondheidsgetal, afgerond. */
+  score: number
+}
+
 /**
- * Het verloop met de LOPENDE maand als live stand. De opgeslagen stand van deze
- * maand is eerder in de maand geschreven en rekent de vrijheidspijler met een
- * andere motor; de kaart toont het live getal. Door het punt van de lopende maand
- * het live getal te geven, zeggen "sinds vorige maand" en de grafiek per
- * constructie hetzelfde.
- *
- * Staat er een rij deze maand, dan krijgt die het live getal en de huidige
- * rekenmethode; datum, vrijheidsleeftijd en motor blijven historie. Staat er geen
- * rij, dan komt er een punt van vandaag bij zonder vrijheidsleeftijd. Alleen
- * aanroepen wanneer het live getal een oordeel is (verdict 'score').
+ * Het verloop naast de live stand. De opgeslagen maandstanden en het live getal
+ * zijn met verschillende methodes berekend (de writers rekenen de vrijheidspijler
+ * als kapitaalratio met de scalar-leeftijd, live rekent de kernel mét stop-anker),
+ * dus ze horen niet op één lijn. De lijn van het gezondheidsgetal loopt daarom tot
+ * en met de laatste maand vóór de lopende: een opgeslagen score van deze maand
+ * valt eruit (zijn vrijheidsleeftijd blijft historie). Het live getal komt als
+ * losse markering "nu" terug, niet verbonden. Alleen aanroepen wanneer het live
+ * getal een oordeel is (verdict 'score').
  */
-export function withLiveCurrentMonth(
+export function verloopMetNu(
   verloop: readonly HealthVerloopPunt[],
-  live: { liveTotal: number; now: Date; currentVersion?: number },
-): HealthVerloopPunt[] {
-  const { liveTotal, now, currentVersion = HEALTH_SCORE_VERSION } = live
-  const vandaag = localDateString(now)
+  live: { liveTotal: number; now: Date },
+): { punten: HealthVerloopPunt[]; nu: HealthVerloopNu } {
+  const vandaag = localDateString(live.now)
   const dezeMaand = vandaag.slice(0, 7)
-  const liveScore = Math.round(liveTotal)
-  const idx = verloop.findIndex((p) => p.snapshot_date.slice(0, 7) === dezeMaand)
-  if (idx === -1) {
-    return [
-      ...verloop,
-      { snapshot_date: vandaag, resilience_score: liveScore, score_version: currentVersion, fire_age: null, engine_bron: null, live: true },
-    ]
+  return {
+    punten: verloop.map((p) =>
+      p.snapshot_date.slice(0, 7) === dezeMaand && p.resilience_score !== null ? { ...p, resilience_score: null } : p,
+    ),
+    nu: { snapshot_date: vandaag, score: Math.round(live.liveTotal) },
   }
-  return verloop.map((p, i) =>
-    i === idx ? { ...p, resilience_score: liveScore, score_version: currentVersion, live: true } : p,
-  )
 }
 
 /**
@@ -136,27 +141,99 @@ export function detectGrondslagBreuk(
 }
 
 /**
- * "Sinds vorige maand": het huidige gezondheidsgetal min de opgeslagen stand van
- * de vorige KALENDERMAAND (t.o.v. `now`), afgerond op hele punten.
- *
- * Null — geen vergelijking — wanneer die maand geen stand of geen score heeft,
- * of wanneer de stand met een andere rekenmethode is berekend dan het huidige
- * getal (`currentVersion`, standaard `HEALTH_SCORE_VERSION`).
+ * De maandstand van de vorige KALENDERMAAND (t.o.v. `now`) als invoer voor
+ * "sinds vorige maand": het netto vermogen en de spaarquote zoals opgeslagen —
+ * data, geen berekende score. Null zonder stand in die maand.
  */
-export function healthScoreSinceLastMonth(input: {
-  /** Het huidige gezondheidsgetal uit de canonieke bron. */
-  currentTotal: number
-  verloop: readonly HealthVerloopPunt[]
-  now: Date
-  currentVersion?: number
-}): number | null {
-  const { currentTotal, verloop, now, currentVersion = HEALTH_SCORE_VERSION } = input
-  if (!Number.isFinite(currentTotal)) return null
+export function vorigeMaandStand(
+  rows: readonly { snapshot_date: string; net_worth: number | string; savings_rate?: number | string | null }[],
+  now: Date,
+): { netWorth: number; savingsRatePct: number | null } | null {
   const vorigeMaand = localMonthStartMonthsAgo(now, 1).slice(0, 7)
-  const stand = verloop.find((p) => p.snapshot_date.slice(0, 7) === vorigeMaand)
-  if (!stand || stand.resilience_score === null) return null
-  if (stand.score_version !== currentVersion) return null
-  return Math.round(currentTotal) - Math.round(stand.resilience_score)
+  const stand = [...rows].reverse().find((r) => String(r.snapshot_date).slice(0, 7) === vorigeMaand)
+  if (!stand) return null
+  const netWorth = Number(stand.net_worth)
+  if (!Number.isFinite(netWorth)) return null
+  return { netWorth, savingsRatePct: toNumberOrNull(stand.savings_rate) }
+}
+
+/**
+ * De live grondslag van `healthScoreInput.freedomPct` uit de horizon-bundel —
+ * precies de velden die `lib/horizon-data-loader.ts` aan `computeFreedomPctForPlan`
+ * gaf. Eén mapping voor de hub en de briefing.
+ */
+export function liveFreedomBasis(h: {
+  freedomBasis: { homeExcludedFromFire: boolean; netWorthInclHome: number; fireEligibleNetWorth: number }
+  requiredNetWorthInclHome: number | null
+  requiredPortfolioExclHome: number | null
+}): FreedomProgressBasisInput {
+  return {
+    homeExcludedFromFire: h.freedomBasis.homeExcludedFromFire,
+    netWorthInclHome: h.freedomBasis.netWorthInclHome,
+    fireEligibleNetWorth: h.freedomBasis.fireEligibleNetWorth,
+    requiredNetWorthInclHome: h.requiredNetWorthInclHome,
+    requiredPortfolioExclHome: h.requiredPortfolioExclHome,
+  }
+}
+
+/** Afrondingsruis tussen twee identieke `computeFreedomPctForPlan`-aanroepen. */
+const FREEDOM_PARITEIT_MARGE = 1e-9
+
+/**
+ * "Sinds vorige maand": de verandering van het gezondheidsgetal in hele punten,
+ * met de trend van `computeHealthScoreWithTrend` — DEZELFDE canonieke functie op
+ * vorige-maand-invoer (het opgeslagen netto vermogen en de spaarquote van vorige
+ * maand), op dezelfde actieve pijlerset. Nooit een opgeslagen score naast het
+ * live getal: die zijn met een andere methode berekend.
+ *
+ * De vrijheidspijler van vorige maand komt uit `computeFreedomPctForPlan` op de
+ * live grondslag, verschoven met het verschil in netto vermogen. Pariteit is een
+ * voorwaarde: reproduceert die grondslag het live `freedomPct` niet exact, dan
+ * geen vergelijking.
+ *
+ * Null — geen vergelijking — bij:
+ *  · een onbekend oordeel (ADR 0131);
+ *  · een vast stop-anker (`aow`/`now`/`age`): live is de vrijheidspijler daar de
+ *    DEKKING uit een kernel-run, en een vorige-maand-dekking vergt een run op het
+ *    vermogen van toen die hier niet is. Liever geen regel dan een valse stijging;
+ *  · geen stand vorige maand, of een grondslag zonder pariteit.
+ */
+export function healthScoreSinceLastMonth(args: {
+  /** Het huidige gezondheidsgetal uit de canonieke bron. */
+  health: HealthScore
+  /** De canonieke invoer waarmee `health` berekend is. */
+  input: HealthScoreInput
+  budgetingActive: boolean
+  /** De live grondslag van `input.freedomPct` (solved: kapitaalratio). */
+  freedomBasis: FreedomProgressBasisInput
+  vorigeMaand: { netWorth: number; savingsRatePct: number | null } | null
+}): number | null {
+  const { health, input, budgetingActive, freedomBasis, vorigeMaand } = args
+  if (!vorigeMaand) return null
+  if (healthScoreVerdict(health).kind !== 'score') return null
+  const anker = input.fireStopAnchor ?? legacyAnchorOf(input.fireEndStrategy)?.kind ?? 'solved'
+  if (anker !== 'solved') return null
+  const nuFreedomPct = computeFreedomPctForPlan({ anchorFixed: false, coverage: null, basis: freedomBasis })
+  if (Math.abs(nuFreedomPct - input.freedomPct) > FREEDOM_PARITEIT_MARGE) return null
+
+  const verschil = vorigeMaand.netWorth - freedomBasis.netWorthInclHome
+  const prevFreedomPct = computeFreedomPctForPlan({
+    anchorFixed: false,
+    coverage: null,
+    basis: {
+      ...freedomBasis,
+      netWorthInclHome: freedomBasis.netWorthInclHome + verschil,
+      fireEligibleNetWorth: freedomBasis.fireEligibleNetWorth + verschil,
+    },
+  })
+  const metTrend = computeHealthScoreWithTrend(input, budgetingActive, {
+    prevNetWorth: input.totalAssets - input.totalDebts + verschil,
+    prevSavingsRate: vorigeMaand.savingsRatePct,
+    requiredPortfolio: null,
+    prevFreedomPct,
+  })
+  if (metTrend.previousMonth == null) return null
+  return Math.round(metTrend.total) - Math.round(metTrend.previousMonth)
 }
 
 /**

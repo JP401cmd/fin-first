@@ -7,6 +7,7 @@ import {
   detectGrondslagBreuk,
   detectScoreVersionTransition,
   formatTransitionDate,
+  type HealthVerloopNu,
   type HealthVerloopPunt,
 } from '@/lib/health-verloop'
 
@@ -42,18 +43,26 @@ function Voetregel({ children, testId }: { children: ReactNode; testId: string }
  * kalendermaanden, geplot op datum.
  *
  * Leest uitsluitend de opgeslagen maandstanden (`HealthVerloopPunt`); rekent
- * niets opnieuw uit. Een wisseling van `score_version` wordt gemarkeerd (andere
+ * niets opnieuw uit. Het live getal (`nu`) staat als losse stip naast de lijn:
+ * de writers rekenen de vrijheidspijler anders dan live, dus die twee horen niet
+ * op één lijn. Een wisseling van `score_version` wordt gemarkeerd (andere
  * rekenmethode = niet vergelijkbaar), een wisseling van `engine_bron` krijgt de
  * bestaande "rekenwijze gewijzigd"-regel. Wordt lazy geladen zodra de kassabon
  * opengaat.
  */
-export function HealthScoreVerloop({ punten }: { punten: readonly HealthVerloopPunt[] }) {
+export function HealthScoreVerloop({
+  punten,
+  nu = null,
+}: {
+  punten: readonly HealthVerloopPunt[]
+  /** Het live gezondheidsgetal — losse "nu"-stip, niet op de lijn. */
+  nu?: HealthVerloopNu | null
+}) {
   const headingId = useId()
   const metScore = punten.filter((p) => p.resilience_score !== null)
   const metLeeftijd = punten.filter((p) => p.fire_age !== null)
   const versieWissel = detectScoreVersionTransition(metScore)
   const motorWissel = detectEngineBronTransition(metLeeftijd)
-  const lopendeMaandLive = punten.some((p) => p.live)
   const grondslagBreuk = detectGrondslagBreuk(metScore)
 
   return (
@@ -67,22 +76,23 @@ export function HealthScoreVerloop({ punten }: { punten: readonly HealthVerloopP
           Verloop
         </h3>
         <p className="mt-0.5 text-[11px] text-[var(--ink-3)]" data-testid="health-verloop-ondertitel">
-          {lopendeMaandLive
-            ? 'De laatste stand van elke maand over de laatste twaalf maanden; voor deze maand je huidige stand.'
+          {nu
+            ? 'De lijn toont de laatste stand van elke afgesloten maand zoals die toen berekend werd, over de laatste twaalf maanden. De losse stip ‘nu’ is je huidige stand; die wordt anders berekend en staat daarom niet op de lijn.'
             : 'De laatste stand van elke maand, over de laatste twaalf maanden.'}
         </p>
       </div>
 
-      {punten.length === 0 ? (
+      {punten.length === 0 && !nu ? (
         <Voetregel testId="health-verloop-leeg">
           Er zijn nog geen maandstanden; het verloop groeit mee met elke maand.
         </Voetregel>
       ) : (
         <>
           <Reeks titel="Gezondheidsgetal" testId="health-verloop-gezondheid">
-            {metScore.length >= 2 ? (
+            {metScore.length >= 2 || (metScore.length === 1 && nu) ? (
               <ResilienceTrendChart
                 snapshots={metScore}
+                nu={nu ? { date: nu.snapshot_date, value: nu.score, label: 'nu' } : null}
                 markers={
                   grondslagBreuk
                     ? [{ date: grondslagBreuk, label: 'budgettelling aangepast', testId: 'grondslag-breuk-marker' }]
@@ -93,6 +103,10 @@ export function HealthScoreVerloop({ punten }: { punten: readonly HealthVerloopP
               <Voetregel testId="health-verloop-gezondheid-een-punt">
                 Eén maandstand tot nu toe: {metScore[0].resilience_score} van 100 in{' '}
                 {formatTransitionDate(metScore[0].snapshot_date)}.
+              </Voetregel>
+            ) : nu ? (
+              <Voetregel testId="health-verloop-gezondheid-alleen-nu">
+                Nog geen afgesloten maandstand. Nu: {nu.score} van 100.
               </Voetregel>
             ) : (
               <Voetregel testId="health-verloop-gezondheid-leeg">

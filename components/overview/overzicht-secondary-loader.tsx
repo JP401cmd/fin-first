@@ -172,11 +172,11 @@ export async function OverzichtSecondaryLoader({
         ...dashboardData,
         monthlyIncome: perspectiveOverride.monthlyIncome,
         monthlyExpenses: perspectiveOverride.monthlyExpenses,
-        healthVerloop: undefined,
+        healthVorigeMaand: undefined,
       }
     : perspective === 'personal'
       ? dashboardData
-      : { ...dashboardData, healthVerloop: undefined }
+      : { ...dashboardData, healthVorigeMaand: undefined }
   const composedBriefing = composeOverviewBriefing(
     briefingDashboardData,
     finData,

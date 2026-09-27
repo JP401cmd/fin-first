@@ -32,8 +32,7 @@ import { formatStopAge } from '@/lib/horizon/anker-copy'
 import { isFixedAnchor } from '@/lib/fire-strategy'
 import { lookupAowAge } from '@/lib/aow-leeftijd'
 import { HORIZON_PLAFOND_LEEFTIJD } from '@/lib/constants'
-import { healthScoreVerdict } from '@/lib/financial-health'
-import { healthScoreSinceLastMonth } from '@/lib/health-verloop'
+import { healthScoreSinceLastMonth, liveFreedomBasis } from '@/lib/health-verloop'
 
 type FinData = Awaited<ReturnType<typeof loadFinData>>
 type HorizonData = Awaited<ReturnType<typeof loadHorizonData>> | null
@@ -129,13 +128,18 @@ export function buildOverviewBriefingInput(
   const freedomPct =
     horizonData?.healthScoreInput?.freedomPct ?? dashboardData.freedomPct ?? undefined
   // "Sinds vorige maand" — dezelfde helper als de gezondheidskaart op /overzicht:
-  // het canonieke huidige getal tegen de opgeslagen stand van vorige maand, alleen
-  // binnen dezelfde rekenmethode en alleen bij een oordeel. Zonder `healthVerloop`
-  // (huishoud-/partnerblik, mock-bundel) geen vergelijking.
+  // de trend van `computeHealthScoreWithTrend` op de opgeslagen vorige-maand-DATA.
+  // Zonder `healthVorigeMaand` (huishoud-/partnerblik, mock-bundel) geen vergelijking.
   const health = horizonData?.healthScore ?? null
   const healthSinceLastMonth =
-    health && dashboardData.healthVerloop && healthScoreVerdict(health).kind === 'score'
-      ? healthScoreSinceLastMonth({ currentTotal: health.total, verloop: dashboardData.healthVerloop, now })
+    health && horizonData?.healthScoreInput && dashboardData.healthVorigeMaand !== undefined
+      ? healthScoreSinceLastMonth({
+          health,
+          input: horizonData.healthScoreInput,
+          budgetingActive: horizonData.budgetingActive,
+          freedomBasis: liveFreedomBasis(horizonData),
+          vorigeMaand: dashboardData.healthVorigeMaand,
+        })
       : null
 
   return {

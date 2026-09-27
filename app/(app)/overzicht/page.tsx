@@ -5,7 +5,13 @@ import { createClient } from '@/lib/supabase/server'
 import { getCachedUser } from '@/lib/supabase/cached-user'
 import { loadHorizonData } from '@/lib/horizon-data-loader'
 import { getNetWorthSnapshots12m, getOwnProfile } from '@/lib/server-data/base'
-import { deriveHealthVerloop, healthScoreSinceLastMonth, withLiveCurrentMonth } from '@/lib/health-verloop'
+import {
+  deriveHealthVerloop,
+  healthScoreSinceLastMonth,
+  liveFreedomBasis,
+  verloopMetNu,
+  vorigeMaandStand,
+} from '@/lib/health-verloop'
 import { healthScoreVerdict } from '@/lib/financial-health'
 import { getTxAgg12m, aggLatestMonth, type TxMonthAggregateRow } from '@/lib/server-data/tx-aggregates'
 import { StaleDataGuard } from '@/components/app/stale-data-guard'
@@ -133,20 +139,32 @@ export default async function OverzichtPage() {
   // maandstanden zijn persoonlijk (eigen user_id), terwijl `health` in
   // Huishouden/Partner het perspectief-getal is; die twee vergelijken zou een
   // verandering tonen die er niet is. Het huidige getal komt uit de canonieke
-  // bron (`horizonData.healthScore`) — geen eigen som. De lopende maand in het
-  // verloop IS die live stand (`withLiveCurrentMonth`), zodat de grafiek en
-  // "sinds vorige maand" per constructie hetzelfde zeggen.
+  // bron (`horizonData.healthScore`) — geen eigen som.
+  //  · Verloop: de opgeslagen maandstanden als lijn tot en met vorige maand, het
+  //    live getal als losse "nu"-markering (`verloopMetNu`) — twee methodes, dus
+  //    niet op één lijn.
+  //  · "Sinds vorige maand": de trend van `computeHealthScoreWithTrend` op de
+  //    opgeslagen vorige-maand-DATA (`healthScoreSinceLastMonth`), nooit een
+  //    opgeslagen score naast het live getal.
   const nu = new Date()
   const healthIsScore = health != null && healthScoreVerdict(health).kind === 'score'
   const opgeslagenVerloop =
     perspective === 'personal' ? deriveHealthVerloop(snapshots12mRes.data ?? []) : null
-  const healthVerloop =
+  const verloopEnNu =
     opgeslagenVerloop && health && healthIsScore
-      ? withLiveCurrentMonth(opgeslagenVerloop, { liveTotal: health.total, now: nu })
-      : opgeslagenVerloop
+      ? verloopMetNu(opgeslagenVerloop, { liveTotal: health.total, now: nu })
+      : null
+  const healthVerloop = verloopEnNu?.punten ?? opgeslagenVerloop
+  const healthVerloopNu = verloopEnNu?.nu ?? null
   const healthSindsVorigeMaand =
-    health && healthVerloop && healthIsScore
-      ? healthScoreSinceLastMonth({ currentTotal: health.total, verloop: healthVerloop, now: nu })
+    perspective === 'personal' && health && horizonData?.healthScoreInput
+      ? healthScoreSinceLastMonth({
+          health,
+          input: horizonData.healthScoreInput,
+          budgetingActive: horizonData.budgetingActive,
+          freedomBasis: liveFreedomBasis(horizonData),
+          vorigeMaand: vorigeMaandStand(snapshots12mRes.data ?? [], nu),
+        })
       : null
 
   // Mini-tijdslijn-strip inputs: huidige leeftijd uit DOB + vrijheidsleeftijd.
@@ -344,6 +362,7 @@ export default async function OverzichtPage() {
           }
           health={health}
           healthVerloop={healthVerloop}
+          healthVerloopNu={healthVerloopNu}
           healthSindsVorigeMaand={healthSindsVorigeMaand}
           leverScores={leverScoresResult.scores}
           totals={totals}
