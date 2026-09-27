@@ -95,10 +95,15 @@ export async function GET(request: Request) {
       budgetsResult,
       childBudgetsResult,
     ] = await Promise.allSettled([
-      // Net worth snapshots for the year
+      // Net worth snapshots for the year — EXPLICIETE EIGENAAR-SCOPING. De
+      // SELECT-policy op `net_worth_snapshots` is huishoud-gedeeld en `ownership`
+      // is door de gebruiker zelf schrijfbaar; RLS filtert hier dus NIET op de
+      // kijker. Het jaaroverzicht is persoonlijk: een gedeelde partnerrij hoort
+      // niet in begin-/eindvermogen, groei of FIRE-voortgang.
       supabase
         .from('net_worth_snapshots')
         .select('snapshot_date, net_worth, total_assets, total_debts, freedom_percentage')
+        .eq('user_id', claims.sub)
         .gte('snapshot_date', yearStart)
         .lt('snapshot_date', yearEnd)
         .order('snapshot_date', { ascending: true }),
