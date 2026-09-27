@@ -73,10 +73,12 @@ describe('bronanker — de grondslag in loadCoreData is net_worth_snapshots', ()
     expect(code).toContain('const prevAssets = Number(snaps[snaps.length - 2].total_assets)')
   })
 
-  it('houdt de snapshot-query ASC gesorteerd — anders wijzen [-1]/[-2] de verkeerde kant op', () => {
-    expect(code).toContain(
-      "from('net_worth_snapshots').select('snapshot_date, total_assets, total_debts, net_worth, freedom_percentage, fire_age, sovereignty_level, savings_rate, resilience_score, fire_portfolio_required').order('snapshot_date', { ascending: true })",
-    )
+  it('haalt de reeks via fetchRecentNetWorthSnapshots — eigen rijen, recentste 24, oplopend (anders wijzen [-1]/[-2] de verkeerde kant op)', () => {
+    // De volgorde, het venster en de eigenaar-scoping zijn getest in
+    // lib/snapshots/recent-net-worth-snapshots.test.ts. Dit anker borgt dat de
+    // loader die helper gebruikt en geen eigen, ongescoopte query terugkrijgt.
+    expect(code).toContain('fetchRecentNetWorthSnapshots(supabase)')
+    expect(code).not.toContain("from('net_worth_snapshots')")
   })
 
   it('houdt de ±0,1 %-drempel die hieronder gespiegeld staat', () => {

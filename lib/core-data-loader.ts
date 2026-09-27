@@ -51,6 +51,7 @@ import {
 import { ageAtDate } from '@/lib/horizon-data'
 import { loadCombinedCashStats, type CashAssetStats } from '@/lib/kpi-context'
 import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
+import { fetchRecentNetWorthSnapshots } from '@/lib/snapshots/recent-net-worth-snapshots'
 import { getAowLeeftijden } from '@/lib/reference-cache'
 import { resolveFireAssumptions, type FireAssumptionRow } from '@/lib/fire-assumptions'
 import { loadPerspectiveDataServer } from '@/lib/household/perspective-loader-server'
@@ -1026,7 +1027,10 @@ export const loadCoreData = cache(async function loadCoreData(
     // client-scope) en gebruikt daarom de kolomconstante + `fetchSpendingSplits`
     // i.p.v. de gedeelde `getCurrentMonthTx`-ingang.
     supabase.from('transactions').select(BUDGET_SPENDING_TX_COLUMNS).gte('date', monthStart).lt('date', monthEnd),
-    supabase.from('net_worth_snapshots').select('snapshot_date, total_assets, total_debts, net_worth, freedom_percentage, fire_age, sovereignty_level, savings_rate, resilience_score, fire_portfolio_required').order('snapshot_date', { ascending: true }).limit(24),
+    // De recentste 24 EIGEN snapshots, oplopend (zie de helper). Was een inline
+    // `order(asc).limit(24)` zonder user-filter: bij meer dan 24 rijen de oudste
+    // 24, en een gedeelde partnerrij schoof mee in de reeks.
+    fetchRecentNetWorthSnapshots(supabase),
     // debt-progress (original_amount/current_balance, is_active) hergebruikt nu
     // `debtsResult` uit batch-1 — aparte query verwijderd (−1 query, byte-identiek).
     //
