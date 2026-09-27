@@ -198,11 +198,11 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'KERN',
     persona: 'compleet',
     given: 'Persona Tessa geladen, perspectief Eigen; gezondheidsscore + pijler-uitsplitsing genoteerd op /overzicht. HERZIEN (fase 5 van ADR 0179, 26 sep 2026): /toekomst toont het gezondheidsgetal niet meer — het sheet "Financiële Gezondheid" en het verloop-grid zijn van Plan af; de volledige kassabon met het verloop woont op /overzicht (WF-OVZ-29).',
-    when: 'De gebruiker vergelijkt de score + uitsplitsing (spaarquote, buffer, DSTI, spreiding, vrijheidsvoortgang, budgetdiscipline) op de gezondheidskaart van /overzicht, in de gezondheidskassabon (ook geopend via de widget gezondheids_score → /overzicht#gezondheid), het punt van de lopende maand in het verloop, en de widget gezondheids_score op zijn homescherm.',
-    then: 'Alle oppervlakken tonen exact dezelfde totaalscore én per pijler dezelfde waarde — één server-berekening (`buildHealthScoreInput` + `computeHealthScoreFromInputs`, ADR 0008), via dezelfde loader geconsumeerd; het punt van de lopende maand in het verloop is dat live getal (`withLiveCurrentMonth`). Een input-wijziging (bv. +€5.000 buffer) beweegt ze identiek. Consistentie tussen weergaven van één berekening.',
+    when: 'De gebruiker vergelijkt de score + uitsplitsing (spaarquote, buffer, DSTI, spreiding, vrijheidsvoortgang, budgetdiscipline) op de gezondheidskaart van /overzicht, in de gezondheidskassabon (ook geopend via de widget gezondheids_score → /overzicht#gezondheid), de losse "nu"-stip in het verloop, en de widget gezondheids_score op zijn homescherm.',
+    then: 'Alle oppervlakken tonen exact dezelfde totaalscore én per pijler dezelfde waarde — één server-berekening (`buildHealthScoreInput` + `computeHealthScoreFromInputs`, ADR 0008), via dezelfde loader geconsumeerd; de losse "nu"-stip in het verloop is dat live getal (`verloopMetNu`; de lijn zelf toont opgeslagen standen t/m de laatste afgesloten maand en hoeft daar niet mee gelijk te zijn). Een input-wijziging (bv. +€5.000 buffer) beweegt ze identiek. Consistentie tussen weergaven van één berekening.',
     assertion: {
       kind: 'consistency',
-      source: 'consistentie-eis: gezondheidsgetal + pijlers identiek op components/overview/overzicht-hero/health-score-card.tsx, components/app/horizon/health-score-receipt.tsx (+ health-score-verloop.tsx, lopende maand) en components/widgets/gezondheids-score-widget.tsx (lib/health-score-input.ts + lib/financial-health.ts, één loader-bron; lib/health-verloop.ts#withLiveCurrentMonth).',
+      source: 'consistentie-eis: gezondheidsgetal + pijlers identiek op components/overview/overzicht-hero/health-score-card.tsx, components/app/horizon/health-score-receipt.tsx (+ health-score-verloop.tsx, de "nu"-stip) en components/widgets/gezondheids-score-widget.tsx (lib/health-score-input.ts + lib/financial-health.ts, één loader-bron; lib/health-verloop.ts#verloopMetNu).',
     },
   },
   {
