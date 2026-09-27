@@ -271,6 +271,26 @@ describe('InstellingenRijen — deeplinks (?rij= met aliassen)', () => {
     expect(nav.replace).toHaveBeenCalledWith('/toekomst/instellingen', { scroll: false })
   })
 
+  it('met ?modal= (redirect van ?modal=strategie|withdrawal) wacht de rij-deeplink op de overlay-opruimer: één keer open', () => {
+    const geopend: string[] = []
+    laatst.regel = null
+    nav.search = new URLSearchParams('modal=withdrawal&rij=onttrekking')
+    const { rerender } = renderRijen()
+    expect(screen.queryByTestId('regel-pane')).toBeNull()
+    expect(nav.replace).not.toHaveBeenCalled()
+    // De overlay-state ruimt `modal` op; daarna ziet de rij-hook een schone URL.
+    nav.search = new URLSearchParams('rij=onttrekking')
+    rerender(
+      <DisplayModeProvider initialMode="full">
+        <InstellingenRijen {...PROPS} />
+      </DisplayModeProvider>,
+    )
+    geopend.push(screen.getByTestId('regel-pane').textContent ?? '')
+    expect(geopend).toEqual(['onttrekkingsstrategie||snap'])
+    expect(nav.replace).toHaveBeenCalledTimes(1)
+    expect(nav.replace).toHaveBeenCalledWith('/toekomst/instellingen', { scroll: false })
+  })
+
   it('met ?planreview= wacht de rij-deeplink op de opruimer van de review', () => {
     nav.search = new URLSearchParams('planreview=open&rij=box3')
     renderRijen()
