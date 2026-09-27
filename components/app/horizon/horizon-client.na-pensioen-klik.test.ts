@@ -20,8 +20,9 @@
  *  1. er is precies één handler, en die toetst `householdRetireInfo` vóór hij
  *     naar de huishoud-tak vertakt, met de rij "Uitgave na pensioen" in Instellingen als
  *     terugval (ADR 0179 fase 3; tot dan het eigen uitgavenpaneel);
- *  2. beide KPI-varianten (desktop-strip + mobiele strip) consumeren die ene
- *     handler — geen tegel schrijft de vertakking zelf uit;
+ *  2. de persoonlijke KPI 4 is sinds ADR 0179 fase 3 een link naar de rij Uitgave na
+ *     pensioen (`instellingenRijHref('uitgave-na-pensioen')`); alleen de huishoudtak
+ *     loopt via de handler — geen tegel schrijft de vertakking zelf uit;
  *  3. de oude, onbewaakte vertakking komt nergens meer voor.
  */
 

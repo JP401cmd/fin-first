@@ -22,7 +22,7 @@
  */
 
 import type { SimResult, SimRow } from '@/lib/fire-simulation'
-import type { FireEndStrategy } from '@/lib/fire-strategy'
+import { DEFAULT_FIRE_STRATEGY, type FireEndStrategy } from '@/lib/fire-strategy'
 import { HideInSimple } from '@/components/app/hide-in-simple'
 import { AfbouwOverzichtCard } from '@/components/future/afbouw-overzicht-card'
 import { useToekomstEuroContext, useToekomstSimContext } from '@/components/toekomst/state/toekomst-state-provider'
@@ -66,7 +66,7 @@ export function PlanAfbouwOverzicht() {
   const invoer = afbouwInvoer({
     simResult,
     rows: viewDisplaySimRows,
-    endAge: fireStrategy?.endAge ?? 90,
+    endAge: fireStrategy?.endAge ?? DEFAULT_FIRE_STRATEGY.endAge,
     strategy: fireStrategy?.strategy ?? 'deplete',
   })
   if (!invoer) return null

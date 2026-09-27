@@ -55,8 +55,13 @@ export function makePostgrestSim(tables: Record<string, SimRow[]>, userId: strin
         result = result.filter(r => r[col as string] === val)
       },
       not: (col, op, val) => {
-        // Alleen de vorm die de code hier gebruikt: `.not(col, 'is', null)`.
-        if (op === 'is' && val === null) result = result.filter(r => r[col as string] != null)
+        // Alleen de vorm die de code hier gebruikt: `.not(col, 'is', null)`. Een andere vorm
+        // gooit, zodat een test er niet stil groen doorheen gaat (eindreview 27 sep).
+        if (op === 'is' && val === null) {
+          result = result.filter(r => r[col as string] != null)
+          return
+        }
+        throw new Error(`postgrest-sim: .not(${String(col)}, ${String(op)}, …) wordt niet gesimuleerd`)
       },
       gte: (col, val) => {
         result = result.filter(r => String(r[col as string]) >= String(val))

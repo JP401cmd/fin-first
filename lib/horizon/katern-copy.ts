@@ -314,14 +314,14 @@ export const DOELEN_VOLGT_PLAN_REGEL =
 
 /**
  * Doelen, in Samenstelling en Geldstroom, als de balken het doelscenario tonen (ADR 0179
- * fase 4; spec §4.5: label "je doelscenario"). Nog langs merkstem (kopij-toets §11).
+ * fase 4; spec §4.5: label "je doelscenario"). Getoetst in kopij-toets §12.
  */
 export const DOELEN_TOONT_DOELSCENARIO_LABEL = 'Je doelscenario'
 
 /**
  * De legenda van de vermogensgrafiek op /toekomst (fase 4): "Je plan" en "Je doelscenario"
  * (wireframe §4.3: "─ plan ┄ doelscenario"). Vervangt "Jouw pad" / "Jouw wat-als": het
- * wat-als heet sinds ADR 0144/0145 het doelscenario. Nog langs merkstem.
+ * wat-als heet sinds ADR 0144/0145 het doelscenario. Getoetst in kopij-toets §12.
  */
 export const CANVAS_LEGENDA_PLAN = 'Je plan'
 export const CANVAS_LEGENDA_DOELSCENARIO = DOELEN_TOONT_DOELSCENARIO_LABEL
@@ -331,7 +331,7 @@ export const CANVAS_LEGENDA_DOELSCENARIO = DOELEN_TOONT_DOELSCENARIO_LABEL
  * Doelen, §5). De kop letterlijk uit de spec; de uitleg is de bestaande zin van de
  * vroegere Plan-sectie "Wat het betekent" (ongewijzigd verhuisd). Kop nog langs merkstem.
  */
-/** Katern Doelen, sectie II: de doelenlijst onder het lab (spec §4.3 wireframe Doelen). Nog langs merkstem. */
+/** Katern Doelen, sectie II: de doelenlijst onder het lab (spec §4.3 wireframe Doelen). Getoetst in kopij-toets §12. */
 export const DOELEN_LIJST_KOP = 'Je doelen'
 
 export const ANDERE_PADEN_KOP = 'Andere paden naast je doelscenario'

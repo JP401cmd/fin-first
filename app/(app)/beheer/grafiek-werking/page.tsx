@@ -415,7 +415,7 @@ export default function GrafiekWerkingPage() {
       </Sec>
 
       {/* 2 — Voorkeuren */}
-      <Sec id="voorkeuren" kicker="2 · /toekomst/voorkeuren" title="Voorkeuren & instellingen">
+      <Sec id="voorkeuren" kicker="2 · /toekomst/instellingen" title="Voorkeuren & instellingen">
         <Sub>Markt-aannames</Sub>
         <ul className="list-disc space-y-1 pl-5">
           <li><strong>Verwacht bruto rendement</strong> — <F>profiles.expected_return</F> (default 7%). Fallback; per-pot rendement wint.</li>

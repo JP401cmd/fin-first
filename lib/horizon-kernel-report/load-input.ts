@@ -239,7 +239,7 @@ export async function loadKernelReportInput(supabase: SupabaseClient): Promise<K
       { label: 'Verwacht rendement', waarde: pct(fireParams.grossReturn), bron: 'profiles.expected_return' },
       { label: 'Inflatie', waarde: pct(fireParams.inflationRate), bron: 'profiles.inflation_rate' },
       { label: 'Marginaal tarief', waarde: pct(fireParams.marginaalTarief), bron: 'jaar-afgeleid uit net_monthly_income (BOX1_PARAMS)' },
-      { label: 'Box 3-methode', waarde: fireParams.box3Method, bron: 'profiles.box3_method (instelbaar op /toekomst/voorkeuren)' },
+      { label: 'Box 3-methode', waarde: fireParams.box3Method, bron: 'profiles.box3_method (instelbaar op /toekomst/instellingen)' },
     ],
     strategie: [
       { label: 'Eindstrategie', waarde: String(profileRaw.fire_end_strategy ?? 'perpetual'), bron: 'profiles.fire_end_strategy' },
