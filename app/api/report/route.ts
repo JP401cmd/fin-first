@@ -229,9 +229,14 @@ export async function GET(request: Request) {
       profileResult,
       basisPrefsResult,
     ] = await Promise.allSettled([
+      // EXPLICIETE EIGENAAR-SCOPING. De SELECT-policy op `net_worth_snapshots` is
+      // huishoud-gedeeld en `ownership` is door de gebruiker zelf schrijfbaar; RLS
+      // filtert hier dus NIET op de kijker. Het rapport is persoonlijk en wordt als
+      // PDF gedeeld: een gedeelde partnerrij hoort niet in de vermogensreeks.
       supabase
         .from('net_worth_snapshots')
         .select('snapshot_date, net_worth, total_assets, total_debts, freedom_percentage')
+        .eq('user_id', user.id)
         .gte('snapshot_date', dateFrom)
         .lt('snapshot_date', dateTo)
         .order('snapshot_date', { ascending: true }),
@@ -809,9 +814,12 @@ export async function GET(request: Request) {
       type HistTxRow = { amount: number; budget_id: string | null }
 
       const histFetches = previousPeriods.flatMap(p => [
+        // Eigen rijen expliciet, om dezelfde reden als de periodereeks hierboven:
+        // anders wint een recentere gedeelde partnerrij de "laatste stand".
         supabase
           .from('net_worth_snapshots')
           .select('net_worth, snapshot_date')
+          .eq('user_id', user.id)
           .gte('snapshot_date', p.from)
           .lt('snapshot_date', p.to)
           .order('snapshot_date', { ascending: false })
