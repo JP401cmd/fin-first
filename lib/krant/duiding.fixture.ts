@@ -34,4 +34,7 @@ export const GELDIGE_UITVOER: DuidingModelUitvoer = {
     { param: 'jaar', citaat: 'stijgt in 2027 naar € 60.000' },
     { param: 'heffingsvrij_single', citaat: 'stijgt in 2027 naar € 60.000' },
   ],
+  // Bewust leeg: de bestaande controles blijven zo onafhankelijk van de thema's
+  // getoetst; duiding-controles.test.ts heeft een eigen blok voor thema's (v3).
+  themas: [],
 }

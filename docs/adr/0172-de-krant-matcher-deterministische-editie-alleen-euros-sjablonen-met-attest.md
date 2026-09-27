@@ -123,3 +123,15 @@ eerdere modeluitvoer.
   herattestatie van beide (manifest én sjabloon-attest).
 - **Architectuur**: rekenmotor `nieuwsimpact` in het nieuwe domein *Nieuws* van de
   Berekeningen-view; geen HLD-wijziging (geen gebruikersfunctie tot 1C).
+
+## Aanvulling 27 sep 2026 — thema's maken persoonlijk, nooit exclusief (B35, `MATCHER_VERSIE` 3)
+
+Een artikel zonder berekend bereik (relevant) scoort `SCORE_RELEVANT_GERICHT` (2) als de
+doelgroep bevestigd is **óf** als minstens één gegrond thema van de duiding dit profiel raakt
+(`toetsThema`: OF over `THEMAS[id].raakt` met `toetsRegel`; één 'ja' → ja, alle 'nee' → nee,
+anders onbekend; `'iedereen'` telt als 'nee', want het maakt niemand in het bijzonder gericht).
+Anders blijft het `SCORE_RELEVANT_ALGEMEEN` (1). Waarom-code `thema:<id>`. **Thema's sluiten
+nooit iets uit**, ook niet uit het algemene katern: een verkeerd thema maakt een bericht
+hooguit onterecht persoonlijk. `SCORE_DREMPEL` blijft 3 (B37 — drempel 2 en de vorm "Raakt jouw
+situatie" — is 1C). Fixtures van vóór v3 lopen via een lege themalijst; de goldens veranderden
+alleen in `matcherVersie`.

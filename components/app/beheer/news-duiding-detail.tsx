@@ -212,6 +212,23 @@ export function NewsDuidingDetail({ articleId, titel, velden, onGewijzigd }: Pro
                 ? 'algemeen'
                 : weergave.doelgroep.map((r) => `${r.veld} ${r.op} ${r.waarden.join(' / ')}`).join(' · ')}
             </dd>
+            <dt className="text-[var(--ink-4)]">Thema&apos;s</dt>
+            <dd className="text-[var(--ink-2)]">
+              {weergave.themas.length === 0 ? (
+                <span className="text-[var(--ink-4)]">geen</span>
+              ) : (
+                <ul className="space-y-0.5">
+                  {weergave.themas.map((t) => (
+                    <li key={t.id}>
+                      <span className="font-medium">{t.label}</span> — <q>{t.citaat}</q>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {weergave.themasGeweigerd > 0 && (
+                <span className="text-[var(--ink-4)]"> ({weergave.themasGeweigerd} weggevallen: geen letterlijk citaat, geen trefwoord, te kort, of boven de vier)</span>
+              )}
+            </dd>
             <dt className="text-[var(--ink-4)]">Grondslag</dt>
             <dd className="text-[var(--ink-2)]">
               {weergave.grondslag} ({weergave.tekens.toLocaleString('nl-NL')} tekens) · {weergave.model}

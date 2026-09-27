@@ -15,7 +15,10 @@
 //      het veld onder `watMist`.
 //   3. IMPACT: berekenImpact op de bandranden (impact.ts).
 //   4. VORM + SCORE: direct/gevoeligheid uit de impact, anders relevant;
-//      score 1–5 op de ONDERGRENS per maand (de tabel hieronder).
+//      score 1–5 op de ONDERGRENS per maand (de tabel hieronder). Relevant
+//      telt als GERICHT bij een bevestigde doelgroep óf een thema dat dit
+//      profiel raakt (B35, `lib/krant/themas.ts`); thema's sluiten nooit iets
+//      uit, ze maken een artikel alleen persoonlijk.
 //   5. BIJSTELLING: deadline in de toekomst +1, rubriek uit de voorkeur +1
 //      (max 5) — alleen bij een BEVESTIGDE doelgroep (geen regel onbekend);
 //      een gedempte rubriek ("minder", demotedCategories) haalt de editie
@@ -43,6 +46,7 @@
 
 import { type DuidingV1, type DoelgroepRegel, type Deadline } from './duiding-schema'
 import { vindWftOvertreding } from './wft-woordenlijst'
+import { THEMAS, type ThemaId } from './themas'
 import { DOELGROEP_SLEUTELS, type DoelgroepSleutel } from './profiel-velden'
 import type { MechanismeId, MechanismeVorm } from './mechanismen'
 import {
@@ -79,8 +83,10 @@ import {
 /**
  * Bumpt bij elke wijziging van de regels hieronder; landt op de editie zodat een regelwijziging zichtbaar is.
  * 2 (22-09-2026, ADR 0176): tiebreak van het algemeen katern op duidingssoort en kop in plaats van id.
+ * 3 (27-09-2026, B35 · Krant 1G): een relevant artikel zonder bevestigde doelgroep scoort toch GERICHT
+ *   als één van zijn gegronde thema's dit profiel raakt (OF over de `raakt`-regels); waarom `thema:<id>`.
  */
-export const MATCHER_VERSIE = 2
+export const MATCHER_VERSIE = 3
 
 /** Volgorde bij gelijke datum in het algemeen katern: wat vastligt of gemeten is, vóór verwachting en uitleg. */
 const KATERN_SOORT_RANG: Record<DuidingV1['soort'], number> = {
@@ -119,7 +125,7 @@ export const SCORE_AOW_VERSCHUIVING = 4
 /** Gevoeligheid (B5) scoort nooit hoger dan de drempel: het is blootstelling, geen regel. */
 export const SCORE_GEVOELIGHEID_MAX = 3
 /**
- * Relevant zonder bedrag: gericht (met doelgroep) 2, algemeen 1. Bewust ónder
+ * Relevant zonder bedrag: gericht (bevestigde doelgroep, of een thema dat het profiel raakt — v3) 2, algemeen 1. Bewust ónder
  * de drempel (analyse 1B §5): "wat mist" en "relevant" halen de editie alleen
  * met een bonus. Laat de meting per profieltype dunne edities zien, dan is dít
  * de eerste knop — niet vooraf verlagen.
@@ -291,6 +297,28 @@ function toetsDoelgroep(duiding: DuidingV1, profiel: NieuwsprofielV1): Doelgroep
   return { past: true, onbekend }
 }
 
+/**
+ * Raakt dit thema het profiel? OF-semantiek over de `raakt`-regels: één 'ja'
+ * → ja; alle 'nee' → nee; anders onbekend. 'iedereen' is bewust 'nee': het
+ * raakt elk profiel en maakt dus niemand in het bijzonder gericht.
+ */
+export function toetsThema(thema: ThemaId, profiel: NieuwsprofielV1): RegelUitkomst {
+  const raakt = THEMAS[thema].raakt
+  if (raakt === 'iedereen') return 'nee'
+  let onbekend = false
+  for (const regel of raakt) {
+    const u = toetsRegel(regel, profiel)
+    if (u === 'ja') return 'ja'
+    if (u === 'onbekend') onbekend = true
+  }
+  return onbekend ? 'onbekend' : 'nee'
+}
+
+/** De thema's van de duiding die dit profiel raken ('ja'), in duidingvolgorde. */
+function themasVoorProfiel(duiding: DuidingV1, profiel: NieuwsprofielV1): ThemaId[] {
+  return duiding.themas.filter((t) => toetsThema(t.thema, profiel) === 'ja').map((t) => t.thema)
+}
+
 // ── 4. Vorm en score ─────────────────────────────────────────────────────────
 
 function scoreBedragPerMaand(loPerJaar: number): number {
@@ -299,14 +327,14 @@ function scoreBedragPerMaand(loPerJaar: number): number {
   return perMaand > 0 ? 2 : 1
 }
 
-function basisScore(impact: ImpactUitkomst, duiding: DuidingV1): number {
+function basisScore(impact: ImpactUitkomst, duiding: DuidingV1, themaRaakt: boolean): number {
   if (impact.soort === 'bereik') {
     if (impact.richting === 'geen' && impact.lo === 0 && (impact.hi ?? 0) === 0 && impact.vorm !== 'gevoeligheid') return 1
     if (impact.eenheid === 'maanden') return impact.lo !== 0 ? SCORE_AOW_VERSCHUIVING : 1
     const s = scoreBedragPerMaand(impact.lo)
     return impact.vorm === 'gevoeligheid' ? Math.min(SCORE_GEVOELIGHEID_MAX, s) : s
   }
-  return duiding.doelgroep.length > 0 ? SCORE_RELEVANT_GERICHT : SCORE_RELEVANT_ALGEMEEN
+  return duiding.doelgroep.length > 0 || themaRaakt ? SCORE_RELEVANT_GERICHT : SCORE_RELEVANT_ALGEMEEN
 }
 
 // ── 7. Slots per sjabloon ────────────────────────────────────────────────────
@@ -392,6 +420,8 @@ function bouwKandidaat(artikel: KandidaatArtikel & { duiding: DuidingV1 }, profi
   if (!dg.past) return null
 
   const waarom: string[] = duiding.doelgroep.map((r) => `doelgroep:${r.veld}`)
+  const themaJa = themasVoorProfiel(duiding, profiel)
+  for (const id of themaJa) waarom.push(`thema:${id}`)
   const watMist = [...dg.onbekend]
   // Een ONBEVESTIGDE doelgroep (een regel onbekend) krijgt geen som en geen
   // bonus: "misschien raakt dit jou" mag geen stellige zin met een bedrag
@@ -415,7 +445,7 @@ function bouwKandidaat(artikel: KandidaatArtikel & { duiding: DuidingV1 }, profi
   } else {
     waarom.push(`impact:${impact.reden}`)
   }
-  let score = bevestigd ? basisScore(impact, duiding) : SCORE_RELEVANT_GERICHT
+  let score = bevestigd ? basisScore(impact, duiding, themaJa.length > 0) : SCORE_RELEVANT_GERICHT
   const deadline = deadlineVoor(duiding, ctx)
   const rubriek = artikel.category
   if (bevestigd) {

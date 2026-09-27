@@ -27,6 +27,7 @@ import { z } from 'zod'
 import { DOELGROEP_SLEUTEL_LIJST } from './profiel-velden'
 import { MECHANISMEN, type MechanismeId } from './mechanismen'
 import { DREMPEL_SLEUTELS } from './drempels'
+import { THEMA_IDS, THEMA_CITAAT_MAX, THEMA_MAX } from './themas'
 
 /**
  * 2 (22-09-2026, ADR 0176 · 1F fase 2): de grondslag is het EIGEN bronfragment
@@ -35,7 +36,17 @@ import { DREMPEL_SLEUTELS } from './drempels'
  * de poortuitslag. De bump zet elke v1-rij via `duidWachtendeArtikelen` terug
  * op 'wacht' — herleiden, niet ophogen.
  */
-export const DUIDING_VERSIE = 2
+/**
+ * 3 (27-09-2026, B35/B36 · Krant 1G): de duiding draagt `themas` — thema's uit
+ * de gesloten lijst van `lib/krant/themas.ts`, elk met een letterlijk citaat
+ * als bewijs; de koppeling thema → profielveld staat in code. Een ongegrond
+ * thema valt alleen zelf weg (`meta.themasGeweigerd`), nooit de duiding. De
+ * prompt laat de samenvatting ook UITLEGGEN (wat verandert, voor wie, per
+ * wanneer), zonder getal; de tekstpoort G1–G6 is ongewijzigd. De bump zet elke
+ * v2-rij via `duidWachtendeArtikelen` terug op 'wacht' — herleiden, niet
+ * ophogen.
+ */
+export const DUIDING_VERSIE = 3
 
 export const DUIDING_SOORTEN = [
   'besloten',
@@ -112,6 +123,27 @@ export type Mechanisme = z.infer<typeof mechanismeSchema>
  */
 const samenvatting = z.string().min(20).max(600).nullable()
 
+/**
+ * Thema's zoals het MODEL ze aanlevert. Bewust RUIMER dan het opgeslagen
+ * contract (max 4, citaat max 200): een overtreding in het modelschema laat
+ * generateObject de HELE duiding weigeren ('schema'), en B35 zegt dat een fout
+ * thema één label kost, niet de duiding. De strakke grens dwingt
+ * `duiding-controles.ts` per thema af. `thema` blijft een enum: een id buiten
+ * de lijst is geen fout thema maar een schemabreuk. (Een enum binnen een array
+ * is geen union — telt niet mee voor de union-grens van de provider.)
+ */
+const themaModelSchema = z.strictObject({
+  thema: z.enum(THEMA_IDS),
+  citaat: z.string().min(1).max(400),
+})
+
+/** Thema's zoals ze in de opgeslagen duiding STAAN: alleen de gegronde, hoogstens THEMA_MAX. */
+export const themaSchema = z.strictObject({
+  thema: z.enum(THEMA_IDS),
+  citaat: z.string().min(1).max(THEMA_CITAAT_MAX),
+})
+export type DuidingThema = z.infer<typeof themaSchema>
+
 /** Wat het model teruggeeft. */
 export const duidingModelSchema = z.strictObject({
   soort: z.enum(DUIDING_SOORTEN),
@@ -127,6 +159,8 @@ export const duidingModelSchema = z.strictObject({
    * volledige tekst wordt niet bewaard, alleen fragmenten.
    */
   grond: z.array(z.strictObject({ param: z.string().min(1).max(60), citaat: z.string().min(1).max(300) })),
+  /** Waar het fragment over gaat, uit de gesloten themalijst (B35). Leeg mag. */
+  themas: z.array(themaModelSchema).max(12),
 })
 export type DuidingModelUitvoer = z.infer<typeof duidingModelSchema>
 
@@ -169,11 +203,13 @@ export const duidingMetaSchema = z.strictObject({
   kopBron: z.literal('bron'),
   modeltekst: z.literal(false),
   poort: poortSchema,
+  /** Hoeveel thema's van het model de gronding niet haalden (v3, B35). Door code geteld. */
+  themasGeweigerd: z.number().int().nonnegative(),
 })
 export type DuidingMeta = z.infer<typeof duidingMetaSchema>
 
-/** Alles behalve de poort: wat de aanroeper aanlevert; `controleerDuiding` vult de poort. */
-export type DuidingMetaZonderPoort = Omit<DuidingMeta, 'poort'>
+/** Alles behalve wat `controleerDuiding` vult (de poort en de thema-telling): wat de aanroeper aanlevert. */
+export type DuidingMetaZonderPoort = Omit<DuidingMeta, 'poort' | 'themasGeweigerd'>
 
 /** Wat in `news_articles.duiding` staat — het leescontract voor 1B. */
 export const duidingV1Schema = z.strictObject({
@@ -185,6 +221,8 @@ export const duidingV1Schema = z.strictObject({
   mechanisme: mechanismeSchema.nullable(),
   samenvatting,
   grond: z.record(z.string(), z.string()),
+  /** Alleen de gegronde thema's (v3): citaat letterlijk in de grondslag én een trefwoord van het thema. */
+  themas: z.array(themaSchema).max(THEMA_MAX),
   meta: duidingMetaSchema,
 })
 export type DuidingV1 = z.infer<typeof duidingV1Schema>

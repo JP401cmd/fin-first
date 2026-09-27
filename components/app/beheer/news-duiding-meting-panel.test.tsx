@@ -23,6 +23,7 @@ function week(over: Partial<WeekMeting> = {}): WeekMeting {
     poort: { groen: 6, gedegradeerd: 3, perReden: { 'g1:ongegrond-getal': 2, 'g2:datum': 1 } },
     kopNietVanBron: 0,
     metModeltekst: 0,
+    metThema: 5,
     teruggetrokken: { 'fout-getal': 0, 'verkeerde-doelgroep': 0, 'verkeerd-mechanisme': 0, anders: 0 },
     teruggetrokkenTotaal: 0,
     foutGetalRekenend: 0,
@@ -79,6 +80,12 @@ describe('NewsDuidingMetingPanel — de poortmaten zijn afleesbaar', () => {
     // lijst afwijzingen, en met een label onder de tekstpoort.
     expect(screen.getByText(/G6 · doelgroep niet in de bron/)).toBeInTheDocument()
     expect(screen.getAllByText(/doelgroep:ongegrond:wonen/)).toHaveLength(2)
+  })
+
+  it("toont per week hoeveel geduide artikelen een gegrond thema hebben (v3, B35)", async () => {
+    render(<NewsDuidingMetingPanel ververs={0} />)
+    expect(await screen.findByRole('columnheader', { name: 'Met thema' })).toBeInTheDocument()
+    expect(screen.getAllByText('5/9')).toHaveLength(2)
   })
 
   it('toont G5 (herkomst van de grondslag) en G4 (kop van de bron)', async () => {

@@ -42,6 +42,7 @@ function opgeslagen(over: Partial<DuidingV1> = {}): DuidingV1 {
     mechanisme: GELDIGE_UITVOER.mechanisme,
     samenvatting: GELDIGE_UITVOER.samenvatting,
     grond: Object.fromEntries(GELDIGE_UITVOER.grond.map((g) => [g.param, g.citaat])),
+    themas: [],
     meta: {
       grondslag: 'fragment',
       grondslagSha256: 'c'.repeat(64),
@@ -50,6 +51,7 @@ function opgeslagen(over: Partial<DuidingV1> = {}): DuidingV1 {
       kopBron: 'bron',
       modeltekst: false,
       poort: { status: 'groen', reden: null },
+      themasGeweigerd: 0,
     },
     ...over,
   }
@@ -144,6 +146,19 @@ describe('duidingWeergave', () => {
     expect(u.duiding.poort).toEqual({ status: 'groen', reden: null })
   })
 
+  it("toont de gegronde thema's met label en citaat, en hoeveel er geweigerd zijn (v3)", () => {
+    const u = duidingWeergave(
+      opgeslagen({
+        themas: [{ thema: 'box3-vermogen', citaat: 'het heffingsvrij vermogen in box 3' }],
+        meta: { ...opgeslagen().meta, themasGeweigerd: 2 },
+      }),
+    )
+    expect(u?.ok).toBe(true)
+    if (!u?.ok) return
+    expect(u.duiding.themas).toEqual([{ id: 'box3-vermogen', label: 'Box 3 en vermogen', citaat: 'het heffingsvrij vermogen in box 3' }])
+    expect(u.duiding.themasGeweigerd).toBe(2)
+  })
+
   it('zonder mechanisme: mechanisme null', () => {
     const u = duidingWeergave(opgeslagen({ mechanisme: null, grond: {} }))
     expect(u?.ok && u.duiding.mechanisme).toBeNull()
@@ -183,6 +198,17 @@ function rij(over: Partial<MetingRij>): MetingRij {
 describe('bouwDuidingMeting', () => {
   it('lege invoer → geen weken', () => {
     expect(bouwDuidingMeting([])).toEqual([])
+  })
+
+  it("telt 'met thema' op het eerste thema-id, zonder de citaten te lezen (v3)", () => {
+    const [w] = bouwDuidingMeting([
+      rij({ eerste_thema: 'huur' }),
+      rij({ eerste_thema: null }),
+      rij({}),
+      rij({ duiding_status: 'afgewezen', duiding_fout: 'schema', eerste_thema: 'huur' }),
+    ])
+    expect(w.geduid).toBe(3)
+    expect(w.metThema).toBe(1)
   })
 
   it('telt elke tak per week, cohort op fetched_at', () => {

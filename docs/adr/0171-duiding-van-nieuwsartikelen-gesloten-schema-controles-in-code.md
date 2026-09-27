@@ -167,3 +167,38 @@ langere bewaartermijn hen niet raakt.
   `revoke all … from anon` op `news_articles` (alleen RLS keert anon nu), de toelichting bij
   reden *anders* staat alleen in het best-effort-auditlog (niet op de rij), en de CHECK dwingt
   `teruggetrokken_door` niet af (botst met de FK `on delete set null`).
+
+## Aanvulling 27 sep 2026 — Krant 1G: thema's en een uitleggende samenvatting (B35/B36, `DUIDING_VERSIE` 3)
+
+**Aanleiding (productie 27 sep).** Van 105 geduide artikelen had er 1 een doelgroep en 7 een
+samenvatting. Een doelgroepregel moet lexicaal in het fragment staan (G6) en één ongegronde
+regel wijst de hele duiding af — terecht, want een lege doelgroep betekent iedereen. Het model
+liet de doelgroep dus veilig leeg. En de prompt vroeg "de regel of het cijfer en het gevolg",
+wat het model las als: zonder getal is null het antwoord.
+
+**B35 — thema's uit een gesloten lijst.** De duiding draagt nu `themas: [{thema, citaat}]`
+(hoogstens 4) uit `lib/krant/themas.ts` (16 thema's). De koppeling thema → profielveld staat in
+code (`THEMAS[id].raakt`, OF-semantiek; `'iedereen'` alleen bij zorgkosten); het model wijst
+alleen het onderwerp aan. `controleerDuiding` houdt een thema alleen als het citaat
+(genormaliseerd) letterlijk in de grondslag staat én een trefwoord van dát thema bevat; anders
+valt alleen dat thema weg en telt `meta.themasGeweigerd` op. **Een thema wijst de duiding nooit
+af** — dat is het wezenlijke verschil met de doelgroep. Het modelschema is bewust ruimer (tot 12
+thema's, citaat tot 400 tekens) dan het leescontract (4, 200): een overtreding in het
+modelschema zou generateObject de hele duiding laten weigeren.
+
+**B36 — de samenvatting mag uitleggen.** De prompt vraagt nu "wat verandert er of wat is er
+gemeten, voor wie, per wanneer"; een getal is niet nodig, ook de uitleg van een bestaande regel
+telt. Null blijft voor een fragment zonder inhoud (kop, menu, documenttitels). Alle verboden
+blijven; de Wft-regel is explicieter ("je zou …", "overweeg …" verboden). **De tekstpoort G1–G6
+is ongewijzigd.**
+
+**Omhulsel-herstel.** De proefrun (32 echte rijen, drie rondes) liet zien dat de json-tool
+soms een schema-echo teruggeeft (`{"$PARAMETER_NAME": {…}}` of een losse `"$schema"`-sleutel).
+`herstelParameterOmhulsel` (via `experimental_repairText`) haalt uitsluitend `$`-sleutels weg;
+het resultaat gaat opnieuw door zod en `controleerDuiding`.
+
+**Gevolg bij deploy.** De bump zet alle v2-rijen (`geduid`/`afgewezen`) terug op `wacht`;
+`teruggetrokken` blijft staan. De selectie leest nieuwste eerst (`fetched_at desc`). Meting:
+"met thema" per week op /beheer/nieuws; de uitgeklapte duiding toont de thema's met citaat.
+Geen migratie (jsonb), geen nieuwe route; het pad blijft `getModel(service, 'nieuws_duiding')`
+met kill-switch en token-logging.

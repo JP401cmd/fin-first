@@ -152,10 +152,14 @@ const META = {
   kopBron: 'bron',
   modeltekst: false,
   poort: { status: 'groen', reden: null },
+  themasGeweigerd: 0,
 } as const
 
-function duiding(d: Omit<DuidingV1, 'versie' | 'meta' | 'grond'> & { grond?: Record<string, string> }): DuidingV1 {
-  return { versie: DUIDING_VERSIE, grond: {}, meta: META, ...d }
+/** Fixtures van vóór v3 hebben geen thema's: die lopen via een lege lijst (gedrag ongewijzigd). */
+function duiding(
+  d: Omit<DuidingV1, 'versie' | 'meta' | 'grond' | 'themas'> & { grond?: Record<string, string>; themas?: DuidingV1['themas'] },
+): DuidingV1 {
+  return { versie: DUIDING_VERSIE, grond: {}, themas: [], meta: META, ...d }
 }
 
 interface ArtikelOpties {

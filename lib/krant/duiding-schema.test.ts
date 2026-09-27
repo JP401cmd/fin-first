@@ -73,6 +73,7 @@ describe('duidingV1Schema — het leescontract voor 1B', () => {
     kopBron: 'bron',
     modeltekst: false,
     poort: { status: 'groen', reden: null },
+    themasGeweigerd: 0,
   }
   const opgeslagen = {
     ...GELDIGE_UITVOER,
@@ -86,6 +87,25 @@ describe('duidingV1Schema — het leescontract voor 1B', () => {
     expect(duidingV1Schema.safeParse({ ...opgeslagen, samenvatting: null }).success).toBe(true)
     expect(duidingV1Schema.safeParse({ ...opgeslagen, versie: DUIDING_VERSIE + 1 }).success).toBe(false)
     expect(duidingV1Schema.safeParse({ ...opgeslagen, meta: { ...meta, dagen: 3 } }).success).toBe(false)
+  })
+
+  it("v3: thema's uit de gesloten lijst, hoogstens vier, citaat hoogstens 200 tekens", () => {
+    const thema = { thema: 'huur', citaat: 'De huurverhoging wordt 4 procent' }
+    expect(duidingV1Schema.safeParse({ ...opgeslagen, themas: [thema] }).success).toBe(true)
+    expect(duidingV1Schema.safeParse({ ...opgeslagen, themas: [{ ...thema, thema: 'erfbelasting' }] }).success).toBe(false)
+    expect(duidingV1Schema.safeParse({ ...opgeslagen, themas: Array(5).fill(thema) }).success).toBe(false)
+    expect(duidingV1Schema.safeParse({ ...opgeslagen, themas: [{ ...thema, citaat: 'x'.repeat(201) }] }).success).toBe(false)
+    // v2-rijen (zonder themas of themasGeweigerd) parsen niet: de bump duidt ze opnieuw.
+    const zonderThemas: Record<string, unknown> = { ...opgeslagen }
+    delete zonderThemas.themas
+    expect(duidingV1Schema.safeParse({ ...zonderThemas, versie: 2 }).success).toBe(false)
+    expect(duidingV1Schema.safeParse({ ...opgeslagen, meta: { ...meta, themasGeweigerd: -1 } }).success).toBe(false)
+  })
+
+  it('het modelschema is ruimer dan het leescontract: een te lang citaat of te veel thema’s is geen schemabreuk (B35)', () => {
+    const thema = { thema: 'huur', citaat: 'x'.repeat(300) }
+    expect(duidingModelSchema.safeParse({ ...GELDIGE_UITVOER, themas: Array(6).fill(thema) }).success).toBe(true)
+    expect(duidingModelSchema.safeParse({ ...GELDIGE_UITVOER, themas: [{ thema: 'onbekend', citaat: 'x' }] }).success).toBe(false)
   })
 
   it('v1-rijen parsen niet meer: de versie-bump duidt ze opnieuw in plaats van ze te vertrouwen', () => {

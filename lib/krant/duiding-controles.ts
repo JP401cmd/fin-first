@@ -43,6 +43,18 @@
 //     0080). Een mechanisme degradeert dus NIET mee met de tekstpoort en
 //     andersom.
 //
+//  D. THEMA'S (v3, B35) — LOS van alles hierboven, en per thema: een thema
+//     blijft staan als (a) het citaat letterlijk (genormaliseerd) in de
+//     grondslag staat én (b) het citaat een trefwoord van DÁT thema bevat
+//     (`lib/krant/themas.ts`). Anders valt alleen dat thema weg en telt
+//     `meta.themasGeweigerd` één op. Een thema wijst NOOIT de duiding af — dat
+//     is precies het verschil met de doelgroep (A.4): een lege doelgroep
+//     verbreedt het bereik naar iedereen, een weggevallen thema maakt een
+//     artikel alleen minder persoonlijk. Ontdubbeld op thema-id, hoogstens
+//     THEMA_MAX, citaat hoogstens THEMA_CITAAT_MAX tekens en minstens
+//     THEMA_CITAAT_MIN tekens en THEMA_CITAAT_MIN_WOORDEN woorden (een los
+//     woord staat ook in een menu en bewijst niets over het onderwerp).
+//
 // Levert het model zelf `samenvatting: null` (mag, B27), dan is de poort GROEN
 // met reden null: dat is een keuze, geen degradatie.
 //
@@ -76,6 +88,7 @@ import {
   normaliseerVoorLexicon,
 } from './doelgroep-lexicon'
 import { MECHANISMEN, JAAR_MIN, JAAR_MAX } from './mechanismen'
+import { THEMAS, THEMA_CITAAT_MAX, THEMA_CITAAT_MIN, THEMA_CITAAT_MIN_WOORDEN, THEMA_MAX } from './themas'
 import {
   duidingModelSchema,
   DUIDING_VERSIE,
@@ -83,6 +96,7 @@ import {
   type DuidingMeta,
   type DuidingMetaZonderPoort,
   type DuidingModelUitvoer,
+  type DuidingThema,
   type DuidingV1,
   type Poort,
   type PublishedBron,
@@ -138,6 +152,11 @@ const VERWIJZING = /https?:\/\/|www\.|@/i
  */
 const META_PATRONEN: readonly RegExp[] = [
   /\b(de|deze)\s+(tekst|pagina|webpagina|bron)\b/i,
+  // "het fragment" is het woord dat de prompt zelf gebruikt; sinds B36 (uitleg
+  // mag, 27 sep 2026) glipte het in de proefrun van Krant 1G door als
+  // "Het fragment noemt geen ingangsdatum" (1 van 12). Geen samenvatting over
+  // een regel noemt ooit "het fragment" — dus geen vals-positief-risico.
+  /\b(het|dit)\s+fragment\b/i,
   /\bnavigatie\b/i,
   /\bbevat geen\b/i,
   /\bgeen concrete\b/i,
@@ -195,7 +214,7 @@ function datumFout(iso: string, veld: 'ingangsdatum' | 'deadline', grondslag: Gr
  * één van meerdere; `bevat` = alleen op een meerkeuzeveld; `minstens`/
  * `hoogstens` = alleen op een geordend veld (band of jaartal).
  */
-const TOEGESTANE_OPS: Record<(typeof DOELGROEP_SLEUTELS)[DoelgroepSleutel]['soort'], readonly DoelgroepOp[]> = {
+export const TOEGESTANE_OPS: Record<(typeof DOELGROEP_SLEUTELS)[DoelgroepSleutel]['soort'], readonly DoelgroepOp[]> = {
   jaartal: ['is', 'minstens', 'hoogstens'],
   keuze: ['is', 'in'],
   meerkeuze: ['bevat', 'in'],
@@ -373,6 +392,42 @@ function mechanismeFout(uitvoer: DuidingModelUitvoer, brontekst: string, grondsl
   return null
 }
 
+// ── Thema's (v3, B35) ────────────────────────────────────────────────────────
+
+/**
+ * De gegronde thema's, in modelvolgorde, plus hoeveel er afvielen. Een thema
+ * blijft staan als het citaat (genormaliseerd zoals de mechanisme-citaten)
+ * een deelstring van de grondslag is én een trefwoord van dát thema bevat.
+ * Een dubbel thema-id telt niet als geweigerd (het is hetzelfde label); wat
+ * boven THEMA_MAX uitkomt wel.
+ */
+export function grondThemas(
+  themas: DuidingModelUitvoer['themas'],
+  brontekst: string,
+): { themas: DuidingThema[]; geweigerd: number } {
+  const bron = normaliseerTekst(brontekst)
+  const gehouden: DuidingThema[] = []
+  const gezien = new Set<string>()
+  let geweigerd = 0
+  for (const t of themas) {
+    if (gezien.has(t.thema)) continue
+    const citaat = normaliseerTekst(t.citaat)
+    const gegrond =
+      t.citaat.length <= THEMA_CITAAT_MAX &&
+      citaat.length >= THEMA_CITAAT_MIN &&
+      citaat.split(' ').filter(Boolean).length >= THEMA_CITAAT_MIN_WOORDEN &&
+      bron.includes(citaat) &&
+      THEMAS[t.thema].trefwoorden.some((w) => citaat.includes(normaliseerTekst(w)))
+    if (!gegrond || gehouden.length >= THEMA_MAX) {
+      geweigerd++
+      continue
+    }
+    gezien.add(t.thema)
+    gehouden.push({ thema: t.thema, citaat: t.citaat })
+  }
+  return { themas: gehouden, geweigerd }
+}
+
 /**
  * Toets de modeluitvoer tegen de grondslag en lever de opgeslagen vorm op.
  *
@@ -441,7 +496,10 @@ export function controleerDuiding(
     }
   }
 
-  const volledigeMeta: DuidingMeta = { ...meta, poort }
+  // ── D. Thema's (los, per thema) ────────────────────────────────────
+  const { themas, geweigerd: themasGeweigerd } = grondThemas(d.themas, bron.tekst)
+
+  const volledigeMeta: DuidingMeta = { ...meta, poort, themasGeweigerd }
   return {
     ok: true,
     fout: mFout,
@@ -454,6 +512,7 @@ export function controleerDuiding(
       mechanisme,
       samenvatting,
       grond,
+      themas,
       meta: volledigeMeta,
     },
   }

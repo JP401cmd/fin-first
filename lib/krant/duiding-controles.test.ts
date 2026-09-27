@@ -45,8 +45,9 @@ describe('controleerDuiding — schema en doelgroep (hard afgewezen)', () => {
     expect(r.ok).toBe(true)
     if (!r.ok) return
     expect(r.fout).toBeNull()
-    expect(r.duiding.versie).toBe(2)
-    expect(r.duiding.meta).toEqual({ ...META, poort: { status: 'groen', reden: null } })
+    expect(r.duiding.versie).toBe(3)
+    expect(r.duiding.meta).toEqual({ ...META, poort: { status: 'groen', reden: null }, themasGeweigerd: 0 })
+    expect(r.duiding.themas).toEqual([])
     expect(r.duiding.samenvatting).toBe(GELDIGE_UITVOER.samenvatting)
     expect(r.duiding.grond).toEqual({ jaar: 'stijgt in 2027 naar € 60.000', heffingsvrij_single: 'stijgt in 2027 naar € 60.000' })
     expect(r.duiding.mechanisme?.soort).toBe('box3-parameter')
@@ -245,6 +246,17 @@ describe('de tekstpoort (B26) — de rij blijft geduid, de samenvatting vervalt'
     ]) {
       expect(poort({ ...GELDIGE_UITVOER, samenvatting: zin })?.reden, zin).toBe(POORT_CODE.meta)
     }
+  })
+
+  it('G3: "het fragment" is meta (proefrun Krant 1G, 27 sep 2026) — een gewone zin met "fragment" niet', () => {
+    for (const zin of [
+      'Het vermogen in box 3 wordt anders belast. Het fragment noemt geen ingangsdatum.',
+      'Dit fragment gaat over het vermogen in box 3 en de nieuwe heffing.',
+    ]) {
+      expect(poort({ ...GELDIGE_UITVOER, samenvatting: zin })?.reden, zin).toBe(POORT_CODE.meta)
+    }
+    const gewoon = 'Het vermogen in box 3 wordt voortaan belast op het werkelijke rendement, ook over een klein fragmentarisch deel.'
+    expect(poort({ ...GELDIGE_UITVOER, samenvatting: gewoon })?.reden ?? null, gewoon).not.toBe(POORT_CODE.meta)
   })
 
   // De twee `aankondiging`-patronen zijn ONGEMETEN t.o.v. de 58 samenvattingen
@@ -524,5 +536,126 @@ describe('controleerDuiding — mechanisme (keuze 7: geduid zonder mechanisme)',
     )
     expect(r.ok && r.fout).toBeNull()
     expect(r.ok && r.duiding.mechanisme).toEqual({ soort: 'inflatie-cijfer', params: {}, drempel: null })
+  })
+})
+
+describe("thema's (v3, B35) — een fout thema kost één label, nooit de duiding", () => {
+  const HUURBRON =
+    'Huurverhoging sociale huur in 2027 begrensd. De maximale huurverhoging voor woningcorporaties wordt 4 procent. ' +
+    'Ook de huurtoeslag gaat omhoog.'
+  const met = (themas: DuidingModelUitvoer['themas'], extra: Partial<DuidingModelUitvoer> = {}): DuidingModelUitvoer => ({
+    ...GELDIGE_UITVOER,
+    ingangsdatum: null,
+    doelgroep: [],
+    mechanisme: null,
+    grond: [],
+    samenvatting: null,
+    themas,
+    ...extra,
+  })
+
+  it('houdt een thema met een letterlijk citaat dat een trefwoord van dát thema bevat', () => {
+    const r = controleerDuiding(met([{ thema: 'huur', citaat: 'De maximale huurverhoging voor woningcorporaties wordt 4 procent' }]), bron(HUURBRON), META)
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.duiding.themas).toEqual([{ thema: 'huur', citaat: 'De maximale huurverhoging voor woningcorporaties wordt 4 procent' }])
+    expect(r.duiding.meta.themasGeweigerd).toBe(0)
+  })
+
+  it('normaliseert hoofdletters, witruimte en aanhalingstekens zoals bij de mechanisme-citaten', () => {
+    const r = controleerDuiding(met([{ thema: 'toeslagen', citaat: '"ook  de HUURTOESLAG gaat omhoog"' }]), bron(HUURBRON), META)
+    expect(r.ok && r.duiding.themas.map((t) => t.thema)).toEqual(['toeslagen'])
+  })
+
+  it('weigert alleen het thema waarvan het citaat niet in de bron staat — de rest blijft', () => {
+    const r = controleerDuiding(
+      met([
+        { thema: 'huur', citaat: 'Huurverhoging sociale huur in 2027 begrensd' },
+        { thema: 'eigen-woning', citaat: 'De hypotheekrenteaftrek wordt beperkt' },
+      ]),
+      bron(HUURBRON),
+      META,
+    )
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.duiding.themas.map((t) => t.thema)).toEqual(['huur'])
+    expect(r.duiding.meta.themasGeweigerd).toBe(1)
+  })
+
+  it('weigert een thema waarvan het (echte) citaat geen trefwoord van dat thema bevat', () => {
+    // Het citaat staat letterlijk in de bron, maar gaat over huur, niet over beleggen.
+    const r = controleerDuiding(met([{ thema: 'beleggen', citaat: 'Huurverhoging sociale huur in 2027 begrensd' }]), bron(HUURBRON), META)
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.duiding.themas).toEqual([])
+    expect(r.duiding.meta.themasGeweigerd).toBe(1)
+  })
+
+  it('weigert een los woord als citaat, ook als het letterlijk in de bron staat (eindreview 1G, M3)', () => {
+    // "huur" staat in de bron en is een trefwoord van het thema — maar een los
+    // woord staat ook in een menu en bewijst niet dat het fragment erover gaat.
+    for (const citaat of ['huur', 'sociale huur']) {
+      const r = controleerDuiding(met([{ thema: 'huur', citaat }]), bron(HUURBRON), META)
+      expect(r.ok, citaat).toBe(true)
+      if (!r.ok) continue
+      expect(r.duiding.themas, citaat).toEqual([])
+      expect(r.duiding.meta.themasGeweigerd, citaat).toBe(1)
+    }
+  })
+
+  it('wijst nooit af om thema’s: ook als alle thema’s vallen, blijven samenvatting, doelgroep en mechanisme staan', () => {
+    const r = controleerDuiding(
+      { ...GELDIGE_UITVOER, themas: [{ thema: 'huur', citaat: 'staat nergens' }, { thema: 'aow', citaat: 'ook niet' }] },
+      bron(),
+      META,
+    )
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.duiding.samenvatting).toBe(GELDIGE_UITVOER.samenvatting)
+    expect(r.duiding.doelgroep).toEqual(GELDIGE_UITVOER.doelgroep)
+    expect(r.duiding.mechanisme?.soort).toBe('box3-parameter')
+    expect(r.duiding.themas).toEqual([])
+    expect(r.duiding.meta.themasGeweigerd).toBe(2)
+  })
+
+  it('ontdubbelt op thema-id (een dubbel telt niet als geweigerd) en kapt op vier', () => {
+    // Citaten zijn zinsdelen van ≥ 3 woorden en ≥ 20 tekens (M3): een los woord telt niet.
+    const BRED =
+      'De heffing in box 3 verandert. De huur in de sociale sector stijgt. De AOW-leeftijd gaat omhoog. ' +
+      'Het nieuwe pensioenstelsel start later. De zorgtoeslag wordt lager voor hogere inkomens.'
+    const r = controleerDuiding(
+      met([
+        { thema: 'box3-vermogen', citaat: 'De heffing in box 3 verandert' },
+        { thema: 'box3-vermogen', citaat: 'De heffing in box 3 verandert' },
+        { thema: 'huur', citaat: 'De huur in de sociale sector stijgt' },
+        { thema: 'aow', citaat: 'De AOW-leeftijd gaat omhoog' },
+        { thema: 'pensioenopbouw', citaat: 'Het nieuwe pensioenstelsel start later' },
+        { thema: 'toeslagen', citaat: 'De zorgtoeslag wordt lager voor hogere inkomens' },
+      ]),
+      bron(BRED),
+      META,
+    )
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.duiding.themas.map((t) => t.thema)).toEqual(['box3-vermogen', 'huur', 'aow', 'pensioenopbouw'])
+    expect(r.duiding.meta.themasGeweigerd).toBe(1)
+  })
+
+  it('weigert een citaat boven de 200 tekens, ook als het letterlijk in de bron staat', () => {
+    const lang = `De huurverhoging ${'wordt echt heel lang uitgelegd '.repeat(8)}`.trim()
+    const r = controleerDuiding(met([{ thema: 'huur', citaat: lang }]), bron(`${lang}. Einde.`), META)
+    expect(r.ok && r.duiding.themas).toEqual([])
+    expect(r.ok && r.duiding.meta.themasGeweigerd).toBe(1)
+  })
+
+  it('laat de doelgroep-afwijzing onverkort staan: een gegrond thema redt een ongegronde doelgroepregel niet', () => {
+    const r = controleerDuiding(
+      met([{ thema: 'huur', citaat: 'Huurverhoging sociale huur in 2027 begrensd' }], {
+        doelgroep: [{ veld: 'werk', op: 'bevat', waarden: ['zelfstandig'] }],
+      }),
+      bron(HUURBRON),
+      META,
+    )
+    expect(r).toEqual({ ok: false, code: 'doelgroep:ongegrond:werk' })
   })
 })

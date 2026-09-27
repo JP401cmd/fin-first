@@ -47,6 +47,7 @@ import { classifyProviderError } from '@/lib/ai/provider-error'
 import { DOELGROEP_SLEUTELS, DOELGROEP_SLEUTEL_LIJST } from './profiel-velden'
 import { MECHANISMEN, MECHANISME_IDS } from './mechanismen'
 import { DREMPEL_SLEUTELS } from './drempels'
+import { THEMAS, THEMA_IDS, THEMA_CITAAT_MAX, THEMA_CITAAT_MIN_WOORDEN, THEMA_MAX } from './themas'
 import {
   duidingModelSchema,
   DUIDING_VERSIE,
@@ -209,6 +210,20 @@ export const LEGE_DUIDING_SUMMARY: DuidingSummary = { geduid: 0, afgewezen: 0, m
 //      verbiedt het model er zelf een te noemen (de bf458a7b-fout).
 // Het schema kent geen kopveld (G4): de prompt vraagt dus nergens om een kop,
 // titel of formulering. De catalogus-secties blijven gerenderd uit de code.
+//
+// v3 (27 sep 2026, B35/B36 · Krant 1G) — twee wijzigingen, gemeten op
+// productie (105 geduide artikelen: 1 met doelgroep, 7 met samenvatting):
+//   5. THEMA'S — een tweede, goedkope route naar "voor wie". De doelgroep
+//      blijft streng (één ongegronde regel = hele duiding weg), dus het model
+//      liet 'm leeg. Een thema kost bij een vergissing alleen zichzelf; de
+//      prompt zegt dat met zoveel woorden en verwijst er bij DOELGROEP naar.
+//   6. SAMENVATTING MAG UITLEGGEN — "de regel of het cijfer en het gevolg"
+//      las het model als "zonder getal: null". Nu: wat verandert of wat er
+//      gemeten is, voor wie, per wanneer; een getal is niet nodig. Null blijft
+//      voor een fragment zonder inhoud (kop, menu, documenttitels). Alle
+//      verboden blijven, en de Wft-regel (beschrijven, nooit adviseren) wordt
+//      explicieter nu er meer uitleg geschreven wordt: uitleg glijdt het
+//      makkelijkst in "je zou…". De tekstpoort G1–G6 is ongewijzigd.
 
 function renderDoelgroepVelden(): string {
   return DOELGROEP_SLEUTEL_LIJST.map((sleutel) => {
@@ -231,6 +246,10 @@ function renderMechanismen(): string {
   }).join('\n')
 }
 
+function renderThemas(): string {
+  return THEMA_IDS.map((id) => `- ${id} — ${THEMAS[id].omschrijving}`).join('\n')
+}
+
 export function buildDuidingSystemPrompt(): string {
   return `Je duidt één Nederlands nieuwsbericht over persoonlijke financiën naar een vaste set parameters. Je uitvoer is een gesloten schema; alles wat je niet zeker weet laat je leeg (null of een lege lijst). Je adviseert niet, je beschrijft.
 
@@ -242,12 +261,18 @@ GRONDSLAG: je krijgt één bronfragment — de kop van het bericht (de regel "Ti
 SOORT (precies één): ${DUIDING_SOORTEN.join(' · ')}.
 - besloten = door wet of besluit vastgesteld; voorstel = aangekondigd maar nog niet vastgesteld; verwachting = een prognose; cijfer = een gepubliceerd cijfer (inflatie, rente, index); marktbeweging = koersen en tarieven van banken of beurzen; achtergrond = uitleg zonder wijziging.
 
-INGANGSDATUM: alleen als het fragment een datum of jaar van ingang noemt (YYYY-MM-DD; een kaal jaar wordt 1 januari). Anders null.
+INGANGSDATUM: alleen als het fragment een datum of jaar van ingang noemt (YYYY-MM-DD; een kaal jaar wordt 1 januari). Anders null. Het gaat om de ingang van wat nu verandert of gaat veranderen; een datum waarop een bestaande regel lang geleden begon ("sinds 2018") is geen ingangsdatum.
 DEADLINE: alleen bij een termijn voor de lezer (${DEADLINE_SOORTEN.join(' · ')}), met de datum uit het fragment. Anders null.
 PUBLICATIEDATUM: die noem je nooit zelf — niet in een veld en niet in de samenvatting. Wanneer er "Datum: onbekend" staat, kennen wij de publicatiedatum niet en is elke datum die je erbij schrijft verzonnen.
 
-DOELGROEP: regels die samen bepalen wie dit raakt. Elke regel leest één profielveld met een operator (is · in · bevat · minstens · hoogstens) en waarden uit de vaste lijst hieronder. Alle regels moeten waar zijn. Een leeg lijstje betekent: algemeen nieuws voor iedereen — en dat is de goede keuze zodra het fragment de groep niet zelf noemt. Elke regel wordt tegen het fragment getoetst: een regel die er niet in terug te vinden is, laat de HELE duiding afwijzen, niet alleen die regel. Gokken kost dus alles, niet één veld. Gebruik uitsluitend deze velden en waarden:
+DOELGROEP: regels die samen bepalen wie dit raakt. Elke regel leest één profielveld met een operator (is · in · bevat · minstens · hoogstens) en waarden uit de vaste lijst hieronder. "is", "minstens" en "hoogstens" nemen precies één waarde; meerdere waarden als OF gaan met "in"; "bevat" en "in" zijn de operatoren voor een meerkeuzeveld; "minstens" en "hoogstens" alleen voor een band of jaartal. Alle regels moeten waar zijn. Een leeg lijstje betekent: algemeen nieuws voor iedereen — en dat is de goede keuze zodra het fragment de groep niet zelf noemt. Elke regel wordt tegen het fragment getoetst: een regel die er niet in terug te vinden is, laat de HELE duiding afwijzen, niet alleen die regel. Gokken kost dus alles, niet één veld. Twijfel je of een doelgroepregel zo in het fragment staat, laat de doelgroep dan leeg en geef een THEMA (hieronder): dat kost bij een vergissing alleen dat thema. Gebruik uitsluitend deze velden en waarden:
 ${renderDoelgroepVelden()}
+
+THEMA'S: waar het fragment over gaat, uit deze gesloten lijst — hoogstens ${THEMA_MAX}, en geen thema is een geldig antwoord.
+- Kies een thema alleen als het fragment er zelf over gaat, niet omdat het onderwerp ernaast ligt.
+- Geef per thema één kort citaat, letterlijk overgenomen uit het fragment (een zinsdeel van minstens ${THEMA_CITAAT_MIN_WOORDEN} woorden, hoogstens ${THEMA_CITAAT_MAX} tekens — nooit een los woord), waarin het thema zelf genoemd wordt. Kopieer één aaneengesloten stuk tekst teken voor teken: niets inkorten, niets samenvoegen uit twee zinnen, geen woord toevoegen.
+- Elk thema wordt apart tegen het fragment getoetst. Staat het citaat er niet letterlijk in, of noemt het het thema niet, dan vervalt alleen dat thema; de rest van je duiding blijft staan.
+${renderThemas()}
 
 MECHANISME: de weg waarlangs dit iemands geld raakt — precies één uit de catalogus, of null als geen enkel mechanisme past. Kies nooit een mechanisme "ongeveer". Catalogus:
 ${renderMechanismen()}
@@ -255,14 +280,17 @@ ${renderMechanismen()}
 - Een bestaande drempel (heffingsvrij vermogen, schijfgrens, NHG-grens …) noem je nooit als bedrag maar als sleutel in "drempel": ${DREMPEL_SLEUTELS.join(' · ')}. Staat de huidige waarde toevallig in het fragment, dan hoort die niet in params.
 - Voor elke numerieke param in params geef je in "grond" het letterlijke citaat (één zin of zinsdeel uit het fragment) waarin het getal staat. Zonder citaat wordt de param afgekeurd.
 
-SAMENVATTING: twee of drie zinnen over de regel of het cijfer en het gevolg — of null.
-- NULL IS EEN VOLWAARDIGE UITKOMST, geen falen. Draagt het fragment geen regel, geen cijfer en geen gevolg — bijvoorbeeld omdat je alleen een kop hebt — dan is null het goede antwoord. De lezer krijgt dan de kop van de bron met de link, en dat is een bruikbaar bericht. Schrijf nooit zinnen om dit veld te vullen.
+SAMENVATTING: één tot drie zinnen (samen hoogstens 500 tekens) over wat er verandert of wat er gemeten is, voor wie, en per wanneer — voor zover het fragment dat zegt. Of null.
+- Een getal is niet nodig. Uitleg van een regel, een plan of een maatregel — wat er verandert, wie het raakt, wanneer het ingaat — is een volwaardige samenvatting, ook zonder bedrag of percentage. Dat geldt ook voor een fragment dat een BESTAANDE regel uitlegt (wat het is, voor wie het geldt) zonder dat er iets verandert, en voor een gemeten cijfer of een raming. Bevat het fragment minstens één volledige zin met zo'n mededeling, schrijf de samenvatting dan.
+- Wat het fragment niet zegt, laat je weg — zonder te melden dát het ontbreekt.
+- NULL IS EEN VOLWAARDIGE UITKOMST, geen falen — en het goede antwoord wanneer het fragment geen inhoud draagt: alleen een kop, een menu of navigatie, een lijst documenttitels, of tekst zonder mededeling. De lezer krijgt dan de kop van de bron met de link, en dat is een bruikbaar bericht. Schrijf nooit zinnen om dit veld te vullen.
 - Half werk bestaat hier niet: een los woord of een halve zin ("Niets.", "Geen bijzonderheden") is geen samenvatting. Gebruik in dat geval null — dat is dezelfde boodschap, en alleen die route levert de lezer nog de kop met de link.
-- Schrijf over de REGEL, nooit over de bron waar je naar keek. Dus niet beschrijven wat er níét in staat ("bevat geen concrete bedragen", "er zijn geen tarieven genoemd"), niet verwijzen naar de tekst, de pagina, de bron of naar navigatie, de lezer niet naar de wettekst of een website sturen, en niet melden dát er iets is aangekondigd in plaats van wát er verandert. Heb je alleen zulke zinnen te schrijven, schrijf dan niets: geef null.
+- Schrijf over de REGEL, nooit over de bron waar je naar keek. Dus niet beschrijven wat er níét in staat ("bevat geen concrete bedragen", "er zijn geen tarieven genoemd"), niet verwijzen naar de tekst, het fragment, de pagina, de bron of naar navigatie ("het fragment noemt geen ingangsdatum" is dus fout), de lezer niet naar de wettekst of een website sturen, en niet melden dát er iets is aangekondigd in plaats van wát er verandert. Heb je alleen zulke zinnen te schrijven, schrijf dan niets: geef null.
 - Geen kop, geen titel, geen pakkende formulering — de kop boven het bericht komt van de bron, nooit van jou.
 - Noem alleen getallen die letterlijk in het fragment staan, met dezelfde eenheid als de bron gebruikt ("36 procent", niet kaal "36"; "€ 60.000", niet kaal "60.000").
 - Maak geen onderscheid dat het fragment zelf niet maakt (sociale versus vrije sector, zzp versus loondienst, met of zonder hypotheek): een kwalificatie die er niet staat, is verzonnen.
-- Geen aanbieders of productnamen, geen vergelijking tussen producten, geen gebiedende wijs (niet "vraag aan", wel "de aanvraag moet vóór … binnen zijn"), geen "sparen of beleggen", geen advies, geen aansporing.
+- Beschrijf, adviseer nooit. Geen aanbieders of productnamen, geen vergelijking tussen producten, geen gebiedende wijs (niet "vraag aan", wel "de aanvraag moet vóór … binnen zijn"), geen "sparen of beleggen", geen advies, geen aansporing — ook niet verpakt als "je zou …", "overweeg …", "het is verstandig om …" of "let op". Schrijf over de regel en wie hij raakt ("huurders betalen …", "wie AOW ontvangt, krijgt …"), niet tegen de lezer — ook niet als de bron zelf "u" of "je" zegt.
+- Een datum of jaar in de samenvatting ("per wanneer") komt uit het fragment, zoals elk getal. Neem hem over zoals het fragment hem schrijft; vul geen gebruikelijke ingangsdag of jaartal aan (de regel "een kaal jaar wordt 1 januari" geldt alleen voor het veld INGANGSDATUM, nooit voor de samenvatting).
 - Alleen euro's en percentages — nooit dagen, een dagtarief of "vrijheidstijd".
 - Nederlands, voor iedere lezer gelijk.
 
@@ -308,6 +336,47 @@ export function bepaalGrondslag(artikel: WachtendArtikel): { tekst: string; soor
   if (!kop && !fragment) return null
   const tekst = [kop, fragment].filter((t) => t.length > 0).join('\n\n').slice(0, GRONDSLAG_MAX_TEKENS)
   return { tekst, soort: fragment ? 'fragment' : 'kop' }
+}
+
+// ── Omhulsel-herstel ─────────────────────────────────────────────────────────
+
+/**
+ * Herstel twee bekende transportvormen van de json-tool, beide een echo van
+ * het JSON-schema in plaats van inhoud. Gezien in de proefrun van Krant 1G
+ * (27 sep 2026, 3 van ~110 calls, alle op hetzelfde artikel); zonder herstel
+ * werd zo'n artikel direct 'afgewezen' met code 'schema', terwijl de inhoud
+ * klopte:
+ *   1. het hele object onder één placeholder-sleutel:
+ *      `{"$PARAMETER_NAME": { …de duiding… }}`;
+ *   2. een losse `"$schema": "http://json-schema.org/…"` naast de velden.
+ *
+ * SMAL: alleen sleutels die met '$' beginnen worden aangeraakt — geen veld van
+ * `duidingModelSchema` doet dat. Het resultaat gaat daarna opnieuw door de
+ * zod-validatie van generateObject én door `controleerDuiding`: het contract
+ * wordt niet verruimd, alleen de verpakking weggehaald. Niets te herstellen:
+ * null (dan blijft de oorspronkelijke fout staan).
+ */
+export async function herstelParameterOmhulsel({ text }: { text: string }): Promise<string | null> {
+  let waarde: unknown
+  try {
+    waarde = JSON.parse(text)
+  } catch {
+    return null
+  }
+  const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
+  if (!isObject(waarde)) return null
+  let veranderd = false
+  const sleutels = Object.keys(waarde)
+  // 1. Eén $-sleutel met een object eronder: uitpakken.
+  if (sleutels.length === 1 && sleutels[0].startsWith('$') && isObject(waarde[sleutels[0]])) {
+    waarde = waarde[sleutels[0]]
+    veranderd = true
+  }
+  if (!isObject(waarde)) return null
+  // 2. Losse $-sleutels (schema-echo) op het hoogste niveau weglaten.
+  const schoon = Object.fromEntries(Object.entries(waarde).filter(([k]) => !k.startsWith('$')))
+  if (Object.keys(schoon).length !== Object.keys(waarde).length) veranderd = true
+  return veranderd && Object.keys(schoon).length > 0 ? JSON.stringify(schoon) : null
 }
 
 // ── Runner ───────────────────────────────────────────────────────────────────
@@ -380,6 +449,7 @@ async function duidEen(
       // blijft gesloten: generateObject valideert tegen zod en
       // controleerDuiding doet het daarna opnieuw, strikt.
       providerOptions: { anthropic: { structuredOutputMode: 'jsonTool' } },
+      experimental_repairText: herstelParameterOmhulsel,
     })
     uitvoer = object
   } catch (err) {

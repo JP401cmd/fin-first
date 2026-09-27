@@ -68,6 +68,9 @@ function modelUitvoer(f: BronFixture): unknown {
   return {
     ...rest,
     grond: Object.entries((grond ?? {}) as Record<string, string>).map(([param, citaat]) => ({ param, citaat })),
+    // Rijen van vóór v3 kenden geen thema's: een lege lijst, zodat deze gevallen
+    // precies de poort van toen blijven toetsen.
+    themas: [],
   }
 }
 

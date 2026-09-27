@@ -6,6 +6,7 @@ import {
   SCORE_DREMPEL,
   matchEditie,
   toetsRegel,
+  toetsThema,
   voldoetAanLeescontract,
   type KandidaatArtikel,
   type MatchContext,
@@ -13,6 +14,7 @@ import {
 import { LEEG_PROFIEL, type NieuwsprofielV1 } from './profiel'
 import { AOW_RIJEN, ARTIKELEN, NU, PROFIEL_DAAN, PROFIEL_TESSA, PROFIEL_WILLEM } from './editie.fixture'
 import { vindWftOvertreding } from './wft-woordenlijst'
+import type { DuidingV1 } from './duiding-schema'
 
 function context(opties: Partial<MatchContext> = {}): MatchContext {
   return {
@@ -252,7 +254,7 @@ describe('matcher — uitkomst', () => {
 
   it('draagt de matcher- en sjabloonversie en het profieltype, zonder id', () => {
     const u = matchEditie(PROFIEL_DAAN, ARTIKELEN, context())
-    expect(u.matcherVersie).toBe(2)
+    expect(u.matcherVersie).toBe(3)
     expect(u.sjabloonVersie).toBe(1)
     expect(u.profielType).toBe('onder-35·wonen-onbekend·alleen')
     expect(JSON.stringify(u)).not.toMatch(/user_id|userId/)
@@ -264,5 +266,59 @@ describe('matcher — uitkomst', () => {
     const c = matchEditie(PROFIEL_TESSA, [...ARTIKELEN].reverse(), context())
     expect(JSON.stringify(a)).toBe(JSON.stringify(b))
     expect(JSON.stringify(a)).toBe(JSON.stringify(c))
+  })
+})
+
+describe("matcher — thema's (v3, B35): persoonlijk maken, nooit uitsluiten", () => {
+  const RECENT = '2026-09-19T05:10:00Z'
+  function themaArtikel(themas: DuidingV1['themas'], category: string | null = 'wonen'): KandidaatArtikel {
+    const basis = fixture('a15-oud')
+    return { ...basis, id: 't1-huur', category, fetched_at: RECENT, published_at: RECENT, duiding: { ...basis.duiding!, themas } }
+  }
+  const HUUR: DuidingV1['themas'] = [{ thema: 'huur', citaat: 'De maximale huurverhoging wordt 4 procent' }]
+  const huurder: NieuwsprofielV1 = { ...LEEG_PROFIEL, wonen: 'huur-sociaal', rubrieken: ['wonen'] }
+  const koper: NieuwsprofielV1 = { ...LEEG_PROFIEL, wonen: 'koop-met-hypotheek', rubrieken: ['wonen'] }
+
+  it('toetsThema: OF over de regels, onbekend zonder ja, en iedereen telt niet als gericht', () => {
+    expect(toetsThema('huur', huurder)).toBe('ja')
+    expect(toetsThema('huur', koper)).toBe('nee')
+    expect(toetsThema('huur', LEEG_PROFIEL)).toBe('onbekend')
+    // aow: geboortejaar hoogstens 1970 OF werk bevat pensioen — één ja is genoeg.
+    expect(toetsThema('aow', { ...LEEG_PROFIEL, geboortejaar: 1990, werk: ['pensioen'] })).toBe('ja')
+    expect(toetsThema('aow', { ...LEEG_PROFIEL, geboortejaar: 1990 })).toBe('onbekend')
+    expect(toetsThema('aow', { ...LEEG_PROFIEL, geboortejaar: 1990, werk: ['loondienst'] })).toBe('nee')
+    expect(toetsThema('zorgkosten', huurder)).toBe('nee')
+  })
+
+  it('een thema dat het profiel raakt maakt een relevant artikel gericht: met rubriekbonus haalt het de drempel', () => {
+    const e = matchEditie(huurder, [themaArtikel(HUUR)], context())
+    expect(e.items).toHaveLength(1)
+    expect(e.items[0].score).toBe(SCORE_DREMPEL)
+    expect(e.items[0].waarom).toContain('thema:huur')
+  })
+
+  it('zonder thema scoort hetzelfde artikel algemeen en blijft onder de drempel (gedrag van vóór v3)', () => {
+    const e = matchEditie(huurder, [themaArtikel([])], context())
+    expect(e.items).toHaveLength(0)
+    expect(e.algemeen.items.map((i) => i.artikelId)).toEqual(['t1-huur'])
+  })
+
+  it('een thema sluit nooit uit: wie het thema niet raakt, ziet het artikel gewoon in het algemene katern', () => {
+    for (const p of [koper, LEEG_PROFIEL]) {
+      const e = matchEditie(p, [themaArtikel(HUUR)], context())
+      expect(e.items).toHaveLength(0)
+      expect(e.algemeen.items.map((i) => i.artikelId)).toEqual(['t1-huur'])
+    }
+  })
+
+  it("'iedereen' maakt niemand gericht", () => {
+    const e = matchEditie(huurder, [themaArtikel([{ thema: 'zorgkosten', citaat: 'Het eigen risico blijft gelijk' }])], context())
+    expect(e.items).toHaveLength(0)
+  })
+
+  it('is deterministisch: dezelfde invoer geeft byte-dezelfde editie', () => {
+    const een = JSON.stringify(matchEditie(huurder, [themaArtikel(HUUR)], context()))
+    const twee = JSON.stringify(matchEditie(huurder, [themaArtikel(HUUR)], context()))
+    expect(een).toBe(twee)
   })
 })

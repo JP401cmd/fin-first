@@ -46,6 +46,7 @@ import {
   type Poort,
 } from './duiding-schema'
 import { MECHANISMEN, MECHANISME_IDS, isMechanismeId, type MechanismeId } from './mechanismen'
+import { THEMAS, type ThemaId } from './themas'
 import type { NumericUnit } from '@/lib/nummer-grond'
 
 // ── Mutaties ─────────────────────────────────────────────────────────────────
@@ -145,6 +146,10 @@ export interface DuidingWeergave {
   tekens: number
   model: string
   poort: Poort
+  /** De gegronde thema's (v3, B35) met hun citaat uit de bron — zoals de grond-citaten bij de params. */
+  themas: Array<{ id: ThemaId; label: string; citaat: string }>
+  /** Hoeveel thema's van het model de gronding niet haalden. */
+  themasGeweigerd: number
 }
 
 export type DuidingWeergaveUitkomst = { ok: true; duiding: DuidingWeergave } | { ok: false }
@@ -192,6 +197,8 @@ export function duidingWeergave(ruw: unknown): DuidingWeergaveUitkomst | null {
       tekens: d.meta.tekens,
       model: d.meta.model,
       poort: d.meta.poort,
+      themas: d.themas.map((t) => ({ id: t.thema, label: THEMAS[t.thema].label, citaat: t.citaat })),
+      themasGeweigerd: d.meta.themasGeweigerd,
     },
   }
 }
@@ -203,7 +210,10 @@ export const METING_KOLOMMEN =
   'id, title, category, fetched_at, duiding_status, duiding_fout, teruggetrokken_reden, ' +
   'mechanisme:duiding->mechanisme->>soort, grondslag:duiding->meta->>grondslag, ' +
   'poort_status:duiding->meta->poort->>status, poort_reden:duiding->meta->poort->>reden, ' +
-  'kop_bron:duiding->meta->>kopBron, modeltekst:duiding->meta->>modeltekst'
+  'kop_bron:duiding->meta->>kopBron, modeltekst:duiding->meta->>modeltekst, ' +
+  // Alleen het EERSTE thema-id, nooit het citaat: "met thema" is een telling,
+  // en de meting leest geen tekst (route.test.ts bewaakt de kolomlijst).
+  'eerste_thema:duiding->themas->0->>thema'
 
 export interface MetingRij {
   id: string
@@ -225,6 +235,8 @@ export interface MetingRij {
   kop_bron: string | null
   /** `duiding->meta->>modeltekst` (G5) — hoort altijd 'false' te zijn; jsonb geeft 'm als string. */
   modeltekst: string | null
+  /** `duiding->themas->0->>thema` (v3) — gezet zodra de duiding minstens één gegrond thema heeft. */
+  eerste_thema?: string | null
 }
 
 /**
@@ -300,6 +312,8 @@ export interface WeekMeting {
    * modeltekst" is een belofte, en een belofte die niemand meet is een aanname.
    */
   metModeltekst: number
+  /** Geduid met minstens één gegrond thema (v3, B35) — de dekking van de tweede route naar "voor wie". */
+  metThema: number
   teruggetrokken: Record<TerugtrekReden, number>
   teruggetrokkenTotaal: number
   /** De poortmaat: teruggetrokken om een fout getal bij een rekenend mechanisme. */
@@ -336,6 +350,7 @@ function legeWeek(week: string): WeekMeting {
     poort: { groen: 0, gedegradeerd: 0, perReden: {} },
     kopNietVanBron: 0,
     metModeltekst: 0,
+    metThema: 0,
     teruggetrokken: { 'fout-getal': 0, 'verkeerde-doelgroep': 0, 'verkeerd-mechanisme': 0, anders: 0 },
     teruggetrokkenTotaal: 0,
     foutGetalRekenend: 0,
@@ -416,6 +431,7 @@ export function bouwDuidingMeting(rijen: readonly MetingRij[]): WeekMeting[] {
     if (isGrondslagSoort(r.grondslag)) w.perGrondslag[r.grondslag]++
     if (r.kop_bron !== null && r.kop_bron !== 'bron') w.kopNietVanBron++
     if (r.modeltekst !== null && r.modeltekst !== 'false') w.metModeltekst++
+    if (r.eerste_thema) w.metThema++
     if (r.poort_status === 'gedegradeerd') {
       w.poort.gedegradeerd++
       const reden = r.poort_reden ?? 'onbekend'

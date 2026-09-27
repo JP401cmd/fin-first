@@ -171,6 +171,9 @@ export function NewsDuidingMetingPanel({ ververs }: { ververs: number }) {
                   <th className="px-3 py-2.5 text-right font-medium">Geduid</th>
                   <th className="px-3 py-2.5 text-right font-medium">Dekking</th>
                   <th className="hidden px-3 py-2.5 text-right font-medium sm:table-cell">Rekenend</th>
+                  <th className="hidden px-3 py-2.5 text-right font-medium sm:table-cell" title="Geduid met minstens één gegrond thema (B35)">
+                    Met thema
+                  </th>
                   <th className="px-3 py-2.5 text-right font-medium" title="Samenvattingen die de tekstpoort niet haalden (G1–G3, G6)">
                     Poort
                   </th>
@@ -199,6 +202,9 @@ export function NewsDuidingMetingPanel({ ververs }: { ververs: number }) {
                         <td className="px-3 py-2 text-right text-[var(--ink-2)]">{w.geduid}</td>
                         <td className="px-3 py-2 text-right text-[var(--ink-2)]">{pct(w.dekking)}</td>
                         <td className="hidden px-3 py-2 text-right text-[var(--ink-3)] sm:table-cell">{w.rekenend}</td>
+                        <td className="hidden px-3 py-2 text-right text-[var(--ink-3)] sm:table-cell">
+                          {w.metThema}/{w.geduid}
+                        </td>
                         <td className="px-3 py-2 text-right text-[var(--ink-3)]">
                           {w.poort.gedegradeerd}/{w.poort.groen + w.poort.gedegradeerd}
                         </td>
@@ -241,7 +247,7 @@ export function NewsDuidingMetingPanel({ ververs }: { ververs: number }) {
                       </tr>
                       {isOpen && (
                         <tr>
-                          <td colSpan={12} className="bg-[var(--subtle)]/50 px-4 py-3 font-sans">
+                          <td colSpan={13} className="bg-[var(--subtle)]/50 px-4 py-3 font-sans">
                             <WeekDetail w={w} />
                           </td>
                         </tr>
