@@ -250,6 +250,33 @@ function ActionButton({
 }
 
 /**
+ * Eén tekstactie in de extra rij van een action-bar: onderstreept, compact, met een
+ * raakgebied van minstens 44px hoog. `href` wordt een Link, anders een knop; zonder
+ * `onClick` is de knop uitgeschakeld (zoals `ActionButton`).
+ */
+function ExtraAction({ action }: { action: BottomBarAction }) {
+  const klassen =
+    'tap-highlight inline-flex min-h-11 items-center font-sans text-[12px] font-semibold text-[var(--ink-2)] underline underline-offset-2 transition-colors hover:text-[var(--ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]'
+  if (action.href) {
+    return (
+      <Link href={action.href} className={klassen}>
+        {action.label}
+      </Link>
+    )
+  }
+  return (
+    <button
+      type="button"
+      onClick={action.onClick}
+      disabled={!action.onClick}
+      className={`${klassen} disabled:cursor-not-allowed disabled:no-underline disabled:opacity-50`}
+    >
+      {action.label}
+    </button>
+  )
+}
+
+/**
  * MobileBottomBar — slot-component binnen de tray-of-three. Plaatsing en
  * achtergrond komen van deze wrapper; de inhoud komt uit de juiste renderer
  * voor het gegeven `kind`.
@@ -301,6 +328,32 @@ export function MobileBottomBar({ config }: MobileBottomBarProps) {
   }
 
   if (kind === 'action-bar' && effectiveConfig?.kind === 'action-bar') {
+    const extra = effectiveConfig.extra ?? []
+    if (extra.length > 0) {
+      // Met extra acties: een compacte tekstrij boven de twee knoppen, binnen dezelfde
+      // bar (ADR 0179 D7 — één plek per actie). De knoppenrij houdt de gewone hoogte.
+      return (
+        <div
+          className={`${wrapperClasses} flex flex-col px-3 pb-[var(--safe-area-bottom)]`}
+          data-testid="shell-action-bar"
+        >
+          <div
+            role="group"
+            aria-label="Meer acties"
+            className="flex flex-wrap items-center gap-x-4"
+            data-testid="shell-action-bar-extra"
+          >
+            {extra.map((action, i) => (
+              <ExtraAction key={`${action.label}-${i}`} action={action} />
+            ))}
+          </div>
+          <div className="flex items-center gap-2" style={{ minHeight: 'var(--bottom-nav-height)' }}>
+            {effectiveConfig.secondary ? <ActionButton action={effectiveConfig.secondary} variant="secondary" /> : null}
+            <ActionButton action={effectiveConfig.primary} variant="primary" />
+          </div>
+        </div>
+      )
+    }
     return (
       <div
         className={`${wrapperClasses} flex items-center gap-2 px-3 pb-[var(--safe-area-bottom)]`}

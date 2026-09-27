@@ -17,7 +17,10 @@ export function UitgavenRijPane({
   open,
   onClose,
   snapshot,
+  title = 'Uitgave na pensioen',
 }: {
+  /** Schermtitel — gelijk aan het rijlabel. */
+  title?: string
   open: boolean
   onClose: () => void
   snapshot: RegelSimSnapshot | null
@@ -36,7 +39,7 @@ export function UitgavenRijPane({
       onClose={actions?.saving ? () => {} : onClose}
       kind="pane"
       mobileBackCloses
-      title="Uitgave na pensioen"
+      title={title}
       primaryAction={
         actions
           ? { label: 'Opslaan', onClick: actions.save, disabled: !actions.canSave, loading: actions.saving }

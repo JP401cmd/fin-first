@@ -64,7 +64,7 @@ export const STOP_ANCHOR_OPTIONS: ReadonlyArray<{
 }> = [
   {
     kind: 'solved',
-    name: 'Zo vroeg als het kan',
+    name: 'Zo vroeg mogelijk',
     subtitle: 'De app rekent uit vanaf welke leeftijd werken een keuze wordt.',
   },
   {

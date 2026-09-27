@@ -93,7 +93,7 @@ describe('EindstrategieBody — Geen tekort-lening in mijn plan', () => {
   })
 
   // B-050 (19 sep 2026, variant B): de ankervoorwaarde staat alleen bij een vast stopmoment.
-  it('"zo vroeg als het kan" (solved): geen ankervoorwaarde bij de instelling', async () => {
+  it('"zo vroeg mogelijk" (solved): geen ankervoorwaarde bij de instelling', async () => {
     renderBody()
     await screen.findByRole('switch', { name: /Geen tekort-lening in mijn plan/ })
     expect(screen.queryByTestId('geen-tekort-lening-vast-anker')).toBeNull()
@@ -110,7 +110,7 @@ describe('EindstrategieBody — Geen tekort-lening in mijn plan', () => {
     const caveat = screen.getByTestId('geen-tekort-lening-vast-anker')
     expect(caveat.textContent).toBe(GEEN_TEKORT_LENING_VAST_ANKER_UITLEG)
     expect(GEEN_TEKORT_LENING_VAST_ANKER_UITLEG).toMatch(/verschuift die leeftijd niet/)
-    expect(GEEN_TEKORT_LENING_VAST_ANKER_UITLEG).toMatch(/zo vroeg als het kan/)
+    expect(GEEN_TEKORT_LENING_VAST_ANKER_UITLEG).toMatch(/zo vroeg mogelijk/)
     // Beschrijvend (Wft): geen advies.
     expect(GEEN_TEKORT_LENING_VAST_ANKER_UITLEG).not.toMatch(/aanbevolen|past bij jou|kies voor|je moet/i)
   })

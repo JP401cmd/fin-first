@@ -53,7 +53,7 @@ export const GEEN_TEKORT_LENING_UITLEG =
 
 /**
  * B-050 (19 sep 2026) — de ankervoorwaarde bij "Geen tekort-lening in mijn plan".
- * De instelling werkt alleen op het GESOLVEDE stopmoment ("zo vroeg als het kan"):
+ * De instelling werkt alleen op het GESOLVEDE stopmoment ("zo vroeg mogelijk"):
  * daar zoekt de solver de vroegste leeftijd zonder blijvende tekort-lening. Onder een
  * vast anker (leeftijd/AOW/nu) verschuift de leeftijd niet en is de uitkomst met de
  * vlag aan of uit byte-identiek (kernel: `computeStatusBlok`, bewezen in
@@ -63,7 +63,7 @@ export const GEEN_TEKORT_LENING_UITLEG =
 export const GEEN_TEKORT_LENING_VAST_ANKER_UITLEG =
   'Let op: met een vast stopmoment (een gekozen leeftijd, je AOW-datum of nu) verschuift die ' +
   'leeftijd niet. De berekening kan dan alsnog een tekort-lening laten zien; deze instelling ' +
-  'verandert daar niets aan. Alleen bij ‘zo vroeg als het kan’ zoekt de app het stopmoment ' +
+  'verandert daar niets aan. Alleen bij ‘zo vroeg mogelijk’ zoekt de app het stopmoment ' +
   'waarop geen lening nodig is.'
 
 /**
@@ -360,11 +360,13 @@ export function EindstrategieBody({
         </label>
       </div>
 
-      {/* Live impact */}
-      <div className="mt-6">
-        <SubsectionLabel>Impact op je vrijheidspad</SubsectionLabel>
-        <LiveSimImpact baseline={baseline} draft={draftProj} />
-      </div>
+      {/* Live impact — A2: pas bij een verschil; tot dan draagt de footer het effect. */}
+      {changed && (
+        <div className="mt-6">
+          <SubsectionLabel>Impact op je vrijheidspad</SubsectionLabel>
+          <LiveSimImpact baseline={baseline} draft={draftProj} />
+        </div>
+      )}
     </div>
   )
 }

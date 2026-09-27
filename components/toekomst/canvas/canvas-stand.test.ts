@@ -2,16 +2,23 @@
  * De stand van het canvas per katern (ADR 0179 D3/D5, spec §4.5).
  *
  * Pint: de keuze van de gebruiker blijft staan bij een katernwissel; alleen vaste
- * lagen komen erbij en gaan weer weg; Instellingen is compact (alleen Vermogen, geen
- * Lagen, geen fasebalk, niet op mobiel); de aannamesregel en de fasebalk staan alleen
- * in Plan; Doelen buiten Vermogen zegt dat die modi het plan volgen.
+ * lagen komen erbij en gaan weer weg; Instellingen is compact (geen Lagen, geen
+ * fasebalk, niet op mobiel) en volgt sinds 27 sep de modus-keuze; de aannamesregel en de
+ * fasebalk staan alleen in Plan; Doelen buiten Vermogen zegt dat die modi het plan volgen;
+ * op desktop delen Plan en Doelen de maat van de canvas-rij (de harp is maatgevend).
  */
 import { describe, it, expect } from 'vitest'
 import { LAAG_VOLGORDE, LAGEN_EENVOUDIG, type LaagId } from '@/lib/horizon/katern-copy'
 import {
   COMPACTE_PLOTHOOGTE,
   DOELEN_PLOTHOOGTE_DESKTOP,
+  KOLOM_PLOTHOOGTE,
+  SAMENSTELLING_MOBIEL,
+  samenstellingPlotPassend,
+  samenstellingStartMobiel,
   doelenPlotHoogteMobiel,
+  klemKolomPlotHoogte,
+  kolomPlotHoogte,
   canvasStand,
   type CanvasBeschikbaarheid,
   type CanvasKeuze,
@@ -107,11 +114,22 @@ describe('canvasStand — Instellingen', () => {
   }
   const stand = canvasStand('instellingen', keuze, alles, VOLLEDIG)
 
-  it('tekent alleen Vermogen, zonder modus-switch en zonder Lagen-knop', () => {
-    expect(stand.modi).toEqual(['vermogen'])
-    expect(stand.modus).toBe('vermogen')
-    expect(stand.toonModusSwitch).toBe(false)
+  it('volgt de keuze van het canvas (27 sep: Samenstelling is de basis), mét modus-switch, zonder Lagen-knop', () => {
+    expect(stand.modi).toEqual(['vermogen', 'samenstelling', 'geldstroom'])
+    expect(stand.modus).toBe('samenstelling')
+    expect(stand.toonModusSwitch).toBe(true)
     expect(stand.toonLagenKnop).toBe(false)
+    expect(stand.beschikbaar).toEqual([])
+    for (const modus of ['vermogen', 'geldstroom'] as const) {
+      const s = canvasStand('instellingen', { ...keuze, modus }, alles, VOLLEDIG)
+      expect(s.modus).toBe(modus)
+      expect(s.toonLagenKnop).toBe(false)
+      expect(s.grafiekBron).toBe('plan')
+    }
+  })
+
+  it('heeft geen kolom naast de grafiek', () => {
+    expect(stand.kolom).toBeNull()
   })
 
   it('tekent alleen de hoofdlijn met de gebeurtenissen (vast)', () => {
@@ -132,8 +150,18 @@ describe('canvasStand — Instellingen', () => {
     expect(canvasStand('plan', standaard, alles, VOLLEDIG).plotHoogte).toBeNull()
   })
 
-  it('tekent alleen de hoofdlijn en heeft geen cijferbalk; Plan wel, Doelen wel de doellijnen', () => {
-    expect(stand.alleenHoofdlijn).toBe(true)
+  it('Samenstelling op desktop: dezelfde compacte hoogte; op mobiel (geen canvas) de eigen hoogte', () => {
+    expect(canvasStand('instellingen', keuze, alles, { eenvoudig: false, breed: true }).samenstellingHoogte).toBe(
+      COMPACTE_PLOTHOOGTE,
+    )
+    expect(stand.samenstellingHoogte).toBeNull()
+  })
+
+  it('in Vermogen alleen de hoofdlijn en geen cijferbalk; in de andere modi geen hoofdlijn-beperking; Plan wel, Doelen wel de doellijnen', () => {
+    const vermogen = canvasStand('instellingen', { ...keuze, modus: 'vermogen' }, alles, VOLLEDIG)
+    expect(vermogen.alleenHoofdlijn).toBe(true)
+    expect(vermogen.toonReadout).toBe(false)
+    expect(stand.alleenHoofdlijn).toBe(false)
     expect(stand.toonReadout).toBe(false)
     expect(canvasStand('plan', standaard, alles, VOLLEDIG).toonReadout).toBe(true)
     for (const katern of ['plan', 'doelen'] as const) {
@@ -251,10 +279,38 @@ describe('canvasStand — Doelen: grafiek en knoppen op één scherm (ADR 0179 D
     expect(canvasStand('doelen', k, b, { eenvoudig: false, viewportHoogte: 667 }).plotHoogte).toBe(170)
   })
 
-  it('desktop: de vaste Doelen-hoogte, lager dan de standaard 260', () => {
-    const s = canvasStand('doelen', k, b, { eenvoudig: false, breed: true, viewportHoogte: 720 })
-    expect(s.plotHoogte).toBe(DOELEN_PLOTHOOGTE_DESKTOP)
-    expect(DOELEN_PLOTHOOGTE_DESKTOP).toBeLessThan(260)
+  it('desktop: de maat van de canvas-rij — start zonder meting, anders de onthouden meting (geklemd)', () => {
+    const zonder = canvasStand('doelen', k, b, { eenvoudig: false, breed: true, viewportHoogte: 720 })
+    expect(zonder.plotHoogte).toBe(KOLOM_PLOTHOOGTE.start)
+    expect(zonder.samenstellingHoogte).toBe(KOLOM_PLOTHOOGTE.start)
+    expect(zonder.kolom).toBe('maatgevend')
+    const gemeten = canvasStand('doelen', k, b, { eenvoudig: false, breed: true, kolomPlotHoogte: 312 })
+    expect(gemeten.plotHoogte).toBe(312)
+    expect(canvasStand('doelen', k, b, { eenvoudig: false, breed: true, kolomPlotHoogte: 90 }).plotHoogte).toBe(
+      DOELEN_PLOTHOOGTE_DESKTOP,
+    )
+    expect(canvasStand('doelen', k, b, { eenvoudig: false, breed: true, kolomPlotHoogte: 900 }).plotHoogte).toBe(
+      KOLOM_PLOTHOOGTE.max,
+    )
+  })
+
+  it('Plan deelt de maat op desktop (de grafiek verspringt niet bij de wissel); mobiel de standaard', () => {
+    const w = { eenvoudig: false, breed: true, kolomPlotHoogte: 300 }
+    expect(canvasStand('plan', k, b, w).plotHoogte).toBe(canvasStand('doelen', k, b, w).plotHoogte)
+    expect(canvasStand('plan', k, b, w).kolom).toBe('volgend')
+    expect(canvasStand('plan', k, b, { eenvoudig: false, viewportHoogte: 800 }).plotHoogte).toBeNull()
+    expect(canvasStand('plan', k, b, { eenvoudig: false }).samenstellingHoogte).toBeNull()
+    // Mobiel Doelen: Samenstelling past in de Vermogen-cel (start = Vermogen-plot − marge,
+    // daarna gemeten). Desktop, Plan en Instellingen doen dat niet.
+    const m844 = canvasStand('doelen', k, b, { eenvoudig: false, viewportHoogte: 844 })
+    expect(m844.samenstellingPastInVermogen).toBe(true)
+    expect(m844.samenstellingHoogte).toBe(200 - SAMENSTELLING_MOBIEL.startMarge)
+    expect(canvasStand('doelen', k, b, { eenvoudig: false, viewportHoogte: 800 }).samenstellingHoogte).toBe(
+      192 - SAMENSTELLING_MOBIEL.startMarge,
+    )
+    expect(canvasStand('doelen', k, b, w).samenstellingPastInVermogen).toBe(false)
+    expect(canvasStand('plan', k, b, { eenvoudig: false }).samenstellingPastInVermogen).toBe(false)
+    expect(canvasStand('instellingen', k, b, { eenvoudig: false }).samenstellingPastInVermogen).toBe(false)
   })
 
   it('geen cijferbalk, geen tijdlijn, legenda op één regel; Plan houdt ze', () => {
@@ -287,5 +343,76 @@ describe('canvasStand — gedempte hoofdlijn (spec §4.5, fase 4 S5b)', () => {
     const b = { doelen: false, doelscenario: true, metHuis: false }
     expect(canvasStand('plan', metKeuze, b, { eenvoudig: false }).hoofdlijnGedempt).toBe(false)
     expect(canvasStand('instellingen', metKeuze, b, { eenvoudig: false }).hoofdlijnGedempt).toBe(false)
+  })
+})
+
+describe('kolomPlotHoogte — de harp is maatgevend (27 sep)', () => {
+  const { min, max, start } = KOLOM_PLOTHOOGTE
+
+  it('plot = kolomhoogte − chrome van de grafiekkolom (midden van de band)', () => {
+    // Grafiekkolom 400 bij plot 240 ⇒ chrome 160; kolom 460 ⇒ plot 300.
+    expect(kolomPlotHoogte({ kolomHoogte: 460, grafiekKolomHoogte: 400, huidigePlot: 240 })).toBe(300)
+  })
+
+  it('stabiel: na de volgende render levert dezelfde som dezelfde plot (geen feedback-lus)', () => {
+    const eerste = kolomPlotHoogte({ kolomHoogte: 460, grafiekKolomHoogte: 400, huidigePlot: 240 })!
+    // De grafiekkolom is nu chrome + nieuwe plot = de kolomhoogte.
+    expect(kolomPlotHoogte({ kolomHoogte: 460, grafiekKolomHoogte: 160 + eerste, huidigePlot: eerste })).toBe(eerste)
+  })
+
+  it('klemt op beide uiteinden: een lage kolom houdt het minimum, een hoge het maximum', () => {
+    expect(kolomPlotHoogte({ kolomHoogte: 200, grafiekKolomHoogte: 400, huidigePlot: 240 })).toBe(min)
+    expect(kolomPlotHoogte({ kolomHoogte: 160 + min, grafiekKolomHoogte: 400, huidigePlot: 240 })).toBe(min)
+    expect(kolomPlotHoogte({ kolomHoogte: 160 + max, grafiekKolomHoogte: 400, huidigePlot: 240 })).toBe(max)
+    expect(kolomPlotHoogte({ kolomHoogte: 2000, grafiekKolomHoogte: 400, huidigePlot: 240 })).toBe(max)
+  })
+
+  it('een onbruikbare meting (0, negatief, NaN) geeft null: de onthouden maat blijft staan', () => {
+    expect(kolomPlotHoogte({ kolomHoogte: 0, grafiekKolomHoogte: 400, huidigePlot: 240 })).toBeNull()
+    expect(kolomPlotHoogte({ kolomHoogte: 460, grafiekKolomHoogte: -1, huidigePlot: 240 })).toBeNull()
+    expect(kolomPlotHoogte({ kolomHoogte: 460, grafiekKolomHoogte: 400, huidigePlot: Number.NaN })).toBeNull()
+  })
+
+  it('klemKolomPlotHoogte: null/ongeldig ⇒ start; binnen de band afgerond; buiten de band geklemd', () => {
+    expect(klemKolomPlotHoogte(null)).toBe(start)
+    expect(klemKolomPlotHoogte(undefined)).toBe(start)
+    expect(klemKolomPlotHoogte(Number.POSITIVE_INFINITY)).toBe(start)
+    expect(klemKolomPlotHoogte(301.6)).toBe(302)
+    expect(klemKolomPlotHoogte(min - 1)).toBe(min)
+    expect(klemKolomPlotHoogte(max + 1)).toBe(max)
+    expect(start).toBeGreaterThanOrEqual(min)
+    expect(start).toBeLessThanOrEqual(max)
+  })
+})
+
+describe('samenstellingPlotPassend — Samenstelling past in de Vermogen-cel (mobiel Doelen, 27 sep)', () => {
+  const { min, maxBoven, startMarge } = SAMENSTELLING_MOBIEL
+
+  it('te hoog: krimpt met precies het overschot (gemeten 27 px boven Vermogen)', () => {
+    // Vermogen-laag 232 (plot 192 + band 40), Samenstelling 259 bij plot 180 ⇒ 153.
+    expect(samenstellingPlotPassend({ vermogenHoogte: 232, samenstellingHoogte: 259, huidigePlot: 180, vermogenPlot: 192 })).toBe(153)
+  })
+
+  it('te laag (lege strook): groeit met het tekort', () => {
+    expect(samenstellingPlotPassend({ vermogenHoogte: 240, samenstellingHoogte: 200, huidigePlot: 150, vermogenPlot: 200 })).toBe(190)
+  })
+
+  it('stabiel: bij gelijke hoogte blijft de plot staan (geen trilling bij een modus-wissel)', () => {
+    expect(samenstellingPlotPassend({ vermogenHoogte: 232, samenstellingHoogte: 232, huidigePlot: 153, vermogenPlot: 192 })).toBe(153)
+  })
+
+  it('klemt op beide uiteinden', () => {
+    expect(samenstellingPlotPassend({ vermogenHoogte: 100, samenstellingHoogte: 400, huidigePlot: 180, vermogenPlot: 192 })).toBe(min)
+    expect(samenstellingPlotPassend({ vermogenHoogte: 400, samenstellingHoogte: 100, huidigePlot: 180, vermogenPlot: 192 })).toBe(192 + maxBoven)
+  })
+
+  it('onbruikbare meting ⇒ null', () => {
+    expect(samenstellingPlotPassend({ vermogenHoogte: 0, samenstellingHoogte: 200, huidigePlot: 180, vermogenPlot: 192 })).toBeNull()
+    expect(samenstellingPlotPassend({ vermogenHoogte: 200, samenstellingHoogte: Number.NaN, huidigePlot: 180, vermogenPlot: 192 })).toBeNull()
+  })
+
+  it('startwaarde: Vermogen-plot − marge, nooit onder het minimum', () => {
+    expect(samenstellingStartMobiel(200)).toBe(200 - startMarge)
+    expect(samenstellingStartMobiel(min)).toBe(min)
   })
 })

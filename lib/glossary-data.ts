@@ -467,7 +467,7 @@ export const GLOSSARY_ENTRIES: Record<string, GlossaryEntry> = {
   },
   stopanker_solved: {
     // Zelfde woorden als de plan-vragen (lib/horizon/plan-draft.ts) — één taal op alle oppervlakken.
-    name: 'Zo vroeg als het kan',
+    name: 'Zo vroeg mogelijk',
     alternative: 'De app rekent je vroegste stopmoment uit',
     explanation:
       'De app rekent uit vanaf welke leeftijd werken een keuze wordt: de vroegste leeftijd waarop je vermogen je plan draagt. Dat is je vrijheidsleeftijd.',

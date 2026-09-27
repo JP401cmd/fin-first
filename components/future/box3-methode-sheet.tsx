@@ -26,6 +26,7 @@ export function Box3MethodeSheet({
   snapshot = null,
   open = true,
   onClose,
+  title = 'Voorkeur bewerken',
 }: {
   /** De nu opgeslagen methode (zoals `resolveFireParams` 'm leest). */
   current: Box3Method
@@ -35,6 +36,8 @@ export function Box3MethodeSheet({
   snapshot?: RegelSimSnapshot | null
   open?: boolean
   onClose: () => void
+  /** Schermtitel; katern Instellingen geeft het rijlabel mee ("Box 3"). */
+  title?: string
 }) {
   const [actions, setActions] = useState<RegelEditActionsState | null>(null)
   const router = useRouter()
@@ -58,7 +61,7 @@ export function Box3MethodeSheet({
       onClose={saving ? () => {} : onClose}
       kind="sheet"
       size="sm"
-      title="Voorkeur bewerken"
+      title={title}
       footer={
         <ModalFooter
           primary={{
@@ -67,7 +70,7 @@ export function Box3MethodeSheet({
             loading: saving,
             disabled: !(actions?.changed ?? false),
           }}
-          secondary={{ label: 'Annuleer', onClick: onClose }}
+          secondary={{ label: 'Annuleren', onClick: onClose }}
           info={actions?.footerInfo}
         />
       }

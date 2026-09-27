@@ -42,12 +42,14 @@ export interface LabOpslaanBalkProps {
   onReset: () => void
   /**
    * Waar de opslaan-actie staat (ADR 0179 D7). `inline` (standaard): alle knoppen in de balk.
-   * `shell`: de primaire actie (Vastleggen of Bijwerken) en zijn tweede knop staan in de
-   * action-bar van de mobiele shell (`labActieBar`); de balk toont dan alleen de statusregel
-   * en wat níét in die bar staat (Loslaten). Staat er niets op te slaan, dan is er geen bar
-   * en blijven de knoppen gewoon in de balk.
+   * `shell`: alle knoppen staan in de action-bar van de mobiele shell — de primaire actie
+   * (Vastleggen of Bijwerken) en zijn tweede knop (`labActieBar`), en Loslaten in de extra
+   * rij van die bar (één plek per actie, 27 sep). De balk toont dan alleen de statusregel.
+   * Staat er niets op te slaan, dan is er geen bar en blijven de knoppen gewoon in de balk.
    */
   acties?: 'inline' | 'shell'
+  /** Plaatsing van de balk (marge, breedte); standaard `mt-4` onder de knoppen. */
+  className?: string
 }
 
 /** De knoppen van de opslaan-actie in de shell-action-bar (mobiel). */
@@ -103,9 +105,10 @@ export function LabOpslaanBalk({
   onLoslaten,
   onReset,
   acties = 'inline',
+  className = 'mt-4',
 }: LabOpslaanBalkProps) {
   const datum = formatGezetOp(gezetOp)
-  // In de shell-stand staan primair en secundair in de action-bar; hier alleen de rest.
+  // In de shell-stand staan alle knoppen in de action-bar (ook Loslaten); hier dan alleen de status.
   const inBar = acties === 'shell' ? labActieBar(toestand, { vastleggenMogelijk, bijwerkenMogelijk }) : null
   const tekst =
     toestand === 'rust'
@@ -127,7 +130,7 @@ export function LabOpslaanBalk({
       role="status"
       aria-live="polite"
       data-testid="lab-opslaan-balk"
-      className={`mt-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border border-[var(--border-ed)] border-l-4 px-3 py-2 ${
+      className={`${className} flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border border-[var(--border-ed)] border-l-4 px-3 py-2 ${
         toestand === 'opgeslagen'
           ? 'border-l-positive'
           : toestand === 'rust' || toestand === 'nu-anker'
@@ -167,9 +170,11 @@ export function LabOpslaanBalk({
                 {LAB_COPY.opslaanActieHerstel}
               </button>
             )}
-            <button type="button" onClick={onLoslaten} disabled={busy} className={KNOP_STIL}>
-              {LAB_COPY.opslaanActieLoslaten}
-            </button>
+            {!inBar && (
+              <button type="button" onClick={onLoslaten} disabled={busy} className={KNOP_STIL}>
+                {LAB_COPY.opslaanActieLoslaten}
+              </button>
+            )}
           </>
         )}
         {toestand === 'opgeslagen' && (

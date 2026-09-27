@@ -7,7 +7,9 @@
  * Drie hosts, allemaal op dezelfde provider (de knopstanden blijven staan bij een
  * katernwissel; niets leest de route, D8):
  * - `DoelenKaternLab plek="kolom"` — rechts naast de grafiek in de canvas-rij, desktop
- *   (de layout rendert hem via `CanvasZijkolom`), knopvorm `knopWeergave.desktop`;
+ *   (de layout rendert hem via `CanvasZijkolom`), knopvorm `knopWeergave.desktop`; alleen
+ *   het lab. De acties staan daaronder over de volle breedte (`DoelenKaternLabActies`, via
+ *   `CanvasActierij`, 27 sep);
  * - `DoelenKaternLab plek="onder-koppen"` — direct onder de katern-koppen, mobiel
  *   (`lg:hidden`), knopvorm `knopWeergave.mobiel`, opslaan-actie in de shell-action-bar;
  * - `DoelenKaternLabSheets` — de drie sheets, precies één keer gemount (op de page).
@@ -18,7 +20,7 @@
  */
 
 import { useIsLgUp } from '@/lib/hooks/use-media-query'
-import { DoelenLab, type DoelenLabPlek } from '@/components/toekomst/doelen/doelen-lab'
+import { DoelenLab, DoelenLabActies, type DoelenLabPlek } from '@/components/toekomst/doelen/doelen-lab'
 import { DoelenLabSheets } from '@/components/toekomst/doelen/doelen-lab-sheets'
 import type { KnopBreekpunt } from '@/lib/horizon/toekomst-scenario'
 import {
@@ -114,6 +116,52 @@ export function DoelenKaternLab({ plek }: { plek: DoelenLabPlek }) {
         handleScenarioReset={handleScenarioReset}
       />
     </div>
+  )
+}
+
+/**
+ * De actierij van het lab op desktop (27 sep): stopmoment, plan-keuzes en de opslaan-balk,
+ * over de volle breedte onder grafiek en harp. De layout rendert hem via `CanvasActierij`;
+ * de canvas toont hem alleen vanaf `lg` (mobiel staan de acties bij het lab of in de bar).
+ */
+export function DoelenKaternLabActies() {
+  const { verkenSectieZichtbaar } = useToekomstPerspectiefContext()
+  const {
+    doelBlok,
+    setDoelSheetOpen,
+    doelSaving,
+    setDoelLoslatenOpen,
+    setStopPlanConfirmOpen,
+    stopPlanSaving,
+    setStopPlanError,
+    doelVastleggenMogelijk,
+    doelBijwerkenMogelijk,
+    effectiveStopAge,
+    planIsDezeStop,
+    handleScenarioReset,
+    labOpslaanToestand,
+    handleDoelHerstellen,
+  } = useToekomstScenarioContext()
+  const { simResult } = useToekomstSimContext()
+  if (!simResult) return null
+  return (
+    <DoelenLabActies
+      verkenSectieZichtbaar={verkenSectieZichtbaar}
+      planIsDezeStop={planIsDezeStop}
+      setStopPlanError={setStopPlanError}
+      setStopPlanConfirmOpen={setStopPlanConfirmOpen}
+      stopPlanSaving={stopPlanSaving}
+      effectiveStopAge={effectiveStopAge}
+      labOpslaanToestand={labOpslaanToestand}
+      doelBlok={doelBlok}
+      doelSaving={doelSaving}
+      doelVastleggenMogelijk={doelVastleggenMogelijk}
+      doelBijwerkenMogelijk={doelBijwerkenMogelijk}
+      setDoelSheetOpen={setDoelSheetOpen}
+      handleDoelHerstellen={handleDoelHerstellen}
+      setDoelLoslatenOpen={setDoelLoslatenOpen}
+      handleScenarioReset={handleScenarioReset}
+    />
   )
 }
 

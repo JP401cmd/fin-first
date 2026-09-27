@@ -2,7 +2,16 @@ import { describe, it, expect } from 'vitest'
 import type { LifeEvent } from '@/lib/horizon-data'
 import { POT_RULES_DEFAULTS } from '@/lib/pot-rules'
 import { RIJ_SLEUTELS } from './instellingen-rij'
-import { RIJ_LABEL, rijwaarde, rijwaardeTekst, type RijwaardenInput } from './instellingen-rijwaarden'
+import { freedomDaysToday } from '@/lib/horizon/vrijheidsdagen'
+import {
+  RIJ_LABEL,
+  rijStaat,
+  rijwaarde,
+  rijwaardeTekst,
+  sectieSamenvatting,
+  wizardIngangActie,
+  type RijwaardenInput,
+} from './instellingen-rijwaarden'
 
 const EUR = (n: number) => `€ ${n}`
 
@@ -20,8 +29,8 @@ const BASIS: RijwaardenInput = {
   housingStrategy: { mode: 'include_full' },
   inflationRate: 0.02,
   grossReturn: 0.05,
-  effectiveSwr: 0.034,
   box3Method: 'werkelijk',
+  dagtarief: 100,
 }
 
 const t = (rij: Parameters<typeof rijwaarde>[0], over: Partial<RijwaardenInput> = {}) =>
@@ -36,22 +45,23 @@ describe('rijwaarden van katern Instellingen', () => {
   })
 
   it('Stopmoment noemt de keuze, nooit een leeftijdsgetal onder een opgelost anker (§4.9)', () => {
-    expect(t('stopmoment')).toBe('zo vroeg als het kan')
+    expect(t('stopmoment')).toBe('zo vroeg mogelijk')
     expect(t('stopmoment')).not.toMatch(/\d/)
     expect(t('stopmoment', { firePlan: { ...BASIS.firePlan!, anchor: { kind: 'aow' } } })).toBe('op je AOW-leeftijd')
     expect(t('stopmoment', { firePlan: { ...BASIS.firePlan!, anchor: { kind: 'now' } } })).toBe('nu')
     expect(t('stopmoment', { firePlan: { ...BASIS.firePlan!, anchor: { kind: 'age', age: 58.5 } } })).toBe('op 58,5')
   })
 
-  it('eindleeftijd en wat er overblijft volgen de eind-vorm', () => {
-    expect(t('eindleeftijd')).toBe('tot je 90e · niets over')
+  it('Einde van je plan beantwoordt de vraag: tot welke leeftijd en wat er over is', () => {
+    expect(RIJ_LABEL.eindleeftijd).toBe('Einde van je plan')
+    expect(t('eindleeftijd')).toBe('tot 90 · € 0 over')
     expect(t('eindleeftijd', { firePlan: { ...BASIS.firePlan!, endForm: 'legacy', endAge: 95, legacyAmount: 300_000 } })).toBe(
-      'tot je 95e · € 300000 over',
+      'tot 95 · € 300000 over',
     )
-    expect(t('eindleeftijd', { firePlan: { ...BASIS.firePlan!, endForm: 'perpetual' } })).toBe('je vermogen mag niet slinken')
+    expect(t('eindleeftijd', { firePlan: { ...BASIS.firePlan!, endForm: 'perpetual' } })).toBe('vermogen blijft staan')
     // Zonder plan (oude bundel): de legacy-configuratie.
     expect(t('eindleeftijd', { firePlan: null, fireStrategy: { strategy: 'legacy', endAge: 85, legacyAmount: 1000 } })).toBe(
-      'tot je 85e · € 1000 over',
+      'tot 85 · € 1000 over',
     )
   })
 
@@ -68,12 +78,16 @@ describe('rijwaarden van katern Instellingen', () => {
     expect(t('verdeling-toename', { potRules: { ...POT_RULES_DEFAULTS, surplusGroup: 'schuld_aflossen' } })).toBe(
       'schulden aflossen',
     )
-    expect(t('onttrekkingsvolgorde')).toContain(' → ')
+    // De presetnaam uit dezelfde bron als de presetkiezer; een eigen volgorde als pijlen.
+    expect(t('onttrekkingsvolgorde')).toBe('Spaargeld eerst')
+    expect(
+      t('onttrekkingsvolgorde', { potRules: { ...POT_RULES_DEFAULTS, withdrawalOrderGroups: ['vastgoed', 'spaargeld', 'overig', 'pensioen', 'beleggingen'] } }),
+    ).toContain(' → ')
   })
 
   it('levensstrategieën uit de beheerde gebeurtenissen', () => {
     const ev = (e: Partial<LifeEvent>) => ({ is_active: true, target_age: null, metadata: null, ...e }) as LifeEvent
-    expect(t('aow')).toBe('niet op je tijdas')
+    expect(t('aow')).toBe('nog niet op je tijdas')
     expect(t('aow', { events: [ev({ event_type: 'aow', metadata: { leefsituatie: 'alleenstaand' } as never })] })).toBe(
       'wettelijke leeftijd · alleenstaand',
     )
@@ -111,5 +125,45 @@ describe('tekort-leningrente: de rente waar de kern mee rekent (review Y2)', () 
     expect(t('geen-tekort-lening', { geenTekortLening: false, tekortLeningRente: rente })).toBe(
       `uit · rente ${String(verwacht * 100).replace('.', ',')}${Number.isInteger(verwacht * 100) ? ',0' : ''}%`,
     )
+  })
+})
+
+describe('R1 — staat per rij, sectiesamenvatting en wizardknop', () => {
+  it('standaard alleen waar de app een eigen default heeft', () => {
+    expect(rijStaat('stopmoment', BASIS)).toBe('standaard')
+    expect(rijStaat('stopmoment', { ...BASIS, firePlan: { ...BASIS.firePlan!, anchor: { kind: 'aow' } } })).toBe('ingesteld')
+    expect(rijStaat('geen-tekort-lening', BASIS)).toBe('standaard')
+    expect(rijStaat('geen-tekort-lening', { ...BASIS, geenTekortLening: false })).toBe('ingesteld')
+    expect(rijStaat('verdeling-toename', { ...BASIS, potRules: { ...POT_RULES_DEFAULTS, surplusGroup: 'spaargeld' } })).toBe('ingesteld')
+    expect(rijStaat('inflatie', BASIS)).toBe('standaard')
+    expect(rijStaat('rendement', BASIS)).toBe('ingesteld') // 5% ≠ de default van de app
+    expect(rijStaat('box3', BASIS)).toBe('ingesteld')
+    expect(rijStaat('uitgave-na-pensioen', { ...BASIS, uitgaveNaPensioen: 0 })).toBe('ontbreekt')
+    expect(rijStaat('aow', BASIS)).toBe('ontbreekt')
+    expect(rijStaat('huis', { ...BASIS, housingStrategy: null })).toBe('standaard')
+  })
+
+  it('de samenvatting van sectie II telt de aangepaste regels', () => {
+    const potten = ['geen-tekort-lening', 'onttrekkingsvolgorde', 'verdeling-toename', 'onttrekking-afname'] as const
+    expect(sectieSamenvatting(potten, BASIS)).toBe('4 regels · alle standaard')
+    expect(sectieSamenvatting(potten, { ...BASIS, geenTekortLening: false })).toBe('4 regels · 1 aangepast')
+  })
+
+  it('de knop van de wizard-ingang volgt de stand (0 · deels · klaar)', () => {
+    expect(wizardIngangActie({ bevestigd: 0, voltooid: false })).toBe('Beginnen')
+    expect(wizardIngangActie({ bevestigd: 2, voltooid: false })).toBe('Verder')
+    expect(wizardIngangActie({ bevestigd: 5, voltooid: true })).toBe('Opnieuw doorlopen')
+  })
+
+  it('uitgave na pensioen: vrijheidstijd uit freedomDaysToday met het dagtarief uit de bundel', () => {
+    const [, bedrag] = rijwaarde('uitgave-na-pensioen', { ...BASIS, dagtarief: 90 })
+    expect(bedrag).toMatchObject({
+      bedrag: 31_500,
+      vrijheidsdagen: freedomDaysToday({ nominalAmount: 31_500, canonicalDailyRate: 90 }),
+    })
+    expect(typeof bedrag === 'object' && bedrag.vrijheidsdagen).toBe(350)
+    // Onbekende grondslag (ADR 0131): geen getal.
+    const [, zonder] = rijwaarde('uitgave-na-pensioen', { ...BASIS, dagtarief: 90, dagtariefBron: 'none' })
+    expect(typeof zonder === 'object' && zonder.vrijheidsdagen).toBeNull()
   })
 })

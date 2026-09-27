@@ -112,7 +112,11 @@ export function VoorkeurBewerkenBody({
   onSaved,
   onOngewijzigd,
 }: VoorkeurBewerkenBodyProps) {
-  const [value, setValue] = useState(String(currentValuePct))
+  // De opgeslagen fractie × 100 geeft float-ruis (0,07 × 100 = 7,000000000000001): rond af op
+  // twee decimalen vóór het veld, de vergelijking en de effect-run hem zien. Een number-input
+  // verwacht een punt als decimaalteken; de browser toont hem in de taal van de gebruiker.
+  const basisPct = Math.round(currentValuePct * 100) / 100
+  const [value, setValue] = useState(String(basisPct))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -128,11 +132,11 @@ export function VoorkeurBewerkenBody({
       ? `Vul een waarde tussen ${min}% en ${max}% in.`
       : null
   // Vergeleken met wat er opgeslagen staat (afgerond op de invoerstap, tegen float-ruis).
-  const changed = invoerFout == null && Math.abs(pctNu - currentValuePct) > 1e-9
+  const changed = invoerFout == null && Math.abs(pctNu - basisPct) > 1e-9
 
   // Kernel-runs pas zodra er iets gewijzigd is: zonder wijziging toont de footer geen effect.
   const deferredPct = useDeferredValue(pctNu)
-  const deferredChanged = Number.isFinite(deferredPct) && Math.abs(deferredPct - currentValuePct) > 1e-9
+  const deferredChanged = Number.isFinite(deferredPct) && Math.abs(deferredPct - basisPct) > 1e-9
   const baseline = useMemo(
     () => (snapshot && deferredChanged ? runRegelProjection(snapshot) : null),
     [snapshot, deferredChanged],
@@ -214,9 +218,13 @@ export function VoorkeurBewerkenBody({
 
   return (
     <form onSubmit={handleSubmit} className={kop === 'h2' ? 'p-5 sm:p-6' : ''}>
-      <Kop className="font-serif text-lg text-[var(--ink)] mb-4">
-        {title}
-      </Kop>
+      {/* In de sheet draagt de overlay-titel de naam al (`VoorkeurBewerkenSheet`); alleen in
+          de plan-review staat hij als kop in het scherm. */}
+      {kop !== 'h2' && (
+        <Kop className="font-serif text-lg text-[var(--ink)] mb-4">
+          {title}
+        </Kop>
+      )}
 
       {error && (
         <div

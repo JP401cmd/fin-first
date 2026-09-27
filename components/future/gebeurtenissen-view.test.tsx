@@ -103,6 +103,7 @@ function renderView(props: {
   kernelSim?: KernelSimData | null
   eventPaneData?: EventPaneData
   mode?: 'simple' | 'full'
+  compact?: boolean
 }) {
   const { strategieData, kernelSim, eventPaneData, mode, ...rest } = props
   return render(
@@ -273,7 +274,7 @@ describe('GebeurtenissenView — levensstrategieën zijn verhuisd naar Voorkeure
       events: [mockEvent({ event_type: 'aow', name: 'AOW', target_age: 67, target_date: null })],
     })
     fireEvent.click(screen.getByRole('button', { name: 'Open Beheerd via AOW-strategie' }))
-    expect(mockPush).toHaveBeenCalledWith('/toekomst/instellingen?rij=aow')
+    expect(mockPush).toHaveBeenCalledWith('/toekomst?rij=aow#levensstrategieen')
   })
 })
 
@@ -443,7 +444,7 @@ describe('GebeurtenissenView — kernel-afgeleide strategiemomenten (feature #87
     expect(screen.getByText(/Restschuld hypotheek/)).toBeTruthy()
     // Klik → Huis-strategie op Voorkeuren.
     fireEvent.click(row)
-    expect(mockPush).toHaveBeenCalledWith('/toekomst/instellingen?rij=huis')
+    expect(mockPush).toHaveBeenCalledWith('/toekomst?rij=huis#levensstrategieen')
   })
 
   it('telt de kernel-afgeleide verkooprij mee en toont de telling precies één keer', () => {
@@ -482,7 +483,7 @@ describe('GebeurtenissenView — kernel-afgeleide strategiemomenten (feature #87
     fireEvent.click(
       screen.getByRole('button', { name: 'Berekend: Opname opeethypotheek start' }),
     )
-    expect(mockPush).toHaveBeenCalledWith('/toekomst/instellingen?rij=huis')
+    expect(mockPush).toHaveBeenCalledWith('/toekomst?rij=huis#levensstrategieen')
   })
 
   it('pensioenpot-einde rendert bij eindige duur en navigeert naar de Pensioen-strategie', () => {
@@ -499,7 +500,7 @@ describe('GebeurtenissenView — kernel-afgeleide strategiemomenten (feature #87
     // Levenslange pot → geen einde-rij.
     expect(screen.queryByText('Bedrijfspensioen stopt')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Berekend: Lijfrente stopt' }))
-    expect(mockPush).toHaveBeenCalledWith('/toekomst/instellingen?rij=pensioen')
+    expect(mockPush).toHaveBeenCalledWith('/toekomst?rij=pensioen#levensstrategieen')
   })
 
   it('tekort-lening-rij opent de read-only uitleg-sheet met rente + voorkeuren-link', () => {
@@ -611,5 +612,38 @@ describe('GebeurtenissenView — kernel-afgeleide strategiemomenten (feature #87
     })
     expect(screen.queryByText('Berekend door je plan')).toBeNull()
     expect(container.querySelector('.animate-pulse')).toBeNull()
+  })
+})
+
+// ── Kolom-tijdlijn compact (27 sep) ──────────────────────────────────────────
+
+describe('GebeurtenissenView — compacte kolom naast de grafiek', () => {
+  it('één kopregel met het aantal en een kleine "+ Toevoegen"; geen grote knop', () => {
+    renderView({ events: [mockEvent()], compact: true, currentAge: 36 })
+    const kop = screen.getByRole('heading', { level: 2 })
+    expect(kop.textContent).toContain('Wat er in je leven gebeurt')
+    expect(kop.textContent).toContain('1 gebeurtenis')
+    expect(screen.getByRole('button', { name: 'Levensgebeurtenis toevoegen' }).textContent).toContain('Toevoegen')
+    expect(screen.queryByText('Levensgebeurtenis toevoegen')).toBeNull()
+    expect(screen.getByText('Nu · 36')).toBeTruthy()
+  })
+
+  it('per gebeurtenis twee regels zonder kaart: leeftijd · naam, dan het effect; dezelfde klik', () => {
+    renderView({
+      events: [mockEvent({ event_type: 'aow', name: 'AOW', target_age: 75, target_date: null, one_time_cost: 0, monthly_cost_change: 0, monthly_income_change: 1558 })],
+      compact: true,
+    })
+    const knop = screen.getByRole('button', { name: 'Open Beheerd via AOW-strategie' })
+    expect(knop.textContent).toMatch(/^75·AOW/)
+    expect(knop.textContent).toMatch(/\+€\s?1\.558\/mnd/)
+    expect(knop.querySelector('.rounded-2xl')).toBeNull()
+    fireEvent.click(knop)
+    expect(mockPush).toHaveBeenCalledWith('/toekomst?rij=aow#levensstrategieen')
+  })
+
+  it('zonder gebeurtenissen: een korte zin, de toevoegactie blijft in de kop', () => {
+    renderView({ events: [], compact: true })
+    expect(screen.getByText(/Nog geen gebeurtenissen/)).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Levensgebeurtenis toevoegen' })).toBeTruthy()
   })
 })

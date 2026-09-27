@@ -308,3 +308,23 @@ describe('detectDeficitLoanFromRows — meerdere aanhoudende episodes', () => {
     expect(detectDeficitLoanFromRows(rows, { endAge: 90 })!.terugkeerAge).toBeNull()
   })
 })
+
+describe('detectDeficitLoanFromRows — peakAge (verschilregel, 27 sep 2026)', () => {
+  it('draagt de rij-leeftijd van de piek, zodat de weergave de factor van díé rij neemt', () => {
+    const rows = [row(40), row(41), row(42, 5_000), row(43, 12_000), row(44, 8_000)]
+    expect(detectDeficitLoanFromRows(rows)).toMatchObject({ peak: 12_000, peakAge: 43 })
+  })
+
+  it('over meerdere aanhoudende episodes: de leeftijd hoort bij de hoogste piek', () => {
+    const rows = [
+      row(40, 9_000), row(41, 9_500), row(42, 9_000), row(43), // episode 1, piek 9.500 op 41
+      row(44), row(45, 4_000), row(46, 20_000), row(47, 30_000), // episode 2 (open), piek 30.000 op 47
+    ]
+    expect(detectDeficitLoanFromRows(rows)).toMatchObject({ peak: 30_000, peakAge: 47 })
+  })
+
+  it('gelijke piek: de eerste rij wint (strikt groter verplaatst de piek)', () => {
+    const rows = [row(40, 7_000), row(41, 7_000), row(42, 7_000)]
+    expect(detectDeficitLoanFromRows(rows)).toMatchObject({ peak: 7_000, peakAge: 40 })
+  })
+})

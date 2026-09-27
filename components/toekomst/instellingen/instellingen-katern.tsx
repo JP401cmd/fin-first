@@ -37,12 +37,16 @@ export function InstellingenKatern({
     <div className="pt-4">
       {/* Een deeplink met #voorkeuren (sectie I) landt pas na hydratie op zijn plek. */}
       <AnkerScroll ankers={Object.values(INSTELLINGEN_ANKERS)} />
-      {planReviewProgress && (
-        <div className="mx-auto max-w-3xl px-4 pb-8 sm:px-6">
-          <WizardIngang progress={planReviewProgress} />
-        </div>
-      )}
-      <InstellingenRijen {...rijen} />
+      {/* B5: links uitgelijnd met canvas en koppen, geen gecentreerde kolom; wel een
+          leesbare maximale breedte. */}
+      <div className="max-w-4xl">
+        {planReviewProgress && (
+          <div className="pb-10">
+            <WizardIngang progress={planReviewProgress} />
+          </div>
+        )}
+        <InstellingenRijen {...rijen} planReviewProgress={planReviewProgress} />
+      </div>
     </div>
   )
 }

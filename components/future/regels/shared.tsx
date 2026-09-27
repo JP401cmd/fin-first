@@ -6,12 +6,15 @@ import { EditorialDeck, SubsectionLabel } from '@/components/editorial'
 import { EventImpactPreview } from '@/components/app/horizon/event-impact-preview'
 import { REGEL_META, type RegelId } from '@/lib/future/regel-registry'
 import type { RegelProjection } from '@/lib/future/regel-sim'
-import { deflate } from '@/lib/euro-display'
+import { deflate, euroViewLabel, type EuroView } from '@/lib/euro-display'
+import { useEuroView } from '@/lib/hooks/use-euro-view'
 import { formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { ankerReachesAge, type AnkerReach } from '@/lib/horizon/anker-copy'
 import { leeftijdJaar } from '@/lib/horizon/leeftijd-jaar'
 import { EFFECT_BEDRAG_AFRONDING } from '@/lib/plan-review/types'
+import { isTekortStatus } from '@/lib/horizon-kernel/solver'
+import { formatAge } from '@/lib/horizon/fire-format'
 
 /** Intro-blok bovenaan elke body: uitleg-deck uit de registry. */
 export function RegelIntro({ regelId }: { regelId: RegelId }) {
@@ -120,6 +123,9 @@ export function fireDeltaMonths(baseline: RegelProjection, draft: RegelProjectio
  *  3. beide reiken tot het einde → wat er aan het einde meer of minder over is, in euro's van
  *     vandaag (elk bedrag precies één keer gedeflateerd met de kernelfactor van zijn eigen
  *     eindrij, ADR 0090), afgerond zoals de overzichten.
+ * Heeft een van beide runs geen vrijheidsleeftijd (besluiten eigenaar 27 sep 2026): "wordt
+ * haalbaar: vrij op X", "wordt niet haalbaar", of — als beide niet haalbaar zijn — het
+ * maandtekort A → B, anders de piek van de tekort-lening A → B. Zie `haalbaarheidEffect`.
  * Consume, don't recompute: alles komt uit de twee kern-runs.
  */
 export type FireFooterEffect =
@@ -134,6 +140,36 @@ export type FireFooterEffect =
     }
   | { kind: 'einde'; euro: number }
   | { kind: 'geen'; waarin: 'bereik' | 'eindbedrag' }
+  /** Basis niet haalbaar, het concept wel: de vrijheidsleeftijd van het concept (fractioneel). */
+  | { kind: 'wordt-haalbaar'; leeftijd: number }
+  /**
+   * Beide niet haalbaar: het maandtekort van de basis → dat van het concept, in hele euro's per
+   * maand. Bron: P!B96 van elke run (`RegelProjection.maandHint`), dezelfde grootheid en
+   * afronding als de plan-melding "Plan nog niet haalbaar" (`antwoordMinderUitgeven`).
+   */
+  | { kind: 'tekort'; van: number; naar: number }
+  /**
+   * Beide niet haalbaar, maar niet allebei met een maandtekort (bv. onhaalbaar door een blijvende
+   * tekort-lening, ADR 0149): de piek van de tekort-lening vóór → ná, nominaal met de factor van
+   * de eigen piekrij. De weergave deflateert elk bedrag precies één keer (`piekInWeergave`).
+   */
+  | { kind: 'tekort-lening'; van: TekortLeningPiek; naar: TekortLeningPiek }
+  /** Basis haalbaar, het concept niet: de maatstaf van het concept (maandtekort, anders de piek). */
+  | { kind: 'wordt-niet-haalbaar'; maat: { soort: 'maand'; euro: number } | { soort: 'lening'; piek: TekortLeningPiek } }
+
+/** Een tekort-leningpiek als nominaal puntbedrag met de kernelfactor van zijn eigen rij. */
+export interface TekortLeningPiek {
+  nominaal: number
+  inflationFactor: number
+}
+
+/**
+ * De piek zoals de melding op Plan hem toont (`useMeldingBedragenInView`): exact één keer
+ * `deflate` met de factor van de piekrij in de actieve euro-weergave, dan hele euro's.
+ */
+export function piekInWeergave(p: TekortLeningPiek, view: EuroView): number {
+  return Math.round(deflate(p.nominaal, p.inflationFactor, view))
+}
 
 /**
  * Tot welke leeftijd het geld reikt, op dezelfde as voor alle uitkomsten: "gedekt" = de eigen
@@ -146,9 +182,69 @@ function reikAs(r: AnkerReach | undefined): number | null {
   return leeftijdJaar(ankerReachesAge(r) ?? Number.NaN)
 }
 
+/**
+ * Haalbaar = de run heeft een vrijheidsleeftijd én meldt geen tekort. Onder een vast anker met
+ * tekort ís `fireAgeFractional` het stopmoment (de bridge zet `fireReachable` daar op `true`),
+ * dus een leeftijd alleen is geen haalbaarheid. `null` = niet te beoordelen (geen geslaagde
+ * run, of een leeftijd zonder status).
+ */
+function isHaalbaar(p: RegelProjection): boolean | null {
+  if (p.rows.length === 0) return null
+  if (p.fireAgeFractional == null) return false
+  if (p.kernelStatus == null) return null
+  return !isTekortStatus(p.kernelStatus)
+}
+
+/** Het maandtekort van een niet-haalbare run in hele euro's; `null` = geen maatstaf (ADR 0131). */
+function maandTekort(p: RegelProjection): number | null {
+  const hint = p.maandHint
+  if (hint == null || !Number.isFinite(hint)) return null
+  const euro = Math.round(hint)
+  return euro > 0 ? euro : null
+}
+
+/** De tekort-leningpiek van een run (het getal van de melding op Plan); `null` = geen. */
+function leningPiek(p: RegelProjection): TekortLeningPiek | null {
+  const t = p.tekortLening
+  if (!t || !Number.isFinite(t.piek) || t.piek < 1) return null
+  return { nominaal: t.piek, inflationFactor: t.inflationFactor }
+}
+
+/**
+ * Het effect wanneer minstens één van de twee runs geen vrijheidsleeftijd heeft (besluiten
+ * eigenaar 27 sep 2026, "haalbaar op X, anders het tekort"). Alles komt uit DEZELFDE twee runs
+ * als de rest van de footer; geen extra run, geen eigen som.
+ *  - basis niet haalbaar, concept wel → `wordt-haalbaar` (de vrijheidsleeftijd van het concept);
+ *  - basis haalbaar, concept niet → `wordt-niet-haalbaar` met het maandtekort van het concept
+ *    (P!B96), anders zijn tekort-leningpiek;
+ *  - beide niet haalbaar → `tekort` A → B als béíde een maandtekort hebben, anders
+ *    `tekort-lening` A → B als béíde een tekort-leningpiek hebben (ADR 0149- en V26-klasse);
+ *  - geen maatstaf (mislukte run, leeftijd zonder status, geen hint > 0 en geen piek) →
+ *    `onbekend`. Onbekend is geen nul (ADR 0131).
+ */
+function haalbaarheidEffect(baseline: RegelProjection, draft: RegelProjection): FireFooterEffect {
+  const basis = isHaalbaar(baseline)
+  const concept = isHaalbaar(draft)
+  if (basis == null || concept == null) return { kind: 'onbekend' }
+  if (!basis && concept) return { kind: 'wordt-haalbaar', leeftijd: draft.fireAgeFractional! }
+  if (basis && !concept) {
+    const euro = maandTekort(draft)
+    if (euro != null) return { kind: 'wordt-niet-haalbaar', maat: { soort: 'maand', euro } }
+    const piek = leningPiek(draft)
+    return piek ? { kind: 'wordt-niet-haalbaar', maat: { soort: 'lening', piek } } : { kind: 'onbekend' }
+  }
+  if (basis && concept) return { kind: 'onbekend' } // beide een leeftijd: hoort in de treden, niet hier
+  const van = maandTekort(baseline)
+  const naar = maandTekort(draft)
+  if (van != null && naar != null) return { kind: 'tekort', van, naar }
+  const piekVan = leningPiek(baseline)
+  const piekNaar = leningPiek(draft)
+  return piekVan && piekNaar ? { kind: 'tekort-lening', van: piekVan, naar: piekNaar } : { kind: 'onbekend' }
+}
+
 export function fireFooterEffect(baseline: RegelProjection, draft: RegelProjection): FireFooterEffect {
   const delta = fireDeltaMonths(baseline, draft)
-  if (delta == null) return { kind: 'onbekend' }
+  if (delta == null) return haalbaarheidEffect(baseline, draft)
   if (delta !== 0) return { kind: 'maanden', maanden: delta }
   const basisAs = reikAs(baseline.reach)
   const draftAs = reikAs(draft.reach)
@@ -191,7 +287,10 @@ export function FireDeltaFooter({
   draft: RegelProjection
 }) {
   const { masked } = useMaskedAmounts()
+  const { view } = useEuroView()
   const effect = fireFooterEffect(baseline, draft)
+  const richting = (van: number, naar: number) =>
+    naar < van ? 'text-positive' : naar > van ? 'text-negative' : 'text-[var(--ink-2)]'
   const toon = (goed: boolean) => (goed ? 'text-positive' : 'text-negative')
   switch (effect.kind) {
     case 'onbekend':
@@ -226,6 +325,67 @@ export function FireDeltaFooter({
                 : t.eindLeeftijd != null
                   ? `reikt dan tot het einde (${t.eindLeeftijd})`
                   : 'reikt dan tot het einde'}
+          </span>
+        </span>
+      )
+    }
+    case 'wordt-haalbaar':
+      return (
+        <span className="text-[12px]">
+          <span className="text-[var(--ink-3)]">Wordt haalbaar: </span>
+          <span className="font-semibold text-positive tabular-nums">vrij op {formatAge(effect.leeftijd)}</span>
+        </span>
+      )
+    case 'tekort': {
+      // euro-view: exempt — P!B96 is een €/mnd-grootheid van de hele run (−gap ÷ maanden tot de
+      // eindleeftijd), geen bedrag op een leeftijd, dus zonder kernelfactor. Getoond zoals de
+      // plan-melding "Plan nog niet haalbaar" hem toont (`antwoordMinderUitgeven`): de weergave-
+      // grens kruist hij hier precies één keer, bij het formatteren.
+      const kleur = richting(effect.van, effect.naar)
+      // De langste footer-regel: in de smalle pane (lg: 560px) staat hij links van twee knoppen
+      // en mag hij op twee regels breken in plaats van de rij te laten overlopen.
+      return (
+        <span className="inline-block text-[12px] leading-snug lg:max-w-[15rem] xl:max-w-none">
+          <span className="text-[var(--ink-3)]">Nog niet haalbaar · tekort </span>
+          <span className={`font-semibold tabular-nums ${kleur}`}>
+            {effect.naar === effect.van
+              ? `blijft ${formatMaskedCurrency(effect.naar, masked)}`
+              : `${formatMaskedCurrency(effect.van, masked)} → ${formatMaskedCurrency(effect.naar, masked)}`}
+          </span>
+          <span className="text-[var(--ink-3)]"> per maand</span>
+        </span>
+      )
+    }
+    case 'tekort-lening': {
+      // Puntbedragen op een toekomstige leeftijd: hier kruisen ze de weergave-grens, exact één
+      // keer (`piekInWeergave` = deflate met de factor van de eigen piekrij in de actieve
+      // weergave), zoals `useMeldingBedragenInView` het voor de melding op Plan doet. Kleur en
+      // "blijft" op de getoonde bedragen, niet op de nominale.
+      const van = piekInWeergave(effect.van, view)
+      const naar = piekInWeergave(effect.naar, view)
+      return (
+        <span className="inline-block text-[12px] leading-snug lg:max-w-[15rem] xl:max-w-none" title={euroViewLabel(view)}>
+          <span className="text-[var(--ink-3)]">Nog niet haalbaar · je tekort-lening </span>
+          <span className={`font-semibold tabular-nums ${richting(van, naar)}`}>
+            {naar === van
+              ? `blijft ${formatMaskedCurrency(naar, masked)}`
+              : `loopt op tot ${formatMaskedCurrency(van, masked)} → ${formatMaskedCurrency(naar, masked)}`}
+          </span>
+        </span>
+      )
+    }
+    case 'wordt-niet-haalbaar': {
+      const m = effect.maat
+      return (
+        <span
+          className="inline-block text-[12px] leading-snug lg:max-w-[15rem] xl:max-w-none"
+          title={m.soort === 'lening' ? euroViewLabel(view) : undefined}
+        >
+          <span className="text-[var(--ink-3)]">Wordt niet haalbaar · </span>
+          <span className="font-semibold tabular-nums text-negative">
+            {m.soort === 'maand'
+              ? `tekort ${formatMaskedCurrency(m.euro, masked)} per maand`
+              : `je tekort-lening loopt op tot ${formatMaskedCurrency(piekInWeergave(m.piek, view), masked)}`}
           </span>
         </span>
       )

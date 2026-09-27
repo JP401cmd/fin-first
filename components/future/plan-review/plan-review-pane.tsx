@@ -468,7 +468,7 @@ export function PlanReviewPane({
     <ShellOverlay
       open={open}
       onClose={onClose}
-      kind="pane"
+      kind="pane" mobileInset={false}
       title={PLAN_REVIEW_NAAM}
       mobileBackCloses
       primaryAction={

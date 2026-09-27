@@ -138,9 +138,10 @@ export function useToekomstLagen({ initialData, goals, perspectief, overlays, sc
   // Sub-weergave van de modus Geldstroom (Lijnen / Bronnen).
   const [ieViewMode, setIeViewMode] = useState<IeViewMode>('lines')
   // Vermogen · Samenstelling · Geldstroom (ADR 0179 D3). Hoort bij het canvas: de keuze
-  // blijft staan bij een katernwissel; Instellingen tekent altijd Vermogen zonder deze
-  // keuze te overschrijven (`canvas-stand.ts`).
-  const [canvasModus, setCanvasModus] = useState<CanvasModus>('vermogen')
+  // blijft staan bij een katernwissel, ook in Instellingen (`canvas-stand.ts`).
+  // Eigenaarsbesluit 27 sep: Samenstelling is de basisweergave, in Plan, Doelen én
+  // Instellingen.
+  const [canvasModus, setCanvasModus] = useState<CanvasModus>('samenstelling')
 
   // Levenslijn cijferbar + "speel af" (alleen volledige weergave): de actieve leeftijd
   // wordt gedeeld door de SimChart-hover én de playback-animatie.

@@ -65,6 +65,12 @@ describe('VoorkeurBewerkenSheet — render', () => {
     expect(input.value).toBe('2.5')
   })
 
+  it('D1 — de float-ruis van fractie × 100 komt niet in het veld (0,07 × 100)', () => {
+    renderSheet({ column: 'expected_return', currentValuePct: 0.07 * 100 })
+    const input = screen.getByRole('spinbutton') as HTMLInputElement
+    expect(input.value).toBe('7')
+  })
+
   it('toont helperText wanneer aanwezig', () => {
     renderSheet({ helperText: 'NL-default 2.5% per jaar.' })
     expect(screen.getByText(/NL-default 2.5%/i)).toBeTruthy()
@@ -215,7 +221,7 @@ describe('VoorkeurBewerkenSheet — sluiten', () => {
   it('Annuleer-knop roept onClose', () => {
     const onClose = vi.fn()
     renderSheet({ onClose })
-    fireEvent.click(screen.getByText('Annuleer'))
+    fireEvent.click(screen.getByText('Annuleren'))
     expect(onClose).toHaveBeenCalled()
   })
 

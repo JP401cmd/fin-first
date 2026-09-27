@@ -30,6 +30,7 @@ export function RegelBewerkenPane({
   potRules,
   potBalances,
   anker,
+  title,
 }: {
   open: boolean
   /** Welke regel wordt bewerkt; null tijdens de sluit-animatie. */
@@ -49,6 +50,11 @@ export function RegelBewerkenPane({
    * en "Geen tekort-lening" openen dezelfde body als Stopmoment, op hun eigen plek.
    */
   anker?: string | null
+  /**
+   * Schermtitel. Weggelaten = de naam van de regel (`REGEL_META`); katern Instellingen geeft
+   * het rijlabel mee ("Stopmoment", "Einde van je plan"): de titel is gelijk aan de rij.
+   */
+  title?: string
 }) {
   const [actions, setActions] = useState<RegelEditActionsState | null>(null)
   // Behoud de laatste niet-null regelId tijdens de sluit-animatie zodat de
@@ -105,7 +111,7 @@ export function RegelBewerkenPane({
       open={open}
       onClose={onClose}
       kind="pane"
-      title={meta?.title}
+      title={title ?? meta?.title}
       primaryAction={primaryAction}
       secondaryAction={secondaryAction}
       footerInfo={actions?.footerInfo}

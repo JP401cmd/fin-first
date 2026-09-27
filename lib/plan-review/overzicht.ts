@@ -62,6 +62,7 @@ import {
 import type { RetirementExpenseMethod } from '@/lib/budget-utils'
 import { bouwStrategieRij } from '@/lib/life-events/strategie-write'
 import { NIET_LIQUIDE_ASSET_TYPES } from './niet-liquide'
+import { strategieHref } from '@/lib/horizon/strategie-route'
 import { EFFECT_BEDRAG_AFRONDING, PLAN_REVIEW_STAP_TITELS, type PlanReviewFacts, type PlanReviewStap } from './types'
 
 // ── Contract naar de pane ────────────────────────────────────────────────────
@@ -560,14 +561,14 @@ function stapInkomsten(b: PlanReviewBronnen): PlanReviewStapOverzicht {
     // Het eerste label is ook de knop van de inline bewerkstand (TPR-15).
     aanpassen: [
       {
-        href: '/toekomst/instellingen?rij=aow',
+        href: strategieHref('aow'),
         label: heeftAow ? 'AOW, pensioen en werk aanpassen' : 'AOW-gegevens toevoegen',
       },
-      { href: '/toekomst/instellingen?rij=pensioen', label: 'Pensioen bekijken' },
+      { href: strategieHref('pensioen'), label: 'Pensioen bekijken' },
     ],
     // De upload van je pensioenoverzicht en de jaarruimte blijven op het pensioenscherm.
     beperking:
-      'Je pensioenoverzicht uploaden, een pot of werkplan verwijderen en je jaarruimte berekenen doe je op het pensioenscherm onder Voorkeuren.',
+      'Je pensioenoverzicht uploaden, een pot of werkplan verwijderen en je jaarruimte berekenen doe je in je pensioenstrategie, bij je levensstrategieën onder je plan.',
   }
 }
 
@@ -740,7 +741,7 @@ function stapWoning(b: PlanReviewBronnen): PlanReviewStapOverzicht {
     // TPR-15 — de eerste regel is ook het label van de inline bewerkstand (stap 4 heeft een editor).
     aanpassen: [
       ...(heeftHuis
-        ? [{ href: '/toekomst/instellingen?rij=huis', label: overig.length > 0 ? 'Woonstrategie en verkoop aanpassen' : 'Woonstrategie aanpassen' }]
+        ? [{ href: strategieHref('huis'), label: overig.length > 0 ? 'Woonstrategie en verkoop aanpassen' : 'Woonstrategie aanpassen' }]
         : []),
       ...(overig.length > 0 ? [{ href: '/overzicht/bezittingen', label: 'Verkoopinstellingen aanpassen' }] : []),
     ],

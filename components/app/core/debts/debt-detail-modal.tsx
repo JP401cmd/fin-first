@@ -559,7 +559,7 @@ export function DebtDetailModal({
 
   return (
     <>
-      <ShellOverlay open={true} onClose={onClose} kind="pane" title={debt.name}>
+      <ShellOverlay open={true} onClose={onClose} kind="pane" mobileInset={false} title={debt.name}>
         {body}
       </ShellOverlay>
       {siblings}

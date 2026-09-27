@@ -20,7 +20,7 @@ import {
 const basis: PlanDraft = { anchor: 'solved', stopAge: null, endForm: 'deplete', endAge: 90, legacyAmount: 0 }
 
 // Kopij herzien 5 sep 2026 (eigenaar-besluit, bijlage ADR 0129 "Herzien"): gewone
-// taal op alle oppervlakken — 'Zo vroeg als het kan' i.p.v. 'Laat de app het
+// taal op alle oppervlakken — 'Zo vroeg mogelijk' i.p.v. 'Laat de app het
 // uitrekenen', en vraag 2 als "tot welke leeftijd, en wat blijft er over" met
 // expliciete tegelteksten i.p.v. de vaktermen uit STRATEGY_LABELS.
 describe('plan-draft — de twee vragen dragen de ADR 0129-kopij (herzien 5 sep 2026)', () => {
@@ -28,7 +28,7 @@ describe('plan-draft — de twee vragen dragen de ADR 0129-kopij (herzien 5 sep 
     expect(STOP_ANCHOR_QUESTION).toBe('Wanneer wil je stoppen met werken?')
     expect(STOP_ANCHOR_OPTIONS.map((o) => o.kind)).toEqual(['solved', 'aow', 'age', 'now'])
     expect(STOP_ANCHOR_OPTIONS.map((o) => o.name)).toEqual([
-      'Zo vroeg als het kan',
+      'Zo vroeg mogelijk',
       'Op mijn AOW-leeftijd',
       'Op een leeftijd die ik kies',
       'Nu',

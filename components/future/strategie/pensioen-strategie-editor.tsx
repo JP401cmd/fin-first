@@ -342,7 +342,7 @@ export function PensioenStrategieEditor({
       <StrategieModalShell
         open
         onClose={onClose}
-        title="Pensioen-strategie"
+        title="Pensioen"
         intro="Werknemerspensioen, lijfrente en banksparen — elke pot verschijnt als gebeurtenis op je tijdas."
         error={error}
         readOnly={readOnly}

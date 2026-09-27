@@ -111,9 +111,10 @@ describe('labActieBar + acties="shell" (mobiel, ADR 0179 D7)', () => {
     expect(knoppen).toEqual([])
   })
 
-  it('gewijzigd in de shell-stand: alleen Loslaten blijft in de balk', () => {
-    const { knoppen } = renderBalk({ toestand: 'gewijzigd', acties: 'shell' })
-    expect(knoppen).toEqual(['Doel loslaten'])
+  it('gewijzigd in de shell-stand: geen knoppen in de balk, ook Loslaten staat in de bar (één plek per actie)', () => {
+    const { tekst, knoppen } = renderBalk({ toestand: 'gewijzigd', acties: 'shell' })
+    expect(tekst.length).toBeGreaterThan(0)
+    expect(knoppen).toEqual([])
   })
 
   it('zonder bar (bijwerken wacht) blijven de knoppen in de balk', () => {

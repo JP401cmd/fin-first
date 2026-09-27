@@ -609,11 +609,13 @@ export function OnttrekkingsstrategieBody({
         </div>
       )}
 
-      {/* Live impact */}
-      <div className="mt-6">
-        <SubsectionLabel>Impact op je vrijheidspad</SubsectionLabel>
-        <LiveSimImpact baseline={baseline} draft={draftProj} />
-      </div>
+      {/* Live impact — A2: pas bij een verschil; tot dan draagt de footer het effect. */}
+      {changed && (
+        <div className="mt-6">
+          <SubsectionLabel>Impact op je vrijheidspad</SubsectionLabel>
+          <LiveSimImpact baseline={baseline} draft={draftProj} />
+        </div>
+      )}
 
       {/* ADR 0179 fase 3 — de vier profielen naast elkaar (uit de opgeheven Strategieën-modal). */}
       <OnttrekkingProfielVergelijk

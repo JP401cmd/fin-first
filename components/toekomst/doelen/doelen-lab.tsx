@@ -8,7 +8,9 @@
 // Fase 4 (ADR 0179 D7): het lab staat op twee plekken — in de rechterkolom van de canvas-rij
 // op desktop (`plek="kolom"`, standaard harp) en direct onder de katern-koppen op mobiel
 // (`plek="onder-koppen"`, standaard rad). Zichtbaarheid regelt CSS (de host), dus geen
-// hydratiesprong. `vraag={heroVraag}` blijft staan — ADR 0179 toetste B10 op precies die
+// hydratiesprong. Eigenaarsbesluit 27 sep: één plek per actie. Desktop: de acties staan in
+// een eigen rij onder grafiek en harp (`DoelenLabActies`); de kolom draagt alleen het lab.
+// Mobiel: met een shell-bar staan álle acties in die bar, anders op de pagina. `vraag={heroVraag}` blijft staan — ADR 0179 toetste B10 op precies die
 // voorwaarde. De marktaannames en de indicatieregel staan in `doelen-lab-details.tsx`.
 import type { Dispatch, RefObject, SetStateAction } from 'react'
 import Link from 'next/link'
@@ -28,7 +30,7 @@ import {
   type LabOpslaanToestand,
 } from '@/components/app/horizon/lab-opslaan-balk'
 import { VERKEN_SECTION_ID } from '@/components/app/horizon/scenario-chip'
-import { useLiveActionBar } from '@/components/app/shell/use-live-action-bar'
+import { useLiveActionBar, type LiveActionBarExtra } from '@/components/app/shell/use-live-action-bar'
 import { formatAge } from '@/lib/horizon/fire-format'
 import { LAB_COPY } from '@/lib/horizon/anker-copy'
 import type { zoneVanHuidig, HefboomKey } from '@/lib/horizon/lab-grenzen-types'
@@ -77,7 +79,9 @@ export interface DoelenLabProps {
 /** De sectieklassen per plek: de kolom heeft zijn eigen rand; onder de koppen compact. */
 export const DOELEN_LAB_PLEK_KLASSE: Record<DoelenLabPlek, string> = {
   kolom: 'scroll-mt-24',
-  'onder-koppen': 'mt-2 scroll-mt-24 border-t border-[var(--border-ed)] pt-2',
+  // Onder de tabbladen staat het lab in de witte katern-module: die en de tabstrook zijn
+  // de rand, dus geen eigen lijn en geen extra ruimte (één-scherm-eis).
+  'onder-koppen': 'scroll-mt-24',
 }
 
 export function DoelenLab({
@@ -112,7 +116,10 @@ export function DoelenLab({
   handleScenarioReset,
 }: DoelenLabProps) {
   // Mobiel: de opslaan-actie is de action-bar van de shell (ADR 0179 D7). Alleen de plek
-  // onder de koppen registreert, en alleen als er iets op te slaan is.
+  // onder de koppen registreert, en alleen als er iets op te slaan is. Is er een bar, dan
+  // staan ÁLLE lab-acties erin (één plek per actie, 27 sep): de twee knoppen, en daarboven
+  // stopmoment, plan-keuzes en Loslaten. Zonder bar blijft alles op de pagina en blijft de
+  // nav-pill staan — een altijd-bar zou de pill verbergen.
   const bar =
     plek === 'onder-koppen' && verkenSectieZichtbaar
       ? labActieBar(labOpslaanToestand, {
@@ -120,6 +127,10 @@ export function DoelenLab({
           bijwerkenMogelijk: doelBijwerkenMogelijk,
         })
       : null
+  const openStopBevestiging = () => {
+    setStopPlanError('')
+    setStopPlanConfirmOpen(true)
+  }
   useLiveActionBar(
     bar
       ? {
@@ -129,6 +140,14 @@ export function DoelenLab({
             onClick: bar.secondary === 'herstel' ? handleDoelHerstellen : handleScenarioReset,
             disabled: doelSaving,
           },
+          extra: labBarExtra({
+            planIsDezeStop,
+            stopPlanSaving,
+            effectiveStopAge,
+            onStop: openStopBevestiging,
+            // Loslaten hoort bij een doel dat er ligt: in de bar is dat de toestand `gewijzigd`.
+            loslaten: labOpslaanToestand === 'gewijzigd' ? { onClick: () => setDoelLoslatenOpen(true), disabled: doelSaving } : null,
+          }),
         }
       : null,
   )
@@ -153,7 +172,7 @@ export function DoelenLab({
                       <button
                         type="button"
                         onClick={dismissFirstDragHint}
-                        className="font-semibold text-horizon-700 underline underline-offset-2 transition-colors hover:text-[var(--ink)]"
+                        className="font-semibold text-[var(--module-active-700)] underline underline-offset-2 transition-colors hover:text-[var(--ink)]"
                       >
                         Begrepen
                       </button>
@@ -179,53 +198,213 @@ export function DoelenLab({
                     schaalLegenda={false}
                     formatters={labFormatters}
                     stopSlot={
-                      // TPR-09 + melding B-038 — de stop-knop is een VERKENNING. Hier staat de
-                      // enige plek waar die verkenning het plan kan worden (het volledige plan,
-                      // via `planDraftToFireSettingsBody`), náást de verwijzing naar de plek waar
-                      // álle plan-keuzes staan. Alleen zichtbaar als de knop van het plan afwijkt.
-                      <div className="flex flex-wrap items-center gap-x-4">
-                        {plek === 'onder-koppen' && (
+                      // Desktop (kolom): de acties staan in de actierij onder grafiek en harp
+                      // (`DoelenLabActies`, 27 sep). Mobiel: de weergavekeuze, en de acties
+                      // alleen zolang er geen shell-bar is (anders staan ze in die bar).
+                      plek === 'kolom' ? null : (
+                        <div className="flex flex-wrap items-center gap-x-4">
                           <LabWeergaveMenu weergave={knopWeergave} onChange={setKnopWeergave} />
-                        )}
-                        {!planIsDezeStop && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setStopPlanError('')
-                              setStopPlanConfirmOpen(true)
-                            }}
-                            disabled={stopPlanSaving}
-                            className="inline-flex min-h-[44px] items-center font-sans text-[11px] font-semibold text-horizon-700 underline underline-offset-2 transition-colors hover:text-horizon-800 disabled:no-underline disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
-                          >
-                            {stopPlanSaving ? 'Opslaan…' : `Maak ${formatAge(effectiveStopAge)} mijn stopmoment`}
-                          </button>
-                        )}
-                        {/* ADR 0179 D4: één ingang per instelling — de plan-keuzes wonen in
-                            katern Instellingen (de strategie-modal verdwijnt in fase 3). */}
-                        <Link
-                          href={KATERN_HREF.instellingen}
-                          className="inline-flex min-h-[44px] items-center font-sans text-[11px] font-medium text-[var(--ink-2)] underline underline-offset-2 transition-colors hover:text-horizon-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
-                        >
-                          Je plan-keuzes &rarr;
-                        </Link>
-                      </div>
+                          {!bar && (
+                            <DoelenLabStopActies
+                              planIsDezeStop={planIsDezeStop}
+                              stopPlanSaving={stopPlanSaving}
+                              effectiveStopAge={effectiveStopAge}
+                              onStop={openStopBevestiging}
+                            />
+                          )}
+                        </div>
+                      )
                     }
                   />
 
-                  <LabOpslaanBalk
-                    toestand={labOpslaanToestand}
-                    gezetOp={doelBlok?.gezetOp ?? null}
-                    busy={doelSaving}
-                    vastleggenMogelijk={doelVastleggenMogelijk}
-                    bijwerkenMogelijk={doelBijwerkenMogelijk}
-                    onVastleggen={() => setDoelSheetOpen(true)}
-                    onHerstel={handleDoelHerstellen}
-                    onLoslaten={() => setDoelLoslatenOpen(true)}
-                    onReset={handleScenarioReset}
-                    acties={plek === 'onder-koppen' ? 'shell' : 'inline'}
-                  />
+                  {/* Desktop: de opslaan-balk staat in de actierij onder de canvas-rij. */}
+                  {plek === 'onder-koppen' && (
+                    <DoelenLabOpslaanBalk
+                      acties="shell"
+                      labOpslaanToestand={labOpslaanToestand}
+                      doelBlok={doelBlok}
+                      doelSaving={doelSaving}
+                      doelVastleggenMogelijk={doelVastleggenMogelijk}
+                      doelBijwerkenMogelijk={doelBijwerkenMogelijk}
+                      setDoelSheetOpen={setDoelSheetOpen}
+                      handleDoelHerstellen={handleDoelHerstellen}
+                      setDoelLoslatenOpen={setDoelLoslatenOpen}
+                      handleScenarioReset={handleScenarioReset}
+                    />
+                  )}
                 </section>
               )}
     </>
+  )
+}
+
+/** Het label van de stop-actie: dezelfde tekst op de pagina en in de shell-bar. */
+export function stopActieLabel(effectiveStopAge: number, saving: boolean): string {
+  return saving ? 'Opslaan…' : `Maak ${formatAge(effectiveStopAge)} mijn stopmoment`
+}
+
+/** De tekst van de link naar álle plan-keuzes (katern Instellingen). */
+export const PLAN_KEUZES_LABEL = 'Je plan-keuzes →'
+
+/**
+ * De extra acties in de shell-bar (mobiel, 27 sep): stopmoment (als de knop van het plan
+ * afwijkt), de plan-keuzes, en Loslaten (als er een doel ligt). Pure afleiding, zodat de
+ * volgorde en de voorwaarden zonder DOM te toetsen zijn.
+ *
+ * Staan stopmoment én Loslaten er, dan valt de plan-keuzes-link weg: drie acties lopen op
+ * 360 px over twee regels, en die bar dekt dan het rad af (één-scherm-eis, ADR 0179 D7).
+ * De link is een verwijzing, geen actie, en het tabblad Instellingen staat erboven.
+ */
+export function labBarExtra({
+  planIsDezeStop,
+  stopPlanSaving,
+  effectiveStopAge,
+  onStop,
+  loslaten,
+}: {
+  planIsDezeStop: boolean
+  stopPlanSaving: boolean
+  effectiveStopAge: number
+  onStop: () => void
+  loslaten: { onClick: () => void; disabled: boolean } | null
+}): LiveActionBarExtra[] {
+  const extra: LiveActionBarExtra[] = []
+  if (!planIsDezeStop) {
+    extra.push({ label: stopActieLabel(effectiveStopAge, stopPlanSaving), onClick: onStop, disabled: stopPlanSaving })
+  }
+  if (planIsDezeStop || !loslaten) extra.push({ label: PLAN_KEUZES_LABEL, href: KATERN_HREF.instellingen })
+  if (loslaten) extra.push({ label: LAB_COPY.opslaanActieLoslaten, onClick: loslaten.onClick, disabled: loslaten.disabled })
+  return extra
+}
+
+/**
+ * De stop-actie en de verwijzing naar de plan-keuzes.
+ *
+ * TPR-09 + melding B-038 — de stop-knop is een VERKENNING. Hier staat de enige plek waar
+ * die verkenning het plan kan worden (het volledige plan, via `planDraftToFireSettingsBody`),
+ * náást de verwijzing naar de plek waar álle plan-keuzes staan. De stop-knop staat er alleen
+ * als de knop van het plan afwijkt.
+ */
+export function DoelenLabStopActies({
+  planIsDezeStop,
+  stopPlanSaving,
+  effectiveStopAge,
+  onStop,
+}: {
+  planIsDezeStop: boolean
+  stopPlanSaving: boolean
+  effectiveStopAge: number
+  onStop: () => void
+}) {
+  return (
+    <>
+      {!planIsDezeStop && (
+        <button
+          type="button"
+          onClick={onStop}
+          disabled={stopPlanSaving}
+          className="inline-flex min-h-[44px] items-center font-sans text-[11px] font-semibold text-[var(--module-active-700)] underline underline-offset-2 transition-colors hover:text-[var(--module-active-800)] disabled:no-underline disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+        >
+          {stopActieLabel(effectiveStopAge, stopPlanSaving)}
+        </button>
+      )}
+      {/* ADR 0179 D4: één ingang per instelling — de plan-keuzes wonen in
+          katern Instellingen (de strategie-modal verdwijnt in fase 3). */}
+      <Link
+        href={KATERN_HREF.instellingen}
+        className="inline-flex min-h-[44px] items-center font-sans text-[11px] font-medium text-[var(--ink-2)] underline underline-offset-2 transition-colors hover:text-[var(--module-active-600)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+      >
+        {PLAN_KEUZES_LABEL}
+      </Link>
+    </>
+  )
+}
+
+type DoelenLabOpslaanBalkProps = Pick<
+  DoelenLabProps,
+  | 'labOpslaanToestand'
+  | 'doelBlok'
+  | 'doelSaving'
+  | 'doelVastleggenMogelijk'
+  | 'doelBijwerkenMogelijk'
+  | 'setDoelSheetOpen'
+  | 'handleDoelHerstellen'
+  | 'setDoelLoslatenOpen'
+  | 'handleScenarioReset'
+> & { acties: 'inline' | 'shell'; className?: string }
+
+/** De opslaan-balk van het lab, op de plek die de host kiest (onder het lab of in de actierij). */
+function DoelenLabOpslaanBalk({
+  acties,
+  className,
+  labOpslaanToestand,
+  doelBlok,
+  doelSaving,
+  doelVastleggenMogelijk,
+  doelBijwerkenMogelijk,
+  setDoelSheetOpen,
+  handleDoelHerstellen,
+  setDoelLoslatenOpen,
+  handleScenarioReset,
+}: DoelenLabOpslaanBalkProps) {
+  return (
+    <LabOpslaanBalk
+      toestand={labOpslaanToestand}
+      gezetOp={doelBlok?.gezetOp ?? null}
+      busy={doelSaving}
+      vastleggenMogelijk={doelVastleggenMogelijk}
+      bijwerkenMogelijk={doelBijwerkenMogelijk}
+      onVastleggen={() => setDoelSheetOpen(true)}
+      onHerstel={handleDoelHerstellen}
+      onLoslaten={() => setDoelLoslatenOpen(true)}
+      onReset={handleScenarioReset}
+      acties={acties}
+      className={className}
+    />
+  )
+}
+
+export type DoelenLabActiesProps = Pick<
+  DoelenLabProps,
+  | 'verkenSectieZichtbaar'
+  | 'planIsDezeStop'
+  | 'setStopPlanError'
+  | 'setStopPlanConfirmOpen'
+  | 'stopPlanSaving'
+  | 'effectiveStopAge'
+> &
+  Omit<DoelenLabOpslaanBalkProps, 'acties'>
+
+/**
+ * De actierij van het lab op desktop (27 sep, eigenaarsbesluit): over de volle breedte
+ * ónder grafiek en harp, zodat de harp alleen het lab draagt en de grafiek tot zijn maat
+ * kan groeien. Links de stop-actie en de plan-keuzes, rechts de opslaan-balk met zijn
+ * knoppen (inline). Hangt aan dezelfde afleiding `verkenSectieZichtbaar` als het lab.
+ */
+export function DoelenLabActies({
+  verkenSectieZichtbaar,
+  planIsDezeStop,
+  setStopPlanError,
+  setStopPlanConfirmOpen,
+  stopPlanSaving,
+  effectiveStopAge,
+  ...balk
+}: DoelenLabActiesProps) {
+  if (!verkenSectieZichtbaar) return null
+  return (
+    <div data-testid="doelen-lab-actierij" className="flex flex-wrap items-center gap-x-6 gap-y-1">
+      <div className="flex flex-wrap items-center gap-x-4">
+        <DoelenLabStopActies
+          planIsDezeStop={planIsDezeStop}
+          stopPlanSaving={stopPlanSaving}
+          effectiveStopAge={effectiveStopAge}
+          onStop={() => {
+            setStopPlanError('')
+            setStopPlanConfirmOpen(true)
+          }}
+        />
+      </div>
+      <DoelenLabOpslaanBalk acties="inline" className="min-w-0 flex-1" {...balk} />
+    </div>
   )
 }

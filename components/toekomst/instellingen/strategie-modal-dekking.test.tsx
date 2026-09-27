@@ -9,7 +9,9 @@ import type { RegelSimSnapshot } from '@/lib/future/regel-sim'
 import { DisplayModeProvider } from '@/lib/hooks/use-display-mode'
 import { POT_RULES_DEFAULTS } from '@/lib/pot-rules'
 import { END_FORM_QUESTION, STOP_ANCHOR_QUESTION } from '@/lib/horizon/plan-draft'
-import type { StrategieEditorsData } from '@/components/future/strategie/strategie-editors'
+import { StrategieEditors, type StrategieEditorsData } from '@/components/future/strategie/strategie-editors'
+import { levensstrategieRijwaarde, rijwaardeTekst } from '@/lib/toekomst/instellingen-rijwaarden'
+import { RIJ_META } from '@/lib/toekomst/instellingen-rij'
 import { PROFIEL_VERGELIJK_KOPIJ } from '@/components/future/regels/onttrekking-profielvergelijk'
 import { EINDSTRATEGIE_ANKER } from '@/lib/toekomst/instellingen-rij'
 
@@ -76,16 +78,18 @@ const PROPS: InstellingenRijenProps = {
   potBalances: { spaargeld: 0, beleggingen: 250_000, pensioen: 0, vastgoed: 0, overig: 0 },
   box3HeffingvrijInkomen: null,
   events: [],
-  strategieData: {
-    baseline: null, dailyExpenses: 100, aowRows: [], dateOfBirth: '1985-01-01', grossYearlyIncome: 70_000,
-    pensioenFactorA: 0, currentAge: 41, inflationRate: 0.02, currentNetMonthly: 5_000, housingPreview: null,
-  } as StrategieEditorsData,
   housingStrategy: { mode: 'exclude_from_fire' },
   retirementMethod: 'essential_budgets',
   uitgaveNaPensioen: 36_000,
   geenTekortLening: true,
   tekortLeningRente: 0.05,
+  dagtarief: 100,
 }
+
+const STRATEGIE_DATA = {
+  baseline: null, dailyExpenses: 100, aowRows: [], dateOfBirth: '1985-01-01', grossYearlyIncome: 70_000,
+  pensioenFactorA: 0, currentAge: 41, inflationRate: 0.02, currentNetMonthly: 5_000, housingPreview: null,
+} as StrategieEditorsData
 
 beforeEach(() => {
   vi.stubGlobal(
@@ -119,9 +123,11 @@ describe('StrategieModal → rijen: elke functie is bereikbaar (plan §3)', () =
   it('kop-badges Stop · Eind · Onttrekking · Eigen woning → de rijwaarden', () => {
     renderRijen()
     expect(rij('stopmoment').textContent).toContain('op je AOW-leeftijd')
-    expect(rij('eindleeftijd').textContent).toContain('tot je 90e')
+    expect(rij('eindleeftijd').textContent).toContain('tot 90')
     expect(rij('onttrekking').textContent).toContain('guardrails')
-    expect(rij('huis').textContent).toContain('uitsluiten van FIRE-pot')
+    // Eigen woning is sinds 27 sep een rij op Plan (LevensstrategieenBlok), met dezelfde waarde.
+    expect(RIJ_META.huis.sectie).toBe('levensstrategieen')
+    expect(rijwaardeTekst(levensstrategieRijwaarde('huis', PROPS), String)).toBe('uitsluiten van FIRE-pot')
   })
 
   it('tab Eind, vraag 1 (stop-anker) → rij Stopmoment', () => {
@@ -156,9 +162,8 @@ describe('StrategieModal → rijen: elke functie is bereikbaar (plan §3)', () =
     expect(within(blok).getByText(PROFIEL_VERGELIJK_KOPIJ.disclaimer)).toBeTruthy()
   })
 
-  it('tab Woning (HousingStrategySection) → rij Eigen woning', async () => {
-    renderRijen()
-    fireEvent.click(rij('huis'))
+  it('tab Woning (HousingStrategySection) → rij Eigen woning (op Plan, dezelfde editor)', async () => {
+    render(<StrategieEditors open="huis" onClose={() => {}} events={[]} data={STRATEGIE_DATA} snapshot={SNAPSHOT} />)
     expect(await screen.findByRole('button', { name: /Uitsluiten/ })).toBeTruthy()
     expect(screen.getByRole('button', { name: /Opeethypotheek/ })).toBeTruthy()
   })

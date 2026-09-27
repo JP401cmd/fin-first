@@ -3,7 +3,14 @@
 import { useEffect, useRef } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { PLAN_REVIEW_PARAM } from '@/lib/plan-review/types'
-import { RIJ_DEEPLINK_PARAMS, RIJ_OPRUIM_PARAMS, resolveRijDeeplink, type RijSleutel } from '@/lib/toekomst/instellingen-rij'
+import {
+  RIJ_DEEPLINK_PARAMS,
+  RIJ_OPRUIM_PARAMS,
+  instellingenRijHref,
+  isLevensstrategieRij,
+  resolveRijDeeplink,
+  type RijSleutel,
+} from '@/lib/toekomst/instellingen-rij'
 
 /**
  * De rij-deeplink van katern Instellingen (ADR 0179 fase 3): `?rij=<sleutel>`, met de oude
@@ -19,6 +26,12 @@ import { RIJ_DEEPLINK_PARAMS, RIJ_OPRUIM_PARAMS, resolveRijDeeplink, type RijSle
  *
  * `via` gaat mee naar de aanroeper: `?strategie=pensioen` (de verwijzing vanaf Box 1) opent
  * de factor-A-uitvraag meteen (S6).
+ *
+ * Levensstrategieën (`?rij=aow|pensioen|werk|huis`, `?strategie=…`) wonen sinds 27 sep op
+ * katern Plan. `next.config.ts` stuurt zulke links al op de routing-laag door; komt er toch
+ * één binnen (bv. een client-navigatie die de redirect mist), dan vervangt deze hook de URL
+ * door de Plan-deeplink (`instellingenRijHref`) in plaats van hem op te ruimen, en roept
+ * `onRij` niet aan.
  */
 /** Params met een eigen opruimer; zolang ze er staan, wacht de rij-deeplink. */
 const ANDERE_OPRUIMERS = [PLAN_REVIEW_PARAM, 'modal'] as const
@@ -40,6 +53,10 @@ export function useInstellingenRijDeeplink(onRij: (rij: RijSleutel, via: 'rij' |
     if (!RIJ_DEEPLINK_PARAMS.some((k) => searchParams.has(k))) return
     if (ANDERE_OPRUIMERS.some((k) => searchParams.has(k))) return
     const doel = resolveRijDeeplink(searchParams)
+    if (doel && isLevensstrategieRij(doel.rij)) {
+      routerRef.current.replace(instellingenRijHref(doel.rij))
+      return
+    }
     if (doel) onRijRef.current(doel.rij, doel.via)
     const rest = new URLSearchParams(searchParams)
     for (const k of RIJ_OPRUIM_PARAMS) rest.delete(k)

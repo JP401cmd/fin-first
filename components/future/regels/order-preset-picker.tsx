@@ -2,8 +2,9 @@
 
 import { useState } from 'react'
 import type { WealthGroup } from '@/lib/wealth-composition'
-import { detectOrderPreset, type OrderPreset, type OrderPresetId } from '@/lib/pot-rules'
+import { detectOrderPreset, type OrderPreset } from '@/lib/pot-rules'
 import { SubsectionLabel } from '@/components/editorial'
+import { ORDER_PRESET_COPY } from '@/lib/future/order-preset-copy'
 import { RegelOptionCard } from './shared'
 import { GroupOrderEditor } from './pot-flow-diagram'
 
@@ -15,37 +16,9 @@ import { GroupOrderEditor } from './pot-flow-diagram'
  *
  * Puur volgorde-herordening → geen datamodel-/kernelwijziging (zie pot-rules.ts).
  */
-/**
- * Beschrijft de volgorde zoals de kern hem rekent (`prio-overgang.ts#orderedGroupsToPrio`:
- * plek → prio min(plek, 4), gewicht ½^(prio−1)): vooraan = het zwaarst aangesproken, de rest
- * loopt in afnemende mate mee. Geen oordeel ("gunstig", "beschermen"), geen belofte (Wft;
- * compliance-check TPR-15 14 sep 2026). Getoetst in `plan-review/wizard-kopij.test.ts`.
- */
-export const ORDER_PRESET_COPY: Record<OrderPresetId, { title: string; description: string }> = {
-  'liquide-eerst': {
-    title: 'Spaargeld eerst',
-    description:
-      'Spaargeld staat vooraan en wordt het zwaarst aangesproken; beleggingen en overig lopen in afnemende mate mee, pensioen en vastgoed het minst.',
-  },
-  'rendement-beschermen': {
-    title: 'Beleggingen achteraan',
-    description: 'Spaargeld staat vooraan; beleggingen staan achteraan en worden het minst aangesproken.',
-  },
-  'fiscaal-box3': {
-    title: 'Beleggingen eerst',
-    description:
-      'Beleggingen staan vooraan en worden het zwaarst aangesproken; spaargeld loopt in mindere mate mee.',
-  },
-  'pensioen-sparen': {
-    title: 'Pensioen achteraan',
-    description:
-      'Je pensioenbezittingen staan achteraan en worden het minst aangesproken; spaargeld staat vooraan.',
-  },
-  aangepast: {
-    title: 'Aangepast',
-    description: 'Bepaal de volgorde zelf met de slepen-editor hieronder.',
-  },
-}
+// De presetnamen wonen in een pure module (één bron met de rijwaarde in Instellingen);
+// hier her-geëxporteerd voor bestaande imports.
+export { ORDER_PRESET_COPY }
 
 export function OrderPresetPicker({
   presets,

@@ -12,13 +12,15 @@
  * katern de "Wat zie ik hier?"-inhoud van zijn eigen route toont.
  */
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { KaternKoppen, type KaternKopItem } from '@/components/editorial/katern-koppen'
+import { KaternAccentScope } from '@/components/editorial/katern-accent-scope'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import type { PageInfoContent } from '@/lib/page-info-content'
 import { KATERN_LABEL, KATERN_NAV_LABEL, KATERN_VOLGORDE, type KaternId } from '@/lib/horizon/katern-copy'
 import { useToekomstKaternMeldingen } from '@/components/toekomst/meldingen/toekomst-katern-meldingen'
 import { KATERN_HREF } from './katern-routes'
+import { KATERN_ACCENT } from './katern-accent'
 import { useActiefKatern } from './actief-katern'
 
 /**
@@ -66,6 +68,9 @@ export function ToekomstKaternKoppen({ className = '' }: { className?: string })
       samenvatting: staat?.samenvatting ?? null,
       status: staat?.status ?? null,
       onSelect: staat && staat.display === 'minimized' ? staat.restore : undefined,
+      // Eigen accent per katern (Fins drie kleuren, `KATERN_ACCENT`): de koppen lezen als
+      // tabbladen: de drie delen van de pagina, de actieve sluit aan op zijn katern.
+      accent: KATERN_ACCENT[key],
     }
   })
   return (
@@ -75,6 +80,22 @@ export function ToekomstKaternKoppen({ className = '' }: { className?: string })
       <div ref={ankerRef} aria-hidden="true" data-testid="katern-koppen-anker" />
       <KaternKoppen items={items} actiefKey={actief} label={KATERN_NAV_LABEL} className={className} />
     </>
+  )
+}
+
+/**
+ * Het accent van het actieve katern als module-accent voor alles erbinnen
+ * (`--module-active-*` → het accent uit `KATERN_ACCENT`): de subpagina draagt de kleur
+ * van haar tab, zonder vlak. `display: contents` — geen box, dus geen verschuiving (de
+ * één-scherm-eis van Doelen op mobiel meet de plek van het rad). Ook bruikbaar om losse
+ * slots (canvas-zijkolom, actierij) heen. Met `className` wordt de scope zelf een box —
+ * de layout maakt er zo de witte katern-module onder de tabbladen van (`KATERN_MODULE`).
+ */
+export function ToekomstKaternAccentScope({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <KaternAccentScope accent={KATERN_ACCENT[useActiefKatern()]} className={className}>
+      {children}
+    </KaternAccentScope>
   )
 }
 

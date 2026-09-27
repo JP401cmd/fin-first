@@ -272,7 +272,9 @@ export function ToekomstKaternMeldingenProvider({
   const doelenTekst = doelenSamenvatting(
     doelActief && effectiveStopAge != null ? { stopAge: effectiveStopAge, zone: labZone } : null,
   )
-  const instellingenTekst = instellingenSamenvatting({ voorkeurenOpen, aowOntbreekt: aowNoticeVisible })
+  // AOW ontbreekt hoort sinds 27 sep bij Plan (de levensstrategieën staan daar); het punt
+  // op de Plan-kop draagt de melding, de Instellingen-kop noemt hem niet meer.
+  const instellingenTekst = instellingenSamenvatting({ voorkeurenOpen, aowOntbreekt: false })
 
   // Vaste volgorde van hook-aanroepen: één per katern.
   const plan = useKaternMeldingMinimize({

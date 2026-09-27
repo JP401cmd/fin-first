@@ -54,8 +54,8 @@ import {
   type HorizonOutcomeIssue,
 } from './outcome-guard'
 import { resolvePlanStatus, resolvePlanVerdict, type PlanStatusInput } from './plan-status'
-import { STRATEGIE_PAGINA, strategieHref } from './strategie-route'
-import { instellingenRijHref } from '@/lib/toekomst/instellingen-rij'
+import { strategieHref } from './strategie-route'
+import { INSTELLINGEN_PAGINA, instellingenRijHref } from '@/lib/toekomst/instellingen-rij'
 import { isKernelReachedNowDisplay } from '@/lib/horizon-kernel/bridge'
 import type { SolverStatus } from '@/lib/horizon-kernel/solver'
 import type { KaternKopStatus } from '@/components/editorial/katern-koppen'
@@ -243,7 +243,7 @@ export const KATERN_MELDING_KOPIJ = {
 export const KATERN_ROUTE: Readonly<Record<KaternId, string>> = {
   plan: '/toekomst',
   doelen: '/toekomst/doelen',
-  instellingen: STRATEGIE_PAGINA,
+  instellingen: INSTELLINGEN_PAGINA,
 }
 
 /**
@@ -431,8 +431,10 @@ function doelAchterMeldingen(doelen: readonly DoelSignaal[]): KaternMelding[] {
 
 function aowMelding(): KaternMelding {
   return {
-    id: 'instellingen-aow',
-    katern: 'instellingen',
+    // Sinds 27 sep staat de AOW-strategie bij de levensgebeurtenissen op Plan: de melding
+    // staat bij het katern waar je hem oplost (ADR 0179 D6).
+    id: 'plan-aow',
+    katern: 'plan',
     ernst: 'warn',
     titel: AOW_ONTBREEKT_COPY.kop,
     // Kopij-toets §4: het statuspunt heet "AOW ontbreekt" (zelfde woord als de samenvatting).
@@ -444,8 +446,9 @@ function aowMelding(): KaternMelding {
 
 function huisMelding(h: NonNullable<KaternMeldingenInput['huisNooitVerkocht']>): KaternMelding {
   return {
-    id: 'instellingen-huis',
-    katern: 'instellingen',
+    // Woonstrategie: sinds 27 sep op Plan (zie de AOW-melding).
+    id: 'plan-huis',
+    katern: 'plan',
     ernst: 'neutral',
     titel: KATERN_MELDING_KOPIJ.huisTitel,
     kort: KATERN_MELDING_KOPIJ.huisTitel,
@@ -511,9 +514,11 @@ export function wijsMeldingenToe(input: KaternMeldingenInput): KaternMeldingen {
   push(labPlanMelding(input.labDoelenBuitenPlan))
   for (const m of doelAchterMeldingen(input.doelen)) push(m)
 
-  // Instellingen
+  // Plan: de levensstrategieën (AOW, woning) staan sinds 27 sep bij de gebeurtenissen.
   if (input.aowOntbreekt) push(aowMelding())
   if (input.huisNooitVerkocht) push(huisMelding(input.huisNooitVerkocht))
+
+  // Instellingen
   push(gegevensMelding(input.ontbrekendeGegevens))
 
   const uit = {} as Record<KaternId, KaternMeldingenVanKatern>

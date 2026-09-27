@@ -20,9 +20,7 @@
  */
 
 import { useState } from 'react'
-import { GebeurtenissenMetHoofdrun } from './gebeurtenissen-met-hoofdrun'
-import { AnkerScroll } from '@/components/toekomst/layout/anker-scroll'
-import { GEBEURTENISSEN_ANKER } from '@/components/toekomst/layout/oude-lab-bladwijzer'
+import { PlanGebeurtenissen, PlanJaartabelLink } from './plan-gebeurtenissen'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { HideInSimple } from '@/components/app/hide-in-simple'
 import { SectionLabel } from '@/components/editorial'
@@ -40,7 +38,6 @@ import { PlanAnkerEnVoortgang } from '@/components/toekomst/plan/plan-hero-duidi
 import { PlanGegevensmelding } from '@/components/toekomst/plan/plan-gegevensmelding'
 import { PlanVerdieping } from '@/components/toekomst/plan/plan-verdieping'
 import { doelbedragOnderschrift } from '@/components/toekomst/plan/plan-helpers'
-import { PLAN_JAARTABEL_LINK } from '@/lib/horizon/katern-copy'
 import {
   PlanKassabonVrijheidsleeftijd,
   PlanKassabonDoelbedrag,
@@ -55,7 +52,7 @@ import {
 } from '@/components/toekomst/state/toekomst-state-provider'
 
 export function PlanPaneel() {
-  const { initialData, gebeurtenissen } = useToekomstBron()
+  const { initialData } = useToekomstBron()
   const {
     isHouseholdView,
     isPartnerView,
@@ -64,7 +61,6 @@ export function PlanPaneel() {
   } = useToekomstPerspectiefContext()
   const {
     openRetirementExpensePane,
-    setSimModalOpen,
   } = useToekomstOverlayContext()
   const {
     input,
@@ -356,44 +352,14 @@ export function PlanPaneel() {
       </section>
 
       {/* === KATERN II — Wat er in je leven gebeurt ===
-          De levensgebeurtenissen onder het plan (ADR 0179, addendum 26 sep): dezelfde
-          lijst met kernelmomenten en dezelfde toevoegknop als tot dan in Instellingen, in
-          Eenvoudig én Volledig. De props bouwt de layout server-side; de hoofdrun komt uit
-          de provider (besluit Q8). `#gebeurtenissen` is het anker van elke deeplink. */}
-      {gebeurtenissen && (
-        <section
-          id={GEBEURTENISSEN_ANKER}
-          className="mt-8 scroll-mt-20 sm:mt-10"
-          data-testid="plan-gebeurtenissen"
-        >
-          <AnkerScroll ankers={[GEBEURTENISSEN_ANKER]} />
-          <HideInSimple>
-            <SectionLabel num="II">Wat er in je leven gebeurt</SectionLabel>
-          </HideInSimple>
-          {/* De view draagt zijn eigen `max-w-6xl px-4 sm:px-6`-kolom; de katern-layout
-              padt al, dus de negatieve marge voorkomt dubbele inspringing. */}
-          <div className="-mx-4 sm:-mx-6">
-            <GebeurtenissenMetHoofdrun {...gebeurtenissen} />
-          </div>
-        </section>
-      )}
+          Onder `lg` hier; vanaf `lg` in de kolom naast de grafiek (layout, CanvasZijkolom;
+          eigenaarsbesluit 27 sep). Eén plek per breekpunt, zie `plan-gebeurtenissen.tsx`. */}
+      <PlanGebeurtenissen plek="pagina" />
 
       <PlanVerdieping personalHeroProjection={personalHeroProjection} />
 
-      {/* Links-rij van Plan (spec §4.3/§4.9): alleen de jaar-op-jaar-tabel. "Zo werkt je
-          grafiek" heeft één ingang, de i op het canvas. In beide weergavemodi (§4.7). */}
-      {simResult && (
-        <p className="mt-6 sm:mt-8">
-          <button
-            type="button"
-            onClick={() => setSimModalOpen(true)}
-            data-testid="plan-jaar-op-jaar"
-            className="inline-flex min-h-[44px] items-center font-sans text-[13px] text-[var(--ink-2)] underline decoration-[var(--border-ed)] underline-offset-4 transition-colors hover:text-[var(--module-active-700)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
-          >
-            {PLAN_JAARTABEL_LINK}
-          </button>
-        </p>
-      )}
+      {/* De jaar-op-jaar-tabel: hier onder `lg`, vanaf `lg` in de kolom onder de gebeurtenissen. */}
+      <PlanJaartabelLink />
 
       <PlanKassabonVrijheidsleeftijd
         showFireAgeReceipt={showFireAgeReceipt}

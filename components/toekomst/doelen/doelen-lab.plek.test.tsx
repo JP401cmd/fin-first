@@ -16,6 +16,9 @@ const h = vi.hoisted(() => ({
   setKnopWeergave: vi.fn(),
   toestand: 'nieuw' as string,
   saving: false,
+  planIsDezeStop: true,
+  stopConfirm: vi.fn(),
+  loslaten: vi.fn(),
 }))
 
 vi.mock('@/lib/hooks/use-media-query', () => ({
@@ -44,8 +47,8 @@ vi.mock('@/components/toekomst/state/toekomst-state-provider', () => ({
     doelBlok: null,
     setDoelSheetOpen: vi.fn(),
     doelSaving: h.saving,
-    setDoelLoslatenOpen: vi.fn(),
-    setStopPlanConfirmOpen: vi.fn(),
+    setDoelLoslatenOpen: h.loslaten,
+    setStopPlanConfirmOpen: h.stopConfirm,
     stopPlanSaving: false,
     setStopPlanError: vi.fn(),
     firstDragHintVisible: false,
@@ -56,7 +59,7 @@ vi.mock('@/components/toekomst/state/toekomst-state-provider', () => ({
     planEindVorm: 'deplete',
     labGrenzenPending: false,
     labZone: null,
-    planIsDezeStop: true,
+    planIsDezeStop: h.planIsDezeStop,
     handleScenarioReset: vi.fn(),
     labOpslaanToestand: h.toestand as LabOpslaanToestand,
     handleDoelHerstellen: vi.fn(),
@@ -67,7 +70,7 @@ vi.mock('@/components/toekomst/state/toekomst-state-provider', () => ({
   useToekomstEuroContext: () => ({ labUitkomstRegel: null }),
 }))
 
-import { DoelenKaternLab } from './doelen-katern-lab'
+import { DoelenKaternLab, DoelenKaternLabActies } from './doelen-katern-lab'
 
 beforeEach(() => {
   h.isLg = false
@@ -75,11 +78,20 @@ beforeEach(() => {
   h.bar = []
   h.toestand = 'nieuw'
   h.saving = false
+  h.planIsDezeStop = true
   h.setKnopWeergave.mockClear()
+  h.stopConfirm.mockClear()
+  h.loslaten.mockClear()
 })
 afterEach(cleanup)
 
-const laatsteBar = () => h.bar[h.bar.length - 1] as { primary: { label: string; disabled?: boolean }; secondary?: { label: string } } | null
+type Extra = { label: string; onClick?: () => void; href?: string; disabled?: boolean }
+const laatsteBar = () =>
+  h.bar[h.bar.length - 1] as {
+    primary: { label: string; disabled?: boolean }
+    secondary?: { label: string }
+    extra?: Extra[]
+  } | null
 
 describe('DoelenKaternLab — twee plekken', () => {
   it('kolom: desktop-vorm (harp), altijd in de DOM; de CSS-zichtbaarheid komt van de zijkolom', () => {
@@ -169,5 +181,94 @@ describe('DoelenKaternLab — de opslaan-actie in de shell-action-bar (mobiel)',
   it('de kolom (desktop) registreert nooit een bar', () => {
     render(<DoelenKaternLab plek="kolom" />)
     expect(h.bar.every((c) => c === null)).toBe(true)
+  })
+})
+
+describe('DoelenKaternLab — één plek per actie (27 sep)', () => {
+  const stopSlot = () => {
+    cleanup()
+    render(<>{h.lab[0].stopSlot as React.ReactNode}</>)
+  }
+
+  it('met bar: stopmoment en plan-keuzes staan in de extra rij; nieuw heeft geen Loslaten', () => {
+    h.planIsDezeStop = false
+    h.toestand = 'nieuw'
+    render(<DoelenKaternLab plek="onder-koppen" />)
+    const extra = laatsteBar()?.extra ?? []
+    expect(extra.map((e) => e.label)).toEqual(['Maak 60 mijn stopmoment', 'Je plan-keuzes →'])
+    expect(extra[1].href).toBe('/toekomst/instellingen')
+    extra[0].onClick?.()
+    expect(h.stopConfirm).toHaveBeenCalledWith(true)
+  })
+
+  it('met bar in gewijzigd: Loslaten erbij; de stop-actie alleen als de knop van het plan afwijkt', () => {
+    h.toestand = 'gewijzigd'
+    render(<DoelenKaternLab plek="onder-koppen" />)
+    const extra = laatsteBar()?.extra ?? []
+    expect(extra.map((e) => e.label)).toEqual(['Je plan-keuzes →', 'Doel loslaten'])
+    extra[1].onClick?.()
+    expect(h.loslaten).toHaveBeenCalledWith(true)
+  })
+
+  it('stopmoment én Loslaten: de plan-keuzes-link valt weg (drie acties lopen op 360 px over twee regels)', () => {
+    h.planIsDezeStop = false
+    h.toestand = 'gewijzigd'
+    render(<DoelenKaternLab plek="onder-koppen" />)
+    const extra = laatsteBar()?.extra ?? []
+    expect(extra.map((e) => e.label)).toEqual(['Maak 60 mijn stopmoment', 'Doel loslaten'])
+  })
+
+  it('tijdens opslaan zijn de extra acties uitgeschakeld', () => {
+    h.planIsDezeStop = false
+    h.toestand = 'gewijzigd'
+    h.saving = true
+    render(<DoelenKaternLab plek="onder-koppen" />)
+    const extra = laatsteBar()?.extra ?? []
+    expect(extra.find((e) => e.label === 'Doel loslaten')?.disabled).toBe(true)
+  })
+
+  it('met bar: op de pagina alleen de weergavekeuze en de statusregel, geen knoppen', () => {
+    h.planIsDezeStop = false
+    h.toestand = 'gewijzigd'
+    render(<DoelenKaternLab plek="onder-koppen" />)
+    const balk = screen.getByTestId('lab-opslaan-balk')
+    expect(balk.querySelectorAll('button')).toHaveLength(0)
+    stopSlot()
+    expect(screen.getByTestId('lab-weergave-menu')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /mijn stopmoment/ })).toBeNull()
+    expect(screen.queryByRole('link', { name: /Je plan-keuzes/ })).toBeNull()
+  })
+
+  it('zonder bar (opgeslagen): alles blijft op de pagina, de nav-pill blijft staan', () => {
+    h.planIsDezeStop = false
+    h.toestand = 'opgeslagen'
+    render(<DoelenKaternLab plek="onder-koppen" />)
+    expect(laatsteBar()).toBeNull()
+    expect(screen.getByRole('button', { name: 'Doel loslaten' })).toBeTruthy()
+    stopSlot()
+    expect(screen.getByRole('button', { name: 'Maak 60 mijn stopmoment' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: /Je plan-keuzes/ })).toBeTruthy()
+  })
+
+  it('kolom (desktop): alleen het lab — geen acties, geen opslaan-balk', () => {
+    h.planIsDezeStop = false
+    render(<DoelenKaternLab plek="kolom" />)
+    expect(h.lab[0].stopSlot).toBeNull()
+    expect(screen.queryByTestId('lab-opslaan-balk')).toBeNull()
+  })
+
+  it('de actierij (desktop): stopmoment, plan-keuzes en de opslaan-balk met zijn knoppen', () => {
+    h.planIsDezeStop = false
+    h.toestand = 'gewijzigd'
+    render(<DoelenKaternLabActies />)
+    const rij = screen.getByTestId('doelen-lab-actierij')
+    expect(rij.textContent).toContain('Maak 60 mijn stopmoment')
+    expect(screen.getByRole('link', { name: /Je plan-keuzes/ }).getAttribute('href')).toBe('/toekomst/instellingen')
+    const knoppen = Array.from(screen.getByTestId('lab-opslaan-balk').querySelectorAll('button')).map((b) => b.textContent)
+    expect(knoppen).toEqual(['Doel bijwerken', 'Herstel mijn doel', 'Doel loslaten'])
+    fireEvent.click(screen.getByRole('button', { name: 'Maak 60 mijn stopmoment' }))
+    expect(h.stopConfirm).toHaveBeenCalledWith(true)
+    // De actierij registreert geen shell-bar.
+    expect(h.bar).toEqual([])
   })
 })

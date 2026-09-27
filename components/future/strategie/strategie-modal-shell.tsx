@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
+import { ModalFooter } from '@/components/app/modal-footer'
 
 /**
  * StrategieModalShell — gedeelde chrome voor de drie levensstrategie-editors
@@ -13,7 +14,7 @@ import { ShellOverlay } from '@/components/app/shell/shell-overlay'
  * De `footer`-slot is volledig injecteerbaar (geen vaste onSave), omdat de
  * Pensioen-editor twee views heeft (lijst vs pot-editor) met verschillende
  * acties en Huis zijn eigen inline-save behoudt. Gebruik `StrategieFooter` voor
- * het standaard Annuleer/Opslaan-paar.
+ * het standaard Opslaan/Annuleren-paar.
  */
 export function StrategieModalShell({
   open,
@@ -76,14 +77,19 @@ export function StrategieModalShell({
   )
 }
 
-/** Standaard footer-actiebalk: optioneel een leading-element links, Annuleer + Opslaan rechts. */
+/**
+ * Standaard footer-actiebalk van de levensstrategie-editors — dezelfde vorm als elke andere
+ * bewerk-footer (`ModalFooter`, D3 27 sep 2026): de verschilregel (`info`) en een optioneel
+ * leading-element eerst, dan de primaire knop links, "Annuleren" ernaast. Zonder `onSave`
+ * (bv. de pensioenlijst) is de enige knop het sluiten.
+ */
 export function StrategieFooter({
   onCancel,
   onSave,
   saving,
   saveDisabled,
   saveLabel = 'Opslaan',
-  cancelLabel = 'Annuleer',
+  cancelLabel = 'Annuleren',
   leading,
   info,
 }: {
@@ -97,31 +103,20 @@ export function StrategieFooter({
   /** ADR 0179 §7.7 — de verschilregel van de body (`RegelEditActionsState.footerInfo`). */
   info?: ReactNode
 }) {
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-3 sm:px-6">
-      <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1">
+  const voorKnoppen =
+    leading || info ? (
+      <span className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1">
         {leading}
-        {info && <span className="text-[var(--ink-2)]">{info}</span>}
-      </div>
-      <div className="ml-auto flex items-center gap-2">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="rounded-xl px-3 py-2 text-sm font-medium text-[var(--ink-3)] transition-colors hover:text-[var(--ink-2)]"
-        >
-          {cancelLabel}
-        </button>
-        {onSave && (
-          <button
-            type="button"
-            onClick={onSave}
-            disabled={saving || saveDisabled}
-            className="rounded-xl bg-[var(--ink)] px-4 py-2 text-sm font-semibold text-[var(--paper)] transition-colors hover:bg-[var(--ink-2)] disabled:opacity-50"
-          >
-            {saving ? 'Opslaan…' : saveLabel}
-          </button>
-        )}
-      </div>
-    </div>
+        {info}
+      </span>
+    ) : undefined
+  return onSave ? (
+    <ModalFooter
+      primary={{ label: saveLabel, onClick: onSave, loading: saving, disabled: saveDisabled }}
+      secondary={{ label: cancelLabel, onClick: onCancel }}
+      info={voorKnoppen}
+    />
+  ) : (
+    <ModalFooter primary={{ label: cancelLabel, onClick: onCancel }} info={voorKnoppen} />
   )
 }

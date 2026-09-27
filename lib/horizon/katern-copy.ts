@@ -280,6 +280,12 @@ export function aannamesRegelTekst(input: AannamesInput, modus: 'eenvoudig' | 'v
  */
 export const PLAN_JAARTABEL_LINK = 'Jaar-op-jaar-tabel →'
 
+/**
+ * De kop van de levensgebeurtenissen op Plan — het sectielabel op de pagina en de
+ * kicker-kop van de compacte kolom naast de grafiek (27 sep). Eén bron voor beide.
+ */
+export const PLAN_GEBEURTENISSEN_KOP = 'Wat er in je leven gebeurt'
+
 // ── Canvas-modi (spec §4.2 regel 2, ADR 0179 D3) ─────────────────────────────
 
 export type CanvasModus = 'vermogen' | 'samenstelling' | 'geldstroom'

@@ -24,6 +24,7 @@ import {
   nextRangeValueForKey,
   snapToStep,
 } from '@/components/overview/belasting/range-slider-snap'
+import { strategieHref } from '@/lib/horizon/strategie-route'
 
 const BOX1_COLOR = 'var(--color-box1-700)'
 const PLAYFAIR = 'var(--font-playfair, Georgia, serif)'
@@ -433,7 +434,7 @@ export function JaarruimteCard({
             dus dit is een bovengrens (elke euro factor A verlaagt de ruimte met{' '}
             {JAARRUIMTE_FACTOR_A_IMPUTATIE} euro). Vul &apos;m in bij je{' '}
             <Link
-              href="/toekomst/instellingen?rij=pensioen"
+              href={strategieHref('pensioen')}
               className="font-medium text-[var(--ink-2)] underline underline-offset-2 hover:text-[var(--ink)]"
             >
               pensioen-strategie
@@ -447,7 +448,7 @@ export function JaarruimteCard({
             {' '}(telt × {JAARRUIMTE_FACTOR_A_IMPUTATIE} mee in de aftrek). Je factor
             A beheer je bij je{' '}
             <Link
-              href="/toekomst/instellingen?rij=pensioen"
+              href={strategieHref('pensioen')}
               className="font-medium text-[var(--ink-2)] underline underline-offset-2 hover:text-[var(--ink)]"
             >
               pensioen-strategie

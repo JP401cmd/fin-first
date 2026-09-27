@@ -9,7 +9,8 @@
 
 import { describe, it, expect } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
-import { KaternKoppen, type KaternKopItem } from './katern-koppen'
+import { KATERN_MODULE, KaternKoppen, type KaternKopItem } from './katern-koppen'
+import { KaternAccentScope, moduleActiveVars } from './katern-accent-scope'
 import { LEVERAGE_STATUS_DOT } from '@/lib/leverage-status'
 
 const ITEMS: KaternKopItem[] = [
@@ -98,5 +99,136 @@ describe('KaternKoppen', () => {
   it('rendert geen kop-element (de shell draagt de h1, de pagina de koppen)', () => {
     const { container } = renderKoppen()
     expect(container.querySelector('h1, h2, h3, h4, h5, h6')).toBeNull()
+  })
+
+  it('zonder accent: het oorspronkelijke kicker-gedrag (mono, inkt-streep, ink-3 in rust)', () => {
+    renderKoppen('plan')
+    const actief = screen.getByTestId('katern-kop-plan')
+    const rust = screen.getByTestId('katern-kop-doelen')
+    expect(actief.className).toContain('border-t-2')
+    expect(actief.className).toContain('border-[var(--ink)]')
+    expect(rust.className).toContain('text-[var(--ink-3)]')
+    expect(rust.className).toContain('border-transparent')
+    expect(actief.className).not.toMatch(/--color-(kern|wil|horizon|fin)-/)
+    expect(actief.firstElementChild?.className).toContain('font-mono')
+    expect(actief.firstElementChild?.className).toContain('uppercase')
+    // Geen tab-overloop zonder accent.
+    expect(actief.parentElement?.className).not.toContain('-mb-px')
+  })
+})
+
+describe('KaternKoppen — accent per kop', () => {
+  const MET_ACCENT: KaternKopItem[] = [
+    { ...ITEMS[0], accent: 'kern' },
+    { ...ITEMS[1], accent: 'wil' },
+    { ...ITEMS[2], accent: 'horizon' },
+  ]
+
+  it('tabbladen: een strook op een basislijn, elke tab een eigen omkaderd vlak met ruimte ertussen', () => {
+    renderKoppen('plan', MET_ACCENT)
+    const ul = screen.getByTestId('katern-koppen').querySelector('ul')!
+    expect(ul.className).toContain('border-b')
+    expect(ul.className).toContain('gap-1')
+    for (const link of screen.getAllByRole('link')) {
+      expect(link.className).toContain('border-x')
+      expect(link.className).toContain('border-t-[3px]')
+      expect(link.className).toContain('border-x-[color:var(--border-ed)]')
+    }
+  })
+
+  it('inactieve tabs liggen achter: geen eigen tint (op de pagina), ink-2, gedempte accentstreep', () => {
+    renderKoppen('plan', MET_ACCENT)
+    const doelen = screen.getByTestId('katern-kop-doelen')
+    const instellingen = screen.getByTestId('katern-kop-instellingen')
+    // Eigenaar 27 sep: een gemengde tint gaf een roze waas — de tab ligt gewoon op de pagina.
+    expect(doelen.className).toContain('bg-transparent')
+    expect(doelen.className).not.toContain('color-mix')
+    expect(doelen.className).toContain('text-[var(--ink-2)]')
+    expect(doelen.className).not.toContain('text-[var(--ink-3)]')
+    expect(doelen.className).toContain('border-t-[color:var(--color-wil-400)]')
+    expect(doelen.className).toContain('hover:border-t-[color:var(--color-wil-500)]')
+    expect(instellingen.className).toContain('border-t-[color:var(--color-horizon-400)]')
+    // Zwaardere, grotere naam.
+    expect(doelen.firstElementChild?.className).toContain('font-display')
+    expect(doelen.firstElementChild?.className).toContain('font-semibold')
+    expect(doelen.firstElementChild?.className).not.toContain('uppercase')
+  })
+
+  it('de actieve tab: sterkere streep, wit (papier, zoals de module eronder), sluit zonder lijn aan; het accent is nooit een vlak', () => {
+    renderKoppen('doelen', MET_ACCENT)
+    const doelen = screen.getByTestId('katern-kop-doelen')
+    expect(doelen.getAttribute('aria-current')).toBe('page')
+    expect(doelen.className).toContain('border-t-[color:var(--color-wil-600)]')
+    expect(doelen.className).toContain('bg-[var(--paper)]')
+    expect(doelen.className).toContain('text-[var(--ink)]')
+    expect(doelen.parentElement?.className).toContain('-mb-px')
+    // Geen enkele tab heeft een accent als achtergrond.
+    for (const link of screen.getAllByRole('link')) expect(link.className).not.toMatch(/bg-\[var\(--color-/)
+  })
+
+  it('de witte katern-module: papier, hairline zonder bovenrand (die is de tabstrook), geen accent-vlak', () => {
+    expect(KATERN_MODULE).toContain('bg-[var(--paper)]')
+    expect(KATERN_MODULE).toContain('border-t-0')
+    expect(KATERN_MODULE).toContain('sm:border-x')
+    expect(KATERN_MODULE).not.toMatch(/--color-|module-active/)
+  })
+
+  it('raakgebied en hoogte gelijk aan de kicker-variant (één-scherm-eis Doelen mobiel)', () => {
+    renderKoppen('doelen', MET_ACCENT)
+    for (const link of screen.getAllByRole('link')) {
+      expect(link.className).toContain('min-h-[44px]')
+      expect(link.className).toContain('pt-2.5')
+      expect(link.className).toContain('pb-2')
+      expect(link.className).not.toMatch(/\b(py|pt|pb)-(3|4|5|6)\b/)
+      expect(link.className).toContain('focus-visible:outline-2')
+    }
+  })
+
+  it('het statuspunt blijft stoplicht, los van het accent; naam en beschrijving ongewijzigd', () => {
+    renderKoppen('plan', MET_ACCENT)
+    const punt = screen.getByTestId('katern-kop-punt-instellingen')
+    expect(punt.className).toContain(LEVERAGE_STATUS_DOT.warn)
+    expect(punt.className).not.toMatch(/horizon-|kern-|wil-|fin-|module-active/)
+    const link = screen.getByTestId('katern-kop-instellingen')
+    expect(link).toHaveAccessibleName('Instellingen, melding: AOW ontbreekt')
+    expect(link).toHaveAccessibleDescription('nog 2 voorkeuren open · AOW ontbreekt')
+  })
+})
+
+describe('KaternAccentScope', () => {
+  it('zet --module-active-50..950 op het accent, als contents-wrapper zonder vlak', () => {
+    render(
+      <KaternAccentScope accent="wil">
+        <p>inhoud</p>
+      </KaternAccentScope>,
+    )
+    const scope = screen.getByTestId('katern-accent-scope')
+    expect(scope.getAttribute('data-accent')).toBe('wil')
+    expect(scope.className).toBe('contents')
+    for (const t of [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950]) {
+      expect(scope.style.getPropertyValue(`--module-active-${t}`)).toBe(`var(--color-wil-${t})`)
+    }
+    // Geen achtergrond, geen padding: het accent is nooit een vlak.
+    expect(scope.style.background).toBe('')
+    expect(scope.style.backgroundImage).toBe('')
+    expect(scope.style.backgroundColor).toBe('')
+    expect(screen.getByText('inhoud')).toBeTruthy()
+  })
+
+  it('raakt alleen module-active: stoplicht-, status- en fasetokens blijven buiten de scope', () => {
+    const vars = Object.keys(moduleActiveVars('horizon'))
+    expect(vars).toHaveLength(11)
+    for (const v of vars) expect(v).toMatch(/^--module-active-\d+$/)
+  })
+
+  it('zonder accent: geen override, de subtree erft het route-accent', () => {
+    render(
+      <KaternAccentScope>
+        <p>inhoud</p>
+      </KaternAccentScope>,
+    )
+    const scope = screen.getByTestId('katern-accent-scope')
+    expect(scope.getAttribute('style')).toBeNull()
+    expect(scope.hasAttribute('data-accent')).toBe(false)
   })
 })

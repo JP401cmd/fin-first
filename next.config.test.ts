@@ -81,10 +81,11 @@ describe('next.config redirects — legacy routes redirecten op de routing-laag 
     expect(gericht.has).toEqual([
       { type: 'query', key: 'focus', value: '(?<focus>aow|pensioen|huis|werk)' },
     ])
-    expect(gericht.destination).toBe('/toekomst/instellingen?rij=:focus')
+    // Sinds 27 sep 2026 staan de levensstrategieën op Plan (ADR 0179 addendum (e)).
+    expect(gericht.destination).toBe('/toekomst?rij=:focus#levensstrategieen')
 
     expect(fallback.has).toBeUndefined()
-    expect(fallback.destination).toBe('/toekomst/instellingen?rij=aow')
+    expect(fallback.destination).toBe('/toekomst?rij=aow#levensstrategieen')
   })
 
   it('/horizon/whatif en /toekomst/whatif landen kaal op het lab in katern Doelen (ADR 0144, 0179)', async () => {
@@ -103,11 +104,16 @@ describe('next.config redirects — legacy routes redirecten op de routing-laag 
 
   it('/toekomst/voorkeuren gaat op in Instellingen, /toekomst/gebeurtenissen landt onder het plan (ADR 0179, addendum 26 sep)', async () => {
     const voorkeuren = await rulesFor('/toekomst/voorkeuren')
-    expect(voorkeuren).toHaveLength(1)
-    expect(voorkeuren[0].destination).toBe('/toekomst/instellingen')
-    expect(voorkeuren[0].permanent).toBe(false)
-    // Geen `has`-filter: elke query (?strategie=, ?regel=) gaat mee.
-    expect(voorkeuren[0].has).toBeUndefined()
+    expect(voorkeuren).toHaveLength(2)
+    for (const r of voorkeuren) expect(r.permanent).toBe(false)
+    // Eerst de levensstrategieën: die staan sinds 27 sep 2026 op Plan (addendum (e)).
+    expect(voorkeuren[0].has).toEqual([
+      { type: 'query', key: 'strategie', value: '(?:aow|pensioen|huis|werk)' },
+    ])
+    expect(voorkeuren[0].destination).toBe('/toekomst#levensstrategieen')
+    // Daarna de rest naar Instellingen, zonder `has`-filter: elke overige query (?regel=) gaat mee.
+    expect(voorkeuren[1].destination).toBe('/toekomst/instellingen')
+    expect(voorkeuren[1].has).toBeUndefined()
 
     const gebeurtenissen = await rulesFor('/toekomst/gebeurtenissen')
     expect(gebeurtenissen).toHaveLength(2)
@@ -197,10 +203,10 @@ describe('next.config redirects — /toekomst/gebeurtenissen (ADR 0179, addendum
     expect(await resolveLocation('/toekomst/gebeurtenissen?nieuw=1')).toBe('/toekomst?nieuw=1#gebeurtenissen')
   })
 
-  it('met een levensstrategie → Instellingen (die editors wonen bij Voorkeuren)', async () => {
+  it('met een levensstrategie → Plan, bij de levensstrategieën (sinds 27 sep 2026, addendum (e))', async () => {
     for (const key of ['aow', 'pensioen', 'huis', 'werk']) {
       expect(await resolveLocation(`/toekomst/gebeurtenissen?strategie=${key}`)).toBe(
-        `/toekomst/instellingen?strategie=${key}`,
+        `/toekomst?strategie=${key}#levensstrategieen`,
       )
     }
     expect(await resolveLocation('/toekomst/gebeurtenissen?strategie=aowx')).toBe(
@@ -221,11 +227,12 @@ describe('next.config redirects — oude /toekomst?tab= en ?modal=withdrawal (AD
     expect(await resolveLocation('/toekomst?tab=gebeurtenissen&nieuw=1')).toBeNull()
   })
 
-  it('tab=gebeurtenissen mét levensstrategie → Instellingen zonder hash (strategieën wonen bij Voorkeuren)', async () => {
+  it('tab=gebeurtenissen mét levensstrategie blijft op Plan: geen redirect; OudeTabParam en de editor-host doen de rest', async () => {
+    // Sinds 27 sep 2026 staan de levensstrategieën op Plan zelf (addendum (e)): een redirect
+    // van /toekomst naar /toekomst zou een lus zijn. OudeTabParam haalt `tab` weg, de
+    // editor-host leest `strategie` en opent de levensstrategie.
     for (const key of ['aow', 'pensioen', 'huis', 'werk']) {
-      expect(await resolveLocation(`/toekomst?tab=gebeurtenissen&strategie=${key}`)).toBe(
-        `/toekomst/instellingen?tab=gebeurtenissen&strategie=${key}`,
-      )
+      expect(await resolveLocation(`/toekomst?tab=gebeurtenissen&strategie=${key}`)).toBeNull()
     }
     // Geen levensstrategie-sleutel (een prefix-truc): geen regel, dus Plan — waar
     // OudeTabParam het anker #gebeurtenissen zet (addendum 26 sep).

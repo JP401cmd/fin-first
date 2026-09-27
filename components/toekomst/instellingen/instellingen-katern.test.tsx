@@ -4,7 +4,6 @@ import { DisplayModeProvider } from '@/lib/hooks/use-display-mode'
 import { PlanReviewContext } from '@/components/future/plan-review/plan-review-provider'
 import { PLAN_REVIEW_HREF, PLAN_REVIEW_NAAM, type PlanReviewProgress } from '@/lib/plan-review/types'
 import { POT_RULES_DEFAULTS } from '@/lib/pot-rules'
-import type { StrategieEditorsData } from '@/components/future/strategie/strategie-editors'
 
 /**
  * InstellingenKatern (ADR 0179) — compositie van wizard-ingang en de rijen (fase 3). Bewaakt:
@@ -32,11 +31,6 @@ vi.mock('@/lib/supabase/client', () => ({
   }),
 }))
 vi.mock('@/components/future/regel-bewerken-pane', () => ({ RegelBewerkenPane: () => null }))
-vi.mock('@/components/future/strategie/strategie-editors', () => ({
-  StrategieEditors: ({ open }: { open: string | null }) => (
-    <div data-testid="strategie-editors-open">{open ?? 'none'}</div>
-  ),
-}))
 vi.mock('@/components/future/gebeurtenissen-view', async () => {
   const { useSearchParams } = await import('next/navigation')
   return {
@@ -52,19 +46,6 @@ vi.mock('@/components/future/plan-review/plan-review-pane', () => ({ PlanReviewP
 
 import { InstellingenKatern } from './instellingen-katern'
 
-const strategieData: StrategieEditorsData = {
-  baseline: null,
-  dailyExpenses: 0,
-  aowRows: [],
-  dateOfBirth: null,
-  grossYearlyIncome: 0,
-  pensioenFactorA: 0,
-  currentAge: null,
-  inflationRate: 0,
-  currentNetMonthly: 0,
-  housingPreview: null,
-}
-
 const rijen = {
   events: [],
   firePlan: null,
@@ -75,7 +56,7 @@ const rijen = {
   uitgaveNaPensioen: 0,
   geenTekortLening: true,
   tekortLeningRente: 0.05,
-  strategieData,
+  dagtarief: 100,
   fireParams: {
     grossReturn: 0.07,
     inflationRate: 0.025,
@@ -175,10 +156,18 @@ describe('InstellingenKatern — wizard-ingang', () => {
 })
 
 describe('InstellingenKatern — deeplinks op de samengevoegde route', () => {
-  it('?strategie=aow (alias van ?rij=aow) opent de AOW-editor', () => {
+  it('?strategie=aow (alias van ?rij=aow) gaat door naar de AOW-rij op Plan (27 sep)', () => {
     nav.search = new URLSearchParams('strategie=aow')
     renderKatern(null)
-    expect(screen.getByTestId('strategie-editors-open').textContent).toBe('aow')
+    expect(nav.replace).toHaveBeenCalledWith('/toekomst?rij=aow#levensstrategieen')
+  })
+
+  it('de wizardknop volgt de stand: niets bevestigd → Beginnen, deels → Verder', () => {
+    renderKatern(progress({ bevestigd: 0 }), { open: vi.fn() })
+    expect(screen.getByRole('button', { name: /Beginnen/ })).toBeTruthy()
+    cleanup()
+    renderKatern(progress(), { open: vi.fn() })
+    expect(screen.getByRole('button', { name: /Verder/ })).toBeTruthy()
   })
 
 })
@@ -189,18 +178,16 @@ describe('InstellingenKatern — deeplink ruimt zich op en het anker klopt (C3 p
     vi.restoreAllMocks()
   })
 
-  it('?strategie=aow: de editor opent en de param verdwijnt meteen, met behoud van de hash', () => {
-    window.history.replaceState(null, '', '/toekomst/instellingen?strategie=aow#voorkeuren')
-    nav.search = new URLSearchParams('strategie=aow')
+  it('?rij=box3: de editor opent en de param verdwijnt meteen, met behoud van de hash', () => {
+    window.history.replaceState(null, '', '/toekomst/instellingen?rij=box3#voorkeuren')
+    nav.search = new URLSearchParams('rij=box3')
     renderKatern(null)
-    expect(screen.getByTestId('strategie-editors-open').textContent).toBe('aow')
     expect(nav.replace).toHaveBeenCalledWith('/toekomst/instellingen#voorkeuren', { scroll: false })
   })
 
   it('een ongeldige ?strategie= opent niets maar blijft ook niet hangen', () => {
     nav.search = new URLSearchParams('strategie=onzin&x=1')
     renderKatern(null)
-    expect(screen.getByTestId('strategie-editors-open').textContent).toBe('none')
     expect(nav.replace).toHaveBeenCalledWith('/toekomst/instellingen?x=1', { scroll: false })
   })
 

@@ -474,7 +474,7 @@ export function AssetPane({
       <ShellOverlay
         open={isOpen}
         onClose={onClose}
-        kind="pane"
+        kind="pane" mobileInset={false}
         title={title}
         actions={headerActions}
         primaryAction={primaryAction}

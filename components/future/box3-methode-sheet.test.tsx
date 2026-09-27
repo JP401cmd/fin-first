@@ -179,7 +179,7 @@ describe('Box3MethodeSheet — sluiten', () => {
   it('Annuleer-knop roept onClose zonder te schrijven', () => {
     const onClose = vi.fn()
     render(<Box3MethodeSheet current="werkelijk" onClose={onClose} />)
-    fireEvent.click(screen.getByText('Annuleer'))
+    fireEvent.click(screen.getByText('Annuleren'))
     expect(onClose).toHaveBeenCalled()
     expect(mockFetch).not.toHaveBeenCalled()
   })

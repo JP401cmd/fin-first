@@ -48,7 +48,7 @@ describe('Plan-bladeren — map-brede grendels', () => {
     // Fase 1: uit horizon-client @ c1b4849eb. Fase 3: het afbouwoverzicht kwam uit de
     // opgeheven Voorkeuren-view (resultaat hoort in Plan, spec §5).
     expect(eerste).toMatch(
-      /^\/\/ Verplaatst uit (components\/app\/horizon\/horizon-client\.tsx r\d+–\d+.* @ c1b4849eb \(fase 1|components\/future\/voorkeuren-view\.tsx r\d+–\d+ @ [0-9a-f]{9} \(fase 3|components\/toekomst\/instellingen\/[\w-]+\.tsx @ [0-9a-f]{9} \(fase 6), ADR 0179\)\.$/,
+      /^\/\/ Verplaatst uit (components\/app\/horizon\/horizon-client\.tsx r\d+–\d+.* @ c1b4849eb \(fase 1|components\/future\/voorkeuren-view\.tsx r\d+–\d+ @ [0-9a-f]{9} \(fase 3|components\/toekomst\/instellingen\/[\w-]+\.tsx @ [0-9a-f]{9} \((fase 6|27 sep)|components\/toekomst\/plan\/[\w-]+\.tsx @ [0-9a-f]{9} \(27 sep), ADR 0179\)\.$/,
     )
   })
 
@@ -75,8 +75,10 @@ describe('Plan-bladeren — map-brede grendels', () => {
   })
 
   it('de jaartabel-link consumeert PLAN_JAARTABEL_LINK uit katern-copy, geen eigen tekst', () => {
-    const src = code(readSourceLF(join(DIR, 'plan-paneel.tsx')))
+    // Sinds 27 sep woont de link bij de gebeurtenissen (kolom vanaf lg, pagina eronder).
+    const src = code(readSourceLF(join(DIR, 'plan-gebeurtenissen.tsx')))
     expect(src).toContain('{PLAN_JAARTABEL_LINK}')
+    expect(code(readSourceLF(join(DIR, 'plan-paneel.tsx')))).toContain('<PlanJaartabelLink />')
     for (const f of bestanden) {
       expect(code(readSourceLF(join(DIR, f)))).not.toMatch(/Jaar-op-jaar-tabel/i)
     }
@@ -97,20 +99,29 @@ describe('plan-paneel — Doelbedrag-onderschrift volgt het bestaan van een woni
   })
 })
 
-describe('plan-paneel — de levensgebeurtenissen onder het plan (ADR 0179, addendum 26 sep)', () => {
+describe('plan-paneel — de levensgebeurtenissen onder het plan (ADR 0179, addendum 26 sep; kolom 27 sep)', () => {
   const paneel = code(readSourceLF(join(DIR, 'plan-paneel.tsx')))
+  const sectie = code(readSourceLF(join(DIR, 'plan-gebeurtenissen.tsx')))
 
-  it('rendert de bestaande GebeurtenissenMetHoofdrun met het anker #gebeurtenissen', () => {
-    expect(paneel).toContain('id={GEBEURTENISSEN_ANKER}')
-    expect(paneel).toContain('<GebeurtenissenMetHoofdrun {...gebeurtenissen} />')
-    expect(paneel).toContain('<AnkerScroll ankers={[GEBEURTENISSEN_ANKER]} />')
+  it('rendert de bestaande GebeurtenissenMetHoofdrun met het anker #gebeurtenissen op de zichtbare plek', () => {
+    expect(sectie).toContain('id={anker ? GEBEURTENISSEN_ANKER : undefined}')
+    expect(sectie).toContain('<GebeurtenissenMetHoofdrun {...gebeurtenissen} />')
+    expect(sectie).toContain('<GebeurtenissenMetHoofdrun {...gebeurtenissen} compact />')
+    expect(sectie).toContain('<AnkerScroll ankers={[GEBEURTENISSEN_ANKER]} />')
     // De props komen uit de provider (de layout bouwt ze), niet uit de route (D8).
-    expect(paneel).toContain('const { initialData, gebeurtenissen } = useToekomstBron()')
-    expect(paneel).not.toMatch(/useSearchParams|usePathname/)
+    expect(sectie).toContain('const { gebeurtenissen } = useToekomstBron()')
+    expect(sectie + paneel).not.toMatch(/useSearchParams|usePathname/)
+  })
+
+  it('één plek per breekpunt: de pagina-plek is lg:hidden, de kolom staat in de canvas', () => {
+    expect(sectie).toContain("pagina: 'lg:hidden'")
+    expect(paneel).toContain('<PlanGebeurtenissen plek="pagina" />')
+    const zijkolom = code(readSourceLF(join(process.cwd(), 'components', 'toekomst', 'layout', 'canvas-zijkolom.tsx')))
+    expect(zijkolom).toContain('<PlanGebeurtenissen plek="kolom" />')
   })
 
   it('staat onder de KPI-strip, de voortgang en de gegevensmelding, en boven "Wat het betekent"', () => {
-    const posities = ['<PlanKpiStrip', '<PlanAnkerEnVoortgang', '<PlanGegevensmelding', '<GebeurtenissenMetHoofdrun', '<PlanVerdieping'].map(
+    const posities = ['<PlanKpiStrip', '<PlanAnkerEnVoortgang', '<PlanGegevensmelding', '<PlanGebeurtenissen', '<PlanVerdieping'].map(
       (t) => paneel.indexOf(t),
     )
     expect(posities.every((p) => p >= 0)).toBe(true)
@@ -118,7 +129,7 @@ describe('plan-paneel — de levensgebeurtenissen onder het plan (ADR 0179, adde
   })
 
   it('verbergt de lijst niet in Eenvoudig (alleen het sectielabel is Volledig-only)', () => {
-    expect(paneel).not.toMatch(/<HideInSimple>\s*<div className="-mx-4 sm:-mx-6">\s*<GebeurtenissenMetHoofdrun/)
+    expect(sectie).not.toMatch(/<HideInSimple>\s*(<div className="-mx-4 sm:-mx-6">\s*)?<GebeurtenissenMetHoofdrun/)
   })
 
   it('het gezondheid-sheet is weg: het verloop-grid was zijn enige opener', () => {

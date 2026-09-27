@@ -284,11 +284,45 @@ const nextConfig: NextConfig = {
       // fase 3 aliassen van `?rij=`) blijven werken, en `?nieuw=1` (alias van `?event=new`) opent op Plan de catalogus.
       // Volgorde-eis: een levensstrategie-sleutel hoort bij Voorkeuren (Instellingen), dus
       // die gerichte variant staat vóór de algemene.
+      //
+      // Levensstrategieën (eigenaarsbesluit 27 sep 2026): AOW, pensioen, werk en eigen woning
+      // staan niet meer in Instellingen maar bij de levensgebeurtenissen op Plan
+      // (`/toekomst?rij=<key>#levensstrategieen`, lib/horizon/strategie-route.ts). Oude links
+      // met een levensstrategie-sleutel gaan daar rechtstreeks heen; de query (`rij`/
+      // `strategie`) reist mee, en de editor-host op Plan leest hem. Zonder `tab`: een
+      // `/toekomst?tab=voorkeuren&strategie=aow` gaat eerst naar Instellingen (regel verderop)
+      // en zou met de meereizende `tab` anders heen en weer blijven springen — die laatste
+      // stuurt de rij-deeplink in de client door.
+      {
+        source: '/toekomst/instellingen',
+        has: [{ type: 'query', key: 'rij', value: '(?:aow|pensioen|huis|werk)' }],
+        missing: [{ type: 'query', key: 'tab' }],
+        destination: '/toekomst#levensstrategieen',
+        permanent: false,
+      },
+      {
+        source: '/toekomst/instellingen',
+        has: [{ type: 'query', key: 'strategie', value: '(?:aow|pensioen|huis|werk)' }],
+        // `rij` wint van `strategie` (zelfde voorrang als `resolveRijDeeplink`): staat er een
+        // rij, dan beslist de regel hierboven, of de rij-deeplink op Instellingen zelf.
+        missing: [
+          { type: 'query', key: 'tab' },
+          { type: 'query', key: 'rij' },
+        ],
+        destination: '/toekomst#levensstrategieen',
+        permanent: false,
+      },
+      {
+        source: '/toekomst/voorkeuren',
+        has: [{ type: 'query', key: 'strategie', value: '(?:aow|pensioen|huis|werk)' }],
+        destination: '/toekomst#levensstrategieen',
+        permanent: false,
+      },
       { source: '/toekomst/voorkeuren', destination: '/toekomst/instellingen', permanent: false },
       {
         source: '/toekomst/gebeurtenissen',
         has: [{ type: 'query', key: 'strategie', value: '(?:aow|pensioen|huis|werk)' }],
-        destination: '/toekomst/instellingen',
+        destination: '/toekomst#levensstrategieen',
         permanent: false,
       },
       {
@@ -315,18 +349,8 @@ const nextConfig: NextConfig = {
       // sep): de gebeurtenissen staan op `/toekomst` zelf, en een regel `/toekomst` →
       // `/toekomst` zou met de meereizende query een lus zijn. `OudeTabParam` in de
       // katern-layout haalt `tab` weg en zet het anker `#gebeurtenissen`. Mét een
-      // levensstrategie-sleutel hoort de link bij Voorkeuren, in Instellingen:
-      {
-        source: '/toekomst',
-        has: [
-          { type: 'query', key: 'tab', value: 'gebeurtenissen' },
-          // Groep verplicht: Next bouwt `^${value}$`, en zonder `(?:…)` zou het
-          // anker maar aan de eerste en laatste alternatief hangen.
-          { type: 'query', key: 'strategie', value: '(?:aow|pensioen|huis|werk)' },
-        ],
-        destination: '/toekomst/instellingen',
-        permanent: false,
-      },
+      // levensstrategie-sleutel (`&strategie=aow`) is er sinds 27 sep ook geen regel meer:
+      // de levensstrategieën staan zelf op Plan, en de editor-host daar leest `strategie`.
       {
         source: '/toekomst',
         has: [{ type: 'query', key: 'tab', value: 'voorkeuren' }],
@@ -386,8 +410,8 @@ const nextConfig: NextConfig = {
       },
 
       // /toekomst/strategie?focus=aow|pensioen|huis|werk opende de bijbehorende
-      // levensstrategie — sinds ADR 0179 in katern Instellingen (daarvoor
-      // Voorkeuren, en vóór 17 sep 2026 de Gebeurtenissen-tab). Die vertakking gaat mee naar
+      // levensstrategie — sinds 27 sep 2026 bij de levensgebeurtenissen op Plan (daarvoor
+      // katern Instellingen, Voorkeuren, en vóór 17 sep 2026 de Gebeurtenissen-tab). Die vertakking gaat mee naar
       // de routing-laag via een named capture group in `has` — met een
       // volgorde-eis: de gerichte variant MOET vóór de
       // catch-all staan, anders landt elke deeplink op `aow`. Een onbekende
@@ -396,12 +420,12 @@ const nextConfig: NextConfig = {
       {
         source: '/toekomst/strategie',
         has: [{ type: 'query', key: 'focus', value: '(?<focus>aow|pensioen|huis|werk)' }],
-        destination: '/toekomst/instellingen?rij=:focus',
+        destination: '/toekomst?rij=:focus#levensstrategieen',
         permanent: false,
       },
       {
         source: '/toekomst/strategie',
-        destination: '/toekomst/instellingen?rij=aow',
+        destination: '/toekomst?rij=aow#levensstrategieen',
         permanent: false,
       },
 

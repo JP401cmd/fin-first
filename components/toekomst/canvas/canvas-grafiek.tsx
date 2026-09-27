@@ -34,6 +34,7 @@ import type { ChartEventKind, ChartEventOverlay } from '@/lib/chart-event-overla
 import type { NaturalMilestone } from '@/lib/natural-milestones'
 import { HideInSimple } from '@/components/app/hide-in-simple'
 import { useIsLgUp } from '@/lib/hooks/use-media-query'
+import { useSamenstellingPast } from './use-samenstelling-past'
 import {
   SimChart,
   type ScenarioOverlay,
@@ -195,6 +196,17 @@ export interface CanvasGrafiekProps {
   /** Compacte basishoogte van de vermogensgrafiek (`CanvasStand.plotHoogte`); `null` ⇒ standaard. */
   plotHoogte: number | null
   /**
+   * Basishoogte van de Samenstelling-grafiek (`CanvasStand.samenstellingHoogte`): op desktop
+   * gelijk aan `plotHoogte`, zodat de standaardweergave meegroeit met de kolom (27 sep).
+   * `null`/afwezig ⇒ de eigen hoogte van de grafiek.
+   */
+  samenstellingHoogte?: number | null
+  /**
+   * Mobiel in Doelen (`CanvasStand.samenstellingPastInVermogen`): de Samenstelling-plot
+   * wordt gemeten bijgesteld zodat die laag de cel niet hoger maakt dan Vermogen.
+   */
+  samenstellingPastInVermogen?: boolean
+  /**
    * ADR 0179 fase 4 — Samenstelling en Geldstroom tekenen in katern Doelen het doelscenario
    * (`CanvasStand.grafiekBron === 'doelscenario'`). Alle rijen komen al over de euro-grens
    * (`viewDoel*`) en uit één run; Vermogen blijft op het plan. `null`/afwezig ⇒ het plan.
@@ -291,9 +303,20 @@ export function CanvasGrafiek({
   toonTijdlijn = true,
   hoofdlijnGedempt = false,
   plotHoogte,
+  samenstellingHoogte = null,
+  samenstellingPastInVermogen = false,
   doelscenario = null,
 }: CanvasGrafiekProps) {
   const isLg = useIsLgUp()
+  const {
+    vermogenRef: vermogenLaagRef,
+    samenstellingRef: samenstellingLaagRef,
+    samenstellingPlot,
+  } = useSamenstellingPast({
+    actief: samenstellingPastInVermogen,
+    startPlot: samenstellingHoogte,
+    vermogenPlot: plotHoogte,
+  })
   // Samenstelling en Geldstroom: het doelscenario als de stand dat vraagt, anders het plan.
   const samenstelling = doelscenario
     ? {
@@ -364,6 +387,7 @@ export function CanvasGrafiek({
                       <div className="relative grid" data-testid="canvas-modi">
                         {/* Vermogenspad (SimChart) */}
                         <div
+                          ref={vermogenLaagRef}
                           className={MODUS_CEL}
                           {...modusLaagProps(modus === 'vermogen')}
                           data-testid="canvas-vermogen"
@@ -462,6 +486,7 @@ export function CanvasGrafiek({
 
                         {/* Vermogensopbouw (WealthCompositionChart) */}
                         <div
+                          ref={samenstellingLaagRef}
                           className={MODUS_CEL}
                           {...modusLaagProps(modus === 'samenstelling')}
                           data-testid="canvas-samenstelling"
@@ -485,6 +510,7 @@ export function CanvasGrafiek({
                             onEventClick={handleChartEventClick}
                             onClusterOpen={handleChartClusterOpen}
                             onYearClick={(age) => setSelectedYearAge(age)}
+                            plotHoogte={samenstellingPlot ?? undefined}
                           />
                         </div>
 

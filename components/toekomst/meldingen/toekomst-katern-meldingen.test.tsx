@@ -23,6 +23,7 @@ import {
   type KaternId,
 } from '@/lib/horizon/katern-copy'
 import { AOW_ONTBREEKT_COPY } from '@/lib/horizon/aow-notice-minimize'
+import { HORIZON_MISSENDE_GEGEVENS_LABEL } from '@/lib/horizon/outcome-guard'
 import { doelenPlanGewijzigdMelding } from '@/lib/horizon/anker-copy'
 import { buildDeficitLoanCopy } from '@/lib/horizon/deficit-loan-copy'
 import type { BannerDisplay } from '@/lib/page-status/display'
@@ -70,13 +71,14 @@ const INVOER: KaternMeldingenInput = {
   doelen: [],
   aowOntbreekt: true,
   huisNooitVerkocht: null,
-  ontbrekendeGegevens: [],
+  // 27 sep: AOW staat op Plan; Instellingen houdt de gegevensmelding als eigen melding.
+  ontbrekendeGegevens: ['geen-gegevens'],
 }
 
 const SAMENVATTING: Record<KaternId, string | null> = {
   plan: planSamenvatting({ kind: 'solved', doelbedragPct: 61.2 }),
   doelen: doelenSamenvatting({ stopAge: 58, zone: 'groen' }),
-  instellingen: instellingenSamenvatting({ voorkeurenOpen: 2, aowOntbreekt: true }),
+  instellingen: instellingenSamenvatting({ voorkeurenOpen: 2, aowOntbreekt: false }),
 }
 
 function waarde(display: Partial<Record<KaternId, BannerDisplay | 'none'>> = {}) {
@@ -121,10 +123,12 @@ describe('meldingenslot — per katern de juiste melding', () => {
     expect(within(kaart).getAllByRole('link', { name: /Bijwerken/ })[0]).toHaveAttribute('href', DOELEN_LAB_HREF)
   })
 
-  it('Instellingen: AOW ontbreekt, naar de AOW-strategie', () => {
+  it('Plan: AOW ontbreekt (in de ingeklapte rest), naar de AOW-strategie op Plan (27 sep)', () => {
     const { w } = waarde()
-    render(<KaternMeldingSlotVoor katern="instellingen" waarde={w} />)
-    const kaart = screen.getByTestId('katern-melding-instellingen-aow')
+    expect(w.meldingen.plan.meldingen.some((m) => m.id === 'plan-aow')).toBe(true)
+    const alleenAow = { ...w, meldingen: { ...w.meldingen, plan: { ...w.meldingen.plan, meldingen: w.meldingen.plan.meldingen.filter((m) => m.id === 'plan-aow'), aantal: 1 } } }
+    render(<KaternMeldingSlotVoor katern="plan" waarde={alleenAow} />)
+    const kaart = screen.getByTestId('katern-melding-plan-aow')
     expect(kaart).toHaveTextContent(AOW_ONTBREEKT_COPY.kop)
     expect(within(kaart).getAllByRole('link')[0]).toHaveAttribute('href', AOW_ONTBREEKT_COPY.actieHref)
   })
@@ -132,7 +136,7 @@ describe('meldingenslot — per katern de juiste melding', () => {
   it('geminimaliseerd: niets zichtbaars, de aria-live-regio blijft en Minimaliseren roept de host', () => {
     const { w, minimize } = waarde({ instellingen: 'minimized' })
     const { rerender } = render(<KaternMeldingSlotVoor katern="instellingen" waarde={w} />)
-    expect(screen.queryByTestId('katern-melding-instellingen-aow')).toBeNull()
+    expect(screen.queryByTestId('katern-melding-instellingen-gegevens')).toBeNull()
     expect(screen.getByTestId('katern-melding')).toHaveAttribute('aria-live', 'polite')
 
     const basis = waarde().w
@@ -159,7 +163,7 @@ describe('katern-koppen — samenvatting en statuspunt', () => {
     segment = 'doelen'
     renderKoppen(waarde().w)
     expect(screen.getByTestId('katern-kop-plan')).toHaveTextContent('61% van je doelbedrag')
-    expect(screen.getByTestId('katern-kop-instellingen')).toHaveTextContent('nog 2 voorkeuren open · AOW ontbreekt')
+    expect(screen.getByTestId('katern-kop-instellingen')).toHaveTextContent('nog 2 voorkeuren open')
     expect(screen.getByTestId('katern-kop-doelen')).toHaveAttribute('aria-current', 'page')
     expect(screen.getByTestId('katern-kop-doelen')).not.toHaveTextContent(SAMENVATTING.doelen!)
   })
@@ -168,7 +172,7 @@ describe('katern-koppen — samenvatting en statuspunt', () => {
     renderKoppen(waarde().w)
     const instellingen = screen.getByTestId('katern-kop-instellingen')
     expect(within(instellingen).getByTestId('katern-kop-punt-instellingen').className).toContain(LEVERAGE_STATUS_DOT.warn)
-    expect(instellingen).toHaveAccessibleName('Instellingen, melding: AOW ontbreekt')
+    expect(instellingen).toHaveAccessibleName(`Instellingen, melding: ${HORIZON_MISSENDE_GEGEVENS_LABEL}`)
     // Plan (tekort-lening) en Doelen (lab) hebben er ook één; zonder melding geen punt.
     expect(screen.getByTestId('katern-kop-punt-plan')).toBeTruthy()
   })

@@ -20,4 +20,6 @@ export const DOELEN_MOBIEL_COMPACT = {
   canvasKolom: 'max-lg:group-data-[katern=doelen]/katern:py-2',
   /** De katern-koppen: dichter onder het canvas. */
   koppen: 'max-lg:group-data-[katern=doelen]/katern:mt-3',
+  /** De witte katern-module onder de tabbladen: nauwelijks ruimte boven het lab. */
+  module: 'max-lg:group-data-[katern=doelen]/katern:pt-1',
 } as const

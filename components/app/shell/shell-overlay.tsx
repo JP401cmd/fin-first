@@ -123,6 +123,15 @@ type ShellOverlayProps = {
    * t.o.v. `onRequestClose`. Bij kind="pane" geen effect.
    */
   lockedOpen?: boolean
+  /**
+   * Alleen voor kind="pane": de zijmarge van de mobiele BottomSheet-terugval (D2, 27 sep
+   * 2026). Op desktop wrapt `SlideInPane` de children al in `px-7 py-6 lg:px-8 lg:py-7`; de
+   * BottomSheet gaf ze onder `lg` géén padding, waardoor tekst tegen de schermrand liep.
+   * Default aan (`px-5 py-5`, gelijk aan de kop- en footerinzet van de sheet). Zet `false`
+   * voor een pane waarvan de body zichzelf al inspringt (bv. een volle-breedte accentlijn
+   * of kopband met eigen padding) — anders springt hij dubbel in.
+   */
+  mobileInset?: boolean
   children: ReactNode
 }
 
@@ -147,6 +156,7 @@ export function ShellOverlay({
   mobileBackCloses = false,
   suspended = false,
   lockedOpen = false,
+  mobileInset = true,
   children,
 }: ShellOverlayProps) {
   // SSR-safe matchMedia hook — bepaalt voor `kind="pane"` of we de SlideInPane
@@ -246,7 +256,7 @@ export function ShellOverlay({
           // (B-012-klasse). Volledige stack-push blijft Fase 0.5.
           manageHistory={mobileBackCloses}
         >
-          {children}
+          {mobileInset ? <div className="px-5 py-5">{children}</div> : children}
         </BottomSheet>
       </>
     )

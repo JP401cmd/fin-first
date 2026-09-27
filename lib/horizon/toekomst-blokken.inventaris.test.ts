@@ -235,23 +235,30 @@ describe('/toekomst-blokken — volgorde (blokken die samen blijven, verspringen
 
 describe('/toekomst-blokken — katern Plan (fase 2, spec §4.3)', () => {
   // Addendum 26 sep: de levensgebeurtenissen staan tussen de voortgang en de verdieping.
-  const PLAN_VOLGORDE = ['PlanKpiStrip', 'PlanAnkerEnVoortgang', 'GebeurtenissenMetHoofdrun', 'PlanVerdieping'] as const
+  // 27 sep: onder `lg` op deze plek (`PlanGebeurtenissen plek="pagina"`, met de
+  // jaar-op-jaar-link onder de verdieping); vanaf `lg` in de kolom naast de grafiek.
+  const PLAN_VOLGORDE = ['PlanKpiStrip', 'PlanAnkerEnVoortgang', 'PlanGebeurtenissen', 'PlanVerdieping', 'PlanJaartabelLink'] as const
   const plan = codeOnly(readRel('components/toekomst/plan/plan-paneel.tsx'))
 
   it('KPI-strip → ankerdrieslag en voortgangsbalk → gebeurtenissen → verdieping → jaar-op-jaar-tabel', () => {
     const posities = PLAN_VOLGORDE.map((naam) => plan.search(renderRe(naam)))
     expect(posities.every((p) => p >= 0), PLAN_VOLGORDE.join(', ')).toBe(true)
     expect([...posities].sort((x, y) => x - y)).toEqual(posities)
-    expect(plan.indexOf('data-testid="plan-jaar-op-jaar"')).toBeGreaterThan(posities[posities.length - 1])
+    const sectie = codeOnly(readRel('components/toekomst/plan/plan-gebeurtenissen.tsx'))
+    expect(renderRe('GebeurtenissenMetHoofdrun').test(sectie)).toBe(true)
   })
 
-  it('de jaar-op-jaar-tabel heeft één ingang: de link in Plan (spec §4.2 regel 10)', () => {
+  it('de jaar-op-jaar-tabel heeft één ingang per breekpunt: de link in Plan (spec §4.2 regel 10)', () => {
     // Twee knoppen naar dezelfde tabel (Details in de canvaskop én de link in Plan) is
     // precies wat §4.2 regel 10 verbiedt; de wireframe (§4.3 regel 7) houdt de link.
+    // Sinds 27 sep staat hij bij de gebeurtenissen: in de kolom vanaf `lg`, op de pagina
+    // eronder (`lg:hidden`) — nooit twee tegelijk zichtbaar.
     const openers = bronnen
       .filter(({ code }) => code.includes('setSimModalOpen(true)'))
       .map(({ rel }) => rel.replace(/\\/g, '/'))
-    expect(openers).toEqual(['components/toekomst/plan/plan-paneel.tsx'])
+    expect(openers).toEqual(['components/toekomst/plan/plan-gebeurtenissen.tsx'])
+    const sectie = codeOnly(readRel('components/toekomst/plan/plan-gebeurtenissen.tsx'))
+    expect(sectie).toContain('<p className="mt-6 sm:mt-8 lg:hidden">')
   })
 
   it('de drieslag staat onder de KPI-strip, in het voortgangsblok', () => {

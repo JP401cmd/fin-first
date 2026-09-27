@@ -37,6 +37,12 @@ export interface DeficitLoanNotice {
   /** Hoogste tekort-lening-eindsaldo over alle rijen (afgerond, nominaal). */
   peak: number
   /**
+   * Rij-leeftijd van dat hoogste saldo (de eerste bij een gelijke piek). Een puntbedrag op
+   * een toekomstige leeftijd: de weergave deflateert `peak` met de kernelfactor van déze
+   * leeftijd (`factorAtAge`, ADR 0090/0093) — geen tweede zoektocht in de rijen nodig.
+   */
+  peakAge: number
+  /**
    * Eerste leeftijd waarop de gemelde (eerste aanhoudende) episode weer op €0 staat,
    * of null als hij binnen het venster niet bewezen is afgelost. Het werkelijke einde
    * van de leenperiode — de copy mag dat niet uit de AOW-leeftijd afleiden.
@@ -117,6 +123,7 @@ export function detectDeficitLoanFromRows(
     startAge: number
     lastAge: number
     peak: number
+    peakAge: number
     clears: boolean
     clearedAge: number | null
   }
@@ -127,10 +134,13 @@ export function detectDeficitLoanFromRows(
     const endBalance = r.debtBalances['tekort-lening']?.endBalance ?? 0
     if (Math.round(endBalance) >= 1) {
       if (current === null) {
-        current = { startAge: r.age, lastAge: r.age, peak: endBalance, clears: false, clearedAge: null }
+        current = { startAge: r.age, lastAge: r.age, peak: endBalance, peakAge: r.age, clears: false, clearedAge: null }
       } else {
         current.lastAge = r.age
-        if (endBalance > current.peak) current.peak = endBalance
+        if (endBalance > current.peak) {
+          current.peak = endBalance
+          current.peakAge = r.age
+        }
       }
     } else if (current !== null) {
       current.clears = true
@@ -152,10 +162,13 @@ export function detectDeficitLoanFromRows(
   )
   if (sustained.length === 0) return null
   const firstAge = sustained[0].startAge
-  const peak = Math.max(...sustained.map((ep) => ep.peak))
+  // De eerste episode met de hoogste piek (strikt groter wint) — `peak` en `peakAge` horen
+  // bij dezelfde rij.
+  const piekEpisode = sustained.reduce((best, ep) => (ep.peak > best.peak ? ep : best))
   return {
     firstAge,
-    peak: Math.round(peak),
+    peak: Math.round(piekEpisode.peak),
+    peakAge: piekEpisode.peakAge,
     clearedAge: sustained[0].clearedAge,
     terugkeerAge: sustained[1]?.startAge ?? null,
   }

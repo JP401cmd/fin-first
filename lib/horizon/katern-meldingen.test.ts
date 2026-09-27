@@ -362,17 +362,19 @@ describe('Doelen — doel loopt achter', () => {
 
 describe('Instellingen', () => {
   it('AOW ontbreekt: kop en actie uit AOW_ONTBREEKT_COPY, kort "AOW ontbreekt"', () => {
-    const [m] = wijsMeldingenToe(metInput({ aowOntbreekt: true })).instellingen.meldingen
+    const [m] = wijsMeldingenToe(metInput({ aowOntbreekt: true })).plan.meldingen
+    expect(m.katern).toBe('plan')
     expect(m).toMatchObject({ ernst: 'warn', titel: AOW_ONTBREEKT_COPY.kop, kort: 'AOW ontbreekt' })
-    expect(m.actie).toEqual({ label: AOW_ONTBREEKT_COPY.actieLabel, href: '/toekomst/instellingen?rij=aow' })
+    expect(m.actie).toEqual({ label: AOW_ONTBREEKT_COPY.actieLabel, href: '/toekomst?rij=aow#levensstrategieen' })
     expect(m.uitleg).toBe(`${AOW_ONTBREEKT_COPY.keuze} ${AOW_ONTBREEKT_COPY.effect}`)
-    expect(wijsMeldingenToe(metInput({ aowOntbreekt: false })).instellingen.aantal).toBe(0)
+    expect(wijsMeldingenToe(metInput({ aowOntbreekt: false })).plan.aantal).toBe(0)
   })
 
   it('huis nooit verkocht: informatief, actie naar de huis-strategie', () => {
     const [m] = wijsMeldingenToe(
       metInput({ huisNooitVerkocht: { bedragTekst: '€ 650.000 (12 jaar vrijheid)', sharePct: 41, endAge: 90 } }),
-    ).instellingen.meldingen
+    ).plan.meldingen
+    expect(m.katern).toBe('plan')
     expect(m.ernst).toBe('neutral')
     expect(m.titel).toBe(KATERN_MELDING_KOPIJ.huisTitel)
     expect(m.uitleg).toContain('€ 650.000 (12 jaar vrijheid), oftewel 41% van je vermogen op leeftijd 90.')
@@ -416,12 +418,14 @@ const ALLES: KaternMeldingenInput = {
 describe('toewijzing — sortering en uniciteit', () => {
   it('sorteert per katern op ernst (bad > warn > good > neutral), gelijke ernst in invoervolgorde', () => {
     const uit = wijsMeldingenToe(ALLES)
-    expect(uit.plan.meldingen.map((m) => m.ernst)).toEqual(['bad', 'warn', 'neutral'])
-    expect(uit.instellingen.meldingen.map((m) => m.id)).toEqual([
-      'instellingen-aow',
-      'instellingen-gegevens',
-      'instellingen-huis',
+    expect(uit.plan.meldingen.map((m) => m.ernst)).toEqual(['bad', 'warn', 'warn', 'neutral', 'neutral'])
+    // 27 sep: AOW en woning staan bij de levensstrategieën op Plan, in invoervolgorde na
+    // de tekort-lening resp. de eindsituatie.
+    expect(uit.plan.meldingen.map((m) => m.id).filter((id) => id === 'plan-aow' || id === 'plan-huis')).toEqual([
+      'plan-aow',
+      'plan-huis',
     ])
+    expect(uit.instellingen.meldingen.map((m) => m.id)).toEqual(['instellingen-gegevens'])
     for (const k of KATERN_VOLGORDE) {
       const rangen = uit[k].meldingen.map((m) => ernstRang(m.ernst))
       expect([...rangen].sort((a, b) => b - a)).toEqual(rangen)
@@ -448,8 +452,9 @@ describe('toewijzing — sortering en uniciteit', () => {
   it('elke vervolgactie wijst naar precies één toegestane plek', () => {
     const toegestaan = new Set([
       // Fase 3 (ADR 0179): elke instelling-actie wijst naar precies één rij (`?rij=`).
-      '/toekomst/instellingen?rij=aow',
-      '/toekomst/instellingen?rij=huis',
+      // 27 sep: de levensstrategieën (AOW, eigen woning) staan op Plan, bij de gebeurtenissen.
+      '/toekomst?rij=aow#levensstrategieen',
+      '/toekomst?rij=huis#levensstrategieen',
       '/toekomst/instellingen?rij=stopmoment',
       '/toekomst/instellingen?rij=eindleeftijd',
       '/toekomst/instellingen?rij=geen-tekort-lening',
@@ -494,16 +499,17 @@ describe('katernKopStatus', () => {
     const uit = wijsMeldingenToe(ALLES)
     expect(katernKopStatus(uit, 'instellingen')).toEqual({
       ernst: 'warn',
-      label: katernStatuspuntLabel('AOW ontbreekt'),
-      aantal: 3,
+      label: katernStatuspuntLabel(uit.instellingen.meldingen[0].kort),
+      aantal: 1,
     })
-    expect(katernKopStatus(uit, 'instellingen')?.label).toBe('melding: AOW ontbreekt')
+    expect(katernKopStatus(uit, 'plan')?.aantal).toBe(5)
+    expect(katernStatuspuntLabel('AOW ontbreekt')).toBe('melding: AOW ontbreekt')
   })
 
   it('één melding → aantal 1; geen melding → null', () => {
     const uit = wijsMeldingenToe(metInput({ aowOntbreekt: true }))
-    expect(katernKopStatus(uit, 'instellingen')?.aantal).toBe(1)
-    expect(katernKopStatus(uit, 'plan')).toBeNull()
+    expect(katernKopStatus(uit, 'plan')?.aantal).toBe(1)
+    expect(katernKopStatus(uit, 'instellingen')).toBeNull()
   })
 })
 

@@ -208,10 +208,13 @@ function UitgavenEditorInhoud({
         )
       )}
 
-      <div className="mt-6">
-        <SubsectionLabel>Impact op je vrijheidspad</SubsectionLabel>
-        <LiveSimImpact baseline={baseline} draft={draftProj} />
-      </div>
+      {/* A2: de impactgrafiek pas bij een verschil; tot dan draagt de footer het effect. */}
+      {keuze.changed && (
+        <div className="mt-6">
+          <SubsectionLabel>Impact op je vrijheidspad</SubsectionLabel>
+          <LiveSimImpact baseline={baseline} draft={draftProj} />
+        </div>
+      )}
     </div>
   )
 }

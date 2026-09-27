@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import { isStrategieKey, strategieHref } from './strategie-route'
 
-describe('strategie-route — levensstrategieën wonen in katern Instellingen', () => {
-  it('strategieHref wijst naar /toekomst/instellingen', () => {
-    expect(strategieHref('pensioen')).toBe('/toekomst/instellingen?rij=pensioen')
+describe('strategie-route — levensstrategieën wonen in katern Plan', () => {
+  it('strategieHref wijst naar /toekomst met de rij en het anker van het blok', () => {
+    expect(strategieHref('pensioen')).toBe('/toekomst?rij=pensioen#levensstrategieen')
+    expect(strategieHref('aow')).toBe('/toekomst?rij=aow#levensstrategieen')
   })
 
   it('isStrategieKey kent precies de vier strategieën', () => {

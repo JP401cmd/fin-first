@@ -21,6 +21,7 @@
  */
 
 import type { BannerDisplay } from '@/lib/page-status/display'
+import { strategieHref } from './strategie-route'
 
 /**
  * Sleutel in de JSONB-map `profiles.status_banner_minimized`. Route-achtig in dezelfde
@@ -72,7 +73,8 @@ export const AOW_ONTBREEKT_COPY = {
   waarom:
     'Voor de meeste huishoudens is de AOW de grootste vaste post na het stoppen — zonder AOW is het beeld voorzichtiger dan de werkelijkheid.',
   actieLabel: 'Naar je AOW-strategie',
-  actieHref: '/toekomst/instellingen?rij=aow',
+  // De AOW-strategie staat sinds 27 sep bij de levensgebeurtenissen op Plan.
+  actieHref: strategieHref('aow'),
   /** Kassabon-regel (label · waarde). */
   kassabonLabel: 'AOW-inkomen',
   kassabonWaarde: '€ 0 — geen AOW-gebeurtenis',

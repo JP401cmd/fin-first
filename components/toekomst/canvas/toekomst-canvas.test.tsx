@@ -28,6 +28,7 @@ const h = vi.hoisted(() => ({
   grafiek: { current: null as Record<string, unknown> | null },
   // De eind-vorm van het plan. Standaard een vorm mét eindleeftijd; de perpetual-test zet hem om.
   eindvorm: 'deplete' as 'deplete' | 'legacy' | 'perpetual',
+  gebeurtenissen: { events: [] } as Record<string, unknown> | null,
 }))
 
 vi.mock('next/navigation', () => ({
@@ -75,6 +76,8 @@ const fireParams = { grossReturn: 0.05, inflationRate: 0.02 }
 const events = [{ id: 'a' }, { id: 'b' }, { id: 'c' }]
 
 vi.mock('@/components/toekomst/state/toekomst-state-provider', () => ({
+  // Plan krijgt de gebeurtenissen in de kolom naast de grafiek (27 sep).
+  useToekomstBron: () => ({ gebeurtenissen: h.gebeurtenissen }),
   useToekomstPerspectiefContext: () => ({
     partnerName: null,
     isPartnerView: false,
@@ -179,6 +182,7 @@ vi.mock('@/components/toekomst/state/toekomst-state-provider', () => ({
 }))
 
 import { ToekomstCanvas } from './toekomst-canvas'
+import { COMPACTE_PLOTHOOGTE, KOLOM_PLOTHOOGTE } from './canvas-stand'
 
 function renderIn(segment: string | null, eindvorm: 'deplete' | 'legacy' | 'perpetual' = 'deplete') {
   h.segment = segment
@@ -304,12 +308,15 @@ describe('ToekomstCanvas — Doelen', () => {
     expect(screen.queryByTestId('canvas-readout')).toBeNull()
     expect(grafiek().toonTijdlijn).toBe(false)
     expect(grafiek().toonReadout).toBe(false)
-    // useIsLgUp is hier gemockt op true ⇒ de desktophoogte.
-    expect(grafiek().plotHoogte).toBe(220)
+    // useIsLgUp is hier gemockt op true ⇒ de maat van de canvas-rij; zonder meting
+    // (jsdom meet niets) de startwaarde. Samenstelling groeit even hard mee.
+    expect(grafiek().plotHoogte).toBe(KOLOM_PLOTHOOGTE.start)
+    expect(grafiek().samenstellingHoogte).toBe(KOLOM_PLOTHOOGTE.start)
     expect(grafiek().hoofdlijnGedempt).toBe(true)
     renderIn(null)
     expect(grafiek().toonTijdlijn).toBe(true)
-    expect(grafiek().plotHoogte).toBeNull()
+    // Plan op desktop: dezelfde maat als Doelen (de grafiek verspringt niet bij de wissel).
+    expect(grafiek().plotHoogte).toBe(KOLOM_PLOTHOOGTE.start)
     expect(grafiek().hoofdlijnGedempt).toBe(false)
   })
 
@@ -326,7 +333,10 @@ describe('ToekomstCanvas — de canvas-rij in Doelen: grafiek links, lab rechts 
     h.segment = segment
     return render(
       <DisplayModeProvider initialMode="full">
-        <ToekomstCanvas zijkolom={<div data-testid="lab-kolom-stub" />} />
+        <ToekomstCanvas
+          zijkolom={<div data-testid="lab-kolom-stub" />}
+          actierij={<div data-testid="actierij-stub" />}
+        />
       </DisplayModeProvider>,
     )
   }
@@ -345,11 +355,53 @@ describe('ToekomstCanvas — de canvas-rij in Doelen: grafiek links, lab rechts 
     expect(within(rij).getByTestId('grafiek-stub')).toBeTruthy()
   })
 
-  it('Plan: geen rij, geen zijkolom (zelfde DOM als zonder slot)', () => {
+  it('Doelen: de kolom is maatgevend (gewone stroom), de grafiekkolom houdt zijn natuurlijke hoogte', () => {
+    renderMetKolom('doelen')
+    expect(screen.getByTestId('doelen-canvas-rij').getAttribute('data-kolom')).toBe('maatgevend')
+    expect(screen.getByTestId('canvas-kolom-inhoud').className).not.toContain('absolute')
+    const grafiekKolom = screen.getByTestId('grafiek-stub').closest('.min-w-0') as HTMLElement
+    expect(grafiekKolom.className).toContain('lg:self-start')
+  })
+
+  it('Doelen: de acties staan in een rij over de volle breedte ónder grafiek en kolom (alleen vanaf lg)', () => {
+    renderMetKolom('doelen')
+    const actierij = screen.getByTestId('doelen-canvas-actierij')
+    expect(within(actierij).getByTestId('actierij-stub')).toBeTruthy()
+    expect(actierij.className).toContain('hidden')
+    expect(actierij.className).toContain('lg:block')
+    // Niet in de rij en niet in de kolom: eronder, binnen dezelfde kaart.
+    expect(within(screen.getByTestId('doelen-canvas-rij')).queryByTestId('actierij-stub')).toBeNull()
+    expect(screen.getByTestId('horizon-hero').contains(actierij)).toBe(true)
+  })
+
+  it('Plan: dezelfde kolommen, de gebeurtenissen volgen de rijhoogte en scrollen zelf; geen actierij', () => {
     renderMetKolom(null)
+    const rij = screen.getByTestId('doelen-canvas-rij')
+    expect(rij.className).toContain('lg:grid-cols-[minmax(0,1fr)_minmax(320px,360px)]')
+    expect(rij.getAttribute('data-kolom')).toBe('volgend')
+    const inhoud = screen.getByTestId('canvas-kolom-inhoud')
+    expect(inhoud.className).toContain('absolute inset-0')
+    expect(inhoud.className).toContain('overflow-y-auto')
+    expect(within(inhoud).getByTestId('lab-kolom-stub')).toBeTruthy()
+    expect(screen.queryByTestId('doelen-canvas-actierij')).toBeNull()
+  })
+
+  it('Plan zonder gebeurtenissen-data: geen kolom', () => {
+    h.gebeurtenissen = null
+    try {
+      renderMetKolom(null)
+      expect(screen.queryByTestId('doelen-canvas-rij')).toBeNull()
+      expect(screen.queryByTestId('doelen-canvas-zijkolom')).toBeNull()
+    } finally {
+      h.gebeurtenissen = { events: [] }
+    }
+  })
+
+  it('Instellingen: geen rij, geen kolom, geen actierij', () => {
+    renderMetKolom('instellingen')
     expect(screen.queryByTestId('doelen-canvas-rij')).toBeNull()
     expect(screen.queryByTestId('doelen-canvas-zijkolom')).toBeNull()
-    expect(screen.queryByTestId('lab-kolom-stub')).toBeNull()
+    expect(screen.queryByTestId('doelen-canvas-actierij')).toBeNull()
   })
 })
 
@@ -420,22 +472,25 @@ describe('ToekomstCanvas — Eenvoudig tekent alleen de lagen van zijn menu (spe
 })
 
 describe('ToekomstCanvas — Instellingen', () => {
-  it('is compact: alleen Vermogen, geen modus-switch, geen Lagen, geen fasebalk, geen aannamesregel', () => {
+  it('is compact en volgt de keuze (27 sep): modus-switch wel, geen Lagen, geen fasebalk, geen aannamesregel', () => {
     canvasModus = 'geldstroom'
     keuze = lagenKeuze(['gebeurtenissen', 'mijlpalen', 'doelscenario', 'rendementScenarios'])
     renderIn('instellingen')
-    expect(screen.queryByRole('radiogroup', { name: 'Weergave van de grafiek' })).toBeNull()
+    expect(screen.getByRole('radiogroup', { name: 'Weergave van de grafiek' })).toBeTruthy()
     expect(screen.queryByTestId('lagen-knop')).toBeNull()
     expect(screen.queryByTestId('aannamesregel')).toBeNull()
-    expect(grafiek().modus).toBe('vermogen')
+    expect(grafiek().modus).toBe('geldstroom')
     expect(grafiek().toonFasebalk).toBe(false)
+    expect(grafiek().plotHoogte).toBe(COMPACTE_PLOTHOOGTE)
+    expect(grafiek().samenstellingHoogte).toBe(COMPACTE_PLOTHOOGTE)
     expect(overlayNamen()).toEqual([])
     expect(grafiek().chartEventOverlay).toEqual([
       { id: 'bouw', lagen: { gebeurtenissen: true, mijlpalen: false, doelen: false } },
     ])
   })
 
-  it('tekent alleen de hoofdlijn: geen doellijnen, geen verschilvlak of nalatenschap-bol, geen cijferbalk', () => {
+  it('in Vermogen: alleen de hoofdlijn — geen doellijnen, geen verschilvlak of nalatenschap-bol, geen cijferbalk', () => {
+    canvasModus = 'vermogen'
     renderIn('instellingen')
     expect(grafiek().viewFireTarget).toBeUndefined()
     expect(grafiek().showDualFireTarget).toBe(false)

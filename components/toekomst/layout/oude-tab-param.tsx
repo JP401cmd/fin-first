@@ -30,7 +30,8 @@ const ANDERE_OPRUIMERS: readonly string[] = [...CONSUMED_DEEPLINK_PARAMS, 'planr
  * het plan, op `/toekomst` zelf. Een redirect van `/toekomst` naar `/toekomst` zou een lus
  * zijn (de query reist mee), dus hier: `tab` weg, het anker `#gebeurtenissen` erbij, en na
  * één frame naar de lijst scrollen. Met een levensstrategie erbij
- * (`&strategie=aow|pensioen|huis|werk`) stuurt `next.config.ts` hem nog naar Instellingen.
+ * (`&strategie=aow|pensioen|huis|werk`) blijft die param staan: de levensstrategieën staan
+ * sinds 27 sep op Plan, en de editor-host daar opent de strategie (ADR 0179 addendum (e)).
  */
 export function OudeTabParam() {
   const router = useRouter()

@@ -3,6 +3,14 @@
 import { useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import type { CategoriePrios, PotRulesConfig, PrioSubject } from '@/lib/pot-rules'
 import { SubsectionLabel } from '@/components/editorial'
+import { InfoIconTooltip } from '@/components/editorial/info-icon-tooltip'
+
+/**
+ * D7 (27 sep): de rekenregel achter de prioriteit staat in de i, niet in de lopende tekst.
+ * Dezelfde regel als de kern (`prio-overgang.ts`): gewicht ½^(prio−1).
+ */
+const PRIO_GEWICHT_UITLEG =
+  'Zo rekent de app: elke prioriteit krijgt het gewicht ½ tot de macht (prio − 1). Prioriteit 1 weegt 1, prioriteit 2 weegt ½, prioriteit 3 weegt ¼, en 4 weegt ⅛. Een categorie met prioriteit 5 is reserve.'
 
 /**
  * V5 (horizon-kernel) — compacte per-categorie-prio-instelling (1..5) voor één
@@ -198,8 +206,8 @@ export function CategoriePrioEditor({
       ) : (
         <>
           <p className="mt-1 text-[11px] text-[var(--ink-3)] leading-snug">
-            Lager = eerder aangesproken. Elke stap weegt dubbel zo zwaar (gewicht ½
-            <sup>prio−1</sup>).{' '}
+            Lager = eerder aangesproken. Elke stap weegt dubbel zo zwaar{' '}
+            <InfoIconTooltip text={PRIO_GEWICHT_UITLEG} />.{' '}
             <span className="font-semibold text-[var(--ink-2)]">5 = reserve</span>: pas
             aanspreken als de rest leeg is.
           </p>

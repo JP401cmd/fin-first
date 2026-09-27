@@ -49,7 +49,7 @@ import {
  * de tweede aan en houdt vraag 2 zijn eigen <h2>.
  *
  *   1. Wanneer wil je stoppen met werken?  → het STOP-ANKER
- *      · Zo vroeg als het kan          (`solved`)
+ *      · Zo vroeg mogelijk          (`solved`)
  *      · Op mijn AOW-leeftijd          (`aow`)
  *      · Op een leeftijd die ik kies   (`age` + leeftijdveld, halve jaren)
  *      Het anker `now` wordt hier bewust NIET aangeboden — een nieuwe gebruiker

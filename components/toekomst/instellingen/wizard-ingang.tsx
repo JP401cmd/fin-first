@@ -18,14 +18,16 @@ import Link from 'next/link'
 import { ArrowRight, ListChecks } from 'lucide-react'
 import { PLAN_REVIEW_HREF, PLAN_REVIEW_NAAM, type PlanReviewProgress } from '@/lib/plan-review/types'
 import { usePlanReviewOpener } from '@/components/future/plan-review/plan-review-provider'
+import { wizardIngangActie } from '@/lib/toekomst/instellingen-rijwaarden'
 
 const ROW_CLS =
   'group flex w-full min-h-[56px] items-center gap-3 border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3 text-left transition-colors hover:bg-[var(--subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--module-active-500)]'
 
 export function WizardIngang({ progress }: { progress: PlanReviewProgress }) {
   const opener = usePlanReviewOpener()
-  // Voltooid: opnieuw doorlopen vanaf stap 1 (A6). Anders: bij de eerste open stap.
-  const actie = progress.voltooid ? 'Opnieuw doorlopen' : 'Verder'
+  // De knop volgt de stand (B4): niets bevestigd → Beginnen, deels → Verder, klaar →
+  // Opnieuw doorlopen (vanaf stap 1, A6). Anders opent hij bij de eerste open stap.
+  const actie = wizardIngangActie(progress)
   const voortgang = `${progress.bevestigd} van ${progress.totaal} bevestigd`
 
   const inhoud = (

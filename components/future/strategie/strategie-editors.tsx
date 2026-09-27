@@ -159,7 +159,7 @@ function HuisStrategieEditor({
     <StrategieModalShell
       open
       onClose={onClose}
-      title="Huis-strategie"
+      title="Eigen woning"
       intro="Bepaal hoe je eigen woning meedoet in de FIRE-berekening. Een huis is geen liquide vermogen — je kunt er pas uit putten door te verkopen of een opeethypotheek af te sluiten."
       readOnly={readOnly}
       footer={

@@ -15,7 +15,8 @@
 import { render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
-import { ToekomstKaternKoppen } from './toekomst-katern-navigatie'
+import { ToekomstKaternKoppen, ToekomstKaternAccentScope } from './toekomst-katern-navigatie'
+import { KATERN_ACCENT } from './katern-accent'
 
 vi.mock('next/link', () => ({
   default: ({ href, children, scroll, ...rest }: { href: string; children: ReactNode; scroll?: boolean }) => (
@@ -88,6 +89,37 @@ describe('ToekomstKaternKoppen — wisselen zonder sprong', () => {
     segment = 'instellingen'
     rerender(<ToekomstKaternKoppen />)
     expect(scrollIntoView).toHaveBeenCalledTimes(1)
+  })
+
+  it('elke kop draagt het accent uit KATERN_ACCENT (Fins drie kleuren: Plan kern, Doelen wil, Instellingen horizon)', () => {
+    expect(KATERN_ACCENT).toEqual({ plan: 'kern', doelen: 'wil', instellingen: 'horizon' })
+    segment = 'doelen'
+    render(<ToekomstKaternKoppen />)
+    for (const key of ['plan', 'doelen', 'instellingen'] as const) {
+      expect(screen.getByTestId(`katern-kop-${key}`).parentElement?.getAttribute('data-accent')).toBe(KATERN_ACCENT[key])
+    }
+    const doelen = screen.getByTestId('katern-kop-doelen')
+    expect(doelen.getAttribute('aria-current')).toBe('page')
+    expect(doelen.className).toContain('border-t-[color:var(--color-wil-600)]')
+  })
+
+  it('de subpagina krijgt het accent van het actieve katern als module-accent', () => {
+    const { rerender } = render(
+      <ToekomstKaternAccentScope>
+        <p>katern</p>
+      </ToekomstKaternAccentScope>,
+    )
+    const scope = () => screen.getByTestId('katern-accent-scope')
+    expect(scope().getAttribute('data-accent')).toBe('kern')
+    expect(scope().style.getPropertyValue('--module-active-700')).toBe('var(--color-kern-700)')
+    segment = 'instellingen'
+    rerender(
+      <ToekomstKaternAccentScope>
+        <p>katern</p>
+      </ToekomstKaternAccentScope>,
+    )
+    expect(scope().getAttribute('data-accent')).toBe('horizon')
+    expect(scope().style.getPropertyValue('--module-active-700')).toBe('var(--color-horizon-700)')
   })
 
   it('niet bij de eerste render en niet bij een hash (die scrolt zelf naar zijn anker)', () => {

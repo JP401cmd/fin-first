@@ -3,6 +3,11 @@ import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { OrnamentColophon } from '@/components/editorial'
 import { PlanPaneel } from '@/components/toekomst/plan/plan-paneel'
 import { OudeLabBladwijzer } from '@/components/toekomst/layout/oude-lab-bladwijzer'
+import { LevensstrategieEditorsHost } from '@/components/toekomst/plan/levensstrategie-editors-host'
+import { getToekomstClient } from '@/lib/toekomst/load-toekomst-data'
+import { computeHorizonFireSim } from '@/lib/fire-target-shared'
+import { buildClientRegelSimSnapshot } from '@/lib/future/regel-sim-snapshot'
+import type { RegelSimSnapshot } from '@/lib/future/regel-sim'
 
 export const metadata: Metadata = {
   title: 'Toekomst — TriFinity',
@@ -20,6 +25,10 @@ export const metadata: Metadata = {
  * Backwards-compat: oude `?tab=<doelen|gebeurtenissen|voorkeuren|rekenhulp>`- en
  * `?modal=withdrawal`-deeplinks redirecten op de routing-laag (`has`-regels in
  * `next.config.ts`, ADR 0179 besluit Q2) — deze page ziet ze nooit.
+ *
+ * Levensstrategieën (eigenaarsbesluit 27 sep 2026): de rijen staan bij de gebeurtenissen
+ * (`LevensstrategieenBlok`, kolom en pagina); hun editors host deze page één keer
+ * (`LevensstrategieEditorsHost`), met de client-veilige snapshot van de canonieke run.
  */
 export default function ToekomstPlanPage() {
   return (
@@ -35,6 +44,11 @@ export default function ToekomstPlanPage() {
       <OudeLabBladwijzer />
       <PlanPaneel />
 
+      {/* De editors van de levensstrategieën. De host staat er meteen (klikken gaan nooit
+          verloren); de snapshot komt als belofte binnen, zodat het Plan-paneel er niet op
+          wacht en een open editor niet sluit als hij binnenkomt (review 27 sep). */}
+      <LevensstrategieEditorsHost snapshot={laadStrategieSnapshot()} />
+
       {/* Krant-stijl colophon als voet van katern Plan. `print:hidden` blijft staan:
           de eigen printknop is weg (B-021), maar de browser-print van de
           gebruiker (Ctrl+P) hoort deze footer nog steeds niet mee te nemen. */}
@@ -43,4 +57,22 @@ export default function ToekomstPlanPage() {
       </div>
     </>
   )
+}
+
+/**
+ * De snapshot voor de verschilregel in de footers van de editors: dezelfde canonieke,
+ * React-`cache()`'d run die de katern-layout (plan-oordeel) en de Instellingen-bundel
+ * (`regelSimSnapshot` in de dashboard-loader) lezen, client-veilig gemaakt met dezelfde
+ * builder. Op een volle lading kost hij niets extra; zonder run (geen geboortedatum) is de
+ * snapshot `null` en tonen de editors geen verschilregel.
+ */
+async function laadStrategieSnapshot(): Promise<RegelSimSnapshot | null> {
+  try {
+    const supabase = await getToekomstClient()
+    const shared = await computeHorizonFireSim(supabase)
+    return shared ? buildClientRegelSimSnapshot(shared) : null
+  } catch (e) {
+    console.error('toekomst:plan-strategie-snapshot', e)
+    return null
+  }
 }

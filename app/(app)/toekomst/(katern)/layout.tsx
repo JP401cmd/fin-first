@@ -6,9 +6,10 @@ import type { KaternId } from '@/lib/horizon/katern-copy'
 import { PlanReviewProvider } from '@/components/future/plan-review/plan-review-provider'
 import { ToekomstStateProvider } from '@/components/toekomst/state/toekomst-state-provider'
 import { ToekomstCanvas } from '@/components/toekomst/canvas/toekomst-canvas'
-import { CanvasZijkolom } from '@/components/toekomst/layout/canvas-zijkolom'
+import { CanvasActierij, CanvasZijkolom } from '@/components/toekomst/layout/canvas-zijkolom'
 import { ToekomstKaternStand } from '@/components/toekomst/layout/toekomst-katern-stand'
 import { DOELEN_MOBIEL_COMPACT } from '@/components/toekomst/layout/doelen-mobiel-compact'
+import { KATERN_MODULE } from '@/components/editorial/katern-koppen'
 import { ToekomstOverlayHost } from '@/components/toekomst/overlays/toekomst-overlay-host'
 import { ToekomstRekenGrens } from '@/components/toekomst/layout/toekomst-reken-grens'
 import { ToekomstAnkerregel } from '@/components/toekomst/layout/toekomst-ankerregel'
@@ -16,6 +17,7 @@ import { OudeTabParam } from '@/components/toekomst/layout/oude-tab-param'
 import {
   ToekomstKaternKoppen,
   ToekomstKaternInfo,
+  ToekomstKaternAccentScope,
 } from '@/components/toekomst/layout/toekomst-katern-navigatie'
 import {
   ToekomstKaternMeldingenProvider,
@@ -125,12 +127,19 @@ export default async function ToekomstKaternLayout({ children }: { children: Rea
 
           <ToekomstRekenGrens>
             <div className={`mx-auto max-w-6xl py-5 sm:py-8 px-4 sm:px-6 ${DOELEN_MOBIEL_COMPACT.canvasKolom}`}>
-              {/* In Doelen staat het lab op desktop naast de grafiek (ADR 0179 D7). */}
-              <ToekomstCanvas zijkolom={<CanvasZijkolom />} />
+              {/* Op desktop een canvas-rij met een kolom naast de grafiek: in Doelen het lab
+                  (ADR 0179 D7), in Plan de gebeurtenissen; in Doelen eronder de lab-acties
+                  over de volle breedte (27 sep). */}
+              <ToekomstCanvas zijkolom={<CanvasZijkolom />} actierij={<CanvasActierij />} />
               <ToekomstKaternKoppen className={`mt-6 ${DOELEN_MOBIEL_COMPACT.koppen}`} />
-              {/* Meldingen per katern (spec §4.8): bovenaan het actieve katern. */}
-              <ToekomstKaternMeldingSlot className="[&>div]:mt-3" />
-              {children}
+              {/* Het katern draagt het accent van zijn tab als module-accent (eigenaarswens
+                  27 sep): geen gekleurd vlak, alleen accenten. De scope is de witte module
+                  waar de drie tabbladen op staan, zoals de kaart van het canvas. */}
+              <ToekomstKaternAccentScope className={`${KATERN_MODULE} ${DOELEN_MOBIEL_COMPACT.module}`}>
+                {/* Meldingen per katern (spec §4.8): bovenaan het actieve katern. */}
+                <ToekomstKaternMeldingSlot className="[&>div]:mt-3" />
+                {children}
+              </ToekomstKaternAccentScope>
             </div>
             <ToekomstOverlayHost />
           </ToekomstRekenGrens>

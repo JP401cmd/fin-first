@@ -10,17 +10,19 @@
  * (`applyDraftToRawContext`) — de kernel resolvet pensioen/AOW ZÉLF.
  */
 
-import { toSimResult } from '@/lib/unified-projection'
+import { toSimResult, type UnifiedProjectionRow } from '@/lib/unified-projection'
 import {
   computeConvergentieProjection,
   type ConvergentieRawContext,
   type ConvergentieRawProfileRow,
 } from '@/lib/horizon-kernel/convergentie-router'
 import type { SimResult, SimRow } from '@/lib/fire-simulation'
-import type { FactorRow } from '@/lib/euro-display'
+import type { SolverStatus } from '@/lib/horizon-kernel/solver'
+import { factorAtAge, type FactorRow } from '@/lib/euro-display'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
 import { ankerReachFromSim, type AnkerReach } from '@/lib/horizon/anker-copy'
 import { clipRowsToPlanEnd } from '@/lib/horizon/clip-rows-to-plan-end'
+import { detectDeficitLoanFromRows } from '@/lib/horizon/deficit-loan-display'
 import type { PlanDraft } from '@/lib/horizon/plan-draft'
 import type { WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
 import type { SaleConfig } from '@/lib/sale-config'
@@ -83,6 +85,30 @@ export interface RegelProjection {
    * `lib/euro-display.ts` — nooit met een eigen `Math.pow`. Optioneel/additief in het TYPE.
    */
   factorRijen?: FactorRow[]
+  /**
+   * Haalbaarheid van DEZELFDE run (extend-feature 27 sep 2026, verschilregel zonder
+   * vrijheidsleeftijd) — pure doorgifte van de solver-uitvoer, geen afleiding:
+   *  - `kernelStatus` = P!B93 (`SolveFireResult.status`). Nodig omdat een vrijheidsleeftijd
+   *    niet "haalbaar" betekent: onder een vast anker met tekort is `fireAgeFractional` het
+   *    stopmoment (`isTekortStatus`).
+   *  - `maandHint` = P!B96 (`kernelMaandHint` = −gap ÷ maanden tot de eindleeftijd, €/mnd,
+   *    `lib/horizon-kernel/solver.ts#computeStatusBlok`). Dezelfde grootheid die de
+   *    plan-melding "Plan nog niet haalbaar" als €/mnd toont (`antwoordMinderUitgeven`).
+   *    Geen bedrag op een leeftijd en dus geen kernelfactor: de consument toont 'm zoals
+   *    die melding, zonder deflatie.
+   * Optioneel/additief in het TYPE; `runRegelProjection` zet beide bij een geslaagde run.
+   */
+  kernelStatus?: SolverStatus
+  maandHint?: number
+  /**
+   * De piek van de tekort-lening in DEZELFDE run (besluit eigenaar 27 sep 2026) — exact het
+   * getal dat de melding op Plan noemt: `detectDeficitLoanFromRows(rijen, { endAge:
+   * displayEndAge })` (venster t/m eindleeftijd − 1, zelfherstellende bruggetjes niet mee),
+   * met de kernelfactor van de piekrij (`factorAtAge`, dezelfde rijen als
+   * `useMeldingBedragenInView`). NOMINAAL: de consument deflateert precies één keer.
+   * `null` = geen (aanhoudende) tekort-lening. Optioneel/additief in het TYPE.
+   */
+  tekortLening?: { piek: number; leeftijd: number; inflationFactor: number } | null
 }
 
 /** Verse lege projectie per aanroep — geen gedeelde (muteerbare) `rows`-array. */
@@ -229,7 +255,20 @@ export function runRegelProjection(
       : null,
     sim: res,
     factorRijen: outcome.result.rows.map((r) => ({ age: r.age, inflationFactor: r.inflationFactor })),
+    kernelStatus: outcome.kernelStatus,
+    maandHint: outcome.kernelMaandHint,
+    tekortLening: tekortLeningVan(outcome.result.rows, res.displayEndAge),
   }
+}
+
+/** De tekort-leningpiek zoals de melding op Plan hem leest (zie `RegelProjection.tekortLening`). */
+function tekortLeningVan(
+  rows: readonly UnifiedProjectionRow[],
+  endAge: number,
+): RegelProjection['tekortLening'] {
+  const notice = detectDeficitLoanFromRows(rows, { endAge })
+  if (!notice) return null
+  return { piek: notice.peak, leeftijd: notice.peakAge, inflationFactor: factorAtAge(rows, notice.peakAge) }
 }
 
 /**

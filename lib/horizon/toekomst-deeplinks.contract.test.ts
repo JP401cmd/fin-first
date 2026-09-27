@@ -48,7 +48,18 @@ type Contract = {
  */
 const CONTRACT: Record<string, Contract> = {
   whatif: { values: ['open'], effect: 'doelscenario (lab) in beeld scrollen' },
-  strategie: { values: ['open'], effect: 'next.config-redirect naar de rij Stopmoment in Instellingen (ADR 0179 fase 3)' },
+  strategie: {
+    values: ['open', 'aow', 'pensioen', 'werk', 'huis'],
+    effect:
+      'open → next.config-redirect naar de rij Stopmoment in Instellingen (ADR 0179 fase 3); ' +
+      'aow/pensioen/werk/huis (alias van ?rij=, 27 sep) → de editor van die levensstrategie op Plan; pensioen met de factor-A-uitvraag',
+  },
+  // 27 sep 2026: de levensstrategieën staan bij de gebeurtenissen op Plan; de editor-host
+  // (`LevensstrategieEditorsHost`) leest de rij en ruimt hem op.
+  rij: {
+    values: ['aow', 'pensioen', 'werk', 'huis'],
+    effect: 'de editor van die levensstrategie op Plan (#levensstrategieen); pensioen met de factor-A-uitvraag',
+  },
   uitgaven: { values: ['open'], effect: 'next.config-redirect naar de rij Uitgave na pensioen in Instellingen (ADR 0179 fase 3)' },
   event: { values: '*', effect: "'new' → gebeurtenis-catalogus; <id> → gebeurtenis bekijken" },
   edit: { values: ['true'], effect: 'met event=<id>: gebeurtenis in bewerkmodus' },
@@ -68,8 +79,8 @@ const CONTRACT: Record<string, Contract> = {
     effect:
       'next.config-redirect (has-regel, ADR 0179 Q2) naar het katern: doelen/rekenhulp → ' +
       'hun route, voorkeuren → /toekomst/instellingen (overige query mee); gebeurtenissen ' +
-      'blijft op Plan (addendum 26 sep): OudeTabParam zet #gebeurtenissen, mét levensstrategie ' +
-      '→ /toekomst/instellingen',
+      'blijft op Plan (addendum 26 sep): OudeTabParam zet #gebeurtenissen; mét levensstrategie ' +
+      'opent de editor-host op Plan die strategie (27 sep)',
   },
 }
 
@@ -163,7 +174,11 @@ describe('deeplink-contract /toekomst — de opschoning loopt in de pas', () => 
     // CONSUMED_DEEPLINK_PARAMS. De rest moet er wél in, anders heropent een
     // refresh hetzelfde paneel. `uitgaven` (ADR 0179 fase 3) gaat óók op de routing-laag weg:
     // de pane op Plan bestaat niet meer, de redirect landt op de rij in Instellingen.
-    const clientKeys = Object.keys(CONTRACT).filter((k) => k !== 'tab' && k !== PLAN_REVIEW_PARAM && k !== 'uitgaven')
+    // `rij` (27 sep) poetst zichzelf net als `planreview`: de editor-host van de
+    // levensstrategieën haalt hem bij het openen weg met native replaceState.
+    const clientKeys = Object.keys(CONTRACT).filter(
+      (k) => k !== 'tab' && k !== PLAN_REVIEW_PARAM && k !== 'uitgaven' && k !== 'rij',
+    )
     for (const key of clientKeys) {
       expect(CONSUMED_DEEPLINK_PARAMS as readonly string[], key).toContain(key)
     }

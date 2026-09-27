@@ -167,7 +167,7 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
     terms: ['netto_vermogen', 'liquiditeit', 'LTV', 'hypotheek'],
     related: [
       { href: '/overzicht/schulden/mortgage', label: 'De hypotheek ernaast' },
-      { href: '/toekomst/instellingen', label: 'Hoe je huis meetelt in de projectie' },
+      { href: '/toekomst', label: 'Hoe je huis meetelt in je plan (je levensstrategieën)' },
     ],
   },
   '/overzicht/bezittingen/retirement': {
@@ -496,7 +496,7 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
   // ── Toekomst (Horizon) ───────────────────────────────────────────────
   '/toekomst': {
     insight:
-      'Deze tijdas laat zien waar je financieel heen gaat: de opbouwjaren (groen) en de afbouwjaren (oranje) tot je gekozen eindleeftijd, met de levensgebeurtenissen en instellingen die samen je route bepalen. Onder je plan staan je levensgebeurtenissen: een kind, een erfenis, een verhuizing of minder werken, en de momenten die je plan zelf berekent, zoals het stoppen van een pensioenpot.',
+      'Deze tijdas laat zien waar je financieel heen gaat: de opbouwjaren (groen) en de afbouwjaren (oranje) tot je gekozen eindleeftijd, met de levensgebeurtenissen en instellingen die samen je route bepalen. Onder je plan staan je levensgebeurtenissen: een kind, een erfenis, een verhuizing of minder werken, en de momenten die je plan zelf berekent, zoals het stoppen van een pensioenpot. Daaronder staan je levensstrategieën: je AOW, je pensioen, je werk en je huis. Kies het potloodje om er één aan te passen.',
     grip:
       'Je sleept een gebeurtenis naar een ander jaar en ziet meteen hoe je vrijheidsmoment verschuift. Onder de grafiek staan Plan, Doelen en Instellingen: onder Plan voeg je een levensgebeurtenis toe en zie je meteen het effect op je pad naar vrijheid, in Doelen verken je met je doelscenario wat een andere keuze doet, en in Instellingen staan de aannames achter je plan. Bovenaan Instellingen loop je met "Je voorkeuren voor je plan instellen" stap voor stap na waar de app mee rekent.',
     werking: [
@@ -576,11 +576,11 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
     insight:
       'Hier staat elke keuze waar je plan op rust, als één regel met de waarde waarmee de app nu rekent.',
     grip:
-      'Tik op het potloodje om één keuze aan te passen. Onderin zie je wat het met je vrijheidsmoment doet, nog vóór je opslaat. Liever stap voor stap? "Je voorkeuren voor je plan instellen" bovenaan zet de belangrijkste keuzes met hun effect op een rij.',
+      'Kies het potloodje om één keuze aan te passen. Onderin zie je wat het met je vrijheidsmoment doet, nog vóór je opslaat. Liever stap voor stap? "Je voorkeuren voor je plan instellen" bovenaan zet de belangrijkste keuzes met hun effect op een rij.',
     werking: [
       {
         title: 'Eén plek per keuze',
-        text: "Je stopmoment, je strategieën en je aannames pas je alleen hier aan. Meldingen en de tegel 'Na pensioen' op Plan brengen je naar de juiste regel.",
+        text: "Je stopmoment, je onttrekking, je pot-regels en je aannames pas je alleen hier aan. Je AOW, pensioen, werk en huis staan bij je levensgebeurtenissen op Plan. Meldingen en de tegel 'Na pensioen' op Plan brengen je naar de juiste regel.",
       },
       {
         title: 'Het effect vóór je opslaat',
@@ -588,7 +588,7 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
       },
       {
         title: 'Eenvoudig en Volledig',
-        text: 'In Eenvoudig zijn de tekort-lening, de pot-regels en de marktaannames ingeklapt. Ze tellen wel gewoon mee.',
+        text: 'Hoe je potten meebewegen (de tekort-lening en de pot-regels) staat altijd ingeklapt, met een regel die zegt of je iets hebt aangepast. In Eenvoudig zijn ook de marktaannames ingeklapt. Ze tellen wel gewoon mee.',
       },
     ],
     related: [{ href: '/toekomst/inflatie-koopkracht', label: 'Wat doet inflatie met je plan?' }],

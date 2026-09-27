@@ -53,7 +53,9 @@ import { CanvasLegenda } from '@/components/toekomst/canvas/canvas-legenda'
 import { MarktcheckGetallen } from '@/components/toekomst/canvas/marktcheck-getallen'
 import { Aannamesregel } from '@/components/toekomst/canvas/aannamesregel'
 import { aantalReeksen, canvasStand } from '@/components/toekomst/canvas/canvas-stand'
+import { useKolomPlotHoogte } from '@/components/toekomst/canvas/use-kolom-plot-hoogte'
 import {
+  useToekomstBron,
   useToekomstPerspectiefContext,
   useToekomstOverlayContext,
   useToekomstScenarioContext,
@@ -68,15 +70,32 @@ const DOELSCENARIO_OVERLAY = 'wat-als'
 const GEEN_FACTOREN: { age: number; factor: number }[] = []
 
 /**
- * De canvas-rij van katern Doelen op desktop (ADR 0179 D7, spec §4.2 regel 9): grafiek
- * links, het lab (standaard harp) rechts, zodat een knop en zijn effect samen in beeld staan.
- * Onder `lg` blijft het één kolom en staat het lab onder de katern-koppen.
+ * De canvas-rij op desktop (ADR 0179 D7, spec §4.2 regel 9; eigenaarsbesluit 27 sep):
+ * grafiek links, een kolom rechts — in Doelen het lab (standaard harp), zodat een knop en
+ * zijn effect samen in beeld staan; in Plan de levensgebeurtenissen. Dezelfde kolommen in
+ * beide katernen, zodat de grafiek bij een wissel op dezelfde plek blijft. Onder `lg` blijft
+ * het één kolom en staan lab en gebeurtenissen onder de katern-koppen.
  */
 export const DOELEN_CANVAS_RIJ = 'lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(320px,360px)]'
 /** De rechterkolom: alleen vanaf `lg`, met een haarlijn als scheiding. */
-export const DOELEN_CANVAS_ZIJKOLOM = 'hidden min-w-0 border-l border-[var(--border-ed)] p-5 lg:block'
+export const DOELEN_CANVAS_ZIJKOLOM = 'relative hidden min-w-0 border-l border-[var(--border-ed)] lg:block'
+/**
+ * De inhoud van de kolom:
+ * - `maatgevend` (Doelen): in de gewone stroom; de natuurlijke hoogte is de maat van de rij;
+ * - `volgend` (Plan): absoluut over de hele kolom, dus zonder eigen bijdrage aan de
+ *   rijhoogte; een lange lijst scrolt in de kolom zelf (max-hoogte = de rijhoogte).
+ */
+export const CANVAS_KOLOM_INHOUD: Record<'maatgevend' | 'volgend', string> = {
+  maatgevend: 'p-5',
+  volgend: 'absolute inset-0 overflow-y-auto overscroll-contain p-5',
+}
+/** De actierij onder grafiek en kolom (Doelen, desktop): over de volle breedte. */
+export const DOELEN_CANVAS_ACTIERIJ = 'hidden border-t border-[var(--border-ed)] px-5 py-3 md:px-8 lg:block lg:empty:hidden'
 
-export function ToekomstCanvas({ zijkolom = null }: { zijkolom?: ReactNode } = {}) {
+export function ToekomstCanvas({
+  zijkolom = null,
+  actierij = null,
+}: { zijkolom?: ReactNode; actierij?: ReactNode } = {}) {
   const {
     partnerName,
     isPartnerView,
@@ -192,6 +211,13 @@ export function ToekomstCanvas({ zijkolom = null }: { zijkolom?: ReactNode } = {
   // overlayEmphasis: welke grafiekfase een gehoverde/gefocuste ballon accentueert.
   const [overlayEmphasis, setOverlayEmphasis] = useState<OverlayEmphasis>(null)
 
+  // De kolom naast de grafiek: in Doelen het lab, in Plan de gebeurtenissen (27 sep).
+  const { gebeurtenissen: gebeurtenissenBron } = useToekomstBron()
+
+  // De harp is maatgevend: in Doelen meet de canvas de lab-kolom en onthoudt de plothoogte
+  // die daarbij hoort; Plan gebruikt dezelfde (de canvas blijft gemonteerd bij de wissel).
+  const [kolomPlotHoogte, setKolomPlotHoogte] = useState<number | null>(null)
+
   // ── De stand van het canvas in dit katern (spec §4.5) en deze weergave (§4.7) ──
   const eenvoudig = displayMode === 'simple'
   const heeftDoelen = goalChartMarkers.length > 0
@@ -203,10 +229,22 @@ export function ToekomstCanvas({ zijkolom = null }: { zijkolom?: ReactNode } = {
         katern,
         { modus: canvasModus, lagen: canvasLagenKeuze },
         { doelen: heeftDoelen, doelscenario: hasDoelLijn, metHuis: dualBasisAvailable, doelscenarioRijen },
-        { eenvoudig, breed, viewportHoogte },
+        { eenvoudig, breed, viewportHoogte, kolomPlotHoogte },
       ),
-    [katern, canvasModus, canvasLagenKeuze, heeftDoelen, hasDoelLijn, dualBasisAvailable, doelscenarioRijen, eenvoudig, breed, viewportHoogte],
+    [katern, canvasModus, canvasLagenKeuze, heeftDoelen, hasDoelLijn, dualBasisAvailable, doelscenarioRijen, eenvoudig, breed, viewportHoogte, kolomPlotHoogte],
   )
+  // De kolom (desktop): in Doelen bij een run (zonder run geen lab), in Plan zodra er
+  // gebeurtenissen-data is — de pagina-plek is vanaf `lg` verborgen, dus de kolom moet er
+  // dan altijd staan, ook zonder run.
+  const kolomSoort = stand.kolom
+  const metZijkolom =
+    zijkolom != null &&
+    ((kolomSoort === 'maatgevend' && simResult != null) || (kolomSoort === 'volgend' && gebeurtenissenBron != null))
+  const { kolomRef: kolomMeetRef, grafiekRef: grafiekMeetRef } = useKolomPlotHoogte({
+    meten: metZijkolom && kolomSoort === 'maatgevend' && breed,
+    huidigePlot: stand.plotHoogte,
+    setOnthouden: setKolomPlotHoogte,
+  })
   // ADR 0179 fase 4: in Doelen tonen Samenstelling en Geldstroom het doelscenario, uit
   // feeds die al over de euro-grens zijn en uit dezelfde run als de stippellijn.
   const doelscenarioFeed = useMemo<CanvasDoelscenarioFeed | null>(
@@ -224,8 +262,8 @@ export function ToekomstCanvas({ zijkolom = null }: { zijkolom?: ReactNode } = {
     [stand.grafiekBron, doelGrootboek, viewDoelWealthCompositionRows, viewDoelDisplaySimRows, viewDoelIeBreakdownResult],
   )
   const { gebeurtenissen, mijlpalen, doelen, doelscenario, marktcheck, rendementScenarios, metHuis } = stand.lagen
-  // De rechterkolom bestaat alleen in Doelen, met een run en met iets om te tonen.
-  const metZijkolom = katern === 'doelen' && simResult != null && zijkolom != null
+  // De actierij onder de rij: alleen in Doelen, naast een kolom (desktop).
+  const metActierij = metZijkolom && kolomSoort === 'maatgevend' && actierij != null
 
   // Markers en tijdlijn volgen de lagen van dít katern (vaste lagen erbij), zonder de
   // keuze van de gebruiker te overschrijven.
@@ -321,8 +359,17 @@ export function ToekomstCanvas({ zijkolom = null }: { zijkolom?: ReactNode } = {
       {/* Module-active accent (Horizon-500 op /toekomst/**) */}
       <div className="h-1.5" style={{ background: 'var(--module-active-500)' }} />
 
-      <div className={metZijkolom ? DOELEN_CANVAS_RIJ : undefined} data-testid={metZijkolom ? 'doelen-canvas-rij' : undefined}>
-      <div className={`min-w-0 p-4 sm:p-6 md:p-8 ${katern === 'doelen' ? 'max-lg:py-3' : ''} ${metZijkolom ? 'lg:py-5' : ''}`}>
+      <div
+        className={metZijkolom ? DOELEN_CANVAS_RIJ : undefined}
+        data-testid={metZijkolom ? 'doelen-canvas-rij' : undefined}
+        data-kolom={metZijkolom ? (kolomSoort ?? undefined) : undefined}
+      >
+      {/* `lg:self-start`: de grafiekkolom houdt zijn natuurlijke hoogte (de meting van de
+          harp-maat leest die), de kolom ernaast rekt mee met de rij. */}
+      <div
+        ref={grafiekMeetRef}
+        className={`min-w-0 p-4 sm:p-6 md:p-8 ${katern === 'doelen' ? 'max-lg:py-3' : ''} ${metZijkolom ? 'lg:self-start lg:py-5' : ''}`}
+      >
         <CanvasKop
           hasPerspectiveHero={hasPerspectiveHero}
           isPartnerView={isPartnerView}
@@ -458,6 +505,8 @@ export function ToekomstCanvas({ zijkolom = null }: { zijkolom?: ReactNode } = {
               toonTijdlijn={stand.toonTijdlijn}
               hoofdlijnGedempt={stand.hoofdlijnGedempt}
               plotHoogte={stand.plotHoogte}
+              samenstellingHoogte={stand.samenstellingHoogte}
+              samenstellingPastInVermogen={stand.samenstellingPastInVermogen}
               doelscenario={doelscenarioFeed}
             />
 
@@ -510,12 +559,22 @@ export function ToekomstCanvas({ zijkolom = null }: { zijkolom?: ReactNode } = {
           </>
         ) : null}
       </div>
-      {metZijkolom && (
-        <aside className={DOELEN_CANVAS_ZIJKOLOM} data-testid="doelen-canvas-zijkolom">
-          {zijkolom}
+      {metZijkolom && kolomSoort && (
+        <aside
+          className={`${DOELEN_CANVAS_ZIJKOLOM} ${kolomSoort === 'volgend' ? 'lg:min-h-[320px]' : ''}`}
+          data-testid="doelen-canvas-zijkolom"
+        >
+          <div ref={kolomMeetRef} className={CANVAS_KOLOM_INHOUD[kolomSoort]} data-testid="canvas-kolom-inhoud">
+            {zijkolom}
+          </div>
         </aside>
       )}
       </div>
+      {metActierij && (
+        <div className={DOELEN_CANVAS_ACTIERIJ} data-testid="doelen-canvas-actierij">
+          {actierij}
+        </div>
+      )}
     </section>
   )
 }

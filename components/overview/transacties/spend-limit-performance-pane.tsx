@@ -317,7 +317,7 @@ export function SpendLimitPerformancePane({
     <ShellOverlay
       open={open && limit !== null}
       onClose={onClose}
-      kind="pane"
+      kind="pane" mobileInset={false}
       title={limit?.config.name ?? copy.singular}
       // Bewust GEEN primaryAction: dit is een leesoppervlak. Een "Sluiten"-knop
       // zou een vierde close-affordance zijn naast de ✕, Esc en de backdrop —

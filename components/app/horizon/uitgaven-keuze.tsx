@@ -10,6 +10,7 @@
 import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { Check } from 'lucide-react'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { AspirationQuestionnaire } from '@/components/app/horizon/aspiration-questionnaire'
 import { formatMaskedCurrency } from '@/lib/format'
@@ -316,13 +317,19 @@ export function UitgavenMethodeKeuze({
               type="button"
               onClick={() => onPick(m)}
               disabled={saving}
-              className={`text-left p-4 border-2 rounded-lg transition-all min-h-[120px] flex flex-col gap-2 ${
+              aria-pressed={active}
+              // D5 (27 sep): de gekozen kaart op papier met een inktrand en een vinkje. De oude
+              // accenttint haalde 2,80:1 tegen de rand van de andere kaarten.
+              className={`relative text-left p-4 border-2 transition-all min-h-[120px] flex flex-col gap-2 bg-[var(--paper)] ${
                 active
-                  ? 'border-[var(--module-active-700)] bg-[var(--module-active-50)]'
-                  : 'border-[var(--border-ed)] bg-[var(--paper)] hover:border-[var(--border-md)]'
+                  ? 'border-[var(--ink)]'
+                  : 'border-[var(--border-ed)] hover:border-[var(--border-md)]'
               }`}
             >
-              <div className="text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)]">
+              {active && (
+                <Check className="absolute right-3 top-3 h-4 w-4 text-[var(--ink)]" aria-hidden="true" />
+              )}
+              <div className="pr-6 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)]">
                 {meta.title}
               </div>
               <div

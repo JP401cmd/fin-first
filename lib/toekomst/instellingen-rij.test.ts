@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { REGEL_ORDER } from '@/lib/future/regel-registry'
+import { PLAN_REVIEW_STAPPEN } from '@/lib/plan-review/types'
 import {
   RIJ_META,
   RIJ_SLEUTELS,
@@ -13,10 +14,10 @@ import {
 const p = (q: string) => new URLSearchParams(q)
 
 describe('rij-register van katern Instellingen', () => {
-  it('kent vijftien rijen, verdeeld over drie secties', () => {
+  it('kent vijftien rijen: drie secties in Instellingen en het blok Levensstrategieën op Plan', () => {
     expect(RIJ_SLEUTELS).toHaveLength(15)
     const per = (s: string) => RIJ_SLEUTELS.filter((k) => RIJ_META[k].sectie === s).length
-    expect([per('plan'), per('levensstrategieen'), per('markt')]).toEqual([8, 4, 3])
+    expect([per('plan'), per('potten'), per('markt'), per('levensstrategieen')]).toEqual([4, 4, 3, 4])
   })
 
   it('elke regel en elke levensstrategie heeft een rij (aliassen zijn compleet)', () => {
@@ -55,7 +56,17 @@ describe('rij-register van katern Instellingen', () => {
     },
   )
 
-  it('de href gebruikt ?rij=', () => {
+  it('de href gebruikt ?rij=; een levensstrategie wijst naar Plan', () => {
     expect(instellingenRijHref('geen-tekort-lening')).toBe('/toekomst/instellingen?rij=geen-tekort-lening')
+    expect(instellingenRijHref('aow')).toBe('/toekomst?rij=aow#levensstrategieen')
+    expect(instellingenRijHref('huis')).toBe('/toekomst?rij=huis#levensstrategieen')
+  })
+
+  it('elke rij die de wizard bevestigt noemt een bestaande stap; de marktaannames geen', () => {
+    for (const k of RIJ_SLEUTELS) {
+      const stap = RIJ_META[k].wizardStap
+      if (RIJ_META[k].sectie === 'markt') expect(stap).toBeUndefined()
+      else expect(PLAN_REVIEW_STAPPEN).toContain(stap)
+    }
   })
 })

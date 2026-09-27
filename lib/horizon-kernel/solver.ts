@@ -88,6 +88,28 @@ export type SolverStatus =
   | 'anchor_shortfall'
 
 /**
+ * De drie TEKORT-statussen: het plan heeft een stopmoment (vast anker of de
+ * pensioen-kortsluiting), maar het geld reikt niet tot de eindleeftijd — zie
+ * `computeStatusBlok#vastAnkerTekort` en de `pension_shortfall`-tak. De bridge zet
+ * `fireReachable` bij deze statussen op `true` (er ís een leeftijd), dus "heeft een
+ * vrijheidsleeftijd" is niet hetzelfde als "haalbaar": wie haalbaarheid leest, leest
+ * deze set. Pure weergave-hulp naast het type; de status-keten zelf verandert niet.
+ *
+ * NB: `lib/horizon/haalbare-uitgave.ts`, `lib/horizon/lab-grenzen.ts` en
+ * `lib/horizon/katern-meldingen.ts` dragen (nog) een eigen private kopie van deze set.
+ */
+export const TEKORT_STATUSSEN: ReadonlySet<SolverStatus> = new Set<SolverStatus>([
+  'anchor_shortfall',
+  'stop_now_shortfall',
+  'pension_shortfall',
+])
+
+/** `true` als de status een tekort meldt (zie `TEKORT_STATUSSEN`). */
+export function isTekortStatus(status: SolverStatus | null | undefined): boolean {
+  return status != null && TEKORT_STATUSSEN.has(status)
+}
+
+/**
  * **De enige plek die een vast stopmoment naar een leeftijd omzet** (ADR 0129 D3).
  *
  * Vervangt de twee kortsluitingen die hier stonden ('Pensioenleeftijd' → AOW,

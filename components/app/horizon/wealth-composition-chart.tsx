@@ -195,7 +195,14 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
   onEventClick,
   onClusterOpen,
   onYearClick,
+  plotHoogte,
 }: {
+  /**
+   * Basishoogte in px, vervangt 260 (desktop) / 180 (mobiel); de marker-band komt erbovenop,
+   * net als bij `SimChart.plotHoogte`. Afwezig ⇒ die standaard (byte-identiek voor bestaande
+   * callers). Het /toekomst-canvas geeft op desktop de maat van de canvas-rij mee (27 sep).
+   */
+  plotHoogte?: number
   stackedRows: StackedRow[]
   currentAge: number
   endAge: number
@@ -309,7 +316,7 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
   }
 
   // Basis-H + extra ruimte voor marker-stacks
-  const H = (isDesktop ? 260 : 180) + extraTop + extraBottom
+  const H = (plotHoogte ?? (isDesktop ? 260 : 180)) + extraTop + extraBottom
   const innerW = W - PAD.left - PAD.right
   const innerH = H - PAD.top - PAD.bottom
 

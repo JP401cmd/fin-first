@@ -60,7 +60,7 @@ export function AowStrategieEditor({
     <StrategieModalShell
       open
       onClose={onClose}
-      title="AOW-strategie"
+      title="AOW"
       intro="AOW levert je tijd op — gegarandeerde vrijheid vanaf je pensioenleeftijd."
       readOnly={readOnly}
       footer={

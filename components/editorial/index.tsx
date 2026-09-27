@@ -50,6 +50,8 @@ export type { SubtotalLineProps } from './subtotal-line'
 // Re-export KaternKoppen (navigatie tussen katernen van één pagina; ADR 0179 D6)
 export { KaternKoppen } from './katern-koppen'
 export type { KaternKoppenProps, KaternKopItem, KaternKopStatus } from './katern-koppen'
+export { KaternAccentScope, moduleActiveVars } from './katern-accent-scope'
+export type { KaternAccent, KaternAccentScopeProps } from './katern-accent-scope'
 
 const PLAYFAIR = 'var(--font-playfair, Georgia, serif)'
 const SOURCE_SERIF = 'var(--font-source-serif, Georgia, serif)'

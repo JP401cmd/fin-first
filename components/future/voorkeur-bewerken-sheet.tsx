@@ -62,11 +62,13 @@ export function VoorkeurBewerkenSheet({
       onClose={saving ? () => {} : onClose}
       kind="sheet"
       size="sm"
-      title="Voorkeur bewerken"
+      // De schermtitel is de naam van de aanname ("Inflatie", "Rendement") — in Instellingen
+      // gelijk aan het rijlabel. De body toont hem dan niet nog eens.
+      title={bodyProps.title}
       footer={
         <ModalFooter
           primary={{ label: 'Opslaan', onClick: () => actions?.save(), loading: saving }}
-          secondary={{ label: 'Annuleer', onClick: onClose }}
+          secondary={{ label: 'Annuleren', onClick: onClose }}
           // ADR 0179 §7.7 — de verschilregel van de body (alleen met een snapshot en na een wijziging).
           info={actions?.footerInfo}
         />

@@ -36,7 +36,8 @@ import {
   derivePensionPotEndFromRows,
 } from '@/lib/horizon/kernel-strategy-moments'
 import { detectDeficitLoanFromRows } from '@/lib/horizon/deficit-loan-display'
-import { isStrategyManagedEvent, STRATEGY_BADGE_LABEL } from '@/lib/strategy-events'
+import { isStrategyManagedEvent, STRATEGY_BADGE_LABEL, type ManagedStrategy } from '@/lib/strategy-events'
+import { openLevensstrategie } from '@/components/toekomst/plan/levensstrategieen-blok'
 import { strategieHref } from '@/lib/horizon/strategie-route'
 import type { StrategieEditorsData } from './strategie/strategie-editors'
 import { BottomSheet } from '@/components/app/bottom-sheet'
@@ -45,6 +46,12 @@ import {
   useToekomstSimContextOptioneel,
 } from '@/components/toekomst/state/toekomst-state-provider'
 import { eventPaneBeschikbaar } from '@/components/toekomst/state/event-pane-bron'
+import { PLAN_GEBEURTENISSEN_KOP } from '@/lib/horizon/katern-copy'
+import {
+  GebeurtenissenTijdlijnCompact,
+  type CompactEffectDeel,
+  type CompactTijdlijnItem,
+} from './gebeurtenissen-tijdlijn-compact'
 
 // EventPane = herstelde toevoeg/bewerk-flow uit /horizon (catalogus + Praat met
 // Fin + 3-blokken-editor). Dynamisch geladen zodat de pagina-bundle licht blijft.
@@ -162,6 +169,47 @@ function werkSummary(event: LifeEvent): string {
   return parts.length > 0 ? parts.join(' · ') : 'Inkomenslijn ingesteld'
 }
 
+/**
+ * De effectregel van de compacte tijdlijn: dezelfde gegevens als `eventImpact`, maar met de
+ * bedragen als `{ bedrag }` (gemaskeerd getoond) en de geschatte vrijheidsimpact erachter
+ * ("2,2 jaar eerder vrij"). Niets herberekend: `computeEventImpact` levert het label.
+ */
+function compactEffect(
+  event: LifeEvent,
+  stopAge: number | null,
+  impact: ReturnType<typeof computeEventImpact> | null,
+  verkoopOpbrengst?: number,
+): CompactEffectDeel[] {
+  const d: CompactEffectDeel[] = []
+  if (typeof verkoopOpbrengst === 'number' && verkoopOpbrengst > 0) {
+    d.push({ bedrag: Math.round(verkoopOpbrengst), achter: ' netto-opbrengst' })
+  } else if (event.event_type === 'werk') {
+    d.push(werkSummary(event))
+  } else {
+    if (event.one_time_cost > 0) d.push({ voor: 'eenmalig −', bedrag: event.one_time_cost })
+    else if (event.one_time_cost < 0) d.push({ voor: 'eenmalig +', bedrag: Math.abs(event.one_time_cost) })
+    if (event.monthly_cost_change !== 0) {
+      d.push({
+        voor: event.monthly_cost_change > 0 ? '+' : '−',
+        bedrag: Math.abs(event.monthly_cost_change),
+        achter: '/mnd kosten',
+      })
+    }
+    if (event.monthly_income_change !== 0) {
+      d.push({
+        voor: event.monthly_income_change > 0 ? '+' : '−',
+        bedrag: Math.abs(event.monthly_income_change),
+        achter: '/mnd',
+      })
+    }
+    if (event.monthly_cost_change !== 0 || event.monthly_income_change !== 0) {
+      d.push(describeEventDuration(event, stopAge))
+    }
+  }
+  if (impact && impact.tone !== 'neutral') d.push(impact.displayLabel.replace(/^→\s*/, ''))
+  return d
+}
+
 function eventImpact(event: LifeEvent, stopAge: number | null): string {
   if (event.event_type === 'werk') return werkSummary(event)
   const parts: string[] = []
@@ -194,7 +242,13 @@ export function GebeurtenissenView({
   eventPaneData,
   kernelSim = null,
   hoofdrun = null,
+  compact = false,
 }: {
+  /**
+   * Compacte kolomweergave (320–360 px, naast de grafiek in katern Plan op desktop, 27 sep):
+   * geen eigen paginakolom en -inspringing, een kleinere kop. Gedrag blijft gelijk.
+   */
+  compact?: boolean
   events: LifeEvent[]
   /** Huidige leeftijd uit DOB — nodig om scenario-defaults op te baseren
    *  (target_age = currentAge + N). */
@@ -311,10 +365,10 @@ export function GebeurtenissenView({
         action: 'huis',
         Icon: KeyRound,
         title: 'Opname opeethypotheek start',
-        detail:
-          dailyExpenses > 0
-            ? `Totaal ${formatWithFreedom(opeet.totalDrawn, dailyExpenses)} opgenomen binnen je plan`
-            : `Totaal ${formatCurrency(opeet.totalDrawn)} opgenomen binnen je plan`,
+        // Geen bedrag: het opeettotaal is een nominaal kernelbedrag op een toekomstige
+        // leeftijd; gedeeld door het dagtarief van nu gaf het een verkeerde vrijheidstijd
+        // (CLAUDE.md, consume-don't-recompute). De Huis-strategie toont de cijfers.
+        detail: 'Vanaf hier neem je overwaarde op uit je huis, binnen je plan.',
       })
       if (opeet.depletionAge != null) {
         out.push({
@@ -335,7 +389,8 @@ export function GebeurtenissenView({
         action: 'pensioen',
         Icon: Wallet,
         title: `${end.naam} stopt`,
-        detail: `${formatCurrency(end.maandbedrag)}/mnd uitkering valt weg`,
+        // Geen bedrag: een nominale uitkering op een toekomstige leeftijd (zie opeet-start).
+        detail: 'De uitkering van deze pot valt weg.',
       })
     }
     if (deficitNotice) {
@@ -345,22 +400,30 @@ export function GebeurtenissenView({
         action: 'tekort',
         Icon: TrendingDown,
         title: 'Tekort-lening ontstaat',
-        detail:
-          dailyExpenses > 0
-            ? `Loopt op tot ${formatWithFreedom(deficitNotice.peak, dailyExpenses)}`
-            : `Loopt op tot ${formatCurrency(deficitNotice.peak)}`,
+        // Geen bedrag: de piek staat (gedeflateerd, met vrijheidstijd uit de canonieke
+        // helper) in de tekort-melding en in de uitleg-sheet achter deze rij.
+        detail: 'Je plan overbrugt vanaf hier een tekort met een lening.',
         warn: true,
       })
     }
     return out.sort((a, b) => a.age - b.age)
-  }, [sim.unifiedRows, sim.kernelPensionPots, deficitNotice, dailyExpenses])
+  }, [sim.unifiedRows, sim.kernelPensionPots, deficitNotice])
 
   // Klik-routering kernel-rijen: huis/opeet en pensioenpot-einde → de strategie-
   // editor op Voorkeuren (`?strategie=huis|pensioen`), tekort-lening → read-only
   // uitleg-sheet op deze pagina.
   function openKernelMoment(m: KernelMoment) {
     if (m.action === 'tekort') setDeficitSheetOpen(true)
-    else router.push(strategieHref(m.action))
+    else openStrategie(m.action)
+  }
+
+  // Een levensstrategie openen. Binnen de /toekomst-provider (Plan) staat de editor-host op
+  // dezelfde pagina: open hem ter plekke (geen navigatie, geen server-ronde, geen
+  // history-regel en geen factor-A-uitvraag — dat is alleen voor een echte deeplink).
+  // Buiten de provider (los gebruik) blijft het de link naar de rij op Plan.
+  function openStrategie(key: ManagedStrategy) {
+    if (overlayContext) openLevensstrategie(key)
+    else router.push(strategieHref(key))
   }
 
   // Routeert een klik op een event-kaart: strategie-beheerde events openen hun
@@ -368,7 +431,7 @@ export function GebeurtenissenView({
   function openEventOrStrategy(event: LifeEvent) {
     const managed = isStrategyManagedEvent(event)
     if (managed) {
-      router.push(strategieHref(managed))
+      openStrategie(managed)
     } else {
       if (overlay) {
         overlay.openEventPane(event.id, 'view')
@@ -441,9 +504,62 @@ export function GebeurtenissenView({
   // Skeleton-rij zolang de kernel-run nog niet gedraaid heeft (tot hydration).
   const showKernelSkeleton = kernelSimActive && sim.isLoading
 
+  // Kolomweergave (compact, 27 sep): dezelfde tijdlijn-items als hieronder, met dezelfde
+  // klikbestemming en toegankelijke naam, maar als twee regels zonder kaart.
+  const compactItems: CompactTijdlijnItem[] = compact
+    ? timeline.map((item) => {
+        if (item.kind === 'moment') {
+          const m = item.moment
+          return {
+            key: `kernel-${m.key}`,
+            wanneer: String(Math.floor(m.age)),
+            naam: m.title,
+            // Alleen het label: de toelichting staat achter de klik.
+            effect: [],
+            berekend: true,
+            ariaLabel: `Berekend: ${m.title}`,
+            onClick: () => openKernelMoment(m),
+          }
+        }
+        const event = item.event
+        const managed = isStrategyManagedEvent(event)
+        const meta = (event.metadata ?? {}) as { kernelDerived?: boolean; saleProceeds?: number }
+        const kernelDerived = meta.kernelDerived === true
+        const impact = annualSavings && annualSavings > 0 ? computeEventImpact(event, annualSavings) : null
+        return {
+          key: event.id,
+          wanneer:
+            event.target_date == null && event.target_age != null
+              ? String(Math.floor(event.target_age))
+              : formatEventDate(event),
+          naam: event.name,
+          effect: compactEffect(event, eventStopAge, impact, kernelDerived ? meta.saleProceeds : undefined),
+          berekend: kernelDerived,
+          ariaLabel: kernelDerived
+            ? `Berekend: ${event.name}`
+            : managed
+              ? `Open ${STRATEGY_BADGE_LABEL[managed]}`
+              : `Bewerk ${event.name}`,
+          onClick: () => openEventOrStrategy(event),
+        }
+      })
+    : []
+
   return (
-    <section className="mx-auto max-w-6xl px-4 sm:px-6 pb-8 space-y-8">
+    <section className={compact ? 'space-y-4' : 'mx-auto max-w-6xl px-4 sm:px-6 pb-8 space-y-8'}>
       {/* Levensgebeurtenissen */}
+      {compact ? (
+        // Kolom naast de grafiek (27 sep): dezelfde items en klikbestemmingen, compact getekend.
+        <GebeurtenissenTijdlijnCompact
+          kop={PLAN_GEBEURTENISSEN_KOP}
+          aantal={sorted.length}
+          currentAge={currentAge}
+          items={compactItems}
+          laden={showKernelSkeleton}
+          leeg={sorted.length === 0 && kernelMoments.length === 0 && !showKernelSkeleton}
+          onToevoegen={openCatalog}
+        />
+      ) : (
       <div>
         <header className="mb-4 flex items-end justify-between gap-3 flex-wrap">
           {/* De énige telling op de pagina: geteld op de rijen die deze tijdlijn
@@ -696,6 +812,7 @@ export function GebeurtenissenView({
           </ol>
         )}
       </div>
+      )}
 
       {/* Alleen buiten de /toekomst-provider: daarbinnen staat de ene EventPane in de
           overlay-host (spec §4.2 regel 8). */}

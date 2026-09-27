@@ -2,9 +2,21 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup, within } from '@testing-library/react'
 import { DisplayModeProvider } from '@/lib/hooks/use-display-mode'
 import { POT_RULES_DEFAULTS } from '@/lib/pot-rules'
-import type { StrategieEditorsData } from '@/components/future/strategie/strategie-editors'
 import { RIJ_META, RIJ_SLEUTELS, type RijSleutel } from '@/lib/toekomst/instellingen-rij'
-import { RIJ_LABEL, INFLATIE_LINK, MEER_OVER_JE_PLAN, INSTELLINGEN_SECTIE_KOP } from '@/lib/toekomst/instellingen-rijwaarden'
+import {
+  RIJ_LABEL,
+  INFLATIE_LINK,
+  INSTELLINGEN_SECTIE_KOP,
+  NOG_NIET_BEVESTIGD,
+  RENDEMENT_HINT,
+} from '@/lib/toekomst/instellingen-rijwaarden'
+import { freedomDaysToday } from '@/lib/horizon/vrijheidsdagen'
+import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import type { PlanReviewProgress } from '@/lib/plan-review/types'
+import {
+  ToekomstKaternMeldingenContext,
+  type ToekomstKaternMeldingenWaarde,
+} from '@/components/toekomst/meldingen/toekomst-katern-meldingen'
 
 /**
  * InstellingenRijen (ADR 0179 fase 3) — één rij per instelling, elke ✎ opent de bestaande
@@ -41,37 +53,12 @@ vi.mock('@/components/future/voorkeur-bewerken-sheet', () => ({
 vi.mock('@/components/future/box3-methode-sheet', () => ({
   Box3MethodeSheet: (p: Stub) => <div data-testid="box3-sheet">{String(p.current)}|{p.snapshot ? 'snap' : 'geen'}</div>,
 }))
-vi.mock('@/components/future/strategie/strategie-editors', () => ({
-  StrategieEditors: (p: { open: string | null; autoOpenJaarruimte?: boolean; snapshot?: unknown; onClose: () => void }) => (
-    <div>
-      <div data-testid="strategie-open">{p.open ?? 'none'}</div>
-      <div data-testid="strategie-jaarruimte">{String(Boolean(p.autoOpenJaarruimte))}</div>
-      <div data-testid="strategie-snapshot">{p.snapshot ? 'snap' : 'geen'}</div>
-      <button type="button" onClick={p.onClose}>
-        editor-sluiten
-      </button>
-    </div>
-  ),
-}))
 vi.mock('./uitgaven-rij-pane', () => ({
   UitgavenRijPane: (p: { open: boolean; snapshot: unknown }) =>
     p.open ? <div data-testid="uitgaven-pane">{p.snapshot ? 'snap' : 'geen'}</div> : null,
 }))
 
 import { InstellingenRijen, type InstellingenRijenProps } from './instellingen-rijen'
-
-const strategieData = {
-  baseline: null,
-  dailyExpenses: 0,
-  aowRows: [],
-  dateOfBirth: null,
-  grossYearlyIncome: 0,
-  pensioenFactorA: 0,
-  currentAge: null,
-  inflationRate: 0,
-  currentNetMonthly: 0,
-  housingPreview: null,
-} as StrategieEditorsData
 
 const PROPS: InstellingenRijenProps = {
   fireParams: { grossReturn: 0.05, inflationRate: 0.02, effectiveSwr: 0.034, box3Method: 'forfaitair', marginaalTarief: 0.37 },
@@ -84,23 +71,40 @@ const PROPS: InstellingenRijenProps = {
   potBalances: { spaargeld: 0, beleggingen: 0, pensioen: 0, vastgoed: 0, overig: 0 },
   box3HeffingvrijInkomen: null,
   events: [],
-  strategieData,
   housingStrategy: { mode: 'include_full' },
   retirementMethod: 'essential_budgets',
   uitgaveNaPensioen: 30_000,
   geenTekortLening: true,
   tekortLeningRente: 0.05,
+  dagtarief: 100,
+  dagtariefBron: 'transactions',
 }
 
-function renderRijen(mode: 'full' | 'simple' = 'full', props = PROPS) {
-  return render(
+const HIER: RijSleutel[] = RIJ_SLEUTELS.filter((r) => RIJ_META[r].sectie !== 'levensstrategieen')
+
+function renderRijen(
+  mode: 'full' | 'simple' = 'full',
+  props: InstellingenRijenProps = PROPS,
+  meldingen?: ToekomstKaternMeldingenWaarde,
+) {
+  const boom = (
     <DisplayModeProvider initialMode={mode}>
       <InstellingenRijen {...props} />
-    </DisplayModeProvider>,
+    </DisplayModeProvider>
+  )
+  return render(
+    meldingen ? (
+      <ToekomstKaternMeldingenContext.Provider value={meldingen}>{boom}</ToekomstKaternMeldingenContext.Provider>
+    ) : (
+      boom
+    ),
   )
 }
 
 const rijKnop = (r: RijSleutel) => document.querySelector(`button[data-rij="${r}"]`) as HTMLButtonElement
+const ingeklapt = (r: RijSleutel) =>
+  (document.querySelector(`[data-rij-wrap="${r}"]`)?.closest('[data-testid="depth-section"]') as HTMLElement | null)
+    ?.dataset.collapsed
 
 beforeEach(() => {
   nav.search = new URLSearchParams()
@@ -110,30 +114,64 @@ beforeEach(() => {
 })
 afterEach(cleanup)
 
-describe('InstellingenRijen — drie secties, vijftien rijen', () => {
-  it('Volledig: elke rij staat er als knop met label, waarde en "aanpassen"', () => {
+describe('InstellingenRijen — R1: drie secties, checklist van je plan', () => {
+  it('drie zichtbare h2-secties met kicker en romeins cijfer; geen levensstrategieën, geen h1', () => {
     renderRijen()
-    for (const r of RIJ_SLEUTELS) {
-      const knop = rijKnop(r)
-      expect(knop, r).toBeTruthy()
-      expect(knop.textContent).toContain(RIJ_LABEL[r])
-      expect(knop.textContent).toContain('aanpassen')
+    for (const s of ['plan', 'potten', 'markt'] as const) {
+      expect(screen.getByRole('heading', { level: 2, name: INSTELLINGEN_SECTIE_KOP[s] })).toBeTruthy()
     }
-    for (const kop of Object.values(INSTELLINGEN_SECTIE_KOP)) {
-      expect(screen.getByRole('heading', { level: 2, name: kop })).toBeTruthy()
-    }
+    expect(screen.queryByRole('heading', { name: INSTELLINGEN_SECTIE_KOP.levensstrategieen })).toBeNull()
+    for (const r of ['aow', 'pensioen', 'werk', 'huis'] as const) expect(rijKnop(r), r).toBeNull()
+    expect(document.body.textContent).toMatch(/I · Wanneer en hoelang/)
     expect(document.querySelector('h1')).toBeNull()
   })
 
-  it('Stopmoment noemt geen leeftijdsgetal (de kop draagt het, §4.9)', () => {
+  it('Volledig: elke rij van dit katern is een knop met naam "label: waarde, aanpassen"', () => {
     renderRijen()
-    expect(rijKnop('stopmoment').textContent).toContain('zo vroeg als het kan')
+    for (const r of HIER) {
+      const knop = rijKnop(r)
+      expect(knop, r).toBeTruthy()
+      expect(knop.textContent).toContain(`${RIJ_LABEL[r]}: `)
+      expect(knop.textContent).toMatch(/aanpassen|Toevoegen/)
+    }
+  })
+
+  it('Stopmoment: "zo vroeg mogelijk" als standaard, zonder leeftijdsgetal (§4.9)', () => {
+    renderRijen()
+    const waarde = rijKnop('stopmoment').querySelector('[data-staat]')!
+    expect(waarde.getAttribute('data-staat')).toBe('standaard')
+    expect(waarde.textContent).toContain('zo vroeg mogelijk')
+    expect(waarde.textContent).toContain('standaard')
     expect(rijKnop('stopmoment').textContent).not.toMatch(/\d/)
   })
 
-  it('de uitgave-rij draagt het bedrag uit de bron van KPI 4', () => {
+  it('Einde van je plan beantwoordt de vraag', () => {
     renderRijen()
-    expect(rijKnop('uitgave-na-pensioen').textContent).toMatch(/30\.000/)
+    expect(rijKnop('eindleeftijd').textContent).toContain('Einde van je plan')
+    expect(rijKnop('eindleeftijd').textContent).toMatch(/tot 90.*·.*€\s0 over/)
+  })
+
+  it('de uitgave-rij: het bedrag uit de bron van KPI 4, met vrijheidstijd uit freedomDaysToday', () => {
+    renderRijen()
+    const tekst = rijKnop('uitgave-na-pensioen').textContent ?? ''
+    expect(tekst).toMatch(/30\.000/)
+    const dagen = freedomDaysToday({ nominalAmount: 30_000, canonicalDailyRate: 100, source: 'transactions' })!
+    expect(tekst).toContain(`(≈ ${formatFreedomTimeString(calculateFreedomTime(dagen, 1), 'long', false)} vrijheid)`)
+  })
+
+  it('de opnamerate staat niet meer in Instellingen (C4)', () => {
+    renderRijen()
+    expect(document.querySelector('[data-rij="effectief-swr"]')).toBeNull()
+    expect(document.body.textContent).not.toMatch(/Opnamerate/)
+  })
+
+  it('inflatie en rendement dragen hun hint onder de eigen rij (I2)', () => {
+    renderRijen()
+    const inflatie = screen.getByRole('link', { name: new RegExp(INFLATIE_LINK.label) })
+    expect(inflatie.getAttribute('href')).toBe(INFLATIE_LINK.href)
+    expect(inflatie.closest('[data-rij-wrap="inflatie"]')).toBeTruthy()
+    const bezittingen = screen.getByRole('link', { name: RENDEMENT_HINT.link.label })
+    expect(bezittingen.closest('[data-rij-wrap="rendement"]')).toBeTruthy()
   })
 
   it('sectie I draagt het oude anker #voorkeuren', () => {
@@ -141,46 +179,120 @@ describe('InstellingenRijen — drie secties, vijftien rijen', () => {
     expect(container.querySelector('#voorkeuren')?.contains(rijKnop('stopmoment'))).toBe(true)
   })
 
-  it('de inflatierij linkt naar inflatie-koopkracht (besluit §11 #8)', () => {
+  it('II is ook in Volledig ingeklapt, met de samenvatting; openklikken toont de vier regels', () => {
     renderRijen()
-    expect(screen.getByRole('link', { name: new RegExp(INFLATIE_LINK.label) }).getAttribute('href')).toBe(INFLATIE_LINK.href)
-  })
-
-  it('de afgeleide opnamerate is een leesrij zonder ✎', () => {
-    renderRijen()
-    const leesrij = document.querySelector('[data-rij="effectief-swr"]')!
-    expect(leesrij.tagName).toBe('DIV')
-    expect(leesrij.textContent).toContain('3,4%')
-  })
-
-  it('Eenvoudig: plan-kern, alle vier levensstrategieën open; meer-over-je-plan en markt ingeklapt met leesregel', () => {
-    renderRijen('simple')
-    for (const r of ['stopmoment', 'eindleeftijd', 'onttrekking', 'uitgave-na-pensioen', 'aow', 'pensioen', 'werk', 'huis'] as const) {
-      expect(rijKnop(r), r).toBeTruthy()
-    }
-    const ingeklapt = (r: RijSleutel) =>
-      (rijKnop(r).closest('[data-testid="depth-section"]') as HTMLElement | null)?.dataset.collapsed
-    for (const r of ['geen-tekort-lening', 'onttrekkingsvolgorde', 'inflatie', 'box3'] as const) {
+    for (const r of ['geen-tekort-lening', 'onttrekkingsvolgorde', 'verdeling-toename', 'onttrekking-afname'] as const) {
       expect(ingeklapt(r), r).toBe('true')
     }
-    for (const r of ['stopmoment', 'aow'] as const) expect(ingeklapt(r), r).toBeUndefined()
-    const meer = screen.getByRole('button', { name: new RegExp(MEER_OVER_JE_PLAN) })
-    expect(document.body.textContent).toContain('Geen tekort-lening: aan')
-    fireEvent.click(meer)
+    expect(document.body.textContent).toContain('4 regels · alle standaard')
+    expect(ingeklapt('inflatie')).toBeUndefined()
+    fireEvent.click(screen.getByRole('button', { name: /De vier regels voor je potten/ }))
     expect(ingeklapt('geen-tekort-lening')).toBe('false')
-    // Ook ingeklapt blijft de sectie een h2 (koppenvolgorde, ADR 0110).
+  })
+
+  it('II telt een aangepaste regel mee in de samenvatting', () => {
+    renderRijen('full', { ...PROPS, geenTekortLening: false })
+    expect(document.body.textContent).toContain('4 regels · 1 aangepast')
+  })
+
+  it('Eenvoudig: I open; II en III ingeklapt; de koppen blijven h2 (ADR 0110)', () => {
+    renderRijen('simple')
+    for (const r of ['stopmoment', 'eindleeftijd', 'onttrekking', 'uitgave-na-pensioen'] as const) {
+      expect(ingeklapt(r), r).toBeUndefined()
+    }
+    for (const r of ['geen-tekort-lening', 'inflatie', 'box3'] as const) expect(ingeklapt(r), r).toBe('true')
     expect(screen.getByRole('heading', { level: 2, name: INSTELLINGEN_SECTIE_KOP.markt })).toBeTruthy()
+  })
+
+  it('een ontbrekende waarde: italic en "Toevoegen" in plaats van ✎', () => {
+    renderRijen('full', { ...PROPS, uitgaveNaPensioen: 0 })
+    const knop = rijKnop('uitgave-na-pensioen')
+    expect(knop.querySelector('[data-staat]')!.getAttribute('data-staat')).toBe('ontbreekt')
+    expect(knop.textContent).toContain('Toevoegen')
+    expect(knop.textContent).not.toContain('aanpassen')
+  })
+
+  it('"nog niet bevestigd" alleen bij rijen waarvan de wizardstap open staat', () => {
+    const progress: PlanReviewProgress = {
+      stappen: [
+        { stap: 'plan', status: 'bevestigd', reden: null },
+        { stap: 'uitgaven', status: 'open', reden: null },
+        { stap: 'inkomsten', status: 'open', reden: null },
+        { stap: 'woning', status: 'nvt', reden: null },
+        { stap: 'potten', status: 'bevestigd', reden: null },
+        { stap: 'grondslag', status: 'open', reden: null },
+      ],
+      bevestigd: 2,
+      totaal: 5,
+      eersteOpen: 'uitgaven',
+      voltooid: false,
+    }
+    renderRijen('full', { ...PROPS, planReviewProgress: progress })
+    expect(rijKnop('uitgave-na-pensioen').textContent).toContain(NOG_NIET_BEVESTIGD)
+    for (const r of ['stopmoment', 'onttrekking', 'inflatie'] as const) {
+      expect(rijKnop(r).textContent, r).not.toContain(NOG_NIET_BEVESTIGD)
+    }
   })
 })
 
-describe('InstellingenRijen — elke ✎ opent de bestaande body, met de snapshot', () => {
-  it.each(RIJ_SLEUTELS)('%s', (r) => {
+describe('InstellingenRijen — duidingsregel bij een plan dat niet haalbaar is (besluit 2)', () => {
+  const metMelding = (id: string, titel: string) =>
+    ({
+      meldingen: {
+        plan: {
+          meldingen: [
+            {
+              id,
+              katern: 'plan',
+              ernst: 'bad',
+              titel,
+              kort: titel,
+              actie: { label: 'Verken je opties', href: '/toekomst/doelen' },
+              tweedeActie: { label: 'Stopmoment', href: '/toekomst/instellingen?rij=stopmoment' },
+            },
+          ],
+          hoogsteErnst: 'bad',
+          aantal: 1,
+        },
+        doelen: { meldingen: [], hoogsteErnst: null, aantal: 0 },
+        instellingen: { meldingen: [], hoogsteErnst: null, aantal: 0 },
+      },
+      perKatern: {},
+    }) as unknown as ToekomstKaternMeldingenWaarde
+
+  it('dezelfde titel als de Plan-melding, met beide acties in haar volgorde', () => {
+    renderRijen('full', PROPS, metMelding('plan-niet-haalbaar', 'Plan nog niet haalbaar'))
+    const regel = screen.getByTestId('instellingen-duiding')
+    expect(regel.textContent).toBe('Plan nog niet haalbaar. Verken je opties in Doelen, of pas je stopmoment aan ✎.')
+    const links = within(regel).getAllByRole('link')
+    expect(links.map((l) => l.getAttribute('href'))).toEqual(['/toekomst/doelen', '/toekomst/instellingen?rij=stopmoment'])
+    const link = links[1]
+    fireEvent.click(link)
+    expect(screen.getByTestId('regel-pane').textContent).toBe('eindstrategie|stop-plan-stopmoment|snap')
+  })
+
+  it('ook bij het tekort onder een vast anker; niet bij andere meldingen of zonder provider', () => {
+    // Een ankerzin eindigt al op een punt: geen dubbele punt.
+    renderRijen('full', PROPS, metMelding('plan-tekort', 'Je geld reikt tot je 90e.'))
+    expect(screen.getByTestId('instellingen-duiding').textContent).toMatch(/^Je geld reikt tot je 90e. Verken/)
+    cleanup()
+    renderRijen('full', PROPS, metMelding('plan-tekort-lening', 'Je plan leunt op een lening'))
+    expect(screen.queryByTestId('instellingen-duiding')).toBeNull()
+    cleanup()
+    renderRijen()
+    expect(screen.queryByTestId('instellingen-duiding')).toBeNull()
+  })
+})
+
+describe('InstellingenRijen — elke ✎ opent de bestaande body, met de snapshot en het rijlabel als titel', () => {
+  it.each(HIER)('%s', (r) => {
     renderRijen()
     fireEvent.click(rijKnop(r))
     const e = RIJ_META[r].editor
     switch (e.soort) {
       case 'regel':
         expect(screen.getByTestId('regel-pane').textContent).toBe(`${e.regel}|${e.anker ?? ''}|snap`)
+        expect(laatst.regel!.title).toBe(RIJ_LABEL[r])
         break
       case 'voorkeur':
         expect(screen.getByTestId('voorkeur-sheet').textContent).toBe(
@@ -190,26 +302,12 @@ describe('InstellingenRijen — elke ✎ opent de bestaande body, met de snapsho
       case 'box3':
         expect(screen.getByTestId('box3-sheet').textContent).toBe('forfaitair|snap')
         break
-      case 'strategie':
-        expect(screen.getByTestId('strategie-open').textContent).toBe(e.strategie)
-        expect(screen.getByTestId('strategie-snapshot').textContent).toBe('snap')
-        // Via de rij geopend: geen automatische factor-A-uitvraag.
-        expect(screen.getByTestId('strategie-jaarruimte').textContent).toBe('false')
-        break
       case 'uitgaven':
         expect(screen.getByTestId('uitgaven-pane').textContent).toBe('snap')
         break
+      default:
+        throw new Error(`onverwachte editor ${e.soort}`)
     }
-  })
-
-  it('één overlay tegelijk: een andere rij sluit de vorige', () => {
-    renderRijen()
-    fireEvent.click(rijKnop('aow'))
-    expect(screen.getByTestId('strategie-open').textContent).toBe('aow')
-    fireEvent.click(screen.getByText('editor-sluiten'))
-    fireEvent.click(rijKnop('stopmoment'))
-    expect(screen.getByTestId('strategie-open').textContent).toBe('none')
-    expect(screen.getByTestId('regel-pane')).toBeTruthy()
   })
 
   it('na opslaan in een regel-body ververst de bundel', () => {
@@ -233,22 +331,16 @@ describe('InstellingenRijen — deeplinks (?rij= met aliassen)', () => {
     expect(screen.getByTestId('regel-pane').textContent).toBe(verwacht)
   })
 
-  it('S6 — ?strategie=pensioen (en ?rij=pensioen) opent de editor mét factor-A-uitvraag', () => {
-    nav.search = new URLSearchParams('strategie=pensioen&x=1')
-    renderRijen('simple')
-    expect(screen.getByTestId('strategie-open').textContent).toBe('pensioen')
-    expect(screen.getByTestId('strategie-jaarruimte').textContent).toBe('true')
-    // De param verdwijnt bij het openen; de rest blijft.
-    expect(nav.replace).toHaveBeenCalledWith('/toekomst/instellingen?x=1', { scroll: false })
-    fireEvent.click(screen.getByText('editor-sluiten'))
-    expect(screen.getByTestId('strategie-open').textContent).toBe('none')
-  })
-
-  it.each(['aow', 'huis', 'werk'] as const)('?strategie=%s opent die editor zonder factor-A-uitvraag', (key) => {
-    nav.search = new URLSearchParams(`strategie=${key}`)
+  it.each([
+    ['rij=aow', '/toekomst?rij=aow#levensstrategieen'],
+    ['strategie=pensioen&x=1', '/toekomst?rij=pensioen#levensstrategieen'],
+    ['strategie=huis', '/toekomst?rij=huis#levensstrategieen'],
+  ])('?%s (levensstrategie) gaat door naar Plan en opent hier niets', (q, doel) => {
+    nav.search = new URLSearchParams(q)
     renderRijen()
-    expect(screen.getByTestId('strategie-open').textContent).toBe(key)
-    expect(screen.getByTestId('strategie-jaarruimte').textContent).toBe('false')
+    expect(nav.replace).toHaveBeenCalledTimes(1)
+    expect(nav.replace).toHaveBeenCalledWith(doel)
+    expect(screen.queryByTestId('regel-pane')).toBeNull()
   })
 
   it('?rij=uitgave-na-pensioen opent de uitgaven-pane', () => {
@@ -266,27 +358,22 @@ describe('InstellingenRijen — deeplinks (?rij= met aliassen)', () => {
   it('?strategie=open opent niets maar wordt wel opgeruimd', () => {
     nav.search = new URLSearchParams('strategie=open')
     renderRijen()
-    expect(screen.getByTestId('strategie-open').textContent).toBe('none')
     expect(screen.queryByTestId('regel-pane')).toBeNull()
     expect(nav.replace).toHaveBeenCalledWith('/toekomst/instellingen', { scroll: false })
   })
 
-  it('met ?modal= (redirect van ?modal=strategie|withdrawal) wacht de rij-deeplink op de overlay-opruimer: één keer open', () => {
-    const geopend: string[] = []
-    laatst.regel = null
+  it('met ?modal= wacht de rij-deeplink op de overlay-opruimer: één keer open', () => {
     nav.search = new URLSearchParams('modal=withdrawal&rij=onttrekking')
     const { rerender } = renderRijen()
     expect(screen.queryByTestId('regel-pane')).toBeNull()
     expect(nav.replace).not.toHaveBeenCalled()
-    // De overlay-state ruimt `modal` op; daarna ziet de rij-hook een schone URL.
     nav.search = new URLSearchParams('rij=onttrekking')
     rerender(
       <DisplayModeProvider initialMode="full">
         <InstellingenRijen {...PROPS} />
       </DisplayModeProvider>,
     )
-    geopend.push(screen.getByTestId('regel-pane').textContent ?? '')
-    expect(geopend).toEqual(['onttrekkingsstrategie||snap'])
+    expect(screen.getByTestId('regel-pane').textContent).toBe('onttrekkingsstrategie||snap')
     expect(nav.replace).toHaveBeenCalledTimes(1)
     expect(nav.replace).toHaveBeenCalledWith('/toekomst/instellingen', { scroll: false })
   })
@@ -303,6 +390,6 @@ describe('InstellingenRijen — geen losse Tailwind-kleuren voor module-identite
   it('rendert zonder standaardpaletten', () => {
     const { container } = renderRijen()
     expect(container.innerHTML).not.toMatch(/(bg|text|border)-(violet|emerald|amber|sky|teal|purple)-\d/)
-    expect(within(container).getAllByRole('button').length).toBeGreaterThanOrEqual(RIJ_SLEUTELS.length)
   })
 })
+

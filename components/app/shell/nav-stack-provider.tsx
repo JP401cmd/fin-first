@@ -91,8 +91,10 @@ export type BottomBarAppTab = {
 
 /**
  * BottomBar-configuratie per stack-entry. Zie plan §4.4.
- * - 'tabs' (default): module-tabs (Kern/Wil/Horizon), gating-aware.
- * - 'action-bar': primary + optionele secondary CTA.
+ * - 'tabs': historisch. De module-tabs zijn afgeschaft (ADR 0179 fase 6); `MobileBottomBar`
+ *   rendert 'tabs' net als 'hidden' als niets. `NavStackMeta` zet zelf 'hidden' als default.
+ * - 'action-bar': primary + optionele secondary CTA, en optioneel een rij extra
+ *   tekstacties (`extra`) boven die twee knoppen.
  * - 'context-actions': 2-3 actie-knoppen.
  * - 'app-tabs': drie vaste in-app-tabs (left/center/right) voor Kern-apps
  *   zoals Budgetteren. Vervangt de module-tabs zolang de gebruiker binnen
@@ -105,6 +107,12 @@ export type BottomBarConfig =
       kind: 'action-bar'
       primary: BottomBarAction
       secondary?: BottomBarAction
+      /**
+       * Extra acties als compacte tekstrij boven de twee knoppen (ADR 0179 D7: in Doelen
+       * staan dan álle lab-acties in de bar, één plek per actie). Optioneel; zonder
+       * `extra` is de bar ongewijzigd.
+       */
+      extra?: BottomBarAction[]
     }
   | {
       kind: 'context-actions'
@@ -119,8 +127,8 @@ export type BottomBarConfig =
   | { kind: 'hidden' }
 
 /**
- * Eén entry in de per-tab-stack. `bottomBar` is optioneel; ontbrekend wordt
- * behandeld als `{ kind: 'tabs' }`.
+ * Eén entry in de per-tab-stack. `bottomBar` is optioneel; ontbrekend rendert
+ * `MobileBottomBar` als `{ kind: 'tabs' }`, en dat is sinds ADR 0179 fase 6 niets.
  *
  * Belangrijk: `BottomBarConfig` met onClick/href is NIET serializable. We
  * schrijven alleen `pathname` + `title` + `scrollY` + `bottomBar.kind` (+
@@ -135,7 +143,10 @@ export type StackEntry = {
   title: string
   /** Bewaard bij push, te herstellen bij pop. SSR: 0. */
   scrollY: number
-  /** Optionele BottomBar-override; default = `{ kind: 'tabs' }`. */
+  /**
+   * Optionele BottomBar-override. Ontbrekend of `'tabs'` rendert niets (de module-tabs
+   * zijn afgeschaft, ADR 0179 fase 6); `NavStackMeta` zet zelf `'hidden'` als default.
+   */
   bottomBar?: BottomBarConfig
   /** Optionele TopBar-override; default = `'rich'` op tab-roots, `'simple'` op sub-pages. */
   topBar?: TopBarConfig
@@ -755,13 +766,11 @@ export function NavStackProvider({
     // Default-config voor nieuwe entries.
     //  - TopBar: 'rich' op tab-roots (utility-cluster), 'simple' op sub-pages
     //    (←+titel).
-    //  - BottomBar: 'tabs' alleen op tab-roots; sub-pages krijgen 'hidden'
-    //    (lege bar). Reden: gebruiker keert op sub-pages terug via ←-knop,
-    //    niet via cross-tab-tabs. Pagina's die alsnog tabs willen zien (bv.
-    //    een list-overview onder een module) overrulen via
-    //    `<NavStackMeta bottomBar={{ kind: 'tabs' }}>`. Pagina's met een
-    //    form-flow overrulen naar 'action-bar', detail-pagina's naar
-    //    'context-actions'.
+    //  - BottomBar: 'tabs' op tab-roots, 'hidden' op sub-pages. Beide renderen
+    //    niets: de module-tabs zijn afgeschaft (ADR 0179 fase 6) en de mobiele
+    //    navigatie loopt via de FloatingNavButton. `NavStackMeta` overschrijft
+    //    dit direct met zijn eigen default 'hidden'. Pagina's met een form-flow
+    //    kiezen 'action-bar', detail-pagina's 'context-actions'.
     const defaultTopBar: TopBarConfig = { kind: isRoot ? 'rich' : 'simple' }
     const defaultBottomBar: BottomBarConfig = { kind: isRoot ? 'tabs' : 'hidden' }
 

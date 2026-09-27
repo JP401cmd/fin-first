@@ -29,17 +29,23 @@ interface DepthSectionProps {
   children: ReactNode
   /** Optioneel icoon naast de titel. */
   icon?: ReactNode
+  /**
+   * Ook in Volledig standaard ingeklapt (bv. de pot-regels in katern Instellingen: een
+   * bedieningsvlak dat de meeste mensen op de standaard laten, ADR 0026). Een klik op de
+   * header opent hem gewoon; een moduswissel klapt hem weer in.
+   */
+  ingeklapt?: boolean
 }
 
-export function DepthSection({ title, summary, children, icon }: DepthSectionProps) {
+export function DepthSection({ title, summary, children, icon, ingeklapt = false }: DepthSectionProps) {
   const { mode } = useDisplayMode()
-  const [open, setOpen] = useState(mode === 'full')
+  const [open, setOpen] = useState(!ingeklapt && mode === 'full')
 
   // Modus-wissel beweegt alle secties mee; een handmatige klik (setOpen) geldt
   // tot de volgende modus-wissel (ephemeral, géén persist).
   useEffect(() => {
-    setOpen(mode === 'full')
-  }, [mode])
+    setOpen(!ingeklapt && mode === 'full')
+  }, [mode, ingeklapt])
 
   return (
     <div

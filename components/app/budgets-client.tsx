@@ -3734,7 +3734,7 @@ function BudgetDetailModal({
     <ShellOverlay
       open={true}
       onClose={onClose}
-      kind="pane"
+      kind="pane" mobileInset={false}
       title={budget.name}
       /* B-022: "archiveren" en de vraag-aan-Fin horen niet meer in de rij
          onderin — die rij liep op 384px breed buiten beeld (B-018). Beide zijn
@@ -5108,7 +5108,7 @@ function BudgetEditModal({
       open={true}
       onClose={handleClose}
       onRequestClose={requestClose}
-      kind="pane"
+      kind="pane" mobileInset={false}
       title="Budget bewerken"
       /* B-018/B-022: de knoppen stonden onderaan de SCROLL-content — op een
          384px-viewport moest je het hele formulier doorscrollen om Opslaan te

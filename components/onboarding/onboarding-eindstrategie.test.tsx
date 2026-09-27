@@ -52,7 +52,7 @@ const bedragVeld = () => screen.getByLabelText(/Bedrag dat over moet blijven/)
 describe('OnboardingEindstrategie — de twee vragen in gewone taal', () => {
   it('biedt drie ankers (zonder "Nu") en drie eind-vormen in de woorden van het besluit', () => {
     render(<Harness />)
-    expect(tile(/Zo vroeg als het kan/)).toBeInTheDocument()
+    expect(tile(/Zo vroeg mogelijk/)).toBeInTheDocument()
     expect(tile(/Op mijn AOW-leeftijd/)).toBeInTheDocument()
     expect(tile(/Op een leeftijd die ik kies/)).toBeInTheDocument()
     // `now` blijft in Voorkeuren — een nieuwe gebruiker begint er niet mee.
@@ -87,7 +87,7 @@ describe('OnboardingEindstrategie — de twee vragen in gewone taal', () => {
 
   it('begint op solved × deplete met eindleeftijd 90, zonder stopleeftijd- of bedragveld', () => {
     render(<Harness />)
-    expect(tile(/Zo vroeg als het kan/)).toHaveAttribute('aria-pressed', 'true')
+    expect(tile(/Zo vroeg mogelijk/)).toHaveAttribute('aria-pressed', 'true')
     expect(tile(/Niets, het mag op zijn/)).toHaveAttribute('aria-pressed', 'true')
     expect(eindVeld()).toHaveValue(90)
     // De <input min/max> lezen de ene grens (DB-CHECK 60..120) via plan-draft.
@@ -117,8 +117,8 @@ describe('OnboardingEindstrategie — de twee vragen in gewone taal', () => {
     fireEvent.change(stopVeld(), { target: { value: '58.5' } })
     expect(stateNow().fire_stop_age).toBe(58.5)
 
-    // Terug naar "zo vroeg als het kan" wist de stopleeftijd.
-    fireEvent.click(tile(/Zo vroeg als het kan/))
+    // Terug naar "zo vroeg mogelijk" wist de stopleeftijd.
+    fireEvent.click(tile(/Zo vroeg mogelijk/))
     expect(stateNow()).toMatchObject({ fire_stop_anchor: 'solved', fire_stop_age: null })
   })
 

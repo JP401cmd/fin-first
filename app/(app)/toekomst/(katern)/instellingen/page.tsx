@@ -10,17 +10,21 @@ import { InstellingenKatern } from '@/components/toekomst/instellingen/instellin
 import { OudeGebeurtenissenBladwijzer } from '@/components/toekomst/layout/oude-lab-bladwijzer'
 import { resolveWithdrawalProfiel } from '@/lib/withdrawal-strategy'
 import { buildPotBalances } from '@/lib/future/pot-balances'
-import { buildStrategieEditorsData } from '@/lib/horizon/strategie-editors-data'
 import { resolveDeficitLoanRate } from '@/lib/horizon-kernel/adapter/params'
 
 export const metadata: Metadata = {
   title: 'Instellingen — TriFinity',
   description:
-    'Wat je toekomstplan voedt: je stopmoment, je onttrekking, je AOW-, pensioen-, werk- en woonstrategie en de marktaannames.',
+    'Wat je toekomstplan voedt: je stopmoment, het einde van je plan, je onttrekking, hoe je potten meebewegen en de marktaannames.',
 }
 
 /**
- * /toekomst/instellingen — katern Instellingen (ADR 0179 D1/D4, fase 1 stap 17).
+ * /toekomst/instellingen — katern Instellingen (ADR 0179 D1/D4, fase 1 stap 17; R1 27 sep).
+ *
+ * De levensstrategieën (AOW, pensioen, werk, eigen woning) staan sinds 27 sep op katern Plan,
+ * bij de levensgebeurtenissen. Oude deeplinks hierheen (`?rij=aow|pensioen|werk|huis`,
+ * `?strategie=…`) stuurt `next.config.ts` op de routing-laag door naar
+ * `/toekomst#levensstrategieen` (geen render-tijd-redirect: React #310, zie next.config).
  *
  * Vervangt de oude subroute /toekomst/voorkeuren (redirect via `next.config.ts`, query
  * mee). De levensgebeurtenissen stonden hier tot het addendum van 26 sep (ADR 0179); ze
@@ -42,8 +46,6 @@ export default async function ToekomstInstellingenPage() {
     loadDashboardData(supabase),
   ])
 
-  // Levensstrategie-editors (AOW/Pensioen/Huis/Werk).
-  const { strategieData } = buildStrategieEditorsData(horizonData)
   const rawProfile = horizonData.rawProfile
   const potBalances = buildPotBalances(horizonData.assets, horizonData.unlinkedCash)
   // TPR-12 — heffingvrij inkomen (Box 3, werkelijk-tak); NULL = kernel-default.
@@ -59,9 +61,8 @@ export default async function ToekomstInstellingenPage() {
       {/* `/toekomst/instellingen#gebeurtenissen` (de lijst stond hier tot het addendum van
           26 sep) → de gebeurtenissen onder het plan. */}
       <OudeGebeurtenissenBladwijzer />
-      {/* De views dragen hun eigen `max-w-6xl px-4 sm:px-6`-kolom; de katern-layout padt
-          al, dus de negatieve marge voorkomt dubbele inspringing (zoals bij Doelen). */}
-      <div className="-mx-4 sm:-mx-6">
+      {/* De rijen dragen geen eigen paginakolom meer (B5): ze staan links uitgelijnd in de
+          inspringing van de katern-layout, net als het canvas en de koppen. */}
       <InstellingenKatern
         planReviewProgress={planReviewProgress}
         rijen={{
@@ -79,7 +80,6 @@ export default async function ToekomstInstellingenPage() {
           potBalances,
           box3HeffingvrijInkomen,
           events: horizonData.events,
-          strategieData,
           housingStrategy: horizonData.housingStrategy,
           retirementMethod: rawProfile?.retirement_expense_method ?? null,
           // Dezelfde bron als KPI 4 "Na pensioen" op Plan (de state-provider leest
@@ -90,9 +90,12 @@ export default async function ToekomstInstellingenPage() {
           // Dezelfde resolver als de kernel-adapter (default + klem 0..1): de rij toont de
           // rente waar de kern mee rekent, ook bij een ongeldige DB-waarde.
           tekortLeningRente: resolveDeficitLoanRate({ date_of_birth: null, deficit_loan_rate: rawProfile?.deficit_loan_rate ?? null }),
+          // Het canonieke dagtarief van de bundel: de vrijheidstijd bij "Uitgave na pensioen"
+          // (`freedomDaysToday`), zelfde grondslag als de rest van /toekomst.
+          dagtarief: horizonData.dailyExpenseRate,
+          dagtariefBron: horizonData.dailyExpenseRateDetail?.source,
         }}
       />
-      </div>
     </>
   )
 }

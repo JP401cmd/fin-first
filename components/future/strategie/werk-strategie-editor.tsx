@@ -87,7 +87,7 @@ export function WerkStrategieEditor({
     <StrategieModalShell
       open
       onClose={onClose}
-      title="Werk-strategie"
+      title="Werk"
       intro="Je loopbaan levert tijd op. Schets je inkomenslijn — groei, een plafond, minder werken — en zie wat het met je vrijheidsdatum doet. Elke euro die je extra verdient, spaar je volledig."
       error={error}
       readOnly={readOnly}
