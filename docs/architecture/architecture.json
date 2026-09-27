@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-27T06:08:11.957Z",
+  "generatedAt": "2026-09-27T09:40:21.175Z",
   "generatedDate": "2026-09-27",
   "repo": {
     "name": "fin",
@@ -193,9 +193,9 @@
     "routesProduction": 89,
     "api": 334,
     "tables": 105,
-    "migrations": 265,
+    "migrations": 266,
     "integrations": 25,
-    "components": 1226,
+    "components": 1237,
     "providers": 19,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -8732,7 +8732,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 265
+    "migrationCount": 266
   },
   "tablesByDomain": [
     {
@@ -9290,7 +9290,7 @@
     }
   ],
   "components": {
-    "total": 1226,
+    "total": 1237,
     "groups": [
       {
         "group": "app",
@@ -10071,7 +10071,7 @@
       },
       {
         "group": "future",
-        "count": 87,
+        "count": 90,
         "items": [
           "afbouw-overzicht-card",
           "afbouw-overzicht-card.test",
@@ -10099,8 +10099,11 @@
           "eindstrategie-body.geen-tekort-lening.test",
           "eindstrategie-body.nalatenschap.test",
           "fields",
+          "fire-delta-footer.haalbaarheid.test",
+          "gebeurtenissen-tijdlijn-compact",
           "gebeurtenissen-view",
           "gebeurtenissen-view.een-pane.test",
+          "gebeurtenissen-view.plan.test",
           "gebeurtenissen-view.test",
           "grondslag-editor",
           "grondslag-editor.test",
@@ -10253,7 +10256,7 @@
       },
       {
         "group": "toekomst",
-        "count": 71,
+        "count": 78,
         "items": [
           "aannamesregel",
           "aannamesregel.test",
@@ -10287,6 +10290,9 @@
           "katern-melding.test",
           "lagen-menu",
           "lagen-menu.test",
+          "levensstrategie-editors-host",
+          "levensstrategieen-blok",
+          "levensstrategieen-blok.test",
           "marktcheck-getallen",
           "marktcheck-getallen.test",
           "modus-switch",
@@ -10297,6 +10303,8 @@
           "oude-tab-param.test",
           "plan-afbouw-overzicht",
           "plan-afbouw-overzicht.test",
+          "plan-gebeurtenissen",
+          "plan-gebeurtenissen.test",
           "plan-gegevensmelding",
           "plan-helpers",
           "plan-hero-duiding",
@@ -10323,6 +10331,8 @@
           "uitgaven-rij-pane.test",
           "use-euro-view-feeds.test",
           "use-in-view-once.test",
+          "use-kolom-plot-hoogte.test",
+          "use-samenstelling-past.test",
           "use-toekomst-overlay-state.whatif-scroll.test",
           "use-toekomst-sim.props-als-bron.test",
           "wizard-ingang"
@@ -10475,7 +10485,7 @@
       },
       {
         "group": "editorial",
-        "count": 23,
+        "count": 24,
         "items": [
           "aanname-hint",
           "button",
@@ -10487,6 +10497,7 @@
           "index",
           "info-icon-tooltip",
           "inline-info-disclosure",
+          "katern-accent-scope",
           "katern-koppen",
           "katern-koppen.test",
           "page-blueprints",
@@ -18877,6 +18888,20 @@
       ],
       "summary": "/toekomst wordt één layout met kop, gedeeld grafiekcanvas en drie katern-koppen, met drie routes eronder: Plan (`/toekomst`), Doelen (`/toekomst/doelen`) en Instellingen (`/toekomst/instellingen`). Het canvas blijft gemonteerd; elk katern heeft één taak, elke instelling één plek.",
       "file": "docs/adr/0179-toekomst-in-drie-katernen.md"
+    },
+    {
+      "id": "0180-snapshots-waarderingen-en-rollovers-zijn-eigen-rijen",
+      "title": "Vermogenssnapshots, waarderingen en meegenomen budgetruimte zijn eigen rijen",
+      "status": "aanvaard",
+      "date": "2026-09-27",
+      "elements": [
+        "as-huishouden",
+        "do-huishouden",
+        "as-vermogen",
+        "as-budget"
+      ],
+      "summary": "`net_worth_snapshots` en `valuations` lezen voortaan alleen de eigen rij; de huishoud-tak verdwijnt uit hun SELECT-policy. Een waardering hoort bij een bezitting of schuld van de schrijver zelf. Meegenomen budgetruimte (`budget_rollovers`) schrijft alleen de aanmaker van het budg",
+      "file": "docs/adr/0180-snapshots-waarderingen-en-rollovers-zijn-eigen-rijen.md"
     }
   ],
   "churn": {
@@ -18884,7 +18909,7 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 84
+        "commits": 85
       },
       {
         "path": "lib/ai",
@@ -18892,7 +18917,7 @@
       },
       {
         "path": "app/(app)/toekomst",
-        "commits": 54
+        "commits": 55
       },
       {
         "path": "app/api/ai",
@@ -18942,7 +18967,7 @@
       {
         "file": "lib/release-notes.ts",
         "loc": 3634,
-        "commits": 13
+        "commits": 14
       },
       {
         "file": "lib/dashboard-data-loader.ts",
@@ -18961,8 +18986,8 @@
       },
       {
         "file": "app/(app)/core/checkin/page.tsx",
-        "loc": 2419,
-        "commits": 13
+        "loc": 2430,
+        "commits": 14
       }
     ]
   },
@@ -20150,9 +20175,17 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-09-26",
-    "hasChanges": false,
-    "sections": []
+    "previousDate": "2026-09-27",
+    "hasChanges": true,
+    "sections": [
+      {
+        "label": "Componenten (aantal)",
+        "added": [
+          "+11"
+        ],
+        "removed": []
+      }
+    ]
   },
   "statsHistory": [
     {
@@ -20634,7 +20667,7 @@
     {
       "date": "2026-09-27",
       "api": 334,
-      "components": 1226,
+      "components": 1237,
       "tables": 105,
       "routesProduction": 89
     }

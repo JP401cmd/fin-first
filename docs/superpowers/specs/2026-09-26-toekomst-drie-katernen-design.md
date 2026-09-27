@@ -408,8 +408,8 @@ Een melding staat bovenaan het katern waar ze over gaat, niet onder de paginakop
 | Eindsituatie: vermogen op vóór de eindleeftijd, of nalatenschap (`detectEindsituatie`) | Plan | oranje of informatief | "Eindleeftijd →" naar Instellingen · Je plan |
 | Doelscenario loopt achter op het plan (`LabPlanMelding`, "Plan gedekt" volgt het plan) | Doelen | informatief | Bijwerken · Loslaten |
 | Een doel loopt achter op koers | Doelen | oranje | naar het doel in de lijst |
-| AOW ontbreekt (`aowOntbreekt`) | Instellingen | oranje | Toevoegen → levensstrategie AOW |
-| Je huis wordt nooit verkocht (`housingHeldNotice`) | Instellingen | informatief | Eigen woning ✎ |
+| AOW ontbreekt (`aowOntbreekt`) | Plan *(was Instellingen; de levensstrategieën staan sinds 27 sep op Plan — ADR 0179 addendum (e))* | oranje | Toevoegen → levensstrategie AOW |
+| Je huis wordt nooit verkocht (`housingHeldNotice`) | Plan *(idem)* | informatief | Eigen woning ✎ |
 | Ontbrekende gegevens ("Vul profiel aan", outcome-guards) | Instellingen | oranje | naar /mijn/profiel |
 | Wizard niet afgerond (N van M) | Instellingen | geen melding; staat in de wizard-ingang zelf | Verder → |
 
