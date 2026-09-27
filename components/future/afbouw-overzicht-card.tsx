@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { TrendingDown, ArrowRight, Compass } from 'lucide-react'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
 import { STRATEGY_LABELS, type FireEndStrategy } from '@/lib/fire-strategy'
 
 /**
@@ -15,6 +15,11 @@ import { STRATEGY_LABELS, type FireEndStrategy } from '@/lib/fire-strategy'
  * snelle getallen-blik die laat zien hoeveel vermogen wordt verbruikt
  * tussen vrijheidsmoment en eindleeftijd. Past in VoorkeurenView omdat
  * eindstrategie + onttrekking de afbouw-dynamiek bepalen.
+ *
+ * Vrijheidstijd komt kant-en-klaar binnen (`fireAgeVrijheid`/`endVrijheid`): de kaart
+ * rekent niets. Hij hoort bij het LIQUIDE deel, niet bij het getoonde netto vermogen
+ * (een huis leef je niet op) — vandaar "in het liquide deel". Het verbruik krijgt geen
+ * regel: een verschil tussen twee leeftijden heeft geen eerlijke vrijheidstijd.
  */
 export function AfbouwOverzichtCard({
   fireAge,
@@ -22,6 +27,9 @@ export function AfbouwOverzichtCard({
   fireAgeBalance,
   endBalance,
   strategy,
+  masked = false,
+  fireAgeVrijheid = null,
+  endVrijheid = null,
 }: {
   /** Vrijheidsleeftijd (round) uit dashboardData.fireAgeFractional. */
   fireAge: number | null
@@ -33,6 +41,12 @@ export function AfbouwOverzichtCard({
   endBalance: number | null
   /** FireEndStrategy uit fireStrategy.strategy — voor context-label. */
   strategy: FireEndStrategy
+  /** Privacyweergave: bedragen als placeholder. */
+  masked?: boolean
+  /** Vrijheidstijd van het liquide deel op fireAge, al als tekst; `null` = geen regel. */
+  fireAgeVrijheid?: string | null
+  /** Vrijheidstijd van het liquide deel op endAge, al als tekst; `null` = geen regel. */
+  endVrijheid?: string | null
 }) {
   if (fireAge == null || fireAgeBalance == null || endBalance == null) {
     return null
@@ -70,8 +84,13 @@ export function AfbouwOverzichtCard({
             </div>
           </header>
           <div className="font-serif text-lg sm:text-xl font-semibold text-[var(--ink)] tabular-nums">
-            {formatCurrency(Math.round(fireAgeBalance))}
+            {formatMaskedCurrency(Math.round(fireAgeBalance), masked)}
           </div>
+          {fireAgeVrijheid && fireAgeBalance > 0 && (
+            <p className="mt-0.5 text-[11px] font-medium text-[var(--ink-2)] tabular-nums">
+              {fireAgeVrijheid} vrijheid in het liquide deel
+            </p>
+          )}
           <p className="mt-1 text-[11px] text-[var(--ink-2)] leading-snug">
             Startbedrag voor de afbouw-fase.
           </p>
@@ -88,7 +107,7 @@ export function AfbouwOverzichtCard({
             </div>
           </header>
           <div className="font-serif text-lg sm:text-xl font-semibold text-amber-700 tabular-nums">
-            −{formatCurrency(Math.round(consumed))}
+            −{formatMaskedCurrency(Math.round(consumed), masked)}
           </div>
           <p className="mt-1 text-[11px] text-[var(--ink-2)] leading-snug">
             Wat je opneemt en aan kosten betaalt.
@@ -106,8 +125,13 @@ export function AfbouwOverzichtCard({
             </div>
           </header>
           <div className="font-serif text-lg sm:text-xl font-semibold text-[var(--ink)] tabular-nums">
-            {formatCurrency(Math.round(remaining))}
+            {formatMaskedCurrency(Math.round(remaining), masked)}
           </div>
+          {endVrijheid && remaining > 0 && (
+            <p className="mt-0.5 text-[11px] font-medium text-[var(--ink-2)] tabular-nums">
+              {endVrijheid} vrijheid in het liquide deel
+            </p>
+          )}
           <p className="mt-1 text-[11px] text-[var(--ink-2)] leading-snug">
             {remaining > 0
               ? 'Restant — nalatenschap of buffer.'

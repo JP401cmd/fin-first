@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import { MASKED_AMOUNT_PLACEHOLDER } from '@/lib/format'
 import { AfbouwOverzichtCard } from './afbouw-overzicht-card'
 
 describe('AfbouwOverzichtCard — render-states', () => {
@@ -125,5 +126,49 @@ describe('AfbouwOverzichtCard — render-content', () => {
       />,
     )
     expect(container.querySelector('a[href="/toekomst"]')).toBeTruthy()
+  })
+})
+
+describe('AfbouwOverzichtCard — vrijheidstijd en privacyweergave', () => {
+  it('toont de aangeleverde vrijheidstijd van het liquide deel onder begin- en eindstand', () => {
+    const { container } = render(
+      <AfbouwOverzichtCard
+        fireAge={52}
+        endAge={90}
+        fireAgeBalance={500_000}
+        endBalance={100_000}
+        strategy="deplete"
+        fireAgeVrijheid="12 jaar en 4 maanden"
+        endVrijheid="2 jaar en 1 maand"
+      />,
+    )
+    expect(container.textContent).toContain('12 jaar en 4 maanden vrijheid in het liquide deel')
+    expect(container.textContent).toContain('2 jaar en 1 maand vrijheid in het liquide deel')
+  })
+
+  it('geen regel zonder vrijheidstijd, en geen regel onder een eindstand van nul', () => {
+    const { container, rerender } = render(
+      <AfbouwOverzichtCard fireAge={52} endAge={90} fireAgeBalance={500_000} endBalance={100_000} strategy="deplete" />,
+    )
+    expect(container.textContent).not.toContain('vrijheid in het liquide deel')
+    rerender(
+      <AfbouwOverzichtCard
+        fireAge={52}
+        endAge={90}
+        fireAgeBalance={500_000}
+        endBalance={0}
+        strategy="deplete"
+        endVrijheid="3 maanden"
+      />,
+    )
+    expect(container.textContent).not.toContain('3 maanden vrijheid')
+  })
+
+  it('verbergt de bedragen in de privacyweergave', () => {
+    const { container } = render(
+      <AfbouwOverzichtCard fireAge={52} endAge={90} fireAgeBalance={500_000} endBalance={100_000} strategy="deplete" masked />,
+    )
+    expect(container.textContent).not.toMatch(/500\.000|400\.000|100\.000/)
+    expect(container.textContent?.split(MASKED_AMOUNT_PLACEHOLDER).length).toBe(4)
   })
 })

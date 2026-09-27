@@ -19,13 +19,30 @@
  *
  * Montage (orchestrator): één regel in `plan-verdieping.tsx`, `<PlanAfbouwOverzicht />`.
  * De `HideInSimple` zit al hier (diepte, geen bedieningsvlak — ADR 0026).
+ *
+ * Vrijheidstijd: de bedragen zijn netto vermogen (`SimRow.endPortfolio` = `netWorth`,
+ * Prognose!I, incl. eigen woning), maar een huis leef je niet op. De dagen komen daarom uit
+ * `nettoLiquide` (Prognose!J) van dezelfde kernelrij, via de canonieke `freedomDaysAtAge`:
+ * teller één keer door de kernelfactor van die leeftijd, noemer het dagtarief van vandaag,
+ * real-verankerd (beweegt niet mee met de Nominaal/Reëel-schakelaar). Nominale rijen in,
+ * geen `view*`-bedrag: vrijheidstijd is geen euro-weergave.
  */
 
 import type { SimResult, SimRow } from '@/lib/fire-simulation'
+import type { UnifiedProjectionRow } from '@/lib/unified-projection'
+import type { FactorRow } from '@/lib/euro-display'
+import type { FreedomRateSource } from '@/lib/format'
 import { DEFAULT_FIRE_STRATEGY, type FireEndStrategy } from '@/lib/fire-strategy'
+import { freedomDaysAtAge } from '@/lib/horizon/vrijheidsdagen'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { HideInSimple } from '@/components/app/hide-in-simple'
 import { AfbouwOverzichtCard } from '@/components/future/afbouw-overzicht-card'
-import { useToekomstEuroContext, useToekomstSimContext } from '@/components/toekomst/state/toekomst-state-provider'
+import { vrijheidTekst } from '@/components/toekomst/meldingen/meldingen-bron'
+import {
+  useToekomstBron,
+  useToekomstEuroContext,
+  useToekomstSimContext,
+} from '@/components/toekomst/state/toekomst-state-provider'
 
 export interface AfbouwInvoer {
   fireAge: number
@@ -60,9 +77,36 @@ export function afbouwInvoer({
   return { fireAge, endAge: endRow.age, fireAgeBalance: fireRow.endPortfolio, endBalance: endRow.endPortfolio, strategy }
 }
 
+/**
+ * Vrijheidsdagen van het LIQUIDE deel op begin en eind van de afbouw. Leest `nettoLiquide`
+ * (J) van de nominale kernelrij op die leeftijd — nooit `netWorth` (I), dat de eigen woning
+ * meetelt. `null` = geen regel (geen rij, geen liquide vermogen of geen dagbasis, ADR 0131).
+ */
+export function afbouwVrijheidsdagen({
+  rows,
+  fireAge,
+  endAge,
+  canonicalDailyRate,
+  source,
+}: {
+  rows: readonly (FactorRow & Pick<UnifiedProjectionRow, 'nettoLiquide'>)[]
+  fireAge: number
+  endAge: number
+  canonicalDailyRate: number
+  source: FreedomRateSource | undefined
+}): { start: number | null; eind: number | null } {
+  const opLeeftijd = (age: number) => {
+    const rij = rows.find((r) => r.age === age)
+    return rij ? freedomDaysAtAge({ rows, age, nominalAmount: rij.nettoLiquide, canonicalDailyRate, source }) : null
+  }
+  return { start: opLeeftijd(fireAge), eind: opLeeftijd(endAge) }
+}
+
 export function PlanAfbouwOverzicht() {
-  const { simResult, fireStrategy } = useToekomstSimContext()
+  const { simResult, fireStrategy, displayUnifiedRows, canonicalDailyRate } = useToekomstSimContext()
   const { viewDisplaySimRows } = useToekomstEuroContext()
+  const { initialData } = useToekomstBron()
+  const { masked } = useMaskedAmounts()
   const invoer = afbouwInvoer({
     simResult,
     rows: viewDisplaySimRows,
@@ -70,10 +114,22 @@ export function PlanAfbouwOverzicht() {
     strategy: fireStrategy?.strategy ?? 'deplete',
   })
   if (!invoer) return null
+  const dagen = afbouwVrijheidsdagen({
+    rows: displayUnifiedRows,
+    fireAge: invoer.fireAge,
+    endAge: invoer.endAge,
+    canonicalDailyRate,
+    source: initialData.dailyExpenseRateDetail?.source,
+  })
   return (
     <HideInSimple>
       <div data-testid="plan-afbouw-overzicht">
-        <AfbouwOverzichtCard {...invoer} />
+        <AfbouwOverzichtCard
+          {...invoer}
+          masked={masked}
+          fireAgeVrijheid={vrijheidTekst(dagen.start, masked)}
+          endVrijheid={vrijheidTekst(dagen.eind, masked)}
+        />
       </div>
     </HideInSimple>
   )

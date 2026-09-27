@@ -13,13 +13,16 @@ import { DisplayModeProvider } from '@/lib/hooks/use-display-mode'
 const ctx = vi.hoisted(() => ({
   sim: {} as Record<string, unknown>,
   euro: {} as Record<string, unknown>,
+  bron: {} as Record<string, unknown>,
 }))
 vi.mock('@/components/toekomst/state/toekomst-state-provider', () => ({
   useToekomstSimContext: () => ctx.sim,
   useToekomstEuroContext: () => ctx.euro,
+  useToekomstBron: () => ctx.bron,
 }))
 
-import { PlanAfbouwOverzicht, afbouwInvoer } from './plan-afbouw-overzicht'
+import { PlanAfbouwOverzicht, afbouwInvoer, afbouwVrijheidsdagen } from './plan-afbouw-overzicht'
+import { vrijheidTekst } from '@/components/toekomst/meldingen/meldingen-bron'
 
 const RIJEN = [
   { age: 50, endPortfolio: 400_000 },
@@ -28,12 +31,26 @@ const RIJEN = [
   { age: 90, endPortfolio: 12_000 },
 ]
 
+/**
+ * De nominale kernelrijen van dezelfde run: `netWorth` (I, incl. woning) spiegelt
+ * `endPortfolio`, `nettoLiquide` (J) is het deel zonder woning.
+ */
+const KERNELRIJEN = [
+  { age: 50, inflationFactor: 1, netWorth: 400_000, nettoLiquide: 300_000 },
+  { age: 52, inflationFactor: 1.0404, netWorth: 610_000, nettoLiquide: 520_000 },
+  { age: 70, inflationFactor: 1.5, netWorth: 350_000, nettoLiquide: 300_000 },
+  { age: 90, inflationFactor: 2.2, netWorth: 12_000, nettoLiquide: 11_000 },
+]
+
 beforeEach(() => {
   ctx.sim = {
     simResult: { fireAgeFractional: 52.3, vastStopLeeftijd: null },
     fireStrategy: { strategy: 'deplete', endAge: 90, legacyAmount: 0 },
+    displayUnifiedRows: KERNELRIJEN,
+    canonicalDailyRate: 100,
   }
   ctx.euro = { viewDisplaySimRows: RIJEN }
+  ctx.bron = { initialData: { dailyExpenseRateDetail: { source: 'transactions' } } }
 })
 afterEach(cleanup)
 
@@ -61,6 +78,27 @@ describe('afbouwInvoer — kiest rijen uit de hoofdrun, rekent niets', () => {
   })
 })
 
+describe('afbouwVrijheidsdagen — het liquide deel, één keer door de kernelfactor', () => {
+  const basis = { rows: KERNELRIJEN, fireAge: 52, endAge: 90, canonicalDailyRate: 100 }
+
+  it('rekent op nettoLiquide (J), niet op het netto vermogen incl. woning (I)', () => {
+    // 520.000 / 1,0404 / 100 = 4.998 dagen; op I zou het 610.000 / 1,0404 / 100 = 5.863 zijn.
+    // Eind: 11.000 / 2,2 / 100 = 50 dagen.
+    expect(afbouwVrijheidsdagen({ ...basis, source: 'transactions' })).toEqual({ start: 4_998, eind: 50 })
+  })
+
+  it('zonder geloofwaardige dagbasis geen regel, ook geen nul (ADR 0131)', () => {
+    expect(afbouwVrijheidsdagen({ ...basis, source: 'none' })).toEqual({ start: null, eind: null })
+    expect(afbouwVrijheidsdagen({ ...basis, canonicalDailyRate: 0, source: 'transactions' })).toEqual({ start: null, eind: null })
+  })
+
+  it('geen rij op die leeftijd of geen liquide vermogen: geen regel', () => {
+    expect(afbouwVrijheidsdagen({ ...basis, fireAge: 60, source: 'transactions' }).start).toBeNull()
+    const zonderLiquide = KERNELRIJEN.map((r) => (r.age === 90 ? { ...r, nettoLiquide: 0 } : r))
+    expect(afbouwVrijheidsdagen({ ...basis, rows: zonderLiquide, source: 'transactions' }).eind).toBeNull()
+  })
+})
+
 describe('PlanAfbouwOverzicht — gepind op de provider', () => {
   it('toont de bedragen van de hoofdrun-rijen (Volledig)', () => {
     render(
@@ -72,6 +110,17 @@ describe('PlanAfbouwOverzicht — gepind op de provider', () => {
     expect(kaart.textContent).toMatch(/610\.000/)
     expect(kaart.textContent).toMatch(/12\.000/)
     expect(kaart.textContent).toContain('Bij vrijheid · 52')
+  })
+
+  it('toont de vrijheidstijd van het liquide deel onder begin- en eindstand', () => {
+    render(
+      <DisplayModeProvider initialMode="full">
+        <PlanAfbouwOverzicht />
+      </DisplayModeProvider>,
+    )
+    const kaart = screen.getByTestId('plan-afbouw-overzicht')
+    expect(kaart.textContent).toContain(`${vrijheidTekst(4_998, false)} vrijheid in het liquide deel`)
+    expect(kaart.textContent).toContain(`${vrijheidTekst(50, false)} vrijheid in het liquide deel`)
   })
 
   it('Eenvoudig: niet getoond (diepte, HideInSimple)', () => {
@@ -91,5 +140,10 @@ describe('PlanAfbouwOverzicht — gepind op de provider', () => {
     }
     expect(code).toContain('useToekomstSimContext')
     expect(code).toContain('viewDisplaySimRows')
+    // Vrijheidstijd via de canonieke helper op de J-grondslag, nooit een eigen deling.
+    expect(code).toContain('freedomDaysAtAge(')
+    expect(code).toContain('nominalAmount: rij.nettoLiquide')
+    expect(code).not.toContain('formatWithFreedom')
+    expect(code).not.toContain('netWorth')
   })
 })
