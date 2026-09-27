@@ -41,16 +41,35 @@ function eventPaneCalls(body: string): string[] {
   return [...body.matchAll(/setEventPane(EditingId|Mode|Open)\(([^)]*)\)/g)].map((m) => `${m[1]}=${m[2]}`)
 }
 
+/** De body van de ene opener `openEventPane` (fase 6: één EventPane op /toekomst). */
+function openerBody(): string {
+  const start = source.indexOf('const openEventPane = useCallback(')
+  expect(start, 'openEventPane niet gevonden').toBeGreaterThan(-1)
+  const end = source.indexOf('}, [])', start)
+  expect(end).toBeGreaterThan(start)
+  return source.slice(start, end)
+}
+
 describe('deeplink ?modal=life_events → EventPane-catalogus (ADR 0179 fase 1 stap 2)', () => {
-  it('opent de EventPane in catalogus-modus zonder bewerk-id', () => {
-    const body = branchBody(/\n( +)\} else if \(modal === 'life_events'\) \{/)
-    expect(eventPaneCalls(body)).toEqual(['EditingId=null', "Mode='catalog'", 'Open=true'])
+  it('de opener zet voor "new" de catalogus zonder bewerk-id en opent de pane', () => {
+    const body = openerBody()
+    const nieuwTak = body.slice(body.indexOf("if (doel === 'new') {"), body.indexOf('} else {'))
+    expect(eventPaneCalls(nieuwTak)).toEqual(['EditingId=null', "Mode='catalog'"])
+    // Open staat ná de if/else: elke opening, catalogus of gebeurtenis, zet hem.
+    expect(eventPaneCalls(body.slice(body.lastIndexOf('}')))).toEqual(['Open=true'])
   })
 
-  it('doet exact hetzelfde als ?event=new', () => {
+  it('?modal=life_events doet exact hetzelfde als ?event=new: allebei via openEventPane("new")', () => {
     const lifeEvents = branchBody(/\n( +)\} else if \(modal === 'life_events'\) \{/)
-    const eventNew = branchBody(/\n( +)if \(eventParam === 'new'\) \{/)
-    expect(eventPaneCalls(lifeEvents)).toEqual(eventPaneCalls(eventNew))
+    expect(lifeEvents).toMatch(/openEventPane\('new'\)/)
+    expect(eventPaneCalls(lifeEvents)).toEqual([])
+    // ?event=new (en de alias ?nieuw=1) loopt via dezelfde opener met eventParam === 'new'.
+    expect(source).toMatch(/openEventPane\(eventParam,/)
+  })
+
+  it('geen enkele pad zet de EventPane-state buiten de ene opener (één sheet tegelijk)', () => {
+    const buiten = source.replace(openerBody(), '')
+    expect(eventPaneCalls(buiten)).toEqual([])
   })
 
   it('het legacy-gebeurtenisformulier en zijn schrijfpad bestaan niet meer', () => {
