@@ -128,7 +128,7 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'KERN',
     persona: 'compleet',
     given: 'Persona Tessa geladen; gezondheidsscore + pijler-uitsplitsing genoteerd op /overzicht.',
-    when: 'De gebruiker vergelijkt de score + pijlers op /overzicht, /toekomst, de gezondheid-widget en legacy /core.',
+    when: 'De gebruiker vergelijkt de score + pijlers op /overzicht (kaart en kassabon, incl. het punt van de lopende maand in het verloop), de gezondheid-widget en legacy /core. (/toekomst toont het gezondheidsgetal sinds fase 5 van ADR 0179, 26 sep 2026, niet meer — WF-OVZ-29.)',
     then: 'Alle oppervlakken tonen exact dezelfde totaalscore én per-pijler-waarde uit één server-berekening (`buildHealthScoreInput` + `computeHealthScoreFromInputs`, ADR 0008), via dezelfde loader geconsumeerd. Geen consument herberekent een pijler.',
     assertion: {
       kind: 'consistency',

@@ -216,7 +216,7 @@ export const CANONICAL_REGISTRY: CanonicalEntry[] = [
     label: 'Gezondheidsgetal (financiële gezondheidsscore)',
     sourceFn: 'buildHealthScoreInput + computeHealthScoreFromInputs',
     sourceFiles: ['lib/health-score-input.ts', 'lib/financial-health.ts'],
-    consumers: ['/overzicht', '/toekomst', 'gezondheid-widget', 'legacy /core', 'maandsnapshots'],
+    consumers: ['/overzicht', 'gezondheid-widget', 'legacy /core', 'maandsnapshots', 'verloop (/overzicht-kassabon)'],
     toetsbaar: 'consistency',
     kruisWorkflow: 'WF-KRUIS-11',
     canonWorkflow: 'WF-CANON-07',

@@ -297,7 +297,7 @@ Kriticiteit: **KERN** = raakt financiële uitkomsten of gebruikersdata · **BELA
 | WF-TOEK-03 | Statusmeldingen boven de grafiek begrijpen en opvolgen | Zien wanneer het plan knelt (niet haalbaar, tekort-lening, huis nooit verkocht) en direct doorklikken naar de juiste instelling. | KERN | ja | 3 |
 | WF-TOEK-04 | De grafiek verkennen: modus wisselen, zoomen, Inkomen & Uitgaven | Het vermogen bekijken als pad-lijn, gestapelde opbouw en inkomen/uitgaven-verloop, met zoom op een leeftijdsbereik. | BELANGRIJK | ja | 3 |
 | WF-TOEK-05 | Jaar-detail-kassabon: één projectiejaar uitgesplitst bekijken | Voor één toekomstig jaar exact zien waar het vermogen uit bestaat en wat er in- en uitgaat. | KERN | ja | 3 |
-| WF-TOEK-06 | Details: 'Zo werkt jouw grafiek'-walkthrough en jaar-op-jaar tabel | De volledige rekenroute achter de grafiek begrijpen en het jaar-op-jaar verloop als tabel controleren. | BELANGRIJK | ja | 3 |
+| WF-TOEK-06 | Jaar-op-jaar-tabel via de link in Plan (walkthrough verwijderd, 27 sep 2026) | Het jaar-op-jaar verloop als tabel controleren. | BELANGRIJK | ja | 3 |
 | WF-TOEK-07 | Eerste gebruik: Tips-modus (ballonnen-overlay) | Als nieuwe gebruiker de wijzende tips-ballonnen over de grafiek aan-/uitzetten (de eenmalige welkomstkaart is per ADR 0130 vervangen door de rondleiding op /overzicht, zie WF-OVZ-26). | OVERIG | ja | 4 |
 | WF-TOEK-08 | Rendement-scenario's en Monte Carlo over de grafiek leggen | Zien hoe gevoelig het pad is voor markten via scenario-lijnen (±2pp) en een Monte Carlo-waaier met slaagkans. | BELANGRIJK | ja | 2 |
 | WF-TOEK-09 | *VERVALLEN (14 sep 2026, ADR 0144)* — Opgeslagen wat-als-scenario's als spooklijn vergelijken | Eerder opgeslagen scenario's als ghost-lijnen naast het actuele plan leggen. Verwijderd met de standalone Wat-Als-pagina; geen acceptatiecriterium meer in `lib/uat/acceptance/toek.ts`. | BELANGRIJK | ja | 2 |
@@ -4697,18 +4697,18 @@ Scope: /toekomst (tijdas-landing), /toekomst/doelen, /toekomst/gebeurtenissen, /
   - Privacy-maskering: bedragen gemaskeerd.
 - **Cross-module effecten:** geen (alleen-lezen).
 
-#### WF-TOEK-06 — "Details": simulatie-uitleg met "Zo werkt jouw grafiek" en jaar-op-jaar tabel
-- **Doel:** De gebruiker begrijpt de volledige rekenroute achter de grafiek via een verhalende walkthrough en kan het jaar-op-jaar verloop als tabel controleren.
-- **Trigger/startpunt:** Klik op de pill "Details" rechtsboven in de hero op /toekomst.
-- **Eindresultaat:** Full-screen sheet "Simulatie Prognose" met (1) de walkthrough in 4 hoofdstukken, (2) de vermogensgrafiek met legenda, (3) inklapbaar blok "Onder de motorkap" met kassabon-onderbouwing en de jaar-op-jaar tabel.
+#### WF-TOEK-06 — Jaar-op-jaar-tabel via de link in Plan
+> **Bijgewerkt 27 sep 2026 (ADR 0179 fase 2 + FX-D).** De "Details"-pill en de walkthrough "Zo werkt jouw grafiek" (`GrafiekUitlegWalkthrough`, map components/app/horizon/grafiek-uitleg/) bestaan niet meer — de map is verwijderd in aef5588dd. "Zo werkt je grafiek" is de canvas-i boven de grafiek (WF-TOEK-07). De actuele definitie staat in `lib/uat/acceptance/toek.ts` (WF-TOEK-06).
+- **Doel:** De gebruiker kan het jaar-op-jaar verloop als tabel controleren.
+- **Trigger/startpunt:** De link "Jaar-op-jaar-tabel →" onderaan katern Plan op /toekomst.
+- **Eindresultaat:** Sheet "Simulatie Prognose" met de jaar-op-jaar-tabel bovenaan en uitgeklapt, plus het inklapbare blok "Onder de motorkap" met de kassabon-onderbouwing.
 - **Stappen:**
-  1. Klik "Details" → sheet opent.
-  2. Doorloop "Zo werkt jouw grafiek" (4 hoofdstukken met eigen kerngetallen).
+  1. Klik "Jaar-op-jaar-tabel →" → sheet opent met de tabel.
+  2. Lees per leeftijd: fase, beginvermogen, rendement, inleg/opname, levensgebeurtenissen, cumulatief en eindvermogen; de FIRE-rij is gemarkeerd.
   3. Klap "ONDER DE MOTORKAP" uit → kassabon met invoerparameters, benodigd FIRE-vermogen, meegenomen kasstromen en formules.
-  4. Klap "JAAR-OP-JAAR VERLOOP" uit → tabel met per leeftijd: fase, beginvermogen, rendement, inleg/opname, levensgebeurtenissen, cumulatief en eindvermogen; de FIRE-rij is gemarkeerd.
-- **Schermen/componenten:** components/app/horizon/sim-chart-widget.tsx (SimChartModal); components/app/horizon/grafiek-uitleg/grafiek-uitleg-walkthrough.tsx; components/app/kassabon-shell.tsx.
+- **Schermen/componenten:** components/toekomst/plan/plan-paneel.tsx (link `plan-jaar-op-jaar`); components/app/horizon/sim-chart-widget.tsx (SimChartModal); components/app/kassabon-shell.tsx.
 - **Kriticiteit:** BELANGRIJK
-- **Rekenend:** ja — jaar-op-jaar rijen (`simResult.rows`), vereist FIRE-vermogen, impliciete opnamerate, fractionele FIRE-leeftijd (interpolatie); walkthrough-getallen via components/app/horizon/grafiek-uitleg/chapter-data.ts (`deriveChapterData`) op dezelfde simResult/unifiedRows. Let op: de kassabon toont "Bruto rendement" uit `DEFAULT_RETURN` (lib/constants.ts) en vaste "2% inflatie"-tekst — toetsbaar of dit met de gebruikersinstelling matcht.
+- **Rekenend:** ja — jaar-op-jaar rijen (`simResult.rows`), vereist FIRE-vermogen, impliciete opnamerate, fractionele FIRE-leeftijd (interpolatie). Let op: de kassabon toont "Bruto rendement" uit `DEFAULT_RETURN` (lib/constants.ts) en vaste "2% inflatie"-tekst — toetsbaar of dit met de gebruikersinstelling matcht.
 - **Varianten & randgevallen:**
   - Tabel ingeklapt: samenvattingsregel met opbouwjaren/afbouwjaren/AOW-jaren.
   - Strategie-afhankelijke formuleteksten (deplete/legacy/perpetual/pensioen).

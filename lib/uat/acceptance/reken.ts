@@ -243,16 +243,16 @@ const criteria: AcceptanceCriterion[] = [
   {
     workflow: 'WF-REKEN-23',
     scenarioId: 'UAT-REKEN-23',
-    titel: 'Uitgave na pensioen: methode kiezen (pane)',
+    titel: 'Uitgave na pensioen: methode kiezen (rij in katern Instellingen)',
     kriticiteit: 'KERN',
     persona: 'marijke',
     given: 'Persona Marijke Vermeer (`net_monthly_income`=€3.400, methode momenteel "Zelf samenstellen" op €2.800/mnd). Essentiële budgetten: "Vaste lasten wonen" €390/mnd + "Dagelijkse uitgaven" €430/mnd + "Vervoer" €130/mnd (geen children).',
     when: 'De drie methodekaarten tonen hun preview-jaarbedrag: "Behoud van inkomen" = `net_monthly_income`×12, "Essentiële budgetten" = `computeYearlyMustExpenses`, "Zelf samenstellen" = het opgeslagen custom-bedrag×12.',
-    then: '"Behoud van inkomen" = €40.800/jaar (triviaal exact); "Essentiële budgetten" = minimaal €11.400/jaar (950×12, vóór eventuele extra als-essentieel-gemarkeerde categorieën — bevinding te melden als het preview-bedrag rond €13.800/jaar ligt, want dat zou betekenen dat ook "Sparen & investeren" wordt meegeteld); "Zelf samenstellen" toont €33.600/jaar. Klik op een kaart slaat DIRECT op (geen aparte opslaanknop); sluiten herlaadt de tijdas.',
+    then: '"Behoud van inkomen" = €40.800/jaar (triviaal exact); "Essentiële budgetten" = minimaal €11.400/jaar (950×12, vóór eventuele extra als-essentieel-gemarkeerde categorieën — bevinding te melden als het preview-bedrag rond €13.800/jaar ligt, want dat zou betekenen dat ook "Sparen & investeren" wordt meegeteld); "Zelf samenstellen" toont €33.600/jaar. INGANG (ADR 0179 fase 3, 26 sep 2026): de oude `UitgavenPane` op Plan is weg. De methodekaarten staan in de rij "Uitgave na pensioen" van katern Instellingen (/toekomst/instellingen?rij=uitgave-na-pensioen, `UitgavenRijPane`, ShellOverlay-pane met `UitgavenBody` — dezelfde body als de wizardstap "Leven na stoppen"). Ingangen: de persoonlijke KPI 4-tegel "Na pensioen" op Plan (een link naar die rij; in de huishoudweergave opent hij de gezamenlijke aanpasflow), /toekomst?uitgaven=open en /horizon|toekomst/uitgaven-na-pensioen (redirects, WF-NAV-15/16). Een klik op een methodekaart is een CONCEPT: Opslaan staat in de footer, naast de verschilregel (`runRegelProjection` met de uitgaven-override); sluiten zonder opslaan schrijft niets.',
     assertion: {
       kind: 'exact',
       expected: 'behoudVanInkomen=40800; essentieleBudgetten=11400; zelfSamenstellen=33600',
-      source: 'lib/budget-utils.ts#computeYearlyMustExpenses/computeRetirementExpenses (échte productiefuncties) — zie reken-checks.ts',
+      source: 'lib/budget-utils.ts#computeYearlyMustExpenses/computeRetirementExpenses (échte productiefuncties) — zie reken-checks.ts. Ingang: components/toekomst/instellingen/uitgaven-rij-pane.tsx (`UitgavenRijPane`, `UitgavenBody`, verschilregel) via lib/toekomst/instellingen-rij.ts (`uitgave-na-pensioen`); context-route app/api/uitgaven-na-pensioen/context/route.ts.',
     },
   },
   {
@@ -261,7 +261,7 @@ const criteria: AcceptanceCriterion[] = [
     titel: 'Uitgave na pensioen "Zelf samenstellen" (aspiraties-vragenlijst)',
     kriticiteit: 'KERN',
     persona: 'marijke',
-    given: 'Persona Marijke Vermeer, paneel van WF-REKEN-23, kaart "Zelf samenstellen". Keuzes: reizen "Eén EU-vakantie" (2 wk × €78 p.p., 2 reizigers), auto "Middenklasse" (€7.200), uit eten/cultuur 4×/2× per maand à €60/€45 p.p. (2 personen), hobby\'s "Tuin"(€600)+"Sport"(€1.500), zorg "Comfort"(€2.700, geen top-up), lifestyle "Comfort" (×1,0), buffer uit.',
+    given: 'Persona Marijke Vermeer, rij Uitgave na pensioen van WF-REKEN-23 (/toekomst/instellingen?rij=uitgave-na-pensioen), kaart "Zelf samenstellen". Keuzes: reizen "Eén EU-vakantie" (2 wk × €78 p.p., 2 reizigers), auto "Middenklasse" (€7.200), uit eten/cultuur 4×/2× per maand à €60/€45 p.p. (2 personen), hobby\'s "Tuin"(€600)+"Sport"(€1.500), zorg "Comfort"(€2.700, geen top-up), lifestyle "Comfort" (×1,0), buffer uit.',
     when: 'Het jaartotaal wordt opgebouwd uit reis-, auto-, dining-, hobby- en zorgbedragen × lifestyle-multiplier × buffer, afgerond op het dichtstbijzijnde honderdtal.',
     then: 'Reizen €2.184, auto €7.200, uit eten/cultuur €7.920, hobby\'s €2.100, zorg €2.700 → subtotaal €22.104 → totaal €22.100/jaar. Handmatige override (bv. €30.000) wint volledig van het berekende totaal. Verpleegreservering aan → zorg +€3.200/jaar (€5.900); buffer aan → totaal (ná multiplier) +10%.',
     assertion: {

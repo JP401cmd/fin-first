@@ -254,11 +254,18 @@ export const NAV_ENGINE_CHECKS: NavEngineCheck[] = [
         `modalStrategie=${doel({ modal: 'strategie' })}`,
         `modalWithdrawal=${doel({ modal: 'withdrawal' })}`,
         `onbekendeTab=${doel({ tab: 'onzin' })}`,
+        `uitgavenOpen=${doel({ uitgaven: 'open' })}`,
         `zonderQuery=${doel({})}`,
       ].join('; ')
+      // Sinds de gebeurtenissen onder het plan staan (addendum ADR 0179, 26 sep 2026)
+      // heeft `?tab=gebeurtenissen` zonder levensstrategie GEEN regel meer: een regel
+      // /toekomst → /toekomst zou met de meereizende query een lus zijn. `OudeTabParam`
+      // haalt `tab` weg en zet `#gebeurtenissen` (client, niet in deze check). Fase 3:
+      // de Strategieën-modal is opgeheven; de oude modal-/strategie-deeplinks landen op
+      // een rij in Instellingen (`?rij=`), `?uitgaven=open` op de rij Uitgave na pensioen.
       return {
         expected:
-          'tabGebeurtenissenStrategie=/toekomst/instellingen; tabGebeurtenissenOnbekendeStrategie=/toekomst/instellingen#gebeurtenissen; tabGebeurtenissen=/toekomst/instellingen#gebeurtenissen; tabVoorkeuren=/toekomst/instellingen; tabDoelen=/toekomst/doelen; tabRekenhulp=/toekomst/rekenhulp; whatifOpen=/toekomst/doelen; strategieOpen=/toekomst/instellingen?regel=eindstrategie; modalStrategie=/toekomst/instellingen?regel=eindstrategie; modalWithdrawal=/toekomst/instellingen?regel=onttrekkingsstrategie; onbekendeTab=null; zonderQuery=null',
+          'tabGebeurtenissenStrategie=/toekomst/instellingen; tabGebeurtenissenOnbekendeStrategie=null; tabGebeurtenissen=null; tabVoorkeuren=/toekomst/instellingen; tabDoelen=/toekomst/doelen; tabRekenhulp=/toekomst/rekenhulp; whatifOpen=/toekomst/doelen; strategieOpen=/toekomst/instellingen?rij=stopmoment; modalStrategie=/toekomst/instellingen?rij=stopmoment; modalWithdrawal=/toekomst/instellingen?rij=onttrekking; onbekendeTab=null; uitgavenOpen=/toekomst/instellingen?rij=uitgave-na-pensioen; zonderQuery=null',
         actual: uitkomst,
       }
     },
@@ -282,6 +289,10 @@ export const NAV_ENGINE_CHECKS: NavEngineCheck[] = [
         (r) => r.source === '/overzicht/cashflow' || r.source.startsWith('/overzicht/cashflow/'),
       )
       const cashflowBestemmingZonderQuery = cashflowRegels.every((r) => !r.destination.includes('?'))
+      // De oude subroute /toekomst/gebeurtenissen: eerst de gerichte levensstrategie-regel
+      // (→ Instellingen), dan de algemene (→ Plan #gebeurtenissen, addendum 26 sep 2026).
+      const gebeurtenissenDoel = eersteRedirectDoel(redirects, '/toekomst/gebeurtenissen', { nieuw: '1' })
+      const gebeurtenissenStrategieDoel = eersteRedirectDoel(redirects, '/toekomst/gebeurtenissen', { strategie: 'huis' })
       return {
         // 24 = de eerdere 25 (16 + React #310-lichtingen, zie het redirect-blok
         // in next.config.ts) MIN de /dashboard-regel (1 sep 2026, kiesbaar
@@ -304,8 +315,12 @@ export const NAV_ENGINE_CHECKS: NavEngineCheck[] = [
         // /toekomst/instellingen?regel=…. De whatif-, strategie- en
         // /identity/parameters-regels wijzen nu rechtstreeks naar het katern
         // (geen extra regel). Welke regel wint, toetst WF-NAV-15.
-        expected: 'aantalRedirects=41; coreNaarOverzicht=true; dashboardGeenConfigRedirect=true; coreAssetsGeenRedirect=true; cashflowRedirects=5; cashflowBestemmingZonderQuery=true',
-        actual: `aantalRedirects=${redirects.length}; coreNaarOverzicht=${coreNaarOverzicht}; dashboardGeenConfigRedirect=${dashboardGeenConfigRedirect}; coreAssetsGeenRedirect=${coreAssetsGeenRedirect}; cashflowRedirects=${cashflowRegels.length}; cashflowBestemmingZonderQuery=${cashflowBestemmingZonderQuery}`,
+        // 41 -> 42 (26 sep 2026, addendum ADR 0179 + fase 3): +1 gerichte regel
+        // /toekomst/gebeurtenissen?strategie=aow|pensioen|huis|werk -> Instellingen,
+        // -1 `?tab=gebeurtenissen` zonder strategie (OudeTabParam doet dat nu),
+        // +1 `?uitgaven=open` -> /toekomst/instellingen?rij=uitgave-na-pensioen.
+        expected: 'aantalRedirects=42; coreNaarOverzicht=true; dashboardGeenConfigRedirect=true; coreAssetsGeenRedirect=true; cashflowRedirects=5; cashflowBestemmingZonderQuery=true; gebeurtenissen=/toekomst#gebeurtenissen; gebeurtenissenStrategie=/toekomst/instellingen',
+        actual: `aantalRedirects=${redirects.length}; coreNaarOverzicht=${coreNaarOverzicht}; dashboardGeenConfigRedirect=${dashboardGeenConfigRedirect}; coreAssetsGeenRedirect=${coreAssetsGeenRedirect}; cashflowRedirects=${cashflowRegels.length}; cashflowBestemmingZonderQuery=${cashflowBestemmingZonderQuery}; gebeurtenissen=${gebeurtenissenDoel}; gebeurtenissenStrategie=${gebeurtenissenStrategieDoel}`,
       }
     },
   },

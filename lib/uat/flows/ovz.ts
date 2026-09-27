@@ -56,7 +56,7 @@ export const OVZ_FLOW: UatFlow = {
     { id: 'euroweergave', scenarioId: 'UAT-OVZ-22', label: "WF-OVZ-22 · Euro-weergave: widgets & mini-grafiek", kind: 'action', stage: 1, lane: 'verkennen', subOf: 'vermogensverloop' },
     { id: 'kaarttweedeling', scenarioId: 'UAT-OVZ-27', label: 'WF-OVZ-27 · Netto-vermogen-kaart in twee delen (verleden-venster / toekomst-link)', kind: 'screen', stage: 1, lane: 'verkennen', subOf: 'vermogensverloop' },
     { id: 'planstoplicht', scenarioId: 'UAT-OVZ-28', label: 'WF-OVZ-28 · Plan-stoplicht op de plankaart (punt + oordeel, banner in dezelfde kleur)', kind: 'screen', stage: 1, lane: 'verkennen', subOf: 'kaarttweedeling' },
-    // Verhuisd uit WF-TOEK-32 (eigenaarsbesluit 26 sep 2026, fase 5; doelstand, bouw loopt).
+    // Verhuisd uit WF-TOEK-32 (eigenaarsbesluit 26 sep 2026, fase 5; gebouwd 26-27 sep).
     { id: 'gezondheidsverloop', scenarioId: 'UAT-OVZ-29', label: 'WF-OVZ-29 · Verloop (gezondheidsgetal + vrijheidsleeftijd) in de gezondheidskassabon', kind: 'screen', stage: 1, lane: 'verkennen', subOf: 'gezondheidsscore' },
 
     // ── 2 · doelen & vrijheid ─────────────────────────────────────────────

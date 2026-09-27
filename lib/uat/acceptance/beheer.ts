@@ -604,7 +604,7 @@ const criteria: AcceptanceCriterion[] = [
     assertion: {
       kind: 'ui-only',
       source:
-        'app/(app)/beheer/{releases,widget-audit,blueprints,grafiek-werking}/… — statische/gescande naslag, geen cijfermatige uitkomst',
+        'app/(app)/beheer/{releases,widget-audit,blueprints,grafiek-werking}/… (o.a. app/(app)/beheer/grafiek-werking/page.tsx) — statische/gescande naslag, geen cijfermatige uitkomst',
     },
   },
   {

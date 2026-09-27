@@ -102,7 +102,7 @@ export const TOEK_FLOW: UatFlow = {
     { id: 'eventedit', scenarioId: 'UAT-TOEK-14', label: 'WF-TOEK-14 · Bekijken / bewerken / verwijderen', kind: 'screen', stage: 3, lane: 'gebeurtenissen', subOf: 'eventadd' },
     { id: 'eventtotwanneer', scenarioId: 'UAT-TOEK-47', label: 'WF-TOEK-47 · Blijvend: doorlopend of tot je stopt met werken', kind: 'action', stage: 3, lane: 'gebeurtenissen', subOf: 'eventadd' },
     { id: 'eventdrag', scenarioId: 'UAT-TOEK-15', label: 'WF-TOEK-15 · Slepen op de tijdas & undo', kind: 'action', stage: 3, lane: 'gebeurtenissen', subOf: 'eventadd' },
-    // Eigenaarsbesluit 26 sep 2026 (doelstand, bouw loopt): de lijst levensgebeurtenissen
+    // Addendum ADR 0179 (26 sep 2026, gebouwd): de lijst levensgebeurtenissen
     // verhuist van katern Instellingen naar katern Plan (#gebeurtenissen, onder de KPI-strip).
     { id: 'eventpagina', scenarioId: 'UAT-TOEK-17', label: 'WF-TOEK-17 · Levensgebeurtenissen in Plan (kernel-momenten, Toevoegen)', kind: 'screen', stage: 3, lane: 'gebeurtenissen' },
     { id: 'tekortbeslis', label: 'Tekort in de projectie?', kind: 'decision', stage: 3, lane: 'gebeurtenissen', subOf: 'eventpagina' },
@@ -119,8 +119,8 @@ export const TOEK_FLOW: UatFlow = {
     // ── 4 · de toekomst configureren · voorkeuren ─────────────────────────
     // ADR 0179 fase 1 — katern Instellingen (/toekomst/instellingen) bundelt de
     // wizard-ingang en Voorkeuren (plan-regels + levensstrategieën) op één route; de
-    // Gebeurtenissen-sectie verhuist naar Plan (eigenaarsbesluit 26 sep 2026, doelstand).
-    { id: 'instellingen', scenarioId: 'UAT-TOEK-59', label: 'WF-TOEK-59 · Katern Instellingen (wizard-ingang · Voorkeuren · levensstrategieën)', kind: 'screen', stage: 4, lane: 'voorkeuren' },
+    // Gebeurtenissen-sectie staat sinds het addendum van 26 sep 2026 op Plan.
+    { id: 'instellingen', scenarioId: 'UAT-TOEK-59', label: 'WF-TOEK-59 · Katern Instellingen (wizard-ingang · rijen: plan, levensstrategieën, marktaannames)', kind: 'screen', stage: 4, lane: 'voorkeuren' },
     { id: 'eindstrat', scenarioId: 'UAT-TOEK-24', label: 'WF-TOEK-24 · Plan (stop × eind-vorm) / onttrekkingsstrategie', kind: 'screen', stage: 4, lane: 'voorkeuren' },
     // ADR 0149 — hoofdinstelling naast de rest van de Eindstrategie-kaart; ook
     // als detailregel + vergelijking in de plan-review-stap "Je plan" (WF-TOEK-44).
@@ -201,7 +201,7 @@ export const TOEK_FLOW: UatFlow = {
     { from: 'katernkoppen', to: 'deeplinks' },
     { from: 'katernkoppen', to: 'instellingen', kind: 'branch', label: 'Instellingen' },
     { from: 'deeplinks', to: 'instellingen', label: 'oude /toekomst/voorkeuren, ?tab=voorkeuren, ?modal=' },
-    { from: 'deeplinks', to: 'eventpagina', label: 'oude /toekomst/gebeurtenissen, ?tab=gebeurtenissen → Plan #gebeurtenissen (doelstand)' },
+    { from: 'deeplinks', to: 'eventpagina', label: 'oude /toekomst/gebeurtenissen, ?tab=gebeurtenissen → Plan #gebeurtenissen' },
 
     // hub → simuleren
     { from: 'tijdas', to: 'scenarios' },
@@ -215,7 +215,7 @@ export const TOEK_FLOW: UatFlow = {
     { from: 'aowbeslis', to: 'aowstop', kind: 'branch', label: 'ja: doorwerken tot AOW' },
     { from: 'sliders', to: 'x-reken', kind: 'cross', label: 'levensgebeurtenis-export → Rekenhulp (zelfde horizon-kernel)' },
 
-    // hub/katern Plan → gebeurtenissen (doelstand 26 sep 2026; tot de bouw landt nog in Instellingen)
+    // hub/katern Plan → gebeurtenissen (addendum ADR 0179, 26 sep 2026)
     { from: 'tijdas', to: 'eventadd' },
     { from: 'eventadd', to: 'eventedit' },
     { from: 'eventadd', to: 'eventdrag' },
@@ -235,7 +235,7 @@ export const TOEK_FLOW: UatFlow = {
     // De woonstrategie bepaalt de grondslag van de PRIMAIRE vermogenslijn
     // (ADR 0114 D1) — de keuze wordt hier gemaakt, op de grafiek afgelezen.
     { from: 'huisstrat', to: 'grondslaglijn', kind: 'branch', label: 'grondslag hoofdlijn (I of J)' },
-    { from: 'instellingen', to: 'eindstrat', kind: 'branch', label: '#voorkeuren' },
+    { from: 'instellingen', to: 'eindstrat', kind: 'branch', label: 'rij (?rij=, #voorkeuren)' },
     { from: 'eindstrat', to: 'potregels' },
     { from: 'eindstrat', to: 'marktaannames' },
     { from: 'eindstrat', to: 'geentekortlening' },

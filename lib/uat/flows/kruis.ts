@@ -51,7 +51,7 @@ export const KRUIS_FLOW: UatFlow = {
     { id: 'k06', scenarioId: 'UAT-KRUIS-06', label: 'WF-KRUIS-06 · Spaarquote: één getal overal', kind: 'screen', stage: 2, lane: 'consistentie' },
     { id: 'k08', scenarioId: 'UAT-KRUIS-08', label: 'WF-KRUIS-08 · Vrijheidsvoortgang (%) overal gelijk', kind: 'screen', stage: 2, lane: 'consistentie' },
     { id: 'k09', scenarioId: 'UAT-KRUIS-09', label: 'WF-KRUIS-09 · Grondslag-verschil (netto ≠ FIRE-eligible) — verwacht', kind: 'screen', stage: 2, lane: 'consistentie' },
-    { id: 'k11', scenarioId: 'UAT-KRUIS-11', label: 'WF-KRUIS-11 · Gezondheidsgetal identiek /overzicht ↔ /toekomst', kind: 'screen', stage: 2, lane: 'consistentie' },
+    { id: 'k11', scenarioId: 'UAT-KRUIS-11', label: 'WF-KRUIS-11 · Gezondheidsgetal identiek: kaart ↔ kassabon ↔ widget', kind: 'screen', stage: 2, lane: 'consistentie' },
     { id: 'k12', scenarioId: 'UAT-KRUIS-12', label: 'WF-KRUIS-12 · Box 3: drie bewuste weergaven', kind: 'screen', stage: 2, lane: 'consistentie' },
     { id: 'k13', scenarioId: 'UAT-KRUIS-13', label: 'WF-KRUIS-13 · FIRE-datum/-leeftijd per constructie gelijk', kind: 'screen', stage: 2, lane: 'consistentie' },
     { id: 'k18', scenarioId: 'UAT-KRUIS-18', label: 'WF-KRUIS-18 · Status-semantiek: sidebar==kaart==banner==box', kind: 'screen', stage: 2, lane: 'consistentie' },
