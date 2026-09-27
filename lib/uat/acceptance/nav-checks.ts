@@ -263,9 +263,12 @@ export const NAV_ENGINE_CHECKS: NavEngineCheck[] = [
       // haalt `tab` weg en zet `#gebeurtenissen` (client, niet in deze check). Fase 3:
       // de Strategieën-modal is opgeheven; de oude modal-/strategie-deeplinks landen op
       // een rij in Instellingen (`?rij=`), `?uitgaven=open` op de rij Uitgave na pensioen.
+      // 27 sep 2026: ook `?tab=gebeurtenissen&strategie=aow|…` heeft geen regel meer — de
+      // levensstrategieën staan zelf op Plan (/toekomst) en de editor-host daar leest
+      // `strategie`; een regel /toekomst → /toekomst zou een lus zijn.
       return {
         expected:
-          'tabGebeurtenissenStrategie=/toekomst/instellingen; tabGebeurtenissenOnbekendeStrategie=null; tabGebeurtenissen=null; tabVoorkeuren=/toekomst/instellingen; tabDoelen=/toekomst/doelen; tabRekenhulp=/toekomst/rekenhulp; whatifOpen=/toekomst/doelen; strategieOpen=/toekomst/instellingen?rij=stopmoment; modalStrategie=/toekomst/instellingen?rij=stopmoment; modalWithdrawal=/toekomst/instellingen?rij=onttrekking; onbekendeTab=null; uitgavenOpen=/toekomst/instellingen?rij=uitgave-na-pensioen; zonderQuery=null',
+          'tabGebeurtenissenStrategie=null; tabGebeurtenissenOnbekendeStrategie=null; tabGebeurtenissen=null; tabVoorkeuren=/toekomst/instellingen; tabDoelen=/toekomst/doelen; tabRekenhulp=/toekomst/rekenhulp; whatifOpen=/toekomst/doelen; strategieOpen=/toekomst/instellingen?rij=stopmoment; modalStrategie=/toekomst/instellingen?rij=stopmoment; modalWithdrawal=/toekomst/instellingen?rij=onttrekking; onbekendeTab=null; uitgavenOpen=/toekomst/instellingen?rij=uitgave-na-pensioen; zonderQuery=null',
         actual: uitkomst,
       }
     },
@@ -293,6 +296,20 @@ export const NAV_ENGINE_CHECKS: NavEngineCheck[] = [
       // (→ Instellingen), dan de algemene (→ Plan #gebeurtenissen, addendum 26 sep 2026).
       const gebeurtenissenDoel = eersteRedirectDoel(redirects, '/toekomst/gebeurtenissen', { nieuw: '1' })
       const gebeurtenissenStrategieDoel = eersteRedirectDoel(redirects, '/toekomst/gebeurtenissen', { strategie: 'huis' })
+      // Levensstrategieën op Plan (27 sep 2026, addendum (e) ADR 0179): oude links naar
+      // Instellingen/Voorkeuren met een levensstrategie-sleutel gaan naar
+      // /toekomst#levensstrategieen (de query reist mee); een niet-strategie-rij blijft in
+      // Instellingen, en met een meereizende `tab` grijpt de regel niet (`missing`).
+      const instellingenRijAow = eersteRedirectDoel(redirects, '/toekomst/instellingen', { rij: 'aow' })
+      const instellingenStrategiePensioen = eersteRedirectDoel(redirects, '/toekomst/instellingen', { strategie: 'pensioen' })
+      const instellingenRijStopmoment = eersteRedirectDoel(redirects, '/toekomst/instellingen', { rij: 'stopmoment' })
+      const instellingenRijAowMetTab = eersteRedirectDoel(redirects, '/toekomst/instellingen', { rij: 'aow', tab: 'voorkeuren' })
+      // `rij` wint van `strategie` (missing: [tab, rij] op de strategie-regel): een
+      // Instellingen-rij met een meereizende `strategie` blijft in Instellingen.
+      const instellingenRijStopmomentMetStrategie = eersteRedirectDoel(redirects, '/toekomst/instellingen', { rij: 'stopmoment', strategie: 'aow' })
+      const voorkeurenStrategie = eersteRedirectDoel(redirects, '/toekomst/voorkeuren', { strategie: 'werk' })
+      const strategieFocus = eersteRedirectDoel(redirects, '/toekomst/strategie', { focus: 'werk' })
+      const strategieZonderFocus = eersteRedirectDoel(redirects, '/toekomst/strategie', {})
       return {
         // 24 = de eerdere 25 (16 + React #310-lichtingen, zie het redirect-blok
         // in next.config.ts) MIN de /dashboard-regel (1 sep 2026, kiesbaar
@@ -319,8 +336,14 @@ export const NAV_ENGINE_CHECKS: NavEngineCheck[] = [
         // /toekomst/gebeurtenissen?strategie=aow|pensioen|huis|werk -> Instellingen,
         // -1 `?tab=gebeurtenissen` zonder strategie (OudeTabParam doet dat nu),
         // +1 `?uitgaven=open` -> /toekomst/instellingen?rij=uitgave-na-pensioen.
-        expected: 'aantalRedirects=42; coreNaarOverzicht=true; dashboardGeenConfigRedirect=true; coreAssetsGeenRedirect=true; cashflowRedirects=5; cashflowBestemmingZonderQuery=true; gebeurtenissen=/toekomst#gebeurtenissen; gebeurtenissenStrategie=/toekomst/instellingen',
-        actual: `aantalRedirects=${redirects.length}; coreNaarOverzicht=${coreNaarOverzicht}; dashboardGeenConfigRedirect=${dashboardGeenConfigRedirect}; coreAssetsGeenRedirect=${coreAssetsGeenRedirect}; cashflowRedirects=${cashflowRegels.length}; cashflowBestemmingZonderQuery=${cashflowBestemmingZonderQuery}; gebeurtenissen=${gebeurtenissenDoel}; gebeurtenissenStrategie=${gebeurtenissenStrategieDoel}`,
+        // 42 -> 44 (27 sep 2026, addendum (e) ADR 0179 — levensstrategieën op Plan): +2
+        // regels /toekomst/instellingen?rij=|?strategie=aow|pensioen|huis|werk (zonder `tab`)
+        // -> /toekomst#levensstrategieen, +1 /toekomst/voorkeuren?strategie=… -> idem,
+        // -1 `?tab=gebeurtenissen&strategie=…` op /toekomst (de editor-host op Plan leest
+        // `strategie` zelf). /toekomst/strategie en /toekomst/gebeurtenissen?strategie=
+        // wijzen nu naar Plan in plaats van naar Instellingen (geen extra regel).
+        expected: 'aantalRedirects=44; coreNaarOverzicht=true; dashboardGeenConfigRedirect=true; coreAssetsGeenRedirect=true; cashflowRedirects=5; cashflowBestemmingZonderQuery=true; gebeurtenissen=/toekomst#gebeurtenissen; gebeurtenissenStrategie=/toekomst#levensstrategieen; instellingenRijAow=/toekomst#levensstrategieen; instellingenStrategiePensioen=/toekomst#levensstrategieen; instellingenRijStopmoment=null; instellingenRijAowMetTab=null; instellingenRijStopmomentMetStrategie=null; voorkeurenStrategie=/toekomst#levensstrategieen; strategieFocus=/toekomst?rij=:focus#levensstrategieen; strategieZonderFocus=/toekomst?rij=aow#levensstrategieen',
+        actual: `aantalRedirects=${redirects.length}; coreNaarOverzicht=${coreNaarOverzicht}; dashboardGeenConfigRedirect=${dashboardGeenConfigRedirect}; coreAssetsGeenRedirect=${coreAssetsGeenRedirect}; cashflowRedirects=${cashflowRegels.length}; cashflowBestemmingZonderQuery=${cashflowBestemmingZonderQuery}; gebeurtenissen=${gebeurtenissenDoel}; gebeurtenissenStrategie=${gebeurtenissenStrategieDoel}; instellingenRijAow=${instellingenRijAow}; instellingenStrategiePensioen=${instellingenStrategiePensioen}; instellingenRijStopmoment=${instellingenRijStopmoment}; instellingenRijAowMetTab=${instellingenRijAowMetTab}; instellingenRijStopmomentMetStrategie=${instellingenRijStopmomentMetStrategie}; voorkeurenStrategie=${voorkeurenStrategie}; strategieFocus=${strategieFocus}; strategieZonderFocus=${strategieZonderFocus}`,
       }
     },
   },

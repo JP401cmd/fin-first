@@ -1,7 +1,7 @@
 // Gecureerde Toekomst-procesflow (verdiepingslaag laag 2 voor de UAT-plaat).
 //
 // Bron: docs/uat/uat-plan.md Deel 1 — "Toekomst & tijdas (WF-TOEK)"
-// (WF-TOEK-01..26,28,30,33..59; 29 geschrapt en 32 verhuisd naar OVZ-29 op 26 sep 2026) en de acceptatie in lib/uat/acceptance/toek.ts.
+// (WF-TOEK-01..26,28,30,33..62; 29 geschrapt en 32 verhuisd naar OVZ-29 op 26 sep 2026) en de acceptatie in lib/uat/acceptance/toek.ts.
 // De knopen met `scenarioId` verwijzen naar de UAT-scenario-ID's uit
 // lib/uat/catalog.ts (UAT-TOEK-NN) en erven daarmee de rondestatus. Het label
 // toont bewust het WF-nummer, spiegelt lib/uat/flows/bezit.ts.
@@ -94,8 +94,8 @@ export const TOEK_FLOW: UatFlow = {
     // TPR-09 — de verkende stopleeftijd van de stop-knop tot plan maken (schrijft het volledige plan).
     { id: 'maakplan', scenarioId: 'UAT-TOEK-46', label: 'WF-TOEK-46 · Verkenning tot plan maken ("Maak dit mijn plan")', kind: 'action', stage: 3, lane: 'simuleren', subOf: 'sliders' },
     // TPR-04 — geen actief AOW-event: de €0 AOW benoemd; sinds ADR 0179 fase 2 in katern
-    // Instellingen, minimaliseerbaar naar het punt op de Instellingen-kop.
-    { id: 'aowmelding', scenarioId: 'UAT-TOEK-45', label: 'WF-TOEK-45 · Melding "Geen AOW op je tijdas" in Instellingen (minimaliseren/heropenen)', kind: 'screen', stage: 2, lane: 'aflezen' },
+    // Instellingen, sinds 27 sep 2026 in katern Plan (`plan-aow`), minimaliseerbaar naar het punt op de Plan-kop.
+    { id: 'aowmelding', scenarioId: 'UAT-TOEK-45', label: 'WF-TOEK-45 · Melding "Geen AOW op je tijdas" in Plan (minimaliseren/heropenen)', kind: 'screen', stage: 2, lane: 'aflezen' },
 
     // ── 3 · gebeurtenissen op de tijdas ───────────────────────────────────
     { id: 'eventadd', scenarioId: 'UAT-TOEK-13', label: 'WF-TOEK-13 · Levensgebeurtenis toevoegen', kind: 'action', stage: 3, lane: 'gebeurtenissen' },
@@ -120,7 +120,7 @@ export const TOEK_FLOW: UatFlow = {
     // ADR 0179 fase 1 — katern Instellingen (/toekomst/instellingen) bundelt de
     // wizard-ingang en Voorkeuren (plan-regels + levensstrategieën) op één route; de
     // Gebeurtenissen-sectie staat sinds het addendum van 26 sep 2026 op Plan.
-    { id: 'instellingen', scenarioId: 'UAT-TOEK-59', label: 'WF-TOEK-59 · Katern Instellingen (wizard-ingang · rijen: plan, levensstrategieën, marktaannames)', kind: 'screen', stage: 4, lane: 'voorkeuren' },
+    { id: 'instellingen', scenarioId: 'UAT-TOEK-59', label: 'WF-TOEK-59 · Katern Instellingen (duidingsregel · wizard-ingang · rijen: plan, potten, marktaannames)', kind: 'screen', stage: 4, lane: 'voorkeuren' },
     { id: 'eindstrat', scenarioId: 'UAT-TOEK-24', label: 'WF-TOEK-24 · Plan (stop × eind-vorm) / onttrekkingsstrategie', kind: 'screen', stage: 4, lane: 'voorkeuren' },
     // ADR 0149 — hoofdinstelling naast de rest van de Eindstrategie-kaart; ook
     // als detailregel + vergelijking in de plan-review-stap "Je plan" (WF-TOEK-44).
@@ -153,7 +153,14 @@ export const TOEK_FLOW: UatFlow = {
 
     // Knoop-id `pillenrij` blijft (edges); de pillenrij zelf is sinds ADR 0179 fase 2 weg.
     { id: 'pillenrij', scenarioId: 'UAT-TOEK-41', label: 'WF-TOEK-41 · Geen kaal getal zonder naam (Lagen-menu, drie getallen) & het md-breekpunt van de KPI-strip', kind: 'screen', stage: 2, lane: 'aflezen', subOf: 'grafiek' },
-    { id: 'strategiekaarten', scenarioId: 'UAT-TOEK-42', label: 'WF-TOEK-42 · Vier levensstrategieën in beide weergavemodi', kind: 'screen', stage: 4, lane: 'strategie', subOf: 'strategiebeslis' },
+    { id: 'strategiekaarten', scenarioId: 'UAT-TOEK-42', label: 'WF-TOEK-42 · Vier levensstrategie-rijen in beide weergavemodi', kind: 'screen', stage: 4, lane: 'strategie', subOf: 'strategiebeslis' },
+    // Addendum ADR 0179 (27 sep 2026): de levensstrategieën staan bij de gebeurtenissen op
+    // Plan (kolom naast de grafiek op desktop, op de pagina op mobiel), niet meer in Instellingen.
+    { id: 'levensstrategieen', scenarioId: 'UAT-TOEK-60', label: 'WF-TOEK-60 · Je levensstrategieën op Plan (kolom naast de grafiek, deeplinks)', kind: 'screen', stage: 4, lane: 'strategie' },
+    // De verschilregel in de footer van elke editor spreekt ook zonder vrijheidsleeftijd.
+    { id: 'verschilregel', scenarioId: 'UAT-TOEK-61', label: 'WF-TOEK-61 · Verschilregel zonder vrijheidsleeftijd (haalbaar, tekort, tekort-lening)', kind: 'screen', stage: 4, lane: 'voorkeuren', subOf: 'eindstrat' },
+    // Mobiel: met iets op te slaan staan alle lab-acties in de shell-bar (één plek per actie).
+    { id: 'mobielebar', scenarioId: 'UAT-TOEK-62', label: 'WF-TOEK-62 · Doelen mobiel: alle lab-acties in de shell-bar (extra rij)', kind: 'action', stage: 4, lane: 'doelen', subOf: 'doelen' },
     // Loslaten is een doel-actie, niet een aparte pagina: hij hangt onder de
     // doelen-rail en moet terugleiden naar het opnieuw vastleggen (B-031).
     { id: 'doelloslaten', scenarioId: 'UAT-TOEK-43', label: 'WF-TOEK-43 · Doel loslaten met een weg terug (doelsectie blijft, "Maak dit mijn doel" keert terug)', kind: 'action', stage: 4, lane: 'doelen', subOf: 'doelen' },
@@ -280,6 +287,14 @@ export const TOEK_FLOW: UatFlow = {
     { from: 'doelenmelding', to: 'fire' },
     { from: 'grafiek', to: 'pillenrij' },
     { from: 'strategiebeslis', to: 'strategiekaarten' },
+    { from: 'eventpagina', to: 'levensstrategieen', label: 'Plan #levensstrategieen' },
+    { from: 'deeplinks', to: 'levensstrategieen', label: 'oude ?rij=aow|…, ?strategie=, /toekomst/strategie?focus=' },
+    { from: 'levensstrategieen', to: 'strategiebeslis', label: 'rij → editor' },
+    { from: 'eindstrat', to: 'verschilregel', label: 'footer van elke editor' },
+    { from: 'verschilregel', to: 'fire' },
+    { from: 'labknoppen', to: 'mobielebar', label: 'mobiel, iets op te slaan' },
+    { from: 'mobielebar', to: 'maakplan', label: 'Maak N mijn stopmoment' },
+    { from: 'mobielebar', to: 'doelloslaten', label: 'Doel loslaten' },
     { from: 'pillenrij', to: 'fire' },
     { from: 'strategiekaarten', to: 'fire' },
 
