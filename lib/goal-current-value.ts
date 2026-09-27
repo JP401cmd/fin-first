@@ -444,7 +444,8 @@ export function computeParameterWeightedReturnPct(
 
 /**
  * Laatste bekende `net_worth_snapshots.fire_age` (fractioneel toegestaan). De query
- * levert de meest recente niet-NULL rij vooraan; NUMERIC komt als string terug uit
+ * levert de meest recente niet-NULL EIGEN rij vooraan (`.eq('user_id', …)`, want de
+ * SELECT-policy is huishoud-gedeeld); NUMERIC komt als string terug uit
  * Supabase → expliciet casten. Geen snapshot / niet-positief → `undefined` (tolerant:
  * laat de DB-waarde staan, geen misleidende 0 die "0% rood" zou schreeuwen).
  *
@@ -554,10 +555,16 @@ export async function injectParameterGoalCurrentValues(
           .eq('user_id', userId)
           .then(r => ((r.data ?? []) as ParamAssetRow[]))
       : Promise.resolve([] as ParamAssetRow[]),
-    needsFireAge
+    // EXPLICIETE EIGENAAR-SCOPING. De SELECT-policy op `net_worth_snapshots` is
+    // huishoud-gedeeld en `ownership` is door de gebruiker zelf schrijfbaar; RLS
+    // filtert hier dus NIET op de kijker. Zonder deze regel wint een recentere
+    // gedeelde partnerrij en toont het doel de FIRE-leeftijd van de partner.
+    // Zonder eigen id geen query (fail-closed): de DB-waarde blijft staan.
+    needsFireAge && userId
       ? supabase
           .from('net_worth_snapshots')
           .select('fire_age')
+          .eq('user_id', userId)
           .not('fire_age', 'is', null)
           .order('snapshot_date', { ascending: false })
           .limit(1)
